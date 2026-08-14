@@ -1,0 +1,51 @@
+[{:db/id -1
+  :adr/id "ADR-2608145200"
+  :adr/title "通信面は 8 枚。link は merkle と action の 2 種。Holochain は overlay であって IPLD の置換ではない"
+  :adr/status "accepted"
+  :adr/date "2026-08-14"
+  :adr/last_verified "2026-08-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "protocol-planes-two-link-kinds"
+  :adr/repos ["orgs/kotoba-lang/kotoba-protocol"]
+  :adr/related ["90-docs/adr/2608145100-public-resource-identity-is-cid-and-ipns.edn"
+                "90-docs/adr/2607071500-kotoba-lang-kotoba-protocol-atprotocol-layering.edn"
+                "90-docs/adr/2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane.edn"]
+  :adr/authoritative_for
+  ["kotoba-protocol の planes 表（identity naming routing discovery transport session authorization content-protocol）"
+   "link-kinds :merkle（親 CID が変わる）と :action（親 CID は不変）"
+   "IPNI は discovery 面であって identity ではない"
+   "input-addressed と output-addressed は identity 面の 2 種。片方を選ばない"
+   "Holochain CreateLink は :action。conductor と無順序 DHT は採らない（ADR-2608038000 を維持）"]
+  :source/dataset "adr"
+  :adr/body
+  "公開 identity を CID/IPNS にしたあと（ADR-2608145100）、残る問いは「URL・DNS・HTTP・Git・pkg・RPC を同じ Merkle DAG に落とすか」と「Holochain の後付け link を IPLD の代わりにするか」。どちらも否。面を分け、link を 2 種にする。
+
+## Status
+accepted — 2026-08-14。正本は `kotoba-lang/kotoba-protocol` の `kotoba.protocol.layers`。
+
+## 8 面
+
+L0–L5 はデータの梯子のまま。通信の落とし先は直交する 8 面:
+
+identity / naming / routing / discovery / transport / session / authorization / content-protocol
+
+HTTP URL は transport+location。DNS は naming。Git blob は identity、tree は merkle、ref は naming。RPC call は input-addressed identity、stream は session、許可は authorization。1 CID に畳まない。
+
+## IPNI
+
+CID → provider の索引。discovery。公開 URI に載せない。kad delegated routing がいまの実装。IPNI adapter を足しても identity は `ipfs://{cid}` のまま。
+
+## input vs output
+
+output-addressed = hash(bytes) = 既定の CID。input-addressed = hash(recipe/call/drv)。recipe も bytes なので CID を持つ。nix が両方要る存在証明。片方をプロトコルの正にしない。
+
+## 2 種の link
+
+:merkle — edge は block 内。親を変えると CID が変わる。配布物の closure 検証。
+:action — edge は signed metadata。親 CID 不変。Holochain CreateLink、datom assertion、IPNS（退化形）。
+
+Holochain との相性は :action 側。置き換えないのは :merkle。ランタイムとしての Holochain と無順序書き込み面は ADR-2608038000 のとおり採らない。datom log が CreateLink 相当。L2 graph CID は log の merkle であって、entry の CID ではない。
+
+## 改訂履歴
+
+2026-08-14: accepted。"}]
