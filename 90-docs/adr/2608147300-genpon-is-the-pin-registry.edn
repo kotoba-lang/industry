@@ -1,0 +1,36 @@
+[{:db/id -1
+  :adr/id "ADR-2608147300"
+  :adr/title "genpon（原本）is the spoken name of the pin registry; fleet-db.edn stays the on-disk file"
+  :adr/status "accepted"
+  :adr/date "2026-08-14"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :source/dataset "adr"
+  :adr/related
+  ["ADR-2607160005"
+   "ADR-2608040100"]
+  :adr/repos ["orgs/kotoba-lang/kagami"]
+  :adr/body
+  "ADR-2607160005's pin registry lived next to west.yml as manifest/fleet-db.edn. The projector was renamed kagami（鏡）. The thing being projected still answered to fleet-db, which is the same word as the old CLI, kotoba-fleet/za-actor, murakumo machines, and fleet-ci. Vocabulary already said the registry had the thinnest claim to fleet.
+
+Owner chose genpon（原本）as the spoken name: kagami is the mirror, genpon is the original, west.yml is the copy.
+
+---
+
+## Decision
+
+1. **Speech and index: 原本 (genpon).** Spellings include pin 登録簿, pin registry, and fleet-db as a legacy alias. Lookups of 原本 / genpon / fleet-db must land here. Metaphor-name rule: README 名乗り is kagami's (the owner of this data) plus this ADR plus manifest/concept-vocabulary.edn.
+
+2. **Do not create kotoba-lang/genpon.** The registry lives in the superproject next to its projection. A child repo would split the catalog from west.yml.
+
+3. **Do not collapse into mokuroku, toukibo, daichou, or chobo.** mokuroku is the app-* catalog kernel (Finder/Photos/Music-shaped viewer). toukibo is the Ministry of Justice register vocabulary a commercial-register vertical will need. daichou is agent receipts. chobo is billing EAVT.
+
+4. **On-disk file and keys stay.** manifest/fleet-db.edn, fleet-db.ledger.edn, :fleet/repos, and kagami.p2p graph name \"fleet-db\" remain the format. Same pattern as keeping :fleet/repos when the projector became kagami. A git mv plus --db shim is a later cutover, not this naming.
+
+5. **kagami CLI flags stay --db manifest/fleet-db.edn.** Callers are not updated in this ADR. The filename is legacy; the name of the thing is genpon.
+
+---
+
+## Current state (2026-08-14)
+
+Vocabulary :genpon is registered. kagami README introduces 原本. CLAUDE.md / AGENTS.md / west-pin-advance skill say the spoken name is genpon and keep the path. File rename is not done."}]

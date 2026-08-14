@@ -12,8 +12,9 @@ description: west manifest（manifest/west.yml）の pin を前進させる・re
 
 - `manifest/repos.edn` が**ポリシーの正本**、`manifest/west.yml` は
   `scripts/gen-west-manifest.cljs` の**生成物（手書き禁止）**。
-- `manifest/fleet-db.edn` が west.yml の**上流の正本**（Phase 1.5 dual-write 吸収期）。
-  west.yml はその projection。
+- `manifest/fleet-db.edn` が **原本 (genpon)** — west.yml の上流の正本
+  （Phase 1.5 dual-write 吸収期。ファイル名は legacy、ADR-2608147300）。
+  west.yml はその写し。
 
 ## やりたいことから引く
 
@@ -73,9 +74,10 @@ printf '%s\n' <name> <name> | xargs west update --fetch smart           # ← xa
 
 ## 罠 3 — `kagami sync` の前に `kagami reconcile`
 
-**`kagami sync` を使う前に `kagami reconcile` を通す。** fleet-db は west.yml の
-**上流の正本**だが、west.yml 側の pin 書き込みを fleet-db へ運ぶのは reconcile だけで、
-それを回していた CI は 2026-07-30 に撤去された（ADR-2607300900）。**遅れた fleet-db に
+**`kagami sync` を使う前に `kagami reconcile` を通す。** 原本 (genpon、
+`manifest/fleet-db.edn`) は west.yml の**上流の正本**だが、west.yml 側の pin
+書き込みを原本へ運ぶのは reconcile だけで、
+それを回していた CI は 2026-07-30 に撤去された（ADR-2607300900）。**遅れた原本に
 対して `kagami sync` すると checkout が pin より「後ろ」へ動く。** 実測 2026-08-07:
 reconcile が未実行のまま 24 pin ぶん遅れており、dry-run が既に west pin と一致している
 repo に `:advance` を出した。
