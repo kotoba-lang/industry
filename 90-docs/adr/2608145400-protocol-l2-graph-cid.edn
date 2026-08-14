@@ -1,0 +1,49 @@
+[{:db/id -1
+  :adr/id "ADR-2608145400"
+  :adr/title "action log の L2 CID は chain.core/commit! が付ける。protocol は hash しない"
+  :adr/status "accepted"
+  :adr/date "2026-08-14"
+  :adr/last_verified "2026-08-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "protocol-l2-graph-cid"
+  :adr/repos ["orgs/kotoba-lang/kotoba-protocol" "orgs/kotoba-lang/chain"]
+  :adr/related ["90-docs/adr/2608145300-protocol-graph-algebra.edn"
+                "90-docs/adr/2608145200-protocol-planes-two-link-kinds.edn"
+                "90-docs/adr/2607050800-commit-dag-renamed-chain.edn"]
+  :adr/authoritative_for
+  ["kotoba.protocol.graph/log-state が chain.core/commit! の opaque state"
+   "kotoba.protocol.graph/commit-log が L2 graph CID の継ぎ目"
+   "CreateLink は log を dirty にする。merkle put は dirty にしない"
+   "dirty な log が前の graph CID と同じ値に hash されたら :graph-cid-unchanged"
+   "protocol repo に ipld/chain を依存として足さない"]
+  :source/dataset "adr"
+  :adr/body
+  "ADR-2608145300 の代数は overlay の seq を進めたが、L2 の identity は seq ではない。graph CID は既に `kotoba-lang/chain` が `{state, prev, seq}` を IPLD して付けている。protocol 側で hash を再発明しない。
+
+## Status
+accepted — 2026-08-14。正本は `kotoba.protocol.graph` の `log-state` / `commit-log`。hasher は `chain.core/commit!`。
+
+## 継ぎ目
+
+```
+(commit-log st
+  (fn [prev-cid state]
+    (chain.core/commit! put! get-fn state prev-cid)))
+```
+
+`log-state` は string-key の action 列。L0 node map は入らない。だから merkle put のあと graph CID は動かない。
+
+## 不変条件
+
+1. create-link の直後は `:log-dirty? true` で `:graph-cid` はまだ前の sealed 値（初回は nil）。
+2. commit-log が成功すると dirty が落ち、新しい CID が付く。entry の CID は変わらない。
+3. dirty なのに hasher が prev と同じ CID を返したら `:graph-cid-unchanged`。
+4. dirty でない commit-log は hasher を呼ばない。
+
+## 置かないもの
+
+protocol への chain/ipld 依存。IPNI live adapter（次の候補）。fake CID を protocol が発行すること。
+
+## 改訂履歴
+
+2026-08-14: accepted。"}]
