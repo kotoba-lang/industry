@@ -288,6 +288,17 @@
 ;;   4. **annex repo は status を撮らない**。m365-archive は untracked 15,945 /
 ;;      dirty 122,792 を常時抱えており、`status --porcelain` 自体が極端に重い。
 ;;      annex は untracked/dirty が既定状態なので、そもそも数える必要がない。
+;;
+;; ⚠ **この survey は gitignore された状態を一切見ない。**`status --porcelain` の
+;; 仕事はそれを隠すことなので、dirty / untracked / stash / branch のどれにも
+;; 映らない。したがって「この checkout は何も持っていない」と読める行は、
+;; **追跡対象について**そう言っているだけである。実測 2026-08-13（ADR-2608138400）:
+;; 249 の shadow checkout のうち 4 件が、どの commit にも twin にも無い gitignore
+;; 済みの中身を持っていた（`com-etzhayyim-kawaraban/.kawaraban/` は actor の
+;; Ed25519 identity を 157 バイトで持つ）。この section が下で出す警告
+;; ——「untracked は共有 checkout で `git checkout` が走った瞬間に消える」——は
+;; ignore された中身にもそのまま当たるが、この survey はそれを 1 行も印字しない。
+;; checkout ごと退役させる前に `scripts/shadow-ignored-content-survey.cljs` を通す。
 
 (def ^:private pr-budget
   "phase 2 で許す `gh pr list` の総往復数。超えたら打ち切って件数を報告する。

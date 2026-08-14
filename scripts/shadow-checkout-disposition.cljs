@@ -35,6 +35,21 @@
 ;; same subject reported `kotoba-lang/svgraph` and `com-junkawasaki/svgraph` --
 ;; two genuinely distinct repositories -- as one duplicate.
 ;;
+;; ## ⚠ The verdict below is a GIT-STATUS verdict, and `git status` hides ignored state
+;;
+;; Every "holds nothing unique" judgement in this script comes from `git status`,
+;; `stash list`, `for-each-ref` and `rev-list` -- all of which are silent about
+;; gitignored paths, because hiding them is what gitignore is for. Measured
+;; 2026-08-13 (ADR-2608138400): 4 of the 223 checkouts this script called
+;; :safe-to-retire held gitignored content that exists in no commit and in no
+;; twin, including an actor's Ed25519 identity in 157 bytes.
+;;
+;; **`:shadow/verdict` is therefore an upper bound on safety.** The corrected
+;; three-way ranking lives in the `shadow-ignored` dataset written by
+;; `scripts/shadow-ignored-content-survey.cljs`, which joins this one on
+;; `:shadow/dir` and carries `:shadow/verdict-revised`. Do not retire on this
+;; script's verdict alone.
+;;
 ;; ## Three verdicts, and why the middle one exists
 ;;
 ;;   :safe-to-retire   nothing unique, no linked worktree, not shallow, every
