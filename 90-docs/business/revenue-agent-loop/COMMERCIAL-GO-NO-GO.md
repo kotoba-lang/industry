@@ -67,7 +67,7 @@ ratify 記録は net-kotobase repo 側にあり未検証（下記「Session cons
 | Product | Contracting boundary | Product-specific boundary | Decision |
 |---|---|---|---|
 | cloud-itonami | AWAI/Gftd Japan の収納代行は ADR + 公開 Terms で確定。**登記・税務のみ赤** | terms/privacy/DPA は承認済み・公開済み。ただし 24h で 5xx 28%（有料導線に載せる品質ではない） | **conditional**（red 1 + yellow 3 + 品質。前版 no-go から前進） |
-| net-kotobase | Gftd Japan K.K.（Corporate Number 1011101086505、国内法人）が operator。**外国会社登記の論点は構造的に無い** | **価格は owner 確定（¥2,980/月、2026-08-08）だが未公開。** run 0022 の実測: `terms.md` は**依然 DRAFT**（1 行目に「counsel review required before publication」）かつ製品ドメインに無く GitHub blob リンクのみ（`kotobase.net/legal/terms/` は実 404）。**privacy.md / dpa.md はどちらも 404 = 存在しない**。`/pricing` は live だが**価格が 1 つも書かれていない**（¥表記ゼロ）。`[CONFIRM: …]` が 5 件未解決（最低年齢・価格・請求周期・税・**返金**）。`/api/billing/status` 無し | **no-go** |
+| net-kotobase | Gftd Japan K.K.（Corporate Number 1011101086505、国内法人）が operator。**外国会社登記の論点は構造的に無い** | **価格は owner 確定（¥2,980/月、2026-08-08）だが未公開。** run 0031 (2026-08-14): `/legal/terms/` `/legal/privacy/` `/legal/dpa` は live 200。本文は in-repo drafts で、**依然 DRAFT / UNAPPROVED TEMPLATE**（counsel 承認ではない。DPA は offered/executed ではない）。`noindex`、sitemap 非掲載、`[CONFIRM:` マーカー残。commercial go は動かない。`/pricing` と Stripe 照合はこの run では再実測していない | **no-go** |
 | club-shinshi | operator・決済条件の確定が必要 | adult specialist review、age assurance、refund/tax/payoutが赤 | **no-go**（SPA のため legal surface は HTTP で再実測不能 — run 0022） |
 | net-babiniku | PSP/crypto railの契約証跡なし | monetization proposal自体がhard hold | **no-go**（未再実測） |
 
@@ -76,10 +76,11 @@ ratify 記録は net-kotobase repo 側にあり未検証（下記「Session cons
 **前版の推奨（net-kotobase Standard）を撤回する。** 当時 net-kotobase を選んだ理由は
 「AWAI の法人間・外国会社論点を持たない」ことで、**それ自体は今も正しい**（operator は
 国内法人 Gftd Japan K.K.）。しかし 2026-08-08 に実測したところ（run 0022）、net-kotobase は
-**Terms が依然 DRAFT で、privacy と DPA は存在せず、価格も未公開**だった。cloud-itonami の
-red 1 件を回避する代わりに、「公開前に counsel review が要る」と自ら宣言している DRAFT と、
-ゼロから書く privacy・DPA を引き受けることになる。**両方とも counsel は要る。文書が
-完成・公開済みなのは cloud-itonami だけ。**
+**Terms が依然 DRAFT で、privacy と DPA は製品ドメインに無く、価格も未公開**だった。
+run 0031 (2026-08-14) で drafts は `/legal/*` に載ったが、バナーは DRAFT / UNAPPROVED
+のままなので counsel 前の公開版ではない。cloud-itonami の red 1 件を回避する代わりに、
+counsel 未了の DRAFT を販売面に出すことになる。**両方とも counsel は要る。owner 承認済みの
+公開版があるのは cloud-itonami だけ。**
 
 現行の最小経路は **cloud-itonami**。残りは 2 red/yellow + 1 需要である。
 
