@@ -44,9 +44,14 @@
 ;; 22 のまま（Hyakka -1 / cost guard +1）。cost guard を推測で root 所有にせず、
 ;; 正式な所有 repo の宣言待ちとして名指しする。
 
-{:undeclared 22
- :measured-at "2026-08-14"
+;; 2026-08-15: `cloud.itonami.noren.resident` の所有宣言を
+;; cloud-itonami/loop-noren に着地。実機の LaunchAgent、credential-bearing
+;; operator 配置、日次 cadence と Git/B2 custody が repo 側の宣言に一致したため
+;; baseline を 22 → 21 に ratchet する。
+
+{:undeclared 21
+ :measured-at "2026-08-15"
  :host :operator-laptop
- :note "この数は下げるためにある。2026-08-14 は Hyakka 宣言 -1 と未宣言 cost guard +1 で 22 のまま。"
+ :note "この数は下げるためにある。2026-08-15 は loop-noren の所有宣言で 22 から 21 へ ratchet。"
  :pending-declaration ["com.gftd.identity-probe → orgs/cloud-itonami/cloud-itonami-isic-6311-identity"
                        "com.gftd.cloudflare-cost-guard → owner repo 未特定"]}
