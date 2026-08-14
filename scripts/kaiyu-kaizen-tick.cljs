@@ -94,6 +94,24 @@
     ;; 2026-08-08, the day its own measurement landed. Earlier windows report
     ;; :not-measured rather than :blocked, which is the honest reading.
     :live-since "2026-08-08"
+    ;; Declared for the same reason as kotobase.net above, and read off the same
+    ;; evidence: `cloud-itonami.edge.self-kaiyu/report` returns
+    ;; `:dwell (kaiyu/section win [] nil)` as a literal constant, and its ns
+    ;; docstring names the absence — 「**Dwell is not measured**, and
+    ;; `kaiyu.core/section` reports it `:not-measured` rather than as an empty
+    ;; distribution」. It is a multi-page site measured server-side from the
+    ;; `Referer`, deliberately with 「no client script and no cookie」, so there
+    ;; is no beacon that could be broken.
+    ;;
+    ;; Without this the window ending 2026-08-14 — the first whose `from`
+    ;; reached `:live-since` — asked a three-way question (beacon dead? read
+    ;; broken? nobody came?) whose three answers are all wrong, so nobody could
+    ;; close it, while the `:blocked` short-circuit hid every site rule for the
+    ;; site the loop files INTO. The acquisition finding it masked was top in
+    ;; all four recorded rounds before it stopped being evaluated. This is the
+    ;; kotobase.net case of 2026-08-13 recurring one site later; the comment
+    ;; above predicted it and the declaration was simply never carried across.
+    :uninstrumented #{:dwell}
     :shape :kotobase}])
 
 (defn- keychain
