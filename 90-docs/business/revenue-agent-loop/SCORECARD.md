@@ -43,20 +43,24 @@ cloud-itonami 行が引いていた「Terms/PrivacyはDRAFT、operator・DPAが�
 
 ## Current selection
 
-- **Selected:** net-kotobase — AI agent / GraphRAG durable-memory セグメントの
-  named accounts。有料勧誘はしない。30分の課題ヒアリング + 14日無償 alpha のみ
-- **Run:** `runs/0025-net-kotobase-named-accounts-discovery.edn`
-- **Timebox:** 14日または20人時
-- **Cash at risk:** ¥0。広告費は¥0
-- **Offer hypothesis:** DESIGN-PARTNER-OFFER の first message（販売ではない）
-- **T1 evidence gate:** 100 named accounts が目標。本 run は検証済み公開経路 10 件
-- **Score:** 56/100（discovery のみ。paid pitch は red のまま）
-- **Operator:** Gftd Japan K.K.
-- **Next:** Beekle 公式フォーム（https://beekle.jp/contact、種別=開発パートナー・協業）を
-  人間の Chrome で 1 通送信。Turnstile が自動化 Chrome では描画されず未送信。
-  返信 0 のまま 100 件に拡げない。Laboro/Enison は Beekle 送信成功後に限る。
-  2026-08-14 session close: PR #2170 で run 0025 一式は main 着地済み。
-  Automations の next-form reminder はエディタに載せた。Gmail 未接続。
+- **Selected (this session):** GLEIF joined-tier listing — correct Base custody
+  note after 2026-08-14 RPC remeasure. Paid fulfill is blocked (funds floor +
+  no solicitation). Catalog stays off.
+- **Run:** `runs/0035-gleif-base-safe-custody-remeasure.edn`
+- **Score:** 57/100 after custody remeasure (was 53). Code is not a payment.
+- **Cash at risk:** ¥0
+- **Queued:** net-kotobase named-accounts discovery. Beekle form
+  (https://beekle.jp/contact) still needs human Chrome (Turnstile). Run 0025
+  PR #2170 is on main. Do not expand to 100 contacts on 0 replies.
+
+## Session note — 2026-08-14 (GLEIF)
+
+run 0034 shipped the listing (402/404 live). Named next was a non-owner paid
+read then nexus catalog. That action is **blocked**: the agent must not send
+USDC, and counsel written-advice still forbids solicitation. Self-purchase
+does not count. Selected instead: remeasure family payTo on Base. A Safe
+proxy is deployed (threshold 1). Listing copy that said "no contract on Base"
+is superseded. Facilitator junk settle → 402, not 500. Catalog still off.
 
 ## Known evidence
 
@@ -90,7 +94,7 @@ cloud-itonami 行が引いていた「Terms/PrivacyはDRAFT、operator・DPAが�
 次回は推定値より、chat activation、checkout start、wallet initiation、
 qualified reply、実入金を優先して更新する。
 
-## Session note — 2026-08-14
+## Session note — 2026-08-14 (net-kotobase)
 
 run 0031 served the in-repo DRAFT legal pages from `net-kotobase/control-plane`
 (not `network-awai/net-kotobase`). run 0032 filled owner decisions and measured

@@ -6,7 +6,7 @@
   :adr/decided "2026-08-14"
   :adr/deciders ["Jun Kawasaki (オーナー指示「では設計実装」— paid listing analog of Google Datasource over existing GLEIF projections)"]
   :adr/tags ["gleif" "x402" "listing" "revenue" "joined-tier"]
-  :adr/links ["adr-2608012000" "adr-2608071000" "adr-2607246100"]
+  :adr/links ["adr-2608012000" "adr-2608071000" "adr-2607246100" "adr-2607300100"]
   :adr/repos ["orgs/com-junkawasaki/org-gleif-projections"]
   :source/dataset "adr"
   :adr/body
@@ -26,7 +26,7 @@ Collection of worldwide LEI data already exists (gleif-cell on judah, committed 
 
 5. **Do not register on x402.nexus until a live 402 and a fulfilled paid read are both observed.** Catalog advertising `resources: []` or an unfulfillable path is the 2026-07-29/31 murakumo failure. `/.well-known/x402` distinguishes unconfigured from empty-on-purpose via `offer-status`.
 
-6. **Treasury is the family payTo** `0xA00366234D29d4F882088048c0B2fa0dB7302D4E`. It is a Safe on Ethereum mainnet and, as of 2026-07-29, has no contract on Base. This listing reuses that rail and states the custody gap; it does not invent a second treasury.
+6. **Treasury is the family payTo** `0xA00366234D29d4F882088048c0B2fa0dB7302D4E` (etzhayyim junbi Safe). A 2026-07-29 check found no contract on Base. Remeasured 2026-08-14: Base `eth_getCode` returns a Safe proxy, storage slot 0 (masterCopy) is `0x29fcb43b46531bca003ddc8fcb67ffe91900c762`, `getThreshold` is 1. Ethereum mainnet remains 2-of-3 (ADR-2607300100). The listing reuses that rail and states the measured custody; it does not invent a second treasury. The 2026-07-29 empty-Base sentence is superseded (run 0035).
 
 7. **No paid solicitation.** cloud-itonami counsel written-advice gate still blocks outreach. Shipping a listing that answers 402 is allowed; pitching buyers is not.
 
