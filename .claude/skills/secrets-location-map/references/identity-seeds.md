@@ -160,3 +160,14 @@
   `:zero-ex-v2` adapter が `:verified? false` のままなのはこれが理由 — キーを取得したら
   `swap/bin/verify_live.cljs` を実行して live 検証し、フラグを立てる。LI.FI 側は
   キー不要で live 検証済み。
+
+## cloud-itonami-app IPNS latest (2026-08-14)
+
+- **`cloud-itonami-app-latest`（kagi vault、compartment `personal`、
+  `KAGI_HOME=$HOME/.kagi`）** — desktop app の `:kotoba.app/latest` 更新チャネル用
+  Ed25519 seed（64 hex）。**艦隊共有 `itonami-fleet-kotobase-seed` ではない**
+  （graph join 用の 1 本と、この app の latest 名は別の authority）。
+  公開 IPNS 名は
+  `k51qzi5uqu5dj6z20sjzztyay81591voe6yofukl0ylsmug9euf934z1g04erd`。
+  取得: `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get cloud-itonami-app-latest`。
+  env は `CLOUD_ITONAMI_APP_IPNS_SEED`。値は git に置かない。
