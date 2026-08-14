@@ -158,6 +158,46 @@
                                "remote" "get-url" "origin")]
     (when (zero? exit) (not-empty (str/trim out)))))
 
+(defn canonical-slug
+  "GitHub の改名リダイレクトを辿った owner/name。引けなければ nil。
+
+  `git remote get-url` が返すのは **改名される前の名前**でありうる（GitHub は
+  リダイレクトするので fetch は成功し続け、ローカルは古い名前のままになる）。
+  full_name は改名後の実体を返すので、これが唯一の権威ある信号。"
+  [origin-url]
+  (when-let [slug (some-> (re-find #"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?$" origin-url) second)]
+    (let [{:keys [exit out]} (sh "gh" "api" (str "repos/" slug) "--jq" ".full_name")]
+      (when (zero? exit) (not-empty (str/trim out))))))
+
+(defn reclassify-renamed
+  "`:true-orphan-git` のうち、remote が **west に登録済みの repo へリダイレクトする**
+  ものを `:renamed-upstream` へ移す。
+
+  なぜ必要か（実測 2026-08-14）: `:registered-elsewhere` は HEAD が後継の pin と
+  完全一致することを要求するので、旧 path の checkout が少しでも drift すると
+  捕まらない。その結果 true-orphan-git 40 件が**全て**改名残骸だったのに
+  「register or retire」として報告されていた。これは危険な誤報である —— 読んだ
+  agent が旧 path を登録し直す（規約違反）か、退役させる（実害）ことになる。
+  実際 40 件のうち 3 件（com-etzhayyim-{rasen,inochi,masago}）は observatory
+  レジストリが名指しする**稼働中の checkout** で、rasen の 38KB のゲノム台帳は
+  後継 path に存在しない（twin=absent）。
+
+  判定は 1 候補 1 往復。true-orphan-git は小さい集合なので許容できる。
+  引けなかったものは true-orphan-git に**残す**（『確かめられなかった』を
+  『改名ではない』に潰さない。ADR-2608136000）。"
+  [acc west]
+  (let [{:keys [renamed orphan]}
+        (reduce (fn [m {:keys [path origin] :as row}]
+                  (let [canon (when (seq origin) (canonical-slug origin))
+                        canon-path (when canon (str "orgs/" canon))]
+                    (if (and canon-path (contains? west canon-path))
+                      (update m :renamed conj (assoc row :redirects-to canon
+                                                     :registered-at canon-path))
+                      (update m :orphan conj row))))
+                {:renamed [] :orphan []}
+                (:true-orphan-git acc))]
+    (assoc acc :true-orphan-git orphan :renamed-upstream renamed)))
+
 (defn tracked-in-superproject?
   "superproject の index に <rel> 配下の tracked file があるか。
 
@@ -346,6 +386,8 @@
     (println (str "  registered-elsewhere (HEAD == another path's pin): "
                   (count (:registered-elsewhere unregistered))
                   "  (旧 path 残骸。orphan ではない)"))
+    (println (str "  renamed-upstream: " (count (:renamed-upstream unregistered))
+                  "  (remote が west 登録済み repo へリダイレクト = 改名残骸。**登録し直さない**)"))
     (println (str "  true-orphan-git: " (count (:true-orphan-git unregistered))))
     (println (str "  true-orphan-nongit: " (count (:true-orphan-nongit unregistered))))
     (println (str "  local-root-broken (blocking): " (count local-root-broken)))
@@ -363,6 +405,11 @@
     (when (and (not (:blocking? opts)) (or (:all? opts) true))
       (println)
       (println "## true-orphan-git (register or retire)")
+      (println "   ⚠ origin=(none) の行は **改名残骸かどうか判定できていない**（リダイレクトを引く")
+      (println "     remote が無い）。『true orphan』は『後継を探して見つからなかった』ではなく")
+      (println "     『探せなかった』の意味なので、登録も退役もする前に west.yml を名前で引くこと。")
+      (println "     実測 2026-08-14: これらの一部は observatory レジストリが名指しする稼働中の")
+      (println "     checkout で、その観測台帳は後継 path に存在しない（消すと復元できない）。")
       (let [rows (:true-orphan-git unregistered)
             show (if (:all? opts) rows (take 25 rows))]
         (doseq [row show]
@@ -402,7 +449,8 @@
         west (west-paths)
         overrides (path-overrides)
         local (local-org-projects)
-        unreg (classify-unregistered local west overrides (west-rev->path))
+        unreg (-> (classify-unregistered local west overrides (west-rev->path))
+                  (reclassify-renamed west))
         broken (scan-local-root-deps west)
         report {:counts {:local (count local)
                          :west (count west)
