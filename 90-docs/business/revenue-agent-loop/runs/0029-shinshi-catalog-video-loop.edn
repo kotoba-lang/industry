@@ -1,0 +1,107 @@
+[{:db/id -1
+  :doc/id "revenue-agent-loop-run-0029-shinshi-catalog-video-loop"
+  :doc/doc_type "revenue-agent-loop-run"
+  :doc/title "Run 0029 — arm per-character catalog i2v + quality loop"
+  :doc/path "90-docs/business/revenue-agent-loop/runs/0029-shinshi-catalog-video-loop.edn"
+  :doc/run_number 29
+  :doc/status "running"
+  :doc/date "2026-08-14"
+  :doc/source "revenue-agent-loop RUN-TEMPLATE (ADR-2607246100)"
+  :doc/body "# Run 0029 — arm per-character catalog i2v + quality loop
+
+**Status:** running — watcher armed
+**Started:** 2026-08-14
+**Owner:** agent, under owner direction（character ごとに動画を生成する、また品質を評価する loop を）
+**Mode:** cash-first
+**Prior context:** two Cafe Corner clips already live (akari-hoshino-cafe, aoi-amano-cafe) via gad Wan i2v, not billed murakumo generation. Next evidence is more original-series catalog clips that pass a fail-closed quality gate. Not revenue.
+
+## Hypothesis
+
+If a 30-minute loop picks the next original-series actress with scenes and 0 videos, generates one Wan2.2 ti2v 5B clip on gad, scores it deterministically (luma / bytes / geometry / MAE), and publishes only on pass, then the catalog fills without black-frame posts and without murakumo spend.
+
+## Capital governor
+
+| Field | Value/evidence |
+|---|---|
+| Current tranche | T1 |
+| Released / committed / spent | unknown / ¥0 / ¥0 |
+| This run cash-at-risk ceiling | ¥0 (own-fleet ComfyUI; no murakumo credits) |
+| Paid acquisition allowed? | no |
+
+## Score before
+
+Catalog fill is dogfood. Does not create external demand.
+
+| Axis | 0–5 | Reason |
+|---|---:|---|
+| P(payment ≤30d) | 1 | no new checkout; adult catalog only |
+| Speed to evidence | 4 | one clip ~3 min once GPU is free |
+| Existing external demand | 1 | no measured external paid video |
+| Payment readiness | 2 | site live; this path is catalog not billed gen |
+| 12m expected gross profit | 1 | catalog is not the paid SKU |
+| Repeat likelihood | 2 | 1,000 original actresses could repeat |
+| Gross margin | 3 | own GPU, no murakumo invoice |
+| Learning value | 4 | quality gate both directions; next slug is evidence |
+| Spillover | 2 | same drain path as existing two clips |
+| Evidence confidence | 3 | two live clips measured; loop not yet green on a third |
+
+**Total:** 44/100. Arming the loop is not a funnel move.
+
+## Hard gates
+
+- Do not spend murakumo generation / Stripe credits.
+- Do not publish black / unanswered / tiny clips.
+- Original series only. No IP without owner `--allow-ip`.
+- Do not leave MiniMax-H3 stopped.
+- Do not treat D1/Comfy unanswered as an empty catalog.
+- Do not raise cash score on dogfood posts.
+- Adult 18+ synthetic characters only.
+
+**Gate:** yellow — catalog dogfood allowed. External paid video remains unproven.
+
+## One selected action
+
+Arm one 30-minute generate+quality loop (launchd `com.gftd.shinshi-catalog-video` + Cursor session loop). WIP=1 character. Model wakes only on yellow or non-black fail.
+
+## Result
+
+**Person-hours:** ~1.0
+**External evidence:** none (dogfood). First live generate after arming is recorded in `~/.gftd/shinshi-catalog-video/loop.ledger.edn`.
+
+Artifacts:
+
+- `scripts/shinshi-catalog-video-quality.cljs` — fail-closed score; empty mp4 fail; known-good pass
+- `scripts/shinshi-catalog-video-tick.cljs` — next original-series gap + gad GPU
+- `scripts/shinshi-catalog-video-loop.cljs` — generate 1 / score / publish on pass / restore H3
+- `scripts/shinshi-wan-i2v-once.py` — gad ComfyUI one-shot
+- `scripts/com.gftd.shinshi-catalog-video.plist` — StartInterval 1800
+- `.claude/skills/shinshi-catalog-video/SKILL.md`
+- live ledgers: `~/.gftd/shinshi-catalog-video/` (not git)
+
+| Funnel stage | Before | After | Delta |
+|---|---:|---:|---:|
+| Qualified visitors/leads | 0 external video buyers | 0 | 0 |
+| Core activation | 2 original catalog clips | same until first loop publish | 0 |
+| Checkout/wallet initiated | 0 | 0 | 0 |
+| Verified external payments | 0 | 0 | 0 |
+| Revenue / gross profit | 0 | 0 | 0 |
+| Repeat/retained | 0 | 0 | 0 |
+
+Score not raised: catalog posts are not external payments.
+
+## Score after
+
+Same as before. **Total:** 44/100
+
+## Decision
+
+`continue`
+
+Keep the 30m loop until Cafe Corner (and then other original series in the LIMIT 80 window) have ≥1 passing clip each, or gad/Comfy is unanswered for a measured interval. Next single action after a pass publish: do not start a second character in the same run. Stop if black-frame rate stays high after three consecutive fails.
+
+**Tranche verdict:** `hold`
+
+Success: ≥1 additional original-series clip live that the quality gate passed.
+Continue: loop live, gaps remain.
+Stop: unanswered GPU/D1 for a working day, or owner redirects WIP.
+"}]
