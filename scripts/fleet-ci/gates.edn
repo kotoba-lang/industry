@@ -753,6 +753,45 @@
    :script-args ["--min" "150"]
    :include-ext [".kotoba" ".mjs" ".cljc" ".edn"] :min-files 1500 :cd false}
 
+  ;; ── 70-tools/bmc の決定核 3 本（ADR-2608158000 / -2608159300 / -2608160500）──
+  ;;
+  ;; いずれも上の fabric-actor-core と同型: 正本は `70-tools/bmc/kotoba/*_core.kotoba`
+  ;; （`kotoba/pure`、capability 0）、参照は `70-tools/bmc/src/gftd/*.cljc` **そのもの**
+  ;; （2 つ目の名前空間を作らない）、gate が digest・purity・完全一致・evidence floor を見る。
+  ;; 算術は整数 basis point（10000 = 1.0）なので **ε 無しの完全一致**で書ける。
+  ;;
+  ;; **:include-ext に `.cljs` が要る**（3 本とも。実測 2026-08-15）。参照実装が
+  ;; `gftd.canvas` を経由して `scripts.nbb-compat` を require するので、
+  ;; `scripts/nbb_compat.cljs` が配られないと gate は `Could not find namespace` で
+  ;; **赤**になる —— 沈黙ではなく赤なので「実行できないとき pass を返さない」側だが、
+  ;; 原因を取り違えないようここに書いておく。fabric-actor-core が `.cljs` 無しで
+  ;; 足りるのは、あれの参照が canvas を通らないからで、規則の違いではない。
+  ;;
+  ;; **3 本とも「落ちること」を確認済み**（無改変で exit 0 / それぞれ 390・467・1740 cases）。
+  ;; 詳細は各 ADR。score 側の 3 番目の実演で分かった一般的な教訓だけここに残す:
+  ;; **総数の床は、1 つの case 表だけが空になったのを捕まえられない**（他の表が
+  ;; 総数を支えるので緑のまま通った）。score gate には種別ごとの床と
+  ;; 「rubric が名指しする綴りを全部踏む」検査を足してある。
+  ;;
+  ;; ⚠ 2026-08-15 の登録時点で、この 3 本は **fleet ノードで 1 度も走っていない**。
+  ;; 「gate は fleet で 1 度緑になるまで landed としない」に照らすと未達で、
+  ;; 最初の receipt を確認するまでは landed 扱いにしないこと。
+  {:name "root" :id "root-score-core" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/score-core-check.cljs"
+   :script-args ["--min" "350"]
+   :include-ext [".kotoba" ".mjs" ".cljc" ".cljs" ".edn"] :min-files 1500 :cd false}
+  {:name "root" :id "root-gate-core" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/gate-core-check.cljs"
+   :script-args ["--min" "400"]
+   :include-ext [".kotoba" ".mjs" ".cljc" ".cljs" ".edn"] :min-files 2000 :cd false}
+  {:name "root" :id "root-funnel-core" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/funnel-core-check.cljs"
+   :script-args ["--min" "1700"]
+   :include-ext [".kotoba" ".mjs" ".cljc" ".cljs" ".edn"] :min-files 2000 :cd false}
+
   ;; kotobase-shard-index（ADR-2608071500）。client が object store から直接
   ;; 読む検索索引。2 つを守る:
   ;;
