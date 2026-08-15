@@ -132,4 +132,20 @@ deploy 直後の reset は height を 0 にしたが view は 8799 のままだ�
   静かに戻せてはいけない。コスト回帰は数週間後に請求書として届く。
 - code-version 148 が live であることを `/head` で確認してから信じること。
 
-kotoba-lang/torihiki-node f6e1eaa4。west pin 前進済み。"}]
+kotoba-lang/torihiki-node f6e1eaa4。west pin 前進済み。
+
+## closing 時点の実測（2026-08-15）
+
+    cv149  h 5626  committed 5624  view 5705  v-h 79  equivocators []
+
+**equivocation 修正前に止まった 4,843 を越えて走っている。** equivocators は
+空のまま。v-h 79 は上の「leadership が 2 つの時計」の症状で、進みを遅くするが
+止めてはいない。
+
+`/reset` は ADMIN_TOKEN を要る（rotate 済み、値は session scratchpad）。
+再開の 1 手目:
+
+    curl -sS \"$B/head?w=w1\" | python3 -m json.tool | grep -E 'view|height|leader'
+
+で `leader-of-next`(高さ由来) と `propose-refusal.leads-that-round`(view 由来)
+が一致しているかを見ること。ずれていれば、それが次の 1 件。"}]

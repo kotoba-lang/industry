@@ -73,7 +73,8 @@ kotoba-lang/inga 7fb9f43。west pin 前進済み。
 
 ## まだ解けていないこと
 
-torihiki の devnet validator は 410 Gone のまま（`torihiki-engi-devnet-1`、
-コスト増幅を止めるために retire）。この修正は在庫の合意層バグを 1 つ潰した
-だけで、chain を立て直してはいない。ADR-2800004800 の残務（w2 の equivocation
+~~torihiki の devnet validator は 410 Gone のまま~~ **2026-08-15 に復活した**
+（ADR-2608150300）。この修正は在庫の合意層バグを 1 つ潰しただけで、それ自体は
+chain を立て直していない —— 立て直しは別作業で、そこで**2 つ目の合意層バグ**
+（equivocation を view でなく height で判定していた）が見つかっている。ADR-2800004800 の残務（w2 の equivocation
 証拠の失効規則、validator 7 台化）も未着手。"}]
