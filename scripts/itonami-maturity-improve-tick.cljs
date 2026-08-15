@@ -262,6 +262,37 @@
          (take 4)
          vec)))
 
+(defn- unseen-content
+  "Content this repository has that the axis it is about to be sent to cannot see.
+
+   `scan` emits :uncounted/* as report-only fields and no :maturity/* axis reads
+   them (ADR-2608052000). They matter HERE because a 0bp axis has two causes that
+   look identical in the ranking -- the repository has nothing, or the instrument
+   is looking in the wrong place -- and sending an agent to the second is asking it
+   to add what is already there.
+
+   Returns a seq of one-line strings, or nil when there is nothing to say."
+  [e]
+  (seq
+   (keep identity
+         [(when (and (zero? (or (:maturity/axis-test e) 0))
+                     (pos? (or (:uncounted/test-file-count e) 0)))
+            (str "axis-test は 0bp だが test が " (:uncounted/test-file-count e)
+                 " ファイル・" (:uncounted/test-bytes e 0) " バイト在る"
+                 "（トップレベル test/ の外なので数えられていない）"))
+          (when (and (zero? (or (:maturity/axis-substrate e) 0))
+                     (pos? (or (:uncounted/src-file-count e) 0)))
+            (str "axis-substrate は 0bp だが src が " (:uncounted/src-file-count e)
+                 " ファイル・" (:uncounted/src-bytes e 0) " バイト在る"
+                 "（入れ子の src/ なので数えられていない）"))
+          (when (and (zero? (or (:maturity/axis-ingest e) 0))
+                     (>= (or (:uncounted/url-count e) 0) 5))
+            (str "axis-ingest は 0bp だが計数外のファイルに URL が "
+                 (:uncounted/url-count e) " 件在る"))
+          (when (pos? (or (:uncounted/readme-file-count e) 0))
+            (str "README が .md ではないので docs の README 成分は 0"
+                 "（README.edn 等が " (:uncounted/readme-file-count e) " 件）"))])))
+
 (defn- row [e]
   {:repo (:repo/path e)
    :kind (:repo/kind e)
@@ -270,6 +301,7 @@
    :effective (:maturity/effective e)
    :fleet-gain (:leverage/fleet-gain e)
    :band (:leverage/band e)
+   :unseen (unseen-content e)
    :weakest (weakest-axes e)})
 
 ;; ── lane（substrate か breadth か）───────────────────────────────────────────
@@ -571,7 +603,12 @@
                                             (js/Math.round (:value %)) "bp"
                                             " → +" (:headroom-bp %) "bp"
                                             (when-not (:targetable? %) "（狙わない）"))
-                                      (:weakest r))))))
+                                      (:weakest r)))))
+      ;; **0bp には 2 つの原因があり、順位表では同じ顔をしている。**
+      ;; 「何も無い」と「計器が別の場所を見ている」を区別しないと、既に在るものを
+      ;; 足しに行く周になる。
+      (doseq [u (:unseen r)]
+        (log! (str "      ⚠ " u))))
     (when flat?
       (log! "⚠ この lane の leverage は平坦（上位 5 本の差 < 0.5）。順位は弱い信号なので、"
             "順位より『弱い軸を 1 つ確実に埋める』を優先する"))
