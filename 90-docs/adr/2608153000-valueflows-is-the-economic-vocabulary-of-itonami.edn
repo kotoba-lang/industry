@@ -330,10 +330,29 @@ value equation が向いている方向は ENGI の Commons issuance が既に�
 
 | 状態 | 件数 | 意味 |
 |---|---|---|
-| `classified` | **497** | UN ISIC Rev.4 の class に解決 → `vf:ProcessSpecification` |
-| `classification-unresolvable` | 46 | コードはあるが Rev.4 表（428 class）に無い（多くは Rev.5 専用） |
+| `classified` | **459** | 宣言された revision の class に解決（Rev.5 337 / Rev.4 122） |
+| `classification-unresolvable` | 84 | どちらの表にも無い（Rev.4 428 / Rev.5 463） |
 | `occupation-only` | 340 | ISCO は職業の分類で、産業の活動ではない |
 | `unclassified` | 515 | ISIC も ISCO も宣言していない |
+
+⚠ **この数は初版（497）より小さいが、初版は間違っていた。** 初版は Rev.5 宣言の
+コードを **Rev.4 表**に当てていた。実測: **両表に在るコード 361 のうち 83 は意味が
+違う** —— `1104` は Rev.4 で「清涼飲料・ミネラルウォーター」、**Rev.5 で「麦芽製造」**。
+**Rev.5 宣言 393 件のうち 121 件**が Rev.4 側の異なる名称（または Rev.5 に無いもの）を
+取っており、初版は最大 121 の business に**誤った産業名**を付けていた。
+**数が減ったのが改善である。**
+
+そこで `org-un-isic` に **公式 ISIC Rev.5（CSV、463 class、sha256 pin）** を追加し、
+binder は**宣言された revision で解決する**（bare `:isic` は Rev.4→Rev.5 の順で試し、
+どちらが答えたかを `:vf.spec/resolved-against` に記録 —— revision を推測して黙ると
+誤った title が権威ありげに残る）。⚠ **Rev.4↔Rev.5 の correspondence table は UN の
+landing page から辿れない**（推測した 2 URL は 404）ので、**横断 mapping はしない**。
+
+**`includes` から ResourceSpecification は導出しない** —— 前版の「次に効くこと」で
+挙げたが撤回した。`includes` は散文で、そこから資源仕様を抜くのは**導出に見せた発明**。
+代わりに UN の enumeration を**逐語で添付**する（`:vf.spec/includes`、122 件 = Rev.4 で
+解決した分だけ。Rev.5 の explanatory notes は PDF/XLSX のみで機械可読な `includes` が
+存在しない —— UN の公開形態の性質で、mirror の穴ではない）。
 
 **何を導出し、何を拒否したか。** blueprint に**経済的内容は無い** ——
 1,398 件全部を測った上での事実で、資源・価格・数量・flow を 1 つも持たず、

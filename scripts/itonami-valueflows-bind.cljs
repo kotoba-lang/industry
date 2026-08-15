@@ -84,12 +84,14 @@
     (when-not (exists? west) (die 2 (str "CANNOT ANSWER: " west " is absent.")))
     (into #{} (map second) (re-seq #"path: orgs/cloud-itonami/(\S+)" (slurp* west)))))
 
-(defn- isic-table
-  "code -> {:name :group}. UN ISIC Rev.4, public domain."
+(defn- isic-rev4
+  "code -> {:name :group :includes [...]}. UN ISIC Rev.4, public domain.
+   Rev.4's per-class JSON carries `includes` — the activities the UN itself
+   lists for the class."
   [root]
   (let [dir (path/join root "orgs" "cloud-itonami" "org-un-isic" "data" "classes")]
     (when-not (exists? dir)
-      (die 2 (str "CANNOT ANSWER: the ISIC class data is absent at " dir
+      (die 2 (str "CANNOT ANSWER: the ISIC Rev.4 class data is absent at " dir
                   ". Without it no business can be classified, and emitting"
                   " every business as :unclassified would blame the businesses"
                   " for a missing input.")))
@@ -97,8 +99,27 @@
           (keep (fn [f]
                   (when (str/ends-with? f ".json")
                     (let [j (js->clj (js/JSON.parse (slurp* (path/join dir f))))]
-                      [(get j "code") {:name (get j "nameEn") :group (get j "group")}]))))
+                      [(get j "code") {:name (get j "nameEn") :group (get j "group")
+                                       :includes (vec (get j "includes"))}]))))
           (js->clj (fs/readdirSync dir)))))
+
+(defn- isic-rev5
+  "code -> {:name :group}. UN ISIC Rev.5, public domain.
+
+   NO `includes`: the Rev.5 explanatory notes are published only as PDF and
+   XLSX, so the structure CSV carries code and title alone. That is a property
+   of what the UN publishes, not a gap — see org-un-isic data/rev5/upstream.edn."
+  [root]
+  (let [f (path/join root "orgs" "cloud-itonami" "org-un-isic" "data" "rev5" "classes.json")]
+    (when-not (exists? f)
+      (die 2 (str "CANNOT ANSWER: the ISIC Rev.5 class data is absent at " f
+                  ". Most blueprints declare Rev.5, and resolving them against"
+                  " the Rev.4 table instead would be wrong in principle and"
+                  " would silently attach a Rev.4 title to a Rev.5 code — 83 of"
+                  " the 361 codes in both tables mean different things.")))
+    (into {}
+          (map (fn [[code j]] [code {:name (get j "nameEn") :group (get j "group")}]))
+          (js->clj (js/JSON.parse (slurp* f))))))
 
 (defn- blueprint-field [text k]
   (when-let [m (re-find (re-pattern (str ":itonami\\.blueprint/" k "\\s+\"([^\"]+)\"")) text)]
@@ -125,14 +146,33 @@
 
 ;; ── one business ──────────────────────────────────────────────────────────
 
-(defn- bind-one [isic dir-name dir text]
-  (let [rev5 (blueprint-field text "isic-rev5")
-        rev4 (blueprint-field text "isic-rev4")
+(defn- resolve-code
+  "Resolve against the revision the blueprint DECLARED. A bare :isic is tried
+   Rev.4 first then Rev.5, and which one answered is recorded — guessing a
+   revision and not saying so is how a wrong title ends up looking authoritative.
+
+   Measured 2026-08-15: 361 codes exist in both tables and 83 of them mean
+   different things (1104 is soft drinks in Rev.4 and malt in Rev.5). Resolving
+   across revisions mislabelled 121 of 393 Rev.5-declared businesses.
+
+   => {:hit {...} :revision \"isic-rev5\"} | nil"
+  [rev4 rev5 code declared-as]
+  (case declared-as
+    "isic-rev5" (when-let [h (get rev5 code)] {:hit h :revision "isic-rev5"})
+    "isic-rev4" (when-let [h (get rev4 code)] {:hit h :revision "isic-rev4"})
+    "isic" (or (when-let [h (get rev4 code)] {:hit h :revision "isic-rev4"})
+               (when-let [h (get rev5 code)] {:hit h :revision "isic-rev5"}))
+    nil))
+
+(defn- bind-one [rev4 rev5 dir-name dir text]
+  (let [r5 (blueprint-field text "isic-rev5")
+        r4 (blueprint-field text "isic-rev4")
         bare (blueprint-field text "isic")
         isco (blueprint-field text "isco-08")
-        code (or rev5 rev4 bare)
-        declared-as (cond rev5 "isic-rev5" rev4 "isic-rev4" bare "isic" :else nil)
-        hit (get isic code)
+        code (or r5 r4 bare)
+        declared-as (cond r5 "isic-rev5" r4 "isic-rev4" bare "isic" :else nil)
+        resolved (resolve-code rev4 rev5 code declared-as)
+        hit (:hit resolved)
         base {:db/id nil
               :source/dataset dataset
               :repo/path (str "orgs/cloud-itonami/" dir-name)
@@ -158,7 +198,14 @@
              ;; and the mirrored table is Rev.4. A code that happens to exist in
              ;; both is resolved against Rev.4, and this says so.
              :vf.spec/declared-as declared-as
-             :vf.spec/resolved-against "isic-rev4")
+             :vf.spec/resolved-against (:revision resolved)
+             ;; The UN's own enumeration of activities for this class, VERBATIM.
+             ;; NOT parsed into resource specifications: `includes` is prose
+             ;; and extracting specs out of it would be invention dressed as
+             ;; derivation. Rev.4 only, because the UN publishes no
+             ;; machine-readable includes for Rev.5.
+             :vf.spec/includes-count (count (:includes hit))
+             :vf.spec/includes (vec (:includes hit)))
 
       code
       (assoc base
@@ -166,8 +213,9 @@
              :vf.spec/isic-code code
              :vf.spec/declared-as declared-as
              :vf.binding/why (str "declared " declared-as " " code
-                                  " is not in the mirrored ISIC Rev.4 table"
-                                  " (428 classes); most such codes are Rev.5-only"))
+                                  " is in neither mirrored table (Rev.4 428"
+                                  " classes, Rev.5 463); it was resolved against"
+                                  " the revision it declared, not mapped across"))
 
       isco
       (assoc base
@@ -185,7 +233,8 @@
 
 (defn- build [root]
   (let [registered (registered-paths root)
-        isic (isic-table root)
+        rev4 (isic-rev4 root)
+        rev5 (isic-rev5 root)
         org-dir (path/join root "orgs" "cloud-itonami")]
     (when-not (exists? org-dir)
       (die 2 (str "CANNOT ANSWER: " org-dir " is absent. west checkouts are"
@@ -193,9 +242,10 @@
     (when (< (count registered) (:registered floor))
       (die 2 (str "CANNOT ANSWER: west.yml lists only " (count registered)
                   " cloud-itonami paths, floor " (:registered floor) ".")))
-    (when (< (count isic) (:isic-classes floor))
-      (die 2 (str "CANNOT ANSWER: read " (count isic) " ISIC classes, floor "
-                  (:isic-classes floor) ".")))
+    (doseq [[label n] [["Rev.4" (count rev4)] ["Rev.5" (count rev5)]]]
+      (when (< n (:isic-classes floor))
+        (die 2 (str "CANNOT ANSWER: read " n " ISIC " label " classes, floor "
+                    (:isic-classes floor) "."))))
     (let [consuming-in-org
           (vec (sort (keep (fn [d]
                              (when (and (contains? registered d)
@@ -208,13 +258,14 @@
                             (let [dir (path/join org-dir d)
                                   bp (path/join dir "blueprint.edn")]
                               (when (and (contains? registered d) (exists? bp))
-                                (bind-one isic d dir (slurp* bp))))))
+                                (bind-one rev4 rev5 d dir (slurp* bp))))))
                     vec)]
       (when (< (count rows) (:blueprints floor))
         (die 2 (str "CANNOT ANSWER: bound only " (count rows)
                     " west-registered blueprints, floor " (:blueprints floor)
                     ". An input is missing; a smaller file would look complete.")))
-      {:rows rows :registered (count registered) :isic-classes (count isic)
+      {:rows rows :registered (count registered)
+       :isic-classes {:rev4 (count rev4) :rev5 (count rev5)}
        :consuming-in-org consuming-in-org})))
 
 (defn- coverage [{:keys [rows registered isic-classes consuming-in-org]}]
@@ -225,7 +276,10 @@
      :vf.coverage/businesses (count rows)
      :vf.coverage/west-registered-paths registered
      :vf.coverage/blueprints-without-repo (- registered (count rows))
-     :vf.coverage/isic-classes-available isic-classes
+     :vf.coverage/isic-classes-available (:rev4 isic-classes)
+     :vf.coverage/isic-rev5-classes-available (:rev5 isic-classes)
+     :vf.coverage/resolved-by-revision (frequencies (keep :vf.spec/resolved-against rows))
+     :vf.coverage/with-un-includes (count (filter #(pos? (or (:vf.spec/includes-count %) 0)) rows))
      :vf.coverage/classified (get by-state "classified" 0)
      :vf.coverage/classification-unresolvable (get by-state "classification-unresolvable" 0)
      :vf.coverage/occupation-only (get by-state "occupation-only" 0)
