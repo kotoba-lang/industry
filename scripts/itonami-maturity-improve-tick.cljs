@@ -78,6 +78,40 @@
   (when-let [s (slurp* datoms-file)]
     (try (edn/read-string s) (catch :default _ nil))))
 
+(defn- root-reads-behind-remote?
+  "Is the datoms file this tick just read the one at the remote tip?
+
+   Asked of git directly rather than inferred from commit distance, because the
+   question that matters is not `how far behind is this checkout` but `is the FILE
+   I read the landed one`. A checkout can be 40 commits behind and still hold the
+   identical datoms; it can be 1 commit behind and hold a stale one.
+
+   Why this exists: `root` is COM_JUNKAWASAKI_ROOT or $HOME/github/com-junkawasaki
+   and is NOT cwd, so a shared checkout parked on another branch makes this tick
+   read an old measurement, report :blind-to-own-work, and advise a remeasure that
+   lands on main and changes nothing it can see. Measured 2026-08-15: two rounds
+   spent in that loop.
+
+   Returns nil, not false, when git cannot answer -- no remote, detached, offline.
+   nil keeps the old behaviour, because claiming the root is fine when we could not
+   look is the failure this whole file is about."
+  []
+  (let [head (sh "git" ["symbolic-ref" "--quiet" "--short" "HEAD"])
+        remote-head (sh "git" ["symbolic-ref" "--quiet" "--short" "refs/remotes/origin/HEAD"])
+        default (or (when (zero? (:code remote-head))
+                      (last (str/split (str/trim (:out remote-head)) #"/")))
+                    "main")
+        rel (str "90-docs/system-dynamics/itonami-maturity.datoms.edn")
+        ;; does the working tree's copy differ from the remote tip's copy?
+        d (sh "git" ["diff" "--quiet" (str "origin/" default) "--" rel])]
+    (cond
+      ;; git could not answer -- say so by returning nil rather than a verdict
+      (nil? (:code d)) nil
+      (not (zero? (:code head))) nil
+      (= 0 (:code d)) false
+      (= 1 (:code d)) true
+      :else nil)))
+
 (defn- generated-at
   "datoms が最後に commit された時刻（epoch ms）。**ファイルの mtime では
   ない** —— checkout し直しただけで新しく見えてしまう。
@@ -289,11 +323,13 @@
 
   (let [rows (->> datoms (filter :repo/path) (mapv row))
         entries (ledger-lines)
+        behind? (root-reads-behind-remote?)
         freshness (fresh/freshness {:generated-at (generated-at)
                                     :now (.now js/Date)
                                     ;; `:at` ではなく merge commit の実時刻で測る
                                     :entries (with-landing-times entries)
-                                    :stale-after-days stale-after-days})
+                                    :stale-after-days stale-after-days
+                                    :root-reads-behind-remote? behind?})
         {:keys [stale? unseen suspect]} freshness
         age (:age-days freshness)
         {:keys [lane observed-substrate-share iterations]} (lane entries)
@@ -413,6 +449,16 @@
           (cond
             stale?
             (str (case (:reason freshness)
+                   :root-reads-behind-remote
+                   (str "**測り直しても直らない。** 読んでいる datoms（" datoms-file
+                        "）は remote の tip のものではないので、scan → dynamics を"
+                        "回して main に着地させても、この root を読む限り同じ値が"
+                        "返る。順位も『既に上げた軸が 0bp』のまま出る。直す:"
+                        " (a) この root の checkout を既定 branch に同期する"
+                        "（他セッションの WIP があるなら触らない）"
+                        " (b) COM_JUNKAWASAKI_ROOT に、既定 branch を含む"
+                        " checkout / worktree を渡して tick を回し直す。"
+                        " どちらかを済ませてから順位を読む。")
                    :blind-to-own-work
                    (str "**上の順位を信用しない。** 計測(" (:datoms-age-days entry)
                         " 日前)より後に、この loop 自身が " (count unseen)
@@ -421,8 +467,16 @@
                         "『0bp』と読んで同じ場所へ送り返す —— 従うと水増しになる。")
                    :too-old (str "計測値が " (:datoms-age-days entry) " 日前。")
                    "")
-                 " まず itonami-maturity-scan → dynamics を回し直して着地させる"
-                 "（skill の §5。この周は lane を消費しない）")
+                 ;; The remeasure instruction belongs ONLY to the reasons a
+                 ;; remeasure answers. Appending it unconditionally made the
+                 ;; :root-reads-behind-remote message contradict itself in the
+                 ;; same sentence -- "remeasuring will not fix this" followed by
+                 ;; "so remeasure" -- which is how an agent ends up doing the
+                 ;; futile thing anyway.
+                 (if (= :root-reads-behind-remote (:reason freshness))
+                   ""
+                   (str " まず itonami-maturity-scan → dynamics を回し直して着地させる"
+                        "（skill の §5。この周は lane を消費しない）")))
             (empty? ranked) (str lane " lane に対象が無い。lane の判定か計測値を疑う")
             ;; 重みのある軸が 1 つも無い = その kind にとって上げる意味のある軸が
             ;; 無い。**作らない。** 重みテーブルか kind 分類を疑う。

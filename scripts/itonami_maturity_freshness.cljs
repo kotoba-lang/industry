@@ -26,15 +26,40 @@
 
   ## 判定
 
-  計測値が blind なのは、次のどちらか:
+  計測値が blind なのは、次のどれか:
 
-    :blind-to-own-work  計測の**後**に、この loop 自身が軸上げを main へ
-                        着地させている。順位は自分の直前の仕事を見ていない。
-    :too-old            誰も着地させていなくても、他セッションや外部の変化で
-                        古くなる。従来の日数の床（これは残す）。
+    :root-reads-behind-remote  読んでいる datoms が **remote の tip のものでは
+                               ない**。測り直して main に着地させても、この root
+                               を読む限り同じ値が返る。
+    :blind-to-own-work         計測の**後**に、この loop 自身が軸上げを main へ
+                               着地させている。順位は自分の直前の仕事を見ていない。
+    :too-old                   誰も着地させていなくても、他セッションや外部の
+                               変化で古くなる。従来の日数の床（これは残す）。
 
-  片方だけでは足りない —— 前者は速いが loop 自身の仕事しか見えず、後者は
-  何でも捉えるが遅い。"
+  3 つとも要る —— :blind-to-own-work は速いが loop 自身の仕事しか見えず、
+  :too-old は何でも捉えるが遅い。
+
+  ## なぜ 3 つ目を足したか（2026-08-15、実測）
+
+  tick が読む root は `COM_JUNKAWASAKI_ROOT` か `$HOME/github/com-junkawasaki`
+  で固定されており、**cwd ではない**。その共有 checkout が別 branch に居ると、
+  tick は working tree の古い datoms を読む。すると:
+
+    1. ledger には着地が記録されている → `:blind-to-own-work` が立つ
+    2. 出る指示は「測り直せ」
+    3. 測り直して main に着地させる → **共有 checkout は変わらない**
+    4. 1 に戻る
+
+  実測: outreach の axis-docs を上げて main に着地させた後、origin/main の
+  datoms は `axis-docs 3333` を持っているのに、共有 checkout（branch
+  `agent/shirohan-geom-live`、main より 4 commit 遅れ）の working tree は
+  `axis-docs 0` を返し続けた。**2 周が『測り直し』に消えた**（1 周目は
+  ledger に `:blocked-observation` として原因まで書かれていたが、コードは
+  変わらなかったので次の周も同じ穴に落ちた）。
+
+  この 2 つは出力で区別できなければならない。「計測が古い」への正しい手は
+  測り直しで、「読んでいるコピーが古い」への正しい手は **root を直すこと**
+  であって、後者に測り直しを指示するのは何度でも空振りする。"
   (:require [clojure.string :as str]))
 
 (defn parse-instant
@@ -146,11 +171,20 @@
   言わない**。stale にすると計測を直しても抜けられない永久ループになり、fresh に
   すると今回直した嘘をもう一度つくことになる。判定できなかったことを、そのまま
   呼び出し側へ返して表示させる。"
-  [{:keys [generated-at now entries stale-after-days]}]
+  [{:keys [generated-at now entries stale-after-days root-reads-behind-remote?]}]
   (let [age (when (and (number? generated-at) (number? now))
               (/ (- now generated-at) 86400000.0))
         {:keys [unseen suspect]} (classify-landings entries generated-at now)]
     (cond
+      ;; FIRST, because it changes what the caller should DO. Every other reason
+      ;; here is answered by remeasuring; this one is not answered by remeasuring
+      ;; at all, and reporting it as one of the others sends the loop back through
+      ;; a round that cannot succeed. Measured 2026-08-15: two rounds spent that
+      ;; way, the first of which had already written the cause into the ledger.
+      (true? root-reads-behind-remote?)
+      {:stale? true :reason :root-reads-behind-remote :age-days age
+       :unseen unseen :suspect suspect}
+
       (not (number? generated-at))
       {:stale? false :reason :unknown-generation :age-days nil :unseen [] :suspect suspect}
 
@@ -175,6 +209,9 @@
     :blind-to-own-work
     (str "計測値の鮮度: " (js/Math.round age-days) " 日（STALE: 計測の後に "
          "この loop 自身が " (count unseen) " 周ぶん着地させている）")
+    :root-reads-behind-remote
+    (str "計測値の鮮度: **測り直しでは直らない**（読んでいる datoms が remote "
+         "の tip のものではない）— この root を読む限り、何周測り直しても同じ値が返る")
     :unknown-generation
     "計測値の鮮度: **不明**（datoms の commit 時刻が読めない）— 順位を信用する前に確かめる"
     (str "計測値の鮮度: " (pr-str reason))))
