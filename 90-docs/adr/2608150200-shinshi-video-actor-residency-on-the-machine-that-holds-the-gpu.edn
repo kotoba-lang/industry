@@ -105,38 +105,88 @@ the selector's copies of the 12 series are the same set.
 gad's 6.1.1. Thresholds are 8 and 1, so no verdict changes — but a stored
 number must not be diffed against a fresh one and read as drift.
 
-## Not done — the timer is not enabled
+## The actor's own plane is kotobase.net (owner instruction, same day)
 
-The actor needs a Cloudflare credential on gad for **both** halves of its work:
-the candidate scan reads D1, and the publish writes it. The blob upload does not
-— it goes through `shinshi.club/b/upload` with a purpose-built token, which is
-the right shape.
+Asked to use kotobase.net's API rather than D1, the actor now mints a CACAO
+from its **own** Ed25519 key and keeps its ledger -- every commit and every
+hold -- on the kotobase.net datom plane. Verified live with a freshly
+generated seed: transact wrote, the read returned the rows, `policy-mode:
+legacy-public`. **No owner credential, no Cloudflare token, no hand-off** --
+the third clause of ADR-2608111721 (hokan wa kotobase) made concrete.
 
-The laptop's wrangler uses an **OAuth session** in
-`~/Library/Preferences/.wrangler`, which must not be copied to a GPU box. The
-only account credential in the secrets map is `CLOUDFLARE_GLOBAL_API_KEY` —
-account-wide, unscopeable, and worse to place on gad than the OAuth session; it
-was also not retrievable from kagi in this session (`no such item`, which per
-that map is not proof of absence). The keychain `gftd.cf` token is DNS-scoped
-and returns `Authentication error` against the D1 API, measured.
+A full tick then ran end to end and published `aoi-hoshino-seaside` --
+generated, measured, passed the governor, uploaded, verified live (200
+video/mp4, 234344 B, present in the character's feed), and recorded itself on
+the plane. That is the fifth catalog entry filled and the first the actor
+filled by itself.
+
+### What did NOT move, and why it is not a detail
+
+Candidate selection and the feed-post write still speak the appview's D1.
+**shinshi.club's appview reads D1 and nothing else** -- its `kotobase`
+references are comments, measured. Writing the post to kotobase instead would
+make the clip durably recorded and permanently invisible, which is worse than
+leaving it. Moving them needs the appview to gain a kotobase read path, or a
+token-gated record route beside `/b/upload`; either is a change to a live
+shared Worker and is not an actor change.
+
+So the credential story is split and should be stated that way: **the actor's
+own memory needs nothing**, and the appview conversation still needs a
+Cloudflare token scoped to `ai-gftd-shinshi` and `ai-gftd-pds-recordlog`.
+
+## Four bugs, all found by running it rather than reading it
+
+Recorded because they are one shape -- a check that cannot fire returning the
+value of a check that looked and found nothing (ADR-2608136000):
+
+1. **`series-of` on the slug suffix alone** classified `tifa-final-fantasy` as
+   `Astral Realm` and put Square Enix's Tifa at the head of the queue. The
+   governor cannot catch it: the candidate arrives already carrying an original
+   series name. Caught against live D1.
+2. **`entries` queried `ledger/kind` while `ledger-summary` folds on
+   `ledger/tag`.** The fold received rows it could never match and returned
+   `{:published 0 :recent-failures #{}}` against a non-empty ledger -- the
+   budget could never bite and a failing slug was retried immediately -- while
+   the tick printed `RECORDED true`. The test now feeds WRONG-predicate rows
+   and asserts zero; a test using only right-predicate rows passes against the
+   broken reader too.
+3. **`comfy-free?` read `MURAKUMO_COMFY_URL` while the vendored python read
+   `COMFY`**, so a tick could confirm a healthy GPU on one host and submit the
+   graph to another.
+4. **gad runs node 18.19.1**, which has no `globalThis.crypto` (added in v19)
+   and no happy-eyeballs in `fetch`. The first broke CACAO minting; the second
+   made every kotobase.net call fail `ECONNREFUSED` while `curl` to the same
+   URL returned 200 from the same shell. Shimmed, and stated in the unit.
+
+Number 4 deserves its own line: **`--whoami` worked on gad throughout**,
+because deriving a public key from a seed needs no randomness. Only the first
+call that actually authenticated failed. A smoke test that stops at 'the
+identity loads' would have reported a healthy deployment.
+
+## Not done -- the timer is not enabled
+
+`deploy/install.cljs` still refuses, and correctly: `/etc/shinshi-video-actor.env`
+is absent, so `SHINSHI_UPLOAD_TOKEN` and the D1 credential are not in place.
+Everything else on gad is verified -- 32-case suite ALL OK, identity created
+0600, the kotobase plane answering `true`.
 
 **Remaining owner step:** issue a Cloudflare API token scoped to D1 edit on
 `ai-gftd-shinshi` and `ai-gftd-pds-recordlog`, write it plus
 `SHINSHI_UPLOAD_TOKEN` into `/etc/shinshi-video-actor.env` (0600) on gad, then
-`nbb deploy/install.cljs --apply`. Until then the install script refuses, which
-is the correct behaviour: a timer firing without credentials would burn a GPU
-slot per tick and hold every clip it made.
+`nbb deploy/install.cljs --apply`. The laptop's wrangler OAuth session must not
+be copied there, and `CLOUDFLARE_GLOBAL_API_KEY` is account-wide and
+unscopeable -- worse on a GPU box than the OAuth session, and not retrievable
+from kagi in this session anyway.
 
-A better shape than a Cloudflare API token, deferred: give the appview a
-token-gated record-write route beside `/b/upload`, so no Cloudflare account
-credential leaves the laptop at all. That is a change to a live shared Worker
-and was out of scope here.
+The better shape is now clearly the next piece of work rather than a
+nice-to-have: give the appview a kotobase read path, at which point the
+Cloudflare credential leaves this design entirely.
 
 ## Consequences
 
 - The catalog fill stops depending on the laptop being awake, once the
   credential lands.
-- One more machine holds a publish credential. It is the machine that already
+- The actor's own plane needs no credential at all. One machine will still hold a publish credential for the appview half. It is the machine that already
   held a signing key and already cannot receive gate work.
 - The 12 original series are now asserted identical in two places by test. IP
   characters are excluded twice, independently, and the outer exclusion is the
