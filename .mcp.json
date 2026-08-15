@@ -32,7 +32,7 @@
     "telnyx": {
       "type": "http",
       "url": "https://api.telnyx.com/v2/mcp",
-      "headersHelper": "set -e; K=$(security find-generic-password -s telnyx-api-key -w); printf '{\"Authorization\":\"Bearer %s\"}' \"$K\""
+      "headersHelper": "set -e; K=$(security find-generic-password -s telnyx-api-key -w 2>/dev/null) || { echo 'telnyx-api-key missing from the Keychain cache. kagi holds the record; rebuild per .claude/skills/secrets-location-map/references/third-party-api.md' >&2; exit 44; }; printf '{\"Authorization\":\"Bearer %s\"}' \"$K\""
     }
   }
 }

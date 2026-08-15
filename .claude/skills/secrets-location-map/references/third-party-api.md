@@ -1,4 +1,36 @@
-# 外部 API（生成モデル・RealtimeKit）
+# 外部 API（生成モデル・RealtimeKit・Telnyx）
+
+## Telnyx API キー — kagi が正本、Keychain はキャッシュ（2026-08-15）
+
+- **正本 = kagi item `telnyx-api-key`（compartment `personal`）。**
+  `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get telnyx-api-key`
+- **キャッシュ = macOS Keychain の service `telnyx-api-key`（account `telnyx`）。**
+  `.mcp.json` の `telnyx` サーバの `headersHelper` が**接続のたびに**これを読み、
+  `Authorization: Bearer …` を組み立てて `https://api.telnyx.com/v2/mcp` に渡す。
+- **なぜ 2 か所なのか（mirror ではなく projection）。** 実測 2026-08-15、
+  `kagi get` は **3.8〜5.1 秒**、Keychain は **0.02 秒**。`headersHelper` の予算は
+  **10 秒・キャッシュ無し・接続ごと・401 リトライごとに再実行**なので、kagi を
+  ホットパスに置くと予算の 4〜5 割を毎回使い、負荷時に落ちる。
+  **消して再構築できるか**の判定どおり、kagi = premise（custody / `kagi rotate` /
+  `kagi device grant` / 監査台帳）、Keychain = projection（消しても kagi から
+  作り直せる）。**Keychain 側を先に書き換えて kagi を放置しない** —— そうした
+  瞬間に projection ではなく mirror になる。
+- **キャッシュの再構築**（Keychain 項目を消した / 別マシンに移した / rotate した）:
+
+  ```bash
+  # 値は端末に出さず、隠しプロンプトに貼る（-w を最後に置くとプロンプトになる）
+  security add-generic-password -a telnyx -s telnyx-api-key -U -w
+  ```
+
+  kagi 側から流し込む場合も、値を argv に置かないこと（`ps` に見える）。
+- **rotate したら 2 か所とも更新する。** `kagi rotate telnyx-api-key` は kagi の
+  DEK 再封緘であって Telnyx 側の鍵の再発行ではない —— Telnyx Portal で新しい
+  キーを発行し、kagi に入れ直し、Keychain キャッシュを作り直す、が 1 組。
+- ⚠ **このキーの権限が唯一の境界。** `api.telnyx.com/v2/mcp` は本番アカウントに
+  対して番号購入・発信・AI assistant 作成ができる。読み取り中心の用途なら
+  Portal 側で権限を絞ったキーを発行して、それをここに入れる。
+
+## 生成モデル・RealtimeKit
 
 - **fal.ai API キー（hosted 生成モデル — Seedance 2.0 等の video / 3D / music / voice）**:
   - **正本 = kagi item `seedance-key`（compartment `personal`）**。取得は

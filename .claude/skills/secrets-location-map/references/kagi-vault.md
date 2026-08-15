@@ -28,7 +28,22 @@
 
 **`bin/kagi` は自身の repo root へ `cd` するため、既定では
 `orgs/kotoba-lang/kagi/.kagi/vault.edn`（2026-07-17 付・56KB の**古い方**）を読む。
-実際に使われている vault は `~/.kagi/vault.edn`（2.1MB、日々更新）。**
+実際に使われている vault は `~/.kagi/vault.edn`（日々更新）。**
+
+⚠ **この行はかつて「2.1MB」と書いていたが、2026-08-15 の実測で 5.7MB だった。**
+サイズも `kagi get` の所要時間も**育つ側の値**なので、ここに数値を書き足さない
+（書いた瞬間に次の読み手が定数として引用する）。ホットパスに kagi を置くか
+判断するときは、その場で測る:
+
+```bash
+/usr/bin/time -p env KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get <既知のitem> >/dev/null
+```
+
+**`kagi get` は秒オーダーであり、ミリ秒オーダーではない。** タイムアウトのある
+呼び出し元（MCP の `headersHelper` は 10 秒・キャッシュ無し・接続ごとに再実行）
+から直に叩く前に必ず測ること。実例は
+`references/third-party-api.md` の Telnyx 節（kagi を正本、OS Keychain を
+projection として分けた）。
 **どの reference ファイルの item であれ**、「無い」と判断する前に必ず
 `KAGI_HOME=$HOME/.kagi` を付けて引き直すこと:
 
