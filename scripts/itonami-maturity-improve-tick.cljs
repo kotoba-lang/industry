@@ -337,7 +337,20 @@
                  (:uncounted/url-count e) " 件在る"))
           (when (pos? (or (:uncounted/readme-file-count e) 0))
             (str "README が .md ではないので docs の README 成分は 0"
-                 "（README.edn 等が " (:uncounted/readme-file-count e) " 件）"))])))
+                 "（README.edn 等が " (:uncounted/readme-file-count e) " 件）"))
+          ;; manifest/repo-taxonomy.edn の冒頭は「判定できないものは
+          ;; \"unclassified\"。デフォルト値で埋めない」と書いている。そして
+          ;; unclassified は実際に 125 件付いている。だから kind が**無い** 145 件は
+          ;; 「判定できなかった」ではなく「taxonomy に行が無い」であり、
+          ;; dynamics はそこへ :default の重み(substrate 2500 / test 2000 /
+          ;; governed 500 / ingest 1500 / docs 2500 / surface 500 / fresh 500)を
+          ;; 当てて採点する。**推測した profile で付いた点が、判明している
+          ;; profile で付いた点と同じ顔で並ぶ。** 出力に何も出ていなかったので
+          ;; ここで言う(実測 2026-08-16: 1,934 中 145 = 7.5%)。
+          (when (nil? (:repo/kind e))
+            (str "taxonomy に :repo/kind の行が無い → :default の重みで採点されている"
+                 "（unclassified とは別。この own は kind が判明している repo と"
+                 "同じ尺度では比べられない）"))])))
 
 (defn- row [e]
   {:repo (:repo/path e)
