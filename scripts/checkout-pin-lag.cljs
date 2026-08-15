@@ -115,6 +115,14 @@
                     :else :cannot-tell)
            :shallow (= "true" (git-out d ["rev-parse" "--is-shallow-repository"])))))
 
+(defn- dirty?
+  "Only ever asked about the behind set. `git status --porcelain` walks the whole
+  worktree, so asking it for all 4,158 checkouts took this script from seconds to
+  over two minutes (measured 2026-08-16, on the first version of this change).
+  The question is only meaningful where the answer changes what to do."
+  [e]
+  (not (str/blank? (or (git-out (path/join root (:path e)) ["status" "--porcelain"]) ""))))
+
 (let [text (when (fs/existsSync west) (str (fs/readFileSync west "utf8")))]
   (when-not text
     (die 2 (str "CANNOT ANSWER: " west " is absent. Pass --west, or run from a"
@@ -127,7 +135,9 @@
                   " prevent.")))
     (let [present (filterv #(fs/existsSync (path/join root (:path %) ".git")) es)
           rows (mapv classify present)
-          by (group-by :state rows)
+          by0 (group-by :state rows)
+          ;; dirty? is asked here and only here -- see its docstring.
+          by (assoc by0 :behind (mapv #(assoc % :dirty (dirty? %)) (get by0 :behind [])))
           n (fn [k] (count (get by k [])))]
       (when (zero? (count present))
         (die 2 (str "CANNOT ANSWER: none of the " (count es) " projects is populated"
@@ -137,17 +147,28 @@
                     " · populated here: " (count present)))
       (println (str "  at-pin       " (n :at-pin)))
       (println (str "  ahead        " (n :ahead) "   (left alone -- HEAD is the truth)"))
-      (println (str "  behind       " (n :behind) "   (these measure landed work as absent)"))
+      (let [bs (get by :behind [])
+            bd (count (filterv :dirty bs))]
+        (println (str "  behind       " (count bs) "   (these measure landed work as absent)"))
+        (when (pos? (count bs))
+          (println (str "    of those, dirty  " bd "   (uncommitted work -- `west update`"
+                        " refuses these, correctly. Not yours to sync)"))
+          (println (str "                clean " (- (count bs) bd)
+                        "   (the actionable ones)"))))
       (println (str "  cannot-tell  " (n :cannot-tell)
                     "   (pin not in the local clone; "
                     (count (filter :shallow (get by :cannot-tell []))) " shallow)"))
       (when names?
         (doseq [k [:behind :cannot-tell]]
           (println (str "\n-- " (name k) " --"))
-          (doseq [r (get by k [])] (println (:name r)))))
+          (doseq [r (get by k [])]
+            (println (str (:name r) (when (:dirty r) "\tdirty"))))))
       (println (str "\nThese are a snapshot, not a state: the fleet advances pins"
                     " while this runs. Fixing is not done here -- `west update"
-                    " --fetch smart <names>` with xargs, and budget for it, since a"
-                    " batch of 120 cannot-tell checkouts did not finish fetching in"
-                    " ten minutes on 2026-08-15."))
+                    " --fetch smart <names>` with xargs, on the CLEAN ones only,"
+                    " and budget for it, since a batch of 120 cannot-tell checkouts"
+                    " did not finish fetching in ten minutes on 2026-08-15."
+                    " The exit code stays 1 while anything is behind, dirty or not:"
+                    " the measurement is degraded either way. What changes is whose"
+                    " problem it is."))
       (js/process.exit (if (pos? (n :behind)) 1 0)))))
