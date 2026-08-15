@@ -306,23 +306,45 @@ value equation が向いている方向は ENGI の Commons issuance が既に�
     drift しない）と **west pin**（どの credits commit が正本か)。
     contract が必要になるのは、datoms が root に住む射影のときである。
 
+## 現在地（2026-08-15 closing 時点）
+
+| repo | pin | gate |
+|---|---|---|
+| `kotoba-lang/ws-valueflo-vocabulary` | `95e552d` | `:jvm-test :cd true` / 100 tests 658 assertions |
+| `kotoba-lang/ws-valueflo-algorithms` | `b657c66` | `:jvm-test :cd true` / 71 tests 275 assertions |
+| `kotoba-lang/plm` | `1e0901d` | `:jvm-test :cd true` / 31 tests 118 assertions |
+| `cloud-itonami/credits` | `909b866` | `:jvm-test :cd true` / 70 tests 432 assertions |
+
+4 repo すべて GitHub main == west pin == fleet receipt。plm の gate 登録も
+`--dry-run` で実ノードに当ててから（receipt `ce94ff2c3480`）。
+
 ## 次に効くこと（未着手）
 
-1. **定期 tick はこれらの gate を検査していない。** tick は `gates.edn` を
+1. **定期 tick はこの 4 gate を検査していない。** tick は `gates.edn` を
    *自分の checkout の working tree* から読み、共有 checkout は feature branch 上に
    居るので、ここまでの緑は**すべて worktree から手で回したもの**。共有 checkout が
-   main に追いつけば自動で対象に入る。
-2. `cloud-itonami-app` の Contracts / tenant connection は依然 VF の
-   Agreement として書かれていない（形は在るが、あの repo は未移行）。
-3. ~~plm に fleet gate が無い~~ → **2026-08-15 に登録済み**（`:cd true`、
-   receipt `ce94ff2c3480`、`test-plm-1e0901d-murakumo-judah` 31 tests/118
-   assertions）。登録前に `--dry-run` で実ノードに当てて緑を確認した ——
-   `:test` alias が maven（cognitect test-runner + datomic local）を要するので、
-   egress を推測で登録すると恒久的に赤い gate になる。旧記述: VF の dependent-demand / value-rollup の
-   :mapped 判定の根拠が plm なのに、CI で何も検査していない。`:test` alias が
-   maven（cognitect test-runner + datomic local）を要するので、
-   ノードの egress を実測してから登録する（推測で登録すると恒久的に赤い
-   gate になる）。"
+   main に追いつけば自動で対象に入る。再現手順:
+
+       cd <worktree at origin/main>
+       ln -s <root>/orgs/kotoba-lang/murakumo orgs/kotoba-lang/murakumo   # placement authority
+       export FLEET_CI_SIGNER_PEM=$HOME/.gftd/fleet-ci-signer-tip.pem
+       nbb scripts/fleet-ci/tick.cljs --only credits,plm,ws-valueflo-vocabulary,ws-valueflo-algorithms --no-pr
+
+   ⚠ `--only a,b`（カンマ）が複数指定。`--only` を繰り返すと**上書き**され最後の
+   1 つだけになる。
+
+2. **共有 checkout の plm / credits は古い pin のまま**（`f7fd559` / `57c4703`、
+   どちらも clean）。main に追いついた checkout で
+   `west update --fetch smart plm credits`。
+
+3. `cloud-itonami-app` の Contracts / tenant connection は依然 VF の Agreement と
+   して書かれていない（形は `valueflows.proposal` に在るが、あの repo は未移行）。
+   `valueflows.mapping` の `:Agreement` に
+   `:note-on-cloud-itonami-app` として記録済み。
+
+4. VF の残る未検討 class は `mapping/gaps` を引く。`Claim` / `ProposalList` /
+   `AgreementBundle` / `BatchLotRecord` / `SpatialThing` 等は**未検討**であって
+   不在ではない（`mapping/summary` の `:coverage-note`）。"
 
   :adr/evidence
   "{:repo-search \"nbb scripts/repo-search.cljs valueflows -> 0 of 4175 projects\"
