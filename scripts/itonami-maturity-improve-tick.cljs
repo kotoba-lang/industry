@@ -111,12 +111,23 @@
    lands on main and changes nothing it can see. Measured 2026-08-15: two rounds
    spent in that loop.
 
-   Returns nil, not false, when git cannot answer -- no remote, detached, offline.
-   nil keeps the old behaviour, because claiming the root is fine when we could not
-   look is the failure this whole file is about."
+   Returns nil, not false, when git cannot answer -- no remote, no origin/<default>,
+   offline. nil keeps the old behaviour, because claiming the root is fine when we
+   could not look is the failure this whole file is about.
+
+   A DETACHED HEAD is not one of those cases, and treating it as one was a bug here
+   for exactly one day. The first version also required
+   `git symbolic-ref --quiet --short HEAD` to succeed, which fails on a detached
+   HEAD, and returned nil. But `git diff --quiet origin/<default> -- <path>`
+   compares the WORKING TREE against the remote tip and does not care what HEAD is;
+   the question is about the file, not the branch. Measured 2026-08-16: another
+   session ran `git checkout origin/main` in the shared checkout at 18:22Z, which
+   detaches HEAD, and from then on this check answered `nil` -- so the tick reported
+   the landing-based reason and advised a remeasure that had ALREADY been done and
+   landed. The guard written to stop a check from claiming health it had not
+   observed was instead suppressing an observation that succeeded."
   []
-  (let [head (sh "git" ["symbolic-ref" "--quiet" "--short" "HEAD"])
-        remote-head (sh "git" ["symbolic-ref" "--quiet" "--short" "refs/remotes/origin/HEAD"])
+  (let [remote-head (sh "git" ["symbolic-ref" "--quiet" "--short" "refs/remotes/origin/HEAD"])
         default (or (when (zero? (:code remote-head))
                       (last (str/split (str/trim (:out remote-head)) #"/")))
                     "main")
@@ -126,7 +137,6 @@
     (cond
       ;; git could not answer -- say so by returning nil rather than a verdict
       (nil? (:code d)) nil
-      (not (zero? (:code head))) nil
       (= 0 (:code d)) false
       (= 1 (:code d)) true
       :else nil)))
