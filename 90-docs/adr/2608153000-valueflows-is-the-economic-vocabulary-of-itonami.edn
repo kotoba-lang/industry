@@ -482,6 +482,51 @@ GS1 の canonical URI（`https://id.gs1.org/01/<gtin>`）は **404**（実測）
 
 detector に 4 番目の検査として追加し、`resources-stale` が出ることを確認済み。
 
+## 算術が実データで回った（2026-08-15）
+
+`scripts/uchiwake-valueflows-recipes.cljs` →
+`90-docs/valueflows/uchiwake-recipes-vf.datoms.edn`。**数量つきの recipe 3 件、
+入力 flow 12 本。** committed な 2 ファイルの join で、**数字は 1 つも発明していない**:
+
+    data/ingest/openfoodfacts.sample.edn   成分ごとの percent_estimate
+    data/products.merged.kotoba.edn        その GTIN の net content と単位
+    percent / 100 * net content            = 成分あたりの質量
+
+Open Food Facts は uchiwake の README と CLAUDE.md が既に出所として名指している。
+
+例（Nutella 750g）: 砂糖 420g / パーム油 232.5g / ヘーゼルナッツ 97.5g /
+ココア 55.5g / 脱脂粉乳 49.5g。
+
+**そして算術が回った**（`ws-valueflo-algorithms`、実行結果）:
+
+    dependent-demand  Nutella 1,000 個 = 750,000 g、期限 30
+                      -> 砂糖 420 kg / パーム油 232.5 kg / ヘーゼルナッツ 97.5 kg
+                         / ココア 55.5 kg / 脱脂粉乳 49.5 kg
+                      independent demand 5 件（ここでは誰も作らない）を正しく分離
+    net-requirements  砂糖 100 kg 在庫 -> net 320 kg
+                      他 5 件は :on-hand-unknown（「数えたことがない」）と申告
+    critical-path     **拒否** :duration-not-measured
+                      recipe に所要時間が無いので、これが正しい答え
+
+同じデータが片方の algorithm で回り、もう片方で**正しく拒否される** ——
+これが「入力が無いなら答えない」設計が効いている証拠。
+
+⚠ **導出した質量は質量収支ではない。** `percent_estimate` は Open Food Facts の
+**推定**で、実測した per-product の合計は **114 / 100.5 / 92** —— どれも 100 では
+ない（入れ子成分の二重計上と、申告漏れによる過少計上）。Nutella は投入合計 855g に
+対し産出 750g。**要求量の見積りには使えるが、収支の照合には使えない。**
+全 recipe に `:mass-balanced? false` を立て、合計を per-recipe で記録している。
+
+⚠ **BAD GTIN は check digit を計算して弾いた。** sample には
+`5449000000997`（Coca-Cola の check digit 違い）が「must be skipped」として
+入っている。**コメントを信じて skip する fixture は何も検査しない**ので、
+GS1 mod-10 を実装して弾いた。⚠ 最初の実装は `(str/split s #\"\")` が cljs で
+**先頭に空文字列**を返すことで **good も bad も全部 reject** していた ——
+**全部拒否する検査は全部通す検査と同じだけ無価値**。既知の good 3 件 + bad 1 件 +
+独立の教科書ペア（1234567890128 / …127）で両方向を確認して直した。
+
+detector に 5 番目の検査として追加。
+
 ## 次に効くこと（未着手）
 
 1. **定期 tick はこの 4 gate を検査していない。** tick は `gates.edn` を
