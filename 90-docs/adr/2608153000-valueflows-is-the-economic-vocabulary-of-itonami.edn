@@ -186,18 +186,41 @@ value equation が向いている方向は ENGI の Commons issuance が既に�
     列挙する（他の commitment は正しく settle して見えるから）。
   - deadline は period 数値でも ISO-8601 文字列でもよい（後者は辞書順＝時系列）。
     **両者を比較しない。** `outstanding` が `(str due)` で並べていて
-    "10" < "4" になっていた —— 金額を double にしたのと同じ族の欠陥で、
+    \"10\" < \"4\" になっていた —— 金額を double にしたのと同じ族の欠陥で、
     約束のキューが黙って並べ替わる。sort key に型 rank を先頭に置いて解消。
+
+- **`plm` の在庫は 2 レジスタになった**（`kotoba.plm.registers`、
+  `:erp.inventory/qty-accounting` 追加）。**これが「VF を中心に据える」の
+  最初の実適用**で、plm は語彙を git dep として取り込み、
+  **どのレジスタが動くかを pin した表から読む**（表を 2 箇所に持たない）。
+  1 列では区別できなかった 3 つが表現できるようになった:
+  `transfer`（所有と占有が動く）/ `transferCustody`（預り在庫 —— 占有だけ）/
+  `transferAllRights`（船上の売却 —— 所有だけ）。**どちらに畳んでも誤り**で、
+  預り在庫を所有として計上すれば貸借対照表が過大になり、占有から外せば
+  MRP が既に構内にある材料を発注する。netting は占有側を使う。
+  既存 4 箇所の posting は全て全権移転なので両レジスタに同じ差分を書き、
+  **挙動は不変**（baseline 20 tests/73 assertions → 31/118）。
+  ⚠ **単体テストは posting 経路を通らない。** `receive-goods!` /
+  `complete-production!` を通る統合アサーションを phase2-test に足し、
+  production の posting を壊して `INV-P@A` で落ちることを確認した ——
+  無ければ「`qty-accounting` が一度も書かれていない」まま suite は緑だった。
 
 ## 次に効くこと（未着手、優先順）
 
-1. `plm` の on-hand を accounting / onhand の 2 レジスタに分ける。
-2. ENGI transfer を `valueflows.datom` 経由で datom 面に射影する
-   （ENGI 側の憲章的不変条件は触らない。射影だけ）。
-3. 共有 unit registry（om-2）。今は repo ごとに単位を持っている。
-4. `Proposal` / `Agreement` は依然 :absent / :partial。offer/request を
+1. **ENGI の datom 射影は入力が無くて着手できない**（2026-08-15 実測）。
+   `cloud-itonami/credits` は journal を replay で構成し、**corpus を repo に
+   持たない**（committed な journal / fixture データが無い）。入力の無い
+   projection は「見ないことで pass を報告する」ので書かない。
+   先に必要なのは ENGI 側に検証可能な event corpus が存在すること。
+2. 共有 unit registry（om-2）。今は repo ごとに単位を持っている。
+3. `Proposal` / `Agreement` は依然 :absent / :partial。offer/request を
    `vf:Proposal` として持つと commitment-ledger の融資 offer が
-   （false friend のままではなく）VF の語彙で表現できる。"
+   （false friend のままではなく）VF の語彙で表現できる。
+4. **plm に fleet gate が無い。** VF の dependent-demand / value-rollup の
+   :mapped 判定の根拠が plm なのに、CI で何も検査していない。`:test` alias が
+   maven（cognitect test-runner + datomic local）を要するので、
+   ノードの egress を実測してから登録する（推測で登録すると恒久的に赤い
+   gate になる）。"
 
   :adr/evidence
   "{:repo-search \"nbb scripts/repo-search.cljs valueflows -> 0 of 4175 projects\"
@@ -230,4 +253,5 @@ value equation が向いている方向は ENGI の Commons issuance が既に�
     :ttl-url-trap \"https://www.valueflo.ws/specification/all_vf.html does NOT contain the action instances or the effect properties (inputOutput / onhandEffect / pairsWith are absent from it). The raw TTL lives in the codeberg *pages* repo, not the valueflows/valueflows repo: codeberg.org/valueflows/pages/raw/branch/main/assets/all_vf.TTL (the /valueflows/valueflows path 404s).\"
     :nbb-pprint \"nbb needs [clojure.pprint :as pprint] required explicitly; cljs.pprint/pprint is unresolvable.\"
     :no-github-workflows \"Neither repo has .github/workflows (ADR-2607300900). CI is the murakumo fleet gate registered in scripts/fleet-ci/gates.edn.\"
-    :test-runner-floor \"Both repos register test namespaces explicitly with a minimum count and exit 2 on '0 tests ran', because auto-discovery that finds nothing exits 0.\"}"}]
+    :test-runner-floor \"Both repos register test namespaces explicitly with a minimum count and exit 2 on '0 tests ran', because auto-discovery that finds nothing exits 0.\"
+    :this-adr-broke-its-own-rule \"2026-08-15: an earlier revision of :adr/body contained the prose 10 < 4 written with bare double quotes around the numerals. That TERMINATED the body string early. The reader did not error -- edn/read-string returned a map, the two stray numerals became entity keys 10 and 4, and ~1.5 KB of the body (the whole landed-work section and the next-steps list) was parsed as trailing garbage instead of text. A verification step that printed 'body chars 7810' looked entirely plausible and was accepted. This is the exact shape ADR-2608136000 describes, inside the document that cites it: the file READS while being wrong, so nothing downstream complains. The check that would have caught it is not 'does it parse' but 'does the entity have exactly the expected keys, and does the body still contain the sections it is supposed to'. Escape quotes inside an :adr/body, or use corner brackets.\"}"}]
