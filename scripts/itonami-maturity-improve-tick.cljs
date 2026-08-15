@@ -281,6 +281,34 @@
         (let [n (js/parseInt (str/trim out) 10)]
           (when-not (js/isNaN n) (* 1000 n)))))))
 
+(defn- root-can-resolve-landings?
+  "Can this root resolve a child repository's :merged sha at all?
+
+   `commit-time-ms` asks `git -C <target>` where target is `orgs/<org>/<repo>`, so
+   it needs a root whose `orgs/` is POPULATED -- not merely present. A plain
+   worktree of the root repository has the fresh manifest and datoms and an empty
+   or partial `orgs/`, and there every resolution fails, every axis-raise row falls
+   back to its `:at` string, and a row written after the remeasure commit is
+   reported as :blind-to-own-work. The measurement was fine; the root could not
+   read the ledger's evidence.
+
+   Measured 2026-08-15: this cost a round. The :root-reads-behind-remote message
+   added earlier the same day advises passing COM_JUNKAWASAKI_ROOT, and following
+   that advice with a worktree produced a FALSE stale -- public-malak's axis-docs
+   was already 3333 on main and the tick said the ranking had not seen it. Prose in
+   the message was not enough, because the prose is what got misread.
+
+   Returns false only when we looked and found nothing resolvable; nil when there
+   was nothing to check."
+  [entries]
+  (let [raises (filter fresh/axis-raise? entries)]
+    (when (seq raises)
+      (boolean (some (fn [{:keys [target]}]
+                       (and (string? target)
+                            (str/starts-with? target "orgs/")
+                            (.existsSync fs (str root "/" target "/.git"))))
+                     raises)))))
+
 (defn- with-landing-times
   "軸上げの行に、merge commit から測った実時刻を添える。
 
@@ -324,6 +352,8 @@
   (let [rows (->> datoms (filter :repo/path) (mapv row))
         entries (ledger-lines)
         behind? (root-reads-behind-remote?)
+        ;; plain entries: this only reads :target paths, no git
+        can-resolve? (root-can-resolve-landings? entries)
         freshness (fresh/freshness {:generated-at (generated-at)
                                     :now (.now js/Date)
                                     ;; `:at` ではなく merge commit の実時刻で測る
@@ -460,7 +490,15 @@
                         " checkout / worktree を渡して tick を回し直す。"
                         " どちらかを済ませてから順位を読む。")
                    :blind-to-own-work
-                   (str "**上の順位を信用しない。** 計測(" (:datoms-age-days entry)
+                   (str (when (false? can-resolve?)
+                          (str "⚠ **この STALE はこの root の性質かもしれない。** "
+                               "着地時刻は `git -C orgs/<org>/<repo>` で測るので、"
+                               "root の `orgs/` が populate されていないと解決に全部失敗し、"
+                               "各行は `:at` 文字列に落ちる —— 測り直しの commit より後に "
+                               "ledger を書いた行は、それだけで『計測が見ていない』と読まれる。"
+                               "この root（" root "）には軸上げ行の子 checkout が 1 つも無い。"
+                               "先に `orgs/` を持つ checkout で読み直すこと。\n\n     "))
+                        "**上の順位を信用しない。** 計測(" (:datoms-age-days entry)
                         " 日前)より後に、この loop 自身が " (count unseen)
                         " 周ぶん着地させている（" (str/join ", " (map :target unseen))
                         "）。順位はその仕事を見ていないので、既に上げた軸を"
