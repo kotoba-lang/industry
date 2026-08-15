@@ -49,9 +49,10 @@ repo `kotoba-lang/kotoba-lang` は profile と admission seam だけを所有す
 
 これは DID/VC/UCAN 全仕様対応ではない。UCAN の完全な policy language、Invocation、
 Promise、container compression、P-256 / secp256k1、network resolution は未対応のまま
-明示的に reject する。また encrypted live transport、dataspace provider restriction、
-facet unwind、durability、多 node recovery、OCapN handoff/pipelining、consensus adapter、
-cross-runtime interop は別の gap であり、この ADR はそれらの完了を主張しない。
+明示的に reject する。また encrypted live transport、durability、多 node recovery、
+OCapN handoff/pipelining、consensus adapter、cross-runtime interop は別の gap であり、
+この ADR はそれらの完了を主張しない。dataspace provider restriction と facet unwind
+は後続 ADR-2608159510 で閉じた。
 
 参照仕様: https://ucan.xyz/specification/ 、https://www.w3.org/TR/vc-data-model-2.0/ 、
 https://www.w3.org/TR/vc-data-integrity/ 。"}]
