@@ -230,6 +230,58 @@ Number 6 deserves the emphasis. It was a test written **to cover** number 5,
 and in its first form it could not have caught it. The assertion count is what
 exposed it -- not the test result, which was green either way.
 
+## Closing state (2026-08-15)
+
+Landed and verified, all on default branches:
+
+| what | where |
+|---|---|
+| actor repo | `cloud-itonami/shinshi-video-actor` @ `5fc4db24` |
+| west entry + pin | `com-junkawasaki/root` @ `a6bb5535`, pin `5fc4db24` |
+| catalog-loop fix + run 0037 | `com-junkawasaki/root` @ `6744c6c1` |
+| appview bridge | `network-awai/club-shinshi-app` @ `77ee2134` |
+| appview fixes matching production | same @ `29e787b3` |
+| deployed Worker | version `9dbd1261` |
+
+Checked at close: the actor checkout, the west pin and origin/main agree on
+`5fc4db24`; the appview checkout, its main and the deployed Worker source are
+byte-identical; all five actor source files on gad hash-match the landed
+versions; the timer is enabled with its next firing scheduled.
+
+**One gap was found by this audit and closed.** Three fixes -- the D1
+bound-parameter limit, the misthreaded `.catch`, and the async test -- were made
+in the shared checkout AFTER the first merge, then built and deployed.
+Production was correct and main was not. Landing them was not tidying: a later
+deploy from main would have silently reintroduced
+`D1_ERROR: too many SQL variables` on the live endpoint.
+
+### Resume point
+
+The actor fills one character per 30-minute tick, unattended. **90 remain**;
+the head of the queue is `emi-hoshino-fantasy`.
+
+- On gad: `nbb --classpath src:/home/gad/kotobase-client/src bin/resident.cljs --status`
+  (needs `NODE_OPTIONS=--dns-result-order=ipv4first` outside the unit)
+- From anywhere: `POST https://shinshi.club/xrpc/ai.gftd.apps.shinshi.listUnfilled`
+
+`--status` reporting `ANSWERED false` means the plane could not be read, NOT an
+empty ledger; `listUnfilled` returning `unanswered` means the same for the
+catalogue. Neither is a reason to generate.
+
+### Known gaps, in priority order
+
+1. **`probe.cljs`'s `operator-hosts` does not name gad**, which now holds a
+   publish credential as well as its Radicle signing key. It is safe today only
+   because gad is absent from `nodes.edn` -- which that docstring itself calls
+   luck rather than design.
+2. **The projection is push-only.** Nothing rebuilds the recordlog from the
+   kotobase graph, so the claim that D1 is reconstructible is true in principle
+   and untested in practice. A `reprojectFromKotobase` pass would make it real.
+3. **`motion` has no upper band.** 4.2 and 21.0 both pass; the first is close to
+   a still. A yellow band would surface it without failing the clip.
+4. **IP characters remain excluded** and are the larger share of the catalogue.
+   Unblocking them is a licensing decision, not an engineering one.
+
 ## Consequences
 
 - The catalog fill stops depending on the laptop being awake, once the
