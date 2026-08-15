@@ -158,6 +158,45 @@
               paths). Only `git show`/`git log`/`git rev-list` against already
               checked-out repos; no network."}
 
+  {:id       :verify-valueflows-binding
+   :title    "the cloud-itonami Valueflows binding, and the ISIC tables under it"
+   :why      "ADR-2608153000, 2026-08-15: the binding that puts 1,398 cloud-itonami
+              businesses on the Valueflows plane is a committed projection derived from
+              blueprints plus the mirrored UN ISIC tables, and every input is outside
+              the repo that holds it. Its first version reported 497 classified
+              businesses of which up to 121 had the WRONG industry name, because it
+              resolved Rev.5-declared codes against the only mirrored table, which was
+              Rev.4 -- 83 of the 361 codes in both tables mean different things (1104 is
+              soft drinks in Rev.4 and malt in Rev.5). Nothing would have caught that
+              recurring. The Rev.4 half of the mirror is also unpinned and disputed
+              against the UN legacy structure file on 33 of 414 titles, which 122
+              businesses' industry names currently rest on; if that record and the mirror
+              stop agreeing, a human has to decide which vintage is authoritative, and
+              silently is the one way it must not happen."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-valueflows-binding.cljs" "--root" "{{root}}"
+              "--findings"]
+   :cwd      :repo
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 21600000                 ; 6h -- the inputs change when a blueprint or
+                                         ; the mirror does, neither of which is hourly
+   :timeout-ms  600000                   ; 10m -- 200x the measured runtime, because the
+                                         ; binder subprocess walks 1,398 blueprints
+   :writes   :none
+   :measured "2026-08-15 on this machine: 3s wall, SCANNED 1398, 0 findings, exit 0. All
+              three checks were shown to discriminate before the entry was added, each
+              after asserting the mutation had actually applied: a mutated projection
+              gives binding-stale, an absent projection exits 2 on the SCANNED floor, a
+              one-byte change to the Rev.5 CSV gives rev5-pin-drift, an edited
+              class-titles-that-differ gives rev4-conflict-count-mismatch, and a deleted
+              PROVENANCE.edn gives rev4-provenance-record-absent. It shells out to
+              scripts/itonami-valueflows-bind.cljs --check rather than re-deriving,
+              because a second copy of the classification logic is how one copy gets
+              fixed and the other does not. Reads only files; no network -- the Rev.4
+              comparison is against the RECORD, not a refetch, so a UN outage says
+              nothing about this workspace."}
+
   {:id       :verify-require-graph
    :title    "namespaces migrated to .kotoba with the callers left behind"
    :why      "ADR-2608071000, 2026-07-21: kotoba-lang/dsl-core deleted
