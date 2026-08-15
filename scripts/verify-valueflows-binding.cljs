@@ -17,6 +17,7 @@
 ;;   2. the ISIC Rev.5 mirror still matches its recorded sha256
 ;;   3. the Rev.4 provenance conflict is still exactly what was measured
 ;;   4. the committed uchiwake resource projection still matches the workspace
+;;   5. the committed uchiwake recipe projection still matches the workspace
 ;;
 ;; Check 3 is the interesting one. org-un-isic's Rev.4 half is unpinned and
 ;; disputed against the UN's legacy structure file on 33 of 414 class titles
@@ -53,6 +54,7 @@
 
 (def projection "90-docs/valueflows/itonami-business-vf.datoms.edn")
 (def resource-projection "90-docs/valueflows/uchiwake-resources-vf.datoms.edn")
+(def recipe-projection "90-docs/valueflows/uchiwake-recipes-vf.datoms.edn")
 
 (defn- run-generator
   "Invoke a projection's own generator in --check mode. Never re-derive here: a
@@ -87,6 +89,11 @@
 
 (defn check-resource-projection! []
   (run-generator "uchiwake-valueflows-resources.cljs" resource-projection "resources"))
+
+(defn check-recipe-projection! []
+  ;; The only projection with quantities, so the only one the algorithms can run
+  ;; on. A silent regeneration that changed a mass would change an explosion.
+  (run-generator "uchiwake-valueflows-recipes.cljs" recipe-projection "recipes"))
 
 ;; ── 2. the Rev.5 mirror matches its recorded pin ──────────────────────────
 
@@ -154,6 +161,7 @@
 
 (check-projection!)
 (check-resource-projection!)
+(check-recipe-projection!)
 (check-rev5-pin!)
 (check-rev4-conflict!)
 
