@@ -1,0 +1,103 @@
+[{:db/id -1
+  :adr/id "ADR-2608157000"
+  :adr/title "app の link は content addressing で設計する（identity / naming / location の三分）"
+  :adr/status "accepted"
+  :adr/date "2026-08-15"
+  :adr/last_verified "2026-08-15"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "app-links-are-content-addressed"
+  :adr/repos ["orgs/kotoba-lang/content-address"
+              "orgs/cloud-itonami/cloud-itonami-app"
+              "orgs/kotoba-lang/kotoba-protocol"]
+  :adr/related ["90-docs/adr/2608148200-graph-cid-identity-vs-archive-location.edn"
+                "90-docs/adr/2608145400-l2-graph-cid-chain-core-commit.edn"
+                "90-docs/adr/2607071500-kotoba-protocol-layers.edn"
+                "90-docs/adr/2608039000-d1-is-not-a-premise-in-decentralized-paths.edn"
+                "90-docs/adr/2608136000-five-questions-before-trusting-green.edn"]
+  :adr/authoritative_for
+  ["path ベースでない link / resource 設計の名前は content addressing（対語 location addressing）"
+   "app の resource identity は content address であって path / URL ではない"
+   "identity（CID）・naming（IPNS）・location（取得ヒント）を混ぜない"
+   ":kotoba.* 属性にホスト名を書かない —— Location は protocol 外の記録"
+   "content address を持つかどうかは機械で測る（addressed? / audit）"
+   "共有実装は kotoba-lang/content-address であり app ごとに書き写さない"]
+  :source/dataset "adr"
+  :adr/body
+  "オーナーの問い（2026-08-15）: 「cloud-itonami で link の実装を path じゃなくて ipld, cid, ipns の設計にしているんだけれど、こういった path ベースじゃない link, resource 設計をなんというのかな?」
+
+## 名前
+
+**content addressing（内容アドレッシング）**。対語は location addressing（URL・path ベース）。層ごとに固有名を持つので、設計文書では分けて呼ぶ:
+
+| 層 | 名前 | 対語 |
+|---|---|---|
+| 識別子（CID） | intrinsic / self-describing identifier | extrinsic (assigned) identifier、URL |
+| link（IPLD） | merkle link / hash link、集合として merkle DAG、一般名 authenticated data structure | pointer、href、foreign key |
+| データモデル | content-addressed linked data model | hierarchical namespace |
+| 可変な名前（IPNS） | self-certifying name（Mazières の SFS 由来） | DNS 名、mutable path |
+| 取得経路 | provider record / routing hint（multiaddr は locator） | URL のホスト部 |
+| ネットワーク全体 | Information-Centric Networking (ICN) / Named Data Networking (NDN) | host-centric networking |
+
+性質としては **location-independent** かつ **self-certifying**（受け取った側が出所を信頼せずに検証できる）。ストレージ側の同型語が **CAS**（git・Nix・Bazel）、言語側が **hash-consing / structural identity**。
+
+⚠ **IPLD にも path はある**（`/ipld/{cid}/a/b`）。あれは DAG の resolution path であって location ではない。「path ベースでない」と書くとここで衝突するので、正確には **hierarchical location path を identity に使わない**と言う。
+
+## 実測した現在地（2026-08-15）
+
+語彙は広まっているが、設計は広まっていない。
+
+- `kotoba.app.edn` は **155 件**（全 org、rg で全件走査）。そのうち **content address を持つのは 1 件**（`cloud-itonami/cloud-itonami-app`）。残り 154 は actor の placement manifest で、resource を location でしか識別していない。
+- `chain.core` / `kotoba.protocol.graph` を使う app も **cloud-itonami-app だけ**。他の hit は全部 infrastructure（kotobase 系・p2p・chain・nekko・torihiki）。
+- cloud-itonami の deployed worker は **134 件**（`wrangler.jsonc` 実在数）。`app-*` repo は 77 件だが、その多くは抜き出し途中の scaffold で「動くアプリ」ではない（例: `kago` は README が自ら scaffold と申告）。
+
+**足りていなかったのはライブラリではない。** 層ごとの実装は全部在る —— `kotoba-protocol`（層表・manifest 検証、L0〜L5、ADR-2607071500）、`chain`（L2 commit）、`tech-ipfs-specs-ipns`（IPNS 記録、`.cljc`）、`kotobase-client`（cljs 第二実装）、`tech-ipfs-specs-http-gateway`、`kotobase`（配布）。無かったのは **app が実際に歩く 1 本の道**で、しかも cloud-itonami-app のそれは JVM の 3 namespace（`bundle.clj` / `graph.clj` / `latest.clj`）に app 固有のパスごと書かれており、cljs Worker として動く他の app からは呼べない形だった。
+
+## Decision
+
+1. **app の resource identity は content address とする。** path / URL / ホスト名を identity にしない。記録形は `kotoba.app.edn`:
+   - `:kotoba.app/bundle-cid` — document の raw CIDv1（identity）
+   - `:kotoba.app/embed-url` — `ipfs://{cid}`（location-independent な link）
+   - `:kotoba.graph/cid` — L2 graph の identity（dag-cbor）
+   - `:kotoba.app/latest` — 鍵由来 IPNS 名 `k51…`（naming）
+   - `:published` / `:graph`（**非 protocol キー**）— どのホストが GET に答えたか（Location）
+2. **`:kotoba.*` 属性にホスト名を書かない。** Location は protocol の外に置く。protocol しか読まない実装からはホストが 1 つも見えないのが正しい。
+3. **共有実装は `kotoba-lang/content-address`**（新規、portable `.cljc`、依存ゼロ、nbb first）。app ごとに書き写さない。層を所有する既存ライブラリを置き換えるものではなく、それらを合成した 1 本の道だけを持つ。
+4. **content address を持つかどうかは測る。** `content-address.core/addressed?` が判定器、`bin/content_address.cljs audit` が集計器。superproject の `scripts/verify-app-content-address.cljs` が `orgs/` 全体に対して回す。
+5. **archive PUT は fail-closed。** PUT → GET → **返ってきた bytes を送った bytes と比較**するまでを 1 単位とする。201 だけでは証拠にしない —— 防ぎたい失敗は「誰も配っていないアドレスを manifest が記録している」状態。
+6. **既存の 154 manifest を一括で書き換えない。** 規則が縛るのは新規と、実際に document を配る app。scaffold に content address を付けても劇場になる（ADR-2608136000 と同じ理由）。
+
+## Consequences
+
+- **D1 規則（ADR-2608039000）との整合**: 「消して再構築できるか」テストに content address はそのまま通る。archive を消しても bytes を持つ者が同じアドレスを導出できるので、archive は premise ではなく Location。
+- **codec が 2 つ見える件は仕様**（ADR-2608148200）。`PUT /ipfs/{cid}` は raw CIDv1 しか受けないので、dag-cbor の graph identity は同じ bytes の raw CID で archive する。`same-object?` はこの対を「2 つの identity」ではなく「1 つの object の 2 codec」として読むために在る。
+- **測定は両方向を出す。** exit code は 3 値: 0 = 全部 addressed、1 = location のみの manifest が在る、2 = **答えられなかった**（走査 0 件 / 読めない EDN）。ADR-2608136000 の evidence floor をそのまま実装している。
+- **fleet gate にはしない。** この検査の入力は `orgs/` 配下で、fleet が配る tree は repo 単体なので、gate にすると `root-permit-index` と同じ「入力が無いので永遠に赤い gate」になる（CLAUDE.md 実測）。superproject の script として手で回し、結果を ADR に記録する。
+
+## 検証（実測）
+
+- `sha256(\"hello world\")` → `bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e`。IPFS 自身が公開している値と一致。
+- live の `cloud.itonami.app` appview（816,065 bytes）を `kotobase.net` から GET し、再ハッシュして格納アドレス `bafkreigpvrijgdm36vjt6xvqsi7ahvzslv6yymdqzbozi2id3wgorvgnp4` を厳密に再現。`verify` が exit 0。
+- `bafyreia2pjck2…` と `bafkreia2pjck2…`（graph identity と raw Location）は digest 一致 = 同一 object と判定。
+- 11 tests / 58 assertions（nbb、ネットワーク不要）。
+- audit を実 manifest 2 件に当てて **両方向**を確認: addressed 1 / located 1 で exit 1、addressed のみで exit 0、入力ゼロで exit 2。
+
+## 第 1 波（実施済み、2026-08-15）
+
+**cloud-itonami の ISIC app 15 本に適用して着地させた。** 対象は `docs/index.html` を実際に配っている repo（scaffold ではない）: isic-0111 / 0112 / 0113 / 0114 / 0115 / 0116 / 0119 / 0121 / 0122 / 0123 / 0124 / 0125 / 0126 / 0127 / 3091。
+
+- 15 本とも **PUT 201 → GET 200 → 送ったバイト列と返ってきたバイト列が一致**。1 本も推測で書いていない。
+- 各 repo の main に `kotoba.app.edn` が実在することを GitHub API で確認（15/15）。
+- west pin も同じ 15 本を前進（`west-pin-put.cljs` = サーバ側 single-entry。ローカル west.yml を書いてから push する経路は使っていない）。
+
+再測定: **170 manifest 中 16 が addressed、154 が location のみ、unreadable 0**（exit 1）。
+
+### 途中で踏んだ欠陥を 1 つ記録する
+
+最初の audit は **155 件中 50 件を「unreadable」と報告して exit 2** した。原因は判定器が manifest の shape を 1 つしか知らなかったこと —— 105 件は素の map、50 件は EDN-only 規約の tx-data ベクタ `[{:db/id -1 …}]` で、どちらも正しい。**読めなかったものを「壊れている」と報告していた**（ADR-2608136000 の 5 問のうち「入力が無いとき何を返すか」の変種）。`content-address.core/entities` を足して両形を読むようにし、回帰テストを付けた。exit 2 で止まったから見つかった —— pass を返す実装だったら 50 件は静かに消えていた。
+
+## 未了（正直に）
+
+- **残り 408 本の ISIC app**（`docs/index.html` を持つ repo は全部で 423）と、cloud-itonami の deployed worker 134 本のうち document を配るものは未適用。手順は確立して 15 本で実証済みなので、あとは wave として回すだけ。次の対象も「実際に document を配っている app」であって scaffold ではない。
+- 既存 154 の actor placement manifest は対象外のまま（document を配っていない）。
+- `content-address.core` は純関数でスカラ判断（`raw-cid?` / `same-object?` / `addressed?` / `refusals`）なので `.kotoba` 決定核の候補だが、**やっていない。主張もしない。**
+- IPNS naming の自動化はこの landing に含まれない（app ごとに鍵の custody が要る）。今回運んだのは identity と location の 2 面で、naming は cloud-itonami-app が既に持っている経路をそのまま正本とする。"}]
