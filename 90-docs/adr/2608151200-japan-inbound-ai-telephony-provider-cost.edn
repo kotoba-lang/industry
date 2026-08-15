@@ -161,7 +161,40 @@ ConversationRelay 自体を使わないので、この差は消える。
 - **3 社とも ja-JP の実品質は資料から読めない。** 日本語受付は敬語と数え方で
   壊れる（`latency.md` に 6 名 → 6 つな の実例がある）。実音声で比較すること
   —— **契約はこの検証を済ませたことを意味しない。まだ済んでいない。**
-- **番号の在庫。** レートシートに載っていることは買えることを意味しない。
+- ~~**番号の在庫。**~~ → **2026-08-15 に実測した。下記「在庫」節。**
+
+## 在庫 — 日本で実際に買えるのは 050 だけ（2026-08-15、契約済みアカウントで実測）
+
+**price sheet に載っている日本の 4 種類のうち、3 種類は買えない。**
+`GET /v2/available_phone_numbers` を契約済みの API キーで叩いた結果:
+
+| クエリ | 結果 | 読み方 |
+|---|---|---|
+| `JP / national`（050） | **在庫あり**。`+8150 3142 34xx` 等、`monthly_cost 4.50` / `upfront_cost 8.00` | API が price sheet と**完全一致**した |
+| `JP / local`（03 等） | クエリは有効・**`total_results: 0`** | 商品はあるが**在庫ゼロ** |
+| `JP / toll_free`（0120） | **`10015 No coverage found in the specified country`** | **国として提供が無い** |
+| `JP / mobile` | 同上 | 同上 |
+| 対照 `US / local` | 3 件 | — |
+| 対照 `US / toll_free` | 3 件 | — |
+
+**対照を取ったのは、0 件が「在庫が無い」なのか「クエリが間違っている」なのかを
+区別するため。** US で同じ形が結果を返すので、JP の 0 は query 由来ではない。
+
+**`local` の 0 件と `toll_free` の `No coverage` は別物として扱うこと。**
+前者は在庫が戻りうる（再測定の価値がある）、後者は国として提供されていない
+（待っても出ない）。
+
+**この実測は本 ADR の判断を 2 つ変える:**
+
+1. **「0120 が要件なら Amazon Connect」は選好ではなく物理的な壁だった。**
+   Telnyx では 0120 を購入できない。反転条件ではなく前提条件である。
+2. **「業種次第で 03 を選ぶ理由が立つ（`isic-561` の飲食店受付では 03 が自然）」は
+   Telnyx 上では実行不能。** 03 は在庫ゼロ。03 が要件なら provider を変えるか、
+   国内の事業者から取って SIP で持ち込む（BYOC）ことになる。
+
+したがって **050 + BYO は「選んだ案」ではなく「Telnyx で唯一取れる案」**である。
+選定の結論は変わらないが、**理由が変わった**ので、後から読む者が
+「他も検討したうえで 050 にした」と読まないようにここに書いておく。
 
 ## 解決した UNVERIFIED（2026-08-15、`llms-full.txt`）
 
@@ -197,9 +230,12 @@ $0.000006/文字、`llms-full.txt` が $0.000003/文字で **2 倍ずれてい�
 | Twilio | 同程度 |
 | Amazon Connect | **AWS サポートケース + 日本に事業所があることの書類。3 社で最も重い** |
 
-050 は 110/119 が使えず、一部プランから発信できない。**単価は 03 より安い
-のに信用面で不利**という逆転があるので、業種次第で 03 を選ぶ理由が立つ
-（`isic-561` の飲食店受付では 03 の方が自然）。
+050 は 110/119 が使えず、一部プランから発信できない。**単価は 03 より安いのに
+信用面で不利**という逆転があり、`isic-561` の飲食店受付なら本来 03 の方が自然
+である —— **が、上記の在庫実測どおり Telnyx に 03 は無い。** この不利は
+「選んだ結果」ではなく**引き受けている制約**なので、店に 050 を出すことが
+受け入れられるかは事業側の判断として別に要る。受け入れられないなら、
+provider を変えるか、国内事業者の 03 を BYOC で持ち込む。
 
 ## 再測定の手順
 
@@ -211,7 +247,24 @@ curl -sS -L https://telnyx.com/llms-full.txt
 curl -sS -L https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonConnect/current/region_index.json
 # Twilio は機械可読な正本が無い。HTML の <tr> を取る
 curl -sS -L -A 'Mozilla/5.0' https://www.twilio.com/en-us/voice/pricing/jp
+
+# 在庫（価格ではなく「買えるか」）。-g が要る —— curl は [] を範囲指定と解釈する
+K=$(security find-generic-password -s telnyx-api-key -w)
+curl -sS -g --oauth2-bearer $K 'https://api.telnyx.com/v2/available_phone_numbers?filter[country_code]=JP&filter[phone_number_type]=national&filter[limit]=3'
+# phone_number_type を local / toll_free / mobile にも振る
+# 0 件を見たら必ず country_code=US で対照を取る
+# （在庫ゼロと query 誤りは同じ 0 に見える。実測 2026-08-15）
 ```
+
+**この節に shell を書くときは二重引用符とバックスラッシュを使わない** ——
+`:adr/body` は EDN 文字列なので、二重引用符で括ったヘッダ指定や、行末に
+バックスラッシュを置く行継続をそのまま書くと、そこで文字列が終端して
+**文書全体が読めなくなる**。Bearer は `--oauth2-bearer` で渡し、長い行は
+折り返さない。
+
+実測 2026-08-15: これで `docs-edn-only verify` を 2 回 FAIL させた。**2 回目は、
+1 回目の再発防止として書いたこの注意書き自身が二重引用符を含んでいた**ため。
+検査を通すまで landed としない（gate が両方向を出すまで信じない、と同じ）。
 
 **この ADR の数値は 2026-08-15 の測定である。定数として引用しない。**
 CI/CD の egress で同じ誤りを踏んだ前例がある（CLAUDE.md の fleet gate 節、
