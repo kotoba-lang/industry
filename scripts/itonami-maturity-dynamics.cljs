@@ -686,6 +686,18 @@
                         :maturity/axis-docs (:m/docs ax)
                         :maturity/axis-surface (:m/surface ax)
                         :maturity/axis-fresh (:m/fresh ax)
+                        ;; ── 見えていない内容を datoms まで運ぶ（scan が測る報告専用
+                        ;; フィールド。ADR-2608052000）。**スコアには一切入らない** ——
+                        ;; 上の :maturity/* はどれもこれを読まない。運ぶ理由は、順位を
+                        ;; 出す tick が datoms しか読まないので、evidence に在るだけでは
+                        ;; 「この repo の axis-test が 0 なのは test が無いからではない」
+                        ;; と言えないこと。
+                        :uncounted/src-file-count (:uncounted/src-file-count e 0)
+                        :uncounted/src-bytes (:uncounted/src-bytes e 0)
+                        :uncounted/test-file-count (:uncounted/test-file-count e 0)
+                        :uncounted/test-bytes (:uncounted/test-bytes e 0)
+                        :uncounted/readme-file-count (:uncounted/readme-file-count e 0)
+                        :uncounted/url-count (:uncounted/url-count e 0)
                         :dep/direct-count (count (nth dep-idx i))
                         :dep/transitive-dependents tdeps
                         :leverage/fleet-gain gain
