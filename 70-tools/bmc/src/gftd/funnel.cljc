@@ -15,7 +15,29 @@
    the metrics block, and surfaces any unmeasured stage as an instrument to-do.
 
    Grounded in collectable metrics (same emitters as gate/collect — funnel counts
-   come from the product's metrics edn). Pure .cljc; io stays in cli/collect."
+   come from the product's metrics edn). Pure .cljc; io stays in cli/collect.
+
+   ## 算術の正本は `70-tools/bmc/kotoba/funnel_core.kotoba`（ADR-2608160500）
+
+   転換率・benchmark との差・ボトルネック判定は **Kotoba の決定核**が持つ。
+   この名前空間はその **参照実装**（reference implementation）であり、
+   `absent` … `pct-bp` の関数群は kernel と名前も引数の順序も 1 対 1 に対応する。
+   fleet gate `root-funnel-core` が両者の完全一致を毎回見る。**食い違ったら
+   kernel が正しく、ここを直す。**
+
+   別名前空間の mirror は作らない（CLAUDE.md「同じ判断を 2 実装が別々に持ち
+   片方だけ直る状態にしない」）。ここが唯一の参照実装で、
+   `evaluate-funnel` / `render-text` / `proposals` はこの関数群を呼ぶ。
+
+   ## 単位は整数 basis point（10000 = 1.0）
+
+   浮動小数を判断から追い出した（理由は kernel の冒頭と
+   `90-docs/system-dynamics/kotoba/itonami_maturity_kernel.kotoba`）。
+   `evaluate-funnel` が返す step は `:rate` / `:gap` ではなく
+   **`:rate-bp` / `:gap-bp` / `:benchmark-bp`** を持つ —— 同じ鍵の下で
+   小数から bp へ型を変えると、読み手に気づかせずに 100 倍ずれる。
+   `funnel-specs` の `:benchmark` は従来どおり 0.03 のような小数のまま
+   （業界水準の読みやすさを優先）で、bp への変換は `benchmark->bp` 1 箇所。"
   (:require [clojure.string :as str]
             [gftd.canvas :as canvas]))
 
@@ -59,28 +81,146 @@
     {:key :activation  :label "実推論 run (記録済)"  :metric [:cost :runs-count]  :benchmark 0.02}
     {:key :revenue     :label "paid (credits 購入)"  :metric [:stripe :murakumo-paid-charges] :benchmark 0.01}]})
 
-;; ---- evaluation -------------------------------------------------------------
+;; ---- 決定核の参照実装 --------------------------------------------------------
+;; `70-tools/bmc/kotoba/funnel_core.kotoba` と 1 対 1。名前・引数順・返り値を
+;; 変えるときは **両方** を変える（gate は名前で突き合わせる）。
+
+(defn absent
+  "件数 / benchmark の『host がそれを読めなかった』番兵。件数にも benchmark bp
+   にも負は無いので実在の値と衝突しない。"
+  [] -1)
+
+(defn gap-absent
+  "gap の『無い』番兵。実在の gap は [-10000, ∞) に収まるので到達不能。
+   **0 は使えない** —— 0 は『benchmark ちょうど』という実在の gap。"
+  [] -100000)
+
+(defn clamp-bp [x] (if (< x 0) 0 (if (< 10000 x) 10000 x)))
+
+(defn measured? [n] (not (neg? n)))
+
+(defn denominator?
+  "0 件は分母にならない。『0 件から 0% 転換した』ではなく『率を出す材料が無い』。"
+  [from] (not (< from 1)))
+
+(defn step-measured? [from to] (and (measured? from) (measured? to)))
+
+(defn rate-known? [from to] (and (step-measured? from to) (denominator? from)))
+
+(defn conversion-bp
+  "転換率（bp）。**clamp しない** —— 10000 bp 超は後段の emitter が前段より
+   多く数えているという信号で、頭打ちにすると『ちょうど 100%、健全』に見える。"
+  [from to]
+  (if (rate-known? from to) (quot (* 10000 to) from) (absent)))
+
+(defn benchmark-known? [b] (not (neg? b)))
+
+(defn benchmark-bp
+  "不在判定を先に済ませてから clamp する。逆順だと -1（不在）が 0（目標 0%）に
+   化ける。上限を掛けることで gap の下限が -10000 に固定される。"
+  [b]
+  (if (benchmark-known? b) (clamp-bp b) (absent)))
+
+(defn gap-known? [from to bench]
+  (and (rate-known? from to) (benchmark-known? bench)))
+
+(defn gap-bp [from to bench]
+  (if (gap-known? from to bench)
+    (- (conversion-bp from to) (benchmark-bp bench))
+    (gap-absent)))
+
+(defn below-benchmark?
+  "ちょうど一致（gap = 0）は未達ではない。"
+  [from to bench]
+  (and (gap-known? from to bench) (neg? (gap-bp from to bench))))
+
+(defn bottleneck-wins?
+  "候補 `cand` の gap が現職 `best` を置き換えるか。**同点は候補が勝つ = 後ろの
+   段が勝つ** —— 移行前に使っていた Clojure の `min-key` は等しいキーのとき
+   最後の要素を返す（2 引数版 `(if (< (k x) (k y)) x y)`、3 引数以上はループ内が
+   `<=`。2026-08-15 に nbb で実測）。暗黙に反転させないよう明示する。"
+  [cand best]
+  (cond (not (< (gap-absent) cand)) false
+        (not (neg? cand))           false
+        (not (< (gap-absent) best)) true
+        :else                       (not (< best cand))))
+
+(defn pct-bp
+  "bp → パーセント（half-up）。不在は不在のまま（`0%` と綴らない）。"
+  [bp]
+  (if (neg? bp) (absent) (quot (+ bp 50) 100)))
+
+;; ---- host 側の橋渡し（kernel には無い。metrics edn の形を知っているのは host）--
 
 (defn- num [x] (cond (number? x) x (string? x) (parse-double x) :else nil))
 
+(defn count->bp-input
+  "metrics から読んだ段の件数を kernel が受け取れる i64 にする。
+
+   数でないもの（nil / 読めない文字列）と **負値** は `(absent)`。負を弾くのは、
+   emitter が -1 を『不明』の意味で出すことがあり、以前はそれが素の数として
+   算術に入って **その段をボトルネックに仕立てていた**ため（ADR-2608136000:
+   測れなかったものが、測って悪かったものと同じ顔をする）。
+   小数は切り捨てる（bp の丸めと同じく、端数は常に下側）。"
+  [x]
+  (let [n (num x)]
+    (if (and (number? n) (== n n) (>= n 0))
+      (long (Math/floor n))
+      (absent))))
+
+(defn benchmark->bp
+  "spec の `:benchmark`（0.03 のような小数）を bp に。**この 1 箇所だけが
+   浮動小数に触る。** 現行 6 product の 13 個の benchmark はすべて誤差なく
+   整数 bp になる（0.03→300 … 0.50→5000、2026-08-15 実測。gate が毎回
+   往復して確かめる）。
+   宣言が無い / 数でない / 負なら `(absent)`。"
+  [b]
+  (if (and (number? b) (>= b 0))
+    (long (Math/round (* 10000.0 (double b))))
+    (absent)))
+
+(defn- nil-when-absent [v sentinel] (when-not (= v sentinel) v))
+
+;; ---- evaluation -------------------------------------------------------------
+
 (defn evaluate-funnel
   "→ {:stages [{:key :label :count n|nil}]
-      :steps  [{:from :to :from-count :to-count :rate r|nil :benchmark b :gap g|nil :measurable bool}]
+      :steps  [{:from :to :from-count :to-count
+                :rate-bp r|nil        ; 転換率（basis point、10000 = 1.0）
+                :benchmark b|nil      ; spec が書いた小数のまま（未加工）
+                :benchmark-bp bb|nil
+                :gap-bp g|nil         ; rate-bp − benchmark-bp
+                :measurable bool      ; 両端の件数が読めたか
+                :rate-known bool}]    ; **かつ分母がある**か（別の条件）
       :bottleneck step|nil  ; measured step furthest below its benchmark
-      :missing [stage-key ...]}  ; stages with no measurable count"
+      :missing [stage-key ...]}  ; stages with no measurable count
+
+   `:measurable` と `:rate-known` は別物である。前段が 0 件の step は
+   **測れている**が率を出せない（分母が無い）—— 以前はこの 2 つがどちらも
+   `:rate nil` に潰れ、出力でも『(未計測)』と同じに綴られていた。"
   [metrics spec]
   (let [stages (mapv (fn [s] (assoc s :count (num (get-in metrics (:metric s))))) spec)
         steps (mapv (fn [[a b]]
                       (let [fc (:count a) tc (:count b)
-                            rate (when (and fc tc (pos? fc)) (/ (double tc) fc))
-                            bench (:benchmark b)]
+                            f (count->bp-input fc) t (count->bp-input tc)
+                            bench (:benchmark b)
+                            bbp (benchmark->bp bench)]
                         {:from (:key a) :to (:key b) :from-label (:label a) :to-label (:label b)
-                         :from-count fc :to-count tc :rate rate :benchmark bench
-                         :gap (when (and rate bench) (- rate bench))
-                         :measurable (and (some? fc) (some? tc))}))
+                         :from-count fc :to-count tc
+                         :rate-bp (nil-when-absent (conversion-bp f t) (absent))
+                         :benchmark bench
+                         :benchmark-bp (nil-when-absent bbp (absent))
+                         :gap-bp (nil-when-absent (gap-bp f t bbp) (gap-absent))
+                         :measurable (step-measured? f t)
+                         :rate-known (rate-known? f t)}))
                     (partition 2 1 stages))
-        measured-below (filter #(and (:measurable %) (:gap %) (neg? (:gap %))) steps)
-        bottleneck (when (seq measured-below) (apply min-key :gap measured-below))
+        ;; ボトルネックは畳み込みで決める。判定は kernel の `bottleneck-wins?` が
+        ;; 持ち、host が持つのは反復の順序だけ（同点は後ろの段が勝つ）。
+        bottleneck (reduce (fn [best st]
+                             (if (bottleneck-wins? (or (:gap-bp st) (gap-absent))
+                                                   (or (:gap-bp best) (gap-absent)))
+                               st best))
+                           nil steps)
         missing (mapv :key (filter #(nil? (:count %)) stages))]
     {:stages stages :steps steps :bottleneck bottleneck :missing missing}))
 
@@ -90,7 +230,12 @@
    :activation  "onboarding の摩擦削減（signup→checkout 最短化）・価格/tier の明確化・空状態の初期価値提示"
    :revenue     "trial→paid の nudge（使用量到達通知）・価格 tier 見直し・年額/上位 tier の提示"})
 
-(defn- pct [r] (when r (str (Math/round (* 100.0 (double r))) "%")))
+(defn- pct
+  "bp → \"12%\"。丸めの規則は kernel の `pct-bp` が持つ（切り捨てた bp から出す
+   丸めと元の小数から出す丸めが別の答えを出しうるので、1 箇所に置く）。"
+  [bp]
+  (when (and bp (not (neg? bp))) (str (pct-bp bp) "%")))
+
 (defn- block-id [product suffix] (keyword (str (name product) "." suffix)))
 
 (defn- block-items-set
@@ -117,8 +262,8 @@
                           (str/join " → " (map (fn [s] (str (:label s) "=" (or (:count s) "?"))) stages))
                           (when (seq steps)
                             (str " | 転換 "
-                                 (str/join " / " (keep (fn [st] (when (:rate st)
-                                                                  (str (:from-label st) "→" (:to-label st) " " (pct (:rate st)))))
+                                 (str/join " / " (keep (fn [st] (when (:rate-bp st)
+                                                                  (str (:from-label st) "→" (:to-label st) " " (pct (:rate-bp st)))))
                                                        steps)))))]
         (concat
          ;; funnel snapshot (when measurable) — dedup'd against metrics block
@@ -131,7 +276,7 @@
          (let [gtm-txt (when bottleneck
                          (str "GTM (" (name (:from bottleneck)) "→" (name (:to bottleneck)) "): "
                               (:from-label bottleneck) "→" (:to-label bottleneck) " 転換 "
-                              (pct (:rate bottleneck)) " < 目標 " (pct (:benchmark bottleneck))
+                              (pct (:rate-bp bottleneck)) " < 目標 " (pct (:benchmark-bp bottleneck))
                               " — " (get gtm-playbook (:to bottleneck) "獲得施策を検討")))]
            (when (and bottleneck (not (contains? channels-items gtm-txt)))
              [{:proposal/action :canvas/add-item
@@ -148,6 +293,15 @@
             :event/value kiage-txt
             :proposal/reason "funnel 段の計測が未整備 — 計器を準備項目として提案"}))))))
 
+(defn- step-rate-text
+  "率の綴り。**『測れていない』と『分母が無い』を別々に綴る** —— 以前はどちらも
+   `(未計測)` になり、instrument の穴と 0 件の前段が読み手に区別できなかった
+   （ADR-2608136000 の 4 問目: 飛ばしたのか合格したのかが出力で分かるか）。"
+  [st]
+  (cond (:rate-bp st)          (pct (:rate-bp st))
+        (not (:measurable st)) "(未計測)"
+        :else                  "(分母なし)"))
+
 (defn render-text
   "Human-readable funnel report for `funnel show`."
   [product metrics]
@@ -162,12 +316,12 @@
            ["  ─ 転換 ─"]
            (map (fn [st]
                   (str "  " (:from-label st) " → " (:to-label st) ": "
-                       (if (:rate st) (pct (:rate st)) "(未計測)")
-                       (when (:benchmark st) (str " (目標 " (pct (:benchmark st)) ")"))
-                       (when (and (:gap st) (neg? (:gap st))) " ⚠ bottleneck 候補")))
+                       (step-rate-text st)
+                       (when (:benchmark-bp st) (str " (目標 " (pct (:benchmark-bp st)) ")"))
+                       (when (and (:gap-bp st) (neg? (:gap-bp st))) " ⚠ bottleneck 候補")))
                 steps)
            (when bottleneck
              [(str "  ▸ bottleneck: " (:from-label bottleneck) "→" (:to-label bottleneck)
-                   " " (pct (:rate bottleneck)) " < 目標 " (pct (:benchmark bottleneck)))])
+                   " " (pct (:rate-bp bottleneck)) " < 目標 " (pct (:benchmark-bp bottleneck)))])
            (when (seq missing)
              [(str "  ▸ 未計測段: " (str/join ", " (map name missing)))])))))))
