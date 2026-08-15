@@ -366,62 +366,57 @@ clock / http-ingress / http / llm / log / state / storage / stream-object / ui�
 > `reference-implemented` で、私の grep が `` `backtick` `` を期待して
 > `**bold**` を取り落としていた。測り方が答えを決めた例なので残す。
 
-### 実測しなおした結果、不足は capability ではなかった
+### 実測しなおした結果 —— 不足は capability でも言語機能でもなかった
 
 **base64 と HMAC は capability ではない。** どちらも純関数で、権限を要さない。
 Kotoba は capability を「世界に影響する権限」に使うのだから、純粋な計算に
-capability を付けるのは言語のモデルに反する。正しい置き場は stdlib である。
+capability を付けるのは言語のモデルに反する。
 
-**では stdlib に書けるか。** authority（`kotoba-lang/lang/guest-grammar.edn` の
-`:admitted-builtins`）は `byte-at` `byte-store!` `bytes-len` `bytes-ptr` `alloc`
-と `bit-and/or/xor/shift-left/shift-right` を挙げている。**書けそうに見える。**
+> **訂正（同日、2 度目）。** この節は一度「shift の lowering が 4 バックエンド
+> 全部に無いので base64 は書けない」と書いた。**誤りである。**
+> 私が試したのは Clojure の演算名（`bit-shift-left`）で、Kotoba の名前は
+> `i64-shift-left` / `i64-shift-right` / `u64-shift-right` である
+> （`frontend.cljc:119` の `i64-operations`）。**正しい名前では 4 バックエンド
+> 全部で通る。** authority の `:admitted-builtins` を読んだのも外し方で、あれは
+> memory ABI であって source surface ではない。
+>
+> **同じ形の誤りをこのセッションで 4 回やった** —— Twilio のテストベクタ、
+> epoch-day 定数、WAV ヘッダ長、そしてこれ。**共通しているのは「実物に当てる前に
+> 別のものを読んで結論した」こと。** コンパイルすれば 1 回で分かった。
 
-**実際にコンパイルして測った。書けない。**
+### 実際に測った結果（`kotoba-lang/compiler` d3443d96 に conformance kit として landed）
 
 ```
-                 wasm32  cljs  x86_64  aarch64
-bit-and             OK    OK      OK      OK
-bit-or              OK    OK      OK      OK
-bit-xor             OK    OK      OK      OK
-bit-shift-left       ✗     ✗       ✗       ✗     operation has no admitted lowering
-bit-shift-right      ✗     ✗       ✗       ✗     同上
-byte-at / alloc      ✗     ✗       ✗       ✗     同上
-i64shl/shr/ushr      ✗     ✗       ✗       ✗     同上
+                                       wasm32  cljs  x86_64  aarch64
+bit-and / bit-or / bit-xor / bit-not      OK    OK      OK      OK
+i64-shift-left / -right / u64-shift-right OK    OK      OK      OK
+i32 shifts                                OK     ✗      OK      OK   (cljs は別 profile)
 ```
 
-**4 バックエンド全部で同一。** バックエンドの差ではなく、**言語の lowering に
-shift と byte アクセスが無い**。
+**バイト容器は `:vector-i64`**（`vector-count` / `vector-at` / `vector-conj` /
+`vector-assoc` / `vector-drop`）。`:bytes` 型は存在するが `bytes-empty` しか
+持たないので**実質使えない** —— 空しか作れない。
 
-原因の場所も特定した:
+**base64 を実際に Kotoba で書き、RFC 4648 §10 のベクタ 9 件で検証した。**
+`""` `"f"` `"fo"` `"foo"` `"foob"` `"fooba"` `"foobar"` を含み、パディング
+0/1/2 個の三通りすべて一致。conformance kit `:base64-kit` として登録済み
+（61/61 dual-backend、golden 再生成済み、変異 3 種で discriminate を実測）。
 
-```clojure
-;; kotoba-lang/kotoba-sema/src/kotoba/compiler/frontend.cljc:96
-(def arithmetic '#{+ - * quot bit-xor bit-and bit-or})
-```
+> kit も 2 度書いた。最初の版は `"foobar"`（6 バイト = 2 group ちょうど）だけを
+> 符号化して「base64 が動く」と主張していた。**パディングの分岐が一度も実行されず**、
+> パディング文字を `'='` から `'A'` に変えても緑のままだった。いまは 6/5/4 バイトを
+> 通す。**canonical なベクタが canonicalization を試していない**のは、今日の
+> Twilio 署名テストと同じ形である。
 
-**shift がこの集合に入っていない。** authority の `:admitted-builtins` は
-「memory/string ABI helpers」として byte 系と shift 系を挙げているが、通常の
-source からの lowering は上の集合が決めており、両者が**ずれている**。CLAUDE.md が
-「frontend が受理することと authority が認めることは別物で、drift は機械検査で
-潰す対象」と書いている、まさにその drift（向きは逆で、authority の方が広い）。
+### 不足の正しい一覧（優先順、訂正後）
 
-**shift 無しに base64 は書けない**（6 bit への組み替えができない）。**byte アクセス
-無しに HMAC は書けない**（鍵と ipad/opad の XOR がバイト列に対する操作である）。
-
-### 不足の正しい一覧（優先順）
-
-| | 何が要るか | 規模 |
+| | 何が要るか | 状態 |
 |---|---|---|
-| 1 | **`bit-shift-left` / `bit-shift-right` の lowering** —— `arithmetic` 集合への追加 + 4 バックエンドの emit + arity 検査 + conformance kit | 小〜中。既存の `bit-and` の隣 |
-| 2 | **byte 値面**（`byte-at` / `byte-store!` / `bytes-len` / `alloc` を通常の source から使えるようにする、あるいは安全な `:bytes` 値型として作り直す） | 中〜大。`:admitted-builtins` は memory ABI 用で、application profile の形ではない |
-| 3 | **双方向 stream ingress kit** —— `http-ingress-v1` の双方向版。**これだけが本物の capability**。フレームの出入りだけを capability にすれば `koe.bridge` の形と一致する | 中。既存 kit の形に沿う |
-| — | ~~hash/HMAC kit~~ | **不要**。sha256 は既に provider 実装済みで、HMAC はその上の純粋な構成 |
-| — | ~~base64 kit~~ | **不要**。純関数なので stdlib。ただし 1 と 2 が前提 |
-
-**process/exec は引き続き「足すべきでないもの」。** `say` を叩くのは ambient
-authority そのもので、Kotoba が deny-by-default で拒否している当のもの。合成器も
-音声認識器もホスト側 provider のまま、型付き capability 越しに呼ぶ（aiueos の
-「判断は .kotoba、機構は外」と同じ形）。
+| 1 | **双方向 stream ingress kit** —— `http-ingress-v1` の双方向版。フレームの出入りだけを capability にすれば `koe.bridge` の形と一致する | **これだけが本物の不足** |
+| 2 | base64 の **stdlib 収録** | コードは動く。stdlib は `:frozen` で「public names の拡張は version bump + WBS T4.x タスク」と明記されており、**governed な手続き**が要る（勝手に足さない） |
+| 3 | HMAC | 純粋な構成。sha256 は provider 実装済みだが ABI が `(ptr len out-ptr out-cap)` の**メモリ面**なので、`:vector-i64` から呼ぶ橋が要る |
+| — | ~~shift の lowering~~ | **不要。既にある**（名前が違っただけ） |
+| — | ~~hash/HMAC kit~~ / ~~base64 kit~~ | **不要**（純関数 / provider 実装済み） |
 
 ### したがって、いま Kotoba に移せるもの / 移せないもの
 
