@@ -1,0 +1,89 @@
+[{:db/id -1
+  :adr/id "2608150300"
+  :adr/title "torihiki devnet を立て直した —— 走る。数千 block で止まる。止まり方は 1 つの相関に収束する"
+  :adr/status "accepted"
+  :adr/date "2026-08-15"
+  :adr/body
+"## 決定と到達点
+
+`torihiki-validator-v3` を復活させた。410 の tombstone を置き換え、
+inga を 7fb9f43（fork 解消）へ、alarm cadence を 25 ms → 500 ms へ。
+
+**畳まれた理由は「動かなかったから」ではない。** deploy 履歴が読める:
+21:46「Reduce devnet validator alarm cadence from 50ms to 500ms to stop DO cost
+amplification」、21:53 に 410 の tombstone。**請求書を止めるために畳まれた。**
+
+実測（外側から、block 数 / 実時間）:
+
+    tick 500   764 blocks / 60,162 ms   78.7 ms per block
+    tick 100   317 blocks / 30,040 ms   94.8 ms per block
+    tick  25   337 blocks / 30,003 ms   89.0 ms per block
+
+**alarm を 20 分の 1 にして block は速くなった。** 相殺ではなく両取りで、
+25 は速さを 1 ミリ秒も買っていなかった。理由は validator.cljs が既に書いて
+結論だけ引いていなかった —— DO は届いたものを直列化するので tick は入ってくる
+票が待たされる窓であり、毎秒 40 個の窓は毎秒 40 回の遅れる機会。時計が、chain を
+実際に動かしているメッセージと競合していた。
+
+コストは毎秒 160 invocation（1 日 1,380 万）→ 毎秒 8。既存の放棄検知
+（120 秒誰にも呼ばれなければ止める）はこれを捕まえない —— **4 台の validator は
+構造的に互いを呼び続けるので、時計が止まる唯一の状態に、動いている chain は
+決して入らない。**
+
+## 走る
+
+`/reset` 4 台 → genesis から。2 サイクルとも同じ:
+
+- 0 → 約 4,843 block を約 6 分（78.7 ms/block）
+- 0 → 約 3,293 block を約 5 分（57 ms/block の区間あり）
+- `committed` は height−2 を追随、`view` は height に一致（pacemaker 健全）
+
+**安全性**: 4 replica が同じ committed 高さで報告した **26 個の state root が
+1 つも食い違わなかった**（4 台全員が一致した高さを含む）。
+
+⚠ この検査は**測れないときに合格を返す形**を持っている。chain が速いと 2 台が
+同じ committed 高さでサンプルされず、共有高さ 0 で「不一致 0」になる。実際に
+1 回それを出した。**共有高さの件数を先に見ること** —— 0 件は合格ではなく無回答。
+
+## 止まる —— そして止まり方は 1 つの相関に収束する
+
+数千 block（4,843 と 3,293。**この数字は再現しない**ので閾値ではない）で停止する。
+停止時の姿は 2 サイクルとも同一:
+
+- 4 台が**それぞれ別の tip**（高さ 4841-4844）に票 1 ずつ —— **4 分岐**
+- `view` が height を 110 以上引き離して上昇（timeout だけが回っている）
+- sync は `does-not-attach` / `does-not-link` で拒否
+- `dropped-votes {unsigned …}` が数千。**各 replica が落としているのは自分自身の
+  票**（`last-dropped-vote.witness` が自分）
+
+**そして `equivocators` が 0 → 4 に変わる。** 2 サイクルとも:
+
+    reset 直後  equivocators 0   走る
+    停止時      equivocators 4   止まる
+
+観測できた範囲で例外なく相関する。ADR-2800004800 §1b は
+「view change を equivocation と呼んでいた」誤検出を (witness, height, view) で
+直したと記録しているが、**本番では 4 台全員が互いを断罪する状態が再生成される。**
+
+## 次はここから
+
+1. **`equivocators` が 0 → 4 になる瞬間を捕まえる。** 相関は強いが因果の向きは
+   未確定 —— 誤検出が票を無効化して fork を作るのか、fork が正当な証拠を作るのか。
+   証拠 1 件を dump して、それが view をまたいだ同一 height の投票（= view change、
+   無罪）かを見るのが最短。
+2. **4 分岐は in-process harness に無い。** landed した rewind は 2 分岐を解く
+   （JVM/cljs 両方で実証済み）が、4 台が別々の tip に居る形は再現していない。
+   harness に 4 分岐を足すのが先で、production で直そうとしない。
+3. `dropped-votes {unsigned}` が自分の票である件 —— DO は WebCrypto が非同期
+   なので replica は署名なしで emit し dispatch が署名して畳み戻す設計。その
+   往復が停止時に成立していない。
+
+## 運用メモ
+
+- ADMIN_TOKEN は読めない（write-only）ので rotate した。`/reset` にはそれが要る。
+- `TICK_MS` で cadence を上書きできる（下限 50 / 上限 60000）。**下限が要点** ——
+  畳まれた時の既定が 25 だったので、typo した `TICK_MS=1` が 25 倍のコスト回帰を
+  静かに戻せてはいけない。コスト回帰は数週間後に請求書として届く。
+- code-version 148 が live であることを `/head` で確認してから信じること。
+
+kotoba-lang/torihiki-node f6e1eaa4。west pin 前進済み。"}]
