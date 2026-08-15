@@ -445,5 +445,51 @@
               identical namespaces are scaffold families and would be 1500 standing
               lines. --findings was proved additive on a 3-repo fixture: output
               byte-identical without the flag, and identical with it once the FINDING
-              and SCANNED lines are removed; --check still exits 1 either way."}]}
+              and SCANNED lines are removed; --check still exits 1 either way."}
 
+  {:id       :verify-appview-facade
+   :title    "migrated appviews whose deployed handler is not the file a reader opens"
+   :why      "2026-08-15, found while writing an operator quickstart for
+              cloud-itonami/port and then asking whether it was one repo's quirk.
+              It was not. Across all 329 appview repos in cloud-itonami and
+              etzhayyim carrying a wrangler.jsonc: 175 deploy the SvelteKit build,
+              147 ship an appview/*/src/app.ts facade, and 89 serve /health in
+              that facade and in NO deployed route -- so 89 services document a
+              health endpoint that hits the SvelteKit 404 in production, which is
+              worse than having none because the source says 200. A further 58
+              have request validation only in the undeployed file: the facade
+              answers 400 InvalidJson while the deployed route does
+              `.catch(() => ({}))` and calls the tool with EMPTY ARGUMENTS. Both
+              read as correct from the source, which is why nothing reported them.
+              It cannot be a fleet gate: it reads `orgs/` and a gate ships one
+              repo's tree, so on a node it would find an empty workspace and never
+              go green (ADR-2608124800)."
+   :argv     ["nbb" "{{repo}}/scripts/verify-appview-facade.cljs" "--root" "{{root}}" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 86400000
+   :timeout-ms  1800000                 ; 30m -- 14x the measured 125s, since it shells git once per repo
+   :writes   :none
+   :measured "2026-08-15 on this machine, through orgs-detector-tick: `ok exit 1
+              125s 146 finding(s) scanned=329`, and 122s on a second run. (A
+              standalone run looked like ~70s; the tick-measured number is the one
+              recorded, because the tick is what enforces the timeout.) 146 =
+              89 health + 57 validation. Discrimination shown three ways
+              on a constructed root: a divergent repo yields both findings, a repo
+              whose deployed route serves health and validates yields none, and
+              patching the divergent one to match clears it to exit 0. The floor
+              refuses rather than reporting clean -- pointed at a root with 2
+              appviews it exits 2 with CANNOT ANSWER, because `no divergence` and
+              `no repositories` otherwise print the same zero. 183 of the 329 real
+              repos produce no finding, which is the negative direction on real
+              data."
+   ;; NO :accepted block, deliberately. The keys here are per repository
+   ;; (`health-only-in-undeployed-facade:orgs/<org>/<repo>`), so a bare prefix
+   ;; matches nothing -- the first version of this entry declared the prefixes and
+   ;; the tick correctly reported them as STALE ACCEPTANCE, warning that an
+   ;; exemption outliving its finding exempts whatever lands on that key next.
+   ;; The baseline mechanism already gives the wanted behaviour: the first run
+   ;; records all 146, and from then on only NEW and RESOLVED surface, so a NEW
+   ;; one means someone has just built another appview with this shape.
+   }]}
