@@ -235,7 +235,68 @@
           {:stale? false :reason :unknown-generation :age-days nil}
           (select-keys r [:stale? :reason :age-days])))
 
+;; ── 読んでいるコピー自体が古い場合 ───────────────────────────────────────────
+;;
+;; `:root-reads-behind-remote` は他の理由と違って **測り直しでは直らない**。
+;; tick が読む root は cwd ではないので、共有 checkout が別 branch に居ると
+;; 「測り直せ」→ main に着地 → 同じ古い値を読む、が閉ループになる（実測
+;; 2026-08-15、2 周消費）。だから他のどの理由よりも先に立つ必要がある。
+
+(let [r (f/freshness {:generated-at measured-at :now now
+                      :entries real-ledger :stale-after-days 7
+                      :root-reads-behind-remote? true})]
+  (check! "root が remote の tip を読んでいないなら、それを最初に言う"
+          {:stale? true :reason :root-reads-behind-remote}
+          (select-keys r [:stale? :reason])))
+
+;; 順番が効いていること。unseen があっても :blind-to-own-work に落ちてはいけない
+;; —— 両方が真のとき正しい手は測り直しではなく root を直すことなので。
+(let [unseen-entries [{:at "2026-08-15T10:00:00Z" :outcome :landed
+                       :axis :axis-docs :target "orgs/x/y"
+                       :landing-ms (+ measured-at 60000)}]
+      r (f/freshness {:generated-at measured-at :now now
+                      :entries unseen-entries :stale-after-days 7
+                      :root-reads-behind-remote? true})]
+  (check! "unseen があっても root の問題を優先する（測り直しは空振りするから）"
+          :root-reads-behind-remote
+          (:reason r)))
+
+;; 日数の床より先でもある
+(let [r (f/freshness {:generated-at (- now (* 40 86400000)) :now now
+                      :entries [] :stale-after-days 7
+                      :root-reads-behind-remote? true})]
+  (check! "40 日古くても、先に root の問題を言う"
+          :root-reads-behind-remote
+          (:reason r)))
+
+;; **判定できなかったときは判定しない。** git が答えられない（remote が無い /
+;; detached / offline）とき tick は nil を渡す。nil を true と同じに扱えば、
+;; 見ていないものを見たことにする——このファイル全体が扱っている失敗形そのもの。
+(doseq [[label v] [["nil（git が答えられなかった）" nil]
+                   ["false（tip と一致している）" false]]]
+  (let [r (f/freshness {:generated-at measured-at :now now
+                        :entries real-ledger :stale-after-days 7
+                        :root-reads-behind-remote? v})]
+    (check! (str "root の判定が " label " なら、この理由は立てない")
+            false
+            (= :root-reads-behind-remote (:reason r)))))
+
+;; 引数を渡さない既存の呼び出しは、今までどおり
+(let [r (f/freshness {:generated-at measured-at :now now
+                      :entries real-ledger :stale-after-days 7})]
+  (check! "引数を省略した既存の呼び出しは挙動が変わらない"
+          false
+          (= :root-reads-behind-remote (:reason r))))
+
 ;; ── 表示 ─────────────────────────────────────────────────────────────────────
+
+(check! "explain: root の問題は『測り直しでは直らない』と言う"
+        true
+        (boolean (re-find #"測り直しでは直らない"
+                          (f/explain (f/freshness {:generated-at measured-at :now now
+                                                   :entries real-ledger :stale-after-days 7
+                                                   :root-reads-behind-remote? true})))))
+
 
 (let [r (f/freshness {:generated-at measured-at :now now
                       :entries real-ledger :stale-after-days 7})]
