@@ -105,6 +105,12 @@
   ;; maven の cognitect test-runner + datomic local を要するので、egress を
   ;; 推測で登録すると恒久的に赤い gate になる）:
   ;;   test-plm-1e0901d-murakumo-judah  exit 0  Ran 31 tests / 118 assertions
+  ;; ADR-2608153000 — ENGI。plm と同じ手順で、登録前に `--dry-run --only credits`
+  ;; を実ノードに当てて緑を確認した（`:test` alias が maven の cognitect
+  ;; test-runner を要し、ws-valueflo-vocabulary の git dep も搬送が要る）:
+  ;;   test-credits-909b866-murakumo-judah  exit 0  Ran 70 tests / 432 assertions
+  ;;   dep shipped (checkout) io.github.kotoba-lang/ws-valueflo-vocabulary 95e552d -> judah
+  {:name "credits" :gate :jvm-test :cd true}
   {:name "plm" :gate :jvm-test :cd true}
   {:name "ws-valueflo-vocabulary" :gate :jvm-test :cd true}
   {:name "ws-valueflo-algorithms" :gate :jvm-test :cd true}
