@@ -55,6 +55,8 @@
 (def projection "90-docs/valueflows/itonami-business-vf.datoms.edn")
 (def resource-projection "90-docs/valueflows/uchiwake-resources-vf.datoms.edn")
 (def recipe-projection "90-docs/valueflows/uchiwake-recipes-vf.datoms.edn")
+(def cost-projection "90-docs/valueflows/uchiwake-costs-vf.datoms.edn")
+(def price-observations "90-docs/valueflows/commodity-prices.observed.edn")
 
 (defn- run-generator
   "Invoke a projection's own generator in --check mode. Never re-derive here: a
@@ -94,6 +96,56 @@
   ;; The only projection with quantities, so the only one the algorithms can run
   ;; on. A silent regeneration that changed a mass would change an explosion.
   (run-generator "uchiwake-valueflows-recipes.cljs" recipe-projection "recipes"))
+
+(defn check-cost-projection! []
+  ;; The cost basis derived from the pinned prices. --check is deterministic: it
+  ;; reads the committed observation file and never touches the network, so a
+  ;; FRED outage cannot make this red and a stale price cannot make it green.
+  (run-generator "commodity-prices.cljs" cost-projection "costs"))
+
+(defn check-price-observations! []
+  ;; The prices are PINNED, and the pin is what makes the cost projection
+  ;; reproducible. Three things must hold, and the third is the one that rots:
+  ;; a price observation is a measurement with a date, and a cost quoted from a
+  ;; year-old observation is not wrong so much as undated.
+  (let [f (path/join repo price-observations)]
+    (if-not (exists? f)
+      (finding! "high" "price-observations-absent"
+                (str f " is missing; the cost projection has no pinned prices"))
+      (let [{:keys [observations fetched-at units-read-at]} (edn/read-string (slurp* f))]
+        (cond
+          (empty? observations)
+          (finding! "high" "price-observations-empty"
+                    (str f " records no observations"))
+
+          ;; every row must carry the unit AS PUBLISHED. Sugar is cents per pound
+          ;; while the others are dollars per tonne, so a row without its unit
+          ;; cannot be converted and a wrong conversion is out by 10^5.
+          (some #(str/blank? (str (:unit-published %))) observations)
+          (finding! "high" "price-observation-without-unit"
+                    (str "an observation in " f " has no :unit-published;"
+                         " cents-per-pound and dollars-per-tonne cannot be told"
+                         " apart without it"))
+
+          (some #(str/blank? (str (:contract-prices %))) observations)
+          (finding! "medium" "price-observation-without-contract"
+                    (str "an observation in " f " does not say what its contract"
+                         " actually prices, so the gap between the commodity and"
+                         " the recipe's ingredient is invisible"))
+
+          :else
+          (let [ages (keep (fn [o]
+                             (when-let [d (:date o)]
+                               (/ (- (.now js/Date) (.getTime (js/Date. d)))
+                                  86400000)))
+                           observations)
+                oldest (when (seq ages) (apply max ages))]
+            (when (and oldest (> oldest 400))
+              (finding! "medium" "price-observations-stale"
+                        (str "the oldest price observation is " (int oldest)
+                             " days old (fetched " fetched-at ", units read "
+                             units-read-at "); re-run"
+                             " scripts/commodity-prices.cljs --fetch")))))))))
 
 ;; ── 2. the Rev.5 mirror matches its recorded pin ──────────────────────────
 
@@ -162,6 +214,8 @@
 (check-projection!)
 (check-resource-projection!)
 (check-recipe-projection!)
+(check-cost-projection!)
+(check-price-observations!)
 (check-rev5-pin!)
 (check-rev4-conflict!)
 
