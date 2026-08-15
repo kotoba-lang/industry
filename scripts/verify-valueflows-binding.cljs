@@ -201,7 +201,42 @@
                         (str (count missing) " of the recorded differing codes are no"
                              " longer in the mirror (" (str/join " " (take 5 missing))
                              "); the Rev.4 half was re-ingested without updating"
-                             " PROVENANCE.edn")))))))))
+                             " PROVENANCE.edn")))))
+        ;; The finding that the mirror is not ISIC at all rests on 14 codes the
+        ;; UN's own file does not contain. Those 14 are checkable OFFLINE -- they
+        ;; either are in data/classes or they are not -- so the claim cannot rot
+        ;; quietly if the mirror is replaced. What is NOT checked here is the UN
+        ;; file's side of it: that needs the network, and a detector that goes red
+        ;; when unstats.un.org is down would be reporting on the UN's uptime.
+        (let [ev (get-in p [:rev4-conflict :what-the-mirror-actually-is :evidence])
+              claimed (get-in ev [:codes-only-in-mirror :codes])
+              n (get-in ev [:codes-only-in-mirror :count])]
+          (cond
+            (empty? claimed)
+            (finding! "medium" "rev4-mirror-identity-unrecorded"
+                      (str "PROVENANCE.edn no longer records which codes show the"
+                           " mirror is not ISIC Rev.4; 122 businesses take an"
+                           " industry name from it under that label"))
+
+            (not= n (count claimed))
+            (finding! "medium" "rev4-mirror-identity-count-mismatch"
+                      (str "PROVENANCE.edn says " n " codes are mirror-only but"
+                           " lists " (count claimed)))
+
+            (exists? cls)
+            (let [mirrored (into #{}
+                                 (keep (fn [f]
+                                         (when (str/ends-with? f ".json")
+                                           (get (js->clj (js/JSON.parse (slurp* (path/join cls f))))
+                                                "code"))))
+                                 (js->clj (fs/readdirSync cls)))
+                  absent (remove #(contains? mirrored %) claimed)]
+              (when (seq absent)
+                (finding! "medium" "rev4-mirror-identity-stale"
+                          (str (count absent) " of the codes recorded as EU-only are"
+                               " no longer in the mirror (" (str/join " " (take 5 absent))
+                               "); either it was re-ingested from a different source"
+                               " or the finding needs re-measuring"))))))))))
 
 ;; ── report ────────────────────────────────────────────────────────────────
 
