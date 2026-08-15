@@ -1044,4 +1044,18 @@
      :file "README.md"
      :find "[docs/adr/0001-descriptor-snapshot-not-an-executor.md](docs/adr/0001-descriptor-snapshot-not-an-executor.md)"
      :replace "docs/adr/0001-gone.md"
-     :must-fail ["the-adr-exists-and-is-linked"]}]}]}
+     :must-fail ["the-adr-exists-and-is-linked"]}]}
+
+  {:repo "orgs/cloud-itonami/cloud-itonami-app"
+   :label "Cloud Itonami Bot handoff context isolation"
+   :cmd ["clojure" "-Sdeps" "{:paths [\"src\" \"resources\" \"test\"]}"
+         "-M" "-e"
+         "(require 'clojure.test 'cloud.itonami.app.routines-test)(let [r (clojure.test/run-tests 'cloud.itonami.app.routines-test)] (shutdown-agents) (System/exit (+ (:fail r) (:error r))))"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :cloud-itonami-app/handoff-target-context-isolated
+     :why "A handoff target must receive only the attributed task envelope. Reusing its ambient conversation silently leaks unrelated prior messages into a new Bot-to-Bot direction."
+     :file "src/cloud/itonami/app/bots.clj"
+     :find "            (store-context! target-context-id target target-direction :handoff\n                            [target-message]"
+     :replace "            (store-context! target-context-id target target-direction :handoff\n                            (conversation to-bot-id)"
+     :must-fail ["a-handoff-is-an-isolated-two-way-durable-conversation"]}]}]}
