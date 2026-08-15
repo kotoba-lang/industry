@@ -729,6 +729,30 @@
    :script "gates/capital-pools-check.cljs"
    :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
 
+  ;; fabric actor（`*-organism.aozora.app`）が外へ出す文字列と終了状態の 2 実装。
+  ;; ADR-2608155000。正本は `scripts/kotoba/fabric_actor_core.kotoba`（kotoba/pure、
+  ;; capability 0）、参照は `scripts/gftd/fabric_actor_core.cljc`、それを JVM の
+  ;; `register_fabric_actors.clj` と `publish_fabric_actor_status.clj` が読む。
+  ;;
+  ;; 移行前は 2 本の .clj が product 一覧・handle・Keychain service 名・exit 規則を
+  ;; **それぞれ独立に**持っていた。gate はその再発を見る。
+  ;;
+  ;; **:include-ext に .mjs が要る。** ノードに kotoba ツールチェーンは無い（fleet が
+  ;; 配るのはこの repo の tree だけで、`orgs/` の amu は入らない）ので、org-id gate と
+  ;; 同じくコンパイル済み artifact を配って import する。`.kotoba` も sha256 の
+  ;; 突き合わせ対象なので要る。`.cljc` は参照実装そのもの。
+  ;;
+  ;; **落ちることを確認済み**（2026-08-15、無改変で exit 0 / 198 cases）:
+  ;;   cljc の pulse 文を 1 語変える        -> 36 件の parity 不一致で exit 1
+  ;;   `.kotoba` を触って再コンパイルしない -> `artifact<->source: BROKEN` で exit 1
+  ;;   product 一覧を 1 件に縮める          -> 一覧の乖離を名指しして exit 1
+  ;; --min は case 表が空になった gate を緑にしない床（ADR-2608136000）。上限ではない。
+  {:name "root" :id "root-fabric-actor-core" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/fabric-actor-core-check.cljs"
+   :script-args ["--min" "150"]
+   :include-ext [".kotoba" ".mjs" ".cljc" ".edn"] :min-files 1500 :cd false}
+
   ;; kotobase-shard-index（ADR-2608071500）。client が object store から直接
   ;; 読む検索索引。2 つを守る:
   ;;
