@@ -148,4 +148,25 @@ kotoba-lang/torihiki-node f6e1eaa4。west pin 前進済み。
     curl -sS \"$B/head?w=w1\" | python3 -m json.tool | grep -E 'view|height|leader'
 
 で `leader-of-next`(高さ由来) と `propose-refusal.leads-that-round`(view 由来)
-が一致しているかを見ること。ずれていれば、それが次の 1 件。"}]
+が一致しているかを見ること。ずれていれば、それが次の 1 件。
+
+## closing 直前に見えた 2 つ目の形 —— checkpoint resume が prefix を分岐させる
+
+    w1  h 5616  committed 5614  booted-from-checkpoint true   checkpoint 5600
+    w2  h 5634  committed 5632  booted-from-checkpoint false
+    sync  offered 18  from 5617  to 5634  adopted 0
+          w1/w4 does-not-link / w2/w3 does-not-attach
+
+w1/w4 は evict されて checkpoint から resume し、w2/w3 と**違う prefix**に着いた。
+**分岐は tip より下に在る**ので、peer が出す 5617-5634 は `sync-step` の rewind
+経路に到達しない（segment が tip より上から始まるため `conflicts-with-chain?`
+が consult されない）。append が does-not-link で終わる。
+
+⚠ **committed が下がって見えるのは安全性違反ではない** —— restart した replica を
+restart 前の同じ名前の replica と比べているだけ。`booted-from-checkpoint` を
+先に見ること。closing 中に一度これで肝を冷やした。
+
+これは ADR-2608150200 で「どのシナリオでも実行されないので落とした」と書いた
+`sync-from`（tip より下へ要求を歩かせる）が、まさに書かれた条件である。
+**harness で再現できないことを、起きないことと読んだのが誤り**だった。
+順序は「この形を harness に足す → `sync-from` を戻す」。"}]
