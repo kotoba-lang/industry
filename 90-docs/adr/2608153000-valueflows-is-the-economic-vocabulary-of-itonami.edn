@@ -225,16 +225,59 @@ value equation が向いている方向は ENGI の Commons issuance が既に�
   **突き合わせる既存の単位語彙が無いから** —— plm は `:plm.item/uom` を宣言して
   値をどこにも入れていない（実測）。
 
+- **`Proposal` / `Agreement` が入った**（`valueflows.proposal`）。これで VF の
+  中核 class で :absent なものは無くなった。
+  - **片側だけの取引は「記述」であって欠陥ではない。** upstream の
+    「*sometimes* with what is expected in return」が効いている —— 贈与・助成・
+    相互扶助は reciprocal が無い。拒否すると commons のやることの大半が
+    表現できなくなる。
+  - **完済と貸倒れを 1 つの flag に畳まない。** `:both-closed?`（もう何も
+    起きない）と `:both-fulfilled?`（満額届いた）を分け、`:closed-short` が
+    どの commitment が届かずに閉じたかを名指しする。初稿は `:settled?` 1 つで、
+    **貸倒れた融資と完済した融資を同じ値で報告していた** —— テストが捕まえた。
+  - 同じテストが 2 つ目の欠陥も出した: `:fulfilled` を「もう何も来ない」に
+    含めていなかった。`vf:finished` は既定 false で、届いた注文に後から flag を
+    立てる人は居ないので、**実ログでは全 commitment が open に見え exposure が
+    計算不能**だった。
+  - `vf:unitBased` が乗算を門番する（価格表の 1 行は commitment に展開でき、
+    一品物は拒否する）。**両側が同時に scale する** —— 品物だけ scale して
+    支払いを scale しないのが、価格表が損失になる経路。
+  - **融資の正しい形も記録した**: 元本を primary commitment、返済を reciprocal に
+    置く。commitment-ledger は依然 false friend（あちらの record は
+    `vf:Commitment` ではない）だが、**VF 語彙ならこう書く**が併記された。
+- **ENGI が VF 面に射影された**（`credits.engi.valueflows`、read-only）。
+  ⚠ **前の版で「入力が無くて着手できない」と書いたのは、射影 contract
+  （`projection-verify.cljs` の input hash 固定）についてだけ正しかった。**
+  **写像そのものは corpus を要しない** —— ENGI の実 event 形に対して正しく
+  写せるかはテストで示せる。corpus が要るのは *coverage を主張する*ときだけで、
+  ここを混同して item 全体を blocked と書いたのは誤りだった。
+  - **射影は admission ではない。** 署名・nonce・与信枠・epoch cap を一切
+    検証しない（kernel の仕事で、憲章的境界は無改変）。kernel 側は依存しない。
+    テストで固定した: **未署名の transfer も射影される**（signers 空のまま）。
+    射影の成功を検証と読むのが危険な誤りなので、意図的に pin した。
+  - transfer → `vf:transfer`（accounting/onhand とも decrementIncrement =
+    net supply ゼロそのもの）/ Commons issuance → `vf:raise`（相手側が無いので
+    decrement する先が無い）/ **credit line → 何にも写さない**
+    （`:non-economic`。負残高を受け入れる用意は flow ではない。数量 0 の event を
+    返せば起きていない移動を台帳に置くことになる）。
+  - kernel は `:accepted-events` に型を付けないので**形で判別**する。未知の形は
+    丸ごと返して数え、`:complete?` を false にする。
+  - **金額は整数 micro-EN のまま**（EN に直すと 10^6 で割って分数になり、
+    zero-net-supply が依存している整数厳密性が壊れる）。`:micro-en` を registry に
+    追加（`:mutual-credit`、`:currency` ではないので円と加算されない）。
+  - `net-supply` が**憲章的不変条件を join の向こう側で再確認する**:
+    *射影後の* event を `valueflows.event` で replay し、transfer は総額を
+    動かさず issuance だけが増やすことを検査する。issuance の写像を
+    `:transfer` に壊すと 5 assertion が落ちることを確認済み。
+
 ## 次に効くこと（未着手、優先順）
 
-1. **ENGI の datom 射影は入力が無くて着手できない**（2026-08-15 実測）。
-   `cloud-itonami/credits` は journal を replay で構成し、**corpus を repo に
-   持たない**（committed な journal / fixture データが無い）。入力の無い
-   projection は「見ないことで pass を報告する」ので書かない。
-   先に必要なのは ENGI 側に検証可能な event corpus が存在すること。
-2. `Proposal` / `Agreement` は依然 :absent / :partial。offer/request を
-   `vf:Proposal` として持つと commitment-ledger の融資 offer が
-   （false friend のままではなく）VF の語彙で表現できる。
+1. **`cloud-itonami/credits` に fleet gate が無い。** 64 tests/406 assertions を
+   持ちながら CI で何も検査していない。plm と同じ手順（`--dry-run` で実ノードに
+   当ててから登録）で入れられるはず。
+2. **ENGI の射影 contract**（`projection-verify.cljs` の input hash 固定）は
+   依然 corpus 待ち。写像は landed したが、**「この journal をこの datom 集合に
+   写した」という固定は committed な event corpus が無いと書けない**。
 3. ~~plm に fleet gate が無い~~ → **2026-08-15 に登録済み**（`:cd true`、
    receipt `ce94ff2c3480`、`test-plm-1e0901d-murakumo-judah` 31 tests/118
    assertions）。登録前に `--dry-run` で実ノードに当てて緑を確認した ——
