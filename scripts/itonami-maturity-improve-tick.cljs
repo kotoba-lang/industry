@@ -262,6 +262,42 @@
          (take 4)
          vec)))
 
+(defn- taken-by-someone-else
+  "Is another session already working on this repository?
+
+   Measured 2026-08-16: of seven consecutive rounds, FIVE had the tick's first
+   choice already taken -- supplychain (two worktrees), sanctions, vin, toshi-kozan
+   twice over. Every collision was caught by checking before starting, and nothing
+   in the tick said so, which makes the check both mandatory and easy to skip. Two
+   sessions writing the same docs/operator-quickstart.md is the outcome.
+
+   Asks git about the repository rather than guessing from /tmp path names: a
+   scratch file called /private/tmp/isic-vintage.cljs once matched a name-glob for
+   `vin` and read as contention that was not there. `worktree list` is
+   authoritative and finds linked worktrees wherever they live.
+
+   Returns nil when it looks free, or a reason string."
+  [path]
+  (let [d (str root "/" path)
+        wt (sh "git" ["-C" d "worktree" "list" "--porcelain"])
+        br (sh "git" ["-C" d "branch" "--list" "agent/*"])
+        n-wt (if (zero? (:code wt))
+               (count (filter #(str/starts-with? % "worktree ")
+                              (str/split-lines (:out wt))))
+               0)
+        branches (if (zero? (:code br))
+                   (remove str/blank? (map str/trim (str/split-lines (:out br))))
+                   [])]
+    (cond
+      ;; more than the checkout itself
+      (> n-wt 1)
+      (str "別セッションが worktree を " (dec n-wt) " 個持っている（触らない）")
+
+      (seq branches)
+      (str "agent branch が在る: " (str/join ", " (take 2 branches)) "（触らない）")
+
+      :else nil)))
+
 (defn- unseen-content
   "Content this repository has that the axis it is about to be sent to cannot see.
 
@@ -302,6 +338,7 @@
    :fleet-gain (:leverage/fleet-gain e)
    :band (:leverage/band e)
    :unseen (unseen-content e)
+   :taken (taken-by-someone-else (:repo/path e))
    :weakest (weakest-axes e)})
 
 ;; ── lane（substrate か breadth か）───────────────────────────────────────────
@@ -608,7 +645,9 @@
       ;; 「何も無い」と「計器が別の場所を見ている」を区別しないと、既に在るものを
       ;; 足しに行く周になる。
       (doseq [u (:unseen r)]
-        (log! (str "      ⚠ " u))))
+        (log! (str "      ⚠ " u)))
+      (when-let [t (:taken r)]
+        (log! (str "      ⛔ " t))))
     (when flat?
       (log! "⚠ この lane の leverage は平坦（上位 5 本の差 < 0.5）。順位は弱い信号なので、"
             "順位より『弱い軸を 1 つ確実に埋める』を優先する"))
@@ -673,6 +712,20 @@
             (str (:repo (first ranked)) "（kind=" (:kind (first ranked)) "）は"
                  "上位 3 軸がすべて『狙わない軸』。**水増しに行かせない** —— "
                  "この repo は飛ばして次を採るか、軸の外側の仕事（実装そのもの）を選ぶ")
+
+            ;; **1 位が誰かの作業中なら、次の 1 手はそれを言うこと。** 順位表に
+            ;; ⛔ を出すだけでは足りない —— agent が従うのはこの行で、5/7 周で
+            ;; 衝突していたのはここが黙っていたから。
+            (:taken (first ranked))
+            (let [r (first ranked)
+                  free (first (remove :taken (rest ranked)))]
+              (str "**1 位 " (:repo r) " は触らない** —— " (:taken r) "。"
+                   (if free
+                     (str "clean な次の候補は " (:repo free) "（own="
+                          (some-> (:own free) (.toFixed 3)) "）。順位が平坦なので、"
+                          "そちらを採って理由を ledger に書く")
+                     (str "上位に clean な候補が無い。順位を下へ辿るか、"
+                          "この周は測り直し/計器の仕事に充てる"))))
 
             :else (let [r (first ranked) a (first (filter :targetable? (:weakest r)))]
                     (str (:repo r) "（kind=" (:kind r) "）の "
