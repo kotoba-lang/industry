@@ -193,7 +193,17 @@
        (when distributed? "--split-mode layer")
        (when distributed? (str "--tensor-split " rpc-split))
        "-ngl 999" (str "-c " ctx) (str "--parallel " parallel)
-       "--host 0.0.0.0" (str "--port " port) "--jinja"])))
+       "--host 0.0.0.0" (str "--port " port) "--jinja"
+       ;; **n-gram 投機デコードは既定で入れる。** 追加メモリ 0 で、出力は
+       ;; 非投機と一致する（kbench 28/30・compile 3/3 が前後で不変、2026-08-15 実測）。
+       ;; 効き方は「出力が文脈をどれだけなぞるか」に比例する:
+       ;;   コード編集（入力をほぼ再掲）  13.0 -> 32.4 tok/s
+       ;;   新規コード生成               13.0 -> 12〜15.5 tok/s（ほぼ中立）
+       ;;   数え上げ（文脈に無い列）      13.0 -> 13.0 tok/s
+       ;; **MTP（`draft-mtp`）は入れない** —— この gguf は MTP テンソルを持ち
+       ;; 起動もするが、mini で 6.8 -> 5.3〜6.3 tok/s と**遅くなった**。帯域が
+       ;; 飽和した機械では draft の計算と +513 MiB を受理率で回収できない。
+       "--spec-type ngram-cache,ngram-simple"])))
 
 (defn- cmd-set! [dir]
   (let [distributed? (flag? "--distributed")
