@@ -161,6 +161,48 @@ object を取得する必要がある）。全掃引は 1 時間超で 30 分ル
 entry 数の床で「何も parse できなかった」を clean と報告しない）。4 状態すべてが
 到達可能であることと、床が拒否することを構築した root で実演済み。
 
+### ⚠ ingest は facts/catalog/data だけを見る —— 3 つ目の同型の盲点（2026-08-15 実測）
+
+`:ingest/citation-count` は URL を数える対象を
+`facts|catalog|jurisdictions?.(clj|cljc|cljs|edn)` と `data/` 配下に限っている。
+実測: **citation-count が 0 の 1,345 repo のうち 648（48%）が、計数器が見ない
+ファイルに 5 個以上の distinct URL を持つ。** 最大は `cloud-itonami-gtm-data` の
+**1,920 URL** が 0 と測られている。
+
+発見の経緯: `researcher-bio-gene` は `sources.jsonld` に PubMed / gnomAD / OMIM /
+Reactome / KEGG / ENA / ArrayExpress など **15 の distinct URL** を持ち、5 本を実際に
+fetch して 4 本が 200（OMIM は 403 —— 自動アクセスを拒否する方針で、URL の誤りではない）。
+それでも `axis-ingest` は **0bp**。ingest 先を書くことが主題の repo が、ingest 0 と
+測られている。
+
+### 3 つの盲点は 1 つの原因を共有する
+
+これで同じ形が 3 つ揃った:
+
+| 軸 | 見ているもの | 見ていないもの | 影響 |
+|---|---|---|---|
+| docs (README) | `README.md` だけ | `README.edn` | 316 repo |
+| substrate / test | **トップレベルの** `src/` `test/` だけ | 入れ子のレイアウト | 387 repo が src 0 かつ test 0 |
+| ingest | `facts/catalog/jurisdictions.(clj*/edn)` と `data/` だけ | それ以外の宣言ファイル | 648 repo |
+
+**原因は 3 つではなく 1 つ: 計器は内容をファイル名の規約で同定しており、fleet は
+その規約に従っていない。** 個別に見ると 3 つのバグに見えるが、同型である。
+
+そして帰結は順位に出ている —— **7 軸のうち 3 つが fleet の大きな部分で構造的に 0**
+なので、下位が平坦になる。成熟度向上 loop はそこで空の repo と中身のある repo を
+区別できないまま送り先を選んでいる。
+
+**どれも直していない。** 直せば数百 repo のスコアが一度に動き、`mean-own` と全 repo の
+`fleet-gain` が変わる（1 commit で地形が書き換わる）。3 つまとめて 1 つの判断として
+オーナーに出す方が、docs 軸の周の副産物として 1 つずつ変えるより良い。選択肢は 2 つ:
+
+- **(a) 計器を内容ベースに変える。** ファイル名ではなく「その repo が実際に何を
+  持っているか」で測る。387 + 648 + 316 repo のスコアが上がり、順位の平坦さが
+  解ける可能性がある。
+- **(b) レイアウト規約を明文化し、非適合として扱う。** その場合は移行 seed の
+  `:allowed-additions` と衝突しうる（`README.edn` しか許されていない repo に
+  `README.md` を足せない）。
+
 ### スコアは fleet 中央値に対する相対量なので、全 repo が一斉に ±1bp 動く
 
 同じ日に 2 セッションが独立に測り直し、**411 repo の own-bp が 1bp だけ食い違った。**
