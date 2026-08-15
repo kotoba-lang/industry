@@ -113,8 +113,12 @@
         (is (= 5.0 (get-in s' [:bmc :dims :validation])))
         (is (> (get-in s' [:bmc :score]) (get-in s [:bmc :score])))))
     (testing "yc = design 50% + traction 50%"
-      (is (= (+ (* 50.0 (/ 20.0 30.0)) (* 50.0 (/ 3.0 15.0)))
-             (get-in s [:yc :score]))))
+      ;; design 4+2+4+5+1+4 = 20 / traction 2+1+0 = 3。浮動小数版はここで
+      ;; 43.33333333333333 を返していた。ADR-2608158000 で算術を整数 basis point
+      ;; （kotoba/score_core.kotoba）へ移してからは (40000 + 2*6000)/12 = 4333 bp
+      ;; = 43.33 で、**切り捨てのぶんだけ下に動く**。動いた値はこの 1 件だけ。
+      (is (= 43.33 (get-in s [:yc :score])))
+      (is (= 4333 (get-in s [:yc :score-bp]))))
     (testing "render"
       (is (re-find #"cloud-itonami" (score/render-table {:cloud-itonami s}))))))
 
