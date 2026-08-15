@@ -505,6 +505,18 @@ accumulation); this section is the recovery path. Verified in practice 2026-07-0
    - same-file-set stashes in a numbered series ("round N") where the latest round is
      fully landed → earlier rounds are superseded intermediates; safe to retire.
 
+   **Append-only ledgers are judged on a semantic key, not on the line.** If the diff
+   touches `90-docs/business/canvas-ledger.edn`, `90-docs/design-quality/design-quality-ledger.edn`
+   or `manifest/fleet-db.ledger.edn`, read `:append-only-ledger-gate` in the edn before
+   deciding — a missing ledger line is un-landed *data*, not a stale generated artifact.
+   But strip `:event/at` before comparing: `kagami reconcile` re-stamps it on every run,
+   so two agents reconciling the same drift seconds apart produce lines identical in
+   `:event/type`, `:repo/name`, `:pin/old`, `:pin/new` and `:event/seq` that differ only
+   in their timestamp. Measured 2026-08-15: a line-exact test called **37 of 37** events
+   missing from `main`; on the semantic key **35 were identical**, 33 seconds apart. A
+   false `:unlanded` disables the gate — it parks retirable branches forever and invites
+   the append this section forbids.
+
 3. **Archive everything before dropping.** Export each stash as a patch (plus its
    untracked-file list from `stash^3` when present) into
    `.git/stash-archive-<date>/` with an `index.txt` of `SHA | message`. Dropping is then
