@@ -118,12 +118,58 @@ operator の署名鍵は Cloudflare secret の中にしか無く読み戻せな�
 - `app-aozora-appview` の release build が `jp-go-dds.core` 不在で落ちており、
   **画像同期を含む deploy 全体が止まっていた**。canvaskit と同じ形で git dep を追加。
 
-## 次にやるなら
+## 2026-08-15 close: relay-bsky を Aozora の read 面へ接続した
+
+上記 3 の実装を完了した。AppView の discover feed だけを
+`DISCOVER_DB_NAME=relay-bsky` に向け、既存の YORO route は
+`YORO_DB_NAME=yoro-social-v2` のまま維持した。AppView は generic な
+`at://.../app.bsky.feed.post/...` も投稿として materialize する。
+
+公開 read は server-side proxy を通さない。browser の
+`kotobase-client` が `https://kotobase.net` を直接 query し、gateway は次の
+**1 graph × 2 operation の完全一致 allowlist** だけを匿名許可する。
+
+```
+owner = did:key:z6MkvXVYfX3duzGkqW2YPRfXJpDDLmbaLN3jHuPphXCoMWFH
+graph = bafyreieq24o5wxv4lpcczopcs7xhngntyxv2qahv3leo7bqdeurrfk5k5q
+ops   = datomic.datoms, datomic.view
+```
+
+未登録 graph は 401、匿名 `datomic.transact` も 401。公開 graph の
+anonymous read と、browser が所有 seed から mint する read 限定 CACAO は
+別の境界である。後者は audience / graph / `datom:read` / 5 分 expiry を固定し、
+`x-kotoba-did` とともに直接送る。`atproto.kotobase.net` も browser origin から
+使える CORS preflight を返す。
+
+missing view の fallback が `scan-yoro` 自身へ再帰していたため、初回 query が
+止まる不具合も修正した。fallback は `scan-eavt-full` を直接呼ぶ。空 feed cache は
+削除し、cache generation を `relay-bsky-v1` に進め、旧空値が再利用されないようにした。
+
+本番実測:
+
+- 公開 graph: HTTP 200、14,043 datom、`:yoro.post/uri` 150 件
+- discover feed `limit=30`: cold 17.785 秒 / 30 件、その後 cache hit 0.1245 秒
+- `aozora.app`: HTTP 200、同 feed は最終確認 0.219 秒 / 30 件
+- CORS preflight: 204 / `Access-Control-Allow-Origin: *`
+- allowlist 外 graph と匿名 write: ともに 401
+
+本番 version は gateway `f3bac6f5-22a7-4048-880c-f0c43bd85565`、graph database
+`c34b121a-6ba2-4855-96dd-2f2237187434`、atproto
+`b5bcbf2f-c0c3-488c-9767-bed55543263f`、AppView
+`a8047116-2436-4a55-b4ef-727039f305b0`、SPA
+`2e00ebe2-0ab1-4fd9-980e-eee99434d97e`。
+
+## 残る境界
+
+private read の CACAO は現在 **graph owner の自己発行**だけを受ける。
+別主体へ共有する private graph の read delegation / operator-signed grant は
+未実装であり、実装済みと扱わない。
+
+また次は未解決のまま:
 
 1. `fold` の 503（D1 削除と整合。別系統）
 2. retract が通らない原因を engine 側で見る —— **直すまで importGraph で
-   本番 graph に入れない**（入れて戻せない状態を増やす）
-3. 取り込んだ bsky データを使う面（appview から `relay-bsky` を読む）"
+   本番 graph に入れない**（入れて戻せない状態を増やす）"
 
   :adr/evidence
   "app-aozora-engine@382af99（relay 隔離 + main のビルド修正）/
@@ -133,4 +179,11 @@ operator の署名鍵は Cloudflare secret の中にしか無く読み戻せな�
    app-aozora-appview@c94b9d3（jp-go-dds 依存）/
    kotobase-client@e5acb13（User-Agent）/
    kotobase-storage-s3@5a45f01（keyed read の計器）/
-   loop-ka-production@c91dc1d, 07209f2（shiropico の :ffmpeg 除去ほか）"}]
+   loop-ka-production@c91dc1d, 07209f2（shiropico の :ffmpeg 除去ほか）/
+   control-plane@e9bf207（公開 graph allowlist）/
+   app-aozora-appview@fa1d389（relay-bsky discover read）/
+   kotobase-client@7a9d27a（browser read CACAO）/
+   app-aozora-engine@684761c（direct query / cache generation / fallback 修正）/
+   root@ee4733f（west pin）/ root@ba0780f（genpon reconcile）。
+   検証: gateway 424 tests / 2,059 assertions、graph 362 / 1,120、
+   SPA 283 / 910、client 71 / 219、AppView release build 0 warnings。"}]
