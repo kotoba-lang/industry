@@ -131,13 +131,29 @@
         (throw (js/Error. (str "upload-http-" (str/trim (:out r)) " "
                                (subs (:err r) 0 (min 120 (count (:err r)))))))))))
 
+;; `npx --yes wrangler …` はこのループを走らせるマシン（npm 11.12.1）で壊れて
+;; いて `npm ERR! cb.apply is not a function` を吐く。publish 経路がこれに当たると
+;; **R2 に上がった clip が D1 に入らないまま失敗する**。実測 2026-08-15。
+;; wrangler が PATH に居るならそれを直接呼び、居ないときだけ npx へ落ちる。
+(def wrangler-cmd
+  (let [r (.spawnSync cp "wrangler" #js ["--version"]
+                      #js {:encoding "utf8" :timeout 30000
+                           :stdio #js ["ignore" "pipe" "pipe"]})]
+    (if (zero? (or (.-status r) 1)) :direct :npx)))
+
+(defn- wrangler-argv [args]
+  (if (= :direct wrangler-cmd)
+    ["wrangler" (vec args)]
+    ["npx" (into ["--yes" "wrangler"] args)]))
+
 (defn- d1-apply! [sql]
   (let [f (.join path work-dir "videos.sql")]
     (.mkdirSync fs work-dir #js {:recursive true})
     (.writeFileSync fs f (str sql "\n"))
-    (let [r (sh "npx" ["--yes" "wrangler" "d1" "execute" "ai-gftd-pds-recordlog"
-                       "--remote" "--yes" "--file" f]
-                {:cwd appview :env js/process.env :timeout 180000})]
+    (let [r (let [[bin args] (wrangler-argv ["d1" "execute" "ai-gftd-pds-recordlog"
+                                             "--remote" "--yes" "--file" f])]
+                (sh bin args
+                {:cwd appview :env js/process.env :timeout 180000}))]
       (when-not (zero? (:status r))
         (throw (js/Error. (str "d1-apply " (subs (str (:out r) (:err r)) 0 300)))))
       (:out r))))
