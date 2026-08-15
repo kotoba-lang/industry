@@ -29,6 +29,42 @@
 - ⚠ **このキーの権限が唯一の境界。** `api.telnyx.com/v2/mcp` は本番アカウントに
   対して番号購入・発信・AI assistant 作成ができる。読み取り中心の用途なら
   Portal 側で権限を絞ったキーを発行して、それをここに入れる。
+- 🔴 **2026-08-15 に発行した初回キーは会話ログへ平文で貼られている。rotate 対象。**
+  `REALTIMEKIT_API_TOKEN` と同じ経路（このファイル内の前例を参照）。rotate は
+  Telnyx Portal で新キーを発行 → kagi を更新 → Keychain キャッシュを作り直す、
+  の 3 手で 1 組。**`kagi rotate` は DEK の再封緘であって Telnyx 側の再発行では
+  ないので、これだけでは終わらない。**
+- **格納は argv を経由させない。** `security add-generic-password ... -w` は
+  値を**2 回** stdin から読む（1 回だけ渡すと `passwords don't match` で失敗
+  する。実測 2026-08-15）ので、`{ cat f; echo; cat f; echo; } | security …` の形。
+  `-w "$VALUE"` は `ps` に見え、このマシンは並行セッションが多い。
+  また **`security … -w` の出力は末尾に `\n` が付く** —— kagi へ複製するときは
+  `tr -d '\n'`、`headersHelper` の `$(…)` は自動で落とすので対処不要（実測）。
+
+### ⚠ `claude mcp list` の `✔ Connected` は鍵が通った証拠ではない（2026-08-15 実測）
+
+**Telnyx の MCP は `initialize` / `tools/list` / `resources/list` / `resources/read`
+を認証なしで公開しており、Bearer を要求するのは `tools/call` だけ。** したがって
+**Keychain が空でも `✔ Connected` は出る**。実際にこの順で誤診した:
+
+1. 鍵ゼロ件の状態で `claude mcp list` → `telnyx: ✔ Connected`
+2. それを見て「helper が鍵を読めている」と報告した（**誤り**）
+3. 最初の `tools/call` で `requires re-authorization (token expired)` になり切断
+
+**鍵が通ったことの確認は、認証が要るエンドポイントを 1 本実際に叩くこと。**
+
+```bash
+K=$(security find-generic-password -s telnyx-api-key -w)
+curl -sS -g -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $K" \
+  'https://api.telnyx.com/v2/phone_numbers?page[size]=1'   # 200 なら有効
+```
+
+⚠ **`-g`（globoff）が要る** —— curl は URL 中の `[` を範囲指定と解釈して
+`bad range in URL` で落ちる。これも「鍵の問題」と誤読しやすい。
+
+**同じクラスの沈黙がこの環境の 1Password にもある**（`op vault list` は未サインイン
+でも **exit 0 + 出力ゼロ**、`op signin` は非 TTY で**無言で何もしない**、
+`op item get` は rc=124 で無言タイムアウト）。**「空の結果」を「無い」と読まないこと。**
 
 ## 生成モデル・RealtimeKit
 
