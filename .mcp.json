@@ -28,6 +28,11 @@
       "env": {
         "CLOUD_ITONAMI_DATA_DIR": "/Users/junkawasaki/.cloud-itonami/data"
       }
+    },
+    "telnyx": {
+      "type": "http",
+      "url": "https://api.telnyx.com/v2/mcp",
+      "headersHelper": "set -e; K=$(security find-generic-password -s telnyx-api-key -w); printf '{\"Authorization\":\"Bearer %s\"}' \"$K\""
     }
   }
 }
