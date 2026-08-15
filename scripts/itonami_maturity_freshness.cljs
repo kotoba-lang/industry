@@ -248,6 +248,49 @@
       :else
       {:stale? false :reason :fresh :age-days age :unseen [] :suspect suspect})))
 
+(defn landings-all-excluded?
+  "Did the movement probe already remove EVERY landing the freshness check named?
+
+  `freshness` runs before the probe, so `:blind-to-own-work` is decided without
+  knowing which candidates the probe will drop. When the probe then excludes every
+  landing by name, the rows that are wrong are gone and the ranking below them is
+  over repositories nobody touched — so `trust nothing above` is stronger than the
+  evidence. This function answers only that question; the caller decides what to
+  print and whether to proceed.
+
+  Measured 2026-08-15, twice in consecutive rounds: freshness named exactly one or
+  two landings and the probe excluded exactly those, by name. With two sessions
+  driving the same tick, each session's landing pushes the other into a remeasure
+  round, so the loop spent alternating rounds remeasuring for a contention reason
+  rather than a correctness one.
+
+  **Fail-closed in every direction it cannot see.** Returns false when:
+
+    - the reason is anything other than `:blind-to-own-work`. `:root-reads-behind-remote`
+      is not answered by remeasuring at all and `:too-old` is not about landings;
+      neither is weakened here.
+    - the probe answered nothing (`:checked` 0 or missing). That is the state where
+      `orgs/` is not populated, and the probe reports 24/24 unanswered — an empty
+      exclusion list must never read as complete coverage.
+    - any landing is missing from the excluded set. The probe only inspects the top
+      `movement-probe-depth` candidates, so a landing further down is never seen; it
+      simply will not be in `:moved`, and this returns false.
+    - a landing carries no `:target` it can be matched on.
+
+  Comparing by name rather than by count is the point. Equal counts can coincide
+  while naming different repositories, and that coincidence would silently hand back
+  a ranking whose top row is stale."
+  [{:keys [reason unseen]} {:keys [moved checked]}]
+  (boolean
+   (and (= :blind-to-own-work reason)
+        (seq unseen)
+        (number? checked)
+        (pos? checked)
+        (let [excluded (into #{} (keep :repo) moved)]
+          (every? (fn [u] (and (string? (:target u))
+                               (contains? excluded (:target u))))
+                  unseen)))))
+
 (defn explain
   "`freshness` の結果を、tick の 1 行表示にする。"
   [{:keys [reason unseen age-days]}]
