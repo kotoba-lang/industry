@@ -448,6 +448,40 @@ dict repr**（`{1: 22, ...}`）をそのまま書いており、EDN reader は `
 していない —— **書いた EDN を読み戻さない**という、このセッションが各所で
 追ってきた欠陥と同型。detector が最初に読もうとして見つけた。
 
+## 最初の実データが面に乗った（2026-08-15）
+
+`scripts/uchiwake-valueflows-resources.cljs` →
+`90-docs/valueflows/uchiwake-resources-vf.datoms.edn`。
+**165 件の `vf:ResourceSpecification`**（material 120 / part 18 / product 27）。
+`cloud-itonami/uchiwake` は blueprint と違って**資源を持っている** —— 実 GS1 GTIN、
+UNSPSC、HS code、net content と単位。`vf:ResourceSpecification` の仕様は
+「the kind of economic or environmental resource, **EVEN IF** the resource is not
+instantiated as an EconomicResource」なので、これは伸ばした用法ではなく忠実な用法
+（何も動いたと主張していない）。
+
+⚠ **2 つ、読み手が結論してはいけないこと**を coverage に false で明記した:
+
+1. **これは BOM ではない。** uchiwake の README は product → part → material の
+   数量つき分解を書いているが、**committed なデータには辺も数量も 1 つも無い**
+   （実測: 属性は identity と classification だけ、merged も seed も同じ）。
+   よって `dependent-demand` / `value-rollup` は**まだ回せない**。
+   165 件が recipe に読まれないよう `:vf.coverage/is-a-bill-of-materials? false`
+   と `:has-quantities-between-resources? false` を立てている。
+2. **圧倒的に推論である。** uchiwake 自身が全 node に `:authoritative` /
+   `:representative` を付けており、**165 件中 authoritative は 2 件**
+   （GTIN が公開文書で確認できる製品）。残り 163 は teardown や原材料表示からの
+   推論。**そのラベルを全 entity に持ち越し**、coverage で別に数える ——
+   2/163 の内訳を出さずに 165 という数だけ見せるのは、推論を測定として
+   提示することになる。
+
+`:ml` を unit registry に追加した（uchiwake が 330 ml を持っていたから ——
+registry 自身の規則「実際の値が要るときに足す、投機的に足さない」の通り。
+om-2 に `millilitre` が実在することを pin 済み RDF で確認）。
+GS1 の canonical URI（`https://id.gs1.org/01/<gtin>`）は **404**（実測）——
+識別子は生きたページの約束ではない（om-2 の IRI と同じ）。
+
+detector に 4 番目の検査として追加し、`resources-stale` が出ることを確認済み。
+
 ## 次に効くこと（未着手）
 
 1. **定期 tick はこの 4 gate を検査していない。** tick は `gates.edn` を

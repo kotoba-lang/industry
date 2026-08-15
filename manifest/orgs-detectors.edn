@@ -159,7 +159,7 @@
               checked-out repos; no network."}
 
   {:id       :verify-valueflows-binding
-   :title    "the cloud-itonami Valueflows binding, and the ISIC tables under it"
+   :title    "the cloud-itonami Valueflows projections, and the ISIC tables under them"
    :why      "ADR-2608153000, 2026-08-15: the binding that puts 1,398 cloud-itonami
               businesses on the Valueflows plane is a committed projection derived from
               blueprints plus the mirrored UN ISIC tables, and every input is outside
@@ -172,7 +172,12 @@
               against the UN legacy structure file on 33 of 414 titles, which 122
               businesses' industry names currently rest on; if that record and the mirror
               stop agreeing, a human has to decide which vintage is authoritative, and
-              silently is the one way it must not happen."
+              silently is the one way it must not happen. 2026-08-15 addition: the
+              uchiwake resource projection is checked the same way. It is the first real
+              economic content on the plane and 163 of its 165 specifications are
+              uchiwake's own :representative rather than :authoritative, so a silent
+              regeneration that dropped that label would turn inference into
+              measurement."
    :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-valueflows-binding.cljs" "--root" "{{root}}"
               "--findings"]
