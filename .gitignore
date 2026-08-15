@@ -2180,6 +2180,35 @@ orgs/personal/bin/datomic/.clj-kondo/
 /orgs/gftdcojp/weight-modal-emotion/
 /orgs/gftdcojp/weight-modal-world/
 /orgs/gftdcojp/weight-oka/
+
+# west-managed gftdcojp project checkouts that were never added here. Each is a
+# registered west project (`path: orgs/gftdcojp/<name>` in manifest/west.yml) with
+# its own GitHub remote; the superproject tracks no file under any of them. Without
+# these lines a plain `git add` at the root sweeps the child repos' working trees
+# into the superproject index — measured 2026-08-15, 210 paths were staged that way,
+# including a child repo's whole `venv/lib/python3.12/site-packages` tree.
+/orgs/gftdcojp/action-paid-outreach/
+/orgs/gftdcojp/app-6ir/
+/orgs/gftdcojp/app-chat-shell/
+/orgs/gftdcojp/app-ge/
+/orgs/gftdcojp/app-inducer/
+/orgs/gftdcojp/app-ka/
+/orgs/gftdcojp/app-mamoru/
+/orgs/gftdcojp/app-news/
+/orgs/gftdcojp/app-oshiete/
+/orgs/gftdcojp/app-pre/
+/orgs/gftdcojp/app-swe/
+/orgs/gftdcojp/app-tia/
+/orgs/gftdcojp/app-webpage/
+/orgs/gftdcojp/app-webya/
+
+# Agent worktree scratch: tamaki sessions create linked worktrees of a child repo at
+# `orgs/<org>/.<repo>-tamaki--<session>/`. They are other repos' working trees, so the
+# superproject must never stage them. This glob cannot hide a registered project —
+# measured against manifest/west.yml, 0 of 4,170 `path:` entries contain `-tamaki--`
+# or a dot-prefixed segment. It is deliberately narrow rather than an org-wide
+# blanket, per the 2026-07-25 note above.
+/orgs/*/.*-tamaki--*/
 /orgs/jk-luxury/club-shinshi-actor-magatama/
 /orgs/jk-luxury/club-shinshi-actor-shinshi/
 /orgs/jk-luxury/jk-corp/
