@@ -467,6 +467,48 @@
       (let [n (js/parseInt (str/trim out) 10)]
         (when-not (js/isNaN n) (* 1000 n))))))
 
+(defn- landing-vs-checkout
+  "Where does `sha` sit relative to `path`'s HEAD? One of
+  `:absent` / `:behind` / `:contained`, or nil when git cannot answer.
+
+  Asked only to explain a coverage miss. The movement probe measures the LOCAL
+  checkout's HEAD, so a checkout that has not caught up to a landing looks unmoved,
+  and the coverage condition then fails closed with nothing said about why.
+  Measured 2026-08-16: app-air-crew's landing was on main and its west pin had
+  already advanced, but this root's checkout sat at a commit from 2026-08-10 — the
+  probe saw an old HEAD, the landing was not excluded, and the tick demanded a
+  remeasure that could not have helped, since scan would have read the same old
+  tree. One `git merge --ff-only` in that child answered it.
+
+  **Two questions, not one.** `cat-file -e` answers about the OBJECT STORE, and a
+  linked worktree shares that store with its parent — so a worktree parked on an old
+  commit reports the newer one as present. Measured while testing this very
+  diagnostic. `--is-ancestor` answers the question that matters: does the HEAD this
+  root reads actually contain the landing. Both are asked, because `absent` and
+  `behind` need different repairs (fetch versus fast-forward)."
+  [path sha]
+  (when (and (string? path) (string? sha) (seq sha))
+    ;; **Is there a clone here at all?** Without this, a path that does not exist
+    ;; makes `cat-file -e` exit non-zero and reads as `:absent` — so `no checkout`
+    ;; and `clone lacks the commit` print the same line, and the repair it advises
+    ;; (`git -C <path> fetch`) cannot run on a path that is not there. Measured
+    ;; 2026-08-16 while exercising this diagnostic: removing a child directory
+    ;; produced the `:absent` message. Three states that need three answers.
+    (let [repo (sh "git" ["-C" path "rev-parse" "--git-dir"])]
+      (cond
+        (not (number? (:code repo))) nil
+        (not= 0 (:code repo)) :no-checkout
+        :else
+        (let [present (sh "git" ["-C" path "cat-file" "-e" (str sha "^{commit}")])]
+          (cond
+            (not (number? (:code present))) nil
+            (not= 0 (:code present)) :absent
+            :else (let [anc (sh "git" ["-C" path "merge-base" "--is-ancestor" sha "HEAD"])]
+                    (cond
+                      (not (number? (:code anc))) nil
+                      (= 0 (:code anc)) :contained
+                      :else :behind))))))))
+
 (defn- with-head-times
   "候補に `:head-ms`（その repo の現 HEAD の commit 時刻）を添える。
 
@@ -609,6 +651,37 @@
 
     (log! "── 成熟度向上 tick ──")
     (log! (fresh/explain freshness))
+    ;; **覆えなかったときは、なぜ覆えなかったかを言う。** 黙って fail-closed に倒れると
+    ;; 「測り直せ」しか出ず、原因が「子 checkout がその commit を持っていない」ときは
+    ;; 測り直しても直らない（scan は同じ古い tree を読む）。
+    (when (and (= :blind-to-own-work (:reason freshness))
+               (not excluded-covers-landings?)
+               (seq unseen))
+      (let [excluded (into #{} (keep :repo) moved)]
+        (doseq [u unseen
+                :when (not (contains? excluded (:target u)))]
+          (let [sha8 (subs (str (:merged u)) 0 (min 8 (count (str (:merged u)))))]
+            (log! (str "  ↳ 覆えなかった着地: " (:target u)
+                       (case (landing-vs-checkout (:target u) (:merged u))
+                         :no-checkout
+                         (str " — この root に " (:target u) " の checkout が無い。"
+                              "**測り直しても直らない**（scan もこの repo を測れない）。"
+                              "`west update --fetch smart " (last (str/split (:target u) #"/")) "`")
+                         :absent
+                         (str " — この root の clone は " sha8 " を持っていない。"
+                              "**測り直しても直らない**（scan は同じ古い tree を読む）。"
+                              "先に `git -C " (:target u) " fetch` してから ff")
+                         :behind
+                         (str " — " sha8 " は clone に在るが HEAD が含んでいない"
+                              "（checkout が着地に追いついていない）。"
+                              "**測り直しても直らない**。`git -C " (:target u)
+                              " merge --ff-only <remote>/main`")
+                         :contained
+                         (str " — HEAD は " sha8 " を含んでいる。probe が『動いた』と"
+                              "判定しなかったので、probe 深度 24 の外か、着地 commit の"
+                              "時刻が計測より前（= 計測は実際にこの仕事を見ている）")
+                         nil
+                         " — この root では git が答えられない（checkout が無い / 読めない）")))))))
     (when excluded-covers-landings?
       (log! (str "  ↳ ただし **順位は使える**: 名指しされた着地 " (count unseen)
                  " 件は、下の movement probe が全て名前一致で候補から落としている"
