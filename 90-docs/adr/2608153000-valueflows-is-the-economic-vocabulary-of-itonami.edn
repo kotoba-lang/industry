@@ -270,14 +270,50 @@ value equation が向いている方向は ENGI の Commons issuance が既に�
     動かさず issuance だけが増やすことを検査する。issuance の写像を
     `:transfer` に壊すと 5 assertion が落ちることを確認済み。
 
-## 次に効くこと（未着手、優先順）
+- **`credits` に fleet gate を入れた**（`:cd true`。登録前に
+  `--dry-run --only credits` で実ノードに当てて緑を確認 ——
+  `test-credits-909b866-murakumo-judah` 70 tests/432 assertions、
+  git dep も `dep shipped` で搬送されている）。
+- **ENGI の corpus と射影 ratchet が入った。**
+  `resources/engi/example-journal.edn` は **synthetic だが kernel が実際に
+  受理した** 7 event の小さな社会 —— 生成器は本物の kernel を駆動し（実
+  Ed25519 署名・nonce 連続性・credit-line 親子・epoch cap）、**replay が 1 つでも
+  拒否したら何も書かずに落ちる**。だから「kernel が受理しない corpus」は commit
+  され得ない。これが synthetic fixture を commit する価値: 私が想像した形ではなく
+  **kernel が実際に作る形**に対して射影を試せる。state root を記録し、残高は
+  `{alice -35, bob 35, carer 30, carol 0}` で **和は commons issuance の 30
+  ちょうど**。file header 自身が「誰の経済活動の記録でもない」と言い、
+  テストがその header の存在を検査する。
+  - 射影も commit し、**毎テスト実行で再導出して比較する**（drift すると
+    再生成コマンドを添えて suite が落ちる。balance-resource の接頭辞を変えて
+    落ちることを確認済み）。
+  - ⚠ **corpus 経路を通したことで、写像の前提の誤りが 2 つ出た。**
+    ①**`:type` が正本だった** —— `replay/apply-event` は `:type` で dispatch し、
+    それ以外を `:unknown-event-type` で拒否する。初稿は形で判別し、docstring に
+    「kernel は event に型を付けない」と**書いていた**（実 journal が通る唯一の
+    経路について誤り）。形は untagged event の fallback として残し、`:by-source` が
+    どちらが答えたかを報告する。②**宣言された型を record が支えられない場合**の
+    conflict 判定が `(and (some? shape) …)` で、`{:type :transfer :to \"bob\"}` を
+    通してしまい **`:provider nil` / 払い手残高 `\"engi-balance:\"` の flow を射影**
+    していた。機構を足した当の case のテストを書いて初めて出た。
+  - **root 側の `projection-verify.cljs` contract は書かない**、という判断も
+    記録する。allowlist された loader は 1 本（`:canonical-edn-v1` =
+    `manifest/project-edn.cljs`）で、入力は **root-tracked な entity map の EDN**
+    でなければならない。credits の corpus は west 管理で root の tree に無いので、
+    root に contract を置くと (a) 同じデータを root に複製して所有者が 2 つになる
+    か (b) **fleet に配られない入力を読む gate**（`root-permit-index` と同じ罠）
+    になる。代わりに固定は 2 つで足りている: **再生成テスト**（写像が黙って
+    drift しない）と **west pin**（どの credits commit が正本か)。
+    contract が必要になるのは、datoms が root に住む射影のときである。
 
-1. **`cloud-itonami/credits` に fleet gate が無い。** 64 tests/406 assertions を
-   持ちながら CI で何も検査していない。plm と同じ手順（`--dry-run` で実ノードに
-   当ててから登録）で入れられるはず。
-2. **ENGI の射影 contract**（`projection-verify.cljs` の input hash 固定）は
-   依然 corpus 待ち。写像は landed したが、**「この journal をこの datom 集合に
-   写した」という固定は committed な event corpus が無いと書けない**。
+## 次に効くこと（未着手）
+
+1. **定期 tick はこれらの gate を検査していない。** tick は `gates.edn` を
+   *自分の checkout の working tree* から読み、共有 checkout は feature branch 上に
+   居るので、ここまでの緑は**すべて worktree から手で回したもの**。共有 checkout が
+   main に追いつけば自動で対象に入る。
+2. `cloud-itonami-app` の Contracts / tenant connection は依然 VF の
+   Agreement として書かれていない（形は在るが、あの repo は未移行）。
 3. ~~plm に fleet gate が無い~~ → **2026-08-15 に登録済み**（`:cd true`、
    receipt `ce94ff2c3480`、`test-plm-1e0901d-murakumo-judah` 31 tests/118
    assertions）。登録前に `--dry-run` で実ノードに当てて緑を確認した ——
@@ -320,4 +356,4 @@ value equation が向いている方向は ENGI の Commons issuance が既に�
     :nbb-pprint \"nbb needs [clojure.pprint :as pprint] required explicitly; cljs.pprint/pprint is unresolvable.\"
     :no-github-workflows \"Neither repo has .github/workflows (ADR-2607300900). CI is the murakumo fleet gate registered in scripts/fleet-ci/gates.edn.\"
     :test-runner-floor \"Both repos register test namespaces explicitly with a minimum count and exit 2 on '0 tests ran', because auto-discovery that finds nothing exits 0.\"
-    :this-adr-broke-its-own-rule \"2026-08-15: an earlier revision of :adr/body contained the prose 10 < 4 written with bare double quotes around the numerals. That TERMINATED the body string early. The reader did not error -- edn/read-string returned a map, the two stray numerals became entity keys 10 and 4, and ~1.5 KB of the body (the whole landed-work section and the next-steps list) was parsed as trailing garbage instead of text. A verification step that printed 'body chars 7810' looked entirely plausible and was accepted. This is the exact shape ADR-2608136000 describes, inside the document that cites it: the file READS while being wrong, so nothing downstream complains. The check that would have caught it is not 'does it parse' but 'does the entity have exactly the expected keys, and does the body still contain the sections it is supposed to'. Escape quotes inside an :adr/body, or use corner brackets.\"}"}]
+    :this-adr-broke-its-own-rule \"2026-08-15, TWICE. First an earlier revision of :adr/body contained the prose 10 < 4 written with bare double quotes around the numerals; then, in the very edit that added this note, two more bare-quoted strings went in the same way and truncated the body again. The second time the check caught it before landing -- which is the actual lesson: a note in an operational-note does not prevent this, and the thing that does is reading the entity back and asserting the key count. Prefer corner brackets in prose, or escape. That TERMINATED the body string early. The reader did not error -- edn/read-string returned a map, the two stray numerals became entity keys 10 and 4, and ~1.5 KB of the body (the whole landed-work section and the next-steps list) was parsed as trailing garbage instead of text. A verification step that printed 'body chars 7810' looked entirely plausible and was accepted. This is the exact shape ADR-2608136000 describes, inside the document that cites it: the file READS while being wrong, so nothing downstream complains. The check that would have caught it is not 'does it parse' but 'does the entity have exactly the expected keys, and does the body still contain the sections it is supposed to'. Escape quotes inside an :adr/body, or use corner brackets.\"}"}]
