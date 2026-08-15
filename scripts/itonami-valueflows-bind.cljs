@@ -103,6 +103,64 @@
                                        :includes (vec (get j "includes"))}]))))
           (js->clj (fs/readdirSync dir)))))
 
+(defn- cofog-groups
+  "3-digit COFOG group -> the mirrored class under it.
+
+   The mirror is a SAMPLE, not the classification: measured 2026-08-15 it holds
+   10 classes, one per division. So a blueprint declaring a real COFOG group is
+   reported as declared-and-unresolved when that group is outside the sample,
+   which is a fact about this mirror and not about the blueprint."
+  [root]
+  (let [dir (path/join root "orgs" "cloud-itonami" "org-un-cofog" "data" "classes")]
+    (if-not (exists? dir)
+      {}
+      (into {}
+            (keep (fn [f]
+                    (when (str/ends-with? f ".json")
+                      (let [j (js->clj (js/JSON.parse (slurp* (path/join dir f))))]
+                        [(get j "group") {:code (get j "code")
+                                          :nameEn (get j "nameEn")}]))))
+            (js->clj (fs/readdirSync dir))))))
+
+(defn- scope-of
+  "What DELIMITS this business, when it is not an industry.
+
+   Derived from the registered repository name, which is the only thing these
+   blueprints say on the subject. Three of these are not classifications at all
+   -- a country, a legal entity and a municipality are places and parties -- and
+   grouping them with the businesses that simply forgot a code was what made 515
+   look like one problem."
+  [dir-name]
+  (let [n (str/replace dir-name #"^cloud-itonami-" "")]
+    (cond
+      (re-matches #"^iso3166-.+" n)
+      {:scope-kind :jurisdiction :scope-code (subs n (count "iso3166-"))}
+
+      (re-matches #"^lei-.+" n)
+      {:scope-kind :legal-entity :scope-code (subs n (count "lei-"))}
+
+      (re-matches #"^municipality-.+" n)
+      {:scope-kind :municipality :scope-code (subs n (count "municipality-"))}
+
+      ;; these DO declare a classification, just not ISIC or ISCO
+      (re-matches #"^cofog-.+" n)
+      {:scope-kind :government-function :scope-code (subs n (count "cofog-"))
+       :vocabulary :cofog}
+
+      (re-matches #"^unspsc-.+" n)
+      {:scope-kind :product :scope-code (subs n (count "unspsc-"))
+       :vocabulary :unspsc}
+
+      (re-matches #"^jsic-.+" n)
+      {:scope-kind :national-industry :scope-code (subs n (count "jsic-"))
+       :vocabulary :jsic}
+
+      (re-matches #"^gtin-.+" n)
+      {:scope-kind :trade-item :scope-code (subs n (count "gtin-"))
+       :vocabulary :gtin}
+
+      :else nil)))
+
 (defn- isic-rev5-groups
   "3-digit group code -> {:name}. A blueprint may classify at group level and 27
    of them do; reading a coarser classification as a broken one was the bug."
@@ -199,7 +257,7 @@
     (and (= "isic-rev4" declared-as) (get rev5 code)) "isic-rev5"
     :else nil))
 
-(defn- bind-one [rev4 rev5 groups5 dir-name dir text]
+(defn- bind-one [rev4 rev5 groups5 cofog dir-name dir text]
   (let [r5 (blueprint-field text "isic-rev5")
         r4 (blueprint-field text "isic-rev4")
         bare (blueprint-field text "isic")
@@ -266,14 +324,60 @@
              :vf.binding/why "ISCO classifies an occupation, not an industry; a process specification needs the activity")
 
       :else
-      (let [in-name (second (re-find #"isic[-_]?(\d{3,4})" dir-name))]
+      (let [in-name (second (re-find #"isic[-_]?(\d{3,4})" dir-name))
+            {:keys [scope-kind scope-code vocabulary]} (scope-of dir-name)]
         (cond-> (assoc base
-                       :vf.binding/state "unclassified"
-                       :vf.binding/why "the blueprint declares no ISIC or ISCO code")
+                       ;; NOT "unclassified". Measured 2026-08-15: of the 515
+                       ;; businesses with no ISIC or ISCO code, 470 are scoped by
+                       ;; JURISDICTION OR LEGAL ENTITY -- 223 iso3166-*, 185
+                       ;; lei-*, 62 municipality-* -- and for those an industry
+                       ;; code is a category error rather than a missing value.
+                       ;; "cloud-itonami-iso3166-JP" is the business of operating
+                       ;; in a country; asking which industry it is in has no
+                       ;; answer to find. Reporting all 515 as one gap invited
+                       ;; exactly the wrong repair: generating 515 industry
+                       ;; guesses, which was the plan until the names were
+                       ;; actually counted.
+                       :vf.binding/state (if scope-kind "not-industry-scoped" "unclassified")
+                       :vf.binding/why
+                       (if scope-kind
+                         (str "scoped by " (name scope-kind)
+                              ", not by industry; an ISIC class describes an"
+                              " activity and this business is delimited by"
+                              " something else")
+                         "the blueprint declares no code in any vocabulary"))
+          scope-kind (assoc :vf.binding/scope-kind (name scope-kind))
+          scope-code (assoc :vf.binding/scope-code scope-code)
+          ;; a business that declares a code in a vocabulary OTHER than
+          ;; ISIC/ISCO. Whether it resolves is a fact about our mirrors, and it
+          ;; is recorded separately from the declaration itself.
+          vocabulary (assoc :vf.binding/declares-vocabulary (name vocabulary))
+          (= :cofog vocabulary)
+          (as-> e (let [g (str/replace (str scope-code) "." "")
+                        hit (get cofog g)]
+                    (if hit
+                      (assoc e :vf.binding/vocabulary-resolved? true
+                             :vf.spec/cofog-group g
+                             :vf.spec/cofog-name (:nameEn hit)
+                             :vf.spec/cofog-class (:code hit))
+                      (assoc e :vf.binding/vocabulary-resolved? false
+                             :vf.binding/vocabulary-gap
+                             (str "COFOG group " g " is not in the mirror, which"
+                                  " carries " (count cofog) " groups --"
+                                  " one class per division, a sample rather than"
+                                  " the full classification")))))
+          (#{:unspsc :jsic :gtin} vocabulary)
+          (assoc :vf.binding/vocabulary-resolved? false
+                 :vf.binding/vocabulary-gap
+                 (case vocabulary
+                   :unspsc (str "no UNSPSC data is mirrored here. orgs/cloud-itonami/"
+                                "org-unspsc is an application repository -- appview,"
+                                " docs, a charter -- and carries no code table")
+                   :jsic "no JSIC (Japan Standard Industrial Classification) mirror exists in this workspace"
+                   :gtin "a GTIN identifies a trade item, not an industry"))
           ;; Reported, NOT used to classify. A repository name is a discovery
-          ;; alias, not a declaration, and turning 515 names into 515
-          ;; classifications would be exactly the invention this binder refuses.
-          ;; Measured: only 2 of the 515 even carry a code in their name.
+          ;; alias, not a declaration. Measured: 2 of the 515 carry an ISIC code
+          ;; in their name.
           in-name (assoc :vf.binding/code-in-repo-name in-name))))))
 
 ;; ── all ───────────────────────────────────────────────────────────────────
@@ -283,6 +387,7 @@
         rev4 (isic-rev4 root)
         rev5 (isic-rev5 root)
         groups5 (isic-rev5-groups root)
+        cofog (cofog-groups root)
         org-dir (path/join root "orgs" "cloud-itonami")]
     (when-not (exists? org-dir)
       (die 2 (str "CANNOT ANSWER: " org-dir " is absent. west checkouts are"
@@ -306,7 +411,7 @@
                             (let [dir (path/join org-dir d)
                                   bp (path/join dir "blueprint.edn")]
                               (when (and (contains? registered d) (exists? bp))
-                                (bind-one rev4 rev5 groups5 d dir (slurp* bp))))))
+                                (bind-one rev4 rev5 groups5 cofog d dir (slurp* bp))))))
                     vec)]
       (when (< (count rows) (:blueprints floor))
         (die 2 (str "CANNOT ANSWER: bound only " (count rows)
@@ -347,6 +452,25 @@
      :vf.coverage/classification-unresolvable (get by-state "classification-unresolvable" 0)
      :vf.coverage/occupation-only (get by-state "occupation-only" 0)
      :vf.coverage/unclassified (get by-state "unclassified" 0)
+     ;; The 515 that were reported as one gap, decomposed. Three of these scope
+     ;; kinds are not classifications at all -- a country, a legal entity and a
+     ;; municipality are places and parties, and an ISIC class describes an
+     ;; activity -- so for 470 of them there was never an industry code to find.
+     ;; Reporting them together invited the wrong repair.
+     :vf.coverage/not-industry-scoped (get by-state "not-industry-scoped" 0)
+     :vf.coverage/by-scope-kind (frequencies (keep :vf.binding/scope-kind rows))
+     ;; and the ones that DO declare a classification, just not ISIC or ISCO.
+     ;; Whether each resolves is a fact about this workspace's mirrors, kept
+     ;; separate from the declaration so a mirror gap cannot read as a blueprint
+     ;; that said nothing.
+     :vf.coverage/declares-other-vocabulary
+     (frequencies (keep :vf.binding/declares-vocabulary rows))
+     :vf.coverage/other-vocabulary-resolved
+     (count (filter #(true? (:vf.binding/vocabulary-resolved? %)) rows))
+     :vf.coverage/other-vocabulary-unresolved
+     (count (filter #(false? (:vf.binding/vocabulary-resolved? %)) rows))
+     :vf.coverage/other-vocabulary-gaps
+     (vec (sort (distinct (keep :vf.binding/vocabulary-gap rows))))
      ;; The numbers that say whether anything is CONNECTED, as opposed to named.
      ;; TWO populations, because they answer different questions and collapsing
      ;; them misleads in both directions:
@@ -375,7 +499,24 @@
           " exists to prevent. :complete? is false and stays false until economic"
           " records exist for a business, which no blueprint contains: a blueprint"
           " declares governance and technology, never resources, prices, quantities"
-          " or flows.")}))
+          " or flows. One number in here was actively misleading until"
+          " 2026-08-15: 515 businesses were reported as `unclassified`, which"
+          " reads as 515 missing codes and very nearly produced 515 invented"
+          " ones. Counting the names instead showed that "
+          (get by-state "not-industry-scoped" 0) " are delimited by something"
+          " other than an industry -- "
+          (str/join ", " (map (fn [[k v]] (str v " " k))
+                              (sort-by (comp - val)
+                                       (frequencies (keep :vf.binding/scope-kind rows)))))
+          " -- and for a country, a legal entity or a municipality there is no"
+          " industry code to find. A further "
+          (count (filter #(false? (:vf.binding/vocabulary-resolved? %)) rows))
+          " declare a code in a vocabulary this workspace does not mirror at"
+          " that level, which is a gap here and not in the blueprint. What is"
+          " left genuinely says nothing: " (get by-state "unclassified" 0)
+          " businesses, mostly payments and crowdfunding, that plausibly do have"
+          " an ISIC class and simply do not declare one. Those are for their"
+          " authors to declare, not for this projection to guess.")}))
 
 (defn- render [{:keys [rows] :as built}]
   (let [entities (conj (vec rows) (coverage built))
