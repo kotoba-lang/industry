@@ -187,3 +187,16 @@
   `k51qzi5uqu5dj6z20sjzztyay81591voe6yofukl0ylsmug9euf934z1g04erd`。
   取得: `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get cloud-itonami-app-latest`。
   env は `CLOUD_ITONAMI_APP_IPNS_SEED`。値は git に置かない。
+
+## itonami.cloud app site IPNS (2026-08-14 公開名 / 2026-08-15 実測)
+
+- **`itonami-site-ipns/app/shirohan`（kagi vault、compartment `personal`、
+  `KAGI_HOME=$HOME/.kagi`）** — `app/shirohan` の IPNS 名用 Ed25519 seed。
+  `sites.edn` の公開名は
+  `k51qzi5uqu5dgxdm1x95y3dk2nzj9xnz7ntyv08jbrzfacpj53mncoebqe3m92`。
+  **2026-08-15 実測: live vault で `no such item`。** 既知の別名
+  (`itonami-site-ipns-app-shirohan` / `itonami-site-ipns/shirohan`) も無い。
+  `~/.gftd` にも shirohan IPNS ファイルは 0。catalog の
+  `.itonami/identity.edn` と `cloud-itonami-app-latest` は**別の k51**。
+  この公開名を更新するには元の 32-byte が要る。新しい seed は別 k51 になり、
+  代わりにならない。値は git に置かない。
