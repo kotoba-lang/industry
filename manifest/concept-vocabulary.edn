@@ -278,4 +278,34 @@ cloud-itonami/loop-noren（orchestrator と I/O）。ADR-2608111400。**暖簾 �
 この loop が売るのはその面の月額。UI 品質の採点は kotoba-lang/design-quality が正本で
 noren は再実装しない（presence 軸だけを足す）。自社サイトのアクセス解析は別物
 （kotoba-lang/kaiyu）。"}
+ :content-addressing
+ {:label "内容アドレッシング / content addressing（identity・naming・location の三分）"
+  :spellings ["content addressing" "content-addressed" "content address"
+              "内容アドレッシング" "コンテンツアドレッシング" "内容アドレス"
+              "cid" "cidv1" "raw cid" "bafkrei" "bafy"
+              "merkle link" "hash link" "merkle dag" "authenticated data structure"
+              "self-certifying" "自己証明" "自己証明名"
+              "location-independent" "location independence" "場所非依存"
+              "intrinsic identifier" "extrinsic identifier" "固有識別子"
+              "cas" "content-addressable storage" "hash-consing" "structural identity"
+              "ipld" "ipfs" "ipns" "embed-url" "ipfs://" "ipns://"
+              "icn" "information centric networking" "named data networking" "ndn"
+              "path ベースでない" "link 設計" "resource identity" "immutable resource"]
+  :note "**path を identity にしない link / resource 設計の総称が content addressing。**
+対語は location addressing（URL・path ベース）。層ごとに別の名を持つので分けて呼ぶ:
+識別子は intrinsic / self-describing identifier（CID）、link は merkle link / hash link で
+集合が merkle DAG（一般名 authenticated data structure）、可変な名前は self-certifying name
+（IPNS。SFS 由来）、HTTPS gateway URL は **Location（取得ヒント）であって identity ではない**。
+学術名は ICN / NDN。ストレージ側の同型語が CAS（git・Nix と同じ）、言語側が hash-consing /
+structural identity。⚠ **IPLD にも path はある**（/ipld/{cid}/a/b）が、あれは DAG の
+resolution path であって location ではない —— 「path ベースでない」と書くとここで衝突する。
+正しくは「hierarchical location path を identity に使わない」。
+層表の正本は kotoba-lang/kotoba-protocol（L0 address … L5 application、ADR-2607071500）。
+L2 commit は kotoba-lang/chain、IPNS 記録は tech-ipfs-specs-ipns（JVM/.cljc）と
+kotobase-client（cljs の第二実装）、gateway は tech-ipfs-specs-http-gateway、
+配布は kotobase(.net)。app 側の記録形は kotoba.app.edn の :kotoba.app/bundle-cid（document の
+identity）+ :kotoba.app/embed-url（ipfs://）+ :kotoba.graph/cid（L2 graph identity）+
+:kotoba.app/latest（IPNS 名 k51…）。ADR-2608148200 / ADR-2608145400 / ADR-2608157000。
+⚠ **実測 2026-08-15: kotoba.app.edn は 155 件あるが content address を持つのは 1 件**
+（cloud-itonami-app）—— 語彙が広まっていることと設計が広まっていることは別。"}
 }
