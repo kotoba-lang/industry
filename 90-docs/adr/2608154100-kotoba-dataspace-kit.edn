@@ -65,6 +65,7 @@ dataspace 協調の proving slice を 1 本着地させる。
 |---|---|---|
 | kit `dataspace-v1` | reference implemented（JVM KIR + reference-runtime） | wasm-aot / native-aot / jit は pending |
 | wire id 24 | named `:dataspace/transact` landed（kotoba-sema 6afc350c, amu 2375cfcd）。numeric `typed-cap-call 24` も残る | provider-conformance 9-kit への編入はまだ（下の行）。named が通ったことを編入済みと読まない |
+| reference host | `kotoba-lang/provider` `provider.dataspace`（amu は inject するだけ） | compiler-local host に戻さない |
 | provider-conformance 9-kit 閉集合 | **入れない**（`:capability-count` 9 と component-model inventory を壊す） | 9-kit 構造ゲートへの編入は sema vendor + component-model 行が揃ってから |
 | Goblins / OCapN | 統合していない | 統合したと書かない |
 | observe | host-owned match、inert notices | guest vat / callback 関数 |
@@ -74,12 +75,18 @@ dataspace 協調の proving slice を 1 本着地させる。
 ### compiler = `kotoba-lang/amu`（GitHub は `compiler` → `amu` にリダイレクト）
 
 - `resources/kotoba/lang/capability-kits/dataspace-v1.edn` — 閉 effect 集合、deny-by-default、resource=dataspace
-- `src/kotoba/compiler/dataspace/match.cljc` — 純 EDN matcher（core.match に依存しない）
-- `src/kotoba/compiler/dataspace/provider.cljc` — in-memory reference host
-- `test/kotoba/compiler/dataspace_match_test.clj`
-- `test/kotoba/compiler/dataspace_provider_test.clj` — cap 無し deny、facet retract、observe bind、`#cap` 拒否、偽 handle 拒否
+- `test/kotoba/compiler/dataspace_match_test.clj` — `provider.dataspace-match` を見る
+- `test/kotoba/compiler/dataspace_provider_test.clj` — named `:dataspace/transact` で `provider.dataspace` を inject。cap 無し deny、facet retract、observe bind、`#cap` 拒否、偽 handle 拒否
 - `resources/kotoba/lang/application-language.edn` に `:dataspace` kit を記録
 - `test/kotoba/compiler/test_runner.clj` に ns を追加
+- ~~`src/kotoba/compiler/dataspace/{match,provider}.cljc`~~ **removed** — host は provider へ（gap 2）
+
+### provider = `kotoba-lang/provider`
+
+- `src/provider/dataspace.cljc` — in-memory reference host（wire id 24）
+- `src/provider/dataspace_match.cljc` — 純 EDN matcher（`.cljc` のまま。native recursive map walk は未 qualified）
+- `test/provider/dataspace_test.clj` / `dataspace_match_test.clj`
+- provider-conformance inventory には **載せない**（9-kit 閉集合を壊さない。stream-ingress と同じ置き方）
 
 ### kotoba-lang（worktree `/tmp/kotoba-lang-dataspace`、branch `agent/dataspace-kit`）
 
@@ -108,6 +115,16 @@ dataspace 協調の proving slice を 1 本着地させる。
   `kotoba-lang` を上記 SHA へ前進させる（`compiler` という旧 west 名は
   同じ GitHub repo のリダイレクトであり、この slice では `amu` を正とする）。
   named 面の pin は kotoba-sema / amu を上記 SHA へ前進済み。
+
+- gap 2 host move（2026-08-15）:
+  - `kotoba-lang/provider` main `e6fcf7379c89952266553a01b3b6702804e9a2c5`
+    （merge of `1780292a21c9b2a2f0aeb97b9f7c9dfa14c3a088`）
+    https://github.com/kotoba-lang/provider/commit/e6fcf7379c89952266553a01b3b6702804e9a2c5
+  - `kotoba-lang/amu` main `cfc6721866b6628b9e9d919afc088ba432658454`
+    （merge of `a867b8a9ff227504d881161cdb68621f3d165f74`）
+    https://github.com/kotoba-lang/amu/commit/cfc6721866b6628b9e9d919afc088ba432658454
+  - west pin: provider `edd6368f90b048a2c776a52c92a12e82cb488867`、
+    amu `0649486c0604830889bba03543f2c9a79d035925`
 
 ## テストの回し方と結果（2026-08-15 実測）
 
@@ -140,14 +157,43 @@ clojure -M:test -n kotoba.lang.dataspace-cap-test -n kotoba.lang.capability-cata
 
 結果: **6 tests / 17 assertions、0 fail / 0 error。**
 
+gap 2（host を provider へ、2026-08-15）:
+
+provider（cognitect test-runner、対象 ns）:
+```
+cd /tmp/provider-dataspace-host
+clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+```
+結果: **13 tests / 36 assertions、0 fail / 0 error。**
+両方向: `:default` tagged-literal 拒否を外すと `tagged-cap-literal-cannot-mint-authority` が `:edn-invalid` になって落ちる。戻すと緑。
+`dataspace-qualifies-alone-without-joining-the-9-kit-set` は capability-count 1 の単独 suite と、inventory に `:dataspace` が無いことを同時に見る。
+
+amu（`clojure -M:test -n` は無視される。clojure.main で対象 ns）:
+```
+cd /tmp/amu-dataspace-host
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.provider-conformance-test))
+    (apply clojure.test/run-tests
+           (quote [kotoba.compiler.dataspace-match-test
+                   kotoba.compiler.dataspace-provider-test
+                   kotoba.compiler.provider-conformance-test]))'
+```
+結果: **14 tests / 64 assertions、0 fail / 0 error。** provider-conformance `:capability-count` は **9 のまま**。guest は named `:dataspace/transact`。
+
 ## 残ギャップ（次の agent へ）
 
 1. **DONE.** kotoba-sema の `capability-catalog.edn` と cljs fallback に id 24 を vendor し、named `dataspace/transact` と `(:capabilities #{:dataspace/transact})` を通した。
    - kotoba-sema `6afc350c447e1ffcfed0649e3b503f480a7a750c`: 13 tests / 65 assertions（sema-test）。named cap-call、undeclared ns reject、cljs fallback lockstep を含む。
    - amu `2375cfcd91f7f52caada865bb7ff53bcaf451a37`: frontend-named-capability-test + backend-qualification + provider-conformance = 22 tests / 129 assertions。`:capability-count` は 9 のまま。
-2. `kotoba-lang/provider` へ reference host を移す。compiler pin は `amu` として main tip へ前進済み。
-3. provider-conformance 閉集合と component-model inventory への編入。
-4. assertion の kit ABI を `:document` にする（今日は EDN string）。
-5. matcher を `.kotoba` 決定核へ移す（recursive map walk が native-qualified になってから）。
+2. **DONE.** `kotoba-lang/provider` へ reference host を移した。kit EDN は amu に残す。9-kit には入れない。
+   - provider `e6fcf7379c89952266553a01b3b6702804e9a2c5`: 13 tests / 36 assertions。`#cap` fail-closed の break/unbreak 済み。
+   - amu `cfc6721866b6628b9e9d919afc088ba432658454`: 14 tests / 64 assertions（dataspace + provider-conformance）。`:capability-count` 9。
+   - west pin: provider `edd6368f90b048a2c776a52c92a12e82cb488867`、amu `0649486c0604830889bba03543f2c9a79d035925`。
+3. provider-conformance 閉集合と component-model inventory への編入。**9-kit `:capability-count` 9 を壊すな。** 編入するなら sema vendor + component-model 行が揃ってから、count と inventory を一緒に動かす。
+4. assertion の kit ABI を `:document` にする（今日は EDN string）。compile/runtime の実ギャップとして閉じられるときだけ。
+5. matcher を `.kotoba` 決定核へ移す（recursive map walk が native-qualified になってから。今は backend gap であって言語の天井ではない）。
 6. kgraph / incidence を backing にするかは別 slice。混在させない。
 "}]
