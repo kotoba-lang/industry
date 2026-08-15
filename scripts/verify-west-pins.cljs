@@ -235,6 +235,25 @@
       (re-find #"HTTP (404|422)" (str err)) :missing
       :else nil)))
 
+(defn- commit-exists?
+  "その sha 自体が上流に在るか。true / false(確実に無い) / nil(**答えられない**)。
+
+  **compare の 404 と、commit が無いことは別の問い**である——前者は merge 直後などに
+  一時的に起きる（実測 2026-08-15）。
+
+  ⚠ **status code の割り当てを推測しない。**実測 2026-08-15 の GitHub の応答:
+    commit が無い  → **HTTP 422** `No commit found for SHA: ...`
+    repo が無い    → **HTTP 404** `Not Found`
+  最初この二つを逆に書いており、**存在しない sha に対して nil(分からない)、
+  存在しない repo に対して false(commit は無い)** を返していた。
+  したがって 404 は『commit が無い』の証拠にならない——repo に届いていないだけである。"
+  [repo sha]
+  (let [{:keys [exit err]} (gh-api (str "repos/" repo "/commits/" sha) "--jq" ".sha")]
+    (cond
+      (zero? exit) true
+      (re-find #"No commit found for SHA" (str err)) false
+      :else nil)))
+
 (def failures (atom []))
 (def warnings (atom []))
 
@@ -272,11 +291,23 @@
                 (println (str "OK   " name " (" repo "): 新規 entry, pin " (s8 revision) " は " db " から到達可能"))
                 (let [fwd (compare-status repo old revision)]
                   (cond
+                    ;; **compare の 404 を「旧 pin が消えた」と即断しない。**
+                    ;; 実測 2026-08-15: merge 直後の head に対する compare が一時的に 404 を返し、
+                    ;; この分岐が前進検証を skip したうえ **OK と印字した**（数分後に同じ compare は
+                    ;; 正常に ahead を返した）。**答えられなかったことが、合格と同じ顔をしていた。**
+                    ;; 旧 sha 自体の存在を問い直し、実在するなら「消失」ではなく「検証不能」に落とす。
                     (= fwd :missing)
-                    (do (swap! warnings conj
-                               (str "WARN " name " (" repo "): 旧 pin " (s8 old)
-                                    " が上流に存在しない(壊れた pin の修復とみなし前進検証を skip)"))
-                        (println (str "OK   " name " (" repo "): " (s8 old) "→" (s8 revision) " (旧 pin 消失からの修復)")))
+                    ;; **commit-exists? が nil(問い合わせ失敗)のときも「消失」に倒さない。**
+                    ;; 確実な 404 が返ったときだけ消失とみなす。
+                    (if-not (false? (commit-exists? repo old))
+                      (swap! warnings conj
+                             (str "WARN " name " (" repo "): 旧 pin " (s8 old)
+                                  " の消失を確認できないのに compare が 404。**前進検証できていません**"
+                                  "(一時的な失敗の可能性。再実行して確認すること)"))
+                      (do (swap! warnings conj
+                                 (str "WARN " name " (" repo "): 旧 pin " (s8 old)
+                                      " が上流に存在しない(壊れた pin の修復とみなし前進検証を skip)"))
+                          (println (str "OK   " name " (" repo "): " (s8 old) "→" (s8 revision) " (旧 pin 消失からの修復)"))))
 
                     (= fwd "ahead")
                     (println (str "OK   " name " (" repo "): " (s8 old) "→" (s8 revision) " (fast-forward)"))
