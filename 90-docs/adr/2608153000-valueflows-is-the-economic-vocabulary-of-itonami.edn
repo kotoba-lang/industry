@@ -527,7 +527,181 @@ GS1 mod-10 を実装して弾いた。⚠ 最初の実装は `(str/split s #\"\"
 
 detector に 5 番目の検査として追加。
 
+## 4 項目に答えた（2026-08-15）
+
+### 1. 価格が入り、cost roll-up が実データで回った
+
+`value-rollup` は回すものが無かった。ワークスペースに価格が一件も無かったからで、
+IMF Primary Commodity Prices（FRED が鍵なしの CSV で再配信）の 3 系列が Nutella の
+宣言済み 5 成分のうち 3 つを覆う。
+
+**単位は実測し、しかも揃っていない。** 砂糖は **U.S. cents per pound**、パーム油と
+ココアは **U.S. dollars per metric ton** —— 各 series ページから読み取った。混ぜて
+掛ければ **5 桁**狂う。換算は定義値のみ（国際ヤードポンド法の 1 lb = 0.45359237 kg
+厳密、1 metric ton = 1,000,000 g）。
+
+価格は **pin する。検査時に取りに行かない。** `--fetch` が series id・公表単位・
+観測日・取得日を書き、他の全モードはそのファイルを読む。だから `--check` は決定的で、
+FRED が落ちても赤くならず、価格が腐っても緑にならない（別 check が窓を超えた観測を報告）。
+
+**どの合計も二重に下限**である。①未価格の成分はゼロを寄与する（`:complete? false`、
+`:unpriced-because` を読まないと「安い製品」に見える）②3 系列はすべて**世界商品契約**
+（ICE No.11 粗糖・粗パーム油・カカオ豆）で、レシピが名指しする**加工済み食品原料では
+ない**。精製・輸送・包装は契約の下流なので、この差は常に**過小評価にしかならない**。
+
+**単位の拒否が 1 件ある。** 清涼飲料の内容量は ml で、per-gram の価格は密度なしに
+体積を値付けできない。だから ml を g として黙って扱わず、その行を未価格にした。
+
+実測: 3 recipe / 12 入力行 / 6 価格付き。Nutella 750 g 瓶の契約価格分は **0.6305 USD**。
+
+### 2. アルゴリズムに実データが在るのは 7 のうち 3（残り 4 は詰まっている）
+
+`critical-path` に必要な工程時間は**ワークスペースに一件も無い**。スキーマは在る
+（`plm` の Bill of Process が `:plm.op/std-time-hr` / `:plm.op/setup-time-hr` を持つ）が、
+値が入っているのはその repo 自身のテスト fixture だけ。実データの唯一の出所である
+uchiwake は内容量と成分比率を持ち、時間は一切持たない。**1 分で捏造できて、出力では
+実測値と見分けが付かない** —— だから入れていない。
+
+これを文章でなく**測定**として残した（`90-docs/valueflows/algorithm-readiness.datoms.edn`）:
+
+| algorithm | 実データ | 注 |
+|---|---|---|
+| flow-graph | ある | 3 recipe / 12 入力行 |
+| dependent-demand | ある | **ただし浅い** —— 他の process が作る入力が 0 件なので展開は 1 段。多段展開は未実行 |
+| value-rollup | ある | ただし全合計が下限 |
+| critical-path | **無い** | 工程時間 0 件 |
+| value-equation | **無い** | 誰かの実際の分配請求が要る |
+| track-trace | **無い** | 唯一の event 列が `:corpus/synthetic? true` を自己宣言 |
+| cash-flow | **無い** | 同じ corpus |
+
+**fixture かどうかは判定せず、読む。** `cloud-itonami/credits` の corpus は
+`#:corpus{:synthetic? true}` を、`IT IS NOT A RECORD OF ANYONE'S ECONOMIC ACTIVITY`
+という一文の上に書いている。だから生成器はその**フラグを読む**。宣言をやめれば答えは
+変わり、何も言わない corpus は「実データ」と仮定せず「未宣言」と報告する。
+
+`ws-valueflo-algorithms` の 79 テストは全部通り、全部 fixture の上で走る。それは
+テストへの非難ではなく、この測定が要る理由である —— 「実装されている」と「この
+ワークスペースについて何かを計算する」は別の主張で、後者を書く場所が無ければ前者が
+それとして引用される。
+
+### 3. 未分類 515 は、515 個の欠損コードではなかった
+
+515 に対して ISIC の候補をスコア付きで提案する予定だった。**先に名前を数えたら、
+その計画が誤りだった。**
+
+| scope | 件数 | 形 |
+|---|---|---|
+| jurisdiction | 223 | `cloud-itonami-iso3166-*` |
+| legal-entity | 185 | `cloud-itonami-lei-*` |
+| municipality | 62 | `cloud-itonami-municipality-*` |
+| government-function | 5 | COFOG を宣言 |
+| product | 5 | UNSPSC を宣言 |
+| national-industry | 3 | JSIC を宣言 |
+| trade-item | 3 | GTIN を宣言 |
+| **not-industry-scoped 計** | **486** | |
+| **なお未分類** | **29** | |
+
+**470 は場所か当事者で切られている。** ISIC のクラスは活動を記述するので、
+「日本で営む business」や「この法人に紐づく business」に**探すべき業種コードは
+最初から無い**。欠損ではなく圏違いである。コードを書き忘れた business と同じ
+バケツに入れていたことが、515 を「1 つの問題」に見せ、その修復は **470 件の捏造**に
+なっていた。
+
+さらに 16 件は分類を**宣言している**（ISIC/ISCO ではないだけ）。解決するかは
+blueprint の性質ではなく**こちらのミラーの性質**なので、宣言とは別に記録する。
+1 件解決: `cofog-05.1` → `org-un-cofog` の 0510 `Waste management`（名前
+`Independent Municipal Waste Collection Robotics` と一致）。15 件は各々の穴を名指し
+—— COFOG ミラーは各 division から 1 クラスの計 10 件なので群 032/045/063/074 は圏外、
+JSIC のミラーは存在せず、`org-unspsc` は appview と docs と憲章を持つ**アプリ repo**で
+コード表を持たない。
+
+残る 29 件は本当に何も言っていない（card issuing・EMI・crowdfunding 5 段）。
+ISIC クラスはおそらく在るが宣言が無い。**それは著者が宣言することで、この projection
+が当てることではない。**
+
+状態は厳密に分割する: 460 + 83 + 340 + 29 + 486 = 1,398。
+
+### 4. Rev.4 の系統 —— ミラーは ISIC Rev.4 ではない
+
+オーナー判断の入力を良くするために legacy の `ISIC_Rev_4_english_structure.txt` が
+**実際に何なのか**を測った（419 クラスは Rev.4 の 428 とも Rev.5 の 463 とも合わない）。
+一時パスに取得し、記録済み sha256（`18b645ef…`）と**一致を確認してから**比較し、破棄した
+（取り込んではいない）。
+
+**legacy は ISIC Rev.4 の系統である。** 記録の暫定見解「旧名で Rev.5 を配っている」は
+**検査した 2 件からの一般化で、誤り**だった: 33 件のうち Rev.5 と厳密一致は **7 件**、
+6 件は Rev.5 に**存在しないコード**。ファイル全体では Rev.5 と 366 コード共有に対し、
+ミラーとは **414 / 419** を共有する。33 件の差のうち **17 件は綴りだけ**
+（`specialized` / `specialised`）で -ise/-ize 正規化で消える。
+
+残る差の 1 つを追ったら、より大きな問いが決着した。**4774** は UN のファイルで
+`Retail sale of second-hand goods`、ミラーで
+`Retail sale of medical and orthopaedic goods in specialised stores` ——
+語の揺れではなく**同一コードで別の産業**。ずれでもない（隣接する共有 413 対を全部
+試して、ミラーが前のコードと一致する例は **0 件**）。
+
+**ミラーは ISIC Rev.4 ではない。** UN 自身のファイルに**存在しない** 4 桁コードを
+14 件持ち、それは EU 側の細分である —— 4775 化粧品・4777 時計と宝飾・4779 中古品、
+ISIC は 4773 と 4774 の 2 つで済ませている箇所。ISIC の公共行政 3 クラス
+8411/8412/8413 を持たず、単一の 8410 を持つ。綴りは英式（`-ise` 34 対 `-ize` 9、
+`orthopaedic`・`Dispensing chemist`）で、UN ISIC は米式（`-ize` 30 対 `-ise` 8）。
+この証拠から**欧州 NACE 系**に属する。**どの NACE リビジョンかは名指ししない**:
+NACE のソースがこのワークスペースに pin されておらず、pin 無しで名指しすれば
+この記録が文書化しているまさにその誤りを繰り返す。
+
+**したがってオーナー判断は形が変わった。** 「Rev.4 のどの系統が正か」ではなく
+「この repo が ISIC をミラーするのか（`data/classes` を UN ファイルの pin 付き
+ingest に置き換える。419 クラス）、それとも NACE 系のデータが 122 business の
+求めているものなのか（その場合は出所の名前を持つ repo —— origin 面の reverse-DNS
+規則なら `eu-europa-nace` 等 —— に自前の pin で移し、`org-un-isic` は ISIC を
+ミラーする）」。**どちらを求めているかは business についての問い**で、blueprint は
+どの分類を意図したか一言も書いていない。
+
+## 実データを通したことが 2 つの欠陥を出した（ライブラリ側、2026-08-15）
+
+79 テストが緑のライブラリに、実データを 1 回通しただけで 2 つ出た。両方とも
+**拒否ではなく、もっともらしい間違った数**を返す形だった。
+
+1. **同一 resource の比が単位を見ていなかった。** `dependent-demand` の `runs` は
+   「欲しい量 ÷ 1 run の産出量」で両辺が同じ resource なので無次元でなければ
+   ならない。20 each を産む process に 3 kg を要求すると **0.15 runs を組んで
+   `:ok? true`** を返した。単位は「検査されていなかった」のではなく**失われていた**
+   —— `explode-1` は `(g/qty quantity)` で数値に落とされてから受け取っていた。
+2. **値が通貨は言うのに分母を言っていなかった。** `{:has-numerical-value 0.0003
+   :has-unit :usd}` は per gram か per ml かを言わない。だから roll-up は flow の
+   単位を勝手に採用し、**per-gram の価格が ml の flow を掛けて**コーラ 1 缶の砂糖を
+   0.0111 USD と返した —— 密度の分だけ違う数字で、正しかった 2 件と同じ顔をしていた。
+   `values` は `{:value m :per m}` で修飾でき、不一致は
+   `:value-denomination-mismatch` で拒否する。裸の measure も従来の意味で動くが、
+   依存した spec は `:assumed-denomination` に名前が出る（**黙って間違っていたのは
+   その仮定**だから）。
+
+**そして 1 つは私の誤診だった。** `value-rollup` の per-unit factor も単位を
+見ていないので同じ欠陥に見え、同じガードを付けたら**fixture の全レシピが壊れた**。
+そこは両辺が**別の resource** で、単位が違うのが正しい —— 小麦 2 kg / パン 20 個 =
+0.1 kg/個 で、入力側の単位は子の per-unit 値の分母と打ち消し合う。既存テストが
+私を捕まえた。だから番人は `g/same-unit-ratio` に、寛容な除算は `g/factor` に分け、
+**「ここに単位検査を足すな」と書いた**。誤った修正の回帰テストは、それを誤りに
+した算術を固定する: シロップ 1 kg 入り 750 g 瓶は 2 JPY/kg でちょうど 2 JPY。
+
+2 実装（この projection の独立計算とライブラリ）が 3 件すべてで一致した ——
+**拒否の内容まで一致**（コーラは両方が「ml に per-gram は当てられない」と言う）。
+
 ## 次に効くこと（未着手）
+
+0. **オーナー判断が 1 つ待っている** —— 上記 4 の Rev.4 系統。`org-un-isic` が
+   ISIC をミラーするのか、NACE 系データを出所名の repo に移すのか。判断材料は
+   `org-un-isic` の `data/PROVENANCE.edn` の `:owner-decision` に測定値ごと在る。
+
+0b. **詰まっている 4 アルゴリズムを開けるのはコードではなくデータ。** `critical-path`
+   は実在の item に対する `plm` routing か、工程時間を公表する出所。`track-trace` と
+   `cash-flow` は実台帳（projection のコードは既に在ってテスト済み）。`value-equation`
+   は誰かの実際の分配請求 —— **この一覧で捏造して最も悪いもの**。
+
+0c. **多段展開が未実行。** uchiwake の recipe は 1 段（製品 ← 成分）で、成分を作る
+   process が無い。成分の 1 つを作る recipe が 1 本入れば `dependent-demand` が
+   本来の仕事をする。
+
 
 1. **定期 tick はこの 4 gate を検査していない。** tick は `gates.edn` を
    *自分の checkout の working tree* から読み、共有 checkout は feature branch 上に
