@@ -42,7 +42,7 @@
 
 ⚠ **IPLD にも path はある**（`/ipld/{cid}/a/b`）。あれは DAG の resolution path であって location ではない。「path ベースでない」と書くとここで衝突するので、正確には **hierarchical location path を identity に使わない**と言う。
 
-## 実測した現在地（2026-08-15）
+## 決定の動機になった実測（2026-08-15、着手前）
 
 語彙は広まっているが、設計は広まっていない。
 
@@ -78,64 +78,143 @@
 - `sha256(\"hello world\")` → `bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e`。IPFS 自身が公開している値と一致。
 - live の `cloud.itonami.app` appview（816,065 bytes）を `kotobase.net` から GET し、再ハッシュして格納アドレス `bafkreigpvrijgdm36vjt6xvqsi7ahvzslv6yymdqzbozi2id3wgorvgnp4` を厳密に再現。`verify` が exit 0。
 - `bafyreia2pjck2…` と `bafkreia2pjck2…`（graph identity と raw Location）は digest 一致 = 同一 object と判定。
-- 11 tests / 58 assertions（nbb、ネットワーク不要）。
+- 18 tests / 270 assertions（nbb、ネットワーク不要。うち parity は下記 gap 4）。
 - audit を実 manifest 2 件に当てて **両方向**を確認: addressed 1 / located 1 で exit 1、addressed のみで exit 0、入力ゼロで exit 2。
 
-## 第 1 波（実施済み、2026-08-15）
+## 適用の実績（2026-08-15）
 
-**cloud-itonami の ISIC app 15 本に適用して着地させた。** 対象は `docs/index.html` を実際に配っている repo（scaffold ではない）: isic-0111 / 0112 / 0113 / 0114 / 0115 / 0116 / 0119 / 0121 / 0122 / 0123 / 0124 / 0125 / 0126 / 0127 / 3091。
+**cloud-itonami の配信面を全部通した。** 再測定（`scripts/verify-app-content-address.cljs`）:
+**589 scanned / 435 addressed / 154 located / 0 unreadable**（着手前は 155 / 1）。
 
-- 15 本とも **PUT 201 → GET 200 → 送ったバイト列と返ってきたバイト列が一致**。1 本も推測で書いていない。
-- 各 repo の main に `kotoba.app.edn` が実在することを GitHub API で確認（15/15）。
-- west pin も同じ 15 本を前進（`west-pin-put.cljs` = サーバ側 single-entry。ローカル west.yml を書いてから push する経路は使っていない）。
+| 対象 | 本数 |
+|---|---|
+| ISIC / UNSPSC appview（`docs/index.html` を配る repo） | 429 |
+| document を配る deployed worker（app-mitate-pwa / app-manabi-cert-prep / kaisya） | 3 |
+| cloud-itonami-app（元からの 1 本） | 1 |
+| その他（cloud-itonami-pi / cloud-itonami-card-issuing） | 2 |
 
-再測定: **170 manifest 中 16 が addressed、154 が location のみ、unreadable 0**（exit 1）。
+すべて **PUT 201 → GET 200 → 送ったバイト列と返ったバイト列の一致**まで確認。
+west pin も **420 本前進**（14 本は既に最新）。実行器は `scripts/content-address-wave.cljs`。
 
-### 途中で踏んだ欠陥を 1 つ記録する
+### 「134 の worker」は 134 の document ではなかった
 
-最初の audit は **155 件中 50 件を「unreadable」と報告して exit 2** した。原因は判定器が manifest の shape を 1 つしか知らなかったこと —— 105 件は素の map、50 件は EDN-only 規約の tx-data ベクタ `[{:db/id -1 …}]` で、どちらも正しい。**読めなかったものを「壊れている」と報告していた**（ADR-2608136000 の 5 問のうち「入力が無いとき何を返すか」の変種）。`content-address.core/entities` を足して両形を読むようにし、回帰テストを付けた。exit 2 で止まったから見つかった —— pass を返す実装だったら 50 件は静かに消えていた。
+deployed worker は **136**（`wrangler.jsonc` 実数）。内訳:
 
-## 未了（正直に）
+- **3 本** committed な static document を配る → 適用済み
+- **44 本** `assets`/`site` 設定を持つが、その directory は deploy 時に build され repo に無い
+- **89 本** static asset を持たない純粋な動的 Worker
 
-- **残り 408 本の ISIC app**（`docs/index.html` を持つ repo は全部で 423）と、cloud-itonami の deployed worker 134 本のうち document を配るものは未適用。手順は確立して 15 本で実証済みなので、あとは wave として回すだけ。次の対象も「実際に document を配っている app」であって scaffold ではない。
-- 既存 154 の actor placement manifest は対象外のまま（document を配っていない）。
-- IPNS naming（`k51…`）はこの landing に含まれない。app ごとに鍵の custody が要るため、運んだのは identity と location の 2 面だけ。
+残りは「sweep で埋まる穴」ではない。前者は **deploy pipeline に publish step を 1 行足す**作業、
+後者は**そもそも単一 document を持たない app** で、この設計の対象かどうかから決める必要がある。
+「134 本が未適用」と書いていたのは、数えていたものが違った。
+
+### naming plane は在る —— 435 個の鍵ではなく 1 個（gap 3）
+
+IPNS 名 `k51qzi5uqu5dhhxwqi8puzqiau2lpwkt8oh8rajqpyak21v8gpvs8qh17o89br` が
+435 app の catalog を指す（`manifest/appview-catalog.edn`、87,078 bytes、sequence 4）。
+publish は `clojure -M:catalog`（kotoba-lang/content-address）。
+
+**per-app 名を意図的に発行していない。** 435 名は 435 本の秘密鍵で、その規模の鍵集合は
+誰が何と言おうと**総当たりで管理される** —— 安全床⑦が禁じている形そのもの。1 鍵で catalog を
+名付ければ、1 app を追うのは resolve ではなく fetch + lookup で済む。`:kotoba.app/latest` は
+**空のまま**にしてある（別のものに解決する名前を入れるより、無い方が正確）。
+
+publish は最後に**名前を引き直して、その CID が返ることを要求する** —— router が record を
+受理したことは、名前がそこへ解決することの証拠ではない。
+catalog file は**archive したバイト列そのもの**で、pointer（CID / 名前 / sequence）は
+`manifest/appview-catalog.pointer.edn` に分けてある。自分の CID を自分の中に畳み込んだ文書は
+**自分を検証できない**（再ハッシュで CID が再現することを確認済み）。
+
+### 決定核は `.kotoba` に移した（gap 4）
+
+`raw-cid-shape?` / `same-object?` / `over-cap?` / `refusal-code` は CID **文字列**と整数 2 つで
+決まる（collection も capability も要らない）ので `kotoba/address_core.kotoba` に置き、
+compile 済み KIR を artifact として同梱した。**18 tests / 270 assertions** の parity test が
+guest と host の答えを突き合わせる。
+
+文字列判定は近似ではない: CIDv1 + sha2-256 は先頭 6 base32 文字が 32 bit ヘッダのうち 30 bit を
+使い切るので、codec が prefix に綴られる（raw = `bafkrei`、dag-cbor = `bafyrei`）。8 文字目に
+こぼれる 2 bit は digest 長で両 codec 共通 —— だから同じバイト列の 2 CID は 8 文字目以降が
+完全に一致し、`same-object?` は decode せず suffix 比較でよい。
+
+**両方向を確認済み**: `digest-start` を 7 → 8 にして再コンパイルすると 34 失敗、戻すと 0。
+parity test を持つ runner は、interpreter が classpath に無いと**ロード自体に失敗する**
+（exit 1、`Could not find namespace`）—— 静かに pure test だけ走る余地を残していない。
+`core.cljc` は guest を呼ばず自分で計算する（interpreter への runtime 依存が全 appview の
+build step に載るため）。それを安全にしているのが「parity test が任意ではない」ことである。
+
+### wave driver で見つけた欠陥 4 つ
+
+全部「測れなかったものが、測って問題が無かったものと同じ顔をする」の変種（ADR-2608136000）。
+
+1. **manifest を書いてから branch を切っていた。** `checkout -B` は「修正済みファイル」と
+   「そのファイルを持たない target」を突き合わせられず正しく拒否する → detached HEAD の
+   commit・押すものが無い push・**きれいに見える working tree**。branch を先に切れば
+   突き合わせるものが無い。
+2. **remote が `origin` とは限らない。** 443 中 2 本は org 名だけを remote に持っていた。
+3. **idempotence を working tree に訊いていた。** 1 の結果、未着地の repo が `already` を
+   返す。今は **remote の default branch に在るか**を訊く。
+4. **最初に落ちた step のエラーを捨てていた。** 症状（`src refspec does not match any`）を
+   原因から 3 step 下流で報告していた。
+
+catalog 側でも 2 つ: `--out FILE` の **値**を入力 manifest として読んでいた（gate が
+`--min 10` を「10 という名の directory」と読むのと同型）/ `validate-fn` に 2 引数版を渡し、
+**PUT が成功し record が live になった後**で arity error になっていた。
+
+### skip したもの（正直に）
+
+- **unregistered 10 件**: 9 件は stray worktree（`-wt-` / `-flagship-item2` 接尾辞、west 未登録）。
+  1 件は checkout path が `cloud-itonami-isic-750` で GitHub 側の repo が
+  `cloud-itonami-isic-7500` —— 改名の残骸。orphan として報告するに留め、直していない。
+- **dirty 2 件**: `cloud-itonami-unspsc-10` / `-39` に他セッションの未コミット WIP
+  （`src/*/registry.cljc`）。触っていない。
+
+## 未了
+
+- **44 本**の worker の deploy pipeline への publish step 追加（`content-address publish` 1 行）
+- **89 本**の動的 Worker —— 単一 document を持たないので、この設計の対象かどうかから決める
+- **154** の actor placement manifest（document を配っていないので対象外のまま）
+- per-app IPNS 名（**意図的に**発行していない。理由は上記）
 
 ## 再開点（次の agent はここから）
 
-現在地の測り直し（これが唯一の被覆率の正本。数値を引用せず毎回測る）:
+現在地は毎回測る。数値を引用しない:
 
 ```bash
 nbb --classpath \".:orgs/kotoba-lang/content-address/src\" \\
   scripts/verify-app-content-address.cljs orgs
-# 2026-08-15 の値: SCANNED 170 / ADDRESSED 16 / LOCATED 154 / UNREADABLE 0（exit 1）
+# 2026-08-15: SCANNED 589 / ADDRESSED 435 / LOCATED 154 / UNREADABLE 0（exit 1）
 ```
 
-次の wave（1 本あたりの手順は 15 本で実証済み。順序を変えない）:
+新しい document を content address 化する（1 本でも 400 本でも同じ）:
 
 ```bash
-# 0. token は kagi から 1 件だけ狙い撃ちで取る（総当たり列挙はしない）
 export KOTOBASE_ARCHIVE_TOKEN=$(KAGI_HOME=$HOME/.kagi FLEET_ROOT=$PWD \\
   orgs/kotoba-lang/kagi/bin/kagi get KOTOBASE_ARCHIVE_TOKEN)
+nbb --classpath \".:orgs/kotoba-lang/content-address/src\" \\
+  scripts/content-address-wave.cljs <list-file> --execute      # 省略で dry-run
+nbb scripts/advance-pins.cljs cloud-itonami <names> --execute && nbb scripts/verify-west-pins.cljs
+```
 
-# 1. 対象を出す（scaffold ではなく document を実際に配っている repo だけ）
-rg --files -g 'index.html' orgs/cloud-itonami \\
-  | grep -E '^orgs/cloud-itonami/cloud-itonami-isic-[0-9]+/docs/index.html$'
+catalog を名前ごと更新する（sequence は pointer から自動で上がる）:
 
-# 2. publish（PUT → GET → バイト比較まで 1 単位。fail-closed）
-nbb --classpath orgs/kotoba-lang/content-address/src \\
-  orgs/kotoba-lang/content-address/bin/content_address.cljs \\
-  publish <repo>/docs/index.html --manifest <repo>/kotoba.app.edn --id cloud.itonami.isic-NNNN
-
-# 3. 着地: origin/main から branch → commit → push → gh api .../merges → branch 削除
-# 4. pin: scripts/west-pin-put.cljs <name> HEAD（**サーバ側 single-entry**）
+```bash
+cd orgs/kotoba-lang/content-address
+CONTENT_ADDRESS_CATALOG_IPNS_SEED=$(kagi get cloud-itonami-appviews-catalog) \\
+KOTOBASE_ARCHIVE_TOKEN=… clojure -M:catalog \\
+  --out <root>/manifest/appview-catalog.edn <addressed manifests...>
 ```
 
 **踏むと分かっている罠**（実測済み）:
 
-- `scripts/advance-pins.cljs --execute` はローカル west.yml を書く。並行セッションが tip を進めていると、そのローカル編集は古い base に載り、`verify-west-pins.cljs` が**自分が触っていない 6 件**を pin 退行として報告する。**pin 前進は `west-pin-put.cljs`（tip から読んで tip に書く）を使う。**
-- `west-pin-put.cljs` の 409 は正常動作（楽観ロック）。そのまま再実行する。
-- superproject の共有 checkout で `git checkout main` が `already used by worktree` で失敗することがある。別セッションが main を掴んでいるだけなので、奪わず `--detach origin/main` にする。
-- `gh api \"repos/.../contents/x?ref=main\"` は**引用符が要る**。zsh が `?` を glob として食い、15 件全部が「missing」に見える（実際は 15/15 在った）。**検査が走らなかったことを、検査が落ちたことと読み違えない。**
-- `content-address.core` は純関数でスカラ判断（`raw-cid?` / `same-object?` / `addressed?` / `refusals`）なので `.kotoba` 決定核の候補だが、**やっていない。主張もしない。**
-- IPNS naming の自動化はこの landing に含まれない（app ごとに鍵の custody が要る）。今回運んだのは identity と location の 2 面で、naming は cloud-itonami-app が既に持っている経路をそのまま正本とする。"}]
+- **並列 worker は同じ repo で `index.lock` を奪い合う。** 3 本走らせて 1 件が
+  branch 上に staged なまま取り残された。最後に**単一 worker で全件を通す**と、
+  remote 照会型の idempotence が拾い直す。
+- `advance-pins.cljs` はローカル west.yml を書く。**必ず `origin/main` から切った枝で走らせ、
+  `verify-west-pins.cljs` を通してから**サーバ側 merge する。420 本を単一 entry API で
+  1 本ずつ書くと west.yml に 420 commit が並ぶので、この規模ではこちらを採った。
+- **背景ジョブは起動時の cwd を引き継ぐ。** 子リポに `cd` した後で superproject 向けの
+  ジョブを投げると、その子リポで branch を切って動く（実際に 1 度やった）。
+- `gh api \"repos/.../contents/x?ref=main\"` は**引用符が要る**。zsh が `?` を glob として
+  食い、15 件全部が「missing」に見える。**検査が走らなかったことを、検査が落ちたことと
+  読み違えない。**"}]
