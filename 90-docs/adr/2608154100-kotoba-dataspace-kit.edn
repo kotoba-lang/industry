@@ -1,0 +1,141 @@
+[{:db/id -1
+  :adr/id "ADR-2608154100"
+  :adr/title "Kotoba dataspace kit — Syndicate 風の協調を OCap カーネルの capability kit として足す"
+  :adr/status "accepted"
+  :adr/date "2026-08-15"
+  :adr/body
+  "## 発端
+
+2026-08-15 の mapping: Syndicate / Goblins / OCapN は Kotoba 言語カーネルに
+**入っていない**。入っているのは Clojure 形の `.kotoba`、EDN 的な inert 値、
+ambient authority の排除、capability で閉じた effect。オーナー指示は
+「では設計、実装」— 新しい言語を作らず、OCapN / Preserves / Goblins vat /
+ValueFlows をカーネルに持ち込まず、既存 OCap カーネルの上に Syndicate 風
+dataspace 協調の proving slice を 1 本着地させる。
+
+## 決定
+
+1. **意味のカーネルは変えない。** source は Clojure 形 `.kotoba`
+   （ADR-2607279200 / `guest-grammar.edn`）。値は EDN 的 inert。wire は
+   `kotoba.value.v1`（DAG-CBOR）。セキュリティは ambient 排除、caps は
+   host handle / grant∩policy。`#cap` は権限を mint しない。
+2. **足りない層は協調 (coordination) である。** Syndicate に着想した
+   dataspace を **capability kit** として足す。第二言語でも新しい store
+   でもない。resource は dataspace インスタンス（プロセス全体ではない）。
+3. **assertion / pattern は普通の EDN**（vector / map）。例:
+   `[:temperature :room/a 21]` に対し `[:temperature :room/a ?t]` または
+   `_` / `:_` wildcard。Clojure thesis の `'?t` はデータとしては
+   `(quote ?t)`。guest が quote する必要はなく、pattern は EDN 値。
+   map は「pattern 側の key が在ること」でマッチし、余分な key は許す。
+4. **ops:** `assert` / `retract` / `observe` / `facet-enter` / `facet-leave`
+   （kit の `typed-cap-call` 境界。Clojure の `assert!` ではない）。
+   Facet を抜けるとその facet が publish した assertion を retract し、
+   その facet の observation を捨てる。
+5. **ambient dataspace は無い。** すべての op は dataspace capability
+   （この slice では wire id 24 / `:dataspace/transact`）の所持を要する。
+6. **observe の callback / facet body は guest 閉包ではない。** guest は
+   inert な request を返す。matching と lifecycle は host provider
+   （ADR-2607201300 `state+event → effects`）。この slice の observe は
+   (a) 登録して現在の matches を返す (b) 後続 assert の `:notices` に
+   binding を載せる。guest `fn` / `future` は足さない。
+7. **assertion のシリアライズも `#cap` / `#cap-ref` も権限を復元しない。**
+   解決は既存 cap（`intersect-grants` / 実行時 allow 集合 / host 表）。
+8. **encoding:** in-process は EDN。kit ABI はこの slice では bounded
+   EDN **string**（既存 `:string` 型で KIR が通る）。wire は
+   `kotoba.value.v1`。Preserves ではない。
+9. **この slice の外:** Goblins vat を guest に入れること、`<-` eventual
+   send、OCapN、Preserves、ValueFlows-in-kernel、user `defmacro`、
+   Clojure/JVM ambient、actor family (`<-` / spawn) の compiler kit。
+10. **vat の対応物:** kototama tender / reference runtime が single-turn
+    scheduler。guest に unbounded concurrency は無い
+    （`future`/`agent`/`send` は `:intentional-security-constraint`）。
+11. **置き場:** 新規 GitHub repo は作らない。`nbb scripts/concept-lookup.cljs
+    dataspace|syndicate` は語彙に無く、`repo-search` も dataspace kit を
+    返さなかった。実装は既存 `kotoba-lang/compiler`（kit + reference host +
+    tests）と `kotoba-lang/kotoba-lang`（catalog / semantics / cap values）。
+12. **既存の隣接実装を捨てない。** `kotoba.lang.incidence` は既に
+    Syndicate 風 assert/retract/observe/facet を **CID 付き incidence ブロック**
+    として持っている。`incidence-ocapn` は CapTP 下書きであり、**この kit には
+    入れない**。本 kit は guest が書く **EDN tuple space**。kgraph-assert!
+    は i64 EAV であり、この slice の backing にはしない。
+
+## 現在地 vs 目標（正直に）
+
+| 面 | 今日 | 目標ではないもの |
+|---|---|---|
+| kit `dataspace-v1` | reference implemented（JVM KIR + reference-runtime） | wasm-aot / native-aot / jit は pending |
+| wire id 24 | kotoba-lang catalog に登録。compiler テストは numeric `typed-cap-call 24` | kotoba-sema の vendor catalog が追いつくまで named `:dataspace/transact` は frontend が拒否する |
+| provider-conformance 9-kit 閉集合 | **入れない**（`:capability-count` 9 と component-model inventory を壊す） | 9-kit 構造ゲートへの編入は sema vendor + component-model 行が揃ってから |
+| Goblins / OCapN | 統合していない | 統合したと書かない |
+| observe | host-owned match、inert notices | guest vat / callback 関数 |
+
+## この slice で実装したもの
+
+### compiler = `kotoba-lang/amu`（GitHub は `compiler` → `amu` にリダイレクト）
+
+- `resources/kotoba/lang/capability-kits/dataspace-v1.edn` — 閉 effect 集合、deny-by-default、resource=dataspace
+- `src/kotoba/compiler/dataspace/match.cljc` — 純 EDN matcher（core.match に依存しない）
+- `src/kotoba/compiler/dataspace/provider.cljc` — in-memory reference host
+- `test/kotoba/compiler/dataspace_match_test.clj`
+- `test/kotoba/compiler/dataspace_provider_test.clj` — cap 無し deny、facet retract、observe bind、`#cap` 拒否、偽 handle 拒否
+- `resources/kotoba/lang/application-language.edn` に `:dataspace` kit を記録
+- `test/kotoba/compiler/test_runner.clj` に ns を追加
+
+### kotoba-lang（worktree `/tmp/kotoba-lang-dataspace`、branch `agent/dataspace-kit`）
+
+- `lang/capability-catalog.edn` と `resources/kotoba/lang/capability-catalog.edn` に `:dataspace/transact` wire id 24
+- `lang/capability-semantics.edn` の `:kinds` と `capability_values.cljc` の `effect-for-kind`
+- `test/kotoba/lang/dataspace_cap_test.clj` — `#cap` reader は mint しない、grant 無しは deny
+
+### 着地（2026-08-15）
+
+- `kotoba-lang/amu` main `003db3eb8ec1e2222f38b26821a04b4ca493d14e`
+  （merge of `2b697f513c29e1cc7f66be673b2ffdeae5411929`）
+  https://github.com/kotoba-lang/amu/commit/003db3eb8ec1e2222f38b26821a04b4ca493d14e
+- `kotoba-lang/kotoba-lang` main `f67c9cbc16b1b1045805f1786692913bbefc34a0`
+  （merge of `57f1de81bc252c98daccd122d64643b622734693`）
+  https://github.com/kotoba-lang/kotoba-lang/commit/f67c9cbc16b1b1045805f1786692913bbefc34a0
+- 本 ADR は superproject `agent/kotoba-dataspace-kit`。west pin は `amu` と
+  `kotoba-lang` を上記 SHA へ前進させる（`compiler` という旧 west 名は
+  同じ GitHub repo のリダイレクトであり、この slice では `amu` を正とする）。
+
+## テストの回し方と結果（2026-08-15 実測）
+
+compiler（対象 ns だけ。フル `clojure -M:test` は native/wasm を含むのでこの slice では回していない）:
+
+```
+cd /tmp/kotoba-compiler-dataspace
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.dataspace-provider-test))
+    (apply clojure.test/run-tests
+           (quote [kotoba.compiler.dataspace-match-test
+                   kotoba.compiler.dataspace-provider-test]))'
+```
+
+結果: **11 tests / 32 assertions、0 fail / 0 error。**
+
+両方向: `missing-grant-denies-before-provider-invoke` は allow 集合が空なら
+`capability denied`（cap 無し assert/observe は落ちる）。
+`facet-exit-retracts-owned-assertions-and-drops-observations` は leave 後の
+observe が `[]`（retract が動かなければ bindings が残る）。
+
+kotoba-lang:
+
+```
+cd /tmp/kotoba-lang-dataspace
+clojure -M:test -n kotoba.lang.dataspace-cap-test -n kotoba.lang.capability-catalog-test
+```
+
+結果: **6 tests / 17 assertions、0 fail / 0 error。**
+
+## 残ギャップ（次の agent へ）
+
+1. kotoba-sema の `capability-catalog.edn` と cljs fallback に id 24 を vendor し、named `dataspace/transact` と `(:capabilities #{:dataspace/transact})` を通す。
+2. `kotoba-lang/provider` へ reference host を移す。compiler pin は `amu` として main tip へ前進済み。
+3. provider-conformance 閉集合と component-model inventory への編入。
+4. assertion の kit ABI を `:document` にする（今日は EDN string）。
+5. matcher を `.kotoba` 決定核へ移す（recursive map walk が native-qualified になってから）。
+6. kgraph / incidence を backing にするかは別 slice。混在させない。
+"}]
