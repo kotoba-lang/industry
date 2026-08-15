@@ -205,6 +205,26 @@ value equation が向いている方向は ENGI の Commons issuance が既に�
   production の posting を壊して `INV-P@A` で落ちることを確認した ——
   無ければ「`qty-accounting` が一度も書かれていない」まま suite は緑だった。
 
+- **単位に共有 registry が入った**（`valueflows.unit` +
+  `resources/valueflows/units.edn`）。**「単位違いを拒否する」検査は、2 者が
+  同じ綴りを使っていて初めて意味を持つ** —— それまで supplier の `:kilogram` と
+  作業指示の `:kg` は不一致として弾かれていた。`vf:Unit` は `om:Unit` の
+  subclass、`vf:omUnitIdentifier` は「standardization across networks」用なので
+  物理単位の authority は om-2、通貨は ISO 4217 も併記。
+  **om-2 の RDF 配布物に当てて実測した 3 点**（pattern で組み立てたら全部誤り）:
+  `each` は存在しない（数量は `piece`）/ 素の `second` `minute` も存在しない
+  （`second-Time` `minute-Time` —— `second-Angle` があるため）/ om-2 自身が
+  `JapaneseYen` は大文字で `euro` は小文字（識別子はこちらが整える対象ではない）。
+  ⚠ **om-2 のサイトは落ちている**（data ファイル 500、`/resource/om-2/<name>` は
+  全て 404、2026-08-15 実測）。だから IRI は dereference しない —— `xsd:anyURI` は
+  識別子であって生きたページの約束ではない。**404 を「その単位は存在しない」と
+  読んだら誤り**だったので、authoritative な RDF 配布物（sha256 記録）で検証した。
+  ENGI の `EN` は `:mutual-credit` / `:authority :none`（`:currency` にすると
+  円と加算可能になる。発行者も利息も無い）。**未登録の綴りは推測しない**
+  （`:kilo` は似ているだけで kg にならない）。registry が小さいのは
+  **突き合わせる既存の単位語彙が無いから** —— plm は `:plm.item/uom` を宣言して
+  値をどこにも入れていない（実測）。
+
 ## 次に効くこと（未着手、優先順）
 
 1. **ENGI の datom 射影は入力が無くて着手できない**（2026-08-15 実測）。
@@ -212,11 +232,14 @@ value equation が向いている方向は ENGI の Commons issuance が既に�
    持たない**（committed な journal / fixture データが無い）。入力の無い
    projection は「見ないことで pass を報告する」ので書かない。
    先に必要なのは ENGI 側に検証可能な event corpus が存在すること。
-2. 共有 unit registry（om-2）。今は repo ごとに単位を持っている。
-3. `Proposal` / `Agreement` は依然 :absent / :partial。offer/request を
+2. `Proposal` / `Agreement` は依然 :absent / :partial。offer/request を
    `vf:Proposal` として持つと commitment-ledger の融資 offer が
    （false friend のままではなく）VF の語彙で表現できる。
-4. **plm に fleet gate が無い。** VF の dependent-demand / value-rollup の
+3. ~~plm に fleet gate が無い~~ → **2026-08-15 に登録済み**（`:cd true`、
+   receipt `ce94ff2c3480`、`test-plm-1e0901d-murakumo-judah` 31 tests/118
+   assertions）。登録前に `--dry-run` で実ノードに当てて緑を確認した ——
+   `:test` alias が maven（cognitect test-runner + datomic local）を要するので、
+   egress を推測で登録すると恒久的に赤い gate になる。旧記述: VF の dependent-demand / value-rollup の
    :mapped 判定の根拠が plm なのに、CI で何も検査していない。`:test` alias が
    maven（cognitect test-runner + datomic local）を要するので、
    ノードの egress を実測してから登録する（推測で登録すると恒久的に赤い
