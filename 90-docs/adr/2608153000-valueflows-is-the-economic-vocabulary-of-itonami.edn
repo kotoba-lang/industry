@@ -318,6 +318,50 @@ value equation が向いている方向は ENGI の Commons issuance が既に�
 4 repo すべて GitHub main == west pin == fleet receipt。plm の gate 登録も
 `--dry-run` で実ノードに当ててから（receipt `ce94ff2c3480`）。
 
+## cloud-itonami の business を VF 面に接続した（2026-08-15）
+
+`scripts/itonami-valueflows-bind.cljs` → `90-docs/valueflows/itonami-business-vf.datoms.edn`
+（`:source/dataset \"itonami-valueflows\"`、`:repo/path` で datom 面と join）。
+
+**母集団を先に測った。** app store の business entity は **1 件**
+（`cloud-itonami-vc`、6 面のうち repos 面だけ bound）。実際の business は
+**blueprint** で、west 登録のものが **1,398 件**（filesystem には 1,585 あるが
+187 は `_wt*` / `.wt*` 等の scratch worktree で repo ではない。west.yml が authority）。
+
+| 状態 | 件数 | 意味 |
+|---|---|---|
+| `classified` | **497** | UN ISIC Rev.4 の class に解決 → `vf:ProcessSpecification` |
+| `classification-unresolvable` | 46 | コードはあるが Rev.4 表（428 class）に無い（多くは Rev.5 専用） |
+| `occupation-only` | 340 | ISCO は職業の分類で、産業の活動ではない |
+| `unclassified` | 515 | ISIC も ISCO も宣言していない |
+
+**何を導出し、何を拒否したか。** blueprint に**経済的内容は無い** ——
+1,398 件全部を測った上での事実で、資源・価格・数量・flow を 1 つも持たず、
+governance と技術だけを宣言する。だから**経済イベントは導出しない**（無いものから
+1,398 件分の flow を作るのは捏造）。導出できるのは**分類**で、それは分類が実在の
+外部データだから: blueprint の ISIC コード → UN の public domain class
+（`org-un-isic/data/classes/*.json`、428 件）→ `vf:classifiedAs` にその URI。
+`vf:classifiedAs` は仕様が「references one or more uri's for a concept in a common
+taxonomy」と言っている用途そのもの。URI prefix も捏造していない ——
+`org-un-isic` の `PROJECT.jsonld` が
+`isic: https://unstats.un.org/unsd/classifications/Econ/ISIC/` を宣言している。
+
+⚠ **分類された business は「接続された台帳」ではない。** これが coverage entity の
+存在理由。ProcessSpecification は「どの種類の活動か」を言うだけで、活動が記録された
+かは何も言わない。そこで 2 母集団を別に数えて併記する:
+
+- `:vf.coverage/consuming-in-population` = **0**（1,398 の blueprint business のうち）
+- `:vf.coverage/consuming-in-org` = **1**（west 登録の cloud-itonami repo 全部のうち。
+  `credits`。blueprint を持たないので前者の母集団に居ない）
+
+**片方だけ出すと両方向に誤解される** —— 前者だけなら「cloud-itonami で VF は
+何も使われていない」と読め、497 だけなら「497 が接続済み」と読める。
+
+**検査は 3 値**（`--check`）: 一致 0 / 不一致 1 / **入力欠落は exit 2**。ISIC データを
+外して実演した —— 1,398 件を `:unclassified` と書き出せば、**入力の欠落を business の
+せいにする**ことになる。**fleet gate は付けない**: `--check` の入力は `orgs/` で、
+node には配られない（ENGI contract と同じ判断）。
+
 ## 次に効くこと（未着手）
 
 1. **定期 tick はこの 4 gate を検査していない。** tick は `gates.edn` を
