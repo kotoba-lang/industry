@@ -2209,6 +2209,23 @@ orgs/personal/bin/datomic/.clj-kondo/
 # or a dot-prefixed segment. It is deliberately narrow rather than an org-wide
 # blanket, per the 2026-07-25 note above.
 /orgs/*/.*-tamaki--*/
+
+# Local machine residue that is NOT a repo: orgs/com-junkawasaki/maxwell-mac/ has no
+# .git, is not a west project, and has no GitHub remote (404). Measured 2026-08-15:
+# 31,622 files / 798 MB, of which only 33 sit outside `venv/` — and those 33 are
+# `.log` files, `__pycache__/*.pyc`, and a HuggingFace credential `.hf_token`. The
+# `modal_*.py` sources that produced those caches are already gone, so there is no
+# source work here to lose.
+#
+# It is listed because it is the one untracked path under orgs/ that is neither a
+# nested git repo nor ignored — every other credential-bearing checkout (actor
+# identity.edn, .npmrc) sits inside its own repo, which `git add` at the root will
+# not recurse into. Until now the token was shielded only by the sparse-checkout
+# cone, which is incidental and moves; this makes it durable.
+#
+# This does NOT settle the orphan's disposition. west-orphan-audit reads the
+# filesystem, not `git status`, so it still reports the directory.
+/orgs/com-junkawasaki/maxwell-mac/
 /orgs/jk-luxury/club-shinshi-actor-magatama/
 /orgs/jk-luxury/club-shinshi-actor-shinshi/
 /orgs/jk-luxury/jk-corp/
