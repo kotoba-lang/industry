@@ -68,13 +68,59 @@ datomic 連携なども考慮に, kotoba 言語を前提に」
 
 | 軸 | 測っているもの |
 |---|---|
-| substrate | `src/**` の実バイト数 |
-| test | `test/**` の実バイト数 |
+| substrate | `src/**` の実バイト数（**トップレベルのみ。下記の盲点を読むこと**） |
+| test | `test/**` の実バイト数（**同上**） |
 | governed | governed-actor 7 部品（operation/governor|policy/store/phase/sim/facts/ledger）の充足率 |
 | ingest | facts/catalog/data 内の実 URL 引用数 |
 | docs | README バイト数・ADR 数・operator-quickstart の有無 |
 | surface | demo・cron 再生成 workflow・business-model・pricing の有無 |
 | fresh | 最終 commit からの経過日数 |
+
+### ⚠ substrate と test はトップレベルの `src/` `test/` しか見ていない（2026-08-15 実測）
+
+`itonami-maturity-scan.cljs` の判定は `(str/starts-with? % \"src/\")` と
+`(str/starts-with? % \"test/\")` で、**リポジトリ直下に限る**。入れ子のレイアウトは
+1 バイトも数えない。
+
+**実測（1,935 repo）:**
+
+| | 件数 |
+|---|---|
+| コードは在るのに src 0 かつ test 0 と測られている | **387（20%）** |
+| テストが在るのに数えられていない（`test/` が直下でない） | **164** |
+| 入れ子の `src/` が数えられていない | **167** |
+
+最大例は `cloud-itonami/mangaka` の 66 テストファイル、次が `app-maps` 27、
+`app-mangaka` 26、`app-open-kyber` 26。
+
+**具体例 — `cloud-itonami/patent`**: 36 ファイル、`lg/clj/lg_patent/**.cljc` の
+LangGraph graph 群と Python 版、`kotoba/src` の TS registry、`kotoba/test` の
+vitest。`bb test` を実際に回すと **38 tests / 78 assertions / 0 failures** で緑。
+それを計器は **substrate 0bp / test 0bp** と測る。
+
+**これは規約違反ではなく盲点である。** この ADR は `src/**` `test/**` と書くだけで、
+**レイアウト規約はどこにも定めていない**（`top-level` / `layout` / `規約` の語は
+この ADR に 1 件も無い）。したがって 387 repo は「規約に従っていない」のではなく
+「測られていない」。そして測られていないものが 0 として蓄積している —— この
+workspace が繰り返し踏んでいる形（「未測定 ≠ 0」）そのもの。
+
+**帰結が順位に出ている。** 成熟度向上 loop の順位表は下位が平坦（上位 5 本の差
+< 0.5）で、tick 自身が「順位は弱い信号」と警告する。その平坦さの主因がこれ ——
+実体のある repo が横並びで 0.044 に潰れるので、loop は空の repo と中身のある repo
+を区別できないまま送り先を選んでいる。
+
+**オーナー判断が要る。今周は測り方を変えていない。**
+
+- (a) 測定を広げる（入れ子の `src/` `test/` も数える）。387 repo の own-bp が一度に
+  動き、`mean-own` と全 repo の `fleet-gain` が変わる。**1 commit で成熟度の地形が
+  書き換わる**ので、docs 軸の周の副産物としてやるべきではない。
+- (b) レイアウト規約を明文化し、387 repo を「非適合」として扱う。その場合は
+  適合させる作業（コードの移動）が必要で、それは移行 seed の
+  `:allowed-additions` と衝突しうる。
+
+どちらも「スコアを上げる」作業ではなく「スコアを正しくする」作業である。
+substrate は tick が agent に狙わせない軸（直接上げると水増しになる）なので、
+**測り方の変更を軸上げの周に混ぜない**という規律がここでも効く。
 
 **半飽和定数を発明していない。** `sat(x,k)=10000x/(x+k)` の k は fleet 自身の
 正値中央値を使う（src 41,641 B / test 17,139 B / citation 12 / README 4,283 B /
