@@ -873,6 +873,34 @@ CertGovernor）。
 - lock の `:kotoba.*` に archive 専用の raw CID を載せない。Location は protocol 外の記録（例 `:graph {:raw-cid …}`）。
 - document が raw なら identity と Location の文字列は一致してよい。dag-cbor commit では一致しない。それをバグにしない。
 
+## live service の永続化境界は `kotobase.net`（repo-wide mandatory、2026-08-15、ADR-2608159100）
+
+**live service が生成・収集する proof、actor、wiki、graph、event、index の durable source は
+Kotobase とし、application から見える production origin は `https://kotobase.net` 1つにする。**
+provider の実装（R2 / B2 / S3 / IPFS）や内部 Worker host を application の前提にしない。
+
+- immutable bytes は `PUT/GET https://kotobase.net/ipld/:cid`。書く前と読む時の両方で
+  CID を検証する。`graph-database.kotobase.net` 等の provider origin や application 自身の
+  R2 binding を production path に直書きしない。
+- logical metadata、provenance、actor、proof 評価、CID index は
+  `https://kotobase.net/api/*` の datom 面に置く。bytes 本体を datom に埋めない。
+- Durable Object / D1 / KV は alarm、lease、single-writer、cursor、session、cache、projection
+  にだけ使える。消しても Kotobase の block + datom から durable state を復元できなければ違反。
+- write は fresh nonce の CACAO capability を route ごとに使う。credential は既知の識別子を
+  credential 専用ツールから1件だけ取得し、repo・ログ・datom・block に保存しない。
+- 8 MiB を超える object は datom や `/ipld` に押し込まず、`kotobase.net` から取得した
+  presigned transfer capability を使う。入口の authority は同じく `kotobase.net`。
+- localhost / mock / testnet は明示した環境でのみ可。production の接続失敗時に direct R2、
+  provider host、DO SQL へ黙って fallback しない。
+- Git 管理の policy / source / artifact は引き続き Git + EDN + DataLad が正本
+  （ADR-2608039700）。この規則が対象にするのは **live service の runtime durable plane**。
+
+機械可読な正本は `manifest/repository-rules.edn` の
+`:workspace-policies :live-service-durable-data`。検査は
+`nbb scripts/verify-kotobase-persistence-policy.cljs`、CI/CD は murakumo fleet の
+`root-kotobase-persistence-policy` gate。新しい service は README / ADR / config で
+Kotobase の database/ref と block codec を宣言する。
+
 ## kotobase の Datalog join は ref 1本までしか届かない（repo-wide mandatory、2026-07-26、ADR-260726-kotobase-query-plane-is-one-ref）
 
 **`kotobase.core/open` は `:ref-name` を1つしか取らず、`q` / `query` / `pull` /

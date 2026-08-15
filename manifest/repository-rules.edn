@@ -18,6 +18,26 @@
 
 {:schema "kotoba.repository-role-rules.workspace.v1"
 
+ :workspace-policies
+ {:live-service-durable-data
+  {:policy/authority "90-docs/adr/2608159100-kotobase-net-default-durable-boundary.edn"
+   :policy/scope :runtime-durable-plane
+   :policy/production-origin "https://kotobase.net"
+   :policy/immutable-block-path "/ipld/:cid"
+   :policy/datom-path-prefix "/api/"
+   :policy/large-object-entry-origin "https://kotobase.net"
+   :policy/requires #{:cid-verified-read
+                      :cid-verified-write
+                      :fresh-cacao-nonce
+                      :recoverable-without-coordination-store}
+   :policy/coordination-only #{:durable-object :d1 :kv}
+   :policy/forbids #{:application-direct-r2-binding
+                     :provider-origin-as-production-premise
+                     :durable-object-as-data-authority
+                     :silent-production-fallback}
+   :policy/excludes #{:git-edn-source-plane :datalad-large-artifact-plane
+                      :explicit-localhost :explicit-mock :explicit-testnet}}}
+
  :vocabularies
  [{:vocabulary/id :stack-tier
    :vocabulary/authority "90-docs/adr/2607266000-kotoba-stack-responsibility-split-t0-t3.edn"

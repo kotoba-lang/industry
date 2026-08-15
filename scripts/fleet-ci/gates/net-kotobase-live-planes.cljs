@@ -79,6 +79,28 @@
   ;; 0xed 0x01 = the Ed25519 multicodec prefix a did:key carries.
   (str "did:key:" (base58btc (buf (js/Buffer.from #js [0xed 0x01]) pub))))
 
+(def ^:private b32 "abcdefghijklmnopqrstuvwxyz234567")
+(defn- base32lower [bytes]
+  (loop [i 0 bits 0 acc 0 out ""]
+    (if (< i (.-length bytes))
+      (let [acc' (bit-or (bit-shift-left acc 8) (aget bytes i))
+            bits' (+ bits 8)
+            [remain kept emitted]
+            (loop [b bits' a acc' s out]
+              (if (>= b 5)
+                (let [shift (- b 5)]
+                  (recur shift a (str s (nth b32 (bit-and 31 (bit-shift-right a shift))))))
+                [b (bit-and a (dec (bit-shift-left 1 b))) s]))]
+        (recur (inc i) remain kept emitted))
+      (if (pos? bits)
+        (str out (nth b32 (bit-and 31 (bit-shift-left acc (- 5 bits)))))
+        out))))
+
+(defn- raw-cid [bytes]
+  ;; CIDv1 + raw codec + sha2-256 multihash.
+  (let [digest (.digest (.update (crypto/createHash "sha256") bytes))]
+    (str "b" (base32lower (buf (js/Buffer.from #js [0x01 0x55 0x12 0x20]) digest)))))
+
 ;; ── minimal deterministic CBOR (dag-cbor subset: text strings, maps, arrays) ─
 ;; dag-cbor orders map keys by length first, then bytewise, and the decoder on
 ;; the other side is strict about it. Only the shapes a CACAO uses are handled.
@@ -192,6 +214,8 @@
   (let [seed (crypto/randomBytes 32)
         priv (private-key seed)
         did (did-key (public-bytes priv))
+        block-body (utf8 (str "kotobase-live-plane:" (crypto/randomUUID)))
+        block-cid (raw-cid block-body)
         pin-res ["kotoba://can/kotobase:pin" (str "kotoba://graph/" did)]
         auth (fn [& {:as opts}]
                (mint (merge {:seed seed :did did :resources pin-res} opts)))
@@ -228,6 +252,20 @@
                          (json-post (doto (auth) (aset "x-datomic-db-name" "fleet-probe"))
                                     {:index "eavt" :limit 1})
                          "200" (status= 200)))
+        ;; 2a. the apex is the actual immutable data boundary. A route that is
+        ;; documented but not deployed used to return 405 while the provider
+        ;; hostname worked, which leaked provider placement into applications.
+        (.then #(expect! "ipld/put-cid-verified" (str base "/ipld/" block-cid)
+                         {:method "PUT"
+                          :headers (js/Object.assign
+                                    #js {"content-type" "application/octet-stream"}
+                                    (auth))
+                          :body block-body}
+                         "204" (status= 204)))
+        (.then #(expect! "ipld/get-byte-equal" (str base "/ipld/" block-cid)
+                         {:method "GET"} "200 + exact bytes"
+                         (fn [{:keys [status body]}]
+                           (and (= status 200) (= body (.toString block-body "utf8"))))))
         ;; 2b. SQL must be an executable backend surface, not only an advertised
         ;; lexicon entry. The throwaway tenant's empty graph is enough to prove
         ;; auth, graph derivation, routing, parsing, and bounded execution.
