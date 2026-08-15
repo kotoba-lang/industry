@@ -40,12 +40,70 @@
                   (str/trim (str err (when (and (seq err) (seq out)) "\n") out)))))
     out))
 
+(def lock-owner-file (str lock-dir "/owner.edn"))
+
+(defn- alive?
+  "Is `pid` a live process owned by this user? `kill -0` answers without
+  signalling. Anything we cannot answer is treated as ALIVE — reclaiming a
+  lock we merely failed to interrogate is the dangerous direction."
+  [pid]
+  (if-not (and (number? pid) (pos? pid))
+    true
+    (try (.kill js/process pid 0) true
+         (catch :default e (not= "ESRCH" (.-code e))))))
+
+(defn- lock-owner []
+  (try (edn/read-string (.readFileSync fs lock-owner-file "utf8"))
+       (catch :default _ nil)))
+
+(defn- reclaim-stale-lock!
+  "A bare `mkdir` lock with no owner record cannot tell `a tick is working`
+  from `a tick died holding it`, and reports both as the same refusal. On
+  2026-08-15 a tick died inside `npm run build` (shadow-cljs par-compile
+  abort) and the next FIVE hourly ticks refused to run for ~7h — the ingest
+  looked idle rather than broken. So the lock now records its owner and a
+  later tick may reclaim it, but only when it can SHOW the owner is gone:
+  a dead pid, or a lock with no owner record at all (written by the old
+  scheme, or by a tick killed between mkdir and write)."
+  []
+  (let [{:keys [pid started-at]} (lock-owner)]
+    (cond
+      (nil? pid)
+      (do (println (str "reclaiming ownerless lock " lock-dir))
+          (try (.rmSync fs lock-dir #js {:recursive true}) true
+               (catch :default _ false)))
+
+      (alive? pid) false
+
+      :else
+      (do (println (str "reclaiming lock from dead pid " pid
+                        " (held since " started-at ")"))
+          (try (.rmSync fs lock-dir #js {:recursive true}) true
+               (catch :default _ false))))))
+
+(defn- claim! []
+  (.mkdirSync fs lock-dir)
+  (.writeFileSync fs lock-owner-file
+                  (pr-str {:pid (.-pid js/process)
+                           :started-at (.toISOString (js/Date.))
+                           :host (.hostname os)})))
+
 (defn acquire-lock! []
   (.mkdirSync fs (.dirname path lock-dir) #js {:recursive true})
-  (try (.mkdirSync fs lock-dir)
-       (catch :default _ (fail! (str "another tick holds " lock-dir)))))
+  (try (claim!)
+       (catch :default _
+         ;; Occupied. Reclaim only on evidence the owner is gone, then make
+         ;; exactly one more attempt — a retry loop here would race two
+         ;; ticks into the same worktree.
+         (if (reclaim-stale-lock!)
+           (try (claim!)
+                (catch :default _
+                  (fail! (str "another tick took " lock-dir " during reclaim"))))
+           (fail! (str "another tick holds " lock-dir " — owner "
+                       (pr-str (lock-owner))))))))
 
-(defn release-lock! [] (try (.rmdirSync fs lock-dir) (catch :default _ nil)))
+(defn release-lock! []
+  (try (.rmSync fs lock-dir #js {:recursive true}) (catch :default _ nil)))
 
 (defn process-env [] (js/Object.assign #js {} js/process.env))
 
@@ -249,10 +307,25 @@
                    "deployed=" deploy?))))
     (finally (release-lock!))))
 
+(defn lock-selftest!
+  "Exercise the real acquire/release pair and nothing else, so the reclaim
+  rule can be shown to refuse AND to reclaim. Without this the only way to
+  test the lock is to run a full tick, which uploads and deploys."
+  []
+  (acquire-lock!)
+  (println "acquired" (pr-str (lock-owner)))
+  (release-lock!)
+  (println "released"))
+
+(if (= "1" (aget js/process.env "HYAKKA_LOCK_SELFTEST"))
+  (try (lock-selftest!)
+       (catch :default e
+         (binding [*out* *err*] (println "FAIL" (or (.-message e) (str e))))
+         (set! (.-exitCode js/process) 1)))
 (if (= "1" (aget js/process.env "HYAKKA_VALIDATE_ONLY"))
   (validate-policy!)
   (try
     (main)
     (catch :default e
       (binding [*out* *err*] (println "FAIL" (or (.-message e) (str e))))
-      (set! (.-exitCode js/process) 1))))
+      (set! (.-exitCode js/process) 1)))))
