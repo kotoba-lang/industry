@@ -159,6 +159,31 @@
                          " attempts: expected " expected ", got "
                          (:catalog-id health)))))))
 
+(defn live-catalogue-id []
+  ;; A failed deploy must remain retryable even after its ledger was already
+  ;; projected to Kotobase. Transport or JSON failures deliberately read as
+  ;; "unknown", which causes a safe redeploy followed by semantic verification.
+  (let [response (run ["curl" "-fsS" (str public-health "?resident=preflight")] {})]
+    (when (zero? (:exit response))
+      (try
+        (let [health (js->clj (js/JSON.parse (:out response)) :keywordize-keys true)]
+          (when (:ok health) (:catalog-id health)))
+        (catch :default _ nil)))))
+
+(defn deploy-required? [pending expected live]
+  (or (seq pending) (not= expected live)))
+
+(defn validate-policy! []
+  (doseq [[pending expected live wanted]
+          [[[] "sha256:new" "sha256:new" false]
+           [[] "sha256:new" "sha256:old" true]
+           [[] "sha256:new" nil true]
+           [["ledger"] "sha256:new" "sha256:new" true]]]
+    (when-not (= wanted (boolean (deploy-required? pending expected live)))
+      (fail! (str "deploy retry policy validation failed: "
+                  (pr-str {:pending pending :expected expected :live live})))))
+  (println "hyakka resident deploy retry policy validated"))
+
 (defn publish-kotobase! [env ledgers]
   (when (seq ledgers)
     (let [e (js/Object.assign #js {} env)
@@ -209,17 +234,23 @@
         ;; that exact merge tree before projection and deploy; last-writer-wins
         ;; deploys from a stale checkout previously reverted this zone.
         (sync-main! env)
-        (let [pending (unpublished-ledgers)]
+        (let [pending (unpublished-ledgers)
+              expected (catalogue-id)
+              live (live-catalogue-id)
+              deploy? (boolean (deploy-required? pending expected live))]
           (println "Kotobase pending ledgers=" (count pending))
           (publish-kotobase! env pending)
-          (when (seq pending) (deploy-public! env))
+          (when (and deploy? (empty? pending))
+            (println "public catalogue drift detected; redeploying"
+                     "expected=" expected "live=" (or live "unavailable")))
+          (when deploy? (deploy-public! env))
           (println "hyakka resident tick complete; receipts=" (count receipts)
                    "projected=" (count pending)
-                   "deployed=" (boolean (seq pending))))))
+                   "deployed=" deploy?))))
     (finally (release-lock!))))
 
 (if (= "1" (aget js/process.env "HYAKKA_VALIDATE_ONLY"))
-  (println "hyakka resident operator loaded")
+  (validate-policy!)
   (try
     (main)
     (catch :default e
