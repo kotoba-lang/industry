@@ -1,0 +1,204 @@
+[{:db/id -1
+  :adr/id "ADR-2608153000"
+  :adr/title "Valueflows (REA) を営み OS の経済語彙の中心に据える — ws-valueflo-vocabulary / -algorithms"
+  :adr/status "accepted"
+  :adr/date "2026-08-15"
+  :adr/body
+  "## 発端 — 「対応している?」への答えは「していない」だった
+
+オーナーの問い（2026-08-15）: 「cloud-itonami の実行、計算モデルは
+https://www.valueflo.ws/algorithms/overview/#network-based-algorithms を
+ベースにしている? 対応している?」
+
+実測して答えは **していない**。west 4,175 project と 90-docs 全走査で
+`valueflo` / `EconomicEvent` / `EconomicResource` の参照は **1 件**、しかも
+偶然（`orgs/cloud-itonami/credits/test/credits/engi_r3_test.clj:120` の
+テスト名 `asynchronous-signatures-enrich-one-immutable-economic-event`。
+`vf:EconomicEvent` とは無関係）。REA / vf-graphql / VF の JSON-LD 語彙も
+0 件。
+
+それに対するオーナー判断: **「valueflow をむしろ中心にしたい。itonami では」。**
+本 ADR はその決定と、それに伴って実際に着地したものを記録する。
+
+## 決定
+
+1. **cloud-itonami（営み OS）の経済語彙の正本は Valueflows (REA) とする。**
+   Agent / EconomicResource / EconomicEvent / Process / Recipe / Plan /
+   Commitment / Intent / Proposal / Agreement は、以後この語彙の名前と
+   意味で書く。産業 actor が経済的な面を持つとき、その面は VF の語彙で
+   表現する（自前の ad-hoc な keyword shape を新設しない）。
+2. **spec mirror を 2 本起こした**（どちらも `kotoba-lang`、public）:
+   - `kotoba-lang/ws-valueflo-vocabulary` — 語彙。upstream TTL を sha256 で
+     pin し、EDN と portable `.cljc` に生成。action behaviour table を
+     **実行する** `valueflows.event`、conformance、datom 射影、既存資産への
+     対応表を持つ。44 tests / 425 assertions。
+   - `kotoba-lang/ws-valueflo-algorithms` — network-based algorithms 8 本。
+     64 tests / 249 assertions。
+3. **命名は origin 面**（ADR-2608040100）。`valueflo.ws` の登録可能ドメインを
+   ラベル逆順にして `ws-valueflo` + 主題。`valueflows-clj` でも
+   `org-valueflows` でもない。DNS 実測: NS 3 本（Gandi）、A は
+   `valueflows.codeberg.page`。
+4. **既存の実装を捨てない。** `kotoba-lang/plm` の MRP/MPS/BOM、
+   `cloud-itonami/credits` の ENGI、CID lineage、`kotoba-lang/dynamics` の
+   system dynamics はいずれもそのまま正で、VF はそれらを**置き換えるのでは
+   なく joinable にする語彙**として入る。
+5. **`kotoba-lang/dynamics`（Forrester/Meadows）を VF に寄せない。**
+   両方とも「流れのある有向グラフ」だが、SD の flow は連続 rate の時間積分、
+   VF の flow は離散の型付きイベントで、相互変換できない。
+   `:different-formalism` として並存させる（ADR-2607203000 は変わらない）。
+
+## なぜ語彙が足りていなかったのか
+
+このワークスペースは **REA の大半を独立に、別の名前で到達していた**。
+VF が『dependent demand とは recipe の explosion である』と説明している
+その計算は `kotoba.plm.mrp/gross-requirements` に実在する。VF の
+value equation が向いている方向は ENGI の Commons issuance が既に向いて
+いる。欠けていたのは能力ではなく **共有語彙**で、そのため 1 つの actor の
+イベントを別の actor の資源に join できなかった（`kotoba-lang/ontology`
+の README が『各 source が同じ実世界 entity に別々の ad hoc keyword shape
+を発明している』と書いているのと同じ問題の、経済面での現れ）。
+
+## 実測した現在地（VF の 8 algorithm ごと）
+
+正本は `valueflows.mapping/algorithms`（データ。証拠つき）。要約:
+
+| algorithm | 判定 | 既存 |
+|---|---|---|
+| Dependent Demand | :mapped | plm の MBOM 多段展開（MRP-II 系譜） |
+| **Critical Path** | **:vf-native（新規）** | **無かった** |
+| Value Rollup | :partial | plm は cost のみ |
+| Value Equation | :adjacent | ENGI（機構が違う: 相互信用 + 証人 quorum） |
+| Track & Trace | :adjacent | artefact の lineage はあるが資源の lineage は無い |
+| Provenance | :adjacent | ontology は ingestion provenance |
+| Cash Flow | :partial | 決済はあるが 2 列の timeline は無い |
+| Network Flows | :different-formalism | system dynamics（変換しない） |
+
+**critical path が本当に無かった**ことは実測で確認した:
+`grep -in 'critical.?path'` を plm / murakumo / cloud-itonami に当てて
+出たのは latency の散文とテストカバレッジの散文だけ。
+`murakumo.task.plan` は greedy least-filled の**配置**で、
+「どの機械か」に答えるが「どの工程が遅れられないか」には答えない。
+
+## false friend を名指しした
+
+語が同じで別物のものは、名前で結線されないようデータに記録した
+（`valueflows.mapping/false-friends`）:
+
+- `cloud-itonami-commitment-ledger` の *commitment* は**融資コミット**
+  （V1 は貸付のみ、equity 語は hard governor violation）。VF の
+  `Commitment`（将来の EconomicEvent の約束）ではない。
+- ENGI の *economic event* は署名付き相互信用 transfer。VF の 19 action の
+  うち 1 つ。ENGI journal を『完全な EconomicEvent ログ』と読まない。
+- SD の *flow* は連続 rate。VF の flow ではない。
+
+## 設計上、意図的にそうしたこと
+
+- **action behaviour table を散文にせずコードで実行する。** VF の 19 action ×
+  11 セル（accounting / onhand / location / contained / accountable / stage /
+  state effect ほか）が `valueflows.event` の唯一の演算根拠。`transferAllRights`
+  が accounting だけを動かし `transferCustody` が onhand だけを動かすのは、
+  pin した語彙がそう言っているからで、コードに分岐が書いてあるからではない。
+  **rights と the thing を別レジスタで持つのが REA を借りる実利**であり、
+  多くの在庫モデルはここを畳んでいる。
+- **behaviour table は upstream では PNG。** `https://www.valueflo.ws/concepts/actions/`
+  は表を画像で出しており、機械可読なのは TTL だけ。だから ingest は RDF を
+  読む（HTML から作れば画像を目で書き写すことになる = 捏造）。
+- **生成器 1 本・出力 2 つ**（読める EDN + inline した portable source）。
+  library が実行時に resource を読まないのは、`kotoba wasm > cljs > nbb`
+  の順で JVM 以外に載せるため（`io/resource` + `slurp` は JVM にしか無い）。
+- **`--check` は 3 値。** TTL 不在 / sha256 が pin と不一致 / 実測した
+  evidence floor（19 actions・67 classes・111 properties・19 enum members）
+  未満は **exit 2**。0 でも 1 でもない。読めなかった mirror が pass を
+  報告してはならない（ADR-2608136000）。**最初に置いた floor は実測より
+  1 つ大きい推測値で、初回実行で落ちた** — それがこの機構の買っている挙動。
+- **時間は caller が定義する数**（day index / hour / week）。portable `.cljc`
+  に clock も date library も無いので、暦演算はしない。無いものを発明する
+  より、period の意味を caller に言わせる方がよい。
+- **金額は整数演算。** value equation は integer product に `quot` を当てる
+  largest-remainder で配り、除算を一度もしない。初稿は先に割っていて
+  `(= 5000 5000.0)` が false になった。**自分自身と等しく比較されなくなった
+  金額は丸めの不便ではなく誤答**である。
+- **空答えを返さず拒否する。** 空 recipe / 空ログ / duration 未測定 /
+  循環 / 値付け無し / 加算できない単位 / agent 未指定は
+  `{:ok? false :insufficient <code>}`。部分解は使えるままにしつつ申告する
+  （値の無い input は `:complete? false` + `:unvalued` に名指し、深さ打ち切りは
+  `:truncated? true`、数えたことのない on-hand は 0 と同じく net されるが
+  `:on-hand-unknown` が立つ）。
+
+## 対応表は自分を検証できない、と書いてある
+
+`valueflows.mapping` が引用する repo は west project でこの repo の tree の
+外にある。**それを読む gate は「入力が無い gate」**で、見ないことで pass を
+報告する（ADR-2608136000 / CLAUDE.md「gate が要求する入力が repo に無い」）。
+そこで各 entry は `:evidence`（読んだファイルと読んだ日）を持ち、
+**citation であって measurement ではない**とラベルしている。
+`mapping/summary` は「語彙の class 数」と「検討した class 数」を並べて出す
+—— 差は *未検討* であって *不在* ではない。
+
+## テストが実際に捕まえた欠陥（劇場ではない証拠）
+
+先にテストを書いたことで、実装の 3 つの本物の欠陥が落ちた:
+
+1. `(some #{effect-a effect-b} [...])` — produce のように両レジスタの effect が
+   同じ action で **set literal の duplicate key** になり実行時に throw。
+2. 金額が double になっていた（上記）。19 assertion が赤。
+3. **backward の trace が transfer を順方向に辿っていた** —— loaf の
+   *行き先* が『何から作られたか』に混入した。`:transferred-from` を別に
+   持ち、方向ごとに片方だけ使う。
+
+## 適用範囲
+
+- **縛るのは経済面だけ。** StateGraph（Pregel superstep）・Governor・
+  append-only 台帳・capability・datom 面という**実行モデルは変わらない**。
+  VF は実行モデルではなく語彙である。
+- 既存の 1,900 超の産業 repo を一括改修しない。**新しく経済面を書くときに
+  VF で書く**、が規則。既存の逸脱は `mapping` の `:gap` に記録済み。
+- RDF / GraphQL surface（vf-graphql）は実装しない。着地面は datom 面
+  （`:source/dataset \"valueflows\"`、join key は `:company/lei` と
+  `:repo/path`）。kotobase の Datalog join は ref 1 本しか届かないので、
+  event と resource は**同じ dataset に射影する**（分けると
+  『この資源を誰が作ったか』が引けなくなる。ADR-260726-kotobase-query-plane-is-one-ref）。
+
+## 次に効くこと（未着手、優先順）
+
+1. `Commitment` / `Intent` は :absent。約束と充足（`vf:fulfills`）が入ると
+   commitment-ledger・受発注・MPS が 1 つの面に乗る。
+2. `plm` の on-hand を accounting / onhand の 2 レジスタに分ける。
+3. ENGI transfer を `valueflows.datom` 経由で datom 面に射影する
+   （ENGI 側の憲章的不変条件は触らない。射影だけ）。
+4. 共有 unit registry（om-2）。今は repo ごとに単位を持っている。
+5. fleet gate を両 repo に足す（本 ADR で `gates.edn` に登録済み、
+   **fleet で 1 度緑になるまで landed としない**）。"
+
+  :adr/evidence
+  "{:repo-search \"nbb scripts/repo-search.cljs valueflows -> 0 of 4175 projects\"
+    :grep \"rg -il 'valueflo|EconomicEvent|EconomicResource|economic-event' orgs/cloud-itonami 90-docs manifest -> 1 hit, coincidental (credits/test/credits/engi_r3_test.clj:120)\"
+    :upstream-ttl {:url \"https://codeberg.org/valueflows/pages/raw/branch/main/assets/all_vf.TTL\"
+                   :base \"https://w3id.org/valueflows/ont/vf\"
+                   :sha256 \"47cada8122561100520702e2998c2949f6f4f42ba550c36797791882cbc48ece\"
+                   :bytes 87877
+                   :fetched-at \"2026-08-15\"}
+    :ttl-term-counts \"grep -c: owl:Class 67, owl:ObjectProperty 85, owl:DatatypeProperty 26, owl:NamedIndividual 38, vf:Action typings 19 — the reader recovers all of them\"
+    :dns \"dig +short NS valueflo.ws -> ns-5-a.gandi.net ns-50-b.gandi.net ns-84-c.gandi.net; A -> valueflows.codeberg.page\"
+    :critical-path-absence \"grep -in 'critical.?path' over orgs/kotoba-lang/plm, orgs/kotoba-lang/murakumo, orgs/cloud-itonami -> only latency prose and test-coverage prose; murakumo/src/murakumo/task/plan.cljc defns are slots/admit/assign/node-score (greedy least-filled), no forward or backward pass\"
+    :existing-mrp \"orgs/kotoba-lang/plm/src/kotoba/plm/mrp.cljc gross-requirements (multi-level MBOM explosion), plan, mrp-run!, plan-from-mps; cost.cljc rolled-cost; mps.cljc mps-for-item; routing.cljc work-center/operation/process-cost — all read 2026-08-15\"
+    :tests {:ws-valueflo-vocabulary \"clojure -M:test -> Ran 44 tests containing 425 assertions, 0 failures 0 errors\"
+            :ws-valueflo-algorithms \"clojure -M:test -> Ran 64 tests containing 249 assertions, 0 failures 0 errors\"}
+    :ingest-discrimination \"nbb bin/ingest.cljs --check observed at exit 0 (identical), 1 (EDN mutated), 1 (reader predicate renamed), 2 (TTL byte appended -> sha mismatch), 2 (TTL absent), then 0 again\"
+    :commits {:vocabulary \"kotoba-lang/ws-valueflo-vocabulary 1318e74 (amended for trailers)\"
+              :algorithms \"kotoba-lang/ws-valueflo-algorithms 9b89a27 (amended for trailers)\"}
+    :base-commit \"worktree branched from origin/main da89acc8f0b\"}"
+
+  :adr/authoritative_for
+  ["cloud-itonami / 営み OS の経済語彙を Valueflows (REA) にする決定（オーナー指示 2026-08-15）"
+   "spec mirror 2 本の origin-plane 命名: valueflo.ws -> ws-valueflo（ADR-2608040100 の導出）"
+   "VF の 8 network-based algorithm ごとの現在地判定と、critical path が既存に無かったという実測"
+   "dynamics（system dynamics）を VF に統合せず :different-formalism として並存させる決定"
+   "既存 plm / ENGI / CID lineage を置換しない（VF は joinable にする語彙であって代替ではない）"]
+
+  :adr/operational-note
+  "{:action-table-is-a-png \"https://www.valueflo.ws/concepts/actions/ publishes the action behaviour table as ../../assets/vf-actions.png. Do not try to read it from the HTML — WebFetch returns the surrounding prose and the table is not in it. The machine-readable form is the TTL only.\"
+    :ttl-url-trap \"https://www.valueflo.ws/specification/all_vf.html does NOT contain the action instances or the effect properties (inputOutput / onhandEffect / pairsWith are absent from it). The raw TTL lives in the codeberg *pages* repo, not the valueflows/valueflows repo: codeberg.org/valueflows/pages/raw/branch/main/assets/all_vf.TTL (the /valueflows/valueflows path 404s).\"
+    :nbb-pprint \"nbb needs [clojure.pprint :as pprint] required explicitly; cljs.pprint/pprint is unresolvable.\"
+    :no-github-workflows \"Neither repo has .github/workflows (ADR-2607300900). CI is the murakumo fleet gate registered in scripts/fleet-ci/gates.edn.\"
+    :test-runner-floor \"Both repos register test namespaces explicitly with a minimum count and exit 2 on '0 tests ran', because auto-discovery that finds nothing exits 0.\"}"}]

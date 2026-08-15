@@ -237,7 +237,17 @@
   ;; overpass-api.de で運用されるが、タグ体系（power=pole / man_made=utility_pole）と
   ;; データの authority は OSM 側にあるので openstreetmap.org を記録する。
   "kotoba-lang/com-mapillary-graph-api" "mapillary.com"
-  "kotoba-lang/org-openstreetmap-overpass" "openstreetmap.org"}
+  "kotoba-lang/org-openstreetmap-overpass" "openstreetmap.org"
+
+  ;; 2026-08-15 追加（ADR-2608153000、Valueflows を営み OS の経済語彙に据える）
+  ;; valueflo.ws は登録可能ドメインそのもの（.ws は Samoa の ccTLD で、
+  ;; valueflo は第 2 レベル）。ラベル逆順 => ws-valueflo。
+  ;; DNS 実測 2026-08-15: NS 3 本（ns-5-a / ns-50-b / ns-84-c.gandi.net）、
+  ;; A は valueflows.codeberg.page。仕様本体の permanent identifier は
+  ;; w3id.org/valueflows/ont/vf だが、記録するのは authority が使っている
+  ;; ドメイン（= 公開サイト valueflo.ws）であって PURL リダイレクタではない。
+  "kotoba-lang/ws-valueflo-vocabulary" "valueflo.ws"
+  "kotoba-lang/ws-valueflo-algorithms" "valueflo.ws"}
 
  ;; ── unresolvable ───────────────────────────────────────────────────────
  ;; Names that carry an origin prefix but have no single authority domain to
@@ -321,7 +331,17 @@
   ;; nothing but github.com), so there is no in-repo evidence to extract. Each
   ;; needs an external lookup. What CAN be done mechanically is narrow the
   ;; worklist, which is what the DNS sweep below does.
-  :why-not-batched :no-authority-url-inside-the-repositories}
+  :why-not-batched :no-authority-url-inside-the-repositories
+  ;; Entries recorded AFTER the run above. The counts are a dated measurement
+  ;; and are not hand-incremented; the additions are named instead, so
+  ;; recorded-here=112 stays true of 2026-08-05 rather than becoming a wrong
+  ;; number about today.
+  :added-after-last-measurement
+  [{:date "2026-08-15"
+    :repos ["kotoba-lang/ws-valueflo-vocabulary" "kotoba-lang/ws-valueflo-algorithms"]
+    :domain "valueflo.ws"
+    :dns-checked-at "2026-08-15"
+    :adr "ADR-2608153000"}]}
 
  ;; ── DNS sweep, 2026-08-05 ──────────────────────────────────────────────
  ;; A way to find candidates without asserting anything: for each com-* repo,

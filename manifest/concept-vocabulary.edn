@@ -27,7 +27,16 @@
 ;; 概念を 1 つに畳むとどれかが消える。**別概念として並べ、同じ綴りを両方に
 ;; 持たせる** —— `console` で引いた人には両方出るのが正しい。
 
-{:amu-compiler
+{:valueflows
+ {:label "Valueflows / REA（経済語彙）"
+  :spellings ["valueflows" "valueflo" "valueflo.ws" "rea" "resource event agent"
+              "economic event" "economic resource" "経済イベント" "経済資源"
+              "commitment" "recipe" "dependent demand" "critical path"
+              "value equation" "value rollup" "provenance" "cash flow"
+              "network based algorithms" "従属需要" "クリティカルパス" "価値方程式"]
+  :note "kotoba-lang/ws-valueflo-vocabulary が語彙（19 action の behaviour table を実行できる形で pin）、kotoba-lang/ws-valueflo-algorithms が network-based algorithm 8 本。ADR-2608153000 で cloud-itonami / 営み OS の経済語彙の正本になった。**同じ計算が別の名前で既にある場所を先に見る**: 従属需要は kotoba-lang/plm の MRP、価値方程式に近いのは cloud-itonami/credits の ENGI、lineage は CID/receipt 面。critical path だけは 2026-08-15 まで実在しなかった。⚠ system dynamics（kotoba-lang/dynamics / org-oasis-open-xmile）の flow は連続 rate で VF の flow ではない —— 変換できない別形式として並存する。⚠ cloud-itonami-commitment-ledger の commitment は融資コミットで vf:Commitment ではない（false friend。valueflows.mapping/false-friends に列挙）。"}
+
+ :amu-compiler
  {:label "Amu / Kotoba compiler（編む）"
   :spellings ["amu" "compiler" "kotoba compiler" "コンパイラ" "編む"
               "weave" "project link" "プロジェクトリンク"]
