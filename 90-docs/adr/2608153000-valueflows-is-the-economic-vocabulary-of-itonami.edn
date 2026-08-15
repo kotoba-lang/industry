@@ -64,7 +64,7 @@ value equation が向いている方向は ENGI の Commons issuance が既に�
 
 | algorithm | 判定 | 既存 |
 |---|---|---|
-| Dependent Demand | :mapped | plm の MBOM 多段展開（MRP-II 系譜） |
+| Dependent Demand | :mapped | plm の MBOM 多段展開（MRP-II 系譜）。2026-08-15 に `explode-plan`（Plan の独立需要から）を追加 |
 | **Critical Path** | **:vf-native（新規）** | **無かった** |
 | Value Rollup | :partial | plm は cost のみ |
 | Value Equation | :adjacent | ENGI（機構が違う: 相互信用 + 証人 quorum） |
@@ -159,16 +159,45 @@ value equation が向いている方向は ENGI の Commons issuance が既に�
   event と resource は**同じ dataset に射影する**（分けると
   『この資源を誰が作ったか』が引けなくなる。ADR-260726-kotobase-query-plane-is-one-ref）。
 
+## 着地済み（2026-08-15、同日追記）
+
+- **fleet gate は実ノードで緑になり `:cd true` に反転した。** receipt
+  `1d6bd3ca7025`（signer `did:key:z6MkjyhVmg…`）:
+  `test-ws-valueflo-algorithms-73816c6-murakumo-judah` / 
+  `test-ws-valueflo-vocabulary-3c89972-murakumo-benjamin` とも exit 0。
+  ⚠ **algorithms が緑になれたのは deps.edn を `:local/root` から
+  `:git/sha` に直したから。** fleet は 1 repo の tree しか配らないので
+  （`tick.cljs:729`）、sibling を filesystem で掴む `:test` alias は
+  **永久に赤の gate** になる。ADR 本文でその罠を引用しておきながら初稿で
+  踏んだ。log の `dep shipped (checkout) io.github.kotoba-lang/
+  ws-valueflo-vocabulary → judah` が正しい経路の証拠。
+- **`Commitment` / `Intent` は :absent ではなくなった**（`valueflows.commitment`）。
+  `vf:fulfills`（event→Commitment）と `vf:satisfies`（event|Commitment→Intent）で
+  「約束したか」と「守られたか」が 1 つの面に乗る。
+  `dependent-demand/explode-plan` が `vf:independentDemandOf` を辿るので、
+  explosion の入力が手打ちの資源+数量ではなく**実際に取った受注**になった。
+  - **`finished` は「充足」ではない。** upstream の定義は「もうこれ以上
+    やらない。目標が達成されたかとは無関係」なので、60% で閉じた commitment は
+    `:closed-short`（成功でも誤りでもない通常の帰結）で、40kg 不足も併記する。
+    初稿はこれを「矛盾」として flag しようとしていた —— 仕様を読んで直した。
+  - **overdue は `:as-of` が無ければ `:unknown`**（`false` ではない）。期限の
+    無い約束は遅れられない。
+  - `:fulfills` が誰も持っていない commitment を指す event は orphan として
+    列挙する（他の commitment は正しく settle して見えるから）。
+  - deadline は period 数値でも ISO-8601 文字列でもよい（後者は辞書順＝時系列）。
+    **両者を比較しない。** `outstanding` が `(str due)` で並べていて
+    "10" < "4" になっていた —— 金額を double にしたのと同じ族の欠陥で、
+    約束のキューが黙って並べ替わる。sort key に型 rank を先頭に置いて解消。
+
 ## 次に効くこと（未着手、優先順）
 
-1. `Commitment` / `Intent` は :absent。約束と充足（`vf:fulfills`）が入ると
-   commitment-ledger・受発注・MPS が 1 つの面に乗る。
-2. `plm` の on-hand を accounting / onhand の 2 レジスタに分ける。
-3. ENGI transfer を `valueflows.datom` 経由で datom 面に射影する
+1. `plm` の on-hand を accounting / onhand の 2 レジスタに分ける。
+2. ENGI transfer を `valueflows.datom` 経由で datom 面に射影する
    （ENGI 側の憲章的不変条件は触らない。射影だけ）。
-4. 共有 unit registry（om-2）。今は repo ごとに単位を持っている。
-5. fleet gate を両 repo に足す（本 ADR で `gates.edn` に登録済み、
-   **fleet で 1 度緑になるまで landed としない**）。"
+3. 共有 unit registry（om-2）。今は repo ごとに単位を持っている。
+4. `Proposal` / `Agreement` は依然 :absent / :partial。offer/request を
+   `vf:Proposal` として持つと commitment-ledger の融資 offer が
+   （false friend のままではなく）VF の語彙で表現できる。"
 
   :adr/evidence
   "{:repo-search \"nbb scripts/repo-search.cljs valueflows -> 0 of 4175 projects\"
