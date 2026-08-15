@@ -64,7 +64,7 @@ dataspace 協調の proving slice を 1 本着地させる。
 | 面 | 今日 | 目標ではないもの |
 |---|---|---|
 | kit `dataspace-v1` | reference implemented（JVM KIR + reference-runtime） | wasm-aot / native-aot / jit は pending |
-| wire id 24 | kotoba-lang catalog に登録。compiler テストは numeric `typed-cap-call 24` | kotoba-sema の vendor catalog が追いつくまで named `:dataspace/transact` は frontend が拒否する |
+| wire id 24 | named `:dataspace/transact` landed（kotoba-sema 6afc350c, amu 2375cfcd）。numeric `typed-cap-call 24` も残る | provider-conformance 9-kit への編入はまだ（下の行）。named が通ったことを編入済みと読まない |
 | provider-conformance 9-kit 閉集合 | **入れない**（`:capability-count` 9 と component-model inventory を壊す） | 9-kit 構造ゲートへの編入は sema vendor + component-model 行が揃ってから |
 | Goblins / OCapN | 統合していない | 統合したと書かない |
 | observe | host-owned match、inert notices | guest vat / callback 関数 |
@@ -95,9 +95,19 @@ dataspace 協調の proving slice を 1 本着地させる。
 - `kotoba-lang/kotoba-lang` main `f67c9cbc16b1b1045805f1786692913bbefc34a0`
   （merge of `57f1de81bc252c98daccd122d64643b622734693`）
   https://github.com/kotoba-lang/kotoba-lang/commit/f67c9cbc16b1b1045805f1786692913bbefc34a0
+- `kotoba-lang/kotoba-sema` main `6afc350c447e1ffcfed0649e3b503f480a7a750c`
+  named `:dataspace/transact`（wire id 24）vendor + frontend
+  https://github.com/kotoba-lang/kotoba-sema/commit/6afc350c447e1ffcfed0649e3b503f480a7a750c
+- `kotoba-lang/amu` named frontend + backend-qualification
+  `2375cfcd91f7f52caada865bb7ff53bcaf451a37`
+  （provider-conformance は 9-kit のまま。`:capability-count` 9）
+  https://github.com/kotoba-lang/amu/commit/2375cfcd91f7f52caada865bb7ff53bcaf451a37
+- west pin: kotoba-sema `0d1b8c4b239cfd9c6e68d1c62c54951b3ad01270`、
+  amu `9db85a92ef58c712006853173c0d8160628de437`
 - 本 ADR は superproject `agent/kotoba-dataspace-kit`。west pin は `amu` と
   `kotoba-lang` を上記 SHA へ前進させる（`compiler` という旧 west 名は
   同じ GitHub repo のリダイレクトであり、この slice では `amu` を正とする）。
+  named 面の pin は kotoba-sema / amu を上記 SHA へ前進済み。
 
 ## テストの回し方と結果（2026-08-15 実測）
 
@@ -132,7 +142,9 @@ clojure -M:test -n kotoba.lang.dataspace-cap-test -n kotoba.lang.capability-cata
 
 ## 残ギャップ（次の agent へ）
 
-1. kotoba-sema の `capability-catalog.edn` と cljs fallback に id 24 を vendor し、named `dataspace/transact` と `(:capabilities #{:dataspace/transact})` を通す。
+1. **DONE.** kotoba-sema の `capability-catalog.edn` と cljs fallback に id 24 を vendor し、named `dataspace/transact` と `(:capabilities #{:dataspace/transact})` を通した。
+   - kotoba-sema `6afc350c447e1ffcfed0649e3b503f480a7a750c`: 13 tests / 65 assertions（sema-test）。named cap-call、undeclared ns reject、cljs fallback lockstep を含む。
+   - amu `2375cfcd91f7f52caada865bb7ff53bcaf451a37`: frontend-named-capability-test + backend-qualification + provider-conformance = 22 tests / 129 assertions。`:capability-count` は 9 のまま。
 2. `kotoba-lang/provider` へ reference host を移す。compiler pin は `amu` として main tip へ前進済み。
 3. provider-conformance 閉集合と component-model inventory への編入。
 4. assertion の kit ABI を `:document` にする（今日は EDN string）。
