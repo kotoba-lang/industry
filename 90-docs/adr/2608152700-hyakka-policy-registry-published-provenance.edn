@@ -115,6 +115,33 @@ game-kouryaku 16（台帳記録版）/ vulnerability 90（台帳記録版）。
   seed 無しで完了した。止まっているのは datom 面への projection だけ。
 - ADR 0005 以前に書かれた claim は `:claim/corpus \"world-knowledge\"` のままで
   `:connector` も `:code-revision` も持たない。**推測で埋めず「未記録」と表示する。**
+## セッション終了時の実測（2026-08-15T14:04Z、closing）
+
+次の agent が会話履歴なしで再開できる現在地。**再導出しないこと。**
+
+| 項目 | 値 |
+|---|---|
+| `network-awai/app-hyakka` main | `6944079` |
+| west pin | 同一（`commits since pin: 0`） |
+| live catalog（`/health`） | `sha256:f3008d31…` = main の `catalog.cljc` と一致 |
+| 常駐 | `com.network-awai.hyakka-knowledge-ingest`（毎時、last exit **1**） |
+| 全 9 connector | 直近 tick で成功（`knowledge/state.edn` に実 timestamp） |
+| Kotobase 未 projection | **4 ledger**（12:57 / 13:00 / 13:29 / 13:39） |
+
+**唯一のブロッカー**: `kagi get hyakka-kotobase-seed` → `no such item`。
+常駐は毎時 ingest → B2 upload → ledger を main へ merge まで**成功**し、
+`publish-kotobase!` で落ちる。deploy はその後ろにあるので走らない。
+
+**最初にやること**: seed を復元する（他人が復元するまで待つ以外に代替は無い ——
+別 seed は別 DID = 別グラフで、`:apex` が graph scope == issuer DID を要求するため
+既存 `hyakka` ref に書けない）。復元後は常駐が未 projection 4 本を自動で追いつかせ、
+その tick の deploy で `/policy` の `world-knowledge` が
+「組み込み既定」→「台帳記録版」に変わる。
+
+**seed が無くても壊れていないもの**: wiki は台帳から生成した catalog を配るので、
+収集・公開・方針表示・provenance 表示は動いている。止まっているのは datom 面への
+projection だけ。**「サイトが古い」と「収集が止まっている」を混同しないこと。**
+
 - 並行して別セッションが `hyakka.corpus`（Wikidata の content-addressed 索引）を landing
   させたため、registry は `hyakka.corpus.registry` に置いた。**同名 namespace の 2 ファイルは
   大きな音を立てない** —— ClojureScript は `.cljs` を優先し、もう一方は読まれなくなるだけで、
