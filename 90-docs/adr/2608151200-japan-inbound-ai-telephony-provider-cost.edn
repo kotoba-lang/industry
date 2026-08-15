@@ -1,0 +1,189 @@
+[{:db/id -1
+  :adr/id "2608151200"
+  :adr/title "日本で電話を AI に受けさせる — Telnyx / Twilio / Amazon Connect の実測コストと provider 選定"
+  :adr/status "proposed"
+  :adr/date "2026-08-15"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/tags "denwaban, koe, telephony, telnyx, twilio, amazon-connect, cost, japan, pstn, voice-ai, provider-selection, murakumo, isic-561"
+  :adr/body
+  "## 決定（暫定 — status は proposed）
+
+**日本の着信を AI に受けさせる経路は、Telnyx の 050 (national) 番号 + BYO
+（音声だけ取り出して自前 AI に流す）を第一候補にする。**
+
+オーナーの言（2026-08-15）は「telnyx にしようかな」であって確定ではない。
+確定した時点で status を accepted に書き換える（この 1 語を変えるだけ）。
+反転させる条件は下記に名指しで書いてある —— 条件が満たされるなら Amazon
+Connect が正しい答えになる。
+
+`cloud-itonami/denwaban` の `koe.ports/ITelephony` は provider-neutral な
+まま維持する。この ADR が決めるのは **どの adapter を最初に実装するか**で
+あって、他を排除することではない。
+
+## なぜ測ったのか
+
+`cloud-itonami/denwaban/docs/telephony-provider-architecture.md` は冒頭で
+**価格と規制は外部事実であり、使う前に測り直せ**と書いている。これはその
+測定の記録である。同 doc の provider 比較表は Telnyx を
+「best second CPaaS candidate」と書いていたが、**金額は 1 つも入っていな
+かった**。
+
+## 測り方（再現可能な形で残す）
+
+| provider | 出所 | 取り方 |
+|---|---|---|
+| Telnyx | `https://telnyx.com/pricing.md`（canonical price sheet、704 KB） | curl して grep |
+| Twilio | `https://www.twilio.com/en-us/voice/pricing/jp` | HTML の `<tr>` を実スクレイプ |
+| Amazon Connect | AWS Pricing API `AmazonConnect/current/ap-northeast-1` | JSON を parse |
+
+FX は 159 円/USD（2026-08-14 実測 159.15）。
+
+**Telnyx と AWS は機械可読な正本を公開している。Twilio は公開していない**
+（価格表は HTML の中）。これは再測定のコストに効く。
+
+## 実測 — 番号（2026-08-15）
+
+| | Telnyx | Twilio | Amazon Connect |
+|---|---|---|---|
+| 050 (national) | $4.5/月 + 初期 $8 | $4.75/月 | 日額課金（JP 額 UNVERIFIED） |
+| 03 (0ABJ local) | $5/月 + 初期 $5 | **$20/月** | 同上 |
+| 0120 (toll-free) | $35/月 + 初期 $30 | $25/月 | 日額課金 |
+
+**Twilio の 03 番号は $20/月で Telnyx の 4 倍。** 050 なら 3 社ほぼ横並び。
+
+## 実測 — 着信と AI（2026-08-15）
+
+| | Telnyx | Twilio | Amazon Connect |
+|---|---|---|---|
+| 着信 050 / 03 | **$0.004 / $0.010** | $0.010 | UNVERIFIED |
+| 着信 0120（固定/携帯） | $0.15 / $0.28 | $0.1854（区別なし） | **$0.08** |
+| マネージド AI | Voice AI Agent $0.05 | ConversationRelay $0.07（BYO LLM） | Connect AI $0.038 |
+| BYO 用の音声取り出し | Media Streaming $0.0035 | Media Streams $0.0044 | — |
+| **課金単位** | 60/60 切り上げ | 60/60 切り上げ | **秒課金（10 秒下限）** |
+
+参考（Telnyx 部品）: Deepgram Nova 3 STT $0.0074/分、Azure Neural HD TTS
+$0.00005/文字、Kimi K2.6 は $0.95/1M in・$4.00/1M out。
+参考（Twilio 部品）: streaming transcription $0.027/分、TTS Neural
+$0.0032/100 文字、TTS Generative $0.0130/100 文字。
+
+## 総額（月 500 件、159 円/USD）
+
+実通話 75 秒（受付 bot の現実的な長さ）:
+
+| | 円/通話 | 月額 |
+|---|---|---|
+| Telnyx 050 + 自前 (murakumo) | 3.0 | 2,226 |
+| Twilio 050 + MediaStreams + murakumo | 4.6 | 3,045 |
+| AWS Connect AI + DID | 9.5 | 4,913 |
+| Telnyx 050 + 自前 (Realtime mini) | 12.6 | 6,996 |
+| Telnyx 050 + Telnyx Voice AI | 19.1 | 10,256 |
+| Twilio 050 + ConversationRelay | 27.3 | 14,429 |
+
+実通話 180 秒:
+
+| | 円/通話 | 月額 |
+|---|---|---|
+| Telnyx 050 + 自前 (murakumo) | 4.5 | 2,981 |
+| Twilio 050 + murakumo | 6.9 | 4,190 |
+| Telnyx 050 + Realtime mini | 18.8 | 10,136 |
+| AWS Connect AI + DID | 22.9 | 11,591 |
+| Telnyx Voice AI | 28.6 | 15,026 |
+| Twilio ConversationRelay | 41.0 | 21,266 |
+
+0120（月 500 件 x 3 分）: AWS 28,600 円 < Twilio 66,300 円 < Telnyx 81,000 円。
+**順位が完全に入れ替わる。**
+
+## 効いたのは単価ではなく課金単位
+
+**この比較で一番効いた変数はレートシートに載っていない。**
+AWS だけが秒課金（10 秒下限）で、Telnyx と Twilio は 60/60 切り上げである。
+
+75 秒の通話は Telnyx/Twilio では **2 分課金**、AWS では **1.25 分課金**。
+マネージドスタック同士だと、**この一点だけで AWS が Telnyx より安くなる**
+（9.5 円 vs 19.1 円）。単価表の比較は実費を予測しない。
+
+BYO にすると回線代しか残らないので、60/60 のペナルティを払っても
+Telnyx 050 が最安のままになる。**BYO を選ぶ理由の一部は課金単位である。**
+
+系: **レイテンシがそのまま金になる。** 回線側も AI 側も秒で走っている。
+`denwaban/docs/latency.md` の 12.6 秒 → 0.95 秒（whisper 常駐化 + 台詞の
+事前レンダ）は体感品質の話として書かれているが、**60/60 の境界をまたぐか
+どうかを決めるので原価の話でもある。**
+
+## 決定を反転させる条件（名指しで書く）
+
+次のどれかが真になったら Amazon Connect が正しい答えになる。**満たされた
+ことに気付かないまま Telnyx を使い続けないために、条件の方を書いておく。**
+
+1. **0120 フリーダイヤルが要件になった** — AWS $0.08/分は他社の 2〜3 分の 1。
+   携帯からの着信が支配的な日本では、これ単独で他の全コストを圧倒する。
+2. **マネージドで済ませたい かつ 短い通話が主** — 秒課金が効いて AWS が最安。
+3. **人間へのエスカレーションが本番要件になった** — 席・キュー・ルーティング・
+   評価をまともに設計しているのは Connect だけ。denwaban には既に
+   「折り返しへのエスカレーション」が在るので、そこが実運用に入るなら再評価。
+4. **音声処理の国内完結が要件になった** — AWS は ap-northeast-1 で閉じられる。
+   Telnyx/Twilio はメディアが国外に出る可能性がある。**denwaban は同意
+   (consent) を刻む actor なので、これは価格より重い判断材料になり得る。**
+
+逆に、Twilio を選ぶ理由は現時点で 1 つある: **ConversationRelay は BYO LLM
+が前提**なので murakumo fleet の LLM をそのまま挿せる。Telnyx Voice AI は
+自社 GPU / フロンティアモデル前提。ただし BYO 経路を選ぶなら
+ConversationRelay 自体を使わないので、この差は消える。
+
+## 測れなかったこと（UNVERIFIED であって CONFORMANT ではない）
+
+**記録が無い = 未検証であって、適合の証拠ではない。** 下記を根拠にした判断を
+しない。
+
+- **AWS の Japan DID 着信単価と番号日額。** Pricing API にはサービス利用料
+  （$0.018/分、Connect AI は $0.038/分、ap-northeast-1 実測）しか無く、
+  telephony 側は機械可読な正本が見つからなかった。上表は $0.010/分・
+  $0.03/日を**仮置き**している。
+- **AWS の 0120 $0.08/分**は 2023-04 の値下げ発表が出典で、現在値は未確認。
+- **Telnyx の $0.05 に LLM が含まれるか**は同社資料内で矛盾している
+  （`pricing.md` は SIP + STT + LLM + TTS 込みと書き、marketing ページは
+  LLM を add-on と書く）。上表は安全側で加算した。
+- **3 社とも ja-JP の実品質は資料から読めない。** 日本語受付は敬語と数え方で
+  壊れる（`latency.md` に 6 名 → 6 つな の実例がある）。契約前に実音声で
+  比較すること。
+- **番号の在庫。** レートシートに載っていることは買えることを意味しない。
+
+## 規制（金額ではなく時間のコスト）
+
+| provider | 入り口の摩擦 |
+|---|---|
+| Telnyx | セルフサーブ + 日本住所と証明書（公共料金・納税証明等、3 か月以内）+ 身分証。法人は登記事項証明書か印鑑証明（3 か月以内） |
+| Twilio | 同程度 |
+| Amazon Connect | **AWS サポートケース + 日本に事業所があることの書類。3 社で最も重い** |
+
+050 は 110/119 が使えず、一部プランから発信できない。**単価は 03 より安い
+のに信用面で不利**という逆転があるので、業種次第で 03 を選ぶ理由が立つ
+（`isic-561` の飲食店受付では 03 の方が自然）。
+
+## 再測定の手順
+
+```bash
+curl -sS -L https://telnyx.com/pricing.md | grep -i japan
+curl -sS -L https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonConnect/current/region_index.json
+# Twilio は機械可読な正本が無い。HTML の <tr> を取る
+curl -sS -L -A 'Mozilla/5.0' https://www.twilio.com/en-us/voice/pricing/jp
+```
+
+**この ADR の数値は 2026-08-15 の測定である。定数として引用しない。**
+CI/CD の egress で同じ誤りを踏んだ前例がある（CLAUDE.md の fleet gate 節、
+「実測して定数で持つな」と書いた節に実測値を書いた結果それが定数になった）。
+provider の価格は egress より速く動く。
+
+## 影響
+
+- `cloud-itonami/denwaban` — `koe.ports/ITelephony` の Telnyx adapter を
+  最初に実装する。G7（Council Lv6+ + named operator + 明示フラグ +
+  admitted carrier）は据え置き。**adapter が在ることと電話に出られることは
+  別**であり、この ADR は後者を開けない。
+- `cloud-itonami/denwaban/docs/telephony-provider-architecture.md` — 金額の
+  入っていない provider 比較表に、この ADR への参照を足す（follow-up）。
+- BYO を前提にするので、**STT/TTS/LLM は murakumo fleet 側で完結させる**
+  （`com-whisper` の常駐 whisper、`denwaban.serifu` の事前レンダ、
+  `murakumo-main` alias）。Telnyx の STT/TTS 部品は使わない —— 使うと
+  provider lock が音声パイプラインまで伸びる。"}]
