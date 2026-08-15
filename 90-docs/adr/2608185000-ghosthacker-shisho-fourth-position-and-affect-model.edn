@@ -1,0 +1,188 @@
+[{:db/id -1
+  :adr/id "adr-2608185000-ghosthacker-shisho-fourth-position-and-affect-model"
+  :adr/doc_type "adr"
+  :adr/topic "ghosthacker-shisho-fourth-position-and-affect-model"
+  :adr/title "ADR-2608185000: ghosthacker にシショウ（第四の位置＝自他非分離）を置き、シナリオの感情・情緒・成長を XMILE で計算する"
+  :adr/status "accepted"
+  :adr/date "2026-08-15"
+  :adr/last_verified "2026-08-15"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/related ["adr-2607072350-org-oasis-open-xmile-system-dynamics-authority"
+                "adr-2607203000-system-dynamics-loop-all-entities"
+                "adr-2608136000-five-questions-before-writing-a-check"]
+  :adr/evidence
+  {:repo "com-junkawasaki/ghosthacker"
+   :landed-commits ["cd3b704d (シショウ profile + Arc 17 p7)"
+                    "020273736d61 (presence ladder 7 sighting + verify-arc-plan 汎用化)"
+                    "5076f048 (Arc 5-1 + score-affect.cljs)"
+                    "b43c4b88 (空気感の実測と :gh/air + :panels キー修正)"
+                    "fc30a6a3 (焦点人物ごとの affect + 反例→失敗の順序)"
+                    "2a159db2 (Arc 16-5 / Arc 10-1 / 払いの設計 / 空気感 6 話)"
+                    "3f52e756 (払いの検査 + Part 2/3 一覧 + payoff-gap を閉じる)"]
+   :superproject-pins ["cc472afa" "7a054c21" "02cbac95" "f76e190b" "f4db329a" "ad4a6c4d" "c0e3b257"]
+   :superproject-fix "86a46588 (verify-west-pins: compare の一時 404 を『旧 pin 消失』と誤断して OK を出す穴)"
+   :verified "verify-arc-plan exit 0（SIGHTINGS 12: OK 11 / NOT-YET 1、PAYOFFS 7: NOT-YET 6）、verify-air exit 0（宣言済み 6 話 292 コマ）、verify-west-pins 現 main で exit 0"}
+
+  :adr/body
+  "## 決定
+
+**ghosthacker（Arc 17『猿の手』第 1 話＝魔法使いの弟子）に、第四の位置としてシショウを置く。**
+
+三つの寓話（弟子と箒／漁師と魔神／猿の手）はどれも**同じ形**——**外に願いを預けた話**である。
+願いという行為は「自分と、それを聞く何かが別々である」という前提の上でしか成立しない。
+Arc 17 は ①**始める**（歩／ACTUATOR）②**止める**（蓮／FEEDBACK）の二つで閉じていたが、
+**止めるのも制御であり、制御は自と他が分かれているときにしか要らない。**
+第四の位置は ③**そもそも外に出さない**であり、①②の上位互換ではなく**別の軸**である。
+したがって彼は六ノードの制御ループに入らない（プラント側・環境側に立つ）。
+
+自他非分離の工学形は**外部性の内部化**——エージェントが暴れたとき最初に困るのが自分になる
+場所に立つこと。これが唯一、書き落とせない停止条件である（配置であって、言葉ではないから）。
+ただし**この構造は作り手の設計であって、彼の役割ではない**（オーナー指示 2026-08-15
+「設計実装, ai agent という話にするより … 成長のきっかけを与える人物として高めていきたい」）。
+作中で彼がやるのは**六人それぞれの信念の反例として、ただ居ること**だけである。
+
+## 人物設計
+
+**助言をしない。反例として居る。**六人の罪はそれぞれ『その人が信じている一つの命題』で、
+彼はその命題が偽であることの生きた実例——否定して回るのではなく、**否定になってしまう形で
+普通に生活している**。**誤読 → 失敗 → 想起**の順序を崩さない（失敗の前に意味が分かったら説教）。
+
+tell は**いつも何かを開けている**（蓮は切る／久我は止める／シショウは開ける）。
+**Part 1 は全編無言**（最初の台詞は Arc 17 第 2 話の一行だけ）——喋らせると必ず誰かが要約して
+説教になるので、無言は演出ではなく**安全装置**である。
+**技名テロップの枠だけあって文字が無い**本作唯一の人物。
+
+本作の公理（情報は物理である／ランダウアー）と接続する: **消去は熱を出し、熱は痕跡になり、
+痕跡が Ghost になる。**蓮は止めるたびに熱を出すから摩耗する（Part 2 の Overflow）。
+シショウは押さない・消さない・争わないから熱が出ず、だから記録が無い——
+**Ghost の対義語は正義ではなく、無為である。**
+
+七つの大罪は既に埋まっており（3 大美徳＝怠惰蓮／傲慢要／短気千世 × 4 大悪徳＝強欲／色欲久我／
+嫉妬歩／暴食寧）、**強欲だけ味方の誰も持っていない**＝Kurosagi-Net の頂点。その定義が
+『怠惰の逆＝過剰な労働で過剰に奪う』なので、**シショウは師匠であると同時にラスボスの対義語**
+（敵は「もっと」、彼は「減らす」）。**作中では一度も言わない。**
+
+## 実装（すべて default branch に着地済み）
+
+- `characters/Shisho/profile.edn`（30 キー、六人分の :gh/perCharacter）
+- `arc-order.edn` の `:order/shisho-presence`——presence ladder（Arc 5 歩 → 10 要 → 12 久我 →
+  13 寧 → 15 千世 → 16 蓮 → 17 全員）。**新規アークはゼロ、既存アークに一〜二コマ。**
+  `:ladder/payoffs`（7 件）で Part 2/3 の払いを設計。`:order/later-parts` に Part 2/3 の
+  アーク一覧を draft から写した
+- 新規 episode: **Arc 5-1『鍵は、詰まらない』**（13 頁 / 50 コマ）、
+  **Arc 16-5『数で見ていた』**（13 頁 / 49 コマ）、
+  **Arc 10-1『持っていないデータは、漏れない』**（13 頁 / 48 コマ）
+- `scripts/score-affect.cljs`（XMILE による感情・情緒・成長の計算）
+- `scripts/verify-air.cljs`（空気感がレンダラに届いているかの検査）
+- `scripts/verify-arc-plan.cljs` を ladder 汎用化＋払いの検査＋evidence floor 追加
+
+**シショウの 7 sighting はすべて landed。**残る sighting NOT-YET は久我の Arc 8 のみ。
+
+## シナリオの XMILE 模型（scripts/score-affect.cljs）
+
+engine は `kotoba-lang/org-oasis-open-xmile`（ADR-2607072350 が正本）。**自前の積分器は書かない。**
+
+    Tension（緊張）  Belief（信念の強度）  Wound / Trust
+    Latent ──mature──> Ripe ──recall──> Insight ──use──> Growth
+             (遅い)         (failure のときだけ)   (agency のぶんだけ)
+
+**「誤読 → 失敗 → 想起」を連結そのもので書いた。**三つのどれが欠けても成長しない。
+
+入力の分担が要: **手で書く**のは `:gh/affect` の 5 つ（pressure / validation / contact /
+failure / agency）だけ。**`:exposure`（焦点人物のコマ数比）と `:hint`（同じ頁に反例が居るか）
+はコマと cast から計算する。**手で書かれていたら exit 2 で拒否——
+**書けてしまうなら、スコアは書いた人の希望を測る。**
+
+⚠ **読者の測定ではない。**係数は手で置いたダイヤル（`:params/provenance` に明記）。
+反実仮想が測るのは**大きさと時期**であって主張の真偽ではない——
+「反例を置くと成長する」は模型に書き込まれている。
+
+### 実測が出した設計上の発見（2026-08-15）
+
+    焦点人物   頁  起伏   信念   成長  未回収  反例の寄与
+    歩        24 0.141  0.066 0.386  0.707     0.182
+    要        12 0.126  0.233 0.173  0.709     0.024
+    千世      12 0.123  0.323 0.151  0.217     0.022
+    久我      12 0.134  0.207 0.116  0.398     0.000
+    寧        13 0.107  0.371 0.113  0.386     0.007
+    蓮        12 0.160  0.161 0.105  0.500     0.000
+
+**反例が効いているのは歩だけ。**理由は順序と距離である——歩は Arc 5 の反例から Arc 17 の失敗まで
+11〜12 頁あって熟した。千世は 3 頁で未熟、寧は反例が失敗より**後**（順序が逆）、
+久我は反例と失敗が**同じ頁**。設計どおり払いは後のアークに置いてあるので誤りではないが、
+**Part 1 の中では 7 つの sighting のうち実質 1 つしか動いていない。**
+
+⚠ **数字を良くするために反例を前へ動かさない**（新規 2 話の designNotes に
+`:dontTuneForTheScore` として明記）。**数字は設計を測るためのもので、設計を決めるものではない。**
+
+## 空気感（オーナー質問 2026-08-15「空気感はちゃんと表現に含まれている?」）
+
+**答えは「ほとんど入っていない」だった。**全 15 話 1,359 コマの実測で
+光質 8 / 湿度 1 / 粒子 1 コマ、**空気感の語をひとつも含まないコマが 86%。**
+`:gh/atmosphere` は新しい話ほど**1 話 1 文字列を全コマに複製**しており
+（fake-warning 1/47・heiiki 1/48・monkeys-paw 1/49）、**古い arc0 系のほうが変えていた**
+（17/18・15/15）——新しく、より設計された話のほうが退行していた。
+
+決定的なのは、**画像生成に渡るのは `:gh/sdxlPrompt` / `:gh/imagePrompt` / `:gh/sdxlTags` で
+あって `:gh/atmosphere` ではない**こと。atmosphere をいくら書いてもレンダラは読まない。
+したがって `:gh/air`（時刻・日差し・光源・光質・湿度・粒子・体感温度の 6 面）を統制語彙で導入し、
+**prompt / tags / atmosphere の三箇所に届かせる。**verify-air が見るのは
+「書いてあるか」ではなく**「prompt に出ているか」**である。
+
+**6 話 292 コマが 6 面すべて達成。**光を話の進行に合わせた——対策室は朝→深夜→夜明け、
+病院は「閉域」どおり空気が動かない、港は海霧と室内の乾き、商店街だけ湿気と湯気を効かせ
+**コンビニの頁で光を痛くする**。シショウの居る頁は必ず空気が動く（点検口・非常口・窓）。
+
+## この作業で踏んだ「静かな緑」（ADR-2608136000 の class）
+
+1. **`:panels` と `:gh/panels` のキー不一致。**nue だけ `:panels` を使っており（他 14 話は
+   `:gh/panels`）、score-affect が `:panels` を読んでいたため **monkeys-paw 側の
+   `:exposure` と `:hint` が全 12 頁ぶん 0 として静かに計算されていた**。
+   気づけたのは verify-air の evidence floor が「episode が 1 つしかない」と**答えを拒否した**から。
+2. **ladder のキーに `:ladder/` 名前空間を付け忘れ**、sightings 0 件のまま「OK — 違反なし」が出た。
+3. **`:ladder/payoffs` のキー名を 1 文字変えたら PAYOFFS の行ごと消えて静かに緑**になった。
+4. **払いの NOT-YET を sighting と同じ atom に入れ**、SIGHTINGS が「OK 11」から「OK 4」に見えた。
+5. **空気感の初回測定で `hot` が `shot` に当たり**、体感温度 844 コマ（実際は 24）と出た。
+6. **`verify-west-pins` が compare の一時 404 を『旧 pin 消失』と誤断して OK を印字**していた
+   （superproject `86a46588` で修正）。さらにその修正で **404/422 の割り当てを推測して二度目の
+   誤りを踏んだ**——実測では commit 不在が **422**、404 は repo 不在だった。
+   **404 は commit 不在の証拠にならない。**
+7. **私自身の shell で `nbb verify-west-pins | tail -2 && …` と繋ぎ、FAIL 5 件を素通りして
+   pin を merge した**（パイプの終了コードは `tail` のもの）。結果は無害（サーバ側 3-way merge が
+   他セッションの値を保持し、現 main で再検証 exit 0）だが、**検証の門を自分で迂回した**。
+   以後この chain にパイプを挟まない。
+
+## 未着手（次の agent への引き継ぎ）
+
+1. **払い 6 件が NOT-YET**（`verify-arc-plan` の PAYOFFS 行）。Part 2/3 の episode.edn が
+   `:gh/payoffOf` を宣言するまで消えない。**未回収 0.707 の大半は Arc 17 p7 の二つ目の反例**で、
+   その払いは「Part 2 の破局の最終コマで p7 の構図だけを反復し、**そこに誰も居ない**」と設計済み
+2. **久我 Arc 8『顔を、作る』の episode.edn 未作成**（最後の sighting NOT-YET）
+3. **空気感の残債 7 話 866 コマ**（arc0/cschool 系・hospital-night・keiei・mtp）。
+   `verify-air` が毎回名指しする
+4. **Part 2/3 のアーク番号が Part 1 と衝突**（Part 1 Arc 17『猿の手』/ Part 3 Arc 17『色欲支部壊滅』）。
+   draft の番号のまま写して衝突を記録しただけで、**振り直しはオーナー判断**
+5. **`:gh/affect` は 7 話のみ**。hospital-night / keiei / mtp / arc0 系は未注釈
+   （score-affect はそれらに対して exit 2 で答えを拒否する）
+
+## 決定済みで、蒸し返さないこと
+
+- Arc 5 の対面は**歩の一時帰国**（オーナー判断 2026-08-15）。蓮が渡米する案・オンライン維持案は
+  採らない。理由は p4-5 に**台詞なしの一コマ**（航空券の控えと祖父母宅の呼び鈴）で置き、説明しない
+- 老子・荘子の名も原文も**作中に一度も出さない**（設計表は profile の `:gh/laozhuang` にのみ）
+- **千世はシショウを許さない**——払いと赦しを同じ場所で起こさない
+- **払いでシショウ本人を出さない**（出した瞬間に「帰ってくる師匠」になり、主題を裏切る）
+
+## 再開の一手
+
+    cd orgs/com-junkawasaki/ghosthacker
+    nbb 260123-jump/scripts/verify-arc-plan.cljs      # sighting と払いの残りを見る
+    nbb 260123-jump/scripts/verify-air.cljs           # 空気感の残債を見る
+    nbb --classpath <ws>/orgs/kotoba-lang/org-oasis-open-xmile/src \\
+      260123-jump/scripts/score-affect.cljs nue monkeys-paw collected-too-much \\
+      heiiki nuts-log fake-warning father-written
+
+⚠ **共有 checkout は pin より遅れている**（session 終了時点で `a6584345`、pin は `3f52e756`）。
+読む前に `west update --fetch smart ghosthacker` で合わせること。"}]
