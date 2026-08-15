@@ -1,0 +1,301 @@
+;; gftd-japan-mf-ledger.datoms.edn
+;;
+;; Gftd Japan株式会社（MF事業者コード 9007-2846）の会計実測。
+;; 取得元: マネーフォワード クラウド会計 リモート MCP サーバー
+;;         https://beta.mcp.developers.biz.moneyforward.com/mcp/ca/v3
+;;         （読み取りスコープのみ使用。journal.write / transaction.write /
+;;           trade_partners.write は同意対象に含まれるが一切使っていない）
+;; 取得日: 2026-08-15
+;; 正本 ADR: adr-2608152200 / adr-2608152300
+;;
+;; ⚠ 2026年7月・8月は未記帳である（月次推移で売上・給料賃金・役員報酬がすべて 0）。
+;;    近田建夫の未払い給与明細には 2026-07-30 計上 ¥169,184 があるので、
+;;    「人件費が発生していない」のではなく「記帳が止まっている」。
+;;    月次平均は 1〜6 月で取ること。
+;;
+;; ⚠ :bs/closing は「照会時点の期末残高」であって決算値ではない。FY2026 は進行中。
+;;
+;; 属性は datascript.js 向けに裸文字列ではなく通常のキーワードで書く
+;; （manifest/edn-query.cljs のローダは :source/dataset で出自を区別する）。
+
+[;; ---------------------------------------------------------------- 事業者
+ {:db/id -1
+  :source/dataset "gftd-japan-mf"
+  :office/name "Gftd Japan株式会社"
+  :office/mf-code "9007-2846"
+  :office/type "CORPORATE"
+  :office/employee-count-range "RANGE_1_5"
+  :office/is-manufacturing true
+  :office/fiscal-years [2018 2019 2020 2021 2022 2023 2024 2025 2026]
+  :office/fy2026-period ["2026-01-01" "2026-12-31"]
+  :office/as-of "2026-08-15"}
+
+ ;; ------------------------------------------------- 貸借対照表 FY2026（現在）
+ {:db/id -2
+  :source/dataset "gftd-japan-mf"
+  :bs/fiscal-year 2026
+  :bs/as-of "2026-08-15"
+  :bs/assets-total 45707016
+  :bs/liabilities-total 156916480
+  :bs/net-assets-total -111209464
+  :bs/cash-and-deposits 86189
+  :bs/cash-detail {"普通預金(PayPay銀行3771952)" 8749
+                   "普通預金(みずほ銀行 銀座中央支店3007865)" 0
+                   "マネーフォワードウォレット" 77284
+                   "仮想通貨" 156}
+  :bs/receivables 13206000
+  :bs/receivables-detail {"Gftd Works 株式会社" 13206000}
+  :bs/other-current {"前払費用" 709935 "未収消費税" 1192523
+                     "仮払消費税" 487828 "役員貸付金(河﨑純真)" 27925
+                     "仮払金" 8 "未収法人税等" 78}
+  :bs/fixed-tangible 114305
+  :bs/deposits-guarantee {"JustCo DK Japan" 640000 "The Executive Centre" 50000}
+  :bs/subsidiary-shares 29249376
+  :bs/long-overdue-receivable 21500000
+  :bs/long-overdue-allowance -21500000
+  :bs/short-term-borrowings 52280000
+  :bs/short-term-borrowings-detail {"JK株式会社" 23100000
+                                    "Gftd Works㈱" 15000000
+                                    "河崎 純真" 14180000}
+  :bs/accounts-payable 74333043
+  :bs/accounts-payable-top {"Gftd Works㈱" 63313948
+                            "㈱野心満々" 3740000
+                            "㈱アイドマ・ホールディングス" 1540000
+                            "佐藤公認会計士事務所" 1505745
+                            "㈱コンプス情報技術研究社" 834900
+                            "JustCo DK Japan" 704000
+                            "㈱リンクス" 660000
+                            "モノリス法律事務所(河瀬)" 484612
+                            "㈱カオナビ" 288986
+                            "㈱うるる" 275000
+                            "社会保険労務士法人エクシア&パートナーズ" 264000
+                            "小田 敦子" 232170
+                            "高橋 鴻介" 165000
+                            "麹町税務署" 127000
+                            "河崎 暖" 82500
+                            "マネーフォワードクラウド使用料" 44330
+                            "㈱マネーフォワードカード" 40352
+                            "松岡義明" 0}
+  :bs/accrued-expenses 20045949
+  :bs/accrued-expenses-detail {"給与" 14249592
+                               "社会保険料" 4896829
+                               "河﨑純真" 794342
+                               "労働保険料" 77686
+                               "The Executive Centre" 27500}
+  :bs/deposits-received 2873864
+  :bs/deposits-received-detail {"源泉税(給与)" 2142317
+                                "住民税" 673493
+                                "源泉税(士業報酬)" 47731
+                                "源泉税(業務委託)" 10210
+                                "雇用保険" 113}
+  :bs/suspense-received 7050000
+  :bs/suspense-received-detail {"河﨑純真" 5600000
+                                "飯島敬一" 750000
+                                "JK株式会社" 550000
+                                "渡邉兼久" 150000}
+  :bs/accrued-corporate-tax 290000
+  :bs/capital 20250000
+  :bs/capital-surplus 6799376
+  :bs/retained-earnings -140958840
+  :bs/current-period-loss -16248283
+  :bs/share-options 2700000
+  :bs/note "固定負債はゼロ。負債 1.57 億すべてが 1 年以内の支払期限を持つ。"}
+
+ ;; -------------------------------------------------------- 損益 FY2026 累計
+ {:db/id -3
+  :source/dataset "gftd-japan-mf"
+  :pl/fiscal-year 2026
+  :pl/as-of "2026-08-15"
+  :pl/period-note "1/1〜8/15。ただし 7・8 月は未記帳のため、月次平均は 1〜6 月で取ること。"
+  :pl/revenue 443506
+  :pl/revenue-detail {"売上高" 434092 "広告売上(Google)" 9414}
+  :pl/cogs 0
+  :pl/gross-profit 443506
+  :pl/sga-total 16669948
+  :pl/sga-detail {"給料賃金" 5653317
+                  "役員報酬" 3635102
+                  "支払報酬" 1776297
+                  "通信費" 1757204
+                  "地代家賃" 1675000
+                  "法定福利費" 807474
+                  "支払手数料" 579015
+                  "諸会費" 396692
+                  "業務委託料" 182105
+                  "広告宣伝費" 172692
+                  "旅費交通費" 20928
+                  "備品・消耗品費" 9832
+                  "租税公課" 4290}
+  :pl/operating-loss -16226442
+  :pl/ordinary-loss -16248283
+  :pl/net-loss -16248283
+  :pl/monthly-1-6 {:revenue 73918 :operating-loss -2687839}
+  :pl/note "1〜6 月の営業損失合計 −16,127,032 を 6 で割ると月 −2,687,839。"}
+
+ ;; ------------------------------------------------------- 通信費（SaaS）内訳
+ {:db/id -4
+  :source/dataset "gftd-japan-mf"
+  :saas/fiscal-year 2026
+  :saas/account "通信費"
+  :saas/total 1757204
+  :saas/detail {"CURSOR" 1067638
+                "補助科目なし" 306000
+                "Amazon" 82308
+                "AKAMAI(Linode)" 54051
+                "BITWARDEN" 51134
+                "RUNWAY" 48888
+                "VERCEL" 41061
+                "海外関係" 32919
+                "Google" 18000
+                "OPENROUTER INC" 12421
+                "JustCo DK Japan" 12000
+                "電話代" 10037
+                "登録国外事業者" 9056
+                "CyberLink" 6091
+                "郵送料等" 5600}
+  :saas/other-accounts {"支払手数料/マネーフォワードクラウド" 244350
+                        "支払手数料/マイクロソフト" 181175
+                        "支払手数料/GITHUB" 116426
+                        "支払手数料/GODADDY" 28976
+                        "広告宣伝費/HubSpot" 63984
+                        "広告宣伝費/GOOGLE JAPAN" 33850
+                        "広告宣伝費/LinkedIn" 23998
+                        "広告宣伝費/Canva" 22228
+                        "広告宣伝費/Studio" 12512
+                        "諸会費/日本セキュリティ監査協会(JASA)" 175500
+                        "諸会費/日本サイバー犯罪対策センター(JC3)" 150000
+                        "諸会費/東京商工会議所" 45000
+                        "諸会費/日本情報経済社会推進協会(JIPDEC)" 26192}
+  :saas/finding "Cursor が通信費の 61%。Anthropic は FY2026 の帳簿に 1 円も無く、課金は止まっている。"
+  :saas/correction "前版で JC3 を『月 ¥125,000』としたのは誤り。年 ¥150,000 が正しい（前払費用の取り崩しを月額と誤読した）。"}
+
+ ;; ------------------------------------------------------------ 月次推移 2026
+ {:db/id -5
+  :source/dataset "gftd-japan-mf"
+  :monthly/fiscal-year 2026
+  :monthly/months [1 2 3 4 5 6 7 8]
+  :monthly/revenue [39414 280000 31364 31364 31364 30000 0 0]
+  :monthly/officer-comp [699601 699601 699600 512100 512100 512100 0 0]
+  :monthly/salaries [992498 947874 958386 956407 937685 860467 0 0]
+  :monthly/rent [320000 320000 320000 320000 320000 25000 50000 0]
+  :monthly/comms [1313131 43159 45797 32042 319068 1515 2492 0]
+  :monthly/operating-pl [-4140067 -2461221 -2574212 -2678184 -2452251 -1821097 -93475 -1187]
+  :monthly/note "7・8 月は未記帳。役員報酬は 4 月に 699,601 → 512,100 へ減額済み。地代家賃は 6 月に JustCo が落ち The Executive Centre へ。"}
+
+ ;; --------------------------------------------------- 貸借対照表 FY2025（確定）
+ {:db/id -6
+  :source/dataset "gftd-japan-mf"
+  :bs/fiscal-year 2025
+  :bs/assets-total 32539929
+  :bs/liabilities-total 127501110
+  :bs/net-assets-total -94961181
+  :bs/cash-and-deposits 63680
+  :bs/net-loss -78713021
+  :bs/write-off {"アニメートアーク㈱(旧アニカナジャパン㈱)" 38919404}
+  :bs/note "当期純損失 −78,713,021 の主因は売掛金アニメートアーク 38,919,404 の消滅（回収なら現金が増えるはずだが期末普通預金は 31,404）。仮払金に 東京地裁 98,764・千代田年金事務所 980,727・新宿年金事務所 609,232 が立っている。"}
+
+ ;; ------------------------------------------- グループ間債権債務の履歴（実測）
+ {:db/id -7
+  :source/dataset "gftd-japan-mf"
+  :intercompany/counterparty "Gftd Works株式会社"
+  :intercompany/borrowing 15000000
+  :intercompany/borrowing-origin
+  [{:date "2023-11-28" :amount 1000000 :to "PayPay銀行" :remark "Gftd Works㈱ 資金借入"}
+   {:date "2023-11-29" :amount 1000000 :to "みずほ銀行" :remark "Gftd Works㈱ 資金借入"}
+   {:date "2023-12-14" :amount 13000000 :to "PayPay銀行" :remark "Gftd Works㈱ 資金借入"}]
+  :intercompany/borrowing-movement-since "2023-12-14 以降 FY2024/2025/2026 とも増減ゼロ"
+  :intercompany/payable 63313948
+  :intercompany/payable-history {2024 45449702 2025 49684185 "2026期首" 49812805 "2026-08-15" 63313948}
+  :intercompany/receivable 13206000
+  :intercompany/net-debt 65107948
+  :intercompany/offsettable 13200000
+  :intercompany/offsettable-note
+  "2026-01-01 に『借 売掛金 GW 13,200,000 / 貸 未払金 GW 13,200,000』の両建てが計上されており、別仕訳の摘要に『洗替　GW・GJ　債権債務相殺』とある。相殺すれば双方が消え、純債務は 65,107,948 → 51,907,948 になる。"
+  :intercompany/tax-hypothesis-tested
+  "オーナー仮説『GJ が GW の税金を払うことになっていたのが借入の原因』は帳簿では裏付けが取れない。3 件の仕訳はいずれも摘要が「資金借入」で、現金が GJ の口座に実際に入金されている。税金の立替なら立替金/仮払金が立つはずだが、GW 向け立替金は FY2025 に ¥9,278 しか動いていない。ただし GW 側の帳簿に対応記録がある可能性は残る。"
+  :intercompany/timing-context
+  "2023-11-01 に Gftd Labo合同会社を吸収合併（『吸収合併 債権債務相殺 GLより包括承継分』）。未収入金 GL 38,684,712 消却／未払金 GL 24,300,316 + 15,126,384／立替金 GL 3,741,988／短期借入金 GL 3,000,000。12/14 の 1,300 万はこの 6 週間後で、合併に伴う資金手当ての可能性があるが帳簿の摘要は『資金借入』としか言っていない。"
+  :intercompany/payable-traced
+  [{:as-of "2019-01-04 設立時" :value 0 :note "Gftd Japan の設立年。全科目の期首残高がゼロ"}
+   {:as-of "2019-12-31" :value 9551805 :note "設立初年度に純増 +9,551,805（借方 11,937,405 / 貸方 21,489,210）"}
+   {:as-of "2020-12-31" :value 27401501 :note "2020 年に純増 +17,849,696（借方 11,654,635 / 貸方 29,504,331）。ここが 2,740 万の主因"}
+   {:as-of "2021-01-01 振替" :value 19451676 :note "未払金 Gftd Works㈱(DESCHOOL) を『未収入金（GW/DS）、未払金（GW/DS）残高相殺、未払金（GW）に振替』で本体へ移管"}
+   {:as-of "2023-01-01 期首" :value 46361544 :note "27,401,501 + 19,451,676 = 46,853,177 とほぼ一致。2021〜2022 はほぼ横ばい"}
+   {:as-of "2024-01-01 期首" :value 45449702}
+   {:as-of "2025-01-01 期首" :value 49684185}
+   {:as-of "2026-01-01 期首" :value 49812805}
+   {:as-of "2026-08-15" :value 63313948 :note "期中 +13,501,143。うち 13,200,000 は売掛金との両建て"}]
+  :intercompany/payable-conclusion
+  "GW への未払金の本体（約 4,685 万）は単一の事象ではなく、設立初年度 2019 の 955 万と 2020 年の 1,785 万＝計 2,740 万の累積に、DE-SCHOOL 事業に係る GW 未払金 1,945 万の振替が乗ったもの。2021〜2025 の 5 年間はほぼ横ばい（4,636万 → 4,981万）で、2026 年に両建て 1,320 万が乗って 6,331 万になった。全期間を通じて GW との関係は設立時から一貫して『GJ が GW に払う側』である。"
+  :intercompany/unresolved
+  "2019〜2020 の個別取引の内容（何に対する未払いか）は追っていない。FY2019 の仕訳 568 件・FY2020 も同規模。GW 側の帳簿と突き合わせるのが早い。"}
+
+ ;; ------------------------------------------------- 設立と組織再編（2019年）
+ {:db/id -11
+  :source/dataset "gftd-japan-mf"
+  :founding/incorporated "2019-01-04"
+  :founding/note "MF 上の最初の会計期間は 2019-01-04 開始。全科目の期首残高がゼロで、新設法人であることが確認できる。"
+  :founding/fy2019-net-loss -1519163
+  :founding/reorg-account {"組織再編により生じた株式特別勘定（固定負債）" 32259065}
+  :founding/retained-earnings-opening-debit 34959065
+  :founding/investments {"関係会社株式 ㈱フィルコマンド" 24012000
+                         "子会社株式 Gftd Labo合同会社" 1250000}
+  :founding/officer-payable {"未払金 河﨑純真" 12012000}
+  :founding/finding
+  "設立初年度に『組織再編により生じた株式特別勘定』32,259,065 が固定負債として計上され、繰越利益剰余金に借方 34,959,065 が立っている。分割型分割・現物出資などの組織再編が設立時から絡んでいる。㈱フィルコマンド株式 24,012,000 もこの年に取得。この特別勘定は 2021 年以降の BS には現れないので、どこかで整理されている。"
+  :founding/unresolved
+  "組織再編の法形式（会社分割か現物出資か）と、株式特別勘定 32,259,065 がどう解消されたかは帳簿の科目名だけでは分からない。登記簿と当時の決算書が要る。"}
+
+ ;; ------------------------------------------- ㈱フィルコマンド（詐欺被害・訴訟）
+ {:db/id -12
+  :source/dataset "gftd-japan-mf"
+  :filcommand/counterparty "㈱フィルコマンド"
+  :filcommand/owner-account
+  "オーナー証言（2026-08-15）: フィルコマンドは詐欺会社だった。訴訟し、株式は放棄している。"
+  :filcommand/acquired {:fiscal-year 2019 :account "関係会社株式" :amount 24012000}
+  :filcommand/written-off
+  {:fiscal-year 2021 :note "関係会社株式 ㈱フィルコマンド 期首 24,012,000 → 貸方 24,012,000 → 期末 0。同じ FY2021 に 長期滞留債権 21,500,000 を新規計上し、貸倒引当金（長期滞留）21,500,000 を同額で計上している。"}
+  :filcommand/fy2021-net-loss -17329809
+  :filcommand/related-observations
+  ["FY2021 に未収入金 水谷翔太 24,000,000 が期中に立って全額消えている（関連の可能性）"
+   "FY2025 の仮払金に 東京地裁 98,764（訴訟費用）"
+   "m365 アーカイブに『株式会社フィルコマンド サーバーマシン代金（60台×500,000円）33,000,000』の請求書がある（日付不明）"]
+  :filcommand/current-state
+  "長期滞留債権 21,500,000 は現在も BS に残るが、貸倒引当金 −21,500,000 と両建てで正味ゼロ。したがって『資産 4,570 万の換金余地』の計算には入っていない。"
+  :filcommand/note
+  "帳簿の動き（2019 取得 → 2021 全額落とし＋長期滞留債権の全額引当 → 2025 訴訟費用）はオーナー証言と整合する。FY2021 の当期純損失 −17,329,809 の主因はこの処理とみられる。"}
+
+ ;; -------------------------------------------------------- 繰越利益剰余金の推移
+ {:db/id -8
+  :source/dataset "gftd-japan-mf"
+  :retained/series [{:as-of "2024期首" :value 11128171}
+                    {:as-of "2025期首" :value -45997536}
+                    {:as-of "2026期首" :value -124710557}
+                    {:as-of "2026-08-15" :value -140958840}]
+  :retained/note "2024 年期首まではプラスだった。2023 年末に のれん 15,553,379・未収消費税 11,584,864・売掛金アニメートアーク 38,919,404 を資産に持っていた。のれんは現在消滅している。"}
+
+ ;; ------------------------------------------------------------- 連携口座
+ {:db/id -9
+  :source/dataset "gftd-japan-mf"
+  :accounts/banks ["PayPay銀行-3771952" "【法人】みずほ銀行(ビジネスWEB) 銀座中央支店 普通3007865"]
+  :accounts/card "マネーフォワード ビジネスカード"
+  :accounts/card-subcards
+  ["CORPORATE" "CYBER SECURITY" "GJ BRANDING" "SOMU" "BRANDING" "CORPORATEENGINEER"
+   "KAWASAKI JUN" "GJ HR" "KEIRI" "RANDD" "ZOOM" "PRODUCT DEVELOPMENT" "RANDD VERSEL"
+   "SUBCARD" "TRANSPORTATION" "BRFACEBOOK" "TOKYOOFFICE" "CS HUBSPOT"
+   "CS AMAZON WEB SERVICES" "CS VERCEL" "CS LINODE AKAMAI"]
+  :accounts/note "サブカード 27 枚が部門・サービス別に発行されている。SaaS はこのカード群から出ている。"}
+
+ ;; ---------------------------------------------------- 労務・税務関連の未払い
+ {:db/id -10
+  :source/dataset "gftd-japan-mf"
+  :labor-tax/as-of "2026-08-15"
+  :labor-tax/unpaid-wages 14249592
+  :labor-tax/unpaid-social-insurance 4896829
+  :labor-tax/withheld-income-tax 2142317
+  :labor-tax/withheld-resident-tax 673493
+  :labor-tax/withheld-other 57941
+  :labor-tax/total 22020172
+  :labor-tax/note
+  "源泉税と住民税は従業員から預かった他人の金である。個別の未払い給与明細（近田建夫 1,023,077 / 田中冬紀 558,168）は、この 14,249,592 の内側にある。"
+  :labor-tax/roudou-case-resolved
+  "労基署 呼発第10号（松岡義明）は解決済み。未払金の補助科目『松岡義明』が期首 187,500 → 期中に全額支払われて 0 になっていることで帳簿からも確認できる。"}]
