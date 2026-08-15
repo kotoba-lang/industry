@@ -99,6 +99,13 @@
   ;; :git/sha で掴んでいるからで（tick.cljs:729）、log に
   ;; `dep shipped (checkout) io.github.kotoba-lang/ws-valueflo-vocabulary 3c89972
   ;; -> judah` が出ている。:local/root のままなら永久に赤だった。
+  ;; ADR-2608153000 — plm は VF の dependent-demand / value-rollup の :mapped 判定の
+  ;; 根拠なのに、2026-08-15 まで CI で何も検査していなかった。登録前に
+  ;; `--dry-run --only plm` で実ノードに当てて緑を確認した（`:test` alias が
+  ;; maven の cognitect test-runner + datomic local を要するので、egress を
+  ;; 推測で登録すると恒久的に赤い gate になる）:
+  ;;   test-plm-1e0901d-murakumo-judah  exit 0  Ran 31 tests / 118 assertions
+  {:name "plm" :gate :jvm-test :cd true}
   {:name "ws-valueflo-vocabulary" :gate :jvm-test :cd true}
   {:name "ws-valueflo-algorithms" :gate :jvm-test :cd true}
 
