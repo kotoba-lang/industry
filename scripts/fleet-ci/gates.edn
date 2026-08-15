@@ -1619,5 +1619,10 @@
    :org "kotoba-lang" :gate :jvm-test :cd true}
   {:name "kotoba-lang" :id "kotoba-org-first-ocapn"
    :org "kotoba-lang" :gate :jvm-test :alias "ocapn-test" :cd true}
+  {:name "kotoba-lang" :id "kotoba-ocapn-endo-live"
+   :org "kotoba-lang" :gate :nbb-script
+   :script "gates/kotoba-ocapn-endo-check.cljs"
+   :include-ext [".clj" ".cljc" ".cljs" ".edn" ".json"]
+   :min-files 12 :cd false}
   ;; ────────────────────────────────────────────────────────────────────────
   ]}
