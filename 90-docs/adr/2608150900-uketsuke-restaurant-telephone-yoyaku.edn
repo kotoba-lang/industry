@@ -19,7 +19,9 @@
 | repo | 追加 | main |
 |---|---|---|
 | `cloud-itonami/yotei` | `yotei.seat`（席=容量）/ `yotei.delegation`（受付委任）/ `yoyaku/confirm-yoyaku-delegated` | `e85ae891` |
-| `cloud-itonami/denwaban` | `denwaban.uketsuke`（会話）/ `denwaban.yoyaku`（予約委譲）/ `denwaban.consent`（同意）/ `denwaban.arrival`（着信の出自）/ `session/run-call` | `66593408` |
+| `kotoba-lang/koe` | `koe.media` / `koe.carrier` / `koe.arrival` / `koe.bridge`（電話側の共通部分） | `1ebb0acd` |
+| `kotoba-lang/com-whisper` | `whisper.engine`（実エンジン結合 + fleet 実測） | `8ec472c5` |
+| `cloud-itonami/denwaban` | `uketsuke`（会話）/ `yoyaku`（予約委譲）/ `consent` / `kikitori`（決定論抽出）/ `serifu`（事前レンダ）/ `ws`（socket） | `f0f56d82` |
 | `cloud-itonami/cloud-itonami-isic-561` | `restaurantops.yotei-intake`（確定 予約 → 検証済み記録） | `1264639a` |
 
 ## 統合の前に在ったもの（実測 2026-08-15）
@@ -177,7 +179,9 @@ attestation は 予約 のたびに一般人の音声記録を残す。運ぶの
 | suite | 結果 |
 |---|---|
 | yotei | 170 tests / 540 assertions |
-| denwaban | 65 tests / 182 assertions |
+| koe | 49 tests / 129 assertions |
+| com-whisper | 13 tests / 62 assertions |
+| denwaban | 98 tests / 323 assertions |
 | isic-561 | 23/23（nbb） |
 
 変異で discriminate を実測した（壊したものと報告されたものが一致することも確認）:
@@ -312,6 +316,109 @@ confirm 側は yotei に、**それぞれ独立したテストを置いた**。
 （価格表 PDF が要る）、断定していない。**最初の一手は「一番安い」ではなく
 「一番早く実測できる」を採る** —— `koe.ports/ITelephony` が provider-neutral で
 `denwaban.transport` に admission があるので、乗り換えコストが構造的に低い。
+
+
+## closing（2026-08-15）— 現在地と、Kotoba で実装する場合の不足
+
+### 動くもの / 動かないもの
+
+**動く**: 着信 webhook（署名検証込み）→ 応答文書 → メディア WS 接続 → フレーム受信 →
+発話の区切り → ローカル STT → 決定論抽出 → 対話 → 席の割当 → 封筒による認可 →
+確定した 予約 → 事前レンダ音声の返送。**socket は実ポートを開いてテスト済み。**
+
+**動かない**: 電話が鳴ること。**残っているのはキャリア契約だけ**（アカウント・番号・
+支払い・本人確認。安全床①②によりオーナーの手が要る）と、fleet への配備
+（whisper-server 常駐化 + `clojure -M:media` を公開 ingress に載せる）。
+
+### 応答遅延（実測、合成音声に対する上限値）
+
+| 段 | 前 | 今 |
+|---|---|---|
+| STT | 1.45 s | **0.90 s**（whisper 常駐化） |
+| 抽出 | ~10 s | **~0 s**（`kikitori`。モデルは fallback） |
+| TTS | 0.65–1.14 s | **0.02 s**（`serifu` 事前レンダ） |
+| **合計** | **12.6 s** | **~0.95 s** |
+
+**0.92 s の STT が底である。** whisper 内部は encode 1005 ms / decode 67 ms で、
+処理時間は音声長に依らず一定（30 秒窓）。encoder を削る 4 手（small / medium /
+`-ac 768` / q5_0）を測り、**4 手とも「六名」= 人数を落とした**（q5_0 はむしろ遅い）。
+人数は卓を決めるので採らない。
+
+### Kotoba で実装する場合に不足しているもの（2026-08-15 実測）
+
+**まず分類する。** CLAUDE.md の規則どおり「恒久の安全設計」と「backend 未達」を
+混ぜない。前者を後者と誤ると自己制限が残り続け、後者を前者と誤ると要らない
+capability を作る。
+
+**capability kit は 9 つ**（`compiler/resources/kotoba/lang/capability-kits/`):
+clock / http-ingress / http / llm / log / state / storage / stream-object / ui。
+**9 つとも `:reference :implemented` だが `:wasm-aot` `:native-aot` `:jit` は
+すべて `pending`** —— つまり今日 Kotoba で書けば **KIR インタプリタ（JVM ホスト）の
+上で動く**のであって、独立した native/wasm 成果物にはならない。
+
+`capability-*` の atomic authority package（`capability-http-fetch` /
+`capability-audio-io` / `capability-fs-app-data` / `capability-process-list` 等）は
+実測したものが**すべて `provider status: contract-only`** —— 契約はあるが実装が無い。
+
+| 受付がやること | Kotoba の現状 | 分類 |
+|---|---|---|
+| 着信 webhook を受ける | ✅ `http-ingress-v1`（reference のみ） | backend 未達 |
+| **WebSocket で音声を双方向に流す** | ❌ **kit が無い**。`capability-net-transport` は contract-only | **本物の欠落** |
+| STT へ HTTP POST | ✅ `http-v1`（reference のみ） | backend 未達 |
+| **`say` / `whisper-cli` を起動** | ❌ process/exec capability が無い | **恒久（設計上そうあるべき）** |
+| ローカル音声ファイルの読み書き | △ `storage-v1`/`stream-object-v1` はオブジェクト面であってローカル FS ではない | 設計の違い |
+| **HMAC-SHA1（webhook 署名検証）** | ❌ kit に無い。`capability-hash-sha256` は contract-only | **本物の欠落** |
+| base64 | ❌ 見当たらない | **本物の欠落** |
+| 時刻 | ✅ `clock-v1` | — |
+| LLM フォールバック | ✅ `llm-v1` | — |
+
+**process/exec が無いのは欠落ではなく設計である。** `say` を叩くのは ambient
+authority そのもので、Kotoba が deny-by-default で防いでいる当のものだから、
+**「exec capability を足す」が答えではない**。aiueos の先例（判断は `.kotoba`、
+機構は C）と同じ形にする —— 合成器も音声認識器も**ホスト側の provider**として残し、
+Kotoba からは型付き capability 越しに呼ぶ。
+
+### したがって、いま Kotoba に移せるもの / 移せないもの
+
+**移せる（決定核。今日 KIR で動く）**:
+
+- `koe.media` の区切り判定 —— フレーム列に対する算術。μ-law 復号も整数演算
+- `koe.bridge` —— fold そのもの。I/O を返すだけで実行しない設計が既に Kotoba 向き
+- `denwaban.kikitori` の数詞・時刻の解釈 —— ただし**正規表現に依存している**ので、
+  移行前に「走査をやめて宣言データにする」設計変更が要る（CLAUDE.md の
+  「正規表現でテキストを走査して構造を得る設計は、移行ではなく設計変更を先に」）
+- `yotei.delegation/admit` —— 封筒に対する再導出。純粋な比較の集合
+- `yotei.seat` —— 席数と重なりの計算
+
+**移せない（ホスト側の機構のまま）**: socket、process 起動、ファイル I/O、
+WebCrypto。これは Kotoba の弱点ではなく**境界の置き方**である。
+
+**足すとしたら 3 つ**、優先順に:
+
+1. **hash/HMAC kit** —— webhook 署名検証は「判断」であって機構ではない。
+   contract-only の `capability-hash-sha256` に provider を付けるのが素直
+2. **stream ingress kit** —— `http-ingress-v1` の双方向版。WebSocket そのものを
+   Kotoba に入れる必要はなく、**フレームの出入りだけを capability にする**のが
+   `koe.bridge` の形と一致する
+3. **base64**（あるいは bytes ↔ text の正準変換）
+
+**注意**: 3 つとも `:reference` で足しても `:native-aot :pending` は変わらない。
+「Kotoba で書ける」と「Kotoba だけで配れる」は別の到達点である。
+
+### 次に着手するときの最初のコマンド
+
+```bash
+# 予約の経路が壊れていないこと（3 repo）
+cd orgs/cloud-itonami/yotei    && clojure -M:test      # 170 tests
+cd orgs/cloud-itonami/denwaban && clojure -M:test      # 98 tests（socket 込み）
+cd orgs/kotoba-lang/koe        && clojure -M:test      # 49 tests
+
+# fleet 側の STT（levi に常駐させる）
+ssh levi 'nohup whisper-server -m ~/.whisper/models/ggml-large-v3-turbo.bin --host 127.0.0.1 --port 8178 -l ja -t 4 &'
+
+# 台詞を書き出してから socket を上げる
+cd orgs/cloud-itonami/denwaban && clojure -M:serifu resources/serifu && clojure -M:media 1344
+```
 
 ## 代替案として退けたもの
 
