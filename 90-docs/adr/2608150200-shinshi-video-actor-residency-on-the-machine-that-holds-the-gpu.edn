@@ -163,24 +163,72 @@ because deriving a public key from a seed needs no randomness. Only the first
 call that actually authenticated failed. A smoke test that stops at 'the
 identity loads' would have reported a healthy deployment.
 
-## Not done -- the timer is not enabled
+## The Cloudflare credential is gone, and the timer is running
 
-`deploy/install.cljs` still refuses, and correctly: `/etc/shinshi-video-actor.env`
-is absent, so `SHINSHI_UPLOAD_TOKEN` and the D1 credential are not in place.
-Everything else on gad is verified -- 32-case suite ALL OK, identity created
-0600, the kotobase plane answering `true`.
+The actor's last two D1 calls -- the candidate scan and the feed-post write --
+were the appview's own data reached through a Cloudflare token that would have
+had to sit on a GPU box. Both moved into the appview Worker, where the D1
+bindings already live, as two XRPC methods
+(`network-awai/club-shinshi-app` commit `77ee2134`, deployed):
 
-**Remaining owner step:** issue a Cloudflare API token scoped to D1 edit on
-`ai-gftd-shinshi` and `ai-gftd-pds-recordlog`, write it plus
-`SHINSHI_UPLOAD_TOKEN` into `/etc/shinshi-video-actor.env` (0600) on gad, then
-`nbb deploy/install.cljs --apply`. The laptop's wrangler OAuth session must not
-be copied there, and `CLOUDFLARE_GLOBAL_API_KEY` is account-wide and
-unscopeable -- worse on a GPU box than the OAuth session, and not retrievable
-from kagi in this session anyway.
+- **`listUnfilled`** -- the candidate query. Scan limit 600, above the 593 rows
+  that qualify, and it reports `truncated`.
+- **`projectVideoPost`** -- token-gated on `UPLOAD_TOKEN`, checked BEFORE the
+  d1-direct branch so a rename cannot make it fall through unauthenticated, and
+  it does not accept a browser session.
 
-The better shape is now clearly the next piece of work rather than a
-nice-to-have: give the appview a kotobase read path, at which point the
-Cloudflare credential leaves this design entirely.
+The actor's three writes now use: this appview's upload token (the clip's
+bytes), the actor's **own** Ed25519 key (the record, to kotobase), and that same
+upload token (the projection). **No owner credential anywhere.**
+
+`projectVideoPost` requires `kotobaseCid` and refuses without it. That is what
+keeps the D1 row a projection rather than a second original: kotobase holds the
+authoritative copy, the row names it, and the row is rebuildable from the
+graph. Verified on the live row for `emi-hoshino-cafe` -- its `kotobaseCid` is
+`bafyreiaqylryjwixp6h64o3zc7omupyapqelrubikvchrevlsk5xb74lfi`.
+
+The write order is R2 -> kotobase -> projection, chosen so every partial failure
+is repairable. A failed commit leaves an orphaned blob (invisible, cheap,
+re-runnable); a failed projection leaves a durable record a later call renders.
+The reverse would put a visible post in front of a record that exists nowhere
+authoritative, which retrying cannot fix.
+
+`series-of` moved with the candidate list, because a check downstream of the
+list cannot see a candidate that arrives already carrying an original series
+name. It has cases in both repositories now.
+
+**The timer is enabled.** `deploy/install.cljs --apply` ran on gad and the
+first unattended firing published `emi-hoshino-campus` by itself. Next tick
+every 30 minutes.
+
+## Six more bugs, all found by running it
+
+Every one is the same shape -- a check that cannot fire returning the value of
+a check that looked and found nothing (ADR-2608136000):
+
+1. **`series-of` on the slug suffix alone** put Square Enix's Tifa at the head
+   of the queue as an `Astral Realm` original.
+2. **`entries` queried `ledger/kind` while `ledger-summary` folds on
+   `ledger/tag`** -- the budget could never bite and a failing slug was retried
+   at once, while the tick printed `RECORDED true`.
+3. **`comfy-free?` read `MURAKUMO_COMFY_URL`, the vendored python read
+   `COMFY`** -- a tick could confirm a healthy GPU on one host and submit to
+   another.
+4. **node 18 on gad** has no `globalThis.crypto` and no happy-eyeballs in
+   `fetch`. `--whoami` kept working throughout, because deriving a pubkey from
+   a seed needs no randomness; only the first call that AUTHENTICATED failed.
+5. **`.catch` threaded inside its own `.then`** in the appview's candidate
+   scan. It compiled -- the parens balanced, the meaning did not -- and failed
+   only in production, as `(intermediate value).catch is not a function`.
+6. **A cljs.test async test that asserted nothing.** Written without
+   `cljs.test/async`, the reporter finished before the `.then` ran: the suite
+   went green claiming an extra passing test while the assertion total stayed
+   at 3447. Fixed, it is 3454, and breaking the chain again reproduces exactly
+   the production error before restoring it.
+
+Number 6 deserves the emphasis. It was a test written **to cover** number 5,
+and in its first form it could not have caught it. The assertion count is what
+exposed it -- not the test result, which was green either way.
 
 ## Consequences
 
