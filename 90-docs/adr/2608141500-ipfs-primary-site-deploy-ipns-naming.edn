@@ -11,7 +11,8 @@
   :adr/topic "ipfs-primary-site-deploy"
   :adr/repos ["orgs/network-awai/cloud-itonami"
               "orgs/net-kotobase/ipfs"
-              "orgs/cloud-itonami/cloud-itonami-app"]
+              "orgs/cloud-itonami/cloud-itonami-app"
+              "orgs/cloud-itonami/shirohan"]
   :adr/related ["90-docs/adr/2608140500-ipfs-ipns-subdomain-execution-origin.edn"
                 "90-docs/adr/2607301300-itonami-cloud-org-repo-site-publishing-rule.edn"
                 "90-docs/adr/2608057000-org-is-a-host-not-a-path-segment.edn"]
@@ -107,6 +108,27 @@ itonami deploy --file <html> [--ipns]
 - PSL 登録
 - HEAD を Worker で受ける
 - catalog `/app/{repo}/` の 302（いまは 200 の目次。k51 に HTML が載ってから）
+
+## Resume (2026-08-15 close)
+
+Product は GitHub default-branch main に着地済み（API merge。PR は無い）。
+
+- `cloud-itonami/shirohan` `ed53c3cc` — G1 joins + `split-long-cubics`（93 tests / 234 assertions）
+- `network-awai/cloud-itonami` `87c6be87` catalog G1 on Pages; tip `8a0653f3` が k51 default deploy
+- この ADR + secrets map は `2684776` / merge `1a4b59cb`（main の祖先）
+
+Live G1 は Pages catalog `https://itonami.cloud/sites/app/shirohan/`。この k51 はまだ古い inlined HTML。`/shirohan/geom.cljs` に `g1-smooth-joins` が載るまで catalog を 302 しない。
+
+Blocker: kagi item `itonami-site-ipns/app/shirohan` が無い。新しい seed を発行しない（別 k51 になる）。
+
+種を戻したあとの最初のコマンド:
+
+```
+git worktree add -b agent/shirohan-k51-publish /tmp/cloud-itonami-k51-pub origin/main
+ITONAMI_IPFS_ROOT=/tmp/wt-ipfs-ipns-r2 nbb scripts/deploy-site.cljs app/shirohan --dry-run
+```
+
+`/tmp/wt-ipfs-ipns-r2` は他セッション。消さない。superproject `agent/shirohan-geom-live` はこの作業ではない。
 
 ## Consequences
 
