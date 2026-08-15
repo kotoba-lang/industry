@@ -247,7 +247,13 @@
   ;; w3id.org/valueflows/ont/vf だが、記録するのは authority が使っている
   ;; ドメイン（= 公開サイト valueflo.ws）であって PURL リダイレクタではない。
   "kotoba-lang/ws-valueflo-vocabulary" "valueflo.ws"
-  "kotoba-lang/ws-valueflo-algorithms" "valueflo.ws"}
+  "kotoba-lang/ws-valueflo-algorithms" "valueflo.ws"
+
+  ;; 2026-08-15 追加（ADR-2608159400、UCAN Delegation v1 の外部仕様境界）
+  ;; UCAN Working Group の仕様公開元は ucan.xyz。登録可能ドメインの
+  ;; ラベル逆順は xyz-ucan。DNS 実測 2026-08-15: authoritative NS は
+  ;; scott.ns.cloudflare.com / sreeni.ns.cloudflare.com。
+  "kotoba-lang/xyz-ucan" "ucan.xyz"}
 
  ;; ── unresolvable ───────────────────────────────────────────────────────
  ;; Names that carry an origin prefix but have no single authority domain to
@@ -341,7 +347,12 @@
     :repos ["kotoba-lang/ws-valueflo-vocabulary" "kotoba-lang/ws-valueflo-algorithms"]
     :domain "valueflo.ws"
     :dns-checked-at "2026-08-15"
-    :adr "ADR-2608153000"}]}
+    :adr "ADR-2608153000"}
+   {:date "2026-08-15"
+    :repos ["kotoba-lang/xyz-ucan"]
+    :domain "ucan.xyz"
+    :dns-checked-at "2026-08-15"
+    :adr "ADR-2608159400"}]}
 
  ;; ── DNS sweep, 2026-08-05 ──────────────────────────────────────────────
  ;; A way to find candidates without asserting anything: for each com-* repo,
