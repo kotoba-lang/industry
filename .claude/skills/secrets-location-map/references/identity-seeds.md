@@ -43,6 +43,33 @@
   - **投入先**: dispatch namespace `ai-gftd-repository-dispatch` の user Worker の
     `KOTOBASE_SECRET_KEY`。現時点で `cloud-itonami-isic-0111` のみ。
 
+## hyakka (wiki.kotobase.net) identity seed — 2026-08-15 に消えた
+
+- ⚠ **`hyakka-kotobase-seed` は 2026-08-15 13:00 UTC 時点で kagi に存在しない**
+  （`KAGI_HOME=$HOME/.kagi` で `no such item`）。**同じ乖離の 4 例目**
+  （`itonami-marketplace-kotobase-seed` / `MURAKUMO_GENERATION_TOKEN_SECRET` /
+  `MURAKUMO_CHAT_TOKEN_SECRET_2` に続く）。
+  - **他の 3 例と違い、これは「保管されなかった」ではない。** 同日 03:00 UTC の
+    常駐 tick は Kotobase publish に成功して `.resident/published.edn` を書いており、
+    その時点では読めていた。**03:00 と 12:56 の間に失われた**（原因未特定。
+    vault の総当たり列挙はしていない —— 安全床⑦）。
+  - **記録上の所在**: ADR-2607311100 と
+    `scripts/hyakka-knowledge-resident.cljs` の `kotobase-seed` が
+    ともに item 名 `hyakka-kotobase-seed`、compartment `personal` と書いている。
+    名前の食い違いではない。
+  - **新しい seed を作っても代わりにならない**（marketplace と同じ理由）。
+    tenant DID は `did:key:z6MkuEj8M1GKrAqW8ZsenbickiLvpfzJFLpNpxgyggcm1DKv` で、
+    `:apex` は graph scope == issuer DID を要求する。別 seed = 別 DID = 別グラフになり、
+    既存の 630 claim / 147 source を持つ `hyakka` ref には書き込めない。
+  - **実害**: 収集は動いている（ledger は main に着地、raw は B2 に上がっている）が、
+    **datom 面への projection と Worker deploy がここで止まる**。2026-08-15 13:00 時点で
+    未 projection の ledger 2 本（NVD CVE 5 件 + ELDEN RING + Tokyo Station を含む）。
+    live の `/health` は 630 claims のまま。
+  - **復旧に要るもの**: オーナーによる seed の復元（バックアップからの再登録）。
+    `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi add hyakka-kotobase-seed`
+    に元の 32 byte hex を流す。復元後は常駐 tick が未 projection 分を
+    自動で追いつかせる（`unpublished-ledgers` が published.edn との差で拾う）。
+
 ## marketplace 共有 identity seed (ADR-2607275000、2026-07-27)
 
 - ⚠ **`itonami-marketplace-kotobase-seed` は 2026-08-05 時点で kagi に存在しない**
