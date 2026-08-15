@@ -421,4 +421,162 @@
   ["GJ が GW に提供した総務役務の期間と工数"
    "役員報酬をどちらの法人がどの割合で負担すべきか（実態に基づく按分根拠）"
    "遡及請求が可能な期間と、税務上の取り扱い"]}
+
+ ;; ================================================ 差押え（2025年、GJ 口座）
+ {:db/id -20
+  :source/dataset "gftd-japan-mf"
+  :seizure/fiscal-year 2025
+  :seizure/total 1701495
+  :seizure/events
+  [{:date "2025-01-16" :authority "新宿年金事務所" :amount 408548
+    :remark "差押え　新宿年金事務所" :settled "2025-12-31 法定福利費/社会保険料へ充当"}
+   {:date "2025-05-30" :authority "新宿年金事務所" :amount 200684
+    :remark "差押え　新宿年金事務所" :settled "2025-12-31 法定福利費/社会保険料へ充当"}
+   {:date "2025-10-10" :authority "渋谷区役所" :amount 12772
+    :remark "サシオサエ シブヤクヤクシヨ／河﨑代表分　住民税一部と思われる"
+    :settled "2025-12-31 預り金/住民税 5,612 ＋ 租税公課/延滞金 5,400 ＋ 支払手数料 1,600"}
+   {:date "2025-11-06" :authority "東京地裁" :amount 98764
+    :remark "差押え　東京地裁／カオナビの可能性"
+    :settled "2025-12-15 未払金 ㈱カオナビ 82,610 ＋ 支払利息 16,154。残 5,214 円"}
+   {:date "2025-12-03" :authority "千代田年金事務所" :amount 980727
+    :remark "差押え　千代田年金事務所" :settled "2025-12-31 法定福利費/社会保険料へ充当"}]
+  :seizure/by-authority {"年金事務所（社会保険料滞納）" 1589959 "東京地裁（カオナビ債権回収）" 98764 "渋谷区役所（住民税）" 12772}
+  :seizure/correction
+  "前版で『FY2025 の仮払金 東京地裁 98,764 は訴訟費用』と書いたのは誤り。実際は ㈱カオナビ の未払金に対する債権回収の差押えで、㈱フィルコマンド訴訟とは無関係である。"
+  :seizure/finding
+  "2025 年に GJ の銀行口座は 5 回差し押さえられている。うち 3 回・計 ¥1,589,959 が年金事務所によるもので、社会保険料の滞納が強制執行の段階に入っている。現在も未払費用に社会保険料 ¥4,896,829 が残っており、再度の差押えは想定しておくべきである。"
+  :seizure/tax-consolidation-not-found
+  "オーナー仮説『GJ が親会社としてグループの税金をまとめて支払う処理があったはず』は、この 5 件では裏付けられない。仕訳の相手勘定はすべて GJ 自身の 法定福利費/社会保険料・預り金/住民税 で、GW への請求は 1 件も立っていない。新宿年金事務所が GW の渋谷・早稲田拠点の管轄である可能性はあるが、帳簿上は GJ 自身の費用として落とされている。もし実態が GW 分だったなら GJ から GW への債権が立つべきところ、立っていない —— §-19 の総務役務の請求漏れと同じ構図。"
+  :seizure/gj-corporate-tax-2025 {"法人税均等割" 290000 :note "赤字のため均等割のみ。連結納税・グループ通算の痕跡は無い。"}}
+
+ ;; ------------------------- GW 側から見た GJ 向け債権の年次（2025 実測）
+ {:db/id -21
+  :source/dataset "gftd-group"
+  :ic-annual/fiscal-year 2025
+  :ic-annual/gw-side
+  {"売掛金 Gftd Japan株式会社" {:opening 6371862 :debit 1924718 :credit 8296580 :closing 0}
+   "未収入金 Gftd Japan㈱" {:opening 43312323 :debit 19580829 :credit 13080347 :closing 49812805}
+   "立替金 Gftd Japan㈱" {:opening 0 :debit 13202121 :credit 13202121 :closing 0}
+   "未払金 Gftd Japan㈱" {:opening 0 :debit 33672329 :credit 33672329 :closing 0}}
+  :ic-annual/finding
+  "未払金 GJ 33,672,329 は FY2025 にも同額で立って消えており、FY2026 期首にまた立っている。毎期繰り返される洗替仕訳とみられる。GJ 側は 13,200,000 でしか受けていないため、差 20,472,329 は複数年にわたって放置されている可能性がある。"
+  :ic-annual/gw-fy2025-net-loss -13868775}
+
+ ;; ------------------------- GW 6 期の推移（2021-2026、MF 実測 2026-08-15）
+ ;; 出典: mfc_ca_gw getReportsTrialBalanceBalanceSheet fiscal_year=2021..2024（2025/2026 は既出）
+ {:db/id -22
+  :source/dataset "gftd-works-mf"
+  :gw-history/note "GW は 2021・2022 に黒字で、2022 年末には純資産がプラスだった。現在の債務超過は 2023 以降の 3 年で作られている。"
+  :gw-history/series
+  [{:fy 2021 :cash-end 48968560 :assets 163522708 :liabilities 177322005 :net-assets -13799297 :profit 13913128}
+   {:fy 2022 :cash-end 39430922 :assets 167379901 :liabilities 161464860 :net-assets 5915041 :profit 19714338}
+   {:fy 2023 :cash-end 24820955 :assets 116800912 :liabilities 148204033 :net-assets -31403121 :profit -9596930}
+   {:fy 2024 :cash-end 267309 :assets 68672335 :liabilities 141439783 :net-assets -72767448 :profit -41364327}
+   {:fy 2025 :cash-end nil :assets nil :liabilities nil :net-assets nil :profit -13868775}
+   {:fy 2026 :as-of "2026-08-15" :cash-end 18520 :assets 101553209 :liabilities 190449861 :net-assets -88896652 :profit nil}]
+  :gw-history/peak
+  {:date "2022-12-31" :net-assets 5915041 :cash 39430922
+   :remark "2 期連続黒字（+13,913,128 / +19,714,338）で繰越損失を埋め切り、純資産がプラスに転じた唯一の時点。"}
+  :gw-history/turning-point 2024
+  :gw-history/caveat "2025 の期末 BS はこの版では未取得。純資産の 2025 末は 2024 末 −72,767,448 に当期損失 −13,868,775 を足した −86,636,223 と推定できるが、実測値ではない。"}
+
+ ;; ------------------------- 2024: 拠点撤退と借入延滞の開始
+ {:db/id -23
+  :source/dataset "gftd-works-mf"
+  :gw-2024/net-loss -41364327
+  :gw-2024/cash-drop {:from 24820955 :to 267309 :delta -24553646}
+  :gw-2024/asset-disposals
+  {"建物" {:opening 17908015 :closing 0}
+   "附属設備" {:opening 5630286 :closing 0}
+   "工具器具備品" {:opening 4514932 :closing 403920 :remark "入替（新規取得 403,920）"}
+   "敷金 ニシカワビル" {:opening 2820000 :closing 0}
+   "敷金 テンジン5丁目アパートメント3F" {:opening 660000 :closing 0}
+   "有形固定資産 純額" {:opening 16150635 :closing 270730 :delta -15879905}}
+  :gw-2024/site-exit
+  "渋谷（ニシカワビル）と福岡（テンジン5丁目）から撤退。福岡の介護給付費売掛金 2,564,511 → 0、福岡銀行・愛知銀行・西武信金・第一勧信・福岡小口現金の残高がほぼ全てゼロになった。残ったのは東海（825,749）と渋谷（1,171,410）の売掛金のみ。"
+  :gw-2024/borrowing-delinquency-begins
+  {:unpaid-interest-year-end
+   {"日本政策金融公庫/2,900万" 626041 "日本政策金融公庫/1,100万" 237461
+    "西武信用金庫③/2,000万" 61689 "みずほ銀行/2,000万" 9021
+    "第一勧業信用組合/1,000万" 2812 "西武信用金庫②/500万" 193
+    "WAM 渋谷/3,000万" 4718 "WAM 天神/3,000万" 4718 "WAM 東海/3,000万" 6250}
+   :unpaid-interest-total 952903
+   :principal-repaid 7285000
+   :principal-scheduled 11076000
+   :principal-shortfall 3791000
+   :current-portion {:opening 11076000 :closing 12087000}
+   :finding "2024 年末に初めて借入先別の未払利息が計上され、元本返済も予定 11,076,000 に対し 7,285,000 にとどまった。一年以内返済予定長期借入金が増えているのは、返済が予定に追いついていないため。GW の返済停止はここから始まっている。"}
+  :gw-2024/anomaly
+  {"預り金 給与源泉" -681521 "預り金 社会保険料" -63595
+   :remark "いずれも貸方残がマイナス（＝借方残）。預かった額を超えて納付したか記帳のズレ。要確認。"}}
+
+ ;; ------------------------- Gftd Labo ↔ Gftd Works（2021-2023、吸収合併まで）
+ {:db/id -24
+  :source/dataset "gftd-group"
+  :labo-gw/question "Gftd Labo から Gftd Works への支払いを確認する（オーナー依頼 2026-08-15）"
+  :labo-gw/method "Labo の MF office は未接続。GW 側の Labo 補助科目から年次の増減を読んだ。"
+  :labo-gw/annual
+  [{:fy 2021
+    "売掛金 Gftd Labo合同会社" {:opening 1260600 :debit 35633400 :credit 36894000 :closing 0}
+    "未収入金 Gftd Labo(合)" {:opening 0 :debit 29063500 :credit 29063500 :closing 0}
+    "未払金 Gftd Labo合同会社" {:opening 18424495 :debit 15181834 :credit 1147434 :closing 4390095}
+    "短期借入金 Gftd Labo(合)" {:opening 0 :debit 24196066 :credit 24196066 :closing 0}}
+   {:fy 2022
+    "売掛金 Gftd Labo合同会社" {:opening 0 :debit 30656285 :credit 30656285 :closing 0}
+    "未収入金 Gftd Labo(合)" {:opening 0 :debit 91653500 :credit 91653500 :closing 0}
+    "未払金 Gftd Labo合同会社" {:opening 4390095 :debit 18991334 :credit 15573819 :closing 972580}
+    "短期借入金 Gftd Labo(合)" {:opening 0 :debit 16796066 :credit 16796066 :closing 0}}
+   {:fy 2023
+    "売掛金 Gftd Labo合同会社" {:opening 0 :debit 7445087 :credit 7445087 :closing 0}
+    "未収入金 Gftd Labo(合)" {:opening 0 :debit 54628500 :credit 54628500 :closing 0}
+    "未払金 Gftd Labo合同会社" {:opening 972580 :debit 19620329 :credit 18647749 :closing 0}
+    "短期借入金 Gftd Labo(合)" {:opening 0 :debit 8796066 :credit 8796066 :closing 0}}]
+  :labo-gw/labo-paid-gw
+  {:売掛金回収 {2021 36894000 2022 30656285 2023 7445087 :total 74995372}
+   :未収入金回収 {2021 29063500 2022 91653500 2023 54628500 :total 175345500}
+   :合計 250340872}
+  :labo-gw/answer
+  "Labo は GW に払っている。3 期で 売掛金 74,995,372 ＋ 未収入金 175,345,500 ＝ 250,340,872 が GW に入っており、Labo 関連の残高は 4 科目すべて 2023 年末にゼロになっている。GW 側に Labo に対する未回収は残っていない。"
+  :labo-gw/absorption
+  {:date "2023-11-01"
+   :goodwill {:recognized 27721232 :written-off 27721232 :fy 2023
+              :route "P/L を通さず繰越利益剰余金に直接賦課（利益剰余金 借方 27,721,232）。抱合せ株式消滅差損等の合併処理。"}
+   :finding "Labo を吸収したのは GW。GJ 側の『GL より包括承継分』とあわせると、Labo の資産負債は GJ と GW に分けて承継されている。"}
+  :labo-gw/limitation "Labo 自身の帳簿は見ていない。ここに書いたのは全て GW 側から見た数字であり、Labo 側の相手勘定・残高は未確認。"}
+
+ ;; ------------------------- GJ ↔ GW の年次全体（GW 側、2021-2025）
+ {:db/id -25
+  :source/dataset "gftd-group"
+  :ic-history/gw-side-by-year
+  [{:fy 2021 :売掛金GJ 0 :未収入金GJ 15065157 :短期貸付金GJ 0 :立替金GJ 13202121 :未払金GJ洗替 5495169}
+   {:fy 2022 :売掛金GJ 0 :未収入金GJ 33159423 :短期貸付金GJ 0 :立替金GJ 13202121 :未払金GJ洗替 6380000}
+   {:fy 2023 :売掛金GJ 0 :未収入金GJ 45449702 :短期貸付金GJ 15000000 :立替金GJ 0 :未払金GJ洗替 25367829}
+   {:fy 2024 :売掛金GJ 6371862 :未収入金GJ 43312323 :短期貸付金GJ 15000000 :立替金GJ 0 :未払金GJ洗替 34345994}
+   {:fy 2025 :売掛金GJ 0 :未収入金GJ 49812805 :短期貸付金GJ 15000000 :立替金GJ 0 :未払金GJ洗替 33672329}]
+  :ic-history/wash-entry
+  {:years [2023 2024 2025 2026]
+   :amounts {2023 25367829 2024 34345994 2025 33672329 2026 33672329}
+   :finding "未払金 Gftd Japan㈱ の期首計上・期末取消は 4 期連続。金額は毎年変わっており固定の振替ではない。GJ 側は 13,200,000 でしか受けていないため、両社で同じ金額の洗替が行われていない。差 20,472,329 は複数年にわたって放置されている。"}
+  :ic-history/gw-billing-to-gj
+  {2021 99000 2022 66000 2023 781000 2024 7342086 2025 1924718
+   :finding "GW が GJ に売上請求を立てたのは 2024 年が実質最初（7,342,086）。回収は 970,224 のみで 6,371,862 が 2025 に繰り越され、2025 に落ちた。前版で指摘した『GW→GJ 請求 8,218,476 に GJ 側対応なし』の由来はこれ。"}
+  :ic-history/gj-receivable-total-2024
+  {:売掛金 6371862 :未収入金 43312323 :短期貸付金 15000000 :total 64684185
+   :remark "2024 年末時点で GW が GJ に対して持つ債権の合計。GW はこの年に現金を使い切っており、以降 GW の資産は実質この GJ 向け債権と公的借入だけになる。"}
+  :ic-history/other-related-party-writeoffs-2023
+  {"長期貸付金 一般社団法人Gftd Family" 26526500
+   "立替金 COMMONS㈱" 13656480
+   "短期貸付金 COMMONS㈱" 6000000
+   "未収収益 一般社団法人Gftd Family" 1177344
+   "未収収益 COMMONS㈱" 224683
+   :total 47585007
+   :remark "いずれも 2023 年に残高ゼロになっている。Labo 合併の承継処理と同じ年。個別の相手勘定は未確認。"}
+  :ic-history/ceo-loan-to-gw
+  {"短期借入金 河崎純真" {2021 {:opening 16849669 :repaid 16650669 :closing 199000}
+                          2022 {:opening 199000 :closing 0}}
+   :remark "代表から GW への貸付は 2021-2022 に完済されている。現在 GJ 側にある代表借入 14,180,000 とは別。"}
+  :ic-history/deschool-transfer-2021
+  {"立替金 Gftd Japan㈱(DESCHOOL)" 19451676
+   "仮受金 Gftd Japan㈱(DESCHOOL)" 19240446
+   :remark "2021 に GW を通過。前版で『GW未払金 6,331万の起源』に挙げた DE-SCHOOL 振替 1,945 万はこれ。"}}
 ]
