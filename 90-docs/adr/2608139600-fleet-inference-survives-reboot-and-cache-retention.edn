@@ -3,6 +3,32 @@
   :adr/title "fleet の推論は LaunchDaemon で常駐する — LaunchAgent は誰もログインしないので永久に起動しない"
   :adr/status "accepted"
   :adr/date "2026-08-13"
+  :adr/last-verified "2026-08-15"
+  :adr/addendum-2026-08-15-ha-closeout
+  {:inventory {:online 11 :expected 11 :source "live /ready hwmetrics"}
+   :inference-ring {:mac-workers 9
+                    :head "gad"
+                    :participants 10
+                    :excluded ["zebulun"]
+                    :exclude-reason "online inventory but unreachable from the RPC head"
+                    :parallel-request-slots 2}
+   :recovery {:fault "SIGSTOP one live RPC worker"
+              :watchdog-detect-to-model-loaded-seconds 69
+              :fault-to-model-loaded-seconds 128
+              :post-recovery-concurrent-requests 2}
+   :public-routing {:primary "https://infer.murakumo.cloud/v1/chat/completions"
+                    :fallbacks ["https://qwen-gad.gftd.ai/v1/chat/completions"
+                                "https://gemma-fleet.gftd.ai/v1/chat/completions"]
+                    :fallback-on "transport failure or 5xx only"
+                    :streaming-verified true}
+   :security {:registry-put-auth-required true
+              :unauthenticated-status 401}
+   :merged {:murakumo ["kotoba-lang/murakumo#305" "kotoba-lang/murakumo#306"]
+            :api ["network-awai/local-murakumo#132" "network-awai/local-murakumo#133"]
+            :root ["com-junkawasaki/root#2207" "com-junkawasaki/root#2209"]
+            :murakumo-pin "76207e62593a623dec256285803459199f3f2a92"
+            :local-murakumo-pin "30cf0242c538adc59d22fdf3bd734333651d48b3"
+            :worker-version "55b2dee5-bf55-4c36-9e9a-a7e0daf8fbfe"}}
   :adr/repo "scripts/fleet-ci"
   :adr/supersedes ""
   :adr/superseded-by ""
@@ -155,11 +181,75 @@ llama-server を `127.0.0.1` に固定して接続するので、**モデルの�
 landing 前に両方向を実演済み: `--days 0` で違反を出して exit 1、到達不能ホストで
 exit 2、正常で exit 0。
 
-## Follow-ups
+## Addendum — 2026-08-15: llama.cpp RPC 推論面の HA closeout
 
-- zebulun / asher の再起動（他の長期プロセスの復帰手段を確認してから）
-- ポート枯渇の発生源。asher で `hayari-rad` の収集タスクが稼働していたのが候補だが、
-  嵐は既に止まっており**因果は確定していない**。再発したら発生源を捕まえる
-- `fleet-hf-cache-prune.cljs --check` の定期実行（現状は手動）
+この ADR の LaunchDaemon 原則を、Ollama の常駐だけでなく公開 API が使う
+llama.cpp RPC ring へ適用した。**在庫、推論参加、request 並列度は別の値**として扱う。
+
+| 面 | live 実測 |
+|---|---|
+| fleet 在庫 | `/ready` hwmetrics で **11/11 online** |
+| 1 推論へ参加する ring | **9 Mac worker + gad head = 10 participants** |
+| 除外 | zebulun は online 在庫だが RPC head から到達不能。plan 時点で fail-closed 除外 |
+| request 並列度 | llama-server `/slots` が **2 configured / 2 available** |
+
+### 常駐・復旧
+
+- 9 Mac worker は system LaunchDaemon `com.murakumo.rpc-worker`。
+  `RunAtLoad` + `KeepAlive` で、GUI login に依存しない
+- head だけが持つ Ed25519 key から worker を再起動できる。ただし
+  `authorized_keys` は `restrict` と固定 `launchctl kickstart` command で拘束し、
+  shell・port forwarding・caller 指定 command は許さない
+- head systemd unit は全 endpoint の bounded preflight と 5 秒の protocol settle を通す。
+  TCP LISTEN だけを model ready と誤認しない
+- watchdog は distributed probe failure 時に head を止め、全 worker を固定 command で
+  再起動し、全 endpoint ready + settle 後に head を戻す
+
+落ちない検査を green にしないため、Benjamin の live RPC process を `SIGSTOP` した。
+direct distributed request は 20 秒で timeout。watchdog は異常を検知して全 worker と
+head を再構成し、**watchdog 検知から model loaded まで約 69 秒、fault 注入から約
+128 秒**で復旧した。worker PID は全て更新され、post-recovery の 2 concurrent request
+は両方 200。これは process が存在し socket が LISTEN していても応答しない故障を含む。
+
+### 公開 API、fallback、streaming、queue
+
+`api.murakumo.cloud` の model 省略／`murakumo-main` は
+`https://infer.murakumo.cloud/v1/chat/completions` を primary とし、上記 10-participant
+ring へ送る。`qwen-gad` と `gemma-fleet` は transport failure または 5xx の時だけ使う
+owned fallback で、正常時の分散推論を黙って standalone に置換しない。
+`qwen3.6-35b-a3b` は vision-capable standalone として explicit endpoint を保つ。
+
+公開 model 省略経路へ同時に 2 request を投入し、両方が Qwen-AgentWorld の同じ
+distributed model 実体から 200 を返した。streaming は同じ primary/fallback 契約で
+終端 `[DONE]` まで確認。poll 型 `/infer/queue` の enqueue/claim/result 面は維持され、
+closeout 時点の unclaimed job は 0。したがって「10 台」は request 数ではなく
+1 request の分散参加数であり、現在の同時 request capacity は 2 である。
+
+### control-plane write の HA 境界
+
+closeout 中に `/infer/models/:id` と `/infer/plans/:id` の PUT が未認証であることを発見。
+第三者が endpoint や plan を変更できるのは availability defect なので、Worker entry と
+CLJS route の両方で service bearer を必須にした。本番で unauthenticated PUT = 401、
+probe record = 404 を確認。model registry は live topology に合わせて
+`murakumo-main -> qwen-agentworld-35b-a3b`、primary = `infer.murakumo.cloud`、
+qwen3.6 = `qwen-gad.gftd.ai` へ修正した。
+
+実装は `kotoba-lang/murakumo` PR #305/#306、公開 routing と write auth は
+`network-awai/local-murakumo` PR #132/#133、west/genpon は root PR #2207/#2209 で
+merge 済み。pin は murakumo `76207e62`、local-murakumo `30cf0242`。
+テストは murakumo narrow 16 tests / 67 assertions、full 655 tests / 6727 assertions
+（別 witness の既知 flaky 1 件は targeted rerun で pass）、local-murakumo
+154 tests / 814 assertions、release build と Wrangler dry-run。本番 Worker version は
+`55b2dee5-bf55-4c36-9e9a-a7e0daf8fbfe`。
+
+## Follow-ups after HA closeout
+
+- **解消**: asher は 9 Mac RPC worker の一員として live 推論へ復帰した
+- **残存**: zebulun は 11 台の online inventory には含むが、RPC head からの到達性を
+  回復するまでは inference ring に入れない。11 台 ring と呼ばない
+- **残存**: port 枯渇の発生源は未確定。再発時に source process/socket owner を捕捉する
+- **残存**: `fleet-hf-cache-prune.cljs --check` の定期実行（現状は手動）
 - 使わなくなった LaunchAgent 18 個は各ノードの
-  `~/.gftd/launchagents-retired-2026-08-13/` に退避済み"}]
+  `~/.gftd/launchagents-retired-2026-08-13/` に退避済み
+- この closeout は fault-injection と point-in-time live verification。長期 soak 完了を
+  意味しない"}]
