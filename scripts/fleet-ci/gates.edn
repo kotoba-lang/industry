@@ -284,6 +284,14 @@
    :script "gates/video-default-parity-check.cljs" :script-args []
    :include-ext [".edn"] :min-files 50 :cd true}
 
+  ;; Distributed inference HA is a separate executable boundary from the
+  ;; cloud-murakumo video-default parity gate above. murakumo's broad :test
+  ;; suite deliberately needs west siblings, so the repository publishes a
+  ;; sibling-free :fleet-infer-test alias covering the ring planner, systemd
+  ;; units, watchdog false-positive guard, and generated recovery artifacts.
+  ;; :cd true advances the murakumo pin only after a signed fleet receipt.
+  {:name "murakumo" :gate :jvm-test :alias "fleet-infer-test" :cd true}
+
   {:name "root" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/docs-edn-check.cljs" :script-args ["--sub" "90-docs/adr" "--min" "1400"]
    :include-ext [".edn"] :min-files 1500 :cd false}

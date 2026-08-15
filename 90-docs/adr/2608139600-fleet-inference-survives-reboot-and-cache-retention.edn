@@ -29,6 +29,58 @@
             :murakumo-pin "76207e62593a623dec256285803459199f3f2a92"
             :local-murakumo-pin "30cf0242c538adc59d22fdf3bd734333651d48b3"
             :worker-version "55b2dee5-bf55-4c36-9e9a-a7e0daf8fbfe"}}
+  :adr/addendum-2026-08-15-long-stability
+  {:measured-at "2026-08-15T02:42:51Z"
+   :public-ready {:http-status 200
+                  :fleet-online 11
+                  :fleet-expected 11
+                  :inference-endpoints-healthy 3
+                  :request-slots-configured 2
+                  :request-slots-available 2}
+   :capacity {:inventory-nodes 11
+              :ring-participants 10
+              :ring-mac-workers 9
+              :ring-heads 1
+              :excluded-online-nodes ["zebulun"]
+              :nominal-ring-cpu-threads 122
+              :ring-memory-gib 190.687
+              :ring-free-memory-gib 80.348
+              :ring-free-disk-gib 599.746
+              :context-tokens-total 524288
+              :context-tokens-per-slot 262144
+              :single-slot-decode-tokens-per-second 11.699329
+              :two-slot-decode-tokens-per-second [7.729759 7.465963]
+              :two-slot-aggregate-decode-tokens-per-second 15.195722
+              :benchmark-completion-tokens-per-request 256}
+   :incident {:started-at "2026-08-15T02:37:13Z"
+              :watchdog-probe-timed-out-at "2026-08-15T02:37:49Z"
+              :service-restored-at "2026-08-15T02:38:07Z"
+              :root-cause "a healthy long decode serialized /slots beyond the watchdog's ten-second deadline"
+              :impact "watchdog cancelled the live request and unnecessarily rebuilt the full RPC ring"
+              :fallback-observed true}
+   :stabilization {:busy-connection-fence true
+                   :post-probe-arrival-race-check true
+                   :idle-probes-required 2
+                   :confirmation-delay-seconds 5
+                   :soak-ledger "/var/lib/murakumo/ring-watchdog-events.log"
+                   :ledger-retention-weeks 12
+                   :canonical-ci "fleet-ci/murakumo/murakumo"
+                   :github-actions-authoritative false
+                   :murakumo-pr "kotoba-lang/murakumo#307"
+                   :murakumo-main "5f392e0ce5f31a692c1b8a046570fa64e2467e3b"
+                   :deployed-at "2026-08-15T02:59:22Z"
+                   :live-busy-fence {:request-seconds 79.067474
+                                     :http-status 200
+                                     :busy-ledger-events 3
+                                     :pid-before 3494325
+                                     :pid-after 3494325
+                                     :systemd-restarts 0
+                                     :idle-health-after true}}
+   :qualification {:status "soak-started"
+                   :soak-started-at "2026-08-15T03:06:31Z"
+                   :required-distinct-main-tip-receipts 3
+                   :required-soak-seconds 604800
+                   :note "point-in-time capacity and fault recovery are measured; long-term stability is not yet claimed"}}
   :adr/repo "scripts/fleet-ci"
   :adr/supersedes ""
   :adr/superseded-by ""
