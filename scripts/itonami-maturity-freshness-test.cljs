@@ -375,6 +375,52 @@
   (check! "movement: 基準が無いことを :checked 0 で言う" 0 (:checked r)))
 
 (println)
+
+;; ── landings-all-excluded? ───────────────────────────────────────────────────
+;; **両方向を出す。** 覆えているときに true を返せなければ意味が無く、覆えて
+;; いないときに true を返せば stale な 1 位を黙って渡す。
+(let [blind {:reason :blind-to-own-work
+             :unseen [{:target "orgs/o/a" :axis :axis-docs}
+                      {:target "orgs/o/b" :axis :axis-docs}]}
+      probe (fn [names checked] {:moved (mapv (fn [n] {:repo n}) names) :checked checked})]
+
+  (check! "excluded?: 名指しされた着地を全て除外していれば true"
+          true (f/landings-all-excluded? blind (probe ["orgs/o/a" "orgs/o/b"] 24)))
+
+  (check! "excluded?: 1 つでも欠けていれば false（probe 深度の外は :moved に入らない）"
+          false (f/landings-all-excluded? blind (probe ["orgs/o/a"] 24)))
+
+  (check! "excluded?: 件数が合っても名前が違えば false"
+          false (f/landings-all-excluded? blind (probe ["orgs/o/a" "orgs/o/zzz"] 24)))
+
+  ;; orgs/ が populate されていない状態。probe は 24/24 答えられず :moved が空。
+  (check! "excluded?: probe が 1 件も答えていなければ false"
+          false (f/landings-all-excluded? blind (probe [] 0)))
+
+  (check! "excluded?: :checked が無ければ false"
+          false (f/landings-all-excluded? blind {:moved [{:repo "orgs/o/a"} {:repo "orgs/o/b"}]}))
+
+  (check! "excluded?: :target を持たない着地は照合できないので false"
+          false (f/landings-all-excluded?
+                 {:reason :blind-to-own-work :unseen [{:axis :axis-docs}]}
+                 (probe ["orgs/o/a"] 24)))
+
+  ;; ここは緩めない。測り直しでは直らない理由と、日数の床。
+  (check! "excluded?: :root-reads-behind-remote は緩めない"
+          false (f/landings-all-excluded?
+                 (assoc blind :reason :root-reads-behind-remote)
+                 (probe ["orgs/o/a" "orgs/o/b"] 24)))
+
+  (check! "excluded?: :too-old は緩めない"
+          false (f/landings-all-excluded?
+                 (assoc blind :reason :too-old)
+                 (probe ["orgs/o/a" "orgs/o/b"] 24)))
+
+  (check! "excluded?: 着地が無ければ（:fresh 等）false"
+          false (f/landings-all-excluded?
+                 {:reason :blind-to-own-work :unseen []} (probe [] 24))))
+
+(println)
 ;; 件数つきの summary。**gate 側はこの行が無ければ pass と報告しない** ——
 ;; classpath が壊れて 1 件も走らないまま exit 0 になる経路を塞ぐ
 ;; （west-pin-policy-check.cljs と同じ床）。

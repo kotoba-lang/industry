@@ -559,6 +559,15 @@
                   measured-at)
         moved (:moved movement)
         ranked (vec (take 5 (:kept movement)))
+        ;; `freshness` は probe より前に走るので、:blind-to-own-work は
+        ;; 「どの候補が落ちるか」を知らずに決まっている。probe が名指しされた着地を
+        ;; **全部** 落としたなら、間違っている行はもう候補に居ない —— 残りの順位は
+        ;; 誰も触っていない repo の順位で、`上の順位を信用しない` は証拠より強い。
+        ;; 条件と fail-closed の方向は `fresh/landings-all-excluded?` の docstring。
+        excluded-covers-landings? (fresh/landings-all-excluded? freshness movement)
+        ;; 生の判定は entry に残す。**降格したことも残す** ——
+        ;; 「stale ではなかった」と「stale だが除外で足りた」は別の記録である。
+        effective-stale? (and stale? (not excluded-covers-landings?))
         flat? (and (= :breadth lane)
                    (let [gs (keep :fleet-gain ranked)]
                      (and (seq gs) (< (- (apply max gs) (apply min gs)) 0.5))))
@@ -568,6 +577,7 @@
                :datoms-age-days (if (number? age) (js/Math.round age) :unknown)
                :datoms-stale? stale?
                :datoms-stale-reason (:reason freshness)
+               :datoms-stale-superseded-by-exclusion? excluded-covers-landings?
                ;; 見落とした着地を **名指しで** 残す。次周が ledger を読んだとき
                ;; 「なぜ測り直しになったか」を自分で再構成できるようにする。
                :datoms-unseen-landings (mapv #(select-keys % [:at :target :axis :merged])
@@ -599,6 +609,12 @@
 
     (log! "── 成熟度向上 tick ──")
     (log! (fresh/explain freshness))
+    (when excluded-covers-landings?
+      (log! (str "  ↳ ただし **順位は使える**: 名指しされた着地 " (count unseen)
+                 " 件は、下の movement probe が全て名前一致で候補から落としている"
+                 "（probe が答えた本数 " (:checked movement) "）。"
+                 "間違っている行は候補に居ないので、残りの順位は誰も触っていない"
+                 " repo の順位である。測り直しは要らない")))
     (doseq [u unseen]
       (log! (str "    ↳ 計測が見ていない着地: " (:at u) " " (:target u)
                  " " (name (or (:axis u) :?))
@@ -682,7 +698,7 @@
     (log! "")
     (log! "次の 1 手:"
           (cond
-            stale?
+            effective-stale?
             (str (case (:reason freshness)
                    :root-reads-behind-remote
                    (str "**測り直しても直らない。** 読んでいる datoms（" datoms-file
