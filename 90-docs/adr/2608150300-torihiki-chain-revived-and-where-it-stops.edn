@@ -65,12 +65,58 @@ amplification」、21:53 に 410 の tombstone。**請求書を止めるため�
 「view change を equivocation と呼んでいた」誤検出を (witness, height, view) で
 直したと記録しているが、**本番では 4 台全員が互いを断罪する状態が再生成される。**
 
+## 追記 2026-08-15 —— 1 つ目は直った。止まる理由は別に在った
+
+**原因は inga 側だった。** 投票規則は「1 view に 1 票」（`voted-view`）に
+なっていたのに、`stake/detect-equivocation` と `replica/fold-vote` の
+`:first-vote` は `[witness height]` で group していた。view change は
+「同じ高さ・違う block・後の view で投票し直す」ことなので、**正直な replica の
+回復動作が、それ自身に対する署名付きの equivocation 証拠として記録・broadcast
+されていた。protocol が、自分自身に従った replica を slash していた。**
+
+直したのは 3 箇所（1 箇所では足りない）。本命は
+`verify-equivocation-evidence` —— 検出だけ直しても、`[witness height]` の
+ままの peer から wire で証拠が届き、一度記録された有罪は revisit されない。
+view が nil なら等しいと見なさず拒否する（評価できない証拠で有罪にしない）。
+
+kotoba-lang/inga e4974f7 / torihiki-node cv149。
+
+**deploy して測った**（cv149 + 4 台 reset）:
+
+    16:54:10  h  124  view  124  v-h 0  eq []
+    16:55:40  h 1321  view 1321  v-h 0  eq []
+
+`equivocators` は空のまま。以前は同じ地点で 0 → 1 → 4 に増えて止まった。
+
+### まだ止まる。ただし今度は読める
+
+1500 前後から view が height を引き離し、進みが遅くなる（止まりきらず
+1524 → 1729 と這う）。**equivocators は空のまま**なので前の原因ではない。
+
+    w1  h 1725  view 1797  votes-for-tip 3  blocked-by 「not my turn, w3 leads」
+        propose-refusal {round 1797, leads-that-round w2, me w1}
+    w3  h 1727  view 1800  votes-for-tip 3  blocked-by 「not my turn, w4 leads」
+        propose-refusal {round 1800, leads-that-round w1, me w3}
+
+**票は数えられている**（3, 4）—— 前と決定的に違う。問題は `leader-of-next`
+（高さ由来）と `leads-that-round`（view 由来）が**別の答えを出す**こと。
+view が height から離れた瞬間、各 replica は「leader は別の誰か」と考え、
+誰も提案しない。**leadership が 2 つの時計から導かれている。**
+`catch-up-view` の docstring が逆向き（view が round に足りない）で記録して
+いるのと同じ族。
+
+### `/reset` は view を戻さない
+
+deploy 直後の reset は height を 0 にしたが view は 8799 のままだった
+（v-h 8065）。全台が同じ cv になってから reset し直すと v-h 0 で始まる。
+**reset 後は高さだけでなく view を見ること** —— 高さだけなら綺麗に見える。
+
 ## 次はここから
 
-1. **`equivocators` が 0 → 4 になる瞬間を捕まえる。** 相関は強いが因果の向きは
-   未確定 —— 誤検出が票を無効化して fork を作るのか、fork が正当な証拠を作るのか。
-   証拠 1 件を dump して、それが view をまたいだ同一 height の投票（= view change、
-   無罪）かを見るのが最短。
+1. ~~`equivocators` が 0 → 4 になる瞬間を捕まえる~~ **完了（上の追記）。**
+   誤検出が票を無効化して fork を作る向きだった。次は
+   **leadership を導く 2 つの時計を 1 つにする** —— `leader-of-next` と
+   `leads-that-round` が別の答えを出さないこと。
 2. **4 分岐は in-process harness に無い。** landed した rewind は 2 分岐を解く
    （JVM/cljs 両方で実証済み）が、4 台が別々の tip に居る形は再現していない。
    harness に 4 分岐を足すのが先で、production で直そうとしない。
