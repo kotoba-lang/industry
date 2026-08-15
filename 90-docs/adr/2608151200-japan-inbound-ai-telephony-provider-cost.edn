@@ -1,25 +1,42 @@
 [{:db/id -1
   :adr/id "2608151200"
   :adr/title "日本で電話を AI に受けさせる — Telnyx / Twilio / Amazon Connect の実測コストと provider 選定"
-  :adr/status "proposed"
+  :adr/status "accepted"
   :adr/date "2026-08-15"
   :adr/supersedes ""
   :adr/superseded-by ""
   :adr/tags "denwaban, koe, telephony, telnyx, twilio, amazon-connect, cost, japan, pstn, voice-ai, provider-selection, murakumo, isic-561"
   :adr/body
-  "## 決定（暫定 — status は proposed）
+  "## 決定
 
 **日本の着信を AI に受けさせる経路は、Telnyx の 050 (national) 番号 + BYO
-（音声だけ取り出して自前 AI に流す）を第一候補にする。**
+（音声だけ取り出して自前 AI に流す）を採る。**
 
-オーナーの言（2026-08-15）は「telnyx にしようかな」であって確定ではない。
-確定した時点で status を accepted に書き換える（この 1 語を変えるだけ）。
-反転させる条件は下記に名指しで書いてある —— 条件が満たされるなら Amazon
-Connect が正しい答えになる。
+**2026-08-15、オーナーが Telnyx を契約した。** この ADR は同日 `proposed` で
+起票し、契約をもって `accepted` に変えた。反転させる条件は下記に名指しで
+書いてある —— **契約したことは条件が消えたことを意味しない。** 0120 が要件に
+なる・人間へのエスカレーションが本番に入る、といった条件が真になれば、
+その時点で Amazon Connect が正しい答えになる（その場合この ADR を superseded
+にして後継を書く）。
 
 `cloud-itonami/denwaban` の `koe.ports/ITelephony` は provider-neutral な
 まま維持する。この ADR が決めるのは **どの adapter を最初に実装するか**で
 あって、他を排除することではない。
+
+## 契約後に配線したもの（2026-08-15）
+
+- **Telnyx remote MCP** を `.mcp.json` の `telnyx` に登録した
+  （`https://api.telnyx.com/v2/mcp`、streamable HTTP）。**OAuth ではなく
+  Bearer API キー**なので、駆動できる sign-in フローは存在しない。
+- **鍵の custody は kagi が正本、OS Keychain はキャッシュ。** `headersHelper`
+  が接続のたびに Keychain だけを読む。実測 2026-08-15 で `kagi get` は
+  3.8〜5.1 秒、Keychain は 0.02 秒、`headersHelper` の予算は 10 秒・キャッシュ
+  無し・接続ごと・401 リトライごとの再実行。**消して再構築できるか**の判定で
+  kagi = premise / Keychain = projection に分けた。詳細と再構築手順は
+  `.claude/skills/secrets-location-map/references/third-party-api.md`。
+- ⚠ **このキーの権限が唯一の境界。** `/v2/mcp` は本番アカウントに対して
+  番号購入・発信・AI assistant 作成ができる。権限を絞ったキーを発行するかは
+  用途が固まった時点で判断する。
 
 ## なぜ測ったのか
 
@@ -141,13 +158,36 @@ ConversationRelay 自体を使わないので、この差は消える。
   telephony 側は機械可読な正本が見つからなかった。上表は $0.010/分・
   $0.03/日を**仮置き**している。
 - **AWS の 0120 $0.08/分**は 2023-04 の値下げ発表が出典で、現在値は未確認。
-- **Telnyx の $0.05 に LLM が含まれるか**は同社資料内で矛盾している
-  （`pricing.md` は SIP + STT + LLM + TTS 込みと書き、marketing ページは
-  LLM を add-on と書く）。上表は安全側で加算した。
 - **3 社とも ja-JP の実品質は資料から読めない。** 日本語受付は敬語と数え方で
-  壊れる（`latency.md` に 6 名 → 6 つな の実例がある）。契約前に実音声で
-  比較すること。
+  壊れる（`latency.md` に 6 名 → 6 つな の実例がある）。実音声で比較すること
+  —— **契約はこの検証を済ませたことを意味しない。まだ済んでいない。**
 - **番号の在庫。** レートシートに載っていることは買えることを意味しない。
+
+## 解決した UNVERIFIED（2026-08-15、`llms-full.txt`）
+
+**Telnyx の $0.05/分に何が含まれるか。** 起票時は同社資料内で矛盾していた
+（`pricing.md` の note は SIP + STT + LLM + TTS 込みと書き、marketing ページは
+LLM を add-on と書いていた）。オーナーが示した **agent 向け正本
+`https://telnyx.com/llms-full.txt`** が構造を明示していた:
+
+| Conversational AI | |
+|---|---|
+| base rate | $0.05/分 |
+| Speech-to-Text | **Included** |
+| Telnyx Natural / NaturalHD / Qwen3TTS / Telnyx Ultra TTS | **Included** |
+| AWS / Azure / ElevenLabs voices | 各 provider 課金 |
+| LLM | **1M トークン単位で別課金** |
+
+**つまり STT と Telnyx 系 TTS は込み、LLM は別。** 本 ADR の見積もりは安全側で
+LLM を加算していたので**そのまま正しい**。
+
+⚠ **ただし `llms-full.txt` は自分で「2026-04-29 の snapshot（一部のみ 2026-08-11
+訂正）」と申告している。** 現行価格の正本は引き続き `pricing.md` であり、
+llms-full から引いてよいのは**構造の主張**（何が bundle されるか）であって
+**価格の数値ではない**。実際 Telnyx TTS の単価は `pricing.md` が
+$0.000006/文字、`llms-full.txt` が $0.000003/文字で **2 倍ずれている** ——
+**同一ベンダの 2 つの公開正本が食い違う**ので、単一ソースを決定的として
+引用しないこと。
 
 ## 規制（金額ではなく時間のコスト）
 
@@ -164,7 +204,10 @@ ConversationRelay 自体を使わないので、この差は消える。
 ## 再測定の手順
 
 ```bash
+# 価格の正本（現行値はこちら）
 curl -sS -L https://telnyx.com/pricing.md | grep -i japan
+# 構造の正本（何が bundle されるか）。数値は dated snapshot なので引かない
+curl -sS -L https://telnyx.com/llms-full.txt
 curl -sS -L https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonConnect/current/region_index.json
 # Twilio は機械可読な正本が無い。HTML の <tr> を取る
 curl -sS -L -A 'Mozilla/5.0' https://www.twilio.com/en-us/voice/pricing/jp
