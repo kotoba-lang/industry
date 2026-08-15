@@ -148,6 +148,43 @@
     (is (= :validated (:status (gate/evaluate-hyp {:revenue {:creator-gmv-jpy 500000 :ad-revenue-jpy 100000}}
                                                   (get gate/gate-specs :hyp/club-shinshi-creator-take)))))))
 
+;; ADR-2608159300 — 判定を .kotoba の決定核へ移したときに変わった振る舞い。
+;; 「挙動保存 + 名指しできる欠陥の修正だけ」という条件の、その名指しの部分。
+(deftest gate-decision-core-migration
+  (testing "欠測は 0 ではない —— `:> 0` の gate に欠測を渡しても validated にしない。
+            測定値を basis point へスケールする経路で、数にできないものを 0 に
+            落とすと『測って落第』でも『測って合格』でもある値になる（ADR-2608136000）"
+    (let [spec (get gate/gate-specs :hyp/nexus-x402-agent-demand)]
+      (is (= :blocked   (:status (gate/evaluate-hyp {} spec))))
+      (is (= :measuring (:status (gate/evaluate-hyp {:catalog {:settlements {:agent-hint {:agent 0}}}} spec))))
+      (is (= :validated (:status (gate/evaluate-hyp {:catalog {:settlements {:agent-hint {:agent 1}}}} spec))))
+      (is (= gate/absent-bp (gate/->bp nil)))
+      (is (= gate/absent-bp (gate/->bp "n/a")))
+      (is (= 0 (gate/->bp 0)))))
+  (testing "節が 0 本の `:all` は blocked。移行前は `(every? :met [])` が true で
+            :validated を返しており、節を書き忘れた spec が『機械測定で gate 到達』
+            として昇格 event を積む形だった（今日の gate-specs には無い）"
+    (is (= :blocked (:status (gate/evaluate-hyp {:a 1} {:all [] :needs-when-unmeasurable ["x"]})))))
+  (testing "閾値が数でない spec は落ちる。移行前の cljs は `(>= 5 nil)` が JS の
+            null 強制で true になり、閾値の書き損じが静かに validated になった"
+    (is (thrown? #?(:clj Exception :cljs js/Error)
+                 (gate/evaluate-hyp {:a 5} {:metric [:a] :op :>= :threshold nil}))))
+  (testing "未知の演算子は既定に落ちず落ちる（kernel が -2 = 答えられなかった を返し、
+            host の verdict 対応表が既定を持たない。ADR-2608122000）"
+    (is (= gate/op-unknown (gate/op-code :≒)))
+    (is (thrown? #?(:clj Exception :cljs js/Error)
+                 (gate/evaluate-hyp {:a 5} {:metric [:a] :op :≒ :threshold 3}))))
+  (testing "0.3 のような 10 進閾値が bp で壊れない（floor だと 2999 になる）"
+    (is (= 3000 (gate/->bp 0.3)))
+    (is (= 200 (gate/->bp 0.02)))
+    (is (= 10000 (gate/->bp 1.0))))
+  (testing "再提案規則は順位の単調性 1 本（validated と measuring の 2 条件を畳んだもの）"
+    (is (= 1 (gate/should-propose (gate/status-rank nil) gate/status-validated)))
+    (is (= 0 (gate/should-propose (gate/status-rank :validated) gate/status-validated)))
+    (is (= 0 (gate/should-propose (gate/status-rank :validated) gate/status-measuring)))
+    (is (= 0 (gate/should-propose (gate/status-rank :measuring) gate/status-measuring)))
+    (is (= 1 (gate/should-propose (gate/status-rank :measuring) gate/status-validated)))))
+
 (deftest gate-proposals-cycle
   (testing "blocked gate → 準備 proposal into solution block"
     (let [idx (canvas/index (conj base
