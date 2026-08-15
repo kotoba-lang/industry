@@ -1,0 +1,57 @@
+[{:db/id -1
+  :adr/id "ADR-2608159400"
+  :adr/title "Kotoba の外部 identity evidence を concrete DID/VC/UCAN profile で authority admission へ接続する"
+  :adr/status "accepted"
+  :adr/date "2026-08-15"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :source/dataset "adr"
+  :adr/related ["ADR-2607050500" "ADR-2607289500"]
+  :adr/repos ["kotoba-lang/kotoba-lang" "kotoba-lang/xyz-ucan" "com-junkawasaki/root"]
+  :adr/body
+  "## 決定
+
+Kotoba の organisation-first authority model に入る外部 evidence を、抽象的な
+verifier callback のままにせず、次の狭い concrete profile として実装した。
+
+1. **DID/VC** — offline `did:key` + Ed25519、W3C Data Integrity の
+   `eddsa-jcs-2022` / `eddsa-rdfc-2022` だけを許可する。issuer と proof key の
+   controller、要求された assertion method を一致させる。`credentialStatus` が
+   あれば resolver を必須にし、status-list credential 自体の proof、URL、issuer、
+   Bitstring Status List の bit を検証する。revoked / suspended / inactive / unknown
+   は authority にしない。
+2. **UCAN** — current UCAN Delegation v1 の canonical DAG-CBOR envelope、厳密な
+   `ucan/dlg@1.0.0` tag、Ed25519 Varsig、`did:key` issuer/subject、CIDv1、time、
+   command attenuation、principal alignment、revocation を検証する。closed policy は
+   `[[\"==\" \".resource\" URI]]` だけを admit し、Powerline や unknown policy は
+   fail closed とする。
+3. **authority admission** — DID、VC、UCAN は authority そのものではなく inert な
+   evidence。検証済み結果だけを既存の opaque typed grant へ写す。現時点では
+   `kotoba://cap/...` resource だけが grant へ変換可能で、reader や serialized EDN が
+   capability を生成することはない。
+
+外部仕様の実装は origin-plane repo `kotoba-lang/xyz-ucan` に置き、言語 authority
+repo `kotoba-lang/kotoba-lang` は profile と admission seam だけを所有する。これにより
+外部 protocol の identity と Kotoba の runtime authority を同一視しない。
+
+## 実装 evidence
+
+- `kotoba-lang/xyz-ucan` commit `fc203dedef8633d4d2ff4a65333c15f29fd92059`:
+  4 tests / 15 assertions、clj-kondo 0 errors / 0 warnings。
+- `kotoba-lang/kotoba-lang` PR #446、merge commit
+  `82efea4e46690976a5e0d821d36877e011a13b54`:
+  profile 3 tests / 8 assertions、abstract interop 5 / 19、lint 0 errors。
+- authority full suite は 230 tests / 1306 assertionsを実行し、新 profile は green。
+  ただし sibling `kotoba-sema` の vendor catalog drift による既存 3 failures が残るため、
+  full suite green とは主張しない。
+
+## 明示的な残余
+
+これは DID/VC/UCAN 全仕様対応ではない。UCAN の完全な policy language、Invocation、
+Promise、container compression、P-256 / secp256k1、network resolution は未対応のまま
+明示的に reject する。また encrypted live transport、dataspace provider restriction、
+facet unwind、durability、多 node recovery、OCapN handoff/pipelining、consensus adapter、
+cross-runtime interop は別の gap であり、この ADR はそれらの完了を主張しない。
+
+参照仕様: https://ucan.xyz/specification/ 、https://www.w3.org/TR/vc-data-model-2.0/ 、
+https://www.w3.org/TR/vc-data-integrity/ 。"}]
