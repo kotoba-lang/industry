@@ -40,8 +40,9 @@ dataspace 協調の proving slice を 1 本着地させる。
    binding を載せる。guest `fn` / `future` は足さない。
 7. **assertion のシリアライズも `#cap` / `#cap-ref` も権限を復元しない。**
    解決は既存 cap（`intersect-grants` / 実行時 allow 集合 / host 表）。
-8. **encoding:** in-process は EDN。kit ABI はこの slice では bounded
-   EDN **string**（既存 `:string` 型で KIR が通る）。wire は
+8. **encoding:** in-process host matching still uses Clojure EDN values.
+   kit ABI assertions / patterns / notices / bindings are `:document`
+   （KIR bounded tagged document。opaque EDN string ではない）。wire は
    `kotoba.value.v1`。Preserves ではない。
 9. **この slice の外:** Goblins vat を guest に入れること、`<-` eventual
    send、OCapN、Preserves、ValueFlows-in-kernel、user `defmacro`、
@@ -64,9 +65,10 @@ dataspace 協調の proving slice を 1 本着地させる。
 | 面 | 今日 | 目標ではないもの |
 |---|---|---|
 | kit `dataspace-v1` | reference implemented（JVM KIR + reference-runtime） | wasm-aot / native-aot / jit は pending |
-| wire id 24 | named `:dataspace/transact` landed（kotoba-sema 6afc350c, amu 2375cfcd）。numeric `typed-cap-call 24` も残る | provider-conformance 9-kit への編入はまだ（下の行）。named が通ったことを編入済みと読まない |
+| wire id 24 | named `:dataspace/transact` landed。numeric `typed-cap-call 24` も残る | named が通ったことを wasm-aot 済みと読まない |
 | reference host | `kotoba-lang/provider` `provider.dataspace`（amu は inject するだけ） | compiler-local host に戻さない |
-| provider-conformance 9-kit 閉集合 | **入れない**（`:capability-count` 9 と component-model inventory を壊す） | 9-kit 構造ゲートへの編入は sema vendor + component-model 行が揃ってから |
+| provider-conformance 閉集合 | **10** application capabilities（旧 9-kit + `:dataspace/transact`）。component-model inventory は id 24 まで | count と inventory を片側だけ動かさない |
+| kit ABI | `:document`（runtime は tagged document 以外を KIR で拒否） | opaque EDN string / Preserves |
 | Goblins / OCapN | 統合していない | 統合したと書かない |
 | observe | host-owned match、inert notices | guest vat / callback 関数 |
 
@@ -83,10 +85,10 @@ dataspace 協調の proving slice を 1 本着地させる。
 
 ### provider = `kotoba-lang/provider`
 
-- `src/provider/dataspace.cljc` — in-memory reference host（wire id 24）
+- `src/provider/dataspace.cljc` — in-memory reference host（wire id 24, `:document` ABI）
 - `src/provider/dataspace_match.cljc` — 純 EDN matcher（`.cljc` のまま。native recursive map walk は未 qualified）
 - `test/provider/dataspace_test.clj` / `dataspace_match_test.clj`
-- provider-conformance inventory には **載せない**（9-kit 閉集合を壊さない。stream-ingress と同じ置き方）
+- provider-conformance inventory に **載せた**（amu 閉集合は 10。provider 側 inventory も `:dataspace` を含む）
 
 ### kotoba-lang（worktree `/tmp/kotoba-lang-dataspace`、branch `agent/dataspace-kit`）
 
@@ -125,6 +127,29 @@ dataspace 協調の proving slice を 1 本着地させる。
     https://github.com/kotoba-lang/amu/commit/cfc6721866b6628b9e9d919afc088ba432658454
   - west pin: provider `edd6368f90b048a2c776a52c92a12e82cb488867`、
     amu `0649486c0604830889bba03543f2c9a79d035925`
+
+- gap 3+4（閉集合編入 + `:document` ABI、2026-08-15）:
+  - `kotoba-lang/provider` main `7d5934bd629c4e129889d04bcbcf8fe03b958c7d`
+    （merge of `51b7b7e` document ABI + inventory）。17 tests / 53 assertions。
+    break: assert-type `:string` に戻すと `abi-assertions-are-documents-not-edn-strings` が落ちる。unbreak 緑。
+    https://github.com/kotoba-lang/provider/commit/7d5934bd629c4e129889d04bcbcf8fe03b958c7d
+  - `kotoba-lang/kotoba-sema` main `c13458983f589bb21d3b96ebd5e48983fcb903f7`
+    frontend + guest-grammar request-boundary `:document`。17 tests / 94 assertions。
+    https://github.com/kotoba-lang/kotoba-sema/commit/c13458983f589bb21d3b96ebd5e48983fcb903f7
+  - `kotoba-lang/kotoba-component` main `b44c99a85d956b6606c769a566f087710304a76f`
+    component-model inventory id 24、count 23→24。8 tests / 42 assertions。
+    https://github.com/kotoba-lang/kotoba-component/commit/b44c99a85d956b6606c769a566f087710304a76f
+  - `kotoba-lang/amu` main `4292eae78b796ef9f11633fcfb6b1b6cd2506101`
+    provider-conformance `:capability-count` 10、manifest sha256
+    `f90f2906d65f30a8d717a79ae38897babdbc7b00202d9f06105e3ad8feaa26b8`。
+    dataspace + conformance + qualification + named-cap = 34 tests / 166 assertions。
+    `stale-capability-count-nine-fails-closed` が count 9 を拒否。
+    runtime は non-document を `value is not a tagged document node` で KIR 拒否。
+    https://github.com/kotoba-lang/amu/commit/4292eae78b796ef9f11633fcfb6b1b6cd2506101
+  - west pin: provider `04ed56635d97de3df7c482d3d27a8c035ab0a763`、
+    kotoba-sema `d0895d6896625a93571de6d1be27ffa951ea7ef2`、
+    kotoba-component `7da91151c7b076a98b77ad79341aca737a7f9cdb`、
+    amu `fa176e95fa340615c96e5c21c54853bd8753d5c3`。
 
 ## テストの回し方と結果（2026-08-15 実測）
 
@@ -183,17 +208,59 @@ java -cp \"$CP\" clojure.main -e \\
 ```
 結果: **14 tests / 64 assertions、0 fail / 0 error。** provider-conformance `:capability-count` は **9 のまま**。guest は named `:dataspace/transact`。
 
+gap 3+4（2026-08-15）:
+
+provider:
+```
+cd /tmp/provider-dataspace-gaps
+clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+```
+結果: **17 tests / 53 assertions、0 fail / 0 error。**
+
+kotoba-sema:
+```
+cd /tmp/kotoba-sema-dataspace-gaps
+clojure -M:test -n kotoba.sema-test
+```
+結果: **17 tests / 94 assertions、0 fail / 0 error。**
+
+kotoba-component:
+```
+cd /tmp/kotoba-component-dataspace-gaps
+clojure -M:test -n kotoba.component-wit-test
+```
+結果: **8 tests / 42 assertions、0 fail / 0 error。**
+
+amu（`clojure -M:test -n` は無視される）:
+```
+cd /tmp/amu-dataspace-gaps
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.provider-conformance-test)
+            (quote kotoba.compiler.backend-qualification-test)
+            (quote kotoba.compiler.frontend-named-capability-test))
+    (apply clojure.test/run-tests
+           [(quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.provider-conformance-test)
+            (quote kotoba.compiler.backend-qualification-test)
+            (quote kotoba.compiler.frontend-named-capability-test)])'
+```
+結果: **34 tests / 166 assertions、0 fail / 0 error。** `:capability-count` **10**。
+
 ## 残ギャップ（次の agent へ）
 
 1. **DONE.** kotoba-sema の `capability-catalog.edn` と cljs fallback に id 24 を vendor し、named `dataspace/transact` と `(:capabilities #{:dataspace/transact})` を通した。
-   - kotoba-sema `6afc350c447e1ffcfed0649e3b503f480a7a750c`: 13 tests / 65 assertions（sema-test）。named cap-call、undeclared ns reject、cljs fallback lockstep を含む。
-   - amu `2375cfcd91f7f52caada865bb7ff53bcaf451a37`: frontend-named-capability-test + backend-qualification + provider-conformance = 22 tests / 129 assertions。`:capability-count` は 9 のまま。
-2. **DONE.** `kotoba-lang/provider` へ reference host を移した。kit EDN は amu に残す。9-kit には入れない。
-   - provider `e6fcf7379c89952266553a01b3b6702804e9a2c5`: 13 tests / 36 assertions。`#cap` fail-closed の break/unbreak 済み。
-   - amu `cfc6721866b6628b9e9d919afc088ba432658454`: 14 tests / 64 assertions（dataspace + provider-conformance）。`:capability-count` 9。
-   - west pin: provider `edd6368f90b048a2c776a52c92a12e82cb488867`、amu `0649486c0604830889bba03543f2c9a79d035925`。
-3. provider-conformance 閉集合と component-model inventory への編入。**9-kit `:capability-count` 9 を壊すな。** 編入するなら sema vendor + component-model 行が揃ってから、count と inventory を一緒に動かす。
-4. assertion の kit ABI を `:document` にする（今日は EDN string）。compile/runtime の実ギャップとして閉じられるときだけ。
-5. matcher を `.kotoba` 決定核へ移す（recursive map walk が native-qualified になってから。今は backend gap であって言語の天井ではない）。
-6. kgraph / incidence を backing にするかは別 slice。混在させない。
+2. **DONE.** `kotoba-lang/provider` へ reference host を移した。kit EDN は amu に残す。
+3. **DONE.** provider-conformance 閉集合と component-model inventory を一緒に動かした。`:capability-count` 9→10。amu `stale-capability-count-nine-fails-closed` が旧 count を拒否。component-model id 24 / count 24。
+4. **DONE.** kit ABI は `:document`。opaque EDN string ではない。wire は `kotoba.value.v1`。amu 経路は KIR が non-document を拒否し、provider 直呼びは `:dataspace/document-invalid`。
+5. **SKIP with evidence.** matcher は `.cljc` のまま。native recursive map walk は未 qualified:
+   - `kotoba-kir` `933c148a3d810795966d92948f9abe9fe5383145` の `only-native-word-typed-features?`
+   - `native-word-value-type?` は `#{:i64 :bool :string :option-i64 :result-i64}`（`:document` 無し）
+   - `native-word-field-types` は `#{:i64 :bool :string :keyword}`
+   - `document-*` / `document-edn-*` は `non-string-typed-ops` に入り、else 枝で拒否
+   - これは backend gap（ADR-2608650000）であって言語の天井ではない。`.kotoba` へ移さない。
+6. **OPEN.** kgraph / incidence を `:dataspace/transact` の inject-able backend にするのは別 slice。in-memory host を壊さず、D1 を premise にせず、identity CID と archive Location を混ぜない。次コマンド:
+   `git -C orgs/kotoba-lang/provider fetch origin && git -C orgs/kotoba-lang/provider worktree add -B agent/dataspace-kgraph /tmp/provider-dataspace-kgraph origin/main`
+   その worktree で `provider.dataspace` の atom を差し替え可能な store にし、同じ request/result 契約のまま incidence/kgraph を 1 本だけ挿す。WIP が膨らむならこのコマンドで止めてよい。
 "}]
