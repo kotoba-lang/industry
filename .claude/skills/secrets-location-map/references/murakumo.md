@@ -29,12 +29,26 @@
 
 ## api.murakumo.cloud ノード面 service token (ADR-2608031000、2026-08-03)
 
-- **`LOCAL_MURAKUMO_SERVICE_TOKEN`（kagi vault、compartment `network-awai`、
-  `KAGI_HOME=$HOME/.kagi`）** — Worker `local-murakumo`（= `api.murakumo.cloud`）の
-  **write gate** `MURAKUMO_SERVICE_TOKEN` と同値。`/infer/runs` `/infer/spend`
-  `/infer/queue*` と、新設の低速ティア ノード面 `/v1/slow/work*` `/v1/slow/workers/heartbeat`
-  の Bearer。取得:
-  `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get LOCAL_MURAKUMO_SERVICE_TOKEN`。
+- ⚠ **2026-08-15 実測: この item は kagi に存在しない。**
+  `KAGI_HOME=$HOME/.kagi … kagi get LOCAL_MURAKUMO_SERVICE_TOKEN` は
+  **`no such item: LOCAL_MURAKUMO_SERVICE_TOKEN`** を返す（この索引冒頭が警告して
+  いる「記述は実在の証明ではない」の 5 例目）。旧記述は復旧時の参照として下に残す。
+  - **stdout は空、メッセージは stderr に出る。** `$(kagi get …)` で捕まえると
+    空文字が入るだけなので、**「取れた」と読める**。実際 2026-08-15 にそれで
+    空 Bearer を送り、401 の原因を token 側でなく gate 側だと誤読しかけた。
+    取得は必ず `2>&1 1>/dev/null` でエラー本文を読んでから使う。
+  - **読み戻せないので再発行しかない。ただし単独で rotate してはいけない** ——
+    Worker 側の env `MURAKUMO_SERVICE_TOKEN` は `operator-authorized?`（`/infer/models/:id`
+    `/infer/plans/:id` の PUT）**と** `write-authorized!`（`/infer/runs` `/infer/spend`
+    `/v1/slow/*`）が**共有**している（`worker.cljs` の `operator-authorized?` と
+    `write-authorized!` が同じ `gobj/get env "MURAKUMO_SERVICE_TOKEN"` を読む）。
+    rotate すると稼働中のノード caller が全部 401 になる。再発行するなら
+    Worker secret 更新とノード側の配布を同時にやる。
+  - （旧記述、2026-08-03 時点）**`LOCAL_MURAKUMO_SERVICE_TOKEN`（kagi vault、
+    compartment `network-awai`、`KAGI_HOME=$HOME/.kagi`）** — Worker `local-murakumo`
+    （= `api.murakumo.cloud`）の **write gate** `MURAKUMO_SERVICE_TOKEN` と同値。
+    `/infer/runs` `/infer/spend` `/infer/queue*` と低速ティア ノード面
+    `/v1/slow/work*` `/v1/slow/workers/heartbeat` の Bearer。
   - **2026-08-03 に新規発行（rotation ではない）。** 発行前この Worker には
     `MURAKUMO_SERVICE_TOKEN` が未設定で、`write-gate/service-authorized?` は
     **未設定を「全部許可」に倒さない**（fail-closed）ため、該当ルートは常に 401 を
