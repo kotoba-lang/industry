@@ -58,6 +58,15 @@
   (let [local (io/file top "node_modules" ".bin" "nbb")]
     (if (.exists local) (.getPath local) "nbb")))
 
+;; deny 文に添える「この candidate はどこから来たか」。PUT 経路だけが設定する。
+;; **hook はコマンド実行前に走るので、payload を書く処理が同じ Bash 呼び出しに入って
+;; いると、hook が読むのは同名の古い残骸**である。payload path が読めない場合は既に
+;; deny しているが、読めてしまう場合(前回の残骸が居る)は静かに別の内容を検証して
+;; 「触っていない pin が退行している」と報告する。実測 2026-08-16: /tmp/put.json が
+;; 前周の残骸で、単一 entry の advance に対し 10 件超の退行が並んだ。
+;; 出所と mtime を書けば、その場で残骸だと分かる。
+(def payload-origin (atom nil))
+
 (defn- verify!
   "verify-west-pins.cljs を実行し、exit 1 なら deny。それ以外は allow 側に倒す。"
   [top & extra-args]
@@ -69,6 +78,7 @@
           (deny! (str "west.yml の pin 検証に失敗しました(未 push commit / main 非到達 / pin 退行)。"
                       "main に載る前にブロックします。\n\n"
                       (if (> (count msg) 1500) (str (subs msg 0 1500) "\n…(truncated)") msg)
+                      (when-let [o @payload-origin] (str "\n\n検証した candidate の出所: " o))
                       "\n\n修正: 子リポを push / pin を main 上の commit に / 退行なら git pull + west update 後に再生成。"
                       "緊急スキップ: WEST_PIN_VERIFY_SKIP=1(理由をコミットに残すこと)。"))))
       (allow!))))
@@ -125,6 +135,16 @@
                                   (when-not (str/blank? t) t))
                                 ".")]
                 (compat/spit tmp decoded)
+                (reset! payload-origin
+                        (let [src (or input field-path)]
+                          (str (or src "inline") " ("
+                               (or (try (some-> (.statSync node-fs src) .-mtime
+                                                (.toISOString))
+                                        (catch :default _ nil))
+                                   "mtime 不明")
+                               ", " (count decoded) " bytes)"
+                               " ← このファイルを書いたのが今回の呼び出し自身なら、hook が"
+                               "読んだのは前回の残骸です(payload 生成と PUT を別の呼び出しに分ける)")))
                 (verify! top "--candidate" tmp)))))))
 
     ;; --- 経路1: git push で west.yml が origin/main と異なる ------------------

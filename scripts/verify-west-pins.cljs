@@ -213,6 +213,18 @@
   (println "verify-west-pins: 変更された pin はありません。OK.")
   (scripts.nbb-compat/exit 0))
 
+;; **何件変えようとしているかを先に言う。** これが無いと、単一 entry を進めたつもりの
+;; 呼び出しに対して 11 件の FAIL が並び、読み手は「自分が触っていない pin が壊れている」
+;; と読む(実測 2026-08-16: single-entry の PUT に対して aiueos/amu/kotobase 等 10 件超の
+;; 退行が報告された。原因は candidate が古い残骸で、私の payload ではなかった)。
+;; 件数と名前を先に出せば、「1 件のはずが N 件」がその場で見える。
+(println (str "verify-west-pins: この candidate は pin を " (count changed) " 件変更します"
+              (when (<= (count changed) 12)
+                (str ": " (str/join ", " (map :name changed))))
+              "。"
+              (when (> (count changed) 1)
+                " ← 単一 entry を進めたつもりならこの件数が答えです(candidate が意図した内容か確かめる)。")))
+
 ;; --- API 検証 ---------------------------------------------------------------
 (defn- gh-api [& args] (apply sh "gh" "api" args))
 
