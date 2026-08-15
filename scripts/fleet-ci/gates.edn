@@ -91,11 +91,16 @@
   {:name "chain" :gate :jvm-test :cd true}
   {:name "org-chainagnostic-cacao" :gate :jvm-test :cd true}
   {:name "tech-ipfs-specs-ipns" :gate :jvm-test :cd true}
-  ;; ADR-2608153000 — Valueflows 経済語彙。:cd false で入れる（gate が fleet で
-  ;; 1 度緑になるまで pin 前進を自動化しない。CLAUDE.md「fleet で 1 度緑になる
-  ;; まで landed としない」）。
-  {:name "ws-valueflo-vocabulary" :gate :jvm-test :cd false}
-  {:name "ws-valueflo-algorithms" :gate :jvm-test :cd false}
+  ;; ADR-2608153000 — Valueflows 経済語彙。2026-08-15、実ノードで 1 度緑になった
+  ;; ので :cd true に反転（receipt 1d6bd3ca7025、signer did:key:z6MkjyhVmg…）:
+  ;;   test-ws-valueflo-algorithms-73816c6-murakumo-judah      Ran 64 tests / 249 assertions
+  ;;   test-ws-valueflo-vocabulary-3c89972-murakumo-benjamin   Ran 44 tests / 425 assertions
+  ;; algorithms が緑になれるのは deps.edn が sibling を :local/root ではなく
+  ;; :git/sha で掴んでいるからで（tick.cljs:729）、log に
+  ;; `dep shipped (checkout) io.github.kotoba-lang/ws-valueflo-vocabulary 3c89972
+  ;; -> judah` が出ている。:local/root のままなら永久に赤だった。
+  {:name "ws-valueflo-vocabulary" :gate :jvm-test :cd true}
+  {:name "ws-valueflo-algorithms" :gate :jvm-test :cd true}
 
   {:name "kotoba-delta" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd true}
 
