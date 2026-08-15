@@ -57,8 +57,11 @@ dataspace 協調の proving slice を 1 本着地させる。
 12. **既存の隣接実装を捨てない。** `kotoba.lang.incidence` は既に
     Syndicate 風 assert/retract/observe/facet を **CID 付き incidence ブロック**
     として持っている。`incidence-ocapn` は CapTP 下書きであり、**この kit には
-    入れない**。本 kit は guest が書く **EDN tuple space**。kgraph-assert!
-    は i64 EAV であり、この slice の backing にはしない。
+    入れない**。本 kit は guest が書く **EDN tuple space**。guest の
+    `kgraph-assert!` は i64 EAV host-op であり kit ABI ではない。host は
+    `kotoba.kgraph` の EDN EAV（`assert-datom` / `retract-datom` / `query` /
+    `get-objects`）を `:dataspace/transact` の inject-able store にしてよい
+    （gap 6）。D1 は premise にしない。identity CID と archive Location は混ぜない。
 
 ## 現在地 vs 目標（正直に）
 
@@ -71,6 +74,7 @@ dataspace 協調の proving slice を 1 本着地させる。
 | kit ABI | `:document`（runtime は tagged document 以外を KIR で拒否） | opaque EDN string / Preserves |
 | Goblins / OCapN | 統合していない | 統合したと書かない |
 | observe | host-owned match、inert notices | guest vat / callback 関数 |
+| backing store | default in-memory `{:q :transact!}`。kgraph EAV inject 可 | D1 / guest `kgraph-assert!` / identity CID を Location にしない |
 
 ## この slice で実装したもの
 
@@ -85,7 +89,9 @@ dataspace 協調の proving slice を 1 本着地させる。
 
 ### provider = `kotoba-lang/provider`
 
-- `src/provider/dataspace.cljc` — in-memory reference host（wire id 24, `:document` ABI）
+- `src/provider/dataspace.cljc` — host（wire id 24, `:document` ABI）。atom は `{:q :transact!}` store の後ろ。default = in-memory reference
+- `src/provider/dataspace_store.cljc` — memory store（同じ request/result 契約）
+- `src/provider/dataspace_kgraph.clj` — kgraph EAV adapter（`assert-datom` / `retract-datom` / `query` / `get-objects`）。entity incidence は `get-objects`、attr join は `query`
 - `src/provider/dataspace_match.cljc` — 純 EDN matcher（`.cljc` のまま。native recursive map walk は未 qualified）
 - `test/provider/dataspace_test.clj` / `dataspace_match_test.clj`
 - provider-conformance inventory に **載せた**（amu 閉集合は 10。provider 側 inventory も `:dataspace` を含む）
@@ -150,6 +156,22 @@ dataspace 協調の proving slice を 1 本着地させる。
     kotoba-sema `d0895d6896625a93571de6d1be27ffa951ea7ef2`、
     kotoba-component `7da91151c7b076a98b77ad79341aca737a7f9cdb`、
     amu `fa176e95fa340615c96e5c21c54853bd8753d5c3`。
+
+- gap 6（swappable kgraph store、2026-08-15）:
+  - `kotoba-lang/provider` main `c0ee70978cf9ef7e6bbf74364ced3e4d4b4cfec0`
+    （merge of `6c490e487a3f81a0b4f7824ce2301d10710740f6`）。
+    21 tests / 61 assertions（dataspace + match）。
+    break: kgraph `:facet-leave` が owned assertion を retract しないと
+    `injected-kgraph-store-honors-assert-retract-observe-facet-leave` が落ちる。
+    unbreak 緑。`store-that-drops-facet-leave-retracts-fails-closed` が壊れた store を拒否。
+    https://github.com/kotoba-lang/provider/commit/c0ee70978cf9ef7e6bbf74364ced3e4d4b4cfec0
+  - `kotoba-lang/amu` main `b88cb6c0f276ab8f98bd2b62adeef0ae5ec7ffcd`
+    （merge of `72a4d166dcea66fb349b9ac899ddebc0db4f89dc`）。
+    provider git dep → `c0ee70978cf9ef7e6bbf74364ced3e4d4b4cfec0`。
+    dataspace + match + conformance = 18 tests / 79 assertions。
+    https://github.com/kotoba-lang/amu/commit/b88cb6c0f276ab8f98bd2b62adeef0ae5ec7ffcd
+  - west pin: provider `71dc952d05c7586bdf8071a4e3e78ea8371ecd55`、
+    amu `80ac3bc94b4ec82668d3593ebc71b968f1374f24`。
 
 ## テストの回し方と結果（2026-08-15 実測）
 
@@ -248,19 +270,45 @@ java -cp \"$CP\" clojure.main -e \\
 ```
 結果: **34 tests / 166 assertions、0 fail / 0 error。** `:capability-count` **10**。
 
+gap 6（2026-08-15）:
+
+provider:
+```
+cd /tmp/provider-dataspace-kgraph
+clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+```
+結果: **21 tests / 61 assertions、0 fail / 0 error。**
+両方向: kgraph store の facet-leave から owned retract を外すと
+`injected-kgraph-store-honors-assert-retract-observe-facet-leave` が落ちる。戻すと緑。
+`store-that-drops-facet-leave-retracts-fails-closed` は facet-leave で assertion を
+root に戻す store を `not (facet-leave-retracts?)` で拒否。
+
+amu（`clojure -M:test -n` は無視される）:
+```
+cd /tmp/amu-dataspace-kgraph
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.provider-conformance-test))
+    (apply clojure.test/run-tests
+           [(quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.provider-conformance-test)])'
+```
+結果: **18 tests / 79 assertions、0 fail / 0 error。** guest は named `:dataspace/transact`。count 10。
+
 ## 残ギャップ（次の agent へ）
 
 1. **DONE.** kotoba-sema の `capability-catalog.edn` と cljs fallback に id 24 を vendor し、named `dataspace/transact` と `(:capabilities #{:dataspace/transact})` を通した。
 2. **DONE.** `kotoba-lang/provider` へ reference host を移した。kit EDN は amu に残す。
 3. **DONE.** provider-conformance 閉集合と component-model inventory を一緒に動かした。`:capability-count` 9→10。amu `stale-capability-count-nine-fails-closed` が旧 count を拒否。component-model id 24 / count 24。
 4. **DONE.** kit ABI は `:document`。opaque EDN string ではない。wire は `kotoba.value.v1`。amu 経路は KIR が non-document を拒否し、provider 直呼びは `:dataspace/document-invalid`。
-5. **SKIP with evidence.** matcher は `.cljc` のまま。native recursive map walk は未 qualified:
-   - `kotoba-kir` `933c148a3d810795966d92948f9abe9fe5383145` の `only-native-word-typed-features?`
+5. **SKIP with evidence（re-check 2026-08-15）。** matcher は `.cljc` のまま。native recursive map walk は未 qualified:
+   - `kotoba-kir` HEAD はまだ `933c148a3d810795966d92948f9abe9fe5383145`
    - `native-word-value-type?` は `#{:i64 :bool :string :option-i64 :result-i64}`（`:document` 無し）
    - `native-word-field-types` は `#{:i64 :bool :string :keyword}`
    - `document-*` / `document-edn-*` は `non-string-typed-ops` に入り、else 枝で拒否
    - これは backend gap（ADR-2608650000）であって言語の天井ではない。`.kotoba` へ移さない。
-6. **OPEN.** kgraph / incidence を `:dataspace/transact` の inject-able backend にするのは別 slice。in-memory host を壊さず、D1 を premise にせず、identity CID と archive Location を混ぜない。次コマンド:
-   `git -C orgs/kotoba-lang/provider fetch origin && git -C orgs/kotoba-lang/provider worktree add -B agent/dataspace-kgraph /tmp/provider-dataspace-kgraph origin/main`
-   その worktree で `provider.dataspace` の atom を差し替え可能な store にし、同じ request/result 契約のまま incidence/kgraph を 1 本だけ挿す。WIP が膨らむならこのコマンドで止めてよい。
+6. **DONE.** `provider.dataspace` の atom は `{:q :transact!}` store。default = memory。inject した `provider.dataspace-kgraph` が assert/retract/observe/facet-leave を同じ契約で満たす。D1 なし。identity CID を Location にしない。guest ABI 不変。capability-count 10 のまま。
 "}]
