@@ -356,27 +356,72 @@ clock / http-ingress / http / llm / log / state / storage / stream-object / ui�
 すべて `pending`** —— つまり今日 Kotoba で書けば **KIR インタプリタ（JVM ホスト）の
 上で動く**のであって、独立した native/wasm 成果物にはならない。
 
-`capability-*` の atomic authority package（`capability-http-fetch` /
-`capability-audio-io` / `capability-fs-app-data` / `capability-process-list` 等）は
-実測したものが**すべて `provider status: contract-only`** —— 契約はあるが実装が無い。
+`capability-*` の atomic authority package は **13 件中 4 件が
+`reference-implemented`**（`hash-sha256` / `random-bytes` / `data-json` /
+`clock-monotonic`）、残り 9 件が `contract-only`。
 
-| 受付がやること | Kotoba の現状 | 分類 |
+> **訂正（同日）。** この節は最初「実測したものがすべて contract-only」と書いた。
+> **誤りである。** `capability-hash-sha256` は wasm core provider（`sha256_hex`、
+> host ABI `(i32 i32 i32 i32) → i32`）と JVM 参照実装を持つ
+> `reference-implemented` で、私の grep が `` `backtick` `` を期待して
+> `**bold**` を取り落としていた。測り方が答えを決めた例なので残す。
+
+### 実測しなおした結果、不足は capability ではなかった
+
+**base64 と HMAC は capability ではない。** どちらも純関数で、権限を要さない。
+Kotoba は capability を「世界に影響する権限」に使うのだから、純粋な計算に
+capability を付けるのは言語のモデルに反する。正しい置き場は stdlib である。
+
+**では stdlib に書けるか。** authority（`kotoba-lang/lang/guest-grammar.edn` の
+`:admitted-builtins`）は `byte-at` `byte-store!` `bytes-len` `bytes-ptr` `alloc`
+と `bit-and/or/xor/shift-left/shift-right` を挙げている。**書けそうに見える。**
+
+**実際にコンパイルして測った。書けない。**
+
+```
+                 wasm32  cljs  x86_64  aarch64
+bit-and             OK    OK      OK      OK
+bit-or              OK    OK      OK      OK
+bit-xor             OK    OK      OK      OK
+bit-shift-left       ✗     ✗       ✗       ✗     operation has no admitted lowering
+bit-shift-right      ✗     ✗       ✗       ✗     同上
+byte-at / alloc      ✗     ✗       ✗       ✗     同上
+i64shl/shr/ushr      ✗     ✗       ✗       ✗     同上
+```
+
+**4 バックエンド全部で同一。** バックエンドの差ではなく、**言語の lowering に
+shift と byte アクセスが無い**。
+
+原因の場所も特定した:
+
+```clojure
+;; kotoba-lang/kotoba-sema/src/kotoba/compiler/frontend.cljc:96
+(def arithmetic '#{+ - * quot bit-xor bit-and bit-or})
+```
+
+**shift がこの集合に入っていない。** authority の `:admitted-builtins` は
+「memory/string ABI helpers」として byte 系と shift 系を挙げているが、通常の
+source からの lowering は上の集合が決めており、両者が**ずれている**。CLAUDE.md が
+「frontend が受理することと authority が認めることは別物で、drift は機械検査で
+潰す対象」と書いている、まさにその drift（向きは逆で、authority の方が広い）。
+
+**shift 無しに base64 は書けない**（6 bit への組み替えができない）。**byte アクセス
+無しに HMAC は書けない**（鍵と ipad/opad の XOR がバイト列に対する操作である）。
+
+### 不足の正しい一覧（優先順）
+
+| | 何が要るか | 規模 |
 |---|---|---|
-| 着信 webhook を受ける | ✅ `http-ingress-v1`（reference のみ） | backend 未達 |
-| **WebSocket で音声を双方向に流す** | ❌ **kit が無い**。`capability-net-transport` は contract-only | **本物の欠落** |
-| STT へ HTTP POST | ✅ `http-v1`（reference のみ） | backend 未達 |
-| **`say` / `whisper-cli` を起動** | ❌ process/exec capability が無い | **恒久（設計上そうあるべき）** |
-| ローカル音声ファイルの読み書き | △ `storage-v1`/`stream-object-v1` はオブジェクト面であってローカル FS ではない | 設計の違い |
-| **HMAC-SHA1（webhook 署名検証）** | ❌ kit に無い。`capability-hash-sha256` は contract-only | **本物の欠落** |
-| base64 | ❌ 見当たらない | **本物の欠落** |
-| 時刻 | ✅ `clock-v1` | — |
-| LLM フォールバック | ✅ `llm-v1` | — |
+| 1 | **`bit-shift-left` / `bit-shift-right` の lowering** —— `arithmetic` 集合への追加 + 4 バックエンドの emit + arity 検査 + conformance kit | 小〜中。既存の `bit-and` の隣 |
+| 2 | **byte 値面**（`byte-at` / `byte-store!` / `bytes-len` / `alloc` を通常の source から使えるようにする、あるいは安全な `:bytes` 値型として作り直す） | 中〜大。`:admitted-builtins` は memory ABI 用で、application profile の形ではない |
+| 3 | **双方向 stream ingress kit** —— `http-ingress-v1` の双方向版。**これだけが本物の capability**。フレームの出入りだけを capability にすれば `koe.bridge` の形と一致する | 中。既存 kit の形に沿う |
+| — | ~~hash/HMAC kit~~ | **不要**。sha256 は既に provider 実装済みで、HMAC はその上の純粋な構成 |
+| — | ~~base64 kit~~ | **不要**。純関数なので stdlib。ただし 1 と 2 が前提 |
 
-**process/exec が無いのは欠落ではなく設計である。** `say` を叩くのは ambient
-authority そのもので、Kotoba が deny-by-default で防いでいる当のものだから、
-**「exec capability を足す」が答えではない**。aiueos の先例（判断は `.kotoba`、
-機構は C）と同じ形にする —— 合成器も音声認識器も**ホスト側の provider**として残し、
-Kotoba からは型付き capability 越しに呼ぶ。
+**process/exec は引き続き「足すべきでないもの」。** `say` を叩くのは ambient
+authority そのもので、Kotoba が deny-by-default で拒否している当のもの。合成器も
+音声認識器もホスト側 provider のまま、型付き capability 越しに呼ぶ（aiueos の
+「判断は .kotoba、機構は外」と同じ形）。
 
 ### したがって、いま Kotoba に移せるもの / 移せないもの
 
@@ -393,16 +438,7 @@ Kotoba からは型付き capability 越しに呼ぶ。
 **移せない（ホスト側の機構のまま）**: socket、process 起動、ファイル I/O、
 WebCrypto。これは Kotoba の弱点ではなく**境界の置き方**である。
 
-**足すとしたら 3 つ**、優先順に:
-
-1. **hash/HMAC kit** —— webhook 署名検証は「判断」であって機構ではない。
-   contract-only の `capability-hash-sha256` に provider を付けるのが素直
-2. **stream ingress kit** —— `http-ingress-v1` の双方向版。WebSocket そのものを
-   Kotoba に入れる必要はなく、**フレームの出入りだけを capability にする**のが
-   `koe.bridge` の形と一致する
-3. **base64**（あるいは bytes ↔ text の正準変換）
-
-**注意**: 3 つとも `:reference` で足しても `:native-aot :pending` は変わらない。
+**注意**: どれを足しても `:native-aot :pending` は変わらない。
 「Kotoba で書ける」と「Kotoba だけで配れる」は別の到達点である。
 
 ### 次に着手するときの最初のコマンド
