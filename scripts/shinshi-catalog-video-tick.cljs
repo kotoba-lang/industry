@@ -60,12 +60,29 @@
       (throw (js/Error. (str "wrangler-no-json: " (subs (str out) 0 (min 200 (count (str out))))))))
     (js->clj (js/JSON.parse (subs (str out) i)) :keywordize-keys true)))
 
+;; `npx --yes wrangler …` はこのループを走らせるマシン（npm 11.12.1）で壊れて
+;; いて `npm ERR! cb.apply is not a function` を吐く。tick はそれを D1 不通と
+;; 読んで :unanswered を立てるので、**ループは毎周「測れなかった」で止まる**。
+;; 実測 2026-08-15。wrangler が PATH に居るならそれを直接呼び、居ないときだけ
+;; 従来の npx へ落ちる（CI ノード等、npx が正常な環境では挙動が変わらない）。
+(def wrangler-cmd
+  (let [r (.spawnSync cp "wrangler" #js ["--version"]
+                      #js {:encoding "utf8" :timeout 30000
+                           :stdio #js ["ignore" "pipe" "pipe"]})]
+    (if (zero? (or (.-status r) 1)) :direct :npx)))
+
+(defn- wrangler-argv [args]
+  (if (= :direct wrangler-cmd)
+    ["wrangler" (vec args)]
+    ["npx" (into ["--yes" "wrangler"] args)]))
+
 (defn- d1 [db sql]
   (when-not (.existsSync fs (.join path appview "wrangler.jsonc"))
     (throw (js/Error. (str "wrangler.jsonc missing: " appview))))
-  (let [r (.spawnSync cp "npx"
-                      #js ["--yes" "wrangler" "d1" "execute" db
-                           "--remote" "--json" "--command" sql]
+  (let [[bin args] (wrangler-argv ["d1" "execute" db
+                                   "--remote" "--json" "--command" sql])
+        r (.spawnSync cp bin
+                      (clj->js args)
                       #js {:encoding "utf8"
                            :cwd appview
                            :env js/process.env
@@ -143,14 +160,36 @@
         (catch :default e
           {:ok false :unanswered true :reason (str "gpu-parse:" e)})))))
 
+;; 走査の上限。`scanned` がこれに達したら :truncated を立てる（下記）。
+(def scan-limit 400)
+
+;; original-series の slug 接尾辞だけを SQL で先に絞る。
+;;
+;; **なぜ SQL 側に置くか。** 以前は接尾辞も動画有無も JS 側で絞っており、SQL は
+;; `ORDER BY scenes DESC LIMIT 80` で切っていた。つまり **絞り込みの前に切って
+;; いた** ので、上位 80 件が「動画済みの 5-scene 勢」で埋まると、その下にいる
+;; 3-scene 帯の未充填キャラは 1 件も見えない。実測 2026-08-15: 適格 593 行のうち
+;; original-series は 127、うち **95 体が動画無し**だったのに、tick は
+;; `SCANNED=80 MATCHES=0 UNANSWERED=false`（= 測った空 = 埋めるものは無い）を
+;; 返し続けていた。沈黙が緑として蓄積する形（ADR-2608136000）そのもの。
+;;
+;; 接尾辞での事前絞り込みが安全なことは実測で確かめた（2026-08-15）: profile の
+;; `:series` が original-series を宣言する適格キャラ 127 件と、接尾辞が一致する
+;; 127 件は完全に一致し、**接尾辞を持たない例外は 0 件**だった。IP の除外は
+;; 従来どおり `series-of` が profile を見て行う（`*-final-fantasy` は接尾辞
+;; `fantasy` に当たるが、profile の series が original-series に無いので落ちる）。
+(def original-slug-filter
+  (str "(" (str/join " OR " (map #(str "a.slug LIKE '%-" % "'") (keys original-suffix))) ")"))
+
 (defn- candidates []
   (let [rows (d1 "ai-gftd-shinshi"
                  (str "SELECT a.slug AS slug, a.did AS did, COUNT(s.scene_id) AS scenes "
                       "FROM actress a JOIN scene s ON s.slug = a.slug "
                       "WHERE a.status = 'active' AND s.blob_key IS NOT NULL "
+                      "AND " original-slug-filter " "
                       "GROUP BY a.slug, a.did "
                       "HAVING scenes >= 1 "
-                      "ORDER BY scenes DESC, a.slug ASC LIMIT 80"))
+                      "ORDER BY scenes DESC, a.slug ASC LIMIT " scan-limit))
         dids (mapv :did rows)
         in (str/join "," (map sql-quote dids))
         profs (if (empty? dids) {}
@@ -196,6 +235,10 @@
                                    "GROUP BY slug) t "
                                    "ON s.slug = t.slug AND s.scene_index = t.mx")))))]
     {:scanned (count rows)
+     ;; 走査が上限に当たったなら、`MATCHES=0` は「埋めるものが無い」ではなく
+     ;; 「この窓では見つからなかった」でしかない。切られたことを黙って
+     ;; pass と同じ形で返さない。
+     :truncated (>= (count rows) scan-limit)
      :picked (mapv (fn [m]
                      (let [bk (get blobs (:slug m))]
                        (assoc m :blob-key bk :image-url (blob-url bk))))
@@ -209,6 +252,7 @@
   (when-not json?
     (println (str "SCANNED\t" (:scanned out)))
     (println (str "MATCHES\t" (count (:candidates out))))
+    (println (str "TRUNCATED\t" (boolean (:truncated out))))
     (println (str "UNANSWERED\t" (boolean (:unanswered out))))
     (when (:reason out) (println (str "REASON\t" (:reason out))))
     (when-let [n (:next out)]
@@ -223,7 +267,7 @@
   (println (js/JSON.stringify (clj->js out))))
 
 (try
-  (let [{:keys [scanned picked]} (candidates)
+  (let [{:keys [scanned picked truncated]} (candidates)
         g (gpu)
         unanswered (boolean (:unanswered g))
         out {:kind :shinshi-catalog-video-scan
@@ -231,6 +275,7 @@
              :unanswered unanswered
              :reason (when unanswered (:reason g))
              :scanned scanned
+             :truncated truncated
              :candidates picked
              :next (first picked)
              :gpu g
