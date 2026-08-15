@@ -876,12 +876,23 @@ CertGovernor）。
 ## live service の永続化境界は `kotobase.net`（repo-wide mandatory、2026-08-15、ADR-2608159100）
 
 **live service が生成・収集する proof、actor、wiki、graph、event、index の durable source は
-Kotobase とし、application から見える production origin は `https://kotobase.net` 1つにする。**
-provider の実装（R2 / B2 / S3 / IPFS）や内部 Worker host を application の前提にしない。
+Kotobase とする。authority と既定 API origin は `https://kotobase.net`。protocol 固有の
+wire contract は capability subdomain を使える。** provider の実装（R2 / B2 / IPFS）を
+application の前提にしない。
 
 - immutable bytes は `PUT/GET https://kotobase.net/ipld/:cid`。書く前と読む時の両方で
-  CID を検証する。`graph-database.kotobase.net` 等の provider origin や application 自身の
-  R2 binding を production path に直書きしない。
+  CID を検証する。application 自身の R2 binding を production path に直書きしない。
+- stable な capability origin は `datomic.kotobase.net`、`sparql.kotobase.net`、
+  `cypher.kotobase.net`、`gremlin.kotobase.net`、`graphql.kotobase.net`、
+  `s3.kotobase.net`、`git.kotobase.net`、`atproto.kotobase.net`、
+  `pinning.kotobase.net`。apex path facade と同じ authority/policy に属する。
+- edge 内部の datom/CID execution capability は `datoms.kotobase.net`。
+  `graph-database.kotobase.net` / `backend.kotobase.net` はその deprecated alias、
+  `graphdb.kotobase.net` は SPARQL/RDF4J 互換面の deprecated alias。新規 config / SDK / docs
+  では使わない。
+- RDF4J は別 database product ではなく `sparql.kotobase.net/repositories/default` の path
+  compatibility。SQL は独立 origin ではなく query dialect。implementation/product 名を
+  capability 名として増やさない。
 - logical metadata、provenance、actor、proof 評価、CID index は
   `https://kotobase.net/api/*` の datom 面に置く。bytes 本体を datom に埋めない。
 - Durable Object / D1 / KV は alarm、lease、single-writer、cursor、session、cache、projection
