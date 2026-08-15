@@ -175,6 +175,57 @@ fetch して 4 本が 200（OMIM は 403 —— 自動アクセスを拒否す�
 それでも `axis-ingest` は **0bp**。ingest 先を書くことが主題の repo が、ingest 0 と
 測られている。
 
+### ⚠ 上の 3 つの件数は「4 org 全体」で測った値で、計器の母集団ではない（2026-08-16 訂正）
+
+**同じ問いを 2 つの母集団で測ると 2 つの正しい答えが出る。片方を他方として引用したのが
+誤りだった。** 上の 387 / 648 / 316 は `cloud-itonami` + `etzhayyim` + `kotoba-lang` +
+`gftdcojp` の checkout 全体（4,700 超）を `git ls-files` で歩いた値である。
+
+**計器が測る母集団は 1,936 repo**で、内訳は cloud-itonami 1,832 / **etzhayyim 1** /
+kotoba-lang 101 / その他 2（`scan` は west 登録の `orgs/cloud-itonami/*` と、その
+`deps.edn` `:local/root` が指す substrate repo だけを歩く）。つまり私の ad-hoc な
+etzhayyim 354 repo 分は、**計器が一度も測っていない repo についての数字**だった。
+
+`scan` 側に報告用フィールドを足して同じ母集団で測り直した値:
+
+| 盲点 | 4 org 全体 | **計器の母集団（1,936）** |
+|---|---|---|
+| test が 0 で、数えられていない test ファイルが在る | 164 | **43** |
+| src が 0 で、数えられていない src が在る | 167 | **29** |
+| README が 0 バイトで、`.md` 以外の README が在る | 316 | **103** |
+| citation が 0 で、5 URL 以上が計数外に在る | 648 | **648** |
+
+**ingest だけ一致するのは偶然ではない** —— あれは最初から evidence ファイル
+（＝計器の母集団）に対して測ったからで、他の 3 つは `git ls-files` で 4 org を
+歩いたから違う。数字が合う/合わないの理由まで測ると、どちらが正しいかではなく
+**何を数えたか**の違いだと分かる。
+
+母集団内でも最大例は大きい: `cloud-itonami/mangaka` は **20 ファイル・316,341 バイト**の
+test を持ちながら counted test bytes が **0**、`cloud-itonami/danjo` は 16 ファイル・
+67,695 バイトで同じく 0。
+
+### 見えていない内容は報告する（スコアは動かさない）
+
+`itonami-maturity-scan.cljs` に `:uncounted/*` 6 フィールドを足した ——
+`src-file-count` / `src-bytes` / `test-file-count` / `test-bytes` /
+`readme-file-count` / `url-count`。**どの `:maturity/*` にも入らない。**
+
+これが第 3 の道である。測り方を変えれば数百 repo のスコアが一度に動き
+（オーナー判断）、報告しなければ未測定が 0 として蓄積し続ける（この ADR が
+繰り返し記録している形）。報告だけなら、判断を先取りせずに盲点が見える。
+
+**スコアが動かないことは A/B で証明した**: 同じ tree に対して旧コードと新コードを
+走らせ、新しい方が増やしたキーは `:uncounted/*` の 6 つだけ、消したキーは 0、
+**既存キーの値が変わった件数は 0**。実行時間は 36s → 38s。
+
+`:truncated?` を持つ repo は 0 件だったので、この母集団では walk の打ち切りが
+数字を下げてはいない（`walk-files` は深さ 6・6,000 entry で打ち切り、その事実を
+`:truncated?` で申告する）。
+
+**次の一手**: tick が `:uncounted/*` を読んで「この repo の axis-test は 0 だが
+数えられていない test が N ファイル在る」と言えるようにする。今は evidence に
+在るだけで、順位を出す tick は datoms しか読まない。
+
 ### 3 つの盲点は 1 つの原因を共有する
 
 これで同じ形が 3 つ揃った:

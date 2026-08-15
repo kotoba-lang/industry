@@ -215,7 +215,42 @@
                                      (take 40 (concat fact-files (take 20 data-files)))))
             wf-files    (filterv #(re-find #"^\.github/workflows/" %) files)
             demo-files  (filterv #(re-find #"(?i)^(docs|samples|public|demo)/.*\.html$" %) files)
-            adr-files   (filterv #(re-find #"(?i)^(docs/adr|90-docs/adr)/" %) files)]
+            adr-files   (filterv #(re-find #"(?i)^(docs/adr|90-docs/adr)/" %) files)
+            ;; ── 見えていない内容（スコアには入れない。ADR-2608052000）─────────
+            ;;
+            ;; 上の 4 つは内容をファイル名の規約で同定している。fleet はその規約に
+            ;; 従っていないので、実在するのに 0 と測られる repo が大量にある
+            ;; （実測: src/test で 387、ingest で 648、README.edn で 316）。
+            ;;
+            ;; **ここで測るのは報告用の別キーで、:maturity/* は 1bp も動かさない。**
+            ;; 測り方を変えれば数百 repo のスコアが一度に動き、mean-own と全 repo の
+            ;; fleet-gain が変わる —— それはオーナー判断であって scan の判断ではない。
+            ;; 一方「見えていない」ことを報告しないのは、未測定を 0 として蓄積する
+            ;; ことなので、報告だけは今する。
+            uncounted-src   (filterv #(and (not (str/starts-with? % "src/"))
+                                           (not (str/starts-with? % "test/"))
+                                           (re-find #"(^|/)src/" %)
+                                           (src-ext (ext-of %)))
+                                     files)
+            uncounted-test  (filterv #(and (not (str/starts-with? % "test/"))
+                                           (src-ext (ext-of %))
+                                           (re-find #"(?i)(^|/)tests?/|_test\.|\.test\.|\.spec\.|(^|/)test_" %))
+                                     files)
+            ;; README.md 以外の README（.edn / .rst / 拡張子なし）
+            uncounted-readme (filterv #(re-find #"(?i)^readme\.(edn|rst|txt|org)$" %) files)
+            ;; 計数対象外の宣言ファイル。URL は distinct で数える —— 同じ URL が
+            ;; 20 回出てくるのは 20 の出典ではない。上限は既存の計数と同じ発想で
+            ;; 25 ファイル（scan は 1,936 repo を歩くので、ここは安くなければならない）
+            other-decl  (filterv #(and (re-find #"(?i)\.(jsonld|json|edn|md|ttl|yaml|yml)$" %)
+                                       (not (str/starts-with? % "data/"))
+                                       (not (re-find #"(?i)(^|/)(facts|catalog|jurisdictions?)\.(cljc|cljs|clj|edn)$" %))
+                                       (not (re-find #"(?i)^(package|package-lock|tsconfig)" %)))
+                                 files)
+            uncounted-urls (count (into #{}
+                                        (mapcat (fn [f]
+                                                  (let [t (slurp* (str root "/" f))]
+                                                    (if t (re-seq #"https?://[^\"'\s)>,]+" t) [])))
+                                                (take 25 other-decl))))]
         {:repo/path rel
          :repo/org org
          :repo/name repo
@@ -233,6 +268,13 @@
          :component/count (count components)
          ;; --- real-world ingest
          :ingest/citation-count citation-n
+         ;; --- 見えていない内容（報告のみ。どの :maturity/* にも入らない）
+         :uncounted/src-file-count (count uncounted-src)
+         :uncounted/src-bytes (reduce + 0 (map #(file-size (str root "/" %)) uncounted-src))
+         :uncounted/test-file-count (count uncounted-test)
+         :uncounted/test-bytes (reduce + 0 (map #(file-size (str root "/" %)) uncounted-test))
+         :uncounted/readme-file-count (count uncounted-readme)
+         :uncounted/url-count uncounted-urls
          :ingest/fact-file-count (count fact-files)
          :ingest/data-file-count (count data-files)
          ;; --- docs
