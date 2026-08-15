@@ -83,14 +83,43 @@
      無ければ landing していた。
    - JVM と ClojureScript の両方で green。edge Worker は cljs なので、この 2 面が
      揃っていることが採用の前提条件である。
-   - **未実施（意図的）**: 既存経路への配線。edge_cacao.cljc の issuer 制約撤去、
-     cacao/edge ビルドへの chain 検証移植、8 スキームの typed model への畳み込み、
-     kotobase の visible? を chain 内属性クラスへ縮小する作業は、いずれも本 ADR の
-     範囲外。オーナー指示「後で組み合わせも設計統合」に従い、統合設計は別 ADR とする。
-   - したがって現時点の authority は **本番呼び出し元ゼロ**である。これは
-     kotobase.guarded / cacao verify-chain と同じ状態であり、ライブラリが正しいことと
-     経路上にあることは別の主張である、という本 workspace の既知の教訓がそのまま
-     当てはまる。統合まで完了扱いにしない。"
+   - **統合済み（2026-08-15、同日）**。本 ADR は当初「本番呼び出し元ゼロ」で着地したが、
+     オーナー指示により同日中に配線まで進めた。現在地:
+
+     | 経路 | commit | 状態 |
+     |---|---|---|
+     | cacao.core/covers? → authority.scope | org-chainagnostic-cacao 71014021 | 完了。既存 61 test 無改変で通過 |
+     | security の分類語彙（:personal = rank 2） | security 74235d1c | 完了 |
+     | kotobase.edge-chain（純粋な鎖判断） | control-plane f33db76 | 完了 |
+     | edge_cacao への配線（verify-cacao-chain） | control-plane 334b8bc3 | 完了 |
+     | proxy.cljc の tenant 解決を鎖経由に | control-plane 01e6c5ac | **完了。リクエスト経路上にある** |
+
+     したがって「ライブラリが正しいことと経路上にあることは別の主張」という警告は、
+     この repo については解消した。**ただし deploy はしていない** —— main に在ることと
+     稼働していることも、同じく別の主張である。
+
+   - **未実施**: (1) `verify-cacao-scoped`（worker.cljc の object-capability 経路）は
+     required-resource 契約が別なので今回のスコープ外。(2) `cacao/edge/*.cljs`
+     （cloud-itonami / cloud-manimani が使う build）は mint + 単発 verify のまま。
+     (3) kotobase-peer の `visible?` 本体と `:legacy-public` posture は未変更 ——
+     律速は AUTHORITY_REGISTRY / KEY_UNWRAPPER / CLAIM_STORE / AUDIT_SINK の
+     provisioning であって、コード変更ではない。今回入れたのは、その層が
+     **そもそも合成不能だった原因**（`:personal` が未知ラベルとして `:restricted` に
+     潰されていた）の除去である。
+
+   - **配線中に設計を 2 回直した。どちらもテストが見つけた。**
+     ① `decide` が「子の exp 欠落」も scope escalation と同列に扱い鎖ごと拒否していた。
+     CACAO は exp を optional とし meet が既に締めているので、拒否は最も普通の
+     sloppy client を障害に変えるだけだった（現在は `:tightened` で報告）。
+     ② 最初の nonce 実装は全リンクの nonce を replay 記録しようとしていた。親リンクは
+     長命の委譲で毎リクエスト提示されるので、**2 回目のリクエストから必ず失敗する**。
+     現在は leaf（invocation）の nonce だけを検査し、captured chain はちょうど 1 回
+     使える —— 単発 token が既に持つ保証と同じ。
+
+   - **自分が入れた回帰を 1 件直した**: f33db76 が edge_chain_test を JVM 集約にだけ
+     登録し、cljs registry に入れ忘れたため main で `npm test` の registry 検査が
+     落ちていた（334b8bc3 で修正）。repo 自身の check-test-registry が
+     「未登録」と「登録済みだが run-tests に無い」を別々に検出して二段階で止めた。"
 
   :adr/body
   "実装: kotoba-lang/authority @ 2de205a。3 名前空間、外部依存ゼロ、暗号なし。
