@@ -1609,5 +1609,15 @@
    :gate :nbb-script
    :script "gates/babashka-facade-check.cljs" :script-args ["--min-tasks" "3"]
    :include-ext [".edn" ".bb"] :min-files 1 :cd false}
+  ;; Organisation-first authority closure (ADR-2608159700). These are real
+  ;; JVM gates on each child tree. kotoba-lang uses a focused alias because its
+  ;; full suite also compares sibling vendor copies, which is a workspace sync
+  ;; question rather than this distributed-authority implementation slice.
+  {:name "provider-incidence" :id "provider-incidence-durable"
+   :org "kotoba-lang" :gate :jvm-test :cd true}
+  {:name "provider-transport" :id "provider-transport-live-tls"
+   :org "kotoba-lang" :gate :jvm-test :cd true}
+  {:name "kotoba-lang" :id "kotoba-org-first-ocapn"
+   :org "kotoba-lang" :gate :jvm-test :alias "ocapn-test" :cd true}
   ;; ────────────────────────────────────────────────────────────────────────
   ]}
