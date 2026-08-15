@@ -1164,7 +1164,7 @@ projection、index、local read accelerator、運用メトリクス。
 
 | 層 | 実体 | premise か |
 |---|---|---|
-| **L0** block / ref / large-object | `kotobase-storage` の `IBlockStore`(CID) + `IRefStore`(CAS) + `IObjectStore`(transfer profile)。S3/R2・B2・IPFS/IPNS・Postgres・D1・inga は**この境界の provider** | **premise**（消すと全部壊れる） |
+| **L0** block / **pack** / ref / large-object | `kotobase-storage` の `IBlockStore`(CID) + `IRefStore`(CAS) + `IObjectStore`(transfer profile)、**block を束ねる CARv2 pack**（`io-ipld-car`）。S3/R2・B2・IPFS/IPNS・Postgres・D1・inga は**この境界の provider** | **premise**（消すと全部壊れる） |
 | **L1** datom（triple / EAV）+ immutable value + content-addressed history | `arrangement` / `datalog` の spo・pso・pos・ocp | **premise**（全 query surface の論理モデル） |
 | **L2** query language（Datalog / SQL / Cypher / SPARQL / GraphQL / Gremlin） | `kotobase.core/q`、`kotobase-query` bridge、各 protocol repo | **premise ではない** |
 
@@ -1183,6 +1183,67 @@ projection、index、local read accelerator、運用メトリクス。
 - **Datomic 互換（`kotobase.core` の Datalog API / `kotobase.datomic` の EDN grammar）は残すが、
   位置づけは surface の1つ。** 「kotoba : kotobase = Clojure : Datomic」（ADR-2607032500）は repo 名と
   用語の由来であって、**設計の前提に昇格させない** —— 全 surface を Datalog 経由にする設計はここから来た。
+
+## kotobase の物理層は block → CARv2 pack → object。1 CID = 1 object を既定にしない（repo-wide mandatory、2026-08-16、ADR-2608160100）
+
+**block の identity（CID）と location（どこにあるか）を分ける。** 上の L0 の中身は
+3 段で、混ぜると設計が黙って壊れる:
+
+```text
+L0a  block    IPLD dag-cbor / raw   identity = その block 自身の CID
+L0b  pack     CARv2                 location = (pack CID, file-offset, frame-length)
+L0c  object   S3 / R2 / B2 / IPFS   transport = object key + HTTP Range
+```
+
+- **新しい backend は `:block-per-object` か `:packed-blocks` のどちらかを宣言する。**
+  既定値は無い（`ref-profiles` と同じ理由 —— 推測は黙って通って壊れる）。
+  `:packed-blocks` は object 面の **`:range-read` を併せて宣言しないと拒否**する。
+  Range の無い store で packed を名乗ると、pack 全体を GET して 1 block を取り出す
+  実装が動き、**round trip は減るが転送量が爆発する**（成功に見える失敗）。
+- **packing policy は write-locality。1 commit = 1 pack を既定にする。** 効くのは
+  ここだけ —— hydration の逐次項の 97% は novelty の cons chain で、幅 1・prefetch
+  不能（ADR-2608021000）。**同じ pack に入っていれば 1 回の Range GET で全部取れる**
+  ので、chain は論理的に逐次のまま network の逐次性が消える。
+- **成功の指標は round trip 数**。bytes でも wall-clock でもない（この workstation は
+  load 100 超で並行 agent が走る。count を測る）。
+- **pack は封じたら不変。in-place で追記しない** —— offset が動き、catalog と
+  embedded index の両方を静かに嘘にする。compaction は新しい pack を書いて
+  catalog を差し替える。
+- **pack catalog（CID → どの pack）は datom 面に置く。** 別の store に置くと
+  pack と commit と tenant を跨ぐ query が書けなくなる（ref 1 本規則）。
+  catalog は **projection** であって premise ではない —— 消しても pack を走査して
+  再構築できる形にする（D1 規則と同じ削除・再構築テスト）。
+- **columnar は pack に入れない。** Parquet / Arrow は large object のまま
+  （`:presigned-transfer` + footer の range 読み）。pack は小 block 領域のもの。
+- **圧縮の seam は動かない**: `bytes → codec frame → CID → pack → object`。
+  pack を丸ごと圧縮しない（中身は ciphertext、実測 ratio 1.003 で*増える*）。
+- **CARv2 codec の正本は `kotoba-lang/io-ipld-car`**（`ipld.car` / `ipld.car.v2` /
+  `ipld.car.index`）。自分で CAR を書かない。index cost は実測 **40 byte/block**
+  （+ pack あたり固定 81 byte）なので、**block を小さくするほど相対コストが上がる**。
+- 既存の `:block-per-object` deployment は**そのまま正しい**。一斉移行の計画は
+  持たない —— 書き換えるなら round trip の実測が先。
+
+### 5 つの canonical IR を共有する（ADR-2608160200）
+
+**State / Transaction / Capability / CausalLink / Effect**、および 6 つ目の
+**Execution**（`{program, input, state, runtime, policy, effects} → CID`）。
+5 つとも IPLD 値なので、**同じ物理層に載る —— artifact 用の第二の store を作らない**
+（amu の `:kotoba.output-set/v1`、kototama の receipt、kotobase の state は同じ
+object 面の同じ pack に入る）。
+
+- **Execution CID を memo key にしてよいのは、effect set が空か、effect log が
+  完全に記録されていて replay できるときだけ。** それ以外の CID は receipt であって
+  cache key ではない（外界が変わったことを見ない cache ができる）。
+- **capability の core IR は `kotoba-lang/kotoba-lang` の `lang/capability-semantics.edn`**
+  （`:cap/kind` `:cap/resource` `:cap/holder`）。**UCAN / CACAO / OCapN は adapter**
+  であって core semantics にしない。**VC（claim）と capability（authority）を混ぜない。**
+- **causality は principal ごとの署名付き DAG**（複数親 + logical clock）。単一 chain に
+  畳まない。**合意が要る経路だけ inga に繋ぐ**（それ以外に consensus を置かない）。
+- **綾（`kotoba-wasm` / `kotoba-native` / `kotoba-script` / `kotoba-component`）は
+  権限を持たない** —— backend ごとに違うのは lowering だけで、5 つの IR の形は同一。
+  「その backend でまだ動かない」ことは、別の IR を持つ理由にならない。
+- この 2 つの ADR を根拠に **Pregel / Substrait repo を起こさない**（query / compute
+  backend は別の、証拠付きの決定）。**改名も再開しない**（ADR-2608139980 のまま）。
 
 ## agent loop の正本は Git + EDN + DataLad、Datomic/kotobase は query projection（repo-wide mandatory、2026-08-03、ADR-2608039700）
 
