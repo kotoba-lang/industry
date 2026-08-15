@@ -78,6 +78,25 @@
   (when-let [s (slurp* datoms-file)]
     (try (edn/read-string s) (catch :default _ nil))))
 
+(def ^:private scan-at-ms
+  "計測が repo を読んだ時刻（datoms の `:scan/at`）。無ければ nil。
+
+  **datoms の commit 時刻ではこの問いに答えられない。** commit は scan の後に
+  起きるので、その窓に着地した仕事を『計測は見ている』と読んでしまう ——
+  まさにこの検査が捕まえるはずの形である。
+
+  実測 2026-08-15、この関数が生まれた周: redelivery の operator-quickstart は
+  14:06:31Z に着地し、datoms は 14:09:52Z に commit された。commit 時刻を基準に
+  すると `head-ms < generated-at` となり **見落とす**。`:scan/at`（14:03:30Z）を
+  基準にすると捕まる —— そしてその datoms の redelivery 行は実際に
+  `axis-docs 0` のままだった（つまり計測は本当に見ていない）。
+
+  `:scan/at` は dynamics が走った時刻で、scan が repo を読んだ時刻よりわずかに
+  後である。したがってこの基準も過少報告する側に倒れる —— 安全な向きは
+  こちらなので、それでよい。"
+  (when-let [s (some :scan/at datoms)]
+    (fresh/parse-instant s)))
+
 (defn- root-reads-behind-remote?
   "Is the datoms file this tick just read the one at the remote tip?
 
@@ -320,6 +339,51 @@
             e))
         entries))
 
+;; ── 計測より後に動いた repo は候補から外す ──────────────────────────────────
+;;
+;; **The ledger is a self-report, and a round that lands and then dies writes no
+;; self-report at all.** `freshness` learns "the measurement has not seen my last
+;; landing" from ledger rows only, so a round that merged to main and exited
+;; before appending its line is indistinguishable, here, from a round that did
+;; nothing: both produce an empty `unseen`. The next tick names the same
+;; repository and the same axis, and doing that work a second time is padding by
+;; construction.
+;;
+;; Measured 2026-08-15: the preceding round raised axis-docs on
+;; cloud-itonami/redelivery and merged it (2da6173, 14:06:31Z) without writing a
+;; ledger row. This tick then ranked redelivery first and named axis-docs, whose
+;; operator-quickstart had been on main for 23 minutes. The measurement was
+;; committed at 14:43:04Z -- git could have said so; nothing asked it.
+;;
+;; So ask git. The fact the ledger was supposed to carry is already there.
+
+(def ^:private movement-probe-depth
+  "How far down the gain-sorted candidates to ask git. Not the whole lane -- that
+  is 1,782 repositories every tick. Deep enough that dropping the moved ones
+  still leaves five to rank."
+  24)
+
+(defn- head-commit-ms
+  "Epoch ms of `path`'s current HEAD commit, or nil when git cannot answer.
+
+  nil is neither 0 nor `now`. A repository that is not checked out, or whose
+  `.git` this root cannot read, has not been shown to be unmoved -- and keeping
+  `could not look` apart from `looked and it is current` is the entire point."
+  [path]
+  (let [{:keys [code out]} (sh "git" ["-C" path "log" "-1" "--format=%ct"])]
+    (when (and (= 0 code) (seq (str/trim out)))
+      (let [n (js/parseInt (str/trim out) 10)]
+        (when-not (js/isNaN n) (* 1000 n))))))
+
+(defn- with-head-times
+  "候補に `:head-ms`（その repo の現 HEAD の commit 時刻）を添える。
+
+  判定そのものは `fresh/classify-movement` が持つ —— この関数は git に聞く役だけ。
+  `with-landing-times` が `:landed-at-ms` を添えるのと同じ分け方で、純粋な判定は
+  test の効く ns に置く。"
+  [candidates]
+  (mapv #(assoc % :head-ms (head-commit-ms (:repo %))) candidates))
+
 (defn- lane
   "ADR-2608052000 決定 2 を**実績から**維持する。固定スケジュール
   （『5 周に 1 回 substrate』等）にしないのは、周が飛んだり skip されたりすると
@@ -354,7 +418,8 @@
         behind? (root-reads-behind-remote?)
         ;; plain entries: this only reads :target paths, no git
         can-resolve? (root-can-resolve-landings? entries)
-        freshness (fresh/freshness {:generated-at (generated-at)
+        gen-ms (generated-at)
+        freshness (fresh/freshness {:generated-at gen-ms
                                     :now (.now js/Date)
                                     ;; `:at` ではなく merge commit の実時刻で測る
                                     :entries (with-landing-times entries)
@@ -388,7 +453,20 @@
         ;; substrate 層は 17 本しかなく leverage に 10〜20 倍の段差がある。
         ;; cohort は 1,700 本超で ratio ≈ 1.0 の平坦地 —— **同じ順位付けでも
         ;; 意味の強さが違う**ので、それを出力に明記する。
-        ranked (->> in-lane (sort-by #(- (or (:fleet-gain %) 0))) (take 5))
+        ;; **順位に載せる前に、git へ『この行はまだこの repo を describe して
+        ;; いるか』を聞く。** ledger だけでは、着地して ledger を書かずに落ちた
+        ;; 周を『何もしなかった周』と区別できない（上の classify-movement）。
+        by-gain (vec (sort-by #(- (or (:fleet-gain %) 0)) in-lane))
+        ;; **基準は `:scan/at`（計測が repo を読んだ時刻）であって datoms の
+        ;; commit 時刻ではない。** 両者の差はこの検査が捕まえるべき窓そのもの
+        ;; （上の scan-at-ms を見よ）。`:scan/at` が無い古い datoms のときだけ
+        ;; commit 時刻へ落ちる。
+        measured-at (or scan-at-ms gen-ms)
+        movement (fresh/classify-movement
+                  (with-head-times (vec (take movement-probe-depth by-gain)))
+                  measured-at)
+        moved (:moved movement)
+        ranked (vec (take 5 (:kept movement)))
         flat? (and (= :breadth lane)
                    (let [gs (keep :fleet-gain ranked)]
                      (and (seq gs) (< (- (apply max gs) (apply min gs)) 0.5))))
@@ -420,6 +498,11 @@
                                   :total (:archived-count archived)}
                                  :missing)
                :archived-excluded (mapv :repo dropped)
+               ;; **確認した本数を必ず残す。** `:moved []` だけでは「動いた repo が
+               ;; 無かった」と「1 本も確かめられなかった」が同じ行になる。
+               :movement {:checked (:checked movement)
+                          :moved (mapv :repo moved)
+                          :unknown (mapv :repo (:unknown movement))}
                :ranking-is-flat? flat?}]
 
     (log! "── 成熟度向上 tick ──")
@@ -454,6 +537,29 @@
                  "**archived な repo が候補に混ざる** —— 指名されても push できず"
                  "その周は空振りする。`nbb --classpath \".:scripts/nbb_compat\" "
                  "scripts/gen-archived-repos.cljs` で作り直す")))
+    ;; 計測より後に動いた repo。**archived と同じく、落としたことを黙らない。**
+    ;; これを黙ると、順位から repo が消えた理由が ledger だけでは再構成できない。
+    (when (seq moved)
+      (log! (str "計測より後に動いたので候補から除外: " (count moved) " 本"
+                 "（上位 " (:checked movement) " 本を git に確認）"))
+      (doseq [m (take 5 moved)]
+        (log! (str "    ↳ " (:repo m) " — HEAD が "
+                   (subs (.toISOString (js/Date. (:head-ms m))) 0 19) "Z"
+                   "、計測は " (subs (.toISOString (js/Date. measured-at)) 0 19) "Z"
+                   (when-not scan-at-ms "（:scan/at が無いので commit 時刻）")
+                   "。この行の軸値は現状を表していない（従うと水増しになる）"))))
+    ;; **「確かめられなかった」と「動いていない」を混ぜない。**
+    (when (seq (:unknown movement))
+      (log! (str "⚠ " (count (:unknown movement)) "/" (:checked movement)
+                 " 本は git が答えず、動いたかを確かめられなかった（候補には残した）: "
+                 (str/join ", " (map :repo (take 3 (:unknown movement)))))))
+    ;; evidence floor —— 1 本も答えを得られていないなら、『除外 0 本』は
+    ;; 『動いた repo が無い』ではなく『確かめていない』である。
+    (when (and (pos? (:checked movement))
+               (= (count (:unknown movement)) (:checked movement)))
+      (log! (str "⚠ **この確認は 1 本も答えを得ていない。** root（" root "）の "
+                 "`orgs/` が populate されていない可能性が高い。この状態の"
+                 "『除外 0 本』を『計測は現状を表している』と読まないこと")))
     (doseq [r ranked]
       (log! (str "  · " (:repo r) " [" (:kind r) "]"
                  "  own=" (some-> (:own r) (.toFixed 3))
@@ -515,6 +621,14 @@
                    ""
                    (str " まず itonami-maturity-scan → dynamics を回し直して着地させる"
                         "（skill の §5。この周は lane を消費しない）")))
+            ;; **候補が消えた理由を取り違えさせない。** 全部が「計測より後に
+            ;; 動いた」で落ちたのなら、疑うべきは lane でも計測の中身でもなく
+            ;; 計測の**時点**で、次の 1 手は測り直しである。
+            (and (empty? ranked) (seq moved))
+            (str "上位 " (:checked movement) " 本すべてが計測より後に動いており、"
+                 "順位に載せられる行が残らなかった。lane の判定ではなく計測の時点を疑う"
+                 " —— itonami-maturity-scan → dynamics を回し直して着地させる"
+                 "（skill の §5。この周は lane を消費しない）")
             (empty? ranked) (str lane " lane に対象が無い。lane の判定か計測値を疑う")
             ;; 重みのある軸が 1 つも無い = その kind にとって上げる意味のある軸が
             ;; 無い。**作らない。** 重みテーブルか kind 分類を疑う。

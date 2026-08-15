@@ -310,6 +310,70 @@
                           (f/explain (f/freshness {:generated-at :unknown :now now
                                                    :entries [] :stale-after-days 7})))))
 
+;; ── classify-movement（2026-08-15、実測した回帰）─────────────────────────────
+;;
+;; 直前の周が cloud-itonami/redelivery の axis-docs を上げて main へ merge し
+;; （2da6173、14:06:31Z）、**ledger 行を書かずに終わった**。ledger だけを読む
+;; `classify-landings` にとって、その周は『何もしなかった周』と同じ形をしている
+;; —— `unseen` は空になり、tick は redelivery を 1 位に置いて axis-docs を
+;; 名指しした。operator-quickstart は 23 分前から main に在った。
+;;
+;; **基準時刻の選び方まで固定する。** datoms の commit は 14:09:52Z で、それを
+;; 基準にすると見落とす（14:06:31 < 14:09:52）。`:scan/at` は 14:03:30Z で、
+;; こちらを基準にすると捕まる。実際その datoms の redelivery 行は
+;; `axis-docs 0` のままだった —— 計測は本当に見ていない。
+
+(def scan-at (ms "2026-08-15T14:03:30.385Z"))          ; datoms の :scan/at
+(def datoms-committed-at (ms "2026-08-15T14:09:52Z"))  ; datoms の commit 時刻
+(def redelivery-head (ms "2026-08-15T14:06:31Z"))      ; 2da6173
+
+(def candidates
+  [{:repo "orgs/cloud-itonami/redelivery" :head-ms redelivery-head}
+   {:repo "orgs/cloud-itonami/robot" :head-ms (ms "2026-07-20T00:00:00Z")}
+   {:repo "orgs/cloud-itonami/sanctions" :head-ms nil}])
+
+(let [r (f/classify-movement candidates scan-at)]
+  (check! "movement: ledger に行が無くても、動いた repo を名指しできる"
+          ["orgs/cloud-itonami/redelivery"]
+          (mapv :repo (:moved r)))
+  (check! "movement: 動いた repo は候補に残さない"
+          false
+          (boolean (some #(= "orgs/cloud-itonami/redelivery" (:repo %)) (:kept r))))
+  (check! "movement: 動いていない repo は候補に残る"
+          true
+          (boolean (some #(= "orgs/cloud-itonami/robot" (:repo %)) (:kept r))))
+  ;; **『確かめられなかった』を『動いていない』と混ぜない。** git が答えな
+  ;; かった repo は :unknown に出しつつ候補にも残す —— 落とすと確かめられ
+  ;; なかったことだけを理由に候補が静かに減り、黙って残すと沈黙が pass になる。
+  (check! "movement: git が答えない repo は :unknown に出す"
+          ["orgs/cloud-itonami/sanctions"]
+          (mapv :repo (:unknown r)))
+  (check! "movement: :unknown な repo は候補にも残す"
+          true
+          (boolean (some #(= "orgs/cloud-itonami/sanctions" (:repo %)) (:kept r))))
+  ;; evidence floor —— `:moved []` だけでは「動いた repo が無かった」と
+  ;; 「1 本も確かめられなかった」が同じ行になる。件数を必ず返す。
+  (check! "movement: 確認した本数を返す（:moved [] を『確かめた』と読ませない）"
+          3 (:checked r)))
+
+;; **基準時刻の回帰そのもの。** commit 時刻を基準にすると、この検査が捕まえる
+;; はずだった当の着地を見落とす。tick の基準を commit 時刻へ戻すと赤くなる。
+(check! "movement: commit 時刻を基準にすると redelivery を見落とす（だから :scan/at）"
+        []
+        (mapv :repo (:moved (f/classify-movement candidates datoms-committed-at))))
+
+;; `>` を `>=` にすると赤くなる。計測と同時刻の commit は計測に含まれている。
+(check! "movement: 計測と同時刻の commit は『動いた』ではない"
+        []
+        (mapv :repo (:moved (f/classify-movement
+                             [{:repo "same" :head-ms scan-at}] scan-at))))
+
+;; 基準が無いとき『誰も動いていない』と**主張しない**。:checked 0 で区別する。
+(let [r (f/classify-movement candidates :unknown)]
+  (check! "movement: 基準が無ければ動いたと主張しない" [] (mapv :repo (:moved r)))
+  (check! "movement: 基準が無ければ候補を落とさない" 3 (count (:kept r)))
+  (check! "movement: 基準が無いことを :checked 0 で言う" 0 (:checked r)))
+
 (println)
 ;; 件数つきの summary。**gate 側はこの行が無ければ pass と報告しない** ——
 ;; classpath が壊れて 1 件も走らないまま exit 0 になる経路を塞ぐ

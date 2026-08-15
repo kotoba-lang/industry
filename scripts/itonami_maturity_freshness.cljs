@@ -152,6 +152,55 @@
   ([entries generated-at now]
    (:unseen (classify-landings entries generated-at now))))
 
+(defn classify-movement
+  "候補 repo を『計測がまだ describe している』『計測より後に動いた』
+  『確かめられなかった』の 3 つに分ける。
+
+  ## なぜ ledger とは別にこれが要るか
+
+  `classify-landings` が読むのは ledger、すなわち **周の自己申告**である。
+  着地させたあと ledger を書く前に落ちた周は行を 1 つも残さないので、そのとき
+  `unseen` は空になり —— **『何もしなかった周』と出力で区別できない**。次の
+  tick は同じ repo の同じ軸を名指しし、それに従うと構造的に水増しになる。
+
+  実測 2026-08-15: 直前の周が cloud-itonami/redelivery の axis-docs を上げて
+  main へ merge し（2da6173、14:06:31Z）、ledger 行を書かずに終わった。計測は
+  13:43:04Z に commit されており、tick は redelivery を 1 位に置いて axis-docs を
+  名指しした —— operator-quickstart は 23 分前から main に在った。
+
+  周の自己申告に依らず同じ問いへ答えられる観測が git にある。`:head-ms`
+  （その repo の現 HEAD の commit 時刻）は**呼び出し側が git から測って添える**
+  —— この ns は git も時計も読まない（`:landed-at-ms` と同じ約束）。
+
+  ## 判定
+
+  `generated-at` は datoms が **commit された**時刻で、scan が repo を歩いた
+  時刻より後である。その窓の中で着地した commit は捕まらない —— つまりこの
+  判定は **過少報告する側に倒れる**。安全な向きはこちらで、ここで flag された
+  repo は実際に動いている。
+
+  `:head-ms` が数でない候補は **`:unknown` に入れ、同時に `:kept` にも残す**。
+  落とすと『確かめられなかった』という一点だけを理由に候補が静かに減り、
+  黙って残すと沈黙が pass として読まれる。両方へ入れて、呼び出し側に
+  『確かめていない』と言わせる。
+
+  `generated-at` が数でなければ比較の基準が無いので、**誰も動いていないとは
+  主張しない**（`:checked 0` を返し、全員 `:kept`）。"
+  [candidates generated-at]
+  (if-not (number? generated-at)
+    {:kept (vec candidates) :moved [] :unknown [] :checked 0}
+    (reduce (fn [acc {:keys [head-ms] :as c}]
+              (cond
+                (not (number? head-ms)) (-> acc
+                                            (update :unknown conj c)
+                                            (update :kept conj c))
+                ;; `>` であって `>=` ではない。計測と同時刻の commit は計測に
+                ;; 含まれている（`classify-landings` と同じ約束）。
+                (> head-ms generated-at) (update acc :moved conj c)
+                :else (update acc :kept conj c)))
+            {:kept [] :moved [] :unknown [] :checked (count candidates)}
+            candidates)))
+
 (defn freshness
   "計測値を信用してよいか。
 
