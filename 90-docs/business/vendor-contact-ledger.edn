@@ -1,0 +1,793 @@
+;; vendor-contact-ledger.edn — 取引先・SaaS の最終連絡日／最終請求日
+;;
+;; 生成: Microsoft Graph（m365 CLI / gftd-m365-archive アプリ）で keiri@ / somu@ / jinji@ の
+;;       2024-08-01 以降 7,425 通を走査し、送信元ドメインごとに最終連絡日と最終請求メール日を集計。
+;; 生成日: 2026-08-15。手編集ではなく再生成すること（scripts は ADR-2608152200 参照）。
+;;
+;; ⚠ :last-invoice は「請求・支払に関する件名のメールを最後に受けた日」であって、
+;;    契約が生きているかでも、支払ったかでもない。判定にはベンダーのコンソールが要る。
+;; ⚠ 走査対象は共有 3 箱のみ。個人箱 (j.kawasaki@) 宛だけの請求は入っていない。
+;;
+;; :status  :active     最終請求 2026-07 以降
+;;          :dormant    2026-01〜06
+;;          :stale      2025 年内
+;;          :historical 2024 年以前
+
+[
+{:vendor/domain "moneyforward.com"
+ :vendor/last-contact "2026-08-15"
+ :vendor/last-invoice "2026-08-15"
+ :vendor/last-invoice-subject "決済できませんでした（マネーフォワード ビジネスカード）"
+ :vendor/invoice-mail-count 890
+ :vendor/total-mail-count 1134
+ :vendor/mailboxes ["jinji" "keiri" "somu"]
+ :vendor/status :active}
+{:vendor/domain "gftd.co.jp"
+ :vendor/last-contact "2026-08-14"
+ :vendor/last-invoice "2026-08-14"
+ :vendor/last-invoice-subject "FW: Customer Invoice JP-JCJP-004758 Gftd Japan 株式会社"
+ :vendor/invoice-mail-count 393
+ :vendor/total-mail-count 855
+ :vendor/mailboxes ["jinji" "keiri" "somu"]
+ :vendor/status :active}
+{:vendor/domain "myworkday.com"
+ :vendor/last-contact "2026-08-14"
+ :vendor/last-invoice "2026-08-14"
+ :vendor/last-invoice-subject "Customer Invoice JP-JCJP-004758 Gftd Japan 株式会社"
+ :vendor/invoice-mail-count 48
+ :vendor/total-mail-count 91
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :active}
+{:vendor/domain "vercel.com"
+ :vendor/last-contact "2026-08-13"
+ :vendor/last-invoice "2026-08-13"
+ :vendor/last-invoice-subject "$66.01 payment to Vercel Inc. was unsuccessful"
+ :vendor/invoice-mail-count 138
+ :vendor/total-mail-count 139
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :active}
+{:vendor/domain "notify.cloudflare.com"
+ :vendor/last-contact "2026-08-13"
+ :vendor/last-invoice "2026-08-13"
+ :vendor/last-invoice-subject "Your invoice is attached"
+ :vendor/invoice-mail-count 25
+ :vendor/total-mail-count 40
+ :vendor/mailboxes ["somu"]
+ :vendor/status :active}
+{:vendor/domain "biz.moneyforward.com"
+ :vendor/last-contact "2026-08-12"
+ :vendor/last-invoice "2026-08-12"
+ :vendor/last-invoice-subject "【至急ご確認ください】ご登録済みクレジットカードの決済失敗について"
+ :vendor/invoice-mail-count 22
+ :vendor/total-mail-count 29
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :active}
+{:vendor/domain "peatix.com"
+ :vendor/last-contact "2026-08-10"
+ :vendor/last-invoice "2026-08-10"
+ :vendor/last-invoice-subject "【主催者様へ】定額課金機能の活用事例｜毎年の会費徴収を自動化したコミュニティ"
+ :vendor/invoice-mail-count 2
+ :vendor/total-mail-count 5
+ :vendor/mailboxes ["somu"]
+ :vendor/status :active}
+{:vendor/domain "makeleaps.com"
+ :vendor/last-contact "2026-08-07"
+ :vendor/last-invoice "2026-08-07"
+ :vendor/last-invoice-subject "令和8年8月度　ご請求書"
+ :vendor/invoice-mail-count 35
+ :vendor/total-mail-count 35
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :active}
+{:vendor/domain "hubspot.com"
+ :vendor/last-contact "2026-08-06"
+ :vendor/last-invoice "2026-08-06"
+ :vendor/last-invoice-subject "HubSpot請求書802191763"
+ :vendor/invoice-mail-count 60
+ :vendor/total-mail-count 72
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :active}
+{:vendor/domain "google.com"
+ :vendor/last-contact "2026-08-01"
+ :vendor/last-invoice "2026-08-01"
+ :vendor/last-invoice-subject "Google Workspace: Your invoice is available for gftd.group"
+ :vendor/invoice-mail-count 57
+ :vendor/total-mail-count 85
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :active}
+{:vendor/domain "microsoft.com"
+ :vendor/last-contact "2026-08-07"
+ :vendor/last-invoice "2026-07-28"
+ :vendor/last-invoice-subject "Your Microsoft invoice G173632453 is ready"
+ :vendor/invoice-mail-count 105
+ :vendor/total-mail-count 146
+ :vendor/mailboxes ["jinji" "keiri" "somu"]
+ :vendor/status :active}
+{:vendor/domain "monolith-law.jp"
+ :vendor/last-contact "2026-07-27"
+ :vendor/last-invoice "2026-07-27"
+ :vendor/last-invoice-subject "Re: ご請求書の件について"
+ :vendor/invoice-mail-count 24
+ :vendor/total-mail-count 24
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :active}
+{:vendor/domain "account.canva.com"
+ :vendor/last-contact "2026-07-25"
+ :vendor/last-invoice "2026-07-25"
+ :vendor/last-invoice-subject "Canvaよりご請求内容のお知らせ"
+ :vendor/invoice-mail-count 24
+ :vendor/total-mail-count 26
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :active}
+{:vendor/domain "cc.paypay-bank.co.jp"
+ :vendor/last-contact "2026-08-04"
+ :vendor/last-invoice "2026-07-24"
+ :vendor/last-invoice-subject "【Ｖｉｓａデビット】ご利用代金お引き落としのお知らせ"
+ :vendor/invoice-mail-count 359
+ :vendor/total-mail-count 1440
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :active}
+{:vendor/domain "bitwarden.com"
+ :vendor/last-contact "2026-07-24"
+ :vendor/last-invoice "2026-07-24"
+ :vendor/last-invoice-subject "Your receipt from Bitwarden Inc. #2515-9334"
+ :vendor/invoice-mail-count 24
+ :vendor/total-mail-count 26
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :active}
+{:vendor/domain "moneyforward.co.jp"
+ :vendor/last-contact "2026-08-05"
+ :vendor/last-invoice "2026-07-23"
+ :vendor/last-invoice-subject "ご請求金額未納によるサービス停止について【マネーフォワード】"
+ :vendor/invoice-mail-count 18
+ :vendor/total-mail-count 69
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :active}
+{:vendor/domain "ra2.so-net.ne.jp"
+ :vendor/last-contact "2026-07-21"
+ :vendor/last-invoice "2026-07-21"
+ :vendor/last-invoice-subject "【請求書送付】動画制作業務のご請求について"
+ :vendor/invoice-mail-count 4
+ :vendor/total-mail-count 4
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :active}
+{:vendor/domain "executivecentre.com"
+ :vendor/last-contact "2026-07-24"
+ :vendor/last-invoice "2026-07-17"
+ :vendor/last-invoice-subject "Invoice from The Executive Centre Japan K.K. - Gftd Japan K.K.(IN-TYOS"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 7
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :active}
+{:vendor/domain "outlook.jp"
+ :vendor/last-contact "2026-06-30"
+ :vendor/last-invoice "2026-06-30"
+ :vendor/last-invoice-subject "Re: 6月25日のお支払について"
+ :vendor/invoice-mail-count 2
+ :vendor/total-mail-count 5
+ :vendor/mailboxes ["jinji"]
+ :vendor/status :dormant}
+{:vendor/domain "justcoglobal.com"
+ :vendor/last-contact "2026-07-21"
+ :vendor/last-invoice "2026-06-19"
+ :vendor/last-invoice-subject "Re: 【JustCo GranTokyo South Tower】お支払い遅延につきまして 請求書番号JP-JCJP-003383"
+ :vendor/invoice-mail-count 27
+ :vendor/total-mail-count 40
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :dormant}
+{:vendor/domain "sys.mykomon.com"
+ :vendor/last-contact "2026-06-09"
+ :vendor/last-invoice "2026-06-09"
+ :vendor/last-invoice-subject "【請求管理システム】Gftd Japan株式会社様 請求書公開のお知らせ"
+ :vendor/invoice-mail-count 11
+ :vendor/total-mail-count 11
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :dormant}
+{:vendor/domain "e.godaddy.com"
+ :vendor/last-contact "2026-06-08"
+ :vendor/last-invoice "2026-06-08"
+ :vendor/last-invoice-subject "Gftdgroup様：製品請求失敗に関する通知"
+ :vendor/invoice-mail-count 8
+ :vendor/total-mail-count 43
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :dormant}
+{:vendor/domain "runwayml.com"
+ :vendor/last-contact "2026-06-01"
+ :vendor/last-invoice "2026-06-01"
+ :vendor/last-invoice-subject "¥50,667 payment to Runway AI, Inc. was unsuccessful again"
+ :vendor/invoice-mail-count 24
+ :vendor/total-mail-count 24
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :dormant}
+{:vendor/domain "jasa.jp"
+ :vendor/last-contact "2026-05-19"
+ :vendor/last-invoice "2026-05-19"
+ :vendor/last-invoice-subject "RE: 【確認依頼】JASA年会費請求書"
+ :vendor/invoice-mail-count 5
+ :vendor/total-mail-count 58
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :dormant}
+{:vendor/domain "2943.co.jp"
+ :vendor/last-contact "2026-05-13"
+ :vendor/last-invoice "2026-05-13"
+ :vendor/last-invoice-subject "Re: お支払い遅延のお詫びと今後のご連絡について"
+ :vendor/invoice-mail-count 3
+ :vendor/total-mail-count 5
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :dormant}
+{:vendor/domain "github.com"
+ :vendor/last-contact "2026-07-15"
+ :vendor/last-invoice "2026-05-07"
+ :vendor/last-invoice-subject "[GitHub] Payment Receipt for gftdcojp"
+ :vendor/invoice-mail-count 54
+ :vendor/total-mail-count 58
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :dormant}
+{:vendor/domain "ecxia.com"
+ :vendor/last-contact "2026-08-10"
+ :vendor/last-invoice "2026-04-27"
+ :vendor/last-invoice-subject "RE: お支払い遅延のお詫びと今後のご連絡について"
+ :vendor/invoice-mail-count 10
+ :vendor/total-mail-count 22
+ :vendor/mailboxes ["jinji" "keiri"]
+ :vendor/status :dormant}
+{:vendor/domain "stripe.com"
+ :vendor/last-contact "2026-07-24"
+ :vendor/last-invoice "2026-04-15"
+ :vendor/last-invoice-subject "$3.00 payment to Hume AI was unsuccessful again"
+ :vendor/invoice-mail-count 25
+ :vendor/total-mail-count 59
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :dormant}
+{:vendor/domain "gmail.com"
+ :vendor/last-contact "2026-08-04"
+ :vendor/last-invoice "2026-04-08"
+ :vendor/last-invoice-subject "Re: 【ご確認お願い申し上げます】3月分請求書について"
+ :vendor/invoice-mail-count 22
+ :vendor/total-mail-count 97
+ :vendor/mailboxes ["jinji" "keiri" "somu"]
+ :vendor/status :dormant}
+{:vendor/domain "works.gftd.co.jp"
+ :vendor/last-contact "2026-04-08"
+ :vendor/last-invoice "2026-04-08"
+ :vendor/last-invoice-subject "Re: 【Gftd Japan】お支払いについて"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 4
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :dormant}
+{:vendor/domain "canva.com"
+ :vendor/last-contact "2026-03-25"
+ :vendor/last-invoice "2026-03-25"
+ :vendor/last-invoice-subject "要対応：Gftd Japan株式会社へのご請求が完了しませんでした"
+ :vendor/invoice-mail-count 11
+ :vendor/total-mail-count 21
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :dormant}
+{:vendor/domain "uluru.jp"
+ :vendor/last-contact "2026-07-27"
+ :vendor/last-invoice "2026-03-03"
+ :vendor/last-invoice-subject "Re: お支払い遅延のお詫びと猶予のお願い"
+ :vendor/invoice-mail-count 4
+ :vendor/total-mail-count 33
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :dormant}
+{:vendor/domain "freee.co.jp"
+ :vendor/last-contact "2026-02-27"
+ :vendor/last-invoice "2026-02-27"
+ :vendor/last-invoice-subject "【高橋鴻介】 請求書送付のご案内"
+ :vendor/invoice-mail-count 28
+ :vendor/total-mail-count 28
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :dormant}
+{:vendor/domain "muratainc.com"
+ :vendor/last-contact "2026-02-27"
+ :vendor/last-invoice "2026-02-27"
+ :vendor/last-invoice-subject "３月分請求書を添付致します。"
+ :vendor/invoice-mail-count 23
+ :vendor/total-mail-count 28
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :dormant}
+{:vendor/domain "kagoya.co.jp"
+ :vendor/last-contact "2026-02-25"
+ :vendor/last-invoice "2026-02-25"
+ :vendor/last-invoice-subject "Re: 【請求書】送付のご案内（Gftd Japan株式会社から）"
+ :vendor/invoice-mail-count 4
+ :vendor/total-mail-count 4
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :dormant}
+{:vendor/domain "db3.so-net.ne.jp"
+ :vendor/last-contact "2026-03-29"
+ :vendor/last-invoice "2026-02-03"
+ :vendor/last-invoice-subject "Re: 12月分の請求書"
+ :vendor/invoice-mail-count 11
+ :vendor/total-mail-count 105
+ :vendor/mailboxes ["jinji" "keiri"]
+ :vendor/status :dormant}
+{:vendor/domain "mail.timescar.jp"
+ :vendor/last-contact "2026-07-01"
+ :vendor/last-invoice "2025-12-04"
+ :vendor/last-invoice-subject "《重要》距離料金の課金条件およびタイムズカープログラムステージ特典の一部改定のお知らせ【Times CAR】"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 6
+ :vendor/mailboxes ["somu"]
+ :vendor/status :stale}
+{:vendor/domain "billing-robo.jp"
+ :vendor/last-contact "2025-10-31"
+ :vendor/last-invoice "2025-10-31"
+ :vendor/last-invoice-subject "株式会社Enjinよりご請求書送付のご案内（202510-726616-1）"
+ :vendor/invoice-mail-count 17
+ :vendor/total-mail-count 17
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :stale}
+{:vendor/domain "icloud.com"
+ :vendor/last-contact "2025-10-03"
+ :vendor/last-invoice "2025-10-03"
+ :vendor/last-invoice-subject "Re: 請求書再送のお願い"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 5
+ :vendor/mailboxes ["jinji" "somu"]
+ :vendor/status :stale}
+{:vendor/domain "gcoach.jp"
+ :vendor/last-contact "2025-09-29"
+ :vendor/last-invoice "2025-09-29"
+ :vendor/last-invoice-subject "再度のご連絡【 請求書No. GTJ202306_再発⾏ 】未払いの件"
+ :vendor/invoice-mail-count 3
+ :vendor/total-mail-count 3
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :stale}
+{:vendor/domain "auth0.com"
+ :vendor/last-contact "2025-09-28"
+ :vendor/last-invoice "2025-09-28"
+ :vendor/last-invoice-subject "Your receipt from Auth0 by Okta #2786-7858"
+ :vendor/invoice-mail-count 7
+ :vendor/total-mail-count 7
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :stale}
+{:vendor/domain "lastpass.com"
+ :vendor/last-contact "2025-09-09"
+ :vendor/last-invoice "2025-09-09"
+ :vendor/last-invoice-subject "URGENT: LastPass Payment Update Required"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 4
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :stale}
+{:vendor/domain "yashin.co.jp"
+ :vendor/last-contact "2025-09-04"
+ :vendor/last-invoice "2025-09-04"
+ :vendor/last-invoice-subject "令和7年9月発行分顧問料等御請求書"
+ :vendor/invoice-mail-count 14
+ :vendor/total-mail-count 14
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :stale}
+{:vendor/domain "prtimes.co.jp"
+ :vendor/last-contact "2025-09-01"
+ :vendor/last-invoice "2025-09-01"
+ :vendor/last-invoice-subject "【2025年8月PR TIMESご利用請求書】#20250901_134218#08009653"
+ :vendor/invoice-mail-count 4
+ :vendor/total-mail-count 8
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :stale}
+{:vendor/domain "bit.cloud"
+ :vendor/last-contact "2025-08-25"
+ :vendor/last-invoice "2025-08-25"
+ :vendor/last-invoice-subject "Bit Cloud subscription canceled"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 2
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :stale}
+{:vendor/domain "resalon-inc.com"
+ :vendor/last-contact "2025-10-01"
+ :vendor/last-invoice "2025-08-18"
+ :vendor/last-invoice-subject "【be my flora / RESALON 公式オンラインショップ】 領収書を発行いたしました"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 6
+ :vendor/mailboxes ["jinji"]
+ :vendor/status :stale}
+{:vendor/domain "mobile.rakuten.co.jp"
+ :vendor/last-contact "2025-08-05"
+ :vendor/last-invoice "2025-08-05"
+ :vendor/last-invoice-subject "【重要】[楽天モバイル] ご利用額確定のお知らせとお支払い方法のご案内"
+ :vendor/invoice-mail-count 15
+ :vendor/total-mail-count 20
+ :vendor/mailboxes ["somu"]
+ :vendor/status :stale}
+{:vendor/domain "tm.openai.com"
+ :vendor/last-contact "2025-07-31"
+ :vendor/last-invoice "2025-07-30"
+ :vendor/last-invoice-subject "OpenAI API Invoice EFB010DC-0014"
+ :vendor/invoice-mail-count 8
+ :vendor/total-mail-count 13
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :stale}
+{:vendor/domain "sales-crowd.jp"
+ :vendor/last-contact "2025-07-30"
+ :vendor/last-invoice "2025-07-30"
+ :vendor/last-invoice-subject "本人資料請求内容 受付日：2025/07/30 【Sales Crowd報告メール】"
+ :vendor/invoice-mail-count 2
+ :vendor/total-mail-count 3
+ :vendor/mailboxes ["somu"]
+ :vendor/status :stale}
+{:vendor/domain "uefll.co.jp"
+ :vendor/last-contact "2025-07-03"
+ :vendor/last-invoice "2025-07-03"
+ :vendor/last-invoice-subject "Re: 【ご確認のお願い】Fwd: 【11月の請求書添付】【12月の請求書を先日請求いたしました】"
+ :vendor/invoice-mail-count 21
+ :vendor/total-mail-count 24
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :stale}
+{:vendor/domain "aidma-hd.jp"
+ :vendor/last-contact "2026-08-07"
+ :vendor/last-invoice "2025-06-30"
+ :vendor/last-invoice-subject "【株式会社アイドマ・ホールディングス】アイドマライン 御請求書送付のご案内"
+ :vendor/invoice-mail-count 38
+ :vendor/total-mail-count 105
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :stale}
+{:vendor/domain "uniforce.co.jp"
+ :vendor/last-contact "2025-06-27"
+ :vendor/last-invoice "2025-06-27"
+ :vendor/last-invoice-subject "Re: お支払の件ついて"
+ :vendor/invoice-mail-count 44
+ :vendor/total-mail-count 44
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :stale}
+{:vendor/domain "bunkyo-cl.jp"
+ :vendor/last-contact "2025-06-05"
+ :vendor/last-invoice "2025-06-05"
+ :vendor/last-invoice-subject "RE: 文京内科・循環器クリニック　健康診断料お支払いについて"
+ :vendor/invoice-mail-count 5
+ :vendor/total-mail-count 6
+ :vendor/mailboxes ["jinji" "keiri"]
+ :vendor/status :stale}
+{:vendor/domain "mfkessai.co.jp"
+ :vendor/last-contact "2025-06-05"
+ :vendor/last-invoice "2025-06-04"
+ :vendor/last-invoice-subject "Re: 【マネーフォワードケッサイ株式会社】請求書につきまして"
+ :vendor/invoice-mail-count 17
+ :vendor/total-mail-count 26
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :stale}
+{:vendor/domain "np-kakebarai.com"
+ :vendor/last-contact "2025-06-03"
+ :vendor/last-invoice "2025-06-03"
+ :vendor/last-invoice-subject "【NP掛け払い】お支払いありがとうございました（ＧＯ株式会社様ご購入分）"
+ :vendor/invoice-mail-count 21
+ :vendor/total-mail-count 26
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :stale}
+{:vendor/domain "callconnect.jp"
+ :vendor/last-contact "2025-06-30"
+ :vendor/last-invoice "2025-06-03"
+ :vendor/last-invoice-subject "6月度クレジットカード決済のお知らせ"
+ :vendor/invoice-mail-count 17
+ :vendor/total-mail-count 62
+ :vendor/mailboxes ["somu"]
+ :vendor/status :stale}
+{:vendor/domain "arata-lawoffice.com"
+ :vendor/last-contact "2025-05-18"
+ :vendor/last-invoice "2025-05-18"
+ :vendor/last-invoice-subject "受任通知兼請求書　【弁護士法人　あらた】　※送信専用※"
+ :vendor/invoice-mail-count 3
+ :vendor/total-mail-count 3
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :stale}
+{:vendor/domain "jc3.or.jp"
+ :vendor/last-contact "2025-04-22"
+ :vendor/last-invoice "2025-04-22"
+ :vendor/last-invoice-subject "RE: 打合せ依頼: 【ご確認のお願い】11月発行分のご請求書につきまして"
+ :vendor/invoice-mail-count 12
+ :vendor/total-mail-count 14
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :stale}
+{:vendor/domain "transition.jp"
+ :vendor/last-contact "2026-07-21"
+ :vendor/last-invoice "2025-04-22"
+ :vendor/last-invoice-subject "【スカウター】料金のお支払方法（ポイント購入手順）"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 15
+ :vendor/mailboxes ["jinji" "somu"]
+ :vendor/status :stale}
+{:vendor/domain "rbbasil.eco-serv.jp"
+ :vendor/last-contact "2025-04-21"
+ :vendor/last-invoice "2025-04-21"
+ :vendor/last-invoice-subject "【株式会社ベストパーソン　Web請求書】帳票公開のご案内"
+ :vendor/invoice-mail-count 8
+ :vendor/total-mail-count 8
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :stale}
+{:vendor/domain "misoca.jp"
+ :vendor/last-contact "2025-04-09"
+ :vendor/last-invoice "2025-04-09"
+ :vendor/last-invoice-subject "弁護士法人モノリス法律事務所 より請求書が届いています。 【3月分タイムチャージの件】"
+ :vendor/invoice-mail-count 10
+ :vendor/total-mail-count 10
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :stale}
+{:vendor/domain "gftd.works"
+ :vendor/last-contact "2025-05-13"
+ :vendor/last-invoice "2025-04-07"
+ :vendor/last-invoice-subject "Fw: 決済できなかったカードがあります（マネーフォワード Pay for Business）"
+ :vendor/invoice-mail-count 17
+ :vendor/total-mail-count 54
+ :vendor/mailboxes ["jinji" "keiri" "somu"]
+ :vendor/status :stale}
+{:vendor/domain "email.teams.microsoft.com"
+ :vendor/last-contact "2025-04-21"
+ :vendor/last-invoice "2025-04-07"
+ :vendor/last-invoice-subject "Undeliverable: Fw: 【至急ご確認ください】ご登録済みクレジットカードの決済失敗について"
+ :vendor/invoice-mail-count 2
+ :vendor/total-mail-count 6
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :stale}
+{:vendor/domain "paddle.com"
+ :vendor/last-contact "2025-04-02"
+ :vendor/last-invoice "2025-03-26"
+ :vendor/last-invoice-subject "Your Item: 1192864 | Tariff Plan: Amateur, billed for 1 Year subscript"
+ :vendor/invoice-mail-count 3
+ :vendor/total-mail-count 4
+ :vendor/mailboxes ["somu"]
+ :vendor/status :stale}
+{:vendor/domain "nks.co.jp"
+ :vendor/last-contact "2025-05-09"
+ :vendor/last-invoice "2025-03-03"
+ :vendor/last-invoice-subject "Re: 【日経テレコン】お支払いの件"
+ :vendor/invoice-mail-count 17
+ :vendor/total-mail-count 23
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :stale}
+{:vendor/domain "mailgw60.onamae.ne.jp"
+ :vendor/last-contact "2025-02-26"
+ :vendor/last-invoice "2025-02-26"
+ :vendor/last-invoice-subject "配信不能: 【お支払いの件】アイドマ・ホールディングスの北でございます。"
+ :vendor/invoice-mail-count 2
+ :vendor/total-mail-count 2
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :stale}
+{:vendor/domain "efax.co.jp"
+ :vendor/last-contact "2025-02-20"
+ :vendor/last-invoice "2025-02-20"
+ :vendor/last-invoice-subject "eFax 請求明細書"
+ :vendor/invoice-mail-count 7
+ :vendor/total-mail-count 7
+ :vendor/mailboxes ["somu"]
+ :vendor/status :stale}
+{:vendor/domain "mail.efax.com"
+ :vendor/last-contact "2025-02-18"
+ :vendor/last-invoice "2025-02-18"
+ :vendor/last-invoice-subject "お支払処理を行うことができませんでした [eFax]"
+ :vendor/invoice-mail-count 2
+ :vendor/total-mail-count 3
+ :vendor/mailboxes ["somu"]
+ :vendor/status :stale}
+{:vendor/domain "isoplab.co.jp"
+ :vendor/last-contact "2025-08-01"
+ :vendor/last-invoice "2025-02-10"
+ :vendor/last-invoice-subject "Re: 【株式会社IsoPらぼ】請求書送付のご案内"
+ :vendor/invoice-mail-count 3
+ :vendor/total-mail-count 17
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :stale}
+{:vendor/domain "pasona-jobhub.co.jp"
+ :vendor/last-contact "2025-01-22"
+ :vendor/last-invoice "2025-01-22"
+ :vendor/last-invoice-subject "RE: ご捺印対応のご依頼　RE: 休止解約書類のご確認のお願い　RE: 【顧問/ご請求書のご送付(12月末日)】パソナJOB HUB功刀"
+ :vendor/invoice-mail-count 34
+ :vendor/total-mail-count 48
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :stale}
+{:vendor/domain "biz.nuro.jp"
+ :vendor/last-contact "2025-01-07"
+ :vendor/last-invoice "2025-01-07"
+ :vendor/last-invoice-subject "【NURO Bizポータル】領収書／領収履歴準備完了のご案内"
+ :vendor/invoice-mail-count 11
+ :vendor/total-mail-count 11
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :stale}
+{:vendor/domain "cardservice.co.jp"
+ :vendor/last-contact "2025-01-07"
+ :vendor/last-invoice "2025-01-07"
+ :vendor/last-invoice-subject "【ZEUS】決済完了メール（自動配信）"
+ :vendor/invoice-mail-count 6
+ :vendor/total-mail-count 7
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :stale}
+{:vendor/domain "smaregi.jp"
+ :vendor/last-contact "2025-01-07"
+ :vendor/last-invoice "2025-01-07"
+ :vendor/last-invoice-subject "[POS]【スマレジ】2025年01月01日ご請求費用お支払完了のお知らせ"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 8
+ :vendor/mailboxes ["jinji" "keiri"]
+ :vendor/status :stale}
+{:vendor/domain "goinc.jp"
+ :vendor/last-contact "2025-06-19"
+ :vendor/last-invoice "2025-01-07"
+ :vendor/last-invoice-subject "【必ずご確認ください】GO BUSINESSのお支払いにつきまして"
+ :vendor/invoice-mail-count 3
+ :vendor/total-mail-count 25
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :stale}
+{:vendor/domain "silver-life.jp"
+ :vendor/last-contact "2026-08-05"
+ :vendor/last-invoice "2024-12-12"
+ :vendor/last-invoice-subject "【重要】正月明け12月請求書発行スケジュールについて"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 43
+ :vendor/mailboxes ["somu"]
+ :vendor/status :historical}
+{:vendor/domain "hifcorp.co.jp"
+ :vendor/last-contact "2024-11-28"
+ :vendor/last-invoice "2024-11-28"
+ :vendor/last-invoice-subject "【システム通知】株式会社アイドマ・ホールディングス様発行の請求書について"
+ :vendor/invoice-mail-count 2
+ :vendor/total-mail-count 2
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :historical}
+{:vendor/domain "hikarigiga.jp"
+ :vendor/last-contact "2024-11-20"
+ :vendor/last-invoice "2024-11-20"
+ :vendor/last-invoice-subject "【株式会社ハイホー】ご請求額確定お知らせメール"
+ :vendor/invoice-mail-count 4
+ :vendor/total-mail-count 4
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :historical}
+{:vendor/domain "sdiken.org"
+ :vendor/last-contact "2024-11-14"
+ :vendor/last-invoice "2024-11-14"
+ :vendor/last-invoice-subject "Re: 【請求書】送付のご案内（Gftd Japan株式会社から）"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 1
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :historical}
+{:vendor/domain "koankai.com"
+ :vendor/last-contact "2024-11-12"
+ :vendor/last-invoice "2024-11-12"
+ :vendor/last-invoice-subject "Re: 当社請求書の確認依頼"
+ :vendor/invoice-mail-count 2
+ :vendor/total-mail-count 2
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :historical}
+{:vendor/domain "hi-hoinc.com"
+ :vendor/last-contact "2024-11-04"
+ :vendor/last-invoice "2024-11-04"
+ :vendor/last-invoice-subject "【株式会社ハイホー】ご請求額確定お知らせメール"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 1
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :historical}
+{:vendor/domain "fimplepay.com"
+ :vendor/last-contact "2024-10-31"
+ :vendor/last-invoice "2024-10-31"
+ :vendor/last-invoice-subject "販売元 株式会社アイドマ・ホールディングス / H.I.F.株式会社様より請求書が届いています ー"
+ :vendor/invoice-mail-count 5
+ :vendor/total-mail-count 5
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :historical}
+{:vendor/domain "paiza.co.jp"
+ :vendor/last-contact "2024-10-25"
+ :vendor/last-invoice "2024-10-25"
+ :vendor/last-invoice-subject "Re: 7月末入金依頼の請求書について／paiza千田"
+ :vendor/invoice-mail-count 18
+ :vendor/total-mail-count 18
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :historical}
+{:vendor/domain "bestperson.jp"
+ :vendor/last-contact "2025-06-11"
+ :vendor/last-invoice "2024-10-23"
+ :vendor/last-invoice-subject "11月過誤請求チェックリスト送付"
+ :vendor/invoice-mail-count 9
+ :vendor/total-mail-count 59
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :historical}
+{:vendor/domain "burg.co.jp"
+ :vendor/last-contact "2024-12-27"
+ :vendor/last-invoice "2024-10-18"
+ :vendor/last-invoice-subject "テンジン5丁目アパートメント請求書の件"
+ :vendor/invoice-mail-count 2
+ :vendor/total-mail-count 9
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :historical}
+{:vendor/domain "lynx.life"
+ :vendor/last-contact "2024-10-08"
+ :vendor/last-invoice "2024-10-08"
+ :vendor/last-invoice-subject "Gftd Japan様　 10月分のご請求について【リンクス】"
+ :vendor/invoice-mail-count 3
+ :vendor/total-mail-count 12
+ :vendor/mailboxes ["keiri" "somu"]
+ :vendor/status :historical}
+{:vendor/domain "kaonavi.jp"
+ :vendor/last-contact "2024-10-01"
+ :vendor/last-invoice "2024-10-01"
+ :vendor/last-invoice-subject "【カオナビ】請求書 2024年9月分(Gftd Japan株式会社 様)"
+ :vendor/invoice-mail-count 16
+ :vendor/total-mail-count 17
+ :vendor/mailboxes ["jinji" "keiri"]
+ :vendor/status :historical}
+{:vendor/domain "up-sider.com"
+ :vendor/last-contact "2026-06-12"
+ :vendor/last-invoice "2024-10-01"
+ :vendor/last-invoice-subject "【重要】決済システムのメンテナンス日程とその影響のお知らせ｜UPSIDER"
+ :vendor/invoice-mail-count 3
+ :vendor/total-mail-count 8
+ :vendor/mailboxes ["somu"]
+ :vendor/status :historical}
+{:vendor/domain "yamamoto-kinen.or.jp"
+ :vendor/last-contact "2024-09-19"
+ :vendor/last-invoice "2024-09-19"
+ :vendor/last-invoice-subject "RE: 【請求書】送付のご案内（Gftd Japan株式会社から）"
+ :vendor/invoice-mail-count 4
+ :vendor/total-mail-count 4
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :historical}
+{:vendor/domain "yurindo.co.jp"
+ :vendor/last-contact "2024-09-18"
+ :vendor/last-invoice "2024-09-18"
+ :vendor/last-invoice-subject "アスクルご請求について"
+ :vendor/invoice-mail-count 2
+ :vendor/total-mail-count 2
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :historical}
+{:vendor/domain "value-press.com"
+ :vendor/last-contact "2024-09-18"
+ :vendor/last-invoice "2024-09-17"
+ :vendor/last-invoice-subject "[valuepress]クレジットカード決済完了通知"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 3
+ :vendor/mailboxes ["somu"]
+ :vendor/status :historical}
+{:vendor/domain "8card.net"
+ :vendor/last-contact "2024-09-09"
+ :vendor/last-invoice "2024-09-09"
+ :vendor/last-invoice-subject "Sansan株式会社 からの領収書 (領収書番号 2775-0902)"
+ :vendor/invoice-mail-count 2
+ :vendor/total-mail-count 5
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :historical}
+{:vendor/domain "digitalocean.com"
+ :vendor/last-contact "2024-09-08"
+ :vendor/last-invoice "2024-09-08"
+ :vendor/last-invoice-subject "DigitalOcean - Received $2.02 payment"
+ :vendor/invoice-mail-count 14
+ :vendor/total-mail-count 14
+ :vendor/mailboxes ["somu"]
+ :vendor/status :historical}
+{:vendor/domain "kyuden.co.jp"
+ :vendor/last-contact "2024-08-21"
+ :vendor/last-invoice "2024-08-21"
+ :vendor/last-invoice-subject "【九州電力】電気料金のお支払方法変更　お申込受付のお知らせ"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 1
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :historical}
+{:vendor/domain "sansan.com"
+ :vendor/last-contact "2024-08-20"
+ :vendor/last-invoice "2024-08-20"
+ :vendor/last-invoice-subject "※ご対応ください※決済エラーについて（8/24までにご対応ください）/ Sansan株式会社"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 1
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :historical}
+{:vendor/domain "kurashi3.tepco.co.jp"
+ :vendor/last-contact "2024-08-09"
+ :vendor/last-invoice "2024-08-09"
+ :vendor/last-invoice-subject "【重要／くらしTEPCO web】2024年10月分ご請求からの各種割引等の終了について"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 1
+ :vendor/mailboxes ["somu"]
+ :vendor/status :historical}
+{:vendor/domain "paid.jp"
+ :vendor/last-contact "2026-03-09"
+ :vendor/last-invoice "2024-08-06"
+ :vendor/last-invoice-subject "＜Paid＞複数拠点向けの請求も対応できるのをご存じですか？"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 12
+ :vendor/mailboxes ["keiri"]
+ :vendor/status :historical}
+{:vendor/domain "nlpcloud.com"
+ :vendor/last-contact "2024-08-23"
+ :vendor/last-invoice "2024-08-06"
+ :vendor/last-invoice-subject "Your receipt from NLP Cloud #2166-6416"
+ :vendor/invoice-mail-count 1
+ :vendor/total-mail-count 3
+ :vendor/mailboxes ["somu"]
+ :vendor/status :historical}
+]
