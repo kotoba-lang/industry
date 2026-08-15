@@ -22,7 +22,25 @@
  {:live-service-durable-data
   {:policy/authority "90-docs/adr/2608159100-kotobase-net-default-durable-boundary.edn"
    :policy/scope :runtime-durable-plane
-   :policy/production-origin "https://kotobase.net"
+   :policy/authority-origin "https://kotobase.net"
+   :policy/default-api-origin "https://kotobase.net"
+   :policy/capability-origins
+   {:datomic "https://datomic.kotobase.net"
+    :sparql "https://sparql.kotobase.net"
+    :cypher "https://cypher.kotobase.net"
+    :gremlin "https://gremlin.kotobase.net"
+    :graphql "https://graphql.kotobase.net"
+    :s3 "https://s3.kotobase.net"
+    :git "https://git.kotobase.net"
+    :atproto "https://atproto.kotobase.net"
+    :pinning "https://pinning.kotobase.net"}
+   :policy/internal-capability-origins
+   {:datoms "https://datoms.kotobase.net"}
+   :policy/query-dialects #{:datalog :sql :cypher :sparql :graphql :gremlin}
+   :policy/deprecated-origin-aliases
+   #{"https://graph-database.kotobase.net"
+     "https://backend.kotobase.net"
+     "https://graphdb.kotobase.net"}
    :policy/immutable-block-path "/ipld/:cid"
    :policy/datom-path-prefix "/api/"
    :policy/large-object-entry-origin "https://kotobase.net"
@@ -33,6 +51,8 @@
    :policy/coordination-only #{:durable-object :d1 :kv}
    :policy/forbids #{:application-direct-r2-binding
                      :provider-origin-as-production-premise
+                     :deprecated-origin-alias-in-new-config
+                     :query-implementation-name-as-capability
                      :durable-object-as-data-authority
                      :silent-production-fallback}
    :policy/excludes #{:git-edn-source-plane :datalad-large-artifact-plane

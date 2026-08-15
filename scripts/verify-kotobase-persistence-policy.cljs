@@ -27,13 +27,16 @@
       p (get-in rules [:workspace-policies :live-service-durable-data])
       exact {:policy/authority adr-path
              :policy/scope :runtime-durable-plane
-             :policy/production-origin "https://kotobase.net"
+             :policy/authority-origin "https://kotobase.net"
+             :policy/default-api-origin "https://kotobase.net"
              :policy/immutable-block-path "/ipld/:cid"
              :policy/datom-path-prefix "/api/"
              :policy/large-object-entry-origin "https://kotobase.net"}
       required #{:cid-verified-read :cid-verified-write :fresh-cacao-nonce
                  :recoverable-without-coordination-store}
       forbidden #{:application-direct-r2-binding :provider-origin-as-production-premise
+                  :deprecated-origin-alias-in-new-config
+                  :query-implementation-name-as-capability
                   :durable-object-as-data-authority :silent-production-fallback}]
   (when-not (map? p) (fail! "missing :workspace-policies :live-service-durable-data"))
   (doseq [[k expected] exact]
@@ -43,12 +46,36 @@
     (fail! (str ":policy/requires drift: " (pr-str (:policy/requires p)))))
   (when-not (= forbidden (:policy/forbids p))
     (fail! (str ":policy/forbids drift: " (pr-str (:policy/forbids p)))))
+  (when-not (= {:datomic "https://datomic.kotobase.net"
+                :sparql "https://sparql.kotobase.net"
+                :cypher "https://cypher.kotobase.net"
+                :gremlin "https://gremlin.kotobase.net"
+                :graphql "https://graphql.kotobase.net"
+                :s3 "https://s3.kotobase.net"
+                :git "https://git.kotobase.net"
+                :atproto "https://atproto.kotobase.net"
+                :pinning "https://pinning.kotobase.net"}
+               (:policy/capability-origins p))
+    (fail! ":policy/capability-origins drift"))
+  (when-not (= {:datoms "https://datoms.kotobase.net"}
+               (:policy/internal-capability-origins p))
+    (fail! ":policy/internal-capability-origins drift"))
+  (when-not (= #{:datalog :sql :cypher :sparql :graphql :gremlin}
+               (:policy/query-dialects p))
+    (fail! ":policy/query-dialects drift"))
+  (when-not (= #{"https://graph-database.kotobase.net"
+                 "https://backend.kotobase.net"
+                 "https://graphdb.kotobase.net"}
+               (:policy/deprecated-origin-aliases p))
+    (fail! ":policy/deprecated-origin-aliases drift"))
   (when-not (= #{:durable-object :d1 :kv} (:policy/coordination-only p))
     (fail! ":policy/coordination-only must be exactly durable-object/d1/kv"))
   (when-not (= "ADR-2608159100" (:adr/id adr)) (fail! "ADR id mismatch"))
   (when-not (= "accepted" (:adr/status adr)) (fail! "ADR is not accepted"))
   (doseq [needle ["live service の永続化境界は `kotobase.net`"
                   "PUT/GET https://kotobase.net/ipld/:cid"
+                  "sparql.kotobase.net/repositories/default"
+                  "SQL は独立 origin ではなく query dialect"
                   ":workspace-policies :live-service-durable-data"
                   "root-kotobase-persistence-policy"]]
     (when-not (str/includes? agents needle)
@@ -60,4 +87,4 @@
   (do (println "kotobase-persistence-policy: FAIL")
       (doseq [f @failures] (println " -" f))
       (js/process.exit 1))
-  (println "kotobase-persistence-policy: OK — apex origin, IPLD blocks, datom metadata, coordination-only stores"))
+  (println "kotobase-persistence-policy: OK — apex authority, capability origins, IPLD blocks, datom metadata, coordination-only stores"))
