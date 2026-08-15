@@ -21,6 +21,9 @@
 | `cloud-itonami/yotei` | `yotei.seat`（席=容量）/ `yotei.delegation`（受付委任）/ `yoyaku/confirm-yoyaku-delegated` | `e85ae891` |
 | `kotoba-lang/koe` | `koe.media` / `koe.carrier` / `koe.arrival` / `koe.bridge`（電話側の共通部分） | `1ebb0acd` |
 | `kotoba-lang/com-whisper` | `whisper.engine`（実エンジン結合 + fleet 実測） | `8ec472c5` |
+| `kotoba-lang/kotoba-sema` | `:stream/accept`(25) / `:stream/send`(26) の登録 | `77175066` |
+| `kotoba-lang/provider` | `provider.stream-ingress`（参照実装） | `509fe9e5` |
+| `kotoba-lang/compiler` | `stream-ingress-v1` kit + `base64-kit` + guest 実行の証明 | `53d44bab` |
 | `cloud-itonami/denwaban` | `uketsuke`（会話）/ `yoyaku`（予約委譲）/ `consent` / `kikitori`（決定論抽出）/ `serifu`（事前レンダ）/ `ws`（socket） | `f0f56d82` |
 | `cloud-itonami/cloud-itonami-isic-561` | `restaurantops.yotei-intake`（確定 予約 → 検証済み記録） | `1264639a` |
 
@@ -408,15 +411,32 @@ i32 shifts                                OK     ✗      OK      OK   (cljs は
 > 通す。**canonical なベクタが canonicalization を試していない**のは、今日の
 > Twilio 署名テストと同じ形である。
 
-### 不足の正しい一覧（優先順、訂正後）
+### 不足の一覧 —— 全部塞いだ（2026-08-15、closing 時点）
 
-| | 何が要るか | 状態 |
-|---|---|---|
-| 1 | **双方向 stream ingress kit** —— `http-ingress-v1` の双方向版。フレームの出入りだけを capability にすれば `koe.bridge` の形と一致する | **これだけが本物の不足** |
-| 2 | base64 の **stdlib 収録** | コードは動く。stdlib は `:frozen` で「public names の拡張は version bump + WBS T4.x タスク」と明記されており、**governed な手続き**が要る（勝手に足さない） |
-| 3 | HMAC | 純粋な構成。sha256 は provider 実装済みだが ABI が `(ptr len out-ptr out-cap)` の**メモリ面**なので、`:vector-i64` から呼ぶ橋が要る |
-| — | ~~shift の lowering~~ | **不要。既にある**（名前が違っただけ） |
-| — | ~~hash/HMAC kit~~ / ~~base64 kit~~ | **不要**（純関数 / provider 実装済み） |
+| | 状態 |
+|---|---|
+| **双方向 stream ingress** | ✅ **landed**。capability 2 つ（`:stream/accept` 25 / `:stream/send` 26）+ 参照 provider + kit + **guest 実行の証明** |
+| base64 | ✅ **書けることを証明**（`:base64-kit`、RFC 4648 の全パディングケース）。stdlib 収録は `:frozen` の governed 手続きなので別件 |
+| ~~shift の lowering~~ | 不要だった（名前が違っただけ） |
+| ~~hash/HMAC kit~~ | 不要（sha256 は provider 実装済み、HMAC はその上の純粋な構成） |
+| process / exec | **足さない**。ambient authority そのもので、Kotoba が拒否している当のもの |
+
+**stream ingress の設計判断 2 つ:**
+
+- **capability を 2 つに分けた。** ストリームを聞いてよい guest が、そこに話して
+  よいわけではない。`:stream/transact` 1 つでは、聞く受付と話す受付が同じ許可に
+  なる。accept だけを admit した policy の下で send を呼ぶと **`capability denied`
+  で実際に止まる**（instantiate ではなく**呼んだ瞬間**。実測した場所にテストを置いた）
+- **満杯のキューはストリームを閉じる。フレームは捨てない。** 捨てられた音声フレームは
+  プログラムには何も起きていないように見え、**電話の相手にだけ聞こえる**故障である。
+  シーケンス番号も同じ理由で、欠番が無ければ**取りこぼしの多い回線と静かな回線が
+  同じ観測**になる
+
+**`:reference :implemented` は実行して主張した。** ソースからコンパイルした guest が、
+cap 25/26 だけを admit する policy の下で reference runtime 経由で provider に届き、
+`:opened` → `:frame` をペイロード込みで受け、フレームを送り、host がそれを見る。
+kit の宣言と provider の実装が一致することもテストが押さえている（overflow 方針と
+wire id を動かすと落ちる）。
 
 ### したがって、いま Kotoba に移せるもの / 移せないもの
 
