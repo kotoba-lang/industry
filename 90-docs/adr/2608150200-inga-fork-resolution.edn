@@ -55,12 +55,34 @@ fork しない**（片側が未証明の block を 1 つ余分に持つだけ）
 - **rewind 経路では certified-prefix の救済をしない。** 切り詰めると peer が
   どこまで巻き戻すかを選べる。
 
-## 書かなかったもの
+## 書かなかったもの —— そして、それは誤りだった（2026-08-15 追記）
 
 sync-request の `:from` を tip より下へ歩かせる版も書いた（`sync-from` /
-`fork-rewind-step`）。**どのシナリオでも実行されなかった** —— 外して full suite が
-緑のままだったので落とした。解決に効いているのは `sync-step` 側だけ。
-一度も緑にならない gate と同じ理由で、実演できない機構は無内容。
+`fork-rewind-step`）。in-process harness のどのシナリオでも実行されなかったので
+落とした。「実演できない機構は無内容」という理由づけ自体は正しい。
+
+**結論が誤っていた。反例が production に在った。**
+
+deploy 済み devnet で実測（closing 時）:
+
+    w1  h 5616  committed 5614  booted-from-checkpoint true   checkpoint 5600
+    w2  h 5634  committed 5632  booted-from-checkpoint false
+    sync  offered 18  from 5617  to 5634  adopted 0
+          reason: w1/w4 does-not-link / w2/w3 does-not-attach
+
+w1 と w4 は evict されて checkpoint 5600 から resume し、5616 に着いた。
+w2/w3 は 5634 まで進んでいる。peer が出せるのは 5617-5634 で、**分岐は 5616
+以下（resume した prefix の中）に在る**。segment は tip より上から始まるので
+`sync-step` の rewind 経路（`conflicts-with-chain?`）には**到達しない** ——
+append 経路が `does-not-link` で拒否して終わる。
+
+**tip+1 から要求する限り、分岐点を含む範囲は永久に要求されない。** これは
+落とした `sync-from` がまさに書かれた条件で、私は「harness で再現できない」
+ことを「起きない」と読んだ。**再現できないことは、存在しないことの証拠ではない**
+—— この repo が repo 検索について言っているのと同じ誤り。
+
+正しい順序は「production の形（checkpoint resume で分岐した prefix）を harness に
+足す → `sync-from` を戻す」であって、harness に無いからと落とすことではなかった。
 
 ## 検査
 
