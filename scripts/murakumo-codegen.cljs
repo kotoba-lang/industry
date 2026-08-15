@@ -129,6 +129,25 @@
                         :tps (get-in m [:timings :predicted_per_second])})))))
         (.catch (fn [e] {:error (str "request failed: " (.-message e))})))))
 
+;; **markdown fence を剥がす。** "Output ONLY code" と指示してもモデルは
+;; ```clojure … ``` で包むことがあり、そのまま `.kotoba` に書くと
+;; `only ns, def, defn, and defn- are allowed at top level` でコンパイルが落ちる。
+;; 2026-08-15 に実際に踏んだ —— **生成物は正しかったのに、包装のせいで使えなかった。**
+;; ここで剥がすのは整形ではなく、「書き出したファイルがそのまま入力になる」という
+;; この script の約束を守るため。fence が無ければ何もしない。
+;; **正規表現で書かない。** 最初の版は `#"(?s)\A\s*```…"` を使ったが、
+;; ClojureScript の正規表現は JS の RegExp なので `\A` も `\z` も `(?s)` も無く、
+;; **一致せず、例外も出さず、黙って原文を返した**（2026-08-15 実測。「剥がした」
+;; と読めるのに fence が残り、下流のコンパイルが落ちた）。行単位の素直な判定にする。
+(defn- strip-fences [s]
+  (let [lines (str/split-lines (str/trim (str s)))
+        opens? (str/starts-with? (str/trim (or (first lines) "")) "```")
+        closes? (and (> (count lines) 1)
+                     (str/starts-with? (str/trim (or (last lines) "")) "```"))]
+    (if-not opens?
+      (str s)
+      (str/join "\n" (cond-> (vec (rest lines)) closes? pop)))))
+
 (defn- run-pool!
   "bounded concurrency。Promise.all で全部同時に投げない —— ring の申告並列度を
    超えると queue に積まれるだけで、速くならず失敗の診断だけ難しくなる。"
@@ -149,7 +168,7 @@
                                             (println "FAIL" (:id job) "—" (:error r))
                                             (do (when (:out job)
                                                   (fs/mkdirSync (path/dirname (:out job)) #js {:recursive true})
-                                                  (fs/writeFileSync (:out job) (:content r)))
+                                                  (fs/writeFileSync (:out job) (strip-fences (:content r))))
                                                 (println (str "ok   " (:id job)
                                                               "  " (get-in r [:usage :completion_tokens]) " tok"
                                                               "  " (.toFixed secs 1) "s"
