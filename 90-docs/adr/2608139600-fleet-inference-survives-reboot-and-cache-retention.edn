@@ -86,7 +86,24 @@
                    :first-main-tip-receipt-outcome "pass"
                    :first-main-tip-receipt-check "test-murakumo-5f392e0-murakumo-judah"
                    :first-main-tip-receipt-signer "did:key:z6MkjyhVmg5Nfyv9hHN2RAtUe1mM4M5CZitpoHRZpiwhSjwG"
-                   :note "point-in-time capacity and fault recovery are measured; long-term stability is not yet claimed"}}
+                   :note "point-in-time capacity and fault recovery are measured; long-term stability is not yet claimed"}
+   :session-closeout {:observed-at "2026-08-15T04:44:32.183Z"
+                      :public-ready-http-status 200
+                      :fleet-online 11
+                      :fleet-expected 11
+                      :inference-endpoints-healthy 3
+                      :inference-endpoints-configured 3
+                      :request-slots-available 2
+                      :request-slots-configured 2
+                      :ring-active-state "active"
+                      :ring-main-pid 3494325
+                      :ring-active-since "2026-08-15T02:59:22Z"
+                      :systemd-restarts 0
+                      :watchdog-ledger-events {:healthy 165 :busy 15 :rebuilding 0}
+                      :qualification-remains "soak-started"
+                      :signed-main-tip-receipts 1
+                      :next-gate "two more distinct main-tip receipts and 604800 seconds since soak start"
+                      :earliest-qualification-at "2026-08-22T03:06:31Z"}}
   :adr/repo "scripts/fleet-ci"
   :adr/supersedes ""
   :adr/superseded-by ""
