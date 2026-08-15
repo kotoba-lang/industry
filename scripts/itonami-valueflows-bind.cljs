@@ -103,6 +103,17 @@
                                        :includes (vec (get j "includes"))}]))))
           (js->clj (fs/readdirSync dir)))))
 
+(defn- isic-rev5-groups
+  "3-digit group code -> {:name}. A blueprint may classify at group level and 27
+   of them do; reading a coarser classification as a broken one was the bug."
+  [root]
+  (let [f (path/join root "orgs" "cloud-itonami" "org-un-isic" "data" "rev5" "groups.json")]
+    (if-not (exists? f)
+      {}                                  ; absent is reported by the caller, not guessed at
+      (into {}
+            (map (fn [[code j]] [code {:name (get j "nameEn")}]))
+            (js->clj (js/JSON.parse (slurp* f)))))))
+
 (defn- isic-rev5
   "code -> {:name :group}. UN ISIC Rev.5, public domain.
 
@@ -146,6 +157,9 @@
 
 ;; ── one business ──────────────────────────────────────────────────────────
 
+(defn- level-of [code]
+  (case (count (str code)) 4 "class" 3 "group" 2 "division" 1 "section" "unknown"))
+
 (defn- resolve-code
   "Resolve against the revision the blueprint DECLARED. A bare :isic is tried
    Rev.4 first then Rev.5, and which one answered is recorded — guessing a
@@ -156,22 +170,43 @@
    across revisions mislabelled 121 of 393 Rev.5-declared businesses.
 
    => {:hit {...} :revision \"isic-rev5\"} | nil"
-  [rev4 rev5 code declared-as]
-  (case declared-as
-    "isic-rev5" (when-let [h (get rev5 code)] {:hit h :revision "isic-rev5"})
-    "isic-rev4" (when-let [h (get rev4 code)] {:hit h :revision "isic-rev4"})
-    "isic" (or (when-let [h (get rev4 code)] {:hit h :revision "isic-rev4"})
-               (when-let [h (get rev5 code)] {:hit h :revision "isic-rev5"}))
-    nil))
+  [rev4 rev5 groups5 code declared-as]
+  (let [cls (fn [table rev] (when-let [h (get table code)]
+                              {:hit h :revision rev :level "class"}))
+        grp (fn [] (when-let [h (get groups5 code)]
+                     ;; a group is a real ISIC level, not a degraded class
+                     {:hit h :revision "isic-rev5" :level "group"}))]
+    (case declared-as
+      "isic-rev5" (or (cls rev5 "isic-rev5") (grp))
+      ;; No Rev.4 group fallback: Rev.4 group titles are unavailable at any level
+      ;; of confidence. org-un-isic data/PROVENANCE.edn measures the mirror's
+      ;; Rev.4 half as unpinned and disputed against the UN's legacy structure
+      ;; file (33 of 414 class titles differ). A group title taken from a
+      ;; disputed source would look authoritative and might be Rev.5 wording.
+      "isic-rev4" (cls rev4 "isic-rev4")
+      "isic" (or (cls rev4 "isic-rev4") (cls rev5 "isic-rev5") (grp))
+      nil)))
 
-(defn- bind-one [rev4 rev5 dir-name dir text]
+(defn- other-revision-has?
+  "Diagnosis for a code that did not resolve: does it exist in the revision the
+   blueprint did NOT declare? 50 of 84 do. This is REPORTED, never resolved —
+   whether the code or the revision label is the mistake cannot be told from
+   here, and picking one would re-introduce the cross-revision mislabelling this
+   binder was corrected to avoid."
+  [rev4 rev5 code declared-as]
+  (cond
+    (and (= "isic-rev5" declared-as) (get rev4 code)) "isic-rev4"
+    (and (= "isic-rev4" declared-as) (get rev5 code)) "isic-rev5"
+    :else nil))
+
+(defn- bind-one [rev4 rev5 groups5 dir-name dir text]
   (let [r5 (blueprint-field text "isic-rev5")
         r4 (blueprint-field text "isic-rev4")
         bare (blueprint-field text "isic")
         isco (blueprint-field text "isco-08")
         code (or r5 r4 bare)
         declared-as (cond r5 "isic-rev5" r4 "isic-rev4" bare "isic" :else nil)
-        resolved (resolve-code rev4 rev5 code declared-as)
+        resolved (resolve-code rev4 rev5 groups5 code declared-as)
         hit (:hit resolved)
         base {:db/id nil
               :source/dataset dataset
@@ -193,7 +228,9 @@
              :vf.spec/name (:name hit)
              :vf.spec/classified-as (str isic-prefix code)
              :vf.spec/isic-code code
-             :vf.spec/isic-group (:group hit)
+             :vf.spec/isic-level (:level resolved)
+             :vf.spec/isic-group (or (:group hit)
+                                     (when (= "group" (:level resolved)) code))
              ;; Honest about the revision skew: most blueprints declare Rev.5
              ;; and the mirrored table is Rev.4. A code that happens to exist in
              ;; both is resolved against Rev.4, and this says so.
@@ -212,6 +249,10 @@
              :vf.binding/state "classification-unresolvable"
              :vf.spec/isic-code code
              :vf.spec/declared-as declared-as
+             :vf.spec/isic-level-declared (level-of code)
+             :vf.binding/rev4-group-unavailable?
+             (boolean (and (= "isic-rev4" declared-as) (= 3 (count code))))
+             :vf.binding/exists-in-other-revision (other-revision-has? rev4 rev5 code declared-as)
              :vf.binding/why (str "declared " declared-as " " code
                                   " is in neither mirrored table (Rev.4 428"
                                   " classes, Rev.5 463); it was resolved against"
@@ -225,9 +266,15 @@
              :vf.binding/why "ISCO classifies an occupation, not an industry; a process specification needs the activity")
 
       :else
-      (assoc base
-             :vf.binding/state "unclassified"
-             :vf.binding/why "the blueprint declares no ISIC or ISCO code"))))
+      (let [in-name (second (re-find #"isic[-_]?(\d{3,4})" dir-name))]
+        (cond-> (assoc base
+                       :vf.binding/state "unclassified"
+                       :vf.binding/why "the blueprint declares no ISIC or ISCO code")
+          ;; Reported, NOT used to classify. A repository name is a discovery
+          ;; alias, not a declaration, and turning 515 names into 515
+          ;; classifications would be exactly the invention this binder refuses.
+          ;; Measured: only 2 of the 515 even carry a code in their name.
+          in-name (assoc :vf.binding/code-in-repo-name in-name))))))
 
 ;; ── all ───────────────────────────────────────────────────────────────────
 
@@ -235,6 +282,7 @@
   (let [registered (registered-paths root)
         rev4 (isic-rev4 root)
         rev5 (isic-rev5 root)
+        groups5 (isic-rev5-groups root)
         org-dir (path/join root "orgs" "cloud-itonami")]
     (when-not (exists? org-dir)
       (die 2 (str "CANNOT ANSWER: " org-dir " is absent. west checkouts are"
@@ -258,14 +306,14 @@
                             (let [dir (path/join org-dir d)
                                   bp (path/join dir "blueprint.edn")]
                               (when (and (contains? registered d) (exists? bp))
-                                (bind-one rev4 rev5 d dir (slurp* bp))))))
+                                (bind-one rev4 rev5 groups5 d dir (slurp* bp))))))
                     vec)]
       (when (< (count rows) (:blueprints floor))
         (die 2 (str "CANNOT ANSWER: bound only " (count rows)
                     " west-registered blueprints, floor " (:blueprints floor)
                     ". An input is missing; a smaller file would look complete.")))
       {:rows rows :registered (count registered)
-       :isic-classes {:rev4 (count rev4) :rev5 (count rev5)}
+       :isic-classes {:rev4 (count rev4) :rev5 (count rev5) :rev5-groups (count groups5)}
        :consuming-in-org consuming-in-org})))
 
 (defn- coverage [{:keys [rows registered isic-classes consuming-in-org]}]
@@ -279,6 +327,21 @@
      :vf.coverage/isic-classes-available (:rev4 isic-classes)
      :vf.coverage/isic-rev5-classes-available (:rev5 isic-classes)
      :vf.coverage/resolved-by-revision (frequencies (keep :vf.spec/resolved-against rows))
+     :vf.coverage/resolved-by-level (frequencies (keep :vf.spec/isic-level rows))
+     :vf.coverage/isic-rev5-groups-available (:rev5-groups isic-classes)
+     ;; actionable diagnoses, so 84 opaque failures become 84 fixable records
+     :vf.coverage/unresolvable-but-in-other-revision
+     (count (filter :vf.binding/exists-in-other-revision rows))
+     ;; The 122 Rev.4 classifications rest on titles with NO upstream pin, 33 of
+     ;; which are disputed against the UN's legacy structure file. Flagged here
+     ;; because a name that came from an unprovenanced table reads exactly like
+     ;; one that came from a pinned one.
+     :vf.coverage/rev4-titles-unpinned? true
+     :vf.coverage/rev4-titles-provenance "orgs/cloud-itonami/org-un-isic/data/PROVENANCE.edn"
+     :vf.coverage/rev4-group-codes-unresolvable
+     (count (filter :vf.binding/rev4-group-unavailable? rows))
+     :vf.coverage/unclassified-with-code-in-repo-name
+     (count (filter :vf.binding/code-in-repo-name rows))
      :vf.coverage/with-un-includes (count (filter #(pos? (or (:vf.spec/includes-count %) 0)) rows))
      :vf.coverage/classified (get by-state "classified" 0)
      :vf.coverage/classification-unresolvable (get by-state "classification-unresolvable" 0)

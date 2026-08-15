@@ -381,6 +381,42 @@ taxonomy」と言っている用途そのもの。URI prefix も捏造してい�
 せいにする**ことになる。**fleet gate は付けない**: `--check` の入力は `orgs/` で、
 node には配られない（ENGI contract と同じ判断）。
 
+## 未分類・未解決を診断に変えた（2026-08-15、同日）
+
+分類を増やそうとして、**mirror 側の出所不明**が出てきた。件数より重い発見なので
+そちらを先に landed させた。
+
+**⚠ `org-un-isic` の Rev.4 半分は unpinned かつ実測で係争中。**
+`data/classes/*.json` は source URL・sha256・取得日を持たず、git 履歴は squash 1 件。
+一方 UN の legacy path `ISIC_Rev_4_english_structure.txt` は今も 200 を返し
+（landing page からは辿れない）、mirror と **414 件中 33 件でタイトルが違い**、
+level 数も 419 class / 238 group（README は 428 / 272 と主張）。差分は **Rev.5 の
+文言**に読める（`1010` は両方で「Processing and preserving of meat」、mirror は
+「meat and meat products」）。**どちらが Rev.4 かはここでは決められない**ので
+**ingest しなかった** —— 係争中の表に権威ありげな pin を与えるのは、閉じるはずの
+文書ギャップより悪い。記録は `org-un-isic/data/PROVENANCE.edn`（33 コードを列挙）。
+帰結: **122 件の Rev.4 分類は unpinned な title に依存している**（coverage の
+`:vf.coverage/rev4-titles-unpinned?` で申告）。解消には「どの vintage が正本か」の
+オーナー判断と pin 付き再取得が要る —— 導出できない。
+
+**group 階層を足した**（Rev.5 の CSV から 258 group / 87 division / 22 section）。
+3 桁コードは class ではなく **group** という正当な階層なので、粗い分類を壊れた
+分類として読んでいたのがバグだった。ただし増えたのは **1 件だけ**: 27 件の 3 桁の
+うち **24 件は `isic-rev4` 宣言**で、上記のとおり Rev.4 の group title は信頼できる
+形で入手できない（`:vf.binding/rev4-group-unavailable?` で 26 件を申告）。
+
+**残りは「診断」にした**（不透明な失敗 → 直せる記録）:
+
+| 診断 | 件数 | 意味 |
+|---|---|---|
+| `:vf.binding/exists-in-other-revision` | 50 | 宣言していない側の revision には在る。**解決はしない** —— コードが誤りか revision ラベルが誤りかはここでは判別できず、片方を選べば直したばかりの誤ラベルが戻る |
+| `:vf.binding/rev4-group-unavailable?` | 26 | Rev.4 の group title が入手不能 |
+| `:vf.binding/code-in-repo-name` | 2 | repo 名にコードが見える。**分類には使わない** —— repo 名は discovery alias であって宣言ではなく、515 の名前を 515 の分類に変えるのはこの binder が拒否している発明そのもの |
+
+**515 の unclassified のうち、repo 名からコードが回収できるのは 2 件だけ**（実測）。
+残り 513 は本当に何も宣言しておらず、**分類を決めるのは 513 回の判断＝発明**なので
+しない。ここが最大の未接続で、blueprint 側の記述作業。
+
 ## 次に効くこと（未着手）
 
 1. **定期 tick はこの 4 gate を検査していない。** tick は `gates.edn` を
