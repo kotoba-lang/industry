@@ -99,5 +99,43 @@
 
 - **残り 408 本の ISIC app**（`docs/index.html` を持つ repo は全部で 423）と、cloud-itonami の deployed worker 134 本のうち document を配るものは未適用。手順は確立して 15 本で実証済みなので、あとは wave として回すだけ。次の対象も「実際に document を配っている app」であって scaffold ではない。
 - 既存 154 の actor placement manifest は対象外のまま（document を配っていない）。
+- IPNS naming（`k51…`）はこの landing に含まれない。app ごとに鍵の custody が要るため、運んだのは identity と location の 2 面だけ。
+
+## 再開点（次の agent はここから）
+
+現在地の測り直し（これが唯一の被覆率の正本。数値を引用せず毎回測る）:
+
+```bash
+nbb --classpath \".:orgs/kotoba-lang/content-address/src\" \\
+  scripts/verify-app-content-address.cljs orgs
+# 2026-08-15 の値: SCANNED 170 / ADDRESSED 16 / LOCATED 154 / UNREADABLE 0（exit 1）
+```
+
+次の wave（1 本あたりの手順は 15 本で実証済み。順序を変えない）:
+
+```bash
+# 0. token は kagi から 1 件だけ狙い撃ちで取る（総当たり列挙はしない）
+export KOTOBASE_ARCHIVE_TOKEN=$(KAGI_HOME=$HOME/.kagi FLEET_ROOT=$PWD \\
+  orgs/kotoba-lang/kagi/bin/kagi get KOTOBASE_ARCHIVE_TOKEN)
+
+# 1. 対象を出す（scaffold ではなく document を実際に配っている repo だけ）
+rg --files -g 'index.html' orgs/cloud-itonami \\
+  | grep -E '^orgs/cloud-itonami/cloud-itonami-isic-[0-9]+/docs/index.html$'
+
+# 2. publish（PUT → GET → バイト比較まで 1 単位。fail-closed）
+nbb --classpath orgs/kotoba-lang/content-address/src \\
+  orgs/kotoba-lang/content-address/bin/content_address.cljs \\
+  publish <repo>/docs/index.html --manifest <repo>/kotoba.app.edn --id cloud.itonami.isic-NNNN
+
+# 3. 着地: origin/main から branch → commit → push → gh api .../merges → branch 削除
+# 4. pin: scripts/west-pin-put.cljs <name> HEAD（**サーバ側 single-entry**）
+```
+
+**踏むと分かっている罠**（実測済み）:
+
+- `scripts/advance-pins.cljs --execute` はローカル west.yml を書く。並行セッションが tip を進めていると、そのローカル編集は古い base に載り、`verify-west-pins.cljs` が**自分が触っていない 6 件**を pin 退行として報告する。**pin 前進は `west-pin-put.cljs`（tip から読んで tip に書く）を使う。**
+- `west-pin-put.cljs` の 409 は正常動作（楽観ロック）。そのまま再実行する。
+- superproject の共有 checkout で `git checkout main` が `already used by worktree` で失敗することがある。別セッションが main を掴んでいるだけなので、奪わず `--detach origin/main` にする。
+- `gh api \"repos/.../contents/x?ref=main\"` は**引用符が要る**。zsh が `?` を glob として食い、15 件全部が「missing」に見える（実際は 15/15 在った）。**検査が走らなかったことを、検査が落ちたことと読み違えない。**
 - `content-address.core` は純関数でスカラ判断（`raw-cid?` / `same-object?` / `addressed?` / `refusals`）なので `.kotoba` 決定核の候補だが、**やっていない。主張もしない。**
 - IPNS naming の自動化はこの landing に含まれない（app ごとに鍵の custody が要る）。今回運んだのは identity と location の 2 面で、naming は cloud-itonami-app が既に持っている経路をそのまま正本とする。"}]
