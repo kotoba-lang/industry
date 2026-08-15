@@ -1,0 +1,121 @@
+[{:db/id -1
+  :adr/id "adr-2608155000-authority-capability-lattice"
+  :adr/doc_type "adr"
+  :adr/topic "authority-capability-lattice"
+  :adr/title "ADR-2608155000: kotoba-lang/authority — capability-semantics.edn が規定する capability 束を実装し、8 種の URI 文字列比較を 1 つの半順序に畳む"
+  :adr/status "accepted"
+  :adr/date "2026-08-15"
+  :adr/last_verified "2026-08-15"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/related ["adr-2608136000-five-questions-before-writing-a-check"
+                "adr-2607300900-fleet-ci-not-github-actions"
+                "adr-2608040100-repo-name-four-planes"]
+  :adr/evidence
+  {:repo "kotoba-lang/authority"
+   :commit "2de205a778f4744a42c609abcc70c989449c2852"
+   :tests "37 tests / 122 assertions green (clojure -M:test, JVM); 10/10 green under ClojureScript (nbb --classpath src test/cljs_smoke.cljs)"
+   :mutation-tests "2 discriminating mutations run against a broken copy; each produced exactly the intended failure and no other"}
+
+  :adr/context
+  "調査（2026-08-15、本 superproject の会話ログ）で、fleet の認可経路に同じ形の欠陥が
+   複数見つかった。
+
+   1. 権限比較が URI 文字列の等値 + 末尾 `*` 特例として、**スキーム毎に 1 回ずつ**
+      書かれている。実測 8 種: kotoba://can/ (180) / kotoba://graph/ (91) /
+      kotoba://op/ (27) / kotoba://org/ (18) / kotoba://cap/ (17) /
+      kotoba://authority/ (3) / kotoba://tenant/ (1) / kotoba-rad://<rid>/push/<ref>。
+
+   2. その比較にプレフィックス混同がある。`cacao.core/covers?` は末尾 `*` を剥がして
+      `starts-with?` を呼ぶので `kotoba://graph/alice*` が
+      `kotoba://graph/alice-evil` を覆う。現在の minter は必ず `/` の後に `*` を置く
+      ので **live ではなく latent** だが、latent なのは *比較関数の側* であり、
+      以後の minter 全員が検査されない不変条件を手で守ることになっている。
+
+   3. `cacao.core/link-problems` は expiry を `(when (and (:exp parent) (:exp child)))`
+      でしか比較しないので、**exp を持たない子リンクが exp を持つ親の下にある場合を
+      報告しない**。fold 側は min を取るので実効値は正しく、検査と fold が食い違って
+      いて、レビューで見られるのは検査の方である。
+
+   4. `manifest/capability-semantics.edn`（kotoba-lang/kotoba-lang）は
+      `:effective-scope :requested-intersect-delegated-intersect-local-policy` /
+      `:scope-attenuation-only true` という**正しい代数を仕様として持っているが、
+      実装が存在しない**。既存の近接 repo を確認したところ kotoba-lang/policy は
+      ABAC ルール評価、kotoba-lang/authorization は request→decision ファサードで、
+      どちらも held authority の半順序ではない。"
+
+  :adr/decision
+  "kotoba-lang/authority を新設する（bare subject 名 = 再利用ライブラリ、
+   ADR-2608040100 の 4 面規則）。capability を文字列ではなく**束の値**として持つ。
+
+   - scope = セグメントのベクタ。`[\"kotoba\" \"graph\" \"alice\"]`。
+     セグメントは `=` で比較するので、プレフィックス混同は**拒否されるのではなく
+     表現不可能**になる。
+   - `covers?` は半順序（反射・反対称・推移）、`meet` はその最大下界。
+   - 委譲の畳み込みは検査ではなく meet: `effective = meet(link0 … linkn)`。
+     meet が最大下界なので、結果は**構成上**すべてのリンクに覆われる。過大主張する
+     リンクは拒否しなくても安全で、単に何も寄与しない。`:authority/attempts` が
+     試行を別途報告する（安全性は代数から、証拠は報告から、互いを代替しない）。
+   - expiry の欠如は +∞ とし meet が min を取る。よって無期限の子は有期限の親を
+     延長できない（上記 context 3 を閉じる）。
+   - bottom は sentinel ではなく**空の antichain**。何にも届かない grant は
+     特別扱いの分岐ではなく通常の経路で deny する（nil punning が
+     「policy 不在 → 全公開」になる経路を構造的に断つ）。
+   - **wire は変えない。** render/parse が既存 8 スキームを byte 単位で往復するので、
+     採用は比較の置き換えであってトークンの移行ではない。
+   - **認証はしない。** 署名検証・鍵・issuer/audience linkage は
+     cacao.core/verify-chain の担当で、authority.chain の docstring 冒頭でそう明示する。
+     「検査に見えるが検査の経路に無い」gate（kotobase.guarded で実測された形）を
+     再生産しないため。"
+
+  :adr/consequences
+  "- 順序則（反射・反対称・推移・最大下界）は 12 scope の閉じた宇宙に対して
+     **網羅列挙**で検査する（144 対 / 1,728 三つ組）。fold 定理は 3 リンク鎖 343 本
+     すべて。サンプリングではないので、成り立つのは検査したからである。
+   - discriminate することを、壊したコピーで両方向確認済み（ADR-2608136000）:
+     セグメント比較を starts-with? に戻すと a-wildcard-cannot-confuse-a-prefix だけが
+     落ち、expiry の nil 扱いを戻すと an-unbounded-child-cannot-outlive-a-bounded-parent
+     と the-tightest-expiry-in-the-chain-wins-wherever-it-sits だけが落ちた。
+     いずれも他のテストは落ちていない。
+   - テスト自身が実バグを 1 件検出した: `normalize` が自分の出力（set）を受け取れず、
+     `clojure.core/distinct` の逐次分配が `nth` に到達して throw していた。冪等則が
+     無ければ landing していた。
+   - JVM と ClojureScript の両方で green。edge Worker は cljs なので、この 2 面が
+     揃っていることが採用の前提条件である。
+   - **未実施（意図的）**: 既存経路への配線。edge_cacao.cljc の issuer 制約撤去、
+     cacao/edge ビルドへの chain 検証移植、8 スキームの typed model への畳み込み、
+     kotobase の visible? を chain 内属性クラスへ縮小する作業は、いずれも本 ADR の
+     範囲外。オーナー指示「後で組み合わせも設計統合」に従い、統合設計は別 ADR とする。
+   - したがって現時点の authority は **本番呼び出し元ゼロ**である。これは
+     kotobase.guarded / cacao verify-chain と同じ状態であり、ライブラリが正しいことと
+     経路上にあることは別の主張である、という本 workspace の既知の教訓がそのまま
+     当てはまる。統合まで完了扱いにしない。"
+
+  :adr/body
+  "実装: kotoba-lang/authority @ 2de205a。3 名前空間、外部依存ゼロ、暗号なし。
+
+   authority.scope — 束そのもの。parse / render / valid? / covers? / meet /
+     normalize / meet-sets / covered? / sorted / parse-all。
+     parse-all は {:scopes … :rejected …} を必ず両方返す。:rejected を無視した
+     呼び出し側は**狭くなる**（安全側）だけで、広くはならない。
+   authority.grant — scope 集合 + holder + expires。escalation は証拠、covers? は判定、
+     authorized? は clock と holder を省略できる arity を持たない。
+   authority.chain — fold（meet の畳み込み + attempts 報告）と authorize（1 呼び出しの
+     入口、:authority/reason で否認理由を区別）。:strict? は fold が既に無害化した
+     過大主張でも鎖ごと拒否する（既定 off — 過大主張の多くは stale client であり、
+     作文ミスを障害に変えない）。
+
+   複雑度: covers? は深さに対して O(depth) で早期脱出。meet-sets は正規化前で
+   O(|a|·|b|)、正規化が grant を antichain（実務上数個）に保つので、委譲鎖の畳み込みは
+   鎖長に対して線形。deny 経路でアロケーションしない。
+
+   .kotoba 移行: scope/covers? は 2 つのセグメント列に対する純粋な決定で、
+   決定核規則が求める形そのもの。今 .cljc なのは消費者が .cljc（kotobase / security /
+   nekko）と .cljs（edge Worker）だからで、normalize / meet-sets のコレクション層は
+   規則が「残せ」と言っている部分である。対の決定核の障壁は kotoba-kir の native
+   admission gate が word-typed であること（scope は文字列列なので :compiler /
+   :kotoba-wasm / :kotoba-cljs では qualify するが :native-aot ではしない）。
+   これは backend 未達であって言語の天井ではない（ADR-2608650000 の分類）。
+   移行を安くするため、atom なし・host interop なし・決定経路に例外なし・
+   失敗は既に値、で書いてある。"}]
