@@ -188,14 +188,21 @@
   (let [spec [{:key :awareness :label "訪問" :metric [:v]}
               {:key :acquisition :label "signup" :metric [:s] :benchmark 0.05}
               {:key :revenue :label "paid" :metric [:p] :benchmark 0.30}]]
-    (testing "stage counts + step conversion rates"
+    ;; ADR-2608160500: 率と gap は整数 basis point（10000 = 1.0）で、鍵も
+    ;; `:rate-bp` / `:gap-bp` に変わった。同じ鍵のまま小数から bp へ型を変えると
+    ;; 読み手に気づかせずに 100 倍ずれるので、名前を変えて壊れて見えるようにした。
+    (testing "stage counts + step conversion rates (basis point)"
       (let [r (funnel/evaluate-funnel {:v 1000 :s 30 :p 12} spec)]
         (is (= [1000 30 12] (map :count (:stages r))))
         (is (= 2 (count (:steps r))))
-        ;; 30/1000 = 0.03 < 0.05 benchmark (below); 12/30 = 0.4 >= 0.30 (ok)
-        (is (< (Math/abs (- 0.03 (:rate (first (:steps r))))) 1e-9))
-        (is (neg? (:gap (first (:steps r)))))
-        (is (not (neg? (:gap (second (:steps r))))))))
+        ;; 30/1000 = 300 bp < 500 bp benchmark (below); 12/30 = 4000 bp >= 3000 (ok)
+        (is (= 300 (:rate-bp (first (:steps r)))))
+        (is (= -200 (:gap-bp (first (:steps r)))))
+        ;; 旧版はここが `(not (neg? (:gap …)))` で、cljs の `(neg? nil)` が false を
+        ;; 返すため **gap が nil でも通っていた**（ADR-2608136000 の 1 問目:
+        ;; 測れなかったものが、測って問題が無かったものと同じ値を返す）。実値を見る。
+        (is (= 4000 (:rate-bp (second (:steps r)))))
+        (is (= 1000 (:gap-bp (second (:steps r)))))))
     (testing "bottleneck = measured step furthest below benchmark"
       (let [r (funnel/evaluate-funnel {:v 1000 :s 30 :p 12} spec)]
         (is (= :awareness (:from (:bottleneck r))))
@@ -206,7 +213,56 @@
         (is (nil? (:bottleneck r)))))
     (testing "all above benchmark → no bottleneck"
       (let [r (funnel/evaluate-funnel {:v 1000 :s 200 :p 100} spec)]
-        (is (nil? (:bottleneck r)))))))
+        (is (nil? (:bottleneck r)))))
+    ;; --- ADR-2608160500 で直した/固定した振る舞い -----------------------------
+    (testing "前段 0 件は『0% 転換』ではなく『分母が無い』"
+      (let [r (funnel/evaluate-funnel {:v 0 :s 5 :p 1} spec)
+            st (first (:steps r))]
+        (is (true? (:measurable st)) "両端とも読めている")
+        (is (false? (:rate-known st)) "しかし率は出せない")
+        (is (nil? (:rate-bp st)))
+        (is (nil? (:gap-bp st)) "gap も無い — 0 ではない")
+        (is (not= :awareness (:from (:bottleneck r))) "未測定段をボトルネックにしない")
+        ;; 出力でも『未計測』と区別する（以前はどちらも "(未計測)"）
+        (is (re-find #"分母なし" (with-redefs [funnel/funnel-specs {:x spec}]
+                                  (funnel/render-text :x {:v 0 :s 5 :p 1}))))))
+    (testing "分子 0 は測った 0% であって欠測ではない"
+      (let [r (funnel/evaluate-funnel {:v 1000 :s 0 :p 0} spec)
+            st (first (:steps r))]
+        (is (= 0 (:rate-bp st)))
+        (is (= -500 (:gap-bp st)))
+        (is (= :acquisition (:to (:bottleneck r))))))
+    (testing "benchmark を持たない段には gap が無い（0 に既定しない）"
+      (let [nob [{:key :awareness :label "訪問" :metric [:v]}
+                 {:key :acquisition :label "signup" :metric [:s]}]
+            st (first (:steps (funnel/evaluate-funnel {:v 1000 :s 0} nob)))]
+        (is (= 0 (:rate-bp st)) "率は 0 bp と測れている")
+        (is (nil? (:benchmark-bp st)))
+        (is (nil? (:gap-bp st)) "gap は無い — 0 ではない")))
+    (testing "benchmark ちょうどは未達ではない"
+      (let [r (funnel/evaluate-funnel {:v 1000 :s 50 :p 15} spec)]
+        (is (= 500 (:rate-bp (first (:steps r)))))
+        (is (= 0 (:gap-bp (first (:steps r)))))
+        (is (nil? (:bottleneck r)))))
+    (testing "率が 1.0 を超えても頭打ちにしない（emitter の食い違いの信号）"
+      (let [r (funnel/evaluate-funnel {:v 10 :s 30 :p 3} spec)]
+        (is (= 30000 (:rate-bp (first (:steps r)))))
+        (is (= 29500 (:gap-bp (first (:steps r)))))))
+    (testing "負の件数は数ではなく『読めなかった』"
+      ;; 旧版は -1 を素の数として算術に入れ、その段をボトルネックに仕立てていた。
+      (let [r (funnel/evaluate-funnel {:v 1000 :s -1 :p 1} spec)
+            st (first (:steps r))]
+        (is (false? (:measurable st)))
+        (is (nil? (:rate-bp st)))
+        (is (nil? (:bottleneck r)))))
+    (testing "同点のボトルネックは後ろの段が勝つ（旧 min-key と同じ）"
+      (let [tie [{:key :awareness :label "a" :metric [:v]}
+                 {:key :acquisition :label "b" :metric [:s] :benchmark 0.20}
+                 {:key :revenue :label "c" :metric [:p] :benchmark 0.20}]
+            ;; 100/1000 = 1000 bp と 10/100 = 1000 bp、目標はどちらも 2000 bp
+            r (funnel/evaluate-funnel {:v 1000 :s 100 :p 10} tie)]
+        (is (= [-1000 -1000] (map :gap-bp (:steps r))))
+        (is (= :revenue (:to (:bottleneck r))))))))
 
 (deftest funnel-proposals-cycle
   (testing "bottleneck → GTM proposal into channels block; snapshot into metrics; missing → 計器 into solution"
