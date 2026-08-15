@@ -91,6 +91,12 @@
   {:name "chain" :gate :jvm-test :cd true}
   {:name "org-chainagnostic-cacao" :gate :jvm-test :cd true}
   {:name "tech-ipfs-specs-ipns" :gate :jvm-test :cd true}
+  ;; ADR-2608153000 — Valueflows 経済語彙。:cd false で入れる（gate が fleet で
+  ;; 1 度緑になるまで pin 前進を自動化しない。CLAUDE.md「fleet で 1 度緑になる
+  ;; まで landed としない」）。
+  {:name "ws-valueflo-vocabulary" :gate :jvm-test :cd false}
+  {:name "ws-valueflo-algorithms" :gate :jvm-test :cd false}
+
   {:name "kotoba-delta" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd true}
 
   ;; kotoba-selfhost-contracts — the self-host decision slices (ADR-2608110100).
