@@ -447,7 +447,18 @@
    ;; treaty bodies — irs.gov simply reverses to gov-irs.
    :vocabulary/tld-values :open
    :vocabulary/observed-tlds
-   {"com" 1054 "org" 119 "io" 13 "tech" 2 "jp" 2 "net" 1 "edu" 1 "dev" 1}
+   {"com" 1054 "org" 119 "io" 13 "tech" 2 "jp" 2 "net" 1 "edu" 1 "dev" 1 "ws" 2}
+   ;; "ws" declared 2026-08-15 (ADR-2608153000): valueflo.ws -> ws-valueflo-*.
+   ;; Declared because the observed set is what makes a name VISIBLE to the
+   ;; audit at all. Until this line existed, ws-valueflo-vocabulary and
+   ;; ws-valueflo-algorithms appeared in NEITHER the conformant nor the
+   ;; misfiled list -- they were classified out of the origin plane and
+   ;; silently dropped. The docstring in verify-repository-roles.cljs says an
+   ;; unseen TLD "is reported as an undeclared prefix, which surfaces it for a
+   ;; decision"; measured 2026-08-15, it was not reported at all. Adding the
+   ;; TLD is the decision that mechanism was asking for. The remaining gap --
+   ;; that an unknown TLD is dropped rather than surfaced -- is recorded as
+   ;; :gap/unknown-tld-is-dropped-not-surfaced below.
    ;; Pin the domain as of registration. An authority that moves its domain does
    ;; NOT trigger a rename: the name is a discovery alias, not identity
    ;; (ADR-2607289500), and chasing a move would churn west pins and every
@@ -1025,6 +1036,34 @@
    :gap/candidates ["e-gov.go.jp" "myna.go.jp" "digital.go.jp"]
    :gap/note "the other five code-system catalogs were renamed to their authority
               names on 2026-08-05; these two were left alone rather than guessed."}
+
+  {:gap/id :unknown-tld-is-dropped-not-surfaced
+   :gap/measured-at "2026-08-15"
+   :gap/measured-by "nbb scripts/verify-repository-roles.cljs --name-audit, before and after declaring \"ws\""
+   :gap/count 1
+   :gap/adr "ADR-2608153000"
+   ;; The docstring of `origin-tlds` says the observed set is deliberate because
+   ;; "a repo under a TLD nobody has used here yet is reported as an undeclared
+   ;; prefix, which surfaces it for a decision instead of silently absorbing
+   ;; it." Measured: it is not reported. On 2026-08-15 the two new
+   ;; ws-valueflo-* repositories appeared in NEITHER the conformant list nor
+   ;; the misfiled list nor any undeclared-prefix list -- `classify` fell
+   ;; through and they left the origin plane entirely. Declaring "ws" moved the
+   ;; counts from 28/1266 to 30/1268, which is how the invisibility was found.
+   ;;
+   ;; This is the shape ADR-2608136000 is about: the check that COULD NOT
+   ;; classify a name returned the same output as a check that classified it
+   ;; and found no problem. Silence accumulated as green.
+   ;;
+   ;; The fix belongs in the script, not here: an origin-shaped name
+   ;; (<head>-<rest>) whose head is not a declared TLD should be listed as
+   ;; UNDECLARED-TLD rather than dropped. Recorded rather than done, because
+   ;; the head token of a bare subject-plane name is indistinguishable from an
+   ;; undeclared TLD without a rule for which heads are plausible TLDs, and
+   ;; guessing that would flood the audit.
+   :gap/note "declaring a TLD is currently the only way to make a name visible
+              to the audit, so an unregistered authority TLD hides its repos
+              instead of surfacing them."}
 
   {:gap/id :serving-family-prefix-lacks-its-tld
    :gap/measured-at "2026-08-05"
