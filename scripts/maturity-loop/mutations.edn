@@ -767,6 +767,127 @@
      :must-fail ["the-readme-names-both-dids-and-says-which-one-resolves"
                  "every-identity-claim-names-the-value-its-source-file-actually-holds"]}]}
 
+  {:repo "orgs/kotoba-lang/langchain-store"
+   :label "langchain-store —— 316 consumer が黙って依存している store seam の不変条件"
+   ;; この repo の形は他の suite と違う。**テストが無かったのではなく、
+   ;; 在るテストが discriminate していなかった。** 13 tests / 40 assertions が
+   ;; 緑で、その裏で: blob が「文字列として」保存されるという *この library の
+   ;; 存在理由そのもの* を 1 つも見ておらず（全部 `dec*` を通して読み戻すので、
+   ;; `enc` を identity にしても in-memory db なら round-trip は成立する）、
+   ;; 順序テストは seq 1,2,3 を **順番どおりに** append して 1,2,3 が返ることを
+   ;; 見ていた（sort を消しても緑になりうる）。
+   ;;
+   ;; だから mutation の大半は「実装を壊すと赤くなるか」ではなく
+   ;; 「**壊したときに、壊れたと言えるテストが在るか**」を問うている。
+   ;; 2026-08-15 に 12 件すべて赤くなるところを見た（JVM / CLJS 両方）。
+   ;;
+   ;; 最後の 4 件は *sharp edge* の pin —— 現状の挙動が驚くもので、
+   ;; もっともらしい「改善」が 316 consumer に黙って伝播する箇所。
+   ;; **mutation が「修正」の側である**（`or` を `if-some` にする、
+   ;; `count` を high-water mark にする、`pr-str` を canonical にする）。
+   ;; 赤くなることで、その修正が「掃除」ではなく「互換性イベント」になる。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :langchain-store/enc-is-not-a-codec
+     :why "blob が **文字列として** datom に載ること。これがこの library の存在理由（『langchain.db が sub-entity に展開しないように EDN 文字列で持つ』）なのに、既存テストは全部 dec* を通して読み戻すので enc を identity にしても気づけなかった"
+     :file "src/langchain_store/core.cljc"
+     :find "  [v]\n  (pr-str v))"
+     :replace "  [v]\n  v)"
+     :must-fail ["blobs-are-stored-as-strings-not-as-structure"]}
+
+    {:id :langchain-store/read-stream-unsorted
+     :why "seq 順に読むこと。既存テストは 1,2,3 を順番に append していたので、sort を消しても緑になりうる —— 順不同で入れて初めて gate になる"
+     :file "src/langchain_store/core.cljc"
+     :find "       (sort-by first)\n       (mapv (comp dec* second))))"
+     :replace "       (mapv (comp dec* second))))"
+     :must-fail ["read-stream-sorts-numerically-not-by-arrival-or-as-text"]}
+
+    {:id :langchain-store/read-stream-sorts-as-text
+     :why "seq が **数として** 並ぶこと。1..3 しか使わないテストでは辞書順と数値順が一致するので通ってしまう（9/10 の境界を跨いで初めて分かれる）"
+     :file "src/langchain_store/core.cljc"
+     :find "       (sort-by first)"
+     :replace "       (sort-by (comp str first))"
+     :must-fail ["read-stream-sorts-numerically-not-by-arrival-or-as-text"]}
+
+    {:id :langchain-store/ledger-numbering-off-by-one
+     :why "台帳が 0 始まりで連番であること。既存テストは順序と件数しか見ないので off-by-one は緑のまま通り、`(count records)` から resume する consumer だけが 1 ずれる"
+     :file "src/langchain_store/core.cljc"
+     :find "   (let [next-seq (count (read-stream conn seq-attr edn-attr))]"
+     :replace "   (let [next-seq (inc (count (read-stream conn seq-attr edn-attr)))]"
+     :must-fail ["append-record-numbers-the-ledger-from-zero-and-contiguously"]}
+
+    {:id :langchain-store/stamp-loses-to-a-spoofed-payload
+     :why "台帳の stamp が caller の :type/:timestamp に勝つこと。merge の向きが逆になると、監査記録を呼び手が backdate できる"
+     :file "src/langchain_store/core.cljc"
+     :find "  (assoc record-data :type record-type :timestamp ts))"
+     :replace "  (merge {:type record-type :timestamp ts} record-data))"
+     :must-fail ["stamp-overwrites-a-spoofed-stamp-on-the-whole-path"]}
+
+    {:id :langchain-store/map-tx-writes-absent-keys-as-nil
+     :why "`some?` gate が partial write を安全にしていること。conn 越しに読むと『省略された属性』と『nil で書かれた属性』はどちらも nil に見えるので、既存テストはこの差を見られない —— upsert で消える側の差である"
+     :file "src/langchain_store/core.cljc"
+     :find "                 (if (some? v) (assoc tx attr (if blob? (enc v) v)) tx)))"
+     :replace "                 (assoc tx attr (if blob? (enc v) v))))"
+     :must-fail ["map->tx-omits-absent-keys-so-a-partial-write-does-not-erase"]}
+
+    {:id :langchain-store/identity-schema-stops-marking-identity
+     :why "`identity-schema` が付ける :db.unique/identity が re-put を upsert にしていること。無いと 2 個目の entity に fork し、store は 1 つの key に 2 つの答えを持つ（誰も文句を言わない）"
+     :file "src/langchain_store/core.cljc"
+     :find "  (reduce (fn [m a] (assoc m a {:db/unique :db.unique/identity})) {} attrs))"
+     :replace "  (reduce (fn [m a] (assoc m a {})) {} attrs))"
+     :must-fail ["identity-schema-is-what-makes-a-re-put-upsert"]}
+
+    ;; ⚠ `dec*` の nil ガードを外す mutation を書いたが、**噛まなかったので
+    ;; 載せていない**（このファイルの冒頭の規則: 落ちるのを見ていない mutation は
+    ;; 載せない）。理由は実測してある —— 2026-08-15、`(edn/read-string nil)` は
+    ;; JVM の `clojure.edn` でも CLJS の `cljs.reader` でも **nil を返す**（throw
+    ;; しない）。つまり `dec*` の `(when s ...)` は防御であって nil 安全の出所では
+    ;; なく、外しても両 runtime で挙動が変わらない。
+    ;; 副産物として、core-test の `(is (nil? (ls/dec* nil)))` は **どちらの実装でも
+    ;; 通る assertion**（= 赤くなれない）だと分かった。消してはいない —— 文書として
+    ;; 正しく、将来 reader を差し替えたとき（kotoba-WASM 経路）に意味を持つ。
+    ;; 意味を持つのはそのときであって、今ではない、というのがここの記録。
+
+    {:id :langchain-store/clock-frozen-at-append
+     :why "`append-record!` の短い arity が append 時に実時計を読むこと。『テストのために決定的にする』という形の退行で、監査台帳の timestamp が全部同じ値になる"
+     :file "src/langchain_store/core.cljc"
+     :find "   (append-record! conn seq-attr edn-attr record-type record-data (now-ms)))"
+     :replace "   (append-record! conn seq-attr edn-attr record-type record-data 0))"
+     :must-fail ["now-ms-is-a-real-clock-and-append-record-reads-it"]}
+
+    ;; ── ここから 3 件は「修正」を撃つ mutation ────────────────────────────
+    ;; 現状の挙動が驚くものである箇所。直すこと自体は正しいかもしれないが、
+    ;; **黙って直ると 316 consumer に伝播する**ので、赤くして決定にする。
+
+    {:id :langchain-store/blob-default-fixed-to-some
+     :why "sharp edge の pin。`(or (dec* v) default)` は false と nil の両方で default を返す（docstring は『nil -> default』と書いている）。`if-some` にするのは自然な修正だが、既にディスクに在る台帳の読み戻しが変わる —— 赤くなることで測り直しを強制する"
+     :file "src/langchain_store/core.cljc"
+     :find "                               (cond blob? (or (dec* v) default)"
+     :replace "                               (cond blob? (if-some [d (dec* v)] d default)"
+     :must-fail ["blob-default-fires-on-false-and-nil-not-only-on-absence"]}
+
+    {:id :langchain-store/coerce-wins-over-blob
+     :why "sharp edge の pin。`cond` は blob? を coerce より先に見るので、両方付いた spec では :coerce が走らない。呼び出し側からは両方効くように読める箇所なので、順序を固定する"
+     :file "src/langchain_store/core.cljc"
+     :find "                               (cond blob? (or (dec* v) default)\n                                     coerce (coerce v)"
+     :replace "                               (cond coerce (coerce v)\n                                     blob? (or (dec* v) default)"
+     :must-fail ["coerce-does-not-apply-to-blob-fields"]}
+
+    {:id :langchain-store/next-seq-becomes-high-water-mark
+     :why "sharp edge の pin。README の『atomic ではない』が意味する具体的な失敗は、**gap のある台帳で counter が追いつき、既存 record を upsert で潰す**こと（seq 0,1,3 -> count 3 -> seq 3 に上書き、stream の長さは変わらないので何も言わない）。high-water mark にするのがその修正で、赤くなることで修正が決定になる"
+     :file "src/langchain_store/core.cljc"
+     :find "   (let [next-seq (count (read-stream conn seq-attr edn-attr))]"
+     :replace "   (let [next-seq (inc (reduce max -1 (map first (d/q [:find '?s '?v :where ['?e seq-attr '?s] ['?e edn-attr '?v]] (d/db conn)))))]"
+     :must-fail ["append-record-catches-up-through-a-gap-and-clobbers"]}
+
+    {:id :langchain-store/enc-becomes-canonical
+     :why "sharp edge の pin。`enc` は pr-str なので map の並びは 8 entry を超えると hash 順になり、text は content address にならない（実測 2026-08-15: JVM と CLJS は一致するが sorted ではない）。canonical にするのは改善だが、blob を hash している consumer には互換性イベントである"
+     :file "src/langchain_store/core.cljc"
+     :find "  (pr-str v))"
+     :replace "  (pr-str (if (map? v) (into (sorted-map) v) v)))"
+     :must-fail ["enc-is-not-canonical-text-so-do-not-address-a-blob-by-its-bytes"]}]}
+
   {:repo "orgs/cloud-itonami/marine-insurance"
    :label "marine-insurance actor —— deny-by-default gate・descriptor 本体・文書の腐り"
    ;; 5 兄弟目。m365-ingest / jp-ashiba と同型の descriptor snapshot で、
