@@ -16,7 +16,27 @@
   {:repo "kotoba-lang/authority"
    :commit "2de205a778f4744a42c609abcc70c989449c2852"
    :tests "37 tests / 122 assertions green (clojure -M:test, JVM); 10/10 green under ClojureScript (nbb --classpath src test/cljs_smoke.cljs)"
-   :mutation-tests "2 discriminating mutations run against a broken copy; each produced exactly the intended failure and no other"}
+   :mutation-tests "2 discriminating mutations run against a broken copy; each produced exactly the intended failure and no other"
+   :integration
+   {:cacao {:commit "71014021b99d34b9e90cba5d4b5ff3a261bc3f2a"
+            :tests "63 tests / 237 assertions; the 61 pre-existing pass unchanged"
+            :mutation "covers? reverted to the substring test -> 3 assertions in the 2 new tests failed, nothing else"}
+    :security {:commit "74235d1cdf8034334f01dcb2f6faaff0c731146e"
+               :tests "219 tests / 1091 assertions (baseline 216 / 1076)"
+               :mutation ":personal removed from ranks -> 8 assertions in the 3 new tests failed, nothing else"}
+    :control-plane {:commits ["f33db76b499c99c0c9343897cbd5800320a7f8e3"
+                              "334b8bc3a5c6d11d09db4161936cc874a904e10f"
+                              "01e6c5acdcc918315afc84a9d2abb628aecedbca"
+                              "e3d130f4ff53f4ffdd7128fe011c060639281cf5"]
+                    :tests "cljs (shadow-cljs compile all-tests + node): 440 tests / 2128 assertions, 0 failures. JVM (clojure -M:test): 110 tests / 675 assertions, 4 failures"
+                    :known-failures "provider-source-catalog-contract x2 and worker-artifact-contract x2 are PRE-EXISTING: they need build artifacts a fresh checkout has not produced, and fail identically on a baseline run of the same worktree with these files removed. Verified, not assumed."
+                    :mutation "graph rule stated at the leaf instead of the chain root -> a-chain-lets-alice-delegate-her-graph-to-bob failed (4 assertions), nothing else"}
+    :deploy {:worker "net-kotobase"
+             :version "1a9fba30-90e7-4785-9984-0816bca89112"
+             :at "2026-08-15T13:26:17Z"
+             :routes ["kotobase.net" "www.kotobase.net" "smtp.kotobase.net"
+                      "datomic.kotobase.net" "kotobase.gftd.ai/*"]
+             :live-probe "GET / 200, /.well-known/did.json 200, xrpc no-auth 401 (all unchanged from the pre-deploy baseline); bogus single CACAO 401, bogus comma chain 401, empty CACAO 401 -- the new path fails closed rather than 5xx"}}}
 
   :adr/context
   "調査（2026-08-15、本 superproject の会話ログ）で、fleet の認可経路に同じ形の欠陥が
@@ -93,19 +113,58 @@
      | kotobase.edge-chain（純粋な鎖判断） | control-plane f33db76 | 完了 |
      | edge_cacao への配線（verify-cacao-chain） | control-plane 334b8bc3 | 完了 |
      | proxy.cljc の tenant 解決を鎖経由に | control-plane 01e6c5ac | **完了。リクエスト経路上にある** |
+     | 本番 bundle 再生成 | control-plane e3d130f4 | 完了 |
+     | **kotobase.net へ deploy** | worker `net-kotobase` version `1a9fba30-90e7-4785-9984-0816bca89112` | **完了。100% 稼働中（2026-08-15T13:26Z）** |
 
      したがって「ライブラリが正しいことと経路上にあることは別の主張」という警告は、
-     この repo については解消した。**ただし deploy はしていない** —— main に在ることと
-     稼働していることも、同じく別の主張である。
+     この repo については解消した。**稼働もしている。**
 
-   - **未実施**: (1) `verify-cacao-scoped`（worker.cljc の object-capability 経路）は
-     required-resource 契約が別なので今回のスコープ外。(2) `cacao/edge/*.cljs`
-     （cloud-itonami / cloud-manimani が使う build）は mint + 単発 verify のまま。
-     (3) kotobase-peer の `visible?` 本体と `:legacy-public` posture は未変更 ——
-     律速は AUTHORITY_REGISTRY / KEY_UNWRAPPER / CLAIM_STORE / AUDIT_SINK の
-     provisioning であって、コード変更ではない。今回入れたのは、その層が
-     **そもそも合成不能だった原因**（`:personal` が未知ラベルとして `:restricted` に
-     潰されていた）の除去である。
+     ⚠ **コードを main に入れただけでは本番に入らない。**
+     `kotobase-api-gateway/js/` は commit された deploy artifact で、wrangler の
+     `main` は `edge-app.generated.mjs` → `../js/kotobase-worker.js` を指す。
+     `01e6c5ac` の時点では bundle が古く、本番は旧経路のままだった。
+     `npm run build`（`shadow-cljs release worker` + `release entry` + manifest）で
+     再生成し、生成物に `CACAO chain rejected` / `graph-scope-not-root-issuer` /
+     `leaf-iss` / `skip-graph-rule` が入っていることを確認してから deploy した。
+
+     **live 検証（deploy 前 → 後）**: `GET /` 200→200、`/.well-known/did.json`
+     200→200、xrpc 認証なし 401→401。新経路の 3 ケースはいずれも **401（5xx でない）**
+     —— 不正な単発 CACAO / **comma 付きの不正 chain** / 空 CACAO。garbage が
+     fail-closed で落ちることを本番で確認した。
+
+     本番で変わったのは viewer 解決（`resolve-viewer` が「TENANT BOUNDARY」と呼ぶ DID）
+     が鎖を通るようになったこと。単発 token では root = leaf = issuer なので
+     **従来と同一の値**に解決される。
+
+   - **未実施（優先度順の resume point）**:
+
+     **(1) `verify-cacao-scoped` を鎖対応にする**（最も近い、最も価値がある）。
+     `kotobase-api-gateway-cljs/src/kotobase/edge_cacao.cljc:248`。現在は
+     `(some #(= % required-resource) resources)` の**完全一致**なので、委譲された
+     `kotoba://cap/host/x/*` が `kotoba://cap/host/x/y` を覆えない。`verify-chain*`
+     は既に `graph-rule?` で分岐しているので、required-resource を
+     `authority.scope/covered?` に載せ替えて第 3 の呼び出し口を足すだけ。
+     呼び出し元は `worker.cljc` の 108 / 509 / 880（object-capability upload 等）。
+     手順: 変更 → `clojure -M:test` → `npm test`（shadow 実ビルド。resource-guard
+     必須）→ `npm run build` で bundle 再生成 → deploy → live probe。
+
+     **(2) `cacao/edge/*.cljs` に chain 検証を移植**（cloud-itonami /
+     cloud-manimani 向け。現在 mint + 単発 verify のみ、`verify-chain` 参照 0 件）。
+     `cacao.core` / `ed25519.core` / `cbor.core` は 3 つとも `.cljc` なので、
+     `nekko.cacao-delegate` の docstring が言う「JVM-only」は**古い記述**。
+     暗号の移植ではなく edge ビルドへの載せ替えの可能性が高いが、未実測。
+
+     **(3) kotobase-peer の `visible?` / `:legacy-public`**。律速は
+     AUTHORITY_REGISTRY / KEY_UNWRAPPER / CLAIM_STORE / AUDIT_SINK の provisioning
+     であって、コード変更ではない（`net-kotobase/engine/wrangler.jsonc:48` の
+     コメントが条件を列挙している）。今回入れたのは、その層が**そもそも合成不能
+     だった原因**（`:personal` が未知ラベルとして `:restricted` に潰されていた）の
+     除去である。
+
+     **(4) `nekko` は依然として自分の外に消費者ゼロ。** journal（共有台帳、撤回が
+     即時）と `cacao-delegate`（bearer chain、撤回は exp か epoch rotation 待ち）は
+     **代替品ではなく別の信頼モデル**で、repo 自身がそう書いている。edge は今回
+     chain 側を採ったので、撤回要件が出た時点で journal 側を検討する。
 
    - **配線中に設計を 2 回直した。どちらもテストが見つけた。**
      ① `decide` が「子の exp 欠落」も scope escalation と同列に扱い鎖ごと拒否していた。
