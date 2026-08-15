@@ -1,0 +1,146 @@
+[{:db/id -1
+  :adr/id "ADR-2608150200"
+  :adr/title "shinshi-video-actor: residency belongs to the machine that holds the GPU, not to the Bots surface"
+  :adr/status "accepted"
+  :adr/date "2026-08-15"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body
+  "## Context
+
+The owner asked to make shinshi.club's catalog video generation resident —
+phrased as *「itonami.cloud の bots の常駐化」* — and approved placing the
+publish write-key on gad.
+
+Before this, the generation existed as a Claude skill
+(`.claude/skills/shinshi-catalog-video`) plus three scripts in the superproject,
+driven by hand. **The launchd job the skill describes as ticking every 30
+minutes was never installed**: `com.gftd.shinshi-catalog-video` is absent from
+`launchctl list`, and `~/.gftd/shinshi-catalog-video/loop.ledger.edn` contained
+only entries written by hand on 2026-08-15. So there was no residency to move —
+there was a documented residency that did not exist.
+
+## Decision
+
+Create `cloud-itonami/shinshi-video-actor`, the second service cloud-itonami
+operates for club-shinshi (sibling of `shinshi-growth-actor`), and run it as a
+**systemd timer on gad** — the machine that already holds the ComfyUI this
+generation drives.
+
+Registered in west as `cloud-itonami-shinshi-video-actor` at
+`orgs/cloud-itonami/shinshi-video-actor`, pin `96288001`, by single-entry API
+commit `e216c3bc` (4177 -> 4178 entries, no other pin touched).
+
+### Why not a Bot in cloud-itonami-app
+
+That surface is deliberately this laptop. `bots.clj` says so in its own words:
+*'What a Bot's own computer is here — Not a cloud VM … A Bot's computer is
+therefore this machine.'* That is the right answer for a Bot reading mail, and
+the wrong one here: the work happens on a GPU box and on Cloudflare, and the
+laptop only issues instructions. Under ADR-2608111721's three questions, the
+answer to *'what stops if this machine sleeps tonight'* should be **nothing**.
+
+The Bots surface remains the right place to *look at* and *steer* the actor.
+This ADR separates where it is watched from where it lives, which is the same
+split ADR-2608111721 draws: 常駐の機構は murakumo、常駐する権利は cloud-itonami.
+
+### Why gad and not asher
+
+asher is the only host declared in `probe.cljs`'s `operator-hosts` — the
+implementation of `:slot/attested`. Measured 2026-08-15, **asher has no
+outbound HTTPS and cannot reach gad's ComfyUI**: `api.cloudflare.com`,
+`shinshi.club` and `100.82.98.110:8188` all returned 000. It cannot publish and
+it cannot generate.
+
+gad answered `shinshi.club:200` and `api.cloudflare.com:400` (reachable),
+already carries `nbb`, `node` and `wrangler`, runs the ComfyUI locally, and has
+been up 29 days under systemd. It is **not in `scripts/fleet-ci/nodes.edn`**, so
+no gate code sent from a repository is ever scheduled onto it — which is the
+substance of fleet invariant 3, not merely its letter.
+
+**gad already holds a write key**: the Radicle seed COB signing identity
+(`gates.edn` `:rad`, passphrase item `radicle-seed-gad-passphrase`). So this
+does not create a second attested host — but it does surface that gad has been
+attested in substance while only asher was attested in declaration.
+`operator-hosts` should name gad. Not doing so is safe today only because gad is
+absent from `nodes.edn`, which `probe.cljs`'s own docstring calls out as luck
+rather than design.
+
+## The actor
+
+`generation ⊣ CatalogGovernor ⊣ append-only ledger`, driven by a durable outer
+loop rather than a StateGraph — the same reasoning ADR-2607123000 §3 gives for
+the seven sibling `gftd-*-actor` asset actors: a generation is minutes-scale and
+the process may die inside one, so recovery is running the tick again.
+
+Two structural choices worth recording:
+
+**Measurement and judgement are separate namespaces.** `measure` runs ffprobe
+and returns numbers or `:unanswered true`; `governor` is pure and consumes that.
+A gate that fuses them must map 'could not measure' onto pass or fail, and in
+this workspace that mapping has always eventually become pass (ADR-2608136000).
+Here an unanswered measurement is simply a value the governor rejects.
+
+**The IP containment is upstream of the governor, and it is load-bearing.**
+While building `catalog/series-of`, a version that read only the slug suffix
+classified `tifa-final-fantasy` as `Astral Realm` — `%-fantasy` matches
+`-final-fantasy` — and put Square Enix's Tifa at the head of the candidate
+queue. **The governor does not catch this**: the candidate arrives already
+carrying an original series name. Caught by running the selector against live
+D1 rather than by reading it. The profile's declared series now wins and a
+declared non-original series is a refusal rather than a fallback; both
+directions are in `test/run.cljs`, which also asserts that the governor's and
+the selector's copies of the 12 series are the same set.
+
+## Verified on gad
+
+- 27-case test suite: ALL OK (governor accept + one reject per check, plus the
+  `series-of` regression cases)
+- `measure` on a real clip: same bytes/frames/geometry as the laptop
+- `install.cljs` refuses correctly (exit 2) with the env file absent
+- ffmpeg/ffprobe installed (`7:6.1.1-3ubuntu5`); gad had neither
+
+**Measurements are not comparable across hosts.** The same clip reads
+140.945 luma / 9.508 motion under macOS ffmpeg 7.x and 141.641 / 9.563 under
+gad's 6.1.1. Thresholds are 8 and 1, so no verdict changes — but a stored
+number must not be diffed against a fresh one and read as drift.
+
+## Not done — the timer is not enabled
+
+The actor needs a Cloudflare credential on gad for **both** halves of its work:
+the candidate scan reads D1, and the publish writes it. The blob upload does not
+— it goes through `shinshi.club/b/upload` with a purpose-built token, which is
+the right shape.
+
+The laptop's wrangler uses an **OAuth session** in
+`~/Library/Preferences/.wrangler`, which must not be copied to a GPU box. The
+only account credential in the secrets map is `CLOUDFLARE_GLOBAL_API_KEY` —
+account-wide, unscopeable, and worse to place on gad than the OAuth session; it
+was also not retrievable from kagi in this session (`no such item`, which per
+that map is not proof of absence). The keychain `gftd.cf` token is DNS-scoped
+and returns `Authentication error` against the D1 API, measured.
+
+**Remaining owner step:** issue a Cloudflare API token scoped to D1 edit on
+`ai-gftd-shinshi` and `ai-gftd-pds-recordlog`, write it plus
+`SHINSHI_UPLOAD_TOKEN` into `/etc/shinshi-video-actor.env` (0600) on gad, then
+`nbb deploy/install.cljs --apply`. Until then the install script refuses, which
+is the correct behaviour: a timer firing without credentials would burn a GPU
+slot per tick and hold every clip it made.
+
+A better shape than a Cloudflare API token, deferred: give the appview a
+token-gated record-write route beside `/b/upload`, so no Cloudflare account
+credential leaves the laptop at all. That is a change to a live shared Worker
+and was out of scope here.
+
+## Consequences
+
+- The catalog fill stops depending on the laptop being awake, once the
+  credential lands.
+- One more machine holds a publish credential. It is the machine that already
+  held a signing key and already cannot receive gate work.
+- The 12 original series are now asserted identical in two places by test. IP
+  characters are excluded twice, independently, and the outer exclusion is the
+  one that actually matters.
+- `operator-hosts` in `probe.cljs` should gain gad. Filed as follow-up, not
+  done here: changing gate rotation membership mid-session without re-running
+  probe is exactly the ordering hazard that docstring warns about."}]
