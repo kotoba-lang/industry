@@ -37,7 +37,7 @@
    :policy/internal-capability-origins
    {:datoms "https://datoms.kotobase.net"}
    :policy/query-dialects #{:datalog :sql :cypher :sparql :graphql :gremlin}
-   :policy/deprecated-origin-aliases
+   :policy/retired-origin-hostnames
    #{"https://graph-database.kotobase.net"
      "https://backend.kotobase.net"
      "https://graphdb.kotobase.net"}
@@ -51,7 +51,7 @@
    :policy/coordination-only #{:durable-object :d1 :kv}
    :policy/forbids #{:application-direct-r2-binding
                      :provider-origin-as-production-premise
-                     :deprecated-origin-alias-in-new-config
+                     :retired-origin-hostname-in-production
                      :query-implementation-name-as-capability
                      :durable-object-as-data-authority
                      :silent-production-fallback}

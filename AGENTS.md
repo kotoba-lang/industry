@@ -887,12 +887,13 @@ application の前提にしない。
   `s3.kotobase.net`、`git.kotobase.net`、`atproto.kotobase.net`、
   `pinning.kotobase.net`。apex path facade と同じ authority/policy に属する。
 - edge 内部の datom/CID execution capability は `datoms.kotobase.net`。
-  `graph-database.kotobase.net` / `backend.kotobase.net` はその deprecated alias、
-  `graphdb.kotobase.net` は SPARQL/RDF4J 互換面の deprecated alias。新規 config / SDK / docs
-  では使わない。
+  `graph-database.kotobase.net` / `backend.kotobase.net` / `graphdb.kotobase.net` は
+  2026-08-15 に Custom Domain と DNS から除去済みの retired hostname。rollback alias を含め
+  production config / SDK / docs に再導入しない。
 - RDF4J は別 database product ではなく `sparql.kotobase.net/repositories/default` の path
-  compatibility。SQL は独立 origin ではなく query dialect。implementation/product 名を
-  capability 名として増やさない。
+  compatibility。GraphQL は `graphql.kotobase.net/graphql` の独立した read-only document
+  query protocol で、RDF4J/SPARQL の別名ではない。SQL は独立 origin ではなく query dialect。
+  implementation/product 名を capability 名として増やさない。
 - logical metadata、provenance、actor、proof 評価、CID index は
   `https://kotobase.net/api/*` の datom 面に置く。bytes 本体を datom に埋めない。
 - Durable Object / D1 / KV は alarm、lease、single-writer、cursor、session、cache、projection

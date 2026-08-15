@@ -29,8 +29,8 @@
 1. live service が生成・収集する proof、actor、wiki、graph、event、index の runtime durable source は Kotobase とする。
 2. authority と default API origin は `https://kotobase.net`。immutable bytes は CACAO-authenticated `PUT /ipld/:cid` と public CID-verified `GET /ipld/:cid`、logical metadata と provenance は `/api/*` の datom 面を使う。
 3. protocol 自身が client contract である面は stable capability origin を持てる。`datomic`、`sparql`、`cypher`、`gremlin`、`graphql`、`s3`、`git`、`atproto`、`pinning` は apex path facade と同じ Kotobase authority/policy の別 ingress であり、provider bypass ではない。
-4. edge-to-datom execution は `datoms.kotobase.net` を canonical internal capability とする。`graph-database.kotobase.net` / `backend.kotobase.net` は migration alias、`graphdb.kotobase.net` は SPARQL/RDF4J 面の migration alias。新規 SDK、docs、config は alias を使わない。
-5. RDF4J compatibility は `sparql.kotobase.net/repositories/default` に統合する。Kotobase は RDF4J repository registry を実装しないため `default` 以外を同じ graph に黙って map しない。SQL は independent protocol origin ではなく query dialect とする。
+4. edge-to-datom execution は `datoms.kotobase.net` を canonical internal capability とする。`graph-database.kotobase.net` / `backend.kotobase.net` / `graphdb.kotobase.net` は 2026-08-15 に Custom Domain と DNS から除去した retired hostname とし、rollback alias を含め production contract に再導入しない。
+5. RDF4J compatibility は `sparql.kotobase.net/repositories/default` に統合する。Kotobase は RDF4J repository registry を実装しないため `default` 以外を同じ graph に黙って map しない。GraphQL は `graphql.kotobase.net/graphql` の独立した read-only document-query protocol で、SPARQL/RDF4J の別名ではない。SQL は independent protocol origin ではなく query dialect とする。
 6. R2、B2、IPFS は Kotobase 内部の interchangeable provider。S3 は storage provider であると同時に public wire capability でもあり、application は direct binding ではなく `s3.kotobase.net` を使う。
 7. Durable Object、D1、KV は alarm、lease、single-writer、cursor、session、cache、projection に限定する。これらを消しても Kotobase block + datom から durable state を復元できることを境界テストにする。
 8. block は upload 前と read 時に requested CID と照合する。write authorization は route capability と fresh nonce を持つ CACAO。credential は保存しない。
@@ -40,7 +40,7 @@
 
 ## Consequences
 
-application は provider migration を知らず、actor/proof/wiki の block と datom を同じ authority、CACAO、監視面で扱える。native protocol client は capability origin を利用でき、通常 application は apex を既定にできる。custom domain は single-owner なので alias は一度に奪わず migration 期間を置く。direct provider fallback で provenance を分岐させず、復旧は CID-addressed blocks と datom index から行う。
+application は provider migration を知らず、actor/proof/wiki の block と datom を同じ authority、CACAO、監視面で扱える。native protocol client は capability origin を利用でき、通常 application は apex を既定にできる。retired hostname は NXDOMAIN として fail closed し、曖昧な compatibility contract を残さない。direct provider fallback で provenance を分岐させず、復旧は CID-addressed blocks と datom index から行う。
 
 ## Enforcement
 
@@ -48,4 +48,4 @@ application は provider migration を知らず、actor/proof/wiki の block と
 
 ## Current migration
 
-`cloud-itonami/hyakka` は proof/record DAG-CBOR blocks を R2-backed Kotobase に置き、datom index から再構築し、DO を alarm/cursor のみに縮退済み。apex `/ipld` route も production round trip 済み。2026-08-15 の名称整理では datom execution を `datoms`、RDF4J path compatibility を `sparql` に統合し、旧 host は破壊的に削除せず migration alias とした。"}]
+`cloud-itonami/hyakka` は proof/record DAG-CBOR blocks を R2-backed Kotobase に置き、datom index から再構築し、DO を alarm/cursor のみに縮退済み。apex `/ipld` route も production round trip 済み。2026-08-15 の名称整理では datom execution を `datoms`、RDF4J path compatibility を `sparql` に統合し、GraphQL を独立した read-only document-query protocol と明記した。同日 `graph-database` / `backend` / `graphdb` の Custom Domain を除去し、authoritative DNS が応答しないことを確認した。"}]

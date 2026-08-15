@@ -35,7 +35,7 @@
       required #{:cid-verified-read :cid-verified-write :fresh-cacao-nonce
                  :recoverable-without-coordination-store}
       forbidden #{:application-direct-r2-binding :provider-origin-as-production-premise
-                  :deprecated-origin-alias-in-new-config
+                  :retired-origin-hostname-in-production
                   :query-implementation-name-as-capability
                   :durable-object-as-data-authority :silent-production-fallback}]
   (when-not (map? p) (fail! "missing :workspace-policies :live-service-durable-data"))
@@ -64,10 +64,10 @@
                (:policy/query-dialects p))
     (fail! ":policy/query-dialects drift"))
   (when-not (= #{"https://graph-database.kotobase.net"
-                 "https://backend.kotobase.net"
+               "https://backend.kotobase.net"
                  "https://graphdb.kotobase.net"}
-               (:policy/deprecated-origin-aliases p))
-    (fail! ":policy/deprecated-origin-aliases drift"))
+               (:policy/retired-origin-hostnames p))
+    (fail! ":policy/retired-origin-hostnames drift"))
   (when-not (= #{:durable-object :d1 :kv} (:policy/coordination-only p))
     (fail! ":policy/coordination-only must be exactly durable-object/d1/kv"))
   (when-not (= "ADR-2608159100" (:adr/id adr)) (fail! "ADR id mismatch"))
@@ -75,6 +75,8 @@
   (doseq [needle ["live service の永続化境界は `kotobase.net`"
                   "PUT/GET https://kotobase.net/ipld/:cid"
                   "sparql.kotobase.net/repositories/default"
+                  "graphql.kotobase.net/graphql"
+                  "Custom Domain と DNS から除去済み"
                   "SQL は独立 origin ではなく query dialect"
                   ":workspace-policies :live-service-durable-data"
                   "root-kotobase-persistence-policy"]]
