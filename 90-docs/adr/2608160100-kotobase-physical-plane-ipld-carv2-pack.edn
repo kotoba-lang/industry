@@ -303,7 +303,7 @@ CARv2 index を持つのでそうならない。catalog を消す代償は scan 
 | pack catalog の datoms と loader（今は injected な 2 関数） | `kotobase` + `manifest/schema.edn` |
 | write-locality で pack を封じる commit 経路 | `kotobase-peer` / `kotobase-engine` |
 | 実 corpus での round trip 実測（上記は合成 chain） | `kotobase-peer` の `dag_shape_bench` |
-| 実 endpoint（AWS S3 / B2）での ranged GET 確認（miniflare は R2 の実装であって R2 ではない） | `kotobase-storage-s3` |
+| ~~実 endpoint での ranged GET 確認~~ | **B2 で実測（2026-08-16）**。`test/b2_range_probe.cljs` が実 CARv2 を PUT し、`Range: bytes=175-227` がちょうど 53 バイト返り、**それが要求した frame として parse する**ことを確認（1 バイト多くても parse は通り、違う block が返る —— そこが要点）。SigV4 が `range` を署名ヘッダに含めて受理されることも同時に確認。**AWS S3 proper は未確認** —— 「S3 互換」は 1 つの挙動ではない（`:conditional-put` が `:unverified` 既定なのと同じ理由）。credential と network を要するので gate ではなく operator 実行の probe |
 | 既存 deployment の移行（block → pack の再配置） | 未設計。**先に実測** |
 
 **移行は必要ない。** 既存の block-per-object store はそのまま正しく、
