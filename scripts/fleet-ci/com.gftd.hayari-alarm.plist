@@ -21,7 +21,7 @@
   <array>
     <string>/bin/sh</string>
     <string>-lc</string>
-    <string>exec nbb "$HOME/github/com-junkawasaki/scripts/fleet-ci/hayari-alarm.cljs"</string>
+    <string>exec nbb --classpath "$HOME/github/com-junkawasaki/scripts/fleet-ci" "$HOME/github/com-junkawasaki/scripts/fleet-ci/hayari-alarm.cljs"</string>
   </array>
   <!-- 30 分。ループは 15 分間隔なので、これ以上細かく見ても新しい事実は出ない。 -->
   <key>StartInterval</key>    <integer>1800</integer>
