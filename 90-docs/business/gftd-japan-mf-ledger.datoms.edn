@@ -2237,4 +2237,95 @@
   :provenance/read-only
   "読み取りスコープのみ使用。journal.write / transaction.write / trade_partners.write は
    一度も呼んでいない。SharePoint も Graph の GET のみ。帳簿は一切変更していない。"}
+
+ {:db/id -51
+  :source/dataset "gftd-japan-mf-ledger"
+  :record/kind :session-closing
+  :record/date "2026-08-16"
+  :record/title "アニカナ債権譲渡の書類調査 — closing"
+
+  :closing/landed
+  [{:commit "0136010" :entity -49
+    :内容 "SharePoint sites/CSCE の譲渡書類 4 点・内容証明・売掛金内訳を読み、
+           Teams チャネル 2512-アニカナ債権譲渡 17 件とメール 9 通で時系列を突合した。
+           書面の不備 7 件を特定。-48 の 3 点を訂正。"}
+   {:commit "ed8cbcb" :entity -50
+    :内容 "47,098,700 と 38,919,404 の不一致の原因を特定した。
+           前者は 2022-11-07 質権設定契約書の被担保債権額で、2022-12-30 までに完済済み。
+           後者は質権設定日より後に計上された 5 本で、請求書の重複はゼロ。
+           原因は譲渡書類が帳簿ではなく質権設定契約書 第1条を下敷きにしたこと。"}]
+
+  :closing/verification
+  {:算術検算 "nbb で 4 本すべて再計算し一致を確認した。
+              ①被担保債権 11 本の合計 = 47,098,700
+              ②譲渡債権 5 本の合計 = 38,919,404
+              ③96,827,420 − 35,482,700 − 14,226,520 − 19,500 = 47,098,700
+              ④72,563,820 + 10,103,284 − 43,747,700 = 38,919,404"
+   :EDN検証 "cljs.reader/read-string で全 51 entity のパースを確認。
+             途中 :reconciliation/47m-composition が数字始まりで不正な keyword となり
+             read-string が拒否したため :reconciliation/secured-claim-composition に改名した。"
+   :一次資料 "質権設定契約書 PDF、補助元帳 2022年度・2023年1-10月 PDF、
+              アニカナ売掛金.xlsx、内容証明文面 docx、譲渡書類 docx 4 点。
+              いずれも SharePoint から Graph の GET で取得し本文抽出した。"
+   :未実行 "録画・トランスクリプトの取得。主催者 a.oda@gftd.co.jp の OneDrive が
+            管理者ブロック（notAllowed）のため到達できていない。"}
+
+  :closing/artifact
+  {:url "https://claude.ai/code/artifact/064714cc-d97f-4076-b33a-e88586dfaa10"
+   :version "第 13 版"
+   :修正した誤り
+   ["セクション 14 が撤回済みの『貸倒控除 3,538,127 が取れる』を掲げたままだった"
+    "セクション 18 の経営計画 Phase B が
+     『アニメートアークを貸倒損失に是正 → 更正の請求。GJ に入る唯一の外部現金』
+     という実行不能な項目を持っていた"
+    "セクション 19 の問いが既に答えの出た論点のままだった"]
+   :差し替えた内容
+   ["Phase B は『譲渡の確認書を 1 通交わし、譲渡対象を実在の請求書に書き直して署名を取る』へ"
+    "セクション 19 の問いは『2025-12-23 の面談で先方は何を提案したか』へ"
+    "セクション 14 に質権 vs 譲渡債権の対比表と書面不備 5 件の表を追加"]
+   :注意 "第 11・12 版の時点で -44 の撤回は台帳に入っていたが、
+          アーティファクト側の セクション 14・18・19 には反映されていなかった。
+          台帳を直してもアーティファクトが直るわけではない。次回も同じ確認をする。"}
+
+  :closing/open-items
+  [{:優先 1 :担当 "弁護士"
+    :内容 "譲渡が有効に成立しているかの確認。譲渡対象の特定・民法467条通知の要否と有無・譲受人の署名欠如。"}
+   {:優先 2 :担当 "owner / 経理"
+    :内容 "債権譲渡通知書が実際に発送されたかを郵便物管理の記録で確認する
+           （Gftd_C_郵送物管理 フォルダに GJ_督促 の実例がある）。"}
+   {:優先 3 :担当 "税理士（スポット）"
+    :内容 "この譲渡の税務上の妥当性のセカンドオピニオン。
+           佐藤会計事務所は最終判断を出さないまま 2026-06-30 に顧問契約が終了している。"}
+   {:優先 4 :担当 "owner / 小田氏"
+    :内容 "2025-12-23 面談で先方が示した提案の内容を記憶から復元して記録する。"}
+   {:優先 5 :担当 "owner"
+    :内容 "従前からの未了。麹町税務署 徴収部門へ電話（還付金の充当先・延滞税込みの滞納額・換価の猶予の相談）／
+           年金事務所へ電話（差押え 3 件）／eLTAX の特別徴収税額通知の取得（2026-07-23 格納、
+           保護番号は通知メール内）。"}]
+
+  :closing/resume-point
+  "次に手を付けるなら 2 つ。
+   ① 郵便物管理フォルダを Graph で検索して債権譲渡通知書の発送記録を探す
+      （検索語: 債権譲渡通知 / アニメートアーク 発送 / 2512。
+       sites/Gftd435 の Gftd_C_郵送物管理 配下に GJ_督促 の実例がある）。
+   ② 面談の録画は a.oda のドライブがブロックされているため、
+      河崎氏本人の Teams クライアントから当該会議を開いて録画の有無を直接見るしかない。
+   どちらも読み取りのみで進む。帳簿は 計上済み として動かさない（オーナー判断 2026-08-16）。"
+
+  :closing/not-mine
+  {:branch "agent/d1-kotobase-closure-20260815"
+   :状態 "origin/main から 3 ahead / 103 behind。この checkout の現在のブランチ。"
+   :未着地の実体 "7763db0613a docs: close D1 to Kotobase migration architecture
+                  （3 ファイル・161 行の純追加。他 2 commit は origin/main の取り込み）"
+   :検証 "scripts/verify-d1-kotobase-migration.cljs を実行したところ
+          ok - 42 active D1 configs are closed-world registered; no unreviewed binding
+          と通った。内容は健全に見える。"
+   :扱い "前セッション（2026-08-15）の作業であり、本セッションのものではないので削除も merge もしていない。
+          着地させるなら worktree を origin/main から切って 7763db0613a を cherry-pick し、
+          gh api repos/com-junkawasaki/root/merges でサーバ側マージする。"}
+
+  :provenance/read-only
+  "本セッションを通じて読み取りのみ。MoneyForward の journal.write / transaction.write /
+   trade_partners.write は一度も呼んでいない。SharePoint も Graph の GET のみで、
+   ファイルの作成・変更・削除はしていない。外部への送信も行っていない。"}
 ]
