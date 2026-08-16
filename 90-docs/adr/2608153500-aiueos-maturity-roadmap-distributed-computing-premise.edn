@@ -848,6 +848,30 @@
 
    **この script を呼ぶものは依然として無い。** compiler の checkout path を唯一の引数に取るので、配線は「それをどこから渡すか」を決めることになる。
 
+   ### 再現 script を gate にしようとして、できなかった（2026-08-17）
+
+   残る 1 点「この script を呼ぶものが無い」を配線しようとした。**landing しなかった。**
+
+   script は**ライブラリではなく compiler の checkout** を要る（`bin/kotoba-compiler` を起動し、その `git rev-parse HEAD` を自分の pin と照合して、違えば拒否する）。test から「特定 sha の checkout をディスク上に確実に用意する」ところが解けなかった —— `:extra-deps` にも `:override-deps` にも書いたが、その sha が gitlibs に materialize されない。**赤いテストは置かない**ので、test と deps の変更は撤回した。
+
+   ### ただし過程で本物の結果が 1 つ出た —— evidence floor が false-clean を捕まえた
+
+   最初の版は checkout を classpath resource から辿った。**それは別 revision（`1e21a1f5`）の amu を掴み**、script は
+
+   ```
+   error: compiler HEAD is 1e21a1f5…; expected 8ff1030…
+   ```
+
+   と言って**何も実行せずに終了**した。`differ:` 行は **0 件**。**「相違ゼロ」は「全部再現した」と同じ形をしている。**
+
+   捕まえたのは `AIUEOS_KOTOBA_OBJECT_OK` が出力に在ることを要求する assertion —— **ADR-2608136000 の evidence floor そのもの**である。これが無ければ、この test は「異常なし」と報告していた。
+
+   **このセッションで書いた evidence floor が、想定した種類の嘘を実際に止めた最初の事例である。**
+
+   ### 残る配線の問題は設計判断であって test の書き方ではない
+
+   compiler checkout をどこから得るか。**fleet ノードに checkout を置く / script が sha ではなく digest で compiler を受け入れる / path を渡す前提のまま CI に書く** のいずれか。
+
    **A2 を A3 より前に置く。**再現できないものは attest できず、attest できないものを『安全』として売れない。顧客に監査ログを見せる商品が、自分の出荷物を自分で再構築できないのは通らない。ネットワークが動く方が見栄えはするが、**再現性の無い OS が外部と喋り始めると、後から『いつから壊れていたか』を言えなくなる。**
 
    ## 4. 再利用の規律 —— 新しく書くのは『無いもの』だけ
