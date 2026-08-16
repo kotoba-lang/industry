@@ -337,6 +337,28 @@
 
    `compile-source`（このワークスペースの parity harness が全部使う入口）は **`:require` 節を拒否する**ので、依存を持つ module は project-linking API 無しには JVM テストから駆動できない。
 
+   ### amu#611 を自分で直そうとして、直せない理由が分かった（2026-08-16）
+
+   **拒否している場所は特定できた**: `kotoba-kir` の `only-native-word-typed-features?` の終端 `:else` が `non-string-typed-ops` で守られており、`i64-shift-left` / `i64-shift-right` / `u64-shift-right` はその集合に居る。`i32` 族には数行上に native 専用の明示 clause が在るのに、i64 族には無い —— **抜けに見える。**
+
+   **抜けではなかった。clause を足して測った。**
+
+   直る側: `state_core.kotoba` が 4 native target 全部で通り、`extract-native` が `segment-decision` の **344 バイトの実 AArch64** を出す（`f004 40f9 …`、packing が要求する `lsl`/`orr` を含む）。backend は元から出せる —— `isa_execution_test` が `(i64-shift-left 1 5)` を ISA で実行して 32 を期待している。
+
+   壊れる側: **amu の 8 テストが落ちる**（19 failures/8 errors → 28/17）。`bit-or`/`bit-not` を外して shift 3 つだけにしても**まったく同じ 8 件**。全部 string / profile split / golden digest 系で、admission ではなく**実行時**に出る:
+
+   ```
+   value-type-mismatch {:expected :i64 :position {:function same :result true}}
+   ```
+
+   `true` を返す関数に `:i64` を期待している —— このファイル自身のコメントが profile の違いとして書いている現象（*every comparison, including `=`, always returns `:i64`, never `:bool`*）である。
+
+   **つまり厳しさが 2 つの仕事を兼ねている。** 「native が lower できるもの」を述べると同時に、**string module を native profile の外に留めている**。shift のために広げると、それらの module が profile 境界を越えてしまい、golden digest と profile split が一緒に動く。
+
+   **1 clause の変更では済まないので PR は出さず、測定を issue に返した**（amu#611 のコメント）。gate を広げるなら、profile 境界に**別の担い手**が要る —— 今は 1 つの述語が両方を持っている。
+
+   ついでに: **`kotoba-kir` 自身の test suite は main 時点で compile できない**（`kir_value_runtime_test.clj:65` が存在しない `kir/value-runtime-operations` を参照）。あのファイルを変更しても**答えるべき local suite が無い**。
+
    **A2 を A3 より前に置く。**再現できないものは attest できず、attest できないものを『安全』として売れない。顧客に監査ログを見せる商品が、自分の出荷物を自分で再構築できないのは通らない。ネットワークが動く方が見栄えはするが、**再現性の無い OS が外部と喋り始めると、後から『いつから壊れていたか』を言えなくなる。**
 
    ## 4. 再利用の規律 —— 新しく書くのは『無いもの』だけ
