@@ -227,7 +227,7 @@ CID は二重実行を止めず、file lock と fsync と count が止める。j
 
 | 次の一手 | 置き場所 |
 |---|---|
-| receipt に `capability-semantics.edn` の 4 field（`:receipt/cap` `:receipt/at` `:receipt/call` `:receipt/outcome`）を実際に載せる —— 今の journal が記録しているのは**消費であって outcome ではない** | `kototama` |
+| ~~receipt の 4 field~~ | **着地（2026-08-16）**。claim は provider 実行の*前*に書かれる（それが at-most-once であって exactly-once でない理由）ので、outcome は必然的に 2 つ目の entry。source 用の `:receipt/value` も載る —— `kototama.execution` が cache key を許す条件がまさにそれ。`:attempt-always-receipted` は `unreceipted`（outcome の無い消費を答える）で**検査可能**になった —— claim と provider 復帰の間の crash はそこに出る |
 | receipt を dag-cbor にする（generic tooling が field を読めるように）。CBOR 依存を zero-dep の repo に持ち込むので**読み手が現れてから払う** | `kototama` |
 | 署名。`chain` は `authority` の shape しか検証しない（grant の正当性判断は aiueos） | `aiueos` 境界 |
 | UCAN / CACAO adapter を core から adapter 面へ寄せる | 境界 repo |
