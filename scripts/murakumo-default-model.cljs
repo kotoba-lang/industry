@@ -208,7 +208,15 @@
 (defn- cmd-set! [dir]
   (let [distributed? (flag? "--distributed")
         parallel (opt "--parallel" "1")
-        ctx (opt "--ctx" "32768")
+        ;; **既定はモデルの native 上限。絞らない。** 2026-08-16 実測: gad で
+        ;; 32768 -> 262144（8 倍）にしても decode は 13.01 tok/s のまま変わらない。
+        ;; Qwen3.8 は Gated DeltaNet 混成で、状態サイズが文脈長に依存しない層が
+        ;; 大半を占めるため長文脈の KV コストが構造的に小さい。以前ここに 32768 と
+        ;; 書いていたのは私が安全側に置いただけの根拠の無い値で、その 8 分の 1 が
+        ;; 「コーディングに context が足りない」の原因だった。
+        ;; ⚠ 16GB の mini はこの限りではない —— あちらは model 本体が wired limit を
+        ;; ほぼ埋めるので ctx=4096 が上限（murakumo-nodes.cljs の実測を参照）。
+        ctx (opt "--ctx" "262144")
         ls (:out (ssh! (str "ls -S " model-root "/" dir "/*.gguf 2>/dev/null | xargs -n1 basename")))
         files (remove str/blank? (str/split-lines (str/trim ls)))
         gguf (first (remove #(str/starts-with? % "mmproj") files))

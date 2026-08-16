@@ -1,0 +1,125 @@
+[{:db/id -1
+  :adr/id "ADR-2608169000"
+  :adr/title "Qwen3.8 はどこで動かすか —— context・量子化・投機デコードの実測と、16GB mac mini が使えない理由"
+  :adr/status "accepted"
+  :adr/date "2026-08-16"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :source/dataset "adr"
+  :adr/related ["ADR-2607173100" "ADR-2607300900" "ADR-2608136000"]
+  :adr/repos ["com-junkawasaki/root" "orgs/kotoba-lang/murakumo"]
+  :adr/body
+  "オーナー指示（2026-08-15）でフリートの既定モデルを Qwen3.8-27B にした。その配置と
+設定を決めるために測った値と、測る過程で壊したものの記録。
+
+## 決定
+
+  gad（Radeon 8060S / 47GB）  Qwen3.8-27B **Q4_K_M** + mmproj + n-gram 投機
+                              **ctx 262144**（モデルの native 上限）· parallel 1
+  16GB mac mini               **推論には使わない**（下記の算術的な壁）
+
+`murakumo-main` は gad を指す。mini は ring の RPC worker としても使わない。
+
+## 実測（すべて同一の課題セット。品質は kbench = 生成物を Kotoba コンパイラに
+## 通し KIR で実行して assert を数える。基準 30 checks / 3 files）
+
+### 量子化
+
+| quant | サイズ | decode | 品質 |
+|---|---|---|---|
+| Q4_K_M | 17.1GB | 13.0 tok/s | 28/30, compile 3/3 |
+| UD-IQ3_XXS | 11.9GB | 6.8 tok/s | **28/30, compile 3/3** |
+| UD-IQ2_M | 9.8GB | 6.79 tok/s | **18/30, compile 2/3** |
+
+**IQ3_XXS は Q4 と同点で、失敗した 2 件の内容まで一致した**（どちらも `ratio-bp` を
+`(clamp-bp (* 10000 (quot num den)))` と書き、スケール前に切り捨てる）。量子化ノイズ
+なら失敗の仕方が散るはずで、同じ推論の癖が同じ形で出るのは 3bit が Q4 と同じ判断を
+している証拠。**IQ2_M は崩れる** —— `op-dispatch` がコンパイルすら通らなくなり、これは
+切替前の 35B-A3B が失敗していたのと同じ形で、Qwen3.8 を選んだ理由が消える。
+しかも 2GB 小さいのに速くない（逆量子化コストが帯域の節約を食う）。
+
+### context —— **絞っていたのは根拠のない設定だった**
+
+gad で 32768 -> 131072 -> **262144** と上げて decode は **13.01 / 13.01 / 12.9 tok/s**、
+つまり**変わらない**。Qwen3.8 は Gated DeltaNet と Gated Attention の混成で、状態
+サイズが文脈長に依存しない層が大半を占めるため、長文脈の KV コストが純 Attention の
+27B とは桁違いに小さい。native 262144 を名乗れるのはそのため。
+**「コーディングに context が足りない」の原因は、私が `-c 32768` と書いたことだった。**
+
+### 投機デコード
+
+n-gram（`--spec-type ngram-cache,ngram-simple`、draft モデル不要・追加メモリ 0）:
+
+    コード編集（出力が入力をなぞる）  13.0 -> **32.4 tok/s**
+    新規コード生成                    13.0 -> 12〜15.5 tok/s
+    数え上げ（文脈に無い列）          13.0 -> 13.0 tok/s
+
+品質は前後で 28/30・3/3 のまま不変。効き方は「出力が文脈をどれだけなぞるか」に比例する。
+
+**MTP は入れない。** この gguf は MTP テンソルを持ち llama.cpp も draft context を
+作る（+513 MiB）が、mini で **6.8 -> 5.3〜6.3 tok/s と遅くなった**。帯域が飽和した
+機械では draft の計算と追加メモリを受理率で回収できない。
+
+### エンジン（MLX vs llama.cpp）
+
+同一マシン・同時刻で MLX 3bit 1.70 tok/s / llama.cpp Q3_K_XL 1.29 tok/s。
+バイトあたり **MLX が約 1.16 倍速い**。ただし**絶対値は無効** —— 測定機（M1 Max）が
+load 190〜372 で飽和していた。1.16 倍では llama.cpp 側の n-gram 投機（コード編集
+2.5 倍）を埋められないので **MLX は採らない**。「MLX が遅い」とは言っていない。
+
+## 16GB mac mini を使わない理由（算術）
+
+    GPU wired limit           13312 MiB（既定。上げてはいけない、後述）
+    IQ3_XXS モデル本体      −11361 MiB
+    ────────────────────────────────
+    KV + compute buffer に     1951 MiB
+
+vision（mmproj 888 MiB）を捨ててなお **ctx=4096 が上限**。8192 は f16 でも q8_0 でも
+`Compute error`。**KV 量子化が効かない** —— 制約が KV ではなく本体 + compute buffer が
+wired limit をほぼ埋め切っていることだから。5.44 tok/s の 4096 ではコーディングに
+使えない。
+
+分散（RPC ring、9 台で 117GB プール）はフル Q4 を無劣化・vision 付きで載せられ、
+実際に画像認識まで通ったが **4.67 tok/s** で gad 単体の 1/3。dense モデルを 1 台に
+載る大きさのまま分散させると、層ごとのネットワーク往復を足すだけになる。
+（この結論に至る途中で「遅いのは RPC ビルドのバイナリのせい」という仮説を立てたが
+誤りだった。Vulkan ビルドは `--rpc` を持つが worker と protocol 非互換で、worker を
+build 9334 に揃えて測り直しても 4.67 のままだった。）
+
+## 壊したもの —— **16GB 機で `iogpu.wired_limit_mb` を上げない**
+
+`13312 -> 14848` に上げた **dan と judah の 2 台を失った**。16GB のうち 14.5GB を GPU に
+固定すると OS に 1.5GB しか残らず、**tailscaled が餓死して tailnet から消える**。
+ping は通り LAN の sshd も生きているのに、`authorized_keys` が tailnet からの接続しか
+受けないため入れない。**復旧には物理アクセスが要る。**
+
+構造的な問題はここ: **フリートに帯域外の復旧経路が無い。** 負荷試験でノードを追い込むと、
+追い込んだ結果を確認する手段ごと失う。健全なうちに gad から LAN で入れる経路を
+用意しておくべきだった。
+
+## 計測の作法（この日 7 回以上踏んだ形）
+
+* **`server is listening` をロード成功と読まない。** llama.cpp は遅延確保なので、
+  余裕が無くても listening までは進み、最初のリクエストで死ぬ。**本物の生成で判定する。**
+* **`Pages free` は available ではない。** macOS は inactive/speculative/purgeable を
+  回収する。benjamin 実測で free 447 MiB に対し available 11282 MiB（25 倍）。この指標で
+  床を判定して、載るモデルを 5 回連続で誤って断った。
+* **`-ngl 999` の天井は system available ではなく GPU wired limit。**
+* **`pkill -f <文字列>` はリモートコマンド自身に一致して自分を殺す。** 3 回踏んだ。
+* **パイプの途中に `tail` を挟むと `$?` は tail のものになる。** 失敗した rsync を
+  「TRANSFER DONE」と報告した。
+* **メモリだけでなく load と最大占有プロセスを見る。** 推論プロセス 0 件なのに空きが
+  急減していたのは python が 1GB 級を持っていたため。他人の仕事が載ったノードで
+  測れば汚染された数字が出る。
+
+これらは `scripts/murakumo-nodes.cljs`（audit / reap / serve / stop）と
+`scripts/murakumo-default-model.cljs`（status / set / revert）に不変条件として
+埋め込んだ。`serve` は載る前に断り、載せたら本物の生成で確かめ、失敗したら自分で片付ける。
+
+## 未解決
+
+* dan / judah / levi / zebulun にアクセスできない（前 2 台は本 ADR の作業で失った）
+* `api.murakumo.cloud` の registry メタデータが実態と乖離（alias-for / parallel /
+  vision / fleet / context）。`MURAKUMO_SERVICE_TOKEN` が kagi に無く書けない
+* gad の `:11434` に同一モデルの 2 つ目のプロセスが居る（legacy alias 用）。統合すれば
+  約 16GB 空くが、alias の利用者が未確認"}]
