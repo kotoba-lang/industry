@@ -124,6 +124,55 @@
     (when (zero? exit) (boolean (seq (str/trim out))))))
 
 ;; ----------------------------------------------------------------- coverage
+;; `:kip/status :final` is a string somebody typed. Before any of it is allowed
+;; to cover a surface, the quorum behind it has to verify — otherwise the whole
+;; mechanism is defeated by editing one keyword.
+;;
+;; The verification is NOT reimplemented here: scripts/verify-kip-quorum.cljs is
+;; the authority and this shells out to it, the same way the fleet gates call
+;; the checker they wrap rather than restating it. Two implementations of one
+;; check is how a state where only one of them passes gets created quietly.
+(def ^:private quorum-script (io/file root "scripts" "verify-kip-quorum.cljs"))
+
+(def quorum-check
+  (if-not (.exists quorum-script)
+    ;; Distinct from "it ran and said no". A missing verifier is an environment
+    ;; gap, and reporting it as a quorum failure would send someone to look at
+    ;; signatures that are fine.
+    {:status :absent :out (str (str quorum-script) " is not in this checkout")}
+    (let [{:keys [status stdout stderr]}
+          (js->clj (.spawnSync (js/require "node:child_process")
+                               "nbb"
+                               #js ["--classpath"
+                                    (str/join ":" [(str root "/orgs/kotoba-lang/kip/src")
+                                                   (str root "/orgs/kotoba-lang/kagami/src")])
+                                    (str quorum-script)]
+                               #js {:encoding "utf8" :cwd root :timeout 300000})
+                   :keywordize-keys true)]
+      {:status status :out (str stdout stderr)})))
+
+(defn- readable-tail
+  "The subprocess's own report lines, not its host's stack trace. A raw nbb
+  backtrace pasted into this report tells the reader about node, not about the
+  registry."
+  [out]
+  (let [lines (remove str/blank? (str/split-lines (str out)))
+        ours (filter #(re-find #"^(RESULT|REJECT|ADMIT|SCANNED|POLICY|SELF-CHECK|FINAL-KIPS|SUMMARY|  )" %) lines)]
+    (str/join "\n  " (take-last 6 (if (seq ours) ours lines)))))
+
+(say "QUORUM-VERIFY"
+     (case (:status quorum-check)
+       0 "ok"
+       1 "FAIL"
+       :absent "skipped:verifier-not-in-this-checkout"
+       "could-not-run")
+     (str "(scripts/verify-kip-quorum.cljs exit " (pr-str (:status quorum-check)) ")"))
+
+(when-not (= 0 (:status quorum-check))
+  (bail! 2 "the quorum behind :final could not be confirmed, so no KIP may be counted as covering anything."
+         "verify-kip-quorum.cljs said:"
+         (readable-tail (:out quorum-check))))
+
 (def finals
   (into #{}
         (comp (filter #(= :final (:kip/status %)))
