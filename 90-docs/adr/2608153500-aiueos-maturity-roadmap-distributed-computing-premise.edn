@@ -488,6 +488,28 @@
 
    `options` の window scaling は shift 量が変数（handshake で 0–14 に交渉される）で、`i64 shift count must be an integer literal in [0,63]`。**残り 4 箇所のリテラル shift は今日通る。**
 
+   ### pacing —— そして ABI の引数は 5 本（2026-08-16）
+
+   `org-ietf-tcp` `0d59482`。7/11 namespace が Kotoba object を持つ。**1,371 parity assertion**、`extract-native` が `may-send-reason` の 332 バイト AArch64 を出す。
+
+   **`ack-reason` が 6 引数で `function parameters exceed ABI-supported arity` に当たった。上限は 5。** 直し方は RFC 1122 の「2 つの full segment」閾値を**別の export 関数に切り出す**ことで、**呼び出し側に計算させることではない** —— 呼び出し側が計算する閾値は規則が住む 2 つ目の場所になり、しかもこの閾値**そのものが規則**である。
+
+   **決定は flag と reason の 2 値ではなく code 1 つを返す。** `send?` は「reason が許可する 3 つのどれか」に厳密に等しく、両方返せば**食い違いうる導出が 2 つ**になる。
+
+   ### 5 通りの破壊は全部赤
+
+   | 壊した内容 | 結果 |
+   |---|---|
+   | out-of-order の ACK を遅らせる | 279 赤 |
+   | Nagle の第 4 節を落とす | 12 赤 |
+   | timer が delay を超えることを要求 | 6 赤 |
+   | stall-ms が負になれる | 6 赤 |
+   | RFC 1122 の上限を外す | 2 赤 |
+
+   どちらのアルゴリズムも**何も起きていないように見える壊れ方**をする。Nagle の第 4 節（「送った分は全部 ack 済みなので束ねる相手が居ない」）を落とすと、**接続の最初の 1 バイトを、束ねる相手が来るまで抱える** —— request/response では永遠に来ない。out-of-order の ACK を遅らせると、fast retransmit が数える重複が遅れ、**segment を失ったばかりの経路で**再送が delay timer ぶん遅れる。
+
+   `deadlock?` は片側からではなく**両決定の全直積**で駆動した。stall は相互作用そのものだからである。
+
    **A2 を A3 より前に置く。**再現できないものは attest できず、attest できないものを『安全』として売れない。顧客に監査ログを見せる商品が、自分の出荷物を自分で再構築できないのは通らない。ネットワークが動く方が見栄えはするが、**再現性の無い OS が外部と喋り始めると、後から『いつから壊れていたか』を言えなくなる。**
 
    ## 4. 再利用の規律 —— 新しく書くのは『無いもの』だけ
