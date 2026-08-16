@@ -1,0 +1,150 @@
+[{:db/id -1
+  :adr/id "ADR-2608161500"
+  :adr/title "UnixFS は IPLD layout adapter。aiueos の正本でも公開 HTTP の正本でもない"
+  :adr/status "accepted"
+  :adr/date "2026-08-16"
+  :adr/last-verified "2026-08-16"
+  :adr/last_verified "2026-08-16"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "unixfs-layout-adapter"
+  :adr/repos ["orgs/kotoba-lang/aiueos"
+              "orgs/kotoba-lang/kotoba-protocol"
+              "orgs/kotoba-lang/io-ipld"
+              "orgs/kotoba-lang/io-ipld-car"]
+  :adr/related
+  ["ADR-2608012050"
+   "ADR-2608145100"
+   "ADR-2608140500"
+   "ADR-2608147400"
+   "ADR-2608148200"
+   "ADR-2608157000"
+   "ADR-2608160100"
+   "ADR-2608160200"
+   "ADR-0013"]
+  :adr/authoritative-for
+  ["UnixFS は IPLD codec ではなく dag-pb 上の layout / ADL であること"
+   "aiueos の boot / catalog / journal の正本は aiuefs であり UnixFS ではないこと"
+   "aiueos が UnixFS を持つなら外来 CAR の ingest reader（layout adapter）に限ること"
+   "公開 HTTP は UnixFS directory walk を identity にも origin の正本にもしないこと"
+   "公開 content の IPLD 代替は raw document / dag-cbor map+IPLD path / 専用 ADL / CAR transfer であること"]
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :source/dataset "adr"
+  :adr/body
+  "## Context
+
+UnixFS（https://specs.ipfs.tech/unixfs/）は IPFS のファイルシステム互換 DAG である。
+この workspace では既に 2 つの隣接決定がある。
+
+- ADR-2608145100: 公開 resource identity から UnixFS path を外す（`ipfs://{cid}/index.html` を採らない）。
+- ADR-2608012050 §4: aiueos の bare-metal object store は name-addressed のまま据え置く。content-addressed store は non-goal。今日の店を縛っているのは addressing ではなく `:capacity 4` / アプリ 12 KiB / `:rollback-window 1`。
+
+残っていた問いが 2 つある。
+
+1. aiueos の内部抽象として UnixFS を持っておくべきか。
+2. web / HTTP 公開面を UnixFS にしないなら、IPLD 目線で何が代わりか。
+
+west に `tech-ipfs-specs-unixfs` は無い（あるのは `tech-ipfs-specs-ipns` と `tech-ipfs-specs-http-gateway`）。aiueos リポジトリに `unixfs` / `dag-pb` / `ipfs` / `ipld` は 0 件。ストレージ正本は署名付き `aiuefs-v3` カタログである。itonami gateway の UnixFS directory walk は website-compat の観測であって、protocol の要求ではない（ADR-2608140500）。
+
+## Decision
+
+### 1. UnixFS は IPLD codec ではない。layout / ADL である
+
+IPLD から見ると段が分かれる。混ぜると「ファイルシステムを正本にする」設計が黙って通る。
+
+```text
+Data Model     map / list / bytes / link (CBOR tag 42)
+codec          raw 0x55 · dag-cbor 0x71 · dag-json · dag-pb 0x70
+layout / ADL   UnixFS · HAMT · prolly · MST · arrangement · git tree
+transfer       CARv1/v2（どこにあるか。何であるかではない）
+HTTP           Location（取り方）であって identity ではない
+```
+
+UnixFS は **dag-pb の `Data` を File / Directory / HAMTShard / Symlink と読む約束**である。codec は dag-pb（と leaf の raw）。公開 identity に path を入れるのは、この layout を website 互換へ昇格させた結果であって、IPLD Data Model の要件ではない。
+
+### 2. aiueos の正本は aiuefs。UnixFS は外来 ingest の adapter
+
+boot が荷重を受けている仕事は 3 つで、どれも UnixFS は持っていない。
+
+| 今日の仕事 | 正本 | UnixFS が足すもの |
+|---|---|---|
+| 起動時に `app/hello` を 1 回で引く | 16 バイト ID の署名カタログ | directory / HAMT walk。boot が再帰 DAG になる |
+| 改ざんを拒否する | SHA-256 + RSA-2048 を Kotoba が判定 | codec だけ。署名と revocation は別途まだ要る |
+| 落ちても先行 commit を壊さない | sector 1/2 の dual-slot journal + readback | 不変 DAG。mutable registry は別レイヤのまま |
+
+`app-catalog-valid.kotoba` は magic・extent 衝突・ID 一意を固定仕事で見る。UnixFS を boot TCB に載せると protobuf 2 段、sister-list の `blocksizes`、HAMT（fanout 上限は CVE-2023-23625）、symlink、mode/mtime が入り、C に判断を足すか native オブジェクトが肥大する。どちらも ADR-2607241100 の境界に反する。
+
+**持ってよい抽象は一段上**である。
+
+```text
+IBlockStore          CID → bytes
+codec                raw | dag-cbor |（読むだけ dag-pb）
+layout adapter       aiuefs catalog          ; boot / journal の正本
+                     ipld-map                ; 公開・アプリ bundle
+                     unixfs-reader           ; 外来 CAR の ingest のみ
+```
+
+- boot catalog・journal・ESP A/B 更新は aiuefs のまま。
+- kotobase から来る artifact は dag-cbor map か raw document。
+- UnixFS reader は「他人が dag-pb で渡してきたとき落ちない」ための adapter。公開 Worker が directory walk して `index.html` を探す、は持たない。
+- `examples/components/fs-service` の `:fs/open` は capability 例であり、UnixFS codec ではない。
+
+aiueos に UnixFS 実装を今書く必要は無い。抽象として予約するなら、上記 3 adapter の席だけを契約に残し、unixfs-reader は外来 ingest が実在してから足す。席を先に codec 実装で埋めると、boot 正本が置換されたように読める。
+
+### 3. 公開 HTTP は UnixFS directory walk をしない
+
+公開面の切り方:
+
+```text
+identity   ipfs://{cid} | ipns://{k51}
+bytes      raw または dag-cbor の 1 ノード
+selector   IPLD path / map key（機械）
+view       fragment（人）
+pack       CARv2（location）
+```
+
+これは ADR-2608145100 / ADR-2608147400 / ADR-2608080100 の追認である。`{cid}.ipfs.itonami.cloud/{unixfs-path}` は gateway の website-compat 投影として残ってよいが、protocol の canonical ではなく、新しい公開 origin の既定にしない。
+
+Content-Type は filename から推測しない。datom 側の metadata、またはノード自身の schema。
+
+### 4. IPLD 目線の代替（UnixFS directory の代わり）
+
+公開 content に使う順:
+
+1. **文書そのものが CID（raw）。** 現在地。`cloud-itonami-app` は 1 HTML = 1 raw CID。`GET /ipld/{cid}` または archive Location。view は fragment。
+2. **dag-cbor の map + IPLD path。** IPLD 本来の木。`{\"entry\": link, \"assets\": {\"logo\": link}}`。`/ipld/{cid}/assets/logo` は Data Model の selector であり、UnixFS の `/logo.png` ではない。`:kotoba.app/entry` がこの key。generic walk は `ipld.core/links`（tag 42）だけで足りる。名前が要る欲求が出たら取るのはこれであって、dag-pb + UnixFS protobuf ではない。
+3. **専用 ADL。filesystem ではない。** この workspace に既にある。`prolly-tree`（index / 包含証明）、`arrangement`（datom 4 index → `/api` と query surface）、`mst`（ATProto record）、`chain`（commit の親リンク、graph identity）。どれもサイトの path を配信する木ではない。
+4. **転送は CAR。** `application/vnd.ipld.car` / `dag-cbor` / `raw` が IPLD 側の HTTP。pack は ADR-2608160100 の物理層。identity を変えない。
+
+Filecoin AMT/HAMT と git codec は、この公開面の候補にしない（actor state と git tree であって、web origin ではない）。
+
+### 5. 再検討の trigger
+
+addressing を変えたい、は trigger ではない。
+
+- aiueos store: `:capacity` / 12 KiB / 単一 ELF という bound が実際に動いたとき。最初に取るのは CID を主キーにした object table で、UnixFS ディレクトリではない。
+- 外来 UnixFS CAR をゲストに見せる実需要が来たとき。unixfs-reader を adapter として足す。boot 正本は動かさない。
+- 公開 HTML origin を `{cid}/index.html` に戻したくなるとき。戻さない。文書 CID か dag-cbor map に直す。
+
+## Consequences
+
+- aiueos に UnixFS を「内部 FS の正本」として導入する提案は、この ADR に反する。reader adapter なら §2 の席に収まる。
+- 新しい公開 Worker / Pages origin は UnixFS directory walk を既定にしない。website-compat が要るなら ADR-2608140500 の投影に閉じ、canonical URI は path 無しの CID / IPNS。
+- `tech-ipfs-specs-unixfs` を west に登録する理由は、外来 ingest の test vector を持つときだけ。公開 identity の正本にする理由にはならない。
+- ADR-2608145100 と ADR-2608012050 は superseded しない。前者の identity、後者の name-addressed store を、layout の語彙で固定する。
+
+## 検証
+
+この ADR は決定の記録である。コード変更は伴わない。次の実装がこの決定を荷重として受ける条件:
+
+- aiueos の boot 契約（`os/aiueos/contracts/boot-v1.edn` の `:object-store :format`）が `:aiuefs-v3` のままであること。UnixFS に書き換えた diff はこの ADR の違反。
+- 公開 URI parser（`kotoba.protocol.ref`）が path 付き `ipfs://cid/index.html` を `:path-not-identity` で拒否し続けること（ADR-2608145100 の既存 test）。
+- 新しい公開 origin が UnixFS walk を既定にする PR は、この ADR を supersede する ADR 無しでは着地しない。
+
+## 改訂履歴
+
+2026-08-16: accepted。オーナー判断「aiueos の抽象として持っておくぐらいか」「web/HTTP 公開面は unixfs じゃない方がいい」。IPLD 代替を raw document / dag-cbor map / 専用 ADL / CAR に固定。"}]
