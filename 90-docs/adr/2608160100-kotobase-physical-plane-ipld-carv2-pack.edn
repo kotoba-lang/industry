@@ -142,7 +142,29 @@ network の逐次性が消える。
 - compaction は**新しい pack を書いて catalog を差し替える**。古い pack は
   参照が消えてから消す。
 - **read-locality と write-locality が食い違う場合は、実測してから compaction
-  を書く**。先に compaction 戦略を設計しない —— 今日そのための測定は無い。
+  を書く**。先に compaction 戦略を設計しない。
+
+  **測定した（2026-08-16）。答えは「compaction を書かない」。**
+  `kotobase-peer` の `dag_shape_bench`（本物の `pt/scan-prefix` と本物の
+  with-blocks retry を回し、wall-clock ではなく count を測る）を docs=2000 で:
+
+  | unfolded-tx | novelty hops | async round trips 合計 | novelty の割合 |
+  |---|---|---|---|
+  | 64 | 4 | 6 | 67% |
+  | 512 | 32 | 34 | **94%** |
+  | 2048 | 128 | 130 | **98%** |
+
+  novelty は 16 entry の segment を `rest` で繋ぐので **hops = ceil(unfolded-tx / 16)**。
+  prolly-tree 側はこの doc 数では **2 wave** で頭打ちであり、伸びる項は novelty
+  だけである。
+
+  **したがって支配項の唯一の乗数は `unfolded-tx` であり、それを下げる機構は
+  fold で、fold は既に在る。** compaction は同じ 4 hops を 1 にできるが、
+  ①新しい機構をまるごと作る必要があり ②chain が伸びるたびに再実行が要る。
+  **fold は分子そのものを消す。** 比較して compaction を正当化する材料は無い。
+
+  結論: **fold-first。** compaction は、fold 閾値を下げた後の再測定でなお
+  chain が支配する場合にだけ再検討する。**それまで書かない。**
 
 ### 5. packing が直す cost と、直さない cost
 
