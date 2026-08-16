@@ -3,25 +3,29 @@
 ;;
 ;; `scripts/residency-collect.cljs --check` を呼んで exit code を見るだけ。
 ;; **判定をここに複製しない** —— 閾値と drift の定義は collector 側にあり、
-;; 2 箇所にあって片方だけ直る、を起こさない（hayari-alarm と同じ方針）。
+;; 2 箇所にあって片方だけ直る、を起こさない。
 ;;
 ;; **なぜ fleet gate ではないのか。** drift の片側は `launchctl list`、つまり
 ;; *この機械で実際に何が動いているか*である。fleet gate はノードへ tree を配って
 ;; 走らせるので、operator の launchd を見られない。したがって operator 側の常駐。
 ;;
-;; **重複について。** 遷移検出（前回の健全性を state に持ち、変化した時だけ鳴らす）は
-;; `hayari-alarm.cljs` と同型である。2 本目なので共通化しない —— **3 本目を書くときに
-;; `transition-alarm` として抽出する。** ここに書いておかないと、3 本目の人が
-;; 同じ判断を最初からやり直す。
+;; **遷移の扱いは `transition-alarm` にある**（2026-08-16 に抽出）。この file が
+;; 「3 本目を書くときに抽出する」と書き残していた、その 3 本目が capacity-alarm
+;; だった。ここに残るのは *何を検査するか* だけ。
 ;;
-;;   nbb scripts/fleet-ci/residency-alarm.cljs [--root <superproject>] [--notify false]
+;; **exit code はこの alarm 固有**: 不健全なら 1 で終わる。hayari-alarm は常に 0 で
+;; 終わり、その理由（通知役が赤いと「通知が壊れている」と「対象が壊れている」が
+;; 混ざる）の方が筋は良いが、ここを黙って変えると gate や plist が exit を見ていた
+;; 場合に挙動が変わる。変えるなら別の変更として、見てから変える。
+;;
+;;   nbb --classpath scripts/fleet-ci scripts/fleet-ci/residency-alarm.cljs \
+;;       [--root <superproject>] [--notify false] [--state <f>]
 
-(ns fleet-ci.residency-alarm
+(ns residency-alarm
   (:require ["node:child_process" :as cp]
-            ["node:fs" :as fs]
             ["node:path" :as path]
-            [clojure.edn :as edn]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [transition-alarm :as alarm]))
 
 (def args (vec *command-line-args*))
 (defn- flag [n d] (let [i (.indexOf args n)] (if (neg? i) d (nth args (inc i)))))
@@ -30,46 +34,27 @@
 (def notify? (not= "false" (flag "--notify" "true")))
 (def state-f (flag "--state" (path/join (or js/process.env.HOME "/tmp") ".gftd" "residency-alarm-state.edn")))
 
-(defn- run-check []
+(defn check []
   (let [r (cp/spawnSync "nbb" #js["scripts/residency-collect.cljs" root "--check"]
-                        #js {:cwd root :encoding "utf8" :maxBuffer (* 8 1024 1024)})]
-    {:rc (aget r "status") :out (str (aget r "stdout") (aget r "stderr"))}))
-
-(defn- notify! [title body]
-  ;; このマシンに実在する唯一の人間向けチャネル（workspace に slack/mail 連携は無い）。
-  ;; 判定は state と exit code に残るので、通知の失敗は握り潰してよい。
-  (when notify?
-    (try
-      (cp/spawnSync "osascript"
-                    #js["-e" (str "display notification " (pr-str body)
-                                  " with title " (pr-str title))]
-                    #js {:encoding "utf8"})
-      (catch :default _ nil))))
+                        #js {:cwd root :encoding "utf8" :maxBuffer (* 8 1024 1024)})
+        rc (aget r "status")
+        out (str (aget r "stdout") (aget r "stderr"))]
+    (println out)
+    {:healthy? (zero? rc)
+     ;; FAIL 行が「何が drift したか」を1行で持っている。
+     :why (or (first (filter #(str/starts-with? % "FAIL") (str/split-lines out)))
+              "drift あり")
+     :persist {:rc rc}}))
 
 (defn -main [& _]
-  (let [{:keys [rc out]} (run-check)
-        healthy? (zero? rc)
-        ;; FAIL 行が「何が drift したか」を1行で持っている。
-        why (or (first (filter #(str/starts-with? % "FAIL") (str/split-lines out)))
-                "drift あり")
-        prior (when (fs/existsSync state-f)
-                (try (edn/read-string (fs/readFileSync state-f "utf8")) (catch :default _ nil)))
-        was-healthy? (:healthy? prior)]
-    (println out)
-    (cond
-      ;; 初回は前回を知らない。**不健全なら鳴らす** —— 「知らない」を「健全」と
-      ;; 読み替えない（hayari-alarm と同じ理由）。
-      (nil? prior)
-      (when-not healthy? (notify! "常駐 drift" why))
-
-      (and was-healthy? (not healthy?))
-      (notify! "常駐 drift が出ました" why)
-
-      (and (not was-healthy?) healthy?)
-      (notify! "常駐 drift が解消しました" "宣言と実機が一致しています"))
-
-    (fs/mkdirSync (path/dirname state-f) #js {:recursive true})
-    (fs/writeFileSync state-f (pr-str {:healthy? healthy? :rc rc :why (when-not healthy? why)}))
+  (let [{:keys [healthy?]}
+        (alarm/run! {:label "residency-alarm"
+                     :check check
+                     :state-file state-f
+                     :notify? notify?
+                     :messages {:broke ["常駐 drift" (fn [{:keys [why]}] why)]
+                                :recovered ["常駐 drift が解消しました"
+                                            (fn [_] "宣言と実機が一致しています")]}})]
     (set! (.-exitCode js/process) (if healthy? 0 1))))
 
-(apply -main *command-line-args*)
+(apply -main args)
