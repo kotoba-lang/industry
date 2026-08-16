@@ -24,12 +24,11 @@
     that returns `{:healthy? :why}`; thresholds live wherever the thing
     being measured is defined.
 
-  **Not yet the single home for this.** `capacity-alarm` is the only caller;
-  `residency-alarm` and `hayari-alarm` still carry their own copies of the
-  transition logic. Porting them is a separate change, kept separate because
-  verifying their transitions means driving the collectors they spawn, and a
-  half-checked refactor of two working monitors is worse than a truthful
-  note that the copies are still there."
+  All three alarms are on it: `capacity-alarm`, `residency-alarm`,
+  `hayari-alarm`. Each keeps only *what it checks* and its own exit contract
+  — `residency-alarm` still exits 1 when it finds drift, because something
+  may branch on that, and changing it silently is a different decision from
+  extracting shared code."
   (:require ["node:child_process" :as cp]
             ["node:fs" :as fs]
             ["node:path" :as path]
@@ -60,6 +59,10 @@
   - `:notify?`   false in tests
   - `:messages`  `{:broke [title body-fn] :recovered [title body-fn]}`,
                  each body-fn taking the check result
+  - `check` may also return `:persist`, a map merged into the state file.
+    Diagnostics an alarm already recorded (`:rc`, `:gate-exit`) keep being
+    recorded — a shared helper that quietly drops what its callers were
+    storing is a refactor that loses evidence.
 
   Returns the check result. Never throws for an unhealthy subject."
   [{:keys [check state-file notify? messages label]}]
@@ -74,9 +77,10 @@
       (and (not was) healthy?) (ring! (:recovered messages)))
     (fs/mkdirSync (path/dirname state-file) #js {:recursive true})
     (fs/writeFileSync state-file
-                      (pr-str {:healthy? healthy?
-                               :at (subs (.toISOString (js/Date.)) 0 19)
-                               :why (when-not healthy? (:why result))}))
+                      (pr-str (merge {:healthy? healthy?
+                                      :at (subs (.toISOString (js/Date.)) 0 19)
+                                      :why (when-not healthy? (:why result))}
+                                     (:persist result))))
     (println (str (or label "alarm") ": healthy?=" healthy?
                   (cond (nil? was) " (初回)"
                         (= was healthy?) " (変化なし — 鳴らさない)"
