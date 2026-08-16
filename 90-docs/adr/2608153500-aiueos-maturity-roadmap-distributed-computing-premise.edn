@@ -359,6 +359,30 @@
 
    ついでに: **`kotoba-kir` 自身の test suite は main 時点で compile できない**（`kir_value_runtime_test.clj:65` が存在しない `kir/value-runtime-operations` を参照）。あのファイルを変更しても**答えるべき local suite が無い**。
 
+   ### congestion control も bare metal に載った（2026-08-16）
+
+   `org-ietf-tcp` `c555a84`。RFC 5681 の window 演算を `tcp.seq` と同じ形で切り出した —— scalar in、1 数値 out、controller map は `.cljc` に残す。**4 native target 全部**で通り、`extract-native` が `on-ack-cwnd` の **352 バイトの AArch64** を出す。
+
+   **載る理由がはっきりしている**: shift も `:bool` パラメータも無い。`state_core` は両方持っていて amu#611 に拒否される。**packing しなければ shift も要らない** —— この 1 点だけが、2 つの object のうち片方が機械で走り片方が走らない理由である。
+
+   **5,400 parity assertion**。入力は「どの規則が効くか」が切り替わる境界に寄せた —— cwnd がちょうど ssthresh、3 発目の重複 ACK、halving より 2 セグメント床が勝つ flight size。**congestion control は drift が高くつき、しかも静かな場所**である。少し速く育つ window は失敗しない —— 分不相応に経路を取るだけで、気付くのは他の flow である。
+
+   ### 5 通り壊し、1 つが破れなかった
+
+   | 壊した内容 | 結果 |
+   |---|---|
+   | 2 セグメント床を外す | 486 赤 |
+   | fast recovery を抜けるとき deflate しない | 176 赤 |
+   | may-send が負になれる | 21 赤 |
+   | initial window の 4380 clamp を外す | 6 赤 |
+   | **congestion avoidance の `max 1` を外す** | **緑** |
+
+   `max(1, MSS²/cwnd)` が効くのは **cwnd が MSS² を超えてから**で、そこでは商が 0 に落ち **window が育たなくなる**。表の cwnd は全部それ未満だった。**長寿命 × 太い経路がこの床の効く場所**で、控えめな window の表が決して届かない場所である。MSS² 超の cwnd を 2 つ足したら同じ改変が 144 赤になった。
+
+   ### 逆向きの本物の食い違いも 1 件
+
+   `.cljc` の docstring は `retransmit?` を「遷移時のみ」と書き、**コードは `n >= 3`** である。実列では違いが出ない（閾値到達で state が fast-recovery へ動くので 4 発目は inflate 分岐へ行く）。suite が到達できたのは、重複 3 発を数えた状態で state を slow-start のままにした controller を組んだからで、**呼び出しの列では作れない**。object は docstring ではなく**コードに合わせた** —— 到達可能な入力すべてで一致し、到達不能な入力でだけ食い違う object は、suite を生き延びて checkpoint からの復元で表に出る種類の差である。
+
    **A2 を A3 より前に置く。**再現できないものは attest できず、attest できないものを『安全』として売れない。顧客に監査ログを見せる商品が、自分の出荷物を自分で再構築できないのは通らない。ネットワークが動く方が見栄えはするが、**再現性の無い OS が外部と喋り始めると、後から『いつから壊れていたか』を言えなくなる。**
 
    ## 4. 再利用の規律 —— 新しく書くのは『無いもの』だけ
