@@ -623,6 +623,32 @@
 
    **次**: これを常設 gate にする。今日の実行は手で組んだ 1 回きりで、**回帰を捕まえるものは何も無い。**
 
+   ### native 実行を gate にしようとして、gate が無い理由が分かった（2026-08-16）
+
+   前項の「常設 gate にする」をやろうとした。**できなかった。理由は書く価値がある。**
+
+   `kototama.native.executor/measure-runtime` は **loader source を固定の相対パス `tools/kexe_loader.c` から読む**。引数は取らず、パスの選択肢も無い。したがって **native 実行は tender-native か amu の作業ディレクトリからしか行えない。**
+
+   ```
+   java.nio.file.NoSuchFileException: tools/kexe_loader.c
+   ```
+
+   **これは「artifact が走るか」を答える唯一の API** であり、`org-ietf-tcp` の 10 個の object はどれもこの問いを掛けられない。**murakumo fleet も同じ理由で gate にできない** —— fleet ノードには 1 リポジトリの tree しか配られない。
+
+   テストは書けており、cwd を amu にすれば通る。**org-ietf-tcp には landing しなかった。** 常に赤い gate を置くのは、ADR-2608136000 が「落ちない gate は劇場」と書いたのと同じ理由で劇場である —— **どちらも誰も行動できない。**
+
+   上流に報告した（kototama-native#5）。直し方は loader source path の option 化か、classpath 解決 —— `runtime-identity/loader-source-for-profile` が既に sha256 を pin しているので、**消費側がディスク上の場所を知る必要は無いはず**である。
+
+   ### 現在地（正直に）
+
+   | 主張 | 状態 |
+   |---|---|
+   | 10 object が native target を通る | **常設 parity suite あり**（TCP 39,058 assertions） |
+   | KIR インタプリタが `.cljc` と一致する | **同上** |
+   | **機械語が走って正しく答える** | **1 回手で実行しただけ。回帰を捕まえるものは無い** |
+
+   3 行目が A3 の本体であり、**そこだけ gate が無い。** upstream が直るまでこの非対称は残る。
+
    **A2 を A3 より前に置く。**再現できないものは attest できず、attest できないものを『安全』として売れない。顧客に監査ログを見せる商品が、自分の出荷物を自分で再構築できないのは通らない。ネットワークが動く方が見栄えはするが、**再現性の無い OS が外部と喋り始めると、後から『いつから壊れていたか』を言えなくなる。**
 
    ## 4. 再利用の規律 —— 新しく書くのは『無いもの』だけ
