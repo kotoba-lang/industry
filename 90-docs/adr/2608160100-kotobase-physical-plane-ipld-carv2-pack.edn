@@ -230,17 +230,47 @@ packing する設計は index が 31% になる。これは block sizing の下�
 
 **着地**（2026-08-16）:
 
-- `kotoba-lang/io-ipld-car` —— codec、両 runtime の suite、外部 2 実装による検証、
-  west 登録（pin `4df0605506e6`、`--entry` の最小 diff）。
+- `kotoba-lang/io-ipld-car` —— codec、両 runtime の suite、外部 2 実装による検証
+  （pin `4df0605506e6`）。
+- `kotobase-storage` —— `block-profiles`（`:block-per-object` / `:packed-blocks`）、
+  `packed?`、`validate-block-profile!`、`:packed-blocks` は `:range-read` 必須という
+  coherence 検査。**未宣言は既定ではなく未回答**（`block-profile` は nil）。
+- `kotobase-storage` —— **`:range-read` に操作を与えた**。それまで `IProxiedTransfer` は
+  `-get-object`（全体）しか持たず、この capability は**反証できない語**だった。
+  `IRangeRead/-get-object-range` は半開区間 `[start, end)` で、HTTP Range が両端
+  閉であることとの差 1 byte を protocol 面で固定する（CAR frame の先頭は varint
+  なので、1 byte のずれは「少し違う答え」ではなく parse の成否になる）。
+  conformance suite は `:range-read :verified` / `:not-claimed` を返す
+  （pin `526070045307`）。
+- `kotoba-lang/kotobase-storage-pack` —— **pack 対応 block store**（decorator であって
+  transport ではない）。coalesce、window read-ahead、CID 検証、`stats`
+  （pin `4d8b1c692d87`）。
 
-**未着地**（この ADR が contract を固定しただけ）:
+**実測（この ADR の主張そのもの）**: 100 link の cons chain を、hydrate loop が
+そうせざるを得ないとおり 1 link 1 回の `-get-blocks` で辿る:
+
+| | requests | bytes fetched |
+|---|---|---|
+| `:window-bytes 0`（read-ahead 無し） | **100** | 8,730 |
+| 既定（1 MiB window） | **1** | 12,760 |
+
+JVM と nbb で同値。**packing だけでは 100 のままである** —— 効くのは
+「1 回目の fetch が frame ではなく window を取る」ことで、chain は論理的に逐次の
+まま network の逐次性が消える。この上の行も実テスト
+（`without-a-window-the-chain-costs-one-request-per-link`）であり、良い方の数字
+だけを出す suite は「packing 一般」の証拠になってしまう。
+
+**window は取引である。** 100 → 1 の代償は転送 +46%。`stats` が `:requests` と
+`:bytes-fetched` を必ず並べて返すのはそのため。
+
+**未着地**（contract は固定済み）:
 
 | 次の一手 | 置き場所 |
 |---|---|
-| `:packed-blocks` / `:block-per-object` profile と `validate-backend!` の拒否 | `kotobase-storage` |
-| pack catalog の datoms と loader | `kotobase` + `manifest/schema.edn` |
-| write-locality で pack を封じる書き込み経路 | `kotobase-peer` / `kotobase-engine` |
-| round trip 数の before/after 実測 | `kotobase-peer` の `dag_shape_bench` を pack 対応に |
+| pack catalog の datoms と loader（今は injected な 2 関数） | `kotobase` + `manifest/schema.edn` |
+| write-locality で pack を封じる commit 経路 | `kotobase-peer` / `kotobase-engine` |
+| 実 corpus での round trip 実測（上記は合成 chain） | `kotobase-peer` の `dag_shape_bench` |
+| 実 provider（S3 / R2 / B2）への `IRangeRead` 実装 | `kotobase-storage-s3` ほか |
 | 既存 deployment の移行（block → pack の再配置） | 未設計。**先に実測** |
 
 **移行は必要ない。** 既存の block-per-object store はそのまま正しく、
