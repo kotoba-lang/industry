@@ -3,9 +3,21 @@
   :adr/title "aozora の D1 撤去で失われたもの、R2 backed への現在地、bsky relay 取り込みの再有効化"
   :adr/status "accepted"
   :adr/date "2026-08-15"
-  :adr/supersedes "ADR-2607022330 add.3（relay ingest 無効化）の無効化部分のみ"
+  :adr/supersedes []
   :adr/body
   "## なぜこれを書くか
+
+> **2026-08-16, 訂正**: この ADR の `:adr/supersedes` は
+> 「ADR-2607022330 add.3（relay ingest 無効化）の無効化部分のみ」と書いていたが、
+> **ADR-2607022330 に add.3 は無い**。あれは passkey-PRF バックアップ /
+> QR デバイスリンク / リカバリーフレーズの ADR で、relay も ingest も bsky も
+> 一度も出てこない —— `.edn` 6 commit と削除済み `.md` 8 commit の全履歴を
+> `git log -S` で見ても `relay` と `add.3` はどちらも一度も現れない。
+> 出典は ADR ではなく `app-aozora/40-engine/cljs/pds/wrangler.jsonc:68` の
+> `// relay ingest DISABLED (ADR-2607022330 add.3)` という**コメントの誤引用**で、
+> 本 ADR がそれをそのまま持ち込んだ。したがって本 ADR が supersede する ADR は
+> 無い（`[]` に訂正）。無効化したのはそのコード側の規則であって、経緯は下の本文が
+> 全部持っている。**コメント側の誤引用は子リポにあり未修正。**
 
 2026-08-14〜15 の 1 セッションで、aozora の永続面が D1 から R2 backed
 kotobase へ移り、その過程で **aozora のデータが運ばれないまま旧 D1 が
