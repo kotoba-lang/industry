@@ -492,4 +492,60 @@
    ;; The baseline mechanism already gives the wanted behaviour: the first run
    ;; records all 146, and from then on only NEW and RESOLVED surface, so a NEW
    ;; one means someone has just built another appview with this shape.
+   }
+
+  {:id       :verify-appview-page-summary
+   :title    "landing pages that tell visitors the app has no routes and no vars"
+   :why      "2026-08-16, found while writing an operator quickstart for
+              cloud-itonami/app-air-sched and then asking whether it was one repo's
+              slip. It is not. The generated appviews embed a summary object at the
+              top of svelte/src/routes/+page.svelte and RENDER it -- a Routes figure
+              and two lists whose {:else} branches say `No public route is declared
+              next to this app surface` and `No public vars are declared in the
+              nearest wrangler config`. Both name the wrangler config, so both are
+              checkable. Of 122 pages in west-registered repositories carrying the
+              summary, 352 findings: routeCount disagrees with wrangler on nearly all
+              of them (almost always claiming 0 while wrangler declares 2), the var
+              count disagrees, and relativePath still points into the monorepo the
+              repository was extracted from. So live surfaces tell a visitor they have
+              no public route, at an address wrangler declares, while serving that
+              page there. There is no generator for the object here or in scripts/, so
+              it is hand-maintained and will not follow wrangler.
+              **This is the class the maturity ranking can no longer surface**: those
+              repositories had axis-docs raised by quickstarts and have left the top of
+              the ranking with the page still lying, so leaving it to the ranking is
+              leaving it. It cannot be a fleet gate: it reads orgs/, and a gate ships
+              one repo's tree, so on a node it would find an empty workspace and never
+              go green (ADR-2608124800)."
+   :argv     ["nbb" "{{repo}}/scripts/verify-appview-page-summary.cljs" "--root" "{{root}}" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 86400000
+   :timeout-ms  600000                  ; 10m -- 30x the measured ~20s, all filesystem reads
+   :writes   :none
+   :measured "2026-08-16 on this machine: exit 1, 352 finding(s) over 122 pages,
+              `candidates=225 examined=122 skipped: not-in-west=62 no-summary=41
+              no-wrangler=0 unparsable-or-toml=0`. Discrimination shown four ways:
+              (a) the two repositories repaired this same day,
+              cloud-itonami/app-air-sched and app-air-yield, produce ZERO findings --
+              the negative direction on real data; (b) a root with one page exits 2 on
+              the candidate floor; (c) a root whose manifest/west.yml cannot be read
+              exits 2 rather than reporting clean, since without the roster it cannot
+              tell a managed repository from a leftover directory; (d) the first
+              version had no roster gate and named 157 repositories of which 42 are
+              absent from west.yml -- nine being the pre-rename
+              etzhayyim/com-etzhayyim-app-air-* checkouts of repositories now living
+              at cloud-itonami/app-air-*. Excluding them took the count from 486 to
+              352, and the excluded number is printed on every run.
+              The floor is on CANDIDATES, not on `examined`: deleting the dead summary
+              object is a legitimate repair that removes a page from `examined`, and at
+              122 against a floor of 120 two such repairs would have made this answer
+              CANNOT ANSWER about a fleet that had just improved."
+   ;; NO :accepted block, deliberately -- same reason as :verify-appview-facade. The
+   ;; keys are per repository (`page-summary-route-count:orgs/<org>/<repo>`), so a bare
+   ;; prefix matches nothing and would be reported as STALE ACCEPTANCE. The baseline
+   ;; mechanism already gives the wanted behaviour: the first run records all 352, and
+   ;; from then on only NEW and RESOLVED surface -- a NEW one means another appview has
+   ;; just been generated with this shape.
    }]}
