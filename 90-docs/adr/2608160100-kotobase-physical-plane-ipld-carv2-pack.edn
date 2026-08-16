@@ -298,7 +298,7 @@ packed block store が要るのは前者。
 
 production の novelty は **1 transaction が 1 cons cell を追記する** chain である
 （`kotobase-peer` の `dag_shape_bench` の novelty-shape が
-`{"e" tx-link "rest" rest-link}` と記述している）。この ADR の write-locality
+`{\"e\" tx-link \"rest\" rest-link}` と記述している）。この ADR の write-locality
 （1 commit = 1 pack）の下では、**各 cell は自分だけの pack に入る**。
 
 | 100 link を 1 link ずつ辿る | requests |
