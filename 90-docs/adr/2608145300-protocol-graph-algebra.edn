@@ -3,7 +3,7 @@
   :adr/title "kotoba-protocol の 2 種 link は表ではなく graph 代数として検証する"
   :adr/status "accepted"
   :adr/date "2026-08-14"
-  :adr/last_verified "2026-08-14"
+  :adr/last_verified "2026-08-16"
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "protocol-graph-algebra"
   :adr/repos ["orgs/kotoba-lang/kotoba-protocol"]
@@ -34,8 +34,9 @@ accepted — 2026-08-14。実装は `kotoba-lang/kotoba-protocol`。
 
 ## 置かないもの
 
-Holochain conductor。無順序 DHT 書き込み面。IPNI 専用 repo。公開 URI への path。
+Holochain conductor。無順序 DHT 書き込み面。公開 URI への path。IPNI origin 面は ADR-2608160300（2026-08-14 の「IPNI 専用 repo」禁止はその条を supersede）。IPNI advertise が CID を書き換えること。
 
 ## 改訂履歴
 
-2026-08-14: accepted。"}]
+2026-08-14: accepted。
+2026-08-16: 「IPNI 専用 repo」禁止を ADR-2608160300 が supersede。IPNI record が CID を変えないことは維持。"}]

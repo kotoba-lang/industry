@@ -3,7 +3,7 @@
   :adr/title "routing の live lookup は GET /peers/{id}。provide の署名は偽造しない"
   :adr/status "accepted"
   :adr/date "2026-08-14"
-  :adr/last_verified "2026-08-14"
+  :adr/last_verified "2026-08-16"
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "protocol-route-lookup-live"
   :adr/repos ["orgs/kotoba-lang/kotoba-protocol" "orgs/kotoba-lang/io-libp2p-specs-kad-dht"]
@@ -46,9 +46,10 @@ accepted — 2026-08-14。正本は `kotoba.protocol.route/lookup-live` と `kad
 
 ## 置かないもの
 
-kad 所有の provide signer。routing v1 に provide が載っているという主張。IPNI 専用 repo。UnixFS path を identity に戻すこと。この process を DHT node と名乗ること。
+kad 所有の provide signer。routing v1 に provide が載っているという主張。UnixFS path を identity に戻すこと。この process を DHT node と名乗ること。IPNI origin 面は ADR-2608160300（discovery 面。本 ADR の routing GET /peers とは別）。
 
 ## 改訂履歴
 
 2026-08-14: accepted。
-2026-08-14: remaining-maturity loop は ADR-2608145800。tick 1 は naming live。"}]
+2026-08-14: remaining-maturity loop は ADR-2608145800。tick 1 は naming live。
+2026-08-16: 「IPNI 専用 repo」禁止を ADR-2608160300 が supersede。routing 面の決定は変わらない。"}]

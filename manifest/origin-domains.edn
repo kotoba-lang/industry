@@ -33,6 +33,7 @@
   :examples {"stripe.com"            "com-stripe"
              "ietf.org"              "org-ietf   (org-ietf-x509)"
              "libp2p.io"             "io-libp2p  (io-libp2p-specs-kad-dht)"
+             "ipni.io"               "io-ipni    (io-ipni-specs)"
              "ipfs.tech"             "tech-ipfs  (tech-ipfs-specs-ipns)"
              "berkeley.edu"          "edu-berkeley (edu-berkeley-spice)"
              "protobuf.dev"          "dev-protobuf"
@@ -71,6 +72,7 @@
   "kotoba-lang/org-chainagnostic-cacao"     "chainagnostic.org"
   "kotoba-lang/org-sourceware-bzip2"        "sourceware.org"
   "kotoba-lang/io-libp2p"                   "libp2p.io"
+  "kotoba-lang/io-ipni-specs"               "ipni.io"
   "kotoba-lang/io-ipfs"                     "ipfs.io"
   "kotoba-lang/tech-ipfs-specs-ipns"        "ipfs.tech"
   "kotoba-lang/edu-berkeley-spice"          "berkeley.edu"
@@ -253,7 +255,13 @@
   ;; UCAN Working Group の仕様公開元は ucan.xyz。登録可能ドメインの
   ;; ラベル逆順は xyz-ucan。DNS 実測 2026-08-15: authoritative NS は
   ;; scott.ns.cloudflare.com / sreeni.ns.cloudflare.com。
-  "kotoba-lang/xyz-ucan" "ucan.xyz"}
+  "kotoba-lang/xyz-ucan" "ucan.xyz"
+
+  ;; 2026-08-16 追加（ADR-2608160300）。IPNI 仕様の公開ドメインは ipni.io
+  ;; （GitHub org `ipni` の website）。ipni.org は Kew の植物名索引で別物。
+  ;; cid.contact は本番 indexer であって仕様の authority ではない。
+  ;; DNS 実測 2026-08-16: NS mona.ns.cloudflare.com / jarred.ns.cloudflare.com。
+  "kotoba-lang/io-ipni-specs" "ipni.io"}
 
  ;; ── unresolvable ───────────────────────────────────────────────────────
  ;; Names that carry an origin prefix but have no single authority domain to

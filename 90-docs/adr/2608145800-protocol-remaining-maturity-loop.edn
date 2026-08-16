@@ -3,7 +3,7 @@
   :adr/title "protocol 残成熟度ループ。ゴールは 8 面が ready か named-block"
   :adr/status "accepted"
   :adr/date "2026-08-14"
-  :adr/last_verified "2026-08-14"
+  :adr/last_verified "2026-08-16"
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "protocol-remaining-maturity-loop"
   :adr/repos ["orgs/kotoba-lang/kotoba-protocol" "orgs/kotoba-lang/io-libp2p-specs-kad-dht"]
@@ -64,11 +64,12 @@ transport / session の live をこの process で `:ready` にしない。そ�
 
 ## 置かないもの
 
-kad 所有の provide signer。この process を DHT node と名乗ること。IPNI 専用 repo。UnixFS path を identity に戻すこと。`:algebra :ready` を README の長さで買うこと。transport の sockets。`session.md` / `authorization.md`（docs は `mux-and-head.md` / `who-may-write.md`）。
+kad 所有の provide signer。この process を DHT node と名乗ること。UnixFS path を identity に戻すこと。`:algebra :ready` を README の長さで買うこと。transport の sockets。`session.md` / `authorization.md`（docs は `mux-and-head.md` / `who-may-write.md`）。IPNI origin 面は ADR-2608160300。この loop は stop 済みで再武装しない。
 
 ## 改訂履歴
 
 2026-08-14: accepted。tick 1 landed `kotoba-protocol@1a7ed667`。
 2026-08-14: tick 2 landed `kotoba-protocol@ca72b830`。次は transport 代数（sockets 無し）。
 2026-08-14: tick 3 landed `kotoba-protocol@6d3af5ab`。次は session 代数（`mux-and-head.md`）。
-2026-08-14: tick 4 landed `kotoba-protocol@47471130`。stop。この loop は再武装しない。"}]
+2026-08-14: tick 4 landed `kotoba-protocol@47471130`。stop。この loop は再武装しない。
+2026-08-16: 「IPNI 専用 repo」禁止を ADR-2608160300 が supersede。本 loop の stop と DHT node 禁止は維持。"}]

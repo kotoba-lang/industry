@@ -3,13 +3,14 @@
   :adr/title "通信面は 8 枚。link は merkle と action の 2 種。Holochain は overlay であって IPLD の置換ではない"
   :adr/status "accepted"
   :adr/date "2026-08-14"
-  :adr/last_verified "2026-08-14"
+  :adr/last_verified "2026-08-16"
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "protocol-planes-two-link-kinds"
   :adr/repos ["orgs/kotoba-lang/kotoba-protocol"]
   :adr/related ["90-docs/adr/2608145100-public-resource-identity-is-cid-and-ipns.edn"
                 "90-docs/adr/2607071500-kotoba-lang-kotoba-protocol-atprotocol-layering.edn"
-                "90-docs/adr/2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane.edn"]
+                "90-docs/adr/2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane.edn"
+                "90-docs/adr/2608160300-ipni-origin-plane-utilization.edn"]
   :adr/authoritative_for
   ["kotoba-protocol の planes 表（identity naming routing discovery transport session authorization content-protocol）"
    "link-kinds :merkle（親 CID が変わる）と :action（親 CID は不変）"
@@ -33,7 +34,7 @@ HTTP URL は transport+location。DNS は naming。Git blob は identity、tree 
 
 ## IPNI
 
-CID → provider の索引。discovery。公開 URI に載せない。kad delegated routing がいまの実装。IPNI adapter を足しても identity は `ipfs://{cid}` のまま。
+CID → provider の索引。discovery。公開 URI に載せない。lookup の現在地は kad delegated routing。origin 面 `io-ipni-specs` と advertise の本番 write は ADR-2608160300。IPNI を足しても identity は `ipfs://{cid}` のまま。
 
 ## input vs output
 
@@ -48,4 +49,5 @@ Holochain との相性は :action 側。置き換えないのは :merkle。ラ�
 
 ## 改訂履歴
 
-2026-08-14: accepted。"}]
+2026-08-14: accepted。
+2026-08-16: IPNI 活用を ADR-2608160300 で許可。面の位置づけ（discovery、URI に載せない）は変わらない。"}]
