@@ -577,6 +577,26 @@
 
    ⚠ **`wire/encode` は client 側の encoder**（BOOTREQUEST・yiaddr 無し。client は yiaddr を送らない）。これでサーバ応答を作ろうとして 4 件失敗し、**状態機械の不一致に見えた**が、テストが違う関数を掴んでいただけだった。
 
+   ### DNS も載った —— A3 の 3 つが揃った（2026-08-16）
+
+   `org-ietf-dns` `9ffc53a`。**A3 が要る DHCP・DNS・TCP の 3 つとも、bare metal で走る決定核を持った。**
+
+   header の 2 バイトの flag と、resolver が返答を信じる前に行う検査。**shift を含むのに native に届く** —— packed 表現を取って返し、`:bool` パラメータを一切持たないから（#611 が拒否するのは組であって、返り値の bool は問題ない）。**packed は回避策ではない** —— flag は wire 上で実際に packed な 2 バイトで、bool に分解して組み直すのは同じレイアウトの 2 つ目の符号化になる。
+
+   `accept-reply?` がこのファイルの存在理由である。**id と QR ビットを飛ばす resolver は、そのポートに届いた任意の UDP datagram を信じる** —— 偽造を一切要さない off-path cache poisoning で、`dhcp.client` の xid 検査と**同じ攻撃者に対する同じ検査**である。3 条件を独立に駆動し、それぞれ別々に壊した（id 無視 12 赤 / query を自分の返答として受理 6 赤 / opcode 無視 6 赤）。
+
+   **名前が `valid?` ではなく `accept-reply?` なのは意図的** —— question section の照合も必須で、それは wire 形式のバイト比較であって header の判断ではない。**必要条件であって十分条件ではない。**
+
+   `rcode-is-error?` は NXDOMAIN を**失敗ではなく答え**として扱う。名前が存在しないことは呼び手が訊いた事実そのもので、ここで再試行する resolver は**打ち間違いのたびにサーバ一覧を歩く**。
+
+   ⚠ ここでも 1 つの破壊が 0 を返し、**適用されていなかった**（複数行アンカーの括弧が合わなかった）。正しく当てると 6 赤。no-op コントロールは緑を維持。
+
+   ### DNS wire codec には唯一の恒久制約が集中している
+
+   `nameserver/wire.cljc` は **`throw (ex-info …)` を 15 箇所**持つ。`throw` は `:forbidden-heads` にある**恒久の安全制約**（`:explicit-errors`）で、このセッションで見つかった唯一の「言語が永久に禁じるもの」である。
+
+   15 箇所は**全部 1 箇所で捕まっている** —— `server.clj:61` の `(catch Exception _ formerr-response)`。つまり `bad hex digit` / `invalid IPv4 address` / `unknown RR type` という**区別された情報は全部そこで捨てられている**。`[:result T E]` へ移すと**その情報は保存される**。ただし blanket catch は「想定外の失敗も FORMERR にする」堅牢性でもあり、Result 化は新しい失敗経路を明示的に通す義務を生む。**費用と利益の両方がある取引で、片方だけではない。**
+
    **A2 を A3 より前に置く。**再現できないものは attest できず、attest できないものを『安全』として売れない。顧客に監査ログを見せる商品が、自分の出荷物を自分で再構築できないのは通らない。ネットワークが動く方が見栄えはするが、**再現性の無い OS が外部と喋り始めると、後から『いつから壊れていたか』を言えなくなる。**
 
    ## 4. 再利用の規律 —— 新しく書くのは『無いもの』だけ
