@@ -1,0 +1,202 @@
+[{:db/id -1
+  :adr/id "ADR-2608170100"
+  :adr/title "aozora の discovery が別グラフを開いていた — 修正の着地と、その後に測れた relay 読み取りの崩壊"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :adr/deciders "Jun Kawasaki（「投稿が見つからないと表示される」→ 方針選択 → 「do it」/「next」）+ Claude Code"
+  :adr/supersedes ""
+  :adr/relates-to "ADR-2607022330 add.3（relay ingest を無効化した理由 — 共有 operator db の肥大）, ADR-2607032430 D1（hot-datoms が scale-safe read path）, ADR-2607166000 / ADR-2607167000（narrow read を捨てて view に寄せた測定）, ADR-2607051000（blind-fn 鍵付き MAC の索引キー）, ADR-2608039000（分散型経路に D1 を前提にしない）, ADR-2608136800（結論を出す前に origin/main を読む）"
+  :adr/body
+  "# ADR-2608170100: aozora の discovery が別グラフを開いていた
+
+**Status**: accepted / **Date**: 2026-08-17
+
+## 1. 出発点
+
+「https://aozora.app/profile/did:plc:fd5keyoor7ikgjdgalh34k7i/post/3mt2oz43rok2u で投稿が見つからないと表示される」
+
+その投稿は実在した。PDS（enoki.us-east.host.bsky.network）にも bsky の AppView にも
+200 で存在する（xopherx.bsky.social / 2026-08-14T17:35:12Z / likes 6）。壊れていたのは aozora 側。
+
+## 2. 根本原因（着地済み）
+
+`aozora.appview.router/db-name-for-route` がルートごとに別のグラフを読んでいた。
+
+| ルート | 読んでいたグラフ |
+|---|---|
+| getDiscoverFeed / getVideoFeed | DISCOVER_DB_NAME = relay-bsky |
+| getPostThread / getPosts / getProfile / getAuthorFeed | YORO_DB_NAME = yoro-social-v2 |
+
+**discovery が出した投稿を開くと、別のグラフに問い合わせる。** 偶発的なデータ欠けではなく、
+クリックのたびに構造的に 404 になる状態だった。実測: getPostThread `{\"thread\":{}}` /
+getProfile `{\"error\":\"not found\"}` / stats `{\"posts\":2,\"profiles\":0}`。
+
+## 3. 入れた修正
+
+**READ fallback**（db-name の変更ではない）。`router/dispatch`:
+
+- yoro グラフを先に引き、見つかればそれが勝つ（relay 行がローカル actor の持ち物を隠さない）
+- 対象は post-detail が呼ぶ 4 系統のみ（thread / posts / authorFeed / profile(s)）。
+  account / convo / prekey / label は db-name-for-route が約束する隔離を維持
+- relay の **取り込み** は PDS 側 RELAY_DB に隔離のまま。2026-08-15 の cutover が守っていたのは
+  「共有 operator db が外部の **書き込み** で肥大しないこと」であって、2 グラフを読まないことではない
+- fallback が失敗したら primary の miss を返す（relay 障害が 404 を 500 に化けさせない）
+
+`run-handler` は `js/Promise.resolve` で包む。**Promise を返さないハンドラがある**
+（`feed/health` は素の map を返す）。旧呼び出し箇所は外側の `.then` に返っていたので無害だったが、
+ハンドラの返り値に直接 `.then` を繋ぐと壊れる —— 包まない初版は **素の map を返す全ルートが 500** になった。
+
+**着地**: network-awai/app-aozora-engine main `edbb75d4b28e`。
+**デプロイ**: appview.aozora.app version `b65b9853-a901-4681-8281-9fc87ccd1ea8`。
+**west pin**: `684761c` → `edbb75d`（single-entry commit `112110c5e8dd`、fast-forward 検証済み）。
+
+**検証**: 156 tests / 499 assertions、失敗 1（`app-projection-resolves-ipfs-through-kotobase`、
+**無改変のツリーでも同じく失敗** — baseline と diff 完全一致）。両方向を実演:
+`discovery-fallback-nsids` を空にすると `discovery-post-opens-from-the-relay-graph` と
+`failed-fallback-returns-the-miss-not-a-500` **だけ** が落ち、隔離側 3 本は通ったまま。
+`:kotobase-test` はこの pin でコンパイルできない（`kotoba.kir` 未解決、既存の破損）ため
+`:auth-test` の前例に倣って `:appview-test` target を追加。
+
+デプロイ直後の実測: 報告の投稿が getPostThread で取得可（45ms、cached）。ローカル投稿も回帰なし。
+stats は 2 のまま（非対象ルートの隔離維持）。
+
+## 4. その後に測れたこと — relay 読み取りの崩壊（未解決）
+
+修正の次段（narrow `:avet` 読みへの置き換え）に着手する前に本番の読み取り経路を測ったところ、
+**別の、より重い障害**が出た。
+
+`POST https://kotobase.net/xrpc/ai.gftd.apps.kotobase.datomic.datoms`（relay-bsky の公開グラフ CID、
+credential 不要の公開読み）:
+
+```
+limit=1  35.71s  {\"ok\":false,\"error\":\"Internal Server Error\"}
+limit=2  35.51s  同上
+limit=3  34.39s  同上
+limit=5  36.84s  同上
+```
+
+**limit に依存せず一律 ~35 秒で失敗する。** これは `kotobase-peer` の `hot-datoms` 自身の
+docstring が記録している失敗と数値まで一致する —— 「a `:eavt` scan with `:limit 5` burned
+32,500ms CPU against a 34,918ms wall clock … making the graph unreadable at ANY limit」、
+原因は同期 block-miss トランポリンの O(N^2) block discovery、修正は `:async-get-fn`
+（kotobase-peer#21）で、それを渡すのは **store 側**。
+
+そして AppView 越しの実測は時間とともに悪化した（すべて cache miss）:
+
+| 時刻(UTC) | 観測 |
+|---|---|
+| 08:53 | getDiscoverFeed **71 件** |
+| 09:1x | 修正デプロイ後、getDiscoverFeed **5 件**（正常） |
+| 12:0x | datoms 直叩きが limit 非依存で ~35 秒 500 |
+| 13:0x | getAuthorFeed **145 秒 / 0 件**、getDiscoverFeed **142〜212 秒 / 0 件** |
+
+**aozora.app の discovery feed は現在空。** これは本 ADR の修正が原因ではない —— getDiscoverFeed は
+`discovery-fallback-nsids` に含まれず、経路は従来どおりで、デプロイ直後は正常に返していた。
+
+### 候補は 2 つ、外からは区別できない
+
+1. **グラフの単調増加**。relay ingest は `RELAY_CRON_ENABLED=1` で 10 秒窓あたり最大 100 レコードを
+   relay-bsky に追記し続けている（2026-08-15 から）。AppView はそれをビュー全走査で読むので、
+   コストはグラフサイズに比例する。50s → 70s → 142〜212s の推移はこれと整合。
+   **これは ADR-2607022330 add.3 が記録した失敗そのもの。2026-08-15 の変更は行き先を隔離したが、
+   増加を止めていない。** operator db は守られたが、relay db 自身が死んだ。
+2. **`yoro-feed` ビューが materialize されていない**。そうなると `scan-posts` は per-attribute の
+   attr-scan wave に落ち、それが上記の CPU 死に当たる。
+
+切り分けには fold の実行記録が要る（未取得）。
+
+## 5. 本 ADR の修正が持つ副作用（正直に）
+
+read fallback は「共有索引が空なら relay も引く」ので、**relay 側が死んでいる間は 2 回目の全走査を
+無駄に払う**。実測 145 秒の内訳はおおよそ 70 秒 x 2。返す答えは従来と同じ（空）だが、
+**cold のレイテンシを 2 倍にしている**。fallback に締切を入れれば ~70 秒に戻せる（未実装）。
+
+## 6. 実装しなかったもの と その理由
+
+**narrow `:avet [attr value]` 読みへの置き換えは着手して取り下げた。** 動いている経路
+（`kc/view`）を 500 になる経路に差し替えることになっていた。AppView が materialized view を
+使っているのは設計の好みではなく、**それしか生きていないから**である。
+
+その過程で確定した設計事実:
+
+- **blind-fn（鍵付き MAC、ADR-2607051000）は等値を保存し、順序を壊す。** したがって索引の
+  prefix / 点検索は blind 索引でも刈れるが、値の範囲は刈れない。
+- `prolly-tree` の tip には **`scan-range` / `scan-range-async` が既にある**（2026-08-16 12:06Z push）。
+  ただし docstring 自身が「HMAC-blinded leaf keys は対象外、prefix + decrypt + filter に留まる」と
+  除外している。`kotobase-peer` からの参照は **0 件**。
+  **primitive はあるが、それを必要とする問いがまだ立っていない。**
+- 値は `JSON.stringify` で **引用符込み** に格納される（`v_edn: \"\\\"did:plc:...\\\"\"`）。
+  一方 `feed.cljc` の `resolve-actor-did` は素のハンドル文字列を `:avet` component に渡している。
+  当たらなければ `did:web:` 導出に静かに落ちるため、**誤った DID を返している疑い**がある。
+  datoms が読めないため未確定。
+
+## 7. IPLD 側の調査結果（別件の問いへの答え）
+
+- **CARv2 の索引は range scan を提供しない。** 仕様: multihash digest 順（IndexSorted 0x0400 /
+  MultihashIndexSorted 0x0401）、「exact digest matching を超える ordered/range query はサポートしない」。
+  得られるのは CID によるランダムアクセス。
+- **HAMT も不可**（hash 順、「順序付き反復をサポートしない」）。
+- **順序付き ADL は存在する** —— IPLD Prolly Tree ADL（ipld/ipld PR #254、**未マージ**）。
+  Get / Range query / Insert / Delete、キーはバイト辞書順。ipld-prolly-indexer の range 検索は
+  まだ \"Future Features\"。**以前「IPLD に ordered ADL は無い」と書いたのは HAMT 仕様の過度な一般化で、誤り。**
+- **selector の `ExploreRange` は list の添字のみ。** map / ADL のキー範囲を表す selector は仕様に無い。
+- **ATProto の MST は key-sorted で「key lookups, key range scans, and appends」を可能にする**、
+  TID は時系列順。`getRepo` の CAR slice が差分。**これが遠隔 range scan の現実的な経路。**
+- ローカル `io-ipld` は Data Model（`INode`、ADL 透過）/ Schema（lens、サブセット）/
+  Selector（10 種中 8 種）/ DAG-CBOR tag 42 を実装済み。**欠けているのは `ExploreConditional` と
+  `InterpretAs`。`InterpretAs` は「このノードを ADL として解釈せよ」とリモートに伝える唯一の selector
+  なので、遠隔 range scan を目標にするなら任意の拡張ではなく load-bearing。**
+- QUIC/WebRTC/WebTransport・relay/NAT traversal・完全な Schema DSL・任意の GraphSync extension・
+  prolly range diff は、いずれも **明示すれば代替 transport / 拡張 / 最適化として扱える**。根拠:
+  libp2p は transport 非固定（ただしブラウザは raw TCP/UDP 不可なので WebRTC/WebTransport が要る）、
+  GraphSync 仕様は「An implementation can choose to support one or more extensions, but it does not
+  have to」、IPLD Schema は構造的型付けの optional な lens（schema 無しでデータは読める）。
+
+## 8. 決定
+
+1. §3 の read fallback を維持する（着地・デプロイ済み）。
+2. **narrow `:avet` 読みへの移行は保留**。relay 読み取りが復旧するまで前提が成立しない。
+3. **relay-bsky の増加を止めるか保持方針を決めるのは製品判断**として owner に上げる。
+   `pds/wrangler.jsonc` 自身が想定するレバーは `RELAY_CRON_ENABLED=0`
+   （「戻すときは行き先ではなくこのフラグを 0 にする」）。discovery は既に空なので失うコンテンツは無い。
+4. `prolly-tree/scan-range` を `kotobase-peer` に配線するのは、上記が片付いた後の話。
+
+## 9. 次の agent への resume point
+
+**未解決（優先順）**
+
+1. **relay-bsky の読み取り復旧。** まず fold の実行記録を見て §4 の 2 候補を切り分ける。
+   増加が原因なら `RELAY_CRON_ENABLED=0` + retention 設計。
+2. **`:async-get-fn` を kotobase.net の store に渡す配線。** 上流実装は kotobase-peer#21 に既にある。
+   ⚠ **その worker のソースがこの manifest から読めない** ——
+   `net-kotobase/kotobase-graph-database` は GitHub で 404、`manifest/west.yml` に `graph-database` の
+   項目は 0 件、概念索引も 0 件、`kotobase-cljc-owner` は main が LICENSE/NOTICE/README のみ（src 無し）。
+   **owner に repo の所在を確認すること。**
+3. **fallback に締切を入れる**（§5 の 2 倍レイテンシを消す。約 10 行、appview のみ）。
+4. `resolve-actor-did` の引用符不一致（§6）。datoms が読めるようになってから確定させる。
+
+**再現コマンド**
+
+```
+# relay グラフの公開読み（現在 ~35s で 500）
+curl -sS -X POST https://kotobase.net/xrpc/ai.gftd.apps.kotobase.datomic.datoms \\
+  -H 'content-type: application/json' \\
+  -d '{\"graph\":\"bafyreieq24o5wxv4lpcczopcs7xhngntyxv2qahv3leo7bqdeurrfk5k5q\",\"index\":\"eavt\",\"limit\":1}'
+
+# discovery feed（現在 空 / 142〜212s）
+curl -sS 'https://appview.aozora.app/xrpc/com.etzhayyim.yoro.feed.getDiscoverFeed?limit=5'
+
+# appview の test（:kotobase-test はこの pin で壊れている）
+cd <app-aozora-engine> && npx shadow-cljs compile appview-test && node out/appview-tests.js
+```
+
+## 10. このセッションで踏んだ手順上の誤り（同型の再発防止）
+
+**古い checkout を正本として読み、2 回結論を誤った。**
+
+1. `app-aozora-engine` の checkout が main より 2 commit 古く、`DISCOVER_DB_NAME` が
+   「main に無い」と誤読して「デプロイが main と一致していない」と報告した。実際は一致していた。
+2. `prolly-tree` の checkout が古く、`scan-range` を「無い」と報告した。実際は当日 landed していた。
+
+どちらも ADR-2608136800 が名指ししている失敗。**結論を出す前に origin/main を読む。**
+とくに west 管理下の checkout は pin に固定されており、repo の main とは別物である。"}]
