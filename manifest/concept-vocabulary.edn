@@ -308,4 +308,19 @@ identity）+ :kotoba.app/embed-url（ipfs://）+ :kotoba.graph/cid（L2 graph id
 :kotoba.app/latest（IPNS 名 k51…）。ADR-2608148200 / ADR-2608145400 / ADR-2608157000。
 ⚠ **実測 2026-08-15: kotoba.app.edn は 155 件あるが content address を持つのは 1 件**
 （cloud-itonami-app）—— 語彙が広まっていることと設計が広まっていることは別。"}
+
+ :kip
+ {:label "KIP — 改善提案プロセス（EIP / IPIP 相当）"
+  :spellings ["kip" "改善提案" "提案プロセス" "proposal" "proposal process"
+              "improvement proposal" "eip" "ipip" "rfc process"
+              "standards track" "last call" "normative surface" "正本面"
+              "change process" "spec governance"]
+  :note "kotoba-lang/kip。名前が acronym で機能を示さないのでここに載せる（README 冒頭が名乗り）。
+既存と混同しないこと —— ADR は決定を記録する（決めた側が書く）、KIP は決定の前に
+queue に載せて第三者が異議を出せる状態を作る。kotoba-issue / kotoba-ledger は同じ
+issue→proposal→review→merge→audit 語彙だが対象は agent effect、kagami govern の
+threshold 署名は対象が west pin。KIP はそれらを参照して normative surface に当てる。
+どの path が normative かは kotoba-lang/kotoba-lang の docs/authority-map.edn が正本で、
+kip/lang/normative-surfaces.edn はその転記 + :proposed。ADR-2608169100。
+⚠ 2026-08-16 時点で :final の KIP は 0 件（署名検証が未配線なので正直には到達できない）。"}
 }
