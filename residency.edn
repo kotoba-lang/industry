@@ -62,7 +62,7 @@
    :slot :anonymous
    :host :operator
    :cadence {:interval-seconds 3600}
-   :run ["nbb" "scripts/fleet-ci/hayari-alarm.cljs"]
+   :run ["nbb" "--classpath" "scripts/fleet-ci" "scripts/fleet-ci/hayari-alarm.cljs"]
    :plist "scripts/fleet-ci/com.gftd.hayari-alarm.plist"
    :credentials []
    :health nil
@@ -146,7 +146,7 @@
    :slot :anonymous
    :host :operator
    :cadence {:interval-seconds 21600}
-   :run ["nbb" "scripts/fleet-ci/residency-alarm.cljs"]
+   :run ["nbb" "--classpath" "scripts/fleet-ci" "scripts/fleet-ci/residency-alarm.cljs"]
    :plist "scripts/fleet-ci/com.gftd.residency-alarm.plist"
    :credentials []
    :health {:kind :state-file :path "~/.gftd/residency-alarm-state.edn"}
