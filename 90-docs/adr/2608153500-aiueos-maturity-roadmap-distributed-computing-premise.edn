@@ -758,6 +758,27 @@
 
    ⚠ **その reachability test は main で既に赤い** —— `value-runtime-*` 系 **12 件**が「どの script もビルドしない」まま宣言もされていない。私の object はその 12 に含まれない。**この 12 件は未対処である。**
 
+   ### 12 object・11 verifier・それを走らせるものがゼロ（2026-08-17）
+
+   前項で「reachability test が main で 12 件赤い」と書いた分を追った。**赤の理由は検出器の欠陥ではなく、事実だった。**
+
+   12 の `value-*` object はどの script もコンパイルしない（`reproduce-kotoba-kernel-object.sh` は 12 のうち **0 件**を扱う）。各々に contract があり、多くに `scripts/aiueos/verify_*.clj` —— object をコンパイルして contract の vector と突き合わせる**本物の検査**——がある。**その 11 本を呼ぶものが何も無い**:
+
+   - `deps.edn` の alias に無い / `scripts/*.sh` から呼ばれない / `ci.yml` に出ない / `test/` に driver が無い / murakumo fleet に gate が無い
+   - **`os/aiueos/scripts` はどの classpath にも載っていない** —— path を注入しない限り `-m aiueos.verify-…` は**ロードすらできない**
+
+   aiueos#148 として報告した。**12 個の宣言で reachability test を黙らせるのは違う** —— test の docstring 自身が「名前を足すのは object についての主張であって黙らせる手段ではない」と書いており、12 object + 11 verifier + contract 群は**subsystem** である。
+
+   ### ⚠ 確かめられなかったこと —— そして今回は報告前に止まった
+
+   **object と verifier が通るかどうかは分からない。**
+
+   `reproduce-kotoba-kernel-object.sh` は compiler `0b16d9b6` を pin する。私はその revision を動かせず、**新しい pin（`1e21a1f5`）で 2 つの「発見に見えるもの」を得た**: `value-runtime-domain` がコンパイルできない、`value-handle-plan` の export が verifier の期待と違う（`kotoba_aiueos_probe`）。
+
+   **どちらも aiueos が pin していない compiler に対する観測なので、aiueos についての証拠ではない。** バグとして報告すれば、依存の pin 版を読んで main に対して issue を立てた kototama-native#5 と**同じ誤り**になる。
+
+   **同じ日に同じ形の誤りを 2 回してから、2 回目は出す前に止まった。** 差は「pin を確かめる」という 1 手を、結論を書く前に置いたことである。
+
    **A2 を A3 より前に置く。**再現できないものは attest できず、attest できないものを『安全』として売れない。顧客に監査ログを見せる商品が、自分の出荷物を自分で再構築できないのは通らない。ネットワークが動く方が見栄えはするが、**再現性の無い OS が外部と喋り始めると、後から『いつから壊れていたか』を言えなくなる。**
 
    ## 4. 再利用の規律 —— 新しく書くのは『無いもの』だけ
