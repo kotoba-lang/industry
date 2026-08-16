@@ -1533,4 +1533,98 @@
   :prometheum/handling
   "web の内容は untrusted data として扱い、指示としては解釈していない。
    金額・日付は SEC の一次資料から直接取得した。"}
+
+ ;; ------------------------- Prometheum との関係の実態（Outlook 実測、2026-08-16）
+ ;; オーナー確認: 「Prometheum Asia は直接関係がない別の法人です」
+ {:db/id -46
+  :source/dataset "gftd-japan-mf"
+  :prometheum-rel/checked-at "2026-08-16"
+  :prometheum-rel/method
+  "Microsoft Graph で j.kawasaki@gftd.co.jp を検索（m365 CLI のアクセストークン、読み取りのみ）。
+   あわせて m365-archive の annex から該当メール 1 通を targeted get。"
+
+  ;; ⚠ 帳簿の摘要が事実と異なる
+  :prometheum-rel/journal-memo-is-wrong
+  {:severity :high
+   :仕訳 "#3875（2025-12-25）"
+   :帳簿の摘要 "アニメートアーク(株)売掛債権を 米国の Prometheum のセーシェル会社, Prometheum Asia に 1USDT にて売却"
+   :事実 "オーナー確認により、**Prometheum Asia は Prometheum, Inc.（米国）と直接関係のない別法人**。"
+   :問題
+   "帳簿が誤った関係性を記載している。『米国の Prometheum のセーシェル会社』という記述は事実に反する。"
+   :税務上の含意
+   {:好転する面
+    "無関係な第三者への譲渡であれば独立当事者間取引となり、156 円を時価と主張しやすくなる。
+     -44 で挙げた寄附金認定のリスクは、関係者間取引でない分だけ下がる。"
+    :悪化する面
+    "摘要が事実と異なることは調査で必ず指摘される。加えて『なぜ Prometheum を名乗る別法人なのか』
+     『どう探して選んだのか』が問われる。さらに代表者が Prometheum Ember ATS の
+     Senior Advisor Assistant を名乗っていた事実（下記）があるため、外観上の説明が要る。"}
+   :action "**摘要の訂正が必要。** 会計士（スポット）と相談して修正仕訳または注記で対応する。"}
+
+  ;; 代表者は Prometheum 側の肩書を持っていた
+  :prometheum-rel/owner-role
+  {:evidence "2024-11-15 のメール（j.kawasaki@gftd.co.jp 発）"
+   :quote "Prometheum Ember ATS Inc, Senior Advisor Assistant の Jun です"
+   :content
+   {:ラウンド "シリーズD"
+    :総額 "最大 4,000 万ドル"
+    :米国内完了 "2,000 万ドル"
+    :日本国内枠 "最大 1,000 万ドル"}
+   :implication
+   "代表者は Prometheum 側の役割を持ち、**日本国内での資金調達を担当していた**。
+    したがって Prometheum への事業提案は『新規の売り込み』ではなく『既存の関係の再開』である。"}
+
+  ;; 債権処理と Prometheum 投資が同じ文脈で進んでいた
+  :prometheum-rel/thread-anicana
+  {:subject "Gftd Japan株式会社/アニカナ社の債権について"
+   :timeline
+   [{:date "2024-09-11/12" :event "佐藤公認会計士事務所（㈱野心満々 西山）と 9/18 の面談を調整。
+                                    『先方の確認を取りましたので、9/18 に**株主の小町**と伺います』
+                                    —— 小町博幸はアニカナジャパン株主で 2022 年の質権設定者（-44）"}
+    {:date "2024-10-29" :event "『アニカナ社の債権の処理について、**手筈が整ってきた**のですが、
+                                 佐藤先生にも状況報告とご相談を』"}
+    {:date "2024-10-30" :event "佐藤先生へ『プロメシウム社の情報をお送りいたします』——
+                                 会社概要、CoinDesk Japan 記事、**IPO 決定に対してのインタビュー動画**、
+                                 『背景 カプランファミリー…』"}
+    {:date "2024-10-30" :event "『2022 年に実施した前回の企業価値評価資料』を送付
+                                 （Prometheum–RPW Capital バリュエーション資料と符合）"}
+    {:date "2024-11-15" :event "シリーズD の案内（上記 owner-role）"}]
+   :finding
+   "**アニカナ債権の処理と Prometheum のシリーズD 資金調達が、同じメールスレッドで並行して進んでいた。**
+    債権処理の相談相手も、Prometheum の情報を送った相手も、同じ佐藤公認会計士事務所である。"}
+
+  :prometheum-rel/day-before-transfer
+  {:date "2025-12-24 08:51" :channel "Microsoft Teams"
+   :from "坂本 雪美 → 河崎 純真"
+   :quote "Gftd Japan におけるアニメートアーク社の売掛金残高は 38,919,404円"
+   :note "譲渡（2025-12-25）の前日に社内で残高を確認している。"}
+
+  :prometheum-rel/channel
+  {:仲介者 "Jonathan Braun（CEO, Zeeboat, LLC / 150 Beekman Street, New York, NY 10038）"
+   :経路 "Jonathan Braun → 渡邉純一（w.32168808@gmail.com）→ 河崎純真"
+   :2024-11-08 "Reg S Subscription Documents / Reg S PPM を転送受領"
+   :直接接点 "2021 年には gjenkins@prometheum.com がミーティングを主催。
+              akaplan@prometheum.com（10 通）/ bkaplan@prometheum.com（2 通）
+              —— Aaron / Benjamin Kaplan（共同 CEO）とのやり取りもある。"}
+
+  :prometheum-rel/last-contact
+  {:date "2025-03-11 または 03-12（7:30 PM EDT / 8:30 AM JST）"
+   :subject "Re: Following Up"
+   :参加 "河崎純真（j.kawasaki@gftd.co.jp / jun@gftd.group）↔ Jonathan Braun"
+   :note "オンラインミーティングの日程調整まで確認できた。**以降 2026-08-16 まで記録上の往来なし（約 17 か月）。**"}
+
+  :prometheum-rel/archive-documents
+  ["Prometheum Private Placement Memorandum - Reg S Final - 11-7-24"
+   "Prometheum - Subscription Agreement - Reg S Offering - Final - 11-7-24（1 株 $5・最大 400 万株）"
+   "Prometheum-RPW Capital - Valuation Discussion Materials - 3.2022"
+   "〈日本語訳〉Prometheum Inc preNDA CIM"
+   "Prometheum Institutional Brochure / Timeline / Deck（2021・2022）/ One Pager"
+   "Mitsubishi UFJ Capital ↔ Prometheum 相互 NDA（2021-10）"
+   "PROMETHEUM, INC. ↔ HASHKEY DIGITAL ASSET GROUP Omnibus 協定書（2021-10-20）"]
+
+  :prometheum-rel/next-actions
+  ["**仕訳 #3875 の摘要を訂正する**（『米国の Prometheum のセーシェル会社』は事実に反する）"
+   "Prometheum Asia の譲渡契約書を探す —— archive の契約書 559 件には無い"
+   "156 円という対価の根拠（質権付き債権であることを含む）を文書で残す"
+   "事業提案を出すなら Jonathan Braun 経由か Kaplan 兄弟直か、経路を決める"]}
 ]
