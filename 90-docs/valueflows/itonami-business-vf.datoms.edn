@@ -15052,23 +15052,33 @@
   :vf.business/maturity "implemented",
   :vf.binding/exists-in-other-revision "isic-rev4",
   :vf.spec/isic-code "7490"}
- {:vf.binding/why
-  "declared isic-rev4 750 is in neither mirrored table (Rev.4 428 classes, Rev.5 463); it was resolved against the revision it declared, not mapped across",
-  :vf.spec/isic-level-declared "group",
+ {:vf.spec/includes-count 6,
+  :vf.spec/classified-as
+  "https://unstats.un.org/unsd/classifications/Econ/ISIC/7500",
+  :vf.spec/includes
+  ["veterinary activities for farm and pet animals"
+   "animal hospital activities"
+   "animal clinic activities"
+   "veterinary inspection of foodstuffs"
+   "post-mortem examination of animals"
+   "livestock health activities"],
   :vf.business/name "Veterinary Activities - Operations Coordination",
+  :vf.spec/isic-level "class",
+  :vf.spec/isic-group "750",
+  :vf.spec/kind "ProcessSpecification",
   :repo/path "orgs/cloud-itonami/cloud-itonami-isic-7500",
   :vf.binding/consumes-vocabulary? false,
   :vf.business/governor "vetops-governor",
   :vf.binding/has-record-series-file? false,
   :source/dataset "itonami-valueflows",
   :vf.spec/declared-as "isic-rev4",
-  :vf.business/id "cloud-itonami-isic-750",
+  :vf.business/id "cloud-itonami-isic-7500",
   :db/id -790,
-  :vf.binding/rev4-group-unavailable? true,
-  :vf.binding/state "classification-unresolvable",
+  :vf.binding/state "classified",
+  :vf.spec/name "Veterinary activities",
   :vf.business/maturity "implemented",
-  :vf.binding/exists-in-other-revision nil,
-  :vf.spec/isic-code "750"}
+  :vf.spec/isic-code "7500",
+  :vf.spec/resolved-against "isic-rev4"}
  {:vf.spec/includes-count 0,
   :vf.spec/classified-as
   "https://unstats.un.org/unsd/classifications/Econ/ISIC/7710",
@@ -24197,15 +24207,15 @@
   :vf.binding/state "unclassified"}
  {:vf.coverage/isic-rev5-classes-available 463,
   :vf.coverage/unclassified 29,
-  :vf.coverage/classification-unresolvable 83,
-  :vf.coverage/rev4-group-codes-unresolvable 26,
+  :vf.coverage/classification-unresolvable 82,
+  :vf.coverage/rev4-group-codes-unresolvable 25,
   :vf.coverage/isic-rev5-groups-available 258,
   :vf.coverage/consuming-in-population 0,
   :vf.coverage/isic-classes-available 428,
   :vf.coverage/not-industry-scoped 486,
-  :vf.coverage/resolved-by-level {"class" 459, "group" 1},
+  :vf.coverage/resolved-by-level {"class" 460, "group" 1},
   :vf.coverage/note
-  "A classified business is NOT a connected ledger. 460 of 1398 businesses have a vf:ProcessSpecification derived from the UN ISIC table, which says what KIND of activity each is and nothing about whether any activity was recorded. Of those 1398 businesses, 0 consume the Valueflows vocabulary in code; across all 1831 west-registered cloud-itonami repositories the figure is 1 (orgs/cloud-itonami/credits). Reading the classified count as adoption is the mistake this entity exists to prevent. :complete? is false and stays false until economic records exist for a business, which no blueprint contains: a blueprint declares governance and technology, never resources, prices, quantities or flows. One number in here was actively misleading until 2026-08-15: 515 businesses were reported as `unclassified`, which reads as 515 missing codes and very nearly produced 515 invented ones. Counting the names instead showed that 486 are delimited by something other than an industry -- 223 jurisdiction, 185 legal-entity, 62 municipality, 5 government-function, 5 product, 3 trade-item, 3 national-industry -- and for a country, a legal entity or a municipality there is no industry code to find. A further 15 declare a code in a vocabulary this workspace does not mirror at that level, which is a gap here and not in the blueprint. What is left genuinely says nothing: 29 businesses, mostly payments and crowdfunding, that plausibly do have an ISIC class and simply do not declare one. Those are for their authors to declare, not for this projection to guess.",
+  "A classified business is NOT a connected ledger. 461 of 1398 businesses have a vf:ProcessSpecification derived from the UN ISIC table, which says what KIND of activity each is and nothing about whether any activity was recorded. Of those 1398 businesses, 0 consume the Valueflows vocabulary in code; across all 1832 west-registered cloud-itonami repositories the figure is 1 (orgs/cloud-itonami/credits). Reading the classified count as adoption is the mistake this entity exists to prevent. :complete? is false and stays false until economic records exist for a business, which no blueprint contains: a blueprint declares governance and technology, never resources, prices, quantities or flows. One number in here was actively misleading until 2026-08-15: 515 businesses were reported as `unclassified`, which reads as 515 missing codes and very nearly produced 515 invented ones. Counting the names instead showed that 486 are delimited by something other than an industry -- 223 jurisdiction, 185 legal-entity, 62 municipality, 5 government-function, 5 product, 3 trade-item, 3 national-industry -- and for a country, a legal entity or a municipality there is no industry code to find. A further 15 declare a code in a vocabulary this workspace does not mirror at that level, which is a gap here and not in the blueprint. What is left genuinely says nothing: 29 businesses, mostly payments and crowdfunding, that plausibly do have an ISIC class and simply do not declare one. Those are for their authors to declare, not for this projection to guess.",
   :vf.coverage/by-scope-kind
   {"government-function" 5,
    "trade-item" 3,
@@ -24214,15 +24224,15 @@
    "legal-entity" 185,
    "municipality" 62,
    "product" 5},
-  :vf.coverage/with-un-includes 122,
+  :vf.coverage/with-un-includes 123,
   :vf.coverage/has-record-series-file 0,
-  :vf.coverage/blueprints-without-repo 433,
+  :vf.coverage/blueprints-without-repo 434,
   :vf.coverage/rev4-titles-provenance
   "orgs/cloud-itonami/org-un-isic/data/PROVENANCE.edn",
   :vf.coverage/consuming-in-population-repos [],
   :vf.coverage/businesses 1398,
   :vf.coverage/unresolvable-but-in-other-revision 50,
-  :vf.coverage/west-registered-paths 1831,
+  :vf.coverage/west-registered-paths 1832,
   :source/dataset "itonami-valueflows",
   :vf.coverage/other-vocabulary-unresolved 15,
   :vf.coverage/occupation-only 340,
@@ -24233,9 +24243,9 @@
   :vf.coverage/declares-other-vocabulary
   {"cofog" 5, "gtin" 3, "jsic" 3, "unspsc" 5},
   :vf.coverage/unclassified-with-code-in-repo-name 2,
-  :vf.coverage/resolved-by-revision {"isic-rev4" 122, "isic-rev5" 338},
+  :vf.coverage/resolved-by-revision {"isic-rev4" 123, "isic-rev5" 338},
   :vf.coverage/rev4-titles-unpinned? true,
-  :vf.coverage/classified 460,
+  :vf.coverage/classified 461,
   :vf.coverage/consuming-in-org-repos ["orgs/cloud-itonami/credits"],
   :vf.coverage/other-vocabulary-gaps
   ["COFOG group 032 is not in the mirror, which carries 10 groups -- one class per division, a sample rather than the full classification"
