@@ -315,3 +315,53 @@
  :dedup-semantics-still-undecided "**7 周連続で未着手。** 08-11 に人へ渡した (a) open な間は (site, finding) で dedup し evidence を新しい window の数字で更新する / (b) ingress 側が同じ (site, finding) の open な activity に already-open を返す —— どちらも未決定。**今周は (a) を採っていれば情報が増えていた回**である: 08-12 の babiniku 回は『(a) を採っても増える情報がゼロ』（数字が 1 つも動いていなかった）だったが、今日は非 direct が 11 → 20 に動き referral という新しい行が出ている。open な 1 通の evidence を更新できていれば、人は『入口が 1 本』ではなく『2 本目が出はじめた』を読めた。guard は queue を汚さない代わりに、**この変化を queue に届けない**"
  :not-done "①今日の issue を提案していない（重複のため。**未着地ではなく、意図的に出していない**）②open な 2 通（08-08 と 08-13）は取り下げていない —— narrow ingress key は POST 専用で withdraw を持たない ③queue の中身は読んでいない（cockpit の CACAO 認証が要る）ので、この 2 通が今も open かは**確認していない**。guard は『ledger に :proposed がある』で止めており、『queue に open がある』では止めていない —— close の signal が ledger に無い限りここは一致しない ④dedup の意味論は決めていない（範囲外）⑤tick / kaiyu 側のコードは 1 行も触っていない ⑥kotobase.net の site 側にも触れていない ⑦guard は今も SKILL.md の散文 1 箇所だけで、機械には入っていない"
  :note "read face への request は読み取りのみ（kotobase.net を 1 回 GET）。Keychain は `net-kotobase KAIYU_REPORT_SECRET` を service 名で 1 件だけ狙い撃ち取得（総当たりなし）。**ingress への POST は 0 通**。共有 checkout では作業していない（/tmp/root-kaiyu-kaizen-0816 の sparse worktree、origin/main から分岐）。直前の babiniku `:woke` 行は共有 checkout に未着地で残っていた loop の tick 記録で、本 entry と一緒に運んだ（append-only の測定列なので順序どおり）"}
+{:status :not-proposed-duplicate-question
+ :at "2026-08-16"
+ :issue-id "kaizen:shinshi.club:bounce-video:2026-08-10_2026-08-16"
+ :site "shinshi.club"
+ :tenant {:org "network-awai" :repo "club-shinshi"}
+ :severity :high
+ :dedup "**guard が発火した 3 周目（連続）。** POST の前に prefix `kaizen:shinshi.club:bounce-video:` で ledger を grep → 3 件。①`…:2026-08-07_2026-08-13` が `:status :proposed`（:at 2026-08-14、queue に open のまま）②`…:2026-08-08_2026-08-14` ③`…:2026-08-09_2026-08-15` がいずれも `:not-proposed-duplicate-question`。skill step 3 のとおり `:proposed` が 1 件でもある以上、提案しない。**問いの文言は 4 周とも一字も違わない**（数字は 11 中 10 → 12 中 10 → 15 中 13 → **15 中 13**、今周は数字すら動いていない）"
+ :dedup-read-origin-main "**working copy ではなく `origin/main` の ledger を読んだ**（`git show origin/main:90-docs/kaizen/kaiyu-kaizen.ledger.edn | grep`）。今周は working copy と origin/main が shasum 一致（6a692b7a…）だったが、**一致していたことは読んだから言える**（ADR-2608136800）"
+ :verification "候補の数字を read face（GET https://shinshi.club/_metrics/audience?window_days=7、x-internal-trust、HTTP 200）に当てて確認。dwell の route=\"video\" は 2 行 lt10=13 / 10_29=2 で **samples 15・under-10s 13** —— tick の evidence {:route \"video\" :samples 15 :under-10s 13} と完全一致。応答側の window も 2026-08-10〜2026-08-16 で候補の id と一致。87% は 13/15=86.67% の **round**（`kaiyu.diagnose` の bounce は `Math/round`、acquisition の `share-pct` は `Math/floor` —— 2 つは別の丸めを使っており、87 は bounce 側として正しい）"
+ :evidence-range-correct "window 2026-08-10〜2026-08-16 に対し dwell.collected-since は 2026-08-08。よって issue 本文の『根拠の範囲: この window 全体（2026-08-08 から測れている）』は応答どおり"
+
+ :carried-question-resolved
+ "**前周が『次周はここを 1 つだけ確かめる』と名指しした discriminate、付いた —— 計器は生きており、遷移の少なさは本物である。**
+
+  問い（08-15 記載）: transitions の top-edges が 4 window 連続 1 バイトも動かない（home→video 2 / video→home 1）。**beacon が transition を送っていないのか、本当に遷移が 0 なのか、どちらでも同じ出力になる。**
+
+  読んだ経路（club-shinshi-app の `jk-luxury/main`。checkout ではなく remote main。remote 名が `origin` でないのは前周記録どおり）:
+  ①`shinshi/ui/api.cljs:645-675` —— `track-dwell!` / `track-visit!` / `track-nav!` は **同一 endpoint `/_track`・同一 transport `navigator.sendBeacon`・同一 try/catch**。nav 側にだけ効く guard は無い
+  ②`shinshi/worker/track.cljs:89-96` —— worker の `(= t \"nav\")` 分岐は実在し、`INSERT INTO route_transition_daily … ON CONFLICT DO UPDATE` を書く。dwell 分岐と同型
+  ③`shinshi/ui/router.cljs:35-95` —— SPA は完全に配線されている。`on-document-click` が in-app `<a>` を `preventDefault` → `navigate` → `analytics/page!`、`popstate` も `page!` を呼ぶ（back/forward も遷移として数える、とコメントが明示）
+  ④`shinshi/ui/analytics.cljs:71,90` → `kaiyu/session.cljc:105-114` —— `:navigate` で `kaiyu/transition` が非 nil のときだけ `{:t :nav}` を出す
+  ⑤`git log` —— router の配線は **2026-08-06 の ddea418（migration 0016 と同じ commit）**、analytics の最終変更は **08-08 の 37063e0**。**08-13 には何も deploy されていない**
+
+  したがって nav 固有の沈黙を作るには、私が読んだ ②④ のどちらかに nav 分岐だけの欠陥が要るが、両方とも dwell と対称だった。**『送っていない』は排除される。**"
+
+ :why-dwell-and-nav-have-different-base-rates
+ "**上の結論に必要な、もう 1 つの構造的事実。dwell の行数と edge の本数を直接比べるのは category error である**（`kaiyu/session.cljc:105-114` を読んで確定）。
+
+  - `session/init` は `route = nil` で始まり、`install!` の最初の `page!` は `(when (:route state) …)` が nil なので **edge を 1 本も出さない**。つまり **1 ページ読んで離れる訪問は dwell 行を 1 つ以上作り、edge をちょうど 0 本作る —— 設計どおり**
+  - **同一 segment 内の移動（/video/scene/a → /video/scene/b）は dwell も edge も出さない**（`(if (and (:route state) (nil? edge)) [state []])`、docstring が『video→video edge would drown the edges that carry signal』と明記）
+  - edge が出るのは **1 回の page load の中で segment を跨いだときだけ**。一方 dwell は `:end`(pagehide) と `:hide` でも出るので、tab 切替のたびに増えうる（`:show` が `closed?` を false に戻す）
+
+  よって『dwell 23 行に対し edge 3 本』は矛盾ではない。08-14 の entry が 2 周の差分から経験的に導いた『単ページ訪問は dwell 行を 1 つ作り edge を 1 つも作らない』は、**source で確認された**。"
+
+ :collected-since-cannot-detect-a-stopped-instrument
+ "**副産物として、read face の `collected-since` の射程を実測した。これは ADR-2608136000 の 5 問のうち『飛ばした と 合格した が出力で区別できるか』に直接当たる。**
+
+  `telemetry.cljs:279` の `since` は **`SELECT MIN(day) AS day FROM <table>` で、window で絞っていない**（同じ応答の他の 4 query はすべて `WHERE day BETWEEN ?1 AND ?2` を持つ）。したがって `collected-since` は **その表に最初の行が入った日**であって、**window 内で今も行が増えているかを一切答えない**。値は window が転がっても永久に動かない。
+
+  - 区別できる: `null`（一度も測っていない）vs 非 null（いつか測った）。**docstring が主張している用途はこちらで、その用途には正しい**（『Absent rows mean NOT MEASURED』）
+  - 区別できない: 『今も収集している』vs 『ある日から止まった』。**どちらも同じ日付を返す**
+
+  今周の transitions が `2026-08-13` を返し続けたのは表の floor であって鮮度ではない。**私はこれを欠陥として報告しない**（read face は自分が答えると言った問いには答えている）。記録する理由は、次に『collected-since が動かないから計器が止まった』と読みたくなる周が必ず来るからで、**その読み方はこの実装では成立しない**。止まったかどうかを知りたいなら `MAX(day)` が要る。"
+
+ :measurement-observation "**video の数字は 4 周目で初めて 1 も動かなかった**（15 中 13 が 2 周連続）。window は 1 日転がっているので、落ちた 08-09 と入った 08-16 の video dwell が同数だったことになる。一方 **dwell 全体は 29 行 → 23 行に減り、`comic`(8 行) と `actresses`(1 行) の行が消えた** —— window が 08-08/08-09 を後ろに送った結果で、これらの route は今 window に 1 行も無い。**『comic を読む人が居なくなった』とは読めない**（母数は JS を実行した 12 visits）。js-execution-rate は 0.061 → 0.072 → **0.050**、pageviews 296 → 264 → **240**"
+ :window-context "参考値（結論には使っていない）: pageviews 240、visits 12、js-execution-rate 0.05。dwell の母数は JS を実行した訪問だけなので、15 件は video を見た全員ではなく **その約 5% の層**である。server 側 pageviews は 240 件ある"
+
+ :outstanding-for-human "**dedup の意味論は依然として人の判断待ち**（2026-08-11 に渡した (a) open な間は (site, finding) で dedup して evidence を更新する / (b) ingress 側が already-open を返す）。**8 周連続で未着手。** guard が実際に POST を止めた周は shinshi で 3 連続・全 site で 5 回目になった —— 手順は効いているが、**効いているのは skill の散文 1 箇所だけ**で、機械には何も入っていない。今周は (a) を採っていても情報は増えなかった（数字が 1 つも動いていない）"
+ :not-done "①提案していない（重複のため。**未着地ではなく、出すべきでない候補だった**）②既に open な 1 通（`…:2026-08-07_2026-08-13`）は取り下げていない —— narrow ingress key は POST 専用で withdraw を持たない ③queue の中身は読んでいない（cockpit の CACAO 認証が要る）ので、それが今も open かは**確認していない** ④**原因を書いていない** —— なぜ video が 87% で 10 秒未満なのかは回遊の計測では答えられない。今周読んだのは計器の配線であって video 面ではない ⑤修正を提案していない ⑥承認していない ⑦**site 側にも tick / kaiyu 側にも 1 バイトも書いていない**（club-shinshi-app は read-only で `git show` しただけ）⑧`collected-since` に `MAX(day)` を足していない（read face の変更は別の仕事で、しかも今周の結論には要らなかった）⑨08-08〜08-12 に nav 行が 0 だったことを『実際に beacon が飛んだが 0 だった』とまでは証明していない —— **証明したのは経路が dwell と対称で生きていること**で、残る説明は『その 5 日間、誰も segment を跨がなかった』（visits ≈ 2/日 の母数では十分ありうる）"
+ :note "read face への request は読み取りのみ（shinshi.club を 1 回 GET）。Keychain は `club-shinshi BMC_COLLECTOR_READONLY_SECRET` を service 名で **1 件だけ**狙い撃ち取得（総当たりなし、CLAUDE.md 安全床⑦）。**KAIZEN_INGRESS_KEY は読んでいない** —— 投げないと決まった後に鍵を取る理由が無い。**ingress への POST は 0 通**。共有 checkout では作業していない（/tmp/root-kaizen-shinshi-0816 の sparse worktree、origin/main 7539b4c0f48 から明示的に分岐）。club-shinshi-app は `jk-luxury/main` を `git show` で読んだだけで checkout を動かしていない（あの checkout は前周記録どおり detached・dirty）"}
