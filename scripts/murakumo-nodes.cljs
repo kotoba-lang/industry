@@ -64,39 +64,53 @@
 (def mini-probe
   (str "l=$(pgrep -f 'llama-server -m' | wc -l | tr -d ' ');"
        "rss=$(ps -eo rss,args | grep 'llama-server -m' | grep -v grep | awk '{s+=$1} END{printf \"%.1f\", s/1048576}');"
-       "free=$(vm_stat | awk '/Pages free/{gsub(/\\./,\"\");printf \"%d\", $3*16384/1048576}');"
+       ;; **`Pages free` は available ではない。** macOS は inactive / speculative /
+       ;; purgeable を要求に応じて回収するので、free だけを見ると実際に載る量を
+       ;; 大幅に過小評価する（benjamin 実測 2026-08-16: free 447 MiB に対し
+       ;; available 11282 MiB、25 倍のズレ。この指標で床を判定すると、載るモデルを
+       ;; 「載らない」と断る —— 実際に 5 回連続で誤って断った）。
+       "free=$(vm_stat | awk '/Pages free/{gsub(/\\./,\"\");f=$3} /Pages inactive/{gsub(/\\./,\"\");i=$3} /Pages speculative/{gsub(/\\./,\"\");s=$3} /Pages purgeable/{gsub(/\\./,\"\");p=$3} END{printf \"%d\", (f+i+s+p)*16384/1048576}');"
        "wl=$(sysctl -n iogpu.wired_limit_mb 2>/dev/null);"
        "tot=$(sysctl -n hw.memsize | awk '{printf \"%d\", $1/1048576}');"
        "rpc=$(for p in 50052 50053; do nc -z -w1 127.0.0.1 $p >/dev/null 2>&1 && printf '%s ' $p; done);"
        "mg=$(ls ~/.murakumo/managed 2>/dev/null | tr '\\n' ' ');"
-       "echo \"$l|${rss:-0}|$free|$wl|$tot|$rpc|$mg\""))
+       ;; **メモリだけ見ても「載せてよいか」は決まらない。** 空きがあっても CPU が
+       ;; 張り付いていれば計測は歪むし、他人の仕事を踏む。load1 と最大の占有プロセスを
+       ;; 併せて出す（2026-08-16、空きが全機で急減したのに llama-server は 0 件、という
+       ;; 状況を前にして「では何が載っているのか」に答えられなかったため追加）。
+       "ld=$(sysctl -n vm.loadavg | tr -d '{}' | awk '{printf \"%.1f\", $1}');"
+       "top1=$(ps -eo rss,comm -r | sed -n 2p | awk '{printf \"%s:%.1fG\", $2, $1/1048576}' | sed 's|.*/||');"
+       "echo \"$l|${rss:-0}|$free|$wl|$tot|$rpc|$mg|$ld|$top1\""))
 
 (def head-probe
   (str "l=$(pgrep -f llama-server | wc -l);"
        "rss=$(ps -eo rss,args | grep llama-server | grep -v grep | awk '{s+=$1} END{printf \"%.1f\", s/1048576}');"
        "read _ tot used free _ <<< $(free -m | sed -n 2p);"
        "ports=$(ss -ltn 2>/dev/null | grep -oE ':(8090|8095|8096|11434)' | tr -d ':' | sort -u | tr '\\n' ' ');"
-       "echo \"$l|${rss:-0}|$free|-|$tot|$ports|\""))
+       "ld=$(awk '{printf \"%.1f\", $1}' /proc/loadavg);"
+       "top1=$(ps -eo rss,comm --sort=-rss | sed -n 2p | awk '{printf \"%s:%.1fG\", $2, $1/1048576}');"
+       "echo \"$l|${rss:-0}|$free|-|$tot|$ports||$ld|$top1\""))
 
 (defn- pad [s n] (let [s (str s)] (str s (apply str (repeat (max 0 (- n (count s))) " ")))))
 (defn- lpad [s n] (let [s (str s)] (str (apply str (repeat (max 0 (- n (count s))) " ")) s)))
 
 (defn- parse-probe [s]
-  (let [[l rss free wl tot ports managed] (str/split (str s) #"\|")]
+  (let [[l rss free wl tot ports managed load top1] (str/split (str s) #"\|")]
     {:procs (js/parseInt (or l "0")) :rss-gb (js/parseFloat (or rss "0"))
      :free-mb (js/parseInt (or free "0")) :wired-mb (js/parseInt (or wl "0"))
      :total-mb (js/parseInt (or tot "0"))
      :ports (remove str/blank? (str/split (or ports "") #"\s+"))
-     :managed (remove str/blank? (str/split (or managed "") #"\s+"))}))
+     :managed (remove str/blank? (str/split (or managed "") #"\s+"))
+     :load (js/parseFloat (or load "0")) :top1 (or (not-empty (str/trim (str top1))) "-")}))
 
 (defn- probe [host]
-  (let [{:keys [exit out]} (sh! host (if (= host head) head-probe mini-probe) 6)]
+  (let [{:keys [exit out]} (sh! host (if (= host head) head-probe mini-probe) 20)]
     (if (or (not= 0 exit) (str/blank? out))
       {:unreachable true}
       (parse-probe out))))
 
 (defn- cmd-audit! []
-  (println (str (str/join "  " ["node      " "procs" "rss"  "freeMB" "wiredMB" "totalMB" "ports/managed"])))
+  (println (str (str/join "  " ["node      " "procs" "rss"  "availMB" "wiredMB" "load1" "biggest proc" "ports/managed"])))
   (let [rows (for [h (cons head minis)] [h (probe h)])]
     (doseq [[h p] rows]
       (if (:unreachable p)
@@ -104,7 +118,7 @@
         (println (str (pad h 10) "  " (lpad (:procs p) 5) " "
                       (lpad (.toFixed (:rss-gb p) 1) 5) "G " (lpad (:free-mb p) 7) " "
                       (lpad (if (pos? (:wired-mb p)) (:wired-mb p) "-") 8) " "
-                      (lpad (:total-mb p) 8) "  "
+                      (lpad (:load p) 6) "  " (pad (:top1 p) 18) " "
                       (str/join "," (:ports p))
                       (when (seq (:managed p)) (str " managed:" (str/join "," (:managed p))))))))
     ;; **低空きを黙って通さない。** 測っただけで終わると、次の人が同じ穴に落ちる。
@@ -187,17 +201,29 @@
             mm-mb (if mmproj
                     (quot (js/parseInt (or (not-empty (:out (sh! node (str "stat -f%z " mmproj " 2>/dev/null")))) "0")) 1048576)
                     0)
-            need (+ model-mb mm-mb headroom-mb)]
-        (println (str node ": free " (:free-mb p) " MiB · model " model-mb
+            need (+ model-mb mm-mb headroom-mb)
+            ;; **`-ngl 999` の天井は system available ではなく GPU の wired limit。**
+            ;; mac は gguf を mmap するので system 側は足りて見えるが、GPU へ wire
+            ;; できる量を超えると listening のあと Compute error で死ぬ。
+            ;; wired limit を持つノード(mac)はそれを予算に、持たない head(Linux)は
+            ;; available を予算にする。
+            ;; ⚠ **16GB 機で wired limit を上げて逃げないこと。** 13312 -> 14848 に
+            ;; 上げた dan と judah は、OS に 1.5GB しか残らず tailscaled が餓死して
+            ;; tailnet から消えた（2026-08-15/16、2 台とも復旧不能）。
+            budget (if (pos? (:wired-mb p)) (:wired-mb p) (:free-mb p))]
+        (println (str node ": budget " budget " MiB ("
+                      (if (pos? (:wired-mb p)) "GPU wired limit" "system available")
+                      ") · avail " (:free-mb p) " · model " model-mb
                       " · mmproj " mm-mb " · headroom " headroom-mb " -> need " need))
         (cond
           (zero? model-mb)
           (do (println "FAIL model file not found on" node) (set! (.-exitCode js/process) 1))
 
           ;; **載せる前に断る。** 載せてから Compute error で落ちるより安い。
-          (< (:free-mb p) need)
-          (do (println (str "REFUSING to load: " (:free-mb p) " MiB free but " need " MiB needed."
-                            " Free memory first (`reap`) or raise iogpu.wired_limit_mb."))
+          (< budget need)
+          (do (println (str "REFUSING to load: budget " budget " MiB but " need " MiB needed."
+                            " Free memory with `reap`, or use a smaller quant / drop --mmproj."
+                            " Do NOT raise iogpu.wired_limit_mb on a 16GB machine."))
               (set! (.-exitCode js/process) 1))
 
           :else
