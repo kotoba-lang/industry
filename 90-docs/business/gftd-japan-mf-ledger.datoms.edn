@@ -1013,4 +1013,92 @@
   {:journal "#3380" :date "2021-12-31" :memo "GL・GJ債権債務相殺 / GW・GJ債権債務相殺"
    :note "期末の債権債務相殺は 2020 年（#2431 #2432）から毎年行われている。
           現在も続く『期首洗替』の起源はここ。"}}
+
+ ;; ------------------------- DE-SCHOOL の MBO（オーナー指摘 2026-08-16「あれは MBO の資金」）
+ ;; 出所: orgs/gftdcojp/m365-archive/facts/contract-terms.edn（559 件、うち譲渡関連 80 件）
+ {:db/id -38
+  :source/dataset "gftd-japan-mf"
+  :mbo/subject "DE-SCHOOL 事業"
+  :mbo/contract
+  {:date "2020-09-01"
+   :type "事業譲渡契約"
+   :party-a "Gftd Japan株式会社"
+   :party-b "株式会社DE-SCHOOL"
+   :price 12396515
+   :price-note "税別。2021年1月〜2023年1月の分割払い"
+   :transferred-assets 284745
+   :assumed-liabilities 1721002
+   :file "201124事業譲渡契約書_v2.docx"
+   :archive-path "onedrive/From G Suite Drive/@キャスター・佐藤公認会計士事務所_共有ドライブ/施設別/早稲田/経理/★DE-SCHOOL関係証憑類（代表藤井様）/DE-SCHOOL譲渡（2020.8）/2020.11.26譲渡契約書案/"
+   :status :draft-unsealed
+   :caveat "押印済みの契約書はアーカイブに無い。ドラフト 2 版（v1/v2）のみ。"}
+  :mbo/executed-evidence
+  "契約書の 引継負債 1,721,002 が GJ の 2020 年末 BS に 未払金 ㈱DE-SCHOOL 1,721,002 として
+   1 円違わず出現している（2021 年に完済）。押印済み契約書は無いが、事業譲渡は実行されている。"
+  :mbo/collection-by-year
+  {2021 {:amount 2640000 :basis "売掛金 ㈱DE-SCHOOL 借方" :memo "経営委任契約に基づく報酬（月 220,000）"}
+   2022 {:amount 2673000 :basis "売掛金 ㈱DE-SCHOOL 借方"}
+   2023 {:amount 2640000 :basis "売掛金 ㈱DE-SCHOOL 借方"}
+   2024 {:amount 1600000 :basis "業務委託売上 ㈱DE-SCHOOL（FY2024 PL 補助科目で確認）"}
+   2025 {:amount 3000000 :basis "業務委託売上 ㈱DE-SCHOOL"}
+   2026 {:amount 0 :basis "計上なし"}
+   :total-gross 12553000
+   :total-net 11830000}
+  :mbo/match
+  {:contract-price 12396515
+   :collected-gross 12553000 :gap-gross 156485 :gap-gross-pct 0.0126
+   :collected-net 11830000 :gap-net -566515 :gap-net-pct 0.046
+   :verdict
+   "契約価額と累計請求が 1.3%（税込）/ 4.6%（税抜）で一致し、開始が 2021 年、
+    停止が 2026 年で契約の分割払い構造と符合する。ただし『業務委託料が譲渡代金である』と
+    明記した契約書は見ていない。強い示唆であって証明ではない。"}
+  :mbo/consequence-for-planning
+  "GJ の FY2021-2025 の DE-SCHOOL 向け収入は事業収益ではなく MBO 譲渡代金の分割回収だった。
+   払い終わったから止まったのであり、戻すべき売上は実在しない。
+   FY2026 の 443,506 円が外部からの事業収益の実勢である。"
+  :mbo/retraction
+  "前版で『DE-SCHOOL 契約がなぜ止まったのか、戻せるのかが GJ の再建可否を最も直接に決める』と
+   書いたのは誤り。戻す対象が無い。"}
+
+ ;; ------------------------- 契約書から出た訂正と補強
+ {:db/id -39
+  :source/dataset "gftd-japan-mf"
+  :contracts/philcommand
+  {:date "2019-10-29"
+   :type "株式譲渡契約"
+   :seller "水谷翔太"
+   :buyer "Gftd Japan株式会社"
+   :shares "㈱フィルコマンド 普通株式 40株のうち 20株"
+   :consideration {:cash 2000000 :eth 600 :other "CommonSquare（仮想通貨取引所）システム納品"}
+   :buyback-clause true
+   :sealed true
+   :files ["3647a56db59985b26d75344b63c0d634__1.株式譲渡契約書フィルコマンド_水谷翔太.pdf"
+           "201910_株式譲渡契約書フィルコマンド・水谷翔太 (1).pdf"]
+   :retraction
+   "-37 で『水谷翔太は ㈱フィルコマンド 株式の譲渡先だった』と書いたのは逆。水谷氏は売り手である。"
+   :reinterpretation
+   "買戻条項があるため、2021 年末の『水谷翔太　株譲渡代金　科目振替 21,500,000』は
+    GJ が買戻を請求し水谷氏が履行できなかった結果と読むのが自然（摘要も『破産更生債権』）。
+    買戻請求の書類は未確認なので断定しない。"
+   :share-value-decomposition
+   {:関係会社株式簿価 24012000 :cash 2000000 :eth-implied 22012000 :eth-rate 36686.67
+    :note "現金 2,000,000 ＋ 600ETH ＝ 24,012,000 で簿価と一致。対価の 92% は ETH。"}}
+  :contracts/gj-share-accumulation
+  [{:date "2019-12-13" :from "佐藤幹雄" :to "河﨑純真" :shares 100 :amount 5000000}
+   {:date "2019-12-13" :from "㈱イシイ" :to "河﨑純真" :shares 50 :amount 5000000}
+   {:date "2020-01-07" :from "GA1号投資組合" :to "河﨑純真" :shares 50 :amount 5000000}]
+  :contracts/gj-share-accumulation-total {:shares 200 :amount 15000000}
+  :contracts/predecessor
+  [{:date "2018-03-30" :type "株式譲渡契約" :from "椎名康雄" :to "GIFTED AGENT株式会社"
+    :subject "プレミア証券株式会社 発行済全株式 199,055株（100%）" :amount 400000000
+    :note "手付金 5,000万 ＋ 残金 3億5,000万"}
+   {:date "2018-10-10" :type "事業譲渡契約" :from "一般社団法人がん病後生活向上回復協会" :to "Gifted Agent株式会社"
+    :subject "福祉事業" :amount 20000000 :note "4 回分割。譲渡日 2018-11-20。Gftd Works の福祉事業の起源"}]
+  :contracts/hypothesis
+  "設立初日の『組織再編により生じた株式特別勘定 32,259,065』の背景は GIFTED AGENT 系列の
+   組織再編にあると見られるが、対応する契約書は未特定。**未確認の推測として記録する。**"
+  :contracts/source-limitation
+  "MoneyForward の MCP はクラウド会計のみ（/mcp/ca/v3）で、クラウド契約（契約書管理）の
+   ツールは提供されていない。ここに書いた契約はすべて m365 アーカイブの OneDrive 側から取得した。
+   MF クラウド契約を利用している場合、その内容は未取得である。"}
 ]
