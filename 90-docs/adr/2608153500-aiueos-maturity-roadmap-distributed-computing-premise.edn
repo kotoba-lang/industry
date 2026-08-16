@@ -872,6 +872,29 @@
 
    compiler checkout をどこから得るか。**fleet ノードに checkout を置く / script が sha ではなく digest で compiler を受け入れる / path を渡す前提のまま CI に書く** のいずれか。
 
+   ### 12 object を、正しい compiler で測った（2026-08-17、aiueos#148 追記）
+
+   前は「pin が違うので未確定」で止めた。pin を `8ff1030`（37 object を再現する revision）に進めたので、**正しく訊けるようになった。**
+
+   | 結果 | 数 | object |
+   |---|---|---|
+   | 拒否: `only a bounded :export vector is admitted in namespace clauses` | **5** | `cas-verify` `dispatch` `entry` `provider-policy` `provider-transport` |
+   | 拒否: その他の subset エラー | 3 | `handle-arena` `capability-table`（型シグネチャ無し）/ `domain`（lowering 無し） |
+   | 通るが **export 名が違う** | 2 | `handle-plan` `syscall-plan` —— どちらも `kotoba_aiueos_probe` |
+   | 通って export も正しい | 2 | `digest-equal` `sha256` |
+
+   **12 のうち 10 は verifier を満たしようがない。** 残り 2 も fallback の probe symbol を吐き、verifier はまさにそこで落ちる。
+
+   ### `:export` エラーの 5 個が本題
+
+   あれは **kernel target が「bounded な `:export` vector 以外を持つ ns 節」を拒否**するメッセージ —— `:require` か複数 symbol の export。**この 5 個は kernel target が認める言語面より新しい面に対して書かれている。**
+
+   それは ADR-0030（1 object 1 シンボル・互いを呼べない）と README が払っている重複の代償と**正面から衝突する**。**この 5 個は、その制約が無いかのように書かれている。**
+
+   ### したがって問いが変わる
+
+   12 個は「ビルドも検証もされていない」だけではない。**大半は、名乗っている target に対して、今の形ではビルドできない。** 問いは「verifier を配線する」ではなく **「これらは何に対して書かれたのか、そしてそこが在るべき場所なのか」** である。
+
    **A2 を A3 より前に置く。**再現できないものは attest できず、attest できないものを『安全』として売れない。顧客に監査ログを見せる商品が、自分の出荷物を自分で再構築できないのは通らない。ネットワークが動く方が見栄えはするが、**再現性の無い OS が外部と喋り始めると、後から『いつから壊れていたか』を言えなくなる。**
 
    ## 4. 再利用の規律 —— 新しく書くのは『無いもの』だけ
