@@ -29,7 +29,7 @@
   <array>
     <string>/bin/zsh</string>
     <string>-lc</string>
-    <string>cd "$HOME/github/com-junkawasaki" &amp;&amp; exec /opt/homebrew/bin/nbb scripts/fleet-ci/residency-alarm.cljs</string>
+    <string>cd "$HOME/github/com-junkawasaki" &amp;&amp; exec /opt/homebrew/bin/nbb --classpath scripts/fleet-ci scripts/fleet-ci/residency-alarm.cljs</string>
   </array>
   <key>StartInterval</key><integer>21600</integer>
   <key>RunAtLoad</key><true/>
