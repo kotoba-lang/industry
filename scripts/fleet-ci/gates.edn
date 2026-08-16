@@ -96,6 +96,16 @@
   {:name "io-ipld-car" :gate :jvm-test :cd true}
   {:name "kotobase-storage" :gate :jvm-test :cd true}
   {:name "kotobase-storage-pack" :gate :jvm-test :cd true}
+  ;; kototama cannot take a :jvm-test gate: its :test alias resolves sibling
+  ;; :local/root deps that a node never receives, so that gate would fail
+  ;; about the classpath forever. The repo declares :test-hermetic for the
+  ;; namespaces that need nothing but itself -- linear-journal (at-most-once
+  ;; authority consumption, now a content-addressed chain) and execution
+  ;; (root ADR-2608160200's execution value and memo decision) -- and this
+  ;; gate runs that. :cap :jvm because the script shells to clojure.
+  {:name "kototama" :id "kototama-hermetic" :gate :nbb-script :cap :jvm
+   :script "gates/kototama-hermetic-test.cljs"
+   :include-ext [".edn" ".clj" ".cljc" ".cljs"] :min-files 60 :cd true}
   {:name "org-ietf-deflate" :gate :jvm-test :cd true}
   {:name "kotobase-block-codec" :gate :jvm-test :cd true}
   {:name "chain" :gate :jvm-test :cd true}
