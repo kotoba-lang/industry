@@ -187,23 +187,39 @@
 
    ### `.cljc` を native に載せる距離を測った（2026-08-16）
 
-   A3 に必要な DHCP・DNS・TCP は `.cljc` で揃った。**それを bare-metal に載せる距離**を、`kotoba-lang/org-ietf-tcp` の 10 namespace を実際にコンパイルして測った（compiler `a635509e`、`amu compile --target x86_64-kotoba-v1`）。
+   A3 に必要な DHCP・DNS・TCP は `.cljc` で揃った。**それを bare-metal に載せる距離**を、`kotoba-lang/org-ietf-tcp` の 11 namespace を実際にコンパイルして測った（compiler `a635509e` / amu `8ff1030`、`--target x86_64-kotoba-v1`）。
 
-   **`amu` は `.cljc` を受け取る**（usage が `.kotoba|.cljk|.cljc` と書いており、実際に読む）。壁は拡張子ではない。
+   **結論を先に書く: packaging は壁ではなかった。** ここを A3 の blocker として記述していたのは誤りで、撤回する。
 
-   測った結果は 3 種類に分かれ、**うち 1 種は私の測り方の欠陥**である:
+   多ファイルの閉じた `:require` グラフは、**pin あり・pin なしの両方の経路でリンクする**:
 
-   | 分類 | 件数 | 内容 |
-   |---|---|---|
-   | **本物の subset gap** | 2 | `seq`: `max` に admitted な型シグネチャが無い（stdlib にも無い）。`options`: top-level の計算済み定数（`(* 24 24 60 60 1000)`）が『closed bounded な整数/文字列/keyword/boolean』でないと拒否される |
-   | **reader が入力を拒否** | 4 | `congestion` / `pacing` / `pmtu` / `rto`。`:code :kotoba/source-read-failed` で行番号が出ない。**未調査** —— `Math/abs` 等の interop か、namespaced-keyword destructuring が候補だが**確かめていない** |
-   | **probe の欠陥** | 5 | `reassemble` / `retransmit` / `sack` / `send` / `state` が『`s/+seq` は登録された capability ではない』で落ちた。**これは gap ではない** —— probe が `:export` 節を足すために `:require` 節を剥がしたので、alias が解決できなくなっただけ。**この 5 件を証拠として引用しない** |
+   ```
+   amu module-lock <entry> --source-path <dir> --blocks <dir>   → {:ok true :modules 2 :lock-cid bafkrei…}
+   amu compile <entry> --source-path <dir> --unpinned           → グラフを解決し、通常の subset 判定へ進む
+   ```
 
-   **`:export` 節は必須**（`only a bounded :export vector is admitted in namespace clauses`）。可搬 `.cljc` はこれを持たないので、native に載せるには ns 節を書き足す必要がある。
+   `compile` は `--source-path` を受け取る（usage に出ていないだけ）。pin 無しで多モジュールを渡すと `:compile/unpinned-inputs` で止まり、`--unpinned` が明示の逃げ道になっている。**`module-lock` は各モジュールを CID で pin した lock を出す** —— 分散配布に必要な形が既に在る。
 
-   **multi-file の閉じたグラフは CLI から測れなかった。**`project_files.clj` と `source_path.cljc` は compiler に実在するが、`amu compile` は `--source-path` を公開しておらず（`module-lock` だけが持つ）、**複数ファイルの `:require` グラフが native target で通るかは未測定のまま**である。上の「probe の欠陥」5 件はここに帰着する。
+   実測で踏んだ 2 つの操作上の罠:
+   - **path は絶対で渡す**（相対だと `project path is not readable`）
+   - **`--blocks` は空のディレクトリを指す**（既存の内容があると診断の無い `internal compiler error` になる。**原因を言わないエラー経路**なので、次に見た人が誤診する）
 
-   **したがって現時点で言えること**: 単一ファイル・依存なしの `.cljc` は、`:export` を足せば native target にほぼ載る。落ちるのは stdlib の穴（`max`）と定数式の 2 点。**複数ファイルについては何も測れていない。**
+   **`:export` 節は必須**（`only a bounded :export vector is admitted in namespace clauses`）。可搬 `.cljc` はこれを持たないので、native に載せるには ns 節を書き足す。
+
+   ### 残るのは言語 subset の穴で、それは列挙できる
+
+   | namespace | 判定 |
+   |---|---|
+   | `seq` | `max` に admitted な型シグネチャが無い（stdlib にも無い） |
+   | `state` `options` `reassemble` `retransmit` `sack` | 依存する `tcp.seq` で落ちるので**自身は未判定**。`seq` の穴 1 つが 6 namespace に見える |
+   | `congestion` `pacing` `pmtu` `send` | **namespaced-keys destructuring** `{:tcp.cc/keys [cwnd ssthresh]}` が非対応。`:keys` / `:as` / keyword 値の明示 entry のみ |
+   | `rto` | `Math/abs` = JVM interop |
+
+   **前回「reader が拒否・未調査」と記録した 4 件は、これで解決した** —— namespaced-keys destructuring だった。interop は候補として挙げていたが、当たっていたのは `rto` だけである。
+
+   **穴は連鎖する。数え上げは 1 回では終わらない。** `max` を `if` に置き換えて測り直すと、同じファイルの別の位置で `no admitted lowering` が出た。**「あと 2 つ」ではなく「剥がすたびに次が出る」**形なので、この表を残りの総数として引用しない。総数を出すには admitted 演算表（`kotoba-lang/kotoba-lang` の `lang/guest-grammar.edn` / `surface-status.edn`）を読む必要があり、それは未実施。
+
+   副産物: `tcp.seq` が `clojure.set` を require して一度も使っていなかった。閉じたグラフの解決は**使われない require も解決しようとする**ので、存在しない依存としてグラフ全体が落ちていた（org-ietf-tcp `f3a9cbb` で除去、169 tests 全通過）。
 
    **A2 を A3 より前に置く。**再現できないものは attest できず、attest できないものを『安全』として売れない。顧客に監査ログを見せる商品が、自分の出荷物を自分で再構築できないのは通らない。ネットワークが動く方が見栄えはするが、**再現性の無い OS が外部と喋り始めると、後から『いつから壊れていたか』を言えなくなる。**
 
