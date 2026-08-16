@@ -1,5 +1,44 @@
 # Backblaze B2
 
+## ⚠ m365-archive は B2 認証情報の手前に GPG の壁がある（2026-08-15 実測）
+
+**`gftdcojp-m365-annex` の annex は `encryption=hybrid` で、実際の B2 認証情報は
+git-annex ブランチの中に GPG 鍵 `BDAE6794050EDB62` で暗号化されて入っている。**
+このファイルが下に列挙している B2 の鍵を全部解決できても、**それだけでは 1 バイトも
+取れない** —— `git annex enableremote b2` が
+`gpg [--quiet --trust-model always --decrypt] exited 2` で落ちる。
+
+実測した切り分け（次のセッションが同じ順番を辿り直さないように）:
+
+| 確認 | 結果 |
+|---|---|
+| `scripts/b2-creds.cljs` の解決 | **成功**（`AWS_ACCESS_KEY_ID` 他 5 変数） |
+| 必要な GPG 秘密鍵 `BDAE6794050EDB62` | **手元に在る** |
+| pinentry-mac + gpg-agent（400 日キャッシュ） | 設定済み・起動中 |
+| 非対話コンテキストでの `gpg --decrypt` | **45 秒でハング**（GUI プロンプトが出せない） |
+| Keychain `service=GnuPG` / `account=<暗号化副鍵の keygrip>` | **項目は在るが値が 4 文字で、gpg が「誤ったパスフレーズ」と判定** |
+
+**つまり Apple Keychain には有効なパスフレーズが入っていない。**
+暗号化副鍵の keygrip は `9F0C4E9F761C84E00E3E1D2F8AE1AE345A4AA881`
+（主鍵は `1BA2DB3551016BD80E908DBD6CF3F5489D3D57F5`、こちらは Keychain に項目なし）。
+
+**このパスフレーズの所在はまだ記録されていない（2026-08-16 時点で未解決）。**
+1Password の 7 vault にはアクセスできるが item 名が不明。
+`identity-seeds.md` の規則どおり **agent は passphrase を推測しない・自分で
+入力しない** ので、名前が判明するまでここは開かない。**分かったらここに追記する。**
+
+解錠の手順（オーナーが 1 回だけ実行すれば 400 日キャッシュされる）:
+
+```bash
+cd orgs/gftdcojp/m365-archive && git annex enableremote b2
+# pinentry-mac のダイアログで入力し「Save in Keychain」にチェック
+```
+
+⚠ **`nbb manifest/west_annex.cljs annex-get` を安易に使わない** —— 引数なしで
+**全 datalad データセットを走査**し、`cloud-itonami-contact-pii` から順に
+init/enableremote を始める。1 ファイルが欲しいだけなら
+`git annex get <path>` を狙い撃ちで使う（実測 2026-08-15、これを踏んだ）。
+
 - **Backblaze B2（複数の鍵が並存 — 用途で使い分ける。同じ鍵を使い回さない）**:
   - `com-junkawasaki.b2/annex`（1Password `gftdcojp` vault）— `manifest/repos.edn`
     の `:b2 :credentials` が参照する M365 archive 用（bucket:
