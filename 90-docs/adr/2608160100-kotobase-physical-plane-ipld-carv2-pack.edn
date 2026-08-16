@@ -243,8 +243,29 @@ packing する設計は index が 31% になる。これは block sizing の下�
   conformance suite は `:range-read :verified` / `:not-claimed` を返す
   （pin `526070045307`）。
 - `kotoba-lang/kotobase-storage-pack` —— **pack 対応 block store**（decorator であって
-  transport ではない）。coalesce、window read-ahead、CID 検証、`stats`
-  （pin `4d8b1c692d87`）。
+  transport ではない）。coalesce、window read-ahead、CID 検証、`stats`。
+  **同期 driver（JVM）と Promise driver（Worker / R2）の 2 つ**を、純粋な
+  `pack-plan`（coalesce / window / cache / frame 検証）の上に薄く載せる —— 同じ
+  coalesce 規則の写しが 2 つあれば規則も 2 つになる。
+- `kotobase-storage-s3` —— **両 client に ranged read**。R2 binding は
+  `{offset, length}`、signed HTTP は両端閉の `Range` ヘッダで、変換はそれぞれ
+  1 手ずれると**次の frame の先頭バイト**を読む（parse が成功して違う block が
+  返る）。miniflare の実 R2 実装と、プロセスから出ていくはずのリクエストの
+  両方で検証。`200` 応答（endpoint が Range を無視）は local slice せず拒否。
+  ⚠ この作業中に **`signed-request` が全リクエストで throw していた**ことが
+  判明した（`:key` の分配束縛が `clojure.core/key` を覆い、object key 文字列が
+  canonical header の sort 関数になっていた）。suite が R2 binding と in-repo
+  mock しか回しておらず、この client を呼ぶテストが 1 つも無かった。修正し、
+  `signed-client` に `:fetch` を注入可能にした —— **オフラインで回せない経路
+  だったことが、壊れたままだった理由**である。
+
+**`:range-read` と `:range-grant` は別の主張である。** 2026-08-16 に pack 経路が
+`:range-read` に操作を与えたとき、**既存の語の意味を黙って変えていた** ——
+S3 adapter は元の意味（「手渡す URL が Range を honour する」）で正しく宣言して
+いた。語を分けた: `:range-read` = この store 自身が `[start, end)` を返す
+（`IRangeRead`、ここで検査できる）/ `:range-grant` = 手渡す URL が Range を
+honour する（fetch は他所で起きるので**ここでは検査できない**）。
+packed block store が要るのは前者。
 
 **実測（この ADR の主張そのもの）**: 100 link の cons chain を、hydrate loop が
 そうせざるを得ないとおり 1 link 1 回の `-get-blocks` で辿る:
@@ -263,6 +284,18 @@ JVM と nbb で同値。**packing だけでは 100 のままである** —— �
 **window は取引である。** 100 → 1 の代償は転送 +46%。`stats` が `:requests` と
 `:bytes-fetched` を必ず並べて返すのはそのため。
 
+**同じ数字が deployment 上でも出る。** miniflare の実 R2 binding に対して
+`kotobase-storage-s3` 経由で実 CARv2 bytes を PUT し、100 link を 1 link ずつ
+辿って **1 ranged GET**（`{:requests 1, :bytes-fetched 12760, :cache-hits 99}`）。
+Promise driver でも同値。
+
+**catalog が projection であることは検査済みになった。** `rebuild-catalog!` が
+pack object だけから全 entry を（writer が記録したのと同じ offset で）復元する。
+これが無いと設計は循環していた —— **自分が入っている pack を特定するために引く
+必要のある catalog は、そもそも bootstrap できない**。pack が自分の中身の
+CARv2 index を持つのでそうならない。catalog を消す代償は scan であってデータでは
+ない。
+
 **未着地**（contract は固定済み）:
 
 | 次の一手 | 置き場所 |
@@ -270,7 +303,7 @@ JVM と nbb で同値。**packing だけでは 100 のままである** —— �
 | pack catalog の datoms と loader（今は injected な 2 関数） | `kotobase` + `manifest/schema.edn` |
 | write-locality で pack を封じる commit 経路 | `kotobase-peer` / `kotobase-engine` |
 | 実 corpus での round trip 実測（上記は合成 chain） | `kotobase-peer` の `dag_shape_bench` |
-| 実 provider（S3 / R2 / B2）への `IRangeRead` 実装 | `kotobase-storage-s3` ほか |
+| 実 endpoint（AWS S3 / B2）での ranged GET 確認（miniflare は R2 の実装であって R2 ではない） | `kotobase-storage-s3` |
 | 既存 deployment の移行（block → pack の再配置） | 未設計。**先に実測** |
 
 **移行は必要ない。** 既存の block-per-object store はそのまま正しく、
