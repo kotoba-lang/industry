@@ -221,6 +221,35 @@
 
    副産物: `tcp.seq` が `clojure.set` を require して一度も使っていなかった。閉じたグラフの解決は**使われない require も解決しようとする**ので、存在しない依存としてグラフ全体が落ちていた（org-ietf-tcp `f3a9cbb` で除去、169 tests 全通過）。
 
+   ### 穴を数える計測器（2026-08-16）
+
+   前節は「穴は連鎖するので、この表を残りの総数として引用しない」で終わっていた。1 つ剥がすと次が出る形で、しかも 1 回の答えに 40 秒のコンパイルがかかる。**`scripts/kotoba-surface-gap.cljs` はこれを 1 パスで数える** —— source の全 call head から、compiler の frontend と言語 authority が admit する語彙を引く。
+
+   ```bash
+   nbb scripts/kotoba-surface-gap.cljs <dir> --frontend <kotoba-sema>/src/kotoba/compiler/frontend.cljc --grammar <kotoba-lang>/lang/guest-grammar.edn --stdlib <kotoba-lang>/lang/stdlib/core.kotoba
+   ```
+
+   **admitted 語彙は表として在る場所から読む**（このファイルに名前を書き写さない）。実測 540 名: `frontend.cljc` の `(def *-operations '#{…})` 群 + **インラインの `'#{inc dec}` membership test** + `guest-grammar.edn` の `:core-special-forms` / `:sugar` + stdlib の `defn`。
+
+   **exit code は 3 値**: 0=穴なし / 1=穴あり / **2=答えられなかった**（対象が読めない・frontend が読めない・語彙が異常に小さい）。0 と 2 を同じ値にすると、**測れなかった実行が clean な実行と同じ顔をする**。4 経路とも実測で判別することを確認した。
+
+   **両方向を出した**（ADR-2608136000 の 5 問目）:
+
+   | 対象 | 結果 |
+   |---|---|
+   | `kotoba-lang/murakumo` の `kotoba/` 35 ファイル（native ISA で qualify 済み） | **0 件・exit 0** |
+   | `org-ietf-tcp` の `.cljc` 11 ファイル | **22 件・exit 1** |
+
+   ### TCP が safe-Kotoba に対して欠いているもの（全件）
+
+   `max` 14 / `vec` 11 / `boolean` 7 / `min` 7 / `remove` 7 / `bit-shift-right` 5 / `into` 5 / `double` 4 / `seq` 3 / `mod` 3 / `subvec` 2 / `false?` 2 / `mapv` 2 / `repeat` / `true?` / `sort-by` / `mapcat` / `last` / `set` / `bit-shift-left` / **set-as-function**（`(#{:fin-wait-1 …} x)`）/ **interop `Math/abs`**。
+
+   前節が名指しした `max` と `Math/abs` は再現した。**残りは前節の表に無い** —— 剥がして最初に出たものだけを見ていたからである。
+
+   **計測器自身の既知の欠陥を出力に残す**: 走査は reader ではなく字句なので、`(let [clear (fn [r] …)] (clear x))` の `clear` を偽陽性として出す。これを潰す heuristic（`sym (fn` を束縛とみなす）は書いて**撤回した** —— `(remove (fn [e] …) xs)` にも当たり、**`remove` `mapv` `mapcat` という本物の穴 3 つを「ローカル定義」として飲み込んでいた**。偽陽性は出力に見えて読み手の 10 秒を使う。偽陰性はこの道具が探しに来た穴そのものを「無い」と報告する。
+
+   **destructuring はこの道具では見えない** —— call head ではないため。前節の namespaced-keys の件は compile でしか出ない。
+
    **A2 を A3 より前に置く。**再現できないものは attest できず、attest できないものを『安全』として売れない。顧客に監査ログを見せる商品が、自分の出荷物を自分で再構築できないのは通らない。ネットワークが動く方が見栄えはするが、**再現性の無い OS が外部と喋り始めると、後から『いつから壊れていたか』を言えなくなる。**
 
    ## 4. 再利用の規律 —— 新しく書くのは『無いもの』だけ
