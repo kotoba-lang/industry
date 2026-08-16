@@ -1,4 +1,5 @@
-[{:adr/authoritative_for
+[{:db/id -1
+ :adr/authoritative_for
   ["kotobase の永続 index を full-snapshot Prolly Tree + novelty fold から immutable sorted run の Merkle-LSM へ移行する決定"
    "write path = epoch/barrier 単位の memtable flush、read path = memtable/L0/leveled run の MVCC multi-way merge"
    "compaction は graph 全体の4-index再構築でなく overlap key-range 単位とし、非重複CID blockを構造共有する"
