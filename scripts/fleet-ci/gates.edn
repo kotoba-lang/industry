@@ -86,6 +86,16 @@
   {:name "org-ietf-cbor" :gate :jvm-test :cd true}
   {:name "io-multiformats" :gate :jvm-test :cd true}
   {:name "io-ipld" :gate :jvm-test :cd true}
+  ;; The physical plane (ADR-2608160100): CARv2 bytes, the storage contract
+  ;; that describes where a block lives, and the packed block store over it.
+  ;; :jvm-test covers each repo's synchronous suite. What it does NOT cover is
+  ;; named here rather than left to be assumed: kotobase-storage-pack's
+  ;; Promise driver and its miniflare/R2 end-to-end need npm packages on the
+  ;; node, and kotobase-storage-s3's whole suite does (miniflare, shadow-cljs),
+  ;; so neither is gated yet.
+  {:name "io-ipld-car" :gate :jvm-test :cd true}
+  {:name "kotobase-storage" :gate :jvm-test :cd true}
+  {:name "kotobase-storage-pack" :gate :jvm-test :cd true}
   {:name "org-ietf-deflate" :gate :jvm-test :cd true}
   {:name "kotobase-block-codec" :gate :jvm-test :cd true}
   {:name "chain" :gate :jvm-test :cd true}
