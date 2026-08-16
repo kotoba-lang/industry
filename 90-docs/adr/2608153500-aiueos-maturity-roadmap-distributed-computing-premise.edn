@@ -527,6 +527,22 @@
 
    **これで 3 つの suite 連続で、判別パスが見つけたのは「弱い検査」ではなく「未検査の export」だった。** テストを書くことと、それが落ちることを確かめることは**別の作業**である。
 
+   ### send scheduler —— 4 モジュール 1 project、そして「一度も発火しなかった timer」（2026-08-16）
+
+   `org-ietf-tcp` `c4453c7`。**9/11 namespace** が Kotoba object を持つ。full suite は **224 tests / 38,484 assertions / 0 failures**。
+
+   `send_core` は pmtu・pacing・congestion を呼ぶ **4 モジュール project**。何も restate していない —— effective MSS を再計算する scheduler は、その規則が住む 2 つ目の場所になる。
+
+   **flight は `sack/pipe`（送信バイト − SACK 済み）であって queue のバイト数ではない。** SACK されたデータは既にネットワークを出ており受信側がそう言っている。in flight として数えると **recovery の残り全部で送り不足になる**。**どちらの namespace の自前テストもこれを捕まえられない —— 両者を合成していないから**である。だから test の queue は SACK 済み entry を持ち、**2 つの数が実際に違うことを先に assert してから**その差に依存する。
+
+   **Nagle は再 export した。** compiled artifact から届くのは project root の export だけなので、この object を持つ caller が Nagle 段を要ると **pacing-core を root にした 2 つ目の artifact**を持つことになり、**両者が別ソースからビルドされうる**。委譲は 1 行、代替は versioning 問題である。
+
+   ### ⚠ 5 つの破壊のうち 1 つが最初 0 —— suite 全体で timer が一度も発火していなかった
+
+   全ケースが queue を `now-ms 0` で push し `now-ms 10`・RTO 1000 で訊いていた。**「発火した timer は congestion window に優先する」（cwnd が 1 セグメントまで潰れたときに RFC 5681 が許す loss-recovery 1 本）が一度も実行されていなかった。** `now-ms` の次元に値を 1 つ足すと同じ改変が **168 赤**。
+
+   なお JVM が 2 回 `Method code too large!` でテストを拒否した（doseq 本体と直積そのもの）。**どちらもコンパイラの事実であってテストの事実ではない** —— 本体を関数へ、直積をデータへ出して解消した。
+
    **A2 を A3 より前に置く。**再現できないものは attest できず、attest できないものを『安全』として売れない。顧客に監査ログを見せる商品が、自分の出荷物を自分で再構築できないのは通らない。ネットワークが動く方が見栄えはするが、**再現性の無い OS が外部と喋り始めると、後から『いつから壊れていたか』を言えなくなる。**
 
    ## 4. 再利用の規律 —— 新しく書くのは『無いもの』だけ
