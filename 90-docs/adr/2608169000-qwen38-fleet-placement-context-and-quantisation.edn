@@ -116,10 +116,29 @@ ping は通り LAN の sshd も生きているのに、`authorized_keys` が tai
 `scripts/murakumo-default-model.cljs`（status / set / revert）に不変条件として
 埋め込んだ。`serve` は載る前に断り、載せたら本物の生成で確かめ、失敗したら自分で片付ける。
 
+## 決着（2026-08-16 セッション終了時点）
+
+* **ノードは全機復旧した。** dan / judah / levi はいずれも再起動しており
+  （`iogpu.wired_limit_mb` が 0 に戻っていた＝メモリ枯渇でカーネルごと落ちた証拠）、
+  dan は `tailscale up` で、judah と levi は自力で tailnet に復帰した。
+  levi が SSH で返した FileVault のプリブート画面は、その再起動の途中段階だった。
+* **帯域外経路を全 9 台に配備した。** gad の公開鍵を各 mini の authorized_keys に
+  `from=\"192.168.1.16\"` + forwarding 全無効で置き、パスワード認証を明示的に切った
+  状態で 9/9 の疎通を確認。`murakumo-nodes.cljs` は tailnet が落ちたら自動でこの
+  経路に落ち、audit に `[via-gad-LAN]` と出す。**ただしこの鍵は今回の 3 台を
+  救っていない** —— 落ちる前に置いておくことが唯一の要件。
+* **registry の乖離は解消した。** `alias-for: qwen3.8-27b`、`status` が
+  `registry: agrees with what is running` を返す。本 ADR 執筆時に書けなかった
+  `MURAKUMO_SERVICE_TOKEN` は別経路で入った（kagi には依然として無い）。
+* 測定に使った gguf は mini から撤去（dan/judah/benjamin で計 45GB 回収）。
+  重複 rpc-server(50053) も全機停止。
+
 ## 未解決
 
-* dan / judah / levi / zebulun にアクセスできない（前 2 台は本 ADR の作業で失った）
-* `api.murakumo.cloud` の registry メタデータが実態と乖離（alias-for / parallel /
-  vision / fleet / context）。`MURAKUMO_SERVICE_TOKEN` が kagi に無く書けない
-* gad の `:11434` に同一モデルの 2 つ目のプロセスが居る（legacy alias 用）。統合すれば
-  約 16GB 空くが、alias の利用者が未確認"}]
+* **zebulun のみ未到達。** セッション開始前から offline で、今回の作業とは無関係
+  （CLAUDE.md にも既知として記載がある）。帯域外鍵も置けていない
+* **legacy alias 2 本が落ちている。** `gemma-gad.gftd.ai` / `gemma-fleet.gftd.ai` を
+  配信していた gad の `llama-server.service`(:11434) が inactive。私が止めたのは
+  :8090 側だけで、こちらを止めた覚えはない。復旧するか :8090 へ統合するかは未判断
+  （統合すれば同一モデルの二重ロードが解消し gad の unified memory が約 16GB 空く）
+* `MURAKUMO_SERVICE_TOKEN` は kagi に無いまま。次に registry を書くときまた詰まる"}]
