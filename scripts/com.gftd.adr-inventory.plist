@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.gftd.adr-inventory</string>
+
+  <!-- ローカル Claude loop（superproject ADR-2608161700）。姉妹の
+       com.gftd.docs-edn-repair と同じ 2 段構え:
+         1) scripts/adr-inventory-tick.cljs が棚卸し候補を測る（決定論）
+         2) 候補があるときだけ claude -p "/adr-inventory" を起こす
+
+       2026-08-16 実測: listed 2242 / findings 229。1 反復 = 1 finding なので
+       8h 間隔だと約 2.5 か月、毎日だと約 8 か月。判断が要る仕事なので
+       docs-edn-repair と同じ 8h にはしない。1 日 1 件。
+
+       止め方:
+         launchctl bootout gui/$(id -u)/com.gftd.adr-inventory
+       候補だけ見る（モデルを起こさない）:
+         nbb --classpath ".:scripts/nbb_compat" scripts/adr-inventory-loop.cljs --dry-run -->
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/nbb</string>
+    <string>--classpath</string>
+    <string>.:scripts/nbb_compat</string>
+    <string>scripts/adr-inventory-loop.cljs</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/junkawasaki/github/com-junkawasaki</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>COM_JUNKAWASAKI_ROOT</key>
+    <string>/Users/junkawasaki/github/com-junkawasaki</string>
+    <key>HOME</key>
+    <string>/Users/junkawasaki</string>
+    <key>USER</key>
+    <string>junkawasaki</string>
+    <key>LOGNAME</key>
+    <string>junkawasaki</string>
+    <key>SHELL</key>
+    <string>/bin/zsh</string>
+  </dict>
+
+  <key>StartInterval</key>
+  <integer>86400</integer>
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/junkawasaki/.gftd/adr-inventory.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/junkawasaki/.gftd/adr-inventory.stdout.log</string>
+</dict>
+</plist>
