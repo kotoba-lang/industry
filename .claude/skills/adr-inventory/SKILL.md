@@ -76,7 +76,8 @@ ln -sfn ~/github/com-junkawasaki/node_modules "$W/node_modules"
    - 後続が自分で「残りの決定は生きている」と書いている
 2. **部分無効**なら、旧 ADR の status は触らない。本文先頭に 1〜2 文と
    `:adr/partially-superseded-by "<後続の adr/id>"` を足す。後続が複数で
-   部分の範囲が食い違うなら、直さず報告して終わる。
+   部分の範囲が食い違うなら、直さず報告して終わる。classifier は、その
+   pointer が後続を覆っていれば `:successor-unmarked` を再掲しない。
 3. **全置換**なら、`:adr/status` を `"superseded"` にし、
    `:adr/superseded-by` に **最終の後継 1 件**（後から出た、決定全体を
    置き換えた方）を書き、本文の Status 行を合わせ、「いつ・どの ADR が

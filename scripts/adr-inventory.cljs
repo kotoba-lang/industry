@@ -8,7 +8,9 @@
 ;; 検出する kind（安全な順。tick もこの順で候補を出す）:
 ;;
 ;;   :successor-unmarked     後続 ADR がこの文書を supersedes しているのに、
-;;                           本人の status が superseded でない
+;;                           本人の status が superseded でなく、かつ
+;;                           :adr/partially-superseded-by がその後続をまだ
+;;                           認めていない（部分無効の印があれば再掲しない）
 ;;   :superseded-without-pointer  status は superseded なのに pointer が空で、
 ;;                           後続がグラフから一意に決まる
 ;;   :superseded-ambiguous   同上だが後続が 2 件以上（推測して埋めてはいけない）
@@ -153,7 +155,9 @@
         suc-by (as-refs (or (:adr/superseded-by entity)
                             (:adr/superseded_by entity)))
         suc (as-refs (or (:adr/supersedes entity)
-                         (:adr/supersedes_by entity)))]
+                         (:adr/supersedes_by entity)))
+        partial (as-refs (or (:adr/partially-superseded-by entity)
+                             (:adr/partially_superseded_by entity)))]
     {:path rel
      :adr-id id
      :stamp (or (stamp id) (stamp rel))
@@ -162,6 +166,7 @@
      :keyword-status? (keyword? st-raw)
      :supersede-refs suc
      :superseded-by-refs suc-by
+     :partially-superseded-by-refs partial
      :body (:adr/body entity)}))
 
 (defn- ledger-ops? [body]
@@ -274,15 +279,21 @@
                   :note (str "同じ :adr/id を " (count rs) " ファイルが名乗っている")})))
 
       (doseq [r records]
-        (let [succs (get succ-map (:path r) [])]
-          (when (and (in-force? (:status r)) (seq succs))
+        (let [succs (get succ-map (:path r) [])
+              covered (->> (:partially-superseded-by-refs r)
+                           (keep (fn [ref]
+                                   (let [res (resolve-ref ref idx)]
+                                     (when-let [hit (:ok res)] (:path hit)))))
+                           set)
+              uncovered (vec (remove #(contains? covered (:path %)) succs))]
+          (when (and (in-force? (:status r)) (seq uncovered))
             (emit! {:kind :successor-unmarked
                     :path (:path r)
                     :adr-id (:adr-id r)
                     :stamp (:stamp r)
                     :status (:status r)
-                    :successors (mapv #(select-keys % [:path :adr-id :stamp :status]) succs)
-                    :note (if (> (count succs) 1)
+                    :successors (mapv #(select-keys % [:path :adr-id :stamp :status]) uncovered)
+                    :note (if (> (count uncovered) 1)
                             "後続が複数。全置換か部分無効か、どれが最終の後継かはモデルが本文を読む"
                             "後続が supersedes に書いている。全置換か部分無効かはモデルが本文を読む")}))
 
