@@ -3,7 +3,7 @@
   :adr/title "action log の L2 CID は chain.core/commit! が付ける。protocol は hash しない"
   :adr/status "accepted"
   :adr/date "2026-08-14"
-  :adr/last_verified "2026-08-14"
+  :adr/last_verified "2026-08-16"
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "protocol-l2-graph-cid"
   :adr/repos ["orgs/kotoba-lang/kotoba-protocol" "orgs/kotoba-lang/chain"]
@@ -43,7 +43,7 @@ accepted — 2026-08-14。正本は `kotoba.protocol.graph` の `log-state` / `c
 
 ## 置かないもの
 
-protocol への chain/ipld 依存。fake CID を protocol が発行すること。IPNI 専用 repo。discovery の live adapter は ADR-2608145500 で kad delegated routing に着地した。
+protocol への chain/ipld 依存。fake CID を protocol が発行すること。discovery の live lookup は ADR-2608145500 で kad delegated routing に着地した。IPNI origin 面は ADR-2608160300。
 
 hasher CID を kotobase `PUT /ipfs/:cid` の path にそのまま載せることは、この ADR の範囲外。archive は raw 専用なので Location は同じ bytes の raw CID でありうる（ADR-2608148200）。
 
@@ -51,4 +51,5 @@ hasher CID を kotobase `PUT /ipfs/:cid` の path にそのまま載せること
 
 2026-08-14: accepted。
 2026-08-14: IPNI live adapter は次の候補ではなく ADR-2608145500。
-2026-08-14: archive Location が identity CID と分かれうることは ADR-2608148200。"}]
+2026-08-14: archive Location が identity CID と分かれうることは ADR-2608148200。
+2026-08-16: 「IPNI 専用 repo」禁止を ADR-2608160300 が supersede。L2 hasher の境界は変わらない。"}]

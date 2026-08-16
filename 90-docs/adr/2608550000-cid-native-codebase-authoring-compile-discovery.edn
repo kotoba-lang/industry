@@ -95,6 +95,8 @@
    IPFS **Delegated Routing HTTP API v1**（`/routing/v1/providers/{cid}`、DHT + IPNI
    backed）で provider を引き、**trustless gateway**（`/ipfs/{cid}?format=raw`）から
    raw block を取る。全バイトを要求 CID に対して検証してから永続化する。
+   2026-08-16: IPNI の write（advertisement chain / cid.contact announce）と origin 面
+   `io-ipni-specs` は ADR-2608160300 で許可。本 ADR の read 経路は変わらない。
 
    ## L2.5 compile / effects / receipt（codebase-compile / codebase-effects）
 
@@ -272,4 +274,5 @@
    "kotoba-lang/kotoba/docs/ADR-kotoba-package-cid-lock.md"
    "2607279200-kotoba-clojure-shaped-safety-elaboration-migration"
    "2608039970-kotoba-datom-plane-not-datalog"
-   "2608039700-agent-loop-git-edn-datalad-source-of-truth"]}]
+   "2608039700-agent-loop-git-edn-datalad-source-of-truth"
+   "90-docs/adr/2608160300-ipni-origin-plane-utilization.edn"]}]

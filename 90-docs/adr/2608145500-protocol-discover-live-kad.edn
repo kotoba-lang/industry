@@ -3,21 +3,22 @@
   :adr/title "discovery の live lookup は kad delegated routing。CID は書き換えない"
   :adr/status "accepted"
   :adr/date "2026-08-14"
-  :adr/last_verified "2026-08-14"
+  :adr/last_verified "2026-08-16"
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "protocol-discover-live-kad"
   :adr/repos ["orgs/kotoba-lang/kotoba-protocol" "orgs/kotoba-lang/io-libp2p-specs-kad-dht"]
   :adr/related ["90-docs/adr/2608145400-protocol-l2-graph-cid.edn"
-                "90-docs/adr/2608145200-protocol-planes-two-link-kinds.edn"]
+                "90-docs/adr/2608145200-protocol-planes-two-link-kinds.edn"
+                "90-docs/adr/2608160300-ipni-origin-plane-utilization.edn"]
   :adr/authoritative_for
   ["kotoba.protocol.discover/lookup-live が discovery の live 継ぎ目"
    "kad.routing/find-providers が GET /routing/v1/providers/{cid} の quorum union"
    "provider record は CID を書き換えない"
    "protocol は kad に依存しない。finder は注入"
-   "IPNI 専用 repo は作らない。この process は DHT node ではない"]
+   "この process は DHT node ではない。IPNI origin 面は ADR-2608160300"]
   :source/dataset "adr"
   :adr/body
-  "ADR-2608145400 が次の候補とした IPNI live adapter は、IPNI repo を新設せず `io-libp2p-specs-kad-dht` の delegated routing に着地する。discovery は index であって identity ではない。
+  "ADR-2608145400 が次の候補とした IPNI live adapter は、当時は IPNI repo を新設せず `io-libp2p-specs-kad-dht` の delegated routing に着地した。lookup の現在地は今もここ。origin 面 `io-ipni-specs` と advertise の本番 write は ADR-2608160300。discovery は index であって identity ではない。
 
 ## Status
 accepted — 2026-08-14。正本は `kotoba.protocol.discover/lookup-live` と `kad.routing/find-providers`。
@@ -41,9 +42,10 @@ kad 側の record 形は protocol の `discover/record` と同じ convention（`
 
 ## 置かないもの
 
-IPNI 専用 repo。UnixFS path を identity に戻すこと。この process が DHT node であるという主張。kad への JSON / HTTP client 依存。書き込み（historic PUT）は ADR-2608145600。
+UnixFS path を identity に戻すこと。この process が DHT node であるという主張。kad への JSON / HTTP client 依存。書き込み（historic PUT）は ADR-2608145600。IPNI origin 面と本番 advertise は ADR-2608160300（2026-08-14 の「IPNI 専用 repo は作らない」はその条を supersede）。
 
 ## 改訂履歴
 
 2026-08-14: accepted。
-2026-08-14: advertise-live は ADR-2608145600。"}]
+2026-08-14: advertise-live は ADR-2608145600。
+2026-08-16: 「IPNI 専用 repo は作らない」を ADR-2608160300 が supersede。lookup の kad delegated routing 着地は維持。"}]
