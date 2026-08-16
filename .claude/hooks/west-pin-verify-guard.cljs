@@ -72,9 +72,27 @@
   [top & extra-args]
   (let [vscript (io/file top "scripts" "verify-west-pins.cljs")]
     (when-not (.exists vscript) (allow!))
-    (let [{:keys [exit out err]} (apply run (nbb-bin top) (.getPath vscript) "--dir" top extra-args)]
+    ;; **`--classpath` explicitly.** Without it nbb resolves `scripts.nbb-compat`
+    ;; against its own cwd, which is not necessarily `top`, and the require simply
+    ;; fails. Measured 2026-08-16: a push from a worktree was denied with the pin-
+    ;; regression message while the real output was
+    ;; `Could not find namespace: scripts.nbb-compat` -- the verifier never ran.
+    (let [cp (str top ":" (.getPath (io/file top "scripts" "nbb_compat")))
+          {:keys [exit out err]} (apply run (nbb-bin top) "--classpath" cp
+                                        (.getPath vscript) "--dir" top extra-args)
+          msg0 (str/join "\n" (remove str/blank? [out err]))]
+      ;; A verifier that could not LOAD exits 1 too, and that is indistinguishable
+      ;; from a verifier that found a pin regression. Denying is right either way --
+      ;; nothing has been verified -- but the reason must not claim a regression that
+      ;; was never observed, because the operator then goes looking for a bad pin.
+      (when (and (= 1 exit) (re-find #"Could not find namespace|Could not resolve symbol|SyntaxError" msg0))
+        (deny! (str "west.yml の pin 検証を**実行できませんでした**（検証器がロードできない）。"
+                    "pin 退行が観測されたわけではありません。\n\n" msg0
+                    "\n\nnbb の classpath は " cp
+                    " を渡しています。scripts/nbb_compat.cljs がこの checkout に在るか、"
+                    "sparse-checkout から漏れていないかを確かめてください。")))
       (when (= 1 exit)
-        (let [msg (str/join "\n" (remove str/blank? [out err]))]
+        (let [msg msg0]
           (deny! (str "west.yml の pin 検証に失敗しました(未 push commit / main 非到達 / pin 退行)。"
                       "main に載る前にブロックします。\n\n"
                       (if (> (count msg) 1500) (str (subs msg 0 1500) "\n…(truncated)") msg)
