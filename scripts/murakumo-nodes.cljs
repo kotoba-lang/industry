@@ -50,11 +50,45 @@
 ;; listening までは進み、最初の生成で Metal の command buffer が落ちた。
 (def headroom-mb 1536)
 
-(defn- sh! [host script & [timeout-s]]
-  (let [r (cp/spawnSync "ssh" (clj->js ["-o" "BatchMode=yes" "-o" (str "ConnectTimeout=" (or timeout-s 8))
-                                        host script])
-                        #js {:encoding "utf8" :maxBuffer (* 16 1024 1024)})]
+;; 各 mini の LAN アドレス。**tailnet が落ちたときの唯一の経路**なので、
+;; ここは名前解決に頼らず数字で持つ（DNS も tailnet の一部だから）。
+(def lan-ip
+  {"dan" "192.168.1.18" "asher" "192.168.1.22" "benjamin" "192.168.1.20"
+   "issachar" "192.168.1.23" "joseph" "192.168.1.17" "naphtali" "192.168.1.25"
+   "simeon" "192.168.1.24" "judah" "192.168.1.21" "levi" "192.168.1.26"})
+
+;; **帯域外(out-of-band)経路。** 2026-08-16 に dan / judah / levi の 3 台を同時に
+;; 失って分かったこと: このフリートは tailnet が唯一の経路で、その tailnet は
+;; メモリ枯渇の巻き添えで落ちる —— つまり**追い込んだ結果を確認する手段ごと失う**。
+;; gad は LAN で全 mini に届くので、gad の鍵を各 mini の authorized_keys に
+;; `from="192.168.1.16"` 付きで入れてある。tailnet が死んでもここから入れる。
+;; （judah と levi はこの鍵を置く前に落ちたので救えなかった。**健全なうちに置く**
+;;  ことがこの経路の唯一の要件。)
+(defn- ssh-args [host timeout-s]
+  ["-o" "BatchMode=yes" "-o" (str "ConnectTimeout=" (or timeout-s 8)) host])
+
+(defn- via-gad-args [host timeout-s script]
+  (when-let [ip (get lan-ip host)]
+    ["-o" "BatchMode=yes" "-o" (str "ConnectTimeout=" (or timeout-s 8)) "gad"
+     (str "ssh -o BatchMode=yes -o PasswordAuthentication=no -o StrictHostKeyChecking=no"
+          " -o ConnectTimeout=" (or timeout-s 8) " " host "@" ip " " (pr-str script))]))
+
+(defn- run-ssh [argv]
+  (let [r (cp/spawnSync "ssh" (clj->js argv) #js {:encoding "utf8" :maxBuffer (* 16 1024 1024)})]
     {:exit (or (aget r "status") 1) :out (str/trim (str (aget r "stdout"))) :err (str (aget r "stderr"))}))
+
+(defn- sh!
+  "tailnet で試し、届かなければ **gad 経由の LAN** で試す。
+   `:via` に :tailnet / :lan / :unreachable を返すので、呼び出し側は
+   『届いた』と『どの経路で届いた』を区別できる。"
+  [host script & [timeout-s]]
+  (let [direct (run-ssh (conj (ssh-args host timeout-s) script))]
+    (if (zero? (:exit direct))
+      (assoc direct :via :tailnet)
+      (if-let [fallback (via-gad-args host timeout-s script)]
+        (let [r (run-ssh fallback)]
+          (assoc r :via (if (zero? (:exit r)) :lan :unreachable)))
+        (assoc direct :via :unreachable)))))
 
 ;; --- 観測 -------------------------------------------------------------------
 ;; **macOS と Linux で書き分ける。** `pgrep -c` は macOS に無く（実測で usage が
@@ -104,10 +138,10 @@
      :load (js/parseFloat (or load "0")) :top1 (or (not-empty (str/trim (str top1))) "-")}))
 
 (defn- probe [host]
-  (let [{:keys [exit out]} (sh! host (if (= host head) head-probe mini-probe) 20)]
+  (let [{:keys [exit out via]} (sh! host (if (= host head) head-probe mini-probe) 20)]
     (if (or (not= 0 exit) (str/blank? out))
       {:unreachable true}
-      (parse-probe out))))
+      (assoc (parse-probe out) :via via))))
 
 (defn- cmd-audit! []
   (println (str (str/join "  " ["node      " "procs" "rss"  "availMB" "wiredMB" "load1" "biggest proc" "ports/managed"])))
@@ -119,6 +153,9 @@
                       (lpad (.toFixed (:rss-gb p) 1) 5) "G " (lpad (:free-mb p) 7) " "
                       (lpad (if (pos? (:wired-mb p)) (:wired-mb p) "-") 8) " "
                       (lpad (:load p) 6) "  " (pad (:top1 p) 18) " "
+                      ;; **どの経路で届いたかを出す。** tailnet が死んで LAN に
+                      ;; 落ちているノードは「届いている」が正常ではない。
+                      (if (= :lan (:via p)) "[via-gad-LAN] " "")
                       (str/join "," (:ports p))
                       (when (seq (:managed p)) (str " managed:" (str/join "," (:managed p))))))))
     ;; **低空きを黙って通さない。** 測っただけで終わると、次の人が同じ穴に落ちる。
