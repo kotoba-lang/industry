@@ -84,7 +84,7 @@ stamp が 2 ファイル以上に付いていたら `:unresolved-supersede-ref` 
 
 skill `adr-inventory` が正本。load-bearing な判断は **全置換 vs 部分無効**。
 
-- 後続が『半分 / のみ無効 / ledger 部分 / decision item N』と書いていれば、旧 ADR の status は触らない。`:adr/partially-superseded-by` と本文 1〜2 文だけ足す。
+- 後続が『半分 / のみ無効 / ledger 部分 / decision item N』と書いていれば、旧 ADR の status は触らない。`:adr/partially-superseded-by` と本文 1〜2 文だけ足す。classifier は、その pointer が後続を覆っていれば `:successor-unmarked` を再掲しない。
 - 後続が決定全体を置き換えていれば `:adr/status \"superseded\"` + `:adr/superseded-by` + 本文 Status 行。古い決定の記述は消さない。
 - ファイルは削除しない。不適切・無断着地でも残す（ADR-2607202500）。
 - 判断がつかなければ直さない。次の候補に飛ばない。
@@ -118,7 +118,7 @@ docs-edn-repair と同じ。間隔は **86400 秒（1 日 1 件）**。判断が
 
   着地前（`b1125af69`）は listed 2241 / findings 229。差は origin/main の前進と本 ADR、および下記 1 件目。
 
-  **1 件目を実行した**: `90-docs/adr/2606241600-shallow-depth1-git-default.edn` は `:successor-unmarked` の先頭ではなくなった。status は superseded、pointer は ADR-2607211600。次の先頭は `2606272330-kagi-clj-pqc-vault.edn`。
+  **2 件目（部分無効）を実行した**: `90-docs/adr/2606272330-kagi-clj-pqc-vault.edn`。後続 ADR-2607230100 は v0.5.0 の実装完了 close で、architecture decision は生きている。status は accepted のまま、`:adr/partially-superseded-by` を付けた。classifier はその後続を覆う pointer があれば `:successor-unmarked` を再掲しない。findings 231→230、successor-unmarked 113→112。次の先頭は `2606302100-shallow-depth-west-hybrid-amendment.edn`。
 
   2606241600 を superseded にした結果 `:cited-superseded` が 2 件出た（CLAUDE.md / AGENTS.md がこの stamp を引用）。経緯の引用は触らない。この loop の後のほうの kind。
 
