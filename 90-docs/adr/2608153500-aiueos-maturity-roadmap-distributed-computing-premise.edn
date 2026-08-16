@@ -649,6 +649,40 @@
 
    3 行目が A3 の本体であり、**そこだけ gate が無い。** upstream が直るまでこの非対称は残る。
 
+   ### 機械語に gate が付いた —— そして私の上流報告は誤りだった（2026-08-17）
+
+   前項で「gate は作れない、理由は upstream」と書いた。**その報告が誤りだった。**
+
+   `kototama.native.executor` は **commit `9114591` で既に直っていた**（`:loader-source-dir` / `KOTOBA_LOADER_SOURCE_DIR`）。私が読んだのは **amu が pin している古い sha** で、それを repo の main に対する不具合として報告していた。**checkout・pin・origin/main は 3 つの別物**という CLAUDE.md の規則を、依存ライブラリに対して破った形である。issue は訂正して close した（kototama-native#5）。
+
+   ### gate は landed した（`org-ietf-tcp` `d8c15e2`）
+
+   ```
+   machine code returned 15 and tcp.seq says 19
+   ```
+
+   `seq_core` の wrap mask を 2^32-1 から 2^31-1 に狭めると**赤になる** —— source 編集が、native コンパイル・署名・プロセス起動を経て誤答に到達する。**このリポジトリがずっと主張していて一度も検査していなかったループ**である。
+
+   実行できないときは**落ちる**。何も実行されていない機械で緑を返す native 実行テストは、**何もしなかったことを根拠に最強の主張を報告する**。evidence が `:native` であることも assert する —— インタプリタに落ちれば正しい数を返してしまい、この test の存在理由が消える。
+
+   ### 3 つの回避策、全部 upstream に出して file にも書いた
+
+   - **amu#612** → probe は `:require` ではなく flatten（process/ISA target が多モジュールを link しない）。実ファイルから毎回導出するので複製は drift しない
+   - **amu#611** → packing は `bit-or` ではなく `+`（bit-or は shift と同じ admission 集合、`seq_core` は `:bool` パラメータを持つ = 拒否される組）。5 値は互いに素な 2 冪
+   - **amu#614** → loader source dir は compiler の classpath resource から親を辿って発見（`tools/kexe_loader.c` が classpath に無い）。git 依存が展開ディレクトリであることに依存し、**壊れたら黙らず落ちる**
+
+   `kototama-native` は amu 経由ではなく**直接依存**にした —— amu は `:test` alias に持っており、library として使う側には渡らない。
+
+   ### 3 つの主張の現在地
+
+   | 主張 | gate |
+   |---|---|
+   | native target を通る | ✅ |
+   | KIR が `.cljc` と一致 | ✅ |
+   | **機械語が走って正しく答える** | ✅（**今日から**） |
+
+   full suite **233 tests / 39,064 assertions / 0 failures**。
+
    **A2 を A3 より前に置く。**再現できないものは attest できず、attest できないものを『安全』として売れない。顧客に監査ログを見せる商品が、自分の出荷物を自分で再構築できないのは通らない。ネットワークが動く方が見栄えはするが、**再現性の無い OS が外部と喋り始めると、後から『いつから壊れていたか』を言えなくなる。**
 
    ## 4. 再利用の規律 —— 新しく書くのは『無いもの』だけ
