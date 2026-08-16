@@ -301,6 +301,42 @@
 
    `call?` が `:bool` を `(= 1 v)` で復号していた（KIR は Clojure の boolean を返す）。結果、**true の側が全部落ち、false の側が全部通った** —— 26,091 中 9,418 赤。**半分が赤くなると object の parity 問題に見える**が、実際は harness の復号バグだった。現在は boolean 以外を受け取ったら throw する。
 
+   ### state machine の決定核も載せた —— そして native の本当の壁が出た（2026-08-16）
+
+   `tcp.state` は map 中心なので、murakumo の `*_core.kotoba` と同じく**決定核だけ**を切り出した（`org-ietf-tcp` `ba91c78`）。11 状態の遷移・返す応答・drop 理由の 3 つを 1 個の i64 に詰めて返す。connection map と segment vector の組み立ては `.cljc` に残る。
+
+   **2,482 parity assertion**（全状態 × FIN/SYN/RST/ACK/data の全組合せ × ACK と acceptability を両方向）。full suite は **28,573 assertion / 0 failures**。
+
+   ### native の壁は「packaging」でも「言語 subset」でもなかった —— compiler の bug（amu#611）
+
+   **i64 shift を含み、かつ `:bool` パラメータを持つ関数を export する module は、両 native ISA が拒否する。** どちらか片方なら通る。**shift は到達可能である必要すらない**（死んだ private 関数で足りる）。
+
+   ```clojure
+   (ns b (:export [f]))
+   (defn f [x :i64 p :bool] :i64 (if p (i64-shift-left x 4) 0))   ; → :kotoba/target-rejected
+   ```
+
+   これは wire code を直撃する —— **packing は shift を要求し、protocol の判断は bool の事実を取る**。同じ repo の `seq_core.kotoba` は bool パラメータを持たず native に載るので、境界がこのファイル側でないことは実測で分かる。
+
+   診断メッセージは string/record/variant/option/result の 5 種を名指しするが、**module にはそのどれも無い**。読み手は書いていない typed value を探しに行く。上流に最小再現つきで報告した（amu#611）。
+
+   ### 破れる gate かを 4 通りで確かめ、1 つが破れなかった
+
+   | 壊した内容 | 結果 |
+   |---|---|
+   | simultaneous close が別状態へ | 12 赤 |
+   | caller の `ack-ok` を信じる | 40 赤 |
+   | LISTEN の stray ACK に RST を返さない | 16 赤 |
+   | **unacceptable segment に ACK を返さず黙って捨てる** | **緑** |
+
+   4 つ目が収穫だった。unacceptable の検査は判定と drop 理由だけを見て**応答を見ていなかった**。黙って捨てる stack は peer に window を伝えないので、**接続は失敗ではなく停止する** —— 見つけるのに一週間かかる方の壊れ方である。応答も検査するようにしたら同じ改変が 56 赤になった。
+
+   ### parity が本物の食い違いも捕まえた
+
+   `.cljc` の `ack-ok` は「ACK を持ち**かつ** ISS+1 と一致」で、object は caller から独立した事実として受けていた。**16 赤、全部 SYN-SENT + 裸の RST** —— caller が誤って `ack-ok` を渡すと**認証されていない reset で接続を閉じる**。RFC 9293 §3.10.7.3 が存在する理由そのものである。object 側で flag を conjoin するように直した。
+
+   `compile-source`（このワークスペースの parity harness が全部使う入口）は **`:require` 節を拒否する**ので、依存を持つ module は project-linking API 無しには JVM テストから駆動できない。
+
    **A2 を A3 より前に置く。**再現できないものは attest できず、attest できないものを『安全』として売れない。顧客に監査ログを見せる商品が、自分の出荷物を自分で再構築できないのは通らない。ネットワークが動く方が見栄えはするが、**再現性の無い OS が外部と喋り始めると、後から『いつから壊れていたか』を言えなくなる。**
 
    ## 4. 再利用の規律 —— 新しく書くのは『無いもの』だけ
