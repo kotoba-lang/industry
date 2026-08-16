@@ -250,6 +250,37 @@
 
    **destructuring はこの道具では見えない** —— call head ではないため。前節の namespaced-keys の件は compile でしか出ない。
 
+   ### 22 件を恒久と一時に分けた（2026-08-16）
+
+   ADR-2608650000 は「`.kotoba` で書けないには 2 種類あり、混ぜると backend が追いついた後も自己制限を守り続ける」と定める。前節の 22 件をその規則で分類した。
+
+   **決め手は `guest-grammar.edn` の `:forbidden-heads`（31 名）**: `atom` `swap!` `reset!` `ref` `agent` `binding` `set!` `volatile!` `defmacro` `eval` `resolve` `require` `import` `new` `.` `..` `throw` `try` `catch` `future` `pmap` `send` `locking` `dosync` 等。**22 件のうちここに在るのは 0 件。** `surface-status.edn` の `:classification-rule` は `:default-for-missing :not-yet-implemented`（＝**安全禁止ではない**）と定めている。
+
+   | 区分 | 件数 | 内訳 |
+   |---|---|---|
+   | **恒久（安全不変条件）** | **1** | `Math/abs` — `:no-interop` = `:intentional-security-constraint`（*Arbitrary JVM/JS object and method access bypasses capability admission*）。source 側で `(if (< x 0) (- 0 x) x)` と書けば済む |
+   | **別名で既に在る** | 7 | `bit-shift-left`→`i64-shift-left` / `bit-shift-right`→`i64-shift-right`・`u64-shift-right` / `double`→`i64-to-f64-checked`・`i64-to-f64-rounded` / `set`→`typed-set-new` / `subvec`→`vector-drop` / `last`→`vector-at` / set-as-function `(#{…} x)`→`contains?` |
+   | **admitted な高階関数で書ける** | 4 | `remove`→`filter` + 否定述語 / `mapv`→`map` / `mapcat`→`map`+`concat` / `seq`→`empty?`・`count`（`:filter-function` `:map-function` とも 3 backend で `:implemented-partial`） |
+   | **本当に無い** | 10 | `max` `min`（i64）/ `mod` / `sort-by` / `vec` `into` `repeat` / `boolean` `true?` `false?` |
+
+   **`max`/`min` の欠落は設計ではなく非対称である** —— frontend には `f32-min` `f32-max` `f64-min` `f64-max` が在り、**i64 にだけ無い**。
+
+   **`boolean`/`true?`/`false?` は `:bool-is-a-type-not-a-number`（`:intentional-semantic-simplification`）の側にある** —— bool が型である以上、任意の値からの強制変換は意味を持たない。これは恒久寄りだが、`:forbidden-heads` には無い。
+
+   ### 「別名で在る」は実際にコンパイルして確かめた
+
+   内部の lowering 名にすぎない可能性があるので、`.kotoba` を書いて通した。`i64-shift-left` / `u64-shift-right` / `i64-to-f64-rounded` は **source から呼べる**。
+
+   その過程で**制約を 1 つ見つけた**: `i64 shift count must be an integer literal in [0,63]`。**変数のシフト量は書けない。**
+
+   TCP の shift は 6 箇所で、**4 箇所はリテラル、2 箇所が変数** —— どちらも RFC 7323 window scaling（shift はハンドシェイクで 0–14 に交渉される）。この 2 箇所だけは有界テーブルか有界ループに書き換える必要がある。**残り 4 箇所は今日そのまま通る。**
+
+   ### 結論 —— A3 の見積もりが変わる
+
+   **恒久に諦めるのは interop 1 件だけ**で、しかも 3 語で書き直せる。11 件は言語を 1 行も変えずに source を書き換えれば済む。言語側の追加が要るのは 10 件で、うち `max`/`min` は f32/f64 に既に在るものの i64 版である。
+
+   なお `lang/stdlib.edn` が宣言する `core.kotoba` の sha256 は実ファイルと一致した（`83f3eb9c…`）。
+
    **A2 を A3 より前に置く。**再現できないものは attest できず、attest できないものを『安全』として売れない。顧客に監査ログを見せる商品が、自分の出荷物を自分で再構築できないのは通らない。ネットワークが動く方が見栄えはするが、**再現性の無い OS が外部と喋り始めると、後から『いつから壊れていたか』を言えなくなる。**
 
    ## 4. 再利用の規律 —— 新しく書くのは『無いもの』だけ
