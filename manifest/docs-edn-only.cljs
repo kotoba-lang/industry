@@ -867,6 +867,23 @@
             (nc/exit 1)
             1)
 
+        ;; All three codes were observed on this repository on 2026-08-17, which
+        ;; is the first time the middle one was reachable at all. Until that day
+        ;; a split string in an ADR made the clause above fire on every run, so
+        ;; every sparse checkout reported FAIL and the CANNOT-ANSWER branch had
+        ;; never executed. Repairing that string (root da71299) made the other
+        ;; two observable:
+        ;;
+        ;;   full checkout   exit 0  edn=2628/2628  "no NEW breakage"
+        ;;   sparse checkout exit 2  edn=2457/2628  171 unreadable
+        ;;   either one      exit 1  when a real defect is found
+        ;;
+        ;; Worth keeping because the sparse run is the DEFAULT here, and it
+        ;; under-reports rather than failing loudly: on the same commit it said
+        ;; path-md-refs=20 where a full checkout says 22. The count line is the
+        ;; only thing that betrays it, and exit 2 is what stops the number being
+        ;; quoted as if it were the whole corpus.
+
         ;; Neither pass nor fail. The parse / split-string / path-ref checks read
         ;; file content, and content absent from this tree was not examined -- so
         ;; "nothing else is wrong" is not something this run is entitled to say.
