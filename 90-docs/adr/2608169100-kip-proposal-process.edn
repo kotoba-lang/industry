@@ -1,0 +1,161 @@
+[{:db/id -1
+  :adr/id "adr-2608169100-kip-proposal-process"
+  :adr/doc_type "adr"
+  :adr/topic "kip-proposal-process"
+  :adr/title "ADR-2608169100: kotoba-lang/kip — EIP/IPIP 相当の提案プロセスを、既存の器（ADR / authority-map / version-policy / kotoba-issue / kagami govern）の上に 1 枚だけ足す"
+  :adr/status "accepted"
+  :adr/date "2026-08-16"
+  :adr/last_verified "2026-08-16"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/repo ["orgs/kotoba-lang/kip"
+             "orgs/kotoba-lang/kotoba-lang"
+             "orgs/com-junkawasaki/root"]
+  :adr/related ["adr-2607061600-kotoba-issue-ledger-shared-libs"
+                "adr-2607160005-genpon-fleet-vcs"
+                "adr-2607171600-docs-edn-only-datascript"
+                "adr-2608136000-five-questions-before-writing-a-check"
+                "adr-2607300900-cicd-is-murakumo-fleet-not-github-actions"]
+
+  :adr/question
+  "kotoba-lang org に EIP / IPIP のような proposal の仕組みは設計されているか。無いなら足すか。"
+
+  :adr/measured
+  "{:date \"2026-08-16\"
+    :west-projects 4187
+    :name-grep {:query \"kip|eip|ipip|rfc|proposal|improvement\" :hits 0}
+    :repo-search {:queries [\"proposal\" \"improvement\" \"rfc\"] :process-repos-found 0}
+    :kotoba-lang-grep {:query \"improvement proposal|proposal process|RFC process\" :hits 0}
+    :existing-organs
+    {:adr {:kotoba-lang 43 :compiler 221 :superproject 2243
+           :note \"lang/surface-status.edn が既に「widening requires an ADR and fail-closed enforcement」と書いている\"}
+     :authority-map {:path \"kotoba-lang/kotoba-lang/docs/authority-map.edn\"
+                     :normative-authorities 7
+                     :note \"EIP editors 相当。しかも機械検査つきで EIP より強い\"}
+     :version-policy {:path \"kotoba-lang/kotoba-lang/lang/version-policy.edn\"
+                      :note \"180 日 deprecation 床 / removal-requires-major / 署名タグが profile を bind。EIP に無い層\"}
+     :kotoba-issue {:note \"issue -> proposal -> review -> merge -> audit の状態機械。対象は agent effect\"}
+     :kagami-govern {:note \"allow-list から threshold 署名。対象は west pin\"}}}"
+
+  :adr/body
+  "
+# ADR-2608169100: kotoba-lang/kip
+
+## 問い
+
+「今の kotoba-lang org に EIP, IPIP のような proposal の仕組みは設計されているか」
+
+## 測った結果
+
+**番号付き改善提案シリーズは無い。** west 4,187 project の名前を grep して 0 件、
+`repo-search` / `concept-lookup` で 0 件、`kotoba-lang/kotoba-lang` 内を
+`improvement proposal` / `proposal process` / `RFC process` で grep して 0 件。
+
+**ただし器はほぼ全部在り、3 つは EIP より強い。**
+
+| EIP/IPIP の役割 | 既に在るもの | 判定 |
+|---|---|---|
+| 提案文書 | ADR（kotoba-lang 43 / compiler 221 / superproject 2,243） | `surface-status.edn` が既に「ADR が要る」と書いている |
+| editors | `docs/authority-map.edn`（surface ごとの owner 7 件） | **EIP より強い** — 機械検査つき |
+| Final の代償 | `lang/version-policy.edn`（180 日床・removal-requires-major・署名タグ） | **EIP に無い** |
+| propose→review→merge の機構 | `kotoba-issue` + `kotoba-ledger` | 在る。対象は agent effect |
+| threshold 投票 | `kagami govern` | 在る。対象は west pin |
+
+## 決定
+
+**足りないのは 1 枚だけなので、1 枚だけ足す。** `kotoba-lang/kip` を起こし、
+既存の 5 つを置き換えずに参照する。
+
+足りなかったものを正確に言うと: **「誰かが考えている」と「決めて書いた」の間の
+状態が無い。** ADR は既に決めた側が書く文書なので、事前に第三者が異議を出す場所が
+構造的に存在しない。そして queue が無いので、**normative surface の変更が
+proposal を通ったかを検査するものも作れなかった。**
+
+### 何を作ったか
+
+- `lang/kip-process.edn` — machine-normative。states / transitions / guards /
+  diagnostics。`kips/kip-0000.edn` は同じことの人間可読版で、**食い違ったら EDN が
+  勝つ**（`semantics-ssot.md` と `guest-grammar.edn` の関係と同型）。
+- `lang/normative-surfaces.edn` — 16 パス。`:adopted` 7 件は authority-map の
+  転記（**この file が path を normative に昇格させることはしない**）、
+  `:proposed` 8 件は KIP-0001 の対象。全 16 パスの実在を 2026-08-16 に確認。
+- `kotoba/kip_gate_core.kotoba` — 判定の決定核。`:i64` / `:bool` / sealed record 2 つ
+  だけで、`kotoba-kir` の `only-native-word-typed-features?` に収まる。
+- `src/kotoba/kip/{core,registry}.cljc` — collection・IO・keyword 対応表。
+- `scripts/check-kips.cljs` — gate。
+
+### track と clock
+
+standards track だけが last-call と quorum を持つ。process / informational は
+editor が review から直接閉じる（その 2 track では **editor が当事者**だから）。
+
+**last-call は 14 日が下限。** clock がここの肝で、下限の無い window は著者の都合で
+閉じるので、無いのと同じ。14 日は「1 人が不在でも生き残る最短」で、それが
+last-call が防ぐ唯一の失敗モード。
+
+**`:editor` は常設委員会ではない。** その KIP が触る surface の authority owner の集合
+（`normative-surfaces.edn` 由来）。つまり**誰が進められるかは、何を変えるかの関数**。
+
+**`:quorum` は allow-list から 2 署名。** allow-list は superproject の
+`manifest/fleet-keys.edn :canonical :allow` を**参照する。複製しない** —
+鍵表が 2 つあることは「誰が署名してよいか」の答えが 2 つあること。
+
+## 正直に書いておく境界
+
+### 1. 署名検証は委譲していて、だから Final は 1 件も無い
+
+`quorum-signers` は optional な `:verify-fn` を取る。渡さなければ**主張された**
+署名者を数えるだけで `:verified? false` を返し、gate は
+`QUORUM-VERIFY skipped:no-verifier` を**独立した行**に出す（検査していない署名を
+pass に畳まないため）。kagami の ed25519 検証への配線は後続の KIP。
+
+**それまで KIP は正直には :final に到達できず、実際に 1 件も到達していない。**
+kip-0000 も kip-0001 も `:review`。
+
+### 2. coverage は fleet gate にしない
+
+「この normative surface の変更は KIP を通ったか」は**他 repo の git 履歴とこの
+registry を同時に**要る。fleet gate に配られるのは repo 1 個の tree だけ。
+
+これは既にこの workspace が犯した誤りで、`root-permit-index` は
+`orgs/cloud-itonami` を読む生成器を fleet gate にしたため、**約 300 回走って一度も
+緑になっていない**。入力を見られない gate は厳格なのではなく無言。
+
+したがって coverage は operator 側の `scripts/verify-kip-coverage.cljs` に置き、
+**入力が無いときは exit 2（答えられなかった）**で終わる。fleet gate として登録するのは
+kip repo 自身の registry 整合性だけ（そちらは入力が同じ tree に在る）。
+
+### 3. ADR を置き換えない
+
+KIP は決定の**前**に立つもので、ADR は決定を記録するもの。Final KIP の後には
+通常それを実装する repo の ADR が続く。`kotoba-issue` / `kotoba-ledger` とは
+語彙を convention で共有し、**コード依存はしない**（あの 2 つが互いにそうしているのと
+同じ理由）。
+
+## 実測（主張ではなく）
+
+- **45 tests / 166 assertions / 0 failures.** parity test は実際の `.kotoba` を
+  compile し、**全交差**（441 state×role×track + 160 guard）を掃く。標本ではない。
+  さらに**意図的に壊した copy** を compile して、sweep が捕まえること、かつ
+  **flip した case が壊した箇所と一致すること**（track 0/1 のみ、track 2 は無傷）を
+  assert する —— 「壊し方を間違えた赤は成功した実演に見える」への対策。
+- **gate は 4 方向すべて実演済み**: healthy=0 / 空 registry=2 / process file 欠落=2 /
+  重複番号=1（両方のファイル名を出す）。
+- **SURFACE-DRIFT を実際の authority-map に当てて ok**（7 authorities が一致）。
+- **`max-parameters` は 5**（amu `1e21a1f`）。12 引数の `transition-code` は `:subset` で
+  `:kotoba.error/max-parameters` として拒否された。sealed record 2 つで 12 field を
+  2 引数に通した。**bitmask に詰めるのは誤答** —— murakumo が T5.3 で逆向きに
+  （packing → record）移した後だから。`record-new` は special form でこの上限の対象外
+  （`max-record-fields` は 32）。
+
+## Consequences
+
+- `orgs/kotoba-lang/kip` を west に登録（`:extra-projects` + `--entry kip`）。
+- `manifest/concept-vocabulary.edn` に `kip` を追加（名前が acronym で機能を示さないため）。
+- fleet-ci に `kip-registry` gate を 1 本追加。
+- `kotoba-lang/kotoba-lang` の `docs/authority-map.edn` に `:change-process` authority を
+  追加し、両方の宣言を一致させる（KIP-0001 の一部）。
+- **KIP-0001 が Final になるまで、何も強制されない。** それが正しい順序で、
+  この ADR 自身も KIP を通っていない（process がまだ Final ではないため）。
+"}]

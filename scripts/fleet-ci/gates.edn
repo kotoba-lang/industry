@@ -549,6 +549,26 @@
    :script "gates/west-pin-policy-check.cljs"
    :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
 
+  ;; kotoba-lang/kip — KIP registry integrity (ADR-2608169100). Numbering,
+  ;; statuses, cumulative field requirements, dangling references, and quorum on
+  ;; any :final standards KIP.
+  ;;
+  ;; The logic is NOT here: this gate runs the repo's own scripts/check-kips.cljs.
+  ;; Two implementations of one check is how "green on one side only" happens.
+  ;;
+  ;; Deliberately NOT covering "did a normative surface change without a KIP" —
+  ;; that needs another repo's git history plus this registry, and a fleet gate
+  ;; gets one tree. It lives at scripts/verify-kip-coverage.cljs, operator-side.
+  ;; root-permit-index is what happens otherwise: ~300 runs, never green,
+  ;; because its input is not in the tree it is handed.
+  ;;
+  ;; :include-ext must carry .cljc — the checker's namespaces are .cljc, and a
+  ;; filter that drops them produces a gate that cannot load its own logic.
+  ;; Measured 2026-08-16: 10 files match, hence the floor of 8.
+  {:name "kip" :id "kip-registry" :org "kotoba-lang" :gate :nbb-script
+   :script "gates/kip-registry-check.cljs"
+   :include-ext [".edn" ".cljs" ".cljc"] :min-files 8 :cd false}
+
   ;; 成熟度向上 loop の鮮度判定（ADR-2608052000 / ADR-2608080000 の loop）。
   ;;
   ;; 壊しても loop は普通に動き続ける —— tick は毎周 exit 0 で順位を出し、ranked も
