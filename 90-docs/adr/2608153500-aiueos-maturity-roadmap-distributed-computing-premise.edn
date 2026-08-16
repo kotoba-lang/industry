@@ -597,6 +597,32 @@
 
    15 箇所は**全部 1 箇所で捕まっている** —— `server.clj:61` の `(catch Exception _ formerr-response)`。つまり `bad hex digit` / `invalid IPv4 address` / `unknown RR type` という**区別された情報は全部そこで捨てられている**。`[:result T E]` へ移すと**その情報は保存される**。ただし blanket catch は「想定外の失敗も FORMERR にする」堅牢性でもあり、Result 化は新しい失敗経路を明示的に通す義務を生む。**費用と利益の両方がある取引で、片方だけではない。**
 
+   ### 機械語が実際に走り、参照実装と同じ答えを出した（2026-08-16）
+
+   ここまでの主張は全部「**コンパイルできる**」と「**KIR インタプリタが `.cljc` と一致する**」だった。**そのどちらでもない主張**を得た。
+
+   `tcp.seq` の Kotoba object に、2^32 の wrap を跨ぐ 5 つの問いを 1 つの i64 に詰める `main` を足し、**署名 → runtime 測定 → loader 生成 → native 実行**まで通した:
+
+   ```
+   TARGET    :aarch64-kotoba-v1
+   STATUS    :ok
+   RESULT    19
+   EXECUTION :native
+   ```
+
+   **`.cljc` の oracle も 19**（`acceptable?`=true / `lt? 2^32-1 0`=true / `lt? 0 2^32-1`=false / `ordered?` antipode=false / `wrap -1`=4294967295）。**この CPU 上で走った機械語が、参照実装と同じ答えを出した。**
+
+   経路は `kototama.native.executor` の `measure-runtime` → `signing/sign` → `execute`（`compiler` repo の `native_executor_test.clj` と同型）。receipt には loader の source sha256 が入る。
+
+   ### この作業自体が #611 と #612 を実地で踏んだ
+
+   - **#612**（process target が多モジュールを取らない）→ probe を**単一ファイルにせざるを得なかった**。`seq_core` を丸ごと 1 ファイルに畳んだ
+   - **#611**（shift + `:bool` パラメータ）→ **`bit-or` で 5 ビットを詰めたら native が module 全体を拒否した**。`seq_core` は `segment-end` に `:bool` パラメータを持つので、`bit-or`（shift と同じ admission 集合に居る）を足した瞬間に組が成立する。5 値は互いに素な 2 冪なので `+` に置き換えた —— **ここでは同じ関数**である
+
+   **どちらも設計文書の中の抽象な制約ではなく、5 行の probe を書くだけで両方踏んだ。** これが「A3 は実機で測る」の意味である。
+
+   **次**: これを常設 gate にする。今日の実行は手で組んだ 1 回きりで、**回帰を捕まえるものは何も無い。**
+
    **A2 を A3 より前に置く。**再現できないものは attest できず、attest できないものを『安全』として売れない。顧客に監査ログを見せる商品が、自分の出荷物を自分で再構築できないのは通らない。ネットワークが動く方が見栄えはするが、**再現性の無い OS が外部と喋り始めると、後から『いつから壊れていたか』を言えなくなる。**
 
    ## 4. 再利用の規律 —— 新しく書くのは『無いもの』だけ
