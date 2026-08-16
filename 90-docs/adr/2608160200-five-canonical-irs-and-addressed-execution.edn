@@ -197,17 +197,39 @@ State / Transaction / Capability / CausalLink / Effect の形は全 backend で�
 
 ## いま着地したもの / まだのもの
 
-**着地**: この ADR（語彙と所有者の固定）。ADR-2608160100 との接続。
+**着地**（2026-08-16）:
 
-**未着地**（順序つき。上から依存する）:
+| 一手 | どこに | 実際に landed したもの |
+|---|---|---|
+| receipt を値にする | `kototama` `linear-journal` | 各行が自分のバイト列の **raw CIDv1** で addressed。`entry-cid` / `canonical-line` はファイルだけから再計算できる |
+| journal を parent-linked chain に | 同上 | `:prev` + `verify-chain`。改竄・削除が**どこで**壊れたか言う。`:prev` の無い旧 journal は *unchained prefix* として報告し、腐敗とは呼ばない（呼べば既存の全 journal で検査が無意味になる）。ただし chained entry から `:prev` を剥がすのは legacy として受理しない —— その抜け道が偽造経路になる |
+| Execution 値と memo 可否 | `kototama` `execution` | `execution-cid` は常に答え（memo できない実行も引用できる）、`memo-key` は replay 可能なときだけ CID を返す。**2 関数に分けたのはフラグが無視できるから** |
+| `:tx/authority` `:tx/causes` | `chain` | `causes` は他 principal の系列からの**親**。`authority` が無いと監査は「誰が」で止まり「なぜ許されたか」に届かない |
+| principal ごとの causal DAG | `chain` | `walk-causal` / `verify-causal`。`lamport` は親の `1 + max` として**導出**し caller から受け取らない —— 時計が辺と食い違えない |
+
+**at-most-once は 1 ミリも動いていない。** content addressing は冪等性ではない ——
+CID は二重実行を止めず、file lock と fsync と count が止める。journal の既存テスト
+（budget 3 に対して 32 並行 claim → ちょうど 3）は**無改変で通る**。
+
+**既存 commit の identity も動いていない。** `chain` の追加フィールドは渡された
+ときだけ書かれ、変更前の実装から採った 2 つの CID をテストに固定してある。既存 8
+テストは無改変で通る。
+
+**replay 可能とは何か**（`memo-key` が nil を返さない条件）:
+**source**（clock / 乱数 / ネットワーク読み）は**値**が記録されていること ——
+`:outcome :ok` は「呼んだ」と言っているだけで「何が返ったか」を言っておらず、
+`:ok` に対して replay すれば答えを捏造する。**sink** は outcome。そして
+**分類されていない effect kind は memo を拒否**する（`capability-semantics.edn` の
+`:unknown-kind :deny` をここに当てたもの —— 見慣れない effect が「見慣れないことに
+よって」cacheable になってはならない）。
+
+**未着地**:
 
 | 次の一手 | 置き場所 |
 |---|---|
-| receipt を IPLD 値にする（既存 4 field をそのまま） | `kototama` `linear-journal` |
-| journal を parent-linked chain に | `kototama` + `chain` |
-| Execution 値と、memo 可否の判定（effect set が空 or 完全記録） | `kototama` |
-| `:tx/authority` `:tx/causes` を transaction に足す | `kotobase` / `chain` |
-| principal ごとの causal DAG（複数親 + logical clock） | `chain` |
+| receipt に `capability-semantics.edn` の 4 field（`:receipt/cap` `:receipt/at` `:receipt/call` `:receipt/outcome`）を実際に載せる —— 今の journal が記録しているのは**消費であって outcome ではない** | `kototama` |
+| receipt を dag-cbor にする（generic tooling が field を読めるように）。CBOR 依存を zero-dep の repo に持ち込むので**読み手が現れてから払う** | `kototama` |
+| 署名。`chain` は `authority` の shape しか検証しない（grant の正当性判断は aiueos） | `aiueos` 境界 |
 | UCAN / CACAO adapter を core から adapter 面へ寄せる | 境界 repo |
 
 **どれも `.kotoba` の決定核として書けるかを先に見る**（ADR-2608650000）。
