@@ -185,6 +185,26 @@
 
    **53 object は凍結コンパイラのまま。A2 は閉じていない —— 4 つ閉じて、残り 53 に必要な手順を実証した。**
 
+   ### `.cljc` を native に載せる距離を測った（2026-08-16）
+
+   A3 に必要な DHCP・DNS・TCP は `.cljc` で揃った。**それを bare-metal に載せる距離**を、`kotoba-lang/org-ietf-tcp` の 10 namespace を実際にコンパイルして測った（compiler `a635509e`、`amu compile --target x86_64-kotoba-v1`）。
+
+   **`amu` は `.cljc` を受け取る**（usage が `.kotoba|.cljk|.cljc` と書いており、実際に読む）。壁は拡張子ではない。
+
+   測った結果は 3 種類に分かれ、**うち 1 種は私の測り方の欠陥**である:
+
+   | 分類 | 件数 | 内容 |
+   |---|---|---|
+   | **本物の subset gap** | 2 | `seq`: `max` に admitted な型シグネチャが無い（stdlib にも無い）。`options`: top-level の計算済み定数（`(* 24 24 60 60 1000)`）が『closed bounded な整数/文字列/keyword/boolean』でないと拒否される |
+   | **reader が入力を拒否** | 4 | `congestion` / `pacing` / `pmtu` / `rto`。`:code :kotoba/source-read-failed` で行番号が出ない。**未調査** —— `Math/abs` 等の interop か、namespaced-keyword destructuring が候補だが**確かめていない** |
+   | **probe の欠陥** | 5 | `reassemble` / `retransmit` / `sack` / `send` / `state` が『`s/+seq` は登録された capability ではない』で落ちた。**これは gap ではない** —— probe が `:export` 節を足すために `:require` 節を剥がしたので、alias が解決できなくなっただけ。**この 5 件を証拠として引用しない** |
+
+   **`:export` 節は必須**（`only a bounded :export vector is admitted in namespace clauses`）。可搬 `.cljc` はこれを持たないので、native に載せるには ns 節を書き足す必要がある。
+
+   **multi-file の閉じたグラフは CLI から測れなかった。**`project_files.clj` と `source_path.cljc` は compiler に実在するが、`amu compile` は `--source-path` を公開しておらず（`module-lock` だけが持つ）、**複数ファイルの `:require` グラフが native target で通るかは未測定のまま**である。上の「probe の欠陥」5 件はここに帰着する。
+
+   **したがって現時点で言えること**: 単一ファイル・依存なしの `.cljc` は、`:export` を足せば native target にほぼ載る。落ちるのは stdlib の穴（`max`）と定数式の 2 点。**複数ファイルについては何も測れていない。**
+
    **A2 を A3 より前に置く。**再現できないものは attest できず、attest できないものを『安全』として売れない。顧客に監査ログを見せる商品が、自分の出荷物を自分で再構築できないのは通らない。ネットワークが動く方が見栄えはするが、**再現性の無い OS が外部と喋り始めると、後から『いつから壊れていたか』を言えなくなる。**
 
    ## 4. 再利用の規律 —— 新しく書くのは『無いもの』だけ
