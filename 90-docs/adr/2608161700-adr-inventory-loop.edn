@@ -120,9 +120,21 @@ docs-edn-repair と同じ。間隔は **86400 秒（1 日 1 件）**。判断が
 
   **2 件目（部分無効）を実行した**: `90-docs/adr/2606272330-kagi-clj-pqc-vault.edn`。後続 ADR-2607230100 は v0.5.0 の実装完了 close で、architecture decision は生きている。status は accepted のまま、`:adr/partially-superseded-by` を付けた。classifier はその後続を覆う pointer があれば `:successor-unmarked` を再掲しない。findings 231→230、successor-unmarked 113→112。
 
-  **3 件目（全置換）を実行した**: `90-docs/adr/2606302100-shallow-depth-west-hybrid-amendment.edn`。後続は ADR-2607211600 1 件（hybrid `:heavy` shallow を撤回し full history 既定）。status を superseded にし pointer を付けた。本文の 2026-07-22 supersede 記録は既にあった。classifier: listed 2245 / readable 2239 / findings 227 / successor-unmarked 111。次の先頭は `2606302300-org-taxonomy-4-orgs.edn`。
+  **3 件目（全置換）を実行した**: `90-docs/adr/2606302100-shallow-depth-west-hybrid-amendment.edn`。後続は ADR-2607211600 1 件（hybrid `:heavy` shallow を撤回し full history 既定）。status を superseded にし pointer を付けた。本文の 2026-07-22 supersede 記録は既にあった。classifier: listed 2245 / readable 2239 / findings 227 / successor-unmarked 111。
 
   2606241600 を superseded にした結果 `:cited-superseded` が 2 件出た（CLAUDE.md / AGENTS.md がこの stamp を引用）。経緯の引用は触らない。この loop の後のほうの kind。
+
+  **closing（2026-08-16、origin/main を再測）**: この session の 3 件は main に居る（`e1ffbed73e7` / `98559a1db4c` / `5580ffac324`）。その後、別 session が先頭 3 件を着地させた: 2606302300 全置換（`4790ae6b065`）、2607022200 部分無効（`3ecc753eb98`）、2608150100 の偽 supersedes を空にした（`684e021c24a`。被害者 2607022330 は無改変）。cited-superseded は 2606302300 の経緯引用で 2→4。
+
+    listed 2245 / readable 2239 / findings 226 / outcome candidates
+      successor-unmarked 108
+      unresolved-supersede-ref 14
+      id-collision 24
+      status-body-mismatch 31
+      ledger-ops-instruction 45
+      cited-superseded 4
+
+  次の先頭は `2607023200-isekai-network-standalone-repo.edn`（後続 2607032400）。resume: `COM_JUNKAWASAKI_ROOT=<worktree> nbb scripts/adr-inventory.cljs --edn` の `:next`。launchd は未配置。ファイル削除はしない（git は旧版の履歴であり、path identity の代用ではない）。
 
   同じ一覧に `2607173000-fleet-babashka-to-nbb.edn` と `2607181900-kbb-kotoba-script-host-priority.edn` が居る。後続は ADR-2607257000 で、**ledger 半分だけ**を無効化している。ここを status superseded にすると nbb-only / kbb roadmap が死ぬ。skill の部分無効ゲートがこれを止める対象。launchd は、そこを正しく残した 1 周のあと。
 
