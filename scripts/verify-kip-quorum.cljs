@@ -152,15 +152,39 @@
 (when (zero? (count kips))
   (bail! 2 "no readable KIPs — refusing to report on an empty registry"))
 
-(def targets
+;; A quorum is a standards-track thing. :process and :informational KIPs are
+;; closed by the editors of what they touch and carry no signatures at all, so
+;; asking them for a quorum reports a designed-in absence as a failure.
+;; Measured 2026-08-16: with kip-0000 (:process) admitted, this rejected it for
+;; :quorum-not-met and took the whole run to exit 1 -- which then made
+;; verify-kip-coverage.cljs refuse a verdict. Read the flag from the process
+;; authority rather than hardcoding the track names.
+(def process-authority
+  (let [f (path/join kip-root "lang" "kip-process.edn")]
+    (when (fs/existsSync f)
+      (edn/read-string (fs/readFileSync f "utf8")))))
+
+(defn- needs-quorum? [kip]
+  (get-in process-authority [:tracks (:kip/track kip) :requires-quorum] true))
+
+(def selected
   (cond->> kips
     (flag-value "--kip") (filter #(= (flag-value "--kip") (:kip/id (second %))))
     (not (flag? "--all")) (filter #(= :final (:kip/status (second %))))))
 
-(say "FINAL-KIPS" (count targets))
+(def exempt (remove #(needs-quorum? (second %)) selected))
+(def targets (filter #(needs-quorum? (second %)) selected))
+
+(when (seq exempt)
+  (doseq [[f kip] exempt]
+    (say "NO-QUORUM-REQUIRED" (:kip/id kip) f
+         (str (name (:kip/track kip)) " track — :requires-quorum false"))))
+
+(say "FINAL-KIPS" (count targets)
+     (str "(" (count exempt) " exempt by track)"))
 
 (when (zero? (count targets))
-  (bail! 0 "no :final KIPs to verify."
+  (bail! 0 "no :final KIPs that require a quorum."
          "That is the current state of the registry, not a verification of anything:"
          "nothing has been admitted, so nothing needed a quorum. Pass --all to check"
          "signatures on KIPs that are not yet Final."))
