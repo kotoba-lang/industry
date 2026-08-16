@@ -29,14 +29,20 @@
 
 (defn matching-concepts
   "問い合わせ語 → 概念。綴りとの部分一致を両方向で見る（`term` で
-   `terminal-emulator` に、`terminal emulator` で `terminal` に届く）。"
+   `terminal-emulator` に、`terminal emulator` で `terminal` に届く）。
+
+  `:query-spellings` も見る。**問いとして良い語と、索引の鍵として良い語は
+  別**である —— `proposal` はまさに人が訊く語だが、README に書かれた
+  `proposal` を全部拾うと 94 repo に当たって答えが埋まる（実測 2026-08-16、
+  `:kip` に `proposal` を綴りとして入れた直後に 99 件返した）。索引するのは
+  `:spellings` だけ、問いを受けるのは両方、という非対称をここで作る。"
   [q]
   (let [l (str/lower-case q)]
-    (keep (fn [[c {:keys [spellings]}]]
+    (keep (fn [[c {:keys [spellings query-spellings]}]]
             (when (or (str/includes? (name c) l)
                       (some #(let [s (str/lower-case %)]
                                (or (str/includes? s l) (str/includes? l s)))
-                            spellings))
+                            (concat spellings query-spellings)))
               c))
           vocab)))
 
