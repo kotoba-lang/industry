@@ -709,6 +709,37 @@
 
    `kototama-native` は 3 repo とも**直接依存**（amu は `:test` alias に持ち、library 利用者には渡らない）。
 
+   ### 13 object は 1 つも aiueos の kernel object になれない（2026-08-17）
+
+   3 プロトコルの決定核が機械語として gate されたので、**OS がそれを呼べるか**を測った。**呼べない。**
+
+   `aiueos` の kernel object は **1 シンボルだけを export し、他の object を呼べない**（ADR-0030）。README がその代償を明記している —— *shared guards are repeated rather than factored*。IPv4 checksum が 2 箇所、`cpuid` object が 3 つ、というのが実例である。
+
+   私が作った 13 object の実測: **export 合計 106、うち 6 object が `:require` を持つ。1 つも kernel object の形に合わない。**
+
+   | | |
+   |---|---|
+   | objects | 13 |
+   | exports | 106 |
+   | `:require` を持つもの | 6 |
+   | kernel object の形に合うもの | **0** |
+
+   ### これは amu#612 と同じ壁を OS 側から見たもの
+
+   compiler の process/ISA target が多モジュールを link しないのと、kernel object が互いを呼べないのは、**同じ「link が無い」という事実の 2 つの面**である。私の core が生きているのは link が効く空間（wasm32 / `*-kotoba-v1` artifact）で、**kernel はそこに含まれない。**
+
+   ### A3 の現在地は、これで正確に言える
+
+   **プロトコルの決定は機械語として gate されている。そして OS はそれを呼べない。**
+
+   橋を架ける道は 3 つで、どれも安くない:
+
+   - **1 決定 1 object に割る** —— 106 object になり、helper は object ごとに複製される（aiueos が既に払っている代償を 106 回払う）
+   - **kernel object model を変える** —— link を入れる。ADR-0030 の判断を覆す設計変更
+   - **二重実装のまま**（今の状態）—— kernel は probe 水準の `tcp-segment-valid` を持ち、それは**意図的に sequence acceptability を検査しない**（*the arity is spent*）。つまり今日の OS は RFC 9293 §3.10.7.4 を実装していない
+
+   3 つ目が現状であり、**それを二重実装と呼ぶのは正確ではない** —— kernel 側は同じ判断の劣化版ではなく、**別の、より弱い判断**をしている。
+
    **A2 を A3 より前に置く。**再現できないものは attest できず、attest できないものを『安全』として売れない。顧客に監査ログを見せる商品が、自分の出荷物を自分で再構築できないのは通らない。ネットワークが動く方が見栄えはするが、**再現性の無い OS が外部と喋り始めると、後から『いつから壊れていたか』を言えなくなる。**
 
    ## 4. 再利用の規律 —— 新しく書くのは『無いもの』だけ
