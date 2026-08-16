@@ -267,19 +267,41 @@ S3 adapter は元の意味（「手渡す URL が Range を honour する」）�
 honour する（fetch は他所で起きるので**ここでは検査できない**）。
 packed block store が要るのは前者。
 
-**実測（この ADR の主張そのもの）**: 100 link の cons chain を、hydrate loop が
-そうせざるを得ないとおり 1 link 1 回の `-get-blocks` で辿る:
+**⚠ 訂正（2026-08-16、同日）—— この ADR の当初の動機は誤っていた。**
 
-| | requests | bytes fetched |
-|---|---|---|
-| `:window-bytes 0`（read-ahead 無し） | **100** | 8,730 |
-| 既定（1 MiB window） | **1** | 12,760 |
+当初ここには「100 link の cons chain が 1 request になる」と書いた。その測定は
+100 block を **1 回の `-put-blocks!`** で書いており、つまり **1 pack** に入れて
+いた。1 pack は co-location であり、co-location こそ packing が買うものなので、
+**測定が答えを仮定していた**。
 
-JVM と nbb で同値。**packing だけでは 100 のままである** —— 効くのは
-「1 回目の fetch が frame ではなく window を取る」ことで、chain は論理的に逐次の
-まま network の逐次性が消える。この上の行も実テスト
-（`without-a-window-the-chain-costs-one-request-per-link`）であり、良い方の数字
-だけを出す suite は「packing 一般」の証拠になってしまう。
+production の novelty は **1 transaction が 1 cons cell を追記する** chain である
+（`kotobase-peer` の `dag_shape_bench` の novelty-shape が
+`{"e" tx-link "rest" rest-link}` と記述している）。この ADR の write-locality
+（1 commit = 1 pack）の下では、**各 cell は自分だけの pack に入る**。
+
+| 100 link を 1 link ずつ辿る | requests |
+|---|---|
+| 100 block を 1 回で書いた（= 1 pack）、window 無し | 100 |
+| 100 block を 1 回で書いた（= 1 pack）、1 MiB window | **1** |
+| **1 commit ずつ書いた（production の形）** | **100** |
+
+3 行目が実測値である（`kotobase-storage-pack` の
+`a-chain-built-one-commit-at-a-time-is-not-co-located`）。**block-per-object と
+同じ**であり、window は 1 つの object の中で前方に伸びるだけで、前任は別 object
+にある。
+
+**したがって「packing が hydration の逐次項 97% に効く」は成り立たない。**
+残る主張はもっと狭い:
+
+> **packing が買うのは commit-local な読みである。** 1 commit が書いた 12 block
+> —— transaction block、更新した prolly-tree page、その novelty cell —— は
+> 1 pack であり、read-ahead 無しでも 1 request になる（実測）。
+
+**cross-commit の pointer chase を平らにするには別のものが要る**: novelty の
+fold（chain を co-locate するのではなく無くす）か、read-locality で詰め直す
+compaction。**どちらもまだ設計していない。** 下の「read-locality と write-locality
+が食い違う場合は実測してから compaction を書く」は、この実測を待っていた条項で
+あり、実測はこれである。
 
 **window は取引である。** 100 → 1 の代償は転送 +46%。`stats` が `:requests` と
 `:bytes-fetched` を必ず並べて返すのはそのため。
