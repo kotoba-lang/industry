@@ -112,16 +112,32 @@
                        (when (zero? exit) (str/trim out)))))))
 
 (defn- changed?
-  "Did `path` differ between base and HEAD in `dir`? nil means could not tell.
-
-  Symmetric on purpose: `base..HEAD` reports the file whether the change is
-  local (about to land) or upstream (already landed while this checkout sat
-  still). Both are cases where the surface moved across the interval being
-  examined, and deciding which side moved would need an ancestry judgement that
-  is exactly what a shallow clone gets wrong — so that is refused above instead."
+  "Did `path` differ between base and HEAD in `dir`? nil means could not tell."
   [dir base path]
   (let [{:keys [exit out]} (git dir "diff" "--name-only" (str base "..HEAD") "--" path)]
     (when (zero? exit) (boolean (seq (str/trim out))))))
+
+(defn- direction
+  "Which side of base..HEAD moved: :local, :upstream, :diverged, or nil.
+
+  This does not change the verdict — a surface that moved needs a Final KIP
+  naming it either way, and the registry is global, so an upstream change with
+  no KIP is still a finding. It changes what the finding MEANS to whoever reads
+  it. Measured 2026-08-16: the first real run reported :language-semantics as
+  UNCOVERED, which reads as `somebody bypassed the process`; the actual cause
+  was a checkout 61 commits behind its remote. Same word, two very different
+  next actions, and the report was picking neither.
+
+  Shallow clones are refused before this is reached — `rev-list` there answers
+  confidently and wrongly."
+  [dir base]
+  (let [{:keys [exit out]} (git dir "rev-list" "--left-right" "--count" (str base "..." "HEAD"))]
+    (when (zero? exit)
+      (let [[behind ahead] (map #(js/parseInt % 10) (str/split (str/trim out) #"\s+"))]
+        (cond (and (pos? ahead) (pos? behind)) :diverged
+              (pos? ahead) :local
+              (pos? behind) :upstream
+              :else :same)))))
 
 ;; ----------------------------------------------------------------- coverage
 ;; `:kip/status :final` is a string somebody typed. Before any of it is allowed
@@ -205,12 +221,20 @@
                           {:id id :status :undetermined})
              (not c) {:id id :status :unchanged}
              (contains? finals id) {:id id :status :covered}
-             :else {:id id :status :uncovered :repo repo :path path :base base}))
+             :else {:id id :status :uncovered :repo repo :path path :base base
+                    :direction (direction dir base)}))
          (do (undet! (str repo) "no remote default branch resolves (tried <org>/HEAD, <org>/main, origin/*)")
              {:id id :status :undetermined}))))))
 
-(doseq [{:keys [id status repo path]} findings]
-  (say (str/upper-case (name status)) (str id) (if repo (str repo "/" path) "-")))
+(def ^:private direction-note
+  {:local "this checkout is ahead — a local change about to land"
+   :upstream "this checkout is BEHIND — the surface moved upstream, not here"
+   :diverged "diverged — the surface moved on both sides"
+   :same "identical tips but the file differs (detached or rewritten history)"})
+
+(doseq [{:keys [id status repo path direction]} findings]
+  (say (str/upper-case (name status)) (str id) (if repo (str repo "/" path) "-")
+       (or (direction-note direction) "")))
 
 (def uncovered (filterv #(= :uncovered (:status %)) findings))
 (def undet (filterv #(= :undetermined (:status %)) findings))
@@ -234,7 +258,12 @@
   (seq uncovered)
   (bail! 1 (str (count uncovered) " normative surface(s) changed with no Final KIP naming them:")
          (str/join "\n  " (map #(str (:id %) "  " (:repo %) "/" (:path %)
-                                     "  (since " (:base %) ")")
-                               uncovered)))
+                                     "  (since " (:base %) ")"
+                                     "  [" (name (or (:direction %) :unknown)) "]")
+                               uncovered))
+         (when (some #(= :upstream (:direction %)) uncovered)
+           (str "Some of these moved UPSTREAM, not here — this checkout is behind. "
+                "That is still a finding (the registry is global and no Final KIP "
+                "names them), but the fix is `west update`, not a KIP.")))
 
   :else (bail! 0))
