@@ -103,7 +103,7 @@ last-call が防ぐ唯一の失敗モード。
 
 ## 正直に書いておく境界
 
-### 1. 署名検証は配線済み。Final が 0 件なのは別の理由
+### 1. 署名検証は配線済み。kip-0000 は Final、kip-0001 は last-call 中
 
 **2026-08-16 に後続スライスとして着地した**（当初この節は「配線は後続の KIP」と
 書いていた）。
@@ -144,11 +144,58 @@ verifier は答えを出す前に **node の ed25519 を自己検査**する（�
 escaped quote で止まり、**1 つ目の署名は成功して 2 つ目がファイルを壊す**
 （2 署名パスでしか出ない = 唯一意味のあるパス）。
 
-**それでも Final は 0 件で、理由は技術ではなく権限。** 3 鍵とも 1 つの kagi vault
-から届くので、tooling が保証できるのは「別の鍵 2 本」であって「別の人間 2 人」では
-ない。単一オーナーの鍵束での 2-of-3 は**独立レビューではなく、何に署名したかの記録**。
-kip-0000 / kip-0001 の admission はオーナーの行為として残してある
-（`kip-sign.cljs` 冒頭にこの限界を明記）。
+**2026-08-16、オーナーが admission を承認した。process を回避せず通した結果、
+2 つは別々の日に着地する。**
+
+| | track | 状態 |
+|---|---|---|
+| kip-0000（process 本体） | `:process` | **`:final`**（process track に last-call も quorum も無い —— その面では editor が当事者） |
+| kip-0001（8 面の採用 + coverage 強制） | `:standards` | **`:last-call`**、clock `2026-08-16`、**admissible 2026-08-30** |
+
+**kip-0001 を同日に Final にしていない。** standards track の last-call は 14 日下限で、
+その clock を「下限の無い window は著者の都合で閉じる＝無いのと同じ」と書いたのは
+この ADR 自身。**最初にその規則へ当たった KIP のために縮めれば、規則が本物かどうかの
+答えが出てしまう。** validator は現に `:kip/last-call-too-short` で拒否する。
+
+署名は先に記録済み（digest が status を覆わなくなったため。下記②）:
+
+```
+ADMIT kip-0001  2/2 valid of 2 claimed
+  did:key:z6Mki4zQ9MMwufb8Vj51…  fleet-gov1
+  did:key:z6MkiaTK4it22bog8TVe…  fleet-gov2
+digest e482df966153fa0ccb63fbb2ef687d958c3cbc87eedadb782317c14f0fc572b8
+```
+
+**2026-08-30 に残るのは status 行 1 つだけ。** それまでに kip-0001 を編集すると
+両署名が無効になる（意図した挙動）。
+
+**限界は変わらない**: 3 鍵とも 1 つの kagi vault から届くので、tooling が保証できるのは
+「別の鍵 2 本」であって「別の人間 2 人」ではない。単一オーナーの鍵束での 2-of-3 は
+**独立レビューではなく、何に署名したかの記録**（`kip-sign.cljs` 冒頭に明記）。
+
+### 1b. process を実際に回して初めて出た欠陥 3 件（2026-08-16）
+
+**3 件とも同じクラス —— 「そのトラックが持たないもの」を欠落として扱う —— で、
+3 件とも私が書いたテストからは到達できなかった。** KIP を実際に動かさないと出ない。
+
+1. **process / informational の KIP は永久に Final になれなかった。** requirements の
+   梯子が累積で、`:final` が `:kip/last-call-started` と `:kip/quorum` を要求した ——
+   そのトラックが**定義上持たない** 2 つ。最初の修正（`:last-call` の段ごと落とす）は
+   テストが弾いた: `:kip/surfaces` はその段に載るが clock とは無関係で、normative
+   surface に触る process KIP は今も宣言する義務がある。段ではなく**フィールド単位**の
+   宣言的 gating（`:track-gated-fields`）に。
+2. **Final にすると、Final にした署名が無効になった。** digest が `:kip/status` を
+   覆っていた。quorum 署名は `:final` へ**動かす**ものなので `:last-call` の間に作られる
+   （実測 `4cdae201…` → `ce085ddc…`）。`:kip/status` を digest から外した。
+   **`:kip/last-call-started` は中に残す** —— 署名後の clock 後付けは無効化すべきだから。
+   両方向にテストがある。
+3. **検証器が、quorum を持たないトラックに quorum を要求した。** kip-0000 が Final に
+   なった瞬間 `verify-kip-quorum.cljs` が `:quorum-not-met` で reject → exit 1 →
+   `verify-kip-coverage.cljs` が判定を拒否。**設計上の不在が失敗として報告され、それが
+   「答えられない」に連鎖した。** 今は track で分割し `NO-QUORUM-REQUIRED` を専用行に出す。
+
+着地: kip `9c52cfa1`（+ `08394cf`）、superproject `60a16b64`。
+64 tests / 226 assertions 0 failures（`.kotoba` parity sweep 込み）。
 
 ### 2. coverage は fleet gate にしない
 
