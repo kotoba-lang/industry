@@ -421,7 +421,29 @@ signed receipt、壊した実装が落ちる mutation test の六面。
    **`:round-trips` が意味しないこと**もファイルに明記した: 代表値 1 個・片方向であって
    **spec conformance ではない**。corpus へ広げるのは P1-1 / P1-3。
 3. DMT/lens roundtrip、union ambiguity、recursive depth/node/byte budget の property test。
-4. selector の残り、とくに `ExploreConditional` / `InterpretAs` の採否を決める。
+4. ~~selector の残り、とくに `ExploreConditional` / `InterpretAs` の採否を決める~~
+   **closed（2026-08-17、io-ipld #26）**。`resources/ipld/selector-coverage.edn` に
+   10 kind の表と**決定**を pin。
+
+   **測ったら書くコードは無かった** —— `&` と `~` は既に
+   `unsupported selector union member` で名指し拒否されていた。**欠けていたのは理由**である。
+   「決めて入れなかった kind」と「誰も手を付けなかった kind」は外からは区別できず、
+   P1-4 はまさにその区別のために在る。
+
+   - **`ExploreConditional` — 不採用。** selector は**何を取るか**の宣言であって何が
+     match するかではない。条件付き探索は filtering であり、本 ADR §7 が「selector を
+     query engine と呼ぶ」を禁止近道に挙げている。filtering は class 別 serving plane が
+     持つ。**復帰条件**: serving plane で答えられず、かつ条件を requester ではなく
+     **responder 側**で評価する必要がある用途が出たとき。
+   - **`ExploreInterpretAs` — 現時点で不採用、gate 付き。** これは ADL-aware remote
+     traversal の運搬子で、そのコストは §4 が既に列挙している（意味運搬・extension budget・
+     resume token・重複 block 抑止・malicious responder negative）。**syntax だけ先に
+     受理すると、traversal が安全に解釈できない ADL を selector が名指しできてしまう** ——
+     本 ADR が禁じる「名前だけ実装済み」そのもの。**復帰条件**: その 5 つを揃えて、同時に。
+
+   **両方の決定に復帰条件を持たせ、test がそれを要求する** —— 復帰条件の無い決定は
+   時間が経つと「手を付け忘れ」に退化する。表は実行され、implemented は round-trip し、
+   not-adopted は拒否されねばならない。
 5. ADL registration/name collision、unknown ADL、nondeterministic transform の negative corpus。
 
 ### P2 — retrieval interoperability
@@ -494,7 +516,7 @@ root pin は `amu c38f79d2c1af...`（west commit `1069d90b...`）、
 
 **P0 は 5 項目すべてが 2026-08-17 に着地した**（P0-1 `bytes-at` / P0-2 `bytes-slice` /
 P0-3 `bytes-concat` / P0-4 closed expression grammar / P0-5 canonical codec refusal）。
-次は **P1 の残り**（P1-3 / P1-4 / P1-5）。**P1-1 / P1-2 は 2026-08-17 に着地した。**
+次は **P1 の残り**（P1-3 / P1-5）。**P1-1 / P1-2 / P1-4 は 2026-08-17 に着地した。**
 
 P0 全体を通して確定した、P1 に持ち込むべきこと:
 
@@ -511,7 +533,11 @@ P0 全体を通して確定した、P1 に持ち込むべきこと:
   「たぶん大丈夫」でも始めない。
 - **corpus / 表には必ず『空にならない』guard を付ける。** negative を失った corpus は
   何も検査せずに緑になる。P1-1 は invalid 行数の下限を、P1-2 は unsupported 列が空でない
-  ことを test で固定した。
+  ことを、P1-4 は not-adopted 行が理由と復帰条件を持つことを test で固定した。
+- **P1-4 で分かった 3 つ目の形: 「実装が既に正しく、記録だけが無い」gap がある。**
+  `&` / `~` は既に fail-closed だったので書くコードは無く、必要だったのは決定の記録と
+  その pin だけだった。**gap = 未実装、と決めてかからない** —— P1-3 / P1-5 でも
+  まず測ること。
 - **mutation は両方向必要で、方向は項目ごとに違う。** P0-1..4 は「正しい出力を壊す」、
   P0-5 は「壊れた出力を通す」だった。**assertion が「何かが起きた」ではなく
   「誰が/何が起きた」を見ているかを確かめること** —— P0-5 の harness は検査を消しても
