@@ -368,4 +368,4 @@ pack はその隣に増える経路である。既存 object を一斉に pack �
   その値段で相互運用を捨てる理由が無い。
 - **独自の pack format。** CARv2 は既に存在し、2 つの独立実装が読み書きし、
   Filecoin/IPFS の運用系がそのまま使える。ここで新しい container を発明する
-  のは、`io-*` mirror 面の repo が存在する理由そのものに反する。"}]
+  のは、`io-*` mirror 面の repo が存在する理由そのものに反する。\n\n## Implementation state (2026-08-17)\n\nWired, and the wiring produced decisions this ADR does not contain: the bootstrap circularity (a catalog kept as datoms in the graph cannot be read without first reading the graph), the resolution (packs chained through their CARv2 roots plus one unsigned tip object), the reads-before-writes ordering, and the condition for removing the migration fallback. See ADR-2608170300. Production still writes :block-per-object; the write gate is off."}]
