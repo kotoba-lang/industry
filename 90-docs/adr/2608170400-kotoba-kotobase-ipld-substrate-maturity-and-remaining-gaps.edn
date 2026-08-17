@@ -100,12 +100,14 @@ DMT は型付き表現変換、ADL は同じ Data Model interface の背後で�
 | #619 | `15c362ef...` | `(= (bytes-count value) N)` を ABI input length へ lowering |
 | #620 | `6d222fc5...` | `(= (bytes-at value I) N)` を operand-length bounds trap 付き unsigned byte read へ lowering |
 | #621 | `651f90fc...` | `(bytes-slice value START END)` を copy しない bounded view へ lowering（decode/encode body） |
+| #622 | `64dd35d3...` | `(bytes-concat A B)` を operand の後ろへ書く per-byte copy へ lowering |
 
 `kotoba-sema` PR #10（merge `105309ca...`）は `bytes-count(bytes) -> i64` を、
 PR #11（merge `d96e9341...`）は `bytes-at(bytes, i64) -> i64` を、
-PR #12（merge `9da24d86...`）は `bytes-slice(bytes, i64, i64) -> bytes`（half-open）を
-typed pure operation として追加した。いずれも bounds は typing で決まらない run-time の
-事実なので、docstring が backend 側の義務として明記する（下記 P0-1 / P0-2）。
+PR #12（merge `9da24d86...`）は `bytes-slice(bytes, i64, i64) -> bytes`（half-open）を、
+PR #13（merge `f4de940e...`）は `bytes-concat(bytes, bytes) -> bytes` を typed pure operation
+として追加した。いずれも bounds は typing で決まらない run-time の事実なので、docstring が
+backend 側の義務として明記する（下記 P0-1 / P0-2 / P0-3）。
 
 実 runner では 4-byte input が canonical DAG-CBOR true、1-byte input が false。
 io-IPLD projection、署名 receipt、fuel exhaustion、timeout、forbidden import、fixed memory、
@@ -243,7 +245,39 @@ resume token、重複block抑止、malicious responder negative test が必要�
    wasm-tools validation / 実 Wasmtime（`[1,3)`、隣の identity encode、空 subrange が trap では
    なく整形式の答えであること、out-of-range と empty-input の trap、runner の output bound）/
    署名 receipt / mutation test（unit assertion と harness の両方が捕らえ、restore で両方緑）。
-3. `bytes-concat(a,b) -> bytes`: overflow、allocation、fuelを入力長に比例させる。
+3. ~~`bytes-concat(a,b) -> bytes`~~ **closed（2026-08-17、kotoba-sema #13 + amu #622）**。
+   overflow・allocation・fuel を入力長に比例させた。
+
+   **これは「書く」最初の body である。** P0-2 が拠っていた 2 つの性質が両方失効し、
+   捨てるのではなく置き換わった:
+
+   - slice の alias 規則は「module に store が無い」だった。join は必ず書くので、規則は
+     **「書き込み先が operand の後ろから始まる」**になる。書き込みカーソルは最初の store の
+     前に `pointer + length` から初期化される。これは構造的にも**振る舞いとしても**検査
+     できる —— fixture は入力を**回転**させ、byte 0 を bytes 1..2 の**後**に copy するので、
+     重なった書き込み先は「行儀が悪い」ではなく**間違った bytes を返す**。
+   - slice は自分の場所を必要としなかった。join は必要とするので、**operand + 結果**を
+     module 固定 capacity に対して書き込み前に検査する。
+
+   **fuel を byte 単位で課すのは意図的なコストである。** `memory.copy` なら同じ bytes を
+   1 命令分の fuel で動かせてしまう —— それがこの slice の閉じるべき穴なので、copy は
+   明示 loop にした。wasmtime 47.0.3 実測で固定 ~16.6k + **byte あたり ~20 fuel**
+   （8 byte で 16597、8192 byte で 180277）。**regression が主張するのは数値ではなく形** ——
+   同じ module・同じ budget で小さい入力は完走し大きい入力は尽きる。bulk copy なら両方
+   完走してしまう。
+
+   **max-output は 3 箇所で、どれも他を包含しない**: join の定数部分は compile 時に拒否、
+   operand 依存の残りは実行時に trap、runner の `max_output` は host が sizing していない
+   結果にも適用される。
+
+   **nested join は拒否する** —— join の中の join は自分の書き込み先と 2 度目の copy を
+   要求し、それは closed expression grammar（P0-4）であってここではない。
+
+   六面の証拠: sema typing（21 tests/137 assertions）/ 専用 KIR admission
+   `[:input-join [part part]]` / wasm-tools validation / 実 Wasmtime（回転の byte 一致、
+   隣の identity encode、out-of-range trap、fuel の両方向、3x 入力での capacity trap、
+   runner の output bound）/ 署名 receipt / mutation test（書き込み先を operand に向けると
+   unit assertion と harness の両方が捕らえ、harness は回転の比較でちょうど落ちる）。
 4. encode/decode で上記を合成できる closed expression grammar。loop/recursion/host import は別profile。
 5. canonical DAG-CBOR を壊す transform を Schema/codec roundtrip で拒否。
 
@@ -323,28 +357,31 @@ signed receipt、壊した実装が落ちる mutation test の六面。
 
 ## 8. 着地と再開点
 
-root pin は `amu 651f90fc443d...`（west commit `ab1181e8...`）、
-`kotoba-sema 9da24d860e5b...`（west commit `bcba7a9c...`）。genpon は ledger event
-11461/11463 で reconcile 済みで、`kagami reconcile --check` は clean。
+root pin は `amu 64dd35d3a7c9...`（west commit `20b58fee...`）、
+`kotoba-sema f4de940e403c...`（west commit `91650f61...`）。genpon は ledger event
+11464/11465 で reconcile 済みで、`kagami reconcile --check` は clean。
 
-**P0-1 `bytes-at` と P0-2 `bytes-slice` は 2026-08-17 に着地した。** 次の最小縦切りは
-**P0-3 `bytes-concat`**。`(bytes-concat a b)` を overflow・allocation・fuel が入力長に比例する
-形で lowering と runner の両方に載せる。
+**P0-1 `bytes-at` / P0-2 `bytes-slice` / P0-3 `bytes-concat` は 2026-08-17 に着地した。**
+次の最小縦切りは **P0-4 closed expression grammar**。at / slice / concat を encode / decode の
+中で**合成**できるようにする（loop / recursion / host import は別 profile のまま）。
 
-P0-1/P0-2 で確定した、P0-3 に持ち込むべきこと:
+P0-1..3 で確定した、P0-4 に持ち込むべきこと:
 
-- **bounds は operand のものであって memory のものではない。** concat では逆向きに効く ——
-  slice は operand の中を指せばよかったが、**concat は結果を置く場所を必要とする最初の
-  operation** である。view では済まず、書き込み先の確保と、その確保が capacity を越えない
-  ことの両方が要る。`adl_alloc` の固定 1024 offset はここで見直しが要る。
-- **copy しないで済むかどうかは、alias 規則を書き下せるかどうかで決まる。** slice の
-  「view であって copy ではない」は module に store が無いことで検査できた。concat は必ず
-  書くので、**その主張は使えない** —— 代わりに「書き込み先が input と重ならない」を検査する
-  必要がある。
-- **offset/長さを literal に閉じるかは profile の判断であって言語の判断ではない。**
+- **nested join がこの grammar の最初の実物である。** P0-3 が拒否した
+  `(bytes-concat (bytes-concat a b) c)` は、中間結果を置く場所を要求する ——
+  つまり grammar が要るのは構文ではなく**バッファ割り当て規律**である。現在の lowering は
+  「出力は operand の直後に 1 つだけ」を前提にしており、そこが最初に壊れる。
+- **合成すると「書き込み先が operand の後ろ」だけでは足りなくなる。** 中間結果もまた
+  次の演算の operand なので、alias 規則は「書き込み先はどの生きた operand とも重ならない」
+  へ一般化する必要がある。P0-3 の回転 fixture と同型の、**間違えたら違う bytes が出る**
+  fixture を各段で用意すること。
+- **fuel は既に byte 比例なので、合成しても比例は保たれる** —— ただし中間結果を作ると
+  移動 byte 数は式の形で増える。`memory.copy` に置き換えたくなる誘惑はここで最大になる。
+- **max-output は 3 箇所（compile / guest / runner）に増えた。** 合成では compile 時に
+  わかる定数部分が式全体の関数になる。
 - **capability 経由の operand は DAG-CBOR encode 済み**であり、結果もまた node でなければ
-  schema を round-trip しない。concat の結果が node になる入力を選ぶこと。
-- **max-output は lowering と runner の両方に要り、どちらも他方を包含しない。**
+  schema を round-trip しない。
+- **literal に閉じるかは profile の判断であって言語の判断ではない。**
 
 **この ADR は現状を100%と宣言しない。100%へ進むため、何が correctness、何が代替transport、
 何がextension、何がoptimizationかを固定する正本である。**"}]
