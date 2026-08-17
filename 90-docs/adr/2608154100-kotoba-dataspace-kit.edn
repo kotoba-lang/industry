@@ -377,9 +377,11 @@ java -cp \"$CP\" clojure.main -e \\
   http wasm proof は request echo なのでこの穴を踏まない）。
   guest は named `:dataspace/transact`。inject は `typedCapCall`（http wasm と同じ seam）。
   JVM `provider.dataspace` は coord guest（kit ABI types）で走る。
-  sugar `observe!` の `:matches` は sema pin `105309ca` では `:notices` が無く、
-  provider 側 kit と契約がずれる（IPLD merge が sema `91eff5a` を戻した）。
-  この slice では sugar を wasm に、coord を JVM provider に分けた。count 10。
+  当時 sugar `observe!` の `:matches` は sema pin `105309ca` では `:notices` が無く、
+  provider 側 kit と契約がずれた（IPLD merge が sema `91eff5a` を戻した）。
+  その slice では sugar を wasm に、coord を JVM provider に分けた。count 10。
+  2026-08-17 追記: amu の kotoba-sema pin は既に `f4de940e`（`91eff5a` を含む）。
+  sugar `observe!` の notices 契約は次節。
   https://github.com/kotoba-lang/amu/commit/147d3677b40cbe170acc655b7fefc2bfe9198a02
 - west pin: amu `c6905bff4528d6eeb7ccab9e9af36cca91de8ec0`（entry `147d3677`）。
 
@@ -412,16 +414,54 @@ capability-count 10。`:wasm32-kotoba-v1` は dataspace でも pending。clock �
 `host-built-dataspace-variant-is-admitted` が落ちる（forged / unfrozen compound）。
 戻すと緑。allow 24 無しは `capability-denied`。scalar `7n` 結果は `invalid-typed-value`。
 
+10. **DONE（2026-08-17）。** amu の kotoba-sema git dep は既に origin/main
+    `f4de940e403c567473e5f29f28684f58f6e8cfe4`（`91eff5a` を含む）。deps-lock も
+    同じ SHA。この slice では pin を動かさず、sugar `observe!` の JVM coord を
+    契約どおりにした。`:matches` は `[:bindings :document] [:notices :document]`。
+    未マッチは空 mailbox、matching assert の次の `observe!` が `:document` notice
+    を返し、再 observe で drain、facet-leave は undelivered mail を落とす。
+    capability-count 10。`:native-aot` / `:jit` は pending のまま。matcher は
+    `.cljc`。kgraph を `.cljc` にしない。`provider.incidence` / vat / `<-` は無い。
+
+- `kotoba-lang/amu` main `cf49da1c63e7743a4c784c3fe7caa3ad4fbdc32e`
+  （merge of `698f842242d098225a494f00b076645a4954ed98`）。
+  https://github.com/kotoba-lang/amu/commit/cf49da1c63e7743a4c784c3fe7caa3ad4fbdc32e
+- `kotoba-lang/kotoba-sema` main `f4de940e403c567473e5f29f28684f58f6e8cfe4`
+  https://github.com/kotoba-lang/kotoba-sema/commit/f4de940e403c567473e5f29f28684f58f6e8cfe4
+- west pin: amu `e7a06a0e9bcf49237a64ac449610276bdd3f9c02`（entry `cf49da1c`）。
+
+## テストの回し方と結果（2026-08-17 実測、sugar observe! notices）
+
+amu（`clojure -M:test -n` は無視される）:
+```
+cd /tmp/amu-dataspace-sema-notices
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.frontend-named-capability-test)
+            (quote kotoba.compiler.provider-conformance-test))
+    (apply clojure.test/run-tests
+           [(quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.frontend-named-capability-test)
+            (quote kotoba.compiler.provider-conformance-test)])'
+```
+結果: **33 tests / 145 assertions、0 fail / 0 error。**
+provider-conformance 単独でも capability-count 10。
+
+両方向: kotoba-sema を `105309ca84b2cb02a6ffd67d92c1431e12cd2f18` に戻すと
+sugar guest の `:matches` から `:notices` が消え、
+`native-source-forms-cross-hir-kir-and-provider` /
+`native-facet-forms-clean-up-owned-state` /
+`sugar-observe-facet-leave-drops-undelivered-mail` が
+`provider contract does not match guest contract` で 3 error。
+`f4de940e` に戻すと緑（16 tests / 83 assertions on provider+conformance）。
+
 ## 残ギャップ（次の agent へ）
 
 9. **次: `:native-aot` はまだ pending。** `kotoba-kir` `native-word-value-type?` は
    `#{:i64 :bool :string}` plus option/result。amu pin `6d08e3c` も west pin
    `933c148a` も `:document` を持たない。matcher は `.cljc` のまま。kgraph は
    `.clj` のまま wrap しない。`:jit` も pending。
-10. **sema pin が provider より後ろ。** amu `:test` の kotoba-sema は `105309ca`
-    （observe! `:matches` に `:notices` 無し）。provider `4888ab12` の kit ABI は
-    `:notices` 付き。sugar guest を JVM provider に inject すると
-    `provider contract does not match guest contract`。wasm-aot は typedCapCall
-    なのでこのずれを踏まない。直すなら sema を `91eff5a` へ戻す（capability-count
-    は動かさない）。
 "}]
