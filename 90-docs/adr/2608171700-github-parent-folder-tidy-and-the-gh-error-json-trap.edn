@@ -1,0 +1,122 @@
+[{:db/id -1
+  :adr/id "ADR-2608171700"
+  :adr/title "~/github の外側 18 checkout を退役させた。判定を 2 回覆したのは gh の失敗 JSON を成功と読む検査だった"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :source/dataset "adr"
+  :adr/related
+  ["ADR-2608136000"
+   "ADR-2608138400"
+   "ADR-2608124400"
+   "ADR-2607211600"
+   "ADR-2607011345"]
+  :adr/repos
+  ["orgs/network-awai/network-isekai"
+   "orgs/cloud-itonami/cloud-itonami-app"
+   "orgs/network-awai/club-shinshi-app"
+   "orgs/gftdcojp/magatama-host-sdk"]
+  :adr/body
+  "superproject の **外側**、`~/github` 直下に 20 エントリが溜まっていた。superproject 本体
+`com-junkawasaki/` と、独立 repo `edu-mit-cybernetics-ja/` を除く 18 が、並行 agent の
+worktree 残骸・改名で死んだパスの残骸・冗長な clone・published 済みの掃き出しだった。
+`git-cleanup-conflict` の runbook（`manifest/cleanup-workflow.edn`）に沿って全件を測り、
+archive してから退役させた。**20 エントリ → 2、約 2.9 GB。**
+
+---
+
+## 判定を覆した検査の欠陥（この ADR の主内容）
+
+**`gh api ... 2>/dev/null` の出力が空でないことを「成功」として読んでいた。**
+
+```
+pub=$(gh api \"repos/$slug/commits/$head\" --jq .sha 2>/dev/null)
+if [[ -n $pub ]]; then print -- \"tip PUBLISHED\"; fi
+```
+
+`gh` は失敗時にエラー本文の **JSON を stdout へ**吐き、人間向けの `gh: ...` 行だけを
+stderr へ出す。`2>/dev/null` は後者しか消さないので、`$pub` には
+`{\"message\":\"No commit found for SHA: ...\",\"status\":\"422\"}` が入り、**非空 = published**
+と読まれた。17 checkout 中 **2 つが誤って published と報告された**。
+
+この 2 つ（`cloud-itonami-app` の `agent/bot-mailbox-20260815` /
+`agent/bot-mailbox-land-20260815`）は実際には **GitHub に存在せず、このマシンにしか無い
+commit** だった。誤りに気づいたのは、同じ行が `compare` で 404 を返し、その不整合を
+追ったからで、**検査自体は最後まで緑を出し続けた**。
+
+これは ADR-2608136000 の 5 問のうち 3 と 4 にそのまま該当する:
+
+| 問 | この検査の答え |
+|---|---|
+| 3. 受け取ったエラー本文を捨てていないか | 捨てるどころか**成功値として採用**していた |
+| 4. 「飛ばした」と「合格した」が出力で区別できるか | できない。両方 `tip PUBLISHED` |
+
+**直し方は exit code を見ることではなく、値の形を検査すること。** `--jq .sha` が返すのは
+40 hex か空のいずれかで、`{` で始まる値は定義上ありえない。形が違う応答を成功として
+通す経路は、ネットワークが不調な周だけ黙って嘘をつく。
+
+**なお誤りの向きは「未着地 → 着地済み」だった** —— `cleanup-workflow.md` が
+`primary-remote` の欠落について記録した向き（偽の未着地 → 着地済み）と**逆**である。
+あちらは判定を安全側に倒す誤りだが、こちらは**危険側に倒す**（消してよいと言う）。
+出所は違うが同じ列に並ぶので、fleet の landing 判定はどちらの向きの誤りも持つと考える。
+
+---
+
+## 2 つ目の欠陥 — `git status` は鍵を見ない
+
+退役対象が stash ではなく **checkout** のとき、`git status` は ignored を隠すのが仕事なので
+何も答えない（ADR-2608138400 と同じ形）。実測すると
+`cloud-itonami-app-bot-mail-*/target/test-data/` に
+`agent-enrollment.key`(43B) / `drive-issuer.key`(44B) / `esign-keys.edn`(637B) があった。
+テスト生成物であり live checkout も独立した同名ファイルを持つが、**`git diff` では表現できない**
+ので tar.gz で archive してから消した。`app-hyakka` の `.resident/` にも live checkout に無い
+content-addressed blob が 2 件あった。
+
+---
+
+## 退役させたものと、その根拠
+
+| 類 | 件数 | 判定に使った実測 |
+|---|---|---|
+| 登録済み worktree | 14 | 全て clean。tip が default branch の祖先（ahead=0）か、内容が main に完全包含 |
+| 孤児 worktree（親の管理 dir が消滅） | 5 | 後継 repo の object DB に対し **全ファイルの blob 一致**（246/246・259/259・261/261・259/259・99/99） |
+| 冗長 clone | 4 | `clj-wgsl-recovery` の 52 clone は tip が 44/手元・8/GitHub で確認。`mail-ingest-workspace` の clone tip は live repo に存在 |
+| published 済みの掃き出し | 2 | `norbert/` は HF `com-junkawasaki/norbert` と 4 ファイル byte 一致。`kami-app-nle/` は SPA 化前の prototype |
+| symlink / 空 dir / `.DS_Store` | 8 | 実体には触れていない |
+
+**孤児 5 本の正体は改名だった** —— `club-shinshi-app` が `jk-luxury` → `network-awai`、
+`ai-gftd-magatama-host-sdk` → `magatama-host-sdk`。`:path-override-leftover` の教科書例で、
+旧パスに `.git` ファイルだけが残り、親の `.git/worktrees/<name>` は既に prune されていた
+ので **git は何も答えられない**。答えたのは後継 repo の object DB だった。
+
+---
+
+## 保全したもの
+
+`~/github/gftdcojp/network-isekai`（standalone clone）に、7 ファイル・+1001/-173 の
+未コミット変更（mtime 2026-06-25）があった。base は `origin/main` より **816 commit** 古く、
+触っている `src/isekai/web.cljs` と `src/isekai/fork.cljs` は**現在の main に存在しない**
+（構成変更で消えた）。
+
+runbook の `:branches` に従い **push only, never merge**:
+`network-awai/network-isekai` の `preserve/isekai-wip-20260625`（`c29c73c`）。
+GitHub 側に tip があることを確認してから dir を消した。**merge の可否はオーナー判断で、
+この ADR は判断していない。**
+
+---
+
+## 残したもの
+
+- `edu-mit-cybernetics-ja/` — clean、`origin/main` と一致、west 未登録。
+  `:true-orphan-git` は**報告するが黙って消さない**という規則どおり残した。
+- `/private/tmp/` 配下の worktree 登録 —— `app-hyakka` 5 本、`control-plane` 15 本が生きている。
+  `~/github` の外なので今回の scope 外。
+
+## archive
+
+`com-junkawasaki/.git/stash-archive-20260817-github-tidy/`（1.4 MB）に
+未 push branch 2 本の patch + log、ignored の鍵を含む tar.gz 2 本、`.resident/` の blob、
+`norbert/`、prototype HTML、isekai の WIP diff を退避し、`index.txt` に 9 件の由来と判定理由を
+記録した。**「landed だと確信していても archive してから消す」は今回も省略していない。**
+"}]
