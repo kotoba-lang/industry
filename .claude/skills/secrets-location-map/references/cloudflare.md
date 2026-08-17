@@ -60,10 +60,22 @@
     `account is not signed in`、`op read` は無応答のままタイムアウトする。
     1Password アプリの 設定 → 開発者 → 「1Password CLI と連携」を有効にすれば
     非対話で書けるようになる。有効化したら登録してこの行を更新する。
-  - **kotobase-protocols-worker `WRITE_TOKEN`**（s3/atproto/git.kotobase.net の
-    write 認可 Bearer、ADR-2607174500）: Worker secret として投入済み。operator
-    copy は macOS Keychain `service=cf:kotobase-protocols-worker` /
-    `account=WRITE_TOKEN`（2026-07-17 生成）。
+  - **kotobase-protocols-worker `WRITE_TOKEN`**（s3/atproto/pinning の write 認可
+    Bearer、ADR-2607174500）: Worker secret として投入済み（`wrangler secret list`
+    で 2026-08-17 に存在を確認）。operator copy は macOS Keychain
+    `service=cf:kotobase-protocols-worker` / `account=WRITE_TOKEN`（2026-07-17 生成）
+    に**在るが、その値は現在の Worker では通らない**。
+    **⚠ 実測 2026-08-17: この Keychain copy は STALE。** 取り出した値で
+    `POST https://pinning.kotobase.net/pins` を `Authorization: Bearer <値>` で叩くと
+    **401 `unauthorized: writes require a bearer token`**。Worker 側に `WRITE_TOKEN`
+    は存在するので「未設定」ではなく**値の不一致**である。**なぜ食い違うかは未確定** —
+    更新を伴わない rotation が素直な推測だが、推測でしかない。
+    旧記述は上に残してある（復旧時の参照。索引の規則 #2）。
+    **他の候補を当て推量で試していない**（live auth endpoint への変え撃ちは
+    credential brute force であって debug ではない。安全床⑦）。
+    復旧するには owner が現行値を供給して Keychain と kagi を更新するか、
+    `wrangler secret put WRITE_TOKEN` で rotate する —— ただし rotate は
+    既存 consumer（`git annex copy` 経路など）を同時に壊すので、単独で行わない。
   - **kotobase-protocols-worker `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`**
     （s3.kotobase.net の AWS SigV4 write 認可、ADR-2607176000）: Worker secret
     投入済み。operator copy は同 Keychain service `cf:kotobase-protocols-worker`

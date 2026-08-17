@@ -190,13 +190,78 @@
           falsifiable prediction ADR-2608021000 §6-5 left open, and it is one write
           away from being answerable."}]
 
+ :landed
+ {:repo "net-kotobase/control-plane"
+  :merge "8f6955eab7e"
+  :worker "kotobase-protocols-worker"
+  :deployed-version "26059ea8-f1f0-4092-a220-af66f66e88c6"
+  :serves ["s3" "atproto" "pinning" "sparql" "gremlin" "graphql"]
+  :not-served "cypher.kotobase.net is its own Worker (net-kotobase/cypher) over the
+               SAME kotobase-protocols-state bucket. It is deployed read-only with no
+               WRITE_TOKEN, so it never commits and has nothing to schedule -- it
+               benefits from a fold done here without needing the change."
+  :what "Background fold: fold-now! runs the fold as its own head cycle; the Worker
+         schedules it under ctx.waitUntil, one slot per graph, at a threshold of 8
+         (KOTOBASE_FOLD_THRESHOLD overrides). The inline fold-if-due! stays at 64 as
+         the no-ExecutionContext backstop."
+  :verification
+  {:build "shadow-cljs release, 172 files, 0 warnings"
+   :tests "102 tests / 694 assertions, 0 failures (baseline before the change: 95 / 669)"
+   :upstream-lock "protocols upstream lock OK (25 exact revisions)"
+   :discrimination
+   [{:broke "the threshold check in schedule-due-folds!"
+     :reddened "'novelty under the threshold schedules nothing' -- and only that"}
+    {:broke "fold-now!'s own threshold re-check"
+     :reddened "fold-now-below-its-threshold-refuses-and-says-so -- and only that"}
+    {:broke "take-due-folds! draining"
+     :reddened "the drain test AND the scheduler test, which is what its docstring predicts"}]
+   :artifact-gate "scripts/verify-wait-until.cljs, shown to pass on a good bundle,
+                   exit 1 on a bundle with the name renamed away, and exit 2 -- neither
+                   pass nor fail -- when the bundle is missing or empty"
+   :post-deploy "All six served hosts plus cypher answered 200 x12. No regression."}
+  :measured-belief-correction
+  "The received warning that dot access to waitUntil is renamed under :advanced is true
+   of the incident it came from (kotobase-graph-database's first auto-fold deploy) but
+   NOT of this build: (.-waitUntil ctx) compiles to an un-renamed .waitUntil here,
+   because shadow-cljs's externs inference covers the un-hinted ctx. The string key is
+   kept anyway -- it does not depend on that inference holding -- and the docstring now
+   separates the measured half from the hazard."}
+
+ :not-yet-demonstrated
+ {:state "DORMANT. The fold is scheduled only after a COMMIT, and nothing has written to
+          kotobase-protocols-v2 since the deploy. /_diag/health still reports
+          novelty_size 63, and /health p50 is unchanged (4.5-5.0s). Deploying the
+          mechanism is not the same as observing it act, and this receipt does not
+          claim the latency is fixed."
+  :fires-on "the next successful write to the shared graph -- any pinning/git/non-record
+             atproto write, which routes to `shared-graph` per graph/for-request."
+  :blocked-attempt
+  {:what "Tried to trigger it with one POST /pins so the fold could be observed now."
+   :result "401. The deployed Worker HAS a WRITE_TOKEN secret (wrangler secret list),
+            but the operator copy at the documented identifier -- macOS Keychain
+            service=cf:kotobase-protocols-worker account=WRITE_TOKEN, recorded
+            2026-07-17 -- does not authenticate against it as of 2026-08-17."
+   :not-claimed "WHY they differ is not established. Rotation without updating the
+                 operator copy is the obvious guess and it is only a guess."
+   :not-done "No other credential was tried. Guessing variants against a live auth
+              endpoint is credential brute force, not debugging."}
+  :check-when-it-fires
+  "curl -s https://atproto.kotobase.net/_diag/health   # novelty_size should collapse
+   then re-run the warm p50 probe in :method above. The prediction is explicit: with
+   novelty at ~0 the sequential term is the prolly-tree's 2 waves, so handler cost
+   should fall from ~4.4s to well under 1s. If it does not, the novelty chain was not
+   the dominant term after all and this receipt's arithmetic is wrong."}
+
  :follow-ups
  [{:priority 1
-   :what "protocols-worker folds at 64; the sibling worker in the same repo folds at
-          8 and says in its own comment why. Give protocols-worker the same threshold
-          (eng/should-fold? has a 3-arity) and the same KOTOBASE_FOLD_THRESHOLD
-          override. The mechanism is already in the codebase, one directory over."
-   :cost "one constant plus an env read; the deploy is the expensive half"}
+   :what "DONE 2026-08-17 -- see :landed. Kept here because the follow-up as originally
+          written ('one constant plus an env read') was wrong about the shape: lowering
+          the inline threshold would have moved a multi-second fold into a client's
+          write latency, and under batched writes K writers crossing together would
+          each schedule a fold of one graph and then lose to each other on the very
+          head CAS. The sibling had already solved both; the work was porting its
+          mechanism, not changing its number."
+   :status :landed-not-yet-demonstrated}
   {:priority 2
    :what "relay-bsky public read: 500 after 37s, unchanged. ADR-2608170100 §9 item 1."}
   {:priority 3
