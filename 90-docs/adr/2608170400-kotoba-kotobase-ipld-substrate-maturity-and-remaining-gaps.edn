@@ -420,7 +420,30 @@ signed receipt、壊した実装が落ちる mutation test の六面。
 
    **`:round-trips` が意味しないこと**もファイルに明記した: 代表値 1 個・片方向であって
    **spec conformance ではない**。corpus へ広げるのは P1-1 / P1-3。
-3. DMT/lens roundtrip、union ambiguity、recursive depth/node/byte budget の property test。
+3. ~~DMT/lens roundtrip、union ambiguity、recursive depth/node/byte budget の property test~~
+   **closed（2026-08-17、io-ipld #28）**。
+
+   **3 つのうち 2 つは既に健全だった。** lens は全 representation が round-trip する
+   （decode→encode で元の representation が戻る: struct map/tuple/stringjoin/stringpairs/
+   listpairs、map listpairs/stringpairs、union keyed/envelope/stringprefix、enum string/int、
+   field rename）。**lens にとってはこれが本質** —— 情報を落とす lens は片方向の test を
+   すべて通しながらデータを壊す。union ambiguity は **schema compile 時**に拒否される
+   （値がたまたま重なりに当たった時ではない —— 後者は fixture が別 member を選ぶ限り
+   すべての test をすり抜ける値依存バグである）。
+
+   **budget 側に穴があった。** `max-depth` / `max-nodes` は typed structure を正しく縛るが、
+   **`any` の branch は値を walk せず `true` を返していた** —— node 自身は課金され、その下は
+   一切課金されない。caller が `:max-depth 8` を渡して **10 万段ネストした値を受け取れた**
+   （実測。仮説ではない）。**効いた limit と、そもそも適用されなかった limit が区別できない。**
+
+   これは P1-5 の opt-in determinism、G1 の buffered read と**同型** ——
+   何かが壊れているのではなく、**誰にも分からないことが壊れている**。`any` は他の kind と
+   同じ accounting で children を walk するようにした（診断さえ合えば 1 行）。
+   戻すと `any` の budget assertion **ちょうど 2 件**が落ち、他は落ちない。
+
+   ⚠ **この suite は一度 exit 137 で落ちたが、それは load average 51 のマシンであって
+   変更ではない**（同じ tree が clean に通る）。**kill された run は fail した run ではなく、
+   どちらももう一方の証拠にならない。**
 4. ~~selector の残り、とくに `ExploreConditional` / `InterpretAs` の採否を決める~~
    **closed（2026-08-17、io-ipld #26）**。`resources/ipld/selector-coverage.edn` に
    10 kind の表と**決定**を pin。
@@ -537,8 +560,14 @@ root pin は `amu c38f79d2c1af...`（west commit `1069d90b...`）、
 
 **P0 は 5 項目すべてが 2026-08-17 に着地した**（P0-1 `bytes-at` / P0-2 `bytes-slice` /
 P0-3 `bytes-concat` / P0-4 closed expression grammar / P0-5 canonical codec refusal）。
-次は **P1-3**（DMT/lens roundtrip・union ambiguity・recursive budget の property test）。
-**P1-1 / P1-2 / P1-4 / P1-5 は 2026-08-17 に着地した。**
+**P1 は 5 項目すべてが 2026-08-17 に着地した。** 次は **P2 — retrieval interoperability**
+（本 ADR §5 の P2 節、4 項目）。
+
+⚠ **P2 以降は P0/P1 と性質が違い、大半がこの環境のコードでは閉じられない。**
+P2-2 は独立実装との GraphSync interop 実測、P3 は実ブラウザ・実 NAT・live fleet、
+P4-1 は production canary、P5 は複数 backend を要する。**着手前に「これは実測で閉じるのか、
+外部条件待ちか」を先に判定すること** —— gateway ADR の G5/G6/G7 で同じ判定を既に行い、
+「コード側の債務は尽きた」と記録した先例がある。
 
 P0 全体を通して確定した、P1 に持ち込むべきこと:
 
@@ -556,6 +585,9 @@ P0 全体を通して確定した、P1 に持ち込むべきこと:
 - **corpus / 表には必ず『空にならない』guard を付ける。** negative を失った corpus は
   何も検査せずに緑になる。P1-1 は invalid 行数の下限を、P1-2 は unsupported 列が空でない
   ことを、P1-4 は not-adopted 行が理由と復帰条件を持つことを test で固定した。
+- **P1 全体の結果: 5 項目のうち実装の変更を要したのは 3 つ**（P1-1 の canonical 強制、
+  P1-3 の `any` budget、P1-5 の determinism 可視化）**で、2 つは記録だけだった**
+  （P1-2 の coverage 表、P1-4 の selector 決定）。**どれも測る前には判別できなかった。**
 - **gap には少なくとも 4 つの形がある**（今日 1 日で全部出た）:
   ①未実装（P0-1..4）②実装が間違っている（P1-1 の非 canonical 受理）
   ③**実装は正しく記録だけが無い**（P1-4 の selector 決定）
