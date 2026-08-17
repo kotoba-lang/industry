@@ -5,7 +5,7 @@
   :adr/title "datalake 面をサービスに繋ぐ — lake は 5 つ目の方言ではなく `:source` の供給者、そして同期スキャンを非同期ホストで走らせる trampoline"
   :adr/status "accepted"
   :adr/date "2026-08-11"
-  :adr/last_verified "2026-08-11"
+  :adr/last_verified "2026-08-17"
   :adr/deciders ["Jun Kawasaki"]
   :adr/authoritative true
   :adr/source-format "edn"
@@ -34,10 +34,17 @@
    "adr-2607310900（hydrate が応答時間の 92%）"]
 
   :adr/decision-summary
-  "{:verdict :engine-was-complete-service-was-not, :landed [:fleet-ci-gates-6-repos :prefetch-trampoline :async-half :west-registration], :not-landed [:worker-shell :deployment :hostname], :design {:surface :not-a-new-dialect, :mechanism :supplies-source-to-existing-sparql-handler, :deployment :own-worker, :catalog :stays-on-tenant-ref}, :measured {:trampoline-rounds 4, :bytes 1627, :of 2427, :row-groups-read 1, :row-groups-pruned 2, :sync-async-parity true}, :fleet-facts {:jvm-cap :correct-but-only-inside-gate-env, :zebulun :all-egress-lost}, :ci {:before :none, :after :6-repos-jvm-test, :measured \"210 tests / 735 assertions on a real node\"}}"
+  "{:verdict :service-now-exists-but-has-never-scanned-live-data, :landed [:fleet-ci-gates-6-repos :prefetch-trampoline :async-half :west-registration :worker-shell :deployment], :not-landed [:hostname :catalog-writer :live-scan], :blocker :nothing-writes-catalog-documents, :design {:surface :not-a-new-dialect, :mechanism :supplies-source-to-existing-sparql-handler, :deployment :own-worker, :catalog :stays-on-tenant-ref, :tenant :verified-cacao-issuer-did}, :url \"https://net-kotobase-lake.04-feasts-minded.workers.dev\", :measured {:trampoline-rounds 4, :bytes 1627, :of 2427, :row-groups-read 1, :row-groups-pruned 2, :sync-async-parity true, :through-compiled-worker true, :live-request-ms [5547 6531 8893 9475], :live-cost :hydrate-not-scan}, :found {:kotobase-peer-main-did-not-read \"f084cca dropped one paren; fixed f077d947, pin advanced\"}, :fleet-facts {:jvm-cap :correct-but-only-inside-gate-env, :zebulun :all-egress-lost}, :ci {:before :none, :after :6-repos-jvm-test, :measured \"210 tests / 735 assertions on a real node\"}}"
 
   :adr/verify
-  ["fleet gate 登録前の実測（実ノードへ配って実行）: columnar 36/115・org-apache-parquet 34/163・org-apache-arrow 40/130・org-apache-avro 14/32・kotobase-lake 76/257・org-ietf-csv 10/38 = 210 tests / 735 assertions、0 failure"
+  ["【2026-08-17】deploy: net-kotobase-lake が workers.dev に live。https://net-kotobase-lake.04-feasts-minded.workers.dev（version aa32d606-bca1-4032-b221-99f3a813e130）。binding は STATE_BUCKET=kotobase-protocols-state 1 本のみ、secret 0 本、routes は commented out"
+   "【2026-08-17】compiled Worker を実チェーン + 実 pyarrow ファイルで駆動（test/worker_e2e_check.cljs）: GET /sparql?cid=…&query=SELECT ?row WHERE { ?row <urn:kotobase:price> 120 } => 200 application/sparql-results+json、rounds 4、ranges [0 4] [2419 2427] [897 2419] [319 412]、1,627 / 2,427 バイト、bindings 1 件 urn:kotobase:obj:bafkreiadsbmm…#row4。**同期版の実測（4 rounds / 1,627 バイト）が非同期ホスト上でそのまま再現した**"
+   "【2026-08-17】gate: 主張を持たない valid signer は 404 NoSuchObject で **0 バイト**、存在しない cid も **同一 body**。?tenant= で保有者名を名乗っても 401 / 404 のまま（この 2 checks は後から足した — 最初の版は credential 経路を壊しても全部 green だった）"
+   "【2026-08-17】両方向: read-range をオブジェクト全体に広げると答えは 200 のまま正しく、落ちるのは 2 つだけ（fetched less than the object :: 2427 of 2427 / more than one round :: 1）。catalog-docs の keyword 正規化を外すと JVM 側が落ちる"
+   "【2026-08-17】JVM: net-kotobase/lake `clojure -M:test` => 14 tests / 47 assertions、0 failures"
+   "【2026-08-17】live: 実 deploy へ新規 mint した CACAO で 4 回問い合わせ => 404 NoSuchObject、5547 / 6531 / 8893 / 9475 ms。**時間はすべて共有 graph の hydrate**（catalog collection は空）。scan は range 4 本"
+   "【2026-08-17】kotoba-lang/kotobase-peer main（= 旧 west pin 2ed76f5e）が **read できなかった**: `require` は Syntax error、shadow-cljs は EOF while reading。f084cca が 1 個の閉じ括弧を落としていた。f077d947 で修正・merge、west pin 前進済み（cad6367cdee）"
+   "fleet gate 登録前の実測（実ノードへ配って実行）: columnar 36/115・org-apache-parquet 34/163・org-apache-arrow 40/130・org-apache-avro 14/32・kotobase-lake 76/257・org-ietf-csv 10/38 = 210 tests / 735 assertions、0 failure"
    "net-kotobase-lake: clojure -M:test => Ran 4 tests containing 15 assertions, 0 failures 0 errors（JVM、実 pyarrow fixture）"
    "async parity: nbb で resolve-async を実 Promise 4 本に対して実行 => rounds 4 / bytes 1627 / rows 1 / chunks 1 read 2 skipped、resolve-sync と一致"
    "trampoline の実レンジ: [0 4]（先頭 PAR1）/ [2419 2427]（8 バイト tail）/ [897 2419]（footer）/ [319 412]（column chunk 1 本）"
@@ -138,20 +145,94 @@ Worker 無しでテストできる。`r2.cljs` は Promise を知り他を知ら
 仕様**で、実ファイルのテストが付いているのはそちら。実 Promise 4 本で非同期版が
 同じ 4 rounds / 1,627 バイトになることを確認した。
 
-## 着地していないもの（正直に）
+## 現在地（2026-08-17 更新）
 
-- **Worker shell は設計のみで、書いていない。** `acquire/source-for` と hydrate 済み
-  catalog を綴じる層。一度書きかけたが、require していない名前空間を参照する
-  コンパイルの通らないコードだったので**捨てた**。
-- **deploy していない。hostname も取っていない。** `wrangler.jsonc` を意図的に
-  置いていない。**authorization gate 無しでオブジェクトのバイトを返す shell を
-  出すのは、何も出さないより悪い。**
-- **gate は `acquire/source-for` の中にあり、trampoline の毎ラウンド走る設計にする。**
-  1 回で済ませないのは、そのほうが安全だから —— 再試行の組み合わせのどれを取っても
+**Worker shell と deploy は着地した。hostname は意図的に取っていない。
+そして live のデータを 1 度も scan していない。**
+
+### 着地したもの
+
+- **`net-kotobase/lake` が Worker になった**（`fabc4ce3`）。`scan.cljc`（1 ラウンド
+  = gate → `sparql/handle`）/ `catalog_docs.cljc`（catalog quads ↔ tenant ref 上の
+  document、双方向を 1 つの ns に）/ `readers.cljc`（この deployment が scan できる
+  形式）/ `worker.cljs`（shell）。
+- **deploy 済み**: `https://net-kotobase-lake.04-feasts-minded.workers.dev`。
+  binding は `STATE_BUCKET`（`kotobase-protocols-state`）1 本、**secret 0 本**、
+  `routes` は commented out。
+- **gate は予定どおり trampoline の中**。`acquire/source-for` を毎ラウンド呼ぶ。
+  hoisting しないのは、そのほうが安全だから —— 再試行の組み合わせのどれを取っても
   「gate が拒否したはずの呼び手のためにレンジが取得される」状態が作れない。
-  datom 参照なので安くもある。
+  実測でも拒否された呼び手は **0 バイト**しか動かさない。
+- **tenant は検証済み CACAO の issuer DID**。呼び手が名乗れる tenant なら
+  `acquire` の gate は飾りになる。CACAO は自分の署名で検証できるので、
+  **secret を 1 つも持たない shell が唯一チェックできる credential** でもある。
+- **shell は `kotobase-worker-shell/make-handler` を使えない**。`net-kotobase/cypher`
+  が 10 行で済むのに対してここが済まないのは様式ではなく構造の問題で、
+  `make-handler` は `hydrate-run-persist!` の `run-fn` の中で router を**同期に**
+  回すが、レンジを「拒否されて」知る scan は handler の途中に `await` を要る。
+  部品（`hydrate!` / `kotobase-r2` / `cacao`）は 1 段下で再利用し、
+  `hydrate-read-only!` は「たまたま何も変えない `run-fn`」ではなく独立した関数に
+  した —— commit も CAS も put も無い。
+
+### 着地していないもの（正直に）
+
+- **catalog document を書くものが 1 つも無い。** `kotobase.lake.catalog/admit` が
+  quads を作り、この Worker がそれを読むが、**`admit` を呼ぶ deploy 済み経路は
+  存在しない**。したがって live plane に対してこの surface は全オブジェクトに
+  正しく `404 NoSuchObject` を返し、**gate を実データに対して 1 度も開いていない**。
+  次に作るべきはこの write surface で、それは lake repo には属さない。
+- **hostname を取っていない。** custom domain は 1 Worker のもので、最後に deploy
+  した方が勝ち、どちらにも通知されない。`git.kotobase.net` が空の store へ移り
+  28 repo が 404 を返し始めた事故がその記録。
+- **live の費用は scan ではなく hydrate だった**（実測 5,547 / 6,531 / 8,893 /
+  9,475 ms、ほぼ全部が共有 graph の hydrate。catalog collection は空でこの値）。
+  Decision 2 の「スキャンは hydrate を要らない」は **gate の手前までは当たらない**
+  —— gate は catalog を要り、catalog は tenant の ref に在り、ref を読むには
+  hydrate が要る。catalog を大きな共有 graph に置き続けるなら、この surface の
+  費用は hydrate であって range 読みではない。**これは Decision 3 を覆す理由には
+  ならない**（join 到達範囲は依然 ref 1 本）が、「どの ref か」は選べる。
+- **オブジェクトの bytes は R2 からしか読めない**（`<prefix>objects/blocks/<cid>`）。
+  object plane が S3/B2 backend で構成された deployment では bytes がそこに無く
+  `ObjectBytesNotFound` になる。B2 を range 読みするには SigV4 credential が要り、
+  read-only shell が object plane への書き込み credential を持つのは
+  `1 repo = 1 capability` が終わらせたい配置そのもの。
 - **P3（transport）と P5（クエリ到達範囲）は手つかず。** 4 MiB 天井、D5 の
   server-side digest verify、REMOVE 未配線はそのまま。
+
+## この作業で見つかった別の壊れ — `kotobase-peer` main が read できなかった
+
+**旧 west pin（`2ed76f5e` = kotobase-peer main の tip）はソースが読めなかった。**
+`f084cca`（\"push datoms :limit into the prolly prefix scan\"）が `cold-datoms-async`
+の編集した行から閉じ括弧を 1 個落としており、`(.then (fn [prefix] …))` が閉じない
+まま隣の `(.then (fn [entries] …))` を引数として飲み込み、不均衡がファイル末尾まで
+走る。**テストが落ちるのではなく、名前空間が load できない**:
+
+```
+clojure -M -e \"(require '[kotobase-peer.core])\"
+  => Syntax error reading source at (kotobase_peer/core.cljc:1895:32).
+shadow-cljs release
+  => kotobase_peer/core.cljc [line 2917, col 1] EOF while reading.
+```
+
+この family の Worker はすべて `kotobase-protocols-worker.kotobase-store` 経由で
+この ns を require するので、**現行 pin ではどの Worker も再ビルドできなかった**。
+lake Worker のビルドがそれを踏んだ。`f077d947` で修正して merge、pin 前進済み。
+
+**paren の不均衡が main に届いたこと自体が要点**である。この repo に
+`clojure -M:test` を回す gate が在れば、見逃しようがない —— 失敗は read 時、
+どのテストが走るより前に起きる。なお同 commit の `prolly-tree` bump
+（`05e3bff` → `da30b75`）は projection/views テストに 5 件の error を持ち込んで
+おり（`ipld: Data Model map keys must be strings`）、これは paren 修正とは別件。
+`7ec2c78` + 同 bump だけで再現することを実測して切り分けた。
+
+## 実測した自分のテストの穴（同型の再発）
+
+**credential 経路を壊しても、e2e の check は全部 green のままだった。** 認証なしの
+リクエストが `?tenant=` を名乗っていなかったので、`?tenant=` を尊重するビルドでも
+そのリクエストには 401 を返したためである。ADR-2608136000 の
+「その検査は両方向を出したことがあるか」がそのまま当たっている —— 壊して初めて
+分かった。check `[1b]`（保有者を名乗る無認証リクエストは 401）と `[3b]`（他人の
+署名で保有者を名乗っても 404）を足して、壊すと 4 件落ちることを確認した。
 
 ## CI 空白の解消（ADR-2608054000 P4 のうち format library 分）
 
@@ -191,14 +272,31 @@ CLAUDE.md が「wholesale 再生成 commit は禁止」と名指ししている�
 ②危険な操作を background に送ると、止める機会も失う。"
 
   :adr/next
-  "1. **Worker shell を書く。** `acquire/source-for` + hydrate 済み catalog + trampoline を
-      綴じ、`sparql/handle` に `:source` を渡す。gate はループ内。
-   2. **`test/async_parity_check.cljs` を `:nbb-script` gate として登録する。** 今は手で
-      走らせている。同期版は `:jvm-test` で守られたが、非同期版はまだ守られていない。
-   3. **deploy は workers.dev で先に証明してから hostname を付ける**
-      （`net-kotobase-cypher` の wrangler.jsonc が記録している順序。custom domain は
-      1 Worker のもので、最後に deploy した方が勝ち、どちらにも通知されない）。
-   4. **zebulun の egress を直すか、`:caps` に egress を明示する。** 今は `#{}` が
+  "1. **catalog document を書く経路を作る。** これが今の唯一のブロッカーで、
+      deploy 済みの surface が live データに対して 1 度も gate を開けていない理由。
+      `kotobase.lake.catalog/admit` → `net-kotobase-lake.catalog-docs/quads->docs`
+      → tenant の ref の `lake-catalog` collection。**書き surface なので lake repo
+      には置かない**（read-only shell が write credential を持たない、が lake の
+      設計の半分）。候補は s3 surface の PUT 経路（既に object を
+      `objects/blocks/<cid>` に置いている）。
+   2. **catalog を置く ref を選び直す。** 実測 5.5〜9.5 秒/リクエストが全部
+      共有 graph の hydrate だった。join 到達範囲は ref 1 本のままでよい
+      （Decision 3 は覆らない）が、**どの ref かは選べる** —— tenant ごとの
+      graph に置けば hydrate が tenant のデータ量に比例し、共有 graph 全体には
+      比例しない。決める前に、その ref で何と join したいかを名指しすること。
+   3. **`kotoba-lang/kotobase-peer` に `:jvm-test` gate を足す。** 2026-08-17 に
+      main が read すらできない状態で 1 日置かれ、この family の Worker が全部
+      ビルド不能だった。`clojure -M:test` を回す gate なら見逃しようがない
+      （失敗は read 時、どのテストより前）。同じ commit が持ち込んだ
+      projection/views の 5 error も別途。
+   4. **`test/worker_e2e_check.cljs` と `test/async_parity_check.cljs` を
+      `:nbb-script` gate として登録する。** 今は手で走らせている。ただし前者は
+      `:include-ext` が `.cljs .cljc .json .parquet` を運び、かつノードに 25 の
+      sibling source-path を配れる必要がある（ADR-2608102000 の 4 番目の罠 ——
+      「ローカルで緑」は「fleet で緑」ではない）ので、そこを実測してから。
+   5. **hostname は最後。** `lake.kotobase.net` を付けるのは、上の 1 が landed して
+      実データで scan が 1 度でも通ってから。
+   6. **zebulun の egress を直すか、`:caps` に egress を明示する。** 今は `#{}` が
       偶然守っているだけで、`:jvm` を足した瞬間に git 依存 gate が落ちる。
-   5. P3（4 MiB 天井の畳み方 / D5 digest verify / REMOVE）と P5（planner が
+   7. P3（4 MiB 天井の畳み方 / D5 digest verify / REMOVE）と P5（planner が
       catalog と行を跨げない件）は ADR-2608054000 のまま未着手。"}]
