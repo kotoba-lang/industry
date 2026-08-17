@@ -1403,6 +1403,70 @@
   {:name "sigv4" :id "nbb-cross-runtime-sigv4" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+  ;; sigv4's THIRD gate: the Kotoba implementation of the percent-encoder held
+  ;; to the Clojure one, byte for byte, across 147 inputs.
+  ;;
+  ;; `:cap :kotoba` is new, and probe.cljs learned to detect the CLI the same
+  ;; way it detects zig. Only judah has it today (installed 2026-08-17), so
+  ;; this gate is capacity-limited to one node on purpose: a parity gate that
+  ;; cannot build its module must not land somewhere it will always be red.
+  ;;
+  ;; Why this is worth a capability rather than being dropped: measured
+  ;; 2026-08-17, `kotoba wasm emit` had been failing `check-failed` since the
+  ;; language grew its T1 memory-safety gate, so the comparison could not run
+  ;; at all -- and nothing said so, because nothing ran it. The implementation
+  ;; was never wrong (643 bytes, all 147 inputs match once the module declares
+  ;; `:kotoba/raw-memory`). A build red for weeks was hiding only itself, and
+  ;; that is exactly the state a gate exists to make visible.
+  ;;
+  ;; The entry builds the module itself and fails when the CLI is absent,
+  ;; rather than skipping -- `.kotoba` and `.lock.edn` are therefore in
+  ;; `:include-ext`, and the tree without them would fail loudly rather than
+  ;; report a pass over nothing.
+  ;;
+  ;; Verified on judah: intact `OK: 1 tests, 0 failures` exit 0; widening the
+  ;; digit class by one so `:` becomes unreserved -> exit 1, naming
+  ;; `":" -> clojure "%3A", kotoba ":"`.
+  {:name "sigv4" :id "kotoba-parity-sigv4" :gate :nbb-script :cap :kotoba
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :script-args ["--entry" "kotoba-tests.cljs"]
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json" ".kotoba"]
+   :min-files 5 :cd true}
+  ;; org-ietf-cbor's SECOND gate. Its `package.json` had a `test:cljs`, and it
+  ;; is `shadow-cljs compile test` -- a JVM build nothing here can invoke.
+  ;;
+  ;; This one guards a written-down invariant rather than a suspected bug.
+  ;; `cbor/core` already knows the hazard four other repos were found carrying
+  ;; on 2026-08-17, and says so in place: ClojureScript's bitwise operators
+  ;; coerce to Int32/Uint32 first, so the encoder divides and `mod`s instead
+  ;; of shifting. dev-protobuf and io-multiformats had the same reasoning in a
+  ;; comment while the code had quietly stopped matching it, which is what an
+  ;; invariant with nothing re-reading it becomes.
+  ;;
+  ;; Verified on judah: intact `OK: 13 tests, 0 failures` exit 0; reverting
+  ;; that byte extraction to `bit-and`/`unsigned-bit-shift-right` -- the exact
+  ;; thing the comment forbids -- `FAIL: 13 tests, 2 failures` exit 1.
+  {:name "org-ietf-cbor" :id "nbb-cross-runtime-cbor" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+  ;; kotobase-lake's SECOND gate. `:script-args` carries the entry, because
+  ;; this repo's nbb runner is `test/run.cljs` rather than the default name.
+  ;;
+  ;; Its README already records why the cljs half is not a duplicate: the
+  ;; first green JVM run of that suite was sitting on a cljs-only defect --
+  ;; `(int \c)` is a code point on the JVM and `0` in ClojureScript, so every
+  ;; ASCII magic-byte string compiled to zeros and a tar fixture classified as
+  ;; PDF, 15 of 118 assertions failing under nbb while the JVM reported none.
+  ;;
+  ;; Verified on judah, after fixing a subset the node run itself exposed
+  ;; (that runner listed eight namespaces for a nine-namespace suite, so it
+  ;; ran 77 of 84 tests, green): intact `OK: 84 tests, 0 failures` exit 0;
+  ;; with `acquire/holds?` forced false, `FAIL: 84 tests, 8 failures,
+  ;; 3 errors` exit 1.
+  {:name "kotobase-lake" :id "nbb-cross-runtime-lake" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :script-args ["--entry" "test/run.cljs"]
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
 
   ;; `.kotoba` は **この repo の唯一の production source** なので :include-ext に
   ;; 要る（ADR-2608131200）。この gate は 2026-08-05 から 4 回すべて赤で、一度も

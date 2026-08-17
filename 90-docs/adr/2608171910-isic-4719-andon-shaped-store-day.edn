@@ -20,19 +20,23 @@ Andon Labs の Andon Market（Luna）と同じ *1日の形* を
 1日は有界な tick 列である。
 
 roster → hire request → inbound → sales → restock → loss-prevention flag
+→ optional cash-up count
 
 各 tick は既存の `merchandiseops.operation` 1 run。内側で無限 loop しない。
+till の *数え* は in-scope。入金・ドロップ・レジ補填はしない。
+差額は既存の `:flag-loss-prevention-concern` で escalate する。
 
 ## 2. Andon と揃えないもの
 
 Andon の Luna は法人カードを持ち、採用を確定し、仕入を支払う。
 この actor はそれをしない。
 
-- brief に `:charges` / `:corporate-card` / `:wire-funds` 等があれば
-  **actor を起動する前に** plan が拒否する。
-- 提案本文が `charge the corporate card` / `wire funds` / `送金を実行`
-  に触れたら governor が HARD hold（実行動詞。bare な card/payment では
-  自傷しない）。
+- brief に `:charges` / `:corporate-card` / `:wire-funds` /
+  `:bank-deposit` / `:make-whole` 等があれば **actor を起動する前に**
+  plan が拒否する。
+- 提案本文が `charge the corporate card` / `wire funds` / `送金を実行` /
+  `make the till whole` / `deposit the till` に触れたら governor が
+  HARD hold（実行動詞。bare な card/payment/till では自傷しない）。
 - 採用は `:schedule-staffing-operation` + `:hire-request? true`。
   常に escalate。雇用契約は人間が結ぶ。
 - 拘束・所持品検査・逮捕は従来どおり永久除外。
@@ -47,10 +51,15 @@ Andon の Luna は法人カードを持ち、採用を確定し、仕入を支�
 - 検証済み店の demo day が hire と concern を escalate する。
 - 未検証店の day は全 tick HARD hold。
 - fund-actuation brief は tick 0 件。
-- `render-html` は store-day の escalate < 2 または unverified hold 0
-  なら HTML を書かずに throw する。
+- 差額のある cash-up は既存 concern op で escalate する。釣り合えば
+  tick を足さない。
+- `render-html` は store-day の escalate < 2、unverified hold 0、
+  または cash-up discrepancy が escalate しないなら HTML を書かずに
+  throw する。
 
 ## 5. 改訂
 
-2026-08-17 新設。ADR-2680004719 の coordination-only を崩さない。
+2026-08-17 新設。同日、close-of-day till count を既存 concern op で
+足した。新しい op は作っていない。ADR-2680004719 の
+coordination-only を崩さない。
 "}]
