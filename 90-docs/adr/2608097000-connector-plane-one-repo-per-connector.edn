@@ -274,9 +274,10 @@ main に着地しており、本 ADR は 09:46Z に**同じ番号で 2 件目**�
 | 済んだ経路 | 記述子 → registry → consent → invoke → MCP、および Fleet 画面の catalog → tenant_connection → passkey |
 | テスト再実行 | 各 repo で `nbb --classpath \"src:test:../connector/src\" run-tests.cljs`（kernel は `../org-anthropic-mcp/src`） |"
   :adr/consequences
-  "cloud-itonami-app はまだ配線されていない。registry は「使える形で在る」だけで「使われている」ではない。
+  "cloud-itonami-app は配線済み（2026-08-17 に更新。以前ここは「まだ配線されていない」と書いていた）。`cloud.itonami.app.connectors` が 8 connector の registry を持ち、`identity/provider-catalog` はそこから導出される。既定で on になる集合は列挙ではなく計算で、`historical-grant`（registry 以前にこの app が実際に持っていた grant）の内側にある tool だけが on になる —— つまり registry を配線しても誰の grant も広がらない。com-github / com-slack / com-notion / com-google-chat の connector も registry に載っており、既定は off。
+config で広げる口は 2 つあり、意味が違う（cloud-itonami-app main 3bb3ddc、2026-08-17）。`[:connectors :enabled :tools]` は計算された既定を**置き換える**。`[:connectors :enabled :also]` は**足す**。後者が要ったのは、widener を 1 つ on にするだけで既定の全 tool を貼る必要があり、その literal が貼った日の一覧で凍って後から入る connector を既定から締め出すため（凍ったことは何も報告しない）。`:also` なら deployment は自分の逸脱だけを名指しし、`widened-scopes` / `describe` がそれを「次の再接続で出る scope」として申告する。
+実運用の第 1 例: この workstation の deployment が `data/config.edn`（operator ローカル、git 管理外）で `microsoft_graph_list_events` / `microsoft_graph_get_schedule` を on にした。実測 18 → 20 tool、M365 の consent に `Calendars.Read` が入り、起動行が `WIDER than the pre-registry grant: microsoft +1` になる。Outlook の mail 4 tool は `Mail.ReadWrite` が `historical-grant` にあるので最初から on だった —— off だったのは calendar だけで、理由は `Calendars.Read` が既存の `Calendars.ReadBasic` より広いこと。
 tool 名は全 connector で一意。registry が load 時に拒否する。
-既存 origin 面 repo（com-github / com-slack / com-notion / com-google-chat）への connector 追加は未実施。
 Gmail の labelIds は複数指定不可（query map が単値）。1 件なら動き、複数なら省略する。
 connector.edn を手編集するとテストが落ちる。生成し直す。
 別件（追跡済み）: .mcp.json は path と classpath の 2 つの誤りを修正済み（main 72273d9fe3d）。「pin 退行 4 件」は誤報で、実在した遅れは cloud-itonami-app の 2 commit のみ（前進済み）。hosted MCP の OAuth AS は未稼働のまま。ADR 番号 2608094000 は先着があったため本 ADR を 2608097000 へ移動した。"}]
