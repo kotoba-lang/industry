@@ -171,6 +171,34 @@ ClojureScript の double は overflow しないので意図したエラーを報
 | `nbb-cross-runtime-multiformats` | `OK: 35 tests, 0 failures` exit 0 | varint を shift に戻す → `FAIL: 35 tests, 3 failures` exit 1 |
 | `sigv4` `:jvm-test` | 32 tests / 93 assertions exit 0 | 長さ比較を外す → exit 1、`constant-time-eq-semantics` を名指し |
 
+## ⚠ 訂正 —— 「26 repo」は Worker 1 つ分の数だった
+
+本 ADR は冒頭で「live Worker に載る 26 repo」と書き、その inventory を
+`protocols-worker/upstream-lock.json` 1 ファイルから取っていた。**このワークスペース
+から出来ている live Worker は 2 つある。** `net-kotobase/lake` の shadow-cljs source
+path には lock に無い repo が 6 本あり、**和は 32 本**である。
+
+追加で gate したもの（2026-08-17、judah で実測してから登録）:
+
+| repo | 実測 |
+|---|---|
+| `kotobase-protocol-core` | 24 tests / 97 assertions（private repo なので tarball を配って実行） |
+| `org-ietf-zstd` | JVM 28/251、nbb `OK: 20 tests`（2 本立て） |
+
+**gate できない 2 本**（回避せず記録する）:
+
+- `kotobase-client` —— `deps.edn` が `:deps {}` で `:test` alias も無い
+- `kotobase-worker-shell` —— **deps.edn が無い**
+
+どちらも消費側の Worker に shadow-cljs の `:source-paths` として取り込まれる設計で、
+自分の suite が要する兄弟（`datom.source`・`kotobase.cacao`）は**消費側が供給する**。
+実測すると consumer の外では `Could not find namespace` で落ち、
+`nbb-cross-runtime.cljs` は deps.edn から classpath を組むので**組む材料が無い**。
+直すには当該 repo が自分の suite の依存を宣言する必要があり、それは consumer の
+解決結果を変える判断で、gate 登録の範囲を超える。
+
+**監査は inventory の広さまでしか届かない。私の inventory は 1 ファイル分だった。**
+
 ## 測った 2 件目 —— `sigv4` は既に規律ができていた
 
 次に測る先として `sigv4` を挙げていたので測った。**予想は外れ、良い方に外れた。**
