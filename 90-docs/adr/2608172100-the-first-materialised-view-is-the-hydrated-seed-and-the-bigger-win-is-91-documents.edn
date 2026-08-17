@@ -1,0 +1,338 @@
+[{:db/id -1
+  :adr/id "ADR-2608172100"
+  :adr/title "最初に作る materialized view は hydrate 済み seed（chain CID キー）— ただし本当に効く一手は 91 documents の方"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :adr/last-verified "2026-08-17"
+  :adr/last_verified "2026-08-17"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotobase-materialized-view"
+  :source/dataset "adr"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/authoritative-for
+  ["どの materialized view を最初に作るか、その key と invalidation"
+   "その view が positive-conjunctive-query? に admit されるかどうか"
+   "hydrate の CPU が実際にどこへ行っているか（workerd 実測 + 本番 bytes 再生）"
+   "/_diag/hydrate の ms が cost ではなかったこと（112x 過小報告）"
+   "query memo が hydrate を覆えない構造的理由"]
+  :adr/related
+  ["ADR-2608170200（kotobase performance / unit economics closing、resume point 1）"
+   "90-docs/kotobase-performance/2026-08-17-materialized-view-is-a-wiring-gap.edn"
+   "90-docs/kotobase-performance/2026-08-17-fold-cost-at-production-shape.edn"
+   "ADR-2607310900（query memo L1 / persisted index L2）"
+   "ADR-2608061200（object body を blob plane へ移した決定）"
+   "ADR-2608160100（block → CARv2 pack → object、range read）"
+   "net-kotobase/control-plane 21dcc464e7f / 483305390aa"]
+
+  :adr/body
+  "# ADR-2608172100
+
+**Status**: accepted / **Date**: 2026-08-17
+
+## 1. 問い
+
+ADR-2608170200 の resume point 1 は「MV の配線」で、ブロッカーは
+**「どの view を作る価値があるか、それには served query の分布が要る」**だった。
+仮説として与えられたのは:
+
+> 一番大きい materialisable なものは user query view ではないかもしれない。
+> **毎リクエストがグラフ全体を hydrate する** —— 84 blocks / 11.5 MB / ~800 ms ——
+> して 1 つの LocalStore 型 seed を作る。その seed は chain head CID の純関数で、
+> content-addressed かつ immutable。**seed 自体**を chain CID キーで materialise
+> すれば hydrate は range read に潰れ、query mix の知識を一切必要としない。
+
+結論を先に書く。**key の選び方は正しい。効果の見積もりは間違っている。**
+そして**一番効く一手は view ではない。**
+
+## 2. 実測したこと
+
+### 2.1 workerd の実 CPU（`wrangler tail`、n=14）
+
+外から測れなかったのは認証のせいではなく、**測る道具を使っていなかった**だけだった。
+`workers_tail (read)` 権限があり、tail は event ごとに `cpuTime` / `wallTime` を返す。
+atproto は public read surface なので、hydrate する本物のリクエストを撃てる。
+
+| | cpuTime | wallTime |
+|---|---|---|
+| hydrate するリクエスト（14 本） | **2,329–4,416 ms** | 2,851–6,184 ms |
+| `GET /_diag/hydrate` | **1–3 ms** | 1–3 ms |
+
+CPU が wall の 68–85%。**この経路は I/O bound ではなく CPU bound。**
+そして diag は本当に O(1) で、観測対象の仕事を起こしていない（設計どおり）。
+
+### 2.2 `/_diag/hydrate` の `ms` は cost ではなかった（112x 過小報告）
+
+今朝 landing したこの endpoint の `ms` は `Date.now()` の差分だった。
+**Cloudflare Worker の `Date.now()` は I/O 境界でしか進まない**（同期実行中は凍結。
+timing attack 対策で、bug ではない）。したがってこの差分は **累積 I/O 待ち**であって
+CPU を 1 ミリ秒も計上しない。
+
+8 本の**対リクエスト対応づけ実測**（診断は毎回そのリクエストと同じ接続で読み、
+`at` がそのリクエストの窓に入ることを確認済み）:
+
+| request | cpuTime | wallTime | 報告された ms |
+|---|---|---|---|
+| pair-6 | 4,046 | 5,092 | **36** |
+| pair-5 | 3,890 | 4,745 | **43** |
+| pair-4 | 4,416 | 6,184 | 1,822 |
+| pair-3 | 4,163 | 5,883 | 1,251 |
+
+**最悪 112 倍の過小報告で、しかも最悪の 2 例は isolate の block cache が温まっていた
+ケース** —— 測る I/O が残っていない時にこそ小さく出る。つまり
+**この数字は、最も誤読を招く時に最も小さくなる。**「hydrate はもう安い」と読むのは
+真実の正反対で、これは `no sample` を 0 と描くのと同じ failure class である。
+
+**直して deploy 済み**（§6）。`io_wait_ms` に改名し、`cost_note` を body に同梱し、
+`blocks_from_cache` / `blocks_from_r2` を足した。本番で両方向を確認:
+
+```
+io_wait_ms=1220  from_cache=0   from_r2=84   ← cold isolate
+io_wait_ms=44    from_cache=84  from_r2=0    ← 同じ仕事、warm isolate
+```
+
+### 2.3 hydrate の CPU の内訳（本番 bytes を再生、CID 検証済み）
+
+本番 chain head から到達可能な 118 blocks を read-only で取得し、実 CID をキーに
+した in-memory bucket に載せて、**出荷中の `hydrate-run-persist!` をそのまま**回した。
+engine が block CID を検証するので、bytes が違えば黙って別のグラフを測ることはない
+（実際、Node の pooled Buffer を渡した最初の版は `chain: block CID mismatch` で落ちた）。
+
+| phase | Node cpu-ms | 割合 |
+|---|---|---|
+| whole served hydrate | 1,720–2,232 | 100% |
+| **A** `eng/hot-datoms`（84 block 取得 + dag-cbor decode + prolly tree 走査 + novelty 併合） | 491–538 | **23%** |
+| **B** `hydrate!` の fold（`group-by` + `decode2` = 値ごとに `edn/read-string` **2 回** + map 構築） | 1,386–1,473 | **64%** |
+| 残り（head read、before/after diff、counters） | ~300 | ~13% |
+
+phase B は shipped `ks/hydrate!` と `=` で一致することを毎回検査している
+（不一致なら bench は結果を出さず abort する）。
+
+### 2.4 materialised seed を decode し直す costs
+
+| 候補 | bytes | decode cpu-ms | hydrate 比 |
+|---|---|---|---|
+| seed を EDN で | 4,930,593 | 887–919（結果は hydrate と `=`） | **−60%** |
+| seed を CBOR 構造 + 値は 1 層 EDN | 4,933,159 | 836–951（docs は `=`） | −57% |
+| **CBOR 構造だけ decode し、値を一切 parse しない** | 同上 | **2.5–6.8** | **−99.7%** |
+
+**これが核心である。** seed を materialise すると phase A は消えるが、
+**phase B はどんな encoding でも生き残る** —— 消費側が同期 `kotobase.local/LocalStore`
+（素の Clojure map を持つ deftype）である限り、bytes を Clojure の値に戻す仕事は
+毎リクエスト発生する。**−60% と −99.7% を分けているのは bytes の出どころではなく、
+いくつの値を parse するかである。**
+
+### 2.5 では、どの値か（census）
+
+| collection | docs | EDN bytes |
+|---|---|---|
+| `[:kotobase.s3/objects \"etzhayyim-xyz-farcaster-fnames\"]` | 526 | **4,312,242** |
+| `[:kotobase.git/objects \"kotoba-lang/kotobase-protocols-worker\"]` | 75 | 158,281 |
+| 残り 15 collection 合計 | 287 | 460,070 |
+
+さらにその 526 のうち **91 documents が `:bytes` キーを持つ**（inline object body、
+ADR-2608061200 が body を blob plane へ移す前のもの）。その 91 が
+**4,198,531 bytes = seed 全体 4,930,593 の 85.2%**。分布は綺麗に割れていて、
+**1 KB を超える document はちょうどこの 91 だけ。**
+
+そして **2026-08-10 以降、そのバケット宛の s3 リクエストは
+`graph/for-request` により `s3-bucket/etzhayyim-xyz-farcaster-fnames` へ回る。**
+つまり `kotobase-protocols-v2` 上のこの 91 件に到達できるのは 4 つの query surface
+だけ（全部 credential 必須）。**それでも全 surface の全リクエストがこれを parse する** ——
+`hydrate!` が router の分岐より前に seed 全部を作るから。`/health` が定数 4 つを
+返すのに 1,364 CPU-ms 払っていたのと同じ形である。
+
+### 2.6 query memo が hydrate を覆えない理由（仮説への反証要求への答え）
+
+「per-isolate memo が既にあるのに hydrate は 800 ms かかる。durable 版を提案する前に
+**なぜ memo が既に覆っていないのか**を問え」——答えは cold isolate ではない。**構造である。**
+
+`query/memo-version` は **`(:docs state)`** をキーにする。`state` は
+**hydrate の出力**である。つまり **memo キーを計算するには先に hydrate し終えていな
+ければならない** —— memo は定義上 hydrate の下流にあり、hydrate を消せない。
+memoise しているのは `bridge/db-for` の materialisation であって hydrate ではない。
+
+加えて memo は `query/queryable?` が真の 4 surface にしか付かない。
+本番実測（全 isolate）: **`size 0 / hits 0 / misses 0`**。今日この graph で
+query surface のリクエストは 1 本も無い。
+
+## 3. 決定 —— 最初に作る view
+
+**`seed/v1`: hydrate 済み LocalStore seed の projection。**
+
+| | |
+|---|---|
+| **key** | `(graph, chain-head CID)`。R2 の `seeds/<graph>/<chain-cid>` 1 オブジェクト |
+| **中身** | dag-cbor の構造 + **値は保存時の EDN 文字列のまま**。collection ごとに分離して decode できる形 |
+| **読み方** | 構造を decode（実測 2.5–6.8 ms）し、**そのリクエストの surface が到達しうる collection の値だけ** parse する |
+| **invalidate** | 任意の commit。head CAS が通れば chain CID が変わり、キーが変わる。**上書きは無い**（content-addressed、古いオブジェクトはゴミになるので TTL/GC が要る） |
+| **いつ作るか** | **read miss 時に遅延生成**し、`ctx.waitUntil` で書く。commit ごとの eager 生成にしない |
+
+**なぜ eager にしないか。** このグラフは書き込みが稀（seq 972 以降ゼロ）だが、
+`s3-bucket/*` は `git annex copy` 中に毎秒書かれる。commit ごとに seed を作ると
+**一度も読まれない seed を書き込みのたびに作る**ことになる。遅延生成なら維持コストが
+「head あたりの読み回数」に比例し、書き込みの重いグラフでは自動的に無効化される。
+
+**なぜ collection 単位で parse するのか。** §2.4 と §2.5 の合わせ技。構造 decode は
+ほぼ無料（6.8 ms）で、費用は値の parse に集中しており、その値は 1 つの collection に
+偏っている。atproto surface が読む `[:kotobase.at/records …]` は **15 bytes / 0.01 ms**。
+
+### 3.1 `positive-conjunctive-query?` は admit するか —— **しない。別機構である**
+
+はっきり書く。**この view は `kotobase-projection` の Datalog view ではない。**
+`positive-conjunctive-query?` は `:find` / `:where` を持つクエリを検査する述語で、
+seed には `:find` も `:where` も無い —— これは**クエリではなく、store 全体の射影**
+である。`build-view` / `range-query-plan` / `maintain-query-delta` は
+どれもこの形を取らない。projection library が唯一の選択肢であるかのように書くのは、
+「配線するだけ」という結論に都合がよいだけで、間違いである。
+
+近縁なのは **`kotobase-peer` の fold 時 `views`**（chain state の `views` キーから
+リンクされる派生成果物）で、これは「head をキーにした派生物」という点で正しく同型。
+**それでも採らない**理由が 2 つ:
+
+1. `views` は **fold の時にしか更新されない**。fold は 3.8 s CPU / 34.6 MB PUT
+   （2026-08-17 fold receipt 実測）で、seed の更新のために fold を起こすのは本末転倒。
+2. `views` は **chain state を書き換える**。seed は純粋な cache なので、
+   壊れても正しさが失われない場所に置くべきで、chain state はその場所ではない
+   （「消して再構築できるか」テスト、ADR-2608039000）。
+
+したがって **R2 の普通のオブジェクトとして持つ。消せば遅くなるだけで、
+content-addressed な面から再構築できる** —— projection であって premise ではない。
+
+### 3.2 維持コスト vs 節約
+
+**1 回の生成 = 1 回の hydrate（2,329–4,416 ms workerd CPU）+ serialise + 4.9 MB の PUT 1 本。**
+これは **fold より安い**（fold は 3.8 s CPU + 34.6 MB PUT）ので、既にある
+`ctx.waitUntil` の background slot にそのまま乗る。
+
+節約は head あたり **(読み回数 − 1) × (hydrate − seed 読み)**:
+
+| 経路 | 現在 | seed/v1（全 collection parse） | seed/v1（surface 分の collection だけ） |
+|---|---|---|---|
+| Node cpu-ms | 1,720–2,232 | ~890 | atproto なら ~10、git なら ~50 |
+| R2 GET | 85 | 2 | 2 |
+| R2 転送 | 11.46 MB | 4.93 MB | 4.93 MB |
+
+**head あたり 2 回以上読まれれば黒字**になる。1 回しか読まれない head では
+1 回分の hydrate を余計に払う（遅延生成なので、その 1 回は元々払っていた分）。
+
+### 3.3 実装上の既知ハザード（推論であって未検証）
+
+- **streams は常に全部 materialise する。** `diff->tx-data!` の `new-events` は
+  `(count (get-in before [:streams stream]))` を seq の起点にする。streams を
+  部分 materialise すると `before-n` が 0 になり、**既存イベントと seq が衝突する。**
+  docs だけを collection 単位にする。
+- **docs の部分 materialise は write path では安全に見える。** `changed-docs` は
+  `(:docs after)` を走査するので、materialise していない collection は行を生まない。
+  未 materialise の collection へ書いた場合は `::absent` 扱いになり、
+  `doc-point-query` が chain 上の旧値を見つけて retract+assert する。
+  **読んだだけでは検証していない。**
+- **GraphQL の `collections` / SPARQL の `:coll-keys` は「キー集合」しか要らない**
+  （値は不要）。seed の構造 decode だけで満たせる。
+
+## 4. しかし、本当に効く一手は view ではない
+
+**91 documents が、この graph の全リクエストが parse するものの 85% である。**
+そしてそれらは 2026-08-10 以降、s3 surface からは到達できない場所に取り残されている。
+
+**これを外せば、view を 1 行も書かずに phase B の 85% が消える**（seed は 4.93 MB →
+約 0.73 MB、hydrate は Node で 2.2 s → 約 1.0 s）。view を作る場合も、
+先にこれを外した方が view 自体が 6.7 倍小さくなる。
+
+**ここでは実行しない。** これは本番データへの書き込みであり、
+「その 91 件がまだ誰かに必要か」は測定ではなく**オーナー判断**である
+（append-only chain なので retract は履歴を失わないが、それでも判断は判断）。
+**最初に建てるべき view は §3、最初に問うべき問いはこれ。** 順序を逆にしない。
+
+**fold はこれを消さない。** fold が消すのは novelty 側（phase A の一部）で、
+snapshot の 34.6 MB は 91 件を含めて丸ごと書き直される（fold の cost は snapshot
+bytes に比例する、と 2026-08-17 fold receipt が実測している）。
+
+## 5. served query mix —— 測った結果は「無い」
+
+view の選択が止まっていた理由は「served query mix が外から見えない」だった。
+tail で**見える**。そして見た結果:
+
+**marker で挟んだ 5 分間の接続済み tail（12:33:41Z–12:38:41Z）で、
+観測された event は marker 2 本だけ。organic のリクエストはゼロ。**
+
+（最初に回した passive tail は 0 バイトで終わった。これは「traffic ゼロ」ではなく
+**tail が接続していない**のと区別できない —— まさに本 ADR が §2.2 で問題にしている
+形なので、marker を撃って「接続していたこと」を証明できる窓を取り直した。）
+
+したがって**今日この graph において、MV の価値は served CPU の節約ではない。**
+価値は ADR-2608170200 のコストモデルが主張する交差点（100 万 → 6,500 万
+クエリ/月）にあり、それは**将来のトラフィックについての主張**である。正直に書く:
+**トラフィックが無いのだから、query mix に基づいて view を選ぶことは今日できない。**
+それが、query mix を要さない §3 の seed view を選んだ 2 つ目の理由である
+（1 つ目は、それが実際に測って一番大きかったから）。
+
+なお **per-surface の hydrate カウンタを本番に入れた**ので、トラフィックが
+発生し始めれば `/_diag/hydrate` の `hydrates_by_surface` が答える（§6）。
+
+## 6. 本番に出したもの
+
+**`net-kotobase/control-plane`、merge `21dcc464e7f` と `483305390aa`、
+Cloudflare version `2660dd72-ce7d-4e9f-8d4b-a2effb8f4bc5`。**
+
+- `ms` → **`io_wait_ms`** に改名（旧名は残さない —— 残せば誤読する consumer が
+  disclaimer 無しで同じ数字を読み続ける）
+- **`cost_note`** を body に同梱（「これは cost ではない」「cost は tail の cpuTime」）
+- **`blocks_from_cache` / `blocks_from_r2`** —— 84/0 なら I/O は起きておらず、
+  小さい `io_wait_ms` は cache の性質であって仕事の性質ではない、と読める
+- **`hydrates_by_surface`** —— MV の判断が待っていた入力そのもの。
+  `nil`（訊かれていない）と map（測った）は別の body になる
+- `hydrate-sample-body` / `hydrates-surfaces-body` は **pure かつ public** で、
+  テストが**両方の分岐**を駆動できる（isolate の状態任せだと、たまたま通った側だけ
+  緑になり、もう片方が壊れていても気づけない）
+
+**全部 O(1) 読み取りで、どれも hydrate を起こせない。** これが route を
+unauthenticated のままにしてよい理由（1 回 2,500–4,400 CPU-ms + R2 GET 85 回は
+DoS amplifier）。`novelty-size` 読みは try で包んだまま —— 診断は観測対象の
+リクエストを落としてはならない。
+
+**bench も landing**: `hydrate_phase_bench.cljs`（本番 blocks を
+`scripts/fetch-graph-blocks.cljs` で read-only 取得 → 出荷中の hydrate を回して
+CPU を分解。phase B の mirror は `ks/hydrate!` と `=` で照合し、不一致なら abort）。
+`:ns-regexp` の外なので `npm test` には入らない（`fold_bench` と同じ）。
+
+**検証**: 120 tests / 756 assertions → **127 / 794、0 failures**。
+新しい判定点は**壊して赤くなることを実演した** —— `ms` の名前を戻す（3 failures）/
+「訊かれていない」を「測って全部ゼロ」に描く（2）/ `cost_note` を落とす（3）/
+nil surface の hydrate を捨てる（1）/ `block-cached?` を常に false にする（1）。
+**壊したものと報告されたものが一致することを毎回確認した。**
+
+## 7. 測ったもの / 推論したもの
+
+**測った**: workerd の cpuTime（tail、n=14）/ diag の 112x 過小報告（対リクエスト
+対応づけ、n=8）/ 本番 bytes での phase 分解（CID 検証済み、n=4 run）/ seed の
+3 通りの decode コスト（結果は hydrate と `=` で照合）/ collection 別 bytes と
+parse コスト / 91 件の inline body census / query memo の live カウンタ /
+5 分間の organic traffic（marker 付き）/ `graph/for-request` のルーティング（コード）。
+
+**推論した**: seed view を入れた後の per-surface コスト（collection 別 parse
+コストからの算術であって、実装して測った値ではない）/ 部分 materialise の write path
+安全性（`diff->tx-data!` を読んで導いた。**テストしていない**）/ 「head あたり 2 回
+読まれれば黒字」（測った 2 つの数の割り算）/ Node と workerd の比（1.1–2.0x、
+負荷が違う条件での比較なので幅が広い）。
+
+## 8. 決められなかったこと
+
+1. **workerd のメモリ。** seed の decode は 4.9 MB のテキストを Clojure 構造に
+   する。Node の heapUsed は hydrate 後 165–184 MB だった。**isolate の上限は
+   128 MB** だが、Node の計上を workerd に写像することはできない。
+   `exceededMemory` と `exceededCpu` は tail で区別できるので、実装したら測ること。
+2. **served query mix。** 5 分の窓で 1 つの vantage、1 つの graph。
+   「今日ゼロだった」以上のことは言えない。
+3. **91 件がまだ必要かどうか。** これはデータの問題でオーナー判断（§4）。
+4. **部分 materialise の write path。** stream seq のハザードは見つけたが、
+   docs 側の安全性は読解であって検証ではない。
+5. **R2 Range read が単一 GET に勝つか。** 測っていない。構造 decode が 6.8 ms
+   なので、たぶん要らない（ADR-2608160100 の pack 面とは別の話）。
+6. **他の graph。** 全部 `kotobase-protocols-v2` の測定。`s3-bucket/*` と
+   `atproto-repo/*` は形が違い、書き込み頻度も違う。§3 の遅延生成はそれを
+   前提にしているが、そちらでは測っていない。"}]
