@@ -1,6 +1,6 @@
 [{:db/id -1
   :adr/id "ADR-2608171256"
-  :adr/title "Kotobase IPFS/IPNS HTTP protocol maturity 0.20.0 と残 gap の閉鎖順"
+  :adr/title "Kotobase IPFS/IPNS HTTP protocol maturity 0.21.0 と残 gap の閉鎖順"
   :adr/status "accepted"
   :adr/date "2026-08-17"
   :adr/last_verified "2026-08-17"
@@ -18,14 +18,14 @@
   :adr/supersedes ""
   :adr/superseded-by ""
   :adr/authoritative_for
-  ["net-kotobase/ipfs 0.20.0 までに実装・live 確認された HTTP Gateway / IPNS / UnixFS / CAR 面"
+  ["net-kotobase/ipfs 0.21.0 までに実装・live 確認された HTTP Gateway / IPNS / UnixFS / CAR 面"
    "local regression、production live、provider qualification を同一視しない証拠境界"
    "残 gap G1-G7 の優先順、完了条件、非主張"
    "この Worker は bounded HTTP Gateway であり libp2p peer ではない境界"
-   "G1 は 0.20.0 で閉じた。次の実装は G2 CAR raw-child planning から始める"]
+   "G1/G2 は 0.21.0 で閉じた。次の実装は G3 DAG-PB structural buffer から始める"]
   :source/dataset "adr"
   :adr/body
-  "# ADR-2608171256: Kotobase IPFS/IPNS HTTP protocol maturity 0.20.0 と残 gap
+  "# ADR-2608171256: Kotobase IPFS/IPNS HTTP protocol maturity 0.21.0 と残 gap
 
 ## Context
 
@@ -48,7 +48,7 @@ IPNS origin が提供する HTTP compatibility surface の成熟度である。
 
 ### 1. 準拠性は面ごとに答える
 
-| 面 | 0.20.0 の状態 | 主張してよいこと | 主張してはいけないこと |
+| 面 | 0.21.0 の状態 | 主張してよいこと | 主張してはいけないこと |
 |---|---|---|---|
 | Path Gateway GET / HEAD | implemented + live | malformed CID を I/O 前に 400、immutable CID response、Range / conditional | 全 IPFS Gateway conformance suite 合格 |
 | trustless raw | implemented + live | weighted Accept / `format=raw`、strong ETag、304、206、R2 2-pass CID verification | 任意 provider の live qualification |
@@ -93,24 +93,28 @@ live probe → evidence PR → west/genpon pin で閉じた。
    80 byte を同時に返す。full は再検証つき再読込、strict sub-range は
    `onlyIf.etagMatches` 束縛。ETag が無ければ delegate し、full-buffer へは落ちない。
 
-### 3. 0.20.0 closure evidence
+### 3. 0.21.0 closure evidence
 
 | evidence class | 値 | 意味 |
 |---|---|---|
-| canonical child main | `b485f53ff7e416af420231ceaf09cbefc64227b6` | PR #41 / #42 merge 後の `net-kotobase/ipfs` main |
-| production artifact | Cloudflare version `619d87b8-98c6-4829-a3dc-d5fba1c8da80` | deploy 済み Worker artifact |
-| local regression | 103 tests / 473 assertions | fake R2/B2、negative、backpressure、exact bytes |
+| canonical child main | `054b4e450651fd58c81742f59842d6bc51a82e69` | PR #43 / #44 merge 後の `net-kotobase/ipfs` main |
+| production artifact | Cloudflare version `0cae68d6-b7e5-4cde-9ba1-d18e7402758f` | deploy 済み Worker artifact |
+| local regression | 104 tests / 479 assertions | fake R2/B2、negative、backpressure、exact bytes |
 | dependency audit | 0 vulnerabilities | 2026-08-17 の `npm audit` |
-| production probe | 38 / 38（118 assertions） | health、meta、raw、raw origin root、CAR、UnixFS、HAMT、IPNS、negative |
-| public health | `200` / version `0.20.0` | production route |
+| production probe | 38 / 38（120 assertions） | health、meta、raw、raw origin root、CAR、UnixFS、HAMT、IPNS、negative |
+| public health | `200` / version `0.21.0` | production route |
 | storage state | `r2_configured:true`, `b2_configured:false` | active provider と inactive adapter の区別 |
-| superproject adoption | west/genpon pin `b485f53f...` | root single-entry pin 前進（commit `6225f8ca`） |
-| genpon receipt | ledger event 11456 | `9b524854...` → `b485f53f...` |
+| superproject adoption | west/genpon pin `054b4e45...` | root single-entry pin 前進（commit `221d902c`） |
+| genpon receipt | ledger event 11475 | `b485f53f...` → `054b4e45...` |
 | projection check | `fleet-db == manifest/west.yml` | fresh clone の `kagami reconcile --check` |
 
 live 38/38 は active R2 / HTTP surface のnon-regression証拠であり、B2 live、libp2p、
-全spec準拠の証拠ではない。103 testsがgreenでも、production bindingの無いB2を
+全spec準拠の証拠ではない。104 testsがgreenでも、production bindingの無いB2を
 production-readyと呼ばない。
+
+⚠ **deploy 直後の `/health` は edge の古い応答を返しうる。** 実測 2026-08-17: probe 自身の
+version 検査は 0.21.0 で通っていたのに、素の curl は 0.20.0 を返した。cache-bust すれば
+一貫して 0.21.0。**「deploy が効いていない」と誤読しない。**
 
 **live probe と memory 境界を混同しない。** raw origin root の live probe が触る
 block は 39 byte で、「buffer していない」ことを示せる大きさではない。live が示すのは
@@ -158,15 +162,26 @@ discriminateしている）。live metadata `unixfs_raw_root_streaming_local:tru
 **この閉鎖が主張しないこと。** DAG-PB structural blockのbuffer境界（G3）については
 何も言わない。raw rootがcleanにstreamingすることはその境界の証拠ではない。
 
-### G2 — CAR traversal plan がraw childを一度full-bufferする
+### G2 — CAR traversal plan がraw childを一度full-bufferする — **closed（0.21.0、2026-08-17）**
 
-**現在。** completed CAR planはpayloadを保持しないが、DFS planning時にraw leafも
-`get-bytes`で読み、CID検証とsize確認の間は1 block全体がWorker memoryにある。
+**何が buffered だったか。** completed CAR plan は payload を保持しないが、DFS planning 時に
+raw leaf も `get-bytes` で読み、CID 検証と size 確認の間は 1 block 全体が Worker memory に在った。
 
-**完了条件。** CID codecがrawならR2 object size + complete incremental verificationで
-`{cid,size,etag}`だけをplanへ入れる。fake raw leafの`arrayBuffer()`がthrowしても
-`dag-scope=entity|all`がbyte-identical CARを返す。second passはfull CID再検証。
-DAG-PB構造blockの扱いを同時に偽ってstreaming済みにしない。
+**何が閉じたか。** **planning はその bytes を必要としていなかった。** planning の中で raw block を
+decode する箇所は無く、3 つの call site（`descend-all` / `select-file` / `traverse`）はいずれも
+raw child の**長さ**しか使わず、完成した plan は `{cid,size}` だけを持つ。よって raw CID は他の
+raw 経路と同じ verifying stream で**測る**だけになり、plan に入るのは size のみ。emission も
+stream として reload し、`car-v1-stream` が bounded window で copy しつつ CID を再検証する。
+
+**主張しないこと。** DAG-PB structural block は**両 pass とも buffered のまま**である。構造を
+decode することが traversal そのものなので、それは G3 の境界であり、この主張へ黙って畳み込んで
+いない —— `unixfs_dag_pb_structure_buffered:true` は不変。
+
+**証拠。** directory の raw leaf を materialise 不能にして `dag-scope=all` を要求し、同じ tree を
+完全に buffer できる store から作った CAR と突き合わせる: **byte 一致**・同一 `Content-Length`・
+block あたりちょうど **2 read**（planning の検証 1 回、emission の検証 1 回）・gateway 不使用。
+**両半分が荷重を負っていることを別々に確認済み** —— planning 側の read を戻すと 1 pass 目で、
+emission loader を戻すと 2 pass 目で落ちる。
 
 ### G3 — DAG-PB structural block は最大32 MiBのbounded buffer
 
@@ -220,8 +235,14 @@ libp2p live readinessへ読み替えない。
 
 ## Ordered next work
 
-WIPは1。G1は0.20.0で閉じた。残る順序は `G2 → G3 → G4/G5`。G6はcertificate外部条件が
+WIPは1。G1/G2は0.21.0で閉じた。残る順序は `G3 → G4/G5`。G6はcertificate外部条件が
 満たされた時、G7はsuccessor product decisionが出た時だけ開始する。
+
+**G3 へ持ち込むこと（G2 で確定）**: G2 が閉じたのは「planning が raw の bytes を必要として
+いなかった」からで、**DAG-PB では同じ論法が使えない** —— 構造を decode することが traversal
+そのものなので、size だけでは traversal が進まない。したがって G3 は「読まない」ではなく
+「**どこまで読むか**」の問題であり、ADR 本文が既に指示するとおり **まず実測 block-size 分布**を
+取り、構造 cap を payload cap から分離するところから始める。stream parser の採用を先に決めない。
 
 各sliceのclosureは次を全部満たす。
 
