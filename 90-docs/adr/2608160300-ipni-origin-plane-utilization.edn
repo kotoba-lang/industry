@@ -27,7 +27,7 @@
   "オーナー指示（2026-08-16）「IPNI を活用していいよ」。ADR-2608145500 が禁じたのは discovery 面の箱として IPNI を新設することであり、ipni.io の仕様ライブラリまで禁じたわけではない。本 ADR がその条を supersede する。
 
 ## Status
-accepted — 2026-08-16。活用は許可。origin 面 `kotoba-lang/io-ipni-specs` は landed（`11ea61f81388ba3031a32a6c2debf867430cff87`）。pinning `:advertise` 継ぎ目は `kotobase-protocol-pinning@3e3a8d57`。publisher GET は `kotobase-protocol-ipfs@ba842084`（`/ipni/v1/ad/{cid}` と `/head`）。本番 hostname `ipfs.kotobase.net` の採用・deploy shell 注入・1 CID 実測は範囲外のまま。
+accepted — 2026-08-16。活用は許可。origin 面 `io-ipni-specs@11ea61f8`。facade `kotobase-protocols@f3bcecd7` が pin `:advertise` と publisher GET を持つ。`ipfs.kotobase.net` は `/ipni/v1/ad/{cid}` を 301 せず返す（`net-kotobase/ipfs@05199cce`）。pinning worker は outbox に積み `/ipni` を pinning ホストで返す（`control-plane@6d3618ef`）。waitUntil drain → cid.contact と 1 CID 実測は未着。CF 本番 deploy は murakumo CD。
 
 ## 何が変わったか / 何が変わらないか
 
@@ -125,4 +125,5 @@ IPNI indexer node。DHT node。kad 所有の provide signer。UnixFS path を id
 2026-08-16: accepted。オーナー指示で IPNI 活用と origin 面 repo を許可。ADR-2608145500 系の「IPNI 専用 repo は作らない」をこの範囲で supersede。
 2026-08-16: `kotoba-lang/io-ipni-specs` scaffold landed。discover 継ぎ目は注入のまま。kad.routing default-routers に cid.contact を足した。
 2026-08-16: `kotobase-protocol-pinning` に `:advertise` 継ぎ目。ipni は require しない。deploy shell 注入と 1 CID 実測は残る。
-2026-08-17: `kotobase-protocol-ipfs` が `GET /ipni/v1/ad/{cid}` と `/head` を同じ block 面から返す。本番 `ipfs.kotobase.net` は net-kotobase-ipfs が採用するまで非権威。"}]
+2026-08-17: `kotobase-protocol-ipfs` が `GET /ipni/v1/ad/{cid}` と `/head` を同じ block 面から返す。本番 `ipfs.kotobase.net` は net-kotobase-ipfs が採用するまで非権威。
+2026-08-17: facade に継ぎ目を同期。`ipfs.kotobase.net` が publisher GET を 301 せず返す。pinning worker は advertise を outbox に積む。cid.contact drain と 1 CID 実測は残る。"}]
