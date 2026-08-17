@@ -361,7 +361,36 @@ signed receipt、壊した実装が落ちる mutation test の六面。
 
 ### P1 — spec conformance を幅で閉じる
 
-1. Data Model 全kind、DAG-CBOR canonical/invalid corpus、Link/tag42 の相互運用 corpus。
+1. ~~Data Model 全kind、DAG-CBOR canonical/invalid corpus、Link/tag42 の相互運用 corpus~~
+   **closed（2026-08-17、io-ipld #25）**。`resources/ipld/dag-cbor-corpus.edn` に
+   canonical 19 行 / invalid 13 行、両方向 test 駆動で着地。
+
+   **corpus を書く前に測ったら、conforming reader が拒否すべき 3 つを受理していた:**
+
+   | bytes | 読まれ方 | canonical |
+   |---|---|---|
+   | `18 05` | 整数 5 | `05` |
+   | `a2 61 62 01 61 61 01` | map | key 順は `a` が先 |
+   | `a2 61 61 01 61 61 02` | last-wins | 重複 key は禁止 |
+
+   **この層では cosmetic ではない。** DAG-CBOR は canonical —— 任意の node に対し妥当な
+   encoding はちょうど 1 つ —— なので、これを受理すると**同じ値を表す 2 つの byte 列が
+   別々の CID を持つ**。content-addressed identity 層が唯一許せないことである。
+
+   **直し方は checklist ではなく identity。** 順序と重複の事実は `cbor/decode` が map を
+   返した時点で失われているので後から検査できない。よって decode は**往復が identity で
+   あること**を要求する —— 入力が、それが表す node に対して encoder が書いたはずの byte 列
+   そのものであること。3 つ同時に、かつ他の非 canonical encoding も捕まる。**それが
+   canonical の定義だから**であって、思いついた違反を列挙したのではない。代償は decode
+   あたり encode 1 回、canonical form が全仕事である層で払う。
+
+   **既存 78 test が strict decode 下で緑のままだった**ことが、この repo 自身のデータが
+   既に canonical だった証拠（`encode` が canonical を出す以上そうでなければならない）。
+
+   corpus は両方向 driven（canonical 行は encode が出すべき byte 列と decode の復元を、
+   invalid 行は拒否を固定）。**invalid 列が静かに空になるのを防ぐ guard test 付き** ——
+   negative を失った corpus は「何も test せずに緑」になる。identity 検査を外すと
+   **動機となった 3 行ちょうど**が落ちる。
 2. ~~Schema DSL の upstream grammar 対応表~~ **closed（2026-08-17、io-ipld #24）**。
    `resources/ipld/schema-dsl-coverage.edn` に **test が駆動する表**として着地。
 
@@ -465,7 +494,7 @@ root pin は `amu c38f79d2c1af...`（west commit `1069d90b...`）、
 
 **P0 は 5 項目すべてが 2026-08-17 に着地した**（P0-1 `bytes-at` / P0-2 `bytes-slice` /
 P0-3 `bytes-concat` / P0-4 closed expression grammar / P0-5 canonical codec refusal）。
-次は **P1 の残り**（P1-1 / P1-3 / P1-4 / P1-5）。**P1-2 は 2026-08-17 に着地した。**
+次は **P1 の残り**（P1-3 / P1-4 / P1-5）。**P1-1 / P1-2 は 2026-08-17 に着地した。**
 
 P0 全体を通して確定した、P1 に持ち込むべきこと:
 
@@ -475,9 +504,14 @@ P0 全体を通して確定した、P1 に持ち込むべきこと:
   「compile できた」から round-trips と記録した。**2 回とも mutation / test が捕まえた。**
   P1 の残りでも同じ形が出ると想定して、**どの層で測ったかを主張の中に書く**こと
   （P1-2 の表は `:measured-through` を持つ）。
-- **P1-2 で分かった実務的な事実**: 想定に反して Schema DSL の coverage はほぼ完全だった。
-  **「未実装だろう」から始めない** —— P1-1 / P1-3 / P1-5 も、まず測ってから書くこと。
-  未実装の列挙が短いこと自体は成果であって、手抜きの証拠ではない。
+- **P1-1 / P1-2 で分かった実務的な事実、ただし互いに逆向き**: Schema DSL の coverage は
+  想定に反してほぼ完全だった（未対応は 2 つ）。一方 DAG-CBOR canonical 強制には**本物の穴が
+  3 つ**あった。**どちらも「測ってから書いた」から分かったのであって、事前の見立ては両方
+  外れていた。** P1-3 / P1-4 / P1-5 も同じ順序でやること —— 「たぶん未実装」でも
+  「たぶん大丈夫」でも始めない。
+- **corpus / 表には必ず『空にならない』guard を付ける。** negative を失った corpus は
+  何も検査せずに緑になる。P1-1 は invalid 行数の下限を、P1-2 は unsupported 列が空でない
+  ことを test で固定した。
 - **mutation は両方向必要で、方向は項目ごとに違う。** P0-1..4 は「正しい出力を壊す」、
   P0-5 は「壊れた出力を通す」だった。**assertion が「何かが起きた」ではなく
   「誰が/何が起きた」を見ているかを確かめること** —— P0-5 の harness は検査を消しても
