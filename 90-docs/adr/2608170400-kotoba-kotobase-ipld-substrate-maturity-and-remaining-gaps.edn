@@ -492,7 +492,23 @@ signed receipt、壊した実装が落ちる mutation test の六面。
 
 ### P2 — retrieval interoperability
 
-1. trustless path vector: path→block request→CID verification→missing/duplicate/wrong-codec rejection。
+1. ~~trustless path vector: path→block request→CID verification→missing/duplicate/wrong-codec
+   rejection~~ **closed（2026-08-17、io-ipld #30）**。
+
+   **4 つは既に正しかった**: path は値と、それが横切る root-first の block **ちょうど**を返す /
+   2 度到達する block は 1 度だけ証明に入る / 欠損 block は `:ipld/missing-block` /
+   **store が「その CID ではない bytes」を返したら `:ipld/cid-mismatch`**（これが path を
+   trustless にしている検査で、既に効いていた）。
+
+   **5 つ目は正しいが理由が間違っていた。** raw codec の CID への link は
+   `:ipld/cid-mismatch` として拒否されていた —— 検証が bytes に対して **dag-cbor** の CID を
+   再計算し、別の文字列になるから。**拒否は正しく、説明は正しくない**: store は本当のことを
+   言っており、**そのエラーを読んだ人は在りもしない破損を探しに行く**。
+
+   よって CID に「宣言している codec」を訊いてから hash を再計算するようにし、異codec は
+   codec 番号つきで `:ipld/unsupported-codec` として報告する（CIDv1 header の bounded
+   LEB128 読み。`mf/cid->bytes` が既に公開している）。**受理される block は 1 つも変わって
+   いない** —— 変わったのは「2 つの全く違う出来事のどちらが起きたか」をエラーが言うこと。
 2. GraphSync baseline interop を独立実装と実測。extension はまず resume/budget/ADL interpretation の
    うち load-bearing なものだけ。
    ⚠ **この環境のコードでは閉じられない**（2026-08-17 判定）—— 「独立実装と実測」は
@@ -523,7 +539,26 @@ signed receipt、壊した実装が落ちる mutation test の六面。
    ⚠ **test が自分を捕まえた。** 最初の「累積 match の書き換え」case は `:matches` を空に
    していたが、work 1 単位の時点で既に空 —— **何も検査せずに通る no-op 編集**だった。
    捏造は「足す」ものでなければならないので、**在りもしない match を足す**形に直した。
-4. GraphSync 不在時に HTTP path が同じ結果を返す fallback parity。
+4. ~~GraphSync 不在時に HTTP path が同じ結果を返す fallback parity~~
+   **closed（2026-08-17、io-ipld #31）**。
+
+   **字義どおりに読むと空虚である** —— GraphSync が存在しない間、「GraphSync 不在時に
+   HTTP path が同じ結果を返す」は自明に真。**荷重を負っているのは 1 層下だった。**
+
+   `ipld.graph` は自ら「GraphSync adapter と trustless HTTP/CAR gateway の共通 correctness
+   core」と名乗るが、**通り道が 2 本あり、コードを共有していない**:
+   `select-blocks` は `selector/select-graph` に委譲し、`advance-cursor` は**自前の task
+   loop** を回す。**1 つの traversal 意味論に対する 2 実装** —— CLAUDE.md が名指しする
+   「同じ判断を 2 実装が持ち片方だけ直る」形そのもの。
+
+   **今日は一致している**（matcher / explore-all 深さ 3 / link を跨ぐ named fields /
+   edge つき explore-recursive / union）。**だがそれを言うものが無く、一致しなくなっても
+   誰も気づかなかった。** よって matrix が「同じ値を同じ順で選ぶこと」と「証明に読む block
+   数が同じであること」の両方を固定し、matrix 自身が 1 個の自明な selector に縮んでも通って
+   しまわないよう guard を付けた。
+
+   cursor 上に作られた adapter と `select-blocks` 上に作られた gateway が同じ selector に
+   別の答えを返す —— それがこの test の防いでいる失敗である。
 
 ### P3 — transport operational qualification
 
@@ -586,9 +621,21 @@ root pin は `amu c38f79d2c1af...`（west commit `1069d90b...`）、
 
 **P0 は 5 項目すべてが 2026-08-17 に着地した**（P0-1 `bytes-at` / P0-2 `bytes-slice` /
 P0-3 `bytes-concat` / P0-4 closed expression grammar / P0-5 canonical codec refusal）。
-**P1 は 5 項目すべてが、P2 は P2-3 が 2026-08-17 に着地した。** 次は **P2-1**
-（trustless path vector: path→block request→CID verification→missing/duplicate/wrong-codec
-rejection）、次いで **P2-4**。**P2-2 は外部条件待ち**（上記）。
+**P0 / P1 は全項目、P2 は P2-1 / P2-3 / P2-4 が 2026-08-17 に着地した。**
+**P2-2 だけが残り、それは外部条件待ち**（独立した GraphSync peer）。
+
+次に着手できるのは **P3-5**（`connect.edn` 宣言と実 listener inventory の不一致で
+placement を fail-closed）、**P4-2 / P4-3 / P4-4 / P4-5**、**P5-1 / P5-4**。
+**P3-1..4・P4-1・P5-2・P5-3 は外部条件待ち**（実 fleet binary / 実ブラウザ / 実 NAT /
+production canary / 未実装 backend）。
+
+P2 で確定した、以降に持ち込むこと:
+
+- **item を字義どおり読むと空虚なことがある。** P2-4 は字義では自明に真で、荷重は 1 層下の
+  「2 実装が一致しているか」に在った。**「この item は何を防ぐのか」を先に言い直す。**
+- **同じ意味論の 2 実装は、一致している間も gap である。** 一致は事実であって保証ではない。
+- **正しい拒否でも理由が間違っていることがある**（P2-1 の codec）。受理/拒否だけを見て
+  「正しい」と結論しない —— **エラーを読む人が次に何をするか**まで見る。
 
 ⚠ **P2 以降は P0/P1 と性質が違い、大半がこの環境のコードでは閉じられない。**
 P2-2 は独立実装との GraphSync interop 実測、P3 は実ブラウザ・実 NAT・live fleet、
