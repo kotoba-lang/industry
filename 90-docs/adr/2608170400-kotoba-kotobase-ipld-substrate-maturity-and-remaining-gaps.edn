@@ -623,6 +623,40 @@ signed receipt、壊した実装が落ちる mutation test の六面。
    R2 実測も併走させ、read-ahead window が全 pack の末尾を越えて要求する以上
    偽陽性を出しうる range check が、実 binding で偽陽性を出さないことを確認した。
 3. Prolly tree `range-diff(old-root,new-root,lo,hi)` を CID equality で枝刈りし、変更leafだけ返す。
+   **2026-08-17 着地**（`prolly-tree` 3ab08bf5、west pin 前進済み）。`diff` は既に
+   CID 一致で枝刈りしていた。足したのは**鍵順が可能にするもう 1 つの枝刈り** ——
+   span が `[lo, hi)` に届かない subtree は、**変わっていても**読まない。2 つは独立で、
+   `:pruned {:by-cid n :by-range n}` は**別々に数える**（range 枝刈りを外した実装は
+   依然として正しく、返り値に関する assertion を全部通り、大半が変わった木では
+   依然として速く見える）。
+
+   実測（4,000 鍵・200 鍵変更・全 leaf が dirty）: `diff` は**何が欲しくても 40 block
+   読んで 200 件返す**。10 鍵の窓が欲しい呼び手は 40 読んで 199 件を捨てていた。窓は **5**。
+
+   ⚠ **mutation 6 本のうち 3 本が最初の回で生き残った。3 本とも同じ欠陥** ——
+   suite が span 演算を**境界で**試していなかった:
+
+   - `upper` と `lo` の比較を `>=` から `>` に —— **chunk 境界ごとに鍵を 1 個落とす**。
+     **擬似乱数の窓 60 本が 1 度も捕まえなかった**（`lo` が 16 境界のどれかに
+     ぴったり乗ることは、乱択では起きない）。境界は木から導出して窓を置く形に直した。
+   - `lower` と `hi` の比較を `<` から `<=` に —— 届かない subtree を残す。
+     **これは cost のバグで、返り値に関する assertion では原理的に見えない**。
+     block 数の**厳密値**（境界ちょうどで 4、1 文字先で 6）で捕まえる。
+   - 最終 child を自分の max-key で bound する。**この test は 1,000 鍵の `build-tree`
+     を使っていた —— 私はその日すでに「1,000 鍵は単一 leaf」と測っていた**のに、
+     span コードに到達しない fixture で書いた。しかも通常 API では**原理的に試せない**
+     （`insert` は `build-tree` と byte-identical なので最終 max-key は常に最大鍵）。
+     max-key を過少申告した node を手で組む形に直し、**「通常の test が覆っている」と
+     読めないよう source に明記**した。
+
+   **6 本とも、意図した test だけを落とすようになった。**
+
+   ⚠ **README に書いた 2 つの数字が両方とも間違っていた。** `:blocks-read 4` /
+   `:by-range 16` を、**その呼び出しを実行しないまま測定の体裁で**書いた。実際は
+   **5 と 26**。4 の根拠（root 対 + leaf 対 1 組）は**両木が同じ形だと仮定**していたが、
+   200 個の値を変えると leaf の CID が変わり、**この木の内部境界は child の CID で
+   hash される**ので上の fanout も変わり、children は 1 対 1 に整列しない。
+   **今はどちらも印字値で、docs にどちらの種類の数字かを書いた。**
 4. `kotobase-peer` / `IRangeSource` へ配線し、全hydrateとの差を visited nodes/bytes で測る。
 5. encrypted/blinded index は equality と range を別indexにし、漏洩budgetを明示する。
 
@@ -674,10 +708,24 @@ P0-3 `bytes-concat` / P0-4 closed expression grammar / P0-5 canonical codec refu
 **P0 / P1 は全項目、P2 は P2-1 / P2-3 / P2-4 が 2026-08-17 に着地した。**
 **P2-2 だけが残り、それは外部条件待ち**（独立した GraphSync peer）。
 
-次に着手できるのは **P4-3 / P4-4 / P4-5**、**P5-1 / P5-4**（**P4-2 は 2026-08-17 着地**）。
+次に着手できるのは **P4-4 / P4-5**、**P5-1 / P5-4**（**P4-2 / P4-3 は 2026-08-17 着地**）。
 **P3 は 5 項目すべてが外部条件待ち**（P3-1..4 は実 fleet binary / 実ブラウザ / 実 NAT /
 H3 server、**P3-5 は observed listener inventory** —— 上記）。**P4-1・P5-2・P5-3** も
 外部条件待ち（production canary / 未実装 backend）。
+
+P4-3 で確定した、以降に持ち込むこと:
+
+- **乱択は境界を見つけない。** 60 本の擬似乱数窓が、鍵を落とす本物のバグを 1 度も
+  捕まえなかった。**境界は列挙する** —— しかも**対象自身から導出する**
+  （content hash で決まる境界を literal で書けば、encoding が変わった日から
+  test は通り続けたまま何も試さなくなる）。
+- **cost のバグは返り値に映らない。** 「正しいが 1 block 余計に読む」変異は、
+  返り値に関する assertion を全部通る。**厳密値の counter でしか捕まらない。**
+- ⚠ **自分が測った事実を、次の test で使い損ねる。** 「1,000 鍵は単一 leaf」を
+  その日に印字しておきながら、1,000 鍵の fixture で span の test を書いた。
+  **測定は、参照されなければ持っていないのと同じ。**
+- ⚠ **docs に予測値を測定の体裁で書いた**（2 つとも外れた）。**印字してから書く。
+  書いたあとで印字するなら、印字値で置き換える。**
 
 P4-2 で確定した、以降に持ち込むこと:
 
