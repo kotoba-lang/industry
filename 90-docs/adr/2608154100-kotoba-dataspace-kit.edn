@@ -35,9 +35,11 @@ dataspace 協調の proving slice を 1 本着地させる。
    （この slice では wire id 24 / `:dataspace/transact`）の所持を要する。
 6. **observe の callback / facet body は guest 閉包ではない。** guest は
    inert な request を返す。matching と lifecycle は host provider
-   （ADR-2607201300 `state+event → effects`）。この slice の observe は
-   (a) 登録して現在の matches を返す (b) 後続 assert の `:notices` に
-   binding を載せる。guest `fn` / `future` は足さない。
+   （ADR-2607201300 `state+event → effects`）。observe は
+   (a) 登録して現在の matches を返す (b) 後続 assert の asserter `:notices`
+   に binding を載せる (c) matching assert を observer mailbox へ
+   `:document` notice として enqueue し、同じ facet+pattern の次の
+   `:observe` が drain する。guest `fn` / `future` / vat / `<-` は足さない。
 7. **assertion のシリアライズも `#cap` / `#cap-ref` も権限を復元しない。**
    解決は既存 cap（`intersect-grants` / 実行時 allow 集合 / host 表）。
 8. **encoding:** in-process host matching still uses Clojure EDN values.
@@ -73,7 +75,7 @@ dataspace 協調の proving slice を 1 本着地させる。
 | provider-conformance 閉集合 | **10** application capabilities（旧 9-kit + `:dataspace/transact`）。component-model inventory は id 24 まで | count と inventory を片側だけ動かさない |
 | kit ABI | `:document`（runtime は tagged document 以外を KIR で拒否） | opaque EDN string / Preserves |
 | Goblins / OCapN | 統合していない | 統合したと書かない |
-| observe | host-owned match、inert notices | guest vat / callback 関数 |
+| observe | host-owned in-process notice delivery（observer mailbox、次の `:observe` が drain） | guest vat / callback 関数 |
 | backing store | default in-memory `{:q :transact!}`。kgraph EAV inject 可 | D1 / guest `kgraph-assert!` / identity CID を Location にしない |
 
 ## この slice で実装したもの
@@ -298,17 +300,73 @@ java -cp \"$CP\" clojure.main -e \\
 ```
 結果: **18 tests / 79 assertions、0 fail / 0 error。** guest は named `:dataspace/transact`。count 10。
 
+- observer delivery（in-process notices、2026-08-17）:
+  - `kotoba-lang/provider` main `4888ab1217980836b2bc6c288c8e647feb9fd02c`
+    （merge of `a52a180eeae810187be853f25838e9accc14be6a`）。
+    25 tests / 81 assertions（dataspace + match）。
+    break: memory store の `:assert` が mailbox enqueue しないと
+    `matching-assert-delivers-document-notice-to-observer` が落ちる。unbreak 緑。
+    `store-that-swallows-observer-notices-fails-closed` が drain-all store を拒否。
+    https://github.com/kotoba-lang/provider/commit/4888ab1217980836b2bc6c288c8e647feb9fd02c
+  - `kotoba-lang/kotoba-sema` main `91eff5a970e27792a718d6318a548103ef608115`
+    （merge of `c2af8ff`）。observe! result の `:matches` に `:notices :document`。
+    18 tests / 100 assertions。
+    https://github.com/kotoba-lang/kotoba-sema/commit/91eff5a970e27792a718d6318a548103ef608115
+  - `kotoba-lang/amu` main `1dd42bb223ae0d53e34f291fbad3c0c3e1c5d889`
+    （merge of `254a129`）。provider `4888ab12` + sema `91eff5a`。count 10。
+    dataspace + match + conformance + named-cap = 32 tests / 136 assertions。
+    https://github.com/kotoba-lang/amu/commit/1dd42bb223ae0d53e34f291fbad3c0c3e1c5d889
+  - west pin: provider `f88d88d2c6802f36b00fb37fc62ac85fa0a9977d`（entry `4888ab12`）、
+    kotoba-sema `6020097f13f54321f540317dd1df13fb1d797b6a`（entry `91eff5a`）、
+    amu `15b67b84c29bdd9d740396596bcda2166855be6c`（entry `1dd42bb`）。
+
+## テストの回し方と結果（2026-08-17 実測、observer delivery）
+
+provider:
+```
+cd /tmp/provider-dataspace-next
+clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+```
+結果: **25 tests / 81 assertions、0 fail / 0 error。**
+両方向: enqueue を外すと observer の次の observe の `:notices` が `[]` になり 4 fail。戻すと緑。
+
+kotoba-sema:
+```
+cd /tmp/kotoba-sema-dataspace-next
+clojure -M:test -n kotoba.sema-test
+```
+結果: **18 tests / 100 assertions、0 fail / 0 error。**
+両方向: `:matches` から `:notices` を外すと
+`dataspace-source-forms-lower-to-one-typed-effect-kernel` が落ちる。戻すと緑。
+
+amu（`clojure -M:test -n` は無視される）:
+```
+cd /tmp/amu-dataspace-next
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.provider-conformance-test)
+            (quote kotoba.compiler.frontend-named-capability-test))
+    (apply clojure.test/run-tests
+           [(quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.provider-conformance-test)
+            (quote kotoba.compiler.frontend-named-capability-test)])'
+```
+結果: **32 tests / 136 assertions、0 fail / 0 error。** guest は named `:dataspace/transact`。count 10。
+
 ## 残ギャップ（次の agent へ）
 
 1. **DONE.** kotoba-sema の `capability-catalog.edn` と cljs fallback に id 24 を vendor し、named `dataspace/transact` と `(:capabilities #{:dataspace/transact})` を通した。
 2. **DONE.** `kotoba-lang/provider` へ reference host を移した。kit EDN は amu に残す。
 3. **DONE.** provider-conformance 閉集合と component-model inventory を一緒に動かした。`:capability-count` 9→10。amu `stale-capability-count-nine-fails-closed` が旧 count を拒否。component-model id 24 / count 24。
 4. **DONE.** kit ABI は `:document`。opaque EDN string ではない。wire は `kotoba.value.v1`。amu 経路は KIR が non-document を拒否し、provider 直呼びは `:dataspace/document-invalid`。
-5. **SKIP with evidence（re-check 2026-08-15）。** matcher は `.cljc` のまま。native recursive map walk は未 qualified:
-   - `kotoba-kir` HEAD はまだ `933c148a3d810795966d92948f9abe9fe5383145`
-   - `native-word-value-type?` は `#{:i64 :bool :string :option-i64 :result-i64}`（`:document` 無し）
-   - `native-word-field-types` は `#{:i64 :bool :string :keyword}`
-   - `document-*` / `document-edn-*` は `non-string-typed-ops` に入り、else 枝で拒否
+5. **SKIP with evidence（re-check 2026-08-17）。** matcher は `.cljc` のまま。native recursive map walk は未 qualified:
+   - `kotoba-kir` GitHub main はまだ `933c148a3d810795966d92948f9abe9fe5383145`
+   - `native-word-value-type?` は `#{:i64 :bool :string}` plus recursive `:option`/`:result`（`:document` 無し）
    - これは backend gap（ADR-2608650000）であって言語の天井ではない。`.kotoba` へ移さない。
 6. **DONE.** `provider.dataspace` の atom は `{:q :transact!}` store。default = memory。inject した `provider.dataspace-kgraph` が assert/retract/observe/facet-leave を同じ契約で満たす。D1 なし。identity CID を Location にしない。guest ABI 不変。capability-count 10 のまま。
+7. **DONE（2026-08-17）。** matching assert は observer に `:document` notice を届ける。`:observe` は facet+pattern で upsert し mailbox を drain。facet-leave は assertion と undelivered mailbox を落とす。guest vat / `<-` は無い。capability-count 10 のまま。
+8. **次: `:wasm-aot` qualification for dataspace-v1（still no vat）。** kit は `:reference :implemented`、`:wasm-aot`/`:native-aot`/`:jit` は pending。clock は `:wasm32-kotoba-v1 :implemented` だが `:wasm-aot` は pending のまま。native-aot を偽らない。kgraph adapter は `src/kotoba/kgraph.clj`（JVM-only）なので `.cljc` wrap しない。
 "}]
