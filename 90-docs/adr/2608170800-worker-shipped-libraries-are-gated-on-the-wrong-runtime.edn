@@ -1,0 +1,121 @@
+[{:db/id -1
+  :adr/id "ADR-2608170800"
+  :adr/title "live Worker に載る 26 library のうち、17 は gate が 1 つも無く、cljs 経路を回すのは 3 つだけ —— 同じ varint の罠が 4 repo で独立に出た"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :adr/deciders "Jun Kawasaki（「next」）"
+  :adr/repos ["kotoba-lang/io-multiformats" "kotoba-lang/dev-protobuf" "kotoba-lang/proto" "com-junkawasaki/root"]
+  :adr/relates-to "ADR-2608170700（protobuf 2 実装）, ADR-2608136000（測れなかった検査が緑を返す）, ADR-2607300900（CI/CD は murakumo fleet）, ADR-2608110600（lake query surface）"
+  :adr/body
+  "# ADR-2608170800: 出荷先のランタイムで検査されていない
+
+**Status**: accepted
+**Date**: 2026-08-17
+
+## Context
+
+ADR-2608170700 で `dev-protobuf` に 3 件の ClojureScript 専用欠陥を見つけた。
+うち 2 件は**エラーではなく静かに違う答え**で、原因は単純だった ——
+**呼び手は Worker と browser で動くのに、suite は JVM でしか回っていなかった。**
+
+その形がどこまで広がっているかを測った。
+
+## 測ったもの
+
+対象は **`kotobase-protocols-worker` に実際にコンパイルされて入る 26 repo**
+（`protocols-worker/upstream-lock.json`）。この Worker は kotobase.net の
+s3 / atproto / pinning / sparql / gremlin / graphql を配信している。つまり
+**この 26 個は ClojureScript で実行される**。
+
+| | 件数 |
+|---|---|
+| fleet gate が **1 つも無い** | **17 / 26** |
+| gate があり、cljs 経路を回す（`:nbb-script`） | 3（io-ipld・kotobase-block-codec・org-ietf-deflate） |
+| gate はあるが **JVM だけ** | 4（chain・io-multiformats・kotobase-lake・org-ietf-cbor） |
+| `:nbb-script` だが entry を見つけられなかった | 1（kotobase-peer） |
+
+gate が無い 17: arrangement, datalog, datom, datom-source, graphql, kotobase,
+kotobase-client, kotobase-projection, kotobase-protocols, kotobase-query,
+org-apache-tinkerpop-gremlin, org-graphql-http, org-opencypher-cypher,
+org-w3-sparql-protocol, pay, prolly-tree, sparql。
+
+⚠ **この表の「cljs 入口の有無」列は当てにしない。** 私の判定はファイル名の
+heuristic で、`shadow-cljs compile test` 形式（io-multiformats・org-ietf-cbor）を
+「無い」と誤判定した。gates.edn には既に正しく書いてあった。**棚卸しの数字より、
+gates.edn の既存注記の方が正確だった**という事実の方を記録する価値がある。
+
+## 検証した 1 件 —— `io-multiformats`
+
+varint を実装しており、直前に同じ罠を 2 回見た場所なので最初に当たった。
+**両方向とも壊れていた。しかも壊れ方がホストごとに違う。**
+
+### 1. `core/varint` は cljs で 2^32 以上を別の octet にしていた
+
+cljs 分岐が `unsigned-bit-shift-right`（int32）で書かれていた:
+
+```
+2^32  ->  JVM [128 128 128 128 16]    CLJS [128 0]
+2^35  ->  JVM [128 128 128 128 128 1] CLJS [128 0]
+```
+
+エラーではない。**`[128 0]` は 0 に decode される妥当な varint** なので、Worker で
+組んだ CID / multiaddr はどこでも受理され、別のものを意味する。
+
+**latent（実害はまだ無い）**: 使われる multicodec / multiaddr protocol code は
+すべて 2^32 未満。ただしこれは `dev-protobuf` の range note が
+「ここで encode する値は範囲内に十分収まる」と書き、**その例が反例だった**のと
+同じ形の言明なので、直した。
+
+### 2. `multiaddr/read-varint` は JVM で自分の guard に到達しなかった
+
+乗数が 128^9 = 2^63 に達して `ArithmeticException: long overflow` を投げる。
+**multiaddr は peer から来る**ので、0x80 を 10 個送るだけで到達できる:
+
+```
+10 個の 0x80  ->  JVM  ArithmeticException: long overflow
+                  CLJS ex-info \"varint too long in multiaddr\"（意図した拒否）
+```
+
+**JVM では library 自身の guard が一度も走らない。**
+
+## これで同じ罠が 4 repo 目
+
+`proto.wire/read-varint` の docstring は 2026-07 にこれを書き、直している ——
+*「乗数を自由に育てると 10 byte 目で 2^63 に達して JVM の long が overflow する。
+ClojureScript の double は overflow しないので意図したエラーを報告する。0x80 を
+10 個送るのは敵対的な peer にとって合法なので、2 つのランタイムが食い違うのは
+好奇心ではなく本物の挙動差である。」*
+
+その後: `dev-protobuf` が両半分を踏み（今日修正）、`io-multiformats` が JVM 半分を
+踏んでおり（今日修正）、私自身が `dev-protobuf` の decode を書き直したときに
+**初手で同じ overflow を踏んだ**。**1 つの文書化された罠、4 回の独立な遭遇。**
+
+## 決めたこと
+
+1. **`.cljc` library の gate は出荷先のランタイムで回す。** 「portable だから
+   片方が緑なら両方緑」は、この 2 日で 5 件の欠陥を隠していた。
+2. **`io-multiformats` は `:jvm-test` のまま据え置く。** `test/run.cljs` を足して
+   counts は一致（35/133）したが、**`:nbb-test` に倒すと JVM 側の欠陥を見なくなる**
+   —— この repo は**ホストごとに 1 件ずつ**欠陥を持っていたので、どちらの
+   ランタイム単独でも discriminate しない。実測:
+   - varint を shift に戻す → **cljs で 3 赤 / JVM で 0**
+   - 乗数の cap を外す → **JVM で 2 赤 / cljs で 0**
+3. **本当に要るのは「1 repo に 2 gate」で、gates.edn にその形が無い**
+   （entry は `:name` で引かれ status context もそこから作られるので、2 つ目は
+   足されるのではなく衝突する）。**推測で二重登録しない** —— 衝突した context は
+   まさにこの ADR が扱っている「静かに間違う検査」になる。gates.edn に blocker
+   として記録した。
+4. **残り 16 repo は測っていない。** 「gate が無い」ことは確認済みだが、
+   **欠陥があるとは言っていない**。測っていないものを欠陥として数えない。
+
+## 着地したもの
+
+- `kotoba-lang/io-multiformats` `4e075a8` —— varint 両方向の修正、`max-exact`
+  を他 2 実装と揃え、`test/run.cljs` を追加
+- `com-junkawasaki/root` —— 本 ADR + gates.edn の注記更新 + west pin
+
+## 次に測るなら
+
+`sigv4` を推す —— `scripts/verify-cljs.cljs` を持ちながら **gate が無く**、
+Worker の中で B2/S3 の presign と受信 S3 write の**署名検証**を行っている。
+byte 操作と crypto で、int32 の罠が住みやすく、外れたときの影響が認可である。"}]
