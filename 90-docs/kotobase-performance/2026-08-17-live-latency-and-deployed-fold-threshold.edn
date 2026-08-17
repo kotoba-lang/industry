@@ -1,0 +1,206 @@
+{:receipt :kotobase/live-latency
+ :date "2026-08-17"
+ :measured-at "2026-08-17T03:31:34Z/03:45:03Z"
+ :samples-per-endpoint 12
+ :method
+ "12 sequential GETs over ONE curl invocation (so one connection, warm isolate),
+  plus a control request to a NON-EXISTENT path on the SAME host. The control
+  travels the same network, TLS and Worker-start path and does no handler work,
+  so (health - control) is attributable to the handler. Same shape as
+  2026-08-08-live-latency-probe.edn so the two compose."
+
+ :vantage
+ "This workstation (Darwin 25.3.0, Tokyo egress), NOT the remote container the
+  2026-08-08 receipt used. Load average at measurement time {22.09 15.10 12.53}
+  -- concurrent agent sessions. Latency here is network/handler bound, but the
+  load is recorded because this workspace's rule is to write the load beside the
+  value. This is NOT an independent status surface."
+
+ :results
+ [{:label :apex        :url "https://kotobase.net/health"          :handler-work? false
+   :warm {:n 12 :p50-ms 12 :p95-ms 15 :min-ms 11 :max-ms 150}
+   :control {:path "/__probe_no_such_route__" :p50-ms 15 :p95-ms 16}
+   :handler-cost-ms 0 :statuses {200 12}}
+  {:label :sparql      :url "https://sparql.kotobase.net/health"   :handler-work? true
+   :warm {:n 12 :p50-ms 4449 :p95-ms 4754 :min-ms 4365 :max-ms 4880}
+   :control {:path "/__probe_no_such_route__" :p50-ms 12 :p95-ms 14}
+   :handler-cost-ms 4437 :statuses {200 12}}
+  {:label :cypher      :url "https://cypher.kotobase.net/health"   :handler-work? true
+   :warm {:n 12 :p50-ms 7141 :p95-ms 7967 :min-ms 6832 :max-ms 8707}
+   :control {:path "/__probe_no_such_route__" :p50-ms 14 :p95-ms 15}
+   :handler-cost-ms 7127 :statuses {200 12}}
+  {:label :gremlin     :url "https://gremlin.kotobase.net/health"  :handler-work? true
+   :warm {:n 12 :p50-ms 4192 :p95-ms 4726 :min-ms 4008 :max-ms 5076}
+   :control {:path "/__probe_no_such_route__" :p50-ms 17 :p95-ms 21}
+   :handler-cost-ms 4175 :statuses {200 12}}
+  {:label :graphql     :url "https://graphql.kotobase.net/health"  :handler-work? true
+   :warm {:n 12 :p50-ms 4337 :p95-ms 4602 :min-ms 3958 :max-ms 4822}
+   :control {:path "/__probe_no_such_route__" :p50-ms 11 :p95-ms 12}
+   :handler-cost-ms 4326 :statuses {200 12}}
+  {:label :s3          :url "https://s3.kotobase.net/health"       :handler-work? true
+   :warm {:n 12 :p50-ms 3985 :p95-ms 4217 :min-ms 3827 :max-ms 4236}
+   :control {:path "/__probe_no_such_route__" :p50-ms 11 :p95-ms 17}
+   :handler-cost-ms 3974 :statuses {200 12}}]
+
+ :summary
+ {:handler-work-p50-median-ms 4337
+  :handler-cost-p50-median-ms 4326
+  :baseline-2026-08-08 {:handler-cost-p50-median-ms 2422
+                        :handler-work-p50-median-ms 2450}
+  :ratio-vs-2026-08-08 1.79}
+
+ :diag
+ {:url "https://{atproto,sparql,cypher}.kotobase.net/_diag/health"
+  :latency-ms [140 108 244]
+  :graph "kotobase-protocols-v2"
+  :chain-present true
+  :novelty-size 63
+  :should-fold false
+  :note "The non-hydrating diagnostic answers in 0.11-0.24s on the same hosts
+         whose hydrating /health takes 4.0-7.1s. Same shape as ADR-2607310900
+         訂正3 and ADR-2608021000 §6-5."}
+
+ :other-surfaces
+ [{:label :relay-graph-public-read
+   :request "POST https://kotobase.net/xrpc/ai.gftd.apps.kotobase.datomic.datoms
+             {\"graph\":\"bafyreieq24o5wxv4lpcczopcs7xhngntyxv2qahv3leo7bqdeurrfk5k5q\"
+              \"index\":\"eavt\" \"limit\":1}"
+   :status 500 :elapsed-ms 37147
+   :note "Reproduces ADR-2608170100 §4 (34-37s, limit-independent) unchanged."}
+  {:label :hyakka-cid-index
+   :url "https://wiki.kotobase.net/search?q=mario"
+   :status 200 :elapsed-ms 557
+   :note "The content-addressed sorted-index path (ADR-2608152330), for contrast:
+          bounded 2 fetches, no hydrate. Same service, different plane."}
+  {:label :lake
+   :url "https://lake.kotobase.net/health"
+   :status :nxdomain
+   :note "The datalake query surface has no Worker and no hostname; ADR-2608110600's
+          :not-landed [:worker-shell :deployment :hostname] is unchanged as of today."}]
+
+ :source-verified
+ {:how "Read from net-kotobase/control-plane, whose main this session fetched via
+        the GitHub API. NOT from the west checkout, which is at 63af53a1 while main
+        is 6d3618ef."
+  :where-the-deployed-worker-lives
+  "net-kotobase/control-plane is a monorepo; the workers are DIRECTORIES in it --
+   protocols-worker/ and kotobase-graph-database/ -- not separate repositories.
+   ADR-2608170100 §9 recorded the worker source as unreadable because it searched
+   for a REPO named kotobase-graph-database (404). It is a directory. The repo is
+   a west project already checked out at orgs/net-kotobase/control-plane. The old
+   paths network-awai/net-kotobase and gftdcojp/net-kotobase both HTTP-redirect to
+   it, which is why they resolve but do not appear in either org's repo list."
+  :deployed-upstream-pins
+  {:file "protocols-worker/upstream-lock.json"
+   :kotobase-peer "c63468f4f346c7b22c8676723cab92a603bbb7eb"
+   :note "c63468f4 is the novelty-segmentation commit (ADR-2608021000 §6-6). The
+          segmentation IS in the deployed source. What is NOT verified from here is
+          the running Worker version -- a lock file is the source's claim, not the
+          deployment's."}
+  :fold-thresholds
+  [{:worker "protocols-worker"
+    :fn "kotobase_store.cljs/fold-if-due!"
+    :threshold 64
+    :how "calls (eng/should-fold? get-fn chain-cid) -- the 2-arity, so
+          kotobase-peer's default-fold-threshold of 64"
+    :serves ["sparql" "cypher" "gremlin" "graphql" "atproto" "s3" "pinning"]}
+   {:worker "kotobase-graph-database"
+    :fn "xrpc.cljs auto-fold"
+    :threshold 8
+    :overridable-by "KOTOBASE_FOLD_THRESHOLD"
+    :how "ctx.waitUntil background fold after a transact whose novelty_size
+          crossed the threshold, single-slot claim per graph"
+    :its-own-reason "\"the engine's should-fold? default of 64 optimizes write
+                     amortization; a read-heavy BaaS pays novelty tax per READ,
+                     so we fold far sooner\""}]
+  :novelty-size-is-entries-not-hops
+  "kotobase-peer's novelty-size reads the O(1) \"novelty-count\" field, i.e. the
+   number of unfolded transactions. The sequential round trips are NODES, and
+   after c63468f4 a node holds up to novelty-segment-size = 16 entries. So
+   novelty_size 63 is NOT 63 hops. push-novelty!'s own docstring: a pre-existing
+   single-entry head node is never rewritten -- a new entry starts a fresh segment
+   pointing at it -- so a chain written before that landing keeps its old nodes and
+   grows segments on top."}
+
+ :arithmetic
+ {:claim "hops = (single-entry nodes written before segmentation) + ceil(entries written after / 16)"
+  :inputs {:singles-at-2026-08-02 18   ; ADR-2608021000 §6-5, measured on this same graph
+           :entries-today 63
+           :entries-after-segmentation 45
+           :segment-size 16}
+  :hops 21
+  :plus-prolly-tree-waves 2
+  :round-trips 23
+  :implied-per-round-trip-ms [173 190]  ; 3974..4437 / 23
+  :consistency "ADR-2607310900 estimated ~90-250ms per round trip. 173-190ms sits
+                inside that, and four independent hosts (3974/4175/4326/4437) agree
+                to within 12%."
+  :does-not-check-out
+  "The 2026-08-08 handler cost of 2,422ms implies ~13 round trips at the same
+   per-hop cost, which is FEWER than the 18 pre-segmentation singles that should
+   already have existed. One of these is wrong: the 18 count, the assumption that
+   no fold ran between 08-02 and 08-08, or the assumption that per-hop cost is
+   vantage-independent. Latency alone cannot discriminate. Recorded as an open
+   inconsistency rather than resolved by picking the convenient branch."}
+
+ :corrections
+ [{:what "Earlier in this session I said the novelty segmentation is 'not visible
+          in production'."
+   :why-wrong "That inference assumed ~68ms per round trip, which made 63 hops fit.
+               The deployed source pins the segmentation commit, and novelty_size
+               counts entries rather than nodes, so the hop count is ~21 and the
+               implied per-hop is ~180ms -- squarely inside the previously measured
+               range. The measurement is CONSISTENT with segmentation working; it
+               does not show it failing. Retracted."}
+  {:what "Earlier in this session I reported the 1.79x rise since 2026-08-08 as a
+          regression."
+   :why-wrong "It is the expected sawtooth: hydration cost grows linearly with
+               unfolded transactions, and this graph's counter has been climbing
+               since 2026-08-02 without ever crossing its fold threshold. Nothing
+               in the code got slower. Calling growth-toward-a-threshold a
+               regression points the next reader at the wrong file."}
+  {:what "This session's first `nbb scripts/repo-search.cljs graphsync` returned 0
+          and I nearly reported GraphSync as absent."
+   :why-wrong "repo-search matches repo NAMES plus the READMEs of CHECKED-OUT repos,
+               and west checkouts sit at pins. kotoba-lang/p2p's main has seven
+               graphsync namespaces including the /ipfs/graphsync/2.0.0 message
+               boundary. Same failure mode as ADR-2608170100 §10."}]
+
+ :what-this-does-not-show
+ ["/health is not a query. A real query adds parse + plan + scan on top, and all
+   query surfaces returned 401 unauthenticated, so no query was measured."
+  "One vantage, one moment, 12 samples. Repeated GETs over one connection keep
+   hitting a warm isolate, so warm p50 is the FLOOR, not the typical experience --
+   a cold connection measured 5.0-7.9s on the same hosts minutes earlier."
+  "The running Worker version was not read. Cloudflare was not queried; the lock
+   file is the source's claim about its inputs, not evidence about the deployment."
+  "Whether a fold has ever run on kotobase-protocols-v2. novelty_size 18 (08-02)
+   -> 63 (08-17) is consistent with 'never folded', but a fold followed by 63 fresh
+   entries is also consistent with it, and those two differ by 17 hops."]
+
+ :what-would-discriminate
+ [{:question "Is the segmentation actually compressing this chain?"
+   :test "Walk the novelty chain and count NODES rather than reading novelty_size.
+          A node with an \"es\" key is a segment; one with an \"e\" key is a legacy
+          single. The ratio of the two is the whole answer, and it is one authenticated
+          block walk, not an inference from latency."}
+  {:question "Does folding this graph collapse the latency?"
+   :test "novelty is 63 against protocols-worker's threshold of 64. The next write
+          fires fold-if-due!. Measure /health p50 immediately after. This is the
+          falsifiable prediction ADR-2608021000 §6-5 left open, and it is one write
+          away from being answerable."}]
+
+ :follow-ups
+ [{:priority 1
+   :what "protocols-worker folds at 64; the sibling worker in the same repo folds at
+          8 and says in its own comment why. Give protocols-worker the same threshold
+          (eng/should-fold? has a 3-arity) and the same KOTOBASE_FOLD_THRESHOLD
+          override. The mechanism is already in the codebase, one directory over."
+   :cost "one constant plus an env read; the deploy is the expensive half"}
+  {:priority 2
+   :what "relay-bsky public read: 500 after 37s, unchanged. ADR-2608170100 §9 item 1."}
+  {:priority 3
+   :what "The 18 pre-segmentation single-entry nodes are ~86% of today's hop count
+          and are never rewritten by design -- only a fold consumes them. Until one
+          fold runs, segmentation cannot help this graph no matter how many entries
+          are added."}]}

@@ -167,13 +167,32 @@ read fallback は「共有索引が空なら relay も引く」ので、**relay 
 
 1. **relay-bsky の読み取り復旧。** まず fold の実行記録を見て §4 の 2 候補を切り分ける。
    増加が原因なら `RELAY_CRON_ENABLED=0` + retention 設計。
-2. **`:async-get-fn` を kotobase.net の store に渡す配線。** 上流実装は kotobase-peer#21 に既にある。
-   ⚠ **その worker のソースがこの manifest から読めない** ——
-   `net-kotobase/kotobase-graph-database` は GitHub で 404、`manifest/west.yml` に `graph-database` の
-   項目は 0 件、概念索引も 0 件、`kotobase-cljc-owner` は main が LICENSE/NOTICE/README のみ（src 無し）。
-   **owner に repo の所在を確認すること。**
+   **2026-08-17 再現: 変化なし**（limit=1 で 37.1s → 500）。ただし下記のとおり
+   `:async-get-fn` は既に配線済みと分かったので、§4 の 2 候補のうち
+   **「async 化されていないから」は消え、graph の増加が残る**。
+2. ~~**`:async-get-fn` を kotobase.net の store に渡す配線。**~~ **解決済み（2026-08-17）。**
+   配線は既に main に在る —— `kotobase-graph-database/src/kotobase/graph_database/xrpc.cljs`
+   の 5 箇所（`hot-datoms` 呼び出し自体を含む）と `store.cljs` / `physical_index_journal.cljs`。
+   **worker のソースは読める。**「読めない」という前項の結論は、`kotobase-graph-database` を
+   **repo として**探したことによる誤り —— 実体は **`net-kotobase/control-plane` monorepo の
+   *ディレクトリ***（`protocols-worker/` と並ぶ）で、その repo は west project として
+   `orgs/net-kotobase/control-plane` に既に checkout されている。旧パス
+   `network-awai/net-kotobase` と `gftdcojp/net-kotobase` は GitHub の rename redirect で
+   ここに解決するので、`gh api` では 200 なのに org の repo 一覧には現れない。
+   （同型の再発防止は §10。「repo が無い」と「ディレクトリである」は 404 で同じ顔をする。）
 3. **fallback に締切を入れる**（§5 の 2 倍レイテンシを消す。約 10 行、appview のみ）。
 4. `resolve-actor-did` の引用符不一致（§6）。datoms が読めるようになってから確定させる。
+5. **新規（2026-08-17）: `protocols-worker` の fold 閾値を 64 から下げる。**
+   同じ repo の `kotobase-graph-database` は閾値 **8**（`KOTOBASE_FOLD_THRESHOLD` で上書き可）で
+   `ctx.waitUntil` の背景 fold を持ち、その理由をコメントに書いている ——「engine の
+   `should-fold?` の既定 64 は*書き込み*の償却を最適化する。read-heavy な BaaS は novelty 税を
+   *読み*のたびに払うので、もっと早く fold する」。一方 `protocols-worker/kotobase_store.cljs`
+   の `fold-if-due!` は 2-arity の `eng/should-fold?` を呼ぶので **64 のまま**で、
+   `kotobase-protocols-v2` は 2026-08-02 の 18 から **15 日かけて 63 まで積み上がり、一度も
+   閾値を越えていない**。その間、sparql / cypher / gremlin / graphql / s3 の全読みが
+   その税を払っている（実測 handler 分 4.0–7.1s、
+   `90-docs/kotobase-performance/2026-08-17-live-latency-and-deployed-fold-threshold.edn`）。
+   **機構は同じ repo の隣のディレクトリに既に在る。**
 
 **再現コマンド**
 
@@ -199,4 +218,21 @@ cd <app-aozora-engine> && npx shadow-cljs compile appview-test && node out/appvi
 2. `prolly-tree` の checkout が古く、`scan-range` を「無い」と報告した。実際は当日 landed していた。
 
 どちらも ADR-2608136800 が名指ししている失敗。**結論を出す前に origin/main を読む。**
-とくに west 管理下の checkout は pin に固定されており、repo の main とは別物である。"}]
+とくに west 管理下の checkout は pin に固定されており、repo の main とは別物である。
+
+**3 つ目（2026-08-17 に判明、§9-2 の訂正）: 名前を repo として引いて 404 を不在と読んだ。**
+`kotobase-graph-database` を `gh api repos/<org>/kotobase-graph-database` で探して 404 を得、
+west.yml にも概念索引にも無いことを添えて「worker のソースは読めない」と結論した。
+**実体は `net-kotobase/control-plane` monorepo の中のディレクトリ**で、その repo は
+`orgs/net-kotobase/control-plane` に checkout 済みだった。
+
+- **404 は「その名前の repo は無い」しか言っていない。** ディレクトリ・monorepo の
+  サブツリー・rename redirect の 3 つは、repo 名で引く限り全部同じ顔をする。
+- **west.yml と概念索引の 0 件も同じ**。どちらも repo 粒度なので、repo の *中* を答えない
+  （sparse cone の外が `ls` に映らないのと同型 —— CLAUDE.md「無い」と結論する前に検索する）。
+- **やるべきだったのは 1 コマンド**: 疑わしい名前を、repo 名ではなく**パスとして**引く。
+  `gh api repos/<org>/<repo>/contents --jq '.[].name'` か、org の repo 一覧を取って
+  「その名前の repo が本当に無い」ことと「では何が deploy を所有しているか」を分けて確かめる。
+- 逆向きの罠も同時に踏んだ: `gh api repos/network-awai/net-kotobase` は **200 を返す**
+  （rename redirect で control-plane に解決される）のに、`orgs/network-awai/repos` の
+  一覧には出ない。**200 が「その org にある」の証拠にならない。**"}]

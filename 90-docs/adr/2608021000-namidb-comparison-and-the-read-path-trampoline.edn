@@ -463,6 +463,47 @@ segment 化が圧縮するのは **deploy 後に書かれた novelty だけ**で
 そこで `/health` の p50 を測れば改善したか否かが決まる。測るまで
 「本番が速くなった」とは言わない。
 
+**⚠ この予測の算術が間違っている（2026-08-17 訂正）。** 直前の段落が正しく
+書いているとおり、既存の 18 ノードは単一 entry のまま残る。だから 64 entry に
+達したときの node 数は 4 ではなく **18 + ceil(46/16) = 21**。予測を 4 と書いて
+おくと、21 を測った次の agent は「segment 化が効いていない」と読む —— 実際には
+機構どおりである。**予測値は「新規分だけが 16 で割れる」形で書くこと。**
+
+**2026-08-17 の実測（この予測はまだ決着していない）。**
+`_diag/health` は `novelty_size: 63` / `should_fold: false`。閾値 64 に**まだ
+届いていない** —— 15 日で 18 → 63 まで積み上がったが、一度も fold していない。
+その状態の hydrating `/health` は warm p50 で **sparql 4,449ms / cypher 7,141ms /
+gremlin 4,192ms / graphql 4,337ms / s3 3,985ms**、同ホストの存在しないパスへの
+control が 11–17ms。2026-08-08 の handler 分 2,422ms に対して **約 1.8 倍**だが、
+**これは回帰ではなく予期された鋸歯**である（未 fold tx に比例する項が伸びただけ）。
+
+上の算術を当てると node 数は 18 + ceil(45/16) = **21**、prolly-tree の 2 wave を
+足して 23 round trip、handler 分 3,974–4,437ms を割ると **1 往復あたり 173–190ms**
+—— ADR-2607310900 の見積り 90–250ms の中に収まり、独立した 4 ホストが 12% 以内で
+一致する。**したがって今日の数字は segment 化が効いていないことの証拠ではない。**
+（`novelty_size` は O(1) の `novelty-count`、すなわち **entry 数であって node 数
+ではない**。63 entry を 63 hops と読まないこと。）
+
+**未解決の不整合**: 2026-08-08 の 2,422ms は同じ per-hop で割ると ~13 往復になり、
+既に存在していたはずの 18 個の単一 entry ノードより**少ない**。18 という数・
+「08-02 から 08-17 の間に fold が走っていない」という仮定・per-hop が vantage に
+依らないという仮定のどれかが誤っている。**latency だけでは切り分けられない**ので、
+都合のよい枝を選ばずに不整合として記録する。切り分けは chain を歩いて
+`"es"`（segment）と `"e"`（単一）の**ノードを数える**こと —— 認証付きの block walk
+1 回で、推論ではなく観測になる。
+
+receipt: `90-docs/kotobase-performance/2026-08-17-live-latency-and-deployed-fold-threshold.edn`
+
+**そして、この予測が 15 日決着しなかったこと自体が答えである。**
+`protocols-worker/kotobase_store.cljs` の `fold-if-due!` は 2-arity の
+`eng/should-fold?` を呼ぶので閾値 64 のまま。同じ repo
+（`net-kotobase/control-plane`）の `kotobase-graph-database` は閾値 **8**
+（`KOTOBASE_FOLD_THRESHOLD` で上書き可）で、その理由を自分のコメントに書いている
+——「engine の既定 64 は*書き込み*の償却を最適化する。read-heavy な BaaS は
+novelty 税を*読み*のたびに払うので、もっと早く fold する」。**閾値を下げる機構は
+同じ repo の隣のディレクトリに既に在る。**「本番 novelty の再測定」を待つ前に、
+そもそも fold が発火する閾値にすること。
+
 **deploy 手順で 3 回同じ失敗をした**ので記録する。依存 20 repo の照合で
 ①source-paths を `head` で切って 12 個と読み (実際は 21) ②全部 west に
 あると仮定し (`datom-source` は未展開) ③clean かどうかだけ見て
