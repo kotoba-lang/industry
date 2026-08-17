@@ -29,7 +29,12 @@
 ;; org は west.yml の remote から解決するのでここには書かない（drift 防止）。
 {:policy "fleet-ci/tip-verify/v1"
  :gate-timeout-ms 1800000            ;; 1 gate 30 分（clojure の初回 maven 解決を含む）
- :status-context-prefix "fleet-ci/murakumo"
+ ;; NOTE 2026-08-17: `:status-context-prefix` was removed. Nothing read it. It was the
+ ;; prefix for GitHub commit statuses, and that write-back was dropped on 2026-07-26 when
+ ;; the whole tick moved off the GitHub API (owner policy "github token は使わない");
+ ;; the reflection surface is Radicle issues. A config key nobody reads is a claim that
+ ;; the feature exists — someone checked a commit, found no statuses, and read a removed
+ ;; feature as a broken one.
  ;; receipt を署名する弱権限鍵（kagi item 名）。fleet-keys.edn には**入っていない** —
  ;; pin 前進も governance quorum も持たない（漏れても append-only の fleet-ci.edn に
  ;; 偽の行を足せるだけ）。machine ごとに別 identity を enroll する運用なので、
@@ -728,6 +733,29 @@
   {:name "root" :id "root-west-pin-policy" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/west-pin-policy-check.cljs"
    :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+
+  ;; 「その gate が落ちたとき、誰に届くのか」を訊く gate。
+  ;;
+  ;; fleet-ci の反映面は **Radicle issue 1 本だけ**である（commit status は 2026-07-26 に
+  ;; 撤回済み。上の :status-context-prefix の NOTE 参照）。そして issue を開くには
+  ;; manifest/repos.edn の rad-rids に RID が要る。無ければ tick は
+  ;; 「no RID registered … skipped」を launchd の stdout に書いて**何もしない**。
+  ;;
+  ;; 実測 2026-08-17: gate 対象 132 repo のうち **41 repo に反映面が無い**。
+  ;; その中には `com-junkawasaki/root`（superproject 自身）と、同日に matrix へ入れた
+  ;; network-isekai が含まれる。つまり「CI を足した」と「失敗が誰かに届く」は別問題で、
+  ;; 前者だけを満たした状態が既に 41 件ある。
+  ;;
+  ;; この gate は 41 件を直さない（private repo を Radicle に seed するのは disclosure の
+  ;; 判断であって CI の雑務ではない —— network-isekai は private 82MB）。**増えないように
+  ;; する**だけ: baseline に無い repo が反映面なしで matrix に入ったら落ちる。
+  ;; baseline が減ったら RESOLVED として報告する（古い allowlist は嘘になるので）。
+  ;;
+  ;; 落ちること・治ることの両方を確認済み: baseline 外の repo を 1 行足すと exit 1、
+  ;; baseline の repo に RID を与えると RESOLVED を出して exit 0、入力が欠けると exit 90。
+  {:name "root" :id "root-reflection-surface" :org "com-junkawasaki" :gate :nbb-script
+   :script "gates/fleet-ci-reflection-surface.cljs"
+   :include-ext [".edn" ".yml"] :min-files 1500 :cd false}
 
   ;; kotoba-lang/kip — KIP registry integrity (ADR-2608169100). Numbering,
   ;; statuses, cumulative field requirements, dangling references, and quorum on

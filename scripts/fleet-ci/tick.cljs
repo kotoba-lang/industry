@@ -6,9 +6,14 @@
 ;;      （5 分間隔で tip を見て、前回検証した sha と違う repo だけ gate を回す）
 ;;   B) 実行先を zebulun/asher ハードコードから **nodes.edn の capability による
 ;;      動的割り当て + fan-out** に（ノードの provision/増減は probe.cljs 再実行で反映）
-;;   C) 結果を **GitHub commit status** として書き戻す（fleet の検証が commit/PR 上に
-;;      出て、required status check にできる。Checks API は GitHub App 必須だが
-;;      statuses は既存 gh の repo scope で足りる）
+;;   C) ~~結果を GitHub commit status として書き戻す~~ — **2026-07-26 に撤回した。**
+;;      commit status は GitHub API でしか書けず、launchd 下の gh は Keychain の
+;;      token を読めないので匿名に落ちる（下記「git transport」節の実測）。
+;;      オーナー方針「github token は使わない」に従って API 経路ごと落とし、
+;;      **反映面は Radicle issue（:rad）に一本化**した。
+;;      2026-08-17 追記: この行は「書き戻す」と現在形で書かれたまま 22 日残り、
+;;      status が 0 件なのを見た者に「壊れている」と読ませた（実際は仕様どおり
+;;      存在しない）。撤回した機能を現在形で書かない。
 ;;   D) green なら **west pin を前進**させる（CD。既存のサーバ側 pin 検証
 ;;      scripts/verify-west-pins.cljs を必ず通し、branch + PUT + server-side merge。
 ;;      fleet-owner-key は使わない = 署名権限の昇格なし）
@@ -26,7 +31,7 @@
 ;;
 ;; 使い方:
 ;;   nbb scripts/fleet-ci/tick.cljs                   ;; 通常の tick（変化した repo のみ）
-;;   nbb scripts/fleet-ci/tick.cljs --dry-run         ;; gate まで実行するが landing/status/CD をしない
+;;   nbb scripts/fleet-ci/tick.cljs --dry-run         ;; gate まで実行するが landing/rad/CD をしない
 ;;   nbb scripts/fleet-ci/tick.cljs --only kagami     ;; repo を絞る（変化が無くても回す）
 ;;   nbb scripts/fleet-ci/tick.cljs --all             ;; 全 repo を強制的に回す
 ;;   nbb scripts/fleet-ci/tick.cljs --no-cd           ;; pin 前進（CD）だけ止める
@@ -1143,7 +1148,9 @@
         :else {:ok false :detail (:detail r)}))))
 
 ;; ---------------------------------------------------------------------------
-;; commit status 書き戻し（Checks API は GitHub App 必須。statuses は repo scope で足りる）
+;; commit status 書き戻しは **存在しない**（2026-07-26 撤回、上記 C）。
+;; この見出しは実装が消えた後も 22 日残り、空のまま「ここに在るはず」と読ませた。
+;; 反映面は次節の Radicle issue が唯一である。
 
 
 ;; ---------------------------------------------------------------------------
