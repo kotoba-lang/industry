@@ -2312,17 +2312,36 @@
       河崎氏本人の Teams クライアントから当該会議を開いて録画の有無を直接見るしかない。
    どちらも読み取りのみで進む。帳簿は 計上済み として動かさない（オーナー判断 2026-08-16）。"
 
-  :closing/not-mine
+  :closing/retired-stale-branch
   {:branch "agent/d1-kotobase-closure-20260815"
-   :状態 "origin/main から 3 ahead / 103 behind。この checkout の現在のブランチ。"
-   :未着地の実体 "7763db0613a docs: close D1 to Kotobase migration architecture
-                  （3 ファイル・161 行の純追加。他 2 commit は origin/main の取り込み）"
-   :検証 "scripts/verify-d1-kotobase-migration.cljs を実行したところ
+   :結末 "退避したうえで削除した。checkout は main（origin/main と 0/0）に戻した。"
+   :判定 "content-containment で完全に包含されていた。
+          commit 7763db0613a が追加する 3 ファイル
+          （90-docs/adr/2608152300-repo-wide-d1-to-kotobase-and-shared-identity.edn /
+           manifest/d1-kotobase-migration.edn / scripts/verify-d1-kotobase-migration.cljs）は
+          3 本ともバイト単位で origin/main のものと一致していた。
+          別経路の commit c9bee77b9e0 cleanup: land D1→Kotobase closure ADR + murakumo OEM ADR
+          で既に着地していた。"
+   :マージしなかった理由
+   "このブランチを main へマージすると main が巻き戻る。
+    origin/main → ブランチ tip の diff は 1,488 行の削除を含み、その中に
+    90-docs/business/gftd-japan-mf-ledger.datoms.edn の 507 行
+    （本セッションで追加した -49 / -50 / -51 を含む）・
+    manifest/fleet-ci.edn の 430 行・fleet-db.ledger.edn の 27 行があった。
+    ブランチが 1,628 commit 遅れており、その間の main の前進を打ち消す形になる。
+    着地させるべき差分はゼロだったので、マージではなく retirement が正解だった。"
+   :退避先 ".git/stash-archive-20260817/
+            — 0001-docs-close-D1-to-Kotobase-migration-architecture.patch（commit のパッチ）
+            / branch-commits.txt（tip の 3 commit）
+            / 2608169000-qwen38-fleet-placement-context-and-quantisation.edn.worktree-copy
+            （checkout を戻す際に邪魔になった working tree の実体。
+              内容は origin/main とバイト一致だったが、規則どおり削除前に退避した）"
+   :検証 "scripts/verify-d1-kotobase-migration.cljs は
           ok - 42 active D1 configs are closed-world registered; no unreviewed binding
-          と通った。内容は健全に見える。"
-   :扱い "前セッション（2026-08-15）の作業であり、本セッションのものではないので削除も merge もしていない。
-          着地させるなら worktree を origin/main から切って 7763db0613a を cherry-pick し、
-          gh api repos/com-junkawasaki/root/merges でサーバ側マージする。"}
+          で通る。内容の健全性に問題があったわけではなく、単に着地済みだった。"
+   :触っていないもの
+   "stash 2 件（他セッションの murakumo scripts WIP と owner の .mcp.json WIP）は
+    そのまま残してある。移動も削除もしていない。"}
 
   :provenance/read-only
   "本セッションを通じて読み取りのみ。MoneyForward の journal.write / transaction.write /
