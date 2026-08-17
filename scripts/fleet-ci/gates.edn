@@ -274,11 +274,12 @@
   ;;   `constant-time-eq?`'s length check removed -> exit 1, naming
   ;;   `constant-time-eq-semantics`
   ;;
-  ;; **Not covered**: the cljs half. `verify-cljs.cljs` prints `ok <check>`
-  ;; lines rather than a clojure.test summary, so `nbb-cross-runtime.cljs`
-  ;; (which requires "Ran N tests" and fails a zero-test run) cannot consume
-  ;; it. Converting that script to clojure.test would earn this repo a second
-  ;; entry the way io-multiformats has one.
+  ;; The cljs half is covered too, by the second entry below. It was not when
+  ;; this was first written: `scripts/verify-cljs.cljs` printed `ok <check>`
+  ;; lines rather than a clojure.test summary, which `nbb-cross-runtime.cljs`
+  ;; refuses to accept as a pass. That script is now `run-tests.cljs`, a real
+  ;; suite, and the old one is deleted rather than kept beside it -- two entry
+  ;; points for one parity check is how one of them quietly stops matching.
   {:name "sigv4" :gate :jvm-test :cd true}
   ;; ADR-2608153000 — Valueflows 経済語彙。2026-08-15、実ノードで 1 度緑になった
   ;; ので :cd true に反転（receipt 1d6bd3ca7025、signer did:key:z6MkjyhVmg…）:
@@ -1355,6 +1356,23 @@
   ;; The script npm-installs when package.json is present and node_modules is
   ;; absent, which is how @noble/hashes resolves there -- hence ".json".
   {:name "io-multiformats" :id "nbb-cross-runtime-multiformats" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+  ;; sigv4's SECOND gate. It signs this fleet's outbound S3 requests and
+  ;; verifies the inbound ones its Workers accept, and ClojureScript is where
+  ;; both happen -- WebCrypto is Promise-based, so the same source takes a
+  ;; completely different path there.
+  ;;
+  ;; How much the JVM entry above cannot see, measured 2026-08-17 by
+  ;; corrupting the ClojureScript HMAC key by ONE character:
+  ;;   nbb    -> 7 failures: both AWS reference signatures, the verification
+  ;;             path, and the composed signer
+  ;;   JVM    -> 32 tests / 93 assertions, 0 failures
+  ;;
+  ;; **Verified on judah before landing**, against a fresh clone with the real
+  ;; script: intact `OK: 17 tests, 0 failures` exit 0; that same one-character
+  ;; break `FAIL: 17 tests, 7 failures` exit 1.
+  {:name "sigv4" :id "nbb-cross-runtime-sigv4" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
 
