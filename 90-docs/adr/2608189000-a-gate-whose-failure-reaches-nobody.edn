@@ -1,0 +1,96 @@
+[{:db/id -1
+  :adr/id "ADR-2608189000"
+  :adr/title "落ちても誰にも届かない gate —— 反映面は Radicle issue 1 本だけで、gate 対象 132 repo のうち 41 にそれが無い"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :adr/deciders "Jun Kawasaki（「next」）"
+  :adr/repos ["com-junkawasaki/root"]
+  :adr/relates-to "ADR-2607178000（standing runner）, ADR-2607300900（CI/CD は murakumo fleet）, ADR-2608102000（赤い gate を直す前に 3 つ確かめる）, ADR-2608136000（検査を書く前・緑を信じる前の 5 問）"
+  :adr/body
+  "# ADR-2608189000: 落ちても誰にも届かない gate
+
+**Status**: accepted (2026-08-17)
+
+## きっかけは、私の誤診だった
+
+network-isekai を gate matrix に入れた直後、その tip に commit status が 1 件も無いのを見て
+**「status 書き戻しが壊れている、次はここ」**と報告した。**間違いだった。**
+
+`tick.cljs` の git transport 節がはっきり書いている:
+
+> API でしかできないこと＝**commit status の書き戻し**は落とした。反映面は Radicle issue
+> （:rad）に一本化する。
+
+2026-07-26、launchd 下の `gh` が Keychain の token を読めず匿名に落ちるため private repo が
+404 になり **scheduled CI が一度も動かない**状態だった。オーナー方針「github token は
+使わない」に従って、入力経路ごと git+SSH に移し、API でしかできない status 書き戻しは
+**意図して落とした**。壊れてはいない。存在しない。
+
+**では、なぜ壊れていると読めたのか。** 撤回した機能が 3 箇所に現在形で残っていたからである:
+
+| 場所 | 何と書いてあったか |
+|---|---|
+| `tick.cljs` 冒頭 拡張 C | 「結果を **GitHub commit status** として書き戻す（… required status check にできる）」 |
+| `tick.cljs` 使い方 | `--dry-run` は「landing/**status**/CD をしない」 |
+| `tick.cljs` L1146 | `;; commit status 書き戻し（…）` という**中身の無い節見出し** |
+| `gates.edn` | `:status-context-prefix \"fleet-ci/murakumo\"` —— **どのコードも読んでいない** |
+
+22 日間そのままだった。**誰も読まない設定キーは、その機能が在るという主張である。**
+4 箇所とも訂正した（消さずに「いつ・なぜ撤回したか」を残す形で）。
+
+## それを直しに行って、本当の欠陥に当たった
+
+反映面が Radicle issue **1 本だけ**なら、その 1 本が繋がっているかが全てである。
+`rad-issue-for-failure!` は `manifest/repos.edn` の `rad-rids` に RID がある repo にしか
+issue を開かない。無ければ launchd の stdout に
+`no RID registered … skipped` と書いて**何もしない**。
+
+実測（2026-08-17、この ADR の gate 自身が出した数字）:
+
+```
+SCANNED    169 gate entr(ies), 132 distinct repo(s), 3 unresolvable to <org>/<name>
+NO-SURFACE  41 repo(s) whose failures reach nobody
+```
+
+**132 のうち 41。** その中に:
+
+- **`com-junkawasaki/root`** —— superproject 自身。gate 数が最も多い repo
+- **`network-awai/network-isekai`** —— 同じ日に私が matrix へ入れたばかりの repo
+
+つまり今日の作業は「CI を足した」を満たして「失敗が誰かに届く」を満たしていなかった。
+**その 2 つは別の問題で、前者だけ満たした状態が既に 41 件あった。**
+
+これは今日 1 日で 5 回目の同じ形である —— 走らないテスト、測れない gate、開かない issue。
+**沈黙が緑として蓄積する。**
+
+## Decision
+
+`gates/fleet-ci-reflection-surface.cljs` を root の gate として足す。
+
+- gates.edn の repo は、**RID を持つか、日付と理由つきで baseline に載っているか**の
+  どちらかでなければならない。baseline 外が反映面なしで入ったら **exit 1**。
+- baseline の repo が RID を得たら **RESOLVED** として報告する（古い allowlist は嘘になる）。
+- 入力（gates.edn / repos.edn / west.yml）が欠けたら **exit 90** —— pass でも fail でもない。
+
+**41 件は直さない。** private repo を Radicle に seed するのは **disclosure の判断**であって
+CI の雑務ではない（network-isekai は private / 82 MB）。反映面を別に用意するのか、
+receipt 台帳で足りると決めるのかは**オーナーの判断**で、だからこの gate は
+**要求せず報告する**。恒久的に赤い gate は、一度も落ちない gate と同じだけ無内容である
+（ADR-2608102000）。
+
+## 確認したこと（両方向）
+
+- baseline 外の repo を 1 行足す → **exit 1**、名指しで出る
+- baseline の repo に RID を与える → **RESOLVED** を出して exit 0（改善は失敗ではない）
+- 入力を消す → **exit 90**
+- 無改変・`:include-ext [\".edn\" \".yml\"]` で絞った実 tree（2,862 ファイル）→ **exit 0**
+
+## Consequences
+
+- **41 件は open のまま**、ただし数えられ、名前が付き、増えたら落ちる。
+- **オーナー判断が要る**: この 41 のうち private repo の失敗をどこへ届けるか。
+  選択肢は (a) private として Radicle に seed する (b) 別の反映面（メール / 常駐 alarm）
+  (c) receipt 台帳で足りると決める —— どれも CI の判断ではない。
+- `:status-context-prefix` は削除した。commit status を復活させるなら launchd で読める
+  token 経路が要り、それは 2026-07-26 のオーナー方針の再検討になる。**この ADR は
+  それを提案しない。**"}]
