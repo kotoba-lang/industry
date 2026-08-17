@@ -377,9 +377,33 @@ live なのは D1 backend の方で、上記のとおり**恒久の設計では�
   実際に走った証拠)。**覆うのは base + HTTP だけ**で `test-kotobase` と worker build は
   走らない(gates.edn に明記)
 - **Worker が datom 面に載っていない**(非同期 IssueStore 契約が上流に無い)
-- **hydrate が毎リクエスト全件を読む。** dedupe が全件への問いなので v0.1 では全件。
-  表が育てば通用しない——隠れた TODO ではなく docstring と README に書いた
-- **認証が共有 secret 表**(持てる最弱の identity)。CACAO 検証への差し替えが次
+- **hydrate が毎リクエスト全件を読む（上限は強制済み）。** 正しい直し方は fingerprint で
+  候補を絞ることで、**backend 確定後**にやる(今 D1 に索引を作ると捨てる作業)。
+  それまで**黙って越えないようにした**: `/health` が上限を publish し、越えたら
+  `:store-failure` ではなく **`:hydrate-ceiling-exceeded` を実数付きで 503**。
+  `HYDRATE_CEILING` を 0 にして **live で発火を確認**(`{:entities 4 :ceiling 0}`)、
+  既定に戻して 200 も確認——**一度も発火したことのない上限は、効くか誰も知らない上限**
+- **認証が共有 secret 表**(持てる最弱の identity)。CACAO 検証への差し替えが次。
+  **これは datom 面移行と同じ鍵で解ける**
 - **credit の決済面が無い**(意図的。上記)
+
+## durable provider 実測（2026-08-17。gap を閉じ、実バグを 1 件出した）
+
+`kotobase-storage-sqlite` に対して JVM adapter を測った(`:kotobase-sqlite` alias)。
+「provider 非依存」は memory でしか確かめていない主張だったので、**実ファイルを開き、
+閉じ、同じファイルを開き直した 2 個目の database に、1 個目が書いたものを訊く**形にした。
+
+**実バグが出た**: `append-audit!` の連番が record 内の atom で、開き直すと **0 から
+振り直す**。2 個目の session の記録が 1 個目と衝突し、audit の順序が
+`[opened, review/approved, merge/merged, proposal/proposed]` に壊れた。
+**memory provider では原理的に出ない**——開き直しが無いので、バグの出る場所が無い。
+連番は既存の最大値から seed するよう修正。
+
+**テストは先に本物のバグで落ち、修正後に通った**——人工的に壊すより良い両方向の実証。
+なお concurrent writer 同士の race はこの adapter では解いておらず、**解いたふりも
+していない**(Worker 側は DO を前に置いてそれを解く。JVM 呼び出し側は自前で直列化が要る)。
+
+53 tests / 187 assertions / 0 failures、clj-kondo 0 warnings。
+s3 / postgres provider では引き続き測っていない。
 - **LLM 発見側（agent がどう申告を作るか）は範囲外。** kenbun は入口であって
   発見器ではない。`isekai-qa-loop` 系の loop が申告を投げ込む側になる"}]
