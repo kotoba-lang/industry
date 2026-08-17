@@ -34,10 +34,54 @@
    "adr-2607310900（hydrate が応答時間の 92%）"]
 
   :adr/decision-summary
-  "{:verdict :service-now-exists-but-has-never-scanned-live-data, :landed [:fleet-ci-gates-6-repos :prefetch-trampoline :async-half :west-registration :worker-shell :deployment], :not-landed [:hostname :catalog-writer :live-scan], :blocker :nothing-writes-catalog-documents, :design {:surface :not-a-new-dialect, :mechanism :supplies-source-to-existing-sparql-handler, :deployment :own-worker, :catalog :stays-on-tenant-ref, :tenant :verified-cacao-issuer-did}, :url \"https://net-kotobase-lake.04-feasts-minded.workers.dev\", :measured {:trampoline-rounds 4, :bytes 1627, :of 2427, :row-groups-read 1, :row-groups-pruned 2, :sync-async-parity true, :through-compiled-worker true, :live-request-ms [5547 6531 8893 9475], :live-cost :hydrate-not-scan}, :found {:kotobase-peer-main-did-not-read \"f084cca dropped one paren; fixed f077d947, pin advanced\"}, :fleet-facts {:jvm-cap :correct-but-only-inside-gate-env, :zebulun :all-egress-lost}, :ci {:before :none, :after :6-repos-jvm-test, :measured \"210 tests / 735 assertions on a real node\"}}"
+  "{:verdict :gate-has-now-opened-on-real-data-but-not-from-a-production-ingest, :landed [:fleet-ci-gates-6-repos :prefetch-trampoline :async-half :west-registration :worker-shell :deployment :catalog-writer :live-scan :write-read-handoff-headers], :not-landed [:hostname :production-ingest-principal :production-bytes-where-the-lake-ranges], :blockers {:principal \"CACAO_OPERATOR_DIDS is \\\"\\\" so a CACAO PUT answers 401 — an owner permission decision, measured 2026-08-17\", :bytes \"production blob backend is B2 (s3.us-west-004.backblazeb2.com) while the lake ranges R2 objects/blocks/<cid>, so a production-catalogued object would answer ObjectBytesNotFound\"}, :design {:surface :not-a-new-dialect, :mechanism :supplies-source-to-existing-sparql-handler, :deployment :own-worker, :catalog :stays-on-tenant-ref, :tenant :verified-cacao-issuer-did}, :url \"https://net-kotobase-lake.04-feasts-minded.workers.dev\", :measured {:trampoline-rounds 4, :bytes 1627, :of 2427, :row-groups-read 1, :row-groups-pruned 2, :sync-async-parity true, :through-compiled-worker true, :live-request-ms [5547 6531 8893 9475], :live-cost :hydrate-not-scan}, :live-gate {:cid \"bafkreih24dc4p6ygt7bfgun47likynv7uo7ppkeaun537cwn6y36oqck5q\", :graph \"s3-bucket/lake-proof\", :status 200, :bindings 1, :rounds 4, :bytes \"1627/2427\", :via \"application/vnd.apache.parquet\", :stranger-did 404}, :found {:kotobase-peer-main-did-not-read \"f084cca dropped one paren; fixed f077d947, pin advanced\", :first-catalogued-put-poisoned-its-bucket \"query/collections sorted heterogeneous :docs keys; fixed sort-by pr-str, control-plane 4fee88b, deployed f2048337\"}, :fleet-facts {:jvm-cap :correct-but-only-inside-gate-env, :zebulun :all-egress-lost}, :ci {:before :none, :after :6-repos-jvm-test, :measured \"210 tests / 735 assertions on a real node\"}}"
 
   :adr/verify
-  ["【2026-08-17】deploy: net-kotobase-lake が workers.dev に live。https://net-kotobase-lake.04-feasts-minded.workers.dev（version aa32d606-bca1-4032-b221-99f3a813e130）。binding は STATE_BUCKET=kotobase-protocols-state 1 本のみ、secret 0 本、routes は commented out"
+  ["【2026-08-17 夜】**gate が実データに対して初めて開いた。** 実 pyarrow parquet
+    （2,427 B）を、実 Cloudflare edge 上で走る実 `kotobase-protocols-worker` の
+    `fetch`（`wrangler dev --remote`、R2 binding は本番の `kotobase-protocols-state`）へ
+    CACAO 認証で PUT → `200` / `x-kotobase-object-cid=bafkreih24dc4p6ygt7bfgun47likynv7uo7ppkeaun537cwn6y36oqck5q`
+    / `x-kotobase-catalogued=true`。その CID を **deploy 済みの** lake Worker に問うと
+    `GET /sparql?cid=…&graph=s3-bucket/lake-proof` => **200
+    application/sparql-results+json**、binding 1 件
+    `urn:kotobase:obj:bafkreih24d…#row4`、`x-kotobase-lake-rounds=4`
+    `x-kotobase-lake-bytes=1627` `x-kotobase-lake-object-bytes=2427`
+    `x-kotobase-lake-via=application/vnd.apache.parquet`。**別 DID で同じ問いを出すと
+    404 NoSuchObject** —— gate は開くだけでなく閉じることも見せた"
+   "【2026-08-17 夜】**本番の s3 面はこの経路をまだ実行できない、を実測した。**
+    `scripts/lake-ingest-probe.cljs --ingest https://s3.kotobase.net` は
+    **PUT 401** で `COULD-NOT-ANSWER`（exit 2）。`CACAO_OPERATOR_DIDS` が `\"\"` である
+    ことの直接の観測であって、推測ではない"
+   "【2026-08-17 夜】**2 つ目の blocker を実測した（これは新しい）。**
+    `GET https://s3.kotobase.net/_diag/health` => `blob_backend:\"s3\"` /
+    `blob_endpoint:\"s3.us-west-004.backblazeb2.com\"`。**本番の object bytes は B2 に在り、
+    lake は R2 の `<prefix>objects/blocks/<cid>` しか range できない。** 本 ADR は
+    この事態を条件節（「S3/B2 backend で構成された deployment では」）として書いて
+    いたが、それが**本番の実際の構成である**。つまり allowlist を開けても、本番
+    ingest の object は `ObjectBytesNotFound` になる。**blocker は 1 つではなく 2 つ**"
+   "【2026-08-17 夜】**この drive が live のバグを 1 件見つけた。**
+    `query/enrich` は `run-once` の全リクエストで走り、hydrate 済み `:docs` の key を
+    `sort` する。key の形は書いた surface が決めるので、s3 の
+    `[:kotobase.s3/objects \"<bucket>\"]`（vector）と catalog の `\"lake-catalog\"`
+    （string）が同居した瞬間に `compare` が throw する（実測メッセージ:
+    `Cannot compare lake-catalog to [:kotobase.s3/objects \"lake-proof\"]`）。
+    **最初の catalog を書いた PUT は成功する**（空の seed を sort したから）、
+    そして**次のリクエストから write も read も落ちる**（502 / 500）。
+    e2e が見つけられなかったのは、どのケースも fake bucket 1 個につき PUT 1 回
+    だから。本番で潜在していたのは allowlist が空だからにすぎない。
+    `sort-by pr-str` で修正、`net-kotobase/control-plane` `4fee88b`、
+    本番 deploy version `f2048337-b4d2-4576-8a26-3c81a66326d9`"
+   "【2026-08-17 夜】write→read の受け渡しを塞いだ: s3 PUT が
+    `x-kotobase-object-cid`（**格納後**の bytes の CID。ETag は**受信時**の bytes の
+    sha256 なので codec が走ると別物）と `x-kotobase-catalogued` を返す。
+    catalog は CID で引かれ lake は `?cid=` で問われるのに、**claim した本人が対象を
+    名指しできなかった**。両方向を確認: CID header に etag を返すと新 e2e 2 件だけが赤、
+    `catalogued` を定数 true にすると bearer のケース 1 件だけが赤、
+    `collections` の修正を外すと second-request のケース 1 件だけが赤"
+   "【2026-08-17 夜】protocols-worker: `npm test` => **123 tests / 769 assertions**、
+    0 failures。`npm run build` 0 warnings、waitUntil gate OK、deploy 後の
+    `smoke:public` は cypher / gremlin / sparql / graphql すべて 200"
+   "【2026-08-17】deploy: net-kotobase-lake が workers.dev に live。https://net-kotobase-lake.04-feasts-minded.workers.dev（version aa32d606-bca1-4032-b221-99f3a813e130）。binding は STATE_BUCKET=kotobase-protocols-state 1 本のみ、secret 0 本、routes は commented out"
    "【2026-08-17】compiled Worker を実チェーン + 実 pyarrow ファイルで駆動（test/worker_e2e_check.cljs）: GET /sparql?cid=…&query=SELECT ?row WHERE { ?row <urn:kotobase:price> 120 } => 200 application/sparql-results+json、rounds 4、ranges [0 4] [2419 2427] [897 2419] [319 412]、1,627 / 2,427 バイト、bindings 1 件 urn:kotobase:obj:bafkreiadsbmm…#row4。**同期版の実測（4 rounds / 1,627 バイト）が非同期ホスト上でそのまま再現した**"
    "【2026-08-17】gate: 主張を持たない valid signer は 404 NoSuchObject で **0 バイト**、存在しない cid も **同一 body**。?tenant= で保有者名を名乗っても 401 / 404 のまま（この 2 checks は後から足した — 最初の版は credential 経路を壊しても全部 green だった）"
    "【2026-08-17】両方向: read-range をオブジェクト全体に広げると答えは 200 のまま正しく、落ちるのは 2 つだけ（fetched less than the object :: 2427 of 2427 / more than one round :: 1）。catalog-docs の keyword 正規化を外すと JVM 側が落ちる"
@@ -145,10 +189,58 @@ Worker 無しでテストできる。`r2.cljs` は Promise を知り他を知ら
 仕様**で、実ファイルのテストが付いているのはそちら。実 Promise 4 本で非同期版が
 同じ 4 rounds / 1,627 バイトになることを確認した。
 
-## 現在地（2026-08-17 更新）
+## 現在地（2026-08-17 夜 更新）
 
-**Worker shell と deploy は着地した。hostname は意図的に取っていない。
-そして live のデータを 1 度も scan していない。**
+**gate は実データに対して開いた。hostname は意図的に取っていない。
+そして本番の ingest はまだこの経路を通れない —— 理由は 2 つあり、どちらも設定である。**
+
+### gate が開いた（2026-08-17 夜）
+
+実 pyarrow parquet を実 Cloudflare edge 上の実 `kotobase-protocols-worker` へ
+CACAO で PUT し、その CID を **deploy 済みの** lake Worker に問うと 200 が返り、
+binding が 1 件、range 読み 4 ラウンド / 1,627 バイトで返ってきた。別 DID には 404。
+**「deploy 済みの surface が live データに対して 1 度も gate を開けていない」は、
+今日で終わった。**
+
+このとき本番と違えた設定はちょうど 2 つで、**それがそのまま残る 2 つの blocker である**:
+
+1. `CACAO_OPERATOR_DIDS` に ingest する DID を入れた（本番は `\"\"`）
+2. `BLOB_*` を与えなかったので bytes が **R2** に落ちた（本番は B2）
+
+### 本番がまだ通れない理由（2 つ、どちらも実測）
+
+- **principal が無い。** `CACAO_OPERATOR_DIDS` が `\"\"` なので本番の s3 PUT は
+  CACAO では 401（実測）。`WRITE_TOKEN` / SigV4 は bearer で principal を持たない。
+  **どの DID を admin 相当にするかは権限の判断**であって機械的な手順ではない。
+- **bytes が lake の読める場所に無い。** `GET /_diag/health` は
+  `blob_backend:\"s3\"` / `s3.us-west-004.backblazeb2.com` を返す。lake は R2 の
+  `<prefix>objects/blocks/<cid>` しか range しない。**本 ADR はこれを条件節として
+  書いていたが、それが本番の実際の構成だった。** したがって allowlist を開けても、
+  本番 ingest の object は `ObjectBytesNotFound` になる。**片方だけ直しても gate は
+  開かない。**
+
+### この drive が見つけた live のバグ（修正・deploy 済み）
+
+**最初に catalog を書いた PUT が、その bucket を次のリクエストから落としていた。**
+`query/enrich` は全リクエストで hydrate 済み `:docs` の key を `sort` し、key の形は
+書いた surface が決める —— s3 は vector、catalog は string、`compare` は両者を
+比べられない。最初の PUT が成功するのは**空の seed を sort したから**で、
+壊れるのは 1 リクエスト後、catalog と無関係な経路で、write も read も
+（502 / 500）。**e2e が見つけられなかったのは、どのケースも fake bucket 1 個に
+つき PUT 1 回だったから。** 本番で潜在していたのは allowlist が空だからにすぎず、
+**上の blocker 1 を解いた瞬間に最初の upload で発火していた。**
+`sort-by pr-str` で修正（`4fee88b` / deploy `f2048337`）。
+
+### 塞いだ write→read の受け渡し
+
+catalog は CID で引かれ lake は `?cid=` で問われるのに、**PUT が返す識別子は ETag
+だけ**だった —— ETag は**受信時**の bytes、CID は**格納後**の bytes で、codec が
+走ると別物になる。つまり claim された本人が対象を名指しできなかった。
+`x-kotobase-object-cid` と `x-kotobase-catalogued` を返すようにした。後者が無いと、
+principal を持たない PUT（catalog に何も書かない）が、書いた PUT と**ワイヤ上で
+区別できない** —— 差は後で lake の 404 として現れる。
+
+### 旧・現在地（2026-08-17 朝）
 
 ### 着地したもの
 
@@ -176,14 +268,12 @@ Worker 無しでテストできる。`r2.cljs` は Promise を知り他を知ら
 
 ### 着地していないもの（正直に）
 
-- ✅ **catalog document を書くものが出来た**（2026-08-17、ADR-2608170600）。
-  `kotobase-protocols-worker` の s3 PUT が `admit` を呼び、object metadata と
-  同じ hydrate→commit cycle で書く。**ただし live ではまだ 1 件も書かれていない**
-  —— `CACAO_OPERATOR_DIDS` が `\"\"` で、`operator-allowed?` は空 allowlist を
-  fail-closed に扱うため、s3 PUT は CACAO では通らず principal を持たない。
-  残るのは「どの DID を admin 相当にするか」という権限の判断だけで、経路は通っている。
+- ✅ **catalog document を書くものが出来て、実データで gate を開けた**（2026-08-17、
+  ADR-2608170600 + 本 ADR 上部の「gate が開いた」節）。`kotobase-protocols-worker` の
+  s3 PUT が `admit` を呼び、object metadata と同じ hydrate→commit cycle で書く。
   なお **query は `?graph=s3-bucket/<bucket>`** —— s3 の書き込みは shared admin
   graph ではなく bucket ごとの chain に載るので、catalog も object と同じ graph に在る。
+  **本番の ingest がまだ通れない理由は上の 2 blocker（principal / bytes の置き場）。**
 - **hostname を取っていない。** custom domain は 1 Worker のもので、最後に deploy
   した方が勝ち、どちらにも通知されない。`git.kotobase.net` が空の store へ移り
   28 repo が 404 を返し始めた事故がその記録。
@@ -195,10 +285,17 @@ Worker 無しでテストできる。`r2.cljs` は Promise を知り他を知ら
   費用は hydrate であって range 読みではない。**これは Decision 3 を覆す理由には
   ならない**（join 到達範囲は依然 ref 1 本）が、「どの ref か」は選べる。
 - **オブジェクトの bytes は R2 からしか読めない**（`<prefix>objects/blocks/<cid>`）。
-  object plane が S3/B2 backend で構成された deployment では bytes がそこに無く
-  `ObjectBytesNotFound` になる。B2 を range 読みするには SigV4 credential が要り、
-  read-only shell が object plane への書き込み credential を持つのは
-  `1 repo = 1 capability` が終わらせたい配置そのもの。
+  **2026-08-17 夜に実測: 本番の object plane はまさにその S3/B2 backend で構成
+  されている**（`blob_backend:\"s3\"` / `s3.us-west-004.backblazeb2.com`）ので、
+  本番 ingest の object は catalog に載っても `ObjectBytesNotFound` になる。
+  この項は「そういう deployment では」という条件節として書かれていたが、
+  **条件は本番で成立している。**
+  B2 を range 読みするには SigV4 credential が要り、read-only shell が object plane
+  への書き込み credential を持つのは `1 repo = 1 capability` が終わらせたい配置
+  そのもの —— ただし**読み取り専用の B2 application key は書き込み credential では
+  ない**ので、その反論は「新しい secret を発行するか」という別の判断に還元される。
+  代案は 3 つ: ①lake に read-only B2 key を与える ②scannable な形式だけ R2 にも
+  置く（保管費が二重）③object plane を R2 に戻す。**どれも選んでいない。**
 - **P3（transport）と P5（クエリ到達範囲）は手つかず。** 4 MiB 天井、D5 の
   server-side digest verify、REMOVE 未配線はそのまま。
 
@@ -275,13 +372,16 @@ CLAUDE.md が「wholesale 再生成 commit は禁止」と名指ししている�
 ②危険な操作を background に送ると、止める機会も失う。"
 
   :adr/next
-  "1. **catalog document を書く経路を作る。** これが今の唯一のブロッカーで、
-      deploy 済みの surface が live データに対して 1 度も gate を開けていない理由。
-      `kotobase.lake.catalog/admit` → `net-kotobase-lake.catalog-docs/quads->docs`
-      → tenant の ref の `lake-catalog` collection。**書き surface なので lake repo
-      には置かない**（read-only shell が write credential を持たない、が lake の
-      設計の半分）。候補は s3 surface の PUT 経路（既に object を
-      `objects/blocks/<cid>` に置いている）。
+  "0. **本番 ingest を通せるようにするには 2 つ揃える必要がある（片方だけでは開かない）。**
+      ①`CACAO_OPERATOR_DIDS` に DID を置く —— **権限の判断なのでここでは決めない。**
+      ②本番の bytes を lake が range できる場所に置く —— 現在 B2、lake は R2 のみ。
+      進捗は `nbb scripts/lake-ingest-probe.cljs --ingest https://s3.kotobase.net …`
+      で毎回測れる（①未解決なら PUT 401 で exit 2、②未解決なら
+      `ObjectBytesNotFound` で exit 2、両方解ければ PASS）。
+   1. ✅ **catalog document を書く経路は出来て、実データで gate が開いた**
+      （2026-08-17）。`kotobase-protocols-worker` の s3 PUT が `admit` を呼ぶ。
+      **書き surface なので lake repo には置かなかった**（read-only shell が write
+      credential を持たない、が lake の設計の半分）。
    2. **catalog を置く ref を選び直す。** 実測 5.5〜9.5 秒/リクエストが全部
       共有 graph の hydrate だった。join 到達範囲は ref 1 本のままでよい
       （Decision 3 は覆らない）が、**どの ref かは選べる** —— tenant ごとの

@@ -105,23 +105,85 @@ Worker になった瞬間に『同じ 1 つを両者が load している』こ�
 - `kotoba-lang/kotobase-lake` `6696337` —— `kotobase.lake.docs`
 - `net-kotobase/lake` `b6b4af0`（facade 撤去）/ `ec389e6`（README）
 - `net-kotobase/control-plane` `978187b` —— write surface + codec 規則
+- `net-kotobase/control-plane` `4fee88b` —— `collections` の全順序化（上の追記 1）、
+  `x-kotobase-object-cid` / `x-kotobase-catalogued`（追記 2）、
+  `scripts/lake-ingest-probe.cljs`
 - deploy: `kotobase-protocols-worker` version `af28248e-6936-473e-9811-84f2d38c8a56`
-  （s3 / atproto / pinning / sparql / gremlin / graphql の 6 custom domain）
+  → **現行 `f2048337-b4d2-4576-8a26-3c81a66326d9`**（s3 / atproto / pinning /
+  sparql / gremlin / graphql の 6 custom domain。deploy 後の `smoke:public` は 4 面とも 200）
 
-## 正直に —— 本番では、まだ 1 件も claim が書かれない
+## 追記（2026-08-17 夜）—— gate は開いた。そして「経路は既に通っている」は誤りだった
 
-**`CACAO_OPERATOR_DIDS` は `wrangler.jsonc` で `\"\"` であり、deploy 出力もそう
-表示した。** `operator-allowed?` は空 allowlist を **fail-closed**（CACAO は非
-atproto 面で何も認可しない）として扱うので、**live の s3 PUT は CACAO では通らず、
-したがって principal を持たず、したがって catalog に何も書かない。**
+**この節は同じ日の夕方まで「残る 1 手は権限の判断だけで、経路は既に通っている」と
+書いていた。実際に通してみると、通っていなかった。**
 
-つまり本 ADR が本番で今日変えたのは **Decision 2（Parquet/Arrow を gzip しない）
-だけ**である。これは credential を問わず全 PUT に効くので実質的な改善だが、
-**gate はまだ実データに対して開いていない。**
+実 pyarrow parquet を、実 Cloudflare edge 上で走る実 `kotobase-protocols-worker` の
+`fetch`（`wrangler dev --remote`、R2 binding は本番の `kotobase-protocols-state`、
+`CACAO_OPERATOR_DIDS` に probe の DID）へ CACAO で PUT し、その CID を **deploy 済みの**
+lake Worker に問うと **200 / binding 1 件 / rounds 4 / 1,627 of 2,427 bytes**。
+別 DID には 404。**gate は実データに対して開いた**（詳細は ADR-2608110600）。
 
-**残る 1 手は「どの DID をこの Worker で admin 相当にするか」という権限の判断**で
-あり、機械的な手順ではないのでここで決めない。DID が決まれば
-`CACAO_OPERATOR_DIDS` に置いて再 deploy するだけで、経路は既に通っている。
+その過程で、この ADR が landed とした write surface のバグが 2 つ出た。
+
+### 1. 最初に catalog を書いた PUT が、その bucket を次のリクエストから落としていた
+
+`query/enrich` は `run-once` の全リクエストで hydrate 済み `:docs` の key を `sort` し、
+key の形は書いた surface が決める —— s3 は `[:kotobase.s3/objects \"<bucket>\"]`
+（vector）、catalog は `\"lake-catalog\"`（string）。`compare` は String と
+PersistentVector を比べられず throw する。
+
+**最初の PUT は成功する**（空の seed を sort したから）。**壊れるのは 1 リクエスト
+後**で、write も read も（502 / 500）、しかも catalog と無関係な経路で。
+`lake_catalog_e2e_test` はどのケースも fake bucket 1 個につき PUT 1 回しかしないので、
+**書いた本人のテストが構造的に見られない位置に落ちていた。**
+
+本番で潜在していたのは allowlist が空だからにすぎず、**「残る 1 手」を実行した瞬間に
+最初の upload で発火していた。** `sort-by pr-str` で修正（`4fee88b` /
+deploy `f2048337-b4d2-4576-8a26-3c81a66326d9`）。**collection key の形を 1 つに
+法制化しない** —— surface が key を選べるだけで graph が落ちる性質のほうを消す。
+
+### 2. claim された本人が、対象を名指しできなかった
+
+catalog は CID で引かれ、lake は `?cid=` で問われる。しかし PUT が返す識別子は
+**ETag だけ**で、ETag は**受信時**の bytes、CID は**格納後**の bytes —— codec が
+走ると別物になる。つまり client は `objects/codec-for` の判断を再実装して hash し直す
+以外に、自分が今上げた object の CID を知る方法が無かった。**Decision 4 が
+「writer と reader が別々に encode したら区別が付かない」と書いたのと同じ形の穴が、
+identifier 側にも空いていた。**
+
+`x-kotobase-object-cid` と `x-kotobase-catalogued` を返すようにした。後者が無いと、
+principal を持たない PUT（＝ catalog に何も書かない、この ADR の Decision 3.1）が、
+書いた PUT と**ワイヤ上で区別できない** —— 200 + ETag で同一で、差は後に lake の
+404 として現れる。
+
+### 検査
+
+`scripts/lake-ingest-probe.cljs` が 2 つの Worker をまたいで全経路を driving する
+（PUT → `SELECT` → 別 DID が拒否されること）。**質問できなかった場合は 0 でも 1 でも
+なく exit 2**。protocols-worker は **123 tests / 769 assertions**。両方向を毎回確認:
+CID header に etag を返すと新 e2e 2 件だけ赤、`catalogued` を定数 true にすると
+bearer のケース 1 件だけ赤、`collections` の修正を外すと second-request のケース
+1 件だけ赤。
+
+## 正直に —— 本番の ingest はまだこの経路を通れない。理由は 1 つではなく 2 つ
+
+1. **principal が無い。** `CACAO_OPERATOR_DIDS` は `wrangler.jsonc` で `\"\"`。
+   `operator-allowed?` は空 allowlist を **fail-closed** に扱うので、live の s3 PUT は
+   CACAO では通らず（実測: probe が `https://s3.kotobase.net` に対して **401**）、
+   principal を持たず、catalog に何も書かない。**どの DID を admin 相当にするかは
+   権限の判断**であり、機械的な手順ではないのでここで決めない。
+2. **bytes が lake の読める場所に無い（これは 2026-08-17 夜に初めて実測した）。**
+   `GET https://s3.kotobase.net/_diag/health` は `blob_backend:\"s3\"` /
+   `s3.us-west-004.backblazeb2.com` を返す。**本番の object bytes は B2 に在り、
+   lake は R2 の `<prefix>objects/blocks/<cid>` しか range しない。**
+   ADR-2608110600 はこれを「S3/B2 backend で構成された deployment では」という
+   条件節で書いていたが、**条件は本番で成立している。**
+
+**片方だけ直しても gate は開かない。** 1 だけ直せば catalog は書かれるが query は
+`ObjectBytesNotFound`、2 だけ直しても catalog が空のままである。
+
+なお本 ADR が本番で当日変えたのは **Decision 2（Parquet/Arrow を gzip しない）**で、
+これは credential を問わず全 PUT に効く。
 
 ## 併せて記録する 2 つの事実
 
