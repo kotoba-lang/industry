@@ -78,8 +78,16 @@
     既存 consumer（`git annex copy` 経路など）を同時に壊すので、単独で行わない。
   - **kotobase-protocols-worker `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`**
     （s3.kotobase.net の AWS SigV4 write 認可、ADR-2607176000）: Worker secret
-    投入済み。operator copy は同 Keychain service `cf:kotobase-protocols-worker`
-    の account `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`（2026-07-17 生成）。
+    投入済み（`wrangler secret list` で 2026-08-17 に両方の存在を確認）。
+    operator copy は同 Keychain service `cf:kotobase-protocols-worker`
+    の account `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`（2026-07-17 生成）と
+    記録されているが、**実測 2026-08-17: どちらの account も取得できない**
+    （`security find-generic-password -s cf:kotobase-protocols-worker -a
+    S3_ACCESS_KEY_ID -w` が失敗）。
+    **同じ service の `WRITE_TOKEN` は同じコマンド形で取得できる**ので、
+    keychain のロックや service 名の誤りではなく、**この 2 account が無い**。
+    他の account 名を当て推量で試していない（安全床⑦）。
+    旧記述は上に残す（復旧時の参照。索引の規則 #2）。
   - **net-babiniku 外部配信の operator gate**（ADR-2607253000）: Pages secret
     `LIVESTREAM_OPERATOR_SECRET`（project `net-babiniku`）の operator copy は
     macOS Keychain `service=net-babiniku:livestream-operator-secret` /
