@@ -176,11 +176,14 @@ Worker 無しでテストできる。`r2.cljs` は Promise を知り他を知ら
 
 ### 着地していないもの（正直に）
 
-- **catalog document を書くものが 1 つも無い。** `kotobase.lake.catalog/admit` が
-  quads を作り、この Worker がそれを読むが、**`admit` を呼ぶ deploy 済み経路は
-  存在しない**。したがって live plane に対してこの surface は全オブジェクトに
-  正しく `404 NoSuchObject` を返し、**gate を実データに対して 1 度も開いていない**。
-  次に作るべきはこの write surface で、それは lake repo には属さない。
+- ✅ **catalog document を書くものが出来た**（2026-08-17、ADR-2608170600）。
+  `kotobase-protocols-worker` の s3 PUT が `admit` を呼び、object metadata と
+  同じ hydrate→commit cycle で書く。**ただし live ではまだ 1 件も書かれていない**
+  —— `CACAO_OPERATOR_DIDS` が `\"\"` で、`operator-allowed?` は空 allowlist を
+  fail-closed に扱うため、s3 PUT は CACAO では通らず principal を持たない。
+  残るのは「どの DID を admin 相当にするか」という権限の判断だけで、経路は通っている。
+  なお **query は `?graph=s3-bucket/<bucket>`** —— s3 の書き込みは shared admin
+  graph ではなく bucket ごとの chain に載るので、catalog も object と同じ graph に在る。
 - **hostname を取っていない。** custom domain は 1 Worker のもので、最後に deploy
   した方が勝ち、どちらにも通知されない。`git.kotobase.net` が空の store へ移り
   28 repo が 404 を返し始めた事故がその記録。
