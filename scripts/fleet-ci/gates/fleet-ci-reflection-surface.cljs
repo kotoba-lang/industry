@@ -49,27 +49,64 @@
 ;;
 ;; WHO IS EXPECTED TO SOLVE IT: whoever adds the next gate to one of these repos should ask
 ;; where its failure goes before adding it.
-(def baseline-without-surface
-  #{"cloud-itonami/cloud-itonami-gftd-audio-actor"
-    "cloud-itonami/cloud-itonami-gftd-avatar-actor"
-    "cloud-itonami/cloud-itonami-gftd-illust-actor"
-    "cloud-itonami/cloud-itonami-gftd-motion-actor"
-    "cloud-itonami/cloud-itonami-gftd-rig-actor"
-    "cloud-itonami/cloud-itonami-gftd-sculpt-actor"
-    "cloud-itonami/cloud-itonami-gftd-voice-actor"
+(def private-on-github
+  "PRIVATE repos. **Owner decision 2026-08-18: 「private はひとまず github のままで ok」** —
+   they are not seeded to Radicle, so they will never acquire a RID and these entries are
+   permanent, not pending work.
+
+   That leaves them with no reflection surface at all: fleet-ci writes commit statuses to
+   nothing (removed 2026-07-26) and opens Radicle issues for RIDs that will not exist. A red
+   gate on one of these lands a signed receipt in manifest/fleet-ci.edn and stops there.
+   `com-junkawasaki/root` — the most-gated repo in the matrix — is one of them.
+
+   This is recorded as a known, decided gap rather than solved, because giving these a
+   surface means either a GitHub token in the launchd path (which 2026-07-26 removed on
+   purpose) or a different channel entirely. Both are the owner's call."
+  #{;; added 2026-08-18 by this gate catching it in the act: another session put a gate
+    ;; on it while this change was in flight, and it is private, so the owner decision
+    ;; above applies unchanged.
+    "net-kotobase/control-plane"
+    "com-junkawasaki/org-spirit-in-physics-comics"
+    "com-junkawasaki/root"
+    "kotoba-lang/kotobase-protocol-core"
+    "network-awai/cloud-itonami"
+    "network-awai/cloud-murakumo"
+    "network-awai/club-shinshi-app"
+    "network-awai/network-isekai"})
+
+(def pending-registration
+  "PUBLIC repos with no RID. No disclosure question — these can simply be registered, and
+   each one that is clears itself from this set (the gate reports it as RESOLVED).
+
+   Measured 2026-08-18. Seven of them were renamed in this set on that date, not fixed: the
+   gate used to key on `orgs/<org>/<project-name>` and now keys on west's `path:`, so
+   `cloud-itonami/cloud-itonami-gftd-audio-actor` — a repo that does not exist — became
+   `cloud-itonami/gftd-audio-actor`, which does."
+  #{;; added 2026-08-18: gated by another session while this change was in flight.
+    ;; Both public, so registering a RID clears them — ordinary work, no decision.
+    "cloud-itonami/keihi"
+    "cloud-itonami/shiharai-actor"
+    "cloud-itonami/gftd-audio-actor"
+    "cloud-itonami/gftd-avatar-actor"
+    "cloud-itonami/gftd-illust-actor"
+    "cloud-itonami/gftd-motion-actor"
+    "cloud-itonami/gftd-rig-actor"
+    "cloud-itonami/gftd-sculpt-actor"
+    "cloud-itonami/gftd-voice-actor"
     "cloud-itonami/kenbun"
     "cloud-itonami/kintai"
     "cloud-itonami/sakkyokuka"
     "cloud-itonami/tehai"
-    "com-junkawasaki/org-spirit-in-physics-comics"
-    "com-junkawasaki/root"
     "kotoba-lang/columnar"
+    "kotoba-lang/datalog"
+    "kotoba-lang/datom-source"
     "kotoba-lang/dev-protobuf"
     "kotoba-lang/governor"
     "kotoba-lang/inga"
     "kotoba-lang/io-ipld-car"
     "kotoba-lang/kotobase-block-codec"
     "kotoba-lang/kotobase-lake"
+    "kotoba-lang/kotobase-projection"
     "kotoba-lang/kotobase-shard-index"
     "kotoba-lang/kotobase-storage"
     "kotoba-lang/kotobase-storage-pack"
@@ -80,17 +117,18 @@
     "kotoba-lang/org-ietf-nfs"
     "kotoba-lang/org-ietf-oncrpc"
     "kotoba-lang/org-ietf-xdr"
+    "kotoba-lang/org-ietf-zstd"
     "kotoba-lang/provider-incidence"
     "kotoba-lang/provider-transport"
     "kotoba-lang/sigv4"
     "kotoba-lang/taxlaw"
     "kotoba-lang/tech-ipfs-specs-unixfs"
     "kotoba-lang/ws-valueflo-algorithms"
-    "kotoba-lang/ws-valueflo-vocabulary"
-    "network-awai/cloud-itonami"
-    "network-awai/cloud-murakumo"
-    "network-awai/club-shinshi-app"
-    "network-awai/network-isekai"})
+    "kotoba-lang/ws-valueflo-vocabulary"})
+
+(def baseline-without-surface
+  "The union: every gated repo known on 2026-08-18 to have nowhere to report a failure."
+  (into private-on-github pending-registration))
 
 ;; Separately, 3 of the 169 gate ENTRIES cannot be resolved to an `<org>/<name>` pair by the
 ;; rule above (no `:org` in gates.edn and no matching `- name:` / `remote:` pair in west.yml).
@@ -118,6 +156,19 @@
   (when-let [m (re-find (re-pattern (str "- name: " n "\\s*\\n\\s+remote: ([a-z0-9-]+)")) west)]
     (second m)))
 
+(defn- west-path-of
+  "The project's checkout path — `orgs/<org>/<repo>` — which is what rad-rids is keyed on.
+
+   NOT `orgs/<org>/<project-name>`. west lets `repo-path:` differ from `name:`, and 59 of
+   4,191 projects do (measured 2026-08-18). Keying on the name asks about a repo that does
+   not exist; 36 projects have a RID under the path key and none under the name key, so the
+   name-keyed question answers \"no reflection surface\" for repos that have one.
+   tick.cljs's `west-path` does the same lookup — the two must not disagree about which
+   string identifies a repo."
+  [west n]
+  (when-let [m (re-find (re-pattern (str "- name: " n "\\s*\\n(?:\\s+[a-z-]+: [^\\n]*\\n)*?\\s+path: ([^\\n]+)\\n")) west)]
+    (str/trim (second m))))
+
 (let [gates (read-edn "scripts/fleet-ci/gates.edn")
       rids (rad-rids)
       west-file (path/join root "manifest/west.yml")
@@ -135,7 +186,16 @@
 
   (let [rows (for [g (:repos gates)
                    :let [n (:name g) o (or (:org g) (org-of west n))]]
-               {:name n :org o :key (when o (str o "/" n))})
+               {:name n :org o
+                ;; An explicit `:org` in gates.edn means "this is NOT a west project" — the
+                ;; superproject is the documented case. Looking such an entry up in west.yml
+                ;; BY NAME is wrong and not merely useless: west has a project literally
+                ;; named `root` under a different org (`orgs/etzhayyim/root`), and it has a
+                ;; RID. The first version of this line found that RID and reported
+                ;; `com-junkawasaki/root` as having a reflection surface it does not have.
+                :key (or (when-not (:org g)
+                           (some-> (west-path-of west n) (str/replace #"^orgs/" "")))
+                         (when o (str o "/" n)))})
         uniq (vals (into {} (map (juxt :key identity)) (filter :key rows)))
         unresolved (count (remove :key rows))
         without (sort (map :key (remove #(get rids (str "orgs/" (:key %))) uniq)))

@@ -250,6 +250,31 @@
         url (get-in west [:remotes remote])]
     (when url (last (str/split url #"[:/]")))))
 
+(defn west-path
+  "west project の checkout path（`orgs/<org>/<repo>`）。rad-rids はこれを key にする。"
+  [west nm]
+  (get-in west [:projects nm :path]))
+
+(defn repo-name-of
+  "**west の project 名ではなく、GitHub 上の repo 名。**
+
+  west は `name:` と `repo-path:` を分けられる。実測 2026-08-18、4,191 project のうち
+  **59 が両者で違う**（例: name `cloud-itonami-gftd-audio-actor` / repo-path
+  `gftd-audio-actor` / path `orgs/cloud-itonami/gftd-audio-actor`）。
+
+  ここを project 名で組み立てていたせいで、その 7 件は gates.edn に載っていながら
+  **一度も走っていなかった** —— `git ls-remote git@github.com:cloud-itonami/
+  cloud-itonami-gftd-audio-actor.git` は「repository does not exist」で、tip が nil に
+  なり、tip の無い work は黙って落とされる。state ファイルの 2,063 entry に
+  `gftd-` を含むものは 1 件も無い（実測）。
+
+  `path:` の最終セグメントが正しい repo 名で、`repo-path:` が無ければ name と同じに
+  なるので、この 1 行が両方を吸収する。"
+  [west nm]
+  (if-let [p (west-path west nm)]
+    (last (str/split p #"/"))
+    nm))
+
 (defn gate-id
   "gates.edn entry の識別子。既定は :name（= repo 名）だが、**1 つの repo に
   複数の gate を載せたいときは :id を明示する**。:name は org / tip 解決に使う
@@ -1384,13 +1409,14 @@
                               ;; superproject 自身は west project ではないので引けない —
                               ;; そういう対象だけ gates.edn に :org を明示する。
                               org (or (:org r) (org-of west nm))
-                              org-repo (str org "/" nm)
+                              org-repo (str org "/" (repo-name-of west nm))
                               tip (tip-of org-repo)
                               pin (get-in west [:projects nm :revision])
                               last-sha (get-in @state [:repos id :sha])
                               spec (gate-spec-hash r)
                               last-spec (get-in @state [:repos id :spec-hash])]]
                     (let [w (assoc r :org org :org-repo org-repo :tip tip :pin pin
+                                   :west-path (west-path west nm)
                                    :id id
                                    :last-sha last-sha
                                    :spec-hash spec :last-spec last-spec)]
@@ -1420,8 +1446,10 @@
                  "NOT verified"))
         pr-work
         (vec (for [r repos
+                   ;; `repo-name-of`, not (:name r) — same reason as the tip branch above:
+                   ;; a west project's name is not always its GitHub repo name.
                    :let [org (or (:org r) (org-of west (:name r)))
-                         org-repo (when org (str org "/" (:name r)))]
+                         org-repo (when org (str org "/" (repo-name-of west (:name r))))]
                    :when org-repo
                    {:keys [number head]} (take pr-cap (get prs-by-repo org-repo))
                    :let [id (str (gate-id r) "#pr" number)
@@ -1429,6 +1457,7 @@
                          spec (gate-spec-hash r)
                          last-spec (get-in @state [:repos id :spec-hash])]]
                (let [w (assoc r :org org :org-repo org-repo :tip head :pin nil
+                              :west-path (west-path west (:name r))
                               :id id :pr number :cd false
                               :last-sha last-sha
                               :spec-hash spec :last-spec last-spec)]
@@ -1658,7 +1687,13 @@
             :else
             (let [rids (rad-rid-map landing)]
               (doseq [w failed]
-                (if-let [rid (get rids (str "orgs/" (:org w) "/" (:name w)))]
+                ;; rad-rids は west の `path:`（orgs/<org>/<repo>）を key にする。
+                ;; `orgs/<org>/<project-name>` で引いていたので、name != repo-path の
+                ;; project は RID が登録されていても見つからず、issue が開かなかった。
+                ;; 実測 2026-08-18: そういう project は 59、うち **36 が path key で
+                ;; だけ RID を持つ** = 反映面が登録済みで到達不能だった。
+                (if-let [rid (get rids (or (:west-path w)
+                                           (str "orgs/" (:org w) "/" (:name w))))]
                   (rad-issue-for-failure! rc rid w)
                   (log "rad: no RID registered for" (str (:org w) "/" (:name w))
                        "— skipped (register it in repos.edn rad-rids first)"))))))
