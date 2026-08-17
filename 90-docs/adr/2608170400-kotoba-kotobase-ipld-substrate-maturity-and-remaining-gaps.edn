@@ -102,6 +102,7 @@ DMT は型付き表現変換、ADL は同じ Data Model interface の背後で�
 | #621 | `651f90fc...` | `(bytes-slice value START END)` を copy しない bounded view へ lowering（decode/encode body） |
 | #622 | `64dd35d3...` | `(bytes-concat A B)` を operand の後ろへ書く per-byte copy へ lowering |
 | #623 | `6f0aecc3...` | subrange / join の lowering を 1 本の expression compiler へ畳み、bump cursor で合成を可能に |
+| #624 | `c38f79d2...` | guest 出力の canonical DAG-CBOR roundtrip を capability で強制（receipt 署名の前） |
 
 `kotoba-sema` PR #10（merge `105309ca...`）は `bytes-count(bytes) -> i64` を、
 PR #11（merge `d96e9341...`）は `bytes-at(bytes, i64) -> i64` を、
@@ -320,7 +321,40 @@ resume token、重複block抑止、malicious responder negative test が必要�
    を使っているかに関わらず**——match し続けた。今は backreference で slot を束縛する。
    *通っているが何も検査していない test* は、この repo の ADR 群が繰り返し名指ししている
    失敗形そのものである。
-5. canonical DAG-CBOR を壊す transform を Schema/codec roundtrip で拒否。
+5. ~~canonical DAG-CBOR を壊す transform を Schema/codec roundtrip で拒否~~
+   **closed（2026-08-17、amu #624）**。
+
+   grammar は byte 列に閉じているので、**完璧に忠実に lower された transform が
+   canonical DAG-CBOR の書かない bytes を返せる**。値 `0x18 0x05` の encoding は
+   `42 18 05` で、`(bytes-slice value 1 3)` は `18 05` —— これは整数 5 として
+   **decode は綺麗に通る**。
+
+   ⚠ **これが閉じた穴を誤って主張しないこと。** `ipld.schema` は既にこの出力を
+   自前で `:adl-wasm-output-not-canonical` として拒否している。私は
+   `ipld.core/decode` を単体で測って（単体では確かに `18 05` を受理する）逆を推論し、
+   **mutation で初めて誤りに気づいた**。単体を測って系に一般化した典型例である。
+
+   **実際に開いていたのは別の 2 箇所**:
+   - **receipt。** 署名は capability の中で起きるので、この検査が無いと executor は
+     「この module がこの bytes を出した」と**署名してから**、後段が「それは node では
+     ない」と判断する。codec が拒否する bytes を receipt が保証してはならない。
+   - **`ipld.schema` 以外の consumer 全部。** capability は raw output bytes を返す
+     public entry point で、その下の engine 経路には codec 検査が**一切ない** ——
+     raw runner は今日でも truncated な `41` を `status:ok` で返す。
+
+   **schema 境界は ADL の ex-data を通さない** —— message を `:message` に入れ、自分の
+   `:problem` を報告する。したがって構造化 code の assertion は raise される層
+   （capability の test）に置き、harness は message で照合する。
+
+   **harness の reject mode は「何かが throw した」ではなく「capability 自身の理由」を
+   要求する。** これが弁別性の要 —— 検査を消しても schema が拒否するので、「throw した」
+   だけの assertion は通り続けてしまう。
+
+   六面の証拠: sema typing（変更不要）/ KIR 変更なし（これは capability 層の決定）/
+   wasm-tools validation（既存）/ 実 Wasmtime（非 canonical を返す実 module が end-to-end
+   で capability の理由により拒否される）/ 署名 receipt（**拒否された出力は attest され
+   ない**ことを test が固定）/ mutation（re-encode 比較を消すと unit 4 assertion が落ち、
+   harness の拒否者が schema 側に変わって「拒否者が違う」で落ちる）。
 
 完了証拠は sema typing、専用KIR admission、Wasm validation、real Wasmtime positive/negative、
 signed receipt、壊した実装が落ちる mutation test の六面。
@@ -398,32 +432,29 @@ signed receipt、壊した実装が落ちる mutation test の六面。
 
 ## 8. 着地と再開点
 
-root pin は `amu 6f0aecc3ad7e...`（west commit `ff8198d3...`）、
+root pin は `amu c38f79d2c1af...`（west commit `1069d90b...`）、
 `kotoba-sema f4de940e403c...`（west commit `91650f61...`）。genpon は ledger event
-11468 で reconcile 済みで、`kagami reconcile --check` は clean。
+11472 で reconcile 済みで、`kagami reconcile --check` は clean。
 
-**P0 は 5 項目中 4 つが 2026-08-17 に着地した**（P0-1 `bytes-at` / P0-2 `bytes-slice` /
-P0-3 `bytes-concat` / P0-4 closed expression grammar）。次の最小縦切りは **P0-5**:
-**canonical DAG-CBOR を壊す transform を Schema/codec roundtrip で拒否する**。
+**P0 は 5 項目すべてが 2026-08-17 に着地した**（P0-1 `bytes-at` / P0-2 `bytes-slice` /
+P0-3 `bytes-concat` / P0-4 closed expression grammar / P0-5 canonical codec refusal）。
+次は **P1 — spec conformance を幅で閉じる**（本 ADR §5 の P1 節、5 項目）。
 
-P0-1..4 で確定した、P0-5 に持ち込むべきこと:
+P0 全体を通して確定した、P1 に持ち込むべきこと:
 
-- **P0-5 は前 4 つと種類が違う。** あれらは「lowering が source に忠実か」を問うていたが、
-  P0-5 が問うのは **lowering が忠実であってもなお出力が node でないことがある**という別の
-  失敗である。grammar は byte 列に閉じており、`(bytes-slice value 1 2)` は完璧に正しく
-  lower されて **DAG-CBOR として無効な 1 byte** を返せる。
-- **その事実は既に実測済みで、証拠もある。** capability 経由の operand は DAG-CBOR encode
-  済みで、`42 41 05` の `[1,3)` は node（`0x05` を持つ byte string）だが `[1,2)` は node
-  ではない。conformance script が値と期待値を引数に取るようになっているのはこのため。
-  **P0-5 の positive/negative fixture は既にこの形で書ける。**
-- **どこで拒否するかが設計判断である**: compile 時（式から出力の codec 形を推論できる場合
-  のみ可能で、`:whole` を含む式では一般に不可能）/ guest 側（module に codec validator を
-  emit することになり grammar の外）/ host 側の schema roundtrip（既に `adl-rejected` を
-  返している）。**既存の拒否を「実装済み」と読まないこと** —— 現在それが動くのは
-  capability 経路だけで、raw runner 経路には codec 検査が無い。
-- **mutation は「壊れた出力が受理されてしまう」方向で書く。** 今までの mutation は
-  「正しい出力が壊れる」方向だった。P0-5 では node でない出力を通す変更を入れて、
-  roundtrip 検査が落ちることを見る。
+- **⚠ 単体を測って系に一般化しない。** P0-5 でまさにこれをやった —— `ipld.core/decode` が
+  `18 05` を受理するのを見て「系が受理する」と推論したが、`ipld.schema` は自前で拒否して
+  いた。誤りに気づいたのは mutation だけである。**P1 は conformance corpus の項目なので、
+  この誤りの形（「この層がやっていない」→「誰もやっていない」）が最も出やすい。**
+  「未実装」と書く前に、系に対して測ること。
+- **P1-2 が明示的に要求している**「未対応 construct を `unsupported` と列挙し、
+  『完全な Schema DSL』を test 数だけで宣言しない」は、上と同じ規律の別表現である。
+- **mutation は両方向必要で、方向は項目ごとに違う。** P0-1..4 は「正しい出力を壊す」、
+  P0-5 は「壊れた出力を通す」だった。**assertion が「何かが起きた」ではなく
+  「誰が/何が起きた」を見ているかを確かめること** —— P0-5 の harness は検査を消しても
+  別の層が拒否するので、「throw した」だけでは通り続けた。
+- **層をまたぐと構造化エラーは平坦化される。** schema 境界は ADL の ex-data を落として
+  `:message` + 自分の `:problem` にする。構造化 assertion は raise される層に置く。
 
 **この ADR は現状を100%と宣言しない。100%へ進むため、何が correctness、何が代替transport、
 何がextension、何がoptimizationかを固定する正本である。**"}]
