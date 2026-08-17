@@ -99,11 +99,13 @@ DMT は型付き表現変換、ADL は同じ Data Model interface の背後で�
 | #618 | `538633a1...` | literal bool、identity、canonical empty bytes の closed non-identity lowering |
 | #619 | `15c362ef...` | `(= (bytes-count value) N)` を ABI input length へ lowering |
 | #620 | `6d222fc5...` | `(= (bytes-at value I) N)` を operand-length bounds trap 付き unsigned byte read へ lowering |
+| #621 | `651f90fc...` | `(bytes-slice value START END)` を copy しない bounded view へ lowering（decode/encode body） |
 
 `kotoba-sema` PR #10（merge `105309ca...`）は `bytes-count(bytes) -> i64` を、
-PR #11（merge `d96e9341...`）は `bytes-at(bytes, i64) -> i64` を typed pure operation
-として追加した。後者の bounds は typing で決まらない run-time の事実なので、
-docstring が backend 側の義務として明記する（下記 P0-1）。
+PR #11（merge `d96e9341...`）は `bytes-at(bytes, i64) -> i64` を、
+PR #12（merge `9da24d86...`）は `bytes-slice(bytes, i64, i64) -> bytes`（half-open）を
+typed pure operation として追加した。いずれも bounds は typing で決まらない run-time の
+事実なので、docstring が backend 側の義務として明記する（下記 P0-1 / P0-2）。
 
 実 runner では 4-byte input が canonical DAG-CBOR true、1-byte input が false。
 io-IPLD projection、署名 receipt、fuel exhaustion、timeout、forbidden import、fixed memory、
@@ -211,8 +213,36 @@ resume token、重複block抑止、malicious responder negative test が必要�
    ⚠ `clojure -M:test`（amu 全体）はこのマシンでは `cli-test` の
    `wasm-tools version is not pinned` で exit 70 する。**無改変の origin/main が同じ test で
    同じ exit をすることを別 worktree で確認済み** —— 本 slice の regression ではない。
-2. `bytes-slice(bytes, start, end) -> bytes`: `0 <= start <= end <= len`、overlap/alias規則、
-   max-output bound を lowering と runner の両方で強制。
+2. ~~`bytes-slice(bytes, start, end) -> bytes`~~ **closed（2026-08-17、kotoba-sema #12 + amu #621）**。
+   `0 <= start <= end <= len`、overlap/alias 規則、max-output bound を lowering と runner の
+   両方で強制した。
+
+   **alias 規則は「view であって copy ではない」に落ちた。** 結果は operand 自身の pointer を
+   START だけ進めたもので、長さは `END-START`。**module は linear memory へ一度も書かない**ので、
+   規則は「結果は operand を alias し、host は input buffer を再利用する前に読み出さねばならない」
+   の一文になる（runner は既にそうしている）。しかもこれは**検査できる** —— emit した module に
+   `store` / `memory.copy` / `memory.fill` が無いことを test が主張する。
+
+   **bounds は P0-1 と同じ罠で、slice は二重に食らう** —— offset と結果長の両方を支配する。
+   `length < END` を pointer 形成の前に trap させる。この guard が無い module は
+   **Wasm として依然 valid で、pointer も返す** —— 2 page memory の中で input の後ろに
+   続く何かを指して。`0 <= START <= END` は compile 時に決まるので名前つきで拒否する。
+
+   **max-output は両側で強制し、どちらも他方を包含しない**: lowering 側は module 固定の
+   input capacity を越える END を「trap しかありえない」として compile 時に拒否する
+   （host の limit は見えない）。runner 側は host が選んでいない view にも `max_output` を
+   適用する（source の offset は見えない）。
+
+   **conformance script が値を hardcode するのをやめた必然的な理由**: subrange が schema を
+   round-trip するのは**その subrange 自身が DAG-CBOR node であるとき**だけで、それは値に依存する。
+   `0x41 0x05` の encoding は `42 41 05`、`[1,3)` は `0x05` を持つ CBOR byte string。よって
+   representation と期待 logical 値を引数化し、slice lowering を capability と署名 receipt
+   経由でも走らせた（既存の呼び出しは既定で不変）。
+
+   六面の証拠: sema typing（20 tests/125 assertions）/ 専用 KIR admission `[:input-subrange S E]` /
+   wasm-tools validation / 実 Wasmtime（`[1,3)`、隣の identity encode、空 subrange が trap では
+   なく整形式の答えであること、out-of-range と empty-input の trap、runner の output bound）/
+   署名 receipt / mutation test（unit assertion と harness の両方が捕らえ、restore で両方緑）。
 3. `bytes-concat(a,b) -> bytes`: overflow、allocation、fuelを入力長に比例させる。
 4. encode/decode で上記を合成できる closed expression grammar。loop/recursion/host import は別profile。
 5. canonical DAG-CBOR を壊す transform を Schema/codec roundtrip で拒否。
@@ -293,16 +323,28 @@ signed receipt、壊した実装が落ちる mutation test の六面。
 
 ## 8. 着地と再開点
 
-root pin は `amu 6d222fc583f4...`（west commit `dad868e4...`）、
-`kotoba-sema d96e9341ac0a...`（west commit `62972fe6...`）。genpon は ledger event
-11458/11459 で reconcile 済みで、`kagami reconcile --check` は clean。
+root pin は `amu 651f90fc443d...`（west commit `ab1181e8...`）、
+`kotoba-sema 9da24d860e5b...`（west commit `bcba7a9c...`）。genpon は ledger event
+11461/11463 で reconcile 済みで、`kagami reconcile --check` は clean。
 
-**P0-1 `bytes-at` は 2026-08-17 に着地した。** 次の最小縦切りは **P0-2 `bytes-slice`**。
-`(bytes-slice value start end)` を `0 <= start <= end <= len` の bounds、overlap/alias 規則、
-max-output bound とともに lowering と runner の両方で強制する。P0-1 で分かったことを持ち込む:
-**bounds は operand のものであって memory のものではない**（slice は結果長も operand から
-導かれるので、この誤りは length にも波及する）。**index/長さを literal に閉じるかは profile の
-判断であって言語の判断ではない。** capability 経由の operand は DAG-CBOR encode 済みである。
+**P0-1 `bytes-at` と P0-2 `bytes-slice` は 2026-08-17 に着地した。** 次の最小縦切りは
+**P0-3 `bytes-concat`**。`(bytes-concat a b)` を overflow・allocation・fuel が入力長に比例する
+形で lowering と runner の両方に載せる。
+
+P0-1/P0-2 で確定した、P0-3 に持ち込むべきこと:
+
+- **bounds は operand のものであって memory のものではない。** concat では逆向きに効く ——
+  slice は operand の中を指せばよかったが、**concat は結果を置く場所を必要とする最初の
+  operation** である。view では済まず、書き込み先の確保と、その確保が capacity を越えない
+  ことの両方が要る。`adl_alloc` の固定 1024 offset はここで見直しが要る。
+- **copy しないで済むかどうかは、alias 規則を書き下せるかどうかで決まる。** slice の
+  「view であって copy ではない」は module に store が無いことで検査できた。concat は必ず
+  書くので、**その主張は使えない** —— 代わりに「書き込み先が input と重ならない」を検査する
+  必要がある。
+- **offset/長さを literal に閉じるかは profile の判断であって言語の判断ではない。**
+- **capability 経由の operand は DAG-CBOR encode 済み**であり、結果もまた node でなければ
+  schema を round-trip しない。concat の結果が node になる入力を選ぶこと。
+- **max-output は lowering と runner の両方に要り、どちらも他方を包含しない。**
 
 **この ADR は現状を100%と宣言しない。100%へ進むため、何が correctness、何が代替transport、
 何がextension、何がoptimizationかを固定する正本である。**"}]
