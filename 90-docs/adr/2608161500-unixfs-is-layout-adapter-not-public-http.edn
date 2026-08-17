@@ -3,8 +3,8 @@
   :adr/title "UnixFS は IPLD layout adapter。aiueos の正本でも公開 HTTP の正本でもない"
   :adr/status "accepted"
   :adr/date "2026-08-16"
-  :adr/last-verified "2026-08-16"
-  :adr/last_verified "2026-08-16"
+  :adr/last-verified "2026-08-17"
+  :adr/last_verified "2026-08-17"
   :adr/doc-type "adr"
   :adr/doc_type "adr"
   :adr/source-format "edn"
@@ -145,6 +145,17 @@ addressing を変えたい、は trigger ではない。
 - 公開 URI parser（`kotoba.protocol.ref`）が path 付き `ipfs://cid/index.html` を `:path-not-identity` で拒否し続けること（ADR-2608145100 の既存 test）。
 - 新しい公開 origin が UnixFS walk を既定にする PR は、この ADR を supersede する ADR 無しでは着地しない。
 
+## Closing / resume
+
+2026-08-17 セッション終了時点:
+
+- **決定は accepted。コード実装は無い**（この ADR の意図どおり）。
+- **default branch 着地済み**: merge `af4c43d1f1e`（2026-08-16、サーバ側 merge。初回は PR 無し）。
+- **検証**: EDN は `cljs.reader/read-string` で通る。`:adr/id` `ADR-2608161500`、`:adr/status` `accepted`。fleet gate / 実装 test は対象外（決定記録）。
+- **未実装のまま正しいもの**: `unixfs-reader` adapter。外来 UnixFS CAR の実需要が来るまで書かない。boot 契約は `:aiuefs-v3` のまま。
+- **次の最初の動作**: 新しい公開 origin または aiueos store 変更に当たったら、この ADR の §2–§4 を荷重として読む。UnixFS を正本にする diff は successor ADR 無しでは着地しない。
+
 ## 改訂履歴
 
-2026-08-16: accepted。オーナー判断「aiueos の抽象として持っておくぐらいか」「web/HTTP 公開面は unixfs じゃない方がいい」。IPLD 代替を raw document / dag-cbor map / 専用 ADL / CAR に固定。"}]
+2026-08-16: accepted。オーナー判断「aiueos の抽象として持っておくぐらいか」「web/HTTP 公開面は unixfs じゃない方がいい」。IPLD 代替を raw document / dag-cbor map / 専用 ADL / CAR に固定。
+2026-08-17: closing。main 着地 SHA と resume point を本文に固定。"}]
