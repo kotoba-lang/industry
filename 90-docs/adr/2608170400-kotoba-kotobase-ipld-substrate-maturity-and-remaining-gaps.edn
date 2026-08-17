@@ -362,8 +362,35 @@ signed receipt、壊した実装が落ちる mutation test の六面。
 ### P1 — spec conformance を幅で閉じる
 
 1. Data Model 全kind、DAG-CBOR canonical/invalid corpus、Link/tag42 の相互運用 corpus。
-2. Schema DSL の upstream grammar 対応表。未対応constructを `unsupported` と列挙し、
-   「完全なSchema DSL」をテスト数だけで宣言しない。
+2. ~~Schema DSL の upstream grammar 対応表~~ **closed（2026-08-17、io-ipld #24）**。
+   `resources/ipld/schema-dsl-coverage.edn` に **test が駆動する表**として着地。
+
+   **測るのに 3 回かかり、その食い違いこそが表の存在理由である。** `dsl/parse` で測ると
+   `copy` を含め全 construct が「通る」、`compile-schema` で測ると 1 つを除いて通る、
+   `representation->logical!` に代表値を通して初めて本当の答えが出る。**parser や
+   test 数から読んだ coverage 主張は間違っていた。**
+
+   **結果は ADR の想定と違った。** coverage はほぼ完全で、struct / map / union / enum の
+   upstream representation はすべて round-trip し、`optional` / `nullable` / `implicit` /
+   `rename` も通る。**通らないのはちょうど 2 つ**で、code つきで名指しした:
+
+   | construct | 拒否される層 | code |
+   |---|---|---|
+   | `type A = copy B` | parse | `:unknown-record` |
+   | `unit representation empty` | compile | `:invalid-unit-representation` |
+
+   **表は書き置きではなく実行される。** `:round-trips` の行は decode できねばならず、
+   `:rejected` の行は**記録した code で**落ちねばならない（「何かが throw した」では駄目 ——
+   別の理由で落ちるようになったのは別の事実である）。無い support を主張すれば落ち、
+   probe の無い行を足せば落ち、行を消しても落ちる。**両方向を mutation で確認済み。**
+
+   ⚠ **表は著者自身を捕まえた。** 初稿は `advanced` を「schema が compile できた」ことを
+   根拠に round-trips と記録していたが、test が拒否した —— `advanced` は capability 無しに
+   round-trip できない。probe は in-process identity ADL を渡して測り直した。
+   **3 層を測れと自分で決めた直後に同じ誤りをやり、test に捕まった。**
+
+   **`:round-trips` が意味しないこと**もファイルに明記した: 代表値 1 個・片方向であって
+   **spec conformance ではない**。corpus へ広げるのは P1-1 / P1-3。
 3. DMT/lens roundtrip、union ambiguity、recursive depth/node/byte budget の property test。
 4. selector の残り、とくに `ExploreConditional` / `InterpretAs` の採否を決める。
 5. ADL registration/name collision、unknown ADL、nondeterministic transform の negative corpus。
@@ -438,17 +465,19 @@ root pin は `amu c38f79d2c1af...`（west commit `1069d90b...`）、
 
 **P0 は 5 項目すべてが 2026-08-17 に着地した**（P0-1 `bytes-at` / P0-2 `bytes-slice` /
 P0-3 `bytes-concat` / P0-4 closed expression grammar / P0-5 canonical codec refusal）。
-次は **P1 — spec conformance を幅で閉じる**（本 ADR §5 の P1 節、5 項目）。
+次は **P1 の残り**（P1-1 / P1-3 / P1-4 / P1-5）。**P1-2 は 2026-08-17 に着地した。**
 
 P0 全体を通して確定した、P1 に持ち込むべきこと:
 
-- **⚠ 単体を測って系に一般化しない。** P0-5 でまさにこれをやった —— `ipld.core/decode` が
-  `18 05` を受理するのを見て「系が受理する」と推論したが、`ipld.schema` は自前で拒否して
-  いた。誤りに気づいたのは mutation だけである。**P1 は conformance corpus の項目なので、
-  この誤りの形（「この層がやっていない」→「誰もやっていない」）が最も出やすい。**
-  「未実装」と書く前に、系に対して測ること。
-- **P1-2 が明示的に要求している**「未対応 construct を `unsupported` と列挙し、
-  『完全な Schema DSL』を test 数だけで宣言しない」は、上と同じ規律の別表現である。
+- **⚠ 単体を測って系に一般化しない。** P0-5 でこれをやり（`ipld.core/decode` が `18 05` を
+  受理するのを見て系が受理すると推論したが `ipld.schema` は拒否していた）、**P1-2 でも
+  形を変えて再発した** —— `dsl/parse` を測って coverage を結論しかけ、さらに `advanced` を
+  「compile できた」から round-trips と記録した。**2 回とも mutation / test が捕まえた。**
+  P1 の残りでも同じ形が出ると想定して、**どの層で測ったかを主張の中に書く**こと
+  （P1-2 の表は `:measured-through` を持つ）。
+- **P1-2 で分かった実務的な事実**: 想定に反して Schema DSL の coverage はほぼ完全だった。
+  **「未実装だろう」から始めない** —— P1-1 / P1-3 / P1-5 も、まず測ってから書くこと。
+  未実装の列挙が短いこと自体は成果であって、手抜きの証拠ではない。
 - **mutation は両方向必要で、方向は項目ごとに違う。** P0-1..4 は「正しい出力を壊す」、
   P0-5 は「壊れた出力を通す」だった。**assertion が「何かが起きた」ではなく
   「誰が/何が起きた」を見ているかを確かめること** —— P0-5 の harness は検査を消しても
