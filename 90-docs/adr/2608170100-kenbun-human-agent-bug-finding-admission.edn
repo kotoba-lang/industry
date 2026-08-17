@@ -365,38 +365,6 @@ graph の schema 次第で、**これは埋め込みエンジンで実際に踏�
 
 live なのは D1 backend の方で、上記のとおり**恒久の設計ではなく暫定**である。
 
-## Worker の datom 面 backend（2026-08-17。実装・live 検証済み。残るは seed のみ）
-
-`kenbun.worker.kotobase-store`。`KOTOBASE_SECRET_KEY` binding が在れば Worker は
-kotobase.net を使い、無ければ D1 に落ちる。`/health` の `:kenbun/backend` が
-どちらで動いているかを申告する（推測させない）。
-
-**鍵が無くても測れることは全部測った。** `kotobase.live-e2e` が **ephemeral な
-Ed25519 identity** を使っていることから、**任意の seed が kotobase.net に通り事前登録は
-不要**と分かったので、使い捨て identity + 使い捨て database で実サービスに当てた。
-
-### 実測した wire の性質 4 つ（3 つは、測る前に誤った実装を実際に生んでいた）
-
-1. **同じ属性は蓄積する**（埋め込みエンジンと同じ）。`[:db/retract e a v]` は
-   **効き**、その値だけ消える。→ retract-before-assert がここでも必要で、かつ可能
-2. **属性は先頭コロン付きの文字列**で返る（`\":kenbun.store/kind\"`）。
-   `(keyword (str a))` は `::kenbun.store/kind` になり何にも一致しない
-3. **`v_edn` は「保存された値の EDN テキスト」**で、保存された値はこちらが書いた
-   文字列なので**層が 2 つ**ある。1 回しか decode しないと**全 entity が組み立てに
-   失敗し、書き込みは正しく着いているのに『保存されない』ように見える**
-4. 生の値を送ると埋め込みエンジンと同じく壊れる: `Date` → `\"Thu Jan 01 1970 ...\"`、
-   `nil` → `\"\"`。一律 `pr-str` が `#inst` / set / map / nil を保つ
-
-### 検証
-
-`npm run e2e` が実 kotobase.net に対して **11 checks 全 PASS**——finding の往復・
-入れ子 evidence・**network 越しに候補を取ってくる dedupe**・status が最新値で
-読み戻る・audit 永続。`npm run inspect` は raw wire を印字する道具として repo に
-残した（次に encoding を疑う人は**再導出ではなく再測定**すべきなので）。
-
-**残っているのは鍵であってコードではない。** `itonami-fleet-kotobase-seed` を
-`KOTOBASE_SECRET_KEY` に入れれば、他を一切変えずに切り替わる。
-
 ## まだ無いもの（正直に）
 
 - ~~custom domain 未取得~~ **完了**(2026-08-17)。`kenbun.itonami.cloud`。
@@ -408,6 +376,7 @@ Ed25519 identity** を使っていることから、**任意の seed が kotobas
   緑(`38 tests / 129 assertions / 0 failures`、ローカルと同数 = 配られた tree で
   実際に走った証拠)。**覆うのは base + HTTP だけ**で `test-kotobase` と worker build は
   走らない(gates.edn に明記)
+- **Worker が datom 面に載っていない**(非同期 IssueStore 契約が上流に無い)
 - **hydrate が毎リクエスト全件を読む（上限は強制済み）。** 正しい直し方は fingerprint で
   候補を絞ることで、**backend 確定後**にやる(今 D1 に索引を作ると捨てる作業)。
   それまで**黙って越えないようにした**: `/health` が上限を publish し、越えたら
@@ -415,8 +384,30 @@ Ed25519 identity** を使っていることから、**任意の seed が kotobas
   `HYDRATE_CEILING` を 0 にして **live で発火を確認**(`{:entities 4 :ceiling 0}`)、
   既定に戻して 200 も確認——**一度も発火したことのない上限は、効くか誰も知らない上限**
 - **認証が共有 secret 表**(持てる最弱の identity)。CACAO 検証への差し替えが次。
-  **これは datom 面移行と同じ鍵で解ける**
+  ⚠ **訂正(2026-08-17)**: 一度「datom 面移行と同じ鍵で解ける」と書いたが**不正確**。
+  **outbound(kenbun → kotobase.net)は艦隊 seed で解けるが、inbound(報告者 → kenbun)の
+  CACAO 検証は別問題**である。`kotobase.cacao` は `mint-cacao` を持つが **verify を
+  持たない**(cljs 側で inbound を検証する実装の所在は未確認)。着手前にまず
+  「cljs で CACAO を verify できる実装はどこか」を索引で引くこと——無いと決めつけない
 - **credit の決済面が無い**(意図的。上記)
+
+## 再開点（次に触る人へ）
+
+**1 手目**: `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get itonami-fleet-kotobase-seed`
+
+- **在れば**: `cd orgs/cloud-itonami/kenbun/worker && npx wrangler secret put KOTOBASE_SECRET_KEY`
+  で入れ、`curl -sS https://kenbun.itonami.cloud/health` の `:kenbun/backend` が
+  `:kotobase` に変わることを確認する。**コード変更は要らない**。切替後に
+  `POST /findings` → `GET /report` まで通し、D1 側の行は残るが参照されなくなる
+  (撤去は別判断。消す前に移行の要否を決める)
+- **無ければ**(2026-08-17 時点は `no such item`): オーナーが kagi へ復元中。
+  **新しい seed を発行して埋めない**——新 DID = 新 graph で、2026-07-30 に
+  明示的に退けられた分割になる
+
+**2 手目**: inbound CACAO 検証(上記の訂正を読んでから)。
+
+**触る前に読む**: `orgs/cloud-itonami/kenbun/README.md`。wire の実測表と
+`npm run inspect` / `npm run e2e` がそこにある。**encoding を疑ったら再導出せず再測定**。
 
 ## durable provider 実測（2026-08-17。gap を閉じ、実バグを 1 件出した）
 
