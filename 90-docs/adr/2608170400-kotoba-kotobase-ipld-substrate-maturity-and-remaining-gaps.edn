@@ -588,6 +588,40 @@ signed receipt、壊した実装が落ちる mutation test の六面。
 
 1. CARv2 pack write gate を canary→read-after-write→fallback→promotion の順で production 化。
 2. pack catalog/chain の再構築、欠損pack、壊れたindex、range over/under-fetch の recovery drill。
+   **2026-08-17 着地**（`kotobase-storage-pack` b5b0ba3c、west pin 前進済み）。
+   drill は `test/kotobase/storage/pack_recovery_test.cljc`。**破る前に測ったら、
+   4 つのうち 4 つが黙っているか誤診していた。**
+
+   | 壊したもの | 実測（変更前） |
+   |---|---|
+   | 3 pack chain の中央を削除 | tip pack の 3 entry を返す = **健全な 1-pack store と同じ値** |
+   | tip を削除 | `[]` = budget 0 と同じ、空 store とも同じ（**4 状態 2 値**） |
+   | index 破壊 | throw。**既に回収した 2 pack を捨て、どの pack かも言わない** |
+   | object 切り詰め | frame を黙って省略、counter は全て健全 |
+   | store が Range を無視 | `car: unsupported CID version {:version 13217}` —— **store のバグを pack のせいにする** |
+
+   直したのは 3 点。①walk が**終わり方**を返す（`:chain-start` / `:missing-pack` /
+   `:unreadable-pack` / `:budget-exhausted` / `:cycle`）。理由を置く場所が無い
+   entries-only の `bootstrap-catalog!` は、本物の失敗 3 種で **throw する** ——
+   回収済み entry は ex-data に載るので、catalog と名乗るのを拒んでも何も失わない。
+   ②壊れた pack が walk 全体を道連れにしない。③**受け取らなかった byte は省略して
+   数える / 受け取った byte が間違っていれば throw** という線を引き、
+   `:evidence :degraded` を `:served` の隣に置いた（100 中 99 を返した read は
+   99-block の成功ではない —— その request count は何の測定でもない）。
+
+   **P4-2 が名指ししていない 2 件が drill から出た。** catalog が別 frame の offset を
+   指すと、その frame が**自分の CID で返って result に merge されていた**（要求した
+   CID は欠落、counter は健全）。もう 1 つは async driver —— nbb では `.then` 内の
+   `throw` を SCI が `:sci/error` で包み、shadow-cljs でビルドした Worker では
+   ex-info がそのまま reject される。**1 つの driver を共有する前提が、失敗値では
+   崩れていた**（`js/Promise.reject` に統一）。
+
+   ⚠ **test を先に書いて drill に否定された。** 「最初の block は run が offset 0 から
+   始まるので読める」と書いたが、CARv2 の data 領域は byte 51 から始まるので
+   **offset 0 の frame は存在しない**。検出器は確率的ではなく**全数**だった。
+   mutation は 6 本（各 check 1 本）、**6 本とも意図した drill test だけを落とした**。
+   R2 実測も併走させ、read-ahead window が全 pack の末尾を越えて要求する以上
+   偽陽性を出しうる range check が、実 binding で偽陽性を出さないことを確認した。
 3. Prolly tree `range-diff(old-root,new-root,lo,hi)` を CID equality で枝刈りし、変更leafだけ返す。
 4. `kotobase-peer` / `IRangeSource` へ配線し、全hydrateとの差を visited nodes/bytes で測る。
 5. encrypted/blinded index は equality と range を別indexにし、漏洩budgetを明示する。
@@ -640,10 +674,22 @@ P0-3 `bytes-concat` / P0-4 closed expression grammar / P0-5 canonical codec refu
 **P0 / P1 は全項目、P2 は P2-1 / P2-3 / P2-4 が 2026-08-17 に着地した。**
 **P2-2 だけが残り、それは外部条件待ち**（独立した GraphSync peer）。
 
-次に着手できるのは **P4-2 / P4-3 / P4-4 / P4-5**、**P5-1 / P5-4**。
+次に着手できるのは **P4-3 / P4-4 / P4-5**、**P5-1 / P5-4**（**P4-2 は 2026-08-17 着地**）。
 **P3 は 5 項目すべてが外部条件待ち**（P3-1..4 は実 fleet binary / 実ブラウザ / 実 NAT /
 H3 server、**P3-5 は observed listener inventory** —— 上記）。**P4-1・P5-2・P5-3** も
 外部条件待ち（production canary / 未実装 backend）。
+
+P4-2 で確定した、以降に持ち込むこと:
+
+- **drill は「直す前に走らせる」。** 4 つの失敗のうち事前に予想できていたのは 1 つで、
+  残り 3 つは走らせて初めて出た（うち 2 つは P4-2 の文面が名指ししていない）。
+  **「たぶんこうなる」で直すと、直したものと壊れているものが一致しない。**
+- **自分が test に書いた説明が間違っていることがある。** 「offset 0 から始まるので
+  読める」は drill に即否定された。**test の日本語は assertion ではない** ——
+  走らせるまでは仮説。
+- **runtime をまたぐ driver は、成功値だけでなく失敗値も同じか確かめる。**
+  nbb と shadow-cljs で例外の形が違い、それが見えたのは drill が `:type` で
+  照合したから。**成功経路の parity test はこれを一度も見ていなかった。**
 
 P2 で確定した、以降に持ち込むこと:
 
