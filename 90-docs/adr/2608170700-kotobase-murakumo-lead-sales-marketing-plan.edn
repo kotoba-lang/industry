@@ -101,7 +101,20 @@ SubscriptionGovernor 経由のまま変わらない。ledger は `:governed? fal
 gad は P1（capture ingress）より前の commit で動き続けている。両者は別ホスト・
 別ストアなので、**『正本は 5820』は今日そのままでは意味が確定しない。**
 D1 が禁じた分裂を、こちらが自分で作っている状態である。
-**どちらが正本かを決めるまで drain を実行しない。**
+
+**→ 解消済み（2026-08-17、オーナー承認のうえ実行）。** gad 側を停止・無効化した。
+判断材料（全部実測）: gad の store は 94 バイトの初期 seed のまま **2026-07-18 以降
+無変更**／7 日間 journal entry ゼロ／`/` が `/leads` も `/approve` も広告しない
+＝ capture ingress 以前の commit／**tracked file に `:8092` を指すものが 0 件**。
+データ損失ゼロ。store は `db.edn.retired-20260817.bak` に退避し、
+`systemctl enable --now isic5820-crm.service` で戻せる。
+退役後の実測: gad:8092 → 接続不能、25mbair:8582 → 200、
+`itonami-5820.etzhayyim.com/health` → 200、`POST /leads`（token 無し）→ 401。
+**正本は 25mbair の LaunchAgent 1 台に確定した。**
+
+⚠ **これはホスト移設ではない。** 正本は今もノート PC の上にあり、
+ADR-2607199950 の consequence 6（単一 Mac 依存）は**そのまま残っている** ——
+空の重複を消したことと、常時稼働ホストへ移すことは別の作業である。
 
 murakumo の 24h トラフィックはほぼ内部 API（fleet promotions 17,156 / scanner
 17,103 / hwmetrics 8,204）で、外部認知由来の流入ではない。一方 **原価優位は実測済み**:
@@ -129,6 +142,48 @@ PKCE）を追加した。**OAuth ログインと HubSpot 側の MCP auth app 作
 **用途に含まれないもの**: HubSpot への書き戻し、HubSpot workflow による送信、
 `hubspot-hb5p0t1n` の retired ingest / agentgateway MCP router の再有効化。
 
+#### 登録手順（2026-08-17 に実測して確定。推測値は無い）
+
+`.mcp.json` に URL を書くだけでは**認証できない**。HubSpot の
+`GET https://mcp.hubspot.com/.well-known/oauth-authorization-server` を読むと
+**`registration_endpoint` が無い** —— 動的クライアント登録 (DCR) に非対応なので、
+client を名乗る側が事前に登録されている必要がある。つまり **auth app の作成は
+省略できるオプションではなく必須**である。同 metadata が公開している値:
+`code_challenge_methods_supported: [S256]`（PKCE 必須）/
+`token_endpoint_auth_methods_supported: [client_secret_post]` /
+`grant_types_supported: [authorization_code, refresh_token, client_credentials]`。
+
+Claude Code 側の redirect URI は **`http://localhost:<port>/callback`** で、
+`--callback-port` で固定できる（バイナリの実文字列を確認）。設定の形も実測した
+（throwaway entry を追加して読み、削除した）:
+
+```json
+\"hubspot\": {\"type\": \"http\", \"url\": \"https://mcp.hubspot.com/\",
+             \"oauth\": {\"clientId\": \"...\", \"callbackPort\": 8765}}
+```
+
+owner の手順は 2 手:
+
+1. HubSpot → Development → **MCP Auth Apps** → Create。
+   Redirect URL に **`http://localhost:8765/callback`** を入れ、
+   Client ID と Client secret を控える。
+2. 端末で登録し直す（既存の URL だけの entry を置き換える）:
+
+```bash
+claude mcp remove --scope project hubspot
+MCP_CLIENT_SECRET='<client secret>' claude mcp add --transport http --scope project \\
+  --client-id '<client id>' --client-secret --callback-port 8765 \\
+  hubspot https://mcp.hubspot.com/
+```
+
+**client secret は agent が扱わない**（安全床①）。`.mcp.json` に載るのは
+`clientId` と `callbackPort` だけで、secret は env / prompt 経由。
+
+⚠ **ブラウザ経由で agent が auth app を作ることはしなかった。** Chrome 拡張が
+未接続で、かつこの機械は並行セッションが OS フォーカスを奪い合う（CLAUDE.md
+の既知ハザード）。盲目的な desktop 自動化で本番 HubSpot に OAuth app を作るのは
+割に合わない。
+
 ### D3. outbound が通ってよい経路は 1 本だけ
 
 `isic-6201`（MarketingOps-LLM ⊣ ConsentGovernor）を deploy し、送信提案は
@@ -151,7 +206,7 @@ Phase 2 が閉じるまで維持する。許されるのは 30 分の problem in
 
 | # | 作業 | 実行者 |
 |---|---|---|
-| 0-0 | **5820 の正本を 1 台に決める**（gad を退役させるか、pin を進めて 25mbair に合わせるか） | owner 判断 → agent |
+| 0-0 | ~~5820 の正本を 1 台に決める~~ **完了 2026-08-17**: gad を退役、25mbair が正本 | 済 |
 | 0-1 | HubSpot で MCP auth app 作成 → `/mcp` で OAuth 認可 | **owner** |
 | 0-2 | portal 実測: object 種別ごとの件数、tier、form、list、consent 状態 | agent |
 | 0-3 | `POST /leads` へ drain（`source=hubspot`、`external-id=<HubSpot object id>`） | agent |
