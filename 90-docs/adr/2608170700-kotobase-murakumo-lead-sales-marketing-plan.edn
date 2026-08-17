@@ -253,20 +253,36 @@ compartment `gftdcojp` にあり、**このワークステーション (main-2) 
 
 source 名を固定し、後から join できる形にする:
 
-| source | 意味 | 今日の状態 |
-|---|---|---|
-| `kotobase-signup` | kotobase.net の登録 | **識別子が無い**。28 はカウンタであってレコードではない（上記 4-a） |
-| `murakumo-join` | murakumo.cloud の `/#signup`（did:key 発行） | signup は在る。**5820 に落とす配管が無い**（訂正） |
-| `hubspot` | 過去の HubSpot contact | Phase 0 で回収 |
-| `outbound-research` | named-accounts の調査候補 | T1 目標 100 社に対し researched |
-| `itad-lp` | itad.gftd.ai の LP | 稼働（ADR-2607271200 P1） |
+**5820 の capture ingress は `@` を含む email を必須にする**（`crm.http/capture-lead`
+の 3 つ目の cond 節）。これを軸に各 source を実測すると、**今日 5820 に届けられる
+source は 1 つも無い**:
 
-Phase 1 の実体は **2 つとも『ingress を作る』**である。kotobase は 28 件を運ぶ
-作業ではなく、**signup で identity を捕まえて 5820 に落とす経路を新設する**こと
-（現状はカウンタしか残っていないので、過去 28 回分は取り返せない —— これは
-損失であって、作業で埋められる差分ではない）。murakumo は lead の落ち先が
-そもそも無い。murakumo は `/pricing` が 404 で
-公開価格が無く、`/join/mobile.html` はあるが lead を受ける先が無い。
+| source | 今日ある識別子 | 5820 に届くか |
+|---|---|---|
+| `kotobase-signup` | **無い** —— カウンタのみ（上記 4-a） | ✗ |
+| `murakumo-join` | **サーバ側に無い** —— did:key は `ui/core.cljs` で**完全にクライアント生成**され、`sekisho` が localStorage に置くだけ。サーバが DID を初めて見るのは `/api/store/checkout`。**signup はサーバに痕跡を一切残さない**（カウンタすら無い） | ✗ |
+| `outbound-research` | **email 0 件** —— 実測: 全 10 件が web フォーム（`official-form` 8 / `homepage-form` 1 / `product-demo-form` 1）。加えて **T1 目標 100 社に対し実在は 10 件** | ✗ |
+| `hubspot` | email（想定） | **OAuth が開けば ○** |
+| `itad-lp` | email | ○（配管済み、ただし上流が 0 件） |
+
+### Phase 1 は Phase 0 と Phase 2 より後にしか始まらない（順序の訂正）
+
+この ADR は Phase 1（ingress）→ Phase 2（go/no-go を閉じる）の順で書いた。**逆である。**
+
+- **連絡できる lead を新たに作る**＝ email を新規に集めることであり、
+  privacy policy が DRAFT（kotobase `[CONFIRM:` 残 / murakumo 11 箇所、準拠法自体が未確定）
+  の状態で PII 収集面を live に出すことになる。**Phase 2 の counsel 承認が先。**
+- **既にある lead を運ぶ**経路は HubSpot だけで、**Phase 0 の OAuth が先。**
+- `outbound-research` は運べない —— そもそも
+  `net-kotobase-named-accounts.edn` 自身が『**research candidates, not contacted leads**』
+  『paid solicitation is forbidden while commercial go/no-go is no-go』と宣言しており、
+  **CRM に lead として入れるのは、その宣言に反して status を先に進めることになる。**
+  5820 を email 以外の連絡経路（フォーム URL）も受けるように緩めれば技術的には
+  入るが、**それは『連絡先が無い』という事実を『CRM に行が在る』に置き換えるだけ**で、
+  gate は 1 つも閉じない。やらない。
+
+したがって Phase 1 で今日書けるコードは無い。**書けないことが分かったのが成果であって、
+何か書けるものを探して書くのは、動いたように見せるための作業になる。**
 
 ### Phase 2 — 『売ってよいか』を閉じる
 
