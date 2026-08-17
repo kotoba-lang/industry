@@ -203,11 +203,56 @@ merge された修正になったか』が query で辿れない）。代償は�
   `storage.memory` に対してのみ。sqlite / s3 / postgres では測っていない——
   **測っていないものを『動く』と書かない**
 
+## HTTP 面（2026-08-17 追加。`kenbun.http`）
+
+**pure な `.cljc` 関数** `(handle ctx req) → resp`。I/O も host JSON も transport も
+持たず、store は注入される——`kotobase.protocols.issue` と同じ seam なので、自前の
+server を持たずにその隣に mount できる。wire は **EDN**（あちらと同じ理由: 外部仕様が
+JSON を強制しておらず、データは下まで Clojure 形）。
+
+### この面が存在する理由は 1 行に尽きる: 報告者は ctx から取り、body からは取らない
+
+`kenbun.credit` は admitted な finding を「名前の付いた報告者への取り分」に変える。
+したがって **body が名乗る報告者 id は「submitter が指名した相手に払え」という指示**に
+なる。全 handler は ctx の認証済み principal から報告者を作り、`:reporter` を積んだ
+body は**無視ではなく reject** する——黙って落とすと、クライアントから見て
+**尊重されたのと見分けがつかない**。
+
+同じ理由で `:reproduced-by` も body から受け取らない: 自分で witness を名乗れると
+credit を水増しでき、しかも `:needs-second-repro` を自力で抜けて `:auto-file` に
+入ってしまう。principal の**認証**は shell の仕事だが、**信用するか**はこの ns が
+決めることではない——principal の無い write は 401 で、匿名の報告者を発明しない。
+
+### 3 値は wire でも 3 値のまま
+
+`:rejected` → **422**（理解した上で処理しない）、`:undecidable` → **409**
+（server がどちらとも断定するのを拒む）。同じ status に畳まない。
+
+`GET /report` は **submission 総数を報告しない**。reject / undecidable は entity を
+残さないので、store に在るものを「提出された全部」として数えるのは admission gate が
+拒んでいる collapse そのもの。それに答えるのは `intake/intake-report` の仕事で、
+結果の集合が要る。
+
+### review lane に出口を付けた
+
+`intake/review!` + `intake/merge-handlers`。これが無いと、**high / critical——
+`:needs-human-review` に回される唯一の種類——だけが永久に解決しない**。
+`merge!` は当該 proposal に scope する（無 scope 版は他人の決定待ちの :approved まで
+掃く）。保存された payload は `clojure.core/read-string` ではなく `clojure.edn` で
+読む（前者はデータ中の reader literal を評価する）。
+
+### 検証（追加分）
+
+- **48 tests / 167 assertions / 0 failures**、clj-kondo 0 warnings（4 root）
+- **中心的主張を壊すと 3 failure**——body に報告者を名乗らせると、それを名指しする
+  test が status / reason / 「何も filed されない」の 3 点で落ちる。戻した
+- ついでに**常に通る空検査を 1 件見つけて直した**: 新しく作った store に対して
+  「空か」を訊いていた（答えが 1 つしかない問い）
+
 ## まだ無いもの（正直に）
 
-- **appview / HTTP 面が無い。** いまは決定ランタイム + store adapter だけで、
-  deploy されていない。足すときは `kotobase-protocol-issues` の `/issues/*`
-  （`git.kotobase.net`）に載せる
+- **deploy されていない。** `handle` は在るが、それを呼ぶ shell（socket・認証・
+  route mount）は書いていない。**面が在ることと serve されていることは別**
 - **credit の決済面が無い**（意図的。上記）
 - **fleet gate に載せていない。** `scripts/fleet-ci/gates.edn` への登録は未実施。
   CLAUDE.md「gate は fleet で 1 度緑になるまで landed としない」に従い、ここでは
