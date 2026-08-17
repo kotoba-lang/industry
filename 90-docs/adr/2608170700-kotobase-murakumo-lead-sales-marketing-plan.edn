@@ -162,11 +162,24 @@ Claude Code 側の redirect URI は **`http://localhost:<port>/callback`** で�
              \"oauth\": {\"clientId\": \"...\", \"callbackPort\": 8765}}
 ```
 
+HubSpot 側も実測した（2026-08-17、owner の既存ログインセッションで閲覧のみ）:
+
+- **portal id = `42189574`**（`app.hubspot.com/global-home/42189574`）。
+  drain の `portalId` 入力にそのまま使える
+- 画面は **開発 → MCP認証アプリ**、URL は
+  `https://app.hubspot.com/mcp-auth-apps/42189574`。**ベータ**表示
+- **既存の MCP 認証アプリは 0 件**（『利用できるMCP認証アプリがありません』）。
+  重複作成の心配は無い。作成すると client ID・secret・事前設定済みスコープ・
+  リダイレクト URL フローが得られる、と同画面が明記している
+
 owner の手順は 2 手:
 
-1. HubSpot → Development → **MCP Auth Apps** → Create。
+1. 上記ページで **[MCP認証アプリを作成]** を押す。
    Redirect URL に **`http://localhost:8765/callback`** を入れ、
    Client ID と Client secret を控える。
+   ⚠ **この作成クリックは agent が代行しない** —— skill `computer-use` の
+   絶対境界（Create / Submit などの状態変更操作を押さない）に当たる。
+   ページを開いてログイン状態と既存アプリ 0 件を確認するところまでが agent の範囲。
 2. 端末で登録し直す（既存の URL だけの entry を置き換える）:
 
 ```bash
@@ -179,10 +192,10 @@ MCP_CLIENT_SECRET='<client secret>' claude mcp add --transport http --scope proj
 **client secret は agent が扱わない**（安全床①）。`.mcp.json` に載るのは
 `clientId` と `callbackPort` だけで、secret は env / prompt 経由。
 
-⚠ **ブラウザ経由で agent が auth app を作ることはしなかった。** Chrome 拡張が
-未接続で、かつこの機械は並行セッションが OS フォーカスを奪い合う（CLAUDE.md
-の既知ハザード）。盲目的な desktop 自動化で本番 HubSpot に OAuth app を作るのは
-割に合わない。
+⚠ **ブラウザ操作は『読む』だけに留めた。** Claude-in-Chrome 拡張は未接続だったので
+AppleScript でタブの URL を設定・読み取りし（キーストロークを一切送らない経路。
+この機械は並行セッションが OS フォーカスを奪い合うため、CLAUDE.md の既知ハザード）、
+画面の確認は screenshot 1 枚で済ませた。**フォームへの入力も作成クリックもしていない。**
 
 ### D3. outbound が通ってよい経路は 1 本だけ
 
