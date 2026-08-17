@@ -1,0 +1,224 @@
+[{:db/id -1
+  :adr/id "ADR-2608171256"
+  :adr/title "Kotobase IPFS/IPNS HTTP protocol maturity 0.19.0 と残 gap の閉鎖順"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :adr/last_verified "2026-08-17"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotobase-ipfs-protocol-maturity-and-remaining-gaps"
+  :adr/repos ["orgs/net-kotobase/ipfs"]
+  :adr/related ["90-docs/adr/2608112035-kotobase-kubo-independent-retrieval-closeout.edn"
+                "90-docs/adr/2608141500-ipfs-primary-site-deploy-ipns-naming.edn"
+                "90-docs/adr/2608145800-protocol-remaining-maturity-loop.edn"
+                "90-docs/adr/2608161500-unixfs-is-layout-adapter-not-public-http.edn"
+                "90-docs/adr/2608161600-ipfs-has-no-storj-client-encryption-compose-envelope-signal.edn"]
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/authoritative_for
+  ["net-kotobase/ipfs 0.19.0 までに実装・live 確認された HTTP Gateway / IPNS / UnixFS / CAR 面"
+   "local regression、production live、provider qualification を同一視しない証拠境界"
+   "残 gap G1-G7 の優先順、完了条件、非主張"
+   "この Worker は bounded HTTP Gateway であり libp2p peer ではない境界"
+   "次の実装は G1 standalone raw root streaming から始める"]
+  :source/dataset "adr"
+  :adr/body
+  "# ADR-2608171256: Kotobase IPFS/IPNS HTTP protocol maturity 0.19.0 と残 gap
+
+## Context
+
+出発点の問いは、`https://specs.ipfs.tech/` の protocol に現在の
+`kotobase.net` の IPFS / IPNS が準拠しているか、であった。
+
+答えを一つの yes/no に潰してはいけない。`orgs/net-kotobase/ipfs` は
+Cloudflare Worker 上の **bounded HTTP Gateway** であり、Kademlia DHT、
+Bitswap、IPNS PubSub を話す libp2p peer ではない。一方、HTTP Gateway、
+trustless raw/CAR、UnixFS compatibility、署名済み IPNS record、Delegated
+Routing V1 の実装面は独立に準拠性と成熟度を上げられる。
+
+ADR-2608112035 が固定した Kubo 非依存と、ADR-2608161500 が固定した
+UnixFS は canonical identity ではなく website-compat layout adapter という境界は
+維持する。本 ADR はそれらを supersede しない。対象は
+`ipfs.kotobase.net` / `*.ipfs.kotobase.net` / `*.ipfs.itonami.cloud` /
+IPNS origin が提供する HTTP compatibility surface の成熟度である。
+
+## Decision
+
+### 1. 準拠性は面ごとに答える
+
+| 面 | 0.19.0 の状態 | 主張してよいこと | 主張してはいけないこと |
+|---|---|---|---|
+| Path Gateway GET / HEAD | implemented + live | malformed CID を I/O 前に 400、immutable CID response、Range / conditional | 全 IPFS Gateway conformance suite 合格 |
+| trustless raw | implemented + live | weighted Accept / `format=raw`、strong ETag、304、206、R2 2-pass CID verification | 任意 provider の live qualification |
+| trustless CARv1 | implemented + live | deterministic DFS / dups=n、block/entity/all、bounded plan、stream framing | CARv2 serving、任意 selector 全対応 |
+| UnixFS website compatibility | implemented + live | raw / dag-pb、multi-block file、HAMT、selective Range、late failure fail-closed | UnixFS が Kotobase の canonical identity |
+| IPNS record | implemented + live | protobuf IpnsEntry の name / signature 検証、`format=ipns-record`、Routing V1 GET | DHT publish、PubSub、Worker 自身が DHT node |
+| direct R2 retrieval | implemented + live | Kubo 無し、CID verification 後に executable origin を描画 | R2 が database truth |
+| legacy B2 raw adapter | implementation-qualified only | fake transport で SigV4、Range + If-Match、2-pass / exact length を検証 | production live-qualified |
+| libp2p / DHT / Bitswap | not implemented, named boundary | HTTP Worker は peer と名乗らない | IPFS network node への完全準拠 |
+
+### 2. ここまでに着地した成熟化
+
+一連の変更は proposal ではなく、各sliceを test → ready PR → merge → deploy →
+live probe → evidence PR → west/genpon pin で閉じた。
+
+1. **HTTP negotiation と trustless response。** PR #5 以降で CID validation、
+   weighted `Accept`、`format=raw|car|ipns-record`、safe response headers、
+   immutable caching、conditional、Range、representation-scoped ETag を実装した。
+2. **identity CID と UnixFS traversal。** 128-byte identity digest 上限を I/O 前に
+   強制し、entity byte range、HAMTShard type 5、multi-block file、nested dag-pb、
+   selective child traversal、HEAD / 416 / late failure を bounded DFS にした。
+3. **R2 executable integrity。** web / UnixFS origin が R2 bytes を MIME sniffing や
+   rendering に使う前に identity または SHA-256 multihash を検証する。既知 mismatch は
+   502 で fail-closed、未対応 multihash は unverified bytes を描画せず delegate する。
+4. **CAR memory と backpressure。** CAR header / frame / payload を
+   `FixedLengthStream` へ逐次出力し、plan は `{cid,size}` のみ保持する。matching
+   conditional は traversal 前の zero-read 304。single raw block は 64 KiB window の
+   2-pass incremental CID verification。
+5. **raw R2 / legacy B2 streaming。** full response は complete stream を2回検証。
+   Range は complete first pass 後、R2 は `onlyIf.etagMatches`、B2 は署名済み
+   `Range` + `If-Match` で選択byteだけを転送する。ETag、size、Content-Range、
+   encoding、output length drift は fail-closed。
+6. **UnixFS child raw leaf streaming。** 0.19.0 / PR #39 でmulti-block web fileの
+   raw childをfull `Uint8Array`化しない。full leafは2本ともCID検証し、partial leafは
+   complete first pass + exact ETag-bound R2 Range。PR #40 がproduction evidenceを記録した。
+7. **toolchain hygiene。** Wrangler 4.123.0 / shadow-cljs 3.4.12 へ更新し、current
+   high advisoryを解消した。GitHub Actions は使わず、local/fleet-compatible gateで検証した。
+
+### 3. 0.19.0 closure evidence
+
+| evidence class | 値 | 意味 |
+|---|---|---|
+| canonical child main | `9b524854cf00cf9f34d2c908819e700c2853c1f7` | PR #39 / #40 merge 後の `net-kotobase/ipfs` main |
+| production artifact | Cloudflare version `75059044-f176-4da2-bed4-2951c2154b80` | deploy 済み Worker artifact |
+| local regression | 97 tests / 433 assertions | fake R2/B2、negative、backpressure、exact bytes |
+| dependency audit | 0 vulnerabilities | 2026-08-17 の `npm audit` |
+| production probe | 33 / 33 | health、meta、raw、CAR、UnixFS、HAMT、IPNS、negative |
+| public health | `200` / version `0.19.0` | production route |
+| storage state | `r2_configured:true`, `b2_configured:false` | active provider と inactive adapter の区別 |
+| superproject adoption | west/genpon pin `9b524854...` | root single-entry pin 前進 |
+| genpon receipt | ledger event 11450 | `b59f546...` → `9b524854...` |
+| projection check | `fleet-db == manifest/west.yml` | fresh clone の `kagami reconcile --check` |
+
+live 33/33 は active R2 / HTTP surface のnon-regression証拠であり、B2 live、libp2p、
+全spec準拠の証拠ではない。97 testsがgreenでも、production bindingの無いB2を
+production-readyと呼ばない。
+
+### 4. 共通安全・効率規則
+
+- CID mismatch、declared size mismatch、ETag drift、missing child、over-budgetは
+  partial successにしない。headers後ならstreamをerror、headers前なら502またはdelegate。
+- 未対応codec / multihashをlocal successへ丸めない。
+- full responseでbytesを出す前にcomplete objectを検証する。full second passも再検証する。
+- partial responseはcomplete first passでCIDを検証し、同一immutable objectへ束縛できる時だけ
+  selected rangeを出す。ETagが無ければfull-buffer fallbackをしない。
+- payload consumer windowは64 KiB。metadata / DAG traversalは1024 references /
+  32 MiB encoded-output budgetを越えない。
+- R2 / B2 / public gatewayはavailability transport。signed commit DAGやdatom truthを置換しない。
+- UnixFS pathはwebsite compatibility。canonical URI / identityへ昇格させない。
+
+## Remaining gaps and closure order
+
+### G1 — standalone raw root の通常web originがbuffered
+
+**現在。** `format=raw` はstreaming済みだが、unnegotiated executable-originで
+raw CIDそのものがrootの場合、UnixFS `walk` が先に `get-block-bytes` を通り、complete
+`Uint8Array`を作る。0.19.0 の `unixfs_raw_leaf_streaming_local` はmulti-block fileの
+raw childについての証拠で、standalone raw rootまで広げて読まない。
+
+**完了条件。** 200 / 206 / HEAD / 304 / 416を、raw objectの`arrayBuffer()`がthrowする
+fake R2で通す。first passでCIDとMIME prefixをincrementalに得て、full bodyはfresh
+CID-verified stream、Rangeはsame-ETag exact range。matching conditionalは可能ならzero-read、
+少なくともbody pass zeroを明示する。live metadataは`unixfs_raw_root_streaming_local:true`。
+
+### G2 — CAR traversal plan がraw childを一度full-bufferする
+
+**現在。** completed CAR planはpayloadを保持しないが、DFS planning時にraw leafも
+`get-bytes`で読み、CID検証とsize確認の間は1 block全体がWorker memoryにある。
+
+**完了条件。** CID codecがrawならR2 object size + complete incremental verificationで
+`{cid,size,etag}`だけをplanへ入れる。fake raw leafの`arrayBuffer()`がthrowしても
+`dag-scope=entity|all`がbyte-identical CARを返す。second passはfull CID再検証。
+DAG-PB構造blockの扱いを同時に偽ってstreaming済みにしない。
+
+### G3 — DAG-PB structural block は最大32 MiBのbounded buffer
+
+**現在。** protobuf links / UnixFS Data / blocksizes / HAMT bitmapを安全に判断するため、
+DAG-PB blockはbuffered decodeする。これはunboundedではないが、one structural blockの
+peakは現行budgetまで残る。metadataの`unixfs_dag_pb_structure_buffered:true`は意図的な告知。
+
+**完了条件。** まず実測block-size分布を取り、構造block専用capをpayload capから分離する。
+次にbounded incremental protobuf parserか、十分小さいstructural capのどちらかを選ぶ。
+malformed varint、oversized field、link count、HAMT fanout、cross-shard driftのnegativeが
+byte buffer版と同じfail-closedになるまで置換しない。stream parser採用を先に決めない。
+
+### G4 — legacy prebuilt B2 CAR はserver-side parse / reverifyしない
+
+**現在。** B2 raw objectとraw-block CAR adapterはbounded verification済み。一方、既存の
+prebuilt CAR direct streamはclient-verifiableではあるが、Workerが全frameをparseし
+root / CID / completenessを再検証してから成功とする経路ではない。
+
+**完了条件。** 選択肢は二つ。A: bounded streaming CAR verifierを入れ、root、frame length、
+CID multihash、duplicate/order、EOF completenessを検証する。B: direct prebuilt CARをlocal
+successから外し、verified block assemblyかdelegateだけにする。どちらでも
+`b2_prebuilt_car_server_verified`をtruthfulに出す。単なる200をqualificationにしない。
+
+### G5 — B2 adapter はproduction live-unqualified
+
+**現在。** productionは`b2_configured:false`でarchive keyspaceも空。fake transportと
+SigV4 regressionはimplementation evidenceに留まる。
+
+**完了条件。** 別ADRでread-only credential、既知CID canary、full / Range / ETag drift /
+missing / CAR negativeを実bucketに対して測る。write/archive enableは
+`net-kotobase` storage-mode decisionを伴うため本ADRの恒久承認に含めない。
+資格化までは`b2_raw_live_qualified:false`を維持する。
+
+### G6 — `*.ipns.kotobase.net` certificate pack
+
+**現在。** path plane `ipfs.kotobase.net/ipns/{name}` と `*.ipns.itonami.cloud` は動くが、
+kotobase.net zoneのadvanced certificate quotaによりwildcard IPNS originを同等には
+提供していない。
+
+**完了条件。** certificate pack取得後、valid/invalid k51、hostname isolation、TLS、
+signed record、redirectなしのlive probeを通す。DNSだけを置いて完了としない。
+
+### G7 — DHT / PubSub / Bitswap / libp2p peer
+
+**現在。** 意図的にnot implemented。Delegated Routing IPNS readがHTTP境界。
+
+**扱い。** 現行Worker成熟化の次tickにしない。public DHT announceやBitswap providerに
+なるproduct decisionが出た時だけsuccessor ADRを開き、peer identity、transport、routing、
+abuse/capacity、signer、soakを別serviceとして設計する。HTTP 200やprotocol algebraを
+libp2p live readinessへ読み替えない。
+
+## Ordered next work
+
+WIPは1。順序は `G1 → G2 → G3 → G4/G5`。G6はcertificate外部条件が満たされた時、
+G7はsuccessor product decisionが出た時だけ開始する。
+
+各sliceのclosureは次を全部満たす。
+
+1. positiveだけでなく、buffer回帰・CID mismatch・length/ETag driftのnegativeを先に作る。
+2. local test / build / dependency audit / Wrangler dry-runを通す。
+3. ready PRをmergeし、merged main artifactをdeployする。
+4. live probeとmetadataでclaimを確認し、evidence PRをmergeする。
+5. child mainをwest single-entryでpinし、genpon ledgerとfresh reconcileを確認する。
+
+## Consequences
+
+- 0.19.0は成熟したproduction HTTP Gatewayだが、IPFS network peerの完全準拠とは呼ばない。
+- active R2のraw response、CAR emission、multi-block UnixFS raw childについて、complete
+  payloadを常時Worker-owned bufferにする必要は無くなった。
+- 残るmemory debtは具体的にG1-G3へ局所化された。特にDAG-PB structural bufferを
+  raw payload streamingの実績で隠さない。
+- B2は実装済みadapterとproduction qualificationを分離したまま維持する。
+- UnixFS compatibilityを改善しても、Kotobase canonical identityやpublic protocolの正本へ
+  昇格させない。
+
+## Revision history
+
+2026-08-17: accepted。protocol 0.19.0、PR #39/#40、Cloudflare version、97/433、
+live 33/33、west/genpon event 11450をclosure evidenceとして固定。残gapをG1-G7へ分離し、
+次は G1 から始める。"}]
