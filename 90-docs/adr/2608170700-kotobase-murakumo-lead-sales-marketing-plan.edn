@@ -287,7 +287,19 @@ cross-tier add が拒否されるため、`network-awai/net-kotobase` を initia
 （`COMMERCIAL-GO-NO-GO.md` の『Portfolio gate — cloud-murakumo』が正本）。判定は **no-go**、
 red 4: Terms/Privacy が DRAFT（`[CONFIRM:` terms 5 / privacy 11、privacy は準拠法自体が
 未確定）／日本の登記・税務（operator が AWAI Network, L.L.C. なので cloud-itonami と
-同じ red を継承）／**特商法表記が見つからない**のに storefront は JP を含む 4 か国向け／需要。
+同じ red を継承）／特商法表記の未確定 3 項目（所在地・電話・代表者）／需要。
+
+⚠ **この ADR は特商法について一度誤った記述をした。** 『2 箇所を探して 0 件』と
+書いたが、`/legal/tokushoho.md` は**実在して live**（200 / 5,735 B）である。
+外した理由は、SPA バンドルを grep したこと（**静的な `.md` はバンドルに入らない**ので
+その問いに答えられない探索）と、バンドルが名指しした 2 本の `.md` だけを probe した
+こと。repo の `legal/` を `ls` すれば 1 コマンドで出た。
+**しかも実物はこちらの想定より良い** —— ページ自身が『未完成』と宣言し、
+`cloud_murakumo/storefront.cljc` の `purchasable?` が物理出荷 SKU に対して
+`commercial-disclosure-complete?` を AND しているので、**3 項目が埋まるまで
+murakumo Node 24 は checkout に出ない**。表示義務違反のまま売られてはいない。
+同ファイルは『prose の申し送りは 2026-08-02 の「課金だけされて何も届かない」出荷を
+止められなかった』からコードで止めた、と理由まで書いている。
 
 **この ADR の初稿を訂正**: 『`/pricing` が 404 なので公開価格が無い』は誤読だった。
 murakumo.cloud は **hash route の SPA** で、価格は `/#studio`、store は `/#store`、

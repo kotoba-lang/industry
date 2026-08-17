@@ -68,7 +68,7 @@ ratify 記録は net-kotobase repo 側にあり未検証（下記「Session cons
 |---|---|---|---|
 | cloud-itonami | AWAI/Gftd Japan の収納代行は ADR + 公開 Terms で確定。**登記・税務のみ赤** | terms/privacy/DPA は承認済み・公開済み。ただし 24h で 5xx 28%（有料導線に載せる品質ではない） | **conditional**（red 1 + yellow 3 + 品質。前版 no-go から前進） |
 | net-kotobase | Gftd Japan K.K.（Corporate Number 1011101086505、国内法人）が operator。**外国会社登記の論点は構造的に無い** | **課金中の live 価格は Secure Managed ¥19,800/月**（run 0033、Aura Professional 2 GB 帯）。owner 確定の Developer ¥2,980/月は **未公開のまま**。run 0031/0032: `/legal/terms/` `/legal/privacy/` `/legal/dpa` は live 200 だが **DRAFT / UNAPPROVED TEMPLATE**。`noindex`、sitemap 非掲載、`[CONFIRM:` マーカー残。Stripe Price ID は 0033 でも未変更。commercial go は動かない | **no-go** |
-| cloud-murakumo | AWAI Network, L.L.C.（Delaware）が operator と公開文書で一致。**cloud-itonami と同じ登記・税務の red を継承** | Terms/Privacy は live だが **DRAFT**（`[CONFIRM:` terms 5 / privacy 11、privacy は準拠法自体が未確定）。**特商法表記が 2 箇所を探して 0 件**なのに storefront は JP を含む 4 か国向け。同意の版管理と返金条件は実装済み（この product の強い側）。価格は `/#studio` にあるが hash fragment の先で server 側に無い | **no-go**（2026-08-17 初評価、上記 gate 表） |
+| cloud-murakumo | AWAI Network, L.L.C.（Delaware）が operator と公開文書で一致。**cloud-itonami と同じ登記・税務の red を継承** | Terms/Privacy は live だが **DRAFT**（`[CONFIRM:` terms 5 / privacy 11、privacy は準拠法自体が未確定）。特商法表記は live だが **3 項目（所在地・電話・代表者）が未確定**で、`purchasable?` が物理 SKU の checkout をコードで止めている。同意の版管理と返金条件は実装済み（この product の強い側）。価格は `/#studio` にあるが hash fragment の先で server 側に無い | **no-go**（2026-08-17 初評価、上記 gate 表） |
 | club-shinshi | operator・決済条件の確定が必要 | adult specialist review、age assurance、refund/tax/payoutが赤 | **no-go**（SPA のため legal surface は HTTP で再実測不能 — run 0022） |
 | net-babiniku | PSP/crypto railの契約証跡なし | monetization proposal自体がhard hold | **no-go**（未再実測） |
 
@@ -125,6 +125,16 @@ ADR-2608170700 で実測して埋めた。**この節だけ as-of 2026-08-17。�
 配信中の `js/main.js`（284,845 bytes）から実 route を読んで確認した:
 `#landing` `#landing-try` `#landing-how` `#store` `#store/` `#studio` `#signup` `#console`。
 
+**訂正（同日、この節を書いた直後）**: 初版はこの表で『特商法表記が見つからない』と
+書いた。**誤り。** `/legal/tokushoho.md` は実在して live である。なぜ外したかを残す ——
+配信バンドルを grep して `特定商取引` / `tokushoho` が 0 件だったこと、および
+バンドルが名指ししていた `/legal/terms.md` と `/legal/privacy.md` の 2 本だけを
+probe したことを根拠にした。**静的な `.md` 資産は SPA バンドルの中に無い**ので、
+バンドル grep は最初からこの問いに答えられない。repo の `legal/` を `ls` すれば
+1 コマンドで出た（`company.md` `privacy.md` `terms.md` `tokushoho.md`）。
+**『2 箇所を探して無かった』と正直に書いても、その 2 箇所が両方とも答えを持たない
+場所なら、出てくる結論は same-faced な false negative になる。**
+
 **この読み方は club-shinshi にも効く。** 上の表が run 0022 以来
 「SPA のため legal surface は HTTP で再実測不能」としている項目は、
 配信バンドルの文字列を読めば測れる（規約文言・operator 名・返金条件・同意ゲートは
@@ -138,10 +148,15 @@ ADR-2608170700 で実測して埋めた。**この節だけ as-of 2026-08-17。�
 | 返金・解約条件 | 公開された条件 | バンドルが明示: クレジット購入は**原則返金不可**（強行法規が要求する場合を除く）、ハードウェアノード購入は §6A で fulfillment が手動 | **yellow**（条件は在るが DRAFT の Terms 内） |
 | 購入前の同意取得 | チェックアウト前に規約同意、版管理 | 実装済み。`accept the Terms … before checkout` + **版が変わったら再同意**（`2026-08-04` を版として保持）。この product で一番よくできている部分 | **green** |
 | PSP / collection | 契約主体の PSP 口座または有効な収納代行 | Stripe Checkout（カードのみ、BNPL/分割なし）。`Pay with crypto — coming soon`。cloud-itonami と同じ AWAI/Gftd Japan の収納代行境界に載る | **green**（governance level） |
-| 日本向け表示義務 | JP 消費者に売るなら特定商取引法に基づく表記 | **見つからない。** `/legal/*` の 2 文書にも、配信バンドル全体にも `特定商取引` / `tokushoho` の文字列が 0 件。一方 llms.txt は storefront が **JP を含む 4 か国**（US/EU/CN/JP）向けと明記している | **red**（法的結論ではなく、2 箇所を探して無かったという実測） |
+| 日本向け表示義務 | JP 消費者に売るなら特定商取引法に基づく表記 | **存在し、live**（`/legal/tokushoho.md` 200 / 5,735 B、Last updated 2026-08-04）。ただし自ら『未完成 — このページは公開できる状態にありません』と宣言し、**所在地・電話番号・代表者／販売責任者の 3 項目が `[未確定 — 公開前に必須]`**。**しかもこれはコードで強制されている** —— `cloud_murakumo/storefront.cljc` の `purchasable?` が物理出荷 SKU に対して `commercial-disclosure-complete?` を AND しており、`:seller-address` `:seller-phone` `:seller-representative` が `nil` である限り **murakumo Node 24 は checkout に出ない**。同ファイルは『prose の申し送りは 2026-08-02 の「課金だけされて何も届かない」出荷を止められなかった』からコードで止めた、と理由まで書いている | **red**（3 項目は owner 固有の事実。ただし**未表示のまま売られてはいない**） |
 | 需要 | 外部の実需 | federation `active-demand-apps: 0`、Stripe active subs 0 / paid charges 0。24h トラフィックはほぼ内部 API（fleet promotions 17,156 / scanner 17,103） | **red** |
 
-**判定: no-go。** red 4（Terms/Privacy の DRAFT・日本の税務/登記・特商法表記・需要）。
+**判定: no-go。** red 4（Terms/Privacy の DRAFT・日本の税務/登記・特商法の 3 項目・需要）。
+
+**赤の性質が product ごとに違うことを潰さない。** murakumo の特商法 red は
+『表示が無いまま売っている』ではなく『**表示が揃うまで売れないようコードで止めてある**』で、
+残っているのは owner しか知らない 3 つの事実（所在地・電話・代表者）である。
+同じ red でも、cloud-itonami の税務 red（専門家の判断が要る）とは必要な仕事が違う。
 
 **ただし kotobase より近い。** 同意取得の版管理と返金条件は既に実装・公開されており、
 kotobase 側に無いものが murakumo には在る。逆に kotobase に在って murakumo に無いのは
