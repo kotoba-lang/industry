@@ -173,6 +173,37 @@
   {:name "chain" :gate :jvm-test :cd true}
   {:name "org-chainagnostic-cacao" :gate :jvm-test :cd true}
   {:name "tech-ipfs-specs-ipns" :gate :jvm-test :cd true}
+  ;; ── protobuf wire, both implementations (ADR-2608170700) ──────────────────
+  ;;
+  ;; Neither was gated at all. Actions are disabled here (ADR-2607300900), so
+  ;; nothing had run dev-protobuf's tests since 2026-08-04 -- and what ran then
+  ;; was the JVM half only, while its callers (tech-ipfs-specs-ipns,
+  ;; io-libp2p-specs-kad-dht) ship to Workers and browsers. Three defects were
+  ;; sitting in that green, all ClojureScript-only: varints past 2^53 decoded
+  ;; to silently wrong numbers, fixed64 emitted its low four octets twice, and
+  ;; two assertions were host-dependent in the test itself.
+  ;;
+  ;; dev-protobuf is :nbb-test, and the three admissions at the head of :repos
+  ;; were measured 2026-08-17 rather than assumed:
+  ;;   1. `Ran 18 tests containing 66 assertions` -- IDENTICAL under
+  ;;      `clojure -M:test` and `nbb --classpath src:test test/run.cljs`
+  ;;   2. removing the varint guard exits 1 and names the two tests about it;
+  ;;      restoring it exits 0
+  ;;   3. deps.edn is `{}` -- zero dependencies, so a one-repo tree is enough
+  ;; It runs on the cheaper :node capability AND covers the runtime the defects
+  ;; lived in, which is the rare case where those point the same way.
+  {:name "dev-protobuf" :gate :nbb-test :classpath "src:test" :entry "test/run.cljs" :cd true}
+  ;; proto stays :jvm-test, and NOT because nobody checked. Its counts differ
+  ;; by runtime -- 13 tests / 89 assertions on the JVM, 11 / 79 under
+  ;; `scripts/verify-cljs.cljs` -- because `test/proto/core_test.clj` is
+  ;; JVM-only. Admission 1 therefore fails, and picking the nbb entry would
+  ;; drop two tests to reach a cheaper node.
+  ;; **What this gate does not cover**: the ClojureScript half. That half is
+  ;; real (its runner's own docstring is the lesson dev-protobuf lacked --
+  ;; "it is tempting to treat a green JVM run as covering both runtimes; it
+  ;; does not") and it was green when measured. It is simply not gated, and
+  ;; closing that needs a second entry per repo, which this file does not have.
+  {:name "proto" :gate :jvm-test :cd true}
   ;; ADR-2608153000 — Valueflows 経済語彙。2026-08-15、実ノードで 1 度緑になった
   ;; ので :cd true に反転（receipt 1d6bd3ca7025、signer did:key:z6MkjyhVmg…）:
   ;;   test-ws-valueflo-algorithms-73816c6-murakumo-judah      Ran 64 tests / 249 assertions
