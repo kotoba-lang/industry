@@ -286,6 +286,70 @@
   ;; suite, and the old one is deleted rather than kept beside it -- two entry
   ;; points for one parity check is how one of them quietly stops matching.
   {:name "sigv4" :gate :jvm-test :cd true}
+
+  ;; ── the rest of what ships inside kotobase-protocols-worker ───────────────
+  ;;
+  ;; ADR-2608170800 counted 26 libraries compiled into that Worker and found 17
+  ;; with no gate of any kind. It said plainly that they had been counted, not
+  ;; measured. These sixteen are the measurement.
+  ;;
+  ;; Every one was run to completion on judah, from a fresh clone, with
+  ;; `clojure -M:test` and its own deps resolved on the node:
+  ;;
+  ;;   arrangement            46 tests /  207 assertions    kotobase-query        35 /   62
+  ;;   datalog                91 /  163                     gremlin               23 /   37
+  ;;   datom                   3 /    9                     org-graphql-http      23 /   39
+  ;;   datom-source           23 /   74                     opencypher-cypher     75 /  174
+  ;;   graphql                20 /   56                     w3-sparql-protocol    75 /  197
+  ;;   kotobase               86 / 2560                     pay                   55 /  288
+  ;;   kotobase-projection    48 /  195                     prolly-tree           58 / 2510
+  ;;   kotobase-protocols     71 /  269                     sparql                26 /   43
+  ;;
+  ;; all 0 failures, 0 errors.
+  ;;
+  ;; **What was verified per repo, exactly**: that the suite RUNS on a node and
+  ;; is green. The red direction is a property of the gate type, demonstrated
+  ;; separately (`:jvm-test` fails when `Ran N tests` is absent or failures are
+  ;; non-zero -- shown on sigv4 the same day by removing its length check).
+  ;; Sixteen individual break-and-restore demonstrations were NOT done, and
+  ;; this note says so rather than implying a stronger claim.
+  ;;
+  ;; **`:cd false` on all of them.** CD advances the west pin on green, and
+  ;; that is opt-in for a reason: a gate should have been green on the fleet's
+  ;; own tick before it is allowed to move pins. The `ws-valueflo` entries
+  ;; above record the same progression -- flipped to `:cd true` only after
+  ;; being seen green on a real node through the scheduler.
+  ;;
+  ;; Two of the 26 are deliberately absent:
+  ;;   kotobase-client  no `:test` alias at all -- `clojure -M:test` opens a
+  ;;                    REPL. Its suite is `.cljs`, so it needs an nbb entry
+  ;;                    and an `:nbb-script` gate, not this.
+  ;;   chain            already gated above.
+  ;;
+  ;; And one caution, learned on datom-source the same day: **nbb red is not
+  ;; the shipped runtime red.** Its suite fails under nbb (1 failure, 6 errors,
+  ;; including `No protocol method IDeref.-deref ... type undefined`, the SCI
+  ;; deftype behaviour `nbb-cross-runtime.cljs` documents) and is GREEN under
+  ;; `cljs.main --target node`, which is what the Worker's compilation
+  ;; resembles. So none of these get an `:nbb-script` gate on the strength of
+  ;; a JVM suite being portable -- that would be a permanently red gate for a
+  ;; reason production does not have.
+  {:name "arrangement" :gate :jvm-test :cd false}
+  {:name "datalog" :gate :jvm-test :cd false}
+  {:name "datom" :gate :jvm-test :cd false}
+  {:name "datom-source" :gate :jvm-test :cd false}
+  {:name "graphql" :gate :jvm-test :cd false}
+  {:name "kotobase" :gate :jvm-test :cd false}
+  {:name "kotobase-projection" :gate :jvm-test :cd false}
+  {:name "kotobase-protocols" :gate :jvm-test :cd false}
+  {:name "kotobase-query" :gate :jvm-test :cd false}
+  {:name "org-apache-tinkerpop-gremlin" :gate :jvm-test :cd false}
+  {:name "org-graphql-http" :gate :jvm-test :cd false}
+  {:name "org-opencypher-cypher" :gate :jvm-test :cd false}
+  {:name "org-w3-sparql-protocol" :gate :jvm-test :cd false}
+  {:name "pay" :gate :jvm-test :cd false}
+  {:name "prolly-tree" :gate :jvm-test :cd false}
+  {:name "sparql" :gate :jvm-test :cd false}
   ;; ADR-2608153000 — Valueflows 経済語彙。2026-08-15、実ノードで 1 度緑になった
   ;; ので :cd true に反転（receipt 1d6bd3ca7025、signer did:key:z6MkjyhVmg…）:
   ;;   test-ws-valueflo-algorithms-73816c6-murakumo-judah      Ran 64 tests / 249 assertions

@@ -114,8 +114,46 @@ ClojureScript の double は overflow しないので意図したエラーを報
    `nbb-cross-runtime-multiformats`（`:nbb-script`）の 2 本。汎用 script
    `gates/nbb-cross-runtime.cljs` が repo の deps.edn から classpath を組み、
    package.json があれば npm install もするので、新しい配管は要らなかった。
-4. **残り 16 repo は測っていない。** 「gate が無い」ことは確認済みだが、
-   **欠陥があるとは言っていない**。測っていないものを欠陥として数えない。
+4. **残りも測って gate に載せた**（2026-08-17、同日追記）。当初ここには
+   「残り 16 repo は測っていない。gate が無いことは確認済みだが欠陥があるとは
+   言っていない」と書いた。**測った。**
+
+   18 repo を JVM と nbb の両方で回し、うち **16 本を `:jvm-test` として登録**した。
+   全部 judah 上の fresh clone で `clojure -M:test` を完走させ、0 failures:
+
+   arrangement 46/207・datalog 91/163・datom 3/9・datom-source 23/74・
+   graphql 20/56・kotobase 86/**2560**・kotobase-projection 48/195・
+   kotobase-protocols 71/269・kotobase-query 35/62・gremlin 23/37・
+   org-graphql-http 23/39・opencypher-cypher 75/174・w3-sparql-protocol 75/197・
+   pay 55/288・prolly-tree 58/**2510**・sparql 26/43
+
+   **repo ごとに確認したのは「ノードで走って緑」までである。** 赤方向は gate 種別の
+   性質として別途実証済み（`:jvm-test` は `Ran N tests` が無いか failures 非ゼロで
+   落ちる。同日 sigv4 で実演）。**16 本それぞれの break/restore はやっていない**ので、
+   そう書く。
+
+   `:cd false` で登録した —— CD は緑で west pin を前進させる opt-in であり、
+   fleet 自身の tick で緑を見る前に pin を動かす権利は与えない
+   （`ws-valueflo` の entry が同じ順序を記録している）。
+
+   除外 2 本: `kotobase-client` は `:test` alias が無く（`clojure -M:test` が REPL に
+   なる）suite は `.cljs` なので nbb entry が要る。`chain` は既登録。
+
+### ⚠ nbb が赤いことは、出荷先が赤いことではない
+
+**`datom-source` で実測（2026-08-17）**: nbb で 1 failure + 6 errors、うち 1 つは
+`No protocol method IDeref.-deref ... type undefined` ——
+`gates/nbb-cross-runtime.cljs` の header が記録している **SCI の deftype 挙動**そのもの。
+同じ suite が **`cljs.main --target node` では 21/68 緑**である。Worker の
+コンパイルはこちら側なので、**この repo に `:nbb-script` gate を付けると本番に
+影響しない理由で恒久的に赤になる。**
+
+したがって「JVM が緑の `.cljc` だから nbb gate も足す」はやらない。**nbb を足す
+根拠は counts の一致を実測したことであって、`.cljc` であることではない。**
+
+本 ADR がこれまでに `dev-protobuf` / `io-multiformats` で報告した欠陥はこれに
+影響されない —— あれは int32 と 2^53 の意味論で、SCI でもコンパイル済み cljs でも
+同一であり、**JVM との差分として直接測っている**。
 
 ## 着地したもの
 
