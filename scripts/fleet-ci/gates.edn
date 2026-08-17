@@ -233,6 +233,13 @@
   ;; DEFAULT when 帳簿及び請求書等 are not preserved, so an unrecorded
   ;; preservation state refuses rather than sitting in :not-declared.
   {:name "keihi" :gate :jvm-test :cd true}
+  ;; shiharai-actor 債務支払 (2026-08-17). NOT `shiharai` -- that name was
+  ;; already taken by an unrelated TypeScript appview registered at
+  ;; orgs/cloud-itonami/shiharai since 2026-07-19, so the role suffix rule
+  ;; (ADR-2607102200 addendum 14) applies. Reads 中小受託取引適正化法 第三条
+  ;; for itself; note the law was renamed and renumbered on 2026-01-01 and
+  ;; is no longer 下請代金支払遅延等防止法 第二条の二.
+  {:name "shiharai-actor" :gate :jvm-test :cd true}
   {:name "kintai" :gate :jvm-test :cd true}
   {:name "tehai" :gate :jvm-test :cd true}
   {:name "org-ietf-deflate" :gate :jvm-test :cd true}
