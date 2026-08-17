@@ -380,6 +380,76 @@ kotobase より近い点もある: **購入前の規約同意が版管理付き�
 - 6201 を deploy するまで outbound は 0 本。**これは制約ではなく現状の正直な記述**で、
   今日『メールを送る計画』を書いてもそれを実行する経路が無い。
 
+## Session close — 2026-08-17（現在地と再開点）
+
+**このセッションで landed したもの**（すべて `origin/main` 上で存在確認済み）:
+
+| 成果物 | 状態 |
+|---|---|
+| 本 ADR（計画の正本） | on main。以後の訂正もここに畳んである |
+| `scripts/crm-lead-drain.cljs` | on main。8 ケースで両方向検証済み。**正しい token での成功経路は未検証** |
+| `.mcp.json` の `hubspot` entry | on main（`oauth.clientId` / `oauth.callbackPort`） |
+| `COMMERCIAL-GO-NO-GO.md` の cloud-murakumo gate | on main。この product の初評価 |
+| ADR-2607173500 | `superseded` に変更、退役記録を本文へ |
+
+**実際に外界を変えた操作は 2 つだけ**:
+
+1. **gad の `isic5820-crm.service` を停止・無効化**（空の重複インスタンス）。
+   store は `db.edn.retired-20260817.bak` に退避。`systemctl enable --now
+   isic5820-crm.service` で戻せる。
+2. **HubSpot に MCP 認証アプリを作成**（app id `49510230`、client id
+   `20a2b814-6a56-4fee-8264-3eb55db11219`、redirect `http://localhost:8765/callback`）。
+   owner の明示指示による。**client secret は取得していない。**
+
+### 再開点 —— 次のセッションが最初に打つコマンド
+
+**ブロッカーは 1 つだけ**: HubSpot の client secret が kagi に入っていない。
+ブラウザは既にアプリ詳細ページを開いた状態で残してある。
+
+```bash
+# owner が [コピー]（クライアントシークレット横）を 1 回押した直後に:
+pbpaste | kagi add HUBSPOT_MCP_CLIENT_SECRET -c gftdcojp --category api-credential
+pbcopy < /dev/null
+# 続けて
+claude mcp remove --scope project hubspot
+MCP_CLIENT_SECRET=\"$(kagi get HUBSPOT_MCP_CLIENT_SECRET -c gftdcojp)\" claude mcp add --transport http --scope project --client-id 20a2b814-6a56-4fee-8264-3eb55db11219 --client-secret --callback-port 8765 hubspot https://mcp.hubspot.com/
+```
+
+**なぜ agent が代行しなかったか**: 値を JS で読めば 1 行だが、それは secret を
+agent の文脈に入れることであり安全床①に反する。clipboard 経由なら文脈を通らないが、
+**合成クリックでは Clipboard API が user activation 無しを拒否**し、実クリックは
+Chrome ウィンドウが負の Y 座標を持つ副ディスプレイに在って
+（`cliclick` は無反応、`macos-computer-use` は範囲外として拒否、
+ウィンドウ移動は AppleScript / AX とも無反応）届かなかった。4 通り試して止めた。
+
+### secret が入った後に agent が回せるもの
+
+Phase 0-2（portal 実測）→ 0-3（drain）→ 0-4（突合）→ 0-5（解約可否の提示）。
+**ただし 0-3 の実 POST は 25mbair でしか回らない**（`ISIC5820_API_TOKEN` が
+kagi の compartment `gftdcojp` にあり、main-2 には無い）。
+
+### owner / counsel にしか動かせないもの（agent は代行しない）
+
+- counsel review（kotobase / murakumo の Terms・Privacy の DRAFT 解除）
+- murakumo 特商法の 3 項目（所在地・電話番号・代表者）—— **counsel ではなく事実の記入。
+  いちばん安い赤**
+- Stripe の `sk_test_…` 発行、live 販売承認
+- **非 owner による実決済 1 件**（T1 exit。誰も代行できない）
+
+### このセッションで 4 回出た同型の誤り（次の agent への申し送り）
+
+**答えを持ち得ない場所を探して、きれいな空振りを結論にした**が 4 回:
+
+1. kotobase の 28 signups を「レコード」と読んだ（実際は識別子なしのカウンタ）
+2. murakumo の `/pricing` 404 を「価格が無い」と読んだ（実際は hash route の SPA）
+3. SPA バンドルを grep して「特商法表記が無い」と読んだ（静的 `.md` はバンドルに入らない。
+   実際は live で、しかもコードで購入をブロックしていた）
+4. `document.body.innerText` で redirect URL を探して「未保存」と読んだ
+   （`innerText` は `<input>` の値を含まない。実際は登録済み）
+
+**4 つとも『2 箇所を探した』と正直に書ける形をしている。** 正直さは探索先の
+妥当性を保証しない。**結論を出す前に、その探索先が構造的に答えを持ち得るかを問う。**
+
 ## Non-goals（明示的にやらないこと）
 
 - HubSpot を正本に戻す / dual-write する
