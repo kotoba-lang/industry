@@ -703,6 +703,63 @@ signed receipt、壊した実装が落ちる mutation test の六面。
    このセッションで 2 度目）。ただしその失敗が実測を 1 つ残した:
    **1 回の scan 内で cursor は同じ block を 2 度読まない。**
 5. encrypted/blinded index は equality と range を別indexにし、漏洩budgetを明示する。
+   **2026-08-17 着地**（`arrangement` 37cd9c1a、west pin 前進済み。
+   `arrangement.range-index` + `commit!` の 7 引数 arity + `scan-range-report`）。
+
+   **P4-4 が測った問題**: blinded leaf key は決定的 MAC で順序を保たないので、
+   10 件返す range と 1,000 件返す range が **byte 単位で同じ** 11 blocks /
+   248,177 bytes。同じ corpus・同じ query に **partition を宣言した後**:
+
+   | | blocks | bytes |
+   |---|---|---|
+   | partition 無し・窓 10 件 | 11 | 248,177 |
+   | partition 無し・全件 | 11 | 248,177 |
+   | **partition 有り・窓 10 件** | **3** | **96,145** |
+   | partition 有り・全件 | 5 | 212,788 |
+
+   **窓が全件より厳密に安くなり、pruned と unpruned の答えが完全一致する。**
+   行を落として安くなった cut は cut ではなく、**小さい答えの中に「本当はもっと
+   大きいはず」と言うものは何も無い** —— この oracle が要の assertion。
+
+   **何を漏らすか**（item の後半、機構がこの形である理由）: attribute の値域を
+   **宣言された** boundary で分割し、**bucket 序数だけを leaf key に平文で**書く。
+   他の component は blinded のまま。観測者が新たに知るのは
+   **その attribute の全値の bucket**（1 値あたり最大 log2(b) bit + leaf を数えれば
+   **正確な histogram**）と **bucket 間の順序**。**値そのもの・bucket 内の順序・
+   宣言されていない attribute については何も**知らない。equality 漏洩は不変
+   （元から在る。`blind` の README が値スロットについて同じ cost を書いている）。
+
+   **`budget-bits` は必須かつ検査される field。** boundary 100 個で「2 bit」と
+   宣言すれば **拒否**され、error が実際の数を言う。**prose にしか無い budget は
+   誰も間違えられない budget** で、ここで効くのは間違えられることの方。
+   **過大申告も拒否する** —— 対称性の礼儀ではなく、実際より多く漏らすと主張する
+   partition は**緩すぎる threat model に対して評価され**、次に広げる人が
+   「その主張は既に自分を覆っている」と読むから。**検証は write path で走る**ので、
+   未申告 budget は block に到達できない。
+
+   **データから boundary を導出する関数は意図的に存在しない**（test が「無いこと」を
+   検査する）。corpus から cut 点を選ぶと **corpus の分布が平文 parameter として
+   公開される** —— budget した開示より厳密に大きく、しかも**静かに**起こる
+   （結果は「よく調律された index」に見える）。boundary は attribute の**宣言された
+   値域**から来る。**強制は「関数が無いこと」で、それは無いままである限りだけ強制**。
+
+   **`scan-range-report` は P4-4 の教訓の実装**: quad と一緒に `:pruned?` /
+   bucket span / `:budget-bits` を返す。**それ以前は cut と scan を呼び手が
+   区別できなかった** —— query は選択的に見え、cost はそうではなく、
+   どちらかを言うものが無かった。**その区別を持たない range 面は、構造上この ADR が
+   繰り返し見つけている失敗そのもの。**
+
+   **partition 無しの commit は 6 引数版と byte 単位で同一の snapshot** を作る
+   （assert 済み）。整頓の話ではない: `kotobase-peer/fold!` は**同一 state が同一 CID**
+   を出すことに依存して並行 fold を収束させており、これは `blind` の決定的 nonce が
+   守っている性質と同じ。**黙って全 snapshot に range index が現れれば壊れていた。**
+
+   mutation 5 本、すべて意図した test に着弾。名指しに値するのは
+   **`key-bounds` の上界が `to+1` でなく `to`** —— **最終 bucket 全体を落とす**、
+   P4-3 で擬似乱数の窓 60 本を生き延びたのと同型の off-by-one。
+   **今回は列挙した境界 test と oracle の両方が捕まえた。**
+   budget 検査を外すと **budget の test だけ**が落ちる —— これが budget を
+   「correctness の副産物」ではなく**独立した gate** にしている。
 
 ### P5 — distributed history と execution backend parity
 
@@ -752,12 +809,23 @@ P0-3 `bytes-concat` / P0-4 closed expression grammar / P0-5 canonical codec refu
 **P0 / P1 は全項目、P2 は P2-1 / P2-3 / P2-4 が 2026-08-17 に着地した。**
 **P2-2 だけが残り、それは外部条件待ち**（独立した GraphSync peer）。
 
-次に着手できるのは **P4-5**、**P5-1 / P5-4**（**P4-2 / P4-3 / P4-4 は 2026-08-17 着地**）。
-**P4-5 の入力は P4-4 の実測** —— blinded 経路で value 区間が刈れないことは測定済みで、
-P4-5 はその漏洩 budget を明示して equality と range を別 index にする提案である。
+次に着手できるのは **P5-1 / P5-4** の 2 つだけ
+（**P4-2 / P4-3 / P4-4 / P4-5 は 2026-08-17 着地。P4 で残るのは P4-1 のみで、
+それは production canary 待ち**）。
 **P3 は 5 項目すべてが外部条件待ち**（P3-1..4 は実 fleet binary / 実ブラウザ / 実 NAT /
 H3 server、**P3-5 は observed listener inventory** —— 上記）。**P4-1・P5-2・P5-3** も
 外部条件待ち（production canary / 未実装 backend）。
+
+P4-5 で確定した、以降に持ち込むこと:
+
+- **budget は checked argument にする。** prose の budget は誰も間違えられない ——
+  つまり誰も検査できない。**数を引数にして、機構が導出できる値と突き合わせる。**
+- **危険な便利関数は「書かない」ことで強制する。** データから boundary を導出する
+  関数は静かに開示を広げる。**無いものは誤って呼べない**（ただし無いままである限り。
+  test で「無いこと」を検査する）。
+- **既定の挙動を 1 byte も変えないことを assert する。** 新機能が opt-in であることは、
+  **opt-out していない経路の出力が同一である**ことを測って初めて主張になる。
+- **cost の主張には「刈ったか」を同梱する。** 返り値だけでは cut と scan が同じ顔をする。
 
 P4-4 で確定した、以降に持ち込むこと:
 
