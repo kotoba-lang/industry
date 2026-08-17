@@ -69,8 +69,8 @@ dataspace 協調の proving slice を 1 本着地させる。
 
 | 面 | 今日 | 目標ではないもの |
 |---|---|---|
-| kit `dataspace-v1` | reference implemented（JVM KIR + reference-runtime） | wasm-aot / native-aot / jit は pending |
-| wire id 24 | named `:dataspace/transact` landed。numeric `typed-cap-call 24` も残る | named が通ったことを wasm-aot 済みと読まない |
+| kit `dataspace-v1` | reference implemented。`:wasm-aot :implemented` on `:wasm32-browser-kotoba-v1` + `kotoba:typed/cap-call` id 24 | `:wasm32-kotoba-v1`（clock の i64 `kotoba:cap/call`）/ native-aot / jit は pending |
+| wire id 24 | named `:dataspace/transact` landed。numeric `typed-cap-call 24` も残る | named が通ったことと wasm-aot を混同しない。wasm-aot は typed browser host の E2E |
 | reference host | `kotoba-lang/provider` `provider.dataspace`（amu は inject するだけ） | compiler-local host に戻さない |
 | provider-conformance 閉集合 | **10** application capabilities（旧 9-kit + `:dataspace/transact`）。component-model inventory は id 24 まで | count と inventory を片側だけ動かさない |
 | kit ABI | `:document`（runtime は tagged document 以外を KIR で拒否） | opaque EDN string / Preserves |
@@ -368,5 +368,60 @@ java -cp \"$CP\" clojure.main -e \\
    - これは backend gap（ADR-2608650000）であって言語の天井ではない。`.kotoba` へ移さない。
 6. **DONE.** `provider.dataspace` の atom は `{:q :transact!}` store。default = memory。inject した `provider.dataspace-kgraph` が assert/retract/observe/facet-leave を同じ契約で満たす。D1 なし。identity CID を Location にしない。guest ABI 不変。capability-count 10 のまま。
 7. **DONE（2026-08-17）。** matching assert は observer に `:document` notice を届ける。`:observe` は facet+pattern で upsert し mailbox を drain。facet-leave は assertion と undelivered mailbox を落とす。guest vat / `<-` は無い。capability-count 10 のまま。
-8. **次: `:wasm-aot` qualification for dataspace-v1（still no vat）。** kit は `:reference :implemented`、`:wasm-aot`/`:native-aot`/`:jit` は pending。clock は `:wasm32-kotoba-v1 :implemented` だが `:wasm-aot` は pending のまま。native-aot を偽らない。kgraph adapter は `src/kotoba/kgraph.clj`（JVM-only）なので `.cljc` wrap しない。
+8. **DONE（2026-08-17）。** `:wasm-aot :implemented` for dataspace-v1 on the typed browser host. Not clock's i64 `:wasm32-kotoba-v1`. `:native-aot` / `:jit` stay pending. No vat.
+
+- `kotoba-lang/amu` main `147d3677b40cbe170acc655b7fefc2bfe9198a02`
+  （merge of `90c8e925130021a5fe32c9fa310fd67167e0fc40`）。
+  `runtime/browser-host.mjs` が host-built variant/record を `admitHostResult` する
+  （以前は `assertValue` だけなので kit ABI の新しい compound が forged で落ちた。
+  http wasm proof は request echo なのでこの穴を踏まない）。
+  guest は named `:dataspace/transact`。inject は `typedCapCall`（http wasm と同じ seam）。
+  JVM `provider.dataspace` は coord guest（kit ABI types）で走る。
+  sugar `observe!` の `:matches` は sema pin `105309ca` では `:notices` が無く、
+  provider 側 kit と契約がずれる（IPLD merge が sema `91eff5a` を戻した）。
+  この slice では sugar を wasm に、coord を JVM provider に分けた。count 10。
+  https://github.com/kotoba-lang/amu/commit/147d3677b40cbe170acc655b7fefc2bfe9198a02
+- west pin: amu `c6905bff4528d6eeb7ccab9e9af36cca91de8ec0`（entry `147d3677`）。
+
+## テストの回し方と結果（2026-08-17 実測、wasm-aot）
+
+amu（`clojure -M:test -n` は無視される）:
+```
+cd /tmp/amu-dataspace-wasm-aot
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-wasm-aot-test)
+            (quote kotoba.compiler.wasm32-kotoba-v1-qualification-test)
+            (quote kotoba.compiler.wasm-typed-test)
+            (quote kotoba.compiler.backend-qualification-test)
+            (quote kotoba.compiler.provider-conformance-test)
+            (quote kotoba.compiler.test-runner-completeness-test))
+    (apply clojure.test/run-tests
+           [(quote kotoba.compiler.dataspace-wasm-aot-test)
+            (quote kotoba.compiler.wasm32-kotoba-v1-qualification-test)
+            (quote kotoba.compiler.wasm-typed-test)
+            (quote kotoba.compiler.backend-qualification-test)
+            (quote kotoba.compiler.provider-conformance-test)
+            (quote kotoba.compiler.test-runner-completeness-test)])'
+```
+結果: **49 tests / 218 assertions、0 fail / 0 error。** dataspace-wasm-aot 単独は 8 / 26。
+capability-count 10。`:wasm32-kotoba-v1` は dataspace でも pending。clock の wasm-aot は pending のまま。
+
+両方向: `cap-call` の `admitHostResult` を `assertValue` に戻すと
+`named-dataspace-guest-runs-on-browser-wasm-typedCapCall` と
+`host-built-dataspace-variant-is-admitted` が落ちる（forged / unfrozen compound）。
+戻すと緑。allow 24 無しは `capability-denied`。scalar `7n` 結果は `invalid-typed-value`。
+
+## 残ギャップ（次の agent へ）
+
+9. **次: `:native-aot` はまだ pending。** `kotoba-kir` `native-word-value-type?` は
+   `#{:i64 :bool :string}` plus option/result。amu pin `6d08e3c` も west pin
+   `933c148a` も `:document` を持たない。matcher は `.cljc` のまま。kgraph は
+   `.clj` のまま wrap しない。`:jit` も pending。
+10. **sema pin が provider より後ろ。** amu `:test` の kotoba-sema は `105309ca`
+    （observe! `:matches` に `:notices` 無し）。provider `4888ab12` の kit ABI は
+    `:notices` 付き。sugar guest を JVM provider に inject すると
+    `provider contract does not match guest contract`。wasm-aot は typedCapCall
+    なのでこのずれを踏まない。直すなら sema を `91eff5a` へ戻す（capability-count
+    は動かさない）。
 "}]
