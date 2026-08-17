@@ -317,12 +317,53 @@ review:approved → merge:merged`)。**corroboration の成立自体が hydrate 
 後続リクエストが先行の欠陥を見つけるには D1 から読み戻す必要がある。
 **reject / undecidable は 1 行も残していない。**
 
-### この deployment が塞ぐもの（明記）
+### D1 を選んだのは誤りだった（2026-08-17、オーナー指摘で訂正）
 
-**この行は共有 kotobase datom 面に無い。** `repo-taxonomy` / `repo-maturity` と
-repo path で join する query——「どの repo が確定欠陥を最も抱えているか」——は
-**この deployment に対しては書けない**。JVM 側の `kenbun.store.kotobase` が在るのは
-そのためで、こちらでは使えない(`kotobase.core` が cljs で Promise を返す)。
+オーナー指摘: **「kotobase.net 自体が graph baas なので、それで作れるように
+なっていない?」** —— 正しい。この節は当初「この行は共有 datom 面に無い」を
+*必然*として書いていた。**必然ではなく、私の調査不足の結果である。**
+
+私は埋め込みエンジン `kotobase.core` だけを見て「cljs では Promise を返すから
+JVM 専用」と結論し、**kotobase.net が hosted BaaS であることを検討せずに** D1 へ
+飛んだ。実測(2026-08-17)すると:
+
+- **`kotoba-lang/kotobase-client` は ClojureScript** —— つまり **Worker で動く**。
+  `q` / `datoms` / `pull` / `transact` / `fold` を持ち、CACAO を自分で mint する
+- **kotobase.net は live**(`/health` 200、`datomic.kotobase.net` 200)
+- **async は障害にならない** —— D1 のために既に書いた hydrate → 同期 handler →
+  差分 commit の橋が、backend を差し替えるだけでそのまま効く。**「同期 protocol だから
+  無理」という私の論拠は、自分が既に解いていた問題を未解決として引用していた**
+
+さらに `identity-seeds` の記述が、オーナーの元の指摘と同じ理由を持っている:
+**`:apex` は graph scope == issuer DID を要求するので、鍵の本数がそのまま Datalog で
+結合できる範囲になる**(2026-07-30 オーナー判断で艦隊 1,197 actor が seed 1 本を共有)。
+kenbun を艦隊 seed に載せれば、`repo-taxonomy` / `repo-maturity` との join は
+**塞がらない**。
+
+### いま実際に止まっているのは鍵の所在（能力ではない）
+
+**`itonami-fleet-kotobase-seed` は kagi に存在しない**(`no such item`、2026-08-17 実測)。
+`itonami-marketplace-kotobase-seed` も同様。`secrets-location-map` が
+「記述と実在の乖離」として数えている既知の class の **5 例目**で、seed の投入先は
+Worker secret(`KOTOBASE_SECRET_KEY`)であり**読み戻せない**。
+
+**新しい seed を発行して埋めない。** 新 seed = 新 DID = **新しい graph** であり、
+それはオーナーが 2026-07-30 に明示的に退けた分割そのもの——「actor ごとに鍵を持つと
+1,197 ref に割れ、セクター横断の問いが永久に立てられなくなる」。ここで黙って鍵を
+足すのは、この指摘が直そうとしている問題を作り直すことになる。したがって
+**鍵の回復はオーナー判断に返す**。
+
+### 加えて、鍵が入っても実測が 1 つ残る
+
+`put-entity!` は**マージ**を要求する。datom 面で `[:db/add e a v]` が
+cardinality-one として**置換**するのか、cardinality-many として**蓄積**するのかは
+graph の schema 次第で、**これは埋め込みエンジンで実際に踏んだ silent corruption と
+同じ問い**(あちらは蓄積した)。**鍵が無いと probe できないので、この store は
+未検証のまま出さない。**
+
+## 現状の deploy（D1。暫定）
+
+live なのは D1 backend の方で、上記のとおり**恒久の設計ではなく暫定**である。
 
 ## まだ無いもの（正直に）
 
