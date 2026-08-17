@@ -89,11 +89,38 @@ parity, not a win in either direction, and only for this kernel.**
    resolved by layout may not. `x86-mov-imm` / `x86-mov-imm-fixed` is that
    split (kotoba-native 48f27b7).
 
-4. **Do not claim x86-64 speed from a Rosetta measurement.** x86-64 code is
-   executable on this arm64 workstation through `cc -arch x86_64` plus Rosetta
-   2, which is enough to verify that a kernel still answers 1830338420, and is
-   not evidence about x86-64 hardware. An x86-64 timing claim needs an x86-64
-   host; until then x86-64 changes report instruction mix and bytes.
+4. **A Rosetta measurement is evidence about compilers, not about x86-64
+   hardware — and that first half is worth having.** x86-64 code runs on this
+   arm64 workstation through `cc -arch x86_64` plus Rosetta 2. Comparing two
+   x86-64 binaries under the same translator holds the host, the workload and
+   the translator fixed and varies only the emitted instruction stream, which
+   is a real comparison; the first draft of this ADR refused it outright and
+   was too blunt. What may not be claimed is that the resulting ratio is what
+   x86-64 silicon would show.
+
+   Measured 2026-08-17, 21 rotated samples under load average 35-44, all
+   agreeing on 1830338420:
+
+   ```
+                            min     p25   median   vs LLVM
+   amu x86-64 (today)     31.44   34.70    52.35     1.49x
+   amu x86-64 (magic div) 34.96   46.16    59.85     1.71x
+   amu x86-64 (idiv)      39.04   54.44    60.44     1.72x
+   rustc x86-64 -> LLVM   21.13   22.01    35.08     1.00x
+   ```
+
+   **The distortion is measurable and points one way.** Replacing 8 `idiv`
+   with a reciprocal multiply moved the median by 1% and the minimum by 10%,
+   which is far less than it should be worth: Rosetta lowers an x86-64 `idiv`
+   onto an ARM `sdiv` at roughly 7-10 cycles, where the instruction it stands
+   for costs roughly 40-100 on x86-64 silicon. So Rosetta **under**-reports the
+   value of removing a division, and a Rosetta ratio is a conservative reading
+   of a change that removes one. It is not a safe reading of a change whose
+   cost model runs the other way; those still need an x86-64 host.
+
+   A corollary worth stating because it was violated first: a single sample is
+   not a measurement. One run of the reciprocal build was 3.5x slower than the
+   `idiv` build here, which twenty more samples showed to be noise.
 
 ## Consequences
 
