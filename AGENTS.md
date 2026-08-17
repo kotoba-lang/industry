@@ -885,7 +885,9 @@ application の前提にしない。
 - stable な capability origin は `datomic.kotobase.net`、`sparql.kotobase.net`、
   `cypher.kotobase.net`、`gremlin.kotobase.net`、`graphql.kotobase.net`、
   `s3.kotobase.net`、`git.kotobase.net`、`atproto.kotobase.net`、
-  `pinning.kotobase.net`。apex path facade と同じ authority/policy に属する。
+  `pinning.kotobase.net`、`search.kotobase.net`。apex path facade と同じ
+  authority/policy に属する。`search.kotobase.net` は Datalog dialect ではなく
+  inverted-postings serving plane（ADR-2608170600）。query-dialects に足さない。
 - edge 内部の datom/CID execution capability は `datoms.kotobase.net`。
   `graph-database.kotobase.net` / `backend.kotobase.net` / `graphdb.kotobase.net` は
   2026-08-15 に Custom Domain と DNS から除去済みの retired hostname。rollback alias を含め

@@ -54,7 +54,8 @@
                 :s3 "https://s3.kotobase.net"
                 :git "https://git.kotobase.net"
                 :atproto "https://atproto.kotobase.net"
-                :pinning "https://pinning.kotobase.net"}
+                :pinning "https://pinning.kotobase.net"
+                :search "https://search.kotobase.net"}
                (:policy/capability-origins p))
     (fail! ":policy/capability-origins drift"))
   (when-not (= {:datoms "https://datoms.kotobase.net"}
@@ -78,6 +79,7 @@
                   "graphql.kotobase.net/graphql"
                   "Custom Domain と DNS から除去済み"
                   "SQL は独立 origin ではなく query dialect"
+                  "search.kotobase.net"
                   ":workspace-policies :live-service-durable-data"
                   "root-kotobase-persistence-policy"]]
     (when-not (str/includes? agents needle)
