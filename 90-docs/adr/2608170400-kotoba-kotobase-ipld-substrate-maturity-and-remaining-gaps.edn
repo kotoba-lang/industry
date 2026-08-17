@@ -567,6 +567,22 @@ signed receipt、壊した実装が落ちる mutation test の六面。
 3. symmetric NAT / relay-only / relay failure / credential expiry / replay を試験。
 4. WebTransport は対応 browser + H3 server、WSS は edge/DO で必要になった時だけ追加。
 5. connect.edn 宣言と実 listener inventory が一致しない時は placement を fail-closed。
+   ⚠ **この項目は 3 つの部品を前提にするが、2 つが存在しない**（2026-08-17 実測）——
+   宣言（`connect.edn`）は在る、**observed listener inventory は無い**
+   （`murakumo.fleet.inventory` は tailscale 到達性を merge するだけで transport は見ない）、
+   よって比較器も無い。**永久に空の inventory に対して比較器を作れば「走れない検査」になる**
+   ので作らない。P3-1..4 と同じく **observed inventory の取得（実 fleet probe）待ち**。
+
+   **ただし測って隣接する実物が出た**（murakumo #313 で着地）。`eligible-nodes` は
+   labels / roles / reach で候補を絞るが、**reach は block せず degrade する** ——
+   connect 宣言が無ければ全 node が通る。degrade は意図的で test も
+   「degrades, never blocks」と書いており、**そこは変えていない**。
+
+   変えたのは **degrade が黙っていたこと**。「この node 群は browser-live を提供する」と
+   「誰も確認していない」が、呼び出し側にはどちらも同じ名前の list として返っていた。
+   `eligible-report` の `:reach-evaluated?` は、**reach が要求されて skip された時だけ
+   false** になる。`eligible-nodes` は名前を返し続ける。
+   **これは inventory が出来る前に真にできる半分**であり、出来た時の接続点でもある。
 
 ### P4 — physical/query optimization
 
@@ -624,10 +640,10 @@ P0-3 `bytes-concat` / P0-4 closed expression grammar / P0-5 canonical codec refu
 **P0 / P1 は全項目、P2 は P2-1 / P2-3 / P2-4 が 2026-08-17 に着地した。**
 **P2-2 だけが残り、それは外部条件待ち**（独立した GraphSync peer）。
 
-次に着手できるのは **P3-5**（`connect.edn` 宣言と実 listener inventory の不一致で
-placement を fail-closed）、**P4-2 / P4-3 / P4-4 / P4-5**、**P5-1 / P5-4**。
-**P3-1..4・P4-1・P5-2・P5-3 は外部条件待ち**（実 fleet binary / 実ブラウザ / 実 NAT /
-production canary / 未実装 backend）。
+次に着手できるのは **P4-2 / P4-3 / P4-4 / P4-5**、**P5-1 / P5-4**。
+**P3 は 5 項目すべてが外部条件待ち**（P3-1..4 は実 fleet binary / 実ブラウザ / 実 NAT /
+H3 server、**P3-5 は observed listener inventory** —— 上記）。**P4-1・P5-2・P5-3** も
+外部条件待ち（production canary / 未実装 backend）。
 
 P2 で確定した、以降に持ち込むこと:
 
