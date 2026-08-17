@@ -182,6 +182,33 @@
   {:name "kototama" :id "kototama-hermetic" :gate :nbb-script :cap :jvm
    :script "gates/kototama-hermetic-test.cljs"
    :include-ext [".edn" ".clj" ".cljc" ".cljs"] :min-files 60 :cd true}
+  ;; ---- the accounting plane (ADR-2608171800) --------------------------
+  ;;
+  ;; Four iterations of work landed here checked only by `clojure -M:test` on
+  ;; one workstation. CLAUDE.md's rule is that a gate is not landed until it
+  ;; has gone green on the fleet once, and none of these had ever run there.
+  ;;
+  ;; taxlaw and governor are zero-dependency `.cljc`, so a plain :jvm-test
+  ;; is exactly right. governor is the higher-leverage of the two: four
+  ;; actors now take their verdict assembly from it, so this gate stands
+  ;; between that library and every one of them.
+  {:name "governor" :gate :jvm-test :cd true}
+  {:name "taxlaw" :gate :jvm-test :cd true}
+  ;; These two took their capability library by :local/root until 2026-08-17,
+  ;; which made them structurally ungateable -- the fleet ships one repo's
+  ;; tree and no siblings, so the classpath could never resolve. Measured
+  ;; that day: taxlaw and labor both have ZERO :local/root deps of their own
+  ;; and always were git-dep consumable. 4313's deps.edn had said otherwise
+  ;; in a comment, about another repo, that nothing ever rechecked.
+  {:name "cloud-itonami-isco-4311" :gate :jvm-test :cd true}
+  {:name "cloud-itonami-isco-4313" :gate :jvm-test :cd true}
+  ;; kintai and tehai are NOT gated, and the reason is one dependency:
+  ;; kotoba-lang/langchain-store is the only library in this plane that
+  ;; still carries :local/root deps (two, on langchain-clj). psa, shift and
+  ;; worklaw are all consumable. Converting those three would leave the
+  ;; classpath broken on langchain-store alone, so the conversion is worth
+  ;; doing only together with it -- named here rather than left as an
+  ;; unexplained absence.
   {:name "org-ietf-deflate" :gate :jvm-test :cd true}
   {:name "kotobase-block-codec" :gate :jvm-test :cd true}
   {:name "chain" :gate :jvm-test :cd true}
