@@ -234,6 +234,44 @@
       (is (:ok r))
       (is (= 1 puts)))))
 
+;; ---------------------------------------------------------------------------
+;; A west project's name is not always its GitHub repo name.
+;;
+;; west allows `repo-path:` to differ from `name:`, and `path:` is then
+;; `orgs/<org>/<repo-path>`. tick used to build both the GitHub coordinate and the
+;; rad-rids key from the project NAME, so for those projects it asked GitHub about a
+;; repository that does not exist.
+;;
+;; Measured 2026-08-18: 59 of 4,191 projects differ that way. Seven were in gates.edn —
+;; `cloud-itonami-gftd-{audio,avatar,illust,motion,rig,sculpt,voice}-actor` — and
+;; `git ls-remote git@github.com:cloud-itonami/cloud-itonami-gftd-audio-actor.git`
+;; answers "repository does not exist" while `.../gftd-audio-actor.git` returns the
+;; pinned sha. A work item with a nil tip is dropped, so those seven gates produced
+;; nothing: the tick state file held 2,063 entries and not one matched `gftd-`.
+;;
+;; Separately, 36 projects have a RID under the path key and none under
+;; `orgs/<org>/<name>` — a reflection surface registered and unreachable.
+
+(def ^:private west-fixture
+  {:remotes {"cloud-itonami" "git@github.com:cloud-itonami"}
+   :projects {"cloud-itonami-gftd-audio-actor"
+              {:remote "cloud-itonami" :revision "50caaa0"
+               :path "orgs/cloud-itonami/gftd-audio-actor"}
+              "kagami"
+              {:remote "kotoba-lang" :revision "abc1234"
+               :path "orgs/kotoba-lang/kagami"}}})
+
+(deftest repo-name-comes-from-the-west-path-not-the-project-name
+  (is (= "gftd-audio-actor"
+         (tick/repo-name-of west-fixture "cloud-itonami-gftd-audio-actor")))
+  (is (= "kagami" (tick/repo-name-of west-fixture "kagami")))
+  (is (= "unregistered" (tick/repo-name-of west-fixture "unregistered"))))
+
+(deftest west-path-is-the-rad-rids-key
+  (is (= "orgs/cloud-itonami/gftd-audio-actor"
+         (tick/west-path west-fixture "cloud-itonami-gftd-audio-actor")))
+  (is (nil? (tick/west-path west-fixture "unregistered"))))
+
 (let [{:keys [fail error]} (run-tests 'tick-unit-test)]
   (when (pos? (+ fail error))
     (js/process.exit 1)))

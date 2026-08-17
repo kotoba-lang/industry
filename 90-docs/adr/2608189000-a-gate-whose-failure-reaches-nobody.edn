@@ -93,4 +93,55 @@ receipt 台帳で足りると決めるのかは**オーナーの判断**で、�
   (c) receipt 台帳で足りると決める —— どれも CI の判断ではない。
 - `:status-context-prefix` は削除した。commit status を復活させるなら launchd で読める
   token 経路が要り、それは 2026-07-26 のオーナー方針の再検討になる。**この ADR は
-  それを提案しない。**"}]
+  それを提案しない。**
+
+## 追記 2026-08-18 — オーナー判断と、そこで見つかった 2 つ目の欠陥
+
+### 判断: private はひとまず GitHub のまま
+
+オーナー回答「private はひとまず github のままで ok」。**private repo を Radicle に
+seed しない。** したがって baseline は 2 つに分かれる:
+
+- **`private-on-github`（7 件）** —— `com-junkawasaki/root` / `network-isekai` /
+  `cloud-itonami` / `cloud-murakumo` / `club-shinshi-app` /
+  `org-spirit-in-physics-comics` / `kotobase-protocol-core`。**恒久的な entry**であって
+  未着手の作業ではない。反映面は無いまま（receipt 台帳だけ）。
+- **`pending-registration`（39 件）** —— public なので disclosure の問題が無い。
+  RID を登録すれば各自 baseline から外れる（gate が RESOLVED として報告する）。
+
+**gate 対象の中で最も gate 数が多い `com-junkawasaki/root` が前者に入る**ことは記録しておく。
+
+### 欠陥 2: west の project 名は GitHub の repo 名ではない
+
+RID の key を確かめる過程で、`tick.cljs` 自身の欠陥に当たった。
+
+west は `name:` と `repo-path:` を分けられ、`path:` は `orgs/<org>/<repo-path>` になる。
+**実測 2026-08-18: 4,191 project のうち 59 が両者で異なる。** tick は GitHub の座標も
+rad-rids の key も **project 名**から組み立てていた。
+
+結果、2 つのことが起きていた:
+
+1. **gates.edn に載っている 7 つの gate が一度も走っていなかった。**
+   `cloud-itonami-gftd-{audio,avatar,illust,motion,rig,sculpt,voice}-actor` は
+   `git ls-remote git@github.com:cloud-itonami/cloud-itonami-gftd-audio-actor.git` が
+   「repository does not exist」を返す。tip が nil の work は黙って落とされる。
+   **tick の state ファイル 2,063 entry に `gftd-` を含むものは 1 件も無い**（実測）。
+2. **RID を持ちながら到達できない repo が 36 件。** path key で RID があり
+   `orgs/<org>/<name>` では無い project がそれだけある。**反映面が登録済みで、
+   探しに行く key が違うので届かない。**
+
+`repo-name-of` / `west-path` を足して 3 箇所（tip 解決・PR head・RID 引き）を
+west の `path:` 基準に直した。unit test 2 本（5 assertion）で pin し、
+`repo-name-of` を元に戻すと落ちることを確認済み。
+
+### この ADR の gate 自身にも同じ形のバグがあった
+
+key を west path に切り替えた直後、gate が `com-junkawasaki/root` を **RESOLVED**
+（反映面を得た）と報告した。**嘘である。** west.yml には `etzhayyim` remote の下に
+**`root` という名前の別 project** があり（`orgs/etzhayyim/root`）、そちらには RID がある。
+名前で west を引いたので他人の RID を拾っていた。
+
+gates.edn の `:org` 明示は「これは west project ではない」という宣言であり
+（superproject がその文書化された事例）、その entry を west に名前で引いてはいけない。
+修正済み。**RESOLVED 行が無ければ気付かなかった** —— 報告する gate が自分の誤りを
+見せた形なので、これは設計どおりに働いた例として残す。"}]
