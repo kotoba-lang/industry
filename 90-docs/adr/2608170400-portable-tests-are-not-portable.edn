@@ -51,9 +51,14 @@ test files.
 
 | class | repos | share |
 |---|---|---|
-| **CLEAN** — tests use no JVM-only token; a runner works today | **731** | 36% |
+| **CLEAN** — tests use no JVM-only token; a runner works today | **712** | 35% |
 | MIDDLE — token present, possibly guarded | 1,134 | 56% |
 | FLOOR — token present, no reader conditional at all | 169 | 8% |
+
+(CLEAN was first reported as 731. The token list has since gained `format`,
+`Long/`, `Integer/`, `Double/`, `Character/`, `BigDecimal`, `with-open` and
+`Throwable` — each added because a sweep LOAD-FAIL named it — which moved 19
+repos out of CLEAN.)
 
 Test files: FLOOR 438, CEIL 2,202, of 5,653.
 
@@ -99,6 +104,47 @@ in this workspace already use. Also one substitution.
 `getProperty` / `getenv` / `currentTimeMillis` / `nanoTime` (2,460 combined) are the part
 that needs a small portable helper rather than a substitution, and `arraycopy` (98) and
 the `java.*` refs are the genuinely per-site work.
+
+## The third category: tests that pass on the JVM because the shim is identity there
+
+Running the tranche found a blocker no token scan can reach. `cloud-itonami/media`
+and `gftdcojp/mamori` both carry, verbatim:
+
+    (defn- ->clj [x] #?(:cljs (js->clj x :keywordize-keys true) :clj x))
+    (defn- ->js  [x] #?(:cljs (clj->js x) :clj x))
+
+Their public functions take a parameter literally named `js-obj` and return
+`(->js …)`: this is a JS-object boundary API for a Worker. On the JVM both
+conversions are the identity, so tests written as
+`(:valid (core/validate-subject {…}))` pass. Under ClojureScript — the platform
+the code is actually deployed on — the result is a `#js {…}` and keyword lookup
+returns nil. 5 failures in media, 11 in mamori.
+
+**The tests are written for the platform the code is not deployed on**, and
+nothing in the source is JVM-only. Only running it shows this.
+
+Measured: exactly **3** repositories carry that shim (`media`, `mamori`, and
+`news`, whose tests happen not to touch the boundary functions and therefore
+pass). So the category is real and narrow, and does not change the tranche plan.
+
+## The first tranche, measured rather than projected
+
+| | first filters | corrected filters |
+|---|---|---|
+| CLEAN and self-contained | 37 | **322** |
+| verified PASS | 7 (19%) | **~88%** |
+
+The candidate count went UP because the first dependency filter was too strict,
+not too loose: nearly every repo here pins `io.github.cognitect-labs/test-runner`
+as a GIT dep, and counting that as a cross-repo dependency excluded almost
+everything. It is irrelevant to an nbb run. In the other direction the filter had
+ignored maven entirely, which is why 20 of the first 37 candidates died on
+LOAD-FAIL against `cheshire.core` and friends.
+
+`scripts/list-portable-runner-candidates.cljs`,
+`scripts/sweep-portable-runners.cljs` and `scripts/land-portable-runners.cljs`
+are the three steps, landed so the remaining ~390 CLEAN-but-not-self-contained
+repositories can be worked the same way once their classpath question is settled.
 
 ## Why this is not 'just run sed'
 
