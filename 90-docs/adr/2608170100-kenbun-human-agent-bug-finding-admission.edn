@@ -1,0 +1,163 @@
+[{:db/id -1
+  :adr/id "2608170100"
+  :adr/title "kenbun（検分）— 人間と AI が申告した bug を選別する admission gate"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/tags "kenbun, cloud-itonami, bug, issue, kotoba-issue, admission, evidence, agent, qa"
+  :adr/body
+  "## 決定
+
+`cloud-itonami/kenbun`（検分）を起こす。**人間と AI の両方が提出する bug 申告を、
+issue になる前に 3 値で選別する決定ランタイム**である。pure `.cljc`、依存は
+`kotoba-lang/kotoba-issue` のみ。
+
+repo: https://github.com/cloud-itonami/kenbun （public、AGPL-3.0、west 登録済み）
+
+## 経緯
+
+オーナー質問（2026-08-17）: 「https://bugspot.com/ と同じような 人間と ai で bug を
+発見, issue 報告をする サービスは cloud-itonami にある?」
+
+索引を引いた結果（`repo-search` で bug / issue / bounty / tracker / defect /
+vulnerability / backlog / kanban、`concept-lookup` で bug / qa、surface 索引、
+cloud-itonami 全 README の grep）——**cloud-itonami には無い**。1,800 project の
+うち分類系（isic / isco / iso3166 / municipality / assoc / lei）を除いた 718 の
+実サービス repo に該当なし。`hakken`（発見）は名前が紛らわしいが OEM 候補の
+マッチング決定ランタイムで無関係。
+
+部品は kotoba-lang 側に分散して実在していた:
+
+| repo | 持っているもの |
+|---|---|
+| `kotoba-lang/kotoba-issue` | issue → proposal → review → merge → audit の状態機械 + `IssueStore` 契約（依存 `data.json` のみ） |
+| `kotoba-lang/kotobase-protocol-issues` | `/issues/*` の実 API 面（`git.kotobase.net`、deploy 済み） |
+| `kotoba-lang/qa-governor` | LLM の自己申告スコアを evidence と突き合わせる governor |
+| `kotoba-lang/app-reviewer` | 提出アプリの自動チェック → 人間レビュー → 判定 |
+| skill `isekai-qa-loop` | agent が実際にプレイして欠陥を見つける稼働中の loop |
+
+つまり **tracker 面と AI 発見面と人間+自動の合流面が別々に在り、束ねる 1 本が
+無かった**。kenbun がその 1 本。
+
+## なぜ tracker の複製ではないのか
+
+bugspot.com を実際に fetch して確認した（2026-08-17）。**bug を発見するサービス
+ではなく bug tracker** である——小規模チーム（5〜50 人）向け、seat 課金でなく
+tier 課金の Linear / Jira 競合。「人間と AI が発見する」面は掲げていない。
+
+tracker として同じものを作る意味は薄い。意味があるのは**申告者に AI が混じった
+瞬間に tracker が壊れる**ところで、そこが kenbun の対象領域である:
+
+- AI は**自信のある散文を無限に**生成できる。再現しない欠陥も同じ流暢さで書ける
+- 人間も報奨がかかれば同じことをする
+
+このとき tracker に溜まるのは欠陥ではなく**未検証の主張**であり、検証済みの欠陥と
+**同じ顔**をしている。これは CLAUDE.md「検査を書く前・緑を信じる前の 5 問」
+（ADR-2608136000）の——測れなかった検査が測って問題が無かった検査と同じ値を返す、
+沈黙が緑として蓄積する——**ちょうど裏返し**であり、未再現の申告が bug として
+蓄積する。同じ class なので、同じ直し方（3 値 + evidence floor）が効く。
+
+## 設計
+
+```
+申告（人間 or agent）
+   ▼  kenbun.finding    形を整える。severity 不明は既定値に落とさず nil のまま
+   ▼  kenbun.evidence   3 値の admission ← repo の中心
+   ▼  kenbun.dedupe     判別内容の指紋。同じ欠陥の別表現は 1 issue + 2 witness
+   ▼  kenbun.triage     severity × witness → lane と gate に渡す risk tier
+   ▼  kotoba.issue.gate issue/proposal/review/merge の状態機械 + 全遷移の audit
+   ▼  kenbun.credit     報告者の取り分（整数。値は動かさない）
+```
+
+`kenbun.intake` だけが store に書く（`kotoba.issue.store` の 4 関数契約経由なので、
+kotobase / Datomic / in-memory を差し替えても intake は変わらない）。他は pure。
+
+### 中心的判定は 3 値である
+
+| verdict | 意味 |
+|---|---|
+| `:admitted` | evidence が判別に足りている |
+| `:rejected` | evidence を**見た上で**主張を支えないと判断した |
+| `:undecidable` | 検査そのものが**走らなかった**（未知 severity / 未知 reporter 種別 / title 空） |
+
+`:undecidable` を他の 2 つに畳むことがこの repo の防ぎたいバグそのものなので、
+`admit-batch` は 3 つのカウントを別々に返し `:clean?` のような**単一 boolean を
+持たない**。`:kenbun.admission/scanned` が evidence floor で、空 batch を
+「問題 0 件」と読めないようにしている。
+
+### 申告者の種別はバーを変えない
+
+`:human` / `:agent` は**記録されるが判定に入らない**（`admit` は kind を「既知か」
+しか見ない）。記録が変えるのは**何が残るか**だけで、agent の申告は model と
+prompt-cid も残す——後の監査が「どのモデルが再現しない申告を出したか」を問える
+ように。corroboration も種別を見ない: **裏づけているのは再現であって再現者ではない**
+ので、agent が人間を裏づけても人間が agent を裏づけても同じ 1 witness。
+
+### その他の実装判断
+
+- **expected と observed の両方が要る。** 片側だけ、あるいは両側が同じことを
+  言っている申告は、散文がどれだけ長くても欠陥を述べていない
+- **正規化で桁を落とさない。** `returns 404` と `returns 500` は別の欠陥。落とすのは
+  大文字小文字と空白だけ
+- **hedge は severity 依存。** 「再現できなかった」「たぶん」を含む evidence は
+  `:high` 以上の主張と矛盾するので reject、`:low` では通す——断続的な欠陥を正直に
+  断続的と書いた報告を罰しないため
+- **dedupe は完全一致キーで比較し hash は索引ハンドル。** hash 衝突で 2 つの実在の
+  欠陥が併合されると片方が黙って消える。短いキーより正しさを取る
+- **fingerprint は自前 FNV-1a。** `hash` は clj / cljs で一致が保証されないので、
+  保存されるハンドルに使うと runtime が変わった時点で issue の履歴が割れる
+- **high / critical は witness が何人いても人間に回る。** 「この系に致命的な欠陥が
+  ある」と公開するのは外向きの行為で、同意した agent の数はその代わりにならない
+  （gate の risk tier も `:external-send` になり `gate/route` が review に回す）
+- **裏づけ者の取り分は申告者の取り分から割らない。** 割る設計は申告者に裏づけを
+  潰すことを教える。bonus は witness が何人来ても 1 回だけ払う（per-witness にすると
+  agent を 20 体走らせる誘因になる）
+- **`kenbun.credit` は値を動かさない。** 整数を返すだけで送金レールも台帳書き込みも
+  持たない。純関数なので二者が再計算して突き合わせられる——それが監査可能性の中身で
+  あり、CLAUDE.md 安全床②（資金の移動をしない）とも整合する
+
+## 最近接 repo との境界（CLAUDE.md 命名規則の要求）
+
+- **`kotoba-lang/kotoba-issue` には依存する。** 状態機械は再実装しない。kenbun は
+  「issue にする価値があるか」だけを決め、決まった後は全部あちらに渡す
+- **`kotoba-lang/qa-governor` には依存しない。** 述語が逆向きである: あちらは
+  「高スコアの主張が失敗 evidence と矛盾しないか」、こちらは「欠陥の主張を支える
+  再現 evidence が在るか」。形（`{claim, evidence} → approved/rejected`）は似ているが
+  判定が違う。加えてあちらの `:paths` は langgraph を引き込むので、pure な決定
+  ランタイムに重い推移依存が乗る
+- **`kotoba-lang/app-reviewer`** は対象が違う。あちらは**提出物**を審査する、
+  こちらは**提出物についての申告**を審査する
+- **`kotoba-lang/kip`** は提案であって欠陥ではない
+
+## 命名
+
+`kenbun`（検分）= 現場へ行って自分の目で確かめ、確かめた内容を記録に残すこと。
+role 面の repo で、prefix は `hakken` / `tehai` / `meisai` / `kago` と同じく
+省略している（CLAUDE.md「既存 family の形が elision に優先する」）。メタファ名なので
+**README 冒頭で名乗り**、`manifest/concept-vocabulary.edn` にも登録した。
+
+## 検証
+
+- `clojure -M:dev:test` → **20 tests / 70 assertions / 0 failures / 0 errors**
+- `clojure -M:lint`（clj-kondo）→ **0 errors / 0 warnings**
+- **両方向を出した。** 全 assertion が拒否する入力と受理する入力の両方を持つ
+- **landing 前に壊して確かめた。** admission の中心的主張（`:undecidable` が
+  `:admitted` に畳まれない）を壊すと **7 failure**。内訳は `admit-batch` の
+  undecidable カウントが 1→0、`intake-report` も 1→0、そして undecidable な申告が
+  `:filed` になり **store に実際に issue が開かれた**。壊したものと報告されたものが
+  一致することを確認してから戻した（CLAUDE.md ADR-2608136000 の「壊し方を間違えた赤は
+  成功した実演に見える」への対応）
+
+## まだ無いもの（正直に）
+
+- **appview / HTTP 面が無い。** いまは決定ランタイムだけで、deploy されていない。
+  足すときは `kotobase-protocol-issues` の `/issues/*`（`git.kotobase.net`）に載せる
+- **永続 store adapter が無い。** `store/mem-store` のみ。契約は 4 関数なので
+  kotobase adapter は薄いはず、だが**書いていないものを薄いと断定はしない**
+- **credit の決済面が無い**（意図的。上記）
+- **fleet gate に載せていない。** `scripts/fleet-ci/gates.edn` への登録は未実施。
+  CLAUDE.md「gate は fleet で 1 度緑になるまで landed としない」に従い、ここでは
+  gate を主張しない
+- **LLM 発見側（agent がどう申告を作るか）は範囲外。** kenbun は入口であって
+  発見器ではない。`isekai-qa-loop` 系の loop が申告を投げ込む側になる"}]

@@ -329,4 +329,23 @@ threshold 署名は対象が west pin。KIP はそれらを参照して normativ
 どの path が normative かは kotoba-lang/kotoba-lang の docs/authority-map.edn が正本で、
 kip/lang/normative-surfaces.edn はその転記 + :proposed。ADR-2608169100。
 ⚠ 2026-08-16 時点で :final の KIP は 0 件（署名検証が未配線なので正直には到達できない）。"}
+ :kenbun
+ {:label "検分 — bug 申告の選別（人間 / AI 共通の admission gate）"
+  :spellings ["kenbun" "検分" "bug" "bugs" "バグ" "不具合" "欠陥" "defect"
+              "bug report" "バグ報告" "不具合報告" "bug tracker" "issue tracker"
+              "課題管理" "bug bounty" "報奨金" "crowdtest" "triage" "トリアージ"
+              "repro" "reproduction" "再現手順" "severity" "重大度"
+              "bugspot" "linear" "jira"]
+  :query-spellings ["bug" "バグ" "不具合" "bug tracker" "issue tracker" "bug report"]
+  :note "cloud-itonami/kenbun。名前が機能を示さないのでここに載せる（README 冒頭が名乗り）。
+tracker ではなく **入口の選別**を持つ —— 人間と AI の両方が申告する場では、tracker に
+溜まるのは欠陥ではなく未検証の主張で、検証済みの欠陥と同じ顔をする。判定は 3 値
+（:admitted / :rejected / :undecidable）で、:undecidable を他へ畳まない。
+既存と混同しないこと —— kotoba-lang/kotoba-issue は issue→proposal→review→merge→audit の
+状態機械（kenbun が依存する。対象は agent effect 一般）、kotoba-lang/qa-governor は
+LLM の自己申告スコアと evidence の突き合わせ（述語が逆向きなので依存しない）、
+kotoba-lang/app-reviewer は提出アプリ自体の審査、kotoba-lang/kip は提案であって欠陥ではない。
+cloud-itonami/hakken(発見) は OEM 候補マッチングで無関係 —— 名前で引き当てない。
+ADR-2608170100。
+⚠ 2026-08-17 時点で appview / 永続 store / fleet gate は無い（決定ランタイムのみ）。"}
 }
