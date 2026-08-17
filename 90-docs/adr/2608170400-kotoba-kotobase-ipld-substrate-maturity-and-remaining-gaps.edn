@@ -1,0 +1,267 @@
+[{:db/id -1
+  :adr/id "ADR-2608170400"
+  :adr/title "Kotoba/Kotobase IPLD substrate — 着地済み境界、代替経路、残りの成熟度 gap"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :adr/deciders "Jun Kawasaki（IPLD Data Model / codecs / Schema / ADL / GraphSync / trustless pathing / IPNS PubSub / transports / Prolly range diff を順次実装し成熟度を上げる指示）"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/relates-to "ADR-2606271700（Read/Live transport planes）, ADR-2606271800（WebRTC/TURN）, ADR-2607309970（IPNS record+DHT）, ADR-2608039970（datom plane）, ADR-2608112035（Kubo-independent retrieval）, ADR-2608160100（CARv2 pack）, ADR-2608170100（IPLD調査とrange境界）, ADR-2608170200（query serving planes）"
+  :adr/repos ["kotoba-lang/io-ipld" "kotoba-lang/amu" "kotoba-lang/kotoba-sema"
+              "kotoba-lang/tech-ipfs-specs-ipns" "kotoba-lang/prolly-tree"
+              "kotoba-lang/kotoba" "kotoba-lang/kotobase" "net-kotobase/control-plane"]
+  :adr/body
+  "# ADR-2608170400: Kotoba/Kotobase IPLD substrate maturity
+
+**Status**: accepted / **Date**: 2026-08-17
+
+## 1. 問いと結論
+
+一連の問いは、Kotoba/Kotobase が次の形になっているか、IPLD の各仕様を名前だけでなく
+適切な境界で使えているか、さらに何を入れるべきか、であった。
+
+> Clojure-like code-as-data を表面、IPLD を persistent semantic address space、
+> CARv2 を物理 pack、capability を security primitive、causal DAG を distributed
+> history、Wasm/Substrait/Pregel/Actor を execution backends とする content-addressed
+> distributed operating + database + compute substrate。
+
+**方向として yes、完成した単一製品としては no。** これは一枚の巨大 runtime ではなく、
+明示した面の合成である。現在、Data Model、canonical codec、selector、Schema lens、ADL、
+CARv2、CID/IPNS、capability-gated Wasm 実行は実装証拠を持つ。一方 GraphSync の任意 extension、
+全 transport の live 配備、遠隔 Prolly range diff、全 Schema grammar conformance は残る。
+
+本 ADR は「存在する primitive」「実経路へ配線済み」「live で実測済み」を分ける。
+テストが green でも fleet / public route / browser NAT の実証には数えない。
+
+## 2. 決定する層
+
+| 層 | 正本 / 役割 | 置かないもの |
+|---|---|---|
+| source | Clojure-like inert code-as-data → checked HIR/KIR | ambient JVM/Clojure authority |
+| semantic value | IPLD Data Model + canonical DAG-CBOR + CIDv1 | storage URL、pack offset、mutable name |
+| structural view | Schema lens / DMT / ADL | query planner、ACL、保存先 |
+| history | parent-linked commit/causal DAG + signed receipts | global total order の強制 |
+| security | typed capability、grant∩policy、deny-by-default provider | CID所持だけで authority を得ること |
+| physical | immutable block + CARv2 pack/index + object store range GET | CAR index を ordered query index と読むこと |
+| naming | IPNS record（署名付き mutable pointer）/ delegated routing / PubSub router | IPNS をデータ暗号やDB CASと読むこと |
+| retrieval | CID-over-HTTP/trustless path、selector/cursor、必要時 GraphSync | transport peer を信頼根にすること |
+| live mesh | QUIC、WebRTC、relay/dcutr/autonat、必要時 WebTransport/WSS | Read/Object correctness の前提 |
+| query | datom covering index、range、postings、columnar、adjacency、view | Schema walk / GraphSync selector をDB query engineにすること |
+| execution | Wasm、native、Substrait、Pregel、Actor/tender adapter | backend固有 authority を source semantics に逆流させること |
+
+identity / naming / location を混ぜない。CID は意味内容、IPNS は可変な名前、
+CARv2 `(pack CID, offset, length)` と HTTP endpoint は location である。
+
+## 3. 今回までに着地したもの
+
+### 3.1 IPLD Data Model、codec、selector、cursor
+
+`kotoba-lang/io-ipld` に以下が merge 済み。
+
+- PR #13 `aa751442...`: Data Model、Schema、selector、bounded traversal。
+- PR #14 `31977fd1...`: Data Model kind count の訂正。
+- PR #15 `6c74d97b...`: canonical selector codec。
+- PR #16 `aad6274c...`: bounded recursive selectors。
+- PR #17 `87e5fab7...`: resumable selection cursor。
+- PR #18 `f6e0e59d...`: durable cursor checkpoints。
+
+Data Model は block store や Clojure map の別名ではない。Node kind、Link、canonical bytes、
+bounded traversal の共通契約である。DAG-CBOR tag 42 link と canonical encoding を identity
+hot path に使い、非決定的 codec や LLM 出力を CID 算出に入れない。
+
+selector は取得範囲の宣言であり query language ではない。`ExploreRange` は list index、
+map key range ではない。`InterpretAs` が無い経路で ADL-aware remote traversal を
+実装済みと名乗らない。
+
+### 3.2 Schema DSL、DMT、representation lens、ADL
+
+`io-ipld` の merge:
+
+- PR #19 `84bfab92...`: Schema DSL と bounded DMT unification。
+- PR #20 `dccade41...`: representation lenses。
+- PR #21 `77fe5cd9...`: union と ADL schema lenses。
+- PR #22 `8fa47c12...`: Schema DMT hardening と ADL metering。
+- PR #23 `1a2e10cf...`: content-addressed Wasm ADL boundary。
+
+Schema は optional な構造 lens であり、schema が無くても Data Model node は読める。
+DMT は型付き表現変換、ADL は同じ Data Model interface の背後で高度な layout を解釈する。
+どちらも ACL、物理 store、Datalog engine の代用にしない。
+
+### 3.3 Kotoba source → bounded Wasmtime ADL
+
+`kotoba-lang/amu` の連続 slice:
+
+| PR | merge SHA | 到達点 |
+|---|---|---|
+| #615 | `35b25e2c...` | import-free module を実 C Wasmtime engine で fuel/time/memory/output bound 付き実行 |
+| #616 | `b1b6157a...` | Kotoba source の identity ADL を checked HIR→専用KIR→Wasm ABI へ compile |
+| #617 | `07c5fc75...` | runner artifact、module/input/output CID、fuel/memory を署名付き execution receipt に束縛 |
+| #618 | `538633a1...` | literal bool、identity、canonical empty bytes の closed non-identity lowering |
+| #619 | `15c362ef...` | `(= (bytes-count value) N)` を ABI input length へ lowering |
+
+`kotoba-sema` PR #10（merge `105309ca...`、current root pin `91eff5a...` が包含）は
+`bytes-count(bytes) -> i64` を typed pure operation として追加した。
+
+実 runner では 4-byte input が canonical DAG-CBOR true、1-byte input が false。
+io-IPLD projection、署名 receipt、fuel exhaustion、timeout、forbidden import、fixed memory、
+output bound を同じ C Wasmtime runner で確認した。ADL source の未対応 body は identity に
+置換せず fail-closed。これは arbitrary Kotoba を Wasm 化した証拠ではなく、閉じた ADL profile
+の証拠である。
+
+### 3.4 CARv2 physical plane
+
+ADR-2608160100 の境界を採用する。canonical value identity は block CID、物理配置は CARv2 pack。
+CARv2 index は exact multihash lookup 用で、ordered/range query は提供しない。B2 の ranged GET で
+要求 frame の byte range を読み戻す実測はある。pack chain/bootstrap wiring は
+ADR-2608170300。production write default はなお `:block-per-object` であり、pack write gate は
+off と記録されているため「全データがCARv2化済み」とは言わない。
+
+### 3.5 IPNS、DHT、PubSub router
+
+IPNS は本物の signed record として検証し、name は key から導出する。value は head CID。
+delegated routing の publish/resolve と public application の live record 証拠は既存 ADR にある。
+`tech-ipfs-specs-ipns` PR #2（merge `274ac7dd...`）で PubSub Router state machine が着地した。
+
+PubSub router は announcement/liveness の最適化であり、record validity、sequence、expiry、
+name-key binding を省略しない。PubSub delivery を durable history や CAS 成功の証拠にしない。
+
+### 3.6 transport と NAT
+
+Read/Object は CID-over-HTTP を共通の correctness path とする。受信側が CID を再計算するため、
+gateway/CDN/peer は availability source であって trust root ではない。
+
+Live/Mesh は transport 非固定:
+
+- native QUIC + Noise は既存経路。
+- libp2p WebRTC transport、TURN credential XRPC、UDP relay listener、murakumo reach wiring は
+  ADR-2606271800 の P1/P2 code と test が着地。
+- circuit-relay-v2 / dcutr / autonat は native mesh の NAT vocabulary として存在。
+- WebTransport と WSS は補完 transport。Read correctness には不要。
+
+ただし「コードが在る」と「現在の fleet binary が feature を有効化し、public browser から
+TURN fallback を通った」は別証拠である。本 ADR 作成時には後者を再測定していない。
+
+### 3.7 Prolly tree と query boundary
+
+`prolly-tree` には `scan-range` / `scan-range-async` primitive がある。HMAC-blinded key は
+等値を保つが順序を壊すため、blind value range には使えない。CARv2 index、HAMT、GraphSync
+selector を ordered query index として使わない。
+
+query は ADR-2608170200 の class-specific serving planesへ送る。equality/join、range、search、
+OLAP、multi-hop、feed はそれぞれ covering datom、range source、postings、columnar、adjacency、
+materialized view を持つ。IPLD/ADL/GraphSync はその下の identity/retrieval/layout 層である。
+
+## 4. GraphSync と trustless pathing の扱い
+
+GraphSync は selector に従う graph transfer と extension negotiation に有用だが、正しさの唯一経路
+にはしない。実装が任意 extension を全て持つ必要はない。現在の必須経路は次で代替できる。
+
+| 要求 | 現在の必須経路 | GraphSync の位置 |
+|---|---|---|
+| block取得 | CID-over-HTTP + CID再検証 | peer transfer optimization |
+| bounded graph取得 | canonical selector + resumable cursor/checkpoint | selector exchange/stream optimization |
+| web trustless path | path→CID/block、各block検証 | transport option |
+| ordered range | Prolly/IRangeSource | selectorでは代替しない |
+| query | class-specific serving plane | query engineにしない |
+
+従って任意 GraphSync extension 未実装は correctness gap ではない。ただし
+ADL-aware remote traversal を選ぶ場合、`InterpretAs` 相当の意味運搬、extension budget、
+resume token、重複block抑止、malicious responder negative test が必要になる。
+
+## 5. 残りの gap（優先順）
+
+### P0 — 現在の閉じた ADL を実用変換へ広げる
+
+1. `bytes-at(bytes, i) -> i64`: bounds check、unsigned byte、out-of-range trapを固定。
+2. `bytes-slice(bytes, start, end) -> bytes`: `0 <= start <= end <= len`、overlap/alias規則、
+   max-output bound を lowering と runner の両方で強制。
+3. `bytes-concat(a,b) -> bytes`: overflow、allocation、fuelを入力長に比例させる。
+4. encode/decode で上記を合成できる closed expression grammar。loop/recursion/host import は別profile。
+5. canonical DAG-CBOR を壊す transform を Schema/codec roundtrip で拒否。
+
+完了証拠は sema typing、専用KIR admission、Wasm validation、real Wasmtime positive/negative、
+signed receipt、壊した実装が落ちる mutation test の六面。
+
+### P1 — spec conformance を幅で閉じる
+
+1. Data Model 全kind、DAG-CBOR canonical/invalid corpus、Link/tag42 の相互運用 corpus。
+2. Schema DSL の upstream grammar 対応表。未対応constructを `unsupported` と列挙し、
+   「完全なSchema DSL」をテスト数だけで宣言しない。
+3. DMT/lens roundtrip、union ambiguity、recursive depth/node/byte budget の property test。
+4. selector の残り、とくに `ExploreConditional` / `InterpretAs` の採否を決める。
+5. ADL registration/name collision、unknown ADL、nondeterministic transform の negative corpus。
+
+### P2 — retrieval interoperability
+
+1. trustless path vector: path→block request→CID verification→missing/duplicate/wrong-codec rejection。
+2. GraphSync baseline interop を独立実装と実測。extension はまず resume/budget/ADL interpretation の
+   うち load-bearing なものだけ。
+3. disconnect→checkpoint→resume が同じ root/result を返す soak。cursor state 自体も
+   content-addressed または署名付きで改ざんを拒否。
+4. GraphSync 不在時に HTTP path が同じ結果を返す fallback parity。
+
+### P3 — transport operational qualification
+
+1. current fleet binary の QUIC feature/identity/peer reach を実測。
+2. real browser→WebRTC→native の data channel、direct と TURN fallback の両方向。
+3. symmetric NAT / relay-only / relay failure / credential expiry / replay を試験。
+4. WebTransport は対応 browser + H3 server、WSS は edge/DO で必要になった時だけ追加。
+5. connect.edn 宣言と実 listener inventory が一致しない時は placement を fail-closed。
+
+### P4 — physical/query optimization
+
+1. CARv2 pack write gate を canary→read-after-write→fallback→promotion の順で production 化。
+2. pack catalog/chain の再構築、欠損pack、壊れたindex、range over/under-fetch の recovery drill。
+3. Prolly tree `range-diff(old-root,new-root,lo,hi)` を CID equality で枝刈りし、変更leafだけ返す。
+4. `kotobase-peer` / `IRangeSource` へ配線し、全hydrateとの差を visited nodes/bytes で測る。
+5. encrypted/blinded index は equality と range を別indexにし、漏洩budgetを明示する。
+
+### P5 — distributed history と execution backend parity
+
+1. causal DAG merge/conflict semantics、actor authority、revocation、receipt parent chain の横断test。
+2. Wasm/Substrait/Pregel/Actor 各backendで同じ checked KIR/effect envelope を再検証。
+3. backend間 result parity を適用可能なpure subsetで測り、backend固有非決定性をreceiptへ記録。
+4. transport断、重複配送、順序逆転、再実行に対する idempotency / exactly-onceを混同しない。
+
+## 6. 成熟度 100% の定義
+
+100% は「仕様名が repo にある」「green suite」「一度HTTP 200」ではない。次を全て満たす状態とする。
+
+| gate | 100% 条件 |
+|---|---|
+| semantic | 対応する Data Model/codec/Schema/selector/ADL matrix が明記され、unknownはfail-closed |
+| safety | capability/effect/resource admission、forbidden import、revocation/expiry、negative corpus |
+| determinism | canonical bytes/CID、同一入力同一出力、nondeterminismは明示receipt |
+| storage | blockとCARv2双方のrebuild/recovery、実object store range、production write/read canary |
+| retrieval | HTTP fallback parity + 選択したGraphSync interop + resume/attack tests |
+| naming | IPNS publish/resolve/expiry/replay/pubsub/DHT、name-key binding、複数router実測 |
+| transport | native/browser/edge の宣言した全経路、direct/relay/NAT failure、live fleet inventory |
+| query | class別計算量のcounter evidence、full hydrateへ静かにfallbackしない |
+| execution | real engine、signed measured receipt、backend parity、fresh install/fleet execution |
+| operations | murakumo fleet gate、release/pin/genpon closure、rollback、soak、default-branch再検証 |
+
+各行に current main SHA、再現コマンド、positive/negative、測定日時、production/local の区別が要る。
+一行でも未証明なら全体は100%ではなく、その行の成熟度を報告する。
+
+## 7. 禁止する近道
+
+- IPLD Schema/ADL/GraphSync を query engine と呼ぶ。
+- CARv2 index を ordered range index と呼ぶ。
+- IPNS/PubSub を暗号化、CAS、consensus、durable history と呼ぶ。
+- capability confinement を Rust ownership/memory safety と呼ぶ。
+- WebRTC/WebTransport のコード存在を live NAT traversal 証拠と呼ぶ。
+- identity transform だけで arbitrary ADL compiler 完成と呼ぶ。
+- local green を production/fleet/fresh-install/interop の証明へ昇格する。
+
+## 8. 着地と再開点
+
+本 ADR 時点の root pin は `amu 15c362ef96b5...`、`kotoba-sema 91eff5a970e2...`。
+genpon は root PR #2366（merge `e7003be1...`）で reconcile され、default branch の
+`kagami reconcile --check` は clean だった。
+
+次の最小縦切りは **P0-1 `bytes-at`**。validator
+`(= (bytes-at value 0) N)` を typed source→専用KIR→import-free Wasm→実 Wasmtime→署名receipt
+まで通し、空入力/out-of-range/負index/large input をfail-closedで落とす。その後に slice/concat。
+
+**この ADR は現状を100%と宣言しない。100%へ進むため、何が correctness、何が代替transport、
+何がextension、何がoptimizationかを固定する正本である。**"}]
