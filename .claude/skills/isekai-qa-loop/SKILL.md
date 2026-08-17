@@ -13,17 +13,21 @@ description: isekai.network のゲームを agent が実際にプレイして品
 ## この loop が存在する理由
 
 2026-08-08 の実測がこの loop を生んだ。カタログ 29 本のゲームプレイ gate は本番に対して
-**29/29 で通っていた**。同じ日の実測で、`battle-royale + building + combat` を宣言する
-`gftd/palisade` は **entity 1** —— 対戦相手が 1 体もいなかった。`wave-defense` の
-`gftd/waves` も同じ。3.8 秒の窓で測り直しても変わらなかったので、spawner が遅いのではなく
-**居ない**。
-
-gate が緑だったのは、それが「プレイヤーが宣言速度で動くか」しか訊いていなかったからである
-（ADR-0074 はまさに「どの gate も *そのゲームは動くのか* を訊いていない」ために作られた。
-次の死角は **動く先に何かあるのか** だった）。
+**29/29 で通っていた**。gate が緑だったのは、それが「プレイヤーが宣言速度で動くか」しか
+訊いていなかったからである（ADR-0074 はまさに「どの gate も *そのゲームは動くのか* を
+訊いていない」ために作られた。次の死角は **動く先に何かあるのか** だった）。
 
 **緑の gate は品質の証明ではない。訊いていない質問については何も言っていない。**
 この loop の仕事は、毎周ひとつ新しい質問を実際に訊くことである。
+
+**そして 2026-08-17、この節自身がその教訓の実例になった。** 初版はここで
+「`gftd/palisade` は entity 1、対戦相手が 1 体もいなかった。3.8 秒の窓で測り直しても
+変わらない」と断言していた。**間違いだった。** 窓は開いていたが、数は**窓が開く前の
+frame** から読まれていた（`:entities` は t=0 の snapshot）。窓の後で数えると palisade は
+2、`waves` は 21。**「測り直しても変わらなかった」のは、測り直していなかったからである。**
+
+つまりこの loop を生んだ発見そのものが、それが警告している形をしていた ——
+**新しい質問を訊いたつもりで、古い答えを読んでいた。** 詳細は network-isekai の ADR-0080。
 
 ## 1 反復でやること
 
@@ -33,7 +37,7 @@ gate が緑だったのは、それが「プレイヤーが宣言速度で動く
 cd orgs/network-awai/network-isekai
 git fetch origin && git log --oneline -1 origin/main
 
-# gameplay: 本番に対して実 Chrome + 実キーイベント + ECS tick（29 本、約 10 分）
+# gameplay: 本番に対して実 Chrome + 実キーイベント + ECS tick（42 本中 30 本 steerable、約 12 分）
 PLAYTEST_URL=https://isekai.network \
   nbb scripts/isekai/playtest_headless.cljs --out /tmp/qa-gameplay-$(date +%Y%m%d).edn
 ```
@@ -48,9 +52,11 @@ PLAYTEST_URL=https://isekai.network \
 | `combat title(s) ... NOT in baseline` | **新しく増えた。これは直すか、日付と理由つきで baseline に足す** |
 | `now has an opponent` | 既知分に相手が付いた。**baseline から消す**（古い allowlist は嘘になる） |
 
-`:adversary-missing` の判定は現在 **報告のみで exit code を左右しない**。entity 数が
-時間依存に見えた経緯があるため（実際は tag 判定の誤りだった）、数周ぶん安定を確認してから
-enforcing に上げること。**上げるときは、壊したコピーで exit 1 になることを実際に見てから。**
+`:adversary-missing` の判定は現在 **報告のみで exit code を左右しない**。2026-08-17 に
+「どの snapshot を読むか」を訂正したばかりなので（`:entities` t=0 → `:entities-end` 窓の後）、
+訂正後の計測が本番で数周 安定してから enforcing に上げること。**上げるときは、壊したコピーで
+exit 1 になることを実際に見てから**（`gftd/waves` の spawner を潰したコピーで両方向は
+確認済み）。
 
 ### 2. visual を測る
 
@@ -106,7 +112,9 @@ autoplay は **60 秒級のエピソードを何世代も回して「遊べる�
 3. **`now has an opponent`** — baseline の掃除（1 行削除）
 4. **`SUSPECT`** — 宣言速度と実測の乖離
 5. **`LONELY` の既知分に相手を実装する** — 一番価値が高いが一番重い。
-   1 反復では **1 本だけ**。`palisade` → `royale` → `waves` の順（棚の順序と同じ）
+   1 反復では **1 本だけ**。⚠ **着手する前に、その数がどの snapshot から来たか確かめる**
+   （`:entities` は t=0、`:entities-end` は窓の後）。2026-08-08〜17 の baseline 3 本は
+   **全部これで誤っており**、実装していれば既に相手が居るゲームに 2 体目を足していた
 
 **gate 自身の欠陥も 1 件に数える。** ADR-0074 の初回本番実行では、5 件の「失敗」のうち
 4 件が harness 由来だった（CDP ポート固定・引数解釈・例外メッセージの欠落）。
@@ -138,16 +146,34 @@ autoplay は **60 秒級のエピソードを何世代も回して「遊べる�
   測って選択肢を提示するところまでが engineering
 - **本番に書き込むテストをしない。** gate は読み取りとローカル ECS tick だけ
 
-## 現在地（2026-08-08、次の反復はここから読む）
+## 現在地（2026-08-17、次の反復はここから読む）
 
 | | 実測 |
 |---|---|
-| gameplay | 29/29 PASS（本番） |
-| adversary | `palisade` / `royale` / `waves` が entity 1（240 tick 窓でも不変） |
+| catalog | 42 本（29 ではない）。うち steerable 30 / declared-stationary 11 / data-only 1 |
+| gameplay | **30/30 PASS（本番、deploy 後）** |
+| adversary | **LONELY ゼロ。baseline は空。** 下記の訂正を読むこと |
+| link card | 42/42 に実フレームの 1200x630 PNG。`og:`/`twitter:` は edge 注入（ADR-0080） |
+| aozora.app | 42 本すべて登録（`palisade` を含む 3 本が欠けていた）。avatar は実フレーム |
 | render load | royale = 197 instance / 5,184 triangle / 材質 3 / 外部アセット 0 |
 | AAA signoff | 物理 GPU 1/6 class、frame p95 16.8ms vs 目標 16.7ms、stock 凍結中 |
 | scene 7 指標 | 全て `-1`（未測定）。校正済みリファレンス待ち = art-direction |
-| playtest co-scientist | 実装あり・2026-07-16 以降 0 回稼働・出力ブランチ 0 |
+| playtest co-scientist | 2026-08-17 05:00 の standing run あり（`playtest-coscientist-*` branch） |
 
-**最初の一手として推奨**: `palisade` に対戦相手を 1 体入れる。棚の 1 番目に置いてあり、
-訪問者が最初に触るのが「敵のいないバトルロイヤル」になっている。
+### ⚠ 2026-08-08 版のこの節が推奨していた「最初の一手」は間違いだった
+
+旧版はこう書いていた ——「`palisade` に対戦相手を 1 体入れる。訪問者が最初に触るのが
+敵のいないバトルロイヤルになっている」。**palisade には最初から相手が居た。**
+
+`:entities` は **t=0 の snapshot** から読まれていた。spawner が発火するために*わざわざ
+開けた* 240 tick の窓を、**窓が開く前のフレーム**から判定していた。窓の後で数え直すと
+palisade 1→2 / royale 1→2 / waves 1→**21**。palisade の HUD は同じ snapshot から
+`ALIVE 2` を 9 日間 描き続けていた。
+
+**実行していれば、既に相手が居るゲームに 2 体目を足していた。** gate の出力を、それが
+測れていないものの証拠として読むな —— この skill 自身がその見本になっていた。
+
+**今の最初の一手**: 決まったものは無い。**測ってから選ぶ**。`:entities-end` と
+`:tags-end` が evidence EDN に入るようになったので、`1 → N` の N と tag の内訳を見て、
+declared な genre に対して薄いものを探す。adversary 判定は**まだ exit code を左右しない**
+（訂正後の計測が本番で数周 安定してから enforcing に上げること）。
