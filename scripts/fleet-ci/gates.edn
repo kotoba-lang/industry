@@ -94,13 +94,21 @@
  ;; would have looked the same. (Fixed upstream in columnar 5e165f0 before the
  ;; flip below.)
  ;;
- ;; Admission for a flip is therefore three measurements, not one:
+ ;; Admission for a flip is therefore four measurements, not one:
  ;;   1. `Ran N tests containing M assertions` is IDENTICAL under
  ;;      `clojure -M:test` and under `nbb --classpath <cp> <entry>`.
  ;;   2. The nbb entry exits non-zero with the subject broken and zero with it
  ;;      intact -- and the reported failure is the thing that was broken.
  ;;   3. deps.edn has no cross-repo dep the test path needs: the gate ships one
  ;;      repo's tree, so `:nbb-test`'s classpath cannot reach a sibling.
+ ;;   4. The runner covers the whole suite:
+ ;;        nbb --classpath ".:scripts/nbb_compat" \
+ ;;          scripts/verify-cljs-runner-completeness.cljs --repo orgs/<org>/<name>
+ ;;      reports it complete. Condition 1 catches this today only because someone
+ ;;      thought to run both sides and compare; the detector is what makes it hold
+ ;;      after the flip, when nothing runs `clojure -M:test` any more and there is
+ ;;      no second number to compare against. Measured 2026-08-17: 22 of the 201
+ ;;      repos with a ClojureScript runner do not pass it.
  ;;
  ;; Measured, all three, on the three flipped below:
  ;;   kagami        19 tests / 121 assertions  JVM == nbb;  broken -> exit 1

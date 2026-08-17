@@ -1,0 +1,148 @@
+[{:db/id -1
+  :adr/id "adr-2608170300-cljs-runner-completeness-gate"
+  :adr/title "Moving a gate to ClojureScript needs a fourth condition: that the runner runs the suite. Five measured corrections took the detector from 779 findings to 23"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :source/dataset "adr"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/context
+  "ADR-2608170200 moved three `:jvm-test` fleet gates to `:nbb-test` on three measured
+conditions, and named the trap it had walked into: `kotoba-lang/columnar` shipped three
+test namespaces and two ClojureScript runners, each requiring one of the three. The JVM
+suite ran 36 tests / 117 assertions; nbb ran 10 / 54. With `group/group` altered to drop
+the last group from every grouped result, the partial runner printed
+`Ran 10 tests ... 0 failures` and exited 0.
+
+The `:nbb-test` gate's own floor only requires that SOME `Ran N tests` line appear, which
+a one-third runner satisfies. Condition 1 of that ADR -- identical counts under both
+runtimes -- catches this, but only while a human is running both sides and comparing. The
+whole point of the flip is that `clojure -M:test` stops running, and with it the second
+number. After the flip there is nothing left to compare against.
+
+So the condition that actually has to hold is not 'the two numbers matched on the day we
+flipped'. It is 'the ClojureScript runner runs the suite', continuously, and nothing in
+the workspace measured that."
+
+  :adr/decision
+  "1. **`scripts/verify-cljs-runner-completeness.cljs`**, registered as the 12th
+     orgs-detector (`:verify-cljs-runner-completeness`, 24h, `:writes :none`). It compares
+     each project's ClojureScript runners against the `deftest`-bearing portable files in
+     the subtree they sit in.
+
+  2. **A fourth admission condition** at the head of `gates.edn` `:repos`: a `:jvm-test`
+     gate may become `:nbb-test` only if this detector reports the repo complete.
+
+  3. **Classification is by CONTENT, never by filename.** A runner is a non-test
+     `.cljs`/`.cljc` file that calls `run-tests`/`run-all-tests`; a test namespace is a
+     portable file containing `deftest`. This is what keeps
+     `kotobase-storage/test/run.cljs` out of scope without an exemption list -- it is a
+     hand-written async oracle for the Worker path, calls no `run-tests`, and prints no
+     `Ran N tests` line at all. It is a different suite, not an incomplete port.
+
+  4. **The unit is the project and the question is the UNION of its runners**, because
+     whether a repo splits runners by subject or by platform is intent that cannot be read
+     from source. What can be read, and what matters, is whether a namespace is run by no
+     runner at all."
+
+  :adr/body
+  "## What it measures (2026-08-17, 4,163 of 4,184 registered checkouts, 34s)
+
+201 repos are in scope -- they have a ClojureScript runner AND at least one portable test.
+225 runners; 366 oracle scripts counted and excluded. **179 of 201 complete; 23 findings
+over 22 repos.**
+
+| kind | n | meaning |
+|---|---|---|
+| `:suite-uncovered` | 21 | no runner in the project names the namespace |
+| `:runner-loaded-not-run` | 2 | required, but handed to no `run-tests`, and no `run-all-tests` |
+| `:runner-runs-nothing` | 0 | `(run-tests)` with no target — runs its own namespace |
+| `:runner-unreadable` | 0 | the honest refusal |
+
+Both directions on the same repo, with the real defect and the real fix: columnar at
+`6e417bc` reports 2 of 3 uncovered; at `5e165f0` it is complete. All four finding paths
+were additionally shown red and green on real trees.
+
+Exits: 0 in monitor mode, 1 with `--strict`, and **2** -- neither -- when west.yml has no
+`path:` entries or its paths have no checkouts. Could-not-look must not share a value with
+looked-and-clean.
+
+## The most interesting catch is not columnar
+
+`kotoba-lang/kotobase-peer` ships 17 `_test.cljc` and 2 `_test.cljs`. Its
+`run-nbb-tests.cljs` walks `test/`, turns paths into namespaces, writes a static-require
+entry file and runs nbb on it -- a good pattern, with its own zero floor (`no *_test.cljc
+files found` -> exit 1). But it discovers `_test.cljc` only. Those two `.cljs` namespaces
+run under shadow-cljs (`:ns-regexp \"-test$\"`) and never under nbb, while the runner's own
+docstring calls itself *a genuine 3rd platform tier alongside JVM and self-hosted cljs*.
+
+That is the same defect as columnar's arriving by a completely different route, and it is
+why auto-discovery is not treated as a blanket pass: the literals a discovering runner
+matches on are extracted and applied, rather than assumed exhaustive.
+
+## Five measured corrections, 779 -> 23
+
+Every one was found by opening the repo a finding named and comparing by hand. The first
+version's 779 findings would have been, in the workspace's own vocabulary, theatre.
+
+| # | wrong rule | what it did | n |
+|---|---|---|---|
+| 1 | test files are `*_test` | read 1,081 `test_*` files as RUNNERS | ~690 |
+| 2 | judge each runner alone | called `gftdcojp/tia`'s five deliberate subsystem runners defects | ~29 |
+| 3 | the repo is the unit | asked `etzhayyim/root`'s akashi runner to cover all 1,033 tests in that monorepo (`1074 of 1079`) | 1 huge |
+| 4 | a runner must have `(ns ...)` | declared 35 ordinary nbb scripts unmeasurable; one of them (`cloud-itonami/loop-noren`) was complete | 35 |
+| 5 | quoting is `'ns` | akashi writes `(quote ns)`, so its five genuinely-run namespaces looked unrun | 5 |
+
+Measured naming conventions behind (1): of the portable files under a test directory,
+5,690 are `*_test`, **1,081 are `test_*`**, 35 `*_tests`, 6 bare `test`/`tests`, 86 contain
+`run`, and 270 are something else (`block_vectors`, `browser_harness`,
+`apex_worker_smoke`). No filename rule survives that. `deftest` and `run-tests` are exact.
+
+Correction (3) needed two boundaries, not one: nearest `deps.edn` ancestor was not enough,
+because that monorepo's subprojects carry none, so akashi still collapsed to the root. The
+subtree the runner SITS IN -- a `test/`/`tests/` component stripped back to its parent,
+else its own directory -- is what scopes it correctly, and project membership is decided by
+path containment rather than by comparing computed labels, so a test outside any `test/`
+directory cannot land in a runner-less project and vanish.
+
+Correction (4) is the mirror image of the failure this whole family of detectors exists to
+prevent. **Refusing to answer a question you can answer is the same defect as answering
+one you cannot, pointed the other way** -- and it is quieter, because a refusal looks
+conscientious. The honest refusal is now `:runner-unreadable`, which needs the file read to
+actually fail.
+
+## What is NOT claimed
+
+The 22 repos are reported, not repaired. Each needs its runner's require list and
+`run-tests` call brought up to its suite -- the same two-line change columnar's fix made --
+and then the suite has to be run to confirm it still passes, which is per-repo work.
+
+This does not measure whether a covered test PASSES under ClojureScript, only that it is
+run. A `.cljc` test whose body is `#?(:clj ...)` throughout is reported as uncovered when
+absent from the runner, because the reported fact -- the ClojureScript run covers less than
+the JVM run -- is true either way; why it is true is the repo owner's call."
+
+  :adr/consequences
+  "- `manifest/orgs-detectors.edn` gains a 12th detector. First run records a baseline of
+  23; after that only NEW and RESOLVED surface, and a NEW one means a runner just stopped
+  covering its suite -- precisely the moment coverage silently drops.
+- `gates.edn` gains a fourth admission condition for `:jvm-test` -> `:nbb-test`. 22 of the
+  201 repos with a ClojureScript runner do not currently pass it, so the condition has
+  teeth before anyone flips the next gate.
+- The three gates already flipped (kagami, columnar, org-ietf-csv) all pass condition 4,
+  checked after the fact.
+- The detector's own calibration history is recorded above rather than smoothed away,
+  because a detector's first number is the least trustworthy thing about it, and five of
+  five corrections here made it quieter, not louder."
+
+  :adr/evidence
+  ["scripts/verify-cljs-runner-completeness.cljs"
+   "manifest/orgs-detectors.edn"
+   "scripts/fleet-ci/gates.edn"
+   "kotoba-lang/columnar 6e417bc (2 of 3) vs 5e165f0 (complete)"
+   "kotoba-lang/kotobase-peer run-nbb-tests.cljs vs shadow-cljs.edn :ns-regexp"]
+  :adr/related
+  ["adr-2608170200-jvm-dependency-surface-measured-repowide"
+   "adr-2608136000"
+   "adr-2608124800"
+   "adr-2607173000"]}]

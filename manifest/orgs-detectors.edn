@@ -607,4 +607,57 @@
    ;; :jvm-runtime-clojure-only (`org.clojure/clojure` alone, 1,292 repos, of which
    ;; 1,210 ship zero .clj -- the line pins a test-alias version rather than binding
    ;; anything). Those four are ~8,300 repo-class pairs, none of which names a defect.
+   }
+
+  {:id       :verify-cljs-runner-completeness
+   :title    "ClojureScript test runners that run less than the suite they sit in"
+   :why      "ADR-2608170200 moves :jvm-test fleet gates to :nbb-test, and the :nbb-test
+              gate's own floor only requires that SOME `Ran N tests` line appear. A runner
+              covering a third of its suite satisfies that floor, so a gate can be moved
+              to a cheaper node and silently stop testing most of its subject with an
+              identical signed receipt. Measured on kotoba-lang/columnar before its
+              repair: `clojure -M:test` ran 36 tests / 117 assertions, `nbb test/run.cljs`
+              ran 10 / 54, and with group/group deliberately broken the partial runner
+              printed `Ran 10 tests ... 0 failures` and exited 0. Nothing prints the
+              number it should have reached, which is why only a detector can see it.
+              What it has already caught beyond columnar: kotoba-lang/kotobase-peer ships
+              17 `_test.cljc` and 2 `_test.cljs`; its nbb runner auto-discovers
+              `_test.cljc` only, so those two namespaces run under shadow-cljs
+              (`:ns-regexp \"-test$\"`) and never under nbb -- while the runner's own
+              docstring calls itself a genuine third platform tier. No other check in the
+              workspace compares a runner against the tree it sits in."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-cljs-runner-completeness.cljs" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 86400000                 ; 24h
+   :timeout-ms  600000                   ; 10m -- 18x the worst measured runtime
+   :writes   :none
+   :measured "2026-08-17 on this machine: 34s standalone, 45s under the tick, over
+              4,163 of 4,184 registered
+              checkouts, 201 repos in scope (a ClojureScript runner AND at least one
+              portable test), 225 runners, 366 oracle scripts counted and excluded.
+              exit 0 in monitor mode with 23 findings over 22 repos; 179 of 201 in-scope
+              repos complete. Ratchet verified against an isolated --state: first run
+              recorded all 23, second reported none as NEW.
+              `--strict` exits 1; a west.yml with no `path:` entries and
+              one with paths but no checkouts both print `SCANNED 0` and exit **2**.
+              All four finding paths were shown red AND green on real trees, and the
+              headline case both ways on the SAME repo: columnar at 6e417bc reports 2 of
+              3 uncovered, at 5e165f0 (the actual fix) it is complete.
+              Calibration is the part worth trusting least on its face, so: the first
+              version reported 779 findings and five successive measured corrections took
+              it to 23. A `_test$` filename rule read 1,081 `test_*` files as runners;
+              judging each runner separately called gftdcojp/tia's five deliberate
+              subsystem runners defects; a repo-wide unit asked
+              etzhayyim/root's akashi runner to cover all 1,033 tests in that monorepo;
+              demanding an `(ns ...)` form declared 35 ordinary nbb scripts unmeasurable,
+              one of which was complete; and reading only `'ns` and not `(quote ns)` made
+              akashi's five genuinely-run namespaces look unrun. Each of those was found
+              by opening the repo the finding named and comparing by hand."
+   ;; NO :accepted block. Keys are `<kind>:orgs/<org>/<repo>:<project>`, so no prefix
+   ;; would match and it would be reported as a stale acceptance. The baseline gives the
+   ;; wanted behaviour: a NEW finding means a runner just stopped covering its suite --
+   ;; which, with gates moving to :nbb-test, is the moment coverage silently drops.
    }]}
