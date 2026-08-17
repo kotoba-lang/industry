@@ -80,6 +80,26 @@
 ;;                     `:require` vector AND the `run-tests` call, so this is
 ;;                     the half that a require-only audit would miss.
 ;;
+;; ## What "181 of 201 complete" does and does not say
+;;
+;; 201 is the number of repos that HAVE a ClojureScript runner. It is not the
+;; population of repos with portable tests: measured 2026-08-17, another **2,034**
+;; hold a `deftest` in a `.cljc`/`.cljs` file and have no `run-tests` call
+;; anywhere, so their portable suites run under `clojure -M:test` and nowhere
+;; else. Spot-checked by hand: cloud-itonami/action-gtin-registry, actor-crew,
+;; actor-shukubo.
+;;
+;; Those are printed as a count and are deliberately NOT findings -- an absent
+;; runner is not an incomplete one, and nothing there is fixed by editing a
+;; require list. But the count has to be on screen, or "181 of 201 complete"
+;; reads as a claim about the workspace when the real share of portable suites
+;; that any ClojureScript host runs is 201 of 2,235, about 9%.
+;;
+;; (A first pass at this number said 860, from a shell probe that filtered test
+;; files by NAME and dropped repos through a `head -1`. The name-filter error is
+;; the same one corrected inside this script; it recurred the moment the question
+;; was asked outside it.)
+;;
 ;; ## Refusals
 ;;
 ;; A runner file that cannot be read is `:runner-unreadable`, not skipped -- "I
@@ -172,6 +192,36 @@
 
 (defn runner? [text]
   (boolean (and text (re-find #"\(\s*[a-zA-Z0-9._/-]*run-(all-)?tests" text))))
+
+;; ---------------------------------------------------------------------------
+;; Two more ways a namespace can genuinely be run, both measured on
+;; `kotoba-lang/nekko` 2026-08-17 after this script reported "16 of 17 uncovered"
+;; there. Three of those sixteen were running the whole time.
+;;
+;; 1. A SELF-RUNNING test namespace. `test/nekko/keyslot_test.cljs` ends in a
+;;    bare top-level `(run-tests)` with its own `:end-run-tests` exit hook, and
+;;    is invoked directly. It holds `deftest`, so `runner?` correctly refuses to
+;;    call it a suite runner -- but it does run itself, and reporting it as
+;;    covered-by-nobody is wrong.
+;;
+;; 2. A runner declared in `package.json` or a `deps.edn` alias rather than in a
+;;    `.cljs` file. nekko's `test:async` script is three separate
+;;    `nbb --classpath src:test -e "(require '[nekko.keyslot-test])"`
+;;    invocations. Nothing in the source tree names those namespaces, so a
+;;    file-only audit cannot see them. This is the same failure as the `_test$`
+;;    filename rule: looking in one place and concluding about all of them.
+(defn self-running?
+  "A test namespace that runs itself when loaded."
+  [text]
+  (boolean (and text (re-find #"(?m)^\s*\(\s*[a-zA-Z0-9._/-]*run-(all-)?tests" text))))
+
+(defn declared-runner-text
+  "`package.json` scripts and `deps.edn` alias `:main-opts`, concatenated. Only
+   namespace-shaped tokens are ever read out of this, so treating it as one blob
+   is enough and needs no JSON or EDN parse to be correct."
+  [read-fn dir]
+  (str/join "\n" (keep (fn [f] (read-fn (if (= "" dir) f (str dir "/" f))))
+                       ["package.json" "deps.edn"])))
 
 ;; ---------------------------------------------------------------------------
 ;; Auto-discovering runners.
@@ -334,6 +384,13 @@
                  :current-ns-only? current-ns-only?
                  :loaded loaded
                  :run-set run-set}))
+         ;; Namespaces that need no runner to name them, or that a non-source
+         ;; declaration names. Both are unioned into every project's run set.
+         :self-running (set (keep (fn [[n p]] (when (self-running? (texts p)) n)) expected))
+         ;; `texts` holds only the clj family, so these are read from disk.
+         :declared-text (into {} (for [pd (distinct (map project-of (vals expected)))]
+                                   [pd (declared-runner-text
+                                        (fn [f] (some-> (by-rel f) read-text)) pd)]))
          ;; ns -> path. Membership in a project is decided by PATH CONTAINMENT
          ;; below, not by comparing computed labels: a test that sits outside any
          ;; `test/` directory gets a label of its own (`src/foo`), and equality
@@ -370,11 +427,23 @@
 (def in-scope
   (filter #(and (seq (:runners %)) (seq (:expected-path %))) inspected))
 
+;; Repos with portable tests and NO ClojureScript runner at all. NOT findings:
+;; an absent runner is not an incomplete one, and there is nothing here to fix
+;; by editing a require list. They are counted and printed because without the
+;; number, "181 of 201 complete" reads as a claim about the workspace, and it is
+;; not: 201 is the population that HAS a runner. Measured 2026-08-17 there are
+;; 860 more repos with portable tests and no runner, so the share of portable
+;; suites that any ClojureScript host runs is nearer a fifth than nine tenths.
+;; A `:jvm-test` gate in one of those cannot be flipped at all -- there is no
+;; second number for admission condition 1 to compare against.
+(def no-runner
+  (filter #(and (empty? (:runners %)) (seq (:expected-path %))) inspected))
+
 (defn findings-for
   "One judgement per PROJECT, over the union of that project's runners. See the
    header: whether a repo splits runners by subject or by platform is intent this
    cannot read, but 'no runner runs this namespace' is a fact either way."
-  [{:keys [repo runners expected-path]}]
+  [{:keys [repo runners expected-path self-running declared-text]}]
   (let [by-project (group-by :project runners)
         projects (set (keys by-project))
         under? (fn [p path] (or (= "" p) (str/starts-with? path (str p "/"))))]
@@ -391,8 +460,15 @@
                                                      projects)))
                                  n))
                              expected-path))
-             loaded (reduce into #{} (map :loaded rs))
-             run-set (reduce into #{} (map :run-set rs))
+             ;; A namespace named by package.json / a deps.edn alias is both
+             ;; loaded and run, because that is what those invocations do.
+             declared (let [t (get declared-text project "")
+                            named (names-mentioned t)]
+                        (set (filter named mine)))
+             loaded (into (reduce into #{} (map :loaded rs))
+                          (into declared (filter self-running mine)))
+             run-set (into (reduce into #{} (map :run-set rs))
+                           (into declared (filter self-running mine)))
              uncovered (sort (remove run-set mine))
              ;; required somewhere, run nowhere -- the half a require-only audit
              ;; would miss
@@ -441,7 +517,9 @@
 (println)
 (println "  repos with a complete runner:"
          (count (remove (fn [r] (some #(= (:repo r) (:repo %)) all-findings)) in-scope))
-         "of" (count in-scope) "in scope")
+         "of" (count in-scope) "with a ClojureScript runner")
+(println "  repos with portable tests and NO ClojureScript runner:" (count no-runner)
+         "-- counted, never a finding; see the header")
 
 (when verbose?
   (doseq [f (sort-by (juxt :repo :project) all-findings)]

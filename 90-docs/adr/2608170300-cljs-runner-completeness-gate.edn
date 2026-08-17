@@ -92,6 +92,30 @@ version's 779 findings would have been, in the workspace's own vocabulary, theat
 | 3 | the repo is the unit | asked `etzhayyim/root`'s akashi runner to cover all 1,033 tests in that monorepo (`1074 of 1079`) | 1 huge |
 | 4 | a runner must have `(ns ...)` | declared 35 ordinary nbb scripts unmeasurable; one of them (`cloud-itonami/loop-noren`) was complete | 35 |
 | 5 | quoting is `'ns` | akashi writes `(quote ns)`, so its five genuinely-run namespaces looked unrun | 5 |
+| 6 | a runner is a source file | `nekko`'s `test:async` is three `nbb -e \"(require '[ns])\"` invocations in **package.json**, invisible to a source-only audit | 3 |
+| 7 | a test namespace needs a runner | a namespace ending in a bare top-level `(run-tests)` runs **itself** | (same 3) |
+
+(6) and (7) came from `kotoba-lang/nekko`, reported as 16 of 17 uncovered. Three of
+those sixteen were running the whole time. Corrected, it reports 13, and those
+thirteen are genuinely JVM-only. Both corrections are the `_test$` error again in
+new clothes: **looking in one place and concluding about all of them.**
+
+## What the completion ratio does not say
+
+`181 of 201 complete` is about the repos that HAVE a ClojureScript runner. Measured
+2026-08-17, another **2,034** hold a `deftest` in a portable file and have no
+`run-tests` call anywhere -- their portable suites run under `clojure -M:test` and
+nowhere else (spot-checked: `cloud-itonami/action-gtin-registry`, `actor-crew`,
+`actor-shukubo`). The real share of portable suites any ClojureScript host runs is
+**201 of 2,235, about 9%**. Those 2,034 are counted and printed, never emitted as
+findings: an absent runner is not an incomplete one and nothing there is fixed by
+editing a require list. A `:jvm-test` gate in one of them cannot be flipped at all,
+because admission condition 1 has no second number to compare against.
+
+A first pass at that number said 860, from a shell probe that filtered test files by
+NAME and dropped repos through a `head -1`. The name-filter error is the one this
+script had already corrected internally; it recurred the moment the question was
+asked outside it.
 
 Measured naming conventions behind (1): of the portable files under a test directory,
 5,690 are `*_test`, **1,081 are `test_*`**, 35 `*_tests`, 6 bare `test`/`tests`, 86 contain

@@ -634,11 +634,16 @@
    :interval-ms 86400000                 ; 24h
    :timeout-ms  600000                   ; 10m -- 18x the worst measured runtime
    :writes   :none
-   :measured "2026-08-17 on this machine: 34s standalone, 45s under the tick, over
+   :measured "2026-08-17 on this machine: 44s standalone (34s before it began reading
+              package.json and deps.edn per project), 45s under the tick, over
               4,163 of 4,184 registered
               checkouts, 201 repos in scope (a ClojureScript runner AND at least one
-              portable test), 225 runners, 366 oracle scripts counted and excluded.
-              exit 0 in monitor mode with 23 findings over 22 repos; 179 of 201 in-scope
+              portable test), 225 runners, 366 oracle scripts counted and excluded, and
+              2,034 repos with portable tests but NO runner counted separately -- never
+              findings, since an absent runner is not an incomplete one, but on screen
+              because 181 of 201 otherwise reads as a claim about the workspace when the
+              real share of portable suites any ClojureScript host runs is 201 of 2,235.
+              exit 0 in monitor mode with 21 findings over 20 repos; 181 of 201 in-scope
               repos complete. Ratchet verified against an isolated --state: first run
               recorded all 23, second reported none as NEW.
               `--strict` exits 1; a west.yml with no `path:` entries and
@@ -655,7 +660,15 @@
               demanding an `(ns ...)` form declared 35 ordinary nbb scripts unmeasurable,
               one of which was complete; and reading only `'ns` and not `(quote ns)` made
               akashi's five genuinely-run namespaces look unrun. Each of those was found
-              by opening the repo the finding named and comparing by hand."
+              by opening the repo the finding named and comparing by hand.
+              Two more corrections landed the same day, found the same way on
+              kotoba-lang/nekko, which this script had reported as 16 of 17 uncovered:
+              three of those sixteen were running the whole time. A test namespace ending
+              in a bare top-level `(run-tests)` runs ITSELF, and nekko's `test:async` npm
+              script is three separate `nbb -e \"(require '[ns])\"` invocations -- a
+              runner declared in package.json, which a source-file-only audit cannot see.
+              Both are read now; nekko reports 13, and those thirteen are genuinely
+              JVM-only."
    ;; NO :accepted block. Keys are `<kind>:orgs/<org>/<repo>:<project>`, so no prefix
    ;; would match and it would be reported as a stale acceptance. The baseline gives the
    ;; wanted behaviour: a NEW finding means a runner just stopped covering its suite --
