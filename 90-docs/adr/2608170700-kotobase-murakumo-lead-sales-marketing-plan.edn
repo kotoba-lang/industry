@@ -256,7 +256,7 @@ source 名を固定し、後から join できる形にする:
 | source | 意味 | 今日の状態 |
 |---|---|---|
 | `kotobase-signup` | kotobase.net の登録 | **識別子が無い**。28 はカウンタであってレコードではない（上記 4-a） |
-| `murakumo-join` | murakumo.cloud の問い合わせ | **ingress が構造的に無い** |
+| `murakumo-join` | murakumo.cloud の `/#signup`（did:key 発行） | signup は在る。**5820 に落とす配管が無い**（訂正） |
 | `hubspot` | 過去の HubSpot contact | Phase 0 で回収 |
 | `outbound-research` | named-accounts の調査候補 | T1 目標 100 社に対し researched |
 | `itad-lp` | itad.gftd.ai の LP | 稼働（ADR-2607271200 P1） |
@@ -283,11 +283,23 @@ Phase 1 の実体は **2 つとも『ingress を作る』**である。kotobase 
 cross-tier add が拒否されるため、`network-awai/net-kotobase` を initial source にした
 別 session が要る。
 
-**murakumo.cloud（まず gate 行を作る）**
+**murakumo.cloud** —— **gate 行は 2026-08-17 に実測して作った**
+（`COMMERCIAL-GO-NO-GO.md` の『Portfolio gate — cloud-murakumo』が正本）。判定は **no-go**、
+red 4: Terms/Privacy が DRAFT（`[CONFIRM:` terms 5 / privacy 11、privacy は準拠法自体が
+未確定）／日本の登記・税務（operator が AWAI Network, L.L.C. なので cloud-itonami と
+同じ red を継承）／**特商法表記が見つからない**のに storefront は JP を含む 4 か国向け／需要。
 
-go/no-go 表に murakumo の行が無い = 評価されていない。作るべき行は
-operator 法人 / Terms・Privacy / 公開価格 / 返金・解約条件 / PSP の 5 つ。
-x402 と Stripe checkout の配管は実在するので、欠けているのは**公開された商品**である。
+**この ADR の初稿を訂正**: 『`/pricing` が 404 なので公開価格が無い』は誤読だった。
+murakumo.cloud は **hash route の SPA** で、価格は `/#studio`、store は `/#store`、
+signup は `/#signup` にある（配信中の `js/main.js` から実 route を読んで確認）。
+**curl の 404 は不在の証明ではない。** 同じ誤りが `Phase 1` の
+『murakumo に lead の落ち先が無い』にも掛かっている —— `/#signup` は実在し、
+did:key を作る経路がある。無いのは *signup* ではなく、**そこで得た identity を
+5820 に落とす配管**の方である。
+
+kotobase より近い点もある: **購入前の規約同意が版管理付きで実装済み**
+（版が変われば再同意）で、返金条件も公開されている。kotobase に在って murakumo に
+無いのは owner が確定した価格の方。
 
 ### Phase 3 — 需要（唯一誰も代行できない部分）
 
