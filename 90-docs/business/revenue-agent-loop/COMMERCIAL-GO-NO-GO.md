@@ -68,6 +68,7 @@ ratify 記録は net-kotobase repo 側にあり未検証（下記「Session cons
 |---|---|---|---|
 | cloud-itonami | AWAI/Gftd Japan の収納代行は ADR + 公開 Terms で確定。**登記・税務のみ赤** | terms/privacy/DPA は承認済み・公開済み。ただし 24h で 5xx 28%（有料導線に載せる品質ではない） | **conditional**（red 1 + yellow 3 + 品質。前版 no-go から前進） |
 | net-kotobase | Gftd Japan K.K.（Corporate Number 1011101086505、国内法人）が operator。**外国会社登記の論点は構造的に無い** | **課金中の live 価格は Secure Managed ¥19,800/月**（run 0033、Aura Professional 2 GB 帯）。owner 確定の Developer ¥2,980/月は **未公開のまま**。run 0031/0032: `/legal/terms/` `/legal/privacy/` `/legal/dpa` は live 200 だが **DRAFT / UNAPPROVED TEMPLATE**。`noindex`、sitemap 非掲載、`[CONFIRM:` マーカー残。Stripe Price ID は 0033 でも未変更。commercial go は動かない | **no-go** |
+| cloud-murakumo | AWAI Network, L.L.C.（Delaware）が operator と公開文書で一致。**cloud-itonami と同じ登記・税務の red を継承** | Terms/Privacy は live だが **DRAFT**（`[CONFIRM:` terms 5 / privacy 11、privacy は準拠法自体が未確定）。**特商法表記が 2 箇所を探して 0 件**なのに storefront は JP を含む 4 か国向け。同意の版管理と返金条件は実装済み（この product の強い側）。価格は `/#studio` にあるが hash fragment の先で server 側に無い | **no-go**（2026-08-17 初評価、上記 gate 表） |
 | club-shinshi | operator・決済条件の確定が必要 | adult specialist review、age assurance、refund/tax/payoutが赤 | **no-go**（SPA のため legal surface は HTTP で再実測不能 — run 0022） |
 | net-babiniku | PSP/crypto railの契約証跡なし | monetization proposal自体がhard hold | **no-go**（未再実測） |
 
@@ -111,6 +112,46 @@ itonami.cloud 自身が `bottleneck: "run Stripe checkout via /isco-1212/"` と�
 externalPaid は 1 になるが、それは owner 決済であって T1 が要求する非 owner 決済ではない。
 release 条件を満たさないまま満たしたように見える数値を作る行為であり、
 ADR-2608062400 が防いでいる捏造そのものである。
+
+## Portfolio gate — cloud-murakumo（2026-08-17 実測。この表に初めて載る）
+
+前版までこの product には**行が無かった**。無かったのは「評価して問題なし」ではなく
+**評価していない**という意味で、両者が同じ空欄として出ていた（ADR-2608136000 の形）。
+ADR-2608170700 で実測して埋めた。**この節だけ as-of 2026-08-17。他節は 2026-08-08。**
+
+**先に訂正**: 「`/pricing` が 404 なので公開価格が無い」は**誤読**だった。murakumo.cloud は
+**hash route の SPA**（ADR-2608080100 の推奨形）で、価格は `/#studio`、ストアフロントは
+`/#store`、signup は `/#signup` にある。curl の 404 は不在の証明にならない。
+配信中の `js/main.js`（284,845 bytes）から実 route を読んで確認した:
+`#landing` `#landing-try` `#landing-how` `#store` `#store/` `#studio` `#signup` `#console`。
+
+**この読み方は club-shinshi にも効く。** 上の表が run 0022 以来
+「SPA のため legal surface は HTTP で再実測不能」としている項目は、
+配信バンドルの文字列を読めば測れる（規約文言・operator 名・返金条件・同意ゲートは
+すべてバンドルに入っている）。**測れないのではなく、測り方が HTTP status だけだった。**
+
+| Gate | Required evidence | Measured evidence (2026-08-17) | Status |
+|---|---|---|---|
+| 契約主体 | 法人名・住所・連絡先・operator が公開文書で一致 | バンドルが `murakumo.cloud · operated by AWAI Network, L.L.C.` を表示。`/legal/terms.md` が Service operator: AWAI Network, L.L.C.（Delaware LLC）、準拠法 Delaware と明記 | **green** |
+| Terms / Privacy | placeholder 無し・公開版・発効日・operator 承認証跡 | `/legal/terms.md` 200 / 23,446 B（Last updated 2026-08-04）、`/legal/privacy.md` 200 / 9,837 B（同 2026-07-23）。**両方とも冒頭が DRAFT** で、`[CONFIRM:` が terms 5 件 / privacy 11 件。privacy は準拠法自体が `[COUNSEL CONFIRMATION REQUIRED]`。store 側も『**DRAFT:** … still draft pending review by qualified counsel. They are not final legal documents.』と自ら表示 | **red** |
+| 日本での法人・税務 | 外国会社登記・PE・源泉/消費税の専門家判断 | **cloud-itonami と同一の red を継承する** —— operator が同じ AWAI Network, L.L.C. であり、written advice は存在しない | **red** |
+| 返金・解約条件 | 公開された条件 | バンドルが明示: クレジット購入は**原則返金不可**（強行法規が要求する場合を除く）、ハードウェアノード購入は §6A で fulfillment が手動 | **yellow**（条件は在るが DRAFT の Terms 内） |
+| 購入前の同意取得 | チェックアウト前に規約同意、版管理 | 実装済み。`accept the Terms … before checkout` + **版が変わったら再同意**（`2026-08-04` を版として保持）。この product で一番よくできている部分 | **green** |
+| PSP / collection | 契約主体の PSP 口座または有効な収納代行 | Stripe Checkout（カードのみ、BNPL/分割なし）。`Pay with crypto — coming soon`。cloud-itonami と同じ AWAI/Gftd Japan の収納代行境界に載る | **green**（governance level） |
+| 日本向け表示義務 | JP 消費者に売るなら特定商取引法に基づく表記 | **見つからない。** `/legal/*` の 2 文書にも、配信バンドル全体にも `特定商取引` / `tokushoho` の文字列が 0 件。一方 llms.txt は storefront が **JP を含む 4 か国**（US/EU/CN/JP）向けと明記している | **red**（法的結論ではなく、2 箇所を探して無かったという実測） |
+| 需要 | 外部の実需 | federation `active-demand-apps: 0`、Stripe active subs 0 / paid charges 0。24h トラフィックはほぼ内部 API（fleet promotions 17,156 / scanner 17,103） | **red** |
+
+**判定: no-go。** red 4（Terms/Privacy の DRAFT・日本の税務/登記・特商法表記・需要）。
+
+**ただし kotobase より近い。** 同意取得の版管理と返金条件は既に実装・公開されており、
+kotobase 側に無いものが murakumo には在る。逆に kotobase に在って murakumo に無いのは
+**owner が確定した価格**である。
+
+**この product 固有の distribution 上の問題**（gate ではないが、需要 red の原因側）:
+価格・ストア・signup が**すべて hash fragment の先**にあるので、
+サーバ側に価格ページが存在せず、**検索エンジンにもリンク共有にも載らない**。
+SPA 規約（ADR-2608080100）は fragment を正しい既定としているが、同時に
+「SSR/OG が必要な公開ページは例外」とも書いている。**価格ページはその例外に当たる。**
 
 ## 並行トラック — net-kotobase（価格は確定、公開が未了）
 
