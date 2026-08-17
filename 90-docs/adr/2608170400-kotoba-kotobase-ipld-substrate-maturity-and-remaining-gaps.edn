@@ -495,8 +495,34 @@ signed receipt、壊した実装が落ちる mutation test の六面。
 1. trustless path vector: path→block request→CID verification→missing/duplicate/wrong-codec rejection。
 2. GraphSync baseline interop を独立実装と実測。extension はまず resume/budget/ADL interpretation の
    うち load-bearing なものだけ。
-3. disconnect→checkpoint→resume が同じ root/result を返す soak。cursor state 自体も
-   content-addressed または署名付きで改ざんを拒否。
+   ⚠ **この環境のコードでは閉じられない**（2026-08-17 判定）—— 「独立実装と実測」は
+   独立した GraphSync peer を要する。gateway ADR の G5 と同型の外部条件待ちであり、
+   **実装しても「閉じた」と書かないこと**。
+3. ~~disconnect→checkpoint→resume が同じ root/result を返す soak。cursor state 自体も
+   content-addressed または署名付きで改ざんを拒否~~ **closed（2026-08-17、io-ipld #29）**。
+
+   **両半分を先に測った。resume は既に正しかった** —— 途中で checkpoint して resume した
+   結果は、通しで走らせた結果と一致する。**改ざん側は正しくなかった** ——
+   `restore-cursor` は envelope の shape と version しか見ておらず、**編集された checkpoint
+   はそのまま復元できた**。
+
+   **これは見た目より悪い。復元後の traversal は他のすべてについて律儀だからである。**
+   記録された root を差し替えると、以後読む block は**すべて CID 検証を通る —— 間違った
+   root に対して**。結果は自信を持って、完全な形で、**誰も頼んでいない graph について**
+   返ってくる。
+
+   checkpoint は「再開される作業」であり、**移動する** —— peer に渡り、storage に置かれ、
+   返ってくる。よって envelope は cursor state の **content address** を持ち、restore が
+   再計算する。root 差し替え・resource limit の緩和・match の捏造は**同じ 1 つの検査**で
+   拒否される（守るべき field を列挙するのではなく **state を address する**から）。
+
+   version は 2 へ。version 1 の checkpoint は digest 不一致ではなく**未知の version**と
+   して拒否する —— version field はそのために在る。**古い token には「古い」と言うべきで、
+   改ざんを探しに行かせるべきではない。**
+
+   ⚠ **test が自分を捕まえた。** 最初の「累積 match の書き換え」case は `:matches` を空に
+   していたが、work 1 単位の時点で既に空 —— **何も検査せずに通る no-op 編集**だった。
+   捏造は「足す」ものでなければならないので、**在りもしない match を足す**形に直した。
 4. GraphSync 不在時に HTTP path が同じ結果を返す fallback parity。
 
 ### P3 — transport operational qualification
@@ -560,8 +586,9 @@ root pin は `amu c38f79d2c1af...`（west commit `1069d90b...`）、
 
 **P0 は 5 項目すべてが 2026-08-17 に着地した**（P0-1 `bytes-at` / P0-2 `bytes-slice` /
 P0-3 `bytes-concat` / P0-4 closed expression grammar / P0-5 canonical codec refusal）。
-**P1 は 5 項目すべてが 2026-08-17 に着地した。** 次は **P2 — retrieval interoperability**
-（本 ADR §5 の P2 節、4 項目）。
+**P1 は 5 項目すべてが、P2 は P2-3 が 2026-08-17 に着地した。** 次は **P2-1**
+（trustless path vector: path→block request→CID verification→missing/duplicate/wrong-codec
+rejection）、次いで **P2-4**。**P2-2 は外部条件待ち**（上記）。
 
 ⚠ **P2 以降は P0/P1 と性質が違い、大半がこの環境のコードでは閉じられない。**
 P2-2 は独立実装との GraphSync interop 実測、P3 は実ブラウザ・実 NAT・live fleet、
