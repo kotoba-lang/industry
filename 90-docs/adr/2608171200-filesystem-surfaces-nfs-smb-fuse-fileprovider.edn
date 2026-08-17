@@ -114,6 +114,26 @@ app extension を署名済み app に同梱する必要があり、`.cljc` で�
 当たるので、**採るなら例外を明文化した ADR が先**。Apple 署名基盤自体は既にある
 （skill `secrets-location-map` の mobile-publishing）。
 
+# 着地（2026-08-17、この ADR を書いた後に完了した分）
+
+**Drive は実際に mount できるようになった。** `cloud-itonami-app` の ADR-0058 が
+`nfs.v3/IFilesystem` を Drive で埋め、`kekkai.acl` を authorization として繋いだ。
+macOS で mount して読み書き・mkdir・rename・rm が通り、CID ストアを有効にすると
+Finder で保存したファイルがそのまま kotobase archive の IPFS CID になる
+（`bafkreihbfo374yy4mz2w3sli2azqfw3ea73cnr3jm5gzqvub7wsh57uoxa` を無認証 GET で
+取得し、`ipfs add` の出力と一致することを確認）。
+
+**fleet gate は 3 つとも実ノードで緑**（judah / simeon / levi、`org-ietf-nfs` は
+authorization seam 追加後の 6 tests / 50 assertions でも追随）。手元ではなく配られた
+tree で discriminate している。
+
+**この ADR が名指しした欠陥のうち 1 つは直った。** `net-kotobase/ipfs` の UnixFS
+codec は `Links`/`Data` を転置していて実 IPFS コンテンツを 1 つも読めなかったが、
+node codec を `ipld.dag-pb` に委譲し、fixture を適合ブロックとして再 publish し、
+deploy して live probe 38/38 を確認した。ついでにこの repo のビルドが
+`shadow-cljs.edn` の `../../kotoba-lang/…` に依存して west レイアウト外で
+コンパイルできなかった問題も、依存を deps.edn の SHA pin へ移して解いた。
+
 # 帰結
 
 - Drive を「Finder の disk」として出す道が、third-party 導入・署名・root の
