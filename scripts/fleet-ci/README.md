@@ -10,6 +10,35 @@ tip 変化を検出 → gate をノードへ fan-out → 署名 receipt を flee
               → commit status を書き戻し → green なら west pin を前進（CD）
 ```
 
+## 静かに壊れる 2 つを直した（2026-08-17）
+
+**CD の pin 前進が push race を再試行していなかった。** landing repo の ref 更新
+そのものが楽観ロックなので、fleet が忙しいと別セッションに負けて `push rejected`
+が返る。receipt landing は最初から 3 回まで再試行していた（`land-receipt!`）が、
+`advance-pin!` は 1 回で諦めていた —— **同じ race を、片方だけが吸収していた。**
+
+症状は green のときにしか出ない: gate は通り、署名 receipt は着地し、pin だけが
+取り残される。**赤い gate としては現れないので、誰も気付かない。** 実測 2026-08-17、
+3 本走らせて 2 本（`cloud-itonami-isco-4311` と `tehai`）が置き去りになった。
+
+再試行するのは `push rejected` のときだけ。pin verification の拒否や entry 不在は
+何度やっても同じ答えなので即返す —— 正直な "no" を 3 回に増やしてログに埋めない。
+回帰テストは `tick-unit-test.cljs`（4 本）。
+
+**`tick.cljs` に生の NUL バイトが 1 個あり、`grep` がこのファイル全体を binary
+として扱っていた。** `file` は `binary data` と答え、**`grep` は常に静かに 0 件を
+返していた** —— exit 1 で、「一致なし」と見分けがつかない。実測: 1 セッション中に
+このファイルへの検索が 3 回空振りし、コードの不在として読まれた。
+
+正体は `gate-spec-hash` の domain separator で、意味はあった。unicode エスケープで
+書けば同じ 1 文字に読まれるので digest は不変、ファイルは text に戻る。
+
+⚠ **`manifest/fleet-ci.edn` にも ESC バイトが 8 個ある**（`app-yorishiro` の
+vitest 色付き出力が receipt の `:detail` に入った）。台帳全体が同じく grep 不可視
+だが、**これらは署名対象のペイロード内なので触っていない** —— 書き換えると
+receipt の signature が壊れる。前向きの対策は gate 出力の ANSI 除去で、それは
+receipt を組み立てる `kagami` 側の仕事であってここではない。
+
 ## ファイル
 
 | path | 役割 |
