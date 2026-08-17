@@ -548,4 +548,63 @@
    ;; mechanism already gives the wanted behaviour: the first run records all 352, and
    ;; from then on only NEW and RESOLVED surface -- a NEW one means another appview has
    ;; just been generated with this shape.
+   }
+
+  {:id       :verify-jvm-dependency-surface
+   :title    "where a JVM is still required, across every west-registered checkout"
+   :why      "CLAUDE.md demotes the JVM to last resort and
+              90-docs/migration/kotoba-wasm-runtime-cutover.edn freezes a JVM inventory
+              of exactly FOUR entries, all under orgs/kotoba-lang/, with
+              `:new-jvm-runtime-dependencies :forbidden`. Nothing checked the other
+              4,179 registered repositories, so the contract's own rule was
+              unenforceable outside the four repos it names. Measured 2026-08-17 on the
+              first run: 954 repositories ship .clj sources, 149 name a third-party JVM
+              library in top-level :deps, 291 carry a JVM build toolchain, and 363 still
+              have a bb.edn that ADR-2607173000 retired. A forbidden-by-contract class
+              with no detector is a rule that reads as satisfied because nobody can see
+              it: `verify-kotoba-wasm-runtime-cutover` has been green throughout,
+              correctly, because it only ever looks at four deps.edn files.
+              It also answers the question the frozen inventory implies but does not
+              state: all three Chicory call sites on disk are INSIDE the frozen
+              inventory, so the one class the contract calls forbidden has zero
+              breaches. That is a real green, and before this it was unmeasured.
+              What it would have caught, concretely: a new repository scaffolded with
+              .clj sources or a cheshire/http-kit dependency appears as a NEW finding the
+              next tick, which is exactly the event the cutover rule forbids and which
+              the four-entry inventory cannot see."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-jvm-dependency-surface.cljs" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 86400000                 ; 24h -- a JVM dependency lands on human
+                                         ; timescales, and the answer is stable
+   :timeout-ms  600000                   ; 10m -- 60x the worst measured runtime
+   :writes   :none
+   :measured "2026-08-17 on this machine: 9.6s standalone (4.0s user, 68% CPU), 26s under
+              the tick, walking 4,163 of 4,183 registered checkouts, 3,524 deps.edn
+              parsed, 4 unparsable, exit 0 in monitor mode with 1,760 FINDING lines
+              (1,103 fail / 654 warn / 3 info). Fast because it is one process doing
+              readdir, not a subprocess per repo -- which is why the timeout can be 10m
+              rather than the 15m the subprocess-per-repo detectors need.
+              Ratchet verified end to end against an isolated --state: the first run
+              recorded all 1,760, the second reported none of them as NEW.
+              Refusal shown both ways: a root whose west.yml has no `path:` entries, and
+              one with paths but no checkouts on disk, both print `SCANNED\t0` and exit
+              **2** -- neither 0 nor 1 -- so the tick records :inconclusive rather than
+              clean. `--strict` exits 1 while monitor mode exits 0.
+              20 registered paths have no checkout on disk; they are simply not cloned
+              here, and the run says so rather than counting them as clean."
+   ;; NO :accepted block. Keys are `<kind>:orgs/<org>/<repo>`, per repository, so a
+   ;; prefix would match nothing and be reported as a stale acceptance. The baseline
+   ;; does the right thing already: the first run records all 1,760, and after that only
+   ;; NEW and RESOLVED surface. A NEW one is a repo that just acquired a JVM dependency,
+   ;; which is the forbidden event; a RESOLVED one is a port that landed.
+   ;;
+   ;; Four classes are counted but NOT emitted per repo, and the script says why in its
+   ;; own header: :jvm-test and :jvm-test-oracle (the contract allows them),
+   ;; :jvm-lint (a clj-kondo alias, identical in 3,023 repos) and
+   ;; :jvm-runtime-clojure-only (`org.clojure/clojure` alone, 1,292 repos, of which
+   ;; 1,210 ship zero .clj -- the line pins a test-alias version rather than binding
+   ;; anything). Those four are ~8,300 repo-class pairs, none of which names a defect.
    }]}
