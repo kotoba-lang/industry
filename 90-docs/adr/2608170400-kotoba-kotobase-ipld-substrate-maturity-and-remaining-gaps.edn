@@ -6,7 +6,7 @@
   :adr/deciders "Jun Kawasaki（IPLD Data Model / codecs / Schema / ADL / GraphSync / trustless pathing / IPNS PubSub / transports / Prolly range diff を順次実装し成熟度を上げる指示）"
   :adr/supersedes ""
   :adr/superseded-by ""
-  :adr/relates-to "ADR-2606271700（Read/Live transport planes）, ADR-2606271800（WebRTC/TURN）, ADR-2607309970（IPNS record+DHT）, ADR-2608039970（datom plane）, ADR-2608112035（Kubo-independent retrieval）, ADR-2608160100（CARv2 pack）, ADR-2608170100（IPLD調査とrange境界）, ADR-2608170200（query serving planes）"
+  :adr/relates-to "ADR-2606271700（Read/Live transport planes）, ADR-2606271800（WebRTC/TURN）, ADR-2607309970（IPNS record+DHT）, ADR-2608039970（datom plane）, ADR-2608112035（Kubo-independent retrieval）, ADR-2608160100（CARv2 pack）, ADR-2608170100（IPLD調査とrange境界）, ADR-2608170200（query serving planes）, ADR-2608171256（production HTTP Gateway 0.19.0 maturity）"
   :adr/repos ["kotoba-lang/io-ipld" "kotoba-lang/amu" "kotoba-lang/kotoba-sema"
               "kotoba-lang/tech-ipfs-specs-ipns" "kotoba-lang/prolly-tree"
               "kotoba-lang/kotoba" "kotoba-lang/kotobase" "net-kotobase/control-plane"]
@@ -155,6 +155,10 @@ materialized view を持つ。IPLD/ADL/GraphSync はその下の identity/retrie
 
 GraphSync は selector に従う graph transfer と extension negotiation に有用だが、正しさの唯一経路
 にはしない。実装が任意 extension を全て持つ必要はない。現在の必須経路は次で代替できる。
+
+production HTTP Gateway の raw/CARv1/UnixFS/IPNS surface と buffer/streaming gap G1-G7 は
+ADR-2608171256 がより具体的な正本である。本 ADR はそれを置換せず、Kotoba compiler、IPLD core、
+CARv2、transport、query、execution を横断する上位の成熟度境界を固定する。
 
 | 要求 | 現在の必須経路 | GraphSync の位置 |
 |---|---|---|
