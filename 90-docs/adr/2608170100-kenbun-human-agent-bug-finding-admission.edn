@@ -367,14 +367,19 @@ live なのは D1 backend の方で、上記のとおり**恒久の設計では�
 
 ## まだ無いもの（正直に）
 
-- **custom domain 未取得。** live は workers.dev だけ(意図的。上記)
+- ~~custom domain 未取得~~ **完了**(2026-08-17)。`kenbun.itonami.cloud`。
+  claim の**前に**未使用を確認した(DNS 無し、workspace のどの wrangler config も
+  この名前を持たない)——単一所有で最後の deploy が勝ち conflict が出ないため。
+  両ホストが同じ store を見ることを `/report` の一致で実測
+- ~~fleet gate 未登録~~ **完了**(2026-08-17)。`gates.edn` に
+  `{:name \"kenbun\" :org \"cloud-itonami\" :gate :jvm-test :cd true}`、node `joseph` で
+  緑(`38 tests / 129 assertions / 0 failures`、ローカルと同数 = 配られた tree で
+  実際に走った証拠)。**覆うのは base + HTTP だけ**で `test-kotobase` と worker build は
+  走らない(gates.edn に明記)
 - **Worker が datom 面に載っていない**(非同期 IssueStore 契約が上流に無い)
 - **hydrate が毎リクエスト全件を読む。** dedupe が全件への問いなので v0.1 では全件。
   表が育てば通用しない——隠れた TODO ではなく docstring と README に書いた
 - **認証が共有 secret 表**(持てる最弱の identity)。CACAO 検証への差し替えが次
 - **credit の決済面が無い**(意図的。上記)
-- **fleet gate に載せていない。** `scripts/fleet-ci/gates.edn` への登録は未実施。
-  CLAUDE.md「gate は fleet で 1 度緑になるまで landed としない」に従い、ここでは
-  gate を主張しない
 - **LLM 発見側（agent がどう申告を作るか）は範囲外。** kenbun は入口であって
   発見器ではない。`isekai-qa-loop` 系の loop が申告を投げ込む側になる"}]
