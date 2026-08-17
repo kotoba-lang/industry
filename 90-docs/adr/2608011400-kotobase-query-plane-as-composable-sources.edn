@@ -6,8 +6,8 @@
   :adr/doc-type "adr"
   :adr/source-format "edn"
   :adr/date "2026-08-01"
-  :adr/last-verified "2026-08-01"
-  :adr/last_verified "2026-08-01"
+  :adr/last-verified "2026-08-17"
+  :adr/last_verified "2026-08-17"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "kotobase-query-plane-as-composable-sources"
@@ -124,7 +124,7 @@ storage を読む実装は、その storage を所有する lib に置く（`arr
 | **datalog を seam 上へ** | ✅ `1c0f86a0` | 2-clause join が **7 block vs hydrate 71（10.1x）** |
 | **2 compaction** | ✅ `1c0f86a0` | k=50 で **merged 50 block/scan → compacted 2（25x）** |
 | **3 view** | ✅ `datom-source` `cd069ba4` | 被覆パターンは map lookup。`absorb` は O(new-quads × patterns) |
-| **4 adjacency** | ❌ 未着手 | — |
+| **4 adjacency** | ✅ `datom-source` 2026-08-17 in-memory | 100-chain + 10k noise: 2 out-lookups vs 10100 examined. Packed form not landed. ADR-2608170200 |
 
 ### datalog を seam に載せた話（当初「最優先」としていたもの）
 
