@@ -77,7 +77,51 @@
  ;; 対象は :cd true の repo のみ（opt-in — 静かな pin 前進を全 repo に広げない）。
  :cd {:pin-advance-on-green true}
  :repos
- [{:name "kagami" :gate :jvm-test :cd true}
+ ;; ── :jvm-test → :nbb-test, only where the ClojureScript run was MEASURED to
+ ;;    be the same run (ADR-2608170200) ──────────────────────────────────────
+ ;;
+ ;; `:jvm-test` needs node cap :jvm, which `nodes.edn` puts on 2 of 10 hosts
+ ;; (4 slots) against 56 :jvm-test entries; `:node` is on 4 (8 slots), and
+ ;; placement.cljs costs them 600s vs 180s. So moving a gate off the JVM is
+ ;; worth real queue time — which is exactly why it must not be done on the
+ ;; strength of "the sources are .cljc".
+ ;;
+ ;; The trap, measured 2026-08-17 on columnar: `test/run.cljs` required one of
+ ;; the suite's three test namespaces, so nbb ran 10 of 36 tests and printed
+ ;; `Ran 10 tests ... 0 failures`. With group/group deliberately broken, the
+ ;; partial runner still exited 0. Flipping that gate would have moved it to a
+ ;; cheaper node AND silently dropped two thirds of the suite, and the receipt
+ ;; would have looked the same. (Fixed upstream in columnar 5e165f0 before the
+ ;; flip below.)
+ ;;
+ ;; Admission for a flip is therefore three measurements, not one:
+ ;;   1. `Ran N tests containing M assertions` is IDENTICAL under
+ ;;      `clojure -M:test` and under `nbb --classpath <cp> <entry>`.
+ ;;   2. The nbb entry exits non-zero with the subject broken and zero with it
+ ;;      intact -- and the reported failure is the thing that was broken.
+ ;;   3. deps.edn has no cross-repo dep the test path needs: the gate ships one
+ ;;      repo's tree, so `:nbb-test`'s classpath cannot reach a sibling.
+ ;;
+ ;; Measured, all three, on the three flipped below:
+ ;;   kagami        19 tests / 121 assertions  JVM == nbb;  broken -> exit 1
+ ;;   columnar      36 tests / 117 assertions  JVM == nbb;  broken -> exit 1
+ ;;   org-ietf-csv  10 tests /  38 assertions  JVM == nbb;  broken -> exit 1
+ ;;
+ ;; NOT flipped, with the reason, so the next reader does not re-derive it:
+ ;;   kotobase-storage  test/run.cljs is a COMPLEMENT, not a port -- it covers
+ ;;                     the async/Worker path the JVM suite cannot reach, and
+ ;;                     prints no `Ran N tests` line at all (the gate's own
+ ;;                     floor, exit 93, would reject it). Both halves are real
+ ;;                     coverage; dropping either loses tests.
+ ;;   io-multiformats, org-ietf-cbor
+ ;;                     their cljs half is `shadow-cljs compile` -- a JVM
+ ;;                     build. No nbb entry exists yet.
+ ;;   chain, io-ipld, io-ipld-car, nekko, org-apache-avro, kotobase-lake,
+ ;;   tech-ipfs-specs-ipns, sakkyokuka
+ ;;                     zero .clj files, but their test path needs sibling
+ ;;                     repos through deps.edn (condition 3). The note at
+ ;;                     "ongaku" below records the same constraint.
+ [{:name "kagami" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd true}
   {:name "nekko" :gate :jvm-test :cd true}
   {:name "bonsai" :gate :jvm-test :cd true}
   {:name "langgraph" :gate :jvm-test :cd true}
@@ -1450,11 +1494,14 @@
   ;; 落ちることの確認について: `:jvm-test` の gate 本体は各 repo の test suite
   ;; なので、赤くする細工を gates.edn 側に持たない。上記 6 本はいずれも失敗を
   ;; 報告する runner（cognitect test-runner、exit 非 0）で走ることを実測済み。
-  {:name "columnar" :gate :jvm-test :cd true}
+  ;; columnar / org-ietf-csv: flipped to :nbb-test on measured parity — see the
+  ;; admission note at the head of :repos. columnar needed its runner fixed
+  ;; first (5e165f0); org-ietf-csv's already covered its whole suite.
+  {:name "columnar" :gate :nbb-test :classpath "src:test" :entry "test/run.cljs" :cd true}
   {:name "org-apache-parquet" :gate :jvm-test :cd true}
   {:name "org-apache-arrow" :gate :jvm-test :cd true}
   {:name "org-apache-avro" :gate :jvm-test :cd true}
-  {:name "org-ietf-csv" :gate :jvm-test :cd true}
+  {:name "org-ietf-csv" :gate :nbb-test :classpath "src:test" :entry "test/run.cljs" :cd true}
   {:name "kotobase-lake" :gate :jvm-test :cd true}
 
   ;; ── 委譲した decision core を ClojureScript で実行する gate ──────────────
