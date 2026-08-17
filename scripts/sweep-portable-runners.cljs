@@ -165,6 +165,17 @@
                                   ;; reported PASS for gftdcojp/defence.
                                   (re-find #"Ran 0 tests" (or ran "")) (str "ZERO-TESTS " ran)
                                   (and ran (zero? exit)) (str "PASS " ran)
+                                  ;; A suite that printed a summary and THEN died is
+                                  ;; not a suite whose tests failed. Measured on
+                                  ;; cloud-itonami/hayari: `Ran 29 tests ... 0
+                                  ;; failures` followed by `Could not find namespace:
+                                  ;; xmile.model`, exit 1. Labelling that RED reads as
+                                  ;; "the tests are broken" when what happened is that
+                                  ;; an unknown number of them never ran -- the same
+                                  ;; confusion between "did not measure" and "measured
+                                  ;; and found nothing" that this whole tranche exists
+                                  ;; to remove, arriving from the opposite side.
+                                  (and ran err) (str "PARTIAL-LOAD " ran " then " err)
                                   ran (str "RED " ran " / " bad " / exit " exit)
                                   :else (str "LOAD-FAIL "
                                              (or err (str/join " | "
