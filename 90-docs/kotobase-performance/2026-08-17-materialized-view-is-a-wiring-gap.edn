@@ -1,0 +1,92 @@
+{:receipt :kotobase/materialized-view-gap
+ :date "2026-08-17"
+
+ :question
+ "The cost model says routing served reads through materialised views is worth
+  64x per query and moves the Neo4j-Aura crossover from 1M to 65M queries a
+  month. I described that as designing which query shapes a view can answer.
+  Is that actually the gap?"
+
+ :answer "No. The design exists and is implemented. Nothing calls it."
+
+ :what-already-exists
+ {:capability "kotoba-lang/kotobase-projection -- `Portable, storage-neutral
+               derived query artifacts for Kotobase`, extracted from
+               kotobase-peer, with its own conformance tests."
+  :view-building ["kotobase.projection/build-view"
+                  "kotobase.projection/build-view-delta"
+                  "kotobase.projection/compose-view-segments"
+                  "kotobase.projection/build-datom-projection"]
+  :view-reading ["kotobase.projection/range-query-plan"
+                 "kotobase.projection/batch-point-query-plan"
+                 "kotobase.projection/select-blocks"
+                 "kotobase.projection/coalesce-block-ranges"
+                 "kotobase.projection/build-bloom + bloom-might-contain?"
+                 "kotobase.projection/object-range-get"]
+  :incremental-maintenance ["kotobase.projection.datalog/maintain-query-delta"
+                            "kotobase.projection.datalog/refresh-plan"
+                            "kotobase.projection.datalog/affected-query-results"
+                            "kotobase.projection.datalog/build-frontier-work-chain"
+                            "kotobase.projection.datalog/frontier-step-plan"]
+  :fold-time-views "kotobase-peer's `view-rows` / `put-views-block!` -- views
+                    materialised at fold time, linked from chain state under
+                    `views`, merged with unfolded novelty on read so a view is
+                    always fresh."
+
+  :the-admission-predicate-is-already-written
+  "`kotobase.projection.datalog/positive-conjunctive-query?` -- no :rules, every
+   :where clause a 3-element vector, every :find a variable. And
+   `bounded-single-clause-query?` for the cheap path, whose own docstring draws
+   the line I thought needed drawing: `Multi-clause queries need an
+   arrangement/frontier loader and must not use this shortcut merely because
+   their final result is small.`
+
+   So `which query shapes can a materialised view answer` is not an open design
+   question. It is a named, machine-checkable predicate in a shipped library."}
+
+ :the-actual-gap
+ {:measured "Read the production chain head for kotobase-protocols-v2 from R2
+             (seq 972) and decoded its state node."
+  :state-keys ["indexed" "novelty-back" "novelty-count" "novelty-front"]
+  :views nil
+  :reading "There is no `views` key at all. Not an empty map -- absent. Zero
+            materialised views have ever been declared on the graph that every
+            served surface reads."
+  :classpath "protocols-worker's upstream-lock pins kotobase-projection
+              (b35b0537) and its shadow-cljs.edn puts it on the source path, so
+              the capability is COMPILED INTO the deployed bundle. No namespace
+              in the worker's own source requires it."
+  :so "The library is shipped, linked, and never invoked. The served path
+       hydrates on every request instead, at ~1,364 CPU-ms and 85 R2 GETs."}
+
+ :this-is-the-fourth-today
+ "Capability built, tested, linked, never wired -- the same shape found three
+  other times in one day: GraphSync (seven namespaces implementing
+  /ipfs/graphsync/2.0.0, required by no deployed worker), the datalake engine
+  (catalog, columnar, Parquet/Arrow readers, prefetch trampoline all landed;
+  lake.kotobase.net still NXDOMAIN), and `:query-statistics` (implemented,
+  unused for eleven days until 2026-08-13 wired it and took IC08 from 11.4x to
+  1.85x). The pattern is worth naming on its own: this workspace's binding
+  constraint is not capability, it is wiring."
+
+ :correction
+ "I wrote in the unit-economics artifact that item 1 was `make the MV path the
+  default served route`, and then described it as a design project needing a
+  decision about which queries a view can answer. Both halves were wrong in the
+  same direction -- they placed work in the future that is already in the repo.
+  The remaining work is: declare a view, call refresh-plan on write, and route
+  the read. Smaller than described, and differently shaped."
+
+ :what-is-genuinely-not-decided
+ ["WHICH views to declare for this graph -- the predicate says what is
+   admissible, not what is worth materialising. That needs the served query
+   mix, which cannot be read from outside because the query surfaces require
+   credentials."
+  "Whether maintenance runs at fold time (kotobase-peer's existing `views`
+   mechanism) or through kotobase-projection's differential path. Both exist;
+   nothing chooses."
+  "The 34 ms figure quoted for `the MV path` came from
+   kotobase-peer.materialized-view's 2026-07-21 bench -- a pre-packed 100k-row
+   view read by byte range. That is the same family as
+   kotobase.projection/range-query-plan but it is not a measurement of this
+   library on this graph, and it should not be quoted as one."]}
