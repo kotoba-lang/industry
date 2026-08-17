@@ -1741,5 +1741,80 @@
   ;; gated here, so a green :jvm-test says the decision core and HTTP surface
   ;; pass — 38 tests / 129 assertions — and says nothing about the other two.
   {:name "kenbun" :org "cloud-itonami" :gate :jvm-test :cd true}
+
+  ;; ── network-isekai ──────────────────────────────────────────────────────
+  ;;
+  ;; この repo には 2026-08-17 まで **CI が 1 本も無かった**。GitHub Actions は
+  ;; workspace の fleet-ci 移行（ADR-2607300900）で無効化され、最終 run は 2026-08-04 で
+  ;; failure、そして fleet-ci の gate matrix にも 1 行も無かった。13日間、自動では何も
+  ;; 検査されていない。その間に実際に起きたこと（すべて同日に手で測って発見）:
+  ;;
+  ;;   * `itonami/carpet-care` が本番で compile できず、**修正は 7 日前から main に在った**
+  ;;     （deploy が走っていないだけだった）
+  ;;   * `physics_test.cljc` が 36 日前から壊れていた（upstream の namespace 改名。
+  ;;     改名は同じ repo の deps.edn のコメントに記録されている）
+  ;;   * royale の 3 テストが red のまま（本 gate の対象外、下記）
+  ;;
+  ;; **この repo で :jvm-test は使えない。** deps.edn が sibling を `:local/root` で引く
+  ;; ので、ノードに配られる tree 単体では classpath が解決しない（ADR-0076 が既に
+  ;; 記録している）。同じ理由で catalog gameplay gate も載らない —— あれは実 Chrome と
+  ;; **ビルド済みの 7MB バンドル**を要求し、`public/js/` は .gitignore されているので
+  ;; 配られる tree に存在しない（実測: `git archive` した tree に public/js は無い）。
+  ;; つまりここに載るのは「tree だけで答えられる問い」に限られる。載らないものを
+  ;; 載ったふりにしない。
+  ;;
+  ;; 2026-08-17、**3 本とも実ノードで 1 度緑になった**（receipt a1f55b1c623d、
+  ;; signer did:key:z6MkhKgm9Lbc…、tip ffe4108）:
+  ;;   test-isekai-docs-edn-ffe4108-murakumo-dan               edn files: 20 unparsable: 0
+  ;;   test-isekai-generated-artifacts-ffe4108-murakumo-levi   every artifact matches its source
+  ;;   test-isekai-tests-actually-run-ffe4108-murakumo-simeon  53 file(s) with deftest all execute
+  ;;
+  ;; **それでも :cd false のままにする。** `:cd true` は「green なら west pin を自動前進」
+  ;; の意味だが、この 3 本が答えているのは「ドキュメントが読めるか」「生成物が source と
+  ;; 一致するか」「テストが実行されるか」であって、**ゲームが動くか**ではない。それを
+  ;; 訊く gate（catalog gameplay）は上記のとおりノードに載せられない。弱い証拠で pin を
+  ;; 自動で進めるのは、まさにこの repo が今日直したばかりの誤り —— 訊いていない質問に
+  ;; ついて緑が何かを言っているかのように扱うこと —— と同じ形になる。pin は引き続き
+  ;; 手で（advance-pins.cljs + verify-west-pins.cljs で）進める。
+  ;;
+  ;; 3 本とも「壊したコピーで落ちる」ことを確認済み: 生成物 gate は game.edn の改題と
+  ;; content-ratings の descriptor 変更でそれぞれ独立に STALE、tests gate は footer の
+  ;; 無いテストファイルを 1 本足して FAIL、docs gate は ADR-0081 の :adr/body に
+  ;; 未エスケープ引用符を入れて FAIL。加えて「答えられない」経路（tree の取り違え・
+  ;; 過剰な絞り込み・生成器の欠落）は exit 90/91 で、pass とも fail とも別に出る。
+
+  ;; 1) checked-in な生成物が source と一致しているか。
+  ;;    どちらも deploy に載るので request path で作り直せない。stale でも何も落ちない
+  ;;    ——card は古いゲーム名を出し続け、rating catalog は新しいゲームを知らないまま
+  ;;    enforce する。生成器は両方 `--check` を持っていたが、回す者が居なかった。
+  ;;    :include-ext に **.png が要る**（social_catalog は card.png の実在を見て
+  ;;    :image を出すか決める。.png を落とすと 42 件すべて欠落扱いになり STALE を
+  ;;    誤報する —— 実測で確認してからこの行を書いた）。
+  {:name "network-isekai" :id "isekai-generated-artifacts" :gate :nbb-script
+   :script "gates/isekai-generated-artifacts-current.cljs"
+   :include-ext [".cljs" ".cljc" ".edn" ".mjs" ".png"] :min-files 300 :cd false}
+
+  ;; 2) テストを定義して一度も実行しないファイル。
+  ;;    `clojure -M test/royale_world_streaming_test.clj` は何も出力せず exit 0 で
+  ;;    終わっていた —— footer が無いので load され、deftest は定義され、1本も走らない。
+  ;;    **合格と観測上まったく同じ。** 28 ファイル中 4 本がこの状態で、うち 1 本は
+  ;;    36 日前から壊れていた。
+  ;;
+  ;;    `--skip isekai`: test/isekai/** の sekaiju prototype suite は、repo 内の
+  ;;    どの task・どの shadow-cljs build・どの namespace からも参照されておらず
+  ;;    （実測: 参照 0 件）、かつ sibling checkout を要するのでノードでは動かせない。
+  ;;    **報告はするが fail にはしない**（出力に SKIPPED-DIR 行が必ず出る。skipped は
+  ;;    passed ではない）。恒久的に赤い gate は、一度も落ちない gate と同じだけ無内容。
+  {:name "network-isekai" :id "isekai-tests-actually-run" :gate :nbb-script
+   :script "gates/test-files-actually-run.cljs"
+   :script-args ["--sub" "test" "--min" "20" "--skip" "isekai"]
+   :include-ext [".clj" ".cljc" ".cljs"] :min-files 200 :cd false}
+
+  ;; 3) 90-docs の EDN が全部 read できるか（既存の汎用 gate を再利用）。
+  ;;    ADR は `.edn` tx-data で書く規約（ADR-2607171600）で、`:adr/body` の中の
+  ;;    未エスケープ引用符は文字列を静かに終わらせて以降の散文をデータに変える。
+  {:name "network-isekai" :id "isekai-docs-edn" :gate :nbb-script
+   :script "gates/docs-edn-check.cljs" :script-args ["--sub" "90-docs" "--min" "10"]
+   :include-ext [".edn"] :min-files 10 :cd false}
   ;; ────────────────────────────────────────────────────────────────────────
   ]}
