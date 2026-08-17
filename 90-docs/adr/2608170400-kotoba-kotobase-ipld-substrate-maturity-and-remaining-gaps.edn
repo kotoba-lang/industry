@@ -98,9 +98,12 @@ DMT は型付き表現変換、ADL は同じ Data Model interface の背後で�
 | #617 | `07c5fc75...` | runner artifact、module/input/output CID、fuel/memory を署名付き execution receipt に束縛 |
 | #618 | `538633a1...` | literal bool、identity、canonical empty bytes の closed non-identity lowering |
 | #619 | `15c362ef...` | `(= (bytes-count value) N)` を ABI input length へ lowering |
+| #620 | `6d222fc5...` | `(= (bytes-at value I) N)` を operand-length bounds trap 付き unsigned byte read へ lowering |
 
-`kotoba-sema` PR #10（merge `105309ca...`、current root pin `91eff5a...` が包含）は
-`bytes-count(bytes) -> i64` を typed pure operation として追加した。
+`kotoba-sema` PR #10（merge `105309ca...`）は `bytes-count(bytes) -> i64` を、
+PR #11（merge `d96e9341...`）は `bytes-at(bytes, i64) -> i64` を typed pure operation
+として追加した。後者の bounds は typing で決まらない run-time の事実なので、
+docstring が backend 側の義務として明記する（下記 P0-1）。
 
 実 runner では 4-byte input が canonical DAG-CBOR true、1-byte input が false。
 io-IPLD projection、署名 receipt、fuel exhaustion、timeout、forbidden import、fixed memory、
@@ -176,7 +179,38 @@ resume token、重複block抑止、malicious responder negative test が必要�
 
 ### P0 — 現在の閉じた ADL を実用変換へ広げる
 
-1. `bytes-at(bytes, i) -> i64`: bounds check、unsigned byte、out-of-range trapを固定。
+1. ~~`bytes-at(bytes, i) -> i64`~~ **closed（2026-08-17、kotoba-sema #11 + amu #620）**。
+   bounds check・unsigned byte・out-of-range trap を固定した。
+
+   **効いた設計判断は bounds の置き場所である。** linear memory は 2 page、ABI は入力を
+   offset 1024 へ copy するので、**operand を越えた index も memory の中に着地する** ——
+   load は成功し、validator は自分の入力でない byte について自信を持って答える。Wasm 自身の
+   bounds check は *memory* のものであって *operand* のものではない。したがって
+   `length <= index` の trap を load の前に明示的に emit する。unsigned load
+   （`i32.load8_u`）が 0xFF を 255 として読ませる。
+
+   **index は literal に限る。これは profile の制限であって言語の制限ではない** ——
+   `bytes-at` は任意の i64 index を型付けする。literal に閉じるのは emit した bounds check
+   を compile 時に決定可能に保つため。負 index と 0..255 外の比較は名前つきで拒否する
+   （後者は恒偽で、admit すると source の誤りを「常に no と答える validator」へ静かに
+   compile してしまう）。
+
+   **測定して分かったこと（仮定ではない）**: schema capability 経由で駆動すると ADL が
+   受け取るのは **DAG-CBOR encode 済み node** であって payload bytes ではない。3-byte 値に
+   対して byte 0 == 1 を主張する module は `adl-rejected` で落ち、67（`0x43`、length 3 の
+   CBOR byte-string header）を主張する module は署名 receipt つきで通る。
+   `validate-representation` が representation を見るのは正しいが、自明ではない。
+
+   六面の証拠: sema typing（19 tests/111 assertions）/ 専用 KIR admission
+   `[:input-byte-at-eq I N]` / wasm-tools validation / 実 Wasmtime の positive・negative
+   （true、false、index 3、out-of-range trap、empty trap、oversized allocation trap）/
+   署名 receipt（capability 経由）/ mutation test。**mutation は両方向を見せた** ——
+   guard を消した module は *Wasm としては依然 valid* で、unit assertion が捕らえ、harness は
+   1-byte 入力の index 3 でちょうど落ちる（trap しなくなる）。
+
+   ⚠ `clojure -M:test`（amu 全体）はこのマシンでは `cli-test` の
+   `wasm-tools version is not pinned` で exit 70 する。**無改変の origin/main が同じ test で
+   同じ exit をすることを別 worktree で確認済み** —— 本 slice の regression ではない。
 2. `bytes-slice(bytes, start, end) -> bytes`: `0 <= start <= end <= len`、overlap/alias規則、
    max-output bound を lowering と runner の両方で強制。
 3. `bytes-concat(a,b) -> bytes`: overflow、allocation、fuelを入力長に比例させる。
@@ -259,13 +293,16 @@ signed receipt、壊した実装が落ちる mutation test の六面。
 
 ## 8. 着地と再開点
 
-本 ADR 時点の root pin は `amu 15c362ef96b5...`、`kotoba-sema 91eff5a970e2...`。
-genpon は root PR #2366（merge `e7003be1...`）で reconcile され、default branch の
-`kagami reconcile --check` は clean だった。
+root pin は `amu 6d222fc583f4...`（west commit `dad868e4...`）、
+`kotoba-sema d96e9341ac0a...`（west commit `62972fe6...`）。genpon は ledger event
+11458/11459 で reconcile 済みで、`kagami reconcile --check` は clean。
 
-次の最小縦切りは **P0-1 `bytes-at`**。validator
-`(= (bytes-at value 0) N)` を typed source→専用KIR→import-free Wasm→実 Wasmtime→署名receipt
-まで通し、空入力/out-of-range/負index/large input をfail-closedで落とす。その後に slice/concat。
+**P0-1 `bytes-at` は 2026-08-17 に着地した。** 次の最小縦切りは **P0-2 `bytes-slice`**。
+`(bytes-slice value start end)` を `0 <= start <= end <= len` の bounds、overlap/alias 規則、
+max-output bound とともに lowering と runner の両方で強制する。P0-1 で分かったことを持ち込む:
+**bounds は operand のものであって memory のものではない**（slice は結果長も operand から
+導かれるので、この誤りは length にも波及する）。**index/長さを literal に閉じるかは profile の
+判断であって言語の判断ではない。** capability 経由の operand は DAG-CBOR encode 済みである。
 
 **この ADR は現状を100%と宣言しない。100%へ進むため、何が correctness、何が代替transport、
 何がextension、何がoptimizationかを固定する正本である。**"}]
