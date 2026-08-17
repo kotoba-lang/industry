@@ -149,12 +149,65 @@ role 面の repo で、prefix は `hakken` / `tehai` / `meisai` / `kago` と同�
   一致することを確認してから戻した（CLAUDE.md ADR-2608136000 の「壊し方を間違えた赤は
   成功した実演に見える」への対応）
 
+## 永続 store（2026-08-17 追加。`kenbun.store.kotobase`）
+
+kotobase の datom 面に載る `IssueStore` を実装した。`src` ではなく **`src-kotobase`**
+に置き `:kotobase` alias で opt-in——`mem-store` で足りる利用者に datom 面を
+引かせないため。finding / issue / proposal / review / audit は**全部 1 ref**
+（`open` は `:ref-name` を 1 つしか取らない。分けると『どの報告者の finding が
+merge された修正になったか』が query で辿れない）。代償は全書き込みが 1 ref に
+直列化すること。
+
+**「契約は 4 関数だから薄いはず」は外れた。** 実測（`kotobase.storage.memory` に対して。
+仮定していない）で、素朴に書くと壊れる面の性質が 3 つ出た:
+
+1. **`transact!` は上書きせず蓄積する。** `status` を 2 回書くと両方残り `q` は set を
+   返すので、:proposed→:approved→:merged と動いた proposal は**任意の 1 つ**として
+   読み戻る。merge 済みが未レビューに見える。対策は既存値を**名指しで retract してから
+   assert**（同一 tx 内）。`[:db/retract s p nil]` のワイルドカードは**効かない**ことも実測
+2. **`Date` が `pr-str` ではなく `str` で文字列化される。** `\"Thu Jan 01 09:00:00 JST 1970\"`
+   になり読み戻せない。`kotoba.issue.gate` の audit レコードは**全部** Date を持つ。
+   対策は値を一律 `pr-str` / `edn/read-string`（`#inst` が読める）
+3. **`nil` が `\"\"` になり**、本物の空文字列と区別できない。一律エンコードで解消
+
+一律エンコードの実費: 外部 Datalog query は `\":critical\"` とエンコード後の形で当てる
+必要がある。ただし**見える**代償（query が何も返さない）であって、型ごとに使い分けた
+ときの**黙った誤読**ではない。`entity-from-triples` は 1 predicate に複数値が在ったとき
+**1 つを選ばず throw する**——ここで推測すると防いでいるバグを自分で作り直す。
+
+### 途中で見つけて塞いだ 2 つの穴（どちらも同じ形）
+
+**走らなかった検査が、走って通った検査と同じ green を報告する**——この repo の主題
+そのものが自分の harness に出た:
+
+- `cognitect.test-runner` の既定ディレクトリは `test` **1 つだけ**。`:extra-paths` に
+  `test-kotobase` を足しても **classpath に載るだけで 1 本も走らず**、base suite の
+  20 tests green が adapter を覆っているように見えた。`-d` を 2 つ明示して解消
+- `:lint` が `src test` しか名指ししておらず、adapter を開かずに clean を報告していた。
+  4 つの source root すべてを名指しして解消
+
+### 検証（追加分）
+
+- **30 tests / 108 assertions / 0 failures**、clj-kondo 0 warnings（4 root すべて）
+- `intake-behaves-identically-on-both-stores` が同一シナリオを `mem-store` と
+  kotobase の**両方**に流し、adapter が真の代替物であることを示す
+- **retract-then-assert を外すと 4 error**、全部「複数値なので 1 つを選ぶのを拒否する」
+  分岐。壊したものと報告されたものが一致することを確認して戻した
+
+### この adapter にまだ無いもの
+
+- **ClojureScript / Worker 経路。** `kotobase.core` は cljs では **Promise を返す**が
+  `IssueStore` は同期 protocol なので **JVM 専用**。Worker には非同期の issue-store
+  契約が要り、それは**ここにも上流にも無い**。実在する gap であって見落としではない
+- **durable provider での実測。** adapter は provider 非依存だが検証は
+  `storage.memory` に対してのみ。sqlite / s3 / postgres では測っていない——
+  **測っていないものを『動く』と書かない**
+
 ## まだ無いもの（正直に）
 
-- **appview / HTTP 面が無い。** いまは決定ランタイムだけで、deploy されていない。
-  足すときは `kotobase-protocol-issues` の `/issues/*`（`git.kotobase.net`）に載せる
-- **永続 store adapter が無い。** `store/mem-store` のみ。契約は 4 関数なので
-  kotobase adapter は薄いはず、だが**書いていないものを薄いと断定はしない**
+- **appview / HTTP 面が無い。** いまは決定ランタイム + store adapter だけで、
+  deploy されていない。足すときは `kotobase-protocol-issues` の `/issues/*`
+  （`git.kotobase.net`）に載せる
 - **credit の決済面が無い**（意図的。上記）
 - **fleet gate に載せていない。** `scripts/fleet-ci/gates.edn` への登録は未実施。
   CLAUDE.md「gate は fleet で 1 度緑になるまで landed としない」に従い、ここでは
