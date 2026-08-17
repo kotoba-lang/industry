@@ -1,0 +1,128 @@
+[{:db/id -1
+  :adr/id "ADR-2608171200"
+  :adr/title "ローカル disk として現れる面は NFSv3 を正経路にする — SMB / FUSE / File Provider は測った上で降ろす"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :adr/last-verified "2026-08-17"
+  :adr/last_verified "2026-08-17"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "filesystem-surfaces"
+  :adr/related ["ADR-2608170057" "ADR-2607172210"]
+  :adr/body
+  "# 文脈
+
+`cloud-itonami-app` の Drive は Google Drive / Dropbox のような **ボリュームとして
+Finder に現れない**。あるのは ADR-0027 の `folder_sync`（普通のディレクトリの双方向
+同期、初代 Dropbox 型）だけで、File Provider extension・FUSE・NFS・SMB のいずれも
+実装が無いことを 2026-08-17 に確認した（`cloud-itonami-app` 全体検索でヒット 0、
+west 4,191 project にも該当 repo 無し）。
+
+`kotoba-lang/org-ietf-webdav` は在るが app は依存していない。
+
+# 測ったこと（macOS 26.4、2026-08-17）
+
+判断は「どれが綺麗か」ではなく **この OS が今どれを許すか**で決めた。
+
+| | NFSv3 | SMB2/3 | FUSE | File Provider |
+|---|---|---|---|---|
+| クライアントが OS に同梱 | `/sbin/mount_nfs` あり | `/sbin/mount_smbfs` あり | **macFUSE 未インストール**、libfuse 無し | API としては有り |
+| **root なしで mount できる** | **できた（実測）** | 未測定 | system extension が要る | — |
+| 非特権ポートで完結 | `port=` `mountport=` を受ける。`-P` は予約ポートを*使う*側のフラグ | URL にポートは書けるが既定 445 | — | — |
+| コード署名 | 不要 | 不要 | system extension の署名 | **必須**（Swift の app extension + entitlement） |
+| 純プロトコルで書けるか | **書ける**（TCP 上の XDR/ONC RPC） | 書けるが桁違いに大きい（NEGOTIATE / NTLMSSP / TREE_CONNECT / QUERY_DIRECTORY …） | **不可**（`/dev/*` への device I/O。JVM からは FFM 経由になる） | **不可**（Swift） |
+
+実測ログ:
+
+    $ mount_nfs -o vers=3,tcp,port=12049,mountport=12049,nolocks,soft \\
+        127.0.0.1:/kotoba /tmp/nfs-mnt
+    $ mount | grep nfs-mnt
+    127.0.0.1:/kotoba on /private/tmp/nfs-mnt (nfs, nodev, nosuid, mounted by junkawasaki)
+
+`mounted by junkawasaki` — **sudo 不要**。Finder は `kotoba` という名前のボリューム
+として表示した。読み・書き・mkdir・cp・mv・rm が全て OS 経由で通った。
+
+**効かなかった経路も測った**: `nfs://127.0.0.1:PORT/kotoba` を Finder の
+Connect to Server / AppleScript `mount volume` に渡すと NetFS エラー −5014 で失敗し、
+URL のポートに listener を置いて確かめたところ **1 byte も接続して来ない**。
+`com.apple.rpcbind` は LaunchDaemon として存在するが `state = not running`。
+つまり URL 経路は portmapper（program 100000、port 111 = 要 root）を前提にしている。
+コマンドライン mount はポートを明示するので portmapper を必要としない。
+
+# 決定
+
+1. **ローカル disk として現れる正経路は NFSv3 とする。** 実装は
+   `kotoba-lang/org-ietf-nfs`（NFSv3 + MOUNT v3）、その下に
+   `kotoba-lang/org-ietf-oncrpc`（RFC 5531 の封筒と record marking）、
+   さらに下に `kotoba-lang/org-ietf-xdr`（RFC 4506）。すべて portable `.cljc`。
+2. **filesystem は注入する。** `nfs.v3/IFilesystem` が唯一の seam
+   （root / attrs / lookup / readdir / read / write / create / mkdir / remove /
+   rmdir / rename / setattr / fsstat）。Drive も普通のディレクトリもテスト用の
+   double も NFS から見れば同じ。`org-ietf-webdav` が HTTP に対して取っている
+   「純関数 + 注入された store、transport は deploy shell」と同じ配置。
+3. **transport は `.clj` 一枚に隔離する。** `nfs.tcp` は socket と thread を持つ
+   だけで、判断は 1 つも持たない。これは gap ではなく境界
+   （`multiformats.core/cid-of-file` と同じ線）。
+4. **portmapper は実装しない。** port 111 の bind は root を要し、この設計全体が
+   避けようとしているものがそれ。ポートを明示する client は portmapper に訊かない。
+5. **SMB2/3・FUSE・File Provider は「設計はする、今は実装しない」と明言する。**
+   それぞれ repo を作り、README に**何が塞いでいるか**を測定値で書く。空の repo に
+   実装済みの顔をさせない。
+
+# 実装して測ったこと
+
+`org-ietf-xdr` 11 tests / 44 assertions、`org-ietf-oncrpc` 11 / 29、
+`org-ietf-nfs` 3 / 41（実 socket 越しに自作クライアントで MOUNT → FSINFO →
+READDIR → LOOKUP → READ → CREATE → WRITE → READ を通す）。
+
+**実クライアントに教わった 2 つ**（どちらもテストからは出てこなかった）:
+
+- **macOS は READDIR(16) ではなく READDIRPLUS(17) で一覧する。** 16 だけ実装した
+  サーバは mount には成功し、`ls` が `Bad procedure for program` で落ちる。
+- **未実装の手続きは「表から消す」のではなく `NFS3ERR_NOTSUPP` を返す。** 表に無い
+  番号は RPC `PROC_UNAVAIL` になり、filesystem client はそこから回復しない。
+  READLINK / SYMLINK / MKNOD / LINK は答える。
+
+# 残りの 3 面 — 塞いでいるもの
+
+## com-microsoft-smb2
+
+純プロトコルで書ける点は NFS と同じで、規模が違う。mount までに NEGOTIATE →
+SESSION_SETUP(NTLMSSP) → TREE_CONNECT → CREATE → QUERY_DIRECTORY → READ /
+WRITE / CLOSE / QUERY_INFO / SET_INFO が要り、macOS の client は署名を要求する。
+**NFS が動いている限り、これは代替ではなく追加**であり、着手の条件は「NFS では
+届かない要件」（Windows からのマウント、Finder の Connect to Server での URL 接続）
+が実際に出てきたとき。
+
+## org-kernel-fuse
+
+**macFUSE が未インストール**（`/Library/Filesystems/macfuse.fs` 無し、libfuse 無し）。
+FUSE は TCP のプロトコルではなく `/dev/macfuse*` への device I/O なので、
+純 `.cljc` では届かない。JVM からは Panama FFM（`java.lang.foreign`）で JNI を
+書かずに到達できる可能性があるが、**ユーザに third-party の system extension を
+入れさせる**点が NFS に対する明確な後退。Linux ホストで動かす必要が出たときに再評価する。
+
+## com-apple-fileprovider
+
+Google Drive / Dropbox が今まさに使っている方式で、**オンラインのみファイル・
+サイドバー常駐・同期バッジ**という UX はこれでしか出ない。ただし Swift/ObjC の
+app extension を署名済み app に同梱する必要があり、`.cljc` では書けない。
+ワークスペースの「新規ネイティブを書かない」規則（ADR-2607072000）と正面から
+当たるので、**採るなら例外を明文化した ADR が先**。Apple 署名基盤自体は既にある
+（skill `secrets-location-map` の mobile-publishing）。
+
+# 帰結
+
+- Drive を「Finder の disk」として出す道が、third-party 導入・署名・root の
+  いずれも無しで通った。
+- NFS には**認証が無い**（AUTH_SYS は uid の自己申告）。loopback に bind し、
+  export を 1 つに絞ることが唯一の境界であり、これは設計であって手抜きではない
+  — が、**LAN に晒した瞬間に無防備**になる。bind アドレスを設定可能にしない。
+- `nfs://` URL が使えないので、初回マウントはコマンドか、アプリが実行する
+  `mount_nfs` になる。Finder のサイドバーに常駐させたい場合、mount point を
+  `/Volumes` 下に置くには root が要る（`/Volumes` は root 所有）。
+- NLM（ロック）は実装していないので `nolocks` でマウントする。複数クライアントが
+  同じファイルを同時に書く前提には**まだ立てない**。"}]

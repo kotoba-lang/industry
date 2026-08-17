@@ -142,6 +142,12 @@
   ;; "does `ipfs add` still agree with us" and not "do we agree with
   ;; ourselves" -- the distinction the codec it replaced could not make.
   {:name "tech-ipfs-specs-unixfs" :gate :jvm-test :cd true}
+  ;; The filesystem-surface stack (ADR-2608171200). org-ietf-nfs's suite
+  ;; starts a real listener and drives it over a socket, so this gate covers
+  ;; the three layers composing and not just each codec in isolation.
+  {:name "org-ietf-xdr" :gate :jvm-test :cd true}
+  {:name "org-ietf-oncrpc" :gate :jvm-test :cd true}
+  {:name "org-ietf-nfs" :gate :jvm-test :cd true}
   ;; The physical plane (ADR-2608160100): CARv2 bytes, the storage contract
   ;; that describes where a block lives, and the packed block store over it.
   ;; :jvm-test covers each repo's synchronous suite. What it does NOT cover is
