@@ -228,6 +228,11 @@
   ;; There was never a blocker. Both repos were converted (e17e5ea544fb,
   ;; 3870223cbf89) and each verified from a worktree with no sibling
   ;; directory in existence before being listed here.
+  ;; keihi 経費精算 (2026-08-17). Consumes governor + taxlaw and reads
+  ;; 消費税法 第三十条第七項 for itself -- the article makes disallowance the
+  ;; DEFAULT when 帳簿及び請求書等 are not preserved, so an unrecorded
+  ;; preservation state refuses rather than sitting in :not-declared.
+  {:name "keihi" :gate :jvm-test :cd true}
   {:name "kintai" :gate :jvm-test :cd true}
   {:name "tehai" :gate :jvm-test :cd true}
   {:name "org-ietf-deflate" :gate :jvm-test :cd true}
