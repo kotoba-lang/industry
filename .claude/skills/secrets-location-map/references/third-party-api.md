@@ -1,5 +1,54 @@
 # 外部 API（生成モデル・RealtimeKit・Telnyx）
 
+## ⚠ Telnyx の口座は 2 つある。鍵を取り違えない（2026-08-17）
+
+| item | 口座 | 中身 |
+|---|---|---|
+| `telnyx-api-key` | **Gftd Japan株式会社** | 本番稼働中の US 番号 `+1 949 741 7223` を 1 本持つ |
+| `telnyx-api-key-awai` | **AWAI Network, L.L.C.** | 2026-08-17 開設。番号 0 本 / 残高 $0.00 |
+
+**見分け方は `GET /v2/phone_numbers` の件数**（実測: 旧 1 件 / 新 0 件）。どちらのキーも
+HTTP 200 を返すので、認証が通ったことは口座の同定にならない。
+
+`.mcp.json` の `telnyx` サーバは **`telnyx-api-key`（旧・Gftd Japan）** を読む。番号購入・
+発信ができる鍵なので、向き先を変えるときは番号がどちらに付いているかを先に確認する。
+
+### AWAI 口座の付随 secret
+
+- **`telnyx-agent-inbox-key`**（kagi compartment `personal` / Keychain 同名）—
+  Telnyx Agent Inbox `bot-telnyx-432cf07cce8c433dba3a94f8d90357bf@agentmail.to`
+  （`account_id` = `inbox_432cf07c-ce8c-433d-ba3a-94f8d90357bf`）の `account_key`。
+  **一度しか返らず、失うと受信箱ごと復旧できない。** サインイン用メールはここに届くので、
+  口座のパスワードリセット経路そのもの。
+- なぜ Agent Inbox を使ったか: **Telnyx は `j@awai.network` を拒否する**。原因は先方の
+  ブロックリストが `.work$` という**ドット未エスケープの正規表現**で、`.` が任意の 1 文字に
+  一致するため `awai.net**work**` を巻き込んでいる（`\.work$` が意図された形）。
+  実測 2026-08-17、`.network` ドメインは 1 つも登録できない。Telnyx へ報告済み
+  （Request ID `a64cc757-97a9-9dee-8e1a-8411379cf93d`）。修正されたら口座メールを
+  `j@awai.network` へ移し、この受信箱への依存を切る。
+- 取得スクリプト: `scripts/telnyx-agent-signup.cljs`（Agent Inbox の未文書 API 形と、
+  受理された proof-of-work 構成 `sha256(challenge + ":" + nonce)` を記録してある）。
+
+#### この受信箱の読み方（web UI は無い。API 専用・読み取り専用）
+
+```bash
+nbb scripts/telnyx-agent-signup.cljs inbox-list
+nbb scripts/telnyx-agent-signup.cljs inbox-read '<message-id>'   # 角括弧ごと渡す
+```
+
+素で叩くなら 2 本だけ（実測 2026-08-17、これ以外は 404）:
+
+```
+GET https://agent-inbox.telnyx.com/v2/agent_inboxes/<account_id>/messages
+GET https://agent-inbox.telnyx.com/v2/agent_inboxes/<account_id>/messages/<message_id>
+Authorization: Bearer <account_key>
+```
+
+⚠ **送信・返信はできない。** `POST /messages`・`/threads`・受信箱メタデータは全て 404。
+Telnyx から届くものを読むだけの箱で、この口座から人に返信する経路は無い。
+`agentmail.to` に web UI は存在するが、この箱は Telnyx 経由で作られており
+こちらは AgentMail 側の資格情報を持たないので、そこからは入れない。
+
 ## Telnyx API キー — kagi が正本、Keychain はキャッシュ（2026-08-15）
 
 - **正本 = kagi item `telnyx-api-key`（compartment `personal`）。**
