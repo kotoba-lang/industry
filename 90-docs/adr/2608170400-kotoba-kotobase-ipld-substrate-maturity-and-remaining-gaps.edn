@@ -444,7 +444,28 @@ signed receipt、壊した実装が落ちる mutation test の六面。
    **両方の決定に復帰条件を持たせ、test がそれを要求する** —— 復帰条件の無い決定は
    時間が経つと「手を付け忘れ」に退化する。表は実行され、implemented は round-trip し、
    not-adopted は拒否されねばならない。
-5. ADL registration/name collision、unknown ADL、nondeterministic transform の negative corpus。
+5. ~~ADL registration/name collision、unknown ADL、nondeterministic transform の negative corpus~~
+   **closed（2026-08-17、io-ipld #27）**。
+
+   ADL は representation と「CID が決定するはずの logical value」の間に立つ**未信頼の
+   guest code** である。5 例のうち **4 例は既に名指しで拒否されていた**: 未供給の ADL /
+   別名で供給された ADL（部分的な答えではなく答えでない）/ 重複宣言 /
+   determinism 検査 ON での非決定的 transform。
+
+   **5 例目だけが違った。** `:check-adl-determinism?` は opt-in（全 operation の 2 回実行を
+   要するため）で、**OFF だと非決定的 ADL が静かに受理される**。結果として caller から見て
+   **「検査していない」と「検査して問題なかった」が同じ**になる —— P1-1 の
+   「非 canonical が綺麗に decode される」と同型で、**何かが壊れているのではなく、
+   誰にも分からないことが壊れている。**
+
+   既定を ON にすれば全 caller に 2 倍実行を課すので、代わりに**結果がどちらの run かを
+   言う**ようにした: `:adl-determinism-checked?` を `representation->logical!` /
+   `logical->representation!` / `unify!` の結果に追加し、corpus が両方向を固定する。
+
+   ⚠ **この変更の最初の mutation は通ってしまい、その理由が重要である** ——
+   `representation->logical!` が**返さない** 2 箇所を編集していたので、検査は
+   「走って一致した」のではなく**走れなかった**。関数が実際に返す箇所を mutate すると
+   落ちる。**緑の mutation は証拠ではなく、mutation が着弾したかという問いである。**
 
 ### P2 — retrieval interoperability
 
@@ -516,7 +537,8 @@ root pin は `amu c38f79d2c1af...`（west commit `1069d90b...`）、
 
 **P0 は 5 項目すべてが 2026-08-17 に着地した**（P0-1 `bytes-at` / P0-2 `bytes-slice` /
 P0-3 `bytes-concat` / P0-4 closed expression grammar / P0-5 canonical codec refusal）。
-次は **P1 の残り**（P1-3 / P1-5）。**P1-1 / P1-2 / P1-4 は 2026-08-17 に着地した。**
+次は **P1-3**（DMT/lens roundtrip・union ambiguity・recursive budget の property test）。
+**P1-1 / P1-2 / P1-4 / P1-5 は 2026-08-17 に着地した。**
 
 P0 全体を通して確定した、P1 に持ち込むべきこと:
 
@@ -534,10 +556,14 @@ P0 全体を通して確定した、P1 に持ち込むべきこと:
 - **corpus / 表には必ず『空にならない』guard を付ける。** negative を失った corpus は
   何も検査せずに緑になる。P1-1 は invalid 行数の下限を、P1-2 は unsupported 列が空でない
   ことを、P1-4 は not-adopted 行が理由と復帰条件を持つことを test で固定した。
-- **P1-4 で分かった 3 つ目の形: 「実装が既に正しく、記録だけが無い」gap がある。**
-  `&` / `~` は既に fail-closed だったので書くコードは無く、必要だったのは決定の記録と
-  その pin だけだった。**gap = 未実装、と決めてかからない** —— P1-3 / P1-5 でも
-  まず測ること。
+- **gap には少なくとも 4 つの形がある**（今日 1 日で全部出た）:
+  ①未実装（P0-1..4）②実装が間違っている（P1-1 の非 canonical 受理）
+  ③**実装は正しく記録だけが無い**（P1-4 の selector 決定）
+  ④**検査が opt-in で、未検査と合格が区別できない**（P1-5 の determinism、
+  G1 の buffered path も同型）。**「gap = 未実装」と決めてかからない。**
+- ⚠ **緑の mutation は証拠ではない。** P1-5 で最初の mutation が通り、理由は
+  「対象関数が返さない箇所を編集していた」＝**走れなかった**からだった。
+  mutation が緑なら、まず**着弾したか**を疑うこと。
 - **mutation は両方向必要で、方向は項目ごとに違う。** P0-1..4 は「正しい出力を壊す」、
   P0-5 は「壊れた出力を通す」だった。**assertion が「何かが起きた」ではなく
   「誰が/何が起きた」を見ているかを確かめること** —— P0-5 の harness は検査を消しても
