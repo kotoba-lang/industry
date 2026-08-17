@@ -121,9 +121,23 @@
  ;;                     prints no `Ran N tests` line at all (the gate's own
  ;;                     floor, exit 93, would reject it). Both halves are real
  ;;                     coverage; dropping either loses tests.
- ;;   io-multiformats, org-ietf-cbor
- ;;                     their cljs half is `shadow-cljs compile` -- a JVM
- ;;                     build. No nbb entry exists yet.
+ ;;   org-ietf-cbor     its cljs half is `shadow-cljs compile` -- a JVM build.
+ ;;                     No nbb entry exists yet.
+ ;;   io-multiformats   an nbb entry EXISTS now (`test/run.cljs`, added
+ ;;                     2026-08-17), and counts are identical: 35 tests / 133
+ ;;                     assertions on both. It still must NOT be flipped.
+ ;;                     Admission 2 fails in a way the rule did not anticipate:
+ ;;                     the repo has one defect per host, so neither runtime
+ ;;                     alone discriminates. Measured that day --
+ ;;                       reverting `core/varint` to shifts  -> 3 red on CLJS, 0 on JVM
+ ;;                       removing read-varint's mult cap    -> 2 red on JVM,  0 on CLJS
+ ;;                     Flipping to :nbb-test would trade the JVM's half for
+ ;;                     the cljs half, not gain coverage.
+ ;;                     **What this needs is two gates for one repo**, which
+ ;;                     this file has no shape for: entries are keyed by
+ ;;                     :name and the status context is derived from it, so a
+ ;;                     second entry would collide rather than add. Recorded
+ ;;                     here as the blocker; see ADR-2608170800.
  ;;   chain, io-ipld, io-ipld-car, nekko, org-apache-avro, kotobase-lake,
  ;;   tech-ipfs-specs-ipns, sakkyokuka
  ;;                     zero .clj files, but their test path needs sibling
