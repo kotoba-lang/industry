@@ -142,7 +142,25 @@ ClojureScript の double は overflow しないので意図したエラーを報
 `:jvm-test` として登録した（judah で intact 32 tests/93 assertions exit 0、
 長さ比較を外すと exit 1 で `constant-time-eq-semantics` を名指し）。
 
-**覆えていないのは cljs 半分** —— `verify-cljs.cljs` は `ok <check>` を印字する
-形式で clojure.test の summary を出さないので、共有 gate
-（`Ran N tests` を要求し 0 件を失敗にする）が消費できない。そこを clojure.test に
-寄せれば `io-multiformats` と同じく 2 本目の entry を取れる。"}]
+**cljs 半分も gate に載せた**（`b94d2c8`）。`verify-cljs.cljs` は `ok <check>` を
+印字する形式で clojure.test の summary を出さず、共有 gate は
+**summary が無ければ pass と報告することを拒否する**ので消費できなかった。
+その拒否は正しい —— 0 件走って何も印字しない harness は、きれいに通った run と
+区別が付かない。だから選択肢は「正直にその形式を話す」か「gate されない」かで、
+**形式だけ真似る**は最初から選択肢に無かった。
+
+全 assertion を保ったまま `run-tests.cljs`（async deftest 7 本 + 可搬な
+`sigv4.core-test` = 17 tests / 50 assertions）へ移植し、**旧 script は残さず削除した**
+—— 1 つの parity check に入口が 2 つあると、どちらかが黙って一致しなくなる
+（この 2 日間ずっと直してきた形そのもの）。
+
+**JVM 側が何を見られないか**（cljs の HMAC 鍵を 1 文字壊して実測）:
+
+| | 結果 |
+|---|---|
+| `nbb run-tests.cljs` | **7 failures** —— AWS 参照署名 2 本・検証経路・合成署名器 |
+| `clojure -M:test` | 32 tests / 93 assertions、**0 failures** |
+
+judah で両方向確認済み（intact `OK: 17 tests` exit 0 / 同じ 1 文字破壊で
+`FAIL: 17 tests, 7 failures` exit 1）。なお **src は 1 行も変えていない**ので、
+`protocols-worker/upstream-lock.json` の sigv4 pin は前進させていない。"}]
