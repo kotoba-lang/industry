@@ -1204,7 +1204,26 @@
   ;; :include-ext を付けないのは full tarball が 3.2MB だから（max-ship 200MB）。
   ;; ノードは bb / node / python3 / git を要求する（gate が不在なら 91 で fail —
   ;; 「道具が無い」は合格ではない）。実測 pass: judah / asher / levi。
-  {:name "net-kotobase" :gate :nbb-script
+  ;;
+  ;; ⚠ **`:name` は 2026-08-17 に "net-kotobase" から "control-plane" へ直した。**
+  ;; この repo は west 上で `network-awai/net-kotobase` → `net-kotobase/control-plane`
+  ;; へ org 移管 + 改名されており（west.yml は 2026-08-10 に前者、現在は後者）、
+  ;; **`:name` は west の project 名でなければ org が引けない**
+  ;; （`org-of` は `[:projects <name> :remote]` を見る）。project 名が消えた結果
+  ;; org が nil になり、org-repo が `"/net-kotobase"` という実在しない文字列になって
+  ;; tip が解決せず、この repo の 3 gate は **2026-08-12T08:46Z 以降 1 度も
+  ;; 起動していなかった**。実測（`tick.cljs --plan --only net-kotobase`）:
+  ;;   WARN no tip resolved (skipped): net-kotobase /net-kotobase   ×3
+  ;;   tick: 3 covered, 3 tip + 0 PR head, 0 to verify
+  ;; その 5 日間に fleet-ci.edn へ 1,900 超の receipt が着地したが、
+  ;; **net-kotobase の行は 1 本も無い** —— 赤でも緑でもなく、不在。
+  ;; **「入力が無い gate は問いを立てられていない」の一段手前の形**で、
+  ;; gate すら選ばれていない。gate.edn の `:name` は repo 名ではなく
+  ;; **west project 名**である、という不変条件を改名が黙って破った。
+  ;;
+  ;; :id を明示するのは、この repo に gate が 4 本になったため（gate-id 既定の
+  ;; `:name` に頼ると "control-plane" という、どの gate か分からない識別子になる）。
+  {:name "control-plane" :id "net-kotobase-hermetic" :gate :nbb-script
    :script "gates/net-kotobase-hermetic-check.cljs"
    :script-args ["--min-surfaces" "8" "--min-syntax" "20"] :cd true}
 
@@ -1228,7 +1247,8 @@
   ;;   到達不可な base → exit 92。
   ;;
   ;; tree を一切読まないので :include-ext で最小限だけ運ぶ。
-  {:name "net-kotobase" :id "net-kotobase-live-planes" :gate :nbb-script
+  ;; :name は west project 名（上の hermetic entry の注記と同じ理由で 2026-08-17 に修正）。
+  {:name "control-plane" :id "net-kotobase-live-planes" :gate :nbb-script
    :script "gates/net-kotobase-live-planes.cljs"
    :include-ext [".md"] :cd false}
 
@@ -1266,8 +1286,49 @@
   ;; 全部 stub に差し替えた PATH** で実測。stub は一度も呼ばれなかった）:
   ;;   一致する tree → exit 0 / source を 1 行動かす → exit 1（両 digest を提示）/
   ;;   verifier 不在 → exit 90。
-  {:name "net-kotobase" :id "net-kotobase-bundle-freshness" :gate :nbb-script
+  ;; :name は west project 名（上の hermetic entry の注記と同じ理由で 2026-08-17 に修正）。
+  {:name "control-plane" :id "net-kotobase-bundle-freshness" :gate :nbb-script
    :script "gates/net-kotobase-bundle-freshness.cljs" :cd false}
+
+  ;; protocols-worker（kotobase.net の protocol 面）の upstream lock 契約。
+  ;;
+  ;; **この repo の 120 tests は fleet では回せない。** 実測 2026-08-17（ADR-2608170200）:
+  ;; suite は `shadow-cljs compile test && node out/node-tests.js` で、`shadow-cljs.edn` が
+  ;; `../../../kotoba-lang/<repo>/src` を **26 本**参照する。これは west の兄弟 project で
+  ;; repo の外に在り、`git ls-files | grep -c kotoba-lang/` = **0**。fleet が配るのは
+  ;; 対象 repo の tree だけで、運ぶ機構も無い（`ship-git-deps!` は deps.edn の `:git/sha`
+  ;; だけを運び、protocols-worker に deps.edn は無い＝ `:jvm-test` も使えない）。
+  ;; さらに shadow-cljs = JVM なので、仮に運べてもオーナー指示（2026-08-11
+  ;; 「java に依存しないようにしてほしい」）に当たる —— 上の bundle-freshness が
+  ;; まさにその指示で `npm ci && npm test` から sha256 比較へ置き換えられた entry である。
+  ;; **suite の gate は landing しない**（`root-permit-index` を 298 receipt 赤にした
+  ;; 「入力が無い gate」を作り直すことになるため）。
+  ;;
+  ;; 代わりに、ノードで**実際に答えられる**狭い問いを 1 つ取る: lock が自分の checker を
+  ;; まだ満たすか。checker（`scripts/upstream-lock.mjs`）は node builtin だけで動き、
+  ;; `upstream-lock.json` と `shadow-cljs.edn` を自分の隣から読む —— npm ci 不要・
+  ;; JVM 不要・egress 不要・兄弟 checkout 不要。実在した failure mode でもある
+  ;; （shadow-cljs.edn 自身のコメントが `kotobase-block-codec` と `datalog` の
+  ;; 追随漏れでビルドが落ちたことを 2 度記録している）。
+  ;;
+  ;; `--self-test` も回す: `--check` だけだと `lockFailures` が `return []` に潰れた
+  ;; 瞬間に緑になる（実測: 潰した checker は `OK (26 exact revisions)` と言って exit 0）。
+  ;;
+  ;; :include-ext を付けない = full tarball（5.5MB、max-ship 200MB）。同じ sha の
+  ;; 他 3 gate と `full-tarball!` のキャッシュを共有するので追加転送は 0。絞ると
+  ;; `gh-workflow-assoc-gapki`（filter が src/ を落として fleet だけ赤）の罠に入る。
+  ;;
+  ;; 落ちること／通ることの両方を確認済み（2026-08-17、**実ノード simeon / Node 22 で
+  ;; `npx --yes nbb <gate> <dir>`**、fleet と同じ配送・同じ起動形）:
+  ;;   無改変                          → exit 0（SCANNED 26）simeon + judah
+  ;;   source-path 追加 / lock 未更新  → exit 1（drift として `brand-new-dep` を名指し）
+  ;;   revision を 8 hex に切る        → exit 1（`arrangement` を名指し）
+  ;;   lockFailures を `return []`     → exit 1（self-test が捕まえる。--check は緑のまま）
+  ;;   upstream-lock.json を配らない   → exit **90**（= 答えられなかった。0 でも 1 でもない）
+  ;;   lock も source-path も空        → exit **90**（checker は `OK (0 …)` で緑。floor が拒否）
+  {:name "control-plane" :id "protocols-upstream-lock" :gate :nbb-script
+   :script "gates/protocols-upstream-lock-check.cljs"
+   :script-args ["--min-repos" "20"] :cd false}
 
   ;; network-awai/cloud-itonami の公開サイト面（`{org}.itonami.cloud/{repo}`、
   ;; ADR-2607301300 → ADR-2608057000）。
