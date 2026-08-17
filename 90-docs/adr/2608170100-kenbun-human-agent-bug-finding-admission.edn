@@ -249,11 +249,89 @@ credit を水増しでき、しかも `:needs-second-repro` を自力で抜け�
 - ついでに**常に通る空検査を 1 件見つけて直した**: 新しく作った store に対して
   「空か」を訊いていた（答えが 1 つしかない問い）
 
+## Deploy（2026-08-17。live）
+
+**https://kenbun.04-feasts-minded.workers.dev** — Cloudflare Worker。
+**Durable Object 1 個を直列化器、D1 を storage** に使う。build は `worker/`
+（shadow-cljs `:esm`、resource-guard 経由）。
+
+### なぜ DO + D1 か
+
+read-modify-write は 2 リクエストが交差すると**黙って**更新を落とす(両方 201 を返し
+片方の finding が消える)。DO は globally unique・single-threaded なので
+「書き手はちょうど 1 人」を write lease も fencing epoch も**書かずに**得られる。
+storage を DO の中でなく D1 に置くのは CLAUDE.md 規則(DO は直列化器、ストレージは
+共有バックエンド)。
+
+**R2 が第一候補だったが使えない** —— この account の OAuth token に **`r2` scope が
+無い**(ADR-2607299900 と同じ blocker、2026-08-17 に `wrangler whoami` で再実測)。
+D1 は**アプリの DB** として使っており、分散を名乗る経路の premise ではない
+(消せば kenbun は履歴を失う。だから kenbun はその主張をしない)。
+
+### 永続の形
+
+`IssueStore` は同期、D1 は非同期。全 ns を promise 版に分裂させる代わりに
+**hydrate → 同期 handler → 差分 commit**(1 batch = 1 transaction)にした。
+`kotobase-protocols-worker` が同じ不一致に対して実証した形(ADR-2607177500)。
+
+### 出荷前に捕まえた 2 件
+
+1. **`:advanced` が binding lookup をリネームしていた。** `env.PRINCIPALS` が
+   `env.rc`、`env.KENBUN_STORE` が `env.qc` になり、実行時は両方 `undefined`。
+   **binding も DB も見つからない Worker が、リクエストが来るまで何も異常を報告しない。**
+   `goog.object/get` + 文字列リテラル、外部オブジェクトは全部 `^js` に変更。
+   build の `:infer-warning` を 0 にし、**emit 後の bundle に文字列が生存していることを
+   grep で確認**した
+2. **routes を宣言しない。** custom domain は単一所有で、最後に deploy した側が勝ち
+   **どちらにも conflict が出ない**(`kotobase-protocols-worker` は 2026-07-17 に
+   これで `git.kotobase.net` を失った)。v0.1 は workers.dev だけに出し、ホスト名は
+   副作用ではなく明示的に取りにいく
+
+### deploy 時に止まった 2 件（迂回せず直した）
+
+- **workspace 自身の deploy guard がブロックした** —— `:local/root` 依存
+  (`kotobase-storage`)が west pin より後ろ。bundle には入らない依存だが、
+  guard が stale 依存由来の artifact を警戒するのは正しいので、**迂回せず pin に
+  同期**した(clean だったので WIP のリスク無し)
+- **この account は KV 裏の DO namespace を受け付けなくなっている**(API error 10099)。
+  migration を `new_sqlite_classes` に変更。DO は state を持たない(直列化のために在り、
+  行は D1)
+
+### live 実測（2026-08-17。ローカル harness ではなく実サービスに対して）
+
+```
+/health                        principals-configured / bindings-present を申告
+POST 未認証                     401 no-authenticated-principal
+POST human, 良い evidence       201 filed
+POST agent, 同じ欠陥・別の言葉   200 corroborated（reproduced-by #{\"agent-7\"}、issue は 1 本）
+POST 再現手順なし                422 no-repro-steps
+POST 未知 severity               409 unknown-severity（422 とは別 status）
+POST body が :reporter を名乗る  400、かつ何も filed されない
+POST body が :reproduced-by      400
+POST review :approve             200 → :merged → confirmed
+```
+
+**永続は API 越しでなく DB で確認した**: D1 に `finding 1 / issue 1 / proposal 1 /
+review 1`、audit は順序どおり 5 件(`issue:opened → propose → corroborated →
+review:approved → merge:merged`)。**corroboration の成立自体が hydrate の証明**——
+後続リクエストが先行の欠陥を見つけるには D1 から読み戻す必要がある。
+**reject / undecidable は 1 行も残していない。**
+
+### この deployment が塞ぐもの（明記）
+
+**この行は共有 kotobase datom 面に無い。** `repo-taxonomy` / `repo-maturity` と
+repo path で join する query——「どの repo が確定欠陥を最も抱えているか」——は
+**この deployment に対しては書けない**。JVM 側の `kenbun.store.kotobase` が在るのは
+そのためで、こちらでは使えない(`kotobase.core` が cljs で Promise を返す)。
+
 ## まだ無いもの（正直に）
 
-- **deploy されていない。** `handle` は在るが、それを呼ぶ shell（socket・認証・
-  route mount）は書いていない。**面が在ることと serve されていることは別**
-- **credit の決済面が無い**（意図的。上記）
+- **custom domain 未取得。** live は workers.dev だけ(意図的。上記)
+- **Worker が datom 面に載っていない**(非同期 IssueStore 契約が上流に無い)
+- **hydrate が毎リクエスト全件を読む。** dedupe が全件への問いなので v0.1 では全件。
+  表が育てば通用しない——隠れた TODO ではなく docstring と README に書いた
+- **認証が共有 secret 表**(持てる最弱の identity)。CACAO 検証への差し替えが次
+- **credit の決済面が無い**(意図的。上記)
 - **fleet gate に載せていない。** `scripts/fleet-ci/gates.edn` への登録は未実施。
   CLAUDE.md「gate は fleet で 1 度緑になるまで landed としない」に従い、ここでは
   gate を主張しない
