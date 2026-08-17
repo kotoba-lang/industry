@@ -1,0 +1,79 @@
+{:receipt :kotobase/health-without-a-hydrate
+ :date "2026-08-17"
+ :worker "kotobase-protocols-worker"
+ :version "3c9b7376-3205-4011-9618-0accaa0b2e19"
+ :merge "eb57e38095e"
+
+ :how-this-was-found
+ "By asking what produced a number I had already measured more than twenty
+  times in one day and never questioned. Every latency figure in today's
+  receipts came from GET /health, and I had described it throughout as `the
+  hydrate half of a served request` without once reading the handler."
+
+ :the-defect
+ "`kotobase.protocols.router/handle` answers /health from four constants --
+  :ok, :service, :surface, :apex -- and touches no store. The shell's hydrate
+  is unconditional and sits ABOVE the router, so every request rebuilt the
+  whole graph and then called a branch that reads none of it.
+
+  `handle-request` already short-circuits three paths before the hydrate:
+  /capabilities, /_diag/query-memo and /_diag/health. /health was simply not
+  among them. That is why /_diag/health answered in 0.1-0.24s all day while
+  /health took seconds -- the two differ by one line in a cond chain, not by
+  what they compute."
+
+ :cost-per-call
+ {:cpu-ms 1364 :r2-class-b-gets 85 :bytes 11400000
+  :returns "four constant fields"
+  :note "CPU and GET counts from the instrumented harness replaying this
+         graph's real blocks (2026-08-17-fold-cost-at-production-shape.edn),
+         not from workerd."}
+
+ :why-it-is-the-worst-possible-route-for-it
+ "Health is the most polled route a service has -- uptime checks, load
+  balancers, monitoring. Six hosts polled once a minute is ~259,200 calls a
+  month: 353M CPU-ms and 22M Class B operations, about $15/month at the rates
+  captured today, to return a constant. My own probing added several thousand
+  of those calls."
+
+ :measured
+ {:method "10 sequential GETs per host over one connection, immediately before
+           and after the deploy"
+  :before-ms {:sparql 6231 :gremlin 4827 :graphql 3935}
+  :after-p50-ms {:sparql 18 :gremlin 15 :graphql 15 :s3 12 :atproto 14 :pinning 14}
+  :factor "~300x"
+  :body-unchanged "{:ok true, :service :kotobase.protocols/sparql, :surface :sparql, :apex \"kotobase.net\"} -- byte for byte"}
+
+ :the-guard-that-makes-it-a-short-circuit
+ "`static-health` reproduces the router's own mounted-surface check and returns
+  nil when the router would NOT have taken its health branch, so an unmounted
+  surface falls through to exactly the old path. Assuming every host is mounted
+  would have turned a short-circuit into a behaviour change: the split
+  single-surface shells (net-kotobase/cypher) mount a subset via select-keys.
+  Dropping that guard turns exactly the unmounted-surface assertion red and
+  nothing else -- demonstrated, not asserted.
+  103 tests / 700 assertions, 0 failures."
+
+ :consequence-for-the-other-receipts
+ "/health is no longer usable as an external probe for hydrate cost, and that
+  is what every 2,800 ms and 4,400 ms figure in today's receipts was measuring.
+  Those numbers stand -- they measured the hydrate, correctly, and the
+  read-path fix that moved 4,400 -> 2,800 is unaffected -- but the probe point
+  is gone. Measuring hydrate from outside now needs an authenticated query or
+  an instrumented /_diag route. The fold-cost receipt is unaffected: it
+  measures CPU and R2 operations in an instrumented harness over this graph's
+  real blocks, not over HTTP."
+
+ :fifth-of-its-kind-today
+ "Capability present, one wire missing. GraphSync: seven namespaces
+  implementing /ipfs/graphsync/2.0.0, required by no deployed worker. The
+  datalake: catalog, columnar, Parquet/Arrow readers and the prefetch
+  trampoline all landed, lake.kotobase.net still NXDOMAIN. Materialised views:
+  the whole projection library pinned and compiled into the bundle, zero views
+  declared on the production graph. `:query-statistics`: implemented, unused
+  for eleven days, and wiring it took IC08 from 11.4x to 1.85x. And this one --
+  a cond chain missing one line.
+
+  None of these needed new capability. All of them needed someone to connect
+  what was already built. That is worth stating as a property of this
+  workspace rather than as five separate incidents."}
