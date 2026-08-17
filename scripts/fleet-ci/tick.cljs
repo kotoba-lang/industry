@@ -318,7 +318,15 @@
                     (catch :default _ nil)))]
     (subs (-> (crypto/createHash "sha256")
               (.update (canonical-decl r))
-              (.update " ")
+              ;; Domain separator. Written as an escape, NOT as a raw NUL
+              ;; byte: `"\u0000"` reads to the same one-character string, so
+              ;; the digest is unchanged, but a literal 0x00 made `file` call
+              ;; this script "binary data" and every `grep` over it return
+              ;; NOTHING -- silently, with exit 1, indistinguishable from
+              ;; "no match". Measured 2026-08-17: three separate searches of
+              ;; this file during one session came back empty and were read
+              ;; as absence of code.
+              (.update "\u0000")
               (.update (str body))
               (.digest "hex"))
           0 16)))
@@ -1271,9 +1279,9 @@
 ;; ---------------------------------------------------------------------------
 ;; CD: green なら pin 前進（サーバ側検証を必ず通す）
 
-(defn advance-pin!
-  "west.yml の当該 entry の revision を new-sha に進める。
-  検証は scripts/verify-west-pins.cljs（存在 + default branch 到達性 + 前進）に委譲。"
+(defn- advance-pin-once!
+  "1 回ぶんの pin 前進。west.yml を読み直すところから始まるので、呼び直せば
+  そのまま再試行になる（stale な base に対して PUT し続けることがない）。"
   [{:keys [repo branch west] :as landing} nm new-sha]
   (let [cur (gh-raw repo branch west)
         old (get-in (parse-west cur) [:projects nm :revision])]
@@ -1298,6 +1306,35 @@
                                                 " (fleet-ci green on murakumo)")})]
                 (if (:ok r) {:ok true :detail (str old " -> " new-sha)} r)))))
         {:ok false :detail "could not locate revision line (minimal-diff refused)"}))))
+
+(defn advance-pin!
+  "west.yml の当該 entry の revision を new-sha に進める。検証は
+  scripts/verify-west-pins.cljs（存在 + default branch 到達性 + 前進）に委譲。
+
+  **push race は再試行する。** landing repo の ref 更新そのものが楽観ロックなので、
+  fleet が忙しいときは別セッションに負けて `push rejected` が返る。receipt landing
+  は最初からこれを 3 回まで再試行していたが（`land-receipt!`）、pin 前進は 1 回で
+  諦めていた —— 同じ race を、片方だけが吸収していた。
+
+  症状は静かで、しかも green のときにしか起きない: gate は通り、署名 receipt は
+  着地し、pin だけが取り残される。実測 2026-08-17、3 本走らせて 2 本
+  （cloud-itonami-isco-4311 と tehai）がこれで置き去りになり、手で進めた。
+  『赤い gate』としては現れないので、誰も気付かない。
+
+  再試行は毎回 `advance-pin-once!` を呼び直す = west.yml を読み直すので、
+  stale な base に対して PUT を繰り返すことはない。"
+  [landing nm new-sha]
+  (loop [attempt 1]
+    (let [r (advance-pin-once! landing nm new-sha)]
+      (cond
+        (:ok r) r
+        ;; 負けたのが race のときだけ再試行する。pin verification の拒否や
+        ;; entry 不在は、何度やっても同じ答えなので即返す。
+        (and (< attempt 3)
+             (str/includes? (str (:detail r)) "push rejected"))
+        (do (log "WARN CD pin-advance retry" attempt nm (:detail r))
+            (recur (inc attempt)))
+        :else r))))
 
 ;; ---------------------------------------------------------------------------
 ;; main

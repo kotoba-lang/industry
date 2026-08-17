@@ -171,6 +171,69 @@
                                     :spec-hash (tick/decl-hash after)
                                     :last-spec (tick/decl-hash before)})))))
 
+
+;; ---------------------------------------------------------------------------
+;; CD: a lost push race must be retried, as receipt landing already was
+;; ---------------------------------------------------------------------------
+;;
+;; Measured 2026-08-17: three gates went green in one session and TWO of the
+;; three pins were left behind (cloud-itonami-isco-4311, tehai), because
+;; `advance-pin!` gave up after one `push rejected` while `land-receipt!`
+;; retried three times. The failure is silent and only happens on GREEN --
+;; the gate passes, the signed receipt lands, and only the pin is stranded.
+
+(def ^:private pin-landing {:repo "com-junkawasaki/root" :branch "main"
+                            :west "manifest/west.yml"})
+
+(defn- with-pin-stubs
+  "Drive advance-pin! with a scripted sequence of put-file! outcomes."
+  [outcomes f]
+  (let [remaining (atom outcomes)
+        puts (atom 0)
+        reads (atom 0)]
+    (with-redefs [tick/gh-raw (fn [& _] (swap! reads inc) "west")
+                  tick/parse-west (fn [_] {:projects {"r" {:revision "old"}}})
+                  tick/replace-revision (fn [& _] "cand")
+                  tick/sh (fn [& _] {:exit 0 :out ""})
+                  tick/put-file! (fn [& _]
+                                   (swap! puts inc)
+                                   (let [[o & more] @remaining]
+                                     (reset! remaining (vec more))
+                                     o))
+                  tick/log (fn [& _])]
+      (let [r (tick/advance-pin! pin-landing "r" "new")]
+        (f r @puts @reads)))))
+
+(deftest pin-advance-retries-a-lost-push-race
+  (with-pin-stubs [{:ok false :detail "push rejected (someone else moved main)"}
+                   {:ok true :detail "old -> new"}]
+    (fn [r puts reads]
+      (is (:ok r) "a race lost once must not strand the pin")
+      (is (= 2 puts))
+      (is (= 2 reads)
+          "each attempt re-reads west.yml — retrying against a stale base
+           would fail forever"))))
+
+(deftest pin-advance-gives-up-after-three-attempts
+  (with-pin-stubs (vec (repeat 5 {:ok false :detail "push rejected (someone else moved main)"}))
+    (fn [r puts _]
+      (is (not (:ok r)))
+      (is (= 3 puts) "bounded, like receipt landing"))))
+
+(deftest pin-advance-does-not-retry-a-refusal
+  ;; A pin verification refusal is the same answer every time. Retrying it
+  ;; would turn one honest "no" into three, and hide it in the log.
+  (with-pin-stubs [{:ok false :detail "pin verification refused: behind"}]
+    (fn [r puts _]
+      (is (not (:ok r)))
+      (is (= 1 puts)))))
+
+(deftest pin-advance-succeeding-first-time-does-not-retry
+  (with-pin-stubs [{:ok true :detail "old -> new"}]
+    (fn [r puts _]
+      (is (:ok r))
+      (is (= 1 puts)))))
+
 (let [{:keys [fail error]} (run-tests 'tick-unit-test)]
   (when (pos? (+ fail error))
     (js/process.exit 1)))
