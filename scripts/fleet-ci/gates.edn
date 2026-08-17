@@ -1666,5 +1666,15 @@
    :script "gates/kotoba-ocapn-endo-check.cljs"
    :include-ext [".clj" ".cljc" ".cljs" ".edn" ".json"]
    :min-files 12 :cd false}
+  ;; kenbun's admission gate (cloud-itonami). The default :test alias resolves
+  ;; kotoba-issue as a :git/sha dep, which ship-git-deps! carries, so this needs
+  ;; no sibling checkout on the node — unlike kototama above.
+  ;;
+  ;; What it does NOT cover, named rather than assumed: `test-kotobase` (the
+  ;; kotobase datom-plane adapter) needs the :kotobase alias and its own git
+  ;; deps, and the Cloudflare worker build needs shadow-cljs and npm. Neither is
+  ;; gated here, so a green :jvm-test says the decision core and HTTP surface
+  ;; pass — 38 tests / 129 assertions — and says nothing about the other two.
+  {:name "kenbun" :org "cloud-itonami" :gate :jvm-test :cd true}
   ;; ────────────────────────────────────────────────────────────────────────
   ]}
