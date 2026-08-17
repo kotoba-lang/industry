@@ -123,21 +123,22 @@
  ;;                     coverage; dropping either loses tests.
  ;;   org-ietf-cbor     its cljs half is `shadow-cljs compile` -- a JVM build.
  ;;                     No nbb entry exists yet.
- ;;   io-multiformats   an nbb entry EXISTS now (`test/run.cljs`, added
- ;;                     2026-08-17), and counts are identical: 35 tests / 133
- ;;                     assertions on both. It still must NOT be flipped.
- ;;                     Admission 2 fails in a way the rule did not anticipate:
- ;;                     the repo has one defect per host, so neither runtime
- ;;                     alone discriminates. Measured that day --
+ ;;   io-multiformats   NOT flipped, and it does not need to be: it has TWO
+ ;;                     entries now, `:jvm-test` here and the
+ ;;                     `nbb-cross-runtime-multiformats` one below.
+ ;;                     That repo has one defect per host, measured 2026-08-17:
  ;;                       reverting `core/varint` to shifts  -> 3 red on CLJS, 0 on JVM
  ;;                       removing read-varint's mult cap    -> 2 red on JVM,  0 on CLJS
- ;;                     Flipping to :nbb-test would trade the JVM's half for
- ;;                     the cljs half, not gain coverage.
- ;;                     **What this needs is two gates for one repo**, which
- ;;                     this file has no shape for: entries are keyed by
- ;;                     :name and the status context is derived from it, so a
- ;;                     second entry would collide rather than add. Recorded
- ;;                     here as the blocker; see ADR-2608170800.
+ ;;                     so flipping would have traded one half for the other.
+ ;;
+ ;;                     ⚠ An earlier version of this note said two gates for
+ ;;                     one repo were impossible here -- "entries are keyed by
+ ;;                     :name and the status context derives from it, so a
+ ;;                     second entry would collide". **That was wrong, and it
+ ;;                     was wrong about a file that already contained the
+ ;;                     counterexample**: `io-ipld` has had two entries since
+ ;;                     ADR-2608060500, disambiguated by `:id`. Read the file
+ ;;                     before reporting what it cannot do.
  ;;   chain, io-ipld, io-ipld-car, nekko, org-apache-avro, kotobase-lake,
  ;;   tech-ipfs-specs-ipns, sakkyokuka
  ;;                     zero .clj files, but their test path needs sibling
@@ -245,6 +246,25 @@
   ;; does not") and it was green when measured. It is simply not gated, and
   ;; closing that needs a second entry per repo, which this file does not have.
   {:name "proto" :gate :jvm-test :cd true}
+  ;; sigv4 signs and VERIFIES the S3 writes this fleet's Workers accept, and
+  ;; had no gate of any kind. Probed 2026-08-17 expecting the dev-protobuf
+  ;; shape and finding the opposite: `scripts/verify-cljs.cljs` already
+  ;; re-runs the load-bearing assertions on nbb -- AWS's two published
+  ;; reference signatures, presigning, a non-ASCII round trip, 18 checks --
+  ;; and `constant-time-eq?` compares lengths first with the reasoning
+  ;; written down. The library was disciplined; nothing was running it.
+  ;;
+  ;; Verified on judah before landing:
+  ;;   intact -> Ran 32 tests / 93 assertions, 0 failures, exit 0
+  ;;   `constant-time-eq?`'s length check removed -> exit 1, naming
+  ;;   `constant-time-eq-semantics`
+  ;;
+  ;; **Not covered**: the cljs half. `verify-cljs.cljs` prints `ok <check>`
+  ;; lines rather than a clojure.test summary, so `nbb-cross-runtime.cljs`
+  ;; (which requires "Ran N tests" and fails a zero-test run) cannot consume
+  ;; it. Converting that script to clojure.test would earn this repo a second
+  ;; entry the way io-multiformats has one.
+  {:name "sigv4" :gate :jvm-test :cd true}
   ;; ADR-2608153000 — Valueflows 経済語彙。2026-08-15、実ノードで 1 度緑になった
   ;; ので :cd true に反転（receipt 1d6bd3ca7025、signer did:key:z6MkjyhVmg…）:
   ;;   test-ws-valueflo-algorithms-73816c6-murakumo-judah      Ran 64 tests / 249 assertions
@@ -1304,6 +1324,22 @@
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "kotobase-block-codec" :id "nbb-cross-runtime-block-codec" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+  ;; io-multiformats' SECOND gate (ADR-2608170800). The first is :jvm-test
+  ;; above, and it has to stay, because this repo carries one defect per host:
+  ;; `core/varint` built its cljs branch on `unsigned-bit-shift-right` (int32
+  ;; there) so 2^32 encoded to [128 0] -- a well-formed varint decoding to
+  ;; zero -- while `multiaddr/read-varint` let its multiplier reach 2^63 and
+  ;; threw `ArithmeticException: long overflow` on the JVM before its own
+  ;; "varint too long" guard could run, on input any peer can send.
+  ;;
+  ;; **Verified on judah before landing**, which is what this file asks for:
+  ;;   intact  -> `OK: 35 tests, 0 failures, 0 errors on nbb`, exit 0
+  ;;   varint reverted to shifts -> `FAIL: 35 tests, 3 failures`, exit 1
+  ;; The script npm-installs when package.json is present and node_modules is
+  ;; absent, which is how @noble/hashes resolves there -- hence ".json".
+  {:name "io-multiformats" :id "nbb-cross-runtime-multiformats" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
 
