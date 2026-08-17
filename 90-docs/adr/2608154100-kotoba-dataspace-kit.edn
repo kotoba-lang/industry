@@ -521,12 +521,58 @@ java -cp \"$CP\" clojure.main -e \\
 ```
 結果: **34 tests / 149 assertions、0 fail / 0 error。** guest は named `:dataspace/transact`。count 10。
 
+12. **DONE（2026-08-17）。** Syndicate retraction notices。matching assertion の
+    retract は observer の同じ observe mailbox に `:document` notice を載せる。
+    notice 形は `{:kind :assert|:retract :assertion … :bindings …}`。新しい
+    cap / op / mailbox は無い。first observe の current-set replay は
+    `:kind :assert` のまま。非マッチ retract は届かない。facet-leave は
+    undelivered mail（retract 含む）を落とす。`#cap` fail-closed。
+    capability-count 10。memory + kgraph とも緑。vat / `<-` 無し。
+
+- `kotoba-lang/provider` main `9d6c59ac4dbe891de1044fcc8d564447a6aa5c70`
+  （merge of `fb601b1cf2f73c0a9c211cdade4a316a48ec8cd3`）。
+  33 tests / 105 assertions（dataspace + match）。
+  break: memory store の retract enqueue を落とすと 4 fail。unbreak 緑。
+  `store-that-drops-retraction-enqueue-fails-closed` が retract 後に mailbox を
+  drain する store を拒否。
+  https://github.com/kotoba-lang/provider/commit/9d6c59ac4dbe891de1044fcc8d564447a6aa5c70
+- `kotoba-lang/amu` main `105c98804a3ed5d5a3b244dfd08238f245eca260`
+  （merge of `64c4ca3aa4f66d9d3bebc08f09529b1118dc1d48`）。
+  provider `9d6c59ac`。dataspace + match + named-cap + conformance =
+  37 tests / 159 assertions。wasm-aot + qualification + conformance 18 / 110。
+  https://github.com/kotoba-lang/amu/commit/105c98804a3ed5d5a3b244dfd08238f245eca260
+- west pin: provider `9d7a501aa7bf29a038d16d22c2bfbd9bf72a74e1`（entry `9d6c59ac`）、
+  amu `05507480d4f009edd3dc995729a78b78e4a503ff`（entry `105c9880`）。
+
+## テストの回し方と結果（2026-08-17 実測、retraction notices）
+
+provider:
+```
+cd /tmp/provider-dataspace-retract-20260817
+clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+```
+結果: **33 tests / 105 assertions、0 fail / 0 error。**
+両方向: retract enqueue を落とすと 4 fail。戻すと緑。
+
+amu（`clojure -M:test -n` は無視される）:
+```
+cd /tmp/amu-dataspace-retract-20260817
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.frontend-named-capability-test)
+            (quote kotoba.compiler.provider-conformance-test))
+    (apply clojure.test/run-tests
+           [(quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.frontend-named-capability-test)
+            (quote kotoba.compiler.provider-conformance-test)])'
+```
+結果: **37 tests / 159 assertions、0 fail / 0 error。** guest は named `:dataspace/transact`。count 10。
+
 ## 残ギャップ（次の agent へ）
 
-12. **次: retraction notices。** matching assertion の retract は observer に
-    `:document` notice を届けない。Syndicate は observed assertion の retract を
-    届ける。同じ `:dataspace/transact` observe mailbox に載せる。新しい cap は
-    足さない。capability-count 10 のまま。
 13. `:native-aot` / `:jit` は pending（gap 9 の evidence のまま）。
     `provider.incidence` は 1–3 が揃うまで始めない。
 "}]
