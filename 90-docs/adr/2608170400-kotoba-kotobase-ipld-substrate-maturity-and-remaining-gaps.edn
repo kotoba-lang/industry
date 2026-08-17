@@ -101,6 +101,7 @@ DMT は型付き表現変換、ADL は同じ Data Model interface の背後で�
 | #620 | `6d222fc5...` | `(= (bytes-at value I) N)` を operand-length bounds trap 付き unsigned byte read へ lowering |
 | #621 | `651f90fc...` | `(bytes-slice value START END)` を copy しない bounded view へ lowering（decode/encode body） |
 | #622 | `64dd35d3...` | `(bytes-concat A B)` を operand の後ろへ書く per-byte copy へ lowering |
+| #623 | `6f0aecc3...` | subrange / join の lowering を 1 本の expression compiler へ畳み、bump cursor で合成を可能に |
 
 `kotoba-sema` PR #10（merge `105309ca...`）は `bytes-count(bytes) -> i64` を、
 PR #11（merge `d96e9341...`）は `bytes-at(bytes, i64) -> i64` を、
@@ -278,7 +279,47 @@ resume token、重複block抑止、malicious responder negative test が必要�
    隣の identity encode、out-of-range trap、fuel の両方向、3x 入力での capacity trap、
    runner の output bound）/ 署名 receipt / mutation test（書き込み先を operand に向けると
    unit assertion と harness の両方が捕らえ、harness は回転の比較でちょうど落ちる）。
-4. encode/decode で上記を合成できる closed expression grammar。loop/recursion/host import は別profile。
+4. ~~encode/decode で上記を合成できる closed expression grammar~~ **closed（2026-08-17、amu #623）**。
+   `E ::= value | (bytes-empty) | (bytes-slice E START END) | (bytes-concat E E)`。
+   loop / recursion / host import は別 profile のまま。
+
+   **kotoba-sema の変更は不要だった** —— `bytes-slice` / `bytes-concat` は既に expression
+   operand を取り、nested join も既に型付いていた。この slice は完全に lowering 側である。
+
+   **2 つの特殊形は「並べる」のではなく「畳んだ」。** 同じ grammar を 2 経路が認識する形は
+   CLAUDE.md が名指しで警告する形（同じ判断を 2 実装が持ち片方だけ直る）である。畳んで安全
+   だったのは **P0-1..3 の振る舞い harness があったから** —— byte 一致も trap も 1 件も
+   変わらなかった。壊れたのは KIR 表現の 3 assertion と、**受理されるようになった** nested
+   join と、message 名 1 つだけ。
+
+   **本体は buffer discipline である**（resume note の予告どおり）。各 node が
+   (pointer, length) の slot 対を post-order で compile 時に持つ。subrange は view のまま
+   何も確保しない。join は **operand の後ろから始まり上にしか動かない bump cursor** で
+   materialise し、子は親が場所を取る前に emit される。よって alias 規則は
+   **「operand の後ろ」**（join が 1 つの間はこれで足りた）から**「生きている全 operand の
+   上」**へ一般化する。
+
+   **その一般化を弁別するのが新しい fixture である。** cursor で inner join を作り、
+   outer join には operand の**後ろ側**の断片を**先に** copy させる —— inner の場所を
+   再利用する書き込み先は読む前に潰し、`01 61 61 A1` ではなく `01 01 61 A1` を返す。
+   cursor の前進を消すと **P0-1..3 の全 case は通ったまま**（join が高々 1 つなので）
+   ここだけが落ちる。fixture が飾りでなく荷重を負っている証拠。
+
+   **output bound の compile 時分は式全体の関数になる** —— cursor は下がらないので必要な
+   空間は全 join の総和。operand 依存の残りは emit した trap、その両方が見えない分は
+   runner の `max_output`。node 数は 32 で bound。
+
+   六面の証拠: sema typing（変更不要、既存 21 tests/137 assertions が包含）/ 専用 KIR
+   admission `[:input-expression <tree>]` / wasm-tools validation / 実 Wasmtime（合成の
+   byte 一致、materialise 済み結果への subrange、各 nest 段での短い operand の trap、
+   および P0-1..3 の全 case 無変更）/ 署名 receipt / mutation test（cursor 前進を止めると
+   unit 2 件と harness が合成 fixture でちょうど落ちる）。
+
+   ⚠ **畳んだことで 1 つの assertion が静かに弱くなり、直した。** subrange の bound 検査は
+   `local.get 2 ... i32.lt_u` に match していたが、長さが slot へ移った後も——**正しい slot
+   を使っているかに関わらず**——match し続けた。今は backreference で slot を束縛する。
+   *通っているが何も検査していない test* は、この repo の ADR 群が繰り返し名指ししている
+   失敗形そのものである。
 5. canonical DAG-CBOR を壊す transform を Schema/codec roundtrip で拒否。
 
 完了証拠は sema typing、専用KIR admission、Wasm validation、real Wasmtime positive/negative、
@@ -357,31 +398,32 @@ signed receipt、壊した実装が落ちる mutation test の六面。
 
 ## 8. 着地と再開点
 
-root pin は `amu 64dd35d3a7c9...`（west commit `20b58fee...`）、
+root pin は `amu 6f0aecc3ad7e...`（west commit `ff8198d3...`）、
 `kotoba-sema f4de940e403c...`（west commit `91650f61...`）。genpon は ledger event
-11464/11465 で reconcile 済みで、`kagami reconcile --check` は clean。
+11468 で reconcile 済みで、`kagami reconcile --check` は clean。
 
-**P0-1 `bytes-at` / P0-2 `bytes-slice` / P0-3 `bytes-concat` は 2026-08-17 に着地した。**
-次の最小縦切りは **P0-4 closed expression grammar**。at / slice / concat を encode / decode の
-中で**合成**できるようにする（loop / recursion / host import は別 profile のまま）。
+**P0 は 5 項目中 4 つが 2026-08-17 に着地した**（P0-1 `bytes-at` / P0-2 `bytes-slice` /
+P0-3 `bytes-concat` / P0-4 closed expression grammar）。次の最小縦切りは **P0-5**:
+**canonical DAG-CBOR を壊す transform を Schema/codec roundtrip で拒否する**。
 
-P0-1..3 で確定した、P0-4 に持ち込むべきこと:
+P0-1..4 で確定した、P0-5 に持ち込むべきこと:
 
-- **nested join がこの grammar の最初の実物である。** P0-3 が拒否した
-  `(bytes-concat (bytes-concat a b) c)` は、中間結果を置く場所を要求する ——
-  つまり grammar が要るのは構文ではなく**バッファ割り当て規律**である。現在の lowering は
-  「出力は operand の直後に 1 つだけ」を前提にしており、そこが最初に壊れる。
-- **合成すると「書き込み先が operand の後ろ」だけでは足りなくなる。** 中間結果もまた
-  次の演算の operand なので、alias 規則は「書き込み先はどの生きた operand とも重ならない」
-  へ一般化する必要がある。P0-3 の回転 fixture と同型の、**間違えたら違う bytes が出る**
-  fixture を各段で用意すること。
-- **fuel は既に byte 比例なので、合成しても比例は保たれる** —— ただし中間結果を作ると
-  移動 byte 数は式の形で増える。`memory.copy` に置き換えたくなる誘惑はここで最大になる。
-- **max-output は 3 箇所（compile / guest / runner）に増えた。** 合成では compile 時に
-  わかる定数部分が式全体の関数になる。
-- **capability 経由の operand は DAG-CBOR encode 済み**であり、結果もまた node でなければ
-  schema を round-trip しない。
-- **literal に閉じるかは profile の判断であって言語の判断ではない。**
+- **P0-5 は前 4 つと種類が違う。** あれらは「lowering が source に忠実か」を問うていたが、
+  P0-5 が問うのは **lowering が忠実であってもなお出力が node でないことがある**という別の
+  失敗である。grammar は byte 列に閉じており、`(bytes-slice value 1 2)` は完璧に正しく
+  lower されて **DAG-CBOR として無効な 1 byte** を返せる。
+- **その事実は既に実測済みで、証拠もある。** capability 経由の operand は DAG-CBOR encode
+  済みで、`42 41 05` の `[1,3)` は node（`0x05` を持つ byte string）だが `[1,2)` は node
+  ではない。conformance script が値と期待値を引数に取るようになっているのはこのため。
+  **P0-5 の positive/negative fixture は既にこの形で書ける。**
+- **どこで拒否するかが設計判断である**: compile 時（式から出力の codec 形を推論できる場合
+  のみ可能で、`:whole` を含む式では一般に不可能）/ guest 側（module に codec validator を
+  emit することになり grammar の外）/ host 側の schema roundtrip（既に `adl-rejected` を
+  返している）。**既存の拒否を「実装済み」と読まないこと** —— 現在それが動くのは
+  capability 経路だけで、raw runner 経路には codec 検査が無い。
+- **mutation は「壊れた出力が受理されてしまう」方向で書く。** 今までの mutation は
+  「正しい出力が壊れる」方向だった。P0-5 では node でない出力を通す変更を入れて、
+  roundtrip 検査が落ちることを見る。
 
 **この ADR は現状を100%と宣言しない。100%へ進むため、何が correctness、何が代替transport、
 何がextension、何がoptimizationかを固定する正本である。**"}]

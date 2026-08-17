@@ -5,7 +5,7 @@
   :adr/date "2026-08-17"
   :adr/deciders "Jun Kawasaki（「投稿が見つからないと表示される」→ 方針選択 → 「do it」/「next」）+ Claude Code"
   :adr/supersedes ""
-  :adr/relates-to "ADR-2607022330 add.3（relay ingest を無効化した理由 — 共有 operator db の肥大）, ADR-2607032430 D1（hot-datoms が scale-safe read path）, ADR-2607166000 / ADR-2607167000（narrow read を捨てて view に寄せた測定）, ADR-2607051000（blind-fn 鍵付き MAC の索引キー）, ADR-2608039000（分散型経路に D1 を前提にしない）, ADR-2608136800（結論を出す前に origin/main を読む）"
+  :adr/relates-to "ADR-2607022330 add.3（relay ingest を無効化した理由 — 共有 operator db の肥大）, ADR-2607032430 D1（hot-datoms が scale-safe read path）, ADR-2607166000 / ADR-2607167000（narrow read を捨てて view に寄せた測定）, ADR-2607051000（blind-fn 鍵付き MAC の索引キー）, ADR-2608039000（分散型経路に D1 を前提にしない）, ADR-2608136800（結論を出す前に origin/main を読む）, ADR-2608136000（測れなかった検査が合格と同じ値を返す — §10 の 4 つ目）, ADR-2607251500 addendum（per-graph owner binding / KOTOBASE_READ_OWNER_BINDING）, ADR-2607166600（materialized view は fold 時に materialize される）, ADR-2608060500（novelty payload の圧縮フレーム — 実測比 0.10–0.37）, ADR-2608021000（novelty segmentation と hydrate の逐次コスト）, 90-docs/kotobase-performance/2026-08-17-live-latency-and-deployed-fold-threshold.edn"
   :adr/body
   "# ADR-2608170100: aozora の discovery が別グラフを開いていた
 
@@ -60,28 +60,13 @@ getProfile `{\"error\":\"not found\"}` / stats `{\"posts\":2,\"profiles\":0}`。
 デプロイ直後の実測: 報告の投稿が getPostThread で取得可（45ms、cached）。ローカル投稿も回帰なし。
 stats は 2 のまま（非対象ルートの隔離維持）。
 
-## 4. その後に測れたこと — relay 読み取りの崩壊（未解決）
+## 4. relay 読み取りの崩壊 — 原因（2026-08-17 05:1x–05:4xZ 実測、診断済み）
 
 修正の次段（narrow `:avet` 読みへの置き換え）に着手する前に本番の読み取り経路を測ったところ、
-**別の、より重い障害**が出た。
+**別の、より重い障害**が出た。`POST https://kotobase.net/xrpc/ai.gftd.apps.kotobase.datomic.datoms`
+（relay-bsky の公開グラフ CID、credential 不要の公開読み）が **limit に依存せず一律 ~35 秒で 500**。
 
-`POST https://kotobase.net/xrpc/ai.gftd.apps.kotobase.datomic.datoms`（relay-bsky の公開グラフ CID、
-credential 不要の公開読み）:
-
-```
-limit=1  35.71s  {\"ok\":false,\"error\":\"Internal Server Error\"}
-limit=2  35.51s  同上
-limit=3  34.39s  同上
-limit=5  36.84s  同上
-```
-
-**limit に依存せず一律 ~35 秒で失敗する。** これは `kotobase-peer` の `hot-datoms` 自身の
-docstring が記録している失敗と数値まで一致する —— 「a `:eavt` scan with `:limit 5` burned
-32,500ms CPU against a 34,918ms wall clock … making the graph unreadable at ANY limit」、
-原因は同期 block-miss トランポリンの O(N^2) block discovery、修正は `:async-get-fn`
-（kotobase-peer#21）で、それを渡すのは **store 側**。
-
-そして AppView 越しの実測は時間とともに悪化した（すべて cache miss）:
+AppView 越しの実測は時間とともに悪化した（すべて cache miss）:
 
 | 時刻(UTC) | 観測 |
 |---|---|
@@ -93,17 +78,130 @@ docstring が記録している失敗と数値まで一致する —— 「a `:e
 **aozora.app の discovery feed は現在空。** これは本 ADR の修正が原因ではない —— getDiscoverFeed は
 `discovery-fallback-nsids` に含まれず、経路は従来どおりで、デプロイ直後は正常に返していた。
 
-### 候補は 2 つ、外からは区別できない
+以下は 2026-08-17 に `wrangler tail` と R2 の直接読みで測った結果。**§4 が以前「外からは
+区別できない 2 候補」と書いていたものは、両方とも同じ 1 つの原因に還元された。**
 
-1. **グラフの単調増加**。relay ingest は `RELAY_CRON_ENABLED=1` で 10 秒窓あたり最大 100 レコードを
-   relay-bsky に追記し続けている（2026-08-15 から）。AppView はそれをビュー全走査で読むので、
-   コストはグラフサイズに比例する。50s → 70s → 142〜212s の推移はこれと整合。
-   **これは ADR-2607022330 add.3 が記録した失敗そのもの。2026-08-15 の変更は行き先を隔離したが、
-   増加を止めていない。** operator db は守られたが、relay db 自身が死んだ。
-2. **`yoro-feed` ビューが materialize されていない**。そうなると `scan-posts` は per-attribute の
-   attr-scan wave に落ち、それが上記の CPU 死に当たる。
+### 4.1 ~35 秒は Cloudflare の CPU 上限。I/O ではない
 
-切り分けには fold の実行記録が要る（未取得）。
+serving しているのは script **`kotobase-cf-wasm-staging`**（= repo `net-kotobase/control-plane` の
+ディレクトリ `kotobase-graph-database/`、Custom Domain `datoms.kotobase.net`）。apex `kotobase.net` は
+script `net-kotobase`（dir `kotobase-api-gateway/`）で、`KOTOBASE_DATOM_SERVICE_URL` 経由で proxy する。
+`datoms.kotobase.net` を直接叩くと edge-admission で 401 になるので、再現は apex 経由でしかできない。
+
+`wrangler tail kotobase-cf-wasm-staging --format json` の直接観測:
+
+| 時刻(UTC) | request | outcome | cpuTime | wallTime | status |
+|---|---|---|---|---|---|
+| 05:15:28 | datoms `{index eavt, limit 1}` | **exceededCpu** | 32,500ms | 37,495ms | — |
+| 05:26:30 | datoms `{index eavt, limit 1}` | **exceededCpu** | 32,000ms | 35,618ms | — |
+| 05:27:55 | datoms + `components_edn` | ok | **29,307ms** | 32,564ms | 200 |
+
+exception は `Error: Worker exceeded CPU time limit.`。**93% 近くが CPU で、I/O 待ちではない。**
+`kotobase-graph-database/wrangler.jsonc` に `limits` ブロックが無いので上限は既定の 30 秒。
+
+deploy 済み version は `4ce94ef5-65e5-4593-a564-50b627b2bd9d`（tag `5ff5c55e`、2026-08-15T12:28Z）。
+main から 18 commit 遅れだが、その間 `kotobase-graph-database/` に入った変更は ranged object read の
+1 件だけで、読み取り経路には触れていない。**deploy されているコードは実質 main。**
+
+### 4.2 効いているのは fold されていない novelty であって、snapshot でも limit でもない
+
+`components_edn`（**`components` ではない** —— wire 名を間違えると黙って無視され full scan のままになる。
+`kotobase-server` の `do-datoms` が destructure するのは `components_edn`）で snapshot 側を prefix 刈りすると:
+
+- unkeyed（snapshot 全走査あり）: **32,000ms CPU → exceededCpu**
+- keyed（snapshot 側は 0 行に刈られる）: **29,307ms CPU → 200 OK**（返る行も 0）
+
+**indexed snapshot の全走査を丸ごと消して減るのは 2.7 秒（全体の 8%）しかない。**
+残る 29.3 秒は `limit` でも `components` でも減らない部分、すなわち **fold されていない novelty**。
+
+`limit` が効かないのは構造による。`kotobase-peer` の `cold-datoms` / `cold-datoms-async` は
+`(cond->> rows limit (take limit))` を **prefix scan と全 entry の復号が終わったあと**に適用し、
+`hot-datoms` の novelty 半分も全 novelty block を読んで hot db を組んでから絞る。
+**`:limit` は返す行数の上限であって、触る量の上限ではない。**
+
+なお ADR の前版が引用していた `hot-datoms` docstring の「32,500ms CPU / 34,918ms wall」は
+**2026-07-25 の別グラフ（cloud-itonami-lei-catalog）で、同期トランポリンの O(N^2) block discovery が
+原因**の事故であり、その修正 `:async-get-fn` は既に 5 箇所で配線済み（§9-2 で解決済みと記録）。
+**数値が一致するのは偶然で、今回の原因は別**（今回は async 経路で、cost は novelty 量に比例している）。
+
+### 4.3 graph の実測（R2 から直接読んだ値）
+
+head `ipns/<graph>.json`: **sequence 61**、chain tip `bafyreifjimcw6gjmhvr7ma3wt2hmtrh7pz5wlvceptg5hl7u6xmngkvlze`。
+tip の state: `{indexed bafyreiaywa…, novelty-back bafyreibf4i…, novelty-count 15, novelty-front nil}`。
+
+- **novelty: 15 tx block、ciphertext 合計 409,250 bytes**（1 block 26–28KB がほぼ均一 = relay の 1 tick 1 block）。
+  payload は暗号化の内側で圧縮されている（ADR-2608060500、実測比 0.10–0.37）ので平文は概ね 1.1–4 MB。
+- **indexed snapshot**: schema-version 2、index は `spo` / `pso` / `pos` の 3 本（`ocp` は nil）。
+  `spo` は 2 段の prolly tree で root の children 55、leaf 1 個が 264 entry / 85,942 bytes
+  → **概ね 14,500 datom**（leaf を全部数えたのではなく root children × sampled leaf の見積り）。
+- owner marker `owners/<graph>.json` は `created_at 2026-08-15T03:10:09Z`、
+  owner `did:key:z6MkvXVYfX3duzGkqW2YPRfXJpDDLmbaLN3jHuPphXCoMWFH`。
+- bucket `kotobase-graph-database-production` 全体は 759,682 object / 72.8 GB
+  （**この graph だけの数字ではない**。全 tenant の合計）。
+
+### 4.4 fold は 4 回走っている。止まったのは seq 46 のあと
+
+chain を 61 commit すべて歩いた（`prev` を辿って各 commit の `state` を読む）:
+
+| head seq | indexed root | novelty-count |
+|---|---|---|
+| 0–7 | nil | 1 → 8 |
+| 8–24 | `bafyreicjk7…` | 0 → 16 |
+| 25–35 | `bafyreihlx5…` | 0 → 10 |
+| 36–45 | `bafyreih5xb…` | 0 → 9 |
+| 46–61 | `bafyreiaywa…` | 0 → **15**（現在） |
+
+**novelty-count が 0 に戻り indexed root が変わる = fold。4 回起きている**（head seq 8 / 25 / 36 / 46）。
+つまり「fold の実行記録が無い」のではなく、**機構は動いていて、途中から着地しなくなった**。
+snapshot の伸びは spo root の children で 27 → (3 段化) → 51 → 55 と鈍化している
+（relay の取り込み窓が重なるので dedup が効く）。**seq 54 で閾値 8 を越えてから 7 commit、
+fold は 1 度も着地していない。**
+
+### 4.5 fold が起きない理由は 2 つあり、どちらもコードと live 観測で裏が取れる
+
+**(a) 外から呼ぶ `datomic.fold` は production では常に 503。**
+`kotobase-graph-database/wrangler.jsonc` の production vars は `KOTOBASE_MAINTENANCE_OPERATOR_DIDS: \"\"`
+で、`auth.cljs/verify-operator-auth` は**空 allowlist を fail-closed** にする
+（`{:ok? false :status 503 :error \"operator-gated operation is unavailable: …\"}`）。deploy 済み sha
+`5ff5c55e` でも同じ値。実測: **5 分ごとにきっかり 1 回、`datomic.fold` が 503 で弾かれている** ——
+05:15:37 / 05:20:37 / 05:25:37 / 05:30:39 / 05:35:37 / 05:40:37、いずれも cpuTime 0–1ms、
+UA `kotobase-client/1`、`x-kotobase-tenant-did` は relay-bsky の owner と同じ DID。
+
+呼んでいるのは aozora PDS の `scheduled-fold`（`pds/src/aozora/pds/worker.cljc`、cron `*/5`）で、
+これは `FOLD_MAX_NOVELTY` 200 の **bounded** fold に `yoro-feed` の `:views` 宣言を毎 tick 添えて送っている。
+**したがって前版 §4 の候補 2「`yoro-feed` ビューが materialize されていない」も、同じ 503 で説明がつく**
+—— view を宣言・再生成する唯一の経路が fold で、その fold が 5 分ごとに拒否されている。
+（ただしこの cron が畳むのは `YORO_DB_NAME` であって relay-bsky ではない。
+**relay-bsky を畳む cron は存在しない。**）
+
+**(b) 内側の auto-fold は bounded ではない。**
+relay-bsky を実際に畳んできたのは `xrpc.cljs` の `schedule-auto-fold!`（transact 後の
+`ctx.waitUntil`、閾値 8、`KOTOBASE_FOLD_THRESHOLD` で上書き可）。これは操作者ゲートを通らないので
+503 にはならないが、`(run-write env g \"fold\" {:graph g} iss)` と呼ぶだけで **`max_novelty` を渡さない**。
+`kotobase-server` の `do-fold` は `max_novelty` を受けるし、その docstring 自身がこの罠を書いている
+——「novelty can only shrink through a successful fold, so once the backlog is large enough that one
+unbounded fold exceeds the Worker's CPU budget, the fold that would shrink it can never finish and the
+graph stays stuck forever」。unbounded fold は **read がやる仕事の上位集合**である
+（同じ 15 novelty block を読み、さらに snapshot を hydrate して 3 本の index を書き直す）。
+read が 29.3 秒使ういま、30 秒の budget には入らない。
+
+**(b) は推論であって直接観測ではない。** 直接見るには relay-bsky への transact が要り、それは
+書き込み = 修理なので本セッションの範囲外にした。切り分ける 1 観測は §9 に書いた。
+
+### 4.6 いま graph は伸びていない。だが止めても読めるようにはならない
+
+head sequence は 05:14Z から 05:44Z まで **61 のまま**（30 分間 0 write）。owner marker
+（2026-08-15T03:10Z）からの 61 commit を均すと **約 49 分に 1 commit** で、
+`RELAY_LIMIT=100` / `RELAY_WINDOW_MS=10000` の `*/5` cron が想定する頻度に遠く及ばない
+（`wrangler tail app-aozora-pds` は 7 分間 cron event を 1 件も出さず、`subscribeRepos` が
+`loadShed` になっていた。jetstream 側の取り込みがほぼ失敗していると読める）。
+
+⚠ `RELAY_CRON_ENABLED` は **west checkout では \"0\" に見えるが `origin/main` では \"1\"**。
+checkout は west pin に固定されているので、env var を checkout から読むと逆の結論になる
+（§10 と同じ罠。deploy 済みの値でもない —— どちらも「main の宣言」でしかない）。
+
+**したがって `RELAY_CRON_ENABLED=0` は「これ以上悪くしない」レバーであって、復旧のレバーではない。**
+いま在る 15 block を読むだけで 29.3 秒かかり、それを消せるのは完了する fold だけだから。
 
 ## 5. 本 ADR の修正が持つ副作用（正直に）
 
@@ -156,20 +254,54 @@ read fallback は「共有索引が空なら relay も引く」ので、**relay 
 
 1. §3 の read fallback を維持する（着地・デプロイ済み）。
 2. **narrow `:avet` 読みへの移行は保留**。relay 読み取りが復旧するまで前提が成立しない。
-3. **relay-bsky の増加を止めるか保持方針を決めるのは製品判断**として owner に上げる。
-   `pds/wrangler.jsonc` 自身が想定するレバーは `RELAY_CRON_ENABLED=0`
-   （「戻すときは行き先ではなくこのフラグを 0 にする」）。discovery は既に空なので失うコンテンツは無い。
+   ただし §4.2 で分かったとおり、**narrow 化しても効くのは 2.7 秒分だけ**である
+   （snapshot 側しか刈れない）。29.3 秒は novelty 側なので、narrow 読みは復旧策ではない。
+3. **どのレバーを引くか**（§4 の測定を踏まえて書き換え）:
+   - **復旧のレバーは fold であって ingest 停止ではない。** `RELAY_CRON_ENABLED=0` は
+     「これ以上増やさない」だけで、いま在る 15 novelty block を読む 29.3 秒は消えない
+     （しかも §4.6 のとおり実測では 30 分間 1 write も入っていない）。
+   - **判断を要さない修正が 2 つある**（どちらも本 ADR では実行していない）:
+     (i) `xrpc.cljs` の `schedule-auto-fold!` に `max_novelty` を渡す
+         （`do-fold` は既に受ける。unbounded fold は read の上位集合なので今の budget に入らない）。
+     (ii) production の `KOTOBASE_MAINTENANCE_OPERATOR_DIDS` を空でなくする
+         —— **これは security posture の変更なので owner 判断**。空は意図された fail-closed で、
+         いまは PDS の `scheduled-fold` が 5 分ごとに 503 を食っている（`yoro-feed` の
+         materialized view が宣言されないのも同じ 503 が理由）。
+   - **`limits.cpu_ms` を上げる**（現在は宣言が無く既定 30 秒）のは 3 つ目のレバーだが、
+     30 秒超の read は AppView には使えないままなので、fold を完了させるための一時措置としてのみ意味がある。
+   - **relay-bsky のデータを残すか捨てるか（retention）は依然として製品判断**で owner に上げる。
+     discovery は既に空なので失うコンテンツは無い。
 4. `prolly-tree/scan-range` を `kotobase-peer` に配線するのは、上記が片付いた後の話。
 
 ## 9. 次の agent への resume point
 
 **未解決（優先順）**
 
-1. **relay-bsky の読み取り復旧。** まず fold の実行記録を見て §4 の 2 候補を切り分ける。
-   増加が原因なら `RELAY_CRON_ENABLED=0` + retention 設計。
-   **2026-08-17 再現: 変化なし**（limit=1 で 37.1s → 500）。ただし下記のとおり
-   `:async-get-fn` は既に配線済みと分かったので、§4 の 2 候補のうち
-   **「async 化されていないから」は消え、graph の増加が残る**。
+1. ~~**relay-bsky の読み取り復旧。まず fold の実行記録を見て §4 の 2 候補を切り分ける。**~~
+   **診断は完了（2026-08-17、§4）。実行は未着手。** 分かったこと:
+   ~35 秒は Cloudflare の CPU 上限（`exceededCpu`、cpuTime 32,000–32,500ms）で、
+   その **29.3 秒は fold されていない 15 novelty block（409,250 bytes ciphertext）**、
+   indexed snapshot 全走査はわずか 2.7 秒。fold は 4 回走った実績があり（head seq 8/25/36/46）、
+   seq 46 以降は着地していない。外部 `datomic.fold` は 503（`KOTOBASE_MAINTENANCE_OPERATOR_DIDS` が空）、
+   内部 auto-fold は `max_novelty` を渡さない unbounded fold。
+
+   **次の agent がやること（優先順）**:
+   (a) **切り分けの 1 観測**: `wrangler tail kotobase-cf-wasm-staging` を張ったまま
+       relay-bsky に 1 件 transact する。`schedule-auto-fold!` は閾値 8 を既に越えているので必ず発火する。
+       その invocation の `outcome` が `exceededCpu` なら §4.5(b)（unbounded fold が budget に入らない）が確定、
+       `ok` で `auto-fold …` の console.log が出るなら別の理由（CAS 敗北 / claim leak）を疑う。
+       **これは書き込みなので owner の承認が要る**（本セッションは診断のみの指示だったため実施していない）。
+   (b) 判断を要さない修正: `schedule-auto-fold!` に `max_novelty` を渡す（§8-3(i)）。
+   (c) owner 判断: `KOTOBASE_MAINTENANCE_OPERATOR_DIDS` を production に設定するか（§8-3(ii)）。
+       設定すれば PDS の 5 分 cron が bounded fold（`FOLD_MAX_NOVELTY` 200）を回せるようになり、
+       **`yoro-feed` の materialized view も同時に復活する**（下記 6 と同根）。
+   (d) owner 判断: relay-bsky の retention / `RELAY_CRON_ENABLED`。ただし §4.6 のとおり
+       **これは復旧のレバーではない。**
+
+   **測れなかったこと**: bounded fold（`max_novelty` 小）が 30 秒 budget に入るかどうか。
+   `fold!` は `max_novelty` に関わらず snapshot 全体を hydrate して 3 index を書き直すので、
+   novelty を 1 block に絞っても snapshot 側のコストは残る。実測するには書き込みが要る。
+
 2. ~~**`:async-get-fn` を kotobase.net の store に渡す配線。**~~ **解決済み（2026-08-17）。**
    配線は既に main に在る —— `kotobase-graph-database/src/kotobase/graph_database/xrpc.cljs`
    の 5 箇所（`hot-datoms` 呼び出し自体を含む）と `store.cljs` / `physical_index_journal.cljs`。
@@ -181,7 +313,13 @@ read fallback は「共有索引が空なら relay も引く」ので、**relay 
    ここに解決するので、`gh api` では 200 なのに org の repo 一覧には現れない。
    （同型の再発防止は §10。「repo が無い」と「ディレクトリである」は 404 で同じ顔をする。）
 3. **fallback に締切を入れる**（§5 の 2 倍レイテンシを消す。約 10 行、appview のみ）。
-4. `resolve-actor-did` の引用符不一致（§6）。datoms が読めるようになってから確定させる。
+4. `resolve-actor-did` の引用符不一致（§6）。**もう確認できる** —— unkeyed な datoms は
+   500 のままだが、`components_edn` を付けた keyed read は 200 を返す（32 秒かかるが返る）。
+   実 handle と実 DID を component に入れて、どちらの形が当たるかを 2 リクエストで決められる。
+6. **新規（2026-08-17）: `yoro-feed` materialized view が宣言されないのは fold の 503 が原因。**
+   宣言する唯一の経路は `datomic.fold` の `views_edn` で、PDS の `scheduled-fold` は毎 tick それを
+   送っているが、production の `KOTOBASE_MAINTENANCE_OPERATOR_DIDS` が空なので 5 分ごとに 503 で
+   弾かれている（§4.5(a)）。上記 1(c) と同じ 1 つの設定で解決する。
 5. **新規（2026-08-17）: `protocols-worker` の fold 閾値を 64 から下げる。**
    同じ repo の `kotobase-graph-database` は閾値 **8**（`KOTOBASE_FOLD_THRESHOLD` で上書き可）で
    `ctx.waitUntil` の背景 fold を持ち、その理由をコメントに書いている ——「engine の
@@ -207,6 +345,23 @@ curl -sS 'https://appview.aozora.app/xrpc/com.etzhayyim.yoro.feed.getDiscoverFee
 
 # appview の test（:kotobase-test はこの pin で壊れている）
 cd <app-aozora-engine> && npx shadow-cljs compile appview-test && node out/appview-tests.js
+
+# --- 診断に使った観測（2026-08-17） ---
+
+# 1. どの script が serving しているかを見る（exceededCpu / cpuTime はここでしか見えない）
+wrangler tail kotobase-cf-wasm-staging --format json
+#   （5 分ごとの datomic.fold 503 もここに出る）
+
+# 2. snapshot 側を刈った read。200 で返るので「limit ではなく novelty」が分かる
+curl -sS -X POST https://kotobase.net/xrpc/ai.gftd.apps.kotobase.datomic.datoms \\
+  -H 'content-type: application/json' \\
+  -d '{\"graph\":\"bafyreieq24o5wxv4lpcczopcs7xhngntyxv2qahv3leo7bqdeurrfk5k5q\",\"index\":\"eavt\",\"components_edn\":[\"at://does-not-exist\"],\"limit\":1}'
+
+# 3. head と chain と novelty を R2 から直接読む（bucket は wrangler.jsonc の r2_buckets）
+wrangler r2 object get kotobase-graph-database-production/ipns/<graph>.json --file head.json --remote
+wrangler r2 object get kotobase-graph-database-production/blocks/<graph>/<cid> --file blk.bin --remote
+#   key layout: head=ipns/<graph>.json / block=blocks/<graph>/<cid> / owner=owners/<graph>.json
+#   commit block は dag-cbor {seq, prev, state{indexed, novelty-back, novelty-count, novelty-front}}
 ```
 
 ## 10. このセッションで踏んだ手順上の誤り（同型の再発防止）
@@ -235,4 +390,19 @@ west.yml にも概念索引にも無いことを添えて「worker のソース�
   「その名前の repo が本当に無い」ことと「では何が deploy を所有しているか」を分けて確かめる。
 - 逆向きの罠も同時に踏んだ: `gh api repos/network-awai/net-kotobase` は **200 を返す**
   （rename redirect で control-plane に解決される）のに、`orgs/network-awai/repos` の
-  一覧には出ない。**200 が「その org にある」の証拠にならない。**"}]
+  一覧には出ない。**200 が「その org にある」の証拠にならない。**
+
+**4 つ目（2026-08-17、§4 の測定中）: wire 名を間違えた実験を、実験の結果として読みかけた。**
+`components` を body に入れて keyed read を測り、「keyed でも 36 秒だから prefix 刈りは効かない」と
+結論しかけた。`do-datoms` が destructure するのは **`components_edn`** で、`components` は
+黙って無視されて full scan のままだった。正しい名前で測ると 29.3 秒 / 200 OK になり、
+**結論が反転した**（「snapshot が重い」→「snapshot は 2.7 秒しかない」）。
+**無視されたパラメータは、効かなかったパラメータと同じ観測を返す。**
+ADR-2608136000 の「測れなかった検査が、測って問題が無かった検査と同じ値を返す」の
+リクエスト側の形。wire 名は handler の destructure から確かめる。
+
+**5 つ目: env var を west checkout から読んで、逆の値を得た。**
+`pds/wrangler.jsonc` の `RELAY_CRON_ENABLED` は checkout では `\"0\"`（2026-07-18 の無効化）だが、
+`origin/main` では `\"1\"`（2026-08-15 の再有効化）。§10 の 1・2 と同じ pin 由来の罠が、
+コードだけでなく**設定値**にも当たる。しかも main の値ですら「宣言」であって
+「その script に今 deploy されている値」ではない —— 後者は `wrangler` か live の挙動でしか確かめられない。"}]

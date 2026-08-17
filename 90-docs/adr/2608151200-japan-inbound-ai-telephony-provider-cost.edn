@@ -40,16 +40,23 @@
 - 🔴 **初回キーは会話ログへ平文で貼られた。rotate 対象**（Portal で再発行 →
   kagi 更新 → Keychain キャッシュ作り直し、の 3 手で 1 組）。
 
-## 現在地と resume point（2026-08-16 時点）
+## 現在地と resume point（2026-08-17 時点）
+
+**Telnyx の口座は 2 つある。** 下の表は日本向け（Gftd Japan）の話で、2026-08-17 に
+別法人 AWAI Network, L.L.C. の口座を新設した（次節）。**鍵を取り違えない。**
 
 | | |
 |---|---|
-| ✅ アカウント契約 | 済 |
+| ✅ アカウント契約 | 済（Gftd Japan株式会社） |
 | ✅ API キー | kagi 正本 + Keychain キャッシュ。**認証必須エンドポイントで 200 を実測** |
-| ✅ MCP | `.mcp.json` の `telnyx`。`tools/call` が認証エラーなしで通ることを確認 |
+| ✅ MCP | `.mcp.json` の `telnyx`。**旧（Gftd Japan）の鍵を読む。**番号を持つのはこちら |
 | ✅ 住所レコード | id `3027096574225286557` / `Gftd Japan株式会社` / 3-2-1 Nihonbashi, Chuo-ku, Tokyo 103-0027 |
 | ⬜ **書類 2 件** | **未提出（`GET /v2/documents` = 0 件）。ここで止まっている** |
 | ⬜ 番号購入 | 未実行。**書類が承認されるまで注文しない** |
+
+**日本番号のブロッカーは AWAI 口座では外れない。** 日本の番号割当は日本法人・日本住所を
+要求するので、Delaware LLC に切り替えても書類提出は回避できない。AWAI 口座は
+US / 国際番号を運営主体の名義で持つためのものであって、この行の代替ではない。
 
 ### ⚠ このアカウントは空ではない — 本番稼働中の US 番号がある
 
@@ -71,6 +78,58 @@
 最初から 1 と書いてあった。CLAUDE.md ADR-2608136800 の 5 問のうち
 「受け取った本文を捨てていないか」に該当する。**疎通確認に使ったレスポンスにも
 答えが載っていることがある。**
+
+## AWAI Network, L.L.C. の口座（2026-08-17 新設）
+
+運営主体の名義を正すため、`network-awai` の operator record が定める
+**AWAI Network, L.L.C.**（Delaware file no. 10704996 / EIN 30-1502338）で
+2 つ目の口座を作った。番号 0 本・残高 $0.00。
+
+| item | 口座 | 見分け方 |
+|---|---|---|
+| `telnyx-api-key` | Gftd Japan株式会社 | `GET /v2/phone_numbers` = **1 件** |
+| `telnyx-api-key-awai` | AWAI Network, L.L.C. | `GET /v2/phone_numbers` = **0 件** |
+
+**どちらの鍵も 200 を返すので、認証が通ったことは口座の同定にならない。**
+
+### `.network` ドメインは Telnyx に登録できない（先方の正規表現バグ）
+
+`j@awai.network` での登録は拒否される。web フォームが理由を出しており、
+ブロックリストのパターンが `.work$` —— **ドットが未エスケープ**で、正規表現の
+`.` が任意の 1 文字に一致するため `awai.network` の末尾 `twork` に当たっている。
+意図は `.work` TLD の遮断で、正しくはドットをエスケープした形。実測で
+`junkawasaki.com` / `gftd.group` / `gftd.co.jp` は影響を受けない。
+
+- API 側は同じ拒否を error 10027（`source.pointer = /email`）として返す。
+  **API のエラー文は理由を書かない。web フォームの方が情報量が多かった。**
+- 2026-08-17 に support@telnyx.com へ報告済み（Request ID
+  `a64cc757-97a9-9dee-8e1a-8411379cf93d`）。返信あり・**未読**。
+- 回避策として **Telnyx Agent Inbox**（`agentmail.to` ドメイン）で口座を作った。
+  修正されたら口座メールを `j@awai.network` へ移し、この箱への依存を切る。
+
+### Agent Inbox — 未文書 API と、口座復旧経路であること
+
+`agent-signup.md` は Agent Inbox の request body を一切書いていない。実測した形:
+
+```
+POST /v2/agent_inboxes/challenges  {purpose: bot_signup}
+  -> {challenge_id, algorithm: sha256-v1, challenge, difficulty_bits: 20, expires_at}
+POST /v2/agent_inboxes             {purpose: bot_signup, pow: {challenge_id, nonce}}
+```
+
+- `purpose` は必須。値は `bot_signup` のみ受理（`signup` / `agent_inbox` /
+  `inbox` / `general` はいずれも 400）。
+- proof-of-work の構成も未公開。**受理されたのは `sha256(challenge + コロン + nonce)`**
+  で、素の `challenge + nonce` は拒否される。誤った構成は
+  `Invalid proof of work` で弾かれるだけなので順に試して安全に特定できる。
+- **読み取り専用。** 生きているのは messages の一覧と個別取得の 2 本だけで、
+  送信・スレッド・受信箱メタデータは 404。**この口座から人に返信する経路は無い。**
+- ⚠ **`account_key` は一度しか返らず、失うと受信箱ごと復旧できない。**
+  サインインリンクがここに届く以上、これが口座の復旧経路そのものである。
+  kagi（`personal`）と Keychain の両方に `telnyx-agent-inbox-key` として格納した。
+
+手順とアクセス方法は `scripts/telnyx-agent-signup.cljs` と
+`.claude/skills/secrets-location-map/references/third-party-api.md`。
 
 **次の 1 手**: 履歴事項全部証明書（Gftd Japan株式会社、発行 3 か月以内）と
 住所証明を用意し、`POST /v2/documents` → requirement group 作成 →
