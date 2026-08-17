@@ -460,8 +460,73 @@ sugar guest の `:matches` から `:notices` が消え、
 
 ## 残ギャップ（次の agent へ）
 
-9. **次: `:native-aot` はまだ pending。** `kotoba-kir` `native-word-value-type?` は
-   `#{:i64 :bool :string}` plus option/result。amu pin `6d08e3c` も west pin
-   `933c148a` も `:document` を持たない。matcher は `.cljc` のまま。kgraph は
-   `.clj` のまま wrap しない。`:jit` も pending。
+9. **SKIP with evidence（re-check 2026-08-17）。** `:native-aot` は pending。
+   `kotoba-kir` GitHub main `933c148a3d810795966d92948f9abe9fe5383145` の
+   `native-word-value-type?` は `#{:i64 :bool :string :option-i64 :result-i64}`
+   plus recursive `:option`/`:result`。`:document` も document ops も native
+   admission に無い。これは backend gap（ADR-2608650000）であって言語の天井
+   ではない。bounded native `:document` は compiler/kir epic なのでこの slice
+   では触らない。kit `:native-aot` を implemented にしない。matcher は `.cljc`。
+   kgraph は `.clj` のまま wrap しない。`:jit` も pending。
+
+11. **DONE（2026-08-17）。** Syndicate current-set replay。first observe of a
+    facet+pattern delivers already-present matching assertions as `:document`
+    notices。re-observe drains mailbox only（replay は mailbox に残さない）。
+    facet-leave は undelivered mailbox を落とす。新しい observer は surviving
+    current-set を replay する（dead mailbox の duplicate は無い）。
+    encode EDN は `*print-namespace-maps* false`（`#:cap{...}` dispatch を
+    document-edn-read が拒否するため）。capability-count 10。vat / `<-` 無し。
+
+- `kotoba-lang/provider` main `d399b72ce5e4fd874e77611255169499bc83cd6f`
+  （merge of `f0d2c58a8403e704a21b3b17130df927ee65d2b1`）。
+  27 tests / 90 assertions（dataspace + match）。
+  break: memory store の first observe が current-set を返さないと
+  `observe-replays-current-matching-assertions-as-document-notices` が落ちる
+  （4 fail）。unbreak 緑。
+  `store-that-skips-current-set-replay-fails-closed` が first-observe を空にする
+  store を拒否。
+  https://github.com/kotoba-lang/provider/commit/d399b72ce5e4fd874e77611255169499bc83cd6f
+- `kotoba-lang/amu` main `4603d6d861de6947705e73c269bc426fcb060e47`
+  （merge of `35ae9c649e3f48e0653fcab7ebc1e1324fddf29f`）。
+  provider `d399b72`。dataspace + match + named-cap + conformance =
+  34 tests / 149 assertions。wasm-aot + qualification 15 / 75。
+  https://github.com/kotoba-lang/amu/commit/4603d6d861de6947705e73c269bc426fcb060e47
+- west pin: provider `7bac5648d2aff76dbb8040983e5a65cec2c2c463`（entry `d399b72`）、
+  amu `332591d76574da1834fd829bc14357aced4c476e`（entry `4603d6d`）。
+
+## テストの回し方と結果（2026-08-17 実測、current-set replay）
+
+provider:
+```
+cd /tmp/provider-dataspace-replay-20260817
+clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+```
+結果: **27 tests / 90 assertions、0 fail / 0 error。**
+両方向: first observe の current-set を `[]` に戻すと 4 fail。戻すと緑。
+
+amu（`clojure -M:test -n` は無視される）:
+```
+cd /tmp/amu-dataspace-replay-20260817
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.frontend-named-capability-test)
+            (quote kotoba.compiler.provider-conformance-test))
+    (apply clojure.test/run-tests
+           [(quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.frontend-named-capability-test)
+            (quote kotoba.compiler.provider-conformance-test)])'
+```
+結果: **34 tests / 149 assertions、0 fail / 0 error。** guest は named `:dataspace/transact`。count 10。
+
+## 残ギャップ（次の agent へ）
+
+12. **次: retraction notices。** matching assertion の retract は observer に
+    `:document` notice を届けない。Syndicate は observed assertion の retract を
+    届ける。同じ `:dataspace/transact` observe mailbox に載せる。新しい cap は
+    足さない。capability-count 10 のまま。
+13. `:native-aot` / `:jit` は pending（gap 9 の evidence のまま）。
+    `provider.incidence` は 1–3 が揃うまで始めない。
 "}]
