@@ -1,0 +1,268 @@
+[{:db/id -1
+  :adr/id "2608170700"
+  :adr/doc_type "adr"
+  :adr/topic "kotobase-murakumo-lead-sales-marketing-plan"
+  :adr/title "ADR-2608170700: kotobase.net / murakumo.cloud のリード・セールス・マーケティング計画 — 正本は isic-5820、HubSpot は移行元であって正本ではない"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :adr/last_verified "2026-08-17"
+  :adr/deciders ["Jun Kawasaki" "Claude Code"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["kotobase.net / murakumo.cloud の lead・contact・deal の system of record は cloud-itonami-isic-5820 であり、HubSpot ではない"
+   "HubSpot MCP の位置づけ（移行元 + 解約判定の入力であって、正本でも配信面でもない）"
+   "この 2 product の outbound 送信が通ってよい唯一の経路（isic-6201 ConsentGovernor → cloud-itonami.ops-send → Resend）"
+   "commercial go が閉じるまでに許される接触の種類（unpaid design-partner outreach のみ）"]
+  :adr/related ["adr-2607271200-itad-lp-lead-to-5820-crm-capture-ingress"
+                "adr-2607261200-cloud-itonami-crm-marketing-effect-bridge"
+                "adr-2607246100-revenue-agent-loop"
+                "adr-2608152200-gftdcojp-cfo-liabilities-income-operating-plan"
+                "adr-2608136000-five-questions-before-trusting-green"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/repos ["com-junkawasaki/root"
+              "cloud-itonami/cloud-itonami-isic-5820"
+              "cloud-itonami/cloud-itonami-isic-6201"
+              "network-awai/net-kotobase"
+              "gftdcojp/cloud-murakumo"]
+  :adr/body
+  "# ADR-2608170700: kotobase.net / murakumo.cloud のリード・セールス・マーケティング計画
+
+**Status**: accepted / **Date**: 2026-08-17
+
+## Context — 2026-08-17 に実測したこと
+
+オーナー指示『今の hubspot mcp の登録から, kotobase.net, murakumo.cloud の
+リード、セールス、マーケティングを計画して』に対する調査と計画。
+
+### 1. HubSpot MCP は登録されていなかった
+
+- `~/.claude.json`（macos-computer-use / stripe / higgsfield / codex / resend）にも
+  `.mcp.json`（mfc_ca / mfc_ca_gw / cloud-itonami-license / cloud-itonami-app / telnyx）
+  にも hubspot は無い。**『今の登録』は存在しない状態から始まる。**
+- 過去の HubSpot 連携は `gftdcojp/hubspot-hb5p0t1n` に
+  `:migration/status :retired` として記録されている。歴史的 capability は
+  HubSpot CRM v3 incremental polling / Hyperdrive 書き込み / `ai.gftd.apps.hubspot`
+  XRPC / **agentgateway MCP router delegation**。`:migration/reactivation-gate` が
+  再有効化を明示的に禁じている（旧 Wrangler route と旧 router は戻さない）。
+- 一方 **HubSpot は今も課金中**。CFO 台帳（ADR-2608152200）の FY2026 広告宣伝費に
+  HubSpot ¥63,984（7.5ヶ月）= 月およそ ¥8,500。**tier は未実測**（UNVERIFIED）。
+
+### 2. 自前の HubSpot/Salesforce 相当は 3 本あり、稼働は 1 本だけ
+
+| repo | class | 実測 2026-08-17 |
+|---|---|---|
+| `cloud-itonami-isic-5820` | Salesforce / HubSpot Sales | **LIVE**（`/health` 200）。`POST /leads` capture ingress あり |
+| `cloud-itonami-isic-6201` | HubSpot Marketing Hub | **未デプロイ**（`itonami-6201.etzhayyim.com/health` は接続不能） |
+| `cloud-itonami-isic-6202` | HubSpot Service Hub | 未デプロイ |
+
+5820 の `POST /leads` は **(source, external-id) で idempotent** な store-level
+capture であり、governed op ではない（フォームが埋まったことは観測であって決定では
+ないため）。決定（`:lead/qualify` `:lead/convert`）は `/propose` の
+SubscriptionGovernor 経由のまま変わらない。ledger は `:governed? false` を明示的に
+書くので、監査者が capture を governed commit と読み違えることはない。
+
+### 3. 2 product のファネル実測
+
+| | kotobase.net | murakumo.cloud |
+|---|---|---|
+| 訪問 / uniques | 3,377 visitors（累計 `/api/funnel`）・1,068 uniques/7d | 703 uniques/7d |
+| 登録 | **28**（うち organic 24 / other 1） | ingress 無し |
+| checkout | **0** | federation active-demand-apps **0** |
+| Stripe | active subs 0 | active subs 0 / paid charges 0 |
+| 公開価格 | `/pricing` 200（Aura 対応の 3 段。live 課金 SKU は Secure Managed ¥19,800/月） | **`/pricing` は 404** |
+| 法務面 | `/legal/*` は live 200 だが **DRAFT / UNAPPROVED TEMPLATE**、`[CONFIRM:` マーカー残 | go/no-go 表に**行が無い = 未評価** |
+| commercial go | **no-go** | **未評価** |
+
+ポートフォリオ全体の Stripe は最終課金が 2020-11-01。**外部実入金は 4 product とも 0。**
+
+### 4. 実行に入って壊れた前提が 2 つ（2026-08-17、この ADR の初稿を訂正）
+
+初稿は Phase 1 を『28 signups を 5820 へ drain する』と書いた。**実行できない。**
+
+**(a) kotobase の 28 signups は識別子を持たないカウンタである。**
+`kotobase.funnel` の実装は KV の単調増加カウンタ 3 本（`funnel:visitors` /
+`funnel:signups` / `funnel:checkouts`）で、`signups` はクライアントが投げる
+`POST /api/funnel/event {\"event\":\"signup\"}` で加算される。
+**メールアドレスも tenant id も紐づいていない。** identity の受け渡しは
+その後 `auth.kotobase.net` 側で起きる（`kotobase.conversions` の docstring 自身が
+『この段階で kotobase は verified identifier を持たない』と書いている）。
+したがって 28 は**連絡できる 28 人ではなく、押されたボタンの回数**である。
+これは ADR-2608136000 の形そのもの —— *捕まえられなかった* が *捕まえて 28 件* と
+同じ列に出ていた。**kotobase 側の Phase 1 は drain ではなく ingress の新設**になる。
+
+**(b) 5820 は 2 台 live で、store が別である（split-brain）。**
+
+| 実測 2026-08-17 | 応答 | `/` が広告するルート |
+|---|---|---|
+| `gad:8092`（systemd、ADR-2607173500） | `/health` 200 | health / propose / dashboard —— **`/leads` も `/approve` も無い** |
+| `25mbair:8582` → `itonami-5820.etzhayyim.com`（LaunchAgent、ADR-2607199950） | `/health` 200 | health / propose / **approve** / **leads** / dashboard |
+
+gad は P1（capture ingress）より前の commit で動き続けている。両者は別ホスト・
+別ストアなので、**『正本は 5820』は今日そのままでは意味が確定しない。**
+D1 が禁じた分裂を、こちらが自分で作っている状態である。
+**どちらが正本かを決めるまで drain を実行しない。**
+
+murakumo の 24h トラフィックはほぼ内部 API（fleet promotions 17,156 / scanner
+17,103 / hwmetrics 8,204）で、外部認知由来の流入ではない。一方 **原価優位は実測済み**:
+fleet ¥21.85/Mtok vs spot ¥40.55/Mtok（ratio 0.54、`pass? true`、runs 200）。
+これがこの product で今日 hard evidence を持つ唯一の差別化。
+
+## Decision
+
+### D1. lead / contact / deal の正本は `cloud-itonami-isic-5820`（オーナー判断 2026-08-17）
+
+HubSpot を正本にしない。**dual-write もしない** —— 同じ contact を 2 箇所が正本として
+持つのは CLAUDE.md が禁じる『黙ったシャーディング』で、どちらが真かを後から誰も
+言えなくなる。
+
+### D2. HubSpot MCP は『移行元 + 解約判定の入力』として登録する
+
+`.mcp.json` に `hubspot`（`https://mcp.hubspot.com/`、Streamable HTTP、OAuth 2.1 +
+PKCE）を追加した。**OAuth ログインと HubSpot 側の MCP auth app 作成は owner が行う**
+（安全床①: agent は認証情報をフォーム入力しない）。用途は次の 3 つに限る:
+
+1. portal の実データを読む（contact / company / deal / form / list / consent 状態の件数）
+2. その実データを 5820 へ流し込む
+3. 回収完了を根拠に **HubSpot 解約の可否を owner に提示する**（解約実行は owner）
+
+**用途に含まれないもの**: HubSpot への書き戻し、HubSpot workflow による送信、
+`hubspot-hb5p0t1n` の retired ingest / agentgateway MCP router の再有効化。
+
+### D3. outbound が通ってよい経路は 1 本だけ
+
+`isic-6201`（MarketingOps-LLM ⊣ ConsentGovernor）を deploy し、送信提案は
+`:campaign/send-message` を通す → 実送信は `cloud-itonami.ops-send`（送信=PR、
+CACAO 署名 merge だけが発火、receipt dedupe で at-most-once）→ Resend。
+**6201 が未デプロイである以上、今日この 2 product に outbound の経路は無い。**
+これが Phase 3 の前提工事であり、『とりあえず手で送る』で迂回しない
+（consent 検証・二重送信検知・スコア突合が丸ごと落ちるため）。
+
+### D4. commercial go が閉じるまで、許されるのは unpaid design-partner outreach だけ
+
+`COMMERCIAL-GO-NO-GO.md` が net-kotobase を **no-go** としており、
+`net-kotobase-named-accounts.edn` は全件 `:account/send? false`。この状態は正しく、
+Phase 2 が閉じるまで維持する。許されるのは 30 分の problem interview と任意の
+14 日 unpaid alpha であって、有料勧誘・live checkout の公開・実決済の受領ではない。
+
+## 計画 — 5 フェーズ、各フェーズは gate で閉じる
+
+### Phase 0 — HubSpot を回収して固定費を切る（今週）
+
+| # | 作業 | 実行者 |
+|---|---|---|
+| 0-0 | **5820 の正本を 1 台に決める**（gad を退役させるか、pin を進めて 25mbair に合わせるか） | owner 判断 → agent |
+| 0-1 | HubSpot で MCP auth app 作成 → `/mcp` で OAuth 認可 | **owner** |
+| 0-2 | portal 実測: object 種別ごとの件数、tier、form、list、consent 状態 | agent |
+| 0-3 | `POST /leads` へ drain（`source=hubspot`、`external-id=<HubSpot object id>`） | agent |
+| 0-4 | 突合: HubSpot 側 count と 5820 側 count の差分ゼロを確認 | agent |
+| 0-5 | 解約可否を数値付きで提示（月 ¥8,500 / 年 ¥102,000） | agent → owner |
+
+**drain は実装して landing 済み** —— `scripts/crm-lead-drain.cljs`（nbb、source 非依存）。
+`gftdcojp/itad` の `scripts/crm-drain.cljs` が先行実装だが**あちらは Cloudflare KV
+専用**なので、KV を経由しない入力（MCP 経由で吸い出した HubSpot object）を
+受けられる drain としてこちらを足した。5820 への POST の作法（token を argv に
+出さず curl の `--config` を stdin で渡す・insert-if-absent の二重冪等）は
+itad 版から踏襲している。
+
+**evidence floor**（ADR-2608136000）: `SCANNED=<n>` を必ず印字し、
+**exit 0 / 1 / 2 を分ける** —— 0 = 測って捌いた、1 = 測って失敗が在る、
+**2 = 答えられなかった**（入力が読めない / token が解決できない / 5820 が
+`/health` 200 を返さない / `SCANNED=0` で `--allow-empty` が無い）。
+
+実測 2026-08-17、**両方向を確かめた** 8 ケース: 正常 dry-run → 0 ／ 空 → 2 ／
+空 + `--allow-empty` → 0 ／ 不正レコード → 1 ／ 壊れた EDN → 2 ／ 入力不在 → 2 ／
+token 無しの実 POST → 2 ／ 到達不能 URL → 2。さらに**実 5820 に誤 token で当てて**
+preflight 200 → POST → `401 {\"error\":\"unauthorized\"}` を本文ごと記録して
+FAILED=2 で終わることを確認した（status だけ記録して本文を捨てる経路は無い）。
+
+⚠ **正しい token での成功経路はまだ verify していない。** token は kagi の
+compartment `gftdcojp` にあり、**このワークステーション (main-2) には無い**
+（`no such item`、ADR-2607271200 の実測どおり）。実 drain は 25mbair で回す。
+『実装した』と『実 POST が通った』を同じ欄に書かない。
+
+### Phase 1 — リード源を 1 本に集約する
+
+source 名を固定し、後から join できる形にする:
+
+| source | 意味 | 今日の状態 |
+|---|---|---|
+| `kotobase-signup` | kotobase.net の登録 | **識別子が無い**。28 はカウンタであってレコードではない（上記 4-a） |
+| `murakumo-join` | murakumo.cloud の問い合わせ | **ingress が構造的に無い** |
+| `hubspot` | 過去の HubSpot contact | Phase 0 で回収 |
+| `outbound-research` | named-accounts の調査候補 | T1 目標 100 社に対し researched |
+| `itad-lp` | itad.gftd.ai の LP | 稼働（ADR-2607271200 P1） |
+
+Phase 1 の実体は **2 つとも『ingress を作る』**である。kotobase は 28 件を運ぶ
+作業ではなく、**signup で identity を捕まえて 5820 に落とす経路を新設する**こと
+（現状はカウンタしか残っていないので、過去 28 回分は取り返せない —— これは
+損失であって、作業で埋められる差分ではない）。murakumo は lead の落ち先が
+そもそも無い。murakumo は `/pricing` が 404 で
+公開価格が無く、`/join/mobile.html` はあるが lead を受ける先が無い。
+
+### Phase 2 — 『売ってよいか』を閉じる
+
+**kotobase.net（no-go の理由は 4 つ、全部実測済み）**
+
+1. `/legal/terms` `/legal/privacy` `/legal/dpa` の DRAFT / UNAPPROVED を counsel 承認で外す
+   —— **owner / counsel 固有。agent は代行しない**
+2. owner 確定の Developer ¥2,980/月 が未公開（live 課金 SKU は Secure Managed ¥19,800/月）
+3. Stripe Price と landing 表示の照合
+4. test-mode E2E（checkout → signed webhook → entitlement → cancel/downgrade）。
+   `sk_test_…` が金庫に無く、**live key の流用は禁止**なので owner が発行する
+
+⚠ **2・3・4 はこの session からは実行できない。** `network-awai/net-kotobase` は
+cross-tier add が拒否されるため、`network-awai/net-kotobase` を initial source にした
+別 session が要る。
+
+**murakumo.cloud（まず gate 行を作る）**
+
+go/no-go 表に murakumo の行が無い = 評価されていない。作るべき行は
+operator 法人 / Terms・Privacy / 公開価格 / 返金・解約条件 / PSP の 5 つ。
+x402 と Stripe checkout の配管は実在するので、欠けているのは**公開された商品**である。
+
+### Phase 3 — 需要（唯一誰も代行できない部分）
+
+- 対象は既存 ICP をそのまま使う。**新しい ICP を作らない。**
+  - kotobase.net: AI agent / GraphRAG durable-memory セグメント（`net-kotobase-named-accounts.edn`、T1 100 社目標）
+  - murakumo.cloud: US indie AI/ML studio（Q4 Bonus Depreciation の時限フック）→ EU（AI Act / GDPR 監査台帳）
+- ⚠ **murakumo の target list は母集団が間違っている。** `gtm-icp.datoms.edn` が
+  自ら『現在の catalog 母集団（売上順上場企業）はこの ICP と正面から反対』と申告
+  しており、`:icp/unevaluable-edn` に company-size / industry / gpu-spend / entity-form
+  の 4 述語が『どのデータ源にも今日は無い』として名指しされている。
+  **リストを作る前に母集団を替える**のが順序であって、今の catalog から 20 社を
+  切り出す作業は成果に見えて成果ではない。
+- offer は 30 分 problem interview（+ 任意の 14 日 unpaid alpha）。go が閉じるまで
+  価格の提示・見積・請求をしない。
+
+### Phase 4 — 週次で見る数値を 5 つに固定する
+
+1. 5820 の lead 件数（source 別）
+2. qualified 件数（`/propose` を通ったもの）
+3. 実施した interview 件数
+4. go/no-go の red 件数
+5. **非 owner による検証済み実決済**
+
+5 が 0 のままなら 1〜4 がいくら動いても T1 は閉じない。逆に 1〜4 を測らずに 5 だけ
+見ると、何を変えたら 5 が動くのかが分からない。**両方を同じ週次 run に置く。**
+
+## Consequences
+
+- HubSpot を止めれば年 ¥102,000 の固定費が消える。現金 ¥31,404・当期純損失
+  ¥78,713,021 の会社にとって無視できる額ではないが、**これは売上ではない** ——
+  Camunda（最終請求 2025-08-15）/ Neo4j Aura（同 2025-12-01）と同じ棚卸しの続きであって、
+  この計画の主目的ではない。
+- 正本を 5820 に寄せることで、contact identity が 3 actor に割れている現状
+  （ADR-2607271200 が『黙ったシャーディングに相当』と自認）の解消が始まる。
+- 6201 を deploy するまで outbound は 0 本。**これは制約ではなく現状の正直な記述**で、
+  今日『メールを送る計画』を書いてもそれを実行する経路が無い。
+
+## Non-goals（明示的にやらないこと）
+
+- HubSpot を正本に戻す / dual-write する
+- `hubspot-hb5p0t1n` の retired ingest・agentgateway MCP router を再有効化する
+- commercial go が閉じる前に有料勧誘・live checkout 公開・実決済受領をする
+- agent が owner の決済手段で checkout を通して externalPaid を 1 にする（ADR-2608062400 の捏造）
+- counsel review / live 切替 / Stripe live key 操作を agent が代行する
+- 新しい ICP・新しい lead ingress・新しい CRM を作る（既存の 5 つで足りる）
+"}]
