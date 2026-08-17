@@ -1,6 +1,6 @@
 [{:db/id -1
   :adr/id "ADR-2608171256"
-  :adr/title "Kotobase IPFS/IPNS HTTP protocol maturity 0.22.0 と残 gap の閉鎖順"
+  :adr/title "Kotobase IPFS/IPNS HTTP protocol maturity 0.23.0 と残 gap の閉鎖順"
   :adr/status "accepted"
   :adr/date "2026-08-17"
   :adr/last_verified "2026-08-17"
@@ -18,14 +18,14 @@
   :adr/supersedes ""
   :adr/superseded-by ""
   :adr/authoritative_for
-  ["net-kotobase/ipfs 0.22.0 までに実装・live 確認された HTTP Gateway / IPNS / UnixFS / CAR 面"
+  ["net-kotobase/ipfs 0.23.0 までに実装・live 確認された HTTP Gateway / IPNS / UnixFS / CAR 面"
    "local regression、production live、provider qualification を同一視しない証拠境界"
    "残 gap G1-G7 の優先順、完了条件、非主張"
    "この Worker は bounded HTTP Gateway であり libp2p peer ではない境界"
-   "G1/G2/G3 は 0.22.0 で閉じた。次の実装は G4 legacy prebuilt B2 CAR から始める"]
+   "G1-G4 は 0.23.0 で閉じた。G5 は別 ADR と実 bucket を要し、G6 は証明書、G7 は product decision 待ち"]
   :source/dataset "adr"
   :adr/body
-  "# ADR-2608171256: Kotobase IPFS/IPNS HTTP protocol maturity 0.22.0 と残 gap
+  "# ADR-2608171256: Kotobase IPFS/IPNS HTTP protocol maturity 0.23.0 と残 gap
 
 ## Context
 
@@ -48,7 +48,7 @@ IPNS origin が提供する HTTP compatibility surface の成熟度である。
 
 ### 1. 準拠性は面ごとに答える
 
-| 面 | 0.22.0 の状態 | 主張してよいこと | 主張してはいけないこと |
+| 面 | 0.23.0 の状態 | 主張してよいこと | 主張してはいけないこと |
 |---|---|---|---|
 | Path Gateway GET / HEAD | implemented + live | malformed CID を I/O 前に 400、immutable CID response、Range / conditional | 全 IPFS Gateway conformance suite 合格 |
 | trustless raw | implemented + live | weighted Accept / `format=raw`、strong ETag、304、206、R2 2-pass CID verification | 任意 provider の live qualification |
@@ -58,6 +58,7 @@ IPNS origin が提供する HTTP compatibility surface の成熟度である。
 | IPNS record | implemented + live | protobuf IpnsEntry の name / signature 検証、`format=ipns-record`、Routing V1 GET | DHT publish、PubSub、Worker 自身が DHT node |
 | direct R2 retrieval | implemented + live | Kubo 無し、CID verification 後に executable origin を描画 | R2 が database truth |
 | legacy B2 raw adapter | implementation-qualified only | fake transport で SigV4、Range + If-Match、2-pass / exact length を検証 | production live-qualified |
+| legacy B2 prebuilt CAR | **removed（0.23.0）** | 未 parse の archive を local success にしない、`cars/` key を読まない | 「検証済み CAR を提供する」こと |
 | libp2p / DHT / Bitswap | not implemented, named boundary | HTTP Worker は peer と名乗らない | IPFS network node への完全準拠 |
 
 ### 2. ここまでに着地した成熟化
@@ -93,28 +94,29 @@ live probe → evidence PR → west/genpon pin で閉じた。
    80 byte を同時に返す。full は再検証つき再読込、strict sub-range は
    `onlyIf.etagMatches` 束縛。ETag が無ければ delegate し、full-buffer へは落ちない。
 
-### 3. 0.22.0 closure evidence
+### 3. 0.23.0 closure evidence
 
 | evidence class | 値 | 意味 |
 |---|---|---|
-| canonical child main | `d96a4881d57e70b68ea12b402554c62c8dd0efac` | PR #45 / #46 merge 後の `net-kotobase/ipfs` main |
-| production artifact | Cloudflare version `ee0bc23e-4b17-4f49-b27c-4d841c907fbc` | deploy 済み Worker artifact |
-| local regression | 105 tests / 482 assertions | fake R2/B2、negative、backpressure、exact bytes |
+| canonical child main | `49d1f8c008dc89aa06f7d19f47a785047b3ebdc1` | PR #47 / #48 merge 後の `net-kotobase/ipfs` main |
+| production artifact | Cloudflare version `a78ba764-534e-4fa9-9168-f7d9fd54320c` | deploy 済み Worker artifact |
+| local regression | 105 tests / 483 assertions | fake R2/B2、negative、backpressure、exact bytes |
 | dependency audit | 0 vulnerabilities | 2026-08-17 の `npm audit` |
-| production probe | 38 / 38（122 assertions） | health、meta、raw、raw origin root、CAR、UnixFS、HAMT、IPNS、negative |
-| public health | `200` / version `0.22.0` | production route |
+| production probe | 38 / 38（124 assertions） | health、meta、raw、raw origin root、CAR、UnixFS、HAMT、IPNS、negative |
+| public health | `200` / version `0.23.0` | production route |
 | storage state | `r2_configured:true`, `b2_configured:false` | active provider と inactive adapter の区別 |
-| superproject adoption | west/genpon pin `d96a4881...` | root single-entry pin 前進（commit `1905038e`） |
-| genpon receipt | ledger event 11477 | `054b4e45...` → `d96a4881...` |
+| superproject adoption | west/genpon pin `49d1f8c0...` | root single-entry pin 前進（commit `2f11b63d`） |
+| genpon receipt | ledger event 11480 | `d96a4881...` → `49d1f8c0...` |
 | projection check | `fleet-db == manifest/west.yml` | fresh clone の `kagami reconcile --check` |
 
 live 38/38 は active R2 / HTTP surface のnon-regression証拠であり、B2 live、libp2p、
 全spec準拠の証拠ではない。105 testsがgreenでも、production bindingの無いB2を
 production-readyと呼ばない。
 
-⚠ **deploy 直後の `/health` は edge の古い応答を返しうる。** 実測 2026-08-17: probe 自身の
-version 検査は 0.21.0 で通っていたのに、素の curl は 0.20.0 を返した。cache-bust すれば
-一貫して 0.21.0。**「deploy が効いていない」と誤読しない。**
+⚠ **deploy 直後は少数の応答が直前の版から返る。** 実測 2026-08-17、2 リリースで再現:
+直後は 4 read 中 1 が旧版、8 read 後には 0 —— probe 自身の version 検査はその前に通っている。
+Cloudflare の version rollout が PoP / isolate を巡る窓であって、**「deploy が効いていない」
+ではない。** 直後の 1 回の curl で判断しない。
 
 **live probe と memory 境界を混同しない。** raw origin root の live probe が触る
 block は 39 byte で、「buffer していない」ことを示せる大きさではない。live が示すのは
@@ -220,16 +222,35 @@ drift は同じコードと同じ既存 regression が判定し続ける。
 **`unixfs_dag_pb_structure_buffered` は true のまま。** buffer は小さくなったのであって
 消えていない。metadata は数値を公開する —— 消えたと読ませないために。
 
-### G4 — legacy prebuilt B2 CAR はserver-side parse / reverifyしない
+### G4 — legacy prebuilt B2 CAR はserver-side parse / reverifyしない — **closed（0.23.0、2026-08-17、選択肢 B）**
 
-**現在。** B2 raw objectとraw-block CAR adapterはbounded verification済み。一方、既存の
-prebuilt CAR direct streamはclient-verifiableではあるが、Workerが全frameをparseし
-root / CID / completenessを再検証してから成功とする経路ではない。
+**何を主張してしまっていたか。** Worker は prebuilt CAR を一度も parse していなかった ——
+root も frame length も CID multihash も、file が申告どおりに終わるかも検査せず、
+`cars/<type>/<target>.car` に在る bytes をそのまま `application/vnd.ipld.car; version=1`・
+immutable として流していた。既存 fixture がそれを可視化している: **`text/html` の 3 byte が
+CAR として出ていき、test がそれを正しい振る舞いとして固定していた。**
 
-**完了条件。** 選択肢は二つ。A: bounded streaming CAR verifierを入れ、root、frame length、
-CID multihash、duplicate/order、EOF completenessを検証する。B: direct prebuilt CARをlocal
-successから外し、verified block assemblyかdelegateだけにする。どちらでも
-`b2_prebuilt_car_server_verified`をtruthfulに出す。単なる200をqualificationにしない。
+**なぜ A ではなく B か。** A は bounded streaming CAR verifier を書くこと、B は direct
+経路を外して verified block assembly か delegate だけにすること。**B —— 検証すべき対象が
+存在しないから。** B2 は production binding を持たず archive keyspace は一度も object を
+持ったことがない。A は「1 byte も serve したことがない経路のために parser を書く」ことに
+なり、その間ずっと未検証の主張が live に残る。**裏付けの無い主張は、それを正当化する機構を
+足すより、外す方が先。**
+
+`format=car` は verified single-block assembly に届くか delegate し、`cars/` key は
+**読まれもしない**。`car-key` も一緒に削除した —— もう存在しない経路の key builder を
+残さない。
+
+**metadata は 2 key 出す。1 つでは曖昧だから**: `b2_prebuilt_car_direct_serving:false` は
+未検証経路が消えたこと、`b2_prebuilt_car_server_verified:false` は**検証済み経路に置き換えた
+わけでもない**ことを言う。どちらも qualification ではない。
+
+**既存の read count が 7 → 6 に動いた理由を隣に記録した** —— 7 本目は `cars/` key の probe
+で、その唯一の目的が未 parse archive の提供だった。verified raw-object stream 2 本は残る。
+
+⚠ **live probe はこの変更を実証できない。** B2 は production binding も archive object も
+無いので、未検証経路が在ろうと無かろうと probe は `b2_configured:false` で 38/38 通る。
+実証は local regression 側（`cars/` key を読まず delegate する）。
 
 ### G5 — B2 adapter はproduction live-unqualified
 
@@ -261,8 +282,21 @@ libp2p live readinessへ読み替えない。
 
 ## Ordered next work
 
-WIPは1。G1/G2/G3は0.22.0で閉じた。残る順序は `G4/G5`。G6はcertificate外部条件が
-満たされた時、G7はsuccessor product decisionが出た時だけ開始する。
+WIPは1。**G1-G4 は 0.23.0 で閉じた。** 残るのは G5 / G6 / G7 で、**3 つとも
+このセッションのコード変更では閉じられない**:
+
+- **G5** は ADR 本文が明示的に別 ADR を要求する —— read-only credential、既知 CID canary、
+  実 bucket に対する full / Range / ETag drift / missing / CAR negative の実測。
+  write/archive enable は `net-kotobase` の storage-mode decision を伴うため
+  **本 ADR の恒久承認に含まれない**。資格化までは `b2_raw_live_qualified:false` を維持。
+- **G6** は kotobase.net zone の advanced certificate quota（`allocated: 0`）という
+  **外部条件**。DNS だけ置いて完了としない。
+- **G7** は意図的な未実装。public DHT announce / Bitswap provider になる **product
+  decision** が出た時だけ successor ADR を開く。
+
+したがって次に動かせるのは「G5 の前提を作る決定」か「G6 の quota 取得」であって、
+どちらも人間の判断・外部リソースの側にある。**コード側の memory / verification 債務は
+G1-G4 で尽きた。**
 
 **G4/G5 へ持ち込むこと（G1-G3 で確定）**:
 
