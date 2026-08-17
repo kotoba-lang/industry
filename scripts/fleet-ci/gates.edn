@@ -130,6 +130,10 @@
   {:name "org-ietf-cbor" :gate :jvm-test :cd true}
   {:name "io-multiformats" :gate :jvm-test :cd true}
   {:name "io-ipld" :gate :jvm-test :cd true}
+  ;; UnixFS file DAGs. Its fixtures are real kubo CIDs, so this gate answers
+  ;; "does `ipfs add` still agree with us" and not "do we agree with
+  ;; ourselves" -- the distinction the codec it replaced could not make.
+  {:name "tech-ipfs-specs-unixfs" :gate :jvm-test :cd true}
   ;; The physical plane (ADR-2608160100): CARv2 bytes, the storage contract
   ;; that describes where a block lives, and the packed block store over it.
   ;; :jvm-test covers each repo's synchronous suite. What it does NOT cover is
