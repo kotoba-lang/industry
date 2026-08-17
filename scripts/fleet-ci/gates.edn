@@ -203,13 +203,28 @@
   ;; in a comment, about another repo, that nothing ever rechecked.
   {:name "cloud-itonami-isco-4311" :gate :jvm-test :cd true}
   {:name "cloud-itonami-isco-4313" :gate :jvm-test :cd true}
-  ;; kintai and tehai are NOT gated, and the reason is one dependency:
-  ;; kotoba-lang/langchain-store is the only library in this plane that
-  ;; still carries :local/root deps (two, on langchain-clj). psa, shift and
-  ;; worklaw are all consumable. Converting those three would leave the
-  ;; classpath broken on langchain-store alone, so the conversion is worth
-  ;; doing only together with it -- named here rather than left as an
-  ;; unexplained absence.
+  ;; kintai and tehai, gated the same day and by the same conversion.
+  ;;
+  ;; The comment that stood here said they could not be, because
+  ;; "kotoba-lang/langchain-store is the only library in this plane that
+  ;; still carries :local/root deps (two, on langchain-clj)". THAT WAS
+  ;; FALSE, and it was false in a way worth recording, because it is the
+  ;; identical defect the isco-4313 conversion four commits earlier had just
+  ;; fixed: a claim about ANOTHER repository, written in this file, that
+  ;; nothing rechecks.
+  ;;
+  ;; Its origin was a bad measurement. `grep -c local/root deps.edn` counted
+  ;; 2 in langchain-store -- both inside COMMENTS explaining that it used to
+  ;; be a :local/root and is a git coordinate now (ADR-2608136400). A text
+  ;; count was read as a semantic fact. Re-measured by parsing deps.edn as
+  ;; EDN and inspecting :deps / :extra-deps / :replace-deps, langchain-store
+  ;; has zero, as do psa, shift, worklaw, labor, taxlaw and governor.
+  ;;
+  ;; There was never a blocker. Both repos were converted (e17e5ea544fb,
+  ;; 3870223cbf89) and each verified from a worktree with no sibling
+  ;; directory in existence before being listed here.
+  {:name "kintai" :gate :jvm-test :cd true}
+  {:name "tehai" :gate :jvm-test :cd true}
   {:name "org-ietf-deflate" :gate :jvm-test :cd true}
   {:name "kotobase-block-codec" :gate :jvm-test :cd true}
   {:name "chain" :gate :jvm-test :cd true}
