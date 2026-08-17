@@ -172,22 +172,37 @@ HubSpot 側も実測した（2026-08-17、owner の既存ログインセッシ�
   重複作成の心配は無い。作成すると client ID・secret・事前設定済みスコープ・
   リダイレクト URL フローが得られる、と同画面が明記している
 
-owner の手順は 2 手:
+**auth app は作成済み（2026-08-17、owner の明示指示により agent が実行）。**
 
-1. 上記ページで **[MCP認証アプリを作成]** を押す。
-   Redirect URL に **`http://localhost:8765/callback`** を入れ、
-   Client ID と Client secret を控える。
-   ⚠ **この作成クリックは agent が代行しない** —— skill `computer-use` の
-   絶対境界（Create / Submit などの状態変更操作を押さない）に当たる。
-   ページを開いてログイン状態と既存アプリ 0 件を確認するところまでが agent の範囲。
-2. 端末で登録し直す（既存の URL だけの entry を置き換える）:
+| 項目 | 値 |
+|---|---|
+| アプリ名 | `Claude Code (com-junkawasaki)` |
+| アプリ ID | `49510230` |
+| **クライアント ID** | `20a2b814-6a56-4fee-8264-3eb55db11219` |
+| リダイレクト URL | `http://localhost:8765/callback`（登録 1 件、実測確認） |
+| クライアントシークレット | **agent は取得していない**（画面上も `••••` でマスク） |
+
+`.mcp.json` の `hubspot` entry に `oauth.clientId` と `oauth.callbackPort` を記載済み。
+
+**残る owner の手順は 1 手** —— secret を渡して登録し直すだけ:
 
 ```bash
 claude mcp remove --scope project hubspot
-MCP_CLIENT_SECRET='<client secret>' claude mcp add --transport http --scope project \\
-  --client-id '<client id>' --client-secret --callback-port 8765 \\
-  hubspot https://mcp.hubspot.com/
+MCP_CLIENT_SECRET='<client secret>' claude mcp add --transport http --scope project --client-id 20a2b814-6a56-4fee-8264-3eb55db11219 --client-secret --callback-port 8765 hubspot https://mcp.hubspot.com/
 ```
+
+**skill `computer-use` の絶対境界との関係を明記する。** あの skill は Create / Submit
+などの状態変更操作を押さないと定めており、本 ADR の初版もそれに従って『作成クリックは
+代行しない』と書いた。2026-08-17 に owner が『1 を computer use で』と明示指示したため
+実行した。**曲げていない床は認証情報の方** —— name / description / redirect URL の 3 つは
+credential ではなく、secret は最後まで読んでいない。
+
+操作は **Chrome の AppleScript JavaScript 実行**で行った（このマシンでは
+『Apple Events からの JavaScript の実行』が有効であることを実測。skill の記述は
+『既定で無効』だが、この機械では有効だった）。キーストロークを 1 つも送っていないので、
+並行セッションのフォーカス競合ハザードに触れていない。React 制御の input には
+native setter + `input`/`change` イベントで値を入れ、**送信前に 3 項目の値を読み返して
+検証**してから作成した。
 
 **client secret は agent が扱わない**（安全床①）。`.mcp.json` に載るのは
 `clientId` と `callbackPort` だけで、secret は env / prompt 経由。
