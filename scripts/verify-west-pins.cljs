@@ -283,10 +283,34 @@
           (swap! warnings conj (str "WARN " name " (" repo "): repo が参照できず検証不能(素通し)"))
           (let [reach (compare-status repo db revision)]
             (cond
+              ;; **compare の 404 を「pin が push されていない」と即断しない。**
+              ;; `compare-status` は 404 と 422 の両方を :missing に畳むが、
+              ;; `commit-exists?` の docstring が実測で言うとおり **この二つは別の問い**である
+              ;; ——422 は「その sha は無い」、404 は「compare が答えられなかった」。
+              ;; 実測 2026-08-18(GitHub Partial System Outage): `repos/<r>` と
+              ;; `repos/<r>/commits/<sha>` は正常応答しているのに `compare` だけが全 sha に
+              ;; 404 を返し、**main の tip そのものである pin が「上流に存在しません」と
+              ;; FAIL された**(2 周にわたり pin 前進を止めた)。
+              ;; 下の前進検証(fwd)は同じ罠を既に塞いでいる——ここだけが残っていた。
               (= reach :missing)
-              (swap! failures conj
-                     (str "FAIL " name " (" repo "): pin " (s8 revision)
-                          " が上流に存在しません。先に子リポを push してください(未 push HEAD の pin 化は禁止)。"))
+              (let [exists (commit-exists? repo revision)]
+                (cond
+                  (false? exists)
+                  (swap! failures conj
+                         (str "FAIL " name " (" repo "): pin " (s8 revision)
+                              " が上流に存在しません。先に子リポを push してください(未 push HEAD の pin 化は禁止)。"))
+
+                  ;; commit は在る。到達性だけが確かめられなかった → 合格にしない。
+                  (true? exists)
+                  (swap! warnings conj
+                         (str "WARN " name " (" repo "): pin " (s8 revision)
+                              " は上流に存在しますが compare が 404 で **default branch 到達性を"
+                              "検証できていません**(一時的な API 障害の可能性。再実行して確認すること)"))
+
+                  :else
+                  (swap! warnings conj
+                         (str "WARN " name " (" repo "): compare が 404、かつ pin " (s8 revision)
+                              " の存在も確認できず **検証不能**(素通し)"))))
 
               (nil? reach)
               (swap! warnings conj (str "WARN " name " (" repo "): compare API 失敗、検証不能(素通し)"))
