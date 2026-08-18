@@ -715,5 +715,41 @@
               imports in a .cljc :clj branch), and scanning every file in every sibling
               rather than the closure reported 37 of 41 (a library carries modules a
               given build never reaches)."}
+
+  {:id       :verify-worker-name-collisions
+   :title    "Worker names declared by more than one config, with different routes"
+   :why      "2026-08-18: `kotobase-protocols-worker` is declared by FIVE wrangler
+              configs with three different route sets over seven hostnames. One of them
+              (net-kotobase-enterprise-wave2) lists `cypher.kotobase.net`, which is
+              served today by the separate `net-kotobase-cypher` Worker. A Worker is
+              addressed by name at publish time and there is no fast-forward check, so
+              which hostnames it ends up serving depends on which config went last.
+              This is the same shape as the 2026-07-25 incident where an older checkout
+              republished kotobase.net and returned the signup funnel to 404 for eleven
+              minutes. That one was same-routes-older-code; these ten are worse, because
+              the hostname set itself changes.
+
+              The enterprise-wave2 copy is currently harmless only because it cannot
+              compile -- it is one of the 13 found by :verify-shadow-source-paths.
+              REPAIRING ITS SOURCE-PATHS WOULD ARM IT. One detector prints a remedy the
+              other says not to apply yet, which is why both belong in one report."
+   :argv     ["nbb" "{{repo}}/scripts/verify-worker-name-collisions.cljs" "{{root}}" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 43200000                 ; 12h -- config churn is slow
+   :timeout-ms  300000                   ; 5m
+   :writes   :none
+   :measured "2026-08-18 on this machine: 892 wrangler configs found under orgs/, 890
+              named, 263 names declared more than once. 253 of those have IDENTICAL
+              route sets (duplicate checkouts; publishing a stale one ships older code
+              to the same hostnames) and 10 have DIFFERENT ones. Only the 10 are failed
+              on; the 253 are one aggregated warn, because 253 individual findings would
+              bury them. Read-only, no network, ~10s.
+
+              Agent worktrees (.claude/worktrees/) and pre-adoption backups
+              (.root-repository-adopt/) are excluded: they carry real wrangler files and
+              counting them manufactures collisions nobody can act on."}
 ]
+
 }
