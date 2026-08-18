@@ -1,0 +1,74 @@
+{:receipt :kotobase/wrong-graph
+ :date "2026-08-18"
+ :severity "the loop's subject, not one of its inputs"
+
+ :what-the-loop-has-been-pricing
+ "`kotobase-protocols-v2` -- since iteration-01. Every number: 84 blocks,
+  11,462,579 bytes, 63 unfolded transactions, the 2,058 cpu-ms production
+  measurement, the phase decomposition, the per-collection parse costs, h1, h6
+  and h7."
+
+ :what-actually-serves-traffic
+ {:graph "s3-bucket/cloud-itonami-kouhou"
+  :surface "s3"
+  :block-gets 33
+  :unfolded-txs 25
+  :measured "2026-08-18 10:36-10:58Z. Of 46 bare /_diag/hydrate reads across four
+             hosts, 34 landed on isolates that had hydrated. **Every one of the
+             34 reported this graph.** None reported kotobase-protocols-v2, and
+             none reported any other graph."
+  :method "Bare diagnostic reads that do NOT hydrate, so what they report is
+           traffic somebody else drove. The probes this session used to measure
+           kotobase-protocols-v2 all went through atproto and would have shown
+           as `atproto` in hydrates_by_surface; every observed hydrate is `s3`."}
+
+ :the-loop-said-this-and-said-it-wrong
+ "`:what-the-judge-cannot-see` has carried, since iteration-02: *THE TRAFFIC.
+  Twelve consecutive reads of /_diag/hydrate returned sampled:false -- twelve
+  isolates, none of which had ever hydrated. This loop prices a served read on a
+  graph that currently serves none.*
+
+  Both sentences are true and the conclusion drawn from them was wrong. `No
+  isolate has hydrated THIS graph` was read as `there is no traffic`. The
+  traffic exists. It is on a different graph, and nothing asked which graph the
+  isolates that HAD hydrated were holding."
+
+ :why-the-traffic-is-there
+ "The 2026-08-10 routing change (`graph/for-request`): an s3 request for a
+  bucket goes to `s3-bucket/<bucket>`, its own chain, because two clients
+  writing anywhere on the shared graph serialise against each other. Real s3
+  traffic therefore left the shared graph that day. What stayed behind is the
+  526-document collection the shared graph accumulated before the split -- 87.5%
+  of its seed by bytes, and the entire basis of h6 and most of h7's value."
+
+ :what-this-changes
+ {:h6 "Retracting the 91 inline-body documents was already down to $2.14 after
+       the pinned decomposition. Those documents are on the graph with no
+       readers, so in practice it is worth less than that -- irreversible
+       deletion of production data to speed up reads nobody makes."
+  :h7 "Its value is dominated by not parsing that same 526-document collection.
+       On the traffic graph, which has 33 blocks rather than 84, the collection
+       is not there at all."
+  :h1 "Unaffected in principle -- phase A is phase A -- but its SIZE is a
+       property of the graph, and the traffic graph is 2.5x smaller by block
+       count."
+  :the-baseline "class-b-ops 84 and 11,462,579 bytes describe the wrong graph."}
+
+ :what-is-not-invalidated
+ "The method, the instruments, and the structural findings. A query is still 1%
+  of a request. The harness still has to build from pins. The cold-isolate rate
+  is still 6 in 10. Those are properties of the code path, not of which graph it
+  walks."
+
+ :the-shape-again
+ "Fourth instance in one session of a measurement that cannot name its inputs --
+  and this one names the SUBJECT rather than an input. A scaling constant whose
+  calibration decayed; a premise inferred from a counter answering a different
+  question; a build input with no revision in it; and now a graph nobody
+  checked, priced for eight iterations, chosen because it was the graph that
+  happened to be under the first probe."
+
+ :next
+ "Re-measure on `s3-bucket/cloud-itonami-kouhou`: fetch its blocks, run the
+  pinned phase bench against it, and re-derive the baseline. Only then is the
+  ranking about the thing that costs money."}
