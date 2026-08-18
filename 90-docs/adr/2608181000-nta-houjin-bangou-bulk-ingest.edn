@@ -62,7 +62,7 @@ corpus（EDN-lines 約 2.6 GB）は git に入れない（ノードの `~/.cache
 | tier | 中身 | 件数 | git |
 |---|---|---:|---|
 | `joined` | 面が既に参照している法人（GLEIF の JP registration-no + 文書からの名前解決） | 35 | yes |
-| `public-bodies` | 法人種別 101 国の機関 + 201 地方公共団体 | 8,266 | yes |
+| `government` | 法人種別 101 国の機関 + 201 地方公共団体（登記が生きているもの。全体では 8,266） | 8,089 | yes |
 | `universe` | 全件 | 5,816,535 | no（約 32 GB 見積り） |
 
 **projection に無い法人は Datalog で join できない。** corpus に対して答えられるのは
@@ -130,6 +130,16 @@ projection ができる。
   **5,816,535 行を走査して 0 件の projection を書いた**。summary の `:kept 0` だけが
   それを示していた（ファイルは manifest 行を持つ、正しい形の空ファイルになる）。
   修正に加えて `scanned > 0 かつ kept 0` の WARNING を足した。
+
+- **修正した欠陥 2 件目（tier 名のハイフン）**: 最初は tier を `public-bodies` と
+  名付けた。面の `file-tier` は prefix の直後から次の `-` か `.` までを tier と読む
+  （`gleif-lei-closure-2` の `-2` は shard 番号）ので、この名前は tier `\"public\"` と
+  して読まれ、**`--hb-tier public-bodies` は受理され、count 行に load 済みとして
+  表示され、8,089 件のうち 0 件を load した**。tier を `government` に改名し、
+  **要求された tier に該当ファイルが 1 つも無ければ WARNING を出す**ようにした
+  （「その tier が空」と「その名前の tier が無い」を出力で区別する）。
+  実測: `--hb-tier government` で company が 18,965 → **27,054**（= GLEIF 18,930 +
+  joined 35 + government 8,089）。
 
 - **統合クエリ面での実測**: joined tier を既定 load して
   `[:find (count ?e) :where [?e \"company/houjin-bangou\" _]]` が **35**。

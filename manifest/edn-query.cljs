@@ -1024,7 +1024,7 @@
 (def houjin-bangou-default-tiers #{"joined"})
 
 (defn houjin-bangou-tiers
-  "load する tier。`--hb-tier public-bodies`、または
+  "load する tier。`--hb-tier government`、または
    `EDN_QUERY_HOUJIN_BANGOU_TIERS=public-bodies`。joined は常に入る。
 
    GLEIF の `--tier` と別のフラグにしてあるのは、片方の tier を広げたつもりが
@@ -1044,9 +1044,9 @@
    corpus は毎月の 全件データ 5,816,535 件で、**git にも、この面にも載らない**
    （ノードの `~/.cache/houjin-bangou`）。載るのは tier を切った projection:
 
-     joined         plane が既に参照している法人（GLEIF の JP registration-no と
-                    business の名前解決の結果）
-     public-bodies  法人種別 101/201 = 国の機関 848 + 地方公共団体 7,418
+     joined      面が既に参照している法人（GLEIF の JP registration-no と
+                 business 文書からの名前解決の結果）
+     government  法人種別 101/201 = 国の機関 + 地方公共団体（登記が生きているもの）
 
    `:company/registration-no` に法人番号と同じ値を入れてあるので、GLEIF の
    JP レコード（`Entity.RegistrationAuthority.RegistrationAuthorityEntityID`）と
@@ -1055,19 +1055,36 @@
 
    **projection に無い法人は Datalog で join できない。** corpus に対して
    答えられるのは join を伴わない集計だけで、それは
-   `property/scripts/query_houjin_bangou_corpus.cljs` の仕事。"
+   `property/scripts/query_houjin_bangou_corpus.cljs` の仕事。
+
+   ⚠ **tier 名にハイフンを使わない。** `file-tier` は prefix の直後から次の
+   `-` か `.` までを tier と読む（`gleif-lei-closure-2` の `-2` は shard 番号で
+   tier ではない）ので、`houjin-bangou-public-bodies.datoms.edn` は tier
+   `\"public\"` として読まれ、`--hb-tier public-bodies` は**受理された上で 0 件を
+   load した**（実測 2026-08-18）。それが下の「要求された tier に該当ファイルが
+   無い」警告を足した理由でもある。"
   [next-tempid!]
-  (let [files (->> ["jp-go-nta-houjin-bangou"]
-                   (keep west-project-path)
-                   (mapcat (fn [p]
-                             (let [dir (apply io/file root (concat (str/split p #"/") ["data"]))]
-                               (when (.exists dir)
-                                 (->> (seq (.listFiles dir))
-                                      (filter #(let [n (last (str/split (str %) #"/"))]
-                                                 (and (str/starts-with? n "houjin-bangou-")
-                                                      (str/ends-with? n ".datoms.edn")))))))))
-                   (filter #(contains? (houjin-bangou-tiers) (file-tier % "houjin-bangou-")))
-                   (sort-by str))]
+  (let [all (->> ["jp-go-nta-houjin-bangou"]
+                 (keep west-project-path)
+                 (mapcat (fn [p]
+                           (let [dir (apply io/file root (concat (str/split p #"/") ["data"]))]
+                             (when (.exists dir)
+                               (->> (seq (.listFiles dir))
+                                    (filter #(let [n (last (str/split (str %) #"/"))]
+                                               (and (str/starts-with? n "houjin-bangou-")
+                                                    (str/ends-with? n ".datoms.edn")))))))))
+                 (sort-by str))
+        available (into #{} (map #(file-tier % "houjin-bangou-")) all)
+        requested (houjin-bangou-tiers)
+        files (filter #(contains? requested (file-tier % "houjin-bangou-")) all)]
+    ;; 要求された tier に 1 つもファイルが無いなら、それは「その tier が空」では
+    ;; なく「その名前の tier が無い」。黙って 0 件を返すと、flag が効いたのか
+    ;; 効かなかったのかを出力から区別できない。
+    (doseq [t (sort (remove #(contains? available %) requested))]
+      (js/console.error
+       (str "edn-query: WARNING houjin-bangou: tier " (pr-str t)
+            " に該当する data/houjin-bangou-" t "*.datoms.edn が無い（在るのは "
+            (str/join ", " (sort available)) "）")))
     (if (empty? files)
       (do (js/console.error
            (str "edn-query: WARNING houjin-bangou: com-junkawasaki/jp-go-nta-houjin-bangou の "
@@ -2249,7 +2266,7 @@
                 kj-count rad-count
                 etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
                 narrative-count company-count fleet-count yabai-count tadori-count patent-count
-                innen-count awai-yakuwari-count gleif-tiers
+                innen-count awai-yakuwari-count gleif-tiers houjin-bangou-tiers
                 tsukuru-candidates-count tsukuru-registry-seed-count tsukuru-seed-count]}
         (build-conn)
         total (+ adr-count docs-count manifest-count foreign-adr-count biz-count
@@ -2264,14 +2281,15 @@
                              "etzhayyim-80-data=%s proc-registry=%s merged-kotoba=%s working-doc=%s "
                              "narrative=%s company=%s fleet=%s yabai=%s tadori=%s patent=%s innen=%s "
                              "awai-yakuwari=%s tsukuru-candidates=%s tsukuru-registry-seed=%s "
-                             "tsukuru-seed=%s total=%s gleif-tiers=%s")
+                             "tsukuru-seed=%s total=%s gleif-tiers=%s houjin-bangou-tiers=%s")
                         adr-count docs-count manifest-count foreign-adr-count biz-count
                         kj-count rad-count
                         etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
                         narrative-count company-count fleet-count yabai-count tadori-count patent-count
                         innen-count awai-yakuwari-count
                         tsukuru-candidates-count tsukuru-registry-seed-count tsukuru-seed-count total
-                        (str/join "," gleif-tiers)))
+                        (str/join "," gleif-tiers)
+                        (str/join "," houjin-bangou-tiers)))
 
       "q"
       (println (pr-str (js->clj (.q ds (first queries) (.db ds conn)))))
