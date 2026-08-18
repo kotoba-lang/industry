@@ -1,0 +1,182 @@
+#!/usr/bin/env nbb
+;; kouhou-ingest.cljs — 官公庁・公益 press の日次 ingest を回し、その日の
+;; briefing / ledger / corpus receipt を git に、取得した feed 本体を annex の
+;; 2 つの off-machine remote に載せる（ADR-2608110200）。
+;; launchd の com.gftd.kouhou-ingest から呼ばれる。
+;;
+;; ## なぜこれが要るか
+;;
+;; ADR-2608110200 は ingest + store を landing させたが、**定期実行に配線しな
+;; かった**。`manifest/observatories.edn` はそれを正直に書いている（「ここを毎時に
+;; 足すかは別判断なので、まだ足していない」）。結果、2026-08-11 の 1 パス以降
+;; 7 日間 1 件も取り込まれていない。取得側は本物で、動かす仕組みだけが無かった。
+;;
+;; ## 不変条件
+;;
+;; 1. **「測れなかった」を「問題なし」と同じ値で返さない**（ADR-2608136000）。
+;;    checkout が無い / branch が違う / 他人の未コミット変更がある — どれも
+;;    exit 2 で終わる。0 でも 1 でもないのは「答えを出せなかった」の意。
+;; 2. **custody は location log ではなく exit code で確かめる**（ADR-2608131100）。
+;;    `whereis` は主張であって測定ではない。`checkpresentkey` は remote に訊く。
+;; 3. **1 件も archive できなかった run は成功ではない。** 取り込み 0 件は
+;;    「今日は press が無かった」ではなく、ほぼ確実にこちらの故障である。
+;; 4. **他人の作業を壊さない。** data/ と raw/ の外に未コミット変更があれば、
+;;    その checkout では走らない（共有 west checkout なので）。
+;; 5. **publish はしない。** KOUHOU_PUBLISH=0 の phase 0（observe）で回す。
+;;    外向きの発信を無人の定期実行に混ぜない。
+
+(require '[clojure.string :as str])
+
+(def cp (js/require "node:child_process"))
+(def fs (js/require "node:fs"))
+
+(def root "/Users/junkawasaki/github/com-junkawasaki")
+(def ds (str root "/orgs/cloud-itonami/kouhou"))
+(def remotes ["kotobase" "b2"])
+
+(defn- run [args {:keys [dir env]}]
+  (let [r (.spawnSync cp (first args) (clj->js (rest args))
+                      (clj->js (cond-> {:encoding "utf8" :maxBuffer (* 64 1024 1024)}
+                                 dir (assoc :cwd dir)
+                                 env (assoc :env env))))]
+    {:exit (or (.-status r) 1)
+     :out (or (.-stdout r) "")
+     :err (or (.-stderr r) "")}))
+
+(defn- git [& args] (run (into ["git"] args) {:dir ds}))
+
+(defn- die
+  "答えを出せなかった。exit 2 — 成功(0) とも「壊れている」(1) とも違う値にする。"
+  [msg] (println (str "UNABLE " msg)) (js/process.exit 2))
+
+(defn- fail [msg] (println (str "FAIL " msg)) (js/process.exit 1))
+
+(defn- lines [s] (remove str/blank? (str/split-lines (or s ""))))
+
+(println (str "kouhou-ingest " (.toISOString (js/Date.))))
+
+(when-not (.existsSync fs (str ds "/.git"))
+  (die (str "checkout が無い: " ds " — west update してから（黙って clone しない）")))
+
+;; ── 0) 共有 checkout を壊さないための門 ──────────────────────────────────
+;; west の checkout は **detached HEAD が正常**（pin の commit を直接見ている）。
+;; branch 名で門を作ると、この job は一度も走らない — 実測 2026-08-18、最初の
+;; 実装がまさにそれで `UNABLE branch が main ではない (HEAD)` を返した。
+;; 見るべきは「誰かの枝の上に居るか」であって branch 名ではない。
+(let [dirty (->> (lines (:out (git "status" "--porcelain")))
+                 (map #(subs % 3))
+                 (remove #(or (str/starts-with? % "data/") (str/starts-with? % "raw/"))))]
+  (when (seq dirty)
+    (die (str "data/ と raw/ の外に未コミット変更がある: " (str/join " " (take 5 dirty))))))
+
+(git "fetch" "--quiet" "cloud-itonami")
+(def main-ref "cloud-itonami/main")
+
+;; 乖離しているなら触らない。ancestor 関係のどちらかであることだけを要求する
+;; （後ろに居れば FF し、前に居れば未 push の commit があるので push で回収する）。
+(let [behind? (zero? (:exit (git "merge-base" "--is-ancestor" "HEAD" main-ref)))
+      ahead? (zero? (:exit (git "merge-base" "--is-ancestor" main-ref "HEAD")))]
+  (when-not (or behind? ahead?)
+    (die (str "HEAD と " main-ref " が乖離している — 先に解消する")))
+  (when (and behind? (not ahead?))
+    (let [{:keys [exit err]} (git "merge" "--ff-only" main-ref)]
+      (when (pos? exit)
+        (die (str main-ref " に FF できない: " (str/trim err)))))))
+(run ["git" "annex" "merge"] {:dir ds})
+
+(defn- shard-count [plane]
+  (let [d (str ds "/data/" plane)]
+    (if (.existsSync fs d) (count (.readdirSync fs d)) 0)))
+
+(def before {:briefings (shard-count "briefings")
+             :ledger (shard-count "ledger")
+             :corpus (shard-count "corpus")})
+
+;; ── 1) 実 fetch。publish はしない ────────────────────────────────────────
+(def env (doto (js/Object.assign #js {} js/process.env)
+           (aset "KOUHOU_ALLOW_LIVE_INGEST" "1")
+           (aset "KOUHOU_PUBLISH" "0")))
+
+(let [{:keys [exit out err]} (run ["clojure" "-M:dev:live-ingest"] {:dir ds :env env})
+      summary (filter #(or (str/starts-with? % "=== ")
+                           (str/includes? % "sources,")
+                           (str/starts-with? % "persisted:"))
+                      (lines out))]
+  (doseq [l summary] (println (str "  " l)))
+  (when (pos? exit)
+    (println (str "  stderr: " (str/trim (or (last (lines err)) ""))))
+    (fail "live-ingest が失敗した")))
+
+;; ── 2) 何が増えたかを、意図ではなくディスクから数える ────────────────────
+(def after {:briefings (shard-count "briefings")
+            :ledger (shard-count "ledger")
+            :corpus (shard-count "corpus")})
+(println (str "  shards: briefings " (:briefings before) "->" (:briefings after)
+              ", ledger " (:ledger before) "->" (:ledger after)
+              ", corpus " (:corpus before) "->" (:corpus after)))
+
+(def archived
+  ;; `--untracked-files=all` は必須。既定の `normal` は**新しいディレクトリを 1 行に
+  ;; 畳む**ので、38 本の feed を新規 `raw/<日>/` に書いた run が「1」と報告される
+  ;; （実測 2026-08-18、この script の初回実行がまさにそれ）。床としては通るが、
+  ;; 出てくる数が嘘になる — 検査は落ちないが、読む人が誤る。
+  (count (lines (:out (run ["git" "status" "--porcelain" "--untracked-files=all" "raw"]
+                           {:dir ds})))))
+
+;; 不変条件 3。0 件は「今日は press が無かった」ではない。
+(when (zero? archived)
+  (fail "raw/ に 1 件も archive されなかった — 取り込みが実際には走っていない"))
+(println (str "  archived: " archived " feed"))
+
+;; ── 3) commit（raw/** は .gitattributes により annex 行き）────────────────
+(let [{:keys [exit err]} (run ["datalad" "save" "-m"
+                               (str "ingest " (subs (.toISOString (js/Date.)) 0 10)
+                                    " (" archived " feed)")]
+                              {:dir ds})]
+  (when (pos? exit)
+    (println (str "  save stderr: " (str/trim err)))
+    (fail "datalad save に失敗")))
+(println "  save ok")
+
+;; ── 4) 2 つの off-machine remote へ。`datalad push` ではなく annex copy ──
+;;
+;; `datalad push --to <special remote>` は git を押そうとして失敗する。
+;; newsfeed 側はこれで「WARN」を出し続け、台帳のコピーが手元 1 本のまま
+;; 数週間気づかれなかった（2026-08-18 実測）。運ぶのは annex copy。
+(doseq [r remotes]
+  (let [{:keys [exit err]} (run ["git" "annex" "copy" "--to" r "--jobs" "1" "raw"] {:dir ds})]
+    (when (pos? exit)
+      (println (str "  copy --to " r " stderr: " (str/trim (or (last (lines err)) "")))))))
+
+;; ── 5) custody は exit code で確かめる（location log を数えない）─────────
+(def all-keys (lines (:out (run ["git" "annex" "find" "--format=${key}\n" "raw"] {:dir ds}))))
+(def custody
+  (into {}
+        (for [r remotes]
+          [r (count (filter (fn [k]
+                              (zero? (:exit (run ["git" "annex" "checkpresentkey" k r] {:dir ds}))))
+                            all-keys))])))
+(println (str "  custody (VERIFIED by exit code, of " (count all-keys) " keys): "
+              (str/join ", " (for [r remotes] (str r "=" (get custody r))))))
+
+;; ── 6) push。git-annex branch も一緒に（custody の地図はこれ）────────────
+;; **`HEAD:main` で押す。** west の checkout は detached なので `main:main` は
+;; 「そんな ref は無い」で失敗し、commit は手元に残り続ける。newsfeed 側は
+;; まさにこれで、日次 ingest の 4 commit 分が数週間 push されないままだった
+;; （2026-08-18 実測。annex の中身も手元 1 本だったので、台帳は完全に単一コピー）。
+(doseq [[src dst] [["HEAD" "main"] ["git-annex" "git-annex"]]]
+  (let [{:keys [exit err]} (git "push" "cloud-itonami" (str src ":" dst))]
+    (if (pos? exit)
+      (println (str "  push " dst " FAILED: " (str/trim (or (last (lines err)) ""))))
+      (println (str "  push " dst " ok")))))
+
+;; git を押せていなければ、この run の記録はこの機械にしか無い。
+(let [{:keys [exit]} (git "merge-base" "--is-ancestor" "HEAD" main-ref)]
+  (when (pos? exit)
+    (fail "commit が remote に載っていない — 手元だけの記録になっている")))
+
+;; off-machine のコピーが 1 本も取れていない run は、成功として終わらせない。
+(when (zero? (apply max (vals custody)))
+  (fail "どの remote にも 1 件も載っていない — 手元 1 本の状態で終わっている"))
+
+(println "kouhou-ingest done")

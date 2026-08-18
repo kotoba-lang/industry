@@ -267,9 +267,13 @@
    ;; phase 0（observe）で走り、data/{briefings,ledger,corpus} に canonical EDN を、
    ;; raw/ に取得した feed 本体（annex → s3.kotobase.net）を書いて、**app-aozora には
    ;; 何も送らない**。つまり「無人で取り込むが無人で発信はしない」が初めて表現できる。
-   ;; ここを毎時に足すかは別判断なので、**まだ足していない**（この行は可能性の記録で
-   ;; あって配線の記録ではない）。実測 1 パス: 53 source / 39 commit / 2 hold /
-   ;; 0 publish / 12 error、48 feed を archive。
+   ;; 2026-08-18: **配線した。** launchd `com.gftd.kouhou-ingest` が毎日 06:41 に
+   ;; `scripts/kouhou-ingest.cljs` を回す（phase 0 固定、publish はしない）。
+   ;; 上の「まだ足していない」は 7 日間 1 件も取り込まれない状態を作ったので、
+   ;; 可能性の記録のまま置かないことにした。script は custody を location log
+   ;; ではなく exit code で確かめ、archive 0 件・remote 0 本・未 push のいずれでも
+   ;; 失敗として終わる。初回実測: 53 source / 35 commit / 3 hold / 0 publish /
+   ;; 15 error、38 feed archive、93 key が kotobase と b2 の両方で VERIFIED。
    ;;
    ;; ⚠ 上の見出し「走るが、ディスクに書かないのが正常」は **:aliases の既定 run
    ;; （offline sim）についてのみ正しい。** live alias は書く。
