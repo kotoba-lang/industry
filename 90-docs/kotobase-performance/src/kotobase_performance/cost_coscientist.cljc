@@ -67,6 +67,10 @@
    :n 10 :median 2397 :mean 2462 :min 2114 :max 3689
    :cpu-over-wall "60-83%"
    :prior "2026-08-17, pre-fix, n=14: 2329-4416"
+   :superseded-by
+   "2026-08-18, AFTER the native outer-string decode was deployed (version
+    120f3e08): n=10, median 2058, mean 2026, min 1422, max 2583. Same probe,
+    same method. That is the number `baseline` now carries."
    :how "wrangler tail kotobase-protocols-worker --format json, matched to each
          request by a ?probe=<uuid> marker in the URL."})
 
@@ -97,8 +101,13 @@
   isolates, none of which had ever hydrated. There are no organic served reads
   on this graph. Every figure below is therefore unit economics at hypothetical
   volume, and the crossover is the honest headline, not saved CPU."
-  {:cpu-ms 2397                    ; LIVE, wrangler tail, n=10 median
-   :cpu-ms-parts {:a-hot-datoms 623 :b-map-build 1735}  ; harness split, scaled
+  {:cpu-ms 2058                    ; LIVE, wrangler tail, n=10 median, post-120f3e08
+   ;; DELIBERATELY ABSENT. The A/B split above was measured against the OLD
+   ;; decode2. The native outer-string decode took ~28% off B, so the old split
+   ;; no longer describes this baseline, and scaling it would invent a
+   ;; decomposition nothing measured. The hypotheses' :after-harness values have
+   ;; the same problem and are stale by the same amount -- see :roadmap-caveat.
+   :cpu-ms-parts :needs-re-measurement
    :cpu-ms-harness 1976            ; what iteration-01 priced
    :class-b-ops 84                 ; live
    :bytes 11462579                 ; live
@@ -107,8 +116,16 @@
    :seed-bytes-in-91-inline-docs 4198531
    :cpu-uncertainty
    "CLOSED 2026-08-18. Read per-request from wrangler tail (n=10, median 2397,
-    range 2114-3689). The residual uncertainty is variance, not method: the max
-    is 1.7x the min across ten consecutive requests on one worker."
+    range 2114-3689), and re-read after the outer-layer change (n=10, median
+    2058). The residual uncertainty is variance, not method: the max is 1.8x the
+    min across ten consecutive requests on one worker."
+   :roadmap-caveat
+   "Every hypothesis's :after-harness was measured against the OLD decode2. The
+    landed change realised part of h7, so those numbers -- and the savings
+    derived from them -- OVERSTATE the headroom that is left. Re-run the phase
+    bench before treating this ranking as current. Recorded rather than
+    silently rescaled: a projection built on a decomposition that no longer
+    holds is the thing this loop exists to avoid."
    :sources {:cpu-ms :live-workerd :class-b-ops :live :bytes :live}})
 
 ;; ── Generate ─────────────────────────────────────────────────────────────────
