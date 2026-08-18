@@ -579,6 +579,15 @@
   ;; and exit 0; arrow `FAIL: 35 tests, 40 failures, 9 errors` exit 1 with an
   ;; equality inverted in `arrow/decode.cljc`.
   ;;
+  ;; **That verification did not discriminate, and two of these went red on
+  ;; the fleet anyway.** It cloned each repo on judah and ran the script over
+  ;; the CHECKOUT; the fleet runs it over the `:include-ext` TREE. Any repo
+  ;; whose suite reads a file the filter drops is green in the first and red
+  ;; in the second, and nothing about the source says which repos those are.
+  ;; Verifying a gate now means reproducing the filter -- `git ls-tree`,
+  ;; suffix-filter, `git archive` -- not cloning. See the arrow/parquet note
+  ;; below for the two that were caught this way.
+  ;;
   ;; protocol-core is private, so its verification shipped a tarball the way
   ;; tick.cljs does rather than cloning on the node.
   {:name "chain" :id "nbb-cross-runtime-chain" :gate :nbb-script
@@ -602,12 +611,31 @@
   {:name "kotobase-protocol-core" :id "nbb-cross-runtime-protocol-core" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+  ;; **These two carry binary fixtures, and the filter above would drop them.**
+  ;; Both ran on the fleet and both failed the same way on every node they
+  ;; reached: `FAIL: 35 tests, 0 failures, 19 errors` for arrow and
+  ;; `FAIL: 31 tests, 0 failures, 13 errors` for parquet -- the SAME test
+  ;; counts as a green run, because the namespaces load fine and only the
+  ;; tests that open a file blow up. The receipt records the counts and
+  ;; discards the error bodies, so the cause was not in it; the cause is
+  ;; `ENOENT: no such file or directory, open 'test/fixtures/plain.arrow'`.
+  ;;
+  ;; The pre-landing verification passed because it ran on judah against a
+  ;; full `git clone`. The fleet ships the `:include-ext` tree, not the repo,
+  ;; so what has to be reproduced is the FILTER, not the checkout. Doing that
+  ;; locally reproduces the fleet's line exactly, and adding the fixture
+  ;; extension turns it into `OK: 35 tests` / `OK: 31 tests`.
+  ;;
+  ;; Auditing all 25 cross-runtime gates the same way: 13 answerable from a
+  ;; local checkout, of which these are the only two that drop a fixture; the
+  ;; other 12 have no local origin/main to read, and are already green on the
+  ;; fleet, which answers the same question better than the audit could.
   {:name "org-apache-arrow" :id "nbb-cross-runtime-arrow" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json" ".arrow"] :min-files 5 :cd false}
   {:name "org-apache-parquet" :id "nbb-cross-runtime-parquet" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json" ".parquet"] :min-files 5 :cd false}
   {:name "pay" :id "nbb-cross-runtime-pay" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
