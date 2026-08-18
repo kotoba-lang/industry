@@ -1,0 +1,109 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-08"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-08.edn"
+  :doc/date "2026-08-18"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "the allocation path taken by functions that call something"
+  :coscientist/iteration 8
+  :coscientist/subject "kotoba-lang/kotoba-mir, bench/runtime-comparison/kernel_call*.kotoba"
+  :coscientist/action "measure the region every earlier iteration excluded"
+  :coscientist/measured "33% at 24 values live across calls; 3-6% at 8"
+  :coscientist/refuted "three self-consistent rounds of my own timings"
+  :coscientist/carries-forward "iteration-07: every ratio in this file is from a leaf"
+
+  :doc/body
+  "# Codegen co-scientist, iteration 8
+
+Iteration 7 closed with a sentence that was a task: **every ratio in this file
+is from a leaf.** A function containing both calls and control flow never
+reaches the allocator that seven iterations have been improving. It goes to the
+conservative path, where every value gets a stack slot whether or not anything
+was short of registers.
+
+Nobody had measured what that costs. This iteration measures it and does not
+fix it.
+
+## The isolation
+
+Four fixtures, in two pairs. Each pair runs identical arithmetic through
+identical calls and differs by one `if` whose taken arm is the same expression
+— enough to change which path the function takes, and nothing else.
+
+| live across calls | ISA | straight-line | with one `if` | |
+|---|---|---:|---:|---:|
+| 8 | AArch64 | 27.3 ns / 260 B | 28.8 ns / 392 B | +6% |
+| 8 | x86-64 | 38.5 ns | 39.6 ns | +3% |
+| **24** | **AArch64** | **62.2 ns / 828 B** | **82.5 ns / 1344 B** | **+33%** |
+| **24** | **x86-64** | **95.3 ns** | **126.7 ns** | **+33%** |
+
+At 24 values the conservative path takes **99 stack slots against 24** and
+**325 instructions against 190**.
+
+**The same factor on both ISAs.** That is the signature iteration 4 identified
+for a cost living in the shared allocator rather than in either encoder, and it
+is the third time this session that signature has pointed at the right place.
+
+## Why this is not fixed here
+
+The fix needs no new mechanism, which is exactly why it should not be done
+quickly. Values live across a call have to survive caller-saved registers being
+clobbered, and the preserved tier — added in iteration 6 — is a set of
+registers that survives a call. What is missing is call-clobber handling in the
+scan: at each call, move or spill the live values held in caller-saved
+registers, preferring a preserved register over a slot.
+
+That is the same corner of the same function where, earlier today, a hasty
+version of proportional spilling produced a wrong answer that a green test
+suite could not see. Calls, branches, phis and the frame policy all meet there.
+The measurement is landed; the change is the next iteration's, with a benchmark
+already in place to judge it.
+
+## The part worth keeping: three rounds of agreeing, wrong numbers
+
+Before these numbers there were three earlier rounds. All of them were
+self-consistent, all of them plausible, all of them measuring the wrong
+function.
+
+`extract-native` reports an `:offset`. For every kernel measured in iterations
+1 through 7 it was 0, because those modules export one function. These modules
+define the helper first, so the exported kernel is at 72 — and the runner, told
+0, executed the helper. It returned 337898, which is a real number: it is
+`step(7)`.
+
+Three consequences followed before it surfaced:
+
+- **The 8-lane pair looked free** — 5.83 ns against 4.55 ns, the branch version
+  apparently *faster*. Two identical runs of the same helper, differing by
+  noise.
+- I nearly wrote that down as a negative result: *the conservative path costs
+  code size, not time.* It is a clean, publishable-sounding finding and it is
+  false.
+- Scaling to 24 lanes did not expose it. **The wrong measurement scaled just as
+  cleanly as the right one would have**, because it was not measuring either
+  workload.
+
+What surfaced it was running the program through the reference interpreter and
+finding 6210431302 where the artifact said 337898.
+
+## Meta-review
+
+- **Self-consistency is not a check.** Twenty-one rotated samples, low
+  variance, both ISAs agreeing, a sensible scaling curve — every quality signal
+  a measurement can carry, and all of them are properties of the measurement,
+  not of the thing measured.
+- **An oracle is the only check.** Iteration 7 said the guard that works is the
+  one that runs the program. This is the same rule at the measurement layer:
+  before believing a duration, check the answer.
+- **The mistake was invisible in the direction I was looking.** I checked
+  variance, rotation, load, and both ISAs. I did not check that the bytes I was
+  timing were the function I named — and no amount of the first four would ever
+  have shown it.
+- **A negative result is exactly as dangerous as a positive one.** \"This costs
+  nothing\" would have closed the question and removed the reason to look again.
+
+## Next
+
+Call-clobber handling in the scan, so that a function with calls and branches
+stops taking the all-vreg path. The benchmark to judge it is landed, its answers
+are known, and the offsets are written down."}]
