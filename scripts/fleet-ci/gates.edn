@@ -308,6 +308,27 @@
   {:name "shiharai-actor" :gate :jvm-test :cd true}
   {:name "kintai" :gate :jvm-test :cd true}
   {:name "tehai" :gate :jvm-test :cd true}
+  ;; psa and worklaw (2026-08-18). Measured that day: of the eleven repos in
+  ;; this plane, these two were the only ones with no entry here at all. Both
+  ;; are the shape the paragraph above describes and the reason they were
+  ;; skipped appears to be nothing more than that nobody enumerated the plane
+  ;; -- `:deps {}` parsed as EDN, a cognitect test-runner `:test` alias, and a
+  ;; portable `.cljc` suite with no sibling to resolve. Each was run from a
+  ;; worktree with no sibling directory in existence before being listed:
+  ;; psa green at 62 tests / 159 assertions, worklaw at 42 / 194.
+  ;;
+  ;; **`:cd false`, unlike every neighbour above.** That is a deliberate
+  ;; departure and not an oversight. This file states the bar in two places --
+  ;; a gate should have been green on the fleet's own tick before it is
+  ;; allowed to move a west pin, which is why arrow was held and why the
+  ;; twenty-six repos below all landed at `:cd false`. Neither of these has
+  ;; ever run on a node: `manifest/fleet-ci.edn` carries zero receipts for
+  ;; either name. A local green says the suite runs HERE; the fleet ships a
+  ;; `git archive` tree to a different machine, and that is the thing that
+  ;; has not been shown. Flip both to `:cd true` once each has a green
+  ;; receipt, the way ws-valueflo and arrow were flipped.
+  {:name "psa" :gate :jvm-test :cd false}
+  {:name "worklaw" :gate :jvm-test :cd false}
   {:name "org-ietf-deflate" :gate :jvm-test :cd true}
   {:name "kotobase-block-codec" :gate :jvm-test :cd true}
   {:name "chain" :gate :jvm-test :cd true}
