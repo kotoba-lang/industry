@@ -214,6 +214,40 @@ per-datom filter は同一テナントの集合を濾すだけになる、と ns
 - 方言に固有の 2 つ（`ipld.core/link?` 既定、`visible?` required）が**非互換ではなく
   仕様**になる。これが D2 の実利。
 
+## 現在地（2026-08-18 closing）
+
+| 決めたこと | 実装 | 検証 |
+|---|---|---|
+| agent は kotobase 方言で書く | `kotoba-lang/kotobase-query` の **`kotobase.query.agent`**（pure、依存ゼロ、`bridge` にも依存しない） | west pin `97b062bc` |
+| schema 注入 + validator + repair | 同上。**測定と production が同じコードを通る**（bench は require するだけ） | wiring self-test 5/5 |
+| その検査 | `run-tests-pure.cljs`（依存ゼロで回る subset entry） | **17 test / 43 assertion**、`comparison-ops` を空にすると該当 2 test だけ落ちる |
+| fleet gate | `{:name \"kotobase-query\" :gate :nbb-test :entry \"run-tests-pure.cljs\"}` | `scripts/fleet-ci/gates.edn`。**root 側には置かない**（fleet はその repo の tree しか配らず、bench の入力は west 子リポに在る） |
+| 測定 | `scripts/query-dialect-bench` | 45.5% → 88.9%（証拠は `result.edn` と `result.edn.generated.edn`） |
+| validator の文法 | `grammar-agreement.cljs` —— validator と engine を**方向つき**に突き合わせる | 88 変異で **必須方向の違反 0 / 宣言に無い厳しさ 0 / 意図的な厳しさ 12** |
+
+**文法の不変条件は一致ではない**（これが設計の要点）: engine が拒否するものは validator も
+拒否しなければならない（破ると推論を捨てる）。逆に validator は engine より厳しくてよいが、
+**名前で宣言した理由に限る**（現在は `:unknown-attributes` の 1 つ）。engine は捏造属性を
+黙って受けて 0 件を返すので、その厳しさこそがこの入口の存在理由である。
+
+**⚠ まだ production はこの入口を呼んでいない。** grep した範囲では `cloud-itonami-app` が
+`kotobase.query` / `datalog` / `arrangement` を直接 require しており、`agent` 経由になって
+いない。**入口が在ることと使われていることは別**で、88.9% は現状まだ誰の役にも立っていない。
+
+## 再開点（次の 1 手から順に）
+
+1. **`arrangement.datalog` に対して agreement を回す。** 今の 88 変異は **DataScript**
+   に対して測ったもので、kotobase が実際に通すのは `arrangement.datalog` である。
+   **2 つのエンジンが同じ形を拒否する保証は無い。** 上流（`kotobase-query`）で回せば
+   repo 内で完結するので **fleet gate にもできる**（root では不可能だった制約が消える）。
+2. **`cloud-itonami-app` の query を `agent` 経由に移す。** ここまでやって初めて
+   「決めた入口」が使われている状態になる。
+3. **方言間の比較。** 4 surface は live（Bearer）。要るのは ①同じデータを kotobase graph に
+   入れる ②token ③harness に HTTP 経路、の 3 つだけ。
+4. cross-check の**内容**一致（現在は行数のみ）/ 1 モデル・1 回・20 問の再現 /
+   方言の仕様書（`kotoba-lang/datalog` の README が事実上の仕様）/ 既存文書の
+   「Datomic 方言」表記 32 箇所（新規のみを縛る規則なので誤りではない）。
+
 ## まだ決めていないこと（推測で埋めない）
 
 1. **deploy の決定はしていない。** ADR-2608039975 のとおり 6 surface はどれも live で
@@ -245,4 +279,14 @@ per-datom filter は同一テナントの集合を濾すだけになる、と ns
 - 2026-08-18 「6 surface は未 deploy だから比較できない」を訂正。実測すると
   4 surface は live（Bearer 認証）で、**15 日前の ADR-2608039975 を現在地として
   引用した誤り**だった。CLAUDE.md の「結論を出す前に origin/main を読む」が
-  ADR の引用にも当たる、という実例。"}]
+  ADR の引用にも当たる、という実例。
+- 2026-08-18 closing。決めた入口を実装（`kotobase.query.agent`、pin 97b062bc）、
+  gate を `kotobase-query` 側に設置、validator と engine の agreement 検査を追加。
+  **agreement は変異で 4 クラスの欠落を見つけた** —— 手で並べた 13 件の表は前も後も
+  13/13 一致しており、ずれは想像の外に在った。「現在地」と「再開点」を本文に追加。
+  なお**この 3 日間で ADR-2608136000 の class を 5 回踏んだ**（validator が正しい
+  クエリを拒否 / 何も検査せず妥当を返す / 安い段の失敗が高い段の成果を捨てる /
+  転送障害を分母に入れる / `:find` 節を `:in` と誤って全変数を束縛済みにする）。
+  5 回とも**直した箇所の隣で再発**しており、対策は注意深さではなく
+  「検査を検査する場所を作る」（`--self-test` / `run-tests-pure.cljs` /
+  `grammar-agreement.cljs`）だった。"}]
