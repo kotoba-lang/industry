@@ -225,6 +225,41 @@
               24h rather than 6h because a .kotoba migration lands on human timescales
               and four idle 9-minute sweeps a day is a real cost on a shared machine."}
 
+  {:id       :verify-source-path-pins
+   :title    "cross-repo :source-path checkouts against the revision west.yml pins"
+   :why      "A shadow-cljs build whose `:source-path` points at a sibling checkout compiles
+              whatever revision that checkout happens to be at, which is not necessarily the
+              one manifest/west.yml pins. The artifact is then unreproducible: nothing in it
+              records which revision was compiled, and a rebuild on a machine whose checkout
+              sits elsewhere produces different output from the same manifest.
+              ⚠ **This detector has caught nothing, because nothing has ever run it on a
+              schedule** -- ADR-2608196100 measured it as one of twelve verifiers with no
+              runner and no twin. What justifies running it is not a past catch but a present
+              measurement: 2026-08-19, 240 of 383 cross-repo source-paths resolve to a
+              revision west.yml does not pin. The property it guards is violated at scale
+              right now, and the registry's NEW/RESOLVED machinery is what turns that standing
+              number into a signal when it moves.
+              Adjacent and already registered: verify-shadow-source-paths asks whether a
+              declared :source-path EXISTS. This asks whether the checkout behind it is the
+              pinned revision. A build can pass the first and fail this one."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-source-path-pins.cljs" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 21600000                 ; 6h
+   :timeout-ms  600000                   ; 10m -- 37x the measured runtime, sized against
+                                         ; load, not against the quiet number
+   :writes   :none
+   :measured "2026-08-19 on this machine, twice: 16s wall both times, at load 7.6 and 8.3.
+              383 relative cross-repo :source-path entries across 31 shadow-cljs.edn files,
+              240 findings, exit 1 -- it has no --report flag, and the tick does not need one
+              because `:status` is never :ok on an exit code alone; the evidence regex has to
+              match, and this detector prints SCANNED<TAB>383 before any finding.
+              `{{root}}` is passed explicitly on purpose: the script's default root is a
+              HARDCODED absolute path to this machine's checkout, so a tick running from a
+              worktree would silently scan the wrong tree without it."}
+
   {:id       :verify-layer-deps
    :title    "deps.edn :local/root edges against the layer DAG in manifest/layers.edn"
    :why      "manifest/layers.edn declares a dependency DAG over the workspace's layers and
