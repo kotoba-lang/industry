@@ -677,4 +677,43 @@
    ;; would match and it would be reported as a stale acceptance. The baseline gives the
    ;; wanted behaviour: a NEW finding means a runner just stopped covering its suite --
    ;; which, with gates moving to :nbb-test, is the moment coverage silently drops.
-   }]}
+   }
+
+  {:id       :verify-shadow-source-paths
+   :title    "shadow-cljs builds that cannot compile, because a :source-path is missing"
+   :why      "ADR-2608181700, 2026-08-18: kotoba-lang/kotobase-worker-shell and
+              net-kotobase/cypher were both unable to compile at all -- each missing the
+              same three :source-paths, each surfacing only after the previous was added.
+              The shell's test suite had therefore NEVER executed; restoring the paths
+              turned it on at 45 tests. Nothing was red, because `shadow-cljs compile`
+              stops before a test runs and nothing was running that build. Both were
+              found by hand, because they were the two repos that session happened to
+              touch. This run finds 13 of 30 in the same state, including a third copy of
+              that exact three-path drift in net-kotobase-enterprise-wave2."
+   :argv     ["nbb" "{{repo}}/scripts/verify-shadow-source-paths.cljs" "{{root}}" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 21600000                 ; 6h
+   :timeout-ms  600000                   ; 10m -- 19x the measured runtime
+   :writes   :none
+   :measured "2026-08-18 on this machine: 31s wall, 198 shadow-cljs.edn found, 30
+              examined (those declaring a relative sibling path), 17 ok, 12 UNRESOLVED,
+              1 MISSING. Read-only: no git, no network, no compile.
+
+              It does not compile. It resolves the closure the compiler would --
+              seeded from the repo's own non-relative source-paths, walking requires
+              through the siblings -- and reports namespaces nothing on the path
+              provides. An unresolved name that EXISTS elsewhere in orgs/ is the drift
+              and is a fail with the source-path to add; one that does not is reported
+              as probably a :dependencies entry and never failed on, because otherwise
+              every reagent build reads as broken.
+
+              Two earlier versions of this script were wrong in opposite directions and
+              both are worth remembering: a regex over the file reported 41 of 41 repos
+              broken (it matched regex character classes, :refer names and the java.*
+              imports in a .cljc :clj branch), and scanning every file in every sibling
+              rather than the closure reported 37 of 41 (a library carries modules a
+              given build never reaches)."}
+]
+}
