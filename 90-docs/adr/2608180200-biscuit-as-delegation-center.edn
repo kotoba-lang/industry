@@ -1,0 +1,156 @@
+[{:db/id -1
+  :adr/id "ADR-2608180200"
+  :adr/title "delegation の中心を biscuit にする —— wire は増やしてよい、決定器は 1 つ（macaroon / org-biscuitsec を起こし、repo-wide の役割を再整理する）"
+  :adr/status "accepted"
+  :adr/date "2026-08-18"
+  :adr/body "# ADR-2608180200: delegation の中心を biscuit にする —— wire は増やしてよい、決定器は 1 つ
+
+**Status**: accepted / **Date**: 2026-08-18
+
+## Decision
+
+**この workspace の delegation（権限を減衰させて他者へ渡すこと）の中心形式を
+`kotoba-lang/org-biscuitsec`（biscuit）とする。** kotoba・kotobase・cloud-itonami・
+net-kotobase を含む repo-wide の既定であり、他形式は役割を明示して残す。
+
+**ただし決定器は増やさない。** 判定は `kotoba-lang/authority` の束（`covers?` /
+`meet`）1 本のままで、biscuit は**その上の wire**である。この 2 文は分けて読むこと ——
+「中心にする」は「authority を置き換える」ではない。
+
+## なぜ biscuit か（macaroon と並べて実測した差）
+
+同日、両方を実装して比較した（`kotoba-lang/macaroon` / `kotoba-lang/org-biscuitsec`）。
+差は 1 点で、それが配備を決める:
+
+| | macaroon | biscuit |
+|---|---|---|
+| 鎖 | HMAC | **公開鍵** |
+| 検証に要るもの | **root の秘密** | **root の公開鍵だけ** |
+| 減衰 | 鍵不要（誰でも） | 鍵不要（誰でも） |
+| 検証できる場所 | root 秘密を託した所だけ | **任意の node / worker / browser** |
+
+kotobase の面は **edge で検証する**（Worker・browser・untrusted mirror）。macaroon を
+中心に据えると、検証する場所すべてに root 秘密を配ることになり、
+ADR-2608070400 の「server は持っていないものを漏らせない」と正面から衝突する。
+**biscuit は検証を秘密なしにするので、この衝突が構造的に消える。**
+
+さらに biscuit の減衰は **block scope** で単調である —— block の check は
+「authority block の facts + 自 block の facts」だけで評価され、**後続 block の fact で
+先行 block の check を満たせない**。実装が pool にすると普通のテストは全部通る
+（普通の token は自分に嘘をつく理由がない）ので、これは**設計上の性質として持つ**
+必要がある。
+
+## 面ごとの役割（repo-wide。これが再整理の本体）
+
+| 面 | 形式 | 役割 | 変更 |
+|---|---|---|---|
+| **delegation** | **biscuit** | 権限の減衰と委譲。principal→principal | **新規・中心** |
+| decision | `authority` | `covers?` / `meet` の唯一の実装 | 不変 |
+| semantics | kotoba `lang/capability-semantics.edn` | `:cap/kind` `:cap/resource` `:cap/holder` の名前付きモデル | 不変（**core IR**） |
+| human consent | CACAO | wallet / 人の同意、session の起点 | **delegation から降りる** |
+| external interop | UCAN (`xyz-ucan`) | 外部 UCAN 相互運用 | **既定から降りる** |
+| same-trust bearer | macaroon | root 秘密を持つ側だけが検証する狭い経路 | **新規・限定** |
+| claim | VC (`org-w3-vc`) | 属性の主張。**authority ではない** | 不変 |
+| ref 真正性 | `signed-head` | 誰が ref を進めたか + 順序 | 不変 |
+| ref 合意 | `inga` | 2f+1 quorum | 不変 |
+| confidentiality | `envelope` / `org-signal` / `noise` | object / session / hop | 不変 |
+
+**CACAO と UCAN を消さない。** 消すと 2 つの実装を書き直す作業が発生し、どちらも
+現に動いている。**変えるのは「新しい delegation をどれで書くか」だけ** ——
+これから増える委譲は biscuit で書き、既存は wire adapter として `authority` に
+入り続ける。
+
+## 層とトポロジー
+
+```text
+                    kotoba lang/capability-semantics.edn      ← core IR（意味）
+                                    │
+                          kotoba-lang/authority                ← 決定器（束）
+                                    │
+        ┌───────────┬───────────────┼───────────────┬───────────┐
+        │           │               │               │           │
+   org-biscuitsec  macaroon      cacao          xyz-ucan     org-w3-vc
+   （中心）     （狭い bearer）  （人の同意）    （外部）    （claim のみ）
+        │
+   biscuit.datalog（n-ary・予算つき。kotoba-lang/datalog とは別物）
+```
+
+依存の向きは **wire → decision → semantics** の一方向で、逆向きの辺は無い
+（`authority` は 4 つの wire のどれも require しない）。これが「wire を足しても
+決定は増えない」ことの構造的な保証であり、検査可能な不変条件でもある。
+
+kotobase 側の面はこの下に載る:
+
+```text
+authority 決定
+     │
+     ├─ kotobase ref（signed-head / inga）      ← 書き込みの権限
+     ├─ kotobase block/object（envelope 鍵）    ← 読みは鍵の所持で決まる
+     └─ tana root（署名は未実装。ADR-2608180100 の gap）
+```
+
+## Score
+
+**2 種類ある。混ぜない** —— 形式の比較（何を選ぶか）と、この stack 自身の健全性
+（いま何点か）。
+
+### A. wire の比較（0–5。この workspace の要件に対する重み付き）
+
+| 形式 | offline 検証 | **検証に秘密不要** | 減衰 | 表現力 | 失効 | wire 成熟 | ここでの実装 | 計 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| **biscuit** | 5 | **5** | 5 | 5 | 3 | 2 | 4 | **29** |
+| UCAN | 5 | 5 | 5 | 3 | 4 | 4 | 4 | 30 |
+| macaroon | 5 | **0** | 5 | 3 | 2 | 2 | 4 | 21 |
+| CACAO | 5 | 5 | 2 | 2 | 3 | 4 | 5 | 26 |
+| VC/VP | 5 | 5 | 0 | 4 | 4 | 5 | 4 | 27 |
+| mTLS / X.509 | 4 | 5 | 0 | 1 | 2 | 5 | 3 | 20 |
+| OAuth2 / JWT | 4 | 4 | 0 | 2 | 1 | 5 | 3 | 19 |
+| bearer token | 0 | 0 | 0 | 0 | 5 | 5 | 5 | 15 |
+
+**UCAN が 1 点高い。それでも biscuit を中心に選んだ**理由を隠さない: 差は
+「wire 成熟」と「失効」で、**表現力で biscuit が 2 点勝っている**。この workspace は
+Datalog を第一言語に持ち（`kotoba-lang/datalog`、kotobase 方言）、**委譲条件を
+Datalog で書けることが他所より効く**。加えて UCAN の `policy` は fail-closed で
+subset のみ実装（ADR-2608159400 が自ら「完全な policy language は未対応」と書く）。
+**点数は判断の記録であって判断そのものではない。**
+
+### B. stack の健全性（いま何点か）
+
+| 軸 | 点 | 根拠 |
+|---|---:|---|
+| 決定器が 1 つ | **5/5** | `authority` のみ。wire は 4 つとも `->grant` で inert data に落ちる |
+| 依存が一方向 | **5/5** | `authority` は wire を require しない。循環なし |
+| crypto を持たない | **5/5** | 全 wire が sign/verify/hmac を注入。既定なし |
+| 減衰が構造的 | **5/5** | `meet` が最大下界。escalation は算術的に不能 |
+| fail-closed | **4/5** | 未知の caveat/kind は不満足、未知 policy は deny。**biscuit の予算超過だけは新しく足した** |
+| 両方向を見た検査 | **4/5** | 8 defect で赤→緑。**うち 2 つは実演中に見つけた検査漏れ** |
+| **wire 相互運用** | **1/5** | **biscuit protobuf も libmacaroons binary も未実装。**外部実装が我々の token を読んだことは一度もない |
+| 配備 | **0/5** | **どの経路もまだ biscuit を使っていない。** live なのは CACAO 自己発行のまま |
+
+**総合 29/40。落ちている 2 軸が同じことを言っている** —— 決定と代数は堅いが、
+**外と繋がっておらず、まだ誰も使っていない。**
+
+## 何を supersede するか
+
+- **ADR-2608159400**（DID/VC/UCAN profile）の *delegation 既定* の部分。UCAN は
+  外部相互運用の面に降りる。**VC/UCAN の実装と admission seam はそのまま有効。**
+- **ADR-2608160200** の「UCAN / CACAO / OCapN は adapter」は**強化される**（変更なし）。
+  biscuit も adapter であり、**adapter の中で既定がどれか**を本 ADR が決める。
+- CACAO 自己発行（`build-actor` skill）は**人の同意・session 起点として残る**。
+  actor 間の委譲を新しく書くときは biscuit にする。
+
+## 移行していないことを、していないと書く
+
+**この ADR は方針の決定であって移行の完了ではない。** 2026-08-18 時点:
+
+| 経路 | いま | 次 |
+|---|---|---|
+| actor → kotobase-server | CACAO 自己発行（live） | 触らない。session 起点として正しい |
+| actor → actor の委譲 | **まだ無い** | biscuit で書く（最初の 1 本が proving slice） |
+| biscuit の wire | **未実装（protobuf v3）** | **gap ledger の先頭。**これが無い限り `biscuit-auth` と話せない |
+| Ed25519 束縛 | 注入のみ（テストは stand-in） | `kotoba-lang/ed25519` を挿す |
+| edge 検証 | 未配線 | Worker で root 公開鍵だけを持つ検証を 1 本 |
+
+**「biscuit を中心にする」と書いた時点で中心になったのではない。** 中心になるのは
+最初の委譲が biscuit で書かれ、edge で秘密なしに検証されたときである。
+"}]

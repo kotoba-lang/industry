@@ -27,7 +27,14 @@
 ;; 概念を 1 つに畳むとどれかが消える。**別概念として並べ、同じ綴りを両方に
 ;; 持たせる** —— `console` で引いた人には両方出るのが正しい。
 
-{:table-root
+{:delegation
+ {:label "委譲 / capability token（減衰して他者へ渡す）"
+  :spellings ["biscuit" "macaroon" "delegation" "attenuation" "capability token"
+              "ucan" "cacao" "caveat" "委譲" "減衰" "権限委譲" "capability"
+              "offline attenuation" "bearer token"]
+  :note "**中心は kotoba-lang/org-biscuitsec（biscuit）**（ADR-2608180200）—— 公開鍵で鎖を作るので **検証に秘密が要らず edge で検証できる**。判定は常に kotoba-lang/authority の束 1 本で、biscuit も macaroon も CACAO も UCAN も wire（->grant で inert data に落ちてから決定に入る）。役割: biscuit=委譲 / cacao=人の同意・session 起点 / xyz-ucan=外部相互運用 / kotoba-lang/macaroon=root 秘密を持つ側だけが検証する狭い bearer / org-w3-vc=claim であって authority ではない。意味論の正本は kotoba の lang/capability-semantics.edn。⚠ wire 相互運用は未実装 —— biscuit protobuf も libmacaroons binary も書いておらず、外部実装が我々の token を読んだことは無い。まだどの経路も biscuit を使っていない（live は CACAO 自己発行）。"}
+
+ :table-root
  {:label "テーブルルート / table manifest（述語 → バイト範囲）"
   :spellings ["tana" "棚" "table root" "table manifest" "manifest list" "snapshot"
               "iceberg" "partition pruning" "file skipping" "predicate pushdown"
