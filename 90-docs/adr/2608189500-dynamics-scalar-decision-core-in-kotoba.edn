@@ -1,0 +1,136 @@
+[{:db/id -1
+  :adr/id "2608189500"
+  :adr/title "dynamics のスカラ決定核を Kotoba に切り出した — と、最初の FAIL が古い checkout だった話"
+  :adr/status "accepted"
+  :adr/date "2026-08-18"
+  :adr/repos "kotoba-lang/dynamics kotoba-lang/dsl-core com-junkawasaki/root"
+  :adr/commits "kotoba-lang/dynamics fcbeda24f7b3607e49bfdda5ba4b43bd4fff943f; kotoba-lang/dynamics 508ceac"
+  :adr/body "## 問い
+
+「clj から kotoba への refactor を進めて」(オーナー、2026-08-18)。
+
+## 測った現在地 — 最初の答えは間違いだった
+
+`verify-require-graph` は FAIL を 1 件出していた: `kotoba.dsl.problem` が
+`.kotoba` へ移行され、**参照側 11 repo が追従していない**。ADR-2608071000 /
+ADR-2608130900 が記録した dsl-core の事故そのものに見えた。
+
+**それは私の checkout が古かっただけだった。** `dsl-core` の remote main は
+`7f6d44a`「Restore kotoba.dsl.problem as a loadable .cljc beside the .kotoba」で、
+`src/kotoba/dsl/problem.cljc` も `test/kotoba/dsl/problem_parity_test.clj` も
+既に在る。**west pin も `7f6d44a` を指していた。** 遅れていたのは共有 checkout
+だけで、`west update --fetch smart dsl-core` の後は検出器も緑になった:
+
+    OK — .kotoba へ移行された namespace を、.clj/.cljc/.cljs のまま require している repo は無い
+
+ADR-2608136800 が言うとおり **checkout・west pin・repo の main は 3 つの別物**で、
+検出器が読むのは working tree である。この検出器の baseline 89 件も同じ理由で
+汚染されうる —— **stale checkout は「壊れている」と同じ顔をする。**
+
+## 決めたこと
+
+`kotoba-lang/dynamics` の**スカラ決定核を `.kotoba` に切り出し、parity gate で
+原本に固定する。`src/` は 1 バイトも変えない。**
+
+この repo を選んだ理由は 3 つ。CLAUDE.md が system dynamics の計算の正本として
+名指ししている(「計算そのものは `kotoba-lang/dynamics` を使う。ゼロから再発明
+しない」)。ADR-2608189400 が XMILE を測ったときに `.cljc` 3 / **`.kotoba` 0** と
+記録した隣接 repo である。そして checkout・pin・remote main の 3 点が一致しており
+(`bfb0de7`)、**読んだものが正本だと言い切れた**。
+
+着地: `kotoba-lang/dynamics` main `fcbeda2`(merge)、`508ceac`(実装)。
+
+| 移した | 中身 |
+|---|---|
+| `band-weight` | Meadows 5 帯の序数重み。未知の帯は refusal |
+| `leverage-base` | `leverage-score` の `:base-score` = 重み × tractability |
+| `expected-yield` | pool × conversion-rate。model 全体で最も load-bearing な区別 |
+| `loop-structural-strength` | 4 因子の積(左結合) |
+| `pow` | `Math/pow` / `js/Math.pow` の再構成。**host 数学ライブラリを import しない** |
+| `upper-bound-rate-from-zero-events` | `1-(1-c)^(1/n)` |
+| `cagr` / `real-growth` | 複利成長と厳密デフレート |
+
+**残したもの**: `rank-interventions`(整列)、`meadows-bands`(record の map)、
+`loop-archetypes`(700 行のカタログ)、`compare-archetypes-2d`、`regime-changes`、
+`money-loop-measures`。CLAUDE.md の「移行の単位は決定核」のとおり、**スコアを
+決めるスカラは渡り、その周りのコレクション組み立ては渡らない。**
+
+## 2 種類の「書けない」を混ぜなかった
+
+ADR-2608650000 の規則を適用した。`throw` を使わず `[:result :f64 :string]` を
+返すのは**恒久**(`:intentional-security-constraint`)。一方
+`.cljc` の `(number? x)` ガードは移していない —— あれは動的言語が自分の引数を
+検査しているだけで、**`:f64` パラメータは不在になれない**。値としては数である
+ものを拒む guard(非正の start、-100% のインフレ、範囲外の confidence)だけが
+refusal になった。**「絶対値は refusal ではない」をファイル冒頭に書いた。**
+
+## gate — 2 つの半分を混ぜない
+
+| 半分 | 対象 | 根拠 |
+|---|---|---|
+| **exact** | `band-weight` `leverage-base` `expected-yield` `loop-structural-strength` `real-growth` | 両側とも IEEE 演算か選択。1 ulp の差は丸めではなく欠陥 |
+| **1e-12 相対** | `pow` `upper-bound-rate-from-zero-events` `cagr` | port は host の transcendental を import しない。**bit 一致は入手不能で、主張すれば嘘になる** |
+
+実測最悪相対誤差(2026-08-18): `pow` **2.476e-15**、`upper-bound` **1.178e-15**、
+`cagr` **7.142e-15**。閾値 1e-12 は最悪値の約 140 倍で、3 つとも毎回印字する。
+
+`loop-structural-strength` が exact 半分の要である: `(* a b c d)` は左に畳まれ、
+**その 4 つの掛け算を組み替えるのは代数的に同一で IEEE では同一でない。**
+
+## 落ちることを確かめた(5 回、壊したものと報告が一致)
+
+| 壊した箇所 | 出た赤 |
+|---|---|
+| 4 因子の積を数学的に等価な形に再結合 | `loop-structural-strength` **だけ**。1125 中 521 形状、差は最終 ulp |
+| `real-growth` を減算近似に | そのテスト**だけ**。64 中 59 組、-99% で 48.99999999999996 対 0.49 —— docstring が警告しているその場合 |
+| confidence の上界を `<` から `<=` に | refusal テスト**だけ** |
+| 帯 B の重みを 7→6 | `band-weight` と、それに依存する `leverage-base` の該当ケース |
+| `pow` を 1+5e-12 倍 | tolerant 3 本**全部**、exact は 1 本も落ちず。`upper-bound` では相殺により **7.213e-06** に増幅 |
+
+最後の 1 つが tolerant 半分に意味を与えている —— 5e-12 の摂動が 1e-12 の閾値を
+確かに越え、しかも exact 半分は無傷だった。
+
+**evidence floor を入れた**(ADR-2608136000 問 1)。corpus の件数を assertion に
+した —— `for` の束縛が 1 つ消えても、**比較 0 件が「一致」として緑に読まれない**。
+
+## 検証
+
+    clojure -M:parity -m cognitect.test-runner -n dynamics.kotoba-score-core-parity-test
+    Ran 10 tests containing 362 assertions. 0 failures, 0 errors.
+
+`src/` は無改変(`git diff origin/main -- src/` が空)。`amu` は **test-only**。
+`test/run_tests.cljs`(nbb 経路)は名前空間を明示列挙しているので影響を受けない。
+
+## 主張していないこと
+
+**`dynamics.core` が JVM / JS なしに動くとは言っていないし、今日それは真ではない。**
+上記「残したもの」は全部 `.cljc` のままで、全部 host を要る。主張はもっと狭く、
+書いてあるとおり: **スコアを決めるスカラ算術が、host 数学を import しない module で
+再現される。**
+
+**native にも載っていない。** `pow` は `f64-exp-bounded` / `f64-log-bounded` を使い、
+native backend は transcendental を 1 つも持たない(ADR-2608189400 が実測)。
+qualified なのは `kotoba-wasm` と `kotoba-script`。
+
+## fleet gate を足していない — 理由
+
+`:jvm-test` は `clojure -M:test` に固定されており、dynamics の `:test` は
+`dynamics.xmile-test` / `dynamics.sysml-test` を読む。それらは兄弟 repo
+(`org-oasis-open-xmile` / `org-omg-sysmlv2`)を要り、ノードは受け取らない。
+必要なのは `kototama-hermetic` と同じ形 —— `:nbb-script` + `:cap :jvm` で
+`clojure -M:parity` を叩く gate である。
+
+**書いたが landing していない。** CLAUDE.md は「gate は fleet で 1 度緑になるまで
+landed としない」と定めており、このセッションでノード上の緑を観測できなかった。
+**観測していない gate を足すのは、この規則が名指しで禁じている形である。**
+次のセッションの最初の一手はこれ。
+
+## 次の一手(順序つき)
+
+1. 上記 fleet gate を足し、**ノードで 1 度緑を観測してから** landed とする。
+2. **native の bounded transcendental**(ADR-2608189400 の 4 手: kotoba-kir に
+   trap primitive → カーネル形式を kotoba-kir へ抽出 → 両 ISA に接ぐ → 微分テスト)。
+   これが `dynamics` と XMILE の両方を native に載せる唯一の障害。
+3. `verify-require-graph` の baseline 89 件を、**stale checkout を除いてから**
+   数え直す。今日の 1 件はそれで消えた。
+"}]
