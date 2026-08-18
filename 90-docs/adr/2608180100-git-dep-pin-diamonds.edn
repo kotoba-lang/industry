@@ -1,0 +1,96 @@
+[{:db/id -1
+  :adr/id "ADR-2608180100"
+  :adr/title "git 依存の pin が二重化している —— 実測 16 repo 中 9 本、kotobase は 13 library 分。JVM が緑なのは tools.deps が黙って 1 版を選ぶから"
+  :adr/status "accepted"
+  :adr/date "2026-08-18"
+  :adr/deciders "Jun Kawasaki（「next」「gap 解消」）"
+  :adr/repos ["kotoba-lang/kotobase" "kotoba-lang/kotobase-projection" "kotoba-lang/arrangement" "com-junkawasaki/root"]
+  :adr/relates-to "ADR-2608170800（出荷先のランタイムで検査されていない）, ADR-2608136000（測れなかった検査が緑を返す）, ADR-2607300900（CI/CD は murakumo fleet）"
+  :adr/body
+  "# ADR-2608180100: pin の二重化
+
+**Status**: accepted
+**Date**: 2026-08-18
+
+## どうやって見つかったか
+
+ADR-2608170800 の続きで、live Worker に載る library の ClojureScript 半分を
+1 本ずつ gate に載せていた。`arrangement` だけが**ノードで落ちた** ——
+
+```
+Cannot read properties of undefined (reading 'lastIndexOf')
+  at arrangement/core.cljc:291 → …/io-ipld/…/cid decode
+```
+
+同じマシンで **JVM 実行は緑**。手元でも緑。ノードでだけ落ちる。
+
+classpath を見たら答えが書いてあった:
+
+```
+…/io-ipld/e08dc3b2…/src   ← arrangement 自身の pin
+…/io-ipld/45917645…/src   ← 推移依存の pin
+```
+
+**同じ library が 2 つの sha で載っている。**
+
+## なぜ JVM は緑なのか
+
+**tools.deps は diamond を 1 版に解決する。** `gates/nbb-cross-runtime.cljs` の
+classpath 構築は `[lib sha]` を鍵にした幅優先の走査で、見つけた組を全部並べる。
+namespace ごとに first-wins になるので、**片方の library の API と、もう片方を
+前提に書かれたコードが混ざる。**
+
+つまりその gate は「この repo の suite は通るか」ではなく
+**「実際には誰も走らせない classpath で通るか」**に答えていた。
+
+## 実測（2026-08-18）
+
+`~/.gitlibs` の実体を辿って推移閉包を取り、同一 lib が 2 sha 以上に到達する数を数えた。
+
+| repo | 二重化した library 数 |
+|---|---|
+| `kotobase` | **13** |
+| `kotobase-projection` | 4 |
+| `org-w3-sparql-protocol` / `org-opencypher-cypher` / `org-graphql-http` / `org-apache-tinkerpop-gremlin` / `kotobase-query` | 各 2 |
+| `arrangement` / `org-apache-arrow` / `org-apache-parquet` | 各 1 |
+
+**測った 16 repo のうち 9 本。** 最多は `kotobase` で、`io-ipld`・`io-multiformats`・
+`kotoba-kir`・`kotoba-wasm`・`artifact`・`prolly-tree` などが 2 版ずつ載る。
+
+`arrangement` の deps.edn には
+**「the same SHA, so this adds no new transitive dependency」というコメントが
+残っている** —— それが真でなくなったことに誰も気付いていない。
+
+## 決めたこと
+
+1. **gate script は conflict を印字する。落とさない。** これは判断であって
+   見落としではない: 9 本のうち **8 本は diamond を持ったまま緑**である
+   （first-wins がたまたま互換な版を選ぶ）。落とすと**影響していない 8 本の
+   gate が即座に赤**になり、しかも直し方はワークスペース横断の再 pin であって
+   各 repo にできることではない。
+   **したがって、その 9 本の緑は「JVM なら組まない classpath での緑」**であり、
+   混乱した失敗を読む人の目に入る場所（gate の出力）にそう書いた。
+2. **diamond を持つ repo に nbb gate を登録しない**（`arrangement` /
+   `kotobase` / `kotobase-projection`）。実際に落ちるものを landed にしない。
+   entry（`run-tests.cljs`）は commit してあるので、pin が揃えば登録するだけ。
+   ⚠ 既に登録済みの 8 本は、この決定より前に緑を確認して landed している。
+   **後から知った事実で遡って外すのではなく、caveat を記録する**方を採った。
+3. **pin を揃える作業は別の判断。** 13 library を跨ぐ再 pin は consumer の
+   解決結果を変えるので、gate 登録の範囲ではない。
+
+## 付随して直したもの（どちらも repo の欠陥ではなく可搬性）
+
+- **`#?(:cljs cljs.core.ExceptionInfo)` を `ExceptionInfo` に。** compiled
+  ClojureScript では有効だが nbb（SCI）では解決できず、assertion が 1 つも
+  走る前に suite が死んでいた（`kotobase` 18 箇所・`kotobase-projection`）。
+  非修飾形は compiled build でも同じ型なので何も弱めない。
+- **`kotobase-projection` に `package.json`。** 消費側の shadow-cljs が npm 依存を
+  供給する設計なので repo 単体では入れられず、`Cannot find module
+  '@noble/hashes/sha2.js'` で死んでいた。**gate は consumer を持たない。**
+
+## この ADR が残す一般則
+
+**「JVM が緑」は「宣言どおりの依存で緑」ではない。** tools.deps の解決は
+diamond を黙って畳むので、pin がずれていること自体が見えない。見えるのは、
+畳まない別のランタイムで走らせたときだけである ——
+この件は**その差分としてしか観測できなかった。**"}]
