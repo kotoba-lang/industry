@@ -189,8 +189,15 @@
         {:endpoint nil :why :alias-unreachable
          :detail (str "exit=" (.-status res) " " (str/trim (or (.-stderr res) "")))}))))
 
-(defn ask
-  "1 回の chat completion。**エラー本文を捨てない**（5 問の 3）。"
+(defn gateway-error?
+  "504/524 のような **transport の失敗**。モデルが答えなかったのとは別物。
+   実測 2026-08-18: 40 call 中 11 件が Cloudflare の 524 で落ち、これを分母に
+   入れると bare の pass 率が 45.5% ではなく 25.0% に見えた。"
+  [{:keys [why detail]}]
+  (and (= :unparseable-response why)
+       (some #(str/includes? (str detail) %) ["error code: 524" "error code: 504" "error code: 502"])))
+
+(defn ask-once
   [{:keys [endpoint model]} messages]
   (let [payload (js/JSON.stringify
                  (clj->js {:model model :messages messages
@@ -240,6 +247,19 @@
               (if (and (zero? d) (pos? depth))
                 (subs sub 0 (inc n))
                 (recur (inc n) d (or seen (pos? d)))))))))))
+
+(defn ask
+  "1 回の chat completion。**エラー本文を捨てない**（5 問の 3）。
+   transport の失敗は最大 2 回まで再試行する —— モデルの能力とは無関係な
+   ノイズを測定値に混ぜない。"
+  [llm messages]
+  (loop [n 0]
+    (let [r (ask-once llm messages)]
+      (if (and (not (:ok r)) (gateway-error? r) (< n 2))
+        (recur (inc n))
+        (if (and (not (:ok r)) (gateway-error? r))
+          (assoc r :why :gateway-timeout)
+          r)))))
 
 ;; ---------------------------------------------------------------- prompts
 
@@ -497,12 +517,29 @@
                         (.writeFileSync fs (or out "bench-result.edn") (pr-str report))
                         (println)
                         (doseq [c [rb rs]]
-                          (println (str "== " (:label c)
-                                        "  asked=" (:asked c) " executed=" (:executed c)))
-                          (doseq [[k v] (sort-by (comp str key) (:tally c))]
-                            (println (str "   " (name k) ": " v)))
-                          (println (str "   pass-rate = "
-                                        (.toFixed (* 100 (/ (or (get (:tally c) :pass) 0) (:asked c))) 1) "%")))
+                          (let [t (:tally c)
+                                pass (or (:pass t) 0)
+                                ;; ⚠ **測れなかったものを分母に入れない。** transport の
+                                ;; 失敗（524 等）はモデルが間違えたことの証拠ではない。
+                                ;; この harness が防ぐために書かれた誤りを、harness 自身の
+                                ;; 集計層でやっていた（実測 2026-08-18）。
+                                unmeasured (+ (or (:skipped-llm-error t) 0)
+                                              (or (:skipped-truncated t) 0)
+                                              (or (:skipped-gateway t) 0))
+                                answered (- (:asked c) unmeasured)]
+                            (println (str "== " (:label c)
+                                          "  asked=" (:asked c)
+                                          " answered=" answered
+                                          " (測れなかった " unmeasured " 件は分母から外す)"
+                                          " executed=" (:executed c)))
+                            (doseq [[k v] (sort-by (comp str key) t)]
+                              (println (str "   " (name k) ": " v)))
+                            (println (str "   pass / answered = " pass "/" answered " = "
+                                          (if (pos? answered)
+                                            (str (.toFixed (* 100 (/ pass answered)) 1) "%")
+                                            "算出不能")))
+                            (println (str "   pass / asked    = " pass "/" (:asked c)
+                                          "  ← 転送障害を失敗として数えた場合。主指標にしない"))))
                         (println (str "\nwrote " (or out "bench-result.edn")))
                         (compat/exit 0)))))))))))))
 
