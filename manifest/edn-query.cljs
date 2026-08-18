@@ -1149,6 +1149,37 @@
           [])
       (mapcat (fn [f] (or (corpus-line-entities f next-tempid!) [])) files))))
 
+(defn gbizinfo-entities
+  "gBizINFO（経済産業省）の法人活動情報
+   （`jp-go-gbiz-info` の `data/*.datoms.edn`、ADR-2608181000）。
+
+   法人番号 registry が「この法人は在るか」、invoice registry が「適格請求書を
+   出せるか」を答えるのに対し、こちらは**国がこの法人に何を渡し、何を買い、何を
+   記録したか** —— `:grant/kind :subsidy` / `:procurement` と、
+   `:company/fiscal-year-end-month`（決算期）・`:company/net-sales-yen`。
+
+   全部 `:company/houjin-bangou` を持つので、この面の他の全部と join できる。
+   jGrants（公募）とは別物である: あちらは「どんな補助金が在るか」、
+   こちらは「誰が受けたか」。
+
+   ⚠ **今の artifact は公開の動作確認トークンで取った有界なサンプル**で、
+   manifest 行の `:source/token` がそれを言う（`:published-demo` / `:operator`）。
+   count が小さいのは「補助金が無い」ではなく「まだ 16 社しか引いていない」。"
+  [next-tempid!]
+  (let [files (->> ["jp-go-gbiz-info"]
+                   (keep west-project-path)
+                   (mapcat (fn [p]
+                             (let [dir (apply io/file root (concat (str/split p #"/") ["data"]))]
+                               (when (.exists dir)
+                                 (->> (seq (.listFiles dir))
+                                      (filter #(str/ends-with? (str %) ".datoms.edn"))))))))]
+    (if (empty? files)
+      (do (js/console.error
+           (str "edn-query: WARNING gbizinfo: com-junkawasaki/jp-go-gbiz-info の "
+                "data/*.datoms.edn が無い — 補助金交付・調達・決算期は load されない"))
+          [])
+      (mapcat (fn [f] (or (corpus-line-entities f next-tempid!) [])) files))))
+
 (defn property-ownership-entities
   "公開不動産 ownership claim（`data/property-ownership.datoms.edn`）。
    `:ownership/*` は kotoba.property.ownership の可搬コントラクトそのままなので、
@@ -2042,6 +2073,9 @@
         ;; 補助金は company とは別 dataset にする（法人側と join できないので、
         ;; company を数える query に 3,751 件を混ぜない）。
         subsidy-tx (jgrants-entities next-tempid!)
+        ;; gBizINFO は company-tx に入れる（`:company/houjin-bangou` を持ち、
+        ;; 法人側と実際に join するため）。jgrants と違うのはそこ。
+        gbizinfo-tx (gbizinfo-entities next-tempid!)
         ;; company-tx と別にするのは、entity を聞くだけの query に 23,530 本の
         ;; edge を load させないため（ADR-2608031900）。
         relationship-tx (gleif-relationship-entities next-tempid!)
@@ -2066,7 +2100,7 @@
                                                      hirameki-corpus-tx jinushi-tx
                                                      proc-registry-tx merged-kotoba-tx
                                                      working-doc-tx narrative-tx
-                                                     company-tx property-tx subsidy-tx relationship-tx fleet-tx
+                                                     company-tx gbizinfo-tx property-tx subsidy-tx relationship-tx fleet-tx
                                                      yabai-tx tadori-tx patent-tx accounts-tx innen-tx
                                                      awai-tx kakekomi-tx okugai-tx factory-tx
                                                      hayari-tx hayari-ent-tx
