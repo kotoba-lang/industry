@@ -69,7 +69,15 @@
 (def only-id
   (when-let [i (first (keep-indexed #(when (= %2 "--only") %1) argv))]
     (get argv (inc i))))
-(def root (or (first (remove #(or (str/starts-with? % "--") (= % only-id)) argv))
+(def edn-out
+  ;; Where to write this run's observations, in the shape kotoba-lang/uptime's
+  ;; `observation` takes. A single run cannot say anything about availability --
+  ;; that needs a window -- so this emits the raw probes and leaves the statement
+  ;; to whoever accumulates them (scripts/endpoint-health-resident.cljs).
+  (when-let [i (first (keep-indexed #(when (= %2 "--edn") %1) argv))]
+    (get argv (inc i))))
+(def root (or (first (remove #(or (str/starts-with? % "--")
+                                  (= % only-id) (= % edn-out)) argv))
               (js/process.cwd)))
 (def state-path (.join path (or (.-HOME js/process.env) "/tmp")
                        ".gftd" "endpoint-health.state.edn"))
@@ -152,12 +160,43 @@
 
 ;; ---------------------------------------------------------------- main
 
+(defn verdict->outcome
+  "uptime.core/outcomes has exactly three values, and the mapping matters:
+
+   :ok                          -> :up
+   :degraded / :answered-badly  -> :down   (a claim about the SERVICE)
+   :unanswered                  -> :down   (only reached here once the controls
+                                            were reachable, so it is the
+                                            service, not this prober)
+
+  Nothing maps to :inconclusive from here. A run that could not measure exits 2
+  before reporting, and writes no observations at all -- which is what keeps
+  `unobserved` distinguishable from `up` downstream. If a run could write
+  :inconclusive observations, a prober that fails every time would produce a
+  full, healthy-looking window of them."
+  [verdict]
+  (if (= :ok verdict) :up :down))
+
+(defn write-observations! [now rs]
+  (when edn-out
+    (let [obs (mapv (fn [{:keys [verdict detail probe]}]
+                      (cond-> {:observation/target (str (:id probe))
+                               :observation/at now
+                               :observation/outcome (verdict->outcome verdict)}
+                        detail (assoc :observation/detail detail)))
+                    rs)]
+      (try (.mkdirSync fs (.dirname path edn-out) #js {:recursive true})
+           (.writeFileSync fs edn-out (pr-str obs))
+           (println (str "OBSERVATIONS\t" (count obs) "\t" edn-out))
+           (catch :default e (println (str "  (observations not written: " e ")")))))))
+
 (defn report! [state now due rs]
   ;; SCANNED is printed HERE, not at selection time: it is the evidence floor,
   ;; and it must count probes that were actually called. An earlier version
   ;; printed it before the control check, so a run that called nothing (controls
   ;; down) still announced "1 probe(s) actually called".
   (println (str "SCANNED\t" (count rs) "\tprobe(s) actually called"))
+  (write-observations! now rs)
   (let [by (group-by :verdict rs)
         ;; UNANSWERED counts as failure here. This function only runs after the
         ;; controls were reachable, so "could not reach it" is a fact about the
