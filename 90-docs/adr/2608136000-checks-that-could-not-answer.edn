@@ -47,4 +47,47 @@ gateway ADR-2608171256 と substrate ADR-2608170400 の gap 解消中に、同�
   guard は `KEPT` を印字した。**「検証できなかった」が「検証して問題無し」と
   違う値だったから、破壊的操作が起きなかった。**
 
+## 最も強い事例: 「走らない検査」を直す機構が、自分は走っていなかった（2026-08-18）
+
+`scripts/orgs-detector-tick.cljs` の header は、この class の先行事例をこう書いている:
+
+> `scripts/` に**未インストールの launchd plist が 5 本**あり、うち 1 本は 3 つの
+> verifier の**唯一の呼び出し元**だった（1 つは既に**不可逆な資産喪失**を出した
+> custody を守る検査）。**検査には何も問題が無かった。scheduler が一度も
+> インストールされていなかった。** —— だから registry に一般化し、次の検出器は
+> 6 本目の plist ではなく registry の 1 entry になるようにした。
+
+**2026-08-18 実測: その registry を回す tick 自身が、`scripts/` の未インストール
+plist である。** `launchctl list` に該当 job は無く、SessionStart hook は
+**state file を読むだけで tick を起動しない**。結果:
+
+- 登録 12 件のうち **10 件が 2026-08-14/15 で凍結**（4 日間停止）
+- **2 件は state に存在すらしない** —— 一度も走っていない
+  （`verify-appview-page-summary` / `verify-jvm-dependency-surface`）
+- hook は「未実行のまま登録されている」と**正しく報告していた**。読む者が
+  「登録されている＝走っている」と読むまでは。
+
+**registry は 6 本目の plist を不要にしたが、1 本目は未インストールのままだった。**
+一般化は問題を 1 段上に移しただけで、解いていない。
+
+**手で 1 本走らせた結果**（`--only verify-cljs-runner-completeness --force`）:
+**20 repo 以上で、cljs runner が suite より少ない namespace しか名指ししていない** ——
+`cloud-itonami` 62/205、`nekko` 13/17、`io-ipld` 7/9。**test は在り、JVM では通り、
+cljs では一度も走っていない。**
+
+うち `kotobase-storage-pack` は**私がその日 P4-2 で編集した runner**だった。
+namespace を 1 つ足し、**兄弟が未収録であることに気付かなかった** —— この class が
+生き延びる普通の経路である。**file に名指しされたものが全部走るので、file は
+完全に見える。**
+
+しかも原因は怠慢ではなかった: `pack_catalog_test.cljc` は `:test` alias の
+`datalog` を require し、runner の classpath は `clojure -Spath`（base deps のみ）
+だったので**そもそも load できなかった**。JVM は directory scan で拾うので通り、
+cljs では走らない。**runner に足すだけなら suite が壊れた。**（修正 `222bd141`:
+classpath を `-M:test` に。nbb 26 tests/123 assertions → **33/149**。）
+
+**owner 判断が要る残件**: `scripts/com.gftd.orgs-detector-tick.plist` の
+インストール。agent は daemon を勝手に常駐させない（hook 自身が「owner 判断」と
+書いている）。**それまで registry は手で `--force` を打った時だけ動く。**
+
 ## 偽の実演に注意\n\nこの class を直すとき、**壊し方を間違えると赤が出て、それが成功した実演に見える。**\n当日 4 回起きた: gate の *別の* 検査を壊した / reader を throw させた（EDN が\n壊れていることの証明であって、静かな切断の証明ではない）/ コメントの中の key を\n置換した / 検索対象の部分文字列を含む名前に改名した。\n\n**壊したものが、報告されたものと一致することを確かめる。** 一致しなければ、\n実演したのは別の検査である。"}]
