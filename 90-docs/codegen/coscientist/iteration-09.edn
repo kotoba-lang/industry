@@ -1,0 +1,83 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-09"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-09.edn"
+  :doc/date "2026-08-18"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "isel: first-round offset multiply"
+  :coscientist/iteration 9
+  :coscientist/subject "kotoba-lang/kotoba-native, bench/runtime-comparison/kernel_wide.kotoba"
+  :coscientist/action "distribute (n+k)*C through the multiply, GVN n*C, refuse MADD of a reused product"
+  :coscientist/measured "encoded kernel_wide: 1 MUL + 8 MADD. Round 1 matches LLVM's scalar shape (one mul of n, eight constant adds). Round 2 stays unique-use madd. No timed sample in this iteration."
+  :coscientist/refuted "fusing every adjacent mul+add after the leaf cache. A product with eight add users is one mul, not eight madds; dropping it is wrong-code."
+  :coscientist/carries-forward "iteration-04: do not ship a timed bench export; iteration-07: do not overwrite; iteration-08: the call/all-vreg path is a different workload and is not this file"
+
+  :doc/body
+  "# Codegen co-scientist, iteration 9
+
+WIP=1 is still closing the LLVM gap on `kernel_wide`. Iteration 6 moved the
+pool. Iteration 7 is Belady spill placement. Iteration 8 measured the
+call/all-vreg hole and is not this file. Encode-time MADD after the leaf
+cache (kotoba-native `c55711d`) turned eight offset lanes into eight MADDs.
+LLVM does not do that.
+
+## What LLVM actually emits
+
+AArch64 rustc -O3, scalar, no NEON. The kernel is inlined into the 100k loop.
+Round 1 is **one** `mul x14, n, #48271` and then `add` of precomputed
+`(k*48271+1)`. Round 2 is eight `madd`. Remainder is already a Mersenne
+sequence. Dump: `/tmp/kernel-wide-dump-260818/`.
+
+`(n+k)*C+1` is `n*C+(k*C+1)` in wrapping i64. Eight lanes share `n*C`.
+
+## The change
+
+A GMIR pass at the end of `lower-kir-expression`:
+
+1. Distribute `mul (add x k) C` → `add (mul x C) (k*C)` when k and C are i64
+   constants. Commutative in both operators. The add that produced `n+k` stays
+   if it still has other readers.
+2. Fold `add (add x a) b` → `add x (a+b)` when a and b are const, so the
+   trailing `+1` becomes the addend `k*C+1`.
+3. GVN identical `mul x C` within a basic block. No move.
+4. DCE only unused `:gmir/constant` and `:gmir/add`. Quotient stays even when
+   unread (ordered `do` still has to trap).
+
+AArch64 fusion grew a unique-use check. After CSE, one mul has eight add
+users. Fusing the first would drop the mul while the other seven still read
+it. Count uses of the product **until that register is killed**. Counting to
+the end of the function treats a later live-range of the same physical as a
+use of this product, and that refusal broke the already-landed
+`(+ (* n 7) 1)` then `(- v (* n 3))` MADD/MSUB pair.
+
+Landed: kotoba-native `c15026ff` (merge of `agent/offset-mul-reassoc`).
+West pin `314f9be9` → `c15026ff` (superproject `8d7a0827`). Do not bump amu
+without perfgate.
+
+## Break / unbreak
+
+Eight-lane first-round without the rewrite: 8 independent muls, or 8 madds
+after the cache. With it: GMIR has **one** `:gmir/multiply` whose non-constant
+operand is the argument. Encoded bytes: **1 MUL, 0 MADD** on that form.
+`kernel_wide`: **1 MUL + 8 MADD**. Fusion of a reused product refuses
+(lower-mc unit test, two add users). Wrapping identity: `2*Long/MAX_VALUE`
+is the i64 `-2`, not a BigInt. Full suite: 165 tests, 2185 assertions.
+
+The leaf-cache test that used `(+ n 7)` then `(* a 7)` then `(+ b 7)` is no
+longer that program — it is `n*7+56`. Three uses of 7 moved to bit-and/or/xor.
+
+## Honest leftover
+
+Even with round 1 = 1 mul + 8 adds:
+
+- Fuel-on-entry remains.
+- LLVM still inlines into the timed loop; amu still calls a function pointer
+  (`kexe-benchmark`).
+- The call / all-vreg path is unchanged (iteration 8 named it; this pass does
+  not touch it).
+- Seal only via `kotoba-lang/perfgate`, this kernel, min quantile, 25 rotated
+  samples.
+
+Do not land fused-srem, extra MOV peepholes, FMA, PGO, a kototama optimizer,
+or a timed `bench` export. Do not claim LLVM beaten. Do not overwrite
+iterations 04–08."}]
