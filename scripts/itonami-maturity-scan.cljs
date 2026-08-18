@@ -93,15 +93,28 @@
 (defn- walk-files
   "repo 相対 path の列。max-depth / max-entries で必ず打ち切る（暴走防止）。
 
-   打ち切りは黙って起きてはならない —— truncated? な repo は src/test が 0 に
+   打ち切りは黙って起きてはならない —— 打ち切られた repo は src/test が 0 に
    潰れ、『実装が無い repo』と見分けが付かなくなる。呼び出し側は必ず
-   :truncated? を報告すること。"
+   :truncated? と :depth-pruned? の**両方**を報告すること。
+
+   打ち切りの原因は 2 つあり、以前は片方しか報告されていなかった:
+   max-entries は :truncated? を立てるが、**max-depth の枝刈りは黙っていた**。
+   実測 2026-08-18（cloud-itonami/app-analytics の cljs 移行中）——
+   SvelteKit の `svelte/src/routes/xrpc/[...path]/+server.ts` は深さ 7 に居り、
+   この walk からは最初から見えていなかった。その repo の src は 0 と測られ、
+   『実装が無い』と区別が付かなかった。docstring はこの約束を既に書いていたが、
+   守られていたのは 2 経路のうち 1 つだけだった。"
   [root max-depth max-entries]
   (let [out (atom [])
-        truncated? (atom false)]
+        truncated? (atom false)
+        depth-pruned? (atom false)]
     (letfn [(go [dir depth rel]
-              (when (and (<= depth max-depth) (not @truncated?))
-                (doseq [e (try (.readdirSync fs dir #js {:withFileTypes true})
+              (when-not @truncated?
+                (if (> depth max-depth)
+                  ;; ここに来た = max-depth より深い directory を walk しなかった。
+                  ;; 中身は数えられていないので、そう言う。
+                  (reset! depth-pruned? true)
+                  (doseq [e (try (.readdirSync fs dir #js {:withFileTypes true})
                                (catch :default _ #js []))]
                   (when-not @truncated?
                     (let [nm (.-name e)
@@ -111,9 +124,9 @@
                         (when-not (or (contains? skip-dirs nm) (virtualenv? child))
                           (go child (inc depth) crel))
                         (do (swap! out conj crel)
-                            (when (>= (count @out) max-entries) (reset! truncated? true)))))))))]
+                            (when (>= (count @out) max-entries) (reset! truncated? true))))))))))]
       (go root 0 ""))
-    {:files @out :truncated? @truncated?}))
+    {:files @out :truncated? @truncated? :depth-pruned? @depth-pruned?}))
 
 (defn- file-size [p] (try (.-size (.statSync fs p)) (catch :default _ 0)))
 
@@ -192,7 +205,7 @@
         root (dr rel)]
     (if-not (exists? root)
       {:repo/path rel :repo/org org :repo/name repo :repo/present? false}
-      (let [{:keys [files truncated?]} (walk-files root 6 6000)
+      (let [{:keys [files truncated? depth-pruned?]} (walk-files root 6 6000)
             src-files   (filterv #(and (str/starts-with? % "src/") (src-ext (ext-of %))) files)
             test-files  (filterv #(and (str/starts-with? % "test/") (src-ext (ext-of %))) files)
             kotoba-files (filterv #(= "kotoba" (ext-of %)) files)
@@ -256,6 +269,8 @@
          :repo/name repo
          :repo/present? true
          :repo/files-truncated? truncated?
+         ;; max-depth の枝刈り。src/test が 0 でも「無い」ではなく「見ていない」
+         :repo/files-depth-pruned? depth-pruned?
          :repo/file-count (count files)
          ;; --- substrate
          :src/file-count (count src-files)
@@ -392,9 +407,22 @@
       (when (seq tr)
         (binding [*print-fn* *print-err-fn*]
           (println (str "WARNING: " (count tr)
-                        " repo で file walk を打ち切った —— これらの src/test は"
+                        " repo で file walk を打ち切った（entry 上限）—— これらの src/test は"
                         " 0 に潰れており、実測値ではない:"))
           (doseq [e tr]
-            (println (str "  " (:repo/path e) " (files>=" (:repo/file-count e) ")"))))))))
+            (println (str "  " (:repo/path e) " (files>=" (:repo/file-count e) ")"))))))
+    ;; 深さの枝刈りは以前は黙っていた。深い tree（SvelteKit の
+    ;; svelte/src/routes/xrpc/[...path]/ は深さ 7）を持つ repo は、その中身を
+    ;; 一度も見られないまま 0 と測られる。件数だけでも出す。
+    (let [dp (filter :repo/files-depth-pruned? all)]
+      (when (seq dp)
+        (binding [*print-fn* *print-err-fn*]
+          (println (str "WARNING: " (count dp)
+                        " repo で max-depth より深い directory を walk しなかった"
+                        " —— そこにある src/test は 0 と数えられている（不在ではなく未観測）"))
+          (doseq [e (take 20 dp)]
+            (println (str "  " (:repo/path e))))
+          (when (> (count dp) 20)
+            (println (str "  … 他 " (- (count dp) 20) " 件"))))))))
 
 (-main)

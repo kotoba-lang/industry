@@ -29,9 +29,18 @@
 ;; repository was extracted from**. So 160 live surfaces tell a visitor they have no
 ;; public route, at an address wrangler declares, while serving that very page there.
 ;;
-;; There is no generator for the object in these repositories or in the root's
-;; `scripts/`, so it is hand-maintained: change routes or vars in wrangler and the
-;; page does not follow.
+;; There WAS no generator for the object, in these repositories or in the root's
+;; `scripts/`, so it was hand-maintained: change routes or vars in wrangler and the
+;; page did not follow. `scripts/gen-appview-page-summary.cljs` (2026-08-18) now
+;; derives routeCount / routes / vars / relativePath from the nearest wrangler, so
+;; a difference is repairable rather than only reportable:
+;;
+;;   nbb scripts/gen-appview-page-summary.cljs --names <repo>          ; dry run
+;;   nbb scripts/gen-appview-page-summary.cljs --names <repo> --apply
+;;
+;; Measured on the day it landed: 363 of 364 pages carrying the object differed
+;; from their wrangler. This detector stays, because a generator that nobody runs
+;; drifts exactly like a field nobody updates.
 ;;
 ;; **This is the class of defect the maturity ranking can no longer surface.** Those
 ;; repositories had `axis-docs` raised by operator quickstarts, so they have left the
