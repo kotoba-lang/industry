@@ -272,45 +272,39 @@
 
    {:id "h8-l2-cache-api"
     :title "Give this Worker the colo-shared block cache it never had"
-    :change "kotobase_r2.cljs caches immutable blocks in ISOLATE MEMORY only
-             (64 MB, js/Map, FIFO). The sibling Worker that serves
-             datoms.kotobase.net has had two tiers since the block-cache
-             landing -- L1 isolate memory AND L2 the Cloudflare Cache API,
-             which is per-colo and survives the isolate. This one has L1 alone."
-    ;; 84 gets on the COLD fraction only -- L2 can only help a request L1 did
-    ;; not already answer -- times the misses at an assumed 75% hit rate.
-    :after-harness {:cpu-ms :unchanged
-                    :class-b-ops (* 84 cold-isolate-rate 0.25)}
-    :basis :predicted
-    :basis-note "The MECHANISM is measured and the RATE is not, and the two
-                 must not be reported as one number.
+    :change "kotobase_r2.cljs caches immutable blocks in ISOLATE MEMORY only.
+             The sibling Worker serving datoms.kotobase.net has had two tiers
+             since its block cache landed -- L1 isolate memory AND L2 the
+             Cloudflare Cache API, per-colo and outliving the isolate."
+    ;; DEPLOYED AND REFUTED, 2026-08-18. Receipt:
+    ;; 90-docs/kotobase-performance/2026-08-18-h8-deployed-and-refuted.edn
+    :after-harness {:cpu-ms :unchanged :class-b-ops :unchanged}
+    :basis :measured-and-refuted-for-this-shape
+    :basis-note "Landed, deployed as version e36410a5, MEASURED, and rolled back
+                 within minutes. Before: 3.34 s cold / 2.38 s warm. After: twelve
+                 probes at 14.2-41.9 s, none completing a hydrate, then a 503 at
+                 31.3 s. After rollback: 3.51 s, all four query surfaces 200.
 
-                 Measured: L1 cannot be helping a served read here. Twelve
-                 consecutive reads of /_diag/hydrate on 2026-08-18 all reported
-                 `sampled: false` -- twelve isolates, none of which had ever
-                 hydrated. A cache that dies with the isolate is cold on every
-                 request that is measured, and the 84 class-B gets in this
-                 baseline ARE that coldness, priced.
+                 The tier adds one `cache.match` per block and one awaited
+                 `cache.put` per durable answer. The hydrate touches 84 blocks
+                 ONE AT A TIME -- the novelty chain's next CID does not exist
+                 until the previous block is decoded -- so it inserted up to 168
+                 sequential Cache API operations and the request stopped fitting
+                 in a Worker.
 
-                 Predicted: the hit rate. 21 assumes 75%. The Cache API is
-                 per-colo with its own eviction, so this is an assumption and
-                 is labelled one. Sensitivity, because a single number hides
-                 how much of the claim rests on it:
-                   50% hit -> 42 ops, saves $15.12
-                   75% hit -> 21 ops, saves $22.68
-                   90% hit ->  8 ops, saves $27.36
-                 A measured zero is a possible outcome and the landing must be
-                 able to report it: the diagnostic counts L1 hits today and
-                 would have to count the tiers separately, or this hypothesis
-                 cannot be refuted."
+                 The finding is structural, not a tuning miss: ANY per-block
+                 auxiliary tier pays 84x here, and it cannot be amortised because
+                 there is no batch. Same fact that limits h4, from the other
+                 side."
     :effort :S
     :reversible? true
     :depends-on-write-rate? false
-    :note "CPU is :unchanged on purpose. A cache hit removes a ROUND TRIP, and
-           cpuTime does not include I/O wait -- the dag-cbor decode of those
-           11.46 MB happens either way. Anyone expecting this to move the CPU
-           term has mistaken which resource it buys; it buys class-B and wall
-           clock. Wall is not in this judge because Cloudflare does not bill it."}])
+    :the-judge-cannot-price-this
+    "$0.00 above is wrong in a specific way worth stating: the deployed change
+     did not cost nothing, it cost a 503. `cost-per-million` prices CPU, class-B
+     and requests, and has no term for `the request does not complete`. A
+     hypothesis that breaks the service scores the same here as one that changes
+     nothing, so the ranking must never be the only gate before a deploy."}])
 
 (defn- scale-after
   "Harness cpu-ms -> the workerd level the judge prices in. Class-B counts are
@@ -463,7 +457,7 @@
                                      :class-b-ops (get-in h8 [:after :class-b-ops])})]
     {:batch-id "kotobase-cost-kaizen-4"
      :members ["h7-parse-only-addressable-values"]
-     :order "h7 next; h8 is landed and awaiting deployment"
+     :order "h7 next; h8 was deployed and refuted"
      :why "h7 is the larger half of a served read, is reversible, is :M, and is
            independent of the read:write ratio. It is also the half neither h8
            nor any cache can touch: a warm isolate still pays it in full, which
@@ -472,13 +466,17 @@
      :pair-saving (- (cost-per-million baseline) pair-cost)
      :h8-status
      {:landed "net-kotobase/control-plane main 57b1f350f"
-      :ranked-first-in "iteration-03"
-      :ranked-fourth-in "iteration-04, after cold-isolate-rate was measured"
-      :was-that-wrong?
-      "The landing, no: :S, reversible, semantically inert, still $13.61, and it
-       is the only actionable item that needs no credential. The ORDER, yes --
-       it was first on a premise that had not been measured, and measuring it
-       moved it to fourth. Recorded rather than quietly re-sorted."}
+      :deployed "version e36410a5, 2026-08-18"
+      :outcome :refuted-in-production
+      :reverted "main aa714b887; production rolled back to 120f3e08"
+      :arc "ranked 3rd and placed FIRST in the batch (iteration-03) -> 4th once
+            cold-isolate-rate was measured (iteration-04) -> last, refuted, once
+            it was deployed and measured (iteration-05)"
+      :what-each-step-cost
+      "Each demotion came from a measurement that could have been taken earlier.
+       The premise (does L1 ever help?) was measurable before landing. The cost
+       of 168 Cache API operations was measurable before deploying -- not by the
+       test suite, which used an in-memory fake, but by counting them."}
      :additive-not-subsumed
      {:h8-alone (:cost-after h8) :h7-alone (:cost-after h7) :pair pair-cost
       :h1-alone (:cost-after h1)
@@ -529,7 +527,14 @@
        128 MB isolate limit, and a hypothesis that fails on memory scores the
        same here as one that succeeds."
       "Correctness. Every hypothesis is assumed to return the same answers; the
-       judge only prices them."]}))
+       judge only prices them."
+      "FAILURE. There is no term for `the request does not complete`. h8 was
+       deployed and returned 503; it scores $0.00 here, identical to a
+       hypothesis that changes nothing. The ranking is an ordering of
+       CANDIDATES and must never be the only gate before a deploy."
+      "Per-operation cost of anything the hypothesis adds. h8 added 168
+       sequential Cache API calls to a request and the judge has no way to see
+       them: they are neither CPU it models nor class-B it counts."]}))
 
 (defn run []
   (let [g (generate)
