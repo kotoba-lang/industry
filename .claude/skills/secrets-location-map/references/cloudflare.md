@@ -64,8 +64,19 @@
     Bearer、ADR-2607174500）: Worker secret として投入済み（`wrangler secret list`
     で 2026-08-17 に存在を確認）。operator copy は macOS Keychain
     `service=cf:kotobase-protocols-worker` / `account=WRITE_TOKEN`（2026-07-17 生成）
-    に**在るが、その値は現在の Worker では通らない**。
-    **⚠ 実測 2026-08-17: この Keychain copy は STALE。** 取り出した値で
+    に**在り、s3 面では通る**（下記の訂正を読むこと）。
+    **⚠ 訂正 2026-08-18: STALE ではない。面を取り違えていた。**（ADR-2608182100）
+    同じ Keychain の値で **`s3.kotobase.net` は通る** —— PUT 200 / GET 200 /
+    byte 一致 / DELETE 204、壊した token と token 無しは 401。つまりこの copy は
+    現行の Worker で**有効**であり、下の 2026-08-17 の記録は
+    **`pinning.kotobase.net` という別の面**に対する測定だった。
+    今日その pinning 面を同じ token で叩くと **401 ですらなく timeout**
+    （curl exit 28 / status 000）で、401 という記録自体ももう再現しない。
+    **credential が古いことと、ある面が別の理由で失敗することを、同じ結論に
+    畳まないこと。** credential を疑う前に、どの面で測ったかを書く。
+    旧記述（下記）は復旧時の参照として残す。
+
+    **旧記述（2026-08-17、pinning 面での測定）: この Keychain copy は STALE。** 取り出した値で
     `POST https://pinning.kotobase.net/pins` を `Authorization: Bearer <値>` で叩くと
     **401 `unauthorized: writes require a bearer token`**。Worker 側に `WRITE_TOKEN`
     は存在するので「未設定」ではなく**値の不一致**である。**なぜ食い違うかは未確定** —
