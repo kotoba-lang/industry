@@ -275,6 +275,19 @@
     (last (str/split p #"/"))
     nm))
 
+(defn org-repo-of
+  "`<github-org>/<github-repo>` for a gates.edn entry. **The one place this string is
+  built.**
+
+  It used to be built in two places — the `tip-of` map that calls `gh-tip`, and the work
+  item that looks the tip up — and on 2026-08-18 they disagreed: the lookup was corrected
+  to the west path while the map still used the project name. Both produce nil for a
+  missing key, so half a fix looked exactly like no fix, and the seven affected gates went
+  on printing `no tip resolved`. Producer and consumer now cannot drift apart."
+  [west r]
+  (when-let [o (or (:org r) (org-of west (:name r)))]
+    (str o "/" (repo-name-of west (:name r)))))
+
 (defn gate-id
   "gates.edn entry の識別子。既定は :name（= repo 名）だが、**1 つの repo に
   複数の gate を載せたいときは :id を明示する**。:name は org / tip 解決に使う
@@ -1392,11 +1405,15 @@
         ;; 同じ repo の 2 gate が別 sha を検証しうる（実測 2026-07-29: root の
         ;; 2 gate が 49884cd と d802afb に分かれた — main が tick 中に動いた）。
         ;; tick は一貫したスナップショットであるべきで、ls-remote も減る。
+        ;; `repo-name-of`, NOT (:name r) — this map is keyed by the same string the
+        ;; lookup below builds, and on 2026-08-18 the two disagreed. The consumer was
+        ;; fixed to use the west path and this producer was not, so the map held
+        ;; `cloud-itonami/cloud-itonami-gftd-audio-actor` (a repo that does not exist,
+        ;; value nil) while the lookup asked for `cloud-itonami/gftd-audio-actor` and
+        ;; got nil for the different reason of the key being absent. Same symptom —
+        ;; "no tip resolved" — so fixing half of it changed nothing observable.
         tip-of (let [m (into {} (for [org-repo (distinct
-                                                (keep (fn [r]
-                                                        (when-let [o (or (:org r) (org-of west (:name r)))]
-                                                          (str o "/" (:name r))))
-                                                      repos))]
+                                                (keep #(org-repo-of west %) repos))]
                                   [org-repo (gh-tip org-repo)]))]
                  (fn [org-repo] (get m org-repo)))
         ;; 各 repo の tip（fresh）と west pin
@@ -1409,7 +1426,7 @@
                               ;; superproject 自身は west project ではないので引けない —
                               ;; そういう対象だけ gates.edn に :org を明示する。
                               org (or (:org r) (org-of west nm))
-                              org-repo (str org "/" (repo-name-of west nm))
+                              org-repo (org-repo-of west r)
                               tip (tip-of org-repo)
                               pin (get-in west [:projects nm :revision])
                               last-sha (get-in @state [:repos id :sha])
@@ -1449,7 +1466,7 @@
                    ;; `repo-name-of`, not (:name r) — same reason as the tip branch above:
                    ;; a west project's name is not always its GitHub repo name.
                    :let [org (or (:org r) (org-of west (:name r)))
-                         org-repo (when org (str org "/" (repo-name-of west (:name r))))]
+                         org-repo (org-repo-of west r)]
                    :when org-repo
                    {:keys [number head]} (take pr-cap (get prs-by-repo org-repo))
                    :let [id (str (gate-id r) "#pr" number)

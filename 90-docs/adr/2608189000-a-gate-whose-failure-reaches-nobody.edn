@@ -144,4 +144,43 @@ key を west path に切り替えた直後、gate が `com-junkawasaki/root` を
 gates.edn の `:org` 明示は「これは west project ではない」という宣言であり
 （superproject がその文書化された事例）、その entry を west に名前で引いてはいけない。
 修正済み。**RESOLVED 行が無ければ気付かなかった** —— 報告する gate が自分の誤りを
-見せた形なので、これは設計どおりに働いた例として残す。"}]
+見せた形なので、これは設計どおりに働いた例として残す。
+
+## 追記 2026-08-18（closing）— 予測が外れ、直しが半分だったと分かった
+
+前回 **反証可能な予測**を立てた:「修正が効いていれば tick の state に `gftd-` entry が
+現れる」。**現れなかった。** state は 2,095 → 2,130 と増えており tick は回っていたので、
+外れたのは予測ではなく修正のほうである。
+
+常駐 tick の log がそれを見せていた:
+
+```
+2026-08-18T01:09:17Z WARN no tip resolved (skipped):
+  cloud-itonami-gftd-illust-actor cloud-itonami/gftd-illust-actor
+```
+
+**org-repo は既に正しい**（`cloud-itonami/gftd-illust-actor`）。つまり修正は効いていて、
+それでも tip が解決していなかった。
+
+原因: `tip-of` は `gh-tip` を呼んで作る **map** で、その key を
+`(str o \"/\" (:name r))` で組んでいた。私が直したのは**引く側**だけで、**作る側**は
+project 名のままだった。結果、map には `cloud-itonami/cloud-itonami-gftd-audio-actor`
+（存在しない repo、値 nil）が入り、lookup は `cloud-itonami/gftd-audio-actor` を訊いて
+**key が無いという別の理由で** nil を得ていた。**どちらの nil も同じ
+`no tip resolved` として出る**ので、半分だけ直した状態は何も直していない状態と
+観測上まったく同じだった。
+
+対処は座標を組む場所を 1 つにすること —— `org-repo-of` を作り、3 箇所（tip map・
+work item・PR head）全部がそれを通る。producer と consumer が別々に組んでいる限り、
+同じずれがまた起きる。test 1 本（3 assertion）で pin し、壊すと期待値を名指しで落ちる。
+
+実測（`org-repo-of` 経由、実 west.yml）:
+
+```
+cloud-itonami-gftd-audio-actor -> cloud-itonami/gftd-audio-actor -> tip \"50caaa0e…\"
+cloud-itonami-gftd-voice-actor -> cloud-itonami/gftd-voice-actor -> tip \"d08205ed…\"
+```
+
+**まだ確認していないこと**: 7 gate が実際に走って receipt を残すこと。常駐 tick の
+次回実行で `gftd-` entry が state に現れるはずで、現れなければ**また私の診断が
+不完全**ということになる。同じ予測を立て直す。"}]

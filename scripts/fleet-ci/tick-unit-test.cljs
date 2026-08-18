@@ -272,6 +272,21 @@
          (tick/west-path west-fixture "cloud-itonami-gftd-audio-actor")))
   (is (nil? (tick/west-path west-fixture "unregistered"))))
 
+(deftest org-repo-is-built-in-exactly-one-place
+  ;; The regression this pins is not "the wrong string" — it is TWO strings. `tip-of` built
+  ;; the map key and the work item built the lookup key, and when only one was corrected the
+  ;; map held a key nobody asked for while the lookup asked for a key nobody held. Both
+  ;; misses surface identically as `no tip resolved`, which is why fixing half of it changed
+  ;; nothing observable for a full day.
+  (is (= "cloud-itonami/gftd-audio-actor"
+         (tick/org-repo-of west-fixture {:name "cloud-itonami-gftd-audio-actor"}))
+      "a west project resolves to the repo that exists, not to its project name")
+  (is (= "com-junkawasaki/root"
+         (tick/org-repo-of west-fixture {:name "root" :org "com-junkawasaki"}))
+      "an explicit :org wins — such an entry is not a west project")
+  (is (nil? (tick/org-repo-of west-fixture {:name "unknown-to-west"}))
+      "and an entry west does not know, with no :org, yields nil rather than a bad key"))
+
 (let [{:keys [fail error]} (run-tests 'tick-unit-test)]
   (when (pos? (+ fail error))
     (js/process.exit 1)))
