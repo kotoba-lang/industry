@@ -143,6 +143,14 @@
     {:error :missing-where
      :hint ":where 節が無い"}
 
+    ;; :find と :where の間に 1 つも束縛が無いと DataScript が
+    ;; `Cannot parse :find` で throw する。**実行前に捕まえる**（実測 2608189300 の測定で、
+    ;; validator を通ったこの形が batch 全体を落とした）
+    (empty? (remove #{:find :in :where}
+                    (take-while #(not= :where %) (rest q))))
+    {:error :empty-find
+     :hint ":find と :where の間に返す変数か集約が 1 つも無い。例: [:find ?x :where …]"}
+
     :else
     (let [attrs (keep clause-attribute (where-clauses q))
           kw-attrs (sort (map str (filter keyword? attrs)))
@@ -284,7 +292,8 @@
     '[:find ?x :where [?e "company/nonexistent" ?x]] :unknown-attributes]
    ["ベクタでないものは弾く" '{:find "x"} :not-a-vector]
    [":find で始まらないものは弾く" '[:where [?e "repo/kind" ?k]] :missing-find]
-   [":where が無いものは弾く" '[:find ?e] :missing-where]])
+   [":where が無いものは弾く" '[:find ?e] :missing-where]
+   ["空の :find を弾く（DataScript が throw する形）" '[:find :where [?e "repo/kind" ?k]] :empty-find]])
 
 (defn self-test! []
   (let [vres (for [[label q expected] validator-cases]
@@ -422,6 +431,14 @@
 
                     ;; ---- 実行して照合
                     (println "[4/4] 生成クエリを実行して reference と照合（面をもう一度組む）")
+                    ;; ⚠ **実行の前に LLM 出力を書き出す。** 実測 2026-08-18、実行段の
+                    ;; 例外で 90 分ぶんの推論結果が捨てられた。推論は高く、実行は安い。
+                    (let [dump (str (or out "bench-result.edn") ".generated.edn")]
+                      (.writeFileSync fs dump
+                                      (pr-str {:bare (mapv #(dissoc % :raw) bare)
+                                               :repaired (mapv #(dissoc % :raw) repaired)}))
+                      (println (str "  生成クエリを保存: " dump)))
+
                     ;; ⚠ 面のロードが所要時間の全て（実測で分単位）。2 条件を別々に流すと
                     ;; その分だけ倍になるので、**両条件の runnable を 1 回の q* に束ねる**。
                     (let [runnable-of (fn [items]
@@ -442,7 +459,8 @@
                           rs-rows (subvec rows (count rb-run))
                           grade
                           (fn [label items runnable rrows]
-                            (let [by-idx (into {} (map (fn [[i _] r] [i (norm r)]) runnable rrows))
+                            (let [raw-by-idx (into {} (map (fn [[i _] r] [i r]) runnable rrows))
+                                  by-idx (into {} (map (fn [[i _] r] [i (if (map? r) #{} (norm r))]) runnable rrows))
                                   graded (map-indexed
                                           (fn [i it]
                                             (cond
@@ -452,6 +470,10 @@
                                                                  :skipped-llm-error))
                                               (:invalid it) (assoc it :grade :invalid)
                                               (not= :parsed (:outcome it)) (assoc it :grade :malformed)
+                                              ;; エンジンが拒否したものは「違う答え」ではない
+                                              (map? (get raw-by-idx i))
+                                              (assoc it :grade :query-error
+                                                     :detail (:query-error (get raw-by-idx i)))
                                               :else (assoc it :grade
                                                            (if (= (get by-idx i) (nth expected i)) :pass :wrong-answer)
                                                            :got-rows (count (get by-idx i))

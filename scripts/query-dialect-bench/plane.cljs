@@ -115,7 +115,16 @@
       (println (str "market-intel+repo-taxonomy datoms-entities loaded; "
                     "datasets=" (pr-str (js->clj (.q ds "[:find ?ds (count ?e) :where [?e \"source/dataset\" ?ds]]" db)))))
       "q"  (println (pr-str (js->clj (.q ds (first queries) db))))
-      "q*" (println (pr-str (mapv #(js->clj (.q ds % db)) queries)))
+      ;; ⚠ **1 本のクエリの例外で batch 全体を落とさない。** この面の入力は LLM が
+      ;; 書いたもので、構造は妥当でも DataScript が拒否する形（空の :find など）が
+      ;; 来る。実測 2026-08-18、それで 90 分ぶんの推論結果が全部捨てられた。
+      ;; 失敗したものは **落ちたと分かる印**を返す —— 空の結果集合として返すと
+      ;; 「0 件だった」と区別できない。
+      "q*" (println (pr-str (mapv (fn [q]
+                                    (try (js->clj (.q ds q db))
+                                         (catch :default e
+                                           {:query-error (or (.-message e) (str e))})))
+                                  queries)))
       (do (println "usage: plane.cljs [count | q '<q>' | q* '<q1>' '<q2>' ...]")
           (compat/exit 1)))))
 
