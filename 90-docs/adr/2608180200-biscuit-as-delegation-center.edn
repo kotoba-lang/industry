@@ -60,6 +60,58 @@ ADR-2608070400 の「server は持っていないものを漏らせない」と�
 これから増える委譲は biscuit で書き、既存は wire adapter として `authority` に
 入り続ける。
 
+## 実測した 5 つの capability 面 —— **4 つは delegation ではない**
+
+「repo 全体を biscuit 経由に整える」を実行する前に、kotoba / kotobase / amu /
+aiueos / kototama の capability 面を実際に読んだ（2026-08-18）。結論は、**5 つの
+別々の delegation 系があるのではなく、delegation は 1 つしか無かった**というものである。
+
+| repo | 面の実体 | 何であるか | 失効 |
+|---|---|---|---|
+| `kotoba-lang/kotoba-lang` | `lang/capability-semantics.edn` | **意味論** —— `requested ∩ delegated ∩ local-policy` | effect 時に再認可 |
+| `kotoba-lang/amu` | `{:allow #{[:cap/call n]}}` | **compile-time admission**（そもそも何を要求してよいか） | 署名者集合 |
+| `kotoba-lang/aiueos` | `capability-plan.kotoba` / `capability-mutation-plan.kotoba`（slot / generation / type / rights / owner、issue・revoke・derive） | **機械内の capability table** | **generation を進める（強い）** |
+| `kotoba-lang/kototama` | `component-authority`（Ed25519 検証・単調 epoch・replay 順序） | **署名付き epoch feed**（配置と失効の配布） | **epoch 単調前進** |
+| `kotoba-lang/kotobase` | CACAO 自己発行 + `kotoba://` scope | session の起点 | 期限 |
+| **`org-biscuitsec`** | block 鎖 | **principal 間の委譲** | **無い** |
+
+**最後の列がこの調査の収穫である。biscuit は失効を持たない。そして aiueos と
+kototama は既に持っている。** したがって repo-wide の答えは「biscuit に失効リストを
+足す」ではなく、**委譲は biscuit が運び、失効は既存の generation / epoch 面に乗る**。
+誰も配信しない revocation list を新設しない。
+
+### 具体的な継ぎ目 —— 開いていたのは `delegated` の 1 項だけ
+
+`capability-semantics.edn` は既に
+
+```
+:effective-scope  :requested-intersect-delegated-intersect-local-policy
+:scope-attenuation-only  true
+:unknown-kind :deny   :missing-grant :deny
+```
+
+と書いている。4 項のうち **3 項には所有者が居た** —— `requested` は guarded call、
+`local-policy` は host、規則は言語。**`delegated` にだけ wire が無かった。**
+
+`biscuit.kotoba/->delegated` がその wire である（実装済み・テスト済み）。
+**これが「biscuit を中心にする」の具体的な中身**であって、意味論の置き換えではない:
+
+```clojure
+(bk/->delegated token kinds)
+;; => {:grants [{:grant/kind :graph-read
+;;               :grant/resources [\"kotoba://graph/acme\"]
+;;               :grant/expires \"2026-09-01T00:00:00Z\" :grant/id \"biscuit:…\"}]
+;;     :grant/rejected [{:kind :kernel/format-disk :resource \"/dev/sda\"}]}
+```
+
+- **`:grant/*` に写し、`:cap/*` には決して写さない。** capability は intersection の
+  **後**に handler が受け取るもので、token が直接 capability を作れば
+  「省略してはならない」と意味論が書いている当の 1 段を飛ばすことになる。
+- **閉じた `:kinds` の外の kind は無視ではなく reject。** 無視は発行者が意図した制限を
+  黙って落とすので、失敗は**権限が減る方向**に倒し、`:grant/rejected` に見せる。
+- **後続 block は resource を狭め kind を落とせるが、kind を増やせない** ——
+  `:scope-attenuation-only` を「守る規約」ではなく**関数が表現できる唯一のこと**にした。
+
 ## 層とトポロジー
 
 ```text
@@ -123,7 +175,7 @@ subset のみ実装（ADR-2608159400 が自ら「完全な policy language は�
 | crypto を持たない | **5/5** | 全 wire が sign/verify/hmac を注入。既定なし |
 | 減衰が構造的 | **5/5** | `meet` が最大下界。escalation は算術的に不能 |
 | fail-closed | **4/5** | 未知の caveat/kind は不満足、未知 policy は deny。**biscuit の予算超過だけは新しく足した** |
-| 両方向を見た検査 | **4/5** | 8 defect で赤→緑。**うち 2 つは実演中に見つけた検査漏れ** |
+| 両方向を見た検査 | **4/5** | **10 defect** で赤→緑（macaroon 4 / biscuit 6）。**うち 2 つは実演中に見つけた検査漏れ** |
 | **wire 相互運用** | **1/5** | **biscuit protobuf も libmacaroons binary も未実装。**外部実装が我々の token を読んだことは一度もない |
 | 配備 | **0/5** | **どの経路もまだ biscuit を使っていない。** live なのは CACAO 自己発行のまま |
 
@@ -147,6 +199,8 @@ subset のみ実装（ADR-2608159400 が自ら「完全な policy language は�
 |---|---|---|
 | actor → kotobase-server | CACAO 自己発行（live） | 触らない。session 起点として正しい |
 | actor → actor の委譲 | **まだ無い** | biscuit で書く（最初の 1 本が proving slice） |
+| kotoba の `delegated` 項 | **wire 実装済み**（`biscuit.kotoba/->delegated`）。呼び手はまだ居ない | guarded host call の 1 本を通す |
+| amu / aiueos / kototama | **触っていない。触る必要が無い** —— admission・機械内 table・epoch feed であって delegation ではない | 失効を biscuit に足さず、この 2 面に乗せる |
 | biscuit の wire | **未実装（protobuf v3）** | **gap ledger の先頭。**これが無い限り `biscuit-auth` と話せない |
 | Ed25519 束縛 | 注入のみ（テストは stand-in） | `kotoba-lang/ed25519` を挿す |
 | edge 検証 | 未配線 | Worker で root 公開鍵だけを持つ検証を 1 本 |
