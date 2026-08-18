@@ -27,7 +27,14 @@
 ;; 概念を 1 つに畳むとどれかが消える。**別概念として並べ、同じ綴りを両方に
 ;; 持たせる** —— `console` で引いた人には両方出るのが正しい。
 
-{:valueflows
+{:table-root
+ {:label "テーブルルート / table manifest（述語 → バイト範囲）"
+  :spellings ["tana" "棚" "table root" "table manifest" "manifest list" "snapshot"
+              "iceberg" "partition pruning" "file skipping" "predicate pushdown"
+              "byte range" "row group" "footer" "統計による枝刈り" "テーブル manifest"]
+  :note "kotoba-lang/tana。名前が機能を示さない metaphor 名なので登録する（棚 = どの箱がどこにあるかを言うもの）。**「どのオブジェクトを読むべきか」を footer を 1 つも開かずに答える面。** 枝刈りの規則そのものは kotoba-lang/columnar（columnar.stats/skip?）が正本で、tana はそれを 2 段（chunk と manifest）に適用するだけ —— 第二の実装を持たない。format は kotoba-lang/org-apache-parquet / org-apache-arrow、catalog（何が landed したか・誰が何を主張したか、datom 面で Datalog に答える）は kotoba-lang/kotobase-lake、非同期ホストで同期スキャンを回す trampoline は net-kotobase/lake、block の置き場は kotobase-storage(-pack/-s3)。⚠ tana は format でも container でも catalog でも engine でもない —— 混同すると『小さな Parquet / 小さな Iceberg』を再発明する。ADR-2608180100。"}
+
+ :valueflows
  {:label "Valueflows / REA（経済語彙）"
   :spellings ["valueflows" "valueflo" "valueflo.ws" "rea" "resource event agent"
               "economic event" "economic resource" "経済イベント" "経済資源"

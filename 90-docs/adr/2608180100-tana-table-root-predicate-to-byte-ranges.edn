@@ -1,0 +1,187 @@
+[{:db/id -1
+  :adr/id "ADR-2608180100"
+  :adr/title "述語 → バイト範囲を 1 つの content-addressed 値で答える面（kotoba-lang/tana）—— datalake の真ん中は既に埋まっており、空いていたのは footer 1,000 個ぶんの round trip だった"
+  :adr/status "accepted"
+  :adr/date "2026-08-18"
+  :adr/body "# ADR-2608180100: 述語 → バイト範囲を 1 つの content-addressed 値で答える面（kotoba-lang/tana）
+
+**Status**: accepted / **Date**: 2026-08-18
+
+## Context
+
+オーナー問い（2026-08-18）: CARv2 に tabular data を入れる構成を踏まえて、
+既存の datalake / engine / compute / storage / format より高性能なものを設計実装せよ。
+併せて各面に名前を付けよ。
+
+### 先に測った現在地 —— 「真ん中」は既にほぼ埋まっている
+
+| 面 | 実体 | 状態 |
+|---|---|---|
+| tabular format | `org-apache-parquet` / `org-apache-arrow`（読み書きとも portable `.cljc`） | 稼働 |
+| container | `io-ipld-car`（CARv1/v2、外部 2 実装で検証済み）+ `kotobase-storage-pack` | landed |
+| engine | `columnar`（ベクトル化実行、統計による枝刈り、footer だけで答える集約） | 稼働 |
+| 非同期ホスト接合 | `net-kotobase/lake`（同期スキャンを resumable trampoline で回す） | 稼働 |
+| catalog | `kotobase-lake`（admit / sniff / **table manifest を datom 面に**） | 稼働 |
+| storage | `kotobase-storage` / `-s3` / `-pack` | 稼働 |
+| discovery | `io-ipni-specs` | landed |
+
+つまり「ゼロから datalake を作る」は誤った起点で、**ADR-2608054000 の gap 台帳が
+名指ししていた穴を埋めるのが正しい起点**だった。
+
+### 実際に空いていた穴
+
+`kotobase.lake.table` は既にテーブル manifest を持つが、**datom 面に**在る。
+それは Datalog で引ける代わりに、**kotobase の read path 全体（hydration 込み）を
+通らないと引けない**。バケツの URL だけを持つブラウザからは使えない。
+
+そして `net-kotobase/lake` の実測が問題の形を示している —— **2.4 KB の
+オブジェクト 1 個で 4 round trip**（leading magic / 8 byte tail / footer / column chunk）。
+**4 のうち 3 が metadata。** これに object 数を掛けたものが、パーティションされた
+テーブルの query コストになる。
+
+`columnar` は「どの chunk を読まないか」を答える。誰も答えていなかったのは
+**「1,000 個のうちどれを開くのか」**で、その答えは 1,000 個の footer の中にある。
+
+## Decision
+
+### 1. `kotoba-lang/tana`（棚）—— footer を既に読んである値
+
+publish 時に各 object の footer を 1 回読み、**統計とバイト範囲を一緒に**
+content-addressed な root に畳む。query 時は object を 1 つも開かない。
+
+記録するのは 3 種で、**どれを落としても節約が消える**:
+
+| 記録 | 落とすと |
+|---|---|
+| 統計（`:min` `:max` `:rows`） | 枝刈りが起きず、全 object を開く |
+| バイト範囲 `[start end)` | *どの object* は分かるが *どのバイト* が分からず、footer 取得が戻る |
+| `:type` `:codec` `:def-level` `:data-at` | chunk 単体で復号できず、footer 取得が戻る |
+
+3 行目が見落とされやすい。`tana.chunk-only-test` は **footer を一度も読まずに**
+`parquet.decode` を直接呼んで planned range を復号する —— footer が要る plan は
+1 request 節約して 3 request 払う。
+
+### 2. 枝刈りの規則は借りる。写さない
+
+`columnar.stats/skip?` が chunk 面（`tana.plan`）でも manifest 面（`tana.shard`）でも
+判定する。**枝刈り規則の 2 つ目の実装は、最も悪い方向に drift する** —— 取り過ぎは
+throw して見えるが、古い規則で枝刈りすると *正しい答えを返したまま* 余計に読む。
+バグは全ての結果に現れず、請求書にだけ現れる。
+
+継承する 2 規則も load-bearing:
+
+- **統計が無ければ絶対に飛ばさない。** bounds の無い chunk は読み、`:undecidable` と
+  して数える —— `:pruned` には**決して**入れない。「何も判定できなかったので 0 read」は
+  「全部枝刈りできたので 0 read」と同じ顔をする（ADR-2608136000 の第 4 問）。
+- **枝刈りは何を読むかを決めるだけで、何が一致するかは決めない。**
+
+`tana.shard` は 1 つ目を上方向に延長する: **manifest が列の bounds を報告するのは、
+その下の全 chunk が報告したときだけ。** 報告した chunk だけから bounds を導出するのは、
+データがしていない主張を発明することになる。
+
+### 3. `:bounds-authority` と `:trust` に既定値を置かない
+
+query 時に object から読んだ統計は object と同じだけ信用できる。**root から読んだ
+統計は root を書いた者と同じだけ信用でき、失敗が非対称である**:
+
+- bounds が**広すぎる** → 余計に読む。コスト。
+- bounds が**狭すぎる** → **答えから行が消える。** エラーも出ず、「そういう行が
+  無かったテーブル」と区別できない。
+
+よって root は `:from-footers` / `:declared` を宣言し、plan は何を信用するかを宣言し、
+**どちらにも既定値が無い**。`:location-only` が正直な第 3 の選択肢（位置だけ使い、
+枝刈りしない）。`kotobase-storage` が ref profile 未宣言の backend を拒否するのと
+同じ規律 —— **推測は黙って通り、無視された precondition は成功を返す。**
+
+### 4. root は 2 段。**平坦な root は罠**
+
+実測（`bench/rounds.cljs`。両経路が答えを計算し、答えを突き合わせる。単位は
+**request**）:
+
+| objects | baseline req | sharded req | baseline bytes | sharded bytes |
+|---:|---:|---:|---:|---:|
+| 1 | 4 | 3 | 1,108 | 1,789 |
+| 10 | 31 | 3 | 3,637 | 7,971 |
+| 50 | 151 | 3 | 14,877 | 23,325 |
+| 200 | 601 | 3 | 57,027 | 24,143 |
+| **1,000** | **3,001** | **3** | **281,827** | **26,891** |
+
+request は平坦になる。**bytes は平坦にならない。** 平坦な root は
+O(members × chunks × columns) で、この計測では member 1 個あたり約 700 byte ——
+**1,000 object で root 単体が 699 KB になり、全 footer を読むより悪い。**
+だから `tana.shard` は「後で足す最適化」ではなく最初から在る。
+
+```text
+top          小さい 1 object: manifest ごとの bounds
+ └─ manifest member ごとの統計とバイト範囲
+      └─ object   Parquet / Arrow ファイル本体
+```
+
+Iceberg の manifest-list / manifest 分割と同じ形に、同じ圧力から到達した。**違うのは
+各段が content-addressed であること** —— reader は 1 つの address を pin すれば
+**半分だけ publish されたテーブルを観測できない**。現在の snapshot を指す可変
+ポインタを持つ catalog service が存在しない。
+
+`tana.plan/select-manifests` は純粋（fetch する address を返すだけ）。IO を外に
+出しておくことが、同じ planner を Worker とブラウザと JVM テストで動かせる条件。
+
+### 5. 名前 —— 面ごとに 1 つ、既存を改名しない
+
+| 面 | 名前 | 面の種別（ADR-2608040100） | 状態 |
+|---|---|---|---|
+| tabular format | `org-apache-parquet` / `org-apache-arrow` | origin | 稼働 |
+| container / pack | `io-ipld-car` + `kotobase-storage-pack` | origin + family | landed |
+| **table root** | **`kotoba-lang/tana`（棚）** | **subject（metaphor）** | **本 ADR で新規** |
+| engine | `columnar` | subject | 稼働 |
+| storage | `kotobase-storage` / `-s3` / `-pack` | family | 稼働 |
+| query | kotobase 方言（`kotobase.core/q`）/ `kotobase-query` | family | 稼働 |
+| datalake catalog | `kotobase-lake` | family | 稼働 |
+| discovery | `io-ipni-specs` | origin | landed |
+
+**新しい名前は 1 つだけ足す。** compute 面（N shard に跨る fan-out と非同期スケジュール）
+は今日 `net-kotobase/lake` の trampoline が担っており、**分離した実体がまだ無い**ので
+名前を予約しない —— 実在しないものに名前を置くと、索引が「在る」と答えるようになる。
+`tana` は metaphor 名なので README 冒頭で名乗り、`manifest/concept-vocabulary.edn` に
+登録した（名前が機能を示さない repo の入口を 2 本にする規則）。
+
+## Consequences
+
+- **`tana` は format でも container でも catalog でも engine でもない。** 混同すると
+  「小さな Parquet」「小さな Iceberg」を再発明する。chunk は Parquet / Arrow のまま、
+  object の置き場は `kotobase-storage` の問い、何が landed したかは `kotobase-lake`。
+- **Arrow IPC は列統計を持たない**ので、Arrow だけのテーブルに対する `tana` は
+  位置しか与えない（枝刈りは all-null chunk のみ）。これは欠落ではなく形式の性質で、
+  「枝刈りを効かせたい materialize は Parquet に書く」（ADR-2608054000）がそのまま効く。
+- **root の bounds は平文の min/max である。** 暗号化した object の上に root を置くと、
+  root は ADR-2608070400 の**射影面**そのものになる —— 封筒面の統計を root に載せた
+  時点で server は値域を学習する。機密テーブルでは (a) root も封筒に入れて client が
+  復号する、(b) 非識別な射影列だけ bounds を持つ、のどちらかを**明示的に選ぶ**。
+  既定は無い。
+- **pack と直交する。** `tana` の range は `kotobase-storage-pack` の range と合成する
+  （pack CID + offset の中の chunk offset）。置き換えではない。
+- 既存 deployment は何も壊れない。`kotobase.lake.table` の datom 面 manifest は
+  Datalog で引ける利点があり、そのまま正しい。`tana` は**ブラウザが 1 つの address
+  から読む**経路を足す。
+
+## 検証
+
+- `clojure -M:test` と `npm run test:nbb` — **21 tests / 51 assertions、両方 green**。
+- **3 つの実欠陥で赤にし、戻して緑に戻ることを実際に見た**: 統計不在が skip を許す
+  （2 failures）/ `:trust` が既定値に落ちる（1）/ range が 1 byte 長い（1）。
+  一度も赤くならない gate は、誰も問いを立てていない gate と同じ（ADR-2608136000）。
+- bench は**答えが一致しない plan を速い plan と呼ばない**（両経路の rows を突き合わせ、
+  0 行一致なら比較が空虚だとして exit 2）。
+
+## まだのもの
+
+| 次の一手 | 置き場所 |
+|---|---|
+| 集約 push down（root の bounds から `count`/`min`/`max` を `:read 0` で返す） | `tana` |
+| `kotobase-lake` の datom 面 manifest から root を生成する経路 | `kotobase-lake` |
+| pack range との合成の実測 | `kotobase-storage-pack` |
+| 実 corpus（合成 chain ではない）での round trip | `net-kotobase/lake` |
+| fleet gate 登録（format library 群は今も自動検査が無い。ADR-2608054000 の A） | `scripts/fleet-ci/gates.edn` |
+
+**deploy はしていない。** 本 ADR が主張するのは library と 2 runtime の実測であって、
+`kotobase.net` 上の経路が変わったことではない。
+"}]
