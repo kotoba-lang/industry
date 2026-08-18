@@ -390,6 +390,41 @@
   ;; this is an ADDITION, not a flip, the same shape io-multiformats has.
   ;; It earns it: zstd decodes the compressed bodies of Arrow and Parquet
   ;; objects inside the lake Worker, which is a ClojureScript runtime.
+  ;; ── second gates, added only where the counts were MEASURED to match ──────
+  ;;
+  ;; These four ship into a live Worker and had only their JVM half gated. Each
+  ;; got a `run-tests.cljs`, and each was compared before it got an entry here:
+  ;;
+  ;;   datalog             91 tests / 163 assertions   JVM == nbb
+  ;;   graphql             20 /  56                    JVM == nbb
+  ;;   kotobase-protocols  71 / 269                    JVM == nbb
+  ;;   pay                 55 / 288                    JVM == nbb
+  ;;
+  ;; **The matching count is the qualification, not the file extension.**
+  ;; Measured 2026-08-17: `datom-source` is portable `.cljc`, green on the JVM,
+  ;; and red under nbb (1 failure, 6 errors) for SCI deftype behaviour that
+  ;; compiled ClojureScript does not have -- it is green under
+  ;; `cljs.main --target node`. A gate added to it on portability alone would
+  ;; be permanently red for a reason production does not have. So the rule is:
+  ;; measure, then add. `datom-source` therefore stays JVM-only, deliberately.
+  ;;
+  ;; Verified on judah before landing, with the real script:
+  ;;   datalog `OK: 91 tests` · graphql `OK: 20 tests`
+  ;;   kotobase-protocols `OK: 71 tests` · pay `OK: 55 tests`, all exit 0
+  ;; and the red direction on pay -- inverting an equality in its source gives
+  ;; `FAIL: 55 tests, 19 failures`, exit 1.
+  {:name "datalog" :id "nbb-cross-runtime-datalog" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+  {:name "graphql" :id "nbb-cross-runtime-graphql" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+  {:name "kotobase-protocols" :id "nbb-cross-runtime-protocols" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+  {:name "pay" :id "nbb-cross-runtime-pay" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
   {:name "org-ietf-zstd" :id "nbb-cross-runtime-zstd" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
