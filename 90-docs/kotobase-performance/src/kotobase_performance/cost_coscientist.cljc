@@ -270,6 +270,60 @@
     :reversible? true
     :depends-on-write-rate? false}
 
+   {:id "h9-query-engine"
+    :title "Make the query itself faster"
+    :change "Optimise the four query surfaces -- SPARQL/Cypher/Gremlin/GraphQL
+             execution, the materialised indices, the resolvers."
+    ;; MEASURED AND REFUTED, 2026-08-18. Receipt:
+    ;; 90-docs/kotobase-performance/2026-08-18-a-query-is-one-percent.edn
+    :after-harness {:cpu-ms :unchanged :class-b-ops :unchanged}
+    :basis :measured-and-refuted-for-this-shape
+    :basis-note "First direct measurement of the query plane, in-process over
+                 the real production blocks (`query_bench.cljs`, landed
+                 net-kotobase/control-plane 61d40715b). Within one run:
+
+                   hydrate       42,726 cpu-ms
+                   sparql query     632.8   = 1.48% of the request
+                   cypher query      17.5   = 0.04%
+
+                 Applied to production's measured 2,058 cpu-ms per request, the
+                 whole query is ~30 ms. Optimising it to ZERO saves $0.62 per
+                 million and cannot save more, because that is all there is.
+
+                 This is the same answer h3-engine-materialisation got from the
+                 other direction (`the engine is ~6 ms of this request`), now
+                 with a measurement of the surfaces rather than the engine.
+
+                 Why it had never been measured: every latency figure for these
+                 surfaces came from GET /health, which since 2026-08-17 is
+                 answered from four constants ABOVE the router and before that
+                 measured the hydrate. Neither version ever ran a query. And all
+                 four answer 401 to a self-issued CACAO, so the only honest place
+                 to measure them was in-process."
+    :effort :L
+    :reversible? true
+    :depends-on-write-rate? false}
+
+   {:id "h10-query-memo"
+    :title "The isolate query memo, which already exists"
+    :change "`query/memo-version` keys `isolate-memo` on (:docs state) so a
+             second identical query in the same isolate skips materialisation."
+    :after-harness {:cpu-ms :unchanged :class-b-ops :unchanged}
+    :basis :measured
+    :basis-note "It WORKS and it is worth almost nothing here. Measured: sparql
+                 632.8 -> 82.8 cpu-ms on the second identical query, 7.6x. That
+                 is 1.3% of the request, and it is collected only on the SECOND
+                 query in one isolate -- while 6 hydrating requests in 10 land on
+                 an isolate that has never hydrated at all
+                 (`cold-isolate-rate`).
+
+                 Kept in the roadmap as a measured near-zero rather than deleted,
+                 for the same reason h5-engine-pin is: a loop whose inputs get
+                 re-measured needs items whose correct answer is `nothing`."
+    :effort :S
+    :reversible? true
+    :depends-on-write-rate? false}
+
    {:id "h8-l2-cache-api"
     :title "Give this Worker the colo-shared block cache it never had"
     :change "kotobase_r2.cljs caches immutable blocks in ISOLATE MEMORY only.
