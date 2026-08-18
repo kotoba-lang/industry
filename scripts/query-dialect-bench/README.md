@@ -86,13 +86,17 @@ nbb --classpath "$CP" scripts/query-dialect-bench/bench.cljs --self-test
 cd orgs/kotoba-lang/kotobase-query && nbb --classpath src:test run-tests-pure.cljs
 ```
 
-**この repo に gate は置かない。** 検査は `kotobase-query` 側の
-`{:name "kotobase-query" :gate :nbb-test :entry "run-tests-pure.cljs"}`
-（`scripts/fleet-ci/gates.edn`）に置いた。理由は**入力の在処**で、fleet が配るのは
-その repo の tree だけ —— このベンチの `--offline` は west の子リポにある
-market-intel の実ファイルを読むので、**root の tree をどう直しても fleet 上では
-緑にならない**（CLAUDE.md「gate が要求する入力が repo に無いことがある」の同型）。
-validator は `kotobase-query` の中で完結するので、そこでなら回る。
+**この repo に gate は置かない。** fleet が配るのはその repo の tree だけで、
+このベンチの `--offline` は west の子リポにある market-intel の実ファイルを読むので、
+**root の tree をどう直しても fleet 上では緑にならない**（CLAUDE.md
+「gate が要求する入力が repo に無いことがある」の同型）。
+
+**`kotobase-query` 側にも新しい gate は足していない。** 一度足しかけて撤去した ——
+①覆いは元から在った（既存の `:jvm-test` が `cognitect.test-runner` で `test/` を
+走査するので `agent-test` を拾う）②`:id` の無い entry は `:name` で識別されるので
+既存 entry と**同じ gate 名・tarball 名・state キー**になり、どちらの receipt か
+読めなくなる。「登録されていない」と結論したのは **grep を `head` で切って当の行を
+見なかったため**で、CLAUDE.md が名指ししている失敗をそのまま踏んだ。
 
 モデルは **`murakumo-main` alias を実行時に解決**する（CLAUDE.md: concrete な model id を
 焼かない）。`BENCH_LLM_ENDPOINT` / `BENCH_LLM_MODEL` で上書きできる。

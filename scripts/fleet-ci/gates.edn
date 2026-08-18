@@ -236,21 +236,18 @@
   ;; dependency the classpath names.
   {:name "io-ipld-car" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs"
    :ship-git-deps true :cd true}
-  ;; NOT a :jvm-test -> :nbb-test move: a new entry, and it runs a SUBSET
-  ;; entry (`run-tests-pure.cljs`) rather than the repo's whole suite.
-  ;; `kotobase.query.agent` -- the prompt/validate/repair path an LLM writes
-  ;; through, ADR-2608189300 -- depends on nothing, so condition 3 holds
-  ;; trivially: no classpath has to reach a sibling, no ship-git-deps, no npm.
-  ;; The whole suite still needs arrangement + kotobase + four transitive
-  ;; repos and stays where it is; this gates the half that can run anywhere.
-  ;;
-  ;; Condition 2 verified by hand 2026-08-18 before landing: emptying
-  ;; `comparison-ops` fails exactly the two predicate tests and nothing else
-  ;; (2 failures, 1 error), restoring it returns 12 tests / 32 assertions
-  ;; green. Those two fixtures are the queries that actually reached the
-  ;; engine in that measurement.
-  {:name "kotobase-query" :gate :nbb-test :classpath "src:test"
-   :entry "run-tests-pure.cljs" :cd true}
+  ;; kotobase-query は既に 2 つ gate を持つ（下の :jvm-test と、:id 付きの
+  ;; nbb-cross-runtime-query）。ADR-2608189300 の `kotobase.query.agent` を
+  ;; gate する 3 つ目をここに足しかけたが撤去した:
+  ;;   1. **覆いは元から在った** — :jvm-test は cognitect.test-runner で test/ を
+  ;;      走査するので `kotobase.query.agent-test` を拾う。pin が進めば入る。
+  ;;   2. **名前が衝突していた** — :id の無い entry は :name で識別される
+  ;;      （tick.cljs `(or (:id r) (:name r))`）ので、下の :jvm-test と同じ
+  ;;      gate 名・tarball 名・state キーになり、どちらの receipt か読めなくなる。
+  ;; 「登録されていない」と結論したのは grep を head で切って当の行を見なかった
+  ;; ため（2026-08-18、CLAUDE.md が名指ししている失敗の再演）。
+  ;; 依存ゼロで回る `run-tests-pure.cljs` は repo に残してあり、手元での確認と、
+  ;; 将来 :id 付きで足す場合の入口として使える。
   {:name "kotobase-storage" :gate :jvm-test :cd true}
   {:name "kotobase-storage-pack" :gate :jvm-test :cd true}
   ;; OASIS XMILE 1.0. The suite this runs is 75 tests / 1765 assertions, of
