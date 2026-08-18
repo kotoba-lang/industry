@@ -747,9 +747,14 @@
               on; the 253 are one aggregated warn, because 253 individual findings would
               bury them. Read-only, no network, ~10s.
 
-              Agent worktrees (.claude/worktrees/) and pre-adoption backups
-              (.root-repository-adopt/) are excluded: they carry real wrangler files and
-              counting them manufactures collisions nobody can act on."}
+              Any directory below orgs/ whose name begins with a dot is excluded: agent
+              worktrees, pre-adoption backups and scratch run dirs all carry real
+              wrangler files and counting them manufactures collisions nobody can act on.
+              Enumerating them by name did not work -- the first version listed
+              .claude/worktrees/ and .root-repository-adopt/ and still reported
+              itonami-fleet-dispatch as a four-config collision, because two of the four
+              were .cloud-itonami-app-adopt/ and .wt-run/. Measured: generalising removes
+              exactly that one false positive and introduces none (10 -> 9)."}
 ]
 
 }
