@@ -387,17 +387,35 @@
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
   ;;
-  ;; **`arrangement` is deliberately NOT given one**, though it has an entry
-  ;; and passes locally (33 / 2621). On a node it dies at `Cannot read
-  ;; properties of undefined (reading 'lastIndexOf')` inside a CID decode,
-  ;; because it reaches io-ipld at two shas (e08dc3b2 via its own deps.edn,
-  ;; 45917645 transitively) and both land on the classpath. tools.deps
-  ;; resolves that diamond to one version; the gate's walk cannot.
+  ;; arrangement's second gate, once its pins agreed (9b658c8c). It had
+  ;; reached io-ipld at two shas -- e08dc3b2 from its own deps.edn and 45917645
+  ;; through prolly-tree, ten commits behind it -- and died on a node at
+  ;; `Cannot read properties of undefined (reading 'lastIndexOf')` inside a CID
+  ;; decode while its JVM run on the same machine was green. Its deps.edn even
+  ;; said "the same SHA, so this adds no new transitive dependency", which had
+  ;; stopped being true with nothing watching.
   ;;
-  ;; Its deps.edn carries the comment "the same SHA, so this adds no new
-  ;; transitive dependency" — which stopped being true without anything
-  ;; noticing. Aligning the pins is the fix, and it is a dependency change
-  ;; rather than a gate registration.
+  ;; Moving prolly-tree to its main and io-ipld to what that main brings makes
+  ;; the graph agree. Verified on judah after: no library at two shas,
+  ;; `OK: 33 tests` exit 0, and `FAIL: 33 tests, 1 failures` exit 1 with an
+  ;; equality inverted in `arrangement/core.cljc`.
+  {:name "arrangement" :id "nbb-cross-runtime-arrangement" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+  ;;
+  ;; **`kotobase` and `kotobase-projection` still get none, and the reason is
+  ;; larger than they are.** Both have their entries committed and their
+  ;; portability fixed (1a8fe29, ce8efd3), and both still die the same way.
+  ;;
+  ;; Measured 2026-08-18: bumping projection's four direct git deps to their
+  ;; current mains made it WORSE -- four conflicting libraries became fifteen,
+  ;; with io-ipld alone reaching six distinct shas across the closure, because
+  ;; each dependency carries its own older pins. Reverted.
+  ;;
+  ;; So "align the pins" is a one-line fix for a shallow graph like
+  ;; arrangement's and a coordinated sweep for a deep one. That sweep changes
+  ;; what every consumer resolves, which is a decision with blast radius rather
+  ;; than a gate registration. See ADR-2608180100.
   {:name "sparql" :gate :jvm-test :cd false}
 
   ;; ── the four the previous sweep never counted ─────────────────────────────

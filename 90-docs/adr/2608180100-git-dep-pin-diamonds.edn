@@ -75,8 +75,18 @@ namespace ごとに first-wins になるので、**片方の library の API と
    entry（`run-tests.cljs`）は commit してあるので、pin が揃えば登録するだけ。
    ⚠ 既に登録済みの 8 本は、この決定より前に緑を確認して landed している。
    **後から知った事実で遡って外すのではなく、caveat を記録する**方を採った。
-3. **pin を揃える作業は別の判断。** 13 library を跨ぐ再 pin は consumer の
-   解決結果を変えるので、gate 登録の範囲ではない。
+3. **pin を揃える難度は graph の深さで桁が違う（2026-08-18 実測）。**
+
+   - **`arrangement` は 1 行で済んだ。** `prolly-tree` を現 main へ、`io-ipld` を
+     その main が連れてくる版へ揃えるだけで conflict は 0 になり、両ランタイム緑
+     （JVM 58/2733・nbb 33/2621）。gate も登録した。
+   - **`kotobase-projection` は逆に悪化した。** 直接 git 依存 4 本を現 main に
+     上げたら **conflict が 4 → 15 に増え**、`io-ipld` だけで閉包内に 6 版が現れた。
+     各依存が自分の古い pin を連れてくるためで、**1 repo の deps.edn では収束しない**。
+     変更は revert した。
+
+   したがって深い graph の再 pin は**協調した掃引**であり、consumer の解決結果を
+   変える。gate 登録の範囲ではない。
 
 ## 付随して直したもの（どちらも repo の欠陥ではなく可搬性）
 
