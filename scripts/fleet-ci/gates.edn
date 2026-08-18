@@ -81,6 +81,18 @@
  ;; CD: gate が green かつ west pin が tip より遅れているとき pin を前進させる。
  ;; 対象は :cd true の repo のみ（opt-in — 静かな pin 前進を全 repo に広げない）。
  :cd {:pin-advance-on-green true}
+ ;; 2026-08-18: sixteen cross-runtime gates were flipped to `:cd true` after
+ ;; each had gone green on the fleet, which is the bar -- a gate that has never
+ ;; been green on a node has not shown it can discriminate there, whatever it
+ ;; does locally. The one that had NOT gone green (arrow) was left at
+ ;; `:cd false`, and org-apache-parquet and kotobase-projection had exactly one
+ ;; green each at the time, both on the tick that followed their fix.
+ ;;
+ ;; The precondition was landed the same day: until then the CD filter read one
+ ;; result at a time, so turning these on would have handed sixteen more gates
+ ;; the ability to advance a pin on their own green while a sibling gate was
+ ;; failing at the same sha -- which is what org-apache-arrow had been doing.
+ ;; tick.cljs now holds a repo whose other gates did not pass in that tick.
  :repos
  ;; ── :jvm-test → :nbb-test, only where the ClojureScript run was MEASURED to
  ;;    be the same run (ADR-2608170200) ──────────────────────────────────────
@@ -433,7 +445,7 @@
   ;; discriminates rather than having been widened into vacuity.
   {:name "prolly-tree" :id "nbb-cross-runtime-prolly" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   ;;
   ;; arrangement's second gate, once its pins agreed (9b658c8c). It had
   ;; reached io-ipld at two shas -- e08dc3b2 from its own deps.edn and 45917645
@@ -449,7 +461,7 @@
   ;; equality inverted in `arrangement/core.cljc`.
   {:name "arrangement" :id "nbb-cross-runtime-arrangement" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   ;;
   ;; **`kotobase-projection` gets one now; `kotobase` does not, and the two
   ;; reasons turned out to be different problems.**
@@ -469,7 +481,7 @@
   ;; the same counts `clojure -M:test` reports.
   {:name "kotobase-projection" :id "nbb-cross-runtime-kotobase-projection"
    :gate :nbb-script :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   ;;
   ;; **`kotobase` was NOT held back by its pins, and this file said it was.**
   ;; Its diamond is real and much deeper -- thirteen libraries, `kotoba-kir`
@@ -541,13 +553,13 @@
   ;; `FAIL: 55 tests, 19 failures`, exit 1.
   {:name "datalog" :id "nbb-cross-runtime-datalog" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "graphql" :id "nbb-cross-runtime-graphql" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "kotobase-protocols" :id "nbb-cross-runtime-protocols" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   ;; ── round 3: the rest of the Worker's ClojureScript halves ────────────────
   ;;
   ;; Seven more with counts measured identical on both runtimes, and two whose
@@ -592,25 +604,25 @@
   ;; tick.cljs does rather than cloning on the node.
   {:name "chain" :id "nbb-cross-runtime-chain" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "kotobase-query" :id "nbb-cross-runtime-query" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "org-apache-tinkerpop-gremlin" :id "nbb-cross-runtime-gremlin" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "org-graphql-http" :id "nbb-cross-runtime-graphql-http" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "org-opencypher-cypher" :id "nbb-cross-runtime-cypher" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "org-w3-sparql-protocol" :id "nbb-cross-runtime-sparql-protocol" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "kotobase-protocol-core" :id "nbb-cross-runtime-protocol-core" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   ;; **These two carry binary fixtures, and the filter above would drop them.**
   ;; Both ran on the fleet and both failed the same way on every node they
   ;; reached: `FAIL: 35 tests, 0 failures, 19 errors` for arrow and
@@ -635,13 +647,13 @@
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json" ".arrow"] :min-files 5 :cd false}
   {:name "org-apache-parquet" :id "nbb-cross-runtime-parquet" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json" ".parquet"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json" ".parquet"] :min-files 5 :cd true}
   {:name "pay" :id "nbb-cross-runtime-pay" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "org-ietf-zstd" :id "nbb-cross-runtime-zstd" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   ;;
   ;; **Two of the four are NOT gated, and cannot be as they stand.**
   ;;
