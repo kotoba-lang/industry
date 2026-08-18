@@ -73,6 +73,26 @@
           (< h 48) (str (js/Math.round h) "h")
           :else    (str (js/Math.round d) "d"))))
 
+(def scheduler-plist
+  "The LaunchAgent that runs `scripts/orgs-detector-tick.cljs`.
+
+  ADR-2608124800 diagnosed five uninstalled plists in `scripts/` with the
+  sentence **\"Nothing was wrong with the checks. The scheduler was never
+  installed\"**, and built one registry-driven tick so the next detector would
+  be a registry entry rather than a sixth plist nobody loads.
+
+  Measured 2026-08-19: **that tick had no LaunchAgent either.** Its state was 32
+  hours old, no plist named it, and the per-detector staleness lines read as
+  \"nothing changed\" rather than \"nothing ran\". The document that names the
+  failure recurred to the thing that says it.
+
+  So the hook checks. A missing scheduler is louder than a stale detector,
+  because every detector's age is a consequence of it (ADR-2608196000)."
+  (str (.homedir os) "/Library/LaunchAgents/com.gftd.orgs-detector-tick.plist"))
+
+(defn scheduler-installed? []
+  (try (.existsSync fs scheduler-plist) (catch :default _ false)))
+
 (defn age-ms [iso] (when iso (- (js/Date.now) (.getTime (js/Date. iso)))))
 
 (defn done!
@@ -214,6 +234,15 @@
                  (str "orgs 依存 detector: 最終測定 "
                       (if oldest (str (ms->human (age-ms oldest)) "前") "不明")
                       " — 新規なし"))]
+              ;; Louder than any single detector's age, because every one of
+              ;; those ages is a consequence of this (ADR-2608196000).
+              (when-not (scheduler-installed?)
+                [(str "  ⚠⚠ この tick に scheduler がありません —— "
+                      "~/Library/LaunchAgents/com.gftd.orgs-detector-tick.plist が無い。"
+                      "下の「最終測定」は「変化が無い」ではなく「誰も走らせていない」です。"
+                      "install: cp scripts/com.gftd.orgs-detector-tick.plist "
+                      "~/Library/LaunchAgents/ && launchctl load "
+                      "~/Library/LaunchAgents/com.gftd.orgs-detector-tick.plist")])
               (when (seq unrun)
                 [(str "  ⚠ 未実行のまま登録されている: " (str/join ", " (map name unrun)))])
               (mapcat :lines reports)))))))
