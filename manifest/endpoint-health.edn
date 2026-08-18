@@ -1,0 +1,123 @@
+;; 稼働 endpoint の健康診断 —— **手で書く。生成物ではない。**
+;;
+;; ここに載るのは「黙って壊れたら困る endpoint」であって、稼働している全 path では
+;; ない。どれが載るかは判断であって導出ではないので、その判断をこのファイルに置く。
+;;
+;; ## なぜ導出しなかったか（2026-08-18 に両方測って捨てた案）
+;;
+;; 案 A「wrangler config が宣言する upstream origin を全部叩く」: 1,445 config から
+;; 164 origin を取り、118 が dead だった（105 が NXDOMAIN、13 が無応答）。数は出るが
+;; **同日の 2 件の障害をどちらも捕まえない** —— agentChat が落ちたとき宣言先
+;; api.murakumo.cloud は生きており（死んでいたのは source に焼かれた model id）、
+;; images が落ちたとき GATEWAY_URL は**未宣言**だったので叩く先が無かった。
+;; なお 118 件は 4 ドメインの退役に由来する（etzhayyim.com 97 / gftd.ai 14 /
+;; etzhayyim.ai 4 / kotobase.net 3）ので、件数として読むと 30 倍に見える。
+;;
+;; 案 B「source が env から読む *_URL のうち config が宣言していないものを挙げる」:
+;; local-murakumo で 25 件出て、GATEWAY_URL はその 1 件。残り 24 は secret か意図的な
+;; 未設定で、**しかも GATEWAY_URL 自身が 7/29〜8/6 は「正しく未宣言」だった**。
+;; 宣言の有無では正誤を区別できない。区別できたのは「その間に代わりのホストが
+;; 実在するようになったか」だが、それを知っていたのは README だけだった。
+;;
+;; 残ったのは一番素朴な形だった: **自分の endpoint を実際に呼んで、約束どおりの物が
+;; 返るかを見る。** 両方の障害は外から 1 リクエストで見えていた。
+;;
+;; ## 費用
+;;
+;; :cost :gpu の probe は実際に推論を回す。安い代替は無い —— agentChat は空文字なら
+;; gateway に触れる前に 400 を返し、images は空 prompt でも 41 秒かけて生成する
+;; （2026-08-18 実測）。つまり **本物のリクエストを送らないと本物の障害は見えない。**
+;; だから頻度で釣り合いを取る（:every-hours）。
+;;
+;; ## 追加するときの規約
+;;
+;; - `:expect` は「約束」を書く。status だけでは足りない —— 両障害とも HTTP 層では
+;;   502 という正しい形をしており、何が壊れたかは **body の中**にあった。
+;; - `:degraded-when` は「自分で不調を名乗っている応答」の見分け方。空にしてよいが、
+;;   その場合 5xx は全部 :answered-badly になる。
+;; - `:owner` は直す人ではなく**直す場所**（repo）。
+{:controls
+ ;; 「測れなかった」を「測って問題なかった」と区別するための対照。
+ ;; これが落ちたら probe は結果を報告しない（exit 2）—— 自分の回線が死んでいる時に
+ ;; 「全 endpoint が dead」と報告するのが、この probe にとって最悪の失敗。
+ [{:id :control/cloudflare :url "https://cloudflare.com/" :method :head}
+  {:id :control/github     :url "https://github.com/"     :method :head}]
+
+ :probes
+ [{:id :shinshi/chat
+   :url "https://shinshi.club/xrpc/ai.gftd.apps.shinshi.agentChat"
+   :method :post
+   :body {:slug "aoi-hoshino" :message "ping"}
+   :timeout-ms 150000
+   :cost :gpu
+   :every-hours 6
+   :expect {:status 200 :json-non-empty [:reply]}
+   :degraded-when [{:json-path [:error] :contains "gateway"}]
+   :owner "network-awai/club-shinshi-app"
+   :note (str "2026-08-18 に 502 で発見。source に焼かれた model id `qwen3.6-35b-a3b` の "
+              "tunnel が死んでおり、bridge が非 JSON を parse できず 500 を返していた。"
+              "status だけ見ると 502 で、原因は upstreamStatus と body にあった。"
+              ":json-non-empty が要る —— 200 で reply:\"\" は「動いている」ではない。")}
+
+  {:id :murakumo/images
+   :url "https://api.murakumo.cloud/v1/images/generations"
+   :method :post
+   :body {:prompt "a plain grey cube on a white background" :n 1 :size "512x512"
+          :model "animagine-xl-4.0"}
+   :timeout-ms 240000
+   :cost :gpu
+   :every-hours 12
+   :expect {:status 200 :json-non-empty [:data 0 :b64_json]}
+   :degraded-when [{:json-path [:error] :contains "configured"}]  ; 実 body は "no GATEWAY_URL configured" —— "not configured" では一致しない (2026-08-18、replay で発見)
+   :owner "network-awai/local-murakumo"
+   :note (str "2026-08-18 に 503 `no GATEWAY_URL configured` で発見。20 日間そうだった。"
+              "自分で不調を名乗っていたので :degraded-when で拾える —— "
+              "この形（設定不在を自分で申告する 503）が一番「意図的」に見えて長く残る。")}
+
+  {:id :shinshi/scene
+   :url "https://shinshi.club/xrpc/ai.gftd.apps.shinshi.requestScene"
+   :method :post
+   :body {:slug "aoi-hoshino" :scene "standing by a window"}
+   :timeout-ms 240000
+   :cost :gpu
+   :every-hours 24
+   :expect {:status 200 :json-non-empty [:url]}
+   :degraded-when [{:json-path [:error] :contains "gateway"}]
+   :owner "network-awai/club-shinshi-app"
+   :note (str "images の downstream。両方載せるのは、壊れた層を切り分けるため —— "
+              "scene だけ赤なら appview 側、images も赤なら murakumo 側。")}
+
+  {:id :murakumo/chat-alias
+   :url "https://api.murakumo.cloud/infer/models/murakumo-main"
+   :method :get
+   :timeout-ms 20000
+   :cost :cheap
+   :every-hours 1
+   :expect {:status 200 :json-non-empty [:alias-for]}
+   :owner "kotoba-lang/murakumo"
+   :note (str "alias entry そのもの。⚠ これが 200 でも配信は保証されない —— "
+              "2026-08-18 時点で registry は死んだ qwen3.6-35b-a3b を "
+              "status:\"serving\" と申告し続けていた。**自己申告は計測ではない。** "
+              "だからこの probe は :shinshi/chat の代わりにならず、両方要る。")}
+
+  {:id :shinshi/coverage
+   :url "https://shinshi.club/xrpc/ai.gftd.apps.shinshi.coverage"
+   :method :post
+   :body {}
+   :timeout-ms 30000
+   :cost :cheap
+   :every-hours 1
+   :expect {:status 200 :json-non-empty [:total]}
+   :owner "network-awai/club-shinshi-app"
+   :note "D1 read path。生成が全部死んでいても、ここが生きていれば site は読める。"}
+
+  {:id :gateway/comfy-health
+   :url "https://gateway.murakumo.cloud/health"
+   :method :get
+   :timeout-ms 20000
+   :cost :cheap
+   :every-hours 1
+   :expect {:status 200 :json-non-empty [:ok]}
+   :owner "network-awai/cloud-murakumo"
+   :note (str "images の 1 つ上流。2026-08-07 に作られ、8/18 まで誰もここを "
+              "指していなかった —— 健康なまま孤立していたホストが在りうる、の実例。")}]}
