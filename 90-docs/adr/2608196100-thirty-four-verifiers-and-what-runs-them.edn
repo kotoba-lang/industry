@@ -1,0 +1,91 @@
+[{:db/id -1
+  :adr/id "ADR-2608196100"
+  :adr/title "Thirty-four verifiers, and what runs them"
+  :adr/status "accepted"
+  :adr/date "2026-08-19"
+  :adr/body
+"## The question ADR-2608196000 left
+
+That ADR installed the scheduler for the fifteen registered detectors and ended
+by naming what it had not measured: there are 34 `verify-*.cljs` in `scripts/`,
+15 are registered detectors and 5 are named by a fleet gate or a hook. **What
+runs the other fourteen was not measured.**
+
+Measured now, by matching each script name against the detector registry,
+`scripts/fleet-ci/gates.edn`, `.claude/hooks/` and `scripts/tasks.edn`:
+
+  - 19 have a runner
+  - **15 have none**
+
+Of the fifteen, three have a *twin* under `scripts/fleet-ci/gates/` with the
+same stem -- `capital-pools`, `kotobase-persistence-policy`, `source-nul-bytes`.
+Those checks do run; what is unrun is the root copy. **Two implementations of
+one check is the drift `verify-vendored-copies` exists to catch**, so the twins
+are a finding of their own rather than a reassurance.
+
+That leaves **twelve with no runner and no twin.**
+
+## What they are, by what they read
+
+  - reads `orgs/` -- app-content-address, d1-kotobase-migration,
+    duplicate-registrations, kip-quorum, kotoba-pages, source-path-pins.
+    These cannot be fleet gates for the structural reason ADR-2608124800 gives,
+    so their home is the detector registry, which now has a scheduler.
+  - root-only -- adr-edn-shape, artifact-path-policy, clj-everywhere,
+    no-babashka, shadow-warnings-as-errors.
+  - needs the network -- endpoint-health, kotobase-persistence-policy.
+
+## Ran, corrected
+
+    verify-artifact-path-policy     exit 0    checked=27 ok=1 skipped=26
+    verify-capital-pools            exit 0    pool 1 / tranche 4, clean
+    verify-clj-everywhere           exit 1    41 lines
+    verify-shadow-warnings-as-errors exit 1   172 findings
+    verify-source-nul-bytes         exit 1    59s
+    verify-no-babashka              exit 1    4853 findings, 154s
+    verify-adr-edn-shape            exit 1    takes <file.edn>, not a directory
+
+`verify-adr-edn-shape` is not an entry point at all: it checks one file and
+prints a usage line. It is a helper whose caller is missing, which is a
+different thing from an entry point whose schedule is missing, and the census
+should not treat them alike.
+
+## Registered: nothing
+
+The two that exit 0 are the only registration candidates, and neither should be
+registered today.
+
+`verify-capital-pools` already has a gate twin. Registering the root copy would
+make a third implementation of one check.
+
+`verify-artifact-path-policy` skips 26 of the 27 things it checks and reports
+`ok=1`. On a fleet node, which gets only the root tree, it would skip more --
+plausibly all of them -- and **a gate that skips everything and exits 0 is a
+green light for an unmeasured property.** It needs an evidence floor before it
+can be a gate, which is per-script work and not a registry line.
+
+**Measuring and not acting is the outcome here.** The alternative was five
+gates.edn lines that would have looked like progress.
+
+## Two measurement errors, both mine, both caught
+
+First: exit codes were collected as `out=$(cmd | tail -1); code=$?`, which
+captures `tail`'s status, not the script's. That reported **exit 0 for all
+seven**, including two that exit 1. Re-run without the pipe, the table above is
+what they actually do. A measurement that answers about the wrong process is
+the defect this workspace keeps finding, and it produced a clean-looking result.
+
+Second: `nbb --classpath \".:scripts/nbb_compat\" scripts/verify-adr-edn-shape.cljs`
+made the script read `.:scripts/nbb_compat` as its input file -- the argument
+trap CLAUDE.md documents (`<dir>` は引数の先頭に置く). Passing the directory
+after the script did not help, because the classpath value is still first among
+non-flag arguments.
+
+## Next
+
+  - Register the six `orgs/`-reading verifiers in `manifest/orgs-detectors.edn`,
+    one at a time, each with a measured interval and timeout rather than a
+    guessed one. The registry demands that, and bulk registration would defeat
+    it.
+  - Decide per twin whether the root copy or the gate copy is the survivor.
+  - Give `verify-artifact-path-policy` an evidence floor, then gate it."}]
