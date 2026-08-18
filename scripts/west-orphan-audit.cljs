@@ -37,7 +37,16 @@
 ;;   nbb scripts/west-orphan-audit.cljs --edn        ; 機械可読 EDN
 ;;
 ;; exit 0: blocking なし
-;; exit 1: :local-root-broken が1件以上（登録漏れが consumer を壊している）
+;; exit 1: :local-root-broken か :relative-paths-broken が1件以上
+;;         （登録漏れが consumer を壊している）
+;;
+;;   :relative-paths-broken   — deps.edn の :paths/:extra-paths に書かれた
+;;                              "../…" が、実体の無い or west 未登録の project を
+;;                              指す。:local/root の走査は **:local/root だけ** を
+;;                              **project 直下の deps.edn だけ** で見るので、
+;;                              この形は両方の穴を通り抜ける。実測 2026-08-18:
+;;                              :local-root-broken が 0 の状態で 6 件あった。
+;;                              0 は「無い」ではなく「見ていない」だった。
 
 (require '[scripts.nbb-compat :refer [slurp sh]]
          '[clojure.string :as str]
@@ -393,6 +402,75 @@
          (sort-by :project)
          vec)))
 
+;; ── :paths が repo の外を指す辺（2026-08-18 追加） ───────────────────────────
+;; `scan-local-root-deps` は **:local/root だけ** を、しかも **project 直下の
+;; deps.edn だけ** を見る（その docstring が両方を明記している）。同じ「fresh
+;; clone で解決できない」障害は、その2つの穴を通り抜ける形でも起きる:
+;;
+;;   orgs/network-awai/app-aozora-appview/cljs/deps.edn   ← 入れ子（穴2）
+;;     :paths ["../../aozora-engine/appview/src"]         ← :local/root ではない（穴1）
+;;
+;; aozora-engine は west 未登録なので、west update した clone にその dir は
+;; 存在しない。実測 2026-08-18: この経路は `--blocking` が 0 を報告している
+;; 状態で 8 辺／6 target 見つかった。0 は「無い」ではなく「見ていない」だった。
+
+(def ^:private paths-scan-debris
+  ["agent-worktrees" "/_wt-" "/data/" "node_modules"])
+
+(defn- deps-files-recursive
+  "orgs/ 配下の deps.edn を深さ無制限で集める。ドットで始まる dir と
+  worktree/scratch 系は除く（実体の設定ではないため）。"
+  [dir acc]
+  (if-not (exists? dir)
+    acc
+    (reduce
+     (fn [a e]
+       (let [n (.-name e)
+             p (node-path.join dir n)]
+         (cond
+           (or (= n "node_modules") (= n ".git") (str/starts-with? n ".")) a
+           (.isDirectory e) (deps-files-recursive p a)
+           (= n "deps.edn") (conj a p)
+           :else a)))
+     acc
+     (array-seq (.readdirSync node-fs dir #js {:withFileTypes true})))))
+
+(defn scan-relative-paths
+  "deps.edn の :paths / :extra-paths に書かれた `../` 相対 path のうち、
+  実体が無い or west 未登録の project を指すものを列挙する。
+
+  同じ repo 内を指すものは対象外（それは fresh clone でも解決する）。"
+  [west]
+  (let [files (deps-files-recursive (node-path.join root "orgs") [])
+        hits (atom [])]
+    (doseq [f files
+            :when (not (some #(str/includes? (str "/" f) %) paths-scan-debris))
+            :let [text (strip-edn-comments (or (read-text f) ""))
+                  dir (node-path.dirname f)
+                  self (project-of-abs dir)]]
+      (doseq [[_ body] (re-seq #":(?:extra-)?paths\s*\[([^\]]*)\]" text)]
+        (doseq [[_ rel] (re-seq #"\"(\.\./[^\"]*)\"" body)]
+          (let [abs (node-path.resolve dir rel)
+                proj (project-of-abs abs)]
+            (when (and (str/starts-with? proj "orgs/") (not= proj self))
+              (let [dir-exists? (exists? abs)
+                    in-west? (contains? west proj)]
+                (when (or (not dir-exists?) (not in-west?))
+                  (swap! hits conj
+                         {:consumer (node-path.relative root f)
+                          :path rel
+                          :project proj
+                          :dir-exists? dir-exists?
+                          :in-west? in-west?}))))))))
+    (->> @hits
+         (group-by :project)
+         (map (fn [[proj rows]]
+                (assoc (first rows)
+                       :consumers (vec (distinct (map :consumer rows)))
+                       :consumer-count (count (distinct (map :consumer rows))))))
+         (sort-by :project)
+         vec)))
+
 (defn parse-args [argv]
   (let [s (set argv)]
     {:all? (contains? s "--all")
@@ -419,6 +497,20 @@
     (println (str "  true-orphan-git: " (count (:true-orphan-git unregistered))))
     (println (str "  true-orphan-nongit: " (count (:true-orphan-nongit unregistered))))
     (println (str "  local-root-broken (blocking): " (count local-root-broken)))
+    (println (str "  relative-paths-broken (blocking): "
+                  (count (:relative-paths-broken report))))
+    (when-let [pb (seq (:relative-paths-broken report))]
+      (println)
+      (println "## BLOCKING: :paths \"../…\" → missing or not-in-west")
+      (println "   (:local/root scan sees neither of these: not :local/root, and")
+      (println "    often a NESTED deps.edn. 0 above meant not-looked-at, not absent.)")
+      (doseq [row pb]
+        (println (str "  " (:project row)
+                      "  dir=" (:dir-exists? row)
+                      " west=" (:in-west? row)
+                      " consumers=" (:consumer-count row)))
+        (doseq [c (if (:all? opts) (:consumers row) (take 2 (:consumers row)))]
+          (println (str "    - " c)))))
     (when (seq local-root-broken)
       (println)
       (println "## BLOCKING: :local/root → missing or not-in-west")
@@ -480,6 +572,7 @@
         unreg (-> (classify-unregistered local west overrides (west-rev->path))
                   (reclassify-renamed west))
         broken (scan-local-root-deps west)
+        paths-broken (scan-relative-paths west)
         report {:counts {:local (count local)
                          :west (count west)
                          :unregistered (+ (count (:registered-elsewhere unreg))
@@ -491,11 +584,12 @@
                                           (count (:true-orphan-nongit unreg)))}
                 :unregistered unreg
                 :local-root-broken broken
-                :blocking-count (count broken)}]
+                :relative-paths-broken paths-broken
+                :blocking-count (+ (count broken) (count paths-broken))}]
     (if (:edn? opts)
       (println (pr-str report))
       (print-human report opts))
     ;; process.exit を先に呼ばないと nbb が常に 0 で落ちることがある
-    (.exit js/process (if (pos? (count broken)) 1 0))))
+    (.exit js/process (if (pos? (+ (count broken) (count paths-broken))) 1 0))))
 
 (apply -main *command-line-args*)
