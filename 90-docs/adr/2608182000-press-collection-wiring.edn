@@ -105,9 +105,16 @@ push main ok / push git-annex ok
 - newsfeed の台帳は 2 箇所（GitHub の git 履歴 + B2 の annex 実体）に載った。
 - **gBizINFO はこの ADR の対象外**。今も恒常取得は無く、2026-08-18 に 1,014 社を
   1 回 enrich しただけ（ADR-2608180800）。補助金・調達・届出・財務は未取得のまま。
-- **kouhou の 15 error は残っている**（per-source の timeout と「feed が 0 件に
-  parse された」）。設計どおり他を巻き込んでいないが、53 分の 15 が毎日落ちる
-  なら source registry 側の問題であって、次に測るのはそこ。
+- **launchd 経由でも 1 度完走を確認した**（自分の shell からだけでなく）:
+  `custody (VERIFIED by exit code, of 95 keys): kotobase=95, b2=95` / `push main ok`。
+- ⚠ **連続実行が壊れる。** 15 分あけて 2 回走らせたら error が **15/53 → 51/53** に
+  跳ねた（committed 35 → 2）。原因は未特定 —— 上流の throttling、per-source timeout、
+  この機械の負荷（並行 build 多数）のどれか、あるいは複合。日次の間隔では踏まない
+  はずだが、**「53 sources, 2 committed」を正常として読まない**ために書いておく。
+  次に測るのはここ: 2 回とも落ちた source が同じ集合か、error の中身は timeout か parse か。
+- **error 15 件（1 回目）は残っている**（per-source の timeout と「feed が 0 件に
+  parse された」）。設計どおり他を巻き込んでいないが、毎日 53 分の 15 が落ちるなら
+  source registry 側の問題である。
 - **launchd job は 1 台の機械に載っている。** この laptop が止まれば収集も止まる。
   fleet へ移すかは未決（murakumo の常駐枠は `:slot/attested` が要る —— 書き込み鍵を
   持つので 1 台固定、ADR-2608111721）。
