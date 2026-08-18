@@ -14553,9 +14553,21 @@ manifest:
         rad-rid: rad:z48pz1c14QNmcTEGjruV4kRb8FoHV
     - name: root
       remote: etzhayyim
-      revision: b9f6afbed76d9f27ecf17fb2f81b1f7fb6e67416
+      revision: bec359a7ffc44e76ab3066e1d5b26896c460e26f
       path: orgs/etzhayyim/root
       groups: [etzhayyim]
+      submodules:
+        - path: 50-infra/etzhayyim-chain-contracts/lib/forge-std
+        - path: 50-infra/etzhayyim-paymaster/lib/account-abstraction
+        - path: 50-infra/etzhayyim-paymaster/lib/openzeppelin-contracts
+        - path: 50-infra/etzhayyim-yobel-contract/lib/forge-std
+        - path: 50-infra/etzhayyim-authz/contracts/lib/forge-std
+        - path: 50-infra/etzhayyim-k2/contracts/lib/forge-std
+        - path: 50-infra/etzhayyim-fiat-bridge/contracts/lib/forge-std
+        - path: 50-infra/l2-anchor-contract/lib/forge-std
+        - path: 50-infra/openmail-postage/lib/forge-std
+        - path: 50-infra/etzhayyim-membership-contract/lib/forge-std
+        - path: 50-infra/etzhayyim-paymaster/lib/forge-std
       userdata:
         rad-rid: rad:zJFSUJo3nmizU6drRiT8b6kTJFon
     - name: tamaki
