@@ -234,14 +234,54 @@ per-datom filter は同一テナントの集合を濾すだけになる、と ns
 `kotobase.query` / `datalog` / `arrangement` を直接 require しており、`agent` 経由になって
 いない。**入口が在ることと使われていることは別**で、88.9% は現状まだ誰の役にも立っていない。
 
+## 書かれる形と、エンジンが受ける形は同じではなかった（2026-08-18、実測）
+
+**この ADR が「agent はこれで書く」と決めた形は、kotobase が実際に受ける形ではない。**
+方言の表記は `[:find ?t :where [?e \"a/b\" ?t]]`（ベクタ形）で、prompt も validator も
+測定もこれを扱う。ところが `datalog.core/q`（= `arrangement.datalog/q`、`bridge/q` の
+委譲先）が受けるのは **map 形 `{:find [...] :where [...]}` だけ**である。
+
+**そしてベクタ形を渡しても throw しない:**
+
+```
+map     {:find [?t] :where [[?e \"company/ticker\" ?t]]}  =>  #{[\"AAA\"] [\"BBB\"]}
+vector  [:find ?t :where [?e \"company/ticker\" ?t]]      =>  #{[]}
+```
+
+`(:find <vector>)` が nil になるので**空のクエリが 1 件の空タプルを返す**。
+呼び出し側は「一致が無かった」と区別できない。**この ADR が入口を作った理由そのものの
+形（答えられなかったものが、答えと同じ値で返る）が、選んだ経路の production 側に
+在った。**
+
+見つかったのは、agreement を**正しいエンジンに対して**回したからである。それ以前の
+88 変異は DataScript に対するもので、そちらはベクタ形が native なので**この不一致は
+原理的に見えない**。「エンジンが違えば違う形を拒否しうる」と書いた follow-up は、
+形そのものが違うという、もっと手前の答えを持っていた。
+
+対処（`kotobase-query` pin `07405d63`）:
+
+- **`agent/->engine-query`** —— 検証済みベクタ形を map 形に変換する。**変換はこの入口が
+  持つ**（呼び出し側それぞれが持てば、直るのは 1 つだけになる）。
+- **`bridge/q` は map でないものを拒否する** —— 黙って `#{[]}` を返させない。
+  既存の呼び出しは全て map 形だったので bridge の既存スイートは無改変で通る。
+- **agreement を `arrangement.datalog` に対して検査する**（`agent_engine_test`）——
+  必須方向（engine が拒否 ⟹ validator も拒否）と、宣言済みの逸脱
+  （`:unknown-attributes` のみ。engine はこれを受けて 0 件を返すので、早く弾くことが
+  入口の値打ちそのもの）。JVM 59 test / 121 assertion、nbb の依存ゼロ entry 18 / 47。
+  guard を外すと該当 1 test だけが落ちる。
+
 ## 再開点（次の 1 手から順に）
 
-1. **`arrangement.datalog` に対して agreement を回す。** 今の 88 変異は **DataScript**
-   に対して測ったもので、kotobase が実際に通すのは `arrangement.datalog` である。
-   **2 つのエンジンが同じ形を拒否する保証は無い。** 上流（`kotobase-query`）で回せば
-   repo 内で完結するので **fleet gate にもできる**（root では不可能だった制約が消える）。
-2. **`cloud-itonami-app` の query を `agent` 経由に移す。** ここまでやって初めて
-   「決めた入口」が使われている状態になる。
+1. ~~`arrangement.datalog` に対して agreement を回す~~ **完了**（上記）。gate は
+   足していない —— 既存の `:jvm-test` が `cognitect.test-runner` で `test/` を走査して
+   拾うので覆いは元から在り、`:id` の無い entry を足すと既存 entry と gate 名・
+   tarball 名・state キーが衝突する（一度足して撤去した）。
+   **ただし fleet 上の緑はまだ無い**: receipt は `86a032e` / `b699824` で、
+   どちらもこの一連の commit より前。次の tick が新 pin で回るまで未確認。
+2. **`cloud-itonami-app` の query を `agent` 経由に移す（次の 1 手）。** ここまでやって
+   初めて「決めた入口」が使われている状態になる。**そして今回の発見から、移す先は
+   `->engine-query` を通す形でなければならない** —— 直接ベクタ形を渡すと `#{[]}` が
+   返る。
 3. **方言間の比較。** 4 surface は live（Bearer）。要るのは ①同じデータを kotobase graph に
    入れる ②token ③harness に HTTP 経路、の 3 つだけ。
 4. cross-check の**内容**一致（現在は行数のみ）/ 1 モデル・1 回・20 問の再現 /
@@ -289,4 +329,10 @@ per-datom filter は同一テナントの集合を濾すだけになる、と ns
   転送障害を分母に入れる / `:find` 節を `:in` と誤って全変数を束縛済みにする）。
   5 回とも**直した箇所の隣で再発**しており、対策は注意深さではなく
   「検査を検査する場所を作る」（`--self-test` / `run-tests-pure.cljs` /
-  `grammar-agreement.cljs`）だった。"}]
+  `grammar-agreement.cljs`）だった。
+- 2026-08-18 agreement を `arrangement.datalog`（kotobase が実際に通すエンジン）に
+  対して回し、**書かれる形とエンジンが受ける形が違う**ことを発見。ベクタ形は拒否
+  されず `#{[]}` を返す。`->engine-query` と `bridge/q` の guard を追加（pin
+  `07405d63`）。**6 回目の同じ class**で、今回は自分のコードではなく選んだ経路の
+  production 側に在った。DataScript に対する 88 変異では原理的に見えなかった ——
+  **正しいエンジンに当てるまで、検査は当たっていなかった。**"}]
