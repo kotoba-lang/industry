@@ -109,17 +109,47 @@ west.yml）を同時に閉じて初めて撤去になる。**
   `orgs/kotoba-lang/compiler/{src,resources,deps.edn}` から組んでいた。
 - CLAUDE.md の 3 箇所（本 ADR が名指ししていたもの）も同日に `amu` へ直した。
 
-## まだ閉じていない
+## 登録面は空になった（2026-08-18 実測）
 
-- **`scripts/verify-duplicate-registrations.cljs` は依然 timeout する**（load 90 の
-  このマシンで 240 秒・出力ゼロ・exit 124）。進捗を出さないので走っているのか
-  止まっているのか外から分からない。**見つけるための道具が、見つける前に切れる。**
-  今回の 1 件は手で見つけたのであって、この検査器が見つけたのではない。
-- **`orgs/kotoba-lang/compiler/` の実体 133 MB** は west 未登録の孤児として残存
-  （clean、HEAD は origin/main に含まれる）。checkout の削除は manifest 変更では
-  ないので `git-cleanup-conflict` の retirement flow に残す。
-- ADR-2608132700 が測った **19 の「1 repo が 2 回 checkout」のうち、閉じたのは
-  この 1 件だけ**である。
+    nbb scripts/verify-duplicate-registrations.cljs --compare
+    SCANNED 4199 west-entries
+    scanned 4199 west entries; 0 GitHub id(s) registered more than once
+    gh-invocations 39  unresolved 0  manifest-phase-s 71.2  load1 30.7   → exit 0
+
+**4,199 entry で、2 つ以上の entry が同じ id を指すものは 0 になった。**
+ADR-2608134000 が測ったとおり `compiler`/`amu` は 4,166 のうち唯一の組だったので、
+これを撤去したことでこのクラス自体が空になった。
+
+## 訂正 2 件（2026-08-18 —— この ADR が 1 日だけ持っていた誤り）
+
+**この節は 2026-08-18 に一度、測らずに書いて 2 つとも間違えた。** 記録として残す。
+
+1. **「検査器は依然 timeout する」は誤り。** 本 ADR 執筆の翌日（2026-08-13）に
+   直っている —— スクリプト冒頭が自分で
+   `Progress now goes to stderr via js/console.error` と書いており、
+   `(binding [*out* *err*] ...)` が nbb では stdout に出てしまうことまで
+   注記している（ADR-2608130600）。実測 2026-08-18: 既定経路 71.2 秒 /
+   gh 39 回 / exit 0、`--disk-ids` 405.5 秒 / gh 253 回 / exit 0、いずれも
+   進捗が stderr に流れ続け、unresolved は 0。**このセクションの旧文は、
+   直っているものを「まだ壊れている」と 1 日だけ主張していた。**
+2. **「19 のうち閉じたのは 1 件」も誤り。** その 19 は ADR-2608132700 が
+   co-classpath の namespace 衝突を分解して得た**別の測り方**の数であって、
+   登録面の数ではない。登録面はそもそも 1 件（ADR-2608134000）で、それが 0 に
+   なった。
+
+**どちらも、直前の commit message で「古い値を定数として引用するな」と書いた
+その手で、古い ADR 本文の記述をそのまま新しい本文へ転記して起きた。**
+転記は測定ではない。
+
+## まだ閉じていない —— disk 面（登録面ではない）
+
+残っているのは manifest ではなく `orgs/` の実体である。ADR-2608134000 が所有する
+面で、そちらに最新値を書いた。要約すると 2026-08-18 実測で
+**checkout 4,815 / west 未宣言 653 / 宣言済み entry を shadow 541 / うち別コード 528**。
+
+`orgs/kotoba-lang/compiler/` の実体 133 MB も、今日この 653 の 1 つになった
+（clean、HEAD は origin/main に含まれる）。checkout の削除は manifest 変更では
+ないので `git-cleanup-conflict` の retirement flow に残す。
 
 ## 記録しておく形
 
