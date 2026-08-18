@@ -95,7 +95,13 @@
     これは「無い」ではなく**未測定**であり、owner が対話で実行すれば登録できる。
     **この 1 値から全 tenant の secret が導出できる。** rotate すると発行済みの鍵が
     すべて同時に無効になるので、失効は原則 expiry で行い、rotation は緊急時に限る。
-    発行: `S3_ISSUER_ROOT=... nbb protocols-worker/scripts/issue-s3-credential.cljs <did> [days]`
+    **同じ値が apex Worker `net-kotobase` にも入っている**（2026-08-18）。片方が発行し
+    もう片方が同じ root から検証するので、2 箇所に在るのはこの設計の帰結である
+    （AWS SigV4 が共有秘密を要求する以上、この面では公開鍵署名に替えられない）。
+    **rotate するときは 2 つ同時に**。片方だけ替えると、発行した鍵が検証側で全部落ちる。
+    発行: tenant は `POST https://kotobase.net/api/s3-credentials`（CACAO 認証 +
+    `:storage/pin` Grant）、operator は
+    `S3_ISSUER_ROOT=... nbb protocols-worker/scripts/issue-s3-credential.cljs <did> [days]`
   - **kotobase-protocols-worker `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`**
     （s3.kotobase.net の AWS SigV4 write 認可、ADR-2607176000）: Worker secret
     投入済み（`wrangler secret list` で 2026-08-17 に両方の存在を確認）。
