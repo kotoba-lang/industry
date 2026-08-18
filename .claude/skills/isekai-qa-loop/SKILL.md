@@ -146,7 +146,7 @@ autoplay は **60 秒級のエピソードを何世代も回して「遊べる�
   測って選択肢を提示するところまでが engineering
 - **本番に書き込むテストをしない。** gate は読み取りとローカル ECS tick だけ
 
-## 現在地（2026-08-17、次の反復はここから読む）
+## 現在地（2026-08-18、次の反復はここから読む）
 
 | | 実測 |
 |---|---|
@@ -159,6 +159,9 @@ autoplay は **60 秒級のエピソードを何世代も回して「遊べる�
 | AAA signoff | 物理 GPU 1/6 class、frame p95 16.8ms vs 目標 16.7ms、stock 凍結中 |
 | scene 7 指標 | 全て `-1`（未測定）。校正済みリファレンス待ち = art-direction |
 | playtest co-scientist | 2026-08-17 05:00 の standing run あり（`playtest-coscientist-*` branch） |
+| **royale = AAA showcase** | オーナー判断 2026-08-17。ADR-0078 path A を採用し authored cover が live（ADR-0081）。197→251 instance / solid 4→11 / collider 4→7 / authored instance 0→69 / textured 8→41 / emissive 0→29。代償は junction 建物 4→1 とその visual contract |
+| **CI** | 2026-08-17 に fleet-ci へ 3 gate 登録（`isekai-generated-artifacts` / `isekai-tests-actually-run` / `isekai-docs-edn`）。**それ以前はこの repo に CI が 0 本**で、最後の Actions run は 2026-08-04 の failure。全部 `:cd false` |
+| **既知の red（未修正）** | `royale_terrain_test`(3) / `royale_decal_test`(1) / `royale_vegetation_test`(1)。**この変更の前から main で red**（clean tree で確認済み）。scope 外にしただけで無視してよい判断ではない |
 
 ### ⚠ 2026-08-08 版のこの節が推奨していた「最初の一手」は間違いだった
 
@@ -173,7 +176,10 @@ palisade 1→2 / royale 1→2 / waves 1→**21**。palisade の HUD は同じ sn
 **実行していれば、既に相手が居るゲームに 2 体目を足していた。** gate の出力を、それが
 測れていないものの証拠として読むな —— この skill 自身がその見本になっていた。
 
-**今の最初の一手**: 決まったものは無い。**測ってから選ぶ**。`:entities-end` と
+**今の最初の一手**: 上の「既知の red」3 本のどれか、または `:gap/scene-visual-fidelity` の
+signoff 要件（ADR-0063）。**royale の authoring は解けたが signoff は解けていない** ——
+校正済み AAA リファレンス（`:authority/art-direction`）と物理 GPU 5 class が未解決のまま
+（ADR-0078 の #2 / #3）。それ以外は**測ってから選ぶ**。`:entities-end` と
 `:tags-end` が evidence EDN に入るようになったので、`1 → N` の N と tag の内訳を見て、
 declared な genre に対して薄いものを探す。adversary 判定は**まだ exit code を左右しない**
 （訂正後の計測が本番で数周 安定してから enforcing に上げること）。
