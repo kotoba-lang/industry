@@ -4,6 +4,14 @@
   :portfolio/status :active
   :portfolio/owner "Gftd Japan K.K."
   :portfolio/objective "残存する法人資産から、追加固定費を抑えながら売上と利益を作る"
+  :portfolio/company-baseline
+  "{:books-as-of \"2026-08-15\"
+    :fy2026-revenue-jpy 443506
+    :fy2026-operating-loss-jpy -16226442
+    :fy2026-net-loss-jpy -16248283
+    :bookkeeping-gap \"2026年7月・8月は未記帳部分があり、帳簿数値を現在の銀行残高として扱わない\"
+    :sales-diagnosis \"販管費削減より速く売上が減少しており、全社のP0は新規開発ではなく初回入金の獲得\"
+    :capital-diagnosis \"budget-supply.ednの300万円poolは過去ADR上の上限であり、現在利用可能な現預金の証拠ではない\"}"
   :portfolio/principles
   "[{:principle :cash-first
      :rule \"署名済み受注、予約金、または具体的な購入意思に直結しない支出を増やさない\"}
@@ -20,7 +28,7 @@
      :sale-price-jpy 399000
      :gross-profit-before-operations-jpy 49000
      :gross-margin 0.1228
-     :execution \"予約販売または購入意思を確認後、互換構成へ修正し、組立・検品・販売する\"}
+     :execution \"B850Mマザーボードを維持し、Tower 100をMicroATX対応ケースへ変更する。ケース仕様と総原価を確定後、組立・検品・販売する\"}
     {:rank 2
      :product :net-kotobase
      :priority :highest
@@ -43,13 +51,20 @@
     :gross-margin 0.1228
     :current-parts-order-jpy 343040
     :current-parts-order-note \"2026-08-18確認。配送・組立・決済・保証引当を含む前の金額\"
-    :compatibility-blocker \"Thermaltake The Tower 100はMini-ITX用だが、ASRock B850M Pro RS WiFiはMicroATX。現構成のまま組み立てない\"
+    :configuration-decision \"ASRock B850M Pro RS WiFiを維持し、Thermaltake The Tower 100をMicroATX対応ケースへ変更する\"
+    :replacement-case-model :not-yet-recorded
+    :case-acceptance-gates [\"MicroATX対応\"
+                            \"ASRock Arc Pro B70 Creator 32GB（271 x 112 x 39 mm）を収容\"
+                            \"ATX電源 ASRock PRO-750B（150 x 86 x 140 mm）を収容\"
+                            \"140mmファン2基の搭載可否を確認\"
+                            \"ケース交換後も総原価35万円を目標とする\"]
     :margin-protection [\"送料を別建て、または総原価35万円以内に含める\"
                         \"銀行振込・請求書払いを基本に決済手数料を抑える\"
                         \"Linux・AI推論環境のセットアップを有料オプションにする\"
                         \"未開封を維持し、購入者確定前の追加仕入れを避ける\"]}"
   :portfolio/capital-policy
-  "{:available-jpy 100000
+  "{:scenario-available-jpy 100000
+    :availability-status :owner-deposit-scenario
     :account \"Gftd Japan PayPay銀行口座\"
     :allowed [\"Murakumoの互換部品、組立、検品、配送など販売成立に直接必要な費用\"
               \"KotobaseまたはItonamiの受注済み案件を履行するための最小費用\"]
@@ -65,11 +80,37 @@
      :reason \"現在の収益化に不要。追加支出対象外\"}]"
   :portfolio/risk-boundary
   "法務・債務対応は本記録の収益ワークストリームから分離して管理する。本記録は債務、法的義務、保証責任または顧客保護義務を免除・放棄するものではない"
+  :portfolio/company-operating-order
+  "[{:priority :P0
+     :work \"現金保全\"
+     :rule \"銀行残高と入出金予定を確認し、売上成立に直結しない新規固定費・サブスクリプション・広告費を増やさない\"}
+    {:priority :P1
+     :work \"Murakumo在庫の製品化\"
+     :rule \"ケース変更で互換性を閉じ、仕入済み部品を39万9,000円の売上へ変換する\"}
+    {:priority :P2
+     :work \"Kotobase前払い販売\"
+     :rule \"既存本番サービスを使い、10万〜30万円の有償PoCを請求書・銀行振込で販売する\"}
+    {:priority :P3
+     :work \"Itonami既存顧客転換\"
+     :rule \"既存trial/onboarded組織を新規開発より先に有償パイロットへ転換する\"}
+    {:priority :P4
+     :work \"運営維持\"
+     :rule \"銀行、メール、請求、会計データ保全など販売継続に不可欠な機能だけを維持する\"}
+    {:priority :P5
+     :work \"SESその他\"
+     :rule \"情報は保全するが、上位3製品の初回入金までは積極投資しない\"}]"
+  :portfolio/founder-time-allocation
+  "{:cloud-murakumo 0.40
+    :net-kotobase 0.35
+    :cloud-itonami 0.20
+    :operations-and-cash-control 0.05
+    :ses 0.00}"
   :portfolio/next-actions
-  "[{:order 1 :action \"Murakumoの互換構成と総原価35万円以内のBOMを確定する\"}
+  "[{:order 1 :action \"MurakumoのMicroATX対応ケース型番・価格・GPU/PSU/ファン収容条件を確定する\"}
     {:order 2 :action \"Murakumoを39万9,000円で予約販売し、Linux／AIセットアップを有料オプション化する\"}
     {:order 3 :action \"Kotobaseの10万〜30万円の前払い有償PoCを販売する\"}
-    {:order 4 :action \"Itonamiの既存verticalから、最小の有償導入パイロットを一つ選ぶ\"}]"
+    {:order 4 :action \"Itonamiの既存trial/onboarded組織から、最小の有償導入パイロットを一つ選ぶ\"}
+    {:order 5 :action \"各製品について初回入金、実質粗利、次の現金化日を週次で更新する\"}]"
   :portfolio/evidence
   "[{:observed-at \"2026-08-18\"
      :source \"Gmailの発注確認\"
