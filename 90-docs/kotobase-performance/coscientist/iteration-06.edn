@@ -1,0 +1,111 @@
+{:iteration 6
+ :date "2026-08-18"
+ :loop :kotobase/cost-coscientist
+ :engine "90-docs/kotobase-performance/src/kotobase_performance/cost_coscientist.cljc"
+ :asked-for "query and cost optimisation, via the Co-Scientist loop"
+
+ :seed-from-iteration-05
+ "Run the phase bench and replace the stale :after-harness values for h1, h6
+  and h7. Then start h7."
+
+ ;; ── the query axis, which had never been measured ───────────────────────────
+ :new-instrument
+ {:what "query_bench.cljs -- the first measurement of the query plane"
+  :landed "net-kotobase/control-plane main 61d40715b"
+  :why-it-had-to-be-built
+  "Every latency figure for sparql/cypher/gremlin/graphql came from GET
+   /health, which since 2026-08-17 returns four constants from ABOVE the router
+   and before that measured the hydrate. Neither version ever ran a query. And
+   all four answer 401 to a self-issued CACAO, so the only honest place to
+   measure them is in-process."
+  :receipt "90-docs/kotobase-performance/2026-08-18-a-query-is-one-percent.edn"}
+
+ :the-query-answer
+ {:measured {:hydrate-cpu-ms 42726.6
+             :sparql-query-cpu-ms 632.8 :sparql-share 0.0148
+             :cypher-query-cpu-ms  17.5 :cypher-share 0.0004
+             :sparql-enrich-cpu-ms 12.3 :cypher-enrich-cpu-ms 0.7}
+  :statement
+  "A query is 0.04-1.5% of a request. The hydrate is the rest. Against
+   production's 2,058 cpu-ms per served read the whole query is ~30 ms, so
+   optimising the query engine to ZERO is worth about $0.62 per million and
+   cannot be worth more."
+  :so-the-answer-to-the-question-asked
+  "**There is nothing to optimise in the query plane.** The cost of a query on
+   kotobase.net is the cost of the hydrate that precedes it, and every
+   remaining item on the roadmap is about the hydrate."
+  :two-new-hypotheses-both-near-zero
+  {:h9-query-engine {:saves 0.0 :basis :measured-and-refuted-for-this-shape}
+   :h10-query-memo {:saves 0.0 :basis :measured
+                    :note "it WORKS -- sparql 632.8 -> 82.8, 7.6x -- and that is
+                           1.3% of a request, collected only on a second query
+                           in a warm isolate, which 4 requests in 10 are."}}
+  :enrich-was-the-surprise
+  "`query/enrich` runs on every request and rebuilds `collections`, the GraphQL
+   resolvers and the memo version from the whole seed. It reads like a
+   per-request O(docs) walk worth attacking. Measured: 0.7-12.3 cpu-ms. Recorded
+   because it is exactly the shape that attracts optimisation on inspection."}
+
+ ;; ── the seed's own task, and why it was refused ─────────────────────────────
+ :the-phase-bench-was-run-and-its-output-was-not-used
+ {:receipt "90-docs/kotobase-performance/2026-08-18-the-harness-no-longer-reproduces-its-own-baseline.edn"
+  :ran "twice at release -- once from the h8 source, once from the reverted
+        source -- over the same cached blocks and head"
+  :h8-attribution
+  {:question "did h8 cause the 148 gets / 5x bytes / 39,242 cpu-ms?"
+   :answer :no
+   :evidence "control (reverted) = 148 gets / 84 distinct / 56,987,151 bytes /
+              38,062 cpu-ms. Identical."
+   :my-hypothesis-was-wrong
+   "I had said h8's extra promise hop per block probably broke the async
+    batching and dropped the read onto the O(N^2) trampoline. It did not.
+    Stated before it was checked, and checked because it was stated."}
+  :why-the-numbers-were-not-used
+  "The harness no longer reproduces its own documented baseline: 2,201 ->
+   38,062 cpu-ms for the same work. Phase B reproduces (1,252 against 1,386-
+   1,473, which is what the outer-string change should do); phase A does not
+   (491-538 -> 37,062, ~70x). A load or GC artifact would move BOTH. And
+   production is unchanged at 2,058 cpu-ms, so this is the harness, not the
+   service. Putting a number from it into the loop would be worse than keeping
+   one already labelled stale."
+  :so-h1-h6-h7-keep-their-upper-bounds true}
+
+ ;; ── rank ────────────────────────────────────────────────────────────────────
+ :ranking
+ [{:elo 1313 :id "h7-parse-only-addressable-values" :after 31.04 :saves 28.56 :risk :low :note "upper bound"}
+  {:elo 1297 :id "h1-seed-materialisation"          :after 35.22 :saves 24.39 :risk :low :note "upper bound"}
+  {:elo 1268 :id "h6-retract-inline-documents"      :after 38.10 :saves 21.50 :risk :high}
+  {:elo 1246 :id "h2-fold"                          :after 47.00 :saves 12.61 :risk :low}
+  {:elo 1218 :id "h4-carv2-pack"                    :after 55.28 :saves  4.32 :risk :high}
+  {:elo 1196 :id "h10-query-memo"                   :after 59.60 :saves  0.00 :risk :low}
+  {:elo 1157 :id "h5-engine-pin"                    :after 59.60 :saves  0.00 :risk :low}
+  {:elo 1132 :id "h3-engine-materialisation"        :after 59.60 :saves  0.00 :risk :high}
+  {:elo 1105 :id "h8-l2-cache-api"                  :after 59.60 :saves  0.00 :risk :high}
+  {:elo 1069 :id "h9-query-engine"                  :after 59.60 :saves  0.00 :risk :high}]
+
+ :five-of-ten-now-score-zero
+ "h3, h5, h8, h9, h10. Three were measured to be zero, one was refuted in
+  production, one is a control that was always zero. That is not a failing
+  roadmap -- it is what a loop looks like when its inputs get measured. The
+  ones still above zero are the three nobody has measured directly yet, and
+  their numbers are labelled as upper bounds for exactly that reason."
+
+ :what-is-left
+ {:h7 "the largest number, and its ceiling is now bounded from a different
+       direction: within one run, decoding the seed WITHOUT parsing values cost
+       3.1 cpu-ms against 888 ms with, and the s3 collection alone is 399.7 ms
+       of a 1,252 ms phase B. The ratio is real even though the level is
+       disputed."
+  :h1 "the same idea at the granularity that killed h8 -- one object, one read,
+       one write -- and the only item that removes phase A, which is the phase
+       the harness says dominates and production says is 2,058 ms in total."
+  :h6 "still an owner judgement: irreversible deletion of production data."}
+
+ :seed-for-iteration-07
+ "Fix the harness before trusting another level from it. The thread is that
+  `block_gets` reports 148 seam entries for 84 distinct blocks while the bench's
+  own bucket counter reports 85 gets and 0 misses for the same run, and
+  production reports 84 with 0 duplicates. Two counters that disagree about the
+  same read are the reason the level cannot be quoted. Until then, use the
+  bench only for within-run ratios -- which is what every number in this
+  iteration is."}

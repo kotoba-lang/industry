@@ -87,6 +87,15 @@
     復旧するには owner が現行値を供給して Keychain と kagi を更新するか、
     `wrangler secret put WRITE_TOKEN` で rotate する —— ただし rotate は
     既存 consumer（`git annex copy` 経路など）を同時に壊すので、単独で行わない。
+  - **kotobase-protocols-worker `S3_ISSUER_ROOT`**（tenant 向け s3 credential の導出根、
+    ADR-2608182100、2026-08-18 生成）: Worker secret 投入済み（`wrangler secret list` で確認）、
+    operator copy は macOS Keychain `service=cf:kotobase-protocols-worker` /
+    `account=S3_ISSUER_ROOT`（64 hex）。**kagi には未登録** —— `kagi get` が
+    OS-Keychain unlock prompt に非対話で応答できず timeout した（rc=124）。
+    これは「無い」ではなく**未測定**であり、owner が対話で実行すれば登録できる。
+    **この 1 値から全 tenant の secret が導出できる。** rotate すると発行済みの鍵が
+    すべて同時に無効になるので、失効は原則 expiry で行い、rotation は緊急時に限る。
+    発行: `S3_ISSUER_ROOT=... nbb protocols-worker/scripts/issue-s3-credential.cljs <did> [days]`
   - **kotobase-protocols-worker `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`**
     （s3.kotobase.net の AWS SigV4 write 認可、ADR-2607176000）: Worker secret
     投入済み（`wrangler secret list` で 2026-08-17 に両方の存在を確認）。

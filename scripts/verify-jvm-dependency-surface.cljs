@@ -332,9 +332,11 @@
 ;; chicory outside the frozen four is a breach; `.clj` sources and runtime maven
 ;; deps are the debt; test/lint tooling is allowed and reported for planning.
 (def frozen-chicory
+  ;; Four, as the comment above says. `orgs/kotoba-lang/compiler` used to sit
+  ;; here as a fifth entry, but it is the SAME GitHub repo as `amu` (renamed),
+  ;; so it was one repo counted twice. Its west entry was retired 2026-08-18.
   #{"orgs/kotoba-lang/kototama" "orgs/kotoba-lang/aiueos"
-    "orgs/kotoba-lang/kotoba" "orgs/kotoba-lang/amu"
-    "orgs/kotoba-lang/compiler"})
+    "orgs/kotoba-lang/kotoba" "orgs/kotoba-lang/amu"})
 
 ;; Which classes get a per-repo FINDING line, and which are counted only.
 ;;
