@@ -1743,7 +1743,38 @@
   ;; `{:phase :verify :actual nil}` で必ず落ちた —— 28 run 連続で赤だった原因は
   ;; 「依存が無い」ではなく「依存が checkout の形をしていない」。ADR-2608132000 で
   ;; tick.cljs 側を bundle 送付（本物の checkout）に変え、その上でこの 1 行が効く。
-  {:name "amu" :id "amu-native-conformance" :gate :nbb-script
+  ;; :cap :jvm — measured 2026-08-18, from 111 receipts in the ledger.
+  ;;
+  ;; This gate declared no cap, so placement put it anywhere, and on a third of
+  ;; the fleet it could not pass at all:
+  ;;
+  ;;   naphtali  0 pass / 17 fail      joseph    21 / 9
+  ;;   dan       0 / 12                benjamin  10 / 11
+  ;;   issachar  0 / 9                 levi       8 / 2
+  ;;
+  ;; 38 consecutive failures on the three nodes, and every node that ever passed
+  ;; has :jvm. It is not flakiness: 13 of the 39 commits judged on more than one
+  ;; node got CONTRADICTORY verdicts for the same tree (c38f79d joseph pass /
+  ;; naphtali fail; 6d222fc joseph pass / issachar fail). A gate that answers
+  ;; differently for one input is measuring the node, not the repo.
+  ;;
+  ;; Cause, measured over ssh rather than inferred: all six nodes have clang,
+  ;; java and Xcode CLT. The ONLY difference is `clojure` — MISSING on naphtali,
+  ;; dan and issachar. probe.cljs computes jvm? as (javahome AND clojure), so
+  ;; :jvm is exactly "has the clojure CLI", which is why the split is clean.
+  ;; bin/kotoba falls back to `clojure -Spath` when it cannot resolve deps from
+  ;; the lock — the fallback this gate's own header describes — and that fallback
+  ;; is what is absent there.
+  ;;
+  ;; The gate still proves the ARTIFACT is JDK-free: jdk-free-native-conformance
+  ;; stubs java/javac/clojure/clj out of PATH and points JAVA_HOME at nothing
+  ;; before executing. Needing clojure to BUILD is not a claim about what runs.
+  ;;
+  ;; ⚠ The red was NOT visible as a cause: the receipt carries only the die!
+  ;; line ("Windows profile conformance exited 1"), and the last 20 lines the
+  ;; gate prints are dropped. Worth fixing separately — an error body that is
+  ;; discarded is the same defect class as a check that cannot answer.
+  {:name "amu" :id "amu-native-conformance" :gate :nbb-script :cap :jvm
    :script "gates/amu-native-conformance-check.cljs" :ship-git-deps true :cd false}
 
   ;; native parser の sanitizer/fuzz gate。JVM suite は libFuzzer corpus を走らせない
