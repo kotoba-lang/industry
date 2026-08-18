@@ -1180,9 +1180,62 @@ projection、index、local read accelerator、運用メトリクス。
   4 MiB 天井は、この迂回の代償として実測済み。**CID 検証は store の仕事**
   （`kotobase.storage.verify/verifying-block-store`）であって各 surface の仕事ではない。
   メタデータ（bucket 一覧・ref→sha・pin request・audit）は datom 面でよい —— 分けるのは bytes。
-- **Datomic 互換（`kotobase.core` の Datalog API / `kotobase.datomic` の EDN grammar）は残すが、
+- **kotobase 方言（`kotobase.core` の Datalog API / `kotobase.datomic` の EDN grammar）は残すが、
   位置づけは surface の1つ。** 「kotoba : kotobase = Clojure : Datomic」（ADR-2607032500）は repo 名と
   用語の由来であって、**設計の前提に昇格させない** —— 全 surface を Datalog 経由にする設計はここから来た。
+  この方言を `Datomic` と呼ばない理由は次節。
+
+## Datalog / kotobase 方言 / Datomic は 3 つの別の名前（repo-wide mandatory、2026-08-18、ADR-2608189300）
+
+**私たちが日常「Datalog」と呼んで書いているものは Datalog 標準ではない。** 学術 Datalog の
+標準記法は `path(X,Y) :- edge(X,Y).` の Prolog 風であって、`:find` / `:where` の EDN 形ではない。
+EDN 形は Datomic が作った方言であり、私たちが書いているのはその系譜の**別の方言**である。
+
+| 語 | 何を指すか | 所有 | 実体 |
+|---|---|---|---|
+| **Datalog** | クエリ言語の**形式**。range-restricted なら停止する | 誰のものでもない | `kotoba-lang/datalog`（storage-free エンジン） |
+| **kotobase 方言** | 実際に書く **EDN 記法** `[:find ?e :in $ :where [?e :attr ?v]]` + `:rules` | **ここ** | `datalog.core` が実装、`kotobase.core/q` が露出 |
+| **Datomic** | Cognitect → Nubank の**製品**。方言の系譜上の祖先 | 他社 | この workspace には無い |
+
+- **`Datomic` と名乗ってよいのは `kotoba-lang/datomic-client-shim` だけ**で、そこでも
+  **shape 互換であって wire 互換ではない**と同時に書く（現 README がそうなっている。
+  stock の `com.datomic/client-cloud` は接続できない）。文書・ADR・README で
+  「Datomic 方言」「Datomic 互換」と書かない —— **`kotobase 方言`** と書く。
+- **名乗らない理由のうち決定的なのは拡張の自由。** この方言は既に Datomic に無いものを
+  2 つ持つ: `ref?` の既定が **`ipld.core/link?`**（参照とは IPLD Link のこと）と、
+  **`visible?` が required argument**（missing / non-callable なら読む前に refuse）。
+  **Datomic を名乗った瞬間この 2 つは「非互換」になる。自分の名前なら「方言の仕様」になる。**
+- ADR-2608039970（共有しているのは datom 面であって Datalog ではない）と同型の、
+  名前の側の決定。**一括改名はしない** —— 縛るのはこれから書くもの。
+
+### agent の query 入口は kotobase 方言。routine は GraphQL。Cypher / SPARQL / Gremlin は interop
+
+LLM / agent に query を書かせる面の既定は **kotobase 方言（EDN データ形）**。定型・高頻度の
+読みは **GraphQL**（`org-graphql-http` は query-only、resolver 全経路に `visible?`）。
+Cypher / SPARQL / Gremlin は外部データ受け入れ・外部ツール接続に留め、**agent の第一言語に
+しない**。
+
+- **security が決定打**: ①query が EDN 値なので**文字列連結の段が無く injection クラスが
+  構造的に消える** ②redaction seam（`kotobase-query/bridge.cljc` の required な `visible?`）が
+  `q` 側にあり、`materialize` + `datoms` を使う surface は**redaction を各自で再実装する**
+  ことになる ③SPARQL の property path（`*` `+`）と Cypher の可変長パスは LLM が無自覚に書ける
+  unbounded traversal、`SERVICE` は素の SSRF 経路。kotobase 方言は
+  `datalog.query/cardinality` で materialize せず件数を数え、事前予算がかけられる。
+- **IPLD 相性**: `ocp`（≡ VAET）が CID リンクの逆引きそのもの。`materialize-memo` の key が
+  chain CID（content address なので invalidation 経路が存在しない）。
+- **素の LLM 精度は Cypher > SPARQL > Datalog 系**（学習データ量の差。動かない）。それでも
+  採らないのは**穴の埋め方が非対称**だから —— 方言側は schema 注入 + few-shot + validator +
+  repair loop で埋まる（EDN なので実行前に構造検証でき、外れたら**構造化エラーで返せる**。
+  文字列 surface は『構文は通るが意味が違う query』を検出できない）が、Cypher の
+  injection / unbounded path / redaction 再実装を後から塞ぐのは高い。
+- **prompt では形を示す。** 「Datalog」とだけ言うと LLM は Prolog 風記法を出す。
+  prompt に `kotobase dialect (Datomic-shaped EDN Datalog):` と**例を 1 行**書く。
+  系譜に触れるのは精度のための実務であって、名乗りではない。
+- **⚠ これは deploy の決定ではない。** ADR-2608039975 のとおり 6 surface はどれも live で
+  なく、live なのは `kotobase-server` の手書き SPARQL subset（Datalog に翻訳する形＝
+  ADR-2608039970 が「やめる」と決めた形）。**2 実装問題を再燃させない。**
+  **LLM 精度の実測もまだ無い** —— 次の一手は 20〜30 問の query セットで
+  kotobase 方言 / GraphQL / Cypher の pass 率を測ること。
 
 ## kotobase の物理層は block → CARv2 pack → object。1 CID = 1 object を既定にしない（repo-wide mandatory、2026-08-16、ADR-2608160100）
 
