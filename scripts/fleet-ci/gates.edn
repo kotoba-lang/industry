@@ -238,6 +238,26 @@
    :ship-git-deps true :cd true}
   {:name "kotobase-storage" :gate :jvm-test :cd true}
   {:name "kotobase-storage-pack" :gate :jvm-test :cd true}
+  ;; OASIS XMILE 1.0. The suite this runs is 75 tests / 1765 assertions, of
+  ;; which 13 / 1527 are the parity gate between `xmile.expr` -- where XMILE's
+  ;; numeric semantics actually live -- and its Kotoba decision core
+  ;; (root ADR-2608189400). That gate compiles `kotoba/xmile_expr_core.kotoba`
+  ;; through amu and runs it on the KIR interpreter, so this entry is also the
+  ;; only continuous check that the port still reproduces the evaluator.
+  ;;
+  ;; Measured here 2026-08-18 before landing: `clojure -M:test` 0 failures /
+  ;; 0 errors, `clojure -M:lint` 0 errors / 0 warnings, and the gate shown red
+  ;; twice on deliberate breaks with the failure naming what was broken.
+  ;;
+  ;; NOT yet observed green on a node -- that is what this entry is for, and
+  ;; the honest reading of a first red is "the node could not run it", not
+  ;; "the port regressed". amu is a git dep, so `ship-git-deps!` carries its
+  ;; transitive closure automatically (`:jvm-test` ships without being asked);
+  ;; what it does NOT carry is amu's maven deps, so a first failure that names
+  ;; `Error building classpath` or a maven coordinate is node egress, not this
+  ;; repository. Compilation plus the suite took ~90s warm here; the 30-minute
+  ;; gate timeout should hold even cold.
+  {:name "org-oasis-open-xmile" :gate :jvm-test :cd true}
   ;; kototama cannot take a :jvm-test gate: its :test alias resolves sibling
   ;; :local/root deps that a node never receives, so that gate would fail
   ;; about the classpath forever. The repo declares :test-hermetic for the
