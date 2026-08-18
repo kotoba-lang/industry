@@ -169,6 +169,24 @@
   [text]
   (boolean (and text (re-find #"host-imports:|kqe-assert!|kqe-query" text))))
 
+(defn build-entrypoint?
+  "A `.clj` that only exists to be run, not to be required.
+
+  Measured 2026-08-18: of the 768 repos shipping production `.clj`, 514 have
+  NOTHING but files like this -- 472 of them a single `render_html.clj` whose
+  `deps.edn` invokes it as `:render-html {:main-opts [\"-m\" ...]}` to
+  regenerate a docs page at build time. Only 5 places in the whole workspace
+  require a `*.render-html` namespace at all, and of those 514 repos exactly 3
+  have their entrypoint required by other code.
+
+  ADR-2607198300 is explicit that a JVM at BUILD time is not the gap -- the gap
+  is a JVM in the shipped artifact's runtime. Counting these as `:jvm-source`
+  put 514 repos into a bucket labelled `the JVM is the runtime` when the JVM is
+  the tool. That is a 67% overcount of the thing anyone would act on, which is
+  why this is its own kind rather than a comment."
+  [text]
+  (boolean (and text (re-find #"(?m)^\(defn -main" text))))
+
 (defn jvm-loadable?
   "Could the JVM load this file by its namespace? The path the reader needs is
    the namespace with `.`->`/` and `-`->`_`; if the file does not sit there, no
@@ -284,8 +302,15 @@
             clj-rest (remove (set clj-mesh) clj-nontest)
             clj-script (filter #(nil? (ns-of (clj-text %))) clj-rest)
             clj-named (remove (set clj-script) clj-rest)
-            clj-src (filter #(jvm-loadable? % (clj-text %)) clj-named)
-            clj-unloadable (remove (set clj-src) clj-named)
+            clj-loadable (filter #(jvm-loadable? % (clj-text %)) clj-named)
+            clj-unloadable (remove (set clj-loadable) clj-named)
+            ;; split loadable source into "runs at build time" and "is library
+            ;; code someone requires". A repo counts as build-only when EVERY
+            ;; one of its production .clj carries a -main; one library file is
+            ;; enough to make the repo library code.
+            clj-entry (filter #(build-entrypoint? (clj-text %)) clj-loadable)
+            build-only? (and (seq clj-loadable) (= (count clj-entry) (count clj-loadable)))
+            clj-src (if build-only? [] clj-loadable)
             clj-test (filter test-path? cljs-all)
             deps-files (filter #(= "deps.edn" (.basename node-path %)) rels)
             bb? (some #(= "bb.edn" (.basename node-path %)) rels)
@@ -297,6 +322,7 @@
         (swap! stats update :deps-unparsed + (count (filter :unparsed deps)))
         {:repo rel
          :clj-src (count clj-src)
+         :clj-build-entry (if build-only? (count clj-entry) 0)
          :clj-src-sample (vec (take 3 clj-src))
          :clj-mesh (count clj-mesh)
          :clj-script (count clj-script)
@@ -362,7 +388,7 @@
 
 (defn findings-for [{:keys [repo clj-src clj-test runtime runtime-third-party
                             chicory lint test-tool build bb kotoba
-                            clj-mesh clj-script clj-unloadable]}]
+                            clj-mesh clj-script clj-unloadable clj-build-entry]}]
   (cond-> []
     (seq chicory)
     (conj {:sev (if (frozen-chicory repo) "info" "fail") :kind :jvm-chicory :repo repo
@@ -387,6 +413,11 @@
     bb
     (conj {:sev "warn" :kind :babashka :repo repo
            :detail "bb.edn present; ADR-2607173000 retired bb as a script host"})
+    (pos? (or clj-build-entry 0))
+    (conj {:sev "info" :kind :clj-build-entrypoint :repo repo
+           :detail (str clj-build-entry " .clj file(s), every one a -main run at"
+                        " build time -- ADR-2607198300 does not count a build-time"
+                        " JVM as a runtime dependency")})
     (pos? (or clj-mesh 0))
     (conj {:sev "info" :kind :clj-mesh-guest :repo repo
            :detail (str clj-mesh " .clj file(s) calling host capabilities"
@@ -424,7 +455,8 @@
          [:jvm-build        "shadow-cljs / cljs compiler / tools.build"]
          [:babashka         "bb.edn (retired script host)"]
          [:jvm-runtime-clojure-only "org.clojure/clojure only -- a declaration"]
-         [:clj-mesh-guest   "`.clj` that is a KOTOBA Mesh guest, not JVM at all"]
+         [:clj-build-entrypoint  "`.clj` that only runs (-main), never required -- build-time"]
+      [:clj-mesh-guest   "`.clj` that is a KOTOBA Mesh guest, not JVM at all"]
          [:clj-script       "`.clj` with no ns -- a JVM entry point, not library code"]
          [:clj-unloadable   "`.clj` whose ns does not match its path; nothing loads it"]
          [:jvm-test-oracle  ".clj tests (allowed as oracle)"]
