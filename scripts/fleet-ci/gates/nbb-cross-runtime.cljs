@@ -92,28 +92,51 @@
 (defn- resolve-classpath
   "Transitive closure of git deps → their `src` directories, plus this repo's
   own `src` and `test`. Order is deterministic (breadth-first from deps.edn)
-  so a failure is reproducible."
+  so a failure is reproducible.
+
+  `:conflicts` names any library reached at TWO different shas. tools.deps
+  resolves such a diamond to one version; this walk cannot, and putting both
+  on the classpath builds something the code never runs on -- first-wins per
+  namespace, mixing one library's API with another library's expectations.
+
+  Measured 2026-08-18 on `arrangement`: it pins `io-ipld` at e08dc3b2 while a
+  transitive dep pins 45917645, and both landed on the classpath. The suite
+  died at `Cannot read properties of undefined (reading 'lastIndexOf')` deep
+  inside a CID decode -- a failure with nothing whatsoever to do with the
+  repo's own code, on a machine where the JVM run is green. Its deps.edn even
+  carries the comment \"the same SHA, so this adds no new transitive
+  dependency\", which stopped being true without anything noticing."
   []
   (loop [queue (git-deps-of (slurp* (path/join root "deps.edn")))
          seen #{}
+         by-lib {}
+         conflicts []
          dirs []
          missing []
          sibling-used []]
     (if (empty? queue)
-      {:paths (into ["src" "test"] dirs) :missing missing :sibling sibling-used}
+      {:paths (into ["src" "test"] dirs) :missing missing :sibling sibling-used
+       :conflicts conflicts}
       (let [{:keys [lib sha] :as d} (first queue)
-            k [lib sha]]
+            k [lib sha]
+            prior (get by-lib lib)
+            conflicts (cond-> conflicts
+                        (and prior (not= prior sha))
+                        (conj (str lib " @ " (subs prior 0 8) " and " (subs sha 0 8))))]
         (if (contains? seen k)
-          (recur (rest queue) seen dirs missing sibling-used)
+          (recur (rest queue) seen by-lib conflicts dirs missing sibling-used)
           (if-let [{:keys [dir source]} (dep-dir d)]
             (let [src (path/join dir "src")
                   nested (git-deps-of (slurp* (path/join dir "deps.edn")))]
               (recur (concat (rest queue) nested)
                      (conj seen k)
+                     (assoc by-lib lib (or prior sha))
+                     conflicts
                      (cond-> dirs (exists? src) (conj src))
                      missing
                      (cond-> sibling-used (= :sibling source) (conj lib))))
-            (recur (rest queue) (conj seen k) dirs (conj missing lib) sibling-used)))))))
+            (recur (rest queue) (conj seen k) (assoc by-lib lib (or prior sha))
+                   conflicts dirs (conj missing lib) sibling-used)))))))
 
 (defn- fail! [msg]
   (println (str "FAIL: " msg))
@@ -123,17 +146,45 @@
   (if-not (exists? entry-path)
     (fail! (str "no nbb entry at " entry
                 " — this gate is only for repos that have one"))
-    (let [{:keys [paths missing sibling]} (resolve-classpath)
+    (let [{:keys [paths missing sibling conflicts]} (resolve-classpath)
           cp-str (str/join ":" paths)]
       (println "entry:     " entry "  nbb:" nbb-version)
       (println "classpath: " cp-str)
       (when (seq sibling)
         (println "NOTE: resolved from sibling checkouts, NOT sha-pinned:"
                  (str/join ", " sibling)))
-      (if (seq missing)
+      ;; A classpath carrying two shas of one library is not one tools.deps
+      ;; would ever build: it resolves a diamond to a single version, this walk
+      ;; cannot, and first-wins-per-namespace silently mixes them.
+      ;;
+      ;; **Printed, not fatal, and that is a judgement rather than an
+      ;; oversight.** Measured 2026-08-18 across the repos gated by this
+      ;; script: nine carry a diamond and EIGHT of them run green anyway --
+      ;; first-wins happens to pick compatible versions. Failing on the
+      ;; condition would turn eight working gates red for something that did
+      ;; not affect them, and the fix is re-pinning across the workspace, not
+      ;; anything those repos can do.
+      ;;
+      ;; The ninth is why this line exists at all. `arrangement` reaches
+      ;; io-ipld at e08dc3b2 and 45917645, and its suite dies at `Cannot read
+      ;; properties of undefined (reading 'lastIndexOf')` inside a CID decode
+      ;; -- a failure with nothing to do with its own code, on a machine whose
+      ;; JVM run is green. One line here turns half an hour of confusion into
+      ;; a diagnosis.
+      ;;
+      ;; So a green run on a repo listed here means "green on a classpath the
+      ;; JVM would not have built", and that is worth knowing when reading it.
+      (when (seq conflicts)
+        (println "CONFLICT: two versions of one library on this classpath:"
+                 (str/join "; " conflicts)
+                 "— tools.deps would resolve this to one. Align the pins."))
+      (cond
+        (seq missing)
         (fail! (str "unresolved git deps (not in ~/.gitlibs and no sibling "
                     "checkout): " (str/join ", " missing)
                     " — ship-git-deps! should have placed these"))
+
+        :else
         ;; npm deps first: io-multiformats needs @noble/hashes to hash a CID,
         ;; and without it every require of `ipld.core` dies at load time.
         (let [pkg (path/join root "package.json")

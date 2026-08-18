@@ -361,6 +361,37 @@
   {:name "org-w3-sparql-protocol" :gate :jvm-test :cd false}
   {:name "pay" :gate :jvm-test :cd false}
   {:name "prolly-tree" :gate :jvm-test :cd false}
+  ;; prolly-tree's second gate. Its cljs half is LARGER than its JVM half --
+  ;; 66 tests / 2525 assertions against 58 / 2510 -- because eight tests (the
+  ;; async tree reads) exist only under `#?(:cljs …)`. So this is coverage the
+  ;; JVM gate cannot give, including the one that rejects bytes stored under
+  ;; the wrong CID.
+  ;;
+  ;; That test was the single red one under nbb, and it was the runtime rather
+  ;; than the code: SCI rethrows anything raised inside a promise callback as
+  ;; `{:type :sci/error …}` and hangs the original off `ex-cause`, so an
+  ;; assertion reading only the top level saw `:sci/error`. `:sci/error`
+  ;; cannot occur in compiled ClojureScript. Fixed upstream (4d04cf5) by
+  ;; checking both levels, which tests the same property everywhere.
+  ;;
+  ;; Verified on judah: `OK: 66 tests` exit 0; changing the thrown `:type` in
+  ;; `core.cljc` gives exactly one failure, exit 1 -- so the assertion still
+  ;; discriminates rather than having been widened into vacuity.
+  {:name "prolly-tree" :id "nbb-cross-runtime-prolly" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+  ;;
+  ;; **`arrangement` is deliberately NOT given one**, though it has an entry
+  ;; and passes locally (33 / 2621). On a node it dies at `Cannot read
+  ;; properties of undefined (reading 'lastIndexOf')` inside a CID decode,
+  ;; because it reaches io-ipld at two shas (e08dc3b2 via its own deps.edn,
+  ;; 45917645 transitively) and both land on the classpath. tools.deps
+  ;; resolves that diamond to one version; the gate's walk cannot.
+  ;;
+  ;; Its deps.edn carries the comment "the same SHA, so this adds no new
+  ;; transitive dependency" — which stopped being true without anything
+  ;; noticing. Aligning the pins is the fix, and it is a dependency change
+  ;; rather than a gate registration.
   {:name "sparql" :gate :jvm-test :cd false}
 
   ;; ── the four the previous sweep never counted ─────────────────────────────
