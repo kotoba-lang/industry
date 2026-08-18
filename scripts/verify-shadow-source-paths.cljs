@@ -359,12 +359,25 @@
               :unresolved
               (doseq [n (:unresolved r)
                       :when (get (:in-workspace r) n)]
-                (println (str "FINDING\tfail\t" (:repo r) "::" n
-                              "\t" n " is reachable from this build and no :source-path"
-                              " provides it; it lives at "
-                              (get (:in-workspace r) n)
-                              " — the build stops at `The required namespace is not"
-                              " available`, so nothing in this repo runs")))
+                ;; A namespace no file in this repo requires was reached by
+                ;; walking THROUGH a candidate provider. It becomes required only
+                ;; if the suggestion is taken, so it is a `warn` that says so --
+                ;; not a `fail` claiming this build stops on it today. Measured
+                ;; 2026-08-19: three of the five findings for
+                ;; com-etzhayyim-app-explorer were of this kind, and they
+                ;; appeared only because kotoba-lang/dom-gpu exists elsewhere in
+                ;; the tree.
+                (let [direct? (some? (get (:blamed r) n))]
+                  (println (str "FINDING\t" (if direct? "fail" "warn") "\t" (:repo r) "::" n
+                                "\t" n " is reachable from this build and no :source-path"
+                                " provides it; it lives at "
+                                (get (:in-workspace r) n)
+                                (if direct?
+                                  (str " — the build stops at `The required namespace is not"
+                                       " available`, so nothing in this repo runs")
+                                  (str " — but nothing in this repo requires it: it was reached"
+                                       " through that candidate, and becomes required only if"
+                                       " the path is added"))))))
               :missing-dirs
               (doseq [d (:missing-dirs r)]
                 (println (str "FINDING\tfail\t" (:repo r) "::dir::" d
@@ -401,8 +414,20 @@
                                           " no source-path provides:"))
                             (doseq [n (:unresolved r)]
                               (println (str "               " n
-                                            (when-let [b (get (:blamed r) n)]
-                                              (str "   <- " b)))))
+                                            (if-let [b (get (:blamed r) n)]
+                                              (str "   <- " b)
+                                              ;; No file in THIS repo requires it. It was
+                                              ;; reached by walking through a candidate
+                                              ;; provider (see the deliberate walk-through
+                                              ;; above), so it becomes required only if you
+                                              ;; take the suggestion below. Saying so is the
+                                              ;; difference between a cascade the reader can
+                                              ;; act on and a list that grows when unrelated
+                                              ;; repos appear in the tree.
+                                              (when (get (:in-workspace r) n)
+                                                (str "   <- (nothing here requires it; reached"
+                                                     " through a candidate provider — required"
+                                                     " only if you add the path below)"))))))
                             (when-let [adds (seq (distinct (vals (:in-workspace r))))]
                               (println "               fix: add to :source-paths —")
                               (doseq [a adds]
