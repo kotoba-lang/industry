@@ -37,9 +37,12 @@ query 入口を kotobase 方言（Datomic-shaped EDN Datalog）に決めたが�
   `company/isic`）/ `market-intel/lei` / `repo-taxonomy/jurisdiction`（dataset 名を
   接頭辞にした属性を発明）。**何も実行せずに捕まる**のが EDN 面の実利で、それが
   数字として出た。schema 条件では repair loop がこの 5 件をすべて直した。
-- **validator が捕まえられないのは意味の誤り。** schema 条件の残り 2 件は
-  `Missing rules var '%' in :in` と `Cannot compare company/sic to <` ——
-  構造検証は属性の捏造を止めるが**意味の誤用は止めない**。これが残余ギャップ。
+- **残り 2 件は意味の誤りに見えて、実は構文だった**（2026-08-18 に生成クエリを
+  読んで判明）。`[>= ?revenue 100000000000]` は演算子が entity 位置に来たもので
+  DataScript が `Missing rules var '%' in :in` と報告し、`[?ni < 0]` は中置で
+  `Cannot compare company/sic to <` と報告する。**どちらも「述語をデータパターンとして
+  書いた」1 つのクラス**で、型システムでは捕まらない。`agent/validate` が
+  `:predicate-not-wrapped` として実行前に弾く（fixture は上流）。
 
 **分母**: 40 call のうち **11 件が Cloudflare の HTTP 524** で落ちた。モデルの失敗では
 ないので分母から外す。転送障害を失敗として数えると 25.0% / 80.0%。
@@ -47,15 +50,21 @@ query 入口を kotobase 方言（Datomic-shaped EDN Datalog）に決めたが�
 
 ## 使い方
 
+⚠ **prompt も validator も extractor もこの repo には無い。** 全部
+`kotoba-lang/kotobase-query` の **`kotobase.query.agent`**（pure、依存ゼロ）に在り、
+**production の入口と測定が同じコードを通る**。classpath にその src が要る:
+
 ```bash
+CP=".:scripts/nbb_compat:orgs/kotoba-lang/kotobase-query/src"
+
 # reference の健全性だけ（LLM を呼ばない）
-nbb --classpath ".:scripts/nbb_compat" scripts/query-dialect-bench/bench.cljs \
+nbb --classpath "$CP" scripts/query-dialect-bench/bench.cljs \
   --questions scripts/query-dialect-bench/questions.edn \
   --plane-script scripts/query-dialect-bench/plane.cljs \
   --out /tmp/off.edn --offline
 
 # 本番（LLM を呼ぶ）
-nbb --classpath ".:scripts/nbb_compat" scripts/query-dialect-bench/bench.cljs \
+nbb --classpath "$CP" scripts/query-dialect-bench/bench.cljs \
   --questions scripts/query-dialect-bench/questions.edn \
   --plane-script scripts/query-dialect-bench/plane.cljs \
   --out scripts/query-dialect-bench/result.edn
@@ -67,12 +76,23 @@ nbb --classpath ".:scripts/nbb_compat" scripts/query-dialect-bench/bench.cljs \
 | `--limit N` | 全問 | 先頭 N 問だけ |
 | `--max-repair` | 2 | repair の回数 |
 | `--offline` | — | LLM を呼ばず reference の検証だけ |
-| `--self-test` | — | validator と抽出器の**両方向**を 14 fixture で検査（下記） |
+| `--self-test` | — | **配線**の検査（validator 本体の fixture は上流。下記） |
 
 ```bash
-# 検査そのものを検査する。measurement を回す前に必ず通す
-nbb --classpath ".:scripts/nbb_compat" scripts/query-dialect-bench/bench.cljs --self-test
+# 配線（classpath が通り、schema 変換が agent の形になっているか）
+nbb --classpath "$CP" scripts/query-dialect-bench/bench.cljs --self-test
+
+# validator 本体の両方向 fixture —— こちらが正本。依存ゼロで回る
+cd orgs/kotoba-lang/kotobase-query && nbb --classpath src:test run-tests-pure.cljs
 ```
+
+**この repo に gate は置かない。** 検査は `kotobase-query` 側の
+`{:name "kotobase-query" :gate :nbb-test :entry "run-tests-pure.cljs"}`
+（`scripts/fleet-ci/gates.edn`）に置いた。理由は**入力の在処**で、fleet が配るのは
+その repo の tree だけ —— このベンチの `--offline` は west の子リポにある
+market-intel の実ファイルを読むので、**root の tree をどう直しても fleet 上では
+緑にならない**（CLAUDE.md「gate が要求する入力が repo に無いことがある」の同型）。
+validator は `kotobase-query` の中で完結するので、そこでなら回る。
 
 モデルは **`murakumo-main` alias を実行時に解決**する（CLAUDE.md: concrete な model id を
 焼かない）。`BENCH_LLM_ENDPOINT` / `BENCH_LLM_MODEL` で上書きできる。
@@ -140,6 +160,9 @@ repo-taxonomy  manifest/repo-taxonomy.edn                    repo 3 面分類   
 
 **教訓は「validator を書いたら validator を検査する」**であって、注意深く書けという
 ことではない。1 つ目は注意深く書いても起きるし、2 つ目は 1 つ目の修正が生んだ。
+
+（この 2 つの fixture は現在 `kotobase-query` の `agent_test.cljc` に在る。
+**検査は、検査する対象と同じ repo に置く。**）
 
 ### 高い段の結果を、安い段の失敗で捨てない
 
