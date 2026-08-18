@@ -96,6 +96,41 @@
 
 ;; ── the measured baseline ────────────────────────────────────────────────────
 
+(def pinned-decomposition
+  "The first phase split from a build that can name its inputs.
+
+  All 26 of the harness's cross-repo `:source-paths` at their west pin, release
+  target, artifact 9082753bff34f530, load 58-63. It matters that this run's
+  counters are IDENTICAL to production's: block-gets 84, distinct 84, bytes
+  11,462,579 -- the same three numbers /_diag/hydrate reports for this graph.
+  No previous bench run agreed with production on any of them.
+
+      whole hydrate     7,717.7 cpu-ms
+        phase A         7,079.1     hot-datoms: fetch, decode, tree, novelty
+        phase B         1,041.6     the fold: group-by and parse every value
+      decode-edn-seed     936.7     a materialised seed, values parsed
+      opaque floor         13.7     the same seed, values NOT parsed
+
+  A and B sum to more than the whole because phase A is re-run separately
+  against a cache the whole-hydrate already warmed. Shares are taken against
+  the whole, which is the number a request pays.
+
+  **This inverts the split every hypothesis here was written against.** The
+  docstring the roadmap inherited said A was 23% and B was 64%; at the pin A is
+  92% and B is 13%. That earlier split came from a build nobody identified, so
+  this is not a change over time -- it is the first measurement of the thing."
+  {:whole 7717.664 :phase-a 7079.147 :phase-b 1041.596
+   :seed-parsed 936.688 :opaque-floor 13.656
+   :artifact "9082753bff34f530" :target :release
+   :counters-match-production true})
+
+(defn share
+  "Fraction of a served hydrate a phase accounts for. Ratios only -- the LEVEL
+  is not transferable (this run is Node at 7,718 cpu-ms against production's
+  measured 2,058, and that gap is unexplained and deliberately not modelled)."
+  [ms]
+  (/ ms (:whole pinned-decomposition)))
+
 (def cold-isolate-rate
   "How often a HYDRATING request finds L1 empty. Measured, and it is not 1.
 
@@ -186,11 +221,14 @@
              every s3 request for that bucket to its own graph, so on THIS graph
              only the four credential-gated query surfaces can reach them. Every
              request parses them anyway."
-    :after-harness {:cpu-ms 810 :class-b-ops :unchanged}
+    :after-harness {:class-b-ops :unchanged}
+    :removes-share (share 399.698)
     :basis :measured
-    :basis-note "byte accounting of the real seed, 2026-08-17. The cpu figure
-                 assumes B falls with the share of values parsed; that
-                 proportionality is NOT separately measured."
+    :basis-note "No longer an assumption about proportionality. The pinned run
+                 charges each collection separately: this one is 399.7 cpu-ms of
+                 a 1,041.6 ms phase B, and every other collection together is
+                 ~38 ms. So retracting it removes 399.7 ms -- 5.2% of a hydrate,
+                 not the 30% the old build implied."
     :effort :S
     :reversible? false
     :depends-on-write-rate? false
@@ -200,10 +238,16 @@
     :title "Decode the seed without parsing values nobody asked for"
     :change "Keep values as their stored EDN strings and parse only the
              collections the request's surface can address."
-    :after-harness {:cpu-ms 519 :class-b-ops :unchanged}
+    :after-harness {:class-b-ops :unchanged}
+    :removes-share (share (- (:phase-b pinned-decomposition)
+                             (:opaque-floor pinned-decomposition)))
     :basis :measured
-    :basis-note "Same CBOR decoded without parsing values: 2.5-6.8 ms against
-                 887-919 ms parsed. Removes B; A remains."
+    :basis-note "Removes phase B down to its floor: 1,041.6 -> 13.7 cpu-ms, the
+                 same seed decoded without parsing values. At the pin that is
+                 **13.3% of a hydrate**, not the 64% the old unidentified build
+                 reported -- which is why this fell from first to fifth the day
+                 the harness could name its inputs. Phase A remains and phase A
+                 is 92%."
     :effort :M
     :reversible? true
     :depends-on-write-rate? false}
@@ -212,13 +256,19 @@
     :title "Materialise the hydrated seed, keyed by chain CID"
     :change "Serve the seed as one content-addressed object instead of
              rebuilding it from 84 blocks."
-    :after-harness {:cpu-ms 1430 :class-b-ops (* 1 cold-isolate-rate)}
+    :after-harness {:class-b-ops (* 1 cold-isolate-rate)}
+    :removes-share (- 1.0 (share (:phase-b pinned-decomposition)))
     :basis :measured
-    :basis-note "Removes A (514 ms) and the 84 gets. B survives ANY encoding,
-                 because the consumer is a synchronous LocalStore over a plain
-                 Clojure map. The first run of this loop credited h1 with the
-                 whole hydrate and ranked it at 98.4%; the decomposition says
-                 23% of the CPU."
+    :basis-note "Removes phase A and the gets: one object read replaces the tree
+                 walk, the novelty walk and the 84 fetches. B survives ANY
+                 encoding, because the consumer is a synchronous LocalStore over
+                 a plain Clojure map -- so what is left is B.
+
+                 At the pin phase A is **92% of a hydrate**. iteration-01
+                 credited h1 with the whole hydrate and was told off for it;
+                 iteration-02 cut it to 23% on a decomposition from a build
+                 nobody identified. The first identified build says 92%. The
+                 original instinct was closer than the correction."
     :effort :L
     :reversible? true
     :depends-on-write-rate? true}
@@ -377,12 +427,21 @@
 
   A hypothesis that does not claim to move CPU is therefore priced at the CPU
   that was actually measured, with no proxy in the path at all."
-  [{:keys [after-harness] :as h}]
-  (let [cpu (:cpu-ms after-harness)
+  [{:keys [after-harness removes-share] :as h}]
+  (let [cpu (if removes-share
+              ;; A SHARE of the measured production CPU, not a harness level
+              ;; pushed through a proxy constant. The constant was calibrated
+              ;; from two measurements and broke twice when one of them moved
+              ;; (iterations 03 and 04); a share taken within one run has no
+              ;; second measurement to decay.
+              :from-share
+              (:cpu-ms after-harness))
         ops (:class-b-ops after-harness)]
-    (assoc h :after {:cpu-ms (if (= :unchanged cpu)
-                               (:cpu-ms baseline)
-                               (Math/round (* workerd-scale cpu)))
+    (assoc h :after {:cpu-ms (cond
+                               (= :from-share cpu)
+                               (Math/round (* (:cpu-ms baseline) (- 1.0 removes-share)))
+                               (= :unchanged cpu) (:cpu-ms baseline)
+                               :else (Math/round (* workerd-scale cpu)))
                      ;; Same rule on the other axis, and it was needed for the
                      ;; same reason twice in one session: the FIRST fix made
                      ;; CPU-neutral hypotheses resolve to the live baseline, and
@@ -476,79 +535,66 @@
 
 (defn evolve
   "Hypotheses are not independent, and the tournament ranks them as if they
-  were. This is where that is repaired.
+  were. This is where that is repaired -- and this iteration it mostly has
+  nothing left to repair, because the measurement did the work.
 
-  A served read has two priced resources. CPU is $41.16 of the $59.60. The
-  gets are $18.14, and that number moved TODAY: `cold-isolate-rate` measured
-  that 6 hydrating requests in 10 find L1 empty, not 10 in 10, so the class-B
-  term is 40% smaller than iteration-03 priced it.
+  A served hydrate is two phases and the roadmap spent five iterations ranking
+  them against a split that came from a build nobody had identified. At the pin:
 
-    h7 removes the CPU half (parse), leaves the gets.
-    h8 removes most of the gets L1 did not already remove, leaves the CPU.
-    h1 removes the gets AND half the CPU, and is the only one whose cost
-       depends on a write rate nothing has measured.
+      phase A  92% of a hydrate   fetch, decode, prolly-tree, novelty walk
+      phase B  13%                the fold: group-by, parse every value
 
-  h7 and h8 are orthogonal, so their savings add. h1 is NOT additive with h8 --
-  it subsumes it.
+    h1 removes A and the gets, and leaves B.
+    h7 removes B down to its 13.7 ms floor, and leaves A.
+    h6 removes 399.7 ms of B, one collection's worth.
 
-  **The order changed, and the measurement changed it.** iteration-03 put h8
-  first: :S, reversible, no credential, and its premise -- that L1 never helps
-  a served read -- was inferred from twelve `sampled: false` readings. Those
-  readings answered `has this isolate ever hydrated`, which is a different
-  question from `when a request DOES hydrate, is L1 warm`. Measured directly,
-  the answer is warm 4 times in 10, and h8's saving fell from $22.68 to $13.61.
+  **h1 is not first by a margin the ordering rule can override.** $53.53 against
+  $5.48: the tie-breakers -- reversible, cheaper effort -- exist to choose
+  between comparable numbers and these are not comparable. Its :L effort and its
+  dependence on a write rate nobody has measured are real costs, and they are
+  the reasons to measure the write rate NEXT rather than reasons to do something
+  else first.
 
-  h7 is now first on the number as well as being the larger half of the request.
-  h8 is not withdrawn -- it is landed, it is still worth $13.61, and it is the
-  only one of the three that needs neither a credential nor a write. It is
-  simply no longer the biggest thing available."
+  The pair still adds, and by less than it used to look: h1 leaves B, h7 removes
+  B, so h1+h7 is a hydrate that is neither -- the opaque-decode floor, 13.7 ms
+  against 7,717.7. But h7 alone is now 9% of cost, so the pair is worth doing in
+  that order and not the other."
   [ranked]
   (let [by-id (into {} (map (juxt :id identity) ranked))
         h1 (by-id "h1-seed-materialisation")
         h7 (by-id "h7-parse-only-addressable-values")
-        h8 (by-id "h8-l2-cache-api")
-        pair-cost (cost-per-million {:cpu-ms (get-in h7 [:after :cpu-ms])
-                                     :class-b-ops (get-in h8 [:after :class-b-ops])})]
-    {:batch-id "kotobase-cost-kaizen-4"
-     :members ["h7-parse-only-addressable-values"]
-     :order "h7 next; h8 was deployed and refuted"
-     :why "h7 is the larger half of a served read, is reversible, is :M, and is
-           independent of the read:write ratio. It is also the half neither h8
-           nor any cache can touch: a warm isolate still pays it in full, which
-           is exactly what the 2.38 s warm requests show against 3.34 s cold."
+        pair-cost (cost-per-million
+                   {:cpu-ms (Math/round (* (:cpu-ms baseline)
+                                           (share (:opaque-floor pinned-decomposition))))
+                    :class-b-ops (* 1 cold-isolate-rate)})]
+    {:batch-id "kotobase-cost-kaizen-5"
+     :members ["h1-seed-materialisation"]
+     :order "h1 next, then h7"
+     :why "At the pin phase A is 92% of a hydrate and h1 is the only hypothesis
+           that removes it. $53.53 of a $59.60 unit cost, against $5.48 for the
+           item that was first this morning."
      :pair-cost-per-million pair-cost
      :pair-saving (- (cost-per-million baseline) pair-cost)
-     :h8-status
-     {:landed "net-kotobase/control-plane main 57b1f350f"
-      :deployed "version e36410a5, 2026-08-18"
-      :outcome :refuted-in-production
-      :reverted "main aa714b887; production rolled back to 120f3e08"
-      :arc "ranked 3rd and placed FIRST in the batch (iteration-03) -> 4th once
-            cold-isolate-rate was measured (iteration-04) -> last, refuted, once
-            it was deployed and measured (iteration-05)"
-      :what-each-step-cost
-      "Each demotion came from a measurement that could have been taken earlier.
-       The premise (does L1 ever help?) was measurable before landing. The cost
-       of 168 Cache API operations was measurable before deploying -- not by the
-       test suite, which used an in-memory fake, but by counting them."}
-     :additive-not-subsumed
-     {:h8-alone (:cost-after h8) :h7-alone (:cost-after h7) :pair pair-cost
-      :h1-alone (:cost-after h1)
-      :note "h1 vs h8 is a CHOICE, not an order: both remove the gets."}
+     :what-changed-and-why
+     "Nothing about the code. The harness's 26 cross-repo :source-paths resolved
+      to ambient checkouts rather than west pins, 24 of 26 were at a different
+      revision, and every decomposition the roadmap has ever used came from a
+      build nobody identified. Pinning them and re-running produced a run whose
+      block-gets, distinct blocks and byte count are IDENTICAL to production's,
+      which no previous run was -- and that run says A is 92%, not 23%.
+
+      h7 fell from first to third. h6 fell from third to fifth. h1 rose from
+      second to first by a factor of two. None of them changed."
+     :before-h1-is-built
+     "Measure the read:write ratio. h1's maintenance is a seed rebuild per
+      commit, and it is the ONE input that could invert it. Nothing has measured
+      it, this graph currently serves no organic reads, and a 90% saving on a
+      read multiplied by an unmeasured write cost is not yet a decision."
      :not-in-the-batch
-     "h6 (retracting 91 documents) is now THIRD at $21.50 and is still an owner
-      judgement: it is irreversible deletion of production data. h2 (fold) is
-      one write from firing. h4 (pack) is $4.32 on this graph -- same gets as
-      h8, fewer of them removed -- and earns its place on the OTHER Worker's
-      write path, which this judge does not price."
-     :how-this-batch-can-fail
-     "h7's :after-harness was measured against the OLD decode2 and is still
-      stale by the ~28% the outer-string change already took off phase B. Its
-      $28.56 is therefore an UPPER bound. The phase bench that would fix it has
-      been blocked by the repo-wide build governor all session."
-     :unmeasured-dependency
-     "h1's maintenance is a seed rebuild per commit. NOTHING HERE MEASURES THE
-      READ:WRITE RATIO."}))
+     "h2 (fold) is one write from firing and stays worth $12.61. h6 is now
+      $2.14 -- irreversible deletion of production data for 3.6% -- which is a
+      much easier no than it was this morning. h4 is $4.32. Five hypotheses are
+      at zero and four of those were measured there."}))
 
 ;; ── Meta ─────────────────────────────────────────────────────────────────────
 
