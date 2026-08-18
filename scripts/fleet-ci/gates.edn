@@ -115,6 +115,26 @@
  ;;      has a package.json. Of the 14 gates condition 3 had blocked, 8 then match
  ;;      the JVM run exactly. Condition 1 still applies and still bites: 3 of the
  ;;      other 6 hold `.clj` tests, which no classpath reaches.
+ ;;   Seven entries moved on 2026-08-18 once the io-ipld-car canary answered on the
+ ;;   fleet: `test-io-ipld-car-07469f4-murakumo-naphtali` and `-issachar`, both
+ ;;   `exit 0 — nbb: 19 tests, 64 passed`. Those two nodes carry `:caps #{:node}`
+ ;;   and no `:jvm`, so the run is itself the evidence that ship-git-deps! placing
+ ;;   the deps, the derived ~/.gitlibs classpath and the npm step compose on a
+ ;;   node. The output shape changed too — `Ran N tests containing M assertions`
+ ;;   from the cognitect runner became `nbb: N tests, M passed` — so the same
+ ;;   numbers came from a different runtime, not from the same one twice.
+ ;;
+ ;;   All seven were re-measured AT THE TIP, not at the pinned checkout, because
+ ;;   the checkout lies: kotobase-lake read 77/259 there and 84/276 at the tip,
+ ;;   kotobase-protocols 66/238 and 71/269. Both runtimes agree at the tip:
+ ;;     kotobase-lake                 84 tests / 276 assertions
+ ;;     kotobase-protocols            71 / 269
+ ;;     kotobase-protocol-core        24 / 97
+ ;;     org-apache-tinkerpop-gremlin  23 / 37
+ ;;     org-graphql-http              23 / 39
+ ;;     org-apache-avro               14 / 32
+ ;;     sakkyokuka                     6 / 15
+ ;;
  ;;   4. The runner covers the whole suite:
  ;;        nbb --classpath ".:scripts/nbb_compat" \
  ;;          scripts/verify-cljs-runner-completeness.cljs --repo orgs/<org>/<name>
@@ -384,10 +404,13 @@
   {:name "graphql" :gate :jvm-test :cd false}
   {:name "kotobase" :gate :jvm-test :cd false}
   {:name "kotobase-projection" :gate :jvm-test :cd false}
-  {:name "kotobase-protocols" :gate :jvm-test :cd false}
+  {:name "kotobase-protocols" :gate :nbb-test :classpath "src:test" :entry "bin/run_tests.cljs"
+   :ship-git-deps true :cd false}
   {:name "kotobase-query" :gate :jvm-test :cd false}
-  {:name "org-apache-tinkerpop-gremlin" :gate :jvm-test :cd false}
-  {:name "org-graphql-http" :gate :jvm-test :cd false}
+  {:name "org-apache-tinkerpop-gremlin" :gate :nbb-test :classpath "src:test" :entry "bin/run_tests.cljs"
+   :ship-git-deps true :cd false}
+  {:name "org-graphql-http" :gate :nbb-test :classpath "src:test" :entry "bin/run_tests.cljs"
+   :ship-git-deps true :cd false}
   {:name "org-opencypher-cypher" :gate :jvm-test :cd false}
   {:name "org-w3-sparql-protocol" :gate :jvm-test :cd false}
   {:name "pay" :gate :jvm-test :cd false}
@@ -463,7 +486,8 @@
   ;; precisely so nodes hold no credentials (invariant 3) -- but it does mean
   ;; hand-verification has to ship the tree the same way, which is how the run
   ;; above was done.
-  {:name "kotobase-protocol-core" :gate :jvm-test :cd false}
+  {:name "kotobase-protocol-core" :gate :nbb-test :classpath "src:test" :entry "bin/run_tests.cljs"
+   :ship-git-deps true :cd false}
   {:name "org-ietf-zstd" :gate :jvm-test :cd false}
   ;; zstd's second gate. Its counts differ by runtime on purpose -- 28/251 on
   ;; the JVM against 20/173 under nbb, because one test file is `.clj` -- so
@@ -735,7 +759,8 @@
   ;;   territory-covers? の every? を some に変えると 2 failures / exit 1、
   ;;   無改変で exit 0。
   {:name "ongaku" :gate :nbb-test :classpath "src:test" :entry "test/run_portable.cljs" :cd true}
-  {:name "sakkyokuka" :gate :jvm-test :cd true}
+  {:name "sakkyokuka" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs"
+   :ship-git-deps true :cd true}
   {:name "cloud-itonami-isco-2652" :gate :jvm-test :cd true}
 
   ;; gftd-audio-actor（作曲家リツ、network-isekai の music+sfx 生成 actor）。
@@ -2154,9 +2179,11 @@
   {:name "columnar" :gate :nbb-test :classpath "src:test" :entry "test/run.cljs" :cd true}
   {:name "org-apache-parquet" :gate :jvm-test :cd true}
   {:name "org-apache-arrow" :gate :jvm-test :cd true}
-  {:name "org-apache-avro" :gate :jvm-test :cd true}
+  {:name "org-apache-avro" :gate :nbb-test :classpath "src:test" :entry "test/run.cljs"
+   :ship-git-deps true :cd true}
   {:name "org-ietf-csv" :gate :nbb-test :classpath "src:test" :entry "test/run.cljs" :cd true}
-  {:name "kotobase-lake" :gate :jvm-test :cd true}
+  {:name "kotobase-lake" :gate :nbb-test :classpath "src:test" :entry "test/run.cljs"
+   :ship-git-deps true :cd true}
 
   ;; ── 委譲した decision core を ClojureScript で実行する gate ──────────────
   ;;
