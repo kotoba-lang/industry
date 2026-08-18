@@ -1,0 +1,184 @@
+[{:db/id -1
+  :adr/id "ADR-2608181500"
+  :adr/title "kotobase の S3 面を、普通の S3 クライアントが使える面にする"
+  :adr/status "accepted"
+  :adr/date "2026-08-18"
+  :adr/last_verified "2026-08-18"
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/related ["ADR-2608131100" "ADR-2608100100" "ADR-2608061200" "ADR-2607299900" "ADR-2608160100"]
+  :adr/authoritative_for ["s3.kotobase.net の S3 互換範囲" "aws-chunked upload framing" "object の content-type 応答方針"]
+  :adr/body "# ADR-2608181500: kotobase の S3 面を、普通の S3 クライアントが使える面にする
+
+**Status**: accepted
+**Date**: 2026-08-18
+**Deciders**: Jun Kawasaki（指示「kotobase を通常の s3 としても使えるようにしたい」）
+
+## Context
+
+先行する問い（「b2 じゃなくて r2 にしていいよ。s3.kotobase.net を使うのは? 安定している?」）に
+答えるため、**s3.kotobase.net を aws CLI で実際に叩いた**。「S3 互換」を名乗る面が本当に
+互換かは、仕様を読んでも分からない —— 互換の定義は *ordinary な client が動くこと* であって、
+実装した subset の一覧ではない。
+
+実測 2026-08-18（aws-cli v2 / curl --aws-sigv4）:
+
+| 操作 | 結果 |
+|---|---|
+| `aws s3 cp <file> s3://b/k` | **401 Unauthorized** |
+| PUT `text/html` 31 バイト → GET | **390 バイトが返る。sha256 が違う** |
+| `curl -r 0-3` | **200 で 4096 バイト全部** |
+| `aws s3api head-bucket` | **405 Method Not Allowed** |
+| `aws s3api create-multipart-upload` | 405（未実装） |
+| `--max-keys 3` | **無視。49 件全部返る** |
+
+4 番目までが「動かない」で、2 番目は**動いているように見えて壊れている**方だった。
+
+### text/html の 390 バイトは、既に一度別の顔で観測されていた
+
+ADR-2608131100 は kouhou の annex 48 object のうち 10 個が
+`checkpresentkey` で absent になる件を追い、**Cloudflare の HTML rewriter が
+Web Analytics beacon を注入して bytes を変え、ETag と Content-Length を落として
+いる**ことを突き止めていた。その 10 個は kouhou の fetcher が 403 / 301 の HTML
+エラーページを `.xml` の名前で保存したもので、s3.kotobase.net は**それを忠実に
+保存できなかった**。当時の対処は「B2 に第 2 の copy を作る」で、**kotobase 側の
+原因は残されたまま**だった。
+
+今回の 31 → 390 バイトは、同じ欠陥を**任意の client から 2 コマンドで再現した**
+もので、annex 固有の話ではないことを示している。**受け取った bytes と違う bytes を
+返す object store は object store ではない。**
+
+### aws CLI が 401 になっていた理由
+
+aws-cli v2 と最近の SDK は PutObject で既定的に `x-amz-content-sha256:
+STREAMING-UNSIGNED-PAYLOAD-TRAILER` を送り、body に `aws-chunked` framing を掛ける。
+worker の署名検証はこの sentinel を「宣言された payload hash」として body の
+digest と比較しており、**構造上必ず不一致になる**。つまり `aws s3 cp` は
+**一度も通ったことがなかった** —— 通っていたのは git-annex（sentinel を送らない）だけで、
+「S3 互換」はその 1 client についてのみ真だった。
+
+## Decision
+
+**4 つを、それぞれの責任の層で直した。** 実装は `network-awai/net-kotobase`
+`protocols-worker`（commit `9476ff0`、main `ebcbfd2`、deploy version
+`1b587c97-2aa3-4557-81c3-87f8e99c2779`）。
+
+### 1. `aws-chunked` を剥がす（新 ns `kotobase-protocols-worker.aws-chunked`）
+
+sentinel（`STREAMING-*` / `UNSIGNED-PAYLOAD`）は body digest と比較しない。
+**seed signature が鍵の所持を証明することは変わらない**が、**chunk ごとの署名は
+検証していない** —— これは docstring に明記した。この面が認証するのは request で
+あって body の各 frame ではない。
+
+framing の decode に失敗したら **400 で拒否する。生 body に fallback しない。**
+framed bytes は byte 単位で往復し、ETag も本物の digest になり、**この面の検査は
+全部通る** —— ただ、それは client がアップロードしたファイルではない。
+後段で気付ける検査が存在しないので、ここで落とすしかない。
+
+### 2. `text/html` は `application/octet-stream` として返す
+
+CDN が書き換える content-type の集合（`text/html` / `application/xhtml+xml`）を
+明示し、その型で保存された object は octet-stream として返す。client 自身の値は
+`x-amz-meta-original-content-type` に載せて失わない。全 object に
+`cache-control: no-transform` と `x-content-type-options: nosniff` を付ける。
+
+**これは様式の選択ではない。** 選択肢は「bytes を守る」か「browser がその object を
+実行してくれる」かで、object store が売っているのは前者である。
+
+⚠ **これは origin 側の防御であって、edge の設定ではない。** zone 側で
+s3.kotobase.net に対する HTML rewriting（Web Analytics 自動注入 / Rocket Loader /
+Email Obfuscation）を Configuration Rule で切るのが本来の 2 枚目の壁だが、
+**今日は実施していない** —— `CLOUDFLARE_GLOBAL_API_KEY` が
+`secrets-location-map` の記載どおりには kagi から取れなかった（`no such item`。
+名前の当て推量はしていない）。
+
+### 3. `Range: bytes=…` に 206 で答える
+
+満たせない range は 416 + `content-range: bytes */<size>`。**multi-range は
+意図的に 200 で全体を返す** —— 最初の span だけを 206 で返して client に
+「両方受け取った」と思わせるのは、遅いより悪い。
+
+現時点で bytes は blob 面から**丸ごと**取ってから切っている。買えているのは
+「resume できる client」と「footer だけ読む columnar reader」であって、
+store 側の仕事の削減ではない。ADR-2608160100 の `:range-read` を名乗る前提が 1 つ埋まった。
+
+### 4. HeadBucket / CreateBucket に 200 を返す
+
+どちらも chain に触らない（bucket は chain であり、何か書かれた時点で存在する）。
+必要な理由は client 側にある —— rclone と SDK は転送前に HeadBucket を呼び、
+**405 を「そんな bucket は無い」と読む**。動いている store が、まだ書いていない
+client からは存在しないように見えていた。
+
+## Verification
+
+### 単体（`npm test`: 139 tests / 866 assertions、0 failures）
+
+**負の対照を取ってある。** `served-content-type` を恒等に、`decode-body` を
+素通しに書き換えて走らせ、**壊した 2 つに対応する test だけが落ちること**
+（`html-is-never-served-as-html` と `decode-body-only-touches-framed-requests`、
+6 failures）を確認してから戻した。「対照を走らせた」と「対照が成立した」は別
+（ADR-2608100100 で一度踏んでいる）。
+
+### live（deploy 後、同じコマンドを同じ endpoint に）
+
+| 操作 | 前 | 後 |
+|---|---|---|
+| `aws s3 cp`（CLI 既定） | 401 | **成功。round trip の sha256 一致** |
+| PUT `text/html` 31 バイト → GET | 390 バイト / sha 不一致 | **31 バイト / sha 一致** |
+| `curl -r 0-3` | 200 / 4096 バイト | **206 / 4 バイト、`content-range: bytes 0-3/4096`** |
+| range 越え | — | **416** |
+| HeadBucket | 405 | **200** |
+| git-annex `checkpresentkey`（既存 consumer） | ok | **ok（回帰なし）** |
+
+### ADR-2608131100 の 10 object が、構造的に保存できるようになった
+
+kouhou の annex に対して `copy --to kotobase --force` を再実行し、**48 key 全部を
+exit code で検査**した（location log の主張ではなく）:
+
+```
+kotobase VERIFIED present=48 absent=0 of 48
+```
+
+さらに、当時「content is missing」と判定された当の object
+（`raw/2026-08-11/gov-afg-exec.xml` = 403 の HTML ページ）を
+`git annex fsck --from kotobase` で**実際に取り直して checksum 一致**を確認した。
+custody map（git-annex branch）は `602f476..24b41c9` として publish 済み。
+
+## Consequences
+
+### まだ無い。名乗らない
+
+- **multipart upload** —— `aws s3 cp` は既定で 8 MiB を超えると
+  CreateMultipartUpload に切り替わるので、**大きいファイルは今も失敗する**。
+  これが次の 1 本。
+- **ListObjectsV2 の pagination** —— `max-keys` は無視され、`IsTruncated` も
+  `NextContinuationToken` も `delimiter` も無く、**listing は常に全 key を返す**。
+  bucket が育つと、これは互換性ではなく CPU 上限の問題になる。実装場所は
+  pure library `kotoba-lang/kotobase-protocols` の `kotobase.protocols.s3`。
+- **ListBuckets** —— `InvalidRequest`。空の一覧を返す実装は「bucket が無い」と
+  嘘をつくので、やるなら本物を返す。
+- **条件付き要求**（`If-None-Match` → 304 / `If-Match` → 412）。
+
+### 構造的な上限は残っている（互換性の問題ではない）
+
+object の metadata は今も **bucket ごとに head 1 本を CAS する**経路を通る。
+ADR-2608100100 の実測で `jobs=1` が `jobs=4` より速く（124 対 89.5 obj/min）
+失敗 0 だったのはこれが理由で、**普通の S3 にこの性質は無い**。
+bulk backing store として使うなら、ここを CAS 経路から外す設計が要る ——
+**今回はやっていないし、必要になるまでやらない。**
+
+したがって annex remote の既定を s3.kotobase.net にはしない。R2 の S3 endpoint を
+直接使う（そちらは 20 bucket に対して OAuth で操作可能なことを 2026-08-18 に再確認済み。
+`r2` scope が無いという ADR-2607299900 の前提は 2026-08-05 に既に否定されている）。
+**s3.kotobase.net が担うのは「kotobase の graph に載せたい object」**であって、
+その用途では今回の 4 つが揃ったことで初めて ordinary client から扱える。
+
+### 並行セッションと衝突しうる
+
+作業中、別セッションが同じ `protocols-worker` の copy
+（`scratchpad/cp-s3cred/protocols-worker`）で build lock を保持していた。
+deploy は**最後に実行した人が勝つ**ので、その session が古い tree から deploy すると
+この 4 つは黙って戻る。deploy 前に `origin/main` を merge してから出したが、
+**逆向きは防げない**。
+"}]
