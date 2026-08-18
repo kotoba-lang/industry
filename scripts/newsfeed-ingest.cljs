@@ -148,18 +148,51 @@
     (do (println (str "  save stderr: " (str/trim err))) (die "datalad save に失敗"))
     (println (str "  save ok" (when (str/includes? out "notneeded") " (変更なし)")))))
 
-;; ── 4) B2 へ push ────────────────────────────────────────────────────────
-(let [{:keys [exit err]} (run ["datalad" "push" "--to" "b2"] {:dir ds :env env})]
-  (if (pos? exit)
-    ;; 巻き戻さない（不変条件 3）。台帳は手元にあり、次回 push で回収される。
-    (println (str "WARN push --to b2 が失敗した。台帳は手元に残っている（次回回収）。\n  "
-                  (str/trim err)))
-    (println "  push --to b2 ok")))
+;; ── 4) 実体を B2 へ。`datalad push` ではなく annex copy ──────────────────
+;;
+;; `datalad push --to <special remote>` は git を押そうとして失敗する。ここは
+;; 数週間 WARN を出し続け、**台帳のコピーは手元 1 本のままだった**
+;; （2026-08-18 実測。同じ日に `git annex copy --to b2` は一度で通った）。
+(let [{:keys [exit err]} (run ["git" "annex" "copy" "--to" "b2" "--jobs" "1"
+                               "state/articles.ledger.edn"]
+                              {:dir ds :env env})]
+  (when (pos? exit)
+    (println (str "  copy --to b2 stderr: " (str/trim err)))))
 
-;; ── 5) 実際に B2 にあるかを whereis で確認する（exit 0 を信用しない）──────
-(let [{:keys [out]} (run ["git" "annex" "whereis" "state/articles.ledger.edn"] {:dir ds :env env})]
-  (if (str/includes? out "[b2]")
-    (println "  whereis: b2 にコピーあり")
-    (println "WARN whereis に b2 が出ない — B2 側に載っていない可能性がある")))
+;; ── 5) custody は exit code で確かめる。whereis は主張であって測定ではない ──
+;;
+;; ADR-2608131100: location log が「3 copies」と言っていた 10 個の object は、
+;; remote に問い合わせると 1 つも無かった。数えるなら remote に訊く方。
+(def key-of
+  (str/trim (:out (run ["git" "annex" "lookupkey" "state/articles.ledger.edn"]
+                       {:dir ds :env env}))))
+(def in-b2?
+  (and (seq key-of)
+       (zero? (:exit (run ["git" "annex" "checkpresentkey" key-of "b2"]
+                          {:dir ds :env env})))))
+(println (str "  custody: b2 " (if in-b2? "VERIFIED present" "ABSENT")))
+
+;; ── 6) git も押す。`HEAD:main` で ──────────────────────────────────────
+;;
+;; west の checkout は detached HEAD なので、この job の commit は branch に
+;; 載らない。押していなかった結果、日次 ingest の 4 commit がこの機械にしか
+;; 無い状態が続いていた（2026-08-18 実測）。
+(let [remote (or (first (remove #(or (str/blank? %) (= "b2" %))
+                                (str/split-lines (:out (run ["git" "remote"] {:dir ds})))))
+                 "origin")]
+  (doseq [[src dst] [["HEAD" "main"] ["git-annex" "git-annex"]]]
+    (let [{:keys [exit err]} (run ["git" "push" remote (str src ":" dst)] {:dir ds})]
+      (if (pos? exit)
+        (println (str "  push " dst " FAILED: " (str/trim err)))
+        (println (str "  push " dst " ok")))))
+  ;; 押せていなければ、この run の記録はこの機械にしか無い。WARN では
+  ;; 気づかれないことが実証済みなので、失敗として終える。
+  (let [{:keys [exit]} (run ["git" "merge-base" "--is-ancestor" "HEAD"
+                             (str remote "/main")] {:dir ds})]
+    (when (pos? exit)
+      (die "commit が remote に載っていない — 手元だけの記録になっている"))))
+
+(when-not in-b2?
+  (die "台帳の実体が B2 に無い — 手元 1 本の状態で終わっている"))
 
 (println "newsfeed-ingest done")
