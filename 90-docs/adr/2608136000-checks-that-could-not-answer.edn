@@ -1,1 +1,50 @@
-[{:db/id -1, :adr/id "ADR-2608136000", :adr/title "答えられなかった検査が、答えて問題が無かった検査と同じ値を返す —— 1 日で 14 箇所", :adr/status "accepted", :adr/date "2026-08-13", :adr/supersedes "", :adr/superseded-by "", :adr/body "2026-08-13 の 1 日で、**同じ 1 つの欠陥が 14 箇所**で見つかった。個別には\n別々のバグに見えるが、形は 1 つである。\n\n> **測れなかった検査が、測って問題が無かった検査と同じ値を返す。**\n\nexit 0、空の出力、`:pass` —— どれも「合格」と「実行できなかった」の両方を意味して\nしまう。外から区別する手段が無いので、**沈黙が緑として蓄積する。**\n\n## 実測した 14 件\n\n| # | どこ | 何を返していたか | 規模 |\n|---|---|---|---|\n| 1 | `root-permit-index` gate | 入力（`orgs/`）が配られる tree に無いのに「射影が正本とズレている」 | 298 receipt / 259 tip、緑 0 |\n| 2 | `wrangler-deploy-main-sync-guard` | `origin/main` を解決できないと `allow!` | 4,406 checkout 中 **2,824（64%）**。当日の本番 deploy 2 件が未評価 |\n| 3 | `git-push` / `branch-create` / `session-start` guard | 同上 | 同上 |\n| 4 | `west-pin-verify-guard` | `origin/main:manifest/west.yml` を読むが、**子リポ 4,406 件のうち 0 件**がそのファイルを持たない | 到達不能コード |\n| 5 | `deploy-local-root-pin-guard` | pin の無い in-workspace dep を、検査して問題無しと同じ沈黙で飛ばす | — |\n| 6 | `verify-tsukuru-factory-plane` | `edn/read-string \"\"` → nil → `(when rows …)` → skip → exit 0 | 検査 3 本すべて |\n| 7 | `security-gate-*` 5 本 | exit 呼び出しが 1 つも無く PASSED を印字 | 削除済み |\n| 8 | 生成された `run-task.cljs` の `sh` | `spawnSync` の status nil、`.error` 破棄、stdio inherit → exit 1・両ストリーム 0 バイト | **41/41 repo** |\n| 9 | `cloud-itonami` の `:kernels` alias | コメントが「Everything below resolves from git」と宣言、実際は 117 の `:local/root` で全 alias が node 上で失敗 | 一度も走っていない |\n| 10 | `observatory-run` | `:known-broken` が「collector が壊れている」と「600 秒で殺した」の両方を指す。`meets-expectation` を読む gate は 0 件 | 25 行中 3 行 |\n| 11 | `advance-pins.cljs`（当日修正済） | lookup 失敗 210 件を `:no-sha 210` と数えて exit 0 | 210 |\n| 12 | `verify-duplicate-registrations` | 240 秒無出力で kill。進捗を出さないので長時間実行と hang が同じに見える | — |\n| 13 | playtest の launchd job | `spawnSync` の cwd が存在せず status nil、戻り値を見ない → 全コマンド no-op → 無害な 1 行 → exit 0 | 週次 4 回 |\n| 14 | shinshi-kaizen の launchd job | HTTP 400 の**応答本文を捨てて** status だけ記録 | 20 回連続 |\n\n## 検出の合図\n\n新しい検査を書くとき、あるいは緑の検査を信じる前に、**5 つ問う**:\n\n1. **入力が無いとき何を返すか。** pass ならそれが欠陥である（#1 #6 #9）。\n2. **そもそも実行できないとき何を返すか。** pass と同じ値なら欠陥（#2 #3 #4 #5 #13）。\n3. **受け取ったエラー本文を捨てていないか。** status だけを記録する経路は、原因が\n   応答の中に書いてあっても読まない（#8 #11 #14）。\n4. **「飛ばした」と「合格した」が出力で区別できるか。** できないなら、次に\n   飛ばしたとき誰も気付かない（#6 #10）。\n5. **その検査は両方向を出したことがあるか。** 常に緑も、常に赤も、同じだけ\n   無内容である —— 実測 2026-08-13、赤い 8 gate のうち両方向を見せたのは 2 つだけ、\n   `root-permit-index` は 300 回連続で赤、`root-itonami-org-id` は 286 回。\n\n## 効いた直し方\n\n- **evidence floor** —— 検査対象を数え、`SCANNED<TAB>n<TAB>unit` を印字し、\n  **n = 0 を clean として記録できなくする**（`orgs-detector-tick`）。\n- **実行本数の床** —— 実行した検査を数え、期待本数に満たなければ落とす。\n  1 層目を将来の編集が壊しても、飛ばした検査は赤くなる（`verify-tsukuru-factory-plane`）。\n- **「答えられなかった」専用の exit code** —— 0 でも 1 でもない値\n  （`kotoba-provider-orphan-check` の 90/91/92、`verify-duplicate-registrations` の 2）。\n  **合格でも不合格でもない第 3 の結果を、型で持つ。**\n- **答えを拒否する** —— `git archive` に `.git` が無いと分かった gate は\n  「Refusing to report a pass」と言って 90 で終わる。**恒久的に赤い gate を\n  landing させるより良い。**\n- **signal を落とさない** —— 起動できなかったのか、殺されたのか、非ゼロで\n  終わったのかは別の出来事である（`nbb_compat/sh`、生成 runner の `sh`）。\n- **測ったときの環境を値の隣に書く** —— load 153 で測った timeout を actor の\n  欠陥として台帳に残さない（`observatory-run` の `load1-before/after`）。\n\n## 偽の実演に注意\n\nこの class を直すとき、**壊し方を間違えると赤が出て、それが成功した実演に見える。**\n当日 4 回起きた: gate の *別の* 検査を壊した / reader を throw させた（EDN が\n壊れていることの証明であって、静かな切断の証明ではない）/ コメントの中の key を\n置換した / 検索対象の部分文字列を含む名前に改名した。\n\n**壊したものが、報告されたものと一致することを確かめる。** 一致しなければ、\n実演したのは別の検査である。"}]
+[{:db/id -1, :adr/id "ADR-2608136000", :adr/title "答えられなかった検査が、答えて問題が無かった検査と同じ値を返す —— 1 日で 14 箇所", :adr/status "accepted", :adr/date "2026-08-13", :adr/supersedes "", :adr/superseded-by "", :adr/body "2026-08-13 の 1 日で、**同じ 1 つの欠陥が 14 箇所**で見つかった。個別には\n別々のバグに見えるが、形は 1 つである。\n\n> **測れなかった検査が、測って問題が無かった検査と同じ値を返す。**\n\nexit 0、空の出力、`:pass` —— どれも「合格」と「実行できなかった」の両方を意味して\nしまう。外から区別する手段が無いので、**沈黙が緑として蓄積する。**\n\n## 実測した 14 件\n\n| # | どこ | 何を返していたか | 規模 |\n|---|---|---|---|\n| 1 | `root-permit-index` gate | 入力（`orgs/`）が配られる tree に無いのに「射影が正本とズレている」 | 298 receipt / 259 tip、緑 0 |\n| 2 | `wrangler-deploy-main-sync-guard` | `origin/main` を解決できないと `allow!` | 4,406 checkout 中 **2,824（64%）**。当日の本番 deploy 2 件が未評価 |\n| 3 | `git-push` / `branch-create` / `session-start` guard | 同上 | 同上 |\n| 4 | `west-pin-verify-guard` | `origin/main:manifest/west.yml` を読むが、**子リポ 4,406 件のうち 0 件**がそのファイルを持たない | 到達不能コード |\n| 5 | `deploy-local-root-pin-guard` | pin の無い in-workspace dep を、検査して問題無しと同じ沈黙で飛ばす | — |\n| 6 | `verify-tsukuru-factory-plane` | `edn/read-string \"\"` → nil → `(when rows …)` → skip → exit 0 | 検査 3 本すべて |\n| 7 | `security-gate-*` 5 本 | exit 呼び出しが 1 つも無く PASSED を印字 | 削除済み |\n| 8 | 生成された `run-task.cljs` の `sh` | `spawnSync` の status nil、`.error` 破棄、stdio inherit → exit 1・両ストリーム 0 バイト | **41/41 repo** |\n| 9 | `cloud-itonami` の `:kernels` alias | コメントが「Everything below resolves from git」と宣言、実際は 117 の `:local/root` で全 alias が node 上で失敗 | 一度も走っていない |\n| 10 | `observatory-run` | `:known-broken` が「collector が壊れている」と「600 秒で殺した」の両方を指す。`meets-expectation` を読む gate は 0 件 | 25 行中 3 行 |\n| 11 | `advance-pins.cljs`（当日修正済） | lookup 失敗 210 件を `:no-sha 210` と数えて exit 0 | 210 |\n| 12 | `verify-duplicate-registrations` | 240 秒無出力で kill。進捗を出さないので長時間実行と hang が同じに見える | — |\n| 13 | playtest の launchd job | `spawnSync` の cwd が存在せず status nil、戻り値を見ない → 全コマンド no-op → 無害な 1 行 → exit 0 | 週次 4 回 |\n| 14 | shinshi-kaizen の launchd job | HTTP 400 の**応答本文を捨てて** status だけ記録 | 20 回連続 |\n\n## 検出の合図\n\n新しい検査を書くとき、あるいは緑の検査を信じる前に、**5 つ問う**:\n\n1. **入力が無いとき何を返すか。** pass ならそれが欠陥である（#1 #6 #9）。\n2. **そもそも実行できないとき何を返すか。** pass と同じ値なら欠陥（#2 #3 #4 #5 #13）。\n3. **受け取ったエラー本文を捨てていないか。** status だけを記録する経路は、原因が\n   応答の中に書いてあっても読まない（#8 #11 #14）。\n4. **「飛ばした」と「合格した」が出力で区別できるか。** できないなら、次に\n   飛ばしたとき誰も気付かない（#6 #10）。\n5. **その検査は両方向を出したことがあるか。** 常に緑も、常に赤も、同じだけ\n   無内容である —— 実測 2026-08-13、赤い 8 gate のうち両方向を見せたのは 2 つだけ、\n   `root-permit-index` は 300 回連続で赤、`root-itonami-org-id` は 286 回。\n\n## 効いた直し方\n\n- **evidence floor** —— 検査対象を数え、`SCANNED<TAB>n<TAB>unit` を印字し、\n  **n = 0 を clean として記録できなくする**（`orgs-detector-tick`）。\n- **実行本数の床** —— 実行した検査を数え、期待本数に満たなければ落とす。\n  1 層目を将来の編集が壊しても、飛ばした検査は赤くなる（`verify-tsukuru-factory-plane`）。\n- **「答えられなかった」専用の exit code** —— 0 でも 1 でもない値\n  （`kotoba-provider-orphan-check` の 90/91/92、`verify-duplicate-registrations` の 2）。\n  **合格でも不合格でもない第 3 の結果を、型で持つ。**\n- **答えを拒否する** —— `git archive` に `.git` が無いと分かった gate は\n  「Refusing to report a pass」と言って 90 で終わる。**恒久的に赤い gate を\n  landing させるより良い。**\n- **signal を落とさない** —— 起動できなかったのか、殺されたのか、非ゼロで\n  終わったのかは別の出来事である（`nbb_compat/sh`、生成 runner の `sh`）。\n- **測ったときの環境を値の隣に書く** —— load 153 で測った timeout を actor の\n  欠陥として台帳に残さない（`observatory-run` の `load1-before/after`）。\n\n## 兄弟形: 固有の診断が汎用に潰れる（2026-08-17/18 追記）
+
+**14 件の形は「答えられなかった検査が、答えて問題が無かった検査と同じ値を返す」。
+その隣にもう 1 つある —— 検査は走り、正しく落ち、しかし固有の診断が汎用に
+潰れる。** 失うものは同じ: **次に何をすればいいかの情報**。
+
+| どこ | 正しかったこと | 潰れていたこと |
+|---|---|---|
+| `ipld` codec 拒否（P2-1） | 非 canonical を拒否した | **理由が違った** —— 読む人が次に直す場所を間違える |
+| pack の Range 無視（P4-2） | 例外は出た | `car: unsupported CID version {:version 13217}` —— **store のバグを pack のせいにする** |
+| `chain/walk-causal`（P5-1） | `:missing-parent` 検査は正しい | **到達不能**。walk が先に throw し `:threw` に潰れる。**block を失った store の operator が、walk のどこで起きた予期せぬ例外とも区別できない値を受け取る** |
+| `linear-journal`（P5-4、**正例**） | 不完全 receipt は throw、存在しない claim への receipt は nil | **2 条件に 2 形状**。呼び手のバグと race を混ぜない |
+
+**規則: 拒否が正しいことを確かめたら、次に「その理由で誰が動くか」を確かめる。**
+受理/拒否だけを見て「正しい」と結論しない。
+
+## 2026-08-17/18 に見つかった追加事例
+
+gateway ADR-2608171256 と substrate ADR-2608170400 の gap 解消中に、同じ 2 形が
+**10 箇所以上**出た。代表:
+
+- **`bootstrap-catalog!`（P4-2）** —— 3-pack chain の中央を消すと **tip の 3 entry を
+  返す = 健全な 1-pack store と同じ値**。tip を消すと `[]` = budget 0 = 空 store。
+  **4 状態 2 値。** → walk が**終わり方**（`:chain-start` / `:missing-pack` /
+  `:unreadable-pack` / `:budget-exhausted` / `:cycle`）を返し、entries-only 形は
+  本物の失敗で **throw する**（理由を置く場所が無いから）。
+- **read path の欠損 pack（P4-2）** —— `{:requests 1 :evidence :nothing-served}` は
+  「catalog が何も知らなかった」と同じ。→ `:packs-missing` と `:evidence :degraded`。
+- **刈った range と刈っていない range（P4-4/P4-5）** —— 呼び手から**同じ顔**。
+  query は選択的に見え、cost はそうではない。→ `scan-range-report` が `:pruned?` と
+  `:budget-bits` を返す。
+- **degrade が黙る（P3-5）** —— 「この node 群は browser-live を提供する」と
+  「誰も確認していない」が**同じ名前の list**。→ `:reach-evaluated?`。
+
+## 自分の道具にも出る
+
+**この class を潰す作業そのものが、この class を踏む。** 当セッションで 3 回:
+
+- **no-op mutation が緑になった 2 回** —— 変異が着弾していないのに「生き延びた」に
+  見える。**緑の mutation は、まず「着弾したか」を疑う。**（memoize した get-fn が
+  block 数を 1 も変えなかった例、対象関数が返さない箇所を編集していた例）
+- **`tail` が exit code を飲んだ** —— `guard ... | tail -15; echo rc=$?` の `$?` は
+  **tail のもの**。lock 取得に失敗した guard が `rc=0` と報告した。
+- **cleanup script が 2 度壊れ、2 度とも何も消さなかった**（正例）—— URL 未 encode の
+  `/` で 404、次に **zsh が `set -- $spec` で単語分割しない**（CLAUDE.md が
+  `west update` について警告している罠そのもの）。どちらも `$ahead` が `0` にならず、
+  guard は `KEPT` を印字した。**「検証できなかった」が「検証して問題無し」と
+  違う値だったから、破壊的操作が起きなかった。**
+
+## 偽の実演に注意\n\nこの class を直すとき、**壊し方を間違えると赤が出て、それが成功した実演に見える。**\n当日 4 回起きた: gate の *別の* 検査を壊した / reader を throw させた（EDN が\n壊れていることの証明であって、静かな切断の証明ではない）/ コメントの中の key を\n置換した / 検索対象の部分文字列を含む名前に改名した。\n\n**壊したものが、報告されたものと一致することを確かめる。** 一致しなければ、\n実演したのは別の検査である。"}]
