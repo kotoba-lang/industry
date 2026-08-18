@@ -258,4 +258,80 @@ JVM ビルドで compiled artifact を作る）で、fleet-ci にそれを起動
 
 judah で両方向確認済み（intact `OK: 17 tests` exit 0 / 同じ 1 文字破壊で
 `FAIL: 17 tests, 7 failures` exit 1）。なお **src は 1 行も変えていない**ので、
-`protocols-worker/upstream-lock.json` の sigv4 pin は前進させていない。"}]
+`protocols-worker/upstream-lock.json` の sigv4 pin は前進させていない。
+
+## 2026-08-18 closing —— 25/25 が両ランタイムで、fleet で緑で、CD に入った
+
+**この ADR は「登録したこと」で終わっていた。登録は主張であって証拠ではない。**
+受領を読み直したところ、cross-runtime gate 23 本が走っていて **21 本が緑、2 本は
+0 pass / 3 fail で一度も緑になっていなかった**。閉じたのはここから先。
+
+### 「ローカルで緑」は「fleet で緑」ではない —— 2 本がそれで落ちていた
+
+`arrow` `parquet` は毎回同じ形で落ちた:
+
+    arrow    FAIL: 35 tests, 0 failures, 19 errors
+    parquet  FAIL: 31 tests, 0 failures, 13 errors
+
+**テスト数が緑の run と同じ**である。名前空間は読めていて、ファイルを開くテスト
+だけが死ぬからで、`:include-ext` が 5 つの source 拡張子しか持たないのに arrow は
+`.arrow` を 4 本、parquet は `.parquet` を 5 本テストに持っていた。
+
+**受領は本数を残して本文を捨てる**ので、原因は受領の中に無い。`git ls-tree` →
+拡張子で絞る → `git archive` と fleet の絞り込みを再現して初めて
+`ENOENT ... open test/fixtures/plain.arrow` が読めた。
+
+landing 前の検証が判別力を持っていなかった理由もここにある —— あれは judah で
+**repo を clone** して回していた。fleet が配るのは `:include-ext` の tree なので、
+**再現すべきは checkout ではなく絞り込み**である。25 本全部に同じ監査を当て、
+ローカルで判定できた 13 本のうち fixture を落とすのはこの 2 本だけ、残り 12 本は
+`clean` と数えず **unanswered** と報告した（いずれも fleet で緑なので、監査より
+確かな答えが既に出ている）。
+
+### 同じ誤りを、その直後に自分で踏んだ
+
+`kotobase-projection` の gate を「実物の gate script で確かめた」と書いたが、
+**完全な checkout に対して回していた**。fleet では
+`no test summary in output — refusing to report a pass` で落ちた。
+
+原因は fixture ではなく npm の scope だった。`@noble/hashes` が
+`devDependencies` にあり、gate は `--omit=dev` で入れる。issachar で gate と同じ
+引数で実測:
+
+    devDependencies   npm install --silent --omit=dev   exit=0  node_modules=0
+    dependencies      npm install --silent --omit=dev   exit=0  node_modules=1
+
+**npm は「成功して何も入れない」。** したがって install の exit status を見る修正
+では防げない —— 唯一の証拠は事後に module が無いことである。gate は
+`dependencies` の各名前が `node_modules` に在るかを見るようにし、毎回
+`NPM-DEPS <present>/<declared>` を印字する（package.json が無い repo と依存が
+揃っている repo は、失敗時にしか出ない行では後から区別できない）。
+
+### CD の意図と実装がずれていた —— 倒す前に見つかった
+
+gates.edn の policy は「対象は :cd true の **repo** のみ」と書いているのに、
+`tick.cljs` の判定は **gate 単位**で、`advance-pin!` は repo 名しか取らない。
+受領に実例が在った:
+
+    :gate/test-org-apache-arrow-0be7587-…             :outcome :pass   ← :cd true
+    :gate/test-nbb-cross-runtime-arrow-0be7587-…      :outcome :fail
+
+**同じ sha で、赤い gate を横目に pin を進める権利が立っていた。** ここで
+`:cd` を 16 本増やしていれば、その権利を 16 個増やしただけだった。判定を repo
+単位に直し（その tick で走った gate だけを見るので**証明ではなく床**）、
+1 repo 1 回に畳んだ —— `:cd true` を 2 本持つ repo が 7 件あり、2 回目が
+tip→tip を要求して弾かれ、成功した直後に `CD pin-advance FAILED` を吐いていた。
+
+### 現在地
+
+| | |
+|---|---|
+| cross-runtime gate | **25 本すべて fleet で緑、25 本すべて `:cd true`** |
+| arrow / parquet | **同じ sha のまま**赤→緑（tip は動いていない = 原因は配られた tree） |
+| kotobase-projection | 新 pin `3c721f0` で緑、循環を切った成果がここに出た |
+| kotobase | nbb gate は持てない。2 errors とも `:type :sci/error` で **diamond ではない** |
+
+**残る gap**: compiled-cljs の `npm test` を回す gate 種別が無い
+（`kotobase-client` / `kotobase-worker-shell`）/ `datom` `sparql` は `.clj` で
+構造的に JVM のみ / `kotobase` の 13 ライブラリ diamond と peer 閉包の旧版 /
+`CACAO_OPERATOR_DIDS` 未設定で lake catalog が本番で 1 件も書かない（**オーナー判断**）。"}]
