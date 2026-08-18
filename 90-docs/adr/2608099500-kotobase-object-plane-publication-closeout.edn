@@ -52,7 +52,7 @@ review で blocker が見つかった場合は本 PR を merge せず修正す�
 **negative / open**
 
 - この PR は過去の direct merge を PR merge に変換しない。履歴上、実装 commit は direct/server-side merge のままである。本 PR が提供するのは事後 review と publication receipt である。
-- `WRITE_TOKEN` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` の operator copy 不一致により、production Worker 経由の write は未実証。
+- ~~`WRITE_TOKEN` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` の operator copy 不一致により、production Worker 経由の write は未実証。~~ **2026-08-18 に実証して閉じた（ADR-2608182100）**: Keychain の `WRITE_TOKEN` で PUT 200 / GET byte 一致 / HEAD / ListObjectsV2 / DELETE 204、壊した token と token 無しは 401。不一致とされていたのは面の取り違えで、記録は pinning 面に対する測定だった。
 - B2 は `kura-phase0-b2` の `s3-kotobase/` prefix を間借りしており、専用 bucket 移行は未実施。
 - multipart upload / range GET は未実装。
 - Monero fleet は 9/10 node を durable-disable 済みだが、SSH 到達不能の `zebulun` は復帰時に mining を再開する。SupportXMR の 0.049107 XMR は payout threshold 未満で、回収は owner action。"
