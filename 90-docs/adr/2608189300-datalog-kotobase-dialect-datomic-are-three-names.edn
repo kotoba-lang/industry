@@ -1,0 +1,167 @@
+[{:db/id -1
+  :adr/id "ADR-2608189300"
+  :adr/title "Datalog（形式）/ kotobase 方言（記法）/ Datomic（他社製品）は 3 つの別の名前 —— agent の query 入口は kotobase 方言、routine は GraphQL"
+  :adr/status "accepted"
+  :adr/date "2026-08-18"
+  :adr/deciders "Jun Kawasaki（「datalog と datomic はちゃんと分けた方がいいのでは / datomic が名称問題があれば kotobase = datomic 方言でいいのでは」）"
+  :adr/repos ["com-junkawasaki/root"
+              "kotoba-lang/datalog"
+              "kotoba-lang/arrangement"
+              "kotoba-lang/kotobase-query"
+              "kotoba-lang/datomic-client-shim"
+              "kotoba-lang/org-graphql-http"
+              "kotoba-lang/org-w3-sparql-protocol"
+              "kotoba-lang/org-opencypher-cypher"
+              "kotoba-lang/org-apache-tinkerpop-gremlin"
+              "cloud-itonami"]
+  :adr/relates-to "ADR-2608039970（kotobase の base は datom 面であって Datalog ではない）, ADR-2608039975（query surface はどれも deploy されていない / live な SPARQL は Datalog に翻訳している）, ADR-2607172300（kotobase query-protocol extension）, ADR-2607172500（GraphQL / Gremlin の scoping）, ADR-2607310900（materialize-memo）, ADR-260726（query plane is one ref）, ADR-2608039000（分散型経路に D1 を前提にしない）, ADR-2608160200（5 つの canonical IR / capability semantics）"
+  :adr/tags "naming, query, datalog, datomic, kotobase, graphql, llm, agent, ipld, security"
+  :adr/body
+  "# ADR-2608189300: Datalog / kotobase 方言 / Datomic を分ける
+
+**Status**: accepted (2026-08-18)
+
+## Context
+
+問いは cloud-itonami 側から来た —— kotobase は datom 前提だが、LLM / AI agent が
+直感的に query するには Datomic 風 Datalog・SPARQL・Cypher のどれが相性が良いか。
+
+**新規選定ではなかった。** 実測すると 5 つの surface はすべて既にライブラリとして
+在り（`datomic-client-shim` / `sparql` + `org-w3-sparql-protocol` /
+`org-opencypher-cypher` / `graphql` + `org-graphql-http` /
+`org-apache-tinkerpop-gremlin`）、全部が共有の `kotobase-query` bridge を通って
+同じ datom 面に載っている。したがって決めるべきは **どれを agent の入口に
+昇格させるか** であって、どれを作るかではない。
+
+調べる過程で、より根の問題が出た —— **私たちは 3 つの別物を 1 つの名前で
+呼んでいた。**
+
+## Decision
+
+### D1. 3 語を分ける（repo-wide mandatory）
+
+| 語 | 何を指すか | 所有 | 実体 |
+|---|---|---|---|
+| **Datalog** | クエリ言語の **形式**。関数記号なしの演繹 DB 由来。range-restricted なら停止する | 誰のものでもない | `kotoba-lang/datalog`（storage-free エンジン） |
+| **kotobase 方言** | この workspace が実際に書く **EDN 記法** —— `[:find ?e :in $ :where [?e :attr ?v]]` + `:rules` | **ここ** | `datalog.core` が実装、`kotobase.core/q` が露出 |
+| **Datomic** | Cognitect → Nubank の **製品**。方言の系譜上の祖先 | 他社 | この workspace には無い |
+
+**日常「Datalog」と呼んで書いているものは、Datalog 標準ではない。** 学術 Datalog の
+標準記法は `path(X,Y) :- edge(X,Y).` の Prolog 風であって、`:find` / `:where` の
+EDN 形ではない。EDN 形は Datomic が作った方言であり、私たちが書いているのは
+その系譜の方言である。
+
+### D2. その方言を Datomic とは名乗らない。**kotobase 方言**と呼ぶ
+
+オーナー判断（2026-08-18）。理由は 4 つで、うち 3 つは既に repo が実践している。
+
+1. **商標と無関係の明示。** `datomic-client-shim` の README が既に
+   『Datomic / Nubank / Cognitect とは無関係、wire 互換ではない、stock の
+   `com.datomic/client-cloud` は接続できない』と書き、だからこそ `org-*`
+   reverse-domain 名を名乗っていない。同じ規律を方言名にも当てる。
+2. **意味論の overclaim。** Datomic を名乗ると transactor / peer / excision /
+   全 as-of 意味論まで期待される。私たちが持っているのはその一部でしかない。
+3. **拡張の自由。これが決定的。** この方言は既に Datomic に無いものを 2 つ持つ ——
+   `ref?` の既定が `ipld.core/link?`（参照とは IPLD Link のこと）と、
+   `visible?` が required argument であること。**Datomic を名乗った瞬間、この 2 つは
+   「非互換」になる。自分の名前なら「方言の仕様」になる。**
+4. **ADR-2608039970 と同型。** あの ADR は『共有しているのは datom 面であって
+   Datalog ではない』と決めた。ここで決めるのは『共有しているのは EDN 記法の形で
+   あって Datomic ではない』——同じ形の、名前の側の決定である。
+
+**`Datomic` と名乗ってよいのは `kotoba-lang/datomic-client-shim` だけ**で、そこでも
+shape 互換であって wire 互換ではないと同時に書く（現状の README がそうなっている）。
+
+### D3. agent が書く面は kotobase 方言（EDN データ形）。定型の読みは GraphQL
+
+Cypher / SPARQL / Gremlin は **interop に留める**（外部データの受け入れ、外部ツールの
+接続）。agent の第一言語にしない。
+
+**なぜ kotobase 方言か —— security が決定打**:
+
+- **injection クラスが構造的に消える。** query が EDN 値なので文字列連結の段が無い。
+  Cypher / SPARQL もパラメータ化を守れば安全だが、『守れば』が LLM 側の規律に依存する。
+- **redaction seam が既にここにある。** `kotobase-query/bridge.cljc` の `visible?` は
+  required argument で、missing / non-callable なら**読む前に refuse** する。
+  `materialize` 自身は `visible?` を取らないので db は誰にとっても正しい値になる。
+  一方 `org-w3-sparql-protocol` は設計として `materialize` + `datoms` を使い
+  **`q` を通らない**（SPARQL algebra を Datalog に翻訳して戻すのは no benefit、という
+  正しい判断）。結果として **redaction を surface ごとに再実装する**ことになる。
+  agent 入口を kotobase 方言に置けば seam が 1 本で済む。
+- **停止性とコスト上界。** SPARQL の property path（`*` / `+`）と Cypher の可変長パスは
+  LLM が無自覚に書ける unbounded traversal。SPARQL の `SERVICE` は素の SSRF 経路。
+  kotobase 方言は range-restricted なら決定的に終わり、`datalog.query/cardinality` が
+  パターンの件数を materialize せずに数えるので事前予算がかけられる。
+- **capability 面と同じ検査器に載る。** policy（`{:allow #{[:cap/call n]}}`）も EDN 値
+  なので、query も EDN なら同型に検査できる。文字列 surface はここに parser が挟まる。
+
+**なぜ IPLD / IPNS と相性が良いか**:
+
+- `datalog.index` の `ref?` の既定が `ipld.core/link?`。4 番目の索引 `ocp`（≡ VAET）が
+  **CID リンクの逆引きそのもの**。
+- `materialize-memo` の key が **chain CID**。content address なので invalidation 経路が
+  存在しない（memo であって cache ではない）。
+- CID は identity、IPNS は naming（ADR-2608148200）。**query は identity 面に当てる**。
+  SPARQL は IRI に CID を詰めれば形は合うが、`ipfs://bafy…` を IRI 文字列にした瞬間、
+  LLM が prefix を捏造する余地が生まれる。kotobase 方言は Link を**値**として持てる。
+
+**GraphQL を併置する理由**: 型付き・再帰が既定で無い・コスト上限をかけやすく、LLM の
+精度が高い。`org-graphql-http` は既に query-only（mutation / subscription を名前付きで
+reject）で、resolver 全経路に `visible?` を通している。**アドホック分析 = kotobase 方言、
+routine = GraphQL** の 2 本立てで、これは ADR-2608039970 の peer 設計どおり。
+
+### D4. prompt では方言の形を示す。文書では方言名を使う
+
+**LLM に『Datalog』とだけ言うと Prolog 風の学術記法が出る**（`ancestor(X,Y) :- …`）。
+prompt には形と例を書く:
+
+    kotobase dialect (Datomic-shaped EDN Datalog):
+    [:find ?e ?name :in $ ?role :where [?e :user/role ?role] [?e :user/name ?name]]
+
+**文書・ADR・README では `kotobase 方言` と書き、`Datomic` を名乗らない。**
+prompt で系譜に触れるのは精度のための実務であって、名乗りではない。
+
+### D5. 素の LLM 精度では Cypher が勝つ —— それでも採らない
+
+正直に記録する。**text-to-query の素の精度は Cypher > SPARQL > Datalog 系**で、
+これは学習データ量の差なので動かない。採らない理由は**穴の埋め方が非対称**だから:
+
+- kotobase 方言の不利は **schema 注入 + few-shot + validator + repair loop** で埋まる。
+  query が EDN なので実行前に構造検証し、属性名を schema の allowlist と照合し、
+  外れたら**構造化エラーで LLM に返せる**。文字列 surface は『構文は通るが意味が違う
+  query』を検出できない。
+- Cypher の不利（unbounded path / injection / redaction 再実装）を後から塞ぐのは高い。
+
+**安い方の穴を選ぶ。**
+
+## Consequences
+
+- 用語が 3 つに分かれる。既存文書の『Datomic 方言』『Datomic 風』という記述は
+  `kotobase 方言` に読み替える（**一括改名はしない** —— 縛るのはこれから書くもの）。
+- `datomic-client-shim` の位置づけが変わる: agent 入口ではなく**運用者・既存 Datomic
+  資産向けの互換面**。理由は 3 つ —— 製品 API 面なので agent が要らない `transact` /
+  `with` / `administer-system` / lifecycle まで露出する（攻撃面が広い）、`visible?` seam は
+  bridge 側にあり shim はその上の HTTP handler、そして『Datomic 互換』と読まれると
+  transactor / peer の意味論まで期待される。
+- 方言に固有の 2 つ（`ipld.core/link?` 既定、`visible?` required）が**非互換ではなく
+  仕様**になる。これが D2 の実利。
+
+## まだ決めていないこと（推測で埋めない）
+
+1. **deploy の決定はしていない。** ADR-2608039975 のとおり 6 surface はどれも live で
+   なく、live なのは `kotobase-server` の手書き SPARQL subset（Datalog に翻訳する形、
+   ADR-2608039970 が『やめる』と決めた形）。本 ADR は**語彙と入口の決定**であって
+   deploy の決定ではない。2 実装問題を再燃させないこと。
+2. **LLM 精度の実測が無い。** D5 の順序は一般的傾向であって、schema 注入つきの
+   kotobase 方言がどこまで追いつくかは測っていない。**次の一手は測定** ——
+   cloud-itonami の実データに対し 20〜30 問の query セットを作り、kotobase 方言 /
+   GraphQL / Cypher の pass 率を測る。これがこの選択に対する最も安い evidence。
+3. **方言の仕様書が無い。** 現在は `kotoba-lang/datalog` の README が事実上の仕様。
+   authority を 1 本に決めるのは別作業（`lang/guest-grammar.edn` が source-surface の
+   authority を 1 本にしたのと同型）。
+4. **ref 1 本規則が agent の到達範囲をそのまま決める**（ADR-260726）。agent に join
+   させたいものを先に決めて 1 ref に収める設計は、この ADR の外。
+
+## 改訂履歴
+
+- 2026-08-18 起票・accepted。"}]

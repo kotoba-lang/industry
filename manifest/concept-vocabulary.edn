@@ -99,8 +99,10 @@
 
  :query-plane
  {:label "query plane / datom 面"
-  :spellings ["datalog" "datom" "query plane" "datascript" "triple store"]
-  :note "kotobase / arrangement / manifest/edn-query.cljs。"}
+  :spellings ["datalog" "datom" "query plane" "datascript" "triple store"
+              "kotobase 方言" "kotobase dialect" "datomic" "datomic 方言"
+              "sparql" "cypher" "gremlin" "graphql" "text-to-query" "クエリ言語"]
+  :note "kotobase / arrangement / manifest/edn-query.cljs。⚠ 3 語は別物（ADR-2608189300）: **Datalog** = 形式（実装は kotoba-lang/datalog）/ **kotobase 方言** = 実際に書く EDN 記法 `[:find … :where …]`、系譜は Datomic だが所有はここ（`ref?` 既定が ipld.core/link?、`visible?` が required という Datomic に無い 2 点を持つ）/ **Datomic** = 他社製品、名乗ってよいのは kotoba-lang/datomic-client-shim だけ（shape 互換であって wire 互換ではない）。agent の query 入口は kotobase 方言、routine は GraphQL、Cypher / SPARQL / Gremlin は interop。surface は 6 つとも未 deploy（ADR-2608039975）。"}
 
  :package-manager
  {:label "package / dependency management"
