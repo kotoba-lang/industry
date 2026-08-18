@@ -257,8 +257,13 @@ CAR として出ていき、test がそれを正しい振る舞いとして固�
 **現在。** productionは`b2_configured:false`でarchive keyspaceも空。fake transportと
 SigV4 regressionはimplementation evidenceに留まる。
 
-**完了条件。** 別ADRでread-only credential、既知CID canary、full / Range / ETag drift /
-missing / CAR negativeを実bucketに対して測る。write/archive enableは
+**完了条件。** 別ADR = **ADR-2608181200**（2026-08-18 起票、status `proposed`、
+証拠 0 件）が read-only credential、既知CID canary、full / Range / ETag drift /
+missing / CAR negative を実bucketに対して測る計画を固定した。
+credential は `kotoba-lang/com-backblaze-secure` 経由（新経路を作らない）、
+adapter は signing 関数が GET しか無く**構造上 read-only**なので必要権限は
+1 bucket の read のみ。**着手の前提（read-only key の登録・canary object の設置）は
+どちらも agent 側で完了できない。**write/archive enableは
 `net-kotobase` storage-mode decisionを伴うため本ADRの恒久承認に含めない。
 資格化までは`b2_raw_live_qualified:false`を維持する。
 
