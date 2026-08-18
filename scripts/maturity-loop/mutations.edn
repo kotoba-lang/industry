@@ -170,7 +170,31 @@
      :file "src/langgraph/viz.cljc"
      :find "               (for [[from _] conditional]\n                 (str \"  \" (node-id from) \" -.->|condition| END\")))]"
      :replace "               nil)]"
-     :must-fail ["a-conditional-edge-is-drawn-as-one"]}]}
+     :must-fail ["a-conditional-edge-is-drawn-as-one"]}
+
+    ;; 以下 3 件（2026-08-19）は「mock が実在しない wire contract を模していて、
+    ;; 同じだけ間違った古い client と話が合っていたので緑だった」という 1 件の
+    ;; 欠陥に対する gate。壊す向きが 3 つあり、3 つとも別々の主張を持つ。
+    {:id :langgraph/decode-edn-attr-always-reads
+     :why "kotoba substrate 側。wildcard pull は pr-str した値を **既に parse した** 形で返すので、無条件に edn/read-string すると String でない値に当たって ClassCastException。これが 2026-08-19 まで実際に壊れていた向きで、mock が entity_edn を返していたため誰も見ていなかった"
+     :file "src/langgraph/checkpoint.cljc"
+     :find "  (if (string? v) (edn/read-string v) v))"
+     :replace "  (edn/read-string v))"
+     :must-fail ["state-round-trips-identically-through-both-substrates" "put-and-get-latest"]}
+
+    {:id :langgraph/decode-edn-attr-never-reads
+     :why "in-memory substrate 側。langchain.db は書いたときの EDN 文字列をそのまま返すので、読まないと :state が文字列のまま出てくる。上の mutation と対で、decode-edn-attr が **両方向** を持っていることを示す —— 片側だけ赤くなる gate は、その fn が条件分岐である理由を検査していない"
+     :file "src/langgraph/checkpoint.cljc"
+     :find "  (if (string? v) (edn/read-string v) v))"
+     :replace "  v)"
+     :must-fail ["state-round-trips-identically-through-both-substrates" "interrupt-and-resume-datomic"]}
+
+    {:id :langgraph/mock-answers-with-entity-edn
+     :why "mock 自身の忠実度。datomic.pull がこの名前の field を返すことは一度も無く、返していたのはこの mock だけだった。実装ではなく test を壊す mutation なのは、この反復で直したのが **test が模していた contract** だからで、result_edn が load-bearing でなくなった瞬間に tests は再び fiction に対して緑になる"
+     :file "test/langgraph/kotoba_checkpoint_test.cljc"
+     :find ":result_edn (wildcard-result-edn (or entity {}))"
+     :replace ":entity_edn (wildcard-result-edn (or entity {}))"
+     :must-fail ["state-round-trips-identically-through-both-substrates" "put-and-get-latest"]}]}
 
   {:repo "orgs/kotoba-lang/prolly-tree"
    :label "prolly-tree inclusion proof"
