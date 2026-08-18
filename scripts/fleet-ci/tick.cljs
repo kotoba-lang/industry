@@ -1771,8 +1771,46 @@
         ;; ---- CD: green かつ pin が遅れているものを前進
         (let [cd? (and (get-in cfg [:cd :pin-advance-on-green])
                        (not (:no-cd opts)) (not dry?))
-              green (filter #(and (= :pass (:outcome %)) (:cd %)
-                                  (not= (:tip %) (:pin %))) @results)]
+              ;; **A repo's pin advances on the repo's checks, not on one of
+              ;; them.** `:cd` is written per gate, and gates.edn's policy note
+              ;; says the opt-in is per *repo* -- but the filter below used to
+              ;; read one result at a time, so a repo with `:jvm-test :cd true`
+              ;; and a second gate at `:cd false` advanced its pin on the JVM
+              ;; green while the second gate was failing at the same sha.
+              ;;
+              ;; Not hypothetical. Measured 2026-08-18 in manifest/fleet-ci.edn:
+              ;; org-apache-arrow at 0be7587 carries
+              ;; `:gate/test-org-apache-arrow-0be7587-...  :outcome :pass` and
+              ;; `:gate/test-nbb-cross-runtime-arrow-0be7587-... :outcome :fail`
+              ;; on the same sha, and the passing one is the `:cd true` entry.
+              ;; org-apache-parquet at 8245502 is the same shape.
+              ;;
+              ;; This only sees gates that RAN in this tick -- a gate skipped
+              ;; because its tip did not move cannot vote. So it is a floor,
+              ;; not a proof: it stops the case where both gates ran and
+              ;; disagreed, which is the case that was actually happening.
+              not-green (into #{} (comp (remove #(= :pass (:outcome %)))
+                                        (map :name))
+                              @results)
+              candidates (filter #(and (= :pass (:outcome %)) (:cd %)
+                                       (not= (:tip %) (:pin %))) @results)
+              held (filterv #(not-green (:name %)) candidates)
+              ;; One advance per REPO, not per gate. Seven repos here carry
+              ;; `:cd true` on both of their gates; without this the second
+              ;; call asks to move the pin from tip to the same tip, which
+              ;; verify-west-pins correctly refuses as not-a-forward-move --
+              ;; and it is logged as `CD pin-advance ... FAILED` right after
+              ;; the advance that succeeded.
+              green (->> candidates
+                         (remove #(not-green (:name %)))
+                         (group-by :name)
+                         vals
+                         (map first))]
+          ;; Say it out loud. A pin that was held back and a pin that was never
+          ;; a candidate look identical in a log that only prints advances.
+          (doseq [w held]
+            (log "CD hold" (:name w) "— another gate for this repo did not pass at"
+                 (sha7 (:tip w))))
           (if-not cd?
             (when (seq green) (log "CD skipped (--no-cd/--dry-run):"
                                    (pr-str (mapv :name green))))
