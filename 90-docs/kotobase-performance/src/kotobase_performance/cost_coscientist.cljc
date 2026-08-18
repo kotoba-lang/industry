@@ -96,6 +96,39 @@
 
 ;; ── the measured baseline ────────────────────────────────────────────────────
 
+(def cold-isolate-rate
+  "How often a HYDRATING request finds L1 empty. Measured, and it is not 1.
+
+  Ten paired probes on 2026-08-18, each on its own connection
+  (`describeRepo?repo=x` to hydrate, then `/_diag/hydrate` on the SAME
+  connection so the diagnostic reports the isolate the probe actually used):
+
+      cold  84 gets -> R2   n=6   wall 3.09 3.11 3.14 3.54 3.82 4.92  median 3.34
+      warm  84 gets -> L1   n=4   wall 2.24 2.29 2.47 3.11             median 2.38
+
+  6/10. Two things follow, and they point opposite ways.
+
+  **The baseline's `:class-b-ops 84` came from ONE sample and is the COLD
+  case.** The measured mix is 84 * 0.6 = 50.4 gets per served read, so the
+  class-B term was overstated by 40% and every hypothesis that removes gets was
+  credited with removing more than exist.
+
+  **And the rate is confounded by the probe.** Ten requests in ~35 seconds warm
+  the isolates that the next request may land on, so 0.6 is an upper bound on
+  coldness under back-to-back traffic and a LOWER bound on what an idle graph
+  would show. This graph has no organic traffic at all (twelve consecutive
+  `/_diag/hydrate` reads on the same day found twelve isolates that had never
+  hydrated), so its real regime is nearer 1.0 than 0.6.
+
+  Carried as a parameter rather than folded into the numbers, because the two
+  regimes give different answers and the loop should say which one it priced.
+
+  The wall-clock difference is the same 84 gets seen from outside: ~1.0 s of
+  the ~3.3 s cold request. It is not in the judge -- Cloudflare bills CPU, not
+  wall -- and it is the reason a user-visible latency argument and a cost
+  argument can disagree about this tier."
+  0.6)
+
 (def baseline
   "What one served read costs, as of 2026-08-18.
 
@@ -116,7 +149,11 @@
    ;; the same problem and are stale by the same amount -- see :roadmap-caveat.
    :cpu-ms-parts :needs-re-measurement
    :cpu-ms-harness 1976            ; what iteration-01 priced
-   :class-b-ops 84                 ; live
+   ;; MEASURED MIX, not the single sample. 84 is what ONE hydrate costs when it
+   ;; finds L1 empty; `cold-isolate-rate` says 6 in 10 do. Pricing every read at
+   ;; 84 credits every gets-removing hypothesis with 40% more than is there.
+   :class-b-ops (* 84 cold-isolate-rate)
+   :class-b-ops-cold-case 84       ; live, one sample, the cold case
    :bytes 11462579                 ; live
    :unfolded-txs 63                ; live
    :seed-bytes 4930593
@@ -149,7 +186,7 @@
              every s3 request for that bucket to its own graph, so on THIS graph
              only the four credential-gated query surfaces can reach them. Every
              request parses them anyway."
-    :after-harness {:cpu-ms 810 :class-b-ops 84}
+    :after-harness {:cpu-ms 810 :class-b-ops :unchanged}
     :basis :measured
     :basis-note "byte accounting of the real seed, 2026-08-17. The cpu figure
                  assumes B falls with the share of values parsed; that
@@ -163,7 +200,7 @@
     :title "Decode the seed without parsing values nobody asked for"
     :change "Keep values as their stored EDN strings and parse only the
              collections the request's surface can address."
-    :after-harness {:cpu-ms 519 :class-b-ops 84}
+    :after-harness {:cpu-ms 519 :class-b-ops :unchanged}
     :basis :measured
     :basis-note "Same CBOR decoded without parsing values: 2.5-6.8 ms against
                  887-919 ms parsed. Removes B; A remains."
@@ -175,7 +212,7 @@
     :title "Materialise the hydrated seed, keyed by chain CID"
     :change "Serve the seed as one content-addressed object instead of
              rebuilding it from 84 blocks."
-    :after-harness {:cpu-ms 1430 :class-b-ops 1}
+    :after-harness {:cpu-ms 1430 :class-b-ops (* 1 cold-isolate-rate)}
     :basis :measured
     :basis-note "Removes A (514 ms) and the 84 gets. B survives ANY encoding,
                  because the consumer is a synchronous LocalStore over a plain
@@ -189,7 +226,7 @@
    {:id "h2-fold"
     :title "Fold the novelty backlog"
     :change "63 of 84 blocks are one tx-block per unfolded transaction."
-    :after-harness {:cpu-ms 1738 :class-b-ops 21}
+    :after-harness {:cpu-ms 1738 :class-b-ops (* 21 cold-isolate-rate)}
     :basis :measured
     :basis-note "Fold reduces the NOVELTY part of A, not B. The first run of
                  this loop credited it with 57.5% by using an offline harness
@@ -202,7 +239,7 @@
    {:id "h4-carv2-pack"
     :title "Pack commit-local blocks into CARv2 archives"
     :change "One range GET per commit's blocks instead of one per block."
-    :after-harness {:cpu-ms :unchanged :class-b-ops 64}
+    :after-harness {:cpu-ms :unchanged :class-b-ops (* 64 cold-isolate-rate)}
     :basis :measured-and-refuted-for-this-shape
     :basis-note "Only the 21 snapshot blocks coalesce; each novelty cell is its
                  own commit and therefore its own pack."
@@ -213,7 +250,7 @@
    {:id "h3-engine-materialisation"
     :title "Stop materialising query intermediates"
     :change "~16x of headroom inside the query engine."
-    :after-harness {:cpu-ms :unchanged :class-b-ops 84}
+    :after-harness {:cpu-ms :unchanged :class-b-ops :unchanged}
     :basis :measured
     :basis-note "The engine is ~6 ms of this request. CPU is :unchanged rather
                  than 1970: a hypothesis that moves ~6 ms of a 2,058 ms request
@@ -225,7 +262,7 @@
    {:id "h5-engine-pin"
     :title "Ship the benchmarked query engine"
     :change "Production ran datalog 14 commits behind the benchmarked build."
-    :after-harness {:cpu-ms :unchanged :class-b-ops 84}
+    :after-harness {:cpu-ms :unchanged :class-b-ops :unchanged}
     :basis :measured
     :basis-note "Landed 2026-08-17; changed no served number, as predicted.
                  Kept as a control -- a hypothesis with a measured zero."
@@ -240,7 +277,10 @@
              datoms.kotobase.net has had two tiers since the block-cache
              landing -- L1 isolate memory AND L2 the Cloudflare Cache API,
              which is per-colo and survives the isolate. This one has L1 alone."
-    :after-harness {:cpu-ms :unchanged :class-b-ops 21}
+    ;; 84 gets on the COLD fraction only -- L2 can only help a request L1 did
+    ;; not already answer -- times the misses at an assumed 75% hit rate.
+    :after-harness {:cpu-ms :unchanged
+                    :class-b-ops (* 84 cold-isolate-rate 0.25)}
     :basis :predicted
     :basis-note "The MECHANISM is measured and the RATE is not, and the two
                  must not be reported as one number.
@@ -290,11 +330,24 @@
   A hypothesis that does not claim to move CPU is therefore priced at the CPU
   that was actually measured, with no proxy in the path at all."
   [{:keys [after-harness] :as h}]
-  (let [cpu (:cpu-ms after-harness)]
-    (assoc h :after (assoc after-harness
-                           :cpu-ms (if (= :unchanged cpu)
-                                     (:cpu-ms baseline)
-                                     (Math/round (* workerd-scale cpu)))))))
+  (let [cpu (:cpu-ms after-harness)
+        ops (:class-b-ops after-harness)]
+    (assoc h :after {:cpu-ms (if (= :unchanged cpu)
+                               (:cpu-ms baseline)
+                               (Math/round (* workerd-scale cpu)))
+                     ;; Same rule on the other axis, and it was needed for the
+                     ;; same reason twice in one session: the FIRST fix made
+                     ;; CPU-neutral hypotheses resolve to the live baseline, and
+                     ;; then the class-B baseline moved (84 -> the measured mix)
+                     ;; while the hypotheses still carried the cold-case 84.
+                     ;; h5-engine-pin -- the control -- immediately read
+                     ;; -$12.10. A stale literal on EITHER axis reappears as a
+                     ;; regression the hypothesis does not cause, and the only
+                     ;; reason it was caught both times is that a measured zero
+                     ;; is sitting in the roadmap where it can be read.
+                     :class-b-ops (if (= :unchanged ops)
+                                    (:class-b-ops baseline)
+                                    ops)})))
 
 (defn generate [] (mapv scale-after hypotheses))
 
@@ -375,37 +428,32 @@
 
 (defn evolve
   "Hypotheses are not independent, and the tournament ranks them as if they
-  were. This is where that is repaired -- and on the corrected inputs it says
-  something the ranking cannot.
+  were. This is where that is repaired.
 
-  A served read has two priced resources, and the roadmap has been arguing
-  about one of them. CPU is $41.16 of the $71.70; the 84 class-B gets are
-  $30.24, **42% of the unit cost**, and every hypothesis that touched it was
-  ranked by how much CPU it also moved.
+  A served read has two priced resources. CPU is $41.16 of the $59.60. The
+  gets are $18.14, and that number moved TODAY: `cold-isolate-rate` measured
+  that 6 hydrating requests in 10 find L1 empty, not 10 in 10, so the class-B
+  term is 40% smaller than iteration-03 priced it.
 
-    h7 removes the CPU half (parse), leaves the 84 gets.
-    h8 removes most of the gets, leaves the CPU.
-    h1 removes the gets AND half the CPU, and is the only one of the three
-       whose cost depends on a write rate nothing has measured.
+    h7 removes the CPU half (parse), leaves the gets.
+    h8 removes most of the gets L1 did not already remove, leaves the CPU.
+    h1 removes the gets AND half the CPU, and is the only one whose cost
+       depends on a write rate nothing has measured.
 
-  **h7 and h8 are orthogonal, so their savings add.** h1 is NOT additive with
-  h8 -- it subsumes it, by removing the same reads a different way.
+  h7 and h8 are orthogonal, so their savings add. h1 is NOT additive with h8 --
+  it subsumes it.
 
-  Order is the bouts' own rule applied to the pair: reversible first, then
-  cheaper effort. That puts h8 ahead of the top-ranked h1 and ahead of h7:
-  :S rather than :M/:L, reversible, semantically inert (blocks are immutable
-  and CID-verified, so caching them changes no answer), and -- the reason it
-  can be done TODAY -- it needs no credential and no write to the graph, while
-  h1's maintenance is a rebuild per commit and h2/h6 need a write this session
-  cannot issue.
+  **The order changed, and the measurement changed it.** iteration-03 put h8
+  first: :S, reversible, no credential, and its premise -- that L1 never helps
+  a served read -- was inferred from twelve `sampled: false` readings. Those
+  readings answered `has this isolate ever hydrated`, which is a different
+  question from `when a request DOES hydrate, is L1 warm`. Measured directly,
+  the answer is warm 4 times in 10, and h8's saving fell from $22.68 to $13.61.
 
-  What the pair does NOT include, and why: h4 (pack). Its whole saving is the
-  same 84 gets h8 removes, and it removes fewer of them (84->64, because each
-  novelty cell is its own commit and therefore its own pack). After h8 it is
-  worth close to nothing on THIS graph. Packing earns its place on the write
-  path of the OTHER worker -- where a fold re-PUTs every unchanged tree node
-  and reads it back to byte-compare -- and that is not the resource this judge
-  prices."
+  h7 is now first on the number as well as being the larger half of the request.
+  h8 is not withdrawn -- it is landed, it is still worth $13.61, and it is the
+  only one of the three that needs neither a credential nor a write. It is
+  simply no longer the biggest thing available."
   [ranked]
   (let [by-id (into {} (map (juxt :id identity) ranked))
         h1 (by-id "h1-seed-materialisation")
@@ -413,36 +461,41 @@
         h8 (by-id "h8-l2-cache-api")
         pair-cost (cost-per-million {:cpu-ms (get-in h7 [:after :cpu-ms])
                                      :class-b-ops (get-in h8 [:after :class-b-ops])})]
-    {:batch-id "kotobase-cost-kaizen-3"
-     :members ["h8-l2-cache-api" "h7-parse-only-addressable-values"]
-     :order "h8 first, then h7"
-     :why "h8 and h7 buy different resources, so the pair is the sum. h8 goes
-           first because it is :S, reversible, needs no credential, and its
-           mechanism -- not its rate -- is already measured: L1 is isolate
-           memory and every measured request landed on a cold isolate."
+    {:batch-id "kotobase-cost-kaizen-4"
+     :members ["h7-parse-only-addressable-values"]
+     :order "h7 next; h8 is landed and awaiting deployment"
+     :why "h7 is the larger half of a served read, is reversible, is :M, and is
+           independent of the read:write ratio. It is also the half neither h8
+           nor any cache can touch: a warm isolate still pays it in full, which
+           is exactly what the 2.38 s warm requests show against 3.34 s cold."
      :pair-cost-per-million pair-cost
      :pair-saving (- (cost-per-million baseline) pair-cost)
+     :h8-status
+     {:landed "net-kotobase/control-plane main 57b1f350f"
+      :ranked-first-in "iteration-03"
+      :ranked-fourth-in "iteration-04, after cold-isolate-rate was measured"
+      :was-that-wrong?
+      "The landing, no: :S, reversible, semantically inert, still $13.61, and it
+       is the only actionable item that needs no credential. The ORDER, yes --
+       it was first on a premise that had not been measured, and measuring it
+       moved it to fourth. Recorded rather than quietly re-sorted."}
      :additive-not-subsumed
      {:h8-alone (:cost-after h8) :h7-alone (:cost-after h7) :pair pair-cost
       :h1-alone (:cost-after h1)
       :note "h1 vs h8 is a CHOICE, not an order: both remove the gets."}
      :not-in-the-batch
-     "h2 (fold) is one write from firing and reduces the novelty part of the
-      same reads h8 caches; it will land on its own when a write happens. h6
-      (retracting 91 documents) is the largest byte reduction available and is
-      irreversible production data deletion -- an owner judgement, not this
-      loop's. h4 (pack) is superseded on this graph by h8, see the docstring.
-      h1 stays the largest single number and is deliberately NOT first."
+     "h6 (retracting 91 documents) is now THIRD at $21.50 and is still an owner
+      judgement: it is irreversible deletion of production data. h2 (fold) is
+      one write from firing. h4 (pack) is $4.32 on this graph -- same gets as
+      h8, fewer of them removed -- and earns its place on the OTHER Worker's
+      write path, which this judge does not price."
      :how-this-batch-can-fail
-     "h8's saving is a hit RATE and the hit rate is assumed. The landing is not
-      done when the tier exists -- it is done when the diagnostic reports L1 and
-      L2 hits SEPARATELY and a live probe shows which one answered. A tier that
-      is present and never hit costs one extra lookup per block and saves
-      nothing, and would be indistinguishable from success in every counter
-      this Worker has today."
+     "h7's :after-harness was measured against the OLD decode2 and is still
+      stale by the ~28% the outer-string change already took off phase B. Its
+      $28.56 is therefore an UPPER bound. The phase bench that would fix it has
+      been blocked by the repo-wide build governor all session."
      :unmeasured-dependency
-     "h1's maintenance is a seed rebuild per commit. At ~3 writes/day that is
-      free; at a high write rate it inverts. NOTHING HERE MEASURES THE
+     "h1's maintenance is a seed rebuild per commit. NOTHING HERE MEASURES THE
       READ:WRITE RATIO."}))
 
 ;; ── Meta ─────────────────────────────────────────────────────────────────────
