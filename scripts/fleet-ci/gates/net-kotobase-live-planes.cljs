@@ -300,10 +300,48 @@
         ;; 6. the read-only protocol surfaces
         (.then (fn [_]
                  (js/Promise.all
-                  (clj->js (for [h ["sparql" "cypher" "gremlin" "graphql" "graphdb"]]
+                  (clj->js (for [h ["sparql" "cypher" "gremlin" "graphql"]]
                              (expect! (str "surface/" h)
                                       (str "https://" h ".kotobase.net/health") nil
                                       "200" (status= 200)))))))
+        ;; 7. the retired hostnames stay retired.
+        ;;
+        ;; ADR-2608159100 removed `graph-database` / `backend` / `graphdb` from
+        ;; Custom Domains and DNS on 2026-08-15 and forbade reintroducing them
+        ;; "rollback alias を含め". Until 2026-08-18 this gate asserted
+        ;; `graphdb.kotobase.net/health` returned 200 — it was enforcing the
+        ;; OPPOSITE of the accepted decision, and had been red ever since for
+        ;; exactly the reason the ADR intended.
+        ;;
+        ;; EVIDENCE FLOOR. A check that passes when a host does not resolve also
+        ;; passes when nothing resolves — the failure mode CLAUDE.md names, where
+        ;; "could not measure" returns the same value as "measured, and fine". So
+        ;; a non-resolving retired host only counts as compliance once a live
+        ;; surface in the same run has answered; otherwise this reports that it
+        ;; could not tell, and says so.
+        (.then
+         (fn [_]
+           (let [live-surface-answered? (empty? @failures)]
+             (js/Promise.all
+              (clj->js
+               (for [h ["graph-database" "backend" "graphdb"]]
+                 (-> (fetch-text (str "https://" h ".kotobase.net/health") nil)
+                     (.then
+                      (fn [{:keys [status]}]
+                        (cond
+                          (not= 0 status)
+                          (fail! (str "retired/" h)
+                                 (str "ADR-2608159100 retired this hostname on "
+                                      "2026-08-15; it answered HTTP " status))
+
+                          (not live-surface-answered?)
+                          (fail! (str "retired/" h)
+                                 (str "does not resolve, but no live surface "
+                                      "answered in this run either — cannot "
+                                      "distinguish retirement from an outage"))
+
+                          :else
+                          (pass! (str "retired/" h) "does not resolve (as ADR-2608159100 requires)")))))))))))
         (.then
          (fn [_]
            (let [fs @failures]
