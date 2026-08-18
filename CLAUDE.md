@@ -1767,10 +1767,19 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
 > frontend ではなく authority を先に見る。
 
 **kotoba には独立した2つのコンパイラ面があり、新規の `.kotoba` は必ず後者
-（`kotoba compile` → `kotoba-lang/compiler`）で書く。** legacy emitter
+（`amu compile` → `kotoba-lang/amu`）で書く。** legacy emitter
 （`kotoba wasm emit` / `kotoba cljs emit`）は単一ファイル・貧弱な型・127 バイト文字列上限を
 持つ旧経路であり、その制約を「Kotoba 言語の限界」と誤認しない（実際に 2026-07-27 の spike が
 この取り違えをやった）。
+
+⚠ **compiler repo は `kotoba-lang/compiler` から `kotoba-lang/amu`（編む）に改名済み。**
+旧名は GitHub リダイレクトで生きており、**west には `compiler` と `amu` の 2 entry が
+残っていて別々の checkout を持つ**（`orgs/kotoba-lang/compiler` は古い pin で止まる）。
+読むのも走らせるのも `orgs/kotoba-lang/amu` 側にする。CLI の front は `bin/amu`
+（`bin/kotoba` / `bin/kotoba-compiler` は互換 shim）。native backend は
+`kotoba-lang/kotoba-native`、KIR は `kotoba-lang/kotoba-kir`、restricted-ESM emitter は
+`kotoba-lang/kotoba-script`、実行/runtime linking は `kotoba-lang/kototama` に分かれている
+（ADR-2608139980 の 綾 分割）—— **amu に無いからといって「無い」と結論しない。**
 
 | | legacy（`wasm emit` / `cljs emit`） | **`compile`（使うのはこちら）** |
 |---|---|---|
@@ -1818,6 +1827,41 @@ application programming model*」** と明記している。したがって:
   native にも載る書き方として引き続き有効。ただし**string-only SSR を最終 API にしない**
   （ADR-2607279200 Delivery #6）。
 
+### ブラウザ / JS で動かす口は 3 つあり、既定は restricted ESM（2026-08-18 実測）
+
+**`.kotoba` をブラウザや Node で動かすとき、既定は `--target js`（`:js-kotoba-v1`）
+または `--target js-browser`（`:js-browser-kotoba-v1`）の restricted ESM。**
+`kotobaArtifact` と `instantiateKotoba(grants)` を export する `.mjs` が 1 枚出て、
+そのまま `import` できる。
+
+| target | 出力 | host | 使いどころ |
+|---|---|---|---|
+| `js` / `js-browser` | restricted ESM `.mjs` | `amu/runtime/dom-driver.mjs` + `browser-host.mjs` | **既定。** ブラウザアプリ・多ファイル project |
+| `wasm32-browser` | `.wasm` | `amu/runtime/browser-host.mjs`（`kotoba:typed/cap-call`） | capability kit の `:wasm-aot` 面 |
+| `cljs-browser-kotoba-v1` | `.cljs` **ソーステキスト** | 無い（自分で require して `main` を呼ぶ） | cljs toolchain に載せたいとき |
+
+- **UI は `init` / `view` / `step` の 3 つの純関数 export**（`state + event -> next-state`）。
+  参照実装は `amu/examples/todo-app.kotoba`、host は `amu/runtime/dom-driver.mjs`。
+  **capability は要らない** —— guest は DOM 名も host object も callback も受け取らず、
+  往復するのは `data-k` 由来の文字列だけ。`requiredCapabilities` は空で mount する。
+- **cljs backend は「できている」が JS 面の主役ではない。** 出るのは `.cljs` ソースなので
+  nbb / shadow-cljs が要り、**ブラウザ用の host runtime が無い**。capability kit ファイルに
+  cljs の qualification 行は 1 件も無く（`:jit` は kotoba-script の `:js-kotoba-v1` のこと）、
+  `surface-status.edn` の `:backend-parity` も「同じプログラムを `:kotoba-wasm` と
+  `:kotoba-cljs` で走らせて突き合わせる harness はまだ無い」と自分で書いている。
+  **「cljs があるから browser は済んでいる」と読まない。**
+- **先に当たる天井は fuel ではなく値の大きさ。** `:document` は 256 ノードで、
+  `todo-app.kotoba` 程度のレイアウトだと数行で `doc-node-limit` に届く（その天井は
+  ファイル冒頭のコメントが自分で申告しているので、そこを読む）。fuel 512 は instance
+  生涯で使い切りなので dom-driver は **1 インタラクション = 1 新規 instance** にしている
+  —— 共有すると描画途中で `fuel-exhausted` になる。**整数→文字列の builtin が無い**
+  （todo-app が ID を 26 文字のアルファベットから取っているのはそのため）。
+- **コンパイルは `js` / `cljs` とも JVM 経路**（`bin/amu` が nbb ネイティブ経路に振るのは
+  wasm / native だけ）。1 ファイルで分単位かかるので、loop や hook に組み込む前に測る。
+- 実ブラウザでの確認は `amu/tests/browser/`（`app.html` + `browser.spec.mjs`、Playwright で
+  trusted event を送る）。Node の mock DOM で足りるなら `createMockDom` が
+  `browser-host.mjs` に在る。
+
 ### 今日の既知ブロッカー（回避策を知らずに時間を溶かさないこと）
 
 1. ~~project linker が `:capabilities` を拒否~~ / ~~CLI が policy を `{}` 固定で渡す~~ —
@@ -1826,13 +1870,47 @@ application programming model*」** と明記している。したがって:
    `{:allow #{[:cap/call <id>]}}` を渡せば CLI からそのままコンパイルできる。
    `--policy` 無しは空 policy（deny-by-default は不変）。`:schemas` は project mode では
    引き続き拒否（同名 schema の衝突規則が未決定）。
-2. **全 8 capability kit（clock/http/llm/log/state/storage/stream-object/ui）は
-   `:reference :implemented` だが `:wasm-aot`/`:native-aot`/`:jit` は `pending`**。
+2. **capability kit の qualification をここに書き写さない — kit ファイルが正本。**
+   `orgs/kotoba-lang/amu/resources/kotoba/lang/capability-kits/*.edn` の
+   `:qualification` を引く。key の意味は `:reference`（KIR インタプリタ）/
+   `:wasm-aot`（`wasm32-browser-kotoba-v1` + `kotoba:typed/cap-call`）/
+   `:wasm32-kotoba-v1`（clock の i64 `kotoba:cap/call` 面 —— **その target に
+   コンパイルできることと、その host 面で動くことは別の主張**なので別 key）/
+   `:native-aot` / `:jit`（kotoba-script `:js-kotoba-v1` を V8 で実行）。
+   **値は kit ごとに違う**ので「N kit とも同じ」という形の要約を作らない。
+
+   ```bash
+   nbb --classpath ".:scripts/nbb_compat" -e '
+   (ns x (:require [clojure.edn :as edn] ["fs" :as fs] ["path" :as p]))
+   (def dir "orgs/kotoba-lang/amu/resources/kotoba/lang/capability-kits")
+   (doseq [f (sort (fs/readdirSync dir))]
+     (println (.padEnd (subs f 0 (- (count f) 4)) 20)
+              (pr-str (:qualification (edn/read-string (fs/readFileSync (p/join dir f) "utf8"))))))'
+   ```
+
+   **grep で代替しない。** `grep -A6 … | cut` で試したところ、行の折り返しのせいで
+   ちょうど `:jit` が 5 kit 分だけ末尾で切れ、**切れたことが出力から分からなかった**
+   （「測れなかった検査が、測って問題が無かった検査と同じ顔をする」の小型版）。
+   key の集合も kit ごとに違う（`stream-object-v1` だけ `:frontend` / `:wit-03` /
+   `:restricted-esm` という別語彙）ので、reader で読んで map ごと出す。
+
+   kit ファイルは pending の理由まで書いている（例: ui-v1 の `:native-aot` は
+   「未着手」ではなく `[:set [:record …]]` が one-word 値でないという**測定された
+   拒否**で、同じ native に dataspace は qualified 済み）。**pending を「誰も試して
+   いない」と読まない。**
+
+   ⚠ **この項目自身が 3 週間ずれていた。** 旧文は「全 8 kit が `:wasm-aot` /
+   `:native-aot` / `:jit` とも pending」という **2026-07-27 の測定値**を定数として
+   持ち、2026-08-18 に引用された時点で実態と食い違っていた（kit ファイル側は
+   `Measured 2026-08-18` と日付を書いて更新し続けている）。**「今日の既知ブロッカー」
+   という見出しの節に値を書けば、その値は明日も「今日」として読まれる。**
+   ここに残してよいのは*引き方*であって*引いた結果*ではない。
 3. **ingress capability は在る**（`capability-kits/http-ingress-v1.edn`、host-injects /
-   guest-polls の accept-then-reply、queue 深さ 8、body 64 KiB）。**ただし
-   `:native-aot` / `:wasm-aot` は他 kit と同じく `pending`** なので、Cloudflare Worker の
-   エントリは当面 cljs のままにする（ADR-2606290000 と整合）。2026-08-08 訂正: 旧文は
-   「どちらの面にも無い」と書いていた。
+   guest-polls の accept-then-reply、queue 深さ 8、body 64 KiB）。**ただし ingress 系の
+   qualification は他 kit と揃って進まない** —— Cloudflare Worker のエントリを Kotoba に
+   移す前に、item 2 のコマンドで `http-ingress-v1` / `stream-ingress-v1` の行を実際に
+   見る（ADR-2606290000 と整合）。2026-08-08 訂正: 旧文は「どちらの面にも無い」と
+   書いていた。
 4. **fs/process/exec capability も Kotoba script host（`kbb`）も無い** — build スクリプトは
    nbb 据え置き。`kotoba-lang/kotoba-script` は restricted-ESM emitter であって script runner
    ではない（名前で誤解しないこと）。
@@ -1851,7 +1929,7 @@ application programming model*」** と明記している。したがって:
   `:intentional-semantic-simplification`（決定性・可搬性のため意図的に狭い）/
   `:implemented-partial`（1 つ以上の backend で使える）/ `:not-yet-implemented`
   （**安全上の禁止ではない**）。
-- **`kotoba-lang/compiler` の `resources/kotoba/lang/application-language.edn` の
+- **`kotoba-lang/amu` の `resources/kotoba/lang/application-language.edn` の
   `:backend-qualification :rule`** — *An unavailable backend is an implementation gap,
   not a reason to remove a specified safe language feature.*
 
@@ -1976,15 +2054,15 @@ JS エンジン（Node/browser）ホスト・新規 Rust 実行エンジンの�
   「decision-free C mechanism」であり、新しい admission/validation 経路は
   必ず Kotoba object として書く（C に判断ロジックを足さない）。汎用ランタイム
   や Rust 代替としての C 導入は引き続きこの例外に含まれない。
-- **`kotoba-lang/compiler` に、まさにこれを実現するネイティブ AOT バックエンドが
-  既に実在する**: `src/kotoba/compiler/backend/x86_64.cljc`（797行）/
-  `backend/aarch64.cljc`（735行）——生の機械語オペコードを直接 cljc で手書き
-  emit（SysV/AAPCS64 ABI、fuel計測、末尾自己再帰最適化、`pair`ヒープアリーナ）。
-  `test/kotoba/compiler/native_executor_test.clj` で実ネイティブプロセス実行
-  （`result 42`・trap/signal検知・ヒープアリーナ動作）を証明済み。ホスト側の
-  非cljcコードは `tools/kexe_loader.c`（+ `_windows.c`、SHA256ピン留め・
-  レビュー済み）。**新しいネイティブ実行経路を探す前に、まずこのバックエンドを
-  確認する（ゼロから設計しない）。**
+- **`kotoba-lang/kotoba-native` に、まさにこれを実現するネイティブ AOT バックエンドが
+  既に実在する**: `src/kotoba/native/x86_64.cljc` / `src/kotoba/native/aarch64.cljc`
+  ——生の機械語オペコードを直接 cljc で手書き emit（SysV/AAPCS64 ABI、fuel計測、
+  末尾自己再帰最適化、`pair`ヒープアリーナ）。実ネイティブプロセス実行の証明
+  （`result 42`・trap/signal検知・ヒープアリーナ動作）は amu 側の
+  `test/kotoba/compiler/native_executor_test.clj`、ホスト側の非 cljc コードは
+  amu の `tools/kexe_loader.c`（+ `_windows.c`、SHA256ピン留め・レビュー済み）。
+  **新しいネイティブ実行経路を探す前に、まずこのバックエンドを確認する
+  （ゼロから設計しない）。**
 - ~~現状のギャップ: この native backend は `kgraph-assert!`/`kgraph-query` を
   まだサポートしない~~ **→ 解消済み（2026-07-24 実測、adr-ledger seq 41 で
   ADR-2607198300 に amend 済み）**: x86_64/aarch64 backend は
