@@ -68,7 +68,53 @@
   checked, priced for eight iterations, chosen because it was the graph that
   happened to be under the first probe."
 
+ ;; ── CORRECTION, same day, 3 minutes later ──────────────────────────────────
+ :correction
+ {:at "2026-08-18T11:01Z"
+  :what-was-claimed
+  "That every observed hydrate is `s3-bucket/cloud-itonami-kouhou`, and by
+   implication that kotobase-protocols-v2 has no readers."
+  :what-happened
+  "A sampler left running past the window recorded, within three minutes:
+
+     10:58   s3-bucket/cloud-itonami-kouhou only
+     10:59   kotobase-protocols-v2 at 10:59:25 and 10:59:29
+     11:01   kotobase-protocols-v2 at 10:59:10, :19, :25, :29 -- four hydrates
+             in 19 seconds -- and a THIRD graph, s3-bucket/4054fd3a10f226c2"
+
+  :so-the-window-claim-stands-and-the-generalisation-does-not
+  "`Of 34 hydrated isolates observed 10:36-10:58Z, all 34 held
+   s3-bucket/cloud-itonami-kouhou` is what was measured and it remains true.
+   `kotobase-protocols-v2 has no readers` was an inference from it, and it is
+   false: that graph took four hydrates in 19 seconds at 10:59.
+
+   Traffic on this Worker is BURSTY and multi-graph. A 22-minute window sees
+   one graph; the next three minutes see three. The original finding was itself
+   produced by looking at a longer window than the one that produced the
+   error it corrected, and it was still too short."
+
+  :and-the-limit-that-cannot-be-measured-from-here
+  "Whose traffic. This workstation runs many concurrent agent sessions against
+   the same production hosts, and a hydrate recorded by an isolate carries no
+   caller identity. The 10:59 burst on kotobase-protocols-v2 was not driven by
+   this session -- every request it made after 10:57:45 was a BARE diagnostic
+   read, which does not hydrate -- but `not mine` is not `a user`. Agent
+   traffic and organic traffic are indistinguishable from this vantage point,
+   and every traffic statement in this loop inherits that."
+
+  :what-survives-of-the-finding
+  "The routing fact, which is not a traffic observation: since 2026-08-10 an s3
+   request for a bucket goes to its own chain, so the 526-document collection
+   on the shared graph is reachable there only by the four credential-gated
+   query surfaces. That is read from `graph/for-request`, not from a sample,
+   and it is what makes h6 and much of h7 worth less than their numbers say.
+
+   What does NOT survive is `no readers`. Per-graph unit economics still need
+   per-graph measurement, and the traffic mix needs a window measured in hours,
+   not minutes."}
+
  :next
- "Re-measure on `s3-bucket/cloud-itonami-kouhou`: fetch its blocks, run the
-  pinned phase bench against it, and re-derive the baseline. Only then is the
-  ranking about the thing that costs money."}
+ "Re-measure per graph -- `s3-bucket/cloud-itonami-kouhou` at 33 blocks and
+  kotobase-protocols-v2 at 84 -- and get a traffic mix over hours rather than
+  minutes before weighting them. Only then is the ranking about the thing that
+  costs money."}
