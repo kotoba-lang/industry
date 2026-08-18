@@ -59,12 +59,25 @@ the two things to delete. And run `git status` after cleanup steps, not only aft
 edits -- the danger here was in the teardown, which is the part that feels like it
 cannot go wrong.
 
-## Measured aside, for a later iteration
+## Measured aside, and a wrong reading of it corrected
 
-That 229,346 is itself a finding. `orgs/` is described as west-managed and outside
+That 229,346 is worth knowing: `orgs/` is described as west-managed and outside
 root's tree, and for west-registered repos it is -- but 75 paths are committed
 directly into root, including `orgs/personal/drive`, `orgs/personal/takeout`,
-`orgs/personal/media` and several `*-assets` directories. The large-binary policy
-(B2 + DataLad, skill `large-binary-datalad`) says content like that does not belong
-in git history, and root's `.git` reaching 18 GB is consistent with it being there.
-Not acted on here; recorded so it is measured before it is described."}]
+`orgs/personal/media` and several `*-assets` directories.
+
+**My first reading of that was wrong and is corrected here.** I wrote that this
+looked like the large-binary policy being violated. It is the opposite: measured
+with `git ls-files -s`, those paths are ~99% mode 120000 -- **git-annex pointers,
+not blobs**:
+
+    orgs/personal/drive       27,236 tracked   27,221 annex symlinks
+    orgs/personal/takeout    189,651 tracked  187,456 annex symlinks
+    orgs/personal/media          623 tracked      622 annex symlinks
+    mangaka-ghosthacker-assets   956 tracked      838 annex symlinks
+
+That is exactly what skill `large-binary-datalad` prescribes. `git-annex` said so
+itself during the commit for this ADR (*content availability has changed … run
+git-annex restage*) and I filed the ADR before reading it. The count of tracked
+paths says nothing about bytes in history; **`git ls-files` counts entries, and an
+annex pointer is an entry.** Nothing to act on."}]
