@@ -1,22 +1,77 @@
 (ns kotoba.industry
-  (:require [clojure.edn :as edn]
-            [clojure.java.io :as io]
-            [clojure.set :as set]
+  "The ISIC industry registry, portable.
+
+  ## Why this is `.cljc` and not `.clj`
+
+  One line made this namespace JVM-only — `(slurp (io/resource …))` — and
+  with it every consumer, including the 651 `cloud-itonami-isic-*` actors
+  this registry exists to feed. `kotoba.technology`, which this requires,
+  had the same line and was made portable the same day; `kotoba.industry.wave`
+  beside it was already portable. This workspace's runtime order is
+  kotoba-wasm → clojurewasm → ClojureScript → nbb, with the JVM last; a
+  registry of facts is the last thing that should decide a consumer's
+  runtime.
+
+  ## No runtime file access at all
+
+  There is no portable `io/resource`, and the obvious `:cljs` substitute —
+  reading `resources/<path>` relative to the working directory — is right
+  only while this library is the root project. That was measured wrong the
+  same day in `kotoba-lang/technology`: its registry came back nil for all
+  159 of `kotoba.iso3166`'s assertions under nbb, because nbb's cwd was
+  iso3166's root and not technology's. A portability fix that works only
+  while you are the root is not one, and this library has more consumers
+  ahead of it than any other registry in the workspace.
+
+  So the registry is compiled in, as the generated
+  `kotoba.industry.embedded`, projected from
+  `resources/kotoba/industry/registry.edn` by `tools/gen-embedded.cljs`. The
+  EDN stays the thing a human edits; `--check` refuses to let them drift.
+
+  **A registry handed in as nil still propagates as nil.** `(into {} …)`
+  over nil yields `{}`, so `by-id` would answer a complete-looking index
+  over no data and `get-industry` nil for every ISIC class — a caller
+  passing nothing must not receive that."
+  (:require [clojure.set :as set]
+            [kotoba.industry.embedded :as embedded]
             [kotoba.industry.wave :as wave]
             [kotoba.technology :as technology]))
 
-(def registry-resource "kotoba/industry/registry.edn")
+(def registry-resource
+  "The path a human edits. Nothing reads it at runtime — see the namespace
+  docstring — it is named here so the projection can be traced back to it."
+  "kotoba/industry/registry.edn")
 
-(defn registry []
-  (edn/read-string (slurp (io/resource registry-resource))))
+(defn registry
+  "The industry registry.
+
+  Reads `kotoba.industry.embedded`, a GENERATED projection of
+  `resources/kotoba/industry/registry.edn`, and touches no file at runtime.
+  See the namespace docstring for why a cwd-relative read was not
+  portability."
+  []
+  embedded/registry-data)
 
 (defn industries
-  ([] (:industries (registry)))
+  "The industry entries, or **nil** when handed a registry that has none.
+
+  The zero-arg form goes through the one-arg form rather than duplicating
+  its body, so a guard added to one cannot be skipped by the other."
+  ([] (industries (registry)))
   ([reg] (:industries reg)))
 
 (defn by-id
+  "Industries indexed by `:id` (the ISIC class code), or **nil** when there
+  are no entries.
+
+  `(into {} …)` over nil yields `{}`, which is why this needs saying: a
+  caller handing in nil would otherwise receive a complete-looking index
+  over no data, `get-industry` would answer nil for every ISIC class in the
+  standard, and nothing would distinguish that from a class that genuinely
+  is not registered."
   ([] (by-id (registry)))
-  ([reg] (into {} (map (juxt :id identity) (industries reg)))))
+  ([reg] (when-let [inds (industries reg)]
+           (into {} (map (juxt :id identity)) inds))))
 
 (defn get-industry
   ([isic] (get-industry (registry) isic))
