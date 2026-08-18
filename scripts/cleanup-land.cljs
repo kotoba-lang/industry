@@ -205,10 +205,38 @@
   policy 側で先に落として名前の付いた skip クラスとして報告する。"
   #"(^|/)\.github/workflows/")
 
+(def nested-repo-note
+  "untracked なディレクトリの中に**別の git repo** が居ると、展開しても展開されない。
+
+  `plan-repo` は `?? foo/` というディレクトリ表記を
+  `git ls-files --others --exclude-standard -- foo/` で個別ファイルに展開する。
+  ところが `ls-files -o` は**入れ子の repo 境界で止まり、`foo/` を trailing slash
+  付きのまま返す**。展開後もディレクトリのままなので、`classify-file` の regex は
+  どれも当たらず `statSync` も成功し、**ディレクトリのパスが `:additive` に入る**。
+  そのまま `--apply` すると blob を作れないパスを commit しようとする。
+
+  実測 2026-08-18（この gate ができた理由）:
+
+  | repo | untracked | 実体 |
+  |---|---|---|
+  | `kotoba-lang/amu` | `.claude/worktrees/agent-a62da554fc36aeff3/` ほか 1 | **稼働中の登録済み worktree**（branch `agent/log-v1-aot-surface` / `agent/storage-v1-aot-surface`、計 1,623 ファイル） |
+  | `kotoba-lang/kotoba-lang` | `netsync/` | **west 登録済みの別 repo `kotoba-lang/netsync` の重複 clone**（pin と同一 commit c7ca033、unpushed 0） |
+
+  どちらも `plan :additive → PR → merge` として計画されていた。前者は他セッションの
+  worktree を repo に取り込み、後者は独立した repo を親 repo に吸収する。
+  **どちらも「main に同名パスが無い」を完全に満たす** —— `:additive` の論拠
+  （既存の行を書き換えない）は真なのに、やってよい理由にはならない。rename residue
+  （`:residue-gate`）と同型で、*パスが main に無い*ことは*新しい仕事*の証明ではない。")
+
 (defn- classify-file [dir path]
   (let [f (io/file dir path)
+        dir? (try (.isDirectory (.statSync node-fs (.getPath f)))
+                  (catch :default _ false))
         size (try (.-size (.statSync node-fs (.getPath f))) (catch :default _ 0))]
     (cond
+      ;; nested-repo-note: 展開後もディレクトリ = 入れ子 repo の境界。ファイルではない。
+      (str/ends-with? path "/")         :skip-nested-repo
+      dir?                              :skip-nested-repo
       (re-find credential-re path)      :skip-credential
       (re-find workflow-policy-re path) :skip-workflow-policy
       (re-find junk-re path)            :skip-junk
