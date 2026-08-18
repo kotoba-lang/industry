@@ -801,6 +801,12 @@
         :nbb-test
         [(str "test -f " (or entry "run-tests.cljs")
               " || fail 'test entry missing after extract' 90")
+         ;; npm deps, when the repo has them. Measured 2026-08-18: of the eight
+         ;; repos this gate kind can newly take, four need `npm install` and four
+         ;; do not — io-ipld-car reached `Cannot find module '@noble/hashes/sha2.js'`
+         ;; with every Clojure namespace already resolved. Silent, and skipped
+         ;; entirely when there is no package.json.
+         "if [ -f package.json ]; then npm install --silent >/dev/null 2>&1 || fail 'npm install failed' 95; fi"
          (str "out=$(npx --yes nbb --classpath " (or classpath "src:test") " "
               (or entry "run-tests.cljs") " 2>&1); code=$?")
          "echo \"$out\" | tail -25"
@@ -827,6 +833,43 @@
   (mapv (fn [[_ org repo sha]]
           {:lib (str "io.github." org "/" repo) :org org :repo repo :sha sha})
         (re-seq git-dep-re (str deps-text))))
+
+(defn git-deps-closure
+  "gate repo の git 依存の推移閉包を、`ship-git-deps!` が置くのと同じ順で返す。
+
+  なぜ要るか。`:nbb-test` の classpath は gates.edn に書いた literal
+  （既定 `src:test`）で、ノードに送られた **その repo の tree の中しか指せない**。
+  sibling repo を require するテストはそこで `Could not find namespace` になり、
+  ADR-2608180100 はそれを「`:nbb-test` の設計の性質」と書いた。半分は誤りで、
+  運搬機構（`ship-git-deps!`）は既に在り、欠けていたのは
+  `~/.gitlibs/libs/<lib>/<sha>/src` を classpath に組む一手だけだった。
+
+  実測 2026-08-18、条件3 で弾かれていた 14 本にこの classpath を与えると
+  **8 本が JVM と同じ件数で通った**（io-ipld-car 16/54、kotobase-lake 77/259、
+  kotobase-protocols 66/238 ほか）。残りは 3 本が `.clj` テストを持つため件数が
+  合わず（classpath では直らない）、3 本が pin の古い io-ipld に `ipld.value` が
+  無いため落ちる。"
+  [deps-text]
+  (loop [queue (git-deps-of deps-text) seen #{} out []]
+    (if (empty? queue)
+      out
+      (let [{:keys [lib sha org repo] :as d} (first queue)
+            k [lib sha]]
+        (if (contains? seen k)
+          (recur (rest queue) seen out)
+          (let [m (try (ensure-sha! (mirror! (str org "/" repo)) (str org "/" repo) sha)
+                       (catch :default _ nil))
+                child (if m (git-deps-of (or (git-show m sha "deps.edn") "")) [])]
+            (recur (concat (rest queue) child) (conj seen k) (conj out d))))))))
+
+(defn nbb-deps-classpath
+  "`git-deps-closure` を `~/.gitlibs` の path へ。`$HOME` は **リモートで**展開させる
+   （`ship-git-deps!` の dest と同じ理由 — 手元で展開すると他人の HOME が渡る）。"
+  [base deps-text]
+  (->> (git-deps-closure deps-text)
+       (map (fn [{:keys [lib sha]}] (str "$HOME/.gitlibs/libs/" lib "/" sha "/src")))
+       (cons base)
+       (str/join ":")))
 
 (defn ship-git-deps!
   "gate repo の git 依存を **ノードの ~/.gitlibs に直接置く**。
@@ -1579,7 +1622,18 @@
                                  body (when (:script w)
                                         (str (fs/readFileSync (path/join here (:script w)) "utf8")))
                                  sfile (path/join tmp (str "gate-" (:id w) ".bash-stdin"))
-                                 _ (fs/writeFileSync sfile (gate-script (assoc w :name (:id w))
+                                 ;; `:nbb-test` + `:ship-git-deps` … the deps are on the
+                                 ;; node under ~/.gitlibs by now, so point the classpath at
+                                 ;; them. Without this the entry sees only its own tree and
+                                 ;; a sibling require is `Could not find namespace`.
+                                 w' (if (and (= :nbb-test (:gate w)) (:ship-git-deps w))
+                                      (let [m (mirror! (:org-repo w))
+                                            dtxt (git-show m (:tip w) "deps.edn")]
+                                        (assoc w :classpath
+                                               (nbb-deps-classpath (or (:classpath w) "src:test")
+                                                                   (or dtxt ""))))
+                                      w)
+                                 _ (fs/writeFileSync sfile (gate-script (assoc w' :name (:id w))
                                                            (:node w) (:tip w) body))
                                  gname (str "test-" (:id w) "-" (sha7 (:tip w))
                                             "-murakumo-" (get-in w [:node :host]))]
