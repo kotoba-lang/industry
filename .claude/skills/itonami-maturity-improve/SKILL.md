@@ -141,12 +141,12 @@ pin より前に居るのが正常で、HEAD こそ実態である。
 
 どちらも**落ちたのではなく走らなかった**ので、「スコア算術はカーネルと一致している」が
 誰にも検査されないまま計測が landed し続けた（落ちるより悪い。検査されていないことが
-緑と区別できない）。だから閉包は**そのつど `compiler/deps.edn` から引く**:
+緑と区別できない）。だから閉包は**そのつど `amu/deps.edn` から引く**:
 
 ```bash
 R=$HOME/github/com-junkawasaki
-CP=".:scripts/nbb_compat:$R/orgs/kotoba-lang/compiler/src:$R/orgs/kotoba-lang/compiler/resources"
-for r in $(grep -oE 'io\.github\.kotoba-lang/[a-z0-9-]+' "$R/orgs/kotoba-lang/compiler/deps.edn" \
+CP=".:scripts/nbb_compat:$R/orgs/kotoba-lang/amu/src:$R/orgs/kotoba-lang/amu/resources"
+for r in $(grep -oE 'io\.github\.kotoba-lang/[a-z0-9-]+' "$R/orgs/kotoba-lang/amu/deps.edn" \
            | sed 's|.*/||' | sort -u); do
   if [ -d "$R/orgs/kotoba-lang/$r/src" ]; then CP="$CP:$R/orgs/kotoba-lang/$r/src"
   else echo "MISSING checkout: $r"; fi          # ← west update --fetch smart <name> で取る
