@@ -1,0 +1,17 @@
+# Installed by install.cljs. Do not install this file directly.
+[Unit]
+Description=endpoint-health tick
+
+[Timer]
+# Hourly. The cheap probes cost nothing; the GPU ones are rate-limited by their
+# own :every-hours inside manifest/endpoint-health.edn, so a 1h timer does NOT
+# mean hourly inference -- it means the cheap ones are hourly and the expensive
+# ones fire on their own declared cadence.
+OnBootSec=5min
+OnUnitActiveSec=1h
+AccuracySec=2min
+# Catch up after downtime, so a window is not silently short.
+Persistent=true
+
+[Install]
+WantedBy=timers.target
