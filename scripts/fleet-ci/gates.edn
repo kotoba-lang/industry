@@ -293,6 +293,37 @@
   ;; is exactly right. governor is the higher-leverage of the two: four
   ;; actors now take their verdict assembly from it, so this gate stands
   ;; between that library and every one of them.
+  ;; source NUL bytes (2026-08-18). A single NUL byte in a string literal
+  ;; makes `file(1)` call the file `data`, and grep then skips it SILENTLY:
+  ;; `grep -c foo <file>` prints nothing and exits 1, which is exactly what a
+  ;; file not containing `foo` does. Every search-based conclusion about that
+  ;; file is void, and nothing says so.
+  ;;
+  ;; Measured that day, twice, by different routes: `scripts/fleet-ci/tick.cljs`
+  ;; (three searches came back empty and were read as `no such code`), and
+  ;; `network-awai/net-isekai-gen/src/isekai_gen/cid.clj`, where a scan
+  ;; reported `no JVM interop` for a file importing
+  ;; `java.security.MessageDigest` -- and the same file had been copied into
+  ;; three repos. A full sweep found 34 such files across 65,961.
+  ;;
+  ;; The verifier REFUSES to run unless it can first show its own detector
+  ;; answering both ways on a known-bad and a known-clean input. That is not
+  ;; ceremony: the first sweep written for this was broken by shell quoting
+  ;; and reported "0 of 65,961", which would have shipped as a finding.
+  ;; Exit is three-valued -- 0 clean, 1 violation, 2 COULD NOT ANSWER
+  ;; (self-test failed / scanned zero files / no such directory).
+  ;;
+  ;; **Covers the superproject tree only.** The fleet ships one repo's tree
+  ;; and `orgs/` is west-managed and absent from it, so the 34 files found in
+  ;; child repos are NOT guarded by this gate. Written down so a green here
+  ;; is not read as "the workspace is clean".
+  ;;
+  ;; :cd false until it has a green receipt of its own, per this file's own
+  ;; standard.
+  {:name "root" :id "root-source-nul-bytes" :gate :nbb-script :cap :jvm
+   :script "gates/source-nul-bytes-check.cljs"
+   :include-ext [".cljs" ".clj" ".cljc" ".edn" ".kotoba" ".md" ".yml"]
+   :min-files 200 :cd false}
   {:name "governor" :gate :jvm-test :cd true}
   {:name "taxlaw" :gate :jvm-test :cd true}
   ;; shohyo 諸表 (2026-08-18). Folds a trial balance into BS/PL and refuses
