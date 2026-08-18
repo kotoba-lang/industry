@@ -188,4 +188,44 @@ peer 側へ移る。**どちらも設計変更であって pin 作業ではな�
 **「JVM が緑」は「宣言どおりの依存で緑」ではない。** tools.deps の解決は
 diamond を黙って畳むので、pin がずれていること自体が見えない。見えるのは、
 畳まない別のランタイムで走らせたときだけである ——
-この件は**その差分としてしか観測できなかった。**"}]
+この件は**その差分としてしか観測できなかった。**
+
+## 循環は切れた。設計変更をやったので（2026-08-18 追記）
+
+上の節は「どちらも設計変更であって pin 作業ではない」で終わっている。**その設計変更を
+やった。** 2 択のうち後者 —— テストダブルではなく、**テストを peer 側へ移す**方 —— を
+選んだ。ダブルにすると projection を「store の模型」に対して検証することになり、
+15 deftest が実 store を使っていた理由がそのまま失われる。
+
+結果:
+
+    kotobase-peer         688a752a   245 tests /  750 assertions
+    kotobase-projection   d4a5bc47    34 tests /  130 assertions   conflicts 0
+
+`kotobase-projection` は **conflict ゼロ**になり、`gates/nbb-cross-runtime.cljs` が
+CONFLICT 行を 1 本も出さずに **JVM と同じ 34/130** を報告する。fleet gate を登録した
+（`nbb-cross-runtime-kotobase-projection`）。移動で runner が取りこぼした名前空間は
+nbb が起動を拒否して知らせた —— 残り 3 つを走らせて pass と報告しなかったのは、
+この runner が list ではなく pattern を使っているからである。
+
+**限界だと書いた位置は、限界ではなく「pin 作業の限界」だった。** 循環が pin では
+解けないという結論は正しく、そこで止まる理由が無かっただけである。
+
+## 次の diamond は測ってから決める —— `kotobase` はやらない（2026-08-18 追記）
+
+`kotobase` は 13 ライブラリ・`kotoba-kir` だけで 7 版という、ここまでで最大の diamond を
+持つ。出所はほぼ `compiler` の部分木である。**掃引に入る前に、いま持っている pin のまま
+nbb で測った:**
+
+    Ran 61 tests containing 234 assertions.  0 failures, 2 errors.
+
+2 件とも `:type :sci/error` を持つ。片方は deftype の field を SCI が deref できない
+（`No protocol method IDeref.-deref defined for type undefined`）、もう片方は
+`ns-publics` で反射するテストで、SCI に名前空間レジストリが無い
+（`No namespace: kotobase.core found`）。**どちらも diamond ではない。**
+
+13 リポジトリを畳んでも、この gate は緑にならない。やらない。
+
+**一般則**: pin を揃えるのは、①浅いグラフなら 1 行、②深いグラフなら leaf-first の掃引、
+③そして**失敗が pin 由来でないなら、そもそも間違った問い**である。どれなのかを払う前に
+測る。この ADR は ① と ② を記録してきたが、③ を測らずに ② を始めかけていた。"}]
