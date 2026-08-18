@@ -184,7 +184,23 @@
   ;; Promise driver and its miniflare/R2 end-to-end need npm packages on the
   ;; node, and kotobase-storage-s3's whole suite does (miniflare, shadow-cljs),
   ;; so neither is gated yet.
-  {:name "io-ipld-car" :gate :jvm-test :cd true}
+  ;; CANARY for the :nbb-test classpath (tick.cljs, 2026-08-18). This is the first
+  ;; entry to use it, and it exercises all three of the new paths at once: a
+  ;; transitive closure (io-ipld -> io-multiformats -> org-ietf-cbor), an
+  ;; `npm install` (@noble/hashes), and the run itself.
+  ;;
+  ;; Verified by hand on this machine before switching: with
+  ;; `src:test:$HOME/.gitlibs/libs/<lib>/<sha>/src…` and npm deps installed, the
+  ;; suite is 16 tests / 54 assertions, 0 failures — the same as `clojure -M:test`.
+  ;; NOT verified on a node; that is what this canary is for.
+  ;;
+  ;; If it goes red: revert this entry to `:gate :jvm-test :cd true` and read the
+  ;; receipt. exit 95 means `npm install` failed on the node (egress), exit 93/94
+  ;; mean the run produced no summary or zero tests, and a
+  ;; `Could not find namespace` in the output means ship-git-deps! did not place a
+  ;; dependency the classpath names.
+  {:name "io-ipld-car" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs"
+   :ship-git-deps true :cd true}
   {:name "kotobase-storage" :gate :jvm-test :cd true}
   {:name "kotobase-storage-pack" :gate :jvm-test :cd true}
   ;; kototama cannot take a :jvm-test gate: its :test alias resolves sibling
