@@ -831,6 +831,46 @@
               a fault in the detector. Exit 3 is the 'could not answer' code ADR-2608136000
               asks for -- neither 0 nor 1."}
 
+
+  {:id       :verify-app-content-address
+   :title    "application manifests that identify their document by location, not by content"
+   :why      "ADR-2608157000 decided an application's identity is the CID of its document,
+              not the path it happens to sit at. 80 of 516 kotoba.app.edn manifests still
+              identify by location only -- measured today, not asserted -- and nothing was
+              watching whether that number moves in either direction.
+              The judge is `content-address.core/addressed?`; this script deliberately carries
+              no second copy of that decision. It reads two things under orgs/ (every app
+              manifest, and the library that judges them), so it cannot be a fleet gate."
+   :argv     ["nbb" "--classpath"
+              "{{repo}}:{{root}}/orgs/kotoba-lang/content-address/src:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-app-content-address.cljs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 21600000                 ; 6h
+   :timeout-ms  600000                   ; 10m -- 70x the measured runtime, sized against the
+                                         ; load this machine actually runs at, not the quiet number
+   :writes   :none
+   :measured "2026-08-19 on this machine, four directions:
+                fixture: one addressed manifest   -> SCANNED 1,   0 findings, exit 0
+                fixture: one located manifest     -> SCANNED 1,   1 finding,  exit 1
+                the real orgs/ tree               -> SCANNED 516, 80 findings, exit 1, 8.5s at load 12.9
+                library not checked out           -> exit 2 (refusal)
+              Two defects were fixed to make this registrable, and both are this loop's
+              recurring shape:
+              (1) **It reported 80 violations to a human and zero to any machine.** The
+                  located-only rows printed as prose (and only under --list); the registry
+                  parses FINDING<TAB>severity<TAB>key<TAB>detail and nothing else. SCANNED
+                  matched, no FINDING was seen, and the run would have been filed clean.
+              (2) **Its refusal exited 1, not 2.** `set! exitCode 2` followed by a throw is
+                  overridden by nbb's error handler, so 'could not answer' reached the caller
+                  wearing the code for 'found violations'. It now exits without throwing.
+              Everything else here was already careful -- three-valued exits, no mirrored
+              judge, an explicit refusal when the library is absent, worktree copies excluded
+              from the count. The gap was that its output was addressed to a reader.
+              No root argument is passed: the script's default is the relative `orgs`, which
+              keeps FINDING keys repo-relative and therefore stable across machines."}
+
 ]
 
 }

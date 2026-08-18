@@ -79,8 +79,12 @@
     (when-not (.existsSync fs lib)
       (println "UNANSWERED — kotoba-lang/content-address is not checked out at" lib)
       (println "  west update --fetch smart content-address")
-      (set! (.-exitCode js/process) 2)
-      (throw (ex-info "library missing" {})))
+      ;; Exit, do not throw. `set! exitCode 2` followed by a throw is overridden
+      ;; by nbb's own error handler, which exits 1 -- so the refusal ("could not
+      ;; answer") arrived at the caller wearing the code for "found violations".
+      ;; Measured 2026-08-19 by running this from a tree with no orgs/: it
+      ;; printed UNANSWERED and exited 1.
+      (js/process.exit 2))
     (let [rows (mapv classify (find-manifests root))
           by-state (group-by :state rows)
           scanned (count rows)
@@ -102,6 +106,19 @@
                  (get-in r [:address :bundle-cid] (get-in r [:address :graph-cid]))))
       (doseq [r (:unreadable by-state)]
         (println "UNREADABLE" (:path r) (:detail r)))
+      ;; The located-only manifests, in the one format the detector registry
+      ;; parses (FINDING<TAB>severity<TAB>key<TAB>detail). Without these lines
+      ;; this script reports 80 violations to a human reading the log and zero
+      ;; findings to anything that files the result -- SCANNED matches, no
+      ;; FINDING is seen, and the run is recorded as clean. Everything else here
+      ;; was already careful (three-valued exit, no second copy of the judge, a
+      ;; refusal when the library is absent); the gap was only that its output
+      ;; was addressed to a reader.
+      (doseq [r (:located by-state)]
+        (println (str "FINDING\twarn\tlocated-only:" (:path r) "\t"
+                      "identifies its document by location, not by content"
+                      (when (seq (:problems r))
+                        (str " — " (str/join "," (map (comp name :problem) (:problems r))))))))
       (println (str "ROOT\t" (path/resolve root)))
       (println (str "SCANNED\t" scanned))
       (println (str "ADDRESSED\t" addressed))
