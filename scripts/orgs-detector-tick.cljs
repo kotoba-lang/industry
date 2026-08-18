@@ -315,12 +315,32 @@
                        (when (str/blank? (str (some-> (.-stdout e) str)
                                               (some-> (.-stderr e) str)))
                          (str "\n(no output) " (.-message e))))
-              killed? (or (.-killed e) (= "ETIMEDOUT" (.-code e)))]
-          {:status (if killed? :error :ok)
-           :exit (or (.-status e) 1)
+              killed? (or (.-killed e) (= "ETIMEDOUT" (.-code e)))
+              code (or (.-status e) 1)
+              ;; 0 = clean, 1 = found things, >=2 = could not answer. Every
+              ;; detector in this registry follows it (measured 2026-08-19: all
+              ;; 15 exit 0 or 1), and several say so in their own headers.
+              ;;
+              ;; Before this, a refusal was recorded as a clean run. A detector
+              ;; with an evidence floor prints SCANNED before it refuses -- it
+              ;; has to, the count is the reason it is refusing -- so `qualify`
+              ;; saw its evidence line, left the status :ok, and the merge below
+              ;; marked every standing finding RESOLVED. Measured the same day:
+              ;; verify-appview-page-summary printed `CANNOT ANSWER: found 142
+              ;; candidate pages, floor 150`, exited 2, and the tick reported
+              ;; `ok exit 2, 0 finding(s)` and resolved all 337.
+              ;;
+              ;; The protection for this already existed one branch down and is
+              ;; commented "the most dangerous possible lie this thing could
+              ;; tell". What was missing was reaching it.
+              refused? (>= code 2)]
+          {:status (cond killed? :error refused? :inconclusive :else :ok)
+           :exit code
            :out out
            :duration-ms (- (js/Date.now) t0)
-           :note (when killed? (str "killed after " timeout-ms "ms"))})))
+           :note (cond killed? (str "killed after " timeout-ms "ms")
+                       refused? (str "exit " code " — the detector refused to answer;"
+                                     " the previous finding set is kept, NOT resolved"))})))
     ))
 
 (defn qualify
