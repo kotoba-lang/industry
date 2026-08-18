@@ -180,11 +180,23 @@
      (case (:status quorum-check)
        0 "ok"
        1 "FAIL"
+       ;; 3 = "no :final KIP required a quorum" (ADR-2608196300). Not a failure
+       ;; and not an inability to run: there was nothing to verify.
+       3 "nothing-to-verify:no-final-kip-requires-a-quorum"
        :absent "skipped:verifier-not-in-this-checkout"
        "could-not-run")
      (str "(scripts/verify-kip-quorum.cljs exit " (pr-str (:status quorum-check)) ")"))
 
-(when-not (= 0 (:status quorum-check))
+;; Exit 3 proceeds. The bail below exists so that a :final keyword somebody typed
+;; cannot cover a surface without the signatures behind it -- but when NO KIP is
+;; :final, `finals` is empty and nothing is counted as covering anything anyway.
+;; The conclusion is identical; refusing here would turn "there is nothing to
+;; confirm" into "we could not confirm", which is the same collapse of two states
+;; that ADR-2608196300 fixed in the other direction, one script upstream.
+;; (A :final KIP on a track the process authority exempts from quorum also lands
+;; here, and still covers its surfaces -- that exemption is the authority's rule,
+;; not a hole.)
+(when-not (contains? #{0 3} (:status quorum-check))
   (bail! 2 "the quorum behind :final could not be confirmed, so no KIP may be counted as covering anything."
          "verify-kip-quorum.cljs said:"
          (readable-tail (:out quorum-check))))
