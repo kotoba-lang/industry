@@ -228,6 +228,17 @@
 (def ^:private sync-obligation-re
   #"keep in sync|in sync with|1:1 port|[Ff]aithful port|mirror of")
 
+(def ^:private source-extensions
+  "A trailing segment from this set makes the name a file, not a namespace.
+  Namespaces do end in short words, but not in these."
+  #{"clj" "cljs" "cljc" "cljr" "edn" "kotoba" "js" "mjs" "cjs" "ts" "tsx"
+    "json" "md" "wasm" "wat" "py" "rs" "go" "html" "css" "svg" "yml" "yaml"})
+
+(defn- file-name?
+  "`app.cljc` yes, `kotobase.protocols.json` no -- the last segment decides."
+  [nsname]
+  (contains? source-extensions (last (str/split nsname #"\."))))
+
 (defn- ns->path
   "`kotobase.protocols.json` + `.cljc` -> `kotobase/protocols/json.cljc`."
   [nsname ext]
@@ -258,7 +269,18 @@
     (when (and (re-find sync-obligation-re head)
                (re-find sync-ns-re head))
       (let [nsname (second (re-find sync-ns-re head))]
-        {:source nsname :kind :namespace :lib-path (ns->path nsname ext) :pin nil}))))
+        (if (file-name? nsname)
+          ;; "Faithful port of app.cljc" names a FILE. `app.cljc` matches the
+          ;; namespace shape exactly -- lowercase segments joined by a dot -- so
+          ;; it used to be read as the namespace `app.cljc`, turned into the path
+          ;; `app/cljc.cljc`, found in no repo, and reported as "library repo not
+          ;; checked out -- provenance unverifiable". That sends the reader to run
+          ;; `west update` for a repo that was never missing.
+          ;; Measured 2026-08-19: 28 of this detector's 37 unresolved findings
+          ;; (37% of all 76) were this. The obligation is real and stays reported;
+          ;; only its diagnosis changes.
+          {:source nsname :kind :file-target :lib-path nil :pin nil}
+          {:source nsname :kind :namespace :lib-path (ns->path nsname ext) :pin nil})))))
 
 (defn- body
   "From the first `(ns ` form on. The header above it is provenance, not code."
@@ -285,7 +307,9 @@
   explicit `<org>/<repo>`, or -- spelling 5 -- a bare repo name with no org,
   which is resolved by looking for it under each org."
   [source kind lib-path]
-  (if (= kind :namespace)
+  (if (= kind :file-target)
+    nil
+    (if (= kind :namespace)
     ;; The declaration named a namespace and nothing else. Whichever registered
     ;; repo actually ships that file is the upstream; if none does, the promise
     ;; points at nothing and that is itself the finding.
@@ -304,7 +328,7 @@
     (let [dir (if (str/includes? source "/")
                 (str "orgs/" source)
                 (str "orgs/" source "/" (first (str/split lib-path #"/"))))]
-      (when (fs/existsSync dir) dir)))))
+      (when (fs/existsSync dir) dir))))))
 
 (defn- upstream-candidates
   "The paths the library file could be at, given what the header wrote.
@@ -402,8 +426,11 @@
                   " org(s)"))
     (println (str (count (filter :current? results)) " current, "
                   (count stale) " stale, "
-                  (count unresolved-body) " UNRESOLVED (upstream file not found -- "
-                  "not a drift finding), "
+                  (count (remove #(= :file-target (:kind %)) unresolved-body))
+                  " UNRESOLVED (upstream file not found -- not a drift finding), "
+                  (count (filter #(= :file-target (:kind %)) unresolved-body))
+                  " naming a FILE rather than a namespace (unresolvable by "
+                  "construction, not by absence), "
                   (count dishonest) " do NOT match the commit their header claims"))
     (println (str (count no-pin) " declare no pin at all -- for those the CURRENT "
                   "axis is the only one there is."))
@@ -458,11 +485,18 @@
                        (str "drift vs HEAD: " (or drift "?") " line(s)"
                             (when behind (str "; " behind " upstream commit(s) to "
                                               upstream-path " since the pin")))))
-      (doseq [{:keys [file library]} unresolved-body]
-        (emit-finding! "fail" (str "unresolved:" file)
-                       (if library
-                         "upstream file not found at HEAD -- provenance unverifiable"
-                         "library repo not checked out here -- provenance unverifiable"))))
+      (doseq [{:keys [file library kind source]} unresolved-body]
+        (if (= kind :file-target)
+          (emit-finding! "warn" (str "file-target:" file)
+                         (str "declares a sync obligation against `" source
+                              "`, which is a FILE NAME, not a namespace -- nothing"
+                              " can resolve which repo's " source " is meant. The"
+                              " obligation is real and unchecked; name the namespace"
+                              " (or add a VENDORED header) to make it checkable"))
+          (emit-finding! "fail" (str "unresolved:" file)
+                         (if library
+                           "upstream file not found at HEAD -- provenance unverifiable"
+                           "library repo not checked out here -- provenance unverifiable")))))
     (when (and check? (or (seq dishonest) (seq stale) (seq unresolved-body)))
       (set! (.-exitCode js/process) 1))))
 
