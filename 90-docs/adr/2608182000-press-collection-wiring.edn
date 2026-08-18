@@ -118,4 +118,60 @@ push main ok / push git-annex ok
 - **launchd job は 1 台の機械に載っている。** この laptop が止まれば収集も止まる。
   fleet へ移すかは未決（murakumo の常駐枠は `:slot/attested` が要る —— 書き込み鍵を
   持つので 1 台固定、ADR-2608111721）。
-"}]
+
+
+## 追記（同日）: 配線した翌時間に、その収集が何を落としているかを測った
+
+「53 sources, 15 with errors」を毎回出していたので、source ごとに測った。
+**registry は健康だった** —— 普通の client には 53 中 49 が feed を返す。
+落としていたのはこちらで、11 件のうち 9 件は 3 つの原因に集約された。
+
+### 1. User-Agent に bot と書いてあった
+
+alemarahenglish.af に対して 1 変数ずつ測ると:
+
+```
+kouhou/1.0                                     -> 200, 10 items
+kouhou/1.0 (+https://itonami.cloud)            -> 200
+kouhou/1.0 (+https://github.com/.../kouhou)    -> 200
+kouhou/1.0 (public-interest info curator bot)  -> 403
+```
+
+**その部分文字列だけがトリガー**で、旧 UA は `... curator bot, ...` で終わっていた。
+「bare/no-UA を拒む政府サイトがあるから」という理由で選ばれた UA が、
+**それ自体が毎日 1 source に拒まれる理由**になっていた。
+
+**線は引いた**: browser 文字列でも通る（実測）が使わない。これは自動 client であり、
+そう名乗る。正直な識別子を全部拒む source は、拒否として記録する。
+
+### 2. Accept-Encoding を送らず、gunzip もしていなかった
+
+ケニアとソロモン諸島は **gzip を advertise しない request に 403、するものに 200** を返す。
+UN press は無条件に gzip し content-encoding を付けない —— body は binary のまま
+parser に届き `feed parsed to zero items` として出ていた。**transport の問題に対する
+format の判定**で、だから誰にも見えなかった。
+
+magic byte の比較は最初**間違えていた**（Java の byte は符号付きなので 0x8b は -117、
+`-0x1f` は何にも一致しない）。**test が捕まえた**ので、これは出荷されたバグではなく
+直ったバグの記録になっている。
+
+### 3. 9 source が feed ではなく redirect に pin されていた
+
+plain-http の 9 entry は全部 redirect の先でしか feed に届かず、うち 2 件
+（セルビア・サモア）は JDK client が chain を落として **301 ページを feed として**
+返していた。実測した「items を返す address」に pin し直し、host が変わった 3 件は
+`:host` も動かした —— **stale な :host は governor に source-not-in-registry で
+拒否させる**ので、直した fetch が新しい拒否に化けるところだった。
+
+### 結果と、原因でなかったもの
+
+**42 → 47 / 53。** 残り 6: 負荷で run ごとに動く timeout 4 と、TLS 2
+（証明書失効・未知の CA）。後者は**こちらから直せないし、直してはいけない** ——
+press release を取るために証明書検証を切る取引はしない。
+
+**timeout は測って、触らなかった**: 53 source を 10s と 25s で回してどちらも
+48 成功・error 集合も同一。**HttpClient を 1 個再利用**する案も測って無効果。
+**両方とも「明らかな直し方」で、両方とも間違いだった。**
+
+実装: `cloud-itonami/kouhou` `d34b2aa`。回帰を止める test を 2 本足し、
+どちらも壊して**対応する test だけ**が落ちることを確認した。"}]
