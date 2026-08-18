@@ -581,7 +581,11 @@
                                          ; timescales, and the answer is stable
    :timeout-ms  600000                   ; 10m -- 60x the worst measured runtime
    :writes   :none
-   :measured "2026-08-17 on this machine: 9.6s standalone (4.0s user, 68% CPU), 26s under
+   :measured "2026-08-18 recount after classifying `.clj` by CONTENT: jvm-source 954 -> 771
+              repos and 2,756 -> 2,048 files, with 64 repos of KOTOBA Mesh guests, 193 of
+              ns-less script entries and 34 unloadable files split out, and .clj tests
+              6,436 -> 6,570 once the `test_` PREFIX was read as a test.
+              2026-08-17 on this machine: 9.6s standalone (4.0s user, 68% CPU), 26s under
               the tick, walking 4,163 of 4,183 registered checkouts, 3,524 deps.edn
               parsed, 4 unparsable, exit 0 in monitor mode with 1,760 FINDING lines
               (1,103 fail / 654 warn / 3 info). Fast because it is one process doing
