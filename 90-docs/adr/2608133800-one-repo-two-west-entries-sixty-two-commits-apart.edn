@@ -54,17 +54,72 @@ west path をキーにしていた**）、そして bb→nbb の census（41 pat
 `../amu` と `../compiler` の両方を列挙している。**気付いていた場所と、気付いて
 いなかった場所が混在している。**
 
-## 直し方（未実施 —— owner 判断）
+## 実施済み（2026-08-18）—— ただし 2 回目である
 
-正しい終状態は **entry 1 つ、名前は `amu`**（GitHub が redirect を持つので旧名の
-参照は壊れない）。ただし `compiler` entry の撤去は west が管理する checkout を
-1 つ減らす操作で、他セッションがその path を使っている可能性がある。
-`git-cleanup-conflict` の retirement flow に載せるべきもので、この記録の範囲外。
+終状態は当初の見立てどおり **entry 1 つ、名前は `amu`**。2026-08-18 に実施した
+（root `6c965f13a11`、genpon 吸収 `19ebabb1d22`）。撤去時点で pin の距離は
+62 ではなく **74 commit** に開いていた。
 
-**先にやるべきなのは検査**である。`scripts/verify-duplicate-registrations.cljs` は
-まさにこれを見つけるために在るが、**load 90 のこのマシンで 240 秒回して 1 行も
-出力せずに timeout した**（exit 124）。進捗を出さないので、走っているのか止まって
-いるのか外から分からない。**見つけるための道具が、見つける前に切れる。**
+**重要なのは、これが 1 回目の撤去ではなかったこと。** `fleet-db.ledger.edn` が
+自分で記録している:
+
+    2026-08-10 09:18  removed-legacy compiler   seq 7657
+    2026-08-11 06:14  added-legacy   compiler   seq 7997   ← 21 時間で復活
+    2026-08-11〜15    pin/reconcile-legacy ×6              ← 生きた project として前進し続けた
+    2026-08-18 09:46  removed-legacy compiler   seq 12153
+
+**1 回目は genpon 層だけで消していた。** `repos.edn` の `:extra-projects` と
+`west.yml` に名前が残っていたので、次の生成で生成器が再び emit し、次の reconcile が
+`added-legacy` として吸い戻した。そのあと 6 回 pin が前進しており、**撤去された
+はずの entry が 1 週間、生きた project として保守され続けた。**
+
+## 撤去が効く層はどこか
+
+`gen-west-manifest.cljs` の `render` は path を **3 つの source の union** から作る:
+
+    (concat (paths-from-west-yml) (:extra-projects cfg) workspace-projects)
+      → (map canonical-path) → distinct
+
+`paths-from-west-yml` が入っているので、**`:extra-projects` から消すだけでは戻る**
+（既存 west.yml が自分自身の入力だから）。効くのは `:path-overrides` で、
+`canonical-path` が旧 path を新 path に写し `distinct` が畳む —— `ipfs → io-ipfs`
+の改名が既に使っていた機構である。**3 層（`:path-overrides` / `:extra-projects` /
+west.yml）を同時に閉じて初めて撤去になる。**
+
+## 撤去前に測ったこと（旧 path に依存するものは無かった）
+
+| 依存の種類 | 実測 |
+|---|---|
+| `:local/root` が旧 path を指す | **0** / 3,908 deps.edn |
+| `:git/url` が `compiler.git` を指す | 139 —— GitHub redirect で解決、west checkout を読まない |
+| fleet-ci gate | 4 本とも `amu` を名指し。`compiler` は履歴 receipt のみ（3,426 行中 353 行目まで） |
+| checkout 自体 | clean、0 ahead / 74 behind |
+
+**この非対称が「redirect が読みを救う」の実体である**: 139 の消費者は名前で引いて
+いたので無傷、0 の消費者が path で引いていた。壊れるのは path で引く側だけで、
+今回はそれが偶然 0 だった —— **設計ではなく運**である。
+
+## 同時に閉じた 4 つの穴
+
+- `.gitignore` に `/orgs/kotoba-lang/amu/` が無かった（`compiler` の行はあった）。
+  amu の checkout が毎セッション untracked として出ていた。
+- `verify-jvm-dependency-surface` の `frozen-chicory` が「the frozen **four**」と
+  書いたコメントの下に **5 件**持っていた。5 件目が `compiler` = amu の二重計上。
+- `itonami-maturity-improve` skill が classpath を
+  `orgs/kotoba-lang/compiler/{src,resources,deps.edn}` から組んでいた。
+- CLAUDE.md の 3 箇所（本 ADR が名指ししていたもの）も同日に `amu` へ直した。
+
+## まだ閉じていない
+
+- **`scripts/verify-duplicate-registrations.cljs` は依然 timeout する**（load 90 の
+  このマシンで 240 秒・出力ゼロ・exit 124）。進捗を出さないので走っているのか
+  止まっているのか外から分からない。**見つけるための道具が、見つける前に切れる。**
+  今回の 1 件は手で見つけたのであって、この検査器が見つけたのではない。
+- **`orgs/kotoba-lang/compiler/` の実体 133 MB** は west 未登録の孤児として残存
+  （clean、HEAD は origin/main に含まれる）。checkout の削除は manifest 変更では
+  ないので `git-cleanup-conflict` の retirement flow に残す。
+- ADR-2608132700 が測った **19 の「1 repo が 2 回 checkout」のうち、閉じたのは
+  この 1 件だけ**である。
 
 ## 記録しておく形
 
