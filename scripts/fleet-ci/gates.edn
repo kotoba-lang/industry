@@ -84,9 +84,12 @@
  ;; 2026-08-18: sixteen cross-runtime gates were flipped to `:cd true` after
  ;; each had gone green on the fleet, which is the bar -- a gate that has never
  ;; been green on a node has not shown it can discriminate there, whatever it
- ;; does locally. The one that had NOT gone green (arrow) was left at
- ;; `:cd false`, and org-apache-parquet and kotobase-projection had exactly one
- ;; green each at the time, both on the tick that followed their fix.
+ ;; does locally. All 25 are on; arrow was the last, held at `:cd false` until
+ ;; it had a green of its own. org-apache-parquet and kotobase-projection had exactly one
+ ;; green each at the time, both on the tick that followed their fix. arrow
+ ;; went green later the same hour -- `:outcome :pass` on dan at 0be7587, the
+ ;; sha three nodes had failed at before the fixtures were shipped -- and was
+ ;; turned on then, so all 25 are on.
  ;;
  ;; The precondition was landed the same day: until then the CD filter read one
  ;; result at a time, so turning these on would have handed sixteen more gates
@@ -644,7 +647,7 @@
   ;; fleet, which answers the same question better than the audit could.
   {:name "org-apache-arrow" :id "nbb-cross-runtime-arrow" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
-   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json" ".arrow"] :min-files 5 :cd false}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json" ".arrow"] :min-files 5 :cd true}
   {:name "org-apache-parquet" :id "nbb-cross-runtime-parquet" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json" ".parquet"] :min-files 5 :cd true}
