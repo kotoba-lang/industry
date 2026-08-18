@@ -167,6 +167,45 @@
              currently the only thing preventing a hostname reassignment. The remedy
              printed by :verify-shadow-source-paths would arm it -- one detector's fix is
              the other's hazard, and they have to be read together."}
+   {:priority 4.6 :status :closed :closed-on "2026-08-18"
+    :item "Nine builds could not compile; four repaired."
+    :outcome "kura-conformance, kura-coordinator, kaigi/worker and gftdcojp/tia now
+              build, each verified by the repo's OWN build script (tia's also runs its
+              bundle verifier: PASS, 714 KB). Pins advanced as pure fast-forwards and
+              checkouts synced. 13 -> 9. kura-conformance is the one that mattered: a
+              live conformance suite that exists because 'a test that supplies its own
+              world agrees with itself', unable to build since 2026-07-29."}
+
+   {:priority 4.7 :status :closed :closed-on "2026-08-18"
+    :item "west-orphan-audit reported 0 blocking edges while broken ones existed."
+    :outcome "It scanned :local/root only, and only in a project's TOP-LEVEL deps.edn --
+              both limits stated in its own header. Extended to scan :paths/:extra-paths
+              at any depth: 6 blocking targets appeared where the count had been 0.
+              Four were repos renamed or moved org, resolved authoritatively by GitHub's
+              own redirects (ai-gftd-apex -> apex; cloud-murakumo and network-isekai ->
+              network-awai; computer-use-clj -> kotoba-lang/computer-use). One was
+              `orgs/orgs/kotoba-lang` -- a path with one segment too many that can never
+              resolve. Landed in net-babiniku and com-etzhayyim-app-explorer with pins.
+              0 meant not-looked-at, not absent."}
+
+   {:priority 4.8 :new-on "2026-08-18" :owner-blocked true
+    :item "363 of 364 appview landing pages disagree with the wrangler beside them --
+           rendering routeCount 0 and printing 'No public route is declared next to this
+           app surface' at addresses wrangler declares, listing 0 vars against 10, and
+           naming the monorepo the repository was extracted from. These are LIVE pages;
+           a visitor reads the claim today.
+
+           Cause closed: there was no generator, so the object was hand-maintained.
+           scripts/gen-appview-page-summary.cljs now derives routeCount/routes/vars/
+           relativePath from the nearest wrangler, proven end to end on
+           cloud-itonami/aidesk (3b1f6db) against the detector's own three extractors.
+
+           NOT swept. The remaining 362 pages span ~120 repositories and republishing
+           them touches ~120 live public surfaces in one pass. Within standing
+           authorization, but the blast radius is worth naming before starting rather
+           than after. A bounded first batch (10 repos, verified) is the safer shape."
+    :command "nbb scripts/gen-appview-page-summary.cljs --names <repo> --apply"}
+
    {:priority 5 :owner-blocked true :item "KOTOBASE_MAINTENANCE_OPERATOR_DIDS — without it no query surface except atproto can be measured or exercised."}
    {:priority 6 :owner-blocked true :item "The 91 inline documents (85% of the seed, unreachable by s3 since 2026-08-10). h6 in the ranking; irreversible; needs a decision on whether they are still wanted."}
    {:priority 7 :owner-blocked true :item "Which materialised view to build (h1, the top-ranked item), and the read:write ratio it depends on."}]
