@@ -138,6 +138,33 @@
             (recur (rest queue) (conj seen k) (assoc by-lib lib (or prior sha))
                    conflicts dirs (conj missing lib) sibling-used)))))))
 
+(defn- npm-declared
+  "What npm was asked to install, and what is actually there afterwards.
+
+  Only `dependencies`. The gate installs with `--omit=dev` on purpose, so a
+  dev-scoped entry is not something it promises to provide -- but that is
+  exactly how kotobase-projection failed on 2026-08-18: the entry was there,
+  dev-scoped, silently skipped, and the suite died requiring
+  `@noble/hashes/sha2.js` before any assertion ran. The receipt recorded
+  `no test summary in output`, which is true and says nothing about why.
+
+  **The install's exit status cannot report this.** Measured on issachar with
+  this gate's own flags:
+
+      devDependencies   npm install --silent --omit=dev   exit=0  node_modules=0
+      dependencies      npm install --silent --omit=dev   exit=0  node_modules=1
+
+  npm succeeds at installing nothing. So this looks at what is absent
+  afterwards rather than at how the install exited."
+  [root pkg]
+  (try
+    (let [j (js->clj (js/JSON.parse (fs/readFileSync pkg "utf8")))
+          deps (vec (keys (get j "dependencies")))
+          dev (vec (keys (get j "devDependencies")))]
+      {:deps deps :dev dev
+       :missing (vec (remove #(exists? (path/join root "node_modules" %)) deps))})
+    (catch :default e {:unreadable (str e)})))
+
 (defn- fail! [msg]
   (println (str "FAIL: " msg))
   (set! (.-exitCode js/process) 1))
@@ -192,12 +219,45 @@
                   (println "npm install (package.json present, node_modules absent)")
                   (.spawnSync cp "npm" #js ["install" "--silent" "--omit=dev"]
                               #js {:cwd root :encoding "utf8" :stdio "inherit"}))
-              r (.spawnSync cp "npx" (clj->js ["--yes" (str "nbb@" nbb-version)
-                                               "--classpath" cp-str entry])
-                            #js {:cwd root :encoding "utf8"})
-              out (str (.-stdout r) (.-stderr r))]
-          (println (str/join "\n" (take-last 30 (str/split-lines out))))
-          (let [m (re-find #"Ran (\d+) tests containing (\d+) assertions" out)
+              npm (when (exists? pkg) (npm-declared root pkg))
+              ;; Say what was asked for and what arrived. A repo with no
+              ;; package.json and a repo whose every dependency is present
+              ;; both go on to run the suite, but they are not the same state,
+              ;; and a line printed only on failure cannot tell them apart
+              ;; when the run is read back later.
+              _ (println (cond
+                           (nil? npm) "NPM-DEPS\tnone\t(no package.json)"
+                           (:unreadable npm) (str "NPM-DEPS\tunreadable\t" (:unreadable npm))
+                           :else (str "NPM-DEPS\t"
+                                      (- (count (:deps npm)) (count (:missing npm)))
+                                      "/" (count (:deps npm)) "\tpresent"
+                                      (when (seq (:dev npm))
+                                        (str "\t" (count (:dev npm))
+                                             " devDependencies omitted by --omit=dev")))))
+              blocked (cond
+                        (:unreadable npm)
+                        (str "package.json is present but will not parse: "
+                             (:unreadable npm)
+                             " — refusing to run a suite whose dependencies cannot be read")
+
+                        (seq (:missing npm))
+                        (str "declared npm dependencies absent after install: "
+                             (str/join ", " (:missing npm))
+                             " — npm exits 0 while installing nothing, so this is found "
+                             "by looking rather than by status. If the entry sits under "
+                             "devDependencies, move it: this gate installs --omit=dev.")
+
+                        :else nil)
+              r (when-not blocked
+                  (.spawnSync cp "npx" (clj->js ["--yes" (str "nbb@" nbb-version)
+                                                 "--classpath" cp-str entry])
+                              #js {:cwd root :encoding "utf8"}))
+              out (if blocked "" (str (.-stdout r) (.-stderr r)))]
+          (when-not blocked
+            (println (str/join "\n" (take-last 30 (str/split-lines out)))))
+          (if blocked
+            (fail! blocked)
+           (let [m (re-find #"Ran (\d+) tests containing (\d+) assertions" out)
                 ran (some-> m second js/parseInt)
                 fails (re-find #"(\d+) failures, (\d+) errors" out)
                 f (some-> fails second js/parseInt)
@@ -216,4 +276,4 @@
               (fail! (str "nbb exited " (.-status r) " despite a clean summary"))
 
               :else
-              (println (str "OK: " ran " tests, 0 failures, 0 errors on nbb")))))))))
+              (println (str "OK: " ran " tests, 0 failures, 0 errors on nbb"))))))))))
