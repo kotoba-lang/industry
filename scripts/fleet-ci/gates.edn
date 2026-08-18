@@ -200,6 +200,12 @@
   ;; between that library and every one of them.
   {:name "governor" :gate :jvm-test :cd true}
   {:name "taxlaw" :gate :jvm-test :cd true}
+  ;; shohyo 諸表 (2026-08-18). Folds a trial balance into BS/PL and refuses
+  ;; to guess what an account is -- an account missing from the chart is
+  ;; named, not dropped, because a balance sheet that omits one still
+  ;; balances. Zero deps; vendors kanjo's canonical concept vocabulary so
+  ;; the alignment is machine-checked rather than asserted.
+  {:name "shohyo" :gate :jvm-test :cd true}
   ;; These two took their capability library by :local/root until 2026-08-17,
   ;; which made them structurally ungateable -- the fleet ships one repo's
   ;; tree and no siblings, so the classpath could never resolve. Measured
