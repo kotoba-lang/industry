@@ -1,0 +1,171 @@
+{:iteration 3
+ :date "2026-08-18"
+ :loop :kotobase/cost-coscientist
+ :engine "90-docs/kotobase-performance/src/kotobase_performance/cost_coscientist.cljc"
+ :runner "nbb --classpath 90-docs/kotobase-performance/src 90-docs/kotobase-performance/run.cljs"
+
+ :seed-from-iteration-02
+ "Every hypothesis's :after-harness was measured against the OLD decode2. The
+  landed change realised part of h7, so those numbers OVERSTATE the headroom
+  that is left. Re-run the phase bench before treating this ranking as current."
+
+ ;; ── what the seed asked for, and what was done instead ──────────────────────
+ :the-re-measurement-did-not-happen
+ {:intended "re-run test/kotobase_protocols_worker/hydrate_phase_bench.cljs over
+             the cached production blocks at /tmp/kb-blocks (118 files, 33 MB,
+             head bafyreiehotlnqouj5u35gqh535ctxr52smxiphdjhiydtmivc2v6tqx3ye)"
+  :blocked-by "the repo-wide build governor. `scripts/resource-guard.mjs run
+               build` was held by a concurrent cloud-murakumo release for the
+               whole session (two different pids, 09:53 and later), and this
+               workspace's rule is one high-load build at a time."
+  :recorded-because
+  "The seed named a measurement. It was not taken, and a ranking that quietly
+   proceeded without it would be the exact failure iteration-02 wrote its own
+   caveat to prevent. What follows is therefore NOT the re-measurement -- it is
+   an arithmetic defect in the loop that was found while preparing to take it,
+   and that did not need the bench to fix."}
+
+ ;; ── the defect ──────────────────────────────────────────────────────────────
+ :defect-found-in-the-loop-itself
+ {:symptom "h5-engine-pin -- a hypothesis kept deliberately as a MEASURED ZERO,
+            landed 2026-08-17 and confirmed to change no served number -- was
+            ranked LAST at -$6.78 per million. A control that reads as a loss."
+  :cause
+  "`workerd-scale` is 2397/1976: the measured level of 2026-08-18 morning over
+   the harness level that produced it. The outer-string change then moved the
+   measured level to 2058 without anyone re-running the harness. Every
+   hypothesis carrying a stale `:after-harness {:cpu-ms 1976}` -- i.e. every
+   hypothesis that claims NOT to move CPU -- was therefore scaled to 2397 and
+   priced as a +339 ms regression it does not cause."
+  :who-it-hit ["h3-engine-materialisation" "h4-carv2-pack" "h5-engine-pin"]
+  :fix "`:after-harness {:cpu-ms :unchanged}` resolves to the LIVE baseline with
+        no proxy in the path at all. A hypothesis that does not claim to move
+        CPU is priced at the CPU that was actually measured."
+  :evidence-the-fix-is-right
+  {:before {:h5 -6.78 :h3 -6.64 :h4 0.42}
+   :after  {:h5 0.0   :h3 0.0   :h4 7.2}
+   :note "h5 is the control and it now reads exactly zero. h4's real saving --
+          the 84->64 class-B reduction it always claimed -- was being cancelled
+          by a CPU regression it never had, which is why iteration-02 read it as
+          worth $0.42 and dismissed it."}
+  :lesson "A calibration constant computed from two measurements decays when
+           either one moves. The loop had a control in it precisely so this
+           would be visible, and the control had been reporting the defect for a
+           full iteration before anyone read it as one."}
+
+ ;; ── generate: one new hypothesis ────────────────────────────────────────────
+ :new-hypothesis
+ {:id "h8-l2-cache-api"
+  :found-by "reading the sibling Worker's block cache while answering an
+             unrelated question about the storage layout"
+  :the-asymmetry
+  "kotobase-graph-database (datoms.kotobase.net) has had TWO cache tiers since
+   its block cache landed -- L1 isolate memory and L2 the Cloudflare Cache API,
+   which is per-colo and outlives the isolate. kotobase-protocols-worker had L1
+   alone."
+  :why-that-matters-here
+  "Measured 2026-08-18: twelve consecutive reads of /_diag/hydrate reported
+   `sampled: false` twelve times -- twelve isolates, none of which had ever
+   hydrated. L1 is cold on every request anyone can measure. The 84 class-B
+   gets and 11.46 MB in the baseline ARE that coldness, and they are $30.24 of
+   the $71.70 unit cost -- 42%, in the term the roadmap had not been ranking."
+  :basis :predicted
+  :what-is-measured "the mechanism (L1 cannot help; the tier is absent here)"
+  :what-is-not "the hit RATE. 75% is an assumption. 50% saves $15.12, 90% saves
+                $27.36, and a measured zero is a possible outcome."
+  :cpu :unchanged
+  :cpu-note "A cache hit removes a ROUND TRIP, and cpuTime does not include I/O
+             wait. Anyone expecting this to move the CPU term has mistaken which
+             resource it buys."}
+
+ ;; ── rank ────────────────────────────────────────────────────────────────────
+ :baseline {:cost-per-million 71.70 :cpu-ms 2058 :class-b-ops 84
+            :cpu-term 41.16 :class-b-term 30.24 :request-term 0.30}
+ :ranking
+ [{:elo 1298 :id "h1-seed-materialisation"        :after 35.36 :saves 36.34 :risk :low}
+  {:elo 1266 :id "h7-parse-only-addressable-values" :after 43.14 :saves 28.56 :risk :low}
+  {:elo 1242 :id "h8-l2-cache-api"                :after 49.02 :saves 22.68 :risk :medium}
+  {:elo 1213 :id "h2-fold"                        :after 50.02 :saves 21.68 :risk :low}
+  {:elo 1189 :id "h6-retract-inline-documents"    :after 50.20 :saves 21.50 :risk :high}
+  {:elo 1160 :id "h4-carv2-pack"                  :after 64.50 :saves  7.20 :risk :high}
+  {:elo 1130 :id "h5-engine-pin"                  :after 71.70 :saves  0.00 :risk :low}
+  {:elo 1101 :id "h3-engine-materialisation"      :after 71.70 :saves  0.00 :risk :high}]
+
+ ;; ── evolve ──────────────────────────────────────────────────────────────────
+ :batch
+ {:id "kotobase-cost-kaizen-3"
+  :members ["h8-l2-cache-api" "h7-parse-only-addressable-values"]
+  :order "h8 first, then h7"
+  :why "They buy DIFFERENT resources -- h8 the 84 class-B gets, h7 the CPU of
+        parsing every value -- so the pair is the sum, not the max. h8 goes
+        first because it is :S, reversible, semantically inert, and needs no
+        credential and no write to the graph."
+  :pair-cost-per-million 20.46
+  :pair-saving 51.24
+  :h1-is-a-choice-not-an-order
+  "h1 is the largest single number and is deliberately NOT first: it SUBSUMES
+   h8 rather than adding to it (both remove the same reads), it is :L, and its
+   maintenance is a rebuild per commit whose cost depends on a read:write ratio
+   nothing has measured."
+  :h4-is-superseded-on-this-graph
+  "Packing's whole saving here is the same 84 gets h8 removes, and it removes
+   fewer of them (84->64: each novelty cell is its own commit and therefore its
+   own pack). After h8 it is worth close to nothing on THIS graph. Packing earns
+   its place on the WRITE path of the other Worker -- where a fold re-PUTs every
+   unchanged tree node under `if-none-match: *` and reads each one back to
+   byte-compare it -- and that is not a resource this judge prices."}
+
+ ;; ── landed this iteration ───────────────────────────────────────────────────
+ :landed
+ {:what "h8-l2-cache-api"
+  :where "net-kotobase/control-plane, main 57b1f350f"
+  :branch "agent/hydrate-recost-20260818"
+  :files ["protocols-worker/src/kotobase_protocols_worker/kotobase_r2.cljs"
+          "protocols-worker/src/kotobase_protocols_worker/kotobase_store.cljs"
+          "protocols-worker/src/kotobase_protocols_worker/worker.cljs"
+          "protocols-worker/test/kotobase_protocols_worker/kotobase_store_test.cljs"]
+  :tests {:baseline "130 tests, 821 assertions, 5 failures (all ipni_test)"
+          :with-change "131 tests, 828 assertions, 5 failures -- the same five"
+          :broken "l2-get never consults the cache -> 7 failures: 2 in the new
+                   test, 0 collateral"
+          :restored "back to 5"}
+  :the-instrument-is-half-the-landing
+  "`{:cache-hits n}` cannot distinguish a tier that works from a tier that is
+   present and never hit, and the second costs an extra lookup per block while
+   saving nothing. The diagnostic now counts where the answer CAME FROM --
+   blocks_from_l1 / blocks_from_l2 / blocks_from_r2 -- plus `l2_available`,
+   because a zero under a runtime with no Cache API means NOT ASKED. The old
+   split was derived from an `is it in L1?` pre-check and would have counted
+   every L2 hit as an R2 read: the one number that decides whether the tier is
+   worth having."
+  :blocks-unattributed
+  "New, and not always zero. The derived form hid that by construction
+   (`from-r2` was `gets - hits`, absorbing whatever was left whether or not R2
+   was reached). Two real sources: a second caller joining an in-flight fetch,
+   and an absent block. A number that always balances proves nothing."
+  :not-yet-deployed
+  "The release build was still waiting on the same build governor when this
+   receipt was written. Landed on main is not deployed, and the hit rate cannot
+   be measured until it is."}
+
+ ;; ── what this iteration still cannot see ────────────────────────────────────
+ :what-the-judge-cannot-see
+ ["THE TRAFFIC, unchanged from iteration-02. Twelve isolates, none of which had
+   ever hydrated. This loop prices a served read on a graph that currently
+   serves none."
+  "The hit rate of the tier just landed. That is the next measurement and the
+   counters exist to make a zero reportable."
+  "The re-measurement the seed asked for. The hypotheses' :after-harness values
+   for the CPU-MOVING hypotheses (h1, h6, h7) are still stale by the ~28% the
+   outer-string change already took off phase B, and are therefore still
+   OVERSTATED. h8's ranking does not depend on them -- it moves no CPU -- but
+   h1's and h7's do."
+  "Whether L2 survives the eviction pressure of a per-colo cache holding 11.46
+   MB of one graph's blocks."]
+
+ :seed-for-iteration-04
+ "Deploy, then measure the hit rate with the credential-free probe
+  (`GET s3.kotobase.net/health` hydrates; `/_diag/hydrate` on the SAME
+  connection reports the tiers). Then take the phase bench the build governor
+  blocked, and re-derive h1/h7 from a decomposition that describes the current
+  baseline rather than the one before the outer-string change."}
