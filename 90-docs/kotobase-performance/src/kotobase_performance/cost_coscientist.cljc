@@ -43,40 +43,73 @@
      (* (:usd-per-million-cpu-ms prices) cpu-ms)
      (* (:usd-per-million-class-b prices) class-b-ops)))
 
+;; ── the measured CPU term ────────────────────────────────────────────────────
+;; iteration-01 closed with: "Close the CPU uncertainty first; it is the input
+;; every ranking rests on and the only one that cannot be read from inside the
+;; isolate." The second clause was right and the conclusion drawn from it was
+;; wrong. Nothing INSIDE the isolate can read cpuTime — but `wrangler tail`
+;; reads it from outside, per request, and always could.
+
+(def measured-cpu
+  "Production cpuTime for a hydrating request, read from `wrangler tail`.
+
+  The probe is a public-read surface, so this needs no credential: atproto is
+  in `core/public-read-surfaces`, and
+  `GET atproto.kotobase.net/xrpc/com.atproto.repo.describeRepo?repo=x`
+  performs the full shared-graph hydrate. That matters — the sparql and cypher
+  surfaces return 401 to a self-issued CACAO, so a measurement that needed
+  them would have needed an operator credential, and would have stalled here.
+
+  Taken 2026-08-18 against the deployed worker, which by then carried the
+  read-path hoist and the fetch coalescing. All ten outcomes `ok`."
+  {:cpu-ms [2411 2539 2133 2410 2491 2178 2384 2114 2267 3689]
+   :wall-ms [4003 3810 3215 3379 3355 2714 2858 2656 2759 5313]
+   :n 10 :median 2397 :mean 2462 :min 2114 :max 3689
+   :cpu-over-wall "60-83%"
+   :prior "2026-08-17, pre-fix, n=14: 2329-4416"
+   :how "wrangler tail kotobase-protocols-worker --format json, matched to each
+         request by a ?probe=<uuid> marker in the URL."})
+
+(def workerd-scale
+  "measured median / Node proxy = 2397/1976.
+
+  The harness measures the DECOMPOSITION reliably — which half of the hydrate
+  costs what — but its absolute level is a Node proxy for a quantity Cloudflare
+  bills. So the total is anchored to the measurement and the measured
+  proportions are preserved.
+
+  This makes every `:after` a MODELLED PROJECTION, not a measurement, and each
+  hypothesis keeps its raw `:after-harness` so the correction stays auditable.
+  The proxy understated by 21%, not the several-fold iteration-01 feared."
+  (/ 2397 1976))
+
 ;; ── the measured baseline ────────────────────────────────────────────────────
 
 (def baseline
-  "What one served read costs, as of the 2026-08-17 measurements.
+  "What one served read costs, as of 2026-08-18.
 
-  COUNTS are live from GET /_diag/hydrate against production and are trusted.
-  CPU is not, and the loop must say so rather than average it away:
+  COUNTS are live from GET /_diag/hydrate against production. CPU is now live
+  too, from `wrangler tail` — the term iteration-01 called the loop's dominant
+  uncertainty is measured, and this loop now prices as well as it ranks.
 
-  - The first run of this loop used 1,364 Node cpu-ms from an offline harness.
-  - A later decomposition of the *served* hydrate measured 1,720-2,232 Node
-    cpu-ms, split A 491-538 (hot-datoms: block gets, decode, tree walk, novelty
-    merge) and B 1,386-1,473 (building the LocalStore map, `edn/read-string`
-    twice per value).
-  - Paired `wrangler tail` then showed production cpuTime far above any Node
-    figure: one request reporting 36 ms of in-isolate elapsed spent 4,046 ms of
-    cpuTime. n=1 for that pairing.
-
-  So the judge's dominant input is a Node proxy for a quantity only the
-  platform can see. `cpu-ms` below is the mid of the served-hydrate
-  decomposition; `cpu-uncertainty` records that production may be several times
-  higher. Every dollar figure inherits that, and no ranking here should be read
-  as a price."
-  {:cpu-ms 1976                    ; Node, served-hydrate decomposition mid
-   :cpu-ms-parts {:a-hot-datoms 514 :b-map-build 1430}
+  What remains unmeasured is not the rate but the TRAFFIC. Twelve consecutive
+  reads of /_diag/hydrate on 2026-08-18 returned `sampled: false` — twelve
+  isolates, none of which had ever hydrated. There are no organic served reads
+  on this graph. Every figure below is therefore unit economics at hypothetical
+  volume, and the crossover is the honest headline, not saved CPU."
+  {:cpu-ms 2397                    ; LIVE, wrangler tail, n=10 median
+   :cpu-ms-parts {:a-hot-datoms 623 :b-map-build 1735}  ; harness split, scaled
+   :cpu-ms-harness 1976            ; what iteration-01 priced
    :class-b-ops 84                 ; live
    :bytes 11462579                 ; live
    :unfolded-txs 63                ; live
    :seed-bytes 4930593
    :seed-bytes-in-91-inline-docs 4198531
    :cpu-uncertainty
-   "Node proxy. One paired production sample suggests real cpuTime is several
-    times higher; nothing inside the isolate can read cpuTime, so this cannot
-    be closed from here."
-   :sources {:cpu-ms :node-proxy :class-b-ops :live :bytes :live}})
+   "CLOSED 2026-08-18. Read per-request from wrangler tail (n=10, median 2397,
+    range 2114-3689). The residual uncertainty is variance, not method: the max
+    is 1.7x the min across ten consecutive requests on one worker."
+   :sources {:cpu-ms :live-workerd :class-b-ops :live :bytes :live}})
 
 ;; ── Generate ─────────────────────────────────────────────────────────────────
 ;; One hypothesis per candidate mechanism. Each states the resource quantities
@@ -92,7 +125,7 @@
              every s3 request for that bucket to its own graph, so on THIS graph
              only the four credential-gated query surfaces can reach them. Every
              request parses them anyway."
-    :after {:cpu-ms 810 :class-b-ops 84}
+    :after-harness {:cpu-ms 810 :class-b-ops 84}
     :basis :measured
     :basis-note "byte accounting of the real seed, 2026-08-17. The cpu figure
                  assumes B falls with the share of values parsed; that
@@ -106,7 +139,7 @@
     :title "Decode the seed without parsing values nobody asked for"
     :change "Keep values as their stored EDN strings and parse only the
              collections the request's surface can address."
-    :after {:cpu-ms 519 :class-b-ops 84}
+    :after-harness {:cpu-ms 519 :class-b-ops 84}
     :basis :measured
     :basis-note "Same CBOR decoded without parsing values: 2.5-6.8 ms against
                  887-919 ms parsed. Removes B; A remains."
@@ -118,7 +151,7 @@
     :title "Materialise the hydrated seed, keyed by chain CID"
     :change "Serve the seed as one content-addressed object instead of
              rebuilding it from 84 blocks."
-    :after {:cpu-ms 1430 :class-b-ops 1}
+    :after-harness {:cpu-ms 1430 :class-b-ops 1}
     :basis :measured
     :basis-note "Removes A (514 ms) and the 84 gets. B survives ANY encoding,
                  because the consumer is a synchronous LocalStore over a plain
@@ -132,7 +165,7 @@
    {:id "h2-fold"
     :title "Fold the novelty backlog"
     :change "63 of 84 blocks are one tx-block per unfolded transaction."
-    :after {:cpu-ms 1738 :class-b-ops 21}
+    :after-harness {:cpu-ms 1738 :class-b-ops 21}
     :basis :measured
     :basis-note "Fold reduces the NOVELTY part of A, not B. The first run of
                  this loop credited it with 57.5% by using an offline harness
@@ -145,7 +178,7 @@
    {:id "h4-carv2-pack"
     :title "Pack commit-local blocks into CARv2 archives"
     :change "One range GET per commit's blocks instead of one per block."
-    :after {:cpu-ms 1976 :class-b-ops 64}
+    :after-harness {:cpu-ms 1976 :class-b-ops 64}
     :basis :measured-and-refuted-for-this-shape
     :basis-note "Only the 21 snapshot blocks coalesce; each novelty cell is its
                  own commit and therefore its own pack."
@@ -156,7 +189,7 @@
    {:id "h3-engine-materialisation"
     :title "Stop materialising query intermediates"
     :change "~16x of headroom inside the query engine."
-    :after {:cpu-ms 1970 :class-b-ops 84}
+    :after-harness {:cpu-ms 1970 :class-b-ops 84}
     :basis :measured
     :basis-note "The engine is ~6 ms of this request."
     :effort :L
@@ -166,7 +199,7 @@
    {:id "h5-engine-pin"
     :title "Ship the benchmarked query engine"
     :change "Production ran datalog 14 commits behind the benchmarked build."
-    :after {:cpu-ms 1976 :class-b-ops 84}
+    :after-harness {:cpu-ms 1976 :class-b-ops 84}
     :basis :measured
     :basis-note "Landed 2026-08-17; changed no served number, as predicted.
                  Kept as a control -- a hypothesis with a measured zero."
@@ -174,7 +207,14 @@
     :reversible? true
     :depends-on-write-rate? false}])
 
-(defn generate [] hypotheses)
+(defn- scale-after
+  "Harness cpu-ms -> the workerd level the judge prices in. Class-B counts are
+  live and pass through untouched; only the proxied term is corrected."
+  [{:keys [after-harness] :as h}]
+  (assoc h :after (assoc after-harness
+                         :cpu-ms (Math/round (* workerd-scale (:cpu-ms after-harness))))))
+
+(defn generate [] (mapv scale-after hypotheses))
 
 ;; ── Reflect ──────────────────────────────────────────────────────────────────
 
@@ -319,7 +359,13 @@
      :roadmap ranked
      :batch evolved
      :what-the-judge-cannot-see
-     ["Storage, deliberately excluded as constant across hypotheses."
+     ["THE TRAFFIC. Twelve consecutive reads of /_diag/hydrate on 2026-08-18
+       returned `sampled: false` -- twelve isolates, none of which had ever
+       hydrated. This loop prices a served read on a graph that currently
+       serves none, so every saving here is per-request unit economics at
+       volume that does not yet exist. That is the honest headline; it is not
+       an argument against the ranking, but it decides what the ranking is FOR."
+      "Storage, deliberately excluded as constant across hypotheses."
       "The read:write ratio, which decides whether h1 is a win at all."
       "Memory. The fold-cost receipt could not determine whether a fold fits the
        128 MB isolate limit, and a hypothesis that fails on memory scores the
