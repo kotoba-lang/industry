@@ -4,7 +4,7 @@
   :adr/status "accepted"
   :adr/date "2026-08-17"
   :adr/supersedes ""
-  :adr/superseded-by ""
+  :adr/superseded-by "ADR-2608189100 (decision 2 only: Cranelift is a checkpoint, not the ceiling)"
   :adr/tags "kotoba-native amu codegen x86-64 aarch64 benchmark"
   :adr/body
   "# x86-64 gets the AArch64 codegen passes
@@ -72,14 +72,21 @@ parity, not a win in either direction, and only for this kernel.**
    these are new `x86-` passes over the same instruction vector rather than a
    new backend.
 
-2. **The parity target is Cranelift, not LLVM.** Cranelift is a production
+2. **The parity target was Cranelift, not LLVM.** Cranelift is a production
    backend of roughly 100k lines and sits at 1.26-1.32x LLVM on this workload;
-   amu's code generator is 3,350 lines. Reaching LLVM would additionally
-   require register allocation, instruction scheduling and loop-invariant
-   hoisting — the same things that separate Cranelift from LLVM. Claiming
-   \"faster than Rust\" is not available and is not sought: for a scalar kernel
-   with no allocation and no library, `rustc -C opt-level=3` **is** LLVM, so the
-   honest label on the existing table is \"versus LLVM -O3 through rustc\".
+   amu's code generator is 3,350 lines. Reaching LLVM additionally requires
+   inlining, instruction scheduling and a register allocator that sees across
+   the timed loop — the same things that separate Cranelift from LLVM. For a
+   scalar kernel with no allocation and no library, `rustc -C opt-level=3`
+   **is** LLVM, so the honest label on the existing table is \"versus LLVM -O3
+   through rustc\".
+
+   **Superseded in part, 2026-08-18 (ADR-2608189100).** Decisions 1, 3 and 4
+   stand. Decision 2's *ceiling* does not: the owner set LLVM+ as the speed
+   goal. Cranelift remains the checkpoint this table already meets at the
+   minimum. The process that ranks the remaining gap is the Co-Scientist loop
+   in `90-docs/codegen/speed_coscientist.cljc`; a win seals only through
+   `kotoba-lang/perfgate`.
 
 3. **Narrowing an encoding is only sound when the value is final before the
    width is chosen.** `resolve-program-layout` reserves each token's width in a

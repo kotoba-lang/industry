@@ -1,0 +1,113 @@
+[{:db/id -1
+  :adr/id "ADR-2608189100"
+  :adr/title "amu speed goal is LLVM+; Cranelift is a checkpoint; Co-Scientist ranks the remaining gap"
+  :adr/status "accepted"
+  :adr/date "2026-08-18"
+  :adr/deciders "Jun Kawasaki"
+  :adr/repos ["com-junkawasaki/root" "kotoba-lang/kotoba-native" "kotoba-lang/amu" "kotoba-lang/perfgate"]
+  :adr/supersedes "ADR-2608179400 decision 2 (Cranelift as ceiling)"
+  :adr/superseded-by ""
+  :adr/relates-to "ADR-2608179400, ADR-2608039500 (codegen is T2, kototama is T3), ADR-2608145400"
+  :adr/tags "kotoba-native amu codegen aarch64 llvm co-scientist perfgate"
+  :adr/body
+  "# ADR-2608189100: amu speed goal is LLVM+
+
+**Status**: accepted (2026-08-18)
+
+## Context
+
+ADR-2608179400 measured the eight-round Park–Miller kernel on Apple M4:
+
+```
+                     min     p25   median
+amu (AArch64)       15.05   15.68   26.66
+rustc -> Cranelift  14.65   16.59   22.47
+rustc -> LLVM       12.19   13.31   17.32
+```
+
+Decision 2 of that ADR named Cranelift as the parity target and LLVM as
+out of scope. The owner overrode that ceiling: **design and optimize toward
+speed above LLVM**, using the Google Co-Scientist loop (Generate → Reflect →
+Rank/Elo → Evolve → Meta). This ADR records the override, the measured
+decomposition of the 1.24× gap on the published `kernel.kotoba` harness,
+and the WIP=1 landings that followed.
+
+Cranelift remains a checkpoint. The table already meets it at the minimum
+(15.05 vs 14.65 is 1.027×, inside host noise). LLVM is the thing to beat.
+
+Same-day codegen iteration 04 (`kernel_wide.kotoba`) measured a **9×**
+allocator gap. That ranking is a different workload. This ADR does not
+supersede it. A ratio is a statement about a workload (iteration 04
+meta-review). The published `kotoba.runtime-comparison/v1` harness is still
+the narrow kernel, and that is the 1.24× this ADR ranks.
+
+## What was dumped, 2026-08-18
+
+LLVM -O3 on the same kernel lowers each round to seven AArch64 instructions:
+
+```
+madd ; smulh ; add ; asr ; add lsr#63 ; sub lsl#31 ; add
+```
+
+`compile-kir-module :aarch64` of the eight-round kernel, after leaf-constant
+cache and Mersenne reduction, emits **the same seven**. Magic lives in x16
+once. Fused remainder, LICM and autovec therefore predict **zero** on this
+kernel: there is no leftover `sdiv`, and the loop is serial.
+
+The remaining gap on this harness is not IR arithmetic. `kexe-benchmark.c`
+called `kexe_fn8` 100k times. rustc inlines `kernel` into `main`'s 100k
+loop. Matching that shape is the closer for the 1.24×.
+
+## Decision
+
+1. **The speed goal on this kernel is LLVM -O3, not Cranelift.** A claim
+   that the goal is met seals only through `kotoba-lang/perfgate` on this
+   kernel and this host. It does not generalize to allocation, strings, or
+   capability calls. It does not silence the 9× on `kernel_wide`.
+
+2. **Rank remaining work with the Co-Scientist loop** in
+   `90-docs/codegen/speed_coscientist.cljc`. The judge is min ns/call, not
+   an LLM and not instruction count. Codegen iterations 1–2 already showed
+   that byte count can fall 12% with no clock movement (reciprocal hoist
+   under Rosetta).
+
+3. **WIP=1.** Do not land fused-srem and inlining in one pass. Iteration 05
+   ranked `h-inline-loop-artifact` first (Elo 1260, predicted 12.40 ns) and
+   **refuted** `h-fused-srem` on this kernel (saving 0). Register-to-register
+   coalescing (`h-a64-coalesce-direct-results`) lands because it is :S and
+   has been sitting since 2026-08-12 (`a3ed13b`). Iteration 03 already
+   measured that this class of core does not charge for that MOV. It is not
+   claimed as the LLVM closer.
+
+4. **Refuse, still:** FMA that changes rounding; silent bounds-check
+   elision; PGO; an optimizer inside kototama (ADR-2608039500: codegen is
+   T2, kototama is T3). Range-restricted remainder that holds only for the
+   bench's `n=200` is unsound on exported `kernel(n)`.
+
+## Consequences
+
+- The ranked closer `h-inline-loop-artifact` was **measured and refuted
+  on this lowering.** One invoke of `bench` is 71.27 ns min against 12.79
+  ns for 100k C calls of the GMIR `kernel` leaf (5.6× worse). The helper
+  is 1052 bytes, 82 LDR / 72 STR, tail `b` (not `bl`). The 7-inst round
+  spilled once `n`/`left`/`last` were live. Default harness still
+  extracts `kernel`. Allocator is the remaining LLVM+ work; iteration 04
+  already has `kernel_wide` (9×).
+- Fuel-on-back-edge remains a hypothesis for the leftover 1.05× on a
+  quiet host. It is not the 5.6×. Do not claim LLVM beaten without
+  perfgate, this kernel, min quantile, oracle 1830338420, 25 rotated
+  samples.
+- Golden byte assertions move when AArch64 writes x0 directly. That is
+  expected (ADR-2608179400 consequences).
+- `90-docs/codegen/coscientist/iteration-01.edn` through `iteration-03.edn`
+  stay the x86-64 count/chain/rename record. Iteration 04 is the wide
+  kernel / allocator finding and is not overwritten. Iteration 05 is the
+  AArch64 LLVM+ ranking of the published narrow harness, including the
+  loop-in-artifact refutation.
+
+## 改訂履歴
+
+- 2026-08-18: accepted. Owner override of ADR-2608179400 decision 2.
+  Coalescing landed in kotoba-native (`5dbe0d2`). Loop-in-artifact
+  measured and refuted on this lowering (71.27 vs 12.79 ns). Numbered 05
+  so it does not clobber iteration 04."}]
