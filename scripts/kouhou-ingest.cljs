@@ -149,15 +149,40 @@
       (println (str "  copy --to " r " stderr: " (str/trim (or (last (lines err)) "")))))))
 
 ;; ── 5) custody は exit code で確かめる（location log を数えない）─────────
-(def all-keys (lines (:out (run ["git" "annex" "find" "--format=${key}\n" "raw"] {:dir ds}))))
+(def today (subs (.toISOString (js/Date.)) 0 10))
+
+(defn- keys-under [path]
+  (lines (:out (run ["git" "annex" "find" "--format=${key}\n" path] {:dir ds}))))
+
+(def all-keys (keys-under "raw"))
+
+;; **全 key を毎日問い合わせない。** corpus は毎日 40 本ずつ増えるので、
+;; O(key × remote) の検証は 1 件 ~2 秒 × 2 remote で伸び続け、1 年で数時間の job に
+;; なる。今日書いたものは全部、過去のものは標本だけ確かめる —— 系統的な破損
+;; （remote が死んだ、鍵が失効した）は標本で出るし、今日の分は今日しか確かめられない。
+(def todays-keys (keys-under (str "raw/" today)))
+(def older (remove (set todays-keys) all-keys))
+(def sample-size 10)
+(def sampled (take sample-size (shuffle older)))
+(def checked (concat todays-keys sampled))
+
 (def custody
   (into {}
         (for [r remotes]
           [r (count (filter (fn [k]
                               (zero? (:exit (run ["git" "annex" "checkpresentkey" k r] {:dir ds}))))
-                            all-keys))])))
-(println (str "  custody (VERIFIED by exit code, of " (count all-keys) " keys): "
-              (str/join ", " (for [r remotes] (str r "=" (get custody r))))))
+                            checked))])))
+;; 分母を必ず一緒に出す。「93 present」だけでは、何本問い合わせたか読めない
+;; （検査していないものを合格として数える形は ADR-2608131100 でやった）。
+(println (str "  custody (VERIFIED by exit code): "
+              (str/join ", " (for [r remotes]
+                               (str r "=" (get custody r) "/" (count checked))))
+              "  [today " (count todays-keys) " + sample " (count sampled)
+              " of " (count older) " older; corpus " (count all-keys) "]"))
+
+(when (< (apply max (vals custody)) (count checked))
+  (println (str "WARN 問い合わせた " (count checked) " 本のうち、"
+                "どの remote でも揃っていないものがある")))
 
 ;; ── 6) push。git-annex branch も一緒に（custody の地図はこれ）────────────
 ;; **`HEAD:main` で押す。** west の checkout は detached なので `main:main` は
