@@ -165,17 +165,35 @@ Iceberg の manifest-list / manifest 分割と同じ形に、同じ圧力から�
 
 ## 検証
 
-- `clojure -M:test` と `npm run test:nbb` — **32 tests / 89 assertions、両方 green**。
-- **6 つの実欠陥で赤にし、戻して緑に戻ることを実際に見た**: 統計不在が skip を許す
+- `clojure -M:test` と `npm run test:nbb` — **36 tests / 1,093 assertions、両方 green**、
+  かつ**ノード `levi` でも green**（`test-tana-…-murakumo-levi`、receipt `76d8591167ea`）。
+- **8 つの実欠陥で赤にし、戻して緑に戻ることを実際に見た**: 統計不在が skip を許す
   （2 failures）/ `:trust` が既定値に落ちる（1）/ range が 1 byte 長い（1）/
   述語が集約の fold を失格させなくなる（1）/ `:location-only` でも集約が答える（4）/
-  Arrow adapter が wide-open な bounds を発明する（4）。
+  Arrow adapter が wide-open な bounds を発明する（4）/ manifest の bounds を
+  **報告した chunk だけから導出する**（**581 failures** —— 古典的な形で、例示テスト
+  ではなく生成テーブルが捕まえた）/ top が `count-non-null` を `count` で答える（1）。
   一度も赤くならない gate は、誰も問いを立てていない gate と同じ（ADR-2608136000）。
-- **fleet gate `tana`（`:jvm-test` / `:cd true`）を登録した。** `:nbb-test` ではなく
-  `:jvm-test` なのは、nbb runner が sibling checkout を classpath に要求するのに対し
-  fleet は 1 repo の tree しか配らないため —— deps.edn の git 依存は `ship-git-deps!` が
-  運ぶ。**ノード上での実行はまだ観測していない**（登録時、常駐 tick が 25 分走行中で
-  `--only tana` が排他に弾かれた）。次の tick の receipt が最初の観測になる。
+- **fleet gate `tana`（`:jvm-test` / `:cd true`）を登録し、ノード `levi` で緑を観測した。**
+  `:nbb-test` ではなく `:jvm-test` なのは、nbb runner が sibling checkout を classpath に
+  要求するのに対し fleet は 1 repo の tree しか配らないため —— deps.edn の git 依存は
+  `ship-git-deps!` が運び、実際に columnar / parquet / arrow の 3 本がノードに届いて解決した。
+
+  **最初の実行では 2 つの検査のうち 1 つが赤だった** —— `:pin-reachable/tana` が
+  `:unknown-repo`。gate の欠陥ではなく、**tana を west.yml に登録しただけで原本
+  （`fleet-db.edn`）に吸収していなかった**（Phase 1.5 の `kagami reconcile` は
+  ADR-2607300900 で CI が撤去されており手で回す）。CLAUDE.md の手順どおり
+  origin/main の west.yml を入力に worktree で reconcile し、**変更される 77 pin を
+  全て `gh api compare` で fast-forward 確認**（追加 5 件は旧 pin 無し）してから吸収した。
+
+  その 77 件のうち 7 件が最初 404 を返したが、**これは pin の異常ではなく問いの誤り**
+  だった —— `cloud-itonami-gftd-*-actor` は entry が `repo-path:` を持ち、GitHub 上の
+  実体は `cloud-itonami/gftd-*-actor`。west の `name` で問い合わせると存在しない repo を
+  訊くことになる。正しいパスでは 7 件とも ahead / behind 0。**404 は「不正」と
+  「訊き方が違う」の両方の顔をする。**
+
+  吸収後の再実行で `checks 2 required 2` が両方 pass（receipt `76d8591167ea`）。
+  **赤も緑も両方向を見たので landed とする。**
 - bench は**答えが一致しない plan を速い plan と呼ばない**（両経路の rows を突き合わせ、
   0 行一致なら比較が空虚だとして exit 2）。
 
@@ -205,9 +223,40 @@ Iceberg の manifest-list / manifest 分割と同じ形に、同じ圧力から�
   重なり、**round trip を消す当のフィールドでだけ食い違っている**。これは「未着手」では
   なく**測定された境界**なので、そう記録する。
 
+**2026-08-18 の 3 巡目で着地したもの**（pin `1043173`）:
+
+- **`aggregate-top`** —— sharded な top だけから `count` / `min` / `max` を答える
+  （manifest も object も読まない）。`count-non-null` は**名指しで拒否**する ——
+  top は null 数を持たないので、`count` で答えると**ちょうど null の数だけ間違う**。
+- **shard 層の正しさを生成で検査した。** shard は**コストのための層**であり、
+  コストの議論は正しさが静かに壊れる場所である —— flat plan が読んだはずの chunk を
+  持つ manifest を枝刈りすれば、**行が減るのにエラーは出ない**。そこで 40 seed ×
+  shard サイズ 4 × 述語 4 の生成テーブル（範囲が重なり、bounds を持たない chunk を
+  含む）に対して `plan(root) == plan(merge(残った manifest))` を
+  **`(object, range)` の集合として**要求する。
+  併せて**「何も枝刈りしない shard 層でもこの不変条件は成り立つ」**ので、層が実際に
+  除外していることを別テストで要求する（**トートロジーの証明が不変条件テストの
+  失敗の仕方**）。
+- **`aggregate-top` と `aggregate` の一致も同じ生成テーブルで要求する** ——
+  値が一致するか、**両方が拒否するか**のどちらか。root が拒否した所で top が答えるなら、
+  それはデータが報告していない bounds を畳んでいる。
+
+**測って見つけた、自分の検証の穴**:
+
+- **nbb と JVM は同じ依存を見ていなかった。** nbb の classpath は sibling **checkout**、
+  `deps.edn` が固定するのは **sha** で、実測すると `columnar` の checkout は pin より
+  **4 commit 後ろ・13 日古かった**。つまり「JVM と nbb で 36 tests 緑」は**別々の
+  columnar についての 2 つの主張**だった（両方緑なので何も言わなかった）。
+  runner が `deps.edn` の pin と checkout を突き合わせ、食い違えば **exit 2**
+  （pass でも fail でもない）で表を出して止まるようにした。pin が 1 件も見つからない
+  ときも exit 2 —— **何も調べなかった検査が clean に見えてはならない**。
+- **columnar は closure に 3 つの sha で宣言されている**（tana `5e165f0`＝tip /
+  parquet `d89813a` / arrow `16b336b`）。`tools.deps` が 1 つに解決するので
+  **緑の JVM 実行の内側からは見えない**。ADR-2608180100（git dep pin diamonds、別
+  セッション）と同型で、**この repo からは直せない上流の問題**として名指しする。
+
 | 次の一手 | 置き場所 |
 |---|---|
-| sharded root の top から集約を答える（今は root を要求する） | `tana` |
 | lake の datom manifest に byte range を足すか、root を lake へ射影するか（**設計判断が先**） | `kotobase-lake` / `tana` |
 | 実 corpus（合成 chain ではない）での round trip | `net-kotobase/lake` |
 | ノード上の gate receipt を実際に見る（登録しただけでは緑を見たことにならない） | `manifest/fleet-ci.edn` |
@@ -223,4 +272,8 @@ Iceberg の manifest-list / manifest 分割と同じ形に、同じ圧力から�
   `kotobase-lake` bridge は**測定の結果 blocked**（datom manifest に byte range が無い）
   と分かったので、gap の記述を「未着手」から「測定された境界」に書き換えた。
   検証は 21 tests/51 assertions → **32 tests/89 assertions**、赤にした実欠陥は 3 → **6**。
+- 2026-08-18（同日 3 巡目、pin `1043173`）: `aggregate-top`、shard 不変条件の生成検査、
+  nbb runner の pin drift 検査を追加。fleet gate をノードで**両検査 green** まで持っていき、
+  その過程で **原本への未吸収**（reconcile 77 pin）と **nbb/JVM が別の依存を見ていた**
+  ことを発見した。検証は **36 tests/1,093 assertions**、赤にした実欠陥は 6 → **8**。
 "}]
