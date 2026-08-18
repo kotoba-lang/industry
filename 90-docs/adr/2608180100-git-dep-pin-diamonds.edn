@@ -150,6 +150,39 @@ peer の assertion が**増えている**のは、中断していた 5 テスト
 superproject の manifest からは追えない。pin 前進が `entry not found` で
 拒否されて分かった。登録が要る。
 
+## 残った conflict は循環であって、pin では解けない（2026-08-18 追記）
+
+律速のバグを直した後、`kotobase-peer` の閉包に残る旧版を追跡した。ほとんどが
+**`via kotobase-peer`** だった —— つまり `kotobase-projection` の `:test` alias が
+**古い peer** を pin し、その古い peer が全部の旧版を連れてきていた。
+
+peer は緑になったので test alias を現 peer main に繋ぎ直した。**悪化した:**
+
+```
+conflicting pairs   before 8   ->   after 17
+```
+
+新しい peer は 11 ライブラリの部分木を連れてくるので、**循環に再突入して**
+版が増える。revert した。
+
+### なぜ構造的に解けないか
+
+`kotobase-projection` ⇄ `kotobase-peer` は**相互依存**である。
+
+- peer の `:deps` は projection を含む（`atomic-publication` は projection の facade）
+- projection の `:test` alias は peer を含む（`datalog_test.cljc` の 15 deftest が
+  `peer/transact` `peer/query` `peer/transact-effective` を**実データベースとして**
+  使って projection を検証している）
+
+循環では、どちらの側も**相手の少し古い版**を指すしかない。pin をどう並べても
+一致しない —— 一致させた瞬間に「自分自身の未来の版」を要求することになる。
+
+**したがってこの部分グラフの conflict はゼロにできない。** 解くには循環を切る:
+projection のテストが実 store ではなくテストダブルを使うか、それらのテストが
+peer 側へ移る。**どちらも設計変更であって pin 作業ではない。**
+
+これは collapse の失敗ではなく、**collapse が到達できる限界の位置**である。
+
 ## この ADR が残す一般則
 
 **「JVM が緑」は「宣言どおりの依存で緑」ではない。** tools.deps の解決は
