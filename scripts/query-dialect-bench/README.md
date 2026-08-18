@@ -204,12 +204,17 @@ ADR-2608136000 が「一度直した種類の誤りが、次の話題で再発�
 
 ## これが測っていないもの
 
-- **3 方言の比較になっていない。** ADR は kotobase 方言 / GraphQL / Cypher の pass 率を
-  並べると書いたが、**Cypher と GraphQL は同じデータに対して実行できない** ——
-  6 surface はどれも deploy されておらず（ADR-2608039975）、bridge は `IStore` を
-  materialize する経路で、この面は `IStore` ではない。実行できない surface のために
-  機構を作るのは ADR-2608039975 が明示的に「やらない」と決めたことなので、作っていない。
-  **したがってここにあるのは 1 方言の絶対値であって、方言間の相対値ではない。**
+- **3 方言の比較になっていない。** ここにあるのは **1 方言の絶対値**であって
+  方言間の相対値ではない。
+  ⚠ 当初この理由を「surface がどれも deploy されていないから」と書いたが、
+  **2026-08-18 に実測して訂正した** —— `sparql` / `cypher` / `graphql` /
+  `gremlin`.kotobase.net はいずれも **401（Bearer 認証）で live**、`datomic` は 200。
+  `kotobase-worker-shell` の `kotobase-protocols-worker.query` が 4 surface を
+  deploy shell に合成している。ADR-2608039975 の「deploy shell が1つも無い」は
+  2026-08-03 時点の事実で、今の事実ではなかった。
+  実際に阻んでいるのは **①live surface が見るのは kotobase graph でこの 2 dataset の
+  面ではない ②Bearer token ③harness が HTTP を叩かない（面 script を子プロセスで
+  回す形）** の 3 つ。前より小さく具体的な gap。
 - **1 モデルの 1 回の測定**。qwen3.8-27b（`murakumo-main` の現在の解決先）1 本、
   temperature 0、20 問。他のモデルでの再現は取っていない。
 - **prompt の最適化をしていない。** few-shot は 3 例で固定。ここを詰めれば数字は動く。
