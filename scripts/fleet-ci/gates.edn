@@ -106,6 +106,15 @@
  ;;      intact -- and the reported failure is the thing that was broken.
  ;;   3. deps.edn has no cross-repo dep the test path needs: the gate ships one
  ;;      repo's tree, so `:nbb-test`'s classpath cannot reach a sibling.
+ ;;   3b. …unless the entry carries `:ship-git-deps true`. Measured 2026-08-18,
+ ;;      condition 3 was never a property of the repositories: the deps are
+ ;;      already placed on the node under ~/.gitlibs by `ship-git-deps!`, and what
+ ;;      was missing was a classpath pointing at them. `tick.cljs` now derives
+ ;;      `src:test:$HOME/.gitlibs/libs/<lib>/<sha>/src…` transitively for
+ ;;      `:nbb-test` entries that ask for it, and runs `npm install` when the tree
+ ;;      has a package.json. Of the 14 gates condition 3 had blocked, 8 then match
+ ;;      the JVM run exactly. Condition 1 still applies and still bites: 3 of the
+ ;;      other 6 hold `.clj` tests, which no classpath reaches.
  ;;   4. The runner covers the whole suite:
  ;;        nbb --classpath ".:scripts/nbb_compat" \
  ;;          scripts/verify-cljs-runner-completeness.cljs --repo orgs/<org>/<name>
