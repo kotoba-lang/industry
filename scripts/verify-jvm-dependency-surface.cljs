@@ -129,10 +129,53 @@
       (go dir 0))
     @acc))
 
-(defn test-path? [p]
+(defn test-path?
+  "`test_foo.clj` counts too. The `_test$` suffix is the majority convention here
+   but not the only one -- measured 2026-08-18, 24 `.clj` files use the `test_`
+   PREFIX and this predicate was reading every one of them as production source.
+   The identical bug was found and fixed in
+   verify-cljs-runner-completeness.cljs on 2026-08-17, where a `_test$` rule read
+   1,081 `test_*` files as RUNNERS; it survived here because the two scripts were
+   written a day apart and nobody diffed the predicate."
+  [p]
   (or (re-find #"(^|/)(test|tests)/" p)
       (re-find #"_test\.[a-z]+$" p)
+      (re-find #"(^|/)test_[a-z0-9_]*\.[a-z]+$" p)
       (re-find #"(^|/)dev/" p)))
+
+;; ---------------------------------------------------------------------------
+;; What a `.clj` file actually IS, which the extension does not say.
+;;
+;; Measured 2026-08-18 over all 2,756 `.clj` sources in registered checkouts:
+;;
+;;   2,165  the `(ns …)` matches the path, so the JVM can load it   -> real
+;;     218  it does not match, so `clojure -M -e "(require '…)"` answers
+;;          `Could not locate …`. 112 of those are `mesh.clj`.      -> not JVM
+;;     373  no `(ns …)` at all; 211 are `run_tests.clj`             -> entry point
+;;
+;; The 112 `mesh.clj` are KOTOBA Mesh guest components. They declare `(ns aburi)`
+;; while sitting at `src/aburi/mesh.clj`, and they call `kqe-assert!` /
+;; `kqe-query`, which no namespace in the file requires -- those are host
+;; capability imports, listed in the file's own header as
+;; `host-imports: … → kotoba:kais/kqe (needs cap/kqe)`. Nothing on the JVM loads
+;; them and nothing could. Counting them as `:jvm-source` inflated the debt this
+;; whole line of work exists to measure.
+(defn ns-of [text]
+  (second (re-find #"\(ns\s+\^?[:a-zA-Z{}\s]*?([a-zA-Z][a-zA-Z0-9._<>*+!?-]*)" (or text ""))))
+
+(defn mesh-guest?
+  "A KOTOBA Mesh guest: it names host imports, or calls a host capability that
+   nothing in the file provides."
+  [text]
+  (boolean (and text (re-find #"host-imports:|kqe-assert!|kqe-query" text))))
+
+(defn jvm-loadable?
+  "Could the JVM load this file by its namespace? The path the reader needs is
+   the namespace with `.`->`/` and `-`->`_`; if the file does not sit there, no
+   `require` reaches it."
+  [rel text]
+  (when-let [n (ns-of text)]
+    (str/ends-with? rel (str (-> n (str/replace "." "/") (str/replace "-" "_")) ".clj"))))
 
 ;; ---------------------------------------------------------------------------
 ;; deps.edn classification.
@@ -234,7 +277,15 @@
             rels (map #(.relative node-path abs %) files)
             by-ext (group-by #(last (str/split % #"\.")) rels)
             cljs-all (get by-ext "clj" [])
-            clj-src (remove test-path? cljs-all)
+            ;; Split the non-test `.clj` by WHAT THEY ARE, not by extension.
+            clj-nontest (remove test-path? cljs-all)
+            clj-text (fn [r] (try (.readFileSync fs (.join node-path abs r) "utf8") (catch :default _ nil)))
+            clj-mesh (filter #(mesh-guest? (clj-text %)) clj-nontest)
+            clj-rest (remove (set clj-mesh) clj-nontest)
+            clj-script (filter #(nil? (ns-of (clj-text %))) clj-rest)
+            clj-named (remove (set clj-script) clj-rest)
+            clj-src (filter #(jvm-loadable? % (clj-text %)) clj-named)
+            clj-unloadable (remove (set clj-src) clj-named)
             clj-test (filter test-path? cljs-all)
             deps-files (filter #(= "deps.edn" (.basename node-path %)) rels)
             bb? (some #(= "bb.edn" (.basename node-path %)) rels)
@@ -247,6 +298,9 @@
         {:repo rel
          :clj-src (count clj-src)
          :clj-src-sample (vec (take 3 clj-src))
+         :clj-mesh (count clj-mesh)
+         :clj-script (count clj-script)
+         :clj-unloadable (count clj-unloadable)
          :clj-test (count clj-test)
          :cljc (count (get by-ext "cljc" []))
          :cljs (count (get by-ext "cljs" []))
@@ -305,7 +359,8 @@
   #{:jvm-chicory :jvm-source :jvm-runtime-deps :jvm-build :babashka})
 
 (defn findings-for [{:keys [repo clj-src clj-test runtime runtime-third-party
-                            chicory lint test-tool build bb kotoba]}]
+                            chicory lint test-tool build bb kotoba
+                            clj-mesh clj-script clj-unloadable]}]
   (cond-> []
     (seq chicory)
     (conj {:sev (if (frozen-chicory repo) "info" "fail") :kind :jvm-chicory :repo repo
@@ -330,6 +385,16 @@
     bb
     (conj {:sev "warn" :kind :babashka :repo repo
            :detail "bb.edn present; ADR-2607173000 retired bb as a script host"})
+    (pos? (or clj-mesh 0))
+    (conj {:sev "info" :kind :clj-mesh-guest :repo repo
+           :detail (str clj-mesh " .clj file(s) calling host capabilities"
+                        " (kqe-*), which no JVM require reaches")})
+    (pos? (or clj-script 0))
+    (conj {:sev "info" :kind :clj-script :repo repo
+           :detail (str clj-script " .clj file(s) with no ns -- run as a script")})
+    (pos? (or clj-unloadable 0))
+    (conj {:sev "info" :kind :clj-unloadable :repo repo
+           :detail (str clj-unloadable " .clj file(s) whose ns does not match the path")})
     (pos? clj-test)
     (conj {:sev "info" :kind :jvm-test-oracle :repo repo
            :detail (str clj-test " .clj test file(s) [allowed-as-oracle-until-replaced]")})
@@ -357,6 +422,9 @@
          [:jvm-build        "shadow-cljs / cljs compiler / tools.build"]
          [:babashka         "bb.edn (retired script host)"]
          [:jvm-runtime-clojure-only "org.clojure/clojure only -- a declaration"]
+         [:clj-mesh-guest   "`.clj` that is a KOTOBA Mesh guest, not JVM at all"]
+         [:clj-script       "`.clj` with no ns -- a JVM entry point, not library code"]
+         [:clj-unloadable   "`.clj` whose ns does not match its path; nothing loads it"]
          [:jvm-test-oracle  ".clj tests (allowed as oracle)"]
          [:jvm-test         "JVM test runner in an alias"]
          [:jvm-lint         "clj-kondo via maven"]]]
