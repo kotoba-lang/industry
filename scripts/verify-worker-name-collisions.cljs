@@ -51,10 +51,21 @@
 ;; Paths that are not a repository's own configuration. An agent worktree and a
 ;; pre-adoption backup both carry real wrangler files, and counting them would
 ;; manufacture collisions nobody can act on.
-(def ^:private excluded-segments
-  [".claude/worktrees/" "/node_modules/" "/.git/" ".root-repository-adopt/"])
+(defn- excluded?
+  "A path is not a repository's own configuration if any directory BELOW orgs/
+  begins with a dot.
 
-(defn- excluded? [p] (some #(str/includes? p %) excluded-segments))
+  Enumerating them by name did not work. The first version excluded
+  `.claude/worktrees/` and `.root-repository-adopt/` and still reported
+  `itonami-fleet-dispatch` as a four-config collision, because two of the four
+  were `.cloud-itonami-app-adopt/` and `.wt-run/` — the same two kinds of thing
+  under names the list did not have. Measured 2026-08-18: generalising to any
+  dotted segment removes exactly that one false positive and introduces none.
+
+  node_modules is not dotted and is excluded separately."
+  [p]
+  (or (str/includes? p "/node_modules/")
+      (some #(and (seq %) (str/starts-with? % ".")) (rest (str/split p #"/")))))
 
 (defn- walk-configs [dir]
   (if-not (.existsSync fs dir)
