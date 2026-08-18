@@ -64,9 +64,25 @@ other sessions gating repositories that had no gate at all. Coverage expanded.
 ## The one thing still unanswered
 
 `io-ipld-car` was switched to `:nbb-test` + `:ship-git-deps true` as a canary for the
-new classpath (be6780a). **It has not been exercised yet.** Two ticks ran after the
-merge and produced no receipt for it, because gates trigger on the target repo's TIP
-changing and io-ipld-car's tip has not moved.
+new classpath (be6780a). **It has not been exercised yet, and the reason is timing,
+not a defect.**
+
+The first reading of this was wrong and is corrected here. It looked as though two
+ticks had run after the merge without producing a receipt, which would have meant a
+declaration change does not trigger a re-run — a real hole in what ADR-2608137000
+added. It is not that. The three `tick done` lines after the merge are BATCHES of one
+tick that began its preflight at 02:30:27Z, thirteen minutes before the canary merged
+at 02:43:11Z; a full tick takes roughly twenty-eight minutes here. That run read the
+old gates.edn.
+
+Checked rather than assumed:
+
+    decl-hash of the entry now      81415915e2c85be7
+    ~/.gftd/fleet-ci-state.edn      0ff73e8d7bb08950, :at 2026-08-16T13:39:57Z
+
+The hash differs, so `changed?` will fire, and the state was NOT silently backfilled
+with the new hash — which is the failure that would have hidden this. The next tick to
+START will select it.
 
 Expected when it runs: `exit 0`, `Ran 19 tests containing 64 assertions`, 0 failures —
 the same numbers the fleet's own JVM receipt recorded on 2026-08-16, and the same
