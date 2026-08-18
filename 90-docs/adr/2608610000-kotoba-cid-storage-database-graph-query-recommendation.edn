@@ -14,11 +14,13 @@
                 "2608580000-kotoba-hash-native-completion-kotobase-code-graph-projection"
                 "2608039970-kotobase-datom-plane-not-datalog"
                 "2608039000-no-d1-premise-in-decentralized-paths"
-                "2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane"]
+                "2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane"
+                "2608070400-kotobase-client-held-security-and-searchable-encryption-tiers（D5 が本 ADR の D3 を訂正）"
+                "2608161600-ipfs-has-no-storj-client-encryption-compose-envelope-signal（convergent 禁止の確定）"]
   :adr/authoritative_for
   ["kotoba / kotobase の CID ベース storage・database・graph・query の既定構成"
    "S3 等 object store を backend にしたときに最適化すべき対象（request でなく hop、そして pipelining）"
-   "client-side 暗号化の配置と、その配置ごとに失う性質"
+   "client-side 暗号化の配置と、その配置ごとに失う性質（既定は per-tenant 鍵。convergent は ADR-2608070400 D5 で却下済み）"
    "定義 identity をどの層の CID で取るか（source / S式 / checked KIR）"
    "datom 面を data lake として使うときの投影の位置づけ"]
 
@@ -49,7 +51,7 @@ L2 query   datom index 必須。Datalog は surface の 1 つ
 L2 graph   逆依存も同じ datom 面。別 graph DB を立てない
 L2 olap    columnar projection（削除・再構築可能な派生物）
 exec       pure は CID memo / effect は receipt。FVM 境界は commit 検証だけ
-crypto     convergent 暗号を ciphertext-addressed で。random nonce は不可
+crypto     per-tenant 鍵 + pqh-v1 を ciphertext-addressed で。convergent も random nonce も不可
 ```
 
 ### D1. database は kotobase 自身の形（3 index + commit DAG + 条件付き ref）を既定とする
@@ -95,19 +97,40 @@ RTT 別モデル（serial = requests × RTT、pipelined = hops × RTT）:
 効果が大きい。次点が block cache: 1,000 block で point read の request が 2.04 → 0.74（-64%）
 —— 木の上位層は全 descent で共有されるので、小さい cache がちょうどそこを保持する。
 
-### D3. client-side 暗号化は **convergent + ciphertext-addressed** を既定にする
+### D3. client-side 暗号化は **per-tenant 鍵 + ciphertext-addressed**。convergent は採らない
 
-| 配置 | server が検証可 | dedup | equality 漏洩 | 木が canonical |
-|---|---|---|---|---|
-| 無し | yes | yes | n/a | yes |
-| **convergent / ciphertext-addressed** | **yes** | **yes** | **yes** | **yes** |
-| random nonce / ciphertext-addressed | yes | **no** | no | **no** |
-| 任意 mode / plaintext-addressed | **no** | yes | yes | yes |
+> **2026-08-18 訂正 —— この節はもともと『convergent + ciphertext-addressed を既定に
+> する』と決めていた。翌日の ADR-2608070400 D5 がそれを否定し、ADR-2608161600 が
+> 『convergent 暗号を使わない』を禁止事項として固定した。下の実測は当時のまま正しい
+> —— 変わったのは実測から導いた決定の方である。**
+>
+> 否定の根拠は、もとの表の『equality 漏洩』列に既に書いてあった。convergent は
+> **同じ平文 → 同じ住所**なので、server は鍵を持たないまま等価を住所から学習する。
+> 実測（ADR-2608070400）で **tenant A の block の 35.12% が tenant B と byte 同一**。
+> 『server は持っていないものを漏らせない』（同 D1）に対して、dedup はその値段では
+> 買えない。したがって **per-tenant 鍵**とし、**cross-tenant の重複排除は捨てる**。
+> suite は `pqh-v1`（X25519+ML-KEM-768 / Ed25519+ML-DSA-65 / XChaCha20-Poly1305）。
 
-**random nonce は選択肢ではない（失格）。** 同一 430 block を 2 回独立に暗号化した実測で
-**convergent は 430 個のまま、random は 860 個（duplicate factor 2.0）**。同じ論理ノードが
-毎回別の住所になるので 2 replica が同じデータから別の root を出す。content addressing が
-content addressing でなくなる。
+| 配置 | server が検証可 | dedup | equality 漏洩 | 木が canonical | 判定 |
+|---|---|---|---|---|---|
+| 無し | yes | yes | n/a | yes | 機密性を主張しない経路のみ |
+| convergent / ciphertext-addressed | yes | yes | **yes（tenant 間 35.12%）** | yes | **却下**（ADR-2608070400 D5） |
+| **per-tenant 鍵 / ciphertext-addressed** | **yes** | **tenant 内のみ** | **tenant 内のみ** | **yes** | **既定** |
+| random nonce / ciphertext-addressed | yes | **no** | no | **no** | 失格 |
+| 任意 mode / plaintext-addressed | **no** | yes | yes | yes | 失格 |
+
+**random nonce が失格である理由は変わらない。** 同一 430 block を 2 回独立に暗号化した
+実測で **決定的な暗号化は 430 個のまま、random は 860 個（duplicate factor 2.0）**。
+同じ論理ノードが毎回別の住所になるので、2 replica が同じデータから別の root を出す。
+content addressing が content addressing でなくなる。
+
+**未決 —— 封筒面を実装する前にここを決めること。** 上の 2 つを同時に満たすには、
+鍵が tenant ごとに違い、かつ **nonce が内容から決まっている**必要がある（tenant 内では
+決定的なので住所が安定し木が canonical、tenant を跨ぐと同じ平文でも別の住所なので
+等価が漏れない）。**その nonce 導出はどちらの ADR も明示しておらず、実装も無い。**
+ADR-2608070400 D5 は『重複排除は捨てる』としか書いていないので、tenant *内*の決定性
+まで捨てる読み方（= random nonce に落ち、この節の実測どおり木が canonical でなくなる）
+が残っている。この ADR の『測っていないこと』が挙げる鍵管理面の未測定と同じ穴である。
 
 コストは小さいが**ブロック粒度に比例する**（28 B/block 固定 = nonce 12 + GCM tag 16）:
 
@@ -209,8 +232,11 @@ latency ではない。
    append-only log / per-stream event を*正本*にしない（同期・部分レプリカの機構としては可）。
 2. **object store backend の実装は pipelining を最優先**にする。hop 数を設計指標として記録し、
    request 数だけを見ない。block cache は小さくてよいが必ず持つ（上位層が全 descent で共有）。
-3. 暗号化する経路は **convergent + ciphertext-addressed**。random nonce の ciphertext
-   addressing を提案する設計は、content addressing を壊すので却下してよい。
+3. 暗号化する経路は **per-tenant 鍵 + ciphertext-addressed**（ADR-2608070400 D5 /
+   ADR-2608161600）。**convergent は採らない** —— tenant 間で block の 35.12% が byte
+   同一になり、鍵を持たない server が等価を住所から学習する。random nonce の ciphertext
+   addressing も、content addressing を壊すので却下してよい。tenant 内で決定的にする
+   ための nonce 導出は未決（D3 の訂正を参照）。
 4. 定義 identity は **checked KIR**（既存 ADR-2608550000 の追認）。S 式 CID を identity に
    昇格させない。source CID は provenance 専用に留める。
 5. **block 粒度の既定は定義単位。** 細粒度に振るときは「帯域律速である」ことを示す。
