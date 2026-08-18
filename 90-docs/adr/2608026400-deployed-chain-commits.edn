@@ -1,6 +1,0 @@
-[{:db/id -1
-  :adr/id "2608026400"
-  :adr/title "deploy 済み BFT chain が block を commit する — 3つの原因が積み重なっていた"
-  :adr/status "accepted"
-  :adr/date "2026-08-02"
-  :adr/body "## 到達点\n\n4 replica、genesis から、Cloudflare 上、Durable Object 間 HTTP:\n\n```\n  0s     reset to genesis\n  30s    50 / 48\n  55s    58 / 56\n  80s    90 / 88\n  105s   120 / 118\n  ~3min  165 / 163\n```\n\n4台が歩調を揃え、committed は tip の2つ後ろ（3-chain 則）。**state root は同じ height で一致する** — w1/w2 は committed 163 で `c468eebc`、w3/w4 は 164 で `bf1540c9`。equivocator を名指しする replica は無い。\n\n## 停止には3つの原因が積み重なっており、それぞれが次を隠していた\n\n1. **block を受け入れる2つの入口が、どちらも提案者を確認していなかった。** harness の forger の block が、配送が遅れて初めて存在する競争に勝つ。engi `f638f0fb` で修正。harness は 20ms で死んでいたところを 0〜120ms で生き延びる。\n2. **`code-version` を上げると Durable Object の名前が変わる**（自己再スケジュール alarm に deploy を拾わせる唯一の方法）。**名前が変われば storage は空**なので、全 replica が新しい鍵で戻り、TOFU は古い鍵を保持する。鍵は witness 名から導出するようにした。\n3. **これらの修正の前に作られた証明書は、修正の下では検証できない。** そして chain は証明できない block を越えられない。4台とも genesis に reset した — これは**以前の chain を破壊する**（block 2つと mintable な devnet 担保。数時間動いていなかった chain）。\n\n## 診断のコスト\n\n**測定に見えて何も測っていない計器が3つ**あった: どこにも書かれていない `sent-types`、自分の refactor が壊した harness の上で取った latency 閾値、そして `/head` のメンバーですらない `last-sync`。**3つとも、次の観測が否定するまで自信のある誤った文を生んだ。**\n\ntorihiki-node v62 / `f4783da8`、engi `f638f0fb`、torihiki `1a7ff9fc`。"}]

@@ -1,6 +1,0 @@
-[{:db/id -1
-  :adr/id "2608036100"
-  :adr/title "witness 4・quorum 3 は churn に対して余裕ゼロ — n=7 で罰則が 2.24 倍から 1.70 倍に下がる"
-  :adr/status "accepted"
-  :adr/date "2026-08-03"
-  :adr/body "## 測定\n\n```\n             eviction なし   毎秒 evict   罰則\n  N=4          377            168        2.24倍\n  N=7          260            153        1.70倍\n```\n\n**witness 4・quorum 3 は churn に対して余裕がゼロ**: 1台 evict すれば残りはちょうど quorum で、message を1つ落とせば1 round 失う。**7 なら残り6 対 quorum 5 で1つ余る**ので、eviction の罰則が下がる。\n\n**代価は throughput**: eviction 無しで 7台は 260、4台は 377 — 1 round の message が増えるため。churn 下では差がほぼ閉じる（153 対 168）。これは推奨ではなく**取引条件をそのまま述べたもの**。deploy は4台で動いている。\n\n## ここに至るまでに反証した説明（記録）\n\n1. **「replay コストが天井」** — 測ったら 400 block で 3.8ms。コードの*形*から推論して測定結果として書いていた。\n2. **「eviction が集めた票を破壊し誰も再送しない」** — 全 replica が自分の tip 票を毎 tick 再送しても動かず（171/158/167 対 162/156/165/163）。revert。\n3. **「equivocator のせいで正直な集合が quorum ちょうど」** — `BYZANTINE=none` で12%改善するのみ、罰則比は 2.29 対 2.46 で変わらず。\n\n**構造的な事実（余裕ゼロ）だけが残り、それは Byzantine を必要としない。**\n\n## eviction の代価の形\n\n```\n  evictions  60    30    15     7     0\n  blocks    148   216   268   316   391\n```\n\n1回あたり固定 block 数ではない（4.0 → 10.7 と稀になるほど増える）。`391/(1 + evictions/34)` に合う — 各 eviction が「固定の仕事量」でなく**「固定の時間」replica を取り除く**ときの形。\n\nengi `5353cf7d`、229 tests / 1173 assertions、0 failures。harness の knob: `N` `EVICT_MS` `RUN_MS` `NET_DELAY` `BYZANTINE`。"}]
