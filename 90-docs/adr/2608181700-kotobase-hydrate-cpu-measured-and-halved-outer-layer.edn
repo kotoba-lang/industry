@@ -136,7 +136,37 @@
   [{:priority 1 :item "h7's remaining half: defer value parsing. The bench's opaque floor — parsing no values — is 5.75 cpu-ms against phase B's 780-900. Changes what the synchronous LocalStore is handed, so it is a contract change, not a swap."}
    {:priority 2 :item "Re-run the phase bench and re-derive every :after-harness. They are stale by the part just taken."}
    {:priority 3 :item "Two repos deploy net-kotobase-cypher to cypher.kotobase.net (network-awai/net-kotobase-cypher and net-kotobase/cypher). They differ only in README today; that they agree is luck. Last deploy wins."}
-   {:priority 4 :item "Nothing detects source-path drift. It was found by hand in two repos and is presumably in others."}
+   {:priority 4 :status :closed :closed-on "2026-08-18"
+    :item "Nothing detects source-path drift. It was found by hand in two repos and is presumably in others."
+    :outcome "scripts/verify-shadow-source-paths.cljs, registered in
+              manifest/orgs-detectors.edn (NOT gates.edn -- a fleet gate ships only the
+              target repo's tree, so anything reading orgs/ can never go green there).
+              The presumption was right: 13 of the 30 builds declaring a relative
+              sibling source-path cannot compile, and the same three paths fixed by hand
+              appear three more times each. Findings are reported, not repaired: wiring
+              a build changes what it compiles, and a build that starts compiling can
+              start failing."}
+
+   {:priority 4.5 :owner-blocked true :new-on "2026-08-18"
+    :item "Ten Worker names are declared by more than one wrangler config with DIFFERENT
+           route sets. A Worker is addressed by name at publish time with no
+           fast-forward check, so which hostnames it serves is decided by whichever
+           config went last. Worst: kotobase-protocols-worker, five configs, three route
+           sets, seven hostnames -- one of which (enterprise-wave2) claims
+           cypher.kotobase.net, served today by a different Worker.
+
+           Also 253 names with IDENTICAL routes: duplicate checkouts, where publishing a
+           stale copy ships older code to the same hostnames. That is the 2026-07-25
+           signup-funnel incident's exact shape.
+
+           Detector: scripts/verify-worker-name-collisions.cljs. The decision -- which
+           config is canonical for each of the 10 -- is the owner's, because picking one
+           silently retires the others."
+    :do-not "Do NOT repair net-kotobase-enterprise-wave2/protocols-worker's source-paths
+             until this is decided. That build cannot compile, and its broken build is
+             currently the only thing preventing a hostname reassignment. The remedy
+             printed by :verify-shadow-source-paths would arm it -- one detector's fix is
+             the other's hazard, and they have to be read together."}
    {:priority 5 :owner-blocked true :item "KOTOBASE_MAINTENANCE_OPERATOR_DIDS — without it no query surface except atproto can be measured or exercised."}
    {:priority 6 :owner-blocked true :item "The 91 inline documents (85% of the seed, unreachable by s3 since 2026-08-10). h6 in the ranking; irreversible; needs a decision on whether they are still wanted."}
    {:priority 7 :owner-blocked true :item "Which materialised view to build (h1, the top-ranked item), and the read:write ratio it depends on."}]
