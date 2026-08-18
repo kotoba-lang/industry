@@ -204,6 +204,30 @@
 
 (def ^:private pin-re #"pinned at\s+(?:commit\s+)?([0-9a-f]{7,40})")
 
+;; A sixth spelling, and the largest population: a copy that names no repo and
+;; no commit, only a NAMESPACE it promises to track.
+;;
+;;     "1:1 port of `tashikame.cacao` (ADR-2607110200; keep in sync)"
+;;     "... from `kotoba.cacao` (keep in sync), and the crypto is JDK Ed25519"
+;;     ";; pure CACAO builders (mirror of kotoba.cacao)"
+;;
+;; Measured 2026-08-18: 31 files carry a declaration like this and NONE were
+;; scanned, because every earlier spelling anchors on the token VENDORED. All 31
+;; are `cacao.clj`. No two are identical after normalising away comments,
+;; strings and the ns line; they fall into three different public-API shapes
+;; (21, 19 and 17 fns). They also name FOUR different upstreams -- tashikame,
+;; kotoba, itonami, tsumugu -- so this is a chain of copies-of-copies with no
+;; authoritative original.
+;;
+;; These carry no pin, so only the CURRENT axis applies -- the same treatment
+;; the existing "no pin declared" case already gets. The point is not that a
+;; copy differs; it is that 31 files declare an obligation nothing was checking.
+(def ^:private sync-ns-re
+  #"(?:1:1 port of|[Ff]aithful port of|mirror of|[Pp]ort of|in sync with)\s+`?([a-z][a-zA-Z0-9_-]*(?:\.[a-z][a-zA-Z0-9_-]*)+)`?")
+
+(def ^:private sync-obligation-re
+  #"keep in sync|in sync with|1:1 port|[Ff]aithful port|mirror of")
+
 (defn- ns->path
   "`kotobase.protocols.json` + `.cljc` -> `kotobase/protocols/json.cljc`."
   [nsname ext]
@@ -217,7 +241,7 @@
   provenance claim. That case is real: wasm-webcomponent's `kami_ecs.cljs`
   documents the vendored file next to it, and must not be reported as one."
   [head rel-path ext]
-  (when-let [i (str/index-of head "VENDORED")]
+  (if-let [i (str/index-of head "VENDORED")]
     (let [h (subs head i)
           pin (second (re-find pin-re h))]
       (or (when-let [[_ src p] (re-find paren-re h)]
@@ -229,7 +253,12 @@
           (when-let [[_ src p sha] (re-find copied-file-re h)]
             {:source src :kind :org-or-org-repo :lib-path p :pin sha})
           (when-let [[_ repo nsname] (re-find copied-ns-re h)]
-            {:source repo :kind :repo-name :lib-path (ns->path nsname ext) :pin pin})))))
+            {:source repo :kind :repo-name :lib-path (ns->path nsname ext) :pin pin})))
+    ;; no VENDORED token: a sync declaration naming only a namespace
+    (when (and (re-find sync-obligation-re head)
+               (re-find sync-ns-re head))
+      (let [nsname (second (re-find sync-ns-re head))]
+        {:source nsname :kind :namespace :lib-path (ns->path nsname ext) :pin nil}))))
 
 (defn- body
   "From the first `(ns ` form on. The header above it is provenance, not code."
@@ -256,7 +285,18 @@
   explicit `<org>/<repo>`, or -- spelling 5 -- a bare repo name with no org,
   which is resolved by looking for it under each org."
   [source kind lib-path]
-  (if (= kind :repo-name)
+  (if (= kind :namespace)
+    ;; The declaration named a namespace and nothing else. Whichever registered
+    ;; repo actually ships that file is the upstream; if none does, the promise
+    ;; points at nothing and that is itself the finding.
+    (first (for [o (org-names)
+                 :let [base (str "orgs/" o)]
+                 :when (fs/existsSync base)
+                 r (try (vec (fs/readdirSync base)) (catch :default _ []))
+                 :let [d (str base "/" r)]
+                 :when (fs/existsSync (str d "/src/" lib-path))]
+             d))
+    (if (= kind :repo-name)
     (first (for [o (org-names)
                  :let [d (str "orgs/" o "/" source)]
                  :when (fs/existsSync d)]
@@ -264,7 +304,7 @@
     (let [dir (if (str/includes? source "/")
                 (str "orgs/" source)
                 (str "orgs/" source "/" (first (str/split lib-path #"/"))))]
-      (when (fs/existsSync dir) dir))))
+      (when (fs/existsSync dir) dir)))))
 
 (defn- upstream-candidates
   "The paths the library file could be at, given what the header wrote.
@@ -283,7 +323,7 @@
   to HEAD. A scan that cannot tell `drifted` from `not looked at` is worse than
   no scan, because the wrong label is the confident one."
   [source kind lib-path]
-  (let [lib (if (or (= kind :repo-name) (not (str/includes? source "/")))
+  (let [lib (if (or (= kind :repo-name) (= kind :namespace) (not (str/includes? source "/")))
               (first (str/split lib-path #"/"))
               (last (str/split source #"/")))]
     (distinct
