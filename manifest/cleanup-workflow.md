@@ -212,8 +212,32 @@ follow (reads work, writes fail — resolve slugs through `gh api repos/<slug> -
 repo, reported not hidden (webgpu has 67 local branches, slides over 90).
 
 Skipped and always reported: credential-looking paths, build junk, files over 2 MB,
-git-annex/DataLad datasets, **rename residue (below)**. Executable bits preserved. Nothing
+git-annex/DataLad datasets, **rename residue (below)**, and **nested git repositories
+(`:skip-nested-repo`, below)**. Executable bits preserved. Nothing
 is ever deleted — archive to `.git/stash-archive-<date>/` first, then add.
+
+### An untracked directory holding another git repo never expands
+
+`plan-repo` turns `?? foo/` into individual files with
+`git ls-files --others --exclude-standard -- foo/`. **`ls-files -o` stops at a nested repo
+boundary and returns `foo/` unchanged**, so the expansion is a no-op; no regex matches a
+bare directory, `statSync` succeeds, and the *directory path* lands in `:additive`.
+
+Measured 2026-08-18:
+
+| repo | untracked entry | what it actually was |
+|---|---|---|
+| `kotoba-lang/amu` | `.claude/worktrees/agent-a62da554fc36aeff3/` + 1 more | **live registered worktrees of other sessions** — 1,623 files, branches `agent/log-v1-aot-surface` / `agent/storage-v1-aot-surface` |
+| `kotoba-lang/kotoba-lang` | `netsync/` | **duplicate clone of the west-registered repo `kotoba-lang/netsync`**, sitting at the pinned commit `c7ca033`, 0 unpushed |
+
+Both were planned as `:additive → PR → merge`. Merging them would have committed another
+session's worktrees into a repo, and absorbed an independent repo into its parent. **Both
+satisfy `:additive` perfectly** — no path of that name exists on `main`. That is the same
+false argument the residue gate exists to refute: *absent from `main`* is not *new work*.
+
+`classify-file` now returns `:skip-nested-repo` for any candidate that is still a directory
+after expansion. Proven both ways: with only the nested dirs, both repos report
+着地対象なし; with one ordinary untracked file added, `amu` still plans `:additive 1 files`.
 
 **Deletions are never applied** — a ` D ` entry comes from a working tree that may be far
 behind, and replaying it can delete work someone else added. **Re-runs must be idempotent**
