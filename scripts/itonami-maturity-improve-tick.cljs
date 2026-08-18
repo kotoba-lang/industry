@@ -46,6 +46,7 @@
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
 (def datoms-file (str root "/90-docs/system-dynamics/itonami-maturity.datoms.edn"))
+(def evidence-file (str root "/manifest/itonami-maturity-evidence.edn"))
 (def archived-file (str root "/manifest/archived-repos.edn"))
 (def ledger-file (str home "/.gftd/itonami-maturity-improve.ledger.edn"))
 
@@ -509,14 +510,46 @@
                       (= 0 (:code anc)) :contained
                       :else :behind))))))))
 
-(defn- with-head-times
-  "候補に `:head-ms`（その repo の現 HEAD の commit 時刻）を添える。
+(defn- iso->ms
+  "ISO8601 → epoch ms、答えられなければ nil。
 
-  判定そのものは `fresh/classify-movement` が持つ —— この関数は git に聞く役だけ。
-  `with-landing-times` が `:landed-at-ms` を添えるのと同じ分け方で、純粋な判定は
-  test の効く ns に置く。"
+  **文字列同士を比べない。** scan と tick が違う TZ で走ると同じ commit が
+  別の文字列になり、動いていない repo を『動いた』と読む。epoch へ落とせば
+  表記に依らない。"
+  [iso]
+  (when (string? iso)
+    (let [n (.getTime (js/Date. iso))]
+      (when-not (js/isNaN n) n))))
+
+(def scanned-commit-ms
+  "repo path → **scan がその repo で読んだ HEAD commit の時刻**（epoch ms）。
+
+  正本は evidence（`:git/last-commit`）であって datoms ではない —— datoms は
+  スコアだけを運び、どの commit を読んだかを repo ごとには持っていない
+  （持っているのは fleet 全体の `:scan/at` 1 つきり）。それが、この検査が
+  時刻の大小へ落ちていた理由でもある。
+
+  読めなければ空 map。**空を『全部一致』と読ませない** —— 候補は
+  `:scanned-ms` を得られず `:unknown` に落ち、tick の evidence floor が鳴る。"
+  (or (when-let [s (slurp* evidence-file)]
+        (try (into {} (keep (fn [m]
+                              (when-let [ms (iso->ms (:git/last-commit m))]
+                                [(:repo/path m) ms])))
+                   (edn/read-string s))
+             (catch :default _ nil)))
+      {}))
+
+(defn- with-commit-identity
+  "候補に `:head-ms`（いまの HEAD commit の時刻）と `:scanned-ms`（scan が
+  読んだ commit の時刻）を添える。
+
+  判定そのものは `fresh/classify-movement` が持つ —— この関数は git と
+  evidence に聞く役だけ（`with-landing-times` が `:landed-at-ms` を添えるのと
+  同じ分け方で、純粋な判定は test の効く ns に置く）。"
   [candidates]
-  (mapv #(assoc % :head-ms (head-commit-ms (:repo %))) candidates))
+  (mapv #(assoc % :head-ms (head-commit-ms (:repo %))
+                  :scanned-ms (get scanned-commit-ms (:repo %)))
+        candidates))
 
 (defn- lane
   "ADR-2608052000 決定 2 を**実績から**維持する。固定スケジュール
@@ -591,14 +624,16 @@
         ;; いるか』を聞く。** ledger だけでは、着地して ledger を書かずに落ちた
         ;; 周を『何もしなかった周』と区別できない（上の classify-movement）。
         by-gain (vec (sort-by #(- (or (:fleet-gain %) 0)) in-lane))
-        ;; **基準は `:scan/at`（計測が repo を読んだ時刻）であって datoms の
-        ;; commit 時刻ではない。** 両者の差はこの検査が捕まえるべき窓そのもの
-        ;; （上の scan-at-ms を見よ）。`:scan/at` が無い古い datoms のときだけ
-        ;; commit 時刻へ落ちる。
+        ;; `measured-at` は **鮮度の表示**（何日前の計測か）に使う値であって、
+        ;; movement の判定には使わない。判定が時刻の大小だった頃はここが基準で、
+        ;; `:scan/at` を選ぶか datoms の commit 時刻を選ぶかが問題だった ——
+        ;; いまはどちらでもない（commit の同一性を見る。すぐ下を見よ）。
         measured-at (or scan-at-ms gen-ms)
+        ;; **時刻ではなく commit の同一性を聞く。** `measured-at` は下の
+        ;; freshness 表示にはまだ使うが、movement の判定には使わない ——
+        ;; 理由は `fresh/classify-movement` の docstring（2026-08-19 の実測）。
         movement (fresh/classify-movement
-                  (with-head-times (vec (take movement-probe-depth by-gain)))
-                  measured-at)
+                  (with-commit-identity (vec (take movement-probe-depth by-gain))))
         moved (:moved movement)
         ranked (vec (take 5 (:kept movement)))
         ;; `freshness` は probe より前に走るので、:blind-to-own-work は
@@ -721,13 +756,19 @@
     ;; 計測より後に動いた repo。**archived と同じく、落としたことを黙らない。**
     ;; これを黙ると、順位から repo が消えた理由が ledger だけでは再構成できない。
     (when (seq moved)
-      (log! (str "計測より後に動いたので候補から除外: " (count moved) " 本"
-                 "（上位 " (:checked movement) " 本を git に確認）"))
+      (log! (str "計測が読んだ tree がもう無いので候補から除外: " (count moved) " 本"
+                 "（上位 " (:checked movement) " 本を git と evidence に確認）"))
       (doseq [m (take 5 moved)]
-        (log! (str "    ↳ " (:repo m) " — HEAD が "
+        ;; **比べた 2 つをそのまま出す。** 以前はここに『HEAD の時刻 vs 計測の
+        ;; 時刻』を印字していたが、判定はもう時刻の大小ではないので、その並びは
+        ;; 除外の理由を誤って説明する（HEAD の方が古く見える行が出る —— まさに
+        ;; app-kareyanagi がそれで、commit は計測の 3 分前、checkout がそれを
+        ;; 受け取ったのは 50 分後だった）。
+        (log! (str "    ↳ " (:repo m)
+                   " — 計測が読んだ commit は "
+                   (subs (.toISOString (js/Date. (:scanned-ms m))) 0 19) "Z"
+                   "、いま checkout に在るのは "
                    (subs (.toISOString (js/Date. (:head-ms m))) 0 19) "Z"
-                   "、計測は " (subs (.toISOString (js/Date. measured-at)) 0 19) "Z"
-                   (when-not scan-at-ms "（:scan/at が無いので commit 時刻）")
                    "。この行の軸値は現状を表していない（従うと水増しになる）"))))
     ;; **「確かめられなかった」と「動いていない」を混ぜない。**
     (when (seq (:unknown movement))

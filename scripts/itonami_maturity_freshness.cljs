@@ -168,38 +168,70 @@
   13:43:04Z に commit されており、tick は redelivery を 1 位に置いて axis-docs を
   名指しした —— operator-quickstart は 23 分前から main に在った。
 
-  周の自己申告に依らず同じ問いへ答えられる観測が git にある。`:head-ms`
-  （その repo の現 HEAD の commit 時刻）は**呼び出し側が git から測って添える**
-  —— この ns は git も時計も読まない（`:landed-at-ms` と同じ約束）。
+  ## 判定 —— 時刻を比べない。**scan が見た commit と、いま在る commit を比べる**
 
-  ## 判定
+  問いは『この evidence 行は、この repo の *いまの tree* を describe しているか』
+  である。それに答えるのは 2 つの commit の同一性であって、時刻の大小ではない。
+  各候補は `:scanned-ms`（**scan がその repo で記録した commit の時刻** =
+  evidence の `:git/last-commit`）と `:head-ms`（**いま checkout に在る HEAD
+  commit の時刻**）を持つ。両者が違えば、scan が読んだ tree はもう無い。
 
-  `generated-at` は datoms が **commit された**時刻で、scan が repo を歩いた
-  時刻より後である。その窓の中で着地した commit は捕まらない —— つまりこの
-  判定は **過少報告する側に倒れる**。安全な向きはこちらで、ここで flag された
-  repo は実際に動いている。
+  どちらも呼び出し側が測って添える —— この ns は git も時計も evidence も
+  読まない（`:landed-at-ms` と同じ約束）。
 
-  `:head-ms` が数でない候補は **`:unknown` に入れ、同時に `:kept` にも残す**。
-  落とすと『確かめられなかった』という一点だけを理由に候補が静かに減り、
-  黙って残すと沈黙が pass として読まれる。両方へ入れて、呼び出し側に
-  『確かめていない』と言わせる。
+  ## なぜ時刻の大小では駄目だったか（2026-08-19、実測した回帰）
 
-  `generated-at` が数でなければ比較の基準が無いので、**誰も動いていないとは
-  主張しない**（`:checked 0` を返し、全員 `:kept`）。"
-  [candidates generated-at]
-  (if-not (number? generated-at)
-    {:kept (vec candidates) :moved [] :unknown [] :checked 0}
-    (reduce (fn [acc {:keys [head-ms] :as c}]
-              (cond
-                (not (number? head-ms)) (-> acc
-                                            (update :unknown conj c)
-                                            (update :kept conj c))
-                ;; `>` であって `>=` ではない。計測と同時刻の commit は計測に
-                ;; 含まれている（`classify-landings` と同じ約束）。
-                (> head-ms generated-at) (update acc :moved conj c)
-                :else (update acc :kept conj c)))
-            {:kept [] :moved [] :unknown [] :checked (count candidates)}
-            candidates)))
+  以前はここで `head-ms > 計測時刻` を見ていた。これは **commit された時刻**を
+  『checkout がその commit を持った時刻』の代理にしている。両者は同じではない:
+
+      commit が作られた 14:19Z  →  scan が走った 14:22Z  →  checkout が
+      `west update` でその commit を受け取った 15:12Z
+
+  この順序だと `14:19 > 14:22` は偽なので『動いていない』と答えるが、scan が
+  実際に読んだのは 1 週間前の tree である。実測 2026-08-19: evidence の
+  app-kareyanagi は `:git/last-commit 2026-08-11`、checkout は 08-18 の
+  ClojureScript 移行後 —— README.md も docs/operator-quickstart.md も test も
+  在るのに、行は `axis-docs 0 / axis-test 0` のままだった。tick はそれを
+  clean な 1 位として名指しし、**既に在るものを足しに行く周**になりかけた。
+
+  同じ日の fleet 全体で、evidence が stale だった 20 本のうち **6 本**が
+  この形（commit は scan より前、checkout がそれを受け取ったのは後）で、
+  時刻比較からは構造的に見えなかった。commit 同一性で見れば 20/20 捕まる。
+
+  **これは『測れなかった検査が、測って問題が無かった検査と同じ値を返す』の
+  一例**（ADR-2608136000）。旧実装の docstring は自ら『過少報告する側に倒れる、
+  安全な向きはこちら』と書いていたが、過少報告の結果は *候補に残す* こと、
+  つまり水増しの許可であって、安全な向きではない。
+
+  ## 確かめられなかったとき
+
+  `:scanned-ms` か `:head-ms` のどちらかが数でない候補は **`:unknown` に入れ、
+  同時に `:kept` にも残す**。落とすと『確かめられなかった』という一点だけを
+  理由に候補が静かに減り、黙って残すと沈黙が pass として読まれる。両方へ入れて、
+  呼び出し側に『確かめていない』と言わせる（tick の evidence floor）。
+
+  ## 既知の穴
+
+  比べているのは commit **時刻**であって sha ではない（evidence が持つのが
+  `:git/last-commit` だけのため）。別の commit が秒まで同じ committer 時刻を
+  持てば『動いていない』と読む。旧実装と同じ向きに倒れるだけなので後退では
+  ないが、evidence に sha を足せば消せる穴である。"
+  [candidates]
+  (reduce (fn [acc {:keys [head-ms scanned-ms] :as c}]
+            (cond
+              (or (not (number? head-ms)) (not (number? scanned-ms)))
+              (-> acc (update :unknown conj c) (update :kept conj c))
+
+              ;; 同一 commit = scan が読んだ tree がそのまま在る。
+              (= head-ms scanned-ms) (update acc :kept conj c)
+
+              ;; 違う commit = scan が読んだ tree はもう無い。**向きは見ない**
+              ;; —— checkout が pin より後ろへ動いた場合も、行は現状を
+              ;; describe していない。
+              :else (update acc :moved conj c)))
+          {:kept [] :moved [] :unknown [] :checked (count candidates)}
+          candidates))
+
 
 (defn freshness
   "計測値を信用してよいか。

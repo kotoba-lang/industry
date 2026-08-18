@@ -310,29 +310,32 @@
                           (f/explain (f/freshness {:generated-at :unknown :now now
                                                    :entries [] :stale-after-days 7})))))
 
-;; ── classify-movement（2026-08-15、実測した回帰）─────────────────────────────
+;; ── classify-movement ────────────────────────────────────────────────────────
 ;;
-;; 直前の周が cloud-itonami/redelivery の axis-docs を上げて main へ merge し
-;; （2da6173、14:06:31Z）、**ledger 行を書かずに終わった**。ledger だけを読む
-;; `classify-landings` にとって、その周は『何もしなかった周』と同じ形をしている
-;; —— `unseen` は空になり、tick は redelivery を 1 位に置いて axis-docs を
-;; 名指しした。operator-quickstart は 23 分前から main に在った。
+;; **2026-08-15 の回帰（原型）。** 直前の周が cloud-itonami/redelivery の
+;; axis-docs を上げて main へ merge し（2da6173）、**ledger 行を書かずに終わった**。
+;; ledger だけを読む `classify-landings` にとって、その周は『何もしなかった周』と
+;; 同じ形をしている —— tick は redelivery を 1 位に置いて axis-docs を名指しした。
 ;;
-;; **基準時刻の選び方まで固定する。** datoms の commit は 14:09:52Z で、それを
-;; 基準にすると見落とす（14:06:31 < 14:09:52）。`:scan/at` は 14:03:30Z で、
-;; こちらを基準にすると捕まる。実際その datoms の redelivery 行は
-;; `axis-docs 0` のままだった —— 計測は本当に見ていない。
+;; **2026-08-19 の回帰（いまの実装が答える形）。** 判定は時刻の大小をやめ、
+;; 『scan が読んだ commit』と『いま在る commit』の同一性になった。候補は
+;; `:scanned-ms`（evidence の `:git/last-commit`）と `:head-ms` を持つ。
 
 (def scan-at (ms "2026-08-15T14:03:30.385Z"))          ; datoms の :scan/at
-(def datoms-committed-at (ms "2026-08-15T14:09:52Z"))  ; datoms の commit 時刻
-(def redelivery-head (ms "2026-08-15T14:06:31Z"))      ; 2da6173
+(def redelivery-head (ms "2026-08-15T14:06:31Z"))      ; 2da6173（scan の後に着地）
+(def robot-head (ms "2026-07-20T00:00:00Z"))
 
 (def candidates
-  [{:repo "orgs/cloud-itonami/redelivery" :head-ms redelivery-head}
-   {:repo "orgs/cloud-itonami/robot" :head-ms (ms "2026-07-20T00:00:00Z")}
-   {:repo "orgs/cloud-itonami/sanctions" :head-ms nil}])
+  ;; redelivery: scan が読んだのは 1 つ前の commit。いまの HEAD は別物 = 動いた
+  [{:repo "orgs/cloud-itonami/redelivery" :head-ms redelivery-head
+    :scanned-ms (ms "2026-08-15T13:40:00Z")}
+   ;; robot: scan が読んだ commit がそのまま在る = 動いていない
+   {:repo "orgs/cloud-itonami/robot" :head-ms robot-head :scanned-ms robot-head}
+   ;; sanctions: git が答えない = 確かめられなかった
+   {:repo "orgs/cloud-itonami/sanctions" :head-ms nil
+    :scanned-ms (ms "2026-07-20T00:00:00Z")}])
 
-(let [r (f/classify-movement candidates scan-at)]
+(let [r (f/classify-movement candidates)]
   (check! "movement: ledger に行が無くても、動いた repo を名指しできる"
           ["orgs/cloud-itonami/redelivery"]
           (mapv :repo (:moved r)))
@@ -356,23 +359,54 @@
   (check! "movement: 確認した本数を返す（:moved [] を『確かめた』と読ませない）"
           3 (:checked r)))
 
-;; **基準時刻の回帰そのもの。** commit 時刻を基準にすると、この検査が捕まえる
-;; はずだった当の着地を見落とす。tick の基準を commit 時刻へ戻すと赤くなる。
-(check! "movement: commit 時刻を基準にすると redelivery を見落とす（だから :scan/at）"
-        []
-        (mapv :repo (:moved (f/classify-movement candidates datoms-committed-at))))
+;; **2026-08-19 の回帰そのもの。** commit は scan より*前*に作られ、checkout が
+;; それを受け取ったのは scan の*後* —— 時刻の大小（`head-ms > 計測時刻`）では
+;; 構造的に見えない形。実測: evidence の app-kareyanagi は `:git/last-commit
+;; 2026-08-11` なのに checkout は 08-18 の移行後で、README.md も
+;; operator-quickstart も test も在るのに行は `axis-docs 0` のままだった。
+;; tick はそれを clean な 1 位として名指しした。
+(let [scan-ran (ms "2026-08-18T14:21:48Z")
+      ;; commit が作られたのは scan の 3 分前
+      head (ms "2026-08-18T14:19:12Z")
+      ;; だが scan がその repo で実際に読んだのは 1 週間前の commit
+      scanned (ms "2026-08-11T03:41:37Z")
+      r (f/classify-movement [{:repo "orgs/cloud-itonami/app-kareyanagi"
+                               :head-ms head :scanned-ms scanned}])]
+  (check! "movement: commit が計測より前でも、scan が読んだ tree が別なら動いた"
+          ["orgs/cloud-itonami/app-kareyanagi"] (mapv :repo (:moved r)))
+  (check! "movement: その repo は候補に残さない（既に在るものを足しに行かせない）"
+          [] (mapv :repo (:kept r)))
+  ;; 参考（**検査ではない**）: 旧判定は `head-ms > 計測時刻` を見ていたので、
+  ;; ここでは 14:19:12 > 14:21:48 が偽 → 『動いていない』と答えていた。
+  ;; これを `check!` に書くと実装を一切通らない純粋な算術になり、
+  ;; `classify-movement` が何をしても緑のままになる —— 劇場なので書かない。
+  ;; 実装を discriminate しているのは上の 2 つ。
+  (assert (not (> head scan-ran)) "旧判定がこの形を見落とすという前提"))
 
-;; `>` を `>=` にすると赤くなる。計測と同時刻の commit は計測に含まれている。
-(check! "movement: 計測と同時刻の commit は『動いた』ではない"
+;; 逆向き —— checkout が pin より**後ろ**へ動いた場合も、行は現状を describe
+;; していない。向きを見ないことを固定する。
+(check! "movement: checkout が後ろへ動いた場合も『動いた』"
+        ["behind"]
+        (mapv :repo (:moved (f/classify-movement
+                             [{:repo "behind"
+                               :head-ms (ms "2026-08-01T00:00:00Z")
+                               :scanned-ms (ms "2026-08-10T00:00:00Z")}]))))
+
+;; 同一 commit を『動いた』と読まない（計測はまさにこの tree を読んでいる）。
+(check! "movement: scan が読んだ commit がそのまま在れば『動いた』ではない"
         []
         (mapv :repo (:moved (f/classify-movement
-                             [{:repo "same" :head-ms scan-at}] scan-at))))
+                             [{:repo "same" :head-ms scan-at :scanned-ms scan-at}]))))
 
-;; 基準が無いとき『誰も動いていない』と**主張しない**。:checked 0 で区別する。
-(let [r (f/classify-movement candidates :unknown)]
-  (check! "movement: 基準が無ければ動いたと主張しない" [] (mapv :repo (:moved r)))
-  (check! "movement: 基準が無ければ候補を落とさない" 3 (count (:kept r)))
-  (check! "movement: 基準が無いことを :checked 0 で言う" 0 (:checked r)))
+;; evidence が読めないとき『誰も動いていない』と**主張しない**。
+;; `:scanned-ms` が無い候補は :unknown へ入り、同時に候補にも残る ——
+;; tick 側の evidence floor が「1 本も答えを得ていない」と言う材料になる。
+(let [r (f/classify-movement
+         (mapv #(dissoc % :scanned-ms) candidates))]
+  (check! "movement: evidence が無ければ動いたと主張しない" [] (mapv :repo (:moved r)))
+  (check! "movement: evidence が無ければ候補を落とさない" 3 (count (:kept r)))
+  (check! "movement: evidence が無いことを :unknown で言う" 3 (count (:unknown r)))
+  (check! "movement: 確認した本数は候補数のまま（0 に潰さない）" 3 (:checked r)))
 
 (println)
 
