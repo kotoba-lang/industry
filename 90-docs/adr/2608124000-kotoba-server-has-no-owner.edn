@@ -1,0 +1,249 @@
+[{:db/id -1
+  :adr/id "ADR-2608124000"
+  :adr/title "kotoba-server: an unowned production binary, and what it costs today"
+  :adr/status "accepted"
+  :adr/date "2026-08-12"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/related ["ADR-2608123600" "ADR-2607072000" "ADR-2607082400" "ADR-2607072100"]
+  :adr/body
+  "## Position
+
+**Nothing is on fire.** The deployment is healthy and self-healing. What is
+undefined is **ownership** — no repo, no manifest and no team is responsible for
+the source of a binary running on five machines. That decays quietly.
+
+## The absence, confirmed — and one claim of mine softened
+
+No `crates/` at the checkout, at the west pin, or on `origin/main`; confirmed by
+`git ls-tree` and independently by the contents API. Not elsewhere in the fleet
+either: a bounded search finds three `crates/` directories in 4,165 repos and
+none holds this crate, and the name is unused in `west.yml`.
+
+ADR-2608123600 said the source is *recoverable only from git history*. **That is
+accurate; what I nearly wrote instead was not.** Locally the build commit
+appeared to be reachable only from a stale side branch. Server-side comparison
+is definitive: both the build pin and the deletion commit are **on `main`'s
+history**, 643 and 584 commits back. So this is not one branch deletion from
+gone, and GitHub retains it as long as `main` exists.
+
+**The local appearance was an artifact of a defect worth fixing on its own:
+`orgs/kotoba-lang/kotoba` is still a SHALLOW clone** — 24 graft boundaries, an
+apparent history beginning 2026-07-14 with four false roots. CLAUDE.md records
+that shallow was retired 2026-07-21 and everything unshallowed; **this repo was
+missed.** It silently corrupts ancestry, `--contains` and path-limited `git log`
+**in the one repo where this question keeps being asked.**
+
+Second, related: its gitdir is a leftover *submodule* directory under the repo's
+**old org path**, while the checkout lives under the new one. That explains an
+internal contradiction in ADR-2607072000, which cites two different paths for
+the same repo in two fields — the repo changed orgs and the local plumbing did
+not.
+
+## What is deployed, and the one thing that is missing
+
+`bin/BUILD.edn` records the commit, the feature set and the target triple. It
+was last modified 2026-06-27 and **cannot advance, because there are no further
+Rust commits.** The binary is rsynced to the nodes, not built there, and runs as
+a system LaunchDaemon with `RunAtLoad` and `KeepAlive`.
+
+**There is no checksum binding artifact to commit.** A hash exists only as an
+**8-character prefix in prose**, in a README and twice in an ADR — those three
+mentions are its only occurrences, the full digest is recorded nowhere, and the
+two records **disagree about whether it covers one binary or two.** So today the
+position is: **we hope this is what it is.**
+
+**The clearest existing cost is the watchdog.** A second daemon probes health
+every 60 seconds and kills the process after two failures, and its own comment
+names why: a 2026-07-02 incident where the HTTP surface wedged — accepting TCP,
+never responding — while libp2p stayed alive, so `KeepAlive` could not heal it.
+**That is a known defect being managed by a watchdog because nobody can rebuild
+the binary to fix it.**
+
+Also corroborated independently here: `KOTOBA_INTERNAL_SECRET` is **absent from
+the deployment template**, which is ADR-2608123600's central claim arrived at
+from the other direction.
+
+## Rebuildability: the inputs are unusually good, bit-reproduction is impossible
+
+At the build commit the tree is complete — **36** workspace members (33 crates +
+3 examples; an earlier count of 37 here was wrong), 41 source files
+in this crate — and the lockfile is **v4 with 1,056 packages, 1,020 from
+crates.io and `source = \"git+\"` appearing exactly ZERO times.** No git
+dependencies is the single best fact available: crates.io is immutable and
+serves yanked versions, so the closure is very likely still fetchable. That was
+**inferred, not measured** — no fetch was run — and it is cheap to settle.
+
+Against that: **no `rust-toolchain.toml`**, so the compiler version is unpinned;
+and `.cargo/config.toml` sets `target-cpu=native`, so **a rebuild on different
+silicon is never byte-identical.** A recorded checksum can therefore
+**authenticate** the deployed artifact but can never be **re-derived** by
+rebuilding. It also confirms the five copies came from one build fanned out by
+rsync.
+
+## Restoring the source does not violate the no-Rust ADR
+
+Read closely, ADR-2607072000 makes three decisions: cljc is the default for
+**new** implementation; **explicitly no wholesale retroactive rewrite**; and
+`kotoba-server` is named as the top-priority gap and **deliberately not
+started**, because it runs in production and needs a dedicated ADR with staged
+cutover and rollback first.
+
+Storing the already-written source of an already-running binary is neither new
+Rust implementation nor a rewrite. **The ADR's own logic points the other way:**
+it demands rollback, and **rollback requires the artifact you roll back to be
+identifiable.** Preserving the source serves that policy rather than defying it.
+
+Replacement has already been adjudicated twice on real hardware and should not
+be reopened as a way of solving ownership. ADR-2607082400 tested a cljc
+replacement and rejected drop-in on two verified walls: the only JVM WASM engine
+in use rejects the fleet's guests at the **binary version header** (they are
+Component Model, not core WASM) and no JVM component-model runtime was found;
+and the cljc libp2p is 215 lines of routing math whose own docstring says it
+**does not open sockets, dial peers, or perform any handshake.** ADR-2607072100's
+strangler-fig roadmap is the sanctioned path but **names two repos that do not
+appear in `west.yml`.** And the one node where the Rust daemon was replaced runs
+a fixed single **unauthenticated** route, with that ADR stating plainly that
+re-provisioning will **silently restore the Rust plist.**
+
+Measured: replacement is a staked claim, not a substitute.
+
+## Recommendation
+
+**(a) and (b) together.** Cheap, non-exclusive, and neither commits anyone to a
+direction on Rust.
+
+**(a) Give the source an address.** By `manifest/repository-rules.edn`'s
+`:plane-order`: origin does not apply (our own code), role does not apply (no
+prefix covers a daemon), **family does** — so `kotoba-lang/kotoba-server`, free
+in `west.yml`. The org/name duplication is fine: the elision rule is explicitly
+subordinate to existing family form and this family has 32 members. The `-clj`
+prohibition is not engaged — do not append a language suffix. A registered
+`archived` group already exists, so it need not be fetched by default. **This
+does not restart Rust development; it gives the running binary an address.**
+
+**(b) Record the artifact durably.** Compute the full sha256 of each binary on a
+node, record them against the build commit in `BUILD.edn` (git-tracked, already
+the right place), and put the artifact in B2 + git-annex per the
+`large-binary-datalad` skill with custody verification. **State in the record
+that the build is not bit-reproducible**, so the hash reads as an authenticity
+anchor and not a reproducibility claim.
+
+**(d) Retiring** is weaker than it looks but worth pricing — one measurement
+recorded zero peers, a README warns its topology column is history rather than
+current peering, and half the fleet was never provisioned. **Sequencing matters:
+do (a) and (b) first regardless. Retiring a binary you cannot identify is how
+you lose the ability to bring it back.**
+
+## An unauthenticated route that rewrites the fleet's routing table
+
+Found while assessing whether the internal-trust secret could be enabled, and it
+is more serious than the two read routes ADR-2608123600 named.
+
+Those two — `/mesh/http/kenchi/valuation` and `/mesh/http/minidrama/profile` —
+take no `HeaderMap` parameter at all, so authentication is not merely absent but
+**impossible**. Both are documented as deliberately read-only on-mesh surfaces
+serving governor-cleared records, with the governed pipeline kept off-mesh. **So
+the missing auth on those two looks intended.**
+
+**`mesh_deploy`, which INSTALLS those routes, has the same signature and is also
+unauthenticated.** It feeds a handler that installs routes with no signature
+check, no publisher identity and no authorization, and **replaces the entire
+routing table** rather than merging. It both applies locally and gossips to
+every peer. So an unauthenticated POST to any node can replace that node's mesh
+routing and propagate it fleet-wide; the remaining brake is only that the
+component artifact must resolve through the local block store or bitswap.
+
+Compounding it: the invoke path's own doc comment states that a component is *a
+real writer to the kotoba graph, not a no-op sandbox* — it persists guest
+assertions into whatever graph the guest names, with no owner check, quota or
+fee.
+
+**The fleet build enables this**: the recorded feature set includes `p2p`, and
+both routes are gated on that feature.
+
+## Enabling the internal-trust secret is a change of security model, not a config tweak
+
+Assessed and **deliberately not done.** Four reasons, in order of weight:
+
+1. **There is no secret to read, and creating one is not mine.** The value
+   exists only on the cloud path. No fleet secret has ever existed. Minting one
+   is generating a credential; reusing the gateway's would silently extend one
+   credential's blast radius from a single edge to ten LAN daemons. So no
+   credential store was queried at all — **there was no identified item to
+   fetch**, which is the condition under which the safety floor says to ask
+   rather than guess.
+2. **The blast radius is larger than the three bridges named, and not fully
+   knowable from the repo.** Seven bridges, not three, spread across four orgs
+   rather than one — **none sends the header**. Plus murakumo itself: its own
+   identity module mints exactly this unsigned token and attaches it to state
+   writes, so enabling the gate would break the fleet's own recording, **and
+   because that write is a background path it would fail quietly.** Three
+   further callers have no allowlist at all.
+3. **It is a fail-closed cutover with no warn-only mode**, and whether a given
+   actor's loopback IS a fleet node cannot be determined without the running
+   fleet.
+4. **The design intent does not match the topology.** The security package
+   defines this as the *edge-to-origin* boundary, with a go-live checklist
+   reading `secret set; raw origin IP not routable`. The murakumo fleet has no
+   edge. On the fleet the variable stops meaning *you came through the edge* and
+   starts meaning *you hold a bearer secret*.
+
+That fourth point is also why it may be **the highest-value fix available here**
+— it converts a published, unverifiable, never-expiring DID into a real
+credential. But it is a security-model change and belongs to the owner.
+
+**The safe ordering, for whenever that happens: clients first.** Sending the
+header to a server with the secret unset is a complete no-op, so all seven
+bridges and murakumo's write path can be updated and shipped harmlessly; only
+once every caller demonstrably sends it does enabling the server side become low
+risk. **The other order breaks everything at once.**
+
+## DONE: the source has an address
+
+**`kotoba-lang/kotoba-server`**, tip `c4dada2b`, registered as merge
+`eff53f23c3d` with `groups: [archived]` — so a default `west update` does not
+fetch it, since the group filter excludes that group.
+
+The recommendation was verified before it was executed rather than taken from
+this document. ADR-2607072000 makes three decisions — cljc as the default for
+NEW implementation, an explicit refusal of wholesale retroactive rewrites, and
+`kotoba-server` named as a gap deliberately not started pending a dedicated ADR
+with staged cutover and **rollback**. Preserving already-written source of an
+already-running binary is neither new implementation nor a rewrite, and since
+that third decision demands rollback, **which presupposes an identifiable
+artifact, preservation serves the policy.** Not a reversal.
+
+**Scope was established, not guessed**: the crate has **19 direct
+path-dependencies** on siblings and cannot build alone, so the whole workspace
+is preserved — 806 files, 13 MB, and **all 806 blobs match upstream git object
+hashes exactly.** One 39 MB crate was excluded after verifying it is not a
+member, not a path-dependency of any member, and absent from the lockfile.
+
+Registered through the sanctioned path: `repos.edn` edited surgically, then
+`gen-west-manifest.cljs --entry`. **`west.yml` was never hand-edited** and the
+diff is exactly 7 generated lines. Actions disabled on the new repo per the
+fleet-CI policy, and the preserved `.github/` sits under a subdirectory where
+GitHub cannot execute it.
+
+**Two corrections to my own account.** The workspace has **36** members, not 37.
+And I reported this repo as **empty (0 KB)** during a close — that was **stale
+GitHub size accounting after the initial push**; the content had landed, and
+re-checking rather than re-pushing is what established it. The tree reads 807
+blobs, 41 `.rs` files, 2,712 KB.
+
+**One decision left open deliberately: the repo is private.** Upstream
+`kotoba-lang/kotoba` is public, so this source is already public — but the README
+discusses the authentication weaknesses recorded in ADR-2608123600, and **making
+a repo public is outside standing authorization.** That is the owner's call.
+
+## What could not be determined
+
+- **Whether the deployed binary matches the build commit.** The artifact is not
+  on this machine and no node was contacted. (b) is what closes this.
+- **The full sha256** — only an 8-character prefix exists, and the two records
+  disagree on what it covers.
+- **Whether the 1,020 crates.io dependencies still resolve** — highly likely,
+  but inferred rather than measured.
+- **Live fleet state.** Every deployment number is read from documents measured
+  2026-07-25 by someone else and was not re-verified; no network probing."}]

@@ -1,0 +1,187 @@
+[{:db/id -1
+  :adr/id "ADR-2608139000"
+  :adr/title "engine 本体を Kotoba で — 能力表を実測したら、欠けている primitive は「bytes を読むこと」1 つだけだった"
+  :adr/status "accepted"
+  :adr/date "2026-08-13"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body "オーナー指示（2026-08-13）「engine 本体も kotoba で設計実装したい、必要であれば
+kotoba 側に設計実装, amu, native. collection・f64・bytes」。
+
+ADR-2608138800 は ollama 互換面の**決定**を Kotoba に移し、GGUF/tensor/decode は
+「collection・f64・bytes が要るので `.cljc` のまま」と書いた。**その 3 つのうち
+2 つは既に在った。** 測らずに書いたのが誤りで、この ADR はまず実測を記録する。
+
+## 実測した能力表（amu `e8864273` / kotoba-kir `6d08e3c` / target `:wasm32-kotoba-v1`）
+
+| 必要な primitive | 実測 |
+|---|---|
+| f64 スカラ算術 `f64-add/sub/mul/div/min/max/neg/abs/sqrt` | **compile + 実行 OK** |
+| f64 比較 `f64-eq/lt/le/gt/ge` | **OK** |
+| 変換 `i64-to-f64-rounded` / `f64-to-i64-truncating` | **OK** |
+| bounded `f64-exp-bounded` / `f64-log-bounded` / 三角 | **OK** |
+| f32 一式（`f32-add` … `f64-to-f32-rounded` / `f32-to-f64-exact`） | **OK** |
+| 64-bit shift `i64-shift-left` / `u64-shift-right` + `bit-and/or/xor/not` | **OK**（nibble 展開に足りる） |
+| `:vector-f64` 引数 + `vector-f64-at` / `-count` / `-assoc` / `-conj` | **OK** |
+| **内積**（上記の組み合わせ + 末尾再帰） | **OK — `[1,2,3]·[4,5,6]` = 32.0 を実行で確認** |
+| `vector-f64-new` の literal 個数 | 64 は通る / 4096 は `exceeds item limit`（**literal だけの制約**。host から渡す vector には効かない） |
+| **`:bytes` を読む** | **無い。** `bytes-operations` は `{bytes-empty 0}` ちょうど 1 つ —— 長さも byte 取得も存在しない |
+
+## 誤診の経路（同じ形が 2 repo に在った）
+
+`+` / `<` / `f64+` / `f32+` / `byte-at` / `bytes-length` で試して
+`operation has no admitted lowering` と `expected i64, got f64` を得て、
+**「f64 演算は無い」と結論した。** 拒否は本物だが、**どれも存在しない名前**である。
+正しくは `f64-add` / `f64-lt`。
+
+同じ誤りが `kotoba-lang/murakumo` の `windows_core.kotoba` に 2026-08-11 から
+在り（`(> units remaining)` を f64 引数で書いて拒否され、「scalar f64 は
+not-yet-implemented」と記録していた）、そのせいで**その core は今も units を
+i64 に丸めている**。両方訂正した（murakumo PR #296 / ADR-2608138800）。
+
+**教訓**: 「`X` が無い」の証拠にしてよいのは、**その言語が実際に持っている名前で
+試した拒否**だけである。索引（ここでは amu `frontend.cljc` の `*-operations` 表と
+amu の ADR 0005/0006/0241）を引かずに名前を推測すると、拒否は必ず返ってくる。
+
+## 決定
+
+### 1. engine の pure な算術は Kotoba に置く。今日から。
+
+`kotoba-lang/inference` に `kotoba/kernel_math_core.kotoba` を置いた:
+`dot` / `sum-of-squares` / `inv-rms` / `max-element` / `clamp-unit` /
+`clamp-non-negative`。**parity oracle は文字通り engine 自身**
+（`kotodama.inference.ops/dot-values` と `rms-normalize-values`）で、
+リテラルの期待値ではない。
+
+host が持ち続けるもの: GGUF mmap・dequantise・KV cache・スレッド・宛先バッファ。
+**Kotoba が持つのは判断ではなく計算になった** —— これが決定核パターンの engine 版。
+
+### 2. float core と word-typed core は別ファイルにする（構造で分ける）
+
+`kotoba.kir/only-native-word-typed-features?` は f64 式を拒否する。一方 amu の
+native backend は ADR 0241 で **scalar f64 を machine IR 経由で x86-64 /
+AArch64 に pin 済み**。つまり *walk が backend に遅れている*。
+
+結果として、float を decision core に 1 行入れるだけでその core 全体が native
+gate から落ちる。だから `temperature` / `top_p` の clamp を
+`ollama_options_core` ではなく `kernel_math_core` に置いた。**この分割は test で
+主張する**（`kernel_math_parity_test` が「float core は walk の外」「decision core
+は中」を両方 assert する）—— walk が f64 を admit するようになったら、その test が
+落ちて誰かが気付く。
+
+### 3. amu / kir 側でやる作業（順序つき）
+
+| # | 何を | なぜその順序か |
+|---|---|---|
+| 1 | **`:bytes` の読み取り op**（`bytes-length` / `bytes-u8-at` / できれば `bytes-u32-le-at`） | **唯一の本当の blocker。** これが無いと GGUF block を Kotoba 側で一切触れない。`kernel-load-u8` は在るが kernel profile 側で、guest surface には出ていない |
+| 2 | **kir の `only-native-word-typed-features?` を f64 / f32 / 64-bit shift まで拡張** | backend は既に持っている（ADR 0241）。walk が追いつけば float kernel が native sweep に入れる |
+| 3 | 大きい tensor 行の運び方（`vector-f64` の literal 上限を超える構築、または bytes-backed view） | 1 が入ってから決める。1 の形（コピーか view か）で答えが変わる |
+
+**1 を入れる前に 3 を設計しない。**
+
+### 4. まだ Kotoba に持って来ないもの
+
+- **mmap / ファイル IO / スレッド** —— capability の話であり、`kotoba/host` の領分。
+- ~~**softmax**~~ —— **測ったので入れた**（同日）。この節は当初「`f64-exp-bounded` の
+  domain を測っていないから入れない」と書いていた。測った結果 `exp(-100)` =
+  3.72e-44 / `exp(100)` = 2.69e43 で、**「bounded」という名前に反して double の
+  実用域が全部使える**。`exp-shifted` / `softmax-denominator` / `silu` を追加した
+  （softmax は vector を返さず、host が持つ宛先バッファに合わせてスカラ 2 つに分解）。
+  test が exp の値域を**範囲**で pin してある（絶対誤差だと underflow して 0 に
+  なっても通ってしまう）。
+
+**逆に、測って「入れられない」と分かったもの**（推測ではなく実測）:
+
+- **RoPE** —— `f64-sin-bounded` / `f64-cos-bounded` は ±1000 で厳密、1e7 で
+  `f64-bounded-angle-domain` を投げる。RoPE の角度は position / theta^(2i/d) で、
+  除数が 1 のとき position そのもの —— このモデルの context は 262144 なので
+  1000 を大きく超える。host 側で mod 2π に畳めば通るが、それは「範囲縮約を
+  どこに置くか」という決定であって算術の 1 行ではないので、ここでは決めない。
+- **gelu_pytorch_tanh**（Gemma4 の gated MLP 活性化） —— **`f64-tanh` が存在しない**
+  （`operation has no admitted lowering`、実測）。SiLU は exp だけで書けるので
+  移せて、GELU は移せない。この差は測るまで分からなかった。
+- **量子化ブロックの dequantise** —— 上記 1 待ち。演算（nibble 展開の shift/mask、
+  scale の f64 乗算）は既に全部在るので、**入力の読み方だけが足りない**。
+
+## 実測（2026-08-13）
+
+- `clojure -M:test` — 57 tests / 361 assertions / 0 failures（kernel parity 込み）
+- Kotoba の `dot` が `ops/dot-values` と 5 corpus（長さ 1〜40、負値・分数込み）で一致
+- `inv-rms` が `ops/rms-normalize-values` の scale と 3 corpus で一致
+- 空入力は NaN でなく 0.0（層をまたいで静かに伝播する NaN を作らない）
+
+## 現在地（2026-08-13 closing 時点）
+
+### 着地したもの
+
+| 何が | どこに | fleet 検証 |
+|---|---|---|
+| decision core 3 本（route / options / session） | `inference` `ce04bcb` | `test-inference-ce04bcb-murakumo-judah` OK（49 tests / 331 assertions） |
+| engine kernel（dot / sum-of-squares / inv-rms / max-element / clamp × 2） | `inference` `1b9d602` | `test-inference-1b9d602-murakumo-judah` OK（57 / 361） |
+| softmax（exp-shifted / softmax-denominator）と silu | `inference` `817e33d` | `test-inference-817e33d-murakumo-levi` OK（60 / 379） |
+| `POST /api/chat`（ollama_chat_core: role と、会話が終わってよい role） | `inference` `ad53430` | `test-inference-ad53430-murakumo-judah` OK（66 / 434） |
+| OpenAI `/v1/chat/completions` + `/v1/models`（openai_chat_core） | `inference` `fc41669` | この tip 単独では未 gate —— batch が切られる前に tip が進んだ。**中身は 92714c6 の run に含まれて緑**（tip 駆動 CI は現 tip を走らせる） |
+| memory budget（LRU eviction）と compound `keep_alive` | `inference` `92714c6` | `test-inference-92714c6-murakumo-judah` OK（77 / 534） |
+| 固定プローブ外の生成を実測して maturity に記録 | `inference` `19e3402` | `test-inference-19e3402-murakumo-judah` OK（77 / 534） |
+| fleet gate（gates.edn の inference 行、:gate :jvm-test / :cd true） | `scripts/fleet-ci/gates.edn` | 3 tip 連続で緑、別ノード 2 台（judah / levi）で実行 |
+
+west pin は `19e3402` まで前進済み（毎回 `verify-west-pins.cljs` で fast-forward を確認）。
+gate は 2 ノード（judah / levi）で計 5 tip 分緑。
+
+**別途 landed（この ADR の範囲外だが同じセッション）**: ADR-2608139800（言語 authority
+文書の両方向 drift）/ ADR-2608140000（engine は 7 月に直っており、文書が 41 日ズレていた
+——実測して `cloud-murakumo-studio` README `8adf2df` を訂正）。
+
+### 着地していないもの — bytes 読み取り
+
+**frontend 半分だけが書けている。** `kotoba-sema` PR #7（**draft、単独 merge 禁止**）:
+`bytes-length` / `bytes-u8-at`、両方 `:i64`、unsigned、範囲外は trap。
+6 tests / 13 assertions で admission と拒否メッセージを検証済み。
+
+**merge できない理由**: `kotoba-kir` に interpreter case が無く、analyze を通った
+source が実行時に `unknown-function` で落ちる。**誤解を招く runtime error を伴う
+admitted operation は、admit しないより悪い。**
+
+**kir 半分を書かなかった理由**: 別セッションが `src/kotoba/kir.cljc` を編集中
+（`value-runtime-operations` = `value/intern` / `hydrate` / `resolve` / `cid-of` /
+`release` と `test/kotoba/kir_value_runtime_test.clj` を追加中）。同じファイルを
+下から書き換えると衝突する。
+
+### 再開点（次の人がここから始められる）
+
+1. **先に読む**: `kotoba-kir` の remote branch `agent/bytes-empty-20260804`
+   （main から 54 commit behind）。**この領域の先行作業がある。**
+2. `kir.cljc` の別セッションの作業が着地するのを待ってから、既存の
+   `(= op 'bytes-empty)` case の隣に 2 branch 足す:
+   - `bytes-length` → `value/bytes-byte-count`、`string-byte-length` と同じ
+     `#?(:clj (long …) :cljs (i64/->bigint …))` で幅を合わせる
+   - `bytes-u8-at` → index を length に対して境界検査し、失敗は trap、読み値は
+     0..255 に mask
+3. sema PR #7 と kir を**同時に**着地させ、それから pin を前進させる。
+4. backend は**別段**。`frontend/analyze → kir/lower → kir/execute` は backend を
+   一切要さない（実測済み）ので、この workspace が実際に走らせる経路は 1〜3 で
+   完成する。wasm は `kotoba-wasm/src/kotoba/wasm/core.cljc` の
+   `typed-bytes-empty` intrinsic パターンに倣う。`:js-kotoba-v1` は既に `:bytes`
+   値を受けるので `kotoba-script` に規則を 1 つ足せばよい。
+
+### 他セッターの WIP（触っていない）
+
+- `kotoba-kir` 共有 checkout: `src/kotoba/kir.cljc` に未コミット変更 + 未追跡
+  test（上記）
+- `kotoba-sema` 共有 checkout: `frontend.cljc` / `guest-grammar.edn` /
+  `sema_test.clj` に未コミット変更
+- どちらも**このセッションでは一切触れていない**（作業は全て worktree で行った）
+
+### 別件で blocked
+
+`kotoba-lang/murakumo` PR #296（`windows_core.kotoba` の f64 記述訂正、
+MERGEABLE）は **API から merge できない** —— `main` が `test` という status check を
+要求しており、それを出していた GitHub Actions は ADR-2607300900 で全面停止済み。
+**誰にとっても満たせない protection rule** なので、fleet-ci の context
+（`fleet-ci/murakumo/…`）へ張り替えるか admin merge が要る。
+
+## 位置づけ
+
+ADR-2608138800（surface の決定を Kotoba へ）の続きで、対象が surface から engine に
+移る。ADR-2608650000 の「恒久 / 一時」の分類をそのまま使う —— **bytes の読み取りが
+無いのは一時（`:not-yet-implemented`）であって安全上の禁止ではない**。"}]

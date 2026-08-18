@@ -1,0 +1,366 @@
+[{:db/id -1
+  :adr/id "adr-2608120200-what-the-kotoba-cores-actually-run"
+  :adr/title "ADR-2608120200: fleet 全体で .kotoba core を production で実行している repo は 23 中 4 つ —— 残りは cljc の twin が走っており、危険な形だった 5 件は閉じた"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-12"
+  :adr/last-verified "2026-08-12"
+  :adr/last_verified "2026-08-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotoba-core-execution-survey"
+  :adr/tags "kotoba, cljc-migration, survey, decision-core, drift, oracle"
+  :adr/related ["adr-2608112100-a-kotoba-core-with-a-parity-test-is-not-done"
+                "adr-2608111900-native-becomes-an-execution-path-when-verification-is-per-session"
+                "adr-2608110100-selfhost-analyzer-was-removed-not-progressing"
+                "adr-2608650000-kotoba-permanent-vs-temporary-constraints"]
+  :adr/supersedes ""
+  :adr/superseded_by ""
+  :adr/authoritative true
+  :adr/authoritative-for
+  ["2026-08-12 時点で、どの repo の .kotoba core が実際に実行されているか"
+   "cljc twin と core が乖離している具体的な箇所（優先順つき）"
+   "移行の次の 1 手をどこに打つべきか"]
+  :adr/body
+  "# ADR-2608120200: .kotoba core は、ほとんどどこでも走っていない
+
+**Status**: accepted
+**Date**: 2026-08-12
+
+## Context
+
+ADR-2608112100 は「core があり parity test があり host が呼んでいない repo が他にも
+ある可能性が高い」と書いた。**16 repo を実測した**（read-only subagent 4 本で並列走査、
+その後こちらで裏取り）。予測は当たっていたが、状態は予測より悪い。
+
+## 実測（2026-08-12）
+
+### production で Kotoba core を実行している repo は 23 中 4 つ
+
+| repo | 実行経路 |
+|---|---|
+| `etzhayyim/com-etzhayyim-kawaraban` | `wasm_orchestrator.clj` が `kototama.tender` で 7 module 中 6 本を実行。**launchd plist で常駐**（本物の runtime path） |
+| `cloud-itonami/cloud-itonami-app` | `kotoba-oracle` が shipped KIR を実行（2026-08-11 に着地。ADR-2608112100） |
+| `kotoba-lang/com-cloudflare` | 9 core → 9 shipped KIR。`src/` の**公開 9 ns 全部**が `cloudflare.kotoba.oracle` の `oracle/call` を通す（`require-ready!` で fail-closed）。compiler は test-only（2026-08-12 実測） |
+| `kotoba-lang/aiueos` | 59 core のうち **57 が `.o` にコンパイルされ kernel ELF にリンクされる**（`build-uefi.sh` + `verify-kotoba-kernel-object.py` が symbol を検査）。fleet で最も強い実行形 —— 判断は boot した機械の上で走る（2026-08-12 実測） |
+
+**それ以外の repo では、決定は cljc twin が下している。** `src/` から `kotoba.kir` を
+require している repo は 5 つ（`kotoba-selfhost-contracts` / `murakumo` /
+`cloud-itonami-app` / `com-cloudflare` / `provider`）だが、**`provider` の require は
+`kotoba.kir.value`（host↔guest の値コーデック）であって core 実行ではない** ——
+名前空間の prefix だけで実行と数えない。
+
+### 危険な形になっているもの（優先順）
+
+1. **`kotoba-lang/app-files`: 誰も実行しない security predicate。**
+   `bounded_validate.kotoba` の `confined?`（全 entry の `:parent` が付与された `:dir` と
+   一致することを検査）に **cljc の対応物が無く、host も呼んでいない**。
+   つまり **この閉じ込め検査は runtime に存在しない**。他の項目は「二重実装」だが、
+   これは「実装が 1 つあり、それが動いていない」。
+
+2. **`cloud-itonami/cloud-itonami-isic-6492`: 定数がインライン化されている。**
+   `.kotoba` 側は `def` を持てないので `confidence-floor-x100 60` /
+   `affordability-ceiling-x100 43` を**本文に直接書いてある**。cljc 側の定数を変えても
+   core には届かない。`gate_kotoba.clj` という host は在るが、docstring が自ら
+   「その swap は **していない**」と書いている。
+
+3. **`com-etzhayyim-kawaraban`: 同じ判断の写しが 3 つ。**
+   `.kotoba`（実行される）+ `cacao.clj`/`aozora.clj`（純 JVM twin）+
+   `wasm_orchestrator.clj` 内に再実装された payload 整形（docstring が
+   「**手で同期を保っている**」と明言）。**production で走っているのは 1 番目**なので、
+   他 2 つがずれても誰も気付かない側に居る。
+
+4. **`kotoba-lang/calendar`: データモデルが乖離済み。**
+   `.kotoba` の event は `:start`/`:end` が `:i64`、`.cljc` は
+   `:calendar/start`/`:calendar/end` が ISO-8601 文字列。**もはや同じものの 2 実装ですらない。**
+
+5. **`network-awai/cloud-itonami`: bundle → parts → wasm の整合を誰も検査していない。**
+   19 kernel は `.kotoba-bundle` から `scripts/split-kotoba-kernels.bb` で生成され、
+   `.wasm` は `emit-kernel-wasm.sh` で出る。**この 2 本はどの task/CI/hook からも参照されて
+   いない**（前者は ADR-2607173000 が退役させた `bb` script）。
+   `wasm-host-test` は `.wasm` と `.cljc` の一致を毎 push 検査していて価値があるが、
+   **bundle を編集して再生成しなければ、どこも落ちない。**
+
+### 分類（16 repo）
+
+| 状態 | repo |
+|---|---|
+| production で実行 | kawaraban, cloud-itonami-app, com-cloudflare, aiueos, **calendar**, **crdt** |
+| **委譲したが本番経路が無い / 未接続** | tashikame（core の欠陥は 2026-08-12 に修正済み。host がまだ無い） |
+| **parity gate 止まりが妥当と実測** | mokuroku（catalog 13 件で node 上限）、app-files（同型。`bounded?` は 8 件） |
+| 実行されるが test/hook のみ | network-awai/cloud-itonami（kernels は毎 push、media は secondary）、shitsuke、jp-go-dds、mesh、commitment-ledger、tender-component |
+| CI でのみ compile | fsm（**委譲可と実測: 上限 32 に対し実アルファベット 3**） |
+| **何も触っていない** | network-awai の `cert_governor_app.kotoba`（`src`/`test` から参照ゼロ） |
+
+この表は 2026-08-12 に更新した。`calendar`（`d565658`）と `crdt`（`2843f54`）は
+同日 `cloud-itonami-app` と同じ seam で委譲し、`mokuroku` は**測ってから止めた** ——
+委譲できるかは型ではなく**値の大きさがドメインに比例して増えるか**で決まる
+（ADR-2608112100 の訂正節に数字付き）。
+
+## Decision
+
+### 1. 「実行されているか」を repo の状態として記録する
+
+`.kotoba` を持つ repo は、README か ADR に **今それが走っているか**を書く。
+「移行した」は ADR-2608112100 のとおり host が呼んでいることを意味する。
+書けない repo は書けないという事実が残る。
+
+### 2. 次の 1 手は「多く移す」ではなく「危険な 5 件を潰す」
+
+上の 1〜5 は移行の遅れではなく**現在の欠陥**である。特に 1 は移行の話ですらない
+（検査が存在しない）。**新しい core を増やす前にここを閉じる。**
+
+### 3. 定数を持てない core には、定数の gate を付ける
+
+`.kotoba` が `def` を持てないために値をインライン化した箇所（isic-6492）は、
+**cljc 側の定数と core のリテラルが一致することを検査するテスト**を持つ。
+これは jp-go-dds の `fleet_core.kotoba` が既に取っている形（「cljc の `schema` var が
+唯一の読み出し口で、parity test がこのリテラルを等しく保つ」）と同じ。
+
+## 経過（2026-08-12、5 件のうち 4 件を閉じた）
+
+| # | 件 | 結果 |
+|---|---|---|
+| 1 | app-files の閉じ込め検査 | **閉** `4d4a7bd`。`fs/browse` の seam で強制するようにした。core は抽象モデル上の bounded profile なので**実行主体にはできない**（entry に `:parent` が無い / id が `:keyword` / 兄弟の `bounded?` が 8 件で打ち切る）。同じ性質を実データ側で強制し、test が両者を縛る |
+| 2 | isic-6492 の定数インライン | **閉** `d3a129a`。定数 2 つに対し**インライン箇所は 3 つ**（3 つ目は kernel より古く関数名も共有しないので名前ベースでは届かない）+ **散文コピー 3 箇所**。今日は一致。**`.kotoba` 側のドリフトは完全に不可視だった** —— ceiling を変えても 93 test 全部が green（既存 suite は committed な `.wasm` を叩くため） |
+| 3 | kawaraban の 3 コピー | **閉（ただし latent な乖離を 1 件発見）** `622dd26`。下記 |
+| 4 | calendar のデータモデル乖離 | **閉、かつ本物のバグだった** `7b98dbc`。表現の違いではなく**規則の食い違い**で、走っているのは誤っている側だった |
+| 5 | network-awai の bundle→parts 無検査 | **閉** `0a6def0`。今日は**正確に一致**（5 kernel / 9,298 定義）。順序規則は推測と食い違い、**同じ名前が複数の part に現れてよい**（part は依存閉包を持つ。2,932 名前中 1,067 が 2 part 以上）—— 主張すべきは「少なくとも 1 つ、かつ全コピー一致」 |
+
+### kawaraban で見つかった latent な乖離（未修正、pin 済み）
+
+`kawaraban.cacao/siwe-message` は SIWE の `Chain ID:` 行を issuer から `iss-chain-id` で導く。
+`wasm_orchestrator/siwe-message` は **`\"Chain ID: 1\"` を直書き**している。後者の docstring は
+「`kawaraban.cacao/siwe-message` から verbatim に移植」と書いているが、**これは偽**。
+
+区別する入力: `:iss \"did:pkh:eip155:137:0xdeadbeef\"` → cacao.clj は `Chain ID: 137`、
+orchestrator は `Chain ID: 1`。
+
+**今日の実害は無い**（両経路の `:did` は必ず `did-key` 由来で `did:key:z…` のみ。
+`iss-chain-id` はその場合ちょうど `\"1\"` を返す）。ただし **SIWE 本文は Ed25519 署名が
+覆う当のバイト列**なので、`did:pkh` / `did:web` issuer を採用した瞬間に、
+**同じ grant に対して 2 経路が異なる文に署名する**。production code は変更せず、
+両側の挙動を characterization test で固定した（どちらかが動けば落ちる）。
+加えて「mintable な identity は必ず `did:key`」という到達可能性の不変条件も test にした ——
+それが乖離を latent に保っている当のものなので、真でなくなれば大きな音で落ちる。
+
+### 既存 test の穴（同上で発見）
+
+`wasm.cacao-wire-encode-test` は module を **kotoba-lang/kototama から転記した 264 byte 配列**と
+比べている。したがって **`kawaraban.cacao` 側のドリフトは見えない**。変異で証明済み ——
+`->wire` を壊しても既存 suite は全部 green のままだった。新しい gate は module を
+`kawaraban.cacao` 自身の `->wire` と突き合わせる。
+
+## Consequences
+
+- **`crdt` は 4 primitive とも縛られている**（`81d4250` で clock、`acaa674` で残り 3 つ）。
+  `kotoba-conformance-test` は 4 module が link して `main` が 42 を返すことしか見ておらず、
+  **両実装を同じ入力で走らせたものは何も無かった**。現在 34 tests / 4540 assertions。
+- **調査で 1 点、私の側の誤りが出た。** subagent の報告は「crdt には core を compile する
+  test が無い」だったが、`kotoba_conformance_test.clj` は実在した。**ファイルを自分で
+  開いて気付いた** —— 並列調査の報告は裏取りしてから引用する。
+## 残り 4 repo の実測（2026-08-12、上の「未調査」を解消）
+
+**推測は 4 件中 1 件しか当たっていなかった。** `com-cloudflare` は予想どおり murakumo 型
+だったが、残り 3 つを一括りにしたのが誤りで、実際には**最強の実行形・実行ではないもの・
+そもそも対象外**の 3 種類だった。
+
+| repo | 実測 | 見つかった穴 |
+|---|---|---|
+| `com-cloudflare` | **production 実行**（上表に追加） | **出荷 KIR 全体の drift gate は `client_core` の 1 本だけだった。→ 閉じた** |
+| `aiueos` | **production 実行**（上表に追加）。57/59 が kernel ELF にリンク | **閉じた** `e852781`（aiueos）+ `d11d4c2`（murakumo）。`murakumo-join-plan` はどの build script もコンパイルせず、その唯一の実行経路である cross-repo parity test は sibling checkout が無いと**無音で緑**だった。→ 下記 |
+| `provider` | **decision core を持つ repo ではない。** `src/` の `kotoba.kir` は値コーデック。77 `.kotoba` は capability-kit の wasm package **ソース**で、出荷物は 142 `.wasm`。test は shipped `.wasm` を node の `WebAssembly` で実行して期待値を固定している | **半分閉じた** `b3ea0c7`。registry の `:sha256` を実バイトと突き合わせていたのは 142 行のうち 8 行だけだった。**source→wasm 方向は閉じていない**（下記） |
+| `kotoba-v2025` | **対象外。** README が自ら legacy Rust reference と宣言（#12、2026-07-01）。31 `.kotoba` は全部 `_archive/251006/` の Rust 時代の設定・例で decision core ではない | 無し（移行対象ではない） |
+
+### com-cloudflare の drift gate（閉じた、`4975784`）
+
+出荷 KIR を 1 本しか縛っていなかったので、**production が読む当のファイルを書き換えても
+既存 suite が全部通った**。変異で証明: `resources/cloudflare/oracle/zones_path_core.kir.edn`
+の `dns-name-query-pair` を `\"name\"` → `\"nome\"` にし、`.kotoba` source は無改変のまま
+全 suite を回して **94 tests / 519 assertions / 0 failures**。
+
+`precompiled-kir-does-not-drift` を `gen/discover-artifacts` 駆動にして 9 本すべての
+出荷 KIR を source と全体一致で突き合わせるようにした。同じ変異で
+`kotoba/zones_path_core.kotoba KIR drift` として落ち、無改変では
+**94 tests / 537 assertions / 0 failures**。新しい `*_core.kotoba` を足して
+出荷物を作り忘れた場合も落ちる。
+
+**逆向きの変異（source を変えて出荷物を据え置く）は既存の parity test が捕まえていた** ——
+`zones_path` の `per_page` を 50→25 にすると 4 件落ちる。**穴は片側だけだった**ので、
+「parity test がある」ことを両方向の保証と読まないこと。
+
+### provider の registry gate（半分閉じた、`b3ea0c7`）と、閉じられなかった半分
+
+`wasm-packages-v1.edn` の `:sha256` は `grant-binding` / `production-claim-blockers` が
+読む content address だが、**実バイトと突き合わせていたのは 142 行のうち 8 行**
+（pure-allowlist）だけだった。`object-digest-len-v1.wasm` の中の 1 byte を反転させて
+全 suite を回すと **243 tests / 2013 assertions / 0 failures** で通った。
+`provider.wasm-package-registry-test` を足して 142 行すべての digest・wasm magic・
+宣言された `:source-kotoba` の実在を検査するようにし、同じ変異で落ちること・
+無改変で **247 tests / 2523 assertions / 0 failures** を実測した。
+
+**source→wasm 方向は閉じていない。しかもそれは「まだやっていない」ではなく、
+今の記録では原理的にできない。** registry は `:builder :kotoba-compiler/v1` と
+**道具の名前**を書くが**版**を書かず、provider の ADR-0171 / 0209 の再現手順は
+`:git/sha \"<compiler pin>\"` という**プレースホルダのまま**で埋められていない。
+fleet の compiler pin `806f5ce` で実測すると、source を宣言している `:wasm-module`
+71 行のうち **35 が byte 一致、29 が不一致、7 はもうコンパイルできない**。
+
+これは「出荷物が壊れている」証拠ではない —— compiler の codegen が進んだ結果として
+自然に起きることで、**版を記録していないので区別できない**というのが所見である。
+閉じるには先に **1 行につき builder commit を記録する**必要がある。今日それを
+recompile gate として書くと、compiler pin が動くたびに赤くなる劇場になる。
+
+**訂正（2026-08-12、`inga` の調査中）: 「閉じられない」と書いたのは半分言い過ぎだった。**
+`kotoba.compiler.provenance`（`:kotoba.provenance/v1`）は **compile 結果すべてに
+`:provenance` を付けており**、そこには `:source-sha256` と `:outputs :primary
+{:sha256 :size}` が入る。`:wasm-component/v1` も対象なので **provider の 52 component
+行も含めて使える**。`inga` は既にこれを `kotoba/*.wasm.provenance.edn` として
+出荷物の隣に checked in している。
+
+つまり provider に足りないのは 2 つのうち 1 つだけである:
+
+| 問い | 必要なもの | 今日できるか |
+|---|---|---|
+| **出荷物は、記録された source から出たものか** | provenance record（compiler が既に書く） | **できる** |
+| **今この source を compile すると同じ bytes が出るか** | builder commit | できない |
+
+前者は再現性ではないが、**source を編集して出荷物を据え置く**という provider の実際の
+穴はこちらで閉じる。後者だけが commit の記録を待つ。**「無い」と言う前に索引を引く**
+規則が、repo だけでなく**既に在る仕組み**にも当たった例。
+
+**再訂正（同日、ADR-2608121700 の索引を初めて引いたとき）: まだ足りなかった。**
+provider は provenance record を「使える」のではなく **既に 95 本 tracked で持って
+いる**（`366f534`「compiler-AOT process/entropy/git pure bounds」以降。143 wasm 中 95）。
+つまり 2 回とも誤りで、正しい記述は 1 行である:
+
+> **provider の出荷物には source digest の記録が既に在り、誰も読んでいない。**
+
+これは `inga` が今日直したのと**同じ形**であり、今日私が書いた
+`provider.wasm-package-registry-test` も読んでいない（registry の `:sha256` は見るが、
+`.wasm.provenance.edn` は見ない）。**次の 1 手はそこ。**
+
+同じ誤りを 2 回続けた理由は 1 つで、**どちらのときも provider の tree を数えていない**
+—— 1 回目は registry の `:builder` フィールドだけを見て、2 回目は compiler 側の実装を
+見て「使える」と書いた。索引はこれを 1 コマンドで出した。
+
+### aiueos の「誰もコンパイルしない core」（閉じた、`e852781` + `d11d4c2`）
+
+2 つの穴が重なっていた。
+
+**1. 走らない parity は緑だった**（murakumo `d11d4c2`）。`aiueos-join-plan-parity-test` の
+3 つの test は assertion を丸ごと `(when (.exists source-file) ...)` に入れていた。
+sibling checkout が無い機械 —— **fleet ノードは 1 repo の tree しか受け取らない** ——
+では **0 assertion で pass** し、赤くなるのは presence 検査 1 件だけ。実測: `AIUEOS_ROOT`
+を存在しない場所に向けると **旧 1 failure / 3 assertions**、**新 4 failures / 6 assertions**。
+実 checkout では 5 tests / 780 assertions / 0 failures で不変。**答えられなかった問いの数と
+赤の数が一致する**ようにしただけで、gate 自体は強くなっていない。
+
+**2. どの build もコンパイルしない core を、誰も申告していなかった**（aiueos `e852781`）。
+`os/aiueos/kotoba/*.kotoba` 59 本のうち 57 は `build-uefi.sh` が `.o` にして kernel ELF に
+リンクし、`user-smoke` は user ELF として image に載る。`murakumo-join-plan` だけがどこからも
+ビルドされない。**それ自体は妥当な状態**（node の自己登録判断に kernel 内の呼び手は無い）
+だが、**リンクされるはずのものが黙ってリンクされていない状態と見分けが付かない**。
+`aiueos.kotoba-object-reachability-test` は「全 source はビルドされるか、理由付きで
+`not-built-here` に載っているか」を要求する。変異 2 種で確認: 誰もビルドしない source を
+足すと名前を挙げて落ち、**既にビルドされている object を `not-built-here` に書くと
+「drop the entry」で落ちる**（申告リストが飾りに腐るのを防ぐ）。40 文字未満の理由も落ちる。
+
+問いは意図的に弱い —— **「build script に名前があること」は「実行されていること」ではない**
+（`build-multiboot.sh` は 10 本しかリンクせず、外す理由を comment で書いている）。
+弱い方の問いにしたのは、**その答えが事故で no になってはいけない**のがこちらだから。
+
+### crdt の残り 3 primitive（閉じた、`acaa674`）
+
+`clock` だけが縛られていた。`register` / `orset` / `doc` に parity namespace を足した
+（34 tests / 4540 assertions、旧 22 / 1279）。駆動は 3 つとも同じ形 —— **操作を data にして
+両実装に同じ interpreter で流し、caller が観測できるものだけを比べる**（membership・
+field 値・勝った register）。guest の内部状態は一切デコードしない。
+
+**それぞれ、旧 suite が通る変異で証明した**（conformance module は Kotoba 側を literal と
+突き合わせるので、単純な誤りは既に捕まる。捕まらないのは**両実装の食い違い**）:
+
+| primitive | 変異 | 旧 suite | 新 |
+|---|---|---|---|
+| register | `(if (not (before? right left)) …)` —— **stamp が等しい時だけ**原実装と違う | 全緑 | 144 failures |
+| orset | `merge-tags-from` の歩幅 `(+ index 2)` —— tag を 1 つ飛ばしに merge | 全緑 | 3 failures |
+| doc | `merge-fields-from` の歩幅 `(+ index 2)` —— entity を 1 つ飛ばしに merge | 全緑 | **最初は新 suite も通した** |
+
+3 つ目は書いた test の穴だった。script の merge が全部「既に大半を共有している replica 同士」
+だったので、entry を飛ばしても観測可能な損失が出ない。**state-based merge が存在する理由の
+ケース**（長く offline だった replica が entity を複数まとめて受け取る / field を複数まとめて
+受け取る）を 2 本足して、両方の変異が落ちるようにした。
+
+**私の property 主張が 1 つ間違っていて、実装の方が正しかった。** `merge-register` は
+stamp が等しいとき順序に依存する（`before?` が両方向 false なので左が残る）。これは
+clock の一意性不変条件が透けているだけで、この層の欠陥ではない。主張を消さずに
+**tie の挙動を pin した** —— どちらかが右を優先し始めたら、同じ 2 write を逆順で見た
+replica が収束しなくなり、他に気付くものが無い。
+
+### 調査後に core を持った 3 repo（2026-08-12 実測、20 → 23）
+
+`kura` / `inga` / `erasure` は最初の 16 repo 調査の**後**に決定核を持った（west pin は
+`3d4411e8` / `7bc32beb` / `751b50dd` で前進済み）。同じ方法で測った。
+
+| repo | core | 出荷物 | 実行 |
+|---|---|---|---|
+| `kura` | 3（`kura` / `order` / `placement`） | 無し | **cljc twin が production。** parity test が source を live compile して突き合わせる（71 tests / 979 assertions） |
+| `erasure` | 1（`erasure_core`） | 無し | 同上（39 tests / 3048 assertions） |
+| `inga` | 2（`fuel` / `quorum`） | **`.wasm` + `.wasm.provenance.edn`** | cljc twin が production。cljs suite が**出荷 wasm を実際に instantiate** して matrix で突き合わせる |
+
+**出荷物を持たない 2 つには drift の余地が無い** —— parity test が source をその場で
+compile するので、`.kotoba` を編集すれば必ず結果に出る。com-cloudflare / provider /
+network-awai で見た穴は、**成果物を checked in する repo だけが持つ**。
+
+### inga の provenance（閉じた、`a9f2cc2`）
+
+`inga` は出荷物を持つので、その穴も持っていた —— ただし**閉じるための材料も持っていた**。
+compiler が書いた `:source-sha256` / 出力 digest が隣に checked in されていて、
+**どちらも今日時点で正しい。誰も読んでいなかった。**
+
+既存の cljs suite は出荷 `.wasm` を instantiate して cljc と突き合わせるが、
+**`.kotoba` を読まない**（あの 2 ファイルで `.kotoba` が出てくるのは docstring だけ）。
+実測: `kotoba/quorum.kotoba` に comment を 1 行足して binary を据え置くと、
+JVM suite は **364 tests / 1556 assertions / 0 failures** で通り、cljs 側も
+**構造的に気付けない**（試験対象の binary は無改変で、cljc とはなお一致する）。
+
+`inga.kotoba-provenance-test` が record を実バイトと突き合わせる。同じ変異で
+ファイル名と再コンパイル手順を挙げて落ち、wasm の 1 byte 反転では出力 digest で落ちる。
+無改変で **368 tests / 1585 assertions / 0 failures**。
+
+**再現性は主張していない。** record が示すのは「出荷 bytes は、記録された source の
+隣に記録された digest のものである」までで、**今その source を compile して同じ bytes が
+出るか**は別問題（`:compiler` は `\"kotoba-compiler/1\"` という道具名で commit ではない）。
+
+## Evidence
+
+- `kotoba-lang/crdt` `81d4250`: clock parity gate（22 tests / 1279 assertions、変異 2 件で fail）
+- `kotoba-lang/com-cloudflare` `4975784`: 9 本すべての出荷 KIR に drift gate
+  （94 tests / 537 assertions、出荷物を変異させて fail・無改変で pass を実測）。
+  west pin `03a7317b7dc` で前進
+- `kotoba-lang/provider` `b3ea0c7`: registry 142 行の digest gate
+  （247 tests / 2523 assertions、wasm の 1 byte 反転と source 削除の 2 変異で fail）。
+  west pin `d54c6a8616e` で前進。source→wasm 再現性の実測は
+  `806f5ce` で 35 一致 / 29 不一致 / 7 compile 不能（71 行中）
+- `kotoba-lang/crdt` `acaa674`: register / orset / doc の parity
+  （34 tests / 4540 assertions。旧 suite が通る変異 3 種で fail を実測）。west pin `c12606b22a1`
+- `kotoba-lang/aiueos` `e852781`: core reachability gate（442 tests / 1396 assertions。
+  5 failures は origin/main でも同じ TCB inventory / jar digest の既存 fail）。west pin `f12698a19b2`
+- `kotoba-lang/murakumo` `d11d4c2`（PR #291）: 走らない parity が pass しなくなった。
+  west pin `1ec538f2e79`。**この repo の `main` は Actions の `test` check を必須にしており
+  （murakumo ADR-260811 が意図的にそう決めている）、他 3 repo と違って API の直接 merge が
+  通らない。** org 全体で Actions を止めた ADR-2607300900 の例外にあたる
+- `com-junkawasaki/root` `84b4252`: `west-pin-put.cljs` が短縮 sha を展開するようになった。
+  今日この script 自身が `revision: d11d4c2` を書いており（`gh pr merge` の出力をそのまま
+  渡した）、`f12698a`/`113b302` で全 4,162 pin が 40 桁に戻っている
+- `kotoba-lang/inga` `a9f2cc2`: provenance record を実バイトと突き合わせる gate
+  （368 tests / 1585 assertions。source 編集と wasm 1 byte 反転の 2 変異で fail）。
+  west pin `1681569b074`
+- `kura` `084e461` / `erasure` `8abcb0f`: 出荷物を持たないので drift の余地無し。
+  suite は tip で緑（71/979、39/3048）。pin は既に tip
+- 調査対象 23 repo。最初の 16 は read-only subagent 4 本 + 手元での裏取り、
+  残り 4 は subagent を使わず全部自分で開いた。実行の有無は `src/` の
+  `kotoba.kir` require / `ir/execute` / `kototama.tender` 呼び出し、および
+  aiueos では build script の `.o` リンクで判定した
+"}]

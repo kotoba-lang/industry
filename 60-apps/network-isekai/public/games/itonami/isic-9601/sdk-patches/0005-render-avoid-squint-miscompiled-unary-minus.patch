@@ -1,0 +1,56 @@
+diff --git a/src/kotoba/render/architecture.cljc b/src/kotoba/render/architecture.cljc
+index 850b379..bb790b4 100644
+--- a/src/kotoba/render/architecture.cljc
++++ b/src/kotoba/render/architecture.cljc
+@@ -31,7 +31,9 @@
+                (mapv #(+ (* -0.36 width) (* % x-step)) (range columns)))
+         ys (if (= rows 1) [(* body-height 0.42)]
+                (mapv #(+ (* body-height 0.22) (* % y-step)) (range rows)))
+-        front-back (for [z [(- (+ (/ depth 2.0) 0.035)) (+ (/ depth 2.0) 0.035)]
++        ;; `(* -1.0 (+ …))` not `(- (+ …))`: squint miscompiles unary minus over a
++        ;; nested sum into `-(a) + (b)`. Correct under Clojure/CLJS either way.
++        front-back (for [z [(* -1.0 (+ (/ depth 2.0) 0.035)) (+ (/ depth 2.0) 0.035)]
+                          x xs y ys]
+                      (part :window [x y z] [ww wh 0.07]))
+         side-count (max 1 (dec columns))
+@@ -40,7 +42,7 @@
+                          (* % (/ (* depth 0.60) (dec side-count))))
+                      (range side-count)))
+         left-right (when sides
+-                     (for [x [(- (+ (/ width 2.0) 0.035)) (+ (/ width 2.0) 0.035)]
++                     (for [x [(* -1.0 (+ (/ width 2.0) 0.035)) (+ (/ width 2.0) 0.035)]
+                            z zs y ys]
+                        (part :window [x y z] [0.07 wh ww])))]
+     (vec (concat front-back left-right))))
+diff --git a/src/kotoba/render/camera.cljc b/src/kotoba/render/camera.cljc
+index 553b2d6..efd8838 100644
+--- a/src/kotoba/render/camera.cljc
++++ b/src/kotoba/render/camera.cljc
+@@ -54,8 +54,11 @@
+   [(/ 2.0 (- right left)) 0.0 0.0 0.0
+    0.0 (/ 2.0 (- top bottom)) 0.0 0.0
+    0.0 0.0 (/ -1.0 (- far near)) 0.0
+-   (/ (- (+ right left)) (- right left))
+-   (/ (- (+ top bottom)) (- top bottom))
++   ;; `(* -1.0 (+ …))` rather than `(- (+ …))`: squint miscompiles unary minus over a nested
++   ;; sum, emitting `-(right) + (left)` — compiles, runs, silently wrong. Clojure and
++   ;; ClojureScript are unaffected; this form is correct under all three.
++   (/ (* -1.0 (+ right left)) (- right left))
++   (/ (* -1.0 (+ top bottom)) (- top bottom))
+    (/ (- near) (- far near))
+    1.0])
+ 
+diff --git a/src/kotoba/render/road.cljc b/src/kotoba/render/road.cljc
+index a2f4c17..f4bf398 100644
+--- a/src/kotoba/render/road.cljc
++++ b/src/kotoba/render/road.cljc
+@@ -122,7 +122,8 @@
+          centers (centerline path subdivisions)
+          distances (vec (reductions + 0.0 (map distance centers (rest centers))))
+          half-width (/ width 2.0)
+-         columns [[(- (+ half-width shoulder)) (- shoulder-drop)]
++         ;; `(* -1.0 (+ …))`: squint miscompiles `(- (+ a b))` as `-(a) + (b)`. See camera.cljc.
++    columns [[(* -1.0 (+ half-width shoulder)) (- shoulder-drop)]
+                   [(- half-width) 0.0] [0.0 camber]
+                   [half-width 0.0] [(+ half-width shoulder) (- shoulder-drop)]]
+          rows (mapv (fn [i [cx cz]]

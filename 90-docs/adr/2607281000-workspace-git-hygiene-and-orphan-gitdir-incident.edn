@@ -1,0 +1,186 @@
+[{:db/id -1
+  :adr/id "adr-2607281000-workspace-git-hygiene-and-orphan-gitdir-incident"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607281000: workspace の git 衛生（shallow 撲滅・旧 submodule gitdir 移設・gc）と orphan gitdir 誤削除インシデント"
+  :adr/status "accepted, implemented"
+  :adr/date "2026-07-28"
+  :adr/deciders "Jun Kawasaki"
+  :adr/last_verified "2026-07-28"
+  :adr/source-format "edn"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/related "adr-2607211600 adr-2607206700 adr-2607173000 adr-2607280000"
+  :adr/body "# ADR-2607281000: workspace の git 衛生と orphan gitdir 誤削除インシデント
+
+**Status**: accepted, implemented（作業完了・事故は完全復旧済み。未解決 1 件を末尾に明記）
+**Date**: 2026-07-28
+
+## Context
+
+ADR-2607280000（research panel）の作業中に superproject で
+`git merge-base HEAD origin/main` が**空**を返し、
+`git rev-list --left-right --count origin/main...HEAD` が **7 / 15360** という
+異常値を出した。GitHub API で照合すると local HEAD は origin/main の**祖先**
+（status ahead / behind_by 0 / merge_base == local HEAD）で、実際にはただの
+fast-forward だった。
+
+原因は `.git/shallow` が 3 件復活していたこと。ADR-2607211600 が撤回したはずの
+shallow 由来の偽陽性がそのまま再現していた。調査の過程で `.git` が 24G に肥大し
+（うち **20G が `.git/modules`** = 廃止済み submodule 時代の gitdir）、ディスクが
+**99% / 空き 5.0Gi** に達していることも判明した。
+
+## Decision と実施内容
+
+### 1. shallow の撲滅（ADR-2607211600 の再適用）
+
+`git fetch --unshallow origin`。コストは +0.5G のみ。効果:
+
+| | 前 | 後 |
+|---|---|---|
+| `merge-base HEAD origin/main` | 空（共通祖先なし） | local HEAD — サーバの答えと一致 |
+| `--is-ancestor` | 1（偽） | **0（真）** |
+| `rev-list --left-right --count` | 7 / 15360 | 0 / 0（FF 後） |
+
+### 2. 旧 submodule レイアウトの解消（6 repo）
+
+`.gitmodules` は無く gitlink も 0 件なのに、6 repo が `.git` を**ファイル**にして
+`.git/modules/orgs/<org>/<repo>` を指す旧レイアウトで残っていた。gitdir を
+`orgs/<org>/<repo>/.git` へ `mv`（同一 FS の移動なので追加容量ゼロ）し、独立
+repo に揃えた: `gftdcojp/ai-gftd-apps-gftdcojp`（8.3G）/ `etzhayyim/root`（3.2G）/
+`gftdcojp/app-aozora` / `gftdcojp/network-isekai` / `com-junkawasaki/moex` /
+`gftdcojp/net-isekai-gen`。移設前後で HEAD・dirty 数・linked worktree 数が
+すべて一致することを確認済み（dirty 1 / 38 / 12 / 0 / 0 / 0）。
+
+**移設手順で踏んだ罠 3 つ（次に同じことをする agent は必ず読むこと）**:
+
+- **`core.worktree` の除去は `mv` の *前* に、config ファイルを直接編集して行う。**
+  `mv` 後は `core.worktree` の相対パスが壊れて git 自体が起動できず、
+  `git config --unset core.worktree` が
+  `fatal: cannot chdir to '../../../../../orgs/...'` で失敗する。
+- **`core.worktree` は `.git/config` とは限らない。** `extensions.worktreeConfig`
+  を使う repo（実測: `etzhayyim/root`）では **`.git/config.worktree`** にある。
+  `config` だけ見るスクリプトは assert で落ち、repo を壊れた状態で放置する。
+- **入れ子 submodule のポインタも全部直す。** `etzhayyim/root` は 16 件、
+  `ai-gftd-apps-gftdcojp` は 33 件の nested submodule を持ち、その `.git` ファイルと
+  各 gitdir の `core.worktree` が旧パスを指したままだと `git status` が **fatal で
+  異常終了**する。このとき `git status --porcelain | wc -l` は **0** を返すため、
+  『dirty 38 → 0、作業消失』に見える。**0 件がクリーンなのかエラーなのかは
+  stderr を分離しないと区別できない。** 修復規則: 旧 target の
+  `.git/modules/orgs/<org>/<repo>/` 以降がそのまま新 `.git/` 配下になる。
+  submodule の submodule は `<親 gitdir>/modules/<相対パス>`。
+
+### 3. gc
+
+superproject: objects 2.2G → 1.6G、pack 18 → 16、`fsck --connectivity-only` は
+dangling のみ（破損なし）。子リポの gc は容量都合で未実施。
+
+## インシデント — orphan と誤判定して live repo 3 件の gitdir を削除した
+
+`.git/modules/projects/*`（8.1G）を『working tree が無い orphan』と判定して
+削除したが、**4 件のうち 3 件は生きた west project の gitdir だった**:
+`com-junkawasaki/ghosthacker` / `com-junkawasaki/webmaster` /
+`gftdcojp/ai-gftd-lf-case-lingling`。これらは **working tree だけ
+`orgs/<org>/<repo>` へ移設され、gitdir は `projects/` 配下に残されたまま**だった。
+
+### 誤判定の直接原因（再発防止の本体）
+
+判定に使ったのは『`.git/modules/projects/X` に対応する working tree が
+**旧パス** `projects/X` にあるか』だけだった。`orgs/` 側に同名ディレクトリが
+あることは確認していたが、**その `.git` が削除対象を指していないかという
+逆参照を確認していない。**
+
+> **規則: gitdir を削除する前に、workspace 全体を走査して『削除対象を指す
+> `.git` ファイル / シンボリックリンクがゼロ』であることを確認する。**
+> 『対応する working tree が旧パスに無い』は orphan の証明にならない。
+>
+> ```bash
+> # 削除対象 $G を指す参照が無いことを確認してから消す
+> find \"$WS\" -name .git \\( -type f -o -type l \\) -not -path '*/.git/*' 2>/dev/null |
+>   while read -r f; do
+>     t=$( [ -L \"$f\" ] && readlink \"$f\" || sed 's/^gitdir: //' \"$f\" )
+>     case \"$(cd \"$(dirname \"$f\")\" && realpath -m \"$t\")\" in \"$G\"*) echo \"REFERENCED: $f\";; esac
+>   done
+> ```
+
+### 二次的な誤り: 『annex は完全重複』という結論の根拠が無効だった
+
+削除前に「orphan 側 293 キー / live 側 293 キー / orphan 固有 0」と照合して
+安全と判断したが、`orgs/com-junkawasaki/ghosthacker/.git` が**削除対象への
+シンボリックリンク**だったため、`find` が同一ディレクトリを二度数えていただけ
+だった。重複ではなく同一物で、実際には唯一のローカルコピーを消していた。
+
+### 復旧
+
+working tree のファイルは 3 repo とも無傷だった（削除したのは gitdir だけ）。
+各 repo を `git init` + `git fetch origin` + **`git reset --mixed <west pin>`**
+で再構築（`--mixed` なので working tree に一切触れない）。結果、3 repo とも
+**tracked 変更 0 / untracked 0 = west pin と完全一致**。
+
+`ghosthacker` の git-annex 実体 293 キー（528M）は git 履歴では戻らないが、
+`git annex whereis` で **b2 と ghosthacker-images の両方**に存在することを確認し、
+`git annex enableremote b2` → `git annex get --from b2` で全 293 キーを復元
+（壊れた symlink 293 → **0**、`fsck` 非 dangling 問題 0）。B2 認証情報は
+remote.log 内に GPG 暗号化（`cipherkeys=A70BB2C220DE88CA`）されており、
+**秘密鍵が手元にあるため git-annex 自身が復号した — 認証情報を人手/agent が
+扱う必要は無かった**（安全床①と整合する正しい経路）。
+
+### 復旧できた理由（判定の正しさではない）
+
+①削除前に「全 ref がリモートに存在する」ことを確認していた ②`--mixed` で
+working tree に触れなかった ③annex が B2 と ghosthacker-images の**両方**に
+あった。①だけは有効な予防策だったが、②③は運に近い。**逆参照スキャンを
+やっていれば削除自体が起きなかった。**
+
+### 三次的な誤り: 中断した fetch の残骸を確認せず再実行
+
+ghosthacker（7.5G）の fetch をタイムアウトで中断したまま二度目を走らせ、
+未完成 `tmp_pack_*` が 5.7G + 7.5G と積み上がってディスクを **100%（ENOSPC）**
+にした。未完成 pack は commit されたデータではないので削除して 13.2G を回収。
+**大きな fetch を再実行する前に `objects/pack/tmp_pack_*` を確認すること。**
+
+## 容量の正直な会計
+
+**当初の見込みほどは減っていない。**
+
+| | 開始時 | 終了時 |
+|---|---|---|
+| 空き容量 | 5.0Gi / 99% | 32Gi / 93% |
+| superproject `.git` | 24G | **3.4G** |
+| `.git/modules` | 20G | **207M**（`m365-archive` のみ） |
+| `.git/shallow` | 3 件 | **0** |
+
+ただし `20G → 207M` の大半は**解放ではなく移設**（6 repo 分・約 11.7G が
+`orgs/*/.git` へ移動）。実際に消えたのは重複分と、削除後に取り直した
+ghosthacker の差分（7.5G → 9.7G と**増えた**）。作業途中で報告した
+『13Gi 空いた』は live repo の gitdir を消した直後の一時値であり、
+取り直した分がそのまま戻っている。**得られた本体は容量ではなく構造**
+（ancestry が正しく解ける・6 repo が標準レイアウト・pack 整理）。
+
+## 未解決 — shallow が触るたびに再発する
+
+unshallow 完了後、GitHub API で作った pin commit を `git fetch` した直後に
+`.git/shallow` が **再び 1 件**現れ、同じ偽陽性（共通祖先なし・15571 ahead）が
+出た。ローカルには depth 設定が無い（`git config` に depth/shallow エントリ無し、
+`manifest/west.yml` に `clone-depth` 無し、`manifest/repos.edn` にも無し）ため、
+**並行して動いている処理（fleet-ci 等の定期処理と推定）が shallow fetch を
+入れている**と見られる。都度 unshallow で解消できるが、**発生源を止めない限り
+恒久解決しない**。ADR-2607211600 が撤回したはずの挙動が実運用に残っている。
+
+**次の一歩**: `.github/workflows/` と cloud routine の git 呼び出しから
+`--depth` / `--filter` / `clone-depth` を grep し、発生源を特定して撲滅する。
+
+## 併せて実施した子リポの着地
+
+`com-junkawasaki/ghosthacker` の未着地ブランチ `chore/edn-nbb` をレビューして
+main へ着地させた（merge `50a41a39`、west pin `50a41a39`）。内容は
+`edn-datomize.bb` → `.cljs`（ADR-2607173000 Wave 1、CLAUDE.md の nbb-only 規則）。
+
+**原案 `3da0f905` はそのまま merge していない。** `merge-schema!` に 3 つの回帰が
+あったため、意図を引き継いだ新 commit `544b5250` を作って merge した:
+①schema.edn ヘッダ 10 行（データ由来と scalar/blob の揺れの説明）が生成のたびに
+消える ②出力順が map 走査順で非決定になる ③マージが先勝ち→後勝ちに変わり
+ヘッダ自身が明記する『最初に遭遇した型のみ登録』に反する。③は nbb で実証済み
+（入れ子 blob を先に処理したとき、修正版 `:db.type/string` / 原案
+`:db.type/long`）。schema.edn の属性本体は 1 バイトも変えていない。
+**原案 commit は remote から削除済みで、原本はこの作業を行った clone にしか
+残っていない** — 作者の commit を履歴として保全したい場合はブランチ復元が必要。"}]

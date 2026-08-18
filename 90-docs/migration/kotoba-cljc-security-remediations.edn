@@ -1,0 +1,45 @@
+{:schema "kotoba.cljc-security-remediations/v1"
+ :completed-on "2026-07-19"
+ :basis "90-docs/migration/kotoba-cljc-security-dispositions.json"
+ :scope :replace-with-bounded-data-reader-before-migration
+ :summary {:planned-unique-contents 9
+           :implemented 8
+           :removed-upstream 1
+           :remaining 0}
+ :remediations
+ [{:repository "orgs/gftdcojp/cloud-itonami"
+   :paths ["src/cloud_itonami/tick.cljc"
+           "src/cloud_itonami/kotoba.cljc"]
+   :result :portable-edn-reader
+   :pr "https://github.com/gftdcojp/cloud-itonami/pull/457"
+   :merge-commit "971ff8ec348714987100802cda4b9263f7702ac5"
+   :verification {:tests 20 :assertions 80 :failures 0 :errors 0}}
+  {:repository "orgs/gftdcojp/app-aozora"
+   :paths ["40-engine/cljs/appview/src/aozora/appview/manga_export.cljc"]
+   :result :bounded-edn-file-reader
+   :pr "https://github.com/gftdcojp/app-aozora/pull/89"
+   :merge-commit "4a28ad7f0db642b9bd442d06a1db561b37a09b84"
+   :verification {:tests 2 :assertions 2 :failures 0 :errors 0}}
+  {:repository "orgs/gftdcojp/ai-gftd-arms"
+   :paths ["clj/src/arms/store.cljc"]
+   :result :portable-edn-reader
+   :pr "https://github.com/gftdcojp/ai-gftd-arms/pull/3"
+   :merge-commit "687905462c521e9cfb44057441c45ba579cc888d"
+   :verification {:tests 9 :assertions 25 :failures 0 :errors 0}}
+  {:repository "orgs/etzhayyim/root"
+   :paths ["60-apps/etzhayyim-project-animeka/lg-clj/src/lg_animeka/util.cljc"
+           "70-tools/src/etzhayyim/organism.cljc"
+           "70-tools/src/etzhayyim/kotoba/encrypted.cljc"
+           "70-tools/src/etzhayyim/kotoba/test_crypto.cljc"]
+   :result :bounded-reader-and-validated-numeric-parser
+   :pr "https://github.com/etzhayyim/root/pull/3140"
+   :merge-commit "4d07600452bfc26ad1ab38197fda8d70ab4a507f"
+   :verification {:animeka {:tests 40 :assertions 146 :failures 0 :errors 0}
+                  :crypto {:tests 8 :assertions 24 :failures 0 :errors 0}
+                  :hosted-ci [:lint-and-test :codeql :layer-freeze-guard]}}
+  {:repository "orgs/etzhayyim/root"
+   :paths ["20-actors/hirameki/methods/test_dataset.cljc"]
+   :result :removed-upstream-with-extracted-graph
+   :evidence-commit "2395c5449f"
+   :verification :absent-on-current-main}]
+ :completion-rule "Every planned core read-string path is EDN-only, replaced by a non-reader parser, or absent for an independently reviewed upstream reason."}

@@ -1,0 +1,272 @@
+[{:db/id -1
+  :adr/id "adr-2608012050-nix-shaped-supply-chain-properties-aiueos"
+  :adr/title "ADR-2608012050: nix 的性質を採用済み property として取る — 外部 TCB を content-address 化し、残る穴を名指しする"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-01"
+  :adr/last-verified "2026-08-03"
+  :adr/last_verified "2026-08-03"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "nix-shaped-supply-chain-properties"
+  :adr/authoritative-for
+  ["nix 的性質を採用済み property として扱う判断と、その機械可読な正本の所在"
+   "aiueos が持つ nix 的性質と持たない性質の区別"
+   "外部依存の content-address 化の規則（何を content address と認めるか）"
+   "TCB inventory / deps.edn / security-adoption.edn の三者一致規則"
+   "content-addressed store を bare-metal catalog に入れない判断"]
+  :adr/related
+  ["adr-2607241100-kotoba-stack-topology-design-cleanup"
+   "adr-2607198300-kotoba-native-aot-no-jvm-node-rust"
+   "adr-2607279200-kotoba-clojure-shaped-safety-elaboration-migration"]
+  :adr/machine-readable-contract
+  "kotoba-lang/aiueos qualification/build-identity.edn"
+  :adr/evidence
+  ["https://github.com/kotoba-lang/aiueos/pull/139"
+   "https://github.com/kotoba-lang/aiueos/pull/142"
+   "https://github.com/kotoba-lang/aiueos/pull/143"
+   "https://github.com/kotoba-lang/kotoba/pull/445"
+   "https://github.com/kotoba-lang/kotoba-lang/pull/367"
+   "kotoba-lang/aiueos qualification/build-identity.edn"
+   "kotoba-lang/aiueos 90-docs/adr/0016-content-addressed-external-tcb.md"
+   "kotoba-lang/aiueos 90-docs/adr/0017-release-attestations.md"
+   "kotoba-lang/aiueos 90-docs/adr/0018-adopted-build-properties-and-reproducibility-evidence.md"]
+  :adr/body
+  "# ADR-2608012050: aiueos の nix 的性質
+
+**Status**: accepted
+**Date**: 2026-08-01
+
+## Context
+
+オーナーの問い「今の aiueos は nix 的な設計は考慮、統合されている?」に対する監査と、それを受けた
+オーナー指示「nix もすでにある性質として取ってください」（2026-08-03）に対する応答。
+
+**発見時点のリテラルな答えは no だった** — `nix` / `nixos` / `nixpkgs` / `flake` は aiueos
+リポジトリ全体に 0 件で、nix 的設計が明示的に検討されたことは一度もなかった。nix が知られている
+性質のいくつかに aiueos は**独立に到達していた**（build purity ではなく capability security と
+evidence gate の側から）。
+
+**現在の答えは yes** — 2026-08-03 に、その性質群を**採用済み contract として明示的に取った**
+（下記 Decision §5）。正本は `kotoba-lang/aiueos qualification/build-identity.edn` で、
+prose ではなく `aiueos.tcb/validate-build-identity` が fail-closed に検査する機械可読な記録である。
+
+**独立到達を「取った」に変えた理由**: 独立到達は歴史としては正確だが policy としては誤りだった。
+**名前が付いていない性質は、失われたことに誰も気付かない性質**である。実際この監査自体、
+オーナーが問うまで一度も行われていない。名前を与え、各性質に「それを実装する mechanism」と
+「それを強制する gate」を紐付けて初めて、「たまたまそうなっている」が「これはビルドの性質であり、
+壊すと検査が落ちる」になる。
+
+この面の姉妹契約は Unison 側の `kotoba-lang/kotoba-lang lang/code-identity.edn`
+（content-addressed definition identity）。両者は同じ形をしている:
+**外部の設計思想から性質だけを外科的に取り、取らないものを non-goal として名指しする。**
+
+### 独立に到達していた性質（採用の対象になったもの）
+
+| 性質 | 実装 |
+|---|---|
+| 再現ビルド | `scripts/build-hvt-guest.cljs` / `build-hvt-kotoba-guest.cljs` が fixture を再生成して byte 一致を要求。release media は `SOURCE_DATE_EPOCH` 対応 |
+| digest gated admission | hosted profile は `:aiueos/wasm-sha256` + Ed25519 の identity↔artifact binding（ADR-0003/0012）、bare-metal profile は SHA-256 + RSA-2048 の catalog/ELF/journal admission（ADR-0013） |
+| 宣言的設定 + deny-by-default | EDN manifest、`aiueos.policy` の grant 解決、provider graph からの boot order 導出 |
+| atomic update + rollback | primary ESP と byte-identical な recovery partition、`apply-update`、破損 update の rollback を QEMU gate で証明 |
+
+### 到達していなかった箇所（実害）
+
+**TCB の外部半分は記録されていたが一度も検査されていなかった。** `aiueos.tcb/validate` は `:tcb/external` を件数カウントするだけで、中身を何も検証していなかった（`src/aiueos/tcb.clj:56`）。その陰で 2 件の誤りが堆積していた:
+
+1. `io.github.kotoba-lang/security` が `:source :local-root :path \"../security\"` と記録されていた（**path は何もアドレスしない**）のに、`deps.edn` は既に `:git/sha \"49fc4ce…\"` に移行済み。`docs/tcb-inventory.md` はこれを「隠さず記録した assurance gap」と説明していたが、実際には**記述された形ではもう存在しない gap の陳腐化した記録**になっていた。
+2. `io.github.kotoba-lang/abi` — `deps.edn` の `:deps` にある実行時依存、つまり classpath 上、つまり TCB 内 — が inventory に**一件も存在しなかった**。
+
+**記録する対象について間違いうるのに間違いを検出できない記録は、evidence ではない。**
+
+## Decision
+
+### 1. 外部依存は content address で pin し、検査を fail-closed にする
+
+inventory version 2。各 entry は `:source` を宣言し、content で pin する:
+
+| `:source` | content address |
+|---|---|
+| `:maven` | resolve 済み jar の `:sha256` |
+| `:git` | `:git-sha`（git 自身の tree に対する content address） |
+| `:platform` | リポジトリ内部からは不可能 — 明示的な `:assurance-gap` を必須とする |
+
+`aiueos.tcb/validate` が強制する 3 つの fail-closed 不変条件:
+
+1. **unpinned な依存を許さない** — content address も `:assurance-gap` も無い entry はエラー
+2. **黙った drift を許さない** — inventory の version/commit は `deps.edn` と一致必須、shared security の commit はさらに `security-adoption.edn` とも一致必須。**3 つのファイルが 1 つの事実を記録しているなら、食い違ってはならない**
+3. **inventory の外の依存を許さない** — `deps.edn` の `:deps` の全 coordinate が `:tcb/external` に存在必須
+
+変更前の inventory を新しい checker に通すと、上記 2 件がそのまま報告される（+ `:unsupported-version`）。これが「この検査は装飾ではなく荷重を受けている」ことの evidence。
+
+jar digest 検査は CI ステップも新しい環境前提も要らない — **checker を走らせる JVM が起動できている時点で jar は resolve 済み**であり、`clojure -M:test` が既に `aiueos.tcb-test` を回している。
+
+### 2. git commit を content address として認める（caveat 付きで）
+
+git の commit id は tree をアドレスするので `:git-sha` は version label ではなく content address である。ただし SHA-1 のそれ。当面これを受け入れる — 代替の canonical SHA-256 tree digest は無料ではない（`~/.gitlibs` の checkout は `.git` を含むので単純な全ディレクトリ digest は非決定的、正しくやるには canonicalisation の定義が要る）。**future work として記録し、無かったことにはしない。** nix 自身の `fetchGit` も `narHash` 以前はこれと同じ。
+
+### 3. 閉じずに記録する限界
+
+- ~~**推移閉包**~~ — **閉じた**（inventory version 3、`:tcb/classpath`、aiueos PR #140）。実際に load される jar を記録するので、`deps.edn` のどの entry も名指ししていない `org.clojure/clojure` / `spec.alpha` / `core.specs.alpha` が覆われる。**宣言レベルの記録では嘘になっていたことが実測で出た**: shared security package が宣言するのは clojure 1.12.4 だが、実際に load されるのは 1.12.5。closure は宣言ではなく classpath から取る、という規則の根拠がこれ。
+- **`java.base`** — `:minimum-version 25`、リポジトリ内部からは検証不能なので `:assurance-gap :platform-runtime-not-content-addressed` を付けた。**ADR 執筆中に気付いた別件**: `.github/workflows/ci.yml` は temurin 21 を provision しており、宣言された floor を満たしていない。この矛盾を検出するものが無い。**floor と runner のどちらが誤りかはオーナー判断**（勝手に 21 へ下げも 25 へ上げもしない）。この ADR はその主張を無印のまま放置することだけを拒否する。
+
+### 4. 意図的に採用しないもの
+
+**bare-metal の object store は name-addressed のまま据え置く。** `:kotoba-app-catalog` は 16 バイト id（`\"app/hello\"`）で application を引き、SHA-256 は admission にしか使っていない。これを content-addressed に変えれば（digest→bytes を主テーブル、id→digest を第二テーブルに）multi-version 共存と generation list が構造的に付いてくるが、**現在の store は `:capacity 4` / 1 application 12 KiB 上限 / `:rollback-window 1`** であり、**今日その store を縛っているのは addressing 方式ではない**。この bound が動いてから再検討する。先にやると、効かない場所を作り直すことになる。
+
+### 5. 性質そのものを、検査される contract として採用する（2026-08-03、aiueos PR #143）
+
+正本は `qualification/build-identity.edn`。各性質は `:statement` と、それを実装する `:mechanism`
+path 群、それを強制する `:gate` path 群、残る `:assurance-gaps` を持つ。採用した 6 件:
+content-addressed dependency closure / reproducible build / digest-gated admission /
+declarative deny-by-default configuration / atomic update and rollback /
+signed supply-chain attestation。
+
+`aiueos.tcb/validate-build-identity` が `:tcb/external` と同じ規則で強制する:
+
+1. mechanism を名指しし、その path が実在すること
+2. **gate か assurance-gap のどちらかを必ず名指しすること** — どちらも無いのはエラー。
+   強制されていない性質が、確立された性質として読まれてはならない
+3. `src/` 配下の mechanism は `:tcb/files` に載っていること（宣言した性質の実装が
+   inventory review 無しに変わらない）
+4. 理由の無い non-goal はエラー
+
+**この記録自体が `:tcb/files` に載っている**（`:adopted-property-record`）。checker は
+そこに在るものの形しか見ないので、性質を1件黙って消されると痕跡が残らない —
+`src/aiueos/tcb.clj` が自分の inventory に載っている理由と同じ。
+
+**`:non-goals` に「nix が持っていて意図的に取らないもの」を理由付きで書く**:
+store と derivation language（ビルド DSL と store daemon は第二の authority surface。
+ここで欲しい保証は artifact に対するものであって、それを作った言語に対するものではない）/
+binary cache substitution（publisher を信頼する決定であり、digest-gated admission が
+明示化するために存在する当のもの。将来やるなら publisher trust と revocation を
+component admission 並みにモデル化してから）/ system configuration の module system /
+content-addressed bare-metal object store（§4）/ in-toto DSSE envelope（ADR-0017）。
+
+### 6. `:regulated` の「再現可能」半分を実際に検査する（同 PR #143）
+
+`docs/deployment-profiles.md` は `:regulated` に「reproducible, signed, independently
+verified release pipeline」を要求していた。**signed 半分は検査されていたが、reproducible
+半分はどこでも検査されておらず、`kotoba.security.supply-chain/evaluate-reproducibility` は
+workspace 全体で caller がゼロだった** — ADR-0016 / ADR-0017 が各1回ずつ潰した
+「control はある、evaluator もある、evidence が placeholder」の**退化形**（caller が無いので
+false を報告することすらできない）。
+
+`aiueos.reproducibility` が evidence を供給する。**導出できるものは導出する**:
+
+- `:dependencies` は inventory の git entry 由来で、`:dependency/exact-fetch` は
+  「走っている JVM が実際にその commit の checkout（`<gitlibs>/libs/<group>/<artifact>/<sha>`）
+  で動いているか」で判定する。commit が path の一部なので、classpath 上に在ることが
+  exact fetch の証拠そのものになる。
+- `:local-overrides?` も同じ測り方。`:local/root` override は checkout を classpath から
+  置き換えるので、pin した git 依存を classpath が説明できないこと**が** override である。
+  **宣言では満たせない — その宣言こそが疑われている対象だから。**
+
+`fresh-clone?` / `hermetic?` / 2 本の artifact digest は、この namespace が検査できない
+build 環境についての主張なので **caller に要求し、true を既定にしない**
+（`provenance` が `isolated-builder?` を要求するのと同じ理由。既定にすると、あらゆる
+local build がその文書の存在意義たる性質を自称してしまう）。
+
+`:regulated` は `:reproducibility-qualified?` / `:reproducibility-artifact-digest` に加えて
+**それが `:artifact-digest`（SBOM と provenance が attest した digest）と一致すること**を
+要求する。これが無いと「何かを2回再現した」が「別の何かのリリース」を満たしてしまう。
+
+CLI: `clojure -M:reproduce <source-commit> <d1> <d2> [--fresh-clone] [--hermetic]`。
+
+## Consequences
+
+- nix 的性質は「偶然そうなっている」から「宣言され、機械検査される contract」になった。
+  性質を消す・mechanism を inventory から外す・gate も gap も無い性質を足す、はいずれも
+  `clojure -M:tcb-check` で落ちる。
+- inventory は両半分とも「間違っていたら落ちる記録」になった。
+- 実行時依存を 1 つでも進めるには同じ commit で inventory を更新する必要がある — 意図的な摩擦であり、`:tcb/files` が既に in-repo source に課している規律と同型。
+- `deps.edn` / `security-adoption.edn` / inventory が相互検査されるので、shared security の pin が片方だけ進む事故が構造的に起きない（直近の pin revert #138 がまさにこの状況）。
+- release artifact の SBOM / SLSA provenance（`docs/deployment-profiles.md` の `regulated`）は**実装済み**（2026-08-02、aiueos ADR-0017 / PR #141）。`aiueos.sbom` が TCB inventory から SBOM component を導出し、provenance と `regulated` evidence を署名付きで生成して `kotoba.security.supply-chain/evaluate-attestations` に食わせる。`:sbom-digest` / `:provenance-digest` / `:tcb-inventory-digest` / `:tcb-drift-check?` は test literal ではなく inventory と実文書から来る。**残る 3 点**: ①`build-release-image.sh` は まだ `clojure -M:attest` を呼ばず、attestation の存在を要求する gate も無い（pipeline 結線）②文書は EDN で in-toto/DSSE envelope ではない ③`evaluate-reproducibility` の証拠（独立ビルド 2 本の artifact digest）は未接続 — 入力（ADR-0013 の byte 比較 gate）は既にある。
+
+## 現在地 (2026-08-03) — 名指しした穴のうち、閉じたものと残ったもの
+
+この ADR が「記録するが閉じない」とした項目を、閉じられるものから順に閉じた。同じ監査を aiueos の外（kotoba / kotoba-lang / superproject の hook）にも当てた結果、**同型の穴が 3 つ見つかった**: 「control はある、evaluator もある、しかしそれが食う evidence が placeholder か、そもそも誰も突き合わせていない」。
+
+### 閉じたもの
+
+| 対象 | 何が穴だったか | 着地 |
+|---|---|---|
+| aiueos | `java.base :minimum-version 25` と CI の temurin 21 が食い違っていたが検出するものが無かった。**どちらが誤りかは依然オーナー判断** — checker は判断せず「食い違いが正確に記録されているか」だけを見る（runner を 25 に上げても floor を 21 に下げても記録の削除を強制する双方向 gate） | aiueos#142 `e852d033` |
+| aiueos | `src/aiueos/tcb.clj` が `:tcb/files` に無かった＝**drift を報告するか否かを決める当の file だけが drift 自由**だった。`:tcb-inventory-authority` として収録 | 同上 |
+| kotoba | emit coverage 71→**72/74**。2 件は言語の穴ではなく帳簿の穴で、うち 1 件は manifest が sibling policy を shadow していた（`:capability-not-granted` と記録され、ADR 側もそれを「grant する policy が repo に無い」と復唱していた——事実ではなかった）。`:policy-shadows-sibling` gate と `:unknown-forms` を追加 | kotoba#445 `25d5d808` |
+| kotoba-lang | `:nested-let-destructuring` は `:pure-product-run`＝compiler 両 backend を required と宣言する一方、surface-status は compiler がその形を拒否すると測定していた。**各ファイルは単体で無矛盾、突き合わせるものが無かった**。`:orphaned-conformance` を one-off から invariant に昇格（双方向に赤くなる） | kotoba-lang#367 `c28557ad` |
+| superproject | `west-pin-verify-guard` の API 経路が「payload path を名指ししているのに読めない」を fail-open にしていた＝**payload 生成と PUT が同一コマンドなら無検証で通る**。`payload-decision` で 3 状態に分離し `:unreadable` は deny | `34117103` |
+| aiueos | nix 的性質が**どこにも書かれていなかった**。`qualification/build-identity.edn` + `aiueos.tcb/validate-build-identity`（Decision §5） | aiueos#143 |
+| aiueos | `:regulated` の「reproducible」半分が未検査で、`evaluate-reproducibility` の caller が workspace 全体でゼロだった。`aiueos.reproducibility` + profile の 3 key（Decision §6） | 同上 |
+| aiueos | **この一連の仕組みが自分の作者を捕まえた**: `aiueos.reproducibility` が `kotoba.security.supply-chain` を import する初の src namespace で、adoption gate が `:unregistered-security-importers` で commit を拒否した。security control への新しい edge は、その edge の記録が同じ commit で動かない限り足せない | 同上 |
+
+### 残ったもの（2026-08-03 時点）
+
+**A0. 方向転換（2026-08-03、オーナー指示「jdk 依存はしないように進めたい, kotoba-native を優先, その次は clojurescript」）**
+
+**下記 A-1 は、この指示によって「正しい 1 手」ではなくなった。** release job に JDK を足すのは、
+JDK 依存を*増やす*方向である。正しい方向は逆で、**gate 側の JDK 依存を外す**。そうすると
+同時に 2 つが解決する:
+
+- CI blocker が消える（JDK を provision する必要が無くなる）
+- **`java.base` の `:assurance-gap :platform-runtime-not-content-addressed` が消える** —
+  content-address できない唯一の依存は JVM そのものだったので、それが無くなれば
+  closure は完全に content-addressable になる。§4 の floor 25 vs 21 問題も同時に消滅する。
+
+つまり **nix 的性質の最後の穴と CI blocker は同じ根（JVM）を持っていた**。
+
+優先順位は workspace の runtime 規則どおり: **kotoba-native → ClojureScript → nbb**
+（JVM は最後の手段）。設計は aiueos kernel 自身の形（C は機構、判断は `.kotoba`）をそのまま使う:
+**判断（digest 比較・inventory の形式検査・三者一致・reproducibility qualification）は
+`.kotoba`、機構（fs・closure 列挙・SHA-256 のバイト供給）は cljc/nbb。**
+
+**第 1 歩は着地済み** — kotoba-lang/compiler ADR-0202（PR #500）: `bin/kotoba` の nbb fast path が
+JDK 無しで dependency closure を解決できるようになった。実測していた blocker は
+`clojure -Spath`（classpath 解決のためだけの JVM 呼び出し）で、失敗時に空文字を返して
+truncated classpath のまま進む **fail-open** でもあった。`deps-lock.edn`（content-addressed
+closure）+ git のみで再現し、pin と `rev-parse HEAD` を照合する。**parity 実測: 生成される
+`.kexe` は両 resolver で byte-identical。** これで `.kotoba` → native の compile が JDK 無しで
+通る。
+
+**残りの段**: ①aiueos の gate 3 本（`tcb.clj` / `reproducibility.clj` / `sbom.clj`）を
+`.cljc` 化して nbb で走らせる ②判断部分を `.kotoba` へ ③`:tcb/classpath`（JVM classpath 由来の
+推移閉包）を deps-lock 型の content-addressed closure に置き換える —— **③は今より強い**
+（jar が digest で pin される）。aiueos 側の JVM 面は `.clj` 9 本のみで、うち gate は 3 本
+（実測 2026-08-03）。
+
+1. ~~**`.github/workflows/ci.yml` に JDK provisioning**~~（A0 により方針変更。以下は経緯として保持）。release media を作る job は `bare-metal-uefi` だけで JDK が無く、**`workflow` scope の無い token では `.github/workflows/` に到達できない**（push・API とも。2026-08-03 実測: token scopes は `gist, read:org, repo`）。**適用する YAML は aiueos ADR-0017 に逐語で記載済み**。これが入れば release attestation の結線と `evaluate-reproducibility` の release-media 証拠（同 job の 2 回目の呼び出しで得られる第 2 digest）が同時に着地する。**evaluator と evidence 生成器は着地済み**（#143）なので、残るのは 2 本目のビルドを起こす CI step だけ — この 1 点が `build-identity.edn` の `:release-media-second-build-not-produced` gap そのもの。script 側だけ先に書くのは「CI が一度も実行しない step」を作ることであり、この一連の作業が除去してきた失敗そのもの。
+2. **`java.base` の floor 25 と runner 21 のどちらが誤りか**。上記 gate は判断を代行しない。なお floor を 21 に下げるのは agent 側で実行可能（inventory の 1 行）、runner を 25 に上げるのは A-1 と同じ workflow scope 制約に当たる。
+
+**B. 設計変更が要る**
+
+3. compiler の nested vector destructuring（型指向 desugar か、記述子を call site で要求しない accessor）。blocker は `lang/surface-status.edn` に記録済み。
+4. `demo_kbb_fs_report.kotoba` の `str`（legacy emitter に数値→文字列が無い）。compiler 側には `string-from-i64-kit` があるため legacy への実装は投資価値が低い。
+
+**C. 意図的に開けたまま**
+
+5. in-toto/DSSE envelope — 断念の理由を ADR-0017 に明記（payload は JSON、この repo に JSON library が無く、依存追加＝誰も読まない形式のための TCB 拡大／手書き writer＝同 namespace が JSON *parsing* を同じ理由で拒否している面への新規 surface。外部 verifier が release path に入った時に、round-trip verifier と DSSE PAE test vector を同じ commit で）。
+6. git commit id を content address として受容（SHA-1 のそれ）。
+7. bare-metal object store は name-addressed 据え置き（律速は addressing 方式ではない）。
+8. binary cache substitution を取らない（publisher trust の決定を digest-gated admission の外に出すことになる）。
+
+**5–8 はいずれも `qualification/build-identity.edn` の `:non-goals` / `:assurance-gaps` に理由付きで載っている** — この ADR を読まない人が実装に触れても、理由に当たるようになった。
+
+### resume point
+
+次の 1 手は **A0 の段①** — aiueos の gate 3 本（`src/aiueos/{tcb,reproducibility,sbom}.clj`）を
+`.cljc` 化し、`clojure.java.io` → node `fs`、`java.security.MessageDigest` → node `crypto` に
+reader-conditional で分岐させて、`nbb` で `tcb-check` が通ることを確認する。
+`java.class.path` だけは nbb に対応物が無いので、そこで段③（deps-lock 型 closure）に接続する。
+
+**オーナー側に 1 手だけ残る（3 件を同時に塞ぐ）**: GitHub token への `workflow` scope 付与
+（または該当 YAML の手貼り）。現状 `gist, read:org, repo` のみで `.github/workflows/` に
+push も API 書き込みもできず、①aiueos の release attestation 結線 ②compiler の
+`npm run test-nbb-classpath` の CI 実行 ③**JDK を provision しない runner で JDK-free 性を
+証明する job** — の 3 つが同じ理由で止まっている。③は A0 の方向そのものの回帰テストなので、
+これが無いと「JDK 無しで動く」は実測はできても CI で守れない。
+
+## workspace 全体への含意
+
+この ADR は aiueos の話だが、同じ検査の欠落は**同じ形の記録を持つ他 repo にも当てはまりうる**: 「pin を記録したファイルが 2 つ以上あるが、一致を検査するものが無い」構造。superproject 側では `manifest/west.yml` の pin が `scripts/verify-west-pins.cljs` + PreToolUse hook + murakumo fleet gate で server-side 検査されており、この class は既に閉じている。子 repo 側で pin を複数箇所に持つものは、同型の検査があるかを確認する価値がある。"}]

@@ -1,0 +1,29 @@
+{:schema "kotoba-migration-disposition-evidence/v1"
+ :recorded-on "2026-07-20"
+ :decision :retain-generated-cljc-gpu-artifact-facade
+ :unique-content
+ {:sha256 "5a711ff9f2af9d3342e893ca3d614ebb3c944da41d913622d5d84815e84c27c6"
+  :namespace "kotoba.webgl.glsl"
+  :path "src/kotoba/webgl/glsl.cljc"
+  :role :facade-reexport}
+ :canonical-target
+ {:namespace "kami.webgl.glsl"
+  :path "src/kami/webgl/glsl.cljc"
+  :role :generated-webgl2-fallback-shader-text
+  :generator "bb gen-glsl"
+  :source-pipeline [:kami-wgsl-edn :naga :glsl-es-300]}
+ :propagated-repositories
+ ["orgs/kotoba-lang/webgl-character-detail"
+  "orgs/kotoba-lang/webgl-character-exact"
+  "orgs/kotoba-lang/webgl-decal-exact"
+  "orgs/kotoba-lang/webgl-full-humanoid-exact"
+  "orgs/kotoba-lang/webgl-prod-build"
+  "orgs/kotoba-lang/webgl-ssao-dep"
+  "orgs/kotoba-lang/webgl-ssao"
+  "orgs/kotoba-lang/webgl"]
+ :migration-authorized false
+ :reason "This CLJC is a compatibility facade over generated GPU shader text, not guest application logic. Its authority is the EDN shader plus naga generation pipeline; migrating the facade would duplicate or misplace that authority."
+ :reopen-gates
+ [:change-canonical-shader-source-language
+  :replace-webgl2-generated-artifact-contract
+  :consumer-cutover-away-from-cljs-webgl-runtime]}

@@ -1,0 +1,129 @@
+[{:db/id -1
+  :adr/id "2608082248-kotoba-capability-machine-kcm"
+  :adr/title "Kotoba Capability Machine — CID-fixed Kotoba execution instead of a general-purpose sandbox"
+  :adr/status "accepted — content-addressed provider implemented; local and naphtali execution verified"
+  :adr/date "2026-08-08"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotoba-capability-machine"
+  :adr/related ["2607252600" "2607252500" "2608550000" "2608040200"]
+  :adr/authoritative true
+  :adr/authoritative-for
+  ["Kotoba Capability Machine (KCM) as the name and execution contract"
+   "why KCM is not a general-purpose VM or a shell CLI allowlist"
+   "the machine identity, typed HostCaps surface, pure-check cache, governor admission and receipt evidence"
+   "the boundary between KCM and Seatbelt/container/microVM host backing"]
+  :adr/body
+  "# ADR-2608082248: Kotoba Capability Machine (KCM)
+
+## Decision
+
+The preferred Murakumo coding-agent execution profile is the **Kotoba Capability
+Machine**. KCM is not a smaller Unix VM. It is a closed, content-addressed
+Kotoba machine contract:
+
+`definition closure CID + compiler CID + module-lock CID + target ABI + HostCaps
+policy CID + provider closure SHA-256 + Node runtime SHA-256 + declared Kotoba
+check arguments = machine id`.
+
+The model receives typed code capabilities only (`code/list`, `code/read`,
+`code/write`, `code/edit`, `build/check`, `build/compile`). It never receives shell, process
+spawn, an executable name, or argv. `kotoba_check` accepts only a declared check
+id. The host never resolves `kotoba` from PATH. It verifies a provider closure
+containing compiler source, the git-locked dependency graph, NBB and its npm
+runtime dependencies, then executes the manifest entry plus committed arguments
+without `sh -c`. Every regular file, the transport archive, and the selected
+Node runtime bytes are checked before execution and again before cache reuse.
+Declared compiles are a separate `kotoba_build` tool and are never result-only
+cached, because a cache hit must not claim an artifact it did not restore.
+
+Seatbelt remains the outer OS containment backing. It is not the Kotoba language
+security model. Container or microVM backing may replace it for a high-risk
+tenant without changing the KCM identity or guest capability surface.
+
+## Implementation
+
+Implemented in `kotoba-lang/kotoba-fleet` from manifest pin `a2ed736`:
+
+- `hosts/nbb/fleet/kcm.cljs`: canonical contract, validation, machine/cache
+  identities and capability-to-tool projection.
+- `kcm_provider.cljs`: archive traversal/type checks, exact manifest/tree/file
+  verification, Node runtime verification and provider argv construction.
+- `sandbox_agent.cljs`: KCM-only tool surface, exact argv execution without a
+  shell, complete provider verification, final authoritative check pass,
+  persistent pure-check cache and cache evidence.
+- `dispatch.cljs`: copies the KCM contract runtime to the Murakumo node and
+  forwards only the KCM fields.
+- `gate.cljs`: independently recomputes and admits the dispatched KCM identity.
+- `receipt.cljs`: signs machine id, contract, capabilities and cache evidence.
+- `node.cljs`: measures Node bytes and constrains placement to the runtime bound
+  into the KCM identity; a system `kotoba` command is neither required nor used.
+- `scripts/build-kcm-provider.cljs`: builds a stable 566-file closure manifest
+  and ordinary tar transport from the compiler pin and dependency lock.
+- `scripts/kcm-coldstart-probe.cljs`: real compiler cold/warm and corruption
+  negative-control probe.
+- `scripts/kcm-node-probe.cljs`: ephemeral `/tmp` fleet-node execution probe.
+
+The compiler pin had a stale `deps-lock.edn` (digest `0126…` vs current
+`deps.edn` `0993…`). The canonical lock generator refreshed three advanced
+dependency pins; the JDK-free `bin/kotoba -M check` path is green again.
+
+Legacy sandbox work-units remain available for migration and are explicitly
+reported as `legacy-sandbox`; they cannot satisfy a KCM work-unit at the gate.
+
+## Cache and cold start
+
+Only checks declared `pure?` are cacheable, and an identity declaring effects
+cannot mark checks pure. The cache key binds the entire machine id, exact check
+descriptor and patch digest. Compiler, closure, lock, ABI, HostCaps policy,
+provider closure, runtime, command or edited code changes therefore miss. The cache lives
+outside the ephemeral checkout but agent-authored code cannot reach it through
+the Seatbelt profile.
+
+Local measured real-provider probe on 2026-08-08 built 566 files / 6,965,123
+bytes with closure `39f3480c…`. `examples/list.kotoba` checked successfully: a
+cold miss took 4,024 ms and a verified cache hit 141 ms; a wasm32-wasi compile
+took 3,182 ms and produced `main.wasm`. A modified archive was rejected before
+execution.
+
+The same closure was copied ephemerally to `naphtali` (no installation and no
+PATH provider). Against Node `463b47d6…`, the check miss took 904 ms, the
+verified hit 37 ms, and wasm32-wasi compile took 715 ms. Seatbelt blocked 6/6
+escapes. The remote root was removed after the probe.
+
+## Verification
+
+- portable fleet core: 24 tests / 61 assertions green.
+- host selftest: all checks green, including 8-process single-winner lease,
+  governor isolation, signed receipts, path confinement, six blocked escapes,
+  KCM hash stability, compiler/policy/provider identity invalidation, shell and
+  process rejection, tool-surface restriction, cache invalidation, and governor
+  rejection of substituted/legacy machines.
+- local real-provider probe: Kotoba admission green, miss 4,024 ms then hit
+  141 ms with identical cache key; wasm compile 3,182 ms; modified archive rejected.
+- naphtali real-provider probe: Kotoba admission green, miss 904 ms then hit
+  37 ms; wasm compile 715 ms; exact Node bytes admitted; Seatbelt blocked 6/6 escape probes.
+- modified host namespaces load under nbb; `git diff --check` clean.
+
+## Remaining rollout boundary
+
+This checkout proves compiler execution on a real Murakumo node but does not
+claim a production agent/model turn, governor materialization, or published
+signed receipt. Production rollout must publish the provider archive/manifest
+to durable content-addressed storage, select only nodes whose measured runtime
+matches the KCM identity, then run dispatch → gate → receipt. The implementation
+fails placement or execution instead of falling back to JVM, shell, PATH, or an
+unpinned provider."
+  :adr/evidence
+  {:component "orgs/kotoba-lang/kotoba-fleet"
+   :base-revision "a2ed736dc1cd8f5f0ea9a143628d979d25fa7e0c"
+   :verification {:core {:tests 24 :assertions 61 :failures 0 :errors 0}
+                  :containment {:blocked 6 :leaked 0}
+                  :provider {:closure-sha256 "39f3480ca9918c65f719790837d949be27f714e79c3a6ca0c8797c38f1e4ad9f"
+                             :files 566 :bytes 6965123}
+                  :local-cache-probe {:cold-ms 4024 :warm-ms 141 :compile-ms 3182
+                                      :first :miss :second :hit
+                                      :substituted-provider :rejected}
+                  :naphtali-cache-probe {:cold-ms 904 :warm-ms 37 :compile-ms 715
+                                         :first :miss :second :hit
+                                         :runtime-sha256 "463b47d6e984e4f84cd2421dabf5081414e40ab9d967e828b2db7858e707f6de"}}
+   :production-agent-run :pending-durable-provider-publication-and-receipt}}]

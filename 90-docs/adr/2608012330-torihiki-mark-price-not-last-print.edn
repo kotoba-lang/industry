@@ -1,0 +1,103 @@
+[{:db/id -1
+  :adr/id "adr-2608012330-torihiki-mark-price-not-last-print"
+  :adr/title "ADR-2608012330: mark 価格を直近約定値から oracle 起点の帯域付き size-weighted 値へ — 「薄い板を1枚叩けば他人を清算できる」を塞ぐ"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-01"
+  :adr/last-verified "2026-08-01"
+  :adr/last_verified "2026-08-01"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "torihiki-mark-price-not-last-print"
+  :adr/authoritative-for
+  ["torihiki の mark 価格の定義"
+   "証拠金・清算がどの価格を読むか"
+   "impact-price の all-or-nothing 意味論"
+   "app.hyperliquid.xyz/trade に対する成熟度ギャップの優先順位"]
+  :adr/related
+  ["adr-2608011200-torihiki-trading-dedicated-chain-hypercore-replacement"
+   "adr-2608011600-torihiki-verifiable-sequencer-log-phase2"
+   "adr-2608012100-torihiki-sha256-root-cljs-parity-and-published-terminal"]
+  :adr/evidence
+  ["https://hyperliquid.gitbook.io/hyperliquid-docs/trading/order-types"
+   "https://torihiki.pages.dev"
+   "https://github.com/kotoba-lang/torihiki"]
+  :adr/body
+  "# ADR-2608012330: mark 価格を直近約定値から oracle 起点の帯域付き値へ
+
+**Status**: accepted
+**Date**: 2026-08-01
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナー指示（2026-08-01）: app.hyperliquid.xyz/trade との成熟度ギャップを整理し、30 分間隔で解消していく。
+
+ギャップ整理の結果、**機能の欠落ではなく脆弱性**が最優先だった: `apply-tx :order` が fill のたびに `:marks` を約定 level で上書きしており、清算判定がそれを読んでいた。つまり**薄い板を 1 枚叩けば他人を清算できた。** 攻撃コストは小さい約定 1 件、報酬は他人の建玉。これを載せた取引所は繰り返し抜かれている。
+
+## Decision
+
+### 1. mark は oracle に錨を打ち、板が「重さを支えられる範囲」でのみ動かす
+
+```
+mark = oracle + clamp(impact-mid − oracle, ±band)
+```
+
+独立した 2 つの防御で、互いの弱点を覆う:
+
+1. **mid ではなく impact price。** `impact-mid` は**参照サイズ**の注文が実際に払う値の中点（funding の premium が既に使っている入力）。1 ロットの異常気配では動かない——1 ロットでは参照サイズを埋められないから。動かすには実サイズと実リスクが要る。
+2. **oracle 周りの帯域。** 実サイズを払う気のある攻撃者でも、外部価格から `band` までしか引きずれない。**成功した操作の被害額を、板が押される限界ではなく運営者が選んだ数値に固定する。**
+
+どちらかの側が参照サイズを吸収できない板では、mark は oracle そのもの。**自分を値付けできない板に値付けさせない。**
+
+`:last`（直近約定値）は表示専用として別に保持する。トレーダーに直近約定を見せるのは正しく、それで証拠金を測るのは正しくない。
+
+### 2. `:liquidate` は mark 無しでは走らない
+
+mark が正でなければ例外を投げる。推測して清算するより止まる方がよい。
+
+### 3. `impact-price` は all-or-nothing にする（実装の欠陥だった）
+
+**旧実装は部分約定の平均を返していた。** つまり 1 ロットしか無い板でも「参照サイズの注文はいくら払うか」に答えてしまい、**その 1 ロットが参照価格を決めていた**——参照サイズという仕組みが防ぐはずだった操作そのもの。funding の premium もこれを使っている。
+
+板が実際に参照サイズを支えたときだけ答えるよう変更した。ただし**1 ロット未満の端数は成功扱い**とする（最初の実装は端数が割り切れない板すべてで失敗し、mark のテストが即座に捕まえた）。判定は「最後に触れた level の 1 ロット分より残りが小さいか」。
+
+## Consequences
+
+- (+) 直近約定値による清算誘発が塞がれた。end-to-end のテストで、**1200 で実際に print が出ている状態でも mark が oracle に留まる**ことを固定した。
+- (+) funding の premium も同じ修正の恩恵を受ける（同じ `impact-price` を読むため）。
+- (−) mark が oracle に依存するようになった。**oracle 集約はまだ実装されていない**（`:oracle` tx は合意済みの値を受け取るだけ）ので、oracle を汚染できる者は依然として mark を動かせる。band はその被害も縛るが、根治は validator 提出値の median 化であり未着手。
+- (−) `band` と `impact-notional` は運営者が選ぶ数値で、実データからの較正はしていない。
+- (−) state root が変わった（`:last` が canonical encoding に入り、mark が導出値になったため）。parity fixture を更新済み。
+
+## 書いていて出た、既にあった 2 つの欠陥
+
+どちらも「見た目は問題ない」コードだった。
+
+1. **`impact-price` の部分約定**（上記 Decision 3）。mark を書くまで誰も気づかなかった。
+2. **funding のテストが自分の前提を検証していなかった。** `premium-uses-impact-not-top-of-book` は「1 ロットの異常な気配は premium を動かさない」と主張していたが、その気配を**best ask より上の bid** として置いていた——つまり**板に載らず約定していた**。テストは通り続けながら、名前が主張する内容を一度も検証していなかった。気配を spread の内側（操作者が実際に座れる場所）に移した。
+
+**「テストが緑である」ことと「テストが主張を検証している」ことは別。** 前回 ADR-2608012100 に書いた「片方のランタイムでしか実行していないなら主張するな」と同じ型の誤りが、今度はテストの内側で起きた。
+
+## Alternatives considered
+
+- **mark = median(oracle, mid, last)。** 却下。薄い板では mid も last も操作可能で、median は 3 つのうち 2 つが汚染されれば汚染される。
+- **mark = oracle 固定。** 却下。板が示す真の premium を捨てることになり、funding の意味も薄れる。band 内で追随させる方が正しい。
+- **HL の mark 式をそのまま真似る**（oracle + EMA of premium の median など）。保留。EMA は状態を増やし、決定性の面（サンプリング間隔が合意の一部になる）で慎重を要する。現行式で脆弱性は塞げており、精緻化は実データで較正できるようになってから。
+- **`impact-price` を部分約定のまま残し、呼び出し側で深さを検査する。** 却下。同じ検査を呼び出し側ごとに書くことになり、書き忘れが即脆弱性になる。関数自身が答えを拒否する方が安全。
+
+## app.hyperliquid.xyz/trade に対する残りのギャップ（優先順、本 ADR で 1 を消化）
+
+1. ~~mark を oracle ベースに~~ **完了（本 ADR）**
+2. **reduce-only と トリガー注文（stop / take）** — HL は 9 種の注文型 + 4 TIF + TP/SL を持ち、torihiki は limit / IOC / post-only の 3 つ。**損切りが置けないのが最大の実害。** トリガー発火順序が合意の一部になるため、決定性の設計が要る。
+3. **API（発注 + 購読）** — 無い。UI が本物になる前提。
+4. **端末の live 化**（shadow-cljs。手書き JS の置換も同時に片付く）
+5. ADL の実行（現在は ranking 止まり）、段階証拠金、OI 上限
+6. oracle 集約（validator 提出値の median）
+7. Phase 3: engi の合意層（pacemaker / view-change / p2p / 署名集約）
+8. bridge・監査
+
+「同等の**製品**」までは 4 まで、「同等の**チェーン**」までは 7 が必要。
+"}]

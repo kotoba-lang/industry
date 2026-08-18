@@ -1,0 +1,111 @@
+[{:adr/authoritative_for ["cloud-itonami org の役割 — 収益化まで到達した ISIC/ISCO vertical actor fleet（blueprint 専用ではない）"
+                          "cloud-itonami-* repo 群の所属 org は cloud-itonami"
+                          "base cloud-itonami(private, business-os)は gftdcojp に残留"
+                          "4-org taxonomy(ADR-2606302300)に対する cloud-itonami org の例外的位置付け"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "cloud-itonami-org-split"
+  :adr/related ["adr-2607011000-cloud-itonami-robotics-premise-and-isic-21-21"
+                "adr-2607012000-cloud-itonami-isco-occupation-blueprints"
+                "adr-2606271700-cloud-itonami-business-os"
+                "adr-2606302300-org-taxonomy-4-orgs"
+                "adr-2607122300-cloud-itonami-flagship-maturity-sprint"
+                "adr-2607161745-cloud-itonami-flagship-managed-tier-stripe-billing"
+                "adr-2607161930-cloud-itonami-6399-6310-aozora-distribution-actors"
+                "adr-2607276000-cloud-itonami-isic-6312-geo-map-flagship"]
+  :adr/status "accepted"
+  :adr/id "adr-2607012100-cloud-itonami-org-split"
+  :adr/doc_type "adr"
+  :adr/last_verified "2026-07-27"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/date "2026-07-01"
+  :db/id -1
+  :adr/authoritative true
+  :adr/title "ADR-2607012100: cloud-itonami org — ISIC/ISCO vertical actor fleet（gftdcojp からの分離とその後の商用化）"
+  :adr/source-format "edn"
+  :adr/body
+  "# ADR-2607012100: cloud-itonami org — ISIC/ISCO vertical actor fleet
+
+**Status**: accepted
+**Date**: 2026-07-01（発足）／2026-07-27 実態へ更新
+**Deciders**: Jun Kawasaki
+
+## 現在地（2026-07-27）
+
+`cloud-itonami` org（https://github.com/cloud-itonami 、2026-06-30 作成）は
+**ISIC / ISCO / COFOG / UNSPSC / GTIN / 業界団体 / LEI 実体の vertical actor
+fleet**であり、その一部は**実際に課金できる商用プロダクトまで到達している**。
+
+発足時（下記「発足の経緯」）は blueprint 移管のための org だったため、本 ADR は
+当初 `cloud-itonami-* public blueprint 専用 org` と記述していた。2026-07-12 以降の
+flagship maturity sprint 以降その記述は実態と乖離したため、2026-07-27 に本文を
+現状へ書き換えた（旧記述をそのまま引用して配置判断の根拠にすると、商用プロダクトを
+本 org に置けないという誤った結論に至る。実際に一度その誤りが起きた）。
+
+実測の現在地:
+
+| 面 | 状態 |
+|---|---|
+| カタログ | `cloud-itonami.github.io`（`kotoba-lang/industry` の registry.edn 由来、144 implemented / 646 entries） |
+| flagship | isic-6399（Indeed 置換）・isic-6310（kaonavi 置換）・isic-7810（Placement Desk）、加えて isic-5820（Salesforce 置換） |
+| 課金 | Stripe live に Managed Starter ¥80,000/月 の Price + Payment Link が実在（3 flagship、ADR-2607161745） |
+| デモ | モックでなく build 時に OperationActor StateGraph を実走させ、実際の refusal verdict と append-only ledger を描画（ADR-2607122300） |
+| B2C 配信 | aozora.app（自社 AT-Protocol PDS）に vertical 別 distribution actor（did:key + CACAO、ADR-2607161930 / 2607161940） |
+| operator 経路 | repo ごとの `docs/operator-quickstart.md`、fresh clone からの fork-to-production を実地再現検証済み、nightly GitHub Actions で再生成 |
+| GTM | outbound partner plan（ADR-2607185000） |
+
+ビジネスモデルは **AGPL fork/self-host ＋ gftdcojp 自身が managed operator として
+課金**の二層。したがって「商用プロダクトだから gftdcojp/ai-gftd-* へ」という
+振り分けは、本 org に対しては成り立たない。
+
+## 発足の経緯（2026-07-01 の決定、事実として保持）
+
+`gftdcojp` 配下の public な `cloud-itonami-*` 系列 35 件全て（ISIC 由来 26 件 +
+ISCO-08 由来 9 件）を `gh api repos/gftdcojp/<name>/transfer -f new_owner=cloud-itonami`
+で `cloud-itonami` org へ移管した（owner のみ変更、visibility は public のまま不変、
+両 org admin のため即時完了）。base の `cloud-itonami`（private, business-os,
+ADR-2606271700）は影響を受けず `gftdcojp` に残す。ローカル checkout
+`orgs/gftdcojp/cloud-itonami-*` は `orgs/cloud-itonami/` へ移動し remote URL を
+更新した（west 管理外の standalone repo のため manifest/west.yml 変更なし）。
+
+移管 repo（ISIC, 26）: cloud-itonami-{A0162,B0810,C2610,C3030,D3512,E3600,E3830,
+F4211,G4711,H4920,I5510,J6190,J6310,K6419,K6619,L6810,M7110,N7810,O8411,P8569,
+Q8691,Q8810,R9101,S9511,T9700,U9900}
+
+移管 repo（ISCO-08, 9）: cloud-itonami-isco-{1321,2221,3253,4321,5322,6112,7126,
+8332,9312}
+
+## 新規 repo の配置規則
+
+- ISIC / ISCO / COFOG / UNSPSC / GTIN / 業界団体 / LEI に紐づく vertical actor
+  → `cloud-itonami` org 直下（最初からここに作ってよい）。**商用化の有無で
+  gftdcojp へ分岐させない。**
+- 既存 vertical と収益構造が重複する新規 actor は起こさず、既存 vertical の
+  特化スライスとして実装する（先例: AMap 型 map を isic-6312 の地理特化
+  flagship とした ADR-2607276000）。
+- gftdcojp 自社ブランドの消費者向けプロダクト（`ai-gftd-*`）は従来どおり
+  `gftdcojp`。ただし fleet の課金・配信・カタログのレールを使いたい場合は
+  cloud-itonami vertical が先で、ai-gftd はその上の皮として任意。
+
+## Consequences
+
+- (+) blueprint 35 件が独立 org 配下に集約され、`gftdcojp` の自社商用 repo 一覧から分離された。
+- (+) base cloud-itonami（private, business-os）は無変更で gftdcojp に残留。
+- (+) manifest/repos.edn・west.yml は元々これらを管理していないため更新不要（既存の standalone 慣例通り）。
+- (−) ADR-2606302300 の 4-org taxonomy に対する明示的な例外。cloud-itonami は
+  5 番目の org。4 org の役割分担自体は変更しないが、「commercial product →
+  gftdcojp/ai-gftd-*」という taxonomy の振り分け規則は本 org には適用されない
+  （2026-07-27 追記）。
+- ADR-2607011000 / ADR-2607012000 の「blueprint repo (gftdcojp org, public,
+  AGPL-3.0)」という記述は本 ADR で置き換えられている。
+
+## References
+
+- ADR-2607011000（cloud-itonami robotics premise + ISIC 21/21） — 移管元 26 repo の出自。
+- ADR-2607012000（cloud-itonami-isco occupation blueprints） — 移管元 9 repo の出自。
+- ADR-2606271700（cloud-itonami business-os） — private base repo、本 ADR の対象外。
+- ADR-2606302300（4-org taxonomy） — 本 ADR が明示する例外の親規範。
+- ADR-2607122300（flagship maturity sprint） — 商用化の起点。
+- ADR-2607161745（Managed-tier Stripe live 化） — 実課金の根拠。
+- ADR-2607276000（isic-6312 地理特化 flagship） — 本 ADR の配置規則の適用例。
+"}]

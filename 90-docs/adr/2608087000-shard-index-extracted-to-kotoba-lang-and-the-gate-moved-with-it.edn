@@ -1,0 +1,134 @@
+[{:db/id -1
+  :adr/id "adr-2608087000-shard-index-extracted-to-kotoba-lang-and-the-gate-moved-with-it"
+  :adr/doc_type "adr"
+  :adr/topic "shard-index-extracted-to-kotoba-lang-and-the-gate-moved-with-it"
+  :adr/title "ADR-2608087000: kotobase-shard-index を kotoba-lang に切り出す — 3 つの ADR が繰り返した follow-up を閉じ、gate も一緒に動かす"
+  :adr/status "accepted"
+  :adr/date "2026-08-08"
+  :adr/last_verified "2026-08-08"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["kotobase-shard-index の置き場と west 登録"
+   "この subsystem の CI（murakumo fleet gate）がどの repo の tree に対して走るか"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends ["adr-2608071500-kotobase-client-side-shard-index-on-object-storage"
+               "adr-2608085000-cooperative-client-index-routing-cache-donated-work"
+               "adr-2608086000-shard-index-incremental-append-and-the-first-real-corpus"]
+  :adr/related
+  ["adr-2608071500-kotobase-client-side-shard-index-on-object-storage"
+   "adr-2608085000-cooperative-client-index-routing-cache-donated-work"
+   "adr-2608086000-shard-index-incremental-append-and-the-first-real-corpus"
+   "adr-2607300900-github-actions-retired-move-ci-to-murakumo-fleet"
+   "adr-2608040100-repo-name-four-planes"]
+  :adr/decision-summary
+  "{:repo \"kotoba-lang/kotobase-shard-index\", :was \"com-junkawasaki/root:70-tools/kotobase-shard-index\", :west-entry-added true, :gate-moved-from :root-tree :to :child-repo-tree, :why-gate-had-to-move \"west project は superproject の git tree に入らないので、root gate は検査対象 0 件で合格していた\"}"
+  :adr/artifacts
+  "{:repo \"https://github.com/kotoba-lang/kotobase-shard-index\", :west-entry \"manifest/west.yml name: kotobase-shard-index\", :gate \"scripts/fleet-ci/gates.edn id root-shard-index\"}"
+  :adr/body
+  "# Context
+
+**3 つの ADR が同じ follow-up を繰り返していた。**
+
+- ADR-2608071500（2026-08-07）: 「staging 先が正しくない。このセッションの GitHub scope が
+  `com-junkawasaki/root` だけだったため `70-tools/` に置いた。`kotobase-` family の
+  subject repo として `kotoba-lang` に切り出し、west 登録するのが正しい置き場。
+  **名前を付けた follow-up であって、暗黙に済ませない。**」
+- ADR-2608085000（2026-08-08）: 「前 ADR の staging 問題をそのまま引き継いでいる。」
+- ADR-2608086000（同日）: 「3 つの ADR が同じ follow-up を繰り返している。
+  **これ以上先送りしない。**」
+
+先送りを 3 回明記した時点で、それは follow-up ではなく未着手の作業である。本 ADR は
+それを実行した記録で、**実行してみて 1 件、放置すると静かに壊れるものが見つかった**。
+
+# Decision
+
+## D1 — `kotoba-lang/kotobase-shard-index` として切り出し、west に登録する
+
+- repo: `kotoba-lang/kotobase-shard-index`（public。kotoba-lang org の既定）
+- path: `orgs/kotoba-lang/kotobase-shard-index`
+- 登録: `manifest/repos.edn` の `:extra-projects` に 1 行 →
+  `nbb scripts/gen-west-manifest.cljs --entry kotobase-shard-index`（**west.yml の
+  diff は +5 行のみ**。wholesale 再生成はしない）
+
+名前は family 面（`kotobase-`）+ subject（`shard-index`）で、既存 30 余りの
+`kotobase-*` と同じ形（ADR-2608040100 の面順: origin → role → **family** → subject）。
+
+repo 内のパス参照はすべて repo 相対に直した（`70-tools/kotobase-shard-index/...` →
+`...`）。`package.json` に `test` / `mutations` / `budget` / `bench:*` を置いたので、
+呼び出しが superproject の layout を知っている必要はもう無い。
+
+## D2 — gate も一緒に動かす。これを忘れると『0 件検査して合格』になる
+
+**これが実行してみて見つかった、放置すると静かに壊れるもの。**
+
+fleet gate `root-shard-index` は `{:name \"root\" :org \"com-junkawasaki\"}` として
+**superproject の tree を fleet ノードへ配って**いた。ところが **west project は
+superproject の git tree に入らない**（gitlink すら無い、CLAUDE.md 冒頭）。したがって
+切り出した瞬間、gate が配る tree に検査対象が 1 ファイルも含まれなくなる。
+
+`shard-index-check.cljs` は「必要なファイルが無ければ exit 1」を持っているので今回は
+**落ちて気付ける**が、これは実装の善意であって構造ではない。`:min-files 1500` の床も
+守るのは「絞り込みが壊れたとき」であって「repo を間違えたとき」ではない —— root の
+tree には .edn/.cljs/.cljc が 1500 件以上あり続けるので、**床は満たしたまま対象だけが
+消える**。
+
+対応は gate を子 repo に付け替えること:
+
+    {:name \"kotobase-shard-index\" :id \"root-shard-index\" :org \"kotoba-lang\"
+     :gate :nbb-script :script \"gates/shard-index-check.cljs\"
+     :include-ext [\".edn\" \".cljs\" \".cljc\"] :min-files 10 :cd true}
+
+`:cd true` で shipped repo の中に入るので、gate 側のパスも repo 相対になる。
+`:id` は据え置き（gate の履歴が切れないように）。
+
+**一般化できる部分**: **subsystem を repo 間で動かすときは、それを検査しているものが
+どの tree に対して走るかを一緒に動かす。** 検査対象が消えた検査は、多くの場合
+「落ちる」ではなく「何も見ずに通る」形で壊れる —— ADR-2608083000 が
+「移行の回帰は『消えたもの』ではなく『繋がっていないもの』として現れる」と書いた
+のと同じ形が、コードではなく CI 配線で起きる。
+
+## D3 — 履歴は持って行かない
+
+`git init` した新 repo に現在の tree を 1 commit で置いた。`git filter-repo` 等で
+superproject の履歴から切り出す選択肢は採っていない —— この subsystem は 2 日で
+書かれており（2026-08-07〜08）、その履歴は 3 つの ADR が本文として持っている。
+**commit 履歴より ADR の方が読める形で残っている**ケースなので、履歴の移送に
+かける手間の価値が無い。superproject 側の履歴は消していないので、必要なら辿れる。
+
+# Verification
+
+- 切り出した repo 単体で **62 assertions / 0 failures**、`bench/check_budget.cljs`
+  が `OK: within budget (total 221 <= 244, max 65 <= 72, waves 8 <= 9)`。
+  **どちらも superproject の外、repo のルートから実行して確認**した（相対パスの
+  書き換えが効いていることの証拠であって、書き換えたという主張ではない）。
+- west 登録: `verify-west-pins: 1 件の pin 変更をすべて検証 OK`、
+  `west.yml` の diff は **+5 行**。
+- 完了ゲート: `nbb scripts/west-orphan-audit.cljs --blocking` →
+  `true-orphan-git: 0` / `local-root-broken (blocking): 0`、exit 0。
+- **付け替えた gate を、子 repo の tree に対して実際に走らせた** —— `:cd true` 相当
+  （repo ルートを引数に渡す）で `shard-index-check: OK — 一致（exactness 合格 /
+  GET 予算内）`。gates.edn の記述が正しい形をしているという主張ではなく、
+  その形で実際に通ることの確認。
+
+# この作業が到達しないところ（正直に）
+
+- **fleet ノードでの実行は次の tick 待ち。** gate 自体は子 repo の tree に対して
+  手元で通ることを確認したが、**murakumo fleet がこの repo を配れるか**（remote から
+  clone できるか、`:include-ext` の絞り込みで `:min-files 10` を満たすか）は
+  ノード側の実行を見るまで確定しない。手元で通ることと fleet で通ることは別である。
+- **`70-tools/` の他の住人は動かしていない**（`bmc` / `scripts`）。本 ADR が扱うのは
+  3 つの ADR が名指ししていた 1 件だけ。
+- **compaction は依然として無い**（ADR-2608086000 の残 gap）。切り出しは置き場の
+  問題であって、機能の gap を 1 つも埋めていない。
+
+# Consequences
+
+- **(+) 3 回繰り返された follow-up が閉じた。**
+- **(+) subsystem が単体で成立していることが実測で示された**（superproject の
+  layout を知らなくても test と gate が動く）。
+- **(+) 「検査対象が消えた検査は静かに通る」という形が 1 つ潰れた。**
+- **(-) fleet ノードでの実行は次の tick 待ち**（手元では通っている）。
+"}]

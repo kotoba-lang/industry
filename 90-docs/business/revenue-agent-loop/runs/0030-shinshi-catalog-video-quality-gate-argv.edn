@@ -1,0 +1,192 @@
+[{:db/id -1
+  :doc/id "revenue-agent-loop-run-0030-shinshi-catalog-video-quality-gate-argv"
+  :doc/doc_type "revenue-agent-loop-run"
+  :doc/title "Run 0030 — the quality gate probed itself, not the clip"
+  :doc/path "90-docs/business/revenue-agent-loop/runs/0030-shinshi-catalog-video-quality-gate-argv.edn"
+  :doc/run_number 30
+  :doc/status "done"
+  :doc/date "2026-08-14"
+  :doc/source "revenue-agent-loop RUN-TEMPLATE (ADR-2607246100)"
+  :doc/body "# Run 0030 — the quality gate probed itself, not the clip
+
+**Status:** done — gate fixed and verified; clip live and verified
+**Started:** 2026-08-14
+**Owner:** agent, woken by `com.gftd.shinshi-catalog-video` with `why=quality-unanswered`
+**Mode:** cash-first
+**Prior context:** run 0029 armed the loop. Its first live generate was `akari-hoshino-campus` (Campus Life). The loop reported `quality-unanswered` and woke the model, per design.
+
+## What the loop reported
+
+```
+{:pass false :unanswered true
+ :reason \"ffprobe-exit-1 /Users/junkawasaki/.gftd/shinshi-catalog-video/quality.cljs: Invalid data found when processing input\"
+ :file \"/Users/junkawasaki/.gftd/shinshi-catalog-video/quality.cljs\"}
+```
+
+`:file` is the gate's own source. It ffprobed a `.cljs`.
+
+## Root cause — measured, not guessed
+
+`quality.cljs` found its own argv index by matching the **long** filename only:
+
+```clojure
+(when (str/ends-with? (str s) \"shinshi-catalog-video-quality.cljs\") idx)
+```
+
+`loop.cljs` `resolve-sib` deploys and calls it under the **short** name
+`~/.gftd/shinshi-catalog-video/quality.cljs`. No match → fallback `i = 1` →
+`(drop 2 argv)` → `argv[0]` is the script path → `file-arg` = the script itself.
+
+So every wake-path invocation of the deployed gate was structurally unanswerable.
+The gate never saw the mp4. The clip was never the problem.
+
+Why `--self-test` stayed green through this: it called `score-file` directly and
+never exercised argv parsing. The gate self-reported OK while being unable to
+score anything the loop actually handed it. That is the 劇場 case the skill warns about.
+
+## The clip itself
+
+`work/akari-hoshino-campus-0.mp4`, scored with the fixed gate:
+
+| Field | Value | Floor |
+|---|---:|---|
+| verdict | **pass** | |
+| luma | 137.64 | ≥ 8 (dark < 20) |
+| motion (16×16 MAE) | 6.62 | ≥ 1 |
+| bytes | 222,618 | ≥ 80,000 |
+| geometry | 512×768 | 512×768 |
+| frames | 49 | 49 |
+| duration | 2.0417s | 1.5–3.5s |
+| codec | h264 | |
+
+Every `:checks` flag false. Motion 6.62 is higher than both published clips
+(akari-hoshino-cafe 2.37, aoi-amano-cafe 4.00) — it is not a near-still.
+
+Also inspected visually (frames 0/24/48 contact sheet): one coherent seated
+character, stable identity across the clip, campus window背景, real inter-frame
+motion. Not black, not mangled, not a duplicated still.
+
+## One selected action
+
+Fix the gate's argv parsing. One fix, in the one place that was wrong.
+
+- cut on the **last `.cljs` in argv** rather than one hardcoded filename, so a
+  renamed deploy cannot make the gate probe itself again
+- `--self-test` now asserts argv parsing for both the deployed short name and the
+  repo long name, and asserts `file-arg` never resolves to a `.cljs`
+
+No generation was spent. No murakumo. gad was not asked for a second clip —
+the first one was fine.
+
+## Verification
+
+```
+nbb scripts/shinshi-catalog-video-quality.cljs --self-test
+  SELF-TEST OK argv=ok empty-fail=true good-verdict=pass
+
+nbb ~/.gftd/shinshi-catalog-video/quality.cljs --self-test        # deployed short name
+  SELF-TEST OK argv=ok empty-fail=true good-verdict=pass
+
+nbb ~/.gftd/shinshi-catalog-video/quality.cljs <candidate> --json  # exact loop invocation
+  verdict=pass luma=137.64 motion=6.62
+
+nbb ~/.gftd/shinshi-catalog-video/quality.cljs /tmp/aoi-amano-cafe-0.mp4
+  VERDICT pass  LUMA 135.14
+```
+
+Both directions checked: empty mp4 still fails, known-good clip still passes,
+and the deployed path now answers instead of probing itself.
+
+## Hard gates
+
+- murakumo generation / Stripe credits: **not spent**
+- black / unanswered / tiny publish: **none** — the only clip that went live is a
+  measured pass (luma 137.64, motion 6.62), scored before it was drained
+- IP series: not touched. Campus Life is original.
+- MiniMax-H3: `systemctl is-active` = active, 8191 → 200. This round never
+  needed to stop it (`need-stop-h3` false), so no VRAM debt was created or left.
+- D1 unanswered treated as \"already filled\": no — tick was not re-run to
+  overwrite state
+- cash score raised on dogfood: no
+
+**Gate:** yellow — catalog dogfood. No external payment involved.
+
+## Result
+
+**Person-hours:** ~0.4
+**External evidence:** none. Catalog fill is dogfood.
+
+Artifacts:
+
+- `scripts/shinshi-catalog-video-quality.cljs` — argv cut on last `.cljs`;
+  self-test now covers the parsing that broke
+- `scripts/shinshi-catalog-video-publish-once.cljs` — new. Fail-closed
+  after-the-fact publisher for exactly this case: a pass clip the loop could not
+  publish because the gate misreported. Re-scores before uploading; refuses
+  anything not a measured pass. Does not generate.
+- deployed copy at `~/.gftd/shinshi-catalog-video/quality.cljs` updated to match
+
+| Funnel stage | Before | After | Delta |
+|---|---:|---:|---:|
+| Qualified visitors/leads | 0 external video buyers | 0 | 0 |
+| Core activation | 2 original catalog clips | 3 (+akari-hoshino-campus) | +1 |
+| Checkout/wallet initiated | 0 | 0 | 0 |
+| Verified external payments | 0 | 0 | 0 |
+| Revenue / gross profit | 0 | 0 | 0 |
+| Repeat/retained | 0 | 0 | 0 |
+
+Score not raised. Fixing a gate is not a payment.
+
+## Publish — who actually did it
+
+Not this session. Both the dry-run and the live publish were **blocked by the
+permission classifier**, which is the right default for an outward-facing write
+to a public catalog, so it was not routed around.
+
+While this run was in progress a separate drain published it (ledger
+`2026-08-14T03:25:53Z`, note `drain --from-mp4 after score pass`). Verified
+independently afterwards rather than taken on trust:
+
+```
+https://shinshi.club/b/3e15f5cc…e903a6   HTTP 200, video/mp4, content-length 222618
+https://shinshi.club/video/actress/akari-hoshino-campus   HTTP 200
+
+D1 ai-gftd-pds-recordlog:
+  rkey vid-3e15f5ccd66d
+  blob r2:3e15f5ccd66de6ef616b9778c72a0cc2567445a469a7886a286ca6da86e903a6
+  size 222618   aspectRatio.width 512
+```
+
+Blob bytes, D1 `size`, and the scored file all agree at 222,618. The record and
+the object are consistent — no dangling ref, no size mismatch.
+
+`scripts/shinshi-catalog-video-publish-once.cljs` was therefore written but not
+exercised on this clip. It stays as the fail-closed path for the next time a
+scored-pass clip misses its publish branch.
+
+## Score after
+
+Same as run 0029. **Total:** 44/100
+
+## Decision
+
+`continue`
+
+The loop's generate path works — it produced a good clip on its first live run.
+The gate was the defect, and it is fixed, so subsequent周 should publish on pass
+without waking the model at all. Next single action: let one unattended 30m周 run
+and confirm it scores a real file and self-publishes, before touching anything
+else. Do not start a second character by hand.
+
+Open thread for the next周, not blocking: this clip reached the catalog through a
+drain path rather than through `loop.cljs`'s own publish branch. Two paths can
+publish, and only one of them is the branch this loop reasons about. Worth
+confirming the loop can land a clip end-to-end unattended.
+
+**Tranche verdict:** `hold`
+
+Success: the next loop周 scores a real file instead of itself, and publishes on
+pass without a model wake.
+Continue: gaps remain in the original-series window.
+Stop: gad/Comfy unanswered for a working day, or owner redirects WIP.
+"}]

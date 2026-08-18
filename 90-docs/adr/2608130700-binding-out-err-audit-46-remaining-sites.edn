@@ -1,0 +1,128 @@
+[{:db/id -1
+  :adr/id "ADR-2608130700"
+  :adr/title "残り 47 箇所の (binding [*out* *err*] …) を消費者から監査した — 直すべきは 1 箇所、直すと壊れるものが 2 箇所あった"
+  :adr/status "accepted"
+  :adr/date "2026-08-13"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body
+  "ADR-2608130600 が `manifest/edn-query.cljs` の 5 箇所を直したあと、`scripts/` と
+`manifest/` に同じイディオムが残っていた。前 ADR が立てた判定基準は 1 つだけ:
+**その script の stdout を誰かが parse しているか。** その問いを 20 ファイルすべてに
+当てた結果を記録する。
+
+## 実測した数
+
+`git grep 'binding \\[\\*out\\* \\*err\\*\\]' -- '*.cljs'` は **21 ファイル 49 箇所**。
+うち 2 箇所は `edn-query.cljs` の docstring（前 ADR が書いた説明文）なので、
+**コードは 20 ファイル 47 箇所**。さらにその 3 箇所は `bb_edn_to_nbb_tasks.cljs` が
+子リポへ **書き出す** `run-task.cljs` の中身（文字列リテラル）で、この generator は
+欠陥を子リポへ複製している。
+
+前 ADR は「46 箇所」と書いたが、実際に数えると 47 だった。
+
+## 直したのは 1 箇所 — `scripts/b2-creds.cljs`
+
+**このワークスペースで stdout が本当に機械可読なのは、残り 20 ファイル中これだけ。**
+消費者は 3 本ある:
+
+| 消費者 | 何を parse するか | 失敗時に何を表示するか |
+|---|---|---|
+| `manifest/west_annex.cljs:47` | `JSON.parse(out)` | `(fail (str \"B2 creds 解決に失敗: \" err))` |
+| `scripts/hirameki-mirror.cljs:85` | `JSON.parse(:out)` | receipt の `:mirror/reason` に `(str/trim (:err r))` |
+| `scripts/newsfeed-ingest.cljs:63` | `export K='V'` 行を正規表現で拾う | exit で die（本文は使わない） |
+
+**stdout は壊れていなかった** —— 警告は失敗経路にしか無く、直後に exit 1 するので、
+3 本とも exit で分岐して JSON.parse に到達しない。壊れていたのはその裏側で、
+**前 2 者が表示する `err` が空文字だった。**
+
+信用情報ストアに一切触れずに実測した（`:order [:env]` だけを持つ repos.edn を
+scratchpad の使い捨て git repo に置き、参照する env 変数を未設定にした。
+1Password も Keychain も経路に入らない）:
+
+    直す前:  stdout 64 bytes / stderr  0 bytes / exit 1
+    直した後: stdout  0 bytes / stderr 64 bytes / exit 1
+
+つまり **B2 鍵が解決できない理由が、operator の画面にも hirameki の receipt にも
+一文字も残っていなかった。** `hirameki-mirror` は launchd 常駐なので、
+「B2 鍵を解決できない: 」で終わる receipt が積まれ続ける形になる。
+成功経路（`--json` と `export` の両形）は無変更であることも実測で確認した。
+
+## 直さなかったもののうち 2 つは「直すと壊れる」
+
+**stdout が parse されていない = 直しても安全、ではない。** 消費者が
+`:out` を診断文として読んでいる場合、stderr へ移すとその診断が消える。
+
+### `scripts/verify-west-pins.cljs`（6 箇所）— 触らない
+
+失敗メッセージは全部この束縛の中にあり、束縛が効かないので実際は stdout に出ている。
+消費者は 3 本:
+
+- `.claude/hooks/west-pin-verify-guard.cljs:66` — `out` と `err` を**両方**連結して
+  deny メッセージにする。exit code で判定。どちらでも動く
+- `scripts/gen-west-manifest.cljs:363` — `(print out)` と `(print err)` を両方転送する。
+  どちらでも動く
+- **`scripts/fleet-ci/tick.cljs:1021` — `{:keys [exit out]}` しか取らない。**
+  `{:ok false :detail (str \"pin verification refused: \" (str/trim out))}`
+
+3 本目が効く。ここを `js/console.error` に直すと、**fleet-ci の pin 前進が
+拒否されたときの理由が空になる**。今の（偶然の）挙動が正しい出力を生んでいるので、
+直すなら tick.cljs 側で `:err` も取る変更と同じ commit でやる。単独では退行。
+
+**hook は stdout を parse しない** —— 人間向けメッセージに連結するだけで、
+判定は exit code だけ（`(when (= 1 exit) (deny! …))`）。だから
+`verify-west-pins` の出力先を変えても hook の判定は変わらない。
+
+### `scripts/annex-custody-verify.cljs`（1 箇所）— 触らない
+
+`scripts/tsukuru-maturity-tick.cljs` の `probe-script` が **stdout を部分文字列で
+分類する**（`\"no such file\"` `\"Cannot find module\"` `\"ENOENT\"` `\"not checked out\"`
+`\"command not found\"` を含めば `:unknown`、含まなければ `:regressed`）。
+さらに stdout の末尾 200 文字を `:note` にする。`fail` の 2 つのメッセージは
+どのマーカーも含まないので**誤分類は起きていない**が、stderr へ移すと `:note` が
+直前の進捗行に化ける。ここも単独では退行。
+
+## 残りは parse されていない（消費者が見つからなかった）
+
+「見つからなかった」であって「無い」ではない。探した範囲は tracked file 全部
+（`git grep`）+ `.claude/settings.json` の hook 定義 + `scripts/*.plist` /
+`scripts/fleet-ci/*.plist` の launchd 定義 + `scripts/fleet-ci/gates/*.cljs`。
+`orgs/` 配下も `b2-creds` について確認して 0 件。
+
+| script | 箇所 | 消費者 |
+|---|---|---|
+| `gen-west-manifest.cljs` | 8 | `closing-check.cljs:107` が `script-check` で呼ぶが、判定は exit code、`out` は `last-lines` で表示するだけ |
+| `west_annex.cljs` | 5 | 散文の言及のみ（CLAUDE.md / manifest/README.md） |
+| `cleanup-land.cljs` | 4 | 他 script の散文言及のみ。`rename-residue-check` gate が回すのは `rename-residue-test.cljs` であってこれではない |
+| `west-triple-sync.cljs` | 3 | 無し |
+| `migrate-etzhayyim-compat.cljs` | 3 | 無し |
+| `bb_to_nbb_scaffold.cljs` | 3 | 無し |
+| `bb_edn_to_nbb_tasks.cljs` | 3 | **生成物の中身**。子リポの `run-task.cljs` に欠陥を複製する。発火は未知 task 名を渡したときだけ |
+| `verify-clj-everywhere.cljs` / `relocate-west-project.cljs` / `register-archived-west-project.cljs` / `publish_actor_standalone.cljs` / `nbb-run-tests.cljs` / `lifelog-audio-r0-model.cljs` / `hyakka-knowledge-resident.cljs` / `edn_datomize_standalone.cljs` / `datalad-b2-init.cljs` / `adr-new.cljs` | 各 1 | 無し。`hyakka-knowledge-resident` は launchd 常駐だが stdout は `/tmp/…log` へ落ちるだけ |
+
+`nbb-run-tests.cljs` の 1 箇所は引数ゼロの usage 表示（exit 2）。fleet-ci の
+`:nbb-test` gate は `out=$(npx --yes nbb …)` を `grep -qE 'Ran [0-9]+ tests'` に
+かけるので stdout を parse しているが、gate が呼ぶのは各子リポの entry であって
+この共有ランナーではなく、しかも usage は引数ゼロでしか出ない。
+
+## 一括で直さない理由
+
+20 本の出力先を同時に変えると、上の 2 件のような「stdout に出ているから動いていた」
+消費者が同時に壊れる。しかも壊れ方は**失敗時にだけ現れる診断の欠落**なので、
+緑のうちは観測されない —— ADR-2608130600 が記録した壊れ方とまったく同じ形をしている。
+
+**次にこのイディオムを触る人へ:** その script の stdout を parse する者が居なくても、
+`:out` を診断として読む者が居るなら、出力先の変更は消費者側の変更とセットにする。
+
+---
+
+## 注記: この id は 2026-08-13 に二重に引用されている（本 ADR の主題とは無関係）
+
+同日の別セッションが vendored-copy drift の triage を行い、**着地済みの子リポ
+commit 4 本と 4 つの vendored ファイルのヘッダが `ADR-2608130700` を引用した**が、
+その番号はこの ADR が先に取っていた。履歴は書き換えないので引用はそのまま残る。
+
+**それらが指している正本は
+`90-docs/adr/2608130701-vendored-drift-triage-thirteen-findings.edn`（ADR-2608130701）**
+であって、この ADR ではない。`(binding [*out* *err*] …)` の監査を探しに来た読者は
+ここが正しい。vendored copy / treasury / pay / x402 を探しに来た読者は 0701 へ。"}]

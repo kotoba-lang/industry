@@ -1,0 +1,72 @@
+[{:db/id -1
+  :adr/id "ADR-2608122300"
+  :adr/title "Close the repository-ownership migration around Etzhayyim and Kotobase"
+  :adr/status "accepted"
+  :adr/date "2026-08-12"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body
+  "## Context
+
+The repository inventory had accumulated several different ownership concerns in the same GitHub organizations. Etzhayyim is Jun Kawasaki's personal project and Tamaki-centred artificial organism, while Cloud Itonami is an operational product plane, Kotoba Lang owns portable language/protocol substrate, AWAI Network owns the broader AWAI business plane, and Kotobase now has a dedicated product organization at `net-kotobase`.
+
+Repository names are interpreted together with their organization. A destination organization can therefore remove a redundant source prefix without changing the semantic subject: for example, `network-awai/net-kotobase-engine` becomes `net-kotobase/engine`.
+
+## Decision
+
+### Etzhayyim boundary
+
+`etzhayyim` remains the home of Tamaki, the artificial-organism actors, their organs, organism-specific applications, and Jun Kawasaki's personal Etzhayyim experiments. The remaining actor-like repositories are not renamed merely to normalize an `actor-` prefix, and repositories whose names no longer start with `com-etzhayyim-` are not subjected to another naming campaign.
+
+Reusable language or protocol artifacts leave Etzhayyim for `kotoba-lang`; operational applications leave for `cloud-itonami`. This session applied that rule to:
+
+- `etzhayyim/com-etzhayyim-open-wellbecoming` -> `kotoba-lang/open-wellbecoming`
+- `etzhayyim/com-etzhayyim-app-society6` -> `cloud-itonami/app-society6`
+
+The remaining `com-etzhayyim-*` actors and organism applications were reviewed and retained because their identity is specifically Tamaki/Etzhayyim rather than a shared library or a general business application.
+
+The final live GitHub inventory at session closure contains 75 Etzhayyim repositories: 68 active and 7 archived. The 68 active repositories comprise 33 normalized `actor-*` repositories, 12 retained legacy-name actor repositories, 20 organism applications, and the three core/meta repositories `tamaki`, `root`, and `architecture-framework`.
+
+The 12 retained legacy-name actors are `com-etzhayyim-abaki`, `com-etzhayyim-hibiki`, `com-etzhayyim-hirameki`, `com-etzhayyim-minori`, `com-etzhayyim-tawami`, `com-etzhayyim-tomoshibi`, `com-etzhayyim-torifune`, `com-etzhayyim-tsumugi`, `com-etzhayyim-umisachi`, `com-etzhayyim-wakai`, `com-etzhayyim-yoro`, and `com-etzhayyim-yudane`. The 20 retained applications are `com-etzhayyim-app-explorer`, `com-etzhayyim-app-hakkou`, `com-etzhayyim-app-kabi`, `com-etzhayyim-app-karma`, `com-etzhayyim-app-ki`, `com-etzhayyim-app-kinoko`, `com-etzhayyim-app-kiyome`, `com-etzhayyim-app-kobo`, `com-etzhayyim-app-koke`, `com-etzhayyim-app-mold-allergy`, `com-etzhayyim-app-omikuji`, `com-etzhayyim-app-open-ossekai`, `com-etzhayyim-app-organism`, `com-etzhayyim-app-organism-viz`, `com-etzhayyim-app-otakiage`, `com-etzhayyim-app-resources`, `com-etzhayyim-app-saikin`, `com-etzhayyim-app-seibutsu`, `com-etzhayyim-app-seigen-cue`, and `com-etzhayyim-app-shinka`.
+
+These 32 legacy-prefixed active repositories are not migration gaps. No additional repository is currently approved or identified for transfer from Etzhayyim to `cloud-itonami` or `kotoba-lang`. The 7 archived repositories are historical retention and lifecycle-policy work, not ownership-migration backlog.
+
+### Kotobase boundary
+
+The externally operated Kotobase product/service plane belongs to `net-kotobase`. Portable Kotoba/Kotobase engine, storage, protocol, and client libraries remain in `kotoba-lang`. Broader AWAI company and operator repositories remain in `network-awai`.
+
+This session established the following product-plane identities:
+
+| Previous identity | Canonical identity |
+| --- | --- |
+| `network-awai/net-kotobase` | `net-kotobase/control-plane` |
+| `network-awai/net-kotobase-ipfs` | `net-kotobase/ipfs` |
+| `network-awai/net-kotobase-engine` | `net-kotobase/engine` |
+| `network-awai/net-kotobase-authn` | `net-kotobase/authn` |
+| `network-awai/net-kotobase-cypher` | `net-kotobase/cypher` |
+| `network-awai/net-kotobase-lake` | `net-kotobase/lake` |
+| `kotoba-lang/kotobase-docs` | `net-kotobase/docs` |
+| `kotoba-lang/kotobase-commoncrawl-actor` | `net-kotobase/commoncrawl-actor` |
+| `kotoba-lang/net-kotobase-commoncrawler` | `net-kotobase/commoncrawler` |
+
+The pre-existing `net-kotobase/sdk` remains unchanged. `authn` was an empty repository, so it had no reviewable source change before transfer; it was initialized on `main` after transfer. Other moved repositories carried a merged boundary README change through a pull request.
+
+### Manifest and fleet closure
+
+The root manifest now declares the `net-kotobase` remote, group, organization/domain vocabulary, project paths, relocations, and preserved repository identity where applicable. The generated `manifest/west.yml` and fleet-db projection were reconciled. Minimal `--entry` generation was also corrected to synchronize generated remote/group headers when a new organization is introduced.
+
+## Evidence
+
+- Etzhayyim moves landed in root PRs #2094 (`8f4066857141204259910ff3b1eaf9bddff9e932`) and #2096 (`f8fd5b6f89de16e2f513615c7098e5290fb2e38f`).
+- The nine-repository Kotobase organization move landed in root PR #2100 (`08c943b06603e3aaa7bf48650e8067e3ce01a02f`).
+- The final post-transfer control-plane pin advance landed in root PR #2101 (`a957eb96b1211d4b07d0bbcea3e2afc280c52771`), pinning `fabd8408eccbfd79958dea55eafd509ffae85383`.
+- At closure, each of the nine moved Kotobase project pins matched its canonical GitHub repository tip, and fleet-db matched the west projection.
+- A final live GitHub organization inventory reported 75 Etzhayyim repositories (68 active and 7 archived), with zero confirmed ownership-migration gaps.
+
+This is repository, naming, manifest, and fleet-placement evidence. It is not evidence that every production route, deployment, credential, or external integration was exercised after transfer; those remain service-specific verification work.
+
+## Consequences
+
+New Tamaki-specific actors and organs default to `etzhayyim`. New general operational applications default to `cloud-itonami`. New portable language/protocol substrate defaults to `kotoba-lang`. New Kotobase-specific operated services default to `net-kotobase` and should not repeat the organization name in the repository slug.
+
+GitHub redirects preserve old repository URLs, while west paths and canonical identities use the new organizations. No further broad rename or transfer campaign is implied by this ADR. This repository-ownership migration session is closed at the verified boundary above."}]

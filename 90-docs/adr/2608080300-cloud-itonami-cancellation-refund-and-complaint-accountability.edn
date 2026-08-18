@@ -1,0 +1,120 @@
+[{:db/id -1
+  :adr/id "adr-2608080300-cloud-itonami-cancellation-refund-and-complaint-accountability"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/topic "cloud-itonami-cancellation-refund-and-complaint-accountability"
+  :adr/title "ADR-2608080300: cloud-itonami の解約・返金条件と苦情・返金の責任者を決定する — 単価だけは決めない（読める権限が無いため）"
+  :adr/status "accepted"
+  :adr/date "2026-08-08"
+  :adr/last_verified "2026-08-08"
+  :adr/deciders ["Jun Kawasaki" "agent（オーナー指示 2026-08-08『決定して ok』による委任）"]
+  :adr/authoritative true
+  :adr/repos ["com-junkawasaki/root" "gftdcojp/cloud-itonami"]
+
+  :adr/authoritative_for
+  ["cloud-itonami の解約は月次課金期間の末日をもって効力を生じ、後払い課金のため前払残高は発生しない"
+   "既に提供済みの利用分は原則返金しない。返金は請求誤り・Order Form 記載のサービスコミットメント未達・法令要求の 3 事由に限る"
+   "返金の承認権限は AWAI Network, L.L.C.（operator/principal）にあり、Gftd Japan K.K. は承認済み返金の実行者にすぎない"
+   "苦情の一次受付と決済・返金の実行は Gftd Japan K.K.、最終責任と契約・価格・返金の判断は AWAI Network, L.L.C. である"
+   "公開すべき価格情報の項目と、その唯一の欠測（単価 2 件）を埋める手順"
+   "agent は単価を推定・代入してはならない。単価は Stripe Price object にのみ存在し、agent には認可された読み取り経路が無い"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+
+  :adr/related
+  ["adr-2607242600-cloud-itonami-awai-gftd-payment-collection"
+   "adr-2608080200-revenue-blocker-chain-remeasured-gate-doc-was-the-constraint"
+   "adr-2607246100-revenue-agent-loop-capital-allocation-governor"
+   "90-docs/business/revenue-agent-loop/COMMERCIAL-GO-NO-GO.md"
+   "90-docs/business/revenue-agent-loop/runs/0023-cancellation-refund-and-complaint-decision.edn"]
+
+  :adr/context
+  "run 0021（ADR-2608080200）で cloud-itonami の commercial gate は red 1 + yellow 3 まで縮んだ。yellow のうち 2 つ — 『価格・税・返金』と『support / 苦情』 — は、`COMMERCIAL-GO-NO-GO.md` 自身が `owner: commercial policy を決定` と書いているとおり、**決定が無いことが唯一の障害**であって実装でも法務でもなかった。オーナーは 2026-08-08 に『決定して ok』としてこれを委任した。
+
+### 実測した欠落（2026-08-08）
+
+- **Terms 全文に `refund` / `cancel` が 1 度も出現しない。** 解約時点も返金条件も customer-facing に存在しない。
+- **価格がどこにも公開されていない。** `/isco-1212/` は `Usage-based: billed per HR-advisor proposal and per GiB of records stored.` と課金**単位**だけを示し、単価を示さないまま `Subscribe via Stripe Checkout` ボタンを出している。買い手は**いくらか分からないまま Stripe Checkout に入る**。Terms §6.1 が参照する in-product pricing page は存在せず、`/pricing` は cockpit の catch-all fallback である（run 0021）。
+- **苦情・返金の処理者が指名されていない。** 窓口は `hello@gftd.co.jp` のみ。
+
+### 単価だけは決められない
+
+単価は `STRIPE_PRICE_LLM_PROPOSAL` / `STRIPE_PRICE_STORAGE_GB` が指す Stripe Price object の中にのみ存在する。読むには live secret key が要り、**run 0016 が『live key を test key の代用にしない』と決定済み**であり、安全床①（認証情報を自分で扱わない）にも当たる。live Checkout Session を作れば表示されるが、ADR-2607242600 は『Stripe object は test mode で準備してよい』としており live object の新規作成はその範囲外である。
+
+**したがって単価は推定しない。** 既に Stripe に設定されている数値と異なる価格を公開することは、価格を公開しないことより悪い。"
+
+  :adr/decision
+  "### 1. 解約（Cancellation）
+
+- 顧客はいつでも解約でき、効力は**当該月次課金期間の末日**に生じる。
+- 課金は Terms §6.1 のとおり**月次後払い**であるため、**前払残高は構造的に発生しない**。最終請求は解約効力日までの実利用分を対象とする。
+- 利用権は期間末日に終了する。**終了後のデータの取扱いは Terms §3（顧客がデータを所有）および DPA の既存規定に従う。本 ADR はそれを変更しない。**
+- operator は、支払不履行が生じた場合、通知後 14 日を経過したときに提供を停止または解除できる。
+
+### 2. 返金（Refund）
+
+- **原則: 提供済みの利用分は返金しない。** 後払い課金なので、顧客が支払うのは常に**既に発生した消費**に対してのみである。この原則は前払モデルにおける『使わなかった期間の返金』という論点をそもそも生じさせない。
+- **例外として返金する 3 事由**（いずれも operator の承認を要する）:
+  1. **請求誤り** — 計測数量または適用レートが誤っていた場合。差額を返金する。
+  2. **サービスコミットメント未達** — 当該 Order Form にサービス水準の約定がある場合に、その約定に従う。**cloud-itonami の標準 Terms には SLA が無いので、Order Form に書かれていない SLA を根拠にした返金は生じない。**
+  3. **法令が要求する場合。**
+- **返金は請求時と同じ税の取扱いに従う**（Terms §6.4、税抜・reverse charge）。
+- **実行経路**: Gftd Japan K.K. が開示された収納代行として Stripe 経由で元の支払方法へ返金する（ADR-2607242600 §3）。**承認権限は AWAI Network, L.L.C. にある** — 同 §3 が代理人の権限から『契約・価格・税・利用権の変更』を除外している以上、返金の可否判断は代理人の権限外である。
+- 承認から **10 営業日以内**に処理する。
+
+### 3. 苦情・返金の責任者（accountable owner）
+
+| 役割 | 担当 | 根拠 |
+|---|---|---|
+| 一次受付（`hello@gftd.co.jp`） | Gftd Japan K.K. | Terms §15 の contact |
+| 決済・返金・チャージバックの**実行** | Gftd Japan K.K.（収納代行） | ADR-2607242600 §3 |
+| 返金の**承認**、契約・価格・利用権の判断、苦情の最終責任 | **AWAI Network, L.L.C.**（operator / principal） | ADR-2607242600 §2・§3 |
+
+- 応答方針: 営業日（JST）**1 営業日以内に受領の応答**を目標とする。**これは目標であって SLA ではない**（cloud-itonami の Terms は可用性・応答を約定していない）。約定が要る場合は Order Form で個別に定める。
+- 10 営業日以内に解決しない苦情は operator へエスカレーションする。
+
+### 4. 公開すべき価格情報（項目を確定する）
+
+pricing surface は次の 5 項目を**すべて**含むこと。1 つでも欠けたら公開しない。
+
+1. 課金単位 — HR-advisor proposal 1 件あたり / 保管 1 GiB・月あたり
+2. **各単位の単価（JPY）** ← 唯一の欠測
+3. 税の取扱い — 税抜、Terms §6.4 の reverse charge notice へのリンク
+4. 請求周期 — 月次**後払い**
+5. 解約・返金条件へのリンク（本 ADR 1・2 の customer-facing 版）
+
+### 5. 単価を埋める手順（owner の 1 手）
+
+Stripe dashboard または `stripe prices retrieve <price_id>` で `STRIPE_PRICE_LLM_PROPOSAL` / `STRIPE_PRICE_STORAGE_GB` の `unit_amount` と `currency` を読み、pricing surface に転記する。**agent はこの手順を代行しない**（live secret key を要するため）。単価が入った時点で、残りの 4 項目は本 ADR で確定済みなのでページは公開できる。
+
+### 6. 公開の検証は status code で行わない
+
+`/pricing` を公開したら、**既知の不在パス（例 `/legal/refund/`）とバイト数を突き合わせて**実ページであることを確認する。itonami.cloud は未知パスに 200 で cockpit を返すので、200 は存在の証拠にならない（run 0021）。
+
+### 7. 特定商取引法の適用有無は本 ADR で判断しない
+
+顧客は事業目的で購入する検証済み事業者に限られる（ADR-2607242600 §5）ため適用除外の余地があるが、**それは counsel の判断であって本 ADR の決定事項ではない。** 本 ADR が定める返金条件は、**適用の有無どちらでも安全**である — 適用されるなら明示された返品特約がまさに要求されるものであり、適用されないなら不利益は無い。したがって counsel 待ちにせず先に決める。"
+
+  :adr/consequences
+  "- **『価格・税・返金』と『support / 苦情』の yellow のうち、決定が障害だった部分は解消した。** 残るのは customer-facing 文言への適用（機械的）と単価 2 件（owner の 1 手）である。
+- **gate はまだ green にならない。** この gate が要求するのは公開された顧客向け文言であって、決定の記録ではない。本 ADR は blocking だった部分だけを外す。
+- **適用先リポジトリ（`gftdcojp/cloud-itonami`）はこのセッションからアクセスできない**（private、cross-tier add 不可）。文言の適用は access を持つセッションの機械的作業として残る。決定が確定しているので、そこに判断は残っていない。
+- **返金の承認権限を operator に置いたことで、収納代行の境界が返金でも一貫する。** ADR-2607242600 が『代理人は契約・価格・利用権を変更できない』としているのに返金だけ代理人判断にすると、実質的に価格を変更できてしまう。
+- **後払い課金が返金設計を単純にしていることを明文化した。** 前払モデルなら日割・未使用分・繰越の判断が要るが、後払いではそれらが構造的に発生しない。これは偶然の利点であって、課金モデルを変えるときに失われる。
+- **単価を決めなかったことが、この ADR の最も重要な部分である。** 5 項目のうち 4 項目を確定し、残り 1 項目を『読めないから決めない』と明示した。4 項目を決めた勢いで単価も『妥当な値』を置いていたら、Stripe が実際に請求する額と異なる価格を公開することになっていた。"
+
+  :adr/verification
+  "**決定の入力**（すべて既存の accepted な決定または 2026-08-08 の live 実測。新しい事実は導入していない）:
+
+- Terms §6.1（月次後払い・JPY）/ §6.4（税抜・reverse charge）/ §3（顧客がデータを所有）/ §15（contact `hello@gftd.co.jp`、operator = AWAI Network, L.L.C.）— `https://itonami.cloud/legal/terms/` 本文から直接確認
+- ADR-2607242600 §2（AWAI = principal / supplier）・§3（Gftd Japan の権限は受領・**承認済み返金の発行**・dispute 対応・送金に限られ、契約・価格・税・利用権の変更を含まない）・§5（顧客は事業目的で購入する検証済み事業者）
+- **Terms 全文に `refund` / `cancel` が 1 度も出現しないことを確認した**（返金・解約条項の不在は推測ではない）
+- `/isco-1212/` 本文: `Usage-based: billed per HR-advisor proposal and per GiB of records stored.` — 課金単位のみ、単価の記載なし。同ページに `Subscribe via Stripe Checkout` が存在
+- `/isco-1212/` の HTML 全体（26,443 B）に対する数値パターン検索で、通貨表記を伴う価格が **0 件**
+
+**この ADR が検証していないこと**:
+
+- 顧客向け文言の実装。`gftdcojp/cloud-itonami` はこのセッションから読めないため、`legal/terms.md` に本 ADR の 1・2 を追補した結果も、pricing ページの生成結果も、実際には見ていない。
+- 単価そのもの。**読んでいないし、推定もしていない。**
+- 特定商取引法の適用有無（決定 7 のとおり本 ADR の対象外）。"}]

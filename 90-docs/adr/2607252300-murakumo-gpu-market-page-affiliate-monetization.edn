@@ -1,0 +1,45 @@
+[{:db/id -1
+  :adr/id "adr-2607252300-murakumo-gpu-market-page-affiliate-monetization"
+  :adr/title "ADR-2607252300: murakumo.cloud /gpu-market — GPU実勢価格比較ページの公開とアフィリエイト収益化の準備"
+  :adr/status "accepted"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/authoritative-for "murakumo.cloud /gpu-market ページ（gftdcojp/cloud-murakumo site.market）の設計・データ誠実性ポリシーと、同ページのアフィリエイト収益化（採用/見送りプログラムの選定・実装方式）"
+  :adr/topic "murakumo-gpu-market-affiliate"
+  :adr/related "adr-2607122200 (kotoba-ui paved road), adr-2607052200 (cloud-murakumo site worker), adr-2607251500 (aliexpress-sedori-observation-dataset), adr-2607151900 (api.murakumo.cloud 計測付き passthrough)"
+  :adr/last-verified "2026-07-25"
+  :adr/body "## Context
+
+2026-07-25、オーナー指示により murakumo.cloud に「市販で買える GPU / GPU 搭載 PC の購入価格・URL を収集し、最もコスパが良い商品を比較しリンクを貼る」ページを追加した。続いて同リンク群のアフィリエイト収益化（AliExpress / Temu ほか）を検討し、各プログラムの登録準備と情報収集を行った。
+
+## Decision
+
+1. **/gpu-market ページ（公開済み）**: gftdcojp/cloud-murakumo に `src/cloud_murakumo/site/market.cljc` を新設し、既存の kotoba-ui paved road（`site/chrome.cljc` + `clojure -M:site` 生成、ADR-2607122200）で `public/gpu-market.html` を生成。SPA ナビ（`ui/views.cljc`）に /gpu-market リンクを追加し shadow-cljs release を再ビルド。feature branch → GitHub API サーバ側マージで main 着地（merge SHA `0124677b`）→ `wrangler deploy` で本番公開。design-quality audit は既存 docs.html と同スコア（53.56 — 共有 chrome 由来の既知特性、ページ固有の劣化なし）。
+
+2. **データ誠実性ポリシー（このページの不変条件）**: 掲載価格は全て観測日（2026-07-25）・出典 URL・確度ラベル（confirmed = ページ取得済 / snippet = 検索スニペット / unconfirmed）付き。¥/GB は観測レンジ中央値からの目安と明記。JPY 換算は 1 USD = 155 JPY 固定と明記。相場から 30–50% 安い出品（$60 の P40 等）は詐欺として掲載除外。収集は Amazon(US/JP)・eBay・AliExpress・メルカリ/国内中古（メルカリ直接クロール不可のため price-rank.com 等アグリゲータ経由）・ドスパラ中古の 4 系統並行リサーチ。
+
+3. **コスパ結論（観測日時点）**: VRAM 単価最安は MI50 32GB 中古（~¥800/GB、高リスク）。LLM 推論の実用ベストは中古 RTX 3090 24GB（国内 ¥165k〜が eBay より割安、~¥7,400/GB）。新品保証つき現実解は RTX 5060 Ti 16GB（¥111,000、~¥6,900/GB）。市況は GDDR7/DRAM 逼迫で全面高騰・急変動中（RTX 5090 新品は国内 MSRP の約 1.75 倍）。
+
+4. **アフィリエイト方針（調査完了・登録はオーナー引き継ぎ待ち）**:
+   - 採用（費用対効果順）: (a) **Amazon アソシエイト** — 検索 URL + `?tag=xxxx-22` で成立。180日以内 3 適格販売が本審査条件。必須表記文言・独自リダイレクタ禁止。 (b) **eBay Partner Network** — 4 プログラム中唯一、検索 URL への手組みパラメータ付与（`mkevt/mkcid/mkrid/campid/toolid`）が公式サポート。W-8BEN 必須・PayPal 払い。 (c) **AliExpress Affiliate** — リンクは Open Platform API（`aliexpress.affiliate.link.generate`）でのみ生成可（手組み不可）。引き出し手数料 $15/回に注意。
+   - 見送り: **Temu** — 招待/商品リンクのみで検索 URL トラッキング不可・API なし・GPU 品揃え僅少。
+   - 任意: **メルカリアンバサダー** — Web からも登録可・検索結果ページのリンク生成対応（UI 経由のみ）・報酬はメルカリポイント 2%。
+   - 法令対応: リンク差し替え時に景表法ステマ規制（2023-10 施行）の「広告/PR」表記と Amazon 必須文言をページへ追加する。
+
+5. **安全床の適用（実測記録）**: 4 プログラムとも既存ブラウザセッションなしを実測（AliExpress 未ログイン / Amazon 再サインイン要求 / eBay CAPTCHA 付きサインイン / Temu 未ログイン）。アカウント作成・規約同意・認証情報入力・CAPTCHA 突破は agent 実行禁止（system 安全規則 + computer-use skill 絶対境界）のため、**登録確定はオーナー操作**とし、agent は入口タブ準備（Chrome 新規ウィンドウ 4 タブ）と引き継ぎ資料整備までを担当した。claude-in-chrome MCP 未接続のため AppleScript 直接スクリプティング（URL set/get のみ、キーストローク送出なし）で実施。
+
+## Consequences / Follow-ups
+
+- オーナーが Amazon タグ / EPN campid / AliExpress tracking_id を発行後、`market.cljc` のリンク生成をアフィリンク化し、PR 表記を追加して再生成・デプロイする（AliExpress の app_key/secret は kagi 保管を推奨）。
+- ページの価格は 2026-07-25 のスナップショット。市況急変動のため、更新する場合は同じ確度ラベル付き収集手順で再調査してから差し替える（数値の手先更新・捏造をしない）。
+- superproject の west pin（cloud-murakumo entry）は本作業時点で未前進（共有 checkout に別セッションの rescue WIP が載っていたため意図的にスキップ）。pin 前進は fleet 署名経路または GitHub API single-entry で別途行う。
+- Amazon アソシエイトは 180 日 3 販売の維持条件があるため、リンク実装後にトラッキング（BMC funnel 側での成果計測）を検討する。\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-25 — note
+
+セッションクローズ時点の引き継ぎ状態: /gpu-market 公開済み・アフィリエイト登録はオーナー確定待ち
+
+2026-07-25 セッション終了時点の残タスクと引き継ぎ詳細（session scratchpad の dossier は消滅するためここに永続化）。(1) オーナー操作待ち: Chrome 新規ウィンドウに 4 タブ準備済み — Amazon アソシエイト (affiliate.amazon.co.jp, 要サインイン+電話PIN認証, 銀行振込最低¥5,000, 180日3販売条件) / eBay Partner Network (要 eBay アカウント+CAPTCHA, W-8BEN 必須, PayPal 最低) / AliExpress Portals (要アカウント作成, 引出手数料/回) / Temu は見送り推奨。登録フォーム推奨値: サイトURL https://murakumo.cloud/ (+ /gpu-market), カテゴリ Computers/Electronics, 説明「分散GPUクラウドの技術サイト。GPU実勢価格の比較・調達ガイドページを運営」。(2) ID 受領後の agent 作業: market.cljc のリンク差し替え — Amazon は検索URL+?tag=xxxx-22 / eBay は mkevt=1&mkcid=1&mkrid=711-53200-19255-0&campid=<10桁>&toolid=10001 を検索URLに付与 / AliExpress は Open Platform API aliexpress.affiliate.link.generate で商品単位リンク生成 (app_key/secret は kagi 保管推奨) / メルカリはアンバサダーUI生成の検索結果リンク貼付可。同時に景表法ステマ規制の「広告/PR」表記と Amazon 必須文言「Amazonのアソシエイトとして、［運営者名］は適格販売により収入を得ています。」を追加し、clojure -M:site 再生成→wrangler deploy。(3) 未解消: cloud-murakumo west pin 前進 (共有 checkout の rescue WIP 回避のため未実施) / docs-edn-only verify の既存 11 件 FAIL は本件と無関係の既知問題。
+"}]

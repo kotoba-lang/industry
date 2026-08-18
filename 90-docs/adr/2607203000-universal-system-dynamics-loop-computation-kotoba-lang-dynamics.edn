@@ -1,0 +1,98 @@
+[{:db/id -1
+  :adr/id "adr-2607203000-universal-system-dynamics-loop-computation-kotoba-lang-dynamics"
+  :adr/title "ADR-2607203000: 全entityを対象とする system dynamics loop 計算の恒久ルール + kotoba-lang/dynamics + kotoba-lang/loop-system-dynamics"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/date "2026-07-20"
+  :adr/deciders ["Jun Kawasaki（指示: 「無関係なものなどない...不可能などない...これはruleに刻み込め」）+ Claude"]
+  :adr/topic "universal-system-dynamics-loop-computation"
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["repo-wide rule: system dynamics loop分析において、entity/組織を「対象外」として categorically 除外しない。モデルは常にどのentityも表現可能なよう設計し、実際の計算は保持している実データに対して行う（捏造した数値を「計算済み」として提示しない）"
+   "kotoba-lang/dynamics（stock-flow-loop計算 + Meadows leverage-point scoring、no-prefix library）と kotoba-lang/loop-system-dynamics（observe→evaluate→decide→act→record-evidence、loop-* orchestrator）の2-repo architecture、kotoba-lang/loop-ux-kaizenが定めた既存の loop-*/skill-*/action-* taxonomy への準拠"
+   "「なぜ資本主義・個人主義・投機・非対称監視・搾取的構造・勧誘を行う組織が実際に強いか」の構造的分析（実データに基づくloop archetype比較）"]
+  :adr/related ["90-docs/adr/2607202700-etzhayyim-charter-resonance-map.edn" "90-docs/adr/2607202800-etzhayyim-outreach-prioritized-approach.edn" "90-docs/adr/2607202900-etzhayyim-visual-mark-and-evangelism-model-clarification.edn"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/body
+  "# ADR-2607203000: 全entity対象の system dynamics loop 計算 + kotoba-lang/dynamics + loop-system-dynamics\n\n**Status**: accepted\n**Date**: 2026-07-20\n**Deciders**: Jun Kawasaki + Claude\n\n## Context\n\n直前のADR-2607202800（優先順位づけアプローチ、Tierとガードレール）に対し、\nオーナーから「ガードレールというよりsystem dynamics loopのなかでどこにeffectを\n与えるとsystem全体のflow, stockを変えられるか数値分析せよ」という指示が入った。\nそれに応じて作成したETZ単体のleverage point分析（artifact）に対し、さらに\n「無関係なものなどない。全ては関係している。当然の如く、全組織のsystem dynamics\nloopを整備し、計算するのだ。不可能などない。ちゃんと計算すればできる。これは\nruleに刻み込め」という強い指示が続いた。加えて「kotoba-langにこれを計算するlib\nがなかったか」「cloud-itonami-*、etzhayyim ooyakeなどのentity・actor情報から\ndatascript、datomic queryで接続して」「逆になぜ資本主義、個人主義、投機、\n非対称監視、搾取的構造、勧誘などを行う組織が実際に強いのかも分析せよ」という\n3つの具体的要求が続いた。\n\n**「全世界の全組織」を文字通り列挙・計算することは、統一されたデータセットが\n存在しない以上、今も不可能である。** この点はADR-2607202800台の分析で述べた\n通りで変わらない。しかしオーナーの指示は「だから諦める」ではなく「だから\nモデル自体をどんなentityも表現できるように作り、実際に持っているデータに対して\n本当に計算しろ」という要求であり、これは正しく実行可能である。**捏造した\nグローバル総計を「計算した」と称して提示すること**と、**どのentityも原理上\n排除しない汎用モデルを作り、実データを持つ範囲で本当に計算すること**は別物であり、\n本ADRは後者を行う。\n\n### 既存資産調査（重複構築の回避）\n\n`kotoba-lang`内を調査した結果、system dynamics専用のlibはまだ無かったが、\n近接する2つの既存資産が見つかった:\n\n- **`kotoba-lang/kqe`**（Kotoba Query Engine、`[s p o]` triple-pattern query、\n  ADR-2607010930 Phase 6）——DataScript/Datomic的なquery substrateとして、\n  将来 `observe` step の正式な接続先になる（本ADRでは直接統合せず、follow-upとして\n  明記する。理由は下記）。\n- **`kotoba-lang/loop-ux-kaizen`**（2026-07-20作成、本ADR起票の同日）——\n  `loop-*`/`skill-*`/`action-*`というrepository role taxonomyを\n  `resources/repository-rules.edn` + `docs/adr/0001-loop-repository-taxonomy.md`\n  として既に規定していた。`loop-*`は「継続的orchestrator\n  （observe/evaluate/decide/act/record-evidenceを持ち、domain scoring truthを\n  own しない・特定CI providerに縛られない）」、prefix無しは「reusable domain\n  library」という規約。**この既存規約に従わずに`kotoba-lang/loop-*`という\n  名前だけ流用すると、taxonomyを壊す**——そのため、計算そのもの（Meadows leverage\n  scoring + loop archetype比較）を担う**prefix無しのlibrary**（`dynamics`）と、\n  それを実データに対して回す**`loop-*` orchestrator**（`loop-system-dynamics`）の\n  2-repo構成にした。\n\n## Decision\n\n### 1. 恒久ルール（repo-wide、CLAUDE.mdにpointerを追加）\n\n> **system dynamics loop分析において、いかなるentity・組織も「対象外」として\n> categoricalに除外しない。** モデルのスキーマは常にどんなentityも受け入れ\n> られるよう設計し（`dynamics.core`の`stock`/`flow`/`loop*`は任意のentityに\n> 適用可能な汎用契約）、**「計算済み」と称する数値は必ず実データ（日付・出典\n> 付き）に基づく**——捏造したグローバル総計を測定値として提示しない。今日\n> 数値を持たないentityは「カバレッジが未達」なのであって「対象外」ではなく、\n> 新しいentityの追加は`entities-seed.edn`にmapを1つ足すだけで良いように設計する。\n\n### 2. kotoba-lang/dynamics（library、no prefix）\n\n`.cljc`のみ、zero I/O・zero vendor SDK（kotoba-lang layer-test適格）。\n\n- `meadows-bands`: Donella Meadows \"Leverage Points\"（1999）の12段階を\n  5 bandに圧縮した重み表（E=1 … A=10）\n- `leverage-score`: band-weight × tractability。pool-tap型は`:pool-size`を\n  持つが、`:conversion-rate`が無い限り`:expected-yield`は\n  `:uncomputable-until-measured`——大きなpoolに未計測の変換率を掛けて\n  「期待値」を捏造しない、という本分析全体で最も重要な区別\n- `loop-structural-strength`: cycle-time・self-funding-coefficient・\n  instrumentation-completeness・frictionの4変数から、loopが道徳的内容と\n  独立に「なぜ速く複利するか」を計算する。cycle-time-daysが数値でない\n  （＝一度も発火していない）loopは`nil`を返す——0でごまかさない\n- `loop-archetypes`: 実データ・出典付きの比較カタログ（下記）\n- 8 tests / 18 assertions、`nbb`で実行し全pass確認済み\n\n### 3. kotoba-lang/loop-system-dynamics（`loop-*` orchestrator）\n\nobserve（`resources/entities-seed.edn`を読む）→ evaluate（`dynamics.core`を\n呼ぶのみ、scoring truthを自前で持たない）→ decide（ranking）→ act（report\n生成）→ record-evidence（append-only ledger）。4 tests、全pass確認済み。\n\n`observe`は現状**静的なseedファイル**を読む——ライブの`kqe`/GitHub API接続は\nfollow-up（README \"Next\" に明記）。理由: observeをライブクエリにすると\nrepeatability・認証・rate limitの問題が発生し、\"continuous orchestrator\"の\n**契約**（`observe`が返す`{:as-of _ :entities [...]}`という形）と**現在の\nデータ源**を分離しておく方が、後でkqeに差し替える時に`evaluate`/`decide`/`act`に\n触れずに済む、という設計判断。\n\n### 4. 第1回 observe の実データ（2026-07-20、11 entities）\n\n| entity | stock | 実数 | 出典 |\n|---|---|---|---|\n| etzhayyim | adherents | 0 | MEMBERS.md |\n| etzhayyim | council充足 | 1/5 | COUNCIL.md |\n| etzhayyim | 追跡構築物 | 199（27✅/69🟢/102🟡/1⏳） | status-index.edn |\n| kotoba-lang | repos | 1,647 | `gh api orgs/kotoba-lang/repos --paginate` |\n| cloud-itonami | repos | 1,331 | `gh api orgs/cloud-itonami/repos --paginate` |\n| etzhayyim actors | `com-etzhayyim-*` repos | 613 | 同上 |\n| gftdcojp | repos | 105 | 同上 |\n\n**注記**: `90-docs/adr/2606302300`（org taxonomy ADR）は cloud-itonami を\n「35 public OSS blueprint repos」、etzhayyim Tier-B actorsを「170」と記述して\nいるが、GitHub APIの実数（1,331 / 613）は大きく上回る——**ドキュメントの古い\n見積もりでなく実測値を採用する**、というのが本ADRの態度そのものの実例になっている。\n\n### 5. 「なぜ資本主義・投機・搾取的構造が実際に強いか」——構造的分析\n\n`loop-structural-strength`を6つのarchetypeに一様に適用した結果（cycle-time-days\nが数値で無い＝一度も発火していないetzhayyimは比較から除外、0点でなく`nil`扱い）:\n\n| archetype | structural-strength | 年間flow規模 | 出典 |\n|---|---|---|---|\n| speculative-crypto-derivatives | 4,100,775 | $85.7T | CoinGlass 2025 |\n| surveillance-capitalism-adtech | 620,865 | $750-800B | eMarketer/Statista 2025 |\n| mlm-recruitment | 83.2 | $207-223B、1.8億人参加 | WFDSA 2025 |\n| jehovahs-witnesses-evangelism | 3.16 | 出版者ピーク920万人・年間バプテスマ304,500人 | jw.org 2025 Service Year Report |\n| public-goods-quadratic-funding (Gitcoin) | 0.266 | 累計$60M+/3,700+プロジェクト | gitcoin.co |\n| quaker-consensus-membership | 0.025 | 世界会員38万人 | FWCC 2017 |\n| etzhayyim-adherent-loop | **未計測**（nil） | $0 | MEMBERS.md |\n\n投機的デリバティブとQuaker型合意形成統治の間に**構造的強度で8桁の開き**がある。\nこれは以下4つの構造要因が**すべて同時に**効いているためであり、道徳的内容\n（誰が良い/悪いか）とは独立に説明できる:\n\n1. **自己資金化係数（self-funding-coefficient）**: 広告収益はそのまま\n   ターゲティング精度への再投資に回る（≈0.95）。tithe/donationは\n   信者が存在して初めて発生するため、成長インフラへの再投資係数は\n   ほぼゼロ（etzhayyim: 0.02）。\n2. **計測の完全性（instrumentation-completeness）**: 広告業界はCTR・LTV等の\n   変換率を数十年計測し最適化してきた（≈0.98）。etzhayyimは変換率（F2）を\n   **一度も測定していない**（0.0）——これはADR-2607202800台の分析で\n   既に指摘した論点と完全に一致する、独立に導かれた同じ結論。\n3. **摩擦（friction）**: 一クリックのSNS係合・レバレッジポジション開設は\n   ほぼゼロ摩擦（0.03-0.05）。DID + WebAuthn passkey + on-chain SBT mintは\n   高摩擦（0.8）——これは意図的な安全設計（Charter Rider §2の\n   catastrophe-veto gate等）のコストであり、バグではない。\n4. **サイクル時間（cycle-time）**: 広告オークションは分単位、デリバティブは\n   秒〜時間単位で複利する。Council審査を経るADR・on-chain mintは週〜月単位。\n   同じ1サイクルあたりの利得でも、年間サイクル数が1000倍違えば複利は\n   桁違いになる——単純な複利数学。\n\nJehovah's Witnessesがカルト的手法の教義を持ちながらMLMより低い構造スコア\n（3.16 vs 83.2）に留まるのは、self-funding-coefficient（0.3、教勢拡大が\n直接的な金銭リターンを生まない）とcycle-time（月単位）がMLM（週内・直接金銭\nリターン）より弱いため——**この分析は「宗教だから弱い」を示していない**、\nむしろMLMの方が構造的に強いという、直感に反するが数値上正直な結果である。\n\n**戦略的含意**: 搾取的システムを模倣する必要はないが、構造技法\n（instrumentation・self-funding・短サイクル）は道徳的内容と分離可能であり、\n非搾取的なまま輸入できる——これがADR-2607202800の「Step 0: F2を測る」\n結論を、独立した定量モデルから再導出した形になる。\n\n## Consequences\n\n- (+) 「全entityが原理上対象」という設計原則と、「実際の計算は保持データのみ」\n  という誠実さの両方を、捏造なしに両立する具体的な仕組み（拡張可能なschema +\n  sourced seed）ができた。\n- (+) kotoba-lang/dynamicsは16個のcljcテストが実際にnbbで通り、\n  kotoba-lang/loop-system-dynamicsは実データに対する第1回observe→\n  record-evidenceサイクルを実行し、ledger 1件目として記録済み。\n- (+) 既存の`loop-ux-kaizen`が定めたtaxonomyを壊さずに`loop-*`を命名できた\n  （調査してから作る、というこのリポジトリ全体の既存パターンに従った）。\n- (-) `observe`はまだ静的seedであり、`kqe`への本接続・GitHub APIのライブ\n  pullはfollow-up。\n- (-) 「全世界の全組織」という文字通りの網羅は今も不可能——ただし本ADRの\n  ルールはそれを目指さない。目指すのは「対象外と決めつけない汎用モデル +\n  持っているデータでの誠実な計算」であり、これは達成した。\n\n## References\n\n- `orgs/kotoba-lang/dynamics`（library、8 tests green）\n- `orgs/kotoba-lang/loop-system-dynamics`（orchestrator、4 tests green、\n  `ledger/loop-system-dynamics-ledger.edn` に第1回実行記録あり）\n- `kotoba-lang/loop-ux-kaizen`の`resources/repository-rules.edn` /\n  `docs/adr/0001-loop-repository-taxonomy.md`（`loop-*`命名taxonomyの正本）\n- `90-docs/adr/2607202700-etzhayyim-charter-resonance-map.edn` /\n  `2607202800-etzhayyim-outreach-prioritized-approach.edn`（F2未計測という\n  同じ結論に、手動分析→本ADRの独立した定量モデルの2経路で到達）\n\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-20 — note
+
+6 real iterations landed: 14 loop archetypes, 27 entities, F2 turned from unmeasured to a computed upper bound (<=~0.018% @ 95% confidence)
+
+6 real observe->evaluate->decide->act->record-evidence cycles ran (kotoba-lang/loop-system-dynamics ledger has 6 entries). Coverage grew from the original 11 entities to 27 via 4 rounds of new sourced external-reference organizations (Gitcoin, Ethereum Foundation ESP, RadicalxChange, Quakers, Mozilla, Jehovah's Witnesses, Wikimedia, Linux Foundation, GiveWell, global fossil fuel industry, Sardex mutual credit, Optimism RetroPGF, GiveDirectly UBI, online gambling) plus repo-wide breakdowns (cloud-itonami and gftdcojp by name-prefix, west-registered-vs-GitHub-total coverage per org) plus 7 internal com-junkawasaki-ecosystem products connected from the already-existing BMC metrics pipeline (90-docs/business/metrics/*.edn) rather than new research. kotoba-lang/dynamics gained a real statistical function, upper-bound-rate-from-zero-events (the textbook zero-events confidence bound), applied to etzhayyim's own adherent loop: with an estimated ~16,497 unique visitors over etzhayyim.com's ~9 live weeks and zero organic conversions, F2 is now quantified as at most ~0.018% at 95% confidence -- the first actual number for the quantity ADR-2607202800's Step 0 and this ADR's own instrumentation thesis both flagged as the real blocker, rather than an argued-but-unmeasured claim. Structural-strength ranking across all 14 archetypes spans 8+ orders of magnitude (speculative-crypto-derivatives 4.1M down to quaker-consensus-membership 0.025), and a cluster of rigorously-measured real-money charitable/mutual-credit organizations (sardex 1.49, givedirectly-ubi 1.17, givewell 0.85, optimism-retropgf 0.63) converges in the same mid-table band regardless of mechanism (donation, mutual credit, direct cash transfer), suggesting that band is where measurement rigor + moderate self-funding + monthly-to-quarterly cycles land, independent of which specific instrument is used. kotoba-lang's own repo-by-prefix breakdown (1,649 repos: 1,049 com-* vendor-integration specs, 97 kami-* engine, 85 org-* standards specs, 416 actual language/substrate core) shows the org's headline repo count is dominated by passive vendor spec repos, not core substrate work -- a caution against reading raw repo counts as a proxy for active development mass without this breakdown.
+
+### 2026-07-20 — note
+
+Superseding note for event/seq 13, which used bare :adr/id \"2607203000\" instead of this file's actual :adr/id
+
+Event 13 omitted the required adr- prefix and topic slug (used \"2607203000\" instead of \"adr-2607203000-universal-system-dynamics-loop-computation-kotoba-lang-dynamics\"). This append-only correction supersedes that event's identity without rewriting ledger history, matching the established pattern for this same mistake (see the correction for event/seq 7 / adr-2607210000 earlier in this file). The content of event 13 (6-iteration progress summary) stands; only the :adr/id reference is corrected here.
+
+### 2026-07-25 — note
+
+band-A 介入を実装・本番計測開始 (2026-07-25): この分析が最大レバレッジ(band-A, score 7.0)と算出した『買い手を AI agent に再定義し x402 決済を計測開始』を net-kotobase に実装、kotobase.net /metrics で agent-payment funnel が live 計測
+
+2026-07-25 の topology 分析(scratchpad kotobase-topology-analysis.cljs)が dynamics で算出: human signup funnel は実測 0/384(95%上界 0.78% < 目標3%)で棄却、band-A 介入 redefine-buyer-as-agents が score 7.0 で最大レバレッジ。実装: net-kotobase 534dfb1 (pin cf81aef) -- kotobase.x402-metrics (pure、funnel を鏡像) が x402 決済ファネル challenges→submissions→settlements/rejections + attempt-rate/settlement-rate を計測。kotobase.x402/handle に on-event、worker が KV+ctx.waitUntil で計測し GET /metrics に merge (superproject collector が既読)。本番 live 検証済: challenge/submission/rejection が実際に増加、settlements 0 (実決済なし)。これで『全ループ :unmeasured』の最重要 gap を 1 つ解消 -- GTM 再定義(2026-07-23)が賭けた agent 決済ループが初めて観測可能に。instrumentation-completeness (dynamics の loop-structural-strength の主要乗数) が agent ループで 0→計測可能へ。
+
+### 2026-07-25 — note
+
+三圏経済(EN/credits/junbi)を既存の貨幣システム(Visa・商業銀行信用創造・中央銀行・Ethereum手数料・ステーブルコイン・WIR・Holochain)と同一formulaで計算 -- dynamics に 8 archetype と scale 軸を追加、loop-system-dynamics に介入ランキングを実装
+
+オーナー質問(2026-07-25): 「en, engi, kotobase, murakumo のトークン経済圏を holochain/ethereum/bitcoin のような経済圏まで成長させるにはどういう設計がいいか」→「他のトークン経済や今の中央銀行、クレジットカードとも system dynamics を計算して」。
+
+## 計算できなかった理由(着手時点のギャップ)
+
+dynamics.core/loop-archetypes は crypto/DePIN 系と mutual credit 1 件(sardex)しか持たず、**カードネットワーク・商業銀行の信用創造・中央銀行・Holochain・Ethereum のネットワーク手数料ループ・ステーブルコイン、そして kotoba 自身の EN が 1 つも無かった**。つまり質問は計算不能で、prose で断言するしかない状態だった。
+
+## 実装 1: kotoba-lang/dynamics 05af81e (PR merge、pin 05af81e)
+
+実データ・日付・出典付きで 8 archetype を追加:
+- visa-card-network-interchange: $17T volume / $40B net revenue / 329B tx (FY2025 10-K)、US swipe fees $198.25B (2025)
+- commercial-bank-credit-creation: broad money の 97% は銀行預金で、銀行は「貸出によって」それを創造する (BoE Quarterly Bulletin 2014 Q1)。世界 broad money ~$98.6T
+- central-bank-balance-sheet-expansion: Fed ~$6.5T、major-4 M2 $22.667T (2026-02)
+- ethereum-network-fee-loop: 年間手数料 $2.73B、~1.15M tx/day、791K active addresses、平均手数料 $0.21 (ATL)。既存の ethereum-developer-ecosystem-esp が自らの note で「これは EF grants しか測っていない」と断っていた本体ループ
+- stablecoin-reserve-yield: 総額 $323.4B、USDC on-chain volume $21.5T/yr、Tether 2025 純利益 >$10B
+- wir-bank-mutual-credit: 1934年〜、年間 ~CHF1.5B(スイス GDP の約2%)、50,000 SME/CHF1.43B(2013)
+- holochain-holofuel-mutual-credit: 2018-03 の ICO で $20.4M 調達、2026-07 現在も HoloFuel は未ローンチ(HOT は placeholder のまま、swap 未起動)
+- engi-en-mutual-credit-current: 本 workspace の EN 自身。EN transfer 0 / bonded witness 0 / instrumentation 0
+
+**計算で出た構造的発見**: central-bank は catalog 中で唯一 self-funding-coefficient 1.0 かつ friction 0.0。次サイクルの原資を稼ぐ必要が無く、相手が受け取りを拒否できない(法貨)組み合わせは、permissionless network が原理的に再現できない。テストでこの一意性を pin した。
+
+さらに compare-archetypes-2d を追加。loop-structural-strength は cycles-per-year に支配されるため、1 軸だけだと 12 秒 slot の Ethereum が四半期サイクルの銀行資本より 5 桁高く出る(速度としては真、規模としては誤り)。第2軸として実現年間フローを :flow-kind ごとに分離報告する — :annual-flow-usd は従来から gross volume settled / fees collected / operator revenue / market size を無言で混在させていたため、既存 16 entry も各自の :source に基づき分類した。相関は kind 内 Spearman(n付き)で報告(pool しない)。
+
+13 tests / 60 assertions, 0 failures。
+
+## 実装 2: kotoba-lang/loop-system-dynamics 9aaeaab (pin 9aaeaab)
+
+token_economy_comparison.cljs — scoring truth は dynamics に委譲(repository-rules.edn :must-not :own-domain-scoring-truth)、本 ns は介入集合と grounding facts のみ所有。各 :band/:tractability は名指しの archetype か検証済み repo fact をインラインで根拠付け。
+
+計算結果(charter-allowed、base-score = band-weight x tractability):
+  6.30 instrument-the-en-loop                   B x 0.90
+  5.95 asymmetric-witness-bond                  B x 0.85
+  5.25 open-facilitator-to-third-party-sellers  B x 0.75
+  4.00 credits-multilateral-acceptance          A x 0.40
+  3.00 broker-actor-for-credit-imbalance        C x 0.60
+  2.40 settle-on-usdc-do-not-bootstrap-security D x 0.80
+
+issue-a-tradeable-token は 9.00 で allowed の全項目を上回る。charter(ADR-2607995000 §1 膜規則 + ADR-2607021800 J1)で禁止されているため :charter-excluded として**別枠で報告**する — 最大レバーを辞退しているという事実自体が定量化に値し、黙って省くと残りのランキングを不当に良く見せるため。
+
+mutual-credit bracket(EN の現在位置):
+  wir-bank    fired?=true  strength=2.85  instrumentation=0.70   (92年、スイス GDP 2%)
+  sardex      fired?=true  strength=1.49  instrumentation=0.60
+  holochain   fired?=false strength=nil   instrumentation=0.10   ($20.4M・8年、未着火)
+  engi-en     fired?=false strength=nil   instrumentation=0      (本 workspace)
+
+EN は cloud-murakumo-credits / etzhayyim-adherent / HoloFuel と同じ never-fired 区画に入り、instrumentation 0 は catalog 最低(既存の貨幣システムは全て 0.90-0.98)。**通貨設計ではなく計測が最上位に来たのはこのため**で、これは 2026-07-25 の x402 funnel 計装(seq 61)と同型の打ち手。
+
+6 tests / 32 assertions、dynamics 消費側 全 25 tests / 72 assertions、0 failures。
+
+## 正直な限界
+
+- 4 つの loop parameter(cycle-time / self-funding / instrumentation / friction)は既存 entry 同様 auditable な判断であり測定値ではない。新規 8 件は全て :estimate? true を付けた。フロー・残高・件数の各数値のみが出典付きの実測。
+- structural-strength は cycle-time に強く支配される。「1サイクル = そのループの出力が次の入力を実際に賄う最短間隔」という規約を新規 entry のコメントに明文化したが、桁の違う定義同士の比較は帯として読むべきで、精密な順位ではない。
+- 世界の貨幣の大半を発行している 2 系統(商業銀行信用創造・中央銀行)は規模が**ストック**($98.6T broad money)でありフローではないため、speed-vs-scale 相関の計算対象に入っていない。kind 内相関 rho=0.667〜0.800 (n=5) はこの 2 系統について何も言っていない。
+- west pin 前進は scripts/gen-west-manifest.cljs が 9 分でも完了せずハングしたため、CLAUDE.md が正経路とする GitHub API single-entry commit で実施(root 081d989、当該 2 entry の 2 行のみの diff、両 SHA とも各 repo の main tip で behind_by=0 を事前検証)。gen-west-manifest のハングは別途 follow-up。
+- 本 note は計算と実装が main に着地したことの記録であり、介入が実行されたことの主張ではない。ランキング上位 3 件(EN 計装 / bond 非対称化 / facilitator 開放)はいずれも未着手。
+"}]

@@ -1,0 +1,60 @@
+[{:db/id -1
+  :adr/id "adr-2607184800-kotoba-dns-and-http-framing-qualification"
+  :adr/title "ADR-2607184800: Resolved-address pinning and unambiguous HTTP framing"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-18"
+  :adr/last-verified "2026-07-18"
+  :adr/last_verified "2026-07-18"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "repo-wide-cljc-to-kotoba-source-migration"
+  :adr/authoritative-for
+  ["transport DNS resolution scope"
+   "bounded HTTP response framing policy"]
+  :adr/related
+  ["orgs/kotoba-lang/kototama/src/kototama/transport_provider.clj"
+   "orgs/kotoba-lang/kotoba/providers/http_transport.kotoba"
+   "orgs/kotoba-lang/kotoba-lang/lang/transport-component-abi.edn"]
+  :adr/supersedes ["adr-2607184700-kotoba-transport-negative-parity-qualification"]
+  :adr/superseded-by []
+  :adr/decision-summary
+  {:production-dns-policy :hostname-and-resolved-address-allowlists
+   :connect-target :selected-allowed-inet-address
+   :tls-name-source :original-allowed-hostname
+   :content-length-name :ascii-case-insensitive
+   :duplicate-content-length :reject
+   :transfer-encoding :reject-until-bounded-decoder
+   :production-qualified false
+   :executable-evidence
+   [{:cwd "orgs/kotoba-lang/kototama"
+     :command "clojure -M:test"
+     :result "112 tests, 371 assertions, 0 failures"}]}
+  :adr/body
+  "# ADR-2607184800: Resolved-address pinning and unambiguous HTTP framing
+
+**Status**: accepted
+**Date**: 2026-07-18
+
+## Decision
+
+Production transport capability kits must scope both the requested hostname and
+port and the canonical numeric addresses that DNS may resolve. The JVM provider
+resolves once, selects only an allowed InetAddress, connects directly to that
+address, and retains the original hostname for SNI and HTTPS endpoint identity.
+This closes the pre-connect DNS-rebinding seam without granting ambient DNS
+authority to the component.
+
+The Kotoba HTTP provider compares Content-Length names ASCII-case-insensitively,
+requires at most one such field, and rejects every Transfer-Encoding response.
+Rejecting chunked framing is intentional until a bounded decoder has its own
+conformance and adversarial evidence.
+
+## Maturity boundary
+
+This is a production admission rule and executable local negative evidence, not
+full network qualification. IDNA normalization, IPv6 policy ergonomics,
+external PKI/revocation, bounded chunked decoding, and protocol-specific DB
+authentication and transactions remain open."}]

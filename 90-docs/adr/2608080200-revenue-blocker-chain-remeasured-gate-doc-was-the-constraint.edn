@@ -1,0 +1,133 @@
+[{:db/id -1
+  :adr/id "adr-2608080200-revenue-blocker-chain-remeasured-gate-doc-was-the-constraint"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/topic "revenue-blocker-chain-remeasured"
+  :adr/title "ADR-2608080200: 収益ループの blocker chain を実測し直したら 6 red のうち 4 は 15 日前に閉じていた — 停まっていたのは商流ではなく gate 文書のほうだった"
+  :adr/status "accepted"
+  :adr/date "2026-08-08"
+  :adr/last_verified "2026-08-08"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/repos ["com-junkawasaki/root" "gftdcojp/cloud-itonami"]
+
+  :adr/authoritative_for
+  ["cloud-itonami の commercial gate は 2026-08-08 時点で red 1（日本の法人・税務 counsel advice）+ yellow 3 であり、2026-07-24 版の red 6 ではない"
+   "COMMERCIAL-GO-NO-GO.md の product decision は cloud-itonami について no-go ではなく conditional である"
+   "最小経路の推奨は net-kotobase ではなく cloud-itonami である"
+   "非 owner 決済の代行は禁止である — owner の payment method で checkout を通すことは T1 exit を満たさず、満たしたように見える数値を作る行為である"
+   "itonami.cloud は未知パスに 200 で cockpit を返すため、HTTP status だけでページの実在を判定してはならない"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+
+  :adr/related
+  ["adr-2608062400-money-loop-blocked-on-a-measured-price-and-an-observed-cac"
+   "adr-2607246100-revenue-agent-loop-capital-allocation-governor"
+   "adr-2607242600-cloud-itonami-awai-gftd-payment-collection"
+   "adr-2607252200"
+   "90-docs/business/revenue-agent-loop/COMMERCIAL-GO-NO-GO.md"
+   "90-docs/business/revenue-agent-loop/runs/0021-cloud-itonami-commercial-gate-remeasure.edn"]
+
+  :adr/context
+  "オーナー指示（2026-08-08）『blocker を解消』に対する調査。出発点は ADR-2608062400 で、そこでは収益 → 再投資 → 獲得の R ループの XMILE 化が『測定された価格と観測された CAC が無いので blocked』とされている。その release 条件は ADR-2607246100 の T1 exit（非 owner による検証済み実決済 1 件）である。
+
+そこで『では T1 exit は何に阻まれているか』を辿ると、`COMMERCIAL-GO-NO-GO.md`（as-of 2026-07-24）が cloud-itonami を **no-go** と判定し、6 つの gate を red としていた。SCORECARD の全 action もこの red を根拠に blocked になっていた。
+
+**この表を再読せず、全 gate を live に対して実測し直した。結果、6 red のうち 4 は既に閉じていた。**
+
+閉じていたのに表に反映されていなかったもの:
+
+| gate | 表(07-24) | 実測(08-08) | 実際に閉じたもの |
+|---|---|---|---|
+| Terms / Privacy | red (DRAFT) | green | run 0018 の owner 承認 + run 0019 の生成。`/legal/terms/` 200 / 15,322 B、`/legal/privacy/` 200 / 16,902 B、いずれも effective 2026-07-24、DRAFT 表記なし |
+| DPA / subprocessors | red | green | `/legal/dpa/` 200 / 10,047 B。Terms §7.1 が incorporation by reference、Privacy §5 が subprocessor を実名列挙 |
+| Merchant / collection | red (収納代行 unsigned draft) | green | ADR-2607242600 accepted（2026-07-24）。Terms §6.3 が Gftd Japan を開示された限定 collection agent、AWAI を supplier として公開明記 |
+| 契約主体 | yellow | green | Terms §15: AWAI Network, L.L.C.（Delaware file 10704996）、contact hello@gftd.co.jp |
+
+つまり **red の 3 分の 2 は、それを red と書いた文書と同じ日か翌日に閉じており、15 日間そのまま放置されていた。** 停まっていたのは商流ではなく gate 文書のほうである。
+
+### 技術レールは 100% 完成している
+
+`GET /api/billing/status`（2026-08-08 実測）は `mode:live` / `stripeConfigured:true` / `webhookReady:true` / `readyForLiveCheckout:true` / `readyForEntitlement:true` / `missing:[]` を返す。欠けている構成要素はゼロである。itonami.cloud 自身が `bottleneck: run Stripe checkout via /isco-1212/` と申告している。
+
+### それでも残っているもの
+
+- **red 1 件**: 日本の法人・税務。Terms §6.4 は税抜 + reverse-charge の**立場**を公開しているが `Customer is responsible for confirming its own filing position` と自認しており、ADR-2607242600 §7 が『foreign-company registration と counsel review は別 gate』と明示している。**written advice は存在しない。**
+- **yellow 3 件**: ①返金・解約条項が Terms に一切無い（全文に refund / cancel が出現しない）②Terms §6.1 が参照する in-product pricing page が公開されていない ③support の accountable owner 未指名。
+- **Stripe test-mode E2E**: `sk_test_…` が金庫に存在しない（run 0016 で確認済み、live key の流用は同 run が禁止）。owner が Stripe dashboard で発行すれば、その後の証跡取得は機械的作業として agent が完遂できる。
+- **需要**: 非 owner 決済 1 件。`externalTotal:5 / externalPaid:0 / activeSubscriptions:0`。
+
+### 実測中に踏みかけた罠を 1 つ記録する
+
+`GET /pricing` は **200 を返す**。しかし body は 35,552 B で、`/legal/company/` と `/legal/refund/` の応答と**バイト数まで同一**である — cockpit の catch-all fallback であって pricing ページではない。itonami.cloud は未知パスに 404 を返さない。status code だけを見ていたら『価格ページは公開済み』と誤って gate を green にしていた。既知の不在パスとバイト数を突き合わせて初めて判別できる。"
+
+  :adr/decision
+  "### 1. COMMERCIAL-GO-NO-GO.md を実測値へ書き換える
+
+現在値のみを表す（ADR-2607257000）。cloud-itonami の product decision を **no-go → conditional** に変える。各行に『何を実測したか』を URL・バイト数・JSON フィールド名で書き、再測定を可能にする。
+
+### 2. 最小経路の推奨を net-kotobase から cloud-itonami へ移す
+
+前版が net-kotobase を選んだ理由は『AWAI の法人間・外国会社論点を持たないため』だった。その論点のうち**収納代行の側は cloud-itonami で既に閉じており**、terms/privacy/DPA も cloud-itonami だけが承認・公開済みである。net-kotobase は 2026-07-24 以降**一度も再実測されていない**ので、比較の前提そのものが古い。
+
+### 3. 残りの owner action を 6 件から 4 件に確定する
+
+①counsel written advice（唯一の red）②`sk_test_…` 発行 ③返金・解約条件 + 公開 pricing ページ ④support accountable owner の指名。**このうち agent が完遂できるものは 1 つも無い。**②の後続（test-mode E2E 証跡）だけが機械的作業として agent に降りてくる。
+
+### 4. 非 owner 決済の代行を明示的に禁止する
+
+owner の payment method で checkout を通せば `externalPaid` は 1 になる。しかしそれは **owner 決済**であって、T1 exit が要求する**非 owner 決済**ではない。release 条件を満たさないまま満たしたように見える数値を作る行為であり、ADR-2608062400 が防いでいる捏造そのものである。安全床②（資金の売買・送金・trade をしない）と①（認証情報を自分でフォーム入力しない）にも当たる。
+
+### 5. 有償勧誘は counsel gate が閉じるまで held のままにする
+
+standing authorization（CLAUDE.md）は actor のアウトバウンド連絡の実行を agent 判断で許しているが、**登記・税務が未確定な状態での有償勧誘は agent の権限問題ではなく実在の法的制約**である。SCORECARD 最上位の action（75 点、既存 5 tenant への paid pilot 打診）はこの 1 点のみを理由に blocked を維持する。"
+
+  :adr/consequences
+  "- **『blocked』の内訳が 6 分の 1 まで縮んだ。** 残る hard blocker は counsel written advice 1 件であり、他は yellow か需要である。以前は 6 red が並んでいたので、どこから手を付けるかが読み取れなかった。
+- **gate 文書の陳腐化それ自体が blocker になりうると分かった。** SCORECARD は存在しない red を根拠に全 action を blocked にしていた。実装も商流も進んでいたのに、ランキングだけが 15 日前の世界を見ていた。**gate を再読するのではなく再実測する**のが、この種の停滞に対する唯一の対処である。
+- **agent の作業では T1 exit に到達できないことが確定した。** 残り 4 件は全て署名・決定・credential 発行・買い手であり、追加の実装では 1 mm も動かない。ADR-2608062400 の『解けるのは非オーナーが金を払ったときだけ』は、commercial gate を挟んでもなお正しい。
+- **XMILE の R ループは依然 blocked のままである。** 本 ADR は release までの距離を測り直しただけで、価格も CAC も観測していない。ADR-2608062400 の blocked-items は 1 件も解けていない。
+- **200 を実在の証拠にしない、という運用規則が 1 つ増えた。** SPA fallback を持つホストでは、status code は存在を意味しない。"
+
+  :adr/verification
+  "全て 2026-08-08 の live read。再実行可能。
+
+```
+GET https://itonami.cloud/api/fleet/metrics
+  → externalTotal 5 / externalPaid 0 / agentRuns7d 306 / selfRegisteredOwners 5
+    stripe.activeSubscriptions 0 / asOf 2026-08-08T09:05:35.293Z
+    bottleneck: run Stripe checkout via /isco-1212/
+GET https://itonami.cloud/api/billing/status
+  → mode live / stripeConfigured true / webhookReady true
+    readyForLiveCheckout true / readyForEntitlement true / missing []
+GET https://itonami.cloud/legal/terms/    → 200, 15,322 B, effective 2026-07-24
+GET https://itonami.cloud/legal/privacy/  → 200, 16,902 B
+GET https://itonami.cloud/legal/dpa/      → 200, 10,047 B
+GET https://itonami.cloud/pricing         → 200, 35,552 B（fallback。実ページ非在）
+GET https://itonami.cloud/legal/company/  → 200, 35,552 B（同一バイト数 = 同じ fallback）
+```
+
+Terms 本文から直接確認した条項: §6.1（JPY・月次後払い・Order Form または in-product pricing page）/ §6.3（Gftd Japan = 開示された collection agent、AWAI = supplier、ADR-2607242600 を参照、counterpart は git 外）/ §6.4（税抜 + reverse charge notice）/ §7.1（DPA incorporation by reference）/ §15（operator record）。Privacy §5 に subprocessor 実名、§6 に international transfer。
+
+**Terms 全文に refund / cancel の文字列が存在しないことを確認した**（返金・解約条項の不在は推測ではない）。
+
+## net-kotobase の再実測（2026-08-08、run 0022）
+
+上の『検証していないこと』のうち net-kotobase を実測した。**仮説（国内法人 operator なので cloud-itonami より近いはず）は反証された。**
+
+外国会社登記の論点が無いのは事実である（operator は Gftd Japan 株式会社、Corporate Number 1011101086505）。しかし文書面では cloud-itonami より**全項目で後ろ**だった:
+
+- `kotobase-docs/terms.md` は**依然 DRAFT**（1 行目に `DRAFT — Review by qualified counsel is required before publication`）。しかも製品ドメインに無く、`kotobase.net/legal/terms/` は実 404 で、root からは GitHub blob リンクのみ
+- `privacy.md` / `dpa.md` はどちらも **404 = 存在しない**
+- `/pricing` は live だが**価格が 1 つも書かれていない**（`¥` 表記ゼロ）。Standard は 2026-08-08 に並行セッションで **owner が ¥2,980/月 に確定**（本 run が当初引用した SCORECARD の ¥980 は superseded）。ただし**価格を決めることと公開することは別の行為**で、ページには依然 1 円も出ていない
+- `[CONFIRM: …]` が 5 件未解決（最低年齢・価格・請求周期・税・返金）
+- `/api/billing/status` が存在しない
+
+**cloud-itonami の red 1 件を回避する代わりに、公開前 counsel review が必要な DRAFT と、ゼロから書く privacy・DPA を引き受けることになる。両方とも counsel は要る。** したがって決定 2（最小経路を cloud-itonami へ）は推論ではなく実測で確認された。
+
+## この ADR が依然として検証していないこと
+
+club-shinshi（`shinshi.club`）と net-babiniku（`babiniku.net`）は、`/legal/terms/` を含む全パスに対してバイト単位で同一の app shell を返す client-rendered SPA（2,035 B / 1,918 B）であり、**HTTP だけでは legal surface を判定できない**。実ブラウザが要る。
+
+ただし優先度は見た目ほど高くない: 両者の red は **product-safety**（adult content / age assurance / creator billing の payout・返金条件）であり、**commit が黙って閉じる種類の gate ではない**。run 0021 が見つけた陳腐化は、文書 gate に特有の現象である。"}]

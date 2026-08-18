@@ -1,0 +1,532 @@
+[{:db/id -1
+  :adr/id "2800003200-tsukuru-manufacturing-integration-four-phases"
+  :adr/title "ADR-2800003200: tsukuru を datom 面 → marketplace ref → CAE gate → DataLad の順で接続する —— 製造委託の 4 段統合"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "tsukuru-manufacturing-integration"
+  :adr/date "2026-08-05"
+  :adr/last_verified "2026-08-05"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["cloud-itonami における製造委託（工場探索・発注・進捗・QC・決済）の統合順序"
+   "tsukuru-actor が marketplace 7 actor の kotobase ref に載るかどうか"
+   "工場データ（candidates.edn 2,119 社）が superproject の datom 面に載るかどうか"
+   "CAD/CFD/CAE エンジンを production-order の gate として呼ぶ責任境界"
+   "製造系バイナリ（CAD / メッシュ / 解析結果）の custody 面をどこに置くか"]
+
+  :adr/context
+  "オーナー質問（2026-08-05）:「今の cloud-itonami で alibaba のような b2c、また製造委託先の
+情報を収集、また委託もできるように設計、統合されているか。edn, datascript が可能、datalad
+保存、tsukuru で cad, cfd など製造に必要なものが統合されているか。」
+
+実測した回答は **『部品はほぼ全部あるが、統合されていない』**。以下はこの ADR を起こした日に
+実際にファイルを読んで確認した現在地であって、到達目標ではない。
+
+## 実測 1 — marketplace 層は live、ただし factory-direct ではない
+
+`cloud-itonami-marketplace-{order,listing,onboarding,settlement,fulfillment,returns,crossborder}`
+の 7 actor が Cloudflare Worker として稼働し、**同一 kotobase ref `marketplace`** を共有して
+join だけで連携している（ADR-2607264000 / 2607273000 / 2607274000、2026-07-27 に
+kotobase.net で live 検証済み）。契約 primitives は `kotoba-lang/marketplace`
+（:implemented、12 ns / 169 tests）。buyer surface は listing の `:worker` ビルドとして
+write 経路から分離済み。
+
+**しかしこれは『出品者 ↔ 買い手』の marketplace であって『工場 ↔ 買い手』ではない。**
+Alibaba の本体である factory-direct の面は、この ref 上に存在しない。旧 etzhayyim 系の
+`okaimono`（TS/Svelte の EC）・`market.etzhayyim.com`・`fleamarket.etzhayyim.com` は別系統で、
+新しい ref には載っていない。
+
+## 実測 2 — 委託先の情報収集は実質できている
+
+`orgs/cloud-itonami/tsukuru-actor/kotoba/` に:
+
+| ファイル | 件数 | 性質 |
+|---|---|---|
+| `candidates.edn` | **2,119 社（実在企業 / 106 か国）** | 公開ディレクトリ由来。全件 `:factory/source-url` 付き。`:factory/sourcing :public-directory`、`:factory/labor-provenance :unknown`。`:factory/did` は `candidate:manufacturer-directory/...` 形で **意図的に did:web ではない**（未 onboard を偽らないため）。ingest 先も別グラフ `com.etzhayyim.tsukuru.candidates` に隔離され、member graph への書き込みを assert で拒否する |
+| `manufacturer-registry-seed.edn` | 99 社（21 か国） | 実在企業の例示 seed（同じ非-did:web 規律） |
+| `seed.edn` | 3 社 | R0 の worked example（他に production-order / progress / sbt entity 7 件） |
+| `wire/catalogs/manufacturer-catalog.v1.json` | 465 | 約 90% が合成プレースホルダ、別 consumer 向け read-only。上記とは無関係 |
+
+**この層の誠実さ（同意していない企業を『登録済み』と偽らない）は既に設計に焼き込まれており、
+統合作業でこれを緩めてはならない。**
+
+## 実測 3 — 発注は『純計算は書けている、live 経路が無い』
+
+`src/tsukuru/kotoba/agent.cljc`（438 行）に handle-discover / handle-compliance（treaty +
+yabai ScreenEntity + HS 分類 + 輸出管理 pre-screen）/ handle-production（BTO・MTO・CTO の
+draft→placed→dispatched→in-production→qc→ready→shipped）/ handle-qc / build-settlement-intent
+（USDC + tithe 10%）/ validate-run-package（CNT・EUV の実業務ルール検査）がある。cells 6 本、
+lexicon 46 本、`schema.edn` は Datomic 形式。
+
+ただし `:actor/status :r0` であり:
+- LLM rerank は no-op、`screen-entity` / `resolve-treaty` は正直な stub（**黙って pass しない**）
+- ingest は dry-run 既定で live path は placeholder
+- **`kotobase` への参照がリポジトリ全体で 0 件** —— marketplace 7 actor が載っている ref と繋がっていない
+- host / Worker が無い。`appview/tsukuru-tsukr8u0/` は package.json と vitest 設定だけで app 本体が無く、
+  surface 索引（260 host / 157 repo / 2,272 surface）に tsukuru は **0 件**
+- 旧 `orgs/cloud-itonami/tsukuru`（TS 3,189 行）は CLAUDE.md 冒頭で **DEPRECATED**（T3 fallback）
+
+つまり『発注できるように**設計**されている』は Yes、『**できる**』は No。
+
+## 実測 4 — EDN/DataScript は repo 内だけ。横断 join はできない
+
+tsukuru-actor 自体は完全に datom 形。**しかし superproject の datom 面には載っていない** ——
+`manifest/edn-query.cljs` の `all-tx` が読むのは adr / docs / manifest / market-intel /
+cloud-itonami-lei / lei-tos / gleif / fleet-{db,db-remote,ci} / yabai / tadori /
+toshokan-patents / innen / awai-yakuwari / kakekomi / okugai-inventory / concept / surface 等で、
+**factory / manufacturer 系の loader が存在しない**。結果、『工場 × LEI 実体 × ToS × 特許 ×
+制裁スクリーニング』を 1 クエリで引けない。`candidates.edn` は素の map の vector なので、
+これは **loader のギャップであってデータ形状の問題ではない**。
+
+## 実測 5 — DataLad に製造系は 1 件も無い
+
+`datalad` グループの west project は 16 件（contact-pii / gtm-data / eur-lex / govinfo /
+e-gov elaws / uk legislation / gftd audio・avatar・illust・motion・rig・sculpt・voice /
+mangaka-data / m365-archive / emr-claims）。**CAD・メッシュ・解析結果の custody 面は無い。**
+
+## 実測 6 — CAD/CFD エンジンは充実、tsukuru からの結線はゼロ
+
+`kami-engine-cad`（有理 Bezier / NURBS 互換）・`kami-engine-cfd`（D2Q9/D3Q19 格子ボルツマン）・
+`kami-engine-cae-solver`（`:cfd` `:fem` `:process` `:materials` `:emag` `:production-des` の
+決定論的 backend + CalculiX コンテナ、V&V 証拠が無ければ既定で not qualified）・`cnc-toolpath`・
+`kotoba-lang/cad`・`scad`・`dxf`・`org-iso-10303`(STEP)・`org-iso-6983`(G-code) がある。
+
+**tsukuru はこのどれも呼んでいない。** 接点は 2 つだけで、どちらも実装ではない:
+- `contracts/lexicons/manufacturingCell/designCell.edn` —— 説明文に『using kami-engine-sdk
+  manufacturing primitives』とあるが **JSON schema の封筒だけで src に実装が無い**
+  （src は `murakumo.cljc` と `kotoba/agent.cljc` の 2 本のみ）
+- EUV の `cadCamHandoff {\"format\":\"gdsii\"}` —— **完全性を検査するメタデータ項目**であって
+  幾何パイプラインではない
+
+`orgs/cloud-itonami/` 全体で `kami-engine-cad|cfd|cae|cnc-toolpath` を grep すると
+tazuna / noroshi / isic-7110 / isic-2829(`printpressmfg/cfd.cljc`) / suji に当たり、
+**tsukuru には当たらない**。CAD ファイル取り込み・製造性チェック・発注に紐づく CFD/FEM 実行・
+ツールパス生成は、いずれも存在しない。"
+
+  :adr/decision
+  "**4 段を、この順で行う。** 順序は『安い順・依存順』であって好みではない —— 各段は前段が
+landed していなくても壊れないが、逆順にすると後段が前段をやり直させる。
+
+## Phase 1 — factory loader を datom 面に足す（最小・依存ゼロ）
+
+`manifest/edn-query.cljs` に `factory-registry-entities` を足し、`all-tx` に載せる。
+
+- 入力は `orgs/cloud-itonami/tsukuru-actor/kotoba/` の `candidates.edn`(2,119) /
+  `manufacturer-registry-seed.edn`(99) / `seed.edn`(3 工場 + 7 entity)。
+  `wire/catalogs/*.json` は **読まない**（約 90% が合成プレースホルダ）。
+  （2026-08-05 訂正: 当初この ADR は 2,122 / 101 と書いていた。grep が
+  **ヘッダのコメント中の `:factory/did` を数え込んだ**もので、実体を parse した
+  正しい数は 2,119 / 99。数え方を間違えた数字を『実測』として書いていた。）
+- **`:source/dataset` を 3 つに分ける**: `\"tsukuru-candidates\"` / `\"tsukuru-registry-seed\"` /
+  `\"tsukuru-seed\"`。1 つに畳まない —— 同意していない公開ディレクトリ企業と、例示 seed と、
+  デモを 1 つの dataset 名にすると、candidates.edn がヘッダで守っている区別が
+  **クエリ側から消える**（G10 の honesty はデータ側だけでなく面側でも保たれねばならない）。
+- 属性名は既存のまま `:factory/*` を使う。**結合キーは `:company/lei` を新設で持たせない** ——
+  candidates.edn は LEI を持たないので、持たせれば捏造になる。join は Phase 1 では
+  `:factory/display-name` × `:company/legal-name` の **人間が確認する候補提示**に留め、
+  自動同定しない。
+- ローダは shape 不一致を nil で握り潰してよいが、**握り潰した件数を stderr に WARNING で
+  報告する**（`warn-skipped!` 既存規約）。
+- 完了条件: `count` に 3 dataset が別々に出ること、能力で工場が引けること、
+  **3 つのタグが partition になっていること**を検査で固定すること。
+
+  （2026-08-05 訂正: 当初ここには「`:source/dataset` を指定しないクエリが candidates と
+  seed を混ぜて返さないことをテストで固定する」と書いていたが、**これは実装できない**。
+  1 つの面に載せる以上、フィルタしないクエリが両方を返すのは設計どおりで、それを
+  禁じたら Phase 1 の目的そのもの（同じ面で join できること）が消える。実際に固定した
+  のは『混ざらないこと』ではなく『**いつでも分離できること**』:
+  ①各 dataset の件数がファイル実体と一致する（行が落ちても混ざっても検出できる）
+  ②3 タグが互いに素 ③`tsukuru-candidates` に `did:web:` が 1 件も無い
+  ④能力検索が 0 件を返さない ⑤factory entity に `:company/lei` が無い。
+  検査は `scripts/verify-tsukuru-factory-plane.cljs`。）
+
+## Phase 2 — tsukuru を `marketplace` ref に載せる
+
+`marketplace.edge`（cljs、host 層は 1 箇所）の client 構築 / prefetch-run-flush ブラケット /
+ordinal 生成 / fail-closed をそのまま使い、tsukuru は **routes と判断だけ**を持つ。
+
+- ref は **既存の `marketplace` を共有する**。新しい ref を切らない —— CLAUDE.md の
+  『Datalog join の到達範囲はちょうど ref 1 本』規則により、production-order を別 ref に
+  置くと『注文 × その工場 × それを認めた credential × その決済 × その配達』が
+  **二度と join できなくなる**。これが Phase 2 の目的そのものである。
+- 台帳は `persist/stream-ctx` の actor 名スコープで分ける（鍵は共有、帰属は鍵に依存しない）。
+- `:factory/*` は Phase 1 の 3 dataset をそのまま持ち込み、**consented member だけが
+  `did:web:` を持つ**という規律を ref 上でも維持する。
+- 旧 TS `orgs/cloud-itonami/tsukuru` は **移植しない**。DEPRECATED のまま、この Phase の
+  landed をもって『後継が存在する』と README に明記して閉じる。
+- 完了条件: 別 isolate からの読み戻しを含む live cross-actor チェーン
+  （onboarding → credential → tsukuru の production-order → settlement）が
+  **HTTP 呼び出し 0 本 / join のみ**で通ること。ADR-2607274000 が使った検証形をそのまま使う。
+
+## Phase 3 — `cae-solver` を production-order の gate として呼ぶ
+
+`cae.solver/solve` を `[:solver :kind]` で dispatch し、production-order の遷移
+（`placed` → `dispatched`）の前段に **助言 gate** として置く。
+
+- 呼ぶのは既存の決定論的 backend（`:cfd` `:fem` `:process` `:materials` `:emag`
+  `:production-des`）。**新しいソルバを書かない。**
+- **V&V 証拠が無い結果を『適合』として扱わない** —— `cae-solver` 自身が『Missing V&V evidence
+  defaults to not qualified; execution never implies an industrial release』と定めており、
+  gate はこれを**そのまま**伝播させる。数値が出たことを合格と読み替える実装は、
+  ADR-2607203000 が禁じた『未計測の変換率を掛けた期待値の捏造』と同じクラスの誤り。
+- gate の判定は advisor（助言）であって governor（決定）ではない。不合格は
+  **order を止める根拠になるが、合格は自動 dispatch の根拠にならない**（G1 consent-bound /
+  G14 member-principal は不変）。
+- CAD 幾何そのもの（`kami-engine-cad` / `cnc-toolpath` / STEP・G-code）は Phase 3 の scope 外。
+  ここで入れるのは『発注前に物理量で殴れるか』だけで、`designCell` lexicon の実装は
+  Phase 4 の custody 面が無いと成立しない（下記）。
+- 完了条件: 実 production-order 1 件に対し `:cfd` と `:fem` の両方を回し、
+  qualified / not-qualified の**両方**が実際に出ることを見る。落ちない gate は劇場。
+
+## Phase 4 — CAD / メッシュ / 解析結果を DataLad + B2 に置く
+
+skill `large-binary-datalad` の経路で `tsukuru-manufacturing-artifacts`（仮）を west に
+`userdata.datalad: true` / `datalad` グループで登録する。
+
+- **git 履歴に STEP / メッシュ / 解析結果を直接コミットしない。**
+- datom 面には **annex key / CID とメタデータだけ**を載せる（bytes は載せない ——
+  ADR-2608039970 の『byte を datom 面に載せない』）。
+- **公開 repo + 暗号化 annex は本文の秘匿であって metadata の秘匿ではない**
+  （path・size・更新頻度・author が見える）。委託先の図面はここに直接置く前に
+  秘匿要件を別途決める —— この ADR は置き場を決めるだけで、機密図面の受領を承認しない。
+- 完了条件: `numcopies` ≥ 2 と独立した複数 remote、`annex-get` / `annex-drop` の往復、
+  `scripts/annex-custody-verify.cljs` の通過。
+
+## 明示的な非目標（この ADR で決めないこと）
+
+- **Alibaba クローンを作らない。** factory-direct の buyer surface を新規に設計するのは
+  この 4 段の後の別 ADR。Phase 2 が landed すれば、それは『marketplace ref の上の
+  もう 1 種類の出品者』として自然に書けるようになる —— 先に surface を作ると ref を割る。
+- **okaimono（TS）を移植しない。** 旧 etzhayyim 系との統合は別問題。
+- **新しい CAD/CFD エンジンを書かない。** 3D は例外なく kami-engine stack
+  （CLAUDE.md『3D はすべて kami-engine を使う』）。Rust も新規に書かない。
+- **`kbb` を前提にしない。** スクリプト host は nbb のまま。"
+
+  :adr/consequences
+  "## 得るもの
+
+- Phase 1 単体で、2,119 社の実在製造業者が `manifest/edn-query.cljs` の datom 面に載り、
+  LEI 実体（`cloud-itonami-lei`）・ToS アーカイブ・SEC 財務（`market-intel`）・特許
+  （`toshokan-patents`）・passive DNS（`yabai`）と **同じ面に並ぶ**。join は人間確認付きの
+  候補提示から始まるが、面が揃っていること自体が前提条件。
+- Phase 2 で製造委託が『設計されている』から『できる』に変わる。かつ、marketplace の
+  7 actor が既に払った host 層のコスト（ordinal・fail-closed・prefetch）を **再実装せずに**
+  受け取る。
+- Phase 3 で、発注前に物理量で殴れるようになる。既存の決定論的 backend を使うので
+  新しい数値コードは増えない。
+- Phase 4 で、図面と解析結果が git 履歴を汚さずに custody を持つ。
+
+## 払う代償（黙らせない）
+
+- **1 ref は writer lease 1 本。** tsukuru を `marketplace` ref に載せると、production-order の
+  書き込みが既存 7 actor と同じ CAS レーンに乗る。スループットは容量ではなく **CAS 競合**で
+  決まる。規則の答えはシャードではなく『バッチする単一 writer』（Durable Object を
+  直列化器としてのみ使う）。**混んだらシャードする、は禁じられている** —— 割った瞬間に
+  Phase 2 の目的が消える。
+- **Phase 1 は join を約束しない。** `:factory/*` と `:company/lei` を繋ぐ同定は
+  この ADR では自動化しない。『面に載った』と『join できる』は別で、前者だけが Phase 1 の
+  成果物。これを混同した報告をしない。
+- **Phase 3 の gate は合格を意味しない。** V&V 証拠の無い solve 結果は not qualified のまま
+  伝播する。『CFD を回した』が『製造可能と確認した』に読み替えられる文言を UI にも
+  ADR にも書かない。
+- **Phase 4 の metadata は公開される。** 暗号化 annex は本文を隠すが、path・size・
+  更新頻度・author は隠さない。委託先の機密図面をここに置く判断は、この ADR の範囲外。
+- **旧 TS tsukuru を閉じることは後戻りを難しくする。** Phase 2 が landed するまで
+  DEPRECATED のまま残し、閉じるのは Phase 2 の完了条件を満たしてから。
+
+## 検査（landed の判定）
+
+各 Phase は『書いた』ではなく『落ちることを確かめた』で landed とする:
+
+- Phase 1: dataset を混ぜるクエリが失敗することをテストで固定
+- Phase 2: live cross-actor チェーンが HTTP 0 本で通り、別 isolate から読み戻せる
+- Phase 3: qualified と not-qualified の両方が実際に出る
+- Phase 4: `annex-get` / `annex-drop` の往復と custody verify
+
+murakumo fleet gate（`scripts/fleet-ci/gates.edn`）に足す場合は、ノードが tailnet だけに
+繋がっていて **外向き HTTPS が無い**こと、`ship-git-deps!` が **maven 依存を運ばない**ことを
+先に確かめる。解決しないなら repo 側の local contract に残し、gate はノードで完結する
+不変条件に絞る。GitHub Actions は使わない（ADR-2607300900）。
+
+## 再開点（2026-08-05 セッション終了時点）—— 次の agent はここから読む
+
+**着地済み（すべて default branch 上、PR は残っていない）**
+
+| repo | commit | 内容 |
+|---|---|---|
+| `cloud-itonami/tsukuru-actor` | `9d70992` | Phase 2 actor（store/governor/advisor/phase/edge.worker）+ Phase 3 CAE gate |
+| `cloud-itonami/tsukuru-manufacturing-artifacts` | `69b398f` | Phase 4 custody 面（DataLad、B2 remote 2 本） |
+| `com-junkawasaki/root` | `ecc588c` `a71b041` `2e1f8b8` `63a67de` `cd66c91` `a1494ca` | ADR / Phase 1 loader / 検査 3 本 / skill 訂正 / 継続測定 loop |
+
+west pin は両子リポの tip と一致（`9d70992` / `69b398f`）。Cloudflare Worker
+`cloud-itonami-tsukuru` は deploy 済みで **503 fail-closed**（seed 不在の正しい状態）。
+
+**検証の実測値**（この面で実際に走らせた数字）
+
+| 検査 | 結果 |
+|---|---|
+| `tsukuru-actor` `clojure -M:test` | 45 tests / 681–682 assertions、0 failures。assertion 数が揺れるのは repository-contract test が**ディスク上のファイル数に比例**して assert するため（`dist/` の有無で変わる）。テスト数 45 は不変 |
+| `verify-tsukuru-factory-plane.cljs` | PASS。3 タグを畳んだコピーと cardinality-many を外したコピーで **exit 1 を確認済み** |
+| `annex-custody-verify.cljs` | OK（2 件とも remote から fsck）。未 push ファイルで **exit 1 を確認済み** |
+| `verify-artifact-path-policy.cljs` | OK。`raw/cad/AcmeCorp-PART-4471-Rev-C.step` で **exit 1 を確認済み** |
+| Worker build | `shadow-cljs release worker` 0 warnings / 400 KB |
+
+**次の具体的な一手（優先順）**
+
+1. **kotobase.net の読みが揺れる理由を観測する。** 同一 identity の read が
+   10 分で ok→blocked→ok と変わる（kind ごとに揺れ方が違う）。**seed の再発行より先。**
+   再現コマンド:
+   `for i in 1 2 3 4 5; do curl -sS https://cloud-itonami-marketplace-fulfillment.04-feasts-minded.workers.dev/tasks; done`
+   継続観測は `~/.gftd/tsukuru-maturity-tick.ledger.edn`（6h ごと、`:tick/changed` を見る）。
+2. **seed（オーナー作業）。** ①元の値を kagi `itonami-marketplace-kotobase-seed` に戻す
+   ②無ければ再発行して 8 worker に投入（DID が変わるので既存 ref の扱いの判断が要る）。
+   **1 を先に潰さないと、再発行しても chain は通らない。**
+3. **機密材料（オーナー判断）。** `index/policy.edn` の
+   `:policy/confidential-material :blocked-on` 4 件が今日は全部 false。
+4. **`ACTOR_WRITE_TOKEN` が 6 actor で未設定の疑い。** onboarding は**存在しなかった**
+   （＝write route が全部死んでいた）。他 6 台も確認する価値がある:
+   `npx wrangler secret list --name cloud-itonami-marketplace-<actor>`
+
+## 現在の実装状況（2026-08-05 時点）
+
+**Phase 1 = landed。Phase 2 = コードは landed、live 検証は blocked。Phase 3 = landed。Phase 4 = landed。**
+
+### Phase 4 — landed（`cloud-itonami/tsukuru-manufacturing-artifacts`、west 登録 `fcd6fb5`）
+
+DataLad dataset を新設し、west に `userdata.datalad: true` / `datalad` グループで登録した
+（既定の `group-filter` が `-datalad` なので通常の `west update` では取得されない）。
+
+- **git 履歴にバイナリを入れない。** `raw/` は annex、`index/` と `README.md` は git 本体
+  （何があるかだけ知りたい消費者に `datalad get` を強いない。legislation 4 dataset と同型）。
+- **datom 面には annex key と metadata だけ**（ADR-2608039970「byte を datom 面に載せない」）。
+  `index/catalog.datoms.edn` がその git 側の半分で、`:artifact/annex-key` で実体に繋がる。
+- 最初のコンテンツは `kami-engine-cae-solver` 42afc0c の `:fem` / `:cfd` 参照出力 2 件。
+  どちらも **`:artifact/qualification :not-qualified` を明記**している —— V&V 証拠が
+  付いていないので `:no-industrial-accuracy-claim` であり、数値の存在を「適合」と
+  読ませない。`:artifact.coverage/*` entity で「**実 production order 由来のものは 0 件**」
+  も申告している（Phase 2 が blocked なので発注自体が無い）。
+
+**完了条件の達成状況**:
+
+| 条件 | 結果 |
+|---|---|
+| `numcopies` ≥ 2 | **達成**（2） |
+| 独立した複数 remote | **部分的**。remote は 2 本（`b2`=`gftdcojp-m365-annex` / `b2-datasets`=`ai-gftd-datasets`）でバケットも鍵も別だが、**どちらも Backblaze B2**。バケット削除や鍵 1 本の侵害には耐え、**プロバイダ障害には耐えない**。別プロバイダは未着手 |
+| `annex-get` / `annex-drop` の往復 | **達成**。local を drop してバイトが解放されたことと、B2 から復元して sha256 が一致することを実測 |
+| `annex-custody-verify.cljs` | **達成**（`ok=1 fail=0`、2 件とも remote から fsck）。**落ちることも確認済み** —— push していない annex ファイルを 1 つ置くと exit 1 で「1 file(s) exist ONLY on this machine」を出す |
+
+**実測で分かったこと（設計に効く）**: off-machine の remote が **1 本だと numcopies 2 の
+dataset は drop できない**。git-annex が「1/2 コピーしか確認できない」と拒否するため、
+手元のバイトを落として clone を軽くするというこの面の目的が成立しない。numcopies を 1 に
+下げれば drop は通るが、それは保証を弱めて通しただけ。**2 本目の remote を足すのが正しい
+解**で、そうして初めて往復が回った。
+
+**機密材料について実測したこと（2026-08-05 追加）**: **B2 の 2 remote はどちらも
+`encryption: none`**（`scripts/datalad-b2-init.cljs` が明示的にそう設定している）。
+つまり今日この面に置いたバイトは **B2 に平文で載る**し、どちらの bucket も
+この dataset 専用ではない（`gftdcojp-m365-annex` は M365 archive と legislation 4 件、
+`ai-gftd-datasets` は SHIRO & PICO の制作資産と同居）。この事実は dataset の
+`index/policy.edn` の `:policy/storage-facts` に測定値として記録し、README にも書いた。
+
+**path の規律を prose から機械検査に移した**: `index/policy.edn` の
+`:policy/allowed-paths`（正規表現の allowlist）を `scripts/verify-artifact-path-policy.cljs`
+が検査する。allowlist に無い形の path があれば exit 1。`policy.edn` を持たない
+dataset は :skipped（宣言は opt-in、違反は opt-in ではない）。**落ちることも確認済み。**
+「顧客名を path に入れるな」は読む人がいなければ制御にならない —— 暗号化しても
+path・size・更新頻度・author は隠れないので、ここが実際の漏洩面。
+
+**機密材料の受領に何が要るかを checkable な形にした**（`:policy/confidential-material`
+`:blocked-on`、4 件とも今日は false）: ①専用 remote の暗号化（git-annex
+`encryption=shared` は GPG であって age ではない）②他 dataset と同居しない bucket
+（B2 Master Key が要る。1Password が 2026-08-05 に非対話で通らなかった）
+③counterparty を漏らさない path 規約（opaque id）④この保管形態に対する NDA の確認（人間）。
+
+**この Phase が決めていないこと**: 機密図面の受領。公開/private の別に関わらず、
+git-annex の暗号化は**本文**を隠すが path・size・更新頻度・author は隠さない
+（`raw/cad/<顧客>-<部品>.step` が launch 直前に更新されれば、暗号化されていても
+スケジュールが漏れる）。README にこの警告と暫定運用（顧客名・部品番号・
+プログラム名を path に入れない）を書いた。NDA との突き合わせは別途。
+
+### Phase 3 — landed（`cloud-itonami/tsukuru-actor` `9d70992`）
+
+`tsukuru.manufacturability` が `cae.solver/solve` と `cae.vv/qualification-gate` を
+**両方**回す。ソルバも相関式も新しい数値も足していない。
+
+- **数字が出ることと、その模型がその問いに適合していることは別。** V&V の 5 カテゴリ
+  （`:analytic-benchmark` `:conservation` `:iterative-convergence` `:grid-convergence`
+  `:traceability`）のどれか 1 つでも証拠が欠ければ `:not-qualified`。証拠は operator
+  input で、この repo は check を捏造せず・既定で passing にせず・証拠の不在を clean と
+  扱わない（`cae-solver` 自身の契約
+  『Missing V&V evidence defaults to not qualified』のとおり）。
+- **gate は片方向にだけ効く。** not-qualified は order を止めて人に聞く根拠になり、
+  qualified は dispatch の根拠にならない。hard check（G1 / G14 / G16）は通過した
+  応力計算に一切影響されない —— `complianceState pending` の order は qualified でも
+  hold のまま、をテストで固定した。
+- **宣言の無い order は「評価していない」であって「落ちた」ではない。** 台帳には
+  `:not-assessed` / `:verified-for-declared-scope` / `:not-qualified` を毎回区別して
+  書く（何も検査していない order が、通った order と同じに読めてはいけない）。
+
+**完了条件を満たした**: 実 case で `:cfd` と `:fem` の両方を回し、**qualified と
+not-qualified の両方が実際に出た**。証拠ブロックを外すと**数値は出たまま**
+not-qualified になる —— それがそのまま「数値は gate ではない」ことの実演になっている。
+45 tests / 682 assertions green（Phase 3 で新規 10）。worker.js は 0 warnings で
+400 KB にビルドされ deploy 済み（Phase 2 と同じく seed 不在のため 503 fail-closed）。
+
+**Phase 3 が今できないこと**（実装ではなく scope の話）: 幾何そのものは触らない。
+CAD ファイルの取り込み・製造性チェック・ツールパス生成は Phase 4 の custody 面
+（DataLad）が無いと成立しないので、ここでは「発注前に物理量で殴れるか」だけを入れた。
+
+### Phase 2 — 何が landed し、何が止まっているか
+
+landed（`cloud-itonami/tsukuru-actor` `f206c51`）:
+
+- `tsukuru.store` / `governor` / `advisor` / `phase` / `edge.worker` を追加。host 層は
+  `marketplace.edge` をそのまま使い、この repo には **routes と判断だけ**を置いた。
+- ref は既存の `marketplace` を共有（新 ref を切っていない）。
+- **同意の境界を ref でも強制**: `put-factory!` は `did:web:` 以外を拒否する。
+  Phase 1 で datom 面に載せた 2,119 社の `candidate:manufacturer-directory/...` は
+  この ref に入れない。
+- governor は 9 hard check + 3 escalate。credential は `:seller/id` で引く
+  （factory DID と等しいと仮定すると、実在の seller で永久に満たせない check になる）。
+- production-order は**どの phase でも auto-commit しない**（governor と phase 表の二重）。
+- 検証: 35 tests / 642 assertions green（新規 23）。`shadow-cljs release worker` が
+  0 warnings で 355 KB の worker.js を生成。Worker `cloud-itonami-tsukuru` を
+  Cloudflare に deploy 済み。
+
+**live で確かめられたこと**:
+- Worker は動く。secret 0 本のとき `/health` が 503 と
+  `{ok:false, db:\"marketplace\", did:null}` を返す = **設計どおり fail-closed**。
+- 空文字の secret を入れると 1101（例外）になる。`\"\"` は JS で truthy なので
+  `client-for` が 0 バイト鍵で client を作ろうとする。**secret は「無い」か
+  「正しい」かのどちらかにする**（空で置かない）。
+
+**blocked（この ADR の完了条件に到達していない）**:
+
+1. **共有 seed `itonami-marketplace-kotobase-seed` が kagi に無い。**
+   live vault / repo-local vault の両方で `no such item`（3 回再試行）。
+   secrets-location-map はこれが在ると書いていたが**実態と乖離していた**
+   （murakumo の 2 件に続く 3 例目）。**新しい seed を作っても代わりにならない** ——
+   `:apex` は graph scope == issuer DID を要求するので別 seed は別グラフになり、
+   共有 ref に join できない。実測: 使い捨て seed の Worker は kotobase.net に対し
+   `q 401 Unauthenticated`（未登録 DID）。
+2. **7 actor の `ACTOR_WRITE_TOKEN` もどこにも記録が無い。** onboarding を駆動して
+   credential を発行させる live チェーンは、これが無いと動かせない。
+3. **現在の ref は空**（`/offers` `/orders` とも `[]`、shared DID で読める）。
+   ADR-2607274000 の live チェーンの痕跡は残っていないので、seed が戻っても
+   正の join を見るにはチェーンを引き直す必要がある。
+
+**オーナー作業**: ①元の seed を持っていれば kagi `itonami-marketplace-kotobase-seed`
+に入れ直す（値は 7 worker の Cloudflare secret の中にだけ在り、読み出せない）
+②無ければ新 seed を発行して 8 worker 全部に入れ直す（DID が変わるので既存 ref の
+扱いを決める）。
+
+### ⚠ 2026-08-05 追調査 —— seed は「唯一の blocker」ではなかった（この ADR の前の記述を訂正）
+
+上の 1〜3 は「seed さえ戻れば completion 条件の検証に進める」と読めるが、**実測すると
+そうではない**。共有 identity が **ref の一部しか読めない**:
+
+| worker | 経路 | 結果 |
+|---|---|---|
+| `order` | `edge/read-all :order` | **200** `{\"orders\":[]}` |
+| `onboarding` | `edge/read-all :credential` | **`q 401 Unauthenticated`** |
+| `onboarding` | `POST /applicants`（書き込み） | **`q 401 Unauthenticated`** |
+| `fulfillment` | `edge/read-all :task` | **`q 401 Unauthenticated`** |
+
+7 worker とも `/health` の did は同一（`z6Mkid37…`）、`db` は同一（`marketplace`）、
+`wrangler.jsonc` に endpoint / operator-did の上書きは無く、コードは同じ
+`marketplace.edge/read-all`。**同じ identity・同じコードで、kind が違うと 401 になる。**
+
+- **訂正（同日 20:39〜20:49 実測）: これは間欠だった。** 上の「5 回連続で決定論的」は
+  その 1 分間については正しいが、一般化としては**誤り**。継続測定 loop
+  （`scripts/tsukuru-maturity-tick.cljs`）を入れた直後、`fulfillment` の `:task` 読みが
+  **10 分間で ok → blocked → ok と 3 回変わった**（こちら側は何も変えていない）。
+  一方 `onboarding` の `:credential` は同じ窓で 3/3 とも 401 のまま。
+  つまり「kind によって決まる恒久的な拒否」ではなく、**時間で揺れる拒否**であり、
+  kind ごとに揺れ方が違う。原因の切り分けは kotobase.net 側の観測が要る。
+- **現ソースから再ビルドして再 deploy しても変わらない**（onboarding version
+  `d05f6ded`、deps は listing と同一 sha）。「deploy 済み bundle が古い」仮説は**棄却**。
+- 原因は外から特定できていない。kotobase.net（apex）側が、この identity に対して
+  ある種のクエリを拒否している、としか言えない。
+
+**したがって今 seed を再発行するのは誤った手**である:
+
+1. **401 は seed の問題ではない。** 同じ seed で `:order` は読めている。再発行しても
+   `:credential` / `:task` が読めるようにはならない。
+2. **失うものがある。** DID が変われば既存 ref の内容が孤児化する。文書 kind は空に
+   見えるが、**台帳（`:mp.event/*`）は読めていない**（`/ledger` も同じ 401）。
+   読めないものを、直らない変更のために捨てることになる。
+
+**正しい順序は「読めない原因を先に潰す → 測り直す → それから seed を判断する」。**
+次の一手は kotobase.net 側の観測（なぜ同じ identity の読みが時間で揺れるのか）で
+あって、鍵の再発行ではない。
+
+### 残 gap の継続測定（2026-08-05 設置）
+
+`scripts/tsukuru-maturity-tick.cljs` + LaunchAgent `com.gftd.tsukuru-maturity-tick`
+（6h、`tamaki exec` 配下）が、この ADR の残 gap を 11 probe で測り続ける。姉妹の
+`com.gftd.itonami-maturity-tick`（ADR-2607254000）と作法は同じだが **observe-only** ——
+ここに残っているのは決定論的欠陥ではなく、外部サービスの authorization・人間の判断・
+到達できない資格情報なので、無人で埋めてよい種類ではない。
+
+- 監視するもの: seed の在否 / tsukuru worker の fail-closed / 3 worker の ref 到達性 /
+  custody / path-policy / factory-plane / actor tests / remote 暗号化 / 機密材料の許可。
+- **`:unknown` を `:ok` に丸めない。** 機密材料の許可は `:human` 固定で、loop が
+  `:ok` に反転させることは無い（機械は NDA を読めない）。
+- 状態が変わった時だけ `*** STATE CHANGED ***` を出す。
+- 初回のフル tick は 202 秒、`{:blocked 4, :ok 7}`。
+
+**設置初日に 2 つ捕まえた**: ①上記の 401 の間欠性（これが無ければ「決定論的」という
+誤った記述が残った）②`node_modules/` が空になっていて `manifest/edn-query.cljs` が
+`Cannot find module 'datascript'` で落ちていた —— **datom 面が誰にも引けない状態**
+だった（`npm install` で復旧）。後者は loop 自身の欠陥も暴いた: 環境エラーを
+`:regressed` と分類していたので、`:unknown` に直した（6 時間ごとに狼少年になる）。
+
+**この調査で行った live の変更 2 件**（どちらも小さいが記録する）:
+- `cloud-itonami-marketplace-onboarding` に `ACTOR_WRITE_TOKEN` を**新規作成**した
+  （`wrangler` は \"Creating\" と報告 —— **それまで存在せず、`edge/authorised?` は
+  `want` が nil なら false を返すので、この actor の write route は全部死んでいた**）。
+  値は kagi `itonami-marketplace-actor-write-token`。
+- 同 worker を現ソースから再 deploy（挙動は変わらなかった）。
+
+### Phase 1 の実測（この面で実際に走らせた値）:
+
+| | 値 |
+|---|---|
+| `tsukuru-candidates` | 2,119 entity（106 か国） |
+| `tsukuru-registry-seed` | 99 entity（21 か国） |
+| `tsukuru-seed` | 10 entity（うち工場 3） |
+| 面の total | 137,875 → **140,106** |
+| ロード時間 | 55 秒 → 62 秒 |
+
+- `manifest/edn-query.cljs` に `tsukuru-factory-entities` を追加し、`ds-schema` に
+  `factory/capabilities` / `factory/fulfillment-modes` の `:db.cardinality/many` を宣言した
+  （宣言しないと datascript が JS array を 1 値として持ち、能力検索が**例外を出さずに
+  0 件を返す**）。`count` は 3 dataset を**別々に**出す。
+- `scripts/verify-tsukuru-factory-plane.cljs` が上記 5 つの不変条件を検査する。
+  **落ちることを確認済み**: ①3 タグを 1 つに畳んだコピー ②cardinality-many 宣言を
+  外したコピー の両方で exit 1 になり、無改変で exit 0 になることを実際に見た。
+- この検査は murakumo fleet gate に**入れていない**。ノードは tailnet だけに繋がっており
+  npm 依存（datascript）が配られないので `:nbb-script` gate では面を組めない。
+  手で回す前提（面を 3 回ロードするので約 3 分）。
+
+**Phase 2 に進む前に読むこと**: Phase 1 は join を**約束していない**。
+`:factory/display-name` × `:company/legal-name` の候補提示までで、LEI による自動同定は
+していない（candidates.edn は LEI を持たないため）。"
+
+  :adr/body
+  "この ADR の本体は :adr/context / :adr/decision / :adr/consequences にある。
+
+## 関連
+
+- ADR-2607264000 — marketplace 連合商取引層（7 actor の起点）
+- ADR-2607273000 — order actor を kotobase client に載せる
+- ADR-2607274000 — 7 actor を 1 つの kotobase ref に集約、host 層を 1 箇所に
+- ADR-2605202800 — tsukuru の事業モデル（member-principal / 外部 inflow 禁止）
+- ADR-2608039970 — kotobase の base は datom 面。byte を datom 面に載せない
+- ADR-2608039700 — 正本は Git + EDN + DataLad、Datomic/kotobase は query projection
+- ADR-2607203000 — 未計測の変換率で期待値を捏造しない
+- ADR-2607300900 — CI/CD は murakumo fleet、GitHub Actions を使わない
+- CLAUDE.md『kotobase の Datalog join は ref 1 本までしか届かない』
+- CLAUDE.md『3D はすべて kami-engine を使う』
+- skill `large-binary-datalad`"}]

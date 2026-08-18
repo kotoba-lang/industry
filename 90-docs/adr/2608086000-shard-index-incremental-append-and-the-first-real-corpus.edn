@@ -1,0 +1,224 @@
+[{:db/id -1
+  :adr/id "adr-2608086000-shard-index-incremental-append-and-the-first-real-corpus"
+  :adr/doc_type "adr"
+  :adr/topic "shard-index-incremental-append-and-the-first-real-corpus"
+  :adr/title "ADR-2608086000: 索引を全再構築せずに追記する — scoring basis を identity にし、境界を内容で決める。あわせて初めて実コーパスで測った"
+  :adr/status "accepted"
+  :adr/date "2026-08-08"
+  :adr/last_verified "2026-08-08"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["client-side shard index の incremental append の設計・実測・限界"
+   "baked impact を持つ索引における scoring basis の扱いと drift"
+   "この subsystem の実コーパス（合成でない）での実測値"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends ["adr-2608071500-kotobase-client-side-shard-index-on-object-storage"
+               "adr-2608085000-cooperative-client-index-routing-cache-donated-work"]
+  :adr/related
+  ["adr-2608071500-kotobase-client-side-shard-index-on-object-storage"
+   "adr-2608085000-cooperative-client-index-routing-cache-donated-work"
+   "adr-2608039000-blockchain-decentralized-path-does-not-presume-d1"
+   "adr-2607192200-net-kotobase-commoncrawl-web-search-integration"
+   "adr-2607250100-kotobase-maturity-bar-vs-production-databases"]
+  :adr/decision-summary
+  "{:d1 :scoring-basis-is-part-of-index-identity, :d2 :content-defined-chunking-not-fixed-arity, :d3 :append-is-pure-divergence-is-the-ref-plane, :d4 :first-real-corpus-measurement, :found {:one-doc-append-blocks {:fixed 3035 :content 1322} :large-batch {:fixed 110001 :content 115424} :drift-top10-overlap {:x1.25 0.96 :x2.92 0.64} :cjk-path-never-benchmarked-before true}, :still-open [:compaction :network-rtt :extraction-to-kotoba-lang]}"
+  :adr/artifacts
+  "{:impl \"70-tools/kotobase-shard-index/src/kotobase_shard_index/append.cljc\", :corpus \"70-tools/kotobase-shard-index/bench/real_corpus.cljs\", :receipt \"70-tools/kotobase-shard-index/bench/results/2026-08-08-incremental-real-corpus.edn\"}"
+  :adr/body
+  "# Context
+
+ADR-2608071500 と ADR-2608085000 は、どちらも「次にやること」の 2 番目に
+**incremental segment merge** を挙げ、理由をこう書いていた:
+
+> `build!` はコーパス全体から作り直す。**これが無いとクロールに追随できない。**
+
+そして両方とも「合成コーパスでの測定」を limitation として明記していた。本 ADR は
+この 2 つを同時に潰した結果である —— **実コーパスを入れたことが、追記の設計上の欠陥を
+1 件見つけた**ので、順番としてもこれが正しかった。
+
+# Decision
+
+## D1 — scoring basis は索引の identity の一部。manifest に記録する
+
+impact は焼いてある（query 時に BM25 を計算しない、ADR-2608071500 の却下表）。
+BM25 の idf は**コーパス全体の関数**なので、**ある impact が別の impact と比較可能なのは
+両者が同じ N と avgdl に対して計算されたときだけ**である。
+
+追記は既存 shard の impact を計算し直せない（それは全再構築であり、追記が避けたいもの
+そのもの）。したがって:
+
+    :scoring-basis {:doc-count N :avgdl-x1000 A :generation G}
+
+を manifest に記録し、**新しい segment はこの記録された basis に対して採点する**。
+これで索引は構造的に内部整合である —— 全 shard の impact が同じ尺度に載る。
+
+代償は「全再構築したらどうなっていたか」との乖離で、正直な名前は **drift** である。
+設計判断は**問題を無くすことではなく、basis を明示して drift を測ること**にした:
+
+- `:generation` が最後の全再構築からの追記回数を数える
+- `drift-report` がコーパスが basis からどれだけ動いたかを返す
+- bench が**同じ文書集合の全再構築との top-k 不一致**を測る（再構築の判断材料）
+
+**追記のたびに再採点して常に全再構築と一致させる案は、全再構築である。**
+
+## D2 — block 境界は個数でなく内容で決める（実測が要求した）
+
+**これは当初の設計ではなく、実コーパスの測定が突きつけた修正である。**
+
+最初の追記実装は動いたが、**1 文書の追記が索引の 1.1%（276,798 block に対し 3,035）を
+書いた**。原因は dictionary の構築が `partition-all fanout` だったこと —— ソート済み
+リストに語を 1 つ挿入すると、**それ以降の全 leaf の中身が 1 つずつずれる**ので、
+語彙全体ぶんの leaf が別 address になる。追記のコストが batch サイズではなく
+**語彙サイズ**で決まっていた。
+
+修正は content-defined chunking（境界をその位置の内容の hash で決める）。これは
+`kotoba-lang/prolly-tree` と同じ考え方で、この workspace の Merkle 構造すべてが
+使っている性質である。**依存として取らず 15 行で書いた** —— この subsystem の
+依存ゼロという性質が、ブラウザの client で動くことの根拠だから。
+
+実装上の注意（次に触る人向け）:
+
+- **hash は runtime 間で同一でなければならない。** Clojure の `hash` は JVM と JS で
+  異なるので、同じコーパスが 2 つの runtime で**別の木の形・別の manifest CID**になる。
+  FNV-1a を自前で書いたのはそのため（block address 用の hash ではなく、境界判定専用）。
+- **床と天井を置く。** 床が無いと語彙の分布次第で 1 語 1 block に退化し（語ごとに
+  round trip）、天井が無いと不運な連続で client が丸ごと落とす巨大 block ができる。
+
+## D3 — append は純関数。分岐は ref 面の問題であって、ここで検査しない
+
+最初の実装には「同じ manifest への 2 回目の追記を拒否する」ガードを書いた。**これは
+原理的に書けない** —— 親 manifest は自分に子ができたことを知らないので、必要な証拠が
+block 側に無い。**ガードは通ってしまう（2 つの writer が競っている最中でも）** ので
+劇場になる。
+
+削って、代わりに**実際に成り立つ性質**を保証・検査することにした:
+
+> **`append!` は `(manifest, docs)` の純関数である。** 同じ追記を 2 回行えば
+> **同じ manifest CID** になる。
+
+これで、ガードが欲しかったものが手に入る: 応答を取りこぼした後の再試行は無料で、
+重複追記は address の比較で検出できる。**分岐の裁定は `inga`（ref 面）の仕事**で、
+ADR-2608071500 が既に「publish の単一 writer は前提であって強制ではない」と
+scope 外に置いている。
+
+## D4 — 実コーパスで測る。合成コーパスは analyzer の半分を一度も走らせていなかった
+
+これまでの全数値は `synth/corpus`（`w<rank>` トークンの Zipf 抽出）由来だった。
+コストモデルを切り出すには正しい形だが、**2 つが未測定のまま残り、片方は程度問題ではない**:
+
+1. **CJK 経路が一度も走っていない。** `analyze/tokenize` は ASCII run に加えて
+   **CJK bigram** を出し、この形式が合わせている `web.search` の対象は主に日本語である。
+   `w1234` は ASCII。**対象コーパスが実際に通る解析経路が、一度もベンチされていなかった。**
+2. **合成の裾は短い。** 実測: 実コーパスの語彙 127,178 に対し合成は 20,000。
+
+コーパスはこの workspace 自身の `90-docs/adr/*.edn`（日英混在の技術散文）と
+checkout 済み repo の README。**web クロールではない** —— 小さく、技術的で、この
+workspace の語彙に偏っている。**そうでないのは「索引が設計されたのと同じ仮定で
+生成されていない」という点**で、それが合成ベンチには原理的に検出できない失敗モードである。
+
+# 実測（2026-08-08、実コーパス 5,778 文書 / 語彙 127,178）
+
+receipt: `bench/results/2026-08-08-incremental-real-corpus.edn`。
+
+## chunking A/B — 同一コーパス・同一追記・境界規則だけが違う
+
+**当初の主張は部分的にしか正しくなかったので、正確に書く。**
+
+| 追記 | fixed arity | content-defined | |
+|---|---|---|---|
+| **1 文書を 999 文書へ** | 3,035 block | **1,322 block** | **2.3 倍安い** |
+| 3,799 文書を 1,976 文書へ | 110,001 block | 115,424 block | **5% 高い** |
+
+内容定義境界が効くのは**小さい追記だけ**で、大きい batch ではむしろ少し高い
+（可変長 chunk は min-size 床のぶん平均が小さくなり、索引全体が 2.4% 大きくなる:
+466,100 → 477,402 block）。
+
+**理由は 2 つのコストが別物だから**:
+
+- **shift コスト** — fixed arity では、語を 1 つ挿入すると以降の全 leaf の中身が
+  ずれる。語彙 68,049 / fanout 32 ≈ 2,100 leaf が**batch サイズに関係なく**書き直る。
+  内容定義境界はこれを消す。
+- **touch コスト** — 追記した batch に含まれる相異なる語は、それぞれ自分の leaf を
+  触る。**これはどちらの規則でも消えない。**
+
+つまり内容定義境界がしたのは、追記コストを **O(コーパス語彙) から O(batch の語彙) へ**
+落としたことであって、定数にしたことではない。1 文書（相異なる語 ~1,300）の追記が
+1,322 block なのはこの内訳と一致する。大きい batch は leaf のほとんどを触るので
+両者は収束し、索引サイズの差だけが残る。
+
+**それでも既定を `:content` にする**のは、クロールが小さい batch を繰り返すものだから。
+大きい batch しか来ないと分かっている用途では `:fixed` の方が安い —— だから
+オプションとして残し、A/B を bench に置いた。
+
+## 追記のコスト（既定 = content-defined）
+
+| 追記 | 書いた block | 全再構築 | 比 |
+|---|---|---|---|
+| 1 文書 → 999 | 1,322 | 296,448 | **0.004** |
+| 760 文書 → 3,040（同質） | 57,305 | 225,217 | 0.25 |
+| 3,799 文書 → 1,976（別主題） | 115,424 | 540,731 | 0.21 |
+
+## drift — basis からの乖離は測れる量である
+
+同じ文書集合を「追記で作った索引」と「一括で作った索引」で比べた top-10 の doc-id 一致率:
+
+| basis からの成長 | top-10 一致率 |
+|---|---|
+| ×1.00（1 文書） | **0.99** |
+| ×1.25（760 文書） | **0.96** |
+| ×2.92（3,799 文書） | **0.64** |
+
+**score ベクトルは全ケースで不一致**（0/7）—— idf が違うので当然で、これは異常ではない。
+見るべきは**順位の入れ替わり**の方で、コーパスが 3 倍になると top-10 の 36% が別物になる。
+運用の閾値はここから引ける（本 ADR は値を決めない、下記「到達しないところ」）。
+
+**そして全ケースで `self-consistent: true`** —— 追記で作った索引でも、境界付き走査は
+**同じ索引の全走査と一致する**。drift は「正解が何か」を動かすが、early termination の
+証明は動かさない。この 2 つが別物であることが、追記を安全にしている性質である。
+
+## 実コーパスが合成と違ったところ
+
+- **語彙 127,178 対 合成 20,000。** 裾は予想どおりずっと長い。
+- **CJK 経路が初めて走った**（`去を` `共通` `型へ` `割り` `ます` `は置` `到達` `て接`）。
+  **合成コーパスは `w<rank>` しか出さないので、この分岐は一度も実行されていなかった。**
+- **CJK クエリの方が安い傾向**（14〜27 GET）—— ASCII（26〜36）より選択的で、
+  `absent` が 4〜7/8 と高い。bigram が長い語より珍しいため。
+- 1 クエリ 14〜57 GET、索引 54 万 block に対して **0.003〜0.011%**。waves は 9〜11。
+
+# この設計が到達しないところ（正直に）
+
+- **compaction が無い。** 追記は segment を増やし続けるので、放置すれば shard 数が
+  増えて fan-out に効く（ADR-2608085000 が測った項）。小さい segment を統合する
+  merge と、それに伴う basis の更新は**書いていない**。追記だけでクロールに追随でき
+  ても、無限には続けられない。
+- **drift の閾値を決めていない。** 「どこまで drift したら再構築か」は測れるように
+  なったが、値は運用が決めるもので、本 ADR は決めていない。
+- **実コーパスは web ではない。** 5,700 文書は crawl の規模ではないし、技術文書の
+  語彙分布は web 全体のそれではない。**CJK 経路が走ったことは本物**だが、
+  日本語 web の分布を測ったわけではない。
+- **ネットワークを測っていない。** GET 回数と waves のまま。waves × 実測 RTT が
+  見積もりであることは前 2 ADR と同じ。
+- **`70-tools/` は正しい置き場ではない**（3 つ目の ADR が同じことを書いている）。
+  `kotoba-lang` への切り出しと west 登録は依然 follow-up。
+
+# Consequences
+
+- **(+) クロールに追随できるようになった。** 両 ADR の「次にやること 2」が閉じた。
+- **(+) 実コーパスが設計の欠陥を 1 件見つけた**（固定 arity の chunking）。
+  合成コーパスは均質なので、この欠陥を**構造的に見せられなかった**。
+- **(+) 「検査できないものを検査するふり」を 1 件削った**（D3）。
+- **(-) compaction が無いので、追記は無限には続かない。**
+- **(-) 本番経路ではない**（前 2 ADR と同じ）。
+
+# 次にやること（優先順）
+
+1. **compaction** — segment を統合し basis を更新する。追記の対になるもの。
+2. **`kotoba-lang` への切り出しと west 登録** — 3 つの ADR が同じ follow-up を
+   繰り返している。これ以上先送りしない。
+3. **R2/B2 への実 GET で waves × RTT を測る** — 回数を latency に翻訳する。
+4. **実 web コーパス**（`product-corpus` / `kotobase-commoncrawl-actor`）—— ただし
+   前者は annex で B2 から取得が要り、372 件しかない。
+"}]

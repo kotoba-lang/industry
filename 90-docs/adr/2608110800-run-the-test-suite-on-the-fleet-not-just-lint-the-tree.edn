@@ -1,0 +1,80 @@
+[{:db/id -1
+  :adr/id "ADR-2608110800"
+  :adr/title "テストスイートを fleet で実際に回す。検出だけでなく阻止する側の gate"
+  :adr/status "accepted"
+  :adr/date "2026-08-11"
+  :adr/deciders "Jun Kawasaki（「安定化, 成熟度の向上を進めて」→「next」）+ Claude Code"
+  :adr/supersedes ""
+  :adr/relates-to "ADR-2608110700（production を見る live gate。本 ADR はその対の merge 前側）, ADR-2608036600（npm ci 系の除外理由を本 ADR が訂正）, ADR-2607300900（CI は murakumo fleet）, net-kotobase docs/adr/2608110600"
+  :adr/body
+  "# ADR-2608110800: テストスイートを fleet で実際に回す
+
+**Status**: accepted / **Date**: 2026-08-11
+
+## Context
+
+ADR-2608110700 で production を見る live gate を足した。それは**壊れた
+production を検出する**が、**壊れたコードが merge されるのは止めない**。
+
+2026-08-11 の障害（`/api/*` 全 8 経路が 502）の原因は `client_api.cljc` の
+閉じ括弧 1 個で、当時のテストは `client_api_test` が 2 件——**どのパスがこの
+surface に属するか**を主張するだけで、**その surface を一度も呼んでいなかった**。
+修正時に実際に関数を叩くテストを足した（342 → 368 tests）が、**それを回すものが
+fleet に無ければ意味が半分**になる。hermetic gate は syntax と tenant-isolation は
+見るが、テストスイートは回さない。
+
+## Decision
+
+`net-kotobase-gateway-tests` gate を追加する。ノード上で
+`npm ci && npm test` を実行し、結果を検査する。
+
+**合格条件は「0 failures」だけではない。** 実行された test 数が `--min-tests`
+（現在 360）を下回ったら落とす。classpath が壊れて 3 件だけ走り「0 failures」と
+報告する状態を合格にしないための床で、`:min-files` と同じ役割。
+
+**赤いときは失敗したテストを名指しする。** 初版は出力の末尾 25 行を出していたが、
+`clojure.test` の summary は最後、`FAIL in (…)` ブロックははるか上にあるため、
+**件数だけ出てテスト名が 1 つも出なかった**。赤い gate が何を指しているか
+分からないなら、それは赤いだけで役に立たない。
+
+## 前提の訂正（2 件目）
+
+ADR-2608036600 は `npm ci` 系を「ノードは tailnet だけで npm registry に届かない」
+として除外していた。ADR-2608110700 が live smoke の除外理由を訂正したのと同じ誤りで、
+**2026-08-11 実測: judah / levi / simeon の 3 台とも registry.npmjs.org = 200、
+repo1.maven.org = 200**。java は非対話 ssh の PATH に無いだけで
+`/opt/homebrew/opt/openjdk` に 26.0.1 が在る（gate が自分で解決し、無ければ
+**合格ではなく exit 91**）。
+
+**tree 全体が要る。** テストは `net-kotobase/object-store-b2-s3` を `:local/root` の
+兄弟として解決するので、`kotobase-api-gateway-cljs/` だけ配ると classpath が
+解決できず 1 件も走らない（実測。gate が明示的に検査して exit 90）。
+
+## 落ちることを確かめた ―― 実ノードで、実バグで
+
+CLAUDE.md「落ちない gate は劇場」および「ローカルで赤は fleet で赤ではない」に従い、
+すべて judah 上の `npx nbb` で測った:
+
+| 条件 | 結果 |
+|---|---|
+| pin 741fa65 の tree | **exit 0**（368 tests / 1812 assertions） |
+| **修正前の `client_api.cljc` に戻す** | **exit 1（10 failures, 1 error）** |
+| `--min-tests 400` | **exit 1**（床未達） |
+| tree 不在 | **exit 90** |
+| JVM 不在 | **exit 91** |
+
+2 行目が本命である。**この gate は、今回実際に起きた障害を実際に捕まえる。**
+出力には `/api/db must not 502; body was {:error \"(intermediate value).then is
+not a function\"}` がテスト名つきで並ぶ。
+
+## Consequences
+
+- net-kotobase の gate は 3 本になった: hermetic（tree の lint）/
+  gateway-tests（merge 前にコードを止める）/ live-planes（production を見る）。
+  3 本とも別の問いに答えており、どれも他の代わりにならない。
+- gate 1 本あたり `npm ci` + shadow-cljs のフルビルドが走る。gate-timeout は
+  30 分で、実測は余裕をもって収まった。maven の初回解決はノードの
+  `~/.m2` に残るので 2 回目以降は速い。
+- **まだ塞いでいない穴**: 他 repo の cljs スイートは同じ方法で回せるが未着手。
+  この gate は net-kotobase の gateway だけを見る。
+"}]

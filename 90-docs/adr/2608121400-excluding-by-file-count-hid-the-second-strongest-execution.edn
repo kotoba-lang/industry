@@ -1,0 +1,129 @@
+[{:db/id -1
+  :adr/id "adr-2608121400-excluding-by-file-count-hid-the-second-strongest-execution"
+  :adr/title "ADR-2608121400: 「.kotoba が多い repo は fixture だろう」で除外したのが 2 度目の誤り —— provider は 73 core / 142 出荷 wasm を持ち、twin パターンも規模で抱えていた"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-12"
+  :adr/last-verified "2026-08-12"
+  :adr/last_verified "2026-08-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "excluded-set-reclassified"
+  :adr/tags "kotoba, survey-method, provider, kototama, stdlib, classification"
+  :adr/related ["adr-2608120200-what-the-kotoba-cores-actually-run"
+                "adr-2608112100-a-kotoba-core-with-a-parity-test-is-not-done"]
+  :adr/supersedes ""
+  :adr/superseded_by ""
+  :adr/authoritative true
+  :adr/authoritative-for
+  ["ADR-2608120200 の調査が除外した 5 repo の分類（2026-08-12 実測）"
+   "kotoba-lang/provider の .kotoba が何であるか"
+   "調査で repo を除外してよい根拠と、してはいけない根拠"]
+  :adr/body
+  "# ADR-2608121400: 数で除外したのが誤りだった
+
+**Status**: accepted
+**Date**: 2026-08-12
+
+## Context
+
+ADR-2608120200 の調査は `.kotoba` の**ファイル数**で repo を並べ、上位を
+「compiler の test fixture だろう」として**測らずに除外**した。除外集合は
+`compiler` / `amu` / `kotoba` / `kotoba-lang` / `kotoba-v2025` / `provider` /
+`aiueos` / `kototama`。
+
+**その仮定は 2 回外れた。** 1 回目は `aiueos`（59 core 中 57 が `.o` になり kernel ELF に
+リンクされる。別セッションが発見）。**2 回目が `provider` である。**
+
+## 実測（2026-08-12、read-only）
+
+| repo | 総数 | live | test/CI のみ | fixture | dead |
+|---|---|---|---|---|---|
+| `kotoba` | 105 | 0（1 件は下記の境界例） | 93 | 9 | **3** |
+| `kotoba-lang` | 35 | **1** | 5 | 29 | 0 |
+| `kotoba-v2025` | 31 | 0 | 0 | 0 | **31**（全て `_archive/`） |
+| `provider` | 77 | 0（**73 が境界例**） | 73 | 4 | 0 |
+| `kototama` | 12 | 0（**1 件が移行パターンそのもの**） | 12 | 0 | 0 |
+
+### `provider` —— fixture repo ではまったくなかった
+
+- **73 の `.kotoba` decision core**、それぞれに**コミット済みの `.wasm`**（142 本、
+  provenance sidecar 付き）
+- registry `wasm-packages-v1.edn` の **142 entry すべてが `:fixture? false`**。
+  同 repo の `kit-readiness-v1.edn` は「Fixtures never claim production」と書いている
+- **test ではない `src/` の namespace が実際に instantiate して呼ぶ** ——
+  `src/provider/edn_codec.clj` が registry を読み、wasm を取り出し、Node 上で実行する
+
+(a) live にしなかった唯一の理由は、**`provider.edn-codec` を呼ぶ fleet 内の消費者が
+（自身の test 以外に）無い**こと。**出荷物と本番 host はあり、呼び手だけが無い。**
+
+### `provider` は twin パターンを規模で抱えている
+
+`http_post_bounds.kotoba` の `4096 / 32 / 65536 / 30000` は、`src/provider/http.cljc` の
+`max-url-bytes` / `max-headers` / `max-pull-bytes` / `max-timeout-ms` **そのもの**である。
+同じ形が `process_spawn_bounds` `entropy_draw_bounds` `git_run_bounds` `secret_name_len`
+`fs_path_len` `storage_value_len` `object_digest_len` … と約 10 組続く。
+
+**強制しているのは `.cljc` の方**（`http.cljc` は `clojure.string` しか require せず、
+wasm には一切触れない）。`.kotoba` 側は監査用の並行再実装。
+ADR-0171 がこの二重化を意図的と書いている。
+
+**この migration が探している当のパターンが、「fixture だから」と除外した repo の中に
+規模で存在していた。**
+
+### その他、記録に値するもの
+
+- **`kototama/clj/wasm/prior_shortcut.kotoba`** —— 完成した decision-core 移行が
+  **意図的に駐車されている**。compile 済み、production の `src/` namespace が Chicory で
+  host し、`.cljc` と parity test 済み。にもかかわらず default に swap していない。
+  docstring が理由を書く: 「`organism` は live production fleet の decision-gate であり、
+  **autonomous な置換ではなく明示的な owner 判断に値する**」。**正しい止まり方の実例。**
+- **`kotoba-lang/lang/stdlib/core.kotoba`** は出荷される言語成果物（bounded stdlib prelude）。
+  conformance corpus だと思っていた repo の中で、唯一無条件に live。
+- **`kotoba/src/*.kotoba` の 76 本は `src/` 直下にあるデモ**である。本物の Clojure は
+  `src/kotoba/` の 1 階層下。**パス名による分類はここで全滅する。**
+- `kotoba/providers/` の **`pg_consumer` / `pg_explicit_scram_consumer` /
+  `pg_pool_multi_consumer` は参照ゼロ**（archive 外で唯一の真の dead）。
+
+## Decision
+
+### 1. 調査で repo を除外してよいのは、測った結果としてだけ
+
+**ファイル数・ディレクトリ名・「fixture っぽさ」で除外しない。** 今回 2 回とも、
+除外の根拠は「数が多い」であって、fixture であることの証拠ではなかった。
+`provider` は 77 本持っていて、**77 本とも fixture ではなかった**。
+
+分類に使える証拠は: **コミット済みの成果物があるか**、**registry が何と宣言しているか**、
+**test でない `src/` から呼ばれているか**、**CI/hook が走らせるか**。
+パスと本数はそのどれでもない。
+
+### 2. 「呼び手が無い」と「fixture である」を区別する
+
+`provider` は出荷物・provenance・本番 host を持ち、呼び手だけが無い。
+これは fixture ではなく **(b) test/CI のみ**で、**live まで 1 hop** である。
+この 2 つを同じ箱に入れると、完成間近の移行が「テスト用」として見えなくなる。
+
+### 3. `kototama` の止まり方を先例として引く
+
+decision core を作り、host を書き、parity を取り、**そのうえで default に swap せず
+owner 判断を待つ** —— これは未完成ではなく、**live な決定ゲートに対する正しい進め方**である。
+今日 `nexus-x402` や `net-kotobase` で見た「気づかないうちに本番が古い規則で走る」形の
+対極にある。
+
+## Consequences
+
+- **ADR-2608120200 の repo 数は下限として読む。** あの調査は 16 repo、その後別セッションが
+  23 repo、本 ADR がさらに 5 repo。**どれも「見た範囲で」であり、fleet 全体ではない。**
+- **`provider` を移行対象として扱うかは未決。** twin は在るが、強制しているのは `.cljc` で、
+  `.kotoba` 側は監査用と ADR-0171 が明言している。**意図された二重化**なので、
+  今日 vendoring や namespace 衝突で見た「事故としての二重化」とは別物として扱う。
+- 未検証: 実行の主張は call site・コミット済み成果物・CI 設定から立てたもので、
+  **走らせて観測したものではない**。`orgs/` の外の消費者も見ていない。
+
+## Evidence
+
+- read-only の並列調査 1 本、file:line 付き。`grep -o ':fixture? [a-z]*' | sort | uniq -c`
+  → `142 :fixture? false`
+- `kotoba-v2025/README.md` が自ら「active な移行経路の一部ではない」と書いている
+"}]

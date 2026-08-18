@@ -1,0 +1,138 @@
+[{:db/id -1
+  :adr/id "adr-2608080400-isco-1212-usage-unit-price-boundary-computable-optimum-not"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/topic "isco-1212-usage-unit-price"
+  :adr/title "ADR-2608080400: /isco-1212/ の従量単価を XMILE で解いた — 代替境界は実測だけで出るが、最適点は原理的に出ない（需要曲線が未計測なので）"
+  :adr/status "accepted"
+  :adr/date "2026-08-08"
+  :adr/last_verified "2026-08-08"
+  :adr/deciders ["Jun Kawasaki" "agent（オーナー指示 2026-08-08『単価も xmile で、競合を含めて計算して』）"]
+  :adr/authoritative true
+  :adr/repos ["com-junkawasaki/root" "kotoba-lang/org-oasis-open-xmile" "gftdcojp/cloud-itonami"]
+
+  :adr/authoritative_for
+  ["/isco-1212/ の proposal 単価は [限界費用 ¥1.5, 代替境界 ¥785/r] に入る。r は従業員 1 人あたり月間 proposal 数"
+   "代替境界は実測値だけで決まり、Bass 係数・弾力性・需要曲線を一切使わない"
+   "**最適点はこのモデルでは選べない。** 同じ実測値に 2 つの未計測な需要曲線を当てると最適値が 32〜128 倍食い違い、どちらも sweep の端点に張り付く"
+   "r が唯一の律速。境界を 20 倍（¥79〜¥1,570）動かすのは r だけである"
+   "この surface に ¥50,000-150,000/月 の portfolio-uniform 帯を適用しない。あの帯は flat な managed tier 用であって純従量課金の単価ではない"
+   "限界費用は価格の制約になっていない（境界は費用の 52〜1,047 倍）。効いているのは代替であって原価ではない"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+
+  :adr/related
+  ["adr-2608080300-cloud-itonami-cancellation-refund-and-complaint-accountability"
+   "adr-2608026300（murakumo の最適価格 XMILE。SCENARIO と MEASURED を混ぜない作法の先例）"
+   "adr-2607203000（system dynamics は kotoba-lang/dynamics を使う。未計測なら :uncomputable-until-measured）"
+   "adr-2607072350（XMILE を system dynamics 計算基盤とする）"
+   "adr-2608062400（R ループは価格と CAC が無いので blocked）"
+   "90-docs/system-dynamics/itonami_hr_unit_price.cljs（再現スクリプト）"
+   "90-docs/business/cloud-itonami-hr-unit-price.xmile（実行したモデルの XMILE 投影）"
+   "90-docs/pricing-intelligence/pricing-intelligence-ledger.edn seq 152-157"]
+
+  :adr/context
+  "オーナー指示（2026-08-08）『単価も xmile で、競合を含めて計算して』。
+
+ADR-2608080300 は pricing surface の 5 項目のうち 4 項目を確定し、**単価 2 件だけを『読めないから決めない』として残した**。そこで言う『読めない』は **Stripe に現在設定されている額**のことである。本 ADR が解くのはそれとは別の対象 —— **競合と原価から導く提案単価**であって、Stripe の現行値ではない。この 2 つを混同すると、モデルの出力を『現在の価格』として公開してしまう。
+
+### 何が測れていて、何が測れていないか
+
+**MEASURED（2026-08-08、出典付き）**
+
+| 対象 | 値 | 出典 |
+|---|---|---|
+| 競合 jinjer 人事労務管理 | **¥800/ユーザー/月**（最低 12ヵ月、機能制限版 ¥500） | PRONIアイミツ（2025-08-25 更新） |
+| 競合 kaonavi | **価格を 1 円も公開していない** | 公式 /price/ を 2026-08-08 に取得 |
+| 競合 HRBrain | **同じく非公開** | 公式 /price を 2026-08-08 に取得 |
+| 競合 SmartHR | 3 プランとも要見積もり。集約サイトの数値は総額か単価か**読めない** | ITreview ほか |
+| 限界費用 proposal | **¥1.5**（murakumo `.well-known/x402` の $0.01/message） | 自 fleet の公開価格 |
+| 限界費用 保管 | **¥2.25/GiB·月**（R2 Standard $0.015/GB-month） | Cloudflare 公式 |
+| TAM 上限 | 日本の中小企業 **3,364,891 社** | 2024年版中小企業白書 |
+| 現行利用 | agentRuns7d 306 / 外部テナント 5 / **有償 0** | itonami.cloud/api/fleet/metrics |
+
+**4 社中 2 社が価格を 1 円も公開していない。** これは pricing-intelligence-ledger が K-12（ParentSquare / Brightwheel / Procare）と higher-ed（Starfish / Symplicity）で既に記録している不透明パターンと同型である。**非公開の 2 社を『たぶんもっと高い』と仮定して基準を上げていない** —— それは捏造になる。基準は公開されている中で最も高い実価格 = jinjer ¥800。
+
+**未計測**: 需要の価格応答。cloud-itonami の conversion は **0/5** なので、弾力性も Bass 係数も採れていない。"
+
+  :adr/decision
+  "## 1. 硬い答え — 代替境界（実測のみ）
+
+同じ組織にとって itonami の請求が競合と同額になる単価:
+
+```
+p_proposal ≤ (¥800 − p_storage × 0.05) / r        r = proposal/従業員/月
+```
+
+p_storage = ¥300/GiB·月 のとき:
+
+| r | 同額になる ¥/proposal | 限界費用の何倍 |
+|---|---|---|
+| 0.5 | ¥1,570 | 1,047x |
+| 1 | ¥785 | 523x |
+| 2 | ¥393 | 262x |
+| 5 | ¥157 | 105x |
+| 10 | ¥79 | 52x |
+
+**境界は ¥79〜¥1,570 の 20 倍に散らばり、その全部が未計測の r だけで動く。**
+
+**費用は制約になっていない。** 境界は限界費用の 52〜1,047 倍で、価格を縛っているのは代替であって原価ではない。したがって『原価 + マージン』で決めてはならない —— それは 2 桁低い答えを出す。
+
+## 2. 柔らかい答え — 最適点は選べない
+
+XMILE stock-flow を 2 通りの需要曲線で走らせた。**どちらも測定されていない。**
+
+| r | 上限の無い冪の最適 | 飽和(Hill)の最適 | 食い違い |
+|---|---|---|---|
+| 0.5 | ¥5 | ¥640 | **128 倍** |
+| 1 | ¥5 | ¥640 | 128 倍 |
+| 2 | ¥5 | ¥640 | 128 倍 |
+| 5 | ¥5 | ¥320 | 64 倍 |
+| 10 | ¥5 | ¥160 | 32 倍 |
+
+**どちらも sweep の端点に張り付き、内点最適が存在しない。** 曲線の形を選ぶ行為がそのまま答えを選ぶ行為になっており、その形を選ぶ根拠が無い。
+
+**したがって『XMILE で計算した最適単価は ¥N です』とは言えない。言えば、実際には自分が選んだ仮定を計算結果として提示することになる。**
+
+## 3. 帯を跨いで流用しない
+
+`¥50,000-150,000/月` の portfolio-uniform 帯（isic-6399/6310/7810/5820）を **この surface に適用しない**。あれは **flat な per-tenant managed tier** に対して検証された帯であり、`/isco-1212/` は**純従量**である。単位が違うものを同じ帯で語ると、ledger が K-12 で明示的に拒否したのと同じ誤りになる。
+
+## 4. 次に測る 1 数値を r に固定する
+
+**r（従業員 1 人あたり月間 proposal 数）**。境界を 20 倍動かす唯一の変数であり、**有償化を待たずに測れる** —— 既存の 5 テナントは無償だが proposal は出している。現在 `agentRuns7d 306 / 5 tenants` は取れているが、①agent run と HR-advisor proposal は同一ではない ②テナントの従業員数が分からない、の 2 点で r には変換できない。**この 2 つを計測に足すことが、価格決定より先に来る。**
+
+## 5. 単価の公開は依然 owner の 1 手のまま
+
+本 ADR は **Stripe に現在設定されている単価を明らかにしていない**。ADR-2608080300 決定 5 の手順（`stripe prices retrieve` → 転記）はそのまま有効である。本 ADR が与えるのは、**その値を見たときに『高すぎ／安すぎ』を判定できる境界**であって、値そのものではない。"
+
+  :adr/consequences
+  "- **境界という形なら、conversion 0 のままでも価格について言えることがあると分かった。** 『需要が測れないから何も言えない』でも『それらしい最適値を出す』でもない第三の答えがある。
+- **費用が制約でないことが数値で出た（52〜1,047 倍）。** 原価積み上げで単価を決める誘惑がここで消える。
+- **r を測る動機が価格に紐づいた。** これまで agentRuns は健全性の指標でしかなかったが、従業員数と proposal/run の切り分けを足せば価格の律速が外れる。
+- **2 つの需要曲線を両方残したことが、この ADR の核である。** 片方だけ実装していれば、¥5 か ¥640 のどちらかを『XMILE が出した最適値』として出荷していた。**モデルは 1 本だと必ず答えを出す。答えが出たことは正しさの証拠にならない。**
+- **XMILE ライブラリの小さな欠落を 1 件見つけた。** `org-oasis-open-xmile` の `emit-header` は `<caption>` をモデル化しておらず、出典 caption を emit 後に挿入している。既存の `cloud-itonami-saas-funnel.xmile` は手書きだったので露見していなかった。
+- **ADR-2608062400 の blocked-items は解けていない。** 本 ADR は価格の**境界**を出しただけで、**測定された価格**（実決済 1 件）でも CAC でもない。R ループは blocked のままである。"
+
+  :adr/verification
+  "**再現**:
+
+```
+nbb --classpath \"<org-oasis-open-xmile>/src:90-docs/system-dynamics\" \\
+    90-docs/system-dynamics/itonami_hr_unit_price.cljs
+```
+
+実行した XMILE モデルの投影を `90-docs/business/cloud-itonami-hr-unit-price.xmile` に出力した（OASIS XMILE 1.0 名前空間、変数 10 = stock 2 / flow 2 / aux 6）。**well-formedness と構造は Python の ElementTree という独立したパーサで検証した**（emit した側のライブラリで parse し直すのは循環になるため。なお nbb/Node 上では `parse-string` が `DOMParser` を要求して動かない）。
+
+**モデルの誤りを 2 回踏んで直した。両方とも記録する。**
+
+1. **初版は発散した。** `market_size = 3000 × value_ratio^1.5` に上限が無く、価格を下げるほど市場が無限に広がるので、常に最安値が最適という退化解になった。実際の出力は**テナント 758,946 社・2 年累積寄与 ¥334 億**。『競合の 40 分の 1 の価格なら市場が 253 倍になる』は構造として偽である。→ TAM（中小企業 3,364,891 社）で上限を与え、Hill 型の飽和応答に置き換えた。
+2. **修正版は反対側の端点に張り付いた。** 飽和させると市場がほぼ減らないので、今度は常に最高値が最適になった。**これは 1 の鏡像であって修正ではない。** ここで Hill の係数を調整して見栄えのよい内点最適を作ることもできたが、それは欲しい答えにモデルを合わせる行為なのでやっていない。代わりに**両方の曲線を残して食い違いを出力させた**。
+
+**この ADR が検証していないこと**:
+
+- Stripe に現在設定されている単価。**読んでいないし推定もしていない。**
+- r の実測値。agentRuns7d 306 / 5 tenants は取れているが、agent run ≠ HR-advisor proposal であり、テナントの従業員数も分からないので r には変換できない。
+- SmartHR の実価格。集約サイトの数値は読解不能として ambiguous のまま残した。
+- 弾力性・Bass 係数・addressable 比率・従業員あたり保管量。すべて SCENARIO であり、**実測値として引用してはならない。**"}]

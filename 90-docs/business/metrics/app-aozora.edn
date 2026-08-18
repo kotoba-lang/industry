@@ -1,0 +1,38 @@
+{:health-status 200,
+ :zone-name "aozora.app",
+ :workers-invocations-7d
+ {"app-aozora-pds" 16413,
+  "app-aozora-appview" 15155,
+  "app-aozora-spa" 6973},
+ :zone
+ {:requests-7d 1165505,
+  :pageviews-7d 5894,
+  :uniques-7d-sum 929,
+  :zone "aozora.app"},
+ :sources [:cloudflare :health],
+ :paths
+ {:ok
+  [{:path "/v1/datoms", :requests 515012}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4997}
+   {:path
+    "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
+    :requests 208}
+   {:path
+    "/bafyreicy2go3fqwsoh7zup3asioqghz3qykjuednggzcmpaacu7fpao2sm",
+    :requests 199}
+   {:path
+    "/bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4eq3q5k2optwu446juce4",
+    :requests 79}
+   {:path "/robots.txt", :requests 74}
+   {:path "/federation-pilot/did.json", :requests 70}
+   {:path
+    "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
+    :requests 58}],
+  :status-mix {:server-error 172557, :ok 522304, :client-error 6189},
+  :window "24h"},
+ :as-of "2026-08-13",
+ :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 25},
+ :top-paths
+ "上位 page (24h, 2xx/3xx): /v1/datoms 515012 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4997 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 208 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 199 · /bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4… 79 | 4xx(probe) 1% · 5xx 25%",
+ :signal
+ "aozora.app 実測 1165505 req/7d・929 uniques(日次和)・うち4xx probe 1%(24h)、workers 38541 inv/7d"}

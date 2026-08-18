@@ -1,0 +1,313 @@
+[{:db/id -1
+  :adr/id "2608100400"
+  :adr/title "特許収集を常駐化する — journal を shard 化し、query 面を検査に変える"
+  :adr/status "accepted"
+  :adr/date "2026-08-10"
+  :adr/renumbered-from "2608100200 — 並行セッションが同じ番号で ADR を先に着地させていた（13:08 対 17:21）。ADR id は edn-query の面で entity を引く鍵なので、重複は 2 つの決定を 1 つの id に畳む。後から着地した方（これ）が動く。"
+  :adr/related "2608100100 2608081200 2608082600 2607072300 2608039700 2607173000 2605241500"
+  :adr/body
+  "## 決定
+
+オーナー指示（2026-08-10）「収集を安定して murakumo fleet で常駐化して、データは
+datalad, edn で保存, datomic, kotoba query ができるように」。4 つに分けて実装した。
+
+## 1. 常駐化 — observatory-run とは別 plist にする
+
+`com.gftd.observatory-run.plist` は自分でこう定めている: **外向きの fetch/publish を
+無人の毎時 run に黙って混ぜない。混ぜるなら別 plist にして、その旨を書く。**
+
+hirameki の **autorun は観測だけ**（ネットワークに触らない）なので既存の
+observatory-run（毎時 :11、`--due`）に乗る。**harvest は 1 tick 1 外部リクエスト**
+なので `com.gftd.hirameki-harvest.plist`（4 時間ごと、1 回 20 tick）に分けた。
+同じプロセスに入れると「観測を毎時回す」判断が「Google Patents を毎時叩く」判断を
+暗黙に含んでしまう。
+
+**fleet ノード（mac-mini 10 台）には配らない。** ノードは外向き HTTPS を持っている
+（2026-08-05 に全ノード実測）が、配らない理由が 2 つある:
+
+1. **並列化はこの仕事では劣化である。** この source の規約は「識別可能な
+   User-Agent・逐次・低レート」。10 ノードから並列に叩けば速いが、それは守ると
+   決めた礼儀を破ることでしか得られない速さで、要件ではない。
+2. **書き込みに credential が要る。** fleet-ci の不変条件は「ノードにはテストだけを
+   配り、秘密情報を配らない」。取得は鍵不要でも corpus への push は鍵が要るので、
+   ノードに置いても 1 の理由で得るものが無い。
+
+したがって newsfeed-ingest / observatory-run と同じ operator 常駐。
+運用側は `scripts/hirameki-harvest.cljs` が持ち、observatory-run から
+4 つの不変条件を継承する: exit 0 を成功の証拠にしない / FF できなければ何もしない /
+自分のファイルだけ commit する / 落ちたら台帳に理由付きで残す。
+
+## 2. journal の shard 化 — 常駐を安全にするための前提
+
+**これが無いと常駐させてはいけなかった。** journal は 1 ファイルで、しかも中身は
+**691 KB の 1 行**（`(pr-str (vec quads))`）だった。両方とも 618 特許では見えず、
+4 万特許で致命的になる:
+
+- git は commit ごとに journal 全体の新しい blob を保存する。20 tick × 6 run/day で
+  44 MB の journal に対しては、1 日 8 KB の新事実を記録するために**1 日 5 GB の
+  git object** を書くことになる。
+- 1 行のファイルは delta 圧縮を無効化し、`git diff` / `git blame` を
+  **ADR-2607072300 が正本と定めたまさにその artifact に対して**無意味にする。
+
+`toshokan-patents.quad` に `render-journal`（1 quad 1 行、ただし top-level は
+1 つの EDN vector のまま = 既存の全 reader が無改造で動く）と `append-sharded!`
+（1 MiB で封をして次へ）を入れた。**封をした shard は二度と変わらない**ので git は
+1 度だけ保存し、annex も後から取れる。書き換わるのは有界な active shard だけ。
+
+shard は subdirectory ではなく同じ dir に `<source>.NNNN.journal.edn` として置いた。
+`*.journal.edn` を glob する consumer（query 面 / corpus fold / verify）が無改造で
+動くため。移行は目視でなく**等値で検証**した: 10,614 quads が同じ順序の 10,614
+quads として読み戻り、691,043 バイト 1 行が 10,616 行になった。
+
+## 3. DataLad — annex に入れないことを「決定」として書く
+
+corpus repo は 2026-08-10 に本物の DataLad dataset になった（`datalad create`、
+annex 初期化済み、uuid 321b04b1）。**そして何も annex に入れていない。**
+
+これは未着手ではなく決定である。1 MiB の封済み shard は git が 1 度だけ保存するので
+成長は「事実に対して線形」であり「commit に対して二次」ではない。そのサイズで annex 化
+すると、正本に対する `git diff` / `git blame` を失って何も得ない。
+
+**annex は git が本当に苦手なもののためにある** —— USPTO ODP / EPO OPS が吐く
+数 GB の単一ファイル（`*.tsv` / `*.raw.edn`、行構造が無い）。**その最初の 1 本が
+着地したとき content remote が要る**（B2 か IPFS、`large-binary-datalad` の規約）。
+今設定しないのは入れるものが無いからで、そもそも GitHub は annex content を配れない
+（`git-annex-shell` が無い）。
+
+## 4. Datomic / kotoba query — 主張ではなく検査にする
+
+**`verify.clj` が証明するのは「バイトが manifest と一致する」であって
+「この corpus に問いを立てられる」ではない。** shard 群は完璧にハッシュが合ったまま、
+transact できない形や、join したい属性が存在しない形になりうる。
+
+そこで `query-check.clj` を足した: `datoms/*.kotoba.edn` を全部 DataScript に
+transact し、実際のクエリを走らせる —— 保有者別の件数（299 組織）、管轄の roll-up
+（10）、`:kansai-paint` とその 41 件の join、解放クロックの数値比較（589 件が期限超過）。
+さらに **G1/G2/G6 が「書いたコード」ではなく「公開された artifact」の側で成立する**
+ことを検査する。
+
+**両方向で落ちることを確認した**: 全 shard で assignee 属性を改名 → exit 1、
+inventor 属性を混入 → exit 1。最初の試行は 3 shard のうち 1 つだけ改名しており
+gate は緑のままだったが、これは正しい（他の shard がまだ答えられた）——
+**gate が生き延びた改竄は gate が弱い証拠ではなく、改竄が弱い証拠である。**
+
+superproject 側の datom 面（`manifest/edn-query.cljs`）も直した。ADR-2608100100 で
+corpus を移した翌日まで**消えた dir を読んでいて特許 0 件**になっており、しかも旧実装は
+dir が無いと黙って `[]` を返すので count は「読めなかった」ではなく「特許が無い」に
+見えていた。新パスへ向け直し、**corpus が checkout されていないことを stderr で警告する**
+ようにした。
+
+実測できた join（3 dataset 横断）:
+
+    特許 → 正規化出願人 → LEI → SEC 財務
+    [\"Pfizer Inc.\" 62579000000 \"Biotin intermediates\"]
+
+一致は 1 件だけである。corpus が小さく、Google Patents の出願人表記が LEI の
+legal-name と揃うことが稀なため。**これは join が届く証明であって、被覆の証明ではない。**
+
+## kotobase の ref をまだ切らない
+
+kotobase の Datalog join は ref ちょうど 1 本しか届かない（ADR-260726）。特許を
+どの ref に置くかは「何と join できなくなるか」を決める不可逆な選択なので、
+**consumer が無いうちに切らない。** 現在 join したい相手（法人実体・財務）は
+`edn-query.cljs` の datom 面に既に同居しており、そこで join できている。
+kotobase ref を切るときは、その ref を跨げなくなる分析を名指しで書くこと。
+
+## 実測
+
+- toshokan-patents lib: 7 tests / 42 assertions、JVM と nbb の両方で green
+- hirameki actor: 60 tests / 261 assertions、0 failures
+- harvest 実走: 8 tick → +8 特許（618 → 626）→ 再 publish → verify OK → commit
+- query-check: 8 項目すべて ok、改竄 2 種で exit 1
+- 観測 beat: 626 特許を shard から読み、frontier 1,323、chain OK、2 周目は no-change
+
+## west pin は「引用」であって「鏡」ではない
+
+corpus repo は 4 時間ごとに push される。`manifest/west.yml` の pin はそのたびに
+遅れる —— **これは不具合ではなく、常駐するデータ repo の pin の性質である。**
+pin は「この日にこの内容だった」という引用であって、live な鏡ではない。
+`west update` した checkout が最新でないことを後から「壊れている」と誤読しないよう
+ここに書いておく。live が要るなら repo を直接読む。
+
+pin を daemon に前進させることは**しない**: manifest への自動書き込みは
+CLAUDE.md が共有 checkout で禁じている経路であり、4 時間ごとに west.yml を
+書き換えると他セッションの manifest 作業と恒常的に競合する。
+
+## 検証（すべて実測。launchd 下での無人実行を含む）
+
+- toshokan-patents lib: 7 tests / 42 assertions、JVM と nbb 両方 green
+- hirameki actor: 60 tests / 261 assertions、0 failures
+- **launchd 無人実行: 20 tick → +20 特許（648 → 668）→ 再 publish → verify OK →
+  両 repo push 成功。** SSH push が launchd 下で通ることはこれで確かめた
+  （`secrets-location-map` が警告する Keychain 問題は、この経路では起きなかった）
+- query-check: 8 項目 ok、改竄 2 種（属性改名 / inventor 混入）で exit 1
+- 観測 beat: observatory-run 経由で `:produces-datoms`、Δbytes 18,680、1h 間隔で登録
+
+**常駐は「設定した」ではなく「無人で 1 周完走して台帳が伸びた」ことで確認した。**
+最初の無人実行は log が「20 ticks · 20 new patents」と言いながら台帳が
+`patents 0, published false, actor :push-failed` と言っており、3 つの実バグ
+（旧パス計測 / remote 名 / git の非 0 exit を捨てていた）を暴いた。**ログではなく
+台帳を見ること。**
+
+## 安定化（2026-08-10 追記）
+
+常駐を入れた直後に、常駐そのものを壊す 3 つを見つけて直した。
+
+### 1. 収集が止まっても gate が緑のままだった
+
+観測 gate は「beat が datom を出したか」しか見ない。hirameki は**自分では取得しない**
+（収集は 4h ごとの別常駐、観測は毎時）ので、収集が止まっても beat は正常に走り、
+内容が変わらないので冪等に no-op し、**gate は緑のまま**になる。これは仮説ではない —
+元の収集は 2026-07-28 に止まり 13 日誰も気づかなかった。
+
+registry に **`:feeder`** を足した（どの台帳が入力を養っているか / 何時間で古いか）。
+hirameki は 12h（4h × 3 回分の取りこぼし）。古ければ actor 自身が健康でも失敗する。
+**台帳が無い場合は失敗させない** —— observatory-run は daemon が居ないマシンでも
+走りうるので、不在は「止まった」ではなく「ここでは走っていない」を意味しうる。
+古いことだけが証拠になる。3 状態すべてで確認（21h → 下振れ / 台帳削除 → 緑 / 健全 → 緑）。
+
+なお `:expect` は `:produces-datoms` から **`:produces-datoms-idempotent`** に直した。
+観測が収集より速いので 4 回に 3 回は no-change であり、旧設定では gate が常時赤で、
+**常時赤い gate は無視されるので gate が無いのと同じ**だった。
+
+### 2. corpus は約 5,000 特許で永久に停止する設計だった
+
+`:max-seeds` が「同時に抱えるフロンティア」ではなく**生涯の seed 総数**を縛っていた。
+実測（seeds 1,812 / 作業済み 688）から、cap 到達まで約 10 日、seed を使い切るまで
+さらに約 26 日 —— **約 5 週間で約 5,000 特許のまま止まる**。バグではなく、
+縛る対象を間違えた bound。
+
+frontier を**作業キュー**にした。作業した seed は queue から外れるので、
+埋まる速さで捌け、cap は「同時に抱える量」を意味する。corpus は引用グラフが
+新しい id を出す限り伸び続ける。
+
+捨てられたもの: `:exhausted`（作業済み seed を 1 件ずつ永久保持）·`:cursor`·`:pages`。
+dedup は **corpus 自身**に対して行う —— corpus が「取得したものの記録」なのだから、
+取得したものの一覧を別に持つのは構造的に冗長である。**永久に憶える必要があるのは
+dead（404）だけ** —— 存在しない特許 id は後でも存在しないので、憶えないと
+引用されるたびに再提示される。
+
+### 3. seeds.edn / state.edn が journal と同じ病気だった
+
+206 KB と 47 KB、どちらも **2 行**、毎 tick 全書き換え、毎 run commit。
+journal で直したのと同じ形が actor 側に残っていた。
+
+    state.edn   47,707 B          →     161 B
+    seeds.edn  206,269 B / 2 行    → 128,255 B / 1,134 行（1 seed 1 行）
+
+移行は queue から 688 件を除去した。旧 daemon の `:exhausted` は seed id ではなく
+`\"source|seed|p1\"` の pair key だったので、id 照合だけでは**取得済みの seed が 688 件
+queue に残り**、1 件ずつ tick と request を消費して `already-known` を学ぶだけだった。
+corpus に対して dedup することが修復であり、同時に規則でもある。
+
+## どこで安定化させるか — cloud-itonami か murakumo か（2026-08-10 実測）
+
+### murakumo.cloud はスケジューラではない
+
+fleet の駆動元 `com.gftd.fleet-ci-tip-tick` は **operator マシンの launchctl に居る**。
+10 台の mac-mini は operator の tick が配ったものを実行する**実行ファブリック**で、
+独立した時計を持たない。**つまり murakumo に移しても単一障害点は消えず、継承する。**
+加えて fleet の不変条件「ノードにはテストだけを配り、秘密情報を配らない」があるので、
+corpus への push credential はノードに置けない。収集の移送先としては構造的に不適合。
+
+### cloud-itonami には独立した時計がある
+
+実測: このアカウントに **Worker が 116 本デプロイ済み**、うち cloud-itonami 系が 18 本。
+そして **cloud-itonami-domain-reverify に稼働中の Cron Trigger がある**
+（17 3 * * *、2026-07-26 作成）。Cloudflare Cron Triggers は Cloudflare 側で走るので、
+**このマシンが落ちていても動く** —— 今まさに欠けている性質そのもの。
+
+harvest の仕事は Worker に載る: fetch · parse（パーサは .cljc で nbb 実証済み、
+同じ runtime 系）· corpus への commit（**GitHub API**。JVM も git バイナリも不要）。
+
+### 決定 — 3 つに割る（均等ではない）
+
+| レグ | どこ | 理由 |
+|---|---|---|
+| **収集** | cloud-itonami の Worker + Cron | 止まってはいけないのはこれ。Worker に載る唯一のレグ |
+| **検査** | murakumo fleet（jvm-test gate） | fleet の本来の形。**書き手と検証者が別になる** |
+| **ミラー・観測 beat** | operator マシン | git bundle と JVM が要る。止まって失うのはバックアップの鮮度であってデータではない |
+
+この順序は深刻さの順でもある。実際に一度起きた失敗は「収集が止まる」だった。
+
+### 検査を fleet に出した（実装済み）
+
+gates.edn に hirameki-patents を jvm-test gate として登録した。corpus 側の検査ロジックを
+src/hirameki_patents/checks.clj に切り出し、CLI 2 本は薄いラッパに、:test alias が
+両方を clojure.test として回す（実装は 1 つ。2 つに分裂させない）。
+
+**なぜこれが冗長性以上の意味を持つか。** これまで corpus を書いたマシンが唯一の検証者
+だった。ノードは git tree しか持たないので、書き手と検証者がようやく別の主体になる。
+
+**:cd false** —— この repo の pin を fleet に自動前進させない。corpus は daemon が
+1 日 6 回 push するので、自動追従させると west.yml が 1 日 6 回動く。
+**pin は引用であって鏡ではない。**
+
+gate は 3 種の破損で落ちることを確認した（corpus shard に 1 バイト追記 → CID 不一致 /
+datoms shard を 1 つ削除 → 件数不一致 / inventor 属性を混入 → G6）。健全時は通る。
+空の corpus で通らないよう下限も入れた（100 特許超・1000 datom 超）——
+空で満足する gate は削除された corpus でも満足する。
+
+## 現在地（2026-08-10 closing 時点、すべて実測）
+
+corpus **718 特許 / 7,885 datoms / 338 組織 / 11 管轄 / 671 件が存続期間超過**。
+main に着地済みで、pin は 3 つとも remote main と一致。
+
+| repo | main | 役割 |
+|---|---|---|
+| kotoba-lang/toshokan-patents | e26948e2 | lib のみ（純粋 codec = quad / 脚 = quad.fs） |
+| cloud-itonami/hirameki | 6d5a89d5 | actor（ループ・分析・ゲート・コンソール・Worker） |
+| cloud-itonami/hirameki-patents | 2f8370ec | corpus（shard・CID manifest・2 つの gate） |
+
+常駐 3 本（すべて launchd 下で無人完走を確認済み）:
+
+    com.gftd.hirameki-harvest   4h ごと・20 tick            収集
+    com.gftd.observatory-run    毎時（hirameki は 1h 間隔）  観測 + feeder 見張り
+    com.gftd.hirameki-mirror    日次 03:53                  B2 bundle + 復元ドリル
+
+検査は 2 面: operator（CLI 2 本）と murakumo fleet（jvm-test gate）。
+**書き手と検証者が別**になっている。耐久コピーは 2 つ（GitHub と B2 bundle）。
+
+## 検証（この closing で再実行）
+
+- toshokan-patents lib: 7 tests / 42 assertions、JVM と nbb 両方 green
+- hirameki actor: 62 tests / 285 assertions、0 failures
+- corpus gate: 2 tests / 4 assertions、0 failures（fleet が回すのと同じ経路）
+- query-check: 8 項目 ok
+- Worker: shadow-cljs release で dist/worker.js 179 KB。**デプロイと実行は未実施**
+
+すべての gate について「壊すと落ちる」ことを確認済み（corpus shard の 1 バイト改竄 /
+datoms shard 削除 / inventor 属性混入 / 台帳 21h 停止 / bundle 改竄 / router 削除 /
+存在しない hig トークン）。
+
+## 再開点
+
+**Worker のデプロイだけが credential 待ちで止まっている。**
+
+owner が fine-grained PAT を発行する（contents:write、対象は cloud-itonami/hirameki と
+hirameki-patents の 2 つだけ）。このセッションで使えた token は repo scope =
+全 repo 書き込みで、2 ファイルを書くために無人プロセスへ渡すには広すぎる。
+
+    cd orgs/cloud-itonami/hirameki
+    clojure -M:cljs -m shadow.cljs.devtools.cli release worker
+    npx wrangler secret put GITHUB_TOKEN --name cloud-itonami-hirameki-harvest
+    npx wrangler secret put RUN_TOKEN    --name cloud-itonami-hirameki-harvest
+    npx wrangler deploy
+    curl -X POST -H \"Authorization: Bearer $RUN_TOKEN\" \".../run?ticks=1\"
+
+通ったら operator 側の harvest を止めるか間隔を延ばす（両方が同じ 4 ファイルを
+書くので、片方は 409 で捨てられるだけ）。
+
+## 残っている穴（優先順）
+
+1. **Worker 未デプロイ** —— credential 待ち。通るまで収集は operator マシン 1 台に依存する。
+2. **feeder の検出を読む者が居ない。** 収集が止まれば gate は落ちるが、届ける経路が無い。
+3. **LaunchAgent の再起動生存が未検証。**
+4. **CPC が無い**（USPTO ODP key は operator ステップ。field 面は curated 7 件のみ）。
+5. **IPFS の CID は pin されていない**（verifiable であって fetchable ではない、と文書済み）。
+6. **コンソール未 deploy**（build も監査 100.00 も通るが sites plane に出していない）。
+7. **kotobase の ref 未着手**（consumer が無いうちは切らない）。
+8. **90-docs/observatory/observatory.datoms.edn が毎時 dirty になる。** tracked な
+   snapshot を observatory-run が書き換えるので、毎時 superproject の FF マージを塞ぐ。
+   私が ledger で作った問題と同型だが、こちらは私の変更前からの設計なので触っていない。
+"}]

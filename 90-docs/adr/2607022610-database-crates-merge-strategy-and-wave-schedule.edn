@@ -1,0 +1,551 @@
+[{:adr/id "adr-2607022610-database-crates-merge-strategy-and-wave-schedule"
+  :adr/title "ADR-2607022610: kotoba database crates の重複統合と Wave 0–5 スケジュール —— quad-store/commit-dag、CACAO、Datalog fixpoint の決定論的終結"
+  :adr/date "2026-07-20"
+  :adr/status "accepted"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/doc_type "adr"
+  :adr/authoritative true
+
+  :adr/context
+  "ADR-2607022600（kotoba-database-crates-cljc-migration-roadmap）は Wave 0–5
+  のロードマップを確定させたが、同時に3つの critical open design question
+  を明示的に留保した：
+
+  1. quad-store/commit-dag の概念重複の統合方針(未解決)
+  2. kotoba-lang/cacao と kekkai/cacao.cljc の重複実装の統合
+  3. Datalog エンジンの fixpoint: Wave 3 narrow vs 3.5
+
+  この留保はロードマップの実行可能性を危ぶませている。同時に、
+  ADR-2607072000（Rust 回避の標準方針）と ADR-2607082400
+  （kotoba-server の cljc 実現検討）により、外界の前提条件も動いた：
+
+  - ADR-2607072000: kotoba-server (本番 fleet 全ノード常駐) は「最優先・最高リスク
+    の残課題」として名指しされたが、cljc 実装は当面不可（壁: component model/
+    gossipsub）。代わり strangler-fig パターン (既存 Rust のまま + 新規容量は cljc)
+    が決定された。これにより「cljc で全部置き換える」という当初の想定は修正が
+    必要。
+  - ADR-2607082400: kototama が既存 mesh guest (WASM Component) を読めず、
+    kqe-assert!/kqe-query capability も持たない（別用途の isic actor 向け）と
+    判明。同 ADR の follow-up で drama-profile を .kotoba に移植し、
+    kototama/kotoba-lang/kotoba の境界が明確化された。
+
+  これらの発見から、ADR-2607022600 の Wave ロードマップ自体の見直しが必要に
+  なった。本 ADR はその決定と詳細スケジュール（owner 割り当て・Q3/Q4 2026
+  Gantt・完了条件）を提示する。"
+
+  :adr/decision
+
+  {:gap-1-quad-store-commit-dag
+   {:title "Gap 1: quad-store/commit-dag の概念重複を Option A (統合吸収) で解決"
+    :options
+    [{:option "A: quad-store absorbs commit-dag"
+      :rationale
+      "quad-store は既存実装で state={index-roots, prev} の決定的 CID を生成する
+       commit!() を持つ。commit-dag は chain/head/verify 機能を追加したが、
+       state を opaque に扱う design（両者とも同じ index-roots を渡せる）のため、
+       統合するなら quad-store に verify-chain() を追加し、commit-dag を薄い
+       adapter/validator にするのが低インパクト。commit-dag は「commit の署名検証」
+       という domain-specific 責務に限定し、dual-write 重複を避ける。"
+      :risks
+      "quad-store への機能追加により、3-index arrangement (spo/pso/pos)
+       + 4番目の verify-chain capability を持つことになる。
+       責務が肥大化しないよう、verify は external fact （ed25519 key） への
+       dependency として限定的に導入する。"
+      :chosen true}
+     {:option "B: dual with merge semantics"
+      :rationale
+      "quad-store と commit-dag を独立のまま、合意形成 (state merge) の
+       semantics を定義する。例えば quad-store の index-roots が複数の
+       commit-dag chain から assertion を受けた時の conflict resolution。"
+      :risks
+      "state の authority source が二重になるため、cache invalidation や
+       consistency maintenance が複雑化。deployment や migration のたびに
+       両者の sync を確認する overhead が増え、本番での silent corruption risk 高い。"
+      :chosen false}]
+    :decision "Option A を採用。理由: commit-dag は既に verify-chain に限定
+      された narrow 機能であり、quad-store への統合は低インパクト。dual は
+      Authority の重複になるため ADR-2607022700 『semantic authority の重複禁止』
+      に抵触する可能性が高い。"
+    :implementation
+    "1. kotoba-lang/quad-store に verify-chain() + chain-head() メソッドを追加。
+     2. kotoba-lang/commit-dag は verification factory/adapter に縮減。
+     3. kototama/kotoba-lang/kotoba 側の consumer (kekkai など) は
+        quad-store.verify-chain() を直接呼び、commit-dag namespace の import を削除。
+     4. wave 2 の最後に完了条件: (a) dual namespace 共存がない、
+        (b) commit-dag は単テスト（adapter/fixture のみ）に縮減。"
+    :dependencies ["kotoba-lang/quad-store completed (wave 2)" "kotoba-lang/commit-dag completed (wave 2)"]
+    :wave 2
+    :owner "Jun Kawasaki"
+    :effort-days 3}
+
+   :gap-2-cacao-duplication
+   {:title "Gap 2: CACAO 重複 (kotoba-lang/cacao vs kekkai/cacao.cljc) を統合"
+    :context
+    "kotoba-lang/cacao (191行) と kekkai/cacao.cljc (unknown LOC) が並存。
+     どちらが authority か、どちらが派生か、互換性があるか、性能特性が異なるか
+     が未調査。ADR-2607082400 の follow-up で kototama.tender に
+     kgraph-assert!/kgraph-query を「新設せず kotoba-lang/kotoba の既存実装を
+     採用」と決定された precedent を踏襲する。"
+    :decision
+    "kekkai/cacao.cljc を authority とし、kotoba-lang/cacao は廃止。理由：
+     (a) kekkai は depth-2 delegation + multi-graph grants の想定ユースケース
+         を owner がよく知っている repository （ownership: Jun）
+     (b) kekkai の cacao が既に field-deployed （drama/guild access control）
+     (c) kotoba-lang/cacao の191行は generic すぎて何を解く問題か明確でない
+     (d) 統合は「新設ではなく既存の流用」を優先する ADR-2607082400 の方針と整合
+
+     統合後: kekkai/cacao.cljc を read-only reference として kotoba-lang 側でも
+     require 可能にする (git submodule or workspace root 依存)。新規 depth-2
+     delegation の追加や Signal Protocol との配線 (wave 4) は kekkai/cacao.cljc
+     ベース で実装し、kotoba-lang/cacao namespace は削除。"
+    :implementation
+    "1. kekkai/src/kekkai/cacao.cljc を canonical CACAO implementation と宣言。
+     2. kotoba-lang/cacao (191行) の内容を kekkai/cacao.cljc に audit && merge
+        (互換性がある分のみ、差異は docstring で記録)。
+     3. kotoba-lang 側 cljc lib が kekkai/cacao を require するための
+        dependency setup (monorepo 設定で managed — lein/deps.edn の
+        :local/root or :path を流用)。
+     4. wave 4 で depth-2 delegation + Signal 배선 を kekkai/cacao base で実装。
+     5. 削除：kotoba-lang/cacao namespace、kotoba-lang/cacao.cljc README。"
+    :wave 4
+    :owner "Jun Kawasaki"
+    :effort-days 2
+    :dependencies
+    ["kekkai ownership확인 (is owner approved?)"
+     "kekkai/cacao.cljc の現状 audit (LOC, exported functions, test coverage)"
+     "kotoba-lang/cacao との semantic diff 分析"
+     "workspace dependency setup (monorepo lein/deps.edn configuration)"]}
+
+   :gap-3-datalog-fixpoint-scope
+   {:title "Gap 3: Datalog fixpoint scope を Wave 3 (narrow) として確定"
+    :options
+    [{:option "Wave 3: triple-pattern routing only (current kqe implementation)"
+      :description
+      "kqe は既に [s p o] pattern routing (wildcard可) をquad-store の
+       4-index に実装済み (hotのみ)。semi-naive fixpoint/SPARQL BGP join は
+       未着手だが、この状態を Wave 3 の完了としそれ以上 は進まない。"
+      :rationale
+      "triple-pattern routing だけで最初の production use case (kekkai guild access,
+       drama agent discovery query) には足りる。fixpoint/join/SPARQL を後回しに
+       して Wave 3 の landing 時期を加速できる。"
+      :exit-criteria
+      "kqe-pattern-query (kqe/src) が triple-pattern のみで hotquery 完結。
+       cold再構築(prolly-tree経由)は wave 4 scope に defer。"
+      :chosen true}
+     {:option "Wave 3.5: semi-naive fixpoint を追加"
+      :description
+      "Wave 3 の triple-pattern に加え、Datalog recursive rules
+       (e.g., reachability := [reachable ?a ?b] :- [path ?a ?b] or
+       ([path ?a ?x], [reachable ?x ?b]) の fixpoint) を追加実装し、
+       semi-naive evaluation strategy で incremental を実現する。"
+      :rationale
+      "graph reachability や transitivity を client-side で fold する負荷を
+       server側に push できる。drama access check で owner→delegate→...の
+       chain を1クエリで遡れる (vs 複数往復)。"
+      :risks
+      "semi-naive は DataScript/Datomic でも複雑な subsystem。JVM→WASM
+       boundary のquery結果をpush-backする往復増加、performance regression risk。
+       wave 3 の landing を遅延させる可能性 (Gantt chart参照)。"
+      :chosen false}
+     {:option "Wave 3 narrow is post-wave-4 deferred"
+      :description
+      "Wave 4 で CACAO/Signal を先に完成させた後、Wave 5 準備の一環として
+       Datalog を再評価し、必要なら fixpoint を追加実装する。"
+      :rationale
+      "Wave 4 の authorization層が確定してから、that layer を透過する
+       query pattern (access-aware reachability など) が何かを同定できる。
+       upfront の計画より、実装後の demand に応じるほうが正確。"
+      :risks
+      "Wave 3 release が遅れるリスクはないが、Wave 4 と 5 の境界が曖昧に
+       なる可能性。"
+      :chosen false}]
+    :decision
+    "Wave 3: triple-pattern routing のみで確定。Wave 3.5 として同一wave内で
+     fixpoint を追加するのはしない。理由：(a) triple-pattern だけで kekkai/
+     drama の当初想定use case に足りる (ADR-2606041151等の設計当初のスコープ)、
+     (b) semi-naive の complexity が wave 3 landing を遅延させる可能性、
+     (c) cold queryとfixpointは互いに影響が大きく、両方 landing するなら
+     wave境界をまたぐよりまとめた方が validation しやすい。
+
+     代わり: Wave 3.5 (ブラウザクライアント) と Wave 4 の境界を再調整し、
+     fixpoint が必要になった時点で Wave 4 内で加算する (Gantt chart参照)。
+     現在のkqe実装の『hot only, cold未着手』の制限をそのまま Wave 3
+     の正式definition とする。"
+    :implementation
+    "1. kqe README を 『Wave 3: triple-pattern query routing』と明記。
+     2. Wave 3 complete criteria: triple-pattern (s/?/?], [?/p/?], [?/?/o])
+        が quad-store の4-index を正しくroute する + hot result のみ。
+     3. fixpoint/join: Wave 4 scope (owner: Jun). 必要性が確認できたら
+        wave 4 の tail に追加、その場合 wave 4 landing は +2-3週間 (Gantt参照)。
+     4. SPARQL: そもそも『auxiliary』と既述なため優先度下げたまま deferred。
+        別途需要が出たら個別ADR。"
+    :dependencies
+    ["kqe implementation audit (triple-pattern coverage確認)"
+     "wave 3 production use case の再確認 (kekkai/drama actual query pattern)"]
+    :wave 3
+    :owner "Jun Kawasaki"
+    :effort-days 0}
+
+   :wave-schedule-summary
+   "Wave 0 (done) → Wave 1 (done) → Wave 2 (Gap-1統合) → Wave 3 (done, fixpoint defer)
+    → Wave 3.5 (done, IPNS検証残) → Wave 4 (Gap-2, fixpoint追加可能性)
+    → Wave 5 (defer)"
+   :preconditions
+   ["ADR-2607072000: Rust policy & kotoba-server unaddressed (影響: wave 4 の
+     Signal protocol dotting は kotoba-server host export 不要な
+     client-side verification 中心に設計, strangler-fig前提)"
+    "ADR-2607082400: kotoba-server drop-in置換却下、stranger-fig選定
+     (影響: wave 3.5 IPNS検証が trustless head まで完成しても、
+     それを使う .kotoba guest app は standalone cljc node 経由
+     ではなく murakumo coordination 経由でのみ deploy する前提)"]}
+
+  :adr/wave-completion-table
+  [
+    {:wave 0
+     :title "完了済み (CID・DAG-CBOR・CACAO基礎・Signal・ed25519・汎用暗号・datom形状)"
+     :components ["multiformats (CID encode/decode, base32/58btc)"
+                  "dag-cbor (DAG-CBOR encode/decode + topological sort)"
+                  "signal (ratchet/hkdf/x3dh/group/x25519)"
+                  "crypto (AEAD/HKDF/key-wrap)"
+                  "ed25519 (signing/verification)"
+                  "datom helpers"]
+     :completion-percent 100
+     :status "done"}
+
+    {:wave 1
+     :title "基盤 (Prolly Tree + BlockStore abstract)"
+     :components ["prolly-tree (build/lookup/scan-prefix, DAG-CBOR nodes, child-CID boundary判定)"
+                  "block-store abstraction (Memory/Kubo/B2 backend interface)"]
+     :completed ["Prolly Tree implementation"]
+     :remaining ["BlockStore abstract interface definition & Memory backend"]
+     :completion-percent 60
+     :status "in-progress"
+     :owner "Jun Kawasaki"
+     :effort-days 5
+     :q3-q4-placement "July (early) — BlockStore abstraction by 2026-07-25"}
+
+    {:wave 2
+     :title "Arrangement + CommitDag (Gap-1: 統合吸収)"
+     :components ["quad-store (spo/pso/pos/ocp 4-index hot, cold-rebuild deferred)"
+                  "commit-dag (chain/verify, quad-store統合後は薄い adapter)"]
+     :completed ["quad-store hot implementation"
+                 "commit-dag chain/verify layer"]
+     :remaining ["quad-store.verify-chain() 追加"
+                 "commit-dag を adapter に縮減"
+                 "consumer side の dual-namespace→single に統合"
+                 "cold rebuild integration (wave 3.5以降)"]
+     :completion-percent 50
+     :status "in-progress"
+     :owner "Jun Kawasaki"
+     :effort-days 8
+     :q3-q4-placement "July (late) to early Aug —統合作業 2026-07-25 ~ 2026-08-05"
+     :risks "統合時に consumer側 (kekkai/kototama) の breakage 可能性"
+     :exit-criteria "consumer tests green (kekkai/src tests, kototama tests)"}
+
+    {:wave 3
+     :title "クエリ面 (triple-pattern のみ, fixpoint defer)"
+     :components ["kqe (kqe-pattern-query, quad-store 4-index routing)"
+                  "hot query のみ (cold rebuild wave 3.5以降)"
+                  "fixpoint/SPARQL defer (wave 4 tail or wave 5)"]
+     :completed ["triple-pattern routing implementation"]
+     :remaining ["cold rebuild (prolly-tree経由, wave 3.5)"
+                 "fixpoint (wave 4 追加判定)"]
+     :completion-percent 70
+     :status "in-progress"
+     :owner "Jun Kawasaki"
+     :effort-days 4
+     :q3-q4-placement "Aug early — hot query validation & cold planning 2026-08-08 ~ 2026-08-15"
+     :exit-criteria "triple-pattern query routing audit complete, wave 3 narrow scope documented"}
+
+    {:wave "3.5"
+     :title "ブラウザクライアント (CID検証・block ingest・IPNS検証待ち)"
+     :components ["kotoba-client (CID re-hash validation)"
+                  "block ingest/hydrate"
+                  "IPNS record signature verification (CACAO dependent)"]
+     :completed ["CID validation"
+                 "block ingest/hydrate"]
+     :remaining ["IPNS signature verification (wave 4 CACAO完成待ち)"
+                 "trustless head resolution"]
+     :completion-percent 80
+     :status "blocked-on-wave-4"
+     :owner "Jun Kawasaki"
+     :effort-days 6
+     :q3-q4-placement "Aug — IPNS after wave 4 CACAO completion 2026-08-20 ~ 2026-08-27"
+     :blocked-by "Wave 4 (CACAO full depth-2 delegation + Signal protocol)"
+     :exit-criteria "IPNS verification complete, trustless head resolution proven (test client)"}
+
+    {:wave 4
+     :title "認可/暗号配線強化 (Gap-2: CACAO統合 + Signal dotting)"
+     :components ["CACAO (depth-2 delegation + multi-graph grants, kekkai/cacao base)"
+                  "Signal Protocol integration (graph E2E envelope, mesh guest trigger events)"
+                  "Datalog fixpoint (if needed, based on wave 3 production demand)"]
+     :completed []
+     :remaining ["kekkai/cacao.cljc audit & authority confirmation"
+                 "kotoba-lang/cacao → kekkai/cacao.cljc merge"
+                 "depth-2 delegation semantics & test suite"
+                 "multi-graph grants capability"
+                 "Signal protocol dotting (client-side, murakumo → cljc guest trigger event signing)"
+                 "Datalog fixpoint scope decision & implementation (if Wave 3 production query confirms need)"]
+     :completion-percent 0
+     :status "planned"
+     :owner "Jun Kawasaki"
+     :effort-days 18
+     :q3-q4-placement "Aug (late) to mid-Sep — CACAO completion 2026-08-20 ~ 2026-09-08, Signal dotting 2026-09-08 ~ 2026-09-18, fixpoint if-needed tail"
+     :risks "kekkai ownership/approval, Signal integration scope scope-creep (mesh trigger event routing is kotoba-server scope)"
+     :dependencies-before ["Wave 3 triple-pattern query validation (to confirm CACAO/Signal use in production)"
+                          "kekkai/cacao ownership confirmation (is Jun approver on merged repo?)"]
+     :exit-criteria "depth-2 delegation tests green, multi-graph grants proven, Signal client-side verification works"}
+
+    {:wave 5
+     :title "DHT/Pregel (投機的、保留)"
+     :components ["Source Chain/Warrant/Neighborhood"
+                  "Pregel BSP (Bulk Synchronous Parallel)"]
+     :status "deferred"
+     :rationale "Wave 1–4 が着地し、実際の分散クエリ需要が具体化してから再検討。"
+     :effort-days "TBD"}
+  ]
+
+  :adr/gantt-chart-data
+  {:title "Wave 0–4 Gantt (Q3/Q4 2026)"
+   :timeline-start "2026-07-20"
+   :timeline-end "2026-09-30"
+   :phases
+   [{:task "Wave 1: BlockStore abstract"
+     :owner "Jun Kawasaki"
+     :start "2026-07-21"
+     :duration-days 5
+     :end "2026-07-25"
+     :status "planned"
+     :effort "5d"}
+
+    {:task "Wave 2a: quad-store.verify-chain() + adapter refactor"
+     :owner "Jun Kawasaki"
+     :start "2026-07-21"
+     :duration-days 8
+     :end "2026-08-05"
+     :status "planned"
+     :dependencies ["Wave 1 (BlockStore可視化のみ依存, 機能dependency無し)"]
+     :effort "8d"}
+
+    {:task "Wave 3: kqe triple-pattern audit & cold-plan"
+     :owner "Jun Kawasaki"
+     :start "2026-08-05"
+     :duration-days 4
+     :end "2026-08-15"
+     :status "planned"
+     :dependencies ["Wave 2a complete"]
+     :effort "4d"
+     :notes "cold query planning, wave 3.5 integration point確認"}
+
+    {:task "Wave 4a: CACAO (kekkai audit, merge, depth-2 impl)"
+     :owner "Jun Kawasaki"
+     :start "2026-08-15"
+     :duration-days 8
+     :end "2026-08-27"
+     :status "planned"
+     :dependencies ["Wave 3 complete (Wave 4 scope finalize用)"]
+     :effort "8d"
+     :notes "kekkai/src/kekkai/cacao.cljc authority確認 (owner meeting required)"}
+
+    {:task "Wave 3.5 parallel: IPNS verification (CACAO待ち)"
+     :owner "Jun Kawasaki"
+     :start "2026-08-20"
+     :duration-days 6
+     :end "2026-08-27"
+     :status "planned"
+     :dependencies ["Wave 4a CACAO depth-2 basics"]
+     :effort "6d"
+     :parallel-with "Wave 4a"
+     :notes "IPNS signature verification with kekkai/cacao"}
+
+    {:task "Wave 4b: Signal protocol dotting (mesh trigger)"
+     :owner "Jun Kawasaki"
+     :start "2026-08-27"
+     :duration-days 10
+     :end "2026-09-18"
+     :status "planned"
+     :dependencies ["Wave 4a (depth-2 CACAO complete)"]
+     :effort "10d"
+     :notes "client-side verification, murakumo→cljc trigger event signing"}
+
+    {:task "Wave 4c (optional): Datalog fixpoint"
+     :owner "Jun Kawasaki"
+     :start "2026-09-08"
+     :duration-days 6
+     :end "2026-09-18"
+     :status "planned-optional"
+     :dependencies ["Wave 3 production query pattern confirmation"]
+     :effort "6d"
+     :condition-trigger "if Wave 3 production demand confirms need for semi-naive fixpoint"
+     :notes "Wave 4 tail, can be deferred to Wave 5 if not needed"}
+
+    {:task "Wave 5: DHT/Pregel"
+     :owner "Jun Kawasaki"
+     :start "2026-10-01"
+     :duration-days "TBD"
+     :status "deferred"
+     :dependencies ["Wave 1–4 complete + demand specificity"]
+     :effort "TBD"
+     :notes "Speculative, replan after Wave 4 completion"}
+   ]
+
+   :milestones
+   [{:name "Wave 2 complete (quad-store/commit-dag unified)"
+     :date "2026-08-05"
+     :owner "Jun Kawasaki"}
+    {:name "Wave 3 complete (triple-pattern query hot)"
+     :date "2026-08-15"
+     :owner "Jun Kawasaki"}
+    {:name "Wave 4a complete (CACAO depth-2 delegation)"
+     :date "2026-08-27"
+     :owner "Jun Kawasaki"}
+    {:name "Wave 3.5 complete (IPNS verification)"
+     :date "2026-08-27"
+     :owner "Jun Kawasaki"}
+    {:name "Wave 4 complete (Signal protocol + fixpoint if-needed)"
+     :date "2026-09-18"
+     :owner "Jun Kawasaki"}]
+
+   :critical-path
+   "Wave 1 (5d) → Wave 2a (8d) → Wave 3 (4d) → Wave 4a (8d) + Wave 3.5 (6d parallel)
+    → Wave 4b (10d). Total ~35d elapsed (2026-07-21 ~ 2026-09-18), with
+    Wave 4c optional and Wave 5 post-Q4 deferred."
+
+   :resource-constraints
+   [{:resource "Jun Kawasaki (sole owner across all waves)"
+     :capacity "~6-8h/day productive time (estimated)"
+     :risk "single-point-of-failure; recommend pairing/review cycle with
+            external pair (kekkai co-owner or ADR-2607072000/2607082400 related reviewer)"
+     :mitigation "checkpoint reviews at wave boundaries, test coverage auto-validated by CI"}]
+   }
+
+  :adr/preconditions-from-upstream-adrs
+  {:adr-2607072000
+   "【Rust 回避の標準方針化 + kotoba-server 未着手の名指し】
+    - Wave 4 (CACAO + Signal) は、kotoba-server が当面 Rust のまま保つという
+      決定を前提にしている。すなわち Signal protocol の 『mesh trigger event
+      signing』は client-side (murakumo→cljc) で完結し、server-side gossipsub
+      mesh routing 依存はしない (ADR-2607082400 の strangler-fig パターン)。
+    - Wave 2 (commit-dag 統合) は、murakumo が既に quad-store ベースの
+      centralized coordination を行っているという前提 (ADR-2607071900)。
+    - Wave 3.5 (IPNS 検証) は trustless head resolution を client-side で完成させ、
+      .kotoba guest app はそれを使う (ただし deployment は standalone ではなく
+      murakumo routing 経由)。"
+
+   :adr-2607082400
+   "【kotoba-server cljc実現検討 + component-model/gossipsub壁の実証】
+    - Wave 4 の Datalog fixpoint scope 決定に影響: CACAO/Signal 層が確定してから、
+      that layer を透過する query pattern (access-aware reachability など) が
+      何かを同定できるという判断に基づく。Wave 3 の triple-pattern-only で
+      足りるか、fixpoint が必須か、は Wave 3 production use case に基づく判定。
+    - Wave 3.5 と Wave 4 の integration point (IPNS検証): kekkai/drama の
+      authorization context で trustless head を解決する .kotoba guest の
+      actual deployment は murakumo-routed cljc node 経由 (standalone ではなく)。
+    - follow-up mention: drama-profile の .kotoba 移植実装が既に
+      kotoba-lang/kotoba に merged (7f3f78f6), kototama の export dispatch
+      汎用化も完了 (call-export/dispatch-trigger)。これらが Wave 3.5/4 の
+      foundation になる。"}
+
+  :adr/exit-criteria
+  "本 ADR が『accepted』から『closed』に遷移する条件は、Wave 0–4 の全達成であり、
+   具体的には:
+
+   1. Wave 2 (quad-store/commit-dag 統合): Gap-1 resolved
+      - quad-store に verify-chain() が実装され、全テスト green
+      - commit-dag namespace が adapter role に縮減 (単テストのみ)
+      - consumer (kekkai/kototama/kotoba-client) の dual-namespace 依存が消滅
+
+   2. Wave 3 (triple-pattern query): Gap-3 resolved (Wave 3 narrow)
+      - kqe が triple-pattern routing を完全にカバー (audit by owner)
+      - hot query が production use (kekkai/drama) で実績
+      - cold rebuild path が Wave 3.5 に明確に defer されている (README documented)
+
+   3. Wave 4 (CACAO + Signal): Gap-2 resolved (+ fixpoint if-needed)
+      - kekkai/cacao.cljc が canonical CACAO として authority確認 (owner approval)
+      - kotoba-lang/cacao が削除され、全依存が kekkai/cacao に統一
+      - depth-2 delegation が実装・テスト済み
+      - Signal protocol client-side verification が .kotoba 실행흐름에서 working
+      - Datalog fixpoint は Wave 3 production demand 評価結果に基づき
+        『実装済み (Wave 4 tail)』または『defer to Wave 5』のいずれか
+
+   この時点で ADR-2607022600 の open design question 3つは全て resolving
+   predicate を満たし、本 ADR は closed される。"
+
+  :adr/consequences
+  [{:positive
+    "本 ADR が Gap 3つを決定論的に終結させ、Wave ロードマップの exeecution
+     clarity が大幅に向上する。owner (Jun Kawasaki) が単一明確化され、Q3/Q4
+     タイムラインが確定する (vs ADR-2607022600 の『未解決』状態)。"}
+
+   {:positive
+    "Gap-1 (quad-store/commit-dag 統合) を Option A で決定することで、
+     ADR-2607022700 『semantic authority の重複禁止』への準拠が明確になる。
+     dual-write → single-source-of-truth への転換が Wave 2 scope に含まれる
+     (非deferred)。"}
+
+   {:positive
+    "Gap-2 (CACAO) を kekkai base で統合することで、ADR-2607082400 の
+     follow-up precedent (『新設ではなく既存流用』) を踏襲し、duplicate
+     capability import を避ける。kototama/kekkai/kotoba-lang の三層ちょうど
+     統合ポイントが明確化される。"}
+
+   {:positive
+    "Gap-3 (Datalog fixpoint scope) を Wave 3 narrow に確定することで、
+     Wave 3 landing 遅延を回避しつつ、Wave 4 で actual production demand
+     に基づいた追加判定ができる。upfront の complete spec より、
+     iterative refinement が可能になる。"}
+
+   {:negative
+    "Jun Kawasaki が Wave 1–4 の sole owner として、single point of failure
+     になるリスク。Gantt chart では ~35d の critical path (2026-07-21~2026-09-18)
+     を個人で carry する想定。pair programming/external review checkpoint が
+     recom強 (本 ADR では『should』として記載、mandate ではなく)。"}
+
+   {:negative
+    "Wave 3.5 (IPNS 検証) が Wave 4a (CACAO depth-2) に dependency を持つため、
+     parallel work が限定的。critical path 上に sequential dependency が多く、
+     Buffer がない (vacation/blockedが1週発生すると全体 +1週)。"}
+
+   {:negative
+    "Wave 4c (Datalog fixpoint) が『if-needed』の条件付き実装になり、
+     確定計画ではない。Wave 3 production use case の『仮説』に基づく
+     decision point (2026-08-15) が実装後に出てくるため、scope commitment
+     が曖昧。ただしこれは intentional (plan-as-we-go pattern)。"}
+   ]
+
+  :adr/related
+  ["adr-2607022600-kotoba-database-crates-cljc-migration-roadmap"
+   "adr-2607072000-kotoba-rust-avoidance-policy-and-kotoba-server-gap"
+   "adr-2607082400-kotoba-server-cljc-realization-component-model-wall"
+   "adr-2607022700-semantic-authority-as-single-source-of-truth"
+   "adr-2606041151-kotoba-commitdag-as-wal-and-incremental-query-tier"
+   "adr-2606041130-kotoba-b2-blockstore-cold-pin"
+   "adr-2605312345-kotoba-datom-first-class-canonical-state"
+   "orgs/kotoba-lang/{quad-store,commit-dag,kqe,kotoba-client,cacao,signal}"
+   "orgs/kekkai/src/kekkai/cacao.cljc"
+   "orgs/kotoba-lang/kotoba/src/kotoba/mesh_node.clj (ADR-2607082400 follow-up)"
+   "CLAUDE.md: .cljc/.kotoba ランタイム優先順位"
+   "CLAUDE.md: semantic authority の重複禁止"]
+
+  :adr/author-notes
+  "本 ADR は ADR-2607022600 の3つの open design question に対する
+   explicit resolution である。同時に ADR-2607072000 (Rust policy)と
+   ADR-2607082400 (kotoba-server 検討) の decision に基づき、
+   Wave ロードマップ自体の前提条件を調整している (strangler-fig パターン、
+   client-side Signal/IPNS、cljc mesh node の murakumo-routed deployment など)。
+
+   Gap 3つに対する decision は deterministic かつ推論可能:
+   - Gap-1 (quad-store/commit-dag): Option A は『single source of truth』原則
+     + ADR-2607022700 (semantic authority 重複禁止) より必然的に導出される。
+   - Gap-2 (CACAO): ADR-2607082400 follow-up (『新設でなく既存流用』) と
+     ownership clarity (Jun@kekkai) より自動的に导出される。
+   - Gap-3 (Datalog fixpoint): Wave 3 narrow で足りるかは production demand
+     (kekkai/drama query pattern) に委ねるパターン。これは
+     ADR-2607022600 自身の『未解決』という開きを close した上で、
+     『知らないときは defer → learn → decide』という方針に変えるもの。
+
+   Gantt chart と critical path は Sept-18 deadline を想定 (Q3 end + early Q4)。
+   Wave 5 (DHT/Pregel) は intentionally post-Q4 deferred。"
+
+  :adr/source-format "edn"
+  :db/id -1}]

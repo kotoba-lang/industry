@@ -1,0 +1,220 @@
+[{:db/id -1
+  :adr/id "adr-2608039970-kotobase-base-is-the-datom-plane-not-datalog"
+  :adr/title "ADR-2608039970: kotobase の base は datom 面（triple + content addressing）であって Datalog ではない — query language は対等な frontend、byte 面は object/block 直行"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-03"
+  :adr/last-verified "2026-08-04"
+  :adr/last_verified "2026-08-04"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotobase-base-is-datom-plane-not-datalog"
+  :adr/repos ["orgs/kotoba-lang/kotobase"
+              "orgs/kotoba-lang/kotobase-query"
+              "orgs/kotoba-lang/kotobase-protocols"
+              "orgs/kotoba-lang/kotobase-storage"
+              "orgs/kotoba-lang/arrangement"
+              "orgs/kotoba-lang/datalog"
+              "orgs/kotoba-lang/org-w3-sparql-protocol"
+              "orgs/kotoba-lang/org-postgresql-wire"
+              "orgs/kotoba-lang/org-opencypher-cypher"
+              "orgs/kotoba-lang/datomic-client-shim"]
+  :adr/authoritative-for
+  ["kotobase の層と premise 境界: L0 block/ref/object 面が唯一の premise、L1 datom（triple）が canonical logical model、L2 query language は対等な frontend"
+   "ADR-2608039000 の premise テスト（消して再構築できるか）を query 層に適用した結果 — Datalog engine は premise ではなく、premise にしてはならない"
+   "kotobase-query bridge の公開契約: materialize + index access path が正、bridge/q（Datalog）は必須経路ではない"
+   "byte-oriented protocol surface（s3 / git / ipfs gateway / pinning / atproto blob）の宛先は object 面 / block 面であり、datom 面を迂回路として使わない"
+   "Datomic 互換（kotobase.core の Datalog API / kotobase.datomic の EDN grammar）は surface の1つであり、他 protocol の前提ではないという位置づけ"
+   "kotobase README の自己記述の訂正方針（Datomic reimagined ではなく datom model + content addressing がベース）"]
+  :adr/related
+  ["adr-2608039000-d1-is-not-a-premise-in-decentralized-paths"
+   "adr-2608039700-agent-loop-git-datalad-source-kotobase-query-projection"
+   "adr-2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane"
+   "adr-2607032500-kotoba-kotobase-clojure-datomic-relationship"
+   "adr-2607172300-kotobase-query-protocol-extension"
+   "adr-2607172500-kotobase-query-protocol-graphql-gremlin"
+   "adr-2607171700-kotobase-storage-protocol-layers"
+   "adr-2607177500-kotobase-protocols-real-datom-plane-backend"
+   "adr-2607176000-kotobase-protocols-v0-2-sigv4-git-cid"
+   "adr-2607166600-kotobase-ipld-materialized-views-ivm"
+   "adr-260726-kotobase-query-plane-is-one-ref"
+   "adr-2607312100-kotobase-layering-block-ref-split-signed-head"]
+  :adr/evidence
+  ["kotobase/docs/storage-architecture.md — S3/R2・IPFS/IPNS・Postgres・D1 は immutable-block / mutable-ref 境界の provider adapter であり、IPLD が canonical encoding。Datomic は下にいない"
+   "kotobase-storage/README.md + src/kotobase/storage/{core,object,object_id,verify}.cljc — block 面 / ref 面 / large-object 面の3分割、transfer profile、verifying-block-store による CID 検証"
+   "org-w3-sparql-protocol/README.md — bridge の materialize だけを使い bridge/q を使わない、と自ら明記（SPARQL algebra を Datalog に翻訳して戻すのは no benefit）"
+   "kotobase-query/README.md — 公開 API は materialize / q / query の3つ、materialize は毎回 full -list + -get scan して throwaway index を作る v0.1"
+   "datalog/src/datalog/index.cljc — entity-attrs / by-predicate / by-predicate-value / refs-to（spo/pso/pos/ocp の access path）が既に存在する"
+   "kotobase-protocols/src/kotobase/protocols/{s3,git,blocks}.cljc — bucket/key・sha→bytes・cid→bytes をすべて kotobase.store/IStore の document collection に写像している"
+   "kotobase/README.md — Datomic reimagined for the distributed web / kotoba : kotobase = Clojure : Datomic（ADR-2607032500）"]
+  :adr/body
+  "# ADR-2608039970: kotobase の base は datom 面であって Datalog ではない
+
+**Status**: accepted
+**Date**: 2026-08-03
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナーの問い（2026-08-03）: 「今の kotobase は git・cypher・sql など複数の query に対応しているが、Datomic query をベースにしている? これは設計として適切? s3・ipld・ipfs・ipns をベースにするなら、多数の protocol に対応するなら Datomic をベースにしない方がいい?」
+
+実測して分かったのは、**この問いの前提にある二者択一（Datomic か IPLD か）が、実装にはもう存在しない**ということである。Datomic 由来なのは上から1層だけで、基底はすでに content-addressed block + conditional ref になっている。
+
+| 層 | 実体 | Datomic 由来か |
+|---|---|---|
+| L0 block / ref / object | `kotobase-storage`: `IBlockStore`（CID）+ `IRefStore`（CAS）+ `IObjectStore`（large object、transfer profile）。S3/R2・IPFS/IPNS・Postgres・SQLite・D1 は**この境界の provider adapter** | 無関係。IPLD が canonical encoding |
+| L1 datom | `arrangement` / `datalog` の spo・pso・pos・ocp（= EAVT/AEVT/AVET/VAET）+ prolly-tree + commit DAG | 用語は Datomic、構造は triple |
+| L2 query | `kotobase.core/q,query,pull`（Datomic 形 EDN Datalog）。`kotobase-query` の bridge が全 query protocol の共有入口 | ここだけ |
+
+つまり **下から見れば kotobase はすでに IPLD ベースである**。`docs/storage-architecture.md` が自分でそう書いている。問題は「Datomic をやめるか」ではなく、**L1（データモデル）と L2（クエリ言語）が同一視されていること**にある。
+
+### 実装がすでに出している答え
+
+`org-w3-sparql-protocol` は README で明言している —— bridge の `materialize` だけを使い、`bridge/q` は使わない、SPARQL algebra を Datalog に翻訳して戻すのは no benefit である、と。**共有して価値があったのは datom（データモデル）であって Datalog（言語）ではなかった**、と実装がすでに証明している。6 surface のうち 1 つが正規経路を外れているのは設計の綻びであって、その 1 つが正しい。
+
+同じ緊張は他の言語にもある。SQL の bag semantics・NULL 三値論理・ORDER BY、Cypher の可変長パス `[*1..3]`、GraphQL の階層 resolver は、Datalog の set semantics（重複なし・順序なし）と素直に噛み合わない。`org-postgresql-wire` が「小さな real SQL subset」で止まっているのは怠慢ではなく、この構造的な噛み合わなさの表面化である。
+
+### もう1つの綻び — byte 面が datom 面を迂回している
+
+`kotobase.protocols.s3` は bucket/key を、`git` は sha→bytes を、`blocks` は cid→bytes を、いずれも `kotobase.store/IStore` の document collection に写像している。deploy 側は worker がその `IStore` を real datom plane backend（R2 content-addressed blocks）に束ねている（ADR-2607177500）。結果として **5 MB の S3 PUT が document → datom → block と迂回する**。
+
+`kotobase-storage` にはこのための面がすでにある: block 面（CID、batch fetch、プロセスを通る）と、**large-object 面**（`IObjectStore` + transfer profile、GB をプロセスに通さない `:presigned-transfer`）。`PUT /ipfs/:cid` の 4 MiB 天井は、まさにこれを迂回した代償として記録されている（ADR-2607175000 / ADR-2608012600 D4）。**「Datomic に寄せすぎ」の実害が出ているのはここ 1 箇所だけ**で、query 言語の話ではない。
+
+### 判定基準は手元にある
+
+ADR-2608039000 が D1 について定めた操作的基準をそのまま当てる —— **その層を今すぐ消したとき、他が壊れるか、それとも遅くなるだけか**。
+
+- L0 block/ref を消す → S3 も git も IPFS も datom も全部壊れる → **premise**
+- L1 datom（triple + content addressing）を消す → 全 query surface が拠って立つ論理モデルが消える → **premise**
+- L2 Datalog engine を消す → SPARQL は動く（すでに独立）、S3/git/IPFS は動く、SQL/Cypher は別 IR で書き直せる → **premise ではない**
+
+## Decision
+
+### D1. 層と premise 境界を固定する
+
+- **L0 = content-addressed block 面 + conditional ref 面 + large-object 面。唯一の storage premise。** ここに S3/R2・B2・IPFS・DataLad-annex・inga が刺さる。分散型経路の ref は ADR-2608039000 / ADR-2608038000 に従い inga（単一ベンダの条件付き書き込みを premise にしない）。
+- **L1 = datom（triple / EAV）+ immutable value + content-addressed history。canonical logical model。** 多 protocol に対してはこれが正しい最小公倍数である —— relational row も RDF quad も property graph の node/edge も JSON document も triple に落ちるが、逆は無損失では落ちない。**この正当化は「Datomic だから」ではなく「triple + immutable + time だから」であり、ADR-2607032500 の Clojure : Datomic アナロジーはここに効かせない。**
+- **L2 = query language は対等な frontend。** Datalog は L1 の frontend の 1 つであって、他の frontend が経由すべき IR ではない。
+
+### D2. Datalog を premise にしない
+
+**新しい query protocol surface を追加するとき、Datalog への翻訳を必須経路にしない。** その言語の algebra が L1 の index access path に直接束縛できるなら、そちらが正しい。Datalog 経由は「そちらの方が素直な場合の選択肢」であって既定ではない。
+
+逆に、**L1 を迂回して各 surface が独自の物理ストレージ表現を持つことは禁止する**。共有すべきは datom（L1）であり、共有しないと決めたのは Datalog（L2）である。この 2 つを混同しない。
+
+### D3. `kotobase-query` bridge の公開契約を変える
+
+- 公開契約は **`materialize`（IStore → 論理 datom 面）+ index access path** とする。access path は `datalog.index` がすでに持っている（`entity-attrs` = spo、`by-predicate` = pso、`by-predicate-value` = pos、`refs-to` = ocp）ので、**新規に発明せず re-export と契約明記で足りる**。
+- `bridge/q` / `bridge/query`（Datomic 形 Datalog）は**互換 surface として残す**。削除しない。ただし「全 protocol の共有入口」という位置づけは撤回する。
+- `org-w3-sparql-protocol` が取った materialize-only 経路は、**例外ではなく正規経路**として README / ADR-2607172300 の記述を訂正する。
+- `visible?` を required 引数とする規律（ADR-2607050500、query as first-class effect）は access path 側にも同様に適用する —— 経路が増えても認可の穴を作らない。
+
+### D4. byte-oriented surface は object 面 / block 面に直行する
+
+- `s3` / `git` / `ipfs` gateway / `pinning` / `atproto` の blob は、**bytes を datom 面に載せない**。block 面（小）と large-object 面（大、`:presigned-transfer`）に直接束ねる。
+- **CID 検証は store の仕事**であって各 surface の仕事ではない（`kotobase.storage.verify/verifying-block-store` / `async-verifying-block-store`）。`blocks.cljc` の「caller 供給 CID を信頼」・`git.cljc` の「sha1(bytes) == key を検証しない」は、この経路移設で構造的に解消する。real CIDv1 minting は ADR-2607176000 で raw codec について着地済みなので、そこに接続する。
+- **メタデータ（bucket 一覧・ref → sha・pin request・audit イベント）は引き続き datom 面でよい。** 分けるのは bytes であって索引ではない。
+
+### D5. Datomic 互換は surface の 1 つに降格する
+
+`kotobase.core` の Datalog API と `kotobase.datomic` の EDN transaction/query grammar（ADR-2607265000）は**残す**。よく出来ているし、実際に D1 検証配備で動いている。降格させるのは実装ではなく**位置づけ**であって、`datomic-client-shim` と同じ「1 つの surface」に置く。
+
+### D6. 自己記述を訂正する
+
+`kotobase/README.md` の「Datomic reimagined for the distributed web」「kotoba : kotobase = Clojure : Datomic」は、**この自己記述が設計判断を引っ張るリスク**がある（実際、全 query surface を Datalog 経由にする設計はここから来ている）。「datom model + content addressing がベースであり、Datomic 形 API はその 1 surface」に書き換える。ADR-2607032500 を supersede はしない —— あれは repo 名と用語の由来を定めた ADR であり、そこは有効なままである。訂正するのは**アナロジーを設計の前提に昇格させた部分**だけ。
+
+### 決めないこと（scope out）
+
+- **bridge の incremental 化**（materialize が毎回 full scan する v0.1 制約）は本 ADR では決めない。ADR-2607166600（IPLD materialized views / IVM）がすでに land しているので、そこに接続する follow-up とする。**ただしこれが多 protocol 化の real なボトルネックであり、Datomic かどうかではない**ことは本 ADR の認識として記録する。
+- **join 到達範囲が ref 1 本という制約**（ADR-260726-kotobase-query-plane-is-one-ref）は据え置き、変更しない。protocol を増やしても join 面は増えない、という現在地はそのまま有効である。
+- **Bolt / 新規 wire protocol の追加**は本 ADR の対象外。
+
+## Consequences
+
+- (+) **「Datomic をやめるべきか」という二者択一が消える。** やめる必要はなく、外すのは Datalog の特権だけである。L0 はすでに IPLD ベースなので storage 層に変更は要らない。
+- (+) **query surface の追加コストが下がる。** 言語の semantics を Datalog に押し込む翻訳作業が必須でなくなる。SQL の bag semantics も Cypher の path も、L1 の access path に直接書ける。
+- (+) **SPARQL の逸脱が正規化される。** 6 surface のうち 1 つだけが違う経路、という説明のつかない状態が解消する。
+- (+) **byte 面の天井が外れる。** `:presigned-transfer` に載せれば `PUT /ipfs/:cid` の 4 MiB 天井は構造的に消える。
+- (+) **premise テストがレビュー可能。** 「この層を消したら何が壊れるか」は言葉づかいでなく操作で検査できる（ADR-2608039000 と同じ基準）。
+- (−) **既存 6 surface のうち Datalog 経由のものは、当面そのまま動き続ける。** 本 ADR は方向を固定するが、今日すべてを書き換えはしない。**規則が accepted であることと、経路が規則を満たしていることを混同しない。**
+- (−) **byte 面の移設は live な deploy を触る。** `kotobase-protocols-worker` は稼働中であり、ADR-2607177500 で real datom plane backend に切り替えた際に 3 件のインシデント（fold 必須・git.kotobase.net 所有権衝突・git.cljc HEAD バグ）を出している。移設は段階的に行い、各段で実 clone / 実 GET が通ることを検証する。
+- (−) **共有 IR が無くなる分、access path の契約が甘いと各 frontend が勝手な物理仮定を持つ。** D3 の「access path を公開契約として明記する」が守られなければ、Datalog 一本化より悪い状態になりうる。ここは規律で守るしかない。
+
+## Alternatives considered
+
+- **Datomic / Datalog を基底から全面的に外し、IPLD DAG を直接クエリする。** 却下。triple 面が無くなると、SQL も Cypher も SPARQL も各自が IPLD の walk を書くことになり、共有できるものが何も残らない。**捨てるべきは言語であってデータモデルではない。**
+- **現状維持（全 surface を Datalog 経由に統一する）。** 却下。SPARQL がすでに実装レベルで拒否しており、SQL surface が subset で止まっている。統一の利益（1 つの engine）より、semantics ミスマッチの費用の方が大きいことが 6 surface 分の実装で示されている。
+- **query 言語ごとに独立したストレージ表現を持たせる。** 却下。それは L1 を捨てることであり、「一緒に join したいものは同じ面に置く」（ADR-260726）に正面から反する。
+- **byte 面も datom 面に載せたままにする（現状維持）。** 却下。4 MiB 天井という実測済みの代償があり、`kotobase-storage` にはすでに正しい面（`IObjectStore` + transfer profile）が実装されている。使っていないだけである。
+- **ADR を書かず実装だけ直す。** 却下。次に query surface を足す agent は `kotobase-query` の README とこれまでの 6 surface を読み、7 本目も `bridge/q` に繋ぐ。**規則が無い限り、既存の形が規則として機能する。**
+
+## Follow-up の現在地（2026-08-03 更新）
+
+| # | 内容 | 状態 |
+|---|---|---|
+| 1 | `kotobase-query`: access path を公開契約として明記 | **done** — kotoba-lang/kotobase-query#6（`entity-id` public 化 + `entity-attrs`/`by-predicate`/`by-predicate-value`/`refs-to`、`visible?` 必須、prune）+ #7（`datoms`）。35 tests / 62 assertions、nbb と clj 両方 green |
+| 2 | `kotobase-protocols`: byte 面を block / object 面に移設 | **stage 1 done** — kotoba-lang/kotobase-protocols#15（ctx の `:blocks` port + `:cid-of` 検証。port 無しなら従来どおり = live worker は無変更）。64 tests / 231 assertions、nbb と clj 両方 green。**stage 2（worker が `:blocks` を R2 に束ねる）は未着手** —— これが実際に bytes を chain から降ろす変更で、live worker を触る |
+| 3 | `kotobase`: README の自己記述訂正（D6） | **done** — kotoba-lang/kotobase#31 |
+| 4 | `org-w3-sparql-protocol` / ADR-2607172300: materialize-only を正規経路として記述訂正 | **done** — org-w3-sparql-protocol#6（記述訂正 + `(:spo db)` walk を `bridge/datoms` に置換 + kotobase-query pin 前進）、本 ADR 群の記述訂正は ADR-2607172300 に反映済み |
+| 5 | bridge の incremental 化を ADR-2607166600（IVM）に接続 | **やらない（今は）** — ADR-2608039975。設計スケッチと trigger はそちらに記録。2026-08-04 補足: live な SPARQL は materialize を通らなくなった（`pattern-source` が `hot-datoms` を pattern 単位で読む）ので、materialize の full scan が残るのは**未 deploy の HTTP surface 群だけ** |
+
+### D2 の帰結 —— SPARQL は 2026-08-04 に完了した
+
+D2（Datalog を必須 IR にしない）の最初の実適用が終わった。`graph.sparql` は
+`kotoba-lang/org-w3-sparql-protocol` + `kotoba-lang/sparql` の algebra が、`datomic.datoms`
+= filtered index read の上で答える。**SPARQL を Datalog に翻訳していた 233 行の手書き
+subset（`kotobase.server.sparql`）は削除された**（kotobase-server#28）。
+
+| | |
+|---|---|
+| index seam | `datom.source/IPatternSource` 実装が2つ（HTTP: `kotobase.datom-source` / in-process: `kotobase.server.pattern-source`）。**index plan は `kotobase.datom-plan`（`.cljc`）で共有**。値表現も 2026-08-04 に揃えた（kotobase-client#21）—— それまで HTTP 側は `v_edn`、in-process 側は格納値を返しており、**同じクエリがどちらのトランスポートで答えたかで違う値**になっていた。conformance の fake が値そのものを返していたため decode 漏れが2 PR ぶん通っていた |
+| pushdown | BGP の pattern が index 読みに落ちる。**object 位置も押し下げ済み**（kotobase-server#29）。一時見送っていたのは、1 datom のコーパスでは `:avet` の value component が「適用された」のか「無視された」のか区別できず、読み違えると**行が減る**（空の結果に見える誤答）ため。同一属性3 datom・うち2つ同値で実測し、`[a raw-value]` が正しく2件（`e1`/`e3`）に絞り、`[a encoded]` が0件になることを確認して解決した |
+| 追加した機能 | `kotoba-lang/sparql` の algebra に集約（`:group`）—— 無かった。旧 subset は `COUNT` に答えていたので、包含関係が成立しておらず、そのまま切り替えれば機能が減っていた |
+| 検証 | 旧文法全体（BGP / join / OPTIONAL / UNION / ORDER BY 昇降 / LIMIT / 集約 ± GROUP BY / FILTER）で新旧一致。退役時に **equivalence を snapshot へ変換**（片方が消えると比較は自己参照になるため、旧の答えを削除前に採取） |
+
+### 2026-08-04 追記 —— Cypher には同じ移行が成立しない
+
+SPARQL の成功をそのまま Cypher に適用できると当初書いたが、**実測して成立しないと分かった**。
+
+`kotobase-server` の `do-cypher` は今も `kotobase.server.cypher/parse` → `run-compiled-graph-query`
+（hot-db 上の Datalog）で、撤回したパターンのまま残っている。**しかし置き換え先の
+`org-opencypher-cypher` 自身が `bridge/q` を呼ぶ**（`cypher.cljc:1027`）—— **Cypher を Datalog に
+翻訳している**。SPARQL には `kotoba-lang/sparql` という独立した algebra があったが、**Cypher に
+対応するものはワークスペースに無い。**
+
+したがって Cypher を差し替えても得られるのは **pushdown（materialize → index 読み）だけ**で、
+意味論の独立は得られない。D2 は「その言語が Datalog に素直に乗るなら Datalog frontend でよい」
+と書いているので、今の subset の範囲では違反ではない —— **可変長パス `[*1..3]` を入れる段に
+なって初めて問題になる**。それまでは「Cypher は Datalog frontend である」と明示的に認めておく
+方が、独立した engine があるかのように扱うより正確である。
+
+D2 の適用可否は言語ごとに違う、というのがこの追記の要点:
+
+| 言語 | 独立 algebra | D2 の意味 |
+|---|---|---|
+| SPARQL | あり（`kotoba-lang/sparql`） | 翻訳をやめる。**完了** |
+| Cypher | **無い** | pushdown のみ。翻訳は当面残る |
+| SQL / GraphQL / Gremlin | 未調査 | 着手前に同じ確認をすること |
+
+**この移行で見つかった欠陥は、1件を除いて全て「エラーではなく静かに違う答え」だった**
+（wire 非互換で述語がワイルドカードに / 依存 pin が engine を差し替え / リテラルの
+二重符号化 / `visible?` の形違いで何もフィルタしない / 外部 IRI が nil = ワイルドカード）。
+**型でもテストでも捕まらない層**で、2実装を同一入力で突き合わせて初めて出た。次に同種の
+差し替えをするときも、この順序（隣に置く → 突き合わせる → 切り替える → snapshot 化）を
+使うこと。
+
+### 実装して分かったこと（D3 の訂正）
+
+**access path を4本（4 covering index）と書いたのは不足だった。** 自前 algebra を持つ surface が
+実際に最初に必要とするのは「面ぜんぶを1回」であり、それは4本のどれでもない。唯一の非 Datalog
+surface である `org-w3-sparql-protocol` は `(:spo db)` を直接 walk していた —— 可視性判断を伴わない
+raw index read で、同 repo は自前で `visible?` を適用して正しく処理していたが、**次の surface は
+それを知っている必要があった**。`bridge/datoms`（lazy 全面 scan、`visible?` 必須）を追加して塞いだ
+（#7）。D3 の access path 一覧はこの5本目を含む。
+
+**`visible?` の強制が「たまたま」だった。** 述語は*呼ばれる*ことで欠落が露見する設計だったが、
+`refs-to` は `:ocp` が空なので何もフィルタせず、**2引数呼び出しが可視性判断ゼロで `{}` を返した**。
+JVM は arity で弾くが nbb/SCI は弾かない。明示チェック（`check-visible!`）に変更済み。
+"}]

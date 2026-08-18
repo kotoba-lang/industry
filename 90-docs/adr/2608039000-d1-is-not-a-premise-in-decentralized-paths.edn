@@ -1,0 +1,127 @@
+[{:db/id -1
+  :adr/id "adr-2608039000-d1-is-not-a-premise-in-decentralized-paths"
+  :adr/title "ADR-2608039000: blockchain / 分散型経路に D1 を前提にしない — 判定基準は「消して再構築できるか」"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-03"
+  :adr/last-verified "2026-08-03"
+  :adr/last_verified "2026-08-03"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "d1-not-a-premise"
+  :adr/repos ["orgs/network-awai/net-kotobase" "orgs/kotoba-lang/kotobase-storage-d1" "orgs/gftdcojp/engi" "orgs/kotoba-lang/inga"]
+  :adr/authoritative-for
+  ["blockchain / 分散型経路で Cloudflare D1（および他の単一ベンダの条件付き書き込み・単一リージョン SQL）を前提にしてはならないという repo-wide 規則"
+   "premise と cache/projection を分ける判定基準（消して再構築できるか）"
+   "この規則の適用範囲 — 分散性を主張しない普通のアプリは対象外であること"
+   "分散型経路で D1 の代わりに何を使うか（block 面 = content-addressed object store、ref 面 = inga）"
+   "CLAUDE.md の one-ref 節にあった『ストレージは D1』という記述の撤回"]
+  :adr/related
+  ["adr-2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane"
+   "adr-2607299900-kotobase-head-conditional-write-plane"
+   "adr-2607142200-strong-transactions-native-ipld-federation"
+   "adr-2607312100-kotobase-layering-block-ref-split-signed-head"
+   "adr-260726-kotobase-query-plane-is-one-ref"
+   "adr-2608010930-kotobase-chain-and-evm-compatibility-scope"
+   "adr-2607110300-kotoba-lang-net-kotobase-cloud-murakumo-decentralization-roadmap"]
+  :adr/evidence
+  ["CLAUDE.md L684-689（改訂前）『DO は直列化器・realtime room として使い、ストレージは D1』"
+   "kotobase-storage/src/kotobase/storage/core.cljc — block-capabilities / compose / ref-profiles"
+   "net-kotobase/kotobase-cf-wasm/wrangler.jsonc — KOTOBASE_HEAD_DB binding"
+   "grep d1_databases over orgs/ 2026-08-03"]
+  :adr/body
+  "# ADR-2608039000: blockchain / 分散型経路に D1 を前提にしない
+
+**Status**: accepted
+**Date**: 2026-08-03
+
+## Context
+
+オーナー指示（2026-08-03）: **「基本的に blockchain, 分散型経路に d1 は前提にしないで」**。
+
+直前の ADR-2608038000 で inga の ref plane を D1 非依存にしたが、それは inga 1件の決定だった。本 ADR はそれを **repo-wide の規則に一般化**する。
+
+### なぜ prose だけでは足りなかったか
+
+**この規則に真正面から反する記述が CLAUDE.md 本体に載っていた。** one-ref 節（ADR-260726 由来、L684-689）:
+
+> **DO は直列化器・realtime room として使い、ストレージは D1**（または他の共有バックエンド）
+
+その節の**論点は正しい**（DO ごとの private SQLite に datom 面を置くとクエリ面が孤島に割れる）。しかし要件は「**共有**バックエンドであること」であって「D1 であること」ではなかったのに、D1 が例ではなく**既定の答え**として書かれていた。agent はこの1行を読んで D1 を選ぶ。**規則を足す前に、この記述を撤回しなければ何も変わらない。**
+
+### D1 は一度も恒久的な答えとして選ばれていない
+
+ADR-2607299900 が自分で書いている:
+
+> R2 は `onlyIf.etagMatches` を持ち最有力だったが、**この環境の Cloudflare OAuth トークンに `r2` scope が無い**。R2 バケットを作る権限が無いので、実行可能な選択肢は D1 だった。**これは能力の優劣ではなく今この鍵でできることによる選択で、R2 scope が付いたら再評価に値する。**
+
+そして ADR-2607142200 は既に「Cloudflare 固有プリミティブを read / write / recovery / sequencing のどれにも**必須にしない**」を不変条件にしていた。今それは「D1 は off が既定、全経路が B2 に fallback」という**運用規律**で守られている —— 規律は人が忘れる。
+
+## Decision
+
+### 1. 規則
+
+**blockchain・合意・chain 状態・ref/head・台帳・DID/identity・IPFS/IPNS など、分散性を主張する経路では、Cloudflare D1（および他の単一ベンダの条件付き書き込み / 単一リージョン SQL）を前提にしてはならない。**
+
+分散型経路で D1 が担ってはいけない役割:
+
+- 順序 / CAS / 合意の**裁定者**
+- head・ref・chain 状態・台帳の **source of truth**
+- **recovery・sequencing・正しさが依存する対象**
+
+### 2. 判定基準 —— 「消して再構築できるか」
+
+premise と cache を分ける線を1本にする。**設計文書の言葉づかいではなく、この操作で判定する:**
+
+> **その D1 データベースを今すぐ削除したとき、データが失われるか、正しさが壊れるか。**
+> - **壊れる → premise。分散型経路では禁止。**
+> - **遅くなるだけで content-addressed 面から再構築できる → cache / projection。許可。**
+
+この基準を選んだ理由は、**「D1 は補助的に使っているだけです」という自己申告が検査不能だから**である。削除して再構築できるかは実際に試せる。
+
+許可される役割: 読み取り高速化 cache、materialized view / projection、index、local read accelerator、運用メトリクス。
+
+### 3. 代わりに使うもの
+
+- **block 面**: content-addressed な immutable object store（B2 / R2 / S3 / IPFS / DataLad-annex）。要る capability は `kotobase.storage.core/block-capabilities` = `#{:immutable-blocks :cid-addressed-read}` **だけ**で、**`:conditional-ref` はどこにも要らない**。
+- **ref 面**: **inga**（ADR-2608038000 決定 6）。**2f+1 の quorum 証明書それ自体が条件付き書き込み**なので、ホスト側プリミティブは経路から消える。
+- **配備**: `(storage/compose {:blocks <object store> :refs <inga>})`。`compose` は ref profile を `refs` 側からのみ採る（block store が偶然 `IRefStore` を実装していてもその主張を合成に貸せない）ので、**この分離は型で守られる**。
+
+### 4. 適用範囲 —— 全面禁止ではない
+
+**分散性を主張していない経路で D1 を使うのは従来どおり問題ない。** appview・セッション・管理画面・社内ツール等。実測（2026-08-03、`grep d1_databases` over `orgs/`）では `d1_databases` binding を持つ Worker の**大半がこれ**であり、それらは本 ADR の対象外である。
+
+**縛るのは「分散」「decentralized」「blockchain」を名乗る経路だけ**である。理由: そこに単一ベンダの primitive が premise として入ると、**技術的に劣るからではなく、主張そのものが嘘になる**から。ADR-2607110300 の labeling 規律（名乗ってよい条件を実態で決める）の延長線上にある。
+
+### 5. CLAUDE.md の記述を撤回する
+
+one-ref 節の「ストレージは D1」を「ストレージは**共有バックエンド**」に書き換え、本 ADR への参照を付けた。DO ストレージを禁じる論点は無変更 —— 変わるのは**要件が「共有であること」であって「D1 であること」ではない**と明示した点だけである。
+
+## 現在地（2026-08-03 実測）
+
+| 経路 | D1 の役割 | 判定 | 次にやること |
+|---|---|---|---|
+| `net-kotobase/kotobase-cf-wasm` head plane | ref の CAS 裁定（testnet=authoritative / production=shadow） | **premise** | inga 着地まで暫定 shim として稼働継続 → その後撤去（ADR-2608038000 決定 6-c） |
+| `kotoba-lang/kotobase-storage-d1` | block+ref backend adapter | **provider としては可** | 分散型経路の既定にしない。単一運営者向け plane の provider として残す |
+| `gftdcojp/engi`（settlement） | transfer ID の一意記録（replay 防止） | **要再設計** | transfer ID は既に CIDv1 —— 正本を content-addressed 面に移し、D1 は index に降格 |
+| appview 各種（~25 Worker） | アプリのデータ | **対象外** | 何もしない |
+
+**この表は「D1 を全部剥がした」という主張ではない。** production の `backend.kotobase.net` は今も shadow で D1 を使っており、それは inga の ref plane が着地するまで続く。**規則の制定と、既存経路の移行完了は別物である。**
+
+## Consequences
+
+- (+) **「分散」を名乗る経路の判定が、言葉づかいではなく操作（消して再構築できるか）で決まる。** レビューで検査できる。
+- (+) **storage backend の要求水準が下がる。** 条件付き書き込みを持たないホスト（B2 / IPFS / erasure-coded network / DataLad-annex）が一級の配備先になる。「条件付き書き込みがあるホストを探す」という制約が消える。
+- (+) ADR-2607142200 の不変条件が、off-by-default の運用規律ではなく**設計**として満たされる経路ができる。
+- (−) **inga が着地するまで、規則を満たす ref plane は存在しない。** 本 ADR は方向を固定するが、今日 production を移行はしない。**規則が accepted であることと、経路が規則を満たしていることを混同しない。**
+- (−) `gftdcojp/engi` の settlement 経路は再設計が要る。**live worker かつ決済経路**なので、本 ADR では判定を記録するに留め、実作業は別途起票する（無断で触らない）。
+- (−) D1 を使い続ける appview 群との線引きは**人の判断が要る**。「この経路は分散性を主張しているか」は自動判定できない。判断に迷ったら**主張している側に倒す**（＝規則を適用する）。
+
+## Alternatives considered
+
+- **D1 を全面禁止する。** 却下。分散性を主張しない ~25 の Worker で D1 は完全に妥当であり、それらを巻き込むと規則が守られなくなる（守れない規則は無視される）。
+- **「D1 は補助的に使うこと」という原則だけ書く。** 却下。自己申告が検査不能で、これまで実際に機能しなかった（ADR-2607142200 の不変条件が運用規律に落ちていた）。**削除して再構築できるか**という操作的基準に置き換えた。
+- **CLAUDE.md を触らず ADR だけ書く。** 却下。CLAUDE.md 本体が「ストレージは D1」と書いている限り、agent はそちらを読む。**規則の追加より先に、矛盾する記述の撤回が要る。**
+"}]

@@ -1,0 +1,472 @@
+;; Payables, charges, bank-stated balances and their correspondences, derived
+;; from jun784@gmail.com. Loaded by the generic 90-docs reader in
+;; manifest/edn-query.cljs (vector-of-maps -> one entity per record), so it is
+;; queryable alongside the ADR / fleet / company planes.
+;;
+;; EVERY record carries :fin/evidence-message-id -- the Gmail message it came
+;; from. A number without an evidence id in this file is a bug, not a shortcut:
+;; the whole point is that someone can go back and read the mail that said it.
+;;
+;; :fin/confidence is stated wherever a value was INFERRED rather than read.
+;; A matched pair (invoice <-> debit) inferred from amount and date is marked
+;; :inferred with the exchange rate that makes it work, so a reader can reject
+;; the match rather than inherit it silently.
+;;
+;; Scope: obligations and settlements. Routine personal retail (Kindle, Uber,
+;; food delivery) is deliberately NOT itemised here -- it is summarised in the
+;; :fin/kind :summary record. This is an invoice ledger, not a spending diary.
+;;
+;; NOT VERIFIED, stated so it is not mistaken for fact:
+;;   - fin-payable-total-advisory amount comes from the attachment FILENAME
+;;     (...Y38500.pdf). No Gmail attachment-download tool exists, so the PDF
+;;     body was never read.
+;;   - The account these PayPay notifications describe is addressed to
+;;     カワサキ ジュン (an individual). The tax advisor addresses JK株式会社 and
+;;     refers to 貴社PayPay銀行口座. Whether these are ONE account or TWO is
+;;     unresolved -- see fin-open-question-account-identity. Do not wire a
+;;     jk-corp funding account to these balances until that is settled.
+
+[
+ ;; ------------------------------------------------------------------
+ ;; bank-stated balances -- the only real balance readings available
+ ;; ------------------------------------------------------------------
+ ;; PayPay銀行 sends 【残高不足】引落予定のご案内 two days before a direct debit
+ ;; it expects to fail, and that notice STATES THE BALANCE. This is a bank-
+ ;; stated figure with a timestamp, obtainable today with no API contract --
+ ;; the practical :source :statement feed for cloud-itonami-app's funding model.
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-balance-20260708"
+  :fin/kind :balance-observation
+  :fin/account "paypay-bank"
+  :fin/amount-minor 3710
+  :fin/currency "JPY"
+  :fin/as-of "2026-07-08T11:22:35Z"
+  :fin/as-of-basis :notice-generation-time
+  :fin/source :gmail
+  :fin/evidence-message-id "19f4178c841d5322"
+  :fin/evidence-subject "【残高不足】引落予定のご案内"
+  :fin/scheduled-debit-date "2026-07-10"
+  :fin/scheduled-debit-total-minor 95731
+  :fin/shortfall-minor 92021
+  :fin/confidence :bank-stated
+  :fin/note "口座残高 3,710円 に対し引落予定 95,731円。この2日後に実際に振替失敗している（fin-failure-20260710）。"}
+
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-balance-20260725"
+  :fin/kind :balance-observation
+  :fin/account "paypay-bank"
+  :fin/amount-minor 435180
+  :fin/currency "JPY"
+  :fin/as-of "2026-07-25T11:54:23Z"
+  :fin/as-of-basis :notice-generation-time
+  :fin/source :gmail
+  :fin/evidence-message-id "19f9923559cfbaf5"
+  :fin/evidence-subject "【残高不足】引落予定のご案内"
+  :fin/scheduled-debit-date "2026-07-27"
+  :fin/scheduled-debit-total-minor 496131
+  :fin/shortfall-minor 60951
+  :fin/confidence :bank-stated
+  :fin/note "口座残高 435,180円 に対し引落予定 496,131円。差額 60,951円。7/27 に 418,587円分は成立し、残りが失敗した（fin-debit-20260727-smcc / fin-debit-20260727-mufg / fin-failure-20260727）。"}
+
+ ;; ------------------------------------------------------------------
+ ;; direct debit failures -- 残高不足
+ ;; ------------------------------------------------------------------
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-failure-20260710"
+  :fin/kind :debit-failure
+  :fin/account "paypay-bank"
+  :fin/counterparty "三井住友トラストクラブ"
+  :fin/counterparty-raw "ミツイスミトモトラストクラブ"
+  :fin/category :card-settlement
+  :fin/occurred-on "2026-07-10"
+  :fin/source :gmail
+  :fin/evidence-message-id "19f47be9edc27304"
+  :fin/evidence-message-id-duplicate "19f4bf8a12fd47c6"
+  :fin/evidence-subject "【要対応】残高不足により口座振替できませんでした"
+  :fin/matches "fin-balance-20260708"
+  :fin/confidence :bank-stated
+  :fin/note "三井住友トラストクラブ = ダイナースクラブの発行会社。fin-payable-diners（8/10 支払い）と同じ相手方。通知は2通届いている。"}
+
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-failure-20260727"
+  :fin/kind :debit-failure
+  :fin/account "paypay-bank"
+  :fin/counterparty "三井住友カード"
+  :fin/counterparty-raw "ミツイスミトモカ－ド （カ"
+  :fin/category :card-settlement
+  :fin/occurred-on "2026-07-27"
+  :fin/source :gmail
+  :fin/evidence-message-id "19f9f99a6e1429be"
+  :fin/evidence-message-id-duplicate "19fa39d975cf5b9f"
+  :fin/evidence-subject "【要対応】残高不足により口座振替できませんでした"
+  :fin/matches "fin-balance-20260725"
+  :fin/confidence :bank-stated
+  :fin/note "同日に三井住友カードの 411,170円 は成立している（fin-debit-20260727-smcc）ので、失敗したのは別口の振替と思われる。同一収納企業に複数の振替項目がある場合があり、成功と失敗は排他ではない。突合は口座明細でないと確定できない。"}
+
+ ;; ------------------------------------------------------------------
+ ;; direct debits that settled
+ ;; ------------------------------------------------------------------
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-debit-20260727-smcc"
+  :fin/kind :charge
+  :fin/status :settled
+  :fin/account "paypay-bank"
+  :fin/counterparty "三井住友カード"
+  :fin/category :card-settlement
+  :fin/amount-minor 411170
+  :fin/currency "JPY"
+  :fin/occurred-at "2026-07-27T01:48:54+09:00"
+  :fin/source :gmail
+  :fin/evidence-message-id "19fa0936b19fe42c"
+  :fin/evidence-subject "お引き落としのご連絡"
+  :fin/confidence :bank-stated}
+
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-debit-20260727-mufg"
+  :fin/kind :charge
+  :fin/status :settled
+  :fin/account "paypay-bank"
+  :fin/counterparty "三菱UFJファクター"
+  :fin/category :card-settlement
+  :fin/amount-minor 7417
+  :fin/currency "JPY"
+  :fin/occurred-at "2026-07-27T01:41:43+09:00"
+  :fin/source :gmail
+  :fin/evidence-message-id "19fa04710fd9693f"
+  :fin/evidence-subject "お引き落としのご連絡"
+  :fin/confidence :bank-stated}
+
+ ;; ------------------------------------------------------------------
+ ;; invoice <-> charge reconciliation (Cloudflare, three matched pairs)
+ ;; ------------------------------------------------------------------
+ ;; Each Cloudflare invoice email has a matching PayPay Visa debit within a
+ ;; day, and all three imply the same JPY/USD rate (~169.0). That consistency
+ ;; is what makes the match credible; a single pair would not be.
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-cloudflare-in72809497"
+  :fin/kind :charge
+  :fin/status :settled
+  :fin/account "paypay-bank-visa-debit"
+  :fin/counterparty "Cloudflare"
+  :fin/category :cloud-infra
+  :fin/invoice-number "IN-72809497"
+  :fin/invoiced-amount-minor 6394
+  :fin/invoiced-currency "USD"
+  :fin/amount-minor 10809
+  :fin/currency "JPY"
+  :fin/due-date "2026-07-25"
+  :fin/occurred-at "2026-07-25T19:28:26+09:00"
+  :fin/source :gmail
+  :fin/evidence-message-id "19f98d53b976caa3"
+  :fin/evidence-invoice-message-id "19f98e8ac990dfa2"
+  :fin/implied-rate 169.0
+  :fin/confidence :inferred
+  :fin/note "請求 $63.94 → 引落 ¥10,809。含意レート 169.0 JPY/USD。他2件と一致するので採用。"}
+
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-cloudflare-in72878535"
+  :fin/kind :charge
+  :fin/status :settled
+  :fin/account "paypay-bank-visa-debit"
+  :fin/counterparty "Cloudflare"
+  :fin/category :cloud-infra
+  :fin/invoice-number "IN-72878535"
+  :fin/invoiced-amount-minor 110
+  :fin/invoiced-currency "USD"
+  :fin/amount-minor 186
+  :fin/currency "JPY"
+  :fin/due-date "2026-07-26"
+  :fin/occurred-at "2026-07-26T16:52:27+09:00"
+  :fin/source :gmail
+  :fin/evidence-message-id "19f9d6cb9aefa3aa"
+  :fin/evidence-invoice-message-id "19f9d69810ace748"
+  :fin/implied-rate 169.1
+  :fin/confidence :inferred}
+
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-cloudflare-in72979452"
+  :fin/kind :charge
+  :fin/status :settled
+  :fin/account "paypay-bank-visa-debit"
+  :fin/counterparty "Cloudflare"
+  :fin/category :cloud-infra
+  :fin/invoice-number "IN-72979452"
+  :fin/invoiced-amount-minor 935
+  :fin/invoiced-currency "USD"
+  :fin/amount-minor 1580
+  :fin/currency "JPY"
+  :fin/due-date "2026-07-26"
+  :fin/occurred-at "2026-07-27T03:35:31+09:00"
+  :fin/source :gmail
+  :fin/evidence-message-id "19f9fc17b494f977"
+  :fin/evidence-invoice-message-id "19f9fb65bc2aa117"
+  :fin/implied-rate 169.0
+  :fin/confidence :inferred}
+
+ ;; a charge and its refund, same day -- recorded as a pair so the net is
+ ;; visible rather than appearing as two unrelated ¥2,000 lines
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-googleads-20260720"
+  :fin/kind :charge
+  :fin/status :refunded
+  :fin/account "paypay-bank-visa-debit"
+  :fin/counterparty "Google Ads"
+  :fin/category :advertising
+  :fin/amount-minor 2000
+  :fin/currency "JPY"
+  :fin/occurred-at "2026-07-20T12:40:05+09:00"
+  :fin/refunded-at "2026-07-20T12:41:27+09:00"
+  :fin/refund-amount-minor 2000
+  :fin/source :gmail
+  :fin/evidence-message-id "19f7d9e3883cddba"
+  :fin/evidence-refund-message-id "19f7da02970cd3aa"
+  :fin/confidence :bank-stated
+  :fin/note "課金の82秒後に同額返金。実質ゼロ。"}
+
+ ;; ------------------------------------------------------------------
+ ;; settled infra/SaaS charges with no matching invoice email found
+ ;; ------------------------------------------------------------------
+ {:source/dataset "payables-ledger" :fin/id "fin-backblaze-20260715"
+  :fin/kind :charge :fin/status :settled :fin/account "paypay-bank-visa-debit"
+  :fin/counterparty "Backblaze" :fin/category :cloud-infra
+  :fin/amount-minor 11605 :fin/currency "JPY"
+  :fin/occurred-at "2026-07-15T23:01:03+09:00"
+  :fin/source :gmail :fin/evidence-message-id "19f661806976f83c"
+  :fin/confidence :bank-stated
+  :fin/note "B2。この workspace の DataLad/large-binary 経路の実費（skill large-binary-datalad）。請求書メールは未発見。"}
+
+ {:source/dataset "payables-ledger" :fin/id "fin-googleworkspace-20260706"
+  :fin/kind :charge :fin/status :settled :fin/account "paypay-bank-visa-debit"
+  :fin/counterparty "Google Workspace (OUCHI)" :fin/category :saas
+  :fin/amount-minor 13438 :fin/currency "JPY"
+  :fin/occurred-at "2026-07-06T13:58:56+09:00"
+  :fin/source :gmail :fin/evidence-message-id "19f35ced6e5aa30d"
+  :fin/confidence :bank-stated}
+
+ {:source/dataset "payables-ledger" :fin/id "fin-github-20260706"
+  :fin/kind :charge :fin/status :settled :fin/account "paypay-bank-visa-debit"
+  :fin/counterparty "GitHub" :fin/category :saas
+  :fin/amount-minor 1981 :fin/currency "JPY"
+  :fin/occurred-at "2026-07-06T01:06:29+09:00"
+  :fin/source :gmail :fin/evidence-message-id "19f330b8c9a15127"
+  :fin/confidence :bank-stated}
+
+ {:source/dataset "payables-ledger" :fin/id "fin-openrouter-20260706"
+  :fin/kind :charge :fin/status :settled :fin/account "paypay-bank-visa-debit"
+  :fin/counterparty "OpenRouter" :fin/category :ai-inference
+  :fin/amount-minor 1807 :fin/currency "JPY"
+  :fin/occurred-at "2026-07-06T13:42:06+09:00"
+  :fin/source :gmail :fin/evidence-message-id "19f35bf72b3355d0"
+  :fin/confidence :bank-stated}
+
+ {:source/dataset "payables-ledger" :fin/id "fin-godaddy-20260705"
+  :fin/kind :charge :fin/status :settled :fin/account "paypay-bank-visa-debit"
+  :fin/counterparty "GoDaddy" :fin/category :domains
+  :fin/amount-minor 3225 :fin/currency "JPY"
+  :fin/occurred-at "2026-07-05T23:03:46+09:00"
+  :fin/source :gmail :fin/evidence-message-id "19f329a38ea8f88d"
+  :fin/confidence :bank-stated}
+
+ ;; ------------------------------------------------------------------
+ ;; OUTSTANDING -- these are the ones that need a decision
+ ;; ------------------------------------------------------------------
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-payable-total-advisory"
+  :fin/kind :payable
+  :fin/status :outstanding
+  :fin/counterparty "税理士法人TOTAL"
+  :fin/counterparty-contact "tomohito_mizutori@total-office.jp"
+  :fin/debtor "JK株式会社"
+  :fin/category :tax-advisory
+  :fin/reference "03356-20260730"
+  :fin/client-code "03356"
+  :fin/amount-minor 38500
+  :fin/currency "JPY"
+  :fin/invoiced-on "2026-07-30"
+  :fin/settlement-method :bank-transfer
+  :fin/source :gmail
+  :fin/evidence-message-id "19fb09e87efe5d1c"
+  :fin/evidence-subject "【未納顧問料のご案内】税理士法人TOTALの水鳥です。"
+  :fin/evidence-attachment "税務_未納のお知らせ_03356_ＪＫ㈱様_20260730_Y38500.pdf"
+  :fin/related-message-id "19f208ab40cdfb68"
+  :fin/confidence :unverified-amount
+  :fin/priority 1
+  :fin/note "金額はファイル名の Y38500 由来で PDF 本文は未読（Gmail MCP に添付取得 tool が無い）。6月分の口座振替が残高不足で失敗し7月分と合算された経緯（19f208ab40cdfb68、2026-07-02）の帰結。振替でなく振込を依頼されている。cloud-itonami-app の payment authority が最初に扱う対象。"}
+
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-payable-modal"
+  :fin/kind :payable
+  :fin/status :overdue
+  :fin/counterparty "Modal"
+  :fin/category :ai-inference
+  :fin/amount-minor 4074
+  :fin/currency "USD"
+  :fin/invoiced-on "2026-07-22"
+  :fin/source :gmail
+  :fin/evidence-message-id "19f879a587fa7304"
+  :fin/evidence-subject "[Final Warning] Overdue Modal Invoice"
+  :fin/confidence :bank-stated
+  :fin/priority 1
+  :fin/note "Final Warning。auto-charge が失敗した旨の記載あり。カード側の残高不足（fin-failure-*）と同根の可能性があるが未確認。"}
+
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-payable-paidy-apr"
+  :fin/kind :payable
+  :fin/status :overdue
+  :fin/counterparty "Paidy"
+  :fin/category :bnpl
+  :fin/amount-minor 1500
+  :fin/currency "JPY"
+  :fin/period "2026-04"
+  :fin/source :gmail
+  :fin/evidence-message-id "19f8c7f871c1d577"
+  :fin/evidence-subject "2026年4月分のお支払い期日を過ぎています"
+  :fin/confidence :bank-stated
+  :fin/priority 2
+  :fin/note "3か月以上滞留している少額。遅延手数料が加算されうる旨の記載あり。金額の小ささに対して滞留期間が長い。"}
+
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-payable-fal"
+  :fin/kind :payable
+  :fin/status :outstanding
+  :fin/counterparty "fal (Features & Labels, Inc.)"
+  :fin/category :ai-inference
+  :fin/invoice-number "YNMMGW-00011"
+  :fin/amount-minor 1500
+  :fin/currency "USD"
+  :fin/due-date "2026-08-06"
+  :fin/source :gmail
+  :fin/evidence-message-id "19f94827aef2d50b"
+  :fin/confidence :bank-stated
+  :fin/priority 2}
+
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-payable-diners"
+  :fin/kind :payable
+  :fin/status :billed
+  :fin/counterparty "ダイナースクラブ（三井住友トラストクラブ）"
+  :fin/category :card-settlement
+  :fin/due-date "2026-08-10"
+  :fin/source :gmail
+  :fin/evidence-message-id "19f8c99841f03264"
+  :fin/evidence-subject "[オンライン明細/Online Statement] 次回請求金額確定のお知らせ"
+  :fin/matches "fin-failure-20260710"
+  :fin/confidence :amount-unknown
+  :fin/priority 1
+  :fin/note "金額はメールに無くクラブ・オンライン参照。同じ相手方の 7/10 振替が残高不足で失敗しているので、8/10 は要注意。"}
+
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-payable-tokyo-gas"
+  :fin/kind :payable
+  :fin/status :billed
+  :fin/counterparty "東京ガス"
+  :fin/category :utilities
+  :fin/invoiced-on "2026-07-24"
+  :fin/source :gmail
+  :fin/evidence-message-id "19f9351871f2104b"
+  :fin/confidence :amount-unknown
+  :fin/priority 3
+  :fin/note "金額は myTOKYOGAS 参照でメールに無し。"}
+
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-payable-zelo"
+  :fin/kind :payable
+  :fin/status :in-negotiation
+  :fin/counterparty "法律事務所ZeLo"
+  :fin/counterparty-contact "yusuke.mizuno@zelojapan.com"
+  :fin/debtor "JK株式会社"
+  :fin/category :legal
+  :fin/period-from "2025-10"
+  :fin/source :gmail
+  :fin/evidence-message-id "19f63ebc6a507860"
+  :fin/related-message-id "19fab8c98abea2fa"
+  :fin/confidence :amount-unknown
+  :fin/priority 1
+  :fin/note "2025年10月以降の費用が未払い（LingLing訴訟）。2026-07-29 に分割案（7月内に100万円＋オランダ不動産売却時に残額）を提示し先方の回答待ち。金額はメール本文に無い。回答が来ていないので、これは支払い実行より先に先方の合意が要る。"}
+
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-payable-cardloan-20260731"
+  :fin/kind :payable
+  :fin/status :scheduled
+  :fin/counterparty "PayPay銀行カードローン"
+  :fin/category :loan
+  :fin/due-date "2026-07-31"
+  :fin/settlement-method :direct-debit
+  :fin/account "paypay-bank"
+  :fin/source :gmail
+  :fin/evidence-message-id "19fb032a42142947"
+  :fin/evidence-subject "カードローンご返済日のお知らせ"
+  :fin/confidence :amount-unknown
+  :fin/priority 1
+  :fin/note "約定返済は普通預金からの自動引落。7月中に借入が4回（7/01・7/03・7/04・7/06・7/11・7/25）記録されており、残高不足の常態化と同じ面にある。金額はメールに無い。"}
+
+ ;; ------------------------------------------------------------------
+ ;; outbound transfers -- context for where the balance went
+ ;; ------------------------------------------------------------------
+ {:source/dataset "payables-ledger" :fin/id "fin-transfer-20260724-gftd"
+  :fin/kind :transfer-out :fin/account "paypay-bank"
+  :fin/counterparty-raw "ギフテツドジヤパン（．．" :fin/counterparty "Gftd Japan（推定）"
+  :fin/amount-minor 400000 :fin/currency "JPY"
+  :fin/occurred-at "2026-07-24T11:14:13+09:00"
+  :fin/source :gmail :fin/evidence-message-id "19f91ea8520bd847"
+  :fin/confidence :inferred
+  :fin/note "受取人名は銀行側で一部マスクされている。Gftd Japan 株式会社との対応は推定。"}
+
+ {:source/dataset "payables-ledger" :fin/id "fin-transfer-20260724-araki"
+  :fin/kind :transfer-out :fin/account "paypay-bank"
+  :fin/counterparty-raw "アラキ ミカ．．"
+  :fin/amount-minor 250000 :fin/currency "JPY"
+  :fin/occurred-at "2026-07-24T11:14:31+09:00"
+  :fin/source :gmail :fin/evidence-message-id "19f91eaad33abaf8"
+  :fin/confidence :bank-stated}
+
+ {:source/dataset "payables-ledger" :fin/id "fin-transfer-20260715"
+  :fin/kind :transfer-out :fin/account "paypay-bank"
+  :fin/counterparty-raw "カ）カ－．．"
+  :fin/amount-minor 411050 :fin/currency "JPY"
+  :fin/occurred-at "2026-07-15T19:00:50+09:00"
+  :fin/source :gmail :fin/evidence-message-id "19f653c3cd4b189d"
+  :fin/confidence :bank-stated
+  :fin/note "411,050円。7/27 の三井住友カード引落 411,170円 と額が近いが別物（120円差、日付も別）。同一視しないこと。"}
+
+ ;; ------------------------------------------------------------------
+ ;; summary of what was deliberately not itemised
+ ;; ------------------------------------------------------------------
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-summary-uncatalogued"
+  :fin/kind :summary
+  :fin/note "個人小口（Amazon Kindle・Uber・飲食・Nintendo・Apple 等）の Visa デビット通知が 2026-07 だけで数十件あるが、請求書台帳の目的から個別収録していない。PayPay チャージ 30,000円 の定期引落が 7/03・7/04・7/15・7/17・7/21・7/24 に記録されている。必要なら from:paypay-bank.co.jp のラベル Label_3827707782613425965 から再抽出できる。"
+  :fin/source :gmail
+  :fin/evidence-label "Label_3827707782613425965"
+  :fin/confidence :summary-only}
+
+ ;; ------------------------------------------------------------------
+ ;; open questions -- recorded so they are not silently assumed away
+ ;; ------------------------------------------------------------------
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-open-question-account-identity"
+  :fin/kind :open-question
+  :fin/priority 1
+  :fin/note "PayPay銀行の通知はすべて『カワサキ ジュン様』（個人）宛。一方 税理士法人TOTAL は『JK株式会社 代表取締役 河﨑様』宛で『貴社PayPay銀行口座』と書いている。個人口座と法人口座が別に存在するのか、同一口座なのかがメールからは判別できない。cloud-itonami-app の jk-corp に funding account を紐付ける前に、これを確定させる必要がある。誤って個人口座の残高を法人の支払い可否判定に使うと、資金 gate が嘘をつく。"
+  :fin/source :gmail
+  :fin/evidence-message-id "19f208ab40cdfb68"
+  :fin/confidence :unresolved}
+
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-open-question-smcc-split"
+  :fin/kind :open-question
+  :fin/priority 2
+  :fin/note "2026-07-27 に三井住友カードの 411,170円 が引き落とされている一方、同日同じ収納企業で残高不足の振替失敗通知も届いている。同一収納企業に複数の振替項目があると考えれば矛盾しないが、メールだけでは確定できない。口座取引明細で突合が要る。"
+  :fin/source :gmail
+  :fin/evidence-message-id "19fa0936b19fe42c"
+  :fin/confidence :unresolved}
+
+ {:source/dataset "payables-ledger"
+  :fin/id "fin-finding-balance-from-mail"
+  :fin/kind :finding
+  :fin/priority 1
+  :fin/note "PayPay銀行は引落予定日の2日前に【残高不足】引落予定のご案内 を送り、その本文に『口座残高』を明示する。これは銀行が述べた残高であり日付も付く。API 契約（申込→約7営業日、API利用約款、場合により電子決済等代行業者の登録）を待たずに、今日から cloud-itonami-app の funding/record-balance! に :source :statement として投入できる唯一の実データ経路。ただし送られてくるのは残高不足が見込まれるときだけなので、これは常時の残高フィードではなく『危ないときだけ届く』フィードである — 届かないことを残高が十分な証拠として読んではならない。"
+  :fin/source :gmail
+  :fin/evidence-message-id "19f9923559cfbaf5"
+  :fin/confidence :bank-stated}
+]

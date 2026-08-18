@@ -1,0 +1,94 @@
+{:as-of "2026-08-13",
+ :sources [:cloudflare :health :emitter],
+ :workers-invocations-7d {"nexus-x402" 4844},
+ :health-status 200,
+ :catalog
+ {:x402Version 1,
+  :service "nexus-x402",
+  :count 6,
+  :items
+  [{:seller "kotobase",
+    :method "GET",
+    :path-prefix "/x402/ipfs/",
+    :gateway "https://x402.nexus/gateway/kotobase/x402/ipfs/…",
+    :price
+    {:usd "0.001",
+     :micros "1000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
+    :description nil}
+   {:seller "kotobase",
+    :method "POST",
+    :path-prefix "/x402/xrpc/",
+    :gateway "https://x402.nexus/gateway/kotobase/x402/xrpc/…",
+    :price
+    {:usd "0.002",
+     :micros "2000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
+    :description nil}
+   {:seller "kekkai",
+    :method "POST",
+    :path-prefix "/kekkai/x402/",
+    :gateway "https://x402.nexus/gateway/kekkai/kekkai/x402/…",
+    :price
+    {:usd "0.001",
+     :micros "1000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
+    :description
+    "one deny-by-default kekkai edge decision, organisation boundary first"}
+   {:seller "murakumo",
+    :method "POST",
+    :path-prefix "/x402/v1/chat/completions",
+    :gateway
+    "https://x402.nexus/gateway/murakumo/x402/v1/chat/completions…",
+    :price
+    {:usd "0.01",
+     :micros "10000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
+    :description
+    "per-request LLM inference (OpenAI-compatible), up to 25,000 output tokens per request"}
+   {:seller "murakumo",
+    :method "POST",
+    :path-prefix "/x402/v1/infer-memory",
+    :gateway
+    "https://x402.nexus/gateway/murakumo/x402/v1/infer-memory…",
+    :price
+    {:usd "0.01",
+     :micros "10000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
+    :description
+    "infer+memory: OpenAI-compatible inference plus durable Kotobase receipt CID, up to 25,000 output tokens per request"}
+   {:seller "shinshi",
+    :method "GET",
+    :path-prefix "/x402/premium/",
+    :gateway "https://x402.nexus/gateway/shinshi/x402/premium/…",
+    :price
+    {:usd "0.50",
+     :micros "500000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xf1592811063554e2EDfC137964aE181C830967Ac"},
+    :description nil}],
+  :settlements
+  {:count 7,
+   :usd-total 0.07,
+   :agent-hint {:agent 7, :human 0, :unknown 0},
+   :sources
+   {:direct-agent
+    {:paid-calls 7,
+     :paying-wallets 1,
+     :unique-repeat-buyers 1,
+     :repeat-rate 1,
+     :service-gmv-usd 0.07,
+     :repeat-buyer-revenue-usd 0.07,
+     :repeat-buyer-revenue-share 1}}}}, 
+ :signal "workers 4844 inv/7d"}

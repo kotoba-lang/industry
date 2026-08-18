@@ -1,0 +1,66 @@
+{:schema "kotoba-installed-release-evidence/v1"
+ :recorded-on "2026-07-19"
+ :release
+ {:version "0.6.27"
+  :tag "v0.6.27"
+  :commit "bde11a08dd5b73985f2de061d9014273b6c18c88"
+  :url "https://github.com/kotoba-lang/kotoba/releases/tag/v0.6.27"
+  :native-run "https://github.com/kotoba-lang/kotoba/actions/runs/29663453590"
+  :native-platforms
+  [{:os :macos :arch :arm64 :status :passed
+    :archive-sha256 "7768c0de0a770453282132811015fea68264bf84c3853505699164e4d6a9a086"}
+   {:os :macos :arch :amd64 :status :passed
+    :archive-sha256 "45e06484c4fb4183c9a9ba138ab1dbea2fec32544a77ecd225be04750e830b88"}
+   {:os :linux :arch :amd64 :status :passed
+    :archive-sha256 "74091a517b8b5871cef723b675c9a34f786c3c1ee7e4c166bde1ead9668c95ef"}]
+  :source-sha256 "77dab7775100a58d3e8299a2215fc5524607c35fea02d952c5e2227ac73fe803"}
+ :shell-install
+ {:installer-ref "v0.6.27"
+  :clean-prefix true
+  :platform :darwin-arm64
+  :checksum-verified true
+  :executable-format "Mach-O 64-bit executable arm64"
+  :jvm-bundled false
+  :selfhost-check :passed}
+ :lab-installed-conformance
+ {:repository "orgs/kotoba-lang/lab"
+  :entry "test/kotoba/lab/verification_conformance.kotoba"
+  :source-path "src"
+  :project-digest "4dfcf271d8134e80e0b216e9ff54437131e30c6753f1035eadf9b4df641db14a"
+  :web {:compile :passed
+        :runtime-main 42
+        :value-profile "typed-v1"
+        :artifact-sha256 "19c21c5095ec3cb3d9be6c382b445a9eb00e19b0261f89f4ecbe542e837dcfe8"}
+  :wasm {:compile :passed
+         :runtime-main 42
+         :value-profile "typed-v1"
+         :value-abi "externref-v1"
+         :features ["reference-types"]
+         :artifact-sha256 "cb1b8645517713eb2f6e7132e7c6318d3b1e827884cae0f6a40c4186c1065e20"
+         :runtime-host {:repository "kotoba-lang/compiler"
+                        :commit "1619c596112b951f431e4d78d40d79a4a7018ae7"
+                        :path "runtime/browser-host.mjs"
+                        :expected-sha256-bound true
+                        :allow-capabilities []
+                        :typed-abi-admitted true
+                        :heap-capacity 4096
+                        :heap-used 0}}}
+ :homebrew
+ {:formula-pr "https://github.com/kotoba-lang/homebrew-kotoba/pull/35"
+  :formula-commit "3d98c65b3e1cf6668979d89c55f18d697a02464d"
+  :assertion-fix-pr "https://github.com/kotoba-lang/homebrew-kotoba/pull/36"
+  :bottle-digests-pr "https://github.com/kotoba-lang/homebrew-kotoba/pull/37"
+  :bottle-formula-commit "4569a0edd10d03b714d134c7ba1d861a4729cc67"
+  :bottle-run "https://github.com/kotoba-lang/homebrew-kotoba/actions/runs/29663811337"
+  :bottle-release "https://github.com/kotoba-lang/homebrew-kotoba/releases/tag/kotoba-0.6.27"
+  :platforms
+  [{:os :macos :arch :arm64 :install :passed :test :passed
+    :bottle-sha256 "89217b55b9f20a01f0fab929f0fa138636c705c27c2f8f6c158ae6e9e77a7851"}
+   {:os :macos :arch :amd64 :install :passed :test :passed
+    :bottle-sha256 "5fde5b6d21fd522284d4bcd055d063a6c53a1b40b2f8ac07888419cda078aa8a"}
+   {:os :linux :arch :amd64 :install :passed :test :passed
+    :bottle-sha256 "cf9514156138c845da143e1cc021cb34675517b6fe385cacc5d94ea0fe263b45"}]
+  :in-repository-formula-pr "https://github.com/kotoba-lang/kotoba/pull/373"
+  :in-repository-formula-commit "0eacc124f0d6c6f45fea84edc09516bcd3bd03d7"
+  :status :passed}
+ :cutover-authorized false}

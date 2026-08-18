@@ -1,0 +1,27 @@
+;; Kingdom Cascade — level 2, "The Shaft".
+;;
+;; The first irregular silhouette: a narrow shaft cut into the middle of the
+;; board and two stone shoulders. This is the level that exercises diagonal
+;; fall — without it the pockets either side of the shaft never refill.
+;;
+;; Stone needs two hits, so the goal is deliberately smaller than the crate
+;; goal in level 1 despite the level being longer.
+{:level/id "kc-002"
+ :level/name "The Shaft"
+ :level/chapter 1
+ :level/preset :royal-cellar
+ :level/moves 26
+ :level/seed 20260809
+ :level/colors [:coin :gem :clover :goblet :crown]
+ :level/goals [{:goal/kind :block :goal/block :stone :goal/count 6}
+               {:goal/kind :collect :goal/color :coin :goal/count 24}]
+ :level/grid ["###....###"
+              "##......##"
+              "#..s..s..#"
+              ".....ss..."
+              "...###...."
+              "...###...."
+              ".....ss..."
+              "#........#"
+              "##......##"
+              "###....###"]}

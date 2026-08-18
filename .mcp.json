@@ -1,0 +1,46 @@
+{
+  "mcpServers": {
+    "mfc_ca": {
+      "type": "http",
+      "url": "https://beta.mcp.developers.biz.moneyforward.com/mcp/ca/v3"
+    },
+    "mfc_ca_gw": {
+      "type": "http",
+      "url": "https://beta.mcp.developers.biz.moneyforward.com/mcp/ca/v3"
+    },
+    "cloud-itonami-license": {
+      "type": "stdio",
+      "command": "nbb",
+      "args": [
+        "--classpath",
+        "orgs/network-awai/cloud-itonami/src:orgs/kotoba-lang/kyoninka/src:orgs/kotoba-lang/org-anthropic-mcp/src:orgs/kotoba-lang/mail/src",
+        "orgs/network-awai/cloud-itonami/scripts/mcp-server.cljs"
+      ],
+      "env": {}
+    },
+    "cloud-itonami-app": {
+      "type": "stdio",
+      "command": "/bin/sh",
+      "args": [
+        "-c",
+        "cd \"$HOME/.cloud-itonami/app\" && exec clojure -M:mcp"
+      ],
+      "env": {
+        "CLOUD_ITONAMI_DATA_DIR": "/Users/junkawasaki/.cloud-itonami/data"
+      }
+    },
+    "hubspot": {
+      "type": "http",
+      "url": "https://mcp.hubspot.com/",
+      "oauth": {
+        "clientId": "20a2b814-6a56-4fee-8264-3eb55db11219",
+        "callbackPort": 8765
+      }
+    },
+    "telnyx": {
+      "type": "http",
+      "url": "https://api.telnyx.com/v2/mcp",
+      "headersHelper": "set -e; K=$(security find-generic-password -s telnyx-api-key -w 2>/dev/null) || { echo 'telnyx-api-key missing from the Keychain cache. kagi holds the record; rebuild per .claude/skills/secrets-location-map/references/third-party-api.md' >&2; exit 44; }; printf '{\"Authorization\":\"Bearer %s\"}' \"$K\""
+    }
+  }
+}

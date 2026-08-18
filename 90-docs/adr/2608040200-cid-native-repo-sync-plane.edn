@@ -1,0 +1,256 @@
+[{:db/id -1
+  :adr/id "adr-2608040200-cid-native-repo-sync-plane"
+  :adr/title "ADR-2608040200: west の後継 — kotobase の CID 特性（prolly-tree の構造共有・content address・missing-since）を正面から使う repo 同期プレーン"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-03"
+  :adr/last-verified "2026-08-03"
+  :adr/last_verified "2026-08-03"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "cid-native-repo-sync"
+  :adr/repos ["orgs/kotoba-lang/kagami" "orgs/kotoba-lang/prolly-tree" "orgs/kotoba-lang/bonsai"
+              "orgs/kotoba-lang/nekko" "orgs/kotoba-lang/kotobase-storage" "orgs/kotoba-lang/inga"]
+  :adr/authoritative-for
+  ["west の後継として何を作るか — manifest を prolly-tree の値にし、fleet 状態を 1 個の root CID で名指しする設計"
+   "CID が実際に効く 4 点と、効かない 2 点（cross-repo dedup は実測 10.2% であり売り文句にしない）"
+   "kotobase 面が projection であって premise でないことの担保（削除テスト）"
+   "この設計に必要で今日存在しない primitive の名指し（prolly-tree の diff / merge）"
+   "radicle をそのまま使うのではなく、どの概念だけを借りるか"]
+  :adr/related
+  ["adr-2608040100-fleet-sync-topology-content-addressed-vs-west"
+   "adr-2607160005-kotoba-fleet-agent-vcs-west-successor"
+   "adr-2607072200-kotoba-git-kotoba-rad-content-addressed-vcs"
+   "adr-2608039700-agent-loop-git-datalad-source-kotobase-query-projection"
+   "adr-2608039000-d1-is-not-a-premise-in-decentralized-paths"
+   "adr-2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane"
+   "adr-260726-kotobase-query-plane-is-one-ref"
+   "adr-2607312100-kotobase-layering-block-ref-split-signed-head"]
+  :adr/evidence
+  ["manifest/west.yml 1,024,627 B / 4,063 entries; manifest/fleet-db.edn 958,572 B; manifest/fleet-db.ledger.edn 1,441,801 B (2026-08-03)"
+   "kotoba-lang/kagami bin/fleet.cljs cmd-head — 署名対象は fleet-db.edn 全体の SHA-256（node-sha256 (slurp db)）"
+   "kotoba-lang/kagami src/fleet/objects.cljc — missing-since ベースの block 転送・visibility ACL・pack/unpack・reconstructable?"
+   "kotoba-lang/prolly-tree@1e9b401 src/prolly_tree/diff.cljc — 本 ADR の P0 として実装・merge 済み（27 tests / 2,151 assertions）。merge は依然として無い"
+   "cross-repo blob dedup 実測: 325 repo / 240,768 blob entry / distinct 216,092 → entry 10.2%、bytes 15.4%"
+   "scripts/fleet-sync-tick.cljs 実測: reconcile 直後の 1 時間で manifest が 9 changed + 6 added 漂流"]
+  :adr/decision-summary "{:manifest :prolly-tree-value, :fleet-state-name :root-cid, :head :signed-record-over-root-cid, :objects :bonsai-cid-blocks, :transfer :missing-since-closure, :materialisation :working-set-closure-query, :ref-plane {:single-machine :signed-head-cas, :multi-machine :inga-quorum}, :source-of-truth :git-plus-canonical-edn, :kotobase-role :projection, :delete-test :passes, :cid-wins [:o-diff-comparison :deterministic-key-merge :idempotent-transfer :nameable-state], :cid-non-wins [:cross-repo-dedup-10pct :mutable-refs], :missing-primitive :prolly-tree-diff, :west-yml :generated-interop-projection}"
+  :adr/body
+  "# ADR-2608040200: CID ネイティブな repo 同期プレーン（west 後継）
+
+**Status**: accepted（設計）
+**Date**: 2026-08-03
+**Deciders**: Jun Kawasaki（指示:「rad をそのまま使うというより west の代わりになる、kotobase の cid の特徴を活かした repo 同期の仕組みを設計して欲しい」）
+
+## Context
+
+ADR-2608040100 が現在地を実測した。本 ADR はその上に、**west を置き換える具体設計**を置く。
+radicle は「そのまま使う」対象ではなく、**per-writer namespace / sigref / canonical=純関数**
+という 3 概念だけを借りる（ADR-2607160005 と同じ判断）。
+
+## west が構造的にできない 4 つのこと（実測）
+
+1. **fleet 状態を 1 個の値で名指しできない。** 「同期しているか」に答えるには
+   4,063 entry（1,024,627 B）の走査が要る。`west update` は「pin に合わせる」だけで、
+   **同一性の判定を持たない**。
+2. **書き込みが単一ファイルの textual merge。** 30 日で 5,181 commit（173/day、ピーク 430）。
+   `scripts/fleet-sync-tick.cljs` の実測では **reconcile 直後の 1 時間で 9 changed + 6 added**。
+   この経路は west.yml を二度空にしている（ADR-2607258000）。
+3. **同期が repo ごとの独立 negotiation。** 3,600 checkout × `git fetch`。順序依存で、
+   dirty は無言 skip され、**pin の commit を持っていない checkout が 141 件**（HEAD≠pin 203 の 69%）。
+4. **materialise が全か無か。** 3,649 checkout を維持して直近 24h に触るのは 235（6.4%）。
+
+## kotobase の CID が実際に与えるもの — 効く 4 点
+
+### (a) 状態が 1 個の名前になる（root CID）
+manifest を prolly-tree の値にすると、fleet 全体の状態は **root CID 1 個**で名指しできる。
+「同期しているか」は **CID 1 個の比較**になり、4,063 entry の走査が消える。
+現在の `fleet head` は **fleet-db.edn 全体の SHA-256** に署名している（`cmd-head` 実装）——
+値としては正しいが**構造を持たない**ので、差分も部分検証もできない。ここを root CID に
+差し替えるのが本設計の中心の 1 手。
+
+### (b) 差分が O(変更数)（構造共有）
+prolly-tree は chunk 境界が内容依存（~1/256）なので、1 entry の更新は**その chunk と祖先
+だけ**を変える。2 つの root を比較するとき、**子 CID が一致する部分木は丸ごと skip できる**。
+4,063 entry のうち 15 件が動いた 1 時間後の比較コストは、entry 数ではなく**変更数**に比例する。
+
+### (c) 交わらないキーへの更新が textual conflict にならない
+今日の 173 write/day は「1 本の YAML の同じ行域を奪い合う」形をしている。prolly-tree では
+`repo/<name>` という素キーへの更新なので、**別 repo の pin 前進は決定的にマージできる**
+（同一 repo の競合だけが本物の競合で、それは `bonsai.ref-policy/fast-forward?` で裁く）。
+manifest-contention ループの原因側がここで消える。
+
+### (d) 転送が冪等・順序非依存・再開可能
+`bonsai.log/missing-since` は「head から到達可能で、こちらが持っていない CID 集合」を返す
+——pull negotiation の primitive そのもの。`fleet.objects` が既にこれで block 転送・
+visibility ACL・`reconstructable?` 検証まで実装している。**同じ CID を二度取っても同じ結果**
+なので、`(forced update)` の偽陽性も ancestry 誤判定も構造的に起きない。
+
+## 効かない 2 点 — 実測で否定しておく
+
+### (e) cross-repo dedup は小さい: **entry 10.2% / bytes 15.4%**
+325 repo・240,768 blob entry の実測（distinct OID 216,092）。org 別では network-awai が
+entry 32.2%・bytes 51.8% と大きいが、**gftdcojp 5.7% / kotoba-lang 7.9% / com-junkawasaki 2.8%**。
+最多重複 blob は空ファイル（510 コピー）と数百バイトの設定断片。
+**「content address にすれば重複が消えて軽くなる」を本設計の売り文句にしてはならない。**
+git は repo 内では既に content-addressed で、packfile の delta 圧縮も効いている。
+CID の価値は容量ではなく**同一性・差分・冪等性**にある。
+
+### (f) 可変 ref は CID では消えない
+ADR-2608040100 の結論を再掲: unison も nix も同じ形（namespace head / flake.lock は可変）。
+ref 面の答えは別に要る（下記 Plane C）。
+
+## 設計 — 3 プレーン、ただし join 面は ref 1 本
+
+```
+Plane C  head        : 署名付き {:fleet/root <root-CID> :seq n} —— 1 本の ref
+   |                    単機は CAS、複数機は inga quorum（ADR-2608038000）
+Plane A  manifest    : repo entity の prolly-tree（key = repo/<name>）
+   |                    root CID がそのまま fleet 状態の名前
+Plane B  objects     : bonsai の CID ブロック（blob/tree/commit）
+                        転送は missing-since の閉包のみ
+```
+
+### Plane A — manifest は「ファイル」ではなく「prolly-tree の値」
+
+```clojure
+;; key: \"repo/kagami\"
+{:repo/name \"kagami\" :repo/org \"kotoba-lang\"
+ :repo/path \"orgs/kotoba-lang/kagami\"
+ :repo/pin  \"<git sha>\"          ;; interop 用（GitHub と会話するため）
+ :repo/pin-cid \"<bonsai commit CID>\"  ;; 本設計の正
+ :repo/groups #{:kotoba-lang}
+ :repo/deps #{\"datom\" \"chain\" \"prolly-tree\"}   ;; ← :local/root 閉包
+ :repo/rad-rid \"rad:...\"}
+```
+
+**`:repo/deps` を持たせるのが nix 的な肝**。「kagami とその依存閉包を materialise せよ」が
+**再帰 Datalog クエリ 1 本**になり、`west update` の「全部展開」が消える。今日 3,649 維持して
+235 しか使っていない比を、そのまま working set に落とせる。
+
+### Plane B — object 転送は閉包 fetch
+
+```
+have  = fleet.objects/have-set(local db)
+want  = 各 :repo/pin-cid
+fetch = bonsai.log/missing-since(have, want)   ;; ← これだけ取る
+verify= fleet.objects/reconstructable?          ;; 取り終えたら再構成可能を assert
+```
+repo 単位の `git fetch` を 3,600 回回すのをやめ、**working set の閉包を 1 回**で取る。
+private repo は `fleet.objects/visible-to?`（radicle の visibility モデル）で弾く。
+
+### Plane C — head は 1 本、join 面も 1 本（ADR-260726 の制約を設計に織り込む）
+
+`kotobase.core/open` は `:ref-name` を 1 つしか取らず、Datalog join の到達範囲は
+**ちょうど ref 1 本**。したがって **fleet manifest は 1 本の ref（`fleet`）に置く**。
+org ごとに割らない。**割った場合に失われるのは「repo × 依存 × pin 履歴 × CI 結果を
+1 クエリで跨ぐこと」であり、それがこのプレーンの存在理由そのもの**なので割らない。
+書き込み並列度は ref 1 本の CAS で直列化する（現行の `fleet head` の seq 単調増加が既にこの形）。
+
+- **単機**: 署名付き head の CAS（seq+1）。今日の `cmd-head` をそのまま使う。
+- **複数機**: inga の 2f+1 quorum 証明書（ADR-2608038000）。**D1 等の単一ベンダ条件付き
+  書き込みを前提にしない**（ADR-2608039000）。
+
+## Git は正本のまま —— 削除テストを通す
+
+ADR-2608039700 は「agent 向け durable source of truth は Git + canonical EDN、kotobase は
+query/serving projection」と定める。本設計はそれに従う:
+
+- **正本**: append-only の署名付き EDN 台帳（今日の `manifest/fleet-db.ledger.edn`）と、
+  各子 repo の git 履歴。
+- **projection**: prolly-tree（manifest の索引）と block store（object のキャッシュ）。
+- **削除テスト**: kotobase 側の store を全消ししても、**台帳を replay すれば root CID は
+  再構築でき、object は GitHub / git から再取得できる**。失うのは速度だけ。
+  → **premise ではなく projection**。合格。
+- `manifest/west.yml` は **生成された interop projection** に降格する（GitHub・CI・
+  既存 `west update` を壊さないため互換期間は出し続ける）。
+
+## 今日存在しない primitive（名指しする）
+
+| 必要なもの | 現状 | 規模感 |
+|---|---|---|
+| **`prolly-tree/diff` — 2 root を歩き、子 CID が一致する部分木を skip** | **✅ 2026-08-04 実装・merge 済み**（`prolly-tree.diff/diff` / `diff*`（`:blocks-read` つき）/ `changed-keys`） | 下記「実測」節を参照 |
+| `prolly-tree/merge`（3-way、素キー単位） | 無い | diff の上に載る |
+| manifest を prolly-tree に載せる writer（`fleet` CLI） | 無い（今は 1 枚の EDN） | `fleet.db` の置き換え |
+| head の署名対象を file-hash → root CID に | `cmd-head` は `node-sha256(slurp db)` | 数行だが**署名形式の変更**なので verify も同時に |
+| working-set 閉包クエリ（`:repo/deps`） | manifest に dep 情報が無い | deps.edn から抽出して datom 化 |
+| 閉包 materialise（fetch → checkout） | `fleet.objects` に転送はある、checkout 側が無い | Plane 3（ADR-2607160005）の再起動 |
+
+**既にあるもの**: `bonsai`（object model・git byte 互換・missing-since）、`prolly-tree`
+（構造共有チャンク・IPLD link）、`arrangement`、`nekko`（RID・sigref・delegate・CACAO gate）、
+`kagami`（fleet-db・署名 head・pin admission・p2p・objects 転送）、`inga`（2f+1）、
+`kotobase-storage`（block/ref 分離 compose）。**ゼロから作るものは無い。**
+
+## 移行フェーズ（west を止めない）
+
+- **P0（今すぐ・低リスク）**: `prolly-tree/diff` を書き、**現行 fleet-db.edn から
+  prolly-tree を build して root CID を出すだけ**の read-only パスを足す。west.yml も
+  fleet-db.edn も正本のまま。得られるもの: 「fleet 状態 = CID 1 個」がその日から言える。
+- **P1**: `fleet head` の署名対象を root CID にする（旧 file-hash も併記して verify 互換）。
+  head announce（p2p）が構造を運ぶようになる。
+- **P2**: manifest の書き込み経路を prolly-tree の key upsert に切り替え、west.yml を
+  **生成物**に降格。textual merge が経路から消える。
+- **P3**: `:repo/deps` を deps.edn から datom 化し、working-set 閉包 materialise を実装。
+  ここで初めて refresh period が「維持数 / スループット」から外れる。
+- **P4**: 複数機。head を inga quorum に接続。単機のうちは P4 に進まない。
+
+## 受け入れ基準（既存の測定指標に紐づける。全部 `scripts/fleet-sync-probe.cljs` で測る）
+
+| 指標 | 今日 | 目標 | どのフェーズで |
+|---|---|---|---|
+| 「同期しているか」の判定コスト | 4,063 entry 走査 | **CID 1 個の比較** | P0 |
+| manifest の textual conflict | 173 write/day が 1 ファイルに集中 | 素キー単位マージ、textual conflict 0 | P2 |
+| HEAD≠pin の :not-relatable | **141 件** | **0 件（構造的に不可能）** —— 閉包 fetch なので「持っていない pin」に居られない | P3 |
+| fleet refresh period | 15.5 日 | working set 基準で **~1 日** | P3 |
+| head の意味 | 958 KB ファイルの hash | 構造を持つ root CID | P1 |
+
+## 実測（P0 着地後、2026-08-04）
+
+`prolly-tree.diff` を実装して merge した（`kotoba-lang/prolly-tree@1e9b401`、
+27 tests / 2,151 assertions green）。`diff*` は `:blocks-read` を返すので、
+構造 skip が効いているかを**主張でなく測定**できる。実測:
+
+| manifest entry 数 | tree の block 数 | 変更 entry | diff が読んだ block | 比 |
+|---|---|---|---|---|
+| **4,063（今日の fleet）** | **17** | 1 | 4 | 0.24 |
+| 4,063 | 17 | 15 | 20 | 1.18 |
+| 50,000 | 195 | 1 | 6 | 0.03 |
+| 50,000 | 195 | 15 | 38 | 0.19 |
+| 任意 | 任意 | **0（root 一致）** | **0** | — |
+
+**正直な読み方**: 今日の 4,063 entry では tree 全体がわずか **17 block**（1 leaf ≈ 226 entry）
+なので、**block skip の絶対的な得は小さい**。15 entry が動いた比較は両側を読むため 20 block
+＝片側の tree より多い。つまり今日 (b) から得られるものは限定的で、**今日効くのは
+(a) root 一致の比較が 0 block で終わること**と **(c) 素キーの独立更新**である。
+block skip が本当に効き始めるのは manifest が 1 桁増えたとき（50,000 entry で 15 変更なら 19%）、
+および**同じ構造を object 面（block 数が桁違い）に当てたとき**。
+
+**設計判断への影響**: 受け入れ基準の「同期しているか = CID 1 個の比較」は P0 で既に満たせる
+（0 block）。一方「差分コストが O(変更数)」を manifest 面の売りにするのは今日の規模では
+誇張になる。**object 面の閉包 fetch（Plane B）こそが構造 skip の本命**であり、
+P3 の優先度をそのぶん上げる。
+
+## What this ADR does NOT decide
+
+- **git / GitHub の廃止をしない**（interop projection として維持。ADR-2607160005 と同じ）。
+- **radicle-the-software の採用をしない**。借りるのは per-writer namespace / sigref /
+  canonical=純関数の 3 概念のみ。既存の 3,677 repo storage の扱いは ADR-2608040100 の管轄。
+- **kotobase を正本にしない**（ADR-2608039700 の削除テストを通す設計であること自体が本 ADR の制約）。
+- **cross-repo dedup を目的にしない**（実測 10.2%。副産物として得られるだけ）。
+- **CRDT / operation-log merge**（引き続き研究項目。prolly-tree の素キーマージはそれとは別物）。
+- 大容量バイナリは従来どおり DataLad + B2（ADR-2607211600 / skill large-binary-datalad）。
+
+## Consequences
+
+- fleet 状態が**引用可能な値**になる。「bafy… を materialise せよ」が再現可能な指示になり、
+  CI・agent への受け渡し・キャッシュがすべて同じ 1 個の名前で回る。
+- manifest の競合が「行の奪い合い」から「キーの独立更新」に変わる。173 write/day は
+  **競合ですらなくなる**。
+- 一方で **ref 1 本の直列化**という制約を明示的に引き受ける（ADR-260726）。書き込み並列度を
+  上げたくなったとき、**join 到達範囲を割る誘惑に負けない**ことがこの設計の運用上の要。
+- 追加の運用対象: prolly-tree の store（block）の可用性と GC。ただし削除テストを通すので
+  可用性の喪失は速度の喪失であって正しさの喪失ではない。
+- **最初に書くコードは `prolly-tree/diff`** ——(b)(c) の両方がそこに乗る。それ無しで
+  P1 以降に進むと「CID を名乗るが差分は取れない」という中途半端な状態になる。
+"}]

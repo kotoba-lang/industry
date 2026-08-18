@@ -1,0 +1,55 @@
+[{:db/id -1
+  :adr/id "adr-2607197800-kotoba-postgresql-linux-arm64-qualification"
+  :adr/title "ADR-2607197800: PostgreSQL Linux arm64 qualification"
+  :adr/status "accepted" :adr/doc_type "adr" :adr/doc-type "adr"
+  :adr/source-format "edn" :adr/date "2026-07-19"
+  :adr/last-verified "2026-07-19" :adr/last_verified "2026-07-19"
+  :adr/authoritative true :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "repo-wide-cljc-to-kotoba-source-migration"
+  :adr/authoritative-for ["PostgreSQL Linux arm64 interoperability"]
+  :adr/related
+  ["orgs/kotoba-lang/kototama/docs/postgresql-qualification.edn"
+   "orgs/kotoba-lang/kototama/test/kototama/postgresql_interop.clj"]
+  :adr/supersedes ["adr-2607197700-kotoba-postgresql-cross-platform-scheduled-soak"]
+  :adr/superseded-by []
+  :adr/decision-summary
+  {:platform {:os :linux :kernel "7.0.11-orbstack" :arch :arm64
+              :container-base :debian-bookworm
+              :jdk "Temurin 21.0.11"
+              :postgresql "15.18" :status :pass}
+   :cancellation-settle {:client-write-trace-to-cancel-ms 100
+                         :reason :remote-backend-dispatch-race}
+   :scope [:tls :scram-plus :query :cancellation :pool :parallelism
+           :fifo :crash :half-open :rotation :contention-soak]
+   :cleanup {:container :removed :maven-volume :removed
+             :orbstack :returned-to-stopped}
+   :executable-evidence
+   [{:environment "OrbStack Linux arm64 container"
+     :command "clojure -M:postgresql-interop"
+     :result "PostgreSQL 15.18 / Temurin 21.0.11; exit 0"}]}
+  :adr/body
+  "# ADR-2607197800: PostgreSQL Linux arm64 qualification
+
+**Status**: accepted
+**Date**: 2026-07-19
+
+## Decision
+
+Linux arm64 is an observed platform, not merely a scheduled CI claim. The full
+released interoperability program must pass as the non-root `postgres` user in
+a clean Debian Bookworm container. Cancellation waits a fixed 100 ms after the
+client write trace so that a cold or remote backend has dispatched the sleeping
+statement; without this synchronization the test could consume a valid cancel
+before the backend entered query execution.
+
+## Evidence
+
+PostgreSQL 15.18 on Linux arm64 with Temurin 21.0.11 passes TLS,
+SCRAM-SHA-256-PLUS, cancellation, all database protocol slices, concurrent FIFO
+pooling, immediate crash recovery, TLS half-open recovery, credential and
+certificate rotation, and the 90-operation contention soak. The disposable
+container and Maven volume were removed and OrbStack returned to its prior
+stopped state.
+
+This closes one independently observed Linux platform cell. Linux x86_64
+PostgreSQL 14/15/17 and weekly 3,000-operation freshness remain CI-owned gates."}]

@@ -1,0 +1,276 @@
+[{:db/id -1
+  :adr/id "adr-2607277000-cloud-itonami-chn-marketing-vertical"
+  :adr/doc_type "adr"
+  :adr/topic "cloud-itonami-chn-marketing-vertical"
+  :adr/title "ADR-2607277000: cloud-itonami に中国市場向け marketing vertical を起こす（広告审查 7310 / 涉外调查 7320）+ iso3166-chn の GTM 生成"
+  :adr/status "accepted"
+  :adr/date "2026-07-27"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/source-format "edn"
+  :adr/authoritative_for ["cloud-itonami-iso3166-chn-advertising :implemented"
+                          "cloud-itonami-iso3166-chn-market-research :implemented"
+                          "cloud-itonami-gtm-data 2026-07-27 run (CHN family)"]
+  :adr/related ["adr-2607105500-cloud-itonami-iso3166-usa-chn-implemented"
+                "adr-2607105300-cloud-itonami-iso3166-jpn-implemented"
+                "adr-2607252100-webwide-product-corpus-common-crawl-datalad"]
+  :adr/decision-summary "{:new-repos [\"cloud-itonami-iso3166-chn-advertising\" \"cloud-itonami-iso3166-chn-market-research\"] :maturity :implemented :gtm-run \"2026-07-27\" :follow-ups [\"add CHN row to cloud-itonami-isic-7310 catalog\" \"add CHN row to cloud-itonami-isic-7320 catalog\"]}"
+  :adr/body
+"# ADR-2607277000: cloud-itonami に中国市場向け marketing vertical を起こす
+
+**Status**: accepted
+**Date**: 2026-07-27
+
+## Context
+
+オーナーの問い「今の cloud-itonami で 中国市場向けの business, marketing
+business はある?」に対する棚卸しの結果:
+
+- **中国市場向け business は1本だけ存在した** — `cloud-itonami-iso3166-chn`
+  （公共調達の market entry: CCGP / 统一社会信用代码 / domestic-entity posture、
+  ADR-2607105500 で `:implemented` 昇格済み）。
+- **中国向けの marketing business は存在しなかった。** `cloud-itonami-isic-7310`
+  (Advertising) / `7320` (Market research) は実装済みだが catalog は
+  JPN/USA/GBR/DEU の4法域のみで、中国固有の記述はゼロ（WeChat / Weibo /
+  Douyin / Tmall 等の言及も無し）。`adserver` / `ai-gftd-ads` /
+  `shinshi-growth-actor` はいずれも国内向け。
+- カバレッジの穴も判明: `cloud-itonami-assoc-*`（業界団体106件）に **chn は0件**、
+  `cloud-itonami-municipality-*`（59都市）に **中国の都市0件**、
+  `cloud-itonami-gtm-data` の 2026-07-25 run（624 repo）に
+  **`iso3166-chn` は含まれず**（iso3166 は223件中81件しか生成されていない）。
+  GTM summary 内の \"China\" 22件は Goertek / Danieli 等**他 vertical の
+  見込み客の所在地**としての言及にすぎない。
+
+つまり chn 事業は actor としては実装済みだが**売り方が無い**状態で、
+marketing vertical そのものが欠けていた。
+
+## Decision
+
+1. **中国向け marketing vertical を2リポジトリとして起こす**（1本に統合しない）。
+   主管当局・法令・governor がそれぞれ異なり、fleet の慣行は「1つの規制レジーム
+   につき1 actor」であるため。
+   - `cloud-itonami-iso3166-chn-advertising`（ISIC 7310 / SAMR）
+   - `cloud-itonami-iso3166-chn-market-research`（ISIC 7320 / 国家统计局）
+2. **generic な isic-7310/7320 に \"CHN\" 行を足すだけでは不十分**と判断した。
+   catalog 行は citation は運べるが **gate は運べない** — 品目カテゴリ依存で
+   有効期限を持ち、判定不能状態を持ち、独自の監査記録を残す HARD check は
+   データ行では表現できない。7310 の generic な形を1法域のために曲げることに
+   なるため、thematic sibling repo（`iso3166-ind-clean-air` の先例と同型）とした。
+3. **`iso3166-chn` の GTM を生成し `cloud-itonami-gtm-data` の 2026-07-27 run
+   として追加する**（2026-07-25 run は書き換えず、新しい日付ディレクトリに置く）。
+
+### cloud-itonami-iso3166-chn-advertising
+
+Governor `:ad-review-compliance-governor`。flagship HARD は
+`ad-review-approval-missing`: 品目カテゴリが CLOSED な审查対象集合
+（广告法第四十六条の 医疗/药品/医疗器械/农药/兽药/保健食品 ＋
+互联网广告管理办法第七条の 特殊医学用途配方食品）に入る campaign は、
+**广告批准文号が記録済みかつ発布日時点で未失効であることを独立検証**しない限り
+発布提案に進めない（暂行办法第九条/第十八条）。その他の HARD:
+`internet-ad-unlabelled`・`popup-no-one-click-close`（互联网广告管理办法
+第九条/第十条）、`endorser-did-not-use-product`・`endorser-under-minimum-age`
+（广告法第三十八条）、media spend 上限、二重 actuation ガード。
+45 tests / 189 assertions green、clj-kondo clean。
+
+### cloud-itonami-iso3166-chn-market-research
+
+Governor `:survey-integrity-governor`。flagship HARD は2つ、いずれも
+涉外调查管理办法（国家统计局令第7号）:
+- `foreign-survey-permit-missing`/`-elapsed`/`-validity-unknown`（第十条）—
+  実施机构が涉外调查许可证を保持し、実施開始日時点で未失効であること。
+  第十条は「涉外调查を行うこと」自体を许可证保持に条件づけるため、
+  **fieldwork だけでなく filing 時点でも検証する**。
+- `social-survey-project-unapproved`（第八条/第九条）— **涉外社会调查のみ**
+  项目审批を要し、涉外市场调查は许可证のみで足りる。市场调查を审批欠如で
+  hold すると正当な調査を阻害するため、`:per-project-approval-kinds` は
+  boolean ではなく **CLOSED set** とし、未知の种别は「より緩い市场调查」に
+  丸めずそのまま hold する（`survey-kind-unrecognized`）。
+第七条の禁止内容7項目（filing 時点でも検証）、PIPL の単独同意・
+第三十八条の越境4類型、承認標本数の上限。
+51 tests / 217 assertions green、clj-kondo clean。
+
+## 両 repo に共通する設計上の判断
+
+- **判定不能 (un-checkable) は「合格」ではなく独立した HARD hold**。
+  上限値や有効期限の片側が未記録なら `media-budget-uncheckable` /
+  `ad-review-validity-unknown` / `approved-sample-uncheckable` /
+  `foreign-survey-permit-validity-unknown` として hold する。
+  `(and (number? x) (number? y) (> x y))` 型のガードが未記録エンティティを
+  黙って「上限内」として通していた `cloud-itonami-isic-7310` の既往修正と
+  同じ規律。DatomicStore の round-trip も nil を nil のまま保持し、
+  0 や \"\" に潰さない（store contract test で保証）。
+- **日付は ISO-8601 `YYYY-MM-DD` 文字列の辞書順比較**。JVM/JS 両対応、
+  date library 不要、timezone を間違えようがない。その形でない値は
+  `iso-date?` が拒否し、黙って誤順序にならない。
+- **actuation は load 時アサーションで守る**。`:campaign/publish` /
+  `:survey/field` をどの phase の `:auto` にも入れないことを、prose や
+  test だけでなく **namespace の load 時に throw** して保証する
+  （一語の diff で invariant を弱められないように）。
+- **本 actor は許認可番号を発行しない**。广告批准文号・涉外调查许可证・
+  项目审批番号はいずれも当局のみが発行し、actor は「記録されているか」を
+  検証するだけ。
+- **引用は実際に fetch して読んだ公式 URL のみ**。`:retrieved-at` を
+  記録し、catalog に無い法域は spec-basis 無し（governor が hold）。
+
+## Consequences
+
+- iso3166 family の CHN メンバーが3本になった（market entry / advertising /
+  market research）。中国市場向けに「入る → 広告を出す → 調査する」が揃った。
+- 引用元（2026-07-27 fetch）: 中华人民共和国广告法・互联网广告管理办法
+  （令第72号）・药品等广告审查管理暂行办法（令第21号）は samr.gov.cn、
+  涉外调查管理办法（令第7号）は stats.gov.cn、个人信息保护法は cac.gov.cn。
+- `manifest/repos.edn :extra-projects` に2件追加し、
+  `gen-west-manifest.cljs --entry` で当該 entry のみの最小 diff を生成
+  （west.yml は +10 行、pin 検証 OK）。
+
+## Follow-ups の現在地（2026-07-27 更新）
+
+- ~~**`cloud-itonami-isic-7310` / `7320` の catalog に \"CHN\" 行を追加**~~
+  → **完了**（7310 `22e3f57` / 7320 `0365754`）。両行は `:out-of-scope-here`
+  を **data として**持ち、generic actor が判定「しない」ゲート
+  （7310: 广告批准文号 / 7320: 涉外调查许可证・项目审批）と、それを実装する
+  sibling repo を名指しする。テストが「境界が宣言されていること」を検証する。
+  catalog 行を足すだけだと「中国はカバー済み」と誤読されるため。
+- **`cloud-itonami-assoc-*` の中国業界団体** → **部分的に着手**。
+  `cloud-itonami-assoc-2910-chn-caam`（中国汽车工业协会 CAAM、ISIC 2910、
+  deu-vda / gbr-smmt の CHN peer）を作成。**assoc family 初の chn** で、
+  それまでは 106 repo 中 usa 38 / jpn 18 / deu 6 / gbr 4 / fra 4 / **chn 0**
+  だった。CAAM 自身の 协会简介 ページ（発布 2023-06-12）を 2026-07-27 に
+  読んで 2 entry を seed。
+  - **2件目: `cloud-itonami-assoc-4719-chn-ccfa`**（中国连锁经营协会 CCFA、
+    `assoc-4719-usa-nrf` の CHN peer）。CCFA 自身の 简介 ページ（発布
+    2025/01/01）から 2 entry。**ISIC 4719 は CCFA 自身の範囲より狭い**
+    （CCFA は 零售/餐饮/服务/供应商 を含む）ので、「usa-nrf peer と join
+    させるための割当であって CCFA が 4719 に限定される主張ではない」と
+    coverage-note に明記し、テストがその注記の存在を検証する。
+  - **中国银行业协会（CBA、ISIC 6419）は着手して断念した。** `china-cba.net`
+    が HTTP/HTTPS ともこのネットワークから到達不能で（2026-07-27 に再試行
+    しても同じ）、この family は `official-association-site` provenance に
+    二次情報を認めない。CBA はどのファイルにも登場しない — **穴は穴のまま
+    残す**。6419 は多国カバー（are/aus/che/deu/esp/fra/jpn…）があるので、
+    到達可能な環境から再試行する価値がある。
+  - CAAM の 2 entry は**同一 URL を引く**。到達できた CAAM ソースがその 1
+    ページだけだったため、VDA sibling と違い**独立した自律規範文書は主張
+    しない**（`:self-regulatory-mandate` であって `:self-regulatory-code`
+    ではない）。`coverage-note` がその理由を述べ、テストがそれを検証する。
+- **`cloud-itonami-municipality-*` の中国都市** → **着手**。
+  `cloud-itonami-municipality-chn-beijing`（北京市）を作成。**municipality
+  family 初の chn** で、それまで 59 repo 中に中国の都市は 1件も無かった。
+  beijing.gov.cn から条例 2件（控制吸烟条例＝地方性法规、2021-09-24 修正込み /
+  生活垃圾管理条例の**修改决定**）と culture 8件を 2026-07-27 に読んで seed。
+  - **3つの「無いものは無い」をテストで固定した**: ①廃棄物側は
+    consolidated 条例ではなく**修改决定**（実際に読んだのがそのページなので
+    `:kind :amendment-decision`、`:ordinance/number` はその公告番号であって
+    条例番号ではない）②`:festival` と `:craft` は**空のまま**（庙会の一般記事は
+    北京を名指ししない、景泰蓝の出典は Jingtai 帝には触れるが北京には触れない
+    ——出典が支持しない自治体紐付けを主張しない）③八达岭は UNESCO 指定を
+    **記録しない**（出典が述べていない。故宫/天坛/颐和园は述べているので記録する）。
+  - **schema は sibling と完全に同一に保った**。当初 `:ordinance/effective-date`
+    を足しかけたが、schema の同一性こそが federated query の join を成立させて
+    いるので、施行日は日本 sibling と同じく `:ordinance/number` に畳んだ。
+    「catalog が使う属性はすべて schema に宣言されている」ことを検証する
+    テストを追加したので、以後この乖離は静かには入らない。
+  - **2都市目: `cloud-itonami-municipality-chn-shanghai`**（上海市）。
+    cgzf.sh.gov.cn（上海市城市管理行政执法局）から条例 2件と culture 6件。
+    北京と違い**両方とも consolidated な条例本文**——生活垃圾管理条例は
+    公式 PDF を落として first/last ページを読み、header の
+    「2019年1月31日上海市第十五届人民代表大会第二次会议通过」（常務委員会
+    ではなく**本会議**）と 第六十五条「本条例自2019年7月1日起施行」を
+    verbatim で取得。控制吸烟条例は 第一条 が 电子烟 を名指しするので
+    `:e-cigarettes` を topic に入れた（推論ではなく条文）。
+  - 上海側の正直な欠落も 2件テストで固定: ①`:performing-art` は空
+    （沪剧の出典が HTTP 404、読んでいないページからは書かない）
+    ②小笼包・生煎馒头 の summary は出典が挙げる 常州 / 苏州 も名指しし、
+    「純粋に上海のもの」として提示しない。
+  - **3都市目: `cloud-itonami-municipality-chn-shenzhen`**（深圳市）。
+    この街を入れた理由は **深圳が2つの立法手段を持つ**こと:
+    ①`深圳经济特区控制吸烟条例` は **经济特区法规**（1980年5月の第1号
+    经济特区としての立法権。省の批准を経ずに施行）②`深圳市生活垃圾分类
+    管理条例` は **较大的市の地方性法规** で、公告第一九九号 自身が
+    「2019年12月31日 市人大常委会通过 → **广东省第十三届人大常委会
+    2020年6月23日批准** → 2020年9月1日施行」と記録している。
+    北京・上海は直轄市なのでこの批准段階が無く、両 sibling の entry にも
+    現れない。`sez-regulations` / `provincially-approved` で分離でき、
+    「SEZ 側は provincially-approved ではない」ことをテストが検証する。
+  - **provenance の食い違いも記録した**。廃棄物側は cgj.sz.gov.cn（市の
+    部局）だが、控烟条例の verbatim header は **www.szns.gov.cn**
+    （南山**区**政府、独自ドメイン）にしか見つからず、別の
+    `:url-provenance` を与えた。**`szns.gov.cn` は `sz.gov.cn` の
+    サブドメインではない** — 最初の草稿で「どちらも sz.gov.cn 上」と
+    書いてしまい、それは端的に誤りだった。テストがこの区別を固定し、
+    docstring にもその誤りを残してある。
+  - 深圳の culture catalog は **3件・dish/festival/craft ゼロ**で、これ自体が
+    所見。45年の都市に検証可能な伝統項目の蓄積は無く、境界内の明代の
+    城塞2件（大鹏所城・南头、ともに1394年）と 1980年の经济特区指定だけを
+    記録した。客家囲屋（出典が深圳を挙げない）と 盆菜（HTTP 404）は
+    **埋めずに落とした**。南头は出典が指定を述べないので heritage 指定を
+    記録せず、大鹏は述べているので 1983/1989 を記録する。
+  - 広州など他都市は未着手。
+- `cloud-itonami-gtm-data` の iso3166 カバレッジ（223件中 **82**件。
+  2026-07-27 addendum で CHN の1件が埋まった）。**残り141件を一括生成する
+  なら捏造なしでは不可能** — 各 repo につき実在の見込み先を fetch して
+  確認する必要があり、それが 07-25 run が 81 件で止まっている理由でもある。
+
+## Closing 状態（2026-07-27 セッション終了時点）
+
+**全成果は default branch に着地済み。open PR・自分の worktree/branch/stash は
+ゼロ。** 各子リポは remote main と 0/0、dirty なし。
+
+### 着地した10 pin（すべて `west.yml == child HEAD == remote main` を確認）
+
+| repo | 種別 | tests |
+|---|---|---|
+| `cloud-itonami-iso3166-chn-advertising` | 新規 actor (7310/SAMR) | 45 / 189 |
+| `cloud-itonami-iso3166-chn-market-research` | 新規 actor (7320/国家统计局) | 51 / 217 |
+| `cloud-itonami-isic-7310` | CHN catalog 行追加 | 71 / 441 |
+| `cloud-itonami-isic-7320` | CHN catalog 行追加 | 33 / 150 |
+| `cloud-itonami-assoc-2910-chn-caam` | 新規 (assoc 初 chn) | 3 / 17 |
+| `cloud-itonami-assoc-4719-chn-ccfa` | 新規 | 3 / 17 |
+| `cloud-itonami-municipality-chn-beijing` | 新規 (municipality 初 chn) | 16 / 47 |
+| `cloud-itonami-municipality-chn-shanghai` | 新規 | 17 / 47 |
+| `cloud-itonami-municipality-chn-shenzhen` | 新規 | 19 / 65 |
+| `cloud-itonami-gtm-data` | 2026-07-27 addendum | (データのみ) |
+
+**合計 258 tests / 1,190 assertions、全 suite 0 failures 0 errors**（closing 時に
+全リポで再実行して確認）。clj-kondo はどのリポも errors 0
+（`isic-7310` に render_html.clj の unused-var warning 1件が**既存**として残る）。
+
+superproject 側 merge commit: `bedfc5d8608`（ADR + 最初の2 entry）/
+`dfeeb8023b1`（gtm-data pin）/ `4393434`（7310・7320 pin）/
+`b3b9a2c660c`（CAAM）/ `38509a75b52`（Shanghai + CCFA）/
+`09f3beed381`（Shenzhen）。
+
+### 既知の未解決（優先順）
+
+1. **`cloud-itonami-gtm-data` の iso3166 141件** — 一括生成は捏造なしでは
+   不可能。**再開コマンド**: 対象 repo を1つ選び、見込み先を実際に fetch して
+   `2026-07-27/per-repo/<repo>.edn` に既存フォーマットで追記 →
+   `datalad save` → `git annex copy --to b2`（B2 creds は keychain
+   `b2:gftdcojp-m365-annex`、`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` に
+   セット）→ `git push origin main git-annex` → superproject の pin を
+   `gen-west-manifest.cljs --entry cloud-itonami-gtm-data` で前進。
+2. **`cloud-itonami-assoc-6419-chn`（中国银行业协会 CBA）** — `china-cba.net`
+   が HTTP/HTTPS とも到達不能（2026-07-27 に2回試行）。この family は
+   `official-association-site` provenance に二次情報を認めないので**穴のまま**。
+   **再開条件**: 到達可能なネットワークから `https://www.china-cba.net/Index/lists/catid/8.html`
+   を読めること。読めたら `cloud-itonami-assoc-2910-chn-caam` を雛形に複製する。
+3. **municipality 広州ほか** — 手順は確立済み。北京/上海/深圳と同じく
+   市の公式ポータルから条例2件＋culture を読む。深圳で判明した注意点:
+   区政府ドメイン（例 `szns.gov.cn`）は市ドメインのサブドメインではないので
+   `:url-provenance` を分けること。
+4. **assoc の他 ISIC で CHN** — 未探索。既存の多国カバー ISIC
+   （6419/6512/6612/6920/2100 等）から埋めると join 価値が高い。
+
+### この作業で確立した規律（後続はこれを守ること）
+
+- **判定不能 (un-checkable) を「合格」にしない**。上限・有効期限の片側が
+  未記録なら独立した HARD hold にし、DatomicStore の round-trip も nil を
+  0 や空文字列に潰さない。
+- **出典が言っていないことは書かない**。到達できなかったページ・自治体を
+  名指ししない出典は、埋めずに「無い」と記録し、**テストでその空を固定する**
+  （後から出典なしに埋めるとビルドが落ちる）。
+- **schema は sibling 間で同一に保つ**。federated query の join がそれで
+  成立している。「catalog が使う属性はすべて schema に宣言済み」を検証する
+  テストを各 municipality repo に入れてある。
+- **actuation を `:auto` に入れない invariant は load 時 throw で守る**
+  （prose や test だけに頼らない）。
+"}]

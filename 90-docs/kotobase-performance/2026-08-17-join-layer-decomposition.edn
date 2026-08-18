@@ -1,0 +1,78 @@
+{:receipt :datalog/join-layer-decomposition
+ :date "2026-08-17"
+ :implementation "nbb + datalog d1b177c, synthetic relations; script kept at
+                  scratchpad/join-decomp/join_decomp.cljs"
+
+ :question
+ "kotobase-peer bench/results/2026-08-14-scan-layer-decomposition.edn measured
+  ONE clause, found 72% of the per-row cost is projecting into :find-ordered
+  vectors and 22% is hashing them into a set, and then explicitly refused to
+  generalise: `It does not measure the join's own bookkeeping across multiple
+  clauses -- only the single-clause path. A three-clause join may spend its
+  time differently.` The ~16x headroom argument rests entirely on that
+  unanswered question. This answers it."
+
+ :method
+ "Synthetic graph so selectivity and output size are controlled rather than
+  inherited: 4,000 persons, fanout 8, 40,000 quads -- knows edges plus one
+  functional `name` and one functional `city` per person, so 1-, 2- and
+  3-clause queries all return exactly 32,000 rows and clause count is the only
+  variable. For each shape: time `datalog.core/q` whole, then time each clause
+  ALONE through `datalog.query/query`. residual = total - sum(clauses), i.e.
+  everything the join does beyond scanning its clauses in isolation.
+
+  Then a SCALE CONTROL the single-clause receipt could not do: the same
+  3-clause query on a quarter of the graph. If the residual is per-ROW work it
+  falls with the row count; if it is per-CLAUSE planning it stays flat. Nothing
+  else differs."
+
+ :runtime-caveat
+ "nbb (SCI), not the JVM. Absolutes are ~6x the JVM receipt's because SCI
+  interprets -- 13,722 ns/row here against 2,105 ns/row there for the
+  comparable case. The SHARE is what is being read, and the 1-clause share
+  cross-checks: 74.6% here against 72% on the JVM, on a different runtime with
+  different data. That agreement is what licenses reading the other rows as
+  shares."
+
+ :results
+ [{:case "1-clause"  :out-rows 32000 :total-ms 588.5  :residual-share 0.746 :residual-ns-per-out-row 13722}
+  {:case "2-clause"  :out-rows 32000 :total-ms 1616.2 :residual-share 0.866 :residual-ns-per-out-row 43752}
+  {:case "3-clause"  :out-rows 32000 :total-ms 1835.7 :residual-share 0.895 :residual-ns-per-out-row 51360}
+  {:case "3-clause, quarter graph (scale control)"
+   :out-rows 8000 :total-ms 379.1 :residual-share 0.891 :residual-ns-per-out-row 42244}]
+
+ :answer
+ "The single-clause finding TRANSFERS, and it gets larger with clause count.
+
+  1. Scanning the clauses is a small and nearly constant part of a join. At
+     constant output size the sum of clause scans barely moved across shapes
+     (176 -> 207 -> 217 ms) while the total grew 588 -> 1,616 -> 1,836 ms.
+     Each additional join adds its own per-row cost on the SAME rows.
+
+  2. The residual is per-ROW work, not per-clause planning. Quartering the
+     graph took output rows 32,000 -> 8,000 and left residual cost per row
+     essentially unchanged (51,360 -> 42,244 ns, within 18%), while total time
+     fell roughly in proportion to rows. Planning overhead would have stayed
+     flat in milliseconds and quadrupled per row; it did neither."
+
+ :what-follows
+ "The queries that are still behind Neo4j are the multi-clause ones -- IC02 at
+  3.07x and IC09 at 7.38x -- and those sit in the 87-90% residual regime, not
+  the 75% one. So the layer worth attacking is the same one the single-clause
+  receipt named, and the fraction of total time it holds is larger than that
+  receipt could see."
+
+ :what-this-does-not-say
+ ["The residual is everything beyond scanning clauses in isolation, which
+   INCLUDES necessary join work -- probing, binding propagation, dedup. It is
+   an upper bound on what stopping intermediate materialisation could recover,
+   not an estimate of the recoverable amount. Separating those two needs an
+   instrumented join, not a subtraction."
+  "Synthetic uniform relations. Real LDBC clauses have skewed selectivity, and
+   the dataset is not on this machine, so this could not be re-run against it."
+  "It proposes no mechanism. Reasoning from a decomposition straight to a
+   mechanism has failed twice on this codebase already -- 2026-08-02 made IC02
+   worse, 2026-08-13 measured an empty answer -- and the discipline that
+   finally worked was a one-line A/B read as a paired ratio."
+  "Measured at host load average 35. Load-sensitive absolutes are reported only
+   beside that number; the conclusions rest on within-run ratios."]}

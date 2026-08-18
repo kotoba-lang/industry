@@ -1,0 +1,138 @@
+[{:db/id -1
+  :adr/id "2608080000"
+  :adr/doc_type "adr"
+  :adr/topic "itonami-maturity-improve-loop"
+  :adr/title "成熟度を上げる loop —— 軸は観測量なので、狙わせると必ず水増しになる。目標にしてよい軸を『独立に検証できるか』で切り分け、配分は実績から維持する"
+  :adr/status :accepted
+  :adr/date "2026-08-06"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["成熟度 7 軸のうち、loop が目標にしてよい軸といけない軸の切り分けと、その根拠"
+   "軸ごとの必須 gate（水増しを構造的に落とす検査）"
+   "substrate / breadth の配分を ledger の実績から維持する規則"
+   "ローカル Claude loop com.gftd.itonami-maturity-improve の停止条件"]
+  :adr/supersedes []
+  :adr/related ["2608070000" "2608052000" "2607254000" "2607203000" "2607189300"
+                "2607122300"]
+  :adr/repos ["com-junkawasaki/root"]
+  :adr/body
+  "# ADR-2608080000: 成熟度を上げる loop
+
+**Status**: accepted / **Date**: 2026-08-06
+
+## Directive
+
+オーナー指示: 「さらに 成熟度を向上していく loop を」。
+
+## 何が無かったか（実測 2026-08-06）
+
+| 既存 | 何をするか | 現況 |
+|---|---|---|
+| `com.gftd.itonami-maturity-tick`（ADR-2607254000） | 決定論的欠陥クラス（Tier 1）を無人で直す。モデルは居ない | **枯れている** —— 1,398 repo を 6h ごとに走査して findings 0 が続く |
+| `com.gftd.itonami-os-connect`（ADR-2608070000） | まだ繋がっていない産業を OS に繋ぐ（**横**） | 初回発火待ち |
+| ADR-2608052000 | どこに工数を積むと fleet 合計が最大に伸びるか**計算した** | 計算しただけ。**定期的に実行するものが無い** |
+
+つまり「縦に深める」経路だけが空いていた。本 ADR がそれを埋める。
+
+## 決定 1 —— 軸は観測量である。狙わせたら水増しになる
+
+7 軸はすべて観測量（`src/**` のバイト数、`test/**` のバイト数、実 URL 引用数、
+README バイト数、ファイルの有無、最終 commit からの経過日数）である。
+**「この軸を上げろ」とモデルに言えば、素直に観測量を直接動かしに行く。**
+スコアは上がり、fleet は悪くなる。
+
+だから軸を 2 つに分ける。基準は 1 つ:
+
+> **その軸が上がったことを、軸とは独立に検証する手段があるか。**
+
+| 軸 | 目標に | gate / 理由 |
+|---|---|---|
+| `test` | **してよい** | `scripts/maturity-loop/run.cljs`（mutation testing）で**壊して赤くなる**ことを確かめる |
+| `ingest` | **してよい** | 足した URL を実際に取得して 2xx を確認する |
+| `governed` | **してよい** | 拒否を実演する（拒否 0 件の生成は生成器自身が exit 1） |
+| `surface` | **してよい** | demo 生成器を実際に回し、生成物が実 actor 由来であること |
+| `docs` | **してよい** | operator-quickstart の手順を実際に踏む |
+| `substrate` | **してはいけない** | `src/**` のバイト数。狙うと『コードを増やす』になる |
+| `fresh` | **してはいけない** | 経過日数。狙うと『無意味な commit を打つ』になる |
+
+**水増し不可の軸は「上げるな」ではない。良い仕事の副産物として上がるもので
+あって、狙う対象ではない**という区別である。tick は `:targetable? false` の軸を
+最初から候補から外し、上位がそれで埋まった repo は『飛ばす』と言う。
+
+`scripts/maturity-loop/`（テストのテスト）が既に在ったのが効いた ——
+`axis-test` の gate は**新しく作らずに済んだ**。CLAUDE.md の
+「gate は落ちることを確かめてから landed とする。落ちない gate は劇場」を、
+loop の側から強制する形になっている。
+
+## 決定 2 —— 軸の重みは kind ごと。0 の軸は欠陥ではない
+
+ADR-2608052000 は「library に governor が無いのは欠陥ではなく category
+mismatch」と明記しており、実際 `lib` の重みは `governed=0` / `surface=0`。
+
+**素の値が小さい軸を『弱い軸』として出すと、この loop は library に governor を
+生やしに行く。** 実測 2026-08-06、重み補正前の初版は `langgraph`（kind=lib）の
+次の 1 手として `axis-governed`（値 0、重み 0）を名指しした —— スコアは 1 bp も
+動かず、ライブラリには不要なものが増える。**害のある助言**だった。
+
+並べ替えは値ではなく **重み × 伸びしろ**（その軸を満点にしたとき own が実際に
+増える basis point）で行う。重みは自分で持たず、スコアを計算した側が出力に
+載せた `:model/weights` をそのまま読む —— 持った瞬間に、計算する側と助言する側で
+別の重みになる。
+
+## 決定 3 —— 配分は実績から維持する（固定スケジュールにしない）
+
+ADR-2608052000 決定 2 は「substrate への配分を総工数の 2〜5% に固定。専用
+フェーズを切らず常時この帯」。実装は **ledger の実績比率**を見る:
+`substrate 比率 < 2%` なら次は substrate lane、そうでなければ breadth。
+
+固定スケジュール（『5 周に 1 回』）にしないのは、周が飛んだり skip されたりすると
+帯からずれるため。実績を見れば自己補正する。
+
+## 決定 4 —— 古い順位に従うのは、測っていないものを測ったことにするのと同じ
+
+計測値（`itonami-maturity.datoms.edn`）が 7 日より古ければ、その周の仕事は
+「軸を上げる」ではなく **「測り直す」**（scan → dynamics → Kotoba カーネルとの
+完全一致パリティ → 着地）。この周は lane を消費しない。
+
+鮮度は**ファイルの mtime ではなく最後の commit 日**で測る —— checkout し直した
+だけで新しく見えてしまうため。
+
+## 決定 5 —— 上がったかを loop 自身が判定しない
+
+ledger には `:own-before` を残し、**次周の tick が測り直して突き合わせる**。
+自己申告の green を信用しない（ADR-2607189300 が 61% 欠陥 fan-out から得た規律）。
+水増しはスコアが上がっても gate で落ちるが、それでも通ったものは
+`:own-before` との差として後から見える。
+
+## 停止条件（モデルを起こさない）
+
+| 条件 | 理由 |
+|---|---|
+| `origin/main` に FF できない | 古い base の上に積まない |
+| 目標にできる軸が無い | 水増しに行かせない |
+| 測定行が読めない | 推測で走らせない |
+
+## 実測（2026-08-06）
+
+`--dry-run` で: lane=`:substrate`（実績 0 周 → 床 2% を下回るので substrate）、
+対象 `orgs/kotoba-lang/langgraph`（fleet-gain 22.31、ADR-2608052000 の 1 位と一致）、
+軸 `:axis-docs`（5007bp → 満点で +1248bp）。`:axis-substrate` は最大の伸びしろ
+（+1623bp）を持つが**狙わない軸**として除外された —— この除外が働かなければ、
+初回の指示が「langgraph の src にコードを足せ」になっていた。
+
+## 正直な限界
+
+1. **loop はまだ 1 周も回っていない。** `--dry-run` までで、モデルを起こす経路は
+   8 時間後の初回発火が初実行になる。
+2. **gate は軸ごとに強さが違う。** `axis-test` の mutation testing は本物だが、
+   `axis-docs` の「quickstart を実際に踏む」はモデルの自己申告に依存する部分が
+   残る（踏んだかどうかを機械が確かめていない）。
+3. **`scripts/maturity-loop/mutations.edn` は現在 2 repo ぶんしか無い。**
+   `axis-test` を狙う周は、対象 repo の mutation をその場で書くところから
+   始まる —— gate の準備コストが軸によって非対称である。
+4. **cohort lane の leverage は平坦**（ratio ≈ 1.0）。tick は
+   `:ranking-is-flat?` として申告するが、平坦なときに何を優先すべきかの規則は
+   『弱い軸を 1 つ確実に埋める』しか無い。
+5. **`itonami-maturity-tick`（Tier 1）との統合はしていない。** 枯れている以上
+   害は無いが、2 つの ledger が別に積まれる。
+"}]

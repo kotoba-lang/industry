@@ -1,0 +1,84 @@
+[{:db/id -1
+  :adr/id "2608083000"
+  :adr/title "DADS の --hig-* bridge を測り直した: 27 ではなく 71。残る穴は palette 6 色だけ"
+  :adr/status "accepted"
+  :adr/date "2026-08-08"
+  :adr/tags ["jp-go-dds" "dads" "design-system" "hig" "tokens" "kotoba-lang"
+             "adr-2608060000" "kobo"]
+  :adr/supersedes "2608060000 の bridge inventory 部分（27 個 / spacing・text-size・radius が無い、という実測）"
+  :adr/body
+  "## きっかけ
+
+kobo（ADR-2608082700）の DADS 移行を見積もるために `jp-go-dds` の
+`hig->dads` を読んだところ、CLAUDE.md の記述と実物が食い違っていた。
+
+CLAUDE.md（2026-08-05、ADR-2608060000 由来）はこう書いていた:
+
+> bridge が運ぶのは 27 個で、内訳は `--hig-color-*`(17) / `--hig-palette-*`(4) /
+> `--hig-font-*`(3) / `--hig-hairline`。**`--hig-spacing-*` と `--hig-text-*-size`
+> と `--hig-radius-*` は 1 つも入っていない。** …当座は DADS 側の primitive か
+> `em` 相対で書き、恒久的には上流に足す。
+
+## 実測（2026-08-08）
+
+`clojure -M -e \"(require '[jp-go-dds.tokens :as t]) …\"` で数えた:
+
+| 帯 | 件数 |
+|---|---|
+| `--hig-color-*` | 18 |
+| `--hig-text-*` | 22 |
+| `--hig-spacing-*` | 11 |
+| `--hig-palette-*` | 9 |
+| `--hig-radius-*` | 7 |
+| `--hig-font-*` | 3 |
+| `--hig-hairline` | 1 |
+| **合計** | **71** |
+
+`git log` によれば upstream の `e671277`「tokens: bridge the rest of the `--hig-*`
+contract」が入っている。CLAUDE.md が「上流に足せ」と指示していたことは**実際に
+行われた**のに、指示の側が更新されていなかった。
+
+**したがって旧記述に従った回避（`em` 相対で書く / DADS primitive を直接書く）は、
+いま在る契約から不要に外れる。** `padding: var(--hig-spacing-4)` も
+`font-size: var(--hig-text-footnote-font-size)` も `--hig-radius-xs` も、DADS 基盤で
+そのまま書いてよい。
+
+## 残っている本物の穴
+
+**`--hig-palette-*` の 6 色**（teal / mint / indigo / brown / gray2-6）。DADS に
+対応する色相の primitive family が無いので、bridge は意図的に載せていない。
+これは半端に埋めるより正しい判断で、bridge 自身の docstring がその理由を書いている
+（「半分だけ写した palette は無いより悪い —— 写した色は DADS に従い残りは Apple の
+色相に落ちて、1 つの凡例が 2 つのデザイン言語になる」）。
+
+**ただしその docstring の逃げ道は、DADS 基盤では成立しない。** docstring は
+「載せなければ `shitsuke.hig` の既定値がそのまま効く」と書くが、`jp-go-dds.page` は
+bridge も HIG も自動では入れない（app が `:app-css` に `tokens/bridge-css` を渡す）。
+`shitsuke.hig` が居るのは kotoba-ui スタックと**併用**している場合だけで、DADS を
+基盤に据えた app の下には居ない。そこでは未対応の `--hig-*` は**何にも解決しない**。
+
+実例: kobo の端末色マップは ANSI cyan を `--hig-palette-teal` に割り当てている。
+DADS 基盤に移すと、その 1 色だけが解決せず宣言ごと無効になる（文字は残り、色が消える）。
+移行の前に、カテゴリ色にこの 6 つを使っている view を洗う必要がある。
+
+## 決定
+
+- CLAUDE.md の当該段落を実測値で置き換える（この ADR の主目的）。ADR-2608060000 の
+  inventory 部分はこの ADR が supersede する —— **数えた値が古くなる**という、
+  この種の記述に固有の陳腐化。
+- **確認は `grep` でやらない。** 旧記述の確認コマンドは
+  `grep -o '\"--hig-[a-z0-9-]*\"' … | sort -u` で、これは 1 行に複数トークンが
+  ある行を取りこぼす（`sort -u` が重複を消すので少なく見える方向に外れる）。
+  数えるなら map を読んで数える。
+- **DADS に無いものの一覧（app-shell / segmented control / trailing slot 付き list /
+  app が選べる accent）は今回検証していない。** この ADR が言い切るのは token bridge の
+  件数と palette の穴だけ。
+
+## kobo への含意（この ADR では実施しない）
+
+移行の障害として ADR-2608082700 が挙げた「bridge に spacing / font-size / radius が
+無い」は**存在しない**。残るのは (1) palette teal、(2) DADS に `list-row` の
+trailing slot が無く kobo は badge 表示に全面的に使っている、(3) `app-shell` の
+sidebar（ファイル木を置いている）が DADS に無い、の 3 点。(2)(3) は token 契約で書く
+app CSS になるので、**移行は「基盤の差し替え」ではなく UI の書き直し**であり、
+editor plane とは別の変更として起こす。"}]

@@ -1,0 +1,85 @@
+;; clj-stack.edn — portable Clojure エージェントスタックの machine-readable SSoT (ADR-0013)
+;;
+;; 分担: ルート deps.edn = ワークスペース配置 (path/submodule/remote)。
+;;       このファイル     = スタック意味論 (層・依存辺・ns・ホスト能力・datom スキーマ・版)。
+;; goals.edn と同じ規約: エンティティ map の vector + :edges。ツーリングはここを読む側に回る。
+;; :edges は [upstream downstream] (downstream が :repo/depends-on upstream)。
+
+{:version "2026-06-23 ADR-0013/0021（kotoba canonical home = com-junkawasaki に表記統一）"
+
+ :premises
+ {:wasm    "全コード .cljc / サードパーティ依存ゼロ / JVM interop・スレッド・wall clock・乱数なし。kotoba-clj (orgs/kotoba-lang/kotoba。canonical GitHub owner = kotoba-lang、ADR-0024。etzhayyim/kotoba は 2026-06 撤去済) 等の Clojure WASM ホストで動く前提。WASM は層ではなくホストの一つ（JVM/SCI/CLJS/WASM）。"
+  :datomic "状態・履歴・キャッシュは EAV datom (ADR-0010 L1)。ストアは langchain.db (Datomic API 互換ミニ実装)、langchain.db/api の関数マップ {:q :transact! :db :pull :entid} で本物の Datomic Local / DataScript に差し替え可能。"
+  :host-capability "I/O・重い処理は protocol / fn 注入: :http-fn・:json-write/:json-read (anthropic-model)、IBrowser、IComputer、host-fn-node (拡散モデル等)。"}
+
+ :repos
+ [{:repo/id "langchain-clj"
+   :repo/layer :foundation
+   :repo/upstream-project "langchain-core"
+   :repo/github "com-junkawasaki/langchain-clj"
+   :repo/version "v0.1.0" :repo/git-sha "ae475c9"
+   :repo/license "MIT"
+   :repo/ns-root "langchain"
+   :repo/namespaces ["langchain.runnable" "langchain.message" "langchain.prompt"
+                     "langchain.model" "langchain.tool" "langchain.parser"
+                     "langchain.memory" "langchain.db"]
+   :repo/host-capabilities [:http-fn :json-write :json-read]
+   :repo/datom-schemas {:chat-history "langchain.memory/memory-schema"}
+   :repo/provides "LCEL Runnable / ChatModel (Anthropic adapter) / tools / parsers / datom チャット履歴 / Datomic API 互換ミニ EAV ストア"}
+
+  {:repo/id "langgraph-clj"
+   :repo/layer :orchestration
+   :repo/upstream-project "langgraph"
+   :repo/github "com-junkawasaki/langgraph-clj"
+   :repo/version "v0.2.0" :repo/git-sha "133740f"
+   :repo/license "MIT"
+   :repo/ns-root "langgraph"
+   :repo/namespaces ["langgraph.graph" "langgraph.checkpoint"
+                     "langgraph.prebuilt" "langgraph.viz"]
+   :repo/datom-schemas {:checkpoint "langgraph.checkpoint/checkpoint-schema"}
+   :repo/provides "StateGraph + Pregel superstep / channel reducer / interrupt + update-state! / datom checkpointer (resume・time travel) / create-react-agent"}
+
+  {:repo/id "comfyui-clj"
+   :repo/layer :orchestration
+   :repo/upstream-project "ComfyUI"
+   :repo/github "com-junkawasaki/comfyui-clj"
+   :repo/version "v0.1.0"
+   :repo/license "GPL-3.0"
+   :repo/ns-root "comfyui"
+   :repo/namespaces ["comfyui.node" "comfyui.workflow" "comfyui.exec"
+                     "comfyui.queue" "comfyui.std" "comfyui.viz"
+                     "comfyui.nodes.langchain"]
+   :repo/host-capabilities [:host-fn-node]
+   :repo/datom-schemas {:cache+runs "comfyui.exec/exec-schema"}
+   :repo/provides "ノード型レジストリ / API format 互換ワークフロー + 検証 / content-addressed キャッシュ付き topo 実行 (cache・run 履歴 = datom) / prompt queue / ChatModel ノードパック"}
+
+  {:repo/id "browser-use-clj"
+   :repo/layer :agent
+   :repo/upstream-project "browser-use"
+   :repo/github "com-junkawasaki/browser-use-clj"
+   :repo/version "v0.1.0"
+   :repo/license "MIT"
+   :repo/ns-root "browseruse"
+   :repo/namespaces ["browseruse.browser" "browseruse.actions" "browseruse.agent"]
+   :repo/host-capabilities [:IBrowser]
+   :repo/datom-schemas {:action-log "browseruse.agent/log-schema"}
+   :repo/provides "番号付き要素表現 / アクションレジストリ (navigate/click/input_text/…/done) / langgraph StateGraph ループ / 操作ログ datom"}
+
+  {:repo/id "computer-use-clj"
+   :repo/layer :agent
+   :repo/upstream-project "anthropic computer-use-demo"
+   :repo/github "com-junkawasaki/computer-use-clj"
+   :repo/version "v0.1.0"
+   :repo/license "MIT"
+   :repo/ns-root "computeruse"
+   :repo/namespaces ["computeruse.computer" "computeruse.tool" "computeruse.agent"]
+   :repo/host-capabilities [:IComputer]
+   :repo/datom-schemas {:action-log "computeruse.agent/log-schema"}
+   :repo/provides "computer tool action 語彙 (screenshot/key/type/click/scroll/…) / sampling loop / 操作ログ datom"}]
+
+ ;; [upstream downstream] — downstream の deps.edn が upstream を git dep に持つ
+ :edges
+ [["langchain-clj" "langgraph-clj"]
+  ["langchain-clj" "comfyui-clj"]
+  ["langgraph-clj" "browser-use-clj"]    ; langchain-clj は transitive
+  ["langgraph-clj" "computer-use-clj"]]}

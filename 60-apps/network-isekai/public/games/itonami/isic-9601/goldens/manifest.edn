@@ -1,0 +1,20 @@
+;; Small golden set for #1754. Keep SMALL — CLAUDE.md large-binary rule: a handful
+;; of small PNGs OK; do not explode into per-district / per-camera goldens.
+[{:id :street-cleared-0
+  :view :street
+  :file "street-cleared-0.png"
+  :args ["--view" "street" "--backend" "webgl2" "--width" "360" "--height" "640" "--cleared" "0"]}
+ {:id :street-cleared-3
+  :view :street
+  :file "street-cleared-3.png"
+  :args ["--view" "street" "--backend" "webgl2" "--width" "360" "--height" "640" "--cleared" "3"]}
+ {:id :street-cleared-8
+  :view :street
+  :file "street-cleared-8.png"
+  :args ["--view" "street" "--backend" "webgl2" "--width" "360" "--height" "640" "--cleared" "8"]}
+ {:id :board
+  :view :board
+  :file "board.png"
+  :state "board-state.edn"
+  :args ["--view" "board" "--width" "390" "--height" "720"
+         "--state" "goldens/board-state.edn"]}]

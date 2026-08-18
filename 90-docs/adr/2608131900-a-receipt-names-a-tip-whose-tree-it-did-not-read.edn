@@ -1,0 +1,73 @@
+[{:db/id -1
+  :adr/id "ADR-2608131900"
+  :adr/title "receipt は tip を名指すが、その tip の tree から gate 一覧を読んでいない"
+  :adr/status "accepted"
+  :adr/date "2026-08-13"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body
+  "2026-08-13、`root-permit-index` gate を撤去した merge（`33106089965`、02:34 JST）が
+main に着地したあと、fleet-ci が tip `5935855d309` に対する署名付き receipt を出した。
+その receipt は `test-root-permit-index-5935855-murakumo-levi` を
+**`:required` かつ `:outcome :fail`** として含んでいる。
+
+ところが:
+
+    $ git merge-base --is-ancestor 33106089965 5935855d309 && echo contains
+    contains
+    $ git show 5935855d309:scripts/fleet-ci/gates.edn | grep -c ':id \"root-permit-index\"'
+    0
+
+**その tip の tree には、その gate が宣言されていない。** receipt は「tip X で gate G が
+落ちた」と署名して主張しているが、tip X からその主張を再導出できない。
+
+## 機構
+
+`tick.cljs` の `-main` は `gates.edn` を **`here`（tick.cljs 自身のディレクトリ =
+operator の checkout）から、プロセス開始時に 1 回だけ**読む:
+
+    (defn -main []
+      (let [cfg (read-edn-file (path/join here \"gates.edn\") nil)
+
+一方 receipt の `:subject :tips` は、検査した **repo の tip** を名指す。つまり
+**「何を検査するか」と「何に対する判定か」が別の場所から来ている。**
+
+平常時は一致する（operator checkout が main に追随していれば同じ内容になる）。
+一致しなくなるのは、gate 一覧が動いた瞬間から、走っているプロセスが終わるまでの間。
+tick は数十分単位で生きるので、その窓は狭くない。
+
+## なぜこれが「ただの race」より悪いか
+
+receipt は**署名され、`manifest/fleet-ci.edn` に append され、CI の記録になる**。
+後から読む者は tip と gate 名を見て「この commit は permit-index で赤い」と読む。
+その主張を確かめようと tip を checkout すると、**その gate が存在しない**。
+再現できない赤は、赤より始末が悪い —— 誰も反証できないからである。
+
+ADR-2608131200 が数えたとおり、この workspace の赤の 37.5% は「直すものが無い」もので、
+その分類コストは実測で数時間かかっている。**再現不能な receipt はその分類を不可能にする。**
+
+## 直し方（未実施）
+
+`gates.edn` を **検査対象の tip から**読む（`git show <tip>:scripts/fleet-ci/gates.edn`）。
+そうすれば receipt は自己完結し、tip だけから再導出できる。撤去された gate は
+撤去された commit 以降で自動的に消え、追加された gate は追加された commit 以降で現れる。
+
+**今回は実施しない。** 9 本の agent が同時に commit を着地させている最中に CI
+dispatcher の設定読み込みを変えるのは、変更そのものより観測を壊す危険が大きい。
+記録して、単独で入れる。
+
+## 併せて記録する: UTC と JST を突き合わせて存在しない障害を作りかけた
+
+この調査は「**receipt が 9 時間出ていない**」という誤読から始まった。
+`manifest/fleet-ci.edn` の最新 `:at` は `2026-08-12T18:12:40Z` で、当時の現地時刻は
+`2026-08-13 03:15 +0900` だった。9 時間の空白に見える。
+
+**receipt の `:at` は UTC（`Z`）、commit の日付は JST（+0900）。**
+`2026-08-12T18:12:40Z` = `2026-08-13 03:12:40 +0900` = その receipt を運んだ commit の
+時刻そのもの。tick は生きていて、数分前に書いていた。
+
+`grep` で最新のタイムスタンプを拾い、`git log` の日付と並べれば、**同じ出来事が
+9 時間ずれた 2 つの時刻として並ぶ。** 片方に `Z` が付いていることだけが手掛かりで、
+その手掛かりは目立たない。**タイムゾーンの異なる 2 つの時刻を比べる前に、
+両方が同じ時間帯であることを確かめる** —— でなければ、健全なシステムに対する
+障害報告を書くことになる。"}]

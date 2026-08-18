@@ -1,0 +1,37 @@
+[{:db/id -1
+  :adr/id "2607189100"
+ :adr/title "Public runtime and reusable library responsibility boundary"
+ :adr/status :accepted
+ :adr/date "2026-07-18"
+ :adr/deciders ["Jun Kawasaki"]
+ :adr/context
+ "Public Cloudflare ownership had leaked into kotoba-lang deploy shells, while product implementations were copied across monoliths, worktrees and renamed repositories. This made route, secret, migration and receipt authority ambiguous."
+ :adr/decision
+ {:organization-boundary
+  {:kotoba-lang #{:reusable-library :protocol :codec :port :test-harness :migration-reader}
+   :gftdcojp #{:public-hostname :deploy-shell :cloud-binding :secret-reference :migration-runbook :rollback :operational-receipt}}
+  :kotobase
+  {:public-owner "gftdcojp/net-kotobase"
+   :retired-deployers ["kotoba-lang/kotobase-protocols-worker"]
+   :archived-predecessor "kotoba-lang/kotobase-cljc-worker"
+   :legacy-migration-owner "gftdcojp/net-kotobase/migrations/cljc-worker-v2-v3"}
+  :product-snapshots
+  {:canonical "standalone gftdcojp product repository"
+   :historical "ai-gftd-apps-gftdcojp/60-apps"
+   :rule :no-deploy-or-product-fix-in-historical-copy}
+  :aozora
+  {:owner "gftdcojp/app-aozora"
+   :app-aozora-boundary :retired-local-worktree}
+  :murakumo
+  {:owner "gftdcojp/local-murakumo"
+   :cloud-murakumo-fleet :retired-fork
+   :cloud-murakumo :separate-rented-gpu-product}
+  :enforcement
+  [:empty-routes-in-retired-workers
+   :deploy-command-fails-closed
+   :manifest-single-owner
+   :ci-rejects-historical-deploy-edits]}
+ :adr/consequences
+ ["Public runtime authority has one organization and repository owner."
+  "Historical runtimes remain reproducible during test operation without being deployable."
+  "Bulk snapshot deletion is deferred until downstream path references are migrated; CI quarantine prevents additional deployment drift."]}]

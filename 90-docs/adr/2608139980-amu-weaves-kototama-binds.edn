@@ -1,0 +1,156 @@
+[{:db/id -1
+  :adr/id "ADR-2608139980"
+  :adr/title "amu は編む、kototama は結ぶ — linker は二つ、tender は製品名ではない"
+  :adr/status "accepted"
+  :adr/date "2026-08-13"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotoba-stack-weaving-cosmology"
+  :adr/related
+  ["adr-2607266000-kotoba-stack-responsibility-split-t0-t3"
+   "adr-2607022400-kototama-unikernel-tender-runtime-vocabulary"
+   "adr-2607252500-kotoba-wasm-component-first-execution-boundary"
+   "adr-2607241100-kotoba-stack-topology-and-design-cleanup"]
+  :adr/authoritative-for
+  ["言葉 / 編む / 言霊 / あいうえお の権限対応"
+   "compile-time linker は amu、runtime linker は kototama"
+   "T3 の製品名は kototama。tender は Solo5 由来の役割語で製品面から外す"
+   "T2 backend は amu の綾であって存在名を持たない"
+   "IR / verifier / provider / abi を amu にも kototama にも吸収しない"]
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body
+  "# ADR-2608139980: amu は編む、kototama は結ぶ
+
+**Status**: accepted
+**Date**: 2026-08-13
+
+オーナー判断（2026-08-13）: T3 の tender は kototama が適切。amu = 言葉を編む
+compiler という前提で、linker と関連 repo をその宇宙に揃える。
+
+ADR-2607266000 の **repo 分割と依存方向は維持する**。変えるのは製品面の名前と、
+「誰がどの結びを持つか」。コードを kototama へ物理マージして checkable な
+依存方向を消さない。`kototama-component`（旧 `tender-component`）の Rust
+micro-TCB を kototama core に戻さない（同 ADR 決定 4）。`wasm-webcomponent`
+を kototama に再吸収しない（他 repo が採用できるように抽出した、ADR-2607061630）。
+
+## 存在として名前を持つもの
+
+```text
+kotoba     言葉        言語は何か
+amu        編む        言葉を一つの反物にする（compile + プロジェクト link）
+kototama   言霊        反物を宿し、許された手にだけ結ぶ（run + 実行時 link）
+aiueos     あいうえお   どの手を貸すか（grant + OS）
+murakumo   叢雲        どこに置くか（配置。grant しない）
+```
+
+`tender` は Solo5 の海事スラング（客を走らせる係）であり、権限語彙ではない。
+役割の説明には残してよい。製品名、README 冒頭の名乗り、概念索引の見出しには
+使わない。実行の存在名は kototama。
+
+## linker は二つ
+
+英語の link は三箇所に見える。権限は二つしかない。
+
+| いつ | 何を繋ぐか | 誰 |
+|---|---|---|
+| 編むとき | 複数の `.kotoba` を一つの閉じたグラフにする | **amu**（`--source-path`、曖昧な ns は拒否） |
+| 織り終わるとき | 番地、relocation、ELF layout | amu の backend（`kotoba-native` / `kotoba-codegen`）。まだ生成 |
+| 着るとき | 成果物の import を、許された named provider にだけ結ぶ | **kototama** |
+
+前の二つは布を作る結び。最後は布が世界に触れる結び。amu の README は既に
+「component linking / execution は kototama、grant は aiueos」と切っている。
+それを製品面の正本にする。
+
+`musubi` を kotoba-lang の linker 製品にしない。compile-time と runtime を
+またいで両方を奪い、`etzhayyim/actor-musubi` が既に別面にある。
+
+## T3 — kototama の宿（畳むが、repo は残す）
+
+製品面では全部 kototama。GitHub / west 名は 2026-08-13 に改名した
+（repository id 不変、旧名は GitHub redirect）。adapter は kototama を依存し、
+kototama core は adapter を同梱しない。
+
+| repo | kototama の中での役割 |
+|---|---|
+| `kototama` | 契約、admission、budget、実行の境界。製品入口 |
+| `kototama-native`（旧 `tender-native`） | native の宿。ns は既に `kototama.native.executor` |
+| `kototama-component`（旧 `tender-component`） | Component engine の宿（Wasmtime micro-TCB はここに隔離） |
+| `wasm-webcomponent` | ブラウザの宿。抽出済みの採用ライブラリのまま |
+
+`provider` 族は言霊が結ぶ先であり、kototama に同梱しない。
+
+## T2 — amu の綾（存在名を付けない）
+
+`kotoba-wasm` / `kotoba-native` / `kotoba-script` / `kotoba-component` は
+amu が織る柄が違うだけ。独立 version できる契約として repo は残す。
+README 冒頭で「amu の backend / 綾」と名乗る。`katashiro` や `aya` への改名は
+しない — 面が backend なら target 名が正直で、存在名は権限を持たない層に
+付けない。
+
+IR（`grammar` / `kotoba-hir` / `kotoba-kir` / `kotoba-gmir` / `kotoba-mir` /
+`kotoba-codegen`）は経の規格。amu に吸収しない。織り手が経を持つと検反が
+自己検証に戻る。
+
+## 動かさないもの
+
+| repo | 理由 |
+|---|---|
+| `kotoba-verifier` | 織った本人が検反しては検反にならない |
+| `abi` | 経そのもの。実装を持たない契約 |
+| `artifact` | 反物の身分。誰が織ったかから独立 |
+| `provider` / `provider-postgres` / `provider-transport` | 自分で grant せず、compiler にリンクされない手 |
+| `security` / 鍵 | 許可の材料。aiueos の隣 |
+
+## 流れ
+
+```text
+言葉 ──編む──► 反物 ──言霊──► 働き
+                ▲                ▲
+              検反              許可された手
+                                （aiueos が貸す）
+```
+
+依存は一方向のまま: KIR → amu の backend → artifact → kototama の宿 →
+aiueos の grant と provider。逆流させない。
+
+## この ADR で着地するもの / しないもの
+
+着地: 本 ADR、概念索引、対象 README の名乗り、kototama の host 表、
+ADR-2607266000 の製品名の現在地。2026-08-13 追記: GitHub / west 改名
+`tender-native` → `kototama-native`、`tender-component` → `kototama-component`
+（id 1312673399 / 1312921812）。旧 URL は redirect。
+
+しない: `tender-*` の tree を kototama へコピー、`wasm-webcomponent` の再吸収、
+`musubi` 新設。Clojure 役割語 `tender-native-available?` / `kototama.tender` と
+T2 backend 名は改名しない。
+
+## 現在地（2026-08-14 closing）
+
+default branch に着地済み（サーバ側 merge、PR 経由ではない）:
+
+- GitHub rename + west.yml 名: `b3e337798dbc`
+- fleet-db 改名吸収（changed 1438 / added 3 / removed 2）: `6abf2be66aa`
+- signed fleet-head seq 32: `c71df5ccf7e8`
+- hayari など後続 absorb + re-sign: seq 33 `d6413a3e06e` … seq 37 `59ceb04fe710`
+  （value `ee610d9120dc`、signer `did:key:z6MkgaYKLVojxB2iUV13jubQoivUbHM34bBkSXLVo7iY633p`）
+- 共有 checkout に `kototama-native` `e52b41a` / `kototama-component` `d336ff7`
+
+未完:
+
+- 共有 checkout の `orgs/kotoba-lang/tender-native`（`1915ee1`）と
+  `tender-component`（`d985006`）は pin SHA と不一致のため未削除
+- 2026-08-14 14:00 JST の `kagami reconcile --check` は `DRIFT {:changed 60}`。
+  これは loop tidy tick（changed>20 で停止）の対象外。次は 1438 件吸収と同じ
+  dedicated catch-up: 60 pin を全部 GitHub compare で FF 確認してから
+  flagless `kagami reconcile`、続けて
+  `--kagi fleet-owner-root --out manifest/fleet-head.edn`。1 件でも behind なら書かない
+- `/loop さらに整えて` の watcher / 45m heartbeat はこの closing で停止した
+
+resume: worktree を superproject の外に切り、
+`git show origin/main:manifest/west.yml` を入力に `--check`。60 件（またはその時点の
+changed 集合）を FF 確認してから 1 回 absorb+再署名。FF 未確認のまま書かない。
+"}]

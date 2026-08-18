@@ -1,0 +1,35 @@
+{
+  "schema": "kotoba.fabric.nexus-x402-attestation-witness/v1",
+  "observedAt": "2026-07-17T12:51:00Z",
+  "service": "https://x402.nexus",
+  "workerVersion": "3d737f87-be65-41f8-a259-9706eb35330c",
+  "contract": {
+    "algorithm": "Ed25519",
+    "trustBinding": "deploy-time DID/public-key allowlist",
+    "roleSeparation": ["metering", "engi"],
+    "signedValues": ["meteringReceipt.receiptCid", "engiEntry.transferId"]
+  },
+  "tests": {
+    "count": 25,
+    "assertions": 97,
+    "failures": 0,
+    "errors": 0
+  },
+  "live": {
+    "health": {"http": 200, "ok": true},
+    "untrustedSignature": {
+      "http": 400,
+      "error": "untrusted compute settlement attestation"
+    },
+    "missingEngiSignature": {
+      "http": 400,
+      "error": "invalid compute settlement context",
+      "errors": ["engi-missing-signature"]
+    },
+    "settlementsAfterNegativeProbes": 0
+  },
+  "pending": [
+    "governance-approved production metering and Engi signer public keys",
+    "one confirmed real Base USDC transaction bound to the signed context"
+  ]
+}

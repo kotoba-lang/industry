@@ -1,0 +1,119 @@
+[{:db/id -1
+  :doc/id "revenue-agent-loop-run-0033-net-kotobase-aura-pricing-ladder"
+  :doc/doc_type "revenue-agent-loop-run"
+  :doc/title "Run 0033 — publish Aura-comparable pricing ladder; no new SKU"
+  :doc/path "90-docs/business/revenue-agent-loop/runs/0033-net-kotobase-aura-pricing-ladder.edn"
+  :doc/run_number 33
+  :doc/status "completed"
+  :doc/date "2026-08-14"
+  :doc/source "revenue-agent-loop RUN-TEMPLATE (ADR-2607246100)"
+  :doc/body "# Run 0033 — publish Aura-comparable pricing ladder; no new SKU
+
+**Status:** completed — live `/pricing` maps onto Neo4j AuraDB rungs; commercial go remains no-go
+**Started / ended:** 2026-08-14
+**Owner:** agent
+**Mode:** cash-first
+**Prior run:** 0032 (counsel packet; approval not obtained)
+
+## Hypothesis
+
+If public `/pricing` uses the four rungs a Neo4j Aura buyer already quotes
+(Free / Professional / Business Critical / Dedicated) and places the live
+Secure Managed SKU in the Professional 2 GB band, then a graph evaluator can
+compare kotobase without us inventing a RAM-hour meter or a fourth checkout
+SKU. Publishing the unpublished owner figure of ¥2,980 would be a 3× undercut
+of Aura Professional 1 GB, not an Aura-comparable design.
+
+## Capital governor
+
+| Field | Value/evidence |
+|---|---|
+| Current tranche | T1 |
+| Released / committed / spent | ¥300,000 / ¥0 / ¥0 |
+| This run cash-at-risk ceiling | ¥0 |
+| Paid acquisition allowed? | no |
+
+Missing financial inputs are `unknown`, not zero.
+
+| Unit economics | Hypothesis before | Observed after |
+|---|---|---|
+| Collected revenue | 0 | 0 |
+| Refunds + payment fees | 0 | 0 |
+| Variable delivery cost | 0 | 0 |
+| Contribution | 0 | 0 |
+| Attributable acquisition spend | 0 | 0 |
+| New paying customers | 0 | 0 |
+| CAC | unknown | unknown |
+| Monthly contribution | 0 | 0 |
+| Payback months | unknown | unknown |
+| Founder hours / shadow rate | ~1.5 h / unknown | ~1.5 h / unknown |
+| Capital efficiency | unknown | unknown |
+
+## Before
+
+| Funnel stage | Count/value | Evidence |
+|---|---|---|
+| Verified external payments | 0 | prior runs; self-purchase not counted |
+| Revenue / gross profit | 0 | |
+| Live billed SKU | Secure Managed ¥19,800/mo | Stripe `price_1TwkS3LGWYDWP5eYyTt6Cvps` |
+| Owner-ratified Developer figure | ¥2,980/mo, unpublished | run 0006 / COMMERCIAL-GO-NO-GO |
+| Counsel return | absent | run 0032 |
+
+## Score before (this action)
+
+Prerequisite of run 0032 (packet sendable, approval absent). Payment readiness 2.
+P(payment) 1. Hard gate yellow. **Total:** 58/100
+
+## One selected action
+
+WIP=1: publish the Aura-comparable ladder on `https://kotobase.net/pricing`.
+Keep three billed plans (`p2p`, `secure-managed`, `enterprise`). Map them to
+Free / Professional / Virtual Dedicated Cloud. State Business Critical as not
+offered. Do not add a Stripe Price. Do not put ¥2,980 on the page as a live
+price. Do not claim DPA/BAA. Do not remove DRAFT legal banners.
+
+Yen equivalents use ¥150/$, the same FX as ADR-2606130100. Aura public prices
+read from neo4j.com/pricing on 2026-08-14.
+
+## Result
+
+**Person-hours:** ~1.5
+**External evidence:**
+
+- Feature: https://github.com/net-kotobase/control-plane/commit/fa6e99644b591b7f4216d74af6ca745bf3e25bb8
+- Merge: https://github.com/net-kotobase/control-plane/commit/d7a018e8b23a049760eef80c2a3fd2b016efc317
+- PR: https://github.com/net-kotobase/control-plane/pull/456
+- Apex Worker version: `62977810-2eb5-4dd1-85be-c5d486c91c48`
+- Live 2026-08-14 `GET https://kotobase.net/pricing` 200: \"Compared with Neo4j AuraDB\"; Professional 2 GB ≈ ¥19,500; Secure Managed ¥19,800; Business Critical \"Not offered\"; footnote that ¥2,980/month is not a live offer. Does not contain `¥2,980 / month` as a live price.
+- Stripe env on deploy unchanged: `STRIPE_PRICE_SECURE_MANAGED` / `STRIPE_PRICE_PRO` = `price_1TwkS3LGWYDWP5eYyTt6Cvps`. `STRIPE_PRICE_STANDARD` remains configured and unpublished.
+- ADR: `docs/adr/2608141600-aura-comparable-pricing-ladder.md` (accepted)
+
+| Funnel stage | Before | After | Delta |
+|---|---|---|---|
+| Verified external payments | 0 | 0 | 0 |
+| Revenue / gross profit | 0 | 0 | 0 |
+| Live billed SKU | ¥19,800 Secure Managed | same | 0 |
+
+Code shipped is not a score raise. Funnel payments did not change.
+
+## Score after
+
+P(payment) 1 — unchanged. Payment readiness 2 — the live price is now honest
+against Aura Professional 2 GB; it is still not the unpublished ¥2,980, still
+not counsel-approved Terms, still checkout 0. **Total:** 58/100. Do not raise
+commercial go.
+
+## Decision
+
+`continue`
+
+Reason: a Neo4j evaluator can now place kotobase on a ladder they already know.
+Commercial go stays **no-go**. Next single action is still outside this run:
+counsel return (run 0032), Stripe merchant entity, test-mode E2E, first
+non-owner payment. Reopening ¥2,980 is a separate commercial decision, not
+this ladder.
+
+**Tranche verdict:** `hold`
+
+No receipts, no fulfillment, no T2 evidence. Self-purchase still forbidden.
+"}]

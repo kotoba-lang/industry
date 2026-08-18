@@ -1,0 +1,192 @@
+[{:db/id -1
+  :adr/id "adr-2608040170-authority-path-is-org-plus-name"
+  :adr/title "ADR-2608040170: family を origin 面に統合し、identity を <org>/<name> のパスとする。open-* カタログ 5 件を authority 名へ改名、業種 9 件は改名でなく内容マージ、kotodama は retirement"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-05"
+  :adr/last-verified "2026-08-05"
+  :adr/last_verified "2026-08-05"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "authority-path-org-plus-name-family-merge"
+  :adr/authoritative-for
+  ["family 面が origin 面に統合され、面が 4 つから 3 つになること"
+   "identity が repo 名单体ではなく <org>/<name> のパスであること"
+   "名前は org セグメントが述べていない部分だけを担うこと（org の二重記載の禁止）"
+   "既存 family の形が elision 規則に優先すること"
+   "family の裏付けが、配信 family はサブドメイン、library family は所有 repo 宣言であること"
+   "7 org の org→domain 表"
+   "コード体系カタログが ISIC 配下でなく origin 面に属すること"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2608040100-origin-plane-is-reverse-dns-of-the-real-domain"
+   "adr-2608040150-naming-gaps-capability-lei-dns-sweep"
+   "adr-2608040160-origin-misfilings-are-one-deferred-decision"
+   "adr-2606302300-org-taxonomy-4-orgs"
+   "manifest/repository-rules.edn"
+   "manifest/origin-domains.edn"]
+
+  :adr/body
+  "# ADR-2608040170: identity は `<org>/<name>` のパス
+
+**Status**: accepted
+**Date**: 2026-08-05
+**Deciders**: Jun Kawasaki（+ Claude、standing authorization）
+
+## Context
+
+オーナー指示: **「family = reverse domain + subdomain としましょう」**、続いて
+**「kami は kotoba の lib family なので kami のままかなぁ。`org-kotoba-lang-kami-*`
+が正しいんだけれど、ちょっと長い感じが」**、そして 4 項目すべての承認。
+
+## Decision 1 — 面は 4 つから 3 つになる。長さの問題は規則を曲げずに解ける
+
+family は独立した面ではなく、**origin 面を 1 段深くしたもの**である。
+`s3.kotobase.net` → `net-kotobase-s3`。サブドメインが登録可能部分の後ろに来る。
+
+そして——例によって——**これは既に事実上の慣行だった**。実測で 7 org すべての
+ドメインが解決し、**3 org は org 名自体が既に reverse-DNS** である:
+
+| org | ドメイン | 逆順 | org 名と一致 |
+|---|---|---|---|
+| cloud-itonami | itonami.cloud | `cloud-itonami` | **する** |
+| com-junkawasaki | junkawasaki.com | `com-junkawasaki` | **する** |
+| network-awai | awai.network | `network-awai` | **する** |
+| kotoba-lang | kotoba-lang.org | `org-kotoba-lang` | しない（TLD 抜き） |
+| etzhayyim | etzhayyim.com | `com-etzhayyim` | しない |
+| gftdcojp | gftd.co.jp | `jp-co-gftd` | しない（圧縮形） |
+| jk-luxury | jk.luxury | `luxury-jk` | しない（唯一の順方向） |
+
+外部 authority についても既にサブドメイン形式が使われている:
+`specs.libp2p.io` → `io-libp2p-specs-*`、`specs.ipfs.tech` → `tech-ipfs-specs-*`。
+
+### 長さの答え
+
+`org-kotoba-lang-kami-engine` が長いのは、**org を 2 回言っているから**である。
+GitHub のパスが既に第 1 セグメントを与えている。したがって:
+
+> **名前が担うのは、org セグメントがまだ言っていない部分だけ。**
+
+- `kotoba-lang/kami-engine` — org が kotoba-lang.org を、名前が `kami`（サブ
+  ドメイン）+ `engine`（主題）を担う → **既に正しい。改名不要**
+- `kotoba-lang/org-ietf-x509` — authority が外部なので org セグメントは何も
+  述べない → 名前が完全な reverse-DNS を担う
+
+オーナーの「ちょっと長い」という直感は正しく、**妥協ではなく長い形が誤り**である。
+
+同じ物差しで測ると **1,621 repo が org セグメントを名前で繰り返している**
+（cloud-itonami 1,396 / etzhayyim 223 / kotoba-lang 1 / network-awai 1）。
+
+### 既存 family の形が elision に優先する
+
+`cloud-itonami-isic-6419` を bare な `isic-6419` にすると、459 の兄弟と**2 つの形が
+1 つの family に混在**する。冗長さより悪い。**elision 規則が縛るのは
+これから作る family** であり、既存の形はそのまま。冗長だが誤りではない。
+
+### family の裏付け — 配信 family とライブラリ family で異なる
+
+family の主張に実在コストを付けるのが「reverse domain + subdomain」の効きどころ
+だが、**何も serve しない family にサブドメインを要求するのは形式**である:
+
+- **配信 family** → **実在のサブドメイン**（`open-*.etzhayyim.com` が 7 本稼働、
+  `aozora.app` は pds/appview/live）
+- **library family** → **所有 repo の宣言**（`:authority-library` と同型）
+
+`kami-` は `kami.*` がどこにも無いが、**kotoba の library family**であり
+`kami-engine` が所有する。DNS レコードは要らない。
+
+## Decision 2 — open-* 業種 9 件は「改名」ではなく **内容マージ**
+
+「open 関係は isic に統合」を実行しようとして、**前提が崩れた**。
+
+候補 ISIC コード先が**すべて既に存在していた**（4911 4912 6110 6120 2829
+3240 6910 7490 8620 6419 3510 3520 5222 — 全部）。しかも両側とも実体がある:
+
+| open-* | 中身 | 既存 ISIC repo |
+|---|---|---|
+| open-banking（Core-Banking MVP） | 38 files | `cloud-itonami-isic-6419` 40 files |
+| open-denki（Smart Grid Ops） | 27 files | `cloud-itonami-isic-3510` 31 files |
+| open-gas（Gas Utility Ops） | 33 files | `cloud-itonami-isic-3520` 27 files |
+| open-ports（Maritime Port Ops） | 33 files | `cloud-itonami-isic-5222` 25 files |
+
+つまり **同じ ISIC 業種が 2 つの命名体系の下で二重に実装されている**。
+これは名前の問題ではなく**重複した作業**であり、改名では解けない
+（どちらの実装が残るかを決める必要がある）。**未実行として記録する。**
+
+さらに `manifest/repos.edn` を編集していて 3 つ目の系列を見つけた:
+**`etzhayyim/com-etzhayyim-app-open-*`** —— 同じカタログの並行コピーが
+etzhayyim org にも存在する。置換時に巻き込まないよう明示的に除外した。
+
+ISIC コード割り当ての確度も 9 件中 4 件のみ（`open-isic` 同梱の機械可読
+ISIC Rev.4 カタログで確認）:
+
+- **確定**: banking→6419 / denki→3510 / gas→3520 / ports→5222
+- **曖昧**: rail（4911 旅客 vs 4912 貨物）/ network（6110 有線 vs 6120 無線）/
+  robo（2829 特殊機械 vs 3240 玩具、実体は Giemon ロボットキットブランド）/
+  patent（6910 法務 vs 7490 その他専門）/ otology-uhl-r（README が空、不明）
+
+## Decision 3 — コード体系カタログ 5 件を authority 名へ改名（**実行済み**）
+
+`open-*` 16 件のうち 7 件は業種ではなく**分類体系そのものの機械可読カタログ**
+だった。`open-isic` を ISIC で keyed するのは**循環**である —— ISIC は
+`open-isic` が実装している当のものだから。よって origin 面に属する。
+
+**実行済み**（GitHub 改名 → west.yml → repos.edn、いずれもサーバ側 API commit）:
+
+| 旧 | 新 | authority |
+|---|---|---|
+| `open-isic` | `org-un-isic` | unstats.un.org（登録可能 un.org） |
+| `open-isco` | `org-ilo-isco` | ilo.org |
+| `open-cofog` | `org-un-cofog` | un.org |
+| `open-unspsc` | `org-unspsc` | unspsc.org |
+| `open-apqc` | `org-apqc-pcf` | apqc.org |
+
+**未実行 2 件**: `open-jpn-gov` / `open-jpn-mynumber` は authority が
+e-gov.go.jp / myna.go.jp / digital.go.jp のどれか確定できず、当て推量しない。
+
+## Decision 4 — kotodama-* → kototama は「統合」ではなく **retirement**
+
+README を読むと**別プロジェクト**である:
+
+| repo | 自称 |
+|---|---|
+| `kotodama` | generic **functional-organism runtime** on the **kotoba-clj** stack |
+| `kototama` | the Kotoba **Wasm/Component runtime** and engine boundary — tender / host |
+
+同じ言霊の 2 通りのローマ字だが中身が違う。**名前だけ変えると別物の中身が
+kototama に混ざる。**
+
+ただし方向は妥当で、`kotodama-*` は**自ら legacy を名乗っている**
+（\"Legacy Kotodama cell catalog\" / \"extracted from the legacy\" /
+\"historically kept under\"）。しかも土台の `kotoba-clj` は**禁止済みの
+`-clj` 名**である。したがって正しい操作は:
+
+**旧 runtime の retirement + 必要部分の移植**であって rename ではない。
+移植先と廃止範囲の確定が要るため、本 ADR では**決定の記録に留め、実行しない**。
+
+付随して 1 件: **`kototama-cljc-contract` の README は「KAMI clj-wgsl migration
+Phase 4 home」**と述べており、kototama と無関係に見える（むしろ `kami-` family）。
+
+## Consequences
+
+- `manifest/repository-rules.edn` に `:org-domain` vocabulary（7 行、DNS 実測）と
+  family 裏付け規則を追加。vocabulary は 5 つ
+- `--name-audit` に org 二重記載の検査を追加。**報告のみで fail しない**
+  （既存 family の形が優先するため）
+- **`kami-` は改名不要**。規則の下で既に正しい
+- decision 2 と 4 は未実行。どちらも「名前の操作に見えて実は内容の操作」だった
+
+## Alternatives considered
+
+- **`org-kotoba-lang-kami-*` に改名** — 却下。org を 2 回述べる形が正しいという
+  前提が誤り。パスが identity である
+- **`kami.kotoba-lang.org` を登録して family を正当化** — 却下。何も serve しない
+  サブドメインは形式。library family は所有 repo 宣言で足りる
+- **`cloud-itonami-isic-*` を bare `isic-*` に揃える** — 却下。459 件の family に
+  2 つの形を持ち込む
+- **業種 9 件を機械的に改名** — 却下。改名先が全部既存で、両側に実体がある
+"}]

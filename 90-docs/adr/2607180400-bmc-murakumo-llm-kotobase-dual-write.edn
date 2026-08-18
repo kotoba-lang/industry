@@ -1,0 +1,72 @@
+[{:db/id -1
+  :adr/source-format "edn"
+  :adr/id "adr-2607180400-bmc-murakumo-llm-kotobase-dual-write"
+  :adr/doc_type "adr"
+  :adr/status "accepted"
+  :adr/date "2026-07-18"
+  :adr/title "BMC business ReAct loop: murakumo LLM advisor + kotobase dual-write"
+  :adr/topic "portfolio-bmc-murakumo-kotobase-runtime"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/last_verified "2026-07-18"
+  :adr/related ["adr-2607021600" "adr-2607021700" "adr-2607021800" "adr-2607022100"
+                "adr-2607151900" "adr-2607124500"]
+  :adr/authoritative_for
+  ["70-tools/bmc react default advisor = gate-aware + cloud-murakumo chat/completions (auto)"
+   "canvas-ledger.edn remains local SSoT; every append best-effort dual-writes entity maps to kotobase db portfolio-bmc-ledger"
+   "CLI flags --advisor auto|gate|murakumo and --no-kotobase / BMC_KOTOBASE_DUAL_WRITE / BMC_ADVISOR"]
+  :adr/body
+  "# ADR-2607180400: BMC loop closes murakumo inference + kotobase dual-write
+
+**Status**: accepted
+**Date**: 2026-07-18
+
+## Context
+
+Portfolio BMC ReAct (`70-tools/bmc`) was already driving canvas growth for
+cloud-itonami / cloud-murakumo / net-kotobase as *subjects*, but the runtime
+was not the three-layer stack:
+
+- think = deterministic `advisor:gate` only (no murakumo LLM)
+- persist = git file `canvas-ledger.edn` only (no kotobase)
+
+Owner asked whether the loop was `itonami-defined × murakumo inference ×
+kotobase storage`. Answer was no; this ADR lands the missing two edges.
+
+## Decision
+
+1. **Default advisor mode `auto`**: compose `gate-aware-advisor` with
+   `llm-advisor` whose `complete` POSTs to
+   `https://api.murakumo.cloud/v1/chat/completions` (model
+   `qwen3.6-35b-a3b`, `chat_template_kwargs.enable_thinking=false`). LLM
+   failure/empty content → gate-only proposals (fail-soft). `--advisor gate`
+   keeps the old path; actor names `advisor:auto` / `advisor:murakumo` /
+   `advisor:gate` stamp ledger provenance.
+
+2. **Dual-write after every local ledger append**: git ledger remains SSoT for
+   fold/score. Stamped events are projected as entity maps
+   (`:db/id \"bmc.event/<seq>\"` + `:bmc.event/*` attrs) and transacted into
+   kotobase db `portfolio-bmc-ledger` via
+   `70-tools/bmc/bin/kotobase-dual-write.cljs` (kotobase-client CACAO apex
+   profile). Identity seed: `70-tools/bmc/.bmc-kotobase-identity.hex`
+   (gitignored). Fail-open: remote failure never blocks local append.
+   Disable with `--no-kotobase` or `BMC_KOTOBASE_DUAL_WRITE=0`.
+
+3. **Modules**: `gftd.murakumo`, `gftd.kotobase`, CLI `persist-events!` /
+   `resolve-advisor` (nbb primary; JVM Bearer path if `KOTOBASE_TOKEN`).
+
+## Consequences
+
+- Live react ticks can use fleet inference and leave an auditable graph on
+  kotobase without abandoning git as the portfolio fold SSoT.
+- First dual-write mints a new operator DID graph; back up the identity hex.
+- Routines (`itonami-react-growth-hourly` / `bmc-business-operate-daily`)
+  inherit `auto` + dual-write on next deploy of this superproject path;
+  set `BMC_ADVISOR=gate` if a host cannot reach murakumo.
+\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-22 — amend
+
+Reconciled onto current main as PR #1039 (not the original rescue PR #898); fixed a real regression found during reconciliation and relocated a transport-layer helper
+
+The rescued WIP (rescue/bmc-murakumo-kotobase-20260718, PR #898) deleted gftd.cli/normalize-llm-proposal (keyword-izes qwen3.6's string-typed :canvas/id / :proposal/action output, documented as a real observed model quirk) while replacing the old GFTD_LLM_URL/curl/SSE transport with gftd.murakumo, but nothing in the new resolve-advisor/compose-advisors pipeline replaced it -- LLM-mode proposals from the actual fleet-main model would have been silently dropped by the governor's keyword-only matching. Restored normalize-llm-proposal in gftd.cli and wired it into both :clj/:cljs branches of resolve-advisor via a new normalizing-advisor wrapper. Also relocated gftd.cli/strip-fences (markdown code-fence stripping) into gftd.murakumo/extract-content, matching its own docstring's stated transport-layer rationale, since it was deleted along with the old transport with nothing at the new transport layer replacing it. gftd.cli/sse-collect had no replacement and needed none -- it only reassembled the old streaming transport (ADR-2607172800), which make-complete's plain HTTP request/response supersedes outright. Verified via the bmc test runner: 31 tests / 161 assertions, 0 failures, 0 errors. Landed as PR #1039 (merged 2026-07-22), which closed and superseded #898.
+"}]

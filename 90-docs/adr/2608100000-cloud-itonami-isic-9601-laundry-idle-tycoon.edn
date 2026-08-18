@@ -1,0 +1,404 @@
+[{:db/id -1
+  :adr/id "adr-2608100000-cloud-itonami-isic-9601-laundry-idle-tycoon"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/topic "cloud-itonami-isic-9601-laundry-idle-tycoon"
+  :adr/title "ADR-2608100000: ISIC 9601 クリーニング業の governed actor を放置系タイクーンにして isekai.network へ出す"
+  :adr/status "accepted"
+  :adr/date "2026-08-08"
+  :adr/last_verified "2026-08-08"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["90-docs/adr/2607031000-cloud-itonami-network-isekai-job-simulators.edn"
+                "90-docs/adr/2607091830-network-isekai-game-work-actors-app-aozora.edn"
+                "90-docs/adr/2607031400-itonami-games-atproto-actors-app-aozora.edn"
+                "90-docs/adr/2606271700-cloud-itonami-business-os.edn"
+                "90-docs/adr/2608620000-network-isekai-kingdom-cascade-match3.edn"
+                "60-apps/network-isekai/public/games/itonami/isic-9601/"
+                "https://github.com/cloud-itonami/cloud-itonami-isic-9601"]
+
+  :adr/authoritative_for
+  ["cloud-itonami の 9 本目の network-isekai ゲームは `cloud-itonami-isic-9601`
+    (ISIC Rev.5 9601 洗濯・ドライクリーニング業、LaundryOps-LLM ⊣ Garment Care
+    Governor) を題材にし、canonical な置き場所は
+    network-awai/network-isekai:public/games/itonami/isic-9601/ とする"
+   "ジャンルは既存 8 本の depot loop ではなく放置系タイクーン (オーナー判断
+    2026-08-08)。理由は機構の好みではなく、9601 の不変条件がこのジャンルでだけ
+    遊びとして成立するため —— 放置ゲーは「全部自動化する」ゲームであり、この店は
+    最後の 2 工程を構造的に自動化できない"
+   "ゲームの規則は考案しない。`laundry.phase/write-ops` が 5 工程、
+    `laundry.phase/phases` が段階の梯子、各 phase の `:auto` 集合が
+    「無人で回る工程」、`laundry.governor` の 6 HARD チェックが HOLD、
+    `laundry.governor/confidence-floor` (0.6) が承認への escalate、
+    `laundry.registry/cleaning-process-forbidden-by-care-label?` が
+    洗濯表示チェック。転写であって着想ではない"
+   "`:actuation/apply-cleaning-process` と `:actuation/return-garment` は
+    どの phase の `:auto` にも入らない (phase 3 の `:auto` は
+    `#{:garment/intake}` 1 つきり)。承認者を雇っても、店をいくら大きくしても、
+    この 2 つはプレイヤーのタップでしか進まない。
+    `test/logic_test.cljs` の actuation-never-auto-at-any-phase と
+    hired-approver-never-clears-actuation がこれを固定する"
+   "ゲーム本体は pure `.cljc` の `state + event -> state` reducer 1 本
+    (`60-apps/network-isekai/public/games/itonami/isic-9601/logic.cljc`)。nbb のテスト、squint 経由の
+    ブラウザプレビュー、将来の network-isekai guest が同じファイルを読む。
+    UI は `summary` しか見ず、規則を一切持たない"
+   "staging の置き場所は `60-apps/network-isekai/<repo 内と同じ相対パス>/`。
+    同日に並行セッションが同じ blocker (network-isekai が private) に当たり
+    Kingdom Cascade を `60-apps/network-isekai/games/kingdom-cascade/` に
+    置いた (ADR-2608620000) ので、staging の根を揃えた。根の下は移植先の
+    相対パスをそのまま写す —— itonami の game は ADR-2607031000 が記す
+    `public/games/itonami/<slug>/` なので、ここも `public/games/itonami/`
+    が付く"
+   "ワールドマップ (`world.cljc`) の 8 district はすべて実在の cloud-itonami
+    actor repo で、`:ops` / `:auto-at-3` / `:never-auto` は各 repo の
+    `phase.cljc` / `governor.cljc` から 2026-08-08 に読んだ実測値
+    (`world/district-evidence` に出所を記録)。9601 衣類 / 4520 自動車 /
+    9609 動物 / 8121 建物 / 8129 プラント / 3700 排水 / 3811 ごみ /
+    3900 土壌 —— 「クリーニング」を衣服以外へ広げるのは題材の追加ではなく、
+    ISIC の清掃系クラスと cloud-itonami の repo 集合をそのまま辿った結果"
+   "8 つの兄弟 actor を並べて読むと、単店では主張しかできなかったことが事実に
+    なる: **どの actor も、どの phase の `:auto` にも入れない op を最低 1 つ
+    永久に持っている** (街全体で 9 個、それぞれ別の理由で)。マップは 8 通りの
+    変奏ではなく、同じ境界の 8 つの独立した確認"
+   "KAMI 2D SDK (`kotoba-lang/sprite2d`) には盤面ゲームに必要な 3 つが無かった
+    ので実装した: `:text` primitive (文字は player 中心の一瞬の fx layer にしか
+    無く、建物に属して一緒に動く名前が書けない) / camera `:mode :fixed` `:fit`
+    (既定 camera は `\"player\"` entity を探し、無ければ黙って原点に寄る) /
+    `layout/pick` + `sprite-bounds` (world→screen はあるが逆が無く、tap 駆動の
+    ゲームは camera 変換を当て推量で再導出するしかなかった)。
+    push 権限が無いため commit は `sdk-patches/` に退避"
+   "同じ作業中に見つけた sprite2d の既存欠陥 3 件も同じ patch で直した:
+    `clojure -M:test` が 1 assertion も走らずに落ちていた (README が案内する
+    コマンド) / `test/sprite2d_test.clj` が assert している JVM スタブが
+    実装されていなかった / `kotoba.sprite2d.layout` は facade ではなく
+    `kami` 版の完全なコピーで、layout テストは painter が使わない方を
+    検査していた"
+   "**3D が authoritative view** (オーナー指示 2026-08-08、スクショどおり)。
+    `world3d.cljc` が canonical な `kami.webgpu` render-IR を出し、WebGPU と
+    WebGL 2.0 の両 backend が同じ EDN を食う (CLAUDE.md の 3D 規則: WebGPU
+    first / WebGL 2.0 fallback / 第2エンジン禁止 / 3D viewport を Canvas2D で
+    代替しない)。参照画は平坦色の箱の集合で、これは IR の単位そのもの
+    (`ir/instance` = 接地点 + サイズ + 色) なので mesh を要さない。
+    2D の `world.cljc` は fallback view として残り、自分のテストを通り続ける"
+   "街の配置は「カメラ正面に 4 列 × 2 行、後列は半列ずらす」。これは様式では
+    なく要件 —— 固定の高い視点では同一視線上の 2 店は片方が完全に隠れ、
+    見えない建物はタップできない。`world3d-test` の
+    tapping-a-shop-resolves-to-that-district が各店の投影中心をタップして
+    その店が返ることを要求するので、隠れる配置は落ちる"
+   "KAMI 3D SDK (`kotoba-lang/webgpu`) に無かった 2 つを実装した:
+    `kami.webgpu.pick` (render-IR は world→screen を持つのに逆が無い。
+    タップ解決にはアプリが camera 変換を再導出するしかなく、しかも
+    **instance の `:pos` は接地点で箱は半高さ上**という非自明な事実を
+    含むので、画面と少しずつ違う答えになる) と
+    `ir/fit-distance` / `ir/fit-rig` (rig の `:distance` は定数で、水平画角は
+    垂直画角を aspect で広げたもの。16:9 で合わせた構図は縦画面で左右に
+    はみ出し、しかも何も報告されない)。push 権限が無いため commit は
+    `sdk-patches/0002-*.patch` に退避"
+   "**render も gameplay も CLI から動く**(オーナー指示 2026-08-08)。
+    `bin/kuriningu.cljs play|street` は `logic/reduce-event` を叩くので、
+    script 実行は「本物のゲームの実行可能な記述」であって模擬ではない。
+    `bin/render.cljs` は canonical render-IR を engine 自身の
+    `submission/pack-instances` / `pack-globals` で詰め、headless Chromium で
+    `webgpu/fixtures/glsl/lit.*` を通して描き、画素を読み戻して PNG にする。
+    **第2レンダラではない** —— geometry・行列・照明・shading を一切書かず、
+    context 作成 / buffer bind / draw / readback という plumbing だけを持つ"
+   "**WebGPU 経路は実装し、pixel 以外はすべて検証した**(`--backend webgpu`)。
+    canonical な `fixtures/lit-shader.wgsl` は GLSL 版と**同一の `struct G` と
+    同一の vertex/instance location** を宣言している(片方が他方の transpile
+    なので)ため、`pack-globals` / `pack-instances` が無改造で両方に効く ——
+    render-IR の契約が紙の上ではなく実際に成立していることの確認。
+    到達段階: adapter → device → wgsl-compiled → canvas-configured → buffers
+    → bindgroup → **pipeline** → submitted → read-back。とくに
+    `createRenderPipeline` が shader の `@group(0)` binding と 8 本の
+    vertex/instance location を engine の packer が出す layout に対して
+    検証する —— 不一致ならここで、pixel が存在する前に落ちる"
+   "**fallback は SDK 側で壊れていた。** `kami.webgl/pick-backend` は
+    `navigator.gpu` というプロパティの有無しか見ておらず、それが答えるのは
+    「この browser は WebGPU という語を知っているか」で「描けるか」ではない。
+    このコンテナは両者が分かれるまさにその場合 —— property はあり、
+    requestAdapter も requestDevice も成功し、submit で device が死ぬ。
+    `pick-backend` に従う呼び出し側は真っ白な canvas を得て **fallback しない**
+    (何も描けたか誰も尋ねないから)。`sdk-patches/0003` で
+    `backend-from-probe` (pure、GPU 無しで policy をテストでき、理由がログに
+    残る) と `select-backend!` (async、adapter/device を実際に取り、任意で
+    trivial frame を submit してから答える) を足した。`pick-backend` は
+    「hint であって決定ではない」と docstring に明記して残す —— sync な関数は
+    adapter を await できないのでその場では直せない"
+   "**WebGPU の pixel はこのコンテナでは取得できない。** Dawn が submit 直後に
+    instance を落とす(`A valid external Instance reference no longer exists`)。
+    6 通りのフラグ組み合わせ(`--use-angle=swiftshader` /
+    `--use-webgpu-adapter=swiftshader` / `VulkanFromANGLE` / `--in-process-gpu` /
+    `--single-process` / `--disable-gpu-sandbox`)すべてで同一に失敗し、
+    3 行の clear-to-red shader + `layout:'auto'` でも同じ。frame ではなく環境。
+    実測で判明した別件: **WebGPU は secure context にしか露出しない** ——
+    `about:blank` では `navigator.gpu` が adapter 無しではなく *存在しない* ので、
+    「この browser は WebGPU 非対応」と読める。renderer が `http://127.0.0.1` を
+    立てて配信しているのはこの一点のため"
+   "**WebGL 2.0 の E2E は達成した** —— 実 WebGL2 (SwiftShader) で
+    glError=0、1,013,400 画素、92 色、`preview/street.png`。
+    ただし **WebGPU 経路は未実行**(executor に shadow-cljs ビルドが要る)、
+    **shadow pass は未実行**(1x1 の全面 lit depth texture を bind している)、
+    **Pages smoke test も未実施**。CLAUDE.md の 3D 完了条件のうち
+    この 3 つは依然として満たしていない"
+   "**CLI から回して初めて出た欠陥が 3 件**。いずれもブラウザでは出ない
+    —— 盤面を見ている人間は常に「今の盤面」を読むから: ①有効な資格に
+    「更新」を押すと ¥90 取られた(ボタンは失効時しか光らないので誰も
+    早押ししない。毎 turn 呼ぶ script は毎 turn 払い、phase 1 から
+    上がれなかった) ②参照戦略が tick 前の状態で判断し tick 後に操作して
+    いた(差し戻すつもりの提案を 1 turn 遅れで承認していた)
+    ③道路が地面に埋まっていた(instance の `:pos` は接地点で箱は上に伸びる
+    ので、y=-0.5 に立つ 1 単位の地面は天面が +0.5 になり y=0.02 の道路を
+    飲み込む。最初の render は「道路の無い通り」を出したが、どこも
+    エラーを報告しなかった)"
+   "SDK に 3 つ目の穴: `submission/pack-globals`。`kami.webgl` は自分の
+    ソースで 60 f32 の G block layout を明記した上で「呼び出し側が計算する」
+    と書いているのに、engine の中に計算するものが無かった。camera 位置が
+    `sun_dir`/`sun_col`/`sky` の `.w` レーンに紛れ込んでいる事実は
+    どの shader ソースにも書かれておらず、1 レーン間違えてもフレームは
+    描画され照明だけが狂う"
+   "本セッションで着地したのは superproject 側の staging まで。
+    network-awai/network-isekai は private でセッションの repo scope に無く、
+    `add_repo` が承認待ちで通らなかったため、`scene.edn` は書いていない
+    —— 既存 8 本の実スキーマを読めない状態で推測で書かない"]
+
+  :adr/consequences
+  "{:positive
+    [\"9601 が 9 本目として既存レール (feed-index 自動発見、?embed=1、
+      <org>-<slug>.games.aozora.app の Work Actor) にそのまま乗る\"
+     \"actor の不変条件が遊びの手触りとして伝わる —— プレイヤーは「洗浄と返却だけ
+      自動化できない」ことを説明ではなく操作で知る\"
+     \"規則が 1 ファイルの純関数なので、テスト・プレビュー・guest の 3 経路で
+      挙動が割れない\"
+     \"ADR-2607031400 (keyed CACAO actor + Governor gated publish) は未着手のまま
+      温存されており、この ADR はそれを消費しない\"]
+    :negative
+    [\"scene.edn が無いので今は network-isekai に置いても描画されない。
+      移植は既存 8 本のスキーマ確認から始まる\"
+     \"game.edn に schema 外の :staging キーを載せている。移植時に落とす前提で、
+      落とし忘れると schema が汚れる\"
+     \"logic.cljc が flat と src/itonami/isic_9601/ の 2 箇所に同じ内容で存在する
+      (guest は flat file、loader は namespace path)。同期は今は手作業で、
+      一致検査は fleet gate に入れるべき未了作業\"
+     \"preview/style.css が --hig-* トークンをローカル定義している。移植時に
+      jp-go-dds.tokens/bridge-css へ差し替える必要があり、bridge が
+      --hig-spacing-* / --hig-radius-* / --hig-text-*-size を運んでいない
+      既知ギャップ (ADR-2608060000) にそのままぶつかる\"
+     \"バランスは 4 seed の probe で見ただけ。人間のプレイテストはしていない\"]}"
+
+  :adr/body
+  "# ADR-2608100000: ISIC 9601 クリーニング業の governed actor を放置系タイクーンにする
+
+**Status**: accepted (staging landed / port blocked on repo access)
+**Date**: 2026-08-08
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナーから、放置系クリーニング店タイクーン (Laundry Store 系) のスクリーン
+ショット 2 枚とともに「こういう感じのゲームを isekai network で cloud-itonami の
+活動をそのままゲーム化して、公開」「クリーニング屋は cloud-itonami の repo に
+あるかな？」という依頼。
+
+**ある。** `cloud-itonami/cloud-itonami-isic-9601` —— ISIC Rev.5 9601
+「Washing and (dry-)cleaning of textile and fur products」。他の itonami actor と
+同じ形 (langgraph-clj StateGraph + 独立 Governor + append-only 監査台帳) で、
+**LaundryOps-LLM ⊣ Garment Care Governor**。
+
+先行研究も既にある:
+
+- **ADR-2607031000** —— cloud-itonami の 8 blueprint が既に
+  `network-isekai:public/games/itonami/<slug>/` に job simulator として
+  存在する (`game.edn` + `scene.edn` + `logic.cljc`、kami-clj guest subset、
+  `isekai.feed-index` が自動発見)。機構は intake→propose→approve→execute→audit
+  を写した「depot loop」。
+- **ADR-2607091830** —— 31 games 全件に Work Actor
+  (`<org>-<slug>.games.aozora.app`) と `?embed=1` 埋め込み URL が付いている。
+
+つまり 9601 は **9 本目として同じレールに乗る**。
+
+## Decision
+
+### 1. ジャンルは放置系タイクーン。既存の depot loop ではない
+
+オーナー判断。ただし決め手は機構の好みではない。**放置ゲーは「全部自動化する」
+ゲームであり、この店は最後の 2 工程を構造的に自動化できない。** そのねじれが
+そのまま遊びになる。
+
+`laundry.phase` を読むと、phase 3 (supervised-auto) の `:auto` 集合は
+`#{:garment/intake}` の **1 つきり**で、`:actuation/apply-cleaning-process` と
+`:actuation/return-garment` はどの phase の `:auto` にも入っていない。
+`laundry.governor/high-stakes` が同じ不変条件を独立に守っている (2 層)。
+店をいくら大きくしても、承認者を何人雇っても、**洗浄と返却はプレイヤーの指に
+残り続ける**。放置ゲーの文法でこれをやると、プレイヤーは説明ではなく操作で
+それを知る。
+
+### 2. 規則は転写する。考案しない
+
+| ゲーム | actor |
+|---|---|
+| 5 工程 (受付/取扱方法/資格照合/洗浄/返却) | `laundry.phase/write-ops` |
+| 店の段階 0–3 | `laundry.phase/phases` |
+| 無人で回る工程 | 各 phase の `:auto` |
+| 6 種の HOLD | `laundry.governor` の 6 HARD チェック |
+| 確度 60% 未満で承認待ち | `laundry.governor/confidence-floor` |
+| 洗濯表示との衝突 | `laundry.registry/cleaning-process-forbidden-by-care-label?` |
+| 差し戻す | 承認ワークフローの `{:approval {:status :rejected}}` |
+| 監査台帳 | actor の append-only ledger |
+
+**ゲームが教える技能は 3 番目のチェック。** advisor が処理方法を提案し、
+garment 自身の洗濯表示が ground truth。衝突した計画を取扱方法で承認しても
+**安全ではある** —— governor が洗浄で HOLD し、衣類は絶対に傷まない —— が、
+顧客の信頼を失う。表示を読んで差し戻せば時間しか失わない。
+
+### 3. 遊べるようにするために足した 3 つ、その根拠
+
+転写だけでは遊びが成立しない箇所が 3 つあり、いずれも actor の意味論の側から
+埋めた。**バランス調整のための後付けではない。**
+
+1. **工程ごとの入金** (`station-payout`)。返却だけが払うと phase 1/2 は収入ゼロで
+   段階を上げられない。実際のクリーニング屋は預かり時に前受金を取る。
+2. **phase 未対応工程の「手作業で処理」** (`sweep-off-system`)。phase-disabled は
+   失敗ではなく「actor がまだその工程を覆っていない」という意味なので、
+   garment は手作業で流れて半額を払う。これが無いと phase 1 でフロアが詰まって
+   デッドロックする。
+3. **`:clean` の必要書類は 4 でなく 3**。4 件目の洗濯処理記録は洗浄自身が生む。
+   前提として要求すると洗浄に永久に到達できない。`:return` は 4 件全部を要求し、
+   それが「洗っていない衣類は返せない」を自動的に表現する。
+
+また **資格失効 (`:certification-not-current`) はライフを減らさず店を止める。**
+governor はこのチェックを無条件に評価するので全工程が HOLD になる —— これは
+「正しく止まっている」状態であって、garment ごとに罰を積むと 1 回の失効が
+即死になる。
+
+### 4. 1 ファイルの純関数 reducer にする
+
+`60-apps/network-isekai/public/games/itonami/isic-9601/logic.cljc` が全規則。I/O・atom・interop・
+`Math/random` なし。RNG は `:seed` から状態に織り込んだ MINSTD。
+nbb のテストも、squint 経由のブラウザプレビューも、将来の kami-clj guest も
+**同じファイルを読む**ので挙動が割れない。UI は `summary` しか見ず規則を持たない。
+
+実装中に踏んだ 2 つの罠を記録しておく (どちらも「3 経路で同じファイル」を
+成立させるための制約):
+
+- **`(mapv :key xs)` は squint で落ちる。** squint はキーワードを素の文字列に
+  コンパイルするので関数位置に置けない。この ns 全体でキーワードの関数適用を
+  避けている。
+- **LCG の乗数は 16807 (MINSTD)。** よく使う 1103515245 は 2^31 剰余に対して
+  積が 2.4e18 になり float64 の仮数部を溢れる。nbb とブラウザで乱数列が
+  静かにずれ、`:seed` が再現しなくなる。
+
+### 5. 検証
+
+- **単体 63 チェック** (nbb, `test/logic_test.cljs`)。核は
+  `actuation-never-auto-at-any-phase` /
+  `clean-and-return-escalate-even-when-perfectly-clean` /
+  `hired-approver-never-clears-actuation` の 3 本 —— 将来の編集がこの店を
+  actor より自動化しやすくしたら落ちる。
+- **`careless-play-loses-to-the-care-label`** が教材性の両面を固定する:
+  表示を読まずに承認すると負ける、かつ**負ける過程でも禁止処理は 1 件も
+  適用されない**。
+- **ブラウザ 7 チェック** (headless Chromium, `preview/smoke.cljs`) ——
+  実ページで 40/40 返却まで到達することを確認。dead board はここで落ちる。
+- **3D 街 16 テスト / 530 assertion** (JVM, `test/world3d_test.clj`) ——
+  `world3d.cljc` の render-IR を**実物の `kami.webgpu.ir` / `kami.webgpu.pick`**
+  に通し、`ir/valid?` を満たすこと、8 店すべてが 390x844 / 900x1600 /
+  1280x720 / 1920x1080 のどれでもカメラ前方かつ画面内に入ること、各店の
+  投影中心をタップするとその店が返ること (= どの店も他店に隠れていない)、
+  地面・道路・木・プレイヤーは filter で除外されること、施錠中の店も
+  タップできることを確認。
+- **SDK 23 テスト / 108 assertion** (JVM, `kami.webgpu.pick-test`) —— 要は
+  `pick-agrees-with-projection`。executor と同じ行列で各 instance の中心を
+  投影し、その画素で pick して同一 instance が返ることを要求する。
+  up ベクトル・深度規約・半高さの持ち上げのどれを間違えても picker は
+  「それらしい」答えを返し続けるので、これが無いと誤りは縁でしか出ない。
+- **WebGL 2.0 E2E 達成** (`bin/render.cljs`) —— 実 WebGL2 (SwiftShader) で
+  glError=0、1,013,400 画素が背景以外、92 色、`preview/street.png` を出力。
+  engine 自身の GLSL / packer / geometry を通しており、第2レンダラではない。
+- **fallback**: CLI の既定は `--backend auto` で、WebGPU を試して証拠に基づいて
+  WebGL 2.0 へ退く。SDK の fallback policy は 9 tests / 15 assertions
+  (`backend-from-probe`)、webgl repo 全体 14 tests / 34 assertions。
+- **WebGPU 経路**: pipeline 検証まで到達 (canonical WGSL が compile し、
+  `@group(0)` binding と 8 本の vertex/instance location が engine の packer の
+  layout に対して validate される)。**pixel は未取得** —— Dawn が submit 直後に
+  instance を落とす。6 通りのフラグで同一に失敗、3 行の shader でも同じ。
+- **未実施**: shadow pass (1x1 の全面 lit depth texture を bind している)、
+  Pages smoke。
+- **マップ 17 テスト / 102 assertion** (JVM, `test/world_ir_test.clj`) ——
+  `world.cljc` が出す render-IR を**実物の `kotoba.sprite2d.layout`** に通し、
+  8 district 全部が任意の viewport (360x640 / 1280x720 / 900x1600) に収まること、
+  描画位置を tap すると当該 district が返ること、施錠中の店も tap できること、
+  看板の `:text` が hit box を広げることを確認。SDK の追加を revert すると
+  **コンパイルすら通らない** (`layout/pick` が無い) ので、このテストは
+  SDK 側の退行ゲートでもある。
+- **sprite2d 49 テスト / 125 assertion** (JVM, `clojure -M:test`) ——
+  変更前は 0 assertion (suite が起動しなかった)。
+- **balance probe** (`test/balance.cljs`) —— seed 3/7/11/99 すべてで
+  丁寧なプレイが t≈700 で victory、ライフ 3 維持。雑なプレイは t≈300 で gameover。
+
+## 現在地 —— 何が着地して、何が着地していないか
+
+**staging の根について**: 同日、別のセッションが同じ blocker に当たって
+Kingdom Cascade (match-3) を `60-apps/network-isekai/games/kingdom-cascade/`
+に置いた (ADR-2608620000)。`60-apps/` は origin/main にまだ無い新設だが、
+`70-tools` / `80-data` / `90-docs` の数字付きエリア規約に沿っており、
+staging の根を 2 つ作るより揃える方がよいのでこちらも同じ根に置いた。
+根の下は**移植先の相対パスをそのまま写す** —— itonami の game は
+ADR-2607031000 が `public/games/itonami/<slug>/` と記しているので、
+`60-apps/network-isekai/public/games/itonami/isic-9601/` になる。
+(Kingdom Cascade 側は `games/<slug>/` を写している。どちらの相対パスが
+現在の network-isekai の実態かは、repo access が取れるまでどちらの
+セッションも検証できていない。)
+
+**着地した** (2026-08-08 時点):
+
+- **8 district すべてが遊べる。** `district.cljc` が `world.cljc` の 1 行を board に
+  変える —— op 列が station 連鎖に、`:never-auto` が人手必須の station に、
+  `:auto-at-3` が phase 3 で無人稼働する集合になる。`logic.cljc` は spec を受け取って
+  event を畳むだけで、クリーニング固有の名詞を持たない。**主張が 8 回独立に確認できる
+  ものになった** —— それまでは 1 店舗で見せて残り 7 件は README が言うだけだった。
+  ただし phase 1/2 の staging は 9601 以外**創作**で、`:phase-source :game-staging`
+  として district ごとに記録してある（端点 phase 0/3 は repo 由来）。
+- **3D の街がページの中にある。** タップで店に入り、監査クローズで隣が開く。
+  `preview/gl.cljs` が唯一の WebGL 2.0 配線で、`bin/render.cljs` はそれを bundle して
+  使う（以前は同じ手順を JS 文字列として手で写した 2 つ目を持っていた）。
+- **squint の誤コンパイルを見つけて、2 種類の検査を置いた。** `(- (+ a b))` が
+  `-(a) + (b)` に compile される —— 警告もエラーも痕跡も無く、違う数を返す。
+  Clojure と ClojureScript は正しいので、**JVM のテストも nbb の CLI も通ったまま
+  ブラウザだけが静かに歪む**。実際に 2 箇所で生きていた（環状道路の yaw と、engine の
+  orthographic projection）。`npm run parity` が JVM engine と squint bundle の
+  全 float を比較して見つけ、`npm run lint:squint` が source を形で読む。両方 fleet
+  gate 登録済み（`root-squint-unary-minus`）。engine 側の変更は upstream の欠陥では
+  なく squint が壊さない書き方への修正で、`sdk-patches/0004`・`0005` に staged。
+
+**着地していない**:
+
+- **network-isekai への移植。** `network-awai/network-isekai` は private で本セッションの
+  repo scope に無い。`add_repo` は承認待ちではなく**構造的に通らない** —— session の
+  owner が `com-junkawasaki` なので cross-tier add が v1 で未対応。権限付与では
+  解決せず、`kotoba-lang`/`network-awai` を根とする別セッションが要る。
+  したがって `scene.edn` を書いていない（既存 8 本の実スキーマを読めない状態で推測で
+  書くと、動かないものを「できた」と言うことになる）。
+- **WebGPU の pixels。** 経路は adapter → device → wgsl-compiled → pipeline →
+  submitted まで通り、`createRenderPipeline` が engine の packer layout に対して
+  shader の binding と 8 つの vertex/instance location を検証している。この container
+  では Dawn が submit 直後に instance を落とす（6 通りの flag 組合せ、3 行の
+  clear-to-red shader でも同じ）。frame ではなく環境。
+- **shadow pass。** 両 backend とも 1×1 の lit depth texture を bind している。
+- **Pages smoke test。**
+- **SDK patch 5 本が push できない**（同じ cross-tier 制約）。
+
+**次にやること**: `kotoba-lang`/`network-awai` を根とするセッションを起こす → 既存 8 本の `scene.edn`/`logic.cljc` の
+実スキーマを読む → `public/games/itonami/isic-9601/` へ移植 → `feed-index` に
+載ることを確認 → `?embed=1` と Work Actor の生成 (`gen-game-actors.cljs`
+再実行) → 公開。
+
+## Alternatives
+
+- **既存の depot loop をそのまま使う。** 実装リスクは最小で feed-index/Work
+  Actor 統合も確実だが、スクショの手触りと違う。オーナーは放置系を選んだ。
+- **depot loop の上に放置系を重ねる。** 作業量が最大で、2 つの機構の接合部が
+  どちらの意味論でもない場所になる。採らない。
+- **プレビューを手書き JS で書く。** CLAUDE.md (2026-07-14) が新規 `.mjs` を
+  禁じており、かつ規則が 2 実装に割れる。squint で同じ `.cljc` を通した。"}]

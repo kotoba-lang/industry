@@ -1,0 +1,60 @@
+[{:db/id -1
+  :adr/id "adr-2607299100-aozora-app-legal-pages-published"
+  :adr/title "ADR-2607299100: aozora.app に法的文書を公開し、そこへ到達できるようにする — /terms は 404 だった / main が本番より遅れていた / Tailwind ビルドが失われていた"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-29"
+  :adr/last-verified "2026-07-29"
+  :adr/last_verified "2026-07-29"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "aozora-app-legal-pages-published"
+
+  :adr/authoritative_for
+  ["aozora.app の /terms /privacy /company /legal /yoro/terms /yoro/privacy が実在する公開ページであること、およびその生成経路"
+   "app-aozora の legal/*.md が正本で aozora-appview 側に複製を置かないこと"
+   "aozora-appview の静的ページは run_worker_first のため worker/index.mjs の STATIC_DOCUMENT_ROUTES に登録しないと本番に出ないこと"
+   "アプリ内から法的文書へ到達する経路(settings、サインイン gate の外側)"
+   "aozora-appview の Tailwind ビルド手順 — @tailwindcss/cli 4.3.1 pin、@source が ./src だけでは足りないこと、build が css を先に走らせること"
+   "aozora-appview main が本番より遅れていた事実(codex/seo-foundation 未 merge)とその解消"]
+
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/superseded_by []
+
+  :adr/related
+  ["adr-2607289800-app-aozora-awai-network-operator-change"
+   "adr-2607289700-org-taxonomy-by-invocation-axis-network-awai"
+   "adr-2607122200-kotoba-uiux-design-system-paved-road"
+   "adr-2607132300-design-quality-score"
+   "adr-2607173000-nbb-only-script-host"]
+
+  :adr/repos ["orgs/network-awai/aozora-appview" "orgs/network-awai/app-aozora"]
+
+  :adr/decision
+  ["D1: 4つの法的文書 + operator record を aozora.app に公開する。オーナー指示(2026-07-28、選択肢『ToS/Privacy も含め全部公開』)。DRAFT バナー・[DECISION NEEDED]・[CONFIRM] マーカーはそのまま表示する — counsel review 未了という事実を隠さない"
+   "D2: 正本は sibling west project network-awai/app-aozora の legal/*.md。aozora-appview に markdown の複製を置かない(必ず drift する)"
+   "D3: 生成物 HTML は commit 済みビルド成果物として扱う。deploy は再生成しない(sibling checkout が古いと古い operator 名を黙って本番へ出すため)。再生成は `pnpm legal --src ...` の明示操作"
+   "D4: page chrome は kotoba-ui.core のみ(ADR-2607122200)。md→hiccup converter は cloud-itonami site/generate.clj からの移植を ordered list / pipe table / 1段ネストへ拡張"
+   "D5: codex/seo-foundation を main に merge した — 本番で既に動いていたのに未 merge で、main から deploy すると SEO 一式を巻き戻す状態だった"
+   "D6: html_handling を drop-trailing-slash にし、/terms(スラッシュ無し = アプリが実際にリンクする形)を canonical にする"
+   "D7: settings に法的文書への導線を置く。**サインイン gate の外側**に置く — 規約はアカウントを持つ前の読者を拘束するので、サインインしないと読めない場所に置いてはいけない"
+   "D8: Tailwind ビルドを復旧する。@tailwindcss/cli を 4.3.1 に pin(commit 済み stylesheet を作った版と同じ)、@source に messenger の west sibling を追加、build が先頭で css を走らせる。build-css.mjs は復活させない(CLI で足り、script ファイルを増やさない — ADR-2607173000)"]
+
+  :adr/verify "curl -sS -o /dev/null -w '%{http_code}\\n' -H 'Accept: text/html' https://aozora.app/terms  # 200"
+
+  :adr/evidence
+  ["aozora-appview main: ab19859e -> 9c9236b4f2d571e29842b5e731ba5e671563c5e1(server-side merge 6件)。west pin も同値、superproject 0/0、open PR なし、agent branch/worktree 残存なし"
+   "app-aozora main d0668f2a(ADR-2607289800 の legal 文書)= west pin。今回は変更していない"
+   "deploy: app-aozora-spa version 09f91e00-df5d-47eb-8753-ce27c7d57cb5(最終、Tailwind 復旧込み)。経過: 7c3775b0(法務ページ + canonical URL) -> f652b499(in-app 導線) -> 09f91e00"
+   "live 検証: /terms /privacy /company /legal /yoro/terms /yoro/privacy すべて 200 + 正しい <title> + AWAI Network, L.L.C. を含む。control: /manga は SSR 200、/zzz-nonsense は 404、/js/main.js 1,575,449 bytes、/css/tailwind.css 60,024 bytes(旧 52,761)"
+   "design-quality: 法務6ページとも 100.00(10軸・12軸とも)、gate --min 95 PASS"
+   "tests: shadow-cljs :node-test 280 tests / 894 assertions / 0 failures、seo-worker.test.mjs 8/8、release build 372 files / 0 warnings"
+   "目視: headless Chrome(500px)で /settings(サインアウト状態で法的導線が見える・区切り線と chevron あり)と /terms を確認。820px で / と /games が正常。認証必須画面は未確認"]
+
+  :adr/body
+  "# ADR-2607299100: aozora.app に法的文書を公開し、そこへ到達できるようにする\n\n**Status**: accepted\n**Date**: 2026-07-29\n**Deciders**: Jun Kawasaki(オーナー指示、agent 実行)\n\n## Context\n\nADR-2607289800 で app-aozora の Service operator を AWAI Network, L.L.C. に変更したが、\nそれは **repo の中の markdown を書き換えただけ**だった。オーナーの次の指示(『do it』)を\n受けて公開状態を調べたところ、次が判明した。\n\n- **4つの法的文書はどこにも公開されていなかった。**\n- **`/terms` と `/privacy` は死んだリンクだった。** inference-consent モーダル\n  (`yoro-ui.components.inference-consent`)は全ユーザーに同意を求める画面で\n  この2つをリンクしているのに、対応する asset が存在しなかった。\n- **アプリ内でその2つをリンクしているのはそのモーダル1箇所だけだった。**\n  一度同意すると、同意した規約に二度と辿り着けない。messenger の文書と\n  operator record にはリンク自体が存在しなかった。\n\nオーナーは選択肢『ToS/Privacy も含め全部公開』を選び、DRAFT バナーと\n`[DECISION NEEDED]`(『account 作成のどこにも年齢確認が無い』を含む)が\nユーザーに見えることを承知の上で全文公開を指示した。\n\n## 途中で見つかった、より重い問題\n\n### 1. main が本番より遅れていた(codex/seo-foundation 未 merge)\n\n`orgs/network-awai/aozora-appview` の `main` には **本番で既に動いている\nSEO worker(`codex/seo-foundation`、7 commits)が入っていなかった**。\n本番の sitemap は同 branch が生成した 89 URL を配信し、\n`/google7adbda147efc066b.html` は同 branch の verification body を返し、\nナビゲーションは同 branch の SSR shell を返していた。\n\nつまり **main から deploy した人が SEO 基盤一式を黙って巻き戻す状態**\nだった — CLAUDE.md が kotobase.net(2026-07-25)で記録している\nlast-writer-wins そのもの。deploy 前に main へ merge して解消した\n(fast-forward: main は既に ancestor、0 behind / 7 ahead)。\n\n### 2. 静的 asset を置くだけでは本番に出ない\n\n同 branch の `wrangler.jsonc` は `run_worker_first: [\"/*\", ...除外]` を設定して\nおり、除外に無い path は **worker が先に走る**。`pageForPath` も\n`isClientRoute` も `/terms` を知らないので、実測で\n`GET /terms` (Accept: text/html) は **`noindex, nofollow` 付きの 404**、\ntitle は『ページが見つかりません』だった。`worker/index.mjs` に\n`STATIC_DOCUMENT_ROUTES` を足し、6 path を `env.ASSETS.fetch` へ素通しする。\n\n### 3. deps.edn の相対 path が壊れていた\n\n`5f98806d`(numbered layer を west repo へ切り出し)で\n`cljs/deps.edn` の `:paths` が全滅していた(2階層深い旧位置向けだったので\n`../../../../../kotoba-lang` は superproject の外を指し、`40-engine` は消滅)。\n`public/js` は gitignore なので、**この状態で `wrangler deploy` すると\nmain.js の無い asset manifest を配信してアプリ全体が落ちる**。\n`codex/seo-foundation` が同一の修正を独立に入れていた(merge で解消)。\n\n### 4. Tailwind ビルドが失われ、54 クラスが無言で死んでいた\n\n同じ layer extraction が `css` script と `build-css.mjs` を持って行き、\n**`public/css/tailwind.css` を再生成できない状態**になっていた。Tailwind は\n走査していないクラスでエラーを出さず、単に出力しない。実測で\n**src で使われているのに built stylesheet に存在しない Tailwind クラスが 54 個**、\n約20ファイルに散っていた(manga_chat_panel / apps_catalog / ai_suggest_button /\noauth_consent_modal / restore_panel / convo_new 等)。settings のブロック一覧が使う\n`divide-gv2-border/60` もその1つで、区切り線が出ていなかった。\n\n復旧の要点:\n\n- **`@tailwindcss/cli` を `4.3.1` に pin** — commit 済み stylesheet を作ったのと\n  同じ版。これで diff が『旧ビルドが走査できていなかったクラス』だと**証明できる**\n  (版を上げると Tailwind 自身の出力変化と区別がつかない)。\n- **`@source \"./src\"` だけでは足りない。** messenger UI は west sibling\n  `kotoba-lang/kotobase-messenger` から bundle に入る(`deps.edn` `:paths`)。\n  外部 `:paths` 10件のうち markup を持つのは**ここだけ**(`:class` 134箇所 vs\n  他は全て 0)。これ無しで再生成すると **25クラスが消える**。足して 14 になり、\n  その 14 は両ソースツリーに対して1件ずつ手で照合し、どこからも参照されて\n  いない(移動・削除されたコードの残骸)ことを確認した。\n- **`build` が先頭で `css` を走らせる。** 走らせていなかったことが、54クラスが\n  誰にも気づかれず死んだ原因そのもの。\n- `pb-safe` を `@utility` で定義した。`post_composer.cljc` がずっと要求していたのに\n  誰も定義しておらず、composer シートが notch 端末でホームインジケータの下に\n  潜っていた。**ここだけが復元ではない実質的な見た目の変更**(notch 以外では\n  inset が 0)。\n\n## Decision\n\n`aozora-appview/cljs/scripts/gen-legal-pages.cljs`(nbb、ADR-2607173000)が\nsibling west project の `legal/*.md` から\n`public/{terms,privacy,yoro/terms,yoro/privacy,company,legal}/index.html` を生成する。\n\n- **converter は cloud-itonami `site/generate.clj` からの移植。** 同 file の\n  コメントが『tables / nested lists / links に当たったら依存を増やさず\n  これを拡張しろ』と指示しているのでそうした: ordered list(terms.md の\n  DMCA 通知要件)、pipe table(両 privacy policy の APPI/GDPR 根拠表)、\n  1段ネスト bullet。\n- **初回実行で全 table の最終列が消えた。** `str/split` が末尾の空 field を\n  捨てるため『先頭と末尾を drop』が実列を食っていた — privacy policy の\n  `GDPR legal basis` 列が丸ごと消えていた。修正し、**header と cell 数が\n  食い違う行があれば build を落とす** guard を入れた(privacy policy から\n  列が1つ消えても読者には検知できない)。\n- page chrome は `kotoba-ui.core` のみ、theme map 1つ(accent は\n  `--aozora-sky-zenith` = アプリ自身の空色)、HIG text-style class のみ、\n  raw hex / ad-hoc font-size なし。\n- sitemap は生成器(`generate-seo-catalog.clj`)側に 6 URL を足した(89 → 95)。\n- **settings に導線**(`:settings/legal-*` を ja/en 両方に追加)。サインイン\n  gate の外側。クラスは Tailwind の語彙ではなく **built stylesheet に対して**\n  照合してから使った(上記4の通り、語彙にあっても出力に無ければ効かない)。\n\n## 目視確認と、その過程で自分がやった測り方の誤り\n\nChrome 拡張が未接続だったため headless Chrome を直接起動して確認した\n(ヘッドレスなので並行セッションの focus を奪わない)。`/settings` は\nサインアウト状態で法的導線が見え、区切り線と chevron が付き、`/terms` は\nHIG タイポグラフィ・DRAFT のコールアウト・コードスパンが正しく出る。\n820px で `/` と `/games` も正常。\n\n**一度、存在しないレスポンシブ破綻を報告しかけた。** 430px / 390px で撮ると\nアプリも法務ページも右端が切れており『横はみ出し』に見えた。プローブページ\n(`innerWidth` を表示し右端に赤マーカーを置く)を1枚挟んだところ、**macOS の\nheadless Chrome は `--window-size=430` を要求してもウィンドウを 500px 幅に\n切り上げる一方、スクリーンショットは要求した 430px で切り抜く**ため、実際には\n無い見切れが写っていただけだった。**この環境で狭い幅を見るときは 500px 以上を\n使うこと。** 併せて live アセットをローカルにミラーして旧/新 stylesheet で\nA/B 描画し、見え方が同一(= 見切れは CSS 変更由来でない)ことも確認した。\n\n## Consequences\n\n- (+) 同意を求めておいて 404 を返す、という状態が解消された。\n- (+) 同意した規約に後から辿り着けるようになった(settings、サインイン不要)。\n- (+) main が本番の superset になった(#1)。\n- (+) `deps.edn` が直り、build/deploy が再び可能になった(#3)。\n- (+) stylesheet を再生成できるようになり、死んでいた 54 クラスが効くようになった(#4)。\n- (−) その 54 クラスを使う約20画面の**見た目が今日から変わる**。いずれも作者が\n  意図して書いたスタイルが初めて適用されただけだが、**認証必須画面\n  (manga_chat_panel / ai_suggest_button / oauth_consent_modal / restore_panel /\n  convo_new / post_composer の pb-safe)は未確認**。アカウント作成は安全床で\n  禁止されているためサインインしていない。オーナー確認が要る。\n- (−) DRAFT バナーと `[DECISION NEEDED]` 36件・`[CONFIRM]` 4件が公開面に出ている。\n  オーナーの明示指示。counsel review が済んだら文書側を直す。\n- (−) `assets:manga` は壊れたまま(`gen-liquid-glass-css.cljs` が parse できない)。\n  deploy chain から外し、直し方を README に記載。\n- (−) `hello@gftd.co.jp` が連絡先のまま(ADR-2607289800 から不変)。\n\n## 残っている gap(次の担当者向け)\n\n**engineering**\n1. 認証必須画面の目視確認(上記)。\n2. `assets:manga` の修復 — `scripts/gen-liquid-glass-css.cljs` は bb→nbb 移行が\n   line 39 に `(require '         '         ')` を残しており parse できない。\n   `babashka.fs` / `classpath/add-classpath` にも依存(nbb に相当物なし)。\n   nbb 版 `legal` script と同じ `--classpath` 形に書き換える。\n3. ADR-2607173000 違反2件 — `worker/index.mjs`(369行、本番 SSR 経路)と\n   `scripts/generate-seo-catalog.clj`(bb + cheshire、**build の必須ステップ**)。\n   どちらも他セッション/codex 由来で今回は触っていない。\n4. 共有 checkout `orgs/network-awai/app-aozora` が detached `af4c723f` で、\n   別セッションの未 push commit + `40-engine/cljs/pds/` の dirty 12ファイルを\n   抱えている(extraction で消えたはずの path)。触っていない。\n   `gen-legal-pages.cljs` の default `--src` はここを見るので、main に追随\n   するまで `--src` 明示が必要。\n\n**counsel / owner**(`app-aozora/legal/company.md` の \"Known gaps\" が正本)\n外国会社登記(会社法818条1項、『無償の consumer サービスが取引継続に当たるか』が\n未解決)/ 消費者契約法・通則法11条との関係 / DMCA 指定代理人(§512(c)(2)、\nUS 法人化で答えが変わった)/ 年齢確認の不在(COPPA 関連性上昇)/ APPI 171条の\n記述充足性 / GDPR Art.27 代理人 / 本店所在地・EIN 後の US 税務登録 /\n`hello@gftd.co.jp` の置き換え。\n\n## 実行しなかったこと(意図的)\n\n- 法的文書の中身の変更(operator 変更は ADR-2607289800 で完了済み)\n- 準拠法・DRAFT バナー・[DECISION NEEDED] の解消(counsel / owner 判断)\n- `worker/index.mjs` の nbb 移植、`assets:manga` の修復(別スコープ)\n- アカウント作成(安全床で禁止 — 認証必須画面の確認はオーナーに委ねる)\n"
+
+  :source/dataset "adr"}]

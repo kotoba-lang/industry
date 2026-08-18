@@ -1,0 +1,68 @@
+[
+ {:db/id -1
+  :adr/id "2608044000"
+  :adr/title "ADR-2608044000: LEI catalog の作業リストと観測は git の EDN から引く — D1 projection は判断の入力にしない"
+  :adr/status "accepted"
+  :adr/decided "2026-08-04"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/tags ["edn" "d1" "projection" "lei-catalog" "loop"]
+  :adr/links ["adr-2608039700" "adr-2608039000" "adr-2608042000" "adr-2608043000" "adr-2607110300"]
+  :adr/body "## 背景
+
+オーナー指摘（2026-08-04）「あれ、、なぜ sql ? edn で datalad 保存では?」。
+
+正本は当初から EDN だった（`cloud-itonami-lei-<LEI>/blueprint.edn` +
+`80-data/public/tos.journal.edn`）。だが **何をすべきかを決める入力**が D1 だった:
+
+- `loop-lei-catalog` の `observe` が D1 に 5 本の `SELECT`
+- `lei-contact-discover` / `lei-profile-enrich` の作業リストが `SELECT ... WHERE ... IS NULL`
+- `gtm-target-list` の対象抽出が `SELECT ... WHERE country IN (...)`
+
+ADR-2608039700 は「Git + canonical EDN が durable source of truth、D1/kotobase は
+query・serving projection」と定めている。削除テスト（消して再構築できるか）には
+合格していたので規則違反ではない。**しかし判断の入力にしていた点が問題だった。**
+
+## 決定
+
+**catalog の読み取りは `scripts/lei_catalog.cljs` に一本化し、git の EDN を読む。**
+この経路から SQL を外す。
+
+- `lei-catalog/fetch-catalog` — `gh api` で repo 一覧、`raw.githubusercontent` から
+  各 `blueprint.edn`（必要なら ToS journal）を並列取得
+- `lei-catalog/observe` — `catalog-maturity` が採点する metrics を EDN から計算
+- `lei-catalog/needing-contact-route` / `needing-profile` — 作業リスト
+- `scripts/lei-catalog-observe.cljs` — loop が shell out して EDN を受け取る入口
+
+**ローカル west checkout ではなく GitHub raw を読む。** 書き手（contact-discover /
+profile-enrich）は Contents API で GitHub 上の `blueprint.edn` を書き換えるので、
+west revision に pin されたローカル checkout には**たった今書いたものが入っていない**。
+そこを読むと loop の事後計測が自分の行動を見落とす —— 「after-score は測るのであって
+予測しない」という loop の前提そのものが壊れる。ローカル checkout はキャッシュであり、
+「git が正本」の git は GitHub 上の `main` を指す。
+
+コストは 1 read あたり repo 数分の GET（今日 185、並列で 1 分未満）。`d1-ingest` が
+既に毎回やっているのと同じパス。
+
+**不完全な読み取りは報告し、loop では cycle を失敗させる。** `fetch-catalog` は
+読めなかった repo を返し、`observe` はそれが 1 件でもあれば例外を投げる。170/185 で
+計算した maturity は 185/185 の maturity と見た目が同じで、差は ledger に出ない。
+
+## 実測でわかったこと
+
+**D1 は実際に遅れていた。** 切り替え時点で D1 は到達可能 78 社と答え、git には既に
+84 社あった。projection が正しく再構築可能であることと、いま正しいことは別である。
+この 6 社の差の上で「自分の行動は何も動かさなかった」と結論する cycle が起こり得た。
+
+## 帰結
+
+- `loop-lei-catalog` の `act` から **D1 再射影を外した**。観測が git を直接読むように
+  なった以上、行動が書いたものは既に見えており、再射影は「この loop の誰も読まない
+  キャッシュ」のための 185 fetch でしかない。
+- **`scripts/d1-ingest-cloud-itonami-lei.cljs` は残す。** SQL view が欲しい人のために
+  あり、この経路から外れただけ。D1 は消しても `d1-ingest` で戻る（削除テストは変わらず合格）。
+- consumer は `nbb --classpath scripts ...` で動かす必要がある（共有 ns の読み込みのため）。
+  loop の `act` が組み立てるコマンド文字列と `deploy/` の runner を更新済み。
+- 関連するが**別の規則**: ADR-2608039000 の「blockchain / 分散型経路に D1 を前提に
+  しない」は分散性を主張する経路が対象で、この catalog は該当しない。本 ADR が縛るのは
+  「判断の入力を projection から取らない」であって、D1 の全面禁止ではない。"}
+]

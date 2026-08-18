@@ -1,0 +1,371 @@
+[{:db/id -1
+  :adr/id "ADR-2608160100"
+  :adr/title "kotobase の物理層は IPLD block + CARv2 pack — 1 CID = 1 object を既定から降ろす"
+  :adr/status "accepted"
+  :adr/date "2026-08-16"
+  :adr/last-verified "2026-08-16"
+  :adr/last_verified "2026-08-16"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotobase-physical-plane"
+  :adr/related
+  ["ADR-2608039970"
+   "ADR-2608039000"
+   "adr-2608021000-namidb-comparison-and-the-read-path-trampoline"
+   "ADR-2608060500"
+   "ADR-2608071500"
+   "ADR-2608148200"
+   "ADR-2608160200"]
+  :adr/authoritative-for
+  ["kotobase の物理層の構成 — block / pack / object の 3 段と、その間の address"
+   "block の retrieval address は (pack CID, file-offset, frame-length) であること"
+   "pack catalog は datom 面に置く projection であり、premise ではないこと"
+   "packing policy は write-locality（1 commit = 1 pack）であること"
+   "CARv2 codec の正本は kotoba-lang/io-ipld-car であること"
+   "packing が直す cost と直さない cost の区別"]
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body "## Context
+
+ADR-2608039970 は `kotobase の base は datom 面であって Datalog ではない` と決め、
+L0（block / ref / large-object）を premise、L1（datom）を premise、L2（query
+language）を premise でない、と層を切った。**そこで決めなかったのが L0 の中身**
+——「block がどう物理的に置かれるか」である。
+
+今日の答えは暗黙に **1 CID = 1 object** だった。`kotobase-storage` の
+`IBlockStore` は `-get-blocks [store cids]` しか持たず、`kotobase-shard-index` は
+自分の設計を `One immutable object per content address` と明言している。これは
+provider に対して正直な contract だが、**物理層の設計判断が一度も明示的に
+行われていない**ことの結果でもある。
+
+### 実測が指しているのは index の形ではなく object の粒度
+
+- production の `kotobase.net` は p50 2,491ms、その **92% が hydration**
+  （ADR-2607310900 訂正3）。
+- hydration の**逐次項の 97% は prolly-tree ではなく novelty の cons chain**
+  （ADR-2608021000）。`{e, rest}` の連結で、後続 CID は前任を decode するまで
+  存在しない —— 幅 1、深さ = 未 fold tx 数、原理的に prefetch 不能。
+- 同じ実測で **prolly-tree の DAG は横に広い**（breadth-first で並列化できる）と
+  分かっている。
+
+つまり遅さの源は「木が深い」ことではなく、**1 block ごとに 1 round trip 払う
+物理層**である。`kotobase_peer.block_sizing` は 16–128 KiB で刻むので、1 commit は
+小さな block を多数生む。並列化は幅のある部分にしか効かず、cons chain には
+原理的に効かない。
+
+### 前提を確かめた: この workspace に CAR は無かった
+
+2026-08-16 実測。west.yml の 4,183 project 名を `car` で走査（`car-sim` /
+`card` / `cartpole` / `cargo` 等、いずれも無関係）、checkout 済みの
+kotoba-lang と net-kotobase 配下を `carv2` / `CARv1` / `content-addressable
+archive` で grep（explainer HTML と HISTORICAL 文書の言及のみ）、`io-ipld/src` は
+`core` `link` `value` の 3 本のみ。**packing という概念自体が物理層に無かった。**
+「無い」と結論する前に索引を引く規則（CLAUDE.md）に従った結果である。
+
+## Decision
+
+### 1. 物理層は 3 段。identity と location を分ける
+
+```text
+L0a  block    IPLD dag-cbor / raw   identity   = その block 自身の CID
+L0b  pack     CARv2                 location   = (pack CID, file-offset, frame-length)
+L0c  object   S3 / R2 / B2 / IPFS   transport  = object key + HTTP Range
+```
+
+**block の identity は今までどおりその block の CID**。pack は identity を
+一切変えない —— 変えるのは「どこにあるか」だけ。ADR-2608148200 が
+`公開 identity は hasher が付けた CID、archive Location はそれとは別` と
+書いた区別を、そのまま物理層の構造にする。
+
+pack 自身も immutable object なので **raw CIDv1 を持つ**。pack の CID は
+その bytes の CID であって、中の block の集合の関数ではない。
+
+### 2. 1 CID = 1 object は既定から降りる（禁止ではない）
+
+`kotobase-storage` の backend capability に 2 つを足し、**どちらか一方の宣言を
+必須にする**（`ref-profiles` と同じ規律 —— 推測が黙って通ると壊れるから）。
+
+| profile | 意味 |
+|---|---|
+| `:block-per-object` | block 1 個 = object 1 個。従来の provider |
+| `:packed-blocks` | block は pack に入り、読み出しは Range |
+
+`:packed-blocks` を宣言する backend は **object 面の `:range-read` を併せて
+宣言しなければならない**。Range を持たない store に packed を宣言させると、
+pack 全体を GET して 1 block を取り出す実装が黙って動き、**round trip は減るが
+転送量が爆発する**——成功したように見える失敗になる。
+
+### 3. pack catalog は datom 面に置く。embedded index も残す
+
+client が必要とする問いは 2 つあり、**別の層が答える**。
+
+| 問い | 答えるもの |
+|---|---|
+| その CID は**どの pack**に居るか | **datom 面の pack catalog** |
+| その pack の**どこ**に居るか | pack 自身の `MultihashIndexSorted`（または catalog の offset） |
+
+catalog を datom 面に置く理由は kotobase の既存規則そのもの ——
+**join 到達範囲は ref 1 本**（ADR-260726）。「どの pack か」を別の store に
+置けば、pack と tenant / commit / lake object を跨ぐ query が二度と書けなくなる。
+
+```text
+:pack/cid            raw CIDv1 of the pack bytes
+:pack/object-key     transport 上の key
+:pack/size-bytes
+:pack/sealed-at
+:block/cid
+:block/pack          → :pack/cid
+:block/file-offset   pack 先頭からの絶対 offset（frame の length varint を指す）
+:block/frame-length
+```
+
+embedded index を残すのは **generic tooling が pack を単体で読めるようにする**
+ため。`go-car` が実際に読むことを実測済み（下記）。
+
+**catalog は projection であって premise ではない。** 消しても pack を走査すれば
+再構築できる —— ADR-2608039000 の削除・再構築テストにそのまま通る。通らない
+設計（catalog にしか無い情報を作る）にしてはならない。
+
+### 4. packing policy は write-locality。1 commit = 1 pack を既定にする
+
+**一緒に書かれたものを一緒に置く。** 具体的には 1 transaction の commit が生む
+block 群（tx block、novelty、更新された prolly-tree page、index root）を 1 pack に
+封じる。これが cons chain に効く唯一の形である —— chain は論理的には逐次のまま
+だが、**同じ pack に入っていれば 1 回の Range GET でまとめて取れる**ので、
+network の逐次性が消える。
+
+- pack は封じたら不変。**in-place で追記しない**（追記は offset を動かし、
+  catalog と embedded index の両方を静かに嘘にする）。
+- compaction は**新しい pack を書いて catalog を差し替える**。古い pack は
+  参照が消えてから消す。
+- **read-locality と write-locality が食い違う場合は、実測してから compaction
+  を書く**。先に compaction 戦略を設計しない。
+
+  **測定した（2026-08-16）。答えは「compaction を書かない」。**
+  `kotobase-peer` の `dag_shape_bench`（本物の `pt/scan-prefix` と本物の
+  with-blocks retry を回し、wall-clock ではなく count を測る）を docs=2000 で:
+
+  | unfolded-tx | novelty hops | async round trips 合計 | novelty の割合 |
+  |---|---|---|---|
+  | 64 | 4 | 6 | 67% |
+  | 512 | 32 | 34 | **94%** |
+  | 2048 | 128 | 130 | **98%** |
+
+  novelty は 16 entry の segment を `rest` で繋ぐので **hops = ceil(unfolded-tx / 16)**。
+  prolly-tree 側はこの doc 数では **2 wave** で頭打ちであり、伸びる項は novelty
+  だけである。
+
+  **したがって支配項の唯一の乗数は `unfolded-tx` であり、それを下げる機構は
+  fold で、fold は既に在る。** compaction は同じ 4 hops を 1 にできるが、
+  ①新しい機構をまるごと作る必要があり ②chain が伸びるたびに再実行が要る。
+  **fold は分子そのものを消す。** 比較して compaction を正当化する材料は無い。
+
+  結論: **fold-first。** compaction は、fold 閾値を下げた後の再測定でなお
+  chain が支配する場合にだけ再検討する。**それまで書かない。**
+
+### 5. packing が直す cost と、直さない cost
+
+**直す**: 同じ pack に居る block 群の round trip（N → 1）。commit の再生、
+未 fold novelty の走査、prolly-tree の 1 subtree。
+
+**直さない**:
+- 論理的な cons chain の長さ。fold の閾値は別問題のまま。
+- 必要な block が**複数の pack に散っている**場合。この時 round trip は
+  pack 数に比例する —— つまり packing policy が悪ければ何も改善しない。
+- 転送量。むしろ over-fetch すれば増える。
+
+したがって**成功の指標は round trip 数**であって bytes でも wall-clock でもない。
+ADR-2608021000 が wall-clock ではなく count を測ったのと同じ理由（この
+workstation は load 100 超で並行 agent が走る）。
+
+### 6. codec の正本は `kotoba-lang/io-ipld-car`
+
+2026-08-16 に新規登録。portable `.cljc`、`ipld.car`（CARv1）/ `ipld.car.v2`
+（pragma + 40 byte header + pack/locate/read-frame）/ `ipld.car.index`
+（`MultihashIndexSorted`, multicodec 0x0401）。
+
+**外部実装による検証**（自分同士の一致ではない、という区別が要る）:
+
+| 検査 | 判定したもの |
+|---|---|
+| roots / 順序 / block bytes を我々が読む | `@ipld/car` が書いたものを読む |
+| **我々の CARv1 が byte 単位で一致** | 同一 fixture、両方の writer（302 bytes） |
+| pack した CARv2 が block 単位で読み戻る | `@ipld/car` が読む |
+| `car inspect --full` が受理し `car-multihash-index-sorted` と名乗る | `go-car` |
+| `car get-block` がその block の正確な bytes を返す | `go-car`、我々の index 経由 |
+| **index の全 offset を 1 byte ずらすと拒否される** | `go-car` —— 負の対照 |
+
+最後の 1 行が、その上の行に意味を与える。get-block の成功だけなら
+「go-car が archive を走査できる」ことしか示さない（どの CAR reader もできる）。
+offset をずらして初めて **index が実際に読まれた**ことが分かる
+（`invalid cid: expected 1 as the cid version number, got: 113` で落ちる）。
+
+go-car が PATH に無い環境では、その節は `SKIP` を印字し summary は
+`1 SKIPPED — not verified: ...` で終わる。**飛ばしたことと合格したことが
+出力で区別できる**（ADR-2608136000 の 5 問のうち 4 番目）。
+
+JVM と nbb の両方で 16 tests / 54 assertions。
+
+### 7. 実測した overhead
+
+| 量 | 値 |
+|---|---|
+| pragma + header | 51 bytes / pack（固定） |
+| index 固定部 | 30 bytes / pack |
+| index 可変部 | **40 bytes / block**（sha2-256 digest 32 + offset 8） |
+
+3 block の pack で index 150 bytes、100 block で 4,030 bytes ——
+差 3,880 / 97 = 40.0。16 KiB block なら index cost は **0.24%**。
+
+**block を小さくするほど index の相対コストは上がる。** 128 byte の block を
+packing する設計は index が 31% になる。これは block sizing の下限を縛る
+新しい制約であって、既存の 16–128 KiB とは矛盾しない。
+
+### 8. 既存の seam は動かさない
+
+- **`kotobase-block-codec` は CID の下**（bytes → frame → CID）。pack は
+  **CID の上、object の下**。順序は `bytes → codec frame → CID → pack → object`。
+  pack を丸ごと圧縮しない —— 中身は ciphertext で、実測 ratio 1.003 で*増える*
+  （ADR-2608060500）。
+- **columnar は pack に入れない。** `kotobase-lake` の Parquet / Arrow object は
+  large object であり、`:presigned-transfer` と footer 読みでそのまま扱う。
+  pack は小 block 領域のためのものである。数 MB の列を CAR frame に包むと、
+  `net-kotobase/lake` が既に持っている footer + column chunk の range 読みが
+  二重の間接を通ることになる。
+- **D1 規則は変わらない。** pack も catalog も分散型経路の premise を単一
+  ベンダに移さない。catalog を D1 に materialize するのは cache として可。
+
+## Consequences
+
+- `IBlockStore` を実装するだけの provider は今後も動く（`:block-per-object`）。
+  既存 deployment は**何も壊れない**。
+- 新しい deployment は profile を**明示的に選ばされる**。既定値が無いのが
+  この設計の要点で、ref-profiles と同じく「推測は黙って壊れる」から。
+- pack を跨ぐ read は round trip が pack 数に比例するので、**packing policy が
+  性能の設計判断になる**。これは今まで存在しなかった判断で、実測なしに
+  compaction を設計してはならない。
+
+## いま着地したもの / まだのもの
+
+**着地**（2026-08-16）:
+
+- `kotoba-lang/io-ipld-car` —— codec、両 runtime の suite、外部 2 実装による検証
+  （pin `4df0605506e6`）。
+- `kotobase-storage` —— `block-profiles`（`:block-per-object` / `:packed-blocks`）、
+  `packed?`、`validate-block-profile!`、`:packed-blocks` は `:range-read` 必須という
+  coherence 検査。**未宣言は既定ではなく未回答**（`block-profile` は nil）。
+- `kotobase-storage` —— **`:range-read` に操作を与えた**。それまで `IProxiedTransfer` は
+  `-get-object`（全体）しか持たず、この capability は**反証できない語**だった。
+  `IRangeRead/-get-object-range` は半開区間 `[start, end)` で、HTTP Range が両端
+  閉であることとの差 1 byte を protocol 面で固定する（CAR frame の先頭は varint
+  なので、1 byte のずれは「少し違う答え」ではなく parse の成否になる）。
+  conformance suite は `:range-read :verified` / `:not-claimed` を返す
+  （pin `526070045307`）。
+- `kotoba-lang/kotobase-storage-pack` —— **pack 対応 block store**（decorator であって
+  transport ではない）。coalesce、window read-ahead、CID 検証、`stats`。
+  **同期 driver（JVM）と Promise driver（Worker / R2）の 2 つ**を、純粋な
+  `pack-plan`（coalesce / window / cache / frame 検証）の上に薄く載せる —— 同じ
+  coalesce 規則の写しが 2 つあれば規則も 2 つになる。
+- `kotobase-storage-s3` —— **両 client に ranged read**。R2 binding は
+  `{offset, length}`、signed HTTP は両端閉の `Range` ヘッダで、変換はそれぞれ
+  1 手ずれると**次の frame の先頭バイト**を読む（parse が成功して違う block が
+  返る）。miniflare の実 R2 実装と、プロセスから出ていくはずのリクエストの
+  両方で検証。`200` 応答（endpoint が Range を無視）は local slice せず拒否。
+  ⚠ この作業中に **`signed-request` が全リクエストで throw していた**ことが
+  判明した（`:key` の分配束縛が `clojure.core/key` を覆い、object key 文字列が
+  canonical header の sort 関数になっていた）。suite が R2 binding と in-repo
+  mock しか回しておらず、この client を呼ぶテストが 1 つも無かった。修正し、
+  `signed-client` に `:fetch` を注入可能にした —— **オフラインで回せない経路
+  だったことが、壊れたままだった理由**である。
+
+**`:range-read` と `:range-grant` は別の主張である。** 2026-08-16 に pack 経路が
+`:range-read` に操作を与えたとき、**既存の語の意味を黙って変えていた** ——
+S3 adapter は元の意味（「手渡す URL が Range を honour する」）で正しく宣言して
+いた。語を分けた: `:range-read` = この store 自身が `[start, end)` を返す
+（`IRangeRead`、ここで検査できる）/ `:range-grant` = 手渡す URL が Range を
+honour する（fetch は他所で起きるので**ここでは検査できない**）。
+packed block store が要るのは前者。
+
+**⚠ 訂正（2026-08-16、同日）—— この ADR の当初の動機は誤っていた。**
+
+当初ここには「100 link の cons chain が 1 request になる」と書いた。その測定は
+100 block を **1 回の `-put-blocks!`** で書いており、つまり **1 pack** に入れて
+いた。1 pack は co-location であり、co-location こそ packing が買うものなので、
+**測定が答えを仮定していた**。
+
+production の novelty は **1 transaction が 1 cons cell を追記する** chain である
+（`kotobase-peer` の `dag_shape_bench` の novelty-shape が
+`{\"e\" tx-link \"rest\" rest-link}` と記述している）。この ADR の write-locality
+（1 commit = 1 pack）の下では、**各 cell は自分だけの pack に入る**。
+
+| 100 link を 1 link ずつ辿る | requests |
+|---|---|
+| 100 block を 1 回で書いた（= 1 pack）、window 無し | 100 |
+| 100 block を 1 回で書いた（= 1 pack）、1 MiB window | **1** |
+| **1 commit ずつ書いた（production の形）** | **100** |
+
+3 行目が実測値である（`kotobase-storage-pack` の
+`a-chain-built-one-commit-at-a-time-is-not-co-located`）。**block-per-object と
+同じ**であり、window は 1 つの object の中で前方に伸びるだけで、前任は別 object
+にある。
+
+**したがって「packing が hydration の逐次項 97% に効く」は成り立たない。**
+残る主張はもっと狭い:
+
+> **packing が買うのは commit-local な読みである。** 1 commit が書いた 12 block
+> —— transaction block、更新した prolly-tree page、その novelty cell —— は
+> 1 pack であり、read-ahead 無しでも 1 request になる（実測）。
+
+**cross-commit の pointer chase を平らにするには別のものが要る**: novelty の
+fold（chain を co-locate するのではなく無くす）か、read-locality で詰め直す
+compaction。**どちらもまだ設計していない。** 下の「read-locality と write-locality
+が食い違う場合は実測してから compaction を書く」は、この実測を待っていた条項で
+あり、実測はこれである。
+
+**window は取引である。** 100 → 1 の代償は転送 +46%。`stats` が `:requests` と
+`:bytes-fetched` を必ず並べて返すのはそのため。
+
+**同じ数字が deployment 上でも出る。** miniflare の実 R2 binding に対して
+`kotobase-storage-s3` 経由で実 CARv2 bytes を PUT し、100 link を 1 link ずつ
+辿って **1 ranged GET**（`{:requests 1, :bytes-fetched 12760, :cache-hits 99}`）。
+Promise driver でも同値。
+
+**catalog が projection であることは検査済みになった。** `rebuild-catalog!` が
+pack object だけから全 entry を（writer が記録したのと同じ offset で）復元する。
+これが無いと設計は循環していた —— **自分が入っている pack を特定するために引く
+必要のある catalog は、そもそも bootstrap できない**。pack が自分の中身の
+CARv2 index を持つのでそうならない。catalog を消す代償は scan であってデータでは
+ない。
+
+**未着地**（contract は固定済み）:
+
+| 次の一手 | 置き場所 |
+|---|---|
+| pack catalog の datoms と loader（今は injected な 2 関数） | `kotobase` + `manifest/schema.edn` |
+| write-locality で pack を封じる commit 経路 | `kotobase-peer` / `kotobase-engine` |
+| 実 corpus での round trip 実測（上記は合成 chain） | `kotobase-peer` の `dag_shape_bench` |
+| ~~実 endpoint での ranged GET 確認~~ | **B2 で実測（2026-08-16）**。`test/b2_range_probe.cljs` が実 CARv2 を PUT し、`Range: bytes=175-227` がちょうど 53 バイト返り、**それが要求した frame として parse する**ことを確認（1 バイト多くても parse は通り、違う block が返る —— そこが要点）。SigV4 が `range` を署名ヘッダに含めて受理されることも同時に確認。**AWS S3 proper は未確認** —— 「S3 互換」は 1 つの挙動ではない（`:conditional-put` が `:unverified` 既定なのと同じ理由）。credential と network を要するので gate ではなく operator 実行の probe |
+| 既存 deployment の移行（block → pack の再配置） | 未設計。**先に実測** |
+
+**移行は必要ない。** 既存の block-per-object store はそのまま正しく、
+pack はその隣に増える経路である。既存 object を一斉に pack へ書き換える計画は
+持たない —— 書き換えるなら round trip の実測が先。
+
+## Alternatives
+
+- **1 CID = 1 object のまま、並列度を上げる。** 幅のある部分（prolly-tree）には
+  効くが、実測で逐次項の 97% を占める cons chain には**原理的に効かない**。
+  ADR-2608021000 が既にそう書いている。
+- **block を大きくする。** round trip は減るが、CID の粒度が下がって dedup と
+  incremental commit が効かなくなる。prolly tree の boundary 設計そのものを
+  壊す。
+- **CARv1 だけ使い、offset は catalog にだけ持つ。** 動くが pack が
+  self-describing でなくなり、generic tooling（`ipfs dag import`、`go-car`）が
+  中身を読めない。CARv2 の index は 40 byte/block しか要らないので、
+  その値段で相互運用を捨てる理由が無い。
+- **独自の pack format。** CARv2 は既に存在し、2 つの独立実装が読み書きし、
+  Filecoin/IPFS の運用系がそのまま使える。ここで新しい container を発明する
+  のは、`io-*` mirror 面の repo が存在する理由そのものに反する。\n\n## Implementation state (2026-08-17)\n\nWired, and the wiring produced decisions this ADR does not contain: the bootstrap circularity (a catalog kept as datoms in the graph cannot be read without first reading the graph), the resolution (packs chained through their CARv2 roots plus one unsigned tip object), the reads-before-writes ordering, and the condition for removing the migration fallback. See ADR-2608170300. Production still writes :block-per-object; the write gate is off."}]

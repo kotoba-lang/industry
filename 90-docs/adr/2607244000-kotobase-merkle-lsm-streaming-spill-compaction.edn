@@ -1,0 +1,80 @@
+[{:db/id -1
+  :adr/id "adr-2607244000-kotobase-merkle-lsm-streaming-spill-compaction"
+  :adr/doc_type "adr"
+  :adr/topic "kotobase-merkle-lsm-streaming-spill-compaction"
+  :adr/title "ADR-2607244000: kotobase Merkle-LSM streaming/spill compaction — peak RSS を O(dataset) から O(partition) へ"
+  :adr/status "accepted"
+  :adr/date "2026-07-24"
+  :adr/last_verified "2026-07-24"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["ADR-2607211343 P1（10^7 datom scale gate）の後継 — compaction メモリ設計の正本"
+   "compaction の peak RSS 要件（O(partition)）と測定 gate の定義"
+   "monolithic in-memory 10M ベンチ実行の禁止（実測傾きによる裏付け）"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends ["adr-2607211343-kotobase-merkle-lsm-production-gap-closure"]
+  :adr/related
+  ["adr-2607211343-kotobase-merkle-lsm-production-gap-closure"
+   "adr-2607201600-kotobase-merkle-lsm-istore-retirement"
+   "adr-2607032430-kotoba-datom-log-structured-engine-redesign"]
+  :adr/decision-summary
+  "{:requirement :compaction-peak-rss-o-partition, :measured-slope-bytes-per-datom 2300, :fixed-floor-gb 4.5, :receipts [\"kotobase-peer bench/results/2026-07-21-materialized-view-100k.edn\" \"kotobase-peer bench/results/2026-07-24-merkle-lsm-1m.edn\"], :stages [:a-effect-streaming :b-partition-scheduling :c-columnar-encoding], :gates {:gate-1m {:heap \"-Xmx4g\" :datoms 1000000} :gate-10m {:heap \"-Xmx8g\" :datoms 10000000}}, :prohibited [:monolithic-in-memory-10m-run :rss-benches-below-100k], :owner-decision-ledger-seq 40}"
+  :adr/artifacts
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :compaction-fn \"kotobase-peer.merkle-lsm/compact-runs-partitioned\", :bench \"kotobase-peer/bench/kotobase_peer/merkle_lsm_bench.clj\", :receipt-1m \"orgs/kotoba-lang/kotobase-peer/bench/results/2026-07-24-merkle-lsm-1m.edn\", :ledger-events [38 39 40]}"
+  :adr/body
+  "# Context
+
+ADR-2607211343 は P1 として「10^7 datom の compaction gate — peak RSS が sub-linear であることを実測せよ、線形外挿で実用宣言してはならない」を置いたが、gate は未実行のままだった。2026-07-24 に実測を進めた結果:
+
+- **1M datom gate 完走**（receipt: `kotobase-peer/bench/results/2026-07-24-merkle-lsm-1m.edn`）: 1,000,000 datoms build+compact、row loss ゼロ、total 907.5s（compaction 82%）、throughput 1,102 rows/s、**peak RSS 6.93GB**。
+- 100k receipt（4.88GB）との 2 点から、**固定床 ~4.5GB（JVM + ハーネス）+ 傾き ~2.3KB/datom** が実測で得られた。
+- この傾きを 10M に当てると床 +23GB ≈ **27GB 超**となり、現実的な heap（-Xmx20g で 2 回起動、いずれも中断）には収まらない。10M を OOM まで走らせても設計情報は増えない。2M の 3 点目も設計判断を変えず、2k 級は固定床に完全に埋もれて信号ゼロ。
+- 根本原因はコード上も自明: `compact-runs-partitioned` と bench ハーネスは **pure in-memory** — 入力 run 群（`:bytes` 込み）・`retained-entries` の全行・出力 run 群が全て同時にメモリに存在する。effects を返すだけの pure 設計（ADR-2607201600 の IStore 排除方針）自体は正しいが、「effects の受け渡しが一括 vector」である限り peak RSS は O(dataset) になる。
+
+オーナー判断（2026-07-24、adr-ledger seq 40）: monolithic in-memory 10M 実行を停止し、gate を将来の streaming/spill compaction 設計に re-scope する。本 ADR はその設計要件と測定 gate を正本化する。
+
+# Decision
+
+1. **要件: compaction の peak RSS は O(partition) とする。** dataset 全体に比例するメモリ保持（入力 run bytes の一括保持・retained 全行の一括 materialize・出力 run の一括 vector 返し）を compaction 経路から排除する。
+
+2. **段階設計（stages）:**
+   - **Stage A — effect streaming**: `compact-runs-partitioned` の出力を「全出力 run の vector」から **incremental な effect 供給**（reducible / callback / lazy seq のいずれか、決定は実装 PR で）に変え、呼び出し側（ハーネス / host）が BlockPut effect を受け取り次第 store へ書き出して参照を手放せるようにする。入力側も run の `:bytes` を消費後に解放できる形（get-fn による pull）にする。pure cljc / effects-only の原則は維持する（Rust は書かない — ADR-2607072000）。
+   - **Stage B — partition-wise scheduling**: 既存の logical-key-aligned range partition（`partition-logical-groups`）単位で compaction を独立実行し、partition ごとの working set しか同時に持たない scheduler をハーネス / host 側に置く。partition 間の中間結果は store（disk / B2 / R2）へ spill する。
+   - **Stage C — columnar row-block encoding（P2 連動、別 gate）**: DAG-CBOR row block を struct-of-arrays 化して per-datom メモリ / バイト効率を上げる。Stage A/B と独立に測定できる gate を持つ（serving 側 materialized-view 経路の受益も含む）。
+
+3. **測定 gate（外挿禁止、実測のみ）:**
+   - **gate-1M**: `-Xmx4g` で 1M datoms が row-conservation（compacted-count == datoms）を保って完走する。現行実装は 1M で 6.93GB を要するため、この gate は streaming 化の効果を直接証明する。
+   - **gate-10M**: gate-1M 通過後、`-Xmx8g` で 10M datoms を完走する。これが ADR-2607211343 P1 の後継 gate である。
+   - 各 gate の結果は `kotobase-peer/bench/results/*.edn` に receipt 化する。
+
+4. **禁止事項（再確認 + 新規）:**
+   - 現行 pure in-memory `compact-runs-partitioned` に対する monolithic 10M 実行・10M readiness 主張（実測傾きが不可能を示す）。
+   - peak RSS 測定目的で 100k 未満のベンチを追加すること（固定床未満はノイズ）。
+
+# Consequences
+
+- **得るもの**: 10M gate が現実的な heap で実行可能になり、P1 が「実行不能な宿題」から「測定可能な gate」に変わる。compaction を実データ規模へスケールさせる唯一の経路が確定する。
+- **払うもの**: `compact-runs-partitioned` の呼び出し規約変更（一括 vector → incremental）。既存呼び出し側（bench ハーネス、fold 経路の消費者)の追随が必要。ADR-2607211343 の P1 記述は本 ADR が amends（ledger seq 40 で追記済み）。
+- **やらないこと**: serving read path はスコープ外（materialized-view + R2 Range GET 経路が既に別途ベンチ済みで、これが serving スケールの正解。2026-07-24 の cf-wasm 4 パス改善も serving 側で完結済み）。新規 Rust・新規 IStore の再導入はしない。
+
+# Alternatives considered
+
+- **大メモリマシンで 10M を力押し**: gate は通せても production の compaction 実行環境（Worker / 小型 host）と乖離し、実用判定にならない。却下。
+- **shallow な傾き確認（2M）**: 設計判断を変えない 3 点目に ~30 分を払う価値がない（オーナー判断）。却下。
+- **columnar を先行**: per-datom 定数は下がるが O(dataset) 保持という構造は変わらず、gate-10M には streaming/spill が先に必要。Stage C として後置。\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-24 — note
+
+gate-1M PASSED (2026-07-25): 1M datoms, zero row loss, peak RSS 3.40GB under -Xmx4g via compact-run-readers-streaming + fan-in spill harness; throughput 1,235 rows/s (above in-memory 1,102)
+
+Stage A implemented and merged (kotoba-lang/kotobase-peer 6e3c9a3): compact-run-readers-streaming (emit!-streaming outputs, reader-supplied inputs, per-level idempotent retention with unit-tested 2-level==global CID parity) + stream-bench (content-addressed disk spill, fan-in 64, level-N group -> one lazy level-N+1 reader). Receipts: bench/results/2026-07-25-stream-compaction-gate-1m.edn (1M @4g: RSS 3.40GB vs in-memory 6.93GB; supporting 100k @1g: RSS 938MB vs 4.88GB). Co-resident rows bounded at O(fan-in x target-rows) per level, dataset-independent -- the ADR's Stage A requirement is measured, not asserted. gate-10M (-Xmx8g) is next on the same harness.
+
+### 2026-07-24 — note
+
+gate-10M PASSED (2026-07-25): 10M datoms, zero row loss, under the -Xmx8g cap, 2.85h / 974 rows/s -- both gates of this ADR now closed by measurement
+
+Receipt: kotoba-lang/kotobase-peer bench/results/2026-07-25-stream-compaction-gate-10m.edn (merged a7be3e3, pin advanced 6bdb0c0). 3 merge levels, 2,442 final runs, rows conserved exactly. RSS tracks the GC expanding to the heap cap (8.47GB incl. non-heap), not the requirement -- the true 10M floor is untested and the receipt says so. ADR-2607211343 P1's 10^7 scale, measurably infeasible for the in-memory path (~27GB extrapolated; two 20GB attempts stopped 2026-07-24), passes under 8GB via streaming/spill.
+"}]

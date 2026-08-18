@@ -1,0 +1,799 @@
+[{:db/id -1
+  :adr/id "adr-2607300300-esim-voice-reception-card-issuing-integrated-design"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/topic "itonami-subject-three-authority-integration"
+  :adr/title "ADR-2607300300: eSIM・受電・カード発行を cloud-itonami-app の1つの identity subject に統合する設計 — records/ports/governed-actor/consent-surface の4層と、単一 ref 上の cross-domain 監査面"
+  :adr/status "accepted"
+  :adr/date "2026-07-30"
+  :adr/last-verified "2026-07-30"
+  :adr/last_verified "2026-07-30"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative-for
+  ["eSIM（GSMA SGP.22/SGP.02）・受電（inbound voice reception）・カード発行（issuer-side）の3領域を cloud-itonami-app に統合する際の層分割（records / ports / governed actor / consent surface）と、各層がどの org のどの repo に属するかの正本"
+   "cloud-itonami-app 側に追加する単一の proposal→consent→commit 背骨（cloud.itonami.app.authority）の設計と、bitcoin PSBT 経路をその先行実装と見なす判断"
+   "app 側 Passkey consent gate と actor 側 Governor gate が別物であり互いを代替しないという境界定義"
+   "3領域の監査 datom を kotobase の単一 ref に置く決定と、その根拠となる cross-domain 不変条件（eSIM ownership transfer ⇒ card authorization posture）"
+   "この統合が今日actuationできないこと（3 actor すべて :effect :propose only、denwaban run-session は G7 raise、いずれも無免許）という到達上限の明示"
+   "kotoba-lang 側の eSIM records/ports ライブラリ欠落を埋める決定と、既存 com-gsma-opengateway をそれに使わない理由"]
+  :adr/related "adr-2606271930-denwaban-voice-reception-auto-booking-actor, adr-2607249000-cloud-itonami-card-issuing-actor, adr-2607247000-cloud-itonami-emi-electronic-money-institution-actor, adr-260726-kotobase-query-plane-is-one-ref, adr-2604280000-telecom-tmf-esim-phases17-18, adr-2607102000-cloud-itonami-mobilenetwork-6120-blueprint"
+  :adr/body "
+# ADR-2607300300: eSIM・受電・カード発行の統合設計
+
+**Status**: accepted
+**Date**: 2026-07-30
+**Deciders**: Jun Kawasaki（+ Claude、オーナー指示「設計統合してください」に基づき実行）
+
+## Context
+
+棚卸しの結果（本 ADR の起点となった実測、2026-07-30）:
+
+- **`cloud-itonami-app` には3領域とも一切入っていない。** `app.kotoba.edn` の
+  `:local/contracts` と `docs/architecture.md` の権限表が capability 面の正本で、
+  載っているのは推論プロバイダ・Passkey/`did:key`・EIP-4361 wallet の Account Link・
+  mail/projects/drive/calendar の読み取りモデル・AgentRun・bitcoin 境界・
+  service entitlement だけ。`src/` の `card` ヒットは全部 CSS クラス名
+  （`.local-card` / `.connector-card` / `.quota-card`）、`inbound` は `mail.inbound` のみ、
+  `esim` / `iccid` / `eUICC` / telephony はゼロ件。
+- **fleet 側に素材は既にある**が、互いに接続されていない:
+  受電 = `cloud-itonami/denwaban`（R0 scaffold）、
+  カード発行 = `cloud-itonami/cloud-itonami-card-issuing`（R0、ADR-2607249000）、
+  eSIM = **存在しない**。
+- eSIM の実装が唯一あるのは別 org・別スタックの `gftdcojp/ai-gftd-apps-gftdcojp`
+  （ADR-2604280000 Phase 18、ATProto lexicon + BPMN + Python/pyzeebe）。
+  kotoba-lang でも cloud-itonami-app でもなく、この統合には直接使えない。
+
+## Decision
+
+### D1. 4層に分ける。層をまたぐ実装を1つの repo に置かない
+
+3領域はすべて同じ形をしている。統合とは「3つの機能を app に足す」ことではなく、
+**この4層を3領域で揃え、最下層で1つの identity subject に束ねる**ことである。
+
+| 層 | 責務 | 受電 | カード発行 | eSIM |
+|---|---|---|---|---|
+| **records** | 国際標準のレコード形（no I/O, no credential, portable `.cljc`） | `kotoba-lang/phone`（E.164 / SIP / CDR / SMS） | `kotoba-lang/card`（ISO/IEC 7812 PAN + Luhn / ISO 8583 / authorization contract） | **欠落 → `kotoba-lang/esim` を新設（D5）** |
+| **ports** | host 注入される protocol（SDK も鍵も持たない） | `kotoba-lang/koe`（`ITelephony`/`ISTT`/`IDialog`/`ITTS`/`IBooking`） | ✅ `kotoba.card.ports`（+ `kotoba.card.lifecycle`、2026-07-30） | ✅ `kotoba.esim.ports`（2026-07-30） |
+| **governed actor** | Advisor ⊣ Governor + append-only ledger、propose のみ | `cloud-itonami/denwaban` | `cloud-itonami/cloud-itonami-card-issuing` | **欠落 → `cloud-itonami/cloud-itonami-esim` を新設（D6）** |
+| **consent surface** | subject 束ね・deterministic pre-check・Passkey consent | **3領域とも欠落 → `cloud-itonami-app`（D2/D3）** | 同 | 同 |
+
+`kotoba-lang/koe` がこの層分割の**既存の模範**である（ports だけを定義し、
+`denwaban` が twilio-compat / whisper-compat / elevenlabs-compat / yotei を注入する）。
+新設分はこの形に合わせる。逆に `records` 層に I/O や credential を入れない、
+`ports` 層に具体 vendor を入れない、を守る。
+
+### D2. app 側は3つの機能領域ではなく、1本の proposal→consent→commit 背骨を足す
+
+`cloud.itonami.app.authority` を新設し、3領域はその上の薄い typed adapter にする。
+**これは新しい発明ではなく、`bitcoin_wallet.clj` が既に証明している経路の一般化である**:
+
+```
+create-psbt-review!      ; deterministic pre-check（max-fee-sats / max-fee-ratio）で
+                         ; approval を出す前に拒否する。:status :awaiting-passkey
+start-psbt-approval!     ; passkey/start-authorization! に typed context を載せる
+finish-psbt-approval!    ; context type と proposal id の一致を検証
+attach-signed-psbt!      ; 署名済み artifact は外から戻る。app は鍵を持たない
+```
+
+`authority` はこの4段を領域非依存にする。各領域が供給するのは
+(a) proposal の shape、(b) **決定論的な** pre-check 述語、(c) passkey context type、
+(d) commit 先の actor endpoint。context type は領域ごとに分ける:
+`:card/authorization-approval`・`:card/lifecycle-transition`・
+`:esim/profile-transition`・`:esim/ownership-transfer`・`:voice/answer-authority`。
+
+pre-check は **LLM を通さない**。bitcoin の `max-fee-sats` と同じく、
+プログラムで判定できるものだけを pre-check に置く（例: カードの authorization が
+funding account の記録済み日次上限を超えていないか、eSIM の遷移が
+記録済み現在状態から SGP.22 上到達可能か、着信が許可済み時間帯・番号か）。
+判定に判断や法令解釈が要るものは pre-check に**入れない** — それは D3 の actor 側 Governor の仕事。
+
+### D3. gate は2枚。互いを代替しない
+
+- **app 側 Passkey consent gate** = 「この human subject が同意したか」。
+  subject の意思のみを問う。actor の admission 判断はしない。
+- **actor 側 Governor gate** = 「licensed operator にとって admissible か」
+  （管轄・sanctions・license status・上限・escalation）。subject の同意は問わない。
+
+どちらも独立に拒否できる。**どちらも他方の代わりにならない。**
+app が Passkey を取ったことを理由に Governor を省略してはならず、
+Governor が通したことを理由に Passkey consent を省略してはならない。
+2枚あることを冗長と見なして片方を外す最適化を禁じる。
+
+### D4. 監査 datom は単一 ref に置く。書き込み負荷を理由に領域ごとに割らない
+
+統合の産物は cross-domain な問いに答えられることであり、その代表例:
+
+> **eSIM の ownership transfer / SIM swap が起きたら、同一 subject のカードの
+> authorization posture を落とす。**
+
+これは SIM-swap 詐欺に対する実際の防御であり、**3領域が同じ ref に載っていない限り
+表現できない**。`kotobase.core/open` は `:ref-name` を1つしか取らず、
+`q` / `pull` / `datoms` はその1本から hydrate した db value に対してのみ動く
+（ADR-260726-kotobase-query-plane-is-one-ref、repo-wide mandatory）。したがって:
+
+- 3領域の監査 datom は **`did:key` subject を結合キーに1本の ref** に置く。
+- **書き込み負荷を理由に領域ごと・subject ごとに ref を割らない。** 先に
+  「その ref を所有する単一 writer を置いてバッチングする」を採る。
+- Durable Object の `ctx.storage.sql` に durable plane を置かない（per-object private で
+  datom 面が孤島に割れる）。DO は直列化器・realtime room として使い、storage は共有バックエンド。
+
+同じ理由で答えられるようになる問い: どの line がこの authorization の直前に着信を受けたか /
+この cardholder の番号が port out されたか / この通話の録音が保持されたか。
+逆に、ここを割った瞬間これらは N クエリ + マージに落ちる。**黙ったシャーディングを禁じる。**
+
+### D5. kotoba-lang に `esim` を新設する。`com-gsma-opengateway` は使わない
+
+`com-gsma-opengateway` の schema は `Subscriber(imsi/msisdn)` / `Session(apn)` /
+`Message` / `Number` / `Terminal` / `UsageRecord` までで、
+**eUICC・EID・ICCID・profile state・SM-DP+ / SM-DS を一切持たない**（実測）。
+clean-room compat actor であって records 層のライブラリでもない。これを eSIM 面に
+転用すると、持っていない概念を後付けで生やすことになる。
+
+代わりに `kotoba-lang/esim`（prefix なし = reusable library、
+`manifest/repository-rules.edn` の taxonomy 準拠）を新設する。既存 family と同じ規律:
+
+- GSMA **SGP.22 Consumer** + **SGP.02 M2M** の *records*、wire format ではない
+  （`card` が ISO 8583 を、`rcs` が SIP/MSRP を records に留めているのと同じ判断）。
+- E.164 は再実装せず **`kotoba-lang/phone` の `e164-valid?` に委譲**する
+  （`rcs` が既に取っている形）。
+- profile lifecycle は state machine として持つ:
+  `provision-euicc` → `download-profile` → `enable` / `disable` → `delete`、
+  加えて `register-smds-event`・`audit-euicc-state`・`transfer-ownership`（SGP.22 Annex H）。
+  **遷移の到達可能性判定を pure に持つ**（D2 の pre-check がこれを呼ぶ）。
+- ports（`IProfileProvisioning` / `IEventRegistration`）を同梱し、SM-DP+ / SM-DS の
+  具体接続は host 注入にする。**credential も endpoint もライブラリに焼かない。**
+- 言語面は CLAUDE.md の runtime 優先順位に従い portable `.cljc`。
+  `.kotoba` 化は `css` 系の移行順序が片付いてから別 ADR で判断する（今は前提にしない）。
+
+### D6. eSIM actor は 6120 に足さず、新設する
+
+`cloud-itonami-isic-6120`（MNO）は一見近いが、**その `blueprint.edn` の
+`:implemented-slice` が明示するとおり primary entity は SITE（cell tower / base station）**
+であり、`:spectrum-license-status` と `:site-access-record` を軸に組まれている。
+同 repo の ADR-0002 correction history は、初期実装が sibling 6190 を誤って写して
+「subscriber-identity/MSISDN-provisioning model with ZERO site/tower/spectrum modeling」を
+作ってしまったことを**是正した記録**である。ここに eSIM profile lifecycle を足すのは
+その是正を巻き戻す方向になる（README の記述は現行実装より古く、
+`MSISDN provisioning` を掲げているが実装の軸は site である — 別途 README を実装に合わせる）。
+
+よって `cloud-itonami/cloud-itonami-esim` を新設する
+（**eSIM Provisioning Advisor ⊣ eSIM Provisioning Governor**）。
+`:effect :propose` only、`transfer-ownership` は常に human escalation
+（SIM-swap 詐欺の主要経路であるため categorical に自動承認しない）。
+
+### D7. PII 規律は3領域の既存判断を app 側でも保持する
+
+- **EID / ICCID は device-bound quasi-PII → sha256 hashed で保持**（ADR-2604280000 の既決を踏襲）。
+- **PAN は raw で永続化しない**（`kotoba-lang/card` 自身の規約。tokenization は別層）。
+- **通話録音は `:transient`、明示同意なしに保持しない**（denwaban G1）。
+- そして追加規律: **loopback 束縛の app が PAN / EID / 録音の着地先になってはならない。**
+  app が持つのは proposal・consent・hash・参照であって、素の識別子や音声ではない。
+  `:privacy {:bind-loopback-only? true}` は egress を止めるが、
+  ローカルに何を溜めてよいかは規定していない — ここで規定する。
+
+## Non-goals（明示的にやらない）
+
+- 3領域の domain logic を app に実装しない。app は surface と consent gate であって authority ではない。
+- `ai-gftd-apps-gftdcojp` の eSIM/cards lexicon 群を移植しない（別スタック・別 org。
+  技術知識としては参照してよいが、Python/pyzeebe/BPMN 実装をこの4層に持ち込まない）。
+- カードの acquirer 側（`cloud-itonami-isic-6619`）と e-money 発行体（`cloud-itonami-emi`）は
+  本統合で作り直さない。card-issuing は EMI wallet を **funding source として参照するだけ**
+  （ADR-2607249000 の Non-goals をそのまま維持）。
+- MVNO/MNO の実運用（spectrum, RAN）は 6120 の範囲。本統合は line の *provisioning 面* だけを扱う。
+
+## 到達上限 — 今日この統合は actuation できない（重要）
+
+これを書かないと設計が嘘になるので明示する。実測に基づく現在地:
+
+- `cloud-itonami-isic-6120` の7 ops は **すべて `:effect :propose` only**、
+  さらに `:operate-tower-equipment` と `:finalize-spectrum-license-decision` は
+  **permanently blocked（override なし）**。
+- `cloud-itonami-card-issuing` は **R0**。README 自身が、この actor は
+  BIN を実際に sponsor する license も、実カードを発行する能力も持たないと述べている。
+- `denwaban` は **R0 scaffold**。`plan-session` は pure だが
+  **`run-session` は G7 outward-gate で raise する** — socket なし・実発着信なし・fixtures のみ。
+  設計 ADR-2606271930 は今も `status \"proposed\"`。
+- `cloud-itonami-emi` も同型で、e-money 発行 license を持たない。
+
+したがって**統合された成果物が今日 end-to-end でできること**は:
+1つの `did:key` subject を3本の governed proposal stream に束ね、
+実際の human consent（Passkey）と実際の監査（append-only ledger、単一 ref）を付けること。
+**できないこと**: 実カードの発行、実 eSIM profile の download/enable、実電話の応答。
+それらは licensed operator が instance を deploy し、card scheme / carrier / SM-DP+ への
+接続と license を供給して初めて成立する。**app の UI 上でも同じ区別を出す** —
+proposal を「発行済み」と表示してはならない。
+
+## Consequences
+
+- 良い: 3領域が同じ背骨に載るので、4本目（例: EMI wallet、port-in/port-out）を足すコストが
+  adapter 1枚に下がる。bitcoin 経路も事後的にこの背骨へ寄せられる。
+- 良い: SIM-swap ⇒ card freeze が構造的に表現可能になる（D4 を守る限り）。
+- 代償: gate が2枚あるので、ユーザから見た承認ステップが増える。D3 のとおりこれは削らない。
+- 代償: 単一 ref に集約するため、書き込み並列度は単一 writer のバッチングで解く必要がある。
+  ref を割る誘惑が構造的に残るので D4 を repo-wide の判断として固定した。
+- ~~リスク: `denwaban` の参照 drift~~ → **解消済み（2026-07-30、step 3）**。実際には
+  docstring だけでなく `deps.edn` の実依存まで移動先を指していなかった。GitHub の
+  redirect が生きていたため「壊れていないので気付かない」形で残っていた点が教訓 —
+  **redirect は drift を修復せず隠蔽する。** 詳細は build order step 3。
+
+## Build order（依存順。飛ばすと下流が壊れる）
+
+1. ✅ **done（2026-07-30）** `kotoba-lang/esim` を新設。
+   `kotoba.esim`（EID 32桁 + telecom MII / ICCID は E.118 で Luhn を
+   `kotoba.card/luhn-valid?` に委譲 / profile descriptor / SGP.22 activation code
+   roundtrip / notification / SM-DS event registration は consumer 限定 /
+   ownership transfer / issue-seq validator）、`kotoba.esim.lifecycle`（total・
+   deterministic・no I/O の state machine）、`kotoba.esim.ports`（`koe.ports` と同型。
+   `IOwnershipTransfer` は `IProfileProvisioning` から**意図的に分離** — provisioning port
+   を持っただけで transfer に到達できないようにする）、`kotoba.esim.export`
+   （EID/ICCID は既定マスク）。25 tests / 152 assertions green、clj-kondo 0/0。
+   west 登録済み。
+   - **MSISDN は validity だけでなく canonical form も `phone` に委譲した。**
+     `phone/e164-valid?` は裸の国内番号列も normalizable として受けるため、
+     入力をそのまま保存すると1本の回線が2つのレコードになる。`profile` は
+     `normalize-e164` の `+<digits>` を保存する。
+   - **`eid-valid?` は EID checksum を検証しない。** GSMA は checksum を規定しているが、
+     この build では仕様書本文に対してアルゴリズムを検証できておらず、当て推量で
+     実装すると valid な EID を弾く。clause / annex 番号も同じ理由でどこにも書かない
+     （document 名のみ引用）。6120 の ADR-0002 が記録した「未検証の規制引用の捏造」を
+     繰り返さないための明示的な選択。
+   - lifecycle の2つは transcription ではなく**決定**として docstring に明記した:
+     `:delete` は `:disabled` からのみ（保守的な読み。誤ると subject が
+     enabled profile 無しで接続を失う）、`:enable` は incumbent を名指しして
+     `:enable/would-displace` で拒否する（eUICC の enabled profile は最大1本なので、
+     黙って現用回線を落とさない。displacement は2つの明示的決定として表現可能）。
+2. ✅ **done（2026-07-30）** `kotoba-lang/card` に ports 層を追加（pin `879feb55`、
+   CI green、29 tests / 163 assertions。既存 records は無変更）。
+   - `kotoba.card.ports`: `ICardholderProvisioning`（`:cardholder/intake`）/
+     `ICardProgram`（`:bin/assess` `:bin/sponsor`）/ `ICardIssuance`（`:card/issue`
+     `:card/lifecycle`）/ `IAuthorizationDecision`（`:authorization/decide`）/
+     `IDisputeInitiation`（`:dispute/initiate`）。**op 名は issuer 側 actor が
+     既に使っている語彙そのまま**にしたので、実装側が境界で翻訳しなくてよい。
+   - **全 operation は propose-only** であることを docstring に明記した
+     （「このメソッドの中で actuate する host は、licensed act を query に見える
+     interface の裏に移したことになる」）。本 ADR の到達上限を構造にした部分。
+   - **protocol の分割は装飾ではなく効いている**: contract test が
+     「`IAuthorizationDecision` だけ実装した host は、card 発行や BIN sponsor を
+     propose する能力を得ない」ことを検証する。authorization は唯一の hot path
+     （per transaction・latency 束縛・発行可否とは独立に稼働）、BIN sponsorship は
+     program ごと1回の licensing 行為なので、同じ port に置かない。
+   - **acquirer 側は意図的に入れない**（settlement / chargeback hold release は
+     `cloud-itonami-isic-6619`）。1つの actor が dispute の両側を持つのは、
+     この分割が防いでいる利益相反そのもの。
+   - **ADR の字面（`ports.cljc` を追加）を少し超えて `kotoba.card.lifecycle` も
+     追加した。** reachability の authority が無い lifecycle port は曖昧さを
+     移動させるだけで、step 5 が呼ぶ先が無くなる。event は issuer 側 actor の
+     `:card/lifecycle` が既に受ける `#{:activate :block :reissue :close}` に厳密に
+     一致させ（5つ目を作っていないことをテストで固定）、2つの読みを決定として明記:
+     `:activate` は `:blocked` からも可（**unblock は activation である** — issuer
+     語彙に `:unblock` は無く、作れば境界で翻訳が必要になる）、`:close` は
+     `:reissued` から不可（既に terminal で、1つの card reference に terminal
+     レコードが2つ立つ）。`:reissue` は `:card/successor :not-created-here` を返す
+     — 黙って後継カードを作る reissue は、発行という決定を lifecycle event の裏に
+     隠すことになる。
+   - 副産物の訂正: card の README は `51 assertions` と書いていたが、変更前の実測は
+     既に 16 tests / 66 assertions で stale だった。現在値に直した。
+   - **未修正の発見**: issuer 側 actor `cardissuing.registry` は `luhn-check-digit` /
+     `luhn-valid?` を**自前で再実装している**（`kotoba.card/luhn-valid?` があるのに）。
+     別 repo の変更なので step 2 では触っていない。step 4/6 で actor を触る際に
+     ライブラリ委譲へ寄せる。
+3. ✅ **done（2026-07-30）** `denwaban` / ADR-2606271930 の参照 drift 修正
+   （denwaban pin `6b673aff`、ADR-2606271930 は `proposed` → `accepted`）。
+   - **drift は docstring だけではなく `deps.edn` の実依存だった。** GitHub の
+     redirect が生きているため deps は解決しテストも通り、**壊れていないので誰も
+     気付かないまま** manifest が存在しない topology を記述し続けていた。
+   - 各書き換えは **pinned SHA が候補 repo に実在することを確認してから** URL を
+     変えた。名前から推測すると2件間違える:
+     `com-junkawasaki/koe-clj` → `kotoba-lang/koe`、
+     `etzhayyim/com-etzhayyim-social-publication` → `kotoba-lang/social-publication`、
+     `etzhayyim/com-etzhayyim-yotei` → **`cloud-itonami/yotei`**（`kotoba-lang/yotei`
+     という別 repo が実在するが当該 SHA を持たない）、
+     `kotoba-lang/net` → **`kotoba-lang/io-libp2p`**（`kotoba-lang/webrtc` も実在するが
+     当該 SHA を持たない）、`*-compat` → `kotoba-lang/com-{twilio,whisper,elevenlabs}`。
+   - **repo rename は namespace rename ではない**: social-publication の namespace は
+     pinned SHA と HEAD の両方で `etzhayyim.social.publication` のままなので、
+     `denwaban.social` の `:require` は意図的に無変更。
+   - **意図的に未解決にした点**: `io-libp2p` という名前の repo が ADR-2606271800 の
+     WebRTC `ITelephony` transport を供給しているのは不自然で、別に
+     `kotoba-lang/webrtc` も実在する。当て推量で「直さず」、`manifest.edn` に
+     `:review :binding-provenance-unsettled` を記録し、pipeline の該当 stage は
+     repo 名ではなく **transport 名（`\"webrtc\"`）** をラベルにした（データが支えられない
+     ことを主張しないため）。WebRTC ingress を R0 から進める人が決着させる。
+   - **`bb.edn` を撤去した**（ADR-2607173000 で bb は script host として退役）。
+     依存座標の2枚目のコピーが、そもそも URL が黙って乖離できた原因だったため。
+     テストは既存 `run_tests.clj` を `clojure -M:test` で回す。
+   - **検証**: 6 tests / 16 assertions green（manifest が既に申告していた数値と一致）。
+     **ただしこの repo に CI workflow が無いので、ローカル実行が唯一の検証**である。
+     CI 追加は step 3 の範囲外として手を付けていない（残件）。
+   - ADR-2606271930 側: `:adr/related` の8パスを west 実パスへ差し替え、status を
+     `accepted` に更新（設計は R0 で実装済み・2607300300 が依存）。**accepted は
+     actuation を意味しない** ことを本文に明記 — R0 のままで `run-session` は
+     G7 で raise し続ける。
+4. ✅ **done（2026-07-30）** `cloud-itonami/cloud-itonami-esim` actor を新設
+   （pin `600c23ec`、CI green（lint + test + demo runner）、31 tests / 167 assertions、
+   clj-kondo 0/0）。**eSIM Provisioning Advisor ⊣ eSIM Provisioning Governor**、
+   6 ops すべて `:effect :propose` only
+   （`:coverage/report` `:euicc/register` `:profile/download` `:profile/lifecycle`
+   `:smds/register` `:ownership/transfer`）。
+   - **`kotoba-lang/esim` を単一 authority にし、actor は規則の2枚目のコピーを持たない。**
+     identifier 構造・reachability・single-enabled-profile 不変条件・masking を全て委譲
+     （masking は alias で、再実装していない）。これは step 2 で露呈した2つの問題の是正:
+     card-issuing は `kotoba.card/luhn-valid?` があるのに Luhn を自前実装し、lifecycle
+     allowlist を governor だけに持っていたため library を後追いで mirror にする必要が生じた。
+   - **governor は全 ground-truth を library 経由 + store の記録から再計算し、proposal から
+     読まない**（自己申告 `:confidence` が高くても HARD violation は通らない）。
+   - **store が適用するのは governor が計算した結果**（`governor/cleared-transition` →
+     `operation/commit-record`）**であって advisor の payload ではない。** build 中の実バグ:
+     store が `:outcome` を期待していたが、それを計算するのは governor で、commit record は
+     advisor の `:value` しか運んでいなかった。advisor 供給の profile vector が store に
+     届く経路があると reachability check は飾りになる。
+   - `:profile/download` / `:profile/lifecycle` / `:ownership/transfer` は **phase 3 を含む
+     全 phase の `:auto` から不在**（恒久。rollout milestone ではない）。transfer は
+     approve されても `:executed false` で記録され、**subject of record を移さない** —
+     実行は licensed operator の行為で本 actor の外。
+   - **jurisdiction spec-basis catalog は R0 で意図的に持たず、coverage をゼロと報告する。**
+     telecom licensing + GSMA SAS-SM が該当するが、未検証の管轄要件を書くのは
+     isic-6120 の ADR-0002 が記録した捏造そのもの。空で hold するのは誠実、捏造は不誠実。
+   - advisor trace を `:audit` channel だけでなく **ledger にも書く**（checkpointer は
+     in-memory / per-thread、hold された提案の中身は hold fact の rules だけでは分からない。
+     identifier は masked）。
+   - **MemStore のみ**。EDN-blob codec も `:db.unique/identity` schema も無いので
+     `langchain-store` は未依存 — 実 backend を足す時に依存になる。
+   - **build 中に langgraph の resume idiom を取り違えた**: `interrupt-before` からの継続は
+     `input` が nil か `:resume? true` の時だけ成立し、前状態を丸ごと input として渡すと
+     **fresh run** になる（`langgraph.graph/run*`）。テストと sim の両方で誤っていた。
+5. ✅ **done（2026-07-30）** `cloud.itonami.app.authority` 背骨を実装
+   （app pin `ea23fddb`、CI green、**87 tests / 497 assertions**（変更前 69/440 → +18 tests /
+   +57 assertions）、clj-kondo 0 errors・新規 warning なし）。bitcoin PSBT 経路の一般化で、
+   bitcoin 側は現状維持。
+   - **4性質を全 domain に与える**: **ORDER**（`start-approval!` は `review!` が作った
+     proposal しか受けない。pre-check が拒否したら何も保存しない）/ **CONTENT BINDING**
+     （`review!` が material を hash、`finish-approval!` が再検証 — start と finish の間で
+     編集された proposal は他の全検査を通りこれだけで落ちる）/ **TWO GATES**（authority の
+     拒否を `:authority-refused` として記録。**Passkey consent は licence ではなく、
+     governor clearance は consent ではない** = D3 をコードにした部分）/ **SINGLE USE**
+     （approved proposal の commit は1回、両 terminal status は terminal）。
+   - **`approval-match-issues` を純関数に切り出した。** digest binding が最重要検査なのに、
+     実 WebAuthn assertion 経由でしか到達できないと**実質テストされない**。18 deftest のうち
+     5つがこの検査を直接突く。
+   - **`digest` は map ではなく string を要求する。** Clojure の map 反復順は array-map
+     閾値以下でしか安定せず（`css.core/declarations` が宣言8件超で順序を変える実例が
+     この workspace にある）、key 数に暗黙依存する digest は binding にならない。
+   - **`passkey.clj` に `start-authorization!` / `finish-authorization!` を追加した。**
+     これは新規 API の発明ではない — **main に commit 済みの `bitcoin_wallet.clj` が既に
+     両関数を呼んでいて、`passkey.clj` が実装していなかった**（契約は committed コードが
+     規定済み）。context は**サーバ側で束縛**（client が echo する形だと同意後に差し替え可）、
+     `:authorization` は `:assertion` と**別 kind**（同一だと単なるサインインの assertion を
+     `finish-authorization!` に渡せ、ログインしただけのユーザーが操作を承認したように見える）。
+   - **背骨は credential を持たず、domain logic を実装せず、actuate しない。** fleet の
+     authority は全て propose-only なので、`:committed` は「governed proposal が記録された」
+     だけを意味する。docstring にそう書いた — UI が `:committed` を「完了」と読むと嘘になる。
+
+   **この step で見つかった2件（いずれも記録しておく）:**
+   - **手順違反（自分の）**: 共有 west checkout `orgs/cloud-itonami/cloud-itonami-app` を
+     直接編集していた（CLAUDE.md 禁止事項）。気付いたのは main 同期がブロックされた時で、
+     その checkout は **origin/main から 38 commits 遅れ**・**他セッションの未コミット編集が
+     17ファイル**混在していた。自分の3ファイルだけを取り出し origin/main から切った worktree で
+     再検証して着地させた（他者 WIP には触れていない）。**worktree を最初から使えば起きなかった。**
+   - **`cloud-itonami-app` の committed 状態に phantom がある（既存問題、私の変更ではない）**:
+     `bitcoin_wallet.clj` は commit されているが (a) `passkey/start-authorization!` /
+     `finish-authorization!` を呼ぶのに実装が無かった（← step 5 で実装した）(b)
+     `cloud.itonami.app.bitcoin` と `.bitcoin-node` を require するのに**どちらも commit
+     されていない**。**ただし main は壊れていない** — `bitcoin_wallet` を require するものが
+     他に無いので suite（69 tests）もサーバも通る、孤立した dead file。当初「main が壊れている」と
+     判断したが、テストを実際に走らせて訂正した。(b) は別問題として手を付けていない（残件）。
+   - 残件: この app repo の lint は既存 phantom 由来の warning 8件を出す
+     （`agent_control` の `store/update-agent-control!` / `provider/agent-turn`、
+     `mail_sync` の `identity/provider-access-token!` / `connected-providers`）。
+     errors は 0 で、私の追加ファイルには 0 件。
+6. ✅ **done（2026-07-30）** 3領域の typed adapter + `defaults.edn` の設定面
+   （app pin `a293554a`、CI green、**107 tests / 608 assertions**）。
+   - 各 adapter は「op allowlist + 決定論的 pre-check + digest material + hand-off」だけを持つ。
+     事実は全て委譲: esim → `kotoba.esim/validate-eid` `validate-iccid`
+     `lifecycle/apply-operation`、card → `kotoba.card/luhn-valid?` `card.lifecycle`、
+     voice → `kotoba.phone/normalize-e164`（validity と canonical form の両方）。
+   - **最重要の性質を property として test した**: **全 (state, operation) 組で adapter が
+     library と厳密に一致する**（eSIM 16組、card 20組）。governor より緩い pre-check は
+     この仕組みの存在理由を壊す。同様に「結果を変える全フィールドが digest material を
+     変える」も各 adapter で検証（material から漏れたフィールドは同意後に改変できる）。
+   - **3つの拒否は素朴な実装が fail-open するところで fail-closed にした**:
+     voice の allowlist は**空リストなら何も許可しない**（`nil`=未設定、`[]`=まだ誰も許可
+     していない。空を permissive と読むのが漏れる方向）/ 同意なき録音保持は**拒否**
+     （transient への黙った降格ではない — 頼まれたのと違う要求に答えるのは同意が意味を
+     失う経路）/ card は**不明な日次上限を拒否**（無い上限は無制限ではない）。
+   - card は reissue で `:mints-successor?` を出す — issuer は同じ操作で後継カードを作るので、
+     それを言わない同意は同意内容を過小申告している。
+   - `:authorities` は**全て disabled**（`:agent-control` と同じ姿勢）、`:endpoint nil` なので
+     enabled にしても渡す先が無い。
+   - **step 6 は自分の step 1 成果物の実欠陥修正から始まった。** app の CI は
+     `clojure -M:test`（`:dev` なし）なので全依存が git 座標で解決できる必要があるが、
+     `kotoba-lang/esim` は sibling を `:local/root` で参照しており **monorepo の外から
+     一切消費できなかった**（実測: `Error building classpath. Local lib
+     io.github.kotoba-lang/phone not found: ~/.gitlibs/libs/.../esim/phone`）。
+     **同じ欠陥が chain 全体（esim → card → phone → html/css）にあり、各 CI は全て green
+     だった** — 各 CI が sibling を `../` に clone していたため。**教訓: sibling を clone する
+     CI は「siblings の隣で compile できる」ことしか証明せず、誰かが消費できるかは何も
+     証明しない。捕まえられる検査が、誰も走らせていない検査だった。** 3リポを依存順に修正
+     （`card` `488ec325` / `phone` `4e9e01fb` / `esim` `7bfa343a`、いずれも CI green）、
+     各 CI から sibling clone を外して素の git 経路にした（consumability の回帰が CI で落ちる）。
+     clean な外部プロジェクトから8 namespace が全部読めることを実測確認済み。
+
+7. ✅ **done（2026-07-30）** 単一 ref の監査面と cross-domain 不変条件をテストで固定
+   （app pin は step 7 merge `18153aa4`、**134 tests / 722 assertions**、clj-kondo 0 errors）。
+   **これが D4 の核心で、3領域を統合した実際の価値。**
+   - `cloud.itonami.app.authority.posture`: **eSIM ownership transfer が同一 subject の
+     card authorization posture を落とす。** 電話番号を奪った者は他の全ての second factor を
+     奪っており、手順は「回線を移す → 使う」。**どちらの authority も単独ではこの並びを
+     見られない。両方を読むものだけが見られる** — それが D4 が3領域を1つの面に置くことを
+     要求する理由。書き込みスループットのために分割すればスループットは得られるが、
+     統合を正当化していた唯一の不変条件を失う。
+   - `for-subject` は **pure**（proposals + instant → posture）なので clock も store も無しで
+     テストできる。**4つの選択がいずれも fail-closed 側**:
+     ①**試みられた** transfer が数える（`:awaiting-passkey` `:approved` `:committed`
+     `:authority-refused` 全て restrict）— 成功を待つのは攻撃者にこの窓を渡すこと
+     ②人間の `:rejected` だけが解除する（subject 自身が「頼んでいない」と言った最強の証拠）
+     ③**読めない/欠落した timestamp は窓の内側**として扱う（いつか分からないものを古いと
+     扱えば restriction が黙って外れる）④**window 0 でも「今」の transfer は restrict する**
+     （window 0 はルールを切る手段ではない）。
+   - restricted op は `:authorization/decide` と `:card/issue` に**限定**。`:card/lifecycle` と
+     `:dispute/initiate` は**意図的に開けたまま** — 侵害されたカードの block と charge の
+     dispute は**乗っ取りの最中に被害者ができる必要があること**で、救済手段まで塞ぐ
+     restriction は防御ではない。
+   - **「聞かなければ回避できる」を塞いだ**: `:posture` は restricted op の**必須入力**で
+     （`:daily-limit` と同じ）、不在なら拒否。posture は **digest material にも入る**ので、
+     `:normal` で review した proposal を、swap 後に `:restricted` になった状態で
+     そのまま commit できない。
+   - **必須化したことで step 6 の 6 assertion が落ちた** — posture を黙って省略していた
+     箇所が露出したので、検査が仕事をした証拠。
+   - 攻撃手順そのものを scenario test で固定: normal では spend が通る → eSIM transfer が
+     **提案されただけ** → card pre-check が拒否する。1つの subject の transfer が他の
+     subject を restrict しないことも固定。
+
+8. ✅ **done（2026-07-30）** HTTP 面 + transport
+   （app pin `e74439d8`、CI green、**188 tests / 920 assertions**、clj-kondo 0 errors）。
+   **これは当初の build order に無かった step で、私の設計 ADR の抜けだった** — step 7 まで
+   終えた時点で spine と adapter は完成・検証済みだったが、`server.clj` に authority ルートが
+   **0件**、`:endpoint` から commit-fn を組み立てるコードも存在せず、**統合は自分のテストの中
+   でだけ成立していた**。
+   - `authority.transport`: commit-fn を設定から組み立て、3種の拒否を**throw ではなく refusal
+     として返す**（「authority に届かない」と「authority が拒否した」は別の結果で、ledger が
+     区別できるべき）: `:authority-disabled`（既定）/ `:endpoint-not-configured`
+     （**enabled は reachable ではない**）/ `:transport-failed`。
+     actor の governor 拒否は**エラーではない** — 人間が同意し licensed operator が
+     それでも否と言った、という2枚 gate の正常動作。
+   - `authority.api`: ルートを3行に保ち、その下を HTTP 無しでテスト可能にする層。
+     adapter が自力で強制できない2点を強制する:
+     ①**disabled な authority は read も含めて surface を持たない**（disabled なのに proposal が
+     あるかのように答えるのは、拒否より悪い）
+     ②**posture をサーバ側で計算し、リクエストに来たものを上書きする。**
+     **これが cross-domain 不変条件の実際の強制点。** client が posture を送れるなら不変条件は
+     単なる助言で、攻撃者は `{:authority/posture :normal}` を送るだけでよい。adapter 側の
+     「必須入力」チェックは*忘れる*のを防ぐだけ。transfer を持つ subject が `:normal` を
+     送っても hold が発火することをテストで固定した。
+   - 7ルート（`GET /api/authority` / `GET /api/authority/:a` / `review` /
+     `approve/start` / `approve/finish` / `reject` / `commit`）。他の write surface と同じく
+     app session + origin + CSRF を要求。**commit を finish-approval! と別呼び出しにしたのは
+     意図的** — hand-off は拒否されうるし、その拒否は「既に起きた同意の失敗」ではなく
+     見せるべき結果だから。
+   - **正直に書いておく到達状況**: **fleet のどの actor も HTTP 面を持たない**
+     （実測: `cloud-itonami-esim` / `cloud-itonami-card-issuing` / `denwaban` の3つとも
+     server/http/handler/worker 系ファイルが0件、中身は advisor/governor/operation/phase/
+     registry/sim/store のみ）。よって今の fleet では設定済み endpoint は必ず
+     `:transport-failed`、未設定は `:endpoint-not-configured` を返す。
+     **これは app 側を完成させたが、fleet を到達可能にはしていない。**
+
+9. ✅ **done（2026-07-30）** actor 側 HTTP 面と、**wire の第3状態**
+   （esim actor pin `7ee49fd0` CI green・41 tests / 213 assertions、
+   app merge `1c4a33cf` CI green・**222 tests / 1,020 assertions**）。
+   - **actor 自身が fork できなかった。** `deps.edn` が `:local/root` を使っており、
+     README が「qualified operator が fork して deploy できる」と謳っているのに
+     **それが事実でなかった**（同日に library 3本で直したのと同じ欠陥）。git 座標に直し、
+     CI から sibling checkout を外したので **CI が forkability を証明する**。
+     副次的発見: 旧 `:dev` override は `io.github.com-junkawasaki/langchain-clj` という
+     langgraph が宣言していない座標名を指しており **no-op** だった。
+   - **状態は2つでは足りなかった。** `POST /commit` の答えは3状態:
+     `committed`（governor clear **かつ** phase-auto）/ `held`（governor が HARD 拒否）/
+     **`pending`（受理、この actor 自身の operator 承認待ち）**。
+     **Passkey consent は operator approval ではない**ので「subject は同意した、licensed
+     operator はまだ決めていない」は成功でも拒否でもなく、boolean はそれをどちらかに
+     分類することを強制していた。spine に `:authority-pending`（**非 terminal**）を追加。
+     `commit!` では **pending を `ok?` より先に判定する** — pending は `ok? false` かつ
+     refusal 無しなので、`ok?` を先に見ると refused として記録されてしまう。
+   - **app の adapter が送れる3 op はどの phase の `:auto` にも無い**ので、**正常な proposal は
+     必ず `pending` になり `committed` にはならない。** これは統合が動いていないのではなく
+     2枚 gate が動いていることで、docstring と README に明記した。
+   - **テストが本物のバグを捕まえた**: graph の thread-id に proposal id を使っていたため、
+     同じ proposal への再 POST が langgraph の checkpoint 経由で前回 run の state を継承し
+     （`base (if latest (merge base (:state latest)))`）、caller が1回目に送った `:approval` が
+     2回目に持ち越されて**ループの3回目が commit した**。各 POST を fresh thread にして修正。
+     2回の POST は2つの独立した試行になる。`:approval`/`:disposition`/`:verdict`/`:status` を
+     proposal の外と中の両方に混入させ、全て `pending` で終わることを固定した。
+   - **自分のテストの嘘も1つ直した**: `(is (= #{\"committed\"…} #{\"committed\"…}))` という
+     tautology を書いていたので、**実ソケット上に stub actor を立てて3状態のマッピングを
+     検証する本物のテスト**に置き換えた（socket / status code / JSON decode / status mapping、
+     不正 status の拒否、**旧 boolean contract を受け付けないこと**まで）。
+   - transport は3状態のみを受け付け、**旧 boolean 形も拒否する** — 黙って honour すると
+     未移行の actor が「問題なさそうな答え」の裏に隠れる。
+   - actor の HTTP 面は **loopback 束縛・自前の認証なし**（公開に晒すと consent 境界が
+     飾りになる）。store は per-process MemStore のまま（gap 2 は別変更）。
+
+10. ✅ **done（2026-07-30）** pending の決着を問える／下せるようにした
+   （esim actor pin `c072ad15` CI green・**50 tests / 249 assertions**、
+   app pin `3e668275` CI green・**286 tests / 1,289 assertions**）。
+   step 9 が作った gap を閉じる。
+   - **決着を下す口は app が到達できない場所に置いた。** pending を待っているのは
+     **actor 自身の operator** なので、decide を consent surface に置くと
+     **app が自分の proposal を自分で承認でき、D3 が boundary ではなくコメントになる**。
+     2つのリスナーに分けた: consent（`POST /commit` / `GET /proposals/<ref>` /
+     `GET /healthz`）と operator（`POST /proposals/<ref>/decide`）。consent surface は
+     listen していないので decide に**到達できない** — ポリシーチェックではなく構造的分離。
+     テストが3つの path 形すべてで 404 かつ proposal が pending のままであることを固定。
+     **app の config には operator surface のアドレスを持たせない。**
+   - operator surface は `X-ESIM-OPERATOR-TOKEN` を要求し、**`ESIM_OPERATOR_TOKEN`
+     未設定なら全 decide を拒否（503）**。fail-open だと**誰も設定していない時に
+     最も危険**になる。`by`（承認者）も必須 — **名前のない承認は監査できない**。
+   - **「知らない」を「拒否された」にしない。** `GET /proposals/<ref>` は未知の reference に
+     `unknown` を返す（checkpointer が in-memory なので再起動前の reference は全部これ）。
+     app の `refresh!` はこれを受けても proposal を **refused にしない** —
+     **誰も拒否していないのに governor 拒否として ledger に書くと、誰も下していない決定を
+     記録することになる**。pending のまま `:authority-unknown-since` を記録する。
+     「到達できない」と「authority が知らない」も別扱い。
+   - **contract を構造で強制した**: `:authority/status` を domain contract の**必須**に。
+     「pending と答えられるのに、それがどうなったか聞けない authority」は動かない proposal を
+     残すので、`valid-domain?` が要求し `review!` が拒否する。
+   - `:endpoint` の意味を「commit URL」から **base URL** に変更（transport が `/commit` と
+     `/proposals/<ref>` を導出）。既定が nil で誰も依存していなかったので、未使用ノブの改名。
+     `interpret` を commit と refresh で共有し、同じ wire 語を別に読むことを防ぐ。
+   - **別セッションの作業への影響**: 並行して**別セッションが本 spine の上に
+     `authority.payment` adapter を作っていた**。contract 変更で壊れたので**同じ形で拡張して
+     直した** — 彼らのテストは無変更で通る。落ちたまま放置していない。
+   - **報告**: app main の tip（`b36658f4`、別セッションの drive optimistic-locking マージ）は
+     **CI が赤い** — `core_test` の worker タイミング assertion（`:worker/finished` 待ちの race）で、
+     authority 系 namespace は全て通っている。本作業由来ではないので触っていないが、
+     pin は赤い tip ではなく **green な `3e668275`** に留めた。
+
+**build order は 10 step 完了（当初 7 + 抜けていた 8・9・10）。** ただし本 ADR の「到達上限」節は不変で、
+背後の actor は全て `:effect :propose` only なので、`:committed` は
+「governed proposal が記録された」だけを意味する。
+
+各段の完了条件は「実装した」ではなく、pre-check の決定論性・context type 不一致の拒否・
+Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が **test で示されていること**。
+
+## 残る gap（2026-07-30 更新、優先順）
+
+> 前回版の gap 1（card-issuing と denwaban に HTTP 面が無い）は **閉じた**。両者とも
+> `POST /commit` を提供し、`transport.clj` の docstring・`defaults.edn` の注記も
+> 実態に合わせた。**ただし閉じたのは「訊けない」問題だけで、到達上限は動いていない。**
+
+1. **Stripe Issuing の write path が Stripe test mode で一度も走っていない（最大）。**
+   `io-stripe-issuing` は 21 tests / 73 assertions すべて recorded transport のみ。
+   read shape（`GET /v1/issuing/cards`・status `active|inactive|canceled`・type
+   `virtual|physical`）は 2026-07-30 に live spec で検証したが、**POST body は
+   知識から書いたもので未検証** — MCP 面が Issuing の read しか出さないため。
+   `describe` が `:write-paths-unexercised true` を返すのはこのため。
+   **オーナー判断が必要な未決事項**: test mode で始めるか live key を使うか。
+   provider は `:test` 既定で、`:mode :live` は明示指定を要求する。
+2. **phase 3 では Stripe cardholder を作る承認経路が存在しない（新規に判明）。**
+   `:cardholder/intake` は phase 3 の `:auto` にいる唯一の op なので operator 承認を
+   持たず、`actuation/precheck` は名前のない承認を拒否する → auto-commit は
+   `\"actuation\":\"not-attempted\"` + `\"auto-committed-without-operator-approval\"` を
+   返す（`\"committed\"` が「Stripe に cardholder がある」と読まれないように）。
+   一方 `:card/issue` は Stripe の cardholder id（`ich_…`）を要求し、この actor 自身の
+   `ch-1` で代用すると**存在しない、あるいは他人の cardholder に対してカードを作る**ので
+   `:stripe-cardholder-unknown` で outbound 前に拒否する。結果として phase 3 では
+   id を外部から供給するか、phase 2（intake が operator gate になるが `:card/issue` が
+   `:writes` から外れる）で運用するしかない。**actor の phase 表由来の構造的な穴**で、
+   HTTP 面の性質ではない。
+3. **`denwaban` に CI が無い（この session では直せなかった）。** 17 tests /
+   56 assertions がローカル実行のみを証拠にしている。**原因は token scope**:
+   `.github/workflows/*` への書き込みには `workflow` scope が必要で、この session の
+   token は `repo` のみ（GitHub は push を reject、Contents API は 404 を返す）。
+   同じ理由で `cloud-itonami-card-issuing` の CI workflow も直せず、**代わりに
+   `:dev` alias を空にして CI が既に叩くコマンド（`-M:dev:test`）が git 座標を
+   解決するようにした**（workflow 側の sibling checkout は死重として残る）。
+   `gh auth refresh -s workflow` の後に、workflow 側を掃除できる。
+4. **consent surface の transport security は閉じた（2026-07-31）。** 3面すべてが token を
+   要求する: `X-CARD-CONSENT-TOKEN` / `X-ESIM-CONSENT-TOKEN` / `X-VOICE-CONSENT-TOKEN`
+   （env は `CARD_CONSENT_TOKEN` 等、**未設定は 503 で拒否** = fail closed）。
+   **loopback 束縛は認可ではない** — ホスト上の全プロセスがそれを共有する。これが無い間は、
+   ローカルの任意のプロセスが `\"status\":\"approved\"` と捏造した passkey-credential-id を
+   載せた proposal を POST でき、実カード発行や回線の provisioning / **transfer**（SIM-swap
+   経路）との間に残るのは「人間が同意したと信じた operator の承認」だけだった。
+   **governor は影響を受けない**（recorded state から ground truth を再計算する）ので、
+   これは「何をコミットしてよいか」ではなく **「誰が『subject が同意した』と主張してよいか」**
+   を gate する — **governor が再計算できない唯一のもの**（同意は別の場所で起きたので）。
+   **2つの token は別物**で、card にはそのテストがある（app の consent token で自分の提案を
+   承認できない。共有シークレットは改善に見えて 2 gate を静かに 1 つにする）。
+   `/healthz` は 3面とも開けたまま: subject データを持たず、**token を得る前に「actor が
+   生きているか」を訊けなければならない**（denwaban では特に、`can-answer-calls false` を
+   知る手段そのもの）。
+   app 側は authority key から**ヘッダ名を導出**し（`:card` → `X-CARD-CONSENT-TOKEN`)、
+   token は config が**変数名を指す**だけで値は環境変数から読む。**未設定でも app は先回りして
+   拒否しない** — actor の 503 が記録すべき正直な事実で、app が先に拒否すると actor の設定を
+   推測した上に本当の理由と違う理由を報告することになる。ワイヤ上で assert 済み。
+5. **pending は「解決が遅れる」のではなく「解決しなかった」（2026-07-31 訂正）。**
+   ここには「`refresh!` は app から問い合わせる形で、決着を知るのが遅れるだけで嘘には
+   ならない」と書いてあったが、**実測すると `refresh!` を呼ぶものが一つも無かった** —
+   session + CSRF を要する HTTP route としてのみ到達可能で、**UI のどこも、タイマーも
+   叩いていない**。つまり `:authority-pending` は、誰かが手で POST を組み立てない限り
+   **永遠に解決しない**状態だった。
+   `api/resolve-pending!` を追加（`cloud-itonami-app` 276c53d3）: その session が待って
+   いるものを一括で問い合わせ、**何が動いたかを報告**し、「pending が無かった」と
+   「pending はあるが authority が無効」を**別々に数え**、1つ失敗しても**残りを続行**する
+   （設定ミスの actor 1つが他の全 proposal を永久に pending にしないため）。
+   **その過程で既存バグを1件発見・修正**: `refresh!` は**到達できない authority を
+   `:authority-refused` として記録**していた。connection error / disabled / endpoint 未設定は
+   **この app 自身が生成する refusal で、governor は何も言っていない** — つまり
+   **誰も出していない拒否を台帳に書いていた**。unknown-reference 分岐が避けるために存在
+   していたのと同じ誤りで、`transport.clj` の docstring 自身が「到達できないことと
+   『no と言われた』ことは別物で、台帳はそれを区別できるべき」と明記している。
+   この3つは `:authority-unreachable-since` を付けて **pending のまま**にした
+   （`:authority-unknown-since` と同型）。**actor から来た refusal は従来どおり解決する**
+   ことにもテストがある（本物の拒否を飲み込む修正はバグより悪いので）。
+   **残る（2026-07-31 に判明した、より大きい事実）**: **この統合には UI が存在しない。**
+   `web.clj` は `/api/authority` の **17 route のどれも参照していない** — つまり
+   **app 自身の画面から、人間はこの統合に一切到達できない**。Passkey 同意を持つのは app
+   だという設計なのに、同意する画面が無い。route は API として完備しているので client を
+   書けば動くが、**出荷されている web UI はその client ではない**。
+   panel を作るのは**プロダクトの判断**であって、埋めるべき gap として即興で作るものでは
+   ないので、**記録に留めた**。代わりに **17 route を実 HTTP で叩くテストを追加**した
+   （`cloud-itonami-app` 238ae6c3）— これらは次に来る client にとっての**契約そのもの**
+   なのに、既存テストは全部 route を素通りして api namespace を直接呼んでおり、
+   **到達可能かどうかすら誰も検査していなかった**。
+   実測して**そのまま固定**した3点: disabled は **501**（全体 overview は 200 で
+   「無効」を描けるのに、per-authority read は拒否する — 2つの read、2つの契約）／
+   **未知の authority も 「disabled」 と答える**（別の authority には届かないという肝心の
+   性質は保たれるが、client は綴り間違いと deployment の設定を区別できない。
+   *望ましい*とは主張せず、*現状*として固定 — 変えるなら契約変更）／JSON は keyword の
+   namespace を落とすので `:authority/posture` は `{posture: normal}` という namespace 無しの形で届く。actor → app の
+   callback は導入していない — 認証付きの逆方向チャネルを増やすより、まず「呼べば解決する」
+   を成立させた。
+6. **D4 の単一 ref が actor 側でまだ成立していない（2026-07-31 に境界の実態を確認）。**
+   app 内では1つの store partition で cross-domain 読みが成立するが、actor の ledger は
+   各自 MemStore のみ。**「Store protocol が境界だから swap で済む」という論拠を検査した**:
+   - 3 actor とも `Store` protocol + `MemStore` record を持つ（境界はある）が、
+     **第2の実装が無いので、protocol が十分かを何も証明していない**。
+   - `store_contract_test` は3 actor とも docstring で「将来の Datomic / kotoba-server
+     backend は**新しい constructor に対してこれらを再実行するだけ**で同じ contract の
+     裏に差し込める」と書いていたが、**constructor をハードコードしていた** — つまり
+     編集せずに再実行することはできず、**その主張はそれ自身については偽**だった。
+     **2回実行できない境界は、境界ではなく主張**。
+   - `cloud-itonami-esim` で修正（ef63bbe9）: constructor を dynamic var にし、
+     `verify-contract!` が namespace 内の全 assertion を**渡された実装に対して**走らせる。
+     第2 backend は deftest 1つで足りる。**壊れた実装を実際に食わせて確認済み** —
+     transfer *要求* で subject を付け替える store を渡すと
+     `a-transfer-request-does-not-reassign-the-subject` で落ちる（SIM-swap 経路そのもの）。
+     「全部走らせる」ヘルパが**黙って0件選ぶと永遠に通る**ので、10件以上選ぶことも別途 assert。
+   - `cloud-itonami-card-issuing` も同様に修正（962f020f）。**壊れた実装で確認**:
+     sanctions hit を持つ cardholder `ch-3` を欠いた seed を渡すと read-parity が
+     **その hit と名簿の両方**で落ちる（record を1件失った backend は、governor が
+     訊くまで健康に見える）。
+   - **前の版でここに『denwaban も同じ問題』と書いたのは誤り**だった。実測すると
+     **denwaban には store が無い**（`cells` / `http` / `session` / `social` のみ）ので、
+     store contract test も存在しない。
+   - **残り**: 共有 backend そのものがまだ無い。今できたのは「swap で済む」という主張を
+     **検査可能にした**ことであって、swap そのものではない。
+7. **kotoba-lang の 85 ライブラリが git 座標で消費不能（2026-07-31 に実測し直した）。**
+   ここには「199 件」と書いてあったが、**2つの別物を混ぜていた**。default branch を実測した
+   内訳（`nbb scripts/consumability-audit.cljs` で再現可能。west.yml の kotoba-lang project
+   1,927 件が対象）: `clean 1629` / **`deps-local-root 85`（ライブラリ自体が消費不能）** /
+   `alias-local-root 74`（**ライブラリは消費可能** — 自分の `:test`/`:lint`/`:dev` が workspace を
+   要るだけで、消費側が他人の `:test` alias を実行することは無い）/ `deps.edn なし 137` /
+   `parse 不能 2`。
+   **測り方の訂正も記録する**: `orgs/*/deps.edn`（ローカル checkout）を数えると 115 件になるが
+   これは誤りで、作業コピーは進みも遅れもする。`kotoba-lang/phone` はローカルでは消費不能に
+   見えるが **main では 2026-07-30 に修正済み**（checkout が修正より古いだけ）。安い方法
+   （ローカル走査）が嘘をつくので、script は各 repo の **default branch** を読む。
+   修正済み: `card` / `phone` / `esim` / `io-stripe-issuing` / actor 3 repo に加え、
+   **`uikit`**（2026-07-31）。app が従うべき UI 規約は「`kotoba-ui.core` + platform binding」で、
+   `appkit` は既に座標指定なのに `uikit` だけが `:local/root` だった — **2つある binding のうち
+   touch/mobile 側だけが使えなかった**。sibling の無いディレクトリに複製して `clojure -Spath` が
+   `~/.gitlibs` から解決すること、その classpath で 4 tests が緑になることで検証した。
+   **sibling を `../` に clone する CI は consumability を何も証明しない** — `cloud-itonami-card-issuing`
+   で実際に、CI が「fork が持たないレイアウト」を自分で用意していたために、published repo が
+   classpath を作れないことを検出できていなかった。
+
+   **2026-07-31 の sweep: 85 → 50 件。** `nbb scripts/make-consumable.cljs <repo> [--execute]`
+   で 1 件ずつ直す（`consumability-audit.cljs` が母集団、こちらが個体）。**検証は欠陥の定義
+   どおり**: `clojure -Spath` は deps.edn しか要らないので、書き換えた 1 ファイルを**空
+   ディレクトリ**に置いて解決させる（= fork した人の状況であり、workspace が決して再現しない
+   状況）。解決しなければコミットしない。
+   直した 35 件: `uikit` / `geojson` `iso3166` `mathml` `musicxml` `graphml` `atom` `otio`
+   `mrz` `wire` / `atprotocol` `character` `cofog` `ctf` `denrei` `diskspace` `kenchi` `kobo`
+   `kotoba-worker-demo` `kotodama-mcp` `loop-jiten` `occupation` `oidc` `org-ieee-verilog`
+   `org-ietf-turn` `qa-governor` `shoko` `signal-integrity` `toshokan` `watchlist-screen`
+   `banking` `insurance` `kami-studio` `hls` `koyomi` `omise`。
+   **順序の制約**: 座標で pin しても、その sibling 自身が消費不能なら解決しない。85 件のうち
+   63 件は全 sibling が clean（今すぐ直せる）、22 件は別の壊れた sibling 待ちだった。
+   **新たに判明した第3の詰まり**: `deps.edn を持たない 137 repo` は「データが無い」のではなく
+   **git 依存として消費できない**（実測: `ocio` は `yaml` に依存しているが `yaml` に deps.edn が
+   無く、`Manifest file not found` で解決不能 → script が commit を拒否した）。
+
+   **2026-07-31 第2 pass: 50 → 9 件（計 76 件修正）。** 残り 9 件はすべて構造的にブロック:
+   - **相互依存の環**: `cssom ⇄ dom-gpu` が互いに `:local/root`。**pin では解けない** —
+     どちらを先に直しても、相手は「修正前の commit」を指すことになり推移的に失敗する。
+     ソース側で依存の環を切るしかない（`browser` / `htmldom` はこの環の下流）。
+     **2026-07-31 に環の原因を特定した（両脚とも実コードの require であり、片方が
+     comment だけという救いは無い）**:
+     `cssom.core` が **`kotoba.wasm.dom`** を require し、その namespace は **dom-gpu**
+     （`src/kotoba/wasm/dom.cljc`）に住んでいる。逆向きは dom-gpu の
+     `host/retained.cljc`（+ `demo_document.cljs`）が `cssom.*` を require する。
+     つまり **DOM tree 型が dom-gpu 側にあり、その型に対して cascade を解く cssom が
+     dom-gpu に依存し、renderer である dom-gpu が cascade に依存する**。
+     解法は「`kotoba.wasm.dom` を独立ライブラリに切り出して両者がそれに依存する」だが、
+     これは dom-gpu / cssom / htmldom / browser の**モジュール境界を変える設計判断**なので
+     ここでは実施しない（pin 直しの延長でやってよい種類の変更ではない）。
+   - **依存先が空リポジトリ**: `ocio` は `../yaml` を宣言し、`ocio/core.cljc` は
+     `kotoba.yaml` を require して `yaml/ytag` を呼ぶが、**`kotoba-lang/yaml` は main も
+     ローカル checkout も README.md 1 枚しか無い**（`Initial commit` のみ）。
+     deps.edn を足しても解決しない — **依存先にコードが存在しない**。
+     なお「`kotoba.yaml` が他のどこかに在るか」は**確認できていない**:
+     `gh search code` はこの環境で既知の文字列にもヒットを返さず（権限/スコープの問題）、
+     使えなかった。よってここで言えるのは「`ocio` が指している repo にはコードが無い」まで。
+   - **別 org の壊れた repo 待ち**: `securities`（`cloud-itonami/cloud-itonami-isic-6311`）。
+   - 他 sibling 待ち: `dtn` / `eda-flow-demo` / `kami-gen-ml3d`。
+   **script の潜在バグを1件修正**: `:local/root` の**org を path から導出する**ようにした。
+   従来は最後の path segment だけを取って `kotoba-lang/<name>` と仮定しており、
+   `../../cloud-itonami/cloud-itonami-isic-6311` のような cross-org 指定で**同名の別 repo を
+   黙って pin し得た**（`securities` で発覚。その名の kotoba-lang repo が存在しなかったため
+   拒否されただけで、存在していれば誤った code を指したまま classpath は解決していた）。
+8. **`cloud-itonami-app` の 55 namespace のうち 4 つがコンパイルできない（2026-07-31 実測）。**
+   phantom var 警告は「小さいもの」ではなかった。1件（agent-control）を偶然見つけた後、
+   残り全部を `require` して確かめた結果:
+
+   | namespace | 原因 |
+   |---|---|
+   | `agent-control` | `store/update-agent-control!` が存在しない（4箇所で呼ぶ） |
+   | `account-link-sync` | `identity/wallet-links` が存在しない |
+   | `mail-sync` | `identity/provider-access-token!` が存在しない |
+   | `bitcoin-wallet` | `cloud.itonami.app.bitcoin` がこの repo に無い |
+
+   **見逃されていた理由**: **どれも誰からも require されていない** → どの suite もロード
+   しない → clj-kondo の phantom var 警告（まさにこれらの var を名指ししていた）が
+   「lint のノイズ」に見えていた。**コンパイルできない namespace は、テストが無い
+   namespace より悪い** — 後者は動くかもしれないが、前者は動きようがないのに出荷され、
+   行数に数えられ、人には live code として読まれる。
+   **gate を入れた**（`namespaces_test.clj`、`cloud-itonami-app` 6b27ef06）: src/ から
+   namespace を**発見して**全部ロードする。除外リストは**両方向で assert** される —
+   除外した namespace が**まだ壊れていること**も検査するので、誰かが直したのに行を
+   消し忘れると gate が「もう直っている、行を消せ」と言う（**誰も刈らない除外リストは
+   gate が黙って gate でなくなる経路**）。**両方向とも実際に失敗させて確認した**。
+   4件は**記録であって修理ではない**: 足りない var を書けば dead code がロードされる
+   だけで、完成させるか削除するかは**プロダクト範囲の判断**。
+   `fleet.clj` の「`:dev` alias のせいでテストできない」という説明も実測で訂正済み
+   （`agent.run`/`hil.core` は git 座標で名指しでき、その先の phantom var で落ちる）。
+   その他の小さいもの: `cardissuing.registry` の Luhn 重複実装 / `kotoba-lang/esim` に
+   `ui.cljc` が無い / `cloud-itonami-app` の full suite が 5 回中 1 回だけ 1 failure を
+   出した件（原因未特定、以降再現せず）。
+
+**意図的に開けているもの（gap ではなく決定）**: jurisdiction spec-basis catalog の不在 /
+EID checksum を検証しない / `io-libp2p` vs `webrtc` の binding provenance 未決 /
+**denwaban に operator 面を置かないこと**（G7 が閉じている間は承認が実行に変わらないので、
+decide endpoint を置くこと自体が gate の見せかけになる）。いずれも「未検証のものを
+書かない」という同じ理由で、当て推量で埋めない。
+
+## build order の続き（2026-07-30、step 11-14）
+
+| step | 対象 | 結果 |
+|---|---|---|
+| 11 | `kotoba-lang/card` に `kotoba.card.actuation`（承認後の contract） | done。`required-approval-keys`・`precheck`（outbound 前）・`state-mapping-complete?`（畳み込み禁止） |
+| 12 | `kotoba-lang/io-stripe-issuing`（新 repo、live provider） | done。21 tests / 73 assertions、CI green、west 登録済み。write path は未実行 |
+| 13 | `cloud-itonami-card-issuing` の HTTP 面 + Stripe 結線 | done。63/223 → **82 tests / 279 assertions**。4 wire state（`approved-not-actuated` を含む） |
+| 14 | `denwaban` の HTTP 面 | done。6/16 → **17 tests / 56 assertions**。listener は1つ、`pending` は存在しない |
+| 15 | app 側で 4 番目の state を解釈 | done。**396 tests / 1651 assertions**。`approved-not-actuated` を `:transport-failed` と読んでいた（= operator が承認して Stripe が断ったのに「actor に到達できない」と人間に伝える）のを修正 |
+
+**step 13 で見つけた実バグ2件**（deploy 後ではなく test 中に見つかった）:
+`actuate!` が commit record の `:payload` から op を読んでいたが payload は store
+mutation で op を持たないので**全 actuation が静かに `:op-has-no-live-counterpart` に
+落ちる**状態だった／`:card/issue` に actor 自身の cardholder id を渡していた（上記 gap 2）。
+
+**運用上の記録**: 共有 superproject working tree で生成した `west.yml` が、別セッションの
+pull で**未コミットのまま消えた**。CLAUDE.md が「superproject 本体は閲覧専用」と言うのは
+これのこと。以後の pin 前進は tip を取得して当該行だけ書き換え、blob SHA の
+precondition で landing している（1 回 409 が出て、それが lock が働いた証拠）。
+`--entry` は**検証する pin を限定するだけで書き込む pin は限定しない**ので、
+`--entry denwaban` の出力に未検証の `io-multiformats` pin 変更が混ざっていた
+（採らず、手で1行だけ直した）。
+"}]

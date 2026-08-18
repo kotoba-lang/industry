@@ -1,0 +1,159 @@
+[{:db/id -1
+  :adr/id "2608011100-m365-gftdcojp-tenant-identity-audit-and-offboarding"
+  :adr/doc_type "adr"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/topic "m365-tenant-identity-governance"
+  :adr/last_verified "2026-08-02"
+  :adr/related ["2606271700-cloud-itonami-business-os" "2608021200-m365-shared-mailbox-archive-and-query-plane"]
+  :adr/title "ADR-2608011100: gftd.co.jp M365 テナントの棚卸しと退職者オフボーディング"
+  :adr/body "# ADR-2608011100: gftd.co.jp M365 テナントの棚卸しと退職者オフボーディング
+
+**Status**: accepted (実施済み・テナント側で検証済み)
+**Date**: 2026-08-01
+**Deciders**: Jun Kawasaki (オーナー指示), agent execution
+**Tenant**: Gftd Japan株式会社 / `e9b32269-81a5-4d3a-bf94-048ba6770c99`
+
+## Context
+
+オーナーから「まだ停止されていないユーザーは誰か、退職状況も含めて調査せよ」との指示。
+テナントには退職日を表す HR 属性が入力されておらず（`employeeLeaveDateTime` は 44 件中
+0 件、`companyName` が 5 件あるのみ）、Entra ID Premium 未契約のため `signInActivity`
+も監査ログも Graph から取得できない。使用状況レポート API も az CLI の第一党アプリの
+権限外（`S2SUnauthorized`）だった。
+
+そのため初回調査は「アカウント状態 + `m365-archive` の Teams アーカイブ由来の最終活動 +
+ライセンス割当」からの推定で行った。この推定は **j.kawasaki の delegated ビュー**しか
+持たないアーカイブに依存するため不完全であり、後に Exchange Online PowerShell から
+`Get-MailboxStatistics` の `LastLogonTime` を取得して補正した（後述の Findings 参照）。
+
+## Decision
+
+### 実施した変更（すべて可逆・破壊的削除なし）
+
+1. **無効化済みアカウントに残存していた管理者ロールを剥奪（17 件）**
+   - `f.tanaka`（無効）から 11 件 — **Global Administrator** を含む
+     （Security Administrator / Compliance Administrator / Compliance Data Administrator /
+     Cloud App Security Administrator / Security Operator / Azure Information Protection
+     Administrator / Microsoft 365 Backup Administrator / Customer LockBox Access Approver /
+     Attack Simulation Administrator / Attack Payload Author）
+   - `y.sakamoto`（無効）から 6 件 — User / Exchange / SharePoint / Teams / Helpdesk /
+     License Administrator
+   - アカウント無効化ではロール割当は消えないため、再有効化された瞬間に全権限が復活する
+     状態だった。
+
+2. **アカウント無効化 + サインインセッション失効（13 件）**
+   - `t.chikada`（オーナー指示）
+   - 長期休眠ゲスト 11 件 — `k.mori`（2年7ヶ月）/ `yfujita`（2年4ヶ月）/ `h.honma`（11ヶ月）/
+     `o.ishihara`（6ヶ月）/ GW東海ゲスト 7 名（Teams 発言記録なし、全員が単一チーム
+     `GJ/BP/R&D/2312-サイバー防犯ボランティア` のみに所属）
+   - `GftdJapan1`（2019 年のテナント作成時アカウント。ロール 0 / ライセンス 0 /
+     グループ 0 / 依存オブジェクト 0）
+
+3. **`t.chikada` のメールボックスを共有メールボックスへ変換し、ライセンスを回収**
+   - `Set-Mailbox -Type Shared`（512.1 MB / 3,924 アイテムを保持、上限 49.5 GB）
+   - O365 Business Premium を剥奪: **6/11 → 5/11 席**
+   - 無償 SKU（RMS Adhoc / Flow Free）は席を消費しないため据え置き。
+
+### 維持を決めたもの（オーナー判断）
+
+`n.takahashi`（GW髙橋 理仁、ゲストだが Business Premium を消費）/ `m.matsumiya`
+（2026-07-06 削除 → 07-29 再作成のゲスト）/ `k.takahashi`（高橋 鴻介、業務委託、18 チーム所属）。
+
+### 結果
+
+アカウント **全 44 → 有効 19 / 無効 25**。無効アカウントに残る管理者ロールは
+**0 件**（検証済み）。Global Administrator は `j.kawasaki` と `a.nakamura` の 2 名のみ。
+
+## Findings
+
+### 初期推定の誤りと補正
+
+Teams アーカイブ（取得時点 2026-06-17）だけでは活動実態を過小評価する。Exchange の
+`LastLogonTime` を取得したところ、Teams 上は 2025-04 で止まっていた `h.sendachi`（元 CTO）が
+メールでは **2026-03-24** までログオンしていた。**Teams の沈黙は退職の証拠ではない。**
+
+`GftdJapan1` は単なる残骸ではなく **SchedulingMailbox**（Microsoft Bookings 系）であり、
+`j.kawasaki` へ転送設定を持っていた。停止は Bookings 運用に影響しうる（要フォロー、
+即座に再有効化可能）。
+
+### 退職者のメールボックスが無保護で残存
+
+`h.sendachi`（2.6 GB / 23,513 件）/ `k.bakshi`（1.06 GB）/ `y.sakamoto`（654 MB）/
+`a.oda`（314 MB）/ `f.tanaka`（255 MB）が **UserMailbox のまま**残っている。訴訟ホールドは
+全員 `False`。共有メールボックス変換を経ずにライセンスだけ外す運用が繰り返されており、
+猶予期間の経過で消失するリスクがある。
+
+### 退職者の委任権限が残存（ロール剥奪と同型の第 2 幕）
+
+共有メールボックスへの FullAccess 73 件 / SendAs 104 件のうち、**退職者由来が 52 件**:
+`y.sakamoto` 18 / `k.bakshi` 10 / `t.chikada` 6 / `f.tanaka` 6 / `a.oda` 6 ほか。
+アカウントが無効なため即時の悪用はできないが、再有効化で復活する。
+
+### テナント全体で外部自動転送が許可されている
+
+`Get-RemoteDomain` の Default が `AutoForwardEnabled: True`。全ドメイン宛の自動転送が
+可能な状態で、既知の情報持ち出し経路。実際に外部宛の受信トレイルールが存在する
+（`ai-gftd-hrse@zoirune.resend.app` / `keiri@gftd.io` / `h.kenichi@gftd.works`）。
+いずれも業務上意図されたものに見えるが、テナント既定を開けたままにする理由にはならない。
+
+### 論理削除されたメールボックスが大量に滞留
+
+`Get-Mailbox -InactiveMailboxOnly` が 60 件超を返す（gftd.works の退所者、旧 gftd.io、
+`student@gifted.academy` 等）。全件 `LitigationHoldEnabled: False`。
+
+## Consequences
+
+- 退職処理の正しい順序は **共有メールボックス変換 → ライセンス回収 → ロール剥奪 →
+  委任権限の剥奪 → 無効化** であり、これを標準手順として固定する。今回はこの順序が
+  過去に守られていなかったことが、上記 Findings のほぼ全てを生んでいる。
+- 休眠判定を Teams アーカイブに依存しない。Exchange の `LastLogonTime` を一次情報とする。
+- Entra ID Premium が無い限り、サインイン履歴に基づく自動的な休眠検知はできない。
+  導入するか、Exchange 側の指標で代替するかを別途判断する。
+
+## Kaizen backlog（2026-08-02 現在）
+
+1. 退職者 5 名の委任権限（FullAccess / SendAs 52 件）の剥奪 — **未着手**
+2. 退職者メールボックス 5 件の共有メールボックス変換 — **未着手**。ただしデータ消失
+   リスクは後述の権限付与とアーカイブで大幅に下がった（ADR-2608021200）
+3. `Set-RemoteDomain Default -AutoForwardEnabled $false` + 外部転送の例外整理 — **未着手**
+4. `GftdJapan1`（SchedulingMailbox）の Bookings 依存有無の確認 — **未着手**
+5. 論理削除メールボックス 60 件超の保持方針決定 — **未着手**
+6. 共有メールボックスのサインイン無効化状態の点検 — **未着手**
+7. MFA 登録状況の把握とセキュリティ既定値 / 条件付きアクセスの評価 — **未着手**
+
+## 2026-08-02 の追加変更（本 ADR のテナント状態を更新する）
+
+ADR-2608021200（共有メールボックスのアーカイブ）の実施に伴い、テナントに次の変更を
+加えた。identity governance の観点でここに記録する。
+
+- **Entra アプリ `gftd-m365-archive` に委任スコープ `Mail.Read.Shared` を付与**
+  （テナント全体 / AllPrincipals）。`Mail.Read` はサインインユーザー自身の受信箱しか
+  読めないため、共有メールボックスの取得には必須。
+- **退職者 5 名のメールボックス（h.sendachi / f.tanaka / t.chikada / y.sakamoto /
+  a.oda）に `j.kawasaki` の FullAccess を付与**。従来 `a.nakamura` にのみ委任されて
+  おり、取り込みを実行する j.kawasaki からは Graph が 404 を返していた
+  （権限が無いと「存在しない」と応答する）。`-AutoMapping:$false` を指定し、
+  オーナーの Outlook に退職者メールボックスが自動マウントされないようにしている。
+  `Remove-MailboxPermission` で可逆。
+
+**この付与は backlog #1（退職者の委任権限剥奪）と方向が逆に見えるが、対象が違う。**
+#1 が剥奪するのは「退職者が共有メールボックスに対して持つ権限」であり、ここで付与した
+のは「現役の管理者が退職者のメールボックスに対して持つ権限」。前者は再有効化時の
+攻撃面、後者は保全と監査のための経路であり、両立する。
+
+## 実行環境の変更
+
+- `brew install powershell` で PowerShell 7.6.4（+ dotnet 10.0.302）を導入
+- `ExchangeOnlineManagement` 3.10.1 をユーザースコープに導入
+- `az login --scope https://graph.microsoft.com/.default` でトークンスコープを Graph 用に更新
+
+## 実施時の失敗記録
+
+共有メールボックス変換スクリプトの初版は、リモート実行の戻り値が逆シリアル化され
+`ToBytes()` を持たないためサイズ判定で停止し、変換が実行されなかった。修正後の 2 回目は
+変換自体は成功したが、**同一セッション内の `Get-Mailbox` が `UserMailbox` を返し続けた**
+にもかかわらずスクリプトが無条件に「完了」と出力した。ライセンス剥奪の前に新しい
+セッションで再検証して `SharedMailbox` を確認している。**検証を伴わない完了メッセージを
+スクリプトに書かない。**
+"}]

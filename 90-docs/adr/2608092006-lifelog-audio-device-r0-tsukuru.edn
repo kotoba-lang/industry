@@ -1,0 +1,225 @@
+[{:db/id -1
+  :adr/id "adr-2608092006-lifelog-audio-device-r0-tsukuru"
+  :adr/title "ADR-2608092006: 常時音声ライフログ端末 R0 — local-first clip recorder と tsukuru 製造境界"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "lifelog-audio-device-r0"
+  :adr/date "2026-08-09"
+  :adr/last_verified "2026-08-09"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["常時音声ライフログ端末 R0 の製品要求、非目標、privacy/security 不変条件"
+   "端末・取り込みホスト・lifelog actor・tsukuru の責任境界"
+   "R0 EVT 10 台の完了 gate と tsukuru manufacturing package"
+   "実装済みと未実装を分ける現在地"]
+  :adr/related
+  ["2800003200-tsukuru-manufacturing-integration-four-phases"
+   "adr-2606271304-aiueos-vs-zephyr-os-positioning"
+   "adr-2607191500-cloud-itonami-isic-2640-consumer-electronics-coverage"
+   "90-docs/hardware/lifelog-audio-r0-product-spec.edn"]
+  :adr/body "# ADR-2608092006: 常時音声ライフログ端末 R0 — local-first clip recorder と tsukuru 製造境界
+
+## Context
+
+オーナーは、市販の完成品を購入するのではなく、日常を音声で継続記録する端末を
+`tsukuru` を使って自前設計・実装したいと選択した。横断検索では、consumer-electronics
+actor に `audio-device` / `wearable-device` という一般的な製品種別、`tsukuru-actor` に
+工場探索・production order・QC・CAE gate、`tsukuru-manufacturing-artifacts` に CAD / mesh /
+解析結果の custody 面は存在する。しかし、常時音声ライフログに固有の製品要求、回路、PCB、
+筐体、BOM、firmware、暗号化保存、録音表示、同意・削除境界は存在しなかった。
+
+したがって現在地は『製造基盤はあるが、そこへ投入する製品設計がない』である。本 ADR は
+その最初の製品設計 R0 を固定する。R0 は量産完成品ではなく、独自 PCB・独自筐体・自前
+firmware の EVT 10 台を作り、常時録音という中心仮説を実測する段階である。市販する完成品を
+買わないことと、半導体・電池・マイク等の標準部品を調達することは矛盾しない。自前の境界は
+system architecture、PCB、enclosure、firmware、data contract、test/QC を所有することに置く。
+
+## Problem statement
+
+利用者は、一日の会話や独り言を後から検索・想起できる形で残したいが、スマートフォンの
+手動録音は開始忘れ、OS lifecycle、着信、電池、foreground 制約によって連続性を失う。
+一方、第三者クラウドを trust root にする市販端末では、生音声・保持期間・削除・鍵・将来の
+サービス停止を自分で統制できない。解くべき問題は『録音ボタンを増やすこと』ではなく、
+一日を通して欠落なく記録しながら、録音状態と停止権限を物理的に本人と周囲へ返すことである。
+
+## Goals
+
+1. 充電を除く一日の装着時間として、12 時間以上の連続録音を 10 台すべてで達成する。
+2. network / phone / cloud が無くても録音・暗号化・保存を継続する。
+3. 12 時間試験で dropped audio frame 0、突然の電源断で失う音声を直近 65 秒以内にする。
+4. USB-C 取り込み後、chunk の認証・連番・時刻を検証し、欠落を機械的に列挙できる。
+5. 録音中表示、物理 mute、remote start 禁止を firmware から迂回できない回路不変条件にする。
+
+## Non-goals
+
+- R0 端末上で文字起こし、話者分離、要約、検索を行わない。録音の信頼性と電力を先に測る。
+- camera、GPS、speaker、cellular、Wi-Fi、常時 cloud upload を載せない。音声記録以外の privacy
+  面と電力変数を増やさない。
+- covert recorder を作らない。表示 LED を消す設定、遠隔から物理 OFF を越えて録音を始める
+  経路、周囲に録音を隠す mode は恒久的な非目標である。
+- R0 で量産認証、金型、100 台以上の発注、工業的適合を名乗らない。EVT 10 台の設計検証である。
+- 法域ごとの録音可否を端末が自動判定しない。使用者が適用法と同意を確認する責任を、技術が
+  代替したと表現しない。
+
+## User stories
+
+- ライフログ利用者として、phone や network が無くても装着中の音声を記録し続けたい。後で
+  一日の出来事を自分の保管環境から検索できるからである。
+- 利用者として、スライドスイッチ一つでマイクへの給電を物理的に切りたい。firmware の状態を
+  信頼しなくても録音停止を確認できるからである。
+- 周囲にいる人として、マイクが給電され録音可能な時は明瞭な表示を見たい。隠れた録音状態を
+  作らないためである。
+- 利用者として、電池切れ・容量不足・storage fault を見分けたい。記録できていない時間を
+  記録できたと思い込まないためである。
+- 運用者として、USB-C で回収した全 chunk の認証と連番を検査したい。静かな欠落や改竄を
+  transcript に混ぜないためである。
+
+## Decision
+
+### 1. R0 は胸元クリップ型の録音専用端末
+
+product id を `lifelog-audio-r0` とする。目標 envelope は 55 x 42 x 15 mm 以下、質量は
+45 g 以下。衣服の胸元に装着し、2 個の digital MEMS microphone、low-power MCU、local
+storage、USB-C、BLE control、Li-Po battery、物理 recording switch、recording LED、状態
+button を独自 PCB と独自筐体に収める。部品 MPN は availability と bench 測定を経て BOM で
+固定し、本 ADR では未測定の特定部品を採用品と偽らない。
+
+2 microphone は胸元の遮蔽と風雑音に対する診断・beam/mix の余地を持たせるためで、R0 の
+保存正本は calibration 後の mono 1 channel とする。診断時だけ短時間の stereo capture を
+許す。sample format は 16 kHz / signed 16-bit PCM。R0 は codec 実装を reliability path に
+入れず、60 秒ごとの独立 chunk として保存する。16 時間で約 1.84 GB、32 GB storage なら
+format/metadata/予備領域を除いても複数日を保持できる。これは計算上の capacity であって、
+実書き込み電力と filesystem endurance は EVT で測る。
+
+### 2. local-first と crash boundary
+
+録音経路は `microphone -> PDM/I2S -> fixed-size buffer -> 60-second chunk -> authenticated
+encryption -> local storage`。phone、BLE、USB、cloud は録音継続の依存にしない。各 chunk は
+独立した sequence、monotonic time、wall-clock estimate、sample count、firmware build id を
+持ち、AES-256-GCM 等の MCU hardware acceleration で扱える AEAD で認証暗号化する。具体的な
+algorithm/provider は選定 MCU の実測で固定するが、暗号化無し fallback は作らない。
+
+device root key は secure element または同等の non-exportable hardware root で wrap する。
+USB-C は mass-storage の同時 mount を避け、recording と競合しない read/ack protocol で確定済み
+chunk だけを取り出す。host が hash・AEAD・sequence を確認し durable storage へ置いた後にのみ
+device へ delete acknowledgement を返す。電源断時は確定済み chunk を壊さず、失う範囲は現在の
+60 秒 chunk + flush margin 5 秒以内とする。
+
+### 3. privacy/security は UI ではなく回路不変条件
+
+- recording slide switch は microphone power rail を物理的に切る。software mute だけにしない。
+- recording LED は同じ microphone power rail から駆動し、mic が録音可能なのに LED だけを
+  firmware が消す経路を作らない。LED 断線は power-on self-test / QC で検出する。
+- BLE は clock sync、battery/status、physical-presence pairing に限定する。audio streaming と
+  remote recording start は実装しない。物理 OFF 中の remote command は電気的に録音不能である。
+- firmware は signed update と rollback protection を持つ。debug interface は EVT debug unit を
+  除き production fuse/config で閉じ、device key を debug 経由で読めないことを検査する。
+- storage full、write error、key unavailable は fail-stop で録音済みを上書きせず、明瞭な fault
+  pattern と ingest manifest の gap として表す。『記録できたふり』をしない。
+
+### 4. 端末と知識化を分離する
+
+端末は audio evidence を作るだけで、文字起こし・話者推定・要約・検索・他データとの join は
+取り込み側の責務とする。境界は次の 4 層である。
+
+1. `lifelog-audio-r0 device`: capture、chunk、encrypt、status、physical controls。
+2. ingest host: USB read/ack、decrypt、integrity/sequence check、raw retention、asset CID。
+3. lifelog actor: transcript、timeline、consent/retention policy、search projection。raw bytes を
+   datom 面に載せず、CID/annex key と metadata だけを載せる。
+4. `tsukuru`: BOM、factory/RFQ、production order、progress、QC、settlement。個人の録音内容を
+   tsukuru ref に載せない。
+
+R0 firmware は実機 MCU 向けの成熟 RTOS（Zephyr 等）と最小 native driver を使う。aiueos は
+Phase 0 で実 MCU RTOS の代替ではないという ADR-2606271304 の境界を守る。録音 state machine、
+wire contract、policy、test vector は EDN で正準化し、companion/actor 側は workspace の
+`.kotoba` / `.cljc` 優先順位に従う。firmware native code に transcript、policy 判断、network
+business logic を入れない。
+
+### 5. tsukuru manufacturing package
+
+EVT 発注単位は 10 台。`tsukuru` に渡す package は次を一体として version pin する。
+
+- `product-spec.edn`（本 ADR と `90-docs/hardware/lifelog-audio-r0-product-spec.edn`）
+- ECAD source、schematic PDF、Gerber、drill、pick-and-place、PCB stack-up
+- BOM（manufacturer part number、approved alternate、lifecycle、unit cost、source）
+- firmware source、reproducible build manifest、binary hash、programming/locking procedure、SBOM
+- kami-engine stack で導出した enclosure source、STEP、2D drawing、clip/port tolerance
+- assembly instruction、test fixture、microphone calibration procedure、inspection plan
+- battery/charging safety evidence、power budget、12-hour soak log、audio fixture result
+- per-device identity/public key、firmware hash、QC result を assembler DID で署名した
+  `quality_inspection` record
+
+CAD/解析 bytes は `tsukuru-manufacturing-artifacts` custody 面、datom には CID/annex key と
+metadata のみを置く。ただし同 dataset の B2 remote は 2026-08-05 実測で encryption none で
+あり、機密材料受領 gate は未充足である。open-hardware と決めるまでは confidential ECAD/CADを
+そこへ置かず、専用暗号化 remote、opaque path、NDA/保管判断が揃うまで metadata-only とする。
+
+`tsukuru-actor` Phase 2 はコード landed だが live cross-actor chain が blocked であるため、
+EVT 10 台は manual approval を authority とし、live production order が通ったと偽らない。
+Phase 3 CAE gate の qualified は自動 dispatch の根拠にせず、not-qualified だけを停止根拠にする。
+
+## Requirements and acceptance criteria
+
+### P0 — R0 は満たさなければ EVT complete としない
+
+| Requirement | Acceptance |
+|---|---|
+| Continuous capture | 10/10 台が 12 h 録音し、sample counter 上 dropped frame 0 |
+| Battery | recording + LED + storage write + periodic BLE advertising で 12 h 後に 10% 以上残量 |
+| Crash recovery | 20 回のランダム電源断で確定 chunk の破損 0、各回の欠落 <= 65 s |
+| Storage integrity | host が AEAD、sequence、sample count を全 chunk で検証し、欠番を明示 |
+| Physical mute | switch OFF で mic rail 0 V、firmware/BLE command から録音再開不能 |
+| Recording indicator | mic rail ON なら LED ON。software から LED-only OFF の state が存在しない |
+| Offline operation | phone/network/cloud を 12 h 切断しても capture gate と同じ結果 |
+| Ingest | recording 継続中に確定 chunk を USB-C で回収でき、ACK 前に device は削除しない |
+| Speech utility | 固定音響 fixture と pinned transcript model で 1 m quiet-speech WER <= 20%、条件を記録 |
+| Thermal | 20–25 C 室内で charging + recording soak 中、触れる筐体表面 <= 42 C |
+| Provenance | 全10台に serial、PCB revision、firmware hash、device public key、QC署名が対応 |
+
+### P1 — EVT 後の fast follow
+
+- wind/pop mitigation、衣擦れの機械 isolation、dual-mic mixing を fixture データで改善する。
+- phone companion から clock sync、status、marker を扱う。ただし remote start は追加しない。
+- 1 m quiet だけでなく cafe、walking、car cabin の pinned corpus を作り、smartphone baseline と比較する。
+- lossless/lossy codec は PCM path と同じ gap/integrity gateを満たし、電池と容量の実測で有利な場合だけ採る。
+
+### P2 — R0 の非対象だが塞がない
+
+- DVT の custom RF/antenna、射出成形、法規・EMC・電池輸送評価。
+- multi-device sync、optional phone location join、on-prem transcription acceleration。
+- user-controlled retention class、selective redaction、共有用に raw audio から派生した最小 disclosure。
+
+## Success metrics
+
+R0 success は販売数ではなく evidence で判定する。success threshold は P0 11 gate 全通過、stretch
+は 10 台 x 3 日の field wear で一日あたり unplanned gap 0、manual intervention 1 回以下、
+取り込み後に検索可能 transcript へ到達するまで 30 分以内。測定値が無い項目を pass としない。
+
+## Delivery phases
+
+1. Architecture freeze: product spec、threat/privacy boundary、test fixture、parts selection criteria。
+2. Bench proof: microphone、storage、encryption throughput、USB read/ack、powerを development fixtureで測る。
+3. EVT design: schematic、PCB、enclosure、firmware、fixture、BOM/SBOM を manufacturing package 化。
+4. EVT build: manual-approved production order で10台を組み、per-device QCを署名。
+5. EVT gate: P0を全台で実測。未通過ならDVTへ進まず、設計/測定値を本ADRとspecに直接更新する。
+
+## Open decisions
+
+- blocking before schematic freeze: open-hardware とするか confidential design とするか。後者なら
+  tsukuru artifact custody の暗号化 remote/NDA gate が必要。
+- BOM freeze前: controller module=NINA-B306-00B、mic=T5838 x2、secure element=ATECC608C、
+  charger=BQ25188、buck=TPS62840、fuel gauge=BQ27427をcandidate-selectedとした。storage、battery、
+  switch/LEDとpackage suffixはbench/ECADで未決。candidateは採用品ではなく、供給、電力、温度、
+  storage write、encryption throughputのbench evidenceでfreezeする。
+- non-blocking during bench: clip orientation、button gesture、fault LED pattern、chunk durationの 60 s 微調整。
+- blocking before human field recording: 使用場所ごとの同意・表示・保持・削除運用。法的結論は別の
+  compliance review とし、本 ADR は stealth を許可しない技術的な床だけを決める。
+
+## Current state
+
+2026-08-09 時点で **R0 product/architecture design は accepted**。product spec、candidate parts、
+assumption-only power/storage model、bench planを作成した。modelは1000mAh/32GBの算術上のmarginを
+示すが、`:not-qualified`であり実測gateを満たさない。schematic、PCB、CAD、firmware、frozen
+BOM/SBOM、bench measurement、EVT 10台、実production orderは未着手である。設計文書やdatasheetの
+存在を実機実装・電池寿命・製造可能性の検証済みと報告しない。"}]

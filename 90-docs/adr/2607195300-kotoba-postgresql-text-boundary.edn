@@ -1,0 +1,52 @@
+[{:db/id -1
+  :adr/id "adr-2607195300-kotoba-postgresql-text-boundary"
+  :adr/title "ADR-2607195300: PostgreSQL startup and query text boundaries"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-19"
+  :adr/last-verified "2026-07-19"
+  :adr/last_verified "2026-07-19"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "repo-wide-cljc-to-kotoba-source-migration"
+  :adr/authoritative-for ["PostgreSQL component text-field injection boundary"]
+  :adr/related
+  ["orgs/kotoba-lang/kotoba/providers/db_transport.kotoba"
+   "orgs/kotoba-lang/kototama/test/kototama/tender_test.clj"]
+  :adr/supersedes ["adr-2607195200-kotoba-wasm-branch-local-allocation"]
+  :adr/superseded-by []
+  :adr/decision-summary
+  {:startup-user-length [1 63]
+   :startup-database-length [1 63]
+   :query-length [1 65535]
+   :embedded-nul :reject-before-connect-or-write
+   :production-qualified false
+   :executable-evidence
+   [{:cwd "orgs/kotoba-lang/kototama"
+     :command "clojure -M:test"
+     :result "117 tests, 397 assertions, 0 failures"}
+    {:cwd "orgs/kotoba-lang/kotoba"
+     :command "targeted clojure.test: transport-component-test and wasm-map-keyword-test"
+     :result "11 tests, 61 assertions, 0 failures"}]}
+  :adr/body
+  "# ADR-2607195300: PostgreSQL startup and query text boundaries
+
+**Status**: accepted
+**Date**: 2026-07-19
+
+## Decision
+
+PostgreSQL StartupMessage user and database values are non-empty, at most 63
+bytes and contain no NUL. Simple Query text is non-empty, at most 65,535 bytes
+and contains no NUL. Startup fields are checked before opening a transport;
+query text is checked before writing a frame. This prevents a component from
+injecting additional NUL-terminated startup parameters or silently truncating
+a query at the wire boundary.
+
+## Maturity boundary
+
+These are protocol framing limits, not SQL authorization. Query semantics,
+role privileges, row-level security and transaction policy remain the database
+server or a higher-level capability provider's responsibility."}]

@@ -1,0 +1,80 @@
+[{:db/id -1
+  :adr/id "2607199100"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-19"
+  :adr/status :accepted
+  :adr/title "kotoba-lang/ekyc-native-provider: composing IEkycProviderClient, real engine wiring"
+  :adr/scope [:kotoba-lang/ekyc-native-provider]
+  :adr/related ["orgs/kotoba-lang/ekyc" "orgs/kotoba-lang/mrz" "orgs/kotoba-lang/face-liveness"
+                "orgs/kotoba-lang/face-match"]
+  :adr/context
+  "Phase E of the eKYC/AML vendor plan approved earlier this session
+   (following Phase A kotoba-lang/mrz ADR-2607198200, Phase B
+   kotoba-lang/watchlist-screen ADR-2607198500, Phase C
+   kotoba-lang/face-liveness ADR-2607198700, Phase D kotoba-lang/face-match
+   ADR-2607198900). The original plan called for 'one composing adapter'
+   implementing ekyc.adapters.provider/IEkycProviderClient rather than N
+   per-engine shims, keeping each engine repo ekyc-agnostic and reusable
+   standalone.
+
+   Building this surfaced a real gap in ekyc's own abstraction, found only
+   by reading ekyc.adapters.provider.cljc's actual code (not assumed):
+   ekyc.model/evidence and provider.cljc's evidence-payload carry only a
+   :evidence-ref / :custody-ref -- a REFERENCE to already-stored evidence,
+   never raw bytes. ekyc.adapters.provider/IEvidenceCustody only defines a
+   WRITE method (commit-evidence!); there is no read-back protocol
+   anywhere in ekyc for a provider to resolve a reference back to content
+   a check engine could actually score. This is not a bug in ekyc (its
+   scope is a session/evidence LEDGER, not a content store -- raw bytes
+   deliberately live in ekyc.adapters.kagi-custody instead, upstream of
+   this abstraction), but it is a real integration gap this repo has to
+   close to be end-to-end usable, so it defines its own
+   ekyc-native-provider.ports/IEvidenceFetcher seam, mirroring every
+   sibling engine's own host-injection pattern (mrz.ports/IZoneOcr,
+   face-liveness.ports/ILandmarkTracker, face-match.ports/IFaceMatcher).
+   No implementation of it ships here either -- a real deployment supplies
+   one, e.g. backed by ekyc.adapters.kagi-custody's actual store."
+  :adr/decision
+  "Add kotoba-lang/ekyc-native-provider, a portable .cljc library:
+
+   - ekyc-native-provider.ports/IEvidenceFetcher -- the evidence-resolution
+     seam (see Context). Resolves a (check, evidence-ref) pair to per-check
+     content: :document-ocr -> {:mrz-lines [...]}, :liveness ->
+     {:challenge :frames}, :face-match -> {:selfie :document-photo}.
+   - ekyc-native-provider.core/score-check -- dispatches to the real
+     engines: mrz.core/parse+valid? for :document-ocr,
+     face-liveness.core/score-response for :liveness, face-match.core/match
+     for :face-match (the deliberate stub, always :review per
+     ADR-2607198900). Every OTHER ekyc.model/checks member
+     (:document-authenticity, :address, :pep, :sanctions, :adverse-media,
+     :manual-review) and every unresolvable evidence-ref both map to
+     :review -- :pep/:sanctions explicitly belong to the separate
+     kotoba-lang/watchlist-screen + kotoba-lang/aml path (ADR-2607198500),
+     not this provider; the rest have no engine anywhere in this org.
+   - Each engine's own status vocabulary is mapped into EXACTLY
+     ekyc.model/statuses (#{:created :submitted :verified :rejected
+     :expired :review}) in this ONE place -- ekyc.core/valid! rejects
+     anything outside that set, and every engine has its own different
+     internal vocabulary (face-liveness: :verified/:failed/:expired;
+     face-match: :review/:verified/:flagged) that would silently break
+     every ekyc.core caller if leaked through unmapped. This was found by
+     actually reading ekyc.core/problems' validation logic, not assumed.
+   - ekyc-native-provider.core/provider-client -- a real, full
+     IEkycProviderClient (create-session!/upload-evidence!/
+     retrieve-result!), with a process-lifetime in-memory session->evidence
+     map so retrieve-result! is genuinely answerable (documented as
+     non-durable -- a real deployment's durable ledger is whatever
+     ekyc.core's own caller already uses, e.g. ekyc.adapters.identity-bridge
+     into orgs/kotoba-lang/identity).
+
+   Tested end-to-end against REAL fixture data, not stand-ins: the same
+   ICAO Doc 9303 TD3 worked example kotoba-lang/mrz's own test suite uses,
+   and a real dip-then-recover blink-frame sequence -- proving the
+   composing wiring genuinely calls the real engines, not a mock of them.
+   11 tests / 17 assertions, 0 failures. clj-kondo: 0 errors, 0 warnings."
+  :adr/consequences
+  ["Any real deployment needs to supply exactly one new piece to use this end-to-end: an IEvidenceFetcher backed by wherever it actually stores document/selfie/frame data (most naturally ekyc.adapters.kagi-custody). No new ekyc integration work is needed to add a future fourth engine -- one new case branch in score-check."
+   "The 'mechanism, not policy' honesty chain holds all the way through: mrz's real decode/checksum + honestly-experimental optical, face-liveness's real algorithm + no bundled detector, and face-match's deliberate no-algorithm stub all pass through this provider UNCHANGED -- this repo adds real integration plumbing, not new capability claims on top of any of them."
+   "retrieve-result!'s in-memory state is a real, documented, non-durability limitation -- a caller relying on this provider across a process restart without wiring its own durable ledger will lose in-flight session evidence."]
+  :adr/references [2607198200 2607198500 2607198700 2607198900]}]

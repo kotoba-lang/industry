@@ -1,0 +1,201 @@
+[{:db/id -1
+  :adr/id "2607301100"
+  :adr/title "consumer 面 2026-07-30: 4 施策が着地、:contract は空のまま、live PDS は別セッション進行中"
+  :adr/status "accepted"
+  :adr/date "2026-07-30"
+  :adr/tags ["consumer" "mcp" "openai-compat" "atproto" "query-plane" "closing"]
+
+  :adr/context
+  "オーナーの問い: 『今の cloud-itonami-app, app-aozora などで consumer, producer の
+  目線で、今の producer 実装から consumer を増やしたい』、続けて『さらに consumer
+  ニーズを引き上げるには?』。
+
+  診断して分かったのは、consumer がいない理由が consumer 実装の不足ではなく、
+  **producer が「外部から呼べる状態」になっていなかった**ことだった。実測した
+  当時の現在地:
+
+  - cloud-itonami-app の `/v1/chat/completions` は**非ストリーミング**。互換対象の
+    client（Continue / Zed / aider / LangChain）は既定で `stream: true` を送るので、
+    互換性の主張は実質ほぼ誰にも成り立っていなかった。
+  - app-aozora の `describeRepo` は**引数を echo するだけの stub**。handle で引くと
+    `did` に handle が入り、DID で引くと `handle` に DID が入り、引数なしなら
+    `{did: null, handle: \"\", handleIsCorrect: true}` を返し、そのすべてを
+    `handleIsCorrect: true` と称していた。`resolve-handle` は registry 読み取りが
+    **失敗**したときにも `did:web:<handle>` を捏造していた（miss との区別が無い）。
+  - fleet: 1,208 producer のうち endpoint を持つのが 9、機械可読な contract を持つ
+    のが 0。生きている 9 本も `/health` は答えるが `/openapi.json` `/llms.txt`
+    `/.well-known/ai-plugin.json` `/mcp` はすべて 404。
+  - 統合 query 面: CLAUDE.md が看板にしている『財務 × 法人実体 × ToS を 1 クエリ』が
+    `[]` を返していた。さらに 1 query に 37 秒かかっていた。
+
+  後半の問いは需要側で、供給側（呼べるようにする）とは別物。ここで希少なのは
+  個々の actor ではなく **26 dataset・116k entity を `:company/lei` で横断結合できる
+  面**であり、そこが空で遅かったことが needs を潰していた。"
+
+  :adr/decision
+  "4 つを着地させた。いずれも『新しく作る』より『既にあるものを呼べる状態にする』側の
+  変更で、そのことが最大の教訓だった。
+
+  **1. OpenAI SSE streaming**（cloud-itonami-app）。streaming 自体は
+  `service/run-chat-stream!` として既に存在し `/api/chat/stream` で NDJSON を流して
+  いた。欠けていたのは互換ルート上の wire format だけ。
+  設計判断: **レスポンスヘッダを最初のフレームまで遅延させる**。200 と
+  text/event-stream を送った後は status を変えられないので、provider 拒否のような
+  『最初の delta の前の失敗』を成功した stream の中で報告することになり、client には
+  空の回答に見える。遅延させれば既存の ex-data → status マッピングに乗り、
+  cloud provider 拒否は `stream: true` でも 403 のまま。header-first は自明な
+  『簡略化』であり、それがこのバグを黙って復活させるので ADR-0004 に記録した。
+
+  **2. identity conformance**（aozora-engine）。`describeRepo` を registry を読む実装に
+  置き換え、`handleIsCorrect` を lexicon どおりの意味（handle と DID が互いを指す）に。
+  registry 行の無い did:key は自分の DID を handle と称さず atproto の
+  `handle.invalid` + false を返す。`did:web` 派生は**パス無し**のみ受理する
+  （`did:web:host:a:b` のコロンをドットに直すと別ホストを指す文字列になる）。
+  `collections` は測定する。
+  `resolve-handle` の **miss 時の派生は残した** — unkeyed actor の identity は
+  `did:web:<handle>` そのもので、AppView も同じ派生をしており、消すと manga /
+  creator / game actor が全部無名になる。**failure 時の派生だけを止めた**:
+  registry 行を持つ keyed account が間欠的に別の DID として返り、その DID に書いた
+  caller は解決していない repo に書き込む。最初は派生ごと消そうとしていて、それは
+  誤りだった。
+
+  **3. fleet を MCP で出す**（cloud-itonami-app）。`fleet/tools` が JSON-Schema 付きの
+  descriptor を、`fleet/search-tool` / `call-tool` が behaviour を既に持っており、
+  `kotoba-lang/org-anthropic-mcp` が純粋な JSON-RPC dispatcher を持っていた。よって
+  **アダプタ**であり第 2 の tool 層ではない。transport は stdio（loopback server 上の
+  route にすると `/v1/*` に続く 2 本目の無認証面になる）。browser / computer tool は
+  承認と実行の間に frontmost app を検証するため、consent が client 側にある protocol
+  では意味を失うので出さない。mail / calendar / drive / chat は Passkey session の
+  後ろにあり、session の無い面から迂回しない。**これは当初 owner に約束した範囲を
+  意図的に狭めており、黙って落とさず理由を明示した。**
+
+  **4. 統合 query 面を直して常駐化**（superproject）。loader が
+  `orgs/gftdcojp/cloud-murakumo-market-intel/…` を指していたが west は repo を
+  `orgs/network-awai/` に移しており、**ファイル欠損時に無言で空を返す**実装だった
+  ため看板クエリが死んでいた。west の `path:` から解決し、欠損は stderr に出す。
+  さらに 37 秒の内訳を測ると**ロードが全部**で、ロード済み db への 3-way join は
+  14〜33 ms。よって遅さは query ではなくプロセス寿命であり、**常駐**が答えだった。
+
+  **やらなかったこと**も決定である: `:contract` は pipeline を通したが値は入れて
+  いない（どの actor も descriptor を出していないので、入れれば 1,212 件すべてに
+  nil を書いて『やった』と称することになる）。live PDS への再 deploy もしない
+  （下記の事故と、別セッションが同 worker に進行中のため）。"
+
+  :adr/landed
+  "cloud-itonami-app:
+   - #9  29689ba0a03  Stream /v1/chat/completions（ADR-0003）
+   - #11 61657945e43  Serve the fleet over MCP on stdio（ADR-0004）
+   - #12 bd5a3a317a0  Regenerate the fleet catalog
+   - #13 efd55b67044  Catalog: carry the ten advanced pins
+   default branch: efd55b67044 以降
+
+   aozora-engine:
+   - #3 f0ea32b9d81  describeRepo reads the repo's identity
+   - #4 6a6febc7249  Warn against deploying the PDS from main
+   default branch: 6a6febc7249
+
+   superproject (com-junkawasaki/root):
+   - #1439 40d9c91b790  edn-query: resolve market-intel through west
+   - #1440 10e88e10af8  edn-query: serve the plane over MCP
+   - 4ab7008915b  west: deployed actor 10 本の pin 前進（各 verify-west-pins 済み）
+   - a41e32bf6ae  west: cloud-itonami-app pin -> efd55b6704
+
+   open PR は 0。私の branch / worktree の残存も 0。"
+
+  :adr/consequences
+  "実測値（すべて landed 後）:
+
+  - OpenAI 互換: 93 tests / 543 assertions / 0 failures、lint 0 errors。実 HTTP 2 hop
+    で SSE を確認（role chunk → content chunk → stop chunk → usage chunk → [DONE]、
+    upstream usage 伝播、denied provider は `stream: true` でも 403 application/json）。
+  - identity: 451 tests / 1597 assertions / 0 failures。`wrangler dev` で実 kotobase
+    graph に対し 400（従来 200）、did:key repo に `handle.invalid` + false、
+    federation-pilot repo に測定された collections、describeServer は 200 のまま。
+  - MCP (fleet): 174 tests / 861 assertions / 0 failures。実プロセスで
+    initialize → tools/list → fleet_search が catalog から 9 callable → fleet_call が
+    deployed actor の /health 200。
+  - catalog: `gen-itonami-fleet-catalog.cljs --check` が **catalog OK — 1212 actors,
+    10 callable**。修正前は --check 失敗、再生成すると『1212 actors, 0 callable』で
+    fleet の全アドレスを消すところだった。
+  - query 面: market-intel 0 → 5,200 entity、`:company/revenue-usd` 0 → 4,189、
+    company 372 → 5,572、total 111,162 → 116,392。market-intel × cloud-itonami-lei の
+    `:company/lei` 結合が **69 社**（loader のコメントが予測していた数と一致）。
+  - MCP (query plane): handshake 0.43s（面をロードしない）、初回 query で 46s ロード、
+    3 query 合計 47.15s。`company_profile \"Walmart\"` が LEI / legal-name /
+    jurisdiction US-DE / revenue 713,163,000,000 / ToS URL を datalog なしで返す。
+
+  **本番障害を 1 件起こして戻した。** PDS を main から deploy したところ
+  resolveHandle / getAccount が 502（datoms 401 Unauthenticated）に退行。原因は私の
+  変更ではなく、main が同梱していた storage-d1 transport cutover と wrangler.jsonc の
+  vars。**同じ退行を別セッションが 90 分前に起こして戻していた**（03:25Z と 04:22Z、
+  どちらも 0f6b2712 へ rollback）。両者とも test は green で build も clean だった。
+  `wrangler-deploy-main-sync-guard` は checkout が main より**遅れている**ことを見る
+  ので、main そのものが壊れている場合は素通しする。aozora-engine#4 で
+  DEPLOY-RUNBOOK.md に警告・rollback 対象・退行を暴く 1 リクエストを置いた。
+
+  **作った上で捨てた設計が 2 系統ある**（どちらもコメント / PR に記録済み、再発防止）:
+  - `manifest/itonami-endpoints.edn` という endpoint authority + generator 対応。
+    parity まで通してから、**10 本すべての blueprint が既に upstream で
+    `:itonami.blueprint/endpoint` を宣言していた**ことに気づいて破棄。残していれば
+    generator の `carried` から endpoint キーを外し、その 10 件の宣言を黙って捨てて
+    いた。
+  - query 面の db ファイルキャッシュ。DataScript の serializable / from_serializable は
+    この db を往復できない（属性値に JS object があり `No reader function for tag
+    object.`）。さらに repo 直下に置くと自身の書き込みで root の mtime が変わり
+    **存在するだけで自己失効**した（106 MB）。"
+
+  :adr/resume-point
+  "優先度順。いずれも『次にこのコマンドを打つ』粒度:
+
+  1. **catalog --check を CI に載せる**（最小・最も再発防止価値が高い）。今は誰も
+     実行していないため、artifact と入力の乖離は静かに再発する。
+     検証: `nbb scripts/gen-itonami-fleet-catalog.cljs --check`（現在 exit 0、
+     `catalog OK — 1212 actors, 10 callable`）。orphan endpoint も exit 1 になる。
+  2. **query 面 MCP を client に登録して実運用に晒す**。
+     `{\"command\": \"nbb\", \"args\": [\"--classpath\", \".:scripts/nbb_compat\",
+     \"manifest/edn-query.cljs\", \"mcp\"], \"cwd\": \"<superproject root>\"}`。
+     初回 query が 46 秒かかることを承知の上で。
+  3. **`:contract` の proving slice**: 生きている 9 本のうち 1 本に descriptor を
+     serve させ、`manifest` 側ではなく actor 側から埋める。deploy を伴うので
+     上記の deploy 事故を踏まえて単独で行う。
+  4. **aozora の store 分裂**: PDS は hito-e2e-probe.aozora.app を listRepos にも
+     getAccount にも持たない一方、AppView は profile と posts を返す。identity 面が
+     実アカウントに誤った DID を返し続ける。別セッションの storage cutover 進行中の
+     ため未着手。落ち着いたら
+     `curl -s 'https://pds.aozora.app/xrpc/com.atproto.identity.resolveHandle?handle=hito-e2e-probe.aozora.app'`
+     が did:key を返すか確認するところから。
+  5. **did:key は atproto の identity method ではない**（spec は did:plc / did:web のみ）。
+     外部 client は #3 が live でも解決できない。did:plc 移行か `*.aozora.app` の
+     `/.well-known/atproto-did` を wildcard route で配るかの**オーナー判断**待ち。
+  6. **describeRepo の `handleIsCorrect`**: 派生 DID に対して現在 true を返すが、
+     証拠が無い repo は `RepoNotFound` が筋。store 分裂の最中に変えると実アカウントを
+     404 にして別セッションの調査を壊すので保留。"
+
+  :adr/preserved-owner-wip
+  "触っていないもの（すべて他セッション）:
+
+  - superproject 共有 checkout の未コミット変更: `.mcp.json`、
+    `90-docs/repo-reality/repo-reality-ledger.edn`、staged な `scripts/fleet-ci/*`。
+    これが原因で共有 checkout は origin/main へ ff できない（私の変更は origin/main
+    上で検証済み）。
+  - stash@{0}: 別セッションの closing が退避した west.yml（『pin 退行の疑い、
+    origin/main より 10 行少ない』）。その 10 行は私の pin 前進 4ab7008915b と一致
+    するので、退避判断は正しい。drop していない。
+  - branch: `agent/form-submissions`（superproject）、`agent/ao-worker-multi-org` /
+    `agent/passkey-feedback` / `agent/platform-passkey`（cloud-itonami-app）。
+  - worktree: tamaki-workspaces 配下 3 件、session f2e64a99 の wt-app / wt-auth /
+    wt-probe、`/tmp/cloud-itonami-passkey.LxPMWm`、`orgs/cloud-itonami/.wt-passkey`、
+    `orgs/gftdcojp/.aozora-engine-tamaki--*` 4 件。
+  - live worker `app-aozora-pds` は別セッションが継続 deploy 中（04:24Z / 04:33Z）。
+    最終確認時点で healthy、かつ #3 の identity 修正を積んだ版が live。"
+
+  :adr/body
+  "この session の一貫した教訓: **必要だったのは新規実装ではなく、既にあるものを
+  呼べる状態にすることだった。** 4 件中 3 件は『機能は存在するが wire format /
+  path / プロセス寿命が欠けている』であり、1 件（endpoint authority）は既に他者が
+  正しく直していたので自分の実装を捨てた。
+
+  逆向きの教訓も 1 つ: **共有面への deploy と共有 checkout は、他セッションの
+  進行中作業と衝突する。** 本番障害は『自分の変更は正しいが main が同梱していた
+  他人の未リリース作業を一緒に出荷した』ことで起き、pin 前進は共有 checkout が
+  2 回リセットされたため最終的に GitHub tip に対して直接書いた。"}]

@@ -1,0 +1,67 @@
+[{:db/id -1
+  :adr/id "ADR-2608140500"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "accepted"
+  :adr/date "2026-08-14"
+  :adr/last_verified "2026-08-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/title "ADR-2608140500: 実行 origin は {cidv1b32}.ipfs.itonami.cloud / {k51}.ipns.itonami.cloud。path gateway は bytes のまま"
+  :adr/topic "ipfs-subdomain-execution-origin"
+  :adr/repos ["orgs/net-kotobase/ipfs"]
+  :adr/related ["90-docs/adr/2607072000-gftdcojp-net-kotobase-ipfs-gateway-split.edn"
+                "90-docs/adr/2608057000-org-is-a-host-not-a-path-segment.edn"
+                "90-docs/adr/2608145100-public-resource-identity-is-cid-and-ipns.edn"
+                "90-docs/protocols/kotoba-resource-protocol.edn"]
+  :adr/authoritative_for
+  ["実行 origin のホスト形: https://{cidv1b32}.ipfs.itonami.cloud （CID が origin。path は identity ではない — ADR-2608145100）"
+   "可変 head のホスト形: https://{ipns-id-b36}.ipns.itonami.cloud"
+   "bytes retrieval: https://ipfs.kotobase.net/ipfs/{cid} と /ipns/{name}（HTML を出さない）"
+   "人向け URL は {org}.itonami.cloud/{repo} のまま"]
+  :adr/body "# ADR-2608140500: IPFS/IPNS subdomain execution origins
+
+## Status
+accepted — 2026-08-14（Worker 着地・helper 301・両 wildcard TLS・raw origin は R2・UnixFS HTML origin も live）
+
+## Decision
+
+実行可能な HTML は path gateway に載せない。IPFS の正準どおり、CID / IPNS id をホストの第1ラベルにする。
+
+| 面 | 形 | 返すもの |
+|---|---|---|
+| bytes | `ipfs.kotobase.net/ipfs/{cid}` `/ipns/{name}` | CAR / raw / octet-stream。`text/html` は落とす |
+| origin | `{cidv1b32}.ipfs.itonami.cloud` | 実行 origin。CID がホスト。`text/html` 可。path は identity ではない（ADR-2608145100） |
+| origin | `{k51…}.ipns.itonami.cloud` | 同じ。mutable。短い cache |
+| helper | `ipfs.itonami.cloud/ipfs/{cid}/…` | 301 だけ。HTML を出さない |
+
+`cloud.app` は NXDOMAIN なので使わない。`{cid}.itonami.cloud` は org ホストと衝突するので使わない。`app.itonami.cloud` は fleet-dispatch のまま。
+
+## SSL
+
+`*.ipfs.itonami.cloud` は Universal SSL（`*.itonami.cloud`）では覆えない。子ゾーンは Enterprise 専用。ACM の order API もこのゾーンでは 1450。
+
+既存の `{product}.itonami.cloud` custom domain と同じ経路: Workers custom domain が `ipfs.itonami.cloud` + `*.ipfs.itonami.cloud` の advanced pack を発行する。wildcard DNS は `AAAA 100::`（`*.app` には無く、こちらは任意 CID を受けるので必要）。
+
+CIDv1 base32 ホストは 64 文字 CN を超えうるので、ホストごとの個別 cert ではなく wildcard が必要。
+
+## 実測 2026-08-14
+
+- Worker `net-kotobase-ipfs` version `0.2.0`、commit `3831b749`（origin + raw CID の R2-first）
+- `ipfs.itonami.cloud/health` 200 `{\"ok\":true,\"version\":\"0.2.0\"}`
+- helper GET 301 → `https://{cid}.ipfs.itonami.cloud/`（HEAD は Worker が GET のみなので 405）
+- `{bafkrei…}.ipfs.itonami.cloud/` 200、39 byte、0.19s（R2 canary）。path 面と同じ bytes
+- path `ipfs.kotobase.net/ipfs/{canary}` は従来どおり 39 byte `application/octet-stream`
+- DNSLink を IPNS helper に載せると 400（path 面へ）
+- `{k51}.ipns.itonami.cloud` TLS 成立（未知キーは gateway 502）
+- wildcard cert `*.ipfs.itonami.cloud` / `*.ipns.itonami.cloud` とも active（Google Trust Services）
+- `{bafybei…}.ipfs.itonami.cloud/` UnixFS HTML 200 `text/html`（hello-world directory）
+
+canonical identity は `ipfs://{cid}` / `ipns://{k51}`（ADR-2608145100）。この ADR が所有するのは HTTPS 実行 origin のホスト形だけ。`/{unixfs-path}` は website-compat の gateway 投影であり、protocol の公開 URI ではない。
+
+## 残すもの
+
+- PSL に `ipfs.itonami.cloud` / `ipns.itonami.cloud` を載せるのは第三者 HTML を広く載せる段階
+- DNSLink の subdomain 符号化は未実装
+- origin Worker が UnixFS を展開している事実は 2026-08-14 時点の観測。protocol がそれを要求するわけではない
+"}]

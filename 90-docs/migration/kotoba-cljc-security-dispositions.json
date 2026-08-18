@@ -1,0 +1,1912 @@
+{
+  "schema": "kotoba.cljc-security-dispositions/v1",
+  "generated_on": "2026-07-19",
+  "authority": "reviewed-exact-call-head-safety-policy",
+  "preclassification_sha256": "61d75271cb30faf29dc2a927b90875f39dc6aa86c365c8ad697c37f077ac3637",
+  "path_count": 75,
+  "unique_content_count": 75,
+  "migration_authorized_count": 0,
+  "disposition_counts": {
+    "replace-with-bounded-data-reader-before-migration": 2,
+    "retain-security-test-oracle-through-cutover": 4,
+    "split-or-retain-dynamic-resolution-host-adapter": 69
+  },
+  "completion_rule": "Every exact dynamic-evaluation call is retained behind a host boundary or removed by a reviewed bounded-data refactor before migration.",
+  "clusters": [
+    {
+      "sha256": "01df737716bec28930a8a41b0a6949a59016a1522e4038ed3e65b5d6a2ce5a34",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-fuchi/test/fuchi/methods/test_pages_deploy.cljc",
+          "calls": [
+            {
+              "head": "read-string",
+              "line": 111
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "read-string"
+      ],
+      "disposition": "retain-security-test-oracle-through-cutover",
+      "migration_authorized": false,
+      "safety_basis": "clojure.core/read-string admits reader evaluation surface; use an explicitly bounded data decoder."
+    },
+    {
+      "sha256": "03585b058b6392ac566f270b70d3ac6e3b0b7a5846c50664de461d988f9fec62",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/50-infra/cluster/murakumo/cell-runner/lite_runner.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 173
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "042e115a45f8098f9b814c85c69f5c763900cf0b73171944b9d62316cb0edd30",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-yukkuri/lg-clj/src/lg_yukkuri/graphs/generate_bgm.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 35
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 36
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 37
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "049770a562893c9e7468924944851a12fa3a0fb74105d22cecad6bd5498c5343",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-jukyu/lg-clj/src/lg_jukyu/server.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 164
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 165
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 166
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "0b0884a7bf7fe12f70134e726a573a52a1962e4b5f6ac4a1598e21863b038322",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/kotoba-lang/aiueos/test/aiueos/launcher_test.cljc",
+          "calls": [
+            {
+              "head": "read-string",
+              "line": 102
+            },
+            {
+              "head": "read-string",
+              "line": 155
+            },
+            {
+              "head": "read-string",
+              "line": 242
+            },
+            {
+              "head": "read-string",
+              "line": 309
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "read-string"
+      ],
+      "disposition": "retain-security-test-oracle-through-cutover",
+      "migration_authorized": false,
+      "safety_basis": "clojure.core/read-string admits reader evaluation surface; use an explicitly bounded data decoder."
+    },
+    {
+      "sha256": "13656e2ae5e2cfb87e0197c98934f5c91b28f90d7591a1703ee09e8b217f3c7f",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-ibuki/methods/health.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 260
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "1937eaa5e79085065330a4c337562ba711cbd0d06e9907eca4a7f9c4152d7447",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/gftdcojp/ai-gftd-arms/clj/src/arms/store.cljc",
+          "calls": [
+            {
+              "head": "read-string",
+              "line": 40
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "read-string"
+      ],
+      "disposition": "replace-with-bounded-data-reader-before-migration",
+      "migration_authorized": false,
+      "safety_basis": "clojure.core/read-string admits reader evaluation surface; use an explicitly bounded data decoder."
+    },
+    {
+      "sha256": "19490c4c811cc153ceda89ce1437ca39b0e019bda2ecf96392fbbd0f6e84c183",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-ibuki/methods/test_autorun.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 56
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "1abc409b34b35da2598e35fe711222d44757b48857ba72474a6dd48ebc3290e6",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-ibuki/methods/infer.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 101
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 102
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 103
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "22e5a4a913e7262e50d3f964a76950cbb932581c963cf5974fc84d76fdc03f99",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-ibuki/methods/fleet.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 88
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 212
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 231
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "24389ad12a9d4d530bb1e560521aeb46ca9654dfb0753b0ebfcf1c3036b308b5",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-lawfirm/lg-clj/src/lg_lawfirm_intake/server.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 140
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "28f9d5165f7e352ce726fe0cf94f9d8cd462adc07eb156f0fa06fc9bd22b4a16",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/gftdcojp/net-kotobase/cli/src/kotobase/cli.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 118
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 119
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 120
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 164
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 173
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 180
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "2b0d28d0ef9a75f11547cdddf0580537222060cabc3537ad2f7f88df8f86312a",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-kyber/lg/lg_kyber/graphs/business_operating_react.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 157
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "2d0c5f7a4bff4b44201ceedf4a2594cd20ca7691140f7a627e97885497c662ad",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-jukyu/lg-clj/src/lg_jukyu/llm.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 46
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 47
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 48
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "2f7c68228e542f98cd7013afb9d97e01ace8958a0fc2a7a470a965f300bbf5ab",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/gftdcojp/app-aozora/40-engine/cljs/appview/src/aozora/appview/manga_export.cljc",
+          "calls": [
+            {
+              "head": "read-string",
+              "line": 13
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "read-string"
+      ],
+      "disposition": "replace-with-bounded-data-reader-before-migration",
+      "migration_authorized": false,
+      "safety_basis": "clojure.core/read-string admits reader evaluation surface; use an explicitly bounded data decoder."
+    },
+    {
+      "sha256": "2fe7cba5baa3c7f112a98f2593afc80e1fefef88b1de8fb1fa4150e31f8c8665",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-ibuki/methods/receipts.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 35
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "456d90033d2d5324ce85fc55c910153ff389b4b1c5737af5519dfe731c33ebe8",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-yukkuri/lg-clj/src/lg_yukkuri/graphs/generate_visual.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 40
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 41
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 42
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "4afe85677cd28ac5058c4cf6e81fcfab04e3318b89d65ea5bcdba50a17431abb",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-animeka/lg-clj/src/lg_animeka/graphs/breakdown_scene.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 34
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "4c2700893f29556fde54d79ff26ce465e5784cad25907744d65b0af6b686daba",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-open-patent/lg-clj/src/lg_open_patent/llm.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 45
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 46
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 47
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "4fa5b5422fae2af0cccd3c1efde2738c8e1ee6065778cfcdbd417fe9ee6e0055",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-open-isic/lg/clj/lg_open_isic/graphs/classify_entity.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 76
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 77
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 78
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "5239e87d736fe22aa74f2951f586987fc2d63ad7053a54133c7d14343017b39e",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-lawfirm/lg-clj/src/lg_lawfirm_intake/nodes.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 61
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 69
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 109
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "55804ca895a2c31a9f3c455c529c7d283efe8a355f175eac903478e9c880aecc",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/70-tools/src/etzhayyim/murakumo_cmd.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 420
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "5633e99dd57f24c0e166b6de9cb2fdf77e5c61abcbf3fab60962da547a56e8f2",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-ibuki/methods/test_kaizen_feedback.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 13
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "61cdbefda7f6164a68c111efe6386bf3d1f41aeea6fb8f762ae21be7eee7c23b",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-ibuki/methods/delegation.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 71
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "67d54f832e034a66a675de896525a73145544a1d29770bd9c5e4736c74374fb9",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-ibuki/methods/perception.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 96
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 97
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "7660184b7a57f9da91c3b3a0b6f3755f9741308d2b2f275bb3cb6dc4ccd41ae6",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-hakken/lg-clj/src/lg_hakken/xrpc.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 14
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 15
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 28
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 29
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 30
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "774250cd38dd6d6d4189f77651a18b70279dc8a9865982c36943ebfa1c0b1137",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-himotoki/methods/request.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 147
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "77f66e618d4d9fd1a77ad20fbde1420d16b9e901740d7be727d30c05a9041030",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-ki/lg-clj/src/lg_organism/llm.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 48
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 49
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 50
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "784f942731592bdb3e619cdb9639dcfef4205cdb04294fbab1024ae9d123ca9d",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-tadori/methods/ingest.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 52
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "7aae2b2f0cdb691dc9facd10320066682402ef2245ecb8ebe815ddb14e1c051a",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-tadori/tests/test_autorun.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 32
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "82d3c0ed0f4ee4ddb62613c4dee24d3a98fde261b39817e62d3eff126909570d",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-animeka/lg-clj/src/lg_animeka/graphs/generate_layout.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 35
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "8a6fe8d7bfe8bd0fe51ddae41fd7ad2947fb66d6f9d6a97fa77aed4ff1630fc5",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-recap/lg-clj/src/lg_recap/graphs/get_info.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 55
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 56
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "8b06cebd425e81b5cbb8745c32abf67f8e5d71316672dd4117ce28821eeb21f4",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-ki/lg-clj/src/lg_organism/server.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 59
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 122
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 123
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 144
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "8c9d63e7fdc49b108309e82edfe6faec01e99668049091ad0815e6ade59ff9a1",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-recap/lg-clj/src/lg_recap/graphs/summarize.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 83
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 84
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 85
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "8d0a31615c3b3bc2e2199c98c1cda2d5302c539e3bb98df4af5d863ba0985464",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/70-tools/src/etzhayyim/observatory_sign.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 30
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "90e7953607294ff36b2599a91c6207c8250907a40a81c375bb5e3150c6616002",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-watatsuna/methods/test_ingest.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 174
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "94ae950737f797e0bc2ef822e948d7386ca02b422a507d5db4453ecf469a2277",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-aburi/methods/ingest.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 488
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "95892304858e0360df90b1e94ca6281f071c29ec1f826314ec8396489fabb4d6",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-ibuki/methods/test_kotoba_bridge.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 165
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "98a7a831296ac8476e04a8d97f3cdf99cf3c40f84019ec4f13c9a58fd1040731",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-jukyu/lg-clj/src/lg_jukyu/graphs/extract_shocks.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 36
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "9ccc8264eb40b5d555c6c470110bf50f7d66ae316aa7f038ec30eb88f94ea960",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-kanjo/methods/ingest.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 157
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "a79a403dae2aba7b123c88f2fdeefe01e7687d17969f02ae6a80423757ce4ff9",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-yukkuri/lg-clj/src/lg_yukkuri/audit.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 27
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 28
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "a7b8f383682ff4ca99c5ee68207797de6b47799e070adbd9f61efd41f2ae89d6",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-ibuki/methods/autorun.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 77
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "a8ffd0f2d0f807de07c44a0021141aad4e5df0aab8ab2a736a0dd607725d85b4",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-ibuki/methods/kaizen_feedback.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 56
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "a96e0b58fe9c342a0f27d61e49eed99e281caaea8251d82c07aab1b4644e60bd",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-dougaka/lg/src/lg_dougaka/server.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 104
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "ad04caad33fb4375f982eddc45128313c08a810f02bc35477cef430d33acda2c",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/70-tools/src/etzhayyim/vitals.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 621
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 622
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 623
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 624
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 625
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "af0bec11ffe8cf9f07cbcfbbe38e79fb91da5947025a806bba065eff6205d44a",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-yukkuri/lg-clj/src/lg_yukkuri/graphs/synthesize_voice.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 36
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 37
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 38
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "b1858ae8a6be8823c62707f1c36d89fc33269e22571209800124b23980d101e5",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-ibuki/methods/kotoba_bridge.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 205
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 206
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 207
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "b372d95b9c7d8eaa3a5886c5b728ca244809b38f9da1f4d9dcbd31bb8f069d6b",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-ibuki/methods/test_fleet.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 27
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "b62151b74a23e65d8cd49d9438d85cfc73ef7b397a3fb6f02de1b2ed5a3bef15",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-pregel/lg-clj/src/lg_pregel/murakumo.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 32
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 33
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 34
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "bb2911e14beb4fc5c01af42da36b7c5a5a3758bee3d5519fa715ad64599471a7",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-tadori/methods/transact.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 29
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 30
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 31
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "bc0a3b5340ecea2bba110ae3118f1354fe835d35f321add976dc99569bb18938",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-animeka/lg-clj/src/lg_animeka/graphs/design_color_model.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 25
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "bc1d3f26f0634124d5ceccdebce41e04583c4067f74421191576f2635c287642",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-kenkyusha/lg-clj/src/lg_kenkyusha/graphs/research_loop.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 79
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 80
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 81
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "be6a561f0d5387f5ec044d027f3556597e3a034dba0f67bf64b97060f44d955b",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-ibuki/methods/drainer.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 50
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "c2caf7ea9cae933fe7f8ae9ab97bb718cc38ed1cd14962dc59b8aa57fd80d97b",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-pregel/lg-clj/src/lg_pregel/server.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 182
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 233
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 234
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 235
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "ce8e6ec3a0976443c46d323368c3963e8e6a069b1ba1ecb38deb1161b9aa4b13",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/70-tools/src/etzhayyim/identifier_audit.cljc",
+          "calls": [
+            {
+              "head": "resolve",
+              "line": 92
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "cf88bb834e54ce7496572dddcee4327dfd362e8850b3f1b5f44469d3e9de575a",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-yukkuri/lg-clj/src/lg_yukkuri/graphs/review_video.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 44
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 45
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "d0240182f63d99d619958df254f98a946136d6ca6dc9fa15ee65a1aec7cf17d6",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-jukyu/lg-clj/src/lg_jukyu/audit.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 47
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 48
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "d362bd3f9b3f6f84e117000570021f92af4a04bfb0b0d01ab9817ebf2ef0bae0",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-hakken/lg-clj/src/lg_hakken/kotoba_datomic.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 107
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 108
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 109
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "d498f935eb55f86b3a0854b9e74258afbdb88d284262a9dbf783ee15a104515e",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-ibuki/methods/member_submit.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 72
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 73
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 74
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 75
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 184
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "d7e721168c4a74184b4bda8acdfa416de559f4c129f2af98d6d94355cc9d53db",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-yukkuri/lg-clj/src/lg_yukkuri/llm.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 42
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 43
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 44
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 71
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "da1d74f2a586cbc799588453c3caa2fa116e7b5b3858f207be6bb0ee5e0fc6bd",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-animeka/lg-clj/src/lg_animeka/llm.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 55
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 56
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 57
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "db3bd1fe630644f339cad62c61811a3d91a15e058be294b4ad8d971b73768ad3",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-animeka/lg-clj/src/lg_animeka/graphs/autopilot.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 71
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "de5021b2bfa653f3d949618b34e97f212dac264c96f5a303fa7cfefe8fe8e3a5",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-animeka/lg-clj/src/lg_animeka/server.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 182
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 189
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 209
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "e295413e823a6ae7d9e7f8f53b23167c17fd18afd5d48d1e582dcfcec0116a5f",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-animeka/lg-clj/src/lg_animeka/audit.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 35
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 36
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "e6cdca394b5c746e4ecbbff98019c179f2ac822959d1c48a287c3d10ea5f2b13",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/70-tools/scripts/bench/langgraph_coding/diff.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 147
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "f01386197a5f07ce306da9ccd791098635b0d5c5018a655add275a5d167e32ff",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-ibuki/methods/test_datoms.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 99
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "f093a6b43f669bc53b45f3c5ca2484bfdd928f2ab880f9ca002b5e692b4042eb",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-ibuki/methods/kaizen_outcomes.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 70
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 71
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 128
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "f1d7f94a9096ede5df7dbd69bd2859ac7748998350fc7de6cfe6a14d4efd1632",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-yukkuri/lg-clj/src/lg_yukkuri/graphs/render_video.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 31
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 32
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 39
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "f2fc39a7652895935242e93eaad212aca5a59aca1fa90a5d0b548d450011a60c",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/70-tools/src/etzhayyim/database.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 218
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "f56ac4737aa8e5d83c4b66ce711833e894fd345a582fcbcc33dc7dcc56f12425",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/70-tools/src/etzhayyim/actor_deploy.cljc",
+          "calls": [
+            {
+              "head": "resolve",
+              "line": 36
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "f6b3ac0053a423c5bc41bb81d98827b7123770ec7c7b51626a9ae7029fd06c30",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/root/60-apps/etzhayyim-project-recap/lg-clj/src/lg_recap/graphs/download.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 45
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 46
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "fb73af4f0854845e8a5afc51a2fe55c2a2a8a3643622423954b5a9f053148e6e",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-fuchi/test/fuchi/methods/test_pages_publish.cljc",
+          "calls": [
+            {
+              "head": "read-string",
+              "line": 21
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "read-string"
+      ],
+      "disposition": "retain-security-test-oracle-through-cutover",
+      "migration_authorized": false,
+      "safety_basis": "clojure.core/read-string admits reader evaluation surface; use an explicitly bounded data decoder."
+    },
+    {
+      "sha256": "fde0d51c8cac451082706af940e9ceb244d5a9aa4a399a1efb30d4062a852e55",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/etzhayyim/com-etzhayyim-aburi/methods/kotoba_bridge.cljc",
+          "calls": [
+            {
+              "head": "requiring-resolve",
+              "line": 108
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 109
+            },
+            {
+              "head": "requiring-resolve",
+              "line": 110
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "requiring-resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    },
+    {
+      "sha256": "fe3091d96af1ac3807de66612b002bd8beebaf1689f9dd41b90d994e376abc2d",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/kotoba-lang/aiueos/test/aiueos/decide_test.cljc",
+          "calls": [
+            {
+              "head": "read-string",
+              "line": 59
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "read-string"
+      ],
+      "disposition": "retain-security-test-oracle-through-cutover",
+      "migration_authorized": false,
+      "safety_basis": "clojure.core/read-string admits reader evaluation surface; use an explicitly bounded data decoder."
+    },
+    {
+      "sha256": "ffee9373d8b37716cbfd3e725cf67b1a22aded4018ec42559c80a14f2c3d1751",
+      "path_count": 1,
+      "paths": [
+        {
+          "path": "orgs/kotoba-lang/num/test/num/wgsl_test.cljc",
+          "calls": [
+            {
+              "head": "resolve",
+              "line": 21
+            }
+          ]
+        }
+      ],
+      "call_heads": [
+        "resolve"
+      ],
+      "disposition": "split-or-retain-dynamic-resolution-host-adapter",
+      "migration_authorized": false,
+      "safety_basis": "Runtime namespace/var resolution is ambient code authority and cannot cross the Kotoba boundary."
+    }
+  ]
+}

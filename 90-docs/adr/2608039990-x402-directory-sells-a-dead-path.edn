@@ -1,0 +1,113 @@
+[{:db/id -1
+  :adr/id "2608039990"
+  :adr/title "x402 公開ディレクトリが murakumo の死んだ path を売っている（未解決・要オーナー）"
+  :adr/status "open"
+  :adr/date "2026-08-03"
+  :adr/depends-on "ADR-2608026500（x402 の $0.01 が何を買うか）/ nexus-x402 ADR-0001（seller registry）"
+
+  :adr/context
+  "2026-08-03、cloud-murakumo の試験が 8 件赤のままだったので中身を見たところ、
+   3 件は陳腐化ではなく **実在の不一致**を報告していた。`catalog-agrees?` は
+   まさにこれを検出するために書かれた関数で、正しく動いていたが誰も走らせて
+   いなかった（2026-07-29 の同型インシデントの再来）。
+
+   ## 実測（すべて live）
+
+   公開ディレクトリ x402.nexus は murakumo の売り物をこう広告している:
+
+       seller       murakumo
+       method       POST
+       path-prefix  /x402/v1/messages
+       price        $0.01 USDC (base)
+       payTo        0xA00366234D29d4F882088048c0B2fa0dB7302D4E
+       gateway      https://x402.nexus/gateway/murakumo/x402/v1/messages
+
+   一方 murakumo 自身の `/.well-known/x402` が売っているのは
+   `/x402/v1/chat/completions` **だけ**。`/x402/v1/messages` は 2026-08-02 に
+   `priced-resources` から外された —— ANTHROPIC provider に解決するが
+   `MURAKUMO_ANTHROPIC_URL` が未設定で、コード内コメントが自ら
+   『advertised, paid for, verified -- and then threw』と記録している。
+
+   ## 何が起きるか
+
+       POST https://x402.nexus/gateway/murakumo/x402/v1/messages
+         → 402 challenge（$0.01 USDC を murakumo の treasury へ）
+       払うと gateway が origin へ転送:
+         POST https://murakumo.cloud/api/x402/v1/messages
+         → 405
+
+   **公開ディレクトリ経由で $0.01 払うと何も得られない。** 今日 3 度目の
+   同じ失敗形（1. 2026-08-02 の plan、2. hardware 持分 SKU、3. これ）。"
+
+  :adr/decision
+  "murakumo 側でできることは実施済み。**nexus 側は未実施** —— 私では直せない。
+
+   ## 実施済み（deploy 204b1e46、live 確認済み）
+
+   Worker は `/x402/` 配下を『proxy route に解決できれば課金対象』と判定して
+   いた。`priced-resources`（唯一の正）を見るように変え、売っていない path で
+   402 を出さないようにした:
+
+       POST /x402/v1/messages          → 404（以前は 402 = 払えた）
+       POST /x402/v1/chat/completions  → 402
+
+   404 の文言も宣言から導出する（以前はハードコードで `messages` を billable と
+   書き続けていた）。`x402-offer/sells?` と `sold-paths` を追加。
+
+   ⚠ **この修正は gateway 経路を守らない。** gateway は `/api` 側へ転送するので、
+   直接 `/x402/...` を叩く経路の防御でしかない。
+
+   ## 未実施（オーナー判断が要る）
+
+   1. **`ADMIN_TOKEN` が要る。** nexus の registry 更新は
+      `PUT /admin/sellers/murakumo`（bearer 認証）。このトークンは Worker secret
+      で読み戻せず、`secrets-location-map` skill にも記載が無い。**当て推量で
+      vault を探索しない**（安全床⑦: 総当たり access の禁止）。
+
+   2. **正しい rule 値そのものが設計判断。** 単に path-prefix を
+      `/v1/chat/completions` へ替えても解決しない ——
+      転送先 `https://murakumo.cloud/api/v1/chat/completions` は **401**
+      （通常の /api 経路は token 認証）。`SELLERS_JSON` の fallback
+      （`/v1/messages` + origin `/api`）も同じ理由で壊れている。
+
+      つまり **決済後に gateway が origin へ認証する経路が存在しない。**
+      murakumo 自身の `/x402/...` は自前で支払いを検証するので、そちらへ
+      転送すると二重課金になる。どちらの形にするかは設計の選択:
+
+      (a) gateway 専用の認証（nexus に murakumo の service token を持たせ、
+          origin を `/api` のままにする）
+      (b) origin を murakumo の `/x402/...` にし、murakumo 側が
+          『nexus が決済済み』を信頼する経路を持つ（信頼境界が増える）
+      (c) gateway 経由の販売をやめ、registry から murakumo を削除して
+          直接経路（`/.well-known/x402`）だけで売る
+
+   ## 当面の被害限定
+
+   (c) の一部 —— `DELETE /admin/sellers/murakumo` で stale な KV rule を消すだけ
+   でも『払えて何も返らない』は止まる（ただし `SELLERS_JSON` の fallback も
+   壊れているので、そちらも同時に外す必要がある）。**これにも ADMIN_TOKEN が要る。**"
+
+  :adr/consequences
+  "## 学び —— 検出器を書いても、走らせなければ意味がない
+
+   `catalog-agrees?` は 2026-07-29 のインシデント後に『runbook の注意書きでは
+   なくテスト付きの関数にした』と docstring に明記して書かれた。それが正しく
+   不一致を報告し続けていたのに、**suite が 8 件赤のまま常態化していたので
+   ノイズに沈んでいた**。赤い suite は検出器を無効化する。
+
+   今日 suite を 0 failures に戻した（360 tests）。この 3 件が緑になった今、
+   次に赤くなったら本物の不一致である。
+
+   ## 隣接する再発
+
+   同じ日に見つかった 2 件も『宣言と消費側のずれ』という同じ形:
+
+   - hardware 持分 SKU が `purchasable?` の履行ゲートを通らない
+     （`(or (not (plan? sku)) ...)` が plan 以外を無条件に通す）
+   - Worker の x402 課金判定が `priced-resources` でなく route 表を見ていた
+
+   **正本を 1 箇所にしても、消費側が別の表を見ていればずれは残る。**
+   宣言を足すときは、それを読まない経路が残っていないかを同時に確認する。"
+
+  :source/dataset "adr"
+  :source/file "90-docs/adr/2608039990-x402-directory-sells-a-dead-path.edn"}]

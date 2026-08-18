@@ -1,0 +1,329 @@
+[{:db/id -1
+  :adr/id "adr-2607289600-repo-taxonomy-three-planes"
+  :adr/title "ADR-2607289600: agent / person / organisation / actor / organism / service / system を 3 面 (identity / runtime / role) に分解し、証拠ベースで機械分類する"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-28"
+  :adr/last-verified "2026-07-28"
+  :adr/last_verified "2026-07-28"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "repo-taxonomy-three-planes"
+  :adr/authoritative-for
+  ["agent / person / organisation / actor / organism / service / system の 7 語が、単一の階層ではなく identity 面 / runtime 面 / role リンク / scope の 4 種に分かれること"
+   "identity 面 (person | organisation | agent | organism) の定義と、それぞれが持つ責任の種類"
+   "runtime 面 :repo/kind の値域と、kind が排他・traits が非排他であること"
+   "ISCO は person の役割、ISIC / LEI / assoc / ISO3166 / COFOG は organisation の役割という role リンクの対応"
+   "分類を repo 内の証拠から導出し、名前 glob をフォールバックに降格すること"
+   "責任の連鎖 (person -> organisation -> actor -> Governor -> agent -> 台帳 -> organism) と、その各段で越えてはならない境界"
+   "organism は layer ではなく合成であり、manifest/layers.edn に :layer-organism を追加しないこと"
+   "manifest/repo-taxonomy.edn が生成物であり手編集禁止であること"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2606302300-org-taxonomy-4-orgs"
+   "adr-2607171100-west-layer-taxonomy-root-dissolution"
+   "adr-2607172300-kotoba-artificial-organism-fabric"
+   "adr-2607232130-asi-readiness-assessment-etzhayyim-kotoba"
+   "adr-2607261601-etzhayyim-org-reorg-audit"
+   "adr-2607171600-docs-edn-only"
+   "adr-2607252000"
+   "manifest/layers.edn"
+   "manifest/kotoba-boundaries.edn"
+   "manifest/repo-maturity.edn"
+   "manifest/fleet-agents.edn"
+   "90-docs/audits/etzhayyim-reorg-audit.datoms.edn"
+   "80-data/system/artificial-organism-actors.json"]
+
+  :adr/body
+  "# ADR-2607289600: 7 語を 3 面に分解し、証拠ベースで機械分類する
+
+**Status**: accepted
+**Date**: 2026-07-28
+**Deciders**: Jun Kawasaki (+ Claude、standing authorization により設計・実行)
+**Scope**: superproject の分類メタデータ全体 (`manifest/`)、および west 登録 3,817 project
+
+## Context
+
+オーナーの問い: 「agent, person, organisation, actor, organism, service, system で
+それぞれ整理するとどうなるか」。
+
+この 7 語を 1 列に並べようとすると必ず破綻する。`actor` と `person` は排他でなく、
+**actor は person/organisation の役割を実行時に実装したもの**だからである。同様に
+`service` は org でなく deploy 単位、`system` は実体でなく集合である。
+
+既存の分類軸はすでに 4 つあり、それぞれ正本を持つ:
+
+| 軸 | 正本 | 状態 |
+|---|---|---|
+| org (法人格・ライセンス・憲章) | ADR-2606302300 (4 org) | 稼働 |
+| layer (依存方向 DAG) | `manifest/layers.edn` + `scripts/verify-layer-deps.cljs` | **定義のみ**。west.yml に `layer-*` group は 0 件、`gen-west-manifest.cljs` は layers.edn を読んでいない (Wave 2 未実行) |
+| role/prefix (`loop-*`/`skill-*`/`action-*`/prefix なし=lib) | `resources/repository-rules.edn` | kotoba-lang の 5 repo にローカル散在 |
+| maturity | `manifest/repo-maturity.edn` (生成物) + `:itonami.blueprint/maturity` | 稼働 |
+
+欠けているのは **「誰が起動し、状態はどこにあり、誰が責任を負うか」の軸**である。
+7 語のうち person / organisation / agent / actor / organism / service はすべてこの軸の値で、
+それが org 名や layer 名に混ざり込んでいた。実例:
+
+- `cloud-itonami` は GitHub org **かつ** product 名 (`orgs/gftdcojp/cloud-itonami`) **かつ** blueprint catalog 名
+- `gftd` は org 名 **かつ** service brand **かつ** `gftd-*-actor` の actor prefix
+- `etzhayyim` は org 名 **かつ** 宗教法人格 **かつ** artificial-organism アーキテクチャの出所
+
+さらに **名前 glob による分類はすでに実測で破綻している**: `manifest/layers.edn` は
+`com-etzhayyim-*` を `:layer-actor` と定義するが、`90-docs/audits/etzhayyim-reorg-audit.datoms.edn`
+の実測は 612 中 actor 145 / library 466 である。名前は種別を教えてくれない。
+
+## Decision
+
+### D1. 7 語を 3 面 + 1 スコープに分ける
+
+| 面 | 問い | 語 |
+|---|---|---|
+| **identity** | 誰か / 何者か | person / organisation / agent / organism |
+| **runtime** | どう動くか | actor / organism / service (+ app / lib / corpus …) |
+| **role リンク** | この実装は誰の役割か | identity 面と runtime 面をつなぐ辺 |
+| **scope** | どこまでを 1 つと見るか | system (実体ではなく集合の宣言) |
+
+`system` を entity にしない。system は member の集合を宣言するものであって、
+それ自体が起動されたり責任を負ったりしない。
+
+### D2. identity 面 — did / lei を持ち、責任を負うもの
+
+| 語 | 定義 | 負う責任 | 実体 |
+|---|---|---|---|
+| **person** | 自然人 | 最終決定・承認・approval gate | `com-etzhayyim-kaname` の `identity.edn` のみ (最も薄い、D6 参照) |
+| **organisation** | 法人・団体・政府 | 事業活動・法的義務・管轄 | LEI 185 (`:company/lei`) / assoc 80 / ISO3166 225 / COFOG 5 |
+| **agent** | 計算主体。鍵を持ち grant を受けて実行する | **domain 責任を負わない**。委譲された範囲の実行のみ | `manifest/fleet-agents.edn` 4 体 |
+| **organism** | 常駐 loop を持ち、自分の did で対外発話する合成体 | 自分の post / 提案の帰属 | `80-data/system/artificial-organism-actors.json` 9 identity |
+
+agent の定義はすでにコードで確定している — `{:signer :did :agent :kagi :grants :enrolled}` に
+**`:grants` はあるが `:domain` は無い**。agent は「誰かの代わりに動く鍵」であって
+何かの専門家ではない。ADR-2607172300 の不変条件
+'a worker never mints its own authority' がそのまま形になっている。
+
+**organism は identity 面と runtime 面の両方に現れる唯一の語である。** did を持つ (identity)
+と同時に、heartbeat で自分から起きる実行形態でもある (runtime)。これは矛盾ではなく、
+organism が「actor 群 + 常駐 loop + identity」の合成だからである。
+
+### D3. runtime 面 — 起動主体と状態で分ける。kind は排他、traits は非排他
+
+| kind | 誰が起動するか | 状態 | 権限 |
+|---|---|---|---|
+| `actor` | 呼ばれて動く (request-scoped) | append-only 台帳 | `:effect :propose` のみ。Governor が reject -> HOLD 可 |
+| `organism` | 自分で起きる (heartbeat) | datom log + mood + memory | actor 群を束ね、自分の did を持つ |
+| `service` | 外部から叩かれる | tenant DB + 課金 | SLA / ACL / quota |
+| `app` | 人が開く | UI state | ユーザー権限 |
+| `lib` | 呼ばれる | なし (純関数/契約) | なし |
+| `corpus` | されない | データそのもの | — |
+| `organisation-record` | されない | 実在法人の記録 | — |
+| `tombstone` | されない | MOVED / NOT-MIGRATED マーカーのみ | — |
+| `docs` / `blueprint-only` / `unclassified` / `absent` | — | — | — |
+
+**actor でありかつ service にデプロイされている repo は珍しくない** (実測 5 件)。
+優先順位の取り合いをせず、`:repo/kind` に主種別、`:repo/traits` に検出した全シグナルを残す。
+
+### D4. role リンク — ISCO は person、ISIC / LEI / assoc / ISO3166 / COFOG は organisation
+
+実測ですでにこうなっている:
+
+| identity | 分類標準 | repo 数 | governor 実装 | 意味 |
+|---|---|---:|---:|---|
+| person の職業 | ISCO-08 | 340 | 340/340 | 'Community Database Practice' = 人がその職業で何をするか |
+| organisation の事業 | ISIC Rev.5 | 460 | 440/460 | 'Manufacture of other chemical products' = 法人が何を営むか |
+| organisation の実体 | LEI | 185 | 31/185 | `:company/legal-name` `:company/jurisdiction` — データであって actor ではない |
+| organisation (業界団体) | assoc | 80 | **0/80** | `organization.edn` のみ |
+| organisation (政府) | ISO3166 / COFOG | 230 | 203/230 | 管轄と行政機能 |
+
+LEI と assoc に governor が無いのは欠陥ではなく **正しい**。あれは identity 面の記録で
+あって runtime 面の実装ではない。
+
+### D5. 分類は repo 内の証拠から導出する — `scripts/repo-taxonomy.cljs`
+
+生成物 `manifest/repo-taxonomy.edn` (手編集禁止)。規律 4 点:
+
+1. **名前 glob で層/種別を決めない。** 判定は `governor.clj*` / `blueprint.edn` /
+   `wrangler.*` / `organization.edn` / README 宣言などリポ内の証拠から行う。
+   名前は証拠が無いときの弱いフォールバックとしてのみ使い、`:role/derived-from \"name\"` に必ず残す。
+2. **捏造ゼロ。** 判定できない repo は `\"unclassified\"` にし、理由を `:repo/kind-evidence` に書く。
+   デフォルト値で埋めない (`scripts/repo-maturity.cljs` と同じ規律)。
+3. **握り潰さない。** blueprint パース失敗・checkout 欠落・スキャン打ち切りは
+   件数を集計して stderr に WARNING で報告する (docs/EDN 面の `warn-skipped!` 規約)。
+4. **kind は排他、traits は非排他。**
+
+結合キー: `:repo/path` (runtime 面、`manifest/repo-maturity.edn` と共通) /
+`:company/lei` (identity 面の法人キー、market-intel・cloud-itonami-lei と共通) /
+`:entity/did` (agent・organism) / `:source/dataset \"repo-taxonomy\"` (出自)。
+
+**3 面は必ず同じ ref に置く。** ADR-260726-kotobase-query-plane-is-one-ref のとおり
+Datalog join は ref 1 本しか届かないので、面を分けると『この organisation の事業を
+実装している actor はどれで、どの agent が実行し、どの service に載っているか』が
+二度と 1 クエリで引けなくなる。
+
+### D6. person 面のギャップは埋めずに記録する
+
+340 repo が person の職業役割 (ISCO) を実装しているのに、identity 面の person entity は 0 件。
+approval gate と bounded-spend の帰着先が person である以上これは穴だが、
+**捏造して埋めない** — `{:taxonomy/gap \"person-plane\"}` entity として明示する。
+
+### D7. 責任の連鎖 (不変条件)
+
+```
+person ──approve──▶ organisation ──charter/policy──▶ actor
+                                                       │ propose
+                                                       ▼
+                                                    Governor ──reject──▶ HOLD
+                                                       │ admit
+                                                       ▼
+agent ──grants(限定)──▶ 実行 ──receipt──▶ 台帳 ──fold──▶ organism
+                                                              │ heartbeat
+                                                              └─▶ 次の propose
+```
+
+各段で越えてはならない境界:
+
+- **agent は actor になれない** — grant の範囲でしか動けず、domain の判断権を持たない
+- **actor は organisation になれない** — propose するだけで、法的責任は organisation 側
+- **organism は person になれない** — approval gate と bounded-spend は必ず person に返る
+  (ADR-2607232130: 無制限な再帰的自己改善を意図的に避けている、の根拠)
+- **service は identity を持たない** — deploy 単位であって、責任は運営する organisation にある
+
+### D8. organism を layer にしない
+
+`manifest/layers.edn` に `:layer-organism` を追加しない。organism は層ではなく合成であり、
+identity は repo でなく **product 単位** で `80-data/system/artificial-organism-actors.json` に
+登録されている (9 件)。この registry を organism の正本のままにし、repo 軸に混ぜない。
+
+## Implementation (実測、2026-07-28 初回生成)
+
+`nbb --classpath \".:scripts/nbb_compat\" scripts/repo-taxonomy.cljs --workspace <root>`
+— 3,817 west project (datalad 除く) を 12 秒でスキャンし 5,311 entity を生成。
+
+runtime 面 `:repo/kind`: lib 1625 / actor 1107 / absent 430 / organisation-record 323 /
+unclassified 112 / app 106 / tombstone 46 / docs 33 / corpus 27 / service 5 / organism 3
+
+role リンク `:role/for-kind`: organisation 955 / person 340
+(導出元 blueprint 912 / name 383)
+
+identity 面 `:entity/kind`: organisation 185 (LEI) / organism 9 / agent 4
+
+裏取りできた点:
+- person の role が **ちょうど 340** = ISCO repo 数と一致
+- organism と判定された 3 repo はすべて etzhayyim (`ibuki` / `kyoninka` / `sng`)。
+  `ibuki` の証拠は 'README organism declaration + heartbeat substrate'
+- `orgs/gftdcojp/cloud-itonami` は kind=`actor` (governor + wrangler)。
+  organism identity `itonami-organism.aozora.app` は identity 面にある —
+  D2 の『organism は両面に現れる』が実データで確認された
+
+## Consequences
+
+- etzhayyim 再編 (ADR-2607261601、actor 145 中 92 を cloud-itonami へ) が、org 軸だけの
+  議論から **kind 軸込み**の議論になる。実測 466/612 が library なので、org だけで
+  移送先を決めると library が actor org に紛れ込む
+- `manifest/layers.edn` の Wave 2 (west groups への `layer-*` 投影) が
+  `kind-*` group と同時にできるようになる — ただし **本 ADR では実施しない** (下記)
+- 分類が query 面に載るので `[:find ?repo :where [?e \"repo/kind\" \"actor\"] …]` で
+  maturity / org / role と join できる
+
+## 既知の限界 (握り潰さず記録する)
+
+1. **absent 430** — west 登録 3,817 に対しローカル checkout が無い repo。分類不能を
+   `\"absent\"` として明示。全 checkout 後に再生成すれば埋まる
+2. **scan-truncated 35** — `orgs/etzhayyim/root` (1.7GB) 等は 4,000 file / depth 5 で
+   打ち切るため証拠が部分的。`:repo/scan-truncated true` で該当を明示
+3. **service 5 は下限値** — wrangler を持つ west repo は 42 件あるが、うち 5 件は actor、
+   32 件は tombstone が主種別 (kind は排他)。deploy 対象の全量は `:repo/traits` の
+   `:deploy-target` で引く。なお workspace 内の wrangler 137 件のうち大半は
+   dot-prefix の agent worktree で west 登録外
+4. **unclassified 112** — README/CLAUDE.md しか無い scaffold 段階の repo が主。
+   デフォルトで埋めず理由付きで残す
+5. **organism 3 は README 宣言ベース** — heartbeat 実装を持ちながら README で
+   organism と名乗っていない repo は取りこぼす。organism の正本は
+   `artificial-organism-actors.json` (9 identity) 側
+
+### D9. 層単位の操作は west groups への投影ではなく selector で行う
+
+**`groups: [cloud-itonami kind-actor]` への投影は採らない。** 代わりに
+`scripts/repo-taxonomy-select.cljs` が `manifest/repo-taxonomy.edn` を引いて
+west project 名のプレーンなリストを stdout に出し、`west update <names>` /
+`fleet sync --names` にパイプする。**west.yml を 1 バイトも変えない。**
+
+投影を捨てた根拠は 3 つとも実測 (2026-07-28):
+
+1. **`nbb scripts/gen-west-manifest.cljs --check` は main 上で既に STALE。**
+   groups を足すために全体再生成すると pin が **ローカル working HEAD** から
+   書き直される — CLAUDE.md が記録する『1 件の登録のつもりが壊れた pin を 44 件
+   main に流した』事故 (`90852b86`) と同じ経路になる。
+2. **`west list` に `--group-filter` が無い** (west v1.5.0: `unexpected arguments`)。
+   group による絞り込みは `west config manifest.group-filter` の**永続的な書き換え**を
+   要求し、『今この slice だけ触る』用途に使えない。
+3. **west の group 意味論は「どれか 1 つでも有効なら active」。** org group が既定で
+   有効なので、`kind-actor` を足しても org group を全部無効にしない限り絞れない。
+
+selector の契約は実測で確認済み: `--kind actor --present` の 1,107 名すべてが
+west 既知の project 名 (未知 0 件)。使用時の罠も 2 つ実測して usage に記載した —
+**zsh は変数を単語分割しない**ので `west update $NAMES` は 1 引数になって落ちる
+(必ず `xargs`)、**xargs の既定バッチは大きすぎて** 1,107 名一括で west が落ちる
+(`-n 400`〜`-n 1000` は通る)。
+
+## 実施しないこと (次段、別 PR)
+
+- ~~**`repository-rules.edn` の workspace 規約への昇格**~~ — **完了 (2026-07-29、ADR-2607299000)**。
+  「5 repo に散在するコピー」という上の見立ては実測と違った: 同じ schema 文字列の下に
+  互換性のない 2 語彙 (stack-tier / name-prefix) が同居し、前者の辺表は検証器に
+  ハードコード、後者の権威はリーフ repo loop-ux-kaizen の中にあった。
+  manifest/repository-rules.edn を権威にし、検証器を 2 語彙 dispatch にし、
+  murakumo fleet の gate として実行するようにした (GitHub Actions は課金停止中)。
+  過程で子 repo 5 件の宣言乖離が判明し、うち 1 件は責任反転 (T1 library -> T4 assurance)
+  で :exceptions に記録・オーナー判断待ち
+- **person entity の追加** — D6 のとおり穴として記録するに留める
+### D10. repo-maturity は incremental (west pin 不変なら API を叩かない) で回す
+
+`manifest/repo-maturity.edn` は 2026-07-12 時点で 1,642 repo (cloud-itonami **0 件**) しか
+カバーしておらず、person 役割 (ISCO) 340 件の maturity スコアが 0 件だった。2026-07-28 に
+全再生成し **3,809 repo / 3,505 スコア化・skip 0** に更新。3 面 join は
+ISCO(person) × actor × maturity = 340、taxonomy × maturity の path 重なり = 3,808 に回復した。
+
+再生成を現実的な時間に収めるため `scripts/repo-maturity.cljs` に 3 点を入れた:
+
+1. **incremental (既定)** — `:repo/pinned-revision` が west.yml の現在の pin と一致する
+   repo は **GraphQL を 1 回も叩かず**前回 entity を再利用する。pin が同じなら repo の内容は
+   バイト同一なので、内容由来の 4 軸は必ず同じ値になる。再利用分は
+   `:maturity/reused-at-pin true` を持ち `:maturity/computed-at` は前回のまま =
+   いつの値か監査できる。全軸を取り直すなら `--full`。
+   **実測: 全 pin 一致の再実行が GraphQL 0 回・1.55 秒**(フルランは約 13 分)。
+2. **REST 並列化 (`--jobs`、既定 8)** — 律速は GraphQL ではなく **coverage 軸が repo ごとに
+   無条件で叩いていた REST `git/trees` (~0.6s/repo)** だった (GraphQL 本体は 20 repo で
+   1.5-3.4s = ~0.1s/repo)。バッチ内の tree 取得を並列プール化し、同一スライスで
+   **8.4 秒 -> 1.0 秒 (8 倍)**。スコアは不変 (内容由来の全軸が一致することを同期版と
+   diff して確認。composite のみ 1e-6 ずれるが、これは `pushedAt` 経過日数で動く
+   activity 軸によるもの)。あわせて「REST を叩かなくても答が確定する 2 ケース」
+   (coverage 宣言あり / src・test ディレクトリ無し) を短絡した。
+3. **分割再試行と checkpoint** — この 2 つは **既存の実害**を潰すもの:
+   `--batch-size 40` では 5 バッチ中 4 バッチで GitHub が JSON でなく HTML を返し
+   (`invalid character '<'`)、**1 バッチ = 40 repo が WARN 1 行だけ残して黙って欠落**して
+   いた。空応答は半分に割って再試行する (最小 5)。また結果は最後にしか書き出されず、
+   フルランが batch 113/176 で kill されたとき全結果がメモリごと消えた。20 バッチごとに
+   checkpoint を書き、再開は incremental が pin 一致で自動的に行う。
+
+## 実施しないこと (次段、別 PR)"
+
+  :adr/decision-summary
+  ["D1: 7 語を identity 面 / runtime 面 / role リンク / scope に分解する。system は entity にしない"
+   "D2: identity 面 = person | organisation | agent | organism。agent は :grants を持ち :domain を持たない = domain 責任を負わない"
+   "D3: runtime 面 :repo/kind は排他、:repo/traits は非排他。actor かつ deploy 対象は普通に起きる"
+   "D4: ISCO -> person の職業役割、ISIC / LEI / assoc / ISO3166 / COFOG -> organisation の役割"
+   "D5: scripts/repo-taxonomy.cljs が repo 内の証拠から manifest/repo-taxonomy.edn を生成する。名前 glob はフォールバックのみ・捏造ゼロ・握り潰さない"
+   "D6: person 面のギャップは捏造して埋めず :taxonomy/gap entity として記録する"
+   "D7: 責任連鎖の 4 境界 — agent は actor になれない / actor は organisation になれない / organism は person になれない / service は identity を持たない"
+   "D8: organism は layer ではないので manifest/layers.edn に :layer-organism を足さない"
+   "D10: repo-maturity は incremental (west pin 不変なら GraphQL を叩かず再利用) を既定とし、REST 並列化・分割再試行・checkpoint を持つ。2026-07-28 に 3,809 repo へ全再生成し 3 面 join のギャップを解消"
+   "D9: 層単位の操作は west groups への kind-* 投影ではなく scripts/repo-taxonomy-select.cljs で行う。gen-west-manifest --check が既に STALE (全体再生成は pin をローカル HEAD から書き直す) / west list に --group-filter が無い / west の group は「どれか1つ有効なら active」— の 3 実測が根拠"]
+
+  :adr/generator "scripts/repo-taxonomy.cljs"
+  :adr/selector "scripts/repo-taxonomy-select.cljs"
+  :adr/artifact "manifest/repo-taxonomy.edn"
+  :adr/verify "nbb --classpath \".:scripts/nbb_compat\" scripts/repo-taxonomy.cljs --check --workspace <root>"
+  :source/dataset "adr"}]

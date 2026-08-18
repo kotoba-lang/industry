@@ -1,0 +1,2350 @@
+;; gftd-japan-mf-ledger.datoms.edn
+;;
+;; Gftd Japan株式会社（MF事業者コード 9007-2846）の会計実測。
+;; 取得元: マネーフォワード クラウド会計 リモート MCP サーバー
+;;         https://beta.mcp.developers.biz.moneyforward.com/mcp/ca/v3
+;;         （読み取りスコープのみ使用。journal.write / transaction.write /
+;;           trade_partners.write は同意対象に含まれるが一切使っていない）
+;; 取得日: 2026-08-15
+;; 正本 ADR: adr-2608152200 / adr-2608152300
+;;
+;; ⚠ 2026年7月・8月は未記帳である（月次推移で売上・給料賃金・役員報酬がすべて 0）。
+;;    近田建夫の未払い給与明細には 2026-07-30 計上 ¥169,184 があるので、
+;;    「人件費が発生していない」のではなく「記帳が止まっている」。
+;;    月次平均は 1〜6 月で取ること。
+;;
+;; ⚠ :bs/closing は「照会時点の期末残高」であって決算値ではない。FY2026 は進行中。
+;;
+;; 属性は datascript.js 向けに裸文字列ではなく通常のキーワードで書く
+;; （manifest/edn-query.cljs のローダは :source/dataset で出自を区別する）。
+
+[;; ---------------------------------------------------------------- 事業者
+ {:db/id -1
+  :source/dataset "gftd-japan-mf"
+  :office/name "Gftd Japan株式会社"
+  :office/mf-code "9007-2846"
+  :office/type "CORPORATE"
+  :office/employee-count-range "RANGE_1_5"
+  :office/is-manufacturing true
+  :office/fiscal-years [2018 2019 2020 2021 2022 2023 2024 2025 2026]
+  :office/fy2026-period ["2026-01-01" "2026-12-31"]
+  :office/as-of "2026-08-15"}
+
+ ;; ------------------------------------------------- 貸借対照表 FY2026（現在）
+ {:db/id -2
+  :source/dataset "gftd-japan-mf"
+  :bs/fiscal-year 2026
+  :bs/as-of "2026-08-15"
+  :bs/assets-total 45707016
+  :bs/liabilities-total 156916480
+  :bs/net-assets-total -111209464
+  :bs/cash-and-deposits 86189
+  :bs/cash-detail {"普通預金(PayPay銀行3771952)" 8749
+                   "普通預金(みずほ銀行 銀座中央支店3007865)" 0
+                   "マネーフォワードウォレット" 77284
+                   "仮想通貨" 156}
+  :bs/receivables 13206000
+  :bs/receivables-detail {"Gftd Works 株式会社" 13206000}
+  :bs/other-current {"前払費用" 709935 "未収消費税" 1192523
+                     "仮払消費税" 487828 "役員貸付金(河﨑純真)" 27925
+                     "仮払金" 8 "未収法人税等" 78}
+  :bs/fixed-tangible 114305
+  :bs/deposits-guarantee {"JustCo DK Japan" 640000 "The Executive Centre" 50000}
+  :bs/subsidiary-shares 29249376
+  :bs/long-overdue-receivable 21500000
+  :bs/long-overdue-allowance -21500000
+  :bs/short-term-borrowings 52280000
+  :bs/short-term-borrowings-detail {"JK株式会社" 23100000
+                                    "Gftd Works㈱" 15000000
+                                    "河崎 純真" 14180000}
+  :bs/accounts-payable 74333043
+  :bs/accounts-payable-top {"Gftd Works㈱" 63313948
+                            "㈱野心満々" 3740000
+                            "㈱アイドマ・ホールディングス" 1540000
+                            "佐藤公認会計士事務所" 1505745
+                            "㈱コンプス情報技術研究社" 834900
+                            "JustCo DK Japan" 704000
+                            "㈱リンクス" 660000
+                            "モノリス法律事務所(河瀬)" 484612
+                            "㈱カオナビ" 288986
+                            "㈱うるる" 275000
+                            "社会保険労務士法人エクシア&パートナーズ" 264000
+                            "小田 敦子" 232170
+                            "高橋 鴻介" 165000
+                            "麹町税務署" 127000
+                            "河崎 暖" 82500
+                            "マネーフォワードクラウド使用料" 44330
+                            "㈱マネーフォワードカード" 40352
+                            "松岡義明" 0}
+  :bs/accrued-expenses 20045949
+  :bs/accrued-expenses-detail {"給与" 14249592
+                               "社会保険料" 4896829
+                               "河﨑純真" 794342
+                               "労働保険料" 77686
+                               "The Executive Centre" 27500}
+  :bs/deposits-received 2873864
+  :bs/deposits-received-detail {"源泉税(給与)" 2142317
+                                "住民税" 673493
+                                "源泉税(士業報酬)" 47731
+                                "源泉税(業務委託)" 10210
+                                "雇用保険" 113}
+  :bs/suspense-received 7050000
+  :bs/suspense-received-detail {"河﨑純真" 5600000
+                                "飯島敬一" 750000
+                                "JK株式会社" 550000
+                                "渡邉兼久" 150000}
+  :bs/accrued-corporate-tax 290000
+  :bs/capital 20250000
+  :bs/capital-surplus 6799376
+  :bs/retained-earnings -140958840
+  :bs/current-period-loss -16248283
+  :bs/share-options 2700000
+  :bs/note "固定負債はゼロ。負債 1.57 億すべてが 1 年以内の支払期限を持つ。"}
+
+ ;; -------------------------------------------------------- 損益 FY2026 累計
+ {:db/id -3
+  :source/dataset "gftd-japan-mf"
+  :pl/fiscal-year 2026
+  :pl/as-of "2026-08-15"
+  :pl/period-note "1/1〜8/15。ただし 7・8 月は未記帳のため、月次平均は 1〜6 月で取ること。"
+  :pl/revenue 443506
+  :pl/revenue-detail {"売上高" 434092 "広告売上(Google)" 9414}
+  :pl/cogs 0
+  :pl/gross-profit 443506
+  :pl/sga-total 16669948
+  :pl/sga-detail {"給料賃金" 5653317
+                  "役員報酬" 3635102
+                  "支払報酬" 1776297
+                  "通信費" 1757204
+                  "地代家賃" 1675000
+                  "法定福利費" 807474
+                  "支払手数料" 579015
+                  "諸会費" 396692
+                  "業務委託料" 182105
+                  "広告宣伝費" 172692
+                  "旅費交通費" 20928
+                  "備品・消耗品費" 9832
+                  "租税公課" 4290}
+  :pl/operating-loss -16226442
+  :pl/ordinary-loss -16248283
+  :pl/net-loss -16248283
+  :pl/monthly-1-6 {:revenue 73918 :operating-loss -2687839}
+  :pl/note "1〜6 月の営業損失合計 −16,127,032 を 6 で割ると月 −2,687,839。"}
+
+ ;; ------------------------------------------------------- 通信費（SaaS）内訳
+ {:db/id -4
+  :source/dataset "gftd-japan-mf"
+  :saas/fiscal-year 2026
+  :saas/account "通信費"
+  :saas/total 1757204
+  :saas/detail {"CURSOR" 1067638
+                "補助科目なし" 306000
+                "Amazon" 82308
+                "AKAMAI(Linode)" 54051
+                "BITWARDEN" 51134
+                "RUNWAY" 48888
+                "VERCEL" 41061
+                "海外関係" 32919
+                "Google" 18000
+                "OPENROUTER INC" 12421
+                "JustCo DK Japan" 12000
+                "電話代" 10037
+                "登録国外事業者" 9056
+                "CyberLink" 6091
+                "郵送料等" 5600}
+  :saas/other-accounts {"支払手数料/マネーフォワードクラウド" 244350
+                        "支払手数料/マイクロソフト" 181175
+                        "支払手数料/GITHUB" 116426
+                        "支払手数料/GODADDY" 28976
+                        "広告宣伝費/HubSpot" 63984
+                        "広告宣伝費/GOOGLE JAPAN" 33850
+                        "広告宣伝費/LinkedIn" 23998
+                        "広告宣伝費/Canva" 22228
+                        "広告宣伝費/Studio" 12512
+                        "諸会費/日本セキュリティ監査協会(JASA)" 175500
+                        "諸会費/日本サイバー犯罪対策センター(JC3)" 150000
+                        "諸会費/東京商工会議所" 45000
+                        "諸会費/日本情報経済社会推進協会(JIPDEC)" 26192}
+  :saas/finding "Cursor が通信費の 61%。Anthropic は FY2026 の帳簿に 1 円も無く、課金は止まっている。"
+  :saas/correction "前版で JC3 を『月 ¥125,000』としたのは誤り。年 ¥150,000 が正しい（前払費用の取り崩しを月額と誤読した）。"}
+
+ ;; ------------------------------------------------------------ 月次推移 2026
+ {:db/id -5
+  :source/dataset "gftd-japan-mf"
+  :monthly/fiscal-year 2026
+  :monthly/months [1 2 3 4 5 6 7 8]
+  :monthly/revenue [39414 280000 31364 31364 31364 30000 0 0]
+  :monthly/officer-comp [699601 699601 699600 512100 512100 512100 0 0]
+  :monthly/salaries [992498 947874 958386 956407 937685 860467 0 0]
+  :monthly/rent [320000 320000 320000 320000 320000 25000 50000 0]
+  :monthly/comms [1313131 43159 45797 32042 319068 1515 2492 0]
+  :monthly/operating-pl [-4140067 -2461221 -2574212 -2678184 -2452251 -1821097 -93475 -1187]
+  :monthly/note "7・8 月は未記帳。役員報酬は 4 月に 699,601 → 512,100 へ減額済み。地代家賃は 6 月に JustCo が落ち The Executive Centre へ。"}
+
+ ;; --------------------------------------------------- 貸借対照表 FY2025（確定）
+ {:db/id -6
+  :source/dataset "gftd-japan-mf"
+  :bs/fiscal-year 2025
+  :bs/assets-total 32539929
+  :bs/liabilities-total 127501110
+  :bs/net-assets-total -94961181
+  :bs/cash-and-deposits 63680
+  :bs/net-loss -78713021
+  :bs/write-off {"アニメートアーク㈱(旧アニカナジャパン㈱)" 38919404}
+  :bs/note "当期純損失 −78,713,021 の主因は売掛金アニメートアーク 38,919,404 の消滅（回収なら現金が増えるはずだが期末普通預金は 31,404）。仮払金に 東京地裁 98,764・千代田年金事務所 980,727・新宿年金事務所 609,232 が立っている。"}
+
+ ;; ------------------------------------------- グループ間債権債務の履歴（実測）
+ {:db/id -7
+  :source/dataset "gftd-japan-mf"
+  :intercompany/counterparty "Gftd Works株式会社"
+  :intercompany/borrowing 15000000
+  :intercompany/borrowing-origin
+  [{:date "2023-11-28" :amount 1000000 :to "PayPay銀行" :remark "Gftd Works㈱ 資金借入"}
+   {:date "2023-11-29" :amount 1000000 :to "みずほ銀行" :remark "Gftd Works㈱ 資金借入"}
+   {:date "2023-12-14" :amount 13000000 :to "PayPay銀行" :remark "Gftd Works㈱ 資金借入"}]
+  :intercompany/borrowing-movement-since "2023-12-14 以降 FY2024/2025/2026 とも増減ゼロ"
+  :intercompany/payable 63313948
+  :intercompany/payable-history {2024 45449702 2025 49684185 "2026期首" 49812805 "2026-08-15" 63313948}
+  :intercompany/receivable 13206000
+  :intercompany/net-debt 65107948
+  :intercompany/offsettable 13200000
+  :intercompany/offsettable-note
+  "2026-01-01 に『借 売掛金 GW 13,200,000 / 貸 未払金 GW 13,200,000』の両建てが計上されており、別仕訳の摘要に『洗替　GW・GJ　債権債務相殺』とある。相殺すれば双方が消え、純債務は 65,107,948 → 51,907,948 になる。"
+  :intercompany/tax-hypothesis-tested
+  "オーナー仮説『GJ が GW の税金を払うことになっていたのが借入の原因』は帳簿では裏付けが取れない。3 件の仕訳はいずれも摘要が「資金借入」で、現金が GJ の口座に実際に入金されている。税金の立替なら立替金/仮払金が立つはずだが、GW 向け立替金は FY2025 に ¥9,278 しか動いていない。ただし GW 側の帳簿に対応記録がある可能性は残る。"
+  :intercompany/timing-context
+  "2023-11-01 に Gftd Labo合同会社を吸収合併（『吸収合併 債権債務相殺 GLより包括承継分』）。未収入金 GL 38,684,712 消却／未払金 GL 24,300,316 + 15,126,384／立替金 GL 3,741,988／短期借入金 GL 3,000,000。12/14 の 1,300 万はこの 6 週間後で、合併に伴う資金手当ての可能性があるが帳簿の摘要は『資金借入』としか言っていない。"
+  :intercompany/payable-traced
+  [{:as-of "2019-01-04 設立時" :value 0 :note "Gftd Japan の設立年。全科目の期首残高がゼロ"}
+   {:as-of "2019-12-31" :value 9551805 :note "設立初年度に純増 +9,551,805（借方 11,937,405 / 貸方 21,489,210）"}
+   {:as-of "2020-12-31" :value 27401501 :note "2020 年に純増 +17,849,696（借方 11,654,635 / 貸方 29,504,331）。ここが 2,740 万の主因"}
+   {:as-of "2021-01-01 振替" :value 19451676 :note "未払金 Gftd Works㈱(DESCHOOL) を『未収入金（GW/DS）、未払金（GW/DS）残高相殺、未払金（GW）に振替』で本体へ移管"}
+   {:as-of "2023-01-01 期首" :value 46361544 :note "27,401,501 + 19,451,676 = 46,853,177 とほぼ一致。2021〜2022 はほぼ横ばい"}
+   {:as-of "2024-01-01 期首" :value 45449702}
+   {:as-of "2025-01-01 期首" :value 49684185}
+   {:as-of "2026-01-01 期首" :value 49812805}
+   {:as-of "2026-08-15" :value 63313948 :note "期中 +13,501,143。うち 13,200,000 は売掛金との両建て"}]
+  :intercompany/payable-conclusion
+  "GW への未払金の本体（約 4,685 万）は単一の事象ではなく、設立初年度 2019 の 955 万と 2020 年の 1,785 万＝計 2,740 万の累積に、DE-SCHOOL 事業に係る GW 未払金 1,945 万の振替が乗ったもの。2021〜2025 の 5 年間はほぼ横ばい（4,636万 → 4,981万）で、2026 年に両建て 1,320 万が乗って 6,331 万になった。全期間を通じて GW との関係は設立時から一貫して『GJ が GW に払う側』である。"
+  :intercompany/unresolved
+  "2019〜2020 の個別取引の内容（何に対する未払いか）は追っていない。FY2019 の仕訳 568 件・FY2020 も同規模。GW 側の帳簿と突き合わせるのが早い。"}
+
+ ;; ------------------------------------------------- 設立と組織再編（2019年）
+ {:db/id -11
+  :source/dataset "gftd-japan-mf"
+  :founding/incorporated "2019-01-04"
+  :founding/note "MF 上の最初の会計期間は 2019-01-04 開始。全科目の期首残高がゼロで、新設法人であることが確認できる。"
+  :founding/fy2019-net-loss -1519163
+  :founding/reorg-account {"組織再編により生じた株式特別勘定（固定負債）" 32259065}
+  :founding/retained-earnings-opening-debit 34959065
+  :founding/investments {"関係会社株式 ㈱フィルコマンド" 24012000
+                         "子会社株式 Gftd Labo合同会社" 1250000}
+  :founding/officer-payable {"未払金 河﨑純真" 12012000}
+  :founding/finding
+  "設立初年度に『組織再編により生じた株式特別勘定』32,259,065 が固定負債として計上され、繰越利益剰余金に借方 34,959,065 が立っている。分割型分割・現物出資などの組織再編が設立時から絡んでいる。㈱フィルコマンド株式 24,012,000 もこの年に取得。この特別勘定は 2021 年以降の BS には現れないので、どこかで整理されている。"
+  :founding/unresolved
+  "組織再編の法形式（会社分割か現物出資か）と、株式特別勘定 32,259,065 がどう解消されたかは帳簿の科目名だけでは分からない。登記簿と当時の決算書が要る。"}
+
+ ;; ------------------------------------------- ㈱フィルコマンド（詐欺被害・訴訟）
+ {:db/id -12
+  :source/dataset "gftd-japan-mf"
+  :filcommand/counterparty "㈱フィルコマンド"
+  :filcommand/owner-account
+  "オーナー証言（2026-08-15）: フィルコマンドは詐欺会社だった。訴訟し、株式は放棄している。"
+  :filcommand/acquired {:fiscal-year 2019 :account "関係会社株式" :amount 24012000}
+  :filcommand/written-off
+  {:fiscal-year 2021 :note "関係会社株式 ㈱フィルコマンド 期首 24,012,000 → 貸方 24,012,000 → 期末 0。同じ FY2021 に 長期滞留債権 21,500,000 を新規計上し、貸倒引当金（長期滞留）21,500,000 を同額で計上している。"}
+  :filcommand/fy2021-net-loss -17329809
+  :filcommand/related-observations
+  ["FY2021 に未収入金 水谷翔太 24,000,000 が期中に立って全額消えている（関連の可能性）"
+   "FY2025 の仮払金に 東京地裁 98,764（訴訟費用）"
+   "m365 アーカイブに『株式会社フィルコマンド サーバーマシン代金（60台×500,000円）33,000,000』の請求書がある（日付不明）"]
+  :filcommand/current-state
+  "長期滞留債権 21,500,000 は現在も BS に残るが、貸倒引当金 −21,500,000 と両建てで正味ゼロ。したがって『資産 4,570 万の換金余地』の計算には入っていない。"
+  :filcommand/note
+  "帳簿の動き（2019 取得 → 2021 全額落とし＋長期滞留債権の全額引当 → 2025 訴訟費用）はオーナー証言と整合する。FY2021 の当期純損失 −17,329,809 の主因はこの処理とみられる。"}
+
+ ;; -------------------------------------------------------- 繰越利益剰余金の推移
+ {:db/id -8
+  :source/dataset "gftd-japan-mf"
+  :retained/series [{:as-of "2024期首" :value 11128171}
+                    {:as-of "2025期首" :value -45997536}
+                    {:as-of "2026期首" :value -124710557}
+                    {:as-of "2026-08-15" :value -140958840}]
+  :retained/note "2024 年期首まではプラスだった。2023 年末に のれん 15,553,379・未収消費税 11,584,864・売掛金アニメートアーク 38,919,404 を資産に持っていた。のれんは現在消滅している。"}
+
+ ;; ------------------------------------------------------------- 連携口座
+ {:db/id -9
+  :source/dataset "gftd-japan-mf"
+  :accounts/banks ["PayPay銀行-3771952" "【法人】みずほ銀行(ビジネスWEB) 銀座中央支店 普通3007865"]
+  :accounts/card "マネーフォワード ビジネスカード"
+  :accounts/card-subcards
+  ["CORPORATE" "CYBER SECURITY" "GJ BRANDING" "SOMU" "BRANDING" "CORPORATEENGINEER"
+   "KAWASAKI JUN" "GJ HR" "KEIRI" "RANDD" "ZOOM" "PRODUCT DEVELOPMENT" "RANDD VERSEL"
+   "SUBCARD" "TRANSPORTATION" "BRFACEBOOK" "TOKYOOFFICE" "CS HUBSPOT"
+   "CS AMAZON WEB SERVICES" "CS VERCEL" "CS LINODE AKAMAI"]
+  :accounts/note "サブカード 27 枚が部門・サービス別に発行されている。SaaS はこのカード群から出ている。"}
+
+ ;; ---------------------------------------------------- 労務・税務関連の未払い
+ {:db/id -10
+  :source/dataset "gftd-japan-mf"
+  :labor-tax/as-of "2026-08-15"
+  :labor-tax/unpaid-wages 14249592
+  :labor-tax/unpaid-social-insurance 4896829
+  :labor-tax/withheld-income-tax 2142317
+  :labor-tax/withheld-resident-tax 673493
+  :labor-tax/withheld-other 57941
+  :labor-tax/total 22020172
+  :labor-tax/note
+  "源泉税と住民税は従業員から預かった他人の金である。個別の未払い給与明細（近田建夫 1,023,077 / 田中冬紀 558,168）は、この 14,249,592 の内側にある。"
+  :labor-tax/roudou-case-resolved
+  "労基署 呼発第10号（松岡義明）は解決済み。未払金の補助科目『松岡義明』が期首 187,500 → 期中に全額支払われて 0 になっていることで帳簿からも確認できる。"}
+ ;; ============================================================ Gftd Works（GW）
+ ;; 取得元: mfc_ca_gw MCP（MF事業者コード 1350-7642）。読み取りスコープのみ。2026-08-15。
+ {:db/id -13
+  :source/dataset "gftd-works-mf"
+  :office/name "Gftd Works株式会社"
+  :office/mf-code "1350-7642"
+  :office/employee-count-range "RANGE_1_5"
+  :office/fiscal-years [2014 2015 2016 2017 2018 2019 2020 2021 2022 2023 2024 2025 2026]
+  :office/note "FY2018 までは 6月始まり決算。FY2019 に 2019-06-01〜2019-12-31 の変則期を挟んで 1月始まりへ移行し、GJ と期を揃えている。"}
+
+ {:db/id -14
+  :source/dataset "gftd-works-mf"
+  :bs/fiscal-year 2026
+  :bs/as-of "2026-08-15"
+  :bs/cash-and-deposits 18520
+  :bs/assets-total 101553209
+  :bs/liabilities-total 190449861
+  :bs/net-assets-total -88896652
+  :bs/retained-earnings -118146028
+  :bs/long-term-borrowings 133928936
+  :bs/long-term-borrowings-detail
+  {"独立行政法人福祉医療機構①GW渋谷/3,000万" 23010000
+   "独立行政法人福祉医療機構②GW天神/3,000万" 23010000
+   "独立行政法人福祉医療機構③GW東海/3,000万" 30000000
+   "日本政策金融公庫/2,900万" 29000000
+   "日本政策金融公庫/1,100万" 11000000
+   "東京信用保証協会（西武信用金庫③/2,000万）" 12560000
+   "東京信用保証協会（みずほ銀行/2,000万）" 2000000
+   "第一勧業信用組合/1,000万" 3161860
+   "アビリオ債権回収（西武信用金庫②/500万）" 187076}
+  :bs/short-term-borrowings-detail {"髙橋　理仁" 910000 "河崎　純真" 300000}
+  :bs/accrued-expenses 16763857
+  :bs/accrued-expenses-detail {"給与" 5417348 "日本公庫/2900万" 3482384 "佐藤公認会計士事務所" 1626157
+                               "東京信用保証協会（西武信用金庫③）" 1615805 "日本公庫/1100万" 1320904
+                               "河﨑工務店" 1126500 "㈲イケマツマネジメント" 645818 "利用者工賃" 185175}
+  :bs/note
+  "GJ と性質が正反対。GW の借入 1.34 億は全額が公的金融機関・信用保証協会（福祉医療機構 3 拠点・日本政策金融公庫・信用保証協会）。GJ の借入は全額が身内。ただし現金は ¥18,520 しか無い。"}
+
+ {:db/id -15
+  :source/dataset "gftd-works-mf"
+  :pl/fiscal-year 2026
+  :pl/as-of "2026-08-15"
+  :pl/revenue 7117405
+  :pl/revenue-detail {"障害福祉サービス事業売上高/介護給付金・訓練等給付金（市区町村負担分）" 4802801
+                      "障害福祉サービス事業売上高/処遇改善加算" 467448
+                      "障害福祉サービス事業売上高/個人負担分" 9300
+                      "売上高/業務委託売上" 1777149
+                      "売上高/東海（食事代）" 60707}
+  :pl/sga-total 9750150
+  :pl/sga-detail {"役員報酬" 2940000 "給料賃金" 2337359 "利用者工賃" 1120411
+                  "地代家賃(Dion)" 1040000 "法定福利費" 834138 "支払報酬(佐藤公認会計士事務所)" 600000
+                  "通信費" 234769 "備品・消耗品費" 160573 "水道光熱費" 158128 "支払手数料" 102918}
+  :pl/operating-loss -2632745
+  :pl/net-loss -2260429
+  :pl/subsidies 355746
+  :pl/note
+  "障害福祉サービス（就労支援）が売上の 74.2%。拠点は 渋谷・天神・東海・早稲田・福岡。GJ の月次赤字 −269 万に対し GW は −33 万で、桁が違う。"}
+
+ ;; ------------------------------------------------ グループ連結（2 社合算）
+ {:db/id -16
+  :source/dataset "gftd-group"
+  :group/as-of "2026-08-15"
+  :group/entities ["Gftd Japan株式会社" "Gftd Works株式会社"]
+  :group/cash {"Gftd Japan" 86189 "Gftd Works" 18520 :total 104709}
+  :group/revenue-2026 {"Gftd Japan" 443506 "Gftd Works" 7117405 :total 7560911}
+  :group/operating-loss {"Gftd Japan" -16226442 "Gftd Works" -2632745 :total -18859187}
+  :group/liabilities {"Gftd Japan" 156916480 "Gftd Works" 190449861 :total 347366341}
+  :group/net-assets {"Gftd Japan" -111209464 "Gftd Works" -88896652 :total -200106116}
+  :group/finding
+  "2 社合わせて現金 ¥104,709、純資産 −2 億円、負債 3.47 億円。『GW に現金があればグループ全体はマシ』という仮説は否定された。"}
+
+ ;; ------------------------------- 貸付 1,500万 — 両社の帳簿で税金説を否定
+ {:db/id -17
+  :source/dataset "gftd-group"
+  :loan/amount 15000000
+  :loan/gj-side "短期借入金 Gftd Works㈱ 15,000,000（摘要: Gftd Works㈱ 資金借入）"
+  :loan/gw-side "短期貸付金 Gftd Japan株式会社 15,000,000（摘要: Gftd Japan㈱ 資金貸付）"
+  :loan/entries
+  [{:date "2023-11-28" :amount 1000000 :gw-credit "普通預金 PayPay銀行1107866" :gw-debit "短期貸付金 Gftd Japan株式会社"}
+   {:date "2023-11-29" :amount 1000000 :gw-credit "普通預金 PayPay銀行1107866" :gw-debit "短期貸付金 Gftd Japan株式会社"}
+   {:date "2023-12-14" :amount 13000000 :gw-credit "普通預金 PayPay銀行1107866" :gw-debit "短期貸付金 Gftd Japan株式会社"}]
+  :loan/tax-hypothesis-refuted
+  "オーナー仮説（GJ が GW の税金を払うことになっていたのが借入の原因）は、両社の帳簿から確定的に否定された。3 件とも両社が鏡像の仕訳で、どちらにも租税公課・未払税金・立替税金の科目は一切現れない。現金が GW の PayPay 口座から出て GJ の PayPay 口座に入っただけである。"
+  :loan/mirror-match "GJ 側 15,000,000 と GW 側 15,000,000 が完全一致。"}
+
+ ;; --------------------------------------- ミラー照合の不一致（決算前に要突合）
+ {:db/id -18
+  :source/dataset "gftd-group"
+  :reconcile/as-of "2026-08-15"
+  :reconcile/matched
+  [{:item "貸付／借入" :gj 15000000 :gw 15000000 :diff 0}
+   {:item "立替（両建て）" :gj-account "売掛金" :gj 13206000 :gw-account "立替金" :gw 13202121 :diff 3879}]
+  :reconcile/mismatched
+  [{:item "GJ の債務本体" :gj-account "未払金 GW" :gj 63313948 :gw-account "未収入金 GJ" :gw 62393152 :diff 920796}
+   {:item "期首の洗替仕訳" :gj 13200000 :gw 33672329 :diff 20472329
+    :note "両社とも摘要は「洗替　GJ・GW　債権債務相殺」。GW 側は 2026-01-01 の 2 本（13,202,121 と 20,470,208）で計上。GJ 側は 13,200,000 のみ。"}
+   {:item "GW → GJ 請求" :gj "対応なし" :gw-account "売掛金 Gftd Japan株式会社" :gw 8218476
+    :note "GW が GJ に請求している 821 万に対し、GJ 側に受け入れの記帳が無い。"}]
+  :reconcile/note
+  "GJ の 2026年7・8月が未記帳であることを考えると GJ 側の記帳遅れの可能性が高いが、決算前に必ず突き合わせが要る。"}
+
+ ;; ----------------------- GJ が GW の総務を担っていたが請求されていない（オーナー証言）
+ {:db/id -19
+  :source/dataset "gftd-group"
+  :backoffice/owner-account
+  "オーナー証言（2026-08-15）: GJ 側が総務処理で GW の業務をしていた。それらの請求手続き、役員報酬などが適切に処理されていない。"
+  :backoffice/ledger-evidence
+  ["GW の FY2026 販管費に GJ 向けの業務委託料・管理料・支払報酬は 1 件も無い（支払報酬は佐藤公認会計士事務所 600,000 の 1 件のみ）"
+   "逆方向は存在する — GJ の FY2026 支払報酬に Gftd Works 665,937（光バイト案件・サイバー防犯ボランティア・サイバーセキュリティ業務委託・洪庵会HP案件）"
+   "GW の売掛金に Gftd Japan株式会社 8,218,476（GW → GJ の請求）。GJ → GW の請求に対応する GJ 側の売上は FY2026 で 443,506 しかなく、その内訳に GW 向けは現れない"
+   "GJ の FY2026 売上高は 434,092 + 広告売上 9,414 のみ。総務役務の対価とみられる収益科目が無い"]
+  :backoffice/officer-comp
+  {"Gftd Japan FY2026（1〜6月）" 3635102 "Gftd Works FY2026" 2940000
+   :note "両社が並行して役員報酬を計上している。役務の実態がどちらにどれだけ帰属するかの按分根拠は帳簿からは読めない。"}
+  :backoffice/implication
+  "帳簿はオーナー証言と整合する —— GJ から GW への役務提供に対する請求が計上されていない。適正に処理すれば GJ に収益（＝GW への債権）が立ち、現在 GJ 側に偏っている債務が減る方向に働く。ただし遡及計上は税務・監査の論点であり、金額の算定根拠（工数・按分基準）が要る。"
+  :backoffice/caution
+  "これは agent が判断してよい範囲を超える。GW は福祉医療機構・日本政策金融公庫・信用保証協会から 1.34 億を借りており、グループ間取引の適正性は資金使途の説明に直結する。役員報酬の按分と遡及請求は、税理士・会計士（佐藤公認会計士事務所）と弁護士に諮ること。"
+  :backoffice/unresolved
+  ["GJ が GW に提供した総務役務の期間と工数"
+   "役員報酬をどちらの法人がどの割合で負担すべきか（実態に基づく按分根拠）"
+   "遡及請求が可能な期間と、税務上の取り扱い"]}
+
+ ;; ================================================ 差押え（2025年、GJ 口座）
+ {:db/id -20
+  :source/dataset "gftd-japan-mf"
+  :seizure/fiscal-year 2025
+  :seizure/total 1701495
+  :seizure/events
+  [{:date "2025-01-16" :authority "新宿年金事務所" :amount 408548
+    :remark "差押え　新宿年金事務所" :settled "2025-12-31 法定福利費/社会保険料へ充当"}
+   {:date "2025-05-30" :authority "新宿年金事務所" :amount 200684
+    :remark "差押え　新宿年金事務所" :settled "2025-12-31 法定福利費/社会保険料へ充当"}
+   {:date "2025-10-10" :authority "渋谷区役所" :amount 12772
+    :remark "サシオサエ シブヤクヤクシヨ／河﨑代表分　住民税一部と思われる"
+    :settled "2025-12-31 預り金/住民税 5,612 ＋ 租税公課/延滞金 5,400 ＋ 支払手数料 1,600"}
+   {:date "2025-11-06" :authority "東京地裁" :amount 98764
+    :remark "差押え　東京地裁／カオナビの可能性"
+    :settled "2025-12-15 未払金 ㈱カオナビ 82,610 ＋ 支払利息 16,154。残 5,214 円"}
+   {:date "2025-12-03" :authority "千代田年金事務所" :amount 980727
+    :remark "差押え　千代田年金事務所" :settled "2025-12-31 法定福利費/社会保険料へ充当"}]
+  :seizure/by-authority {"年金事務所（社会保険料滞納）" 1589959 "東京地裁（カオナビ債権回収）" 98764 "渋谷区役所（住民税）" 12772}
+  :seizure/correction
+  "前版で『FY2025 の仮払金 東京地裁 98,764 は訴訟費用』と書いたのは誤り。実際は ㈱カオナビ の未払金に対する債権回収の差押えで、㈱フィルコマンド訴訟とは無関係である。"
+  :seizure/finding
+  "2025 年に GJ の銀行口座は 5 回差し押さえられている。うち 3 回・計 ¥1,589,959 が年金事務所によるもので、社会保険料の滞納が強制執行の段階に入っている。現在も未払費用に社会保険料 ¥4,896,829 が残っており、再度の差押えは想定しておくべきである。"
+  ;; ⚠ 撤回済み（2026-08-15、entity -36）。連結納税は FY2020-2022 に実在した。
+  ;; 下記は FY2025 の仕訳と 2023-11/12 の 1,500 万だけを見て一般化した誤りである。
+  ;; 残る正しい部分は「2025 年の差押えの相手勘定はすべて GJ 自身の科目」だけ。
+  :seizure/tax-consolidation-not-found-RETRACTED
+  "オーナー仮説『GJ が親会社としてグループの税金をまとめて支払う処理があったはず』は、この 5 件では裏付けられない。仕訳の相手勘定はすべて GJ 自身の 法定福利費/社会保険料・預り金/住民税 で、GW への請求は 1 件も立っていない。新宿年金事務所が GW の渋谷・早稲田拠点の管轄である可能性はあるが、帳簿上は GJ 自身の費用として落とされている。もし実態が GW 分だったなら GJ から GW への債権が立つべきところ、立っていない —— §-19 の総務役務の請求漏れと同じ構図。"
+  :seizure/gj-corporate-tax-2025 {"法人税均等割" 290000 :note "赤字のため均等割のみ。連結納税・グループ通算の痕跡は無い。"}}
+
+ ;; ------------------------- GW 側から見た GJ 向け債権の年次（2025 実測）
+ {:db/id -21
+  :source/dataset "gftd-group"
+  :ic-annual/fiscal-year 2025
+  :ic-annual/gw-side
+  {"売掛金 Gftd Japan株式会社" {:opening 6371862 :debit 1924718 :credit 8296580 :closing 0}
+   "未収入金 Gftd Japan㈱" {:opening 43312323 :debit 19580829 :credit 13080347 :closing 49812805}
+   "立替金 Gftd Japan㈱" {:opening 0 :debit 13202121 :credit 13202121 :closing 0}
+   "未払金 Gftd Japan㈱" {:opening 0 :debit 33672329 :credit 33672329 :closing 0}}
+  :ic-annual/finding
+  "未払金 GJ 33,672,329 は FY2025 にも同額で立って消えており、FY2026 期首にまた立っている。毎期繰り返される洗替仕訳とみられる。GJ 側は 13,200,000 でしか受けていないため、差 20,472,329 は複数年にわたって放置されている可能性がある。"
+  :ic-annual/gw-fy2025-net-loss -13868775}
+
+ ;; ------------------------- GW 6 期の推移（2021-2026、MF 実測 2026-08-15）
+ ;; 出典: mfc_ca_gw getReportsTrialBalanceBalanceSheet fiscal_year=2021..2024（2025/2026 は既出）
+ {:db/id -22
+  :source/dataset "gftd-works-mf"
+  :gw-history/note "GW は 2021・2022 に黒字で、2022 年末には純資産がプラスだった。現在の債務超過は 2023 以降の 3 年で作られている。"
+  :gw-history/series
+  [{:fy 2021 :cash-end 48968560 :assets 163522708 :liabilities 177322005 :net-assets -13799297 :profit 13913128}
+   {:fy 2022 :cash-end 39430922 :assets 167379901 :liabilities 161464860 :net-assets 5915041 :profit 19714338}
+   {:fy 2023 :cash-end 24820955 :assets 116800912 :liabilities 148204033 :net-assets -31403121 :profit -9596930}
+   {:fy 2024 :cash-end 267309 :assets 68672335 :liabilities 141439783 :net-assets -72767448 :profit -41364327}
+   {:fy 2025 :cash-end nil :assets nil :liabilities nil :net-assets nil :profit -13868775}
+   {:fy 2026 :as-of "2026-08-15" :cash-end 18520 :assets 101553209 :liabilities 190449861 :net-assets -88896652 :profit nil}]
+  :gw-history/peak
+  {:date "2022-12-31" :net-assets 5915041 :cash 39430922
+   :remark "2 期連続黒字（+13,913,128 / +19,714,338）で繰越損失を埋め切り、純資産がプラスに転じた唯一の時点。"}
+  :gw-history/turning-point 2024
+  :gw-history/caveat "2025 の期末 BS はこの版では未取得。純資産の 2025 末は 2024 末 −72,767,448 に当期損失 −13,868,775 を足した −86,636,223 と推定できるが、実測値ではない。"}
+
+ ;; ------------------------- 2024: 拠点撤退と借入延滞の開始
+ {:db/id -23
+  :source/dataset "gftd-works-mf"
+  :gw-2024/net-loss -41364327
+  :gw-2024/cash-drop {:from 24820955 :to 267309 :delta -24553646}
+  :gw-2024/asset-disposals
+  {"建物" {:opening 17908015 :closing 0}
+   "附属設備" {:opening 5630286 :closing 0}
+   "工具器具備品" {:opening 4514932 :closing 403920 :remark "入替（新規取得 403,920）"}
+   "敷金 ニシカワビル" {:opening 2820000 :closing 0}
+   "敷金 テンジン5丁目アパートメント3F" {:opening 660000 :closing 0}
+   "有形固定資産 純額" {:opening 16150635 :closing 270730 :delta -15879905}}
+  :gw-2024/site-exit
+  "渋谷（ニシカワビル）と福岡（テンジン5丁目）から撤退。福岡の介護給付費売掛金 2,564,511 → 0、福岡銀行・愛知銀行・西武信金・第一勧信・福岡小口現金の残高がほぼ全てゼロになった。残ったのは東海（825,749）と渋谷（1,171,410）の売掛金のみ。"
+  :gw-2024/borrowing-delinquency-begins
+  {:unpaid-interest-year-end
+   {"日本政策金融公庫/2,900万" 626041 "日本政策金融公庫/1,100万" 237461
+    "西武信用金庫③/2,000万" 61689 "みずほ銀行/2,000万" 9021
+    "第一勧業信用組合/1,000万" 2812 "西武信用金庫②/500万" 193
+    "WAM 渋谷/3,000万" 4718 "WAM 天神/3,000万" 4718 "WAM 東海/3,000万" 6250}
+   :unpaid-interest-total 952903
+   :principal-repaid 7285000
+   :principal-scheduled 11076000
+   :principal-shortfall 3791000
+   :current-portion {:opening 11076000 :closing 12087000}
+   :finding "2024 年末に初めて借入先別の未払利息が計上され、元本返済も予定 11,076,000 に対し 7,285,000 にとどまった。一年以内返済予定長期借入金が増えているのは、返済が予定に追いついていないため。GW の返済停止はここから始まっている。"}
+  :gw-2024/anomaly
+  {"預り金 給与源泉" -681521 "預り金 社会保険料" -63595
+   :remark "いずれも貸方残がマイナス（＝借方残）。預かった額を超えて納付したか記帳のズレ。要確認。"}}
+
+ ;; ------------------------- Gftd Labo ↔ Gftd Works（2021-2023、吸収合併まで）
+ {:db/id -24
+  :source/dataset "gftd-group"
+  :labo-gw/question "Gftd Labo から Gftd Works への支払いを確認する（オーナー依頼 2026-08-15）"
+  :labo-gw/method "Labo の MF office は未接続。GW 側の Labo 補助科目から年次の増減を読んだ。"
+  :labo-gw/annual
+  [{:fy 2021
+    "売掛金 Gftd Labo合同会社" {:opening 1260600 :debit 35633400 :credit 36894000 :closing 0}
+    "未収入金 Gftd Labo(合)" {:opening 0 :debit 29063500 :credit 29063500 :closing 0}
+    "未払金 Gftd Labo合同会社" {:opening 18424495 :debit 15181834 :credit 1147434 :closing 4390095}
+    "短期借入金 Gftd Labo(合)" {:opening 0 :debit 24196066 :credit 24196066 :closing 0}}
+   {:fy 2022
+    "売掛金 Gftd Labo合同会社" {:opening 0 :debit 30656285 :credit 30656285 :closing 0}
+    "未収入金 Gftd Labo(合)" {:opening 0 :debit 91653500 :credit 91653500 :closing 0}
+    "未払金 Gftd Labo合同会社" {:opening 4390095 :debit 18991334 :credit 15573819 :closing 972580}
+    "短期借入金 Gftd Labo(合)" {:opening 0 :debit 16796066 :credit 16796066 :closing 0}}
+   {:fy 2023
+    "売掛金 Gftd Labo合同会社" {:opening 0 :debit 7445087 :credit 7445087 :closing 0}
+    "未収入金 Gftd Labo(合)" {:opening 0 :debit 54628500 :credit 54628500 :closing 0}
+    "未払金 Gftd Labo合同会社" {:opening 972580 :debit 19620329 :credit 18647749 :closing 0}
+    "短期借入金 Gftd Labo(合)" {:opening 0 :debit 8796066 :credit 8796066 :closing 0}}]
+  :labo-gw/labo-paid-gw
+  {:売掛金回収 {2021 36894000 2022 30656285 2023 7445087 :total 74995372}
+   :未収入金回収 {2021 29063500 2022 91653500 2023 54628500 :total 175345500}
+   :合計 250340872}
+  :labo-gw/answer
+  "Labo は GW に払っている。3 期で 売掛金 74,995,372 ＋ 未収入金 175,345,500 ＝ 250,340,872 が GW に入っており、Labo 関連の残高は 4 科目すべて 2023 年末にゼロになっている。GW 側に Labo に対する未回収は残っていない。"
+  :labo-gw/absorption
+  {:date "2023-11-01"
+   :goodwill {:recognized 27721232 :written-off 27721232 :fy 2023
+              :route "P/L を通さず繰越利益剰余金に直接賦課（利益剰余金 借方 27,721,232）。抱合せ株式消滅差損等の合併処理。"}
+   :finding "Labo を吸収したのは GW。GJ 側の『GL より包括承継分』とあわせると、Labo の資産負債は GJ と GW に分けて承継されている。"}
+  :labo-gw/limitation "Labo 自身の帳簿は見ていない。ここに書いたのは全て GW 側から見た数字であり、Labo 側の相手勘定・残高は未確認。"}
+
+ ;; ------------------------- GJ ↔ GW の年次全体（GW 側、2021-2025）
+ {:db/id -25
+  :source/dataset "gftd-group"
+  :ic-history/gw-side-by-year
+  [{:fy 2021 :売掛金GJ 0 :未収入金GJ 15065157 :短期貸付金GJ 0 :立替金GJ 13202121 :未払金GJ洗替 5495169}
+   {:fy 2022 :売掛金GJ 0 :未収入金GJ 33159423 :短期貸付金GJ 0 :立替金GJ 13202121 :未払金GJ洗替 6380000}
+   {:fy 2023 :売掛金GJ 0 :未収入金GJ 45449702 :短期貸付金GJ 15000000 :立替金GJ 0 :未払金GJ洗替 25367829}
+   {:fy 2024 :売掛金GJ 6371862 :未収入金GJ 43312323 :短期貸付金GJ 15000000 :立替金GJ 0 :未払金GJ洗替 34345994}
+   {:fy 2025 :売掛金GJ 0 :未収入金GJ 49812805 :短期貸付金GJ 15000000 :立替金GJ 0 :未払金GJ洗替 33672329}]
+  :ic-history/wash-entry
+  {:years [2023 2024 2025 2026]
+   :amounts {2023 25367829 2024 34345994 2025 33672329 2026 33672329}
+   :finding "未払金 Gftd Japan㈱ の期首計上・期末取消は 4 期連続。金額は毎年変わっており固定の振替ではない。GJ 側は 13,200,000 でしか受けていないため、両社で同じ金額の洗替が行われていない。差 20,472,329 は複数年にわたって放置されている。"}
+  :ic-history/gw-billing-to-gj
+  {2021 99000 2022 66000 2023 781000 2024 7342086 2025 1924718
+   :finding "GW が GJ に売上請求を立てたのは 2024 年が実質最初（7,342,086）。回収は 970,224 のみで 6,371,862 が 2025 に繰り越され、2025 に落ちた。前版で指摘した『GW→GJ 請求 8,218,476 に GJ 側対応なし』の由来はこれ。"}
+  :ic-history/gj-receivable-total-2024
+  {:売掛金 6371862 :未収入金 43312323 :短期貸付金 15000000 :total 64684185
+   :remark "2024 年末時点で GW が GJ に対して持つ債権の合計。GW はこの年に現金を使い切っており、以降 GW の資産は実質この GJ 向け債権と公的借入だけになる。"}
+  :ic-history/other-related-party-writeoffs-2023
+  {"長期貸付金 一般社団法人Gftd Family" 26526500
+   "立替金 COMMONS㈱" 13656480
+   "短期貸付金 COMMONS㈱" 6000000
+   "未収収益 一般社団法人Gftd Family" 1177344
+   "未収収益 COMMONS㈱" 224683
+   :total 47585007
+   :remark "いずれも 2023 年に残高ゼロになっている。Labo 合併の承継処理と同じ年。個別の相手勘定は未確認。"}
+  :ic-history/ceo-loan-to-gw
+  {"短期借入金 河崎純真" {2021 {:opening 16849669 :repaid 16650669 :closing 199000}
+                          2022 {:opening 199000 :closing 0}}
+   :remark "代表から GW への貸付は 2021-2022 に完済されている。現在 GJ 側にある代表借入 14,180,000 とは別。"}
+  :ic-history/deschool-transfer-2021
+  {"立替金 Gftd Japan㈱(DESCHOOL)" 19451676
+   "仮受金 Gftd Japan㈱(DESCHOOL)" 19240446
+   :remark "2021 に GW を通過。前版で『GW未払金 6,331万の起源』に挙げた DE-SCHOOL 振替 1,945 万はこれ。"}}
+
+ ;; ------------------------- 2023-11-01 吸収合併の実仕訳（両社の journal を実測）
+ ;; オーナー問い（2026-08-15）「Labo を GW が吸収し GJ が負債を吸収している構造では?
+ ;; GW だけが得する構造では?」への回答。帳簿は逆向きの答えを返した。
+ {:db/id -26
+  :source/dataset "gftd-group"
+  :merger/date "2023-11-01"
+  :merger/absorber "Gftd Japan株式会社"
+  :merger/absorbed "Gftd Labo合同会社"
+  :merger/evidence "GJ journal #6760、摘要『抱合せ株式　GL吸収合併消滅会社100％保有分』"
+  :merger/correction
+  "前版（entity -24）で『Labo を吸収したのは GW』と書いたのは誤り。GW journal #226091 は
+   未収入金・未払金の相手先を Labo から GJ に付け替える 2 行だけで、吸収ではない。
+   GW ののれん 27,721,232 は合併とは無関係の科目振替だった（下記 -27）。"
+  :merger/gj-received
+  {"売掛金 アニメートアーク㈱(旧アニカナジャパン㈱)" 38919404
+   "未収消費税" 11584864
+   "普通預金 PayPay 1587947" 10694840
+   "のれん" 18119687
+   "未収法人税等" 1554700
+   "附属設備" 1190000
+   "工具器具備品" 495300
+   "未収入金 Gftd Works㈱" 2135129
+   "立替金 河崎純真" 201566
+   "現金 小口現金" 45030
+   "暗号資産 BTC/DAI" 542
+   "預け金 コインチェック" 758}
+  :merger/gj-assumed
+  {"未払金 Gftd Labo合同会社" 24300316
+   "未払費用 社会保険料" 916066
+   "未払費用 労働保険料" 20970
+   "預り金 源泉税(給与)" 768390
+   "預り金 源泉税(士業報酬)" 41350
+   "預り金 住民税" 216600
+   "未払法人税等" 23300
+   "貸倒引当金" 230000
+   "減価償却累計額 建物附属設備" 179372
+   "減価償却累計額 器具備品" 495299
+   "子会社株式 Gftd Labo合同会社（消滅）" 1250000}
+  :merger/gain
+  {:account "抱合せ株式消滅差益" :amount 56500157
+   :remark "摘要『受入資産負債子会社株式差額』。GJ の 2023 当期純利益 +29,351,064 はこの差益があって成立している。差益が無ければ GJ は −27,149,093 の赤字だった。"}
+  :merger/gw-side
+  {:journal "#226091"
+   :entries [{:debit "未収入金/Gftd Japan㈱" :amount 17397200 :credit "未収入金/Gftd Labo(合)" :remark "GL吸収合併 GJ債権債務引継"}
+             {:debit "未払金/Gftd Labo合同会社" :amount 19532329 :credit "未払金/Gftd Japan㈱" :remark "GL吸収合併 GJ債権債務引継"}]
+   :net "差引 GW が GJ に 2,135,129 多く負う。GJ #6760 の『未収入金 Gftd Works㈱ 2,135,129』と一致 —— 両社の帳簿が一致している数少ない箇所。"}
+  :merger/gj-goodwill-remaining {:fy2023-recognized 18119687 :fy2023-amortized 2592239 :fy2023-closing 15553379
+                                 :note "GJ 2023 期末に無形固定資産として残存。他に #6767 で『洗替 GLみなし決算減価償却費 調整額 のれん』25,931 の調整。BS 上の計上額 18,145,618 との差 25,931 はこれ。"}
+  :merger/the-real-problem
+  "GJ が受け入れた最大の資産は 売掛金 アニメートアーク㈱ 38,919,404 で、これは FY2025 に全額消滅している
+   （FY2025 損失 −78,71万 の主因として既記録）。したがって 2023 に計上した合併差益 56,500,157 のうち
+   38,919,404 は、2 年後に無価値と判明した債権に裏付けられていた。"
+  :merger/answer-to-owner
+  "『GW だけが得する構造』ではない。Labo を吸収し 5,650万の差益とのれん 1,812万を得たのは GJ で、
+   2023 の純資産変動は GJ +90,859,505 / GW −37,318,162。ただし GJ の利益は 2 年で消えた。
+   実態はどちらかが得をした構造ではなく、両社が同じ年にそれぞれ別の方法で損失を将来へ繰り延べた形。"}
+
+ ;; ------------------------- GW の「のれん」は のれんではなかった
+ {:db/id -27
+  :source/dataset "gftd-works-mf"
+  :gw-goodwill/journal "#226076"
+  :gw-goodwill/date "2023-12-31"
+  :gw-goodwill/memo "科目振替　2024.2.20財務会議にて決定"
+  :gw-goodwill/entry
+  {:debit {"のれん" 27721232}
+   :credit {"長期貸付金/一般社団法人Gftd Family" 26526500
+            "未収収益/一般社団法人Gftd Family" 1177344
+            "立替金/一般社団法人Gftd Family" 17388}}
+  :gw-goodwill/finding
+  "企業結合ではない。一般社団法人Gftd Family に対する回収不能債権 27,721,232 を『のれん』という
+   科目名に振り替え、同年に繰越利益剰余金へ直接落としている。"
+  :gw-goodwill/concerns
+  ["のれんは企業結合からしか発生しない。貸付金の焦げ付きをのれんと呼ぶことはできない。"
+   "P/L を通していない。本来は貸倒損失として 2023 の損益に出るべき 27,721,232 が損益計算書に現れていない。GW の公表損失 −9,596,930 に対し経済的損失は −37,318,162。"
+   "摘要が『2024.2.20財務会議にて決定』であり、会計基準に従った処理ではなく会議での決定として記録されている。"]
+  :gw-goodwill/referral
+  "過年度修正の要否を含め 佐藤公認会計士事務所 に確認する。agent の判断範囲外。"
+  :gw-goodwill/related
+  "同じ 2023 に COMMONS㈱ の立替金 13,656,480・短期貸付金 6,000,000・未収収益 224,683 も消えている。
+   これらの相手勘定は未確認 —— 同種の科目振替が他にもある可能性がある。"}
+
+ ;; ------------------------- 租税負担の所在（オーナー問い 2026-08-15「税金は GJ が負担していない?」）
+ {:db/id -28
+  :source/dataset "gftd-group"
+  :tax-incidence/finding
+  "各社が自社分だけを負担している。両社の PL のどこにも相手方の租税科目は無い。
+   『GJ が親会社として GW の税金をまとめて払っていた』という仮説はこれで閉じる。"
+  :tax-incidence/by-company
+  {"GJ FY2025" {:租税公課 240920 :延滞金等 132400 :法人税等 290000 :法定福利費 1434368}
+   "GJ FY2026" {:租税公課 4290 :延滞金等 0 :法人税等 nil :法定福利費 807474}
+   "GW FY2025" {:租税公課 82690 :延滞金等 nil :法人税等 182500 :法定福利費 1395649}
+   "GW FY2026" {:租税公課 16300 :延滞金等 16300 :法人税等 nil :法定福利費 834138}}
+  :tax-incidence/note
+  "法人税等はどちらも均等割のみ。赤字なので正しい。問題は負担の偏りではなく、両社とも延滞金を払っていること。"}
+
+ ;; ------------------------- 取りこぼし・払い過ぎ・未認識損失の棚卸し
+ {:db/id -29
+  :source/dataset "gftd-group"
+  :recovery/question "貸倒れ・焦げ付きを考慮して、支払いすぎ／取り損ねているものはないか（オーナー問い 2026-08-15）"
+
+  :recovery/a1-animatearc-account-class
+  {:severity :highest
+   :fact "FY2025 GJ 営業外費用に『売掛債権譲渡損 38,919,404』（貸方 156 のみ）。貸倒損失ではない。"
+   :implication
+   "貸倒損失なら消費税法39条の貸倒れに係る消費税額の控除が使える（38,919,404 × 10/110 = 3,538,127）。
+    売掛債権譲渡損では使えない。しかも対価が実質ゼロの債権譲渡は譲渡ではなく、貸倒れか寄附金である。
+    寄附金認定なら法人税上も損金算入が制限される。"
+   :potential-recovery 3538127
+   :open-questions ["なぜこの科目か" "譲渡先は誰か" "譲渡契約書はあるか"
+                    "原債権（2023 に Labo から承継）は課税資産の譲渡等に係るものか"]
+   :window "FY2025 の申告期限から 5 年以内は更正の請求が可能"}
+
+  :recovery/a2-consumption-tax-receivable
+  {:severity :resolved
+   :fact "2023 に Labo から承継した 未収消費税 11,584,864 は 2024 に全額回収済み（貸方 11,584,864、期末残 171,900）。"
+   :verdict "取り損ねていない。"}
+
+  :recovery/a3-corporate-tax-receivable
+  {:severity :open
+   :fact "GJ FY2024 で 未収法人税等 が 1,554,700 → 5,787,545 に増加。FY2023 黒字 +29,351,064 / FY2024 赤字 −57,125,707 なので欠損金の繰戻し還付の可能性。"
+   :status "2026 の BS には残っていない。回収されたか落とされたか未確認。"}
+
+  :recovery/b1-intercompany-interest
+  {:severity :review
+   :fy2025-gj-interest {"河崎 純真" {:principal 14180000 :interest 727758 :rate 0.0513}
+                        "Gftd Works㈱" {:principal 15000000 :interest 610621 :rate 0.0407}
+                        "補助科目なし" {:interest 44923}}
+   :both-sides-agree "GW 側 受取利息/貸付利息 610,621 と一致。帳簿が合っている数少ない箇所。"
+   :concern
+   "GW は自身の公的借入で年 6,289,368 の遅延損害金を出しながら GJ から 4.07% の利息を取っている。
+    GJ は現金 86,189 でその利息を払っている。役員借入 5.13% も役員給与認定のリスクを含め水準の妥当性を要確認。"}
+
+  :recovery/b2-gw-withholding-negative
+  {:severity :open
+   :fact {"預り金/給与源泉" -681521 "預り金/社会保険料" -63595 :total 745116 :as-of "2024-12-31"}
+   :implication "貸方残がマイナス＝借方残。従業員から預かった額を超えて納付している可能性。還付請求の余地か記帳のズレか要確認。"}
+
+  :recovery/c1-subsidiary-share-impairment
+  {:severity :highest
+   :carrying-value 29249376
+   :gw-net-assets -88896652
+   :fact "2023 の取得以来、2024 年末（GW 純資産 −72,767,448）も 2025 も 2026 も 1 円も減損していない。"
+   :implication "実質価額の著しい低下。金融商品会計基準上は評価損の計上が必要で、税務上も一定要件で損金。GJ の資産は最大 29,249,376 過大。"}
+
+  :recovery/c2-goodwill-life
+  {:severity :recorded
+   :series {"2023-11-01 計上" 18119687 "2023 償却" -2592239 "2024 一括償却" -15553379 "2024年末" 0}
+   :implication "合併差益 56,500,157 を計上する根拠となったのれんは翌年に全額落ちている。FY2024 損失 −57,125,707 の一部。"}
+
+  :recovery/c3-gw-fy2026-no-interest
+  {:severity :understatement
+   :fact "GW の FY2026 営業外費用は 0。1.34 億の借入があり FY2025 には 6,562,933 を計上していた。"
+   :implication "費用と負債の過少計上。"}}
+
+ ;; ------------------------- GW の借入は既に債権回収段階（FY2025 実測）
+ {:db/id -30
+  :source/dataset "gftd-works-mf"
+  :gw-default/fiscal-year 2025
+  :gw-default/interest-total 6562933
+  :gw-default/ordinary-interest 273565
+  :gw-default/damages-total 6289368
+  :gw-default/damages-ratio 0.958
+  :gw-default/damages
+  {"日本政策金融公庫/2,900万" 2856343
+   "東京信用保証協会（西武信金③/2,000万）" 1519455
+   "日本政策金融公庫/1,100万" 1083443
+   "独立行政法人福祉医療機構（渋谷）/3,000万" 293141
+   "独立行政法人福祉医療機構（天神）/3,000万" 293141
+   "第一勧業信用組合/1,000万" 179073
+   "東京信用保証協会（みずほ銀行/2,000万）" 47139
+   "独立行政法人福祉医療機構（東海）/3,000万" 13759
+   "アビリオ債権回収（西武信用金庫②/500万）" 3874}
+  :gw-default/finding
+  "損害金の相手先に 東京信用保証協会（代位弁済）と アビリオ債権回収（サービサー）が現れている。
+   GW の借入は『返済が遅れている』段階ではなく、既に回収手続に入っている。
+   日本政策金融公庫だけで損害金 3,939,786、福祉医療機構 3 拠点で 600,041。"
+  :gw-default/note "FY2026 は営業外費用ゼロ（-29 c3 参照）。損害金の計上が止まっている。"}
+
+ ;; ------------------------- 訂正: JC3 諸会費
+ {:db/id -31
+  :source/dataset "gftd-japan-mf"
+  :correction/subject "日本サイバー犯罪対策センター（JC3）諸会費"
+  :correction/previous "「¥150,000 ＝ 年額」と記述した"
+  :correction/actual {2025 900000 2026 150000}
+  :correction/note "金額が変わった理由は帳簿からは分からない。年額と断定した根拠が FY2026 の 1 件だけだった。"}
+
+ ;; ------------------------- entity -29 の 2 件を取り消す（実測して外れた）
+ {:db/id -32
+  :source/dataset "gftd-group"
+  :retraction/date "2026-08-15"
+  :retraction/note
+  "-29 で挙げた『取り戻せる／払い過ぎ』のうち 2 件は、2025 年の BS を実測したら成立しなかった。
+   どちらも『2024 年末の残高だけを見て、翌期の動きを見ていない』ことが原因。"
+  :retraction/a3-corporate-tax-receivable
+  {:was "GJ 未収法人税等 5,787,545 は欠損金の繰戻し還付の可能性。回収されたか未確認。"
+   :actual
+   "FY2025 に 未収法人税等 5,787,545 と 未払法人税等 6,077,500 が両方とも全額解消している。
+    差 289,955 は均等割 290,000。同じ税務ポジションのグロス表示であって、還付債権ではなかった。"
+   :verdict :not-a-missed-recovery}
+  :retraction/b2-gw-withholding-negative
+  {:was "GW 2024 年末の 預り金 給与源泉 −681,521 / 社会保険料 −63,595 = 745,116 は払い過ぎの可能性。"
+   :actual
+   "GW の FY2025 期首は FY2024 期末から 3,999,992 だけ遡及修正されている
+    （未払費用 +3,013,197 / 預り金 +986,795 = 3,999,992）。
+    預り金は −690,799 + 986,795 = +295,996 になり、マイナス残は消えている。記帳誤りの訂正だった。"
+   :verdict :not-an-overpayment}
+  :retraction/still-standing
+  ["-29 a1 アニメートアーク 38,919,404 の科目（売掛債権譲渡損）と 消費税 3,538,127"
+   "-29 c1 子会社株式 29,249,376 の減損未計上（FY2025 も動いていないことを実測で確認）"
+   "-29 c3 GW FY2026 の支払利息ゼロ"]}
+
+ ;; ------------------------- GW FY2025 期末（実測。前版の推定を置き換える）
+ {:db/id -33
+  :source/dataset "gftd-works-mf"
+  :gw-fy2025/measured true
+  :gw-fy2025/opening-restatement
+  {:amount 3999992
+   :detail {"未払費用" 3013197 "預り金" 986795}
+   :note "FY2024 期末 純資産 −72,767,448 に対し FY2025 期首は −76,767,440。負債を 3,999,992 積み増す遡及修正。"
+   :round-trip
+   "FY2026 に同額 3,999,992 が繰越利益剰余金へ戻されている（繰越利益剰余金 の貸方 1,739,563
+    ＝ 戻し 3,999,992 − 当期純損失 2,260,429）。permanent な修正ではなく往復している。
+    なぜ入れてなぜ戻したのかは仕訳を見ないと分からない。"}
+  :gw-fy2025/year-chaining-verified
+  "FY2026 期首 純資産 = −90,636,215 = FY2025 期末。年度は正しく繋がっている
+   （2026-08-15 に『繋がっていないのでは』と疑ったが、実測して外れた）。"
+  :gw-fy2025/closing
+  {:現金及び預金 286724 :売掛金 1187839 :未収入金 49815021 :短期貸付金 15000000
+   :資産合計 67237664 :流動負債 23944646 :長期借入金 133929233 :負債合計 157873879
+   :純資産 -90636215 :繰越利益剰余金 -119885591}
+  :gw-fy2025/correction
+  "前版で 2025 年末純資産を −86,636,223 と推定したのは誤り。実測は −90,636,215。
+   差 3,999,992 はちょうど期首の遡及修正額 —— 推定が『期首＝前期末』を仮定していたため。"
+  :gw-fy2025/notes
+  ["一年以内返済予定長期借入金 12,087,000 → 0、長期借入金 121,887,000 → 133,929,233。代位弁済に伴う組替とみられる"
+   "未払費用 7,533,530 → 17,329,780（+9,796,250）。FY2025 の遅延損害金 6,289,368 を含む"
+   "出資金 60,000 → 50,000。西武信用金庫分 10,000 が消えている（取引終了）"
+   "短期借入金 0 → 1,210,000 が新規発生"]
+  :gw-fy2026/negative-balances
+  {"預り金" -127226 "前払費用" -119283 :as-of "2026-08-15"
+   :note "2024 年末にも 預り金 がマイナスだった（-32 で訂正済み）。同じ形が FY2026 にも出ている。
+          単発の記帳誤りではなく反復している可能性がある。"}
+  :gw-fy2026/movements
+  {"未払金" {:opening 4588857 :closing 38061397 :note "期首洗替 33,672,329 を含む"}
+   "未収入金（GJ 向け）" {:opening 49815021 :closing 62309539 :delta 12494518}
+   "売掛金" {:opening 1187839 :closing 10465202}
+   "立替金" {:opening 0 :closing 13202121}}}
+
+ ;; ------------------------- GJ の 4 期（2023-2026）— 営業赤字は一度も途切れていない
+ {:db/id -34
+  :source/dataset "gftd-japan-mf"
+  :gj-history/series
+  [{:fy 2023 :売上 70635200 :営業損益 -26121520 :当期損益 29351064
+    :note "当期純利益 +29,351,064 は 特別利益『抱合せ株式消滅差益 56,500,157』による。経常損失は −26,859,091。"}
+   {:fy 2024 :売上 53141531 :営業損益 -55373052 :当期損益 -57125707
+    :note "販管費に 減価償却費 15,690,260（うち のれん一括償却 15,553,379）。固定資産除却損 917,787。"}
+   {:fy 2025 :売上 5963700 :営業損益 -38167859 :当期損益 -78713021
+    :note "営業外に 売掛債権譲渡損 38,919,404（アニメートアーク）。支払利息 1,383,302。"}
+   {:fy 2026 :as-of "2026-08-15" :売上 443506 :営業損益 -16226442 :当期損益 -16248283
+    :note "7.5 ヶ月。7・8 月は未記帳。"}]
+  :gj-history/finding
+  "GJ は 2023-2026 の 4 期すべてで営業赤字。累計 営業損失 −135,888,873。
+   唯一の黒字年 2023 も、営業段階では −26,121,520 の赤字で、合併差益がなければ赤字だった。
+   売上は 70,635,200 → 53,141,531 → 5,963,700 → 443,506。"
+  :gj-history/cost-side
+  {2023 {:販管費 81290312 :役員報酬 16000000 :業務委託料 29813959}
+   2024 {:販管費 91784812 :役員報酬 10774600 :業務委託料 10551031 :支払手数料 8990650}
+   2025 {:販管費 40384747 :役員報酬 8395212 :業務委託料 1749523}
+   2026 {:販管費 16669948 :役員報酬 3635102 :業務委託料 182105}}
+  :gj-history/asymmetry
+  "販管費は 91,784,812 → 16,669,948 と 82% 削れているが、売上は 53,141,531 → 443,506 と 99% 落ちている。
+   削減が追いつく速度ではない。"
+  :gj-history/consumption-tax-hint
+  {:未収消費税-2025年末 1192523
+   :note "FY2025 の消費税還付債権は 1,192,523。アニメートアークの貸倒れに係る控除 3,538,127 が
+          申告に入っていれば、この額はもっと大きくなるはず。控除が取られていないことと整合的だが、
+          課税売上割合など他の要素もあるので、これだけでは証明にならない。"}}
+
+ ;; ------------------------- GJ 設立初期 2019-2022（オーナー依頼 2026-08-15）
+ {:db/id -35
+  :source/dataset "gftd-japan-mf"
+  :gj-origin/incorporated "2019-01-04"
+  :gj-origin/day-one
+  {:資本金 0
+   :繰越利益剰余金-借方 34959065
+   :組織再編により生じた株式特別勘定 32259065
+   :新株予約権 2700000
+   :check "32,259,065 + 2,700,000 = 34,959,065。初日に自己資本から差し引かれた額と一致する。"
+   :受入資産 {"関係会社株式 ㈱フィルコマンド" 24012000 "子会社株式 Gftd Labo合同会社" 1250000 "創立費" 248450}
+   :初日負債 {"未払金 河﨑純真" 12012000}
+   :finding
+   "GJ は資本金ゼロで設立され、初日に 34,959,065 が繰越利益剰余金へ直接賦課されている。
+    営業の結果ではなく組織再編の開始仕訳。2019 年末の純資産は −33,778,228 で、
+    この会社は一度も『資本金を入れて始めた』ことがない。資本金 20,000,000 の計上は 2023 年。"}
+  :gj-origin/round-trip-34959065
+  "2023 年に 組織再編により生じた株式特別勘定 32,259,065 が消滅し、同年の繰越利益剰余金に
+   34,959,065 が貸方計上されている（FY2023 利益剰余金 貸方 64,310,129 − 当期純利益 29,351,064）。
+   初日に出た額がそのまま戻っている。4 年越しの往復。"
+  :gj-origin/gw-payable-by-year
+  [{:fy 2019 :opening 0 :paid 11937405 :charged 21489210 :closing 9551805 :delta 9551805}
+   {:fy 2020 :opening 9551805 :paid 11654635 :charged 29504331 :closing 27401501 :delta 17849696}
+   {:fy 2021 :opening 27401501 :paid 629000 :charged 1494777 :closing 28267278 :delta 865777}
+   {:fy 2022 :opening 28267278 :paid 1186000 :charged 19280266 :closing 46361544 :delta 18094266}
+   {:fy 2023 :opening 46361544 :paid 16468129 :charged 15556287 :closing 45449702 :delta -911842}]
+  :gj-origin/two-peaks
+  "山は 2 つある —— 2020 年 +17,849,696 と 2022 年 +18,094,266。
+   前版で『2021〜2022 はほぼ横ばい』と書いたのは誤り。横ばいだったのは 2021 だけ（+865,777）。
+   2020 年以降、GJ は GW へほとんど返していない（返済 2021 年 629,000 / 2022 年 1,186,000。
+   2020 年は 11,654,635 返していた）。"
+  :gj-origin/labo-receivable-by-year
+  {2019 0 2020 5468826 2021 8062022 2022 34388076 2023 0}
+  :gj-origin/conduit
+  "GW から入った資金は Gftd Labo へ流れている。2022 年は GW から +18,094,266 を受けながら
+   Labo への未収入金を +26,326,054 増やしている（8,062,022 → 34,388,076）。
+   GJ は資金の通り道になっていた: GW → GJ → Labo。
+   Labo 向け 34,388,076 は 2023 年の吸収合併で消滅した（-26 参照）。"
+  :gj-origin/fy2020-detail
+  {:売上 21153228
+   :売上内訳 {"業務委託売上 Gftd Labo合同会社" 10800000 "DE-SCHOOL売上" 7203228
+              "業務委託売上 Gftd Works㈱" 2100000 "業務委託売上 ㈱DE-SCHOOL" 800000 "その他" 250000}
+   :販管費 22531249
+   :業務委託料 {"㈱リンクス" 6500000 "DE-SCHOOL" 3108768 "DE-SCHOOL（藤井隼人）" 1800000
+                "イースター㈱" 1800000 "補助科目なし" 672728 :計 13881496}
+   :営業損益 -1378021
+   :当期損益 -319291
+   :finding
+   "2020 年の営業損失はわずか −1,378,021 で、当期純損失も −319,291。
+    つまり GW 未払金の +17,849,696 は営業赤字の穴埋めではない。
+    同年の現預金は +5,570,008、Labo への貸付は +5,468,826、Labo への未払金返済は 5,161,698。
+    GJ の PL に GW への費用計上は無く、この未払金は取引債務ではなく資金供給である。"}
+  :gj-origin/net-assets-by-year
+  {2019 -33778228 2020 -34097519 2021 -51427328 2022 -50481958
+   2023 40377547 2024 -16248160 2025 -94961181 :2026-08-15 -111209464}
+  :gj-origin/profit-by-year
+  {2019 -1519163 2020 -319291 2021 -17329809 2022 945370
+   2023 29351064 2024 -57125707 2025 -78713021 :2026 -16248283}
+  :gj-origin/finding
+  "GJ が純資産プラスだったのは 2023 年末の 1 時点だけで、それは合併差益 56,500,157 による。
+   設立初日から 2022 年末まで一貫して債務超過であり、2024 年に再び債務超過へ戻っている。"
+  :gj-origin/open-questions
+  ["2021 年の 未収入金 水谷翔太 24,000,000 の通過（フィルコマンド株 24,012,000 とほぼ同額）"
+   "2022 年末の 未払法人税等 6,594,400（当期純利益は +945,370 しかない）。FY2023 に解消しているが理由が不明"
+   "未払金 河﨑純真 12,012,000 が初日に立った理由（関係会社株式 フィルコマンド 24,012,000 のちょうど半分）"
+   "2019・2021・2022 の PL は未取得"]}
+
+ ;; ------------------------- 連結納税は実在した。前の結論を取り消す
+ ;; ⚠ この entity は -20 の :seizure/tax-consolidation-not-found を撤回する。
+ {:db/id -36
+  :source/dataset "gftd-group"
+  :retraction-2/date "2026-08-15"
+  :retraction-2/what-i-said
+  ["-20 『連結納税・グループ通算の痕跡は無い』"
+   "-20 『GJ が親会社として GW の税金をまとめて払っていたという仮説は両社の帳簿から確定的に否定された』"
+   "-28 『GJ が親会社として GW の税金をまとめて払っていたという仮説はこれで完全に閉じる』"
+   "アーティファクト第 8・9 版の同趣旨の記述"]
+  :retraction-2/what-is-true
+  "連結納税グループは実在した。GJ を親法人とし、Gftd Works と Gftd Labo を子法人とする
+   連結納税が FY2020・FY2021・FY2022 の決算整理仕訳に明記されている。
+   オーナーの当初の仮説（GW からの借入は GJ が GW の税金を払うことになっていたから）は、
+   少なくとも 2022 年について実質的に正しい。"
+  :retraction-2/why-i-was-wrong
+  "FY2025 の仕訳と 2023-11/12 の 1,500 万だけを見て『帳簿から確定的に否定された』と一般化した。
+   連結納税の仕訳は FY2020-2022 の期末決算整理にあり、私が見た窓の外にあった。
+   狭い窓で見た不在を、全体の不在として書いた。"
+
+  :retraction-2/gw-attribution-by-year
+  {2020 {:journal "#2439" :amount 5859774 :entry "借 法人税等 5,859,634 / 貸 未払金 Gftd Works㈱ 5,859,774"
+         :memo "2020.12月期　GW連結納税個別帰属額"
+         :gw-payable-increase-that-year 17849696 :share 0.328}
+   2021 {:journal "#3389" :amount 908965 :entry "借 法人税等 908,770 / 貸 未払金 Gftd Works㈱ 908,965"
+         :memo "2021.12月期　GW連結納税個別帰属額"
+         :gw-payable-increase-that-year 865777 :share 1.05
+         :note "増加分を上回るのは同年に返済 629,000 があるため"}
+   2022 {:journal "#4996" :amount 18056855 :entry "借 法人税等 18,056,676 / 貸 未払金 Gftd Works㈱ 18,056,855"
+         :memo "2022.12月期　GW連結納税個別帰属額"
+         :gw-payable-increase-that-year 18094266 :share 0.998}
+   :total 24825594}
+
+  :retraction-2/gl-attribution-by-year
+  {2020 5844733 2021 67304 2022 24698955 :total 30610992
+   :direction "GJ の借方（未収入金 Gftd Labo）—— GL が GJ に払う向き"
+   :fate "この Labo 向け債権は 2023-11-01 の吸収合併で消滅した（-26 参照）"}
+
+  :retraction-2/direction-matters
+  "GW 分は GJ の貸方（未払金 GW）＝ GJ が GW に負う向き。GL 分は GJ の借方（未収入金 GL）＝ GL が GJ に払う向き。
+   連結納税では黒字子会社が親に払い、欠損子会社は親から補償を受ける。
+   ただし GW は 2021・2022 とも当期黒字であり、この向きになる理由（特定連結欠損金の扱い等）は
+   帳簿だけでは説明できない。**解釈は会計士に委ねる。ここに書いたのは仕訳の事実だけ。**"
+
+  :retraction-2/what-still-stands
+  ["2023-11-28 / 11-29 / 12-14 の 3 件 1,500 万は摘要が『Gftd Works㈱ 資金借入』で、税金ではない"
+   "2025 年の差押え 5 件の相手勘定はすべて GJ 自身の 法定福利費・預り金 で、GW への請求は無い"
+   "連結納税制度は 2022-04-01 開始事業年度からグループ通算制度へ移行。12 月決算なら FY2023 から。
+    FY2023 以降に個別帰属額の仕訳が無いのはこれと整合的"]
+  :retraction-2/structural-finding
+  "Labo は GJ に 30,610,992 の税を負い、GJ は GW に 24,825,594 の税を負った。
+   Labo 側の債務は 2023 年の吸収合併で消滅し、GW 側の債務だけが残っている。
+   現在の GJ→GW 未払金 63,313,948 のうち 24,825,594（39%）は連結納税の個別帰属額である。"
+  :retraction-2/accountant-questions
+  ["GW 個別帰属額 24,825,594 の決済義務は現在も生きているか"
+   "GW が黒字の年に GJ が GW へ負う向きになった理由（特定連結欠損金の扱い）"
+   "グループ通算への移行時（FY2023）に未決済の個別帰属額をどう処理したか"
+   "Labo 分 30,610,992 が合併で消えたことの税務上の扱い"]}
+
+ ;; ------------------------- 2021 年末の 3 仕訳（水谷翔太・債務免除）
+ {:db/id -37
+  :source/dataset "gftd-japan-mf"
+  :fy2021/philcommand-share-transfer
+  {:journal "#3381" :date "2021-12-31" :memo "水谷翔太　株譲渡代金　科目振替"
+   :entry "借 長期滞留債権 21,500,000 / 貸 未収入金 水谷翔太 21,500,000"
+   :followed-by {:journal "#3382" :memo "破産更生債権　貸倒引当金繰入"
+                 :entry "借 貸倒引当金繰入額（特損） 21,500,000 / 貸 貸倒引当金（長期滞留） 21,500,000"}
+   :finding
+   "水谷翔太は ㈱フィルコマンド 株式の譲渡先だった。FY2021 に 未収入金 水谷翔太 が
+    24,000,000 通過し、うち 21,500,000 が回収不能となって長期滞留債権へ振替、
+    同日に全額引当。摘要は『破産更生債権』。
+    オーナー証言『詐欺会社だったので訴訟して株式放棄』と整合するが、帳簿上は
+    放棄ではなく譲渡で、譲渡代金が焦げ付いた形。現在も BS に 21,500,000 が
+    引当と両建てで残っている。"}
+  :fy2021/ceo-debt-forgiveness
+  {:journal "#3388" :date "2021-12-31" :memo "河﨑純真　債務免除"
+   :entry "借 未払金 河﨑純真 12,012,000 / 貸 債務免除益 12,012,000"
+   :finding
+   "設立初日（2019-01-04）に立った 代表への未払金 12,012,000 は、2021 年に
+    代表が債権を放棄して消えている。債務免除益 12,012,000 は FY2021 の利益に入っており、
+    これが無ければ FY2021 の損失は −17,329,809 ではなく −29,341,809 だった。"}
+  :fy2021/offset-entry
+  {:journal "#3380" :date "2021-12-31" :memo "GL・GJ債権債務相殺 / GW・GJ債権債務相殺"
+   :note "期末の債権債務相殺は 2020 年（#2431 #2432）から毎年行われている。
+          現在も続く『期首洗替』の起源はここ。"}}
+
+ ;; ------------------------- DE-SCHOOL の MBO（オーナー指摘 2026-08-16「あれは MBO の資金」）
+ ;; 出所: orgs/gftdcojp/m365-archive/facts/contract-terms.edn（559 件、うち譲渡関連 80 件）
+ {:db/id -38
+  :source/dataset "gftd-japan-mf"
+  :mbo/subject "DE-SCHOOL 事業"
+  :mbo/contract
+  {:date "2020-09-01"
+   :type "事業譲渡契約"
+   :party-a "Gftd Japan株式会社"
+   :party-b "株式会社DE-SCHOOL"
+   :price 12396515
+   :price-note "税別。2021年1月〜2023年1月の分割払い"
+   :transferred-assets 284745
+   :assumed-liabilities 1721002
+   :file "201124事業譲渡契約書_v2.docx"
+   :archive-path "onedrive/From G Suite Drive/@キャスター・佐藤公認会計士事務所_共有ドライブ/施設別/早稲田/経理/★DE-SCHOOL関係証憑類（代表藤井様）/DE-SCHOOL譲渡（2020.8）/2020.11.26譲渡契約書案/"
+   :status :draft-unsealed
+   :caveat "押印済みの契約書はアーカイブに無い。ドラフト 2 版（v1/v2）のみ。"}
+  :mbo/executed-evidence
+  "契約書の 引継負債 1,721,002 が GJ の 2020 年末 BS に 未払金 ㈱DE-SCHOOL 1,721,002 として
+   1 円違わず出現している（2021 年に完済）。押印済み契約書は無いが、事業譲渡は実行されている。"
+  :mbo/collection-by-year
+  {2021 {:amount 2640000 :basis "売掛金 ㈱DE-SCHOOL 借方" :memo "経営委任契約に基づく報酬（月 220,000）"}
+   2022 {:amount 2673000 :basis "売掛金 ㈱DE-SCHOOL 借方"}
+   2023 {:amount 2640000 :basis "売掛金 ㈱DE-SCHOOL 借方"}
+   2024 {:amount 1600000 :basis "業務委託売上 ㈱DE-SCHOOL（FY2024 PL 補助科目で確認）"}
+   2025 {:amount 3000000 :basis "業務委託売上 ㈱DE-SCHOOL"}
+   2026 {:amount 0 :basis "計上なし"}
+   :total-gross 12553000
+   :total-net 11830000}
+  :mbo/match
+  {:contract-price 12396515
+   :collected-gross 12553000 :gap-gross 156485 :gap-gross-pct 0.0126
+   :collected-net 11830000 :gap-net -566515 :gap-net-pct 0.046
+   :verdict
+   "契約価額と累計請求が 1.3%（税込）/ 4.6%（税抜）で一致し、開始が 2021 年、
+    停止が 2026 年で契約の分割払い構造と符合する。ただし『業務委託料が譲渡代金である』と
+    明記した契約書は見ていない。強い示唆であって証明ではない。"}
+  :mbo/consequence-for-planning
+  "GJ の FY2021-2025 の DE-SCHOOL 向け収入は事業収益ではなく MBO 譲渡代金の分割回収だった。
+   払い終わったから止まったのであり、戻すべき売上は実在しない。
+   FY2026 の 443,506 円が外部からの事業収益の実勢である。"
+  :mbo/retraction
+  "前版で『DE-SCHOOL 契約がなぜ止まったのか、戻せるのかが GJ の再建可否を最も直接に決める』と
+   書いたのは誤り。戻す対象が無い。"}
+
+ ;; ------------------------- 契約書から出た訂正と補強
+ {:db/id -39
+  :source/dataset "gftd-japan-mf"
+  :contracts/philcommand
+  {:date "2019-10-29"
+   :type "株式譲渡契約"
+   :seller "水谷翔太"
+   :buyer "Gftd Japan株式会社"
+   :shares "㈱フィルコマンド 普通株式 40株のうち 20株"
+   :consideration {:cash 2000000 :eth 600 :other "CommonSquare（仮想通貨取引所）システム納品"}
+   :buyback-clause true
+   :sealed true
+   :files ["3647a56db59985b26d75344b63c0d634__1.株式譲渡契約書フィルコマンド_水谷翔太.pdf"
+           "201910_株式譲渡契約書フィルコマンド・水谷翔太 (1).pdf"]
+   :retraction
+   "-37 で『水谷翔太は ㈱フィルコマンド 株式の譲渡先だった』と書いたのは逆。水谷氏は売り手である。"
+   :reinterpretation
+   "買戻条項があるため、2021 年末の『水谷翔太　株譲渡代金　科目振替 21,500,000』は
+    GJ が買戻を請求し水谷氏が履行できなかった結果と読むのが自然（摘要も『破産更生債権』）。
+    買戻請求の書類は未確認なので断定しない。"
+   :share-value-decomposition
+   {:関係会社株式簿価 24012000 :cash 2000000 :eth-implied 22012000 :eth-rate 36686.67
+    :note "現金 2,000,000 ＋ 600ETH ＝ 24,012,000 で簿価と一致。対価の 92% は ETH。"}}
+  :contracts/gj-share-accumulation
+  [{:date "2019-12-13" :from "佐藤幹雄" :to "河﨑純真" :shares 100 :amount 5000000}
+   {:date "2019-12-13" :from "㈱イシイ" :to "河﨑純真" :shares 50 :amount 5000000}
+   {:date "2020-01-07" :from "GA1号投資組合" :to "河﨑純真" :shares 50 :amount 5000000}]
+  :contracts/gj-share-accumulation-total {:shares 200 :amount 15000000}
+  :contracts/predecessor
+  [{:date "2018-03-30" :type "株式譲渡契約" :from "椎名康雄" :to "GIFTED AGENT株式会社"
+    :subject "プレミア証券株式会社 発行済全株式 199,055株（100%）" :amount 400000000
+    :note "手付金 5,000万 ＋ 残金 3億5,000万"}
+   {:date "2018-10-10" :type "事業譲渡契約" :from "一般社団法人がん病後生活向上回復協会" :to "Gifted Agent株式会社"
+    :subject "福祉事業" :amount 20000000 :note "4 回分割。譲渡日 2018-11-20。Gftd Works の福祉事業の起源"}]
+  :contracts/hypothesis
+  "設立初日の『組織再編により生じた株式特別勘定 32,259,065』の背景は GIFTED AGENT 系列の
+   組織再編にあると見られるが、対応する契約書は未特定。**未確認の推測として記録する。**"
+  :contracts/source-limitation
+  "MoneyForward の MCP はクラウド会計のみ（/mcp/ca/v3）で、クラウド契約（契約書管理）の
+   ツールは提供されていない。ここに書いた契約はすべて m365 アーカイブの OneDrive 側から取得した。
+   MF クラウド契約を利用している場合、その内容は未取得である。"}
+
+ ;; ------------------------- 換価の猶予・分割納付の申請資料（2026-08-16）
+ {:db/id -40
+  :source/dataset "gftd-japan-mf"
+  :yuyo/as-of "2026-08-15"
+  :yuyo/draft-document "scratchpad/gj-換価の猶予-申請資料ドラフト.md（会計士確認・代表押印が必要）"
+
+  :yuyo/arrears
+  {:国税 {"源泉所得税(給与)" 2142317 "源泉所得税(士業報酬)" 47731 "源泉所得税(業務委託)" 10210 :小計 2200258
+          :徴収機関 "麹町税務署"}
+   :地方税 {"住民税(特別徴収)" 673493 "法人住民税均等割" 290000 :小計 963493}
+   :社会保険労働保険 {"社会保険料" 4896829 "労働保険料" 77686 :小計 4974515}
+   :合計 8138266
+   :caveat "帳簿残高であり延滞税・延滞金を含まない。提出前に各機関へ現在額を照会する必要がある。
+            また 2026 年 7・8 月が未記帳。"}
+  :yuyo/separation-note
+  "前版まで『労務・税務 22,020,172』とまとめていたが、うち 未払賃金 14,249,592 は労働債権であり
+   猶予の対象ではない。猶予の対象になるのは税・社会保険の 8,138,266 だけ。"
+
+  :yuyo/property-inventory
+  {:換価可能 {"現金及び預金" 86189 "未収消費税" 1192523 "敷金" 690000 :小計 1968712}
+   :換価困難 {"売掛金 Gftd Works㈱" 13206000 :理由 "同社の現預金残高は 18,520"}
+   :実質ゼロ {"子会社株式 Gftd Works㈱ 全株" 29249376 :理由 "同社の純資産は −88,896,652"
+              "長期滞留債権" 21500000 :理由2 "全額に貸倒引当金（破産更生債権）"}
+   :その他 {"仮払消費税" 487828 "前払費用" 709935 "有形固定資産" 57154 "役員貸付金ほか" 28011}
+   :資産合計 45707016
+   :換価可能比率 0.043}
+  :yuyo/no-collateral
+  "担保に提供できる財産が無い。不動産・車両・第三者発行の有価証券をいずれも保有せず、
+   唯一の株式は債務超過の子会社株式。国税通則法46条5項ただし書・国税徴収法152条4項の
+   『担保を徴することができない特別の事情』に該当すると考えられる。"
+
+  :yuyo/monthly-cashflow
+  {:基準 "2026年1〜6月の実績・月平均"
+   :収入 73918
+   :支出 {"役員報酬" 605850 "給料賃金" 942220 "法定福利費" 134579 "地代家賃" 279167
+          "支払報酬" 296050 "通信費" 292867 "支払手数料" 96503 "諸会費" 66115
+          "業務委託料" 30351 "広告宣伝費" 28782 "その他" 5842 :計 2778325}
+   :収支差 -2704407
+   :人件費以外の販管費 1095676}
+
+  :yuyo/refunds
+  {"未収消費税(FY2025確定)" {:amount 1192523 :status :確定済み未入金
+                            :note "確定から 8 か月半、残高が 1 円も動いていない"}
+   "貸倒れに係る消費税額の控除(更正の請求)" {:amount 3538127 :status :未請求}
+   "FY2026分の還付見込み" {:amount 444204 :status :確定申告後}
+   :計 5174854
+   :充当 "国税通則法57条により国税の還付金は国税の滞納に充当される。
+          国税滞納 2,200,258 は還付金の充当で完済でき、残余 2,974,596 は他の滞納へ回せる。"}
+
+  :yuyo/payment-plan
+  {:案A {:条件 "更正の請求が認められた場合"
+         :滞納 8138266 :還付充当 5174854 :残額 2963412 :月額24回 123476}
+   :案B {:条件 "更正の請求が認められなかった場合"
+         :滞納 8138266 :還付充当 1636727 :残額 6501539 :月額24回 270898}
+   :前提 "いずれの案でも 人件費以外の販管費 1,095,676/月 の削減が前提。
+          不足は代表者からの借入（累計 19,780,000、うち 2026 年単年 7,100,000）で埋める。"
+   :順序 ["年金事務所（差押え 3 回・最優先）" "麹町税務署（還付充当を予定）"
+          "各区市町村（住民税）" "都税事務所・東京労働局"]}
+
+  :yuyo/legal-constraints
+  ["申請による換価の猶予は納期限から 6 か月以内（国税徴収法151条の2）。
+    源泉税の滞納は 2023 年から積み上がっており、古い分は期限を過ぎている。
+    その分は職権による換価の猶予（同法151条）または分割納付の相談に切り替わる。"
+   "滞納 100 万超・猶予期間 3 か月超は原則担保。上記のとおり『特別の事情』を主張する。"
+   "社会保険料は年金事務所との分割納付誓約で別途手続き（厚生年金保険法）。"]
+
+  :yuyo/archive-search-result
+  "m365 アーカイブの徴収関係の通知は 2019-2020 年の Gftd Works 分が中心で、
+   Gftd Japan 分は『20250612 Gftd Japan 督促状（特別徴収）.pdf』1 件のみ。
+   したがって滞納額の正本は帳簿とし、実額は各機関への照会で確定させる。"}
+
+ ;; ------------------------- 顧問契約の終了（2026-06-30）とその帰結
+ ;; 出所: m365-archive の実メール 2 通（2026 年分 1,268 通が local に present）
+ {:db/id -41
+  :source/dataset "gftd-group"
+  :advisor-exit/date "2026-06-30"
+  :advisor-exit/effective "2026年6月末で顧問契約終了"
+  :advisor-exit/from {:name "佐藤 幹雄" :firm "佐藤公認会計士事務所 ／ ㈱野心満々"
+                      :email "m-sato@yashin.co.jp"
+                      :note "2019-12-13 に GJ 株 100 株を 500 万円で河﨑純真へ譲渡した人物と同一（-39 参照）。約 10 数年の関係。"}
+  :advisor-exit/mail-files
+  {:通知 "mail/受信トレイ/20260630T092850Z_31267978e22b7fd2.eml"
+   :返信 "mail/送信済みアイテム/20260706T023013Z_fbf9a5e4ea4583c3.eml"}
+  :advisor-exit/stated-reasons
+  ["顧問料 約600万円以上の未払いが継続している"
+   "毎月開催される役員会に代表取締役の出席が継続的に確認できず、会社運営に関する必要な確認や意思疎通を十分に行えない"]
+  :advisor-exit/unpaid-claimed
+  {"野心満々／コンサル報酬 Gftd Japan" 3740000
+   "佐藤会計／顧問報酬 Gftd Japan" 1370616
+   "佐藤会計／顧問報酬 Gftd Works" 1600632
+   :各社合計 6711248
+   :as-of "2026-06-30"}
+  :advisor-exit/book-reconciliation
+  {"未払金 ㈱野心満々（GJ 帳簿 2026-08-15）" {:books 3740000 :claimed 3740000 :diff 0 :note "1 円違わず一致"}
+   "未払金 佐藤公認会計士事務所（GJ 帳簿 2026-08-15）" {:books 1505745 :claimed 1370616 :diff 135129
+                                                       :note "帳簿の方が多い。7 月分の計上とみられる"}
+   "Gftd Works 分" {:claimed 1600632 :books :未確認}}
+  :advisor-exit/owner-reply
+  {:date "2026-07-06"
+   :points ["10 数年の支援に謝意"
+            "他の財務会計などは契約はせず、AI で業務をすべて回す予定なので引継ぎ自体は不要"
+            "書類など物理的なものがあれば郵送を依頼"
+            "未払い部分の精算は追って整理"
+            "Gftd Works に関しては高橋に任せている"]}
+  :advisor-exit/consequences
+  ["記帳・決算・税務申告・還付請求・年末調整・法定調書を、外部の税理士なしで行う体制になった。"
+   "未払 6,711,248 は『その他の外部債権者』の一部であり、GJ 分 5,245,745 は既に -40 の
+    滞納集計とは別枠（税ではなく一般債権）。"
+   "-40 の申請資料で担当を『佐藤公認会計士事務所』としていた項目は、すべて会社側の実務に移る。"]
+
+  ;; e-Tax の還付申告 —— 同じメール調査で判明した
+  :advisor-exit/etax-refund-notices
+  {:sender "e-Tax（国税電子申告・納税システム） info@e-tax.nta.go.jp"
+   :subject "税務署からのお知らせ【還付金の処理状況に関するお知らせ】"
+   :gftd-japan {:count 1 :dates ["2026-06-25T08:32:49+09:00"] :to "keiri@gftd.co.jp"}
+   :gftd-works {:count 16 :dates ["2026-06-24（8 通）" "2026-07-03（8 通）"]}
+   :body-summary "『ご提出された還付申告の処理状況についてご連絡します。詳細については還付金処理状況をご確認ください。
+                  e-Tax ホームページからログインの上、マイページの「還付・納税関係」よりご確認いただけます。』
+                  —— 金額はメール本文に無く、e-Tax マイページにのみ表示される。"
+   :finding
+   "還付申告は提出済みで税務署が処理中の通知を出している。-40 で『未収消費税 1,192,523 が
+    8 か月半 動いていない』としたが、申告自体は行われていた。残高が動いていない理由は
+    e-Tax マイページの還付金処理状況で判明する。"
+   :action
+   "オーナーが e-Tax にログインして『還付・納税関係 → 還付金処理状況』を確認する。
+    agent は認証情報を自分で入力しない（安全床）ためログインしない。
+    会計士不在でも今日できる唯一かつ最重要の確認。"
+   :resolved-by "entity -42（2026-08-16 に実画面で確認）"}}
+
+ ;; ------------------------- e-Tax 実画面の確認結果（2026-08-16）
+ ;; オーナーがログインし、agent が画面を読んだ。認証情報の入力は agent は行っていない。
+ {:db/id -42
+  :source/dataset "gftd-japan-mf"
+  :etax/checked-at "2026-08-16"
+  :etax/method
+  "macOS computer-use で Microsoft Edge を操作。ログインはオーナーが実施し、
+   agent は画面遷移と読み取りのみ（利用者識別番号・パスワードは agent が入力していない）。"
+  :etax/office "麹町税務署"
+
+  ;; 決着: FY2025 消費税の還付申告
+  :etax/consumption-tax-return-fy2025
+  {:受付番号 "20260325153540202316"
+   :受付日時 "2026/03/25 15:35:40"
+   :種目 "消費税申告書"
+   :申告の種類 "確定"
+   :課税期間 "令和07年01月01日 〜 令和07年12月31日"
+   :課税標準額 5970000
+   :還付税額 1192523
+   :表示 "消費税及び地方消費税の合計（納付又は還付）税額 △1,192,523 円"
+   :match-with-books
+   "帳簿の 未収消費税 1,192,523 と 1 円違わず一致。申告は実在し、金額も正しい。"
+   :還付申告についての注記
+   "『還付申告の処理は、提出が必要な添付書類が税務署に到着してからとなります。』
+    —— 添付書類の到着が処理開始の条件。"}
+
+  :etax/timeline
+  [{:date "2026-03-25" :event "消費税確定申告を送信（還付 1,192,523）"}
+   {:date "2026-06-02" :event "イメージ添付書類(法人消費税申告) を追加送信 —— 申告から 69 日後"}
+   {:date "2026-06-25" :event "税務署から『還付金の処理状況に関するお知らせ』（keiri@gftd.co.jp）"}
+   {:date "2026-06-26" :event "前回ログイン 12:21（誰かが確認している）"}
+   {:date "2026-08-16" :event "還付金処理状況確認：『表示できる情報はありません』＝処理は終了している"}]
+
+  :etax/refund-status
+  {:還付金処理状況 "表示できる情報はありません"
+   :interpretation
+   "e-Tax の還付金処理状況は処理中の間だけ表示され、完了すると消える。
+    したがって還付は既に『支払済』または『他の国税へ充当済』のいずれか。"
+   :還付先金融機関 "未登録（-）"
+   :ダイレクト納付の金融機関口座 "未登録（-）"
+   :unresolved
+   "支払済か充当済かは未確定。通知書等一覧の『通知書等選択』ドロップダウンで
+    国税還付金振込通知書／充当通知書を選べば判明する（今回は到達できなかった）。
+    帳簿側では 未収消費税 1,192,523 が 2026 年 1 月 1 日から 8 月 15 日まで
+    1 円も動いていない ——「入金の記帳漏れ」か「充当の記帳漏れ」のどちらか。"}
+
+  ;; ⚠ グループ通算は現在も適用中だった
+  :etax/group-tax-still-active
+  {:evidence "受信通知一覧（120日以前）に 2026/03/25 付で『通算法人の確定申告』が存在する"
+   :same-day-filings ["通算法人の確定申告"
+                      "消費税及び地方消費税申告(一般・法人)"
+                      "イメージ添付書類(法人税申告(通算))"
+                      "イメージ添付書類(法人消費税申告)"]
+   :also "還付・納税関係の画面に『関与先(通算法人)の自動ダイレクト納付』の項目がある"
+   :correction
+   "-36 で『連結納税制度は 2022-04-01 開始事業年度からグループ通算へ移行。12 月決算なら
+    FY2023 から。FY2023 以降に個別帰属額の仕訳が無いのはこれと整合的』と書いたが、
+    **制度が終わったのではなく、グループ通算として継続している**。
+    帳簿に個別帰属額の仕訳が無いのは、制度の終了ではなく別の理由（記帳されていない等）。
+    GJ↔GW の税の関係は現在も生きている可能性が高い。"
+   :accountant-question
+   "FY2023-FY2025 のグループ通算における GJ と GW の通算税効果額の授受は
+    どう処理されているか。帳簿に現れていない理由は何か。"}
+
+  :etax/other-findings
+  {:消費税関係情報 {:課税期間 "2025/01/01〜2025/12/31" :中間申告 "なし" :課税期間特例 "適用なし"
+                    :更新日 "2026-01-15"}
+   :通知書等一覧 {:未読 "なし" :更正の請求に対する通知書 "情報なし" :加算税の賦課決定通知書 "情報なし"}
+   :受信フォルダ直近 ["2026/06/02 イメージ添付書類(法人消費税申告)"
+                      "2026/04/24 e-TaxHPのIPアドレスの仕様変更について"
+                      "2026/04/22 源泉所得税関係の税制改正についてのお知らせ"]}
+
+  :etax/next-actions
+  ["確定したら帳簿に記帳する（未収消費税 1,192,523 の消込）"
+   "還付先金融機関が未登録なので、今後の還付のために登録を検討する"
+   "eLTAX に 令和08年度分 特別徴収税額通知（変更分 1 件、2026-07-23 格納）が未取得。
+    保護番号はメール本文にある。住民税 673,493 の滞納額確定に必要"]}
+
+ ;; ------------------------- 還付 1,192,523 の行方（銀行明細で決着、2026-08-16）
+ {:db/id -43
+  :source/dataset "gftd-japan-mf"
+  :refund-trace/checked-at "2026-08-16"
+
+  :refund-trace/etax-notice-list
+  {:通知書等選択の選択肢 ["適格請求書発行事業者通知書" "国税還付金振込通知書"]
+   :国税還付金振込通知書 "現在、国税還付金振込通知書に表示できる情報はありません。"
+   :充当通知書 "選択肢に存在しない（電子交付の対象外）"
+   :note "e-Tax の通知書等は『電子通知を希望した通知書等』のみ表示される。
+          振込通知書が無いことは、紙で届いた可能性も残す。"}
+
+  :refund-trace/bank-transactions
+  {:source "mfc_ca getTransactions 2026-06-01〜2026-08-16"
+   :count 79
+   :finding "¥1,192,523 の入金は 1 件も無い。"
+   :入金の内訳 {"振込 カワサキ ジユン（2026-06-23）" 200000
+                "振込 カワサキ ジユン（2026-06-25）" 350000
+                "振込 カワサキ ジユン（2026-07-24）" 400000
+                "ペイペイ振込 ギフテツドジヤパン（2026-08-03）" 150000
+                "ペイペイ振込（2026-06-24）" 77500
+                "ペイペイ振込（2026-06-23）" 42000
+                "振込 イ)シヤダンコウアンカイ（06-17 / 07-22）" 66000
+                "その他（ポイント振替・利息等）" 4331}
+   :代表からの入金-2ヶ月 950000}
+
+  :refund-trace/conclusion
+  {:verdict :likely-offset
+   :reasoning
+   "① e-Tax の還付金処理状況は空＝処理は終了している
+    ② 銀行に 1,192,523 の入金が無い（6/1〜8/16 の 79 件を全件確認）
+    ③ 還付先金融機関が e-Tax に未登録
+    ④ GJ には源泉所得税 2,200,258 の滞納がある
+    → 国税通則法57条により源泉所得税の滞納へ充当された可能性が高い。"
+   :not-proven
+   "充当通知書は e-Tax の電子交付対象外で、紙で届いている可能性がある。
+    確定には麹町税務署（徴収部門）への照会が要る —— 同じ電話で現在の未納額
+    （延滞税込み）も取れるので、-40 の第1表の差し替えと同時に済む。"
+   :bookkeeping
+   "いずれにせよ 未収消費税 1,192,523 は帳簿で消込が必要。
+    充当なら 借 預り金/源泉税(給与) 1,192,523 / 貸 未収消費税 1,192,523。"}
+
+  ;; ⚠ 2026 年にも差押えがあった
+  :refund-trace/seizures-2026
+  {"2026-06-25 サシオサエ カコガワシヤクシヨ（加古川市役所）" 41195
+   "2026-07-17 サシオサエ チヨダネンキンジムシヨ（千代田年金事務所）" 6
+   :計 41201
+   :finding
+   "-20 で記録したのは 2025 年の 5 件（計 1,701,495）だけだった。2026 年にも 2 件ある。
+    加古川市役所は住民税の特別徴収（従業員の居住地）とみられる。
+    千代田年金事務所の差押えが **6 円しか取れていない** —— 口座が空である事実が、
+    執行側にも記録されたことを意味する。"
+   :cumulative "2025-2026 の差押え 7 件・計 1,742,696"}
+
+  :refund-trace/other-2026-movements
+  {"振込 ギフテツドワ-クス(カ（2026-07-24）" 194465
+   "振込 バクシ クナル（2026-06-25）" 400000
+   "PE チホウゼイキヨウドウキコウ（地方税共同機構・住民税）" {"2026-06-08" 4400 "2026-07-24" 24400}
+   "PE ホウムシヨウ（法務省）" {"2026-06-02" 490 "2026-06-05" 3800}
+   :note "GJ は 2026-07-24 に GW へ 194,465 を実際に振り込んでいる。
+          住民税は地方税共同機構経由で少額ずつ納付している。"}}
+
+ ;; ------------------------- ⚠ 撤回: アニメートアーク債権は貸倒れではなく譲渡だった
+ ;; オーナー指示「貸倒控除の請求を進めて」を受けて事実確認した結果、請求できないことが判明。
+ {:db/id -44
+  :source/dataset "gftd-japan-mf"
+  :retraction-3/date "2026-08-16"
+  :retraction-3/what-i-said
+  ["-29 a1『アニメートアーク 38,919,404 は貸倒損失ではなく売掛債権譲渡損で落ちている。
+     貸倒損失として処理していれば消費税 3,538,127 の控除が使えた』"
+   "-40『納付計画 案A は更正の請求 3,538,127 が認められた場合』"
+   "アーティファクト第 10・11 版の同趣旨の記述"
+   "申請資料ドラフトの第4表『貸倒れに係る消費税額の控除（更正の請求）3,538,127』"]
+  :retraction-3/what-is-true
+  "帳簿は事実を正確に記録していた。債権は貸倒れたのではなく、実際に売却されている。
+   したがって消費税法39条の貸倒れに係る消費税額の控除は適用できず、更正の請求はできない。
+   科目『売掛債権譲渡損』は正しい処理である。"
+
+  :retraction-3/journal
+  {:number "#3875" :date "2025-12-25"
+   :entries
+   [{:借 "売掛債権譲渡損" :amount 38919248
+     :貸 "売掛金/アニメートアーク㈱(旧アニカナジャパン㈱)" :credit 38919404
+     :remark "アニメートアーク(株)売掛債権を 米国の Prometheum のセーシェル会社, Prometheum Asia に 1USDT にて売却"}
+    {:借 "仮想通貨" :amount 156 :remark "Prometheum Asia より 1USDT 入金"}
+    {:借 "売掛債権譲渡損" :amount 156 :貸 "売掛債権譲渡損" :remark "消費税認識仕訳"}]
+   :買主 "Prometheum Asia（米国 Prometheum のセーシェル法人）"
+   :対価 {:usdt 1 :jpy 156}}
+
+  :retraction-3/preceding-events
+  [{:date "2025-12-01" :event "アニメートアーク宛て請求書を郵送（小田敦子が立替、#3850）"}
+   {:date "2025-12-01" :event "記載事項証明書を発行（一般財団法人民事法務協会 600 円、#3852）"}
+   {:date "2025-12-05" :event "**内容証明郵便**で請求書を送付（日本郵便 1,819 円、#3854）"}
+   {:date "2025-12-23" :event "アニメートアーク社との面談（a.oda / j.kawasaki / m.ebashi@animateark.com）"}
+   {:date "2025-12-25" :event "1USDT で Prometheum Asia へ売却"}]
+  :retraction-3/sequence-reading
+  "請求（内容証明）→ 面談 → 2 日後に譲渡、という順序。回収の努力は記録に残っている。"
+
+  ;; 債権には担保が付いていた
+  :retraction-3/pledge
+  {:contract "20221107_GL_小町博幸様_株式質権設定契約書（押印あり）"
+   :date "2022-11-07"
+   :担保権者 "Gftd Labo合同会社"
+   :質権設定者 "小町博幸（アニカナジャパン株主）"
+   :被担保債権 47098700
+   :被担保債権の内容 "Gftd Labo の アニカナジャパン株式会社に対する業務委託料債権"
+   :担保物 "アニカナジャパン株式会社 発行済普通株式 222株"
+   :implication
+   "**担保物のある債権は、担保を処分した後でなければ貸倒れにできない**
+    （法人税基本通達9-6-2 と同趣旨の考え方）。仮に貸倒れの主張を試みても、
+    この質権の存在が障害になる。債権自体を譲渡した以上、質権も一緒に移転したのか、
+    残っているのかは契約書を見ないと分からない。"
+   :金額の差 {:被担保債権 47098700 :GJ承継額 38919404 :差 8179296 :note "一部回収か別勘定か未確認"}}
+
+  ;; ここからが本当の論点
+  :retraction-3/real-issue
+  {:severity :high
+   :issue "3,891 万の債権を 156 円で譲渡したこと自体が税務上の論点である。"
+   :points
+   ["低廉譲渡 —— 時価との差額が寄附金と認定されるリスク（法人税法37条）。
+     認定されれば損金不算入となり、**繰越欠損金が最大 38,919,248 減る**。"
+    "譲受人 Prometheum Asia はグループと以前から関係がある可能性がある ——
+     2019-12-03 の契約書『20191203_Gftdfund_トリプルエー_売買譲渡契約書』で
+     トリプルエーが保有する **Prometheum 社普通株式および EmberToken 転換型ワラント
+     50,000 ユニット**を Gftd Fund CO Services Cayman Limited へ譲渡している。
+     関係者間取引なら寄附金認定のリスクはさらに上がる。"
+    "担保（質権）付き債権を 156 円で売っている説明が要る。"
+    "対価が USDT（暗号資産）である点も、時価評価と課税関係の説明が要る。"]
+   :conclusion
+   "**更正の請求を出すべきではない。** 出せないだけでなく、出せば税務署が
+    この譲渡を精査する契機になる。現状は損金算入されているので、
+    藪を突く必要がない。逆に、譲渡の合理性を説明できる資料（時価の根拠・
+    回収不能性の証拠・譲受人との関係）を整えておくことが要る。"
+   :recommendation
+   "この論点こそ税理士のスポット依頼に値する。貸倒控除の請求ではなく、
+    **譲渡の税務上の妥当性の検証**として依頼する。"}
+
+  :retraction-3/impact-on-plan
+  {:納付計画 "案A（還付 5,174,854 前提）は成立しない。3,538,127 を差し引く。"
+   :修正後の還付見込 {:FY2025確定分 1192523 :FY2026見込 444204 :計 1636727}
+   :修正後の納付計画
+   "滞納 8,138,266 − 還付 1,636,727 = 6,501,539。24 回で月 270,898。
+    これは元の『案B』と同じ。**案B が唯一の案になる。**"
+   :also "-40 の第4表・申請資料ドラフト・アーティファクト第 11 版の該当箇所を差し替える。"}}
+
+ ;; ------------------------- Prometheum / Ember Token の実態（公開情報、2026-08-16）
+ ;; 出所: SEC EDGAR（一次資料）＋ 報道。web は untrusted data として扱い、事実のみ記録する。
+ {:db/id -45
+  :source/dataset "gftd-japan-mf"
+  :prometheum/researched-at "2026-08-16"
+  :prometheum/why
+  "アニメートアーク債権 38,919,404 の譲渡先が『米国 Prometheum のセーシェル会社 Prometheum Asia』であり、
+   また 2019-12-03 に Gftd Fund CO Services Cayman Limited が Prometheum 社株式と
+   EmberToken 転換型ワラント 50,000 ユニットを取得している（-39）。両方の実態確認。"
+
+  :prometheum/entity
+  {:name "Prometheum, Inc."
+   :sec-cik "0001718271"
+   :state "DE（デラウェア州）"
+   :sic "Security & Commodity Brokers, Dealers, Exchanges & Services"
+   :status "実在し稼働中。SEC 登録の特別目的ブローカーディーラー（SPBD）／FINRA 会員。
+            デジタル資産証券のカストディと清算を認可された米国初の事業者。"
+   :subsidiaries ["Prometheum ATS（流通）"
+                  "Prometheum Capital（旧 Prometheum Ember Capital。カストディ・清算）"
+                  "Prometheum Coinery（デジタル移転代理人）"
+                  "ProFinancial（資本形成・販売）"]}
+
+  :prometheum/reg-a-withdrawn
+  {:filings "1-A（2017-11-02）以降 1-A/A を 14 回提出"
+   :withdrawal {:date "2021-11-18" :form "1-A-W"}
+   :implication
+   "Ember Token の Reg A+ 公募は 2021 年 11 月に取り下げられている。
+    Reg A+ は『一般投資家が自由に売買できるトークン』を実現する枠組みだったので、
+    取下げにより **Ember Token は一般流通していない**。"}
+
+  :prometheum/form-d-private-placements
+  [{:filed "2024-08-02" :offering 20000000}
+   {:filed "2024-09-12" :offering 20000000 :sold 9324500 :investors 17 :min-investment 100000}
+   {:filed "2025-08-04" :offering 10000000 :sold 0 :investors 0 :min-investment 100000}
+   {:filed "2025-09-08" :offering 20000000 :sold 0 :investors 0 :min-investment 100000}]
+  :prometheum/market
+  {:株式 "**公開市場は存在しない。** Form D の私募のみで、最低投資額 10 万ドル。
+          ただし 2024 年に 17 名から $9,324,500 を調達しており、会社に価値はある。"
+   :ember-token "価格・時価総額・取扱取引所を公開情報から確認できなかった。Reg A+ 取下げと整合する。"}
+
+  :prometheum/prometheum-asia
+  {:finding "**公開記録で存在を確認できなかった。**"
+   :detail "セーシェル法人『Prometheum Asia』は検索で見つからず、Prometheum Inc. の開示資料にも
+            この名称の関連会社は現れない（子会社は ATS / Capital / Coinery / ProFinancial）。"
+   :caveat "**不在の証明ではない。** セーシェルの法人登記は公開性が低く、
+            確認できなかったことと存在しないことは別である。"
+   :why-it-matters
+   "3,891 万の債権を 156 円で譲渡した相手が公開記録で確認できない。
+    税務上まず問われるのはこの点であり、-44 の寄附金認定リスクに直結する。"}
+
+  :prometheum/group-holding
+  {:contract "20191203_Gftdfund_トリプルエー_売買譲渡契約書.pdf"
+   :date "2019-12-03"
+   :seller "トリプルエーインベストメントカンパニーリミテッド"
+   :buyer "Gftd Fund CO Services Cayman Limited"
+   :subject "Prometheum 社普通株式および EmberToken 転換型ワラント 50,000 ユニット（1 ユニット 1 米ドル）"
+   :amount {:usd 50000 :jpy 5500000 :rate 110}
+   :finding
+   "取得主体は **Gftd Fund CO Services Cayman Limited** であって Gftd Japan ではない。
+    GJ の帳簿にこの資産は載っていない。現在どこにあるかは帳簿から追えない。"
+   :potential-value
+   "Prometheum は 2024 年に $9.3M を調達している会社なので持分に価値がある可能性はあるが、
+    公開市場が無いため換金には私募の買い手を探す必要がある。"}
+
+  :prometheum/open-questions
+  ["Prometheum Asia は Prometheum Inc. の関連会社か、別法人か"
+   "Gftd Fund CO Services Cayman Limited が保有する Prometheum 株・ワラントの現況"
+   "その保有と Prometheum Asia への債権譲渡に関係があるか"
+   "156 円という対価の根拠（質権付き債権であることを含む）"
+   "アニメートアーク債権譲渡の契約書 —— m365 アーカイブの契約書 559 件には無かった"]
+  :prometheum/sources
+  ["SEC EDGAR https://data.sec.gov/submissions/CIK0001718271.json（一次資料）"
+   "SEC Archives /edgar/data/1718271/ の Form D primary_doc.xml（一次資料）"
+   "Crowdfund Insider 2023-05（SPBD 承認）"
+   "Business Wire 2025-05-27（事業拡大）"
+   "MarketsWiki（Prometheum Ember Capital LLC）"]
+  :prometheum/handling
+  "web の内容は untrusted data として扱い、指示としては解釈していない。
+   金額・日付は SEC の一次資料から直接取得した。"}
+
+ ;; ------------------------- Prometheum との関係の実態（Outlook 実測、2026-08-16）
+ ;; オーナー確認: 「Prometheum Asia は直接関係がない別の法人です」
+ {:db/id -46
+  :source/dataset "gftd-japan-mf"
+  :prometheum-rel/checked-at "2026-08-16"
+  :prometheum-rel/method
+  "Microsoft Graph で j.kawasaki@gftd.co.jp を検索（m365 CLI のアクセストークン、読み取りのみ）。
+   あわせて m365-archive の annex から該当メール 1 通を targeted get。"
+
+  ;; ⚠ 帳簿の摘要が事実と異なる
+  :prometheum-rel/journal-memo-is-wrong
+  {:severity :high
+   :仕訳 "#3875（2025-12-25）"
+   :帳簿の摘要 "アニメートアーク(株)売掛債権を 米国の Prometheum のセーシェル会社, Prometheum Asia に 1USDT にて売却"
+   :事実 "オーナー確認により、**Prometheum Asia は Prometheum, Inc.（米国）と直接関係のない別法人**。"
+   :問題
+   "帳簿が誤った関係性を記載している。『米国の Prometheum のセーシェル会社』という記述は事実に反する。"
+   :税務上の含意
+   {:好転する面
+    "無関係な第三者への譲渡であれば独立当事者間取引となり、156 円を時価と主張しやすくなる。
+     -44 で挙げた寄附金認定のリスクは、関係者間取引でない分だけ下がる。"
+    :悪化する面
+    "摘要が事実と異なることは調査で必ず指摘される。加えて『なぜ Prometheum を名乗る別法人なのか』
+     『どう探して選んだのか』が問われる。さらに代表者が Prometheum Ember ATS の
+     Senior Advisor Assistant を名乗っていた事実（下記）があるため、外観上の説明が要る。"}
+   :action "**摘要の訂正が必要。** 会計士（スポット）と相談して修正仕訳または注記で対応する。"}
+
+  ;; 代表者は Prometheum 側の肩書を持っていた
+  :prometheum-rel/owner-role
+  {:evidence "2024-11-15 のメール（j.kawasaki@gftd.co.jp 発）"
+   :quote "Prometheum Ember ATS Inc, Senior Advisor Assistant の Jun です"
+   :content
+   {:ラウンド "シリーズD"
+    :総額 "最大 4,000 万ドル"
+    :米国内完了 "2,000 万ドル"
+    :日本国内枠 "最大 1,000 万ドル"}
+   :implication
+   "代表者は Prometheum 側の役割を持ち、**日本国内での資金調達を担当していた**。
+    したがって Prometheum への事業提案は『新規の売り込み』ではなく『既存の関係の再開』である。"}
+
+  ;; 債権処理と Prometheum 投資が同じ文脈で進んでいた
+  :prometheum-rel/thread-anicana
+  {:subject "Gftd Japan株式会社/アニカナ社の債権について"
+   :timeline
+   [{:date "2024-09-11/12" :event "佐藤公認会計士事務所（㈱野心満々 西山）と 9/18 の面談を調整。
+                                    『先方の確認を取りましたので、9/18 に**株主の小町**と伺います』
+                                    —— 小町博幸はアニカナジャパン株主で 2022 年の質権設定者（-44）"}
+    {:date "2024-10-29" :event "『アニカナ社の債権の処理について、**手筈が整ってきた**のですが、
+                                 佐藤先生にも状況報告とご相談を』"}
+    {:date "2024-10-30" :event "佐藤先生へ『プロメシウム社の情報をお送りいたします』——
+                                 会社概要、CoinDesk Japan 記事、**IPO 決定に対してのインタビュー動画**、
+                                 『背景 カプランファミリー…』"}
+    {:date "2024-10-30" :event "『2022 年に実施した前回の企業価値評価資料』を送付
+                                 （Prometheum–RPW Capital バリュエーション資料と符合）"}
+    {:date "2024-11-15" :event "シリーズD の案内（上記 owner-role）"}]
+   :finding
+   "**アニカナ債権の処理と Prometheum のシリーズD 資金調達が、同じメールスレッドで並行して進んでいた。**
+    債権処理の相談相手も、Prometheum の情報を送った相手も、同じ佐藤公認会計士事務所である。"}
+
+  :prometheum-rel/day-before-transfer
+  {:date "2025-12-24 08:51" :channel "Microsoft Teams"
+   :from "坂本 雪美 → 河崎 純真"
+   :quote "Gftd Japan におけるアニメートアーク社の売掛金残高は 38,919,404円"
+   :note "譲渡（2025-12-25）の前日に社内で残高を確認している。"}
+
+  :prometheum-rel/channel
+  {:仲介者 "Jonathan Braun（CEO, Zeeboat, LLC / 150 Beekman Street, New York, NY 10038）"
+   :経路 "Jonathan Braun → 渡邉純一（w.32168808@gmail.com）→ 河崎純真"
+   :2024-11-08 "Reg S Subscription Documents / Reg S PPM を転送受領"
+   :直接接点 "2021 年には gjenkins@prometheum.com がミーティングを主催。
+              akaplan@prometheum.com（10 通）/ bkaplan@prometheum.com（2 通）
+              —— Aaron / Benjamin Kaplan（共同 CEO）とのやり取りもある。"}
+
+  :prometheum-rel/last-contact
+  {:date "2025-03-11 または 03-12（7:30 PM EDT / 8:30 AM JST）"
+   :subject "Re: Following Up"
+   :参加 "河崎純真（j.kawasaki@gftd.co.jp / jun@gftd.group）↔ Jonathan Braun"
+   :note "オンラインミーティングの日程調整まで確認できた。**以降 2026-08-16 まで記録上の往来なし（約 17 か月）。**"}
+
+  :prometheum-rel/archive-documents
+  ["Prometheum Private Placement Memorandum - Reg S Final - 11-7-24"
+   "Prometheum - Subscription Agreement - Reg S Offering - Final - 11-7-24（1 株 $5・最大 400 万株）"
+   "Prometheum-RPW Capital - Valuation Discussion Materials - 3.2022"
+   "〈日本語訳〉Prometheum Inc preNDA CIM"
+   "Prometheum Institutional Brochure / Timeline / Deck（2021・2022）/ One Pager"
+   "Mitsubishi UFJ Capital ↔ Prometheum 相互 NDA（2021-10）"
+   "PROMETHEUM, INC. ↔ HASHKEY DIGITAL ASSET GROUP Omnibus 協定書（2021-10-20）"]
+
+  :prometheum-rel/next-actions
+  ["**仕訳 #3875 の摘要を訂正する**（『米国の Prometheum のセーシェル会社』は事実に反する）"
+   "Prometheum Asia の譲渡契約書を探す —— archive の契約書 559 件には無い"
+   "156 円という対価の根拠（質権付き債権であることを含む）を文書で残す"
+   "事業提案を出すなら Jonathan Braun 経由か Kaplan 兄弟直か、経路を決める"]
+  :prometheum-rel/superseded-by "entity -47（契約書が実在することが判明し、-46 の評価を下方修正）"}
+
+ ;; ------------------------- 譲渡書類は実在した（Teams 実測、2026-08-16）
+ ;; -46 の :journal-memo-is-wrong は severity を下げる。虚偽記載ではなく当時の認識の記録だった。
+ {:db/id -47
+  :source/dataset "gftd-japan-mf"
+  :assignment-docs/found-at "2026-08-16"
+  :assignment-docs/source
+  "m365-archive の facts/teams-messages.edn（100,162 件、2026-06-18 まで）を annex から
+   targeted get して検索。Teams チャネル『CS/CE/税務/2512-アニカナ債権譲渡』。"
+
+  :assignment-docs/owner-statement
+  {:speaker "河崎 純真"
+   :channel "CS/CE/税務/2512-アニカナ債権譲渡"
+   :quote
+   "アニカナ（アニメートアーク）の債権譲渡について、米国の Prometheum のセーシェル会社,
+    Prometheum Asia に譲渡する方向性にまとまりそうなので、以下の書類を作っています。
+    これで税務的、会計に問題がないか確認をお願いします."
+   :significance
+   "**仕訳の摘要はこの発言をそのまま写したもの。** 経理が独自に書いたのではない。
+    したがって -46 で『帳簿が事実と異なる記載をしている』と評価したのは強すぎる。
+    正しくは『当時の認識に基づく記載であり、その後認識が更新された』。虚偽記載ではない。"}
+
+  :assignment-docs/documents
+  ["譲渡理由書.docx"
+   "債権譲渡通知書.docx"
+   "ASSIGNMENT OF CLAIM AGREEMENT.docx（英文譲渡契約書）"
+   "請求権譲渡契約（和訳）.pdf"]
+  :assignment-docs/location
+  "SharePoint `gftdcojp.sharepoint.com/sites/CSCE`（Teams チャネルのファイル）。
+   Outlook にも m365-archive の契約書 559 件にも入っていないのはこのため
+   —— メール添付ではなく SharePoint 直置きだった。"
+
+  :assignment-docs/accountant-consulted
+  {:channel "【GFTD総合】_会計チャネル"
+   :from "佐藤会計_中根"
+   :date "2025-12-12 前後"
+   :quote "12月12日にチャットいたしました件 税務的にいかがでしょうか。
+           お忙しいところ恐縮ですが、ご意見いただければありがたいです。"
+   :context "代表の意向を会計チャネルに再掲し、4 点の書類を添えて税務・会計上の
+             問題の有無を照会している。"
+   :significance
+   "**譲渡の前に会計事務所へ税務確認を求めた記録が残っている。** これは税務調査において
+    有利な事実である（専門家に照会し、書類を整えたうえで実行した）。
+    ただし**中根氏からの回答があったかは未確認。** 回答が残っていれば決定的な資料になる。"}
+
+  :assignment-docs/internal-friction
+  {:date "2026-01-19"
+   :from "小田 敦子（経理）"
+   :quote "譲渡理由書等 経理で必要な書類を経理自ら作成するのもいかがなものかと感じます。
+           金額他 整合性のとれるようにリーガルオフィス部門にて調整をお願いできないでしょうか。"
+   :note "譲渡（2025-12-25）の 25 日後の時点で、書類の作成責任の所在が社内で議論されていた。
+          書類自体は 12 月時点で存在していたので、**追完・整合性の調整**の話とみられる。"}
+
+  :assignment-docs/other-facts
+  {"2025-12-24 残高確認" "坂本 雪美 → 河崎『アニメートアーク社の売掛金残高は 38,919,404円』
+                          → 河崎『上記金額で関係の書類作成をお願いします』"
+   "請求書の誤記" "小田『すでに作成済みの請求書の「振込先欄」USDT とすべき所 USTD となっています』
+                   → 対価が USDT 建てで請求書も作成されていた"
+   "先方からの連絡" "『本日アニメートアーク(株)社より下記の通りメールがありました。いかがいたしましょうか』
+                     → 河崎『まあ提案があったら打ち合わせしないとですね。ただ譲渡することは変わらず』"}
+
+  :assignment-docs/revised-assessment
+  {:摘要について
+   "訂正の必要性は残るが、性質が変わった。**虚偽記載の是正ではなく、認識の更新の記録**として扱う。
+    仕訳を書き換えるのではなく、譲渡理由書の側で Prometheum Asia の位置づけを正確に記述し、
+    必要なら注記を付けるのが妥当。**申告済み事業年度の仕訳を後から書き換えることは勧めない。**"
+   :寄附金リスクについて
+   "書類 4 点が実在し、会計事務所への事前照会もある。-44 で挙げたリスクは残るが、
+    『無計画に投げ売りした』という評価にはならない。**譲渡理由書の中身が要となる。**"
+   :残る宿題
+   ["SharePoint sites/CSCE で 4 点の書類を実物確認する（agent は未読）"
+    "佐藤会計_中根 氏からの回答の有無を確認する"
+    "譲渡理由書に Prometheum Asia の正確な位置づけ（Prometheum, Inc. とは別法人）が
+     書かれているかを確認し、書かれていなければ補記する"
+    "156 円（1USDT）の対価の算定根拠が書類にあるかを確認する"
+    "質権（アニカナジャパン株 222 株）の帰趨が書類に触れられているかを確認する"]}
+  :assignment-docs/superseded-by "entity -48（会計士の回答が見つかり、経緯が全て揃った）"}
+
+ ;; ------------------------- 会計士の事前照会と回答（Teams 全文、2026-08-16）
+ ;; 税務上もっとも価値のある証跡。時系列で記録する。
+ {:db/id -48
+  :source/dataset "gftd-japan-mf"
+  :advice-trail/found-at "2026-08-16"
+  :advice-trail/source "m365-archive facts/teams-messages.edn（100,162 件）"
+
+  :advice-trail/timeline
+  [{:date "2025-12-05T05:23" :from "佐藤会計_中根" :channel "GJ/C/会計管理 【GFTD総合】_会計チャネル"
+    :quote "①アニメートアーク㈱の処理について2025年12月期に処理を行うかご確認をお願いいたします。"
+    :note "決算前チェックリストの 1 項目として会計士側から先に提起している。"}
+
+   {:date "2025-12-05T05:26" :from "小田 敦子（経理）" :channel "同上"
+    :quote "本年度中にアニメートアーク(株)の売掛金を他社に売却する件について、その売却金額について伺います。
+            計上されている売掛金額は 38,919,404円。**税務上で許容される最低価格はいくらになるかお教えください。
+            （例えば1円）** 現在海外の法人と契約を締結する見込みとなっております。"
+    :note "会社側から明示的に『税務上許容される最低価格』を照会している。"}
+
+   {:date "2025-12-05T05:37" :from "佐藤会計_中根" :channel "同上"
+    :quote "金額ではなく**まず取引先様に大きく左右される事象**となります。
+            **取引先様が利害関係者の場合には損金経理処理が困難**となります。
+            取引先様が第三者の方でしたら、通常の取引法上の行為となりますので
+            取引の妥当性の判断が可能かと思料いたします。"
+    :significance "**会計士が論点を正確に提示している。** 関係者か第三者かが決定的である、と。"}
+
+   {:date "2025-12-05T07:41" :from "佐藤会計_中根" :channel "同上"
+    :quote "お取引様は**確実な第三者様になる旨かしこまりました**。
+            売掛金売却取引の妥当性を判断する場合には、まず資産性の評価が重要となります。
+            本取引においては売掛金の回収が難しいということで**資産性が限りなく薄いものと判断**しての
+            お取引を行うものになるかと思います。**返金スケジュールが存在する場合には
+            その分の資産性を加味する余地**はあろうかと存じます。弊社では現時点で
+            **アニカナ社より数年間入金がないという事実のみが確認**できておりますが、
+            もし上記のような事情がございましたら、売却価格の作成に考慮いただくのも一考いただけるかと思います。
+            **契約書ができ次第弊社にもご共有いただけますと幸いでございます。**"
+    :significance
+    "**会社が『確実な第三者』と回答した記録がここにある。** これはオーナーの
+     『Prometheum Asia は直接関係がない別の法人です』（2026-08-16）と一致する。
+     会計士は資産性が薄いことを前提に妥当性を認める方向を示したうえで、契約書の共有を求めた。"}
+
+   {:date "2025-12-12T06:39" :from "小田 敦子" :channel "同上"
+    :quote "アニメートアーク社の売掛金の処理について代表の河﨑が別チャネルで意向を述べておりましたので、
+            このチャネルに再掲し共有したいと存じます。（書類 4 点を添付）"}
+
+   {:date "2025-12-15T02:32" :from "バクシ・クナル" :channel "同上"
+    :quote "現在、アニメートアーク株式会社件について**郵便物（配達証明付き）を受領**していますが、
+            どこに、どの部署へ共有・対応すべき内容なのか分からなかったため、念のためこちらでご報告"
+    :note "**先方から配達証明付き郵便が届いている。** 内容は未確認。"}
+
+   {:date "2025-12-19T07:15" :from "小田 敦子" :channel "CS/CE/税務/2512-アニカナ債権譲渡"
+    :quote "本日アニメートアーク(株)社より下記の通りメールがありました。いかがいたしましょうか。"
+    :reply "河崎『まあ提案があったら打ち合わせしないとですね。ただ譲渡することは変わらず』"}
+
+   {:date "2025-12-21T01:53" :from "小田 敦子" :channel "GJ/C/会計管理"
+    :quote "12月12日にチャットいたしました件 税務的にいかがでしょうか。
+            お忙しいところ恐縮ですが、ご意見いただければありがたいです。"
+    :note "会社側から催促している。"}
+
+   {:date "2025-12-22T00:30" :from "佐藤会計_中根" :channel "GJ/C/会計管理"
+    :quote "こちら他スレッドに記載させていただきましたとおり**書面に加えてお打ち合わせの際に
+            お取引様等についてご確認をさせていただきます**と幸いでございます。"
+    :significance
+    "**会計士は最終的な妥当性判断を『打ち合わせで取引先を確認してから』と留保している。**
+     この打ち合わせが行われ、確認が済んだかは Teams の記録からは追えなかった。"}
+
+   {:date "2025-12-22T07:20" :from "小田 敦子" :channel "GJ/CE/BO"
+    :quote "アニメートアーク社より 12月23日火曜日14時 了解の返答をいただきました。
+            先方の出席者は **江橋様 小町様** 2名です。"
+    :note "**小町様＝小町博幸**は 2022-11-07 の質権設定契約でアニカナジャパン株 222 株に
+           質権を設定した株主（-44）。当事者が同席している。"}
+
+   {:date "2025-12-23T04:21" :from "小田 敦子" :channel "GJ/CE/BO"
+    :quote "会議の進め方として 1. 冒頭 今回の打合せの趣旨説明：小田（**当社請求内容の事実確認** /
+            **今後の対応を協議する**）2. 先方の意見を聞く 3. 代表が当社としての意見を述べる"}
+
+   {:date "2025-12-23T05:00" :event "**call recording / call transcript が記録されている**"
+    :significance "面談の録画とトランスクリプトが存在する。**譲渡の 2 日前の当事者間協議の一次資料。**"}
+
+   {:date "2025-12-25" :event "譲渡実行（仕訳 #3875）"}]
+
+  :advice-trail/assessment
+  {:強い点
+   ["会社側が『税務上許容される最低価格』を**事前に**会計士へ照会している"
+    "会計士が『関係者か第三者か』という正しい論点を提示している"
+    "会社が『確実な第三者』と回答し、その回答が記録に残っている"
+    "会計士が資産性の薄さを前提に妥当性を認める方向を示している"
+    "書類 4 点（譲渡理由書・債権譲渡通知書・英文契約書・和訳）を作成している"
+    "回収努力（内容証明 2025-12-05、面談 2025-12-23）が記録に残っている"
+    "**譲渡 2 日前の当事者面談に録画とトランスクリプトがある**"]
+   :弱い点
+   ["**会計士の最終的な妥当性判断が下りた記録が見つからない。**
+     2025-12-22 に『打ち合わせでお取引様を確認したい』と留保したまま、
+     以降アニメートアークの話題が会計チャネルに現れない。"
+    "契約書を会計士へ共有したかが未確認（12-05 に依頼されている）"
+    "**佐藤会計事務所は 2026-06-30 に顧問契約を終了している**（-41）。
+     未払 671 万が理由。判断が下りないまま関係が切れた可能性がある。"
+    "2025-12-15 に受領した配達証明付き郵便の内容が未確認"
+    "156 円（1USDT）の算定根拠が書類にあるか未確認"]}
+
+  :advice-trail/revised-recommendation
+  "**仕訳の摘要を書き換える必要はない。** 摘要は代表の当時の発言の写しであり、
+   『第三者である』という会社の立場は 2025-12-05 の時点で会計士へ明確に伝えられている。
+   むしろやるべきは次の 3 つ:
+   ① 2025-12-23 の面談の**録画・トランスクリプトを保全**する（一次資料）
+   ② 譲渡理由書に『Prometheum Asia は Prometheum, Inc. とは別法人』と
+      明記されているかを確認し、無ければ補記する
+   ③ 会計士の最終判断が下りていない事実を認識したうえで、
+      **税理士のスポット依頼で「この譲渡の税務上の妥当性」のセカンドオピニオンを取る**
+      —— 2025-12-22 の留保がそのままなら、判断の空白が残っている。"
+
+  :advice-trail/open-items
+  ["2025-12-23 面談の録画・トランスクリプト（Teams に存在）"
+   "2025-12-15 受領の配達証明付き郵便の内容"
+   "会計士へ契約書を共有したか"
+   "会計士の最終的な妥当性判断の有無"
+   "SharePoint sites/CSCE の書類 4 点の中身（agent は未読）"]}
+
+ {:db/id -49
+  :source/dataset "gftd-japan-mf-ledger"
+  :record/kind :anicana-assignment-documents-read
+  :record/date "2026-08-16"
+  :record/method "Microsoft Graph search + drives/{id}/items/{id}/content で SharePoint の
+                  sites/CSCE/Shared Documents/main/ 配下 26 点を列挙し、docx 4 点と xlsx 1 点を
+                  本文抽出して読んだ。Teams チャネル CS/CE/税務/2512-アニカナ債権譲渡 の
+                  全 17 メッセージ、および keiri@gftd.co.jp のメール 9 通を時系列で突合した。
+                  読み取り専用。MoneyForward の journal.write は一度も呼んでいない。"
+
+  :docs/location "https://gftdcojp.sharepoint.com/sites/CSCE/Shared Documents/main/"
+  :docs/evidence-folder-complete? true
+  :docs/inventory
+  ["譲渡理由書.docx（2025-12-05）"
+   "債権譲渡通知書.docx（2025-12-05）"
+   "ASSIGNMENT OF CLAIM AGREEMENT.docx（2025-12-05）"
+   "ASSIGNMENT OF CLAIM AGREEMENT_260128.docx（2026-01-28、別サイト GW-0003-Caster- 配下）"
+   "令和7年12月4日付内容証明文面.docx"
+   "20251130_アニメートアーク再請求郵送文面.docx / 20251204_同"
+   "2025.12.01投函 配達証明.pdf / 20251201_配達証明_1010.pdf / 20251201_登記簿取得_600.pdf"
+   "2025.12.05-内容証明受領証.pdf / 2025.12.05_内容証明最終ページ.pdf / 郵送料 2000 / 印刷代 220"
+   "2025.12.19アニメートアーク(株)江橋様よりメール.pdf"
+   "アニカナ売掛金.xlsx（債権内訳）"
+   "補助元帳(売掛金_アニメートアーク㈱(旧アニカナジャパン㈱))_2022年度.pdf / _2023.pdf"
+   "請求書 PDF 5 点: 455_20221130_26145900 / 498_20221130_4881800 /
+    499__20231231_3927000 / 500_20230131_4670600 / 545_20230714_1484984"]
+
+  :claim/actual-basis
+  {:文書 "令和7年12月4日付内容証明（2025-12-05 差出、担当 小田敦子）"
+   :請求根拠 "当社発行の請求書（番号353）に基づく売掛金"
+   :金額 38919404
+   :金額表記 "38,919,404円（税込）"
+   :支払期限 "令和7年12月30日"
+   :振込先 "PayPay銀行(0033) ビジネス営業部(005) 普通 3771952 Gftd Japan株式会社"
+   :文言 "万一、上記期限までにご入金が確認できない場合には、やむを得ず法的措置を含む対応を検討いたします"
+   :内訳の出所 "アニカナ売掛金.xlsx"
+   :内訳
+   [{:請求書 "No.455" :金額 23955020 :摘要 "アニカナ案件11月分 26,145,900円のうち残金"}
+    {:請求書 "No.498" :金額 4881800  :摘要 "アニカナゲーム（釣り）11月分"}
+    {:請求書 "No.499" :金額 3927000  :摘要 "アニカナゲーム（釣り）12月分"}
+    {:請求書 "No.500" :金額 4670600  :摘要 "アニカナゲーム（釣り）2023年1月分"}
+    {:請求書 "No.545" :金額 1484984  :摘要 "AWSサーバ立替費"}]
+   :内訳合計 38919404
+   :検算 "23955020 + 4881800 + 3927000 + 4670600 + 1484984 = 38919404。帳簿残高と一致する。"
+   :性質 "ゲーム開発の役務提供対価 + 立替費用。すなわち純然たる売掛金であって、
+          株式質権に基づく金銭債権ではない。"}
+
+  :docs/discrepancy-with-claim
+  {:severity :critical
+   :要旨 "譲渡 3 点セットが記述する債権と、実際に催告した債権が別物である。
+          同じ 2025-12-05 に作成されながら、法的根拠も金額も一致しない。"
+   :対比
+   [{:項目 "法的根拠"
+     :内容証明 "当社発行の請求書（番号353）に基づく売掛金"
+     :譲渡書類 "2022年11月7日付「株式質権設定契約書」に基づく金銭債権
+                （英文では Pledge of Shares Agreement dated 7 November 2022）"}
+    {:項目 "金額"
+     :内容証明 "38,919,404 円"
+     :譲渡書類 "47,098,700 円"
+     :差額 8179296}
+    {:項目 "帳簿"
+     :内容証明 "一致（仕訳 #3875 の売掛金 38,919,404 と同額）"
+     :譲渡書類 "不一致"}]
+   :含意 "債権譲渡は譲渡対象の特定を要する。譲渡書類が特定しているのは
+          株式質権契約に基づく 47,098,700 円の債権であり、
+          実在する売掛金 38,919,404 円（請求書 455/498/499/500/545）ではない。
+          この不一致が譲渡の効力に影響するかは法律判断であり、agent の判断範囲外。
+          弁護士の確認を要する。"}
+
+  :docs/defects-found
+  [{:文書 "債権譲渡通知書.docx"
+    :欠陥 "当事者が逆になっている"
+    :詳細 "（債務者）Gftd Japan 株式会社（Gftd Labo 合同会社より権利引受）／
+           （通知人：元債権者）住所：アニメートアーク　氏名：小町博之
+           —— GJ が債務者、アニメートアーク側が元債権者として記載されている。
+           民法 467 条の通知は譲渡人（GJ）から債務者（アニメートアーク）へ行うものなので、
+           この書式のままでは通知として機能しない。"
+    :severity :critical}
+   {:文書 "債権譲渡通知書.docx"
+    :欠陥 "年号が本文内で 1 年ずれている"
+    :詳細 "冒頭の日付が「令和6年12月5日」（2024年）、【3. 譲渡日】が「令和7年12月5日」（2025年）。"
+    :severity :medium}
+   {:文書 "債権譲渡通知書.docx"
+    :欠陥 "テンプレートのプレースホルダが残存"
+    :詳細 "（債務者）住所：1 ／ 末尾の（通知人）住所・氏名が空欄。"
+    :severity :medium}
+   {:文書 "ASSIGNMENT OF CLAIM AGREEMENT（両版）"
+    :欠陥 "譲受人の署名欄が空欄のまま"
+    :詳細 "ASSIGNEE (Seychelles IBC) Prometheum Asia Inc / Authorized Representative: Ana Laki の
+           Signature 欄は両版とも下線のみ。2026-01-28 の改訂版でも署名されていない。
+           譲渡人側は Signature: Jun Kawasaki と記名がある。"
+    :severity :high}
+   {:文書 "譲渡理由書 / ASSIGNMENT OF CLAIM AGREEMENT（両版）"
+    :欠陥 "催告に応答がないという事実認定が、実際の経緯と食い違う"
+    :詳細 "譲渡理由書「内容証明郵便にも応答なし」／英文 WHEREAS 節
+           failed to respond to multiple certified written demands。
+           書類作成日 2025-12-05 の時点ではこの記述は正しい。しかし
+           2025-12-19 に江橋氏がメールで面談を申し入れ、2025-12-23 に面談が実現しており、
+           譲渡の実行日 2025-12-25 の時点では事実と異なる。改訂版（2026-01-28）でも未修正。"
+    :severity :high}
+   {:文書 "令和7年12月4日付内容証明文面"
+    :欠陥 "連絡先メールアドレスの誤記"
+    :詳細 "当社経理アドレス keiri@gftd.co.kp 宛て —— 正しくは keiri@gftd.co.jp。
+           実害は生じていない（江橋氏は正しいアドレスへ返信している）。"
+    :severity :low}
+   {:文書 "譲渡理由書"
+    :欠陥 "住所の誤記"
+    :詳細 "東京都千代田区1-9-2 —— 丸の内が欠落。英文契約書は Marunouchi 1-9-2 と正しい。"
+    :severity :low}]
+
+  :docs/revision-2026-01-28
+  {:何が直ったか
+   [{:項目 "Claim Amount" :旧 "JPY 47,098,700" :新 "JPY 38,919,404"}
+    {:項目 "Consideration" :旧 "symbolic consideration of JPY 1" :新 "symbolic consideration of 1 USDT"}]
+   :何が直っていないか
+   ["Origin は Pledge of Shares Agreement dated 7 November 2022 のまま
+     —— 金額だけ売掛金に合わせ、法的根拠は株式質権のまま残った"
+    "Effective Date は 5 December 2025 のまま（改訂は 2 か月後）"
+    "failed to respond to multiple certified written demands のまま"
+    "譲受人の署名は依然として空欄"
+    "譲渡理由書と債権譲渡通知書は改訂されていない（47,098,700 円のまま）"]
+   :差分の確認方法 "両 docx の word/document.xml を本文抽出して unified diff を取った。
+                    変更は上記 2 行のみ。"}
+
+  :timeline/reconstructed
+  [{:日付 "2025-12-01" :出来事 "配達証明で再請求を投函（Gftd Labo の請求書再発行 + GJ 名義の再請求 +
+                                 法人番号公表サイトの写し）。登記簿謄本は送付済み。費用 1,010 + 600 + 90 円"}
+   {:日付 "2025-12-04" :出来事 "内容証明文面を作成（売掛金 38,919,404 円、支払期限 令和7年12月30日）"}
+   {:日付 "2025-12-05" :出来事 "内容証明を差出（受領証あり、郵送料 2,000 + 印刷代 220 円）"}
+   {:日付 "2025-12-05 06:32" :出来事 "Teams チャネル CS/CE/税務/2512-アニカナ債権譲渡 を作成"}
+   {:日付 "2025-12-05 06:49" :出来事 "河崎氏が譲渡 3 点セットを投稿し
+                                       「これで税務的、会計に問題がないか確認をお願いします」"}
+   {:日付 "2025-12-12" :出来事 "経理が会計チャネルへ再掲し、佐藤会計_中根氏へ確認依頼"}
+   {:日付 "2025-12-19 05:20" :出来事 "江橋氏（アニメートアーク）よりメール。面談を申し入れ"}
+   {:日付 "2025-12-19 07:22" :出来事 "河崎氏「うーん。まあ提案があったら打ち合わせしないとですね。
+                                       ただ譲渡することは変わらずです」"}
+   {:日付 "2025-12-22 05:12" :出来事 "江橋氏「明日の14時のオンラインで大丈夫です。私と小町で参加致します」"}
+   {:日付 "2025-12-23 14:00" :出来事 "Teams で面談実施（GJ 側 河崎・小田／先方 江橋・小町）"}
+   {:日付 "2025-12-24 07:51" :出来事 "小田氏が帳簿残高を報告「38,919,404円」
+                                       —— 譲渡書類の 47,098,700 円との不一致がここで判明している"}
+   {:日付 "2025-12-25" :出来事 "仕訳 #3875 を計上。売掛債権譲渡損 38,919,248 / 売掛金 38,919,404、
+                                 仮想通貨 156（1USDT 入金）"}
+   {:日付 "2025-12-30" :出来事 "内容証明で自ら設定した支払期限。譲渡はこの 5 日前に実行されている"}
+   {:日付 "2026-01-16" :出来事 "小田氏「上記金額で上と関係の書類作成をお願いします」"}
+   {:日付 "2026-01-19 04:52" :出来事 "小田氏「譲渡理由書等 経理で必要な書類を経理自ら作成するのも
+                                        いかがなものかと感じます。金額他 整合性のとれるように
+                                        リーガルオフィス部門にて調整をお願いできないでしょうか」"}
+   {:日付 "2026-01-19 06:00" :出来事 "河崎氏「この書類の制作責任はこちらですね。」
+                                       小田氏「「こちら」とはどの部門のことでしょうか。」（以降スレッド終了）"}
+   {:日付 "2026-01-28" :出来事 "英文契約書のみ改訂（金額と対価）"}
+   {:日付 "2026-04-14" :出来事 "Teams チャネルのメンバー削除"}]
+
+  :finding/timing
+  {:severity :critical
+   :要旨 "自社が内容証明で設定した支払期限の前に譲渡を実行している。"
+   :根拠 "内容証明の支払期限は令和7年12月30日。譲渡仕訳は 2025-12-25。
+          先方は 2025-12-19 に応答し 2025-12-23 に面談している。"
+   :含意 "回収可能性が極めて低いことを譲渡の理由としているが、
+          期限到来前かつ交渉継続中に 156 円で処分した事実が残る。
+          税務調査で回収努力の十分性が問われた場合、この 5 日間の説明が必要になる。"}
+
+  :finding/decision-preceded-negotiation
+  {:severity :high
+   :根拠 "2025-12-19 07:22 河崎氏「ただ譲渡することは変わらずです」
+          —— 先方の提案内容を聞く前に、譲渡の結論は固定されていた。"
+   :含意 "面談は回収努力の記録として有効だが、
+          その面談で示された提案が譲渡の判断に反映された形跡がない。
+          面談で先方が何を提案したかが未確認のままである。"}
+
+  :finding/internal-objection
+  {:severity :medium
+   :要旨 "社内で整合性への異議が記録されている。"
+   :根拠 "2026-01-19 小田氏が金額の不整合を指摘し、経理でなくリーガル部門での作成を求めた。
+          回答は「この書類の制作責任はこちらですね。」のみで、部門の特定を問い返されたまま
+          スレッドが終わっている。"
+   :含意 "指摘は正しかった（47,098,700 と 38,919,404 の不一致）。
+          英文契約書のみ改訂され、譲渡理由書と債権譲渡通知書は放置された。"}
+
+  :recording/search-result
+  {:結論 "2025-12-23 面談の録画・トランスクリプトは取得できなかった。"
+   :試したこと
+   ["Graph /search/query（driveItem）で アニメートアーク 録画 / Animate Ark recording /
+     アニカナ 打ち合わせ 12月23日 を検索 —— 該当なし"
+    "j.kawasaki@gftd.co.jp の /Recordings —— 全 1 件、2025-12 は 0 件"
+    "a.oda@gftd.co.jp の /Recordings —— notAllowed
+     (Access to this site has been blocked. Please contact the administrator)"]
+   :評価 "前回の記録（-48）で「録画とトランスクリプトがある」と書いたのは
+          Teams の call recording / call transcript イベントの存在を根拠にしたもので、
+          実体ファイルの確認ではなかった。実体は現時点で確認できていない。
+          面談が録画されていない可能性がある。"
+   :次の手 "河崎氏本人の Teams クライアントから該当会議を開いて録画の有無を直接確認する。
+            会議は 小田氏が主催（Teams URL を送信）しているので、
+            録画があれば主催者の OneDrive/Recordings に入る。そこが管理者ブロックされている。"}
+
+  :retraction/of-entity-48
+  {:訂正
+   ["録画・トランスクリプトの存在を強い点として挙げたのは根拠不足だった。
+     イベントの痕跡と実体ファイルは別物である。"
+    "『156 円（1USDT）の算定根拠が書類にあるか未確認』は解消。
+          2025-12-05 版は JPY 1、2026-01-28 版は 1 USDT と契約書に明記されている。
+     ただし 156 円という円換算額の根拠は依然として書類にない。"
+    "『2025-12-15 に受領した配達証明付き郵便』という記述は不正確だった。
+          実際は GJ 側からの発送が 2025-12-01（配達証明）と 2025-12-05（内容証明）の 2 回で、
+     先方からの応答は 2025-12-19 のメールである。"]}
+
+  :assessment/revised
+  {:従前の評価 "譲渡は実体のある売却であり、貸倒控除は適用できない（-44）。この評価は維持する。"
+   :新たに判明した論点
+   ["譲渡書類が特定している債権と実在する債権が一致しない（法的根拠・金額とも）"
+    "民法 467 条の通知書が、そのままでは通知として機能しない書式になっている"
+    "通知が実際に発送された形跡が、SharePoint にもメールにも Teams にも見つからない"
+    "譲受人が署名していない"]
+   :帰結 "譲渡が有効に成立しているかどうかに疑義がある。
+          仮に有効に成立していないのであれば、売掛金 38,919,404 円は
+          いまも Gftd Japan に帰属している可能性がある。
+          これは会計処理（既に譲渡損を計上済み）と法的実態の乖離を意味する。"
+   :agent-判断範囲外 "譲渡の効力の有無は法律判断であり、
+                        帳簿の是正要否は税務判断である。どちらも agent が結論を出すべきでない。"}
+
+  :next-actions
+  [{:優先 1 :内容 "弁護士に譲渡 3 点セットと内容証明を渡し、譲渡が有効に成立しているかを確認する。
+                    特に ①譲渡対象の特定 ②民法 467 条の通知の要否と有無 ③譲受人の署名欠如。"
+    :理由 "有効／無効で、帳簿・税務・回収のすべてが変わる分岐点だから。"}
+   {:優先 2 :内容 "債権譲渡通知書が実際に発送されたかを確認する（郵便物管理の記録、
+                    Gftd_C_郵送物管理 フォルダ、経理の投函記録）。"
+    :理由 "発送していれば当事者間では対抗要件を満たしうる。していなければ①の判断が変わる。"}
+   {:優先 3 :内容 "税理士のスポット依頼で、この譲渡の税務上の妥当性についてセカンドオピニオンを取る。"
+    :理由 "佐藤会計事務所の最終判断が下りないまま 2026-06-30 に顧問契約が終了している（-41）。"}
+   {:優先 4 :内容 "2025-12-23 面談で先方が何を提案したかを、出席者（河崎氏・小田氏）の記憶から復元して記録する。"
+    :理由 "回収努力の十分性を説明する際、面談の内容が空白だと説明が成り立たないため。"}]
+
+  :provenance/read-only
+  "読み取りスコープのみ使用。journal.write / transaction.write / trade_partners.write は
+   一度も呼んでいない。SharePoint も Graph の GET のみで、ファイルの変更・削除はしていない。"}
+
+ {:db/id -50
+  :source/dataset "gftd-japan-mf-ledger"
+  :record/kind :anicana-47m-vs-39m-root-cause
+  :record/date "2026-08-16"
+  :record/status "原因特定。計上済みの処理は動かさない前提での事実整理。"
+  :record/method "2022-11-07 付 株式質権設定契約書 PDF、Gftd Labo の補助元帳
+                  （売掛金_アニメートアーク 2022年度 / 2023年 1-10月）、アニカナ売掛金.xlsx、
+                  Teams の 2022 年 11 月の締結記録を突合した。読み取り専用。"
+
+  :premise/booking-accepted
+  "オーナー判断（2026-08-16）: 2025-12-25 の譲渡計上は確定として扱う。
+   したがって本記録は帳簿の是正を提案するものではなく、
+   書類上の 47,098,700 円と帳簿上の 38,919,404 円が食い違った原因の特定である。"
+
+  :pledge/document
+  {:名称 "株式質権設定契約書"
+   :日付 "2022-11-07"
+   :ファイル "20221107_GL_小町博幸様_株式質権設定契約書（案）Gftd⇔株主.pdf"
+   :担保権者 "Gftd Labo 合同会社（代表社員 Gftd Japan 株式会社、職務執行者 幸田直樹）"
+   :担保権設定者 "小町博幸（個人。東京都中央区月島4丁目11-12 YSレジデンス201）"
+   :対象会社 "アニカナジャパン株式会社（後のアニメートアーク株式会社）"
+   :被担保債権 47098700
+   :被担保債権の条文
+   "乙は、甲とアニカナジャパン株式会社の間で締結された業務委託契約に基づき、
+    2022年10月31日を支払い期限とした、甲が対象会社に対して有する
+    金47,098,700円の債権を担保するため、乙が保有する対象会社の発行済普通株式222株に
+    質権を設定する"
+   :担保物 "アニカナジャパン株式会社 発行済普通株式 222 株"
+   :実行条件 "対象会社が本件被担保債権について一部支払いを含む支払いを2カ月以上怠ったとき、
+              甲は催告その他法定の手続によらないで本件株式を確定的に取得できる（第3条）"
+   :消滅条項 "乙は本契約締結日以降、本件被担保債権が消滅するまで、
+              本件株式を譲渡又は担保に提供してはならない（第5条）"
+   :締結の有無 "締結済み。Teams に「【GL ⇆ 小町博幸 様】契約書の締結のお知らせ。
+                下記の契約書の締結と格納が完了しております」の記録がある。
+                クラウドサインで送付・締結された。"
+   :リーガルチェック "経ていない。担当者が
+                      「アニカナ社の株式質権は、リーガルチェックせずに、
+                       このままクラウドサインで送付という依頼で良かったでしょうか？」と
+                      確認したうえで送付されている。"
+   :会計士の助言 "佐藤先生からは、先に先方の決算書と謄本をもらうように言われています
+                  —— 担保取得の前に与信資料を取るよう助言されていた。"}
+
+  :root-cause
+  {:結論 "2025-12 の譲渡書類は、帳簿ではなく 2022-11-07 の質権設定契約書を下敷きに作られた。
+          その第 1 条の一文をほぼそのまま写したため、金額・法的根拠・当事者の 3 つが
+          まとめて 2022 年時点のものになった。"
+   :写しの対応
+   [{:譲渡書類の記述 "2022年11月7日付「株式質権設定契約書」に基づく 47,098,700円の金銭債権"
+     :出所 "質権設定契約書 第1条"
+     :本来の意味 "質権は債権を担保するものであって、債権を発生させるものではない。
+                  47,098,700 円の債権は業務委託契約に基づく売掛金であり、
+                  質権契約はその担保にすぎない。「に基づく」が逆になっている。"}
+    {:譲渡書類の記述 "債権譲渡通知書で アニメートアーク／小町博之 が元債権者、GJ が債務者"
+     :出所 "質権設定契約書の当事者欄（甲＝Gftd Labo、乙＝小町博幸）"
+     :本来の意味 "小町氏は担保提供者であって債権者ではない。
+                  質権契約に小町氏の名が出てくるため、通知書のひな型に当てはめる際に
+                  役割が入れ替わった。氏名も博幸→博之と誤記されている。"}
+    {:譲渡書類の記述 "Security: All rights and interests in the pledged shares and collateral rights"
+     :出所 "質権設定契約書の担保物（222株）"
+     :本来の意味 "後述のとおり、譲渡した 38,919,404 円は質権の被担保債権ではないので、
+                  この条項が指す担保は譲渡対象の債権を担保していない。"}]
+   :なぜ気づかれなかったか
+   "帳簿残高（38,919,404）は 2025-12-24 に経理から報告されており、
+    社内でも 2026-01-19 に整合性の指摘が出ている（-49）。
+    しかし修正は英文契約書の金額 1 行にとどまり、
+    法的根拠の記述と譲渡理由書・通知書は 2022 年の写しのまま残った。"}
+
+  :reconciliation/secured-claim-composition
+  {:定義 "質権設定日 2022-11-07 時点で未回収だった売掛金のうち、
+          No.375（14,226,520）と No.369 の残 19,500 を除いた 11 本の合計。"
+   :検算 "質権設定日の残高 96,827,420
+          − 10月31日計上分 35,482,700（支払期限未到来）= 61,344,720
+          − No.375 14,226,520 − No.369残 19,500 = 47,098,700"
+   :内訳
+   [{:請求書 "No.403" :金額 2750000  :計上 "2022-08-31" :摘要 "LEVIASチェーン 8月稼働分"}
+    {:請求書 "No.404" :金額 1650000  :計上 "2022-06-30" :摘要 "JSTO案件 6月分"}
+    {:請求書 "No.405" :金額 1650000  :計上 "2022-07-31" :摘要 "JSTO案件 7月分"}
+    {:請求書 "No.406" :金額 1650000  :計上 "2022-08-31" :摘要 "JSTO案件 8月分"}
+    {:請求書 "No.416" :金額 1650000  :計上 "2022-09-30" :摘要 "JSTO案件 9月分"}
+    {:請求書 "No.419" :金額 4538600  :計上 "2022-08-31" :摘要 "アニカナ ポータル 8月"}
+    {:請求書 "No.420" :金額 1430000  :計上 "2022-08-31" :摘要 "アニカナ開発 8月度追加分"}
+    {:請求書 "No.421" :金額 4824600  :計上 "2022-09-30" :摘要 "アニカナ ポータル 9月"}
+    {:請求書 "No.422" :金額 23584000 :計上 "2022-09-30" :摘要 "アニカナ案件 9月"}
+    {:請求書 "No.423" :金額 396000   :計上 "2022-09-30" :摘要 "アニカナ開発 9月度追加分"}
+    {:請求書 "No.424" :金額 2975500  :計上 "2022-09-30" :摘要 "Leviasチェーン 9月稼働分"}]
+   :合計 47098700
+   :除外された2本
+   [{:請求書 "No.375" :金額 14226520 :計上 "2022-06-30" :回収 "2023-02-01"}
+    {:請求書 "No.369残" :金額 19500 :計上 "2022-05-31" :回収 "2023-02-01"
+      :元帳摘要 "請求書変更による差額分"}]
+   :除外の観察 "除外された 2 本は、2023-02-01 に同じ入金で一緒に決済されている。
+                元帳の摘要が請求書変更による差額分となっていることから、
+                質権設定時点で請求内容の調整中だったために被担保債権から外れた、と読める。
+                ただしこれは元帳からの推測であって、契約書に除外理由の記載はない。"}
+
+  :finding/secured-claim-was-fully-collected
+  {:severity :critical
+   :結論 "質権が担保していた 47,098,700 円は、2022-12-30 までに全額回収されている。"
+   :回収の内訳
+   [{:日付 "2022-11-24" :金額 30000000
+     :充当 "No.403 / 404 / 405 / 406 / 419 / 420 / 416 / 421 / 424 / 423
+            （および被担保債権外の No.427 / 444 / 入金差額 10,700）"}
+    {:日付 "2022-12-30" :金額 23584000 :充当 "No.422"}]
+   :確認 "補助元帳 2022年度で 11 本すべてに対応する普通預金入金を確認した。"
+   :帰結 "質権設定契約書 第5条の被担保債権は消滅している。
+          したがって 2025-12 の譲渡書類が引用した 47,098,700 円の債権は、
+          書類作成時点で 3 年前に消滅済みの債権である。"}
+
+  :finding/assigned-claim-was-never-secured
+  {:severity :critical
+   :結論 "2025-12-25 に譲渡した 38,919,404 円は、5 本とも質権設定日より後に計上されている。
+          すなわち 222 株の質権はこの債権を一度も担保していない。"
+   :内訳
+   [{:請求書 "No.455" :金額 23955020 :計上 "2022-11-30" :備考 "26,145,900 のうち残額"}
+    {:請求書 "No.498" :金額 4881800  :計上 "2022-12-31" :摘要 "アニカナゲーム（釣り）11月分"}
+    {:請求書 "No.499" :金額 3927000  :計上 "2022-12-31" :摘要 "アニカナゲーム（釣り）12月分"}
+    {:請求書 "No.500" :金額 4670600  :計上 "2023-01-31" :摘要 "アニカナゲーム（釣り）2023年1月分"}
+    {:請求書 "No.545" :金額 1484984  :計上 "2023-06-30" :摘要 "AWSサーバー立替費"}]
+   :合計 38919404
+   :質権設定日 "2022-11-07"
+   :最古の計上日 "2022-11-30（質権設定の 23 日後）"
+   :帰結 "英文契約書 第3条の Security 条項が指す担保は、
+          譲渡対象の債権を担保していない。無い担保を譲渡したことになる。
+          逆に言えば、譲渡によって Gftd Japan が失った担保は無い。"}
+
+  :bridge/secured-to-residual
+  {:説明 "47,098,700 と 38,919,404 は同じ債権の増減ではない。前者は 2022-11-07 時点の
+          被担保債権、後者は 2023-06-30 以降ずっと動いていない未回収残高であり、
+          構成する請求書が 1 枚も重なっていない。"
+   :残高の推移
+   [{:時点 "2022-11-07（質権設定日）" :残高 96827420 :うち被担保 47098700}
+    {:時点 "2022-12-31" :残高 72563820 :注記 "2022年 計上 210,845,070 / 回収 138,281,250"}
+    {:時点 "2023-02-28" :残高 37434420 :注記 "被担保債権はこの時点で完済済み"}
+    {:時点 "2023-06-30" :残高 38919404 :注記 "No.545 AWS立替 1,484,984 を最後に計上"}
+    {:時点 "2023-10-31" :残高 38919404 :注記 "Gftd Labo の補助元帳はここで終了（GJ へ吸収合併）"}
+    {:時点 "2025-12-25" :残高 38919404 :注記 "Prometheum Asia へ譲渡、譲渡損を計上"}]
+   :検算 "72,563,820 + 2023年計上 10,103,284 − 2023年回収 43,747,700 = 38,919,404"
+   :最終入金日 "2023-04-28（No.497 アニカナゲーム（釣り）2023年2月分 2,994,200 円）"
+   :最終入金からの経過 "譲渡実行日 2025-12-25 まで 2 年 8 か月。
+                        回収可能性が低いという判断そのものは、この事実に支えられている。"}
+
+  :assessment
+  {:確定した論点
+   ["書類の 47,098,700 円は誤記でも水増しでもなく、2022-11-07 の被担保債権額の正確な引用である"
+    "ただしその債権は 2022-12-30 に完済されており、2025-12 時点では存在しない"
+    "実際に譲渡された 38,919,404 円とは請求書が 1 枚も重複しない"
+    "したがって譲渡書類は、譲渡対象を特定できていない"
+    "質権の担保（222株）は譲渡対象債権を担保していないので、担保の逸失は生じていない"]
+   :計上済みという前提での含意
+   "譲渡損 38,919,248 円の計上そのものは、対象債権の実在（請求書 455/498/499/500/545）と
+    回収停滞（最終入金 2023-04-28）に裏付けがある。争点になりうるのは金額ではなく、
+    譲渡契約が譲渡対象を正しく特定しているかという書面の不備である。
+    税務調査で書類の提示を求められた場合、47,098,700 円と株式質権という記述が
+    帳簿と噛み合わないため、その場で説明できる材料を用意しておく必要がある。"
+   :agent-判断範囲外 "書面の不備が譲渡の効力に及ぼす影響は法律判断であり、
+                      追完の要否は税理士・弁護士の判断による。"}
+
+  :recommended-remedy
+  [{:優先 1
+    :内容 "譲渡契約の対象債権の記述を、実在の請求書（455/498/499/500/545、合計 38,919,404 円、
+           業務委託契約に基づく売掛金）に置き換えた確認書を、譲受人と交わす。"
+    :理由 "帳簿を動かさずに書面と帳簿を一致させられる唯一の方法。
+           2026-01-28 の改訂で金額は合わせてあるので、残るのは根拠の記述と署名。"}
+   {:優先 2
+    :内容 "同じ確認書で譲受人の署名を取る（現状 Ana Laki の署名欄は両版とも空欄）。"
+    :理由 "譲渡の成立を書面で示せる状態にするため。"}
+   {:優先 3
+    :内容 "譲渡理由書を、質権契約の引用ではなく元帳の事実で書き直す
+           —— 最終入金 2023-04-28、以後 2 年 8 か月入金なし、
+           2025-12-01 配達証明・2025-12-05 内容証明・2025-12-23 面談。"
+    :理由 "現行の譲渡理由書は完済済みの債権を対象にしており、
+           そのままでは回収努力の説明として機能しない。実際の経緯の方が強い。"}
+   {:優先 4
+    :内容 "222 株の質権が形式上どうなっているかを確認する（被担保債権は消滅済み）。"
+    :理由 "質権設定契約書 第5条は被担保債権の消滅までを拘束期間としており、
+           既に消滅している。株主名簿の記載が残っているなら整理の対象になる。"}]
+
+  :provenance/read-only
+  "読み取りスコープのみ使用。journal.write / transaction.write / trade_partners.write は
+   一度も呼んでいない。SharePoint も Graph の GET のみ。帳簿は一切変更していない。"}
+
+ {:db/id -51
+  :source/dataset "gftd-japan-mf-ledger"
+  :record/kind :session-closing
+  :record/date "2026-08-16"
+  :record/title "アニカナ債権譲渡の書類調査 — closing"
+
+  :closing/landed
+  [{:commit "0136010" :entity -49
+    :内容 "SharePoint sites/CSCE の譲渡書類 4 点・内容証明・売掛金内訳を読み、
+           Teams チャネル 2512-アニカナ債権譲渡 17 件とメール 9 通で時系列を突合した。
+           書面の不備 7 件を特定。-48 の 3 点を訂正。"}
+   {:commit "ed8cbcb" :entity -50
+    :内容 "47,098,700 と 38,919,404 の不一致の原因を特定した。
+           前者は 2022-11-07 質権設定契約書の被担保債権額で、2022-12-30 までに完済済み。
+           後者は質権設定日より後に計上された 5 本で、請求書の重複はゼロ。
+           原因は譲渡書類が帳簿ではなく質権設定契約書 第1条を下敷きにしたこと。"}]
+
+  :closing/verification
+  {:算術検算 "nbb で 4 本すべて再計算し一致を確認した。
+              ①被担保債権 11 本の合計 = 47,098,700
+              ②譲渡債権 5 本の合計 = 38,919,404
+              ③96,827,420 − 35,482,700 − 14,226,520 − 19,500 = 47,098,700
+              ④72,563,820 + 10,103,284 − 43,747,700 = 38,919,404"
+   :EDN検証 "cljs.reader/read-string で全 51 entity のパースを確認。
+             途中 :reconciliation/47m-composition が数字始まりで不正な keyword となり
+             read-string が拒否したため :reconciliation/secured-claim-composition に改名した。"
+   :一次資料 "質権設定契約書 PDF、補助元帳 2022年度・2023年1-10月 PDF、
+              アニカナ売掛金.xlsx、内容証明文面 docx、譲渡書類 docx 4 点。
+              いずれも SharePoint から Graph の GET で取得し本文抽出した。"
+   :未実行 "録画・トランスクリプトの取得。主催者 a.oda@gftd.co.jp の OneDrive が
+            管理者ブロック（notAllowed）のため到達できていない。"}
+
+  :closing/artifact
+  {:url "https://claude.ai/code/artifact/064714cc-d97f-4076-b33a-e88586dfaa10"
+   :version "第 13 版"
+   :修正した誤り
+   ["セクション 14 が撤回済みの『貸倒控除 3,538,127 が取れる』を掲げたままだった"
+    "セクション 18 の経営計画 Phase B が
+     『アニメートアークを貸倒損失に是正 → 更正の請求。GJ に入る唯一の外部現金』
+     という実行不能な項目を持っていた"
+    "セクション 19 の問いが既に答えの出た論点のままだった"]
+   :差し替えた内容
+   ["Phase B は『譲渡の確認書を 1 通交わし、譲渡対象を実在の請求書に書き直して署名を取る』へ"
+    "セクション 19 の問いは『2025-12-23 の面談で先方は何を提案したか』へ"
+    "セクション 14 に質権 vs 譲渡債権の対比表と書面不備 5 件の表を追加"]
+   :注意 "第 11・12 版の時点で -44 の撤回は台帳に入っていたが、
+          アーティファクト側の セクション 14・18・19 には反映されていなかった。
+          台帳を直してもアーティファクトが直るわけではない。次回も同じ確認をする。"}
+
+  :closing/open-items
+  [{:優先 1 :担当 "弁護士"
+    :内容 "譲渡が有効に成立しているかの確認。譲渡対象の特定・民法467条通知の要否と有無・譲受人の署名欠如。"}
+   {:優先 2 :担当 "owner / 経理"
+    :内容 "債権譲渡通知書が実際に発送されたかを郵便物管理の記録で確認する
+           （Gftd_C_郵送物管理 フォルダに GJ_督促 の実例がある）。"}
+   {:優先 3 :担当 "税理士（スポット）"
+    :内容 "この譲渡の税務上の妥当性のセカンドオピニオン。
+           佐藤会計事務所は最終判断を出さないまま 2026-06-30 に顧問契約が終了している。"}
+   {:優先 4 :担当 "owner / 小田氏"
+    :内容 "2025-12-23 面談で先方が示した提案の内容を記憶から復元して記録する。"}
+   {:優先 5 :担当 "owner"
+    :内容 "従前からの未了。麹町税務署 徴収部門へ電話（還付金の充当先・延滞税込みの滞納額・換価の猶予の相談）／
+           年金事務所へ電話（差押え 3 件）／eLTAX の特別徴収税額通知の取得（2026-07-23 格納、
+           保護番号は通知メール内）。"}]
+
+  :closing/resume-point
+  "次に手を付けるなら 2 つ。
+   ① 郵便物管理フォルダを Graph で検索して債権譲渡通知書の発送記録を探す
+      （検索語: 債権譲渡通知 / アニメートアーク 発送 / 2512。
+       sites/Gftd435 の Gftd_C_郵送物管理 配下に GJ_督促 の実例がある）。
+   ② 面談の録画は a.oda のドライブがブロックされているため、
+      河崎氏本人の Teams クライアントから当該会議を開いて録画の有無を直接見るしかない。
+   どちらも読み取りのみで進む。帳簿は 計上済み として動かさない（オーナー判断 2026-08-16）。"
+
+  :closing/retired-stale-branch
+  {:branch "agent/d1-kotobase-closure-20260815"
+   :結末 "退避したうえで削除した。checkout は main（origin/main と 0/0）に戻した。"
+   :判定 "content-containment で完全に包含されていた。
+          commit 7763db0613a が追加する 3 ファイル
+          （90-docs/adr/2608152300-repo-wide-d1-to-kotobase-and-shared-identity.edn /
+           manifest/d1-kotobase-migration.edn / scripts/verify-d1-kotobase-migration.cljs）は
+          3 本ともバイト単位で origin/main のものと一致していた。
+          別経路の commit c9bee77b9e0 cleanup: land D1→Kotobase closure ADR + murakumo OEM ADR
+          で既に着地していた。"
+   :マージしなかった理由
+   "このブランチを main へマージすると main が巻き戻る。
+    origin/main → ブランチ tip の diff は 1,488 行の削除を含み、その中に
+    90-docs/business/gftd-japan-mf-ledger.datoms.edn の 507 行
+    （本セッションで追加した -49 / -50 / -51 を含む）・
+    manifest/fleet-ci.edn の 430 行・fleet-db.ledger.edn の 27 行があった。
+    ブランチが 1,628 commit 遅れており、その間の main の前進を打ち消す形になる。
+    着地させるべき差分はゼロだったので、マージではなく retirement が正解だった。"
+   :退避先 ".git/stash-archive-20260817/
+            — 0001-docs-close-D1-to-Kotobase-migration-architecture.patch（commit のパッチ）
+            / branch-commits.txt（tip の 3 commit）
+            / 2608169000-qwen38-fleet-placement-context-and-quantisation.edn.worktree-copy
+            （checkout を戻す際に邪魔になった working tree の実体。
+              内容は origin/main とバイト一致だったが、規則どおり削除前に退避した）"
+   :検証 "scripts/verify-d1-kotobase-migration.cljs は
+          ok - 42 active D1 configs are closed-world registered; no unreviewed binding
+          で通る。内容の健全性に問題があったわけではなく、単に着地済みだった。"
+   :触っていないもの
+   "stash 2 件（他セッションの murakumo scripts WIP と owner の .mcp.json WIP）は
+    そのまま残してある。移動も削除もしていない。"}
+
+  :provenance/read-only
+  "本セッションを通じて読み取りのみ。MoneyForward の journal.write / transaction.write /
+   trade_partners.write は一度も呼んでいない。SharePoint も Graph の GET のみで、
+   ファイルの作成・変更・削除はしていない。外部への送信も行っていない。"}
+]

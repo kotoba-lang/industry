@@ -1,0 +1,404 @@
+[{:db/id -1
+  :adr/id "adr-2608070400-kotobase-client-held-security-and-searchable-encryption-tiers"
+  :adr/doc_type "adr"
+  :adr/topic "kotobase-confidentiality"
+  :adr/title "ADR-2608070400: kotobase の機密性は client が持ち、server は安全性の責務を持たない — 検索可能暗号の段と実測トレードオフ"
+  :adr/status "accepted"
+  :adr/date "2026-08-07"
+  :adr/last_verified "2026-08-07"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["kotobase の server は安全性の責務を持たない（暗号文と CID の置き場に限る）という決定"
+   "封筒面 / 射影面の二面分割を kotobase.net の既定構造とする決定"
+   "検索可能暗号の 5 段（P/B/S/C/F）と、各段で server が学習するものの定義"
+   "columnar lake projection は射影面にのみ載るという制約"
+   "convergent 暗号を使わない決定（tenant 間 35.12% の等価漏洩が実測されたため）"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["adr-2606131600-kotobase-e2e-pq-and-universal-read-audit"
+                "adr-2608039970-kotobase-base-is-datom-plane"
+                "adr-2608039000-no-d1-premise-on-decentralized-paths"
+                "adr-2608071000-dsl-core-kotoba-migration-orphaned-twelve-consumers"]
+  :adr/artifacts "{:model-hndl \"90-docs/models/crypto-tradeoff-xmile.cljs\", :model-client-burden \"90-docs/models/client-burden-xmile.cljs\", :bench \"kotoba-lang/kotobase/capability-bench/results/{storage,latest}.edn (2026-08-06)\", :pq-suite \"kotoba-lang/pqh (pqh-v1)\", :client-pq \"kotoba-lang/kagi kagi.crypto.noble\", :prior-art \"cloud-itonami-rirekisho / kagi / com-etzhayyim-talent\"}"
+  :adr/body
+"# ADR-2608070400: kotobase の機密性は client が持ち、server は安全性の責務を持たない
+
+**Status**: accepted
+**Date**: 2026-08-07
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナー指示（2026-08-07）: 「安全は client 側の負担に寄せて、server は安全性の
+責務を持たないように」「検索可能暗号までを想定」。
+
+これは同日の先行案（server 可読を既定 Tier とし、機密 graph だけ client-held に
+する二層案）を**否定する訂正**である。server が鍵を持つ限り server は安全性の
+責務を負い、侵害・法的要求・運用ミスの矢面に立つ。責務をゼロにするとは、
+**server が持っていないものは漏らせない**という状態にすることを指す。
+
+### 先行資産 — 新規実装は要らない
+
+| 資産 | 中身 | 状態 |
+|---|---|---|
+| `kotoba-lang/pqh` | suite `pqh-v1`: X25519+ML-KEM-768 (FIPS 203) KEM combiner / Ed25519+ML-DSA-65 (FIPS 204) 二重署名 / XChaCha20-Poly1305 (nonce 24 + tag 16) / Argon2id | 実装済み |
+| `kotoba-lang/kagi` `kagi.crypto.noble` | **ブラウザ**側の実 ML-KEM-768（`@noble/post-quantum`）。JVM 側は JDK 24 標準。双方向の相互運用テストあり | 実装済み |
+| `kotoba-lang/crypto` | `hmac` / `hkdf` | 実装済み |
+| `cloud-itonami-rirekisho` / `kagi` / `com-etzhayyim-talent` | 「運営者に読ませない」二面分割 | **3 実装** |
+| net-kotobase `ADR-2606131600` | 同方針の起草（status: proposed） | 未 ratify |
+
+**client 側 PQ は想定ではなく実在する。** この ADR が足すのは方針の確定と、
+検索可能暗号の段の定義だけである。
+
+### 実測（`kotobase/capability-bench`, 2026-08-06）
+
+- AEAD overhead 28 B/block（index block 平均 12,225.47 B に対し 0.23%）
+- AEAD throughput 56.23 MB/s、index block 復号 0.03 ms
+- opaque index 増幅: **request 2.8x / row 8.06x**
+- convergent 暗号の等価漏洩: **tenant A の 35.12% の block が tenant B と byte 同一**
+- index heights: eavt 2 / avet 2、GET/op point 2.04 / find 3.6 / range 16
+- columnar lake vs avet index: 2 GET・512 行・5.23ms ↔ 16 GET・4,000 行・108.12ms（**20.7x**）
+- padding bucket `[1024 4096 16384 65536]`: index block **+34.0%**、definition block **+150.0%**
+
+## Decision
+
+### D1 — server は暗号文と CID の置き場でしかない
+
+server が持ってよいのは、暗号文ブロック・CID・ref・アクセス台帳だけとする。
+**平文の鍵を server に置かない。** `SealedBlockStore` のような server 保持鍵の
+封緘は「at-rest 保護」であって責務の除去ではないので、これを機密性の根拠に
+しない。
+
+### D2 — 二面分割（封筒面 / 射影面）を既定構造とする
+
+| 面 | 中身 | server から見えるか |
+|---|---|---|
+| **封筒面** | 本体の datom。`pqh-v1` で client が封緘 | 見えない |
+| **射影面** | 何をクエリしたいかを先に決めて、それだけを**非識別**な形で平文投影 | 見える（設計上 PII ゼロ） |
+
+**暗号文は join できない。** したがって「server に読ませない」と「Datalog で
+クエリする」は同じ datom に同時には成立しない。どちらかを諦めるのではなく、
+**クエリしたいものを射影面へ先に決めて出す**。これは新案ではなく、上記 3 実装が
+既に採っている形の 4 つ目である。
+
+射影面の内容は client が決める。server は射影面が非識別であることを**保証しない**
+（保証すると責務が戻る）。非識別性の責任は射影を定義した client 側にある。
+
+### D3 — 検索可能暗号は 5 段。既定は P、機密は C
+
+`90-docs/models/client-burden-xmile.cljs` の実行結果（実測パラメータ、
+1M ops/月・RTT 50ms 想定）:
+
+| 段 | 構成 | server が答えられるもの | GET 増幅 | hops | 復号 ms/op | server が学習するもの | 状態 |
+|---|---|---|---|---|---|---|---|
+| **P** | 射影面（平文・PII ゼロ） | full Datalog | 1.0x | 2 | 0 | 射影の中身のみ | **実装済み（3 例）** |
+| **B** | blind index（HMAC 決定的トークン） | 等価のみ | 1.0x | 2 | 0.944 | 検索パターン + アクセスパターン + **等価/頻度** | 今日作れる |
+| **S** | SSE（暗号化転置索引） | 等価 + 論理積 | 1.0x | 3 | 0.944 | 検索パターン + アクセスパターン | **未実装** |
+| **C** | opaque index + client 側 tree 降下 | 無し（blob 取得のみ） | **2.8x** | **2.04→0.70 実測** | 2.643 | アクセスパターン + サイズ | 今日作れる |
+| **F** | 全 client（corpus 丸ごと） | 無し | 1.0x | 1 | **23,462** | サイズのみ | corpus が小さい間だけ |
+
+**hops 列の出所**: 段 C だけが実測（`capability-bench/run-descent.cljs`、cache 0 → 100）。
+**段 P/B/S の hops は宣言値**で、まだ数えていない（D4 の訂正を参照 — 段 C も当初は
+宣言値 3 で、実測したら誤りだった）。段 S を採るならまず数えること。
+
+**採用**: 既定は **P**、機密 graph は **C**。**B は要件が出てから**（等価/頻度
+漏洩は convergent の 35.12% と同種で、既定にするには漏れすぎる）。**S は未実装**
+なので、S を前提にした設計を今書かない。**F は 1 op あたり 23 秒**で、corpus が
+成長すると成立しない。
+
+### D4 — client 側暗号の実コストは暗号ではなく hops。ただし cache で hops は消える
+
+段 B/S/C の client 復号は 1 op あたり 0.94〜2.64 ms で、RTT 100〜150ms に対し
+**0.63〜1.73%**。つまり **client に寄せても CPU 的にはほぼ無料**。効くのは往復回数。
+
+> **2026-08-07 訂正 — この節の当初の主張は実測で否定された。**
+>
+> 当初ここには「server が index を読めなくなると hops が 2 → 3（+50ms）」と書いた。
+> **これは宣言値であって実測ではなく、2 点とも誤りだった。**
+> `kotoba-lang/kotobase` の `capability-bench/run-descent.cljs`（`npm run bench:descent`）
+> が、依存往復を「降下パス上の cache miss」として**実際に数えた**結果:
+>
+> | client cache | hops/op（実測） | hit率 | cache=0 比 | @RTT 50ms |
+> |---|---|---|---|---|
+> | 0 | **2.04** | 0% | 1x | 102ms |
+> | 10 | 1.04 | 49.0% | 0.51x | 52ms |
+> | **100** | **0.70** | 65.7% | **0.34x** | **35ms** |
+> | 1,000 / 10,000 | 0.70 | 65.7% | 0.34x | 35ms |
+>
+> 1. **無キャッシュの降下は 3 ではなく 2.04。** height+1 という見積もりが誤り。
+> 2. **0.70 は 1 を下回る。** 完全に cache に載った降下は**ネットワークを 1 度も
+>    使わない**ので、opaque index を client が降下する方が、index を読める server に
+>    問い合わせる構成（必ず 1 往復かかる）より **latency 下限が低くなりうる**。
+>    「index を server から隠すと必ず 1 hop 増える」という直観は、この cache 量では
+>    成り立たない。
+> 3. **cache は約 100 block で飽和する**（1,000 でも 10,000 でも同一）。hit するのは
+>    クエリ間で共有される上位ノードで、数が少ない。**それ以上大きくしても何も買わない。**
+>
+> したがって段 C の設計指針は「hops 増を緩和する」ではなく **「100 block 程度の
+> client 側 index cache を必須要件にする」**。GET 増幅 2.8x（D3 の表）は
+> opaque index が range/prefix を attribute-range 走査に落とすことによるもので、
+> こちらは cache とは別要因なので残る。
+>
+> ネットワークは介在していない（hops × 自分の RTT で読むこと）。cache は LRU では
+> なく FIFO で、実際の client の hit 率はこれより高くなる。
+
+### D5 — suite は pqh-v1。convergent 暗号は使わない
+
+`pqh-v1`（X25519+ML-KEM-768 / Ed25519+ML-DSA-65）を封筒面の suite とする。
+**convergent 暗号は採らない** — 実測で tenant 間 35.12% の block が byte 同一に
+なり、server が重複を学習する。これは D1 の「持っていないものは漏らせない」に
+反する。per-tenant 鍵とし、**重複排除は捨てる**。
+
+### D6 — block sizing を pad bucket 直下に揃える
+
+長さ秘匿（padding）が実コストの主項で、AEAD の 0.23% に対し index block +34.0% /
+definition block +150.0%。**block target を 16,384 B 直下に揃えれば padding 比は
+ほぼ消える。** pad bucket の上限は 65,536 B で、それを超える block は
+`ciphertextBlob` 送りになり inline padding の経路を外れる。したがって
+**block sizing は 64 KiB を超えない**。
+
+### D7 — 移行は今日始める。遅延が支配項
+
+`90-docs/models/crypto-tradeoff-xmile.cljs`（露出 = classical のまま保持された
+量の時間積分）:
+
+| シナリオ | 露出@120mo | 何もしない比 |
+|---|---|---|
+| 何もしない | 158.31k MB·mo | 1.0000 |
+| 新規のみ PQ、legacy 放置 | 14.61k | 0.0923 |
+| **新規 PQ + legacy 再暗号化** | **67.14** | **0.0004** |
+| 24ヶ月後に着手（中身は同一） | 9.94k | 0.0628 |
+
+**やることが同一でも 24 ヶ月遅らせると露出は 148 倍。** 再暗号化は 56.23 MB/s
+なので現 corpus では数秒で終わり、**crypto は律速ではない**。高いのは着手を
+遅らせる判断そのもの。
+
+### D8 — columnar lake は射影面にのみ載る
+
+chunk の min/max 枝刈りに平文が要るので、**封筒面には原理的に作れない**。
+射影面に載せれば実測 20.7 倍（2 GET・512 行・5.23ms ↔ 16 GET・4,000 行・108.12ms、
+8 chunk 中 7 skip）。build は 46 PUT / 404,142 B / 281.82ms。
+projection として足すので `manifest/projection-verify.cljs verify` を gate に通す。
+
+## Consequences
+
+- (+) server 侵害の影響が「暗号文とアクセスパターンの露出」に閉じる。鍵が無い。
+- (+) 既存資産だけで組める。新規の暗号実装はゼロ。
+- (+) client 側 PQ は CPU 的にほぼ無料（RTT の 1% 未満）と実測で確定した。
+- (−) **封筒面には server 側 Datalog も columnar lake も無い。** クエリしたい
+  ものは射影面に出す設計判断が、graph ごとに毎回必要になる。
+- (−) 段 C は GET 2.8 倍・hops +1。client キャッシュで緩和するが消えない。
+- (−) 重複排除を捨てる（D5）。同一内容を複数 tenant が持てば複数回保管される。
+- (−) 射影面の非識別性は client の責任であり、server は検査しない。**射影の
+  設計を誤れば、暗号は無傷のまま PII が平文で出る。** これは構造上 server 側
+  では防げない。
+- (−) net-kotobase 本番は現在 server 可読（`SealedBlockStore` 系）で動いており、
+  この ADR は**現状の記述ではなく到達目標**である。移行は未着手。
+
+## 測っていないもの（この ADR の数字を読むときの限界）
+
+- **敵対者の harvest レートは実測が無いので掛けていない。** D7 の露出は
+  harvest レート非依存の積分（MB·月）で、実 harvest バイト = 露出 × 任意レート。
+  CRQC の到来時期もモデルに入れていない（日付非依存）。
+- **仮定であって実測でないもの**: 新規書込 20 MB/月、クエリ 1M ops/月、
+  mix 70/20/10、RTT 50ms。corpus 初期値は本番の *object 数* 8,601 が実測で、
+  バイト数は bench 平均 14,848 B/block からの**推定**（本番の実バイト数は未計測）。
+- **段 S（SSE）の hops 3 と増幅 1.0x は published shape からの見積もりで、
+  実装も実測も無い。** S を採るなら測り直すこと。
+- **ms は nbb/SCI インタプリタ上の値。**
+- **XMILE モデルの構造検証（`xmile.validate`）を走らせていない** — dsl-core が
+  `.kotoba` へ移行して `kotoba.dsl.problem` がどの runtime でも load できない
+  ため（ADR-2608071000、既知・accepted）。`xmile.execute` は通っている。
+
+## 2026-08-08 実装棚卸し — 両面とも「作る」ではなく「既にある」
+
+Follow-up 2/3 に着手する前に索引を引いた結果、**この ADR が新規実装だと想定していた
+ものは大半が既に存在した。** 次に触る人が 4 つ目を書かないよう、現在地を記す。
+
+### 封筒面は実在する。PQ の欠落は 2026-08-08 に解消した
+
+> **この節は 2026-08-08 の棚卸し時点の記述で、その後 D5 の gap は塞がれた。**
+> `kotoba-lang/envelope` に `envelope.kem`（`:x25519+ml-kem-768`）が着地し、
+> 39 tests / 110 assertions が実 ML-KEM-768・実 X25519 に対して通っている。
+>
+> **置き換えではなく結合。** HKDF を `x25519_shared || mlkem_shared` にかけるので、
+> どちらか一方が秘密なら鍵は秘密のまま —— hybrid は元の構成より弱くなりようがない。
+>
+> **ダウングレード耐性を AAD に入れた。** `wrap-aad` は object と recipient しか
+> 束縛しておらず、classical と hybrid の AAD がバイト同一だった（AEAD から見て
+> 交換可能）。hybrid だけ KEM を AAD に足し、classical の文字列は**凍結**した
+> （既存 wrap の AAD を変えると開かなくなる）。`unwrap-with` は construction を
+> entry から読み、**fallback しない** —— fallback こそがダウングレードそのもの。
+>
+> 本当に hybrid であることは退行で確認済み: combiner から `pq_shared` を落とすと
+> 1 件落ち、AAD の KEM 束縛を外すと 1 件落ちる。否定ケース（X25519 半分が誤り /
+> ML-KEM 半分が誤り / encapsulation 差し替え）はそれぞれ単独で失敗する。
+>
+> **残る gap はライブラリの外にある**: recipient が ML-KEM 公開鍵を公開する経路
+> （DID document / 鍵バックアップ / デバイス連携）は未着手。ライブラリは hybrid
+> recipient を受け取れるが、誰もまだ `pq-pub` を配っていない。加算的な変更なので
+> classical の recipient はそのまま動き続ける。**つまり本番 Drive/Mail は今も
+> D7 の S1 の位置にいる** —— 塞いだのは「作れない」ことであって「配ってある」
+> ことではない。
+>
+> **訂正（2026-08-08 closing）**: 下の「18 日間 uncommitted」は**誤りだった**。
+> `pq_noble.cljs` は **2026-07-27 に `f57c175` で landed** しており（`pq.cljc` /
+> `util.cljc` は 2026-08-01 の `72fa921`）、放置されてなどいなかった。誤認の原因は
+> **こちらのローカル checkout が 12 commit 遅れていた**こと —— 遅れた checkout では
+> 着地済みのファイルが untracked / modified に見える。同じ誤りを cleanup survey の
+> 全体でも踏んでおり、dirty と報告された 66 ファイルのうち **42 が main とバイト
+> 同一**（偽陽性）だった。**「ローカルが dirty」を「未着地」と読まないこと。**
+> 判定は必ず fetch 後の `origin/main` に対する content-containment で行う。
+>
+> envelope が `@noble/post-quantum` を自前で束ねた判断自体は変わらない。ただし
+> 理由は「他人の未着地 WIP に乗れないから」ではなく、**pqh のものは `IPq` seam の
+> 背後にある別 consumer 向けの provider 実装だから**である。結果として workspace の
+> ML-KEM 束ねは 3 つ —— 統合の機会として `envelope.kem` の docstring に記録してある
+> （そちらの docstring にも同じ誤りが残っているので、次に触る人が直すこと）。
+
+以下は棚卸し時点の記述:
+
+**`kotoba-lang/envelope`** が kotobase.net の Drive/Mail の本番封筒
+（ADR-2607263000 D3–D5）。1 オブジェクト = 1 content key、鍵は保存せず受信者ごとに
+wrap のみ。共有は re-wrap であって再暗号化ではない。`envelope.model`（portable、
+crypto 不要の判断）と `envelope.seal`（cljs、bytes）に分かれ、20 tests / 61
+assertions が実 Web Crypto・実 X25519 に対して通っている。否定ケース（鍵違い・
+ビット反転・chunk 入れ替え・切り詰め・chunk 移動・wrap 貼り替え）が主眼。
+
+**D5 に対する差分は 1 点だけ: PQ ではない。** wrap は X25519 ECIES + HKDF-SHA256 +
+AES-256-GCM で、`pqh-v1`（X25519+ML-KEM-768 / XChaCha20-Poly1305）ではない。
+つまり **harvest-now-decrypt-later に対して D7 の S1（何もしない）と同じ位置**に
+本番の Drive/Mail がいる。
+
+一方 **D5 の「convergent 暗号を使わない」は既に満たしている** ——
+ADR-2607263000 D4 が object ごとに fresh content key を選んでおり、同一平文が
+重複排除されないことにテストがある。
+
+**PQ 化は crypto だけの変更ではない。** hybrid wrap には受信者が X25519 に加えて
+ML-KEM-768 公開鍵を持つ必要があり、DID document・鍵バックアップ・デバイス連携
+（`kotoba-lang/org-signal` + ADR-2607022330）に及ぶ。crypto を差し替えるより
+identity/鍵配布の方が大きい。
+
+**そして材料は既にある**: `kotoba-lang/pqh` の
+`src/kotoba/lang/pqh/pq_noble.cljs` —— @noble ベースのブラウザ IPq host
+（x25519 / ml_kem768 / ml_dsa65 / hkdf）。pqh の README が「future」と書いている
+当のものが、実は **2026-07-27 に `f57c175` で landed 済み**である。
+
+> ⚠ この節は当初「2026-07-20 から 18 日間 uncommitted のまま」と書いていた。
+> **誤り**で、原因はこちらのローカル checkout が 12 commit 遅れていたこと。
+> 上のブロックの訂正を参照。
+
+### 射影面は「汎用ライブラリが無い」のであって、実装が無いのではない
+
+`cloud-itonami-rirekisho`（封筒 `rirekisho.envelope` / cohort `rirekisho.cohort`）、
+`kotoba-lang/kagi`（index/ACL は graph、secret は SealedBlockStore）、
+`etzhayyim/com-etzhayyim-talent`（cohort は graph、PII は ciphertext）の 3 実装が
+既にある。rirekisho 自身が「これが 3 つ目」と書いている。
+
+**4 つ目のドメイン実装を書いても何も増えない。** 共通化できるのは cohort の中身
+（ドメインごとに違う）ではなく、rirekisho が talent より改善した 1 点 ——
+`persistable?` を「プレフィックスが付いているか」ではなく「**この値が seal の出力
+そのものか**」で判定する契約だけ。未知の鍵があっても通さない。ここを取り出すなら
+それが commons であって、cohort スキーマは commons ではない。
+
+⚠ **`kotoba-lang/kotobase-projection` は名前が似ているが別物** ——
+materialized query bundle と atomic publication（`kotobase-peer` から抽出）で、
+この ADR の「射影面」ではない。名前で取り違えないこと。
+
+### D8 の lake は gate の allowlist を広げなくてよい
+
+`manifest/projection-verify.cljs` は loader を `:canonical-edn-v1` 1 種に絞って
+おり、これは意図的な制限。columnar lake は CBOR ブロックを産むので一見合わないが、
+**射影すべきは lake の manifest（root CID・column footer CID・chunk の zone map）
+であって chunk の bytes ではない。** manifest は小さな canonical EDN なので既存
+loader でそのまま通る。
+
+これは ADR-2608039970 の「byte を datom 面に載せない。メタデータは datom 面で
+よい —— 分けるのは bytes」と同じ判断で、**loader を足す理由にならない。**
+
+**ただし現状 lake は `capability-bench` の中にしか無く、ベンチマークである。**
+「verified projection」にするには先に射影対象の実データが要る（superproject の
+datom 面には market-intel / repo-taxonomy / corpus 等がある）。gate の形は
+決まったが、対象が未定というのが正確な現在地。
+
+## 2026-08-08 closing — fleet 全体の uncommitted 調査と、そこで判明した測定上の罠
+
+`nbb scripts/cleanup.cljs --unlanded` を fleet 全体（**走査 4,158 repo**）で回した。
+
+**素朴なスキャンは 826 repo が「uncommitted」だと言うが、その大半は偽陽性である。**
+origin/main ref を持つ 16 repo をサンプルして dirty ファイルを 1 件ずつ照合した結果:
+
+| dirty ファイルの実態 | 件数 |
+|---|---|
+| **main とバイト同一（偽陽性）** | **42** |
+| 本当にローカル変更 | 24 |
+| ローカルで削除済み（`D`） | 53 |
+
+原因は **checkout が pin/main より遅れていると、内容が同一でも dirty に見える**こと。
+`git status` はローカル HEAD との差を出すのであって、`origin/main` との差ではない。
+**この罠は同じ日に 2 回踏んだ** —— pqh を「18 日放置」と誤認したのも同じ機序で、
+そちらは上のブロックで訂正した。
+
+**判定は必ず fetch 後の `origin/main` に対する content-containment で行うこと。**
+`git status` の dirty/untracked を「未着地」と読んではならない。
+
+`scripts/cleanup-land.cljs` はこの絞り込みを実装済みで、826 → **着地対象 34 repo**
+まで落ちた（偽陽性・削除・ビルドゴミを除外）。実行結果:
+
+- **merge した（`:additive` = 未追跡のみ、既存行を書き換えない）**:
+  `network-awai/cloud-itonami` #510（4 files）、`network-awai/net-kotobase` #362（1 file）
+- **PR のみ・merge しない（`:review` = 追跡ファイルの変更）**: 5 件（slides #13 /
+  cloud-itonami #511 / loop-consumability #2 / net-babiniku #183 / nexus-x402 #8）
+- 内容一致で着地不要と判定: 56 ファイル / 6 repo
+- 手動解決が要る conflict: 18 件（cloud-itonami 15 / nexus-x402 3）
+
+**`:review` を auto-merge しない規則は測定に基づく。** `DO-NOT-MERGE` ラベル付きの
+preservation PR が過去に実際に merge されている（`kotoba-lang/slides` #12、
+`network-awai/loop-consumability` #1、`network-awai/nexus-x402` #7）。
+`cleanup-workflow.edn` の `:preservation-pr-disposition` が記録する 2026-07-26/27 の
+事故（main から約 913 行が消えた）と同型で、**ラベルは merge を止めない**。
+
+**1 件の「失敗」は正しい拒否だった。** `kotoba-lang/user-test` の未追跡ファイルは
+`.github/workflows/ci.yml` で、HTTP 404 は repo 不在ではなく **`workflow` OAuth
+scope の不足**（403 でなく 404 が返るので誤読しやすい）。そもそも CLAUDE.md が
+新しい Actions workflow を禁じているので、着地させないのが正しい。
+
+## Follow-up
+
+1. net-kotobase `ADR-2606131600`（proposed）を本 ADR に合わせて accepted へ更新するか、
+   本 ADR を指す形に整理する。
+2. ~~射影面の第一実装を 1 つ選んで landed にする~~ → **完了 2026-08-08、ただし
+   当初の想定とは別物として**。3 実装が既にあったので 4 つ目のドメイン実装は
+   書かず、代わりに 2 つとも landed:
+   (a) **`envelope.projection`** —— `persistable?` / `leaks` / `sealed?` の契約を
+   commons 化（`kotoba-lang/envelope`、新規 repo は作らず）。prefix ではなく形を
+   見る（talent の穴）、任意の深さを歩く（rirekisho の穴）。28→39 tests。
+   (b) **`envelope.kem`** —— hybrid X25519+ML-KEM-768（D5 の gap）。
+   **残るのは鍵配布**: recipient が `pq-pub` を公開する経路が無いので、本番は
+   まだ classical のまま。ライブラリ側は塞がった。
+3. ~~columnar lake を projection として実装し gate に通す~~ → **loader 追加は不要**と
+   判明（manifest を canonical EDN として射影する。bytes はブロック面に残す）。
+   残る前提は「射影対象の実データを決めること」——今の lake は
+   `capability-bench` の中のベンチマークで、射影すべき本番データがまだ無い。
+4. ~~block sizing を 16 KiB 直下へ。64 KiB 超を禁じる検査を fleet gate に足す。~~
+   **✅ 完了 2026-08-08**（案 B）。`kotoba-lang/pqh` 86c453f が PAD-BUCKETS を
+   7 段へ、`kotoba-lang/kotobase-peer` 587e3f9 が size-classes を bucket 直下
+   （17 バイト下げる）へ。overhead は +300%/+100%/経路外/経路外 → 全 0.0-0.1%。
+   fleet gate `kotobase-peer-block-sizing-pad` を配線済み（落ちることを 3 方向で
+   実測してから配線した）。両 repo のテストは通過（pqh 20/147、peer 229/680）。
+5. ~~段 C の client 側 index キャッシュを実装して hops の実測を取り直す。~~
+   **✅ 完了 2026-08-07** — `capability-bench/run-descent.cljs`（`npm run bench:descent`）。
+   結果は D4 の訂正のとおり。**当初の hops=3 は誤りで、実測 2.04（無キャッシュ）→
+   0.70（cache 100 で飽和）**。残件: 段 P/B/S の hops はまだ宣言値のまま。
+
+## One-line summary
+
+**server は暗号文と CID の置き場でしかなく、機密性は client の鍵と計算で担保する。
+クエリは「封筒面（読めない）」と「射影面（何をクエリしたいか先に決めて非識別に
+平文投影）」の二面に分け、検索可能暗号は P/B/S/C/F の 5 段のうち既定 P・機密 C を
+採る（S は未実装なので前提にしない）。client 側暗号は 1 op あたり 1ms 弱で
+RTT の 1% 未満なので実コストは暗号ではなく往復回数であり、移行を 24 ヶ月遅らせる
+判断だけが露出を 148 倍にする。**
+"}]

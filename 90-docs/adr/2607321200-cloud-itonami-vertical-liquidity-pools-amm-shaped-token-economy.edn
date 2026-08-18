@@ -1,0 +1,831 @@
+[{:db/id -1
+  :adr/id "adr-2607321200-cloud-itonami-vertical-liquidity-pools-amm-shaped-token-economy"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "proposed"
+  :adr/date "2026-07-31"
+  :adr/last_verified "2026-07-31"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/title "ADR-2607321200: cloud-itonami を分散型 SaaS として AMM で初期駆動する — vertical liquidity pool に LP が資本/情報を lock し、AI agent がその原資で事業を運用し、取引収入が LP に還る。同意の単位は payment ではなく envelope である"
+  :adr/topic "cloud-itonami-vertical-liquidity-pools"
+  :adr/repos ["orgs/cloud-itonami/cloud-itonami-app"
+              "orgs/network-awai/cloud-itonami"
+              "orgs/cloud-itonami/cloud-itonami-isic-5820"
+              "orgs/kotoba-lang/loop-system-dynamics"]
+
+  :adr/authoritative_for
+  ["cloud-itonami を分散型 SaaS とし、AMM をその初期駆動（bootstrap）機構として使う設計の正本。LP が vertical pool に lock → AI agent がその原資で事業を運用 → 取引収入が LP に還る"
+   "curve を貼ってよい対象の切り分け: 収益請求権（希少・cold start あり）には貼ってよい / blueprint へのアクセス（非競合財）には貼ってはならない"
+   "**cloud-itonami の資金統治は murakumo の資金統治とは別物である**という区別。cloud-itonami は kekkai を使わない（`orgs/cloud-itonami/` 全 1155 repo で使用 0 件）。正しい substrate は `cloud.itonami.app.authority`（proposal→consent→commit の4不変条件）+ `cloud.itonami.app.funding`（残高 attest）+ `authority.payment`（決定論的 funds gate）"
+   "agent が運用する原資の同意単位は payment ではなく **envelope**（上限・期間・費目）である。ただし authority.clj の4不変条件のうち CONTENT BINDING と SINGLE USE は envelope 化で必ず作り直しが要る"
+   "θ(v)（pooled capital のうち agent が焼いてよい割合）は実現収益の関数であり定数ではない。seed floor は実測済みの GTM 実験1回分で建てる"
+   "この設計は ADR-2607320500 の custody 回避決定を反転させる要求である、という認識。両立しないものを両立するかのように書かない"
+   "**S(v)（vertical share）と ADR-2607299900 の TOKEN は別々の instrument であり、収益源は交わらない。VLP は TOKEN を必要とせず、両者の採否は独立に判断できる**（§5b）"
+   "**cloud-itonami は既に非エクイティを選んでいる（ADR-0010、根拠は FIEA）。Side C はこの選択と衝突し、Side I はこの枠にそのまま乗る** —— 2辺は法的性質の点で対称ではない（§5a）"
+   "**その選択を止めているのは「意図」であって substring filter ではない** —— `equity-blocklist` は memo 部分一致で、`revenue share` / `revenue distribution` は通り抜ける（実測）。ADR で「コードが強制している」と書かないこと（§5a 訂正）"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+
+  :adr/related
+  ["orgs/cloud-itonami/cloud-itonami-app/src/cloud/itonami/app/authority.clj（proposal→consent→commit の4不変条件。propose-only の天井）"
+   "orgs/cloud-itonami/cloud-itonami-app/src/cloud/itonami/app/funding.clj（残高 attest。銀行コネクタ無し・unknown は refuse）"
+   "orgs/cloud-itonami/cloud-itonami-app/src/cloud/itonami/app/authority/payment.clj（決定論的 funds gate。5 fact は server-computed で API が上書き）"
+   "orgs/cloud-itonami/cloud-itonami-app/src/cloud/itonami/app/payment_settlement_actor.clj（銀行資格情報も送金 endpoint も持たない）"
+   "orgs/cloud-itonami/cloud-itonami-app/src/cloud/itonami/app/agent_control.clj（HIL 付き bounded agent 実行）"
+   "orgs/cloud-itonami/cloud-itonami-app/src/cloud/itonami/app/policy.kotoba（既存の .kotoba 純判断面）"
+   "orgs/network-awai/cloud-itonami/src/cloud_itonami/advertiser_ops.cljc（**envelope が既に1費目で実装されている**: ground policy + 前払い USDC gate + micros 整数 SSoT + facts-passed-in）"
+   "orgs/network-awai/cloud-itonami/src/cloud_itonami/business_governor.cljc（中央 censor、ADR-0012。6 kind + fail-closed default + :max-unit-amount 50000）"
+   "orgs/network-awai/cloud-itonami/src/cloud_itonami/billing_x402.cljc（x402 seller 登録アクター。rail は既に存在する）"
+   "orgs/network-awai/cloud-itonami/src/cloud_itonami/kernels/billing_cap.cljc（micros-positive? / micros-below-min? — 金額整数 SSoT）"
+   "orgs/cloud-itonami/cloud-itonami-isic-5820/src/crm/phase.cljc（vertical actor の phase 梯子。phase 3 は低リスク op のみ auto-commit、default-phase は最保守）"
+   "90-docs/adr/2607300900-cloud-itonami-payment-settlement-funding-balance.edn（funding account。『資金 gate が無い承認は何の防御にもならない』）"
+   "90-docs/adr/2607300300（authority spine と propose-only の天井）"
+   "orgs/network-awai/cloud-itonami/src/cloud_itonami/business_loop.cljc（tick! が governor/censor を実際に呼ぶ。observe→advisor→censor→act→record）"
+   "orgs/network-awai/cloud-itonami/src/cloud_itonami/kernels/（billing_cap / substance / phase_gate / policy_risk / cert_verdict — .cljc + *_part_NN.kotoba + .kotoba-bundle。判断コアが Kotoba で書かれている production 実例）"
+   "90-docs/adr/2607302100-shiropico-google-ads-live-spend-pause-and-execution-path-gap.edn（agent 運用型 GTM の唯一の実支出実測。seed floor の単位）"
+   "90-docs/adr/2607320500-legal-structure-three-roles-no-foundation-no-custody.edn（accepted 2026-07-31。custody を設計で回避。本 ADR の curve はこれの反転要求）"
+   "90-docs/adr/2607319000-murakumo-operator-awai-and-crypto-value-accrual-comparison.edn（Uniswap の fee は LP に行き token には 3.3%）"
+   "90-docs/adr/2607299900-tradeable-token-policy-reversal.edn（token は capital を連れてくるが settlement demand は連れてこない）"
+   "90-docs/adr/2607259800-token-economy-and-monetary-system-dynamics.edn（未計測は 0 ではない）"]
+
+  :adr/problem
+  "オーナー指示（2026-07-31）:
+
+> uniswap 的に大事なのは AMM で、cloud-itonami は分散型の SaaS なので、それの初期駆動となる AMM の LP になる、そのサービスの取引の収入を LP が受け取るという仕組み。また LP に載せた後、それを原資に AI agent がビジネスを運用する
+
+**求められているのは分配機構ではなく資本形成機構である。** 458 の ISIC vertical はそれぞれ潜在的な SaaS 事業だが、今は operator が全部を scaffold して1つも converts していない（外部有償 0）。AMM はここで **『どの vertical に資本を付けるか』を市場に決めさせる装置**として働く。
+
+### 前版からの訂正 2件
+
+**(a) curve の貼り先。** 前版は「blueprint は非競合財なので curve を写さない」と書いたが、その論証は「blueprint へのアクセスを値付けする」場合にのみ正しく、「収益請求権を値付けする」場合には当たらない。収益請求権は希少（1 vertical の収益の 100% は有限）で、cold start も実在する（458 の非流動 micro-market で買い手と売り手が同時に現れる必要がない仕組みは curve でしか作れない）。**curve は写す。貼る対象を間違えなければ。**
+
+**(b) 資金統治の substrate。** 前版は cloud-itonami の agent 運用の制約として `kekkai` の `:treasury/release` を挙げたが、**これは murakumo の話であって cloud-itonami の話ではない**（オーナー指摘）。実測:
+
+```
+orgs/cloud-itonami/ 配下 1155 repo で kekkai の使用    = 0 件
+:treasury/release の消費者                            = kotoba-lang/murakumo/overlay/witness_treasury.clj
+                                                        + network-awai/net-kotobase のテストのみ
+```
+
+cloud-itonami は**自前の authority スタック**を持つ（`authority.clj` 353行 + `authority/{api,card,esim,payment,posture,transport,voice}.clj` + `funding.clj` 318行 + `payment_settlement_actor.clj` 248行 + `agent_control.clj` 684行 + `policy.kotoba`）。本 ADR の §3 はこちらに対して書き直したものである。
+
+### 実測（2026-07-31 live、および accepted ADR より）
+
+| | 値 | 出典 |
+|---|---|---|
+| itonami.cloud の x402 面 | **無い**（cockpit HTML） | `curl /.well-known/x402` |
+| murakumo.cloud / kotobase.net | 1 / 2 resource（$0.01 / $0.001・$0.002） | 同 |
+| 外部 tenant / 外部有償 | 5 / **0** | `/api/fleet/metrics` |
+| agent runs 7d | 984 | 同 |
+| fleet gross（$0.01/req 換算） | **$513.09/yr** | 上記から計算 |
+| 登録 vertical / blueprint | 458 / 433 | canvas 2026-07-25 |
+| fleet repo | 1155（active 843 / archive 143 / stub 169） | fleet audit 2026-07-21 |
+| **agent 運用型 GTM の実支出** | **¥5,077（うち shiropico ¥2,376）** | ADR-2607302100 |
+| その成果 | 16,958 imp → 134 clicks → **conversions 0** | 同 |
+
+最後の2行が本 ADR で最も重要な入力である。「AI agent が事業を運用する」ループは既に一度、実際の金で回っている。結果は 0 コンバージョン。これは失敗の記録ではなく、**LP 資本が今日買えるものの唯一の実測値**であり、seed envelope をこの単位で建てる根拠になる。"
+
+  :adr/decision
+  "### 1. 器 — vertical ごとに1つの pool、1つの share、2種類の預入
+
+```
+vertical liquidity pool (VLP) — ISIC/ISCO code ごとに1つ
+  預入①  資本   USDC        →  curve 上で share S(v) を mint
+  預入②  情報   blueprint / governor policy / eval set / 規制コーパス
+                             →  replay 検証された発火に応じて S(v) を vest（sweat equity）
+  払出    S(v) 保有者が、その vertical の取引収入の pro-rata を受け取る
+  出入口  curve が常時、対手方なしの entry/exit を提供する
+```
+
+**情報の評価額は査定しない** — 台帳の replay で「その blueprint が有償の決定で実際に何回発火したか」を数え、それに比例して vest させる。書いただけのものには何も出ない。
+
+### 2. curve に入った USDC は2つに割れる
+
+```
+入金 USDC
+  ├─ (1-θ) → reserve      curve の床。exit 流動性。agent は触れない
+  └─   θ   → envelope     agent の運用原資（推論費・GTM・外注）
+```
+
+**θ を定数にしてはならない。** 実現収益 0 の vertical では curve 価格は純粋な信念であり、信念をそのまま agent の広告費に流し込む設計になる。
+
+> θ(v) = clamp( seed_floor / capital,  k · realized_revenue(v) / capital,  θ_max )
+
+計算（k=2.0、θ_max=0.5、seed floor = 実測 GTM 実験 5 回分 = $76.65）:
+
+| capital | 実現収益/yr | envelope | reserve | LP 資本の risk 露出 |
+|---|---|---|---|---|
+| $1,000 | $0 | $77（実験 5 回） | $923 | **7.7%** |
+| $1,000 | $50 | $100 | $900 | 10.0% |
+| $1,000 | $200 | $400 | $600 | 40.0% |
+| $10,000 | $0 | $77 | $9,923 | **0.8%** |
+| $10,000 | $1,000 | $2,000 | $8,000 | 20.0% |
+
+実績 0 の段階では LP 資本の 90%以上が reserve に残り、curve での出入りはほぼ無損失。**市場は vertical に資本を付けられるが、agent が焼いてよい額は、その vertical が実際に稼いだ額でしか増えない。**
+
+**seed floor が必要な理由**: θ を純粋に収益比例にすると収益 0 で θ=0 となり、agent は最初の一手すら打てない —— 着火しないループを設計で作ることになる。単位は実測に取る（ADR-2607302100: 実支出 ¥2,376 ≈ $15.33 で 16,958 imp / 134 clicks / 0 conv）。**envelope は「GTM 実験 N 回分」という単位を持つ。**
+
+### 3. agent が原資を運用する — envelope は既に1費目で実装されている
+
+**訂正（2026-07-31 コード実測）: envelope は新規発明ではない。** `cloud-itonami.advertiser-ops`（`orgs/network-awai/cloud-itonami`）が広告キャンペーンという1費目について**既に実装している**:
+
+```clojure
+(def default-policy          ; ← advisor が上書きできない ground policy = envelope の policy
+  {:max-bid-usd 50.0         ;   $50 超の bid は human call
+   :min-budget-usd 5.0
+   :allowed-bid-models #{\"cpm\" \"cpc\"} :allowed-tiers #{\"general\" \"adult\"} ...})
+
+;; 前払い残高 gate（= envelope の funds check）
+(when-not (and (integer? prepaid-usdc-micros) (kb/micros-positive? prepaid-usdc-micros))
+  [\"campaign has no verified prepaid USDC deposit — an unfunded campaign
+    may not go live (fund via x402 top-up first)\"])
+```
+
+性質:
+
+- **金額は USDC micros の整数**（`kernels.billing-cap` の `micros-positive?` / `micros-below-min?`）。float の金額を持たない。
+- **`Pure .cljc: zero network I/O, zero custody, zero deps`**。on-chain 残高の取得は「**この ns の仕事ではない** —— ops 層が `treasury/receipt->onchain` で検証して**確定した micros を渡す**」。これは `authority.payment` の「5 fact は passed in, never fetched」と**同じ分割**である。
+- `check` → `{:status :pass}` | `{:status :hold :reasons [...]}`、`censor` → 1 tick 分をまとめて `{:approved [...] :held [...]}`。
+
+**中央の censor は `cloud-itonami.business-governor`**（ADR-0012）で、統治する proposal kind は `:billing.change`（ground limit `:max-unit-amount 50000` = ¥50,000/$500）/ `:marketing.outreach` / `:marketing.copy-suggestion` / `:funding.record` / `:lean.measure` / `:canvas.note`、**未知の kind は hold（fail closed）**。層の関係も明記されている:
+
+> これは proposal が `:itonami.effect/*` になる**前**に走る —— risk-policy + approval-inbox gate の**前に立つ2本目の独立した線**であって置き換えではない。governor が hold した proposal はそもそも queue に載らず、governor を通った proposal も risk が要求すれば人間の承認を待つ。
+
+**訂正（2026-07-31、同日の前の反復が2点とも誤っていた）。** 前の反復は「この governor はどの本番経路からも呼ばれていない」「duplicated-truth 欠陥クラスの実例である」と書いたが、**どちらも誤りである。**
+
+**誤り①「誰も呼んでいない」** — `business_loop.cljc:188` が tick の中で実際に呼んでいる:
+
+```clojure
+;; observe! -> advisor -> governor/censor -> act! each approved -> tick/record!
+{:keys [approved held]} (governor/censor (or limits governor/default-limits) proposals)
+;; ns docstring: govern は独立した censor で advisor は bypass できない。
+;;               hold された proposal は記録され、実行されない。
+;;               governor は human gate の「前」に立つのであって、代わりではない
+```
+
+`ops_governor.cljc` も自分の語彙（`:mail/*` `:incident/*`）以外の全 kind を `business-governor/check` に委譲し、`merge-proposal!` の `{:governor-check ops-governor/check}` で配線されている。**原因は自分の grep を `head -12` で切ったこと** —— test/ のヒットだけを見て src/ のヒットを見落とした。この workspace が繰り返し記録している「静かに間違った結果を返す欠陥」（ADR-2607259800: World Bank API の無警告 truncate）の、**自分自身による実例**である。
+
+**誤り②「duplicated truth」** — 実際は **defense in depth であり、SSoT は kernel にある。** `billing.cljc` が明言している:
+
+> Defense in depth: **propose（ここ、全経路）+ governor censor（tick 経路）+ execute（apply-billing-change!）**
+
+そして `marketing.cljc` の「Same gates as business-governor」は**同じ kernel 関数を呼んでいる**（`ks/outreach-reason` / `ks/reason-outreach-target-blank` = `kernels.substance`）のであって、複製ではない。
+
+**この構造こそが envelope の実装形を決める。** 実在する形は:
+
+```
+        kernels/*.kotoba (+ .cljc)      ← 純粋な整数決定コア = SSoT、Kotoba コンパイル済み
+              ▲        ▲        ▲
+          propose   censor   execute    ← 3つの強制点が同じ kernel を参照する
+        (全経路)   (tick)   (apply-*!)
+```
+
+kernel は既に5つある（`billing_cap` / `substance` / `phase_gate` / `policy_risk` / `cert_verdict`）。**いずれも `.cljc` + `*_part_NN.kotoba` + `.kotoba-bundle` の3点セットで出荷されており、判断コアが実際に Kotoba で書かれている** —— CLAUDE.md の kotoba/pure 方針が production で成立している数少ない実例である。
+
+> **したがって envelope の上限は6つ目の kernel（`kernels/envelope.kotoba`）として書き、propose / censor / execute の3点から参照する。** 新しいアーキテクチャは要らない。
+
+**残る本物の gap は狭く、そして VLP に直撃する**: `business-governor` の allowlist は **x402 rail の kind に届いていない。** `billing_x402.cljc` 自身が KNOWN GAP として全文を書いている:
+
+> `business-governor` の proposal-kind allowlist は **閉じた kotoba-wasm カーネル コード**（`kernels.substance/known-kind`、code 0..5）で、`:billing.x402-rule` の code をまだ持たない。**拡張するには `.kotoba` wasm twin を触って `bb emit-kernel-wasm` を再実行する必要がある**（ADR-0018 follow-up）。それが landing するまで `:billing.x402-rule` proposal は `business-governor/censor` にも `business-loop/tick!` にも**到達しない** —— `kernels.substance` の fail-closed unknown-kind check が governor の multimethod が dispatch する前に無条件に hold する。
+
+**ただし無防備ではない**（前の反復の「自己統治しているだけ」という書き方は厳しすぎた）: proposal は通常の approval queue に載り、`activity/policy-risk` の unknown-policy fallback が未登録 policy を **`:destructive` risk** に解決する —— `billing.cljc` の `:financial` より**保守的**なので、**x402 rule は billing change より厳しくゲートされている。**
+
+コストは2つ: (1) 中央 censor の ground limit が x402 に効かない、(2) 拡張が `.kotoba` wasm twin の再生成を要する。**しかもその emit 手順は `bb` を使っており、`bb` は ADR-2607173000 が script host として退役させたツールである。**
+
+**envelope の設計課題（訂正版）**:
+
+```
+ (a)  envelope 上限を kernels/envelope.kotoba として書く（既存5 kernel と同型）
+ (b)  x402 rail の kind を business-governor の allowlist に入れる
+ (c)  前払い残高の出所を advertiser ごとの deposit から **vertical pool の reserve** へ
+ (d)  上限を定数（:max-bid-usd / :max-unit-amount）から **θ(v)·capital**（実現収益の関数）へ
+```
+
+**agent 実行側にも同じ形の budget が既にある**（`cloud.itonami.app.agent-control`）:
+
+```clojure
+:agent.run/budget {:max-turns N :max-tool-calls M}
+;; advance! のループ頭で、行動の前に算術で落とす
+(when (>= (:agent/turn-count run 0) (:max-turns budget))
+  (throw (ex-info \"...\" {:type :agent/budget-exhausted})))
+```
+
+**建値が turn と tool-call であって金額ではない**という点だけが違う。envelope はこの `:agent.run/budget` に金額次元を足したものであり、強制点（`advance!` のループ頭）は既に正しい位置にある。なお同 ns の HIL は**tool call ごと**（`hil/approval-request` + `decide!` は `:held` からのみ、`append-audit!` は実行前）で、envelope が動かすのはまさにこの粒度である。
+
+**vertical actor 側には auto-commit する経路が実在する**（`crm.phase`、ISIC 5820）:
+
+```
+Phase 0 read-only / 1 assisted / 2 +dispute / 3 supervised-auto
+  :auto #{:opportunity/transition-stage :lead/qualify}      ← phase 3 で自動 commit 可
+  :lead/convert と :dispute/request は「どの phase でも決して :auto に入れない」
+      — convert は status を動かすだけでなく Contact + Opportunity を MINT する
+  default-phase 1  ← :phase を省いた普通の呼び出しで到達するので最も保守的な値にする
+```
+
+**つまり cloud-itonami の3層は自律度が違う**: app の authority は propose-only、business-governor は「hold か、承認待ちか」、vertical actor の phase 3 は低リスク op のみ auto-commit。**envelope はこの3層目の粒度に効く。**
+
+その上で、app 側の `cloud.itonami.app.authority` が持つ **4つの不変条件**を壊さないことが条件になる。
+
+**これらは実装で確認済みである**（2026-08-01、§5a で docstring を測らずに断定した誤りを受けて、本節の前提も実コードに当て直した）:
+
+- **ORDER / SINGLE USE** —— `owned-proposal!` が `(= expected (:status p))` を要求して throw する。`commit!` は `:approved` を渡すので、pre-check を経ていないものは commit できず、commit 後は status が終端に移るため2度目は同じ検査で落ちる
+- **CONTENT BINDING** —— `approval-match-issues` に明示の節がある。**`(not= (:digest proposal) (:digest context))` → `:context/digest-mismatch`、`(nil? (:digest context))` → `:context/digest-absent`。** コメントも『start-approval! と finish-approval! の間で編集された proposal は、上の全検査を通り**この節だけで落ちる**』と書いている
+- しかも `approval-match-issues` は **pure** である。ns 自身の理由がこの ADR の規律と同じ: 「security-critical な比較を pure にしてユニットテスト可能にした —— さもなくば digest binding は hardware authenticator を要する integration 経路にしか覆われず、**実務上それは何にも覆われていないということである**」
+
+> **§5a と対照的に、ここは docstring が実装に裏付けられている。** 本 ADR が envelope の設計前提としている「2 と 4 は作り直しが要る」は、実在する強制の上に立っている。
+
+```
+1. ORDER            start-approval! は review! が作った proposal しか受けない
+                    （pre-check されていないものに同意を求められない）
+2. CONTENT BINDING  review! が材料を hash し finish-approval! が再検証する
+                    （人間が同意したのは「この内容」であり、途中で差し替えられない）
+3. 2つの gate は代替しない  Passkey consent =「人間は同意したか」
+                    Governor =「licensed operator として admissible か」
+                    authority の拒否は :authority-refused として記録し、承認として扱わない
+4. SINGLE USE       承認された proposal は高々1回 commit する
+```
+
+そして `authority.payment` の funds gate は **既に正しい形**である:
+
+> pre-check は、記録された残高が金額を賄わないとき、**人間に聞く前に**拒否する。……必要な事実は全て **PASSED IN、never fetched**。……`authority.api` が5つ全部を**上書きする**ので、client が `{:balance {...}}` を送って自分の承認を買うことはできない。
+
+**envelope 化で何が変わり、何が壊れるか:**
+
+| 不変条件 | envelope 化した場合 |
+|---|---|
+| 1. ORDER | **そのまま使える。** envelope も review! を通る proposal である |
+| 2. CONTENT BINDING | **作り直しが要る。** 今日 hash するのは「この支払い」。envelope の digest は **policy**（上限・期間・費目）を束縛し、個々の支出はその policy に対して**決定論的に照合可能**でなければならない |
+| 3. 2つの gate | **そのまま使える。** むしろ envelope でこそ効く（枠の同意と、個別支出の admissibility は別物） |
+| 4. SINGLE USE | **作り直しが要る。** envelope は本質的に多回使用。「派生する各支出認可が単回 + envelope 自身が replay 不能な単調カウンタを持つ」と言い直さないと、**envelope が静かに不変条件4を廃止する** |
+
+**agent が原資で運用する = 個別支出ごとに Passkey を出さない、ということであって、pre-check を外すことではない。** 外してよいのは人間への問い合わせだけで、`authority.payment` の算術 gate（server-computed な5 fact に対する照合）は各支出で必ず通る。
+
+**最も危険な近道を名指ししておく**: envelope を作るとき、agent に自分の残高・決済履歴・posture を渡させると実装は楽になる。それは `authority.api` が上書きで塞いでいる唯一の防御であり、**LP 資金で動く agent はまさにその client である。**
+
+### 4. 天井 — 今日、この app は金を動かせない（設計として）
+
+**精密化（2026-08-01 実測）。** 本節の初版は各層の docstring を並べて「送れない」と読める書き方をしていたが、**実際には送る**。`authority/transport.clj` は `java.net.http.HttpClient` を持ち、consent 済み proposal を **governed actor へ HTTP で引き渡す**（`cloud-itonami-esim` は既に `POST /commit` を loopback で serve しており、到達可能である）。銀行 API を叩く経路は adapter 群・settlement actor・funding のいずれにも無い（grep で確認）。
+
+**天井の正体は「送れない」ではなく「受け手が決して自動で確定しない」である。** 同 ns が明記している:
+
+> actor が返す状態は **3つ**である —— `committed`（governor が通した）/ `held`（governor が拒んだ）/ **`pending`（受理したが、その actor 自身の operator の判断待ち）**。
+> **今日の fleet では 3 番目が、正しく組まれた proposal が得られる唯一の答えでもある —— consent surface が送れる op は、どの phase の `:auto` 集合にも、恒久的に含まれていない。**
+
+つまり `:authority/commit!` が成功しても、返るのは `pending` である。これは §3 で見た vertical actor 側の phase 梯子と同じ機構で、**`:lead/convert` がどの phase でも `:auto` に入らないのと同じ理由**（レコードを MINT する操作は自動化しない）。
+
+**この精密化は設計の結論を変えない。むしろ強める** —— 天井は transport の欠落という偶然ではなく、**受け手側の phase 梯子による恒久的な設計判断**だからである。LP 資金を実際に動かすには、この判断を変えることになる。
+
+各層が独立に同じことを書いている:
+
+- `authority.clj`: 「commit! は **それ自体が propose-only** の actor に渡す。……committed は governed proposal が記録されたという意味であって、**カードが発行されたという意味ではない**」
+- `payment_settlement_actor.clj`: 「**銀行資格情報も送金 endpoint も持たず、金を動かす能力が無い。** committed は governed record が存在するという意味だけ」
+- `authority/payment.clj`: 「**送金そのものは人間が自分の銀行で行う**」
+- `funding.clj`: 「**このアプリに銀行コネクタは無く、この namespace はそれを足さない。** 残高がここに来るのは人間が読んで記録したから」
+
+**したがって今日「AI agent がビジネスを運用する」は「AI agent が governed record を書く」を意味する。** envelope は「記録ごとに人間を呼ばない」を解錠するが、**actuation は別の、まだ存在しない部品である。** これは未着手ではなく意図的な除外であり（ADR-2607300300 の天井節）、LP 資金を実際に使うには必ずここを通る。
+
+**加えて funding.clj の前提が LP pool と衝突する**: 残高は人間が読んで記録したもので、`:never-recorded` と `:stale` はどちらも**数値ではなく拒否**を返す。**LP pool の reserve は機械可読な残高**であり、この app にとって初めて「人間が銀行を読む」以外の由来を持つ funding account になる。鮮度は改善するが、意図的に選ばれた拒否を1つ弱めることになる。
+
+### 4b. θ(v) の入力 — 実現収益はどこから来て、どう間違うか（2026-07-31 実測）
+
+**帰属の次元が足りない。** `billing-x402/snapshot!` は `/admin/settlements/{seller}` を叩き
+`{:seller :entries :count :usd-total :source \"x402\"}` を返す。**settlement に repo / vertical の次元は無い。**
+org/repo が現れるのは rule proposal の id だけ:
+
+```clojure
+(str org \"/\" repo \":billing-x402:\" seller \":\" path-prefix)
+```
+
+**唯一使える識別子は `:path-prefix` である。** vertical ごとの収益を得るには **vertical ごとに1つの x402 rule を
+別 path-prefix で登録**し、settlement の `:entries` が path を持つ必要がある（nexus-x402 側の形は未確認）。
+
+**settlement entry の実形（`nexus.settlements/settlement-entry`、2026-07-31 実測）**:
+
+```clojure
+{:tx tx :usd usd :chain chain :payer payer :at at-epoch
+ :source (or source \"direct\") :agent-hint (classify-user-agent user-agent)}
+```
+
+**path が無い。** 記録されるのは「金が動いた」ことだけで、「**何が買われたか**」は記録されない。
+
+**しかし `path` は settle 地点のスコープに既にある。** `worker.cljs`:
+
+```clojure
+(defn- serve-and-proxy!
+  [^js request env rule origin path seller settlement-payment settlement]   ; ← path が引数にある
+  (-> (record-settlement! env seller settlement-payment                     ; ← 渡していないだけ
+                          (.get (.-headers request) \"user-agent\"))
+```
+
+> **つまり per-vertical 収益の帰属は、引数を1本通すだけで得られる**（`serve-and-proxy!` → `record-settlement!`
+> → `settlement-entry` の3箇所 + テスト）。新しいストレージも API 変更も要らない。458 の seller を登録する
+> 必要も無い。lever `thread-path-into-the-settlement-entry` を 5.95 に置いたのはこのため。
+
+**さらに settlement の追記は CAS 無しの read-modify-write である**:
+
+```clojure
+(-> (kv-get-settlements env seller)                       ; GET  リスト全体
+    (.then (fn [existing]
+             (let [updated (conj (vec existing) entry)]
+               (.put kv seller (js/JSON.stringify ...))))))  ; PUT リスト全体
+```
+
+Cloudflare KV に atomic append も compare-and-swap も無く、`wrangler.jsonc` の binding は `SELLERS_KV` と
+`SETTLEMENTS_KV` の2つだけで **Durable Object はこの worker のどこにも無い**（truncate した grep ではなく
+設定ファイルで確認）。**同時に着地した2件の settlement は last-write-wins で片方が消える。** ns 自身が
+「これは consuming agent 向けの **INDEX であって ledger of record ではない** —— on-chain tx が source of
+truth で、nexus-x402 はここで突合しない」と書いているが、**他のどこでも突合していない。**
+
+**向きが重要である**: 過少読みは θ にとっては**安全**（burn 枠が小さくなる）だが、**LP 配当にとっては有害**
+—— pro-rata の配当を欠損したインデックスの上で計算することになる。加えて1件ごとにリスト全体を再直列化するので
+O(n) で、KV の value サイズ上限に向かって伸び続ける。
+
+**CLAUDE.md は別文脈で既に処方を書いている**: 「**DO は直列化器として使う**。DO はグローバル一意 +
+シングルスレッドなので『**書き手はちょうど1人**』を実装せずに得られる —— 自前の write lease や fencing
+epoch を書かない」。
+
+**着地済み（2026-07-31、network-awai/nexus-x402 main）**:
+
+```
+5349cea  feat(settlements): record the gateway path a payment bought
+79f31ea  feat(admin): fold per-path revenue into GET /admin/settlements/<seller>
+```
+
+- `settlement-entry` に `:path`。thin facilitator `/settle` 経路では nil で、
+  これは「課金 path に帰属しない」であって「金額不明」ではない
+- `revenue-by-path` — path 別 `{:count :usd-total}`。**path を持たないエントリは
+  `:unrecorded` に集める**（捨てれば seller 総額を過少にし、既存 path に畳めば
+  稼いでいないリソースに収益を付ける）。テストは per-path 分割が `summary` の
+  総額と突合することを assert する
+- fold は `/admin/settlements/<seller>` に置いた。**`/stats` には置かない** ——
+  あちらは全 seller を concat しており、2 seller が同じ path を課金しうるので、
+  path キーの fold は別 seller の収益を静かに混ぜる
+- 検証: 47 tests / 189 assertions green、clj-kondo 0 errors、
+  `shadow-cljs release worker` 61 files / 18 compiled / 0 warnings
+
+**消費側は無変更で受け取る。** `billing_x402/snapshot!` は `(assoc resp :source \"x402\")`
+で応答全体を通すので、`:by-path` はそのまま cloud-itonami に届く。
+
+**課金面の作り方は2通りあり、片方しか :path を記録しない**（2026-07-31 実測、step 1 の再定義）:
+
+| | (A) 自前 origin 402 | (B) gateway 経由 |
+|---|---|---|
+| 例 | murakumo（ADR-2607093100） | nexus-x402 `/gateway/<seller>/…` |
+| origin 側のコード | `pay/x402` + `treasury/core` を vendor（約400行）+ `x402.cljs` 約140行 | **ゼロ** |
+| 検証 | 自前 facilitator（`treasury/verify-payment`、on-chain 直読み） | gateway が実施 |
+| settle 経路 | 自己完結。**nexus-x402 を一切呼ばない** | `serve-and-proxy!` |
+| **`:path` の記録** | **されない** | **される** |
+
+**つまり上で着地した per-path 帰属は、gateway 経由の seller にしか効かない。** murakumo は (A) なので
+`/x402/v1/messages` の収益は nexus の SETTLEMENTS_KV に入らず、path 別に分解できない。これは今回の実装の
+**明示的な限界**であって、後で気付くより先に書いておく。
+
+**したがって cloud-itonami は (B) を採る。** origin コードが要らないうえ、**θ(v) が計算できる唯一の経路**だから。
+そして (B) の登録機構は既にある —— `billing_x402/propose-x402-rule!` が `org` / `repo` / `seller` /
+**`:path-prefix`** / `:usd` / `:pay-to` を取り、承認後に nexus-x402 の `PUT /admin/sellers/<seller>` を叩く。
+
+```
+billing_x402/propose-x402-rule!  (org/repo, seller, path-prefix, usd, pay-to)
+  → 人間承認 → nexus-x402 PUT /admin/sellers/<seller>
+  → 買い手が x402.nexus/gateway/<seller>/<path> を叩く
+  → serve-and-proxy! が :path を記録              ← 2026-07-31 実装
+  → /admin/settlements/<seller> が :by-path を fold ← 同上
+  → billing_x402/snapshot! が無変更で受け取る
+  → vertical 別収益 → θ(v)
+```
+
+### 4c. seller をいくつ作るか — 価格の粒度が決める（2026-07-31 実測）
+
+registry の代数を読むと選択肢が絞れる:
+
+- `registry/upsert-seller` は **seller キーで丸ごと置換**する（`(mapv #(if (= seller (:seller %)) rule %) ...)`）。
+  **1 seller = 1 rule** であり、「1 seller に複数 rule」は存在しない。
+- `facilitator/rule->requirements` は `(:usd rule)` を使う。**価格は rule 単位**で、path ごとには変えられない。
+- `handle-gateway` の `path` は **seller 以降の全体**（`/gateway/cloud-itonami/isic-5820/crm/leads`
+  → `/isic-5820/crm/leads`）。したがって1 seller の下でも **vertical は `:path` の第1セグメントで判別できる。**
+
+| | (i) vertical ごとに seller | (ii) seller 1つ |
+|---|---|---|
+| registry | **458 entry が単一 JSON 配列**（key `\"registry\"`）に入り、upsert のたび全体を書き直す | 1 entry |
+| settlements KV | 458 key | **1 key**（CAS 無し read-modify-write に集中する） |
+| 承認回数 | propose→承認 を **458 回** | 1 回 |
+| vertical 別収益 | seller 単位で自明 | **`:by-path` で得る** ← 本日実装 |
+| **価格** | **vertical ごとに設定可** | **全 458 vertical 一律** |
+
+**どちらの極も採らない。** 一律価格は製品として成立しない（規制業種の agent run と小売業種のそれは価値が違う）
+一方、458 seller は承認 458 回・単一 registry 配列の肥大・KV key 458 本を招く。
+
+> **決定: seller は「価格 tier」ごとに作る**（例 `itonami-basic` / `itonami-pro` / `itonami-regulated` の3〜5個）。
+> vertical は tier に割り当て、**tier 内の vertical 別収益は `:by-path` で分解する。**
+> registry も settlements key も承認回数も tier 数（3〜5）で済み、価格は tier 粒度で設定でき、
+> vertical 粒度の帰属は本日実装した fold がそのまま担う。
+
+**コストは明記する**: tier を跨いだ vertical の値付け変更は seller の付け替え（= 新しい rule 登録と
+path-prefix 変更）になる。また settlements が少数 key に集中するので、**上に記した CAS 無し
+read-modify-write の欠損リスクはこの構成で悪化する** —— DO 直列化の修正は tier 構成を採るなら
+配当開始前の必須項目になる。
+
+**step 1 の再定義**: 「itonami.cloud に discovery 文書を置く」ではなく
+**「vertical ごとに gateway seller rule を別 path-prefix で登録する」**。前者は (A) を含意しており
+約540行の実装を必要とするが、後者は既存の propose→承認→登録フローに乗るだけである。**データ経路は
+通ったが、まだ 1 vertical も課金 path を持っていない。**
+
+**そして実現収益は、静かに間違う経路を4つ持つ**（`billing.cljc` が自ら列挙している）:
+
+1. **2017年の ¥0 legacy subscription**（`group_monthly`）が active 数を膨らませる
+2. **返金前の `:amount`** は「実際の純収益を過大に見せる」
+3. **page size は 100** で、「ページングしない fetch は静かに過少報告する」
+4. **認証失敗を『収益ゼロ』と取り違えてはならない**
+
+さらに `:source \"x402\"` と `:source \"stripe\"` は **「決して1つの数字にマージしない」**（ADR-0012 が
+¥0-legacy 罠に適用したのと同じ規律）。
+
+**これは θ にとって致命的な向きの誤りである。** θ は収益が上がると agent の burn 枠を**上げる**ので、
+過大読みはそのまま「稼いでいない分の burn」を資金供給する。
+
+> **決定: θ の収益入力は、不明なとき refuse する。0 に落とさない。前回値を使わない。**
+> これは `funding.clj` が既に書いている規則と同一である —— 「**unknown な残高は 0 でも無制限でもない。
+> unknown であり、refuse する**」。θ が refuse したときの envelope は seed floor に戻る（agent は
+> 止まらないが、実績由来の上乗せを失う）。
+
+### 5. 収入の還り方と LP 経済
+
+```
+gross
+ ├─ 原価           murakumo 推論 / kotobase storage
+ ├─ operator 取分  AWAI Network（ADR-2607320500 §3 の invoice 方式）
+ ├─ LP 配当        S(v) 保有者へ pro-rata            ← ω(v)
+ └─ reserve 積増   curve の床を上げる（実績が価格に効く唯一の経路）
+```
+
+| LP 額 | 目標利回り | ω | vertical の必要 gross | 換算 |
+|---|---|---|---|---|
+| $1,000 | 20%/yr | 0.2 | $1,000/yr | 100,000 req/yr **または seat 2.1 席**（$40/月・仮定） |
+| $1,000 | 10%/yr | 0.5 | $200/yr | 0.4 席 |
+| $10,000 | 20%/yr | 0.2 | $10,000/yr | 20.8 席 |
+
+**1 vertical あたり有償 2 席で $1,000 の LP が 20% で回る。** 一方 fleet 全体では 458 × $1,000 = $458,000 の調達に対し年 $458,000 の gross が要り、今日の実測 $513.09/yr に対し **893 倍**の隔たり。**vertical 単位では手が届き、fleet 全体では venture 規模の賭けである。**
+
+### 5a. **cloud-itonami は既に非エクイティを選んでおり、コードがそれを強制している**（2026-08-01 実測、本 ADR で最も重い発見）
+
+`cloud-itonami.funding` の ns docstring:
+
+> これは意図的に **cap table でも securities/investment vehicle でもない**。`:contribution` は money in（donation/sponsorship — Open Collective / GitHub Sponsors の形）、`:distribution` は money out（**contributor/maintainer への compensation**、または透明な経費）。**どのスキーマ属性も所有割合や約束された利回りを表さない**。`guard-non-equity!` はそれを付そうとする memo の記録を**拒否する** —— **通貨が fiat か crypto かは FIEA の分類を変えないので**（ADR-0010 Context）。全 entry は常に `:itonami.effect/risk :financial` で、常に承認ゲートを通る。
+
+schema 側にも同じ制約が書かれている（`funding-directions`: 「`:contribution` は **profit-participation right を伴わない**」「`:distribution` は……**never a dividend on a stake**」）。強制は `kernels.substance/equity-blocklist`（kotoba-wasm SSoT）にある。
+
+**これは「法務待ち」ではない。この製品は既に非エクイティを選んでいる。**
+
+#### 訂正: 「コードで強制している」は言い過ぎだった（2026-08-01 実測）
+
+本節の初版は「その判断を kernel レベルで強制している」と書いた。**設計意図は明確だが、強制は memo 文字列の部分一致であり、VLP の最も自然な言い方は通り抜ける。** 実際に `equity-blocklist` に当てて測った:
+
+| memo | 結果 |
+|---|---|
+| `LP dividend on vertical 5820` | **BLOCK**（`dividend`） |
+| **`revenue share for LP`** | **pass** ← VLP Side C の最も自然な言い方 |
+| **`pro-rata revenue distribution to S(v) holders`** | **pass** |
+| `profit share for pool participants` | BLOCK（`profit share`） |
+| `vertical pool ownership stake` | BLOCK（`ownership stake`） |
+| `payout to blueprint contributor as compensation` | pass ← Side I。正しく通る |
+| `配当の支払い` / `利益分配` | BLOCK |
+
+blocklist は `#{\"equity\" \"dividend\" \"shares\" \"share of profit\" \"profit share\" \"profit-share\" \"ownership stake\" \"cap table\" \"cap-table\" \"投資持分\" \"持分\" \"配当\" \"株式\" \"出資比率\" \"議決権\" \"利益分配\"}`。**`revenue share` / `revenue distribution` が入っていない。**
+
+> **したがって正しい表現はこうである: 設計意図（docstring・schema・ADR-0010）は曖昧さなく非エクイティを選んでいる。強制はその意図に届いていない箇所がある。** 本 ADR の Side C を止めるのは**意図**であって、substring filter ではない。
+
+**これは guard 側の gap でもある。** 同 blocklist の docstring は「**Deliberately broad/over-inclusive** —— false positive はただ memo を言い換えれば済み、それがこの機構の趣旨」と書いている。その趣旨に照らすと、profit-participation の最も一般的な言い方である `revenue share` が抜けているのは**意図された緩さではなく漏れ**に見える。
+
+**ただし本 ADR ではこの blocklist を変更していない。** これは FIEA コンプライアンスの制御であり、**何を弾くようになるかは owner が知った上で決めるべき**である。閉じるなら `\"revenue share\"` と `\"revenue distribution\"`（および `\"収益分配\"`）の追加で足りる、というところまでを記録に留める。
+
+#### 本 ADR にとっての帰結
+
+**Side C（資本 lock → 収益シェア）は、この選択と真っ向から衝突する。** S(v) は vertical 収益の所有割合であり、その分配は「dividend on a stake」そのもので、funding ledger が名指しで拒否している当のものである。§7 で挙げた ADR-2607320500 の custody 回避や Howey は**米国側の制約**だったが、こちらは**この製品自身の設計判断で、日本の FIEA を根拠に、コードで強制されている**。制約は2つの法域から来ている。
+
+**Side I（情報 lock）は逆に、この形にそのまま乗る。** `:distribution` の定義は「**contributor/maintainer への compensation**」であり、これは blueprint 貢献者への credits 報酬そのものの形である。§3 で「膜規則の改正は不要」と書いたが、**より強い形で正しかった** —— cloud-itonami 側の funding ledger も、情報 LP を compensation として記録する語彙を既に持っている。
+
+> **したがって本 ADR の2辺は、法的性質の点で対称ではない。** Side I は既存の非エクイティ枠にそのまま収まり、Side C はその枠を出る。§7 の open-decision `:side-c-vs-custody` に、この FIEA 側の制約を加えて読むこと。
+
+**本 ADR は 27 反復のあいだ、この制約を見つけていなかった。** 米国側（Howey / custody）は早期に特定していたが、**この製品自身が同じ問いに既に答えを出していた**ことを見落としていた。設計を書く前に、その製品の funding ledger の docstring を読むべきだった。
+
+### 5b. S(v) と TOKEN の関係 — **VLP は TOKEN を必要としない**
+
+ADR-2607299900（accepted）は準圏に tradeable TOKEN を置くことを許可し、sink を3つ
+定めた（x402 の TOKEN 払い割引 + 受領分 burn / witness bond / treasury release の
+stake 加重）。**本 ADR の初版はその TOKEN に一度も言及していなかった** —— オーナーの
+問いが「トークンエコノミー」だったのに、S(v) と TOKEN の関係が空白だった。埋める。
+
+**結論: 2つは別々の instrument であり、収益源は交わらない。VLP 側から TOKEN は要らない。**
+
+**(1) 同じ1ドルを取り合わせない。** ADR-2607319000 の実測がこの判断を既に済ませている
+—— Uniswap の fees $850M/yr のうち保有者に届くのは 3.3%（V4 は 0%）で、残りは供給側
+（LP）に行く。同 ADR の一般則は「**供給者に払うと決めた時点で、token は残余請求権では
+ないと決めている**」。S(v) が vertical の収益を取るなら、**TOKEN はそこから何も取らない**。
+これは欠陥ではなく、既に下された選択の帰結である。
+
+**(2) S(v) は USDC 建てにする。TOKEN 建てにしない。** 理由は3つとも実務的である:
+
+- **θ の収益入力が信念で汚染される。** §4b の決定（不明なら refuse、過大読みは
+  稼いでいない burn を資金供給する）は、収益が実額であることを前提にしている。
+  TOKEN 建てにすると、実現収益が TOKEN 価格の関数になり、**流量ゼロの段階では
+  純粋な信念**である。自分で置いた規則を裏口から壊すことになる。
+- **x402 rail は USDC で決済する**（実測: murakumo / kotobase の `.well-known/x402`
+  はいずれも `asset: USDC`）。建値を変えると rail と pool の間に為替が挟まる。
+- **LP に二重のリスクを負わせる。** vertical の venture リスクは既に全損しうる（§一行）。
+  そこに TOKEN 価格リスクを重ねても、**得られる機能は1つも増えない**。
+
+**(3) 却下: TOKEN を curation / gauge 層にする（veCRV 型）。** 458 vertical で
+permissionless listing を開けば curation は確かに希少財になるので、一見もっともらしい。
+**しかし本 ADR は既に objective な品質 oracle を持っている** —— `attribution-replay-slashing`
+（決定台帳の決定論的 replay）である。stake 加重の curation はそれを、**主観的で
+capture 可能な機構で二重化する**。ADR-2607995000 の slashing 原則は「決定論的に証明
+できる不正のみ、異議申立て機構不要」と定めており、投票より決定論的証明を選んでいる。
+同じ理由で curation も投票に寄せない。
+
+**(4) 2つが実際に触れる唯一の場所** は既存の膜規則にある: `TOKEN → credits`（一方向 mint、
+ADR-2607299900 で追加済み）。TOKEN 保有者は credits に変換でき、credits は vertical の
+agent run を買える。**つまり TOKEN は vertical の需要を資金供給できるが、vertical に対する
+請求権にはならない。** この非対称は既に書かれていて、本 ADR は何も追加しない。
+
+> **したがって VLP の採否と TOKEN 発行の採否は独立に判断できる。** 片方をもう片方の
+> 人質にしない。TOKEN を出さなくても VLP は成立し（S(v) は USDC 建て）、VLP を作らなくても
+> TOKEN は3つの sink で成立する。**2つを1つの決定として扱うと、法務で止まっている側が
+> 止まっていない側を止める。**
+
+### 6. 計算されたランキング（`dynamics.core/rank-interventions`）
+
+```
+  6.65  agent-supplies-its-own-balance              B  0.95   ← 罠。下記
+  6.30  meter-each-vertical-as-x402-resource        B  0.90
+  6.00  information-deposit-as-sweat-equity         A  0.60
+  5.60  envelope-as-a-kotoba-kernel                 B  0.80   ← 既存5 kernel と同型
+  5.95  theta-must-refuse-not-default               B  0.85   ← 収益は4通りに静かに間違う
+  4.90  envelope-preserving-the-four-invariants     B  0.70
+  4.90  attribution-replay-slashing                 B  0.70
+  4.50  revenue-gated-theta                         C  0.90
+  5.95  thread-path-into-the-settlement-entry       B  0.85   ← 引数1本。path は既にスコープ内
+  4.90  settlement-append-is-a-kv-read-modify-write B  0.70   ← CAS 無し。LP 配当を過少にする
+  3.50  machine-attested-balance-for-pool-funding   B  0.50
+  3.15  govern-the-x402-rail-kind                   B  0.45   ← 0.70 から降格（wasm twin）
+  2.50  per-vertical-share-curve                    A  0.25   ← custody + 証券性
+  1.50  actuation-path                              A  0.15   ← 意図的に存在しない
+  0.50  constant-product-for-blueprint-access       E  0.50   ← 退けた選択肢
+```
+
+**最高スコアが最も危険な項目である。** agent に pre-check の入力（残高・決済履歴・posture）を渡させるのは実装が楽（0.95）で band B の構造変更だが、`authority.api` の上書きこそが「client が自分の承認を買えない」唯一の担保である。**この式は leverage を測っており safety を測っていない。** 両者が乖離する事例として削除せず先頭に残す。
+
+### 7. 実行順
+
+```
+step 1  vertical ごとに **gateway seller rule** を別 path-prefix で登録する
+        （billing_x402/propose-x402-rule! → 承認 → PUT /admin/sellers/<seller>）
+        ※ 自前 origin 402（murakumo 型）は選ばない —— 約540行を要するうえ
+          settle が nexus を通らないので :path が記録されず θ(v) が計算できない
+step 2  settlement-record に vertical 次元（分配の記録面。on-chain 分割はしない）  step 1
+step 3  envelope 上限を kernels/envelope.kotoba として書く（既存5 kernel と同型）
+        + x402 rail の kind を business-governor の allowlist に入れる
+        + 金額次元を :agent.run/budget に足す（強制点 advance! は既に正しい位置）  step 2
+step 4  θ(v) の実装（定数上限 → 実現収益の関数）                                   step 3
+step 5  replay slashing harness                                                   step 3
+step 6  情報預入の vest 規則（replay 発火 → S(v)）                                step 5
+step 7  actuation path（今日この app には存在しない。意図的除外）                  ← 法務・資格
+step 8  curve と share の発行                                                     ← 法務 + §8
+```
+
+**step 1–6 は curve なしで実行でき、curve なしでも意味を持つ。** step 3–4 が終われば「予算枠の中で agent が提案し、全件が台帳に残り、burn は実績で gate される」状態になる。**LP を入れる前に運用実績を作る構成**であり、curve をその上に載せれば価格が信念だけで決まらない。
+
+### 8. ADR-2607320500 との衝突を明示する
+
+**step 8 は本日 accepted の ADR-2607320500 の中心決定を反転させる要求である。** 同 ADR は custody を弁護士待ちにせず**設計で回避**し、protocol fee すら on-chain 分割せず invoice で取ると決めた（「他人の資金を1秒も預からない」）。vertical ごとの curve が USDC reserve を保持することは、そこで避けた当のものである。Howey も素直に当たる。
+
+**両立の道は1つだけある**: invoice 型を LP 分配にも適用する（AWAI が全額受領 → LP へ債務として支払う）。custody は開かないが、LP が持つのは pool の持分ではなく AWAI への債権になり、**Uniswap との類似はかなり薄まる**。これは設計判断ではなく法的性質決定である。
+
+（本 ADR 執筆時点の agent の知識は 2026-05 であり、この領域は法改正が速い。上記は設計上の入力であって法的助言ではない。）"
+
+  :adr/implementation
+  "{:done
+    [{:what \"live 実測 2026-07-31: itonami.cloud に x402 面が無い / murakumo・kotobase にはある / externalPaid=0・agentRuns7d=984\"
+      :how \"curl .well-known/x402 x3 + curl itonami.cloud/api/fleet/metrics\"}
+     {:what \"cloud-itonami の資金統治 substrate を特定（オーナー指摘による訂正）\"
+      :how \"grep -rl kekkai orgs/cloud-itonami/ -> 0 件。grep -rn 'treasury/release' orgs/ -> murakumo/overlay/witness_treasury.clj と net-kotobase テストのみ\"
+      :finding \"cloud-itonami は kekkai を使わない。正しい substrate は cloud.itonami.app.{authority,funding,authority.payment,payment-settlement-actor,agent-control} + policy.kotoba\"}
+     {:what \"authority.clj の4不変条件 / authority.payment の server-computed 5 fact / 各層の propose-only 天井 / funding.clj の『unknown は refuse』を読解\"
+      :how \"orgs/cloud-itonami/cloud-itonami-app/src/cloud/itonami/app/ の各 ns docstring\"}
+     {:what \"envelope の既存実装と、その配線状態を実測\"
+      :how \"advertiser_ops.cljc / business_governor.cljc / billing_x402.cljc / agent_control.clj / crm/phase.cljc を読み、grep で src/ 内の呼び出し元を確認\"
+      :finding \"envelope の pure 決定層は既にある（ground policy + 前払い USDC gate + micros 整数 SSoT + facts-passed-in）。**強制は kernels/*.kotoba を SSoT とし propose/censor/execute の3点から参照する defense in depth** で、business-governor は business_loop.cljc:188 の tick! から実際に呼ばれている。allowlist に届いていない kind は x402 rail だけ\"
+      :self-correction \"同日の前の反復は『governor はどこからも呼ばれない』『duplicated truth の実例』と報告したが両方とも誤り。原因は grep を head -12 で切って src/ のヒットを見落としたこと。marketing.cljc の『Same gates as business-governor』は同じ kernel 関数の呼び出しであって複製ではなく、billing.cljc は自ら defense in depth と明記している\"}
+     {:what \"nexus-x402 に per-path 収益帰属を実装して main に着地\"
+      :commits [\"network-awai/nexus-x402 5349cea (settlement-entry :path + revenue-by-path)\"
+                \"network-awai/nexus-x402 79f31ea (GET /admin/settlements/<seller> の :by-path fold)\"]
+      :verified \"47 tests / 189 assertions green、clj-kondo 0 errors、shadow-cljs release worker 0 warnings\"
+      :note \"lever thread-path-into-the-settlement-entry (5.95) の実装。消費側 billing_x402/snapshot! は応答全体を通すので無変更で :by-path を受け取る\"}
+     {:what \"envelope kernel — pooled capital のうち agent が焼いてよい額（θ の実装）\"
+      :commits [\"network-awai/cloud-itonami b24df79a (kernels/envelope)\"
+                \"network-awai/cloud-itonami 6a2ab4df (wasm twin が無いことを docstring に明記)\"]
+      :verified \"1323 tests / 8844 assertions、envelope 分は全通過。残り 19 failures は着手前と同一の既存セット\"
+      :note \"θ 自体は式から消える — θ = k·revenue/capital なので θ·capital = k·revenue。capital が約分され除算と divide-by-zero が消えた。refusal（revenue-known=0 なら revenue 引数を読まず seed floor に落ちる）がこの kernel の核心\"}
+     {:what \"vertical-revenue — :by-path を envelope の refusal flag に読み込む繋ぎ\"
+      :commits [\"network-awai/cloud-itonami 749abd7f\"]
+      :verified \"1330 tests / 8881 assertions、私の分は全通過。既存 19 failures は不変\"
+      :note \"別々に着地して繋がっていなかった2つを接続した。revenue-known が主張するのは『収益がゼロでない』ではなく『名乗る source から来た読める形で path 別 fold を持つ』。expected-source は既定値なしの必須引数（既定値が x402 の数字を Stripe 形の判断へ流す経路そのもの）。usd→micros は切り捨て。**下界であり θ には適するが LP 配当には適さない**（:unrecorded 分を稼いだ者を過少に払う）\"}
+     {:what \"lever ranking を再現可能にした\"
+      :commits [\"kotoba-lang/loop-system-dynamics 50ca93b / merge 6323eed\"]
+      :verified \"8 tests / 102 assertions\"
+      :note \"11 反復ぶん、本 ADR が引用するスコアはセッション用一時ファイルにしか無かった。honesty 制約を prose でなくテストが持つ（却下項目の分離 / 全体最高スコアが却下項目である assert / dynamics.core との一致 / landed と designed の区別 / 0-event 上限）\"}]
+    :not-done-deliberately
+    [{:what \"share / curve / splitter のデプロイ、資金の移動\"
+      :why \"CLAUDE.md 安全床②。加えて ADR-2607320500 の反転はオーナーと弁護士の判断\"}
+     {:what \"itonami.cloud への x402 面の実装・deploy\"
+      :why \"本 ADR は設計であり、step 1 の採否をオーナーが決める前に本番面を増やさない\"}
+     {:what \"cloud-itonami-app の authority / funding への変更\"
+      :why \"不変条件2と4の作り直しを含むので、実装前に設計判断が要る\"}]
+    :chain-status
+    \"純関数の連鎖はここまで繋がった（2026-08-01）。**ただし本番の呼び出し元は依然ゼロである。**
+
+     gateway settle → :path 記録 ✅ → /admin/settlements の :by-path ✅
+       → snapshot! が素通し ✅ → vertical-revenue が refusal 付きで読む ✅
+       → kernels/envelope が枠を決める ✅
+       → ??? 誰も呼んでいない                                      ← 未接続の最後の1本
+
+     未接続の端は step 3（envelope を authority に載せる）1本に減った。それ以外の
+     未着地項目は全て owner 判断待ちである（下記 :next の :blocked-by を参照）。\"
+    :next
+    [{:step 1 :what \"vertical ごとに gateway seller rule を別 path-prefix で登録する（discovery 文書ではない — §4b/§4c）\"
+      :blocked-by \"tier 境界を引く実測データが無い（外部有償 0）。owner 判断\"}
+     {:step 2 :what \"（着地済み）settlement に vertical 次元 = :path\"
+      :status :landed :commits [\"nexus-x402 5349cea / 79f31ea\"]}
+     {:step 3 :what \"envelope proposal 型（policy を束縛する digest + 単調カウンタ + auto-halt）\"
+      :blocked-by \"authority.clj の不変条件2（CONTENT BINDING）と4（SINGLE USE）の作り直しを含む。card/eSIM/voice/payment が依存する consent 背骨なので owner レビューを要する\"
+      :note \"**これが未接続の最後の1本である。** 決定層（kernels/envelope + vertical-revenue）は着地済みで、欠けているのは authority 側の受け口だけ\"}
+     {:step 4 :what \"（着地済み）θ 実装 = kernels/envelope + vertical-revenue\"
+      :status :landed :commits [\"cloud-itonami b24df79a / 6a2ab4df / 749abd7f\"]}
+     {:step 5 :what \"replay slashing harness\" :blocked-by \"step 3\"}
+     {:step 6 :what \"情報預入の vest 規則（vertical 粒度なら今日のスキーマで可能）\" :blocked-by \"step 5\"}
+     {:step 7 :what \"actuation path\" :blocked-by \"意図的除外。資格・credential・custody\"}
+     {:step 8 :what \"curve と share\" :blocked-by \"ADR-2607320500 の再検討（オーナー + 弁護士）\"}
+     {:step :x :what \"settlements の DO 直列化（LP 配当の前提条件）\"
+      :blocked-by \"x402.nexus は live 本番カスタムドメインで、DO migration は実質不可逆。現在の settlement 流量ゼロの潜在欠陥であり、本番決済インフラの構成変更は owner 判断\"}]}"
+
+  :adr/open-decisions
+  "[{:id :side-c-vs-custody
+     :question \"curve が USDC reserve を保持すること（= 第三者資金の custody）を、ADR-2607320500 の『他人の資金を1秒も預からない』とどう整理するか\"
+     :alternatives [\"ADR-2607320500 の中心決定を反転して custody を開く（curve は本来の形になるが、送金業・証券の論点が全面的に立つ）\"
+                    \"invoice 型を LP 分配にも適用する（custody は開かない。ただし LP の請求権は pool の持分でなく AWAI への債権になり、curve は信用リスク込みの価格を付ける）\"
+                    \"step 1-6 だけを実行し curve を出さない（agent 運用と台帳監査は成立するが資本形成は起きない＝指示の中心が満たされない）\"]
+     :owner \"owner + 弁護士\"}
+    {:id :envelope-content-binding
+     :question \"envelope の digest が束縛する policy の表現をどう定めるか。個々の支出がその policy に対して決定論的に照合可能でなければ、不変条件2（人間が同意したのはこの内容）が envelope 化で失われる\"
+     :note \"policy.kotoba が既にこの app の純判断面として存在する（現状 13 行）。admission をここに置くと CLAUDE.md の kotoba/pure 方針とも揃う\"
+     :owner \"agent（採択後）\"}
+    {:id :envelope-single-use-restatement
+     :question \"不変条件4（承認された proposal は高々1回 commit）を envelope 用にどう言い直すか\"
+     :note \"『派生する各支出認可が単回 + envelope 自身が replay 不能な単調カウンタを持つ』が本 ADR の提案。これを書かないと envelope は静かに4を廃止する\"
+     :owner \"agent（採択後）\"}
+    {:id :pool-balance-provenance
+     :question \"LP pool の reserve を funding account の残高としてどう attest するか。funding.clj は『人間が銀行を読んで記録する』を前提に作られており、:never-recorded / :stale はどちらも拒否を返す\"
+     :note \"pool reserve は機械可読なので鮮度は上がるが、意図的に選ばれた拒否を1つ弱めることになる。attest の由来を型として区別する必要がある\"
+     :owner \"agent + owner\"}
+    {:id :theta-parameters
+     :question \"k / θ_max / seed floor の実値。本 ADR は k=2.0・θ_max=0.5・seed=GTM 実験5回分($76.65) で計算したが、形を示すための値であり較正されていない\"
+     :note \"較正には vertical が1つでも収益を出す必要がある。それまでは θ_max を低く取る側に倒す\"
+     :owner \"owner\"}
+    {:id :attribution-granularity
+     :question \"情報預入の vest 分母 — vertical 単位か blueprint 内の rule 単位か\"
+     :answer \"**vertical 単位。rule 単位は schema に無い**（2026-07-31 実測、schema.cljc）\"
+     :basis \"存在する帰属チェーンは decision -> activity -> repo。:itonami.decision/{id,activity,policy,status,decider,decided-at,note} の :activity は ref で、:itonami.activity/repo -> :itonami.repo/{org,name} に繋がる。**各 ISIC vertical は1つの repo なので、repo 同一性がそのまま vertical 同一性である** — schema に :vertical も :isic も無いが構造的には存在する（:itonami.*/isic は M&A listing / buyer mandate / panellist にしか無く、decision 経路には無い）。一方 blueprint/rule への ref は無く、:itonami.decision/policy は activity.cljc の (def policies) が定める運用ポリシー名の閉じた keyword 集合で、blueprint の rule より1段粗い\"
+     :implication \"step 6（情報預入の vest）は vertical 粒度なら**今日のスキーマで実装できる** — repo ごとに decision を数えるだけ。rule 粒度が欲しくなったら決定台帳への schema 変更（:itonami.decision/rule の追加、または :policy に content digest を持たせる）が要る。spam 耐性は rule 粒度のほうが高いので、vertical 粒度で始める場合は『1 vertical に複数の情報 LP が居るとき、誰の blueprint が効いたかは区別されない』というコストを明記して受け入れる\"
+     :owner \"owner（粒度のコストを受け入れるかの判断）\"}]"
+
+  :adr/known-gaps
+  "[{:gap \"actuation path が存在しない — この app は設計として金を動かせない\"
+     :impact \"『agent がビジネスを運用する』は今日『agent が governed record を書く』を意味する。LP 資金を実際に使うには必ずここを通る\"
+     :note \"authority.clj / payment_settlement_actor.clj / authority.payment.clj / funding.clj が独立に同じ天井を宣言している。未着手ではなく意図的除外（ADR-2607300300）\"}
+    {:gap \"（解消 2026-07-31）台帳の帰属粒度\"
+     :resolved \"vertical 粒度は取れる（decision -> activity -> repo、repo = vertical）。blueprint/rule 粒度は取れない（decision から rule への ref が schema に無い）。詳細は open-decisions の :attribution-granularity\"}
+    {:gap \"vertical 粒度の vest は、1 vertical に複数の情報 LP が居る場合に貢献を区別できない\"
+     :impact \"blueprint spam への耐性が rule 粒度より低い。attribution-replay-slashing（4.90）が spam 抑止の主担当になる\"}
+    {:gap \"（解消 2026-07-31）θ(v) の収益入力の出所\"
+     :resolved \"decision 台帳には金額次元が無い。x402 settlement は per-SELLER（/admin/settlements/{seller}）で repo/vertical 次元を持たない。使える識別子は rule の :path-prefix だけ。詳細は decision §4b\"}
+    {:gap \"（解消 2026-07-31）nexus-x402 の settlement entry が path を含むか\"
+     :resolved \"含まない（{:tx :usd :chain :payer :at :source :agent-hint}）。ただし worker.cljs の serve-and-proxy! は path を引数に持っており、record-settlement! に渡していないだけ。引数1本を3箇所に通せば per-vertical 帰属が得られる\"}
+    {:gap \"settlement の追記が CAS 無しの KV read-modify-write で、並行時にエントリを失う\"
+     :impact \"θ にとっては安全側（過少読み＝burn 枠が小さい）だが、**LP 配当にとっては有害**（pro-rata を欠損インデックスで計算する）。VLP が配当を出す前に直す必要がある\"
+     :note \"DO はこの worker に無い（wrangler.jsonc の binding は KV 2つのみ）。CLAUDE.md が別文脈で処方済み — DO を直列化器に使えば『書き手はちょうど1人』が実装なしで得られる\"}
+    {:gap \"settlements KV は突合されない index であり ledger of record ではない\"
+     :note \"ns 自身が明記。on-chain tx が source of truth だが、nexus-x402 も cloud-itonami も突合していない。LP 配当の根拠にするなら突合が要る\"}
+    {:gap \"kernels の .kotoba wasm twin の再生成手順が bb に依存している\"
+     :note \"billing_x402.cljc が `bb emit-kernel-wasm` と明記。ADR-2607173000 は bb を script host として退役させ、新規 bb.edn を禁じている。x402 kind の allowlist 追加に着手する前に、この emit 手順を nbb へ移すか、既存例外として扱うかの判断が要る\"}
+    {:gap \"fleet gross $513.09/yr は 984 runs/7d の線形外挿である\"
+     :note \"canvas の観測で agentRuns7d は 34k → 0 → 984 と大きく振れた実績がある（0723 の launchd 停止インシデント）。点推定として扱わない\"}
+    {:gap \"seat 単価 $40/月 は仮定であって実測ではない\"
+     :note \"外部有償 org が 0 なので実勢価格が存在しない。『2.1 席』はこの仮定に完全に依存する\"}
+    {:gap \"JPY/USD 155 は桁を合わせるための概算\"
+     :note \"seed floor を USD 建てで書いた箇所すべてに効く。実装時は JPY 建てで扱うほうが正確\"}
+    {:gap \"ad conversion の上限 2.21% は shiropico（作品プロモ）の実測であり cloud-itonami の vertical SaaS の GTM ではない\"
+     :impact \"seed floor の単位としては使えるが、cloud-itonami の転換率の推定には使えない\"}
+    {:gap \"（解消 2026-07-31）agent_control.clj の envelope 挿入点\"
+     :resolved \"advance! のループ頭。:agent.run/budget {:max-turns :max-tool-calls} が >= で行動前に throw する形が既にあり、欠けているのは金額次元だけ。HIL は tool call ごと（hil/approval-request → decide! は :held からのみ → append-audit! は実行前）で、envelope が動かすのはこの粒度\"}
+    {:gap \"（解消 2026-07-31）itonami.cloud の x402 面が意図的に無いのか未実装なのか\"
+     :resolved \"未実装。worker（orgs/network-awai/cloud-itonami）の src/cloud_itonami/edge/ に x402 コードも .well-known ルートも無い。seat 課金専用という設計判断の痕跡も無い\"
+     :correction \"当初『欠けているのは discovery 文書だけ』と書いたが誤り。discovery 文書は自前 origin 402（murakumo 型）を含意し、pay/x402 + treasury/core の vendor と handler で約540行を要する。正しい経路は gateway 登録で、そちらは origin コードが要らない。decision §4b 参照\"}
+    {:gap \"per-path 帰属は gateway 経由の seller にしか効かない\"
+     :impact \"自前 origin 402（murakumo 型、ADR-2607093100）は nexus-x402 を呼ばず treasury/verify-payment で自己完結するので、settlement が SETTLEMENTS_KV に入らず :path も :by-path も得られない。2026-07-31 に着地した実装の明示的な限界\"
+     :note \"cloud-itonami は gateway 経由（B）を採ることでこれを回避する。既存 murakumo 収益を path 別に見たければ gateway 移行か handle-settle 側での path 記録が別途要る\"}
+    {:gap \"（解消 2026-07-31）business-governor が本番経路から呼ばれているか\"
+     :resolved \"呼ばれている。business_loop.cljc:188 の tick! が governor/censor を実行し、ops_governor.cljc は自分の語彙以外の全 kind を business-governor/check に委譲する。強制は kernels/*.kotoba を SSoT とする propose/censor/execute の3点 defense in depth\"
+     :lesson \"同日の前の反復はこれを『どこからも呼ばれていない』と誤報した。原因は grep を head -12 で切ったこと。ADR-2607259800 が『静かに間違った数値を生む欠陥』として記録した World Bank API の無警告 truncate と同型の失敗を、自分の道具で犯した。**出力を切った grep を根拠に「存在しない」と主張しない。**\"}
+    {:gap \"advertiser-ops 自身の配線（store/approval-queue）は未確認\"
+     :note \"ns docstring が『store/approval-queue の配線は these pure fns の上の thin follow-up』と書いており、pure 層の存在は確認したが approval queue への接続は読んでいない。business-governor が :adnet.campaign/* を委譲されている旨は advertiser_ops.cljc:27 にあるが、tick! の proposal 生成側にキャンペーン kind が載っているかは未確認\"}
+    {:gap \"（解消 2026-08-01）採点が scratchpad にしか無かった\"
+     :resolved \"kotoba-lang/loop-system-dynamics の src/loop_system_dynamics/cloud_itonami_vlp_levers.cljs として着地（50ca93b / merge 6323eed）。本 ADR が引用する全スコアはこれで再現可能。実行: nbb --classpath 'src:<dynamics>/src' -e \\\"(require '[loop-system-dynamics.cloud-itonami-vlp-levers :as v]) (v/-main)\\\"\"
+     :why \"11 反復ぶん、ADR の decision 本文が引用する数字がセッション用一時ファイルにしか存在しなかった。再計算できない数字は小数点を付けた主張であって計算ではなく、ADR-2607259800 が終わらせようとした当のもの\"
+     :tests \"8 tests / 102 assertions。honesty 制約を prose でなくテストで持つ: 却下項目は別キーに分離（:ranking を回す呼び出し元が却下を助言と読めない）/ 全体最高スコアが却下項目であることを assert（式は leverage を測り safety を測らない）/ 各スコアが dynamics.core の計算と一致することを assert（局所再実装の drift 防止）/ landed と designed の区別 / 0-event 上限\"}
+    {:gap \"（解消 2026-07-31）seller をいくつ作るか\"
+     :resolved \"価格 tier ごと（3〜5個）。registry/upsert-seller は seller キーで丸ごと置換するので 1 seller = 1 rule であり『1 seller 多 rule』は存在せず、facilitator/rule->requirements は (:usd rule) を使うので価格は rule 単位。一律価格は製品として不成立、458 seller は承認 458 回と単一 registry 配列の肥大を招くため、両極を採らず tier 分割にする。tier 内の vertical 別収益は :by-path が担う。decision §4c 参照\"}
+    {:gap \"kernels/envelope に .kotoba/wasm twin が無い — 他の 5 kernel は全て持っている\"
+     :cost \"完全な twin は4点セットを要する: (1) 手書きの .kotoba-bundle（baked-in case の main battery 付き）(2) scripts/split-kotoba-kernels.bb で生成する *_part_NN.kotoba (3) checked-in の wasm/kernels/*.wasm (4) kernels/wasm-host-test.cljs への登録（Node の WebAssembly.instantiate で main() を呼び .cljc の battery-pass-count と一致を assert）。この parity 検査こそが『同じ判断が wasm で走る』を検証済みの主張にしている\"
+     :blocker \"splitter が scripts/split-kotoba-kernels.bb であり、ADR-2607173000 が bb を script host として退役させている。着手前に nbb 移植か既存例外扱いかの判断が要る（x402 kind の allowlist 拡張が `bb emit-kernel-wasm` を要するのと同じ問題）\"
+     :note \"battery と parity 検査を伴わない手書き bundle は追加しない。支出上限の未検証な第二実装は、実装が1つだけの状態より悪い —— wasm 経路が担保されていると呼び出し元に誤認させる。2026-08-01 に envelope.cljc の docstring へ同趣旨を明記した\"}
+    {:gap \"tier 構成は settlements KV の欠損リスクを悪化させる\"
+     :impact \"settlement が少数 key に集中するので、CAS 無し read-modify-write の last-write-wins が当たる確率が上がる。LP 配当を出すなら DO 直列化は必須の前提条件になる\"}
+    {:gap \"どの vertical をどの tier に置くかの基準が無い\"
+     :note \"規制業種と小売業種で agent run の価値が違うという定性的な理由までは言えるが、tier 境界を引く実測データ（vertical 別の支払意思・原価）は存在しない。外部有償 0 の現状では測れない\"}]"
+
+  :adr/body
+  "# ADR-2607321200: vertical liquidity pool — AMM で初期駆動する分散型 SaaS
+
+## 一行で
+
+**AMM は分配機構ではなく資本形成機構として使う。** LP が vertical pool に資本と情報を lock し、AI agent がその原資で事業を運用し、取引収入が LP に還る。**そして agent が同意を得るべき単位は個々の支払いではなく envelope（予算枠）である。**
+
+## curve はどこに貼るか
+
+| 貼る対象 | 希少か | cold start か | 判定 |
+|---|---|---|---|
+| blueprint への**アクセス** | 非競合財。1万回 serve しても減らない | 価格は既に $0.01/req | **貼らない** |
+| その vertical の**収益請求権** | 有限。100% を分けたら減る | 458 の非流動 micro-market | **貼る** |
+
+後者は Uniswap が実際に解いた問題そのものである。458 個の極小市場それぞれに板を立てて対手方を待たせることはできない。
+
+## cloud-itonami の資金統治は murakumo のそれとは別物である
+
+`kekkai` の `:treasury/release` は **murakumo の witness treasury** の話であって、cloud-itonami の話ではない（実測: `orgs/cloud-itonami/` 全 1155 repo で kekkai 使用 0 件、`:treasury/release` の消費者は `murakumo/overlay/witness_treasury.clj` と net-kotobase テストのみ）。
+
+cloud-itonami の実 substrate は `cloud.itonami.app.authority` の背骨であり、**4つの不変条件**を持つ: ORDER（pre-check 済みのものにしか同意を求めない）/ CONTENT BINDING（材料の digest を review 時に取り finish で再検証）/ 2つの gate は代替しない（Passkey consent は licence ではなく、governor clearance は consent ではない）/ SINGLE USE（承認は高々1回 commit）。
+
+## envelope 化で壊れるのは2つ
+
+**そのまま使えるのが 1 と 3、作り直しが要るのが 2 と 4 である。**
+
+- **CONTENT BINDING**: 今日 hash するのは「この支払い」。envelope の digest は **policy** を束縛し、個々の支出はその policy に対して決定論的に照合可能でなければならない。
+- **SINGLE USE**: envelope は本質的に多回使用。「派生する各支出認可が単回 + envelope 自身が replay 不能な単調カウンタを持つ」と言い直さないと、**envelope が静かに不変条件4を廃止する。**
+
+内側の gate は既に正しい形で存在する —— `authority.payment` の funds check は純粋で、必要な事実は全部 server-computed で、**人間に聞く前に**拒否する。
+
+## 最も危険な近道
+
+`authority.payment` の docstring が攻撃を名指ししている:
+
+> `authority.api` が5つ全部を**上書きする**ので、client が `{:balance {...}}` を送って自分の承認を買うことはできない。
+
+**LP 資金で動く operating agent は、まさにその client である。** envelope 実装で agent に自分の残高を渡させるのは楽で（採点 0.95、最高位）、その1点で pre-check が意味を失う。**この式は leverage を測っていて safety を測っていない。**
+
+## 天井 — 今日この app は金を動かせない
+
+`authority.clj`「commit! はそれ自体が propose-only の actor に渡す……カードが発行されたという意味ではない」／`payment_settlement_actor`「銀行資格情報も送金 endpoint も持たない」／`authority.payment`「送金そのものは人間が自分の銀行で行う」／`funding.clj`「このアプリに銀行コネクタは無い」。
+
+**したがって今日「agent がビジネスを運用する」は「agent が governed record を書く」を意味する。** envelope は「記録ごとに人間を呼ばない」を解錠するが、**actuation は別の、意図的に存在しない部品である。**
+
+さらに `funding.clj` は「残高は人間が銀行を読んで記録する」を前提にしており、`:never-recorded` と `:stale` はどちらも数値ではなく拒否を返す。**LP pool の reserve は機械可読な残高**であり、この app にとって初めて由来の違う funding account になる。鮮度は上がるが、意図的に選ばれた拒否を1つ弱めることになる。
+
+## 信念で burn を増やさない — θ(v)
+
+```
+θ(v) = clamp( seed_floor/capital,  k · realized_revenue(v)/capital,  θ_max )
+```
+
+実績 0 なら LP 資本の 90%以上が reserve に残る（$1,000 に対し envelope $77）。**実際に稼いだ額でしか agent の burn 枠は増えない。**
+
+seed floor は実測で建てる。ADR-2607302100 の shiropico キャンペーンが実支出 ¥2,376（$15.33）→ 16,958 imp / 134 clicks / **0 conversions**（0/134 の 95% 上限 2.21%）。0 コンバージョンは失敗の記録ではなく、**LP 資本が今日買えるものの唯一の実測値**である。
+
+## 数字の二重性
+
+**vertical 単位では現実的**: $1,000 の LP を 20%/yr、ω=0.2 で回すには年 gross $1,000 —— 有償 2.1 席（$40/月と仮定）。
+
+**fleet 全体では venture 規模**: 458 × $1,000 = $458,000 に対し年 $458,000 の gross が要り、今日の実測 $513.09/yr の **893 倍**。
+
+平らにしない。1つ立てるのは現実的で、458 立てるのは賭けである。
+
+## 順序 — curve は最後でよい
+
+step 1–6 は curve 無しで実行でき、無しでも意味を持つ。step 3–4 が終われば「予算枠の中で agent が提案し、全件が台帳に残り、burn は実績で gate される」状態になる。**LP を入れる前に運用実績を作る構成**であり、curve をその上に載せれば価格が信念だけで決まらない。逆順にすると、実績 0 の agent に他人の資金を渡すところから始まる。
+
+## 隠さないこと
+
+**step 8（curve と share の発行）は、本日 accepted の ADR-2607320500 の中心決定を反転させる要求である。** あの ADR は custody を弁護士待ちにせず設計で回避し、protocol fee すら invoice で取ると決めた。curve が USDC reserve を持つことは、そこで避けた当のものである。
+
+両立の道は1つ —— invoice 型を LP 分配にも適用する（AWAI が全額受領 → LP へ債務として支払う）。custody は開かないが、LP が持つのは pool の持分ではなく AWAI への債権になり、**Uniswap との類似はかなり薄まる**。これは設計判断ではなく法的性質決定である。"}]

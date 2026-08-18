@@ -1,0 +1,208 @@
+[{:db/id -1
+  :adr/id "adr-2608019100-superproject-reshallowed-every-six-hours-by-a-launchd-tick"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "accepted"
+  :adr/date "2026-08-01"
+  :adr/last_verified "2026-08-01"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/title "ADR-2608019100: superproject を6時間ごとに shallow へ戻していたのは launchd の qwen36 tick だった — ADR-2607211600 の unshallow が定期的に取り消されていた"
+  :adr/topic "superproject-reshallow-launchd-tick"
+  :adr/repos ["orgs/com-junkawasaki/root"]
+
+  :adr/authoritative_for
+  ["superproject が繰り返し shallow に戻る現象の原因（`~/.gftd/run-itonami-qwen36-tick.cljs` の `git fetch --depth 1 origin main`、launchd StartInterval 21600 秒＝6時間）"
+   "その症状の一覧: `fatal: refusing to merge unrelated histories` / 巨大な ahead カウント / west pin guard による push の誤ブロック。いずれも本物の乖離ではない"
+   "**バージョン管理外のスケジュール実行スクリプトも ADR-2607211600 の shallow 禁止に従う**という適用範囲の確認"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+
+  :adr/related
+  ["90-docs/adr/2607211600（shallow 既定の撤回と全 unshallow。本 ADR はその決定が定期的に取り消されていた事実を記録する）"
+   "90-docs/adr/2607172900（`~/.gftd/run-itonami-qwen36-tick.cljs` の設計 ADR。今回修正した当のスクリプト）"
+   "90-docs/adr/2607022900（west pin のサーバ側検証。この誤ブロックの被害側）"
+   "90-docs/adr/2607173000（bb の script host 退役。本件とは別だが、`~/.gftd/` 配下のスケジュール実行スクリプトが repo の規約から外れやすいという同じ構造の例）"]
+
+  :adr/problem
+  "**ADR-2607211600 は 2026-07-21 にオーナー判断で superproject を含む全リポを unshallow した。それが6時間ごとに取り消されていた。**
+
+### 観測
+
+| 時刻 | 状態 |
+|---|---|
+| 2026-07-31 20:42 | `.git/shallow`（6 graft）。手動 unshallow |
+| 2026-08-01 02:43 | `.git/shallow`（1 graft）。再発。手動 unshallow |
+
+間隔は約6時間。
+
+### 症状 —— どれも「本物の乖離」に見える
+
+- `git merge --ff-only origin/main` → **`fatal: refusing to merge unrelated histories`**
+- `git rev-list --left-right --count origin/main...HEAD` → **186 ahead / 10 behind** のような巨大な値
+- `git merge-base HEAD origin/main` → **何も返さない**（共通祖先が見えない）
+- **west pin guard（PreToolUse）が push を deny する** —— HEAD の west.yml が古く見えるため「pin 退行」と判定される
+
+**サーバ側で見れば全て健全だった。** 実測2回とも `gh api compare` は `status: \"ahead\" / behind_by: 0 / merge_base = 自分の HEAD`、つまり純粋な fast-forward である。
+
+CLAUDE.md はこの偽陽性を既に文書化している（『`unrelated histories` は、それ単独では本物の force-push と断定しない』）。しかし**原因が特定されていなかったので、遭遇するたびに診断からやり直していた。** 本 ADR 執筆中の2回とも、push が実際にブロックされた。
+
+### 原因
+
+```clojure
+;; ~/.gftd/run-itonami-qwen36-tick.cljs
+(def root (str (.homedir os) \"/github/com-junkawasaki\"))   ; ← superproject そのもの
+(sh \"git fetch --depth 1 origin main\" {:cwd root})          ; line 91
+(sh \"git fetch --depth 1 origin main\" {:cwd wt})            ; line 116（superproject の worktree）
+```
+
+`com.gftd.itonami-qwen36-tick.plist` の `StartInterval` は **21600 秒 = ちょうど6時間**で、観測間隔と一致する。
+
+`git fetch --depth 1` は fetch のたびに新しい shallow graft（親情報を持たない境界コミット）を作る。**これは ADR-2607211600 が撤回した当の機構であり、同 ADR が『触るたびに新しい shallow graft を作り続けていたことが偽陽性の根本原因だった』と名指ししている挙動そのものである。** west の `clone-depth` は撤去されたが、同じことをする別の経路が残っていた。
+
+### なぜ見つかりにくかったか
+
+**このスクリプトはバージョン管理外である**（`~/.gftd/`）。repo 内の grep では出てこず、ADR-2607211600 の unshallow 作業でも視野に入らなかった。`manifest/west.yml` の `clone-depth` は 0 件、superproject の git config にも depth 設定は無く、**repo の中だけを見る限り原因は存在しなかった。**"
+
+  :adr/decision
+  "### 1. 該当2行から `--depth 1` を外す
+
+```clojure
+(sh \"git fetch origin main\" {:cwd root})   ; ADR-2607211600: shallow 禁止
+(sh \"git fetch origin main\" {:cwd wt})     ; ADR-2607211600
+```
+
+理由は帯域ではなく **ancestry の正しさ**である（ADR-2607211600 の判断そのもの: disk/帯域コストより ancestry の正しさを優先する）。このスクリプトが取得するのは `origin/main` の1ブランチだけで、superproject は既に full 履歴を持っているため、増分 fetch のコストは無視できる。
+
+### 2. ADR-2607211600 の適用範囲を確認する — **バージョン管理外のスクリプトも対象**
+
+`~/.gftd/` 配下のスケジュール実行スクリプトは repo の外にあるため、repo 内の規約検査（hook / lint / grep）が一切届かない。**それでも同じ規約に従う。**
+
+これは ADR-2607173000（bb の退役）が `~/.gftd/` のスクリプトについて同じ構造の問題に直面しているのと同型であり、**「repo の外で動くが repo を触るもの」という一群が、規約の死角になっている**ことを示している。
+
+### 3. 症状を見たら原因を再診断せず本 ADR を引く
+
+`unrelated histories` / 巨大な ahead / `merge-base` 空 / west pin guard の誤 deny を見たら:
+
+```bash
+git rev-parse --is-shallow-repository     # true なら本件
+git fetch --unshallow origin main         # 解消
+```
+
+**サーバ側の判定を先に取る**のが確実である:
+
+```bash
+gh api \"repos/com-junkawasaki/root/compare/<HEAD>...<origin/main>\" \\
+  --jq '{status,ahead_by,behind_by,merge_base:.merge_base_commit.sha}'
+```
+`status: ahead` / `behind_by: 0` / `merge_base == 自分の HEAD` なら純 fast-forward であり、ローカルの表示が壊れているだけである。"
+
+  :adr/implementation
+  "{:done
+    [{:what \"原因の特定\"
+      :how \"launchd の全 plist から superproject root を cwd にするジョブを抽出（6件）→ 実行スクリプトを解決 → `--depth`/`shallow` で grep → 3件ヒット → cwd が superproject なのは run-itonami-qwen36-tick.cljs のみと確認 → plist の StartInterval 21600 が観測間隔と一致\"
+      :ruled-out \"west（manifest/west.yml に clone-depth 0 件、.west/config は local manifest）/ superproject の git config（depth 設定なし）/ global・system の git config（fetch.writeCommitGraph のみ）/ 他の launchd ジョブ（mail-drain・expiry-alert 等は別リポ orgs/gftdcojp/cloud-itonami で動く）\"}
+     {:what \"修正\"
+      :where \"~/.gftd/run-itonami-qwen36-tick.cljs 91行目・116行目\"
+      :change \"`git fetch --depth 1 origin main` → `git fetch origin main`（両方）。ついでに私が触った行の冗長な (str \\\"...\\\") を外した\"
+      :backup \"~/.gftd/run-itonami-qwen36-tick.cljs.bak-20260801\"
+      :verified \"clj-kondo で parse 通過（残る error 1件は ns 名とファイル名の既存不一致で本件と無関係）。実行はしていない —— このスクリプトは末尾に (-main) を持ち、読み込むと worktree 作成と push が走るため\"}]
+    :not-done
+    [{:what \"スクリプト自体の実走確認\"
+      :why \"末尾の (-main) により読み込み＝実行であり、worktree 作成・branch push・server-side merge が起きる。次の定期実行（最大6時間後）で自然に検証される\"}
+     {:what \"`~/.gftd/` 配下の他スクリプトの同種監査\"
+      :why \"run-innen-tick.cljs と run-fleet-ci-murakumo-tick.cljs も --depth を持つが、前者は自前 CLI の引数、後者は cwd が sip-checkout（superproject ではない）。superproject を shallow 化するのは今回の1件のみと確認済みだが、他リポへの影響は見ていない\"}]}"
+
+  :adr/known-gaps
+  "[{:gap \"`~/.gftd/` のスクリプトはバージョン管理外で、repo の規約検査がまったく届かない\"
+     :impact \"本件も ADR-2607173000 の bb 退役も、この死角で規約から外れた。hook・lint・grep のいずれも repo の外は見ない\"
+     :note \"これらを repo に取り込むか、少なくとも一覧と規約適合の点検経路を作るかは別の決定。本 ADR では提起のみ\"}
+    {:gap \"（解消 2026-08-01）run-fleet-ci-murakumo-tick.cljs の `git fetch origin --depth 1`\"
+     :resolved \"**実際に west 管理下の子リポを潰していた。** cwd の sip-checkout は `orgs/com-junkawasaki/org-spirit-in-physics-comics` で、west.yml に登録済みの project である。実測: shallow=true / graft 3 / **到達可能 commit が 1 件**（ADR-2607211600 が superproject で測った『reachable commit はわずか2件』と同じ病理）。同 plist も StartInterval 21600 秒＝6時間\"
+     :impact \"west pin のローカル到達性検証が原理的に不可能な状態だった。さらに同スクリプトは直後に `git fetch origin <sha>` を行っており、shallow な repo に対する特定 sha の fetch は新しい graft を積む\"
+     :fix \"`--depth 1` を除去（backup: run-fleet-ci-murakumo-tick.cljs.bak-20260801）。clj-kondo parse 通過。checkout も unshallow し、**到達可能 commit 1 → 56** を確認\"}
+    {:gap \"（除外）run-innen-tick.cljs の `--depth`\"
+     :resolved \"git ではない。`innen record tick` CLI の引数であり本件と無関係\"}
+    {:gap \"`~/.gftd/` で git を fetch するスクリプトは2件あり、**2件とも** ADR-2607211600 に違反していた\"
+     :note \"母数が2で違反が2。偶発ではなく、この死角に置かれたスクリプトは repo の規約から外れるのが既定だと考えるべき\"}
+    {:gap \"（完全に解消 2026-08-01）修正の実効 — **両方とも本番で検証済み**\"
+     :fleet-ci-murakumo \"修正 04:34 → log 最終更新 05:29（修正後に実走）→ `org-spirit-in-physics-comics` は shallow=false のまま\"
+     :qwen36 \"修正 04:05 → **08:43 に実走**（予測 02:43 + 21600 秒と一致）→ superproject は shallow=false、`.git/shallow` は存在せず、**到達可能 commit 18,209**。修正前ならこの実行で再び潰れていた（07-31 20:42 と 08-01 02:43 で実際にそうなっていた）\"
+     :script-health \"編集後に初めて走った実行で、tick は正常終了している —— `landed on main: d28861c6a1d8` の後 `=== run end`、launchctl の最終終了コード 0。ログ先頭の `Could not find namespace: kotobase.client` は **116 run 中 144 回**出現する長期の既存事象で、git fetch のフラグ2箇所しか触っていない本修正とは無関係\"}
+    {:gap \"検査は landing したが、どこからも呼ばれていない\"
+     :note \"`scripts/audit-gftd-scripts.cljs`（ed8f6ef2）は手で実行する読み取り専用レポータ。hook にも CI にも繋いでいない —— 繋ぐ判断は owner のもので、かつ現在 3 件の既知違反（`.sh` × 3、うち 2 件 launchd 稼働中）があるため、繋げば即座に落ちる\"}]"
+
+  :adr/body
+  "# ADR-2608019100: superproject を6時間ごとに shallow へ戻していたもの
+
+## 一行で
+
+**ADR-2607211600 が 2026-07-21 に行った unshallow は、バージョン管理外の launchd スクリプトによって6時間ごとに取り消されていた。**
+
+## 症状はすべて「本物の乖離」に見えた
+
+`fatal: refusing to merge unrelated histories` / 186 ahead / `merge-base` が空 / **west pin guard が push を deny**。
+
+**サーバ側で見れば毎回健全だった** —— `status: ahead` / `behind_by: 0` / `merge_base == 自分の HEAD`、純粋な fast-forward。CLAUDE.md はこの偽陽性を文書化していたが、**原因が未特定だったので遭遇のたびに診断からやり直していた。** 本 ADR を書くまでに、実際に push が2回ブロックされている。
+
+## 原因
+
+```clojure
+(def root (str (.homedir os) \"/github/com-junkawasaki\"))   ; superproject
+(sh \"git fetch --depth 1 origin main\" {:cwd root})
+```
+
+launchd の `StartInterval` は **21600 秒 = ちょうど6時間**。観測間隔と一致する。
+
+`--depth 1` は fetch のたびに新しい shallow graft を作る —— **ADR-2607211600 が撤回した当の機構**で、同 ADR が偽陽性の根本原因として名指ししている挙動そのものである。west の `clone-depth` は撤去されたが、**同じことをする別の経路が残っていた。**
+
+## なぜ2回も見つけられなかったか
+
+**このスクリプトは repo の外にある。**
+
+`manifest/west.yml` の `clone-depth` は 0 件。superproject の git config にも global config にも depth 設定は無い。**repo の中だけを見る限り、原因は存在しなかった。** 私は2回、repo の中だけを見て「原因未特定」と報告した。
+
+3回目に launchd から逆に辿って見つかった。**「repo の外で動くが repo を触るもの」は、hook も lint も grep も届かない死角である** —— ADR-2607173000 の bb 退役が `~/.gftd/` で同じ構造の問題に当たっているのと同型。
+
+## 次にこの症状を見たら
+
+原因を再診断しない。
+
+```bash
+git rev-parse --is-shallow-repository   # true なら本件
+git fetch --unshallow origin main       # 解消
+```
+
+迷ったらローカルではなくサーバに聞く:
+
+```bash
+gh api \"repos/<org>/<repo>/compare/<HEAD>...<origin/main>\" \\
+  --jq '{status,ahead_by,behind_by,merge_base:.merge_base_commit.sha}'
+```
+
+## 同じ死角にもう1件あった（2026-08-01、同日追記）
+
+`~/.gftd/` で **git を fetch するスクリプトは2件**あり、**2件とも**同じ違反をしていた。
+
+`run-fleet-ci-murakumo-tick.cljs` は `orgs/com-junkawasaki/org-spirit-in-physics-comics`（west 登録済みの子リポ）を `--depth 1` で fetch していた。実測すると **到達可能 commit が 1 件** —— ADR-2607211600 が superproject で測った「reachable commit はわずか2件」と同じ状態である。west pin のローカル到達性検証が原理的にできない。しかも同スクリプトはその直後に `git fetch origin <sha>` を行っており、shallow な repo に特定 sha を足す操作は graft をもう1つ積む。
+
+同じく `--depth 1` を外し、checkout を unshallow した（**到達可能 commit 1 → 56**）。plist の間隔も同じく 21600 秒。
+
+**母数が2で違反が2である。** 偶発ではない。この死角に置かれたスクリプトは、repo の規約から外れるのが既定だと考えるべきである。
+
+（`run-innen-tick.cljs` の `--depth` は `innen record tick` CLI の引数で git ではない。除外。）
+
+## 検証完了（2026-08-01）
+
+**両方とも本番の定期実行で確認した。** 手で走らせず、実際のスケジュール実行を待った —— 両スクリプトとも末尾に `(-main)` を持ち、読み込みが即実行（worktree 作成・push）になるため。
+
+| tick | 修正 | 実走 | 結果 |
+|---|---|---|---|
+| fleet-ci-murakumo | 04:34 | 05:29 | `org-spirit-in-physics-comics` は shallow=false のまま |
+| qwen36 | 04:05 | **08:43** | superproject は shallow=false、`.git/shallow` 無し、**到達可能 commit 18,209** |
+
+qwen36 の実走時刻は予測（02:43 + 21600 秒）と一致した。**修正前なら、この実行がまさに superproject を再び潰していた** —— 07-31 20:42 と 08-01 02:43 で実際にそうなっていたのがそれである。
+
+編集後の初回実行で tick 自体も正常終了している（`landed on main: d28861c6a1d8` → `=== run end`、終了コード 0）。ログ先頭の `Could not find namespace: kotobase.client` は 116 run 中 144 回出る長期の既存事象で、git fetch のフラグ2箇所しか触っていない本修正とは無関係である。"}]

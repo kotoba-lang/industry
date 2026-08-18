@@ -1,0 +1,110 @@
+[{:db/id -1
+  :adr/id "adr-2608056000-kotodama-kototama-consolidation"
+  :adr/doc_type "adr"
+  :adr/topic "kotodama-kototama-consolidation"
+  :adr/title "ADR-2608056000: kotodama を kototama に統合する（オーナー判断。ADR-2607050900 の「機能重複なし」認定を supersede）"
+  :adr/status "accepted"
+  :adr/date "2026-08-05"
+  :adr/last_verified "2026-08-05"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/supersedes ["adr-2607050900-kotoba-lang-naming-audit"]
+
+  :adr/repos ["orgs/kotoba-lang/kototama"
+              "orgs/kotoba-lang/kototama-cljc-contract"
+              "orgs/kotoba-lang/kotodama"
+              "orgs/kotoba-lang/kotodama-cells"
+              "orgs/kotoba-lang/kotodama-holochain"
+              "orgs/kotoba-lang/kotodama-host"
+              "orgs/kotoba-lang/kotodama-mcp"
+              "orgs/kotoba-lang/kotodama-py"
+              "orgs/etzhayyim/root"
+              "orgs/etzhayyim/com-etzhayyim-unspsc"
+              "orgs/network-awai/local-manimani"]
+
+  :adr/body
+  "## Decision
+
+**オーナー判断（2026-08-05）: 「kotodama は古い、最新は kototama です」。kotodama を
+kototama に統合する。**
+
+この判断は、下記の Context のとおり **accepted な ADR-2607050900 と kotodama repo の
+README が明示している内容と食い違う**。オーナーに測定結果を提示したうえで再確認を得た
+判断なので、ADR-2607050900 の該当認定（「機能重複なし・romanization の分裂だけ」）を
+**supersede** する。経緯を消さないために、反証として提示した測定を Context に残す。
+
+## Context — この決定に反する既存の記録（消さずに残す）
+
+cleanup 中に west-orphan の blocking edge `orgs/com-junkawasaki/kotodama` を追った過程で
+測定した内容:
+
+- **ADR-2607050900（status: accepted）** は `kotodama*` と `kototama*` を
+  「**undocumented romanization split**」と分類し、両側を直接確認したうえで
+  **機能重複は無い**と結論している。
+- **kotodama/README.md** はこの ADR を受けて明示的な注記を持つ:
+  『Not to be confused with kotoba-lang/kototama — both names romanize the same word
+  (言霊/言魂), \"kotodama\" と \"kototama\" は同じ漢字の実在する 2 つの読みであって
+  typo ではない。ただし repo の scope は無関係』。
+- **scope は実際に異なる**:
+  - `kototama` = Kotoba Wasm/Component 実行ランタイム（`tender` / `contract` /
+    `linker` / `guest`）。GitHub description: \"clojure-wasm-runtime\"。
+  - `kotodama` = functional-organism ランタイム（`life` / `organism` / `react`）。
+    README の layer 図では kotoba 基盤の上、concrete actor の下。
+- **どちらも生きている**: kototama pushed 2026-08-05、kotodama pushed 2026-08-04、
+  archived=false。
+- **namespace は排他**: `kotodama.life` / `kotodama.organism` / `kotodama.react` は
+  kototama 側に存在しない。
+
+したがって「古い/新しい」の関係ではなく、**同語の 2 読みが別スコープに割り当てられて
+いた**状態だった。オーナーはこれを承知のうえで統合を選択した。
+
+## 測定済みの blast radius（2026-08-05 実測）
+
+素の `rg kotodama orgs/` は **1,913 ファイル**を返すが、その大半は `com-*` clean-room
+actor 群の README/文字列（\"backed by Datomic and Py Kotodama WASM\" 等）であって
+コード結合ではない。**実際の結合は 2 桁**:
+
+| 種別 | 件数 | repo 数 |
+|---|---|---|
+| `kotodama.(life\\|organism\\|react)` の namespace 結合 | **21 ファイル** | **5** |
+| `deps.edn` 中の kotodama 座標 | **22 ファイル** | **12** |
+| west 登録された `kotodama*` repo | 6（`kotodama` `-cells` `-holochain` `-host` `-mcp` `-py`） | — |
+| west 登録された `kototama*` repo | 2（`kototama` `kototama-cljc-contract`） | — |
+
+namespace 結合を持つ 5 repo: `kotoba-lang/kotodama`（本体）/
+`com-junkawasaki/kotodama`（path-override leftover、退役対象）/ `etzhayyim/root` /
+`etzhayyim/com-etzhayyim-unspsc` / `network-awai/local-manimani`。
+
+## 統合の形 — repo 統合を先、namespace 改名は後
+
+**Phase 1（低リスク・consumer 無変更）**: `kotodama` の source を `kototama` repo に
+取り込み、**namespace は `kotodama.*` のまま維持**する。consumer 側は dep 座標だけを
+`kototama` に向け替える。既存の `kototama.*` namespace と衝突しないので、この段階で
+ビルドが壊れる経路が無い。`kotodama*` repo は superseded として README に後継を明記。
+
+**Phase 2（別 ADR。今回は実施しない）**: `kotodama.*` → `kototama.*` の namespace 改名。
+21 ファイル / 5 repo を同時に動かす必要があり、`etzhayyim/root` と
+`com-etzhayyim-unspsc`（UNSPSC 18,342 actor の organism ランタイム）を巻き込むため、
+実施するなら独立した ADR と staged rollout を立てる。
+
+**理由**: 「統合」を namespace 改名から始めると、consumer 5 repo が同時に壊れる窓が
+できる。repo を先に 1 本化しておけば、改名は後からいつでも、壊れた場合の巻き戻しも
+1 repo で済む。
+
+## Consequences
+
+- ADR-2607050900 の naming-audit のうち **kotodama/kototama に関する認定のみ**が失効する。
+  同 ADR の IPLD/Datomic/IPNS/IPFS/Clojure-stdlib クラスタに関する認定は有効なまま。
+- `kotodama/README.md` の「Not to be confused with kototama」注記は、統合後は誤りになる
+  ため Phase 1 で書き換える。
+- Phase 1 完了までは `kotodama.*` namespace が正であり、consumer は改名しない。
+  **この ADR を根拠に個別 repo で先走って namespace を書き換えないこと。**
+
+## Provenance
+
+2026-08-05 の cleanup セッション（`git-cleanup-conflict`）で、west-orphan blocking edge
+`orgs/com-junkawasaki/kotodama` を追った過程で発見・提起。blocking edge 自体は
+kotodama/kototama とは無関係で、`network-awai/local-manimani` の checkout が
+origin/main から 31 commit 遅れていただけだった（upstream は既に
+`../../kotoba-lang/kotodama` を指していた）。同 checkout を同期して解消済み。"}]

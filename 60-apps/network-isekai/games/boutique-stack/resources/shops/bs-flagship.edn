@@ -1,0 +1,94 @@
+;; Boutique Stack — the flagship shop.
+;;
+;; Positions are integers, one unit = 1 cm, one floor tile = 100 units. The
+;; floor runs roughly 900 x 1400, with the entrance at the bottom and the
+;; departments stacked away from the door in the order they unlock.
+;;
+;; The shoe department sits furthest from the till on purpose: it is the last
+;; unlock and the most valuable stock, so it should also be the longest walk.
+{:shop/id "bs-flagship"
+ :shop/name "Boutique Stack"
+ :shop/seed 20260808
+ :shop/tick-rate 20
+ :shop/starting-money 0
+ :shop/spawn-interval 60
+ :shop/max-customers 20
+
+ :shop/zones
+ [{:zone/id :front
+   :zone/name "Front of house"
+   :zone/cost 0
+   :zone/requires #{}
+   :zone/entry [450 1300]}
+
+  {:zone/id :dept-tops
+   :zone/name "Tops"
+   :zone/cost 0
+   :zone/requires #{}
+   :zone/entry [450 1000]}
+
+  {:zone/id :dept-outerwear
+   :zone/name "Outerwear"
+   ;; Costs tuned against `shift.cljs`, not by feel: at 900/2400 both
+   ;; departments opened within a minute of each other and the shop was
+   ;; finished by minute 9 of a 20-minute session.
+   :zone/cost 1400
+   :zone/requires #{:dept-tops}
+   :zone/entry [450 700]}
+
+  ;; 服屋のアンロックで靴も — shoes are the far end of the same shop, not a
+  ;; separate store. Both clothing departments come first.
+  {:zone/id :dept-shoes
+   :zone/name "Shoes"
+   :zone/cost 9000
+   :zone/requires #{:dept-tops :dept-outerwear}
+   :zone/entry [450 400]}]
+
+ :shop/fixtures
+ [{:fixture/id :entrance :fixture/kind :entrance :fixture/zone :front
+   :fixture/pos [450 1400]}
+  {:fixture/id :exit :fixture/kind :exit :fixture/zone :front
+   :fixture/pos [450 1400]}
+
+  {:fixture/id :till-1 :fixture/kind :checkout :fixture/zone :front
+   :fixture/pos [250 1200]}
+  {:fixture/id :till-2 :fixture/kind :checkout :fixture/zone :front
+   :fixture/pos [650 1200]}
+
+  ;; Tops — open from the first minute.
+  {:fixture/id :crate-tee :fixture/kind :crate :fixture/zone :dept-tops
+   :fixture/item :tee :fixture/capacity 30 :fixture/refill-ticks 24
+   :fixture/pos [150 900]}
+  {:fixture/id :rack-tee-1 :fixture/kind :rack :fixture/zone :dept-tops
+   :fixture/item :tee :fixture/capacity 10 :fixture/pos [450 950]}
+  {:fixture/id :rack-tee-2 :fixture/kind :rack :fixture/zone :dept-tops
+   :fixture/item :tee :fixture/capacity 10 :fixture/pos [750 950]}
+  {:fixture/id :crate-hoodie :fixture/kind :crate :fixture/zone :dept-tops
+   :fixture/item :hoodie :fixture/capacity 24 :fixture/refill-ticks 36
+   :fixture/pos [150 1050]}
+  {:fixture/id :rack-hoodie-1 :fixture/kind :rack :fixture/zone :dept-tops
+   :fixture/item :hoodie :fixture/capacity 8 :fixture/pos [450 1080]}
+
+  ;; Outerwear — first unlock.
+  {:fixture/id :crate-jacket :fixture/kind :crate :fixture/zone :dept-outerwear
+   :fixture/item :jacket :fixture/capacity 20 :fixture/refill-ticks 40
+   :fixture/pos [150 600]}
+  {:fixture/id :rack-jacket-1 :fixture/kind :rack :fixture/zone :dept-outerwear
+   :fixture/item :jacket :fixture/capacity 8 :fixture/pos [450 650]}
+  {:fixture/id :crate-coat :fixture/kind :crate :fixture/zone :dept-outerwear
+   :fixture/item :coat :fixture/capacity 16 :fixture/refill-ticks 60
+   :fixture/pos [150 750]}
+  {:fixture/id :rack-coat-1 :fixture/kind :rack :fixture/zone :dept-outerwear
+   :fixture/item :coat :fixture/capacity 6 :fixture/pos [750 650]}
+
+  ;; Shoes — the last unlock, and the longest walk back to the till.
+  {:fixture/id :crate-sneaker :fixture/kind :crate :fixture/zone :dept-shoes
+   :fixture/item :sneaker :fixture/capacity 20 :fixture/refill-ticks 48
+   :fixture/pos [150 300]}
+  {:fixture/id :rack-sneaker-1 :fixture/kind :rack :fixture/zone :dept-shoes
+   :fixture/item :sneaker :fixture/capacity 8 :fixture/pos [450 350]}
+  {:fixture/id :crate-boot :fixture/kind :crate :fixture/zone :dept-shoes
+   :fixture/item :boot :fixture/capacity 14 :fixture/refill-ticks 72
+   :fixture/pos [150 450]}
+  {:fixture/id :rack-boot-1 :fixture/kind :rack :fixture/zone :dept-shoes
+   :fixture/item :boot :fixture/capacity 6 :fixture/pos [750 350]}]}

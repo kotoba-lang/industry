@@ -1,0 +1,87 @@
+[{:db/id -1
+  :adr/id "adr-2608021330-engi-inbound-half-and-worker-measurement"
+  :adr/title "adr-2608021330: 受理側を実装し Worker で実測する — 「global を使うので動くはず」は主張であって測定ではない"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "engi-inbound-half-and-worker-measurement"
+  :adr/authoritative-for
+  ["engi の inbound 接続受理"
+   "受理側と発信側の方針同一性"
+   "Worker 上の transport 実測"
+   "engi-node の役割境界"]
+  :adr/related
+  ["adr-2608021230-engi-websocket-driver-and-peer-policy"
+   "adr-2608021130-engi-wire-codec-total-decode-and-identifier-mangling"
+   "adr-2608020330-torihiki-node-transport-durable-object-sequencer"]
+  :adr/evidence
+  ["https://engi-node.04-feasts-minded.workers.dev/head"
+   "https://github.com/kotoba-lang/engi-node"]
+  :adr/body
+  "# ADR-2608021330: 受理側と Worker 実測
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+ADR-2608021230 は driver を実装したが、2 つの穴を残した:
+
+1. **発信専用だった。** dial する側しか無く、**受理する側が無かった。**
+2. **「ブラウザと Worker では実測していない。global を使うので動くはずだが、それは主張であって測定ではない」**と自分で書いた。
+
+## Decision
+
+### 1. 受理側は**同じ方針**を走らせる
+
+`engi.net.server`。accepted peer にも**同じ有界キューと同じ strike 会計**を適用する。
+
+**敵対的 peer が「こちらに掛けてきた」というだけで安く済んではならない。** 独自の緩い規則を持つ server 経路は、注意深く書いた client が台無しになる典型的な道。
+
+runtime 差（DO は `addEventListener`、Node `ws` は `on`）は**引数として渡す**。差は単語 1 つで、それを隠すラッパーは引数より長い。
+
+### 2. Worker には受理側が要る
+
+**Durable Object は Node プロセスのように outbound WebSocket を保持できない。** よって Worker を含むメッシュは、**Worker が呼ばれる側である場合にのみ**成立する。
+
+### 3. 実測する
+
+`kotoba-lang/engi-node` を deploy し、nbb client から **実ネットワーク・実 TLS・Durable Object 越し**に接続:
+
+```
+live after dial : [:hub]
+client saw      : [[:hub :vote]]
+hub /head       : peers [\"peer-1\"], seen [{type \"new-view\"}]
+```
+
+**hub への問い合わせは socket が開いている間に行う。** 切断後に聞くと **eviction を測っているのであって transport を測っていない。**
+
+### 4. engi-node は validator ではない、と自分で言う
+
+pacemaker を走らせず vote も投じない。`/head` がそう応答する。**黙っているサービスはもう一方だと見なされる**（ADR-2608020330 と同じ規律）。
+
+## 実測が明らかにしたこと
+
+**切断後に `/head` を叩くと peer も記録も空。** open socket も pending request も無い Durable Object は evict されうる。**正しい挙動**であり、だからこそ接続中に測る。
+
+実 validator にとってはこれが意味を持つ: **peer 状態とそこから導かれるものは、永続化するか wake 時に再構築しなければならない。** engi-node は保つ価値のあるものを持たないので意図的にどちらもしない。
+
+## Consequences
+
+- (+) メッシュが成立しうる形になった（発信・受理の両方）。
+- (+) **Worker 実測が済んだ。** 前回の正直な穴が塞がった。
+- (−) **ブラウザでの実測はまだしていない。** 同じ global 経路だが、これも主張であって測定ではない——同じ言葉を 2 度書くのは、2 度目も測っていないという意味。
+- (−) **署名集約が無い。**
+- (−) engi-node は認証しない。誰でも接続できる。**peer 認証は witness-quorum の鍵に紐づくべきで、未接続。**
+- (−) DO の in-memory peer 状態は evict で消える。validator には不足。
+
+## 残りギャップ
+
+1〜6 完了。**7 は pacemaker・sync・wire・driver・受理側が完了**、署名集約とブラウザ実測が残り。8 bridge・監査。
+"}]

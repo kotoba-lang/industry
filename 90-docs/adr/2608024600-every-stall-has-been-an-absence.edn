@@ -1,0 +1,66 @@
+[{:db/id -1
+  :adr/id "adr-2608024600-every-stall-has-been-an-absence"
+  :adr/title "adr-2608024600: 停止はすべて「起きなかったこと」だった — 拒否を記録する 2 つの計器が、最後の 1 つを名指した"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "engi-refusal-instrumentation"
+  :adr/authoritative-for
+  ["engi の拒否記録（:last-proposal / :last-sync）"
+   "deploy 済み chain の残る 1 つの blocker"]
+  :adr/related ["adr-2608024500-views-converge-on-f-plus-one-evidence"]
+  :adr/evidence ["https://torihiki-validator.04-feasts-minded.workers.dev/head?w=w3"]
+  :adr/body
+  "# ADR-2608024600: 停止はすべて「起きなかったこと」だった
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## 拒否を記録する
+
+`handle-proposal` の 5 つの帰結のうち **4 つは message を出さない。** それは正しい —— **block を拒否する replica は、誰にも何も言わない** —— そして**読むものが何も残らない。**
+
+**このシステムの停止はすべて「起きなかったこと」だった。** そして**見つけるのに一番時間がかかったのは、分岐がすべて同じ沈黙を返す `cond` の中にあった不在。**
+
+- `:last-proposal` —— どの分岐が拒否したか（`no-parent` / `does-not-extend-its-parent` / `already-voted-at-this-height` / `locked-elsewhere` / `voted`）
+- `:last-sync` —— `engi.sync` の閉じた理由集合のどれが segment を拒否したか、何を提示され何を取ったか
+
+## 読み取り
+
+```
+  w1 tip 2  lastprop no-parent 225   sync: 2..2 提示 adopted 0  does-not-attach
+  w2 tip 2  lastprop already-voted   sync: 2..2 提示 adopted 0  does-not-attach
+  w3 tip 1  lastprop already-voted   sync: 2..2 提示 adopted 0  below-quorum
+  w4 tip 2  lastprop already-voted   sync: 2..2 提示 adopted 0  does-not-attach
+```
+
+**height 225 の提案が飛んでいる** —— **chain はどこかで走っている。走っていないのは「全員を連れて行くこと」。**
+
+**`does-not-attach` は無害。** sync-response が全員に broadcast されるので、**3 者が既に持っている block を提示され続けている** —— 無駄だが致命的ではない。**要求した相手にだけ答えれば直る。**
+
+## 効いているのは w3 の `below-quorum`
+
+`engi.sync` は segment 内の証明書に **「検証できた署名の quorum」** を要求する。**w3 は十分な数を検証できない** —— **必要としている block が、それを入れるための検査に拒否される。永久に追いつけない。**
+
+**これは鍵の可用性の問題。**
+
+## 依存グラフが 1 本間違っていた
+
+**G3（TOFU 鍵配布）を L0 の「依存も緊急性も無い」項目に置いていた。** 計器はそれが **critical path 上にある**と言っている —— **devnet の近道ではなく、この chain が動くこととの間に立っているもの。**
+
+## Consequences
+
+- (+) 拒否が読めるようになった（2 層とも）。
+- (+) 残る blocker が 1 つに絞られ、名前が付いた。
+- (+) 依存グラフの誤りが 1 本、測定で訂正された。
+- (−) chain は依然 4 者揃わない（どこかは height 225）。
+- (−) sync-response の broadcast は無駄（要求元に返すべき）。
+
+engi 222 tests / 1160 assertions、parity 不変、in-process harness は pass。
+"}]

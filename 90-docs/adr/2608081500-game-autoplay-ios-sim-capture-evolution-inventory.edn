@@ -1,0 +1,156 @@
+[{:db/id -1
+  :adr/id "adr-2608081500-game-autoplay-ios-sim-capture-evolution-inventory"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/topic "game-autoplay-ios-sim-capture-evolution-inventory"
+  :adr/title "ADR-2608081500: iPhone sim でゲームを自動プレイし、記録し、配信し、進化的に学習する経路の在庫 — 4 面とも実在した（ADR-2608082500 で実装済み）"
+  :adr/status "accepted"
+  :adr/date "2026-08-08"
+  :adr/last_verified "2026-08-08"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/repos ["com-junkawasaki/root"]
+
+  :adr/authoritative_for
+  ["この経路は **ADR-2608082500 で実装済み**（`kotoba-lang/shinka` + `kotoba-lang/loop-game-autoplay`）。本 ADR が authority なのは『4 面の正本がどこにあるか』であって、欠落の一覧ではない —— 在庫表は 2026-08-08 の実測の記録である"
+   "iOS Simulator の駆動面の正本は `kotoba-lang/shell`（`bin/kotoba-shell-host-ios`、`xcrun simctl spawn booted`）であり、新しい simulator bridge を各 app に生やさない"
+   "simulator の画面検査の正本は `kotoba-lang/hinshitsu`（`hinshitsu.mokushi` + `bin/hinshitsu-ios-visual-qa`、`hinshitsu.ios-visual.v0` receipt）であり、app 側には bundle ID と path を渡す薄い wrapper だけを置く"
+   "映像の合成・多重化の正本は `kotoba-lang/utsushi` + `org-iso-isobmff` / `org-iso-h264` / `org-iso-aac` / `org-ietf-opus`、完成物の各プラットフォームへの送出は `kotoba-lang/haishin`。ライブ配信（RTMP/WHIP）はどちらでもない"
+   "RL 環境と policy 探索の正本は `kotoba-lang/com-nvidia-isaac-lab`（旧 `kami-shugyo`、`shugyo.*`）、進化探索ループの実装参照は `kotoba-lang/sha256d` の `sha256d.evolve`"
+   "この経路のゲームは実質 web（isekai.network / app-aozora）であり、iOS 面は kotoba-shell の WKWebView ホストである。したがって「iPhone sim で自動プレイ」は設計上まず「WKWebView 内の web ゲームを叩く」問題であって、ネイティブ iOS ゲーム自動化の問題ではない"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+
+  :adr/related
+  ["adr-2608082500-game-autoplay-evolution-implementation"
+   "adr-2608081200-ios-publishing-capability-measured-state"
+   "adr-2608072000-kotoba-shell-mobile-signing-packaging-in-app-bridge"
+   "adr-2607091830-network-isekai-game-work-actors-app-aozora"
+   "adr-2607023000-ka-creative-craft-libs-isco-decomposition"
+   "adr-2606272200-utsushi-video-edn-filtergraph"
+   "adr-2607087500-kami-genesis-shugyo-nvidia-isaac-rename"
+   "adr-2606141500-keiei-arbor-coscientist-engine"
+   "kotoba-lang/shell"
+   "kotoba-lang/hinshitsu"
+   "kotoba-lang/utsushi"
+   "kotoba-lang/haishin"
+   "kotoba-lang/com-nvidia-isaac-lab"
+   "kotoba-lang/sha256d"
+   "cloud-itonami/gameka"
+   "cloud-itonami/cloud-itonami-jsic-3914"]
+
+  :adr/context
+  "オーナー質問（2026-08-08）「iphone sim を使ってゲームを自動的にプレイして、記録、動画配信、また遺伝的学習の train をする repo, actor は設計されている?」に答えるための在庫調査。
+
+この workspace は 4,138 project あり、checkout されていない repo は `ls` にも `find` にも `grep -r` にも映らない。したがって「無い」と答える前に索引を引く規則（CLAUDE.md「『無い』と結論する前に検索する」/「『無い』と言う前に索引を引く」）が効く場面そのものだった。実際、素朴に手元を見ただけなら 4 面すべてを「無い」と誤答していた —— **4 面とも在った**。
+
+調査手段と、それぞれが何を答えたか:
+
+- `nbb scripts/repo-search.cljs`（名前 + checkout 済み README）—— `game-play-uploader` `gameka` `games` `gameya` `media-gamers` `haishin` `com-twitch` `com-youtube` を出した。
+- `manifest/west.yml` の project 名の直接 grep —— `org-farama-gymnasium` `com-nvidia-isaac-lab` `youtube-upload` `kami-sensor-sim` を出した。**repo-search が名前だけで拾えなかったものがここに出た**（`com-nvidia-isaac-lab` は旧名 `kami-shugyo` で、名前にも README 冒頭にも『RL』『training』の語が無い）。
+- checkout 済みの README / CLAUDE.md に限定した `find | xargs grep`（orgs 全体の再帰 grep は 120 秒で返らず、背景実行しても空を返した）—— **`kotoba-lang/shell` と `kotoba-lang/hinshitsu` の iOS Simulator 面はここで初めて出た**。どちらも名前が機能を示さず（shell / 品質）、概念索引の語彙にも `ios` `simulator` `game` は無い。
+
+つまりこの問いは、既存の索引 3 本（repo-search / concept-lookup / surface）**どれ単独でも解けなかった**。"
+
+  :adr/decision
+  "## 現在地（2026-08-08 更新）— この在庫は実装済みである
+
+**同日 ADR-2608082500 でこの経路を実装した。** 下の在庫表と欠落 5 点は**当時の実測**であって現在地ではない。読む順は ADR-2608082500 が先である。
+
+| 欠落 | 現在地 |
+|---|---|
+| ① 入力注入 | **要件でなくなった** — agent channel をページ内に置き、ゲームが既に polling している key map に書く（`kotoba-lang/loop-game-autoplay` の `resources/autoplay-driver.js`）。Appium / WDA / XCUITest は導入していない |
+| ② 録画 | **閉じた** — 実機で 904.7 秒 / 318 MB / 35,719 frames、hinshitsu gate `:passed` |
+| ③ crossover を持つ GA | **閉じた** — `kotoba-lang/shinka` |
+| ④ 画面 → observation | **閉じない**（設計判断。observation は game state の 12 数値） |
+| ⑤ ライブ配信 | **閉じない**（範囲外と明示。成果物は mp4 で `haishin` に載せる） |
+
+**この ADR は「4 面の正本がどこにあるか」の authority としては引き続き有効**（shell / hinshitsu / utsushi+haishin / com-nvidia-isaac-lab+sha256d.evolve）。無効になったのは欠落の一覧だけである。
+
+なお本 ADR の consequences が挙げた懸念のうち 1 つは**実際に起きた**: 「どの構成要素も実際に繋いで動かしていない」——繋いだ結果、3 つの実バグ（Playwright の string page function が式評価される / パリティゲート自身の真空パス / 実機経路への引数形違い）が出た。詳細は ADR-2608082500 の verification。
+
+## 当時の決定（2026-08-08 の在庫時点）
+
+**1 本の repo / actor を新設しない。** 4 面はそれぞれ既存の正本を持っており、足りないのは面と面の間だけである。以下を在庫の正本とし、この経路に着手するときはここから始める。
+
+### ① iPhone Simulator の駆動 — `kotoba-lang/shell`
+
+`bin/kotoba-shell-host-ios` が `xcrun simctl spawn booted` 経由の bridge。`app scaffold` は XcodeGen で `project.yml` を生成し `xcodegen generate` を自分で走らせ、`app build` は booted Simulator への install + launch + WKWebView 実描画の screenshot まで CI で毎 push 検証している（README の Status 節が「real, verified」と明記、Android も emulator 実起動まで同様）。
+
+**実際に呼んでいる simctl subcommand は `spawn` / `list` / `launch` / `install` / `get` の 5 つだけ**（repo 全体を grep して実測）。
+
+### ② 記録 — `kotoba-lang/hinshitsu`
+
+`bin/hinshitsu-ios-visual-qa` が共有の実行契約: launch 成功を要求し、黒画面を拒否し、baseline に対して ImageMagick `compare -metric RMSE` を取り、hard timeout をかけ、`hinshitsu.ios-visual.v0` の JSON receipt を出す。app repo 側は bundle ID と path を渡す薄い wrapper だけを持つ。ライブラリ面は `hinshitsu.core`（evidence / gate / coverage）+ `hinshitsu.mokushi`（`capture!` / `compare!` / `check!` / `save-baseline!`）。
+
+baseline が無いとき `compare!` は `:failed` ではなく `:skipped` を返す —— 記録されたことのない検査に偽の失敗を作らない。
+
+### ③ 動画・配信
+
+| 面 | repo |
+|---|---|
+| 映像の EDN filtergraph | `kotoba-lang/utsushi`（映し。`kasane` の姉妹） |
+| コンテナ / ビットストリーム | `org-iso-isobmff` / `org-iso-h264` / `org-iso-aac` / `org-ietf-opus` |
+| HLS 再生の決定をデータとして | `kotoba-lang/hls` |
+| 完成物の多プラットフォーム送出 | `kotoba-lang/haishin`（配信。plan → execute、transport と credential は持たない） |
+| 実 upload client | `kotoba-lang/com-youtube` / `kotoba-lang/youtube-upload` |
+| Twitch | `kotoba-lang/com-twitch`（clean-room の *server* 実装） |
+
+### ④ 進化的学習
+
+- **`kotoba-lang/com-nvidia-isaac-lab`**（旧 `kami-shugyo` 修行、ADR-2607087500 で改名）—— Isaac Lab の `isaaclab.envs.ManagerBasedRLEnv` API-compat を狙う zero-dep `.cljc`。`shugyo.traits`（`RLEnv` / `VecRLEnv` protocol、`StepResult`）、`shugyo.policy`（`LinearPolicy`、`act-batch`、`evaluate`、`random-search` = ARS-lite trainer）、`shugyo.dr`（domain randomization）、`shugyo.cartpole` / `.reach` / `.ee-reach`。約 1,480 行。
+- **`kotoba-lang/sha256d` の `sha256d.evolve`** —— この workspace で**実際に回り切った唯一の進化探索ループ**。Generation / Reflection（benchmark 前の hard pass-fail フィルタ）/ Ranking（Elo を世代跨ぎで persist）/ Evolution（elite が落とした gene variant を mutation で再導入し早期収束を防ぐ）/ Meta-review。`docs/evolution-log.md` に 16 ラウンドの実測（採用 5 / 棄却 8 / 保留 1、結論は『単一ハッシュのスループットを動かしたのは per-operation の実行時オーバーヘッド除去だけ』）。
+- `kotoba-lang/org-farama-gymnasium`（中身は cartpole env の pure `.cljc`）、`kotoba-lang/ao`（artificial organism）、`90-docs/design-quality/coscientist.cljc`（同型の co-scientist loop）。
+
+### ⑤ ゲーム側
+
+`cloud-itonami/gameka`（gameSpec → playable runtime、`playtest/` は静的 HTML）、`kotoba-lang/game-production`（gameSpec 語彙・整合検査・バランス算術）、`cloud-itonami/cloud-itonami-jsic-3914`（ゲームソフトウェア業 blueprint: GameOpsAdvisor ⊣ GameProductionGovernor ⊣ ledger）、`network-isekai` の 31 games + `app-aozora` 上の Work Actor（ADR-2607091830）。
+
+## 欠けている 5 点（新規に書くならここだけ）
+
+1. **入力注入。** simctl に tap / swipe は無く、Appium / WebDriverAgent / XCUITest / idb はこの workspace に 1 件も存在しない（checkout 済み全 README + CLAUDE.md を grep して 0 件）。**自動プレイの一番手前が空いている。**
+2. **動画記録。** `simctl io booted recordVideo` を呼ぶコードが無い（`recordVideo` / `screenrecord` の grep が 0 件）。hinshitsu が持っているのは PNG 1 枚と RMSE 比較だけ。
+3. **ライブ配信の送出。** `haishin` は完成した 1 つの work を 6 プラットフォームの互換しない規則に写像して投稿する層で、live stream ではない。RTMP / WHIP の経路は無い。
+4. **画面 → observation。** `shugyo` の env は cartpole / reach の内部 physics を state とするもので、フレームのピクセルを observation にする経路が無い。
+5. **GA 本体。** `sha256d.evolve` は閉じた組合せ空間に対する elite + mutation で、crossover を持つ汎用 GA ライブラリは無い。
+
+## 着手するときの向き
+
+**iOS Simulator に拘るか、web ハーネスに寄せるかで必要な新規実装量が桁で変わる。**
+
+この workspace のゲームは実質 web（`isekai.network` の 31 games、`app-aozora` の inline iframe 再生、gameka の静的 playtest ページ）で、iOS 面は kotoba-shell が用意する WKWebView ホストである。したがって「iPhone sim で自動プレイ」を素直に読むと **WKWebView 内の web ゲームを叩く**問題になり、既存の最も近いハーネスは `kotoba-lang/playwright`（headless WebGL2 Chromium eval）と `kotoba-lang/browser-agent`（MoA supervisor + 自前ブラウザ、全 run を datom 化して time-travel query 可能）である。この経路なら欠落 1（入力注入）と 4（画面 → observation）が既に解けている。
+
+iOS Simulator 上でなければならない理由（ネイティブ iOS ゲームを対象にする、App Store 提出前の実機挙動を測る等）が立つ場合にのみ、欠落 1 を WebDriverAgent / XCUITest で埋める判断に進む。**その判断は別 ADR とする。**"
+
+  :adr/consequences
+  "**positive**
+
+- 4 面それぞれの正本が名指しで固定されたので、この経路に着手する agent が simulator bridge / screenshot 検査 / 映像多重化 / RL env を各 app に再実装しない。
+- 欠けている 5 点が『何が無いか』ではなく『どこに何を足すか』の形で書かれているので、次の着手が scope を切れる。
+- 「web ハーネスに寄せると欠落 2 点が消える」という分岐が明示されたので、iOS Simulator を前提に置く判断がコストを承知の上の判断になる。
+
+**negative**
+
+- この在庫は checkout 済み repo の README / CLAUDE.md しか走査していない。4,138 project のうち未 checkout 側に該当があれば漏れる —— **索引に無いことは不在の証明ではない**（CLAUDE.md 明文）。
+- `com-nvidia-isaac-lab` は名前にも README 冒頭にも『RL』『training』が出ない（旧名 `kami-shugyo` も同様に機能を示さない）。今回は west.yml の名前 grep で偶然当たったが、**同じ探し方をした次の agent が同じ経路で当たる保証は無い**。concept 語彙への登録は本 ADR では行っていない。
+- 欠落 1（入力注入）と 3（ライブ配信）は外部依存の導入判断を含むため、この ADR は方向を決めていない。"
+
+  :adr/verification
+  "**実測した（2026-08-08）**:
+
+- `nbb scripts/repo-search.cljs` を 5 回（simulator/ios/iphone、game/play/agent、genetic/evolution/neuroevolution、stream/record/capture、実況/配信/ゲーム、shugyo/修行/reinforcement）。
+- `manifest/west.yml` の 4,138 project 名を直接 grep（game|play|sim|ios|xcode|appium|emul|gym|evolu|genet|stream|obs|twitch|youtube|record|replay|bot|train）。
+- checkout 済みの README* / CLAUDE.md / MATURITY.md に対する `find -maxdepth 3|4 | xargs grep -liE`:
+  - `simctl|appium|webdriveragent|xcuitest|ios simulator|iphone simulator|シミュレータ` → 8 hit。うち実体は `kotoba-lang/shell`（bridge）と `kotoba-lang/hinshitsu`（visual QA CLI）。**Appium / WebDriverAgent / XCUITest は 0 件。**
+  - `recordVideo|screenrecord|ffmpeg` → 20+ hit だが**すべて codec / 映像ライブラリ側**（utsushi, org-iso-*, douga, kami-eizo-timeline 等）で、**simulator 録画は 0 件**。
+  - `autoplay|自動プレイ|playtest|speedrun` → 5 hit。ゲーム自動プレイの実装は 0 件。
+- `orgs/kotoba-lang/shell` 全体での simctl subcommand の実測: `spawn`(4) `list`(3) `launch`(1) `install`(1) `get`(1)。
+- `crossover|mutation rate|fitness function|tournament selection|遺伝的アルゴリズム` の grep（kotoba-lang + cloud-itonami の md/clj/cljc）→ `sha256d/src/sha256d/evolve.cljc` + `docs/evolution-log.md` に到達。
+
+**この ADR が検証していないこと**:
+
+- **どの構成要素も、実際に繋いで動かしていない。** 読んだのは README / src の docstring / grep 結果であって、simulator を起動して game を動かした run は 1 度も無い。特に `kotoba-lang/shell` の『real, verified』は shell 自身の CI の主張であって、本 ADR が再現したものではない。
+- **未 checkout repo。** 4,138 project のうち README を走査できたのは checkout 済みのものだけ。`repo-search` 自身がこの但し書きを毎回出す。
+- **`gameka` の自認を再現していない。** README は `playtest_game` について『still a scaffold and still says so: there is no headless runner, and a fabricated visual score would be worse than a zero』と書いており、自動プレイの受け皿がそこに名指しで空いていることを示すが、その scaffold のコードは読んでいない。
+- **欠落 1〜5 の埋め方のコスト見積り。** 『web に寄せれば 2 点消える』は経路の性質からの推論であって、実装して測った値ではない。"}]

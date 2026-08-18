@@ -1,0 +1,168 @@
+[{:db/id -1
+  :adr/id "2607321000"
+  :adr/title "gftd.ai apex の UI/UX を kotoba-ui から jp-go-dds (DADS) へ移す"
+  :adr/status "accepted"
+  :adr/date "2026-07-31"
+  :adr/repos "gftdcojp/apex"
+  :adr/supersedes "ADR-2607122200 の gftd.ai 部分（kotoba-ui paved road）"
+  :adr/body
+  "## Context
+
+オーナー指示（2026-07-31）: 「https://gftd.ai/ の uiux を jp-go-dds を使うようにして」。
+
+前提の確認に手間取ったので記録しておく。**gftd.ai の apex を serve しているのは
+`gftdcojp/apex`（Cloudflare Pages project `ai-gftd-apex`）** であって、
+`gftdcojp/chat-shell` / `etzhayyim/com-etzhayyim-app-ai-gftd-chat-shell`
+（SvelteKit）ではない。後者は同じ名前を持つ別実装で、apex route を持たない。
+判別は Cloudflare API で行った（zone の worker routes に apex は無く、Pages
+project の domains に `gftd.ai` があった）。**`gftdcojp/apex` は west にも
+fleet-db にも登録されていない** — 本番の apex を serve する repo が manifest の
+外にあるのは別途の gap（下記 Consequences）。
+
+移行前の skin は kotoba-ui（shitsuke.hig + liquid-glass material、theme map で
+accent/accent-dark/:appearance :auto）。jp-go-dds は skill `kotoba-uiux` が定める
+**明示的な opt-out 先**であり、日本の公的文脈のサービスに使う skin として
+ADR-2607141915 / ADR-2607309900 で既に位置づけられている。
+
+## Decision
+
+**skin だけを入れ替える。state は re-frame のまま、`gftd.chat.views` の構造も維持する。**
+入れ替えは 1 箇所（`gftd.chat.ui`）で起きる。
+
+1. `gftd.chat.ui` は同じ helper API を保ったまま、実装を `jp-go-dds.core` に載せ替える。
+   DADS が持つもの（button / chip / accordion / textarea / input / select /
+   notification-banner / divider / card）は**上流のコンポーネントをそのまま使う**。
+2. DADS が持たないもの（avatar / nav bar / popover menu / spinner / scrim /
+   list rail / chat bubble）は token から自作し `apex-*` prefix を付ける。
+   **上流の `dads-*` の中に混ぜない** — jp-go-dds 自身が `dds-ext-*` で
+   同じ規律を守っている。行政手続きのページに chat bubble が要らないのは当然で、
+   無いことは欠陥ではない。
+3. **light 固定**。DADS 上流に dark palette は無く `jp-go-dds.page` が
+   `color-scheme: light` を張る。theme map と `scripts/gen-theme-css.cljs` は
+   意味を失うので削除。**dark を自作しない**。
+4. **CSS は inline 1 本**。jp-go-dds は「1 ページあたり外部リクエスト 0」を
+   設計目標にしており `jp-go-dds.page` がそれを実装している。SPA は 1 文書なので
+   inline の方が render-blocking link 3 本より良い。`public/style.css` と
+   `<link>` は撤去。`public/css/theme.css` は `viewer.html` 専用として残し、
+   中身を DADS token slice に差し替えた。
+5. **`--hig-*` 契約は維持する**。`jp-go-dds.tokens` が DADS primitive の上に
+   再定義するので、view / SVG / design-quality の決定論 audit が同じ語彙を
+   話し続ける。app CSS に raw hex は書かない。
+6. **コピーは日本語**。デジタル庁デザインシステムの上に英語の chrome が乗るのは
+   不整合で、`relative-time` は元々書き換えが必要だった。
+
+## 実装中に出た本物のバグ（ブラウザ実行で発見）
+
+**jp-go-dds は自分の `class` を caller の `:attrs` の *後* に merge する**
+（consumer に component の同一性を壊させないための意図的な設計）。結果として
+`:attrs` 経由で渡した `:class` は**黙って落ちる**。`.menu-btn` がこれで class を
+失い、**320px でドロワーを開くトリガーが存在しなくなっていた**。読んでも気付かず、
+real-Chromium の E2E が拾った。seam 側で「構築後に class を追記する」形に直し
+（`dads-button` は残り、こちらは併走する）、テストで固定した。
+
+## デプロイが半分しか着地しない問題（2026-08-01、オーナー報告で発覚）
+
+移行を deploy した翌日、オーナーから「style が適切に jp-go-dads になっていない?」と
+スクリーンショット付きで報告があった。**デザインシステムが当たっていなかったのではなく、
+当たっていた相手が古い app だった。**
+
+新しい `index.html`（DADS を inline 済み）が配信される一方、Cloudflare の edge は
+以前の `/assets/main.js` を返し続けていた（`cf-cache-status: HIT`、`age: 56837`、
+`cache-control: public, max-age=2592000`）。そのバイト列にはまだ \"How can I help\" が
+入っており、日本語 chrome は 0 件だった。**layout の class 名は新旧で共通だった**ため、
+サイドバーやグリッドだけが効いて component は素の browser 既定という「壊れた skin」に
+見えた。
+
+原因は bundle のファイル名が内容によらず不変だったこと。30 日の cache entry が
+deploy を跨いで生き残れる。対処は 3 点セット（どれか 1 つでは効かない）:
+
+- `:module-hash-names 8` — 内容ハッシュ入りのファイル名。bytes が変われば URL が
+  変わるので、古い entry は「運悪く当たる」ものではなく**到達不能**になる。
+- `gftd.chat.site` が `public/assets/manifest.edn` を読み、shadow-cljs が実際に
+  出した名前を引用する。生成器がビルドから乖離できない。manifest が無い場合は
+  警告を出す（unhashed fallback を出荷することがこの仕組みが防ぎたい失敗そのもの）。
+  `deploy` は release build を shell 生成の**前**に回す順序へ変更。
+- `public/_headers` — asset は 1 年 immutable（hash 付きなので正しい）、
+  `index.html` と token bundle は常に revalidate（deploy が即座に拾われる）。
+  `/viewer-assets/*` も revalidate — `viewer.html` は手書きで固定名を参照するため。
+
+本番実測（fix 後）: `/assets/main.B4333149.js` を配信、「新しいチャット」ボタンが
+`dads-button new-chat-btn` で key blue `rgb(0, 23, 193)`、chrome は日本語、
+page error 0 件。
+
+**残: 旧 `/assets/main.js` は最大 30 日 edge cache に残る。** 参照するものは無く
+（`index.html` は revalidate して hash 付きを名指す）、このセッションの資格情報では
+purge できなかった（wrangler OAuth は zone:read のみ）。期限切れを待つ。
+
+## skin を product に混ぜない（2026-08-01、オーナー指摘）
+
+「サービス内容まで dads.. になってしまっているんですが, gftd.ai は proton のように
+機密性を保持したまま生成できるのが特徴です」。**これは移行時のこちらの誤り。**
+skin を差し替える作業の中で、デザインシステムが**プロダクト自身の言葉**にまで
+入り込んでいた:
+
+- welcome message が「デザインシステム: デジタル庁デザインシステム (DADS)」と
+  自分の stylesheet を名乗っていた
+- sidebar の brand line が `gftd.ai · デジタル庁デザインシステム`
+- meta description が「デジタル庁デザインシステムで実装した…」と実装で始まっていた
+- suggestion prompt に「行政サービスのダッシュボード画面のビジュアル案」
+- 空状態の見出しが「どのようなご用件でしょうか？」— 役所の窓口の言い回し
+
+**gftd.ai の特徴は機密を保ったまま生成できること**（privacy contract:
+ADR-2606301210 / 2606301220）。既定で揮発し、メールアドレスや電話番号なしで使え、
+生成はポリシー経路を通るのでブラウザが provider の鍵を持たない。デザインシステムは
+presentation であって、サービスが何であるかについて何も言わない。
+
+**規則: skin の名前を product copy に出さない。** DADS への attribution は
+vendored CSS 先頭の MIT notice が各ページに inline されることで既に満たされている
+（visible chrome に出す必要はない）。回帰テストで固定した — welcome / meta
+description / 全 suggestion がデザインシステム名を含まないこと、かつ welcome が
+実際の主張（揮発）を述べていること。
+
+**新しい copy の主張はすべてコードが守っているものに限った**: edge worker は
+prompt も completion も保存しない、quota は salted な一方向の日次バケット、
+identity は端末ローカルの opaque id、生成は murakumo policy proxy 経由。
+end-to-end 暗号化は**主張していない**（実装していないため）。
+
+### 副産物として見つかった renderer のバグ
+
+copy を直した瞬間に発覚: `parse-inline` がループを `split` の parts だけで
+回しており、`split` は末尾の空文字列を落とすため、**行全体が 1 トークンの場合**
+（`**機密を保ったまま、生成する。**`）に parts が空になり、ループが nil を返して
+段落ごと消えていた。welcome の冒頭文が痕跡なく失われ、空の `<p>` が描画されていた。
+**bold で始まる assistant の応答も同様に食われていた**はず。両方の列で回すよう修正し、
+6 ケース（行全体・先頭・末尾・囲み）をテストで固定。
+
+## Consequences
+
+- gftd.ai は light 固定になった。OS の dark 設定には従わない。E2E は**逆の
+  assertion** を持つ: OS が dark を要求しても light で描画されること
+  （flip したら dark palette が紛れ込んだということ）。
+- glass material は消えた。`--liquid-glass-*` の参照が残ると透明に描画されるので、
+  app CSS から一掃した。
+- accent はデジタル庁の key blue `#0017c1`。gftd の brand accent `#1a56db` は
+  出ない。`jp-go-dds.tokens/brand-tokens` + `bridge-css-except` で brand accent を
+  残す選択肢もあるが、**今回は取らなかった** — 指示は「DADS を使う」であり、
+  統一が government design system の目的だから。brand を戻したくなったらこの
+  一行で戻せる。
+- **`gftdcojp/apex` が manifest 未登録である gap は残っている。** 本番 apex を
+  serve する repo が west/fleet-db の外にあり、pin verification も orphan audit も
+  効かない。今回のスコープ外だが、次にこの repo を触る作業で解消すべき。
+
+## Verification (2026-07-31)
+
+- `clojure -M:pin:local:test-portable` — 62 tests / 301 assertions / 0 failures
+- `shadow-cljs release app viewer pages-worker` — 0 warnings
+- real-Chromium E2E（`scripts/verify-e2e.cljs`）— 26 checks / 0 failures。
+  OS dark 下でも light、fast-typing のキーストローク欠落なし、Enter 送信、
+  ストリーム完了、503 のエラーバブル、320px でドロワー開閉と横スクロール無し、
+  viewer が light かつ hex-free、コントラスト 11.29:1（label）/ 9.91:1（key blue）。
+- 本番 deploy 後の実測: `https://gftd.ai/` が DADS inline shell を返し
+  （`dads-*` class 42 個）、`/api/health` が chat/generation とも configured。
+
+## References
+
+- 実装: gftdcojp/apex `86d06eb`（DADS 移行）/ `42ae0e7`（cache-bust）/ `0a719cf`（copy 是正 + markdown 修正）
+- 設計システム: ADR-2607141915（jp-go-dds）/ ADR-2607309900（DADS を選ぶ意味）
+- 直前の skin: ADR-2607122200（kotoba-ui paved road）
+- 姉妹 ADR: ADR-2607321100（awai.network apex、同じ skin）"}]

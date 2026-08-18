@@ -1,0 +1,72 @@
+# Downstream repository registry.
+# Each repo declares which DAG nodes it handles.
+# The orchestrator routes node-related actions to the right repo's agent
+# via `gh issue create`.
+
+repos:
+  - id: spirit-in-physics
+    full_name: com-junkawasaki/spirit-in-physics
+    visibility: private
+    role: physics formalization, Wheeler-DeWitt verification, arXiv submission
+    handles_nodes:
+      - 03_lean_mathlib
+      - 05_adr_0003
+      - 07_arxiv_submit
+    issue_labels: [physics, arxiv]
+    existing_issues:
+      "07_arxiv_submit": 16
+
+  - id: etzhayyim-root
+    full_name: etzhayyim/root
+    visibility: public
+    role: religious-corp 9-domain artificial organism ecosystem
+    handles_nodes:
+      - 22_etzhayyim_ops
+      - 25_magatama_sdk
+    issue_labels: [etzhayyim, organism]
+
+  - id: gftd-monorepo
+    full_name: gftdcojp/ai-gftd-apps-gftdcojp
+    visibility: private
+    role: |
+      Gftd Japan vendor monorepo. Implements lawfirm / crypto-victim /
+      animeka / family-office / internal-control / breakeven nodes.
+    handles_nodes:
+      - 08_gftd_breakeven
+      - 17_internal_control
+      - 18_family_office_conversion
+      - 21_gftd_lawfirm_vertical
+      - 21b_gftd_anime_vertical
+      - 24_cyber_treaty
+      - 27_rokes_attacker_pursuit
+      - 28_crypto_victim_lawfirm
+    issue_labels: [vendor, gftd]
+    existing_issues:
+      "21_gftd_lawfirm_vertical": 1281
+      "28_crypto_victim_lawfirm": 1282
+
+  - id: ghost-hacker
+    full_name: com-junkawasaki/260208-spirit-in-physics
+    visibility: private
+    role: Ghost Hacker manuscript + KDP pipeline + image generation
+    handles_nodes:
+      - 09_ghosthacker_scenarios
+      - 19_ghosthacker_film
+    issue_labels: [fiction, ghost-hacker]
+
+# Nodes handled locally inside com-junkawasaki (not delegated)
+local_nodes:
+  - 01_aishi_disclosure
+  - 02_2021_reconcile
+  - 04_accounting_proof
+  - 06_lingling_brief
+  - 10_jk_holding_revenue
+  - 11_health_steady
+  - 12_legal_offload
+  - 13_meeting_partners
+  - 14_loan_acceleration
+  - 15_remarriage
+  - 16_more_children
+  - 23_jk_holding_governance
+  - 26_counter_litigation
+  - 29_subscription_audit

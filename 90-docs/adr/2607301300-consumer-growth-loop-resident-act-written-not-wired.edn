@@ -1,0 +1,180 @@
+[{:db/id -1
+  :adr/id "2607301300"
+  :adr/title "consumer 成長 loop: consumability + loop-consumability を常駐化、act は書けたが未配線"
+  :adr/status "accepted"
+  :adr/date "2026-07-30"
+  :adr/tags ["consumer" "loop" "consumability" "murakumo" "residency" "launchd" "closing"]
+
+  :adr/context
+  "オーナー指示: 『この consumer を増やす worker, loop を cloud-itonami-app から
+  確認したい, org は awai-network として murakumo.cloud に常駐化させたい』。
+  続けて act の意味を問い、**「PR に加えて deploy まで」** を選択（私は今日の
+  deploy 事故を理由に非推奨と伝えたが、選択は選択として尊重した）。
+
+  着手前に確認して分かった事実 3 点:
+
+  - **`awai-network` は存在しない（404）。** 実在は `network-awai` で、既に
+    `loop-yakuwari` / `aozora-engine` / `cloud-murakumo-market-intel` を持つ。
+  - **`scripts/fleet-ci/gates.edn` は commit 駆動 CI であって常駐機構ではない**
+    （`loop-*` の登録は 0 件）。常駐は launchd plist + `StartInterval` で、
+    fleet-ci 自身の tick もそれで回っている。
+  - **cloud-itonami-app は resident actor の生死を確認できなかった。**
+    `fleet.clj` 自身の docstring が「resident の liveness は最近 evidence を
+    記録したかどうかだが、この catalog はそれを持っていない」と書いており、
+    全 `loop-*` / `person-*` が `:not-probeable` を返していた。
+
+  さらに `manifest/repository-rules.edn` は `loop-*` に
+  `:must-not :own-domain-scoring-truth` を課す。「producer が consumable とは
+  何か」を持つ既存ライブラリは無かったので、**2 repo構成が compliance 上の要件**
+  になった（`loop-system-dynamics` ↔ `kotoba-lang/dynamics` と同型）。"
+
+  :adr/decision
+  "**consumability**（kotoba-lang、public）が scoring truth を持つ。梯子:
+  `:addressed → :reachable → :describable → :discoverable → :agent-callable`。
+  各段は下の段が成立して初めて意味を持つので、**score は到達した最上段であり
+  加重平均にしない** — 加重平均は到達不能な producer を「60% consumable」と
+  報告し、無の 60% は無である。`:unknown` は決して `false` にしない
+  （未計測と拒否は別の事実で、混ぜると障害を設計欠陥として報告する）。
+  `rank` は**低い段を第一キー**にする（人口を第一キーにすると「到達可能な 9 本に
+  MCP を足す」が「残り 1,199 本に住所を与える」より上に来て、fleet ではなく数字を
+  最適化する）。
+
+  **loop-consumability**（network-awai、private）が orchestrator。observe は
+  catalog から `:addressed` を無料で得て、**住所を持つ 10 本だけ probe する**
+  （住所の無い producer は probe に答えられないので、1,212 本を叩くのは
+  directory の大きさに比例したコストを払って既知のことを証明するだけ）。
+  evaluate は library に委譲。decide は pure で policy のみを適用。
+
+  **常駐化は launchd plist（`StartInterval` 900s）**。fleet-ci と同じ機構で、
+  `gates.edn` には入れない（あれは commit 駆動）。
+
+  **liveness を catalog に載せた。** `:resident` actor について
+  `evidence/*.ledger.edn` の**最終行**から `:evidence-at` / `:evidence-entries` /
+  `:evidence-outcome` を運ぶ（mtime ではない — checkout が mtime を書き換えるので
+  clone したばかりの loop が『今走った』になる）。これは by-reference entry が
+  repo の**中身**を運ぶ唯一の例外で、意図的な緩和として test に理由を明記した:
+  pin の日付は「誰かが最後に commit した時刻」で、**loop が健全で誰も編集して
+  いないときにこそ「最後に走った時刻」と乖離する**。
+
+  **act は executor を書いたが tick に配線していない。** `plan` は pure、
+  `execute!` が不可逆な 4 手だけを行う: branch は producer 自身の tip から切る
+  （deploy が他人の未リリース作業を運べない = 今日の障害の直接対策）、verify は
+  deploy の**後**に live を叩く（wrangler の exit 0 は完了ではない）、rollback
+  対象は deploy **前**に捕まえた version。descriptor は catalog から生成し
+  **health operation だけ**を記述する（実ルートを推測した生成物は機械可読な嘘で、
+  置き換える 404 より悪い）。`:describable` 以外の gap は `:unsupported-gap` として
+  拒否し改変しない。"
+
+  :adr/landed
+  "repos:
+   - kotoba-lang/consumability（public）13 tests / 46 assertions
+   - network-awai/loop-consumability（private）9 tests / 25 assertions。
+     常駐稼働中（launchd, run interval 900s, state active）、ledger 3 entries
+
+   PR:
+   - root#1443 7db4a3d90a5  register consumability
+   - root#1446 4d44e2bb396  register loop-consumability + consumability pin 前進
+   - root#1448 18f6b409ae1  gen-catalog: resident の evidence を運ぶ
+   - ci-app#15 3526783ae2f  fleet: resident の liveness は記録した evidence
+
+   loop repo commits: 3984422（root != FLEET_ROOT）, 0911589（HTML は contract で
+   ない、library 側）, e79c455（act executor）
+
+   私の open PR / branch / worktree はいずれも 0。"
+
+  :adr/consequences
+  "実測（live fleet に対する resident tick）:
+
+    {:tick/producers 1212 :tick/probed 10
+     :reached {:addressed 10 :reachable 10 :describable 0 :discoverable 0
+               :agent-callable 0} :unmeasured 0
+     :ranked [{:rung :addressed :blocked 1202} {:rung :describable :blocked 10}]}
+
+  cloud-itonami-app から見える形:
+    {:repo \"loop-consumability\" :execution :resident
+     :evidence-at \"2026-07-30T10:18:18.394Z\" :evidence-entries 2}
+
+  **実際に動かして初めて見つかった bug 2 件**（どちらも手で叩くと通る類）:
+
+  - **`root()` が `FLEET_ROOT` を cwd より先に見ていた。** launchd 下でだけ
+    `<superproject>/resources/policy.edn` を探し `policy.edn missing` で 15 分ごとに
+    死んでいた。bootstrap するまで検出不可能。2 つの root は別の問いに答える
+    （FLEET_ROOT は観測対象の catalog、cwd はこの loop 自身の rail と ledger）。
+  - **HTML を contract として数えていた。** 初回 tick は `describable 3` と報告。
+    Cloudflare Pages は**あらゆる**パスに `200 text/html`（SPA index）を返すため、
+    3 本の SPA index を OpenAPI 文書として読んでいた。`fleet.clj` が health probe に
+    ついて既に警告している罠にそのまま落ちた。library 側で `:reachable` より上の
+    段に machine-readable content-type を要求し、正直な数は **0**。
+    `:reachable` は意図的に content-type を要求しない（答えたことがその段の問い
+    そのもので、Pages の index はそれに対する真の答え）。
+
+  **ci-app#15 は CI 赤のまま `--admin` で merge した。** ubuntu runner の JDK に
+  post-quantum `ML-DSA-65` が無く、**main 自体が同じ理由で赤**（直近 4 run 全て
+  failure、最新 main run に 11 件）。私の変更とは無関係で、検証は手元 JDK 24 の
+  400 tests / 1667 assertions / 0 failures。判断は私のもの。
+
+  **共有 checkout の repos.edn を他セッションの未コミット行ごと上書きした。**
+  気づいて調査し、その行（`org-microsoft-riff`）は既に origin/main に landed 済み
+  = 冗長な local copy だったと確認、ファイルを byte 一致で復元した。失われたものは
+  無い。共有 checkout に起因する事故は今日 3 件目で、最初から worktree を使うべき
+  だった（実際の landing は worktree 経由で行った）。"
+
+  :adr/resume-point
+  "残りは 1 箇所だけ。tick → act の配線と武装:
+
+  1. `loop-consumability/src/loop_consumability/tick.cljs` の `:act` 決定枝で
+     `act/execute!` を呼び、結果を evidence に merge する。**私はこの編集を 2 回とも
+     paren を壊して失敗し、parse できないファイルを commit するより revert を選んだ。**
+     形は決まっている:
+
+       (act/execute! {:plan (act/plan {:target (:target decision)
+                                       :actor actor :policy policy})
+                      :dry-run? (get-in policy [:act :dry-run?] true)
+                      :repos-root (aget js/process.env \"FLEET_ROOT\")})
+
+  2. `resources/policy.edn` を `:act {:enabled? true :dry-run? true}` にする。
+     **dry-run を先に置くこと** — 一度も動作を見ていない deployer を live に
+     向けないため。ledger の dry-run entry を読んでから `:dry-run? false` で武装。
+  3. allowlist は `cloud-itonami-marketplace-order` 1 本のまま広げない。deploy 経路は
+     producer ごとの知識なので、汎用 deployer は『誰も動作を見たことのない
+     deployer』になる。1 本が全チェーンを通り evidence がそれを示してから広げる。
+
+  検証コマンド:
+    cd orgs/network-awai/loop-consumability
+    FLEET_ROOT=/Users/junkawasaki/github/com-junkawasaki nbb \\
+      --classpath \"src:resources:../../kotoba-lang/consumability/src\" \\
+      -e \"(require '[loop-consumability.tick :as t]) (t/-main)\"
+    nbb --classpath \"src:test:resources:../../kotoba-lang/consumability/src\" test/run_tests.cljs
+
+  前フェーズからの未決も継続: catalog `--check` の CI 化（GitHub Actions は
+  com-junkawasaki で課金停止のため fleet-ci 側に置くこと）、actor 側の実 `:contract`、
+  aozora の PDS/AppView store 分裂、did:key が atproto の identity method でない件。"
+
+  :adr/preserved-owner-wip
+  "触っていないもの（すべて他セッション）:
+   - 共有 checkout の未コミット変更（`.mcp.json`、repo-reality-ledger、
+     staged な scripts/fleet-ci/*、repos.edn の 1 行）。origin/main への ff を
+     塞いでいる。
+   - root#1447 `routine/itonami-2026073010`（スケジュール routine の PR。
+     `@me` が GitHub アカウント一致で私の PR として数えられるだけ）
+   - ci-app#2 `DO-NOT-MERGE cleanup: preserve uncommitted tracked changes`
+   - branch: agent/adr-kura-retail-tiers, agent/form-submissions,
+     agent/ao-worker-multi-org, agent/passkey-feedback, agent/platform-passkey
+   - worktree: tamaki-workspaces 3 件、session f2e64a99 の 3 件、
+     /tmp/cloud-itonami-passkey.*、orgs/cloud-itonami/.wt-passkey、
+     orgs/gftdcojp/.aozora-engine-tamaki--* 4 件"
+
+  :adr/body
+  "このフェーズの教訓は 2 つ。
+
+  **1 つ目: 常駐させるまで、常駐のバグは見つからない。** `root()` の取り違えは
+  test でも手動実行でも通り、launchd 下でだけ死んだ。plist を bootstrap して初めて
+  現れた。同じことが scoring にも起きており、HTML を contract と数える誤りは
+  **live fleet に対して実際に 1 tick 回すまで**現れなかった。どちらも
+  『動かしてから分かった』側の欠陥で、設計レビューでは出ない。
+
+  **2 つ目: 危険な半分を小さく保つと、危険でない半分を先に着地できる。**
+  `plan` を pure にしたので、descriptor 生成・分岐選択・gap 拒否は deploy を
+  一度もせずに検証できた。残っているのは `execute!` を呼ぶ 1 箇所で、そこに
+  dry-run gate が挟まっている。act を選んだ決定は撤回していない — 配線と武装が
+  未了なだけである。"}]

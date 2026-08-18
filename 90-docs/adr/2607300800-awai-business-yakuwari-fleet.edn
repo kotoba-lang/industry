@@ -1,0 +1,372 @@
+[{:db/id -1,
+ :adr/id "adr-2607300800-awai-business-yakuwari-fleet",
+ :adr/doc-type "adr",
+ :adr/source-format "edn",
+ :adr/title "awai network の各ビジネスに運営役割 (yakuwari) を与え、murakumo に常駐させ、2 つの itonami 面に表示する",
+ :adr/topic "awai-business-yakuwari-fleet",
+ :adr/status "accepted",
+ :adr/date "2026-07-30",
+ :adr/last-verified "2026-07-30",
+ :adr/authoritative true,
+ :adr/deciders ["Jun Kawasaki"],
+
+ :adr/authoritative-for
+ ["awai network の 6 ビジネスの運営役割 (director/engineer/designer/sales/marketer/supporter) の置き場所と repo 形状"
+  "yakuwari 定義を git の素の EDN に置き、DataLad は journal archive にのみ使う境界"
+  "awai-yakuwari を superproject の DataScript query 面に載せる規約 (:source/dataset)"
+  "2 つの表示面 (itonami.cloud cockpit / cloud-itonami-app) が共有する層と共有しない層の境界"
+  "outward role のみが person-* 運用 identity (mailbox + did:web) を持つ規則"],
+
+ :adr/related
+ ["kotoba-lang/yakuwari README (ao / yakuwari / agent の 3 層と residency の直交性)"
+  "kotoba-lang/ao README (lease は AO の incarnation に属する)"
+  "network-awai/person-awai-ryo docs/adr/0001-awai-ryo-representative-actor.md"
+  "etzhayyim/tamaki docs/adr/0001-artificial-organism-agent-actor-runner-model.md"
+  "adr-2607289700-org-taxonomy-by-invocation-axis-network-awai"
+  "adr-2607141400 (cloud-murakumo organism heartbeat/publish の常駐形)"
+  "adr-2607022300-actor-deploy-3-substrate-topology"
+  "adr-2607299000-repository-rules-workspace-authority"
+  "adr-2607289600-repo-taxonomy-three-planes"
+  "adr-2607171600 (90-docs は EDN only + DataScript query)"],
+
+ :adr/decision-summary
+ ["D1: 役割定義は 1 repo にまとめる — network-awai/loop-yakuwari。yakuwari は「役割の定義」であって AO ではなく、git write authority を持たないので repo を専有する理由がない。tamaki の actors/*.edn 8 件を 1 repo に置く先例と同形"
+  "D2: 役割モデルは kotoba-lang/yakuwari に委譲する。loop-yakuwari は instance data + reconcile + 常駐だけを持ち、domain scoring truth を自分で持たない (:name-prefix 語彙 loop-* の must-not)"
+  "D3: 定義は git の素の EDN。DataLad に入れない。datalad group は west の group-filter が -datalad なので作業ツリーに存在せず、query 面はファイル slurp で db を組むため entity 0 件が黙って通る"
+  "D4: DataLad が効くのは append-only journal の archive 層だけ。現在窓は常に git に残し、fetch なしでも現在地が引けることを保証する"
+  "D5: authored file は :db/id を書かない素の map。yakuwari.spec/validate がそのまま読め、query 面のローダが :db/id と :source/dataset を後付けする (fleet-db / innen / market-intel と同じ慣習)"
+  "D6: 入れ子 map (scale / policy / mandate) はローダで scalar 属性に平坦化し、無損失のため -edn blob も残す (innen-flatten-interval と同形)。さもないと pr-str blob になって :desired で query できない"
+  "D7: 2 表示面で共有するのは projection と semantic markup 語彙だけ。component 実装は共有しない — cockpit は kotoba-ui/appkit、cloud-itonami-app は jp-go-digital-design-system で、共有すると片方が paved road から降りる"
+  "D8: 共有層は kotoba-lang/yakuwari-view (prefix 無し = reusable library)。yakuwari モデルに対して generic であり awai 固有ではない"
+  "D9: outward role (sales / supporter / director) のみ person-* 運用 identity を持つ。inward role (engineer / designer / marketer) は定義のみ"
+  "D10: person-* は責任で命名する (person-isekai-sales)。15 人の架空人物を発明しない — person-awai-ryo の README 自身が「自然人の存在を主張しない」と警告している"
+  "D11: 役割集合はビジネスごとに仕立てる。欠けている役割は businesses.edn に「なぜ無いか」を明記する — 目的を述べられない役割は review 不能 (yakuwari.spec が objective 無しを拒否するのと同じ理由)"],
+
+ :adr/problem
+ "{:source \"owner directive 2026-07-30\",
+   :ask \"network-isekai / club-shinshi / net-babiniku / net-kotobase / app-aozora / nexus-x402 の各ビジネスに、person-awai-ryo のように運営に必要な役割 (director/engineer/designer/sales/marketer/supporter 等) と自律的 actor を設計実装し、cloud-itonami-app に表示、murakumo.cloud に常駐させる\",
+   :prior-art-found
+   {:yakuwari \"kotoba-lang/yakuwari — 役割モデル (objective/scale/runners/policy)。person-awai-ryo が唯一の consumer\",
+    :tamaki \"etzhayyim/tamaki actors/*.edn 8 件 + loops/*.edn + organisms/etzhayyim-fleet.edn。ただし :actor/* の旧語彙で、yakuwari が supersede した\",
+    :residency \"cloud-murakumo/organism/ — pulse.kotoba -> kototama fleet-run -> journal -> 静的 JSON、LaunchAgent (heartbeat 60s / publish 300s)\",
+    :cockpit \"network-awai/cloud-itonami site/public_cockpit.cljc — funnel/queue/audit/business-grid pane\",
+    :local-app \"cloud-itonami/cloud-itonami-app — localhost:1338 の local-first workspace。既に kotoba-lang/agent と kotoba-lang/hil に依存している\"},
+   :ambiguity-resolved
+   {:repo-shape \"36 個の person-* repo にするか 1 registry repo にするかで作業量が桁違い — owner に確認し hybrid を選択\",
+    :display-target \"'cloud-itonami-app' は 2 つの別コードベースを指しうる (network-awai/cloud-itonami と cloud-itonami/cloud-itonami-app) — owner 確認で両方\",
+    :outward-roles \"owner 確認で sales / supporter / director の 3 つ\"},
+   :risk \"yakuwari を DataLad に置くと query 面から黙って消える。定義を各ビジネス repo に散らすと共有 WIP 予算と横断 cockpit が 6 ソースに割れる\"}",
+
+ :adr/decision
+ "{:repos
+   {\"kotoba-lang/yakuwari\" {:status :exists :role \"役割モデル (objective/scale/runners/policy)。この設計は既存を再発明しない\"},
+    \"kotoba-lang/yakuwari-view\" {:status :new :role \"共有層 — projection (registry + runs -> display model, pure) + semantic hiccup。design-system component を呼ばない\"},
+    \"network-awai/loop-yakuwari\" {:status :new :role \"awai instance data + reconcile + murakumo 常駐。loop-* = continuous orchestrator\"},
+    \"network-awai/person-<business>-<role>\" {:status :new :count 15 :role \"outward role の運用 identity (mailbox + did:web)\"}},
+   :data-tiers
+   [{:tier :definitions :what \"yakuwari/<business>/<role>.edn + businesses.edn + fleet.edn\" :where \"plain git\" :queryable :always}
+    {:tier :journal-current-window :what \"直近の run / decision / receipt\" :where \"plain git, append-only\" :queryable :always}
+    {:tier :journal-archive :what \"rollover した履歴\" :where \"DataLad + B2 (datalad group)\" :queryable \"annex-get の後だけ\"}],
+   :query-plane
+   {:dataset \"awai-yakuwari\",
+    :join-keys {\"repo/path\" [\"repo-taxonomy\" \"repo-maturity\"],
+                \"company/lei\" :not-yet-joinable-no-lei-recorded,
+                \"repo name\" [\"fleet-db\" \"fleet-ci\"]},
+    :flatten \"scale / policy decision / mandate を scalar 属性に展開 + -edn blob を残す\"},
+   :sharing-boundary
+   {:shared [\"projection (display model)\" \"semantic class 語彙\"],
+    :not-shared [\"component 実装 — cockpit=kotoba-ui/appkit, local-app=DADS\"],
+    :why \"共有すると片方が paved road から降りる。cockpit の hydration script が既に .row/.pill/.business-card を innerHTML で注入している先例と同形\"},
+   :identity-split
+   {:outward [:sales :supporter :director] :inward [:engineer :designer :marketer],
+    :naming \"責任で命名 (person-isekai-sales)。架空人物を発明しない\",
+    :mailbox \"各ビジネス自身のドメイン (sales@isekai.network 等)。awai.network は network 代表 person-awai-ryo のみ\"}}",
+
+ :adr/honesty
+ "{:implementation-state \"この ADR は設計を固定する。実装の到達点は :adr/body の実装状況節が正本で、phase が landing するたびに書き換える (append しない — ADR-2607257000)\",
+   :person-repo-naming \"責任命名 (person-isekai-sales) は agent 判断。owner が persona 名を望むなら rename が要る — 15 件の identity を勝手に人格化しない方を選んだ\",
+   :datalad-archive \"journal archive の rollover 閾値と実際の DataLad dataset 化は、journal が実際に大きくなるまで実行しない。今から annex に入れると query できないだけで利得がない\",
+   :tamaki-vocabulary \"tamaki の actors/*.edn は :actor/* の旧語彙のまま。この設計は :yakuwari/* を使い tamaki を書き換えない (yakuwari README 自身が tamaki 未切替を既知の follow-up として記録している)\"}",
+
+ :adr/consequences
+ "{:positive
+   [\"役割が 1 repo に集まるので共有 WIP 予算 (fleet.edn) と横断 cockpit が 1 ソースで済む\"
+    \"ビジネス追加が businesses.edn への 1 entry + role EDN 数件で済む\"
+    \"query 面に載るので『承認待ちを抱えた役割をビジネス横断で数える』が 1 query になり、repo-taxonomy / market-intel と join できる\"
+    \"共有境界を projection に引いたので、両表示面がそれぞれの paved road に留まれる\"]
+   :negative
+   [\"person-* 15 repo は west entry / pin / mailbox が 15 件増える。outward role に限り、かつ sales を持つ business が 3 つだけなので 36 でも 18 でもなく 15 だが、軽くはない\"
+    \"journal archive の 2 層構造は、過去分を引くのに annex-get という追加手順を要求する\"
+    \"loop-yakuwari が落ちると 6 ビジネス分の役割が同時に止まる (repo 分散なら独立していた)\"]
+   :gaps
+   [\"AWAI Network, L.L.C. の LEI が未記録 (fleet.edn は Delaware file no. のみ)。このため :company/lei での market-intel / cloud-itonami-lei との join はできない — 初稿はできると書いていたが誤り。LEI を捏造しない\"
+    \"fleet.edn の :capability-ceiling は現在どの役割も narrow していない (全役割が ceiling 以内で書かれている)。正しく配線され test もあるが実データ上まだ load-bearing ではない\"
+    \"dispatcher は配線済み (2026-08-07)。:spawn effect は tamaki の AgentRun になり、隔離 worktree・detached start・runs.edn・status 更新・worktree 返却まで実 tamaki と実 repo で検証済み。ただし :local mode の executor (kotoba-code) がこのマシンに存在しないので dispatch は submit 前の readiness 検査で拒否し、31 役割は :starved のまま (正しいラベル)\"
+    \"journal rollover の閾値は未決定 (journal が小さいうちは決める必要がない)\"
+    \"person-* の mailbox は Cloudflare Email Routing の zone token を要する owner action\"
+    \"marketer を inward に分類したが、対外発信を伴うので publish 帰属 (app-aozora への署名) は別途整理が要る\"]}",
+
+ :adr/artifact "network-awai/loop-yakuwari, kotoba-lang/yakuwari-view, manifest/edn-query.cljs",
+ :adr/verify "nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q '[:find ?biz ?role :where [?e \"source/dataset\" \"awai-yakuwari\"] [?e \"yakuwari/business\" ?biz] [?e \"yakuwari/id\" ?role]]'",
+
+ :adr/body
+ "
+# ADR-2607300800: awai network の各ビジネスに運営役割 (yakuwari) を与え、murakumo に常駐させ、2 つの itonami 面に表示する
+
+**Status**: accepted
+**Date**: 2026-07-30
+**Deciders**: Jun Kawasaki
+
+## Context
+
+owner の指示は「network-isekai / club-shinshi / net-babiniku / net-kotobase /
+app-aozora / nexus-x402 などのビジネスに、`person-awai-ryo` のように運営に必要な
+役割 (director / engineer / designer / sales / marketer / supporter 等) と自律的な
+actor を設計実装し、`cloud-itonami-app` に表示、`murakumo.cloud` に常駐させる」。
+
+調査で分かった既存資産 — **どれもゼロから作る必要がない**:
+
+- **`kotoba-lang/yakuwari`** が役割モデルの正本。`ao` (self-evolve + self-judge、
+  git write authority を持つので lease が要る) / `yakuwari` (self-judge のみ、
+  lease 不要) / `agent` (どちらでもない、request が bound を運んでくる) の 3 層が
+  既に分離されている。**residency は 3 層すべてに直交** — murakumo に常駐しても
+  latency と cost が変わるだけで authority は変わらない。
+- **`etzhayyim/tamaki`** が「多数の役割を 1 repo に置く」先例。`actors/*.edn` 8 件 +
+  `loops/*.edn` + `organisms/etzhayyim-fleet.edn` (global WIP cap / score weights /
+  runner pool / authority)。ただし `:actor/*` の**旧語彙**で、`yakuwari` がそれを
+  supersede している。
+- **`cloud-murakumo/organism/`** が常駐形の実働例。`pulse.kotoba` → `kotoba wasm
+  emit` → kototama `fleet-run` (実 WASM 実行 + lease/tick/fuel receipt) → journal
+  追記 → 静的 JSON、LaunchAgent が heartbeat 60s / publish 300s。**Cloudflare
+  Worker は routing/static-assets のみ** — Worker は JVM/Chicory を動かせないので
+  kototama は murakumo 自身の node で実行し、Worker に届くのは結果の静的 JSON だけ。
+- **表示面は 2 つある**。`network-awai/cloud-itonami` の
+  `site/public_cockpit.cljc` (itonami.cloud の operator cockpit、`kotoba-ui` +
+  `appkit` の paved road) と `cloud-itonami/cloud-itonami-app` (localhost:1338 の
+  local-first workspace、`jp-go-digital-design-system` を直接使い、**既に
+  `kotoba-lang/agent` と `kotoba-lang/hil` に依存している**)。
+
+owner 確認で解決した曖昧点 3 つ: repo 形状は **registry repo + outward role のみ
+person-***、表示先は **両方**、outward role は **sales / supporter / director**。
+
+## Decision
+
+### D1–D2. 役割定義は 1 repo、モデルは委譲する
+
+`network-awai/loop-yakuwari` が 6 ビジネス分の役割定義を持つ。**yakuwari は
+「役割の定義」であって AO ではない** — git write authority を持たないので repo を
+専有する理由がない。tamaki が 8 役割を 1 repo に置いているのと同形。
+
+`loop-` prefix は `manifest/repository-rules.edn` の `:name-prefix` 語彙に従う:
+continuous orchestrator (`observe` → `evaluate` → `decide` → `act` →
+`record-evidence`) であり、`:must-not [:own-domain-scoring-truth]` なので役割
+モデルは `kotoba-lang/yakuwari` に委譲して自分では持たない。`loop-system-dynamics`
+が `resources/entities-seed.edn` の instance data を持ちつつ scoring truth を
+`dynamics` に委譲している先例と同じ。
+
+### D3–D4. 定義は git、DataLad は journal archive だけ
+
+owner から「データも github, datalad に edn で datomic query 可能に保存したい」と
+問われた。**定義を DataLad に入れてはならない。** 実測した理由:
+
+`manifest/west.yml` の `group-filter` は `-datalad` を含むので、`datalad` group の
+project は既定の `west update` で**作業ツリーに存在しない**。実測 (2026-07-30):
+
+```
+ABSENT  orgs/cloud-itonami/cloud-itonami-gtm-data
+ABSENT  orgs/cloud-itonami/gftd-audio-actor
+ABSENT  orgs/cloud-itonami/gftd-avatar-actor
+```
+
+`manifest/edn-query.cljs` は DataScript db を**作業ツリーの `slurp`** で組み立て、
+無いファイルは黙ってスキップする (`warn-skipped!` が stderr に報告するだけ)。
+つまり役割定義を annex に置くと、`annex-get` していない読み手には **entity 0 件**
+で、しかも `count` は素通りする。CLAUDE.md が警告する「count が全部載っている
+ように読めてしまう」そのもの。36 個の小さな EDN は git がそのまま扱えるので、
+annex に入れる利得はゼロで、失うのは queryability。
+
+DataLad が効くのは**無限に伸びる journal**。3 層に分ける:
+
+| 層 | 中身 | 置き場所 | query |
+|---|---|---|---|
+| 定義 | 役割 + `businesses.edn` + `fleet.edn` | plain git | 常に可 |
+| 現在窓 | 直近の run / decision / receipt | plain git、追記 | 常に可 |
+| archive | rollover した履歴 | DataLad + B2 (`datalad` group) | `annex-get` 後 |
+
+現在窓を必ず git に残すので、fetch なしでも「今どうなっているか」は引ける。
+archive を引かないと欠けるのは過去分だけ、と境界が明示される。
+
+### D5–D6. query 面への載せ方
+
+**authored file は `:db/id` を書かない素の map にする。** `yakuwari.spec/validate`
+がそのまま読めるし、child-repo dataset のローダは全部
+`(assoc e :db/id (next-tempid!) :source/dataset \"…\")` で後付けしている
+(`fleet-db` / `innen` / `market-intel` と同じ)。`90-docs/adr/*.edn` だけが
+pre-wrapped tx-data で、子リポの dataset は違う。
+
+**入れ子 map は平坦化が要る。** `:yakuwari/scale {:min 0 :desired 1 :max 2}` は
+ローダが `pr-str` で blob 文字列にするので `:desired` で query できない。
+`innen-flatten-interval` と同じ手で `scale` / `policy` の decision / `mandate` を
+scalar 属性に展開し、無損失のため `-edn` blob も残す。
+
+join できる先: **`:repo/path` → `repo-taxonomy` / `repo-maturity`** (ローダが
+`:yakuwari/project` の `<org>/<repo>` から `orgs/<org>/<repo>` を明示的に出す。
+毎回 query 側で組み立て直させない)、repo 名 → `fleet-db` / `fleet-ci`。
+
+**`:company/lei` での `market-intel` / `cloud-itonami-lei` との join は現時点で
+できない。** この ADR の初稿はできると書いたが誤り — `fleet.edn` の
+`:awai.fleet/principal` は AWAI Network, L.L.C. の **Delaware file no. 10704996
+しか持っておらず LEI を持たない**。LEI を捏造して join を通すことはしないので、
+ローダは `:company/lei` を出さない。LEI が判明して `fleet.edn` に記録されたら、
+ローダに 1 行足すだけで繋がる (`:gaps` 参照)。
+
+なお kotobase に載せる場合は Datalog join が **ref 1 本ぶんしか届かない**
+(ADR-260726-kotobase-query-plane-is-one-ref) ので、ビジネスごとに ref を割ると
+横断集計が二度とできない。1 ref に収める前提。
+
+### D7–D8. 2 表示面の共有境界
+
+owner から「両方の中で共通できる部分は共通 repo にして」と指示があった。
+**共有するのは projection と semantic markup 語彙だけで、component 実装は
+共有しない。** 理由: cockpit は `kotoba-ui` + `appkit` の paved road
+(skill `kotoba-uiux` が `kotoba-ui.core` のみ require を要求)、
+`cloud-itonami-app` は `jp-go-digital-design-system` を直接使う。component を
+共有すると片方が paved road から降りる。
+
+共有層 `kotoba-lang/yakuwari-view` (prefix 無し = reusable library) は:
+
+- `yakuwari-view.model` — projection: registry + runs → display model (pure)
+- `yakuwari-view.hiccup` — semantic class 語彙のみの hiccup。design-system
+  component を呼ばず、CSS は各面が所有する
+
+これは cockpit の hydration script が既に `.row` / `.pill` / `.business-card` /
+`.workflow-item` を innerHTML で注入している (「shell component にできない dense
+markup」) 先例と同形なので、cockpit 側の既存パターンに素直に収まる。
+
+### D9–D11. identity と役割集合
+
+**outward role (sales / supporter / director) のみ** `person-*` 運用 identity
+(mailbox + did:web) を持つ。inward role (engineer / designer / marketer) は定義のみ。
+
+`person-*` は**責任で命名する** (`person-isekai-sales`)。15 人の架空人物を
+発明しない — `person-awai-ryo` の README 自身が「'awai ryo' という自然人が存在する
+という主張ではない」と警告しており、それを 15 件に増やすのは逆方向。mailbox は
+各ビジネス自身のドメイン (`sales@isekai.network` 等)。`awai.network` は network
+代表 `person-awai-ryo` のみ。
+
+**役割集合はビジネスごとに仕立て、欠けている役割は `businesses.edn` に「なぜ
+無いか」を明記する。** `yakuwari.spec` が objective の無い役割を拒否するのと同じ
+理由 — 目的を述べられない役割は review 不能であり、同様に「なぜ無いか」を
+述べられない不在は見落としと区別できない。
+
+## 実装状況
+
+**この節がこの ADR の到達点の正本。** phase が landing するたびに書き換える
+(append しない — ADR-2607257000)。
+
+| phase | 内容 | 状態 |
+|---|---|---|
+| 0 | `kotoba-lang/yakuwari` の capability バグ修正 (下記) | landed `23410f1b` |
+| 1 | この ADR | landed |
+| 2 | `kotoba-lang/yakuwari-view` (28 tests / 57 assertions、両 host) | landed `a819aff` |
+| 3 | `network-awai/loop-yakuwari` (31 役割 / 29 tests、`check: OK`) | landed `7097291` |
+| 4 | `manifest/edn-query.cljs` の `awai-yakuwari` loader | landed |
+| 5 | itonami.cloud cockpit の役割 pane | landed `aed8e3a4` (network-awai/cloud-itonami) |
+| 6 | `cloud-itonami-app` の役割面 | **未着手** |
+| 7 | `person-*` **15** repo (18 ではない — sales を持つ business が 3 つだけ) | **未着手** |
+
+### 検証の記録 (2026-07-30)
+
+| 対象 | 実行したもの | 結果 |
+|---|---|---|
+| `kotoba-lang/yakuwari` | `npm test` / `clojure -M:test` / `clojure -M:lint` | 24 tests 61 assertions、**両 host 一致**、0 failure、lint 0 |
+| `kotoba-lang/yakuwari-view` | `npm test` / `clojure -M:test` / `clojure -M:lint` | 28 tests 57 assertions、**両 host 一致**、0 failure、lint 0 |
+| `network-awai/loop-yakuwari` | `npm test` | 29 tests 52 assertions、0 failure |
+| `loop-yakuwari` 実データ | `nbb bin/awai.cljs check` | `businesses 6 \\| roles 31 \\| outward 15 \\| narrowed by ceiling 0`、OK |
+| query 面 | `edn-query.cljs count` / 2 query | `awai-yakuwari=38`（31 役割 + 6 business + 1 fleet）。roles-per-business = club-shinshi 6 + 5 業種 × 5。approval-required 横断 = 59 行 |
+| cockpit | `clojure -M -e (require …)` ×2 ns | `BOTH_NS_COMPILE_OK` |
+| cockpit 成果物 | `write-public-cockpit!` → `public/index.html` を grep | 119,686 bytes、**role card 31 / group 6 / outward badge 15 / gated capability 75 / raw hex 0** — registry の 31/6/15 と一致 |
+| west pin | `verify-west-pins`（3 件） | 2 件は default branch から到達可能な新規 entry、1 件は fast-forward |
+
+**実行できなかったもの（正直に記録）**: `network-awai/cloud-itonami` の
+`clojure -M:test` は**コンパイル自体が通らない** —
+`bonsai/repo.cljc:41` が `arr/restore` を呼ぶが sibling の `arr` checkout に
+その var が無い。**この破損は既存で、本変更と無関係**（変更した 2 ファイルは
+どちらも bonsai を参照しない: grep 0 件）。cockpit の検証は上記の
+「成果物を実際に build して数える」経路で代替した。
+
+### resume point — 次に打つコマンド
+
+```bash
+west update --fetch smart yakuwari yakuwari-view loop-yakuwari
+cd orgs/network-awai/loop-yakuwari && npm test && nbb bin/awai.cljs check
+nbb bin/awai.cljs identities        # phase 7 が作るべき 15 repo の一覧
+```
+
+phase 6 / 7 の最短経路:
+
+- **phase 6**: `cloud-itonami/cloud-itonami-app` に `yakuwari-view` を
+  `:local/root` で足し、`model/hil-queue` を DADS で描く。同 repo は既に
+  `kotoba-lang/agent` と `kotoba-lang/hil` に依存しているので、承認キューの
+  受け皿は既にある。共有するのは projection のみ（component は共有しない）。
+- **phase 7**: `nbb bin/awai.cljs identities` の 15 行がそのまま作るべき repo と
+  mailbox。**責任命名**（`person-isekai-sales`）にしてあり、架空人物名は
+  発明していない。mailbox は Cloudflare Email Routing の zone token を要する
+  **owner action**。
+
+### 残っている gap の優先順位
+
+1. **executor がこのマシンに無い**（dispatcher は 2026-08-07 に配線済み） —
+   `src/awai/dispatch.cljc` + `awai dispatch` が `:spawn` effect を実際の tamaki
+   AgentRun にする。`tamaki doctor` が `:kotoba-code {:ok? false}` を返すため
+   `:local` mode に executor が無く、`dispatch --apply` はそのパスを名指しして
+   **submit する前に**拒否する。拒否は設計であって回避策ではない —— 起動されない
+   run は `:queued` のまま slot を占め、`stale-run?` は `:leased` しか刈らないので
+   永久に詰まる。31 役割は executor ができるまで `:starved` のまま。
+   測定値で設計が変わった 2 点: `tamaki status` 全件は 5.2 MB / 20,804 行 / 3m04s で
+   この loop 自身の 300 秒 tick より長いので `refresh` は run 単位で問い合わせる
+   (1 KB / 1m26s、`:global-wip` で有界、live 0 件なら呼び出しゼロ)。tamaki の
+   `:local` mode は `--project` 直下で agent を走らせ worktree を作らないので、
+   dispatch は業務 repo の fetch 済み default branch から自前の worktree を切り、
+   `AWAI_WORKTREE_ROOT` 未設定なら拒否する（fallback は共有 west checkout になる）。
+2. **常駐が install されていない** — `deploy/install.cljs` は dry-run 検証済みだが
+   LaunchAgent は未 install。install すれば 300 秒ごとに tick が回り journal が
+   伸び始める。
+3. **phase 6 / 7**（上記）。
+4. **capability ceiling が実データで何も narrow していない** — 配線と test は
+   あるが load-bearing ではない。
+5. **LEI 未記録** — `:company/lei` join が引けない。
+
+### phase 0 — 設計中に見つかった実バグ
+
+`person-awai-ryo` は `:mail.inbound :autonomous` を宣言しているのに
+`spec/decide` が**全 capability に `:blocked`** を返していた。原因は綴りが 2 つ
+あって何も繋いでいなかったこと: 役割ファイルは reviewable な `:note` を持てる
+`:yakuwari/capabilities` (vector) で書き、`yakuwari.spec` は
+`:yakuwari/policy` (flat map) を読んでいた。policy 不在は妥当な空 map なので
+validation は問題 0 件を報告する。fail-closed なので過剰付与は無かったが、
+**人間が承認したファイルはモデルが読んだファイルではなかった**。
+`spec/effective-policy` が両者を `strictest-of` で結合する。修正後は同 repo の
+README が既に印字していた表と完全一致する。
+
+なお validation は **raw** policy を読み `decide` は normalized を読む。
+normalized を validate すると `normalize-decision` が未知値を `:blocked` に
+落とすため、`:autonomus` と打ち間違えた役割が「健全」と報告される — 最初に
+逆に書いて既存 test が落ちたのでそこで判明した。
+
+## Alternatives considered
+
+- **person-* repo を 36 件 (6 business × 6 role)** — 却下。yakuwari は役割定義で
+  あって AO ではないので repo を専有する理由がなく、36 件の west entry / pin /
+  mailbox は定義を置くための対価として高すぎる。outward role に限れば identity が
+  必要な 15 件だけになる (sales を持つ business が 3 つだけなので 18 でもない)。
+- **各ビジネス repo が自分の `yakuwari/` を持つ (6 repo)** — 却下。役割を操作対象と
+  colocate できる利点はあるが、共有 WIP 予算 (`fleet.edn`) と横断 cockpit が
+  6 ソースに割れる。tamaki が 1 repo に集めているのはこの理由。
+- **定義を DataLad に置く** — 却下。上記 D3 の実測どおり query 面から黙って消える。
+- **component 実装も共有する** — 却下。cockpit と local app の design system が
+  違うので、共有すると片方が paved road から降りる。
+- **tamaki の `:actor/*` 語彙を使う** — 却下。`yakuwari` が supersede した旧語彙で、
+  新規に採ると 2 語彙を生かし続けることになる (`yakuwari.policy` の
+  `deprecated-spellings` が報告する対象を自分で増やす)。
+"}]

@@ -1,0 +1,75 @@
+[{:db/id -1
+  :adr/id "adr-2607197000-kotoba-postgresql-opaque-pool-leases"
+  :adr/title "ADR-2607197000: Opaque PostgreSQL pool leases"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-19"
+  :adr/last-verified "2026-07-19"
+  :adr/last_verified "2026-07-19"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "repo-wide-cljc-to-kotoba-source-migration"
+  :adr/authoritative-for ["PostgreSQL opaque connection-pool lease authority"]
+  :adr/related
+  ["orgs/kotoba-lang/kototama/src/kototama/postgresql_pool_provider.clj"
+   "orgs/kotoba-lang/kotoba/providers/pg_pool_consumer.kotoba"
+   "orgs/kotoba-lang/kotoba/providers/db_transport.kotoba"
+   "orgs/kotoba-lang/kototama/test/kototama/postgresql_interop.clj"]
+  :adr/supersedes ["adr-2607196900-kotoba-postgresql-pool-session-reset"]
+  :adr/superseded-by []
+  :adr/decision-summary
+  {:operations ["pg_pool_open" "pg_pool_acquire" "pg_pool_query"
+                "pg_pool_release" "pg_pool_close"]
+   :authority {:pool :opaque-i32 :lease :opaque-i32-monotonic
+               :raw-i64-channel-export false :one-active-lease-per-pool true}
+   :delegation {:authentication :kotoba-postgresql-scram-provider
+                :query :kotoba-database-provider
+                :release-reset :kotoba-pg-session-reset
+                :native-table-only [:pool-membership :lease-freshness]}
+   :denials [:double-release :stale-query :close-while-leased
+             :acquire-closed-pool :quota-exceeded]
+   :release {:reset-required true :reset-failure :close-and-evict}
+   :released-server {:product :postgresql :version "14.19"
+                     :physical-connections 1 :leases 2
+                     :token-rotated true :dirty-state-cleared true :reused true}
+   :executable-evidence
+   [{:cwd "orgs/kotoba-lang/kototama"
+     :command "clojure -M:postgresql-interop"
+     :result "opaque leases; reset/reuse; stale/double/leased-close denial; exit 0"}
+    {:cwd "orgs/kotoba-lang/kotoba"
+     :command "targeted kotoba.transport-component-test"
+     :result "pool consumer has no raw channel/TLS/SCRAM/query/reset imports; exit 0"}]}
+  :adr/body
+  "# ADR-2607197000: Opaque PostgreSQL pool leases
+
+**Status**: accepted
+**Date**: 2026-07-19
+
+## Decision
+
+Pool and lease identities are opaque i32 authorities owned by a bounded JVM
+table. The consumer never receives the native i64 transport handle and imports
+only pool open/acquire/query/release/close operations. Lease tokens are
+monotonic and removed before reset, making release one-shot and preventing a
+stale consumer from acting on a later borrower's connection.
+
+The native table is intentionally narrow: it owns mutable pool membership and
+lease freshness, which current Kotoba components cannot persist between calls.
+It delegates SCRAM/TLS authentication, query framing/parsing and pool-return
+ROLLBACK/DISCARD to compiled `.kotoba` providers. Release returns a channel to
+idle only after reset succeeds; failure closes and evicts it. A pool cannot be
+closed while leased, and pool/lease quotas are explicit constructor limits.
+
+## Evidence
+
+Released PostgreSQL 14.19 qualification opens one physical connection, dirties
+setting/temp/transaction state through lease one, releases it, denies double
+release and stale query, acquires a distinct lease token, denies pool close
+while leased, proves clean state on the same physical channel, releases,
+closes, denies acquisition from the closed pool and finds no handle leak.
+
+This closes the opaque single-node pool lease slice. Multi-connection sizing,
+wait queues and idle/lifetime eviction, credential/certificate rotation,
+compatibility matrices and soak remain open."}]

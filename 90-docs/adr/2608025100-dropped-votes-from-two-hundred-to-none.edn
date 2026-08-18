@@ -1,0 +1,52 @@
+[{:db/id -1
+  :adr/id "adr-2608025100-dropped-votes-from-two-hundred-to-none"
+  :adr/title "adr-2608025100: 落とす票が 200 からゼロへ — 残るのは「1 台が追いつけないだけで止まる」こと"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "validator-own-signature-cache"
+  :adr/authoritative-for
+  ["validator が自分の署名を検証済みとして記録すること"
+   "deploy 済み chain の現在地"]
+  :adr/related ["adr-2608025000-a-replica-was-dropping-its-own-vote"]
+  :adr/evidence ["https://torihiki-validator.04-feasts-minded.workers.dev/head?w=w1"]
+  :adr/body
+  "# ADR-2608025100: 落とす票が 200 からゼロへ
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## 修正
+
+verify-fn から**自分の witness の特別扱いを外した**結果、replica は**自分の票についても cache に訊く**ようになり、**そこに誰も入れていなかった** —— だから**署名済みの写しまで `did-not-verify` で落としていた。**
+
+**投票しうる 3 者に対して quorum が 3 なら、1 票落ちれば致命的。** そして**各 replica に 1〜2 件あった。**
+
+**再検証ではなく記録する**: この Worker は**一瞬前に自分の鍵でその署名を作った**。WebCrypto を呼んでそれを知るのは、**既に答えた問いを訊くこと。**
+
+## 実測
+
+**1 replica あたりの落とした票: 200 → 0。**
+
+**replica が投じるすべての票が、peer の検査できる署名を伴って記録される。** それが要点 —— **証明書は peer が検証できる分だけの価値しかない。**
+
+## 残っているもの
+
+**chain は height 2 のまま。** 3 replica が block を保持し、それへの票は 2。**w3 が 1 block 遅れていて投票しないので、投票しうるのは 3 者・quorum は 3・余裕はゼロ。**
+
+**これは ADR-2608024100 の耐障害性の穴であって、新しい欠陥ではない。** **1 台が追いつけないだけでこの chain は止まり、追いつくことが動いていない。**
+
+## Consequences
+
+- (+) 票の取りこぼしがゼロ。証明書は peer が検証できる署名を運ぶ。
+- (−) **chain は height 2 で停止。** 原因は既知（catch-up と 1 故障耐性）。
+- (−) この 2 つは同じ 1 つの穴の両面 —— **余裕が無いから 1 台の遅れが致命になり、遅れが治らないから余裕が戻らない。**
+
+engi 227 tests / 1171 assertions、parity 不変、in-process harness は pass。
+"}]

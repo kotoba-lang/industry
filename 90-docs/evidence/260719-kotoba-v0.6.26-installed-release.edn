@@ -1,0 +1,52 @@
+{:evidence/schema :kotoba.installed-release/v1
+ :evidence/date "2026-07-19"
+ :release/tag "v0.6.26"
+ :release/commit "6b0b8a61753b8bea42054012e09aa3ed76de263b"
+ :release/workflow-run 29661188462
+ :release/native-matrix {:darwin-arm64 :pass :darwin-amd64 :pass :linux-amd64 :pass}
+ :release/source-archive-sha256 "942c3adc2420a00f154eb08bc988a69326e9eae9adf16893e92a1b2cd6ae60b1"
+ :release/archives
+ {:darwin-arm64 "3d9eb436982229e0333f5f09e4ca371e2a80cf6d4abee170fa51ce83eda3bfa2"
+  :darwin-amd64 "b192f279325a0a1dd7bbd4380410c445fbf9439a6b96902594d6ba76510fb312"
+  :linux-amd64 "5596a1de5a0fb8c7ca1409d1c4ffdcbeaa1b3161d3cbb9d360ee1cb4bc76329c"}
+ :release/binary-sha256
+ {:darwin-arm64 "9e1a3f29f0fc9e5475c4d0c3bba7df71b8e0585d1e525c39612243a2b0b25231"
+  :darwin-amd64 "d659b3bd81f90aa8317de1b4892e6c97aee6d5596a8685af2137f8b919cedafa"
+  :linux-amd64 "b07fb9f3e074432422a59aa4f8475c5d718cdbd3dd6b91afdfb9f7c98e3a7453"}
+ :release/evidence
+ {:runtime :native-jvm-free
+  :closed-cljc-root-beside-source-path :pass
+  :bounded-project-namespace-docstring :pass
+  :structured-rejection :pass}
+ :compiler
+ {:project-docstring-pr 96
+  :project-docstring-merge "3b5a26eacb9229fbd9d8a606c7b4b47117601927"}
+ :kotoba
+ {:project-docstring-pr 370
+  :project-docstring-merge "6b0b8a61753b8bea42054012e09aa3ed76de263b"}
+ :installed-shell
+ {:checksum :pass :closed-cljc-project-compile :pass :node-runtime-result 42
+  :binary-sha256 "9e1a3f29f0fc9e5475c4d0c3bba7df71b8e0585d1e525c39612243a2b0b25231"}
+ :homebrew
+ {:formula-pr 33 :formula-merge "0f6f281d0ac6aa1007d283fd01be536deb6a7084"
+  :bottle-workflow-run 29661459505
+  :bottle-matrix {:darwin-arm64 :pass :darwin-amd64 :pass :linux-amd64 :pass}
+  :bottle-formula-pr 34
+  :bottle-formula-merge "ebe4b944f42a867fb1595a9b49da5c26041e94bd"
+  :bottle-digests
+  {:arm64-sequoia "b3081c12ff606b14de543a5178d676112cb447206298ccfedf2f8bb15acac408"
+   :sequoia "b29e055a450652ab4795021da7535b8bc531f2c9cd3c6bd88e09b6b8f187b2a4"
+   :x86-64-linux "87932e53358d202af5ce5e4907acc63ae636039b188d09cc9e1f0f7f1250958a"}
+  :local-cellar-binary "/opt/homebrew/Cellar/kotoba/0.6.26/bin/kotoba"
+  :pre-existing-shadow-overwritten false}
+ :in-repository-formula
+ {:pr 371 :merge "4a561f577cc33379f9e234784d79668c9954c859" :ci :pass}
+ :live-project-probe
+ {:ledger-sha256 "41a808c1409132b67ce0db4fe88a26a6e9b860162dc3cbd910c0322bacba87cf"
+  :graphs 3 :targets [:web :wasm]
+  :explicit-export-remediation
+  {:crdt :operation-lowering
+   :namespace-priority :parameterized-main
+   :lab-verification :operation-lowering}}
+ :gate/status :complete
+ :gate/remaining []}

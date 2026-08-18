@@ -1,0 +1,57 @@
+[{:db/id -1
+  :adr/id "adr-2607197700-kotoba-postgresql-cross-platform-scheduled-soak"
+  :adr/title "ADR-2607197700: PostgreSQL cross-platform matrix and scheduled soak"
+  :adr/status "accepted" :adr/doc_type "adr" :adr/doc-type "adr"
+  :adr/source-format "edn" :adr/date "2026-07-19"
+  :adr/last-verified "2026-07-19" :adr/last_verified "2026-07-19"
+  :adr/authoritative true :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "repo-wide-cljc-to-kotoba-source-migration"
+  :adr/authoritative-for ["PostgreSQL platform matrix and scheduled pool soak"]
+  :adr/related
+  ["orgs/kotoba-lang/kototama/docs/postgresql-qualification.edn"
+   "orgs/kotoba-lang/kototama/.github/workflows/ci.yml"
+   "orgs/kotoba-lang/kototama/test/kototama/postgresql_interop.clj"]
+  :adr/supersedes ["adr-2607197600-kotoba-postgresql-version-matrix-contention-soak"]
+  :adr/superseded-by []
+  :adr/decision-summary
+  {:pull-request-matrix {:linux-x86_64 {:jdk 21 :postgresql [14 15 17]}
+                         :fail-fast false}
+   :scheduled-soak {:platform :macos-arm64 :jdk 21 :postgresql 17
+                    :cadence :weekly :workers 3
+                    :operations-per-worker 1000 :total-operations 3000
+                    :timeout-minutes 45}
+   :local-scaled-proof {:postgresql "17.9" :workers 3
+                        :operations-per-worker 100 :total-operations 300
+                        :status :pass}
+   :bounds {:read-bytes 67108864 :write-bytes 67108864
+            :guest-scratch :fixed-reuse}
+   :executable-evidence
+   [{:cwd "orgs/kotoba-lang/kototama"
+     :command "KOTOTAMA_POOL_SOAK_OPS=100 clojure -M:postgresql-interop"
+     :result "300 contended operations on PostgreSQL 17.9; exit 0"}]}
+  :adr/body
+  "# ADR-2607197700: PostgreSQL cross-platform matrix and scheduled soak
+
+**Status**: accepted
+**Date**: 2026-07-19
+
+## Decision
+
+Pull requests and main updates require a non-fail-fast Linux x86_64 matrix for
+PostgreSQL majors 14, 15 and 17 on JDK 21. A separate weekly macOS arm64 job
+runs 1,000 operations from each of three contending guest workers through two
+physical connections, with a 45 minute job deadline. The same interop program
+accepts `KOTOTAMA_POOL_SOAK_OPS`; all network bytes remain host-bounded and
+guest scratch is fixed and reused.
+
+## Evidence
+
+The configurable path completed 300 contended acquire/query/reset/release
+operations against PostgreSQL 17.9 locally, in addition to the 90-operation
+proof already run on PostgreSQL 14.19, 15.13 and 17.9. Terminal leases, waiters
+and native handles are empty. CI owns the continuing Linux and 3,000-operation
+freshness evidence.
+
+This closes executable ownership of cross-platform and scheduled soak gates.
+Their newest CI results remain required release evidence; this ADR does not
+claim an unobserved remote run."}]

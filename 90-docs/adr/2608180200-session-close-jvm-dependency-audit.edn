@@ -1,0 +1,167 @@
+[{:db/id -1
+  :adr/id "adr-2608180200-session-close-jvm-dependency-audit"
+  :adr/title "Session close: repo-wide JVM audit — what landed, what is verified, and the one thing still unanswered"
+  :adr/status "accepted"
+  :adr/date "2026-08-18"
+  :source/dataset "adr"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/context
+  "Closing record for the session that started from 'repowide に jvm 依存になっている箇所が
+ないか特定, clojurescript, or kotoba のみで 依存を解決'. Five ADRs were written along the
+way (2608170200 through 2608180100); this is the handoff, so a reader with no
+conversation history can resume.
+
+The honest summary in one line: the MEASUREMENT and the TOOLING are done and landed;
+the TEST tier moved a lot; the JVM debt proper did not move at all."
+
+  :adr/decision
+  "Record final state, name the single unanswered question with the command that
+  answers it, and list what is owed in priority order."
+
+  :adr/body
+  "## Landed on default branches
+
+| what | where |
+|---|---|
+| JVM surface detector (11th orgs-detector) | `scripts/verify-jvm-dependency-surface.cljs` |
+| ClojureScript runner-completeness gate (12th) | `scripts/verify-cljs-runner-completeness.cljs` |
+| tranche pipeline (3 steps) | `list-portable-runner-candidates` / `sweep-portable-runners` / `land-portable-runners` |
+| bb.edn tranche (2 steps) | `measure-bb-to-nbb-yield` / `land-bb-to-nbb` |
+| batched pin advance | `scripts/west-pin-put-batch.cljs` |
+| `:nbb-test` classpath from `~/.gitlibs` | `scripts/fleet-ci/tick.cljs` |
+
+Repositories changed: **438** (260 runner tranche + 177 bb tranche + nekko), plus 5
+runner repos and 3 cloud-itonami actors landed by hand. **Zero landing failures, zero
+forced pins.**
+
+## Measured movement
+
+| | session start | close |
+|---|---|---|
+| repos with a ClojureScript runner | 201 | **457** |
+| complete runners | 181 | **438** |
+| portable tests, no runner | 2,034 | **1,778** |
+| share of portable suites any cljs host runs | ~9% | **~20%** |
+| `bb.edn` (retired script host) | 363 | **186** |
+| tests newly running under ClojureScript | — | **3,412 tests / 34,612 assertions** |
+
+## NOT moved — the actual subject of the original question
+
+| | repos | change |
+|---|---|---|
+| `.clj` sources — the JVM is the runtime | **954** | **none** |
+| third-party JVM jar in top-level `:deps` | **149** | **none** |
+| JVM build toolchain | **292** | **none** |
+
+Chicory: 3 call sites, all inside the frozen inventory — the one class the cutover
+contract calls forbidden has **zero breaches**, and that was unmeasured before this
+session.
+
+`:jvm-test` fleet gates went 56 -> 86. That is NOT backsliding: the additions are
+other sessions gating repositories that had no gate at all. Coverage expanded.
+
+## The one thing still unanswered
+
+`io-ipld-car` was switched to `:nbb-test` + `:ship-git-deps true` as a canary for the
+new classpath (be6780a). **It has not been exercised yet, and the reason is timing,
+not a defect.**
+
+The first reading of this was wrong and is corrected here. It looked as though two
+ticks had run after the merge without producing a receipt, which would have meant a
+declaration change does not trigger a re-run — a real hole in what ADR-2608137000
+added. It is not that. The three `tick done` lines after the merge are BATCHES of one
+tick that began its preflight at 02:30:27Z, thirteen minutes before the canary merged
+at 02:43:11Z; a full tick takes roughly twenty-eight minutes here. That run read the
+old gates.edn.
+
+Checked rather than assumed:
+
+    decl-hash of the entry now      81415915e2c85be7
+    ~/.gftd/fleet-ci-state.edn      0ff73e8d7bb08950, :at 2026-08-16T13:39:57Z
+
+The hash differs, so `changed?` will fire, and the state was NOT silently backfilled
+with the new hash — which is the failure that would have hidden this. The next tick to
+START will select it.
+
+Expected when it runs: `exit 0`, `Ran 19 tests containing 64 assertions`, 0 failures —
+the same numbers the fleet's own JVM receipt recorded on 2026-08-16, and the same
+numbers this repo produced locally at the TIP with the derived classpath and
+`npm install`.
+
+To answer it deliberately rather than waiting:
+
+    nbb --classpath '.:scripts/nbb_compat' scripts/fleet-ci/tick.cljs
+
+If it goes red, the entry carries its own reading: exit 95 = npm install failed on the
+node, 93/94 = no summary / zero tests, `Could not find namespace` in the output =
+`ship-git-deps!` did not place something the classpath names. Revert is the entry back
+to `:gate :jvm-test :cd true`.
+
+Seven more gates measured clean for the same treatment and were deliberately NOT
+switched until the canary answers: kotobase-lake 77/259, kotobase-protocols 66/238,
+kotobase-protocol-core 24/97, org-apache-avro 14/32, org-apache-tinkerpop-gremlin
+23/37, org-graphql-http 23/39, sakkyokuka 6/15.
+
+## Owed, in priority order
+
+1. **`.clj` sources, 954 repos.** The body. Port to `.cljc`, or lift the decision core
+   to `.kotoba` per ADR-2608650000's split between a permanent safety constraint and a
+   backend that has not caught up. Nothing else on this list reduces the JVM debt.
+2. **third-party JVM jars, 149 repos.** cheshire / http-kit / ring-core / datalevin /
+   transit-clj have no cljs form; each needs a real substitute decision.
+3. **390 CLEAN-but-not-self-contained repos** — the runner tranche's next slice. The
+   pipeline exists; they need a classpath built from `clojure -Spath`.
+4. **14 real REDs** — repos green on the JVM and failing under ClojureScript:
+   `mst` 262 errors, `glyph` 49 failures, `katex` 37, `arxiv` 14, `org-ros` 5+10,
+   `mamori` 11, `media` 5.
+5. **1,134 MIDDLE** (unknown until run) and **169 FLOOR** (definitely not portable).
+6. **bb.edn `:complex` 167** — hand ports; do not point `emit-batch` at them.
+7. Individually blocked: `isic-6492` needs a Worker-environment edge runner (6 ns);
+   `kotobase-peer` has 5 pre-existing errors in `kotobase-projection`'s cljs half
+   before its 2 can be added; `kobo` needs a second general runner; 3 bb repos need
+   `System/getProperty` / `cljs.core/ExceptionInfo` made portable first.
+
+## Known holes in the tools themselves
+
+- `verify-cljs-runner-completeness` can call a runner complete when it uses
+  `run-all-tests` with a REGEX filter that excludes a loaded namespace. Not hit today.
+- Both detectors read local checkouts. The 438 landings were invisible to them until
+  `west update` synced 390 checkouts; that is recorded in ADR-2608170500 and the
+  session did run the sync.
+- The `:nbb-test` node-side path is unverified end to end (the canary above).
+
+## The failure that recurred, for the next reader
+
+Five times today a stale local ref or an unchecked exit code produced a confident wrong
+answer: `git archive` writing nothing into an unfetched checkout and being reported as
+`NO-TEST-DIR-ON-MAIN` for 32 of 37 rows; `Ran 0 tests` classified as PASS; a stale
+remote-tracking ref reporting `bb.edn` still present on three repos and then on 174;
+`xargs -a` printing usage on BSD and being read as a completed `west update`.
+
+Every one of those was OUTSIDE a tool. The scripts that were given an explicit check —
+fetch before judging, an evidence floor, a distinct exit code for could-not-measure —
+did not make the mistake once. The discipline this workspace writes into its detectors
+is not applied to the commands typed next to them."
+
+  :adr/consequences
+  "- 438 repositories, 3,412 tests / 34,612 assertions, and six reusable scripts land.
+- The JVM debt is unchanged and remains the subject: 954 `.clj`-source repos and 149
+  third-party jars.
+- One canary is outstanding; the command that answers it is in this ADR.
+- No worktrees, branches, or stashes of this session remain. Nothing belonging to
+  another session was moved."
+
+  :adr/evidence
+  ["scripts/verify-jvm-dependency-surface.cljs"
+   "scripts/verify-cljs-runner-completeness.cljs"
+   "scripts/west-pin-put-batch.cljs"
+   "scripts/fleet-ci/tick.cljs git-deps-closure / nbb-deps-classpath"
+   "gates.edn io-ipld-car canary be6780a"
+   "cloud-itonami-isic-6629 f791408 (42 tests / 446 assertions)"]
+  :adr/related
+  ["adr-2608170200-jvm-dependency-surface-measured-repowide"
+   "adr-2608170300-cljs-runner-completeness-gate"
+   "adr-2608170400-portable-tests-are-not-portable"
+   "adr-2608170500-two-tranches-landed-437-repos"
+   "adr-2608180100-runners-do-not-unlock-gates"]}]

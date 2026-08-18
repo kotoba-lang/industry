@@ -1,0 +1,38 @@
+[{:db/id -1
+  :adr/id "adr-2607197600-kami-publisher-trust-keyframe-editor"
+  :adr/title "KAMI trusts signed audio publishers and edits caption curves"
+  :adr/date "2026-07-19"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/topic "kotoba-lang-media-authoring"
+  :adr/supersedes ["adr-2607197500-kami-plugin-integrity-caption-keyframes"]
+  :adr/decision
+  {:daw {:publisher-trust
+         {:signature {:algorithm :ecdsa-p256 :hash :sha-256 :payload :source-digest}
+          :fingerprint :sha-256-public-jwk
+          :unknown-publisher :pending-explicit-trust
+          :revocation [:remove-trust :disable-associated-plugins]
+          :authority [:project-trusted-publishers :signed-plugin-identity]}}
+   :nle {:keyframe-editor
+         {:scope :caption-animation-interval
+          :controls [:interpolation :x1 :y1 :x2 :y2]
+          :constraints {:values [0.0 1.0] :time-axis :x1-less-than-or-equal-x2}
+          :authority [:validated-project-edit :preview :production-capture :imsc-export]}}
+   :maturity {:kami-app-daw :逍遥 :kami-app-nle :逍遥}
+   :remaining-commercial-gates
+   {:daw ["certificate-chain ecosystem" "sandbox permission broker" "surround/Atmos"]
+    :nle ["graphical curve canvas and tangent handles" "OCIO/ICC/HDR" "MOV/MXF/IMF delivery"]}}
+  :adr/implementation
+  {:daw-commits ["9ed6cee"] :nle-commits ["f6d9392"]
+   :pull-requests ["kotoba-lang/kami-app-daw#34" "kotoba-lang/kami-app-nle#34"]
+   :evidence
+   ["DAW passes 39 tests and 185 assertions; NLE passes 41 tests and 202 assertions."
+    "Both guarded optimized builds generated non-empty artifacts."
+    "Chrome generated a real P-256 keypair and signature, observed pending trust, installed after explicit trust, and persisted revocation with plugin disable."
+    "Chrome changed a caption interval to spline, edited a valid control point, and observed the exact curve in saved EDN."
+    "All five browser assertions passed with zero console errors; Chrome and local servers closed."]}
+  :adr/consequences
+  ["Hash integrity now extends to publisher identity and explicit trust lifecycle."
+   "Caption easing curves are editable without hand-editing EDN or TTML."
+   "Certificate ecosystems and graphical tangent editing remain explicit commercial gaps."]
+  :adr/source-format "edn"}]

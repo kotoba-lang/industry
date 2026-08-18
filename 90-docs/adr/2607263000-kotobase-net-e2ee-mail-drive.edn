@@ -1,0 +1,284 @@
+[{:db/id -1
+  :adr/id "adr-2607263000-kotobase-net-e2ee-mail-drive"
+  :adr/doc_type "adr"
+  :adr/topic "kotobase-net-e2ee-mail-drive"
+  :adr/title "ADR-2607263000: kotobase.net の上に Proton 相当の E2EE Drive / Mail を載せる — Drive を先に出し、Mail は zero-access から始め、OpenPGP 相互運用は当面やらない"
+  :adr/status "accepted"
+  :adr/date "2026-07-26"
+  :adr/last_verified "2026-07-26"
+  :adr/deciders ["Jun Kawasaki (+ Claude)"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["kotobase.net 上の E2EE consumer product（Drive / Mail）の実装順序と、各 phase の受け入れ条件"
+   "暗号エンベロープの設計: per-file ランダム content key (AES-GCM-256) を受信者の X25519 公開鍵に wrap する。共有は re-wrap、公開リンクは URL fragment。鍵実装は kotoba-lang/org-signal の x25519.cljs を消費し、新規の crypto primitive を書かない"
+   "content-addressing と E2EE の衝突に対する決定: CID は ciphertext に対して取り、cross-user 重複排除は放棄する（convergent encryption を採らない）"
+   "Mail の暗号 tier: Tier A (zero-access、受信 Worker が即時に公開鍵暗号化) を先に実装し、Tier B (OpenPGP 相互運用) は本 ADR の scope 外として明示的に延期する"
+   "メール transport の経路: 受信は Cloudflare Email Routing + Email Worker、送信は kotoba-lang/mailer の :resend / :ses（HTTP API）。自前 SMTP サーバを立てない"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related
+  ["90-docs/adr/2607252000-authn-kotobase-net-identity-service.edn（authn.kotobase.net / accountDid。Drive/Mail の account はこれに乗る）"
+   "90-docs/adr/2607177000-kotobase-protocols-per-did-cacao-auth.edn（per-DID CACAO。s3 surface の認証はここに従う）"
+   "90-docs/adr/2607171700（kotobase-protocols: 1つの datom/document/block 面に 4 wire protocol を射影する。s3.kotobase.net の出自）"
+   "90-docs/adr/2607022330-app-aozora-key-backup-device-link.edn（鍵バックアップ / device link の先行実装。Drive/Mail の鍵保管はこれを再利用する）"
+   "90-docs/adr/2607122200（kotoba-uiux paved road。Webmail / Drive UI はこれに従う）"
+   "90-docs/adr/2607093100（x402 per-request billing）および net-kotobase の Stripe tier（課金導線は既存）"]
+  :adr/repos
+  ["gftdcojp/net-kotobase" "kotoba-lang/kotobase-protocols" "kotoba-lang/drive" "kotoba-lang/mail"
+   "kotoba-lang/mailer" "kotoba-lang/org-signal" "kotoba-lang/kotobase-messenger"
+   "kotoba-lang/org-ietf-smtp" "kotoba-lang/org-ietf-imap"]
+  :adr/artifacts
+  ["実測 2026-07-26 07:05 JST（着手前）: kotobase.net/health 200、s3.kotobase.net/health 200（ListBucketResult を返す）、git.kotobase.net/health 200、atproto.kotobase.net/health 404、ipfs.kotobase.net は DNS 解決なし"
+   "実測 2026-07-26 07:05（着手前）: dig MX kotobase.net -> レコード無し（メールの入口が存在しない）"
+   "実測 2026-07-26 07:05（着手前）: GET https://s3.kotobase.net/<任意 bucket>?list-type=2 が無認証で 200（空の ListBucketResult）。GET /probe/nonexistent-key-xyz は 404 で、403 ではない"
+   "Phase 1 実装: gftdcojp/net-kotobase 11bf4962（read gate）+ a2cae3ee（git.kotobase.net の route 撤回）。kotobase-protocols-worker version 4cf55ef2-5e88-4d45-98ba-b83117fb35d3 として deploy 済み"
+   "Phase 1 実測（deploy 後、2026-07-26）: s3 の bucket listing / object GET / HEAD がいずれも 401、pinning /pins も 401、s3・atproto の GET /health は 200（router の EDN）。git.kotobase.net はデータを持つ kotobase-git worker に復帰"
+   "kotoba-lang/envelope a2119e38（新規 repo、20 tests / 61 assertions、実 Web Crypto + 実 X25519）。west entry 登録済み"
+   "kotoba-lang/org-ietf-mime 800548cd（新規 repo、20 tests / 71 assertions、JVM と ClojureScript の両方で green）。west entry 登録済み"
+   "Phase 3 transport: Cloudflare Email Routing を kotobase.net で有効化（zone 5ad3da692f2367905c257cfcb0c1057c、status ready）。実測 dig MX kotobase.net -> route1/2/3.mx.cloudflare.net、TXT -> v=spf1 include:_spf.mx.cloudflare.net ~all"
+   "Phase 3 実装: gftdcojp/net-kotobase mail-worker（817c3d16 で main へ）。Worker kotobase-mail version b5f7a11d-9112-4d1b-93d6-36ff216c788c、R2 bucket kotobase-mail、KV MAIL_DIR 4ca747c7df2f4f4a805b1a0b0928ee74、catch-all rule -> kotobase-mail"
+   "Phase 3 end-to-end 実測（2026-07-26、fixture ではなく外部からの実メール）: seal-check@kotobase.net 宛 -> Cloudflare MX -> Worker -> R2 に 4 objects（index 366B / envelope.json 1259B / parsed/0 4975B / raw/0 5099B）。保存された ciphertext と index のいずれにも本文・subject は含まれない。受信者の X25519 秘密鍵で parsed（subject 「テスト件 inbound seal」= RFC 2047 復号、body = quoted-printable 復号、spf/dkim/dmarc すべて :pass）と byte-exact な raw 原本の両方を復元"]
+  :adr/decision-summary
+  "Drive を先に出す（ドメインモデル・storage・課金・認証が既に揃っており、不足は暗号エンベロープ層とチャンク化と s3 面の認証の3つだけ）。Mail は MX が無く MIME parser も OpenPGP も存在しないため後段に置き、まず Tier A の zero-access encryption だけを実装する。暗号は org-signal の X25519 を消費し新規実装しない。CID は ciphertext に対して取り、cross-user dedup は放棄する。"
+  :adr/source-format "edn"
+  :adr/body "# ADR-2607263000: kotobase.net 上の E2EE Drive / Mail
+
+**Status**: accepted / **Date**: 2026-07-26
+
+## Context
+
+「今の kotobase.net で Proton like な email / drive をどう実現するか」という問い。
+着手前に実際に動いているものを実測した（2026-07-26 07:05 JST）。
+
+### live surface
+
+| surface | 実測 |
+|---|---|
+| `kotobase.net` | 200。clj-edge に CACAO 認証 / B2 storage / archive PUT / Stripe 課金 / signup funnel |
+| `s3.kotobase.net` | 200。S3 ListObjectsV2 が実応答（PUT/GET/HEAD/DELETE subset） |
+| `git.kotobase.net` | 200 |
+| `atproto.kotobase.net` | 404（DNS はあるが未ルーティング） |
+| `ipfs.kotobase.net` | DNS 解決なし |
+| **MX kotobase.net** | **レコード無し** |
+
+### 既にあるコード
+
+- `kotoba-lang/drive` — workspace / owner-editor-commenter-viewer ACL / immutable
+  version / trash-restore / byte quota の pure cljc モデル。**Drive のドメイン層は
+  もう書けている**
+- `kotoba-lang/mail` — address / message / draft / send-effect / receipt /
+  mailbox（thread・label・read・trash・使用バイト計上）の pure cljc モデル
+- `kotoba-lang/mailer` — 承認済み `mail/send` effect から provider request
+  （`:resend` / `:smtp` / `:ses`）への写像
+- `kotoba-lang/org-signal` — X3DH + Double Ratchet + sender-keys group。cljs 側は
+  `@noble/curves` ベースで **Worker / browser で動く**（JVM 版とは別ファイル、
+  Web Crypto に同期 API が無いため意図的に `.cljc` 共有していない）
+- `kotoba-lang/kotobase-messenger` — kotobase 上の E2EE メッセンジャ実体。prekey
+  bundle・group ratchet・Web Push・**平文を走査しない E2E-safe 検索**。「kotobase の
+  上に E2EE アプリを載せる」前例が既に1本存在する
+- `org-ietf-smtp` / `org-ietf-imap` — RFC 5321 / 3501 の本物のクライアント
+  （実 I/O は JVM SSLSocket 前提、injectable transport）
+
+### 欠けているもの
+
+1. **MX レコードが無い** — メールの入口が存在しない
+2. **MIME / RFC 5322 parser がフリートに存在しない** — `mail.inbound/from-parts` は
+   パース済みの parts を期待しており、生の wire format を解く層が無い
+3. **OpenPGP 実装がフリートに存在しない**（RFC 9580 相当）
+4. **暗号エンベロープ層が無い** — Drive にも Mail にも共通で必要
+5. **s3 surface の認証** — `s3.cljc` の docstring どおり SigV4 は deploy shell 側の
+   責務とされているが、実測で無認証の ListObjectsV2 が 200 を返す。今は中身が空だから
+   無害なだけで、実データが乗った瞬間に問題になる
+
+## Decision
+
+### D1. Drive を先、Mail を後
+
+Drive はドメインモデル・storage・認証・課金導線が既に揃っており、不足は3つだけ
+（D2/D3/D4）。Mail は入口（MX）も parser も暗号相互運用も無い。売れる形になるまでの
+距離が一桁違うので、Drive を先に出す。
+
+### D2. s3 surface の認証を閉じるのが Phase 1（Drive の前提条件）
+
+無認証で bucket が列挙できる面の上にユーザーデータを置かない。認証は
+ADR-2607177000 の per-DID CACAO に合わせ、product Worker 側で再実装しない。
+これは Drive の一部ではなく **Drive 以前の前提**として独立に着地させる。
+
+### D3. 暗号エンベロープ — per-file content key を公開鍵に wrap する
+
+- ファイルごとにランダムな content key（AES-GCM-256）を生成し、本体を暗号化する
+- content key を所有者の X25519 公開鍵に wrap して保管する
+- **共有は content key を相手の公開鍵に再 wrap するだけ**。これは
+  `drive.workspace` の ACL（owner/editor/commenter/viewer）とそのまま対応が取れる
+- 公開リンクは鍵を **URL の fragment（`#`）** に置く。fragment はサーバに送られない
+  ので、サーバは鍵を見ない
+- 鍵実装は `org-signal` の `x25519.cljs` / `hkdf.cljs` を消費する。**新しい crypto
+  primitive を書かない**（監査済み `@noble/curves` 経路から離れない）
+- 鍵の保管・デバイス間同期は ADR-2607022330（app-aozora key backup / device link）の
+  先行実装を再利用する
+
+### D4. content-addressing は ciphertext に対して行い、dedup は放棄する
+
+kotobase の CID / prolly tree と E2EE は正面から衝突する。暗号化してから CID を取ると
+cross-user な重複排除が効かず、効かせようとすると convergent encryption になり
+「同じファイルを持っているか」が第三者に漏れる。**ciphertext に対して CID を取り、
+cross-user dedup は諦める**。Proton も重複排除していない。整合性検証とバージョニング
+（同一ユーザー内の差分）の利益は残る。
+
+### D5. チャンク化アップロード
+
+`kotobase.protocols.s3` は multipart 非対応で、Worker のリクエストボディ上限もある。
+4–8MB チャンクに割り、各チャンクを block（CID）として置き、manifest datom で束ねる。
+Range GET と再開可能アップロードを同時に用意する。kotobase の block plane と素直に
+噛み合う形であり、S3 の multipart をそのまま実装する必要はない。
+
+### D6. Mail の暗号は 2 tier。Tier A だけを実装する
+
+- **Tier A（zero-access、実装する）**: 受信 Email Worker が届いた平文を即座に
+  ユーザーの公開鍵で暗号化して保存し、以後サーバは読めない。X25519 + AES-GCM で済み、
+  **OpenPGP は不要**。Proton が外部差出人からのメールに対してやっているのもこれ
+- **Tier B（外部との真の E2E、やらない）**: OpenPGP 相互運用。フリートに実装が無く、
+  RFC 9580 を cljc で書くのは重い。**kotobase ↔ kotobase 間は `org-signal` の
+  ratchet で E2E、外部宛は zero-access のみ**と割り切る。将来やるなら独立 ADR
+
+### D7. 受信は Email Routing + Email Worker、送信は HTTP relay
+
+- 受信: 自前 SMTP サーバを立てない。kotobase.net ゾーンで Cloudflare Email Routing を
+  有効化し、Email Worker をバインドして生の RFC822 を受ける
+- 送信: Workers は outbound SMTP が塞がれているため、`mailer` の `:resend` / `:ses`
+  （HTTP API）経由。SPF/DKIM/DMARC は kotobase.net ゾーンに設定し、DKIM 署名は当面
+  リレー側に委ねる
+- `org-ietf-smtp` / `org-ietf-imap` は**クライアント**なのでこの経路には使わない
+  （用途が違う。将来 Bridge を書く時も server 側は別実装）
+
+### D8. MIME parser は `org-ietf-mime` を cljc で新規に起こす
+
+JS の postal-mime 等を持ち込まない（リポジトリ規約: cljc 優先、新規 `.mjs` 禁止）。
+命名は既存の `org-<standards-body>-<spec>` 慣習に従う。**Mail 側で最大の実装量はここ**。
+
+### D9. サードパーティメールクライアント対応（Proton Bridge 相当）は scope 外
+
+IMAP/SMTP の**サーバ側**が必要になり、既存の client 実装は流用できない。JMAP を選ぶ
+選択肢も含めて後日の独立 ADR とする。
+
+## Phases
+
+```
+Phase 1  s3.kotobase.net の認証を閉じる                       ← Drive 以前の前提
+Phase 2  暗号エンベロープ層 + チャンク化 -> Drive MVP
+Phase 3  Email Routing 有効化 + org-ietf-mime -> 受信・zero-access 保存
+Phase 4  mailer 経由の送信 + SPF/DKIM/DMARC
+Phase 5  Webmail / Drive UI（kotoba-uiux、app-aozora が前例）
+```
+
+受け入れ条件:
+
+- **Phase 1**: 無認証の `?list-type=2` が拒否される。正当な credential では通る
+- **Phase 2**: 100MB 級のファイルを upload -> 別デバイスで download して byte 一致。
+  サーバ側に保存された blob が平文を含まないことを実際に読んで確認する。共有相手が
+  復号でき、共有解除後は復号できない
+- **Phase 3**: 外部から kotobase.net 宛に送ったメールが mailbox に現れ、保存された
+  本文が ciphertext であること
+- **Phase 4**: 主要プロバイダ宛に送信して SPF/DKIM/DMARC が pass すること
+  （実ヘッダで確認。到達したという自己申告で済ませない）
+
+## 進捗（2026-07-26 時点）
+
+**done:**
+
+- **Phase 1 完了・deploy 済み・live で検証済み。** `handle-request` は `core/write?`
+  のときしか認可ラダーを回しておらず、GET/HEAD は無条件 `(js/Promise.resolve true)`
+  だった。read を **surface ごとに**認可するよう変更（`core/public-read-surfaces` は
+  allowlist で、開いている理由を surface ごとに明記。後から足された surface は誰かが
+  そこに書くまで private）。surface は `core/effective-surface` で router の dispatch
+  を single-origin fallback ごと写して導出する — hostname だけで判断すると apex 上の
+  `GET /s3/*` が無認証のまま残る。実測: bucket listing / object GET / HEAD /
+  pinning `/pins` がいずれも 401、`/health` は全 surface で anonymous のまま 200。
+- **`kotoba-lang/envelope`（新規）** — D3/D4/D5 の暗号エンベロープ。`envelope.model`
+  が pure `.cljc`（nonce 導出・AAD・recipient・revoke・link grant）、`envelope.seal`
+  が `.cljs`（AES-256-GCM + X25519 + HKDF、org-signal を消費し crypto を再実装しない）。
+  20 tests / 61 assertions が実 Web Crypto と実 X25519 で green。ネガティブ側が本体:
+  鍵違い・1bit 改竄・chunk 入れ替え・truncation・別 object への chunk 移送・別 envelope
+  への wrap 貼り付けが**すべて open しない**。`revoke` は `:requires-rotation?` を返す
+  （wrap を消しても既に導出された鍵は忘れさせられない）。
+- **`kotoba-lang/org-ietf-mime`（新規）** — D8 の MIME parser。pure `.cljc`・依存ゼロ・
+  **JVM と ClojureScript の両方で同一ファイルが green**（20 tests / 71 assertions）。
+  出力は `mail.inbound/from-parts` の引数そのもの。`multipart/alternative` は
+  **最後の** alternative を採る（RFC 2046 は劣→優の順。最初を採るのが典型的なバグ）、
+  quoted display name 中のカンマは区切りではない、隣接 encoded-word 間の空白は消える
+  （RFC 2047 §6.2）。UTF-8/ASCII/latin-1 以外は host decoder を注入する契約で、
+  `decodable?` が「decoder を渡されていない」を検出可能にする（mojibake で気付くのを避ける）。
+- **Phase 3 の transport 側** — kotobase.net で Cloudflare Email Routing を有効化。
+  MX（route1/2/3.mx.cloudflare.net）と SPF TXT が live。**メールの入口が存在しない**
+  という最大のブロッカーは解消した。
+
+- **Phase 3 完了・deploy 済み・実メールで end-to-end 検証済み。** `mail-worker`
+  （Cloudflare Email Worker）が受信 → `org-ietf-mime` で parse → `envelope` で
+  受信者の**公開**鍵に封入 → R2 に保存。private key を持たないので、封入した
+  ものを自分で読めない。1 メッセージにつき sealed object を 2 つ持つ:
+  `raw`（原本バイト列。後から DKIM を再検証でき、より良い parser で読み直せる）と
+  `parsed`（構造化済み。mailbox client に MIME parser を積まずに済む）。
+  `route/clear-fields` が誠実さの境界で、平文で残す各 field に「なぜ封入できないか」
+  を書いてある — subject / body / attachments はそこに**無い**（test が assert）。
+  `:mail/custody` を 1 通ごとに記録する: `:self` なら本当に zero-access、
+  `:server` なら封入はされているがサービスは開けてしまう。どちらだったかを
+  毎回言うことが、security property と宣伝文句の違い。
+  未知の mailbox は**保存せず reject** する（封入する鍵が無い＝平文保存しかできない）。
+  処理失敗も reject（= 送信者にバウンスして伝わる。silent drop は誰も気付かず
+  メールを失う）。
+
+**残り:**
+
+- mailbox directory を実アカウントに接続する。今は KV `MAIL_DIR` を手で埋めている。
+  ADR-2607252000 の authn/accountDid と、account ごとの X25519 公開鍵の発行・
+  公開経路を繋ぐ必要がある
+- DKIM / DMARC レコード（送信を始める時点で必要。Phase 4）
+- Drive のチャンク化アップロード client（envelope 側の nonce/AAD/chunk-count は
+  実装済みなので、残りは分割・並列 upload・range GET・再開）
+- Webmail / Drive UI（Phase 5）
+
+## Alternatives considered
+
+- **自前 SMTP サーバ（VPS 上の Postfix 等）**: 却下。Email Routing で受信要件は満たせ、
+  IP レピュテーション・24/7 運用・abuse 対応という恒久コストを負う理由が無い
+- **最初から OpenPGP 相互運用（Tier B）**: 却下。RFC 9580 を cljc で書く量が Drive の
+  全実装量を上回りかねず、内部ユーザー同士の価値（ratchet で足りる）を先送りにする
+- **convergent encryption で dedup を残す**: 却下。「同じファイルを持っているか」が
+  漏れる。プライバシー製品としての前提を壊す
+- **JS ライブラリ（postal-mime / openpgp.js）をそのまま持ち込む**: 却下。cljc 優先
+  規約に反し、暗号については監査済み `@noble/curves` 経路から離れる副作用もある
+- **Mail を先に出す**: 却下。上記のとおり距離が一桁違う
+
+## 途中で見つかった、別件の実問題
+
+**`git.kotobase.net` を 2 つの repo が wrangler config で取り合っている。**
+`gftdcojp/net-kotobase` の `protocols-worker`（README で「4 つの公開 hostname の
+唯一の deploy owner」と宣言）と、`kotoba-lang/kotobase-protocols` 自身が持つ
+`kotobase-git` worker の両方が同じ custom domain を claim している。custom domain は
+1 worker にしか属せないので、Phase 1 の deploy で hostname が protocols-worker 側
+（git store が空）に移り、**D1 `kotobase-git` にある 28 repos / 23 refs / 203
+objects / 19 heads（fabric-witness、2026-07-17）が全部 `404 repository not found`
+になった。** kotobase-git を再 deploy して復旧し、`refs/heads/main` が再び解決する
+ことを確認済み。
+
+暫定措置として protocols-worker 側の claim を外した（**データを持っている方が
+hostname を持つ**）。次の deploy で再び奪う地雷を残さないため。両 repo の
+ownership 衝突自体は未解決で、`kotoba-lang/*/wrangler.*` に public route を置くなと
+いう protocols-worker README 側の不変条件と、実際に動いている配置が食い違っている。
+どちらを正とするかは別途決める。
+
+## Open questions
+
+- 暗号エンベロープ層の置き場所は **独立 repo `kotoba-lang/envelope` に決定**
+  （Mail からも使うため）。この項目は解決済み
+- ファイル名・パスのメタデータ暗号化をどこまでやるか。Proton は暗号化するが、その場合
+  S3 互換 surface のキーが opaque になり `s3.kotobase.net` を素の S3 として使えなくなる。
+  互換性と秘匿性のどちらを取るかは Phase 2 の設計判断（`envelope` 側は AAD で
+  object id を縛るだけで、名前の秘匿には踏み込んでいない）
+- 課金 tier（既存 Stripe: Starter $13 / Standard $33 / Pro $650）が graph BaaS 向けの
+  価格であり、consumer Drive/Mail の価格帯と噛み合わない。別 tier が要る
+- 公開 share link の read 経路。Phase 1 で s3 の read を閉じたので、リンク受領者
+  （credential を持たない）が ciphertext を取得する経路が今は無い。SigV4 の presigned
+  URL がそのまま使えるはずだが、`kotoba-lang/sigv4` は presign の**生成**側
+  （`request/presigned`・`core/presign-params`）しか持たず**検証**側が無い。
+  Phase 2 で `sigv4.verify` に presigned 検証を足すのが素直"}]

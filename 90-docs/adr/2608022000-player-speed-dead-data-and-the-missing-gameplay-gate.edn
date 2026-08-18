@@ -1,0 +1,100 @@
+[{:db/id -1
+  :adr/id "adr-2608022000-player-speed-dead-data-and-the-missing-gameplay-gate"
+  :adr/title "ADR-2608022000: :world :player-speed was dead data in 19 games — the host now owns axis magnitude, and a gameplay gate exists to notice"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "kami-engine-host-input"
+  :adr/last_verified "2026-08-02"
+  :source/dataset "root-adr"
+  :adr/authoritative_for
+  ["kami.input axis :scale and pointer :sticks contract"
+   "kami.webgpu.ir/rig->camera :follow-height contract"
+   "network-isekai headless gameplay gate (?frozen=1, __isekai_capture.axes)"
+   "duplicate-coordinate hazard for :local/root libraries also named io.github.*"]
+  :adr/supersedes ["network-isekai local ADR-0033 §4 (hangar altitude requirement)"]
+  :adr/body
+  "# ADR-2608022000 — `:world :player-speed` was dead data, and nothing could have noticed
+
+Status: accepted (2026-08-02)
+Repos: `kotoba-lang/host` · `kotoba-lang/webgpu` · `network-awai/network-isekai`
+Local ADR (full detail): network-isekai `90-docs/adr/0073-player-speed-was-never-wired-and-the-gate-that-would-have-caught-it.md`
+
+## Context
+
+Owner report: `https://isekai.network/gftd/at6-texan` does not work as a game. Root-causing it
+produced one game-specific problem and five that were not.
+
+**`:world :player-speed` was read by no code in the workspace.** 33 network-isekai scenes
+declare it in world units per second. `kami.input/axes-from-held` reported a raw -1/0/1; the
+catalog-standard guest line `(set-velocity! p (axis \"MoveX\") (axis \"MoveY\") zero)` passed
+that straight through; `kami.host/tick!` integrated it at one unit per second. at6-texan's
+world is ~1800x3100 units, so crossing it took about 47 minutes — and the same held for all
+19 games that steer with `axis` (royale 600, palisade 600, kazabue 150, tanememi 130, waves
+220, …). `drive` was unaffected: it selects precomputed constants with `key-pressed?` and
+never calls `axis`. Several scenes carried comments asserting scaling that did not exist.
+
+Nothing errored. The repo's substantial browser-gate suite — SSAO, atmosphere, streaming,
+skinned characters, visual regression — stayed green throughout, because **every one of those
+gates asks a rendering question**. None asked whether the game moves. That is the structural
+finding, and it generalises past this repo: a render gate cannot see a dead input path.
+
+## Decision
+
+1. **The host owns axis magnitude, as data.** `kami.input` axes take `:scale` (full-deflection
+   magnitude) and `with-axis-scale` applies a world-level default without clobbering a
+   per-axis override. Guest code is unchanged in all 19 games; the magnitude is forkable scene
+   EDN. An axis with no `:scale` still reports the exact integer it always did, and a
+   zero/absent world speed leaves the map untouched (a scene declaring a stationary player is
+   stating a mechanic). `kami.input` moved `.cljs` -> `.cljc`; 18 JVM unit tests.
+2. **The camera can follow altitude.** `kami.webgpu.ir/rig->camera` accepts `[x y z]` and a
+   `:follow-height` fraction. Default 0.0 returns byte-identical values for every existing
+   caller.
+3. **Pointer input is real.** `:stick` / `:sticks` with `:zone`s turn drags into the same axis
+   values, several at once; `:on-pointer` feeds `kami.host`'s `:pointer`, which the
+   `kami:engine/input` `pointer-x`/`pointer-y` host imports had been returning a hardcoded 0.0
+   for. Every MoveX/MoveY game becomes touch-navigable without editing its scene.
+4. **A gameplay gate exists.** `scripts/isekai/playtest_headless.cljs` boots each game,
+   dispatches real KeyboardEvents, steps the ECS through `__isekai_capture.tick`, and asserts
+   travel. It required two additions: `?frozen=1` (boot with the rAF loop stopped — with no
+   GPU every frame is software-rasterised, the page's main thread saturates, and CDP evaluates
+   queue behind frames indefinitely) and `__isekai_capture.axes` (without it there is no way
+   to distinguish a game that ignores its input from one whose input is scaled to nothing).
+5. **Altitude is a first-class axis in the host, not just the renderer.** `entities->instances`
+   already read ECS z; now the camera, the HUD bindings (`{{altitude}}` and friends —
+   a guest cannot publish these, `def`s are constants and `defatom` globals are i64), the new
+   `:render/altitude-cues` ground tethers, and `world-collision/resolve-position` all do.
+
+## Consequence worth carrying past this repo
+
+**Naming one `:local/root` library under two coordinates puts two copies of every namespace on
+the classpath, and ClojureScript prefers a `.cljs` source over a `.cljc` one regardless of
+classpath order.** network-isekai declared `kotoba-lang/host` as `:local/root` while
+`kotoba-lang/webgpu` declared `io.github.kotoba-lang/host` by `:git/sha`. Both resolved. The
+moment `kami.input` became `.cljc`, the build silently compiled the git copy's older
+`kami/input.cljs` and boot threw a bare `TypeError: Cannot read properties of undefined`.
+`deps.edn` now names both coordinates at the same `:local/root` — the same fix already present
+for `io.github.kotoba-lang/physics`, for the same reason. **Any repo mixing `:local/root`
+siblings with git-coordinate transitive deps of the same library has this latent.**
+
+## Verification
+
+- 18 JVM tests in `kotoba-lang/host` (`kami.input-test`), 4 new camera assertions in
+  `kotoba-lang/webgpu` (`domains_bb_test.clj`), altitude-collision assertions in
+  network-isekai — all green.
+- Guest `.kotoba`-DSL logic compiles to real wasm on the JVM through the same
+  `kotoba.engine-clj` path the browser uses (1719 bytes).
+- Headless gameplay gate, against the deployed production site: at6-texan travels 320
+  units/s and climbs 150, royale 600, kazabue 150, waves 220, tanememi 130 — each exactly its
+  declared `:player-speed`.
+- Deployed: network-isekai production (Cloudflare Pages, branch `main`, `ca69b9e`).
+
+## Known-unfixed (reported, not hidden)
+
+- 4 assertions in network-isekai's `royale_world_collision_test.clj` fail on `main` and still
+  fail: the royale scene's authored collider/landmark counts have drifted from the test. Not
+  caused by, and not addressed in, this change.
+- The touch sticks have no on-screen affordance — the zones work and are data, but nothing
+  draws them, so a phone player must discover them.
+- Headless screenshots of the WebGPU canvas are black under SwiftShader for every 3D game in
+  the catalog (verified against `royale` as a control), so visual confirmation of the new
+  camera framing rests on the HUD/ECS probes rather than a captured frame."}]

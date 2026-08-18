@@ -1,0 +1,237 @@
+{:doc/type :metrics-pipeline-config
+ :doc/id "metrics-pipeline-wave5-m5m6"
+ :doc/title "Wave 5 M5–M6 Metrics Collection Pipeline"
+ :doc/status "DEPLOYMENT_READY"
+ :doc/deploy-date "2026-08-10"
+
+ :pipeline/overview
+ {:components ["prometheus-collector" "ci-gate-bot" "alert-router" "dashboard-exporter"]
+  :flow "Build → CI Job → Prometheus → Alert Router → Grafana Dashboard + Jira + Slack"
+  :end-to-end-latency-slo "< 2 minutes (detection to Slack alert)"
+  :collection-cadence "15–60 min depending on metric"}
+
+ :prometheus/collector
+ {:status "staged"
+  :deploy-target "monitoring-cluster"
+  :deployment-script "scripts/prometheus-wave5-deploy.cljs"
+  :scrape-targets
+  [{:job "ci-build-times"
+    :url "https://ci.internal/api/v1/metrics/build"
+    :interval "15min"
+    :metrics ["build_duration_seconds (p50, p99)" "build_failure_rate"]}
+   {:job "test-coverage"
+    :url "https://ci.internal/api/v1/metrics/coverage"
+    :interval "1h"
+    :metrics ["code_coverage_percent" "coverage_trend"]}
+   {:job "deployment-success"
+    :url "https://ci.internal/api/v1/metrics/deploy"
+    :interval "1h"
+    :metrics ["deployment_success_rate" "rollback_count" "time_to_production"]}
+   {:job "gate-blockers"
+    :url "https://jira.internal/api/v2/issues?jql=project in (M5W5, M5IW5, M6W5) AND status = Blocked"
+    :interval "5min"
+    :metrics ["blocker_count" "blocker_age_hours" "blocker_severity_p1_count"]}]
+  :retention-policy "30 days raw + 1 year aggregated"
+  :alerting-rules
+  [{:rule "build_timeout_p99"
+    :condition "build_duration_seconds{quantile=\"p99\"} > 720 (12 min)"
+    :severity "warning"
+    :action "notify #prod-gates-wave5"}
+   {:rule "test_coverage_drop"
+    :condition "code_coverage_percent < 92"
+    :severity "warning"
+    :action "notify team-lead (Slack DM)"}
+   {:rule "deployment_failure_spike"
+    :condition "deployment_success_rate < 0.995"
+    :severity "critical"
+    :action "PagerDuty escalation (prod-gates service)"}
+   {:rule "blocker_sla_breach"
+    :condition "blocker_age_hours > 4 AND blocker_severity_p1_count > 0"
+    :severity "critical"
+    :action "escalation protocol armed"}]}
+
+ :ci/gate-bot
+ {:status "tested"
+  :deploy-target "github-workflows"
+  :deployment-script "scripts/ci-gate-bot-deploy.cljs"
+  :workflow-file ".github/workflows/gate-metrics-collector.yml"
+  :triggers
+  [{:event "push to main"
+    :metric "build-times, test-coverage"
+    :job "collect-metrics.sh"}
+   {:event "deployment complete"
+    :metric "deployment-success"
+    :job "track-deployment.sh"}
+   {:event "jira issue state-change to Blocked"
+    :metric "gate-blockers"
+    :job "escalate-blocker.sh"}]
+  :bot-capabilities
+  ["Trigger Prometheus scrape (manual or on-event)"
+   "Fetch metrics from Grafana API"
+   "Post gate-readiness to Jira (issue update)"
+   "Route alerts to Slack + email"
+   "Generate weekly metrics report (markdown)"]
+  :github-workflow-jobs
+  [{:job-id "collect-metrics"
+    :runs-on "ubuntu-latest"
+    :steps
+    ["checkout"
+     "login-prometheus-api"
+     "fetch-build-times (15-min window p99)"
+     "fetch-test-coverage (latest CI run)"
+     "fetch-deployment-success (1h window)"
+     "fetch-blocker-count (Jira query)"
+     "store-to-db (metrics.internal)"
+     "post-to-grafana (panel refresh)"]}
+   {:job-id "generate-weekly-report"
+    :runs-on "ubuntu-latest"
+    :schedule "cron: 0 9 * * 1 (Monday 9 AM JST)"
+    :steps
+    ["checkout"
+     "query-prometheus (week-to-date aggregate)"
+     "generate-markdown-report"
+     "post-to-jira (Issue type: weekly-metrics-snapshot)"
+     "post-to-slack (#prod-gates-wave5)"
+     "post-to-dashboard.internal"]}]}
+
+ :alert/router
+ {:status "configured"
+  :deploy-target "slack-ops-channel"
+  :alert-channels
+  [{:type "slack"
+    :channel "#prod-gates-wave5"
+    :severity-thresholds
+    {:warning "dev alert (thread in channel)"
+     :critical "mention @gates-escalation-on-call"}}
+   {:type "email"
+    :list "gates-escalation@gftd.group"
+    :severity-filter "critical only"}
+   {:type "pagerduty"
+    :service "prod-gates"
+    :severity-filter "critical + P1 blocker SLA breach"}]
+  :routing-rules
+  [{:metric "build-times (p99 > 12 min)"
+    :notify ["Slack #prod-gates-wave5" "team-lead-m5 (DM)"]
+    :sla "2h response"}
+   {:metric "test-coverage (< 92%)"
+    :notify ["Slack thread" "team-lead-m5 (DM)"]
+    :sla "4h response"}
+   {:metric "deployment-success (< 99.5%)"
+    :notify ["Slack alert" "PagerDuty" "team-lead-m6 (DM)"]
+    :sla "2h response + decision"}
+   {:metric "blocker SLA breach (P1 > 2h)"
+    :notify ["PagerDuty" "Slack" "escalation-lead"]
+    :sla "1h escalation-protocol-launch"}
+   {:metric "gate-halt signal (2+ teams blocked)"
+    :notify ["PagerDuty critical" "phase-owner" "platform-lead"]
+    :sla "15 min escalation call"}]}
+
+ :grafana/dashboards
+ {:dashboard-id "wave5-m5m6-live"
+  :url "https://grafana.internal/d/wave5-m5m6"
+  :refresh-rate "30 seconds"
+  :panels
+  [{:title "Build Times (p99)" :type "gauge" :metric "build_duration_seconds{quantile=\"p99\"}" :unit "seconds" :thresholds [600, 720]}
+   {:title "Test Coverage Trend" :type "line" :metric "code_coverage_percent" :unit "%" :thresholds [92]}
+   {:title "Deployment Success Rate" :type "stat" :metric "deployment_success_rate" :unit "%"}
+   {:title "Gate Blockers (SLA Countdown)" :type "table" :query "SELECT blocker_id, age_hours, severity FROM blockers WHERE age_hours > 0 ORDER BY severity DESC, age_hours DESC"}
+   {:title "Weekly Metric Snapshot" :type "stat-panel" :source "jira (weekly-metrics-snapshot issue)"}
+   {:title "Team Velocity (Burndown)" :type "line" :metric "story_points_completed" :source "jira"}
+   {:title "Escalation Timeline (Week by Week)" :type "timeline" :source "slack (#prod-gates-wave5 archive)"}]
+  :alert-annotations
+  {:threshold-breaches "auto-marked on metric cross"
+   :escalation-events "manually annotated from Slack history"}}
+
+ :data/collection-jobs
+ [{:job-id "build-metrics-hourly"
+   :schedule "0 * * * *"
+   :script "scripts/collect-build-metrics.cljs"
+   :source "CI API (github.com/com-junkawasaki/root/.github/workflows)"
+   :destination "prometheus:9090 / metrics.internal"
+   :fields ["build_duration_seconds (p50, p99)" "build_failure_rate" "build_branch" "build_timestamp"]}
+  {:job-id "coverage-metrics-daily"
+   :schedule "0 2 * * *"
+   :script "scripts/collect-coverage-metrics.cljs"
+   :source "CI artifact (coverage-report.json from latest build)"
+   :destination "prometheus:9090"
+   :fields ["code_coverage_percent" "coverage_by_package" "coverage_trend"]}
+  {:job-id "deploy-metrics-hourly"
+   :schedule "0 * * * *"
+   :script "scripts/collect-deploy-metrics.cljs"
+   :source "Kubernetes API / CloudFlare Workers logs"
+   :destination "prometheus:9090"
+   :fields ["deployment_success_rate" "time_to_production" "rollback_count" "deploy_timestamp"]}
+  {:job-id "blocker-metrics-every-5min"
+   :schedule "*/5 * * * *"
+   :script "scripts/collect-blocker-metrics.cljs"
+   :source "Jira API (issue query: status = Blocked, projects = M5W5, M5IW5, M6W5)"
+   :destination "prometheus:9090 / jira-metrics exporter"
+   :fields ["blocker_count" "blocker_age_hours" "blocker_severity" "blocker_owner_team"]}]
+
+ :deployment/steps
+ {:pre-deployment-checklist
+  ["[ ] Prometheus cluster capacity verified (storage: >= 50 GB free)"
+   "[ ] GitHub workflow secrets configured (PROMETHEUS_URL, GRAFANA_API_KEY, PAGERDUTY_KEY)"
+   "[ ] Slack bot token + channel access (#prod-gates-wave5)"
+   "[ ] Jira API credentials (gates-bot service account)"
+   "[ ] All scripts tested in staging (collect-*.cljs verified with mock data)"
+   "[ ] Dashboard panels rendered correctly (Grafana no warnings)"
+   "[ ] Alert routing tested (Slack message delivered, PagerDuty fired)"]
+  :deployment-order
+  ["1. Deploy Prometheus collector (2026-08-08)"
+   "2. Configure CI gate-bot workflow (2026-08-09)"
+   "3. Arm alert router (Slack + PagerDuty + email) (2026-08-09)"
+   "4. Publish Grafana dashboard (2026-08-09)"
+   "5. Smoke test all metrics (2026-08-10, pre-kickoff)"
+   "6. Team training on dashboard access (2026-08-15)"
+   "7. Activate (kickoff 2026-08-18)"]
+  :rollback-plan
+  {:trigger "Critical metric collection failure (> 30 min data gap)"
+   :action "Revert CI workflow to static SLA values (hard-coded fallback)"
+   :communication "Notify #prod-gates-wave5 + escalation-lead"
+   :window-to-decide "30 min after failure detection"}
+
+ :compliance/sla
+ {:metric-freshness
+  {:build-times "< 15 min old (latest CI run)"
+   :test-coverage "< 1h old (latest aggregated)"
+   :deployment-success "< 1h old"
+   :gate-blockers "< 5 min old"}}
+ {:alert-delivery
+  {:critical-alert-to-slack "< 2 min (Prometheus → routing → Slack)"
+   :critical-alert-to-pagerduty "< 2 min"
+   :weekly-report-generation "Mon 9 AM ± 5 min"}}
+ {:dashboard-availability
+  {:uptime-target "99.5% (Grafana SLA)"
+   :refresh-latency "p99 < 30 seconds"
+   :panel-load-time "p95 < 2 seconds"}}
+
+ :maintenance
+ {:runbook "90-docs/gates/metrics-pipeline-runbook.edn"
+  :on-call-rotation "metrics-lead (escalation-lead backup)"
+  :weekly-health-check "Every Monday 09:00 (before team review)"
+  :health-check-steps
+  ["Verify Prometheus scrape success rate (target: >= 99%)"
+   "Verify latest data points exist (all metrics < 15 min old)"
+   "Verify alert routing (test message to #prod-gates-wave5)"
+   "Verify Grafana dashboard renders (all panels load)"
+   "Check for any failed collection jobs (CI logs)"]
+  :escalation-for-health-check-failure
+  {:action "Notify metrics-lead + escalation-lead"
+   :timeline "30 min to triage, decide on rollback vs. fix"}}
+
+ :feedback-loop
+ {:weekly-metrics-snapshot-issue
+  {:type "jira/issue"
+   :template-key "weekly-metrics-snapshot"
+   :published-by "ci-gate-bot"
+   :published-to "Jira + Slack"
+   :archive-location "90-docs/gates/weekly-reports/wave5-m5m6/[week-N].edn"
+   :data-fields ["build_p99" "coverage" "deploy_success" "blocker_count" "velocity" "trending"]}}
+
+ :success-criteria
+ [:all-metrics-live "by 2026-08-18"
+  :zero-data-gaps "week 11–16"
+  :alert-delivery-sla "< 2 min, tested"
+  :dashboard-usable "for Friday gate review (4 PM)"
+  :team-satisfaction "collected in post-gate survey"]}}

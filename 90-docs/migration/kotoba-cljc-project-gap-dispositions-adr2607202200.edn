@@ -1,0 +1,168 @@
+{:migration/id :kotoba-cljc-project-gap-dispositions
+ :migration/as-of "2026-07-20"
+ :migration/adr "90-docs/adr/2607202200-kotoba-sovereign-source-and-cljc-fleet-migration.edn"
+
+ :workspace-baseline
+ {:method "rg --files by org and third path segment; raw workspace baseline, not yet canonical GitHub-repository identity"
+  :orgs
+  {:etzhayyim {:cljc-files 2336 :cljc-path-groups 174 :kotoba-files 3 :kotoba-path-groups 1}
+   :kotoba-lang {:cljc-files 9303 :cljc-path-groups 1506 :kotoba-files 1001 :kotoba-path-groups 790}
+   :gftdcojp {:cljc-files 11916 :cljc-path-groups 140 :kotoba-files 40 :kotoba-path-groups 15}
+   :cloud-itonami {:cljc-files 134 :cljc-path-groups 19 :kotoba-files 0 :kotoba-path-groups 0}
+   :com-junkawasaki {:cljc-files 64 :cljc-path-groups 13 :kotoba-files 3 :kotoba-path-groups 1}}
+  :totals {:cljc-files 23753 :cljc-path-groups 1852 :kotoba-files 1047 :kotoba-path-groups 807}
+  :warning "Path groups can include mirrors, nested checkouts, generated copies, or non-repository directories. They must not be reported as canonical repo counts until remote identity is deduplicated."}
+
+ :tracked-git-baseline
+ {:method "find .git roots, then git ls-files '*.cljc' per local repository"
+  :orgs
+  {:etzhayyim {:local-git-repos 174 :tracked-cljc-files 2336}
+   :kotoba-lang {:local-git-repos 1526 :tracked-cljc-files 9516}
+   :gftdcojp {:local-git-repos 139 :tracked-cljc-files 11940}
+   :cloud-itonami {:local-git-repos 19 :tracked-cljc-files 134}
+   :com-junkawasaki {:local-git-repos 13 :tracked-cljc-files 64}}
+  :totals {:local-git-repos 1871 :tracked-cljc-files 23990}
+  :status :local-roots-confirmed-remote-dedup-open
+  :warning "A local Git root is not yet a unique upstream repository. Remote names are not consistently origin and duplicate upstream URLs still require normalization."}
+
+ :canonical-remote-baseline
+ {:method "Use the first configured remote when origin is absent; normalize GitHub SSH/HTTPS syntax and .git suffix; group by owner/repo; use the maximum tracked .cljc count among duplicate local checkouts."
+  :orgs
+  {:etzhayyim {:unique-remotes 174 :tracked-cljc-files 2336}
+   :kotoba-lang {:unique-remotes 1365 :tracked-cljc-files 5365}
+   :gftdcojp {:unique-remotes 53 :tracked-cljc-files 1401}
+   :cloud-itonami {:unique-remotes 20 :tracked-cljc-files 145}
+   :com-junkawasaki {:unique-remotes 14 :tracked-cljc-files 72}}
+  :totals {:unique-remotes 1626 :tracked-cljc-files 9319 :missing-remotes 0}
+  :duplicate-examples
+  [{:remote "gftdcojp/network-isekai" :local-checkouts 79}
+   {:remote "kotoba-lang/render" :local-checkouts 57}
+   {:remote "kotoba-lang/webgpu" :local-checkouts 45}
+   {:remote "kotoba-lang/shaders" :local-checkouts 23}
+   {:remote "kotoba-lang/game" :local-checkouts 18}]
+  :status :remote-identity-deduplicated
+  :remaining "Confirm archived/fork/default-branch state against GitHub before scheduling writes."}
+
+ :canonical-admission-matrix
+ {:artifact "90-docs/migration/kotoba-cljc-canonical-admission-matrix.json"
+  :generator "scripts/build-kotoba-cljc-admission-matrix.mjs"
+  :method "Include .git directories and worktree .git files, normalize GitHub remotes, choose a complete representative checkout, classify every materialized tracked namespace, and batch live GitHub GraphQL default-branch/archive/fork metadata."
+  :canonical-repositories 1624
+  :local-checkouts 1869
+  :duplicate-checkouts 245
+  :tracked-cljc-files 9333
+  :production-cljc-files 6157
+  :github {:verified 1623 :not-found-or-inaccessible 1
+           :not-found ["kotoba-lang/kototama-clj"]}
+  :source-snapshots {:current-default-branch 898
+                     :stale-against-default-branch 724
+                     :incomplete-worktree 1
+                     :github-unverified 1}
+  :special-state {:archived 4 :forks 0 :incomplete ["kotoba-lang/langchain"]}
+  :classification-counts {:test-only 3168 :generated 6
+                          :security-host-bound 66 :macro-compiler-time 8
+                          :host-adapter 2678 :capability-bound 283
+                          :portable-refactor-required 2770
+                          :portable-direct-candidate 352}
+  :safety-rule "Only current-default-branch snapshots may enter compiler admission. Archived, inaccessible, stale, incomplete, and forked identities require an explicit disposition or fresh clone first."
+  :status :canonical-identity-and-live-repository-state-complete-source-refresh-open}
+
+ :canonical-direct-probes
+ {:artifact "90-docs/migration/kotoba-cljc-canonical-compile-probes.json"
+  :generators ["scripts/probe-kotoba-cljc-canonical-candidates.mjs"
+               "scripts/probe-kotoba-cljc-batch.clj"]
+  :compiler-sha "abf9e5b8125040b1c32956ed5af133f5f962298b"
+  :compiler-worktree :clean
+  :scope "3 current-default-branch repositories with standalone dependency-free portable-direct namespaces after merged migrations/retirements are removed by remote-head freshness gates; 3 production source files; web and typed-Wasm targets"
+  :target-probes 6
+  :direct-accepted 0
+  :minimal-namespace-and-explicit-export-accepted 0
+  :direct-rejections {:unsupported-ns-clause 2 :missing-export 2
+                      :some-type-contract 2}
+  :post-namespace-remediation-rejections
+  {:number-predicate-without-static-contract 2
+   :persistent-update-without-typed-container 2
+   :some-type-contract 2}
+  :conclusion "Lexically quiet CLJC is not automatically Kotoba-admissible. No third wave repository is authorized by this probe; empty namespaces are retirement candidates and every callable source needs a reviewed refactor or language-gap disposition."
+  :status :complete-no-migration-authorized}
+
+ :closed-gaps
+ [{:id :compact-named-index :status :done
+   :evidence "compiler PR #151 and kotoba-script PR #49"}
+  {:id :bounded-cycle-detection :status :done
+   :evidence "persistent disjoint-set-i64, maximum 128 elements"}
+  {:id :typed-wasm-compact-boundary :status :done
+   :evidence "ABI v10 tags 16/17; forged copied externrefs rejected"}
+  {:id :real-kami-consumer :status :done
+   :evidence "kami-articulated PR #7; 128 admitted and 129 rejected in three execution paths"}
+  {:id :bounded-heterogeneous-document :status :done
+   :evidence "kotoba-script PR #50 plus #51; compiler PR #159 / e4dfcbc006f0749d88db8f2d710446a2d4459808; canonical :document, ABI v11 tag 18, bounded runtime keyword construction, reference/restricted-JS/real-Wasm parity, and hostile externref rejection"}
+  {:id :typed-metadata-empty-string :status :done
+   :evidence "compiler PR #159 separates non-empty ABI names from valid empty typed string literals; exercised by the annotation pilot on real Wasm"}
+  {:id :parameterized-f64-pilot :status :done
+   :evidence "cartpole-math PR #2 / 7c6cb3076689165b9aa63487e39ef119841beca4 replaces the fixed-only golden and two production CLJC files with one parameterized Kotoba kernel over bounded vector-f64 values; reference, restricted JS, and typed Wasm agree semantically; malformed vectors and forged externrefs are rejected"}
+  {:id :explicit-bool-and-string-metadata-pilot :status :done
+   :evidence "rtx-native PR #1 / c5e3c1584fc5b2f03066f4ec0e9df5eaad1c3ec9 resolves the admission probe's bool/i64 mismatch with an explicit :bool contract, replaces ambient CLJC constants with typed string getters, and proves exact reference/restricted-JS/typed-Wasm parity"}
+  {:id :closed-f64-top-level-constants :status :done
+   :evidence "compiler PR #166 / d4d3cd8605712134c9b6ff5ef4a3ae5d52f4ee45 admits only closed f64 literal constants through canonical IEEE-754 lowering; all 24 CI checks green; 8 Web/Wasm probes advanced to their next real gap"}
+  {:id :bounded-keyword-set-constants :status :done
+   :evidence "compiler PR #167 / 6309aefa02e22f06cce11b0ae145e5a47eaf1093 admits only non-empty homogeneous keyword sets up to 32 items and lowers canonical typed-set KIR; all 24 CI checks green; engineer-render, mine-ai, and postfx advanced across 8 target probes"}
+  {:id :closed-nested-constant-aliases :status :done
+   :evidence "compiler PR #168 / abf9e5b8125040b1c32956ed5af133f5f962298b resolves only declared acyclic aliases without evaluation or host lookup; all 24 CI checks green; ghosthacker-echoes advances across Web and Wasm while motor's Math/PI remains correctly rejected"}
+  {:id :dependency-aware-direct-classification :status :done
+   :evidence "canonical matrix routes 577 :require-bearing namespaces from standalone direct admission to dependency-graph review; portable-direct count falls from 931 to 354 and the current direct probe contracts from 28 repos / 76 targets to 11 repos / 22 targets"}
+  {:id :pbrt-kotoba-pilot :status :done
+   :evidence "pbrt PR #1 / 17bcaf807eb0fcd548d861d283fd10a0427e2502 removes production CLJC, preserves six metadata values through reference/restricted-JS/instantiated-Wasm typed getters, keeps renderer/device authority in Kami, and passes both CI jobs"}
+  {:id :kami-usd-native-kotoba-pilot :status :done
+   :evidence "kami-usd-native PR #1 / e56fffc291406a5871ee4cd11969a42e8ece3bd2 removes production CLJC and preserves all 11 scalar/former-vector members through reference/restricted-JS/instantiated-Wasm typed getters; both CI jobs green"}
+  {:id :empty-cljc-retirement-path :status :done
+   :evidence "All four verified ns-only shells are retired without empty .kotoba replacements: app PR #1 / f57bfb3cfd3d94ece0bcfa94ae95ff56e20780f1, bridge PR #1 / 650ca7a27dcfbf3b4c08e2320b24ad445c3e8c6e, demo PR #1 / a73aca78646e7f9260660a24058839ac846f8edb, and kami-app PR #1 / 4ae4615811e1320f96fbeea2c20a550207aacc5e. Each removes the vacuous load test and JVM config and passes both docs-only authority checks."}
+  {:id :constants-only-direct-candidates :status :done
+   :evidence "The two constants-only direct candidates are now migrated rather than mechanically renamed: replicator PR #1 / d875a29eeea27299bb778201ca277b07a7e3e866 and kami-app-quarry-walk PR #1 / b55cf842993bf11670a2b9c917463ef2f0c55e9b. Both enforce one sovereign production .kotoba source and prove reference/restricted-JS/instantiated-Wasm semantic and typed-ABI conformance without byte identity."}]
+
+ :open-gaps
+  [{:id :canonical-fleet-inventory :priority 0 :status :done
+   :work "1,624 canonical identities and live GitHub state are recorded. The matrix blocks 724 stale, one incomplete, and one inaccessible snapshot from write scheduling."}
+  {:id :classification :priority 0 :status :open
+   :work "All 9,333 materialized tracked namespaces have a lexical safety class; refresh the 724 stale repositories from fresh default-branch clones and replace provisional classes with reviewed dispositions."}
+  {:id :production-jvm-audit :priority 0 :status :open
+   :work "Reject production launch paths that require java/clojure; distinguish reference qualification tooling from shipped runtime."}
+  {:id :admission-matrix :priority 1 :status :open
+   :work "After the two constants-only migrations, three current standalone repositories remain across six Web/Wasm probes: async needs an explicit static number predicate contract, postfx needs typed persistent update lowering, and tilemap needs a typed some contract."}
+  {:id :pilot-wave :priority 1 :status :open
+   :work "Migrate small pure libraries first, then capability-bound services, then UI/engine consumers; each wave requires rollback-safe commits and CI."}
+  {:id :macro-and-host-code :priority 1 :status :open
+   :work "Replace JVM macros and reader-condition host branches with Kotoba data/schema generation or explicit capability providers."}
+  {:id :browser-security :priority 1 :status :open
+   :work "Qualify restricted JS output against hostile JS hosts, CSP/module loading, capability denial, and deterministic numeric/value behavior."}
+  {:id :graphs-over-128 :priority 2 :status :open
+   :work "Design a separately reviewed streaming/chunked graph profile; do not raise general value or fuel limits implicitly."}
+  {:id :fleet-ci :priority 2 :status :open
+   :work "Enforce extension authority, compiler admission, declared effects, no production JVM, and per-target conformance across all canonical repos."}]
+
+ :next-wave
+ {:selection "canonical repos with small portable-pure .cljc surfaces and existing tests"
+  :required-evidence [:source-admitted :reference-test :restricted-js-test :typed-wasm-test :no-production-jvm :adr-entry]
+  :pilot-audit
+  [{:repo "kotoba-lang/annotation"
+    :tracked-cljc-files 1
+    :status :migrated
+    :pr 1
+    :sha "775081a4cdca8f25d8ab60f5a7f8e27f4a09a099"
+    :evidence "The tracked core.cljc is replaced by core.kotoba. Reference semantics plus instantiated restricted JavaScript and typed Wasm pass (2 tests / 7 assertions), compiler is pinned to merged SHA e4dfcbc006f0749d88db8f2d710446a2d4459808, lint is clean, and GitHub CI passed."
+    :disposition "Use this repository and its ADR 0001 as the bounded heterogeneous-document migration template."}
+   {:repo "kotoba-lang/cartpole-math"
+    :tracked-cljc-files 2
+    :status :migrated
+    :pr 2
+    :sha "7c6cb3076689165b9aa63487e39ef119841beca4"
+    :evidence "Both production CLJC files and the fixed-only Kotoba golden are replaced by one parameterized cartpole_math.kotoba source. Two tests / seven top-level assertions execute canonical and non-canonical physics through reference, restricted JS, and typed Wasm; embedded negative probes reject short vectors and forged externrefs. Lint is clean and both GitHub CI jobs passed."
+    :disposition "Use its ADR 0001 and CI as the bounded numeric/vector-f64 migration template; semantic/ABI conformance is required, not Wasm byte identity."}
+   {:repo "kotoba-lang/rtx-native"
+    :tracked-cljc-files 1
+    :status :migrated
+    :pr 1
+    :sha "c5e3c1584fc5b2f03066f4ec0e9df5eaad1c3ec9"
+    :evidence "The production CLJC metadata namespace is replaced by rtx_native.kotoba. Three tests / thirteen assertions execute exact strings and boolean through reference, restricted JS, and independently instantiated typed Wasm. Lint is clean and both GitHub CI jobs passed."
+    :disposition "Use its ADR 0001 and CI as the fixed typed string/boolean policy-metadata migration template; Kami remains the future rendering provider boundary."}]
+  :status :three-pilots-complete}}

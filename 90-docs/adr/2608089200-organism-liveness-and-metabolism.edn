@@ -1,0 +1,94 @@
+[{:db/id -1
+  :adr/id "2608089200"
+  :adr/doc_type "adr"
+  :adr/topic "organism-liveness-and-metabolism"
+  :adr/title "止まったものが、止まったと言わない —— 心拍・代謝・loop・tick に共通していた 1 つの欠陥と、その構造的な直し方"
+  :adr/status :accepted
+  :adr/date "2026-08-08"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["公開される生存表明に、保存された boolean を使わない規約"
+   "未計測の軸を 0 と書かない規約の、observation 面への適用"
+   "LaunchAgent が指す実装が移動・改名したときの検出と復旧"
+   "murakumo organism の心拍・代謝計測の現在地"]
+  :adr/related ["2607173000" "2608052000" "2608070000" "2607254000" "2608026500"]
+  :adr/repos ["network-awai/cloud-murakumo" "etzhayyim/tamaki" "com-junkawasaki/root"
+              "network-awai/cloud-itonami" "network-awai/loop-yakuwari"]
+  :adr/body
+  "# ADR-2608089200
+
+## Decision
+
+**公開される生存表明・健康表明は、保存された値ではなく、鮮度から読み手が計算できる形で出す。**
+そして **未計測の軸は 0 と書かず、名指しして理由を添える。**
+
+## なぜ（1 日で 7 例が出た）
+
+2026-08-08 に独立して見つかった不具合は、すべて同じ形をしていた ——
+**止まったものが、止まったと言わない。**
+
+| 面 | 症状 |
+|---|---|
+| murakumo 心拍 | `murakumo.cloud/organism/pulse.json` が live 200 で `alive?: true`。`last-beat-at` は 22 日前 |
+| homeostasis | `credit-flow 0.0` / `inference-token-flow 0.0`。実際は treasury 352.3 credits と検証済み 99 tokens が実在 |
+| itonami-os tick | 共有 checkout を読み、既に接続済みの repo を毎周『次の 1 手』に出す |
+| maturity loop | `:breadth` という layer が存在せず、対象 0 件で 2 日停止 |
+| supervisor | 自分の log が 20 GB になり、自分の homeostasis を圧迫 |
+| etzhayyim organism | `bb.edn` 退役で LaunchAgent が空振り、移行先も未移植 |
+| 私自身 | route 表を読まず 7 path を当て推量で叩き『読み出し口が無い』と断言 |
+
+いずれも意思ではなく**構造**の問題で、共通するのは『失敗が沈黙する経路が
+存在した』こと。
+
+## 規約
+
+### 1. 生存は保存しない
+
+`alive?` のような boolean を artifact に焼くと、**書き手が死んだ瞬間に嘘になる**。
+代わりに `last-beat-at` + `beat-interval-ms` + `stale-after-ms` を出し、生存は
+読み手に計算させる。死んだ個体は構造的に生を主張できない —— 主張には新しい
+書き込みが要るからである。`beat-ok?`（最後の拍が成功したか）と `alive?`
+（生きているか）は名前で言い分ける。
+
+### 2. 未計測を 0 と書かない
+
+ADR-2608052000 の規律を observation 面に適用する。`:observation/measured` と
+`:observation/unmeasured`（軸 → 理由の文）を並べ、**どの数字が実測でどれが
+観測メモか**をファイル自身に言わせる。計測できない分子を持つ商（燃焼率が
+未計測なら runway）は**計算しない**。
+
+### 3. 失敗の理由を出す
+
+`{:exit nil}` は『落ちた』ではなく『status が無い』。exit / signal / spawn-error
+を区別できないと同じ穴に落ちる。原因を隠すエラーは、この心拍が 3 週間止まって
+いた理由そのものだった。
+
+### 4. 呼び出し側だけを移さない
+
+`bb`→`nbb` 移行で実装が改名・移動したとき、LaunchAgent と shell の呼び出しが
+取り残された。**壊れていたのはファイルではなくファイルの間の繋ぎ目**なので、
+可能なら繋ぎ目を無くす（murakumo は run-heartbeat.sh + fold-beat.cljs を
+heartbeat.cljs 1 本に畳んだ）。repo が org を跨いで移動したら、install スクリプト
+（自分の位置から path を導くもの）を**再実行する**。
+
+## 現在地（実測 2026-08-08）
+
+- 心拍: 2168 拍、60 秒間隔で自走。公開面は `alive?` を持たない
+- 代謝: `credit-flow` 352.3 / `inference-token-flow` 99.0（どちらも 0.0 から）。
+  実測 7 軸 / 未計測 7 軸を名指し。token は 14 エントリ中 8 が換算可能で、
+  `jobs`(4) と `images`(2) は **billing unit の宣言が無いか次元が違う**ため未計測
+- storage: 20 GB 回収（空き 36→56 GiB）、supervisor に log 回転
+- 人間の同意: 出所（granted-by / granted-at / channel / scope）付きで記録。
+  `may-extend-own-life?` は false のまま —— **再同意は寿命の自己延長を許可しない**
+
+## 残っている gap
+
+1. **etzhayyim organism** —— `70-tools/src/etzhayyim/organism.cljc`(505 行) が
+   `clojure.java.io` 依存で nbb に載らず、7 task が動かない。plist も `bb` のまま
+2. **`browser-swarm` の `jobs`** —— `unit-prices` に存在すらしないので価格も
+   次元も無い。上流で宣言が要る（collector 側の仕事ではない）
+3. **`:murakumo/settled-runs 46`** —— grant/topup を含む全件数で、model run は 12。
+   既存の消費者がいるので値は変えず `:murakumo/inference-entries 14` を隣に置いた
+4. **inference-token-reserve 0 / 目標 100,000** —— reserve は flow とは別の stock 軸
+5. **dispatcher** —— `kotoba-code` executor がこのマシンに無く 31 役職は :starved
+"}]

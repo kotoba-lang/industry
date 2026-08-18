@@ -1,0 +1,199 @@
+;; residency.edn — この repo が「常駐させるもの」の宣言。
+;;
+;; ADR-2608111721（cloud の3面）の決定 6 の実装。**各 repo が自分の常駐を宣言し、
+;; root と murakumo は集めるだけ。** root がよその repo の起動方法を知っている状態
+;; （ADR-2800002700 が Consequences で自ら反省した層違反）をここで解く。
+;;
+;; 集計と突き合わせ: `nbb scripts/residency-collect.cljs`（`--check` で gate 化）。
+;;
+;; ## 形
+;;
+;;   {:residency/version 1
+;;    :residency/repo "<org>/<repo>"
+;;    :jobs [{:id       …  この repo の中で一意な短い名前
+;;            :label    …  launchd label（機構側の名前）
+;;            :slot     :anonymous | :attested   ← ADR-2608111721 決定 6
+;;            :host     …  常駐先。:operator = オーナーの常時稼働機、または fleet ノード名
+;;            :cadence  {:interval-seconds N} | {:keep-alive true}
+;;            :run      [実行体 引数…]  （宣言。plist の ProgramArguments と突き合わせる）
+;;            :plist    …  plist の repo 内パス（無ければ nil = 未 house 化）
+;;            :credentials [参照…]  **値は書かない。何の鍵を要するかだけ**
+;;            :health   {…} | nil    死活をどこで見るか
+;;            :adr      …  なぜ常駐しているかの正本
+;;            :note     …}]}
+;;
+;; ## `:slot` を間違えないこと
+;;
+;; `:attested` = 書き込み鍵を持つ。**そのホストは fleet の gate rotation から外す**
+;; （`scripts/fleet-ci/probe.cljs` の `operator-hosts`）。collector がこの不整合を
+;; 検査する —— 鍵を持つマシンで repo から送られてきた gate コードを実行しない、が
+;; fleet の不変条件 3 の趣旨。
+
+{:residency/version 1
+ :residency/repo "com-junkawasaki/root"
+
+ :jobs
+ [{:id "fleet-ci-tip-tick"
+   :label "com.gftd.fleet-ci-tip-tick"
+   :slot :attested
+   :host :operator
+   :cadence {:interval-seconds 300}
+   :run ["nbb" "scripts/fleet-ci/tick.cljs"]
+   :plist "scripts/fleet-ci/com.gftd.fleet-ci-tip-tick.plist"
+   :credentials [:github-token :fleet-ci-signer :fleet-ssh]
+   :health {:kind :ledger :path "manifest/fleet-ci.edn"}
+   :adr "adr-2607300900-ci-cd-murakumo-fleet"
+   :note "CI/CD の本体。receipt 署名・commit status・pin 前進を行うので credential を持つ。ADR-2608111721 の決定 5 のとおり、この仕事は operator 側に留まる。"}
+
+  {:id "fleet-ci-sweep"
+   :label "com.gftd.fleet-ci-sweep"
+   :slot :attested
+   :host :operator
+   :cadence {:interval-seconds 86400}
+   :run ["nbb" "scripts/fleet-ci/sweep.cljs" "--apply"]
+   :plist "scripts/fleet-ci/com.gftd.fleet-ci-sweep.plist"
+   :credentials [:fleet-ssh]
+   :health nil
+   :adr "adr-2607300900-ci-cd-murakumo-fleet"
+   :note "ノードのディスク回収。allowlist（sweep.edn）の外は触らない。"}
+
+  {:id "hayari-alarm"
+   :label "com.gftd.hayari-alarm"
+   :slot :anonymous
+   :host :operator
+   :cadence {:interval-seconds 3600}
+   :run ["nbb" "--classpath" "scripts/fleet-ci" "scripts/fleet-ci/hayari-alarm.cljs"]
+   :plist "scripts/fleet-ci/com.gftd.hayari-alarm.plist"
+   :credentials []
+   :health nil
+   :adr "adr-2608110300-hayari-tick-residency-and-alarm"
+   :note "無人ループの死活を見る側。判定は gate（hayari-tick-alive）にあり、ここは exit code を見て遷移時に 1 回だけ通知する。public repo を読むだけなので鍵を持たない。"}
+
+  {:id "hirameki-harvest"
+   :label "com.gftd.hirameki-harvest"
+   :slot :attested
+   :host :operator
+   :cadence {:interval-seconds 21600}
+   :run ["nbb" "--classpath" ".:scripts/nbb_compat" "scripts/hirameki-harvest.cljs" "--ticks" "20"]
+   :plist "scripts/fleet-ci/com.gftd.hirameki-harvest.plist"
+   :credentials [:github-token]
+   :health nil
+   :adr "adr-2608100400-hirameki-harvest-residency-shard-query"
+   :note "特許収集。orchestrator の code は root にあり、対象 repo（cloud-itonami/hirameki）は入力。だから root が宣言するのが正しく、層違反ではない。"}
+
+  {:id "hirameki-mirror"
+   :label "com.gftd.hirameki-mirror"
+   :slot :attested
+   :host :operator
+   :cadence {:interval-seconds 21600}
+   :run ["nbb" "--classpath" ".:scripts/nbb_compat:orgs/kotoba-lang/secret-resolve/src" "scripts/hirameki-mirror.cljs"]
+   :plist "scripts/fleet-ci/com.gftd.hirameki-mirror.plist"
+   :credentials [:github-token :secret-resolve]
+   :health nil
+   :adr "adr-2608100400-hirameki-harvest-residency-shard-query"}
+
+  {:id "observatory-run"
+   :label "com.gftd.observatory-run"
+   :slot :attested
+   :host :operator
+   :cadence {:interval-seconds 3600}
+   :run ["nbb" "--classpath" ".:scripts/nbb_compat" "scripts/observatory-run.cljs" "--due"]
+   :plist "scripts/fleet-ci/com.gftd.observatory-run.plist"
+   :credentials [:github-token]
+   :health {:kind :ledger :path "manifest/observatories.edn"}
+   :adr "adr-2608081200-domain-observatory-runner"}
+
+  {:id "newsfeed-ingest"
+   :label "com.gftd.newsfeed-ingest"
+   :slot :attested
+   :host :operator
+   :cadence {:interval-seconds 3600}
+   :run ["nbb" "scripts/newsfeed-ingest.cljs"]
+   :plist "scripts/fleet-ci/com.gftd.newsfeed-ingest.plist"
+   :credentials [:github-token :b2]
+   :health nil
+   :adr "adr-2608031900-newsfeed-ledger-datalad-b2"
+   :note "⚠ 実測 2026-08-11: ingest 自体は動く（485 件を新規取得して台帳 1569→2054 行）が、**custody の脚が折れている** —— `push --to b2` が失敗し `whereis` に b2 が出ない。b2 remote 自体は設定済み（S3 type, uuid 0d401937…）なので credential 解決の問題。台帳は手元に残るので次回回収されるが、B2 に載っていないことを『健全』と読まないこと。"}
+
+  {:id "hyakka-knowledge-ingest"
+   :label "com.network-awai.hyakka-knowledge-ingest"
+   :slot :attested
+   :host :operator
+   :cadence {:interval-seconds 3600}
+   :run ["nbb" "scripts/hyakka-knowledge-resident.cljs"]
+   :plist "scripts/com.network-awai.hyakka-knowledge-ingest.plist"
+   :credentials [:github-token :b2 :kagi/hyakka-kotobase-seed :cloudflare]
+   :health {:kind :http
+            :url "https://wiki.kotobase.net/health"
+            :requires [:ok :catalog-id :ledger-files]}
+   :adr "adr-2607311100-hyakka"
+   :note "Hourly fail-closed publication loop: collect, archive raw bytes to B2, merge the ledger and catalogue, project through Kotobase, test/build/deploy wiki.kotobase.net, then verify the live catalogue CID. The credential-bearing runner stays on the operator host; cloud-itonami's edge is not given Git/B2/signing custody."}
+
+  {:id "capacity-alarm"
+   :label "com.gftd.capacity-alarm"
+   :slot :anonymous
+   :host :operator
+   :cadence {:interval-seconds 3600}
+   :run ["nbb" "--classpath" "scripts/fleet-ci" "scripts/fleet-ci/capacity-alarm.cljs"]
+   :plist "scripts/fleet-ci/com.gftd.capacity-alarm.plist"
+   :credentials []
+   :health {:kind :state-file :path "~/.gftd/capacity-alarm-state.edn"}
+   :adr "adr-2608160300-disk-full-halted-writes"
+   :note "この機械の空き容量と inode を見る。ADR-2608160300 の再発防止 —— ディスクが 0 になったとき、症状は checkout 失敗・テスト失敗・receipt が書けないという無関係な場所に出て、容量そのものを見ているものが何も無かった。fleet gate にできないのは residency-alarm と同じ理由で、対象が *この機械* だから（gate はノードへ tree を配る）。床 20GiB は「最後の警告」ではなく「気づいてから片付ける余地」。df が答えないことと閾値が数値でないことは、どちらも healthy として報告しない。"}
+
+  {:id "residency-alarm"
+   :label "com.gftd.residency-alarm"
+   :slot :anonymous
+   :host :operator
+   :cadence {:interval-seconds 21600}
+   :run ["nbb" "--classpath" "scripts/fleet-ci" "scripts/fleet-ci/residency-alarm.cljs"]
+   :plist "scripts/fleet-ci/com.gftd.residency-alarm.plist"
+   :credentials []
+   :health {:kind :state-file :path "~/.gftd/residency-alarm-state.edn"}
+   :adr "adr-2608111721-placement-authority-is-murakumo-fleet-ci-is-a-gate-consumer"
+   :note "この登録簿そのものの drift を見る側。判定は residency-collect --check にあり、ここは exit code を見て遷移時に 1 回だけ鳴らす。fleet gate にできないのは、drift の片側が『この機械で実際に何が動いているか』(launchctl) だから。"}
+
+  {:id "murakumo-actions-runner"
+   :label "com.gftd.murakumo-actions-runner"
+   :slot :attested
+   :host :operator
+   :cadence {:keep-alive true}
+   :run ["node" "orgs/gftdcojp/cloud-murakumo/scripts/actions-runner.mjs"]
+   :plist "scripts/fleet-ci/com.gftd.murakumo-actions-runner.plist"
+   :credentials [:github-token]
+   :health nil
+   :adr nil
+   :note "⚠ これは GitHub Actions の self-hosted runner である。ADR-2607300900 は『CI/CD の正本は murakumo fleet であって GitHub Actions ではない』と決めており、この常駐はその決定と正面から食い違う。生きている（実測 2026-08-11、pid あり・last-exit 0）ので黙って殺さないが、**存続させるなら理由を ADR にする、しないなら retire する**。判断待ち。"}]
+
+ ;; ---------------------------------------------------------------------------
+ ;; 2026-08-11 に retire した常駐（ADR-2608111721 の第 3 項目）。
+ ;;
+ ;; **記録を残す理由**: 消したことが分からないと、次に同じ label を見た人が
+ ;; 「なぜ動いていないのか」を最初から調べ直す。plist は
+ ;; `~/.gftd/launchd-archive-2026-08-11/` に退避してある（stash-archive と同じ作法）。
+ :retired
+ [{:label "ai.gftd.agent-daemon" :exit 78 :reason :subject-removed-upstream
+   :detail "gftdcojp/ai-gftd-apps-gftdcojp の 20-actors/magatama が上流で撤去済み（numbered-layer 撤去、#1544/#1555 系）。.venv も無い。"}
+  {:label "ai.gftd.agent-zeebe-worker" :exit 78 :reason :subject-removed-upstream
+   :detail "同じ 20-actors/magatama。"}
+  {:label "ai.gftd.pregel-triage" :exit 78 :reason :subject-removed-upstream
+   :detail "同じ 20-actors/magatama（pymagatama.pregel）。"}
+  {:label "ai.gftd.zeebe-port-forward" :exit 78 :reason :subject-removed-upstream
+   :detail "ops/local-agent/run-zeebe-port-forward.sh が現 tree に無い。"}
+  {:label "ai.gftd.llm" :exit 78 :reason :subject-removed-upstream
+   :detail "projects/ai-gftd-project-os/… の dapr サービスごと無い。"}
+  {:label "ai.gftd.playwright.daemon" :exit 78 :reason :subject-removed-upstream
+   :detail "60-apps/ai-gftd-project-playwright が現 tree に無い。"}
+  {:label "ai.gftd.crawler-monitor" :exit 127 :reason :subject-removed-upstream
+   :detail "scripts/260311-crawler-monitor.sh が現 tree に無い。"}
+  {:label "ai.gftd.keiei" :exit 127 :reason :subject-deleted-as-dead
+   :detail "50-infra/vultr/keiei-llm-pool は commit cf392a3d62b『prune confirmed-dead Vultr VKE chart dirs』で意図的に削除されている。後継の cloud-itonami/keiei は別物（kotoba/lg/migration.edn）で、常駐エントリを持たない。"}
+  {:label "ai.gftd.litellm.jacob" :exit 127 :reason :runtime-absent
+   :detail "~/.gftd/litellm-start.sh は在るが、それが exec する ~/litellm-venv/bin/litellm と ~/litellm.yaml がどちらも無い。"}]
+
+ ;; 直したもの（retire ではない）
+ :repaired
+ [{:label "com.murakumo.verify-payments" :exit-before 78
+   :reason :repo-renamed-and-moved
+   :detail "cwd が orgs/com-junkawasaki/cloud-murakumo を指していた。repo は 2026-07-04 に cloud-murakumo → local-murakumo へ改名（ADR-2607041302）され、org も com-junkawasaki → network-awai へ移っている。正しい cwd は orgs/network-awai/local-murakumo。『無い』と結論する前に索引を引く規則がそのまま効いた例 —— tools/verify-payments.clj は消えておらず、名前が変わっていただけだった。"
+   :verified "repath 後 pid あり・last-exit 0。--dry-run で pending 2 件はどちらも test fixture（0xdeadbeef / 0xTESTHASH123 → tx-not-found → hold）なので credit は 1 件も発行しない。"}]}

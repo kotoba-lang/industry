@@ -1,0 +1,257 @@
+[{:db/id -1
+  :adr/id "2608041800-global-legislation-full-text-corpus"
+  :adr/title "ADR-2608041800: 世界の法案法令を全文で保全し、依存グラフを DataScript で引けるようにする（DataLad 4 dataset + corpus 層）"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "global-legislation"
+  :adr/date "2026-08-04"
+  :adr/last_verified "2026-08-04"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["etzhayyim/global-legislation-datoms の corpus 層（:law / :law.rel）と、catalog 層との境界"
+   "法令全文の保全先（DataLad dataset）と、datoms repo が全文を持たない不変条件"
+   "法令間の依存関係を datom としてどう表すか（edge entity か ref か）"
+   "wave-1 の対象法域と、そのカバレッジをどう申告するか"]
+
+  :adr/context
+  "オーナー指示（2026-08-04）:「全世界の法案法令を取得して edn で依存関係、関連を整理しつつ
+   datascript で query できるような repo はある?  edn は datalad で永続化」→ 既存調査の結果を
+   受けて「全文を持つようにして, 1, 2, 3 を進めて」。
+
+   調査の現在地（同日）: `etzhayyim/global-legislation-datoms` が既に存在し、DataScript schema +
+   tx EDN + Kotoba EAVT + provenance + quality-report + read-only adapter + CI contract を持って
+   いた。しかし中身は 567 entity の **カタログ**（どの法域にどんな一次ソースがあり、どのライセンスか）
+   であって、次の 3 つが無かった:
+
+   1. **法令間の依存辺が schema に一つも無い。** 属性は :legal-source/* :legislature/* :court/*
+      :jurisdiction/* のみ。amends / repeals / cites を引く手段が存在しなかった。
+   2. **全文コーパスが明示的にスコープ外。** maturity/scorecard.edn が
+      `:full-text-corpus :status :explicitly-out-of-scope`、quality-report.edn の
+      `:quality/ingested-full-text` は 0 にハードピン。
+   3. **法令用の DataLad raw dataset が 1 つも無い。** scorecard 自身が
+      `:raw-source-integrity :not-applicable — no upstream DataLad raw dataset exists yet for
+      world legislation/case-law TEXT` と記載。
+
+   一方、姉妹の `global-energy-datoms` は同じパターンで既に稼働しており、`org.worldbank.api` /
+   `org.un.unstats` / `org.ourworldindata` という DataLad dataset を投影している。**設計の前例は
+   あって、法令版の source dataset だけが存在しなかった。**"
+
+  :adr/decision
+  "## 1. 出所ごとに DataLad dataset を起こし、そこに全文を置く
+
+   origin 面の reverse-DNS 命名（既存の `org.worldbank.api` / `jp.go.meti.enecho` と同じドット形）で
+   4 つ新設した。いずれも Tier-A ライセンス（政府著作物 / OGL / 2011/833/EU / 17 U.S.C. §105）:
+
+   | dataset | 出所 | wave-1 の対象クラス |
+   |---|---|---|
+   | `etzhayyim/jp.go.e-gov.elaws` | laws.e-gov.go.jp | e-Gov 法令API v2 が挙げる 9,536 件のうち **9,523 件**の全文（残り 13 は上流が 404） |
+   | `etzhayyim/eu.europa.eur-lex` | publications.europa.eu | 現行 EU 法の**全依存グラフ** + 現行**指令 1,114 件全件**の全文 |
+   | `etzhayyim/uk.gov.legislation` | legislation.gov.uk | **UK Public General Acts 1801–2026 全 3,267 件**の改正反映版全文 |
+   | `etzhayyim/gov.govinfo.bulkdata` | govinfo.gov | **第119議会の全 measure 18,052 件**（法案含む）+ 成立公法 102 件の全文 |
+
+   ## 2. 各 dataset は raw/ と index/ の 2 層を持ち、annex に送るのは raw/ だけ
+
+   `raw/` は上流が返したバイト列そのまま（無加工・無正規化）で git-annex → B2。
+   `index/laws.edn` `index/relations.edn` `raw/source-catalog.edn` は **git 本体**に置く。
+
+   **理由: コーパスを query したいだけの消費者に `datalad get` を強いてはならない。** 索引は数 MB の
+   テキストで git に載り、本文は sha256 で名指しして必要な時だけ取る。DataLad の既定（binary だけ
+   annex）は使えない——保全対象が全部テキスト（JSON/XHTML/XML）で、それを git 履歴から外すことが
+   annex 化の目的そのものなので、`.gitattributes` で `raw/**` をパスで明示ルーティングする
+   （`product-corpus` の先例と同型）。
+
+   ## 3. datoms repo は corpus 層を「投影」するが「保存」しない
+
+   `global-legislation-datoms` に `data/corpus/<dataset>/{laws,relations}-NNN.edn` を追加。各 :law
+   entity は `:law.text/dataset` + `:law.text/path`（または `:law.text/archive` + `:law.text/entry`）
+   + `:law.text/sha256` + `:law.text/bytes` を持ち、**本文は 1 バイトも入らない**。
+
+   従来の `:quality/ingested-full-text 0` という不変条件は、実は 2 つのことを同時に言っていた:
+   (a) この repo は法令本文を持たない (b) 法令本文はどこにも取り込まれていない。(a) は今も真で、
+   `:quality/text-bytes-held-here 0`（上限 0 の gate）として維持する。(b) は本 ADR で偽になった。
+   **1 つの数字のままにすると (a) か (b) のどちらかで嘘をつくことになるので、分けた。**
+
+   出力は source ごと・20,000 entity ごとに **シャードする**。単一の数百 MB tx ファイルは、1 法域を
+   問うだけの消費者に世界全体のロードを強い、diff がレビュー不能になる。
+
+   ## 4. 依存辺は ref ではなく string 端点を持つ edge entity にする
+
+   `:law.rel/{id,from,to,kind,provenance,source-id,evidence,at,resolved?}`。
+
+   `:db.type/ref` の方が Datomic 的に自然だが**ここでは誤り**。辺は日常的に「この投影に無い法令」を
+   指す——何十年も前に吸収された改正法や、廃止されたこと自体が記録する価値のある法令。ref にすると
+   そういう辺は transact に失敗するか、空 entity を黙って生成する。string 端点なら宙ぶらりんの辺は
+   正直に宙ぶらりんのまま残せ、`:law.rel/resolved?` が「相手がこの投影にいるか」を述べるので、
+   消費者が推測する必要がない。
+
+   ## 5. 辺は上流が構造化データとして述べている事実だけを採る
+
+   本文の自然言語解析で「推定」した辺は入れない。実際の出どころ:
+
+   - **JP**: `revision_info.amendment_law_id`（改正法 → 被改正法）。9,536 件中 7,793 件。
+   - **EU**: cdm の構造的述語 7 種（amends / repeals / implicitly_repeals / based_on / completes /
+     corrects / codified_version）。`work_cites_work` は**取らない** — 上記全部を合わせたより 1 桁
+     大きく、しかも引用であって依存ではないため。
+   - **UK**: CLML の `<Citation URI=...>`。`<Commentary Type=\"F\">`（textual amendment 脚注）の
+     **内側**にあるものだけ `:law.rel/amends`、それ以外は `:law.rel/cites`。**この区別が本質**で、
+     両方を cites に潰すと「この法律を改正したのはどれか」が答えられなくなる。
+   - **US**: BILLSTATUS の `<laws>`（became-law）と `<relatedBills>`（identical / companion /
+     procedurally-related / related）。"
+
+  :adr/consequences
+  "## 実測（2026-08-04、全部この日に実際に走らせた数字）
+
+   | | 法令 entity | うち全文あり | 依存辺 | 全文バイト |
+   |---|---|---|---|---|
+   | JP e-Gov | 9,536 | 9,523 | 7,793 | 1,229,999,063 |
+   | EU EUR-Lex | 64,237 | 1,114 | 524,077 | 227,301,155 |
+   | UK legislation.gov.uk | 3,267 | 3,267 | 103,333 | 1,594,186,594 |
+   | US govinfo (119th) | 18,154 | 18,066 | 11,265 | 373,702,595（zip 内 20,852 本文） |
+   | **計** | **95,194** | **31,970** | **646,468** | **3,425,189,407（3.43 GB）** |
+
+   ## 正直に言う穴（不在から推測させないため、全部 :catalog/known-gaps に記録済み）
+
+   - **EU の規則 (Regulation) は本文が無い。** 現行の基本規則 ~6,600 + 実施/委任 ~9,400 は
+     メタデータと辺だけ。指令だけが全文クラス。
+   - **EU の `work_cites_work` を取っていない。**
+   - **UK は UKSI（10 万件超）と委譲立法（asp/anaw/nia/asc）と 1801 年以前を取っていない。**
+   - **US は第118議会以前と US Code / CFR を取っていない。** `uscode.house.gov` はこのネットワーク
+     から到達不能（実測: 75 秒でタイムアウト）だったため、法典層は govinfo 経由で別途。
+   - **JP は条文本文中の法令引用を辺にしていない。** 日本の法令 XML は他法令を法令番号の文字列で
+     参照し URI を持たないため、機械的抽出には名寄せが要る。判例（courts.go.jp）はスコープ外。
+   - **カバレッジは「4 法域」であって「全世界」ではない。** 198 法域の議会・最高裁の台帳
+     （:legislature 186 / :court 144）は既にあるので、次の法域を足す作業は
+     `bin/build-corpus.cljs` の `datasets` に 1 行足すことに縮んでいる。
+
+   ## 最初のコーパスの 90% は 404 ページだった（発覚と修正）
+
+   **これは設計の話ではなく、実際に一度作ってしまったものの話。** 最初の JP 取得（pool 6）は
+   ログ上「fetched 9530, failed 0」で終わり、ファイル数も索引の行数も 9,536 で揃っていた。
+   実際には **8,548 件が同一の 34 KB の HTML「ご利用のページが見つかりません」ページ**だった——
+   e-Gov は負荷時にそれを **HTTP 200** で返す。`resp.ok` だけを見ていたので全部受理された。
+
+   **下流のどの検査もこれを捕まえられなかった。** 件数は正しい。失敗ログは空。索引は完成する。
+   quality-report の閾値も通る。発覚したのは B2 へ push したあと **git-annex が 9,537 ファイルを
+   989 個の key に重複排除している**のを見たときで、それも B2 の転送統計が総バイト数と合わない
+   ことに気づいたからにすぎない。**つまり偶然見つかった。**
+
+   直した内容:
+
+   - `fetch-buffer` に `:validate` を追加。2xx でも本文検査に落ちたら 5xx と同じ backoff で再試行。
+   - `law_data` は「JSON であり `law_full_text` を持つ」ことを要求。
+   - **ディスク上の既存ファイルも検証してから skip する。** これが無いと、再開のたびに保存済みの
+     エラーページを「取得済み」として温存し続ける。
+   - `write-file!` は annex symlink を unlink してから書く（annex object は mode 444 で、
+     symlink を辿ると EACCES で死ぬ）。
+   - pool を 6 → 3 に下げた。
+
+   再取得後: **全文 9,523 件、sha256 は全て相異、1,229,999,063 バイト**（誤ったコーパスの
+   519,493,759 バイトの 2.4 倍）。残り 13 件は上流が本当に 404（`code 404004`）を返すもので、
+   `raw/source-catalog.edn` の `:catalog/known-gaps` に **id を列挙して**記録した。
+
+   **他の 3 dataset は同じ検査（sha256 の重複率）を通した結果いずれも汚染なし**——EU 1,114 件・
+   UK 3,267 件・US 20,852 件の bill version、すべて sha256 が相異。
+
+   一般化して残す規則: **ステータスコードは本文がリクエストしたものである証拠にならない。**
+   保全 fetcher は本文の形を検証し、それに落ちたものを再試行し、**保存済みファイルの再検証も**
+   しなければならない。そして「件数が揃っている」は健全性の証拠ではない——**内容の重複率を見る**。
+
+   ## 実装で踏んで直した罠（同じ穴を掘らないために記録する）
+
+   - **Cellar の SPARQL は OFFSET ページングで死ぬ。** OFFSET 10000 以降が HTTP 500（page 0,1 は
+     成功、page 2 で落ちる）。キーセットページングに変更。辺は `CONCAT(?from,\" \",?to)` を複合
+     ソートキーにした——`?from` だけで区切ると、ある法令の辺リストがページ境界をまたいだ時に
+     取りこぼす。
+   - **Cellar は `Accept-Language` 無しだと全件 400**（1114/1114 失敗）。さらに古い指令は XHTML 版が
+     無く `text/html` しか持たず、その時 **406 ではなく 404** を返す。`(メディア型 × 言語)` の連鎖に
+     して初めて 1,114 件全部揃った（XHTML のみでは 780 件で頭打ち）。取れた本文が何語の何形式かは
+     `.meta` に記録し、推測させない。
+   - **`<relatedBills><item>` は `<relationshipDetails><item>` を入れ子で含む。** `</item>` での
+     素朴な分割は関係種別を隣の法案に付け替える。深さを追う分割が要る。
+   - **ClojureScript の `get` は plain JS object をキー文字列で読めない。** `js->clj` を忘れると
+     9,536 件が黙って 0 件になる（実際になった）。`String.prototype.matchAll` はイテレータを返すので
+     `array-seq` では何も取れない（`js/Array.from` で包む）。
+
+   ## 既存契約への影響
+
+   - `data/datascript-tx.edn`（catalog 層 567 entity）は**形も件数も変えていない**。既存の消費者は
+     そのまま動く。corpus は `data/corpus/` に**追加**した独立層。
+   - `sources.lock.edn` に 4 dataset を追加。既存の ooyake pin は据え置き（ただし
+     `etzhayyim/com-etzhayyim-ooyake` は `kotoba-lang/ooyake` に改名済みで、lock はまだ旧名を指す。
+     別件として記録する）。
+   - maturity/scorecard.edn の `:full-text-corpus` は `:explicitly-out-of-scope` から
+     `:met`（4 法域・31,970 文書・3.43 GB、locked dataset に保全）へ書き換え。
+     `:raw-source-integrity` も `:not-applicable` から `:met` へ。
+
+   ## 着地点と検証（2026-08-05 時点。ここが現在地）
+
+   default branch に載っているもの（すべて実測・実行済み）:
+
+   | repo | commit | 中身 |
+   |---|---|---|
+   | `etzhayyim/jp.go.e-gov.elaws` | `2e60162` | 全文 9,523 / 1,229,999,063 B。B2 実体 9,524/9,524 |
+   | `etzhayyim/eu.europa.eur-lex` | `eed2847` | 全文 1,114 / 227,301,155 B。B2 1,569/1,569 |
+   | `etzhayyim/uk.gov.legislation` | `c212340` | 全文 3,267 / 1,594,186,594 B。B2 3,493/3,493 |
+   | `etzhayyim/gov.govinfo.bulkdata` | `49da746` | 全文 18,066 / 373,702,595 B。B2 25/25 |
+   | `etzhayyim/global-legislation-datoms` | `c403b6d` | corpus 層 42 シャード |
+   | `com-junkawasaki/root` | `893c70c` | ADR + repos.edn + west 5 entry |
+
+   **CI は murakumo fleet。GitHub Actions は使わない**（オーナー指示 2026-08-05
+   「github は使わない、murakumo.cloud の cdci, workflow を使う」。ワークスペースの決定は
+   ADR-2607300900 — 3 org の workflow が job を起動しなくなり、**落ちるのではなく走らない**
+   ので repo は green に見えていた）。当該 repo の Actions は Actions API で**無効化済み**
+   （`workflow` scope は不要だった）。`.github/workflows/contract.yml` はディスク上に残るが
+   inert で、ファイルの削除にだけ `workflow` scope が要る。
+
+   gate は `scripts/fleet-ci/gates/legislation-corpus-check.cljs`（`gates.edn` に
+   `:nbb-script` `:cd true` で登録）。tip が動くたびに `.edn` だけの tarball をノードへ送り、
+   署名 receipt を `manifest/fleet-ci.edn` に積み、green なら west pin を前進させる。
+
+   **この gate は Actions 版より強い。** 主眼は「宣言された 42 シャードの sha256・バイト数・
+   entity 件数が manifest 通りか」で、これは**内部整合を保ったまま手編集されたシャード**を
+   捕まえる。Actions 経路では構造的に不可能だった —— あちらは committed 済みの値を読むだけで
+   再生成が走らないので `git diff --exit-code -- data` も無反応。実証済み: UK シャードを
+   1 文字書き換えて exit 1、無改変で exit 0。加えて quality-report の床
+   （`text-bytes-held-here` = 0）、JP シャードの identity 一意性 / text address の形 /
+   本文欠落ちょうど 13 件 / **辺の向き**（日本国憲法に amends が入っていたら from-to 反転）、
+   corpus→catalog のライセンス join、schema の属性宣言を見る。
+
+   **`:jvm-test` gate にしていない理由（実測、推測ではない）**: repo 側の contract test は
+   Datascript を要求し、Datascript は maven 依存。fleet のノードは tailnet だけに繋がっていて
+   外向き HTTPS が無く、`~/.m2/repository/datascript/` は zebulun にも asher にも存在しない
+   （2026-08-05 に両ノードで確認）。`clojure -M:test` は依存解決で必ず落ちる。
+   `ship-git-deps!` は git 依存しか運ばない。したがって Datalog を要する検査は
+   repo 側の local contract（`clojure -M test/query_contract.clj`）に残した。
+
+   **残る 1 点、正確に**: CI は `data/corpus/**` を locked source から**再導出しない**。
+   それには 4 dataset の `index/` をノードに置く必要がある。sha256 は改竄を検出可能にするが、
+   導出を再現可能にはしない。EU/UK/US シャードも sha256 + 件数だけで意味検査はしない
+   （646,468 辺の parse に数分かかる一方、改竄検出は sha256 で足りる）。
+
+   **再開手順**（次の agent はこれだけで続けられる）:
+
+   1. gate を手で回す: `FLEET_CI_SIGNER_PEM=$HOME/.gftd/fleet-ci-signer-tip.pem
+      nbb scripts/fleet-ci/tick.cljs --only global-legislation-datoms`
+      （env を忘れると `no such item: fleet-agent-murakumo-ci-tip-25mbair` で死ぬ —
+      署名鍵は kagi に無く PEM にだけある。常駐 plist は env を渡している）
+   2. 対象を増やすなら `scripts/fleet-ci/gates.edn` に 1 行
+   3. 法域を足すなら `bin/build-corpus.cljs` の `datasets` に 1 行 + DataLad dataset 1 本"
+
+  :adr/alternatives
+  "**全文を datoms repo に直接置く。** 却下——`global-energy-datoms` の「出典別 DataLad dataset を
+   複製せず」という既存原則に反し、2.46 GB を 2 箇所に持てば必ず両方が腐る。
+
+   **辺を `:db.type/ref` にする。** 却下（decision §4）。宙ぶらりんの辺こそ価値がある場面で壊れる。
+
+   **法域ごとに別の repo / 別の DataScript ref に分ける。** 却下——CLAUDE.md の
+   「一緒にクエリしたいものは同じ ref に置く」に反する。「EU 指令を国内法化した各国法はどれか」は
+   法域をまたぐ問いで、分けたら二度と join できない。
+
+   **全文を IPFS / CID で持つ。** 保留。`com-etzhayyim-app-legal-corpus` が `bodyTextCid` で既に
+   その方向を持っており、`:law.text/sha256` はそこへ橋渡しできる形にしてある。今回は既存の
+   B2 + git-annex 経路（skill `large-binary-datalad`）に乗せた。
+
+   **US Code を uscode.house.gov から取る。** 試したが到達不能（実測 75 秒タイムアウト）。govinfo の
+   bulkdata に切り替えた——結果として BILLS/BILLSTATUS/PLAW が取れ、**法案**（オーナーが明示的に
+   挙げた「法案法令」の前半）まで含められた。"}]

@@ -1,0 +1,259 @@
+[{:db/id -1
+  :adr/id "adr-2608130701-vendored-drift-triage-thirteen-findings"
+  :adr/title "ADR-2608130701: vendored copy の drift 13 件を分類し、支払い判定に載っていた 4 件だけを直した（子リポの commit が引く ADR-2608130700 は id 衝突。正本はこちら）"
+  :adr/status "accepted"
+  :adr/date "2026-08-13"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body
+  "# ADR-2608130701: 13 の vendored drift を分類し、4 件だけ直した
+
+**Status**: accepted
+**Date**: 2026-08-13
+**Supersedes**: なし（ADR-2608121000 の「次の 1 手」を実行したもの）
+
+> ⚠ **引用 id のずれ**。この triage で子リポに着地させた 4 commit と、
+> 4 つの vendored ファイルのヘッダは **`ADR-2608130700` を引用している**。
+> その番号は同日、別セッションの
+> `2608130700-binding-out-err-audit-46-remaining-sites.edn` が先に取っていた。
+> 着地済み commit は書き換えない（履歴書き換え禁止）ので、**正本はこの
+> ADR-2608130701**。`ADR-2608130700` を引く vendored ヘッダを読んだ人はここへ来ること。
+> 番号を先に予約しなかったのが原因で、内容の誤りではない。
+
+## Context
+
+ADR-2608121000 は、6 repo が `pay/*` と `treasury/core.cljc` を vendoring しており、
+どのコピーも `;; Diff against upstream to check drift.` と自分で書いておきながら
+**その diff を実行するものがどこにも無い**ことを記録した。検出器
+`scripts/verify-vendored-copies.cljs` はその翌日に書かれ、2026-08-13 の baseline は
+**34 走査 / 21 current / 13 stale / 0 pin 不一致**だった。
+
+本 ADR はその 13 件を 1 件ずつ読み、分類し、**結果として 4 件だけを直した**記録である。
+
+**一括 re-vendor はしていない。** 6 repo の課金判定コードを一度に書き換えて
+per-repo の検証が 1 つも無い状態は、drift そのものより悪い。
+
+## 13 件の triage（2026-08-13 実測）
+
+分類記号: **(a)** 上流の修正がコピーに欠けている / **(b)** コピーが意図的に
+ローカル改変されている / **(c)** 意味差の無い差分 / **(d)** 自分の宣言 pin と不一致。
+**(d) は 0 件だった** —— 宣言された pin はすべて正直だった。
+
+| # | コピー | 分類 | 帰結 | 処置 |
+|---|---|---|---|---|
+| 1 | `network-awai/nexus-x402/src/treasury/core.cljc` | **(a)+(b)** | **最高**。`worker.cljs:195` の `treasury/verify-payment` が支払い成立を判定する | **直した** |
+| 2 | `network-awai/nexus-x402/src/pay/facilitator.cljc` | **(a)** | **高**。`fac/gate` / `fac/settle` が有料リソースの配信を認可する | **直した** |
+| 3 | `network-awai/club-shinshi-app/…/cljs/src/treasury/core.cljc` | **(a)** | **高**。`x402.cljs` と `d1_gateway.cljs` の両方が `verify-payment` を呼ぶ | **直した（+ 呼び出し側も）** |
+| 4 | `cloud-itonami/adserver/src/treasury/core.cljc` | **(a)** | **中〜高**。`receipt->onchain` が on-chain 観測から広告主クレジットを発行する | **直した** |
+| 5–9 | `pay/x402.cljc` ×5（`gftdcojp/cloud-murakumo`, `network-awai/cloud-murakumo`, `net-kotobase/control-plane`, `network-awai/net-kotobase`, `club-shinshi-app`） | **(c)** | 無し | **残した** |
+| 10–13 | `kotobase-protocols` のコピー ×4（`org-graphql-http` の graphql/http・graphql/json、`org-opencypher-cypher` の cypher/http・cypher/json） | **(b)+(c)** | 無し | **残した** |
+
+### 高帰結の 4 件が何を欠いていたか
+
+**上流 `kotoba-lang/treasury` の 3 commit**が 3 つの treasury コピーに欠けていた:
+
+- **`749fe15` — `verify-payment must actually check the on-chain record's :asset`**。
+  該当コピーは `:asset` を**一度も読んでいなかった**（`:wrong-asset` の分岐自体が無い）。
+  上流のコメントいわく、`etherscan-row->onchain` は explorer API の `tokenSymbol` を
+  そのまま写すので **\\\"attacker-chosen ERC-20 metadata, not chain-enforced identity\\\"**
+  であり、この検査が無ければ **\\\"a payer could send a worthless token whose symbol
+  happens to be `USDC`, or any token at all\\\"**。
+  欠落は `nexus-x402` / `club-shinshi-app` の 2 件（`adserver` は既に持っていた）。
+- **`0612e7b` — `treasury: remove dangerous advice — a Safe exists only where it was deployed`**。
+  **3 コピーすべて**が削除済みの助言（Safe のアドレスは CREATE2 で全チェーン同じなので
+  `chain` を安い L2 に替えれば済む）を**今も載せていた**。上流は実測でこれを否定している:
+  実在の Safe（`0x640404B5…A881`）は Ethereum mainnet に deploy されており、
+  **BSC / Avalanche / Base / Polygon / Arbitrum / Optimism では `eth_getCode` が空**。
+  上流の書き換え後のコメントは **\\\"Routing that recipient to an L2 on the strength of
+  the old comment would have burned the funds\\\"**。それを防ぐ
+  `verify-recipient-deployed` / `contract-deployed?` も 3 コピーすべてに無かった。
+- **`8d7834a` — materialized USDC-transfer view**（`logs->view` / `verify-from-view`）。
+  3 コピーすべてに無し。
+
+**上流 `kotoba-lang/pay` の 4 commit**が `nexus-x402` の facilitator に欠けていた:
+`70e43f0`（第三者 seller 登録）/ `a0467ad`（credits-gate）/ `aa85e97`（protocol fee を
+invoice に）/ **`4fb7888`（replay 保護）**。既存コードへの変更は
+`gate` の `:challenge` 分岐が `(seq accepts)` ガード付きで `:accepts` も返すようになった
+1 箇所だけで、USDC 単独ルールは影響を受けない。
+
+### `(d)` が 0 件だったのは、pin 自体が減っていたから
+
+ADR-2608121000 が「pin 不一致」と記録した `nexus-x402/src/pay/x402.cljc` は、
+2026-08-12 に別セッションがヘッダを実体（`848158d`）に直して解消していた。
+**`(d)` が 0 なのは全員が pin を宣言しているからではない** —— 13 件中 6 件は
+`no pin declared` で、そこには正直も不正直も無い。**私が直した 2 件
+（`nexus-x402` と `adserver` の treasury）は pin を宣言していなかったので、
+今回ヘッダに commit を書いた。**
+
+## Decision と、実際に変えたもの
+
+### 1. ローカル改変は上流に上げる —— コピーの中に残さない（`kotoba-lang/treasury`）
+
+`nexus-x402` の treasury コピーは (a) だけでなく **(b) でもあった**: base チェーンに
+`:rpcs` フォールバック配列と `chain-rpcs` が**ローカルで足されていた**
+（`network-awai/nexus-x402#12`、「Cloudflare Workers が単一 public RPC から 403 / 空を
+受け取ると `receipt->onchain` が receipt を見つけられず、**支払い済みの相手に
+『そのトランザクションは存在しない』と答える**」）。
+
+これは **2 重に悪い**。同じ verify 経路を走らせている他の 5 repo は誰もこの修正を
+受け取らないし、**ローカル改変を抱えたコピーは以後どの上流 commit とも照合できない**
+（「X に pin、ただし私の変更入り」は pin ではない）。
+
+なので修正を上流へ移した: **`kotoba-lang/treasury@658fa54`**（main tip
+`e860f9d1b4860bd2a89a96dd9928c5dc63203c0c`）。degradation ケース（`:rpcs` を持たない
+チェーンは空配列ではなく primary 1 本を返す / 未知チェーンは既定チェーンへ解決）を
+テストで固定した。
+
+- 検証: `clojure -M:test` **18 tests / 67 assertions → 20 tests / 73 assertions、
+  0 failures 0 errors**。
+- **その 2 テストが本当に落ちることを確認した**: `:rpcs` の 3 エントリを消すと
+  **2 failures**。落ちない gate は劇場なので実際に壊して見た。
+
+### 2. `network-awai/nexus-x402` —— treasury と facilitator を更新（merge `5bb3ece`）
+
+`treasury/core.cljc` を `e860f9d` から、`pay/facilitator.cljc` を
+`889eb0da0aa2422a7e7d5af838d87fcc9bc56440` から取り直し、**両方のヘッダに実際に
+取った commit を書いた**（本文を新しくして pin を古いまま残すのは、まさにこの欠陥の
+再生産になる）。
+
+- 検証: `clojure -M:test` **52 tests / 212 assertions、0 failures 0 errors** ——
+  変更前と変更後の**両方**を同じ worktree で走らせて同一。
+- 検証: `npx shadow-cljs release worker` **exit 0、warning 4 件で前後同数**
+  （すべて既存の `nexus/worker.cljs` の `:redef-in-file`。今回触っていない）。
+  artifact **323787 → 324730 bytes**。
+- `:wrong-asset` の欠落はここでは**潜在**だった: `verdict` は `receipt->onchain` だけを
+  使い、それは実 USDC コントラクトの Transfer log にしか一致せず `:asset \\\"USDC\\\"` を
+  固定する。`etherscan-row->onchain` を呼ぶ経路ができた瞬間に露出する。
+
+**⚠ replay 保護は入っていない（未解決項目）。** `4fb7888` の
+`spend-verdict` / `spend-key` は**純関数**で、host が consumed-amount レコードを
+読み書きするまで何も決めない。`nexus/worker.cljs` は `spend` / `consumed` を
+**1 箇所も参照していない**（grep 実測 0 件）ので、**同じ txHash を 2 回出せば
+2 回配信される**（上流は murakumo.cloud で 2026-07-31 にそれを実測している）。
+コピーに関数が在ることを replay 保護と読まないよう、ファイルのヘッダに明記した。
+**KV への配線は本 ADR の未解決項目であって、済んだ仕事ではない。**
+
+### 3. `network-awai/club-shinshi-app` —— 機械的な更新なら pay rail を静かに止めていた（merge `ccb146a`）
+
+ここが「一括 re-vendor をしない」理由の実例である。
+
+`d1_gateway.cljs` の `confirm-pay-run-op` は operator 側 verifier から受け取った
+`onchain` を**3 キーだけ組み直して**いた（`:to` / `:amount` / `:confirmations`）。
+`:asset` は捨てられていた。treasury を更新して `749fe15` が入ると、`:asset` が
+nil なので `verify-payment` は **`:wrong-asset` を返す**。そして `:wrong-asset` は
+この op の reject 集合に**入っていない**（`:wrong-recipient` と `:underpaid` だけが
+行を `:rejected` にする）ので、**すべての claim が `:pending` のまま永久に滞留し、
+誰にも通知されない**。**コピーを更新するだけなら pay rail が静かに止まっていた。**
+
+なので record 構築を名前付き public 関数 `pay-run-onchain` に切り出し、`:asset` を
+転送し、caller が省略した場合は `\\\"USDC\\\"` に落とす。docstring はこの経路で
+**その検査が無力である**ことを明記している —— この op は on-chain レコード全体を
+`raw-args` から取るので、`:amount` について嘘をつける caller は `\\\"USDC\\\"` とも言える。
+**検査が本物になるのは、op が自分で `treasury/receipt->onchain`（実 USDC
+コントラクトアドレスに一致させてから `:asset` を置く）からレコードを導出するように
+なったとき**であって、それは**今回やっていない**（未解決項目）。
+
+- 検証: `npm test`（shadow-cljs compile test + node）
+  **148 tests / 3304 assertions → 149 tests / 3312 assertions、0 failures 0 errors**。
+- **新しいテストが劇場でないことを確認した**: `pay-run-onchain` から `:asset` キーを
+  消すと **4 failures**、うち 1 つはまさに「`:asset` を送らない verifier でも confirm
+  する」という滞留ケース。
+- 検証: `npx shadow-cljs release worker` **Build completed、warning 79 件で前後同数**
+  （すべて既存、触った namespace には無い）。artifact **1583545 → 1595472 bytes**。
+- テストは `pay-run-onchain` を**実際に呼ぶ**（形を書き写さない）。
+  **テストが被検査対象の写しを自分で持つのは、誰も diff しない vendored copy と
+  同じ欠陥**なので、そうしないために関数を切り出した。
+
+### 4. `cloud-itonami/adserver` —— 資金を焼く助言を載せていた（merge `6faffc8`）
+
+ヘッダが commit を名乗っていなかった（照合対象が無かった）。`receipt->onchain`
+自体は上流と byte 一致で、今回の更新でも変わっていない —— **ここの drift は
+危険な助言と、それを防ぐ guard の不在**だった。adserver は USDC で広告主に課金する
+ので、その助言に晒される読者そのものである。ヘッダに `e860f9d` を書いた。
+
+- 検証: `npm test` **2 tests / 8 assertions、0 failures 0 errors**（前後同一）。
+- 検証: `npx shadow-cljs release worker` **exit 0、0 warnings、124126 bytes**。
+- **正直に言うと 2 tests は薄い。** adserver の smoke test は今回触った経路を
+  実質検査していない。`receipt->onchain` が byte 単位で無変更であることが、
+  ここでの主たる根拠である。
+
+## 意図的に残した 9 件（1 行ずつ理由）
+
+**この節が「見て問題無かった」の置き場所である。** 書かれていない判断は次回
+ゼロから再検査される。
+
+- **`pay/x402.cljc` ×5（pin `edf58beb`、上流 `848158d` に 1 commit 遅れ）** ——
+  差分は **x402 v2 codec の純粋な追加**（`x402-v2-version` / `base-caip2` /
+  `v2-payment-requirements` / `v2-payment-required` / `v2-payload-errors`）で、
+  **既存の def は 1 つも変わっていない**（diff の `-` 側はヘッダ 4 行のみ）。
+  v2 を使う予定の無い 5 repo に課金 codec を一斉更新する理由が無い。
+- **`kotobase-protocols` のコピー ×4** —— drift の**全量が ns 名と docstring**。
+  ns はホスト名に合わせて**意図的に**改名されている（ADR-2608039970: 4 ファイルが
+  同じ `kotobase.protocols.http` を名乗り、2 つが 1 つの classpath に載った瞬間に
+  静かに壊れる）。`(:require` 以下の**コード本体は 4 件中 3 件が完全一致**、
+  残る 1 件（`cypher/json`）の唯一の差は制御文字クラスの綴りが
+  ユニコードエスケープ表記か 16 進エスケープ表記かで、**両方とも U+0000–U+001F にマッチする等価表現**。
+  検出器はこれらに `provenance is inside the ns docstring` と注記を出す。
+  なお比較対象の `kotobase-protocols` checkout は `rescue/wip-20260718` ブランチに
+  居る（main ではない）—— docstring だけの差分なので判定は変わらないが、
+  **この 4 件の「上流」は main を見ていない**ことは記録しておく。
+- **`treasury/core.cljc` ×4（pin `9bf899da`、新しく stale になった）** ——
+  下記のとおり、私が上流を進めた副作用。差分は `chain-rpcs` の**純粋な追加のみ**
+  （4 件とも `(ns` 以下 25 行の差分で、**その 25 行すべてが chain-rpcs 変更の一部**
+  であることを機械的に確認済み）。
+
+## 検出器は 13 → 13。**中身が入れ替わった。**
+
+数字が動かないので正直に書く。**修正後も stale は 13 件**である。理由は 2 つ:
+
+1. 高帰結の 4 件が消えた（nexus の treasury と facilitator、adserver の treasury、
+   club-shinshi の treasury）。
+2. **`kotoba-lang/treasury` を `e860f9d` へ進めたことで、`9bf899da` に pin されて
+   いた 4 つの treasury コピーが新たに stale になった**
+   （`gftdcojp/cloud-murakumo` / `network-awai/cloud-murakumo` /
+   `net-kotobase/control-plane` / `network-awai/net-kotobase`）。
+
+**これは正しい取引である。** 消えた 4 件は支払い判定に載っていて、規則が違っていた。
+増えた 4 件は 1 commit ぶんの純粋な追加で、pin は正直で、帰結は無い。
+**残る 13 件は全部 (b) か (c) で、(a) は 0 件になった。**
+
+**`--check` を gate に載せるのはまだ早い** —— 13 件が「良性の stale」であることは
+この ADR が読まれて初めて分かるのであって、検出器の出力からは分からない。
+gate に載せるなら先に、良性を宣言する手段（copy 側のヘッダ 1 行か allowlist）が要る。
+
+## 未解決項目（優先順）
+
+1. **`nexus-x402` に replay 保護を配線する。** `spend-verdict` / `spend-key` は
+   コピーに在るが host が使っていないので、**同じ txHash が今も 2 回配信される**。
+   純関数が在ることと保護が効いていることは別物。
+2. **`club-shinshi` の `confirm_pay_run` が on-chain レコードを自分で導出する。**
+   今は `raw-args` を丸ごと信用しており、`:asset` 検査は無力なまま。
+   operator 専用 op なので露出は限定的だが、検査が在るように見えるのは危険。
+3. **vendoring 規約の ADR がまだ無い**（ADR-2608121000 の指摘そのまま）。
+   `cloud-murakumo` の `deps.edn` は「この repo に写しを残さない」と逆を書いている。
+   規約が 2 つあって片方は書かれていない状態が続いている。
+4. **`adserver` / 他 4 repo に `chain-rpcs` を配線するか決める。** 単一 public RPC が
+   403 を返すと、支払い済みの相手に「そのトランザクションは存在しない」と答える
+   問題は 6 repo 全部にある。ライブラリ側の修正は入ったが、host 側は nexus すら
+   まだ `chain-rpcs` を呼んでいない。
+
+## Evidence
+
+- 検出器: `nbb scripts/verify-vendored-copies.cljs --diff`（baseline 2026-08-13:
+  34 走査 / 21 current / 13 stale / 0 pin 不一致）。
+- 各件は検出器の要約ではなく**実 diff**で読んだ
+  （`git -C orgs/<org>/<lib> show <rev>:src/<path>` と `diff -u`）。
+  検出器が出す missing/extra の def 名だけでは (b) と (a) が区別できない ——
+  実際 `nexus-x402` の treasury は def が**足りない**と同時に**余って**いた。
+- 着地: `kotoba-lang/treasury@658fa54`(merge `e860f9d`) /
+  `network-awai/nexus-x402@7ae6c1a`(merge `5bb3ece`) /
+  `cloud-itonami/adserver@deb6de6`(merge `6faffc8`) /
+  `network-awai/club-shinshi-app@b808439`(merge `ccb146a`)。
+  すべて `origin/main` から切った worktree → push → server-side merge。
+  rebase / force-push 無し。
+- west pin は 4 件とも `scripts/advance-pins.cljs --execute` で進め、
+  `scripts/verify-west-pins.cljs --only <name>` が 4 件とも
+  **fast-forward** と判定した。
+- **やっていないこと**: どのビルドが実際に edge にデプロイされているかは見ていない。
+  検証はすべてソースとローカルのテスト／ビルドに対するもので、
+  本番デプロイは今回行っていない。"}]

@@ -1,0 +1,42 @@
+[{:db/id -1
+  :adr/id "2607252000"
+  :adr/title "shiropico: repo を DataLad dataset 化し Seedance ep02-05 資産を B2 annex へ退避"
+  :adr/status "accepted"
+  :adr/date "2026-07-25"
+  :adr/body "## Context\n\nghosthacker/SHIRO & PICO の YouTube 未公開調査 (ADR-2607100900 の後続) の過程で、ep02-05 の Seedance 生成物が **どこにもバックアップされていない**ことが判明した。実測: shorts/renders/ 43M (Seedance 2.0 クリップ 8 本 + 静止画 8 枚)、shorts/masters/ 95M (en/hi/ar ローカライズ済みショート 12 本 + say 合成ナレーション aiff 12 本)。いずれも .gitignore され、この 1 台の macOS 上にのみ存在していた。Seedance 再生成には API コストがかかるため、単一障害点として看過できない。\n\nrepo 内の ASSETS-DATALAD.md は「バイナリは ~/gftdcojp/ghosthacker-shiropico-assets という**外部の** DataLad dataset に退避済み」と記載していたが、**当該ディレクトリはこのマシンに存在しない**。したがってそこに退避されていたはずの ep01 資産 (パネル 5 枚 / 26 秒モーションコミック / shiro・pico gen2 キャラ参照 + 12 表情セット) も本 dataset には無く、これが tools/youtube_publish_short.py (ep01 用) が参照する shiropico-short-{en,hi,ar}.mp4 が 1 つも存在しない理由である。\n\nさらに同文書は「git-annex の S3 special-remote は B2 の checking bucket でハングするので boto3 直接アップロードで回避した」と記録していた。この主張は今回の採用方針と正面から衝突するため実測で検証した。\n\n## Decision\n\n1. **repo 自身を DataLad dataset にする** (`datalad create --force -c text2git`、git-annex MD5E)。外部 dataset 方式 (ASSETS-DATALAD.md の旧方式) は採らない — 外部ディレクトリは west 管理外で、実際に失われた実績がある。\n2. special remote `b2` は既存 gftd-*-actor 群と同じ共有バケット `gftdcojp-m365-annex` を `fileprefix=ai-gftd-ghosthacker-shiropico/` で使う (type=S3, signature=v4, chunk=50MiB, encryption=none, host=s3.us-west-004.backblazeb2.com)。認証は scripts/b2-creds.cljs (env→1Password→Keychain) で解決し、値は repo に一切置かない。\n3. **バイナリの .gitignore を撤廃する。** .gitattributes (text2git) がバイナリを annex、テキストを git に振り分けるので、ignore し続けるのは新方式と矛盾する。character-refs/ resources/ shorts/renders/ shorts/masters/ の 4 つとも ignore を外した。\n4. **manifest 登録では :group を datalad ではなく gftdcojp にする** — これは先行の gftd-*-actor 群 (すべて :group datalad) からの意図的な逸脱である。既定 group-filter は -datalad なので :group datalad にすると **既定の west update 対象から外れる**。shiropico は純粋なデータアーカイブ (m365-archive) ではなく tools/ や shorts/*.edn を持つ現役 code repo なので、既定 checkout に残す必要がある。gen-west-manifest.cljs は groups と userdata を独立に出力するため、:group gftdcojp のままでも userdata.datalad: true + annex-remote: b2 は付き、west_annex.cljs の annex-get/drop 対象になる (実測で確認)。\n5. ASSETS-DATALAD.md を全面改訂し、ep01 資産の回収手掛かり (IPFS CID 2 件、旧バケット ai-gftd-datasets/ghosthacker-shiropico/、Keychain gftd.b2 の bucket-scoped creds) を「未検証の lead」として明記して残す。\n\n## 実測 (旧記録の反証)\n\n**「git-annex S3 は B2 でハングする」は再現しなかった。** git-annex 10.20251215 / datalad 1.2.3 で:\n\n- `git annex initremote b2 ...` → `initremote b2 (checking bucket...) ok` (ハング無し)\n- `datalad push --to b2` → copy(ok) 40/40 (annex 対象 40 件、41 件目の .gitignore はテキストなので git 側)\n- 往復検証: shorts/renders/ep02-reboot.png を `git annex drop` → `git annex get --from b2` → sha256 が投入前と**バイト一致** (e2ccd34b...f9bb)\n- `git annex whereis` で全 40 件が 2 copies (here + b2)\n\nしたがって boto3 回避策は退役させ、annex 経路を正とする。\n\n## Consequences\n\n- 着地: 子 repo `61e46fe` (main へサーバ側マージ)、superproject `6f854e0` (repos.edn 登録)、`5e127d9` (west.yml single-entry: pin 7511bf8→61e46fe + userdata)。pin は compare API で ahead 16 / behind 0 / merge_base == 旧 pin の純 fast-forward であることを確認済み。\n- `git-annex` ブランチも push した。これをしないと他 clone は「実体が b2 にある」ことを知れず get できない。\n- ローカル .git は annex objects を含んで約 141M になる。共有 GitHub 側に飛ぶのは pointer だけなので clone は軽いまま。ディスクを空けたい場合は `datalad drop` で解放でき、B2 から復元できる。\n- **ep01 の実体は依然として失われたまま**であり、本 ADR では解決していない。ep01 の YouTube 公開は媒体が無いため実行不能。回収は上記 IPFS/旧バケットの lead を辿る別作業。\n- 字幕 (.srt) は repo 全体でゼロ。ep02-05 は字幕なしで公開されることになる (別 gap)。\n\n## Alternatives considered\n\n- **外部 dataset の再構築** (旧 ASSETS-DATALAD.md 方式): west 管理外で追跡されず、実際に消失した実績があるため却下。\n- **:group datalad で登録** (gftd-*-actor 準拠): 一貫性はあるが現役 code repo が既定 checkout から消えるため却下。将来 shiropico が純アーカイブ化したら再検討の余地がある。\n- **boto3 直接アップロード** (旧記録の回避策): 前提だったハングが再現しないため不要。annex の位置追跡・整合検証・drop/get を捨てる価値がない。\n\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-25 — amend
+
+ep01 資産の回収を実測: キャラ参照は失われていない (ai-gftd-yukkuri に git 追跡済み)。パネル5枚とモーションコミックのみ消失、ただし再生成は可能。
+
+本 ADR 本文は ep01 資産一式 (パネル 5 枚 / 26 秒モーションコミック / shiro・pico gen2 キャラ参照 + 12 表情セット) が失われたと記述したが、回収作業の実測でこれは**部分的に誤り**だった。訂正:
+
+**(a) キャラ参照は失われていない。** orgs/gftdcojp/ai-gftd-yukkuri の appview/ai-gftd-wasm-yukkuri-y5kk5r1x/svelte/static/img/ に kamishibai 系 43 ファイル、emotions/{shiro,pico} に 24 ファイル (= 12 表情 x 2 キャラ) が存在し、いずれも **git 追跡済み** (git ls-files で確認)。ADR 本文の provenance 節が指していた出所そのものが健在で、annex にも B2 にも依存せず安全。
+
+**(b) パネル 5 枚と 26 秒モーションコミックは実際に消失。** 以下すべて空振り:
+- IPFS ローカル: 両 CID とも pin 無し、block も offline で不在
+- IPFS ネットワーク (daemon 稼働・peer 接続あり、120 秒): resolve せず
+- IPFS 公開ゲートウェイ (ipfs.io / dweb.link / w3s.link / 4everland.io、両 CID、リダイレクト追跡あり): 全て HTTP 504
+- 旧 B2 バケット ai-gftd-datasets: 現行キーは bucket-scoped で not entitled (ListBuckets も不可)
+- Keychain gftd.b2 の DATASETS_KEY_ID / DATASETS_APPLICATION_KEY: 存在しない
+- 旧 doc が指す data/ghosthacker-shiropico/ (ai-gftd-apps-gftdcojp/60-apps/ai-gftd-project-mangaka 配下) は現存するが **テキストのみ 1.8M**。character-refs/ resources/ サブディレクトリは無く、png/mp4/jpg/wav は 1 つも無い。
+
+**(c) ただし ep01 は「回収不能」だが「再生成可能」。** 生成の入力と生成器が両方健在: episode-01-shotlist(-v2) が 11 言語分 + episode-01.md + SERIES-BIBLE.md + character-design-spec.json、生成器は comfy/scripts/ の shiropico-ep01-gen.py / shiropico-motion-comic.py / shiropico-motion-comic-v2.py / shiropico-build-episode{,-v2,-v3}.py / shiropico-opening{,-v2}.py / shiropico-thumbnail.py / shiropico-youtube-upload.py。再生成は既公開版と同一のアートにはならないため、実行するかはオーナー判断。
+
+**(d) 未確認の残り筋:** ai-gftd-datasets バケットに対して entitled な鍵が 1Password に存在する可能性。ただし item 識別子が特定できないため、安全床 (総当たり列挙の禁止) に従い当て推量での検索は行わず、識別子はオーナーに問い合わせるべき事項として残す。
+
+### 2026-07-25 — note
+
+ADR id 2607252000 が衝突している (shiropico-datalad-b2-asset-custody と kotobase-lei-catalog-cpu-outage-async-block-discovery)。seq 63 は前者に係る。
+
+2026-07-25、並行セッションが同一 id 2607252000 で 2 本の ADR を main に着地させた:
+
+1. 2607252000-shiropico-datalad-b2-asset-custody.edn (commit 9c154dc、先着)
+2. 2607252000-kotobase-lei-catalog-cpu-outage-async-block-discovery.edn (後着)
+
+**seq 63 (:type amend) は 1 の shiropico ADR に係るものであり、2 の kotobase ADR とは無関係である。** edn-query.cljs は adr/id で join するため、解消するまで seq 63 は両方に紐づいて見える。
+
+現状の参照: 1 は manifest/repos.edn の :datalad note と本 ledger から参照されている。2 への inbound 参照は (本 note を除き) 存在しない。ledger は append-only で seq 63 の adr/id を書き換えられないため、id の再採番は本 note でなく別途の判断が要る。近傍の空き id: 2607252001 / 2607252100 / 2607252300 / 2607252400。
+
+なお adr-ledger --verify は「event が指す adr/id に対応するファイルが無い」ケースしか検出せず、**id 重複は検出しない** (現在の verify FAIL 7 件は本件と無関係な既存の別問題)。
+"}]

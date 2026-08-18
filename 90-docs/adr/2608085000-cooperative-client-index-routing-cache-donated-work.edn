@@ -1,0 +1,327 @@
+[{:db/id -1
+  :adr/id "adr-2608085000-cooperative-client-index-routing-cache-donated-work"
+  :adr/doc_type "adr"
+  :adr/topic "cooperative-client-index-routing-cache-donated-work"
+  :adr/title "ADR-2608085000: fan-out を切って client を協力させる — routing 索引（実装・実測）と、client が put してよいものの境界"
+  :adr/status "accepted"
+  :adr/date "2026-08-08"
+  :adr/last_verified "2026-08-08"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["client-side shard index の fan-out 削減（routing dictionary）の設計・実測・限界"
+   "client が object store へ put してよいものの分類と、それが正しさを壊さない理由"
+   "query のついでに client が寄付してよい仕事の範囲と予算"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends ["adr-2608071500-kotobase-client-side-shard-index-on-object-storage"]
+  :adr/related
+  ["adr-2608071500-kotobase-client-side-shard-index-on-object-storage"
+   "adr-260726-kotobase-query-plane-is-one-ref"
+   "adr-2608039000-blockchain-decentralized-path-does-not-presume-d1"
+   "adr-2608039970-kotobase-base-is-the-datom-plane-not-datalog"
+   "adr-2608070400-kotobase-client-held-security-and-searchable-encryption-tiers"
+   "adr-2607310900-query-plane-cache-index-materialized-view"
+   "adr-2608021000-namidb-comparison-and-the-read-path-trampoline"
+   "adr-2607250100-kotobase-maturity-bar-vs-production-databases"]
+  :adr/decision-summary
+  "{:d1 :routing-dictionary-removes-the-descent-fanout, :d2 :bounds-are-published-hints-are-donated, :d3 :clients-put-blocks-never-refs, :d4 :donated-work-is-speculative-authority-is-quorum, :measured {:uniform-64k-32shard {:v1-gets 240.8 :route-gets 77.6 :v1-waves 15 :route-waves 18}, :clustered-64k-32shard {:v1-gets 150.6 :route-gets 20.4 :shards-absent 30.8}, :fanout-growth {:v1 12.2 :route 3.9}}, :implemented [:d1 :d2], :designed-only [:d3-class-c :d4], :reach :raised-but-not-to-1e11}"
+  :adr/artifacts
+  "{:impl \"70-tools/kotobase-shard-index/src/kotobase_shard_index/route.cljc\", :receipt \"70-tools/kotobase-shard-index/bench/results/2026-08-08-route-scaling.edn\", :tests \"70-tools/kotobase-shard-index/test/run_tests.cljs\", :mutations \"70-tools/kotobase-shard-index/test/mutations.cljs\"}"
+  :adr/body
+  "# Context
+
+オーナー指示（2026-08-08）: 「google 級を狙って、また server を使わずに client から直接 query する設計、
+client 側でキャッシュなども作って put して、client 側に query のついでに処理もさせて協力させる設計」。
+
+このうち **「server を使わずに client から直接 query」は既に実装・実測済み**である
+（ADR-2608071500 / PR #1706、`70-tools/kotobase-shard-index/`）。したがって本 ADR が
+足すのは残りの 3 つで、そのうち 1 つ目は前 ADR 自身が名指しした行き止まりでもある:
+
+> **fan-out がこの設計の真の上限。** doc-shard 型は全 shard に聞くので GET は shard 数に
+> 比例する（32 倍の shard で 12.2 倍）。**この設計の正直な射程は 10⁹〜10¹⁰ ページ**で、
+> それ以上には client の手前に集約 tier が要る —— **それはサーバーの再導入である**。
+> — ADR-2608071500「この設計が到達しないところ」
+
+つまり「Google 級」と「server を使わない」は、前 ADR の結論では**両立しない**。
+本 ADR はそこを実際に測り直した結果である。
+
+# Decision
+
+## D1 — fan-out は 2 つの独立した項で、routing dictionary が両方を削る
+
+v1 の `open-lists` は **shard × term ごとに dict を降りる**。S=32 / T=3 / height=3 なら
+posting を 1 バイトも読む前に約 288 GET を払う。これが 240.8 GET の中身だった。
+
+索引全体で 1 本の dictionary を足す:
+
+    term -> [{:shard :max-impact :df :postings} ...]
+
+`:max-impact` は「その shard でその term が出しうる最大の寄与」（posting は impact 降順
+なので先頭 chunk の値）。ここから 2 つが出る:
+
+1. **term の所在特定が S 回でなく 1 回になる。** routing entry が各 shard の posting-head
+   の cid を直接持つので、per-shard dictionary はこの経路では **1 度も読まれない**。
+   `S×T×height` → `T×height`。
+2. **shard を開かずに除外できる。** shard `s` のどの文書も、スコアは
+   `Σ_t max-impact(t, s)` を超えられない。確定した k 番目のスコアがその和に達していれば、
+   `s` は posting head すら取らずに飛ばせる。
+
+**正しさは既存の証明がそのまま 1 段上がっただけ**である。v1 の D4 は「term `t` の既読
+prefix に居ない文書は `t` の未読先頭 chunk の max-impact を超えられない」と言う。ここでは
+「未開の shard に居る文書はその shard の per-term max-impact の和を超えられない」と言う。
+どちらも同じ形の上界なので、これを既存の `u`（未見文書の上界）に畳み込むと
+**証明は弱まらず保存される**。したがって厳密性の範囲も変わらない ——
+**score について厳密、同点は未規定**。
+
+## D2 — 実測が仮説を 2 回否定した。fan-out の落ち方はコーパスの性質で決まる
+
+**当初の仮説（誤り）**: 「均質なコーパスでは全 shard の bound が同じなので pruning は効かない。
+効くのは host 単位で塊になった実クロールの形だけ」。**両方とも逆だった。**
+
+| コーパス | 何が起きるか |
+|---|---|
+| **均質**（同一 Zipf 語彙） | shard が小さいほど「どの query term を持つか・どれだけ強いか」の分散が上がり、**bound pruning が効く**（16 shard で 10 個を skip） |
+| **クラスタ化**（host 単位、実クロールの形） | pruning は 0。**そもそも該当 shard しか候補にならない** —— routing entry が term を持たない shard を列挙しないので、32 shard 中 30.8 個が**タダで消える** |
+
+したがって fan-out は **2 段階**で落ちる:
+
+    total → considered : query term を 1 つも持たない shard。routing entry が列挙しないので無料
+    considered → opened: term は持つが bound が k 番目に届かない shard。これが pruning
+
+**片方だけ報告すると、もう片方が見えなくなる。** stats は `:shards-total`
+`:shards-considered` `:shards-opened` `:shards-pruned` `:shards-absent` を全部出す。
+どちらが支配的かは**コーパスの性質であってコードの性質ではない**。
+
+## D3 — client が put してよいのは block だけ。ref は quorum のまま
+
+「client 側でキャッシュを作って put」を安全にする境界は、**書ける場所**ではなく
+**間違いがどちらに転ぶか**で引く。
+
+| 種別 | 例 | 検証 | 誰が書けるか |
+|---|---|---|---|
+| **A. 読んだ block の再 put** | availability への寄付 | CID = hash(bytes)。自己検証 | 誰でも |
+| **B. 順序ヒント** | 「この term はこの shard が濃い」 | **検証不要**（下記） | 誰でも |
+| **C. 導出結果のキャッシュ** | ある query の top-k | 再計算しないと証明できない | **v1 では採らない** |
+| **D. manifest / ref の前進** | 新しいスナップショットの publish | quorum（`inga`） | client は不可 |
+
+**load-bearing な規則はこれ 1 本**:
+
+> **正しさに効く bound は quorum で publish された manifest からしか来ない。
+> client が publish してよいのは「どの順で開くか」だけで、「どれを飛ばすか」ではない。**
+
+嘘の順序ヒントは**遅くするだけで、答えを変えられない** —— 開く順序を変えても、
+飛ばす判断は manifest 由来の bound がするからである。これで「client の put を信用してよいか」
+という問い自体が消える。信用しないまま受け取れる。
+
+**C を v1 で採らない理由を正直に書く**: 導出結果のキャッシュは、検証コストが便益に迫る。
+このクエリは既に 20〜85 GET で終わるので、キャッシュされた答えを検証する
+（＝もう一度やる）なら最初からやった方が速い。k 者の署名付き一致や確率的 spot 再計算で
+組めなくはないが、**それが要る負荷がまだ存在しない**。必要になってから設計する。
+
+## D4 — 寄付されるのは仕事であって権限ではない
+
+「query のついでに処理させて協力させる」で**実際に効く仕事は query 側ではなく build 側**である。
+実測が言っているのはそれで、query は既に 20〜85 GET しかかからない一方、
+ADR-2608071500 は **incremental segment merge** を「次に書くもの」の 2 番目に挙げている。
+
+したがって寄付の単位:
+
+1. **merge の投機実行** — query した client は posting chunk を既に読んでいる。読んだ
+   segment を merge して block として put する（種別 A：CID が bytes の hash なので
+   「間違った merge」は別 address にしかならない）。**採用するかは publisher が決め、
+   採用は quorum の manifest 前進として起きる。** client は CPU と PUT を出し、権限は出さない。
+2. **観測の還元** — どの (term, shard) が実際に触られ、observed max-impact がいくつだったか。
+   これは種別 B（順序ヒント）なので検証不要で、shard の分割・併合の判断材料になる。
+3. **availability** — block を持つ client が peer に配る。`kotoba-lang/p2p` が既に持っている
+   （CID 検証込みの block 交換、「嘘つき peer は sync を止められるが state は壊せない」が
+   証明済み）。Google 級で一番効くのはここで、origin が hot path から消える。
+
+**予算規則**: client が寄付してよいのは、そのクエリで払う予定だった GET / CPU の一定割合まで。
+寄付は**答えをブロックしない**。この 2 つを破ると「協力」は「勝手に重くなる」に変わる。
+
+## D5 — キャッシュは新規に作らない。`kotoba-lang/block-cache` が既にある
+
+CID 命名の block は不変なので **invalidation という概念が存在しない**。これは既に
+`block-cache`（`memory` / `tiered` / `segmented` / `null` / Workers Cache API tier、
+byte 境界、`:verify!` は miss 時のみ）として実装済みで、新しい repo は要らない。
+
+client 側の tier 構成:
+
+    L0 プロセス内（bytes 上限）
+    L1 ブラウザ Cache Storage / OPFS（セッションを跨ぐ）
+    L2 object store 自身（`Cache-Control: immutable` が無条件に正しいので CDN と
+       HTTP cache がタダで働く）
+
+この workload で効く理由は**読まれる block の偏り**にある: routing dict の root と上位内部
+ノード、頻出語の posting head は**ほぼ全クエリが読む**。posting chunk だけがクエリ固有。
+小さな永続キャッシュが waves の大半を吸う。
+
+そして **address が content hash なので、キャッシュは利用者間で共有できる**。D3/D4 が
+成立するのはこの性質の上である。
+
+## D6 — これが Google 級に対して主張してよいこと
+
+Google は艦隊を買う。ここでは**読み手が増えるほどキャッシュ・帯域・CPU が増える**。
+クエリ単価は読者数に対して**下がる**。それが構造的な違いであって、規模で並ぶという主張ではない。
+
+**前提条件を隠さない**: これは**公開コーパス**でしか成り立たない（ADR-2608070400 の段 P）。
+client が読める block は全部読めるので、private を混ぜるなら段 C（opaque index、
+実測 request 2.8x / row 8.06x の増幅）に載せる。**協力の経済性は段 C では崩れる。**
+
+# 実装と実測
+
+`70-tools/kotobase-shard-index/src/kotobase_shard_index/route.cljc`（+ `build.cljc` の
+routing dictionary、`synth.cljc` の clustered corpus）。receipt:
+`bench/results/2026-08-08-route-scaling.edn`。
+
+同一索引の上で v1 の読み経路と routing 経路を A/B した（コーパスもクエリも同じ）。
+
+## 均質コーパス — 前 ADR が上限を測ったのと同じ regime（shard 数がコーパスと共に増える）
+
+| docs | shards | v1 GET | route GET | 比 | absent/pruned/opened | waves |
+|---|---|---|---|---|---|---|
+| 1,000 | 1 | 19.8 | 19.8 | 1.00 | 0/0/1 | 8 → 8 |
+| 4,000 | 2 | 28.4 | 23.6 | 0.83 | 0/0/2 | 8 → 8 |
+| 16,000 | 8 | 72.8 | 39.2 | 0.54 | 0/0/8 | 9 → 9 |
+| 64,000 | 32 | **240.8** | **77.6** | **0.32** | 0/14.4/17.6 | 15 → 18 |
+
+**前 ADR が測った fan-out の成長 19.8 → 240.8（12.2 倍）が、19.8 → 77.6（3.9 倍）になった。**
+
+16,000 / 8 shard の行が 2 つの機構を分離している: **pruned が 0 なのに GET が 0.54 倍**。
+ここで効いているのは descent の削減だけ（`S×T×h → T×h`）で、pruning は 1 shard も
+飛ばしていない。**descent の削減は無条件**、pruning は条件付き、という違いがそのまま出ている。
+
+## クラスタ化コーパス — host 単位で塊になった実クロールの形
+
+| docs | shards | v1 GET | route GET | 比 | absent/pruned/opened | waves |
+|---|---|---|---|---|---|---|
+| 4,000 | 2 | 9.4 | 5.2 | 0.55 | 2/0/0 | 1 → 1 |
+| 16,000 | 8 | 34.6 | 5.2 | 0.15 | 8/0/0 | 1 → 1 |
+| 64,000 | 32 | **150.6** | **20.4** | **0.14** | **30.8**/0/1.2 | 8 → 8 |
+
+**32 shard のうち平均 30.8 個が「候補にすらならない」。** pruning は 0 —— 飛ばすまでもなく
+routing entry がそれらの shard を列挙しないからで、コストはゼロである。**この形では
+shard を増やしてもクエリのコストがほとんど増えない**（16,000/8 と 64,000/32 がどちらも
+5.2 と 20.4 で、shard を 4 倍にした増分は fan-out ではなく posting の量）。
+
+## `shard-batch` — GET と waves のダイヤル（均質 64,000 / 32 shard）
+
+shard を 1 波 1 個ずつ開くと GET は最小になるが、逐次深さが opened に比例する。
+**latency が追随するのは waves の方**なので、両方出す:
+
+| batch | GET | waves |
+|---|---|---|
+| 1 | 70.6 | 70 |
+| 2 | 71.6 | 38 |
+| 4 | 73.6 | 22 |
+| **8（既定）** | **77.6** | **18** |
+| 16 | 82.4 | 16 |
+| 32 | 92.0 | 15 |
+
+**答えは全 batch 値で同一**（receipt の `:batch-sweep-answers-identical`）。既定を 8 に
+したのは、batch 1 比で GET +10% と引き換えに waves を 3.9 倍削るため。
+**最初の実装は batch 1 相当で、GET を 3.4 倍改善しながら waves を 15 → 70 に悪化させていた**
+—— 片方だけ測っていたら「改善」として landed していた。
+
+## routing dictionary の索引コスト
+
+| docs | shards | blocks | bytes |
+|---|---|---|---|
+| 1,000 | 1 | ×1.02 | ×1.32 |
+| 16,000 | 8 | ×1.00 | ×1.18 |
+
+block 数がほぼ動かないのは、索引の block 数を支配しているのが posting chunk だからである
+（routing dictionary は主に bytes を足す）。
+
+## 検証
+
+- **exactness**: 全構成で `query/top-k-exhaustive`（全 posting chunk を読む oracle）と
+  スコアが一致。bench は 16,000 doc まで oracle を回し、**それ以上は回していないことを
+  receipt に記録する**（`:oracle-checked-up-to`）—— 黙って検証を止める bench は
+  検証しない bench より悪い。
+- **suite**: **52 assertions / 0 failures**（変更前 32）。追加分は routing 経路 vs oracle・
+  routing vs v1・`prefetch` 1/2/8/64 不変・`shard-batch` 1/2/8/64 不変・
+  routing dictionary の無い索引を **loud reject** すること（黙って全読みに落ちる
+  fallback は「signal の無い性能の崖」になるので付けない）。
+- **変異で「テストがテストになっているか」を検査した**（ADR-2608071500 ③ の再発防止）:
+  `test/mutations.cljs` が 3 変異を適用して suite を回す。
+  **3 件とも KILLED**（`:drop-unopened-shard-bound` 45/7、`:understate-shard-bound` 45/7、
+  `:finish-with-shards-still-unopened` 39/13）。
+
+- **fleet gate `root-shard-index` を routing 経路まで広げた。** `check_budget.cljs` が
+  v1 と routing の両方の GET / waves 予算を持ち、さらに **「routing が v1 より高い」**
+  という同一 run 内の不変条件を見る（この 3 つ目が無いと、最適化が丸ごと取り消されても
+  他の検査は全部通る）。**落ちることを 4 通りで確認済み**: routing GET 予算改竄 →
+  `149 > 66` で exit 1 / routing waves 予算改竄 → `8 > 3` で exit 1 /
+  変異ロック在り → exit 1 / 無改変 → exit 0。
+
+## 測定器が自分を騙した 1 件（設計より重要なので残す）
+
+**変異テストが `src/` を書き換えている最中に予算を記録してしまい、
+その測定値は 149 GET ではなく 29 GET だった。** 変異は停止条件を壊すので
+**スキャンが早く止まり、結果として 5 倍「速く」見える。** 出力に異常は一切無い。
+そのまま commit していれば、以後の**正しい** run が全部この予算に落ちていた。
+
+対策は README の注意書きではなく**ロック**にした（`test/mutations.cljs` が
+`.mutating` を握り、`check_budget.cljs` はそれが在る間は測定を拒否する）。
+一般化できる部分はこれ:
+
+> **コスト gate は正しさ gate の代わりにならない。** 正しさを壊す変更は、
+> コストの側では**改善として現れる**ことがある。
+
+# この設計が到達しないところ（正直に）
+
+- **10¹¹ ページには届かない。** 射程は上がったが桁は 1 つで、依然 client の fan-out が
+  上限を決める。clustered な実クロールでは 32 shard 中 1 個しか開かないので、
+  この形が実コーパスでも成り立つなら射程はもっと伸びる —— **が、それは合成コーパスでの
+  観測**であって実測ではない。実コーパスでの再測定は未実施（前 ADR の follow-up 3 と同じ）。
+- **D3 の C（導出結果キャッシュ）と D4 の 1（merge 寄付）は設計だけで、実装が無い。**
+  本 ADR で実装・実測したのは D1/D2 のみ。**設計した部分を実装済みと読まないこと。**
+- **`:shards-absent` が効くのは分割が主題に沿っているときだけ。** doc-id 順が主題順で
+  ないコーパス（時系列順のクロールなど）では均質側の挙動になる。分割方針が retrieval
+  コストを決めるという事実は、この設計では**隠せない**。
+- **前 ADR の staging 問題をそのまま引き継いでいる。** `70-tools/` は正しい置き場では
+  なく、`kotobase-` family の subject repo として `kotoba-lang` に切り出すのが正しい。
+  本 ADR もそれを follow-up として名指しするだけで、解いていない。
+- **合成コーパス**。実テキストは裾がずっと長く、dict は深くなる（対数）が中頻度語は
+  より選択的になる。
+- **ネットワークを測っていない。** GET 回数と waves は設計の性質、latency は誰かの
+  deployment の性質。waves × 実測 RTT が見積もりであって、この receipt から latency を
+  直接読まない。
+
+# 却下した選択肢
+
+| 案 | 判定 | 理由 |
+|---|---|---|
+| client の手前に集約 tier を置く | 却下 | サーバーの再導入であり、指示の前提を捨てることになる。前 ADR が「それが要る」と結論した地点を、測り直して動かしたのが本 ADR |
+| shard ごとに ref を分けて並列度を上げる | 却下 | 原子性が消える（ADR-260726 / 前 ADR D1）。routing dictionary は 1 manifest の下に居るのでこの規約に触れない |
+| client が publish した bound で pruning する | 却下 | 嘘の bound が**答えを変える**。D2 の hint/bound 分離はこれを構造的に不可能にするためにある |
+| 導出結果キャッシュに quorum 検証を付ける | 却下（時期尚早） | クエリが 20〜85 GET で終わる間は、検証コストが便益に迫る。必要になってから |
+| term-shard に切り替えて fan-out を消す | 却下 | 前 ADR で判定済み: tail latency が構造的に悪い。doc-shard なら各 shard が独立に top-k を出せる |
+| shard を 1 波 1 個ずつ開く（GET 最小） | 却下（実測） | GET は最小になるが waves が opened に比例する。latency が追随するのは waves の方 |
+
+# Consequences
+
+- **(+) 前 ADR の「10¹¹ には集約 tier = サーバー再導入が要る」という結論が、実測で 1 段
+  押し戻された。** server を使わないまま fan-out を削れることが数字になった。
+- **(+) 「client に put させる」が信用問題を持ち込まない形で定義された**（D3 の hint/bound
+  分離）。これは索引に限らず、client が導出物を書き戻す全ての設計に効く規則である。
+- **(+) 仮説が 2 回否定され、両方 receipt に残った。** fan-out の落ち方はコーパスの性質で
+  決まるという結論は、当初の設計意図ではなく測定の産物である。
+- **(-) 実装したのは D1/D2 だけ。** D3 の C と D4 は設計であって実装ではない。
+- **(-) 本番経路ではない。** kotobase.net は今も hydrate 経路（p50 2,491ms、92% が hydration）。
+  本 ADR も前 ADR と同じく代替経路のコストを測っただけで、移行は決めていない。
+
+# 次にやること（優先順）
+
+1. **incremental segment merge** — 前 ADR の 2 番目のまま未着手で、D4 の寄付が刺さる先でもある。
+2. **実コーパスでの再測定** — `product-corpus` / `kotobase-commoncrawl-actor` の実データ。
+   特に `:shards-absent` が実クロールでも効くかは合成では答えられない。
+3. **`kotoba-lang` への切り出しと west 登録**（前 ADR の 4 番目、未着手のまま）。
+4. **fleet gate に routing 経路の GET 予算を足す** — `root-shard-index` gate は v1 経路の
+   予算しか見ていない。
+5. D4-3（availability の寄付）を `p2p` の block 交換に載せる。ここだけは新規実装が
+   ほとんど要らない。
+"}]

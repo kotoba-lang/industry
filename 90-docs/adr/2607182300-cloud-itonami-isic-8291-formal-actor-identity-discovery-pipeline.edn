@@ -1,0 +1,31 @@
+[
+ {:db/id -1
+  :adr/id "2607182300"
+  :adr/title "cloud-itonami-isic-8291: formal Advisor⊣Governor actor identity + :disclosure/discover-candidates governed operation"
+  :adr/status "accepted"
+  :adr/decided "2026-07-18"
+  :adr/body "## Summary
+
+Formalize cloud-itonami-isic-8291 (Dossier-LLM ⊣ DisclosureGovernor) as a canonical Advisor⊣Governor actor with RAD identity, CACAO self-mint, and automated LEI discovery pipeline.
+
+## Design
+
+### Part A: Actor Identity
+- RAD identity journal: `80-data/kotoba-rad/cloud-itonami-isic-8291.identity.journal.edn`
+- CACAO self-mint: Ed25519 did:key + IPNS, portable `.cljc`, `load-or-create-identity!` persists to `.dossier/identity.edn` (gitignored)
+- Tests: `test/dossier/identity_test.clj`, `test/dossier/operation_test.clj`
+
+### Part B: `:disclosure/discover-candidates` Operation
+- Advisor proposal: top-N companies + rationale + citations
+- Governor: 6-stage pipeline (source-basis HARD gate reused from ADR-2607110400)
+- Fallback: deterministic API clients (per ADR-2607150100, NOT governor-gated)
+
+### Part C: LEI Discovery Automation
+- `bin/collect.cljs` (nbb): read `90-docs/adr/2607110300-*.progress.edn`, call isic-8291, invoke GLEIF API, scaffold `cloud-itonami-lei-<LEI>` repos
+- Honest failures logged to `retry-js-rendered.edn` (no browser JS capability in-script)
+
+## Related ADRs
+ADR-2607110400, ADR-2607150100, ADR-2607110300, ADR-2605192200"
+  :adr/links ["adr-2607110400" "adr-2607150100" "adr-2607110300"]
+  :adr/tags ["actor" "identity" "governor" "dossier" "lei-collection"]}
+]

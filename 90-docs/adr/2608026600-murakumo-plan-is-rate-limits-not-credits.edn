@@ -1,0 +1,168 @@
+[{:db/id -1
+  :adr/id "2608026600"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/title "plan は credits ではなく rate limit にする — 5時間 + 週次の二重窓。繰越問題も stored value 問題も、構造ごと消える"
+  :adr/status "accepted"
+  :adr/date "2026-08-03"
+  :adr/last_verified "2026-08-03"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "murakumo-plan-rate-limits"
+  :adr/repos ["orgs/network-awai/cloud-murakumo" "orgs/network-awai/local-murakumo" "orgs/kotoba-lang/murakumo"]
+
+  :adr/authoritative_for
+  ["**subscription plan は credits を配らない。** 買うのは『アクセス + レート上限』であり、残高ではないこと"
+   "レート上限は **5 時間ローリング窓 + 7 日ローリング窓の二重**であること（ChatGPT/Codex・Claude Code と同じ構造）"
+   "**API credits を plan と完全に別建ての商品にすること。** 前払い・期限なし・plan のレート窓を通らない"
+   "stored value は API credits だけに存在すること。plan 側には存在しないので、escheat / CARD Act / ASC 606 breakage の論点が構造的に発生しない"
+   "plan の消費は rate counter（窓ごとの消費記録）で計量し、credits 残高の fold に混ぜないこと"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends ["2608026200" "2608026100"]
+
+  :adr/related
+  ["90-docs/adr/2608026200（plan 表・価格・§5-3-2 の積み残し調査。本 ADR は plan の**形式**を credits から rate limit へ変える）"
+   "90-docs/adr/2608026100（credits を unit of account に。**API credits 側では全面的に有効なまま**、plan 側には適用しなくなる）"
+   "90-docs/adr/2608026500（トークン単価。API credits plan の価格として生きる）"
+   "orgs/kotoba-lang/murakumo `src/murakumo/infer/credits.cljc`（stored value の台帳。API credits 専用になる）"]
+
+  :adr/problem
+  "オーナー指示（2026-08-03）: 『月次設計にしましょう。chatgpt, claude codex などを参考に 1 週間単位での limit を作りましょう。また api credits plan を別に用意しましょう』。
+
+ADR-2608026200 §5-3-2 で『月次 allowance の非繰越は実装すべき取りこぼし』と結論したが、実装は保留していた —— 『どの spend が allowance を食い、どれが stored value を食ったか』の帰属が現行の flat balance map では表現できず、取り違えると前払い済みの財産を誤って消す金額バグになるため。
+
+**指示された 3 点を調べたら、その保留していた問題が構造ごと消える設計だと分かった。**"
+
+  :adr/decision
+  "## 1. 実際の業界構造（2026-08-03 調査）
+
+| | 短窓 | 長窓 | API |
+|---|---|---|---|
+| **Claude Code** | **5 時間ローリング** | **週次（7 日ローリング）** | 別課金 |
+| **Codex（OpenAI）** | **5 時間ローリング** | **週次（上に積む）** | **両方の cap を通らない。per-token 課金の別経路で、ChatGPT credits を消費しない** |
+
+**両社とも同じ形に収束している。そして決定的なのは、subscription が credits を配っていないこと。**
+
+ChatGPT も Claude Code も、加入者に**残高**を渡していない。渡しているのは**アクセスとレート上限**で、窓が過ぎれば回復する。API は完全に別の課金経路。
+
+## 2. これが murakumo の未解決問題を 3 つ同時に消す
+
+**plan を『credits の月次配布』ではなく『レート上限つきアクセス』にすると:**
+
+| 問題（ADR-2608026200 / 026100） | rate limit にした場合 |
+|---|---|
+| 非繰越の実装（spend の帰属が必要） | **問題が存在しない。** 窓のカウンタは残高ではないので、繰り越す対象が無い |
+| plan credits が stored value に見える（Delaware escheat 5 年、住所不明なら設立州） | **stored value ではない。** 前払残高が無いので escheat の対象物が無い |
+| CARD Act の有効期限下限 / ASC 606 の breakage 認識不可 | **どちらも該当しない。** 未使用の窓は「使わなかった容量」であって前払金ではない |
+
+**ADR-2608026200 §5-3-2 の非対称の結論（allowance の非繰越は取りこぼし、購入 credits の失効は取りこぼしでない）は、この形にすると『allowance を廃止して rate limit にする』という一手で解ける。** 中途半端な非繰越実装は要らなくなる。
+
+**大手 2 社がこの形なのは偶然ではない。** 前払残高を配らなければ、残高にまつわる規制・会計の面倒が全部消える。
+
+## 3. plan の定義（月次課金・週次レート上限）
+
+**買うもの: アクセス + レート上限。credits は渡さない。**
+
+上限の単位は **unit**。数値は価格表（ADR-2608026200 §3）と同じ目盛りを使う（`video/oss` 10 unit/秒 等）が、**unit は残高ではなくカウンタ**である。積み上がらない・譲渡できない・買い足せない・現金価値が無い。
+
+| plan | 月額 | **週次上限** | **5 時間上限** | 込み保管 | 同時実行 |
+|---|---|---|---|---|---|
+| **Starter** | $15 | **350 unit** | 88 unit | 10 GB | 2 |
+| **Plus** | $49 | **1,140 unit** | 285 unit | 100 GB | 8 |
+| **Ultra** | $129 | **3,000 unit** | 750 unit | 500 GB | 24 |
+| **Team** | $79/seat | **1,830 unit/seat** | 458 unit/seat | 250 GB/seat | 24 |
+
+週次上限 = 旧月次 credits ÷ 4.33（52週/12ヶ月）を、**単調非減少になるよう丸めた**（大きい plan ほど 1 unit が安い、が起きないこと）。**5 時間上限 = 週次の 25%。**
+
+**なぜ二重窓なのか。** 週次だけだと 1 人が 1 時間で 1 週間分を焼き切り、共有容量を枯渇させられる（Claude Code の文書が短窓の理由としてこれを挙げている）。5 時間窓は「重いセッションは通すが、1 バーストで週を消し切らせない」ための床で、25% なら 4 セッションで週を使い切れる。
+
+**両方ともローリング窓**（月曜リセットではない）。最初の消費から数えて 5 時間後 / 7 日後に、その分だけ回復する。
+
+**週次で買えるもの**（`video/oss` 10 unit/秒）: Starter 35 秒、Plus 114 秒、Ultra 300 秒。月換算では ADR-2608026200 の plan 表と同じ量で、**寄与率も 39–41% のまま変わらない**（§5 で検算）。
+
+## 4. API credits plan（完全に別建て）
+
+| | plan（subscription） | **API credits** |
+|---|---|---|
+| 買うもの | アクセス + レート上限 | **前払い残高** |
+| 課金 | 月額固定 | **従量（$1 = 100cr、最低 $5）** |
+| 単位 | 窓ごとの unit カウンタ | **credits** |
+| レート窓 | 5 時間 + 週次 | **通らない**（濫用防止の同時実行・RPM のみ） |
+| 期限 | 窓が回復する（残高ではない） | **無期限**（ADR-2608026200 §6 の決定を維持） |
+| stored value か | **いいえ** | **はい** |
+| escheat / CARD Act / ASC 606 | **該当しない** | 該当する（§7 の分析が生きる） |
+| 台帳 | rate counter | **`murakumo.infer.credits`** |
+| 想定利用者 | UI から使う人間 | プログラムから叩く開発者 |
+
+**Codex の『API-key usage skips both caps and bills per token — ChatGPT credits を消費しない』とまったく同じ分離。**
+
+**この分離が実装上の決定打**: plan の消費は窓カウンタ、API の消費は credits 残高。**2 つのプールが 1 つの balance に同居しないので、ADR-2608026200 §5-3-2 が保留の理由に挙げた『spend の帰属』が発生しない。** 別のメーターを 2 つ持つだけになる。
+
+**API credits に volume discount を付けない**（ADR-2608026200 §5 の決定を維持 —— metered backend の上では割引に原価的根拠が無い）。
+
+## 5. 経済（何が変わり、何が変わらないか）
+
+**変わらないもの**: 100% 消化時の寄与率 39–41%（月次と週次で総量が同じなので）。§5-5 の不変条件も据え置き。
+
+**変わるもの（良い方向）**: 週次ローリング窓は**月次バケットより厳しい**。1 週間使わなかった分は永久に戻らないが、月次バケットなら月内のいつでも使えた。つまり**実効 breakage が上がる** —— そしてそれが §2 のとおり**法的に安全な形で**回収される（前払残高ではないので）。
+
+**下振れは増えない**: 100% 消化されても 39–41% は残る。上振れだけが増える。
+
+## 6. 実装（何をどこに）
+
+| 面 | 実装 |
+|---|---|
+| **窓カウンタ** | append-only の消費イベント（`:run/plan-usage {account units} :window/at ts`）を時刻で畳む。5h / 7d の 2 つの窓で合計し、上限と比較する。**`credits/balances` の fold に入れない** |
+| **admission** | ジョブ投入時に「この job の unit が両方の窓に収まるか」を判定。溢れたら 429 + 回復時刻を返す（`retry-after`） |
+| **plan SKU** | `:plan/units-per-week` / `:plan/units-per-5h` に置き換え（`:plan/credits-per-month` は撤去） |
+| **API credits SKU** | 既存の `:credits-*` をそのまま。**plan とは別カテゴリとして表示する** |
+| **webhook** | `invoice.paid` は allowance を mint しなくなる —— **plan の有効期間を延長するだけ**。ADR-2608026200 §6-2 で実装した `allowance-grant-args` は API credits 側では使わないので撤去対象 |
+| **dunning** | 決済失敗 = plan 停止（窓が閉じる）。**購入済み API credits には引き続き触らない** |
+
+**移行順序**: 窓カウンタ → admission → plan SKU 差し替え → webhook 変更。**`invoice.paid` の allowance mint を先に外すと、その間の subscriber が何も受け取れなくなる**ので最後にする。
+
+## 7. 正直な比較（Higgsfield 比）
+
+Ultra $129 で週 300 秒 = 月約 21.5 分の `video/oss`。Higgsfield Ultra $129/3,000cr は Kling 5 秒 7cr 換算で月約 35 分。**同価格で約 1.6 倍の動画秒数**を出している。
+
+差の出所は ADR-2608026200 §2 と §6 で特定済み —— Higgsfield は frontier を原価割れで売り breakage で回収しており、Delaware LLC の murakumo はその breakage を安全に当てにできない。**本 ADR は価格水準を変えない**（それは ADR-2608026200 の決定）。変えるのは plan の**形式**で、それによって breakage を**法的に安全な形**（レート窓）で回収できるようになる。"
+
+  :adr/risks
+  "## 落とし穴
+
+1. **『unit は credits ではない』を実装と表示の両方で貫かないと、rate limit が stored value に化ける。** 残高のように見せる UI（『残り 1,150 unit』）、繰り越し、譲渡、購入による上限引き上げ —— どれか 1 つでも入れた瞬間、§2 で消したはずの escheat / CARD Act / ASC 606 の論点が戻ってくる。**表示は『今週あと N unit 使えます（M 時間後に回復）』**であって残高ではない。
+
+2. **窓カウンタを `credits/balances` の fold に混ぜない。** 混ぜると 2 つのプールが 1 つの balance に同居し、§4 で消したはずの帰属問題が復活する。`normalize-run` の whitelist にも足さない（2026-08-03 に allowance で踏んだのと同じ罠の裏返し —— **今度は足さないことが正しい**）。
+
+3. **移行中に subscriber が無給付になる窓がある。** `invoice.paid` の allowance mint を外すのと窓カウンタの稼働がずれると、その間の加入者は credits も窓も持たない。**§6 の順序を守る**（webhook 変更は最後）。
+
+4. **ローリング窓は『いつ回復するか』を答えられないと苦情になる。** 月曜リセットなら自明だが、ローリングは「最初の消費から 7 日後」。429 に必ず `retry-after` と回復時刻を載せる（ADR-2608011400 の『401 に直し方を書く』と同じ規律）。
+
+5. **5 時間窓 25% は根拠のある数字ではない。** 『1 バーストで週を焼き切らせない』という要件を満たす最も単純な値として置いた。実利用のバースト分布を見て調整する前提で、**実測前にこの数値を最適値として引用しない**。
+
+6. **週次にすると月次バケットより厳しくなる —— それは意図だが、顧客には不利益変更に見える。** 既存加入者がいれば移行時に説明が要る（現時点で加入者 0 なので実害は無いが、後から変えると苦情になる）。
+
+7. **API credits 側は stored value のままなので、§7 の法務論点（Delaware escheat・CARD Act・ASC 606）は消えていない。** 消えたのは plan 側だけ。counsel レビューは引き続き要る。"
+
+  :adr/verification
+  "**業界実態の調査（2026-08-03、公開情報）**: Claude Code は 5 時間ローリング窓 + 週次（7 日ローリング）の二層。Codex（OpenAI）は 5 時間ローリング窓 + その上に積む週次上限で、独立した予算として追跡される。**Codex は API キー経由の利用が両方の cap を通らず per-token 課金の別経路になり、ChatGPT credits を消費しない**。Plus の 5 時間窓はモデル別に 15–280 メッセージ、Pro は 5x / 20x。**実契約・実測ではなく公開情報。**
+
+なお検索結果には『週次上限は実際には 72 時間で回復する』という利用者報告（GitHub gist）も含まれていたが、**一次情報ではないので設計の根拠にしていない**。
+
+**数値の導出**: 週次上限 = ADR-2608026200 の月次 credits ÷ 4.33（52/12）。Starter 1,500→346→350、Plus 4,900→1,131→**1,140**、Ultra 12,900→2,979→3,000、Team 7,900→1,824→**1,830**。**Plus と Team は当初 1,150 / 1,850 としたが、その丸めでは Plus の $/unit が Starter より 0.6% 安くなり微小な volume discount ができていた**（2026-08-03、実装時にテストが検出）。単調非減少になるよう丸め直した。5 時間上限 = 週次 × 0.25（Starter 88 / Plus 285 / Ultra 750 / Team 458）。**4.33 は暦の変換で実測ではない。0.25 は §リスク 5 のとおり要件から置いた値で、実測ではない。**
+
+**寄与率は再計算していない** —— 月次総量が保存される変換なので ADR-2608026200 §5 の検算（Starter 39.1% / Plus 40.5% / Ultra 40.9% / Team 40.7%）がそのまま適用される。**週次ローリングは月次バケットより厳しいので実効寄与率は上がる方向**だが、その上振れ幅は利用分布に依存し未計測。
+
+**Higgsfield 比**: Ultra $129 で murakumo 週 300 秒（月 ≈21.5 分）に対し、Higgsfield Ultra $129/3,000cr は Kling 3.0 720p 5 秒 = 7cr 換算で月 ≈35 分。約 1.6 倍。**Higgsfield 側は公開情報からの換算で、実際の利用条件（モデル選択・解像度）で変動する。**
+
+**実装済み（2026-08-03）**。`murakumo.infer.windows`（5 時間 + 7 日のローリング窓）/ `local-murakumo.plan-admission`（期間イベント → 現在の上限）/ `local-murakumo.spend-admission`（価格 → 窓 → 残高 の唯一の判定）/ `POST /itonami/plan-period` `/itonami/plan-suspend`（両ルーティング表）/ `itonami/plan-period-entry`（Stripe の秒 → ミリ秒。残高を動かさない）。plan は 2026-08-03 に本番で購入可能になった —— did:key 付きで Stripe の live checkout URL が返り、did 無しは課金前に 400 で止まる。
+
+結線して初めて出た欠陥が 2 つある。どちらも、部品それぞれは正しく、**関係だけが誰からも見えていなかった**:
+
+1. **分割不能なジョブが短窓より大きい。** Plus は 1,140 unit/週 → 短窓 285 に対し、Seedance 2.0 の 5 秒動画が 61×5 = 305 unit。短窓で弾くと Plus 契約者は frontier 動画を 1 本も作れず、しかも待っても永久に入らないので 429 の retry-after が来ない回復を約束することになる。`windows/admit` は、短窓より大きい 1 ジョブを短窓では弾かず週窓に委ねる（通した後は短窓が超過するので、バースト防止が緩むのは 1 ジョブ分だけ）。
+
+2. **plan は did:key に結び付くのに、plan の checkout が did を要求していなかった。** did が無いと `plan-period-args` が nil を返し、webhook の『作用なし』枝が 200 を返す —— 課金だけが毎月走り、上限は永久に有効にならず、Stripe は再送しないので誰も気付かない。`checkout-error` が plan にも did を要求し（課金の前に止める）、`unfulfillable-plan-invoice?` が『plan の請求なのに did が無い』形を 503 に変える（沈黙 → 可視の障害）。
+
+**販売可否は宣言でなく実測に変えた。** `plans-fulfillable?`（人間が書き換える定数）を `plans-implemented?`（宣言）と `fulfillment-reachable!`（実測 probe）に分け、plan の checkout は 両方が真のときだけ通る。2026-08-02 に『履行先が 404 のまま plan を売った』ときに閉じ直したのは前者だけで、つまり次も人間が正しく宣言することに賭けていた。"}]

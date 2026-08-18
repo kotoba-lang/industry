@@ -1,0 +1,412 @@
+[{:db/id -1
+  :adr/id "ADR-2608131700"
+  :adr/title "Namespace collisions: one reproduced compile failure, one security property about to be shadowed away, and five files a rename left behind"
+  :adr/status "accepted"
+  :adr/date "2026-08-13"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/related ["ADR-2608123200" "ADR-2608121000" "ADR-2608124800" "ADR-2608125000" "ADR-2608130800" "ADR-2608071000"]
+  :adr/body
+  "## What was run
+
+`nbb scripts/verify-namespace-collisions.cljs --all`, twice on 2026-08-13
+(22.8m and 14.1m wall; the spread is other agents on this machine, not the
+corpus). 4,045 checked-out repos, 5,438 declared source trees, 16,406 file
+paths in 16,374 namespaces.
+
+    collisions: 281 divergent, 1544 identical
+    of the divergent, 28 are CO-CLASSPATH
+      of those, 19 are ONE repo checked out twice, leaving 9 real collisions
+    EXTENSION-SHADOWED: 11 namespaces (1 of them co-classpath)
+    self-shadowing: 0 files
+
+## Triage
+
+Every co-classpath collision and every EXTENSION-SHADOWED namespace, 19
+distinct namespaces. Class counts: DEFECT 7, DELIBERATE 5, STALE 7,
+MIGRATION 0.
+
+| namespace | owners | class |
+|---|---|---|
+| oidc/core | kotoba-lang/oidc, kotoba-lang/org-openid-oidc | DEFECT |
+| kotoba/lang/package_registry | kotoba-core-contracts, kotoba-lang | DEFECT |
+| kami/gpu | kotoba-lang/gpu, kami-engine-sdk | DEFECT |
+| kami/fsm | kotoba-lang/fsm, kami-engine-sdk | DEFECT |
+| kami/backend/browser | kotoba-lang/host (.cljc), kami-engine-sdk (.cljs) | DEFECT |
+| manimani/ui | app-chat-shell, manimani-experience-ui, local-manimani | DEFECT, latent |
+| murakumo/fleet | kotoba-lang/murakumo, murakumo-langchain | DEFECT, latent |
+| pay/core | 7 repos | DELIBERATE |
+| pay/facilitator | 4 repos | DELIBERATE |
+| pay/x402 | 7 repos | DELIBERATE |
+| treasury/core | 8 repos | DELIBERATE |
+| itonami/kotoba | cloud-itonami/itonami, network-awai/cloud-itonami | DELIBERATE |
+| mangaka/server | cloud-itonami/mangaka | STALE, removed |
+| mangaka/store/kotoba | cloud-itonami/mangaka | STALE, removed |
+| mangaka/cljs/api | cloud-itonami/mangaka | STALE, removed |
+| mangaka/cljs/app | cloud-itonami/mangaka | STALE, removed |
+| isekai_gen/config | network-isekai (public copy) | STALE, reported |
+| isekai_gen/modal_client | network-isekai (public copy) | STALE, reported |
+| rdf_canon/core | kotoba-lang/rdf-canon | STALE, reported |
+
+MIGRATION is 0 and that is a property of the scan, not of the fleet: the
+detector's `source-extensions` is `.clj .cljc .cljs`, so a `.kotoba` beside a
+`.cljc` is invisible to it. `kotoba-lang/fsm` ships both `kami/fsm.cljc` and
+`kami/fsm.kotoba` and the report shows only the `.cljc`. Mid-migration pairs
+are `verify-require-graph`'s question, not this one.
+
+## DELIBERATE, and how that was established
+
+**The four payment namespaces are documented vendored copies.** Every non-
+upstream file was read: 22 of 22 open with a `VENDORED from ...` header naming
+the upstream repo, and 21 name the pinned commit. The upstream files in
+`kotoba-lang/pay` and `kotoba-lang/treasury` carry no such header, which is
+what makes them the upstreams. Their drift is real and is
+`verify-vendored-copies.cljs`'s axis, tracked by ADR-2608121000; it is not a
+naming defect and renaming any of them would be wrong.
+
+**`itonami/kotoba` is a JVM/portable split across two repos.**
+`cloud-itonami/itonami` ships `.clj` importing `java.net.http` and
+`java.util.UUID`; `network-awai/cloud-itonami` ships `.cljc` with those imports
+removed and an injected `http-fn`. The `.cljc` docstring states the split and
+names the test that covers it. Different root commits, and no closure puts them
+together.
+
+## STALE, fixed: cloud-itonami/mangaka
+
+Merged as `51ff4c6aa8fc37276bf51ebf58d153344a0df760`; west pin advanced
+`e45999080a4b` to `51ff4c6aa8fc` and verified fast-forward by
+`scripts/verify-west-pins.cljs --only mangaka`.
+
+Five files removed. The evidence they were leftovers rather than a platform
+split, read rather than inferred:
+
+- `3e0c587` (2026-06-30, `chore: split ai-gftd-project-mangaka into standalone
+  repo`) renamed source files by substituting over their CONTENTS as well as
+  their names. `server.cljc` differs from `server.clj` in exactly three lines,
+  all docstring, all of the form `the Python server.py` becoming `the Python
+  server.cljc`. `store/kotoba.cljc` differs in one line, `kotoba_datomic.py`
+  becoming `kotoba_datomic.cljc`. `runtime.cljc` is byte-identical to
+  `runtime.clj`.
+- `cljs/api.cljc` and `cljs/app.cljc` got the same treatment in their `ns`
+  forms: both sit at `src/mangaka/cljs/` and declare `mangaka.cljc.api` /
+  `mangaka.cljc.app`. Namespace and path disagree, so neither name resolves to
+  the file and no tool can load it.
+- `f0cac01` (2026-07-19, `fix: recover authoritative mangaka source and
+  workflows`) added `server.clj`, `runtime.clj`, `store/kotoba.clj`,
+  `cljs/api.cljs`, `cljs/app.cljs` and deleted nothing. 241 files changed, 2
+  deletions.
+- Neither file carries a reader conditional. The `.clj`/`.cljc` pairs are not a
+  platform split, and there is no vendoring header on any of them.
+
+Unreferenced, shown rather than assumed:
+
+- The three same-named `.cljc` are shadowed on the JVM. Confirmed on a two-file
+  fixture in this session: a `demo/x.clj` beside a `demo/x.cljc` on one
+  `:paths` resolves to the `.clj`. Nothing has loaded them since 2026-07-19.
+- The two `mangaka.cljc.*` files are loadable by nobody, per the path/ns
+  disagreement above.
+- The only ClojureScript build in the repo is `clj/shadow-cljs.edn`, whose
+  `:init-fn` was `mangaka.cljc.app/init`. shadow-cljs resolves a namespace to a
+  path, and that namespace has no path, so **the Studio build has been
+  unbuildable since 2026-06-30** -- `clj/shadow-cljs.edn` has exactly one commit
+  in its history, the split -- and `clj/resources/public/js` has never existed.
+  Repointed to `mangaka.cljs.app/init`, which is a file that is actually there.
+  The `mangaka.cljc.*` mentions in `clj/README.md` and `clj/ARCHITECTURE.md`,
+  and the layout lines naming the five removed files, were corrected the same
+  way.
+- After removal, all 60 source files under `clj/src` and `clj-edge/src` have an
+  `ns` matching their path. Before it, two did not.
+
+Deliberately not touched: the same substitution also rewrote the README's
+column of PYTHON filenames (`storyboard_db.cljc`, `llm.cljc`, `comfy*.cljc`).
+Those name files in another project and restoring them means guessing.
+
+Not verified, stated plainly: the repo's own test suite could not be run. Its
+classpath does not resolve on this machine at all -- `jp-go-digital-design-
+system` is pinned by both `:git/sha` and `:local/root` and tools.deps refuses
+to compare them. That break is pre-existing and independent of this change.
+
+## STALE, reported not removed
+
+Two cases are stale in the same sense but the leftover is a whole sub-project,
+not a file, so removing it is an owner call.
+
+**`isekai_gen/config`, `isekai_gen/modal_client`.** The identical corruption
+signature appears here: `network-isekai/backend/src/isekai_gen/config.cljc`
+says `modal/*.cljc` where `net-isekai-gen/src/isekai_gen/config.clj` says
+`modal/*.py`, and that is the only difference between the two files. The
+`.cljc` was written by `22f2331` (2026-07-01), whose subject ends `.cljs to
+.cljc portability pass`. `net-isekai-gen` was created `722b38f` (2026-07-27,
+`restore: net-isekai-gen working tree (history lost)`) and its README states
+the split is deliberate: the generation backend holds Modal tokens and B2 keys
+and `network-isekai` is public. So the private repo holds the uncorrupted copy
+and the public `backend/` tree is the derived one. But `backend/` is eight
+files with its own `deps.edn` and `:run` alias, and `isekai-gen.core` requires
+`isekai-gen.config` from inside it -- the two flagged files ARE referenced,
+within the tree that should probably go as a whole. **Question for the owner:
+should `network-isekai/backend/` be deleted now that `net-isekai-gen` exists,
+or is the public copy still deployed from?**
+
+**`rdf_canon/core`.** `kotoba-lang/rdf-canon` is a 38-line JVM stub,
+`Deterministic RDF quad canonical string and hash helpers`, using
+`java.security.MessageDigest`. `kotoba-lang/org-w3-rdf-canon` is a 443-line
+`.cljc` implementing RDFC-1.0 with all 86 official vectors passing. Different
+root commits, so not one repo twice. Consumers were enumerated over every
+`deps.edn` under `orgs/`: `org-w3-rdf-canon` has three
+(`cloud-itonami/cloud-itonami-app`, `org-w3-vc-data-integrity`,
+`org-w3-json-ld-api`) and **`rdf-canon` has zero**. Both are registered in
+`manifest/west.yml`. This is the naming rule working as designed -- the origin
+plane name won -- with the subject-plane repo left behind. **Question for the
+owner: retire the west entry for `kotoba-lang/rdf-canon`?** No consumer moves.
+
+## DEFECT: `oidc.core`, and it is not theoretical
+
+`kotoba-lang/oidc` and `kotoba-lang/org-openid-oidc` both ship
+`src/oidc/core.cljc`, with **zero shared names**:
+
+    kotoba-lang/oidc      verify, verify-once
+    org-openid-oidc       base64url-decode-bytes, bytes->utf8-string,
+                          base64url-decode, decode-jwt-segments,
+                          validate-id-token-claims, parse-discovery-document,
+                          userinfo-request
+
+`cloud-itonami/local-itonami` depends on both: on `kotoba-lang/authentication`
+(which pins `kotoba-lang/oidc`) and directly on `org-openid-oidc`.
+`network-awai/cloud-itonami` does the same, putting
+`../../kotoba-lang/authentication/src` straight on its `:paths`.
+
+Measured with `clojure -Spath` in `local-itonami`: `org-openid-oidc/src` is at
+position 8, `.gitlibs/.../kotoba-lang/oidc/.../src` at 15. org-openid-oidc
+wins. Then reproduced directly:
+
+    $ clojure -M -e \"(require 'authentication.adapters.external-factors)\"
+    Syntax error compiling at (authentication/adapters/external_factors.cljc:147:19).
+    No such var: oidc/verify-once
+
+That namespace does not compile on this classpath, and has not for as long as
+the two have been co-resident. Nothing reported it.
+
+Consumers, enumerated by require form:
+
+- `oidc.core` from `kotoba-lang/oidc` (`verify`, `verify-once`): ONE outside
+  its own tests -- `kotoba-lang/authentication/src/authentication/adapters/
+  external_factors.cljc:147-148`.
+- `oidc.core` from `org-openid-oidc` (`decode-jwt-segments`,
+  `validate-id-token-claims`): TWO --
+  `network-awai/cloud-itonami/src/cloud_itonami/native/signin.cljc:63` and
+  `cloud-itonami/local-itonami/src/local_itonami/signin.cljc:63`.
+- `authentication.adapters.external-factors` itself has ONE consumer
+  fleet-wide: its own test in `kotoba-lang/authentication`. That bounds the
+  blast radius -- the break is real but nothing downstream of it runs.
+
+Cost of a rename: 2 call sites in 1 file if `kotoba-lang/oidc` renames (say to
+`oidc.verify`), or 4 call sites in 2 files if `org-openid-oidc` renames. The
+repo names are both correct and should not change -- CLAUDE.md's plane rule
+explicitly permits one subject across two planes when the READMEs state the
+boundary, and `org-openid-oidc` does. **Question for the owner: which of the
+two namespaces moves?** The cheaper edit is `kotoba-lang/oidc`, and it is also
+the one whose single consumer is already broken.
+
+## DEFECT: `kotoba.lang.package-registry`
+
+Both repos ship `src/kotoba/lang/package_registry.cljc`, and
+**`kotoba-lang/kotoba-lang` depends on `kotoba-lang/kotoba-core-contracts`**,
+so they are co-classpath by construction.
+
+Ten names are shared -- `registry-version`, `registry-key`, `normalize`,
+`record-problems`, `validate`, `lookup`, `resolve-record`, `record->lock-dep`,
+`lock-from-requests`, `version-only-request?` -- which is the dangerous shape:
+no error at the call site, just different behaviour. The divergence that
+matters is in `record->lock-dep`:
+
+- kotoba-lang's emits `:dep/definition-cids`, and its own comment says why:
+  `CI2: the alias resolves to the definition identities, so linking by name can
+  never silently substitute different code.`
+- core-contracts' does NOT emit it. It emits `:dep/ref`, `:dep/build`,
+  `:dep/registry-record-cid`, `:dep/provides`, `:dep/consumes`, which
+  kotoba-lang's drops.
+
+Neither is a superset. And `kotoba-core-contracts/src/kotoba/lang/
+package_contract.cljc` calls `definition-cids-error` on `(:dep/definition-cids
+dep)` -- the contract validates a key the registry it ships never produces.
+
+History: `0405a21` (2026-07-27, `Separate contracts and assurance ownership
+(#62)`) DELETED all 251 lines of `package_registry.cljc` from kotoba-lang,
+moving ownership to core-contracts. `11eac29` (2026-07-28, `feat(package):
+registry + conformance fixtures`, empty commit body) added 93 lines of it
+straight back. `b6bde5a` (2026-08-03) then grew that copy by 37 lines of the
+CI2 work. So the second copy is a re-introduction one day after a deliberate
+ownership move, and it is the copy carrying the newer security property.
+
+Who wins depends on which tree you look at, and there are three:
+
+- **On `main` in both checkouts**: `kotoba-lang/kotoba`'s classpath places
+  core-contracts at 12 and kotoba-lang at 14. core-contracts wins, and
+  `:dep/definition-cids` disappears from every lock.
+- **On the pins `kotoba-lang/kotoba` actually resolves today**
+  (core-contracts@50de59bf, kotoba-lang@d9fb213c): core-contracts@50de59bf has
+  no `src/kotoba/lang/` directory at all -- only `src/kotoba/core` -- so
+  kotoba-lang is the sole provider. Its pinned copy is a THIRD content
+  (sha 433bbfe3 against 6958d864 on main) and contains zero occurrences of
+  `definition-cids`.
+
+So the CI2 property exists only in `kotoba-lang`'s checked-out `main`, is
+absent from what runs today, and **advancing `kotoba/deps.edn`'s pins would
+silently move the winner to the copy that does not have it**. That is the
+decision-relevant fact.
+
+Consumers, enumerated:
+
+- `kotoba-lang/kotoba/src/kotoba/package_admission.clj:30,781` --
+  `lock-from-requests`. Depends on BOTH owners.
+- `kotoba-lang/security/src/kotoba/security/package_admission.clj:29,772` --
+  `lock-from-requests`. Depends on core-contracts only.
+- `kotoba-lang/package-registry-ipfs/src/kotoba/package_registry/ipfs.clj:5,44`
+  -- `lock-from-requests`. Depends on kotoba-lang only.
+- `kotoba-lang/kotoba/test/kotoba/package_registry_test.clj` --
+  `version-only-request?`, `lock-from-requests`.
+- `kotoba-lang/kotoba-lang/test/kotoba/lang/code_identity_test.clj:18,110` --
+  `check-case`, which exists ONLY in kotoba-lang's copy.
+
+`kotoba.lang.package-registry-network` exists only in core-contracts, and
+`package_admission.clj` requires it alongside the registry -- so `kotoba` and
+`security` cannot simply drop core-contracts.
+
+**Question for the owner: does `kotoba-lang/kotoba-lang` delete its copy and
+port `check-case` plus `:dep/definition-cids` into core-contracts, or does
+core-contracts' registry move under a different name?** The first is the
+smaller edit (one namespace deleted, one function and one `cond->` clause
+moved, five consumers unchanged) and it restores the ownership `0405a21`
+decided. It is not a pure deletion: `:dep/definition-cids` and `check-case`
+must land in core-contracts in the same change or CI2 is lost.
+
+## DEFECT: `kami.gpu`, and the two it is entangled with
+
+Named in ADR-2608123200 as the one of the three `kami.*` collisions that needs
+an owner rather than a cleanup, and that holds. Zero shared names, so the loser
+fails loudly, but they are different KINDS:
+
+- `kotoba-lang/gpu` -- capability/render-graph data contract: `caps-webgpu`,
+  `caps-native`, `caps-console`, `caps-webgl2`, `tiers`, `missing-caps`,
+  `pass-runnable?`, `resolve-graph`, `resolve-for`, `caps-from-device`,
+  `requires`.
+- `kami-engine-sdk` -- runtime protocol: `IGpuBackend` (7 methods), `backend`,
+  `ensure-assets!`, `submit!`.
+
+Consumers, by which side's vars they name:
+
+- SDK side (4): `kami-engine-sdk/src/kami/backend/browser.cljs`
+  (`IGpuBackend`); `kami-engine-sdk/src/kami/sim.cljc` (`backend`,
+  `ensure-assets!`, `submit!`); `kami-engine-sdk/test/kami/runtime_test.cljc`
+  (`ensure-assets!`, `IGpuBackend`); **`kotoba-lang/host/src/kami/backend/
+  browser.cljc` (`IGpuBackend`)**.
+- Extracted side (1): `kotoba-lang/webgpu/test/gpu_test.clj`
+  (`caps-from-device`, `caps-webgl2`, `caps-webgpu`, `missing-caps`,
+  `pass-runnable?`, `requires`, `resolve-for`).
+
+The `host` entry is why this cannot be resolved by deletion: `host` is the SSoT
+of `kami.input`, is a dependency of both `webgpu` and isekai, and needs the
+SDK's protocol. `kotoba-lang/webgl` requires `kotoba.gpu` -- a third
+implementation that owns its code rather than re-exporting -- and survives
+either resolution, which is a pre-paid hedge.
+
+**Question for the owner: which `kami.gpu` renames?** Renaming the extracted
+one costs 7 var references in 1 test file plus `kami.gpu.launch`'s docstring;
+renaming the SDK's costs `IGpuBackend` in 3 files and the three functions in 2.
+The extracted side is the cheaper edit by call-site count; the SDK side is the
+one whose name is least descriptive of what it holds.
+
+`kami.backend.browser` is the same decision wearing a different hat and should
+be taken with it. `kotoba-lang/host` ships `.cljc` (reader-conditional, `make`
+on both platforms, requires `kami.gpu` for `IGpuBackend`); `kami-engine-sdk`
+ships `.cljs` (`make`, `BrowserBackend`). ClojureScript prefers `.cljs` over
+`.cljc` regardless of classpath order, so the SDK always wins there and host's
+`make` is unreachable in any browser build -- and both define `make`, so the
+loss is silent. Consumers: `etzhayyim/com-etzhayyim-sip/src/sip/web.cljs:13`,
+`kotoba-lang/kami-app-sip/src/sip/web.cljs:13`,
+`kami-engine-sdk/examples/hello_scene.cljc:12`,
+`kotoba-lang/host/test/host_test.clj:3`. `kami.fsm` is the third and
+ADR-2608123200 already costs it out; nothing here changes that analysis.
+
+## DEFECT, latent: `manimani/ui` and `murakumo/fleet`
+
+Reported for completeness. Both are several unrelated implementations under one
+name that no closure currently puts together, so neither can bite today; both
+become the previous section the first time a dependency is added.
+
+- `manimani.ui`: `kotoba-lang/app-chat-shell/svelte/cljs/src` (565 lines,
+  reagent), `kotoba-lang/manimani-experience-ui/src/main` (201 lines, reagent +
+  shadow.css), `network-awai/local-manimani/src` (1189 lines `.cljc`, shared
+  policy/viewmodel for iOS/Android/web/desktop). The fourth owner,
+  `etzhayyim/com-etzhayyim-app-chat-shell`, is `app-chat-shell` at a second
+  path -- same root commit, byte-identical.
+- `murakumo.fleet`: `kotoba-lang/murakumo` `.clj` (1190 bytes, fleet inventory
+  + Tailscale enrichment) versus `kotoba-lang/murakumo-langchain` `.cljc` (1834
+  bytes, fleet roster + round-robin ChatModel). `cloud-murakumo-langchain` is
+  `murakumo-langchain` at a second path.
+
+## Gate-ability: it cannot be a fleet gate, and here is where it goes instead
+
+**Verdict: `scripts/fleet-ci/gates.edn` is the wrong home and no entry should
+be added.**
+
+A fleet gate is shipped only the target repository's own tree. This check is
+about two repositories at once -- its whole primitive is `orgs/<org>/<repo>`
+across 4,045 checkouts, and `git ls-files orgs/` in the superproject returns 0.
+Sent to a node as a `root` gate it would scan an empty `orgs/` directory, find
+zero collisions and report PASS. That is worse than absent: it would be a green
+check mark asserting an invariant nobody measured.
+
+This workspace has already paid for that mistake once. `root-permit-index` was
+removed on 2026-08-13 (ADR-2608130800) after 298 receipts across 259 distinct
+tips, every one a failure and not one green, for exactly this reason -- and its
+failure message named a broken invariant rather than a missing input. Neither
+failure mode is acceptable here.
+
+Nor can it be moved to where its input lives. There is no repository that has
+`orgs/` in its tree, because `orgs/` is what west materialises rather than what
+any repo contains.
+
+**So it is registered in `manifest/orgs-detectors.edn` instead**, the home
+ADR-2608125000 built for precisely this class, run by
+`scripts/orgs-detector-tick.cljs` on a machine that has `orgs/`. That required
+one additive change to the detector: a `--findings` flag emitting
+`FINDING<TAB>severity<TAB>key<TAB>detail` and a `SCANNED<TAB>n<TAB>unit` line,
+because the tick keys findings by identity so a collision that appeared today
+is distinguishable from one that has stood for weeks, and refuses to record a
+run as clean without evidence that something was scanned.
+
+`fail` is exactly the set `--check` exits 1 on (the 9 co-classpath divergent
+collisions); `warn` is the 10 EXTENSION-SHADOWED namespaces no closure holds
+together, which are report-only because they cannot bite until a dependency is
+added. Interval 24h and timeout 60m, from the two measured runs.
+
+Proof the flag is additive, since a change that moves counts without an
+explanation is a regression until shown otherwise:
+
+- On a 3-repo synthetic fixture, old script and new script with `--all` produce
+  **byte-identical** output; with `--findings` the output is byte-identical once
+  the `FINDING` and `SCANNED` lines are removed; `--check` exits 1 in all three
+  invocations.
+- On the real corpus, the collision, suppression, unreachable and identical
+  listings are byte-identical between the 03:17 run of the old script and the
+  04:14 run of the new one -- 4,343 lines, no diff.
+- One line did move: `16406 file paths in 16374 namespaces` became `16408 /
+  16376`. Both extra namespaces have a single owner, so they appear nowhere in
+  the report and no finding changed. This is concurrent-session churn in the
+  shared checkouts, and I could not pin down which two files: the `find` sweep
+  over `orgs/` needed to prove it did not finish inside its budget. Stated as
+  weaker evidence than the rest.
+
+## What is deliberately out of scope
+
+The 253 divergent namespaces no closure puts on one classpath, and the 1,544
+identical ones, were not triaged individually. They are scaffold families --
+the actor repos are generated from one template -- and by the detector's own
+design they are separated for that reason. The payment ones among them belong
+to `verify-vendored-copies.cljs`, which asks the axis that actually finds them.
+The 19 suppressed DUPLICATE REGISTRATION namespaces belong to
+`verify-duplicate-registrations.cljs`.
+
+Self-shadowing is 0 today. That bucket is worth keeping: it is the one class
+this detector answers that no per-repo check can."}]

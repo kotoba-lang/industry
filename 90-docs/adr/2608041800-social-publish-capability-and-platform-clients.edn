@@ -1,0 +1,187 @@
+[{:db/id -1
+  :adr/id "2608041800"
+  :adr/title "social/publish capability（id 257）と、欠けていた4つの publishing client"
+  :adr/status "accepted"
+  :adr/date "2026-08-04"
+  :adr/depends-on "ADR-2608041400（haishin）/ ADR-2607259000（未裏付け RID の撤去）/ ADR-2608035000（app-* capability suite）"
+
+  :adr/context
+  "ADR-2608041400 で haishin を起こしたとき、限界の値（`:constraint/provenance`）は
+   `:youtube` だけが `:in-repo-corroborated` で、他5 target は `:unverified` だった。
+   オーナーから『kotoba-lang repo に api, lib がそれぞれで設計実装されていなかったけ?』
+   と問われ、org 全 1,999 repo を名前で走査し、さらに publishing API のホスト
+   （`business-api.tiktok` / `api.linkedin.com` / `graph.instagram.com` /
+   `content-publishing`）で全ソースを content 走査した。
+
+   ## 実測（仮説は半分当たり、決定的に半分外れ）
+
+   repo は3つ実在したが、**どれも publishing client ではなかった**:
+
+   | target | repo | 実際に何をするか |
+   |---|---|---|
+   | youtube | `com-youtube` | **本物の upload client**。title/description を 100/5000 に clamp |
+   | x | `com-x` | mentions 検索 / DM / 返信のみ。長さ制限を一切持たない（pagination の 10–100 だけ） |
+   | vimeo | `com-vimeo` | **clean-room 互換サーバ**。`openapi.json` の `maximum` は pagination の 100 が6件のみ |
+   | instagram | `com-meta-webhook` | `send-message!`（DM）のみ |
+   | tiktok / linkedin | **無し** | — |
+
+   つまり `:unverified` が残った理由は『repo が無いから』ではなく、より具体的に
+   **『publish しない repo は publish の制約を encode する理由が無いから』**だった。
+
+   ## 名前に騙されたもの（記録して再調査を防ぐ）
+
+   `com-meta-presence` は Meta **Presence Platform（XR/空間コンピューティング）**で
+   Instagram ではない（`openapi.json` を持つので紛らわしい）。`threads` は Meta Threads
+   ではなく **BPMN** の contract。`videos` は etzhayyim/root から切り出した BPMN contract。
+   `com-vimeo/manifest.json` の `verified.source` は『Vimeo official OpenAPI 3.4』と
+   主張するが、checked-in された `openapi.json` は clean-room subset で vendor の
+   フィールド制約を運んでいない —— 由来の記述であってファイルの内容の保証ではない。"
+
+  :adr/decision
+  "## 1. capability `social/publish`（wire id 257）を新設する
+
+   **http/post に畳まない。** 付与される authority は『ネットワークソケットに書く』
+   ではなく『**我々として、削除の意味論を我々が支配しないサービス上で、この内容を
+   公に可視にする**』である。内部 API に届くための http/post の grant が、黙って
+   public post をも認可してはならない。
+
+   - effects `#{:network-write :data-egress :external-communication}`。
+     `:external-communication` が http/post の `#{:data-egress :network-write}` との
+     差 —— bytes は単に出ていくのではなく、**我々に帰属して人々の前に届く**。
+     effect 語彙に『不可逆』を表す語は無い（撤回はプラットフォームの約束であって
+     我々が与えられるものではない）ので、その性質は policy が担い、コメントで述べる。
+     **新しい effect keyword を発明しない** —— 語彙は共有面であり、追加は面全体の
+     意味を変えるので独立した ADR と合意を要する。
+   - default policy `:approval-required`。`default-policy` は `:network-write` から
+     既にこれを導出するが、`approval-required-capabilities` にも明示的に載せた ——
+     その規則が将来緩和されても意図が生き残るように。
+   - **host import は2つ**（`social_publish` / `social_publish_receipt`）。publish できる
+     guest は receipt も読めなければ監査証跡が『試みた』で終わる。一方 publish 呼び出しが
+     receipt を返す設計だと、アップロード全体の間 guest を止めることになる。
+   - 両方を `:host-import-order` の**末尾に追加**した。契約自身が警告するとおり、
+     途中挿入は既存 `.wasm` の import index を全部ずらす。
+   - `:capability/radicle-rid` は **gad seed に実登録し fetch で検証**した
+     （`rad:zvDQMMaMdFiFVFsuCevRKwCzmZUy`）。ADR-2607259000 が捏造 RID 3,621 件を
+     撤去済みなので、ここは捏造しない。
+
+   ## 2. 欠けていた4つの publishing client を実装する
+
+   いずれも portable `.cljc` / **依存ゼロ** / I/O 注入（`:http-fn` `:json-write`
+   `:json-read` `:creds`）で、`com-x` `com-youtube` と同じ DI 形。自前の HTTP stack を
+   抱える client はそれ無しにテストできず、認証情報は持つ必要のないコードに入れない。
+
+   - **`com-instagram`** — Content Publishing API。**byte upload 経路が無い**のが本質:
+     Instagram が `video_url` / `image_url` から**自分で取りに来る**ので、post を作る前に
+     asset が公開到達可能でなければならない。container 作成 → FINISHED まで poll → publish の
+     3段。待ちは実在する（非同期トランスコード中の publish は失敗する）。`:sleep-fn` を
+     注入させ、ライブラリが timer を所有しない。
+   - **`com-tiktok`** — Content Posting API。`PULL_FROM_URL`（要ドメイン検証）と
+     `FILE_UPLOAD`（3段）の**両方**を実装 —— 一方は他方の上位集合ではないので、片方だけの
+     client は半分の呼び手にとって使えない。**init は post ではない**（非同期完了）ので
+     `await-publish` を持つ。TikTok は application レベルの失敗を **200 + error body** で
+     返すため、HTTP status だけを成功判定にしない。
+   - **`com-linkedin`** — Posts API + 画像 + chunked video。version は URL でなく
+     **リクエストヘッダ**（`LinkedIn-Version`）なので `:linkedin-version` を**必須の
+     credential** にした —— version を代わりに選ぶ client は LinkedIn の都合で壊れる。
+     post id は body でなく **`x-restli-id` ヘッダ**にあり、大文字小文字は HTTP client 間で
+     揺れるので case-insensitive に引く。pre-signed URL への PUT には Authorization を
+     **付けない**（付けると一部 CDN が弾く）。
+   - **`com-vimeo-upload`** — tus resumable。`com-vimeo` は clean-room **サーバ**なので、
+     同一 repo が同じ API を serve と consume の両方をするのを避け、role suffix で分けた
+     （CLAUDE.md の命名規則: 短名が埋まっている場合は role suffix）。`upload-file!` は
+     **サーバが報告した offset** を回す —— これが『再開』を『やり直し』でなく正しくする。
+
+   ## 3. haishin には依存させない
+
+   haishin の不変条件は『transport も credential も持たない』こと。これらの client を
+   haishin の `deps.edn` に足すとその不変条件が壊れる。接続は **caller 側の sender**
+   （`haishin.core/execute!` の `:senders`）で行い、関係は
+   `haishin/library.edn` の `:library/companion-clients` に記録する。"
+
+  :adr/consequences
+  "## 着地済み
+
+   - `kotoba-lang/kotoba-core-contracts` merge `30426bada38f` —— capability 追加。
+     **48 tests / 423 assertions green**。追加時にテストが3つの実要件を捕捉した:
+     `:host-import-order` の被覆、catalog 件数（56→57）、そして RID 必須。
+   - `kotoba-lang/capability-social-publish`（public、west pin `c5bcfffe519a` で前進）。
+     内容は **`scaffold-capability-repos` の生成物**で手書きではない。
+     `definition-cid` `bafyreicwvmvyfnt65xcx3bxcgn25r2pbzy4a65p7fusezvlplhabbrz5f4` は
+     canonical DAG-CBOR definition block 上の CIDv1 —— **計算値であって選んだ値ではない**。
+     provider status は `:contract-only`（署名済み Wasm component が出るまで実行権限は無い）。
+   - 4 client すべて public 公開 + west 登録（pin はサーバ側検証 OK、20行・当該 entry のみ）:
+     `com-instagram` `495a5cadba4c` / `com-tiktok` `b7de9268cf15` /
+     `com-linkedin` `a77e107bcf98` / `com-vimeo-upload` `ddde9ad21ddc`。
+
+   ## 検証（固定）
+
+   - client 4 本 = **27 tests / 58 assertions が nbb と JVM の両方で green**。
+   - capability repo = 1 test / 1 assertion（manifest が core contract に適合）。
+   - core-contracts = 48 tests / 423 assertions。
+   - **実バグを1件発見して修正した**: ClojureScript で `(count b)` は `js/Uint8Array` に対し
+     `ICounted` 未実装で **throw する**。`Content-Length` / `Content-Range` が必要とするのは
+     まさに byte 長なので、これは3つの client すべてで live upload を壊していた。
+     `byte-count` を reader conditional で導入。nbb と JVM の両方で回していなければ
+     JVM 側だけ緑で見逃していた。
+
+   ## 未了（正直に）
+
+   - **live 投稿は依然として1件も起きていない。** client は書けたが、①各 target の
+     credential 取得（OAuth アプリ登録・スコープ・ドメイン検証）②sender の配線
+     ③`:unverified` な limit の vendor doc 照合 —— が残る。
+   - **limit 照合（R1）は in-repo からは discharge できないことが確定した。** 上記のとおり
+     既存 repo は publish しないので限界値を持たない。vendor doc に当たるか、これら新しい
+     client を実際に叩いて確かめるかのどちらか。**R2（sender を書く）が事実上 R1 を兼ねる。**
+   - **`:x` の publish client はまだ無い。** `com-x` は mentions 検索 / DM / 返信のみで、
+     post 作成と media upload を持たない。6 target のうち publish できるのは
+     `com-youtube` + 今回の4本 = 5 で、X だけが欠けている。
+   - capability は `:contract-only` —— provider（署名済み Wasm component）は未実装。
+   - haishin の sender 束は未着手。haishin に依存を足さない方針なので、置き場所は
+     消費側 repo か、別の adapter repo になる（設計判断は上記 3.）。
+
+   ## 着地方法についての記録（次に manifest を触る人向け、実害があった）
+
+   **`git push` 経由の west.yml 更新は3回連続でブロックされた。** 原因は競合が本物
+   だったこと: push guard は diff ではなく **branch 全体の west.yml を現 tip と比較**
+   するため、fleet が数秒おきに pin を動かすこの workspace では、**自分が触っていない
+   entry** について branch が stale になり弾かれる（実測: 1回目 cssom/kagami/
+   kotoba-delta、2回目 cloud-itonami/kekkai、3回目も同じ2件 —— reset --hard origin/main
+   の直後でも間に合わなかった）。guard の判定は正しく、退行は実在した。
+
+   解決は CLAUDE.md が『唯一の正経路』と呼ぶ **GitHub Contents API の single-entry
+   commit**。tip の blob SHA を precondition にして 1 entry ずつ PUT するので、west.yml を
+   一切ローカルに持ち運ばず、競合は構造的に起きない。**実際に 409 が1回返り、tip を
+   読み直して成功した** —— 楽観ロックが設計どおり働いた証拠。
+   スクリプトは使い捨てにせず残す価値がある形（retry ループ + sorted insert）で書いた。
+
+   ## resume point（会話履歴なしで再開できる粒度）
+
+       # capability の内容は生成物。手で書き換えない
+       git clone git@github.com:kotoba-lang/capability-social-publish.git
+       clojure -M:test        # 1 test — manifest が core contract に適合するか
+
+       # client は4本とも同じ形
+       for r in com-instagram com-tiktok com-linkedin com-vimeo-upload; do
+         git clone git@github.com:kotoba-lang/$r.git && (cd $r && nbb run_tests.cljs)
+       done
+
+   次にやるべきは **sender の配線**（R2）。haishin の `:youtube/videos-insert` などの
+   request 記述を各 client の関数に渡す薄いアダプタを、**haishin ではなく消費側**に置く。
+   それが済めば `:unverified` な limit も実際に叩いて確かめられる（R1 を兼ねる）。"
+
+  :adr/body
+  "調査は org 全 1,999 repo の名前走査 + publishing API ホストでの content 走査。
+   後者のヒットは 0 だった（`business-api.tiktok` / `api.linkedin.com` /
+   `graph.instagram.com` / `content-publishing`）。
+
+   capability の登録点（次に capability を足す人向け）:
+   - `kotoba-core-contracts/resources/kotoba/runtime/capability_contract.edn` の
+     `:capability-ids`（wire id）/ `:host-imports` / `:host-import-order`（**末尾に追加**）
+   - `src/kotoba/core/capability_repository.cljc` の `capability-effects` /
+     `approval-required-capabilities` / `radicle-rids`
+   - `test/kotoba/core/contracts_test.cljc` の catalog 件数と golden import order
+   - 生成: `CAPABILITY_CORE_CONTRACTS_SHA=<landed sha> clojure -M -m scaffold-capability-repos <dir>`
+
+   順序は相互依存で強制される: **west 登録 → RID（rad-register は landing repo の tip から
+   west.yml を読む） → core-contracts 着地（RID が無いと catalog validation が落ちる） →
+   生成（deps.edn が core-contracts の commit を pin する）**。"}]
