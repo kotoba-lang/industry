@@ -2677,5 +2677,26 @@
   {:name "network-isekai" :id "isekai-docs-edn" :gate :nbb-script
    :script "gates/docs-edn-check.cljs" :script-args ["--sub" "90-docs" "--min" "10"]
    :include-ext [".edn"] :min-files 10 :cd false}
+  ;; aiueos — the OS. `:alias "test-fleet"` rather than `:test`, and the
+  ;; difference is one test: `every-kotoba-source-is-built-or-declared-unbuilt`
+  ;; carries `^:upstream-blocked` and the alias drops exactly that selector.
+  ;;
+  ;; Its twelve failures are CORRECT (aiueos ADR-0050): the `value-*` Kotoba
+  ;; objects are built by nothing, and nothing in that repository can fix it —
+  ;; they need an intrinsic the compiler does not have (kotoba-lang/amu#625)
+  ;; and an export-naming answer (#626). A gate that cannot go green until
+  ;; someone else replies is a gate that teaches the fleet to ignore red.
+  ;;
+  ;; Excluded BY NAME rather than by lowering a count: `-M:test` still reports
+  ;; twelve to whoever runs it locally, and the two aliases differ by exactly
+  ;; 632 − 631 = 1, which is the arithmetic that checks the selector did not
+  ;; catch anything else.
+  ;;
+  ;; Needs egress: the alias resolves five git deps (amu among them, which is
+  ;; large) plus maven. Measured 2026-08-18 on judah and levi — maven 200,
+  ;; github 200 — and NOT recorded here as a fleet property, because egress on
+  ;; this fleet is not uniform and the last section that wrote its measurement
+  ;; down had it quoted back as a constant.
+  {:name "aiueos" :gate :jvm-test :alias "test-fleet" :cd true}
   ;; ────────────────────────────────────────────────────────────────────────
   ]}
