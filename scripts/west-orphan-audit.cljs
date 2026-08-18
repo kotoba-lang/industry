@@ -153,10 +153,38 @@
                   rel-base))
               (catch :default _ nil))))))))
 
-(defn git-remote [rel]
-  (let [{:keys [exit out]} (sh "git" "-C" (node-path.join root rel)
-                               "remote" "get-url" "origin")]
-    (when (zero? exit) (not-empty (str/trim out)))))
+(defn git-remote
+  "この checkout の upstream URL。**`origin` 決め打ちにしてはいけない。**
+
+  west は remote を manifest の remote 名（`etzhayyim` / `cloud-itonami` /
+  `kotoba-lang` …）で作るので、west 管理下の checkout に `origin` が無いことの方が
+  多い（`cleanup-land.cljs` の `primary-remote` 実測: west project 3,353 のうち
+  1,644 に `origin` が無い）。
+
+  ここが nil を返すと `reclassify-renamed` は redirect を辿れず、その行は
+  `:true-orphan-git` に残る —— つまり **改名残骸が『register or retire』として
+  報告される**。docstring が言うとおり『確かめられなかった』を『改名ではない』に
+  潰さない設計は正しいが、確かめられなかった理由が直せるバグなら直す。
+
+  実測 2026-08-18: `origin` 決め打ちのため 8 件（`etzhayyim/com-etzhayyim-{abuse,
+  chigiri,kataribe,kizashi,magatama,musubi,niyaku,shidemori}`）が
+  `origin=(none)` として `:true-orphan-git` に落ちていた。実際には remote 名
+  `etzhayyim` を持ち、GitHub は全件を `etzhayyim/actor-*` へリダイレクトし、
+  その 8 つは**すべて west 登録済みで checkout も存在する**。
+
+  github.com を指す remote を優先する（`rad://` 等の非 GitHub remote が
+  先に並んでも canonical-slug が引けるように）。"
+  [rel]
+  (let [dir (node-path.join root rel)
+        {:keys [exit out]} (sh "git" "-C" dir "remote")
+        names (when (zero? exit)
+                (->> (str/split-lines (str out)) (map str/trim) (remove str/blank?)))
+        url-of (fn [n] (let [{:keys [exit out]} (sh "git" "-C" dir "remote" "get-url" n)]
+                         (when (zero? exit) (not-empty (str/trim out)))))
+        urls (->> names (map (fn [n] [n (url-of n)])) (filter second))]
+    (or (some (fn [[_ u]] (when (str/includes? u "github.com") u)) urls)
+        (some (fn [[n u]] (when (= n "origin") u)) urls)
+        (second (first urls)))))
 
 (defn canonical-slug
   "GitHub の改名リダイレクトを辿った owner/name。引けなければ nil。
