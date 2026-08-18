@@ -94,6 +94,54 @@
    (d) **kami-engine / WebGPU で 3D ビューアを作る** — ADR-2607102200 の権限内だが、寸法導出・干渉検出・STEP 出力という今回の目的には不要。可視化は別途 artifact で足りる。
    (e) **GPU を 2 枚にする** — 拡張スロット 2 に対し B70 が 2-slot なので**物理的に不可能**。Mini-ITX なので x16 スロットも 1 本きり。"
 
+  :adr/resume
+  "**現在地と再開点(2026-08-18 セッション終了時点)。**会話履歴なしで再開できる粒度で書く。
+
+   -- 着地した commit --
+   com-junkawasaki/root main = **5d5296ce981**(merge)/ 内容は **845ff599ff2**
+     branch agent/tower100-b70-assembly-check(サーバ側 merge 済み・撤去済み)
+   9 ファイル / +1941 行。子リポの変更は無い(既存 kernel を読み取り専用で使っただけ)。
+
+   -- 何が main に在るか --
+   90-docs/hardware/tower100-b70-parts.datoms.edn   部材カタログ(**正本。寸法はここだけ直す**)
+   90-docs/hardware/tower100-b70-assembly.edn       検査結果(生成物)
+   90-docs/hardware/tower100-b70-chassis.step       STEP / ISO 10303-21(生成物)
+   90-docs/hardware/tower100-b70-views.svg          直交三面図(生成物)
+   90-docs/hardware/tower100-b70-report.html        報告ページ / standalone(生成物)
+   scripts/tower100-b70-cad.cljs                    検査本体
+   scripts/tower100-b70-drawing.cljs                三面図生成
+   scripts/tower100-b70-report.cljs                 報告ページ生成
+   90-docs/adr/2608172000-...edn                    本 ADR
+
+   -- 固定した検証(すべて 0 failure) --
+   公表クリアランス 5 項目 + ファン受け口: 全 PASS。
+   STEP 往復: 6 面 / 12 稜線 / 8 頂点 一致。
+   AABB sim: 内包NG 0 / 干渉 0 / 挿入不可 0 / 公差 worst-case NG 0 / ケーブル曲げ NG 0。
+   CFD ソルバ検証: Poiseuille 相対 L2 = 1.44%(許容 2%)PASS。
+   適用範囲: reachable-reynolds が :feasible? false(意図どおり)。
+   **判別能力の実測 3/3**(決定15)。無改変では 0 件。
+
+   -- 未解決 gap(優先順) --
+   1. **実物が 1 つも採寸されていない。**全部材 `:part/measured false`。
+      発注・購入したら現物を測って parts.datoms.edn を更新し、再実行する。
+   2. **筐体内寸が未実測。**公表クリアランスからの逆算で分解能 2.8mm(決定14)。
+      Tower 100 が手元に来たら内寸を測って `side-allow` / `psu-cover` を実測値に置換する。
+   3. **熱が未決着。**LBM は適用範囲外(決定11)。実機実測が最も安い。
+   4. 基板内クリアランスは規格に帰しただけ(決定13)。実測でも sim でもない。
+   5. 出荷 BIOS と 7500F の互換(B650I Lightning WiFi は 7000 系対応だが個体は未確認)。
+
+   -- 次に打つ最初の手(具体) --
+   a. 再実行:
+      nbb --classpath orgs/kotoba-lang/org-iso-10303/src:orgs/kotoba-lang/kami-engine-cfd/src \\
+          scripts/tower100-b70-cad.cljs
+      nbb scripts/tower100-b70-drawing.cljs
+      nbb scripts/tower100-b70-report.cljs 90-docs/hardware/tower100-b70-report.html --standalone
+   b. 用途適合の 2 件(RAM 16GB / PCIe 4.0 x16、:adr/consequences)は**発注前の判断**。
+      とくに DIMM 2 枚きりなので、8GB x2 で発注すると増設が買い直しになる。
+   c. 熱を決めるなら実機。CFD 経路に戻るなら kami-engine-cae-solver の OpenFOAM runner。
+
+   **何も購入・発注していない。この時点で外部への不可逆な支出・約束は無い。**"
+
   :adr/verification
   "再現:
      nbb --classpath orgs/kotoba-lang/org-iso-10303/src:orgs/kotoba-lang/kami-engine-cfd/src \\
