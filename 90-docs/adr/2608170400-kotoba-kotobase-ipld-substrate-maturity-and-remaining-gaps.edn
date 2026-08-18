@@ -764,6 +764,55 @@ signed receipt、壊した実装が落ちる mutation test の六面。
 ### P5 — distributed history と execution backend parity
 
 1. causal DAG merge/conflict semantics、actor authority、revocation、receipt parent chain の横断test。
+   **2026-08-18 着地**（`chain` b2ba6c7f、west pin 前進済み。`chain.authorized`）。
+
+   **4 つは個別には健全で、だから join が誰にも捕まらなかった。** `chain` は
+   `authority` と `actor` を**記録するが検査しない**と comment で明言し、
+   `revoked?`/`expires-at` を持つ grant の形は**別 org の repo**（gftdcojp/
+   net-kotobase-git の `authority_basis`）に在る。**書かれる前に revoke された
+   authority を名乗る commit が、stack の全検査を通過できた。**
+
+   `chain.authorized` も validity を**決めない** —— `resolve-grant` は注入で、
+   **訊く**。足したのは「誰かが訊く」こと自体。
+
+   **既定値を持たない宣言が 2 つ**（他の no-silent-default と同じ理由）:
+
+   - **`:as-of`** —— **Lamport clock は順序であって時刻ではなく**、grant は
+     wall-clock で失効する。**この 2 つは変換できない**。誤魔化すのがここでの
+     面白い失敗なので、**instant は caller が名乗り、verdict がそれを返す**。
+     suite は**同じ commit・同じ grant・違う `:as-of`** が逆の答えを出すことを示す。
+   - **`:revocation`** = `:retroactive`（その鍵は最初から信頼できなかった＝
+     compromise の意味）か `:prospective`（履歴は「その時何が許されたか」の記録＝
+     receipt の意味）。**一般に正しい方は無い。だから既定値が無い。**
+
+   **merge は洗浄しない**: 到達可能な commit が 1 つでも落ちれば `:ok?` は false。
+   authorized な枝に unauthorized な枝を merge した履歴は unauthorized になる。
+   **merge commit 自身の authority が覆うのは merge であって、引き込んだもの全部ではない。**
+   逆の規則は「正当なものに merge する」を**何でも祝福する手段**にする ——
+   そして**誰も書かなければ読み手はそちらを仮定する**。
+
+   ⚠ **P5-1 の test が `walk-causal` の欠陥を見つけた。形はこの ADR の pattern の反転。**
+   `verify-causal` は固有の診断を文書化していた（「存在しない親を引用することは、
+   何も無いのに provenance に読める」）し、**その検査は正しかった**。しかし
+   `walk-causal` が欠損 CID を先に decode して throw し、`verify-causal` が
+   `:reason :threw` で捕まえていた。**固有の診断は到達不能だった** ——
+   block を失った store の operator は、walk のどこで起きた予期せぬ例外とも
+   区別できない汎用値を受け取っていた。**「走れなかった検査が合格と同じ値を返す」
+   ではなく「固有の診断が汎用に潰れる」** —— 失うのは行動に必要な情報で、同じ。
+   store が出せない親は decode せず**skip**するようにし、引用元が**名指しで**
+   missing-parent に落ちるようにした。**test を `:threw` 期待に書き換えることも
+   できた** —— それは docstring が「無い」と言っている欠陥を隠すことだった。
+
+   **拒否されて分かったことが 2 つ。** `commit!` は引用する親を全て fetch + CID 検証
+   するので、**この API 経由では不正な履歴を書けない**。`authority` は型付き IPLD link
+   なので**でっち上げの識別子も入らない**。つまりこの検証が対象にするのは
+   **書き込みの後に来る破損**か**他所から来た履歴**で、これは `arrangement` と
+   `kotobase-storage-pack` が既に名指ししている threat model と同じ
+   （「bytes は engine が信頼しない store から来た」）。suite の orphan は
+   だから**親を削除して**作り、grant は実際に content-addressed にした。
+
+   mutation 6 本、すべて意図した test に着弾（`walk-causal` の修正を含む ——
+   次にその `try` を「整理」する人が、到達不能な診断を静かに復活させられない）。
 2. Wasm/Substrait/Pregel/Actor 各backendで同じ checked KIR/effect envelope を再検証。
 3. backend間 result parity を適用可能なpure subsetで測り、backend固有非決定性をreceiptへ記録。
 4. transport断、重複配送、順序逆転、再実行に対する idempotency / exactly-onceを混同しない。
@@ -809,7 +858,7 @@ P0-3 `bytes-concat` / P0-4 closed expression grammar / P0-5 canonical codec refu
 **P0 / P1 は全項目、P2 は P2-1 / P2-3 / P2-4 が 2026-08-17 に着地した。**
 **P2-2 だけが残り、それは外部条件待ち**（独立した GraphSync peer）。
 
-次に着手できるのは **P5-1 / P5-4** の 2 つだけ
+次に着手できるのは **P5-4** ただ 1 つ（**P5-1 は 2026-08-18 着地**）
 （**P4-2 / P4-3 / P4-4 / P4-5 は 2026-08-17 着地。P4 で残るのは P4-1 のみで、
 それは production canary 待ち**）。
 **P3 は 5 項目すべてが外部条件待ち**（P3-1..4 は実 fleet binary / 実ブラウザ / 実 NAT /
