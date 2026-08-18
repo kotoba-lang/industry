@@ -1,0 +1,125 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-19"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-19.edn"
+  :doc/date "2026-08-18"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "the remaining 61 amu failures after call-clobber, against the published pin"
+  :coscientist/iteration 19
+  :coscientist/subject "kotoba-mir allocate-without-spills, sibling-arm reload of a backed value"
+  :coscientist/action "discriminate f07d260e against d4b050ae; drop backed assignments at labels; execute native-executor-test and isa-execution-test on judah before the amu pin moves"
+  :coscientist/measured "d4b050ae: native-executor-test 57/190/0, isa-execution-test 15/643/0. f07d260e: 1 native-executor fail (let-composes-with-recursion, 4377772033 on judah) and 60 isa-execution fails (string-contains? / string-replace-all, both ISAs). After kotoba-mir ac14016d (back-edge? plus drop-backed-at-label) and kotoba-native e8642e0, judah ran the two namespaces: 74 tests, 841 assertions, 0 failures. amu 30370f07. west-pin mir ac14016d, native e8642e0, amu 30370f07."
+  :coscientist/refuted "that every CFG+call body must take all-vreg; that store-at-definition made a then-arm reload dominate the else arm; that back-edge? was the remaining string-search fault (iteration 18: 62 to 61). A then-arm spill-load left acc assigned; the else arm added with leftover x20. Dropping backed assignments at a label, only when something assigned is backed, reloads in that block and does not scramble leaf phi coalescing."
+  :coscientist/carries-forward "iteration-04: do not ship a timed bench export; iteration-08: oracle before duration; iteration-14: leaf vs LLVM remains refused; iteration-15: do not overwrite a used number; iteration-16: encodings closed all-vreg on the 24-live branch; iteration-17: the quiet timing is real and is not a pin bump; iteration-18: a benchmark corpus is not a conformance corpus, and green encodings are not execution. Do not overwrite 04-18."
+
+  :doc/body
+  "# Codegen co-scientist, iteration 19
+
+Iteration 18 recorded the amu bump that did not land: native `4f6742e` /
+mir `7f7c556` took **62 failures**, `back-edge?` took that to **61**, and
+`(if (string-contains? \"abcdef\" \"def\") 1 0)` still returned 0. This
+file is the discrimination against the published pin, the sibling-arm
+reload hole, and the executed suite after the pin moved.
+
+Do not overwrite iteration 18. It is the record that the benchmark fixtures
+were not a conformance corpus.
+
+## Discrimination
+
+Same host (judah), `java -cp` not `-M:test -m` (amu's test-runner main-opts
+would swallow the namespace). Trees `/tmp/amu-baseline-iter18` (`d4b050ae`)
+and `/tmp/amu-iter17-iter18` (`f07d260e`).
+
+| pin | namespace | result |
+|---|---|---|
+| `d4b050ae` | `native-executor-test` | 57 tests / 190 assertions / **0 fail** |
+| `d4b050ae` | `isa-execution-test` | 15 / 643 / **0 fail** |
+| `f07d260e` | `native-executor-test` | **1 fail**: `let-composes-with-recursion-within-the-fuel-budget` (Air 4310433793, judah 4377772033) |
+| `f07d260e` | `isa-execution-test` | **60 fails**: `string-contains?` / `string-replace-all`, both ISAs |
+
+The 61 failures are a regression from call-clobber. Full-suite errors about a
+missing wasm tool (`Exec failed, error: 2`) are not failures.
+
+`kernel_call_deep_branch` still oracled correctly: it uses **call results**
+after the calls, not a pre-call value in the other arm.
+
+## The hole
+
+`pair` then `if`; then-arm returns `acc`; else-arm uses `acc` after a
+recursive call. The allocator stored n/acc at definition (slots 0/1),
+reloaded **n** before the branch (dominates both arms), reloaded **acc**
+into `x20` **only on the then path**, and the else `add` used `x20` with
+no load. `x20` was leftover callee-saved garbage, which is why the wrong
+result varied per run.
+
+Linear last-use treats a reload in one arm as keeping the value assigned.
+ADR 0012's store-at-definition does not fix lazy reloads. Iteration 18's
+`back-edge?` is a different hole (textual last-use across a backward jump)
+and does not see this forward split.
+
+## The change
+
+In `allocate-without-spills`, at every `:mir/label` after the entry, if any
+currently assigned value is backed, drop those backed values from
+`:assigned` and rebuild the scratch/reserve lists. The next use in that
+block loads. Unbacked values stay: their definition dominates the split.
+
+Rebuilding the lists on **every** label, including leaves with nothing
+backed, scrambled the unified leaf pool and broke
+`single-phi-join-coalesces-to-direct-edge-moves`. The drop is skipped when
+nothing assigned is backed.
+
+Encoding test:
+`v3-else-arm-reloads-a-value-the-then-arm-already-reloaded`. That is the
+same class of evidence kotoba-mir already had. The measurement is the amu
+execution below.
+
+Stacked on origin/main `799443d` (iteration 18's `back-edge?` plus
+`:accepted-defective`). Did not revert all-vreg for every CFG+call.
+
+## Landed pins
+
+| repo | SHA | what |
+|---|---|---|
+| kotoba-mir | `ac14016d1cb07a9d0a4c1942452c6340814cbaae` | drop-backed-at-label on top of `back-edge?` |
+| kotoba-native | `e8642e0c483b9f708a1680abd692ea3ff08422e5` | pins mir `ac14016d` |
+| amu | `30370f077c86de9cd47da2aaa3fc14bf0ea7e6e3` | pins native `e8642e0`; lock digest refreshed in the same commit |
+
+west-pin-put: mir `ed9dac1a`, native `a2bb6b73`, amu `ca3ea558`.
+
+## Execution
+
+Judah loadavg ~1.6. After the lock refresh:
+
+```
+native-executor-test + isa-execution-test
+74 tests, 841 assertions, 0 failures
+```
+
+That includes `let-composes-with-recursion-within-the-fuel-budget` and the
+string-search rows. The one-line reproducer from iteration 18 is therefore
+no longer the gate that holds the pin. kotoba-mir ADR 0012 is still marked
+`:accepted-defective` on this pin, because that status was written before
+the execution; clearing it is a later Generate, not this file rewriting 18.
+
+kotoba-native's own suite (168 tests / 2199 assertions) was green, which
+iteration 18 already said is worth nothing by itself: it does not run a
+compiled program.
+
+## What this does not change
+
+- Timed `bench` export stays refused (iteration 4 / 5).
+- Leaf vs LLVM stays refused (iteration 14). Do not rematch it here.
+- fused-srem / extra MOV / FMA / PGO / kototama optimizer stay refused.
+- Iteration 17's sealed +7.41% on the 24-live pair is not re-timed here.
+- Straight-line ADR 0006 still storing every live-across value is a later
+  Generate.
+- Do not treat `kernel_call*` fixtures as a conformance corpus
+  (iteration 18).
+
+## Remaining after 19
+
+Clear `:accepted-defective` on ADR 0012 only after a follow-up that records
+this execution in that ADR. `:cfg-liveness` is still false; `back-edge?`
+still sends actual loops with calls to all-vreg. That conservative floor
+is not this file's ranking. Do not overwrite 04-18."}]
