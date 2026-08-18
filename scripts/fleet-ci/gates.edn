@@ -273,6 +273,23 @@
   ;; repository. Compilation plus the suite took ~90s warm here; the 30-minute
   ;; gate timeout should hold even cold.
   {:name "org-oasis-open-xmile" :gate :jvm-test :cd true}
+
+  ;; dynamics のスコア算術の正本は `kotoba/dynamics_score_core.kotoba` で、
+  ;; `src/dynamics/core.cljc` は consumer が require する load path
+  ;; （root ADR-2608189500）。**この gate に JVM は要らない** —— コンパイル済みの
+  ;; `:js-kotoba-v1` artifact が repo に checked in してあり、gate はそれを node で
+  ;; import して `.cljc` と突き合わせるだけ。`:cap :jvm` を付けないのはそのため。
+  ;;
+  ;; `:include-ext` は**あえて書かない**。この gate が読むのは `.kotoba` / `.mjs` /
+  ;; `.cljc` の 3 種で、拡張子を絞ると 1 つ書き忘れただけでノード上だけ赤くなる
+  ;; （CLAUDE.md 実測: gh-workflow-assoc-gapki）。repo は 452K なので tree を
+  ;; 丸ごと配って構わない。
+  ;;
+  ;; 床 1200 は実測 1539 の下。手元で 4 通りに壊して赤を確認済み: 再コンパイル
+  ;; 忘れ（digest）/ 帯の重み / 表の骨抜き（種別 ratchet）/ pow を 1+5e-12 倍。
+  {:name "dynamics" :id "dynamics-score-core" :org "kotoba-lang" :gate :nbb-script
+   :script "gates/dynamics-score-core-check.cljs" :script-args ["--min" "1200"]
+   :cd false}
   ;; kototama cannot take a :jvm-test gate: its :test alias resolves sibling
   ;; :local/root deps that a node never receives, so that gate would fail
   ;; about the classpath forever. The repo declares :test-hermetic for the
