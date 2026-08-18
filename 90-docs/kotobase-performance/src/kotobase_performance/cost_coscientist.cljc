@@ -202,7 +202,7 @@
    {:id "h4-carv2-pack"
     :title "Pack commit-local blocks into CARv2 archives"
     :change "One range GET per commit's blocks instead of one per block."
-    :after-harness {:cpu-ms 1976 :class-b-ops 64}
+    :after-harness {:cpu-ms :unchanged :class-b-ops 64}
     :basis :measured-and-refuted-for-this-shape
     :basis-note "Only the 21 snapshot blocks coalesce; each novelty cell is its
                  own commit and therefore its own pack."
@@ -213,9 +213,11 @@
    {:id "h3-engine-materialisation"
     :title "Stop materialising query intermediates"
     :change "~16x of headroom inside the query engine."
-    :after-harness {:cpu-ms 1970 :class-b-ops 84}
+    :after-harness {:cpu-ms :unchanged :class-b-ops 84}
     :basis :measured
-    :basis-note "The engine is ~6 ms of this request."
+    :basis-note "The engine is ~6 ms of this request. CPU is :unchanged rather
+                 than 1970: a hypothesis that moves ~6 ms of a 2,058 ms request
+                 moves nothing this judge can resolve."
     :effort :L
     :reversible? false
     :depends-on-write-rate? false}
@@ -223,20 +225,76 @@
    {:id "h5-engine-pin"
     :title "Ship the benchmarked query engine"
     :change "Production ran datalog 14 commits behind the benchmarked build."
-    :after-harness {:cpu-ms 1976 :class-b-ops 84}
+    :after-harness {:cpu-ms :unchanged :class-b-ops 84}
     :basis :measured
     :basis-note "Landed 2026-08-17; changed no served number, as predicted.
                  Kept as a control -- a hypothesis with a measured zero."
     :effort :S
     :reversible? true
-    :depends-on-write-rate? false}])
+    :depends-on-write-rate? false}
+
+   {:id "h8-l2-cache-api"
+    :title "Give this Worker the colo-shared block cache it never had"
+    :change "kotobase_r2.cljs caches immutable blocks in ISOLATE MEMORY only
+             (64 MB, js/Map, FIFO). The sibling Worker that serves
+             datoms.kotobase.net has had two tiers since the block-cache
+             landing -- L1 isolate memory AND L2 the Cloudflare Cache API,
+             which is per-colo and survives the isolate. This one has L1 alone."
+    :after-harness {:cpu-ms :unchanged :class-b-ops 21}
+    :basis :predicted
+    :basis-note "The MECHANISM is measured and the RATE is not, and the two
+                 must not be reported as one number.
+
+                 Measured: L1 cannot be helping a served read here. Twelve
+                 consecutive reads of /_diag/hydrate on 2026-08-18 all reported
+                 `sampled: false` -- twelve isolates, none of which had ever
+                 hydrated. A cache that dies with the isolate is cold on every
+                 request that is measured, and the 84 class-B gets in this
+                 baseline ARE that coldness, priced.
+
+                 Predicted: the hit rate. 21 assumes 75%. The Cache API is
+                 per-colo with its own eviction, so this is an assumption and
+                 is labelled one. Sensitivity, because a single number hides
+                 how much of the claim rests on it:
+                   50% hit -> 42 ops, saves $15.12
+                   75% hit -> 21 ops, saves $22.68
+                   90% hit ->  8 ops, saves $27.36
+                 A measured zero is a possible outcome and the landing must be
+                 able to report it: the diagnostic counts L1 hits today and
+                 would have to count the tiers separately, or this hypothesis
+                 cannot be refuted."
+    :effort :S
+    :reversible? true
+    :depends-on-write-rate? false
+    :note "CPU is :unchanged on purpose. A cache hit removes a ROUND TRIP, and
+           cpuTime does not include I/O wait -- the dag-cbor decode of those
+           11.46 MB happens either way. Anyone expecting this to move the CPU
+           term has mistaken which resource it buys; it buys class-B and wall
+           clock. Wall is not in this judge because Cloudflare does not bill it."}])
 
 (defn- scale-after
   "Harness cpu-ms -> the workerd level the judge prices in. Class-B counts are
-  live and pass through untouched; only the proxied term is corrected."
+  live and pass through untouched; only the proxied term is corrected.
+
+  `:cpu-ms :unchanged` resolves to the LIVE baseline, and that is a bug fix, not
+  a convenience. `workerd-scale` was calibrated as 2397/1976 -- the measured
+  level of 2026-08-18 morning over the harness level that produced it. The
+  outer-string change then moved the measured level to 2058 without anyone
+  re-running the harness, so scaling a stale 1976 produced 2397: iteration-02
+  priced every CPU-neutral hypothesis as a **+339 ms regression it does not
+  cause**. `h5-engine-pin` is the proof, and it was sitting in the output --
+  a hypothesis kept deliberately as a MEASURED ZERO was ranked last at
+  -$6.78/million. A control that reads as a loss is the loop telling you its
+  own arithmetic is wrong.
+
+  A hypothesis that does not claim to move CPU is therefore priced at the CPU
+  that was actually measured, with no proxy in the path at all."
   [{:keys [after-harness] :as h}]
-  (assoc h :after (assoc after-harness
-                         :cpu-ms (Math/round (* workerd-scale (:cpu-ms after-harness))))))
+  (let [cpu (:cpu-ms after-harness)]
+    (assoc h :after (assoc after-harness
+                           :cpu-ms (if (= :unchanged cpu)
+                                     (:cpu-ms baseline)
+                                     (Math/round (* workerd-scale cpu)))))))
 
 (defn generate [] (mapv scale-after hypotheses))
 
@@ -320,49 +378,72 @@
   were. This is where that is repaired -- and on the corrected inputs it says
   something the ranking cannot.
 
-  The served hydrate has two halves. A (514 ms, 84 gets) is `hot-datoms`:
-  fetching, decoding and merging blocks. B (1,430 ms) is building the
-  LocalStore map, parsing every value twice.
+  A served read has two priced resources, and the roadmap has been arguing
+  about one of them. CPU is $41.16 of the $71.70; the 84 class-B gets are
+  $30.24, **42% of the unit cost**, and every hypothesis that touched it was
+  ranked by how much CPU it also moved.
 
-    h1 removes A and leaves B.
-    h7 removes B and leaves A.
+    h7 removes the CPU half (parse), leaves the 84 gets.
+    h8 removes most of the gets, leaves the CPU.
+    h1 removes the gets AND half the CPU, and is the only one of the three
+       whose cost depends on a write rate nothing has measured.
 
-  **Neither alone is the answer, and the pair is worth more than the sum of its
-  parts** -- together they leave a decode that measured 2.5-6.8 ms, against
-  1,976 ms today. The tournament cannot see this because it scores one change
-  at a time against one baseline.
+  **h7 and h8 are orthogonal, so their savings add.** h1 is NOT additive with
+  h8 -- it subsumes it, by removing the same reads a different way.
 
-  Order is decided by the same rule the bouts use, applied to the pair: prefer
-  the reversible one, then the cheaper effort. That puts h7 first, NOT the
-  top-ranked h1 -- h7 is reversible, :M rather than :L, captures the larger CPU
-  half on its own, and does not depend on a write rate nothing has measured."
+  Order is the bouts' own rule applied to the pair: reversible first, then
+  cheaper effort. That puts h8 ahead of the top-ranked h1 and ahead of h7:
+  :S rather than :M/:L, reversible, semantically inert (blocks are immutable
+  and CID-verified, so caching them changes no answer), and -- the reason it
+  can be done TODAY -- it needs no credential and no write to the graph, while
+  h1's maintenance is a rebuild per commit and h2/h6 need a write this session
+  cannot issue.
+
+  What the pair does NOT include, and why: h4 (pack). Its whole saving is the
+  same 84 gets h8 removes, and it removes fewer of them (84->64, because each
+  novelty cell is its own commit and therefore its own pack). After h8 it is
+  worth close to nothing on THIS graph. Packing earns its place on the write
+  path of the OTHER worker -- where a fold re-PUTs every unchanged tree node
+  and reads it back to byte-compare -- and that is not the resource this judge
+  prices."
   [ranked]
   (let [by-id (into {} (map (juxt :id identity) ranked))
         h1 (by-id "h1-seed-materialisation")
         h7 (by-id "h7-parse-only-addressable-values")
-        pair-cost (cost-per-million {:cpu-ms 5 :class-b-ops 1})]
-    {:batch-id "kotobase-cost-kaizen-2"
-     :members ["h7-parse-only-addressable-values" "h1-seed-materialisation"]
-     :order "h7 first, then h1"
-     :why "h7 removes B, the larger half, and is reversible, :M effort, and
-           independent of the read:write ratio. h1 removes A and the 84 gets
-           but is :L, and its maintenance is a rebuild per commit whose cost
-           depends on a ratio nothing here has measured."
+        h8 (by-id "h8-l2-cache-api")
+        pair-cost (cost-per-million {:cpu-ms (get-in h7 [:after :cpu-ms])
+                                     :class-b-ops (get-in h8 [:after :class-b-ops])})]
+    {:batch-id "kotobase-cost-kaizen-3"
+     :members ["h8-l2-cache-api" "h7-parse-only-addressable-values"]
+     :order "h8 first, then h7"
+     :why "h8 and h7 buy different resources, so the pair is the sum. h8 goes
+           first because it is :S, reversible, needs no credential, and its
+           mechanism -- not its rate -- is already measured: L1 is isolate
+           memory and every measured request landed on a cold isolate."
      :pair-cost-per-million pair-cost
      :pair-saving (- (cost-per-million baseline) pair-cost)
-     :beats-either-alone
-     {:h1-alone (:cost-after h1) :h7-alone (:cost-after h7) :pair pair-cost}
+     :additive-not-subsumed
+     {:h8-alone (:cost-after h8) :h7-alone (:cost-after h7) :pair pair-cost
+      :h1-alone (:cost-after h1)
+      :note "h1 vs h8 is a CHOICE, not an order: both remove the gets."}
      :not-in-the-batch
-     "h2 (fold) is deployed and one write from firing, so it will land whether
-      or not it is chosen; it reduces the novelty part of A, which h1 removes
-      wholesale. h6 (retracting 91 documents) would shrink the seed 6.7x and is
-      the single largest byte reduction available, but retracting production
-      documents is an owner judgement and it is irreversible."
+     "h2 (fold) is one write from firing and reduces the novelty part of the
+      same reads h8 caches; it will land on its own when a write happens. h6
+      (retracting 91 documents) is the largest byte reduction available and is
+      irreversible production data deletion -- an owner judgement, not this
+      loop's. h4 (pack) is superseded on this graph by h8, see the docstring.
+      h1 stays the largest single number and is deliberately NOT first."
+     :how-this-batch-can-fail
+     "h8's saving is a hit RATE and the hit rate is assumed. The landing is not
+      done when the tier exists -- it is done when the diagnostic reports L1 and
+      L2 hits SEPARATELY and a live probe shows which one answered. A tier that
+      is present and never hit costs one extra lookup per block and saves
+      nothing, and would be indistinguishable from success in every counter
+      this Worker has today."
      :unmeasured-dependency
      "h1's maintenance is a seed rebuild per commit. At ~3 writes/day that is
       free; at a high write rate it inverts. NOTHING HERE MEASURES THE
-      READ:WRITE RATIO -- and a five-minute tail of the whole Worker returned
-      no served queries at all, so the read side is not measured either."}))
+      READ:WRITE RATIO."}))
 
 ;; ── Meta ─────────────────────────────────────────────────────────────────────
 
