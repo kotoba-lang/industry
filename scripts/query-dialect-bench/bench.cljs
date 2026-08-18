@@ -29,7 +29,12 @@
 
 (require '[clojure.string :as str]
          '[clojure.edn :as edn]
-         '[scripts.nbb-compat :as compat])
+         '[scripts.nbb-compat :as compat]
+         ;; ⚠ **prompt も validator も extractor もここには無い。** 全部
+         ;; kotoba-lang/kotobase-query の `kotobase.query.agent`（pure、依存ゼロ）に在る。
+         ;; 測定と production が別々のコピーを持てば、直るのは片方だけになる。
+         ;; classpath に `orgs/kotoba-lang/kotobase-query/src` が要る（README 参照）。
+         '[kotobase.query.agent :as agent])
 
 (def fs (js/require "fs"))
 (def child (js/require "child_process"))
@@ -96,78 +101,6 @@
   [rows]
   (set (map vec (or rows []))))
 
-;; ---------------------------------------------------------------- validator
-;; query が EDN 値であることの実利がここ。文字列 surface はこの段を持てない。
-
-(defn type->str [x]
-  (cond (map? x) "map" (list? x) "list" (string? x) "string" (nil? x) "nil" :else "other"))
-
-(defn where-clauses
-  "query の :where 以降の節だけを返す。:find / :in の中身は data pattern ではない。"
-  [q]
-  ;; ⚠ `(.indexOf (to-array q) :where)` は **-1 を返す** —— JS の indexOf は
-  ;; boxed な cljs keyword を strict equality で比べるので一致しない。実測
-  ;; 2026-08-18、その実装は :where 節を **0 件**走査したうえで「妥当」を返して
-  ;; いた。**測れなかった検査が、測って問題が無かった検査と同じ値を返す**
-  ;; （ADR-2608136000 の 5 問の 2）。cljs の = で数える。
-  (let [i (first (keep-indexed (fn [n x] (when (= x :where) n)) q))]
-    (if (nil? i) [] (filter vector? (subvec (vec q) (inc i))))))
-
-(defn clause-attribute
-  "data pattern `[?e <attr> ?v]` の attr 位置だけを返す。
-   ⚠ **ここを『query 中の全文字列』にすると値も属性として弾く。**
-   実測 2026-08-18: 最初の実装がそれで、`[?e \"source/dataset\" \"market-intel\"]` の
-   値 \"market-intel\" を未知属性として報告し、**正しいクエリを 20 問中 18 問で
-   拒否した**。repair loop はその偽のエラーをモデルに返していたので、その回の
-   測定は丸ごと無効だった。壊れた検査は『指摘』の顔をして出てくる。"
-  [c]
-  (when (and (vector? c) (>= (count c) 2)
-             ;; `[(>= ?r 1e11)]` のような述語節は data pattern ではない
-             (not (seq? (first c)))
-             (not (list? (first c))))
-    (second c)))
-
-(defn validate
-  "構造検証 + 属性 allowlist。戻り値 nil = 妥当、それ以外は **LLM に返せる構造化エラー**。"
-  [q attr-allow]
-  (cond
-    (not (vector? q))
-    {:error :not-a-vector :got (type->str q)
-     :hint "query は EDN のベクタで始まる: [:find ?x :where [?e \"attr\" ?x]]"}
-
-    (not= :find (first q))
-    {:error :missing-find :got (str (first q))
-     :hint "先頭は :find でなければならない"}
-
-    (not (some #{:where} q))
-    {:error :missing-where
-     :hint ":where 節が無い"}
-
-    ;; :find と :where の間に 1 つも束縛が無いと DataScript が
-    ;; `Cannot parse :find` で throw する。**実行前に捕まえる**（実測 2608189300 の測定で、
-    ;; validator を通ったこの形が batch 全体を落とした）
-    (empty? (remove #{:find :in :where}
-                    (take-while #(not= :where %) (rest q))))
-    {:error :empty-find
-     :hint ":find と :where の間に返す変数か集約が 1 つも無い。例: [:find ?x :where …]"}
-
-    :else
-    (let [attrs (keep clause-attribute (where-clauses q))
-          kw-attrs (sort (map str (filter keyword? attrs)))
-          bad (sort (remove attr-allow (filter string? attrs)))]
-      (cond
-        ;; 最も起きやすい誤り。専用のエラーにして直し方を名指しする
-        (seq kw-attrs)
-        {:error :keyword-attributes :got (vec kw-attrs)
-         :hint (str "属性はキーワードではなく**裸文字列**で書く。"
-                    (first kw-attrs) " ではなく "
-                    (pr-str (subs (first kw-attrs) 1)) " とする。")}
-
-        (seq bad)
-        {:error :unknown-attributes :got (vec bad)
-         :hint (str "この面に存在しない属性: " (str/join ", " bad)
-                    "。属性は与えた一覧の中からのみ選ぶ。")}))))
-
 ;; ---------------------------------------------------------------- llm
 
 (defn resolve-model
@@ -227,27 +160,6 @@
                                              (get-in j [:usage :completion_tokens]))}
               :else {:ok false :why :no-content :detail (subs out 0 (min 400 (count out)))})))))))
 
-(defn extract-query
-  "モデル出力から EDN query を取り出す。```fence と散文を剥がす。"
-  [s]
-  (let [s (str/replace (or s "") #"(?s)<think>.*?</think>" "")
-        fenced (re-find #"(?s)```(?:clojure|edn|clj)?\s*(.+?)```" s)
-        body (str/trim (or (second fenced) s))
-        i (str/index-of body "[:find")]
-    (when i
-      (let [sub (subs body i)]
-        ;; 括弧の釣り合いで終端を見つける（後続の散文を落とす）
-        (loop [n 0 depth 0 seen false]
-          (if (>= n (count sub))
-            (when seen (str/trim sub))
-            (let [ch (nth sub n)
-                  d (cond (#{\[ \( \{} ch) (inc depth)
-                          (#{\] \) \}} ch) (dec depth)
-                          :else depth)]
-              (if (and (zero? d) (pos? depth))
-                (subs sub 0 (inc n))
-                (recur (inc n) d (or seen (pos? d)))))))))))
-
 (defn ask
   "1 回の chat completion。**エラー本文を捨てない**（5 問の 3）。
    transport の失敗は最大 2 回まで再試行する —— モデルの能力とは無関係な
@@ -263,75 +175,46 @@
 
 ;; ---------------------------------------------------------------- prompts
 
-(defn schema-block [attrs datasets]
-  (str "この面（DataScript / kotobase 方言）で使える属性は次で全部。**この一覧に無い属性を書かない。**\n"
-       (str/join "\n" (map #(str "  " (pr-str (first %)) "  — " (second %)) attrs))
-       "\n\nsource/dataset の値: " (str/join ", " (map pr-str datasets)) "\n"))
-
-(def few-shot
-  (str "記法の例（kotobase 方言 = Datomic-shaped EDN Datalog、属性は**裸文字列**でコロンを付けない）:\n\n"
-       "  問: market-intel の会社を LEI 付きで列挙\n"
-       "  [:find ?lei :where [?e \"source/dataset\" \"market-intel\"] [?e \"company/lei\" ?lei]]\n\n"
-       "  問: 2 つの dataset を LEI で join して法人名を出す\n"
-       "  [:find ?lei ?name :where [?a \"source/dataset\" \"market-intel\"] [?a \"company/lei\" ?lei]"
-       " [?b \"company/lei\" ?lei] [?b \"company/legal-name\" ?name]]\n\n"
-       "  問: 件数を数える\n"
-       "  [:find (count ?e) :where [?e \"source/dataset\" \"repo-taxonomy\"]]\n"))
-
-(def rules
-  (str "規則:\n"
-       "- 出力は EDN のクエリ 1 本だけ。説明・前置き・後置きを書かない。\n"
-       "- 属性は裸文字列（\"company/lei\"）。キーワード（:company/lei）にしない。\n"
-       "- 変数は ?name の形。\n"
-       "- :find と :where は必須。\n"))
-
-(defn user-msg [nl] (str "問い: " nl "\n\nこの問いに答えるクエリを 1 本書く。"))
+(defn ->schema
+  "questions.edn の `[[attr doc] ...]` を `kotobase.query.agent` の schema 値にする。"
+  [spec]
+  {:datasets (:datasets spec)
+   :attributes (mapv (fn [[a d]] (cond-> {:attr a} d (assoc :doc d))) (:attributes spec))})
 
 
 ;; ---------------------------------------------------------------- self-test
-;; validator と抽出器の**両方向**（通すべきものを通し、弾くべきものを弾く）。
-;; この harness が一度これを持たずに走り、正しいクエリを 18/20 で拒否したまま
-;; repair loop を回した。検査そのものを検査する場所がここ。
+;; ⚠ **これは validator の fixture ではない。** 通すべき/弾くべきの本体は
+;; `kotoba-lang/kotobase-query` の `test/kotobase/query/agent_test.cljc`
+;; （12 test / 32 assertion、`run-tests-pure.cljs` で依存ゼロで回る）に在る。
+;; ここが確かめるのは**配線だけ** —— classpath が通っていて、questions.edn の
+;; schema 変換が agent の期待する形になっていること。それが壊れると validator が
+;; 「何も検査せず妥当を返す」形に戻り、それは実際に一度起きた。
 
-(def ^:private allow-fixture
-  #{"source/dataset" "company/lei" "company/ticker" "company/revenue-usd" "repo/kind" "repo/path"})
-
-(def ^:private validator-cases
-  [;; [label query 期待する :error（nil = 通るべき）]
+(def ^:private wiring-cases
+  [["属性一覧が prompt に載る"
+    (fn [sc] (str/includes? (agent/system-prompt sc) "company/lei"))]
    ["値の文字列を属性と誤認しない"
-    '[:find ?t :where [?e "source/dataset" "market-intel"] [?e "company/ticker" ?t]] nil]
-   ["述語節を属性節と誤認しない"
-    '[:find ?t :where [?e "company/revenue-usd" ?r] [(>= ?r 1e11)] [?e "company/ticker" ?t]] nil]
-   ["複数 dataset の join も通る"
-    '[:find ?l :where [?a "source/dataset" "market-intel"] [?a "company/lei" ?l]
-                      [?b "source/dataset" "repo-taxonomy"] [?b "company/lei" ?l]] nil]
-   ["集約も通る" '[:find (count ?e) :where [?e "repo/kind" "actor"]] nil]
-   ["キーワード属性は弾く"
-    '[:find ?t :where [?e :company/ticker ?t]] :keyword-attributes]
+    (fn [sc] (nil? (agent/validate '[:find ?t :where [?e "source/dataset" "market-intel"]
+                                                     [?e "company/ticker" ?t]] sc)))]
    ["存在しない属性は弾く"
-    '[:find ?x :where [?e "company/nonexistent" ?x]] :unknown-attributes]
-   ["ベクタでないものは弾く" '{:find "x"} :not-a-vector]
-   [":find で始まらないものは弾く" '[:where [?e "repo/kind" ?k]] :missing-find]
-   [":where が無いものは弾く" '[:find ?e] :missing-where]
-   ["空の :find を弾く（DataScript が throw する形）" '[:find :where [?e "repo/kind" ?k]] :empty-find]])
+    (fn [sc] (= :unknown-attributes
+                (:error (agent/validate '[:find ?x :where [?e "company/nope" ?x]] sc))))]
+   ["述語のデータパターン化を弾く"
+    (fn [sc] (= :predicate-not-wrapped
+                (:error (agent/validate '[:find ?t :where [?e "company/ticker" ?t]
+                                                          [>= ?t 1]] sc))))]
+   ["クエリの無い応答は nil"
+    (fn [_] (nil? (agent/extract-query "分かりません。")))]])
 
-(defn self-test! []
-  (let [vres (for [[label q expected] validator-cases]
-               (let [got (:error (validate q allow-fixture))]
-                 {:label label :expected expected :got got :ok (= expected got)}))
-        eres (for [[label s expected] [["素" "[:find ?t :where [?e \"a/b\" ?t]]" true]
-                                       ["fence" "```clojure\n[:find ?t :where [?e \"a/b\" ?t]]\n```" true]
-                                       ["散文つき" "はい:\n[:find ?t :where [?e \"a/b\" ?t]]\n以上。" true]
-                                       ["think タグ" "<think>x</think>[:find ?t :where [?e \"a/b\" ?t]]" true]
-                                       ["クエリ無し" "分かりません。" false]]]
-                (let [got (some? (extract-query s))]
-                  {:label (str "extract/" label) :expected expected :got got :ok (= expected got)}))
-        all (concat vres eres)
-        bad (remove :ok all)]
-    (doseq [r all]
-      (println (str (if (:ok r) "ok   " "FAIL ") (:label r)
-                    "  expected=" (pr-str (:expected r)) " got=" (pr-str (:got r)))))
-    (println (str "\nself-test: " (- (count all) (count bad)) "/" (count all) " passed"))
+(defn self-test! [questions-path]
+  (let [sc (->schema (edn/read-string (.readFileSync fs questions-path "utf8")))
+        rs (for [[label f] wiring-cases]
+             (let [ok (try (boolean (f sc)) (catch :default e (println "  例外:" (.-message e)) false))]
+               {:label label :ok ok}))
+        bad (remove :ok rs)]
+    (doseq [r rs] (println (str (if (:ok r) "ok   " "FAIL ") (:label r))))
+    (println (str "\nwiring self-test: " (- (count rs) (count bad)) "/" (count rs) " passed"
+                  "\n（validator 本体の fixture は kotobase-query の run-tests-pure.cljs）"))
     (compat/exit (if (seq bad) 1 0))))
 
 ;; ---------------------------------------------------------------- main
@@ -341,7 +224,7 @@
 (defn -main [& argv]
   (let [{:keys [questions out limit offline max-repair plane-script self-test]} (parse-args argv)]
     (when plane-script (set! *plane-script* plane-script))
-    (when self-test (self-test!))
+    (when self-test (self-test! (or questions "scripts/query-dialect-bench/questions.edn")))
     (when-not questions
       (println "usage: bench.cljs --questions <file.edn> --out <file.edn> [--limit N] [--offline]")
       (compat/exit 2))
@@ -349,7 +232,7 @@
           attrs (:attributes spec)
           datasets (:datasets spec)
           qs (cond->> (:questions spec) limit (take limit))
-          attr-allow (set (map first attrs))]
+          sc (->schema spec)]
 
       ;; 5 問の 1: 入力が無いとき pass にしない
       (when (empty? qs)
@@ -391,25 +274,25 @@
               (println (str "[2/4] LLM: " (:endpoint llm) " model=" (:model llm)
                             " (alias-for " (:alias-for llm) ")"))
 
-              (let [sys-bare (str "あなたは kotobase 方言（Datomic-shaped EDN Datalog）でクエリを書く。\n" rules)
-                    sys-full (str sys-bare "\n" (schema-block attrs datasets) "\n" few-shot)
+              (let [sys-bare (agent/system-prompt sc {:schema? false :examples? false})
+                    sys-full (agent/system-prompt sc)
                     ;; bare 条件と schema 条件を両方走らせる
                     run-cond
                     (fn [label sys]
                       (println (str "  [" label "] " (count qs) " 問…"))
                       (mapv (fn [q]
                               (let [r (ask llm [{:role "system" :content sys}
-                                                {:role "user" :content (user-msg (:nl q))}])]
+                                                {:role "user" :content (agent/user-turn (:nl q))}])]
                                 (if-not (:ok r)
                                   {:id (:id q) :outcome :llm-error :why (:why r) :detail (:detail r)}
-                                  (let [txt (extract-query (:content r))]
+                                  (let [txt (agent/extract-query (:content r))]
                                     (if-not txt
                                       {:id (:id q) :outcome :no-query :raw (subs (:content r) 0 (min 300 (count (:content r))))}
                                       (let [parsed (try (edn/read-string txt) (catch :default e {::pe (.-message e)}))]
                                         (if (and (map? parsed) (::pe parsed))
                                           {:id (:id q) :outcome :unparseable :text txt :detail (::pe parsed)}
                                           {:id (:id q) :outcome :parsed :query parsed :text txt
-                                           :invalid (validate parsed attr-allow)})))))))
+                                           :invalid (agent/validate parsed sc)})))))))
                             qs))]
 
                 (let [bare (run-cond "bare" sys-bare)
@@ -432,19 +315,17 @@
                                                  err (or (:invalid item)
                                                          {:error (:outcome item) :hint "EDN として読めなかった。クエリ 1 本だけを出す。"})
                                                  r (ask llm [{:role "system" :content sys-full}
-                                                             {:role "user" :content (user-msg (:nl q))}
+                                                             {:role "user" :content (agent/user-turn (:nl q))}
                                                              {:role "assistant" :content (or (:text item) (:raw item) "")}
                                                              {:role "user"
-                                                              :content (str "そのクエリは実行前の構造検査で弾かれた。\n"
-                                                                            (pr-str err)
-                                                                            "\n直したクエリを 1 本だけ出す。")}])]
+                                                              :content (agent/repair-turn err)}])]
                                              (if-not (:ok r)
                                                (assoc item :outcome :llm-error :why (:why r) :detail (:detail r))
-                                               (let [txt (extract-query (:content r))
+                                               (let [txt (agent/extract-query (:content r))
                                                      parsed (when txt (try (edn/read-string txt) (catch :default _ nil)))]
                                                  (if (vector? parsed)
                                                    {:id (:id item) :outcome :parsed :query parsed :text txt
-                                                    :invalid (validate parsed attr-allow) :repaired (inc round)}
+                                                    :invalid (agent/validate parsed sc) :repaired (inc round)}
                                                    (assoc item :outcome :unparseable :repaired (inc round))))))))
                                        cur)
                                  (inc round))))))]

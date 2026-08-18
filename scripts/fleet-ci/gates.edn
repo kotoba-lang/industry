@@ -236,6 +236,21 @@
   ;; dependency the classpath names.
   {:name "io-ipld-car" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs"
    :ship-git-deps true :cd true}
+  ;; NOT a :jvm-test -> :nbb-test move: a new entry, and it runs a SUBSET
+  ;; entry (`run-tests-pure.cljs`) rather than the repo's whole suite.
+  ;; `kotobase.query.agent` -- the prompt/validate/repair path an LLM writes
+  ;; through, ADR-2608189300 -- depends on nothing, so condition 3 holds
+  ;; trivially: no classpath has to reach a sibling, no ship-git-deps, no npm.
+  ;; The whole suite still needs arrangement + kotobase + four transitive
+  ;; repos and stays where it is; this gates the half that can run anywhere.
+  ;;
+  ;; Condition 2 verified by hand 2026-08-18 before landing: emptying
+  ;; `comparison-ops` fails exactly the two predicate tests and nothing else
+  ;; (2 failures, 1 error), restoring it returns 12 tests / 32 assertions
+  ;; green. Those two fixtures are the queries that actually reached the
+  ;; engine in that measurement.
+  {:name "kotobase-query" :gate :nbb-test :classpath "src:test"
+   :entry "run-tests-pure.cljs" :cd true}
   {:name "kotobase-storage" :gate :jvm-test :cd true}
   {:name "kotobase-storage-pack" :gate :jvm-test :cd true}
   ;; OASIS XMILE 1.0. The suite this runs is 75 tests / 1765 assertions, of
