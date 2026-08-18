@@ -181,4 +181,115 @@ bulk backing store として使うなら、ここを CAS 経路から外す設�
 deploy は**最後に実行した人が勝つ**ので、その session が古い tree から deploy すると
 この 4 つは黙って戻る。deploy 前に `origin/main` を merge してから出したが、
 **逆向きは防げない**。
+
+
+---
+
+# 第 2 段（同日）: multipart / listing / rclone
+
+「まだ無い」と書いた 2 つを実装し、その過程で**クライアントを 1 つ増やしただけで
+2 つの欠陥が出た**。deploy version `2314f814`、main `141c34f`。
+
+## 5. multipart upload
+
+5 操作（Create / UploadPart / Complete / Abort / ListParts）はすべて**同じパスに
+対する method+query の形**なので、`object-request` 側が明示的に**除外**する必要が
+あった —— `uploadId` を持つ PUT を全体 PUT として扱うと、**100 MB のアップロードが
+最後の 8 MB として着地し、しかも保存したものに対する正しい ETag が付く**。この
+ケースには test がある。
+
+**part は blob、完成した object は part CID の manifest。** bytes をどこにも
+連結しない。読み出しは part 単位の `ReadableStream` で、Range は**重なる part だけ**を
+流す。Complete で連結する設計は 128 MB 上限の Worker に object 全体を載せることに
+なり、**天井が 8 MiB からもっと分かりにくい場所へ移るだけ**である。
+
+**part は 1 ドキュメント 1 part。** CLI は既定で 10 並列アップロードするので、
+1 ドキュメントを共有すると read-modify-write の競合になり、**負けた側が黙って
+落ちる** —— アップロードは完了し、object は組み上がり、途中が欠ける。
+
+Complete は client が送る part 一覧を**記録済みのものと突き合わせる**。
+アップロードしていない part を挙げたら `InvalidPart` —— 一覧を信じる実装は、
+ある呼び出し元が**他人の blob id から object を組み立てられる**ことを意味する。
+
+ETag は part の sha256 を連結した sha256 + `-N`（S3 の md5-of-md5s と同じ形）。
+`-N` は「これはファイルの digest ではない」と全 client に伝えるためにある。
+
+## 6. ListObjectsV2 が page になった（`kotoba-lang/kotobase-protocols` `c954227`）
+
+`max-keys` を尊重して 1000 で clamp、`IsTruncated`、`NextContinuationToken`、
+`delimiter` / `CommonPrefixes`、`LastModified`、`StorageClass`。
+
+**token は page 最後の key そのもの**で、そう明記した —— 不透明な token は
+「誰も掃除しない server 側カーソル」か「不透明を装った base64 の key」の
+どちらかになる。paging の判断は XML から切り離して data として test した
+（token が最後の key の**直後**から再開すること、tombstone が page 枠を
+消費しないこと —— さもないと満杯の page が短く見えて client が早期に止まる）。
+
+## 7. rclone が全操作で 401 だった —— 原因は edge
+
+**client を 1 つ増やしたら出た。** aws CLI は通り、rclone は通らない。
+live で 1 ヘッダずつ署名して二分した:
+
+```
+署名なし                    200
+accept-encoding: identity   401
+accept-encoding: gzip       401
+accept-encoding: gzip, br   200   ← Worker が実際に受け取る値
+x-test-sign: abc            200
+```
+
+**Cloudflare が Worker の手前で Accept-Encoding を書き換えている。** 受け取った値は
+client が送った値について**何の情報も持たない**ので、そこから署名を再計算しても
+偶然しか一致しない。rclone と Go SDK v2 はこのヘッダを署名し、botocore はしない ——
+**client の形をした失敗で、原因は server 側**。
+
+対処: 1 回目の検証が失敗し、かつ client が `accept-encoding` を SignedHeaders に
+挙げている場合に限り、**実 client が送る値の有限な列挙**に対して再検証する。
+どの候補も**同じ secret に対する完全な検証**なので、鍵を持たない者はどれも
+通せない（これも test にした。path を改竄した要求がこの経路で通らないことも）。
+sigv4 ライブラリではなく Worker に置いた —— **ライブラリは仕様の正しい実装で、
+これはうちの edge の事実**だから。
+
+## 8. `last-modified` が ISO8601 だった（HTTP は HTTP-date）
+
+rclone の `copy` が
+
+```
+parsing time \"2026-08-18T09:51:33.156Z\" as \"Monday, 02-Jan-06 15:04:05 MST\"
+```
+
+を吐いて**ファイルを書かずに終了**した。S3 が XML に入れる形式を HTTP ヘッダに
+入れていた。**aws CLI はこのヘッダを見ないので、2 つ目の client が来るまで
+全 test を通過していた。**
+
+## Verification（第 2 段）
+
+単体 167 tests / 980 assertions、0 failures。負の対照は 2 回取った ——
+`object-request` の multipart 除外と `parts-for-range` を壊して**対応する 2 test
+だけ**が落ちること、`accept-encoding` 再検証を殺して**その 1 test だけ**が落ちること。
+
+live:
+
+| 操作 | 前 | 後 |
+|---|---|---|
+| `aws s3 cp` 10 MiB | MethodNotAllowed | **成功（2 part）、download の sha256 一致** |
+| HEAD の ETag | — | `…-2`（part 数つき） |
+| **part 境界をまたぐ Range**（8388600-8388615） | — | **206 / 16 バイト、元ファイルと一致** |
+| `--max-keys 3`（49 key の bucket） | 49 件 | **3 件、IsTruncated true、token あり** |
+| page 2 | — | **page 1 の直後から。重複なし** |
+| `rclone ls` | 401 | **成功** |
+| `rclone copy` 10 MiB | 401 | **byte 一致** |
+
+## まだ無い（第 2 段の後）
+
+- **ListBuckets** —— `InvalidRequest`。空一覧は「bucket が無い」という嘘なので返さない。
+- **条件付き要求**（`If-None-Match` → 304 / `If-Match` → 412）。
+- **DeleteObjects**（batch）、CopyObject。
+- **`kotobase.protocols.s3` の `object-headers` にも同じ ISO8601 の欠陥が残っている。**
+  この deployment では object の GET/HEAD を Worker が答えるので live には出ないが、
+  ライブラリを直接使う経路では出る。
+- **bucket ごとの head CAS**（第 1 段と同じ）。multipart はこれを増やす方向に働く ——
+  part ごとに 1 CAS なので、10 並列アップロードは 10 者が同じ head を争う。実測では
+  10 MiB / 2 part で問題は出ていないが、**大きなファイルの並列アップロードは
+  ここで詰まる**。直すなら part の記録を CAS 経路から外す設計が要る。
 "}]

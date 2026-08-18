@@ -161,11 +161,32 @@ detector, and that a detector for `a live endpoint that a config claims is
 configured` does not exist yet. Writing one is follow-up work, not a claim of this
 ADR.
 
-## Follow-ups (named, not done)
+## Follow-ups
 
-- A probe that asks each declared gateway URL whether it answers, and reports
-  `unanswered` distinctly from `answered badly` -- the evidence-floor idiom from
-  ADR-2608136000. Must be discriminated in both directions before landing.
+**Done since this ADR was written (same day):**
+
+- The probe landed as `scripts/verify-endpoint-health.cljs` +
+  `manifest/endpoint-health.edn`, discriminated in seven directions.
+  **It is not the probe this section originally described.** Two derived
+  detectors were built first and thrown away after measuring them:
+  probing every declared upstream origin (118 of 164 dead, but chat's declared
+  upstream was ALIVE and images had no declared upstream at all -- catches
+  neither outage), and flagging env vars a worker reads but its config never
+  declares (25 hits in one repo, 24 deliberate, and the one that mattered was
+  itself deliberate for its first nine days). What works is the un-clever
+  version: call our own endpoints and check the promise. Both outages were
+  visible from outside in one request.
+- It became resident on gad under a systemd timer
+  (`scripts/endpoint-health-resident.cljs`), `:slot/anonymous`, using
+  `kotoba-lang/uptime` for the availability statement rather than a second
+  implementation. A tick that cannot measure writes NO observations, so
+  `uptime` reports that window `:unobserved` rather than filling it with
+  `:inconclusive` rows that would look monitored.
+- The statement is mirrored into `network-awai/cloud-itonami` as
+  `docs/endpoint-health-receipt.edn`, carrying `:measured-at` and `:pulled-at`
+  separately, and cloud-itonami's QA objective now names it.
+
+**Still open:**
 - Chat latency: one slot on Qwen3.8-27B gives ~41s. Either more slots, a smaller
   model for companion chat, or a streamed response.
 - The 976 remaining undrained characters: `tools/scene-drain.cljs` is resumable and
@@ -173,7 +194,13 @@ ADR.
 - `/signup` returns 404 on shinshi.club -- it is in `routes/segments` but not in
   `root-pages`. A conversion funnel answering 404 is its own finding, unrelated to
   these two, and is not fixed here.
-- The club-shinshi bot workforce runs on `murakumo-main` and cannot complete a
-  tool-calling turn (21 `provider/invalid-tool-arguments`, 21 `internal-error`
-  across the fleet's 74 bots). Until that is addressed the workforce is not a
-  detector for anything."}]
+- The bot workforce's inability to complete a resident turn was diagnosed and
+  fixed the same day -- see ADR-2608180200. It was not a model-quality problem:
+  resident ticks cap output at 1024 tokens and a reasoning model spent the whole
+  cap thinking. That ADR also records the authority change that lets a corrected
+  registry reach running Bots without a browser.
+- The receipt mirror is refreshed by hand
+  (`nbb scripts/endpoint-health-pull.cljs`). Nothing schedules it. Bots only run
+  while the workspace machine is live, so the window this misses is small, but a
+  reader who ignores `:mirror-age-minutes` will still mistake a stale mirror for
+  a quiet fleet."}]

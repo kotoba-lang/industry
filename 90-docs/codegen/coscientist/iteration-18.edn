@@ -1,0 +1,149 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-18"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-18.edn"
+  :doc/date "2026-08-18"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "the amu pin bump iterations 16 and 17 were building toward"
+  :coscientist/iteration 18
+  :coscientist/subject "kotoba-lang/amu deps.edn kotoba-native pin, kotoba-mir ADR 0012"
+  :coscientist/action "bump amu onto the call-clobber pin and run the whole suite, not the benchmark fixtures"
+  :coscientist/measured "amu on kotoba-native d4b050a: 1094 tests, 0 failures. On 4f6742e (kotoba-mir 7f7c556): 1096 tests, 62 failures, 60 of them string search split 30 aarch64 / 30 x86-64. (defn main [] (if (string-contains? \"abcdef\" \"def\") 1 0)) returns 0. Correct on that pin: call + if with 10 values live across, two calls with the first result live across the second, a call result as branch condition, kernel_call_branch, kernel_call_deep_branch. A back-edge? predicate routing call-containing functions with a backward jump to all-vreg takes 62 failures to 61."
+  :coscientist/refuted "that iterations 16 and 17 validated this pin. They executed oracles, broke and unbroke the change, and used perfgate -- against the four kernel_call fixtures, none of which contains a loop. A corpus built in iteration 8 to measure cost was reused as correctness evidence. Also my own first diagnosis: I wrote the back edge into the ADR as the cause before the experiment that showed it fixes one failure out of 62."
+  :coscientist/carries-forward "iteration-08: an oracle is the only check on a duration; iteration-15: the reference is the oracle for a comparison, and landed is not shipping; iteration-16: the decision and its size effect stand; iteration-17: the timing is real; do not overwrite 04-17"
+
+  :doc/body
+  "# Codegen co-scientist, iteration 18
+
+Iteration 16 landed call-clobber in the linear scanner and closed with a
+condition: *do not bump amu's native pin without a timed win.* Iteration 17
+supplied the timed win on quiet judah — the branched 24-live caller came out
+**faster** than its straight-line twin, `perfgate` qualified it, 0.926.
+
+So the next step was the pin bump. This iteration is that bump, and it does
+not land.
+
+## What the bump found
+
+amu's suite, at the pin iterations 16 and 17 validated:
+
+| kotoba-native | kotoba-mir | amu |
+|---|---|---|
+| `d4b050a` | `8872a54` | 1094 tests, **0 failures** |
+| `4f6742e` | `7f7c556` | 1096 tests, **62 failures** |
+
+Sixty of them are string search, split **30 AArch64 / 30 x86-64**. An even
+split across two independent encoders is the signature iteration 4 identified
+for a fault in the shared allocator.
+
+```
+(defn main [] (if (string-contains? \"abcdef\" \"def\") 1 0))    ; => 0
+```
+
+`string-replace-all` returns wrong content and wrong byte lengths. One
+multi-byte case traps. Cases expecting *absent* largely still pass, so the
+search loop fails to **find** rather than failing outright.
+
+## Why four iterations of careful work did not see it
+
+Not for want of executing. Iteration 16 ran the oracle. It broke and unbroke
+the change on frame policy, slots and instruction count. It corrected an
+oracle value the conversation had been quoting wrongly. Iteration 17 warmed
+the frequency, discarded twelve rotations, and let `perfgate` decide. Every
+practice this loop has accumulated was applied.
+
+**The fixtures were the four `kernel_call*` programs, and not one of them
+contains a loop.**
+
+Those fixtures were built in iteration 8 to measure the *cost* of the
+all-vreg path. They were then reused as the *correctness* evidence for a
+change to the allocator. A corpus assembled to measure speed covers the
+shapes someone chose for timing, which are straight-line and branchy because
+those are easy to time — not the shapes where new allocation logic is
+dangerous, which is where a value's live range does not follow the text.
+
+I confirmed the boundary rather than assuming it. Correct on this pin: a call
+with ten values live across it read in a branch arm; two calls with the first
+result live across the second; a call result used directly as a branch
+condition; `kernel_call_branch`; `kernel_call_deep_branch`. Wrong: anything
+with a loop.
+
+**Iteration 8's rule was \"an oracle is the only check on a duration.\"
+Iteration 15 raised it to \"the reference is the oracle for a comparison.\"
+This is the third form: an oracle checks the input you give it, and a fixture
+set inherited from a benchmark answers questions about benchmark shapes.**
+
+## Partial cause, and a fix that is not one
+
+`last-uses` records, for each vreg, the highest instruction *index* at which
+it appears as a source. It reads no label, no branch target, no jump. That is
+sound exactly while the scanner sees straight-line functions, where textual
+order is execution order. ADR 0012 routed control flow to it, and a back edge
+re-reads a value after its interval has ended and its register has been given
+away.
+
+The ADR carried `:claims {:cfg-liveness false}` from the day it landed. **The
+limitation was declared, and the decision to route control flow through it
+anyway is what turned a declared limitation into wrong code.**
+
+`back-edge?` now sends call-containing functions with a backward `:mir/jump`
+or `:mir/branch-zero` to all-vreg. Measured, not assumed:
+
+> **62 failures become 61.**
+
+It fixes `let-composes-with-recursion-within-the-fuel-budget`. It does not
+touch string search at all — so whatever loop `string-contains?` lowers to is
+not a backward jump this predicate sees, and the rest of the fault is not
+located.
+
+I had written the back edge into the ADR as *the* cause before running that
+experiment. The experiment refuted my own write-up, and the ADR now says
+\"necessary and not sufficient\" with both numbers.
+
+## Where things stand
+
+- **kotoba-mir** ADR 0012 is `:accepted-defective`, with the reproducer, the
+  30/30 split, the shapes that are correct, and the partial fix recorded in
+  both the datom and the prose.
+- **kotoba-native** keeps the pin — reverting it broke another session's
+  legitimate test and protected nothing, since amu's pin is the real gate —
+  and carries the warning beside it. Its suite is green, which is worth
+  exactly nothing here: it inspects encodings and frame policy and never runs
+  a compiled program.
+- **amu** stays on `d4b050a` and gains two executing tests for the call path,
+  landed now so they are in place before the pin moves.
+- The decision in ADR 0012 is **not** withdrawn. Its size effect is real
+  (`kernel_call_deep_branch` 1344 → 672 B, straight-line twins byte-identical)
+  and iteration 17's timing is real. The implementation is what is not ready.
+
+## Meta-review
+
+- **A benchmark corpus is not a conformance corpus.** Reusing one as the
+  other silently scopes correctness evidence to whatever shapes were
+  convenient to time.
+- **Green is not evidence when the suite cannot execute.** kotoba-mir (42
+  tests) and kotoba-native (168) both pass at the defective pin. No result
+  either can produce distinguishes it from a correct implementation. This is
+  ADR-2608136000's third form, and it now has a second instance in the same
+  compiler.
+- **A declared limitation is not a discharged one.** `:cfg-liveness false`
+  was written down, reviewed, and shipped as the thing that makes the feature
+  wrong.
+- **The distance between \"landed\" and \"shipping\" is where this keeps
+  happening.** Iteration 15 found five iterations of codegen that amu never
+  received. This one found that the pin was held back for a performance
+  reason, and the correctness reason was discovered only because someone
+  finally tried to move it.
+- **My own first diagnosis was wrong and my own experiment caught it.** Worth
+  recording next to the finding, not below it.
+
+## Next
+
+Locate the remaining fault: find what `string-contains?` and
+`string-replace-all` lower to, and why `back-edge?` does not see their loop.
+The reproducer is one line, both ISAs show it, and the boundary between
+correct and wrong shapes is mapped.
+
+Do not advance amu's native pin until `(if (string-contains? \"abcdef\" \"def\")
+1 0)` returns 1. Do not treat the `kernel_call*` fixtures as correctness
+evidence for allocator changes. Do not overwrite iterations 04-17."}]
