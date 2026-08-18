@@ -609,9 +609,31 @@
   ;; :nbb-test（classpath はノードへ送った repo tree の中だけ）では sibling repo の
   ;; ソースに届かない。deps.edn 経由ならノードの egress で解決される
   ;; （2026-08-05 に到達可能な 10 ノード全部で repo1.maven.org / github.com が 200）。
-  ;; ongaku と sakkyokuka は nbb でも走るが、両ランタイムを CI で二重に回すのは
-  ;; まだ要らない（両方 green であることは landing 時に手で確かめている）。
-  {:name "ongaku" :gate :jvm-test :cd true}
+  ;; ongaku は 2026-08-18 に :nbb-test へ移した。sakkyokuka と isco-2652 は
+  ;; :jvm-test のまま — 上の理由（ongaku を git dep で引く）がそのまま効く。
+  ;;
+  ;; 移せた理由を書いておく。移せなかった 17 本と分けたのは1つの性質だけで、
+  ;; それは runner の有無ではない。2026-08-18 の実測: 86 本の :jvm-test のうち
+  ;; 18 本は対象 repo が「完全な ClojureScript runner を持つ」ところまで来ていた
+  ;; （verify-cljs-runner-completeness）。そのうち
+  ;;   14 本を条件3が弾いた — sibling repo を要求し、:nbb-test の classpath は
+  ;;      配られた tree の中だけなので届かない
+  ;;    3 本を条件1が弾いた — repo が .clj のテストも持っており、JVM の件数の方が
+  ;;      多い。org-ietf-deflate は JVM 34/488 に対し nbb 23/202、org-ietf-zstd は
+  ;;      28/251 に対し 20/173。cljs runner は「可搬なテストを全部回している」と
+  ;;      いう意味で完全で、それでも flip すれば .clj のテストは誰も回さなくなる。
+  ;; 残った 1 本が ongaku で、.clj のテストを持たず（0 本）、両ランタイムで
+  ;; 30 tests / 111 assertions が一致し、自分の tree だけで走る。
+  ;;
+  ;; **「完全な cljs runner を持つ」は「flip して安全」ではない。** 条件1 がその
+  ;; 差を見ているので、条件4 だけを見て候補を選ばないこと。
+  ;;
+  ;; 実測（2026-08-18、いずれも ongaku の checkout で）:
+  ;;   clojure -M:test              Ran 30 tests containing 111 assertions, 0 failures
+  ;;   nbb … test/run_portable.cljs Ran 30 tests containing 111 assertions, 0 failures
+  ;;   territory-covers? の every? を some に変えると 2 failures / exit 1、
+  ;;   無改変で exit 0。
+  {:name "ongaku" :gate :nbb-test :classpath "src:test" :entry "test/run_portable.cljs" :cd true}
   {:name "sakkyokuka" :gate :jvm-test :cd true}
   {:name "cloud-itonami-isco-2652" :gate :jvm-test :cd true}
 
