@@ -23,7 +23,13 @@
 
   `atproto.kotobase.net/xrpc/com.atproto.repo.describeRepo` を probe にする。
   atproto は `core/public-read-surfaces` なので credential 無しで shared graph の
-  full hydrate が走る。**これが測定を可能にした条件そのもの**である —— sparql /
+  full hydrate が走る。**この probe は HTTP 501 MethodNotImplemented を返すが、
+  それが期待される挙動である** —— hydrate は nsid dispatch の *前* に router で走るので、
+  request は full hydrate を実行してから method を断る。credential 不要の hydrate probe
+  として機能するのはまさにそのためである。実測 2026-08-18、**同一 connection** で
+  （curl --next。別 connection は別 isolate に落ちるので `sampled false` は何の証拠にも
+  ならない）: probe 501 / 3.9 秒 → `/_diag/hydrate` が sampled true, block_gets 84,
+  bytes 11462579, unfolded_txs 63。**これが測定を可能にした条件そのもの**である —— sparql /
   cypher は自己発行 CACAO に 401 を返し operator CACAO を要求し、
   `KOTOBASE_MAINTENANCE_OPERATOR_DIDS` は owner-blocked なので、そちらで測ろうと
   すれば『本番の operator 権限を自分に付与する』ことになる。それは測定の判断では

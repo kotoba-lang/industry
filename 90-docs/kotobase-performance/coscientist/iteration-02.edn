@@ -31,6 +31,7 @@
    CACAO, and `KOTOBASE_MAINTENANCE_OPERATOR_DIDS` is owner-blocked. Measuring
    through them would have meant granting myself operator access to production,
    which is not a measurement decision."
+  :returns-501 "The probe returns HTTP 501 MethodNotImplemented (`unsupported nsid: com.atproto.repo.describeRepo`) and that is EXPECTED: the shared-graph hydrate runs in the router BEFORE nsid dispatch, so the request performs the full hydrate and then declines the method. That is exactly why it works as a credential-free hydrate probe. Verified 2026-08-18 on ONE connection (curl --next, so the diagnostic lands on the same isolate): probe 501 in 3.9 s, then GET /_diag/hydrate reporting sampled true, block_gets 84, bytes 11462579, unfolded_txs 63. Separate connections land on different isolates and report sampled false, which is not evidence of anything."
   :method "wrangler tail --format json, each request carrying a ?probe=<uuid>
            marker so events match requests rather than being assumed to."
   :against "the deployed worker, which now carries the read-path hoist and the
