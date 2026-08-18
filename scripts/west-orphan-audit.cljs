@@ -108,6 +108,17 @@
     (into {} (for [[_ rev p] (re-seq #"(?m)^\s+revision:\s+(\S+)\n\s+path:\s+(\S+)" text)]
                [rev p]))))
 
+(defn west-path->rev
+  "west.yml の path → revision map（`west-rev->path` の逆）。
+
+  ある消費者 deps.edn が **宣言どおりの木に居るか** を判定するのに要る。
+  local HEAD がこの revision と違えば、その checkout は pin より前後しており、
+  そこで読んだ deps.edn の内容は **宣言の現在地ではない**。"
+  []
+  (let [text (or (read-text (node-path.join root "manifest/west.yml")) "")]
+    (into {} (for [[_ rev pa] (re-seq #"(?m)^\s+revision:\s+(\S+)\n\s+path:\s+(\S+)" text)]
+               [pa rev]))))
+
 (defn git-head [rel]
   (let [{:keys [exit out]} (sh "git" "-C" (node-path.join root rel) "rev-parse" "HEAD")]
     (when (zero? exit) (not-empty (str/trim out)))))
@@ -435,12 +446,57 @@
      acc
      (array-seq (.readdirSync node-fs dir #js {:withFileTypes true})))))
 
+;; ── 消費者がどの木に居るか（2026-08-18 追加）─────────────────────────────────
+;; この検査器は **disk の作業ツリー** を歩く。したがって壊れた辺を見つけても、
+;; それが「宣言の欠陥」なのか「その checkout が古いだけ」なのかは、辺だけを見て
+;; いる限り区別できない —— 両者は同じ顔で出る。
+;;
+;; 実測 2026-08-18: BLOCKING と報告された 5 target を 1 件ずつ upstream の main に
+;; 当てたところ、**5 件とも既に解消済み**だった:
+;;
+;;   computer-use-clj   消費者は etzhayyim/root の 461 commit 遅れ checkout 内。
+;;                      main ではその 60-apps/etzhayyim-project-explorer/ 自体が削除済み
+;;   ai-gftd-apex /     消費者は net-babiniku の 20 commit 遅れ checkout 内。
+;;   cloud-murakumo /   main の deps.edn には旧 path が 1 つも無い
+;;   network-isekai
+;;   aozora-engine      消費者は aozora-appview という **west 未登録の改名残骸 dir**。
+;;                      後継 app-aozora-appview の main は既に app-aozora-engine を指す
+;;
+;; 4 repo の west pin はいずれも main と完全一致（`main +0`）だった。つまり
+;; **宣言は正しく、古いのは実体の方**である。それを BLOCKING と呼ぶと、直す先が
+;; 無い 5 件を追いかけることになる（実際に追いかけた）。
+;;
+;; そこで消費者ごとに、その deps.edn が載っている project を 3 つに分ける:
+;;
+;;   :live             west 登録済みで、HEAD が宣言 pin と一致 → 辺は本物
+;;   :stale-tree       west 登録済みだが HEAD ≠ pin → **判定できない**（pin の木を
+;;                     読んでいないので、そこで直っているかどうか分からない）
+;;   :unregistered-tree 未登録 dir（改名残骸・scratch）→ 宣言の話ではない
+;;
+;; **:stale-tree を clean 側に畳まない。** 「見たが問題なかった」と「見られなかった」
+;; が同じ値を返すのが、この workspace が繰り返し踏んできた形である（ADR-2608136000）。
+;; 専用の exit code 2 を返す。
+
+(defn- consumer-tree-class
+  "消費者 deps.edn（root からの相対 path）が載っている木の素性。"
+  [west path->rev consumer-rel]
+  (let [proj (project-of-abs (node-path.dirname (node-path.resolve root consumer-rel)))]
+    (cond
+      (not (contains? west proj)) :unregistered-tree
+      :else
+      (let [rev (get path->rev proj)
+            head (git-head proj)]
+        (if (and rev head (not= rev head)) :stale-tree :live)))))
+
 (defn scan-relative-paths
   "deps.edn の :paths / :extra-paths に書かれた `../` 相対 path のうち、
   実体が無い or west 未登録の project を指すものを列挙する。
 
-  同じ repo 内を指すものは対象外（それは fresh clone でも解決する）。"
-  [west]
+  同じ repo 内を指すものは対象外（それは fresh clone でも解決する）。
+
+  各 hit には消費者の木の素性（`consumer-tree-class`）を付ける。辺だけでは
+  「宣言の欠陥」と「その checkout が古いだけ」を区別できないため。"
+  [west path->rev]
   (let [files (deps-files-recursive (node-path.join root "orgs") [])
         hits (atom [])]
     (doseq [f files
@@ -456,18 +512,27 @@
               (let [dir-exists? (exists? abs)
                     in-west? (contains? west proj)]
                 (when (or (not dir-exists?) (not in-west?))
-                  (swap! hits conj
-                         {:consumer (node-path.relative root f)
-                          :path rel
-                          :project proj
-                          :dir-exists? dir-exists?
-                          :in-west? in-west?}))))))))
+                  (let [crel (node-path.relative root f)]
+                    (swap! hits conj
+                           {:consumer crel
+                            :consumer-class (consumer-tree-class west path->rev crel)
+                            :path rel
+                            :project proj
+                            :dir-exists? dir-exists?
+                            :in-west? in-west?})))))))))
     (->> @hits
          (group-by :project)
          (map (fn [[proj rows]]
-                (assoc (first rows)
-                       :consumers (vec (distinct (map :consumer rows)))
-                       :consumer-count (count (distinct (map :consumer rows))))))
+                (let [classes (set (map :consumer-class rows))]
+                  (assoc (first rows)
+                         :consumers (vec (distinct (map (fn [r] (str (:consumer r)
+                                                                     "  [" (name (:consumer-class r)) "]"))
+                                                        rows)))
+                         :consumer-count (count (distinct (map :consumer rows)))
+                         ;; 1 つでも live な消費者が居れば辺は本物。
+                         :class (cond (contains? classes :live) :live
+                                      (contains? classes :stale-tree) :stale-tree
+                                      :else :unregistered-tree)))))
          (sort-by :project)
          vec)))
 
@@ -497,20 +562,39 @@
     (println (str "  true-orphan-git: " (count (:true-orphan-git unregistered))))
     (println (str "  true-orphan-nongit: " (count (:true-orphan-nongit unregistered))))
     (println (str "  local-root-broken (blocking): " (count local-root-broken)))
-    (println (str "  relative-paths-broken (blocking): "
-                  (count (:relative-paths-broken report))))
-    (when-let [pb (seq (:relative-paths-broken report))]
-      (println)
-      (println "## BLOCKING: :paths \"../…\" → missing or not-in-west")
-      (println "   (:local/root scan sees neither of these: not :local/root, and")
-      (println "    often a NESTED deps.edn. 0 above meant not-looked-at, not absent.)")
-      (doseq [row pb]
-        (println (str "  " (:project row)
-                      "  dir=" (:dir-exists? row)
-                      " west=" (:in-west? row)
-                      " consumers=" (:consumer-count row)))
-        (doseq [c (if (:all? opts) (:consumers row) (take 2 (:consumers row)))]
-          (println (str "    - " c)))))
+    (let [pb (:relative-paths-broken report)
+          by (group-by :class pb)
+          live (:live by) stale (:stale-tree by) leftover (:unregistered-tree by)
+          show (fn [title note rows]
+                 (when (seq rows)
+                   (println)
+                   (println title)
+                   (when note (println note))
+                   (doseq [row rows]
+                     (println (str "  " (:project row)
+                                   "  dir=" (:dir-exists? row)
+                                   " west=" (:in-west? row)
+                                   " consumers=" (:consumer-count row)))
+                     (doseq [c (if (:all? opts) (:consumers row) (take 2 (:consumers row)))]
+                       (println (str "    - " c))))))]
+      (println (str "  relative-paths-broken (blocking): " (count live)))
+      (println (str "  relative-paths-UNJUDGED (消費者の checkout が pin と不一致): "
+                    (count stale)))
+      (println (str "  relative-paths-in-leftover (未登録 dir 内。宣言の話ではない): "
+                    (count leftover)))
+      (show "## BLOCKING: :paths \"../…\" → missing or not-in-west"
+            (str "   (:local/root scan sees neither of these: not :local/root, and\n"
+                 "    often a NESTED deps.edn. 0 above meant not-looked-at, not absent.)")
+            live)
+      (show "## UNJUDGED: 消費者が宣言 pin と違う checkout に居る"
+            (str "   その木で読んだ deps.edn は宣言の現在地ではない。pin の木で\n"
+                 "   既に直っている可能性がある —— clean ではなく『判定できなかった』。\n"
+                 "   直し方: west update --fetch smart <name>（dirty なら先に着地）")
+            stale)
+      (show "## LEFTOVER: 消費者が west 未登録の dir に居る"
+            (str "   改名残骸 / scratch の中の deps.edn。宣言の欠陥ではないので\n"
+                 "   登録し直さない（:west-orphan の :never）。")
+            leftover))
     (when (seq local-root-broken)
       (println)
       (println "## BLOCKING: :local/root → missing or not-in-west")
@@ -572,7 +656,9 @@
         unreg (-> (classify-unregistered local west overrides (west-rev->path))
                   (reclassify-renamed west))
         broken (scan-local-root-deps west)
-        paths-broken (scan-relative-paths west)
+        paths-broken (scan-relative-paths west (west-path->rev))
+        live-paths-broken (filterv #(= :live (:class %)) paths-broken)
+        unjudged-paths (filterv #(= :stale-tree (:class %)) paths-broken)
         report {:counts {:local (count local)
                          :west (count west)
                          :unregistered (+ (count (:registered-elsewhere unreg))
@@ -585,11 +671,16 @@
                 :unregistered unreg
                 :local-root-broken broken
                 :relative-paths-broken paths-broken
-                :blocking-count (+ (count broken) (count paths-broken))}]
+                :blocking-count (+ (count broken) (count live-paths-broken))
+                :unjudged-count (count unjudged-paths)}]
     (if (:edn? opts)
       (println (pr-str report))
       (print-human report opts))
     ;; process.exit を先に呼ばないと nbb が常に 0 で落ちることがある
-    (.exit js/process (if (pos? (+ (count broken) (count paths-broken))) 1 0))))
+    ;; 0 / 1 / 2 を分ける。2 は「答えられなかった」専用（ADR-2608136000）——
+    ;; 判定できなかった辺を clean と同じ 0 で返さない。
+    (.exit js/process (cond (pos? (+ (count broken) (count live-paths-broken))) 1
+                            (pos? (count unjudged-paths)) 2
+                            :else 0))))
 
 (apply -main *command-line-args*)

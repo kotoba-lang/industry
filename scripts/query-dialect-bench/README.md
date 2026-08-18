@@ -117,6 +117,35 @@ repo-taxonomy  manifest/repo-taxonomy.edn                    repo 3 面分類   
 **教訓は「validator を書いたら validator を検査する」**であって、注意深く書けという
 ことではない。1 つ目は注意深く書いても起きるし、2 つ目は 1 つ目の修正が生んだ。
 
+### 高い段の結果を、安い段の失敗で捨てない
+
+修正版を回したら、**stage 4（実行）で 1 本のクエリが DataScript に拒否され、
+batch 全体が落ちて 90 分ぶんの推論結果が消えた。** harness は正しく exit 2 で
+refuse したが、refuse する前に**捨ててはいけないものを捨てていた**。
+
+この harness の段は費用が桁で違う:
+
+| 段 | 費用（実測、load 20〜280） |
+|---|---|
+| 推論（40 call） | **60〜90 分** |
+| 面のロード | 38 秒 |
+| クエリ実行 | ミリ秒 |
+
+**安い段の失敗が高い段の成果を消す構造にしない。** 直したのは 3 点:
+
+1. **実行の前に生成クエリを `<out>.generated.edn` へ書き出す。** 実行段が何をしても
+   推論結果は残る。
+2. **`q*` は 1 本ずつ try/catch する。** 失敗したものは `{:query-error "…"}` という
+   **印**を返す —— 空の結果集合で返すと「0 件だった」と区別できない。
+   grade も `:query-error` を `:wrong-answer` と別立てにする（エンジンが拒否した
+   ことは「違う答え」ではない）。
+3. **`:empty-find` を validator で捕まえる。** `[:find :where …]` は構造としては
+   ベクタで `:find` 始まりで `:where` もあるので前の版を通り抜け、DataScript が
+   `Cannot parse :find` で throw していた。実行前に弾く。
+
+これも 5 問の 2（実行できないとき何を返すか）だが、**答えるのは harness 全体では
+なく個々の item** である、という粒度の話。全体で refuse するだけでは粗すぎた。
+
 ## 「検査を書く前・緑を信じる前の 5 問」への回答（CLAUDE.md / ADR-2608136000）
 
 1. **入力が無いとき** — `questions.edn` が空なら exit 2。pass にしない。
@@ -124,9 +153,11 @@ repo-taxonomy  manifest/repo-taxonomy.edn                    repo 3 面分類   
    すべて **exit 2**（0 でも 1 でもない = 「答えられなかった」専用）。
 3. **エラー本文を捨てない** — LLM の HTTP エラーは status ではなく本文を記録する。
 4. **飛ばしたと落ちたを区別する** — `:pass` / `:wrong-answer` / `:invalid` /
-   `:malformed` / `:skipped-truncated` / `:skipped-llm-error` を別の値にする。
+   `:malformed` / `:query-error` / `:skipped-truncated` / `:skipped-llm-error` を
+   別の値にする。とくに `:query-error`（エンジンが拒否）と `:wrong-answer`
+   （実行できて答えが違う）を混ぜない。
 5. **両方向を出したか** — reference query 自身を同じ比較器に通す。加えて
-   `--self-test` が validator 9 件（通すべき 4・弾くべき 5）と抽出器 5 件を検査する。
+   `--self-test` が validator 10 件（通すべき 4・弾くべき 6）と抽出器 5 件を検査する。
    **通すべきものが通ることを見ない検査は、上の 1 つ目の壊れ方を見逃す。**
 
 ## これが測っていないもの
