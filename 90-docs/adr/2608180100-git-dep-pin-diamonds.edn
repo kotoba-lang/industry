@@ -98,6 +98,58 @@ namespace ごとに first-wins になるので、**片方の library の API と
   供給する設計なので repo 単体では入れられず、`Cannot find module
   '@noble/hashes/sha2.js'` で死んでいた。**gate は consumer を持たない。**
 
+## 掃引を止めていたのは順序ではなく、1 週間開いていたバグだった（2026-08-18 追記）
+
+上の「深い graph は協調した掃引」は正しいが、**それだけでは止まっていた理由の説明に
+ならなかった**。実際に反復を回すと、律速はこれだった:
+
+**`kotobase-projection` を collapsed 依存に載せると 5 errors で落ちる。**
+全部 `ipld: Data Model map keys must be strings`。順序を工夫しても迂回できない ——
+**新しい io-ipld に載ること自体が条件**だったからである。
+
+同じ 5 件は **ADR-2608110600 が 2026-08-11 に記録済み**で、『prolly-tree bump が
+持ち込んだ、これは別件』として脇に置かれていた。**その「別件」が、1 週間後に
+pin collapse 全体のブロッカーになっていた。**
+
+### 原因と、拒否が正しい理由
+
+`publication/atomic-publication-plan` が、キーワードキーの domain map
+（`:epoch` `:rows`）を IPLD ノードにそのまま埋めていた。旧 io-ipld は
+**encoder がキーワードを文字列化する**ので通り、現行は **validate してから拒否**する。
+
+**拒否が正しい。** 実測（旧 io-ipld e08dc3b2 に対して）、キーワードキーの map と
+文字列キーの map が **同一の CID**（bafyreifh6mf4h3va26p46no3owk4kj6khe56xgad3kaf4qi25ymqovqodm）
+に符号化された。**異なる 2 つの値が同じ content address を持っていた。**
+content addressing で最も起きてはいけないことなので、緩めるのではなく呼び出し側を直す。
+
+そして同じ実測が **修正がバイト中立**であることも示す —— 既発行 block の CID は
+1 つも変わらない。変わるのは encoder に何を渡してよいか、だけ。
+
+### 直した結果
+
+| repo | before | after |
+|---|---|---|
+| `kotobase-projection` | collapsed 依存で 48/**170**・5 errors | **48/195・0 errors**（baseline 復帰） |
+| `kotobase-peer` | 231/**660**・5 errors | **231/685・0 errors** |
+
+peer の assertion が**増えている**のは、中断していた 5 テストが最後まで走るように
+なったから。**少なくとも 2026-08-11 以降で初めてこの suite が完全に緑**になった。
+
+### collapsed 済み（すべて両ランタイム緑）
+
+`chain` `prolly-tree` `arrangement` `merkle-lsm` `kotobase-block-codec`
+`kotobase-federation` `kotobase-maintenance` `kotobase-projection` `kotobase-peer`
+
+**残りは機械的な反復**（peer の閉包に `sigv4` / `datom-source` 経由の古い版が残る）。
+律速は解けている。
+
+### 付随して見つかったこと
+
+**`kotobase-federation` と `kotobase-maintenance` は west.yml に無い。**
+`kotobase-peer` が依存し、その peer は live Worker に入っているのに、
+superproject の manifest からは追えない。pin 前進が `entry not found` で
+拒否されて分かった。登録が要る。
+
 ## この ADR が残す一般則
 
 **「JVM が緑」は「宣言どおりの依存で緑」ではない。** tools.deps の解決は
