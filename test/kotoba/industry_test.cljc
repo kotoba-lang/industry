@@ -1,6 +1,7 @@
 (ns kotoba.industry-test
   (:require [clojure.test :refer [deftest is testing]]
             [kotoba.industry :as industry]
+            [kotoba.industry.embedded :as embedded]
             [kotoba.technology :as technology]
             [clojure.set]))
 
@@ -4989,3 +4990,102 @@ clone; superproject ADR-2628000000) is also :implemented"
            (:repo (industry/get-industry "8211"))))
     (is (= "cloud-itonami-isic-8211"
            (:business-id (industry/get-industry "8211"))))))
+
+;; ---------------------------------------------------------------------------
+;; Portability: no runtime file access, and a projection that cannot drift
+;;
+;; This namespace was `.clj` until 2026-08-18 — `(slurp (io/resource …))` —
+;; and through it all 651 `cloud-itonami-isic-*` consumers. The first fix
+;; attempted elsewhere in this workspace gave the reader a `:cljs` branch
+;; reading `resources/` relative to the working directory, and that was
+;; measured wrong the same day: `kotoba-lang/technology` on that pattern
+;; returned nil for all 159 of `kotoba.iso3166`'s assertions under nbb,
+;; because nbb's cwd was iso3166's root. A portability fix that works only
+;; while you are the root project is not one.
+;;
+;; So the registry is compiled in. There is no read, so there is no read that
+;; can fail, and no `readable?` worth keeping — a check with no failure mode
+;; is theatre. What is tested instead is the failure mode that now exists:
+;; the generated projection drifting from the EDN a human edits.
+;; ---------------------------------------------------------------------------
+
+(deftest the-embedded-registry-matches-the-edn
+  (testing "the EDN is the source of truth and the namespace is a projection
+            of it. This **fails rather than skips** when it cannot read the
+            EDN, because a check that could not run must not report what a
+            check that ran and found nothing reports"
+    (let [path "resources/kotoba/industry/registry.edn"
+          txt #?(:clj (try (slurp path) (catch Exception _ nil))
+                 :cljs (try (.readFileSync (js/require "fs") path "utf8")
+                            (catch :default _ nil)))]
+      (is (some? txt)
+          (str "could not read " path " — run from the repo root. This is a
+                FAILURE and not a skip, on purpose"))
+      (when txt
+        (is (= (#?(:clj clojure.edn/read-string :cljs cljs.reader/read-string) txt)
+               embedded/registry-data))))))
+
+(deftest a-registry-handed-in-as-nil-does-not-flatten
+  (testing "`(into {} …)` over nil yields `{}`, so a caller passing nothing
+            would receive a complete-looking index over no data: `by-id` an
+            empty map and `get-industry` nil for every ISIC class in the
+            standard — an answer indistinguishable from `this class is not
+            registered`, when all it means is that the caller passed nil"
+    (is (nil? (industry/industries nil)))
+    (is (nil? (industry/by-id nil)))
+    (is (nil? (industry/get-industry nil "6419")))
+    (is (nil? (industry/required-technologies nil "6419")))
+    (is (nil? (industry/optional-technologies nil "6419"))))
+  (testing "and the real registry is not nil, or the above measured nothing"
+    (is (seq (industry/industries)))))
+
+(deftest an-empty-registry-does-not-look-like-a-fully-unprovided-one
+  (testing "`technology-stack` and `unprovided-technologies` both partition
+            through `technology/resolve-stack`, which answers
+            `{:resolved [] :unknown []}` for no ids at all. Handed nil that
+            is a true statement about nothing, so it must not be read as a
+            statement about an industry: the guard is that the lookup itself
+            answers nil first"
+    (is (empty? (industry/technology-stack nil "6419")))
+    (is (= {:required [] :optional []}
+           (industry/unprovided-technologies nil "6419")))
+    (is (nil? (industry/get-industry nil "6419"))
+        "the distinguishing answer — the ids were nil, not unprovided")))
+
+(deftest the-registry-does-not-depend-on-the-working-directory
+  (testing "the whole point. `registry` returns a compiled-in projection, so
+            there is no path for it to be relative to — asserted here as a
+            property of the value, as well as demonstrated by running this
+            suite from /tmp"
+    (is (= (industry/industries) (:industries embedded/registry-data)))
+    (is (= 651 (count (industry/industries)))
+        "the ISIC full-class coverage this registry claims")))
+
+(deftest the-backlog-tells-required-apart-from-optional
+  (testing "`unprovided-technologies` partitions into `:required` and
+            `:optional`, and until this test nothing distinguished the two:
+            a mutation computing `:optional` from the REQUIRED ids survived
+            the whole 1,826-assertion suite. The existing cases could not see
+            it — 4210 pins only `:required`, and 7911 has both empty. An
+            unprovided OPTIONAL technology is a nice-to-have on the backlog;
+            reported as required it becomes something blocking a launch"
+    (is (= {:required [] :optional [:corporate-intelligence]}
+           (industry/unprovided-technologies "6419"))
+        "6419 declares :corporate-intelligence as OPTIONAL and nobody has built it")
+    (is (empty? (:required (industry/unprovided-technologies "6419")))
+        "and nothing it actually requires is missing -- so the two sides differ")))
+
+(deftest maturity-defaults-to-spec-when-the-entry-claims-nothing
+  (testing "`maturity-of` is documented as unit-testable against a synthetic
+            entry precisely because the real registry stopped exercising its
+            branches — every live entry carries an explicit `:maturity`, so
+            `(or (:maturity entry) …)` short-circuits and the `cond` beneath
+            it was dead code as far as the suite could see. A mutation turning
+            the `:else` default from `:spec` into `:blueprint` survived all
+            1,826 assertions. An entry that claims nothing is a registry
+            stub; calling it :blueprint asserts a published repo nobody wrote"
+    (is (= :spec (industry/maturity-of {:id "0000" :name "claims nothing"})))
+    (is (= :blueprint (industry/maturity-of {:id "0000" :repo "https://example.invalid/r"})))
+    (is (= :implemented (industry/maturity-of {:id "0000" :implemented? true})))
+    (is (= :implemented (industry/maturity-of {:id "0000" :maturity :implemented :repo nil}))
+        "an explicit :maturity still wins over the inference")))
