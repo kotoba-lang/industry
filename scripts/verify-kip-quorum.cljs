@@ -183,8 +183,25 @@
 (say "FINAL-KIPS" (count targets)
      (str "(" (count exempt) " exempt by track)"))
 
+;; SCANNED above counts KIPs *read*. This counts KIPs whose signatures this run
+;; actually checked, and they are not the same number -- a registry full of
+;; drafts reads many and verifies none. The detector registry keys its evidence
+;; floor on this line, so a run that verified nothing cannot be filed as clean
+;; (ADR-2608136000: "did not measure" and "measured, no problem" must not
+;; produce the same output).
+(say "VERIFIED" (count targets) "KIP(s) had their quorum checked")
+
 (when (zero? (count targets))
-  (bail! 0 "no :final KIPs that require a quorum."
+  ;; **Exit 3, not 0.** The prose below was already correct and already said
+  ;; this is not a verification -- but it said it to a human, and exited 0 to
+  ;; everything else. A registry entry, a gate or a script reading the status
+  ;; would have recorded "quorum verified" for a registry where nothing has
+  ;; ever been admitted.
+  ;;
+  ;; 3 is neither pass nor fail: it is "could not answer", the distinct code
+  ;; ADR-2608136000 asks for. Nothing here is broken -- there is simply nothing
+  ;; to check yet, and that is a different fact from a check that passed.
+  (bail! 3 "no :final KIPs that require a quorum."
          "That is the current state of the registry, not a verification of anything:"
          "nothing has been admitted, so nothing needed a quorum. Pass --all to check"
          "signatures on KIPs that are not yet Final."))
@@ -203,6 +220,17 @@
       (assoc r :id (:kip/id kip) :file f))))
 
 (def rejected (filterv #(= :reject (:verdict %)) results))
+
+;; The detector registry parses FINDING<TAB>severity<TAB>key<TAB>detail and
+;; nothing else -- the REJECT lines above are prose it ignores. Emit both rather
+;; than reshaping the human output: a KIP that loses its quorum should appear as
+;; NEW in manifest/orgs-detectors-state.edn in the hour it happens, and a reader
+;; of the log should still see which signatures were counted.
+(doseq [r rejected]
+  (say "FINDING" "error" (str "quorum-not-met:" (:id r))
+       (str (count (:valid-signers r)) "/" (:threshold policy)
+            " valid signature(s) of " (:claimed r) " claimed — "
+            (pr-str (:reasons r)))))
 
 (say "SUMMARY" (str (- (count results) (count rejected)) " admitted, "
                     (count rejected) " rejected"))

@@ -790,6 +790,47 @@
               itonami-fleet-dispatch as a four-config collision, because two of the four
               were .cloud-itonami-app-adopt/ and .wt-run/. Measured: generalising removes
               exactly that one false positive and introduces none (10 -> 9)."}
+
+  {:id       :verify-kip-quorum
+   :title    "the signatures behind every KIP that has actually been admitted"
+   :why      "A :final KIP is a decision this workspace has agreed to be bound by, and the
+              only thing standing between `:status :final` in a text file and a decision
+              nobody signed is this script checking the ed25519 quorum on it. Nothing ran it
+              on a schedule: ADR-2608196100 counted it among twelve verifiers with no runner
+              and no twin, and a check that never runs cannot notice a signature going bad,
+              a signer being removed from the allowed set, or a KIP being flipped to :final
+              by hand.
+              It reads two west checkouts -- orgs/kotoba-lang/kip (the registry) and
+              orgs/kotoba-lang/kagami (did:key resolution) -- so it cannot be a fleet gate:
+              fleet ships one repo's tree to a node, and neither of those would be there.
+              That is what puts it here rather than in scripts/fleet-ci/gates.edn."
+   :argv     ["nbb" "--classpath"
+              "{{root}}/orgs/kotoba-lang/kip/src:{{root}}/orgs/kotoba-lang/kagami/src:{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-kip-quorum.cljs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "VERIFIED\t[1-9][0-9]*\t"
+   :interval-ms 21600000                 ; 6h
+   :timeout-ms  120000                   ; 2m -- 240x the measured runtime; the cost here is
+                                         ; nbb startup, not the work
+   :writes   :none
+   :measured "2026-08-19 on this machine: 0.2s and 0.5s at load 20.2 for the registered form,
+              0.2s twice for --all (which does the ed25519 verification). Three directions
+              shown with the same script, all measured, not argued:
+                --kips <tampered>  one hex digit flipped in a signature ->
+                                   FINDING error quorum-not-met:kip-0001, exit 1
+                --all              untampered -> VERIFIED 1, exit 0
+                (registered form)  VERIFIED 0, exit 3
+              **The third line is why the evidence key is VERIFIED and not SCANNED.** Before
+              today this script exited 0 on an empty subject: two KIPs read, none :final, so
+              nothing was checked -- and it said so in prose, to a human, while handing every
+              machine a zero. SCANNED counts KIPs read (2); VERIFIED counts KIPs whose quorum
+              was checked (0), and the registry's qualifier files a run with no evidence line
+              as :inconclusive rather than clean. So this detector will read as INCONCLUSIVE
+              until the first KIP goes :final, which is the true state of the registry and not
+              a fault in the detector. Exit 3 is the 'could not answer' code ADR-2608136000
+              asks for -- neither 0 nor 1."}
+
 ]
 
 }
