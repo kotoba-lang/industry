@@ -150,10 +150,77 @@ projection ができる。
   \"ニホンエアープロダクツ\" ↔ 登記「日本エアープロダクツ株式会社」。
   GLEIF Level 1 は**自己申告**であり、登記は authority である。
 
+## 2026-08-18 の追加サイクル（オーナー選択: インボイス / custody / 補助金）
+
+### 1. インボイス登録（適格請求書発行事業者、`invoice-*`）
+
+同じ authority の別サイトの月次全件。**法人の登録番号は `T` + 法人番号**なので、
+これは別の population ではなく**同じ entity の属性**であり、`jp-go-nta-houjin-bangou`
+に同居させた。答えるのは法人番号が答えられない問い —— *この取引先は適格請求書を
+出せるか、いつから、今も有効か*（`:invoice/active?` は「取消でない」かつ
+「失効でない」の連言。authority は 2 列で持つ）。
+
+- 実測: 5,069,446 登録（rows 5,386,075、malformed 0、blank 化された履歴行 316,629）。
+  **うち 2,491,986 が個人事業主。**
+- 面に載るのは `invoice-joined` **3,228 件** —— この面が持つ法人番号 8,124 のうち
+  適格請求書発行事業者として登録されている数。
+- **個人は projection に入れない。** 理由は「氏名リストだから」ではない ——
+  **bulk archive は氏名を 1 件も公表していない**（20 万行サンプルで name /
+  tradeName ともに 0）。理由は ①その番号は法人番号ではないのでこの面の何とも
+  join できない ②authority の照会サイトを通せば自然人に解決する識別子である、の 2 つ。
+  規則は prose ではなく `invoice-zenken/projectable?` と projector の refusal
+  カウントと、**commit された artifact 側の検査**（下記）で守る。
+- **ADR-2608181000 の未解決 2 件が解けた**: `T6810352664718`（佐藤公認会計士事務所）と
+  `T2810102630998`（ゆうハートクリニック）は**どちらも個人事業主のインボイス登録番号**
+  （事業者区分 1、2023-10-01 登録、現在有効）。法人番号ではない —— 仮説として
+  書いた推定が、同じ authority の別データで確認された。
+- 実装上の罠 2 つ（各 1 run 分の損失）: **登録番号だけが quote されている**
+  （法人番号ファイルは text 列だけを quote する）/ **取消 disposalDate が
+  失効 expireDate の前に来る** —— 列名と順序は同じレコードの JSON publish から
+  取った（authority が出す成果物のうち順序を一意に述べているのはそれだけ）。
+
+### 2. custody（`jp-go-nta-archives` + artifact 検査 + fleet gate）
+
+- **authority は当月分しか公開しない。** 先月の全件データはどこからも取れないので、
+  そこから切った corpus は二度と再構築できず、projection は出典と突き合わせられない。
+  したがって custody の対象は derived な corpus ではなく**消える input** である。
+  DataLad + git-annex + B2 で `jp-go-nta-archives` を作り、2026-07 の 7 アーカイブ
+  （法人番号 全件 + invoice の法人・人格のない社団等）を置いた。west 登録済み
+  （datalad group、既定 group-filter で off）。
+- **個人アーカイブ（`k_all_*`）は意図的に置かない。** node の corpus で lookup に
+  答え、その後は捨てる。人に紐づく識別子集合を共有 bucket に無期限で置くのは、
+  問いが要求する以上の保有である。代償も書く: それらの行は当月中しか再取得できない。
+- **custody は主張ではなく検査**: `annex-custody-verify` が 7/7 に off-machine コピーを
+  確認し、B2 から 1 本を実際に fsck した。**numcopies は 1**（B2 1 bucket / 1 鍵）——
+  この laptop の喪失には耐えるが、bucket やプロバイダの喪失には耐えない。
+- **artifact 側の検査**: `jp-go-nta-houjin-bangou/scripts/verify-projections.cljs` が
+  manifest 形・**manifest 自身が主張する件数との一致**・publish の鮮度（既定 45 日）・
+  **invoice projection に個人が混ざっていないこと**を見る。exit 0 clean / 1 violation /
+  **2 could-not-answer**（data/ が無い、読めない）—— 2 を pass に丸めない。
+  fleet gate `nta-projections` が tip ごとに回す。**実ノードで両方向を確認**:
+  無改変の tree で exit 0、個人行を 1 行足した tree で exit 1。
+
+### 3. 補助金（`jp-go-digital-jgrants`）
+
+デジタル庁の jGrants 公開 API（鍵不要）から**公募カタログ**を取った。実測
+2026-08-18: 18 keyword の和集合で **3,751 プログラム**、うち**公募中 308**
+（公募中のものだけ detail を 1 件ずつ引いて補助率・対象業種・URL を足す）。
+
+**これは「どんな補助金が在るか」であって「誰が受けたか」ではない。**
+法人番号も LEI も 1 件も無く、法人側と join できない。
+「この取引先は補助金を取ったことがあるか」は**依然として答えられない** —— 交付実績は
+各省庁がプログラムごとに公表する採択者一覧（散在した Excel）にあり、未取得。
+隣に載っているだけで join できると読まれないよう、この境界は README・namespace
+docstring・test・面の loader の 4 箇所に書いた。
+
+API には列挙モードが無い（空 keyword は HTTP 400）ので、カバレッジは keyword 集合が
+拾えた範囲であり、**使った keyword は artifact の manifest 行に入っている**。
+
 ## Consequences / まだ無いもの（正直に）
 
-- **これは gBizINFO の代替ではない。** NTA が持つのは商号・所在地・法人番号だけで、
-  **決算期・財務・従業員数・補助金・調達・特許・認定は 1 件も無い**。
+- **これは gBizINFO の代替ではない。** 3 サイクル終えても、**決算期・財務・従業員数・
+  交付実績・調達・特許は 1 件も無い**。入ったのは identity（法人番号）、その属性
+  （インボイス登録）、そして補助金の**公募**カタログまでである。
   MK-1 の 77 リードの決算期は、これを入れても依然 0 件のままである。
   identity の背骨が入っただけで、その上に載る面は別ソース（EDINET / jGrants / 各省公表）。
 - **個人事業主は原理的に入らない。** 上記 unmatched 3 件はデータの欠落ではなく、

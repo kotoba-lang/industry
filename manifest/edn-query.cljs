@@ -1037,6 +1037,35 @@
           (remove str/blank?)
           (map str/trim (str/split (or raw "") #",")))))
 
+(defn- nta-projection-files
+  "`jp-go-nta-houjin-bangou` の data/ から、prefix と tier で選んだ projection。
+
+   1 repo に 2 dataset（法人番号と invoice registry）が入っているのは、法人の
+   invoice 登録番号が `T` + 法人番号 で、**同じ entity の属性だから**である。
+   population が別なら repo も別にする。"
+  [prefix requested]
+  (->> ["jp-go-nta-houjin-bangou"]
+       (keep west-project-path)
+       (mapcat (fn [p]
+                 (let [dir (apply io/file root (concat (str/split p #"/") ["data"]))]
+                   (when (.exists dir)
+                     (->> (seq (.listFiles dir))
+                          (filter #(let [n (last (str/split (str %) #"/"))]
+                                     (and (str/starts-with? n prefix)
+                                          (str/ends-with? n ".datoms.edn")))))))))
+       (sort-by str)
+       ((fn [all]
+          (let [available (into #{} (map #(file-tier % prefix)) all)]
+            ;; 要求された tier に 1 つもファイルが無いなら、それは「その tier が
+            ;; 空」ではなく「その名前の tier が無い」。黙って 0 件を返すと、flag が
+            ;; 効いたのか効かなかったのかを出力から区別できない。
+            (doseq [t (sort (remove #(contains? available %) requested))]
+              (js/console.error
+               (str "edn-query: WARNING " prefix ": tier " (pr-str t)
+                    " に該当する data/" prefix t "*.datoms.edn が無い（在るのは "
+                    (str/join ", " (sort available)) "）")))
+            (filter #(contains? requested (file-tier % prefix)) all))))))
+
 (defn houjin-bangou-entities
   "国税庁 法人番号 projection（`jp-go-nta-houjin-bangou` の
    `data/houjin-bangou-<tier>*.datoms.edn`、ADR-2608181000）。
@@ -1061,35 +1090,62 @@
    `-` か `.` までを tier と読む（`gleif-lei-closure-2` の `-2` は shard 番号で
    tier ではない）ので、`houjin-bangou-public-bodies.datoms.edn` は tier
    `\"public\"` として読まれ、`--hb-tier public-bodies` は**受理された上で 0 件を
-   load した**（実測 2026-08-18）。それが下の「要求された tier に該当ファイルが
-   無い」警告を足した理由でもある。"
+   load した**（実測 2026-08-18）。"
   [next-tempid!]
-  (let [all (->> ["jp-go-nta-houjin-bangou"]
-                 (keep west-project-path)
-                 (mapcat (fn [p]
-                           (let [dir (apply io/file root (concat (str/split p #"/") ["data"]))]
-                             (when (.exists dir)
-                               (->> (seq (.listFiles dir))
-                                    (filter #(let [n (last (str/split (str %) #"/"))]
-                                               (and (str/starts-with? n "houjin-bangou-")
-                                                    (str/ends-with? n ".datoms.edn")))))))))
-                 (sort-by str))
-        available (into #{} (map #(file-tier % "houjin-bangou-")) all)
-        requested (houjin-bangou-tiers)
-        files (filter #(contains? requested (file-tier % "houjin-bangou-")) all)]
-    ;; 要求された tier に 1 つもファイルが無いなら、それは「その tier が空」では
-    ;; なく「その名前の tier が無い」。黙って 0 件を返すと、flag が効いたのか
-    ;; 効かなかったのかを出力から区別できない。
-    (doseq [t (sort (remove #(contains? available %) requested))]
-      (js/console.error
-       (str "edn-query: WARNING houjin-bangou: tier " (pr-str t)
-            " に該当する data/houjin-bangou-" t "*.datoms.edn が無い（在るのは "
-            (str/join ", " (sort available)) "）")))
+  (let [files (nta-projection-files "houjin-bangou-" (houjin-bangou-tiers))]
     (if (empty? files)
       (do (js/console.error
            (str "edn-query: WARNING houjin-bangou: com-junkawasaki/jp-go-nta-houjin-bangou の "
                 "data/houjin-bangou-*.datoms.edn が無い — 日本の法人は load されない"
                 "（west update 未実行か、projection 未生成）"))
+          [])
+      (mapcat (fn [f] (or (corpus-line-entities f next-tempid!) [])) files))))
+
+(defn invoice-entities
+  "国税庁 適格請求書発行事業者 projection（同じ repo の
+   `data/invoice-<tier>*.datoms.edn`、ADR-2608181000）。
+
+   法人番号 が「この法人は在るか」を答えるのに対し、こちらは
+   **「この取引先は適格請求書を出せるか、いつから、今も有効か」**を答える。
+   `:invoice/active?` は *取消でない* かつ *失効でない* の連言（authority は
+   2 つの列で持つ）。
+
+   **個人事業主の登録は projection に入らない。** 登録番号は法人番号ではないので
+   この面の何とも join できず、しかも authority の照会サイトを通せば自然人に
+   解決する識別子である。ノードの corpus には在るので lookup はできる
+   （実測 2026-08-18: 5,069,446 件のうち 2,491,986 件が個人）。"
+  [next-tempid!]
+  (let [files (nta-projection-files "invoice-" (houjin-bangou-tiers))]
+    (if (empty? files)
+      (do (js/console.error
+           (str "edn-query: WARNING invoice: com-junkawasaki/jp-go-nta-houjin-bangou の "
+                "data/invoice-*.datoms.edn が無い — 適格請求書発行事業者は load されない"))
+          [])
+      (mapcat (fn [f] (or (corpus-line-entities f next-tempid!) [])) files))))
+
+(defn jgrants-entities
+  "jGrants（デジタル庁）の補助金**公募**カタログ
+   （`jp-go-digital-jgrants` の `data/jgrants-catalog.datoms.edn`、ADR-2608181000）。
+
+   **これは「どんな補助金が在るか」であって「誰が受けたか」ではない。**
+   `:company/houjin-bangou` も `:company/lei` も 1 件も無いので、
+   法人側と join できない —— 隣に載っているだけで join できると読まれないよう、
+   ここにも書いておく。交付実績は各省庁の採択者一覧にあり、未取得。
+
+   カバレッジは keyword 和集合（API に列挙モードが無い）。使った keyword は
+   manifest 行の `:corpus/keywords` に入っている。"
+  [next-tempid!]
+  (let [files (->> ["jp-go-digital-jgrants"]
+                   (keep west-project-path)
+                   (mapcat (fn [p]
+                             (let [dir (apply io/file root (concat (str/split p #"/") ["data"]))]
+                               (when (.exists dir)
+                                 (->> (seq (.listFiles dir))
+                                      (filter #(str/ends-with? (str %) ".datoms.edn"))))))))]
+    (if (empty? files)
+      (do (js/console.error
+           (str "edn-query: WARNING jgrants: com-junkawasaki/jp-go-digital-jgrants の "
+                "data/*.datoms.edn が無い — 補助金の公募は load されない"))
           [])
       (mapcat (fn [f] (or (corpus-line-entities f next-tempid!) [])) files))))
 
@@ -1980,8 +2036,12 @@
                             (lei-blueprint-entities next-tempid!)
                             (lei-tos-entities next-tempid!)
                             (gleif-lei-entities next-tempid!)
-                            (houjin-bangou-entities next-tempid!))
+                            (houjin-bangou-entities next-tempid!)
+                            (invoice-entities next-tempid!))
         property-tx (property-ownership-entities next-tempid!)
+        ;; 補助金は company とは別 dataset にする（法人側と join できないので、
+        ;; company を数える query に 3,751 件を混ぜない）。
+        subsidy-tx (jgrants-entities next-tempid!)
         ;; company-tx と別にするのは、entity を聞くだけの query に 23,530 本の
         ;; edge を load させないため（ADR-2608031900）。
         relationship-tx (gleif-relationship-entities next-tempid!)
@@ -2006,7 +2066,7 @@
                                                      hirameki-corpus-tx jinushi-tx
                                                      proc-registry-tx merged-kotoba-tx
                                                      working-doc-tx narrative-tx
-                                                     company-tx property-tx relationship-tx fleet-tx
+                                                     company-tx property-tx subsidy-tx relationship-tx fleet-tx
                                                      yabai-tx tadori-tx patent-tx accounts-tx innen-tx
                                                      awai-tx kakekomi-tx okugai-tx factory-tx
                                                      hayari-tx hayari-ent-tx
