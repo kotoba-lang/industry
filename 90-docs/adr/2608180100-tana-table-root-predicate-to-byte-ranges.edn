@@ -165,23 +165,62 @@ Iceberg の manifest-list / manifest 分割と同じ形に、同じ圧力から�
 
 ## 検証
 
-- `clojure -M:test` と `npm run test:nbb` — **21 tests / 51 assertions、両方 green**。
-- **3 つの実欠陥で赤にし、戻して緑に戻ることを実際に見た**: 統計不在が skip を許す
-  （2 failures）/ `:trust` が既定値に落ちる（1）/ range が 1 byte 長い（1）。
+- `clojure -M:test` と `npm run test:nbb` — **32 tests / 89 assertions、両方 green**。
+- **6 つの実欠陥で赤にし、戻して緑に戻ることを実際に見た**: 統計不在が skip を許す
+  （2 failures）/ `:trust` が既定値に落ちる（1）/ range が 1 byte 長い（1）/
+  述語が集約の fold を失格させなくなる（1）/ `:location-only` でも集約が答える（4）/
+  Arrow adapter が wide-open な bounds を発明する（4）。
   一度も赤くならない gate は、誰も問いを立てていない gate と同じ（ADR-2608136000）。
+- **fleet gate `tana`（`:jvm-test` / `:cd true`）を登録した。** `:nbb-test` ではなく
+  `:jvm-test` なのは、nbb runner が sibling checkout を classpath に要求するのに対し
+  fleet は 1 repo の tree しか配らないため —— deps.edn の git 依存は `ship-git-deps!` が
+  運ぶ。**ノード上での実行はまだ観測していない**（登録時、常駐 tick が 25 分走行中で
+  `--only tana` が排他に弾かれた）。次の tick の receipt が最初の観測になる。
 - bench は**答えが一致しない plan を速い plan と呼ばない**（両経路の rows を突き合わせ、
   0 行一致なら比較が空虚だとして exit 2）。
 
 ## まだのもの
 
+**2026-08-18 の 2 巡目で着地したもの**:
+
+- **集約 push down**（`tana.aggregate`）。`count` / `count-non-null` / `min` / `max` を
+  root から `:read 0` / 1 request で返す。実測: 1,000 object の `max(price)` が
+  **3,000 request → 1**（baseline も列データは読まない —— 避けられないのは footer に
+  届くために全 object を開くこと）。`columnar.aggregate` の失格条件は全て 1 段上でも
+  効き、**ここにしか無い条件が 1 つ増える: `:location-only` は答えを拒否する** ——
+  枝刈りでは誤った bound は「余計に読む」で済むが、集約では bound が**答えそのもの**。
+- **Arrow adapter**（`tana.member/from-arrow`）。**seam の sample size が 1 のままなら
+  それは未検査の主張**という `columnar` 自身の規律を 1 段上でも適用した。Arrow は列
+  統計を持たないので、root は位置だけを与え**枝刈りを 1 件もしない**（`:undecidable 3`
+  として報告し、`:pruned` には入れない）。`count` は答える（行数は bound ではない）が
+  `max` は `:bounds-not-recorded` で**名指しで拒否**する —— 発明しない。混在テーブルは
+  Parquet member を枝刈りし Arrow member を読む。
+- **fleet gate 登録**（上記「検証」）。
+
+**実測して分かった、埋まらなかった穴**:
+
+- **`kotobase-lake` の datom 面 manifest からは root を作れない。** `add-member` が書くのは
+  object / rows / partition 値 / 列ごとの min・max・nulls・型で、**バイト範囲が無い**。
+  つまり bridge は結局 member 1 個につき footer 1 回を払う。2 つの manifest は統計で
+  重なり、**round trip を消す当のフィールドでだけ食い違っている**。これは「未着手」では
+  なく**測定された境界**なので、そう記録する。
+
 | 次の一手 | 置き場所 |
 |---|---|
-| 集約 push down（root の bounds から `count`/`min`/`max` を `:read 0` で返す） | `tana` |
-| `kotobase-lake` の datom 面 manifest から root を生成する経路 | `kotobase-lake` |
-| pack range との合成の実測 | `kotobase-storage-pack` |
+| sharded root の top から集約を答える（今は root を要求する） | `tana` |
+| lake の datom manifest に byte range を足すか、root を lake へ射影するか（**設計判断が先**） | `kotobase-lake` / `tana` |
 | 実 corpus（合成 chain ではない）での round trip | `net-kotobase/lake` |
-| fleet gate 登録（format library 群は今も自動検査が無い。ADR-2608054000 の A） | `scripts/fleet-ci/gates.edn` |
+| ノード上の gate receipt を実際に見る（登録しただけでは緑を見たことにならない） | `manifest/fleet-ci.edn` |
 
 **deploy はしていない。** 本 ADR が主張するのは library と 2 runtime の実測であって、
 `kotobase.net` 上の経路が変わったことではない。
+
+## 改訂履歴
+
+- 2026-08-18: accepted。`kotoba-lang/tana` を新規登録（pin `52ad0be`）。
+- 2026-08-18（同日 2 巡目、pin `7394fea`）: `tana.aggregate`（集約 push down）と
+  `tana.member/from-arrow`（2 つ目の format）を追加。fleet gate を登録。
+  `kotobase-lake` bridge は**測定の結果 blocked**（datom manifest に byte range が無い）
+  と分かったので、gap の記述を「未着手」から「測定された境界」に書き換えた。
+  検証は 21 tests/51 assertions → **32 tests/89 assertions**、赤にした実欠陥は 3 → **6**。
 "}]

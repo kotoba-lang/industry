@@ -2370,6 +2370,11 @@
   ;; admission note at the head of :repos. columnar needed its runner fixed
   ;; first (5e165f0); org-ietf-csv's already covered its whole suite.
   {:name "columnar" :gate :nbb-test :classpath "src:test" :entry "test/run.cljs" :cd true}
+  ;; tana: :jvm-test rather than :nbb-test because its nbb runner needs the
+  ;; sibling checkouts (columnar, parquet, arrow) on the classpath and the
+  ;; fleet ships one repo's tree. deps.edn carries them as git deps, which
+  ;; `ship-git-deps!` does deliver. Same suite either way (ADR-2608180100).
+  {:name "tana" :gate :jvm-test :cd true}
   {:name "org-apache-parquet" :gate :jvm-test :cd true}
   {:name "org-apache-arrow" :gate :jvm-test :cd true}
   {:name "org-apache-avro" :gate :nbb-test :classpath "src:test" :entry "test/run.cljs"
