@@ -422,6 +422,66 @@
   {:name "kotobase-protocols" :id "nbb-cross-runtime-protocols" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+  ;; ── round 3: the rest of the Worker's ClojureScript halves ────────────────
+  ;;
+  ;; Seven more with counts measured identical on both runtimes, and two whose
+  ;; counts differ by a JVM-only test file (an addition, not a flip):
+  ;;
+  ;;   chain               29 /  87   ==       org-apache-arrow   40/130 vs 35/111
+  ;;   kotobase-query      35 /  62   ==       org-apache-parquet 34/163 vs 31/152
+  ;;   gremlin             23 /  37   ==
+  ;;   org-graphql-http    23 /  39   ==       (both differ by `lake_e2e_test.clj`,
+  ;;   opencypher-cypher   75 / 174   ==        which drives a real scan on the JVM)
+  ;;   w3-sparql-protocol  75 / 197   ==
+  ;;   protocol-core       24 /  97   ==
+  ;;
+  ;; **The first measurement of these said they could not run under nbb at all**
+  ;; -- nine reported `Cannot find module '@noble/hashes/sha2.js'` and one
+  ;; `Could not find namespace: kotobase.local`. Both were MY harness: npm deps
+  ;; never installed (the gate script installs them when package.json is
+  ;; present) and a classpath built without `-A:test`. Concluding "unmeasurable"
+  ;; from a broken harness is the failure this whole sweep exists to remove, so
+  ;; it is recorded here rather than quietly corrected.
+  ;;
+  ;; **And the first generated runner for four of them matched no namespace at
+  ;; all** -- `Ran 0 tests containing 0 assertions. 0 failures.`, exit 0. Caught
+  ;; only by comparing counts against the JVM before landing. The gate script
+  ;; would also have refused it (a zero-test run is a failure there), but the
+  ;; runner should not have been written that way in the first place.
+  ;;
+  ;; All verified on judah with the real script before landing: every one `OK`
+  ;; and exit 0; arrow `FAIL: 35 tests, 40 failures, 9 errors` exit 1 with an
+  ;; equality inverted in `arrow/decode.cljc`.
+  ;;
+  ;; protocol-core is private, so its verification shipped a tarball the way
+  ;; tick.cljs does rather than cloning on the node.
+  {:name "chain" :id "nbb-cross-runtime-chain" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+  {:name "kotobase-query" :id "nbb-cross-runtime-query" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+  {:name "org-apache-tinkerpop-gremlin" :id "nbb-cross-runtime-gremlin" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+  {:name "org-graphql-http" :id "nbb-cross-runtime-graphql-http" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+  {:name "org-opencypher-cypher" :id "nbb-cross-runtime-cypher" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+  {:name "org-w3-sparql-protocol" :id "nbb-cross-runtime-sparql-protocol" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+  {:name "kotobase-protocol-core" :id "nbb-cross-runtime-protocol-core" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+  {:name "org-apache-arrow" :id "nbb-cross-runtime-arrow" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+  {:name "org-apache-parquet" :id "nbb-cross-runtime-parquet" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
   {:name "pay" :id "nbb-cross-runtime-pay" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
