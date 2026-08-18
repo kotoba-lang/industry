@@ -1,0 +1,156 @@
+[{:db/id -1
+ :adr/id "adr-2608181000-nta-houjin-bangou-bulk-ingest"
+ :adr/topic "nta-houjin-bangou-bulk-ingest"
+ :adr/doc_type "adr"
+ :adr/status "accepted"
+ :adr/date "2026-08-18"
+ :adr/last_verified "2026-08-18"
+ :adr/authoritative true
+ :adr/source-format "edn"
+ :adr/deciders ["Jun Kawasaki"]
+ :adr/related ["adr-2607182200-isic-8291-houjin-bangou-canonical-business-registry" "adr-2608012000-gleif-lei-universe-and-property-ownership-on-the-query-plane" "adr-2607252000"]
+ :adr/authoritative_for ["法人番号 全件データの bulk ingest 経路" "jp-go-nta-houjin-bangou projection tier" "統合クエリ面の日本法人 identity"]
+ :adr/title "ADR-2608181000: 国税庁 法人番号 全件データを bulk ingest し、日本の法人 identity を統合クエリ面へ載せる"
+ :adr/body "# ADR-2608181000: 国税庁 法人番号 全件データを bulk ingest し、日本の法人 identity を統合クエリ面へ載せる
+
+**Status**: accepted
+**Date**: 2026-08-18
+**Deciders**: Jun Kawasaki（オーナー指示「では設計実装」。先行する問い「今の cloud-itonami に gbiz に変わる企業情報を集めたデータベースはある?」に対する実測の答えは **no** だった）
+
+## Context
+
+実測（2026-08-18）:
+
+- 統合クエリ面に載っている**日本の法人はほぼ居ない**。GLEIF joined tier 18,930 社のうち
+  `:company/jurisdiction \"JP\"` は **187 社**、そのうち法人番号
+  （`Entity.RegistrationAuthority.RegistrationAuthorityEntityID`）を持つのは **19 社**。
+- `cloud-itonami-isic-8291`（dossier）には NTA 法人番号 **Web-API の実クライアントが在る**
+  （ADR-2607182200）が、Application ID が未取得のため**一度も実ネットワーク呼び出しをして
+  いない**。しかもそれは 1 社ずつの lookup 経路であって ingest 経路ではない。
+- gBizINFO が持つ補助金・調達・届出・財務は、そもそもこのワークスペースのどこにも無い。
+
+**同じ authority に、account の要らない ingest 経路がある。** 法人番号公表サイトの
+全件データは、ページのセッショントークンとファイル番号を POST するだけで取得でき
+（Application ID は不要）、2026-07-31 publish で **5,816,535 件**・266 MB の zip。
+
+## Decision
+
+### 1. 全件データを bulk 経路とし、Web-API は lookup 経路のまま残す
+
+GLEIF が API（lookup）と Golden Copy（ingest）を分けているのと同じ形。dossier の
+`dossier.houjin-bangou` は 1 社照会のために残り、この ingest はそれを置き換えない。
+ファイル番号は毎月変わる DB id なので**ハードコードしない** — ページを毎回読み、
+`csv-unicode` 見出し直後の `doDownload(N)` を取る。取得したファイル名が
+`00_zenkoku_all_` で始まらなければ**取り込まずに落ちる**（都道府県ファイルを全国と
+取り違えても 200 が返り、中身は正しい zip であるため）。
+
+### 2. コードは `kotoba-lang/property`（public）、committed projection は
+### `com-junkawasaki/jp-go-nta-houjin-bangou`（private）
+
+GLEIF は projection を `org-gleif-projections` に分けており、その形を踏襲する。
+ただし JP では **private であることが要件**になる: `joined` tier は「このワークスペースが
+関心を持つ会社」で選ばれる — 行そのものは公開の政府データだが、**選択は公開情報では
+ない**。public repo に置けば、公開部品で組み立てた取引先リストを公開することになる。
+
+corpus（EDN-lines 約 2.6 GB）は git に入れない（ノードの `~/.cache/houjin-bangou`）。
+
+### 3. tier は joined / public-bodies。universe は載せない
+
+面は毎回 DataScript に全 load するので、tier のサイズは全 query への課税である
+（GLEIF 実測: 100 万 entity ≒ 5.6 GB / 156 秒、node 既定 old-space 4.2 GB）。
+
+| tier | 中身 | 件数 | git |
+|---|---|---:|---|
+| `joined` | 面が既に参照している法人（GLEIF の JP registration-no + 文書からの名前解決） | 35 | yes |
+| `public-bodies` | 法人種別 101 国の機関 + 201 地方公共団体 | 8,266 | yes |
+| `universe` | 全件 | 5,816,535 | no（約 32 GB 見積り） |
+
+**projection に無い法人は Datalog で join できない。** corpus に対して答えられるのは
+join を伴わない集計だけで、それは `query_houjin_bangou_corpus.cljs` の仕事。join 面を
+広げる正しい操作は「projection を広げる」であって「別ストアに分ける」ではない。
+
+### 4. join key は `:company/registration-no`（法人番号と同値）
+
+GLEIF Golden Copy は JP 法人の
+`Entity.RegistrationAuthority.RegistrationAuthorityEntityID` に法人番号を持つ。
+そこで NTA レコードは **同じ値を 2 つの属性で出す**: 曖昧さのない
+`:company/houjin-bangou` と、GLEIF と翻訳層なしで結合するための
+`:company/registration-no`。都道府県コードは ISO 3166-2:JP がそのまま
+`JP-` + コードなので `:company/region \"JP-13\"` として GLEIF の `\"US-IL\"` と同じ形に載る。
+
+dossier の canonical id `jpn-<法人番号>`（ADR-2607182200）は導出値なので**保存しない**
+（580 万件に `str` の結果を焼き込まない）。
+
+### 5. 名前解決は exact / core / ambiguous を分け、ambiguous は解決しない
+
+日本の商号は key ではない。**「株式会社うるる」はこの file の中で 2 社ある**
+（中央区と香取郡東庄町）。正規化（NFKC + 空白除去 + case-fold）した完全一致を `:exact`、
+法人格を落とした一致を `:core` とし、**どちらの水準でも 2 件以上当たったら解決しない**で
+名指しで報告する。1 件目を採れば「完全に見えて、どの会社かを静かに間違えた」
+projection ができる。
+
+### 6. ライセンスは CC0 ではない — 出典と加工の明示を manifest が運ぶ
+
+公共データ利用規約（第1.0版）は再配布を許すが、**出典表記**と**加工した旨の明示**を
+求める。README にだけ書くと data から離れるので、corpus / projection の manifest 行に
+`:source/attribution` として正確な文言を載せる。
+
+## Verification（すべてこのセッションの実測。measurement は murakumo fleet ノード judah）
+
+- **取得**: 2026-07-31 publish、`00_zenkoku_all_20260731.zip` 265,941,355 bytes、
+  sha256 `69d3c3a694863cdea4adfb57140b2f09703babb4d84e764d816f7ae4070be55a`
+  （このワークステーションと judah で別々に download し、**同一 hash**）。
+- **ingest**: 4 shard 並列で **約 1 分**、5,816,535 行すべて written。
+  `malformed 0` / `bad-check-digit 0`（NTA の検査数字アルゴリズムで全件検証）/
+  `mojibake 0`（Shift_JIS を UTF-8 として読むと出る U+FFFD の件数）。
+- **法人種別の内訳**（corpus 全走査、合計 5,816,535）:
+  301 株式会社 2,937,262 / 302 有限会社 1,675,298 / 399 その他の設立登記法人 585,350 /
+  305 合同会社 457,915 / 304 合資会社 93,214 / 401 外国会社等 20,049 / 499 その他 19,887 /
+  303 合名会社 19,294 / 201 地方公共団体 7,418 / 101 国の機関 848。
+  **コードとラベルの対応は仕様書 xlsx のラベル一覧 + 実データのサンプルで確認した**
+  （spreadsheet はラベルを並べるがコードの隣には置いていない）。
+- **所在地**: 47 都道府県すべてに entity が在り、`nil`（国外所在地）9,604。
+  最大は JP-13 東京都 1,368,559。
+- **name resolution**（business 文書由来の 20 名を照会）: resolved 16（うち 16 すべて
+  `:exact`）/ ambiguous 1 / unmatched 3。
+- **既存の主張の検証**: `90-docs/business/mk1-jp-leads.datoms.edn` が持っていた
+  `:company/houjin-bangou` 19 件のうち **16 件は registry が名前とともに確認**。残り 3 件:
+  - 「株式会社うるる」の `6010001096659` は**正しい**（中央区）。ただし同名の別法人が
+    香取郡東庄町に在るため、名前からの解決は ambiguous として拒否された — 番号が
+    無ければ特定できない、というのがこの dataset の実際の姿である。
+  - 「佐藤公認会計士事務所」`6810352664718` と「ゆうハートクリニック」`2810102630998` は
+    **580 万行のどこにも無い**（承継先としても現れない）。どちらも個人事業主形態で、
+    法人番号は個人事業主には指定されない。検査数字は valid なので、**適格請求書発行
+    事業者の登録番号（インボイス番号、同じ 13 桁形式・別の登録簿）を法人番号として
+    記録したもの**という仮説と整合する。**これは仮説であって、まだ裏を取っていない。**
+- **projector の両方向**: `--kind 101` で 5 件、`--kind 999` で 0 件 + WARNING。
+- **テスト**: property repo で 12 tests / 71 assertions、0 failures 0 errors。
+- **修正した欠陥 1 件**: 最初の実装は、名前照会を伴わない filter-only projection
+  （`--kind` / `--prefecture`）の一致行を candidate map に流していたため、
+  **5,816,535 行を走査して 0 件の projection を書いた**。summary の `:kept 0` だけが
+  それを示していた（ファイルは manifest 行を持つ、正しい形の空ファイルになる）。
+  修正に加えて `scanned > 0 かつ kept 0` の WARNING を足した。
+
+- **統合クエリ面での実測**: joined tier を既定 load して
+  `[:find (count ?e) :where [?e \"company/houjin-bangou\" _]]` が **35**。
+  GLEIF × NTA の join（`:company/registration-no` で結合）は **19 行**返り、
+  **GLEIF 側の商号が登記と食い違っている例がその場で見えた** —
+  \"BRIGHTSTAR JAPAN KK\" ↔ 登記「Ｌｉｋｅｗｉｚｅ　Ｊａｐａｎ株式会社」、
+  \"'Ｅｖｉｄｅｎ株式会社\"（先頭にアポストロフィが混入している）↔ 登記「Ａｔｏｓ株式会社」、
+  \"ニホンエアープロダクツ\" ↔ 登記「日本エアープロダクツ株式会社」。
+  GLEIF Level 1 は**自己申告**であり、登記は authority である。
+
+## Consequences / まだ無いもの（正直に）
+
+- **これは gBizINFO の代替ではない。** NTA が持つのは商号・所在地・法人番号だけで、
+  **決算期・財務・従業員数・補助金・調達・特許・認定は 1 件も無い**。
+  MK-1 の 77 リードの決算期は、これを入れても依然 0 件のままである。
+  identity の背骨が入っただけで、その上に載る面は別ソース（EDINET / jGrants / 各省公表）。
+- **個人事業主は原理的に入らない。** 上記 unmatched 3 件はデータの欠落ではなく、
+  この登録簿の定義そのもの。
+- **差分データ（日次）は未実装。** 更新は月次の全件再取得。
+- **常駐 cell になっていない。** GLEIF は murakumo ノードの `gleif-cell` が毎日押すが、
+  法人番号は今は手で回す。月次で足りるので優先度は高くない。
+- **dossier の `dossier.facts` にこの bulk 経路をまだ書いていない** — 同じ authority に
+  2 つの経路が在ることが、あの catalog からは読めないままである。
+"}]

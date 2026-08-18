@@ -1021,6 +1021,61 @@
           [])
       (mapcat (fn [f] (or (corpus-line-entities f next-tempid!) [])) files))))
 
+(def houjin-bangou-default-tiers #{"joined"})
+
+(defn houjin-bangou-tiers
+  "load する tier。`--hb-tier public-bodies`、または
+   `EDN_QUERY_HOUJIN_BANGOU_TIERS=public-bodies`。joined は常に入る。
+
+   GLEIF の `--tier` と別のフラグにしてあるのは、片方の tier を広げたつもりが
+   もう片方も広がって heap を割る、という混線を避けるため。"
+  []
+  (let [argv (vec (js->clj (or (.-argv js/process) #js [])))
+        flag (second (drop-while #(not= "--hb-tier" %) argv))
+        raw (or flag (.. js/process -env -EDN_QUERY_HOUJIN_BANGOU_TIERS))]
+    (into houjin-bangou-default-tiers
+          (remove str/blank?)
+          (map str/trim (str/split (or raw "") #",")))))
+
+(defn houjin-bangou-entities
+  "国税庁 法人番号 projection（`jp-go-nta-houjin-bangou` の
+   `data/houjin-bangou-<tier>*.datoms.edn`、ADR-2608181000）。
+
+   corpus は毎月の 全件データ 5,816,535 件で、**git にも、この面にも載らない**
+   （ノードの `~/.cache/houjin-bangou`）。載るのは tier を切った projection:
+
+     joined         plane が既に参照している法人（GLEIF の JP registration-no と
+                    business の名前解決の結果）
+     public-bodies  法人種別 101/201 = 国の機関 848 + 地方公共団体 7,418
+
+   `:company/registration-no` に法人番号と同じ値を入れてあるので、GLEIF の
+   JP レコード（`Entity.RegistrationAuthority.RegistrationAuthorityEntityID`）と
+   **翻訳層なしで join できる**。`:company/houjin-bangou` は衝突を避けたい
+   query 用の曖昧さのない別名。
+
+   **projection に無い法人は Datalog で join できない。** corpus に対して
+   答えられるのは join を伴わない集計だけで、それは
+   `property/scripts/query_houjin_bangou_corpus.cljs` の仕事。"
+  [next-tempid!]
+  (let [files (->> ["jp-go-nta-houjin-bangou"]
+                   (keep west-project-path)
+                   (mapcat (fn [p]
+                             (let [dir (apply io/file root (concat (str/split p #"/") ["data"]))]
+                               (when (.exists dir)
+                                 (->> (seq (.listFiles dir))
+                                      (filter #(let [n (last (str/split (str %) #"/"))]
+                                                 (and (str/starts-with? n "houjin-bangou-")
+                                                      (str/ends-with? n ".datoms.edn")))))))))
+                   (filter #(contains? (houjin-bangou-tiers) (file-tier % "houjin-bangou-")))
+                   (sort-by str))]
+    (if (empty? files)
+      (do (js/console.error
+           (str "edn-query: WARNING houjin-bangou: com-junkawasaki/jp-go-nta-houjin-bangou の "
+                "data/houjin-bangou-*.datoms.edn が無い — 日本の法人は load されない"
+                "（west update 未実行か、projection 未生成）"))
+          [])
+      (mapcat (fn [f] (or (corpus-line-entities f next-tempid!) [])) files))))
+
 (defn property-ownership-entities
   "公開不動産 ownership claim（`data/property-ownership.datoms.edn`）。
    `:ownership/*` は kotoba.property.ownership の可搬コントラクトそのままなので、
@@ -1907,7 +1962,8 @@
         company-tx (concat (company-facts-entities next-tempid!)
                             (lei-blueprint-entities next-tempid!)
                             (lei-tos-entities next-tempid!)
-                            (gleif-lei-entities next-tempid!))
+                            (gleif-lei-entities next-tempid!)
+                            (houjin-bangou-entities next-tempid!))
         property-tx (property-ownership-entities next-tempid!)
         ;; company-tx と別にするのは、entity を聞くだけの query に 23,530 本の
         ;; edge を load させないため（ADR-2608031900）。
@@ -1951,6 +2007,7 @@
           (recur (+ i 50000)))))
     {:conn conn
      :gleif-tiers (sort (gleif-tiers))
+     :houjin-bangou-tiers (sort (houjin-bangou-tiers))
      :adr-count (count adr-tx)
      :docs-count (count docs-tx)
      :manifest-count (count manifest-tx)
