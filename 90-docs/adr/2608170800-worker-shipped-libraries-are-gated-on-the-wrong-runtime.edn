@@ -199,6 +199,35 @@ path には lock に無い repo が 6 本あり、**和は 32 本**である。
 
 **監査は inventory の広さまでしか届かない。私の inventory は 1 ファイル分だった。**
 
+## 結末 —— fleet は 2 つのランタイムを gate するが、ここは 3 つに出荷している
+
+最後まで gate が付かなかった `kotobase-client` / `kotobase-worker-shell` について、
+当初は「自分の suite の依存を宣言していないから」と書いた。**半分は誤りだった**
+（2026-08-18）。宣言先を `:test` alias にすれば **consumer の解決結果は変わらない**
+—— consumer はその alias を読まないからである。`kotobase-client` はそうした
+（`e4cc39ea`）ので、suite は単体で立つようになった。
+
+そして測れるようになった結果が、**nbb で gate してはいけない**と言っている:
+
+| | 結果 |
+|---|---|
+| `shadow-cljs compile test`（出荷先） | **81 tests / 258 assertions、0 failures** |
+| nbb（SCI） | 60 / 187、**9 failures + 1 error** |
+
+失敗は全部 retry / rejection 経路で、SCI が ex-info を包む挙動（同週 prolly-tree と
+datom-source で測ったもの）。加えて **SCI は 21 件を読み込むことすらできない**。
+だから entry を置かなかった —— fleet が拾って赤を報告する entry は、**動いている
+library から恒久的な失敗を製造する**。
+
+**本当の blocker は、この file が持っていない gate 種別である。** これらは reader
+conditional の無い `.cljs` で JVM 半分が存在しないので、`:jvm-test` は無意味、
+`:nbb-script` は誤り。要るのは自前の `npm test`（`shadow-cljs compile test` =
+JVM ビルドで compiled artifact を作る）で、fleet-ci にそれを起動するものは無い。
+`org-ietf-cbor` の `test:cljs` も同じ形である。
+
+**これがこの ADR の正直な結末**: 「2 repo が未整備」ではなく
+**「fleet は 2 つのランタイムを gate するが、このワークスペースは 3 つに出荷している」**。
+
 ## 測った 2 件目 —— `sigv4` は既に規律ができていた
 
 次に測る先として `sigv4` を挙げていたので測った。**予想は外れ、良い方に外れた。**

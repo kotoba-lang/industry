@@ -564,11 +564,32 @@
   ;; fails at `Could not find namespace`, and `nbb-cross-runtime.cljs` builds
   ;; its classpath from deps.edn, so it has nothing to build from.
   ;;
-  ;; The fix is for those repos to declare the deps their own suites need,
-  ;; which changes what consumers resolve -- a dependency-declaration decision
-  ;; with blast radius, not a gate registration. Recorded here rather than
-  ;; worked around, because a gate wired past this would be red for a reason
-  ;; that has nothing to do with the code.
+  ;; **Followed up 2026-08-18, and the first half of that was wrong.**
+  ;; Declaring the dep does NOT have to change what consumers resolve: put it
+  ;; in the `:test` alias, which a consumer never reads. kotobase-client now
+  ;; does (e4cc39ea) and its suite stands up alone.
+  ;;
+  ;; That made it measurable, and the measurement says nbb must not gate it:
+  ;;
+  ;;   shadow-cljs compile test  81 tests / 258 assertions, 0 failures
+  ;;   nbb                       60 / 187, 9 failures + 1 error
+  ;;
+  ;; Compiled ClojureScript is what it ships to (the aozora Workers,
+  ;; kami-genko) and it is green. The nbb failures are all retry and rejection
+  ;; paths, where SCI wraps thrown ex-infos -- the behaviour measured on
+  ;; prolly-tree and datom-source the same week -- and SCI cannot load 21 of
+  ;; the tests at all. So no entry was added: one the fleet would pick up and
+  ;; report red on manufactures a permanent failure out of a working library.
+  ;;
+  ;; **The real blocker is a gate type this file does not have.** These two
+  ;; repos are `.cljs` with no reader conditionals and no JVM half, so
+  ;; `:jvm-test` is meaningless and `:nbb-script` is wrong. What they need is
+  ;; their own `npm test` -- `shadow-cljs compile test && node out/…` -- which
+  ;; is a JVM build producing a compiled artifact, and nothing in fleet-ci
+  ;; invokes that today. org-ietf-cbor's `test:cljs` is the same shape.
+  ;;
+  ;; That is the honest end of this thread: not "two repos need tidying" but
+  ;; "the fleet gates two runtimes and this workspace ships to three".
   ;; ADR-2608153000 — Valueflows 経済語彙。2026-08-15、実ノードで 1 度緑になった
   ;; ので :cd true に反転（receipt 1d6bd3ca7025、signer did:key:z6MkjyhVmg…）:
   ;;   test-ws-valueflo-algorithms-73816c6-murakumo-judah      Ran 64 tests / 249 assertions
