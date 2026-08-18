@@ -56,7 +56,14 @@
   The probe is a public-read surface, so this needs no credential: atproto is
   in `core/public-read-surfaces`, and
   `GET atproto.kotobase.net/xrpc/com.atproto.repo.describeRepo?repo=x`
-  performs the full shared-graph hydrate. That matters — the sparql and cypher
+  performs the full shared-graph hydrate.
+
+  It answers 501 MethodNotImplemented, and that is expected: the hydrate runs in
+  the router BEFORE nsid dispatch, so the request does the full hydrate and then
+  declines the method. Verified 2026-08-18 on ONE connection (curl --next):
+  probe 501 in 3.9 s, then /_diag/hydrate reporting sampled true, block_gets 84,
+  bytes 11462579. Separate connections land on different isolates and report
+  sampled false, which is not evidence of anything. That matters — the sparql and cypher
   surfaces return 401 to a self-issued CACAO, so a measurement that needed
   them would have needed an operator credential, and would have stalled here.
 
