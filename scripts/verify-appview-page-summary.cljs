@@ -93,9 +93,28 @@
 ;; **Flooring the examined count instead would punish the fix.** Deleting the dead
 ;; summary object is a legitimate repair, and it removes that page from `examined`; at
 ;; 122 examined against a floor of 120, two such repairs would have made the detector
-;; answer CANNOT ANSWER about a fleet that had just improved. Candidates only fall when
-;; the input is actually missing, which is the thing worth refusing on.
-(def floor-candidates 150)
+;; answer CANNOT ANSWER about a fleet that had just improved.
+;;
+;; The sentence that used to end this paragraph -- "candidates only fall when the
+;; input is actually missing" -- was falsified on 2026-08-19, three days after it
+;; was written. Candidates fell to 142 and the detector refused. Nothing was
+;; missing: **16 repositories had migrated their appview off Svelte entirely**
+;; (cloud-itonami/aidesk `c44f316`, "migrate the appview from TypeScript/Svelte to
+;; ClojureScript"), so `svelte/src/routes/+page.svelte` no longer exists in them.
+;; That is the same repair the paragraph above anticipates, one level up: not
+;; deleting the dead object, but deleting the page that carried it.
+;;
+;; So the floor is now sized against the threat it actually names -- an un-populated
+;; orgs/, a wrong --root, a tree that never got checked out -- and not against
+;; year-on-year attrition of Svelte appviews, which is a number that should be free
+;; to fall to zero. 50 is well below any population this has ever seen (225 pages on
+;; 2026-08-16, 142 candidates on 2026-08-19) and far above what a mis-rooted run
+;; finds, which is none.
+;;
+;; The count that moved is now printed on its own line -- bases that still have a
+;; `svelte/` directory but no page -- so a reader can tell a migration from a missing
+;; checkout without doing what this comment cost: an hour of archaeology.
+(def floor-candidates 50)
 
 (def findings (atom []))
 (defn finding! [sev k detail] (swap! findings conj [sev k detail]))
@@ -118,6 +137,23 @@
   (try (vec (js->clj (fs/readdirSync p))) (catch :default _ [])))
 
 (defn- exists? [p] (try (fs/existsSync p) (catch :default _ false)))
+
+(defn- svelte-dirs-without-page
+  "Bases carrying a `svelte/` directory but no `+page.svelte`. A repository that
+  migrated its appview to ClojureScript lands here; so does one whose checkout is
+  half-populated. It is the difference between the two that a reader needs, and
+  the number alone does not give it -- but its SIZE says whether to go looking."
+  []
+  (let [orgs-dir (path/join root "orgs")]
+    (vec
+     (for [org (dir-entries orgs-dir)
+           repo (dir-entries (path/join orgs-dir org))
+           base (concat [(path/join orgs-dir org repo)]
+                        (let [av (path/join orgs-dir org repo "appview")]
+                          (map #(path/join av %) (dir-entries av))))
+           :when (and (exists? (path/join base "svelte"))
+                      (not (exists? (path/join base "svelte" "src" "routes" "+page.svelte"))))]
+       base))))
 
 (defn- pages
   "Every `svelte/src/routes/+page.svelte` under orgs/<org>/<repo>, whether the
@@ -224,6 +260,8 @@
       ;; The skipped counts are printed whether or not anything was skipped. A run
       ;; that quietly examined half its input reads exactly like a clean one.
       (println (str "SCANNED\t" n "\tappview-page-summary"))
+      (println (str "svelte-dirs-without-a-page=" (count (svelte-dirs-without-page))
+                    " (migrated away, or never had one -- NOT missing input)"))
       (println (str "candidates=" (count ps)
                     " examined=" n
                     " skipped: not-in-west=" @unregistered
