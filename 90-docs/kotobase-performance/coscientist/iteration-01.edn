@@ -1,0 +1,94 @@
+{:iteration 1
+ :date "2026-08-18"
+ :loop :kotobase/cost-coscientist
+ :engine "90-docs/kotobase-performance/cost_coscientist.cljc"
+ :ported-from "design-quality.coscientist (itself ported from isekai.ux.coscientist, ADR-0007)"
+ :seed "The owner's criterion is cost against other graph databases. Every
+        priority list produced on 2026-08-17 was ordered by intuition."
+
+ :judge
+ {:fn "cost-per-million"
+  :unit "USD per million served reads"
+  :prices {:source "developers.cloudflare.com, fetched 2026-08-17"
+           :usd-per-million-requests 0.30
+           :usd-per-million-cpu-ms 0.02
+           :usd-per-million-class-b 0.36}
+  :why-deterministic "The ranking is reproducible from measured quantities and
+                      published prices. Re-running it after a measurement
+                      changes reorders the roadmap by itself, rather than by
+                      anyone's recollection of which change felt biggest."}
+
+ :baseline {:cost-per-million 70.06 :cpu-ms 1976 :class-b-ops 84 :bytes 11462579}
+
+ :ranked
+ [{:elo 1286 :id "h1-seed-materialisation"        :after 29.26 :saves 40.80 :share 0.582 :risk :low  :effort :L}
+  {:elo 1253 :id "h7-parse-only-addressable-values" :after 40.92 :saves 29.14 :share 0.416 :risk :low  :effort :M}
+  {:elo 1231 :id "h2-fold"                        :after 42.62 :saves 27.44 :share 0.392 :risk :low  :effort :S}
+  {:elo 1200 :id "h6-retract-inline-documents"    :after 46.74 :saves 23.32 :share 0.333 :risk :high :effort :S}
+  {:elo 1173 :id "h4-carv2-pack"                  :after 62.86 :saves  7.20 :share 0.103 :risk :high :effort :L}
+  {:elo 1145 :id "h3-engine-materialisation"      :after 69.94 :saves  0.12 :share 0.002 :risk :high :effort :L}
+  {:elo 1113 :id "h5-engine-pin"                  :after 70.06 :saves  0.00 :share 0.000 :risk :low  :effort :S}]
+
+ :the-result-the-ranking-could-not-produce
+ {:finding "Neither top hypothesis is the answer. The pair is, and it is worth
+            far more than their sum."
+  :why "The served hydrate has two halves. A (514 ms, 84 gets) is hot-datoms:
+        fetching, decoding and merging blocks. B (1,430 ms) is building the
+        LocalStore map, parsing every value twice. h1 removes A and leaves B.
+        h7 removes B and leaves A. Each alone is floored by the other's
+        remainder."
+  :h1-alone 29.26 :h7-alone 40.92 :pair 0.76
+  :order "h7 first -- it is reversible, :M rather than :L, captures the larger
+          CPU half on its own, and unlike h1 does not depend on a read:write
+          ratio nothing has measured."
+  :note "A tournament scores one change at a time against one baseline, so it
+         is structurally unable to see this. Evolve is where it was recovered."}
+
+ :what-the-loop-corrected-about-its-own-first-run
+ [{:what "h1 credited with 98.4% of the cost"
+   :now "58.2%"
+   :why "The first run credited a seed MV with the whole hydrate. The
+         decomposition landed later that day showed it removes A only -- 23% of
+         the CPU. B survives ANY encoding, because the consumer is a
+         synchronous LocalStore over a plain Clojure map."}
+  {:what "h2 (fold) credited with 57.5%"
+   :now "39.2%"
+   :why "The first run used an offline harness row that measured a different
+         quantity. Fold reduces the novelty part of A, not B."}
+  {:what "h4 (CARv2 pack) credited with 38.6% and ranked third"
+   :now "10.3%"
+   :why "An arithmetic error in the input: it assumed novelty packs and
+         snapshot does not, when write-locality makes each novelty cell its own
+         commit and therefore its own pack. Only the 21 snapshot blocks
+         coalesce. The judge made this visible by producing a result that
+         contradicted the ADR the hypothesis cited."}
+  {:what "the baseline itself"
+   :now "$57.82 -> $70.06, and the Aura crossover 1.12M -> 0.93M queries/month"
+   :why "The corrected measurement made kotobase look WORSE, not better. This
+         is recorded because a loop that only ever improves its subject is
+         measuring its author's preferences."}]
+
+ :what-the-judge-cannot-see
+ ["CPU. The dominant input is a Node proxy for a quantity only the platform can
+   read. Paired `wrangler tail` showed one request reporting 36 ms of
+   in-isolate elapsed spending 4,046 ms of cpuTime (n=1). Nothing inside the
+   isolate can see cpuTime, so this cannot be closed from here, and every
+   dollar figure inherits the uncertainty. Do not quote these as prices."
+  "The read:write ratio, which decides whether h1 is a win at all."
+  "The read side at all: a five-minute tail of the whole Worker returned no
+   served queries. Today's value is the unit-economics crossover, not saved CPU
+   on traffic that is not there."
+  "Memory. A 4.9 MB seed decode against a 128 MB isolate is unmeasured, and a
+   hypothesis that fails on memory scores the same here as one that succeeds."
+  "Correctness. Every hypothesis is assumed to return the same answers; the
+   judge only prices them."
+  "Storage, deliberately excluded as constant across hypotheses -- including it
+   would shrink every difference by a constant and flatter whichever change is
+   being argued for."]
+
+ :seed-for-next
+ "Close the CPU uncertainty first; it is the input every ranking rests on and
+  the only one that cannot be read from inside the isolate. A `wrangler tail`
+  harness that pairs cpuTime against the counters /_diag/hydrate already
+  reports would make the judge's dominant term measured rather than proxied.
+  Until then this loop ranks reliably and prices unreliably."}
