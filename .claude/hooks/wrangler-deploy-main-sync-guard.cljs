@@ -139,7 +139,16 @@
                 (or (git top "remote") "なし")
                 "）。**このデプロイは検査されていません。**"))
           (allow!))
-        (git top "fetch" "-q" (first (str/split ref #"/")) (second (str/split ref #"/")))
+        ;; remedy 行が名指しする remote は、判定に使った ref と同じものでなければ
+        ;; ならない。ここを "origin" 決め打ちにしていた間、ガードは正しく deny
+        ;; しながら **実行できない直し方を印字していた** —— 実測 2026-08-18、
+        ;; `orgs/net-kotobase/control-plane`（remote は `net-kotobase` のみ）で
+        ;; `git fetch origin` は `'origin' does not appear to be a git repository`
+        ;; で落ちる。2026-08-13 に upstream-ref を一般化した時、この行を一緒に
+        ;; 直していなかったので、**その修正が対象にした 64% の checkout でだけ
+        ;; remedy が壊れている**という形になっていた。
+        (let [[rmt branch] (str/split ref #"/" 2)]
+          (git top "fetch" "-q" rmt branch))
         (let [raw    (git top "rev-list" "--count" (str "HEAD.." ref))
               parsed (js/parseInt (or raw "0") 10)
               behind (if (js/isNaN parsed) 0 parsed)]
@@ -152,11 +161,11 @@
                    "（2026-07-25 に実際に発生: kotobase.net の signup funnel が"
                    "11分で 404 に戻された）。\n\n"
                    "先に同期してください:\n"
-                   "  git -C %s fetch origin && git -C %s merge --ff-only %s\n"
+                   "  git -C %s fetch %s && git -C %s merge --ff-only %s\n"
                    "FF できない場合は乖離しています——CLAUDE.md の方針に従って"
                    "解消してから再実行してください（rebase はしない）。\n\n"
                    "隔離環境へのデプロイ（--env <name>）と --dry-run は"
                    "ブロックしません。")
-              top ref behind top top ref))))))
+              top ref behind top (first (str/split ref #"/" 2)) top ref))))))
     (allow!))
   (catch :default _ (compat/exit 0)))
