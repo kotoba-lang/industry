@@ -59,7 +59,10 @@ ADR-0057 の Drive store は 100 MiB の upload で **403 リクエスト**（40
 + 3 nodes）を出す。bot の work tree は小ファイルが数万個あるので、1 CID =
 1 object のままだと round trip で死ぬ。
 
-packing policy は **write-locality。1 commit = 1 pack** を既定にする。
+packing policy は **write-locality。1 commit = 1 pack** を既定にする —— ただし
+**object 面の天井で切る**。pack も object であり、archive の
+`max-object-bytes` は 4 MiB なので、それを超える commit は複数 pack になる
+（下の実測。この 1 文は測ってから足した）。
 
 ⚠ :packed-blocks を名乗るなら object 面の **:range-read を併せて宣言する**
 （ADR-2608160100）。Range の無い store で packed を名乗ると『pack 全体を GET
@@ -158,22 +161,50 @@ ADR-0057 決定 8 は repository 状態を UnixFS archive に**入れない**と
 形になっていないのは、抜けではなく決定である。本 ADR はその決定を覆さない ——
 覆さずに済むように D5（address する前に seal する）を置いている。
 
-## 何も実装していない
+## 実装されたのは計器だけ
 
-**この ADR は設計判断であり、実装は 1 行も無い。** 上の表の『現在地』が現在地で
-あって、本 ADR の表ではない。決定を実装として引用しないこと。
+**この ADR の設計は 1 行も実装されていない。** pack 層も、ref plane の配線も、
+UnixFS を base に据えた work tree も無い。landed したのは**それを測る計器**
+（`io-ipld-car` の `round_trips.cljs`）であって、設計ではない。
+上の表の『現在地』が現在地であって、本 ADR の表ではない。
 
-## 最初の 1 手 —— 測る
+## 測った（2026-08-19）—— D3 は支持された。ただし『1 commit = 1 pack』は誤り
 
-設計を広げる前に、D3 が要るかどうかを決める 1 つの数字を取る:
+instrument は `kotoba-lang/io-ipld-car` の `script/round_trips.cljs`（landed
+`d4f4ea9`）。network を叩かない —— block-per-object store の request 数は
+block 集合の関数なので、block を数えれば**推定ではなく厳密**になる。latency は
+測っていない（この ADR の指標は round trip 数であり、道具はその数だけを報告する）。
 
-1. 実際の bot work tree 1 本を現行の cloud.itonami.app.kotobase-objects store に
-   書き、**リクエスト数を数える**
-2. 同じ tree を ipld.car.v2/pack で 1 pack にまとめ、同じく数える
+| tree | files | bytes | blocks | block-per-object | packed |
+|---|---:|---:|---:|---:|---:|
+| `cloud-itonami/cloud-itonami-app` | 497 | 7.6 MiB | 510 | **510 PUT** | **2 PUT** |
+| `kotoba-lang/kekkai-node` | 75 | 353 KiB | 75 | **75 PUT** | **1 PUT** |
 
-ADR-0057 自身が『Writes are chattier than a single PUT and that is the number to
-watch』と書いて宿題にしている所である。この 2 つの数字が出るまで、pack 層を
-実装しない。
+255 倍と 75 倍。network 越しの agent work tree にとって、これは設計を分ける大きさ。
+
+**ただし D3 の書き方が 1 箇所間違っていた。** 『1 commit = 1 pack』は object 面の
+天井を無視している —— pack も object であり、
+`kotobase.archive-put/max-object-bytes` は **4 MiB**。7.7 MiB の pack は archive が
+拒否する。正しくは **1 commit = 天井で切った N pack**（write-locality は保つ）。
+測定スクリプトの最初の版はまさにこの誤りを犯して『1 request』と報告した ——
+**設計文の誤りが、それを測る道具に複製されていた。**
+
+読み過ぎてはいけない結果が 2 つ、同じ測定から出た:
+
+- **1 つの tree の中の dedup はゼロ**（510 block / 510 distinct CID）。content
+  address が効くのは **commit をまたぐ時と、同じ base を持つ agent 同士**であって、
+  1 枚のスナップショットの中ではない。**1 tree の測定はそれを見ることができない。**
+- **497 中 492 が 1 block**（256 KiB chunk 未満）。per-file の読みは packed でも
+  unpacked でも 1 GET で、packing が read 側で買うのは **tree 全体の取得** ——
+  base を materialize する agent が実際に行う操作の方である。
+
+exit code は 3 つに割った: `0` 答えた / `2` 測るものが無い / `3` 答えられない
+（grouping の見積りが天井を超える pack を作った）。読めなかったファイルは数えて
+印字する —— `inga` は `node_modules` が commit 済みでローカルに無いため
+**231 unreadable** と出る。黙って 1/3 の tree を測って答えるより良い。
+
+**次**: dedup は commit をまたいで測る（同じ tree の 2 世代）。1 tree では原理的に
+出ない数字を、出ないまま放置しない。
 
 ## 作らないもの
 
