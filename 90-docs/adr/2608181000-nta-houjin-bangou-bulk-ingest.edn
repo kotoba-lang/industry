@@ -499,6 +499,20 @@ pDNS 1,005 / indicator 746 / IP 履歴 441）、tadori-threat-intel 5。
 いる —— 手元で discriminate することと、配られた tree で discriminate することは
 別の主張であり、operator 機の npx は実際に壊れている。
 
+**さらに fleet の tick 自身が緑を記録した**（`manifest/fleet-ci.edn` の受領証、
+実測 2026-08-19）:
+
+```text
+test-cwp-projections-8d23ced-murakumo-dan        pass  VERIFY-PROJECTIONS: OK
+test-kanpou-projections-a731e72-murakumo-simeon  pass  VERIFY-PROJECTIONS: OK
+test-jgrants-projections-30e7c19-murakumo-levi   pass  VERIFY-PROJECTIONS: OK
+test-nta-projections-60e8cad-murakumo-dan        pass  3 files, 11,352 records
+```
+
+`gbiz-info-projections` は登録直後で受領証がまだ無い（tick は 5 分ごとに tip を見て、
+変化した repo だけ gate を回す）。**受領証が無いことは「赤」ではなく「まだ問われて
+いない」** —— この 2 つを混同しないために、gate 名には sha7 が入っている。
+
 ⚠ **`nta` gate の床は最初から在ったが、到達できなかった。** `SCANNED` 行が無ければ
 93 で落とす分岐が `(pos? code)` の**後ろ**にあり、検証器が起動できなかった非 0 が
 「違反があった」として報告されていた。順序を入れ替えた。**走らなかったことと、
@@ -554,6 +568,6 @@ gbizinfo      folded 125,144 → 2,358 社
   `press-wire/distributors` に足す形は空いている。**PR TIMES に出さない会社は
   この面に現れない** —— 不在を「発表していない」と読まない。
 - ~~fleet gate が 5 つの新 repo のうち 1 つにしか無い~~ → **5/5 完了**（15 節）。
-  残っているのは「1 度も緑になっていない gate」問題の一般形 —— 新しい 4 gate は
-  手元と judah で両方向を見たが、**fleet の tick が回して緑を記録するのはまだ**。
+  4 gate のうち 3 つは fleet の tick でも緑になっている（受領証あり）。
+  `gbiz-info-projections` だけ登録直後で未実行。
 "}]
