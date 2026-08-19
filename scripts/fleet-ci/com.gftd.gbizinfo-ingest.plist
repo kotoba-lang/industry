@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.gftd.gbizinfo-ingest — gBizINFO 全件の日次取り込み（ADR-2608190100）。
+
+  全件データの更新は月次だが、**publish 日を事前に知る方法が無い**（配布ファイル名は
+  ダウンロードした日付であって publish 日ではない）。だから毎日引いて、content の
+  sha256 が前回と同じなら projection を書き換えない。約 28 MB/日 は払う ——
+  払わないと「いつ変わったか」を後から言えない。
+
+  07:17 は kouhou (06:41) と newsfeed (05:23) と fleet-ci-sweep (04:17) から
+  ずらしてある。同時刻に走らせるとどちらの負荷か切り分けられない。
+
+  トークンは Keychain `gbizinfo-api-token`（`secrets-location-map` 参照）。
+  無ければ script が exit 2 で「測れなかった」と言って止まる。
+
+  導入:
+    cp scripts/fleet-ci/com.gftd.gbizinfo-ingest.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.gbizinfo-ingest.plist
+  見る:
+    tail -40 /tmp/gbizinfo-ingest.log
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.gftd.gbizinfo-ingest</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <!-- 実体は scripts/gbizinfo-ingest.cljs。plist にロジックを書かない
+         （launchctl は編集のたびに bootout/bootstrap が要り、直せなくなる）。 -->
+    <string>exec /opt/homebrew/bin/nbb /Users/junkawasaki/github/com-junkawasaki/scripts/gbizinfo-ingest.cljs</string>
+  </array>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>7</integer>
+    <key>Minute</key><integer>17</integer>
+  </dict>
+
+  <!-- bootstrap 直後に走らせない。意図しない一斉実行を避ける。 -->
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/gbizinfo-ingest.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/gbizinfo-ingest.err</string>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/junkawasaki/github/com-junkawasaki</string>
+</dict>
+</plist>
