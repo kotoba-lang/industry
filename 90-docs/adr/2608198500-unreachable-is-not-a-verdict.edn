@@ -1,0 +1,83 @@
+[{:db/id -1
+  :adr/id "adr-2608198500-unreachable-is-not-a-verdict"
+  :adr/title "ノードに届かなかった run を、その sha についての判定として台帳に書かない"
+  :adr/status "accepted"
+  :adr/date "2026-08-19"
+  :adr/related "adr-2608198300-a-refusal-names-the-input-not-the-count adr-2608136000-five-questions-before-trusting-green"
+  :adr/body
+  "## 観測
+
+tick log を 2026-08-03 から数えると **extract failure が 566 件**。内訳:
+
+| 原因 | 件数 |
+|---|---|
+| `ssh: connect ... Operation timed out` | 505 |
+| `Read from remote host ...: Operation timed out` | 13 |
+| `Connection timed out during banner exchange` | 10 |
+| 展開先の作成失敗・truncated gzip 等 | 38 |
+
+**528 件が「機械に届かなかった」**であって、コードについて分かったことではない。
+ノード別では levi 196 / dan 187 / judah 124 と全 9 ノードに散っているので、
+壊れた 1 台ではなく一過性の tailnet 断である。
+
+その 528 件はすべて `:fail` として `fleet-ci-state.edn` に、その repo の
+**tip の sha 付きで**書かれていた。
+
+## なぜ「紛らわしい」で済まないか
+
+`work-changed?` は「記録済み sha ≠ 現 tip」を再実行の条件にする。つまり
+tip と等しい sha に `:fail` を書くと、**その gate は次の commit まで二度と
+走らない**。静かな repo では無期限に赤のまま残る。
+
+ssh が 1 回こけただけで、repo は誰も押すまで赤を掲げ続ける。CLAUDE.md が
+数えた「landing 以来一度も緑になっていない 6 gate」の一部は、この経路で
+説明がつく可能性がある（本 ADR はそれを主張しない —— 母集団の再測定が要る）。
+
+## 決定
+
+extract failure は `:unreachable` として扱い、**台帳に書かない**。次の tick が
+そのまま再試行する。Radicle issue も開かない（repo に直す欠陥が無く、
+『ssh が timeout した』という issue は読む相手が違う）。
+
+これは `reject-input!` の**ノード側の双子**である。あちらは「入力を組み立て
+られなかったから判定にしない」で、既にそう実装されている。こちらは同じ理由で
+判定にしていなかっただけ。
+
+**署名済み receipt は `:fail` のまま**で、それは正しい —— gate は実際に成功を
+報告していない。変わるのは operator の台帳がそれを「この sha を判定した」と
+扱わなくなることだけ。
+
+## 判別
+
+`exit 90` は使えない。wrapper 自身の『missing after extract』refusal と同じ
+コードで、**そちらは tree が届いた上での本物の所見**だからである。判別できるのは
+gate command が出す sentinel だけなので、それを定数 `extract-fail-sentinel` に
+して**発する側と読む側で共有**する。二重の綴りは fail-open になる（読む側が
+発する側を認識しなくなり、全部が判定として記録に戻り、見た目は何も変わらない）
+ので、それ自体をテストで固定する。
+
+## 証拠
+
+`scripts/fleet-ci/tick-unit-test.cljs` に 2 件・6 assertion。入力は
+2026-08-19 に fleet が実際に出した detail 文字列。
+
+**両方向を確認済み**:
+
+| 壊し方 | 落ちたもの |
+|---|---|
+| emitter が別の綴りに drift | drift test のみ |
+| predicate が本物の文字列を認識しなくなる | 認識 test と drift test の 2 件 |
+
+無改変で 25 tests / 58 assertions が 0 failures。
+
+`missing after extract`（tree は届いた）と本物の gate 失敗（ASan 報告）が
+**再分類されないこと**も固定している —— この変更は赤を消す方向に働くので、
+消しすぎないことの方が重要。
+
+## 残っていること
+
+- **`:unreachable` が増え続けるノードは別問題**として見えるようにする必要がある。
+  今回の変更は台帳を静かにするので、`levi 196` のような偏りが埋もれうる。
+  現状は log の `UNREACHABLE` 行だけが手がかり。
+- 過去 528 件が既に書き込んだ `:fail` は残る。上書きはしない（次の tip で自然に
+  更新される）。"}]

@@ -379,6 +379,38 @@
       (is (str/includes? wrapper (str/replace p #"^(scripts|tools)/" ""))
           (str "the wrapper still reads " p)))))
 
+(deftest a-tree-that-never-reached-the-node-is-not-a-verdict
+  ;; The exact detail the fleet produced on 2026-08-19. `exit 90` is shared with
+  ;; the wrappers' own "missing after extract" refusal, so the code alone cannot
+  ;; tell the two apart -- only the sentinel the gate command emits can.
+  (let [real (str "exit 90 — ssh: connect to host 100.89.204.30 port 22: "
+                  "Operation timed out | FLEET-CI: extract failed on issachar")]
+    (is (tick/unreachable-outcome? real)
+        "an ssh timeout during placement is recognised"))
+  (is (not (tick/unreachable-outcome?
+            "exit 90 — FLEET-CI: missing after extract: tools/kexe_loader.c — refusing to report a pass"))
+      "a wrapper refusing because a required file is absent is NOT this: the tree
+       arrived, and what it says about the tree is real")
+  (is (not (tick/unreachable-outcome?
+            "exit 1 — SUMMARY: AddressSanitizer: heap-buffer-overflow | FLEET-CI-EXIT: 1"))
+      "and a genuine gate failure is untouched")
+  (is (not (tick/unreachable-outcome? nil))
+      "a check with no detail is not silently reclassified"))
+
+(deftest the-emitter-and-the-reader-share-one-spelling
+  ;; Two spellings of this sentinel would fail open: the reader would stop
+  ;; recognising the emitter, every unreachable run would go back to being
+  ;; recorded as a judgement, and nothing would look different.
+  (let [command (tick/gate-command {:host "issachar" :tarball "/tmp/t.tar.gz"
+                                    :script-file "/tmp/s" :name "amu"
+                                    :sha "1111111111111111111111111111111111111111"
+                                    :out-file "/tmp/o"})]
+    (is (str/includes? command tick/extract-fail-sentinel)
+        "the command emits the constant the predicate reads")
+    (is (tick/unreachable-outcome?
+         (str "exit 90 — something | " tick/extract-fail-sentinel " issachar"))
+        "and the predicate accepts what that command would produce")))
+
 (let [{:keys [fail error]} (run-tests 'tick-unit-test)]
   (when (pos? (+ fail error))
     (js/process.exit 1)))

@@ -794,6 +794,37 @@
 ;;   ことで行う。exit code には一切依存しない。
 (def exit-sentinel "FLEET-CI-EXIT:")
 
+;; The gate command emits this when the tree could not be placed on the node --
+;; almost always because ssh could not reach it. `unreachable-outcome?` below
+;; matches the same constant, so the emitter and the reader cannot drift.
+;;
+;; **This is not a verdict about the repository.** It is the node-side twin of
+;; `reject-input!`: in both cases the gate never ran, so there is nothing to
+;; conclude. `reject-input!` already keeps its case out of the ledger; this one
+;; did not, and the consequence is worse than a misleading line. `work-changed?`
+;; skips a gate whose recorded sha equals the current tip, so recording a
+;; :fail here **pins the red until somebody pushes a new commit** -- on a quiet
+;; repo, indefinitely.
+;;
+;; Measured 2026-08-19 over the tick log since 2026-08-03: 566 extract failures,
+;; of which 505 are `ssh: connect ... Operation timed out`, plus 13 `Read from
+;; remote host` and 10 `Connection timed out during banner exchange` -- 528
+;; unreachability events written into the ledger as judgements about code.
+;; Spread across every node (levi 196, dan 187, judah 124, and six others), so
+;; it is transient tailnet loss rather than one bad machine.
+;;
+;; The signed receipt still says :fail, and that stays honest -- the gate really
+;; did not report success. What changes is that the OPERATOR's ledger no longer
+;; treats that as having judged this sha, so the next tick tries again.
+(def extract-fail-sentinel "FLEET-CI: extract failed on")
+
+(defn unreachable-outcome?
+  "True when this check failed because the tree never reached the node.
+  Reads the sentinel the gate command itself emits, so there is no second
+  spelling to keep in step."
+  [detail]
+  (and (some? detail) (str/includes? (str detail) extract-fail-sentinel)))
+
 (defn gate-script
   "gate 1 本ぶんのノード側スクリプト。どの終了経路でも最後に
   `FLEET-CI-EXIT: <code>` を必ず出す（これが唯一の verdict 伝達路）。"
@@ -1213,7 +1244,7 @@
          " rm -rf " d "; mkdir -p " d ";" place
          " && echo FLEET-CI-EXTRACT-OK\" > " out-file ".extract 2>&1; "
          "grep -q FLEET-CI-EXTRACT-OK " out-file ".extract"
-         " || { tail -5 " out-file ".extract; echo 'FLEET-CI: extract failed on " host "'; exit 90; }; "
+         " || { tail -5 " out-file ".extract; echo '" extract-fail-sentinel " " host "'; exit 90; }; "
          "ssh " ssh-opts " " host " bash -s < " script-file " > " out-file " 2>&1; "
          "tail -30 " out-file "; "
          "grep -q '^" exit-sentinel " 0$' " out-file
@@ -1849,19 +1880,31 @@
                               ;; check の :detail は Radicle issue 本文に入れる。
                               ;; 「落ちた」だけの issue は読んでも何も分からない。
                               det (let [k (keyword (str "gate/" (:gate-name w)))]
-                                    (:detail (first (filter #(= k (:name %)) checks))))]
-                          (swap! results conj (assoc w :outcome oc :cid (:cid receipt)
-                                                     :detail det))
+                                    (:detail (first (filter #(= k (:name %)) checks))))
+                              unreachable? (unreachable-outcome? det)]
+                          (swap! results conj (assoc w :outcome (if unreachable? :unreachable oc)
+                                                     :cid (:cid receipt) :detail det))
+                          (when unreachable?
+                            (log "UNREACHABLE" (:id w) (sha7 (:tip w))
+                                 "— the tree never reached the node; not recorded as a"
+                                 "judgement of this sha, so the next tick retries"))
                           ;; receipt が無い pass を state に保存すると次の tick が
                           ;; same tip を skip し、証跡が永久に欠ける。
-                          (when (and (not dry?) landed?)
+                          ;;
+                          ;; unreachable も同じ理由で保存しない —— こちらは逆向きの
+                          ;; 事故で、保存すると次の tick が same tip を skip し、
+                          ;; **ssh の一過性断で付いた赤が次の commit まで残る**。
+                          (when (and (not dry?) landed? (not unreachable?))
                             (swap! state assoc-in [:repos (:id w)]
                                    {:sha (:tip w) :spec-hash (:spec-hash w)
                                     :outcome oc :cid (:cid receipt) :at (now)})
                             (save-state!))))))))))
         ;; ---- Radicle: 落ちたものだけ issue を開く
         (let [rc (:rad cfg)
-              failed (filter #(not= :pass (:outcome %)) @results)]
+              ;; `:unreachable` is excluded on purpose: the repository has no
+              ;; defect to file, and an issue that says "ssh timed out" reaches
+              ;; the wrong reader entirely.
+              failed (filter #(not (contains? #{:pass :unreachable} (:outcome %))) @results)]
           (cond
             (not (:enabled rc)) nil
             (or dry? (:no-rad opts))
