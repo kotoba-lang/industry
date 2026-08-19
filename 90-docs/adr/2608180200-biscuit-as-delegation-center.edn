@@ -176,12 +176,22 @@ subset のみ実装（ADR-2608159400 が自ら「完全な policy language は�
 | 減衰が構造的 | **5/5** | `meet` が最大下界。escalation は算術的に不能 |
 | fail-closed | **4/5** | 未知の caveat/kind は不満足、未知 policy は deny。**biscuit の予算超過だけは新しく足した** |
 | 両方向を見た検査 | **4/5** | **10 defect** で赤→緑（macaroon 4 / biscuit 6）。**うち 2 つは実演中に見つけた検査漏れ** |
-| **wire 相互運用** | **3/5**（2026-08-19 更新、旧 1/5） | **`biscuit-auth` が発行した実トークンを decode し署名検証まで通る**（公式 `samples/current`、負の 3 種も拒否）。まだ 5 でないのは**書きが無い**ため —— 外部実装が我々の出力を読んだことは一度もない |
-| 配備 | **1/5**（2026-08-19 更新、旧 0/5） | 呼び手は production namespace に在り suite は緑。**まだどの route も biscuit を通さない** —— live は CACAO 自己発行のまま |
+| **wire 相互運用** | **3/5** | **`biscuit-auth` が発行した実トークンを decode し署名検証まで通る**（公式 `samples/current`、負の 3 種も拒否）。まだ 5 でないのは**書きが無い**ため —— 外部実装が我々の出力を読んだことは一度もない |
+| 配備 | **3/5**（2026-08-19 再更新、旧 1/5） | **testnet の 1 graph で live**。実 request で確認: garbage biscuit → `verification-failed` 403、wire off の graph → 従来どおり 200、両方提示 → `ambiguous-credential` 403。まだ 5 でないのは **production に無い**ため |
 
-**総合 32/40**（2026-08-19。旧 29/40）。**上がった 2 軸は同じ 1 日の作業で、
-残りの 2 点も同じことを言っている** —— **書きが無い**ことと、**まだ誰の route も
-通っていない**こと。
+**総合 34/40**（2026-08-19 再測。29 → 32 → 34）。**残る 6 点のうち 4 点は同じ 1 文**
+—— **writer が無い**（外部が我々の出力を読んだことがない）ことと、**production に
+無い**こと。
+
+**実測値（2026-08-19 時点、ノードで観測したものは node と明記）**:
+
+| repo | tests / assertions | 赤も見た defect |
+|---|---|---|
+| `org-biscuitsec` | 69 / 164（node: 61 / 138 — sibling 依存の drift 検査が skip する分） | 10 |
+| `macaroon` | 18 / 39（node で同値） | 4 |
+| `authority` | 37 / 122（node） | — |
+| `kotobase-server` | 152 / 569 | 5 |
+| `net-kotobase/engine` | 256 / 739 | 4 |
 
 ## 何を supersede するか
 
@@ -201,12 +211,13 @@ subset のみ実装（ADR-2608159400 が自ら「完全な policy language は�
 | actor → kotobase-server | CACAO 自己発行（live） | 触らない。session 起点として正しい |
 | actor → actor の委譲 | **まだ無い** | biscuit で書く（最初の 1 本が proving slice） |
 | kotoba の `delegated` 項 | **wire 実装済み**（`biscuit.kotoba/->delegated`） | 済 |
-| guarded call | **実装済み**（`biscuit.effective/authorize`）。`requested ∩ delegated ∩ local-policy` を**言語の `:rules` を読んで**分岐し、全経路が receipt を返し、**どの枝も秘密を要求しない**。契約テストが実 `capability-semantics.edn` を読み、**読めなければ pass せず fail する**。38 tests / 95 assertions、9 defect で赤→緑 | **fleet 側の呼び手はまだ 0。**次は kotobase edge か actor の実 host call を 1 本通す |
+| guarded call | **実装済み**（`biscuit.effective/authorize`）。`requested ∩ delegated ∩ local-policy` を**言語の `:rules` を読んで**分岐し、全経路が receipt を返し、**どの枝も秘密を要求しない**。契約テストは vendor した規則をどこでも検査し、sibling がある時だけ実ファイルとの drift を見る（無い時は **skip を印字**） | **呼び手あり**（下記 route） |
 | **鍵の発見と回転** | **着地（2026-08-19）。** `biscuit.rootkey` が pre-rotation コミット付きの署名付き log を検証し、`publish` / `resolve-log` が発行と解決を持つ。**鍵儀式を実施し、genesis を publish 済み**（下記）。`org-w3-did` は `did:key` / `did:web` のみで `did:webvh` は fleet に無いままだが、**それは transport の選択肢であって authority ではない** | 回転の実演（seq 2 を出す）|
 | amu / aiueos / kototama | **触っていない。触る必要が無い** —— admission・機械内 table・epoch feed であって delegation ではない | 失効を biscuit に足さず、この 2 面に乗せる |
 | biscuit の wire | **読みは実装済み**（`biscuit.wire`）。`biscuit-auth` の公式サンプルを decode し**署名検証まで通る**。負のサンプル 3 種は拒否。**書きは未実装**（外部が受理していない writer を format と名乗らない） | 書きは、外部実装が我々の出力を読むまで claim しない |
 | Ed25519 束縛 | **実装済み。** JVM は `java.security`、nbb は `node:crypto`、公開鍵導出は `org-ietf-ed25519`。stand-in は残すが「どの署名方式でも成り立つ性質」用と明記 | — |
-| edge 検証 | **実装済み。** `kotobase-server` の `security/authority` に `verify-biscuit`（model）と **`verify-biscuit-wire`（biscuit v3 protobuf バイト）**。CACAO と同じ `:effective-caps` を返し、**root 公開鍵しか持たない**。144 tests / 545 assertions green | route はまだ繋いでいない（追加のみ、CACAO が live のまま） |
+| edge 検証 | **実装済み。** `kotobase-server` の `security/authority` に `verify-biscuit`（model）/ `verify-biscuit-wire`（protobuf バイト）/ `delegation-for-request`（Worker が呼ぶ 1 つの面）/ `read-auth-for-request`（read 経路の `{:did :resources}` 形）。**root 公開鍵しか持たない** | — |
+| **route** | **繋がって live**（testnet）。`net-kotobase/engine` の `run-read` が `biscuit/read-auth!` を呼ぶ。**graph 1 つ（`biscuit-pilot`）だけ**で有効、production / staging は wire off。実 request で確認済み（下記） | production は graph 選定と log の置き場を決めてから |
 | **2 wire の共存規則** | **実装済み**（`security/credential`）。**request が wire を名乗り、順に試さない。** 検証失敗は拒否であって retry ではない。両方提示は `:ambiguous-credential` で拒否。graph allowlist は**未設定 = 有効な graph ゼロ**（fail open しない） | route はこの関数を通す |
 
 **「biscuit を中心にする」と書いた時点で中心になったのではない。** 中心になるのは
