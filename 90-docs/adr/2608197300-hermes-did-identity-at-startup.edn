@@ -110,25 +110,46 @@ ADR-2608180200 に反するので同日改めた。CACAO は消えず、human co
 `90-docs/evidence/260819-identity-startup-biscuit-authority.edn`。pin 済み checkout で
 19 tests / 46 assertions / 0 failures。
 
+**consumer も landed**（2026-08-19）: `scripts/identity-verify.cljs`（stdin から EDN、
+exit 0/1/3）と `scripts/hermes-dashboard-auth-did/`（Hermes plugin、`supports_token`）。
+実測は `90-docs/evidence/260819-hermes-did-plugin-verifier.edn`。
+
 ## 次の一手（resume point）
 
-1. **plugin の骨を置く** —— `~/.hermes/hermes-agent/plugins/dashboard_auth/did/__init__.py`。
-   `self_hosted` を雛形にし、5 メソッドを実装。`complete_login` と `verify_token` は
-   **検証を自前で書かず** `scripts/identity-startup-e2e.cljs` と同じ classpath で nbb を
-   subprocess 実行し、`biscuit.token/verify` → `biscuit.kotoba/->delegated` →
-   `authority.chain/authorize` → `identity.startup/resolve-state` を通す。
-2. **verifier CLI を切り出す** —— e2e スクリプトの前半（鍵生成とデモ）を捨て、
-   stdin から `{token, root-public-key, requested, now}` を読んで decision を EDN で返す形にする。
-3. **kagi に鍵を置く** —— compartment `personal`、root と device を別 item。
-   `FLEET_ROOT` 経由で bin を解決する既存の呼び方に合わせる。
-4. **両方向の gate** —— 鍵無しで機微 API が 401、鍵ありで 200 に戻ることを実 Hermes で見せる。
-   これが landed するまで plugin は「動いたと言えるだけ」。
-5. **factor verifier の配線** —— `kotoba-lang/authentication` の `IFactorVerifier` に
-   WebAuthn を挿し、その decision を `identity.authenticators/acceptable` に渡す。
-   ceremony は `kotoba-lang/webauthn` / `org-w3-webauthn`（**新しく書かない**）。
+**1 と 2 は 2026-08-19 に landed。** 実測は
+`90-docs/evidence/260819-hermes-did-plugin-verifier.edn`。
 
-**未実装**: Hermes `dashboard_auth/did` plugin、nbb verifier CLI、kagi への鍵保管、
-mint/link の UI 2 択、pairing 文字列の経路、`authentication` の factor verifier 配線。
+| # | | 現在地 |
+|---|---|---|
+| 1 | Hermes `dashboard_auth/did` plugin | **landed** — `scripts/hermes-dashboard-auth-did/`（版管理の正本。Hermes は他者の repo なので install は copy）。`supports_token`、6 経路を probe で実測 |
+| 2 | nbb verifier CLI | **landed** — `scripts/identity-verify.cljs`。stdin から EDN、exit 0/1/3 |
+| 3 | kagi に鍵を置く | **未** — probe の鍵は決定論的 test seed で、kagi にも Keychain にも触れていない |
+| 4 | 両方向の gate を実 Hermes で | **半分** — plugin seam までは両方向を実測。**非 loopback で起動して HTTP 401/200 を往復させてはいない** |
+| 5 | factor verifier の配線 | **未** — `kotoba-lang/authentication` の `IFactorVerifier` に WebAuthn を挿す |
+
+**exit code を 3 つに分けたのが効いた。** `0 allowed / 1 denied / 3 undecided` と
+し、plugin 側で `1 -> None`（401 経路、次の provider へ）/ `3 -> ProviderError`
+（503 経路）に対応させた。これは `DashboardAuthProvider` の契約そのもの —
+*\"Raise ProviderError ONLY for a genuine backing-store outage\"* — と一致する。
+
+⚠ **ただし exit code だけでは足りなかった。** nbb は namespace を読めないと
+**exit 1** で死ぬ。verifier の `denied` と同じ値なので、code だけを読む初版は
+*classpath が壊れた瞬間に全 token を 401 にしていた* —— 資格情報が正しい相手に
+「あなたの token が無効だ」と言い、検査が走っていないことはどこにも出ない。
+現在は **stdout の verdict を先に読み、exit code は裏付けにしか使わない**。
+verdict が無ければ exit code が何であれ outage として扱う。
+
+**壊れた token は `denied` であって `undecided` ではない。** 読めない資格情報は
+拒否された資格情報であり、それを裁くのが verifier の仕事。初版はここも `undecided`
+にしていて、あらゆる不正 token が呼び出し側には 503 に見えていた。
+
+**holder は token から導出する。** `:holder` を入力に取ると、認証の主体を
+呼び出し側が名乗ることになる。最終 block の `next-public-key` から `did:key` を
+導出し、`:holder` が渡された場合は一致しなければ `:holder-mismatch` で deny。
+
+**未実装**: kagi への鍵保管、非 loopback 実 Hermes での 401/200 往復、mint/link の
+UI 2 択、pairing 文字列の経路、`authentication` の factor verifier 配線、
+session 半分（`complete_login` / `verify_session`。現在 `supports_session=false`）。
 
 **意識的に保留**: `.kotoba` 決定核 + parity gate。`identity` は zero-dep 方針の repo で、
 compiler を足すのは別の決定（先例は `session_handoff_core.kotoba` と murakumo の parity test）。
