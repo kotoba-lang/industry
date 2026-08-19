@@ -918,6 +918,39 @@
               No root argument is passed: the script's default is the relative `orgs`, which
               keeps FINDING keys repo-relative and therefore stable across machines."}
 
-]
-
-}
+  {:id :verify-silent-js-callbacks
+   :title "letfn siblings handed to a JS callback by name, which nbb never invokes"
+   :why "Measured 2026-08-19 (ADR-2608190100): `(.catch fetch-and-retry)` in
+              kotobase-server did nothing under nbb/SCI -- no exception, no warning --
+              so a retryable block-miss escaped as a generic error three layers away.
+              Reduced to four lines, then narrowed in four directions: a single-binding
+              letfn works, a name passed from the letfn BODY works, a sibling calling
+              another directly works, and ONLY a name reaching a JS callback from inside
+              a sibling binding fails. The detector encodes exactly that shape.
+              The same trampoline is copied into six R2 workers. Those are shadow-cljs
+              builds where passing by name works, so they are reported `med`: a hazard
+              that becomes a defect the day the suite moves to nbb, which is the
+              direction this workspace is moving. A repo that already ships an nbb
+              runner gets `high` instead -- that is a fact on disk, not a judgement."
+   :measured "2026-08-19 on this machine, four directions:
+                self-test (10 fixtures, every one a shape actually run under nbb) -> 10/10, exit 0
+                the real pre-fix file (kotobase-server 3d2523d trampoline)         -> 1 finding, exit 1
+                the same file after the fix                                        -> 0 findings, exit 0
+                the whole orgs/ tree                                               -> SCANNED 32741, 13 findings, exit 1, 75s
+              Two defects were fixed before this could be registered, both of which made
+              it answer confidently and wrongly:
+              (1) It parsed its own argv as `(drop 3 …)`, which is only right when the
+                  script is argv[2]. With a `--classpath` it took its own path as a root,
+                  scanned ONE file, and reported findings in its own fixture strings.
+              (2) Its first rule was `any letfn name used as a callback`, which is too
+                  broad by three of the four measured shapes -- it flagged a production
+                  `hydrate-db` that demonstrably builds its database correctly. Narrowing
+                  took the count from 32 to 13 and the `high` count from 4 to 0."
+   :argv ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+          "{{repo}}/scripts/verify-silent-js-callbacks.cljs" "--findings"]
+   :cwd :root
+   :findings :protocol
+   :writes :none
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :timeout-ms 600000
+   :interval-ms 21600000}]}
