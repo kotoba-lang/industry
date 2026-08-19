@@ -19,7 +19,14 @@
 ;;
 ;;   nbb scripts/fleet-ci/retry-unreachable.cljs
 ;;   nbb scripts/fleet-ci/retry-unreachable.cljs --execute
+;;   nbb scripts/fleet-ci/retry-unreachable.cljs --execute --wait 1800
 ;;   nbb scripts/fleet-ci/retry-unreachable.cljs --self-test
+;;
+;; **--wait が要るのは、窓が短いから。** 実測 2026-08-19: tick は約 21 分周期で、
+;; 1 プロセスがそのうち十数分を占有する（batch を組む前の tip 解決が長い）。
+;; 空き窓は在るが短く、手で 3 回試して 3 回とも占有中に当たった。「lock が
+;; 空いていたら書く」だけの道具は、安全ではあるが**実際には一度も成功しない**
+;; ことがある。待てるようにして初めて道具になる。
 
 (ns retry-unreachable
   (:require [cljs.reader :as reader]
@@ -75,6 +82,20 @@
 
 ;; ---------------------------------------------------------------------------
 
+(defn parse-wait
+  "`--wait <sec>` の秒数。無ければ 0（= 待たない、従来どおり）。
+  値が数でなければ 0 ではなく nil を返す —— 誤記を「待たない」に丸めると、
+  待つつもりで打った人に黙って従来の挙動を返すことになる。"
+  [argv]
+  ;; 「--wait が無い」と「--wait はあるが値が無い」は別。前者は 0（従来どおり）、
+  ;; 後者は誤記なので nil。ここを 1 本にまとめると、`--wait` と打ち間違えた人に
+  ;; 黙って「待たない」を返すことになる。
+  (if-not (some #{"--wait"} argv)
+    0
+    (let [v (second (drop-while #(not= "--wait" %) argv))]
+      (when (and v (re-matches #"\d+" (str v)))
+        (js/parseInt v 10)))))
+
 (defn- self-test! []
   (let [fails (atom 0)
         check (fn [ok? label]
@@ -101,13 +122,27 @@
     (check (not (unreachable-only? []))
            "no verdict line at all is not 'unreachable only' — absence of evidence
             is not evidence, and draining on it would re-run everything forever")
+    (check (= 0 (parse-wait ["--execute"]))
+           "no --wait means do not wait, which is the old behaviour")
+    (check (= 1800 (parse-wait ["--execute" "--wait" "1800"]))
+           "--wait takes its seconds")
+    (check (nil? (parse-wait ["--execute" "--wait" "30m"]))
+           "a --wait that is not a number is refused, not rounded to zero — rounding
+            it would hand somebody who asked to wait the silent no-wait behaviour")
+    (check (nil? (parse-wait ["--execute" "--wait"]))
+           "and so is a --wait with nothing after it")
     (if (zero? @fails)
-      (println "retry-unreachable: self-test OK (5 cases)")
+      (println "retry-unreachable: self-test OK (9 cases)")
       (do (println "retry-unreachable: self-test FAILED" @fails) (js/process.exit 1)))))
 
 (defn -main [& args]
-  (let [args (set args)]
+  (let [argv (vec args)
+        wait (parse-wait argv)
+        args (set args)]
     (when (contains? args "--self-test") (self-test!) (js/process.exit 0))
+    (when (nil? wait)
+      (println "retry-unreachable: --wait takes a number of seconds")
+      (js/process.exit 2))
     (when-not (fs/existsSync state-file)
       (println "retry-unreachable: no state file at" state-file) (js/process.exit 2))
     (let [execute? (contains? args "--execute")
@@ -123,14 +158,35 @@
       (cond
         (empty? stuck) (println "retry-unreachable: nothing to drain")
         (not execute?) (println "retry-unreachable: dry-run — pass --execute to drain")
-        (tick-running?)
-        (do (println "retry-unreachable: a tick holds the lock — refusing to write"
-                     "(its save-state! would roll this back). Try again between ticks.")
-            (js/process.exit 3))
         :else
-        (let [next-state (update state :repos #(apply dissoc % (map first stuck)))]
-          (fs/writeFileSync state-file (str (pr-str next-state) "\n"))
-          (println "retry-unreachable: drained" (count stuck)
-                   "— the next tick judges these shas again"))))))
+        (let [deadline (+ (.getTime (js/Date.)) (* 1000 wait))]
+          (loop []
+            (cond
+              (not (tick-running?))
+              ;; **lock が空いた後に読み直す。** 待っている間に走っていた tick が
+              ;; state を書き換えている（まさにその tick が新しい赤を足したかも
+              ;; しれない）。待つ前に読んだ state を書き戻せば、その tick の
+              ;; 成果を丸ごと巻き戻す —— 避けようとしていた事故そのもの。
+              (let [fresh (reader/read-string (str (fs/readFileSync state-file "utf8")))
+                    fresh-log (str (fs/readFileSync log-file "utf8"))
+                    fresh-stuck (stuck-entries fresh fresh-log)]
+                (if (empty? fresh-stuck)
+                  (println "retry-unreachable: nothing to drain after re-reading")
+                  (let [next-state (update fresh :repos #(apply dissoc % (map first fresh-stuck)))]
+                    (fs/writeFileSync state-file (str (pr-str next-state) "\n"))
+                    (println "retry-unreachable: drained" (count fresh-stuck)
+                             "— the next tick judges these shas again"))))
+
+              (< (.getTime (js/Date.)) deadline)
+              (do (js/Atomics.wait (js/Int32Array. (js/SharedArrayBuffer. 4)) 0 0 5000)
+                  (recur))
+
+              :else
+              (do (println "retry-unreachable: a tick holds the lock — refusing to write"
+                           "(its save-state! would roll this back)."
+                           (if (pos? wait)
+                             (str "Waited " wait "s and the window never opened.")
+                             "Pass --wait <sec> to wait for the window."))
+                  (js/process.exit 3)))))))))
 
 (apply -main *command-line-args*)
