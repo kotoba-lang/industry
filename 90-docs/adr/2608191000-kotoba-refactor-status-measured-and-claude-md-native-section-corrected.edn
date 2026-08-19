@@ -173,4 +173,18 @@ green は他セッションの fleet receipt に依っており、**私は確認
 5. **fleet gate: `:jvm-test` 117 / `:nbb-test` 36 / `:nbb-script` 133 / `:shadow-test` 1**
    （`scripts/fleet-ci/gates.edn` 実測）。ADR-2608190200 が残 81 本の内訳と
    「11 本は nbb-cross-runtime の対向 runtime であって旧世代ではない」を持つ。
+
+## 追記（2026-08-19、同日）—— resume point 5 件の成熟度を上げた
+
+adr-2608191100-maturity-pass-on-the-five-kotoba-refactor-resume-points に記録:
+
+- **#4 は着地した。** census は `scripts/verify-kotoba-source-census.cljs` として
+  registry に登録済み。分類規則を直した結果、source は 986 ではなく **1,019**
+  （`;;` の長いヘッダで最初の form が 40 行目より後ろに来るものが 18 件、
+  および EDN データという第 3 のクラスを見落としていた）。
+- **#5 の数字は誤っていた。** ここに書いた `:jvm-test 117 / :nbb-test 36 /
+  :nbb-script 133` は gates.edn に対する grep の出現数で、reader で読むと
+  **80 / 22 / 127**、移行候補は 59 repo。
+- **#1 は clock-v1。** cap 7 は dataspace より 6 日早く native の
+  `native-provider-contract?` に seal されており、不足は provider と実行証拠だけ。
 "}]
