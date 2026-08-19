@@ -84,7 +84,11 @@
     ;; PRIVATE.
     "com-junkawasaki/jp-go-digital-jgrants"
     "com-junkawasaki/jp-go-gbiz-info"
-    "com-junkawasaki/jp-go-npb-kanpou"})
+    "com-junkawasaki/jp-go-npb-kanpou"
+    ;; and a fourth, four hours later. That is three separate arrivals in one
+    ;; day: the set moves faster than an edit to it, which is a fact about
+    ;; how gates get added here rather than about any one repo. PRIVATE.
+    "com-junkawasaki/jp-go-gyoukaku-review"})
 
 (def pending-registration
   "PUBLIC repos with no RID. No disclosure question — these can simply be registered, and
