@@ -95,13 +95,27 @@ somu@gftd.co.jp, keiri@gftd.co.jp などのメールボックスの整理振り�
    同じく repo に無く、**この workspace には hermes cron script を追跡する規約が無い**。
    nbb 側（規則の全部）は repo に在るので失われるのは 40 行の起動器だけだが、
    この機械を建て直すと bot は黙って消える。
-2. **`orgs/gftdcojp/m365-archive` の `origin/main` ref が stale**（`98fab3dfb4a`。
-   実際の main は `2ba43e65e55c`）。**HEAD は正しい**ので bot の動作には影響しないが、
-   この checkout で `origin/main` を読んだ結論は誤る（ADR-2608136800 の形）。
-   この repo は 228k ファイル + annex なので `git fetch` が 3 分超かかり、
-   **`-q` を付けると遅いのか壊れているのかが出力から区別できない**。
+2. ~~`orgs/gftdcojp/m365-archive` の `origin/main` ref が stale~~ **→ 2026-08-20 解消**
+   （`git fetch origin main` で `98fab3dfb4a..2ba43e65e55`、**3.4 秒**）。
+   ⚠ **この項に一度書いた「この repo は fetch に 3 分超かかる」は誤りだった。**
+   直前に 2 回ハングしたのを repo の性質と読んだが、素の `git fetch origin main` は
+   3.4 秒で終わる。ハングした 2 回は `-c annex.used-refspec=` を付けた実行と、
+   別の git 活動と同時に走った実行で、原因は特定できていない。
+   **1 度の遅さを repo の定数として書かない**（CLAUDE.md「実測して定数で持つな」の再演）。
 3. **毎時の配信は blocker が直るまで止まらない。** これは意図的（self-clearing）だが、
    ログイン後・approve marker 前の期間は dry-run のレポートが毎時届く。
+4. **共有 superproject checkout が origin/main に追いつけない。** closing 時は
+   `index.lock` を live な競合と読んだが、**それも誤りだった**。実際の理由は
+   `90-docs/business/canvas-ledger.edn` のローカル 7 行で、これは 2026-08-19T17:08Z に
+   hourly routine が書いた :net-kotobase / :cloud-murakumo の実測イベントであり、
+   **:seq が origin/main 側の別イベントと衝突している**（9234 = origin/main では
+   :cloud-itonami、ローカルでは :net-kotobase。origin/main は既に :seq 9301 まで進み、
+   ローカルは 9237 で止まっている ＝ 2 人の writer が同じ番号を独立に採番した）。
+   解決は他人の append-only 測定列の renumber になるので、通りすがりのセッションが
+   決めない。7 行は `.git/stash-archive-20260820/` に保全済みで、working tree からも
+   消していない（checkout を origin/main へ FF せず遅れたままにした）。
+   もう 1 つの block 要因 `90-docs/kaizen/kaiyu-kaizen.ledger.edn` は origin/main と
+   内容一致で、失うものは無い。
 
 ## resume point
 
