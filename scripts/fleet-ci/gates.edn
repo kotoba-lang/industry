@@ -452,6 +452,25 @@
 {:name "psa" :gate :nbb-test :classpath "src:test" :entry "test/run_portable.cljs" :ship-git-deps true :cd true}
   {:name "worklaw" :gate :nbb-test :classpath "src:test" :entry "test/run_portable.cljs" :ship-git-deps true :cd true}
   {:name "org-ietf-deflate" :gate :jvm-test :cd true}
+  ;; org-w3-png had no gate at all until 2026-08-19, which is how `png.encode`
+  ;; came to write every chunk type as four zero bytes under ClojureScript and
+  ;; nobody found out until something tried to read one.
+  ;;
+  ;; :jvm-test rather than :nbb-test, and the reason is condition 1 above:
+  ;; `core_test.clj` and `encode_jvm_test.clj` are `.clj` -- the second needs
+  ;; javax.imageio and always will -- so an nbb run here would cover strictly
+  ;; less than the JVM one. The ClojureScript half runs from `run-tests.cljs`
+  ;; and belongs in a second entry when someone wants both; moving this one
+  ;; would silently shrink what is checked.
+  ;;
+  ;; No :include-ext: `core_test` reads resources/png/fixtures/pillow.png, and
+  ;; an extension filter that dropped it would leave the decoder untested while
+  ;; the gate stayed green. Verified against the shipped tree rather than the
+  ;; working copy -- `git archive HEAD | tar -x` into a clean directory, then
+  ;; `clojure -M:test`: 12 tests, 39 assertions, 0 failures. Breaking the
+  ;; encoder's chunk-type bytes in that same tree gives 9 errors, so the gate
+  ;; discriminates in the tree the fleet actually ships.
+  {:name "org-w3-png" :gate :jvm-test :cd true}
   {:name "kotobase-block-codec" :gate :jvm-test :cd true}
   {:name "chain" :gate :jvm-test :cd true}
   {:name "org-chainagnostic-cacao" :gate :jvm-test :cd true}
