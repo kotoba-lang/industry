@@ -16,13 +16,29 @@
 ;;                          only the ones we remembered to special-case. The CLI
 ;;                          refuses stream-json output without --verbose, and
 ;;                          refuses stream-json input without stream-json output.
-;;   --max-turns 3          a schema'd reply needs one more turn than a bare
-;;                          one; 2 came back error_max_turns (measured).
-;;   --allowedTools ""      the GUEST runs no tools of its own. Caller-declared
+;;   --max-turns 12         the schema path's whole reply lives inside the final
+;;                          StructuredOutput call, so a run that hits the cap
+;;                          before reaching it returns no text at all, and the
+;;                          truncation recovery below cannot fire -- it 502s
+;;                          instead. Measured 2-5 turns on one
+;;                          request shape; 3 failed 22% of live traffic. Raising
+;;                          it costs nothing on the common path -- a run that is
+;;                          done stops at 2 -- and the worst case is still bounded
+;;                          by CLAUDE_BRIDGE_TIMEOUT.
+;;   --tools ""             the GUEST runs no tools of its own. Caller-declared
 ;;                          tools come back as OpenAI tool_calls for the CALLER
 ;;                          to execute -- that is what /v1/chat/completions
 ;;                          means, and a guest that ran them would be an agent
 ;;                          running commands the caller never sanctioned.
+;;                          --allowedTools "" does NOT do this: it is a PERMISSION
+;;                          allowlist, not an availability list. With it alone the
+;;                          init event still advertised all 25 built-in tools and
+;;                          the guest really executed Bash (measured 2026-08-19:
+;;                          "Run: echo hello-from-guest" came back with a
+;;                          tool_result, not a refusal). --tools "" takes the
+;;                          count to 0 and leaves --json-schema working, because
+;;                          StructuredOutput is not drawn from the built-in set.
+;;                          --allowedTools "" stays as a second, redundant floor.
 ;;   --json-schema          only when the caller declares tools: constrains the
 ;;                          reply to {content, tool_calls} so a call arrives as
 ;;                          data instead of prose we would have to parse out.
@@ -292,9 +308,17 @@
                       "--input-format" "stream-json"
                       "--output-format" "stream-json"
                       "--verbose"
-                      ;; 3, measured: a schema'd reply needs one more turn than
-                      ;; a bare one, and 2 returned error_max_turns.
-                      "--max-turns" "3"
+                      ;; 12, measured: the schema path puts the entire reply in
+                      ;; the final StructuredOutput call, so hitting the cap first
+                      ;; yields NO text and the max_turns recovery below cannot
+                      ;; fire -- it 502s. One request shape needed 2, 4 and 5 turns
+                      ;; across runs; at 3, 30 of 136 live responses died this way.
+                      "--max-turns" "12"
+                      ;; --tools "" removes the built-in tools; --allowedTools ""
+                      ;; only declines to pre-approve them. Passing the allowlist
+                      ;; alone left all 25 exposed and the guest ran Bash for real.
+                      ;; Keep both: availability first, permission as a second floor.
+                      "--tools" ""
                       "--allowedTools" ""
                       "--no-session-persistence"
                       "--strict-mcp-config"
