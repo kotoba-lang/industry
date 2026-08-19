@@ -309,6 +309,74 @@ ad-hoc な登録 payload は、**切り詰められた manifest を書くとこ�
 を同じ fetch 済み ref から取る）。blob SHA precondition はそのまま効くので、
 競合すれば 409 で弾かれる。
 
+### 8. 住所で同名を解く（2026-08-19）
+
+公告も落札公示も住所を持っているのに、名寄せは長く名前しか見ていなかった。
+同名 2 社はほとんどの場合**県が違う**（株式会社うるるは中央区と香取郡東庄町）。
+
+| | 名前だけ | 住所つき |
+|---|---:|---:|
+| 決算公告 | 607 解決 / 曖昧 206 | **658** / 曖昧 155 |
+| 落札公示 | 365 解決 / 曖昧 138 | **458** / 曖昧 45 |
+
+- 市区町村は**切り出さず前方一致**で見る。registry は「さいたま市大宮区」
+  「香取郡東庄町」「中央区」をどれも 1 単位で持つので、切り出す正規表現は
+  この 3 つのどれかを必ず取り違える。
+- **住所がどの候補とも一致しなければ絞らない**（曖昧なままにする）。推測しない。
+- どの証拠で決めたかを `:company/name-match`（`:exact` / `:exact+address` /
+  `:core+address`）に残す —— 記録しないと住所照合の精度を後から測れない。
+
+### 9. 官報 cell（日次、murakumo ノード常駐）
+
+**官報は 90 日窓で、その先に archive が無い。収集しなかった日は永久に失われる**
+—— このワークスペースで、日次で動くこと自体が価値になる最初の仕事。法人番号も
+インボイスも月次で足りる。
+
+- 置き場所はノード（judah）。gleif-cell と同じ理由（ラップトップの tick は sleep で
+  落ちる。実測 2026-08-06、6h 間隔が 17 時間発火せず）に加え、名寄せに要る
+  法人番号 corpus 2.6 GB が既にそこに在る。
+- 権限は `jp-go-npb-kanpou` 1 repo の **write deploy key だけ**（GitHub token を
+  持たない）。鍵はノードで生成しノードから出さない。
+- **追記であって置換ではない。** 公告に id が無いので、重複判定の鍵は内容から作る
+  （社名+決算日+掲載日 / 社名+件名+落札日+金額）。
+- 名寄せに失敗しても公告は捨てず unlinked のまま残す —— 90 日窓では取り逃す方が高い。
+
+**スケジューラの入れ方で 3 つ躓いた（実測 2026-08-19、judah）**:
+
+1. `launchctl bootstrap gui/$(id -u)` は **ssh 越しでは GUI domain が無く失敗**する
+   （`Domain does not support specified action`）。
+2. `crontab` は **SIP/TCC で temp file を書けない**。`sudo crontab -u` も
+   `sudo cp /usr/lib/cron/tabs/…` も `Operation not permitted`。
+3. 通ったのは **LaunchDaemon（`/Library/LaunchDaemons` + `UserName`）**を
+   `sudo launchctl bootstrap system` する経路だけ。
+
+**入れただけでは信じない。** `launchctl kickstart` で実際に発火させ、
+`last exit code = 0` と log の出力まで確認した（この workspace には
+「スケジューラが入っていなかった」ADR が複数ある）。
+
+⚠ **dry-run が repo のデータを書き換えていた欠陥を 1 件直した。** 最初の版は
+commit を飛ばすだけで committed ファイルは更新しており、次の tick が
+「もう入っている」と判断して**新着 75 件が静かに消えかけた**。
+
+### 10. gBizINFO の本番パスは operator 側で走る（トークン待ち）
+
+官報 cell はノード、こちらはラップトップ —— **トークンがここにしか無い**から。
+ノードに credential を置かない不変条件を逆から読むと、鍵の要る仕事は operator に残る。
+
+- 引く相手は**面の committed projection を歩いて発見する**（今日 8,972 番号。
+  官報 2 dataset が入る前は 8,124 で、ハードコードしていたら古い集合を引き続けた）。
+- トークンは env → Keychain item `gbizinfo-api-token` の順（launchd agent は
+  shell の env を見ない）。**service 名で 1 件だけ**引く（keychain を列挙しない）。
+- **トークンが無ければ exit 3** と取得手順を印字する。0 で終われば「走っていない」と
+  「走って 0 件だった」がログ上で同じ行になる。実際に weekly agent を kickstart して
+  exit 3 を確認済み。
+- 週次（full pass は 8,972 社 × 7 aspect ≒ 6.3 万リクエスト）。日次にするのは
+  窓が閉じる官報の方だけ。
+
+**オーナー作業 1 手（約 2 分）**: https://content.info.gbiz.go.jp/api/index.html →
+利用申請 → メールのリンクでトークン →
+`security add-generic-password -s gbizinfo-api-token -a $USER -w '<token>'`
+
 ## Consequences / まだ無いもの（正直に）
 
 - **これは gBizINFO の代替ではない。** 交付実績・調達・決算期は**gBizINFO を読むことで**
