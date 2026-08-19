@@ -198,6 +198,13 @@
   {:name "bonsai" :gate :jvm-test :cd true}
   {:name "langgraph" :gate :jvm-test :cd true}
   {:name "kagitaba" :gate :jvm-test :cd true}
+  ;; user-test carried an untracked .github/workflows/ci.yml in the shared
+  ;; checkout -- `clojure -M:test` + `-M:lint` on push. Actions are retired
+  ;; repo-wide (ADR-2607300900) and disabled per repo, so that file was inert
+  ;; intent, not CI. Registered here instead. Measured 2026-08-19 before
+  ;; landing: `clojure -M:test` prints "Ran 8 tests containing 19 assertions.
+  ;; 0 failures, 0 errors." and exits 0, which is the :jvm-test contract.
+  {:name "user-test" :gate :jvm-test :cd true}
   {:name "org-ietf-ed25519" :gate :jvm-test :cd true}
   {:name "org-ietf-cbor" :gate :jvm-test :cd true}
   {:name "io-multiformats" :gate :jvm-test :cd true}
