@@ -202,7 +202,7 @@ subset のみ実装（ADR-2608159400 が自ら「完全な policy language は�
 | actor → actor の委譲 | **まだ無い** | biscuit で書く（最初の 1 本が proving slice） |
 | kotoba の `delegated` 項 | **wire 実装済み**（`biscuit.kotoba/->delegated`） | 済 |
 | guarded call | **実装済み**（`biscuit.effective/authorize`）。`requested ∩ delegated ∩ local-policy` を**言語の `:rules` を読んで**分岐し、全経路が receipt を返し、**どの枝も秘密を要求しない**。契約テストが実 `capability-semantics.edn` を読み、**読めなければ pass せず fail する**。38 tests / 95 assertions、9 defect で赤→緑 | **fleet 側の呼び手はまだ 0。**次は kotobase edge か actor の実 host call を 1 本通す |
-| **鍵の発見と回転** | **未着手。** `org-w3-did` は `did:key` と `did:web` のみで、**`did:webvh` は fleet に存在しない**（実測 2026-08-19） | 下記 |
+| **鍵の発見と回転** | **着地（2026-08-19）。** `biscuit.rootkey` が pre-rotation コミット付きの署名付き log を検証し、`publish` / `resolve-log` が発行と解決を持つ。**鍵儀式を実施し、genesis を publish 済み**（下記）。`org-w3-did` は `did:key` / `did:web` のみで `did:webvh` は fleet に無いままだが、**それは transport の選択肢であって authority ではない** | 回転の実演（seq 2 を出す）|
 | amu / aiueos / kototama | **触っていない。触る必要が無い** —— admission・機械内 table・epoch feed であって delegation ではない | 失効を biscuit に足さず、この 2 面に乗せる |
 | biscuit の wire | **読みは実装済み**（`biscuit.wire`）。`biscuit-auth` の公式サンプルを decode し**署名検証まで通る**。負のサンプル 3 種は拒否。**書きは未実装**（外部が受理していない writer を format と名乗らない） | 書きは、外部実装が我々の出力を読むまで claim しない |
 | Ed25519 束縛 | **実装済み。** JVM は `java.security`、nbb は `node:crypto`、公開鍵導出は `org-ietf-ed25519`。stand-in は残すが「どの署名方式でも成り立つ性質」用と明記 | — |
@@ -236,7 +236,33 @@ authority namespace に呼び手が入り、`biscuit-auth` が発行した実ト
 
 **まだ route は繋いでいない。**繋ぐのに要る決定を、繋ぐ前に着地させた。
 
-## 次に埋める穴 —— root 鍵の発見と回転（did:webvh）
+## 鍵儀式（2026-08-19 実施）
+
+オーナー承認のうえ、delegation 面の root を実際に発行した。
+
+| | 値 |
+|---|---|
+| subject | `kotobase.net/delegation/root` |
+| **edge が pin する genesis key digest** | `sha256:7718c4bc4047c1e158ce5dbd12540244be476ec03a7e6404755a94d8a728795b` |
+| pre-rotation コミット（次の鍵の digest） | `sha256:dff6eef37940feb50fd24c2870e32a32da25851d79768bfbe2e50d62187edf79` |
+| genesis record（tip） | `sha256:283a66da93454305a9d4df76d7848c89409a0093d80845e14df00a7cc0aff7a3` |
+| seq | 1 |
+
+- **秘密鍵は端末に一度も表示していない。** 生成した process の中から直接 `kagi add`
+  （compartment `personal`、`biscuit-root-kotobase-delegation-genesis` と
+  `-next-1`）へ渡し、非対話用に `~/.gftd/*.seed`（0600）を併置。一時コピーは削除済み。
+- **edge が config に持つのは genesis key digest 1 個であって、現在の鍵ではない。**
+  これが「焼いた鍵は回せない / 可変な場所の鍵は黙って差し替えられる」を同時に外す唯一の形。
+- **publish 先は `manifest/delegation-rootkeys/`。** 場所は authority ではない
+  —— record の権威は連鎖から来るので、git・object store・`did:webvh` は
+  **可用性の選択であって信頼の選択ではない**。いちばん安く既に公開・版管理・
+  content-addressed なものを選んだ。
+- **`tip.edn` は無署名**。植えられた tip は解決され、そして検証に落ちる。
+- **publish 後にファイルから読み直して検証した**（in-memory の値ではなく）:
+  tip → 1 record → `{:seq 1}`、ファイル名 = 中身の digest、そして**誤った
+  genesis digest を pin すると `:signer-not-committed`**。両方向。
+
+## 次に埋める穴 —— did:webvh は transport の選択肢
 
 biscuit の唯一の弱点は**失効を持たないこと**で、その最短の埋め方は
 「委譲を失効させる」ではなく**「root 鍵を検証可能に回す」**である。
