@@ -970,6 +970,41 @@ loader が移動したパスを見続ける。後者は実際に起きている�
 `:review/largest-program` は残す。join の鍵としては細いが、**人が「何に対する支出か」を
 読む**には効く（3,443 / 3,463 行に付いている）。
 
+### 31. 同じ key が 2 つの意味を持っていた —— 直してから照合を足した
+
+27 節の detector は**経路が 0 になったとき**だけ鳴る。経路が痩せても 0 でなければ黙る
+ので、**committed ファイルの申告と面が載せた数を突き合わせる**検査を足そうとした。
+その準備で、語彙の壊れが出た（実測 2026-08-20）:
+
+```text
+面の :corpus/record-count を dataset ごとに合計すると
+  gyousei-review  10,541  = ファイルの実体            ✓
+  kanpou           7,440  = 3 dataset の合計          ✓
+  gbizinfo     1,035,804  ← ファイルの実体は 3,034    ✗
+```
+
+gbizinfo だけ `:corpus/record-count` に**読んだ元ファイルの行数**を入れていた。
+**key が 2 つの意味を持つ間、それを使う検査は全部不健全になる。** 生成器を直し
+（`:projection/source-rows` を新設、`:corpus/record-count` は「このファイルに書いた
+件数」で固定）、全件 pass を回して 2 ファイルを作り直し、検査器も 2 つを別々に要求する
+ようにした（5 つの manifest 行から落として赤になることを確認済み）。
+
+その上で detector に `declared-but-not-loaded` を足した: **committed が N 件在ると
+言っているのに面が 0 を返す**なら、loader・tier の既定・west path のどれかが違う。
+今日そのどちらも実際に踏んでいる（closures が tier 既定から外れて載らなかった、
+yabai の loader が移動したパスを見続けた）。両方向を確認済み:
+
+```text
+現状          SCANNED 3 routes gbizinfo=2710/declared=3036 gyousei-review=1973/declared=10541 kanpou-chotatsu=310/declared=673
+経路を潰す    FINDING high route-silent:kanpou-chotatsu
+              FINDING high declared-but-not-loaded:kanpou-chotatsu  (declares 673, plane answers 0)
+```
+
+⚠ **壊し方が 2 回当たらなかった。** 1 度目は正規表現が manifest の並びに合わず、
+2 度目は patch そのものが適用されていなかった（`grep -c` が 0）。どちらも
+**「壊したのに赤にならない」= 検査が効いていない**と読みかけた。
+**壊したものと報告されたものが一致することを確かめる。**
+
 ## Consequences / まだ無いもの（正直に）
 
 - **gBizINFO からの独立は 1 歩進んだ**（22 節: 行政事業レビューの支出先 3,463 件を
