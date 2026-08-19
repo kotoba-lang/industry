@@ -20,7 +20,7 @@
    "ADR-2608123000"
    "adr-2607198300"]
   :adr/decision-summary
-  "{:goal :block-third-party-patents-only, :own-filing :never, :threat-jurisdiction [:cn :us :ep :jp], :repos-fixed 31, :publication \"com-junkawasaki/prior-art\" :dp-id \"DP-2026-001\", :timestamps {:rfc3161 \"FreeTSA (verified, NOT accredited)\" :ots \"Bitcoin anchor via OpenTimestamps\"}, :archive {:software-heritage {:accepted-at-landing 9 :remaining 22 :cause :anonymous-rate-limit}}, :notice-added 28, :notice-skipped 3, :pins-advanced 28, :indexable-site \"https://com-junkawasaki.github.io/prior-art/ (Scholar citation_* + DC + bilingual + sitemap)\", :records-split 10, :indexnow :submitted, :wayback \"5/5 bundle URLs confirmed via CDX\", :not-done [:west-registration :accredited-tsa :zenodo-doi :tdcommons-submission]}"
+  "{:goal :block-third-party-patents-only, :own-filing :never, :threat-jurisdiction [:cn :us :ep :jp], :repos-fixed 31, :publication \"com-junkawasaki/prior-art\" :dp-id \"DP-2026-001\", :timestamps {:rfc3161 \"FreeTSA (verified, NOT accredited)\" :ots \"Bitcoin anchor via OpenTimestamps\"}, :archive {:software-heritage {:accepted-at-landing 9 :remaining 22 :cause :anonymous-rate-limit}}, :notice-added 28, :notice-skipped 3, :pins-advanced 28, :indexable-site \"https://com-junkawasaki.github.io/prior-art/ (Scholar citation_* + DC + bilingual + sitemap)\", :records-split 10, :indexnow :submitted, :bitcoin-anchor \"block 963148, all four .ots verify Success\", :software-heritage \"29/31\", :wayback \"5/5 bundle + 12/12 site, CDX-confirmed\", :pins \"31/31 == remote head\", :not-done [:west-registration :accredited-tsa :zenodo-doi :tdcommons-submission :swh-last-2]}"
   :adr/body
   "# Context
 
@@ -152,4 +152,57 @@ polling で確認しており、`gh api` が 200 を返したことを live の�
 | token を kagi / Keychain に置いた後の API 全自動化（Zenodo / SWH） | **agent 可**（安全床①の credential 専用ツール経路） |
 
 したがって最小のオーナー作業は「1 回ログインする」または「token を 1 つ kagi に入れる」であって、
-10 件の投稿作業そのものではない。"}]
+10 件の投稿作業そのものではない。
+
+## 10. Closing state（2026-08-19 10:0xZ）
+
+**証拠力の中核は完成している。** 内容の固定・日付の立証・第三者アーカイブ・索引面の 4 つが揃った。
+
+| | 状態 | 確かめ方 |
+|---|---|---|
+| 内容の固定 | 31 repo を commit + tree SHA-1 で固定 | `evidence-manifest.txt`、tree hash は Merkle で全内容をコミット |
+| **Bitcoin アンカー** | **完了。block 963148。4 ファイルとも `ots verify` が Success** | `ots verify <file>.ots` |
+| RFC 3161 | 6 token、`openssl ts -verify` OK。**FreeTSA は非認定** | `VERIFY.md` |
+| Software Heritage | **29/31** | `software-heritage-status.json` |
+| Internet Archive | **証拠バンドル 5/5・サイト 12/12**、CDX で実確認 | `wayback-status.json` / `wayback-status-site.json` |
+| 索引面 | Pages live、Scholar `citation_*` + DC + 中文 + sitemap、IndexNow 送信済 | `curl` で serve 実測済み |
+| west pin | **31/31 が remote head と一致** | `gh api` で全件再測 |
+| SHA256SUMS の整合 | `shasum -c` 4/4 OK（追記は新規ファイルで行い、anchor 対象を書き換えていない） | `shasum -a 256 -c SHA256SUMS` |
+
+**Bitcoin アンカーが一番効く。** RFC 3161 の FreeTSA token と違って**誰の鍵にも依存しない**ので
+「認定事業者でない」という留保が要らず、しかも中国の互联网法院が受容している形式そのものである。
+
+### 追記のときに守った規律（次の agent もこれを守ること）
+
+**anchor 対象のファイルを書き換えない。** `software-heritage-save-requests.json` は `SHA256SUMS` に
+覆われており、`SHA256SUMS` は RFC 3161 token と Bitcoin anchor を持つ。29/31 に進んだからといって
+中身を更新すると、**anchor が attest しているバイト列と実ファイルが食い違う**。現在値は
+`software-heritage-status.json` という**新規ファイル**に書いた。digest を固定した意味はここにある。
+
+### resume point
+
+1. **Zenodo（最短で効く）** — `zenodo-deposit.py` は dry-run 検証済み。41 ファイル / 5.42 MB、
+   `related_identifiers` 33 件（うち 31 件が各 repo の commit 固定 URL）。
+   `security add-generic-password -s zenodo -a $USER -w '<token>'`（scope は `deposit:write` と
+   `deposit:actions` のみ）を置けば `python3 zenodo-deposit.py --sandbox` → 本番の順で DOI が出る。
+   **全ファイルの checksum 照合に通ってからでないと publish しない**実装。
+2. **TDCommons** — アカウント（登録＝パスワード入力なので agent 不可）と Chrome 拡張の接続
+   （実測: `tabs_context_mcp` が "Browser extension is not connected"）の 2 つが未達。
+   投稿順・title・abstract・keywords は `SUBMISSION-SHEET.md` に確定済み。
+   **ただし優先度は下がった** —— TDCommons の目的だった Google Patents NPL への到達性は、
+   Scholar `citation_*` を付けた Pages サイトでアカウント無しに確保済みで、B は経路の二重化である。
+3. **SWH 残り 2 件**（`kami-app-sarutahiko-factory` / `kami-app-hygaccess-plant`）— detached worker が
+   throttle 明けに投げる。取りこぼしたら `software-heritage-status.json` の `how_to_finish` の通り。
+4. **認定 TSA / 公証** — 有料。**紛争が起きてから、その法域に合わせて買えばよい。**
+   digest は固定済みなので後から同じ digest に打てて、置き換えではなく強化になる。
+   前倒しで買うのは費用対効果が悪い（中国の实用新型は実体審査が無く、金を払っても登録は止まらない）。
+
+### やらなかったこと、とその理由
+
+- **west への `prior-art` 登録** — `--entry` splice は checkout 済みパスから block を生成するので
+  共有 `orgs/` に clone が要る。publication artifact は何の依存でもなく、manifest 書き込み経路の
+  リスクに見合わない。
+- **3 repo の rider NOTICE**（`com-nvidia-isaac` / `com-cobot-assembly` / `com-semicon-robotics`）—
+  Apache-2.0 に追加条件を課しながら、参照先の `CHARTER-RIDER.md` が**存在しない**（Contents API 404）。
+  受領者が遵守できない条件が課されている状態で、Apache-2.0 §3 の特許許諾に依拠する外部採用者にとっては
+  採用不能を意味する。**復元か撤去かはオーナー判断**なので、28 repo に複製せず、触らずに残した。"}]
