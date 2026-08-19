@@ -1232,6 +1232,37 @@
           [])
       (mapcat (fn [f] (or (corpus-line-entities f next-tempid!) [])) files))))
 
+(defn gyousei-review-entities
+  "行政事業レビューシートの**支出先**（`jp-go-gyoukaku-review` の
+   `data/gyousei-review.datoms.edn`、ADR-2608181000 22 節）。
+
+   gBizINFO（`:source/dataset \"gbizinfo\"`）が経産省の集約を通した交付実績なのに対し、
+   こちらは**各府省が自分の事業について出す一次資料**。同じ `:company/houjin-bangou`
+   を持つので 1 クエリで突き合わせられる —— どちらが欠けているかを言えるようになる。
+
+   ⚠ **金額の単位が違う。** ここは `:review/total-million-jpy`（百万円・申告値）、
+   gBizINFO は `:grant/amount-yen`。**足し合わせない** —— 名前が違うのは、静かに
+   桁を間違えるより気付かせるためである。
+
+   ⚠ **これは会社 × 府省に畳んだ側**（実測 3,463）。畳む前は面の番号に一致した
+   17,808 行、全体では 80,319 行で、その分母は manifest の
+   `:projection/folded-from` / `:projection/recipients-seen` に載る。
+   **3,463 を「国の支出先はこれで全部」と読まない。**"
+  [next-tempid!]
+  (let [files (->> ["jp-go-gyoukaku-review"]
+                   (keep west-project-path)
+                   (mapcat (fn [p]
+                             (let [dir (apply io/file root (concat (str/split p #"/") ["data"]))]
+                               (when (.exists dir)
+                                 (->> (seq (.listFiles dir))
+                                      (filter #(str/ends-with? (str %) ".datoms.edn"))))))))]
+    (if (empty? files)
+      (do (js/console.error
+           (str "edn-query: WARNING gyousei-review: com-junkawasaki/jp-go-gyoukaku-review の "
+                "data/*.datoms.edn が無い — 各府省の原典から見た交付先は load されない"))
+          [])
+      (mapcat (fn [f] (or (corpus-line-entities f next-tempid!) [])) files))))
+
 (defn web-presence-entities
   "法人番号に紐づく**公開面**（`company-web-presence` の
    `data/web-presence.datoms.edn`、ADR-2608181000）。
@@ -2227,6 +2258,7 @@
         gbizinfo-tx (gbizinfo-entities next-tempid!)
         kanpou-tx (kanpou-kessan-entities next-tempid!)
         web-presence-tx (web-presence-entities next-tempid!)
+        gyousei-review-tx (gyousei-review-entities next-tempid!)
         ;; company-tx と別にするのは、entity を聞くだけの query に 23,530 本の
         ;; edge を load させないため（ADR-2608031900）。
         relationship-tx (gleif-relationship-entities next-tempid!)
@@ -2252,6 +2284,7 @@
                                                      proc-registry-tx merged-kotoba-tx
                                                      working-doc-tx narrative-tx
                                                      company-tx gbizinfo-tx kanpou-tx web-presence-tx
+                                                     gyousei-review-tx
                                                      property-tx subsidy-tx relationship-tx fleet-tx
                                                      yabai-tx tadori-tx patent-tx accounts-tx innen-tx
                                                      awai-tx kakekomi-tx okugai-tx factory-tx
