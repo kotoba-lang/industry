@@ -32,11 +32,17 @@ the first log lives.
 
 | subject | genesis key digest (pin this) | seq |
 |---|---|---|
-| `kotobase.net/delegation/root` | `sha256:7718c4bc4047c1e158ce5dbd12540244be476ec03a7e6404755a94d8a728795b` | 1 |
+| `kotobase.net/delegation/root` | `sha256:7718c4bc4047c1e158ce5dbd12540244be476ec03a7e6404755a94d8a728795b` | 2 |
+
+**The pin above did not change when the key rotated.** That is the property
+this whole shape exists for, and it has now been exercised rather than
+argued: `seq 2` is signed by the key `seq 1` committed to, and a reader
+holding only the genesis digest follows it. During the overlap both keys are
+current, because tokens minted under the first are still live.
 
 Private keys are in `kagi` (compartment `personal`):
-`biscuit-root-kotobase-delegation-genesis` and the pre-rotation
-`biscuit-root-kotobase-delegation-next-1`, with 0600 copies under `~/.gftd/`
+`biscuit-root-kotobase-delegation-genesis`, `-next-1` (now the second
+current key) and the pre-rotation `-next-2`, with 0600 copies under `~/.gftd/`
 for non-interactive use. **No secret is in this directory.**
 
 ## Rotating
