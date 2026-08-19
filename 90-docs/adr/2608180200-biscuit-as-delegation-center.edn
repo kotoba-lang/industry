@@ -246,7 +246,7 @@ authority namespace に呼び手が入り、`biscuit-auth` が発行した実ト
 | **edge が pin する genesis key digest** | `sha256:7718c4bc4047c1e158ce5dbd12540244be476ec03a7e6404755a94d8a728795b` |
 | pre-rotation コミット（次の鍵の digest） | `sha256:dff6eef37940feb50fd24c2870e32a32da25851d79768bfbe2e50d62187edf79` |
 | genesis record（tip） | `sha256:283a66da93454305a9d4df76d7848c89409a0093d80845e14df00a7cc0aff7a3` |
-| seq | 1 |
+| seq | **2**（回転を実演済み、下記） |
 
 - **秘密鍵は端末に一度も表示していない。** 生成した process の中から直接 `kagi add`
   （compartment `personal`、`biscuit-root-kotobase-delegation-genesis` と
@@ -261,6 +261,31 @@ authority namespace に呼び手が入り、`biscuit-auth` が発行した実ト
 - **publish 後にファイルから読み直して検証した**（in-memory の値ではなく）:
   tip → 1 record → `{:seq 1}`、ファイル名 = 中身の digest、そして**誤った
   genesis digest を pin すると `:signer-not-committed`**。両方向。
+
+### 回転を実演した（2026-08-19、seq 1 → 2）
+
+**pin を一切変えずに鍵が回ることを、議論ではなく実行で示した。**
+
+```
+reader が pin しているのは genesis key digest 1 個だけ: sha256:7718c4bc…
+新しい tip から遡った record 数            : 2
+verify-log                                 : {:seq 2, :records 2}
+回転後の current keys                      : [d6df7648… b178d4e7…]   ← 重なり
+```
+
+- `seq 2` の署名者は **`seq 1` がコミットしていた鍵**（`b178d4e7…`）。
+  その鍵は `kagi get` で 1 件だけ狙い撃ちで取り出し、**端末に表示せず**
+  0600 の一時ファイル経由で署名器に渡して即削除した。
+- **重なりを意図的に作った**: `seq 2` の `keys` は**旧鍵と新鍵の両方**である。
+  旧鍵で発行された token はまだ生きているので、rotation は重ならなければならない
+  —— `verify-biscuit-wire` が鍵の**集合**を受けるのはこのため。
+- 次の pre-rotation 鍵（`-next-2`）も同時に発行・保管済み。**回転のたびに
+  次を用意する**のが、この形が「乗っ取られた配布場所は鍵を導入できない」を
+  保ち続ける条件。
+- **負の対照も測った**: `seq 2` の keys を書き換えると `:signature-mismatch`、
+  genesis を差し止めると `:record-not-found`。**片方だけでは何も示せない。**
+- publish 後、**ファイルから読み直して**確認（tip → 2 records → `{:seq 2}`、
+  ファイル名 = 中身の digest）。
 
 ## 次に埋める穴 —— did:webvh は transport の選択肢
 
