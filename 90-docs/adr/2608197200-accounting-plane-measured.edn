@@ -128,9 +128,26 @@ open, because the explanation is what gets read next time.
    files belong to another session (`scripts/newsfeed-ingest.cljs`,
    `scripts/query-dialect-bench/*`). Not mine to discard.
 6. **`kotoba-lang/cofog` is in `manifest/repos.edn` but the generator will
-   not emit it** into west.yml. Ruled out: basename collision, toplevel
-   mismatch, detached HEAD, remote name. A sibling in the same position does
-   emit. Not blocking -- nothing consumes it.
+   not emit it** into west.yml. Investigated twice; **six hypotheses
+   eliminated**, so the next attempt should start after them rather than
+   repeat them:
+     - basename collision -- no: `cofog` is the only path with that basename
+     - `:path-overrides` -- no entry for it
+     - toplevel mismatch / not a separate working tree -- `rev-parse
+       --show-toplevel` gives `orgs/kotoba-lang/cofog`, distinct from root,
+       so `separate-working-tree?` should be true
+     - `working-head` -- `git -C orgs/kotoba-lang/cofog rev-parse HEAD`
+       exits 0 with a sha, so `project-entry`'s `(when sha ...)` should fire
+     - a stale local `repos.edn` -- this WAS the cause for `bangou` (the
+       generator reads the local file and the checkout was 3 commits behind)
+       and is NOT the cause here: cofog is present in the synced local copy,
+       read the same way the script reads it, as a plain string
+     - remote name -- `iso3166` uses the same non-`origin` remote and emits
+   Still unknown: whether `project-entry` returns nil or the path never
+   reaches `paths`. Localising it needs a debug print inside
+   `scripts/gen-west-manifest.cljs`, which was not done. Note also that a
+   full regeneration currently stops at pin verification, so the dry run
+   cannot be used to answer this. **Not blocking** -- nothing consumes cofog.
 7. **`etzhayyim/root` received a direct push to `main`**, bypassing its PR
    gate, because that repo has a repo-local `push.default = upstream`. Clean
    fast-forward of the one intended file. No other repo has that setting.
