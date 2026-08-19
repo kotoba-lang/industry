@@ -769,6 +769,19 @@
 
 (declare land-branches! live-branches)
 
+;; 集計は plan の row ではなく atom に持つ。row（= plan-repo が返す map）の
+;; :additive は **gate を通す前**の値で、drop-already-landed / residue-gate! /
+;; skip-nested-repo はそのあとに効く。row を数えると「gate が落としたもの」まで
+;; 着地予定として数えてしまう。実測 2026-08-18: 66 repo の dry-run が
+;; `additive=19 repo` と表示したが、gate 後に :additive が残ったのは **1 repo**
+;; だけだった（19 倍の過大報告）。同じ誤りを scripts/cleanup.cljs が先に踏んで
+;; おり（manifest/cleanup-workflow.md「集計は row ではなく atom に持つ」）、
+;; ここはその修正を land 側に写したもの。
+(def planned (atom {:additive #{} :review #{}}))
+(defn- record-planned! [dir additive tracked]
+  (when (seq additive) (swap! planned update :additive conj dir))
+  (when (seq tracked)  (swap! planned update :review conj dir)))
+
 (defn- land-repo! [{:keys [dir slug base additive skipped tracked deleted]}]
   ;; canonical 化はここ（着地対象がある repo だけ）。plan 段階ではやらない。
   (let [branch-work? (and branches? (seq (live-branches dir base)))
@@ -847,6 +860,7 @@
           (println (format "  ⚠ untracked だが %s に既存・内容差あり: %d 件 → :review（auto-merge しない）"
                            base (count demoted)))
           (doseq [p demoted] (println (str "      " p))))
+        (record-planned! dir additive tracked)
         (when (seq additive) (println (format "  plan :additive  %d files → PR → merge" (count additive))))
         (when (seq tracked) (println (format "  plan :review    %d files → PR のみ（merge しない）" (count tracked)))))
       (let [adir (archive! dir (concat additive (mapcat val skipped)))
@@ -861,6 +875,7 @@
             ;; base に存在するのに untracked と報告されたものは :additive ではない。
             ;; :review へ落として auto-merge の対象から外す（PR #444 の再発防止）。
             tracked (vec (concat tracked tracked-differs demoted suspects))]
+        (record-planned! dir additive tracked)
         (println (format "  archived → %s" adir))
         (when (seq (concat landed-additive landed-tracked))
           (println (format "  already landed on %s（内容一致でスキップ）: %d 件"
@@ -1029,8 +1044,8 @@
 
 (println (format "\n完了: %d repo 処理 / additive=%d repo / review=%d repo"
                  (count acted)
-                 (count (filter #(seq (:additive %)) acted))
-                 (count (filter #(seq (:tracked %)) acted))))
+                 (count (:additive @planned))
+                 (count (:review @planned))))
 (when (seq archived-skipped)
   ;; 別枠で数える。混ぜると backlog が減らないように見え続ける（cleanup-workflow.edn
   ;; :preservation-pr-disposition と同じ理由）。件数は残置であって消滅ではない。
