@@ -1034,7 +1034,14 @@
               ever measured it, so the violation has been standing and invisible.
               What it adds beyond the count: the four repositories that hold MORE THAN ONE
               shape, where no per-repo glob can separate them, and the 37 files that are
-              neither source nor the known DSL (25 EDN data, 7 unrecognised, 5 empty)."
+              neither source nor the known DSL (25 EDN data, 7 unrecognised, 5 tracked by
+              git and absent from the working tree).
+              That last class was called `empty-or-comment-only` when this entry landed,
+              and every one of the five was a file the detector could not READ -- it
+              caught the exception and passed \"\" to the classifier, which measured the
+              absence as emptiness. Fixed same-day: `:unreadable` is its own class, and a
+              tree where every listed file is unreadable now exits 2 instead of reporting
+              a census of nothing."
    :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-kotoba-source-census.cljs" "{{root}}"]
    :cwd      :root
