@@ -1,0 +1,119 @@
+[{:db/id -1
+  :adr/id "ADR-2608190700"
+  :adr/doc_type "adr"
+  :adr/topic "defensive-publication-robotics-prior-art"
+  :adr/title "DP-2026-001: robotics を先行技術として公開する — 公開は既にできていた。欠けていたのは日付の立証と、審査官が読む言語だった"
+  :adr/status "accepted"
+  :adr/date "2026-08-19"
+  :adr/last_verified "2026-08-19"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["kotoba-lang robotics 群を先行技術として公開する方針と、その証拠バンドルの所在"
+   "自分では特許を取らないという決定（防御のみ）"
+   "先行技術の日付立証に使う手段の階層（何が accredited で何がそうでないか）"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2608041000-kotoba-lang-apache2-license-unification"
+   "ADR-2608123000"
+   "adr-2607198300"]
+  :adr/decision-summary
+  "{:goal :block-third-party-patents-only, :own-filing :never, :threat-jurisdiction [:cn :us :ep :jp], :repos-fixed 31, :publication \"com-junkawasaki/prior-art\" :dp-id \"DP-2026-001\", :timestamps {:rfc3161 \"FreeTSA (verified, NOT accredited)\" :ots \"Bitcoin anchor via OpenTimestamps\"}, :archive {:software-heritage {:accepted-at-landing 9 :remaining 22 :cause :anonymous-rate-limit}}, :notice-added 28, :notice-skipped 3, :pins-advanced 28, :not-done [:west-registration :accredited-tsa :chinese-indexed-venue :tdcommons-submission]}"
+  :adr/body
+  "# Context
+
+オーナー質問（2026-08-19）「今の kotoba-lang に robotics 関係の lib はどれぐらい実装されている? また、ここで公開しておくことで、後で特許などを主張されないようにするには?」。続けて「複数を組み合わせて公開, 特許主張は中国など想定している. 自分が特許を取る道自体は不要。他の特許取得を防御できればok」。
+
+## 実測した robotics の現在地（2026-08-19）
+
+`orgs/kotoba-lang` の 2,138 checkout を README キーワードで抽出し、`src/` の実 LOC を数えた。**合計 ≒ 17,000 src LOC / 9,000 test LOC / 31 repo。テストは実行していない — LOC と export 名からの評価である。**
+
+中身は均一ではなく 3 層に割れる:
+
+| 層 | repo（src LOC / test LOC） |
+|---|---|
+| 実体のある中核 | `com-nvidia-isaac-sim`(3,078/1,429) `kami-autodrive`(1,584/1,454) `com-nvidia-isaac-lab`(1,480/711) `kami-articulated`(804/462) `org-ros`(743/273) `kami-sensor-sim`(740/353) `org-ros-urdf`(519/191) `swarm-choreo`(544/236) `com-sony-dualsense`(554/299) `teleop`(341/208) `robotics`(314/152) `governor`(506/379) |
+| 薄い facade（~190 LOC の同型 CRUD） | `com-ros-robotics` `com-ros2-nav` `com-abb-robotics` `com-universal-robots` `com-bluefin-robotics` `com-liquid-robotics` `com-modbus-tcp` |
+| **test 0 行** | `com-nvidia-isaac`(551/0) `com-cobot-assembly`(562/0) `com-semicon-robotics`(552/0) |
+
+`com-nvidia-isaac-sim` が本命で、空間ベクトル代数（Plücker / crm / crf）・RNEA / CRBA・geometric Jacobian・forward/inverse dynamics・GJK/EPA・摩擦つき接触 impulse solver・DLS-IK（position / pose）・LQR（DARE）・軌道生成（cubic / quintic / min-jerk / waypoint）・vectorized batch を持つ。
+
+**無いもの（正直に）**: リアルタイム制御（モータドライバ、EtherCAT / CANopen、周期実行保証）。ROS のトランスポート（CDR エンコードと rosbridge の op 形はあるがソケットは無い）。SLAM（occupancy grid はあるがループクロージャ / graph SLAM は無い）。学習系の知覚。
+
+# Decision
+
+## 1. 防御のみ。自分では出願しない
+
+3 つを分ける:
+
+1. 他人が後から同じ発明で特許を取るのを防ぐ → 先行技術を作る。公開で達成できる。**これだけを目標にする。**
+2. 既存の他人特許を侵害しない → 公開では一切達成できない。`com-nvidia-*` `com-abb-*` のような clean-room facade は逆方向のリスク。
+3. 自分が特許を取る → 公開で閉じる。**閉じてよい**（オーナー判断 2026-08-19）。
+
+したがって日本特許法30条・米 102(b)(1) のグレース期間を確保する必要は無い。EPO に原則グレースが無いことも制約にならない。
+
+## 2. 欠けていたのは公開ではなく、日付の立証と言語だった
+
+先行技術として効くには 3 つ要る。実測した現在地:
+
+| 条件 | 判定前 |
+|---|---|
+| 公然と利用可能（特許法29条1項3号 / 中国専利法22条「为公众所知」） | **既に達成**。31 repo すべて public、Apache-2.0 |
+| 日付が立証できる | **欠落**。git の commit date と GitHub の `pushed_at` は自己申告で改竄可能 |
+| 当業者が実施できる程度の開示 | **不足**。コードはあるが、**審査官はコードを検索しない** |
+
+3 番目が中国を想定したときに決定的になる。CNIPA の審査官が英語の GitHub リポジトリに到達する確率は低い。**だから中国語の開示文が要る。**
+
+## 3. 何を作ったか
+
+`com-junkawasaki/prior-art`（public、CC0-1.0）に `DP-2026-001-robotics/`:
+
+- **`DISCLOSURE-001-robotics.md`**（6,409 語）。10 の技術思想を「課題 → 機構 → **変形例**」で書いた。英語本文 + **中文摘要（全 10 節をカバー）** + 日本語要旨。開示した機構: ①独立 governor による admit ②アクチュエーションを型付き capability にして未付与動作を**記述不能**にする ③1 機も飛ばす前の全編隊検証 ④deadman + chord e-stop ⑤運動学記述からの actuator BOM + 連続トルク検証ゲート ⑥sim / 学習 / 制御を兼ねる決定論的無依存 dynamics kernel ⑦domain randomization をデータで表す ⑧異種測距源の単一 occupancy 融合 ⑨載具物理をデータとする単一 GNC step ⑩実行の content-addressed identity。
+- **`evidence-manifest.txt`**。31 repo を remote default-branch の commit SHA-1 + tree SHA-1 で固定。**git の tree SHA-1 は Merkle で全内容をコミットするので、この 6,716 byte のファイル 1 枚が 31 repo の全内容を固定する。**
+- **RFC 3161 token（FreeTSA）** 3 通と **OpenTimestamps** 3 通。`openssl ts -verify` → `Verification: OK`。
+- `VERIFY.md`（誰でも自分で検証できる手順）、`SHA256SUMS`、SWH 申請記録。
+
+**変形例を意図的に広く列挙したのが肝である。** 後願が上記機構の自明な変形に向けられたとき、それが「自明だった」という主張ではなく**明示の書面開示**に当たるようにするため。新規性ではなく進歩性で効く。
+
+## 4. 日付立証の階層を混同しない
+
+**FreeTSA はいかなる法域でも認定タイムスタンプ事業者ではない。** 構造的に妥当で誰でも検証できるが、日本の総務大臣認定タイムスタンプ・eIDAS qualified timestamp・中国の联合信任时间戳服务中心（UniTrust）と同等ではない。`kotoba-lang/org-ietf-rfc3161` が `:verified`（構造と署名）と `:trusted`（証明書を誰が保証したか）を別フィールドにしていて、trust predicate 無しでは `:trusted :unknown` を返すのは、まさにこの区別のためである。自己発行タイムスタンプが認定タイムスタンプに見えるのは、両者を 1 個の boolean に潰したときに起きる。
+
+したがって **README に「Honest limits」節を置き、認定でないことを明記した。** 認定 TSA を後から同じ digest に対して打てば、このバンドルは置き換えではなく**強化**される（digest が既に固定されているので）。
+
+OpenTimestamps の Bitcoin アンカーは、最高人民法院の互联网法院 / 在线诉讼規則が区块链存证を受容している経路に一致するので、中国では RFC 3161 より通りやすい可能性がある。**どちらが強いかは法域依存なので両方打った。**
+
+## 5. NOTICE — 28 repo に追加し、3 repo は意図的に触らなかった
+
+NOTICE を持っていた 3 repo（`com-nvidia-isaac` `com-cobot-assembly` `com-semicon-robotics`）の中身は Apache-2.0 に**追加条件を課していた**:
+
+> This software is distributed under the Apache License 2.0 with the etzhayyim Charter Compliance Rider v3.1 (see CHARTER-RIDER.md). By using, modifying, or redistributing this software, you accept both …
+
+**そして `CHARTER-RIDER.md` は 3 repo のいずれにも存在しない**（実測: Contents API が 404）。GitHub は 3 repo を Apache-2.0 と表示している一方、NOTICE は別の条件だと言っており、その条件の本文は読めない。**受領者が遵守できない条件が課されている状態**であり、Apache-2.0 §3 の特許許諾に依拠する外部採用者にとっては採用不能を意味する。
+
+この rider を残り 28 repo に**複製しなかった**。復元でも撤去でもなく、オーナー判断を要する。追加した 28 repo の NOTICE は最小限で、`No additional terms or conditions apply.` と DP-2026-001 への指示を持つ。
+
+## 6. やっていないこと（blocker として明示する）
+
+| 項目 | 理由 |
+|---|---|
+| **Software Heritage 22/31 未申請** | 匿名 API が ~10 件/時で throttle。resume worker を detach 済み（`swh-resume.py`、~3h）。無料の SWH API token があれば一撃で終わる |
+| **認定 TSA** | 有償契約が要る。日本＝総務大臣認定事業者、中国＝联合信任（tsa.cn）。**digest は既に固定済みなので後から打てる** |
+| **TDCommons / IP.com 投稿** | 審査官が引く NPL DB に載せる経路。**中国を想定するならここが最も効く未実施項目** |
+| **中国語で索引される公開先** | 中文摘要は書いたが、CNKI 等に索引される場所には置いていない |
+| **west 登録（`prior-art`）** | `--entry` splice は checkout 済みパスから block を生成するので、共有 `orgs/` に clone が必要。publication artifact は何の依存でもないので、manifest 書き込み経路のリスクに見合わない |
+
+## 7. 中国について、勝ち目を誤解しないための 1 点
+
+**中国の実用新案（实用新型）と外観設計は実体審査を経ずに登録される。** したがって先行技術は**登録を阻止しない** — 事後の無効宣告請求（专利复审和无效审理部）で使う武器になるだけである。発明特許（发明专利）は実体審査があるので阻止に効く。
+
+無効審判での証拠形式要件も効いてくる: 外国語証拠は中文訳の提出が要り、インターネット証拠は公証または承認されたタイムスタンプの裏付けを求められるのが通常である。**つまり中文の開示文と、中国で通用するタイムスタンプの 2 つが、そのまま証拠能力の要件に対応している。** 前者は今日作った。後者は未実施。
+
+# Consequences
+
+- robotics 31 repo の内容は、2026-08-19 07:18 UTC に存在したことを 2 系統の独立した手段で立証できる状態になった。
+- 自分で特許を取る道は閉じた。オーナーの明示的判断であり、これを制約として引用してよい。
+- **`evidence-manifest.txt` の 31 行は当時の pin であって現在の tip ではない。** NOTICE 追加で 28 repo の tree SHA は既に動いている。manifest は snapshot であって追随するものではない — 「commit X の時点でこうだった」は永久に真である。新しい snapshot が必要なら DP-2026-002 を起こす。
+- 28 pin を前進させた（`advance-pins.cljs` → `verify-west-pins.cljs` で 28/28 fast-forward 検証済み）。ADR-2608123000 の「license sweep の後ろで manifest が進まなかった」を繰り返さないため。"}]
