@@ -155,6 +155,60 @@ gate の嘘は伝播する —— 特に『これが正しい検査だ』と名�
    shadow の warning / design-quality の未適用軸 / テンプレの dads-table）とも
    同じ形だった。うち 1 件は自分が作って配ったものである。
 
+## 現在地（2026-08-19 closing 時点）
+
+### 着地したもの
+
+**移行 29 本**（すべて child main + west pin + 共有 checkout の三点一致を確認）:
+app-ongakuka / app-lo / app-analytics / app-cowork / app-po / air-book /
+app-air-{dcs,cargo,crew,ops,sched,ffp,sms,mro,yield} / app-kareyanagi /
+app-crowdfunding / app-credits / app-harai / app-natural-person / app-live /
+app-maps / aidesk / app-legal-entity /
+app-open-{swift,water,power,kyber,airplane}
+
+**superproject 側の修正 6 件**: scan の深さ枝刈り報告 / shadow の検出器
+（202 checkout・設定 0 本）/ design-quality CLI の軸報告 + --extra-axes /
+この ADR / テンプレの検査分割 / テンプレの表示バグ + relay header 修正。
+
+### 証拠の強さが揃っていない 2 本
+
+app-open-power と app-open-airplane は、agent が**マージ直後に API エラーで
+落ちた**ため自分の検証を一度も記録していない。tree に cljs があり Svelte が
+無いことだけを確認済み。**動作は誰も確かめていない。** 検証 agent を出したが
+closing 時点で結果は未着。
+
+### 未完（closing 時点で走行中）
+
+1. **relay header の欠落 —— 29 本中 21 本。** 移行前の SvelteKit route は
+   `host` だけ削って全 header を上流へ渡していたが、cljs 移植は 3 つの header を
+   新規に作るため `authorization` が消える。preflight は許可すると宣言したまま。
+   テンプレ（app-ongakuka）は修正・実測済み（bundle レベルで上流が
+   `authorization` を受領することを確認）。**残り 21 本は修正 agent が走行中。**
+2. **上記 2 本の検証 agent が走行中。**
+
+### 残り作業
+
+- **同一プログラム 74 本**（テンプレ適用可）
+- **一点物 4 本**: app-animeka(POST+GET) / app-mangaka(NSID allowlist、過去に
+  facade を手当てした痕跡あり) / lawyer / **yukkuri**（442 行・12 操作・
+  `env.YUKKURI_DB` に直接アクセスする実アプリ。D1 の扱いは ADR-2608039000 の
+  判定が要る。バッチに混ぜない）
+- **xrpc route を持たない 15 本**（page のみ）
+
+### オーナー対応が要る項目
+
+- **`cloud-itonami/app-maps` に `MAPILLARY_ACCESS_TOKEN` が commit されている。**
+  Mapillary 側でのローテーションが必要。移行の範囲外。
+- **4 ホスト（appview / nanoid / mcp / dispatcher）が全 repo で NXDOMAIN。**
+  deploy するか retire するかは別の決定。移行はこれを直さない。
+
+### 次の 1 手
+
+走行中 2 agent の結果を取り込み、pin を進める。その後
+`/tmp/cljs-migration/same-program.txt` の未着手分から 5 本ずつ配る。
+ブリーフの正本は `/tmp/brief-common.md`（セッション外には残らない ——
+再開時は本 ADR の「6 つの発見」節から再構成する）。
+
 ## Consequences
 
 - 移行完了 8 本（app-ongakuka / app-lo / app-analytics / app-cowork / app-po /

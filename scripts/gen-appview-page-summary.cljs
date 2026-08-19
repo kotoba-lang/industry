@@ -97,18 +97,32 @@
 
 (let [pages (->> (walk (.join path root "orgs") [])
                  (filter (fn [p] (when-let [s (slurp* p)] (str/includes? s "routeCount")))))
-      rows (atom []) skipped (atom {:no-wrangler 0 :unparsable 0})]
+      rows (atom []) examined (atom 0) matched-names (atom #{})
+      skipped (atom {:no-wrangler 0 :unparsable 0})]
   (doseq [p pages
           :let [repo (repo-of p)]
           :when repo
-          :when (or (nil? only) (contains? only repo))]
+          ;; `repo` is `orgs/<org>/<name>`. --names is documented as taking a
+          ;; repository name, so accept both spellings -- `app-saiban` and
+          ;; `orgs/cloud-itonami/app-saiban`. Before this, only the long form
+          ;; matched: `--names app-saiban` filtered every page out and the run
+          ;; printed "128 page(s) carry a summary; 0 differ from their wrangler",
+          ;; which reads exactly like "I compared 128 and they all agree".
+          ;; Measured 2026-08-19: the same page it silently skipped renders
+          ;; routeCount 0 while its wrangler declares one route.
+          :when (or (nil? only)
+                    (contains? only repo)
+                    (contains? only (last (str/split repo #"/"))))
+          :let [_ (swap! matched-names into
+                         (filter #(or (= % repo) (= % (last (str/split repo #"/")))) only))]]
     (let [w (nearest-wrangler (.dirname path p) repo)
           cfg (when w (parse-jsonc w))]
       (cond
         (nil? w) (swap! skipped update :no-wrangler inc)
         (nil? cfg) (swap! skipped update :unparsable inc)
         :else
-        (let [s (slurp* p)
+        (let [_ (swap! examined inc)
+              s (slurp* p)
               routes (vec (keep #(get % "pattern") (get cfg "routes" [])))
               vars (vec (sort (keys (get cfg "vars" {}))))
               rel (.relative path (.join path root repo) p)
@@ -118,12 +132,27 @@
             (swap! rows conj {:repo repo :page (.relative path root p)
                               :routes (count routes) :vars (count vars) :rel rel
                               :file p :out out}))))))
+  ;; A --names that matched nothing is not a clean fleet. Refuse rather than
+  ;; report zero differences from zero comparisons (ADR-2608136000).
+  (when (and only (zero? @examined))
+    (println (str "CANNOT ANSWER: --names matched no page. Looked for "
+                  (str/join ", " (sort only))
+                  " among " (count pages) " page(s) carrying a summary."
+                  " Give a repository name (app-saiban) or its path"
+                  " (orgs/<org>/app-saiban)."))
+    (js/process.exit 2))
   (let [rs (if limit (take limit @rows) @rows)]
     (println (str "gen-appview-page-summary: " (count pages) " page(s) carry a summary; "
+                  @examined " compared; "
                   (count @rows) " differ from their wrangler"
                   (when limit (str " (showing " (count rs) ")"))))
     (println (str "  skipped: no-wrangler=" (:no-wrangler @skipped)
                   " unparsable=" (:unparsable @skipped)))
+    ;; A name in the list that matched nothing, when others did. Not a refusal --
+    ;; the run did compare something -- but a typo here means a repository someone
+    ;; believes they repaired was never opened.
+    (when-let [missed (seq (sort (remove @matched-names (or only #{}))))]
+      (println (str "  ⚠ --names entries that matched no page: " (str/join ", " missed))))
     (doseq [r rs]
       (println (str "  " (if apply? "WROTE " "would ") (:repo r)
                     "  routes=" (:routes r) " vars=" (:vars r)))
