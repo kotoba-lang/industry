@@ -173,10 +173,22 @@ loopback TCP socket**でサービスに繋ぐので、サービスから見た `
 
 - **今日の回避**: peer ごとに service 側の loopback ポートを分け、**ポートで
   principal を決める**。protocol 変更が要らない。
-- **今日の回避は実測で成立した**（下記『測った』1、`kekkai-node` `7570afe`）。
-- **本筋**: stream-edge が証明済みの peer key を service へ渡す（peer ごとの
-  unix socket、あるいは PROXY protocol 相当の 1 フレーム）。principal を
-  ネットワークアドレスから再導出するのをやめる。**未着手。**
+**2026-08-19、両方とも着地した**（`kekkai-node` `7570afe` → `467b02c`）。
+
+- **回避（1 peer 1 port）**は実測で成立（下記『測った』1）。service を変えられない
+  ときの安い答えとして今も有効。
+- **本筋**: `edge/principal-of`。`handle-open!` が loopback socket の
+  **source port** を、既に証明済みの peer と結んで記録し、同居する service は
+  自分が握っている接続の `socket.remotePort` を引いて訊く。
+  - **PROXY protocol header にしなかった**のは意図的。header はその port の
+    全 service が opt-in している場合しか安全でなく、opt-in していない service
+    に当たったときの失敗は「拒否」ではなく**壊れた最初のリクエスト**になる。
+    byte 列に何も注入しないので、agent が parse しない protocol でも効く ——
+    実際 HTTP を通した。
+  - entry は socket と同じ寿命しか持たない。source port は再利用されるので、
+    接続より長生きする entry は「答えが無い」ではなく**別人の名前を答える**。
+  - 秘密ではない。同じホストの任意の local process が『この port は誰か』を
+    引ける。operator が既に持っているホストについての metadata である。
 
 ### 2. cloud-itonami-app が読む policy は署名されていない
 
@@ -187,8 +199,22 @@ loopback TCP socket**でサービスに繋ぐので、サービスから見た `
 `node/actor` は 1 件も無い）。
 
 `kekkai-node` 側は既に envelope を検証している（`agent/load-netmap`、
-未署名は明示 opt-in が要る）。**app 側にその半分が無い。** 制御面を名乗る前に、
-app も envelope 検証を通す。
+未署名は明示 opt-in が要る）。**app 側にその半分が無かった。**
+
+**2026-08-19 に閉じた**（`cloud-itonami-app` `0b05918`）。
+`:nfs {:netmap {:envelope-file … :authority-spki-b64 …} :capability …}` が
+`kekkai.envelope/verify` を通る —— signer・digest・signature を、**parse する前に**
+検査する。admission は `kekkai.node.netmap` の `authorized?` + `permitted?` を
+**再利用**した（同じ規則を 2 度書けば規則は 2 つになり、2 つめは誰も実 netmap に
+対して確かめない方である）。`:policy` は残るが `:allow-unsigned-policy? true` が要る
+—— node が未署名 netmap の前に置いているのと同じスイッチ。
+
+**`:node/actor` は app 側に降ろした。** kekkai に actor の概念は無く、持たせても
+いけない。node id → Drive の持ち主の対応は `:actors` として app が持つ。
+
+**capability は設定必須で、既定を置かない。** kekkai の語彙は
+`:overlay :ssh :private-http :tun` で `:nfs` は無い。ここで既定を選ぶと、
+その既定を既に持っている全ての edge に黙って許可を与えることになる。
 
 ### 3. ephemeral node が無い（D6 の根拠）
 
@@ -273,14 +299,41 @@ publisher/consumer の穴と同じ形の穴が、ref 面にもう 1 つある。
 ADR-2608198000 側に記録した。**D3 は支持され、『1 commit = 1 pack』は誤りだった**
 （object 天井 4 MiB）。
 
+## 穴を塞ぎに行って、もう 1 つ見つかった（2026-08-19）
+
+**HTTP を forwarder に通した瞬間に、half-close の bug が出た。**
+本文が connection close でしか区切られない応答（Content-Length も chunked も
+無い）は、実 overlay で **6 回中 2 回失敗した**。
+
+state machine は正しく、**報告だけが落ちていた**。`on-frame` の `:fin` 分岐は
+自分のコメントで『FIN は後から送られた data を追い越しうる』と述べ、その場合の
+`:fin-at` も正しく記録する。しかし `:stream-peer-fin` を出すのは
+**contiguous prefix が既に FIN に届いていたとき**だけで、data が後から届いて
+prefix を完成させた場合、`:data` 分岐は `:events []` を返していた。peer の close は
+state に取り込まれ、誰にも伝わらない。forwarder はそのイベントでしか local socket を
+`end` しないので、**client は既に書かれた本文を待ち続けた**。どちらの frame が先に
+着くかに依存するので flaky だった。
+
+`stream_test/a-fin-that-overtook-its-data-is-still-reported` が決定的に固定し
+（FIN を data より先に渡す）、fix 無しでは**まさにその欠けたイベント**で落ちる。
+in-order の場合を control として隣に置いた。overlay probe は **4/6 → 8/8**。
+
+**測るために作った道具が、測る対象の欠陥を見つけた**形。raw echo と ssh は
+EOF に依存しないので、この bug は landing 以来ずっと隠れていた。
+
 ## 残っているもの
 
-- **穴 2（署名されていない policy）と穴 3（ephemeral node）はそのまま。**
-- **HTTP client が forwarder 越しに動くかは未測定。** 上の 1 は raw な greeting
-  service で測っており、ref 面は HTTP である。`kekkai.node.stream` は half-close を
-  実装しているが、`fetch` を通したことはまだ無い。**これが 1 と 2 を繋ぐ最後の
-  未測定点**であり、今それらは散文で繋がっている。
-- `inga.ref` ⇄ `inga-node` の wiring（上記 ⚠）。
+- **穴 3（ephemeral node）は塞がない。** これは欠陥ではなく天井で、charter G2
+  （machine approval は常に人間、override 不能）から出ている。**D6 が答えである** ——
+  事前 admit した固定プールを持つ。実装すべきものは無い。
+- **`inga.ref` ⇄ `inga-node` の wiring**（上記 ⚠）が唯一残る散文の継ぎ目。
+  `inga-node` のどこにも `inga.ref` の require は無く、committed record は
+  quorum 証明書を運ばないので、`inga.ref` の cert 検証をそのまま繋ぐことはできない。
+  塞ぐには **inga-node が sink 時に QC を record に添える**必要がある。
+- **NFS を forwarder 越しに使う経路は、まだ閉じていない。** `principal-of` は
+  同居 service 向けであり、cloud-itonami-app は別プロセスの JVM である。
+  agent に local endpoint を生やして訊けるようにするのが次。それまで
+  forwarded NFS は**閉じる側に倒れる**（`node-for` が nil を返して全拒否）。
 
 ## 関連
 
