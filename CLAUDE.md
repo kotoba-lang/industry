@@ -2047,19 +2047,27 @@ native に無いだけ。bare `:bool` パラメータは compiler ADR 0219 が�
 
 ### native の現在地の読み方
 
-**`compiler/docs/native-aot-baseline.md` を引用しない** — ADR 0063 で更新が止まっており
-（ADR 系列は 0221 まで）、*there is still no native provider/capability mechanism at all* と
-書いていて native を実際より低く見せる。現在地は次の 3 つから読む:
+**`amu/docs/native-aot-baseline.md` を引用しない** — ADR 0063 で更新が止まっており、
+*there is still no native provider/capability mechanism at all* と書いていて native を
+実際より低く見せる。現在地は次の 3 つから**その場で読む**:
 
 1. **admission gate** `kotoba-lang/kotoba-kir` の `src/kotoba/kir.cljc` の
-   `only-native-word-typed-features?` — 名前のとおり 1 ワードで表せる値しか通さない
-   （i64/i32/f64/bool、string・keyword は pair handle、sealed scalar record/variant、
-   `[:option word]`/`[:result word]`、同種 `vector-i64`/`vector-f64`、
-   `typed-cap-call` は `[:i64 :i64]` `[:string :string]` `[:option-i64]` `[:result-i64]` の 4 組のみ）
-2. **kit の `:qualification` 行** `compiler/resources/kotoba/lang/capability-kits/*.edn`
-   — 8 kit すべて `:native-aot :pending`。effect を持つコードで native に qualified な
-   ものは 1 本も無い
-3. **ADR 系列** compiler の 0219 / 0220 / 0221
+   `only-native-word-typed-features?` と `native-word-value-type?` — 名前のとおり
+   1 ワードで表せる値しか通さない。**通る型の集合はその場で読む** — 後から足された
+   型がある（`:document` は string と同じ pair(offset,length) として入った）。
+   `typed-cap-call` は固定の型対に加えて `native-provider-contract?` が認めた
+   provider 契約も通るので、**「N 組のみ」と要約しない**。
+2. **kit の `:qualification` 行** — 読み方は上記「今日の既知ブロッカー」item 2 の
+   reader スニペット。**値をここに書き写さない**（kit ごとに key の集合も値も違い、
+   grep は行の折り返しで静かに切れる）。
+3. **ADR 系列** `orgs/kotoba-lang/amu/docs/adr/` を `ls | tail` で末尾から読む。
+   **番号の上限をここに書かない** — 書いた瞬間に天井として引用される。
+
+⚠ **この 3 つは 2026-08-19 時点で 3 つとも実測値がずれていた**（kit 数・native-aot の
+可否・admission gate の型集合・ADR 番号）。読む先が `compiler/` になっていたのも一因で、
+正しくは `amu/`（改名済み。west に残る `compiler` entry は古い pin の別 checkout）。
+**この節に測定値を書き足さないこと** —— 直近 3 回の陳腐化はすべて「日付付きで値を書いた」
+ことが原因で、引用する側は日付を落とす。
 
 可搬 stdlib は `kotoba-lang/lang/stdlib/core.kotoba`（`compile --prelude` で明示取り込み）。
 `select-keys` `merge` `update` `group-by` `every?` `some` `concat` `comp2` `partial1` 等は
