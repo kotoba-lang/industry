@@ -1154,4 +1154,54 @@
      :why "**この suite の沈黙対策そのものを撃つ。** 列挙を絞ると JSON は 1 件も読まれず、違反 0 件で緑になる —— 『測れなかった』が『問題なし』と同じ顔をする形。件数の床がそれを捕まえることを確かめている"
      :file "test/mangaka_data/corpus_test.cljs"
      :find "#js [\"ls-files\"]" :replace "#js [\"ls-files\" \"*.edn\"]"
-     :must-fail ["every-declared-json-document-parses"]}]}]}
+     :must-fail ["every-declared-json-document-parses"]}]}
+
+  {:repo "orgs/cloud-itonami/app-animeka"
+   :label "app-animeka: does README.md still describe the trees this repo has"
+   ;; This repo carries four trees (lg/ Python, lg-clj/ clj port, kotoba/ TS,
+   ;; appview/ Cloudflare) and only lg-clj runs. README.md and
+   ;; docs/operator-quickstart.md say so with numbers, and the numbers have
+   ;; assertions beside them (smoke_test.cljc, "cross-tree claims").
+   ;;
+   ;; The four mutations below were measured against the suite **before and
+   ;; after** those assertions landed, on 2026-08-19: all four bite now, and
+   ;; all four left the previous suite green. Nothing else in the repo reads
+   ;; lg/langgraph.json or the appview wrangler config, so without these tests
+   ;; every one of them is a silent change.
+   ;;
+   ;; Note the direction. Three of these are the doc going stale because the
+   ;; repo got WORSE; the fourth (a wrangler alias becoming relative) is the
+   ;; repo getting BETTER. Both must be red, because in both cases README.md
+   ;; now says something untrue.
+   :cmd ["bb" "lg-clj/run_tests.clj"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :animeka/declared-graph-the-cljc-tree-does-not-implement
+     :why "langgraph.json でグラフ名を変え、cljc 側の追随を忘れる形。dispatch は 27 本のまま緑なので、**config と実装が別の集合を指していること**は誰も見ない"
+     :file "lg/langgraph.json"
+     :find "    \"publish_episode\":       \"./lg_animeka/graphs/publish_episode.py:GRAPH\""
+     :replace "    \"publish_episodes\":      \"./lg_animeka/graphs/publish_episode.py:GRAPH\""
+     :must-fail ["cljc-tree-implements-exactly-the-declared-graph-set"
+                 "python-tree-is-a-stub-not-a-runtime-in-this-repo"]}
+
+    {:id :animeka/declaration-points-at-a-module-named-something-else
+     :why "宣言のキーとモジュール名がずれる形。JSON としては正しく本数も 27 のままなので、**その 1 本だけ import に失敗する**ことは起動するまで分からない"
+     :file "lg/langgraph.json"
+     :find "    \"health\":            \"./lg_animeka/graphs/health.py:GRAPH\","
+     :replace "    \"health\":            \"./lg_animeka/graphs/health_graph.py:GRAPH\","
+     :must-fail ["cljc-tree-implements-exactly-the-declared-graph-set"]}
+
+    {:id :animeka/a-declared-graph-quietly-disappears
+     :why "宣言が 1 本落ちる形。README.md が引用している 27 という数の床を撃つ —— 数を書いた散文は、数が動いても何も言わない"
+     :file "lg/langgraph.json"
+     :find "    \"health\":            \"./lg_animeka/graphs/health.py:GRAPH\",\n"
+     :replace ""
+     :must-fail ["python-tree-is-a-stub-not-a-runtime-in-this-repo"
+                 "cljc-tree-implements-exactly-the-declared-graph-set"]}
+
+    {:id :animeka/an-appview-alias-becomes-resolvable
+     :why "**改良で doc が古くなる方**。alias を相対パスに直すのは appview を直す第一歩で、退行ではない。それでも README.md の『clone からはビルドできない』は嘘になるので赤くする"
+     :file "appview/etzhayyim-wasm-animeka-an1m3k4x/wrangler.jsonc"
+     :find "\"pg\": \"/Users/junkawasaki/etzhayyimcojp/etzhayyim-apps-etzhayyimcojp/node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/index.js\""
+     :replace "\"pg\": \"./node_modules/pg/lib/index.js\""
+     :must-fail ["appview-cannot-be-built-from-this-repo"]}]}]}
