@@ -1,40 +1,40 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 604490, "kotobase-cf-wasm-staging" 485127},
+ {"net-kotobase" 605863, "kotobase-cf-wasm-staging" 486764},
  :zone
- {:requests-7d 492918,
-  :pageviews-7d 2335,
-  :uniques-7d-sum 1421,
+ {:requests-7d 494875,
+  :pageviews-7d 2378,
+  :uniques-7d-sum 1424,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
   [{:path
     "/bafyreih4jmf6omaeb2kcoe3kkhihuaweherwlmc6ukdowiyqic7t4r3y3e",
-    :requests 3841}
-   {:path
-    "/bafyreiam6u7qaumen65uubia7tbbbal6xgfqhskswpsrbm5d6yk24eovn4",
-    :requests 231}
-   {:path
-    "/bafyreibjlfky2zjqcemtk2voopxvt4k7ns7fmqy33nttac55oavz4bpf3m",
-    :requests 217}
-   {:path
-    "/bafyreifgdytbsig2xxdi2vfayr5mx7oibje6uw6cuvjvswqnrer63ovpd4",
-    :requests 181}
-   {:path
-    "/bafyreid6kzu2v7dhupnnvd5x7jx7my5oruyq42isksydatrldvslxxqfr4",
-    :requests 178}
+    :requests 3881}
    {:path
     "/bafyreia3xqvabdu6snyk6fo3sfuqwcjatijdmw7zrqh5yuu6t4a4vswrxa",
-    :requests 167}
+    :requests 239}
+   {:path
+    "/bafyreiam6u7qaumen65uubia7tbbbal6xgfqhskswpsrbm5d6yk24eovn4",
+    :requests 238}
+   {:path
+    "/bafyreibjlfky2zjqcemtk2voopxvt4k7ns7fmqy33nttac55oavz4bpf3m",
+    :requests 215}
+   {:path
+    "/bafyreifgdytbsig2xxdi2vfayr5mx7oibje6uw6cuvjvswqnrer63ovpd4",
+    :requests 207}
+   {:path
+    "/bafyreid6kzu2v7dhupnnvd5x7jx7my5oruyq42isksydatrldvslxxqfr4",
+    :requests 192}
+   {:path
+    "/bafyreihtl4jiepodbuysk4cg3escgg6fdha4sx7yn6pb45uafipbhikdgu",
+    :requests 172}
    {:path
     "/bafyreidan72soum3dybmky4zbk3dvnnrlfh2bx4cdp2g4v7nzbufb5s6uu",
-    :requests 165}
-   {:path
-    "/bafyreibd74zhz3l5nwoceqdumm7vrsgozsvsylyrgce2rqafwowqej4hx4",
-    :requests 146}],
-  :status-mix {:client-error 688, :server-error 5790, :ok 9992},
+    :requests 171}],
+  :status-mix {:client-error 691, :ok 10368, :server-error 5782},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -46,12 +46,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-19",
- :traffic-quality {:window "24h", :probe-4xx-pct 4, :error-5xx-pct 35},
+ :traffic-quality {:window "24h", :probe-4xx-pct 4, :error-5xx-pct 34},
  :top-paths
- "上位 page (24h, 2xx/3xx): /bafyreih4jmf6omaeb2kcoe3kkhihuaweherwlm… 3841 · /bafyreiam6u7qaumen65uubia7tbbbal6xgfqhs… 231 · /bafyreibjlfky2zjqcemtk2voopxvt4k7ns7fmq… 217 · /bafyreifgdytbsig2xxdi2vfayr5mx7oibje6uw… 181 · /bafyreid6kzu2v7dhupnnvd5x7jx7my5oruyq42… 178 | 4xx(probe) 4% · 5xx 35%",
- :funnel {:visitors 3576, :signups 28, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /bafyreih4jmf6omaeb2kcoe3kkhihuaweherwlm… 3881 · /bafyreia3xqvabdu6snyk6fo3sfuqwcjatijdmw… 239 · /bafyreiam6u7qaumen65uubia7tbbbal6xgfqhs… 238 · /bafyreibjlfky2zjqcemtk2voopxvt4k7ns7fmq… 215 · /bafyreifgdytbsig2xxdi2vfayr5mx7oibje6uw… 207 | 4xx(probe) 4% · 5xx 34%",
+ :funnel {:visitors 3584, :signups 28, :checkouts 0},
  :signal
- "kotobase.net 実測 492918 req/7d・1421 uniques(日次和)・うち4xx probe 4%(24h)、workers 1089617 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 494875 req/7d・1424 uniques(日次和)・うち4xx probe 4%(24h)、workers 1092627 inv/7d、Stripe active subs 0",
  :x402
  {:unmetered-twin-ratio 0,
   :rejection-reasons {:malformed-header 1},
@@ -66,6 +66,6 @@
   :rejections-unexplained 3,
   :attempt-rate 0.2},
  :by-source
- {:visitors {:openai-ads 3, :organic 2054},
+ {:visitors {:openai-ads 3, :organic 2062},
   :signups {:organic 24, :other 1}, 
   :checkouts {}}}
