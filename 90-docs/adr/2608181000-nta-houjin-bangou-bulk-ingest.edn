@@ -861,6 +861,26 @@ cell の規律は 21 節と同じ: 新しい版が無ければ何もしない / 
 （書いた物と違う物を検査しない）/ verify が赤なら commit しない。
 kickstart で発火を確認済み（last exit code = 0、3 版の publish を正しく読んで停止）。
 
+### 27. 「経路がまだ答えるか」を毎日測る（測った値ではなく測り方を常駐させる）
+
+25 節は 3 経路の重なりを測ったが、**測った値は定数ではない**。見張るべきは重なりの
+少なさ（事実）ではなく、**経路が黙ること**（欠陥）—— projection が空になる、
+loader が移動したパスを見続ける。後者は実際に起きている（14 節、yabai / tadori の
+3,288 entity が「1 件も無い」と同じ顔で消えていた）。
+
+`scripts/report-public-money-coverage.cljs` を detector protocol に合わせ
+（`FINDING<TAB>sev<TAB>key<TAB>detail` と `SCANNED<TAB>3<TAB>routes`）、
+`manifest/orgs-detectors.edn` に日次で登録した。**fleet gate にはできない** ——
+面全体（`orgs/` 配下の複数 repo）を読むので、ノードには配られない。
+
+両方向で確認済み: 現状 exit 0 / dataset 名を存在しないものに差し替えて
+`FINDING high route-silent:…`。tick 経由でも `ok exit 0 73s 0 finding(s) scanned=3`。
+
+⚠ **SessionStart の警告と実態が食い違っていた。** 「この tick に scheduler が
+ありません」と出ていたが、`~/Library/LaunchAgents/com.gftd.orgs-detector-tick.plist` は
+実在し `launchctl` にも載っていた（last exit code = 0）。**警告を読んで信じる前に
+確かめる** —— hook の判定も、そこが見ているパスも、実態とずれうる。
+
 ## Consequences / まだ無いもの（正直に）
 
 - **gBizINFO からの独立は 1 歩進んだ**（22 節: 行政事業レビューの支出先 3,463 件を
