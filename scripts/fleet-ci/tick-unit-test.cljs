@@ -297,7 +297,15 @@
   "Runs `filtered-tarball!` over a fixture tree, returning the rejection message
   or :built. The cache probe is stubbed miss so the check under test is reached."
   [tree opts]
-  (with-redefs [tick/mirror! (fn [_] "/fake-mirror")
+  ;; `log` is stubbed, not merely tolerated. `filtered-tarball!` logs a
+  ;; `pathspec-filter` line, and `tick/log` appends to ~/.gftd/fleet-ci-tick.log
+  ;; -- the file the operator reads to see what the fleet did. Running these
+  ;; tests wrote four lines naming a repo that was never filtered at a sha that
+  ;; does not exist (`999999999999`), interleaved with real ones. A test that
+  ;; edits the record of production is worse than a noisy test: the record is
+  ;; what everything else here is diagnosed from.
+  (with-redefs [tick/log (fn [& _] nil)
+                tick/mirror! (fn [_] "/fake-mirror")
                 tick/ensure-sha! (fn [m _ _] m)
                 tick/git (fn [_ args & _]
                            (if (= "ls-tree" (first args))
