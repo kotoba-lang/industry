@@ -1367,6 +1367,20 @@
    :script "gates/company-web-presence-projections-check.cljs"
    :include-ext [".edn" ".cljs"] :min-files 4 :cd false}
 
+  ;; 官報 projection（決算公告 / 落札公示）。90 日窓しか無い記録で、日次 cell が
+  ;; 押し込む。個人名の混入・窓の不可視化・名寄せ分母の欠落を artifact 側で見る。
+  {:name "jp-go-npb-kanpou" :id "kanpou-projections" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/kanpou-projections-check.cljs"
+   :include-ext [".edn" ".cljs"] :min-files 3 :cd false}
+
+  ;; jGrants カタログ。3,751 件中 308 件が募集中で、分母が消えると全件が
+  ;; 「使える補助金」に読める。締切の時刻精度もここで守る。
+  {:name "jp-go-digital-jgrants" :id "jgrants-projections" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/jgrants-projections-check.cljs"
+   :include-ext [".edn" ".cljs"] :min-files 2 :cd false}
+
   {:name "root" :id "root-itonami-maturity-freshness" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/itonami-maturity-freshness-check.cljs"
