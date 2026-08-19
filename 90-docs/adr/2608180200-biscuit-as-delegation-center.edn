@@ -176,11 +176,12 @@ subset のみ実装（ADR-2608159400 が自ら「完全な policy language は�
 | 減衰が構造的 | **5/5** | `meet` が最大下界。escalation は算術的に不能 |
 | fail-closed | **4/5** | 未知の caveat/kind は不満足、未知 policy は deny。**biscuit の予算超過だけは新しく足した** |
 | 両方向を見た検査 | **4/5** | **10 defect** で赤→緑（macaroon 4 / biscuit 6）。**うち 2 つは実演中に見つけた検査漏れ** |
-| **wire 相互運用** | **1/5** | **biscuit protobuf も libmacaroons binary も未実装。**外部実装が我々の token を読んだことは一度もない |
-| 配備 | **0/5** | **どの経路もまだ biscuit を使っていない。** live なのは CACAO 自己発行のまま |
+| **wire 相互運用** | **3/5**（2026-08-19 更新、旧 1/5） | **`biscuit-auth` が発行した実トークンを decode し署名検証まで通る**（公式 `samples/current`、負の 3 種も拒否）。まだ 5 でないのは**書きが無い**ため —— 外部実装が我々の出力を読んだことは一度もない |
+| 配備 | **1/5**（2026-08-19 更新、旧 0/5） | 呼び手は production namespace に在り suite は緑。**まだどの route も biscuit を通さない** —— live は CACAO 自己発行のまま |
 
-**総合 29/40。落ちている 2 軸が同じことを言っている** —— 決定と代数は堅いが、
-**外と繋がっておらず、まだ誰も使っていない。**
+**総合 32/40**（2026-08-19。旧 29/40）。**上がった 2 軸は同じ 1 日の作業で、
+残りの 2 点も同じことを言っている** —— **書きが無い**ことと、**まだ誰の route も
+通っていない**こと。
 
 ## 何を supersede するか
 
@@ -203,14 +204,16 @@ subset のみ実装（ADR-2608159400 が自ら「完全な policy language は�
 | guarded call | **実装済み**（`biscuit.effective/authorize`）。`requested ∩ delegated ∩ local-policy` を**言語の `:rules` を読んで**分岐し、全経路が receipt を返し、**どの枝も秘密を要求しない**。契約テストが実 `capability-semantics.edn` を読み、**読めなければ pass せず fail する**。38 tests / 95 assertions、9 defect で赤→緑 | **fleet 側の呼び手はまだ 0。**次は kotobase edge か actor の実 host call を 1 本通す |
 | **鍵の発見と回転** | **未着手。** `org-w3-did` は `did:key` と `did:web` のみで、**`did:webvh` は fleet に存在しない**（実測 2026-08-19） | 下記 |
 | amu / aiueos / kototama | **触っていない。触る必要が無い** —— admission・機械内 table・epoch feed であって delegation ではない | 失効を biscuit に足さず、この 2 面に乗せる |
-| biscuit の wire | **未実装（protobuf v3）** | **gap ledger の先頭。**これが無い限り `biscuit-auth` と話せない |
-| Ed25519 束縛 | 注入のみ（テストは stand-in） | `kotoba-lang/ed25519` を挿す |
-| edge 検証 | 未配線 | Worker で root 公開鍵だけを持つ検証を 1 本 |
+| biscuit の wire | **読みは実装済み**（`biscuit.wire`）。`biscuit-auth` の公式サンプルを decode し**署名検証まで通る**。負のサンプル 3 種は拒否。**書きは未実装**（外部が受理していない writer を format と名乗らない） | 書きは、外部実装が我々の出力を読むまで claim しない |
+| Ed25519 束縛 | **実装済み。** JVM は `java.security`、nbb は `node:crypto`、公開鍵導出は `org-ietf-ed25519`。stand-in は残すが「どの署名方式でも成り立つ性質」用と明記 | — |
+| edge 検証 | **実装済み。** `kotobase-server` の `security/authority` に `verify-biscuit` が入り、CACAO と同じ `:effective-caps` を返す。**root 公開鍵しか持たない**。132 tests / 520 assertions green | route はまだ繋いでいない（追加のみ、CACAO が live のまま） |
 
 **「biscuit を中心にする」と書いた時点で中心になったのではない。** 中心になるのは
 最初の委譲が biscuit で書かれ、edge で秘密なしに検証されたときである。
-**2026-08-19: 秘密なしの検証は実装され、両 runtime とテストで動く。まだ live の
-呼び手が 1 本も無い**ので、中心になったとはまだ言わない。
+**2026-08-19: 秘密なしの検証は実装され、両 runtime で動き、`kotobase-server` の
+authority namespace に呼び手が入り、`biscuit-auth` が発行した実トークンを読んで
+検証できるようになった。それでもまだ route は繋いでいない**ので、中心になったとは
+まだ言わない —— 言えるのは「繋げば動くところまで来た」である。
 
 ## 次に埋める穴 —— root 鍵の発見と回転（did:webvh）
 
@@ -234,8 +237,29 @@ premise を置かない）との緊張はここにある。扱い方は IPNS と
 **identity は鍵（did:key）のまま、webvh は「いまどの鍵が現行か」を知る naming/rotation
 面**であって identity ではない。
 
-出所ドメインは実測済み: `identity.foundation`（DIF、104.21.70.240）と
-`didwebvh.info`（185.199.110.153 = GitHub Pages）の両方が解決する。**origin 面の名前は
-どちらを spec authority と見るかで変わる**ので、repo を起こす前にそこを決める
-（推測で prefix を作らない）。
+### 名前は決まった —— `foundation-identity-didwebvh`（2026-08-19 実測）
+
+前回は「どちらを spec authority と見るかで prefix が変わるので保留」と書いた。
+**仕様 repo 自身に答えが書いてあった**:
+
+```
+decentralized-identity/didwebvh
+  description: did:webvh (did:web + Verifiable History). Formerly called did:tdw.
+  homepage:    https://identity.foundation/didwebvh/next/
+```
+
+発行者は **DIF**（GitHub org `decentralized-identity`）で、その `homepage` が
+`identity.foundation` を指している。`didwebvh.info` は GitHub Pages 上の二次サイトで
+authority ではない。したがって規則どおり:
+
+```
+identity.foundation → foundation-identity      →  foundation-identity-didwebvh
+```
+
+**この workspace に `foundation-` prefix の前例は無い**（実測 0 件）。DIF は W3C とは
+別の authority なので `org-w3-did`（DID Core）とは別 prefix になるのが正しい ——
+prefix はドメインから導出するのであって、分類判断ではない。
+
+**repo はまだ起こしていない。** 中身の無い scaffold は「在る」と索引に答えさせるので、
+log 検証核（hash 連鎖・pre-rotation・署名）が書けるときに同時に起こす。
 "}]
