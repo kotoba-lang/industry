@@ -1,0 +1,90 @@
+[{:db/id -1
+  :adr/id "adr-2608192150-mailbox-triage-bot"
+  :adr/doc_type "adr"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/topic "mailbox-triage"
+  :adr/date "2026-08-19"
+  :adr/last_verified "2026-08-19"
+  :adr/related ["2608021200-m365-shared-mailbox-archive-and-query-plane"
+                "2608011100-m365-gftdcojp-tenant-identity-audit-and-offboarding"
+                "adr-2608190100-bots-cannot-act-three-blocked-layers"]
+  :adr/title "ADR-2608192150: gftd.co.jp のメールボックス整理振り分けを hermes cron の bot にする"
+  :adr/body "## Context
+
+オーナー指示（2026-08-19）「hermes agent の bot で j.kawasaki@gftd.co.jp のメールボックス,
+somu@gftd.co.jp, keiri@gftd.co.jp などのメールボックスの整理振り分け対応」。
+
+着手時点の実測:
+
+| 面 | 状態 |
+|---|---|
+| 対象箱の正本 | `m365-archive/bin/mailboxes.edn`（共有 16 箱 + j.kawasaki + 退職者 6 箱） |
+| 振り分けツール | **main に無い** |
+| m365 / az 認証 | 両方ログアウト |
+| hermes cron | ジョブ 0 件 |
+
+**振り分けツールが無いことは、探すまで分からなかった。** `bin/organize-inbox.py` と
+`bin/triage-inbox.py`（整理/通知・請求経理・カレンダー・SES へ移動 + followupFlag、
+`facts/triage-log.edn` に可逆ログ）は py→cljc 移行で削除され、**移植されていない**。
+ローカルの共有 checkout が 15 commit 遅れていたため、そこにだけ残っており、
+`ls bin/` は「在る」と答えた。ADR-2608136800（checkout・pin・main は 3 つの別物）の実例。
+
+## Decision
+
+### 1. 移植し直し、共有箱へ広げる
+
+`bin/organize-inbox.cljs`（nbb）+ `bin/triage-mailboxes.cljs`（駆動）。旧実装からの変更は 2 つ。
+
+- **`--mailbox <upn>`。** 旧実装は `/me` 固定で、契約・請求・人事の一次情報が在る
+  共有箱（somu@ 21.5k / keiri@ 17.5k）を 1 通も扱えなかった。共有箱で mail を*動かす*には
+  委任スコープ **`Mail.ReadWrite.Shared`** が要る（`Mail.Read.Shared` は読めるが `/move` で 403）。
+  `bin/setup-auth.cljc` の scope 一覧に追加した。Exchange 側の FullAccess は別物で、両方要る。
+
+- **分類器は annex 化された fact 層を読まない。** `facts/messages.edn` は 57 MB の annex
+  オブジェクトで、多くの checkout では pointer ファイルである。**未取得の pointer は
+  「この差出人には一度も返信していない」と読め、それは「片付けてよい」と同じ顔をする。**
+  証拠はメールボックス自身の Sent Items から集め、集まらなかったときは
+  **exit 3（0 でも 1 でもない）で拒否する**（ADR-2608136000）。
+
+### 2. 失敗の向きは受信箱側に倒す
+
+積極的に自動送信と同定できたものだけが動く（会議招集・noreply/一括送信・
+その箱が一度も返信していない差出人からの請求）。**人間が書いたものは残る。**
+既存の相手からの未読には followupFlag を立てる（振り分けずに、目印だけ）。
+オーナー判断は「自動系だけ適用・人間宛は提案」。
+
+### 3. 初回 dry-run を人が見るまで apply しない
+
+`~/.hermes/state/mailbox-triage-approved` が在るときだけ `--apply` が付く。
+これが無いと、**オーナーが別件で m365 にログインした 1 時間後に、初回実行が
+17 箱で数千通を誰も見ないまま動かす**。承認は `touch` 1 回。
+
+### 4. bot は hermes cron の `--no-agent`
+
+ジョブ `mailbox-triage`（`8cf8421b60f9`、毎時）。判断はコードにあり LLM は挟まない
+（毎時 LLM に分類させると、監査可能性と決定性の両方を失う）。hermes の cron script は
+`.sh` は bash・それ以外は Python で実行されるため、`~/.hermes/scripts/mailbox-triage.py`
+は **nbb を呼ぶだけの機構層**にし、振り分け規則が 2 箇所に生えないようにした。
+
+## 実測
+
+- 分類器の self-test 11 件（`--self-test`）が両方向を主張して pass。
+  **discriminate することを確認済み**: correspondent 保護規則を 1 つ壊すと、
+  correspondent の 2 件だけが FAIL し他は緑のまま（壊したものと報告されたものが一致）。
+- hermes cron → launcher → 拒否メッセージまで通した。実際の出力:
+  `m365 is logged out, so no mailbox was read. / fix: m365 login`。
+  **読めなかった実行が、読んで何も無かった実行と違う値を返している。**
+- west pin を `30a8b187723b→2ba43e65e55c` に前進（fast-forward、
+  `verify-west-pins.cljs --only m365-archive` で検証）。共有 checkout も同期済み。
+
+## 残る blocker（bot はここで止まっている）
+
+1. **`m365 login`（device code + MFA、対話、1 回）。** agent は認証情報を自分で
+   フォーム入力しない（安全床①）ので、これはオーナー実行。
+2. **`Mail.ReadWrite.Shared` の同意。** `bin/setup-auth.cljc` を再実行すれば要求される。
+   これが無いと共有箱は読めても `/move` が 403 になる。
+3. 上記 2 つが済んだら **dry-run を 1 回見てから** approve marker を置く。
+
+退職者 6 箱は対象外（ADR-2608011100 の監査保全対象。中で mail が動いてはならない）。
+"}]
