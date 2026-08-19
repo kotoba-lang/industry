@@ -40,6 +40,7 @@
 
 (require '["node:fs" :as fs]
          '["node:path" :as path]
+         '["node:child_process" :as cp]
          '[clojure.string :as str])
 
 (def source-ext #{".clj" ".cljc" ".cljs" ".kotoba" ".edn" ".md" ".yml" ".yaml" ".json"})
@@ -108,6 +109,47 @@
      dir)
     {:files @out :links @links}))
 
+(defn- git*
+  "stdout of a git command as a Buffer, or nil when it fails."
+  [& args]
+  (let [r (cp/spawnSync "git" (clj->js (vec args)) #js {:maxBuffer 67108864})]
+    (when (zero? (or (.-status r) 1)) (.-stdout r))))
+
+(defn- git-str [& args]
+  (some-> (apply git* args) str str/trim))
+
+(defn- published
+  "`{:state :yes|:no|:unknown :behind <string-or-nil>}` — is this file's NUL also
+  in what the repo publishes?
+
+  Two callers hand this script two different kinds of tree. The fleet gate hands
+  it a tarball built from git, so the tree IS the published state and there is
+  nothing to compare against: `:unknown`, and the finding stands. The
+  orgs-detector hands it `orgs/`, a set of working checkouts, and those lag.
+
+  Measured 2026-08-19: of fourteen findings still true on disk, **thirteen were
+  already fixed on the repo's own main**, reported from checkouts behind by 2 to
+  324 commits. The detector was answering about a tree nobody publishes.
+
+  Resolution uses refs that are already local -- no fetch, so this stays cheap
+  and offline. When the ref cannot be resolved the answer is `:unknown` and the
+  finding stands: `:no` is a claim, and a check that could not look must not
+  make it."
+  [p]
+  (let [top (git-str "-C" (path/dirname p) "rev-parse" "--show-toplevel")]
+    (if-not (seq (str top))
+      {:state :unknown}
+      (let [remote (some-> (git-str "-C" top "remote") str/split-lines first str/trim)]
+        (if-not (seq (str remote))
+          {:state :unknown}
+          (let [rel (path/relative top p)
+                blob (git* "-C" top "show" (str remote "/main:" rel))]
+            (if (nil? blob)
+              {:state :unknown}
+              {:state (if (neg? (.indexOf blob 0)) :no :yes)
+               :behind (git-str "-C" top "rev-list" "--count"
+                                (str "HEAD.." remote "/main"))})))))))
+
 (defn- allowed? [p]
   (some (fn [[suffix _]] (str/ends-with? p suffix)) allowed))
 
@@ -135,7 +177,13 @@
         unreadable (filterv (fn [[_ r]] (nil? r)) results)
         scanned (- (count results) (count unreadable))
         hits (filterv (fn [[_ r]] (true? r)) results)
-        {ok true bad false} (group-by (comp boolean allowed? first) hits)]
+        {ok true unallowed false} (group-by (comp boolean allowed? first) hits)
+        ;; Split before reporting: a byte that is gone from what the repo
+        ;; publishes is not a defect in the repo, it is a stale checkout.
+        by-tree (group-by (fn [[p _]] (if (= :no (:state (published p))) :stale :live))
+                          (or unallowed []))
+        bad (:live by-tree)
+        stale (:stale by-tree)]
     (println (str "SCANNED\t" scanned))
     (when (seq unreadable)
       (println (str "UNREADABLE\t" (count unreadable))))
@@ -153,6 +201,16 @@
                   (str "raw control byte in source; grep is silent on this file "
                        "-- `grep -c <name> " p "` prints nothing and exits 1, "
                        "which is what a file NOT containing that name does"))))
+    (doseq [[p _] (sort-by first (or stale []))]
+      (let [{:keys [behind]} (published p)]
+        (println (str "  stale    " p
+                      "  (already fixed upstream; checkout behind " (or behind "?") ")"))
+        (when findings?
+          (finding! "info" (str "stale-checkout:" p)
+                    (str "this checkout still has the raw NUL but the repo's own main"
+                         " does not -- behind by " (or behind "?") " commit(s). Nothing"
+                         " to fix in the repo; run `west update --fetch smart <name>`"
+                         " to stop reporting it")))))
     (cond
       ;; evidence floor: 0 件走査は 0 件違反ではない。
       (zero? scanned)
