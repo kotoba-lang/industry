@@ -332,10 +332,20 @@ EOF に依存しないので、この bug は landing 以来ずっと隠れて�
   head record の canonical bytes を検査する。**別のバイト列なので、QC をどこに
   添えても通らない。** 継ぎ目は未配線ではなく**証明の対象の不一致**である。
   実測と、塞ぎ方 3 つとその代償は **ADR-2608198200**。
-- **NFS を forwarder 越しに使う経路は、まだ閉じていない。** `principal-of` は
-  同居 service 向けであり、cloud-itonami-app は別プロセスの JVM である。
-  agent に local endpoint を生やして訊けるようにするのが次。それまで
-  forwarded NFS は**閉じる側に倒れる**（`node-for` が nil を返して全拒否）。
+- ~~**NFS を forwarder 越しに使う経路**~~ **閉じた**（`kekkai-node` `04c4fa6` /
+  `cloud-itonami-app` `19d77b9`）。`edge/principal-endpoint` が
+  `GET /principal?port=<source port>` を loopback だけに出し（**bind は
+  127.0.0.1 固定、選択肢を置かない** —— ホストの外に出せば『誰が何に繋いでいるか』の
+  地図になる）、app 側は netmap が住所で答えられなかったときだけそれを訊く。
+  - **訊くのは 2 番目**。overlay の住所で既に名指せる peer に round trip を
+    足さない（counter で assert してある）。
+  - **名指されたことは許可ではない** —— peer は変わらず `authorized?` /
+    `permitted?` を通る。`:principal-endpoint` は `:netmap` 無しでは拒否する。
+  - **lookup を設定した時点で、loopback は自己認可をやめる。** agent が名指せない
+    local 接続は、設定 actor として admit せず拒否する。さもないと『わざわざ
+    overlay の後ろに置いた Drive』を、その機械の中の何でも mount できる。
+  - lookup の失敗（到達不能・遅い・壊れた応答・404）は全て nil = 拒否。
+    **答えられなかった lookup と『誰でもない』と答えた lookup を区別できる形にしない。**
 
 ## 関連
 
