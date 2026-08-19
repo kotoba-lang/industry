@@ -1189,6 +1189,35 @@
           [])
       (mapcat (fn [f] (or (corpus-line-entities f next-tempid!) [])) files))))
 
+(defn web-presence-entities
+  "法人番号に紐づく**公開面**（`company-web-presence` の
+   `data/web-presence.datoms.edn`、ADR-2608181000）。
+
+   `:web/url` は gBizINFO 由来（その会社が国に登録した URL）、`:press/feed-url`
+   ほか `:press/*` は**こちらが取得して数えた事実**。混ぜないのは、前者が
+   「こう名乗っている」で後者が「この日こう応えた」だから。
+
+   ⚠ **数える前に分母を見る。** manifest 行の `:projection/queried`（1,040）に対して
+   URL は 194、feed は 41 —— 日本の企業サイトは RSS を出さない方が普通で、
+   **ここに無いのは「発信していない」ではなく「自社サイトに feed が無い」**。
+
+   記事そのものはここに載らない。`kotoba-lang/newsfeed` が取得と台帳を持ち、
+   catalog の各 entry が `:company/houjin-bangou` を持つので記事を会社に戻せる。"
+  [next-tempid!]
+  (let [files (->> ["company-web-presence"]
+                   (keep west-project-path)
+                   (mapcat (fn [p]
+                             (let [dir (apply io/file root (concat (str/split p #"/") ["data"]))]
+                               (when (.exists dir)
+                                 (->> (seq (.listFiles dir))
+                                      (filter #(str/ends-with? (str %) ".datoms.edn"))))))))]
+    (if (empty? files)
+      (do (js/console.error
+           (str "edn-query: WARNING web-presence: com-junkawasaki/company-web-presence の "
+                "data/*.datoms.edn が無い — 会社の URL とフィードは load されない"))
+          [])
+      (mapcat (fn [f] (or (corpus-line-entities f next-tempid!) [])) files))))
+
 (defn kanpou-kessan-entities
   "官報の会社決算公告から抽出した**非上場企業の決算期**
    （`jp-go-npb-kanpou` の `data/kanpou-kessan.datoms.edn`、ADR-2608181000）。
@@ -2114,6 +2143,7 @@
         ;; 法人側と実際に join するため）。jgrants と違うのはそこ。
         gbizinfo-tx (gbizinfo-entities next-tempid!)
         kanpou-tx (kanpou-kessan-entities next-tempid!)
+        web-presence-tx (web-presence-entities next-tempid!)
         ;; company-tx と別にするのは、entity を聞くだけの query に 23,530 本の
         ;; edge を load させないため（ADR-2608031900）。
         relationship-tx (gleif-relationship-entities next-tempid!)
@@ -2138,7 +2168,8 @@
                                                      hirameki-corpus-tx jinushi-tx
                                                      proc-registry-tx merged-kotoba-tx
                                                      working-doc-tx narrative-tx
-                                                     company-tx gbizinfo-tx kanpou-tx property-tx subsidy-tx relationship-tx fleet-tx
+                                                     company-tx gbizinfo-tx kanpou-tx web-presence-tx
+                                                     property-tx subsidy-tx relationship-tx fleet-tx
                                                      yabai-tx tadori-tx patent-tx accounts-tx innen-tx
                                                      awai-tx kakekomi-tx okugai-tx factory-tx
                                                      hayari-tx hayari-ent-tx
