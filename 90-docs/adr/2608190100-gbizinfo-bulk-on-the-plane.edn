@@ -102,4 +102,53 @@ mirror になる。**
 - corpus（103 万行）は git に無い。`~/.cache/gbizinfo` に落ちて、既定では
   ZIP も CSV も run の最後に消える（`--keep-zip` で残る）。**kotobase / annex に
   預けていない** —— kouhou の raw feed と同じ扱いにするかは未決。
-"}]
+
+
+## 追記（2026-08-19）: 日次配線、corpus の custody、R2 の答え
+
+### 日次にした（`com.gftd.gbizinfo-ingest`、07:17）
+
+全件の更新は月次だが、**publish 日を事前に知る方法が無い** —— 配布ファイル名
+（`Hojokinjoho_UTF-8_20260819.zip`）は**ダウンロードした日**であって publish 日では
+ない。だから毎日引いて、**content の sha256 が前回と同じなら publish 変化なしと
+言う**。約 28 MB/日 のダウンロードは払う —— 払わないと「いつ変わったか」を
+後から言えない。
+
+07:17 は kouhou (06:41) / newsfeed (05:23) / fleet-ci-sweep (04:17) からずらした。
+
+### corpus を kotobase と b2 に預けた
+
+`jp-go-gbiz-info` を annex 化し、`raw/**` だけを annex に送る（`.gitattributes`、
+SHA256E）。projection は git の blob のまま —— diff で読めることに意味がある。
+
+初回 run の実測:
+
+```
+publish: 前回と同じ内容 (5 ファイルの sha256)
+custody (VERIFIED by exit code): kotobase=5/5, b2=5/5
+push main ok / push git-annex ok
+```
+
+**custody は location log ではなく exit code で数える**（ADR-2608131100）。
+`raw/` は working tree 上 0 バイト（symlink）で、実体は 2 つの off-machine remote に在る。
+
+### R2 は wrangler からは取れない（実測 2026-08-19）
+
+- `wrangler login --scopes-list` の**全 scope に `r2` が無い**。`account:read` で
+  bucket 一覧は見えるが、S3 互換の鍵は出せない。
+- `POST /accounts/{id}/r2/temp-access-credentials` を wrangler の OAuth token で
+  叩くと **401 (10002 Unauthorized)**。
+
+**したがって R2 直の annex remote はオーナー作業**（ダッシュボード → R2 → API
+トークン発行）。ただし **s3.kotobase.net の blob backend は R2**（`STATE_BUCKET` の
+`objects/` prefix、ADR-2608100100）なので、**kotobase remote に預けた時点で
+中身は R2 に載っている**。R2 直が要るのは、kotobase の per-bucket head CAS を
+迂回して bulk 転送を速くしたいときだけ。
+
+### ⚠ 別セッションの API runner が日曜に起きる
+
+`com.gftd.gbizinfo-refresh`（週次・日曜 09:00）は token 待ちで **exit 3** を出し
+続けていた。token を Keychain に置いたので**次の日曜から本当に走る** —— 9,142 社 ×
+7 aspect = **63,924 リクエスト**、そして削除された `gbizinfo-joined.datoms.edn`
+（26,116 行）を作り直す。bulk と同じ token を使うので、throttle されれば
+こちらも止まる。**意図的にそう設計されたものなので触っていない。**"}]
