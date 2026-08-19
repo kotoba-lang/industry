@@ -56,7 +56,7 @@
 
 (def default-cost-s
   ;; 実測が無い gate の初期値。桁が合っていればよい（LPT は順序しか使わない）。
-  {:jvm-test 600 :nbb-test 180 :nbb-script 120})
+  {:jvm-test 600 :shadow-test 600 :nbb-test 180 :nbb-script 120})
 
 (defn read-costs []
   (try (reader/read-string (str (.readFileSync fs cost-path "utf8")))
@@ -105,7 +105,14 @@
 ;; 配置
 
 (defn required-cap [w]
-  (or (:cap w) (if (= :jvm-test (:gate w)) :jvm :node)))
+  (or (:cap w)
+      ;; The requirement is a property of the GATE KIND, not of each entry.
+      ;; Measured 2026-08-19: `:shadow-test` was added without appearing here,
+      ;; defaulted to :node, and was placed on a node with no JVM. The gate
+      ;; refused to report a pass (exit 93, no test summary) rather than going
+      ;; green on a machine that could not compile it -- the floor held, and
+      ;; the placement was still wrong.
+      (if (contains? #{:jvm-test :shadow-test} (:gate w)) :jvm :node)))
 
 (defn assign-lpt
   "**参照実装。production では使わない。**
