@@ -542,8 +542,8 @@ kanpou-kessan ambiguous 171            kanpou-chotatsu ambiguous 45
 gbizinfo      folded 125,144 → 2,358 社
 ```
 
-⚠ **したがって `[?e "source/dataset" X]` の件数はレコード数ではない** —— manifest 行の
-分だけ多い。レコードだけ数えるなら `(not [?e "corpus/manifest" true])` を足す。
+⚠ **したがって `[?e \"source/dataset\" X]` の件数はレコード数ではない** —— manifest 行の
+分だけ多い。レコードだけ数えるなら `(not [?e \"corpus/manifest\" true])` を足す。
 
 ### 17. 解散公告 —— 「この会社はもう営業していない」（5,777 件）
 
@@ -706,7 +706,7 @@ verify-projections が赤なら commit しない。**途中で切れた corpus �
 「形の正しい、件数だけ足りないファイル」**で、一番検出しにくい壊れ方である。
 
 権限はこの repo 1 つの write deploy key。kickstart で発火を確認済み
-（last exit code = 0、"publish unchanged"）。
+（last exit code = 0、\"publish unchanged\"）。
 
 ## Consequences / まだ無いもの（正直に）
 
