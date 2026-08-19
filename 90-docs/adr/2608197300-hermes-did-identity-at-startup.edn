@@ -106,6 +106,27 @@ ADR-2608180200 に反するので同日改めた。CACAO は消えず、human co
 | 7-9 | authority 判定 | in-scope true、減衰済み false、escalated false |
 | 10 | 閉じた kind の外 | 無視でなく `:grant/rejected` |
 
+**再現**: `scripts/identity-startup-e2e.cljs`（nbb、JVM 不要）。測定値と\"測っていないもの\"は
+`90-docs/evidence/260819-identity-startup-biscuit-authority.edn`。pin 済み checkout で
+19 tests / 46 assertions / 0 failures。
+
+## 次の一手（resume point）
+
+1. **plugin の骨を置く** —— `~/.hermes/hermes-agent/plugins/dashboard_auth/did/__init__.py`。
+   `self_hosted` を雛形にし、5 メソッドを実装。`complete_login` と `verify_token` は
+   **検証を自前で書かず** `scripts/identity-startup-e2e.cljs` と同じ classpath で nbb を
+   subprocess 実行し、`biscuit.token/verify` → `biscuit.kotoba/->delegated` →
+   `authority.chain/authorize` → `identity.startup/resolve-state` を通す。
+2. **verifier CLI を切り出す** —— e2e スクリプトの前半（鍵生成とデモ）を捨て、
+   stdin から `{token, root-public-key, requested, now}` を読んで decision を EDN で返す形にする。
+3. **kagi に鍵を置く** —— compartment `personal`、root と device を別 item。
+   `FLEET_ROOT` 経由で bin を解決する既存の呼び方に合わせる。
+4. **両方向の gate** —— 鍵無しで機微 API が 401、鍵ありで 200 に戻ることを実 Hermes で見せる。
+   これが landed するまで plugin は「動いたと言えるだけ」。
+5. **factor verifier の配線** —— `kotoba-lang/authentication` の `IFactorVerifier` に
+   WebAuthn を挿し、その decision を `identity.authenticators/acceptable` に渡す。
+   ceremony は `kotoba-lang/webauthn` / `org-w3-webauthn`（**新しく書かない**）。
+
 **未実装**: Hermes `dashboard_auth/did` plugin、nbb verifier CLI、kagi への鍵保管、
 mint/link の UI 2 択、pairing 文字列の経路、`authentication` の factor verifier 配線。
 
