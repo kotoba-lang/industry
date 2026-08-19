@@ -72,7 +72,19 @@
     "network-awai/cloud-itonami"
     "network-awai/cloud-murakumo"
     "network-awai/club-shinshi-app"
-    "network-awai/network-isekai"})
+    "network-awai/network-isekai"
+    ;; added 2026-08-19. Both measured PRIVATE via `gh api repos/<r> --jq .private`
+    ;; rather than inferred from the org, so the owner decision above applies
+    ;; unchanged: private repos have no surface until the owner picks a channel.
+    "com-junkawasaki/company-web-presence"
+    "com-junkawasaki/jp-go-nta-houjin-bangou"
+    ;; and three more that appeared between measuring the list and writing it:
+    ;; another session gated them while this edit was in flight, which is the
+    ;; second time that has happened to this set in two days. All three measured
+    ;; PRIVATE.
+    "com-junkawasaki/jp-go-digital-jgrants"
+    "com-junkawasaki/jp-go-gbiz-info"
+    "com-junkawasaki/jp-go-npb-kanpou"})
 
 (def pending-registration
   "PUBLIC repos with no RID. No disclosure question — these can simply be registered, and
@@ -124,13 +136,29 @@
     "kotoba-lang/taxlaw"
     "kotoba-lang/tech-ipfs-specs-unixfs"
     "kotoba-lang/ws-valueflo-algorithms"
-    "kotoba-lang/ws-valueflo-vocabulary"})
+    "kotoba-lang/ws-valueflo-vocabulary"
+    ;; added 2026-08-19, all eight measured public. Registering a RID clears each
+    ;; one on its own; nothing here is a decision, it is unfinished registration.
+    ;;
+    ;; Two of them, shohyo and worklaw, were gated by the session that is writing
+    ;; this line -- a gate was added and the registration was not, which is the
+    ;; same omission this set exists to record. Naming that is the point of the
+    ;; set: it is a debt list, and a debt whose owner is anonymous does not get
+    ;; paid.
+    "kotoba-lang/authority"
+    "kotoba-lang/macaroon"
+    "kotoba-lang/org-biscuitsec"
+    "kotoba-lang/psa"
+    "kotoba-lang/shohyo"
+    "kotoba-lang/tana"
+    "kotoba-lang/user-test"
+    "kotoba-lang/worklaw"})
 
 (def baseline-without-surface
   "The union: every gated repo known on 2026-08-18 to have nowhere to report a failure."
   (into private-on-github pending-registration))
 
-;; Separately, 3 of the 169 gate ENTRIES cannot be resolved to an `<org>/<name>` pair by the
+;; Separately, some gate ENTRIES may not resolve to an `<org>/<name>` pair by the
 ;; rule above (no `:org` in gates.edn and no matching `- name:` / `remote:` pair in west.yml).
 ;; They are counted and printed on the SCANNED line rather than silently dropped — a repo
 ;; this gate cannot name is a repo it cannot vouch for either way.
