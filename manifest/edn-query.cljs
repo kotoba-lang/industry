@@ -1036,7 +1036,16 @@
           [])
       (mapcat (fn [f] (or (corpus-line-entities f next-tempid!) [])) files))))
 
-(def houjin-bangou-default-tiers #{"joined"})
+(def houjin-bangou-default-tiers
+  ;; `closures`（登記記録の閉鎖）を既定に入れる: **面の番号集合に絞った 52 件**しか
+  ;; 無く、答える問いは「この会社はまだ生きているか」という、ほぼ全ての引き手が
+  ;; 最初に要るもの。tier の仕組みは大きい tier を既定から外すためにあるので、
+  ;; 小さいものを外す理由は無い。
+  ;;
+  ;; ⚠ closures projection は**番号集合で絞った結果**であって全件ではない
+  ;; （全件は 773,796 件 = 登記の 13%）。絞りを外して commit されたらこの既定は
+  ;; 高くつくので、loader が record-count を見て名指しで警告する。
+  #{"joined" "closures"})
 
 (defn houjin-bangou-tiers
   "load する tier。`--hb-tier government`、または
@@ -1074,7 +1083,15 @@
             ;; 要求された tier に 1 つもファイルが無いなら、それは「その tier が
             ;; 空」ではなく「その名前の tier が無い」。黙って 0 件を返すと、flag が
             ;; 効いたのか効かなかったのかを出力から区別できない。
-            (doseq [t (sort (remove #(contains? available %) requested))]
+            ;;
+            ;; ⚠ **既定 tier については言わない。** 2 つの dataset（法人番号と
+            ;; invoice）が同じ tier 集合を共有しているので、片方にだけ在る tier を
+            ;; 既定に足すと、もう片方が毎回「その tier が無い」と言い続ける ——
+            ;; 実測 2026-08-19、`closures` を既定に入れた直後に invoice 側が鳴いた。
+            ;; **毎回出る警告は、警告を読まない習慣を作る。**
+            (doseq [t (sort (remove #(or (contains? available %)
+                                         (contains? houjin-bangou-default-tiers %))
+                                    requested))]
               (js/console.error
                (str "edn-query: WARNING " prefix ": tier " (pr-str t)
                     " に該当する data/" prefix t "*.datoms.edn が無い（在るのは "
@@ -1108,6 +1125,17 @@
    load した**（実測 2026-08-18）。"
   [next-tempid!]
   (let [files (nta-projection-files "houjin-bangou-" (houjin-bangou-tiers))]
+    ;; 既定 tier に大きい projection が入ると、**entity を 1 件聞くだけの query も**
+    ;; それを毎回 load する。黙って遅くならないよう名指しで言う。
+    (doseq [f files
+            :let [head (first (or (try (slurp-edn-lines f) (catch :default _ nil)) []))]
+            :when (and (map? head)
+                       (number? (:corpus/record-count head))
+                       (> (:corpus/record-count head) 50000))]
+      (js/console.error
+       (str "edn-query: WARNING houjin-bangou: " (.getName f) " は "
+            (:corpus/record-count head) " 件 —— 既定 tier に置くには大きい"
+            "（number-set で絞られていない可能性）")))
     (if (empty? files)
       (do (js/console.error
            (str "edn-query: WARNING houjin-bangou: com-junkawasaki/jp-go-nta-houjin-bangou の "
