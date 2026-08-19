@@ -2442,13 +2442,26 @@
   ;; could not, which would have been red here forever.
   {:name "org-biscuitsec" :gate :nbb-test :classpath "src:test" :entry "run-nbb-tests.cljs"
    :ship-git-deps true :cd true}
-  ;; The third runtime, gated for the first time (:shadow-test, added to
-  ;; tick.cljs alongside this line). kotobase-server carries the CACAO and
-  ;; biscuit verification both live Workers embed and had no automated check
-  ;; at all. Measured 2026-08-19: it has no `file:` npm sibling and no
-  ;; :local/root, which is what makes it gateable where net-kotobase/engine
-  ;; is not -- that one has both, and the gate refuses them by name.
-  {:name "kotobase-server" :gate :shadow-test :npm-script "test:cljs" :cd true}
+  ;; kotobase-server carries the CACAO and biscuit verification both live
+  ;; Workers embed and had no automated check at all until 2026-08-19, when it
+  ;; was gated as :shadow-test -- the third runtime, which needs a JVM on the
+  ;; node to compile before node can run.
+  ;;
+  ;; It does not need one. Running the same suite under nbb found three real
+  ;; defects the JVM and shadow-cljs runs could not see (nbb/SCI wraps a throw
+  ;; that crosses an async continuation, so classifiers reading `(ex-data e)`
+  ;; one link deep lost the marker that selects the outcome; and a `letfn`
+  ;; sibling passed BY NAME to a JS callback is never invoked). With those
+  ;; fixed, both runtimes report 152 tests / 569 assertions -- same tests, two
+  ;; runtimes, which is how a port is told apart from a re-labelling.
+  ;;
+  ;; :ship-git-deps is what makes this possible at all: the suite loads 28
+  ;; sibling namespaces, and the deps land under ~/.gitlibs/libs/<lib>/<sha>
+  ;; where the classpath can point at them AT THE PINNED SHA.
+  ;;
+  ;; shadow-cljs stays the build path for deploy; it is no longer the gate.
+  {:name "kotobase-server" :gate :nbb-test :classpath "src:test"
+   :entry "test/run_portable.cljs" :ship-git-deps true :cd true}
   {:name "macaroon" :gate :nbb-test :classpath "src:test" :entry "run-nbb-tests.cljs"
    :ship-git-deps true :cd true}
   ;; The decider both wires fold into. Gated because everything above now
