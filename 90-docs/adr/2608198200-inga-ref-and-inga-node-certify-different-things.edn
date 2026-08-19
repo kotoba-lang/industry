@@ -5,7 +5,7 @@
   :adr/date "2026-08-19"
   :adr/supersedes ""
   :adr/superseded-by ""
-  :adr/tags "inga, inga-node, ref-plane, quorum, consensus, certificate, correction"
+  :adr/tags "inga, inga-node, ref-plane, quorum, consensus, certificate, correction, commitment, landed"
   :adr/body
   "## 決定
 
@@ -68,27 +68,62 @@ quorum との往復が増える。
 を捨てる。`verify-head` の docstring が『dumb な read-head! は信用できない host
 でよい』と書いているのは、まさにこれを避けるため。**採らない。**
 
-## 現時点の判断
+## 決定: B を採り、実装した（2026-08-19）
 
-**B が正しい向きである。** ただし本 ADR は **B を実装していない**。理由は 2 つ:
+`inga` `ba437b4` / `inga-node` `bd21f38`。
 
-1. `inga` の証明モデルは security contract であり、この repo の docstring は
-   同じ面で 3 回直している（自己証明する certificate / membership 未検査 /
-   ref-name 未検査）。**追加は additive にできるが、`inga.ref` の seam 変更は
-   既存の呼び出し側の契約を変える。**
-2. 実装する前に決めるべきことが 1 つある: **inclusion proof を `inga.head` に
-   足すのか、`inga.ref` の隣に別の verifier を置くのか。** 前者は 1 つの ns が
-   2 つの証明モデルを持ち、後者は ref 面が 2 通りの構成を持つ。
+**置き場所は 3 つ目の namespace `inga.commitment`。** `inga.head` に足すと
+1 つの ns が 2 つの証明モデルを持ち、**呼び出し側からどちらに依存しているか
+分からなくなる**。`inga.ref` に置くと adapter が『注入されるはずの検証』を
+自分で持つ。**head record 証明書は 1 行も変えていない** —— witness に head
+record を署名させている deployment はそのまま動く。
 
-## いま正しく言えること
+検証は 3 つで、それぞれ**取り除く攻撃**を docstring に書いた:
 
-- **ref の CAS 自体は実在し、測ってある**（ADR-2608198100『測った』2、
-  `inga-node` `54a04b7`）。7 witness process に同一 `[ref seq]` を投げて片方が
-  負け、敗者は勝者の CID を教えられる。**それは ordering の決定であり、
-  offline verifiable な証明ではない。** 両者は別の主張である。
-- **`inga.ref` は今日 cooperative oracle としか繋がっていない**（自分の docstring
-  が『the adapter was correct and connected to nothing』と書いている）。
-  本 ADR はその文が今も正しい理由を、推測ではなく実測で述べたもの。
+| check | 無いとどうなるか |
+|---|---|
+| `:block-not-certified` | 本物の block X の証明書 + 攻撃者の block Y（攻撃者の record 入り）が通る。**何も偽造されておらず、record は commit されていない** |
+| `:certificate-invalid` | 証明書は『持っている人の主張』になる（`attest/verify-certificate` に委譲） |
+| `:not-in-block` | 正当に commit された block の上に、**任意の record** が乗る |
+
+binding を署名より**先に**見る —— membership を threshold より先に見る
+`verify-certificate` と同じ規律で、しかも安い（等値 1 回 対 署名 N 回）。
+
+`inga.ref` は **`head-of!`** を取るようにした（read と verify を 1 つにした seam）。
+proof は read と**一緒に**来るので、分けると verifier が渡されていないものを
+要求することになる。証明書形式の seam 要求は緩めていない（それを assert してある）。
+
+**producer 側も landed。** `sink-blocks!` が record の隣に `{block, qc}` を書き、
+`/committed?ref=` が head と一緒に返す。
+
+⚠ **proof は EDN で運ぶ。JSON では運べない。** `:inga.block/proposals` と
+`:inga.qc/block-hash` は**修飾キーワード**、`:inga.qc/witnesses` は**集合**で、
+`clj->js` はキーワードを `name` だけで書く。最初の実装はそれで名前空間を全部
+落とし、**全ての proof が空のハッシュに対して `:block-not-certified`** になった。
+（この ADR を書いた私は docstring に『修飾キーは JSON round trip を生き延びる』と
+自信を持って書いていた。実行が否定した。）
+
+## 実測（2026-08-19、7 witness process）
+
+race script が勝者の head を**オフラインで**検証する: block hash を再計算し、
+証明書がその block を名指していることを確かめ、**実 Ed25519 の witness 鍵**に
+対して証明書を検証し、record が block の proposals に在ることを確かめる。
+隣に否定を 3 つ置いた —— 別 block の証明書 / 偽造署名 / 別 ref に対する本物の proof。
+
+**3 つの check はそれぞれ落として確かめた** —— どれを外しても、それを主張する
+test *だけ*が落ちる。
+
+## 2 つの主張は今も別である
+
+- **ordering の決定**（誰が seq を取ったか）は `inga-node` `54a04b7` で測った。
+- **offline verifiable な証明**（その head が本当に commit されたと、host を
+  信用せずに確かめられる）は本 ADR で足した。
+
+前者は後者を含まない。ADR-2608198100 の旧文はこの 2 つを混ぜかけていた。
+
+**まだ繋いでいないもの**: `inga.ref` を `head-of!` + `inga.commitment` で
+実際に構成する deployment。seam・verifier・producer は揃って測ってあるが、
+その 3 つを 1 つの store として組んだ稼働構成はまだ無い。
 
 ## 何をしたか
 
