@@ -244,6 +244,59 @@ behind, and replaying it can delete work someone else added. **Re-runs must be i
 since landing does not remove the local copy: compare local blob shas against the base tree
 and drop what already matches.
 
+### A test file is additive by path and still breaks the build
+
+SSoT: `:unresolved-refs-gate` in the edn. Gate: `unresolved-refs-gate!` in
+`scripts/cleanup-land.cljs`.
+
+`:additive` merges on one argument: no path of this name exists on the default
+branch, so no existing line is rewritten. That is true of **lines** and silent about
+**the build**.
+
+Measured on `kotoba-lang/kotoba-kir`, found 2026-08-19. `b0472c3`
+`cleanup: land untracked WIP (1 files)` (2026-08-14) landed
+`test/kotoba/kir_value_runtime_test.clj`, which reads `kir/value-runtime-operations`
+— a var defined in **no ref of the repo and nowhere in the fleet**. All four of its
+deftests drive `kir/execute` with `value-intern` / `value-hydrate` / `value-resolve`
+/ `value-cid-of` / `value-release`; `src/kotoba/kir.cljc` has 0 occurrences of each.
+
+The suite therefore **did not compile for five days**:
+
+```
+Syntax error compiling at (kotoba/kir_value_runtime_test.clj:65:10).
+No such var: kir/value-runtime-operations
+```
+
+Not a red suite — zero tests ran, so nothing in that repo was checked at all, which
+is harder to notice than a failure. Removed in `kotoba-kir#54`; the suite went from
+`0 tests run` to `Ran 136 tests containing 581 assertions. 0 failures`.
+
+The commit's own message reads *"Purely additive: none of these paths exist on main,
+so no existing line is rewritten."* Correct, and beside the point.
+
+**What the gate does.** For each landed `.clj/.cljc/.cljs` file it reads the ns form's
+`:as` aliases, and for every alias whose namespace has source **in this repo**, checks
+that the symbols used through it are actually defined there. External dependencies are
+out of scope, not "clean". When a namespace's source can be read from neither the
+working tree nor the base ref it declines to answer, and it always prints `scanned N`
+so "found nothing" is distinguishable from "looked at nothing".
+
+**It demotes to `:review`; it never drops.** The scan is regex lexing, and regex lexing
+of Clojure is approximate. Measured false-positive rate over 99 files on `main` across
+5 repos whose suites run: **1 in 99** — `kotoba.kir.value` genuinely aliases
+`kotoba.kir.cljs-i64 :as i64` and genuinely contains `i64/f64`, on line 1437, inside a
+docstring, meaning "i64 or f64". Blanking strings and comments before the scan removed
+the other one; this survives because a file containing regex literals can mispair
+quotes. One human glance per hundred files is the right price for catching a repo whose
+suite silently stopped compiling — one silently discarded file would not be.
+
+Proven both ways, in the real pipeline rather than in a unit test:
+
+| probe (same shape, same repo) | unpatched | with the gate |
+|---|---|---|
+| references a var that does not exist | `:additive` → PR → **merge** | **`:review`**, named, with the symbol |
+| references only vars that exist | `:additive` → merge | `:additive` → merge |
+
 ### A renamed-away path is absent from `main` for exactly the reason a new path is
 
 SSoT: `:residue-gate` in the edn. Gate: `scripts/rename_residue.cljs`, entry point
