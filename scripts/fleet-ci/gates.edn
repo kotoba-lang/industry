@@ -374,7 +374,7 @@
   ;; named, not dropped, because a balance sheet that omits one still
   ;; balances. Zero deps; vendors kanjo's canonical concept vocabulary so
   ;; the alignment is machine-checked rather than asserted.
-  {:name "shohyo" :gate :jvm-test :cd true}
+  {:name "shohyo" :gate :nbb-test :classpath "src:test" :entry "test/run_portable.cljs" :ship-git-deps true :cd true}
   ;; These two took their capability library by :local/root until 2026-08-17,
   ;; which made them structurally ungateable -- the fleet ships one repo's
   ;; tree and no siblings, so the classpath could never resolve. Measured
@@ -436,8 +436,21 @@
   ;; `git archive` tree to a different machine, and that is the thing that
   ;; has not been shown. Flip both to `:cd true` once each has a green
   ;; receipt, the way ws-valueflo and arrow were flipped.
-  {:name "psa" :gate :jvm-test :cd false}
-  {:name "worklaw" :gate :jvm-test :cd false}
+    ;; psa / worklaw / shohyo moved from :jvm-test to :nbb-test on 2026-08-19,
+  ;; each verified to report the SAME counts the JVM gate reported
+  ;; (62/159, 42/194, 104/536).
+  ;;
+  ;; Most :jvm-test gates are NOT candidates for this, and the reason is not
+  ;; capability: 11 of the 14 repos that passed the same trial already carry an
+  ;; `nbb-cross-runtime-*` gate, so their :jvm-test entry IS the second
+  ;; runtime. Flipping those would have produced two nbb gates, no JVM gate,
+  ;; and no new coverage -- a parity harness quietly turned into a duplicate,
+  ;; with every gate still green. nekko is excluded for a different measured
+  ;; reason: its portable runner is a documented SUBSET (49 of 84 tests; the
+  ;; chain-walking namespaces cannot run under SCI and are covered by a second
+  ;; ClojureScript runner instead).
+{:name "psa" :gate :nbb-test :classpath "src:test" :entry "test/run_portable.cljs" :ship-git-deps true :cd true}
+  {:name "worklaw" :gate :nbb-test :classpath "src:test" :entry "test/run_portable.cljs" :ship-git-deps true :cd true}
   {:name "org-ietf-deflate" :gate :jvm-test :cd true}
   {:name "kotobase-block-codec" :gate :jvm-test :cd true}
   {:name "chain" :gate :jvm-test :cd true}
