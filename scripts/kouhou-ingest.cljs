@@ -97,15 +97,61 @@
            (aset "KOUHOU_ALLOW_LIVE_INGEST" "1")
            (aset "KOUHOU_PUBLISH" "0")))
 
+;; ── 同じ UTC 日の 2 回目を通す ──────────────────────────────────────────
+;;
+;; annex は commit した raw を**読み取り専用の symlink**にする。だから同じ UTC 日に
+;; 2 回目を走らせると、その日の全 source が
+;; `raw/<日>/<id>.xml (Permission denied)` で落ちる —— **53/53 error、persisted 0**。
+;; 実測 2026-08-19、無人の 2 回が「51 with errors」を出していた正体がこれ。
+;; 日次 run は UTC 日をまたぐので普段は踏まないが、手で回した瞬間・retry した
+;; 瞬間に全滅する。
+;;
+;; unlock は「その日の分」だけ。全部 unlock すると corpus 全体が実ファイルに戻り、
+;; 次の save が履歴全体の diff になる。
+(let [today (subs (.toISOString (js/Date.)) 0 10)
+      dir (str "raw/" today)]
+  (when (.existsSync fs (str ds "/" dir))
+    (let [{:keys [exit]} (run ["datalad" "unlock" dir] {:dir ds})]
+      (println (str "  unlock " dir (if (zero? exit) " ok" " (skipped)"))))))
+
+(def run-out (atom ""))
+
 (let [{:keys [exit out err]} (run ["clojure" "-M:dev:live-ingest"] {:dir ds :env env})
       summary (filter #(or (str/starts-with? % "=== ")
                            (str/includes? % "sources,")
                            (str/starts-with? % "persisted:"))
                       (lines out))]
+  (reset! run-out out)
   (doseq [l summary] (println (str "  " l)))
   (when (pos? exit)
     (println (str "  stderr: " (str/trim (or (last (lines err)) ""))))
     (fail "live-ingest が失敗した")))
+
+;; ── error の中身を残す。数だけでは次に同じことが起きても分からない ──────
+;;
+;; 実測 2026-08-19: 無人の 2 回とも「53 sources, 2 committed, 51 with errors」を
+;; 出したが、直後に手で回すと fetch は 48/53 通った。**理由を捨てていたので
+;; 「51」以上のことが言えなかった。** 残した途端に 1 パスで分かった（上の unlock）。
+;;
+;; 数字だけ潰して本文は切らない —— `(` で切ると
+;; `raw/…/x.xml (Permission denied)` が `raw/…/x.xml` になり、
+;; 「パスが理由」に見えて何が起きたか分からなくなる。
+(def error-reasons
+  (->> (lines @run-out)
+       (keep #(second (re-find #":(?:fetch-)?error \"([^\"]{0,80})" %)))
+       (map #(-> % (str/replace #"\d{2,}" "N") str/trim (subs 0 (min 70 (count %)))))
+       frequencies
+       (sort-by val >)))
+
+(def counts
+  (let [line (first (filter #(str/includes? % "sources,") (lines @run-out)))
+        ns- (map #(js/parseInt % 10) (re-seq #"[0-9]+" (or line "")))]
+    (zipmap [:sources :committed :held :published :errors] ns-)))
+
+(when (seq error-reasons)
+  (println "  error の内訳:")
+  (doseq [[reason n] (take 6 error-reasons)]
+    (println (str "    " n "\t" reason))))
 
 ;; ── 2) 何が増えたかを、意図ではなくディスクから数える ────────────────────
 (def after {:briefings (shard-count "briefings")
@@ -203,5 +249,15 @@
 ;; off-machine のコピーが 1 本も取れていない run は、成功として終わらせない。
 (when (zero? (apply max (vals custody)))
   (fail "どの remote にも 1 件も載っていない — 手元 1 本の状態で終わっている"))
+
+
+;; 半分以上が落ちた run を「done」で終わらせない。しきい値は当て推量だが、
+;; **静かに終わることの方が悪い** —— 実測 2 回とも 51/53 が落ちて、ログには
+;; 「done」とだけ書いてあった。
+(let [{:keys [sources errors]} counts]
+  (when (and (number? sources) (number? errors) (pos? sources)
+             (> errors (quot sources 2)))
+    (fail (str sources " 中 " errors " が error —— 半分を超えた run は成功ではない。"
+               "上の内訳が理由を言う"))))
 
 (println "kouhou-ingest done")
