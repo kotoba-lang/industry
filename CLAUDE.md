@@ -746,6 +746,26 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
 `git cat-file -e origin/main:<path>` を引く。** cone 外・stale checkout・
 未 checkout の west project —— **3 つとも「`ls` に映らない」で同じ顔をする。**
 
+⚠ **その `<rev>:<path>` を shell 変数で組み立てない。zsh が食う。** 実測
+2026-08-19（zsh 5.9）、`$ref:$path` の `:` 以降は history modifier として
+解釈される —— **この workspace で最も多い 2 つの top-level dir がどちらも当たる**:
+
+```
+$r:scripts/x.cljs   → pr/547           # :s = 置換。以降を静かに飲み込む
+$r:tools/x.c        → 547ools/x.c      # :t = tail。静かに別物になる
+$r:manifest/x.yml   → pr/547:manifest/x.yml   # :m は modifier でないので無傷
+${r}:scripts/x.cljs → pr/547:scripts/x.cljs   # ← 常にこう書く
+```
+
+**壊れ方が path 依存なので、動く例を見て安心できない。** しかも `2>/dev/null`
+を付けると `fatal: Not a valid object name` が消え、**存在するファイルが
+「MISSING」として報告される** —— 「無い」と結論しないための道具が、
+「無い」と嘘をつく。2026-08-19 に実際にそれで 1 度誤った結論を出しかけた
+（`ls-tree` で測り直して気付いた）。
+
+**確実な形は 2 つ**: `${r}:...` と波括弧で閉じるか、`git ls-tree -r --name-only
+<rev> -- <path>` を使う（`--` の後は expansion の対象にならず、件数で答えが出る）。
+
 | 結論した内容 | 実際 |
 |---|---|
 | 「semantic-code は kotoba repo にある」 | #429 で `kotoba-lang/codebase` に切り出し済み |
