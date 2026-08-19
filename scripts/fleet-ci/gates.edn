@@ -1421,6 +1421,12 @@
    :script "gates/gbiz-info-projections-check.cljs"
    :include-ext [".edn" ".cljs"] :min-files 2 :cd false}
 
+  ;; 行政事業レビューの支出先（各府省の原典）。畳んだ側なので分母 4 つと単位を見る。
+  {:name "jp-go-gyoukaku-review" :id "gyoukaku-review-projections" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/gyoukaku-review-projections-check.cljs"
+   :include-ext [".edn" ".cljs"] :min-files 2 :cd false}
+
   {:name "root" :id "root-itonami-maturity-freshness" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/itonami-maturity-freshness-check.cljs"
