@@ -206,7 +206,8 @@ subset のみ実装（ADR-2608159400 が自ら「完全な policy language は�
 | amu / aiueos / kototama | **触っていない。触る必要が無い** —— admission・機械内 table・epoch feed であって delegation ではない | 失効を biscuit に足さず、この 2 面に乗せる |
 | biscuit の wire | **読みは実装済み**（`biscuit.wire`）。`biscuit-auth` の公式サンプルを decode し**署名検証まで通る**。負のサンプル 3 種は拒否。**書きは未実装**（外部が受理していない writer を format と名乗らない） | 書きは、外部実装が我々の出力を読むまで claim しない |
 | Ed25519 束縛 | **実装済み。** JVM は `java.security`、nbb は `node:crypto`、公開鍵導出は `org-ietf-ed25519`。stand-in は残すが「どの署名方式でも成り立つ性質」用と明記 | — |
-| edge 検証 | **実装済み。** `kotobase-server` の `security/authority` に `verify-biscuit` が入り、CACAO と同じ `:effective-caps` を返す。**root 公開鍵しか持たない**。132 tests / 520 assertions green | route はまだ繋いでいない（追加のみ、CACAO が live のまま） |
+| edge 検証 | **実装済み。** `kotobase-server` の `security/authority` に `verify-biscuit`（model）と **`verify-biscuit-wire`（biscuit v3 protobuf バイト）**。CACAO と同じ `:effective-caps` を返し、**root 公開鍵しか持たない**。144 tests / 545 assertions green | route はまだ繋いでいない（追加のみ、CACAO が live のまま） |
+| **2 wire の共存規則** | **実装済み**（`security/credential`）。**request が wire を名乗り、順に試さない。** 検証失敗は拒否であって retry ではない。両方提示は `:ambiguous-credential` で拒否。graph allowlist は**未設定 = 有効な graph ゼロ**（fail open しない） | route はこの関数を通す |
 
 **「biscuit を中心にする」と書いた時点で中心になったのではない。** 中心になるのは
 最初の委譲が biscuit で書かれ、edge で秘密なしに検証されたときである。
@@ -214,6 +215,26 @@ subset のみ実装（ADR-2608159400 が自ら「完全な policy language は�
 authority namespace に呼び手が入り、`biscuit-auth` が発行した実トークンを読んで
 検証できるようになった。それでもまだ route は繋いでいない**ので、中心になったとは
 まだ言わない —— 言えるのは「繋げば動くところまで来た」である。
+
+## route を繋ぐときの規則（2026-08-19 決定・実装済み）
+
+2 つの delegation wire が同じ handler に届くようになった時点で、共存のさせ方には
+**安全な答えが 1 つと、もっともらしい答えが複数**ある。handler の `or` ではなく
+純関数（`kotobase.server.security.credential`）として書き、それぞれ壊して赤を見た。
+
+1. **順に試すのは downgrade oracle。** 「biscuit を検証し、駄目なら CACAO」は
+   **どちらの順でも誤り** —— 両方出せる呼び手は*どちらかが与えるものの和*を得るし、
+   片方に影響できる攻撃者は**どちらの検査で決まるかを選べる**（弱い方を選べる）。
+   **request が wire を名乗り、ちょうど 1 つ。**
+2. **検証失敗は拒否であって、別の credential を試す理由ではない。** 同じ論だが
+   別に書く —— 誘惑される実装は fall through する `cond` だから。
+3. **両方提示は「解決」せず拒否する。** 片方を黙って優先すると、もう片方が
+   飾りになる。biscuit で減衰したつもりの呼び手の request を CACAO が決めていたら、
+   それは API が嘘をついている。
+4. **rollout は allowlist で、未設定は「全 graph」ではなく「graph ゼロ」。**
+   fail open する flag は、**設定を忘れることが wire の有効化になる**。
+
+**まだ route は繋いでいない。**繋ぐのに要る決定を、繋ぐ前に着地させた。
 
 ## 次に埋める穴 —— root 鍵の発見と回転（did:webvh）
 
