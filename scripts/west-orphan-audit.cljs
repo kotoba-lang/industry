@@ -37,7 +37,9 @@
 ;;   nbb scripts/west-orphan-audit.cljs --edn        ; 機械可読 EDN
 ;;
 ;; exit 0: blocking なし
-;; exit 1: :local-root-broken か :relative-paths-broken が1件以上
+;; exit 1: :local-root-broken か :relative-paths-broken が1件以上（どちらも
+;;         **消費者の checkout が pin と一致している** hit だけを数える。古い木で
+;;         読んだ宣言は :UNJUDGED で、exit 2 側）
 ;;         （登録漏れが consumer を壊している）
 ;;
 ;;   :relative-paths-broken   — deps.edn の :paths/:extra-paths に書かれた
@@ -561,7 +563,12 @@
                   "  (remote が west 登録済み repo へリダイレクト = 改名残骸。**登録し直さない**)"))
     (println (str "  true-orphan-git: " (count (:true-orphan-git unregistered))))
     (println (str "  true-orphan-nongit: " (count (:true-orphan-nongit unregistered))))
-    (println (str "  local-root-broken (blocking): " (count local-root-broken)))
+    (let [by (group-by :class local-root-broken)]
+      (println (str "  local-root-broken (blocking): " (count (:live by))))
+      (println (str "  local-root-UNJUDGED (消費者の checkout が pin と不一致): "
+                    (count (:stale-tree by))))
+      (println (str "  local-root-in-leftover (未登録 dir 内。宣言の話ではない): "
+                    (count (:unregistered-tree by)))))
     (let [pb (:relative-paths-broken report)
           by (group-by :class pb)
           live (:live by) stale (:stale-tree by) leftover (:unregistered-tree by)
@@ -595,10 +602,23 @@
             (str "   改名残骸 / scratch の中の deps.edn。宣言の欠陥ではないので\n"
                  "   登録し直さない（:west-orphan の :never）。")
             leftover))
-    (when (seq local-root-broken)
+    (when (seq (filter #(= :stale-tree (:class %)) local-root-broken))
+      (println)
+      (println "## UNJUDGED (:local/root): 消費者が宣言 pin と違う checkout に居る")
+      (println (str "   その木で読んだ deps.edn は宣言の現在地ではない。実測 2026-08-20:\n"
+                    "   ここに出た 1 件は main で既に直っており、追いかけた分が無駄になった。\n"
+                    "   直し方: west update --fetch smart <name>（dirty なら先に着地）"))
+      (doseq [row (filter #(= :stale-tree (:class %)) local-root-broken)]
+        (println (str "  " (:project row)
+                      "  dir=" (:dir-exists? row)
+                      " west=" (:in-west? row)
+                      " consumers=" (:consumer-count row)))
+        (doseq [c (if (:all? opts) (:consumers row) (take 2 (:consumers row)))]
+          (println (str "    - " c)))))
+    (when (seq (filter #(= :live (:class %)) local-root-broken))
       (println)
       (println "## BLOCKING: :local/root → missing or not-in-west")
-      (doseq [row local-root-broken]
+      (doseq [row (filter #(= :live (:class %)) local-root-broken)]
         (println (str "  " (:project row)
                       "  dir=" (:dir-exists? row)
                       " west=" (:in-west? row)
@@ -655,8 +675,28 @@
         local (local-org-projects)
         unreg (-> (classify-unregistered local west overrides (west-rev->path))
                   (reclassify-renamed west))
-        broken (scan-local-root-deps west)
-        paths-broken (scan-relative-paths west (west-path->rev))
+        path->rev (west-path->rev)
+        ;; Classify the :local/root hits by the consumer's tree, exactly as the
+        ;; :paths hits below already were. Until 2026-08-20 they were not, and
+        ;; every hit counted as BLOCKING regardless of whether the consumer's
+        ;; checkout was current -- so a checkout 195 commits behind reported a
+        ;; declaration that main had already fixed, and the fix was written,
+        ;; committed, and pushed before the upstream file was read. The note at
+        ;; `consumer-tree-class` describes this failure for the OTHER scanner;
+        ;; the machinery was there, this call simply did not use it.
+        ;;
+        ;; A hit is only :live if some consumer is live: one current checkout
+        ;; declaring a broken edge is a real broken edge, whatever the stale
+        ;; copies say.
+        classify (fn [row]
+                   (let [cs (map #(consumer-tree-class west path->rev %) (:consumers row))]
+                     (assoc row :class (cond (some #{:live} cs) :live
+                                             (some #{:stale-tree} cs) :stale-tree
+                                             :else :unregistered-tree))))
+        broken (mapv classify (scan-local-root-deps west))
+        live-broken (filterv #(= :live (:class %)) broken)
+        unjudged-broken (filterv #(= :stale-tree (:class %)) broken)
+        paths-broken (scan-relative-paths west path->rev)
         live-paths-broken (filterv #(= :live (:class %)) paths-broken)
         unjudged-paths (filterv #(= :stale-tree (:class %)) paths-broken)
         report {:counts {:local (count local)
@@ -671,16 +711,20 @@
                 :unregistered unreg
                 :local-root-broken broken
                 :relative-paths-broken paths-broken
-                :blocking-count (+ (count broken) (count live-paths-broken))
-                :unjudged-count (count unjudged-paths)}]
+                :blocking-count (+ (count live-broken) (count live-paths-broken))
+                :unjudged-count (+ (count unjudged-broken) (count unjudged-paths))}]
     (if (:edn? opts)
       (println (pr-str report))
       (print-human report opts))
     ;; process.exit を先に呼ばないと nbb が常に 0 で落ちることがある
     ;; 0 / 1 / 2 を分ける。2 は「答えられなかった」専用（ADR-2608136000）——
     ;; 判定できなかった辺を clean と同じ 0 で返さない。
-    (.exit js/process (cond (pos? (+ (count broken) (count live-paths-broken))) 1
-                            (pos? (count unjudged-paths)) 2
+    ;; Both arms read the CLASSIFIED sets. Until 2026-08-20 this used the raw
+    ;; `broken`, so classifying the :local/root hits fixed the printed counts
+    ;; and left the exit code -- the thing a hook or a gate actually reads --
+    ;; still answering 1 for an edge the report itself now called UNJUDGED.
+    (.exit js/process (cond (pos? (+ (count live-broken) (count live-paths-broken))) 1
+                            (pos? (+ (count unjudged-broken) (count unjudged-paths))) 2
                             :else 0))))
 
 (apply -main *command-line-args*)
