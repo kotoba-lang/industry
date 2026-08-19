@@ -753,7 +753,7 @@
 (defn gate-script
   "gate 1 本ぶんのノード側スクリプト。どの終了経路でも最後に
   `FLEET-CI-EXIT: <code>` を必ず出す（これが唯一の verdict 伝達路）。"
-  [{:keys [name gate classpath entry script script-args] :as w} node sha script-body]
+  [{:keys [name gate classpath entry script script-args npm-script] :as w} node sha script-body]
   ;; `:alias` は data のキーなので destructure で clojure.core/alias を隠さない。
   (let [alias-name (or (:alias w) "test")
         d (remote-dir name sha)
@@ -828,6 +828,12 @@
         ;; sibling, and a `:local/root` sibling in deps.edn. Measured 2026-08-19:
         ;; kotobase-server has neither and net-kotobase/engine has both, which is
         ;; why only the first is registered.
+        ;;
+        ;; The npm script is named by `:npm-script`, NOT `:script`. `:script`
+        ;; already means "a file under gates/" for `:nbb-script`, and reusing it
+        ;; here made the tick try to open scripts/fleet-ci/test:cljs. It failed
+        ;; loudly, which was luck: the two meanings are both strings, and a key
+        ;; that collides with an optional one fails quietly.
         :shadow-test
         [(str "test -f shadow-cljs.edn || fail 'shadow-cljs.edn missing after extract' 90")
          "test -f package.json || fail 'package.json missing after extract' 90"
@@ -841,7 +847,7 @@
          (str "for i in $(seq 1 900); do mkdir " dep-lock " 2>/dev/null && break;"
               " [ -n \"$(find " dep-lock " -maxdepth 0 -mmin +20 2>/dev/null)\" ]"
               " && rmdir " dep-lock " 2>/dev/null; sleep 1; done")
-         (str "out=$(npm run " (or script "test:cljs") " 2>&1); code=$?")
+         (str "out=$(npm run " (or npm-script "test:cljs") " 2>&1); code=$?")
          (str "rmdir " dep-lock " 2>/dev/null || true")
          "echo \"$out\" | tail -25"
          ;; Same floor as the other kinds: a build that compiled and ran nothing
