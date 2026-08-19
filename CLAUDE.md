@@ -994,6 +994,15 @@ CertGovernor）。
   各 ADR は `(d/transact conn (edn/read-string (slurp f)))` 可能な
   `[{:db/id -1 :adr/id ... :adr/title ... :adr/status ... :adr/body ...}]`。
   入れ子 map/vector は `pr-str` した string blob（`manifest/edn-datomize.cljs` と同型）。
+- **`:adr/id` は slug 形 `adr-<番号>-<slug>` にする。bare な `ADR-<番号>` や
+  `<番号>` を新規に使わない。** 番号だけの id は衝突する —— 並行セッションが同じ
+  日時 prefix で採番するため、**08-16〜08-19 の 4 日で新規衝突が 7 件**出た。
+  実測 2026-08-19: その 7 件を解消した 1 時間後に、同じ番号で 8 件目が生まれている。
+  slug を含めれば同じ番号でも id は分かれ、`:adr/related` の参照先も一意に決まる
+  （既存 1,362 件が既にこの形。bare は 353 / 65）。検査は
+  `nbb --classpath ".:scripts/nbb_compat" scripts/verify-adr-identity.cljs`、
+  fleet gate は `root-adr-identity`。**既知の衝突 23 件は据え置きで、表を増やさない**
+  —— 新しい衝突は fail させる。
 - **横断 query**:
   `nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs count`
   `nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q '[:find ?id :where [?e "adr/id" ?id] [?e "adr/status" "accepted"]]'`
