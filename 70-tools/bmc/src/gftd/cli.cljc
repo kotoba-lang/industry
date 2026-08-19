@@ -246,10 +246,18 @@
            (println "kotobase dual-write: skipped (set KOTOBASE_TOKEN or use nbb CACAO helper)"))))
 
      (defn persist-events!
-       "Local ledger append (SSoT) + optional kotobase dual-write."
+       "Local ledger append (SSoT) + optional kotobase dual-write.
+
+        With --strict-dual-write, a failed publication exits 3 -- not 1. The
+        local ledger WAS written, so this is neither success nor a failed tick,
+        and a caller must not treat it as 'retry me': re-running would append
+        the same observation twice."
        [ps flags events]
-       (let [stamped (ledger/append! (:ledger ps) events)]
-         (dual-write-kotobase! ps flags stamped)
+       (let [stamped (ledger/append! (:ledger ps) events)
+             ok (dual-write-kotobase! ps flags stamped)]
+         (when (and (false? ok) (:strict-dual-write flags))
+           (println "kotobase dual-write: strict mode — local ledger written, remote publication failed")
+           (nc/exit 3))
          stamped))
 
      (defn governed-append!
@@ -655,9 +663,43 @@
          {:status (if (js/isNaN status) (or (:exit r) 0) status)
           :body b}))
 
+     (defn dual-write-status-path
+       "Where the last dual-write outcome is recorded, so a scheduler can see it.
+
+        The failure this exists for is silent by construction: dual-write is
+        fail-open, so a broken publication path leaves exit 0 and one line on
+        stdout that nobody reads. Measured 2026-08-19: kotobase dual-write had
+        been failing on a missing `@noble/curves` for an unknown length of time
+        while every tick reported success."
+       [ps]
+       (str (or (nc/getenv "GFTD_STATE_DIR")
+                (str (nc/getenv "HOME") "/.gftd"))
+            "/bmc-dual-write-status.edn"))
+
+     (defn record-dual-write-status!
+       "Write the outcome where a health check can read it. Never throws."
+       [ps ok? detail n]
+       (try
+         ;; nc/spit already mkdir -p's the parent.
+         (let [f (dual-write-status-path ps)]
+           (nc/spit f (pr-str {:ok ok?
+                               :events n
+                               :detail (when detail (subs (str detail) 0 (min 500 (count (str detail)))))
+                               :at (.toISOString (js/Date.))})))
+         (catch :default _ nil)))
+
      (defn dual-write-kotobase!
        "Best-effort: spawn kotobase-dual-write.cljs (CACAO via kotobase-client).
-        Fail-open — never throws into the local ledger path."
+        Fail-open — never throws into the local ledger path.
+
+        Returns true on success, false on failure, nil when not attempted, and
+        records the outcome to `dual-write-status-path` either way. Fail-open is
+        deliberate and stays: a kotobase.net outage must not stop the local
+        ledger. What is NOT acceptable is the failure being invisible — the exit
+        code deliberately does not change here, because a caller that retries a
+        non-zero tick would append duplicate observations and corrupt the very
+        series this is meant to protect. Use --strict-dual-write to opt into a
+        non-zero exit when you control the caller."
        [ps flags events]
        (when (and (seq events) (kbase/enabled? nc/getenv flags))
          (try
@@ -675,19 +717,34 @@
                  ;; @noble/curves resolves from kotobase-client's node_modules.
                  _ (aset (.-env js/process) "NODE_PATH" node-path)
                  r (nc/sh "nbb" "--classpath" cp helper tmp)]
+             (try (.unlinkSync (js/require "node:fs") tmp) (catch :default _))
              (if (zero? (:exit r))
-               (println "kotobase dual-write:" (str/trim (str (:out r))))
-               (println "kotobase dual-write: FAILED exit" (:exit r)
-                        (str/trim (str (:err r) " " (:out r)))))
-             (try (.unlinkSync (js/require "node:fs") tmp) (catch :default _)))
+               (do (println "kotobase dual-write:" (str/trim (str (:out r))))
+                   (record-dual-write-status! ps true nil (count events))
+                   true)
+               (let [detail (str/trim (str (:err r) " " (:out r)))]
+                 (println "kotobase dual-write: FAILED exit" (:exit r) detail)
+                 (record-dual-write-status! ps false detail (count events))
+                 false)))
            (catch :default e
-             (println "kotobase dual-write: error" (or (.-message e) (str e)))))))
+             (let [detail (or (.-message e) (str e))]
+               (println "kotobase dual-write: error" detail)
+               (record-dual-write-status! ps false detail (count events))
+               false)))))
 
      (defn persist-events!
-       "Local ledger append (SSoT) + optional kotobase dual-write."
+       "Local ledger append (SSoT) + optional kotobase dual-write.
+
+        With --strict-dual-write, a failed publication exits 3 -- not 1. The
+        local ledger WAS written, so this is neither success nor a failed tick,
+        and a caller must not treat it as 'retry me': re-running would append
+        the same observation twice."
        [ps flags events]
-       (let [stamped (ledger/append! (:ledger ps) events)]
-         (dual-write-kotobase! ps flags stamped)
+       (let [stamped (ledger/append! (:ledger ps) events)
+             ok (dual-write-kotobase! ps flags stamped)]
+         (when (and (false? ok) (:strict-dual-write flags))
+           (println "kotobase dual-write: strict mode — local ledger written, remote publication failed")
+           (nc/exit 3))
          stamped))
 
      (defn governed-append!
