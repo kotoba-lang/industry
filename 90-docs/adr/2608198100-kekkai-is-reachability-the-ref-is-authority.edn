@@ -326,12 +326,16 @@ EOF に依存しないので、この bug は landing 以来ずっと隠れて�
 - **穴 3（ephemeral node）は塞がない。** これは欠陥ではなく天井で、charter G2
   （machine approval は常に人間、override 不能）から出ている。**D6 が答えである** ——
   事前 admit した固定プールを持つ。実装すべきものは無い。
-- **`inga.ref` ⇄ `inga-node` の継ぎ目**（上記 ⚠）。**ここに以前書いていた
-  『inga-node が sink 時に QC を record に添えればよい』は誤りだった** ——
-  witness は `vote-payload`（block-hash 入り）に署名し、`inga.head/verify-cert` は
-  head record の canonical bytes を検査する。**別のバイト列なので、QC をどこに
-  添えても通らない。** 継ぎ目は未配線ではなく**証明の対象の不一致**である。
-  実測と、塞ぎ方 3 つとその代償は **ADR-2608198200**。
+- ~~**`inga.ref` ⇄ `inga-node` の継ぎ目**~~ **塞いだ**（`inga` `ba437b4` /
+  `inga-node` `bd21f38`）。ここに以前書いていた『QC を record に添えればよい』は
+  誤りで、witness は `vote-payload`（block-hash 入り）に署名し
+  `head/verify-cert` は head record を検査する —— **別のバイト列**だった。
+  代わりに **membership を証明する**: record がこの block に在り、この block の
+  hash を証明書が名指し、その証明書が検証できる（`inga.commitment`、
+  `inga.ref` の `head-of!` seam、`/committed` が proof を head と一緒に返す）。
+  7 witness process で**勝者の head をオフライン検証**するところまで測ってある。
+  経緯・3 つの選択肢・実測は **ADR-2608198200**。
+  **残り**: seam と verifier と producer を 1 つの store として組んだ稼働構成。
 - ~~**NFS を forwarder 越しに使う経路**~~ **閉じた**（`kekkai-node` `04c4fa6` /
   `cloud-itonami-app` `19d77b9`）。`edge/principal-endpoint` が
   `GET /principal?port=<source port>` を loopback だけに出し（**bind は
