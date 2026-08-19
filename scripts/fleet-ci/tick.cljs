@@ -850,6 +850,12 @@
          (str "out=$(npm run " (or npm-script "test:cljs") " 2>&1); code=$?")
          (str "rmdir " dep-lock " 2>/dev/null || true")
          "echo \"$out\" | tail -25"
+         ;; And the summary explicitly, because for THIS kind `tail -25` does
+         ;; not contain it: shadow prints "Build completed" after the tests, so
+         ;; the receipt recorded a pass whose detail said only that something
+         ;; compiled. A gate whose receipt cannot answer "how many tests ran" is
+         ;; green in a way nobody can read. Measured on receipt 7b9cdd831236.
+         "echo \"$out\" | grep -E 'Ran [0-9]+ tests' | tail -1"
          ;; Same floor as the other kinds: a build that compiled and ran nothing
          ;; is not a pass, and the whole point of this file is that the two must
          ;; not share an outcome.
