@@ -87,4 +87,31 @@ somu@gftd.co.jp, keiri@gftd.co.jp などのメールボックスの整理振り�
 3. 上記 2 つが済んだら **dry-run を 1 回見てから** approve marker を置く。
 
 退職者 6 箱は対象外（ADR-2608011100 の監査保全対象。中で mail が動いてはならない）。
+
+## closing 時点で分かった運用上の穴（2026-08-19、いずれも未解消）
+
+1. **launcher が version control の外にある。** `~/.hermes/scripts/mailbox-triage.py`
+   は hermes home にしか無い。既存の hermes cron script（`canvas-signal-*.py` 4 本）も
+   同じく repo に無く、**この workspace には hermes cron script を追跡する規約が無い**。
+   nbb 側（規則の全部）は repo に在るので失われるのは 40 行の起動器だけだが、
+   この機械を建て直すと bot は黙って消える。
+2. **`orgs/gftdcojp/m365-archive` の `origin/main` ref が stale**（`98fab3dfb4a`。
+   実際の main は `2ba43e65e55c`）。**HEAD は正しい**ので bot の動作には影響しないが、
+   この checkout で `origin/main` を読んだ結論は誤る（ADR-2608136800 の形）。
+   この repo は 228k ファイル + annex なので `git fetch` が 3 分超かかり、
+   **`-q` を付けると遅いのか壊れているのかが出力から区別できない**。
+3. **毎時の配信は blocker が直るまで止まらない。** これは意図的（self-clearing）だが、
+   ログイン後・approve marker 前の期間は dry-run のレポートが毎時届く。
+
+## resume point
+
+```bash
+m365 login                                                   # owner、device code + MFA
+cd orgs/gftdcojp/m365-archive && nbb bin/setup-auth.cljc      # Mail.ReadWrite.Shared 同意
+nbb bin/triage-mailboxes.cljs --max 200                       # dry-run、箱ごとの件数を見る
+touch ~/.hermes/state/mailbox-triage-approved                 # 見てから承認
+```
+
+hermes cron job は `8cf8421b60f9`（`mailbox-triage`、毎時、`--no-agent`）。
+状態は `hermes cron runs 8cf8421b60f9`。
 "}]
