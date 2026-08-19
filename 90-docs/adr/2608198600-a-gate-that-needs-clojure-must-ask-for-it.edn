@@ -1,0 +1,72 @@
+[{:db/id -1
+  :adr/id "adr-2608198600-a-gate-that-needs-clojure-must-ask-for-it"
+  :adr/title "clojure を要する gate は :cap :jvm を宣言する（3 度目の同じ欠陥）"
+  :adr/status "accepted"
+  :adr/date "2026-08-19"
+  :adr/related "adr-2608198500-unreachable-is-not-a-verdict adr-2608136000-five-questions-before-trusting-green adr-2608111721-placement-authority-is-murakumo"
+  :adr/body
+  "## 観測
+
+`itonami-regenerate-*` 31 gate は `:cap` を 1 つも宣言していなかった。
+`required-cap` は `:nbb-script` を `:node` に既定するので、placement は
+どのノードにも置く。
+
+tick log から exit 90（到達不能）の行を除いて node 別に数えると、残る変数は
+ノードの能力だけになる:
+
+| node | pass | fail | clojure |
+|---|---|---|---|
+| benjamin | 9 | 0 | 有 |
+| joseph | 12 | 0 | 有 |
+| judah | 10 | 0 | 有 |
+| simeon | 11 | 1 | 有 |
+| levi | 4 | 0 | 有 |
+| asher | 5 | 1 | 有 |
+| **dan** | **0** | **4** | **無** |
+| **issachar** | **0** | **5** | **無** |
+| **naphtali** | **0** | **4** | **無** |
+
+**13 fail がちょうど 3 ノードに集まり、そこに pass が 1 つも無い。**
+残り 6 ノードは 51 pass / 2 fail。
+
+推測ではなく実測: `command -v clojure` は dan / issachar / naphtali で
+MISSING、他で present。`nodes.edn` の `:caps` も独立に同じ 3 ノードだけ
+`#{:node}`（`:jvm` 無し）としている。この gate の再生成コマンドは
+`clojure -M:dev:render-html` なので、その 3 台では走りようがない
+（`bash: line 4: clojure: command not found`）。
+
+## これは 3 度目である
+
+同じ欠陥が gates.edn に既に 2 回記録されている:
+
+1. `amu-native-conformance` — 同じ 3 ノードで 38 連敗。同じ tree に対して
+   **矛盾する判定**を出していた（c38f79d は joseph pass / naphtali fail）。
+2. `:shadow-test` — `required-cap` に載せ忘れて `:node` に既定し、JVM の無い
+   ノードに置かれた（2026-08-19、本 ADR と同日）。
+
+`probe.cljs` は `jvm?` を (javahome AND clojure) で計算するので、**`:jvm` とは
+正確に「clojure CLI がある」という意味**である。宣言しなければ、fleet の
+1/3 が repo についてではなく自分自身について答える。
+
+## 決定
+
+31 entry すべてに `:cap :jvm` を宣言する。`:jvm` を持つノードは
+judah / levi / simeon / joseph / benjamin の 5 台あり、枯渇しない。
+
+## 原因が読めたのは、同じ日に receipt の予算が広がったから
+
+**この診断は昨日まで不可能だった。** 旧予算では detail が
+`the actor cannot rebuild its own demo | FLEET-CI-EXIT: 1 | gate did not
+report success` で終わり、4 行上の `clojure: command not found` は切られて
+いた。log 全体でその行が現れるのはちょうど 2 回、どちらも予算拡大
+（kagami f95e627）の後である。
+
+したがって**証拠の主役は node 表**であり、直接の目撃 2 件は裏付けである。
+順序を逆にすると、2 件で 31 gate を語ることになる。
+
+## 残っていること
+
+`:cap` は誤配置を**防ぐ**が、誤配置が起きたときにそれを**正直にする**わけでは
+ない。gate script 自身は `clojure` の不在を知れるので、repo が壊れているかの
+ように fail するのではなく「このノードでは答えられない」と拒否できる
+（ADR-2608198500 と同じ族）。未実装。"}]

@@ -2277,103 +2277,128 @@
   ;;
   ;; 2 番目が要点。committed 済みの値を読むだけの経路では、**内部整合を保ったまま
   ;; 手編集された生成物**を検出できない。
-  {:name "cloud-itonami-isic-0610" :id "itonami-regenerate-0610" :gate :nbb-script
+  ;; :cap :jvm — measured 2026-08-19, from the tick log with the exit-90
+  ;; (unreachable) rows excluded so node capability is the only variable left:
+  ;;
+  ;;   benjamin 9/0   joseph 12/0   judah 10/0   simeon 11/1
+  ;;   levi      4/0   asher   5/1
+  ;;   dan       0/4   issachar 0/5  naphtali 0/4
+  ;;
+  ;; 13 failures on exactly three nodes and not one pass there; 51 passes on the
+  ;; other six. Confirmed over ssh rather than inferred: `command -v clojure`
+  ;; is MISSING on dan, issachar and naphtali and present on the rest. This
+  ;; gate's regeneration command is `clojure -M:dev:render-html`, so on those
+  ;; three it cannot run at all -- `bash: line 4: clojure: command not found`.
+  ;;
+  ;; This is the same defect gates.edn already records for
+  ;; amu-native-conformance, on the same three nodes, for the same reason:
+  ;; probe.cljs computes jvm? as (javahome AND clojure), so :jvm is exactly
+  ;; "has the clojure CLI". Declaring no cap lets placement put the work
+  ;; anywhere, and a third of the fleet then answers about itself.
+  ;;
+  ;; ⚠ The cause was only readable because the receipt budget widened the same
+  ;; day (kagami f95e627). Before that the detail ended at "the actor cannot
+  ;; rebuild its own demo", and `clojure: command not found` -- four lines
+  ;; earlier -- was cut. The log carries that line exactly twice, both after
+  ;; the widening, which is why the node table above is the evidence and the
+  ;; two direct sightings are the confirmation rather than the other way round.
+  {:name "cloud-itonami-isic-0610" :id "itonami-regenerate-0610" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-2620" :id "itonami-regenerate-2620" :gate :nbb-script
+  {:name "cloud-itonami-isic-2620" :id "itonami-regenerate-2620" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-2910" :id "itonami-regenerate-2910" :gate :nbb-script
+  {:name "cloud-itonami-isic-2910" :id "itonami-regenerate-2910" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-3600" :id "itonami-regenerate-3600" :gate :nbb-script
+  {:name "cloud-itonami-isic-3600" :id "itonami-regenerate-3600" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-4210" :id "itonami-regenerate-4210" :gate :nbb-script
+  {:name "cloud-itonami-isic-4210" :id "itonami-regenerate-4210" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-4630" :id "itonami-regenerate-4630" :gate :nbb-script
+  {:name "cloud-itonami-isic-4630" :id "itonami-regenerate-4630" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-5210" :id "itonami-regenerate-5210" :gate :nbb-script
+  {:name "cloud-itonami-isic-5210" :id "itonami-regenerate-5210" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-5320" :id "itonami-regenerate-5320" :gate :nbb-script
+  {:name "cloud-itonami-isic-5320" :id "itonami-regenerate-5320" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-6201" :id "itonami-regenerate-6201" :gate :nbb-script
+  {:name "cloud-itonami-isic-6201" :id "itonami-regenerate-6201" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-6202" :id "itonami-regenerate-6202" :gate :nbb-script
+  {:name "cloud-itonami-isic-6202" :id "itonami-regenerate-6202" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-6311" :id "itonami-regenerate-6311" :gate :nbb-script
+  {:name "cloud-itonami-isic-6311" :id "itonami-regenerate-6311" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-6312" :id "itonami-regenerate-6312" :gate :nbb-script
+  {:name "cloud-itonami-isic-6312" :id "itonami-regenerate-6312" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-6420" :id "itonami-regenerate-6420" :gate :nbb-script
+  {:name "cloud-itonami-isic-6420" :id "itonami-regenerate-6420" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-6512" :id "itonami-regenerate-6512" :gate :nbb-script
+  {:name "cloud-itonami-isic-6512" :id "itonami-regenerate-6512" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-6612" :id "itonami-regenerate-6612" :gate :nbb-script
+  {:name "cloud-itonami-isic-6612" :id "itonami-regenerate-6612" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-6622" :id "itonami-regenerate-6622" :gate :nbb-script
+  {:name "cloud-itonami-isic-6622" :id "itonami-regenerate-6622" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-6810" :id "itonami-regenerate-6810" :gate :nbb-script
+  {:name "cloud-itonami-isic-6810" :id "itonami-regenerate-6810" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-6910" :id "itonami-regenerate-6910" :gate :nbb-script
+  {:name "cloud-itonami-isic-6910" :id "itonami-regenerate-6910" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-6920" :id "itonami-regenerate-6920" :gate :nbb-script
+  {:name "cloud-itonami-isic-6920" :id "itonami-regenerate-6920" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-7310" :id "itonami-regenerate-7310" :gate :nbb-script
+  {:name "cloud-itonami-isic-7310" :id "itonami-regenerate-7310" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-7820" :id "itonami-regenerate-7820" :gate :nbb-script
+  {:name "cloud-itonami-isic-7820" :id "itonami-regenerate-7820" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-8299" :id "itonami-regenerate-8299" :gate :nbb-script
+  {:name "cloud-itonami-isic-8299" :id "itonami-regenerate-8299" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-9200" :id "itonami-regenerate-9200" :gate :nbb-script
+  {:name "cloud-itonami-isic-9200" :id "itonami-regenerate-9200" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-9411" :id "itonami-regenerate-9411" :gate :nbb-script
+  {:name "cloud-itonami-isic-9411" :id "itonami-regenerate-9411" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-9522" :id "itonami-regenerate-9522" :gate :nbb-script
+  {:name "cloud-itonami-isic-9522" :id "itonami-regenerate-9522" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
@@ -2388,27 +2413,27 @@
   ;; あって *verifier* ではなく、drift（committed 済み生成物が動いたら落とす）という
   ;; この gate の契約と噛み合わない —— 載せれば求人が 1 件動くたびに赤くなる。
   ;; publisher 側の murakumo 移行は別の仕組みが要る（実行して commit する経路）。
-  {:name "cloud-itonami-isic-851" :id "itonami-regenerate-851" :gate :nbb-script
+  {:name "cloud-itonami-isic-851" :id "itonami-regenerate-851" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-852" :id "itonami-regenerate-852" :gate :nbb-script
+  {:name "cloud-itonami-isic-852" :id "itonami-regenerate-852" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-853" :id "itonami-regenerate-853" :gate :nbb-script
+  {:name "cloud-itonami-isic-853" :id "itonami-regenerate-853" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-854" :id "itonami-regenerate-854" :gate :nbb-script
+  {:name "cloud-itonami-isic-854" :id "itonami-regenerate-854" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-4921" :id "itonami-regenerate-4921" :gate :nbb-script
+  {:name "cloud-itonami-isic-4921" :id "itonami-regenerate-4921" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-5820" :id "itonami-regenerate-5820" :gate :nbb-script
+  {:name "cloud-itonami-isic-5820" :id "itonami-regenerate-5820" :gate :nbb-script :cap :jvm
    :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
