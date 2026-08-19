@@ -326,10 +326,12 @@ EOF に依存しないので、この bug は landing 以来ずっと隠れて�
 - **穴 3（ephemeral node）は塞がない。** これは欠陥ではなく天井で、charter G2
   （machine approval は常に人間、override 不能）から出ている。**D6 が答えである** ——
   事前 admit した固定プールを持つ。実装すべきものは無い。
-- **`inga.ref` ⇄ `inga-node` の wiring**（上記 ⚠）が唯一残る散文の継ぎ目。
-  `inga-node` のどこにも `inga.ref` の require は無く、committed record は
-  quorum 証明書を運ばないので、`inga.ref` の cert 検証をそのまま繋ぐことはできない。
-  塞ぐには **inga-node が sink 時に QC を record に添える**必要がある。
+- **`inga.ref` ⇄ `inga-node` の継ぎ目**（上記 ⚠）。**ここに以前書いていた
+  『inga-node が sink 時に QC を record に添えればよい』は誤りだった** ——
+  witness は `vote-payload`（block-hash 入り）に署名し、`inga.head/verify-cert` は
+  head record の canonical bytes を検査する。**別のバイト列なので、QC をどこに
+  添えても通らない。** 継ぎ目は未配線ではなく**証明の対象の不一致**である。
+  実測と、塞ぎ方 3 つとその代償は **ADR-2608198200**。
 - **NFS を forwarder 越しに使う経路は、まだ閉じていない。** `principal-of` は
   同居 service 向けであり、cloud-itonami-app は別プロセスの JVM である。
   agent に local endpoint を生やして訊けるようにするのが次。それまで

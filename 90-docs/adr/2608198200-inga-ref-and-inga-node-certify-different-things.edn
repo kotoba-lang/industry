@@ -1,0 +1,104 @@
+[{:db/id -1
+  :adr/id "2608198200"
+  :adr/title "inga.ref と inga-node は別のものを証明している —— 継ぎ目は配線ではなく契約の不一致"
+  :adr/status "accepted"
+  :adr/date "2026-08-19"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/tags "inga, inga-node, ref-plane, quorum, consensus, certificate, correction"
+  :adr/body
+  "## 決定
+
+**ADR-2608198100 が書いた『塞ぐには inga-node が sink 時に QC を record に添える
+必要がある』は誤りである。** そこを訂正し、実際に必要なものを記録する。
+
+**`inga.ref` と `inga-node` は別のバイト列に署名している。** QC をどこに添えても
+`inga.head/verify-cert` は通らない。継ぎ目は未配線なのではなく、**証明の対象が
+違う**。
+
+## 実測（2026-08-19）
+
+| | 何に署名しているか |
+|---|---|
+| `inga-node` の witness | `inga.attest/vote-payload` = `engi/vote/v1` + chain-id + view + height + **block-hash** + witness の行区切り文字列 |
+| `inga.head/verify-cert` が検査するもの | `inga.head/canonical-bytes` の **head record**（ref / seq / cid / prev / height） |
+
+同じ record を指してすらいない。consensus が証明するのは『この block に quorum が
+投票した』であり、ref 面が要求するのは『この head record に quorum が署名した』。
+**前者から後者は導けない。** 署名は転記できない。
+
+したがって『QC を添える』は型が合わない。ADR-2608198100 のあの一文は、
+確かめずに書いた処方だった —— **証明の対象が同じだと仮定していた。**
+
+## 塞ぎ方は 3 つあり、代償が違う
+
+### A. witness が head record にも署名する
+
+consensus とは別に、commit した record ごとに quorum 署名を集める。
+`verify-cert` はそのまま通る。
+
+**代償**: 署名ラウンドが 2 本になる。しかも 2 本目は**既に順序が決まったもの**に
+対する署名で、consensus が答えた問いを聞き直している。ref の書き込みごとに
+quorum との往復が増える。
+
+### B. inclusion proof —— record が block に在り、その block に QC がある
+
+`inga.ref` の検証を『record への署名』から『**この record はこの block に入って
+いて、この block には quorum が投票した**』へ変える。
+
+部品は既に全部ある:
+
+- QC の検証は **`inga.attest/verify-certificate`**（validator set と quorum を
+  取り、`vote-payload` を再構成して検証する。`:inga.qc/views` を持つのは
+  view ごとに payload が変わるため）
+- block の同一性は `(hash-fn block)` と `:inga.qc/block-hash` の一致
+- 包含は `:inga.block/proposals` の中に当該 record が在ること
+
+**代償**: 検証側が **block と QC を受け取る**必要があり、**chain-id と hash-fn を
+知っている**必要がある。`/committed?ref=` は今 record しか返さない。そして
+`inga.ref/current-head` は `head/verify-head` を直に呼んでいるので、
+**`inga.ref` に検証器の seam が要る**（`verify-fn` / `quorum` / `admitted?` を
+直接取る今の形から、`verify-head-fn` を注入する形へ）。
+
+### C. witness を信用して読む
+
+`/committed` の答えをそのまま head とする。
+
+**代償**: `inga.ref` が存在する理由そのもの —— offline verifiable であること ——
+を捨てる。`verify-head` の docstring が『dumb な read-head! は信用できない host
+でよい』と書いているのは、まさにこれを避けるため。**採らない。**
+
+## 現時点の判断
+
+**B が正しい向きである。** ただし本 ADR は **B を実装していない**。理由は 2 つ:
+
+1. `inga` の証明モデルは security contract であり、この repo の docstring は
+   同じ面で 3 回直している（自己証明する certificate / membership 未検査 /
+   ref-name 未検査）。**追加は additive にできるが、`inga.ref` の seam 変更は
+   既存の呼び出し側の契約を変える。**
+2. 実装する前に決めるべきことが 1 つある: **inclusion proof を `inga.head` に
+   足すのか、`inga.ref` の隣に別の verifier を置くのか。** 前者は 1 つの ns が
+   2 つの証明モデルを持ち、後者は ref 面が 2 通りの構成を持つ。
+
+## いま正しく言えること
+
+- **ref の CAS 自体は実在し、測ってある**（ADR-2608198100『測った』2、
+  `inga-node` `54a04b7`）。7 witness process に同一 `[ref seq]` を投げて片方が
+  負け、敗者は勝者の CID を教えられる。**それは ordering の決定であり、
+  offline verifiable な証明ではない。** 両者は別の主張である。
+- **`inga.ref` は今日 cooperative oracle としか繋がっていない**（自分の docstring
+  が『the adapter was correct and connected to nothing』と書いている）。
+  本 ADR はその文が今も正しい理由を、推測ではなく実測で述べたもの。
+
+## 何をしたか
+
+ADR-2608198100 の該当箇所を訂正し、本 ADR を指すようにした。**誤った処方を
+残さない** —— 次に読む者は『QC を添えればよい』を実装しようとして、
+署名が別のバイト列を覆っていることを自分で発見する羽目になる。
+
+## 関連
+
+- ADR-2608198100 — kekkai は到達性、ref は権限（訂正対象）
+- ADR-2608198000 — bot が共有するのは disk ではなく base の CID
+- ADR-2608038000 / 2608670000 — inga と、witness が process であること
+- ADR-2608047000 — certificate が validator set を知らなければ何も証明しない"}]
