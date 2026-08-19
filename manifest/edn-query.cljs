@@ -1256,7 +1256,14 @@
    ⚠ **数えるときに 3 つ思い出す**: ①官報は直近 90 日しか無料で読めない
    ②決算公告の履行率が低く、**不在は「決算期が無い」ではない**
    ③名寄せで同名 2 社は解決しないので、`:company/houjin-bangou` を持たない
-   レコードが残る（`:corpus/ambiguous-count`）。"
+   レコードが残る（`:corpus/ambiguous-count`）。
+
+   同じディレクトリから **`kanpou-chotatsu`（落札公示）と `kanpou-kaisan`
+   （解散公告）**も載る。解散公告は「この会社はもう営業していない」という、
+   リード・与信で最も強い 1 事実で、`:kaisan/resolved-on`（解散決議日）と
+   `:kaisan/published-at`（掲載日）を分けて持つ。**`:kaisan/resolved-on` の不在は
+   「決議していない」ではない** —— 決議日を本文に持たない公告と、縦書きの列境界で
+   日付が割れたものがあり、そこは掲載日で埋めずに空けてある。"
   [next-tempid!]
   (let [files (->> ["jp-go-npb-kanpou"]
                    (keep west-project-path)
