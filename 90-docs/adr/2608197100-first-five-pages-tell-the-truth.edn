@@ -33,7 +33,7 @@ checkout. Per repository:
 
     git -C orgs/<org>/<repo> worktree add -b <branch> <scratch>/wt-<repo> <org>/main
     cp -R <scratch>/wt-<repo> /tmp/genroot-<repo>/orgs/<org>/<repo>
-    nbb scripts/gen-appview-page-summary.cljs --root /tmp/genroot-<repo> \
+    nbb scripts/gen-appview-page-summary.cljs --root /tmp/genroot-<repo> \\
         --names <repo> --apply
     # copy back only the +page.svelte files that actually changed, then
     # commit -> push -> gh api .../merges -> nbb scripts/west-pin-put.cljs <repo> <sha>
