@@ -107,14 +107,27 @@ push main ok / push git-annex ok
   1 回 enrich しただけ（ADR-2608180800）。補助金・調達・届出・財務は未取得のまま。
 - **launchd 経由でも 1 度完走を確認した**（自分の shell からだけでなく）:
   `custody (VERIFIED by exit code, of 95 keys): kotobase=95, b2=95` / `push main ok`。
-- ⚠ **連続実行が壊れる。** 15 分あけて 2 回走らせたら error が **15/53 → 51/53** に
-  跳ねた（committed 35 → 2）。原因は未特定 —— 上流の throttling、per-source timeout、
-  この機械の負荷（並行 build 多数）のどれか、あるいは複合。日次の間隔では踏まない
-  はずだが、**「53 sources, 2 committed」を正常として読まない**ために書いておく。
-  次に測るのはここ: 2 回とも落ちた source が同じ集合か、error の中身は timeout か parse か。
-- **error 15 件（1 回目）は残っている**（per-source の timeout と「feed が 0 件に
-  parse された」）。設計どおり他を巻き込んでいないが、毎日 53 分の 15 が落ちるなら
-  source registry 側の問題である。
+- ✅ **連続実行が壊れる件は原因が判明した（2026-08-19）。** 「原因は未特定 —— throttling か
+  timeout か負荷」と書いていたが、**3 つとも違った。** 理由を捨てずに 1 度出したら即座に
+  分かった: `raw/2026-08-19/<source>.xml (Permission denied)`。
+
+  **annex は commit した内容を読み取り専用の symlink にする。** だから同じ UTC 日の
+  2 回目は、その日に既に archive した全 source で書き込みに失敗する —— 53/53 error、
+  persisted 0。日次 run は UTC 日をまたぐので単独では踏まないが、手で回した瞬間・
+  retry した瞬間に全滅する。無人の 2 回が「51 with errors」だったのは、私が同じ UTC 日に
+  何度も回していたから。
+
+  直したのは 3 点（`scripts/kouhou-ingest.cljs`）: ①その日の raw だけ `datalad unlock`
+  してから走る（再実行が冪等）②error の理由をヒストグラムで出す（本文を切らない ——
+  `(` で切ると `raw/…/x.xml (Permission denied)` が「パスが理由」に見える）③半分以上
+  落ちた run は非ゼロで終わる。修正後の同日再実行: **53 sources / 46 committed / 3 held /
+  4 errors**。
+
+  **教訓: 数だけ記録して本文を捨てた検査は、原因を永久に隠す** —— ADR-2608136000 の
+  「受け取ったエラー本文を捨てていないか」がそのまま出た。
+- **残る error は 4 件**（2026-08-19 実測、fetch 修正後）: connect timeout 2 と
+  TLS 2（証明書失効・未知の CA）。**後者はこちらから直せないし、直してはいけない** ——
+  press release を取るために証明書検証を切る取引はしない。
 - **launchd job は 1 台の機械に載っている。** この laptop が止まれば収集も止まる。
   fleet へ移すかは未決（murakumo の常駐枠は `:slot/attested` が要る —— 書き込み鍵を
   持つので 1 台固定、ADR-2608111721）。
