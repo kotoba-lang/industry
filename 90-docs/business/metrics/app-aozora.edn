@@ -1,38 +1,47 @@
-{:health-status 200,
+{:engagement
+ {:dau nil,
+  :active-authors-window {:window 200, :distinct-authors 1},
+  :posts 5,
+  :human {:posts 5, :engagement 0},
+  :organism {:posts 0, :engagement 0},
+  :organism-engagement-ratio nil},
+ :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 16413,
-  "app-aozora-appview" 15155,
-  "app-aozora-spa" 6973},
+ {"app-aozora-pds" 13505,
+  "app-aozora-appview" 12128,
+  "app-aozora-spa" 7364},
  :zone
- {:requests-7d 1165505,
-  :pageviews-7d 5894,
-  :uniques-7d-sum 929,
+ {:requests-7d 516692,
+  :pageviews-7d 8174,
+  :uniques-7d-sum 945,
   :zone "aozora.app"},
- :sources [:cloudflare :health],
+ :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 515012}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4997}
+  [{:path "/__cache/relay-repos-index-v1", :requests 179526}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4067}
    {:path
-    "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
-    :requests 208}
+    "/kotobase-cf-wasm-testnet/ipns/bafyreidwhkvt3omcwb6ytmiy6npf42crhvbekxi7aovgxjhl6hgrmsnvcm.json",
+    :requests 513}
    {:path
     "/bafyreicy2go3fqwsoh7zup3asioqghz3qykjuednggzcmpaacu7fpao2sm",
-    :requests 199}
+    :requests 235}
    {:path
-    "/bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4eq3q5k2optwu446juce4",
-    :requests 79}
-   {:path "/robots.txt", :requests 74}
-   {:path "/federation-pilot/did.json", :requests 70}
+    "/bafyreiezivwicf3zbw3diuaxngntk4o2kwrw3lpa5tyrmwjvzojccf77ya",
+    :requests 227}
    {:path
-    "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
-    :requests 58}],
-  :status-mix {:server-error 172557, :ok 522304, :client-error 6189},
+    "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
+    :requests 214}
+   {:path
+    "/kotobase-cf-wasm-testnet/ipns/bafyreic3lav46wjwgsqm2hgfcls5dnvzqne72y77yhn7rawov2phqppz3e.json",
+    :requests 115}
+   {:path "/liquid-glass/specular.js", :requests 37}],
+  :status-mix {:ok 186955, :client-error 190, :server-error 22394},
   :window "24h"},
- :as-of "2026-08-13",
- :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 25},
+ :as-of "2026-08-19",
+ :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 11},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 515012 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4997 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 208 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 199 · /bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4… 79 | 4xx(probe) 1% · 5xx 25%",
+ "上位 page (24h, 2xx/3xx): /__cache/relay-repos-index-v1 179526 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4067 · /kotobase-cf-wasm-testnet/ipns/bafyreidw… 513 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 235 · /bafyreiezivwicf3zbw3diuaxngntk4o2kwrw3l… 227 | 4xx(probe) 0% · 5xx 11%",
  :signal
- "aozora.app 実測 1165505 req/7d・929 uniques(日次和)・うち4xx probe 1%(24h)、workers 38541 inv/7d"}
+ "aozora.app 実測 516692 req/7d・945 uniques(日次和)・うち4xx probe 0%(24h)、workers 32997 inv/7d"}
