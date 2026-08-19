@@ -795,6 +795,16 @@
          ;; **テストが実際に走ったことも assert する**: summary 行が無い / 0 件は fail。
          (str "out=$(clojure -M:" alias-name " 2>&1); code=$?")
          "echo \"$out\" | tail -25"
+         ;; Keep the count IN the receipt, as the last line before the exit
+         ;; marker. `tail -25` puts it wherever the suite happened to print it,
+         ;; and the receipt detail is truncated from the end -- measured
+         ;; 2026-08-19, comparing 15 gates against their JVM baselines, 7 of
+         ;; them had passed with a summary the receipt no longer carried, so
+         ;; the only question that matters when moving a suite between
+         ;; runtimes ("did it run the SAME tests?") could not be answered from
+         ;; the record. The floor below already greps for this line; printing
+         ;; it costs nothing and makes every receipt comparable.
+         "echo \"$out\" | grep -E 'Ran [0-9]+ tests containing [0-9]+ assertions' | tail -1"
          "echo \"$out\" | grep -qE 'Ran [0-9]+ tests' || fail 'no test summary in output — refusing to report a pass' 93"
          "echo \"$out\" | grep -qE 'Ran 0 tests' && fail 'zero tests ran' 94"
          "echo \"FLEET-CI-EXIT: $code\""]
@@ -810,6 +820,16 @@
          (str "out=$(npx --yes nbb --classpath " (or classpath "src:test") " "
               (or entry "run-tests.cljs") " 2>&1); code=$?")
          "echo \"$out\" | tail -25"
+         ;; Keep the count IN the receipt, as the last line before the exit
+         ;; marker. `tail -25` puts it wherever the suite happened to print it,
+         ;; and the receipt detail is truncated from the end -- measured
+         ;; 2026-08-19, comparing 15 gates against their JVM baselines, 7 of
+         ;; them had passed with a summary the receipt no longer carried, so
+         ;; the only question that matters when moving a suite between
+         ;; runtimes ("did it run the SAME tests?") could not be answered from
+         ;; the record. The floor below already greps for this line; printing
+         ;; it costs nothing and makes every receipt comparable.
+         "echo \"$out\" | grep -E 'Ran [0-9]+ tests containing [0-9]+ assertions' | tail -1"
          "echo \"$out\" | grep -qE 'Ran [0-9]+ tests' || fail 'no test summary in output — refusing to report a pass' 93"
          "echo \"$out\" | grep -qE 'Ran 0 tests' && fail 'zero tests ran' 94"
          "echo \"FLEET-CI-EXIT: $code\""]
