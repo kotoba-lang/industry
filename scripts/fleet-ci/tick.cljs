@@ -818,12 +818,40 @@
 ;; treats that as having judged this sha, so the next tick tries again.
 (def extract-fail-sentinel "FLEET-CI: extract failed on")
 
-(defn unreachable-outcome?
-  "True when this check failed because the tree never reached the node.
-  Reads the sentinel the gate command itself emits, so there is no second
-  spelling to keep in step."
+;; The tree ARRIVED and the gate then found the node cannot run it — a missing
+;; toolchain, not a missing file. `:cap` is supposed to prevent that, and a gate
+;; script cannot know its own `:cap` declaration, so this is the second line of
+;; defence rather than a substitute: `:cap` stops the misplacement, this stops a
+;; misplacement that happens anyway from being written down as a defect.
+;;
+;; Measured 2026-08-19: 31 `itonami-regenerate-*` gates ran `clojure
+;; -M:dev:render-html` with no `:cap`, so a third of the fleet answered about
+;; itself — 13 failures on the three nodes without `clojure`, zero passes there.
+;; Declaring `:cap :jvm` (ADR-2608198600) stops new ones. It does not un-record
+;; `itonami-regenerate-854 :fail 48334d3`, which now sits red until that repo
+;; gets a commit, for a reason that was never about that repo.
+;;
+;; A gate that emits this is saying "ask somebody else", not "this is broken".
+(def cannot-answer-sentinel "FLEET-CI: cannot answer on")
+
+(defn not-a-verdict?
+  "True when this check did not judge the repository at all — the tree never
+  arrived, or it arrived somewhere that cannot run the gate. Both read sentinels
+  emitted on this side of the wire, so there is no second spelling to keep in
+  step.
+
+  The caller must neither record these nor open an issue for them: recording one
+  makes `work-changed?` skip the sha, which pins a red that says nothing about
+  the code until somebody pushes."
   [detail]
-  (and (some? detail) (str/includes? (str detail) extract-fail-sentinel)))
+  (and (some? detail)
+       (let [d (str detail)]
+         (or (str/includes? d extract-fail-sentinel)
+             (str/includes? d cannot-answer-sentinel)))))
+
+;; Kept as the old name because `unreachable` is still the common case and reads
+;; better at the call site that logs it.
+(def unreachable-outcome? not-a-verdict?)
 
 (defn gate-script
   "gate 1 本ぶんのノード側スクリプト。どの終了経路でも最後に

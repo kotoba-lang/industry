@@ -68,6 +68,33 @@
 
 (defn- slurp* [p] (try (.toString (.readFileSync fs p) "utf8") (catch :default _ nil)))
 
+;; `regen-cmd` の実体がこのノードに無いなら、この gate は repo について何も
+;; 言えない。**赤ではなく棄権する。**
+;;
+;; 実測 2026-08-19: この gate 群 31 本は `:cap` を宣言しておらず、placement が
+;; どこにでも置いていた。`clojure` を持たない 3 ノード（dan / issachar /
+;; naphtali）で 13 fail / 0 pass、持つ 6 ノードで 51 pass / 2 fail。落ちた側の
+;; 中身は `bash: line 4: clojure: command not found` で、repo の欠陥ではない。
+;;
+;; ADR-2608198600 が `:cap :jvm` を宣言して**誤配置を止めた**。ここは、それでも
+;; 誤配置が起きたときに**赤として記録されないようにする**方。`:cap` を書き忘れた
+;; 次の gate 群にも効く（同じ欠陥は既に 3 回起きている）。
+(defn- executable-exists? [bin]
+  (zero? (.-status (.spawnSync cp "sh" #js ["-c" (str "command -v " bin)]
+                               #js {:stdio "ignore"}))))
+
+(defn- refuse-if-toolchain-absent! []
+  (let [bin (first (str/split (str/trim regen-cmd) #"\s+"))]
+    (when-not (executable-exists? bin)
+      ;; tick.cljs の `cannot-answer-sentinel` と同じ綴り。tick はこれを見た run を
+      ;; 台帳に書かず、次の tick が別のノードで試す。
+      (println (str "FLEET-CI: cannot answer on " (or (.-HOSTNAME js/process.env)
+                                                      (.hostname os))
+                    " — the regeneration command needs `" bin
+                    "`, which is not on this node. This says nothing about "
+                    (or org "the repo") "; the gate needs :cap :jvm placement."))
+      (js/process.exit 1))))
+
 ;; ---------------------------------------------------------------------------
 ;; deps.edn の :local/root
 ;;
@@ -159,6 +186,10 @@
          {:ok false :out (str (some-> (.-stdout e) str) (some-> (.-stderr e) str))})))
 
 (defn -main []
+  ;; **最初に見る。** `regen-cmd` は argv の flag なので、tree を読む前から
+  ;; 分かっている。後ろに置くと、答えられないと分かっているノードで workspace を
+  ;; 作り、依存を 2 本 clone してから棄権することになる。
+  (refuse-if-toolchain-absent!)
   (when (str/blank? org)
     (die! 90 "--org is required (the GitHub org of the repo under test);"
           "sibling deps written as ../<name> cannot be resolved without it"))
