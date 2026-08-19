@@ -121,9 +121,39 @@ test *だけ*が落ちる。
 
 前者は後者を含まない。ADR-2608198100 の旧文はこの 2 つを混ぜかけていた。
 
-**まだ繋いでいないもの**: `inga.ref` を `head-of!` + `inga.commitment` で
-実際に構成する deployment。seam・verifier・producer は揃って測ってあるが、
-その 3 つを 1 つの store として組んだ稼働構成はまだ無い。
+## 組み上げた（2026-08-20）—— `inga-node/src/inga_node/ref.cljc`（`d8a5cb4`）
+
+seam・verifier・producer を 1 つの `IRefStore` にした。head を読み、
+**commit された証明を検証し**、submit して待つことで compare-and-set する。
+
+**transport は注入で、ns は `.cljc`。** `-compare-and-set-ref!` は同期で
+commit は同期でないので、seam は全部 block しなければならない。**Node は
+block できない**ので、この store の live 構成は `java.net.http` と実 sleep を
+渡す **JVM の consumer** になる。これは `inga.ref` 自身の docstring（『waiting
+は host に住む』）を、言い直すのではなく具体にしたもの。
+
+test は**実バイト列**で駆動する —— 実 Ed25519 の投票、実 `sink-blocks!`、実
+`seams/hash-fn`。socket だけを、HTTP 面が配るのと同じファイルの直接読みに
+置き換えてある。中心の assertion は **disk 上の proof を書き換えると head が
+absent になり、戻すと head が戻る** こと（store は読むのではなく検証する）。
+`verified-head` を『検証せず head を返す』に壊すと、その assertion と
+別 ref の assertion *だけ*が落ちる。
+
+**検査が 2 回、著者ではなく実行のほうを正した:**
+
+1. 最初の版は `.cljs` の `inga-node.store` を require していた。**ClojureScript の
+   ns を require する `.cljc` は名前だけの portable** で、この ns が存在する
+   理由である JVM consumer は永遠に読み込めなかった。clj-kondo が先に言った。
+   format は portable な `inga_node.proof` に移し、**実際に
+   `clojure -M -e` で `(require 'inga-node.ref)` を JVM で通した**（黙っているのと
+   読み込めるのは別）。
+2. tamper test が正規表現で proof を書き換えようとして**何にも一致していなかった**
+   —— `pr-str` は名前空間を共有する map を `#:inga.qc{…}` と印字する。
+   ファイルは無傷のまま『store は検証していない』と報告していた。今は構造で
+   書き換え、proof を書く側では printer を pin してある。
+
+**残り**: この store を実際に構成した JVM deployment。ns は JVM で読み込むところ
+まで確認済みで、あとは consumer 側の配線（`java.net.http` と sleep）。
 
 ## 何をしたか
 
