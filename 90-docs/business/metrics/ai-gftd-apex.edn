@@ -1,26 +1,26 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 7110, "ai-gftd-chat-shell" 1229},
+ {"magatama-sh1n5h1x" 7168, "ai-gftd-chat-shell" 1229},
  :zone
- {:requests-7d 446988,
-  :pageviews-7d 9240,
-  :uniques-7d-sum 5363,
+ {:requests-7d 450052,
+  :pageviews-7d 9241,
+  :uniques-7d-sum 5370,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/wp-content/themes/index.php", :requests 52}
-   {:path "/ops.php", :requests 43}
+  [{:path "/wp-content/themes/index.php", :requests 44}
    {:path
     "/wp-includes/sodium_compat/src/Core32/Curve25519/Ge/about.php",
     :requests 41}
+   {:path "/ops.php", :requests 35}
    {:path "/puc.php", :requests 33}
    {:path "/4PJcpMFsD8B.php", :requests 31}
    {:path "/.env.papertrail", :requests 30}
    {:path "/public_html/.env.dev", :requests 30}
    {:path "/.env.admin", :requests 30}],
-  :status-mix {:server-error 13996, :ok 1729, :client-error 1808},
+  :status-mix {:server-error 13977, :ok 1556, :client-error 1618},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,11 +32,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-19",
- :traffic-quality
- {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 80},
+ :traffic-quality {:window "24h", :probe-4xx-pct 9, :error-5xx-pct 81},
  :top-paths
- "上位 page (24h, 2xx/3xx): /wp-content/themes/index.php 52 · /ops.php 43 · /wp-includes/sodium_compat/src/Core32/Cu… 41 · /puc.php 33 · /4PJcpMFsD8B.php 31 | 4xx(probe) 10% · 5xx 80%",
+ "上位 page (24h, 2xx/3xx): /wp-content/themes/index.php 44 · /wp-includes/sodium_compat/src/Core32/Cu… 41 · /ops.php 35 · /puc.php 33 · /4PJcpMFsD8B.php 31 | 4xx(probe) 9% · 5xx 81%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 446988 req/7d・5363 uniques(日次和)・うち4xx probe 10%(24h)、workers 8339 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 450052 req/7d・5370 uniques(日次和)・うち4xx probe 9%(24h)、workers 8397 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
