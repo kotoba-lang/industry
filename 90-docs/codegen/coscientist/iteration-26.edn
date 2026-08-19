@@ -1,0 +1,93 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-26"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-26.edn"
+  :doc/date "2026-08-19"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "amu execution of call+back-edge across a spill"
+  :coscientist/iteration 26
+  :coscientist/subject "kotoba-lang/amu f21f5c9f, isa-execution-test pressure-loop, kexe on judah"
+  :coscientist/action "WIP=1 was this hole, not predicate removal: five loop-invariants force scratch-tier spills; compile+execute n in {0,1,5,50} as n+31 under with-redefs back-edge? false; keep production all-vreg; do not remove the predicate; do not implement cfg-liveness"
+  :coscientist/measured "judah Apple M4. Probe encodings: production :all-vregs 18 slots; override full-pool aarch64 :call-live 0 spills (preserved absorbs); override full-pool x86 :call-live 4 stores; override scratch-only both ISAs :call-live 8 stores / 10 loads. Execution (scratch-only + back-edge? false): n in {0,1,5,50} result n+31, both ISAs, no KEXE_TRAP. Production same oracle all-vreg. Override live (pos? @calls). Spill-store and spill-load counts pos? so it is a spill. isa-execution-test 19 tests / 729 assertions / 0 fail (was 18/688). west-pin amu 08cc6ad5. mir and native not moved."
+  :coscientist/refuted "that the remaining allocator hole was \"scanner cannot complete under pressure\". It completes and executes. Also that AArch64 full pool measures a spill (it does not; preserved absorbs; scratch-only is the both-ISA measurement)."
+  :coscientist/carries-forward "iteration-18: kernel_call* is not a conformance corpus; iteration-22: the corpus executes; iteration-23: production call+loop is still all-vreg by contract; iteration-24: the throw was :non-prefix-argument; iteration-25: one green function does not license removing back-edge?; ADR-2608136000 fourth form; :cfg-liveness remains false; :llvm-beaten remains false. Do not overwrite 04-25"
+
+  :doc/body
+  "# Codegen co-scientist, iteration 26
+
+Iteration 25 asked to remove `back-edge?` only against a wider amu
+execution run, or keep it and measure call + back-edge across a spill.
+This file takes the spill measurement. WIP=1 was this hole, not
+predicate removal.
+
+Do not overwrite 04-25.
+
+## What ran
+
+amu's `pressure-loop-module` is the iteration-25 count-loop plus five
+loop-invariant constants whose textual last-use is after the latch, so
+the interval covers the back-edge. Sum is 31; return is n+31. Under
+the scratch tier those five plus n/acc do not fit, so the scanner must
+spill.
+
+Probe encodings:
+
+- production: `:all-vregs` 18 slots
+- override full-pool aarch64: `:call-live` 0 spills (preserved absorbs)
+- override full-pool x86: `:call-live` 4 stores
+- override scratch-only both ISAs: `:call-live` 8 stores / 10 loads
+
+`a-call-and-a-back-edge-across-a-spill-execute` (scratch-only +
+`back-edge?` false):
+
+- policy `:call-live` on both targets; spill-store and spill-load
+  counts `pos?` so it is a spill
+- kexe n∈{0,1,5,50} equals n+31, no `KEXE_TRAP`, both ISAs
+- `(pos? @calls)` so green is not an unapplied redef
+- production (no override): same oracle, `:all-vregs`
+
+Judah: `isa-execution-test` **19 tests, 729 assertions, 0 failures**
+(was 18/688). Available ISAs: `[aarch64 x86_64]`. Slot count is not
+the claim.
+
+## What this is not
+
+Not predicate removal. A spill executing on the scanner path is
+encodings plus kexe for this fixture, not a license to drop
+`back-edge?` for the suite. Production still all-vreg via the guard.
+
+Not cfg-liveness. Allocator code is unchanged (`ac14016d` / `69e364e`).
+deps.edn was not bumped. kotoba-mir and kotoba-native were not moved.
+
+## Pins
+
+- amu `f21f5c9f880672b34ed0384c257e892ba0288d62` (merge of
+  `agent/spill-across-back-edge`, feature
+  `cf2a8f81f306a8bcfcee692ff4184e72a9f51b7c`).
+  west-pin `08cc6ad5d0c67fd4948d70ec202e40cbb2c523de`
+- kotoba-mir not moved (`6ccc30eb4a90548c94bc62a912e91386197a069e`,
+  west-pin `0501c1bdd47159c4045630eb0d297ab1b1b384ec`)
+- kotoba-native not moved (`69e364edf3154aa8fdf7d87535ca73179b4d2716`)
+
+## Meta-review
+
+- **A scanner that cannot complete under pressure was the remaining
+  hole. It completes and executes.** The throw is not the story.
+- **AArch64 full pool is not a spill measurement.** Preserved absorbs;
+  scratch-only is the both-ISA measurement.
+- **Keep the production assertion when the override goes green.**
+  Otherwise the guard's remaining job becomes unmeasured.
+- **Do not remove `back-edge?` against one spill fixture.** Wider amu
+  execution that includes this fixture is a different measurement.
+
+## Next
+
+Remove `back-edge?` only against a wider amu execution run that
+includes this spill fixture, or keep it. `:cfg-liveness` is still
+false and is not this week's work. kotoba-mir / kotoba-native still do
+not execute compiled programs.
+
+Do not chase fused-srem, extra MOV, FMA, PGO, kototama optimizer, a
+timed `bench` export, or rematching leaf vs LLVM. Do not overwrite
+04-25. Do not claim LLVM beaten. Do not remove `back-edge?`. Do not
+implement cfg-liveness as a drive-by of this execution."}]
