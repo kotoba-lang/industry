@@ -339,12 +339,34 @@
   ;; child repos are NOT guarded by this gate. Written down so a green here
   ;; is not read as "the workspace is clean".
   ;;
+  ;; **:org is not optional here.** Landed without it 2026-08-18 and the
+  ;; fleet ran this gate three times against `etzhayyim/root` -- west has
+  ;; exactly one project named `root` and it is that one, not the
+  ;; superproject, which is the manifest repo and is addressed by :org.
+  ;; Every other root-* gate already carried :org; a sweep of all 224
+  ;; entries with the EDN reader (a regex sweep first said 221 and would have
+  ;; missed three) found no third case.
+  ;;
+  ;; What caught it was NOT :min-files -- etzhayyim/root clears any file
+  ;; count this gate could sensibly demand, and 200 was cleared by a wide
+  ;; margin. What caught it was the verifier checking that IT ITSELF is in
+  ;; the tree it was handed, and exiting 2 (could not answer) when it was
+  ;; not. A count floor asks "did I get enough files"; only an identity
+  ;; floor asks "did I get the RIGHT files". Without it this gate would
+  ;; have reported green for a repo it never read. :min-files raised to
+  ;; 1500 to match its siblings, but that is hygiene, not the guard.
+  ;;
+  ;; Demonstrated 2026-08-19 against a tree built the way the fleet builds
+  ;; one (`git archive` + the :include-ext filter, 4,179 files): exit 0
+  ;; clean, exit 1 with one NUL injected, exit 2 with the verifier removed.
+  ;;
   ;; :cd false until it has a green receipt of its own, per this file's own
   ;; standard.
-  {:name "root" :id "root-source-nul-bytes" :gate :nbb-script :cap :jvm
+  {:name "root" :id "root-source-nul-bytes" :org "com-junkawasaki"
+   :gate :nbb-script :cap :jvm
    :script "gates/source-nul-bytes-check.cljs"
    :include-ext [".cljs" ".clj" ".cljc" ".edn" ".kotoba" ".md" ".yml"]
-   :min-files 200 :cd false}
+   :min-files 1500 :cd false}
   {:name "governor" :gate :jvm-test :cd true}
   {:name "taxlaw" :gate :jvm-test :cd true}
   ;; shohyo 諸表 (2026-08-18). Folds a trial balance into BS/PL and refuses

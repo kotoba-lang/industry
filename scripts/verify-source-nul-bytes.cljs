@@ -82,16 +82,31 @@
         (js/process.exit 2))
       (println "SELFTEST\tok"))))
 
-(defn- walk [dir]
-  (let [out (atom [])]
+(defn- walk
+  "`{:files [...] :links [...]}` -- regular source files, and separately the
+  symlinks that look like source.
+
+  A git-annex pointer is a symlink, and `(.isFile e)` is FALSE for one, so
+  the first version of this walker dropped them in silence: not scanned, not
+  counted, not named -- and therefore indistinguishable in the output from a
+  file that was read and found clean. Measured 2026-08-19 on the
+  superproject tree: 118 symlinks carry a source extension, all annex
+  pointers under `orgs/personal`.
+
+  Their content is not in the tree at all -- a fleet node has no annex
+  objects -- so this cannot scan them. What it can do is say how many it did
+  not scan, which is the difference between *skipped* and *passed*."
+  [dir]
+  (let [out (atom []) links (atom [])]
     ((fn go [d]
        (doseq [e (fs/readdirSync d #js {:withFileTypes true})]
          (let [n (.-name e) full (path/join d n)]
            (cond
              (and (.isDirectory e) (not (#{".git" "node_modules" ".cpcache"} n))) (go full)
-             (and (.isFile e) (source-ext (path/extname n))) (swap! out conj full)))))
+             (and (.isFile e) (source-ext (path/extname n))) (swap! out conj full)
+             (and (.isSymbolicLink e) (source-ext (path/extname n))) (swap! links conj full)))))
      dir)
-    @out))
+    {:files @out :links @links}))
 
 (defn- allowed? [p]
   (some (fn [[suffix _]] (str/ends-with? p suffix)) allowed))
@@ -115,7 +130,7 @@
     (println "SCANNED\t0")
     (println (str "Refusing to report a verdict: no such directory " dir))
     (js/process.exit 2))
-  (let [files (walk dir)
+  (let [{:keys [files links]} (walk dir)
         results (map (fn [p] [p (has-nul? p)]) files)
         unreadable (filterv (fn [[_ r]] (nil? r)) results)
         scanned (- (count results) (count unreadable))
@@ -124,6 +139,11 @@
     (println (str "SCANNED\t" scanned))
     (when (seq unreadable)
       (println (str "UNREADABLE\t" (count unreadable))))
+    ;; Not a failure: an annex pointer is legitimately unreadable here, and
+    ;; failing on it would leave this gate permanently red. It is printed so
+    ;; that "did not look" never reads as "looked and found nothing".
+    (when (seq links)
+      (println (str "UNSCANNED-SYMLINK\t" (count links))))
     (doseq [[p _] (sort-by first (or ok []))]
       (println (str "  allowed  " p)))
     (doseq [[p _] (sort-by first (or bad []))]
