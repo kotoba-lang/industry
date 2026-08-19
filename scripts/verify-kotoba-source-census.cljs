@@ -145,11 +145,24 @@
         rows (for [f files]
                {:path f
                 :repo (repo-of f)
-                :class (classify (try (fs/readFileSync f "utf8") (catch :default _ "")))})
+                ;; A file that cannot be READ is not a file measured as empty.
+                ;; The first version caught the exception and passed "" to
+                ;; `classify`, which called it :empty-or-comment-only -- and
+                ;; every one of the five files in that class turned out to be
+                ;; tracked-but-absent from the working tree, not empty. That is
+                ;; ADR-2608136000 question 1 committed by this detector itself.
+                :class (let [text (try {:ok (fs/readFileSync f "utf8")}
+                                       (catch :default e {:err (.-message e)}))]
+                         (if (:err text) :unreadable (classify (:ok text))))})
         rows (vec rows)
         census (frequencies (map :class rows))
         legacy (get census :legacy-dsl 0)
-        odd (filter #(#{:edn-data :unknown :empty-or-comment-only} (:class %)) rows)
+        odd (filter #(#{:edn-data :unknown :empty-or-comment-only :unreadable} (:class %)) rows)
+        unreadable (filter #(= :unreadable (:class %)) rows)
+        _ (when (and (seq rows) (= (count unreadable) (count rows)))
+            (die-unanswered (str "every one of " (count rows)
+                                 " listed .kotoba files was unreadable"
+                                 " -- this is a broken tree, not a census")))
         mixed (->> rows
                    (group-by :repo)
                    (filter (fn [[r xs]] (and r (> (count (set (map :class xs))) 1))))
@@ -164,7 +177,7 @@
                       (count dirs) " checkouts"))
         (println (str "CENSUS\t"
                       (str/join "\t" (for [k [:kotoba-source :legacy-dsl :edn-data
-                                              :unknown :empty-or-comment-only]]
+                                              :unknown :empty-or-comment-only :unreadable]]
                                        (str (name k) "=" (get census k 0))))))
         (when (pos? legacy)
           (println (str "FINDING\tfail\tcollision\t" legacy
@@ -176,8 +189,12 @@
                         "\tholds more than one shape under .kotoba, so a per-repo glob"
                         " cannot separate source from data")))
         (doseq [{:keys [path class]} (sort-by :path odd)]
-          (println (str "FINDING\twarn\tshape:" path "\tis " (name class)
-                        ", not Kotoba source, but uses the bare .kotoba extension")))
+          (if (= :unreadable class)
+            (println (str "FINDING\twarn\tunreadable:" path
+                          "\tis tracked by git and absent from the working tree,"
+                          " so nothing here classified it"))
+            (println (str "FINDING\twarn\tshape:" path "\tis " (name class)
+                          ", not Kotoba source, but uses the bare .kotoba extension"))))
         (println)
         (let [n (+ (if (pos? legacy) 1 0) (count mixed) (count odd))]
           (if (pos? n)
