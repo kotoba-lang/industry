@@ -68,6 +68,34 @@
                     :remote (or (second (re-find #"(?m)^\s+annex-remote:\s*([^\s]+)\s*$" block))
                                 "b2")}))))))
 
+(defn annexed-checkouts-on-disk
+  "west path 配下で **実際に git-annex になっている** checkout。
+
+   `projects` は west.yml の `userdata.datalad: true` を見るが、**印は付いていない
+   のに annex になっている dataset が在る**。実測 2026-08-19:
+   `com-junkawasaki/jp-go-gbiz-info` は annex + 2 remote（b2 / kotobase）で
+   corpus を持っているのに印が無く、この検査器の対象に入っていなかった ——
+   つまり custody を**誰も測っていなかった**。
+
+   印は宣言であって観測ではない。ここは disk を見る。"
+  []
+  (->> (re-seq #"(?ms)^\s+- name:\s*([^\n]+)(.*?)(?=^\s+- name:|(?![\s\S]))"
+               (slurp (str root "/manifest/west.yml")))
+       (keep (fn [[_ nm block]]
+               (when-let [[_ path] (re-find #"(?m)^\s+path:\s*([^\s]+)\s*$" block)]
+                 ;; ⚠ `.git/annex/uuid` を見ない —— **この layout には存在しない**
+                 ;; （`annex.uuid` は git config 側）。実測 2026-08-19、最初に書いた
+                 ;; probe はそれを見ており、**どの checkout でも発火しなかった** ——
+                 ;; 「印の無い dataset を見つける」検査が、何も見つけないまま成功した。
+                 ;; `.git/annex` ディレクトリの実在は layout に依らない。
+                 (when (.existsSync fs (str root "/" path "/.git/annex"))
+                   {:name (str/trim nm)
+                    :path path
+                    :remote (or (second (re-find #"(?m)^\s+annex-remote:\s*([^\s]+)\s*$" block))
+                                "b2")
+                    :flagged? (boolean (re-find #"(?m)^\s+datalad:\s*true\s*$" block))}))))
+       vec))
+
 ;; ---------- credentials ----------
 
 (defn resolve-b2!
@@ -189,6 +217,29 @@
                        {:remote rname :fields fields :usable? (>= fields 2)})))))
          vec)))
 
+(defn- git-remotes [dir]
+  (->> (str/split-lines (or (:out (sh "git" "remote" {:cwd dir})) ""))
+       (map str/trim) (remove str/blank?) set))
+
+(defn choose-remote
+  "**どの remote から fsck するかは、観測して決める。** 設定値を信じない。
+
+   実測 2026-08-19: `hyakka-data` の off-machine コピーは `kotobase`（専用 bucket）に
+   在り、`b2` という git remote は**そこに存在しない**。にもかかわらず既定の `b2` に
+   対して fsck し、`remote copy UNREADABLE` と報告した —— **custody は健全なのに赤**。
+   壊れ方を間違えた赤は、直すべき対象を隠す。
+
+   優先順: 設定された remote が git remote として在り、かつ実際に claim している →
+   それ。無ければ claim している git remote のうち最も多く claim しているもの。
+   どれも無ければ nil（= 検証できない。合格でも違反でもない）。"
+  [configured remotes claim-counts]
+  (or (when (and (contains? remotes configured) (pos? (get claim-counts configured 0)))
+        configured)
+      (->> claim-counts
+           (filter (fn [[r n]] (and (contains? remotes r) (pos? n))))
+           (sort-by (fn [[r n]] [(- n) r]))
+           ffirst)))
+
 (defn audit-project [{:keys [name path remote]} env sample-n]
   (let [dir (str root "/" path)]
     (if-not (.existsSync fs dir)
@@ -205,15 +256,43 @@
                 ;; Only fsck files the *configured* remote actually claims —
                 ;; sampling a file that lives on some other remote makes the
                 ;; check fail for a bookkeeping reason rather than a custody one.
-                candidates (->> entries
-                                (filter #(contains? (:on %) (str "[" remote "]")))
-                                (mapv :file))
+                ;; claim している remote 名を数える（`[b2]` の形で入っている）。
+                claim-counts (->> entries
+                                  (mapcat :on)
+                                  (keep #(second (re-find #"^\[(.+)\]$" (str %))))
+                                  frequencies)
+                remotes (git-remotes dir)
+                chosen (choose-remote remote remotes claim-counts)
+                candidates (if chosen
+                             (->> entries
+                                  (filter #(contains? (:on %) (str "[" chosen "]")))
+                                  (mapv :file))
+                             [])
                 idxs (sample-indices (count candidates) sample-n)
                 sampled (mapv #(nth candidates %) idxs)
+                ;; **他の remote の creds を env で押し付けない。** git-annex は
+                ;; env の AWS_* を stored creds より優先するので、B2 の鍵を注入した
+                ;; まま別アカウントの S3 remote を fsck すると 403 が返り、
+                ;; 「コピーが読めない」と報告される —— 実測 2026-08-19、
+                ;; `hyakka-data`（kotobase の専用 bucket）がそれで赤になった。
+                ;; stored creds が健全な remote は、env を剥がして触る。
+                remote-has-creds? (boolean (some #(and (= chosen (:remote %)) (:usable? %)) creds))
+                fsck-env (if remote-has-creds?
+                           (into {} (remove (fn [[k _]] (str/starts-with? (str k) "AWS_"))) env)
+                           env)
                 fsck (if (seq sampled)
-                       (fsck-sample! dir remote sampled env)
+                       (fsck-sample! dir chosen sampled fsck-env)
                        {:ok [] :failed []})]
-            {:name name :path path :remote remote
+            (if (and (nil? chosen) (pos? total) (empty? at-risk) (empty? only-untrusted))
+              ;; 帳簿上はコピーが在るが、ここから検証できる remote が無い。
+              ;; **合格でも違反でもない** —— 黙って ok に倒さない。
+              {:name name :path path :remote remote :status :unverified
+               :annexed total
+               :reason (str "no usable annex remote here to verify from"
+                            (when (seq claim-counts)
+                              (str " (copies claimed by " (str/join ", " (sort (keys claim-counts)))
+                                   "; git remotes: " (str/join ", " (sort remotes)) ")")))}
+            {:name name :path path :remote (or chosen remote)
              :status (if (or (seq at-risk) (seq only-untrusted) (seq (:failed fsck))
                              (seq broken-creds))
                        :fail :ok)
@@ -222,7 +301,7 @@
              :at-risk (mapv :file at-risk)
              :only-untrusted (mapv :file only-untrusted)
              :sampled sampled
-             :fsck-failed (:failed fsck)}))))))
+             :fsck-failed (:failed fsck)})))))))
 
 ;; ---------- main ----------
 
@@ -239,7 +318,19 @@
       sample-n (let [n (js/parseInt (or (arg argv "--sample") "1") 10)]
                  (if (js/isNaN n) 1 n))
       report-path (arg argv "--report")
-      targets (cond->> (projects) wanted (filter #(contains? wanted (:name %))))]
+      declared (projects)
+      on-disk (annexed-checkouts-on-disk)
+      ;; 印の無い annex dataset も対象にする（印は宣言、disk は観測）。
+      by-name (merge (into {} (map (juxt :name identity)) on-disk)
+                     (into {} (map (juxt :name identity)) declared))
+      targets (if wanted
+                (vec (keep by-name wanted))
+                (vec (vals by-name)))
+      ;; **渡した名前が 1 つも解決しなかったことを黙って OK にしない。** 実測
+      ;; 2026-08-19、2 つ渡して 1 つだけ検査し `ok=1 fail=0 skipped=0` と印字した
+      ;; —— 消えた 1 つは印が無かったからで、出力のどこにも現れなかった。
+      unresolved (when wanted (vec (remove by-name wanted)))
+      unflagged (vec (remove :flagged? on-disk))]
   ;; `--list-projects` keeps CI from having to re-implement the west.yml scan as
   ;; an inline one-liner (quoting that inside YAML is a reliable way to ship a
   ;; broken workflow).
@@ -273,19 +364,36 @@
   (when (some #{"--list-projects"} argv)
     (doseq [{:keys [name path]} targets] (println (str name " " path)))
     (exit 0))
+  (when (seq unresolved)
+    ;; 0 でも 1 でもない: 「検査して問題無し」でも「違反あり」でもなく、
+    ;; **問いに答えられなかった**。
+    (binding [*out* *err*]
+      (println (str "annex-custody-verify: CANNOT ANSWER — requested name(s) matched no checkout: "
+                    (str/join ", " unresolved)
+                    " (neither west.yml userdata.datalad nor an on-disk .git/annex)")))
+    (exit 2))
+  (when (seq unflagged)
+    (println (str "annex-custody-verify: NOTE " (count unflagged)
+                  " annexed checkout(s) carry no west userdata.datalad flag — included anyway: "
+                  (str/join ", " (map :name unflagged)))))
   (when (empty? targets)
-    (fail "対象となる DataLad project がありません（west.yml の userdata.datalad: true を確認）。"))
+    (fail "対象となる DataLad project がありません（west.yml の userdata.datalad: true も、on-disk の .git/annex も無い）。"))
   (let [env (merge (getenv-all) (resolve-b2!))
         results (mapv #(audit-project % env sample-n) targets)
         failed (filter #(= :fail (:status %)) results)
         skipped (filter #(= :skipped (:status %)) results)
+        unverified (filter #(= :unverified (:status %)) results)
         ok (filter #(= :ok (:status %)) results)]
     (println (str "annex-custody-verify: projects=" (count results)
-                  " ok=" (count ok) " fail=" (count failed) " skipped=" (count skipped)
+                  " ok=" (count ok) " fail=" (count failed)
+                  " unverified=" (count unverified)
+                  " skipped=" (count skipped)
                   " (sample=" sample-n "/repo)"))
     (doseq [r results]
       (case (:status r)
         :skipped (println (str "  - " (:name r) ": SKIP (" (:reason r) ")"))
+        :unverified (println (str "  - " (:name r) ": UNVERIFIED — " (:annexed r)
+                                  " annexed; " (:reason r)))
         :ok (println (str "  - " (:name r) ": OK — " (:annexed r) " annexed, all with off-machine copies"
                           (when (seq (:sampled r))
                             (str "; verified from " (:remote r) ": " (str/join ", " (:sampled r))))))
