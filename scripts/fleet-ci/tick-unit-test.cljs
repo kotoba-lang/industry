@@ -7,7 +7,10 @@
   (:require [cljs.reader]
             [cljs.test :refer [deftest is run-tests]]
             [clojure.string :as str]
+            ["node:fs" :as fs]
             [tick :as tick]))
+
+(defn- slurp-text [file] (.readFileSync fs file "utf8"))
 
 (def dep-sha "1111111111111111111111111111111111111111")
 (def deps-text
@@ -286,6 +289,87 @@
       "an explicit :org wins — such an entry is not a west project")
   (is (nil? (tick/org-repo-of west-fixture {:name "unknown-to-west"}))
       "and an entry west does not know, with no :org, yields nil rather than a bad key"))
+
+(def ^:private windows-gate-paths
+  ["scripts/windows-loader-cross-compile.cljs" "tools/kexe_loader_windows.c"])
+
+(defn- filter-with
+  "Runs `filtered-tarball!` over a fixture tree, returning the rejection message
+  or :built. The cache probe is stubbed miss so the check under test is reached."
+  [tree opts]
+  (with-redefs [tick/mirror! (fn [_] "/fake-mirror")
+                tick/ensure-sha! (fn [m _ _] m)
+                tick/git (fn [_ args & _]
+                           (if (= "ls-tree" (first args))
+                             {:exit 0 :out (str/join "\n" tree)}
+                             {:exit 0 :out ""}))]
+    (try
+      (tick/filtered-tarball! "kotoba-lang/amu"
+                              "9999999999999999999999999999999999999999" opts)
+      :built
+      (catch :default e
+        (or (tick/gate-input-rejection e) (throw e))))))
+
+;; The tree amu's PR #547 actually has -- measured 2026-08-19 with
+;; `git ls-tree -r --name-only refs/pull/547/head`. The Dependabot branch is
+;; older than the gate, so the verifier the gate RUNS is simply not on it.
+(def ^:private pr547-tree
+  (into ["tools/kexe_loader_windows.c" "tools/kexe_loader.c"
+         "scripts/fuzz-native.cljs" "package.json"]
+        (map #(str "src/pad_" % ".cljs") (range 63))))
+
+(deftest a-named-input-absent-from-the-tree-is-reported-by-name-not-by-count
+  ;; For 10 days this exact tree produced "filter found only 67 files
+  ;; (expected >= 70)" every 90 seconds. The count is a SIDE EFFECT of the
+  ;; branch predating the gate; reading it sends you to lower :min-files, which
+  ;; is the wrong repair -- the branch is what is stale.
+  (let [message (filter-with pr547-tree
+                             {:include-ext [".c" ".cljs"] :min-files 70
+                              :require-paths windows-gate-paths})]
+    (is (str/includes? message "scripts/windows-loader-cross-compile.cljs")
+        "the refusal names the file the gate runs")
+    (is (str/includes? message "cannot answer here")
+        "and says the gate cannot answer, rather than implying a trivial pass")
+    (is (str/includes? message "do not lower :min-files")
+        "and points away from the repair the count invites")
+    (is (not (str/includes? message "expected >= 70"))
+        "the count floor must not win: it is the less specific of the two")))
+
+(deftest a-named-input-the-filter-drops-names-the-filter
+  ;; The other cause, with a different repair. This is the 2026-07-29 root
+  ;; incident's shape: the file is in the tree, :include-ext does not ship it.
+  (let [message (filter-with (into pr547-tree ["scripts/windows-loader-cross-compile.cljs"])
+                             {:include-ext [".c"] :min-files 1
+                              :require-paths windows-gate-paths})]
+    (is (str/includes? message "scripts/windows-loader-cross-compile.cljs"))
+    (is (str/includes? message "widen :include-ext")
+        "tree-present-but-unshipped points at the filter, not at the branch")))
+
+(deftest the-count-floor-still-answers-when-no-named-input-is-missing
+  ;; :require-paths must not replace the count floor -- a filter that collapses
+  ;; is still the hazard the floor was written for.
+  (let [tree (into pr547-tree ["scripts/windows-loader-cross-compile.cljs"])
+        message (filter-with tree {:include-ext [".c" ".cljs"] :min-files 5000
+                                   :require-paths windows-gate-paths})]
+    (is (str/includes? message "expected >= 5000")
+        "with every named input present, the count floor is what speaks"))
+  (is (= :built (filter-with (into pr547-tree ["scripts/windows-loader-cross-compile.cljs"])
+                             {:include-ext [".c" ".cljs"] :min-files 5
+                              :require-paths windows-gate-paths}))
+      "and a tree that satisfies both is built"))
+
+(deftest declared-required-paths-match-the-wrappers-own-floor
+  ;; The two lists are written in different files on purpose (tick refuses
+  ;; before shipping, the wrapper refuses after extracting), so nothing keeps
+  ;; them equal except this.
+  (let [gates (cljs.reader/read-string (slurp-text "scripts/fleet-ci/gates.edn"))
+        by-id (into {} (map (juxt :id identity)) (:repos gates))
+        wrapper (slurp-text "scripts/fleet-ci/gates/amu-windows-loader-cross-check.cljs")]
+    (is (= windows-gate-paths (:require-paths (by-id "amu-windows-loader-cross")))
+        "gates.edn declares what this test pins")
+    (doseq [p windows-gate-paths]
+      (is (str/includes? wrapper (str/replace p #"^(scripts|tools)/" ""))
+          (str "the wrapper still reads " p)))))
 
 (let [{:keys [fail error]} (run-tests 'tick-unit-test)]
   (when (pos? (+ fail error))

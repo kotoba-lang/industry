@@ -589,7 +589,7 @@
   以前は 2 経路あった（trees+blobs API で blob ごとに落とす経路と、全体
   tarball を取って絞る経路）。git 化でどちらも同じ形になったので :include-from
   は無くなり、:include-ext があればこれ、無ければ全体、の 2 択。"
-  [org-repo sha {:keys [include-ext min-files]}]
+  [org-repo sha {:keys [include-ext min-files require-paths]}]
   ;; **キャッシュキーに include-ext を含める。** 含めないと「1 repo = 1 filter」を
   ;; 暗黙に仮定することになり、同じ repo・同じ sha に別 filter の gate を足した
   ;; 瞬間に、先に走った方の tarball を後の方が黙って再利用する。実際に起きた
@@ -615,6 +615,48 @@
             files (filterv (fn [p] (and (seq p) (some #(str/ends-with? p %) include-ext))) all)
             n (count files)]
         (log "pathspec-filter" org-repo (sha12 sha) ":" n "files" (pr-str include-ext))
+        ;; **名指しした入力の不在は、件数の不足より先に報告する。** どちらも
+        ;; `:input-rejected` を出すが、読み手を送る先が違う。
+        ;;
+        ;; 実測 2026-08-19: `amu-windows-loader-cross` が amu の PR #547/#548
+        ;; （9〜10 日前の Dependabot 枝）に対して 90 秒ごとに
+        ;; 「filter found only 67 files (expected >= 70)」を出し続けていた。
+        ;; その枝に無いのは 67 番目のファイルではなく、**この gate が実行する
+        ;; verifier 本体**（`scripts/windows-loader-cross-compile.cljs`。gate より
+        ;; 枝の方が古い）で、件数はその副作用にすぎない。件数だけを読むと
+        ;; `:min-files` を下げに行く —— 実際にそうしかけた。床を下げれば gate は
+        ;; 走り、wrapper が exit 90 で「verifier is missing」と正しく言うが、
+        ;; 空 tree を弾くという床本来の役目は弱まる。直すべきは枝であって床ではない。
+        ;;
+        ;; ⚠ この検査は cache miss のときだけ走る（上の `fs/existsSync` で早期 return
+        ;; するため）。既に tarball がある sha に後から `:require-paths` を足すと、
+        ;; その sha では検査されない。fail-open だが degrade 先は今日の挙動
+        ;; （wrapper 自身の exit 90 が拾う）なので、tick ごとに ls-tree を増やして
+        ;; まで塞がない。拒否された sha は tarball を作れていないので、実害のある
+        ;; stale cache は原理的に存在しない。
+        ;;
+        ;; 出所を 2 つに分けるのは、対処が違うから: tree に無いなら枝を
+        ;; rebase / close する、tree にあって filter が落としたなら
+        ;; `:include-ext` を直す。後者は 2026-07-29 に実際に起きている
+        ;; （この関数の docstring が記録している root の 2 gate の取り違え）—— その時は
+        ;; wrapper の exit 90 が拾ったが、名前で拒否していれば tick が言えていた。
+        (when (seq require-paths)
+          (let [in-tree (set all)
+                shipped (set files)
+                absent (filterv #(not (contains? in-tree %)) require-paths)
+                filtered-out (filterv #(and (contains? in-tree %)
+                                            (not (contains? shipped %)))
+                                      require-paths)]
+            (when (seq absent)
+              (reject-input!
+               (str "this gate reads " (str/join ", " absent) ", which " org-repo
+                    " does not have at " (sha7 sha) " — the gate cannot answer here."
+                    " Rebase or close the branch; do not lower :min-files")))
+            (when (seq filtered-out)
+              (reject-input!
+               (str "this gate reads " (str/join ", " filtered-out) ", which exists in "
+                    org-repo " at " (sha7 sha) " but :include-ext " (pr-str include-ext)
+                    " does not ship — widen :include-ext")))))
         (when (and min-files (< n min-files))
           (reject-input! (str "filter found only " n " files for " org-repo
                               " (expected >= " min-files ") — refusing to build a gate input that "
@@ -695,7 +737,7 @@
   - どちらも無し             … repo 全体の tarball（既定。今日までと同じ）
 
   ノードへ送るサイズに上限を掛ける。"
-  [{:keys [org-repo tip include-ext min-files name ship-self-bundle]}]
+  [{:keys [org-repo tip include-ext min-files require-paths name ship-self-bundle]}]
   (let [f (cond
             ship-self-bundle
             (do
@@ -705,16 +747,18 @@
               ;; 人は「絞って送っている」と読み続ける —— このワークスペースが
               ;; 繰り返し踏んできた形（no-op な設定が正しく見える）なので、拒否する。
               ;; 履歴を読む gate は tree 全体を必要とするので、絞る要求自体が誤り。
-              (when (or (seq include-ext) min-files)
+              (when (or (seq include-ext) min-files (seq require-paths))
                 (reject-input!
-                 (str name ": :ship-self-bundle cannot be combined with :include-ext/:min-files"
+                 (str name ": :ship-self-bundle cannot be combined with"
+                      " :include-ext/:min-files/:require-paths"
                       " — a git bundle carries the whole repository (that is the point: the gate"
                       " reads history), so the filter would silently do nothing. Drop them;"
                       " the gate's own --min floor is what guards against an unread tree.")))
               (self-bundle! org-repo tip))
 
             (seq include-ext)
-            (filtered-tarball! org-repo tip {:include-ext include-ext :min-files min-files})
+            (filtered-tarball! org-repo tip {:include-ext include-ext :min-files min-files
+                                             :require-paths require-paths})
 
             :else (full-tarball! org-repo tip))
         mb (/ (.-size (fs/statSync f)) 1048576)]
