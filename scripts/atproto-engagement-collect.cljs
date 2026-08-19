@@ -45,7 +45,9 @@
 (defn flag [n] (some #(= n %) argv))
 (defn opt [n d] (let [i (.indexOf argv n)] (if (neg? i) d (get argv (inc i) d))))
 
-(def root (or (.-CLOUD_ITONAMI_WORKSPACE_ROOT (.-env js/process)) (.cwd js/process)))
+(def root (or (.-COM_JUNKAWASAKI_ROOT (.-env js/process))
+              (.-CLOUD_ITONAMI_WORKSPACE_ROOT (.-env js/process))
+              (.cwd js/process)))
 (def out-path (opt "--out" (path.join root "90-docs/observation/atproto-engagement.datoms.edn")))
 (def max-repos (let [v (opt "--max-repos" nil)] (when v (js/parseInt v 10))))
 ;; A bounded run is a SAMPLE. It must never enter the durable plane looking like
