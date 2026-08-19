@@ -1381,6 +1381,14 @@
    :script "gates/jgrants-projections-check.cljs"
    :include-ext [".edn" ".cljs"] :min-files 2 :cd false}
 
+  ;; gBizINFO 全件 projection。列挙側（section ごとに manifest）と畳んだ側
+  ;; （summary）で形が違い、片方に合わせた検査は他方に黙る。分母 2 つと publish の
+  ;; sha256、畳んだ行数、兄弟ファイルへの指し先を見る。
+  {:name "jp-go-gbiz-info" :id "gbiz-info-projections" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/gbiz-info-projections-check.cljs"
+   :include-ext [".edn" ".cljs"] :min-files 2 :cd false}
+
   {:name "root" :id "root-itonami-maturity-freshness" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/itonami-maturity-freshness-check.cljs"
