@@ -10,7 +10,14 @@
    Fail-open: callers never block the local ledger path on remote failure."
   (:require [clojure.string :as str]))
 
-(def default-endpoint "https://backend.kotobase.net")
+;; `backend.kotobase.net` is deprecated and no longer resolves in DNS -- a
+;; dual-write against it failed in 1.4ms, before TCP. The live datom plane is
+;; kotobase.net itself, which is also what kotobase-client documents
+;; (client.cljs) and what its live E2E suite actually runs against
+;; (live_e2e.cljs). Verified 2026-08-19 by overriding BMC_KOTOBASE_ENDPOINT:
+;;   {:ok true, :db "portfolio-bmc-ledger", :events 1, :datom_count 7}
+;; The XRPC path was never wrong -- only the host.
+(def default-endpoint "https://kotobase.net")
 (def default-operator-did "did:web:kotobase.net")
 (def default-db-name "portfolio-bmc-ledger")
 (def datomic-ns "ai.gftd.apps.kotobase.datomic")
