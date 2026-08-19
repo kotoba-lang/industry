@@ -66,13 +66,29 @@
 (let [queries (concat (map count-q datasets)
                       (mapcat (fn [[a b]] [(shared-q a b) (only-q a b)]) pairs))
       answers (run-all queries)
-      [c1 c2 c3 & rest*] answers]
+      [c1 c2 c3 & rest*] answers
+      counts (map vector datasets [c1 c2 c3])]
+  ;; ---- 人が読む表 ----
   (println "companies with a 法人番号, by route:")
-  (doseq [[d n] (map vector datasets [c1 c2 c3])]
-    (println (str "  " d "\t" n)))
+  (doseq [[d n] counts] (println (str "  " d "\t" n)))
   (println "\npairwise:")
   (doseq [[[a b] [sh only]] (map vector pairs (partition 2 rest*))]
     (println (str "  " a " × " b "\tshared=" sh "\tonly-in-" a "=" only)))
-  ;; **0 は「重なりが無い」であって「引けなかった」ではない** —— 引けなければ
-  ;; 上の run-all が exit 2 で止まる。
-  (println "\n(0 means measured-and-disjoint; a query that could not run exits 2)"))
+
+  ;; ---- detector protocol ----
+  ;;
+  ;; **見つけるのは「経路が答えなくなったこと」であって、重なりの少なさではない。**
+  ;; 3 経路が互いにほとんど重ならないのは測った事実（ADR-2608181000 25 節）で、
+  ;; 欠陥ではない。欠陥は**答えが 0 になること** —— projection が空になる、loader が
+  ;; 移動したパスを見続ける（実測 2026-08-19: yabai の loader が旧パスを見ており、
+  ;; 3,288 entity が「1 件も無い」と同じ顔で消えていた）。
+  (doseq [[d n] counts]
+    (when (zero? n)
+      (println (str "FINDING\thigh\troute-silent:" d
+                    "\tthe plane answers 0 companies for this route —— projection emptied,"
+                    " or the loader is pointing at a path that moved"))))
+  ;; **走った証拠**。0 経路を走査して「異常なし」と言わせない。
+  (println (str "SCANNED\t" (count datasets) "\troutes\t"
+                (str/join " " (map (fn [[d n]] (str d "=" n)) counts))))
+  (println "\n(0 means measured-and-disjoint; a query that could not run exits 2)")
+  (js/process.exit (if (some (fn [[_ n]] (zero? n)) counts) 1 0)))
