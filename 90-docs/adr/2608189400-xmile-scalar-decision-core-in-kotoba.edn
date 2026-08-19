@@ -156,4 +156,14 @@ classpath を名指す赤はノードの egress であってこの repo では�
 
     clojure -M:test   89 tests / 2012 assertions、0 failures / 0 errors（着手前: 62 / 238）
     clojure -M:lint   0 errors / 0 warnings
+
+## 追記（2026-08-19）—— 「4,189 本」は再現しなかった
+
+本文の workspace 全体の `.kotoba` 計数は、同じ workspace に対する 2 つの独立した測定の
+どちらとも一致しない（tracked な `git ls-files` で 2,044 / working tree の `find` で 2,346、
+node_modules の寄与は 0）。**repo 単位の数字（amu 134 本）は完全に一致している**ので、
+ずれているのは全体集計だけである。本文に測り方が書かれていないため原因は判定できない。
+
+**この数字を method 抜きで引用しないこと。** 詳細と再現コマンドは
+adr-2608191000-kotoba-refactor-status-measured-and-claude-md-native-section-corrected。
 "}]
