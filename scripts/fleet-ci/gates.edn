@@ -1358,6 +1358,15 @@
    :script "gates/nta-projections-check.cljs"
    :include-ext [".edn" ".cljs"] :min-files 4 :cd false}
 
+  ;; company-web-presence の 3 projection（web-presence / press-wire / domain-facts）は
+  ;; ノードの cell が毎日書き換える。人のレビューが挟まらないので、混入・分母欠落・
+  ;; 件数ずれは artifact 側で捕まえるしかない。検証の正本は repo 内の
+  ;; scripts/verify-projections.cljs。
+  {:name "company-web-presence" :id "cwp-projections" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/company-web-presence-projections-check.cljs"
+   :include-ext [".edn" ".cljs"] :min-files 4 :cd false}
+
   {:name "root" :id "root-itonami-maturity-freshness" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/itonami-maturity-freshness-check.cljs"
