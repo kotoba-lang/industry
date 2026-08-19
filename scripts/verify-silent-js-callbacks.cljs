@@ -175,6 +175,39 @@
     (doseq [w bad] (println (str "  FAILED: " w)))
     (when (seq bad) (js/process.exit 2))))
 
+(defn- west-registered-paths
+  "The `path:` entries in manifest/west.yml, as a set.
+
+  Used to skip checkouts under `orgs/` that west does not manage. Measured
+  2026-08-19: `orgs/network-awai/net-kotobase` is an unregistered checkout of
+  the SAME GitHub repository as the registered `orgs/net-kotobase/control-plane`
+  (id 1258823862 under both names, an org rename with a redirect), 324 commits
+  behind. It contributed three findings that had already been fixed upstream --
+  ghosts that a reader would try to fix, in a tree nothing ships from. Content
+  hashing cannot dedupe these: once the registered copy is fixed the two
+  genuinely differ. Registration is the workspace's own answer to which tree is
+  the source, so use it."
+  []
+  (let [f "manifest/west.yml"]
+    (if-not (fs/existsSync f)
+      nil                                ; not at root -- do not filter
+      (set (map second (re-seq #"path:\s*(\S+)" (str (fs/readFileSync f "utf8"))))))))
+
+(def ^:private registered (west-registered-paths))
+(def ^:private skipped-unregistered (atom 0))
+
+(defn- managed?
+  "True unless `dir` is an unregistered checkout under `orgs/`. A path outside
+  `orgs/` (a fixture, a single file, the root repo itself) is always scanned."
+  [dir]
+  (or (nil? registered)
+      (not (str/starts-with? dir "orgs/"))
+      (let [seg (str/split dir #"/")]
+        (or (< (count seg) 3)
+            (let [repo (str/join "/" (take 3 seg))]
+              (or (contains? registered repo)
+                  (some #(str/starts-with? % (str repo "/")) registered)))))))
+
 (defn- source-files [dir]
   (if-not (fs/existsSync dir)
     []
@@ -182,10 +215,11 @@
       (cond
         (.isFile st) (if (re-find #"\.clj[sc]$" dir) [dir] [])
         (.isDirectory st)
-        (if (contains? #{".git" "node_modules" ".shadow-cljs" "target" ".cpcache" ".datalad" "out"}
-                       (p/basename dir))
-          []
-          (vec (mapcat #(source-files (p/join dir %)) (fs/readdirSync dir))))
+        (cond
+          (contains? #{".git" "node_modules" ".shadow-cljs" "target" ".cpcache" ".datalad" "out"}
+                     (p/basename dir)) []
+          (not (managed? dir)) (do (swap! skipped-unregistered inc) [])
+          :else (vec (mapcat #(source-files (p/join dir %)) (fs/readdirSync dir))))
         :else []))))
 
 (defn- repo-of
@@ -207,6 +241,9 @@
 
 (let [files (vec (mapcat source-files roots))]
   (println (str "SCANNED\t" (count files)))
+  (when (pos? @skipped-unregistered)
+    (println (str "SKIPPED-UNREGISTERED\t" @skipped-unregistered
+                  "\ttree(s) under orgs/ that west does not manage")))
   (when (zero? (count files))
     (println "no .cljs/.cljc files under " (pr-str roots)
              " — refusing to report clean")
