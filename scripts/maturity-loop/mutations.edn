@@ -1082,4 +1082,76 @@
      :file "src/cloud/itonami/app/bots.clj"
      :find "            (store-context! target-context-id target target-direction :handoff\n                            [target-message]"
      :replace "            (store-context! target-context-id target target-direction :handoff\n                            (conversation to-bot-id)"
-     :must-fail ["a-handoff-is-an-isolated-two-way-durable-conversation"]}]}]}
+     :must-fail ["a-handoff-is-an-isolated-two-way-durable-conversation"]}]}
+
+  {:repo "orgs/cloud-itonami/mangaka-data"
+   :label "mangaka-data corpus —— 文書どうしの参照と、言語版が共有する背骨"
+   ;; 12 兄弟目で、**コードを持たない repo は初めて**。DataLad dataset なので
+   ;; 「テストする対象が無い」ように見えるが、297 の文書が互いを参照しており、
+   ;; その参照はどれも壊れても throw しない —— 壊れたまま render パイプラインへ
+   ;; 渡り、生成物になって初めて分かる。言語版に至っては、その言語の回を最後まで
+   ;; 観るまで分からない。
+   ;;
+   ;; この repo の pin は west entry 名が `cloud-itonami-mangaka-data`、path の
+   ;; basename が `mangaka-data` で食い違う。run.cljs の `pinned-sha` は 2026-08-19
+   ;; まで `- name:` で引いていたので、**この suite を足しても skip されて何も
+   ;; 検査されなかった**（同じ食い違いが 4,208 entry 中 60 件ある）。
+   ;;
+   ;; annex の実体は既定で不在（symlink が dangling する）。それは custody の話で
+   ;; あって参照整合性の破れではないので、テスト側は lstat で「dataset が宣言して
+   ;; いるか」を見る。fleet の worktree でも実体は無いままなので、この suite は
+   ;; `annex-get` を要求しない。
+   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :green-marker "mangaka-data corpus: all green"
+   ;; 全て 2026-08-19 に実際に赤くなるところを見た。
+   :mutations
+   [{:id :mangaka-data/ref-renamed-without-updating-the-scenario
+     :why "character ref のファイル名を変えて scenario の :ref を直し忘れる形。生成器は参照先を見つけられないまま進み、その cast だけ ref 無しで描かれる"
+     :file "ghosthacker/resources/scenarios/scenario-gh-arc0-0-p03.edn"
+     :find ":ref \"saki.png\"" :replace ":ref \"saki-v2.png\""
+     :must-fail ["scenario-cast-refs-are-declared-in-the-dataset"]}
+
+    {:id :mangaka-data/beat-claims-a-panel-size-the-layout-does-not-have
+     :why "**scenario 冒頭のコメントが実障害として記録している形。** wide のつもりで撮った shot が half のコマに入ると、cover-crop の上下トリムで顔が切れる。値としてはどちらも legal なので、突き合わせない限り誰も気づかない"
+     :file "ghosthacker/resources/scenarios/scenario-gh-arc0-0-p00.edn"
+     :find "{:beat/id 2 :panels [2] :panel-size \"wide\""
+     :replace "{:beat/id 2 :panels [2] :panel-size \"half\""
+     :must-fail ["scenario-beats-target-panels-that-exist-at-the-size-they-claim"]}
+
+    {:id :mangaka-data/beat-targets-a-panel-that-does-not-exist
+     :why "layout からコマを 1 つ削ったのに beat の索引を詰め忘れる形。範囲外の索引は nil を返すだけなので、そのコマが黙って落ちる"
+     :file "ghosthacker/resources/scenarios/scenario-gh-arc0-0-p00.edn"
+     :find "{:beat/id 3 :panels [3]" :replace "{:beat/id 3 :panels [4]"
+     :must-fail ["scenario-beats-target-panels-that-exist-at-the-size-they-claim"]}
+
+    {:id :mangaka-data/image-slot-used-but-not-declared
+     :why "cast を並べ替えて本文の @ImageN を直し忘れる形。生成器は宣言されていない slot を渡され、その beat だけ別人が描かれるか誰も描かれない"
+     :file "ghosthacker/resources/scenarios/scenario-gh-arc0-0-p00.edn"
+     :find "@Image1 (Yuto) sits up in bed" :replace "@Image2 (Yuto) sits up in bed"
+     :must-fail ["scenario-image-slots-are-declared-and-used"]}
+
+    {:id :mangaka-data/style-profile-renamed-without-updating-the-mapping
+     :why "profile key を改名して :genre->style を直し忘れる形。resolve は nil を返して **:default へ黙って落ちる**ので、その genre の作品だけ作画スタイルが入れ替わる"
+     :file "style-registry.edn"
+     :find "\"バトル\"              :shonen-action-ink}"
+     :replace "\"バトル\"              :shonen-action}"
+     :must-fail ["style-registry-resolves-every-profile-it-names"]}
+
+    {:id :mangaka-data/one-language-loses-a-shot
+     :why "翻訳ジョブが 1 行落とす形。その言語版だけカットが 1 つ短くなる —— 気づくにはその言語の回を最後まで観るしかない"
+     :file "ghosthacker/episode-11-shotlist-v2.zh.edn"
+     :find " {:type \"dialogue\", :speaker \"shiro\", :text \"进去看看。这里不对劲。\", :shiro_emo \"normal\", :pico_emo \"confused\", :sfx nil, :fx nil}\n"
+     :replace ""
+     :must-fail ["localized-shotlists-share-one-spine"]}
+
+    {:id :mangaka-data/translation-job-emitted-an-empty-line
+     :why "翻訳が空文字を返す形。EDN としては正しく本数も合っているので、台詞が 1 つ消えていることは再生するまで分からない"
+     :file "ghosthacker/episode-12-shotlist-v2.fr.edn"
+     :find ":text \"D'abord le Zombie ! Réveil Sauvage !\"" :replace ":text \"\""
+     :must-fail ["localized-shotlists-are-actually-localized"]}
+
+    {:id :mangaka-data/enumeration-narrowed-so-json-is-never-read
+     :why "**この suite の沈黙対策そのものを撃つ。** 列挙を絞ると JSON は 1 件も読まれず、違反 0 件で緑になる —— 『測れなかった』が『問題なし』と同じ顔をする形。件数の床がそれを捕まえることを確かめている"
+     :file "test/mangaka_data/corpus_test.cljs"
+     :find "#js [\"ls-files\"]" :replace "#js [\"ls-files\" \"*.edn\"]"
+     :must-fail ["every-declared-json-document-parses"]}]}]}

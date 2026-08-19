@@ -485,6 +485,152 @@
           {landed true differs false} (group-by same? (filter on-base? paths))]
       [(vec (remove on-base? paths)) (vec landed) (vec differs)])))
 
+(defn- ns-source-candidates
+  "Namespace symbol -> the source paths it could live at in this repo."
+  [ns-sym]
+  (let [rel (-> (str ns-sym) (str/replace "-" "_") (str/replace "." "/"))]
+    (for [root ["src/" "test/" ""] ext [".clj" ".cljc" ".cljs"]]
+      (str root rel ext))))
+
+(defn- read-repo-source
+  "Text of `path`, preferring the working tree and falling back to the base ref.
+  Returns nil when neither has it -- which the caller must treat as
+  'not this repo's namespace', never as 'clean'."
+  [dir base path]
+  (or (try (when (.exists (io/file dir path))
+             (.toString (.readFileSync node-fs (.getPath (io/file dir path)))))
+           (catch :default _ nil))
+      (let [{:keys [exit out]} (sh "git" "-C" dir "show" (str base ":" path))]
+        (when (zero? exit) out))))
+
+(defn- defined-names
+  "Every top-level name `source` defines.
+
+  Tokenised rather than matched in one regex: `(defn- execute` and
+  `(def ^:private ops` and `(def ^{:doc \"…\"} t` all put the name in a
+  different position, and an optional-metadata group inside the pattern happily
+  captures the NAME instead of the metadata. Measured while building this gate:
+  that mistake reported `kir/execute` as unresolved against a file that defines
+  it on line one -- a gate whose false positives land on healthy files would be
+  turned off within a day, which is the same as not having it."
+  [source]
+  (into #{}
+        (keep (fn [line]
+                (when (re-find #"^\(def[a-z\-]*\s" line)
+                  (let [toks (-> line
+                                 (str/replace #"^\(def[a-z\-]*\s+" "")
+                                 (str/split #"[\s\(\[\{]+"))]
+                    (->> toks
+                         (remove str/blank?)
+                         ;; drop ^:private, ^String, ^{:doc "…"} fragments
+                         (drop-while #(str/starts-with? % "^"))
+                         first)))))
+        (str/split-lines source)))
+
+(defn- required-aliases
+  "{alias -> namespace-symbol} from the file's ns form. Regex rather than the
+  reader: these files carry metadata, reader conditionals and #_ forms that
+  edn/read-string refuses, and a gate that throws on the input it exists to
+  judge is a gate that never runs."
+  [source]
+  (into {}
+        (for [[_ ns-name alias] (re-seq #"\[([a-zA-Z0-9\-\.]+)\s+:as\s+([a-zA-Z0-9\-\.\*]+)\]" source)]
+          [alias ns-name])))
+
+(defn- code-only
+  "`source` with string literals and line comments blanked out.
+
+  Both false positives measured on the first sweep of 99 healthy files came from
+  reading prose as code: `i64/f64` inside a docstring (a slash meaning \"or\"),
+  and a comment mentioning a namespace. A gate that reads documentation as
+  references reports the best-documented files as the most broken."
+  [source]
+  (-> source
+      (str/replace #"\"(?:\\\\.|[^\"\\\\])*\"" "\"\"")
+      (str/replace #"(?m);.*$" "")))
+
+(defn- unresolved-refs
+  "Symbols the file reads through an alias whose namespace lives IN THIS REPO
+  and which that namespace does not define. Returns a sorted vec."
+  [dir base source]
+  (let [aliases (required-aliases source)
+        body    (code-only source)]
+    (->> (re-seq #"(?:^|[\s\(\[\{\'`~@])([a-zA-Z0-9\-\.\*]+)/([A-Za-z0-9\-\?!*<>=+._]+)" body)
+         (keep (fn [[_ alias sym]]
+                 (when-let [ns-name (get aliases alias)]
+                   (when-let [src (some #(read-repo-source dir base %)
+                                        (ns-source-candidates ns-name))]
+                     ;; the namespace IS in this repo, so its definitions are knowable.
+                     ;; `Rec.` is host-interop construction of a deftype/defrecord --
+                     ;; the name the namespace defines has no trailing dot.
+                     (let [bare (str/replace sym #"\.$" "")]
+                       (when-not (contains? (defined-names src) bare)
+                         (str alias "/" sym)))))))
+         distinct sort vec)))
+
+(defn- unresolved-refs-gate!
+  "Keep `:additive` from landing code whose references do not resolve.
+  -> [additive' unresolved] where `unresolved` is demoted to :review.
+
+  ## Why :additive is not enough
+
+  `:additive` merges on one argument: no path of this name exists on the default
+  branch, so no existing line is rewritten. That is true of LINES and silent about
+  THE BUILD. A test file is additive by path and still breaks compilation.
+
+  Measured (kotoba-lang/kotoba-kir, found 2026-08-19). `b0472c3`
+  `cleanup: land untracked WIP (1 files)` on 2026-08-14 landed
+  `test/kotoba/kir_value_runtime_test.clj`, which reads
+  `kir/value-runtime-operations`. That var is defined in no ref of the repo and
+  nowhere in the fleet, and all four of the file's deftests drive `kir/execute`
+  with `value-intern` / `value-hydrate` / `value-resolve` / `value-cid-of` /
+  `value-release`, none of which exist in `src/kotoba/kir.cljc` either. The suite
+  did not COMPILE for five days -- so zero tests ran and nothing in that repo was
+  checked at all, which is worse than a red suite because it looks like nothing.
+
+  The commit's own message reads 'Purely additive: none of these paths exist on
+  main, so no existing line is rewritten.' Correct, and beside the point.
+
+  ## What it will not do
+
+  Only namespaces whose source is in THIS repo are judged; an alias pointing at
+  an external dependency is out of scope, not 'clean'. When a namespace's source
+  cannot be read from either the working tree or the base ref, the reference is
+  left alone rather than reported -- the gate declines to answer instead of
+  guessing, and says how many files it actually scanned so a zero-finding run is
+  distinguishable from a zero-scan one.
+
+  ## It demotes, it never drops
+
+  Findings go to :review -- a PR a human reads -- exactly like residue-gate!'s
+  :suspect. That is deliberate, because the reference scan is regex lexing and
+  regex lexing of Clojure is approximate.
+
+  Measured over 99 files on main across 5 repos whose suites run, so every
+  finding is by construction a false positive: **1 of 99**. It is
+  `kotoba.kir.value`, which really does alias `kotoba.kir.cljs-i64 :as i64`, and
+  really does contain the characters `i64/f64` -- on line 1437, inside a
+  docstring, meaning \"i64 or f64\". Blanking strings and comments before the scan
+  removed the other one; this one survives because a file with regex literals can
+  mispair quotes. A 1% cost of one human glance is the right price for catching
+  a repo whose suite silently stopped compiling; a 1% cost of silently discarded
+  work would not be."
+  [dir base additive]
+  (let [clj? #(re-find #"\.clj[cs]?$" %)
+        cands (filter clj? additive)]
+    (if (empty? cands)
+      [additive [] {:scanned 0}]
+      (let [findings (into {}
+                           (keep (fn [p]
+                                   (when-let [src (read-repo-source dir base p)]
+                                     (when-let [bad (seq (unresolved-refs dir base src))]
+                                       [p (vec bad)]))))
+                           cands)
+            bad-paths (set (keys findings))]
+        [(vec (remove bad-paths additive))
+         (vec (sort bad-paths))
+         {:scanned (count cands) :findings findings}]))))
+
 (defn- residue-gate!
   "`:additive` から **改名の残骸**を外す。-> [additive' suspects residues]
 
@@ -855,11 +1001,21 @@
       (let [base-map (base-blobs slug base)
             [additive _ demoted] (drop-already-landed dir base-map additive)
             [additive suspects _] (residue-gate! dir base additive base-map)
-            tracked (vec (concat tracked demoted suspects))]
+            ;; 参照が解決しないコードを :additive から外す。:additive は「main に
+            ;; 同名パスが無い」= 行を書き換えない、しか言っていない —— test file は
+            ;; パス的に additive でも compile を壊す（unresolved-refs-gate! の
+            ;; docstring / kotoba-kir b0472c3 の実例）。
+            [additive unresolved uinfo] (unresolved-refs-gate! dir base additive)
+            tracked (vec (concat tracked demoted suspects unresolved))]
         (when (seq demoted)
           (println (format "  ⚠ untracked だが %s に既存・内容差あり: %d 件 → :review（auto-merge しない）"
                            base (count demoted)))
           (doseq [p demoted] (println (str "      " p))))
+        (when (seq unresolved)
+          (println (format "  ⚠ 参照が解決しない %d 件 → :review（scanned %d）"
+                           (count unresolved) (:scanned uinfo)))
+          (doseq [[p syms] (:findings uinfo)]
+            (println (str "      " p "  " (str/join ", " syms)))))
         (record-planned! dir additive tracked)
         (when (seq additive) (println (format "  plan :additive  %d files → PR → merge" (count additive))))
         (when (seq tracked) (println (format "  plan :review    %d files → PR のみ（merge しない）" (count tracked)))))
@@ -872,10 +1028,17 @@
             ;; drop-already-landed の後に置くのは、同じパスが base に在る場合は
             ;; そちらの既存判定の方が安く強いから。
             [additive suspects _] (residue-gate! dir base additive base-map)
+            ;; 参照が解決しないコードも :additive から外す（上の dry-run と同じ理由）。
+            [additive unresolved uinfo] (unresolved-refs-gate! dir base additive)
             ;; base に存在するのに untracked と報告されたものは :additive ではない。
             ;; :review へ落として auto-merge の対象から外す（PR #444 の再発防止）。
-            tracked (vec (concat tracked tracked-differs demoted suspects))]
+            tracked (vec (concat tracked tracked-differs demoted suspects unresolved))]
         (record-planned! dir additive tracked)
+        (when (seq unresolved)
+          (println (format "  ⚠ 参照が解決しない %d 件 → :review（scanned %d）"
+                           (count unresolved) (:scanned uinfo)))
+          (doseq [[p syms] (:findings uinfo)]
+            (println (str "      " p "  " (str/join ", " syms)))))
         (println (format "  archived → %s" adir))
         (when (seq (concat landed-additive landed-tracked))
           (println (format "  already landed on %s（内容一致でスキップ）: %d 件"

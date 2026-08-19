@@ -74,22 +74,34 @@
 
 (defn- pinned-sha
   "west.yml が `repo-path` に対して指している revision。**現在の checkout の
-  HEAD ではない** —— 検査するのは manifest が指すものである。"
+  HEAD ではない** —— 検査するのは manifest が指すものである。
+
+  照合は **`path:`** で行う。`- name:` ではない —— west の project 名は path の
+  basename と一致するとは限らず、実測 2026-08-19 で **4,216 entry 中 60 件**が
+  食い違っている（`cloud-itonami-mangaka-data` が `orgs/cloud-itonami/mangaka-data`、
+  `kotoba-lang-bim` が `orgs/kotoba-lang/bim` など）。名前で引いていた前の版は、
+  その 60 件に対して nil を返し、呼び出し側は **『west.yml に pin が無い』と
+  報告して SKIP** していた —— manifest が壊れているように読めるが、実際には
+  引く鍵を間違えていただけである。`mutations.edn` にそれらの repo を足しても、
+  suite は走らずに skip されるので、**検査を足したのに何も検査されない**。
+
+  entry の境界は次の `- name:` までとする。`revision:` が `name:` の直後 6 行に
+  あるという仮定は置かない —— `userdata:` を持つ entry では実際にもっと下に来る。"
   [repo-path]
-  (let [name (path/basename repo-path)
-        yml (fs/readFileSync (path/join root "manifest/west.yml") "utf8")
-        lines (str/split-lines yml)]
-    (loop [i 0]
-      (cond
-        (>= i (count lines)) nil
-        (= (str/trim (nth lines i)) (str "- name: " name))
-        (loop [j (inc i)]
-          (cond
-            (or (>= j (count lines)) (> j (+ i 6))) nil
-            (str/starts-with? (str/trim (nth lines j)) "revision:")
-            (str/trim (subs (str/trim (nth lines j)) (count "revision:")))
-            :else (recur (inc j))))
-        :else (recur (inc i))))))
+  (let [yml (fs/readFileSync (path/join root "manifest/west.yml") "utf8")
+        lines (vec (str/split-lines yml))
+        name? #(str/starts-with? (str/trim %) "- name: ")
+        field (fn [ls k]
+                (some #(let [t (str/trim %)]
+                         (when (str/starts-with? t (str k ": "))
+                           (str/trim (subs t (+ 2 (count k))))))
+                      ls))
+        starts (keep-indexed (fn [i l] (when (name? l) i)) lines)]
+    (some (fn [[a b]]
+            (let [block (subvec lines a (or b (count lines)))]
+              (when (= (field block "path") repo-path)
+                (field block "revision"))))
+          (partition 2 1 (concat starts [nil])))))
 
 ;; ── mutation ────────────────────────────────────────────────────────────────
 
@@ -159,7 +171,9 @@
                                         (subs (or sha "nopin") 0 8)))]
     (println (str "\n── " label "  [" repo "]"))
     (if-not sha
-      (do (println "   SKIP: west.yml に pin が無い") {:skipped 1})
+      (do (println (str "   SKIP: west.yml に `path: " repo "` の entry が無い"
+                        " —— この repo は west 管理下に無いか、path が変わっている"))
+          {:skipped 1})
       (do
         (sh ["rm" "-rf" dir] root)
         ;; pin は manifest のもので、ローカル checkout がそれを持っているとは
