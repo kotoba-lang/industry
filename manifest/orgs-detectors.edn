@@ -950,6 +950,33 @@
               No root argument is passed: the script's default is the relative `orgs`, which
               keeps FINDING keys repo-relative and therefore stable across machines."}
 
+  {:id :public-money-route-coverage
+   :title "the three routes to \"who received public money\" still answering"
+   :why "Measured 2026-08-19 (ADR-2608181000 25 節): 集約(gbizinfo) 2,708 社 /
+              原典(gyousei-review) 1,973 社 / 官報の落札公示(kanpou-chotatsu) 310 社 で、
+              官報の 310 社は集約に 1 社も出ない —— 3 経路は互いにほとんど重ならない。
+              **重なりの少なさは事実であって欠陥ではない。** 欠陥は経路が黙ること:
+              projection が空になる、あるいは loader が移動したパスを見続ける。
+              後者は実際に起きている —— yabai / tadori の loader が
+              `orgs/etzhayyim/com-etzhayyim-*` を見続け、3,288 entity が
+              『1 件も無い』と同じ顔で消えていた（ADR-2608181000 14 節）。
+              fleet gate にできないのは面全体（orgs/ 配下の複数 repo）を読むからで、
+              ノードには orgs/ が配られない。"
+   :measured "2026-08-19 on this machine, both directions:
+                現状 -> SCANNED 3 routes gbizinfo=2708 gyousei-review=1973 kanpou-chotatsu=310, 0 findings, exit 0
+                dataset 名を存在しないものに差し替え -> FINDING high route-silent:…=0, SCANNED が 0 を出す
+              1 回の面 load で 9 問に答える（1 問 1 プロセスにすると 18 分かかり、
+              10 分の上限で切れた）。重なり 0 のとき datascript のスカラ集約は nil を
+              返すので、数字だけを拾う parser は答えが 1 つ足りないと言って止まる ——
+              nil を 0 に写しつつ、答えの個数が合わなければ exit 2。"
+   :argv ["nbb" "--classpath" ".:scripts/nbb_compat" "{{root}}/scripts/report-public-money-coverage.cljs"]
+   :cwd :root
+   :findings :protocol
+   :evidence "SCANNED\t3\troutes"
+   :interval-ms 86400000
+   :timeout-ms 900000
+   :writes :none}
+
   {:id :verify-silent-js-callbacks
    :title "letfn siblings handed to a JS callback by name, which nbb never invokes"
    :why "Measured 2026-08-19 (ADR-2608190100): `(.catch fetch-and-retry)` in
