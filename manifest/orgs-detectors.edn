@@ -955,7 +955,8 @@
                 self-test (10 fixtures, every one a shape actually run under nbb) -> 10/10, exit 0
                 the real pre-fix file (kotobase-server 3d2523d trampoline)         -> 1 finding, exit 1
                 the same file after the fix                                        -> 0 findings, exit 0
-                the whole orgs/ tree                                               -> SCANNED 32741, 13 findings, exit 1, 75s
+                the whole orgs/ tree                                               -> SCANNED 29423, 6 findings, exit 1, 75s
+                                                                                     (+ SKIPPED-UNREGISTERED 253)
               Two defects were fixed before this could be registered, both of which made
               it answer confidently and wrongly:
               (1) It parsed its own argv as `(drop 3 …)`, which is only right when the
@@ -964,7 +965,12 @@
               (2) Its first rule was `any letfn name used as a callback`, which is too
                   broad by three of the four measured shapes -- it flagged a production
                   `hydrate-db` that demonstrably builds its database correctly. Narrowing
-                  took the count from 32 to 13 and the `high` count from 4 to 0."
+                  took the count from 32 to 13 and the `high` count from 4 to 0.
+              (3) It scanned unregistered checkouts under orgs/. One of them is the SAME
+                  GitHub repo as a registered path under a renamed org, 324 commits behind,
+                  and contributed three findings already fixed upstream -- ghosts in a tree
+                  nothing ships from. Filtering by west registration took 13 to 6; the 253
+                  skipped trees are printed, so the omission is visible."
    :argv ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
           "{{repo}}/scripts/verify-silent-js-callbacks.cljs" "--findings"]
    :cwd :root
