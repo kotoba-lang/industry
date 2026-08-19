@@ -20,7 +20,7 @@
    "ADR-2608123000"
    "adr-2607198300"]
   :adr/decision-summary
-  "{:goal :block-third-party-patents-only, :own-filing :never, :threat-jurisdiction [:cn :us :ep :jp], :repos-fixed 31, :publication \"com-junkawasaki/prior-art\" :dp-id \"DP-2026-001\", :timestamps {:rfc3161 \"FreeTSA (verified, NOT accredited)\" :ots \"Bitcoin anchor via OpenTimestamps\"}, :archive {:software-heritage {:accepted-at-landing 9 :remaining 22 :cause :anonymous-rate-limit}}, :notice-added 28, :notice-skipped 3, :pins-advanced 28, :not-done [:west-registration :accredited-tsa :chinese-indexed-venue :tdcommons-submission]}"
+  "{:goal :block-third-party-patents-only, :own-filing :never, :threat-jurisdiction [:cn :us :ep :jp], :repos-fixed 31, :publication \"com-junkawasaki/prior-art\" :dp-id \"DP-2026-001\", :timestamps {:rfc3161 \"FreeTSA (verified, NOT accredited)\" :ots \"Bitcoin anchor via OpenTimestamps\"}, :archive {:software-heritage {:accepted-at-landing 9 :remaining 22 :cause :anonymous-rate-limit}}, :notice-added 28, :notice-skipped 3, :pins-advanced 28, :indexable-site \"https://com-junkawasaki.github.io/prior-art/ (Scholar citation_* + DC + bilingual + sitemap)\", :records-split 10, :indexnow :submitted, :wayback \"5/5 bundle URLs confirmed via CDX\", :not-done [:west-registration :accredited-tsa :zenodo-doi :tdcommons-submission]}"
   :adr/body
   "# Context
 
@@ -116,4 +116,40 @@ NOTICE を持っていた 3 repo（`com-nvidia-isaac` `com-cobot-assembly` `com-
 - robotics 31 repo の内容は、2026-08-19 07:18 UTC に存在したことを 2 系統の独立した手段で立証できる状態になった。
 - 自分で特許を取る道は閉じた。オーナーの明示的判断であり、これを制約として引用してよい。
 - **`evidence-manifest.txt` の 31 行は当時の pin であって現在の tip ではない。** NOTICE 追加で 28 repo の tree SHA は既に動いている。manifest は snapshot であって追随するものではない — 「commit X の時点でこうだった」は永久に真である。新しい snapshot が必要なら DP-2026-002 を起こす。
-- 28 pin を前進させた（`advance-pins.cljs` → `verify-west-pins.cljs` で 28/28 fast-forward 検証済み）。ADR-2608123000 の「license sweep の後ろで manifest が進まなかった」を繰り返さないため。"}]
+- 28 pin を前進させた（`advance-pins.cljs` → `verify-west-pins.cljs` で 28/28 fast-forward 検証済み）。ADR-2608123000 の「license sweep の後ろで manifest が進まなかった」を繰り返さないため。
+
+## 8. 分割と索引面（2026-08-19 追記、同日実施）
+
+**omnibus 1 件では見つからない。** TDCommons は**レコード単位で title / abstract を索引**するので、
+6,400 語 1 本では検索にほぼ当たらない。10 件に分割した（`tdcommons/DP-2026-001-NN-<slug>.{md,pdf}`、
+各々自己完結・英語本文 + 中文摘要）。CJK が tofu ではなく**抽出可能な実グリフ**であることを
+`pdftotext` で実測した（潰れていれば検索不能になるので、目視でなく機械で確かめた）。
+
+**さらに、アカウント不要で TDCommons と同じ到達性を得る経路を実装した。**
+`https://com-junkawasaki.github.io/prior-art/` を GitHub Pages で公開し、各レコードに
+**Google Scholar の `citation_*` meta**（`citation_title` / `citation_author` /
+`citation_publication_date` / `citation_pdf_url`）と Dublin Core、`description`、`keywords` を付けた。
+**Scholar はこの meta で索引し、Scholar が Google Patents の非特許文献コーパスを供給する** ——
+審査官が実際に検索するのはそこである。加えて中文セクション・sitemap.xml・robots.txt。
+IndexNow で Bing / Yandex に 12 URL を送信（202 / 200）。
+
+**serve されている meta と中文を実測で確認した**（`curl` して grep）。Pages が live になったことも
+polling で確認しており、`gh api` が 200 を返したことを live の証拠にしていない。
+
+## 9. アカウント登録は agent 側でできない（2026-08-19、境界の記録）
+
+オーナー質問「claude work で取得、アカウント登録は進められないの?」。**できない。**
+安全床①（認証情報を自分でフォーム入力しない）に該当する —— アカウント作成はパスワードを決めて
+フォームに打ち込む行為そのものである。kagi / Keychain を狙い撃ちで確認したが
+（`zenodo` / `software-heritage` / `tdcommons` / `orcid`）いずれも未登録。**keychain の総当たりはしない**（安全床⑦）。
+
+**詰まっているのはそこだけである。**
+
+| 作業 | 誰が |
+|---|---|
+| アカウント作成・パスワード入力・メール認証 | **オーナーのみ** |
+| ログイン済みブラウザでの投稿フォーム操作（PDF アップロード、title/abstract 入力） | **agent 可**（credential 入力ではない） |
+| token を kagi / Keychain に置いた後の API 全自動化（Zenodo / SWH） | **agent 可**（安全床①の credential 専用ツール経路） |
+
+したがって最小のオーナー作業は「1 回ログインする」または「token を 1 つ kagi に入れる」であって、
+10 件の投稿作業そのものではない。"}]
