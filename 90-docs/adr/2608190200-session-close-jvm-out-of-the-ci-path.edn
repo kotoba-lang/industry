@@ -76,32 +76,75 @@ kotobase-peer は gate を持たない（手元 nbb で 222 / 682、修正前 22
    だけと判明（単一束縛・letfn 本体から・直接呼び出しは動く）。広い方のままなら
    `kotobase-peer` の本番 `hydrate-db` を「直し」に行っていた（実測では正しく db を組む）。
 
+## detector の 13 件は全部閉じた（2026-08-19、closing 後の続き）
+
+**`verify-silent-js-callbacks` は 0 findings。** 直す前に「なぜ 6 複製が在るのか」を
+問うたのが効いた —— **6 複製の実体は 3 repo・4 ファイル**だった。
+`net-kotobase/control-plane` と `network-awai/net-kotobase` は**同じ GitHub repo**
+（id 1258823862、org 改名によるリダイレクト）の二重 checkout で、後者は west 未登録・
+324 commit 遅れ。**上流で既に直っている「幽霊」を 3 件報告していた。**
+
+| repo | commit | 修正前（nbb 実測） | 修正後 |
+|---|---|---|---|
+| kotobase-protocols-worker | `685b102` | async miss が retry されない | RETRIED |
+| kotobase-worker-shell | `acbfa89` | 同上 | RETRIED |
+| net-kotobase/control-plane（r2 ×2） | `2677b75` | 同上 | RETRIED |
+| kotobase-engine | `54ff90b` | 同上 | RETRIED |
+| net-kotobase/control-plane（worker.cljs） | `69b6a73` | **書き込みを実行せず pending claim を応答として返す** | ok/commit を返す |
+| network-awai/net-babiniku | `bf4311f` | `.then json!` が発火せず生 Response が下流へ | detector 0 件 |
+
+west pin は 5 件とも main tip と一致。
+
+**いちばん重い挙動は control-plane の冪等書き込み** —— 初回要求で `claim-absent!` が
+発火せず、**エラーではなく成功の形をした応答**（pending レコード）が返り、書き込みは
+起きない。`with-redefs` が効かず実際の書き込みが最後まで走ったので、修正後の証拠は
+むしろ強い。
+
+### 途中で測り直した 2 つの仮定
+
+- **自己参照は安全。** detector が `handle-job!` の自己参照を除外していたのは
+  *未測定の仮定*だったので測った —— 多束縛 letfn でも自己参照は発火する（除外は正しい）。
+- **`.then` の失敗モードは拒否ではなく「値の素通し」。** ハンドラが走らないと変換前の
+  値がそのまま下流へ行く。babiniku では生の Response が parsed body として扱われる
+  —— エラーにならない分たちが悪い。
+
+### detector 自身の 3 つ目の欠陥
+
+未登録 checkout を走査して幽霊を数えていた。**内容ハッシュでは重複除去できない**
+（登録側を直した瞬間に本当に別物になる）ので west 登録を基準にし、**飛ばした 253 tree を
+出力に明示**した（黙って減らすと今度は「測っていない」欠陥になる）。
+13 → 6 → 0、走査 32,741 → 29,429、自己検査 10/10。
+
 ## 残っている gap（優先順）
 
-1. **detector の 13 件（すべて `med`）が未修正。** うち **6 件は同一トランポリンの複製**
-   （`kotobase_r2.cljs:51` 系）。shadow ビルドなので今日は動くが、nbb へ移した日に静かに
-   消える。`net-babiniku/src/babiniku/ui/views.cljs` の 4 件は未確認。
+1. **`orgs/` 配下に west 未登録の checkout が 253 個**。うち 1 つは registered repo の
+   324 commit 遅れの写しで、detector に幽霊を出させていた。`west-orphan-audit` の領域。
 2. **`net-kotobase/engine` に gate が無い**（`file:` npm sibling を持つため構造的に不可）。
    live worker で biscuit 検証を持つのに自動検査が無い。
-3. **`:shadow-test` gate 種別は利用者ゼロ**になった（tick.cljs に残る dead code）。
-   engine が使えない以上、撤去か engine の依存形状の是正かを決める必要がある。
-4. **kotobase-server PR #33**（別セッションの rescue WIP）が exit 90 で赤。head に
-   `test/run_portable.cljs` が無いだけで、内容とは無関係。**他セッションの branch なので
+3. **`:shadow-test` gate 種別は利用者ゼロ**（tick.cljs の dead code）。engine が使えない
+   以上、撤去か engine の依存形状の是正かを決める必要がある。
+4. **検証手段を持たない repo がある** —— `kotobase-engine` の package.json は npm の
+   既定プレースホルダだけで（no test specified）、今回の修正は probe が唯一の検証。
+   `net-babiniku` の試験は API 側で、直した promise 鎖は通らない。
+5. **kotobase-server PR #33**（別セッションの rescue WIP）が exit 90 で赤。head に
+   `test/run_portable.cljs` が無いだけで内容とは無関係。**他セッションの branch なので
    触っていない。**
-5. 本セッション前半からの持ち越し: revocation set の**配布**（検証側は live、epoch/generation 未配線）/
-   biscuit **writer** は意図的に未実装 / `foundation-identity-didwebvh` repo 未作成 /
-   production 経路の移行（graph 選択と log 配置、オーナー判断待ち）。
+6. 本セッション前半からの持ち越し: revocation set の**配布**（検証側は live、
+   epoch/generation 未配線）/ biscuit **writer** は意図的に未実装 /
+   `foundation-identity-didwebvh` repo 未作成 / production 経路の移行（オーナー判断待ち）。
 
 ## 再開の一手
 
+detector は 0 件なので、次はここではない。優先度 1 の未登録 checkout を見るなら:
+
 ```bash
-nbb --classpath \".:scripts/nbb_compat\" scripts/verify-silent-js-callbacks.cljs --findings
+nbb scripts/west-orphan-audit.cljs --blocking
 ```
 
-6 件が同じトランポリンなので、直すのは 1 箇所を直して複製へ配るのではなく、**なぜ 6 つの
-copy が在るのか**を先に問う（`verify-vendored-copies` が別途この family を見ている）。
-修正の形は kotobase-server `15d44fc` の `ex-data-chain` + inline `fn` ラップ、
-試験の形は kotobase-peer `722fc00` の「async 腕を直接駆動する」テスト。
+同型の欠陥をこれから防ぐ側は landing 済み（`verify-silent-js-callbacks`、6 時間間隔）。
+**修正の形**は kotobase-server `15d44fc` の `ex-data-chain` + inline `fn` ラップ、
+**試験の形**は kotobase-peer `722fc00` の「async 腕を直接駆動する」テスト、
+**検証の形**は各 repo で「修正前に落ちること」を先に見せてから直すこと。
 
 ## 保全した他者の作業
 
