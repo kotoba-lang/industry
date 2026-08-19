@@ -1,0 +1,144 @@
+[{
+  :db/id -1
+  :adr/id "2608197200"
+  :adr/title "会計面 measured against MoneyForward, and the measuring was the weakest part"
+  :adr/status "accepted"
+  :adr/date "2026-08-19"
+  :adr/body "## What this session did
+
+Measured the cloud-itonami accounting plane against MoneyForward, then built
+what was missing, then found that the measuring was the least reliable part.
+
+### Landed on default branches
+
+| repo | before | after | note |
+|---|---|---|---|
+| cloud-itonami-isco-4311 | 129/429 | 219/904 | 元帳/仕訳帳, 検索要件, 消費税申告 |
+| cloud-itonami-isco-4313 | 115/599 | 239/1287 | 年末調整, 社会保険 |
+| keihi | 103/430 | 137/570 | handoff route, non-JP |
+| tehai | 94/348 | 138/672 | derives 消費税額等 |
+| shiharai-actor | 146/899 | 188/1280 | non-JP, E6 escalation |
+| taxlaw | 32/293 | 79/599 | [:eu] [:us], per-facet coverage, world denominator |
+| shohyo | 24/99 | 104/536 | IFRS module, 連結会計 |
+| shokyaku (new) | -- | 33/517 | 減価償却, registered in west |
+| psa | 41/96 | 62/159 | tax-category subtotals |
+| technology / iso3166 / cofog / unspsc / industry / occupation | JVM-only | portable | compiled-in registries |
+| kgraph / scene-author / rdf-canon / release / package-registry-ipfs / grammar / kotoba-actors / isic / net-isekai-gen / ongakuka | JVM-only | portable | |
+| kotoba-lang/edn | 4/31 | 12/89 | canonical text may not carry a raw control byte |
+
+### Findings a reader should not have to rediscover
+
+**消費税法 第二十九条 sets the national rate at 百分の七・八, not 百分の十.**
+消費税額等 includes 地方消費税. Using the invoice figure as the return's
+課税標準額に対する消費税額 overstates the national tax by about 28% on every
+return, and the return still adds up. Found by a consumer, recorded in
+taxlaw as `:rule/is-not` in the DATA, with the article quoted.
+
+**耐用年数省令 別表第十 is not 別表第八 doubled.** 6 years: 定額法 〇・一六七,
+doubled 〇・三三四, the table says 〇・三三三. Computing the 定率法 rate would
+be wrong in both directions.
+
+**Adding a jurisdiction nearly widened a pass.** `credit-support` gated on
+`covered?`, and `requires-qualified-invoice?` returns nil for an absent
+facet, so `(or (not needs?) ...)` was true. The first jurisdiction added
+without an invoice rule would have flipped every input-tax claim there from
+held to approved, and the diff would have been a data entry. Coverage is now
+per facet, and one layer deeper per QUESTION: [:eu] carries an
+electronic-transaction facet that answers a DIFFERENT question, and with a
+facet-presence gate an EU electronic invoice kept on paper reported as
+preserved.
+
+**ClojureScript has no distinct floating-point type.** `1.0` reads as `1`,
+`(integer? 1.0)` is true, `(str -0.0)` is `\"0\"`. `kotoba-script` was NOT
+ported because its emitter dispatches `integer?` before `Double`, so every
+whole-numbered f64 literal would compile to a BigInt literal -- silent
+miscompilation. The same hazard reached `rdf-canon`, where a canonicalizer
+produced two digests for one input.
+
+**A single NUL byte makes grep lie.** file(1) calls the file `data` and grep
+skips it silently: `grep -c foo <file>` prints nothing and exits 1, exactly
+what a file not containing `foo` does. 20 files across the workspace, all
+load-bearing bytes. Three were .kir.edn -- the canonical IR -- encoding the
+null-byte check itself.
+
+### The recurring defect, and where it landed this time
+
+A check that could not run returning what a check that ran and found nothing
+returns. Found in: a mutation harness that stranded a mutated file when
+killed; a permission check answering `push: true` for an archived repo; a
+scan whose grep was blind to the files it was scanning; a coverage figure
+with no denominator; `psa/invoice` summing 100,000 yen and 500 dollars into
+100500.
+
+**And in my own measurements, at least seven times**: `$?` read from a pipe's
+tail; gates.edn counted as 7 entries when the top level is a map and the 218
+entries are under `:repos`; a NUL sweep whose detector was broken by shell
+quoting and reported 0 of 65,961; three scans run against checkouts 115
+commits behind main. Counting is more fragile than the thing counted.
+
+### Canonical text
+
+`pr-str` and `clojure.pprint/pprint` both emit raw control bytes. The rule
+now lives in `kotoba.lang.edn/escape-controls` -- total, round-tripping,
+idempotent -- and is applied at the WRITER, because a gate finds these
+afterwards and leaves a window. Escaping cannot move a CID: identity is over
+the value, and the escape reads back as the same character.
+
+Proven closed for com-cloudflare: after `clojure -M:oracle-gen`, `git status`
+reports NO change to `resources/` -- the generator reproduces the
+hand-escaped artefacts byte for byte.
+
+**Not closed elsewhere.** `murakumo`'s generator and the scattered `pr-str`
+call sites in chie / aiueos / comfyui / dtn still emit raw bytes.
+
+### Where a live guard was deleted and called dead code
+
+A mutation emptying `literal-controls` reddened nothing, and the reasoning
+that pr-str already escapes 9/10/13 seemed to confirm the set was
+unreachable. That holds INSIDE a string literal and fails for the whitespace
+BETWEEN forms. Removing it turned a 16,250-character KIR artefact into one
+line with zero terminators and it stopped parsing. The mutation was right;
+the removal was wrong; both are recorded in the table rather than the note
+being quietly corrected -- a survivor explained away is worse than one left
+open, because the explanation is what gets read next time.
+
+## Resume point
+
+**Highest value first.**
+
+1. **Finish canonical-text normalization.** Three steps; 1 and 3 are done for
+   one path. Step 2 is open: `murakumo`'s oracle generator and the `pr-str`
+   call sites in `chie`, `aiueos`, `comfyui`, `dtn` still emit raw control
+   bytes. First command:
+   `grep -rn 'pr-str' orgs/kotoba-lang/{chie,aiueos,comfyui,dtn}/src`
+2. **Two NUL fixes are unlanded, patches saved** in the session scratchpad
+   under `patches/`, `git apply --check` clean:
+   `kotoba-lang/murakumo` (baseline red -- overlay-witness-write-test and
+   overlay-quic-driver-live-test are flaky localhost QUIC under load, never
+   green in four runs) and `kotoba-lang/kotobase-protocols-worker` (`:test`
+   build cannot compile at main -- `shadow-cljs.edn` never lists
+   `kotobase-block-codec`).
+3. **The NUL gate covers the superproject tree only.** The fleet ships one
+   repo's tree and `orgs/` is west-managed and absent from it. Child repos
+   have no equivalent check.
+4. **Fleet receipts lag every landing from this session.** The tick is alive
+   (`com.gftd.fleet-ci-tip-tick`, exit 0) so this is rotation, not failure --
+   but nothing landed here has been verified on a node.
+5. **The shared superproject checkout cannot be pulled**: four uncommitted
+   files belong to another session (`scripts/newsfeed-ingest.cljs`,
+   `scripts/query-dialect-bench/*`). Not mine to discard.
+6. **`kotoba-lang/cofog` is in `manifest/repos.edn` but the generator will
+   not emit it** into west.yml. Ruled out: basename collision, toplevel
+   mismatch, detached HEAD, remote name. A sibling in the same position does
+   emit. Not blocking -- nothing consumes it.
+7. **`etzhayyim/root` received a direct push to `main`**, bypassing its PR
+   gate, because that repo has a repo-local `push.default = upstream`. Clean
+   fast-forward of the one intended file. No other repo has that setting.
+8. **Two repos are archived and unpushable** (`cloud-itonami/oshikatsu`,
+   `gftdcojp/ai-gftd-isekai`); `oshikatsu`'s conversion is saved as a patch.
+   Note `gh api` reports `permissions.push: true` for archived repos.
+9. **Still zero repos**: 申告書 beyond 消費税 (法人税/所得税), マイナンバー,
+   クラウドBox. `shokyaku` left 別表第一/第二/第四 unread (654 rows, nested
+   細目 marked only by an empty cell) as `:reachable-not-read`.
+10. **The mutation harness exists in 8+ copies at 4 versions.** Extraction is
+    an ADR-sized decision; the table must stay per-repo."}]
