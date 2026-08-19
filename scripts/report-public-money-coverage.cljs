@@ -63,6 +63,39 @@
        " [?x \"source/dataset\" \"" a "\"] [?x \"company/houjin-bangou\" ?hb]"
        " (not-join [?hb] [?y \"source/dataset\" \"" b "\"] [?y \"company/houjin-bangou\" ?hb])]"))
 
+(def repos
+  "経路 -> committed projection を持つ checkout（west path の末尾）。"
+  {"gbizinfo" "orgs/com-junkawasaki/jp-go-gbiz-info"
+   "gyousei-review" "orgs/com-junkawasaki/jp-go-gyoukaku-review"
+   "kanpou-chotatsu" "orgs/com-junkawasaki/jp-go-npb-kanpou"})
+
+(defn declared
+  "committed ファイルの manifest が申告する**このファイルの件数**の合計。
+
+   ⚠ `:corpus/record-count` の意味は 1 つに固定されている必要がある。実測
+   2026-08-20、gbizinfo だけ「読んだ元ファイルの行数」を入れており、合計すると
+   1,035,804（実体 3,034）になった —— **key が 2 つの意味を持つ間、この照合は
+   成り立たない**。生成器と検査器を直してから、この検査を足した。
+
+   dataset 名で絞るのは、1 つの repo に複数 dataset が入るため
+   （jp-go-npb-kanpou は kessan / chotatsu / kaisan の 3 つ）。"
+  [ds]
+  (let [fsmod (js/require "node:fs")
+        dir (str (get repos ds) "/data")]
+    (when (.existsSync fsmod dir)
+      (reduce
+       (fn [acc f]
+         (let [lines (str/split-lines (.readFileSync fsmod (str dir "/" f) "utf8"))
+               head (first lines)]
+           (if (and (str/includes? (str head) ":corpus/manifest true")
+                    (str/includes? (str head) (str "\"" ds "\"")))
+             (+ acc (reduce + 0 (map #(js/parseInt % 10)
+                                     (map second (re-seq #":corpus/record-count (\d+)"
+                                                         (str/join "\n" (filter #(str/includes? % ":corpus/manifest true") lines)))))))
+             acc)))
+       0
+       (filter #(str/ends-with? % ".datoms.edn") (js->clj (.readdirSync fsmod dir)))))))
+
 (let [queries (concat (map count-q datasets)
                       (mapcat (fn [[a b]] [(shared-q a b) (only-q a b)]) pairs))
       answers (run-all queries)
@@ -87,8 +120,26 @@
       (println (str "FINDING\thigh\troute-silent:" d
                     "\tthe plane answers 0 companies for this route —— projection emptied,"
                     " or the loader is pointing at a path that moved"))))
+  ;; ---- ファイルが申告する件数と、面が実際に載せた件数 ----
+  ;;
+  ;; **経路が痩せても 0 にならなければ上の検査は黙る。** 実測で 2 回踏んだ形:
+  ;; tier の既定から外れて載らない（closures）、loader が移動したパスを見続ける
+  ;; （yabai）。committed の申告と突き合わせれば、どちらも「載っていない」と言える。
+  (let [loaded (into {} (map (fn [[d n]] [d n])) counts)]
+    (doseq [[d _] counts
+            :let [dec* (declared d)
+                  ;; 面の側は entity 数（manifest 行を含む）ではなく**レコード数**で
+                  ;; 比べる必要があるが、この report が持つのは会社数（distinct）。
+                  ;; したがって「申告 > 0 なのに会社 0」だけを見る —— 会社数と
+                  ;; レコード数は別物なので、差の大小は言わない。
+                  ]
+            :when (and dec* (pos? dec*) (zero? (get loaded d 0)))]
+      (println (str "FINDING\thigh\tdeclared-but-not-loaded:" d
+                    "\tcommitted files declare " dec* " record(s) but the plane answers 0 company —— "
+                    "the loader, the tier default, or the west path is wrong"))))
+
   ;; **走った証拠**。0 経路を走査して「異常なし」と言わせない。
   (println (str "SCANNED\t" (count datasets) "\troutes\t"
-                (str/join " " (map (fn [[d n]] (str d "=" n)) counts))))
+                (str/join " " (map (fn [[d n]] (str d "=" n "/declared=" (declared d))) counts))))
   (println "\n(0 means measured-and-disjoint; a query that could not run exits 2)")
   (js/process.exit (if (some (fn [[_ n]] (zero? n)) counts) 1 0)))
