@@ -1,0 +1,148 @@
+[{:db/id -1
+  :adr/id "2608197300"
+  :adr/title "Hermes は起動時に鍵を問い、無ければ DID で名乗る — 3 状態、biscuit 委譲、drop-in plugin"
+  :adr/status "accepted"
+  :adr/date "2026-08-19"
+  :adr/body "## Context
+
+`hermes-agent` を起動して分かったこと（2026-08-18 実測）: Desktop は何も聞かずに
+使えるのに、`cloud-itonami-app` は sign-in を要求する。差は厳しさの好みではなく、
+**この機械の上に主体が何人いると数えているか**にある。
+
+- `hermes_cli/web_server.py:640` の `should_require_auth` —
+  `host == loopback → False (no auth — local-only, trusted operator)`
+- `cloud-itonami-app/README.md` —
+  *a process listening on `127.0.0.1` is close rather than trustworthy*
+
+Hermes が持っているのは 2 つだけで、どちらも**人を名指ししない**: ファイル所有権
+（`~/.hermes` 0700 / `.env` 0600）と、プロセス生存期間のランダム token
+（`_resolve_session_token()`、Desktop が `HERMES_DASHBOARD_SESSION_TOKEN` で子プロセスへ注入）。
+
+実測（Desktop の backend, 127.0.0.1:54550、token 無し）: `/api/status` 200 /
+`/api/health` 200 / `/api/config` 401 / `/api/sessions` 401。機微 API は塞がっているが、
+token の出所が env である以上、境界の強さはファイル所有権と同じ。**identity が無いのでは
+なく、identity が要る場所まで行っていない**（loopback を離れれば同じコードが OAuth か
+パスワードを要求する）。
+
+⚠ **この ADR の初版（2026-08-19 朝）は device delegation に CACAO を使うと書いていた。**
+repo-wide の既定 **ADR-2608180200（delegation の中心は biscuit、決定器は増やさない）**に
+反するので同日中に改めた。CACAO は消えず、**human consent / session の起点**という
+別の役割で残る。
+
+## Decision
+
+### 1. 起動時の状態は 3 つで、2 つではない
+
+`key が無い = 初回` と畳んではならない。畳むと端末ごとに別人が生まれ、「同期」という語が
+意味を失う（端末 A と B が別人なら、同期ではなく共有）。
+
+| 状態 | 条件 | serve |
+|---|---|---|
+| `:key-present` | device key + 生きた委譲 | `:full` |
+| `:mint` | identity がどこにも無い | `:public-only` |
+| `:link` | identity は在るが、この端末が未認可 | `:public-only` |
+| `:undecidable` | **まだ誰も答えていない** | `:public-only`、人に聞く |
+
+4 番目が肝。「他所に identity が在るか」はこの機械が持つ事実ではないので導出できない。
+**答えられない問いを pass と同じ値で返さない**（ADR-2608136000）。
+
+### 2. 委譲は biscuit、判定は authority、人の同意は CACAO
+
+ADR-2608180200 の配分をそのまま使う。**新しい決定器を作らない。**
+
+| 面 | 形式 | この設計での役割 |
+|---|---|---|
+| delegation | **biscuit**（`org-biscuitsec`） | root → device の減衰付き委譲 |
+| decision | **`authority`** の `covers?` / `meet` | 保持権限が要求を覆うか（**唯一の判定器**） |
+| semantics | kotoba `lang/capability-semantics.edn` | `:cap/*` の意味論（core IR） |
+| human consent | CACAO | 人が居ることの証明・session の起点 |
+| lifecycle | **`identity.startup`**（新規） | 上の 3 つに触らず「名乗れるか」だけ決める |
+
+**biscuit を選ぶ理由はこの設計にとって決定的**: 検証に要るのは **root の公開鍵だけ**。
+だから同じ token を、ローカル backend も・リモート backend も・Worker も・他 actor も、
+秘密を配らずに検証できる。これが「持ち運べる名前」の実体。
+
+### 3. 鍵は 2 段
+
+**root identity key**（人、Ed25519 / `did:key`、kagi に保管）は端末の認可と高権限の
+consent にだけ使う。**device key**（端末ごと、Ed25519 / `did:key`）でエージェントが
+無人で署名する。端末認可 = root が device の公開鍵を `next-public-key` に置いた
+biscuit block。1 段にすると root 秘密鍵を全端末へ配ることになり、失効が「全部作り直し」
+になる。2 段なら失効は「その device 向けを再発行しない」で済む。
+
+**失効リストを新設しない** — ADR-2608180200 のとおり、委譲は biscuit が運び、失効は
+既存の generation（aiueos）/ epoch（kototama）面に乗る。
+
+### 4. Hermes への差し込みは plugin。fork しない
+
+`plugins/dashboard_auth/{basic,drain,nous,self_hosted}` の 5 番目。hook は
+`ctx.register_dashboard_auth_provider`。`self_hosted` が自ら *a pure drop-in plugin ...
+touches nothing in core auth/runtime/login* と書いているのと同じ形。
+
+| seam（`dashboard_auth/base.py`） | DID 実装 |
+|---|---|
+| `start_login` | challenge 発行（nonce, aud, exp） |
+| `complete_login` | 提示を検証 → `Session(user_id = did:key)` |
+| `verify_token` | bearer の biscuit → `TokenPrincipal(principal = did, scopes = grants)` |
+| `revoke_session` | 再発行を止める（新しい失効機構を足さない） |
+
+**検証は Python で書き直さない。** 書き直せば 2 つ目の決定器になる。plugin は nbb を
+subprocess で呼び、`biscuit.token/verify` → `biscuit.kotoba/->delegated` →
+`authority.chain/authorize` の既存経路を通す（実測: JVM 不要、`biscuit.ed25519` の
+cljs 分岐が `node:crypto` を使う）。
+
+## 現在地（2026-08-19）
+
+**landed**: `identity.startup`（`kotoba-lang/identity` @ `e3db2b4`、west pin 前進済み
+`1ccf13d`）。pure `.cljc`、zero-dep、repo の既存作法どおり。
+
+- nbb で 9 tests / 24 assertions / 0 failures（JVM 不要）
+- **両方向を確認**: `:undecidable` を `:mint` に畳む改変を入れると、その欠陥のために
+  書いたテストが 3 件赤くなる
+
+**端から端まで実測**（実 Ed25519、nbb、`scratchpad/startup-e2e.cljs`）:
+
+| # | 測ったこと | 結果 |
+|---|---|---|
+| 1 | root の**公開鍵だけ**で chain を検証 | true |
+| 2 | 攻撃者の root 鍵で同じ token | false |
+| 3 | device が root の知らない鍵で減衰 | `notes` が落ち `acme` だけ残る |
+| 4 | **権限を増やそうとした block** | 権限が**全部消える**（`[]`）。増やせないのではなく、試みると失う |
+| 5/6 | startup 状態 | `:key-present`/`:full`、`:undecidable`/`:public-only`/`ask=:mint-or-link` |
+| 7/8/9 | authority 判定 | in-scope=true、減衰済み=false、escalated=false |
+| 10 | 閉じた kind 集合の外 | 無視でなく `:grant/rejected` に出る |
+
+**未実装**: Hermes の `dashboard_auth/did` plugin、nbb verifier CLI、kagi への鍵保管、
+mint/link の UI 2 択、pairing 文字列の経路。
+
+**未着手だが意識的に保留**: `identity.startup` の `.kotoba` 決定核 + parity gate。
+`identity` は zero-dep 方針の repo で、compiler を足すのは別の決定
+（先例は `session_handoff_core.kotoba` と murakumo の parity test）。
+
+## 変わるもの / 変わらないもの
+
+**変わる**: 名前が端末を越える。監査に「誰が」が入る。loopback を離れても platform IdP
+無しで認証できる。同じ鍵で他 actor に名乗れる。
+
+**変わらない — ローカルの境界**。device key を無人で使える場所に置く以上、その OS
+アカウントを取れる者は agent として振る舞える。`cloud-itonami-app` の `agent_session.clj`
+が同じ結論に達している —— *Requiring a Passkey on top of that proves nothing extra*。
+**DID は局所的な壁ではなく、持ち運べる名前である。** 取り違えると「DID にしたから安全」
+という嘘になる。局所の壁が要るならそれは別の決定（署名ごとの user presence）。
+
+## Alternatives
+
+1. **root を passkey にする（itonami と同人格）** — user presence が付く代わりに、
+   委譲が「biscuit block の digest に対する WebAuthn assertion」になり検証器が 2 種類に
+   なる。**itonami と同じ人格を共有したいならこちら**で、その場合 Hermes は
+   「itonami が発行した委譲を検証するだけ」の consumer に縮む。着手前に owner が決める。
+2. **session token を即置換** — 鍵が壊れたとき自分の機械から締め出される。移行期は両方受ける。
+3. **`did:web` を identity にする** — DNS/TLS の運用が identity の前提になる。did:web は
+   **名前**であって identity ではない（CID = identity / IPNS head = naming、ADR-2608148200）。
+
+## 残る gate
+
+- 鍵が無い状態で機微 API が 401、鍵を入れて 200 に戻ることを**両方向**で見せる
+- **link を選んだのに mint される経路が無い**ことを test で固定する（landed: 上記 3 件の赤）
+- pairing 文字列が URL・ログ・redirect に出ないことを検査する
+"}]
