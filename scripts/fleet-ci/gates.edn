@@ -2425,6 +2425,13 @@
   ;; split before this landed: it read a sibling file and refused when it
   ;; could not, which would have been red here forever.
   {:name "org-biscuitsec" :gate :jvm-test :cd true}
+  ;; The third runtime, gated for the first time (:shadow-test, added to
+  ;; tick.cljs alongside this line). kotobase-server carries the CACAO and
+  ;; biscuit verification both live Workers embed and had no automated check
+  ;; at all. Measured 2026-08-19: it has no `file:` npm sibling and no
+  ;; :local/root, which is what makes it gateable where net-kotobase/engine
+  ;; is not -- that one has both, and the gate refuses them by name.
+  {:name "kotobase-server" :gate :shadow-test :script "test:cljs" :cd true}
   {:name "macaroon" :gate :jvm-test :cd true}
   ;; The decider both wires fold into. Gated because everything above now
   ;; depends on it and nothing was checking it.

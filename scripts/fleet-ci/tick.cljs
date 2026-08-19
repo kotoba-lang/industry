@@ -813,6 +813,43 @@
          "echo \"$out\" | grep -qE 'Ran [0-9]+ tests' || fail 'no test summary in output — refusing to report a pass' 93"
          "echo \"$out\" | grep -qE 'Ran 0 tests' && fail 'zero tests ran' 94"
          "echo \"FLEET-CI-EXIT: $code\""]
+        ;; `:shadow-test` — a suite whose runner is `shadow-cljs compile … && node …`.
+        ;;
+        ;; This is the third runtime this workspace ships to, and until now the
+        ;; only one with no gate: `:jvm-test` is meaningless for a `.cljs` suite
+        ;; and `:nbb-script` is the wrong shape. The note further up this file
+        ;; said so and stopped there, so two repos carrying live auth code —
+        ;; kotobase-server and net-kotobase/engine — had no automated check at
+        ;; all while being changed daily.
+        ;;
+        ;; It needs BOTH runtimes on the node (JVM to compile, node to run), and
+        ;; it refuses by name on the two dependency shapes a node cannot satisfy,
+        ;; because a fleet node holds ONE repo's tree: a `file:` npm dep on a
+        ;; sibling, and a `:local/root` sibling in deps.edn. Measured 2026-08-19:
+        ;; kotobase-server has neither and net-kotobase/engine has both, which is
+        ;; why only the first is registered.
+        :shadow-test
+        [(str "test -f shadow-cljs.edn || fail 'shadow-cljs.edn missing after extract' 90")
+         "test -f package.json || fail 'package.json missing after extract' 90"
+         (str "grep -q '\"file:\\.\\./' package.json"
+              " && fail 'npm file: dependency on a sibling — a node holds one repo tree' 96 || true")
+         (str "grep -q ':local/root' deps.edn 2>/dev/null"
+              " && fail ':local/root dependency on a sibling — a node holds one repo tree' 96 || true")
+         (str "export JAVA_HOME=" (or (:java-home node) "/opt/homebrew/opt/openjdk"))
+         "export PATH=$JAVA_HOME/bin:$PATH"
+         "npm install --silent >/dev/null 2>&1 || fail 'npm install failed' 95"
+         (str "for i in $(seq 1 900); do mkdir " dep-lock " 2>/dev/null && break;"
+              " [ -n \"$(find " dep-lock " -maxdepth 0 -mmin +20 2>/dev/null)\" ]"
+              " && rmdir " dep-lock " 2>/dev/null; sleep 1; done")
+         (str "out=$(npm run " (or script "test:cljs") " 2>&1); code=$?")
+         (str "rmdir " dep-lock " 2>/dev/null || true")
+         "echo \"$out\" | tail -25"
+         ;; Same floor as the other kinds: a build that compiled and ran nothing
+         ;; is not a pass, and the whole point of this file is that the two must
+         ;; not share an outcome.
+         "echo \"$out\" | grep -qE 'Ran [0-9]+ tests' || fail 'no test summary in output — refusing to report a pass' 93"
+         "echo \"$out\" | grep -qE 'Ran 0 tests' && fail 'zero tests ran' 94"
+         "echo \"FLEET-CI-EXIT: $code\""]
         :nbb-script
         [(str "cat > " remote-base "/gate-" name ".cljs <<'FLEET_CI_GATE_EOF'\n"
               script-body
