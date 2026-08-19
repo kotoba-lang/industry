@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 16546,
-  :pageviews-7d 9805,
-  :uniques-7d-sum 513,
+ {:requests-7d 16579,
+  :pageviews-7d 9815,
+  :uniques-7d-sum 520,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 36}
+  [{:path "/", :requests 39}
    {:path "/robots.txt", :requests 29}
    {:path "/favicon.ico", :requests 17}
    {:path "/js/app.js", :requests 14}
-   {:path "/feed/fork-stats.edn", :requests 12}
+   {:path "/feed/fork-stats.edn", :requests 13}
    {:path "/preview", :requests 8}
-   {:path "/assets.html", :requests 5}
-   {:path "/studio", :requests 5}],
-  :status-mix {:ok 2021, :client-error 28, :server-error 11},
+   {:path "/feed/index.edn", :requests 7}
+   {:path "/assets.html", :requests 5}],
+  :status-mix {:ok 2000, :client-error 28, :server-error 11},
   :channel-mix
-  {:channel 177, :probe 1336, :unclassified 508, :ok-total 2021},
+  {:channel 191, :probe 1295, :unclassified 514, :ok-total 2000},
   :window "24h"},
  :as-of "2026-08-19",
  :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx・channel-allowlist済): / 36 · /robots.txt 29 · /favicon.ico 17 · /js/app.js 14 · /feed/fork-stats.edn 12 | 4xx(probe) 1% · 5xx 1% · probe(200-fallback) 66% · unclassified 25%",
+ "上位 page (24h, 2xx/3xx・channel-allowlist済): / 39 · /robots.txt 29 · /favicon.ico 17 · /js/app.js 14 · /feed/fork-stats.edn 13 | 4xx(probe) 1% · 5xx 1% · probe(200-fallback) 65% · unclassified 26%",
  :signal
- "isekai.network 実測 16546 req/7d・513 uniques(日次和)・うち4xx probe 1%(24h)",
+ "isekai.network 実測 16579 req/7d・520 uniques(日次和)・うち4xx probe 1%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
