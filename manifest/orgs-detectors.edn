@@ -159,6 +159,30 @@
    :timeout-ms  1800000                  ; 30m -- ~6x the measured 5m runtime
    :writes   :none}
 
+  {:id       :verify-delegation-surfaces
+   :title    "authority decided outside the lattice"
+   :why      "ADR-2608180200, 2026-08-19: biscuit becomes the delegation centre and the
+              decider stays ONE -- kotoba-lang/authority. authority.scope's docstring
+              records what a second answer cost: covers? had been written once per URI
+              scheme and one copy stripped a trailing * and called starts-with?, so
+              kotoba://graph/alice* covered kotoba://graph/alice-evil. That copy is
+              fixed and nothing checks for the next one. Wiring 130 repos by hand is not
+              a plan; making the fleet able to answer where the decision is made is."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-delegation-surfaces.cljs" "--check" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 86400000                 ; 24h -- the shape changes slowly
+   :timeout-ms  1800000                  ; 30m -- 6x the measured runtime
+   :writes   :none
+   :measured "2026-08-19 on this machine: ~5m wall, 3,588 repos with a src/ tree, 1 file
+              matched and it folds into the lattice -- zero findings. `--self-test` is
+              what makes that zero readable: 5/5 cases, including the historical
+              cacao.core/covers? body, which the FIRST version of this scan did not
+              match. It reported zero findings then too. A detector that reports zero
+              and a detector that cannot see are the same output."}
+
   {:id       :verify-vendored-copies
    :title    "vendored copies vs the upstream they name"
    :why      "ADR-2608121000, 2026-08-12: six repos vendor pay/* and treasury/core.cljc
