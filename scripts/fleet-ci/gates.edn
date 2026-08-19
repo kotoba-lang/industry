@@ -2389,6 +2389,17 @@
   ;; fleet ships one repo's tree. deps.edn carries them as git deps, which
   ;; `ship-git-deps!` does deliver. Same suite either way (ADR-2608180100).
   {:name "tana" :gate :jvm-test :cd true}
+  ;; The delegation wires (root ADR-2608180200). Both are :jvm-test: their
+  ;; nbb runners need sibling checkouts on the classpath and the fleet ships
+  ;; one repo's tree, while deps.edn carries the same libraries as git deps,
+  ;; which `ship-git-deps!` delivers. org-biscuitsec's contract test was
+  ;; split before this landed: it read a sibling file and refused when it
+  ;; could not, which would have been red here forever.
+  {:name "org-biscuitsec" :gate :jvm-test :cd true}
+  {:name "macaroon" :gate :jvm-test :cd true}
+  ;; The decider both wires fold into. Gated because everything above now
+  ;; depends on it and nothing was checking it.
+  {:name "authority" :gate :jvm-test :cd true}
   {:name "org-apache-parquet" :gate :jvm-test :cd true}
   {:name "org-apache-arrow" :gate :jvm-test :cd true}
   {:name "org-apache-avro" :gate :nbb-test :classpath "src:test" :entry "test/run.cljs"
