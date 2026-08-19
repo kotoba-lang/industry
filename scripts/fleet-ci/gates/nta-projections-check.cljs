@@ -67,11 +67,16 @@
     (= 2 (:code result))
     (die! 92 "verify-projections could not answer (no data/*.datoms.edn, or a file it could not read)")
 
+    ;; ⚠ この分岐は `(pos? code)` より**手前**でなければならない。後ろに置くと
+    ;; 「検証器が起動できなかった」非 0 が「違反があった」として報告される ——
+    ;; 実測 2026-08-19、operator 機の npx が壊れていて同型の gate がそう言った。
+    ;; **走らなかったことと、走って違反を見つけたことは別の結論。** 床は最初から
+    ;; 在ったが、非 0 の分岐の裏にいて到達できなかった。
+    (nil? scanned)
+    (die! 93 "no SCANNED line in output — the verifier did not run; this is not a violation report")
+
     (pos? (:code result))
     (die! 1 "verify-projections reported violations")
-
-    (nil? scanned)
-    (die! 93 "no SCANNED line in output — refusing to report a pass")
 
     (zero? (js/parseInt (second scanned) 10))
     (die! 94 "zero projection files scanned")
