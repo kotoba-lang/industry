@@ -1109,6 +1109,51 @@
    :script "gates/docs-edn-check.cljs" :script-args ["--sub" "90-docs/adr" "--min" "1400"]
    :include-ext [".edn"] :min-files 1500 :cd false}
 
+  ;; cloud-itonami-app の 90-docs。**同じ gate、隣の repo、対象外だっただけ**。
+  ;;
+  ;; 2026-08-19、この repo に着地した 6 本の ADR のうち **2 本が EDN として
+  ;; 読めなかった**。heredoc の `\\"` はファイル上で「エスケープされた
+  ;; バックスラッシュ + 文字列を閉じる引用符」になり、そこで文書が切れる。
+  ;; 通った 4 本と通らなかった 2 本は git status・PR diff・ファイル一覧の
+  ;; どれでも同じ顔で、closing で reader を回すまで誰も気づかなかった。
+  ;; 上の root の entry は同じ不変条件を superproject に対して 1400 件で
+  ;; 課しており、隣の repo にそれが無かったのは判断ではなく欠落。
+  ;;
+  ;; 床は 2 段で、見る対象が違う。`:min-files 30` は **tarball 全体**の .edn
+  ;; （実測 37）に対する床で、`:include-ext` の絞り込みが壊れた tree を弾く。
+  ;; gate 側の `--min 6` は **90-docs 配下**（実測 8）に対する床で、`--sub` の
+  ;; 指定ミスや展開失敗で空を検査して「不正 0 件 = 合格」と報告するのを防ぐ。
+  ;; どちらも ratchet ではない —— ADR や設定を数本消しただけで赤くする意図は
+  ;; 無く、**空を緑と読ませない**ためだけの床。
+  ;;
+  ;; `:require-paths` は**使わない**。tick 側の照合対象は
+  ;; `git ls-tree -r --name-only` の出力、つまり**ファイルパスだけ**で、
+  ;; ディレクトリ名は決して一致しない。`["90-docs/adr"]` と書けば毎回 absent と
+  ;; 判定されて入力が拒否され、**一度も緑にならない gate** になる（実測 2026-08-20、
+  ;; 書いた直後に semantics を読んで気づいた）。単一の ADR ファイル名を書く手も
+  ;; あるが、ADR は増減し改名するので、その日から壊れるのを待つだけになる。
+  ;; 90-docs が丸ごと落ちた tree は gate 自身が root 不在で exit 90 を返す。
+  ;;
+  ;; `--strict-keys` を付けるのは、**parse が通ることは無傷を意味しない**から。
+  ;; 実測 2026-08-20: ADR 本文に引用符を 1 つ足すと文字列がそこで終わり、続く語が
+  ;; キーとして読まれ、次の引用符から新しい文字列が始まる。偶奇が合えば map も
+  ;; vector も閉じるので **reader は何事もなく値を返す** —— その値では
+  ;; `:adr/body` が数千字から 523 字に切り詰められ、`nothing` と `no-op` が
+  ;; キーになっていた。裸の parse 検査はこれを緑で通す。
+  ;;
+  ;; 手元で 5 通り実測（2026-08-20、`nbb` を直接呼ぶ。npx はこの laptop で
+  ;; 壊れている）: 無改変 8 件 exit 0 / **その日の 2 本と同じ壊し方で exit 1** /
+  ;; **parse は通るが構造が壊れた文書で exit 1（--strict-keys が無いと 0）** /
+  ;; tree 不在 exit 90 / 空 tree は床が拒否して exit 90。
+  ;;
+  ;; :cd false —— 読めるかどうかは repo の suite ではないので、これを根拠に
+  ;; pin を進めない。
+  {:id "itonami-app-docs-edn"
+   :name "cloud-itonami-app" :org "cloud-itonami" :gate :nbb-script
+   :script "gates/docs-edn-check.cljs"
+   :script-args ["--sub" "90-docs" "--min" "6" "--strict-keys"]
+   :include-ext [".edn"] :min-files 30 :cd false}
+
   ;; superproject の ADR identity gate。**:id が必要**（:name は org / tip 解決に
   ;; 使う repo 名のままにする必要があるので、識別子を分ける）。
   ;;

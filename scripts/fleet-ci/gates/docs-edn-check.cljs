@@ -35,6 +35,43 @@
             (if sub (path/join d sub) d)))
 (def min-files (js/parseInt (str (flag "--min" 50)) 10))
 
+;; --strict-keys — 「読めた」を「無傷」と読まないための追加検査。opt-in。
+;;
+;; `read-string` が throw しないことは、文書が壊れていないことを意味しない。
+;; 実測 2026-08-20: ADR の本文中に引用符を 1 つ入れると、そこで文字列が終わり、
+;; 続く語が **キーとして** 読まれ、次の引用符から新しい文字列が始まる。引用符の
+;; 個数の偶奇が合えば map も vector も閉じるので、**reader は何事もなく値を返す**。
+;; その値の keys は `(:adr/status :adr/id nothing :adr/body :adr/date no-op :db/id "\\")`
+;; で、`:adr/body` は数千字あるはずが 523 字に切り詰められていた。
+;;
+;; 壊れた文書と無傷の文書が同じ exit code を返す —— この repo が 1 日で 6 箇所
+;; 見つけた形そのもの。keys が全部 keyword かどうかは、それを 1 行で分ける。
+;;
+;; 既定は off。この gate は 3 つの repo が既に使っており、そちらの現在値を
+;; 測らずに厳しくすると、直すべきものが無いのに赤くなる。
+(def strict-keys (some? (some #{"--strict-keys"} args)))
+
+(defn- bad-keys
+  "SYMBOL keys anywhere in a parsed document. Empty is clean.
+
+  Symbols only, and that narrowing was measured rather than assumed. The first
+  version flagged every non-keyword key and reddened 8 of the superproject's
+  2,347 ADRs — of which 7 were legitimate: `\"p50\"`/`\"p95\"`, `\".clj\"`/`\".cljs\"`,
+  `\"stripe.com\"`, `0 1 2 3`. EDN maps take string and integer keys and this
+  corpus uses them on purpose; a check that calls those corrupt is a check
+  nobody will keep.
+
+  A bare SYMBOL in key position is different: it is what prose becomes when a
+  quote ends its string early and the reader carries on parsing the sentence as
+  structure. Measured across the same 2,347 documents, exactly one has symbol
+  keys — `commit-dag` and `|quad-store`, a table cell that bled into the
+  document — so the rule costs one true positive and no false ones."
+  [v]
+  (cond
+    (map? v) (concat (filter symbol? (keys v)) (mapcat bad-keys (vals v)))
+    (sequential? v) (mapcat bad-keys v)
+    :else nil))
+
 (def skip-dirs #{"node_modules" ".git" "archive" "dist" "target" ".shadow-cljs"})
 
 (defn edn-files [dir]
@@ -57,9 +94,17 @@
       bad (atom [])]
   (doseq [f files]
     (try
-      (let [s (str (fs/readFileSync f "utf8"))]
-        ;; 空ファイル・コメントのみは read-string が nil を返すのが正常。
-        (reader/read-string (str "[" s "]")))
+      (let [s (str (fs/readFileSync f "utf8"))
+            ;; 空ファイル・コメントのみは read-string が nil を返すのが正常。
+            v (reader/read-string (str "[" s "]"))]
+        (when strict-keys
+          (let [odd (distinct (bad-keys v))]
+            (when (seq odd)
+              (swap! bad conj
+                     [f (str "parses, but " (count odd) " symbol key(s) — "
+                             (str/join ", " (map pr-str (take 4 odd)))
+                             " — a quote inside a string ended it early and what "
+                             "followed was read as structure")])))))
       (catch :default e
         (swap! bad conj [f (ex-message e)]))))
   (println "edn files:" (count files) "unparsable:" (count @bad))
@@ -71,4 +116,5 @@
                  ") — extraction or path is wrong, refusing to report pass")
         (js/process.exit 90))
     (seq @bad) (js/process.exit 1)
-    :else (println "OK — all" (count files) "edn files parse")))
+    :else (println "OK — all" (count files) "edn files parse"
+                   (when strict-keys "and no symbol appears in key position"))))
