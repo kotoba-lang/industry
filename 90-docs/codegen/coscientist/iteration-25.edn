@@ -1,0 +1,81 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-25"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-25.edn"
+  :doc/date "2026-08-19"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "amu execution of prefix-argument count-loop with back-edge? false"
+  :coscientist/iteration 25
+  :coscientist/subject "kotoba-lang/amu aa77f569, isa-execution-test count-loop, kexe on judah"
+  :coscientist/action "port iteration-24 prefix arguments into amu; compile+execute n in {0,1,5,50} under with-redefs back-edge? false; keep production all-vreg; do not remove the predicate; do not implement cfg-liveness"
+  :coscientist/measured "judah Apple M4, load averages 1.62 1.66 1.58. isa-execution-test 18 tests / 688 assertions / 0 fail (was 671). Production policy [:all-vregs 8] both ISAs; production kexe n in {0,1,5,50} equals n, no KEXE_TRAP. Override live (pos? @calls): policy :call-live both ISAs; same kexe oracle on aarch64 and x86_64. west-pin amu 64e3380b. mir and native not moved."
+  :coscientist/refuted "that encodings completing the scanner (iteration 24) was the remaining execution gate. amu's copy still started with a preheader label, so its kexe was all-vreg only. Also that one green function licenses removing back-edge?: production still all-vreg by the guard, and the rest of the suite was not re-run under the override."
+  :coscientist/carries-forward "iteration-18: kernel_call* is not a conformance corpus; iteration-22: the corpus executes; iteration-23: production call+loop is still all-vreg by contract; iteration-24: the throw was :non-prefix-argument; ADR-2608136000 fourth form; :cfg-liveness remains false; :llvm-beaten remains false. Do not overwrite 04-24"
+
+  :doc/body
+  "# Codegen co-scientist, iteration 25
+
+Iteration 24 asked for amu execution of the prefix-argument count-loop
+with `back-edge?` false, or keep the guard. This file takes the first
+arm for that one function, and keeps the guard.
+
+Do not overwrite 04-24.
+
+## What ran
+
+amu's `call-and-back-edge-module` now puts `:gmir/argument` and
+`:gmir/constant acc0` before the preheader label, same as kotoba-mir
+iteration 24. Phi predecessors stay `:test.label/preheader`. The jump
+still sits in the preheader block.
+
+`a-call-and-a-back-edge-in-one-function-execute`:
+
+- production (no override): `[:all-vregs 8]` on both targets; kexe
+  n∈{0,1,5,50} equals n, no `KEXE_TRAP`
+- `with-redefs mir/back-edge?` → false: policy `:call-live` on both
+  targets; the same kexe oracle, compile inside the override;
+  `(pos? @calls)` so green is not an unapplied redef
+
+Judah: `isa-execution-test` **18 tests, 688 assertions, 0 failures**.
+Available ISAs: `[aarch64 x86_64]`. Slot count is not the claim.
+
+## What this is not
+
+Not predicate removal. One function executing on the scanner path is
+encodings plus kexe for that fixture, not a license to drop
+`back-edge?` for the suite. Production still all-vreg via the guard.
+
+Not cfg-liveness. Not a spill-across-back-edge measurement. Allocator
+code is unchanged (`ac14016d` / `69e364e`). deps.edn was not bumped.
+
+## Pins
+
+- amu `aa77f569c282e15e48d0d9c5825dcf19fddbf17b` (merge of
+  `agent/scanner-exec-count-loop`, feature
+  `a1baf555bb50a536d190cb243d017efe7afea561`).
+  west-pin `64e3380b6e82993f0943a750308287895083b7ed`
+- kotoba-mir not moved (`6ccc30eb4a90548c94bc62a912e91386197a069e`,
+  west-pin `0501c1bdd47159c4045630eb0d297ab1b1b384ec`)
+- kotoba-native not moved (`69e364edf3154aa8fdf7d87535ca73179b4d2716`)
+
+## Meta-review
+
+- **A scanner that completes as encodings is not a scanner that
+  executes.** Iteration 24's Next named this file. The fixture copy in
+  amu was still label-first.
+- **Keep the production assertion when the override goes green.**
+  Otherwise the guard's remaining job becomes unmeasured.
+- **Do not remove `back-edge?` against one function.** Wider amu
+  execution, or a spill across a back-edge, is a different measurement.
+
+## Next
+
+Remove `back-edge?` only against a wider amu execution run, or keep it
+and measure call + back-edge across a spill. `:cfg-liveness` is still
+false and is not this week's work. kotoba-mir / kotoba-native still do
+not execute compiled programs.
+
+Do not chase fused-srem, extra MOV, FMA, PGO, kototama optimizer, a
+timed `bench` export, or rematching leaf vs LLVM. Do not overwrite
+04-24. Do not claim LLVM beaten. Do not remove `back-edge?`. Do not
+implement cfg-liveness as a drive-by of this execution."}]
