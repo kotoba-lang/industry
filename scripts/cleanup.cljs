@@ -549,7 +549,17 @@
   (hr "子リポ survey: UNLANDED 判定（detached-HEAD + manifest-rev のみは通常状態）")
   (println "凡例: untracked=commit すらされていない / unpushed=push 未了 / nopr=push 済みだが PR 無し")
   (println)
-  (let [repos (->> (sh "find" "orgs" "-maxdepth" "3" "-name" ".git" "-type" "d")
+  ;; `.git` は **ディレクトリとは限らない**。linked worktree と、廃止済み plain
+  ;; submodule 時代の名残は `gitdir: …` と書かれた**ファイル**を置く。旧実装は
+  ;; `-type d` で絞っていたので、そういう checkout は survey から**丸ごと消えて
+  ;; いた** —— 0 件として数えられたのではなく、母集団に入っていなかった。
+  ;; 実測 2026-08-19: 該当 8 件。うち 7 件は clean だったが 1 件
+  ;; （orgs/kotoba-lang/kotoba、gitdir が .git/modules/orgs/com-junkawasaki/kotoba を
+  ;; 指す submodule 時代の残骸）は untracked=23 / dirty=10 の未着地 WIP を抱えており、
+  ;; UNLANDED 324 件のどこにも現れなかった。**「一覧に出ない」は「WIP が無い」では
+  ;; ない**（ADR-2608136000: 測れなかった検査が、測って問題が無かった検査と同じ値を返す）。
+  ;; 無効な `.git` を掴む危険は下の own-repo-root? が従来どおり弾く。
+  (let [repos (->> (sh "find" "orgs" "-maxdepth" "3" "-name" ".git" "(" "-type" "d" "-o" "-type" "f" ")")
                    :out str/trim str/split-lines (remove str/blank?) sort
                    (map #(subs % 0 (- (count %) 5)))
                    (filter own-repo-root?)
