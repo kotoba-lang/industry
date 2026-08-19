@@ -46,6 +46,7 @@
 (def fs (js/require "node:fs"))
 (def cp (js/require "node:child_process"))
 (def path (js/require "node:path"))
+(def os (js/require "node:os"))
 
 (def root (or (.-COM_JUNKAWASAKI_ROOT js/process.env) (.cwd js/process)))
 (def ledger (.join path root "90-docs" "kaizen" "kaiyu-kaizen.ledger.edn"))
@@ -54,13 +55,43 @@
 
 (defn- now [] (.toISOString (js/Date.)))
 
+(defn- land-ledger-line!
+  "台帳に足した 1 行を origin/main へ着地させる。
+
+  これが無いと loop の判断は共有 checkout の working tree にしか存在しない。実測
+  2026-08-19: 08-18 に書いた `:woke` 2 行（kotobase.net 17:27Z / itonami.cloud
+  23:34Z）が、main 同期のための stash に退避されたまま 1 日以上どのブランチにも
+  remote にも無く、issue-id で突き合わせるまで失われかけていることに誰も気づいて
+  いなかった。書くことと残ることは別である。
+
+  着地は best-effort。失敗しても loop は止めない —— 行は working tree に残るので
+  次の周が拾える。ただし **失敗を成功と区別して印字する**（沈黙で緑にしない）。"
+  [entry]
+  (try
+    (let [tmp (.join path (.tmpdir os) (str "kaiyu-ledger-" (.now js/Date) ".edn"))]
+      (.writeFileSync fs tmp (str (pr-str entry) "\n") "utf8")
+      (let [r (.spawnSync cp "nbb"
+                          #js ["scripts/ledger-land.cljs" "com-junkawasaki/root"
+                               "90-docs/kaizen/kaiyu-kaizen.ledger.edn" tmp]
+                          #js {:encoding "utf8" :cwd root :timeout 180000
+                               :stdio #js ["ignore" "pipe" "pipe"]})
+            st (or (.-status r) 1)]
+        (println (str "ledger-land: exit=" st " " (str/trim (str (or (.-stdout r) "")))))
+        (zero? st)))
+    (catch :default e
+      (println (str "ledger-land: failed to invoke (" (.-message e) ") — line stays local"))
+      false)))
+
 (defn- append-ledger!
   "Append-only. This is a measurement/event stream, not a document — the
   exception CLAUDE.md names for append-only files."
   [entry]
   (try
     (.mkdirSync fs (.dirname path ledger) #js {:recursive true})
-    (.appendFileSync fs ledger (str (pr-str (assoc entry :at (now))) "\n") "utf8")
+    (let [stamped (assoc entry :at (now))]
+      (.appendFileSync fs ledger (str (pr-str stamped) "\n") "utf8")
+      ;; 書いただけでは残らない。自分で着地させる。
+      (land-ledger-line! stamped))
     (catch :default e (js/console.error "kaiyu-kaizen-loop: ledger write failed" e))))
 
 (defn- run-tick []
