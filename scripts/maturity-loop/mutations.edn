@@ -1204,4 +1204,90 @@
      :file "appview/etzhayyim-wasm-animeka-an1m3k4x/wrangler.jsonc"
      :find "\"pg\": \"/Users/junkawasaki/etzhayyimcojp/etzhayyim-apps-etzhayyimcojp/node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/index.js\""
      :replace "\"pg\": \"./node_modules/pg/lib/index.js\""
-     :must-fail ["appview-cannot-be-built-from-this-repo"]}]}]}
+     :must-fail ["appview-cannot-be-built-from-this-repo"]}]}
+
+  {:repo "orgs/cloud-itonami/fm"
+   :label "fm —— seed が README の約束を果たすか、設計文書どうしが一致するか"
+   ;; 14 兄弟目。中身は seed script 1 本と設計文書 3 本で、mangaka-data と同じく
+   ;; 「テストする対象が無い」ように見える repo である。実際には 4 つのファイルが
+   ;; 互いに主張し合っており、**どれが破れても何も throw しない**:
+   ;;
+   ;;   README.md ── 6 つの公開ドメインと 6 つの collection を約束する
+   ;;   seed.ts   ── 165 レコードを PDS に書く（その約束を果たすはずのもの）
+   ;;   PROJECT.jsonld / actors/*.yaml ── 同じ 9 体の actor を二重に記述する
+   ;;
+   ;; テストは **実物の seed.ts を走らせる**（Node 26 が型を落とすのでそのまま
+   ;; 実行できる）。`fetch` を捕獲器に差し替えてあるのでネットワークには 1 本も
+   ;; 出ず、assertion は「実際に書かれるはずのレコード」をそのまま見る。写しを
+   ;; 置くと写しの方だけが正しいまま実物が腐るので、写しは持たない。
+   ;;
+   ;; putRecord は **rkey での upsert** なので、衝突は前のレコードを黙って消す。
+   ;; 要求は 165 本出て全部 200 が返り、seed は満額の件数を報告する ——
+   ;; **消えた分はどこにも数えられない**。それが :rkey-truncated が撃つ形。
+   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :green-marker "fm seed + blueprint: all green"
+   ;; 9 件とも 2026-08-19 に実際に赤くなるところを見た。8 つのテストは全て
+   ;; いずれかの mutation に名指しされている（名指しの無いテストを残さない）。
+   :mutations
+   [{:id :fm/domain-dropped-from-synthetic-kinds
+     :why "synthetic の種類を 1 つ間引く形。seed は変わらず『165 件書いた』と報告し、`coverage world --domain government_fund` だけが空を返す —— この repo の存在理由そのものが、成功に見える失敗として消える"
+     :file "seed.ts"
+     :find "  { slug: 'government', title: 'Development Finance Fund', fundKind: 'government_fund', strategy: 'development-finance', managerType: 'development-finance-manager', regulator: 'Ministry of Finance', sponsorPrefix: 'Public Investment Agency', currency: 'USD', metricType: 'aum', baseAum: 6200000000, baseCommitment: 0 },\n"
+     :replace ""
+     :must-fail ["every-public-domain-the-readme-names-is-actually-seeded"]}
+
+    {:id :fm/rkey-truncated-for-a-pds-limit
+     :why "**退行ではなく『対応』の形。** rkey 長の制限に合わせて切り詰めるのは自然な変更だが、prefix が共通なので全 id が同じ rkey に落ちる。upsert なので要求は全部 200、seed の件数報告も満額のまま、PDS には collection あたり 1 件しか残らない"
+     :file "seed.ts"
+     :find ".slice(0, 512);"
+     :replace ".slice(0, 24);"
+     :must-fail ["rkeys-are-unique-so-no-record-silently-overwrites-another"]}
+
+    {:id :fm/fund-renamed-without-updating-the-metric
+     :why "fund の id を改名して METRICS 側を直し忘れる形。孤児の metric が PDS に残り、fund グラフを辿った側が nil に当たる"
+     :file "seed.ts"
+     :find "    fundId: 'swf-norway-gpfg',\n    name: 'Government Pension Fund Global',"
+     :replace "    fundId: 'swf-norway-gpfg-2026',\n    name: 'Government Pension Fund Global',"
+     :must-fail ["every-reference-resolves-to-a-record-the-seed-also-writes"]}
+
+    {:id :fm/collection-renamed-without-updating-the-readme
+     :why "collection を改名して README を直し忘れる形。読む側は改名を知らないので、そこだけ永久に空に見える。**捕獲の床も同時に撃つ** —— investee が 0 件になると、その集合を歩く検査は空振りして緑になれてしまう"
+     :file "seed.ts"
+     :find "await putRecord('com.etzhayyim.apps.fund.investee', investee.investeeId, {"
+     :replace "await putRecord('com.etzhayyim.apps.fund.portfolio', investee.investeeId, {"
+     :must-fail ["readme-promises-the-collections-the-seed-actually-writes"]}
+
+    {:id :fm/actor-regenerated-in-only-one-document
+     :why "actor を作り直して suffix が変わり、2 つの設計文書のうち片方だけ更新する形。blueprint が実在しない actor を名指ししたまま composition の実装まで進む"
+     :file "actors/fund-management-actor-map.yaml"
+     :find "psn-isco-1211-treasury-manager-7df4q796"
+     :replace "psn-isco-1211-treasury-manager-9kk2wq31"
+     :must-fail ["the-blueprint-and-the-actor-map-name-the-same-actors"]}
+
+    {:id :fm/called-ratio-exceeds-the-commitment
+     :why "呼び出し比率を触って約束額を超えさせる形。金額としては不能だが型はどちらもただの number なので、突き合わせない限り NAV / metric の入力になる"
+     :file "seed.ts"
+     :find "calledAmount: Math.floor((650000000 + series * 55000000) * 0.7),"
+     :replace "calledAmount: Math.floor((650000000 + series * 55000000) * 1.3),"
+     :must-fail ["called-capital-never-exceeds-the-commitment"]}
+
+    {:id :fm/duplicate-investor-id
+     :why "投資家の id をコピペして直し忘れる形。rkey が同じになるので後の 1 件が前を上書きし、commitment の参照先も 1 つ消える"
+     :file "seed.ts"
+     :find "    investorId: 'lp-calpers',"
+     :replace "    investorId: 'lp-abu-dhabi',"
+     :must-fail ["ids-are-unique-within-each-collection"]}
+
+    {:id :fm/seed-script-renamed-in-the-project-file
+     :why "PROJECT.jsonld が指す seed script のパスが実体からずれる形。JSON としては正しいので、その宣言を読んで実行しようとするまで分からない"
+     :file "PROJECT.jsonld"
+     :find "\"etzhayyim:seedScript\": \"seed.ts\""
+     :replace "\"etzhayyim:seedScript\": \"seed-v2.ts\""
+     :must-fail ["the-project-file-points-at-a-seed-script-that-exists"]}
+
+    {:id :fm/synthetic-volume-cut-so-collections-go-thin
+     :why "**この suite の沈黙対策そのものを撃つ。** synthetic の本数を削ると全 collection が薄くなる。重複も孤児参照も『0 件』になるので、床が無ければ全検査が中身を見ないまま緑になる。件数の床がそれを捕まえることを確かめている"
+     :file "seed.ts"
+     :find "i < 24; i += 1"
+     :replace "i < 2; i += 1"
+     :must-fail ["every-public-domain-the-readme-names-is-actually-seeded"]}]}]}
