@@ -96,7 +96,20 @@
 (defn- allowed? [p]
   (some (fn [[suffix _]] (str/ends-with? p suffix)) allowed))
 
-(let [dir (or (first *command-line-args*) ".")]
+(defn- finding!
+  "FINDING<TAB>severity<TAB>key<TAB>detail — the orgs-detector protocol.
+
+  Emitted alongside the human-readable lines, not instead of them: this
+  script is BOTH a fleet gate over the superproject tree and an
+  orgs-detector over the child checkouts, and the two callers read different
+  things. The key is the path, so a finding is stable across reruns and a
+  file that gets fixed resolves rather than churning."
+  [severity key detail]
+  (println (str "FINDING\t" severity "\t" key "\t" detail)))
+
+(let [args (vec *command-line-args*)
+      findings? (some #{"--findings"} args)
+      dir (or (first (remove #(str/starts-with? % "--") args)) ".")]
   (self-test!)
   (when-not (fs/existsSync dir)
     (println "SCANNED\t0")
@@ -114,7 +127,12 @@
     (doseq [[p _] (sort-by first (or ok []))]
       (println (str "  allowed  " p)))
     (doseq [[p _] (sort-by first (or bad []))]
-      (println (str "  NUL      " p)))
+      (println (str "  NUL      " p))
+      (when findings?
+        (finding! "warn" p
+                  (str "raw control byte in source; grep is silent on this file "
+                       "-- `grep -c <name> " p "` prints nothing and exits 1, "
+                       "which is what a file NOT containing that name does"))))
     (cond
       ;; evidence floor: 0 件走査は 0 件違反ではない。
       (zero? scanned)
