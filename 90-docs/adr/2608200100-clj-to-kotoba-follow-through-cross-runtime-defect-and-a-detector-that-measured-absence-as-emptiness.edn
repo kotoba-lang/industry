@@ -1,0 +1,147 @@
+[{:db/id -1
+  :adr/id "adr-2608200100-clj-to-kotoba-follow-through-cross-runtime-defect-and-a-detector-that-measured-absence-as-emptiness"
+  :adr/title "resume point を実行した —— jvm-only 候補を調べたら .cljc の host interop が 25 errors を隠していて、mixed repo を見に行ったら私の detector が不在を空と測っていた"
+  :adr/status "accepted"
+  :adr/date "2026-08-20"
+  :adr/topic "kotoba-migration"
+  :adr/doc_type "adr"
+  :source/dataset "adr"
+  :adr/repos "kotoba-lang/kotobase-storage, kotoba-lang/kotobase-storage-pack, com-junkawasaki/root"
+  :adr/commits "kotobase-storage e52ddaa, kotobase-storage-pack 52130b9, root 6f06cd5 (pins), root e9f4af0 (census fix)"
+  :adr/authoritative_for ["why kotobase-storage must NOT be flipped from :jvm-test to :nbb-test, and that gates.edn already said so"
+                          "the defrecord-field-through-host-interop defect: 8 sites, 25 nbb errors, invisible to both suites"
+                          "that the census detector classified five unreadable files as empty, and how that was fixed"
+                          "what clock native-aot actually needs, measured: KEXE_TYPED_CLOCK_V1 is reserved in the loader enum with no validation and no dispatch"
+                          "which of the four mixed-shape repositories are legitimate and which was a symptom"]
+  :adr/related ["adr-2608191100-maturity-pass-on-the-five-kotoba-refactor-resume-points"
+                "adr-2608191000-kotoba-refactor-status-measured-and-claude-md-native-section-corrected"
+                "ADR-2608730000" "ADR-2608136000" "ADR-2608190200" "ADR-2607241100"]
+  :adr/body "
+## 訊かれたこと
+
+オーナー（2026-08-19→20）: ADR-2608191100 の「次」4 件に対して `do it`。
+
+## 着地したもの
+
+| commit | repo | 内容 |
+|---|---|---|
+| `e52ddaa` | kotobase-storage | defrecord のフィールドを keyword で読む（host interop を除去）+ 回帰 oracle 4 本 |
+| `52130b9` | kotobase-storage-pack | 同上 4 箇所 + 依存 pin 前進 |
+| `6f06cd5` | root | west pin 2 件前進 |
+| `e9f4af0` | root | census detector: 読めないものを「空」と測っていたのを修正 |
+
+## #2 — jvm-test 単独 59 本を調べたら、別の欠陥クラスが出た
+
+59 本のうち **nbb entry を既に持つのは 2 本だけ**（kotobase-storage / kotobase-storage-pack）。
+7 本は checkout が無く（gate はあるが west 未取得の gftd actor 群）、50 本は entry 無し。
+
+その 2 本を実際に両ランタイムで走らせたところ、**片方は移行候補ですらなく、
+もう片方は赤だった**。
+
+### kotobase-storage — フリップしてはいけない
+
+    JVM  clojure -M:test        63 tests / 206 assertions
+    nbb  test/run.cljs          22 oracle（async contract）
+
+**同じスイートではない。** フリップすれば検査が 63 から 22 に減る。しかも
+`scripts/fleet-ci/gates.edn` は**既にその結論を書いており**、私が測っていない
+理由まで持っていた —— `test/run.cljs` は `Ran N tests` 行を出さないので gate 自身の
+floor（exit 93）に弾かれる。**gate を足していれば恒久的に赤い gate を作っていた。**
+編集する前に読んだのが効いた唯一の理由である。
+
+### kotobase-storage-pack — README の主張が偽だった
+
+    JVM  clojure -M:test        35 tests / 157 assertions / 0 failures
+    nbb  npm run test:nbb       33 tests /  61 assertions / **25 errors**
+
+README.md は「**Identical numbers on JVM and nbb. The suite prints them on every run.**」
+と書いている。**数は毎回印字されていた。誰も突き合わせていなかった。**
+
+25 errors はすべて 1 つの形だった:
+
+    (.-stats store) / (.-cache store) / (.-tip store) / (.-state store)
+    → JVM では解決し、SCI では undefined
+    → @(.-tip store) が `No protocol method IDeref.-deref defined for type undefined`
+
+`defrecord` なので keyword アクセスが全ランタイムで正しく、コストも無い。
+該当 8 箇所（pack 4 + 上流 kotobase-storage 4）。
+
+**どちらのスイートもこれを捕まえられなかった。** JVM は壊れていないから緑、
+上流の async スイートはこの 3 関数を**一度も呼ばない**から緑。ADR-2608730000 の
+クラス（`.cljc` が 2 ランタイムを主張し、テストは 1 つでしか走らない）が、
+`(int c)` ではなく **host interop** の形で出た。
+
+修正後: nbb 33 / **149** / 0 errors、JVM 35 / 157 / 0。**2 つの合計は今も違い、
+それは正しい** —— 4 つ目の namespace `graphsync_replica_test.clj` は `.clj` なので
+JVM の directory scan が拾い、cljs runner は列挙しない。`.cljc` 3 スイートは一致した。
+
+上流には**この経路を走らせる oracle 4 本**を足した（既存 2 スイートが呼ばないから）。
+`snapshot` を 1 箇所 `.-` に戻すと exit 1、戻すと exit 0 で discriminate を確認済み。
+
+**測定を誤らせた副次的事実**: pack の nbb スイートは `@noble/hashes` を
+**superproject の node_modules から親ディレクトリ解決で拾っている**。worktree や
+fresh clone では 1 テストも走る前に `Cannot find module` で落ちる。commit message に
+記録したが未修正。
+
+## #3 — mixed 4 repo を見に行ったら、私の detector の欠陥が出た
+
+| repo | 実態 |
+|---|---|
+| `com-cloudflare-compat` | `kotoba/compat_core.kotoba`（source）+ `schema/cloudflare.kotoba`（DSL）。ディレクトリで既に分かれている。**正当** |
+| `com-stripe` | `schema/customer.kotoba` は **意図的な pilot port**（docstring が自分でそう名乗る）。schema/ に置かれているのが紛らわしいだけ。**正当** |
+| `kotoba-v2025` | `_archive/251006/` 配下の EDN データ群。**archive** |
+| `lab` | `lab.kotoba` が **git には在るがディスクに無い**（`git status` が `D lab.kotoba`） |
+
+最後の 1 件が detector の欠陥を露出させた。**`empty-or-comment-only` と分類していた
+5 件は、1 件も空ではなく、全部「読めなかった」ファイルだった。**
+`(catch :default _ 空文字)` が空文字を classifier に渡し、**不在を空として測っていた。**
+
+これは私が今日ずっと記録してきたクラス（ADR-2608136000 第 1 問）を、
+**その数時間後に自分が書いた detector でやった**ものである。
+
+    修正前  empty-or-comment-only=5  unreadable=(クラスが無い)
+    修正後  empty-or-comment-only=0  unreadable=5
+
+`:unreadable` を独立クラスにし、**全件が読めない tree は census ではなく壊れた tree**
+として exit 2 で拒否するようにした（合成ツリーで両方向確認済み）。
+
+## #1 — clock native。実装していない。何が要るかは特定した
+
+**`KEXE_TYPED_CLOCK_V1 = 4` は loader の enum に既に予約されている。**
+しかし `valid_typed_value` に case が無く、`checked_typed_cap_call` にも
+`id == 7` の分岐が無い。つまり cap 7 を native で呼ぶと **SIGILL で trap する。**
+この定数は dataspace(=5) を配線した commit `be2130e` が**枠だけ取って実装しなかった**
+もので、`kexe_loader_windows.c` には存在すらしない。
+
+したがって ADR-2608191100 の見積り「provider と実行証拠だけが無い」は**狭すぎた**。
+実際に要るのは:
+
+1. `valid_clock_request` / `valid_clock_result`（C、`tools/kexe_loader.c`）
+2. `clock_inject` 相当（`dataspace_inject` は 126 行）
+3. `kexe_loader_windows.c` への mirror
+4. guest fixture + break 付き `clock_native_aot_test.clj`
+5. kit の `:native-aot` を flip
+
+**やらなかった理由は 2 つで、どちらも「難しい」ではない。**
+
+- **kexe loader は TCB の C である。** 判断を含まない機構だけが C に許される
+  （ADR-2607241100 D6）。`dataspace_inject` という先例はあるが、レビュー無しに
+  他 repo の TCB へ C を書き足すのは、この作業の妥当な範囲を超える。
+- **決めるべきことが 1 つ残っている**: 決定的に実行される native プロセスで
+  clock は何を返すのか。`dataspace_inject` は決定的だが、wall clock はそうではない。
+  ADR 0073（production clock transport, real wall and monotonic sources）が
+  他 backend について既に決めている可能性が高く、**それを読んでから**着手すべきで、
+  推測で C を書く場所ではない。
+
+## #4 — `:implementation` 語彙の権威決定。決めていない
+
+ADR-2608191100 に 3 つの語彙を並べたところまでが私の担当で、**どれを正とするかは
+検査が取れる決定ではない**（`surface-status.edn` 自身がそう書いている）。動いていない。
+
+## 次
+
+1. ADR 0073 を読んでから clock native（loader C 2 関数 + windows mirror + break test）
+2. pack の `@noble/hashes` を親ディレクトリ解決に頼らない形にする
+3. `:jvm-test` 単独 57 本（59 − 上記 2 本）は entry が無い。1 本ずつ書くしかない
+4. `:implementation` 語彙の権威決定（オーナー判断）
+"}]
