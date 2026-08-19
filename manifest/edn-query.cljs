@@ -1162,9 +1162,18 @@
    jGrants（公募）とは別物である: あちらは「どんな補助金が在るか」、
    こちらは「誰が受けたか」。
 
-   ⚠ **今の artifact は公開の動作確認トークンで取った有界なサンプル**で、
-   manifest 行の `:source/token` がそれを言う（`:published-demo` / `:operator`）。
-   count が小さいのは「補助金が無い」ではなく「まだ 16 社しか引いていない」。"
+   **2026-08-19: 全件経路が入った。** `data/gbizinfo-zenken-*.datoms.edn` は
+   データダウンロード（5 ファイル・1,033,446 行）を面の法人番号 9,142 件で
+   絞ったもので、`gbizinfo-joined.datoms.edn`（REST API 経路、特許・職場情報・
+   資本金など bulk に無いもの）と**並存する**。名前がどちらの経路かを言う。
+
+   一致した 125,820 行のうち **125,144 行 (99.5%) は自治体**（交付金の受け手）
+   だったので、government tier は 1 団体 1 entity の集計に畳んである
+   （`:grant/summary? true`）。列挙すると 45 MB になり、面は**クエリのたびに**
+   それを load する。行は捨てていない —— corpus に在る。
+
+   したがって count が小さい aspect は「まだ引いていない」ではなく
+   「その aspect の実績がその会社に無い」を意味するようになった。"
   [next-tempid!]
   (let [files (->> ["jp-go-gbiz-info"]
                    (keep west-project-path)

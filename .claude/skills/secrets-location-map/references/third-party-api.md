@@ -158,3 +158,30 @@ curl -sS -g -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $K" \
   - `REALTIMEKIT_PRESET` — app 作成時に自動生成された preset 名を使う
     （`group_call_host` / `group_call_participant` / `group_call_guest` 等）。
     一覧: `GET /accounts/{acct}/realtime/kit/{app}/presets`。
+
+## gBizINFO（経済産業省）アクセストークン
+
+**API と bulk download の両方が同じトークンを要求する。** 国税庁の全件データは
+Application ID 不要だが、gBizINFO は違う（実測 2026-08-19）。
+
+| どこに | 名前 |
+|---|---|
+| macOS Keychain | service `gbizinfo-api-token`（`scripts/gbizinfo_refresh.cljs` と `collect_gbizinfo_zenken.cljs` が既定で見る場所） |
+| kagi（compartment `personal`） | item `GBIZ_TOKEN` |
+
+**環境変数名が 2 つある。** `GBIZINFO_TOKEN`（property の collector 2 本）と
+`GBIZ_TOKEN`（`scripts/mk1-jp-lead-enrich.cljs`）。`collect_gbizinfo_zenken.cljs` は
+両方＋Keychain を見る。新しいものを書くときは Keychain 経由にして、env は override
+としてだけ使う。
+
+⚠ **2026-08-19 まで、このトークンはどこにも「保管された」記録が無かった。**
+オーナーは共有した記憶があり、実際に過去セッションの transcript に残っていて、
+そこから回収して上の 2 箇所に入れた。**値を共有した時点で場所を書いていれば、
+1 セッション分の探索は要らなかった** —— この索引がある理由そのもの。
+
+申請（オーナー作業・約 2 分・self-serve）:
+https://content.info.gbiz.go.jp/api/index.html → 利用申請 → メールでトークン
+
+**失敗が 200 で返る。** トークン無しの POST は 200 と HTML（「ダウンロードには
+アクセストークンが必要です。」）を返すので、status code を成功判定に使わない。
+collector は Content-Disposition と ZIP magic を見る。
