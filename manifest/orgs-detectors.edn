@@ -159,6 +159,25 @@
    :timeout-ms  1800000                  ; 30m -- ~6x the measured 5m runtime
    :writes   :none}
 
+  {:id       :verify-error-provenance
+   :title    "errors classified from an exception that record none of it"
+   :why      "ADR-2608198100, 2026-08-19: CLAUDE.md question 3 of five -- 受け取ったエラー本文を
+              捨てていないか -- has been repo-wide mandatory since 2026-08-13 and was broken
+              THREE TIMES in one day, twice in code written that day by someone who had read
+              it. claude-bridge kept the HTTP status and dropped the body; parse-arguments
+              kept the error type and dropped the arguments; record-turn! kept the error type
+              and dropped the message. The third cost the most: 205 resident runs filed
+              :internal-error, 196 of them saying \"request timed out\", readable only by
+              walking 3,926 goal events -- and it hid a timeout fix that was already working.
+              Prose did not prevent the third instance after two, which is the workspace's own
+              argument for a hook rather than a sentence. Narrow by construction: it flags a
+              map literal that READS (ex-data ...) and stores no message/body/detail, so a
+              constant type like {:turn/error-type :bot/cancelled} is not a finding."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-error-provenance.cljs" "--findings"]
+   :cwd      :root
+   :findings :protocol}
+
   {:id       :verify-delegation-surfaces
    :title    "authority decided outside the lattice"
    :why      "ADR-2608180200, 2026-08-19: biscuit becomes the delegation centre and the
