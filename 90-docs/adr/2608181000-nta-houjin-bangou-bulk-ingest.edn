@@ -678,6 +678,36 @@ manifest に載せる —— 52 だけでは「閉鎖が少ない」とも「番
 commit は成功し、「43 件は未調査」という古い記述が landed した（次の commit で訂正）。
 **パッチが当たったことを確かめてから commit する。**
 
+### 21. 最後の手回し（全件の月次更新）を常駐化した
+
+官報 cell は日次、gBizINFO は週次、press-wire は日次 —— **全件だけが手回し**だった。
+「月次で足りる」は自動化しない理由になっていたが、その結果 projection は黙って古くなる:
+閉鎖 773,796 件は「この会社はまだ生きているか」に答える面なのに、先月の publish から
+切った答えを返し続けても**ファイルの見た目は健康なまま**である。
+
+`jp-go-nta-houjin-bangou/deploy/houjin-bangou-cell.cljs`（judah、日次で見る）。
+publish の日付は月によって動くので「毎月 N 日」に固定しない —— 変わっていなければ
+数秒で終わる。実装しながら 4 つ直した（どれも「黙って別のことをする」形）:
+
+1. **publish が同じなら何も書かない。** 切り直すと `:source/observed-at` だけが
+   動いた diff が毎月出て、**本当に変わった月の diff が埋もれる**。
+2. **「corpus が古い」と「projection が古い」を分ける。** 面に番号が増えただけの月は
+   corpus を作り直さない（20 分級）。
+3. **dry-run が「書いた物と違う物」を検査していた** —— projection を tmp に書きながら
+   repo の古いファイルを検査し、当然の赤を出した。検査した物と書いた物が違えば、
+   その赤も緑も何も言っていない。
+4. **範囲を広げない。** 番号源を repo 全体に広げた版は joined を 35 → 8,181
+   （government 込み）や 3,286（invoice 込み）に膨らませた。月次更新は「同じ相手を
+   新しい publish で引き直す」仕事で、**範囲の変更は決定**である。今は各 projection が
+   自分の持つ番号で切り直す（joined 36 / closures 52）。
+
+落ちる時は書かない: corpus が 5% 以上縮んだら止め、番号 0 件で止め、
+verify-projections が赤なら commit しない。**途中で切れた corpus から切った projection は
+「形の正しい、件数だけ足りないファイル」**で、一番検出しにくい壊れ方である。
+
+権限はこの repo 1 つの write deploy key。kickstart で発火を確認済み
+（last exit code = 0、"publish unchanged"）。
+
 ## Consequences / まだ無いもの（正直に）
 
 - **これは gBizINFO の代替ではない。** 交付実績・調達・決算期は**gBizINFO を読むことで**
@@ -690,8 +720,7 @@ commit は成功し、「43 件は未調査」という古い記述が landed �
 - **個人事業主は原理的に入らない。** 上記 unmatched 3 件はデータの欠落ではなく、
   この登録簿の定義そのもの。
 - **差分データ（日次）は未実装。** 更新は月次の全件再取得。
-- **常駐 cell になっていない。** GLEIF は murakumo ノードの `gleif-cell` が毎日押すが、
-  法人番号は今は手で回す。月次で足りるので優先度は高くない。
+- ~~常駐 cell になっていない~~ → **21 節で常駐化**（judah、日次で publish を見る）。
 - **dossier の `dossier.facts` にこの bulk 経路をまだ書いていない** — 同じ authority に
   2 つの経路が在ることが、あの catalog からは読めないままである。
 - **DNS/WHOIS は 190 ドメイン（URL を持つ会社）だけ。** 8,972 社のうち URL が
