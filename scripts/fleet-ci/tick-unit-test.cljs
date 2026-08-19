@@ -397,6 +397,27 @@
   (is (not (tick/unreachable-outcome? nil))
       "a check with no detail is not silently reclassified"))
 
+(deftest a-gate-that-cannot-run-here-is-not-a-verdict-either
+  ;; The tree ARRIVED; the node could not run the gate. `:cap :jvm`
+  ;; (ADR-2608198600) stops the misplacement, and this stops one that happens
+  ;; anyway from being written down as a defect in the repository.
+  (is (tick/not-a-verdict?
+       (str "exit 1 — workspace: /tmp/itonami-regen-x | "
+            tick/cannot-answer-sentinel
+            " issachar — the regeneration command needs `clojure`, which is not on this node"))
+      "an abstention is recognised")
+  (is (tick/not-a-verdict?
+       (str "exit 90 — ssh timed out | " tick/extract-fail-sentinel " levi"))
+      "and so is the case that came first")
+  (is (not (tick/not-a-verdict?
+            "exit 1 — bash: line 4: clojure: command not found | FLEET-CI: the regeneration command failed"))
+      "but the SHAPE of the old failure is not pattern-matched: a gate has to say
+       it is abstaining. Guessing from an error body would reclassify real
+       failures whose output happens to mention a missing tool")
+  (is (not (tick/not-a-verdict?
+            "exit 1 — SUMMARY: AddressSanitizer: heap-buffer-overflow | FLEET-CI-EXIT: 1"))
+      "and a genuine failure is untouched"))
+
 (deftest the-emitter-and-the-reader-share-one-spelling
   ;; Two spellings of this sentinel would fail open: the reader would stop
   ;; recognising the emitter, every unreachable run would go back to being
@@ -409,7 +430,12 @@
         "the command emits the constant the predicate reads")
     (is (tick/unreachable-outcome?
          (str "exit 90 — something | " tick/extract-fail-sentinel " issachar"))
-        "and the predicate accepts what that command would produce")))
+        "and the predicate accepts what that command would produce"))
+  ;; The abstention sentinel is emitted by GATE SCRIPTS, which are separate
+  ;; files shipped to the node, so nothing links the two spellings except this.
+  (let [gate (slurp-text "scripts/fleet-ci/gates/itonami-regenerate.cljs")]
+    (is (str/includes? gate tick/cannot-answer-sentinel)
+        "the gate that abstains spells it the way tick reads it")))
 
 (let [{:keys [fail error]} (run-tests 'tick-unit-test)]
   (when (pos? (+ fail error))
