@@ -1,0 +1,63 @@
+;; manifest/atproto-surfaces.edn — この艦隊が atproto に**書いている**面の登録簿。
+;; 手書き（正本）。`scripts/atproto-engagement-collect.cljs` の入力。
+;;
+;; ## なぜ登録簿が要るか
+;;
+;; 反応（like / repost / reply）は**自分の repo には無い**。他人の repo にあって、
+;; `subject.uri` でこちらを指している。だから「反応を読む」には、まず
+;; **自分がどの AT-URI を書いたか**を知っている必要がある。それを導出できる場所は
+;; 無い —— PDS は「この repo は誰のものか」を答えるが「この艦隊のものはどれか」は
+;; 答えない。ここがその答えを持つ。
+;;
+;; ## 測定 2026-08-19（この登録簿が生まれた日）
+;;
+;; **公開済み record はゼロだった。** pds.aozora.app は live（describeServer 200）で
+;; 9 repo を持つが、9 repo すべてが `listRecords` で空を返し、`describeRepo` も
+;; `collections: []` を返した。**2 つの独立に実装された method が一致**したので
+;; これは本物の空である。
+;;
+;; ⚠ 3 つ目の method で危うく誤読した。`com.atproto.sync.getRepo` は全 repo に対して
+;; **90 バイトを返し、2 repo の応答は sha1 まで同一**だった。CAR が空なのだと読み
+;; かけたが、中身は `{"error":"NotImplemented","message":"no stored client commit +
+;; SIGNING_PRIVATE_KEY unset"}` で、router（`aozora/pds/router.cljc`）に getRepo の
+;; 登録が無い。**「測れなかった」が「測って空だった」と同じ顔をしていた**
+;; （ADR-2608136000 の型）。だから下の :read-method は router に実装が在ることを
+;; 確認した method だけを挙げる。
+;;
+;; ## この面の状態（すべて実測 2026-08-19）
+;;
+;;   pds.aozora.app        live / 9 repo / **record 0**
+;;   pds.etzhayyim.com     **down**（Cloudflare 1033）
+;;   public.api.bsky.app   実ネットワークの appview。この艦隊は書いていない
+;;
+;; `shinshi-growth-actor` は `com.atproto.repo.createRecord` で書ける実装を持つが、
+;; その did:key repo は空で、launchd に常駐していない。**書ける実装が在ることと、
+;; 書いたことがあることは別の主張である。**
+
+{:policy "atproto-engagement/v1"
+ :measured "2026-08-19"
+
+ ;; 反応をどう読むか。面によって違う。
+ ;;
+ ;; :self-hosted — appview を持たない単独 PDS。like/repost は同じ PDS の他 repo に
+ ;;   record として在るので、全 repo の like/repost を列挙して subject.uri で突き合わせる。
+ ;;   ⚠ この PDS の外から来た反応は**構造的に見えない**。0 を「反応が無い」と読まないこと。
+ ;; :appview — 集計済みの likeCount / repostCount / replyCount を返す面。
+ :surfaces
+ [{:id :aozora
+   :pds "https://pds.aozora.app"
+   :read-method :self-hosted
+   :read-method-evidence "listRecords / describeRepo / listRepos は aozora/pds/router.cljc に handler が在る。getRepo は無い（NotImplemented）"
+   :owns :all-repos
+   :note "この艦隊自身の PDS。2026-08-19 実測で record 0。"}
+
+  {:id :bsky-public
+   :appview "https://public.api.bsky.app"
+   :read-method :appview
+   :read-method-evidence "app.bsky.feed.getPostThread は likeCount/repostCount/replyCount を返す（実ネットワークの公開 API）"
+   :owns []
+   :note "この艦隊はまだ実ネットワークに書いていない。:owns に DID が入るまで、ここは 0 件を返すのが正しい。"}]
+
+ ;; 反応が指しうる collection。増えたらここに足す。
+ :engagement-collections
+ ["app.bsky.feed.like" "app.bsky.feed.repost" "app.bsky.feed.post"]}
