@@ -746,7 +746,28 @@
  ;; makes it visible and dated. The verifier prints EXCEPTION for each and keeps
  ;; going; without an entry the edge is a hard failure. Every entry must name
  ;; what would resolve it. Delete the entry when the edge is gone.
- :exceptions []
+ :exceptions
+ [;; Found 2026-08-19, and found only because the declaration was corrected.
+  ;; kotoba-lang/provider carried kgraph in production :deps without listing it
+  ;; in :depends-on, so assert-role-direction! never saw the edge -- an
+  ;; undeclared dependency is invisible to the rule that would have forbidden
+  ;; it. The bookkeeping error was hiding an architectural one.
+  ;;
+  ;; The dependency is real and deliberate: provider/dataspace_kgraph.clj
+  ;; implements a kgraph-backed dataspace store behind the same guest ABI as
+  ;; the in-memory reference.
+  {:exception/from "kotoba-lang/provider"
+   :exception/to "kotoba-lang/kgraph"
+   :exception/since "2026-08-19"
+   :exception/why "provider.dataspace-kgraph is a kgraph-backed dataspace store
+                   shipped inside the generic provider repo, so the provider
+                   role reaches a library role."
+   :exception/resolved-by "Move provider.dataspace-kgraph into its own repo, the
+                           way provider-postgres and provider-transport already
+                           are -- one provider repo per backend. Then provider
+                           keeps only :contract/:runtime/:assurance edges and
+                           this entry is deleted. Not done here: that is a
+                           code move across repos, not a declaration fix."}]
 
  ;; Measured 2026-07-29 by scripts/verify-repository-roles.cljs --prefix-audit.
  ;; Recorded as a gap rather than fabricated: these repos carry a role prefix
