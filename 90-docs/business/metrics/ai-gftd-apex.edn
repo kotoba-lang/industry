@@ -1,26 +1,26 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 6913, "ai-gftd-chat-shell" 1229},
+ {"magatama-sh1n5h1x" 7022, "ai-gftd-chat-shell" 1229},
  :zone
- {:requests-7d 440740,
-  :pageviews-7d 9221,
-  :uniques-7d-sum 5319,
+ {:requests-7d 443572,
+  :pageviews-7d 9239,
+  :uniques-7d-sum 5348,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
   [{:path "/wp-content/themes/index.php", :requests 52}
    {:path "/ops.php", :requests 43}
-   {:path "/wp-content/admin.php", :requests 43}
    {:path
     "/wp-includes/sodium_compat/src/Core32/Curve25519/Ge/about.php",
     :requests 41}
-   {:path "/fpwch.php", :requests 41}
+   {:path "/wp-content/admin.php", :requests 41}
+   {:path "/fpwch.php", :requests 35}
    {:path "/puc.php", :requests 33}
-   {:path "/vc.php", :requests 33}
-   {:path "/4PJcpMFsD8B.php", :requests 32}],
-  :status-mix {:server-error 14002, :client-error 1853, :ok 2029},
+   {:path "/4PJcpMFsD8B.php", :requests 31}
+   {:path "/.env.couchdb", :requests 30}],
+  :status-mix {:server-error 14001, :client-error 1779, :ok 1943},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -33,10 +33,10 @@
   :last-charge-epoch 1604224274},
  :as-of "2026-08-19",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 78},
+ {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 79},
  :top-paths
- "上位 page (24h, 2xx/3xx): /wp-content/themes/index.php 52 · /ops.php 43 · /wp-content/admin.php 43 · /wp-includes/sodium_compat/src/Core32/Cu… 41 · /fpwch.php 41 | 4xx(probe) 10% · 5xx 78%",
+ "上位 page (24h, 2xx/3xx): /wp-content/themes/index.php 52 · /ops.php 43 · /wp-includes/sodium_compat/src/Core32/Cu… 41 · /wp-content/admin.php 41 · /fpwch.php 35 | 4xx(probe) 10% · 5xx 79%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 440740 req/7d・5319 uniques(日次和)・うち4xx probe 10%(24h)、workers 8142 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 443572 req/7d・5348 uniques(日次和)・うち4xx probe 10%(24h)、workers 8251 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
