@@ -246,6 +246,45 @@
       0
       (or (:vf.coverage/businesses (last (edn/read-string (slurp* f)))) 0))))
 
+(def ^:private inputs
+  [projection resource-projection recipe-projection cost-projection
+   price-observations])
+
+(defn- in-head?
+  "Is `p` present in HEAD even though it is not on disk?
+
+  This superproject is a cone-mode sparse checkout. A file outside the cone is
+  absent from the working tree and marked `S` (skip-worktree): `fs.existsSync`
+  answers false, and every check below then reports the projection as stale, or
+  the observations as absent. Both readings are wrong, and wrong in the
+  direction that manufactures findings out of a checkout setting.
+
+  Measured 2026-08-19, on this detector's first run through the tick: all five
+  inputs are present in `origin/main`, none is in the cone, and it emitted five
+  `high` findings -- every one an artefact. `90-docs/valueflows` is in nobody's
+  default cone, so this is the normal case, not an unlucky one."
+  [p]
+  (= 0 (.-status (.spawnSync cp "git" (clj->js ["cat-file" "-e" (str "HEAD:" p)])
+                             #js {:cwd repo}))))
+
+;; Admission. Asked before any check runs, because a check that cannot read its
+;; input must not get as far as having an opinion about it.
+(let [missing (remove #(exists? (path/join repo %)) inputs)
+      out-of-cone (filterv in-head? missing)]
+  (when (seq out-of-cone)
+    (println "SCANNED\t0\tvalueflows-binding")
+    (let [d (str (count out-of-cone) " of " (count inputs) " inputs are in HEAD but"
+                 " not in this working tree (cone-mode sparse checkout): "
+                 (str/join ", " out-of-cone)
+                 ". Refusing to report on projections this checkout cannot read"
+                 " -- run from a full checkout, or add 90-docs/valueflows to the"
+                 " cone with `git sparse-checkout add 90-docs/valueflows`.")]
+      (if findings-mode?
+        (println (str "FINDING\thigh\tcannot-answer-sparse-checkout\t" d))
+        (do (println (str "high cannot-answer-sparse-checkout -- " d))
+            (println "1 finding(s)"))))
+    (js/process.exit 2)))
+
 (check-projection!)
 (check-resource-projection!)
 (check-recipe-projection!)
