@@ -184,6 +184,14 @@ GitHub Actions ではない。
   要り、このワークスペースの token は持っていない**（push も Contents API も通らず、後者は
   403 でなく **404** を返すので「repo が無い」と誤読しやすい）。一方 **Actions の無効化は
   `repo` scope で通る** — 詰まっているのは「workflow ファイルを編集する」経路だけ。
+  ⚠ **ただしこの制約は remote の protocol 次第で、repo ごとに違う**（実測 2026-08-19）。
+  OAuth scope が効くのは **HTTPS remote への push** だけで、**SSH remote には効かない**。
+  同じ日に `kotoba-lang/amu`（remote が `git@github.com:`）へは workflow 変更が普通に
+  push でき、`kotoba-lang/kotoba`（`https://github.com/`）は
+  `refusing to allow an OAuth App to create or update workflow ... without workflow scope`
+  で弾かれた。後者は push 先に SSH URL を明示すれば通る（共有 checkout の remote 設定は
+  書き換えないこと）。**「この workspace では workflow を触れない」と一般化しない** ——
+  触れるかどうかは対象 repo の remote を見て決まる。
   org 単位の一括無効化（`PUT /orgs/{org}/actions/permissions`）は `admin:org` が要り、
   これも持っていない（実測 2026-08-05）。
 - **なぜ「動いていない CI」より「無い CI」の方がよいか。** 2026-07-30、com-junkawasaki と
