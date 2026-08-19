@@ -1202,7 +1202,18 @@
    **ここに無いのは「発信していない」ではなく「自社サイトに feed が無い」**。
 
    記事そのものはここに載らない。`kotoba-lang/newsfeed` が取得と台帳を持ち、
-   catalog の各 entry が `:company/houjin-bangou` を持つので記事を会社に戻せる。"
+   catalog の各 entry が `:company/houjin-bangou` を持つので記事を会社に戻せる。
+
+   同じディレクトリの `domain-facts.datoms.edn`（`:source/dataset` は
+   `domain-facts`）もここから載る。**3 つの出所を混ぜないこと**: `:registry/*` はレジストリの登録内容
+   （JPRS WHOIS / RDAP）、`:dns/*` は**こちらが引いて返ってきた**値、`:web/url` は
+   会社の自己申告。`:registry/created-on` は会社の設立日ではなく**ドメインを取った日**。
+
+   `:registry/name-agrees?` は、レジストリの `[組織名]` と法人番号側の商号が
+   同じ会社を指しているか。**false は誤りではない** —— グループ親会社がドメインを
+   持っている形が実在する（実測: 積水化学工業 / 積水武蔵化工、オリックス /
+   オリックス・レンテック）。`:registry/registrant-withheld?` は「レジストリが
+   答えなかった」ではなく「**個人名だったので載せなかった**」の印。"
   [next-tempid!]
   (let [files (->> ["company-web-presence"]
                    (keep west-project-path)
@@ -1652,29 +1663,51 @@
 ;; yabai の merged file は生成物（cf_sweep/rebuild-merged!）。query 面は point-in-time snapshot。
 ;; :access/* は envelope CID のみ（PII は暗号化済み・ADR-2605181100）。tadori は現状 sample のみ。
 
+(defn- cti-file
+  "yabai / tadori のデータファイルを **west に登録されている今のパス**から引く。
+
+   ⚠ 両 repo は `orgs/etzhayyim/com-etzhayyim-*` から `orgs/cloud-itonami/*` へ
+   移っている。loader は旧パスを見続けており、**ファイルが無いと黙って `[]` を
+   返していた** —— 面の上では「passive DNS は 1 件も無い」と、
+   「passive DNS を見に行けていない」が同じ顔をしていた（実測 2026-08-19、
+   1,072 domain / 1,005 pDNS record が載っていないことに誰も気付けなかった）。
+
+   だから今は**候補パスを全部見て、どれにも無ければ WARNING を出す**。"
+  [candidates label]
+  (let [fs (keep (fn [parts] (let [f (apply io/file root parts)] (when (.exists f) f)))
+                 candidates)]
+    (when (empty? fs)
+      (js/console.error
+       (str "edn-query: WARNING " label ": どの候補パスにもファイルが無い ("
+            (str/join " | " (map #(str/join "/" %) candidates))
+            ") — この dataset は load されない")))
+    (first fs)))
+
 (defn yabai-passive-dns-entities [next-tempid!]
-  (let [f (io/file root "orgs" "etzhayyim" "com-etzhayyim-yabai"
-                   "data" "passive-dns.merged.kotoba.edn")]
-    (if (.exists f)
-      (let [es (or (vector-of-maps-entities f) [])]
-        (when (empty? es) (warn-skipped! "yabai passive-dns.merged.kotoba.edn" [f]))
-        (for [e es]
-          (assoc e :db/id (next-tempid!)
-                 :source/dataset "yabai-passive-dns"
-                 :source/file (str f))))
-      [])))
+  (if-let [f (cti-file [["orgs" "cloud-itonami" "yabai-actor" "data" "passive-dns.merged.kotoba.edn"]
+                        ["orgs" "cloud-itonami" "yabai" "data" "passive-dns.merged.kotoba.edn"]
+                        ["orgs" "etzhayyim" "com-etzhayyim-yabai" "data" "passive-dns.merged.kotoba.edn"]]
+                       "yabai passive-dns")]
+    (let [es (or (vector-of-maps-entities f) [])]
+      (when (empty? es) (warn-skipped! "yabai passive-dns.merged.kotoba.edn" [f]))
+      (for [e es]
+        (assoc e :db/id (next-tempid!)
+               :source/dataset "yabai-passive-dns"
+               :source/file (str f))))
+    []))
 
 (defn tadori-threat-intel-entities [next-tempid!]
-  (let [f (io/file root "orgs" "etzhayyim" "com-etzhayyim-tadori"
-                   "data" "persisted" "tadori-threat-intel.tx.kotoba.edn")]
-    (if (.exists f)
-      (let [es (or (add-datoms-entities f nil :tadori/entity-id) [])]
-        (when (empty? es) (warn-skipped! "tadori threat-intel.tx.kotoba.edn" [f]))
-        (for [e es]
-          (assoc e :db/id (next-tempid!)
-                 :source/dataset "tadori-threat-intel"
-                 :source/file (str f))))
-      [])))
+  (if-let [f (cti-file [["orgs" "cloud-itonami" "tadori" "persisted" "tadori-threat-intel.tx.kotoba.edn"]
+                        ["orgs" "cloud-itonami" "tadori" "data" "persisted" "tadori-threat-intel.tx.kotoba.edn"]
+                        ["orgs" "etzhayyim" "com-etzhayyim-tadori" "data" "persisted" "tadori-threat-intel.tx.kotoba.edn"]]
+                       "tadori threat-intel")]
+    (let [es (or (add-datoms-entities f nil :tadori/entity-id) [])]
+      (when (empty? es) (warn-skipped! "tadori threat-intel.tx.kotoba.edn" [f]))
+      (for [e es]
+        (assoc e :db/id (next-tempid!)
+               :source/dataset "tadori-threat-intel"
+               :source/file (str f))))
+    []))
 
 ;; kakekomi (cloud-itonami/kakekomi) — 国外で犯罪被害に遭った渡航者の初動 corpus。
 ;; data/*.edn はいずれもトップレベルが entity map の vector なので vector-of-maps
