@@ -2417,14 +2417,22 @@
   ;; sibling checkouts (columnar, parquet, arrow) on the classpath and the
   ;; fleet ships one repo's tree. deps.edn carries them as git deps, which
   ;; `ship-git-deps!` does deliver. Same suite either way (ADR-2608180100).
-  {:name "tana" :gate :jvm-test :cd true}
+  ;; nbb, not the JVM. CLAUDE.md ranks the runtimes
+  ;; kotoba-wasm > clojurewasm > ClojureScript > nbb, with the JVM LAST, and
+  ;; these four were registered as :jvm-test for one reason: their nbb runners
+  ;; need sibling sources on the classpath and a node holds one repo's tree.
+  ;; `:ship-git-deps true` was already the answer to that (2026-08-18) and I
+  ;; had not read far enough up this file. Owner instruction 2026-08-19.
+  {:name "tana" :gate :nbb-test :classpath "src:test" :entry "run-nbb-tests.cljs"
+   :ship-git-deps true :cd true}
   ;; The delegation wires (root ADR-2608180200). Both are :jvm-test: their
   ;; nbb runners need sibling checkouts on the classpath and the fleet ships
   ;; one repo's tree, while deps.edn carries the same libraries as git deps,
   ;; which `ship-git-deps!` delivers. org-biscuitsec's contract test was
   ;; split before this landed: it read a sibling file and refused when it
   ;; could not, which would have been red here forever.
-  {:name "org-biscuitsec" :gate :jvm-test :cd true}
+  {:name "org-biscuitsec" :gate :nbb-test :classpath "src:test" :entry "run-nbb-tests.cljs"
+   :ship-git-deps true :cd true}
   ;; The third runtime, gated for the first time (:shadow-test, added to
   ;; tick.cljs alongside this line). kotobase-server carries the CACAO and
   ;; biscuit verification both live Workers embed and had no automated check
@@ -2432,10 +2440,15 @@
   ;; :local/root, which is what makes it gateable where net-kotobase/engine
   ;; is not -- that one has both, and the gate refuses them by name.
   {:name "kotobase-server" :gate :shadow-test :npm-script "test:cljs" :cd true}
-  {:name "macaroon" :gate :jvm-test :cd true}
+  {:name "macaroon" :gate :nbb-test :classpath "src:test" :entry "run-nbb-tests.cljs"
+   :ship-git-deps true :cd true}
   ;; The decider both wires fold into. Gated because everything above now
   ;; depends on it and nothing was checking it.
-  {:name "authority" :gate :jvm-test :cd true}
+  ;; authority already had an nbb entry (test/run_portable.cljs, 37 tests /
+  ;; 122 assertions — the same numbers the JVM gate reported). Registering it
+  ;; as :jvm-test was my misconfiguration, not a missing capability.
+  {:name "authority" :gate :nbb-test :classpath "src:test" :entry "test/run_portable.cljs"
+   :cd true}
   {:name "org-apache-parquet" :gate :jvm-test :cd true}
   {:name "org-apache-arrow" :gate :jvm-test :cd true}
   {:name "org-apache-avro" :gate :nbb-test :classpath "src:test" :entry "test/run.cljs"
