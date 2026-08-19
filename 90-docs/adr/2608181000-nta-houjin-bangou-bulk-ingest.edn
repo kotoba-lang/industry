@@ -480,6 +480,57 @@ pDNS 1,005 / indicator 746 / IP 履歴 441）、tadori-threat-intel 5。
 **passive DNS 側は `:domain/fqdn`、こちらは `:domain/name`** で、突き合わせるなら
 正規化を 1 本決める必要がある。今日はまだそれをしていない。
 
+### 15. 5 つのデータ repo を全部 gate した（cell が書くものを誰も見ていなかった）
+
+**gate カバレッジ 1/5 → 5/5。** 検証ロジックは各 repo 内の
+`scripts/verify-projections.cljs` が正本で、fleet gate は展開済み tree に対して
+それを呼ぶだけ（fleet 側と手回し側で別実装を持つと、片方だけ通る状態が黙って生まれる）。
+
+| repo | 何を検査するか |
+|---|---|
+| `jp-go-nta-houjin-bangou` | 既存（publish 鮮度・個人事業主の混入・件数） |
+| `company-web-presence` | 個人名の登録者・分母欠落・件数・メール混入 |
+| `jp-go-npb-kanpou` | **役職+氏名**の混入・90 日窓の不可視化・名寄せ分母 |
+| `jp-go-digital-jgrants` | 募集中 308 と全件 3,751 の混同・締切の時刻精度・申告と実数の一致 |
+| `jp-go-gbiz-info` | 列挙側と畳んだ側で**形が 2 つ**・分母 2 つ・publish sha256・指し先 |
+
+**壊し方は合計 16 通り試し、どれも狙ったメッセージが出ることを確認した**（壊し方を
+間違えた赤を「成功した実演」と読まないため）。全部**実ノード(judah)で両方向**を見て
+いる —— 手元で discriminate することと、配られた tree で discriminate することは
+別の主張であり、operator 機の npx は実際に壊れている。
+
+⚠ **`nta` gate の床は最初から在ったが、到達できなかった。** `SCANNED` 行が無ければ
+93 で落とす分岐が `(pos? code)` の**後ろ**にあり、検証器が起動できなかった非 0 が
+「違反があった」として報告されていた。順序を入れ替えた。**走らなかったことと、
+走って違反を見つけたことは別の結論。**
+
+### 16. 分母が artifact にしか無く、面から引けなかった
+
+`gbizinfo-zenken-government-summary.datoms.edn` は **manifest 行を 1 本も持って
+いなかった** —— 2,358 件の集計が 125,144 行の fold であることが、ファイルからも
+面からも読めない。生成器（`property` の `gbizinfo-zenken/summary-manifest`）を直して
+再生成した（**artifact を手編集しない**）。畳んだ側では分母が 2 つ要る:
+何社に畳んだか、何行を畳んだか。
+
+section ごとの sha256 は summary に**複製しない**（複製すれば必ず片方だけ古くなる）。
+`:corpus/sha256-recorded-in` で兄弟ファイルを名前で指し、**gate がその指し先の実在と
+section 網羅を検査する** —— 誰も読まない key は、機能が在るという嘘になる。
+
+**そしてもっと広い穴が出た。** manifest を足した直後に面へ問い合わせて **nil** が
+返った: `corpus-line-entities` は 1 行目を provenance の供給元として消費し、entity に
+していなかった。**分母が面から引けないなら、面の上では分母が無いのと同じ**で、
+12 dataset が同じ状態だった（`:projection/queried` / `:projection/matched-rows` /
+`:corpus/ambiguous-count` / `:projection/folded-rows` が全滅）。直した後は 1 クエリで出る:
+
+```text
+web-presence  194 / 1,040 queried      domain-facts 190 / 190
+kanpou-kessan ambiguous 171            kanpou-chotatsu ambiguous 45
+gbizinfo      folded 125,144 → 2,358 社
+```
+
+⚠ **したがって `[?e "source/dataset" X]` の件数はレコード数ではない** —— manifest 行の
+分だけ多い。レコードだけ数えるなら `(not [?e "corpus/manifest" true])` を足す。
+
 ## Consequences / まだ無いもの（正直に）
 
 - **これは gBizINFO の代替ではない。** 交付実績・調達・決算期は**gBizINFO を読むことで**
@@ -502,6 +553,7 @@ pDNS 1,005 / indicator 746 / IP 履歴 441）、tadori-threat-intel 5。
 - **配信サイトは PR TIMES 1 社だけ。** @Press・ValuePress・DreamNews は未着手で、
   `press-wire/distributors` に足す形は空いている。**PR TIMES に出さない会社は
   この面に現れない** —— 不在を「発表していない」と読まない。
-- **fleet gate が 5 つの新 repo のうち 1 つ（`nta-projections`）にしか無い。**
-  cell が書いたデータを検査するものが無い。
+- ~~fleet gate が 5 つの新 repo のうち 1 つにしか無い~~ → **5/5 完了**（15 節）。
+  残っているのは「1 度も緑になっていない gate」問題の一般形 —— 新しい 4 gate は
+  手元と judah で両方向を見たが、**fleet の tick が回して緑を記録するのはまだ**。
 "}]
