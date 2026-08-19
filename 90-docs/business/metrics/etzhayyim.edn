@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 12523, "etzhayyim-xrpc-proxy" 671},
+ {"etzhayyim-did-web" 12528, "etzhayyim-xrpc-proxy" 671},
  :zone
- {:requests-7d 49350,
-  :pageviews-7d 938,
+ {:requests-7d 49602,
+  :pageviews-7d 941,
   :uniques-7d-sum 2339,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/robots.txt", :requests 8}
-   {:path "/system-dynamics", :requests 7}
+  [{:path "/system-dynamics", :requests 8}
+   {:path "/robots.txt", :requests 8}
    {:path "/.git/config", :requests 3}
    {:path "/.git/HEAD", :requests 3}
    {:path "/actor/mimamori/did.json", :requests 2}
    {:path "/actor/tatara/did.json", :requests 2}
    {:path "/actor/projector/did.json", :requests 2}
    {:path "/actor/wakai/did.json", :requests 2}],
-  :status-mix {:server-error 1201, :ok 158, :client-error 1222},
+  :status-mix {:server-error 1151, :ok 171, :client-error 1165},
   :window "24h"},
  :as-of "2026-08-19",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 47, :error-5xx-pct 47},
+ {:window "24h", :probe-4xx-pct 47, :error-5xx-pct 46},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 8 · /system-dynamics 7 · /.git/config 3 · /.git/HEAD 3 · /actor/mimamori/did.json 2 | 4xx(probe) 47% · 5xx 47%",
+ "上位 page (24h, 2xx/3xx): /system-dynamics 8 · /robots.txt 8 · /.git/config 3 · /.git/HEAD 3 · /actor/mimamori/did.json 2 | 4xx(probe) 47% · 5xx 46%",
  :signal
- "etzhayyim.com 実測 49350 req/7d・2339 uniques(日次和)・うち4xx probe 47%(24h)、workers 13194 inv/7d"}
+ "etzhayyim.com 実測 49602 req/7d・2339 uniques(日次和)・うち4xx probe 47%(24h)、workers 13199 inv/7d"}
