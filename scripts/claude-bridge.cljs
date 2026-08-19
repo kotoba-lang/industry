@@ -292,6 +292,26 @@
                                   {:name (:name c) :arguments (or (:arguments c) {})}))
                               (:tool_calls obj)))})))
 
+(defn- upstream-status
+  "The HTTP status this failure should surface as, or nil for the 502 default.
+
+  A rate limit is not a server fault and must not be retried like one. The
+  weekly-limit 429 was arriving as 502 `upstream_error`, so hermes read it as a
+  transient blip and burned its three retries (2s, 6s) against a limit that
+  resets in DAYS -- measured 2026-08-19, 15 of them in one hour. Passed through
+  as 429, an OpenAI-compatible client raises RateLimitError instead, which is a
+  different exception the caller can actually route on.
+
+  Only 429 is translated. Everything else stays 502: 5xx and transport faults
+  really are ours to retry, and a 4xx about the CLI's own state would be a lie
+  if we blamed it on the caller's request."
+  [parsed]
+  (let [raw (:api_error_status parsed)
+        n (cond (number? raw) raw
+                (string? raw) (js/parseInt raw 10)
+                :else nil)]
+    (when (= 429 n) 429)))
+
 (defn spawn-claude
   "One CLI run. `content` is a vector of Anthropic blocks (text and images);
   `specs` is the caller's tool list, empty when there are none."
@@ -375,7 +395,8 @@
             ;; Report what the CLI actually said. Reading only `result` gave
             ;; "(no message)" on every real failure and made 10 errors
             ;; undiagnosable -- the reason was in the fields we dropped.
-            (finish {:error (str "claude reported an error"
+            (finish {:status (upstream-status parsed)
+                     :error (str "claude reported an error"
                                  (when-let [st (:subtype parsed)] (str " subtype=" st))
                                  (when-let [tr (:terminal_reason parsed)] (str " terminal_reason=" tr))
                                  (when-let [as (:api_error_status parsed)] (str " api_error_status=" (pr-str as)))
@@ -504,8 +525,12 @@
               (let [ms (- (.now js/Date) t0)]
                 (if (:error result)
                   (do (log "<- ERROR" model (str ms "ms") (:error result))
-                      (send-json res 502 {:error {:message (:error result)
-                                                  :type "upstream_error"}}))
+                      (let [status (or (:status result) 502)]
+                        (send-json res status
+                          {:error {:message (:error result)
+                                   :type (if (= 429 status)
+                                           "rate_limit_error"
+                                           "upstream_error")}})))
                   (do (log "<-" model (str ms "ms")
                            (str (count (str (:text result))) "B")
                            (str "calls=" (count (:tool-calls result))))
