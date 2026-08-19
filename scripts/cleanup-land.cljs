@@ -568,6 +568,78 @@
                          (str alias "/" sym)))))))
          distinct sort vec)))
 
+(defn- base-gitignore
+  "Text of the base ref's root `.gitignore`, read from the tree we are about to
+  commit onto -- deliberately NOT from the working tree.
+
+  `read-repo-source` prefers the working tree, which is exactly wrong here: the
+  stale copy is the thing being defended against. The blob sha already sits in
+  `base-blobs`, so this costs one extra API call and only for repos that still
+  have `:additive` candidates after the cheaper gates."
+  [slug base-map]
+  (when-let [sha (get base-map ".gitignore")]
+    (when-let [b64 (gh-str "api" (str "repos/" slug "/git/blobs/" sha) "--jq" ".content")]
+      (try (.toString (.from js/Buffer (str/replace b64 #"\s" "") "base64") "utf8")
+           (catch :default _ nil)))))
+
+(defn- base-ignore-gate!
+  "Keep `:additive` from landing files the BASE branch declares ignored.
+  -> [additive' ignored info]
+
+  ## Why the other gates do not cover this
+
+  Candidates come from `git status`, which honours the WORKING TREE's
+  `.gitignore`. In a west checkout that is routinely months behind, so a rule
+  added upstream is invisible locally and the build output it was written to
+  exclude keeps presenting as never-committed new work. `drop-already-landed`
+  cannot see it (the path is not in the base tree -- that is what ignoring
+  means) and `residue-gate!` only probes ignore status for paths a rename
+  killed. This is the same false argument those two gates exist to refute:
+  *not on main* does not mean *new work*.
+
+  Measured 2026-08-19, kotoba-lang/murakumo: the checkout is 35 commits behind,
+  and `kotoba/prices_core.kotoba.perf.mjs` plus its 4 inputs/manifest/provenance
+  sidecars (60 KB of `amu compile --target js` output) planned as `:additive ->
+  PR -> merge`. `origin/main`'s `.gitignore` has carried `/kotoba/*.perf.mjs`
+  and `/kotoba/*.perf.mjs.*` since 2026-08-18, added by an earlier cleanup
+  session for this exact symptom. Those five were the ONLY `:additive` files in
+  a 61-repo fleet plan, so without this gate the whole pass lands nothing but
+  build output. The repo tracks no other `.mjs` or `manifest.edn` under
+  `kotoba/`, and nothing in it references the artifact.
+
+  Dropped rather than demoted, on `residue-gate!`'s precedent: a repo declaring
+  a path ignored at its live address is the repo answering the question, so
+  nothing is lost by not landing it. The local file is never touched.
+
+  ## Limits, stated so a pass is not misread
+
+  Root `.gitignore` only -- nested per-directory ignore files in the base are
+  not fetched. `core.excludesFile` is lower precedence than an in-tree
+  `.gitignore`, so a local negation still wins; that is the conservative
+  direction (the file stays a candidate and a human sees it). When the base has
+  no `.gitignore`, or the blob cannot be read, the gate reports that it did not
+  run -- `:applied false` -- and never lets 'we could not check' print like
+  'nothing to drop' (ADR-2608136000)."
+  [dir slug base-map additive]
+  (cond
+    (empty? additive) [additive [] {:scanned 0 :applied false :reason :no-candidates}]
+    (not (contains? base-map ".gitignore"))
+    [additive [] {:scanned 0 :applied false :reason :base-has-no-gitignore}]
+    :else
+    (if-let [txt (base-gitignore slug base-map)]
+      (let [tmp (str "/tmp/cleanup-land-base-gitignore-" (hash slug) "-" (hash txt))
+            _ (.writeFileSync node-fs tmp txt)
+            ignored (into #{}
+                          (filter (fn [p]
+                                    (zero? (:exit (sh "git" "-C" dir
+                                                      "-c" (str "core.excludesFile=" tmp)
+                                                      "check-ignore" "--no-index" "-q" "--" p)))))
+                          additive)]
+        (try (.unlinkSync node-fs tmp) (catch :default _ nil))
+        [(vec (remove ignored additive)) (vec (filter ignored additive))
+         {:scanned (count additive) :applied true}])
+      [additive [] {:scanned 0 :applied false :reason :gitignore-blob-unreadable}])))
+
 (defn- unresolved-refs-gate!
   "Keep `:additive` from landing code whose references do not resolve.
   -> [additive' unresolved] where `unresolved` is demoted to :review.
@@ -928,6 +1000,24 @@
   (when (seq additive) (swap! planned update :additive conj dir))
   (when (seq tracked)  (swap! planned update :review conj dir)))
 
+(defn- report-base-ignored!
+  "Print the base-ignore outcome. A gate that ran and found nothing and a gate
+  that could not run must not look the same (ADR-2608136000), so the
+  `:applied false` cases say so out loud instead of printing nothing."
+  [base ignored {:keys [scanned applied reason]}]
+  (cond
+    (seq ignored)
+    (do (println (format "  skip base-ignored     %d 件（%s の .gitignore が除外を宣言。scanned %d）: %s"
+                         (count ignored) base scanned (str/join ", " (take 4 ignored))))
+        (when (> (count ignored) 4) (println (format "      … 他 %d 件" (- (count ignored) 4)))))
+    (and (not applied) (= reason :base-has-no-gitignore))
+    (println (format "  base-ignore gate 未適用: %s に .gitignore が無い" base))
+    (and (not applied) (= reason :gitignore-blob-unreadable))
+    (println (format "  ⚠ base-ignore gate 未適用: %s の .gitignore blob を読めなかった（合格ではない）" base))
+    applied
+    (println (format "  base-ignore gate: 除外宣言に当たるものは無し（scanned %d）" scanned))
+    :else nil))
+
 (defn- land-repo! [{:keys [dir slug base additive skipped tracked deleted]}]
   ;; canonical 化はここ（着地対象がある repo だけ）。plan 段階ではやらない。
   (let [branch-work? (and branches? (seq (live-branches dir base)))
@@ -1000,6 +1090,10 @@
       ;; PR → merge」と表示したものが apply で :review に降格し、plan が嘘になる。
       (let [base-map (base-blobs slug base)
             [additive _ demoted] (drop-already-landed dir base-map additive)
+            ;; base が ignore すると宣言しているものを :additive から外す。
+            ;; 候補は working tree の .gitignore で決まっており、west checkout は
+            ;; 平気で数十 commit 遅れる（base-ignore-gate! の docstring）。
+            [additive base-ignored bi] (base-ignore-gate! dir slug base-map additive)
             [additive suspects _] (residue-gate! dir base additive base-map)
             ;; 参照が解決しないコードを :additive から外す。:additive は「main に
             ;; 同名パスが無い」= 行を書き換えない、しか言っていない —— test file は
@@ -1011,6 +1105,7 @@
           (println (format "  ⚠ untracked だが %s に既存・内容差あり: %d 件 → :review（auto-merge しない）"
                            base (count demoted)))
           (doseq [p demoted] (println (str "      " p))))
+        (report-base-ignored! base base-ignored bi)
         (when (seq unresolved)
           (println (format "  ⚠ 参照が解決しない %d 件 → :review（scanned %d）"
                            (count unresolved) (:scanned uinfo)))
@@ -1023,6 +1118,8 @@
             base-map (base-blobs slug base)
             [additive landed-additive demoted] (drop-already-landed dir base-map additive)
             [tracked landed-tracked tracked-differs] (drop-already-landed dir base-map tracked)
+            ;; dry-run と同じ位置・同じ理由（base-ignore-gate! の docstring）。
+            [additive base-ignored bi] (base-ignore-gate! dir slug base-map additive)
             ;; 改名で死んだパスの残骸を :additive から外す（residue-gate! の
             ;; docstring / manifest/cleanup-workflow.edn :residue-gate）。
             ;; drop-already-landed の後に置くのは、同じパスが base に在る場合は
@@ -1047,6 +1144,7 @@
           (println (format "  ⚠ untracked だが %s に既存・内容差あり: %d 件 → :review へ降格（auto-merge しない）"
                            base (count demoted)))
           (doseq [p demoted] (println (str "      " p))))
+        (report-base-ignored! base base-ignored bi)
         (when (and (empty? additive) (empty? tracked))
           (println "  → 全て着地済み。新規 PR なし。"))
         ;; :additive — untracked のみ。main のどの行も書き換えないので merge する。
