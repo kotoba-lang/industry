@@ -891,7 +891,20 @@
 (defn corpus-line-entities
   "manifest 行付き edn-lines corpus を読む。1 行目が `{:corpus/manifest true ...}`
    ならその `:source/*` を各レコードへ配る（provenance を 1 ファイル 1 回だけ
-   書く形式。全レコードに複製すると corpus が数百 MB 太る）。"
+   書く形式。全レコードに複製すると corpus が数百 MB 太る）。
+
+   **manifest 行そのものも 1 entity として載せる。** 実測 2026-08-19、
+   `gbizinfo-zenken-government-summary` に `:projection/folded-rows`（2,358 件の
+   集計が 125,144 行の fold であること）を足したのに、面から引けなかった ——
+   1 行目は provenance の供給元として消費され、entity にならなかったため。
+   **分母が artifact にしか無く面から引けないなら、面の上では分母が無いのと同じ**で、
+   projection/queried・matched-rows・ambiguous-count・folded-rows が全部そうなっていた。
+
+   ⚠ **したがって `[?e \"source/dataset\" X]` の件数はレコード数ではない。**
+   manifest 行の分だけ多い。レコードだけ数えるなら
+   `(not [?e \"corpus/manifest\" true])` を足す。この形は以前から
+   gbizinfo（section ごとに manifest 5 本のうち 4 本が載っていた）で成立していた ——
+   今は全 dataset で一貫している。"
   [f next-tempid!]
   (try
     (let [lines (slurp-edn-lines f)
@@ -901,8 +914,10 @@
                      head)
           provenance (into {} (filter (fn [[k _]] (= "source" (namespace k)))) manifest)
           records (if manifest (rest lines) lines)]
-      (for [r records :when (map? r)]
-        (merge provenance r {:db/id (next-tempid!) :source/file (str f)})))
+      (concat
+       (when manifest [(merge manifest {:db/id (next-tempid!) :source/file (str f)})])
+       (for [r records :when (map? r)]
+         (merge provenance r {:db/id (next-tempid!) :source/file (str f)}))))
     (catch :default _ nil)))
 
 (defn property-data-files
