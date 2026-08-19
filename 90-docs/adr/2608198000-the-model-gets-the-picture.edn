@@ -1,0 +1,86 @@
+[{:db/id -1
+  :adr/id "2608198000"
+  :adr/title "撮った絵をモデルに渡す — screenshot がファイル名だった件と、失敗した tool 引数を捨てていた件"
+  :adr/status "accepted"
+  :adr/date "2026-08-19"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/tags "bots, vision, screenshot, tool-arguments, provider, murakumo, cloud-itonami-app"
+  :adr/body
+  "## 同じ形の欠陥が 2 つ
+
+ADR-2608197900 が残した 2 件を直した。**どちらも「取得したのに、使われる前に捨てて
+いた」**という同じ形をしている。
+
+## 1. computer_screenshot はモデルにファイル名を渡していた
+
+`desktop/screenshot!` は PNG を書き出して `{:image-path .. :media-type ..}` を返す。
+しかし `run-tool!` は**文字列を返す契約**だったので、`str` がそれを
+**開く手段のないファイルの名前**に変えていた。撮るたびに、bot は**一度も見ていない
+ウインドウについて推論していた。**
+
+`run-tool!` は `{:text .. :images ..}` を返すようにし、`tool-messages` が 1 つの
+tool 結果を必要なメッセージ列に変える —— `tool` メッセージ、そして画像を運ぶ
+`user` メッセージ（画像は tool メッセージに乗らない。OpenAI 形では `role:\"tool\"`
+の body は文字列）。
+
+**画像は印字結果から再解析せず、データとして運ぶ。** 自前の `pr-str` を parse し直す
+のは、誰も維持を約束していない印字形式に呼び出し側を結びつけることになる。
+
+### 実測（resident が実際に使う murakumo に、bot が持つのと同じ message 列で）
+
+    青地に赤帯の画像 → 「背景色は青、帯の色は赤です。」
+
+正答であり、**同じ画像を直接 API に投げたときと同一**。つまり bot 経路は素の経路と
+等価で、これが主張すべきことである。（magenta/green の画像は**両経路とも**取り違える。
+これは経路が絵を失っているのではなく、モデルの色名判断。）
+
+### 大きさの番人（撮影物は小さな文字列ではない）
+
+- 符号化前に 1200px へ縮小し、**符号化後のバイト数**で上限を掛ける（実際に流れるのは
+  そちら）
+- **256 KB 未満のファイルには触らない** —— `sips` は複製ではなく再符号化するので、
+  185 バイトの PNG が **29 KB** になった。既に小さいものを縮めるのは、
+  **大きさの番人が payload を大きくする**やり方である
+- 添付できなかった撮影は **tool テキストの中で報告する**。失敗したと告げられた
+  モデルはそう言う。何も告げられないモデルは、見ていないウインドウを描写する
+
+⚠ **今日どの bot も `computer_screenshot` を持っていない**（`:bot/browser?` が要り、
+90 体すべて false）。**これは経路を直したのであって、権限を配ったのではない。**
+
+## 2. invalid tool arguments は、その引数を捨てていた
+
+`parse-arguments` は `{:type :provider/invalid-tool-arguments}` だけを投げていた。
+だから 19 件の失敗した resident turn は「引数が不正だった」ことは記録したが、
+**それが何だったかを 1 件も記録していない**。そして後から**実スキーマで再現を試みても
+できなかった**（5 prompt × 3 周 = 15 回、失敗 0）。**理由は、捨てた値の中にあった。**
+status を残して body を捨てる —— この codebase が繰り返し見つけている同じ欠陥。
+
+ex-data が 400 字の標本と長さを持つようにした。報告以外に挙動を 2 つ変えた:
+
+- **markdown fence は剥がす。** 曖昧さが無い（JSON は無傷で、装飾が足されただけ）。
+  **それ以外は修復しない** —— この引数はファイルを書き commit を作りうるもので、
+  モデルが間違えた call を直すのは、**誰も頼んでいない内容で tool を走らせる**やり方
+- **形の違う正しい JSON を拒否する。** `[\"Osaka\"]` は以前**通って**引数になっていた
+  ので、`(:key args)` が全部 nil を返し、**tool は引数なしで走っていた**
+
+## テストが契約変更を自力で捕まえた
+
+`run-tool!` の文字列返却を検査していたテストが落ちた。だから stub も実際の形に直した
+—— 文字列を返す stub は、呼び出し側がもう受け取らない形を検査し続けることになる。
+**1689 tests / 0 failures**（merge 後、main 側の追加分を含む）。
+
+## 途中で分かったこと
+
+main 側が同日に **`:provider/timeout` を `:internal-error` から分離**していた
+（`java.net.http` の `HttpTimeoutException` は ex-data を持たないので、全 timeout が
+アプリの本物のバグと同じ名前で記録されていた）。**ADR-2608197700 が数えた
+internal-error 27 件の一部はこれである可能性が高い** —— 本 ADR の parse-arguments 側が
+説明できなかった分。
+
+## 残り
+
+- **bot に browser/computer tool を配るか**は別の決定（配れば vision が発火する）
+- `invalid-tool-arguments` の**根本原因は依然不明**。再現できず、**次の 1 件が
+  payload 付きで記録されるまで断定しない**
+"}]
