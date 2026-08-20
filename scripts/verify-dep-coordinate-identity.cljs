@@ -163,7 +163,39 @@
     (println (str "SCANNED\t" (count rows) "\tin-house deps (git + local-root) in "
                   (count files) " deps.edn of " (count dirs) " checkouts"
                   (when (seq broken) (str "\tUNPARSEABLE\t" (count broken)))))
-    (println (str "CENSUS\trepos=" (count by-repo) "\tmulti-coordinate=" (count multi)))
+    ;; LATENT vs ACTIVE. "50 repositories are reachable under two coordinates"
+    ;; is a count of names, not of damage, and the two are not the same
+    ;; number: a collision only happens when ONE dependency graph pulls both
+    ;; coordinates. Reporting only the name count invites multiplying a pool
+    ;; by a guess (ADR-2607203000), so the pool is split here by measurement.
+    ;;
+    ;; This counts DIRECT co-occurrence -- two coordinates for one repository
+    ;; named in the same deps.edn -- which is a LOWER BOUND. Transitive
+    ;; co-occurrence (A needs X, and A needs B which needs X under the other
+    ;; name) also collides and is not resolved here, because resolving it
+    ;; means building the real dependency graph. The bound is stated rather
+    ;; than the gap being left silent.
+    (let [active (for [[repo rs] multi
+                       :let [per-dir (group-by :in rs)
+                             clashing (for [[d es] per-dir
+                                            :when (> (count (set (map :lib es))) 1)]
+                                        {:dir d :libs (sort (set (map :lib es)))})]
+                       :when (seq clashing)]
+                   {:repo repo :clashing (vec clashing)})
+          active (vec active)]
+      (println (str "CENSUS\trepos=" (count by-repo) "\tmulti-coordinate=" (count multi)
+                    "\tACTIVE=" (count active) " (both coordinates in one deps.edn)"
+                    "\tLATENT=" (- (count multi) (count active))
+                    " (two names across the fleet, no single graph yet takes both)"))
+      (doseq [{:keys [repo clashing]} active]
+        (doseq [{:keys [dir libs]} clashing]
+          (println (str "FINDING\tfail\tactive-collision:" repo
+                        "\t" dir " names " (str/join " and " libs)
+                        " -- one classpath, the same namespaces from two revisions"))))
+      (when (zero? (count active))
+        (println (str "  no DIRECT collision: every multi-coordinate repository is named "
+                      "under one coordinate per deps.edn. Transitive collisions are not "
+                      "measured here, so this is a lower bound, not an all-clear."))))
     (doseq [b (take 5 broken)]
       (println (str "FINDING\twarn\tunparseable:" (:dir b)
                     "\tdeps.edn did not parse, so its dependencies were not examined: "
