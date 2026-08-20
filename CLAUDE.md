@@ -1014,6 +1014,28 @@ CertGovernor）。
   各 ADR は `(d/transact conn (edn/read-string (slurp f)))` 可能な
   `[{:db/id -1 :adr/id ... :adr/title ... :adr/status ... :adr/body ...}]`。
   入れ子 map/vector は `pr-str` した string blob（`manifest/edn-datomize.cljs` と同型）。
+- **EDN 文書を heredoc で書いたら、reader を通してから commit する。`read-string`
+  が throw しないことは無傷を意味しない。** shell heredoc の中の `\"` はファイル上で
+  **バックスラッシュ 2 つ + 引用符**になり、EDN では「エスケープされたバックスラッシュ」+
+  「文字列を閉じる引用符」と読まれる。そこで本文が終わり、続く語が**キーとして**読まれ、
+  次の引用符から新しい文字列が始まる。**引用符の個数の偶奇が合えば map も vector も
+  閉じるので、reader は何事もなく値を返す。**
+
+  実測 2026-08-19〜20、**別々のセッションが 3 日で 4 文書**をこの形で壊した:
+
+  | 文書 | 症状 |
+  |---|---|
+  | `2608190400` / `2608190600`（cloud-itonami-app） | 読めず。着地から closing まで誰も気づかず |
+  | `2607211400-wave-2-…` | **読める**。`:scope` が 1,465 字 → 604 字、`commit-dag` と `\|quad-store` がキー |
+  | `2608198700-amus-jvm-suite-…` | **読める**。heredoc の `\"` が 4 箇所 |
+
+  後ろ 2 つが厄介で、**parse 検査は緑で通す**。検査は「キー位置に裸のシンボルが
+  無いこと」で、2,350 文書に当てて偽陽性 0・真陽性 2。fleet gate は
+  `docs-edn-check.cljs --strict-keys`（`root` と `cloud-itonami-app` で有効）。
+
+  「全キーが keyword」ではない —— それは 8 件を赤くし、うち 7 件は正当だった
+  （`"p50"` `".cljs"` `"stripe.com"` `0 1 2 3`。EDN の map は文字列キーも整数キーも取る）。
+
 - **`:adr/id` は slug 形 `adr-<番号>-<slug>` にする。bare な `ADR-<番号>` や
   `<番号>` を新規に使わない。** 番号だけの id は衝突する —— 並行セッションが同じ
   日時 prefix で採番するため、**08-16〜08-19 の 4 日で新規衝突が 7 件**出た。
