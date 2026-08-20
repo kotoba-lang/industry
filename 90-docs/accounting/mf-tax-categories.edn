@@ -1,0 +1,64 @@
+;; MF 税区分 —— **勘定科目表が実際に参照している分だけ**。
+;;
+;; 出典: MF Cloud Accounting `getTaxes`（読み取りスコープの MCP）、2026-08-20、
+;;       Gftd Japan株式会社 code 9007-2846。
+;;
+;; ## なぜ 151 ではなく 12 なのか
+;;
+;; この事業者の税区分マスタは **151 件**ある（`moneyforward-parity.datoms.edn`
+;; の `:mf.snapshot/tax-categories`）。しかし勘定科目 200 + 補助科目 512 の
+;; いずれかが `tax_id` で指しているのは **12 件だけ**で、残る 139 件は
+;; 5% 世代・簡易課税の一〜六種・特定課税仕入など、この科目表からは 1 件も
+;; 参照されていない。
+;;
+;; ⚠ **12/151 は「税区分の到達度」ではない。** 仕訳（journal）が持つ税区分は
+;;    測っていない —— 科目の既定値と、実際に記帳で使われた区分は別物である。
+;;    仕訳側を測るには `getJournals` が要る（未実施）。ここが答えているのは
+;;    「科目表を写すのに要る税区分はどれか」という 1 問だけ。
+;;
+;; ## 何に使うか
+;;
+;; `scripts/gen-mf-chart.cljs` が chart を書き出すとき、各科目の `tax_id` を
+;; ここで引いて `:mf/tax-rate` を焼き込む。**引けない id が 1 つでもあれば
+;; 生成を拒否する** —— 既定 0% で埋めると、消費税法 第四十五条第一項 が要求する
+;; 「税率の異なるごとに区分した」集計が、税率を持たない科目を 0% として
+;; 静かに混ぜる。手で写した表が古びたことを、生成器が気付ける唯一の場所。
+;;
+;; :available は MF 側の有効フラグ。false のものは参照されていないので
+;; ここには 1 件も無い（12 件すべて available true）。
+
+{"HOjPa4QwygIDCqSN8LLJoQ%3D%3D"
+ {:name "不明" :abbreviation "不明" :rate 0 :available true}
+
+ "X3DSAI1Z3m0BykUBLzFXPQ%3D%3D"
+ {:name "対象外" :abbreviation "対象外" :rate 0 :available true}
+
+ "vbqSIpfpRHgRlq5Dp6F27Q%3D%3D"
+ {:name "対象外売上" :abbreviation "対象外売" :rate 0 :available true}
+
+ "kLOtqiD1oj%2FeGpzw%2BAHKuA%3D%3D"
+ {:name "課税売上 10%" :abbreviation "課売 10%" :rate 0.1 :available true}
+
+ "d1ST%2FNEUXKvUoacOoxZtxQ%3D%3D"
+ {:name "課税売上-返還等 10%" :abbreviation "課売-返還 10%" :rate 0.1 :available true}
+
+ "FVXT1bepOjpuSZhgtaQTnA%3D%3D"
+ {:name "課税売上-貸倒 10%" :abbreviation "課売-貸倒 10%" :rate 0.1 :available true}
+
+ "HnJI7o8oKOaIe4Caz4hP4w%3D%3D"
+ {:name "輸出売上 0%" :abbreviation "輸売 0%" :rate 0 :available true}
+
+ "ISVxnAD8yUeP3aE1ZHZ9UQ%3D%3D"
+ {:name "非課税売上" :abbreviation "非売" :rate 0 :available true}
+
+ "udkJsdLf0zpR%2Fhf5kDTAjw%3D%3D"
+ {:name "非課税売上-有価証券譲渡" :abbreviation "非売-有証" :rate 0 :available true}
+
+ "BFUjY0cHbLfNyaQ%2B%2Fzyy5A%3D%3D"
+ {:name "課税仕入 10%" :abbreviation "課仕 10%" :rate 0.1 :available true}
+
+ "Qkwy17tUvDmOvvbAzLFquw%3D%3D"
+ {:name "課税仕入-返還等 10%" :abbreviation "課仕-返還 10%" :rate 0.1 :available true}
+
+ "pI%2B1XO3se4rmF9cqOTVIEw%3D%3D"
+ {:name "非課税仕入" :abbreviation "非仕" :rate 0 :available true}}

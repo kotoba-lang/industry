@@ -1,0 +1,152 @@
+[{:db/id -1
+  :adr/id "adr-2608209200-mf-chart-of-accounts-projected-and-checked-per-account"
+  :adr/title "勘定科目 200 + 補助科目 512 を chart に写した —— 区分の面が 46/46 でも、科目の面では 2 件が容器にぶら下がっていた"
+  :adr/status "accepted"
+  :adr/date "2026-08-20"
+  :adr/implemented true
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "moneyforward-chart-of-accounts"
+  :adr/related ["adr-2608209000-moneyforward-parity-has-a-denominator-now"
+                "2608197200"
+                "adr-2608136000-five-questions-before-writing-a-check"]
+  :adr/repos ["90-docs/accounting" "scripts" "manifest" "orgs/kotoba-lang/shohyo"]
+  :adr/authoritative-for
+  ["MF の勘定科目表を kotoba.shohyo の chart へ写す射影（生成物であって手書きではない）の正本"
+   "科目名が条文の号名と一字一句一致するときにだけ区分の既定を上書きしてよい、という規則の正本"
+   "chart の検査を 2 本に分ける決定（root repo だけで済む --check は gate 可、shohyo を読む方は orgs 依存で gate 不可）の正本"]
+  :adr/body "# 何を訊かれ、何をしたか
+
+オーナー指示（2026-08-20）「成熟度を向上」。ADR-2608209000 が並べた次の一手のうち、
+オーナー作業（MF の決済、credential の判断）でないものは 2 番目 ——
+**勘定科目 200 + 補助科目 512 を chart として書き出す** —— だったので、そこをやった。
+
+結果: **712 件すべてが `kotoba.shohyo` に受理される chart として着地した。**
+そしてその過程で、**区分の面（46/46）では構造的に見えない欠落が 2 件出た。**
+
+## 区分が緑でも、科目は容器にぶら下がっていた
+
+ADR-2608209000 は財務諸表区分を 46/46 で閉じた。その数字は正しい。しかし
+**区分は科目より粗い。**
+
+実測: MF の `VALUATION_AND_TRANSLATION_ADJUSTMENTS` は `:valuation-adjustments`
+に写る。ところが 会社計算規則 第七十六条第七項 はその区分を 5 つに細分せよと
+定めており、`kotoba.shohyo.jp/section-problems` は容器に直接ぶら下がった科目を
+`:section-requires-subdivision` として返す。該当したのは 2 科目 ——
+その他有価証券評価差額金 と 土地再評価差額金。
+
+**区分の面の検査はこれを見つけられない。** 容器は「定義されている」ので名前の
+照合は通る。46/46 は嘘ではなく、**問いが 1 段浅かった**。
+
+直し方は上書き表（`90-docs/accounting/mf-account-sections.edn`）だが、
+**上書きしてよい条件を先に決めた**: 科目名がその号の項目名そのものであること。
+この 2 件は第七十六条第七項第一号「その他有価証券評価差額金」と第三号
+「土地再評価差額金」で、一字一句その号である。これは推測ではなく照合。
+名前が号と一致しない科目をここに足せば、「科目が何であるかを推測しない」という
+`kotoba.shohyo` の設計を射影の側で破ることになる。
+
+生成器は、上書き表が MF に**実在しない科目**を指していたら生成を拒否する
+（exit 3）。科目が改名・廃止されたのに上書きだけが残る、を防ぐ。
+
+## 検査は 2 本ある。片方は gate にできて、片方はできない
+
+| script | 読むもの | fleet gate |
+|---|---|---|
+| `scripts/gen-mf-chart.cljs --check` | root repo の中だけ（生 JSON・parity dataset・税区分表・上書き表） | **できる** |
+| `scripts/verify-mf-chart.cljs` | それに加えて `orgs/kotoba-lang/shohyo/src` | **できない** |
+
+分けたのはこの 1 点のためである。CLAUDE.md の「gate が要求する入力が repo に
+無いことがある」（`root-permit-index` が 300 回赤かった理由）に当たるので、
+後者は `manifest/orgs-detectors.edn` に `:verify-mf-chart` として登録した。
+前者はまだ gate にしていない —— 「fleet で 1 度緑になるまで landed としない」
+規律に従い、fleet で回してから足す。
+
+**検査はテキスト走査ではなく本物の shohyo を読み込む。** 隣の
+`verify-moneyforward-parity.cljs` は shohyo をテキストとして読む（superproject
+から走るので deps が classpath に無い、と docstring が言う）が、shohyo は依存
+ゼロなので nbb の `--classpath` に src を足せば本物が読み込める。そして本物だけが
+`:section-type-conflict` を返す —— 売上原価を `:revenue` と宣言しても区分名は
+正しいので名前の照合は通り、第八十九条の側で符号が反転して、**売上総利益は
+正しい形をして間違った値**になる。
+
+## 3 状態を実演した。壊したものと報告されたものが一致することも確かめた
+
+| 状態 | 壊し方 | 報告 |
+|---|---|---|
+| exit 0 | 無改変 | SCANNED 712、0 findings |
+| exit 1 | 上書きを 1 件外す | `section-requires-subdivision`、その他有価証券評価差額金 を名指し |
+| exit 1 | `:revenue` を 1 件 `:expense` に | `section-type-conflict`、DE-SCHOOL売上 を名指し |
+| exit 3 | 科目を 1 件削る | 被覆率を印字せず「写しが欠けている」 |
+| exit 3 | shohyo を空の stub に差し替える | 「shohyo が読み込めていない（bs=0 pl=0）」 |
+
+**stub の場合が一番効く。** 空の名前空間なら誰も何も知らないので誰も文句を言わず、
+検査は全部きれいに通る。だから床は require が成功したことではなく**値**に対して
+置いた（`:current-assets` と `:labor-costs` が実在すること）。
+
+tick 経由でも 3 状態を実測した: ok(0) / ok exit 1 + NEW finding / **inconclusive
+exit 3（既存 finding を resolved にせず保持）**。
+
+## 緑の枝を試したら、緑の枝が落ちた
+
+`--check` の FRESH 分岐が実行時に落ちていた。原因は `let` の局所名 `subs` が
+`clojure.core/subs` を覆っていたこと。**STALE と MISSING は正しく動き、FRESH
+だけが落ちる**ので、赤い方だけ試していれば「動く検査」として着地していた。
+ADR-2608136000 の 5 問のうち「その検査は両方向を出したことがあるか」が、
+まさにこれを捕まえた。
+
+## 写さない。作り直す
+
+勘定科目 200 + 補助科目 512 を手で写せば、写し間違いは**正しい形の chart** として
+着地する。`kotoba.shohyo` は「chart は主張である」という設計なので、間違った主張も
+受理し、貸借は合ったまま区分だけが狂う。だから MF の生応答
+（`90-docs/accounting/raw/mf-accounts-2026-08-20.json`、sha256
+55b28b177270fcd78d0cac6da1609cde2c60413edc99b112f44049ecee0f5f75）を repo に置き、
+そこから毎回作り直す。`--check` は byte 一致を見るので、手編集は STALE になる。
+
+生応答が snapshot と同じ測定であることは**数で**確かめる（200 / 512 が
+`:mf.snapshot/accounts` / `:mf.snapshot/sub-accounts` と一致しなければ拒否）。
+
+## キーの綴りは取り決めであって、MF の綴りではない
+
+勘定科目は科目名そのもの、補助科目は `勘定科目/補助科目`。試算表を作る側
+（bookkeeping / kakeibo / banking）が同じ綴りを使わなければ `statements` は
+`:shohyo/unclassified` に落とす —— 落とすのが正しく、黙って別の科目に混ぜるより
+よい。
+
+⚠ **区切りの `/` でキーを割ってはいけない。** 補助科目の名前自身が `/` を含む
+（実在例: DE-SCHOOL売上 の補助科目に `DE-SCHOOL/その他売上` がある）。一意なのは
+712 キー全体の集合であって綴りの構造ではないので、分解が要るときは
+`:mf/account` と `:mf/sub-account` を読む。
+
+# 何をしていないか（これを到達度と読まない）
+
+- **税区分は 12/151。** chart が参照しているのは 12 件だけで、残る 139 件
+  （5% 世代・簡易課税の一〜六種・特定課税仕入）はどの科目からも参照されていない。
+  **仕訳が持つ税区分は測っていない** —— 科目の既定値と、記帳で実際に使われた区分は
+  別物である。測るには `getJournals` が要る（未実施）。したがって
+  `bookkeeping.shohizei` の `:rates-not-declared` が実データで外れるかどうかは、
+  まだ答えていない。
+- **部門は 1 つも持っていない。** MF は 20 部門を 2 階層で持ち仕訳が部門を持てるが、
+  bookkeeping の journal entry / posting に部門の次元が無い（ADR-2608209000 の
+  次の一手 4、設計変更なので別の ADR が要る）。
+- **`:concept` を持たない。** kanjō の 16 語彙への対応付けは MF の区分からは
+  導出できないので、推測しない。`concept-ok?` は nil を返す = 誰も検査していない。
+- **残高を持たない。** これは科目表であって試算表ではない。この chart に
+  `statements` を通した実データの財務諸表は、まだ 1 度も出していない。
+- **MF は止められない。** ADR-2608209000 の結論は変わらない。加えて 2026-08-25 の
+  18 商品自動解約予告（決済失敗、オーナー作業）が縮小より手前にある。
+
+# 影響
+
+- (+) 会計面の到達度が、初めて**科目の粒度**で分母を持った。712/712。
+- (+) 区分の面が構造的に見られない欠落の種類が 1 つ分かった（容器と細分）。
+      同じ形は 第七十四条第二項（固定資産）・第七十六条第二項/第四項/第五項でも
+      起こりうるが、この事業者の科目表では該当が無かった。
+- (−) 上書き表は人間の照合に依存する。増えるなら、条文の号名との一致を機械で
+      確かめる方に移す。今は 2 件なので手で読める。
+- (−) 生応答を repo に置いたので、Gftd Japan の科目名・補助科目名（取引銀行・
+      取引所名を含む）が root repo に入った。root は private だが、これは
+      ADR-2607285000 の言葉では sealed 面の内容である。**公開 repo に写さない。**
+"}]

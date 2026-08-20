@@ -247,6 +247,28 @@ Phase 0 で landed した鍵分離は B2 面（kotobase-cf-wasm）に対する�
 - **D1 面をどうするか（2026-07-29 に判明、上記の節が本体）。** live な datom 面は平文の SQL 射影であり、封入と射影は同時に成り立たない。service-readable tier として明示するか、射影を等値のみの blinded index に落とすかを決めるまで、cloud-itonami の datom 面の custody は `:server` と書く。
 - Phase 0 の epoch 移行手順（既存 B2 block の再暗号化をどう段階化するか）。
 - 面の分類を schema にどう持たせるか（属性 prefix か、entity 単位か）。
+
+## 2026-08-20 実測 —— 上の D1 の記述は、もう現在地ではない（再測定が要る）
+
+`GET https://kotobase.net/health?deep=1` は 2026-08-20 時点で
+`xrpc_datomic_backend: graph-database` / `client_api_backend: kotobase-graph-database`
+を返す。**上の 2026-07-29 の addendum が前提にした `d1` ではない。**
+
+したがってこの ADR の中で最も強い主張 —— 生きている datom 面が D1 の平文射影に
+載っており、cloud-itonami の datom 面を sealed と呼べない —— は、**その面が
+もう live ではないという理由で、そのままでは引用できない。**
+
+⚠ **これは「直った」という報告ではない。** 新しい面が暗号化されているかどうかは
+**測っていない**。measured なのは health のラベルが変わったこと 1 点だけである。
+`kotobase-graph-database` は ADR-2608070100 の改名（capability で名指す）に由来し、
+`net-kotobase` 側の repo 構成も当時から変わっている（当 ADR が参照する
+`worker/wrangler.jsonc` は現在のツリーに無い）。
+
+**次に誰かがこの面を sealed と呼ぶ前にやること**: 新しい backend の
+encrypt-fn / decrypt-fn / blind-fn が恒等関数でないことと、datom の値が
+関係テーブルに平文で射影されていないことを、コードで確かめる。**確かめるまでは
+custody は `:server` のままとする** —— この ADR が自分で書いたとおり、面が自分の
+posture を言わない限り、上位はそれを推測し、推測は毎回 sealed の側に倒れる。
 "
 
   :adr/supersedes []
