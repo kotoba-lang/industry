@@ -1230,4 +1230,47 @@
               asserts on VALUES (:current-assets present, :labor-costs present), not on the
               require succeeding.
               The break and the report were checked to match in every case -- ADR-2608136000's
-              warning that a mis-aimed break reads as a successful demonstration."}]}
+              warning that a mis-aimed break reads as a successful demonstration."}
+
+  {:id       :verify-itonami-did-webvh
+   :title    "the did:webvh log itonami.cloud holds, and the one it actually serves"
+   :why      "2026-08-20: cloud-itonami cut a did:webvh genesis and it is on main, but
+              https://itonami.cloud/.well-known/did.jsonl is 404. Cloudflare Pages for
+              this project has no git provider, so main advancing deploys nothing, and
+              the deploy is currently refused by deploy-local-root-pin-guard because four
+              :local/root dependencies hold other sessions uncommitted work. Until it is
+              deployed, the DID resolves for nobody -- and nothing in the repository says
+              so. This is the same shape as the kotobase.net funnel that was fixed and
+              then silently rolled back eleven minutes later by an older checkout
+              (root ADR-2607285000): deploy has no fast-forward check, so last writer wins
+              and being on main is not being served.
+              It measures two separate things and does not merge them: whether the
+              repository log verifies cryptographically (asked by running cloud-itonami's
+              own bin/didwebvh.cljs verify in that checkout -- three of did:webvh's rules
+              produce plausible, stable, wrong values when reimplemented, so a second
+              implementation here would be one that gets fixed alone), and whether the
+              live host serves those exact bytes.
+              Cannot be a fleet gate: it needs orgs/network-awai/cloud-itonami AND six
+              west siblings on the classpath, and no single shipped tree holds them."
+   :argv     ["nbb" "{{repo}}/scripts/verify-itonami-did-webvh.cljs"
+              "--root" "{{root}}" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 21600000                 ; 6h -- it is watching for a deploy, which is a human act
+   :timeout-ms  120000                   ; 2m -- 12x the measured run
+   :writes   :none
+   :measured "2026-08-20 on this machine. Five states observed before registering, each
+              produced deliberately and checked against what was broken:
+                real, live 404                     ~10s -> exit 1, did-webvh:not-deployed
+                local server serving the same bytes      -> exit 0, no findings
+                same server, one byte appended           -> exit 1, did-webvh:live-differs-from-repo
+                --root pointed at a tree with no orgs/   -> exit 3, refuses
+                --url pointed at an unresolvable host    -> exit 3, refuses
+              The last one is the reason the fetch is not wrapped in a permissive default:
+              recording unreachable as not-deployed would manufacture a deploy gap on any
+              day the link is down. The green case was demonstrated against a local
+              http.server rather than left as a claim, because a detector that has never
+              been green is as uninformative as one that has never been red.
+              Findings are counted whether or not --findings is passed, so the exit code
+              cannot depend on whether a human happened to ask for the list."}]}
