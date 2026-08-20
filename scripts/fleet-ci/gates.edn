@@ -3120,5 +3120,34 @@
   {:name "tech-ipfs-specs-ipns" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :ship-git-deps true :cd false}
   {:name "org-ietf-xdr" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
   {:name "org-ietf-oncrpc" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :ship-git-deps true :cd false}
+  ;; aiueos, 2026-08-20. Its `:jvm-test :alias "test-fleet"` entry above stays.
+  ;; nbb went from 268 tests / 799 assertions / 12 failures -- with 9 of 33
+  ;; `.cljc` namespaces failing to LOAD and 2 more running zero tests -- to
+  ;; 369 / 1113 / 0. The JVM alias moved 658 -> 659 and stayed at 0 failures.
+  ;;
+  ;; The headline defect is worth stating because it is the class this
+  ;; workspace keeps finding: `(def vfio-type (int \;))` is 59 on the JVM and
+  ;; **0** on ClojureScript, where `\;` reads as the one-character string.
+  ;; Every VFIO ioctl number silently lost its type field --
+  ;; VFIO_GET_API_VERSION came out 100 instead of 15204 -- and nothing threw.
+  ;; Verified independently here before landing: `nbb -e "(let [c \;] (int c))"`
+  ;; prints 0.
+  ;;
+  ;; `:cd false`, like every other gate landed today, even though this one has
+  ;; better evidence than the rest: the real gate script was run on fleet node
+  ;; judah through its own npx nbb, green at 369/0 and red at 369/11 with the
+  ;; fix reverted. That is a hand-run, not a tick receipt, and this file's bar
+  ;; is a receipt. Flip after the first green tick.
+  ;;
+  ;; Two things to know if this goes red. (1) `git-deps-of` scans the whole
+  ;; deps.edn text, so it demands org-ietf-tcp, which is PRIVATE;
+  ;; `ship-git-deps!` places it from the operator so the real path works, but a
+  ;; hand-run on a node fails until it is shipped. (2) The gate prints a long
+  ;; CONFLICT: line -- aiueos reaches roughly fifteen libraries at two shas
+  ;; each. Non-fatal, and the suite is green on that classpath, but it means
+  ;; green on a classpath tools.deps would not have built.
+  {:name "aiueos" :id "nbb-cross-runtime-aiueos" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
   ;; ────────────────────────────────────────────────────────────────────────
   ]}
