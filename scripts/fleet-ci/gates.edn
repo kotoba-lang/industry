@@ -3052,12 +3052,27 @@
   ;; Deliberately NOT gated, each for a measured reason: kotobase (its entry is
   ;; green here, but io-ipld and prolly-tree each appear at two shas in its
   ;; graph -- tools.deps resolves that diamond and a per-(lib,sha) classpath
-  ;; walk cannot), org-w3-png (covers 7 of 12), nekko (red at main -- dag-cbor's
-  ;; `Tagged` deftype declares IEquiv/IHash, which SCI cannot resolve),
-  ;; tech-ipfs-specs-ipns (6 of 29, same upstream cause),
-  ;; tech-ipfs-specs-unixfs (exhausts Node's heap partway through),
-  ;; org-ietf-xdr and org-ietf-oncrpc (`+'`/`*'` do not exist in ClojureScript,
-  ;; and a plain `+` would silently lose precision above 2^53 in a wire codec).
+  ;; walk cannot), org-w3-png (covers 7 of 12), and tech-ipfs-specs-unixfs
+  ;; (exhausts Node's heap partway through).
+  ;;
+  ;; FOUR MORE were on this list on 2026-08-20 and are gated below. Recorded
+  ;; rather than deleted, because the reasons were not wrong so much as
+  ;; perishable, and the next "blocked upstream" note deserves the same
+  ;; suspicion:
+  ;;   nekko and tech-ipfs-specs-ipns -- said to be blocked on dag-cbor's
+  ;;     `Tagged` deftype. That repository is org-ietf-cbor now, its main had
+  ;;     already replaced the deftype with a defrecord, and both consumers were
+  ;;     simply pinned behind the fix (54 and 18 commits). Nothing upstream
+  ;;     needed changing.
+  ;;   org-ietf-xdr and org-ietf-oncrpc -- said to need a choice between `+'`
+  ;;     (absent in cljs) and a plain `+` (lossy above 2^53 in a wire codec).
+  ;;     The answer was neither: this codebase already represents 64-bit values
+  ;;     as `BigInt` on the cljs side, stated in blake2/word.cljc,
+  ;;     kotoba-kir/cljs_i64.cljs and io-ipld/value.cljc. A decoded hyper is
+  ;;     now always a BigInt, never sometimes one. Two pre-existing JVM bugs
+  ;;     fell out with it: an out-of-range hyper was silently truncated to its
+  ;;     low 64 bits, and a negative BigInt encoded differently from the same
+  ;;     negative long.
   ;;
   ;; datom-source is the ONE that would qualify for a flip -- identical counts,
   ;; 23/74 -- and is added rather than flipped anyway, so that this whole block
@@ -3103,5 +3118,7 @@
   ;; run on cljs.
   {:name "nekko" :gate :nbb-test :classpath "src:test" :entry "test/run_portable.cljs" :ship-git-deps true :cd false}
   {:name "tech-ipfs-specs-ipns" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :ship-git-deps true :cd false}
+  {:name "org-ietf-xdr" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "org-ietf-oncrpc" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :ship-git-deps true :cd false}
   ;; ────────────────────────────────────────────────────────────────────────
   ]}
