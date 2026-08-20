@@ -527,6 +527,37 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
 
   **上記 3 点の手順・コマンド・実測済みの罠は skill `west-pin-advance`。**
 
+### pin の既定状態は「upstream default branch の tip」（repo-wide mandatory、2026-08-20）
+
+**オーナー指示（2026-08-20）「west pull, remote pull また基本的に pin を最新に進める
+運用となるように」。** pin が upstream の default branch より遅れているのは、放置して
+よい平常状態ではなく**是正対象**である。
+
+- **`git pull` / `west update` /「pull して」の類を指示されたら、checkout を pin に
+  合わせるだけで終わらせない。** pin 鮮度まで見て、遅れているものは前進させる。
+  「pull」は 3 つの別物を含む: (1) superproject を origin/main に合わせる
+  (2) pin を各 repo の default branch tip に進める (3) checkout を pin に合わせる。
+  (2) を落とすと、(1) と (3) をいくら回しても workspace は古いまま止まる。
+- **前進の経路は変わらない** —— `scripts/west-pin-put.cljs <entry> HEAD`（1 件）か
+  `scripts/west-pin-put-batch.cljs`（多件、1 commit に束ねる）。どちらも
+  (1) default branch 到達性 (2) 旧 pin からの前進 (3) blob SHA precondition を
+  **entry ごとに**検査する。速いから検査を省く、はしない。
+- **repo の中の pin も同じ規則に従う。** `deps.edn` の `:git/sha`、lock ファイル、
+  `resources/*.edn` に焼いた sha —— どれも「upstream の default branch から到達
+  可能」でなければならない。**west pin には `verify-west-pins` という gate があるが、
+  `deps.edn` の pin には無い。** 実測 2026-08-20: `kotoba-native` の deps.edn は
+  `kotoba-codegen` を `c85088b` に固定していたが、その commit は codegen の main に
+  無く、未 merge branch `agent/aarch64-madd-mc` にしかなかった（main はそこから
+  5 commit 遅れ）。branch が消えるか force-update された時点で production の依存が
+  壊れる。**未 merge branch 上の commit を pin にしない。**
+- **例外は「進めない理由を書いた」ときだけ。** 上流の tip が壊れている、API が
+  互換性を壊した、意図的に古い挙動に留めている —— どれも正当だが、pin の隣か
+  commit message にそう書く。**黙って遅れているのと、理由があって留めているのは、
+  出力から区別できなければならない。**
+- ⚠ **これは「引数なしの `west update` を回せ」という意味ではない**（上記の罠 2 の
+  とおり 4,200 project を歩く）。進めるのは**遅れている pin だけ**で、その集合は
+  `gh api repos/<org>/<repo>/compare/<pin>...<default>` の `ahead_by` で決まる。
+
 - **常に `main` と同期し、乖離を作らない（最優先）。** 何らかの git 操作
   （pull / checkout / commit / branch 作業の開始など）を行う前に、上流 `main`
   に更新があれば必ず先に同期する。ローカルが `main` より遅れている状態
