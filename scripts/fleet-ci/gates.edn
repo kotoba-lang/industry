@@ -297,13 +297,41 @@
   ;; kototama cannot take a :jvm-test gate: its :test alias resolves sibling
   ;; :local/root deps that a node never receives, so that gate would fail
   ;; about the classpath forever. The repo declares :test-hermetic for the
-  ;; namespaces that need nothing but itself -- linear-journal (at-most-once
-  ;; authority consumption, now a content-addressed chain) and execution
-  ;; (root ADR-2608160200's execution value and memo decision) -- and this
-  ;; gate runs that. :cap :jvm because the script shells to clojure.
+  ;; namespaces checkable from its own tree, and this gate runs that.
+  ;; :cap :jvm because the script shells to clojure.
+  ;;
+  ;; That list was two namespaces -- 28 tests, 83 assertions -- and it was two
+  ;; because nobody had measured, not because the rest needed siblings.
+  ;; Measured 2026-08-20: all 29 test namespaces LOAD against a classpath
+  ;; built from this repo alone. What the sibling deps were blocking was
+  ;; nothing; what was actually missing was FILES, and that is this entry's
+  ;; problem rather than the repo's.
+  ;;
+  ;; The old `:include-ext` shipped `.edn .clj .cljc .cljs`, so the node never
+  ;; received `tender-test`'s `.wasm`/`.kotoba` emit fixtures (the R1
+  ;; compiler-to-tender linkage proof), the `.mjs` host `host-parity-live-test`
+  ;; drives, or `workerd/kototama-core-host.mjs`, which the TCB inventory
+  ;; hashes. Run against a copy of the tree filtered the old way: 12 failures
+  ;; and 1 error, none of them about the code. Filtered the new way: green.
+  ;;
+  ;; This is CLAUDE.md's `gh-workflow-assoc-gapki` case from the other side --
+  ;; there the filter dropped the only production source, here it dropped the
+  ;; fixtures. The reproduction that matters is the FILTERED tree, not the
+  ;; repo. The whole thing is 8.9 MB, well under `max-ship-mb`.
+  ;;
+  ;; `kototama.packaging-test` is deliberately not in the repo's list, and the
+  ;; reason is structural: it runs `deploy/validate-packaging.sh`, which needs
+  ;; `deploy/bin/kototama-authority-daemon` -- EXTENSIONLESS, which an
+  ;; extension allowlist cannot select at all. Two tests, named rather than
+  ;; quietly dropped.
+  ;;
+  ;; Floors: `--min 200` against a measured 205, and `:min-files 140` against
+  ;; a measured 166, so a truncated ship or a half-run cannot report green.
   {:name "kototama" :id "kototama-hermetic" :gate :nbb-script :cap :jvm
-   :script "gates/kototama-hermetic-test.cljs"
-   :include-ext [".edn" ".clj" ".cljc" ".cljs"] :min-files 60 :cd true}
+   :script "gates/kototama-hermetic-test.cljs" :script-args ["--min" "200"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".wasm" ".kotoba" ".mjs"
+                 ".html" ".sh" ".json" ".service" ".wit" ".wat"]
+   :min-files 140 :cd true}
   ;; ---- the accounting plane (ADR-2608171800) --------------------------
   ;;
   ;; Four iterations of work landed here checked only by `clojure -M:test` on
