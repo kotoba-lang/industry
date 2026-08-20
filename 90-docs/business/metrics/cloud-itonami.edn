@@ -1,7 +1,7 @@
 {:bottleneck "run Stripe checkout via /isco-1212/",
  :freeClaimUrl "/isco-1212/",
  :health-status 200,
- :asOf "2026-08-19T23:56:46.629Z",
+ :asOf "2026-08-20T00:56:01.427Z",
  :freeClaim "/isco-1212/",
  :zone-name "itonami.cloud",
  :productSurfaceHint
@@ -9,9 +9,9 @@
   :note
   "scores.productSurface should be 6340/6340 when free path is live"},
  :zone
- {:requests-7d 42920,
-  :pageviews-7d 7439,
-  :uniques-7d-sum 862,
+ {:requests-7d 37488,
+  :pageviews-7d 2765,
+  :uniques-7d-sum 814,
   :zone "itonami.cloud"},
  :agentRuns7d 68,
  :sources [:cloudflare :health :emitter :itonami-free-path],
@@ -41,7 +41,7 @@
  {:bottleneck
   "free path live — first paid Checkout at /isco-1212/ (hyp/itonami-smb-pay)",
   :freeClaimUrl "/isco-1212/",
-  :asOf "2026-08-19T23:56:47.848Z",
+  :asOf "2026-08-20T00:56:02.254Z",
   :freeClaim "/isco-1212/",
   :nextOwnerActions
   [{:freeClaimUrl "/isco-1212/",
@@ -145,15 +145,15 @@
    {:path "/cloud-itonami-isic-9523/", :requests 93}
    {:path "/cloud-itonami-isic-4921/", :requests 93}
    {:path "/cloud-itonami-isic-9101/", :requests 93}
+   {:path "/cloud-itonami-isic-0610/", :requests 93}
    {:path "/cloud-itonami-isic-7810/", :requests 93}
-   {:path "/cloud-itonami-isic-9601/", :requests 92}
-   {:path "/cloud-itonami-isic-9609-petcare/", :requests 92}],
-  :status-mix {:client-error 1296, :ok 4374, :server-error 4173},
+   {:path "/cloud-itonami-isic-4211/", :requests 92}],
+  :status-mix {:client-error 1296, :ok 4379, :server-error 4183},
   :window "24h"},
  :source "itonami-data-kv-list",
  :note
  "PII-free aggregates only. freePath is live without Stripe; paid stays 0 until checkout + webhook (hyp/itonami-smb-pay).",
- :as-of "2026-08-19",
+ :as-of "2026-08-20",
  :freePath
  {:freeClaimUrl "/isco-1212/",
   :externalTenants 5,
@@ -202,7 +202,7 @@
   :paid 0},
  :version "0.1.953",
  :signal
- "itonami.cloud 実測 42920 req/7d・862 uniques(日次和)・うち4xx probe 13%(24h)",
+ "itonami.cloud 実測 37488 req/7d・814 uniques(日次和)・うち4xx probe 13%(24h)",
  :tenants
  {:active 5,
   :external-paid 0,
