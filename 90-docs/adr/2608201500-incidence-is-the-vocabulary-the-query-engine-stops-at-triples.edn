@@ -1,0 +1,238 @@
+[{:db/id -1
+  :adr/id "adr-2608201500-incidence-is-the-vocabulary-the-query-engine-stops-at-triples"
+  :adr/title "語彙は incidence まで届いていて、query engine は arity 3 の positional triple で止まっている"
+  :adr/status "accepted"
+  :adr/date "2026-08-20"
+  :adr/related "adr-2608039970-kotobase-base-is-the-datom-plane-not-datalog ADR-2608189300 ADR-2608160200 ADR-2608160100 260726-kotobase-query-plane-is-one-ref"
+  :adr/body
+  "## きっかけ
+
+オーナーから、IPLD / IPNI を視野に入れた論理 IR の最小核として
+`Term + Atom + Conjunction + Rule`（`Term := Var | Value | Entity | Hash | Link`、
+`Conjunction := Set<Atom>`）を提案され、いまの kotoba / kotobase でどう考慮されて
+いるか、そして「IPLD を基底にしつつその上に Datalog / Datomic を載せたい」という
+積み方はどちらが美しいか、を問われた。
+
+## 観測（2026-08-20、checkout 済みの repo に対して実測）
+
+### 1. Link は既に一級で、しかも index を駆動している
+
+| 提案の Term | いまの実装 | 出典 |
+|---|---|---|
+| `Var(id)` | 規約のみ。`?` で始まる symbol。整数正規化も α-同値の canonicalize も無い | `datalog/src/datalog/core.cljc:169-175` |
+| `Value` | 完全に仕様化済み。14 型の閉じた codec + `:rejected-closed` + 決定的順序 | `kotoba-lang/lang/value-codec.edn:100-175` |
+| `Link(cid)` | 一級。IPLD Data Model kind `:link`、codec code 8 = tag-42、`defrecord Link` | `io-ipld/src/ipld/link.cljc:35`、`ipld/data_model.cljc` の `kind`、`value-codec.edn:141` |
+| `Entity(id)` | 型としては無い。`[e a v]` の `e` は任意の EDN 値 | `kotoba/src/kotoba/kgraph.clj:10` |
+| `Hash(multihash)` | 無い。`multihash-sha256` は `cidv1` の内部関数で型として外に出ない | `io-multiformats/src/multiformats/core.cljc:219,234` |
+
+`Link` が一級というのは飾りではない。`datalog.index/assert-quad` は `ref?` が真の
+ときだけ `:vaet`（CID の逆引き）に入れ、その `ref?` の既定が
+`ipld.core/link?` である（`arrangement/src/arrangement/core.cljc:26-31`、
+ref? naturalizes to: is the object a link）。つまり「`bafy…` という文字列と
+`Link(bafy…)` は別物」という区別が、そのまま逆引き index に入るか入らないかの
+分岐になっている。
+
+**そして `datalog.index` はその `ref?` の既定を捨てて必須引数にまで上げている**
+（`index.cljc:20-28`）。必須パラメータは、型になりたがっている値である。
+
+### 2. Hash / Link 分離は書かれているが、型ではない
+
+IPNI の EntryChunk がまさにその場所で、docstring がこう言っている:
+
+    io-ipni-specs/src/ipni/ad.cljc:24
+      One EntryChunk. `entries` are multihashes (octet vectors), not CIDs.
+
+区別はフィールドごとの検証（`{:error :invalid-multihash}`）で守られていて、
+値の型では守られていない。
+
+### 3. Atom は arity 3 固定で、しかも clause 種別が 2 つある
+
+`[s p o]` / `[e a v]`。relation は Term ではない。n-ary が要る唯一の場所
+（rule 呼び出し `(rule-name ?a ?b)`）は別の clause 種別として扱われる
+（`datalog/core.cljc:240-248` の `rule-invocation?`）。同じ概念に 2 つの形がある。
+
+**この repo は 2026-08-20 に索引を `:spo/:pso/:pos/:ocp` から
+`:eavt/:aevt/:avet/:vaet` へ改名している**（`datalog` `a43dc1c`、One structure,
+one name）。語彙は今日も研がれている一方で、**arity は 3 のまま動いていない**
+というのが、この ADR が記録している差そのものである。以下 `:vaet` は改名後の名前。
+
+### 4. Conjunction の順序は load-bearing であって、偶然ではない
+
+安全否定が「`(not …)` 内の全 lvar は同じ `:where` の先行する肯定 clause で
+束縛済みであること」を静的に検査する（`datalog/core.cljc:44-52`）。
+値 codec 側には canonical set 順序が既にある
+（`:set {:code 18 :order :encoded-element-bytes-unsigned}`）ので、
+機構が無いのではない。**論理的可換性と検査可能性のどちらを取るかを、
+既に後者で決めてある。**
+
+### 5. content-address されているのはデータ側だけ
+
+4 index の prolly-tree snapshot → commit CID、chain CID、block。
+cache key もデータのアドレスであって論理のアドレスではない:
+
+    kotobase-query/src/kotobase/query/bridge.cljc:309-325
+      materialize-memo … memoised on `version` -- a CONTENT ADDRESS for the
+      state of `store` … `version` is REQUIRED and must not be nil
+
+ただし部品は揃っている。query は EDN で、symbol(6) / list(17) / vector(16) /
+keyword(5) は全部 codec に admit されているので `value-cid` を今日そのまま
+query に当てられる。足りないのは α 正規化だけで、いまは `?x` と `?person` が
+違う CID になる。
+
+### 6. IPNI は relation ではなく map lookup
+
+実装は在る（`ipni.ad` / `announce` / `head` / `find` / `advertise`）。しかし
+`kotoba.protocol.discover` の代数は `(update idx (:cid rec) (fnil conj []) rec)`
+（`discover.cljc:38`）で、datom 面に載っていない。260726（Datalog join は ref
+1 本までしか届かない）の帰結として、**構造的に join できない**。
+本番の finder はまだ kad で、`ipni.find` は ContextID / Metadata が要るときだけ。
+`ipni.hamt` は README が自分で specified; not implemented. Not an empty success
+と書いている。
+
+### 7. ここが核心 —— 提案の Atom は、既に在る incidence の positional 退化形
+
+`kotobase/README.md:50-95` と `com-junkawasaki/inc`（**Lean 4 で機械検証済み**の
+Theory of Incidence）が持っている形:
+
+    Incidence i,  ∂(i) = List Endpoint,  Endpoint = {incidence, role, sign, mult}
+
+語彙は `etzhayyim/architecture-framework/resources/eaf/ontology.edn:9-13` に
+固定されている（`:endpoint-required [:endpoint/incidence :endpoint/role
+:endpoint/sign :endpoint/multiplicity]`、`:signs [-1 0 1]`）。
+
+| 提案 | incidence | 差 |
+|---|---|---|
+| `args` の位置 | `role`（ラベル） | 位置は名前の無い role ＝ 退化形 |
+| （無し） | `sign` ∈ {-1,0,1} | 向き。IPLD link は常に outbound だが論理関係はそうとは限らない |
+| （無し） | `mult` | 同じ role の反復（prolly-tree の `children` が実例） |
+| `relation: Term` | `:incidence/kind` | ほぼ同じ |
+
+そして kotobase README が明言している —— **`[e a v]` は例外ではなく基底ケース**、
+3 つの名前付き endpoint を持つ最小の incidence。木は role が 1 つで無名の特殊ケース。
+
+**`args` を positional にした時点で role が消えるので、sign と mult は後から
+足せない。**
+
+### 8. identity について、提案より良い答えが既に在る
+
+提案の第 11 節は「CID ≠ Entity Identity だから `Entity(id)` を Term に足す」。
+問いは正しい。EAF の答えはこう:
+
+    individual = bisimulation quotient(incidence closure, scope, immutable basis)
+    An ID only locates an incidence. A DID is an identifier binding to an
+    individual; it is not the individual.
+
+**identity は primitive ではなく、導出される商である。** ID は同一性を与えるもの
+ではなく incidence を指すものに降格する。提案は漏れを新しい primitive で塞ぐ。
+EAF は同じ漏れを primitive を 1 つ減らして消す。しかも `inc` 側で bisimulation の
+商定理（一意性・普遍分解・kernel-pair coequalizer）が Lean で checked である。
+
+### 9. 用語の穴 —— 3 面ではなく 4 面
+
+提案の `Hash → IPNI = where` / `Link → IPLD = what` / `Rule → Datalog = why` に
+対し、`kotoba.protocol.ref:1-30` が 4 つ目を持っている（identity は hash、
+name は hash への mutable pointer）。`:kotoba.graph/cid`（identity）と
+`:kotoba.graph/head`（naming）を分ける repo-wide 規則と同じ軸である。
+
+### 10. 語彙は Lean まで届き、配線に穴が空いている最中
+
+`kotoba-lang/provider-incidence` の `src/provider/incidence.clj:5-7` が
+`kotoba.lang.incidence` / `-port` / `-replication` を require しているが、
+2026-08-20 の `verify-require-graph` がこの 3 つを sibling-gap として NEW 報告
+している。require 側は確認した。定義側は checkout 済みの範囲で見つからなかった
+（west は 4,221 project で未 checkout も多いので、これは不在の証明ではない）。
+
+## 決定
+
+### D1. 基底は incidence である。IPLD は値面であって関係面ではない
+
+「IPLD を基底にして、その上に Datalog / Datomic を載せる」という積み方は
+2 箇所直す。
+
+**値の代数としての IPLD は既に基底である** —— `lang/value-codec.edn` が IPLD
+Data Model そのもの（14 型・tag-42 link・canonical 順序・閉じた `:rejected-closed`）。
+**関係の代数としての IPLD は基底になっていない** —— L1 の関係はいまだ arity 3 の
+positional triple で、incidence は README と Lean にはあるが query engine に
+配線されていない。
+
+正しい積み方はこう（`:div` viewpoint が既にこの 3 段を
+conceptual incidence, logical datoms, physical encodings という名前で持っている）:
+
+    L2  Datalog（形式） / kotobase 方言（記法） / GraphQL / Cypher   なぜ・どうやって
+    L1b incidence   ∂(i) = [{role, sign, mult}]                      何であるか（関係）
+          └ datom [e a v] = role 3 つの退化形
+    L1a value       kotoba.value.v1 ≡ IPLD Data Model + tag-42        何であるか（値）
+    L0  block / pack / object                                        どこに在るか
+
+これは ADR-2608039970（共有しているのは datom 面であって Datalog ではない）を
+**否定しない** —— L1 を datom triple から incidence へ*一般化*するだけで、
+L2 を premise にしないという判断はそのまま残る。ADR-2608160100 の
+block → pack → object も L0 として据え置き。
+
+### D2. Datomic は載せられない。載るのは Datalog と kotobase 方言である
+
+ADR-2608189300 のとおり 3 つは別の名前で、Datomic は他社の製品である。
+いま書いている `[:find … :where …]` は kotobase 方言であり、既に Datomic に
+無いものを 2 つ持つ（`ref?` 既定が `link?`、`visible?` が必須）。
+だから `Hash` Term を足すのは非互換ではなく**方言の仕様**になる。
+文書・README で「Datomic 方言」「Datomic 互換」と書かない。
+
+### D3. 採否 —— 6 論点それぞれ
+
+| 論点 | 採否 | 理由 |
+|---|---|---|
+| Term を型にする | **採る** | `ref?` が必須引数になっているのは型になりたがっている証拠 |
+| `Hash` / `Link` 分離 | **採る** | 既存に対応物が無い、唯一の純粋な gain |
+| IR の content-address | **採る** | 新 primitive ゼロ。足りないのは α 正規化だけ |
+| Atom を 1 種に | **方向は採る、形は採らない** | positional n-ary ではなく `∂(i)` に開く。sign / mult を取りこぼすと二度と足せない |
+| Conjunction を集合に | **採らない** | 可換性を取ると safe-negation の静的検査が壊れる。decidable な検査を失う対称性は美しさではなく損失 |
+| `Entity` を Term に足す | **採らない** | identity は primitive ではなく EAF の商に任せる |
+
+採点の基準を明示する: **primitive を減らして説明力が増えるものを採り、
+漏れを塞ぐためだけに増える primitive を採らない。**
+
+### D4. 順番（この順でなければならない）
+
+1. `Hash` を Term 型にする（唯一の純粋な gain、いちばん安い）
+2. Var を正規化して query に `value-cid` を当てる（新 primitive ゼロ）
+3. Atom を `∂(i)` に開く —— **ここで sign / mult を取りこぼすと二度と足せないので、
+   やるならこの順番のここ**
+4. Conjunction は順序付きのまま canonical form を決める（並べ替えではなく、
+   束縛順序を保つ正規形）
+
+`Entity` は足さない。
+
+### D5. 4 つ目の軸を書く
+
+    Hash  → IPNI  → どこに在るか      型が無い（唯一の純粋な穴）
+    Link  → IPLD  → 何であるか        型が在る（code 8, tag-42, vaet index を駆動）
+    Name  → IPNS  → いまどれか        型が無い。identity と naming は別物
+    Rule  → 論理  → なぜ・どうやって   IR が無い
+
+`Link` と `Name` を同じ Term 位置に座らせない —— immutable identity と mutable
+pointer の混同は、第 8 節で警戒したのと同じ事故の別の面である。
+
+## 帰結
+
+- **これは実装の決定ではない。** D4 の 4 手はどれもまだ landed していない。
+  この ADR が固定するのは語彙と順番であって、動くコードではない。
+- **一括改名も一括移行もしない。** `datalog` の arity 3 は 4,000 repo が
+  読んでいる面なので、incidence への一般化は新しい面として足し、既存の
+  `[s p o]` を退化形として残す。
+- **`inc` / EAF / kotobase の 3 つが同じ語彙を既に共有していることを、
+  実装側の README が言っていない**（第 7・10 節）。読み手が `datalog` を
+  開いて「この workspace の関係モデルは triple である」と結論できてしまう。
+  これは測れなかった検査が緑に見えるのと同型で、**語彙が実装より先に在ることが
+  出力から見えない**。`datalog` と `kotobase` の README にこの差分を書く。
+
+## 代替案
+
+- **提案をそのまま採る（positional n-ary Atom + set Conjunction + Entity Term）。**
+  採らない。role / sign / mult を失い、safe-negation の静的検査を失い、
+  identity の商という既に検証済みの答えを捨てて primitive を 1 つ増やす。
+- **何もしない（arity 3 のまま）。** 採らない。`Hash` の穴（where と what が
+  同じ型）は実在し、IPNI を join したくなった時点で必ず当たる。
+- **incidence を先に、`Hash` を後に。** 採らない。incidence への一般化は
+  4,000 repo が読む面を触るので重い。`Hash` は独立して安く、先に入れて損が無い。
+- **新しい repo を起こす。** 採らない。ADR-2608160200 のとおり canonical IR は
+  同じ物理層に載るので、置き場は既存（`datalog` / `kotoba-lang/lang`）である。"}]
