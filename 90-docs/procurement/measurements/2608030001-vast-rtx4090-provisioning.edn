@@ -1,0 +1,68 @@
+;; Vast.ai RTX 4090 プロビジョニング実測（2026-08-03）
+;;
+;; 何を測ったか: **インスタンス作成 → actual_status が running になるまで**。
+;; ここには (a) マーケットのプロビジョニング (b) コンテナイメージの取得
+;; の 2 つが含まれるので、**小さいイメージで (a) だけを分離**した。
+;;
+;; 分離が必要な理由: 打ち手が違う。イメージが支配的なら `cold_workers` で
+;; 償却できるが、プロビジョニングが支配的なら serverless の前提が崩れる。
+;;
+;; 最初の 2 回は 15 分の上限で例外にし、「15 分では終わらなかった」以上の
+;; 情報を残せなかった（どこで時間を使ったかが分からない）。状態遷移を
+;; 時刻付きで記録するようにしてから、初めて切り分けができた。
+
+[{:db/id -1
+  :measurement/id "2608030001-vast-rtx4090-provisioning"
+  :measurement/at "2026-08-03"
+  :measurement/tool "90-docs/procurement/vast-measure.cljs"
+  :source/dataset "procurement"
+  :provider/name "vast.ai"
+  :gpu/name "RTX 4090"
+  :gpu/ram-gb 24
+  :offer/usd-per-hour 0.242962962962963
+  :offer/host-id 293026
+  :offer/geolocation "Texas, US"
+  :offer/inet-down-mbps 767.4
+  :offer/reliability 0.996504
+
+  ;; ── 基準線: 小さいイメージ ────────────────────────────────────────────
+  :baseline/image "alpine:latest"
+  :baseline/provision-ms 61039
+  :baseline/transitions
+  "[{:status \"gone\" :at-ms 253} {:status \"exited\" :at-ms 40763} {:status \"running\" :at-ms 61038}]"
+  :baseline/usd-spent 0.0041
+
+  :measurement/finding
+  "Vast.ai マーケットの **プロビジョニング自体は約 61 秒**（gone → 41s exited →
+   61s running）。Modal の sub-1s〜4s とは 1 桁以上違うが、これはコンテナ起動
+   ではなくマーケットでの計算機確保 + コンテナ作成の時間なので、比較する層が
+   違う。重要なのは『61 秒はイメージと無関係に必ずかかる床』という点。
+
+   したがって Vast.ai serverless の `cold_workers=0`（完全ゼロ）は、**イメージ
+   が瞬時でも 1 分は待つ**ことになる。リクエスト駆動の対話用途には使えず、
+   `cold_workers>=1` を常時抱える運用（= その分は課金される）が前提になる。
+   ADR-2608026300 が『marketplace では完全ゼロ課金かつ即応は成立しない』と
+   書いた推測は、この 61 秒で裏付けられた。"
+
+  :measurement/caveats
+  "単一ホスト・単一試行。ホスト・地域・時間帯で変わりうるので、**この 61 秒を
+   Vast.ai 全体の代表値として引用しない**。3 ホスト × 3 試行の分散を取るまでは
+   『この条件で 61 秒だった』以上のことは言えない。
+
+   `exited` → `running` の 20 秒が何なのかは未解明（コンテナ作成後の起動待ち
+   と思われるが確認していない）。
+
+   ComfyUI イメージでの実測は別途（15 分の上限では終わらなかったので、35 分で
+   再測定中）。**生成そのものの秒数はまだ測っていない** —— ComfyUI への HTTP が
+   要るので本 harness の対象外。"
+
+  :measurement/cost-usd-cumulative 0.0149
+  :measurement/failed-runs 3
+  :measurement/failure-notes
+  "3 回失敗した。いずれも安全網（`with-destroy!`）は機能し、取り残しゼロを
+   API 実測で確認。累計消費 $0.0149。失敗の中身:
+   (1) `set!` が nbb の Module に効かず、エラーハンドラ自身が例外を投げた
+   (2) 5 秒ポーリングが Vast.ai のレート上限（3 req）を踏み、429 が
+       destroy の確認経路を誤報させうる状態だった
+   (3) docstring の生の二重引用符が構文を壊した
+   —— すべて『安全網そのものの欠陥』で、計測ロジックの欠陥ではない。"}]

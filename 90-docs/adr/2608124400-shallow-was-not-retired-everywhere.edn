@@ -1,0 +1,429 @@
+[{:db/id -1
+  :adr/id "ADR-2608124400"
+  :adr/title "Shallow was not retired everywhere, and the superproject was re-shallowed yesterday"
+  :adr/status "accepted"
+  :adr/date "2026-08-12"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/related ["ADR-2607211600" "ADR-2608124000"]
+  :adr/body
+  "## The claim that was false
+
+CLAUDE.md records that shallow clones were retired 2026-07-21 (ADR-2607211600,
+reversing the earlier shallow-by-default) and that **everything was
+unshallowed**. That is stated as completed history, and work today relied on it.
+
+**It is not true.** A scan of every checkout — 4,407 `.git` directories plus 7
+`.git`-file pointers, keyed on the `shallow` marker file, which is definitive
+for both layouts — found **11 shallow child repos, plus the superproject root
+itself**, plus two orphan shallow gitdirs with no checkout.
+
+## Why it mattered today
+
+`orgs/kotoba-lang/kotoba` was one of them: 24 grafts, 4 false root commits, an
+apparent history beginning 2026-07-14, and only 234 commits reachable.
+
+**It is the one repo where ancestry questions keep being asked**, because it
+holds the deleted `kotoba-server` source (ADR-2608124000). An investigation
+concluded from that clone that the deployed build commit was reachable only from
+a stale side branch; the GitHub API said it is on `main`'s history, 643 commits
+back. **The local answer was wrong and looked authoritative.**
+
+Unshallowed, it now reproduces the API exactly and locally:
+
+- 234 -> **1,487 commits**, 4 false roots -> **1 true root**
+- `merge-base --is-ancestor <build> origin/main` -> **yes**
+- distance to `origin/main`: **643** — the ADR's server-side figure
+- deletion commit: ancestor, **584** back — also matching
+- `branch -r --contains <build>`: **57 branches including `origin/main`**, not a
+  stale side branch
+- path-limited `git log -- crates/kotoba-server` works again; the crate is there
+  at the build commit, 52 files
+
+**The question ADR-2608124000 had to route through the API is now answerable on
+this machine.**
+
+## CORRECTION: nothing re-shallowed it yesterday. That was my inference, and it was wrong.
+
+The section below reads the `18:50` mtime as evidence of a recent shallowing.
+**It is a `git gc` artifact.** `git repack -d` / `gc` calls `prune_shallow()`,
+which rewrites `.git/shallow` through a lock-and-rename — **bumping the mtime
+with byte-identical content.**
+
+Verified experimentally with the same git binary: in a scratch shallow clone,
+`git gc --prune=now` bumped the mtime and left the graft unchanged; on a
+non-shallow control, gc created no shallow file at all. **gc can rewrite a
+shallow file but never creates one.**
+
+The root's `.git` carries gc's whole fingerprint from that evening in the exact
+order the experiment reproduced — mass reflog rewrite 18:47:50, pack index and
+`.rev` 18:49, `info/refs` 18:49, `shallow` 18:50.
+
+**When it actually happened.** The 10 graft SHAs all date to 2026-07-18 to
+07-22, and simulating that frontier at the recorded HEAD yields 11,994 reachable
+against the 12,077 measured — the right frontier. Two properties identify the
+operation: each graft's parents are dated within minutes of it, several *later*,
+so **no date cutoff separates them** (not `--shallow-since`); and all 10 sit at a
+uniform min-distance from a single main-line tip, **which is the signature of
+`--depth N` on one branch.**
+
+Bracketed by two independent records: an ADR measured the root non-shallow with
+full history on 2026-08-01, and a byte copy of the root's `.git` made by another
+session at 2026-08-11 14:57 holds the **identical 10 SHAs** — proving the root
+was already shallow **four hours before** the mtime I read as the event.
+
+**So: a `--depth N` fetch somewhere between 2026-08-01 and 2026-08-11.** It left
+no trace in any reachable log and is not attributable to committed tooling —
+consistent with a one-off ad-hoc command, which is **a different risk profile
+from a scheduled job** and means no fix is owed to any script.
+
+Every other shallow repo here has its shallow-file mtime at its frontier date.
+**The root is the only one where they diverge, because it is the only one busy
+enough to have been gc'd since.** That divergence is exactly what misled me.
+
+## The structural hazard this exposed, which is the real finding
+
+**Linked worktrees share `$GIT_COMMON_DIR/shallow` with the repository they were
+made from.** Confirmed: a worktree under `/private/tmp` reports the
+superproject's own `.git` as its common dir.
+
+So **a `--depth` fetch inside any `throwaway` worktree shallows the superproject
+itself**, and the root currently has four linked worktrees, three of them under
+`/private/tmp`.
+
+This workspace *instructs* agents to work in worktrees. That guidance is right
+for isolation of the working tree — **but the object store, and the shallow file,
+are not isolated at all.** A worktree is not a sandbox for anything that writes
+to `.git`. That is very likely how the unattributed fetch reached the root, and
+it is the part worth carrying into practice rather than the date.
+
+### Observed directly, 2026-08-13, with the source repository identified
+
+The mechanism above was an inference when this ADR was written. It has since
+been caught in the act, in a different repository, where the evidence survives
+because nothing gc'd it away.
+
+`orgs/kotoba-lang/kototama` carried exactly one graft:
+`b2965762647d16aedd96edbeb7750a1fa4385b95`, an `Initial commit` whose tree is a
+single `README.md`. Three facts identify where it came from:
+
+- `gh api repos/kotoba-lang/kototama/commits/b296576…` returns **422, no commit
+  found** — it is not in kototama at all, and no kototama ref reaches it.
+- `orgs/kotoba-lang/kototama-cljc-contract` is **a linked worktree of kototama**
+  (its `.git` file points at `…/kototama/.git/worktrees/…`), detached at exactly
+  `b296576`.
+- `gh api repos/kotoba-lang/kototama-cljc-contract/commits/b296576…` **exists,
+  with `parents: []`.**
+
+So a shallow fetch of **one repository** wrote a graft into **another
+repository's** object store, through the shared `$GIT_COMMON_DIR`. This is the
+hazard, observed, rather than reconstructed from a frontier.
+
+Two consequences that generalise:
+
+**`fetch --unshallow origin` cannot repair it.** It exits 0, prints nothing, and
+leaves the shallow file byte-identical, because nothing in *kototama's* own
+history is missing. The repair has to name the repository the graft actually came
+from. A silent success is the worst available answer here, and it is the one the
+obvious command gives.
+
+**This particular graft truncated nothing.** It sits on a genuine root commit of
+a foreign repository, so kototama's ancestry answers were never wrong. That is
+luck, not a property of the mechanism: had the borrowed frontier been mid-history
+rather than at a root, kototama would have answered ancestry questions
+incorrectly with no outward sign. **A shared object store means the correctness
+of repo A's history can depend on how repo B was fetched.**
+
+The underlying anomaly — a repository registered as its own west project while
+existing on disk as a linked worktree of a *different* west project — is not
+repaired here. Restructuring a checkout is owner territory and belongs to the
+`git-cleanup-conflict` retirement flow.
+
+## Ruled out, each checked against the ROOT specifically
+
+west (no `clone-depth`, no `.west` depth, root is not a west project); git config
+(no `gc.*`, `fetch.*`, depth, maintenance or prune settings anywhere, no
+`git maintenance` launchd job); the four surviving `--depth 1` callers in
+`scripts/` (all clone GitHub URLs into throwaway temp workspaces, none opens the
+root's `.git`); 43 launchd plists, of which the only two doing shallow git work
+target a `mkdtemp` directory and a private repo; the previously known offender,
+which ADR-2608019100 caught fetching `--depth 1` into the root every six hours
+and which **no longer exists**; and every session transcript and shell history in
+the window — all `--depth` hits clone other repos elsewhere.
+
+**No `unrelated histories` symptom appears anywhere in the window**, which is
+consistent with a ~12,000-commit-deep frontier: invisible to everyday merge-base
+work. **That is why nobody noticed.**
+
+## The 5.5 GB repo should NOT be unshallowed. It is a stale duplicate.
+
+`orgs/gftdcojp/ai-gftd-apps-gftdcojp` is the **pre-rename path**.
+`manifest/repos.edn` carries the rename and GitHub confirms the redirect — both
+names resolve to one repository.
+
+**The registered path `orgs/gftdcojp/apps-gftdcojp` already has full history**:
+not shallow, 27,976 commits, zero WIP, same HEAD. So **the ancestry question is
+already answerable on this machine**, at the other path.
+
+The old path is worse than recorded: **HEAD is itself a graft**, so
+`rev-list --count HEAD` returns **1**. Depth 1 from the pin — it can answer no
+ancestry question at all. And **nothing reads it**: not in `west.yml`, not in
+`fleet-db.edn`, not in `fleet-ci.edn`, untracked in the superproject. The one
+tool doing local `merge-base --is-ancestor` iterates west projects only, so it
+never visits this path.
+
+**So the benefit of unshallowing is zero and the cost is 5.4 GiB.** The real
+opportunity is the reverse: **retiring the checkout frees ~11 GB.** Of its 39
+local branches, 10 tips are absent from the new checkout and **all 10 were
+verified present on GitHub**. The genuine blocker is 11 uncommitted files inside
+a **stale-locked** worktree — its lock names a process that is not running, last
+commit 2026-07-03 — and those are by definition not on GitHub. That retirement
+belongs in the `git-cleanup-conflict` `:retirement` flow, and involves another
+session's worktree.
+
+One thing that only *looks* like WIP: the 3 modified files at the old path are
+**byte-identical to the new path's `main`**, landed by a cleanup commit with the
+identical diffstat. They appear uncommitted solely because this checkout's HEAD
+is pinned at a graft predating that commit.
+
+**The stale temp pack is gone.** 580,004,872 bytes, verified orphaned five ways
+before removal — git itself called it garbage, it had **no `.idx`** so the pack
+loader could not reach it by construction, no process held it open, it was 24
+days old, and **its retry succeeded**: the interrupted fetch declared 113,157
+objects and a complete pack landed 32 minutes later with 196,797. No `gc`,
+`prune` or `repack` was run.
+
+## The worktree hazard is live in committed tooling
+
+One of the three violations below was **not** a scratch clone. It fetches
+`--depth 1` into a path created by `git worktree add`, and **linked worktrees
+share the shallow file with their parent repository** — so that scheduled job
+writes grafts into the parent's object store. **This is the exact mechanism this
+ADR identifies as how the superproject likely got re-shallowed, running weekly
+on a timer.**
+
+## Two live violations, and an audit wired to nothing
+
+**All three are fixed** — the audit went 6 violations to 3, and the remaining 3
+are unrelated pre-existing items. Both launchd jobs are still loaded and
+scheduled; no plist was touched.
+
+**The shallow bought 174 KB.** The `--depth 50` clone was into a *persistent*
+path refreshed daily, not scratch. Unshallowed: 86 to 136 commits, 18 grafts to
+0, **7.9 seconds**, and the pack grew from 47.04 to 47.21 MiB. No
+B2/DataLad argument was needed; full history cost 0.17 MiB.
+
+**Two corrections to the brief, both worth more than the fix.**
+
+The playtest job's target repo is **not missing — it changed org**, and is
+checked out, not shallow, 855 commits. The script's hardcoded path is stale on
+both counts. And it does not fail: **`spawnSync` with a nonexistent `cwd`
+returns `status: nil`, the script ignores return values, so every command
+silently no-ops** and it prints one benign line and exits 0. The log's last four
+entries are exactly that line with nothing between them — **four consecutive
+weekly no-ops that read as healthy in `launchctl` and whose log line reads like a
+real outcome.** That is worse than an erroring job.
+
+**The other job has failed every run since it was created** — 21 log lines for 21
+expected daily runs, 20 HTTP 400 and one 502, never once succeeding.
+
+**CORRECTION (2026-08-13): the cause recorded here was wrong.** This paragraph
+said the job hardcoded a concrete model id against a legacy hostname, violating
+ADR-2607173100, and that the `murakumo-main` alias resolved that model to a
+different endpoint. That reading came from the code, not from the wire. Measured:
+the legacy hostname returns **200** for a well-formed request, and **both**
+endpoints returned the identical 400:
+
+    {\"error\":{\"code\":400,\"message\":\"Expected 'messages' to be an array\"}}
+
+The request body was built with `#js {…}`, which is **shallow**. `:messages`
+stayed a ClojureScript vector, so `JSON.stringify` serialised its internals —
+`{\"G\":null,\"I\":1,\"shift\":5,\"root\":{…}}`. **Every request since day one was
+malformed**, and the script threw away the server's explanation, logging only
+`\"LLM HTTP \" status`. The answer was in the response body twenty times.
+
+The ADR-2607173100 violation is real and was fixed too, but it was not why the
+job failed. **A defect that is visible in the source is not thereby the defect
+that is firing** — and discarding the error text is what let a wrong diagnosis
+stand for three weeks.
+
+A third defect was hiding behind the second: well-formed but non-streaming
+requests hit a Cloudflare edge **524 at ~128 s**. With `stream: true` the same
+request returns 200, first byte at 17.9 s, complete at 47.0 s.
+
+Verification limits stated rather than implied: the shinshi edit was exercised by
+running the real edited function, and the repo **stayed non-shallow** afterwards
+— but the script was deliberately not run end to end, because it commits, pushes
+and **auto-merges to `main` of a live repo**. The playtest depth-flag removal is
+**unexercised**, because its target directory does not exist so the fetch never
+executes.
+
+**CORRECTED (2026-08-13).** This section said `~/.gftd` is not a git repository
+and that **26** launchd plists point into it, so relocating the scripts would
+break 26 jobs unless the plists moved in the same step. Both halves are now
+wrong, and the count was wrong when written.
+
+**The count.** 25 plists match the string `.gftd`, but **13 of those match only
+through their own Label** (`com.gftd.*`), which points at nothing. **12 reference
+the directory**, and of those only **five actually execute code from it**. The
+rest write a log there or read one credential path — nothing that merely writes a
+log needs to move. Matching a string is not counting a dependency.
+
+**The blocker.** Relocation was never necessary. `~/.gftd` is now under version
+control **in place**, with the git directory held outside the work tree at
+`~/.gftd-vcs.git` and a deny-by-default `.gitignore`. No plist was touched and no
+absolute path changed. Keeping the git dir outside also avoids altering git
+*discovery* for `fleet-ci-cache`'s deliberately git-less trees, which an in-place
+`.git` would have done.
+
+**What remains, for an owner.** `~/.gftd-vcs.git` **has no remote** — the history
+protecting those scripts lives on the same disk as the scripts. And
+`scripts/audit-gftd-scripts.cljs` is still wired to nothing; it works (three
+violations today, all `.sh`, one live under a loaded job), but registering it in
+the orgs-detector tick would install a standing red, so the three files want a
+decision first. A fleet gate cannot substitute: `~/.gftd` is in no repo's tree.
+
+Also worth removing: the byte copy of the root's `.git` at `/private/tmp` still
+holds the shallow frontier. **Fetching from it would re-import the grafts.**
+
+## A guard landed, and it does not use the obvious check
+
+`.claude/hooks/session-start-shallow-check.cljs`, registered as a SessionStart
+hook. Detection only, and the agent argued the other two options away rather
+than building all three: a **PreToolUse deny sees only this session's tool
+calls**, so it would have caught neither the unattributable ad-hoc command nor
+the weekly launchd job; and **a fleet gate cannot see this at all**, because
+`.git/shallow` is not a file in any tree — the same structural failure as
+`root-permit-index`, and worse, since the state is not under version control
+anywhere.
+
+**It keys on graft COUNT, not on `git rev-parse --is-shallow-repository`** —
+because that flag **returns true for an EMPTY shallow file whose history is
+complete and whose ancestry is correct.** Measured on git 2.50.1, and confirmed
+independently here: `is_repository_shallow()` sets the flag on a successful
+open, before reading a line. A guard keyed on the flag would cry wolf.
+
+It reproduced both the failure shape (three commands silently wrong, no error
+printed) and **the worktree vector**: a `--depth 2` fetch inside a `/tmp`
+throwaway worktree collapsed its parent from 30 commits to 2, with **zero
+reflog lines mentioning depth.**
+
+What it does not cover, stated: root and `orgs/<org>/<repo>` only, not fleet;
+**detection, not prevention** — it fires after the damage, shortening exposure
+from ten days to one session; and it names the state, not the culprit. A timed
+-out sweep that finds nothing **stays silent**, so coverage is lost quietly in
+that case.
+
+It also cross-checks `manifest/west.yml` and marks unregistered paths, because
+the generic *unshallow it* advice would otherwise have driven a pointless 5.4
+GiB fetch on the stale duplicate above.
+
+## Will it recur? No scheduled job will redo it
+
+The root is clean — `is-shallow: false`, no shallow file, 25,092 commits — and
+with the file gone gc has nothing to rewrite, so the unshallow is stable.
+
+What would catch the next one: git records fetch arguments in reflog messages,
+**but a depth fetch that does not move a ref writes no entry**, which is why this
+one is invisible. A `reference-transaction` hook or a watcher on `.git/shallow`
+would name the responsible process.
+
+## (original, now corrected) The superproject was re-shallowed YESTERDAY
+
+`.git/shallow` in the superproject root carried **10 grafts** and its mtime is
+**2026-08-11 18:50** — three weeks *after* the retirement. **That is not 2026-07-21
+residue; something re-shallowed it recently.** The root is not a west project,
+so west did not do it, and what did was not determined.
+
+It is now unshallowed: **12,077 -> 25,062 commits, 10 grafts -> 6 true root
+commits.** (A concurrent session moved `origin/main` mid-fetch, producing a ref
+lock warning; the unshallow itself completed.)
+
+This one matters beyond ancestry hygiene: **the superproject is where pin
+verification, merge-base and fast-forward checks are performed.** Those are the
+operations ADR-2607211600 retired shallow to protect.
+
+## Re-shallowing risk from west: measured clear
+
+`manifest/west.yml` has **zero** occurrences of `clone-depth` or `depth`,
+`.west/config` has no depth setting, and no `remote.*.depth` exists in git
+config. `gen-west-manifest.cljs` documents that the `clone-depth` emission
+machinery was **removed 2026-07-25 precisely because it silently reintroduced
+`clone-depth: 1`**. The surviving `--depth 1` calls all clone into throwaway
+temporary workspaces, never into `orgs/`.
+
+**So these unshallows will stick.** What re-shallowed the root on 2026-08-11 is
+therefore *not* west, and remains unexplained.
+
+## Remediation: 9 of the 10 remaining are done
+
+Unshallowed, ~740 MB total, 51 s for the largest: `kotodama`, `kotoba-code`,
+`hil`, `tamaki`, `kotoba-topology`, `kototama`, `ai-gftd-yukkuri`,
+`kotoba-v2025`, and `etzhayyim/root` (20 grafts, 10,122 -> 10,183 commits, 54 ->
+47 roots).
+
+**Safety confirmed rather than assumed.** Every repo's fetch refspec was checked
+first: all map **only** into `refs/remotes/origin/*`, none writes `refs/heads/*`.
+Combined with detached HEAD everywhere (normal at a west pin), **no local branch
+and no HEAD could move.** `git status --porcelain` was hashed before and after
+each and is byte-identical — including `etzhayyim/root`'s pre-existing WIP, which
+survived. `-c gc.auto=0` was passed on every fetch, since `fetch` can trigger
+auto-gc.
+
+**`gftdcojp/ai-gftd-apps-gftdcojp` (50 grafts, 5.5 GB) was skipped**, for four
+reasons rather than size alone: it is ~90% of the remaining liability; it has a
+**locked** agent worktree plus a second on a live branch, i.e. concurrent
+sessions; it carries a **580 MB stale `tmp_pack_` from 19 July**, which is direct
+evidence that a large fetch here has already died mid-flight; and it has
+uncommitted WIP. A failed 5.5 GB fetch leaves more of the same.
+
+Two honest residuals, both real rather than graft artifacts. `kototama` keeps
+**one graft** whose commit is reachable from no ref — the orphaned detached HEAD
+of another session's linked worktree, left rather than disturbed; its own history
+is now genuinely full. And `etzhayyim/root` shows 47 roots with **zero** grafts,
+which is expected for a monorepo that absorbed many former submodule histories.
+
+Two orphan shallow gitdirs remain with no checkout (submodule-era leftovers,
+both carrying the now-banned `-clj` suffix). **No checkout means no ancestry
+answer can come from them**, so unshallowing them buys nothing.
+
+## The original list of 11
+
+Remediating all of them would pull roughly **7 GB**, dominated by one 5.5 GB
+repo. They are recorded here rather than fixed, so the decision is visible:
+
+`gftdcojp/ai-gftd-apps-gftdcojp` (50 grafts, 5.5 GB) · `etzhayyim/root` (20,
+596 MB) · `kotoba-lang/kotoba-v2025` · `gftdcojp/ai-gftd-yukkuri` ·
+`kotoba-lang/kototama` · `kotoba-lang/kotoba-topology` · `etzhayyim/tamaki` ·
+`kotoba-lang/hil` · `kotodama` · `kotoba-code`.
+
+## `git fetch --dry-run --unshallow` is not a preview
+
+Reported honestly by the agent that hit it: **`--dry-run` skips ref updates but
+still performs the fetch.** Running it downloaded the full history and removed
+the `shallow` file — the intended operation happened through a command expected
+to be inert.
+
+The outcome was correct and nothing was at risk, but the lesson generalises:
+**`--dry-run` on `fetch` is not read-only.** That checkout had 33 lines of
+uncommitted WIP and a detached HEAD, so it was worth knowing before rather than
+after.
+
+## The gitdir defect: diagnosed, deliberately left
+
+`orgs/kotoba-lang/kotoba`'s `.git` is a file pointing at a leftover **submodule**
+gitdir under the repo's **old org path**. **It is functionally correct**, which
+the first check got wrong: `core.worktree` is not in `config` but in
+`config.worktree`, enabled by `extensions.worktreeConfig`, and points forward to
+the current checkout. Both links are relative and at equal depth. The only
+functional symptom is `git worktree list` reporting the gitdir path.
+
+A move would be mechanically clean — no alternates, no linked worktrees, no
+gitlink, no `.gitmodules`, and the old path does not exist. **It was still not
+done**, because the benefit is cosmetic while the risk lands on 9 untracked,
+nowhere-backed-up source files in a repo with a detached HEAD and an apparently
+active session, and the operation is **non-atomic across two locations** — between
+the move and the pointer rewrite the checkout is broken.
+
+Precondition if it is ever wanted: land or archive the WIP, confirm no live
+session, then move and rewrite in one scripted step."}]

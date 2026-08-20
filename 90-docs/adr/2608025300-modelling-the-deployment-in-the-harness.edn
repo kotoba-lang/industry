@@ -1,0 +1,67 @@
+[{:db/id -1
+  :adr/id "adr-2608025300-modelling-the-deployment-in-the-harness"
+  :adr/title "adr-2608025300: deploy 環境を harness に写し取る — eviction でも署名順でも catch-up でもなかった。残るは HTTP そのもの"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "engi-harness-models-deployment"
+  :adr/authoritative-for
+  ["harness が写し取る deploy 環境の差"
+   "deploy 済み停止の残る候補"]
+  :adr/related ["adr-2608025200-reproduce-where-it-runs-in-six-seconds"]
+  :adr/evidence ["https://github.com/kotoba-lang/engi/commit/395dfd036da35accaf37d752a8664d3cf75fb3b1"]
+  :adr/body
+  "# ADR-2608025300: deploy 環境を harness に写し取る
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## 3 つの差を写し取った
+
+### ① eviction
+
+**Durable Object は絶えず作り直され、失うのは「集めた票」と「作った証明書」のすべて。** 戻るのは永続化された block だけ（`replay` 経由）。
+
+実行中に replica を自分の chain から作り直すことで再現。**chain は走り続けた。**
+
+### ② transport 側での署名
+
+**Worker の replica は `sign-fn` を持たない** —— 無署名の票を作り、**鍵が使われる場所である transport が送出時に署名し**、署名済みの写しを畳み戻す。WebCrypto は非同期で、consensus の seam はそうではない。
+
+再現。**chain は走り続けた。**
+
+### ③ wipe された replica（前 commit）—— これは本物の欠陥を見つけた
+
+## 3 つすべて + equivocator + forger を入れて
+
+```
+  w1..w4  height 80  committed 78  同一 root
+  wipe された w3 は height 80 / committed 78 まで復帰
+  共通 commit prefix: 79 block、4 者一致
+```
+
+## つまり
+
+**deploy 済みの停止は、eviction でも署名順でも catch-up でもない。**
+
+**残るのは HTTP そのもの** —— batching、latency、順序、そして Durable Object の request queue。**harness がまだ写し取っていないのはそこだけ。**
+
+## harness の assertion が 2 つ間違っていた（コードではなく）
+
+- **genesis 証明書は構成上署名を持たない**し、`replay` はそれを `:qcs` に戻す。「すべての証明書は署名付き」はそこで落ちた。
+- **Byzantine の双子は transport が署名する前に作り、同じ経路を通さねばならない** —— さもないと**プロトコルではなく codec を検査している。**
+
+## Consequences
+
+- (+) harness が deploy 環境の 3 つの差を写し取り、6 秒で回る。
+- (+) 停止の候補が 1 つに絞られた（HTTP transport）。
+- (−) deploy 済み chain は height 2 で停止のまま。
+
+engi 229 tests / 1173 assertions、parity 不変。
+"}]

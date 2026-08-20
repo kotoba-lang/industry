@@ -1,0 +1,159 @@
+[{:db/id -1
+  :progress/family "cloud-itonami-lei-universe"
+  :progress/adr "90-docs/adr/2607199960-cloud-itonami-lei-top10-universe-expansion.edn"
+  :progress/sibling-files ["90-docs/adr/2607110300-cloud-itonami-lei-corporate-tos-catalog.progress.edn"
+                            "90-docs/adr/2607110300-cloud-itonami-lei-corporate-tos-catalog.isco-progress.edn"]
+  :progress/schema-note "cloud-itonami-lei universe-expansion progress tracker, per ADR-2607199960. Distinct from the sibling ISIC/ISCO classification-sampling progress files: this file's company source is real, published stock-index constituent lists (one row per index), not an ISIC/ISCO top-N judgment call. Each :index/constituents entry that reaches :company/status :done gets the SAME cloud-itonami-lei-<LEI> repo treatment (real GLEIF LEI, real ToS fetch, provenance, no fabrication) as the ISIC/ISCO fleet -- and before creating any new repo, the LEI must be checked against ALL already-registered LEIs (this file + both sibling files) to avoid duplicate repos for a company that's already covered via an ISIC/ISCO row or another index. This file is the resume point for the next /loop iteration on the universe track (kept separate from the ISIC/ISCO resume points so the two tracks can proceed independently without stepping on each other)."
+  :progress/resume-from "Iteration 3 done 2026-07-19 (same session day, third /loop pass). sp500 is :index/status :in-progress with 22 constituents attempted total (11 :done, 11 :tos-fetch-failed) -- see that row's :index/constituents and :index/note. This iteration attempted 8 previously-untried candidates chosen for pharma/tech/consumer diversity: Salesforce, Inc. (done), Netflix, Inc. (done), Eli Lilly and Company (tos-fetch-failed), AbbVie Inc. (tos-fetch-failed), Meta Platforms, Inc. (tos-fetch-failed), Colgate-Palmolive Company (tos-fetch-failed), Kimberly-Clark Corporation (tos-fetch-failed), Mondelez International, Inc. (tos-fetch-failed). Only 2/8 succeeded this pass (lower than iterations 1-2) -- all 6 failures were genuine network-layer bot-blocks or client-rendered-SPA content unreachable via curl/WebFetch (Cloudflare challenge pages, GoDaddy parked-domain redirects revealing colgatepalmolive.com is not the real corporate domain, 400s on every Facebook/Meta legal URL guessed, and a heavy client-side-rendered Mondelez site where neither curl nor WebFetch could retrieve server-rendered legal body text, only nav-shell markup) -- see :index/note for full per-company detail. Companies NOT yet attempted for sp500 (real, well-known S&P 500 constituents): Citigroup Inc., Morgan Stanley, Berkshire Hathaway Inc., Chubb Limited, MetLife Inc., Honeywell International Inc., Deere & Company, Apple Inc., Alphabet Inc. -- resume by GLEIF-verifying and ToS-fetching more of these (dedup against the LEIs already in this row + both sibling progress files first) until sp500 reaches a documented stopping point, then mark :index/status :done and move to nikkei225 (next in file order), followed by topix100, ftse100, dax40, stoxx600, hangseng, csi300, asx200, tsx60, sensex, kospi200, bovespa, cac40, smi in that order. Same per-company discipline throughout: real GLEIF LEI only, real ToS fetch (curl with a standard browser User-Agent first, WebFetch as a second-method fallback for JS-shell/client-rendered pages -- note WebFetch tends to paraphrase/summarize rather than return true verbatim text even when explicitly instructed otherwise, so curl+plain-text-extraction remains the preferred method whenever the raw HTML actually contains server-rendered content), never fabricate, never substitute a subsidiary LEI for a parent, record failures honestly, dedup against this file + both sibling ISIC/ISCO progress files before creating any repo -- ALSO cross-check the live `gh api orgs/cloud-itonami/repos` listing since the pre-extracted registered-LEI snapshot can itself go stale between iterations. This superproject checkout has heavy concurrent multi-session activity -- always re-read this file fresh immediately before editing (this iteration again hit a shallow-clone false-positive 'forced update'/'unrelated histories' on fetch, confirmed via `gh api .../compare` to be a pure 8-commit fast-forward, resolved with `git fetch --deepen=30` rather than treating it as a real force-push), and prefer a worktree outside the superproject + feature branch + `gh api .../merges` server-side merge over direct edits in the shared checkout. Separately this iteration, isco-1341 (Independent Child Care Services Management Practice) was topped up from 1 to 4 companies in the sibling isco-progress.edn file -- see that file's :progress/resume-from for its own next-step detail; not duplicated here."
+  :progress/indices
+  [{:index/code "sp500"
+    :index/name "S&P 500"
+    :index/region "US"
+    :index/status :in-progress
+    :index/constituents-source-note "Constituent candidates were selected from the agent's general knowledge of well-known, large-cap S&P 500 member companies (not from a freshly fetched/scraped official S&P Dow Jones Indices constituent list this session) -- honestly disclosed per ADR-2607199960 rather than citing a fabricated source URL for the list itself. Each individual company's LEI and ToS/legal-document text, by contrast, IS a real tool-verified fetch (GLEIF API + WebFetch/curl), recorded per-company below with real source URLs."
+    :index/note "First seed pass, 2026-07-19: 8 candidates attempted, chosen to diversify away from the oil/pipeline/utility/airline/retail/chemicals/semiconductor/aerospace/waste sectors already heavily sampled by the ISIC track -- banking (JPMorgan Chase), CPG (Procter & Gamble, Coca-Cola), healthcare (Johnson & Johnson, UnitedHealth Group), payments (Visa), industrials (3M), and tech (Microsoft). 6/8 succeeded. JPMorgan Chase & Co. and Johnson & Johnson both had real GLEIF-verified LEIs but failed ToS fetch (bot-blocked/JS-shell) after 2 URL attempts each. All 6 successes used a curl+plain-text-extraction fallback after WebFetch alone 403'd/404'd/timed-out/summarized-instead-of-quoting on the same URLs for 5 of the 6 (only Visa needed just the redirect-follow). Iteration 2, same day: 6 more candidates attempted -- banking (Goldman Sachs), pharma (Pfizer, Merck), payments/tech (Mastercard, Adobe), industrials (Caterpillar). 3/6 succeeded (Goldman Sachs and Merck fetched directly via WebFetch on the first URL attempt with no retry needed; Pfizer needed the curl+footer-scan fallback after its first guessed URL 404'd). Adobe and Caterpillar were both fully bot-blocked at the network layer (Adobe: HTTP/2 stream reset + later HTTP 000 connection failure on both WebFetch and curl attempts against multiple hostnames; Caterpillar: HTTP 403 on every attempted hostname/path including the plain homepage) -- not just a wrong URL guess. Mastercard was HTTP 403 via both WebFetch and curl on its known terms-of-use path and its homepage; no substitute privacy-notice document was found on this pass (unlike Visa's precedent) so it was recorded as a clean tos-fetch-failed rather than stretched into a doc-type substitution. Bank of America Corporation (LEI 9DJT3UXIJIZJI4WXO774) and Wells Fargo & Company (LEI PBLD0EJDB5FWOLXP3B76) were both GLEIF-verified as real during this iteration's candidate research but turned out to already be recorded (with :tos-fetch-failed status) under a different progress-file row from earlier catalog work -- correctly not re-added here to avoid a duplicate LEI entry across files; see :progress/resume-from for detail. Iteration 3, same day: 8 more candidates attempted -- pharma (Eli Lilly, AbbVie), tech (Salesforce, Netflix, Meta Platforms), consumer/CPG (Colgate-Palmolive, Kimberly-Clark, Mondelez International). Only 2/8 succeeded. Salesforce's real Terms of Service page (found via a homepage footer-link scan after the legal-hub landing page turned out to be an index of links, not the ToS text itself) and Netflix's Terms of Use both fetched cleanly via curl on the first correctly-identified URL. Eli Lilly was blocked by a Cloudflare 'Just a moment...' JS challenge on every one of 3 URLs tried (lilly.com/terms-of-use redirect target, and a homepage-footer-scanned lillyhub.com copyright page). AbbVie and Kimberly-Clark were both HTTP 403 via curl AND WebFetch (2 clean attempts each, homepage returned only a tiny bot-check stub). Colgate-Palmolive's guessed corporate domain (colgatepalmolive.com) turned out to be a parked/for-sale domain (redirects to a GoDaddy sale page) -- retried on the real brand domain colgate.com, which was also HTTP 403 on 2 URL attempts. Meta Platforms was HTTP 400 on every one of 4 guessed Facebook/Meta legal URLs (facebook.com/legal/terms, about.meta.com/actions/legal-obligations, facebook.com/policies_center, mbasic.facebook.com/legal/terms) -- Meta aggressively blocks non-browser HTTP clients at the edge. Mondelez International's terms-of-use page returned HTTP 200 via curl but is a heavy client-side-rendered SPA (confirmed no embedded JSON/script payload containing the real legal text in the raw HTML); WebFetch on the same URL also explicitly reported it could only see nav/footer markup, not the substantive Terms of Use body -- recorded as a genuine fetch failure, not a wrong-URL guess."
+    :index/constituents
+    [{:company/legal-name "The Procter & Gamble Company"
+      :company/lei "2572IBTT8CCZW6AU4141"
+      :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.legalName%5D=The%20Procter%20%26%20Gamble%20Company"
+      :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-2572ibtt8cczw6au4141"
+      :company/status :done
+      :company/tos-doc-count 1
+      :company/tos-source-url "https://termsandconditions.pg.com/en-us/"
+      :company/note "us.pg.com/terms_conditions/ 404'd via WebFetch; real path found via homepage footer scan, fetched via curl+plain-text-extraction fallback"}
+     {:company/legal-name "UnitedHealth Group Incorporated"
+      :company/lei "549300GHBMY8T5GXDE41"
+      :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=UnitedHealth Group Incorporated"
+      :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300ghbmy8t5gxde41"
+      :company/status :done
+      :company/tos-doc-count 1
+      :company/tos-source-url "https://www.unitedhealthgroup.com/terms-of-use.html"
+      :company/note "unitedhealthgroup.com/legal-notices.html was a soft-404 page (HTTP 200 but 'page not found' body); the real Terms of Use path was found via that same soft-404 page's own footer links, fetched via curl+plain-text-extraction fallback"}
+     {:company/legal-name "Microsoft Corporation"
+      :company/lei "INR2EJN1ERAN0W5ZP974"
+      :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Microsoft Corporation"
+      :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-inr2ejn1eran0w5zp974"
+      :company/status :done
+      :company/tos-doc-count 1
+      :company/tos-source-url "https://www.microsoft.com/en-us/legal/terms-of-use"
+      :company/note "WebFetch returned only a paraphrased summary (and, on a stricter verbatim-quote retry, an explicit refusal citing copyright caution) rather than the actual page text despite an HTTP 200; the real verbatim text was recovered via a direct curl fetch + local HTML-to-text extraction (no AI summarization step)"}
+     {:company/legal-name "Visa Inc."
+      :company/lei "549300JZ4OKEHW3DPJ59"
+      :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Visa Inc"
+      :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300jz4okehw3dpj59"
+      :company/status :done
+      :company/tos-doc-count 1
+      :company/tos-source-url "https://www.visa.com/en-us/legal/global-privacy-notice"
+      :company/note "no general consumer Terms of Use discoverable on this B2B/network-operator site; Global Privacy Notice used as the closest real, substantive published legal document, honestly recorded as :privacy-policy not :terms-of-service"}
+     {:company/legal-name "The Coca-Cola Company"
+      :company/lei "UWJKFUJFZ02DKWI3RY53"
+      :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=The Coca-Cola Company"
+      :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-uwjkfujfz02dkwi3ry53"
+      :company/status :done
+      :company/tos-doc-count 1
+      :company/note "fetched via curl+plain-text-extraction fallback after WebFetch failed on the same URL"}
+     {:company/legal-name "3M Company"
+      :company/lei "LUZQVYP4VS22CLWDAR65"
+      :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=3M Company"
+      :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-luzqvyp4vs22clwdar65"
+      :company/status :done
+      :company/tos-doc-count 1
+      :company/note "fetched via curl+plain-text-extraction fallback after WebFetch failed on the same URL"}
+     {:company/legal-name "JPMorgan Chase & Co."
+      :company/lei "8I5DZWZKVSZI1NUHU748"
+      :company/status :tos-fetch-failed
+      :company/note "real GLEIF-verified LEI kept on record; ToS fetch failed (403 via WebFetch, 404 via curl) on 2 URL attempts"}
+     {:company/legal-name "Johnson & Johnson"
+      :company/lei "549300G0CFPGEF6X2043"
+      :company/status :tos-fetch-failed
+      :company/note "real GLEIF-verified LEI kept on record; site returned a bot/JS error-shell stub on 2 URL attempts, no server-rendered body text"}
+     {:company/legal-name "The Goldman Sachs Group, Inc."
+      :company/lei "784F5XWPLTWKTBV3E584"
+      :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/784F5XWPLTWKTBV3E584"
+      :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-784f5xwpltwktbv3e584"
+      :company/status :done
+      :company/tos-doc-count 1
+      :company/tos-source-url "https://www.goldmansachs.com/terms-and-conditions.html"
+      :company/note "fetched directly via WebFetch on the first URL attempt; no retry or curl fallback needed"}
+     {:company/legal-name "Pfizer Inc."
+      :company/lei "765LHXWGK1KXCLTFYQ30"
+      :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/765LHXWGK1KXCLTFYQ30"
+      :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-765lhxwgk1kxcltfyq30"
+      :company/status :done
+      :company/tos-doc-count 1
+      :company/tos-source-url "https://www.pfizer.com/terms"
+      :company/note "pfizer.com/terms-conditions 404'd via WebFetch; real path /terms found via homepage footer-link scan, fetched via curl+plain-text-extraction fallback"}
+     {:company/legal-name "Merck & Co., Inc."
+      :company/lei "4YV9Y5M8S0BRK1RP0397"
+      :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/4YV9Y5M8S0BRK1RP0397"
+      :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-4yv9y5m8s0brk1rp0397"
+      :company/status :done
+      :company/tos-doc-count 1
+      :company/tos-source-url "https://www.merck.com/terms-of-use/"
+      :company/note "fetched directly via WebFetch on the first URL attempt; no retry or curl fallback needed. GLEIF-disambiguated from unrelated German Merck KGaA by requiring the Rahway, New Jersey headquarters address."}
+     {:company/legal-name "Adobe Inc."
+      :company/lei "FU4LY2G4933NH2E1CP29"
+      :company/status :tos-fetch-failed
+      :company/note "real GLEIF-verified LEI kept on record; adobe.com is fully bot-blocked at the network layer for non-browser clients (HTTP/2 stream reset via WebFetch, then HTTP 000 connection failure via curl under both HTTP/2 and forced HTTP/1.1) on 2+ attempts -- not a wrong-URL problem"}
+     {:company/legal-name "Mastercard Incorporated"
+      :company/lei "AR5L2ODV9HN37376R084"
+      :company/status :tos-fetch-failed
+      :company/note "real GLEIF-verified LEI kept on record; HTTP 403 via both WebFetch and curl on the known terms-of-use path and on the plain homepage (2+ attempts); no substitute privacy-notice document found on this pass, recorded as a clean failure rather than a stretched doc-type substitution"}
+     {:company/legal-name "Caterpillar Inc."
+      :company/lei "WRJR7GS4GTRECRRTVX92"
+      :company/status :tos-fetch-failed
+      :company/note "real GLEIF-verified LEI kept on record; HTTP 403 on every attempted hostname/path (caterpillar.com and cat.com, homepage and terms path) via both WebFetch and curl (2+ attempts) -- fully bot-blocked, not a wrong-URL problem"}
+     {:company/legal-name "Salesforce, Inc."
+      :company/lei "RCGZFPDMRW58VJ54VR07"
+      :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Salesforce Inc"
+      :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-rcgzfpdmrw58vj54vr07"
+      :company/status :done
+      :company/tos-doc-count 1
+      :company/tos-source-url "https://www.salesforce.com/company/legal/sfdc-website-terms-of-service/"
+      :company/note "the legal-hub landing page (company/legal/agreements/) turned out to be an index of links, not the ToS text itself; the real Website Terms of Service URL was found via its own href list and fetched via curl+plain-text-extraction fallback after trimming nav/footer chrome"}
+     {:company/legal-name "Netflix, Inc."
+      :company/lei "549300Y7VHGU0I7CE873"
+      :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/549300Y7VHGU0I7CE873"
+      :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300y7vhgu0i7ce873"
+      :company/status :done
+      :company/tos-doc-count 1
+      :company/tos-source-url "https://www.netflix.com/termsofuse"
+      :company/note "fetched directly via curl on the first URL attempt; no retry or footer-scan needed"}
+     {:company/legal-name "Eli Lilly and Company"
+      :company/lei "FRDRIPF3EKNDJ2CQJL29"
+      :company/status :tos-fetch-failed
+      :company/note "real GLEIF-verified LEI kept on record; blocked by a Cloudflare 'Just a moment...' JS challenge on all 3 URLs tried (lilly.com/terms-of-use redirect target lillyhub.com/legal/lillyusa/english/termsofuse.html, and a homepage-footer-scanned lillyhub.com copyright page) -- fully bot-blocked, not a wrong-URL problem"}
+     {:company/legal-name "AbbVie Inc."
+      :company/lei "FR5LCKFTG8054YNNRU85"
+      :company/status :tos-fetch-failed
+      :company/note "real GLEIF-verified LEI kept on record; HTTP 403 via both curl and WebFetch on the guessed terms-of-use path (2 clean attempts); the plain homepage also returned only a tiny bot-check stub"}
+     {:company/legal-name "Meta Platforms, Inc."
+      :company/lei "BQ4BKCS1HXDV9HN80Z93"
+      :company/status :tos-fetch-failed
+      :company/note "real GLEIF-verified LEI kept on record; HTTP 400 on every one of 4 guessed Facebook/Meta legal URLs (facebook.com/legal/terms, about.meta.com/actions/legal-obligations, facebook.com/policies_center, mbasic.facebook.com/legal/terms) -- Meta aggressively blocks non-browser HTTP clients at the edge, not a wrong-URL problem"}
+     {:company/legal-name "Colgate-Palmolive Company"
+      :company/lei "YMEGZFW4SBUSS5BQXF88"
+      :company/status :tos-fetch-failed
+      :company/note "real GLEIF-verified LEI kept on record; the guessed corporate domain colgatepalmolive.com is actually a parked/for-sale domain (redirects to a GoDaddy sale page, confirmed via WebFetch redirect detection) -- retried on the real brand domain colgate.com, which was also HTTP 403 on 2 URL attempts"}
+     {:company/legal-name "Kimberly-Clark Corporation"
+      :company/lei "MP3J6QPYPGN75NVW2S34"
+      :company/status :tos-fetch-failed
+      :company/note "real GLEIF-verified LEI kept on record; HTTP 403 via both curl and WebFetch on the guessed terms-of-use path (2 clean attempts); the plain homepage also returned only a tiny bot-check stub"}
+     {:company/legal-name "Mondelez International, Inc."
+      :company/lei "549300DV9GIB88LZ5P30"
+      :company/status :tos-fetch-failed
+      :company/note "real GLEIF-verified LEI kept on record; terms-of-use page returned HTTP 200 via curl but is a heavy client-side-rendered SPA with no embedded JSON/script payload containing the real legal text in the raw HTML; WebFetch on the same URL also explicitly reported it could only see nav/footer markup, not the substantive Terms of Use body -- a genuine fetch failure, not a wrong-URL guess"}]}
+   {:index/code "nikkei225" :index/name "Nikkei 225" :index/region "JP" :index/status :pending :index/constituents []}
+   {:index/code "topix100" :index/name "TOPIX 100" :index/region "JP" :index/status :pending :index/constituents []}
+   {:index/code "ftse100" :index/name "FTSE 100" :index/region "UK" :index/status :pending :index/constituents []}
+   {:index/code "dax40" :index/name "DAX 40" :index/region "DE" :index/status :pending :index/constituents []}
+   {:index/code "stoxx600" :index/name "STOXX Europe 600" :index/region "EU" :index/status :pending :index/constituents []}
+   {:index/code "hangseng" :index/name "Hang Seng Index" :index/region "HK" :index/status :pending :index/constituents []}
+   {:index/code "csi300" :index/name "CSI 300" :index/region "CN" :index/status :pending :index/constituents []}
+   {:index/code "asx200" :index/name "S&P/ASX 200" :index/region "AU" :index/status :pending :index/constituents []}
+   {:index/code "tsx60" :index/name "S&P/TSX 60" :index/region "CA" :index/status :pending :index/constituents []}
+   {:index/code "sensex" :index/name "BSE SENSEX" :index/region "IN" :index/status :pending :index/constituents []}
+   {:index/code "kospi200" :index/name "KOSPI 200" :index/region "KR" :index/status :pending :index/constituents []}
+   {:index/code "bovespa" :index/name "Ibovespa" :index/region "BR" :index/status :pending :index/constituents []}
+   {:index/code "cac40" :index/name "CAC 40" :index/region "FR" :index/status :pending :index/constituents []}
+   {:index/code "smi" :index/name "Swiss Market Index" :index/region "CH" :index/status :pending :index/constituents []}]}]

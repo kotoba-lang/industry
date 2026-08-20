@@ -1,0 +1,70 @@
+[{:db/id -1
+  :adr/id "ADR-2608197100"
+  :adr/title "five appview landing pages now report the routes they are served at; the procedure is written down"
+  :adr/status "accepted"
+  :adr/date "2026-08-19"
+  :adr/tags "appview repair procedure west-pin co-scientist"
+  :adr/body
+  "## What was repaired
+
+Five `cloud-itonami` appviews rendered *\"No public route is declared next to this
+app surface\"* while their `wrangler.jsonc` declared the very address serving the
+page, listed no vars against those declared, and carried a `relativePath` pointing
+into the monorepo the repository was extracted from.
+
+    app-saiban     routeCount 0 -> 1   vars 0 -> 10
+    app-scheduler  routeCount 0 -> 2
+    app-warehouse  routeCount 0 -> 2
+    app-wvme       routeCount 0 -> 2
+    car-sim        routeCount 0 -> 2   routes now [c4r51m00.etzhayyim.com/*, driver.etzhayyim.com/*]
+
+Each landed as a child-repo commit, a server-side merge, and a west pin advance:
+`5e0b1b5`, `026d6bc`, `077c04a`, `8b872c0`, `ac3cfb1`.
+
+Measured after: `5 page(s) carry a summary; 5 compared; 0 differ from their
+wrangler`. **The `5 compared` is the load-bearing half of that sentence** -- before
+ADR-2608197000 the same run printed `0 differ` whether or not anything had been
+opened.
+
+## The procedure, because the remaining 91 repositories need it
+
+`--apply` writes into the tree it is pointed at, and that must never be the shared
+checkout. Per repository:
+
+    git -C orgs/<org>/<repo> worktree add -b <branch> <scratch>/wt-<repo> <org>/main
+    cp -R <scratch>/wt-<repo> /tmp/genroot-<repo>/orgs/<org>/<repo>
+    nbb scripts/gen-appview-page-summary.cljs --root /tmp/genroot-<repo> \\
+        --names <repo> --apply
+    # copy back only the +page.svelte files that actually changed, then
+    # commit -> push -> gh api .../merges -> nbb scripts/west-pin-put.cljs <repo> <sha>
+
+Two traps, both hit today:
+
+- **The remote is named after the org, not `origin`** in west checkouts, so
+  `<org>/main` is the branch to fork from.
+- **zsh does not word-split**, so `set -- $pair` inside a loop passes the whole
+  string as one argument and `west-pin-put.cljs` prints its usage four times in a
+  row. Feed pairs through `while read -r name sha` instead. This is the same trap
+  CLAUDE.md records for `west update $NAMES`; it applies to every loop that thinks
+  it is splitting a variable.
+
+## Why the detector's own count has not moved yet
+
+The shared checkout is 23 commits behind `origin/main` and cannot fast-forward: a
+neighbouring session has `90-docs/kaizen/kaiyu-kaizen.ledger.edn` modified in the
+working tree. **That file was left alone.** It is an append-only ledger being
+written by a live session, and stashing it to make a number move today is not worth
+it -- `west update` will pick the new pins up when the tree syncs, and the fifteen
+findings these five repositories account for (of 287) will resolve then.
+
+The verification above does not depend on that: it runs against the five committed
+worktrees directly.
+
+## Note on the index.lock
+
+Four times today `git merge` failed on `.git/index.lock`. The first three were
+stale (zero bytes, no holder by `lsof`) and clearing them was right. **The fourth
+was not**: it reappeared within a second of removal, because the neighbouring
+session is committing continuously (`Merge agent/pin-app-dougaka…` and siblings).
+Retry, do not clear, when a lock comes back immediately -- removing a live lock
+races the process that owns it."}]

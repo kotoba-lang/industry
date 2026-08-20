@@ -1,0 +1,242 @@
+;; clerk-parity — Clerk 相当の SaaS 認証として、この workspace の identity stack に
+;; 何があり、何が配線されておらず、何が無いか。36 項目。
+;;
+;; 3 状態で数える理由: 「無い」と「部品はあるが配線されていない」を混ぜると投資判断が
+;; 1 桁変わる。実測 2026-08-11、MFA を「無い」と数えていたが、判断層
+;; (authentication.core/achieved-level) は実装済み・テスト済みで、TOTP は
+;; authenticator/auth.otp に、リカバリコードは onetime に在った。作る仕事ではなく
+;; つなぐ仕事だった。
+;;
+;;   :running  本番で動いている
+;;   :unwired  可搬ライブラリが west に在り、service に接続されていないだけ
+;;   :absent   無い（:parity/deliberate? true のものは意図的に採らない設計判断）
+;;
+;; :parity/substrate は「その機能の部品が既に在る repo」。:unwired の根拠であり、
+;; 空でない :absent が現れたらそれは分類の誤り。
+;;
+;; query 例:
+;;   nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q \
+;;     '[:find ?f ?s :where [?e "source/dataset" "clerk-parity"]
+;;                          [?e "parity/state" ":unwired"] [?e "parity/feature" ?f]
+;;                          [?e "parity/substrate" ?s]]'
+;;
+;; 正本の散文は ADR-2608110200。この面は数えるためのもの。
+
+[{:db/id -1
+  :source/dataset "clerk-parity"
+  :parity/kind :coverage
+  :parity/measured-on "2026-08-11"
+  :parity/updated "2026-08-11 — TOTP / リカバリコード / step-up が unwired から running へ（ADR-2608110200）"
+  :parity/subject "authn.kotobase.net + kotoba-lang の認証ライブラリ群"
+  :parity/baseline "Clerk（製品として）"
+  :parity/total 36
+  :parity/running 16
+  :parity/unwired 6
+  :parity/absent 14
+  :parity/absent-deliberate 2
+  :parity/caveat
+  "Clerk 側の事実は 2026-05 時点の知識に基づく。機能追加と価格改定が速いので、可否と
+   金額はそのまま引用せず確認してから使う。こちら側の事実は 2026-08-11 の実測
+   （west 索引・各 repo のソース・本番プローブ）。"}
+
+ ;; ── 認証方式 ───────────────────────────────────────────────────────────────
+ {:db/id -2 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "passkey" :parity/category :auth-factor :parity/feature "passkey / WebAuthn"
+  :parity/state :running :parity/clerk :yes
+  :parity/substrate ["orgs/kotoba-lang/webauthn" "orgs/kotoba-lang/org-w3-webauthn"]
+  :parity/note "3 面すべてで稼働。clone 検出・backup state の毎回再読・assurance 判定つき。Clerk と同等かそれ以上に踏み込んでいる。"}
+
+ {:db/id -3 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "email-otp" :parity/category :auth-factor :parity/feature "email OTP + magic link"
+  :parity/state :running :parity/clerk :yes
+  :parity/substrate ["orgs/kotoba-lang/onetime"]
+  :parity/note "1 challenge から 6 桁コードとリンクの両方。どちらかを使うと両方失効。JavaScript 不要。"}
+
+ {:db/id -4 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "social-oauth" :parity/category :auth-factor :parity/feature "social OAuth"
+  :parity/state :running :parity/clerk :yes
+  :parity/substrate ["orgs/kotoba-lang/oauth"]
+  :parity/note "Google と GitHub の 2 つのみ。Clerk は 20 以上。provider 追加は authn.oauth への追加で済む。"}
+
+ {:db/id -5 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "enterprise-sso-oidc" :parity/category :auth-factor :parity/feature "enterprise SSO（OIDC）"
+  :parity/state :running :parity/clerk :yes
+  :parity/substrate ["orgs/kotoba-lang/oidc"]
+  :parity/note "顧客の IdP（Okta / Entra ID / Google Workspace）へ。discovery と JWKS 署名検証まで実装済み。"}
+
+ {:db/id -6 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "wallet-cacao" :parity/category :auth-factor :parity/feature "Web3 / wallet"
+  :parity/state :running :parity/clerk :yes
+  :parity/substrate ["orgs/kotoba-lang/org-chainagnostic-cacao"]
+  :parity/note "did:key の CACAO。自己保管鍵で署名するので、こちらが鍵を預からない唯一の経路。"}
+
+ {:db/id -7 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "sms-otp" :parity/category :auth-factor :parity/feature "SMS OTP"
+  :parity/state :unwired :parity/clerk :yes
+  :parity/substrate ["orgs/kotoba-lang/onetime" "orgs/kotoba-lang/com-twilio"]
+  :parity/note "onetime が SMS コードを含む one-time-code の検証フローを持ち、com-twilio が送信側。authn に口が無いだけ。"}
+
+ {:db/id -8 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "saml" :parity/category :auth-factor :parity/feature "SAML"
+  :parity/state :unwired :parity/clerk :yes
+  :parity/substrate ["orgs/kotoba-lang/saml" "orgs/kotoba-lang/org-oasis-saml"]
+  :parity/hard? true
+  :parity/note "shape は在るが XML 署名検証が host port として未実装。配線ではなく実装が要る。c14n の罠が多く、認証境界で誤ると署名の意味が消える。OIDC で済む顧客は OIDC で済ませる。"}
+
+ {:db/id -9 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "password" :parity/category :auth-factor :parity/feature "password"
+  :parity/state :absent :parity/clerk :yes :parity/deliberate? true
+  :parity/note "意図的。email OTP があるため持たない。Clerk は漏洩パスワード検出まで持つが、そもそも持たないほうが強い。B2C では要求されうる。"}
+
+ ;; ── 多要素 ─────────────────────────────────────────────────────────────────
+ {:db/id -10 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "mfa-policy" :parity/category :mfa :parity/feature "MFA ポリシー / step-up"
+  :parity/state :running :parity/clerk :yes
+  :parity/substrate ["orgs/kotoba-lang/mfa" "orgs/kotoba-lang/authentication"]
+  :parity/note "mfa は用途ごとに必要 factor を選ぶ substrate で、risk_planner / live_risk / orchestrator というリスクベース適応 MFA まで持つ。authentication.core/achieved-level が :none→:single-factor→:multi-factor→:phishing-resistant を既に判定する。authn が呼んでいない。"}
+
+ {:db/id -11 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "totp" :parity/category :mfa :parity/feature "TOTP（authenticator アプリ）"
+  :parity/state :running :parity/clerk :yes
+  :parity/substrate ["orgs/kotoba-lang/authenticator" "orgs/network-awai/net-kotobase"]
+  :parity/note "2026-08-11 稼働（ADR-2608110200）。判断は auth.verify（窓は step で数える／使用済み counter は二度通らない／表示の空白とハイフンを受ける）、計算は auth.adapters.webcrypto（RFC 4226・6238 の公表ベクタで検証）、secret は KEK 封筒。/v1/totp/enroll/begin|verify・/v1/totp/verify・/v1/totp/disable。"}
+
+ {:db/id -12 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "recovery-codes" :parity/category :mfa :parity/feature "リカバリコード"
+  :parity/state :running :parity/clerk :yes
+  :parity/substrate ["orgs/kotoba-lang/authenticator" "orgs/network-awai/net-kotobase"]
+  :parity/note "2026-08-11 稼働。登録と同じ手順で 10 本発行（後回しにすると電話しか入口が無い窓ができる）。digest しか保存せず、単回消費は Durable Object の delete が担う。"}
+
+ {:db/id -13 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "sms-second-factor" :parity/category :mfa :parity/feature "第 2 要素としての SMS"
+  :parity/state :unwired :parity/clerk :yes
+  :parity/substrate ["orgs/kotoba-lang/onetime" "orgs/kotoba-lang/com-twilio"]
+  :parity/note "SMS OTP と同じ部品。第 1 要素か第 2 要素かは mfa のポリシー側の話。フィッシング耐性が無く優先度は TOTP より低い。"}
+
+ ;; ── セッション ─────────────────────────────────────────────────────────────
+ {:db/id -14 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "session-issue" :parity/category :session :parity/feature "セッション発行 / 検証"
+  :parity/state :running :parity/clerk :yes
+  :parity/note "256bit の不透明トークン。保存されるのは SHA-256 ダイジェストのみ。Durable Object が単一の強整合な置き場。"}
+
+ {:db/id -15 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "immediate-revocation" :parity/category :session :parity/feature "即時失効 / 全端末サインアウト"
+  :parity/state :running :parity/clerk :partial :parity/advantage? true
+  :parity/note "/v1/logout/all。Clerk の JWT モデルでは構造的にできない — 失効までトークン寿命ぶんの窓が残る。"}
+
+ {:db/id -16 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "jwks" :parity/category :session :parity/feature "JWKS / オフライン検証"
+  :parity/state :absent :parity/clerk :yes :parity/deliberate? true
+  :parity/note "意図的。ADR-2608039950 が『JWKS を足すのは失効を latency と引き換えにすることであって穴を埋めることではない』と明記。代償は本物で、検証のたびに中央へ行く。"}
+
+ {:db/id -17 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "multi-session" :parity/category :session :parity/feature "マルチセッション"
+  :parity/state :absent :parity/clerk :yes
+  :parity/note "1 ブラウザに複数アカウント。cookie を 1 本しか発行していないので、セッションの配列化が要る。"}
+
+ {:db/id -18 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "device-management" :parity/category :session :parity/feature "端末管理 UI"
+  :parity/state :absent :parity/clerk :yes
+  :parity/note "データは DO にある（セッションは account DID で索引済み）。無いのは画面。"}
+
+ ;; ── 組織・B2B ──────────────────────────────────────────────────────────────
+ {:db/id -19 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "organizations" :parity/category :b2b :parity/feature "組織 / メンバー / ロール"
+  :parity/state :running :parity/clerk :yes
+  :parity/note "tenant・membership・role。権限は狭める方向にしか変更できない（narrowing only）。"}
+
+ {:db/id -20 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "invitations" :parity/category :b2b :parity/feature "招待"
+  :parity/state :running :parity/clerk :yes
+  :parity/note "HMAC トークン。最後の owner は削除できない。"}
+
+ {:db/id -21 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "service-accounts" :parity/category :b2b :parity/feature "サービスアカウント / M2M"
+  :parity/state :running :parity/clerk :yes
+  :parity/note "kb_sa_… の不透明トークン。rotate / revoke が Durable Object の 1 トランザクション。秘密は 1 回だけ返し以後はダイジェストのみ。"}
+
+ {:db/id -22 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "scim" :parity/category :b2b :parity/feature "SCIM ディレクトリ同期"
+  :parity/state :running :parity/clerk :yes
+  :parity/note "SCIM 2.0 の Users CRUD + discovery。IdP が主張したメールがアカウントを作ることも結合することもない、という拒否が入っている。"}
+
+ {:db/id -23 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "audit-log" :parity/category :b2b :parity/feature "監査ログ"
+  :parity/state :running :parity/clerk :yes
+  :parity/note "tenant スコープ。membership / service account / SCIM の変更イベント。audit:read 権限で読む。"}
+
+ {:db/id -24 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "custom-domain" :parity/category :b2b :parity/feature "カスタムドメイン"
+  :parity/state :unwired :parity/clerk :yes
+  :parity/substrate ["orgs/network-awai/net-kotobase"]
+  :parity/note "viewer/resolve-apex と AUTHN_APEXES は実装済み・本番 deploy 済みで環境変数が未設定。Clerk の CNAME と同じ目的（cookie を顧客 apex に first-party 化）に独立して到達している。"}
+
+ ;; ── 開発者体験 ─────────────────────────────────────────────────────────────
+ {:db/id -25 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "hosted-ui" :parity/category :developer :parity/feature "ホスト型サインイン画面"
+  :parity/state :running :parity/clerk :yes
+  :parity/substrate ["orgs/kotoba-lang/jp-go-digital-design-system"]
+  :parity/note "jp-go-dds。/sign-in /login と app.itonami.cloud/auth（ADR-2608110100）。"}
+
+ {:db/id -26 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "dropin-components" :parity/category :developer :parity/feature "ドロップイン UI コンポーネント"
+  :parity/state :absent :parity/clerk :yes :parity/hard? true
+  :parity/note "Clerk の <SignIn/> <UserButton/> <OrganizationSwitcher/> に当たるものが無い。導入時間の差はほぼここ（数分 対 数日）。作った瞬間に維持コストが恒久化する。"}
+
+ {:db/id -27 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "sdk" :parity/category :developer :parity/feature "SDK"
+  :parity/state :absent :parity/clerk :yes :parity/hard? true
+  :parity/note "実質 viewer-from-authn-payload 1 本。フレームワークごとの SDK は無い。"}
+
+ {:db/id -28 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "webhooks" :parity/category :developer :parity/feature "Webhook"
+  :parity/state :absent :parity/clerk :yes :parity/hard? true
+  :parity/note "com-meta-webhook は Meta Graph API 専用で、汎用の送信基盤（署名・再送・順序・DLQ）ではない。単体で 1 サービスぶんの仕事。"}
+
+ {:db/id -29 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "admin-dashboard" :parity/category :developer :parity/feature "管理ダッシュボード"
+  :parity/state :absent :parity/clerk :yes :parity/hard? true
+  :parity/note "ユーザ検索・停止・手動操作の画面が無い。既存 API の上に載るが画面数が多く、権限設計を誤るとそれ自体が攻撃面になる。"}
+
+ {:db/id -30 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "impersonation" :parity/category :developer :parity/feature "impersonation（成り代わり調査）"
+  :parity/state :absent :parity/clerk :yes
+  :parity/note "サポート業務で要求されやすい。監査ログの土台はあるので載せる先はある。"}
+
+ {:db/id -31 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "bot-protection" :parity/category :developer :parity/feature "bot 対策 / 悪用防止"
+  :parity/state :unwired :parity/clerk :yes
+  :parity/substrate ["orgs/network-awai/net-kotobase"]
+  :parity/note "authn.guard がレート制限を持つ（WebCrypto の計算コストを浴びせられないため）。デバイス指紋は無い。漏洩パスワード照合は password 自体が無いので当面不要。"}
+
+ {:db/id -32 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "i18n" :parity/category :developer :parity/feature "多言語対応"
+  :parity/state :absent :parity/clerk :yes
+  :parity/note "日本語固定。DADS が日本語前提であることと表裏。"}
+
+ ;; ── 事業としての面 ─────────────────────────────────────────────────────────
+ {:db/id -33 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "metering-billing" :parity/category :product :parity/feature "MAU 計測 / 課金"
+  :parity/state :absent :parity/clerk :yes
+  :parity/substrate ["orgs/network-awai/nexus-x402" "orgs/kotoba-lang/stripe-ops" "orgs/kotoba-lang/crm"]
+  :parity/note "Stripe 連携も x402 facilitator も crm も workspace には在るが、認証には接続していない。売るなら最初に要る。ADR-2608110200 の decision 4。"}
+
+ {:db/id -34 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "status-sla" :parity/category :product :parity/feature "ステータスページ / SLA"
+  :parity/state :absent :parity/clerk :yes
+  :parity/note "itonami.cloud/trust/ は cloud-itonami のもので、authn 自身の可用性を宣言していない。"}
+
+ {:db/id -35 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "compliance" :parity/category :product :parity/feature "コンプライアンス認証"
+  :parity/state :absent :parity/clerk :yes :parity/hard? true
+  :parity/note "SOC 2 / HIPAA 等。コードではなく監査費用と時間。エンタープライズ商談では入場券になる。いちばん時間がかかり、いちばん外注しにくい。"}
+
+ {:db/id -36 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "data-residency" :parity/category :product :parity/feature "データ所在の選択"
+  :parity/state :unwired :parity/clerk :yes
+  :parity/note "Durable Object に jurisdiction 指定（EU 等）がある。使っていない。EU 顧客が来た時点で必要になり、後から移すのは高い。"}
+
+ {:db/id -37 :source/dataset "clerk-parity" :parity/kind :feature
+  :parity/id "support-docs" :parity/category :product :parity/feature "サポートと文書"
+  :parity/state :absent :parity/clerk :yes
+  :parity/note "ADR と README は実装者向けには極めて厚いが、顧客向けの導入文書ではない。"}]

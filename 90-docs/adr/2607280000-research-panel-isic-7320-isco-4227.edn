@@ -1,0 +1,158 @@
+[{:db/id -1
+  :adr/id "adr-2607280000-research-panel-isic-7320-isco-4227"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607280000: 参加者リサーチパネルを cloud-itonami 本体に ISIC 7320 / ISCO 4227 として実装（Prolific を買わない）"
+  :adr/status "accepted, implemented"
+  :adr/date "2026-07-28"
+  :adr/deciders "Jun Kawasaki"
+  :adr/last_verified "2026-07-28"
+  :adr/source-format "edn"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/related "adr-2607141550-persona-visual-user-test-react-loop"
+  :adr/body "# ADR-2607280000: 参加者リサーチパネルを cloud-itonami 本体に ISIC 7320 / ISCO 4227 として実装
+
+**Status**: accepted, implemented（domain + 公開2ルート。未配線は下記に名指し）
+**Date**: 2026-07-28
+**Deciders**: Jun Kawasaki
+**子リポ側の正本**: `orgs/gftdcojp/cloud-itonami/docs/adr/0035-research-panel-isic-7320-isco-4227.md`
+（実装詳細・不変条件の全文はそちら。本 ADR は superproject 側の決定記録）
+
+## Context
+
+「Prolific / Global App Testing / test IO を cloud-itonami で対応実装済みか」という
+問いに対し、リポジトリ全体を grep した結果 **実装はゼロ**だった（ヒット2件はいずれも
+無関係な `kenkyusha/CLAUDE.md` 散文中の英単語 \"prolific\"）。セットで必要な session
+replay 側も同様にゼロ（`posthog|hotjar|rrweb|fullstory|plausible|GA` が
+`orgs/gftdcojp/cloud-itonami` / `orgs/cloud-itonami/local-itonami` /
+`ai-gftd-itonami` のいずれにも無い）。つまり「Prolific で送客 → replay で録画 →
+participant id で突合」の3辺すべてが未着手だった。
+
+一方で**合成**側は既にある。ADR-2607141550（persona ベースの visual / user test と
+feedback react loop、accepted / implemented / closed、last_verified 2026-07-15）は
+LLM が persona を演じてスクリーンショットを採点する synthetic panel で、mechanism は
+`kotoba-lang/design-quality` の第4層 `:persona-visual`、catalog は各 product repo、
+operation は `cloud-itonami`。その ADR 自身が「実ユーザーテストは遅くて高いので、まず
+synthetic を**内側ループ**にし、実テレメトリを**遅い外側ループ**として合流させる」と
+書き、closing note に「**telemetry 較正は follow-up**」と残している。
+
+したがって論点は「Prolific を買うか」ではなく「その外側ループを自分で持つか」であり、
+本 ADR はそれを cloud-itonami 本体に実装する決定である。
+
+## Decision
+
+**ベンダー統合ではなく、このプラットフォーム自身のオントロジーで two-sided panel を
+実装する。** 需要と供給をそれぞれ既存の標準コードに割り当てる:
+
+| 面 | コード | ルート | 主体 |
+|---|---|---|---|
+| 需要 | **ISIC 7320** Market research and public opinion polling | `/isic-7320/` | org が study を発注 |
+| 供給 | **ISCO-08 4227** Survey and market research interviewers | `/isco-4227/` | 個人が panellist として登録 |
+
+この対応付けは装飾ではない。**スクリーニングが ISCO/ISIC ネイティブ**である
+（study は「ISIC 6201 の組織で働く ISCO 2511 の人」と言い、panellist はその2コード +
+region を持つ）。一般的なデモグラ・パネルより狭いが B2B リサーチには適しており、
+何より **これらのコードは既にこの台帳の join キー**なので、対象者を他のレコードと同じ
+語彙で書ける。買ってきたベンダーの独自 300 属性ではこうならない。
+
+### 5つの不変条件（すべて propose 時点の拒否、テストは拒否側を検証）
+
+実装は `cloud-itonami.research-panel`（pure `.cljc`）:
+
+1. **報酬フロア** — 報酬 ÷ 想定分数 がポリシーの時給フロアを下回る study は拒否。
+   `:currency` を変えて比較を回避することも拒否。
+2. **participant-ref の往復** — `:external-url` は `https://` かつ
+   `{{PARTICIPANT_REF}}` を含む必要がある。これが無いと提出を本人に join できない。
+   Prolific の `{{%PROLIFIC_PID%}}` に相当するが、自分の語彙で名付けることで
+   study が特定ベンダーから可搬になる。
+3. **参加者は blind** — 氏名 / email / 電話 / 住所 / 生年月日 / 国民 ID を含む登録を
+   拒否し、ref 自体も `@` と `.` を弾く。**schema に連絡先の置き場所が無い**ので、
+   これは DB dump に対しても成立する（ADR-0028 の `current-disclosure` が
+   「保持しているものを出さない」なのに対し、こちらは「保持しない」）。
+4. **公開前に満額エスクロー** — places × reward 未満では publish 不可。部分資金の
+   ティアを作らない（誰かが必ず取り残される）。
+5. **完了の自己申告を認めない** — 完了コードを返した時のみ `:awaiting-review` に
+   なる。誤コードは `:reserved` のまま（打ち直せる）。
+
+補助則も同じ性格: 未レビューの提出はレビュー窓を過ぎたら auto-approve（依頼者が
+キューを放置しても参加者は待たされない）、`:rejected` には理由が必須（実在の人物の
+報酬を失わせ記録に残るため）。
+
+### リスク階層と「金を動かさない」
+
+`kernels.policy-risk/keyword-policy->code` に4つ追加（ADR-0028 と同じ、既存3家族の
+拡張であって新ティアの発明ではない）: `:panel-study-draft` → `:read-only` /
+`:panel-study-publish` → `:external-send` / `:panel-submission-review` →
+`:external-send` / `:panel-reward-payout` → `:financial`。
+
+**この ns から資金は動かない。** `propose-reward-payout!` は billing / funding と
+同じ承認キューに入り、人間が承認・実行する（CLAUDE.md 安全床②）。この ns が持つのは
+「何がなぜいくら未払いか」の**会計**で、`amount-owed` / `payout-lines` は承認済み
+submission から**導出**される — 人間は主張された数字ではなく計算された数字を、しかも
+「誰にいくら」の内訳として承認する。空バッチは拒否（金額ゼロの financial effect は
+オペレータをクリックスルーに慣らす）。
+
+完了コードと依頼者連絡先は effect payload から除外する（`withheld-from-queue`）。
+承認キューは設計上 `:audit/read` で広く読めるので、そこに見えるコードは
+「タスクをやらずに提出できるコード」であり、不変条件5を静かに名誉制度に変える。
+
+## Consequences
+
+- 新規 48 テスト（572 tests / 5656 assertions、変更前は 524）。primary gate
+  （`portable-cljs-test-runner`）と `test-runner` の両方に登録。
+- 既存の 5 失敗（`kernels/substance_test.cljc` 4 件、`keiei/ui/gftdcojp_test.cljc`
+  1 件）は**本変更前から存在**する。clean stash した `main` で同一の5件・0 errors を
+  実測して確認済み。本 ADR では触らない。
+- **primary gate のタスク定義自体が main で壊れている**（本件とは独立）:
+  `scripts/tasks.edn` の `test-portable-cljs` が `:paths` を
+  `[\"src\" \"resources\" \"test\"]` で上書きし `../../kotoba-lang/authentication/src`
+  を落とすため、`local_auth.cljc` が `authentication.identity` を解決できずスイート
+  全体がコンパイル不能。検証時はこのパスを足して実行した。`tasks.edn` の修正は
+  別コミットに分ける（無関係なビルドバグ）。
+- 子リポ main へ着地: merge commit `6d6290d6dfb54aef31cd10c2eeff33b935c798e4`
+  （branch `agent/research-panel-isic-7320`、GitHub API サーバ側マージ）。
+- superproject へ着地: 本 ADR が `d982aad6`、west pin 前進が `9bfdd3a3`。
+  pin と子リポ HEAD が `6d6290d6` で一致することを確認済み。作業 branch /
+  worktree は撤去済み（残存ゼロ）。
+
+### 未配線（名指しで残す）
+
+- **参加者登録エンドポイント** `/api/{org}/{repo}/panel/enrol` が無い。`/isco-4227/`
+  の enrol ボタンは passkey から handle を導出して表示した上で「送信していない・
+  保存していない」と画面に明示する。**動くように見える死んだフォームは正直な穴より
+  悪い**ので、存在しないエンドポイントに向けて「修正」しないこと。次の一歩はこの
+  エンドポイントがサーバ側で `research-panel/enrol-panellist` を呼ぶこと。
+- **study / submission の CLI・edge 面**（domain は完成・テスト済み、`-M:panel`
+  alias も edge route も無い）。
+- **auto-approve の定期実行**（`auto-approve-due?` は経過日数を引数に取る純関数。
+  スケジューラは未配線）。
+- **session replay** はプラットフォーム全体で依然ゼロ。不変条件2が replay 側に
+  必要な join キー（`{{PARTICIPANT_REF}}` → `distinct_id`）を用意しているが、
+  ベンダー選定と配線は別決定。
+
+### ナビゲーションの drift（既存問題、悪化させない）
+
+`shell/sidebar` に2ルートを追加し `clojure -M:local:site` で drift の無い7ルートを
+再生成（各 nav 1行差分。`local/index.html`・`theme.css`・`workspace` は byte 同一）。
+`public/index.html` は手当てし、生成器出力と active マーカー以外 byte 同一であることを
+検証した。
+
+`public/isco-1212/index.html` と `public/isic-6492/index.html` は**触らない**。両者の
+コミット済み nav は既に `shell/sidebar` と実質的に乖離しており（isic-6492 は
+`Marketplace` を含む古い順序と日本語ラベル、isco-1212 は shell 自体が別）、これは
+本作業以前からの drift（`cloud-itonami.site.generate` の ns docstring と
+ADR-2607185000 Addendum 2 を参照）。ソースと既にずれているビルド済み HTML を手編集
+するのは drift を悪化させるだけなので、この2ルートは drift 解消まで新 nav を持たない。
+
+## Alternatives considered
+
+- **Prolific を統合する。** API ファーストで速いが、(a) 参加者の身元・スクリーニング
+  属性がベンダー側にあり本台帳と join できない、(b) 画面録画製品ではないので結局
+  replay を別途配線する必要がある、(c) 手数料と時給フロアが外部ポリシーになる。
+  なお本 ADR は Prolific の料率・パネル規模等の**外部数値を検証していない** —
+  採否の理由はコスト比較ではなく join 可能性である。
+- **Global App Testing / test IO を統合する。** これらはバグ出し QA であって
+  リサーチ・パネルではない。必要になったら別 ADR で扱う（本 ADR の 5 不変条件は
+  そのまま QA ベンダーには当てはまらない）。
+- **synthetic persona ループを拡張して代替する。** ADR-2607141550 自身が
+  「synthetic は内側ループ」と定めており、外側ループの代替にはならない。"}]

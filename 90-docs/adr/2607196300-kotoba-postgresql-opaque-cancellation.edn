@@ -1,0 +1,75 @@
+[{:db/id -1
+  :adr/id "adr-2607196300-kotoba-postgresql-opaque-cancellation"
+  :adr/title "ADR-2607196300: Opaque one-shot PostgreSQL cancellation authority"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-19"
+  :adr/last-verified "2026-07-19"
+  :adr/last_verified "2026-07-19"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "repo-wide-cljc-to-kotoba-source-migration"
+  :adr/authoritative-for ["PostgreSQL cancellation authority"]
+  :adr/related
+  ["orgs/kotoba-lang/kotoba/providers/pg_scram.kotoba"
+   "orgs/kotoba-lang/kotoba/providers/pg_cancellable_query_consumer.kotoba"
+   "orgs/kotoba-lang/kotoba/providers/pg_cancel_consumer.kotoba"
+   "orgs/kotoba-lang/kototama/src/kototama/transport_provider.clj"
+   "orgs/kotoba-lang/kototama/test/kototama/postgresql_interop.clj"]
+  :adr/supersedes ["adr-2607196200-kotoba-postgresql-sqlstate"]
+  :adr/superseded-by []
+  :adr/decision-summary
+  {:backend-key-data-export false
+   :registration-operation "pg_cancel_register"
+   :use-operation "pg_cancel"
+   :capability :secret/use-postgresql-cancel
+   :authority {:representation :opaque-i32-handle
+               :use-count 1
+               :endpoint :original-canonical-host-port-and-pinned-address
+               :ambient-target-selection false}
+   :cancel-request {:protocol-code 80877102 :bytes 16 :tls false}
+   :runtime-limits {:max-handles-default 0 :max-requests-default 0}
+   :released-server {:product :postgresql :version "14.19"
+                     :query "select pg_sleep(10)"
+                     :cancel-sqlstate "57014"
+                     :session-state "I"}
+   :executable-evidence
+   [{:cwd "orgs/kotoba-lang/kototama"
+     :command "clojure -M:postgresql-interop"
+     :result "opaque one-shot cancellation; SQLSTATE 57014; exit 0"}]}
+  :adr/body
+  "# ADR-2607196300: Opaque one-shot PostgreSQL cancellation authority
+
+**Status**: accepted
+**Date**: 2026-07-19
+
+## Decision
+
+BackendKeyData is consumed inside the PostgreSQL provider boundary. The PID
+and secret key are registered against the live affine TLS handle through the
+purpose-bound `pg_cancel_register` host operation. The host returns only an
+opaque i32 authority; neither scalar is copied into consumer memory.
+
+Using the authority invokes `pg_cancel`. The host removes it before attempting
+network I/O, so success and failure are both one-shot. It can connect only to
+the canonical host, port and numeric address pinned by the authenticated
+session. It emits only PostgreSQL's fixed 16-byte CancelRequest and cannot be
+used as a socket, arbitrary payload or endpoint selector. Handle and request
+quotas default to zero and require secret/write capability opt-in.
+
+PostgreSQL CancelRequest is intentionally a separate non-TLS protocol message;
+the security boundary is therefore the unguessable backend key plus exact
+endpoint pinning. The backend key remains inside the native/provider TCB.
+
+## Evidence
+
+Released PostgreSQL 14.19 qualification opens a cancellable
+SCRAM-SHA-256-PLUS session, starts `select pg_sleep(10)`, cancels it from an
+independent component, requires SQLSTATE `57014` and ReadyForQuery `I`, then
+verifies a second use of the authority is denied and all handles are closed.
+
+This closes cancellation. Extended query/prepared statements, pooling,
+credential/certificate rotation, version/cloud matrices and long-duration
+soak remain open."}]

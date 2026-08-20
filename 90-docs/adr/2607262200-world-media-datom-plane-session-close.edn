@@ -1,0 +1,104 @@
+[{:db/id -1
+  :adr/id "adr-2607262200-world-media-datom-plane-session-close"
+  :adr/title "ADR-2607262200: world media/government datom plane — session close, operational state, and the resume point"
+  :adr/status "accepted"
+  :adr/date "2026-07-26"
+  :adr/last-verified "2026-07-26"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/topic "news-collection-archive"
+  :adr/authoritative true
+  :adr/authoritative-for
+  ["2026-07-25〜26 の一連の作業（kawaraban / ooyake / kouhou / kotobase-storage-git / tamaki）の到達点と、次に誰かが再開するときの単一の参照点。個々の設計判断は各 ADR が正本で、本 ADR はそれらの間の関係と、閉じた時点の運用状態を持つ。"
+   "閉じた時点で「何が動いていて、何が止まっていて、何がゲートされているか」の記録。特に G8 の片側だけが開いていること（読み取りは可・publish は deny-all）はここが参照点。"]
+  :adr/related
+  ["90-docs/adr/2607252600-kawaraban-queryable-datom-archive-world-outlet-coverage.edn"
+   "90-docs/adr/2607253000-ooyake-public-officeholders-g6-amendment-kawaraban-byline.edn"
+   "90-docs/adr/2607253200-coverage-expansion-and-scheduled-refresh.edn"
+   "90-docs/adr/2607253400-primary-source-layer-and-tamaki-issue-loop.edn"
+   "90-docs/adr/2607262000-kotobase-storage-git-backend.edn"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/body
+  "
+# ADR-2607262200: session close — state, and where to resume
+
+**Status**: accepted
+**Date**: 2026-07-26
+**Deciders**: Jun Kawasaki
+
+## 何を訊かれ、どこまで行ったか
+
+最初の問い（2026-07-25）: 「今の全世界の公共放送、メディアなどの情報を repo に edn で保存して datomic query できるように設計実装、また収集の常駐化は設計されているか」。
+
+調べると、設計（ADR-2607110200 / 2607197800）と収集アクターは既にあったが、**記事は aozora PDS にしか無く手元から query できず、`:news.*` の schema も存在せず、`:verified` は実測でなく手書き**だった。そこから以下が積み上がった。
+
+| ADR | 内容 |
+|---|---|
+| 2607252600 | `schema/news.edn`・`kawaraban.store`（日付分割アーカイブ）・`clojure -M:query`・outlet 37→120 |
+| 2607253000 | 公人を ooyake に admit（G6 改訂）・kawaraban に byline |
+| 2607253200 | カバレッジ拡張と**週次の再測定への移行**（GitHub Actions が使えず launchd） |
+| 2607253400 | 1次ソース層 — 公人 sourcing の是正・kouhou 7→53・follow-up を tamaki issue へ |
+| 2607262000 | `kotobase-storage-git` — git 自体を storage engine にする6番目の provider |
+
+## 閉じた時点の運用状態
+
+**常駐（3本、いずれもこのマシンの launchd）**
+
+- `com.etzhayyim.kawaraban.wasm-orchestrator` — 6時間ごとの記事収集。専用 clone で fetch → reset → 収集 → datom 検証 → commit → push
+- `com.etzhayyim.kawaraban.refresh-feeds` — 週次の feed 再測定
+- `com.etzhayyim.ooyake.refresh-officeholders` — 週次の公人再取得（G6 ゲートが必須ステップ）
+
+**G8 は片側だけ開いている**（`BOOTSTRAP-ATTESTATION-live-ingest.md`、Seat 1 provisional、2026-07-26）:
+
+```
+KAWARABAN_ALLOW_LIVE_INGEST   = 1        読み取り・ローカルアーカイブ
+KAWARABAN_WASM_PDS_ALLOWLIST  = 未設定    deny-all（publish は HttpClient.send 前で拒否）
+```
+
+読ませるために公開されている RSS を読むことと、他サービスが依存する本番 PDS に署名済みレコードを書くことは別の行為である。publish は別判断・別記録として残してある。
+
+**実データ**
+
+| | |
+|---|---|
+| 記事 | 2,712（全件 `:verified`、うち 840 に byline、104 日分） |
+| 媒体 | 154 登録 / feed 実測 82 / **組織確認 73**（44カ国） |
+| 政府組織 | 7,089（official-url 5,986） |
+| 公人 | 1,046 — **`:authoritative` 185（113カ国）/ `:third-party` 861** |
+| 政府公報 | 53 jurisdiction（開始時 7） |
+
+## 止まっているもの
+
+**tamaki の continuous loop 3本は停止中。** 原因は tamaki が `KC_REQUIRE_DONE_NO_EDIT=1` を全 run に無条件で渡す一方、サイクルは「実装してテストを足せ」と要求すること（tamaki issue `4319650`）。両立しないので毎回ロールバックし、失敗サイクルごとに Radicle issue が増える。tamaki は当日4コミット入っており別セッションが編集中だったため、パッチではなく issue にした。**12 issue（kawaraban 5 / ooyake 4 / kouhou 3）が runner 修復待ちで滞留している。**
+
+**フリート常駐は未達。** murakumo の 6ノードは稼働し、simeon は nbb 導入で agent work 適格になった（`exec=contained (6 blocked)`）。収集をノード上で実行することも実証済み。しかし**どのノードも GitHub に push できない**（credential helper も gh も無い）ので、載せると今より悪化する。障害は計算資源ではなく credential。
+
+## 次の再開点（重要度順）
+
+1. **tamaki runner** — `KC_REQUIRE_DONE_NO_EDIT` を run の役割依存にする。直れば12 issue の自律消化が始まる。launchd 駆動時に `rad` が SSH agent に届かない件（sandbox 制限、変数不在ではない）も併せて。
+2. **記事 → 公人/組織の mention edge** — スキーマは繋がっているが live では1本も張られない。本文からの entity 同定が要り、G1（mirror-not-adjudicator）と `:role` の \"never an accusation\" に触れるので Council 判断。
+3. **フリート永続化** — deploy key を置くか、アーカイブを git ではなく kotobase の Datom log に移すか。後者なら `kotobase-storage-git` がそのまま使える。
+4. **R0 のまま動かない cell / actor** — `outlet_ingest`（射影で迂回した）・`actor_project`（憲章の \"medium\" 半分が未稼働）・mikurabe・tsumugi。
+5. **superproject の横断 query** — `manifest/edn-query.cljs` は今も 90-docs しか読まず、子リポの datom は載っていない。
+6. **アーカイブの成長** — 5日分で 1.8MB。数か月先に git 保持か B2/DataLad 移行かの判断が要る。
+
+## このセッションで自分が作った欠陥（すべて修正済み・パターンとして記録）
+
+1. `verify-feeds.cljs` を parse error のまま main へ（`if`→`cond` で `)` を1つ落とし、**スクリプトを実行せずに commit**。テストも audit も呼ばないので緑のまま通過）
+2. runner のテスト実行が untracked の自分自身を削除（**message だけが存在を主張する commit** が main に乗った）
+3. ooyake plist のログが kawaraban のディレクトリへ（sed が `refresh-clone` を含むパスしか置換しなかった）
+4. 公人検証で**昇格だけ実装し降格を忘れた** — 直そうとした嘘がそのまま残る状態を作った
+5. `| head -6` の SIGPIPE で25分の測定ジョブを殺した
+6. zsh の非単語分割を忘れ plist ファイル名が壊れた
+7. **tamaki ループ失敗の原因を2回続けて誤診し、推測を所見として書いた**（台帳 seq 90 で訂正）
+
+1〜4 は main に到達してから発覚した。共通するのは「書いたが実行していない」「実行結果を見ずに次へ進んだ」で、7 はその変種——ログを読まずに原因を述べた。**動かすまで分からなかった**という一点に尽きる。
+
+## 併せて記録に値すること
+
+- **推測と測定を混ぜない**という規律が、この作業の実質的な中身だった。`:verified` を「自信度」から「その日その URL が実際に items を返した」に、公人の `:authoritative` を「Wikidata 由来」から「当局ページで確認し `:source-url` を持つ」に変えたのは、どちらも数字を下げる変更である（30→29、1,046→185）。**下がった数字の方が正しい。**
+- **403 を UA 偽装で抜けない**線は3箇所（feed・政府公報・outlet 照合）すべてで守った。カバレッジ数を上げたい誘惑が最も強いのがここで、それは測定ではなく偽装になる。
+- **未達を削除しない。** 確認できなかった媒体・組織・公人はすべて行を残し、日付つきの理由を付けた。「試したが取れなかった」と「そもそも考えていない」を区別できなくするのが、この種の registry で最も静かな嘘になる。
+"}]

@@ -1,0 +1,192 @@
+[{:db/id -1
+  :adr/id "adr-2608170200-jvm-dependency-surface-measured-repowide"
+  :adr/title "The JVM surface is 4,163 repositories wide, not four; and 'resolve it with ClojureScript' has a failure mode that reports green"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :source/dataset "adr"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/context
+  "CLAUDE.md fixes the runtime order as `kotoba wasm` > `clojurewasm` > ClojureScript >
+nbb, with JVM and babashka demoted to last resort, and
+`90-docs/migration/kotoba-wasm-runtime-cutover.edn` freezes a JVM inventory with
+`:new-jvm-runtime-dependencies :forbidden` and `:new-chicory-call-sites :forbidden`.
+
+That inventory has exactly FOUR entries, all under `orgs/kotoba-lang/`: kototama's
+Chicory tender, aiueos' Chicory execute, kotoba's Chicory launcher, and the compiler
+(now `amu`) Clojure bootstrap. `scripts/verify-kotoba-wasm-runtime-cutover.cljs` checks
+those four deps.edn files and has been green throughout. Correctly green -- it is
+answering the question it was asked.
+
+Nobody had asked the other question. There are 4,183 west-registered repositories, and
+until this measurement nothing looked at 4,179 of them. A rule the contract calls
+FORBIDDEN was therefore unenforceable everywhere except in the four repositories that
+already had it written down, and its enforcement gate could not have gone red no matter
+what landed anywhere else."
+
+  :adr/decision
+  "1. **Measure the whole surface, and classify by what the JVM is FOR.**
+     `scripts/verify-jvm-dependency-surface.cljs` (nbb, ~10s over 4,163 checkouts)
+     replaces the four-file check's blind spot. It is registered in
+     `manifest/orgs-detectors.edn` as `:verify-jvm-dependency-surface` (24h,
+     `:writes :none`) rather than as a fleet gate, for the reason that file's header
+     already gives: a gate ships only the target repo's tree and would find an empty
+     workspace.
+
+  2. **`.clj` sources and third-party jars are the debt. Test runners, linters and a
+     bare `org.clojure/clojure` line are not.** The detector emits per-repo findings
+     only for the former, and counts the latter. Lumping them reports a catastrophe and
+     points at a rename.
+
+  3. **A `:jvm-test` fleet gate may become `:nbb-test` only on three measurements, never
+     on 'the sources are .cljc'.** Identical `Ran N tests containing M assertions` under
+     both runtimes; the nbb entry exits non-zero with the subject broken and zero with it
+     intact, failing for the thing that was broken; and no cross-repo dep on the test
+     path, since `:nbb-test`'s classpath cannot reach a sibling. Recorded in
+     `scripts/fleet-ci/gates.edn` at the head of `:repos`."
+
+  :adr/body
+  "## What was measured (2026-08-17, 4,163 of 4,183 registered checkouts on disk)
+
+| class | repos | what the JVM is doing | emitted per repo |
+|---|---|---|---|
+| `:jvm-source` | 954 | `.clj` sources — the JVM is the runtime, not a tool | yes (fail) |
+| `:jvm-runtime-deps` | 149 | a third-party JVM library in top-level `:deps` | yes (fail) |
+| `:jvm-build` | 291 | shadow-cljs / cljs compiler / tools.build | yes (warn) |
+| `:babashka` | 363 | `bb.edn`, retired by ADR-2607173000 | yes (warn) |
+| `:jvm-chicory` | 3 | Chicory — **all three inside the frozen inventory** | yes (info) |
+| `:jvm-runtime-clojure-only` | 1,292 | `org.clojure/clojure` alone in `:deps` | counted |
+| `:jvm-test-oracle` | 1,656 | `.clj` tests (contract allows) | counted |
+| `:jvm-test` | 3,278 | cognitect test-runner / kaocha in an alias | counted |
+| `:jvm-lint` | 3,023 | clj-kondo via maven | counted |
+
+Source totals: 2,752 `.clj` src, 6,436 `.clj` test, 25,385 `.cljc`, 2,829 `.cljs`,
+2,037 `.kotoba`.
+
+**The one class the contract calls forbidden has zero breaches.** All three Chicory
+call sites are the frozen ones. That is a real green and it was unmeasured before now.
+
+## Three ways the naive count is wrong, each measured
+
+**Maven coordinates are not the question.** 3,683 of 3,994 `deps.edn` carry a
+`:mvn/version`, which reads as near-total capture. 3,293 of those are a `clj-kondo`
+lint alias — a tool with a native binary and an npm package.
+
+**Reading `:deps`/`:extra-deps` is not enough.** clj-kondo's own recommended alias uses
+`:replace-deps`. The first version of the detector found 30 clj-kondo sites where there
+are 3,023.
+
+**A git coordinate into this workspace is a graph edge, not a leaf.** 424 repos pin
+`io.github.kotoba-lang/langgraph` with `:git/tag`+`:git/sha` and no `:git/url`; deriving
+the org from the coordinate symbol the way the Clojure CLI does moved
+`:jvm-runtime-deps` from 1,971 to 1,441.
+
+**Unregistered checkouts must not be counted.** `orgs/` holds 4,581 repo-shaped
+directories against west.yml's 4,183; the surplus is agent worktrees
+(`.tamaki-tamaki-loop-*`, `.cloud-itonami-app-adopt`, `.wt-run`) contributing 3,281
+`.clj` files — 15% of the raw total, every one a copy of a file already counted under its
+registered path. Counting them makes the number move whenever a loop happens to run.
+
+## The failure mode in 'just run it under ClojureScript'
+
+56 fleet gates were `:jvm-test`. `nodes.edn` puts cap `:jvm` on 2 of 10 hosts (4 slots)
+against `:node` on 4 (8 slots), and `placement.cljs` costs them 600s vs 180s — so moving
+a gate off the JVM buys real queue time. 15 of the 56 target repos contain **zero `.clj`
+files**, which looks like a green light.
+
+It is not. On `columnar`, `test/run.cljs` and `test/columnar/cljs_runner.cljs` each
+required ONE of the suite's three test namespaces:
+
+```
+JVM  (clojure -M:test)         Ran 36 tests containing 117 assertions
+nbb  (test/run.cljs)           Ran 10 tests containing  54 assertions
+```
+
+Nothing prints the number it should have reached. With `group/group` altered to drop the
+last group from every grouped result — a defect the JVM suite catches at once:
+
+```
+partial runner, broken source   Ran 10 tests, 0 failures, exit 0    <-- green
+full runner,    broken source   Ran 36 tests, 2 failures, exit 1
+full runner,    clean source    Ran 36 tests, 0 failures, exit 0    == JVM
+```
+
+Flipping that gate on the strength of `.clj == 0` would have moved it to a cheaper node
+AND silently dropped two thirds of the suite, and the signed receipt would have looked
+identical. This is ADR-2608136000's class — *the check that could not measure returns the
+same value as the check that measured and found nothing* — reached from the direction of
+a migration rather than a bug.
+
+Fixed upstream first (`kotoba-lang/columnar` 5e165f0, both halves now 36/117), then
+flipped.
+
+## What was resolved, and what was refused
+
+Flipped `:jvm-test` -> `:nbb-test` (56 -> 53 jvm-test, 1 -> 4 nbb-test), all three
+measured on the three admission conditions:
+
+| repo | tests / assertions, JVM == nbb | broken -> exit |
+|---|---|---|
+| `kagami` | 19 / 121 | 1 (west.yml trailing-line parse) |
+| `columnar` | 36 / 117 | 1 (group dropped) |
+| `org-ietf-csv` | 10 / 38 | 1 (quote char) |
+
+Refused, with the reason recorded in `gates.edn` so it is not re-derived:
+
+- **`kotobase-storage`** — its `test/run.cljs` is a COMPLEMENT, not a port. Its own
+  docstring says the JVM half races real threads and covers the synchronous store, while
+  this half covers the async/Worker path the JVM cannot reach. It prints no `Ran N tests`
+  line at all, so the gate's own floor (exit 93) would reject it. Both halves are real
+  coverage; dropping either loses tests.
+- **`io-multiformats`, `org-ietf-cbor`** — their cljs half is `shadow-cljs compile`,
+  itself a JVM build. No nbb entry exists.
+- **`chain`, `io-ipld`, `io-ipld-car`, `nekko`, `org-apache-avro`, `kotobase-lake`,
+  `tech-ipfs-specs-ipns`, `sakkyokuka`** — zero `.clj`, but the test path needs sibling
+  repos through `deps.edn`, and `:nbb-test`'s classpath is the shipped tree only. The
+  pre-existing note at `ongaku` in gates.edn records the same constraint.
+
+## What is NOT claimed
+
+The 954 `.clj`-source repositories and the 149 third-party-jar repositories are not
+resolved. Each is a per-repo port (`.clj` -> `.cljc`, or a decision core to `.kotoba` per
+ADR-2608650000's split between a permanent safety constraint and a backend that has not
+caught up), and the third-party ones need a real cljs/npm substitute — `cheshire`,
+`http-kit`, `ring-core`, `datalevin`, `transit-clj` have no cljs form, so the code that
+requires them cannot run anywhere else today. The detector now names all of them
+individually and reports a NEW one the next tick, which is the enforcement the four-entry
+inventory could not provide.
+
+`org.clojure/clojure` was NOT stripped from the 1,210 repos that declare it while
+shipping zero `.clj`. It is a declaration, not a binding: nbb does not read `deps.edn` at
+all, so removing the line changes nothing a consumer can observe, and a 1,210-repo sweep
+whose effect is unobservable is the paperwork this ADR is arguing against."
+
+  :adr/consequences
+  "- `manifest/orgs-detectors.edn` gains an 11th detector; its first run recorded a
+  baseline of 1,760 findings and the second reported none as NEW, verified against an
+  isolated `--state`.
+- The forbidden classes in `kotoba-wasm-runtime-cutover.edn` are now enforceable outside
+  the four repositories that inventory names. That contract is unchanged and stays
+  correct; its `:cutover/legacy-inventory` remains 4 entries, because those four are the
+  Chicory/bootstrap debt specifically and not the workspace's whole JVM surface.
+- Three fleet gates left the 4-slot `:jvm` bottleneck for the 8-slot `:node` pool, and
+  `columnar`'s ClojureScript coverage went from 10/36 tests to 36/36 on both halves.
+- The detector refuses rather than guesses: a west.yml with no `path:` entries, or paths
+  with no checkouts, prints `SCANNED 0` and exits **2** — neither 0 nor 1 — so the tick
+  records `:inconclusive`, never clean. Both directions measured.
+- Anyone converting another `:jvm-test` gate must satisfy the three admission conditions
+  at the head of `gates.edn` `:repos`. `.clj == 0` is explicitly not sufficient, and the
+  columnar measurement is there as the reason."
+
+  :adr/evidence
+  ["scripts/verify-jvm-dependency-surface.cljs"
+   "manifest/orgs-detectors.edn"
+   "scripts/fleet-ci/gates.edn"
+   "kotoba-lang/columnar 5e165f0f93f5463461d925248859cab339f58d4f"
+   "manifest/west.yml columnar pin 6e417bc -> 5e165f0"]
+  :adr/related
+  ["adr-2607183300-kotoba-wasm-runtime-jvm-exit"
+   "adr-2608136000"
+   "adr-2608650000"
+   "adr-2607173000"
+   "adr-2608124800"]}]

@@ -1,0 +1,116 @@
+[{:db/id -1
+  :doc/id "revenue-agent-loop-run-0028-murakumo-oem-rfq-inbox-loop"
+  :doc/doc_type "revenue-agent-loop-run"
+  :doc/title "Run 0028 — arm OEM RFQ inbox watch (Mouse/Sycom replies)"
+  :doc/path "90-docs/business/revenue-agent-loop/runs/0028-murakumo-oem-rfq-inbox-loop.edn"
+  :doc/run_number 28
+  :doc/status "running"
+  :doc/date "2026-08-13"
+  :doc/source "revenue-agent-loop RUN-TEMPLATE (ADR-2607246100)"
+  :doc/body "# Run 0028 — arm OEM RFQ inbox watch (Mouse/Sycom replies)
+
+**Status:** running — watcher armed; first scan had 0 vendor replies
+**Started:** 2026-08-13
+**Owner:** agent, under owner direction（受信を監視して、返信対応を行うスケジュール、ループを作って）
+**Mode:** cash-first
+**Prior context:** run 0027 delivered RFQs; next evidence is a written vendor answer, not another send.
+
+## Hypothesis
+
+If inbound mail is scanned every 4 hours on both Resend receiving (`mail.murakumo.cloud`)
+and the Cursor-session Gmail path (`Reply-To hello@gftd.co.jp`), then a Mouse or
+Sycom reply is handled within one interval of arrival, without sending a second
+unsolicited RFQ.
+
+## Capital governor
+
+| Field | Value/evidence |
+|---|---|
+| Current tranche | T1 |
+| Released / committed / spent | unknown / ¥0 / ¥0 |
+| This run cash-at-risk ceiling | ¥0 (watch + optional acknowledgement; no PO) |
+| Paid acquisition allowed? | no |
+
+## Score before
+
+Same action family as 0027 (supplier discovery). Watcher does not create demand.
+
+| Axis | 0–5 | Reason |
+|---|---:|---|
+| P(payment ≤30d) | 1 | no live murakumo hardware checkout |
+| Speed to evidence | 4 | reply is the next evidence; 4h scan |
+| Existing external demand | 1 | no external hardware buyer |
+| Payment readiness | 1 | 特商法 unfinished; Node 24 purchasable? false |
+| 12m expected gross profit | 2 | hardware margin on paper; no sales |
+| Repeat likelihood | 2 | BTO lots could repeat; unproven |
+| Gross margin | 2 | Node 24 modeled thin net after assembly |
+| Learning value | 5 | white-label yes/no still the binary |
+| Spillover | 3 | same assembler could build other SKUs |
+| Evidence confidence | 3 | 0027 delivered; 0028 first scan measured empty |
+
+**Total:** 48/100 (unchanged from 0027 posterior). Arming a watcher is not a funnel move.
+
+## Hard gates
+
+- Do not PO or send funds.
+- Do not claim Node 24 or MK-1 is on sale.
+- Do not treat SCANNED=0 / missing Resend key as zero replies.
+- Do not bypass CAPTCHA.
+- Do not dual-send a correction RFQ unless owner asks.
+- Secrets: known identifiers only (`gftd.resend` / `API_KEY`, `~/.gftd/resend-api-key`). No dump-all.
+
+**Gate:** yellow — supplier correspondence allowed. Consumer sale remains red.
+
+## One selected action
+
+Arm one 4-hour inbox loop (launchd `com.gftd.murakumo-oem-rfq` + Cursor session loop)
+that wakes a model only when a fresh Mouse/Sycom message is unmatched. WIP=1.
+
+## Result
+
+**Person-hours:** ~0.4
+**External evidence:** first scan, not a vendor reply.
+
+| Plane | What was measured | Vendor matches |
+|---|---|---:|
+| Resend inbound `list-received-emails` | 2 messages (probe loopback `probe@mail.murakumo.cloud`; old Amazon Associates to `email.gftd.ai`) | 0 |
+| Gmail MCP `search_threads` | queries `from:mouse-jp.co.jp` / `from:sycom.co.jp` / `murakumo` / `to:hello@gftd.co.jp` after 2026-08-13 | 0 in the connected account |
+| Tick key for launchd | `RESEND_API_KEY` file / keychain `gftd.resend` | may be missing; then tick is UNANSWERED, not zero |
+
+Reply-To is `hello@gftd.co.jp`. The connected Gmail account returning empty is **not** proof that mailbox is empty unless it is that address. Resend inbound only sees replies to From.
+
+Artifacts:
+
+- `scripts/murakumo-oem-rfq-tick.cljs` — Resend receiving scan; fail-closed UNANSWERED
+- `scripts/murakumo-oem-rfq-loop.cljs` — wake `claude -p /murakumo-oem-rfq` once per fresh id
+- `scripts/com.gftd.murakumo-oem-rfq.plist` — StartInterval 14400
+- `.claude/skills/murakumo-oem-rfq/SKILL.md` — 1 reply / iteration
+- live ledgers: `~/.gftd/murakumo-oem-rfq/scans.edn`, `loop.ledger.edn` (not git; launchd must not dirty the shared checkout)
+
+| Funnel stage | Before | After | Delta |
+|---|---:|---:|---:|
+| Qualified visitors/leads | 0 assembler replies | 0 | 0 |
+| Core activation | 0 | 0 | 0 |
+| Checkout/wallet initiated | 0 | 0 | 0 |
+| Verified external payments | 0 | 0 | 0 |
+| Revenue / gross profit | 0 | 0 | 0 |
+| Repeat/retained | 0 | 0 | 0 |
+
+Score not raised: empty inbox scan is not a lead.
+
+## Score after
+
+Same as before. **Total:** 48/100
+
+## Decision
+
+`continue`
+
+Keep the 4h watch through the 0027 10-business-day timebox. Next single action after a real vendor mail: extract white-label / MOQ / lead / who-buys-GPU, then decide on a prototype quote request. Do not PO.
+
+**Tranche verdict:** `hold`
+
+Success: ≥1 written answer handled within one interval.
+Continue: watcher live, still 0 vendor replies.
+Stop: both bounce, or written refusal with no alternative assembler, or timebox expiry with still-empty measured scans (then pick the next cash action; do not keep scanning forever).
+"}]

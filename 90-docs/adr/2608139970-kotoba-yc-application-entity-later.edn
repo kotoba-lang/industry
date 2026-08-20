@@ -1,0 +1,28 @@
+[{:db/id -1
+  :adr/id "adr-2608139970-kotoba-yc-application-entity-later"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/topic "kotoba-yc-application"
+  :adr/title "ADR-2608139970: Kotoba として Y Combinator に出願する。YC 用 Delaware C-Corp は後で作る"
+  :adr/status "accepted"
+  :adr/date "2026-08-13"
+  :adr/last_verified "2026-08-13"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/repos ["com-junkawasaki/root"]
+  :adr/authoritative_for
+  ["Y Combinator への申請主体は Kotoba（言語・compiler・runtime）であり、AWAI Network, L.L.C. でも Gftd Japan 株式会社でもない"
+   "Kotoba 用の Delaware C-Corp は出願時点では未設立でよい（YC FAQ: incorporate before applying? Nope.）。設立は owner が後で行う"
+   "既存2法人（AWAI Network, L.L.C. / Gftd Japan 株式会社）は申請書の legal-entity 欄に関連法人として開示する。隠さない"
+   "この出願は ADR-2607246100 の financing レーンの明示オープンである。投資現金は売上・粗利益・需要検証に加算しない"
+   "revenue loop の run 0025（net-kotobase discovery）は置換しない。WIP=1 はレーンが違う"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2607246100-revenue-agent-loop-capital-allocation-governor"
+   "adr-2607320500-legal-structure-three-roles-no-foundation-no-custody"
+   "adr-2608111634-stripe-atlas-nominee-not-a-kyc-substitute"
+   "90-docs/business/yc-application/kotoba-f26.edn"
+   "90-docs/business/revenue-agent-loop/runs/0026-kotoba-yc-application.edn"]
+  :adr/body
+  "# ADR-2608139970: Kotoba として Y Combinator に出願する。YC 用 Delaware C-Corp は後で作る\n\n**Status:** accepted\n**Date:** 2026-08-13\n**Decider:** Jun Kawasaki（指示: では進めて, 後で yc 用に法人を作ります）\n\n## Context\n\nポートフォリオには YCBench（内部の venture 採点）はあるが、Y Combinator の出願パケットは無かった。契約主体は AWAI Network, L.L.C.（Delaware LLC、file 10704996、2026-07-20 Atlas 設立）と Gftd Japan 株式会社であり、社名 Kotoba の法人は無い。ADR-2607246100 は investor outreach を売上レーンから分離し、運転利益が目的の間は financing を JPY 0 にしている。\n\nオーナーは (1) Kotoba として出願する (2) 法人は後で YC 用に作る、と決めた。YC FAQ は出願前の設立を要求しない。\n\n## Decision\n\n### 1. 申請する会社は Kotoba\n\n一つのこと: AI が書いたコードを untrusted として走らせる言語と、その言語に付いた hosted deploy（Deno 型）。murakumo は最初の実行クラスタ（dogfood、33 cores）であって別製品ではない。kotobase は runtime が grant できる storage capability であって applicant ではない。itonami はこの出願ではない。4000 west repo を製品として書かない。\n\n50 字: Language + deploy for untrusted AI code（39 characters）。公開の課金 deploy はまだ無い。あるとは書かない。\n\n### 2. 法人は後\n\n- 出願時点の Kotoba 法人: 未設立。\n- 設立するなら Delaware C-Corp（YC 標準）。名前候補は Kotoba / Kotoba Lang, Inc.。最終名は owner。\n- AWAI LLC を YC 会社に転用しない。\n- 言語・compiler・runtime の IP は新法人へ移す前提。移管契約は設立時。\n\n### 3. 既存法人は開示する\n\nYC は ANY legal entity を聞く。No と答えない。\n\n- AWAI Network, L.L.C. (Delaware, 2026-07-20): sister operator。applicant ではない\n- Gftd Japan 株式会社 (法人番号 1011101086505): 日本の雇用・一部収納代行。applicant ではない\n\nequity は申請会社が未設立なので planned: Jun Kawasaki 90% / Ichihara 10%。既存2社の cap table を混ぜない。\n\n### 4. Financing lane だけ開く\n\nこの run は売上スコアを上げない。T1 の 300,000 円を使わない。提出は owner（YC アカウントと動画）。agent は下書きまで。\n\n### 5. バッチ\n\nFall 2026 on-time 締切（2026-07-27 20:00 PT）済み。遅延出願は受け付け中。法人待ちで遅らせない。既定は動画ができ次第 F26 遅延提出。Winter 2027 Early Decision でも可。\n\n## Consequences\n\n- 出願文の正本は 90-docs/business/yc-application/kotoba-f26.edn\n- founder 個人欄（学歴、電話、LinkedIn、非コンピュータの hack、動画 URL）は捏造しない\n- 外部売上 0、外部言語顧客 0。dogfood は dogfood と書く\n- 2 founders: Jun Kawasaki 90% (language/compiler), Ichihara 10% (marketing/sales/bizdev)。YC は可\n\n## Verification\n\n下書きが YC フォームの欄と 1:1 で対応すること。提出そのものは本 ADR の完了条件ではない。\n"}]

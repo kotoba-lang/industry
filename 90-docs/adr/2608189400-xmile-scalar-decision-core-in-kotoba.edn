@@ -1,0 +1,169 @@
+[{:db/id -1
+  :adr/id "ADR-2608189400"
+  :adr/title "XMILE の計算は JVM/cljs なしでは動いていなかった — 演算・歩行・1 step を Kotoba に切り出し、3 本の parity gate で固定した"
+  :adr/status "accepted"
+  :adr/date "2026-08-18"
+  :adr/repos "kotoba-lang/org-oasis-open-xmile, com-junkawasaki/root"
+  :adr/commits "org-oasis-open-xmile a032bf4 (operations), 6a100f8 (walk), 81fa38b (simulation step)"
+  :adr/body "## 問い
+
+「今の kotoba-lang で XMILE 関係の計算処理は JVM / cljs 依存なしに kotoba
+native・amu・kototama で計算できるようになっているか」（オーナー、2026-08-18）。
+続けて「残りも成熟度を高めて」。
+
+## 測った現在地（着手前）
+
+**なっていなかった。`.kotoba` の実装が 1 バイトも存在しなかった。**
+
+| repo | origin/main | 中身 |
+|---|---|---|
+| `kotoba-lang/org-oasis-open-xmile` | `b135fab`（2026-08-14） | `.cljc` 5 + `.clj` 1、**`.kotoba` 0** |
+| `kotoba-lang/dynamics` | HEAD と一致 | `.cljc` 3、**`.kotoba` 0** |
+
+workspace 全体の `.kotoba` **4,189 本**に対し `xmile` / `system dynamics` /
+`stock…flow` の grep は **0 件**。amu（134 本）・kototama（14 本、全て fixture）にも
+無い。**compile する source も host する artifact も存在しなかった。**
+
+実行経路は JVM か cljs で、しかも interop に直結していた:
+`src/xmile/expr.cljc:41-57` が sec 3.5.1 の数学組み込みを **16 個の reader
+conditional で `Math/*` と `js/Math.*` に直結**、`src/xmile/xml.cljc` の
+`parse-string`/`emit-string` は `:cljs` 分岐が無く、`conformance.clj` は `javax.xml`。
+
+## 決めたこと
+
+**`xmile.expr` の決定核を `.kotoba` に切り出し、parity gate で原本に固定する。
+`src/` は 1 バイトも変えない。** 3 スライスに分けて着地させた
+（`org-oasis-open-xmile`、いずれも main）:
+
+| スライス | commit | 内容 |
+|---|---|---|
+| 演算 | `a032bf4` | sec 3.5.1 数学組み込み、`^`、floored `MOD`、関係 6 / 論理 3、sec 3.5.4 `STEP`/`RAMP`/`PULSE` |
+| 歩行 | `6a100f8` | expr tree を封じた再帰値 `:xmile/expr` として、環境を typed map として walk。`[:result :f64 :string]` |
+| 1 step | `81fa38b` | 変数 1 本の clamp 付き束縛（3.1.2）、流入−流出（3.1.1）、Euler / RK4 の状態更新（3.7.1） |
+
+**`.cljc` は authority かつ load path のまま。** ADR-2608130900 が記録したとおり
+`dsl-core` の `.kotoba` 単独移行は消費側 12 repo を 23 日間 load 不能にし、
+**この repo はその 12 件の 1 つだった**。css の形（2 ファイル + parity gate）を採る。
+
+## gate — 3 本、2 つの半分を混ぜない
+
+| 半分 | 対象 | 根拠 |
+|---|---|---|
+| **exact** | `ABS` `SQRT` `INT` `MIN` `MAX` `MOD`、関係/論理演算子、`PI` `INF`、`STEP` `RAMP` `PULSE`、および **transcendental を含まない全軌道（RK4 を含む）** | 両側とも IEEE 演算か選択。1 ulp の差は丸めではなく欠陥 |
+| **1e-12 相対** | `EXP` `LN` `LOG10` `SIN` `COS` `TAN` `ARCSIN` `ARCCOS` `ARCTAN` と `^` | `.cljc` は host 数学ライブラリ、port は host の transcendental を import しない固定多項式（amu docs/adr/0009・0012）。**bit 一致は入手不能で、主張すれば嘘になる** |
+
+実測最悪相対誤差（2026-08-18、JDK 24、amu `29e8386`）: 演算 gate **1.276e-13**
+（TAN@1000.25、商なので sin/cos の wide-angle 還元誤差が合成される）、歩行
+**2.538e-16**、40 step の RK4 シミュレーション **2.728e-16**。閾値 1e-12 は最悪値の
+約 8 倍で、3 gate とも毎回この値を印字する。
+
+## 落ちることを確かめた（6 回、壊したものと報告が一致）
+
+| 壊した箇所 | 出た赤 |
+|---|---|
+| `xmile-mod` を floored → truncated | `floored-modulus-is-exact` と繰り返し `PULSE` の 2 つだけ |
+| `ln(10)` 定数を相対 2e-11 摂動 | `LOG10` **だけ**が 1.757e-12 |
+| `IF` を eager に | laziness test の 3 件だけ |
+| refusal を左引数評価の後に | refusal-order test の 3 件だけ |
+| 定数表を env より先に | shadowing test の 1 件だけ |
+| **RK4 の重み付けを数学的に等価な形に再結合** | **RK4 の 2 モデルだけが赤、Euler の 2 モデルは緑** |
+
+最後の 1 つが bit 一致の主張に意味を与えている。
+
+### 判別できなかった検査が 1 つあった（より有用な発見）
+
+**非負クランプを `max(0, x)` から `abs(x)` に替えても suite は全緑のままだった。**
+モデル中の clamp 付き 2 変数が一度も負にならず、両者が全域で一致していたため。
+タンクを排水閾値より下から始め、sink を供給より速く抜くようにモデルを変えたところ、
+同じ置換で 3 系列が赤になった。**この事実と理由を test のコメントに書いた** ——
+次に clamp 付き変数を足す人が、corpus が load-bearing だと知る必要があるため。
+
+## 実測した境界予算 —— 設計が途中で変わった理由
+
+**最初の 1 step 版は評価計画とストック表を丸ごと再帰値として渡していた。入らない。**
+境界を越える値は `kotoba.kir.value` の固定予算で検査される ——
+**`adt-node-limit` 64 / `adt-depth-limit` 12 / `typed-map-entry-limit` 31** ——
+list の 1 link が 2 段を消費するので **6 要素の名前リストが拒否される**（実測）。
+したがって port は「step ごと 1 回」ではなく **「量ごと 1 回」**で呼ぶ形にした。
+引数はモデルの大きさではなく問題（変数 1 本、ストック 1 個の流量リスト）で有界になる。
+
+**失敗は clean である**（境界が拒否するだけで、誤った数を計算しない）。6 という数は
+test で固定してあり、黙って動かない。**これは現在地の制約であって設計原理ではない** ——
+`adt-depth-limit` は既に 8→12 に引き上げられた前例がある（kotoba-kir ADR 0025）。
+
+## この landing が主張していないこと
+
+**「XMILE モデルを JVM / JS なしにシミュレートできる」とは言っていないし、今日それは
+真ではない。** tokenizer / parser・`xmile.xml`・`xmile.validate`、および
+`xmile.execute` のうち**数ではなくモデルについて考える部分**（`topo-order`・
+`desugar-delays`・`constant-names`・時間ループ・反復そのもの）は `.cljc` のまま。
+`topo-order` は代数ループが無いことを証明するグラフ彩色で、port が行う主張とは種類が違う。
+README と MATURITY.md にも同じ言葉で書いた。
+
+## backend の現在地 — これは言語の天井ではない
+
+qualified なのは `kotoba-wasm` と `kotoba-script`。**native は f64 算術
+（add/sub/mul/div/min/max/sqrt/abs/neg と vector-f64）を emit するが、
+exp/log/sin/cos/atan2 を 1 つも持たない**（実測 2026-08-18、
+`kotoba-native/src/kotoba/native/{x86_64,aarch64}.cljc` の op 表）。
+
+なお `kotoba-kir/src/kotoba/kir.cljc:95-118` の「native は f64 を一切拒否する」は
+**古い**。`amu/src/kotoba/compiler/core.clj:499` は現在 f64 を native にも通す
+（ADR-2608030300）。効いている壁は transcendental の不在と、
+`only-native-word-typed-features?` の word-typed gate である。
+
+### native を開けるのに必要な作業は、思ったより小さい（実測）
+
+**多項式カーネルは既に target 非依存の KIR 式として存在する。**
+`kotoba-wasm/src/kotoba/wasm/core.cljc` の `bounded-sin-form` / `bounded-cos-form` /
+`bounded-exp-form` / `bounded-log-form` / `bounded-atan-unit-form` /
+`bounded-atan2-form` / `wide-exp-form` / `wide-log-form` は
+**`f64-add` `f64-mul` `f64-sub` `f64-div` `f64-from-bits` `let` `if` `bit-and` `quot`
+だけで書かれた s 式を返す** —— つまり native backend が既に emit できる op しか使って
+いない。native 側の `emit-expr` は `keyword-name` を `(let … (string-substring …))` へ
+desugar する経路を既に持っているので、**接ぎ木する場所も既にある**。
+`kotoba-native` は `kotoba-kir` に依存しているので、共有の置き場もある。
+
+**残る本物のブロッカーは 1 つだけ: KIR 式レベルの trap が無い。** wasm 側は定義域検査を
+生の bytecode（`unreachable` 0x00）で出しており、共有 KIR 形式には持ち上がっていない。
+定義域検査**抜き**で native に transcendental を入れるのは、この workspace が規則を
+書いてきたまさにその失敗形（定義域外で静かに誤った数を返す）なので、やらない。
+
+したがって native を開ける作業は **①kotoba-kir に trap primitive を足す
+②カーネル形式を kotoba-kir へ抽出（kotoba-wasm はそれを consume する側に変える）
+③両 ISA に接ぐ ④両 ISA で微分テスト** の 4 手で、3 repo をまたぐ独立の landing に
+なる。この ADR ではやっていない。
+
+## 次の一手（順序つき）
+
+1. **native の bounded transcendental**（上記 4 手）。XMILE を native に載せる唯一の障害。
+2. **境界予算の引き上げ**（`adt-depth-limit` / `adt-node-limit` / `typed-map-entry-limit`）。
+   これが上がるまで、モデル規模の値は境界を越えられない。
+3. tokenizer / parser の移植（string op は揃っている: `string-substring`・`string=?`・
+   `string-concat`・`string-contains?`・`string-code-point-at`）。
+
+## fleet gate
+
+`scripts/fleet-ci/gates.edn` に `{:name \"org-oasis-open-xmile\" :gate :jvm-test
+:cd true}` を追加した。この repo はこれまで **fleet gate を 1 本も持っていなかった**
+（`.github/workflows/ci.yml` は ADR-2607300900 で inert）。**まだノード上で緑を
+観測していない** —— 最初の赤は「ノードが走らせられなかった」であって「port が
+退行した」ではない、と entry のコメントに書いてある。amu は git dep なので
+`ship-git-deps!` が推移閉包を自動で運ぶが、**maven 依存は運ばない**ので、
+classpath を名指す赤はノードの egress であってこの repo ではない。
+
+## 検証
+
+    clojure -M:test   89 tests / 2012 assertions、0 failures / 0 errors（着手前: 62 / 238）
+    clojure -M:lint   0 errors / 0 warnings
+
+## 追記（2026-08-19）—— 「4,189 本」は再現しなかった
+
+本文の workspace 全体の `.kotoba` 計数は、同じ workspace に対する 2 つの独立した測定の
+どちらとも一致しない（tracked な `git ls-files` で 2,044 / working tree の `find` で 2,346、
+node_modules の寄与は 0）。**repo 単位の数字（amu 134 本）は完全に一致している**ので、
+ずれているのは全体集計だけである。本文に測り方が書かれていないため原因は判定できない。
+
+**この数字を method 抜きで引用しないこと。** 詳細と再現コマンドは
+adr-2608191000-kotoba-refactor-status-measured-and-claude-md-native-section-corrected。
+"}]

@@ -1,0 +1,197 @@
+{:doc/type :weekly-execution-report
+ :doc/template true
+ :doc/title "Wave 5 Weekly Execution Report Template"
+ :doc/description "Use this template for each week's report (weeks 11–16). Fill in metrics, decisions, blockers, and next steps. Archive completed reports to 90-docs/gates/weekly-reports/wave5-m5m6/week-[N].edn"
+
+ :report/metadata
+ {:week-number "🔄 [N] (replace with 11–16)"
+  :phase "🎯 [M5 or M6]"
+  :reporting-period "[Start Date] to [End Date]"
+  :report-generated-date "[Auto-filled: Monday, [date]]"
+  :reporting-lead "Execution Lead (Claude Code Agent)"
+  :audience ["Main Coordinator" "Platform Lead" "Team Leads" "Stakeholders"]}
+
+ :metrics/snapshot
+ {:period-covered "Week [N]"
+  :build-times-p99
+  {:value "🔢 [X min]"
+   :target "< 12 min"
+   :trend "📈 [up/down/stable] vs. Week [N-1]"
+   :sla-status "✅ [pass/❌ fail]"
+   :note ""}
+  :test-coverage
+  {:value "🔢 [X%]"
+   :target ">= 92%"
+   :trend "📈 [up/down/stable] vs. Week [N-1]"
+   :sla-status "✅ [pass/❌ fail]"
+   :note ""}
+  :deployment-success-rate
+  {:value "🔢 [X%]"
+   :target ">= 99.5%"
+   :trend "📈 [up/down/stable] vs. Week [N-1]"
+   :sla-status "✅ [pass/❌ fail]"
+   :note ""}
+  :gate-blocker-count
+  {:value "🔢 [N]"
+   :breakdown {:p1 "[n] critical" :p2 "[n] high"}
+   :average-age-hours "[X.X h]"
+   :trend "📈 [up/down/stable] vs. Week [N-1]"
+   :note ""}
+  :team-velocity
+  {:m5-core {:story-points-completed "[X]" :forecast "[Y]" :variance "[+X/-X]%"}
+   :m5-integration {:story-points-completed "[X]" :forecast "[Y]" :variance "[+X/-X]%"}
+   :m6-platform {:story-points-completed "[X]" :forecast "[Y]" :variance "[+X/-X]%"}
+   :total {:story-points-completed "[X]" :forecast "[Y]" :burndown-slope "[trajectory]"}}}
+
+ :gate-decision
+ {:decision "🎯 [Go / No-Go / Hold]"
+  :decision-date "[Fri 16:00, date]"
+  :decision-makers "Phase Owner M5, Phase Owner M6, Platform Lead"
+  :approvals "✅ [Unanimous / Consensus / Override (reason)]"
+  :critical-path-status
+  {:overall-completion "[X%]"
+   :m5-core "[deliverables complete]"
+   :m5-integration "[deliverables complete]"
+   :m6-platform "[deliverables complete]"}
+  :gate-rationale "[2-3 bullet summary of why Go/No-Go]"
+  :metrics-passed-all "[✅ yes / ⚠️ some / ❌ no (which ones failed?)]"
+  :next-week-readiness "[Critical path prepared for Week [N+1]? Y/N]"}
+
+ :blockers-and-risks
+ {:active-blockers
+  [{:blocker-id "[Jira key, e.g., M5W5-042]"
+    :title "[Brief title]"
+    :team "[M5-Core / M5-Integration / M6-Platform]"
+    :severity "[P1 / P2]"
+    :created-date "[Week N — date blocker was raised]"
+    :owner "[Team lead contact]"
+    :impact "[What gate deliverable does this block?]"
+    :mitigation "[Action taken or planned]"
+    :eta-to-resolve "[estimate or date]"
+    :escalation-status "[Open / Escalated to L2 / Escalated to L3]"}]
+  :escalations-this-week
+  [{:escalation-id "[Event ID from escalation ledger]"
+    :timestamp "[2026-08-YY HH:MM:SS]"
+    :alert-type "[build-times / coverage / deploy-failure / blocker-sla / gate-halt]"
+    :severity "[warning / critical / critical-red]"
+    :team "[M5-Core / M5-Integration / M6-Platform]"
+    :responder-level "[L1 / L2 / L3]"
+    :resolution "[How was it resolved? Workaround / fix / defer / override]"
+    :resolution-time "[X hours Y min]"
+    :outcome "[resolved / escalated / deferred]"
+    :notes "[Additional context]"}]
+  :risks-identified
+  [{:risk "[Description]"
+    :probability "[High / Medium / Low]"
+    :impact "[High / Medium / Low]"
+    :mitigation "[Plan to address]"}]}
+
+ :team-status
+ {:m5-core
+  {:status "[On-track / Slight slip / Major risk]"
+   :progress-summary "[2-3 bullets: what was completed, what's in progress]"
+   :blockers "[List any P1/P2 blockers specific to this team]"
+   :velocity-trend "[Up/down/stable] vs. forecast"
+   :team-lead-notes "[Optional: team-specific context]"
+   :forecast-next-week "[Go/No-Go risk if current pace continues]"}}
+ {:m5-integration
+  {:status "[On-track / Slight slip / Major risk]"
+   :progress-summary "[2-3 bullets]"
+   :blockers "[List any P1/P2 blockers]"
+   :velocity-trend "[Up/down/stable] vs. forecast"
+   :team-lead-notes "[Optional]"
+   :forecast-next-week "[Go/No-Go risk]"}}
+ {:m6-platform
+  {:status "[On-track / Slight slip / Major risk]"
+   :progress-summary "[2-3 bullets]"
+   :blockers "[List any P1/P2 blockers]"
+   :velocity-trend "[Up/down/stable] vs. forecast"
+   :team-lead-notes "[Optional]"
+   :forecast-next-week "[Go/No-Go risk]"}}
+
+ :dependencies-and-handoffs
+ {:m5-to-m6-readiness
+  {:status "✅ [ready / ⚠️ partial / ❌ not-ready]"
+   :m5-deliverables-for-m6 "[List critical dependencies M6 needs from M5]"
+   :actual-delivery-status "[Which ones are done? Which are pending?]"
+   :handoff-date "[When M5 outputs expected by M6]"
+   :risks "[Any M5→M6 integration risks?]"}}
+ {:platform-dependencies
+  {:infrastructure-status "[Stable / Degraded / Incident]"
+   :any-upstream-blockers "[List repos/services M5/M6 depend on that are slow/broken]"
+   :action-items "[Who will unblock? When?]"}}
+
+ :next-week-forecast
+ {:week "[N+1]"
+  :phase "[M5 / M6]"
+  :critical-path
+  [{:deliverable "[Jira epic or story]"
+    :team "[Owner team]"
+    :status "[Backlog / Ready / In progress]"
+    :risk-level "[Low / Medium / High]"
+    :dependencies "[What must be ready before this can start?]"}]
+  :velocity-forecast "[Story points team expects to complete in Week [N+1]]"
+  :anticipated-risks "[Any known risks that might delay Week [N+1]?]"
+  :readiness-check-needed "[What needs to be ready by Friday to unblock Week [N+1]?]"}
+
+ :escalation-log
+ {:events-this-week "[Number of escalations: [N]]"
+  :high-severity-count "[P1 count: [N], P2 count: [N]]"
+  :sla-compliance
+  {:alert-response-4h "[X/Y met (X%)]"
+   :critical-response-2h "[X/Y met (X%)]"
+   :gate-halt-decision-15min "[X/Y met (X%)​]"}
+  :false-positive-rate "[X alerts, Y were noise, Z% false-positive]"
+  :escalation-source-breakdown
+  {:build-times "[X events]"
+   :test-coverage "[X events]"
+   :deployment-success "[X events]"
+   :blocker-sla-breach "[X events]"
+   :gate-halt-signal "[X events]"}
+  :post-incident-reviews "[Were any incidents reviewed? Y/N. If yes, link to docs.]"}
+
+ :metrics-dashboard-health
+ {:prometheus-status "✅ [healthy / ⚠️ warnings / ❌ errors]"
+  :collection-success-rate "[X.X%] (target: >= 99%)"
+  :alert-routing-latency "[X min] (target: < 2 min)"
+  :grafana-dashboard-uptime "[X%] (target: >= 99.5%)"
+  :data-freshness "[Latest data age: X min] (target: < 15 min)"
+  :any-collection-gaps "[None / [List of < 15 min gaps]]"
+  :dashboard-issues "[Any rendering errors? Panel load times?]"}
+
+ :team-satisfaction
+ {:checkpoint-process-clarity "[1–5 scale: teams clear on Mon review + Fri decision?]"
+  :escalation-protocol-clarity "[1–5 scale: teams clear on how to escalate?]"
+  :metrics-dashboard-usefulness "[1–5 scale: helpful for decision-making?]"
+  :board-workflow-efficiency "[1–5 scale: Trello + Jira boards working smoothly?]"
+  :feedback-and-suggestions "[Any feedback from teams on process / tooling?]"
+  :nps-score "[Net Promoter Score for gate process: [X] / 10]"}
+
+ :post-week-improvements
+ {:what-went-well "[2-3 bullets from team feedback + observations]"
+  :what-can-improve "[2-3 bullets for next week]"
+  :actions-for-next-week "[Specific changes to process / tooling / training for Week [N+1]]"}
+
+ :distribution
+ {:slack-notification
+  {:channel "#prod-gates-wave5"
+   :timestamp "[Fri 16:00 JST]"
+   :message "[2-3 line summary: decision + KPI snapshot + next steps]"}}
+ {:email-notification
+  {:recipients "gates-escalation@gftd.group, main-coordinator@gftd.group"
+   :subject "Wave 5 Week [N] Execution Report — [Go/No-Go Decision]"
+   :timestamp "[Fri 16:00–17:00 JST]"}}
+ {:dashboard-update
+  {:url "https://dashboard.internal/wave5-m5m6"
+   :sections-updated "Metrics snapshot, weekly gate status, escalation history, team scorecards"
+   :refresh-time "[Fri 17:00 JST]"}}
+ {:archive
+  {:location "90-docs/gates/weekly-reports/wave5-m5m6/week-[N].edn"
+   :format "EDN (this report converted to data)"
+   :retention "1 year"}}
+
+ :sign-off
+ {:report-prepared-by "Execution Lead (Claude Code Agent)"
+  :report-date "[Generated: Monday, [date]]"
+  :approval-status "[Draft / Approved by main-coordinator]"
+  :next-report-due "[Monday [date] of Week [N+1]]"}}

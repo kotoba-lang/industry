@@ -1,0 +1,160 @@
+[{:db/id -1
+  :adr/id "adr-2607231830-kotoba-lang-compiler-state-v1-capability-canonical-abi-chain"
+  :adr/title "ADR-2607231830: kotoba-lang/compiler ADR 0050-0061 -- state-v1 capability crosses a real typed-cap-call boundary through a real Wasmtime-verified provider"
+  :adr/topic "kotoba-cljc-fleet-migration"
+  :adr/status "accepted"
+  :adr/date "2026-07-23"
+  :adr/last-verified "2026-07-23"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/related ["90-docs/adr/2607202200-kotoba-sovereign-source-and-cljc-fleet-migration.edn"
+                "90-docs/migration/kotoba-cljc-project-gap-dispositions-adr2607202200.edn"
+                "90-docs/migration/kotoba-cljc-project-gap-dispositions.edn"
+                "orgs/kotoba-lang/kotoba/docs/lang/application-profile.md"
+                "orgs/kotoba-lang/compiler"
+                "orgs/kotoba-lang/compiler/docs/component-model-baseline.md"
+                "orgs/kotoba-lang/compiler/resources/kotoba/lang/capability-kits/state-v1.edn"
+                "orgs/kotoba-lang/compiler/src/kotoba/compiler/provider/state.cljc"
+                "orgs/cloud-itonami/cloud-itonami-isco-8114"]
+  :adr/authoritative-for
+  ["kotoba-lang/compiler における `state-v1` capability kit の Canonical ABI / Component Model 対応チェーン(ADR 0050-0061、12件、全merge済み)の実施記録: base言語プリミティブ(0050) -> identity-export track(0051-0054、nested record/variant/string-keyword field) -> typed-cap-call crossing track(0055-0059、同一identity->異なるidentity->文字列/keywordを含む非対称crossingへ拡張し `state-v1.edn` の文字通りのrequest/result型が実Wasmtime実行を通ることを証明) -> 初の本物のprovider実装(0060、identity/echoではない実dispatch・実永続状態・実バイト比較) -> 容量拡張(0061、4スロット->実容量256スロット)、という段階的増分の全体像と、各段階で実際に検証された内容・意図的に検証範囲外とした内容を正直に記録する"
+   "この作業の直接の動機付けの記録: ADR-2607202200(kotoba sovereign source and CLJC fleet migration)配下の gap-disposition が、cloud-itonami の isic-*/isco-*/iso3166-*/unspsc-*/cofog-*/gtin-* ファミリー(294リポジトリ、2120本の production CLJC)の移行が langgraph.graph actor archetype(advisor/governor/store)の LLM effect・actor/state effect・mutable-store provider を要求し、それが `kotoba/app` capability-profile completion gate(orgs/kotoba-lang/kotoba/docs/lang/application-profile.md)に未達であるためnot-yet-actionableだと判定していたこと、およびその gate 未達の具体的内訳として(a) `kotoba-lang/compiler` に部分文字列検索・case-fold プリミティブが無いこと(ADR 0050 で解消)と(b) capability kit 全7種が揃って `:wasm-aot :pending` であること、の2点を名指ししていたことの記録"
+   "誠実さの記録として明示: 本チェーンは `resources/kotoba/lang/capability-kits/*.edn` の `:qualification` フィールドを一度も書き換えていない(全ADRで一貫)。`state-v1.edn` は本ADR時点でも `{:reference :implemented :wasm-aot :pending :native-aot :pending :jit :pending}` のまま。ADR 0059で `state-v1` の文字通りのrequest/result型が実typed-cap-callを越えることを、ADR 0060-0061で初の実providerロジック(get/put/delete、実256エントリ容量)を実Wasmtime実行で証明したが、これは『wasm-aot実装済み』を意味しない -- native-AOT/JIT が完全未着手であること、他6capability kit(llm/http/ui/storage/clock/log)の実provider実装が無いこと、`component-composition.clj` のvariantケース記述が `:ref`-only(state-v1.edn自身が使うinline `[:record ...]` 表記はテスト専用converter経由でのみ通る)であること、セキュリティ/本番硬化レビュー未実施であることを、次に着手すべき未解決事項として明示的に記録する"
+   "追加調査の記録: native-AOT対応の規模調査(投機ではなくコード直読による確認)の結果、`backend/x86_64.cljc`/`backend/aarch64.cljc` には capability/provider の概念が皆無なだけでなく、record/variant のCanonical ABI相当エンコーディング自体が存在しない(既存の `pair`/`kgraph-*` 演算のための単純な文字列リテラルオフセットのみ)ことが判明した。すなわちnative側では ADR 0043(identity-export track の起点)相当の基礎すら未着手であり、native-AOT対応は『0050-0061チェーンをnativeに移植する』のではなく『record/variant値表現(0051-0054相当) + capability-call/provider連携機構(既存のnative側アナログ無し、ゼロ設計)+ state-v1固有のcrossing(0055-0061相当)』という、本チェーン全体と同等かそれ以上の規模の独立した後続イニシアチブになるという評価の記録。JITバックエンドは本compilerに一切存在しない(`:jit :pending` は全capability kit共通の『未着手』を表すのみで、本チェーン固有の話ではない)ことも確認した"]
+  :adr/body
+  "# ADR-2607231830: kotoba-lang/compiler ADR 0050-0061 -- state-v1 capability crosses a real typed-cap-call boundary through a real Wasmtime-verified provider
+
+**Status**: accepted(実装レイヤーの進捗記録 -- 憲章の改定ではない)
+**Date**: 2026-07-23
+**Deciders**: Jun Kawasaki
+
+## Context
+
+ADR-2607202200(kotoba sovereign source and CLJC fleet migration)配下の
+`90-docs/migration/kotoba-cljc-project-gap-dispositions-adr2607202200.edn`
+は、cloud-itonami org の isic-*/isco-*/iso3166-*/unspsc-*/cofog-*/gtin-*
+ファミリー(2026-07-22時点の全数調査: 294リポジトリが production CLJC を保持、
+2120ファイル、うち1つも `.kotoba` へ未移行)の移行を検討したところ、代表例
+2件(`cloud-itonami-isco-8114`/`cloud-itonami-isco-7211`)がいずれも
+`langgraph.graph` ベースの actor/advisor/governor/store アーキタイプであり、
+LLM effect・actor/state-machine effect・mutable-store provider を要する
+`kotoba/app` capability profile(`orgs/kotoba-lang/kotoba/docs/lang/
+application-profile.md`)の completion gate に未達であるため、本waveは
+`:kind :retain-cljc-pending-application-profile-and-string-search-gates`
+として `not-yet-actionable` と判定していた。
+
+その gate 未達の具体的内訳として同エントリは2点を名指ししていた:
+(a) `kotoba-lang/compiler` の文字列演算セット
+    `{string-byte-length string=? string-concat string-replace-all
+    keyword-from-string keyword-name}` に部分文字列検索・case-fold が無く、
+    `mineralplant.governor/check` の防御的多重チェック(自由記述テキストの
+    case-fold部分一致検索)を安全性を落とさずに移植できないこと。
+(b) capability kit(llm/http/state/storage/ui/clock/log 全7種)が揃って
+    `:qualification {:wasm-aot :pending ...}` であること。
+
+本ADRは、このうち `state` capability kit(`state-v1`)を対象に、
+`kotoba-lang/compiler` リポジトリで実施した12件のADR連鎖(0050-0061、
+全てmerge済み)の実施記録である。作業は state-v1 の実際の request/result
+Canonical ABI型(`resources/kotoba/lang/capability-kits/state-v1.edn`)を
+段階的に、実Wasmtime実行による検証を各段で伴いながら組み上げる形で進めた。
+
+## Decision
+
+### 実施した12件のADR(すべて `kotoba-lang/compiler` main へsquash merge済み)
+
+| ADR | PR | merge commit | 内容 |
+|---|---|---|---|
+| 0050 | #197 | `57aaa67` | `string-contains?`/`string-fold-case` base言語プリミティブ追加(上記gap (a) を解消) |
+| 0051 | #198 | `eb15333` | Canonical ABI: レコードの1段階までの入れ子(identity export) |
+| 0052 | #199 | `def5161` | Canonical ABI: variantのケースがレコード/スカラーを包む形(identity export) |
+| 0053 | #200 | `cc81cd0` | Canonical ABI: レコード内の`:string`/`:keyword`フィールド(identity export) |
+| 0054 | #201 | `b7424ba` | Canonical ABI: variant + 文字列/keywordレコードケース、複数種混在も可(identity export) |
+| 0055 | #205 | `bf40a8b` | `typed-cap-call`(実際のcapability呼び出し境界)がスカラーのみのvariantを越える |
+| 0056 | #208 | `8da4369` | `typed-cap-call`がレコードケースを含むvariantを越える。**実バグ発見**: `wac-cli` 0.9.0のバグ(`wac plug`の型検証失敗)を発見し、release note精査の上0.10.1へpin更新して修正(影響範囲は事前確認: CIは実行毎に独立installのため他repoへの波及なし) |
+| 0057 | #209 | `4db6822` | `typed-cap-call`が文字列/keywordを含むレコードケースのvariantを越える(state-v1の実`entry`レコードを実際に使用)。**実バグ発見**: 文字列を含むvariantケースを跨ぐと、Canonical ABIの文字列lowering用glueコードが予測不能な追加回数`cm32p2_realloc`を呼ぶことで固定アドレス確保と衝突しデータ破損する不具合を発見、容量制限付きbump allocatorへ置き換えて修正 |
+| 0058 | #211 | `805ab34` | `typed-cap-call`のrequestとresultが**異なる**variant identityになれるよう拡張(それまでは同一identityのみ)。`state-v1`の実ケース構造(3ケースget/put/delete request -> 異なる5ケースfound/missing/written/deleted/error result)に到達(フィールド型はまだ`:i64`代替) |
+| 0059 | #215 | `cf916a1` | 非対称パスでの文字列/keyword crossingを追加し、`state-v1.edn`の**文字通りの**request/result型(構造的代替なし)が実composed component経由で実Wasmtime実行を通ることを証明 |
+| 0060 | #219 | `f6b91be` | **初の本物の(identity/echoでない)providerロジック**: 4スロット境界付きテーブル、実バイト単位のキー比較、実dispatch(get/put/delete)、呼び出しを跨ぐ実永続状態。`src/kotoba/compiler/provider/state.cljc`(既存の純Clojureリファレンス実装)の意味論と厳密照合(バージョンカウンタの「初回writeはversion 2」等の細部含む)。**実Wasmtime 14ステップ実ステートフルシーケンス**(put/get/put更新/delete/get後missing/容量超過error等)を単一component instance内で証明し、期待値を意図的に破損させた否定的コントロールでも正しくビットが落ちることを確認 |
+| 0061 | #226 | `69680aa` | テーブル容量を4スロットから`state-v1.edn`/`state.cljc`双方が定める実容量256スロットへ拡張。コード生成が既にClojure側`(range capacity)`ループ駆動だったため実質定数1個の変更で済んだ。実Wasmtime 262回連続呼び出し(全256スロット埋め、257個目の新規keyでcapacity error、末尾スロット255のget/delete、既存keyはfull時も書ける、空き待ち再put)で検証 |
+
+### 意図的に未着手のまま残した事項(誠実さの記録)
+
+`resources/kotoba/lang/capability-kits/*.edn`の`:qualification`フィールドは
+本チェーン12件を通じて**一度も書き換えていない**。`state-v1.edn`は本ADR
+時点でも`{:reference :implemented :wasm-aot :pending :native-aot :pending
+:jit :pending}`のまま。理由は以下がすべて未達なため:
+
+1. **native-AOT完全未着手** -- 後述の追加調査参照。
+2. **JIT完全未着手** -- 本compilerにJITバックエンド自体が存在しない。
+3. **他6capability kit(llm/http/ui/storage/clock/log)の実provider実装なし** --
+   ADR 0055-0059のwiring(配線証明)は汎用的な型crossingとして構築したが、
+   0060-0061の「実ロジック」はstate専用。
+4. **`component-composition.clj`のvariantケース記述が`:ref`-only** --
+   `state-v1.edn`自身が使うinline`[:record ...]`表記は、テスト専用の
+   `ref-ify`converterを経由しないと通らない(ADR 0059の既知の残課題)。
+5. **セキュリティ/本番硬化レビュー未実施** -- ADR 0060自身が明記する通り、
+   「実semanticsを持つ最初のprovider」であって「監査済み・硬化済みの
+   デプロイ成果物」ではない。
+6. **`typed-cap-call`は1関数内1呼び出しのみ**admission -- state-v1が
+   実運用で必要とする「1関数内で複数回capability呼び出し」はKIR側の
+   新規admission次元で、本チェーンのスコープ外。
+
+### native-AOT/JIT規模調査(投機ではなくコード直読で実施)
+
+`src/kotoba/compiler/backend/x86_64.cljc`(463行)・`backend/aarch64.cljc`
+(465行)を全文確認した結果:
+
+- `typed-cap-call`/`capability`/`provider`の概念は**皆無**(grep 0件)。
+- **record/variantのCanonical ABI相当エンコーディング自体が存在しない**
+  (grep 0件)。既存の構造的概念は`pair`/`kgraph-*`演算用の単純な
+  `{:string-literal content}`(bump-allocatedリテラルデータ領域への
+  オフセット)のみ。すなわちnative側では、capability-crossing以前の
+  **identity-export track(ADR 0043起点)相当の基礎すら未着手**。
+- JITバックエンドは本compilerに**存在しない**。`docs/adr/0023-*.md`が
+  「Wasm/native AOTとfuture JIT compilersはqualification target」と
+  policy的に述べるのみで、技術的scopingは一度もされていない。
+  `:jit :pending`は全capability kit共通の「誰も作っていない」状態を
+  表すだけで、本チェーン固有の課題ではない。
+- 規模評価: native-AOT対応は「0050-0061チェーンをnativeへ移植する」
+  のではなく、(a) record/variant値表現(0051-0054相当の独立した多段
+  ADR)、(b) `wac plug`相当のnative側連携機構(既存アナログ無し、
+  ゼロから設計 -- 直接関数ポインタ呼び出しや独自FFI規約が候補、最大の
+  不確定要素)、(c) state-v1固有のcrossing(0055-0061相当)という、
+  **本チェーン全体と同等かそれ以上の規模**の独立した後続イニシアチブ
+  になる。WASM側のコードはほぼ再利用不可(実行モデルが根本的に異なる)。
+
+## Consequences
+
+- `state-v1` capability kitのCanonical ABI境界越え(型システム側)は
+  `state-v1.edn`の文字通りの型で実Wasmtime実行により証明済み。実provider
+  ロジックも実容量(256エントリ)で証明済み。ただし`:qualification`は
+  意図的に`:wasm-aot :pending`のまま(上記6項目が未達のため)。
+- cloud-itonami isic/isco/iso3166/unspsc/cofog/gtin waveの
+  `not-yet-actionable`判定を覆す(=このwaveの移行に着手してよいと
+  宣言する)ものではない -- `kotoba/app` capability profile completion
+  gateは、state以外の6 capability kitや、実運用に必要な`component-
+  composition.clj`の`:ref`-only制約解消など、本ADRが未着手と明記した
+  項目が残っている限り、引き続き未達である。
+- 次のアクションとして、native-AOT基礎(record/variant値表現)への着手を
+  選択した(セッション内でのオーナー判断、AskUserQuestion確認済み)。
+  規模が本チェーン全体に匹敵するため、同じくagent-per-increment・
+  実Wasmtime/実行時証拠必須・`:qualification`不用意に書き換えない、
+  という規律を維持して段階的に進める。
+
+## References
+
+- ADR-2607202200(kotoba sovereign source and CLJC fleet migration、
+  本ADRの上位文脈)。
+- `90-docs/migration/kotoba-cljc-project-gap-dispositions-adr2607202200.edn`
+  (`:kind :retain-cljc-pending-application-profile-and-string-search-gates`
+  エントリ、本作業の直接の動機付け)。
+- `kotoba-lang/compiler`: PR #197/#198/#199/#200/#201/#205/#208/#209/#211/
+  #215/#219/#226、`docs/adr/0050`~`0061-*.md`、
+  `docs/component-model-baseline.md`(実行時要約)。
+- `orgs/kotoba-lang/kotoba/docs/lang/application-profile.md`
+  (`kotoba/app` capability profile completion gateの正本)。
+"}]

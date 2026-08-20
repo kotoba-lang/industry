@@ -1,0 +1,363 @@
+{:doc/type :deployment-coordination-log
+ :doc/id "metrics-deployment-wave5-m5m6-20260808"
+ :doc/title "Wave 5 M5–M6 Metrics Pipeline Deployment Coordination Log"
+ :doc/date-created "2026-07-21"
+ :doc/date-deployed-phase-1 "2026-08-08"
+ :doc/date-deployed-phase-2 "2026-08-09"
+ :doc/date-deployed-phase-3 "2026-08-10"
+ :doc/status "PREPARED_FOR_DEPLOYMENT"
+ :doc/deployment-owner "Metrics Lead (auto-delegate if not assigned)"
+
+ :deployment/context
+ {:target-gate-kickoff "2026-08-18 09:00 JST"
+  :deployment-window-open "2026-08-08 12:00 UTC"
+  :smoke-test-deadline "2026-08-10 16:00 UTC"
+  :pre-kickoff-validation "2026-08-17"
+  :critical-path-item "All 5 metrics LIVE by 2026-08-18 kickoff"
+  :prepared-artifacts 15
+  :artifacts
+  [{:name "Prometheus Configuration" :file "deploy/prometheus.yml" :status "production-ready"}
+   {:name "Alert Rules" :file "deploy/prometheus-rules.yml" :status "configured"}
+   {:name "Grafana Dashboard" :file "deploy/grafana-dashboard-wave5-m5m6.json" :status "ready"}
+   {:name "GitHub Actions Workflow" :file ".github/workflows/production-gates-bot.yml" :status "tested"}
+   {:name "Build Metrics Collector" :file "scripts/collect-build-metrics.cljs" :status "tested"}
+   {:name "Coverage Metrics Collector" :file "scripts/collect-coverage-metrics.cljs" :status "tested"}
+   {:name "Deploy Metrics Collector" :file "scripts/collect-deploy-metrics.cljs" :status "tested"}
+   {:name "Blocker Metrics Collector" :file "scripts/collect-blocker-metrics.cljs" :status "tested"}
+   {:name "Velocity Metrics Collector" :file "scripts/collect-velocity-metrics.cljs" :status "tested"}
+   {:name "Deployment Procedure" :file "90-docs/gates/metrics-deployment-procedure.md" :status "complete"}
+   {:name "Collection Pipeline Config" :file "90-docs/gates/metrics-collection-pipeline.edn" :status "complete"}
+   {:name "Smoke Test Checklist" :file "90-docs/gates/smoke-test-checklist-20260810.edn" :status "ready"}
+   {:name "Kickoff Coordination" :file "90-docs/gates/wave-5-m5-m6-execution-kickoff.edn" :status "active"}
+   {:name "Escalation Protocol" :file "90-docs/gates/escalation-protocol-reference.edn" :status "armed"}
+   {:name "Deployment Log" :file "90-docs/gates/METRICS-DEPLOYMENT-LOG-2026-08-08.edn" :status "active"}]}
+
+ :deployment/phases
+ [{:phase 1
+   :name "Prometheus Deployment"
+   :date "2026-08-08"
+   :window "12:00 UTC → ~15:00 UTC (3 hours)"
+   :owner "Metrics Lead (primary) / Infra Lead (secondary)"
+   :components
+   [{:component "Prometheus Server"
+     :action "Deploy configuration to monitoring-cluster"
+     :files ["deploy/prometheus.yml" "deploy/prometheus-rules.yml"]
+     :verification
+     [{:check "Prometheus service running" :method "systemctl status prometheus"}
+      {:check "Health check passing" :method "curl -s http://localhost:9090/-/healthy → 200"}
+      {:check "Scrape targets configured" :method "curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets | length' >= 5"}]}
+    {:component "Metrics Collection Jobs"
+     :action "Verify 5 metric collectors working"
+     :scripts ["scripts/collect-build-metrics.cljs"
+              "scripts/collect-coverage-metrics.cljs"
+              "scripts/collect-deploy-metrics.cljs"
+              "scripts/collect-blocker-metrics.cljs"
+              "scripts/collect-velocity-metrics.cljs"]
+     :verification
+     [{:check "Build metrics appear" :method "curl -s 'http://localhost:9090/api/v1/query?query=build_duration_seconds' | jq '.data.result | length' > 0"}
+      {:check "Coverage metrics appear" :method "curl -s 'http://localhost:9090/api/v1/query?query=code_coverage_percent' | jq '.data.result | length' > 0"}
+      {:check "Deploy metrics appear" :method "curl -s 'http://localhost:9090/api/v1/query?query=deployment_success_rate' | jq '.data.result | length' > 0"}
+      {:check "Blocker metrics appear" :method "curl -s 'http://localhost:9090/api/v1/query?query=blocker_count' | jq '.data.result | length' > 0"}]}
+    {:component "Alert Rules"
+     :action "Load and verify alert rules"
+     :verification
+     [{:check "Alert rules loaded" :method "curl -s http://localhost:9090/api/v1/rules | jq '.data.groups | length' >= 1"}
+      {:check "All targets UP" :method "curl -s http://localhost:9090/api/v1/query?query=up | jq '.data.result | length' == 5"}]}]
+   :sign-off-template
+   {:checked-by "____________"
+    :timestamp "2026-08-08 ___:___ UTC"
+    :metrics-live-count "___ / 5"
+    :data-retention-configured "[ ] Yes [ ] No"
+    :rollback-backup-confirmed "[ ] Yes [ ] No"}
+   :failure-recovery
+   [{:scenario "Prometheus service fails to start"
+     :action "Check logs: systemctl status prometheus, verify config syntax via promtool"}
+    {:scenario "Metrics not appearing in Prometheus"
+     :action "Verify API tokens in /etc/prometheus/secrets/, check collector logs"}
+    {:scenario "Storage space insufficient"
+     :action "Check du -sh /prometheus/data, extend retention policy or add storage"}]
+   :rollback-plan "Revert prometheus.yml from backup, restart service, retain all collected data"}
+
+  {:phase 2
+   :name "CI Gate-Bot + Grafana Deployment"
+   :date "2026-08-09"
+   :window "12:00 UTC → ~15:00 UTC (3 hours)"
+   :owner "CI Lead (primary) / Metrics Lead (secondary)"
+   :components
+   [{:component "GitHub Actions Workflow"
+     :action "Deploy CI gate-bot workflow to main"
+     :files [".github/workflows/production-gates-bot.yml"]
+     :pre-requisites
+     [{:item "GitHub Actions secrets configured" :list ["PROMETHEUS_URL" "GRAFANA_API_KEY" "JIRA_API_TOKEN" "CI_API_TOKEN" "CLOUDFLARE_API_TOKEN" "PAGERDUTY_KEY" "SLACK_WEBHOOK_URL" "METRICS_DB_URL"]}
+      {:item "Collector scripts deployed" :check "All 5 scripts in scripts/ directory"}]
+     :verification
+     [{:check "Workflow file valid YAML" :method "git show HEAD:.github/workflows/production-gates-bot.yml"}
+      {:check "Manual trigger succeeds" :method "GitHub UI: Actions → Production Gates Bot → Run workflow"}
+      {:check "Workflow logs show no errors" :method "gh run view <run-id> --log"}]}
+    {:component "Grafana Dashboard"
+     :action "Deploy dashboard to Grafana instance"
+     :files ["deploy/grafana-dashboard-wave5-m5m6.json"]
+     :verification
+     [{:check "Dashboard accessible" :method "curl -s -H 'Authorization: Bearer $GRAFANA_API_KEY' https://grafana.internal/api/dashboards/uid/wave5-m5m6 → 200"}
+      {:check "Datasource connected" :method "Verify Prometheus datasource in Grafana UI"}
+      {:check "All panels render" :method "Load dashboard in browser, verify 8 panels display data without errors"}
+      {:check "Auto-refresh working" :method "Observe metrics updating every 30 seconds"}]}
+    {:component "Alert Router"
+     :action "Configure Slack, email, PagerDuty routing"
+     :verification
+     [{:check "Slack integration live" :method "Send test alert, verify message in #prod-gates-wave5 < 2 min"}
+      {:check "PagerDuty integration live" :method "Create test incident, verify it appears in PagerDuty"}
+      {:check "Email routing live" :method "Send test email, verify receipt at gates-escalation@gftd.group"}]}]
+   :sign-off-template
+   {:checked-by "____________"
+    :timestamp "2026-08-09 ___:___ UTC"
+    :workflow-status "[ ] Deployed [ ] Tested [ ] Active"
+    :grafana-panels-live "___ / 8"
+    :alerts-routed-slack "[ ] Yes [ ] No"
+    :alerts-routed-pagerduty "[ ] Yes [ ] No"}
+   :failure-recovery
+   [{:scenario "Workflow fails to execute"
+     :action "Check GitHub Actions logs, verify secrets are set, test with manual trigger"}
+    {:scenario "Grafana dashboard shows no data"
+     :action "Verify Prometheus datasource URL, test Prometheus connectivity from Grafana UI"}
+    {:scenario "Alert routing not working"
+     :action "Check Slack webhook URL, verify PagerDuty API key, test manual alert trigger"}]
+   :rollback-plan "Disable workflow in GitHub UI, remove dashboard from Grafana (retain config as JSON), retain all Prometheus data"}
+
+  {:phase 3
+   :name "Smoke Test & Validation"
+   :date "2026-08-10"
+   :window "10:00 UTC → ~13:00 UTC (3 hours, plus 1h contingency)"
+   :owner "Metrics Lead (primary) / Escalation Lead (secondary)"
+   :checklist "90-docs/gates/smoke-test-checklist-20260810.edn"
+   :phases
+   [{:smoke-phase 1 :name "Pre-Test Setup" :duration-min 15}
+    {:smoke-phase 2 :name "Prometheus Scrape Configuration" :duration-min 20}
+    {:smoke-phase 3 :name "Metrics Collection & Data Freshness" :duration-min 30}
+    {:smoke-phase 4 :name "Grafana Dashboard Validation" :duration-min 20}
+    {:smoke-phase 5 :name "Alert Routing & Notifications" :duration-min 15}
+    {:smoke-phase 6 :name "CI Gate-Bot Workflow Validation" :duration-min 10}
+    {:smoke-phase 7 :name "End-to-End Data Flow" :duration-min 15}
+    {:smoke-phase 8 :name "Escalation Protocol Health Check" :duration-min 10}]
+   :success-criteria
+   ["All 8 smoke test phases PASS (>= 90% checks per phase)"
+    "All 5 core metrics (build, coverage, deploy, blockers, velocity) live in Prometheus and Grafana"
+    "Alert delivery latency < 2 minutes (Prometheus → Slack/PagerDuty/Email)"
+    "Dashboard refresh rate < 1 minute (p99 latency < 30s)"
+    "Data freshness: all metrics within SLA age (build: 15min, coverage: 1h, blockers: 5min)"
+    "CI gate-bot workflow executes without errors"
+    "Escalation protocol verified (runbook accessible, on-call contacts updated)"]
+   :failure-response
+   [{:scenario "Phase 1–2 (Infrastructure) fails"
+     :action "STOP, fix infrastructure issues, re-run smoke test"
+     :escalate-if "Cannot fix within 2 hours"}
+    {:scenario "Phase 3–5 (Metrics/Alerts) fails"
+     :action "Document failure, fix issue, re-run failed phase"
+     :escalate-if "Cannot fix within 4 hours"}
+    {:scenario "Phase 6–8 (CI Bot/Escalation) fails"
+     :action "Verify CI workflow and escalation contacts, fix and re-test"
+     :escalate-if "Cannot fix by 2026-08-10 16:00 UTC"}]
+   :sign-off-template
+   {:checked-by "____________"
+    :timestamp "2026-08-10 ___:___ UTC"
+    :all-phases-pass "[ ] Yes [ ] No"
+    :metrics-count-live "___ / 5"
+    :alert-latency-ms "____"
+    :dashboard-refresh-ok "[ ] Yes [ ] No"
+    :escalation-protocol-ready "[ ] Yes [ ] No"}
+   :post-smoke-actions-if-pass
+   ["Archive smoke test checklist with all sign-offs"
+    "Notify gates team: metrics pipeline LIVE"
+    "Schedule pre-kickoff sync call (2026-08-16)"
+    "Publish Grafana dashboard access to all team-leads"
+    "Confirm metrics collection cron jobs are active and monitoring"]
+   :post-smoke-actions-if-fail
+   ["Document all failures with root cause analysis"
+    "Create incident report"
+    "Fix issues in staging"
+    "Re-schedule smoke test"
+    "Notify platform-lead if delays affect 2026-08-18 kickoff"]}]
+
+ :pre-kickoff/validation
+ {:date "2026-08-17"
+  :window "9:00 AM JST"
+  :owner "Metrics Lead (primary) / Platform Lead (secondary)"
+  :checklist
+  [{:item "Metrics Dashboard" :check "Grafana dashboard LIVE, all 8 panels displaying fresh data, refresh working"}
+   {:item "Data Collection" :check "All 5 core metrics: build, coverage, deploy, blockers, velocity collecting data"}
+   {:item "Gate-Bot Logic" :check "CI gate-bot workflow can execute gate-readiness-check successfully"}
+   {:item "Team Training" :check "All team-leads trained on dashboard access + escalation protocol"}
+   {:item "Alert Routing" :check "Slack + PagerDuty + Email routing tested and confirmed working"}
+   {:item "SLA Compliance" :check "Metrics freshness within SLA for all 5 metrics"}
+   {:item "Runbook Updated" :check "Escalation runbook current and team contacts up-to-date"}]
+  :sign-off-required ["metrics-lead" "escalation-lead" "platform-lead"]
+  :go-no-go-decision "READY FOR KICKOFF or ESCALATE ISSUES"
+  :decision-deadline "2026-08-17 14:00 JST"}
+
+ :deployment/roles
+ {:metrics-lead
+  {:responsibilities
+   ["Phase 1–3 overall coordination"
+    "Prometheus deployment and verification"
+    "Metrics collection testing"
+    "Grafana dashboard validation"
+    "Alert routing testing"
+    "Smoke test execution (lead owner)"
+    "Weekly metrics health checks post-deployment"
+    "Escalation contact for metrics issues"]
+   :contact "metrics-lead@gftd.group"
+   :slack "#prod-gates-wave5"
+   :on-call-rotation "Primary (escalation lead is secondary)"}
+
+  :escalation-lead
+  {:responsibilities
+   ["Phase 8 escalation protocol validation"
+    "PagerDuty incident routing verification"
+    "On-call rotation setup"
+    "Runbook accessibility check"
+    "Secondary support for Metrics Lead during phases 1–3"
+    "Decision authority for go-no-go if metrics-lead unavailable"]
+   :contact "escalation-lead@gftd.group"
+   :slack "#prod-gates-wave5"}
+
+  :platform-lead
+  {:responsibilities
+   ["Overall deployment oversight"
+    "Final sign-off on smoke test results"
+    "Escalation authority for critical issues"
+    "Pre-kickoff validation approval"
+    "Go-no-go decision authority"]
+   :contact "platform-lead@gftd.group"
+   :slack "#prod-gates-wave5"}
+
+  :infra-lead
+  {:responsibilities
+   ["Prometheus cluster infrastructure"
+    "Monitoring cluster storage and capacity"
+    "Network routing configuration"
+    "Backup strategy implementation"]
+   :contact "infra-lead@gftd.group"}
+
+  :ci-lead
+  {:responsibilities
+   ["GitHub Actions workflow deployment"
+    "Collector scripts integration"
+    "Workflow secrets configuration"
+    "CI workflow testing and validation"]
+   :contact "ci-lead@gftd.group"}}
+
+ :deployment/tracking
+ {:log-location "90-docs/gates/METRICS-DEPLOYMENT-LOG-2026-08-08.edn"
+  :append-only-events
+  [{:event-id "deployment-phase-1-start"
+    :timestamp "2026-08-08 12:00 UTC"
+    :status "PENDING_EXECUTION"
+    :assigned-to "Metrics Lead"}
+   {:event-id "deployment-phase-1-complete"
+    :timestamp "PENDING"
+    :status "PENDING_EXECUTION"
+    :sign-off-required "Metrics Lead + Infra Lead"}
+   {:event-id "deployment-phase-2-start"
+    :timestamp "2026-08-09 12:00 UTC"
+    :status "PENDING_EXECUTION"
+    :assigned-to "CI Lead"}
+   {:event-id "deployment-phase-2-complete"
+    :timestamp "PENDING"
+    :status "PENDING_EXECUTION"
+    :sign-off-required "CI Lead + Metrics Lead"}
+   {:event-id "smoke-test-start"
+    :timestamp "2026-08-10 10:00 UTC"
+    :status "PENDING_EXECUTION"
+    :assigned-to "Metrics Lead"}
+   {:event-id "smoke-test-complete"
+    :timestamp "PENDING"
+    :status "PENDING_EXECUTION"
+    :sign-off-required "Metrics Lead + Escalation Lead + Platform Lead"}
+   {:event-id "pre-kickoff-validation"
+    :timestamp "2026-08-17 09:00 JST"
+    :status "PENDING_EXECUTION"
+    :sign-off-required "Metrics Lead + Escalation Lead + Platform Lead"}
+   {:event-id "kickoff-go-no-go"
+    :timestamp "2026-08-18 08:00 JST (1h before kickoff)"
+    :status "PENDING_EXECUTION"
+    :decision-maker "Platform Lead"
+    :criteria "All phases PASS + smoke test PASS + team trained"}]
+  :update-frequency "Real-time after each phase"
+  :communication
+  [{:milestone "Phase 1 complete" :notify "#prod-gates-wave5" :message "Prometheus live, 5 metrics collecting"}
+   {:milestone "Phase 2 complete" :notify "#prod-gates-wave5" :message "Grafana dashboard live, alerts routed"}
+   {:milestone "Smoke test complete" :notify "#prod-gates-wave5" :message "All systems PASS, ready for kickoff"}
+   {:milestone "Go-no-go decision" :notify "#prod-gates-wave5" :message "READY or ESCALATE"}]}
+
+ :critical-path-items
+ {:must-complete-by-2026-08-10
+  ["Prometheus server deployed and collecting data"
+   "All 5 metrics collectors operational"
+   "Grafana dashboard live with all 8 panels"
+   "Alert routing tested (Slack + PagerDuty + email)"
+   "Smoke test PASS with sign-offs"
+   "Deployment log complete and archived"]
+  :must-complete-by-2026-08-17
+  ["Team training on dashboard and escalation protocol"
+   "Metrics freshness verified (all < SLA age)"
+   "CI gate-bot workflow ready for automatic execution"
+   "On-call rotation confirmed"
+   "Pre-kickoff validation PASS"
+   "Go-no-go approval from platform-lead"]
+  :go-no-go-criteria
+  ["All 5 core metrics live by 2026-08-18"
+   "Metrics dashboard accessible to all team-leads"
+   "CI gate-bot workflow can execute without manual intervention"
+   "Alert routing tested and confirmed working"
+   "Escalation protocol armed and team trained"
+   "Zero critical issues blocking kickoff"]}
+
+ :metrics/sla-compliance
+ {:metric-freshness-sla
+  {:build-times "< 15 min old (from latest CI run)"
+   :test-coverage "< 1 hour old (latest aggregation)"
+   :deployment-success "< 1 hour old"
+   :gate-blockers "< 5 min old (Jira query frequency)"
+   :team-velocity "< 1 hour old"}
+  :alert-delivery-sla
+  {:warning-alert "Slack notification < 2 minutes"
+   :critical-alert "PagerDuty + Slack < 2 minutes"
+   :escalation-response "Level 1: 1h, Level 2: 2h, Level 3: 4h"}
+  :dashboard-sla
+  {:availability "99.5% uptime target"
+   :panel-load-time "p95 < 2 seconds"
+   :refresh-latency "p99 < 30 seconds"}
+  :data-retention-sla
+  {:raw-metrics "30 days (Prometheus TSDB)"
+   :aggregated-metrics "1 year"
+   :weekly-reports "archived in 90-docs/gates/weekly-reports/"}}
+
+ :contingency-plans
+ {:prometheus-failure
+  {:detection "Service down > 5 min or data gaps > 15 min"
+   :response "Activate rollback procedure, revert to static SLA values in CI bot"
+   :communication "Notify #prod-gates-wave5 + escalation-lead within 5 min"
+   :recovery-time-target "< 30 min"}}
+
+ :post-deployment/operations
+ {:weekly-health-check
+  {:schedule "Every Monday 09:00 JST"
+   :owner "Metrics Lead"
+   :checks
+   [{:check "Prometheus scrape success rate >= 99%"}
+    {:check "All metrics < SLA age"}
+    {:check "Grafana panels loading (p99 < 2s)"}
+    {:check "Alert routing working"}
+    {:check "Weekly report generated and posted"}]
+   :runbook "90-docs/gates/metrics-pipeline-runbook.edn"}}
+
+ :documentation-references
+ {:deployment-procedure "90-docs/gates/metrics-deployment-procedure.md"
+  :metrics-pipeline-config "90-docs/gates/metrics-collection-pipeline.edn"
+  :smoke-test-checklist "90-docs/gates/smoke-test-checklist-20260810.edn"
+  :kickoff-coordination "90-docs/gates/wave-5-m5-m6-execution-kickoff.edn"
+  :escalation-protocol "90-docs/gates/escalation-protocol-reference.edn"
+  :prometheus-config "deploy/prometheus.yml"
+  :alert-rules "deploy/prometheus-rules.yml"
+  :grafana-dashboard "deploy/grafana-dashboard-wave5-m5m6.json"
+  :github-workflow ".github/workflows/production-gates-bot.yml"}}

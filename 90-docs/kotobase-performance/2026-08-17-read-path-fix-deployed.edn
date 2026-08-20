@@ -1,0 +1,79 @@
+{:receipt :kotobase/read-path-fix-deployed
+ :date "2026-08-17"
+ :measured-at "2026-08-17T07:05Z"
+
+ :change
+ {:what "hot-datoms and three sibling readers resolve the novelty walk BEFORE
+         starting the async snapshot scan, so a block-miss restart no longer
+         re-fetches what the abandoned scan still has in flight."
+  :library "kotoba-lang/kotobase-peer"
+  :deployed-pin "f0623221ece259fc5c1ff64ac35d8f4c6049a265"
+  :pin-shape "hotfix branch off the DEPLOYED sha c63468f4 plus exactly two
+              cherry-picks (the hoist, and the fix that had been taking the nbb
+              test tier down) -- deliberately NOT main, which is 51 commits
+              ahead and includes a tx-block compression-format change."
+  :worker "kotobase-protocols-worker"
+  :version "21a86f75-99df-4f41-a876-ec5b884eef96"
+  :lock-commit "76af894a115"}
+
+ :result
+ {:method "12 sequential GETs over one connection, paired with 12 to a
+           NON-EXISTENT path on the same host in the same window. handler =
+           health - control, so the client's own network is subtracted. Same
+           method as the 03:31Z baseline in
+           2026-08-17-live-latency-and-deployed-fold-threshold.edn."
+  :rows
+  [{:host "sparql"  :handler-before-ms 4437 :handler-after-ms 2839 :reduction 0.36}
+   {:host "gremlin" :handler-before-ms 4175 :handler-after-ms 2928 :reduction 0.30}
+   {:host "graphql" :handler-before-ms 4326 :handler-after-ms 2802 :reduction 0.35}
+   {:host "s3"      :handler-before-ms 3974 :handler-after-ms 2731 :reduction 0.31}]
+  :summary "30-36% off the handler half, on four independent hosts, in the same
+            direction and the same magnitude."
+
+  :attribution-is-clean
+  "`novelty_size` is still 63 and `should_fold` is still false -- NO fold has
+   run. So this is not the fold deploy paying off; it is the read-path fix
+   alone. That separation is exactly why the pin was cut against the deployed
+   sha instead of main: had 51 other commits shipped with it, this number would
+   have had 52 candidate causes."
+
+  :excluded
+  {:host "atproto"
+   :why "Its control path (a non-existent route) measured 2,869ms -- that
+         surface does handler work before routing, so `health - control` is
+         meaningless there and the 82ms it yields is an artifact, not a win.
+         Reported rather than dropped."}}
+
+ :what-this-does-not-show
+ ["The remaining ~2.8s is unexplained by this change. The named suspect is
+   per-ENTRY `read-tx-block` decryption -- 63 encrypted blocks on this graph --
+   which folding would remove and this fix does not touch."
+  "One vantage, one moment, warm isolates. Warm p50 is the floor."
+  "No regression test guards the hoist. Three attempts against kotobase-peer's
+   own async harness passed WITH and WITHOUT the fix; the duplication is a
+   property of the interaction with a specific host trampoline, so the test
+   that discriminates belongs in protocols-worker. Not written yet."]
+
+ :also-landed
+ {:nbb-tier "kotobase-peer's `npm run test:nbb` was dead -- one file wrote
+             `#?(:cljs cljs.core.ExceptionInfo)`, which SCI cannot resolve, and
+             it failed in the analysis phase, so 0 of 17 namespaces ran while
+             the JVM and cljs tiers stayed green. Fixed; now 205 tests / 610
+             assertions, 0 failures on the deployed pin's branch."
+  :verification-tier "This change was verified on cljs and nbb. The JVM run
+                      that preceded them was the wrong tier for this workspace
+                      and is what let the dead nbb tier go unnoticed."}
+
+ :relay-operator-did-captured
+ {:for "the still-open relay-bsky outage (ADR-2608170100)"
+  :observed "`wrangler tail kotobase-cf-wasm-staging`, 400s window, 110 events"
+  :event {:url "https://datoms.kotobase.net/xrpc/ai.gftd.apps.kotobase.datomic.fold"
+          :status 503
+          :x-kotobase-tenant-did "did:key:z6MkvXVYfX3duzGkqW2YPRfXJpDDLmbaLN3jHuPphXCoMWFH"}
+  :caveat "`x-kotobase-tenant-did` is a header the CLIENT sets. The verified
+           identity is the CACAO issuer, and wrangler redacts the authorization
+           header, so this is the DID the caller asserts -- corroborated by it
+           being the only DID appearing repeatedly (59 times) in the window,
+           but NOT independently verified. Confirm before allowlisting."
+  :not-done "KOTOBASE_MAINTENANCE_OPERATOR_DIDS is still \"\". Loosening a
+             deliberate fail-closed control is the owner's decision."}}

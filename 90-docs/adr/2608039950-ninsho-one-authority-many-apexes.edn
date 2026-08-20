@@ -1,0 +1,206 @@
+[{:db/id -1
+  :adr/id "2608039950"
+  :adr/title "共通認証基盤 —— authority は 1 つ、apex は多数。新しい identity を作らない"
+  :adr/status "accepted"
+  :adr/date "2026-08-03"
+  :adr/depends-on "ADR-2607252000（authn.kotobase.net）/ ADR-2607320000（did:key が口座）/ kotoba-lang: identity・authentication・authorization・cacao・policy・kagi"
+
+  :adr/context
+  "murakumo.cloud / itonami.cloud / babiniku.net が既に稼働しており、Clerk 相当の
+   共通認証が要る、というのがオーナーの判断（2026-08-03）。設計の前に実測した。
+
+   ## 部品はほぼ全部ある
+
+   - `kotoba-lang/identity` … subject / attestation / evidence の可搬 EDN
+   - `kotoba-lang/authentication` … FaceID / TouchID / WebAuthn / OTP / CACAO /
+     OAuth・OIDC・SAML の factor 統合。**email OTP / magic-link adapter を含む**
+   - `kotoba-lang/authorization` … `policy` + `cacao` へ委譲する facade
+   - `kagi` … PQC vault・AccessGovernor・append-only 台帳・CACAO 自己発行
+   - **`authn.kotobase.net`（稼働中）** … ADR-2607252000。
+     `net-kotobase-enterprise-wave2/authn/` が **2 つ目の独立 deployable Worker**
+
+   ## DID の二層分離も既に設計済み
+
+     accountDid  did:web:kotobase.net:tenant:<user>   人ひとりに 1 つ。鍵を持たず署名しない
+     activeDid   did:key:z6Mk…                        いま動いている credential
+
+   Clerk が User と Session でやることを **DID で既にやっている**。
+
+   ## 重複の実測（2026-08-03）
+
+     repo              authn 参照   自前 did/storage 実装
+     cloud-murakumo        2              12
+     local-murakumo        0               4
+     net-babiniku          0               8
+
+   **authn を消費しているのは 1 repo だけで、残りは各自 did:key と localStorage を
+   自前で扱っている。** 今日 murakumo に `/signup` を手書きしたのがその 3 件目に
+   なりかけた —— これが止めるべき重複。
+
+   ## 全 apex が自分の Cloudflare 上にある
+
+   murakumo.cloud / itonami.cloud / babiniku.net / kotobase.net / etzhayyim.com /
+   gftd.ai / aozora.app / x402.nexus —— すべて自分のゾーン。**第三者ドメインは
+   まだ 1 つも無い。**"
+
+  :adr/decision
+  "## 決定 1: authority は増やさない。`did:web:kotobase.net:tenant:*` のまま
+
+   `cloud-murakumo.viewer` が既に書いている ——『murakumo.cloud does not get its
+   own account system … **instead of minting a second identity**』。
+
+   `ninsho.cloud` を **新しい identity authority** として立てるのは、この決定に
+   正面から反する。しかも DID namespace の移行は two-sided deploy を要するので、
+   **ここだけは取り返しがつかない**。他の判断は後から変えられる。
+
+   ## 決定 2: 必要なのは新 authority ではなく **custom hostname**
+
+   `viewer.cljc` は迂回を自分で書いている ——『`gftd_session` は
+   `Domain=kotobase.net` に scope されるのでブラウザは murakumo.cloud に絶対に
+   送らない。だからこの面は `Authorization: Bearer` から読む』。
+
+   **この Bearer 迂回が匂い。** Clerk が `clerk.hoge.com` を CNAME させるのは
+   ブランドのためではなく、**session cookie をテナントの apex に対して
+   first-party にするため**。各 consumer が token 転送を自前実装しているのは、
+   その仕組みが無いからにすぎない。
+
+   ## 決定 3: 自前 apex なので **Cloudflare for SaaS は要らない**（Phase 1）
+
+   `auth.murakumo.cloud` / `auth.itonami.cloud` / `auth.babiniku.net` は、
+   **同じ authn Worker に custom domain route を足すだけ**。全部自分のゾーンに
+   あるので、第三者ドメイン用の Custom Hostnames（有料・追加設定）は不要。
+
+   第三者に売る段になって初めて Cloudflare for SaaS を足す。**その時に足せる**
+   ので、今その複雑さを前借りしない。
+
+   ## 決定 4: serving surface は分けたまま、authority は共有する
+
+   ADR-2607252000 が既に authn を独立 Worker にしている。`kotobase.net` は
+   CLAUDE.md が『live 共有インフラ』と書く場所なので、**爆発半径の分離は済んで
+   いる**。DID namespace（authority）と Worker（surface）を混同しない。
+
+   ## 決定 5: 名前は今取るが、サービスは立てない
+
+   `ninsho.cloud` は workspace の命名文化（kagi・kototama・kakure・shitsuke・
+   saifu）に合う。**ただし今やるべきは取得であって立ち上げではない** ——
+   立てた瞬間に第 2 authority の誘惑が生まれる。`iam.cloud` は一般名詞すぎる。
+
+   ## 『足りない 5 つ』を実測で 2 つに訂正した（2026-08-03）
+
+   初版は 5 つ挙げたが、**3 つは既に実装され稼働していた**。authn のソースと
+   実プローブで確認した結果:
+
+   ### 本当に足りないもの
+
+   1. **custom hostname** … `auth.<apex>` を authn Worker に route。cookie が
+      first-party になり Bearer 迂回が消える。判定は `viewer/resolve-apex`
+      として着地済み（純粋・テスト済み）だが、**cookie を出す経路はまだ 1 つも
+      切り替えていない** —— `base-domain` の呼び出し 15 箇所のうち 11 箇所に
+      `request` が届いておらず、部分適用すると一部の flow だけ別 apex に
+      cookie を出して同じセッションで不整合になる
+   2. **tenant ≠ user** … `did:web:kotobase.net:tenant:<user>` は path segment が
+      `tenant` なのに中身が user で、**組織を表せない**。`sekisho.tenant` が
+      `:org:` を新設して埋めた（既存 accountDid は改名しない —— 発行済みの
+      識別子で、改名は全部を無効にする）
+
+   ### 足りていなかったのは私の調査だったもの
+
+   3. ~~hosted UI~~ … **既に稼働**。`/sign-in` `/login` `/start` `/callback`。
+      今日 murakumo に手書きした `/signup` が 4 件目の重複になりかけた
+   4. ~~email ↔ did~~ … **既に稼働**。`/v1/email/start` `/v1/email/verify`。
+      ライブラリ（`authentication.adapters.email`）の存在は把握していたが、
+      **consumer が既に動いていることを知らなかった** —— ライブラリの存在と
+      サービスの稼働は別の事実で、前者を見ても後者は分からない
+   5. ~~JWKS 公開~~ … **適用できない。設計上そうしている。**
+      セッションは 256bit の不透明トークンで、SHA-256 ダイジェストを Durable
+      Object のキーにする。**署名が無いので公開する検証鍵も無い。**
+      `session.cljs` が自分で書いているとおり『every session an account holds
+      can be enumerated and revoked together』—— 不透明トークン + 中央検証は
+      **即時失効**が効き、JWT/JWKS はまさにそれができない。`/v1/logout/all` は
+      この設計の上にしか成立しない。**JWKS を足すのは失効を latency と
+      引き換えにすることであって、穴を埋めることではない。**
+
+   この訂正自体が本 ADR の主題の実例になっている —— **『足りない』と書く前に
+   動いているものを確認する**。対策として `90-docs/surface/surface.datoms.edn`
+   （生成物）と `duplication-warn` hook を作った。"
+
+  :adr/consequences
+  "## 現在地（2026-08-03 実測。ここが最新状態）
+
+   ### 着地したもの
+
+   - `viewer/resolve-apex` … host → apex の純粋判定。許可リストのみを信じ、
+     Host ヘッダを決して信用しない
+   - `viewer/parse-apexes` … 許可リストの解釈。**既定 apex は必ず含める**
+     （落とすと全 apex で cookie が出ず、サインインが全滅する）
+   - `worker/env-for-request` … エントリで env を包む。`base-domain` の
+     呼び出し 15 箇所は無変更のまま正しい apex を返す
+   - `viewer/webauthn-usable?` + `worker/passkey-route` … 下記の RP 制約
+   - `test/apex_worker_smoke.cljs` … **ビルド済み Worker を実行**して 9 件検査
+
+   本番 deploy 済み（version 092ea25a）。`AUTHN_APEXES` 未設定なので
+   `authn.kotobase.net` の挙動は完全に不変 —— live で実測確認した
+   （passkey 節あり・スロット全置換・`/v1/passkey/register/options` が実 challenge を返す）。
+
+   ### 発見した制約 —— passkey は RP apex に縛られる
+
+   `AUTHN_RP_ID` は 1 つの登録可能ドメインにしか属せない（WebAuthn の規則）。
+   `auth.murakumo.cloud` から `authn.kotobase.net` の RP は使えず、**サーバは
+   200 を返しブラウザだけが SecurityError で落ちる**。apex ごとに RP を分ければ
+   動くが、murakumo で作った passkey が itonami で使えなくなり SSO が壊れる。
+
+   採った解: **RP は 1 つのまま、使えない apex では passkey 節を出さない**。
+   別 apex で使えるのは email / OAuth / did:key CACAO の 3 つ（origin に
+   縛られないので ceremony ごとその apex で完結する）。
+
+   ### 実装順 1 は棄却する —— murakumo に session の消費者が居ない
+
+   下の『1. auth.murakumo.cloud を route し /signup を置き換える』は
+   **実行しない**。実測: cloud-murakumo の checkout は did を**リクエスト
+   引数として受け取る**（`site_worker.cljs:458`）だけで、session cookie を
+   一切読まない。apex ごとの cookie を発行しても**読む者が居ない**。
+
+   本 ADR 自身が置いた反証条件『減らなければこの設計は間違っている』に
+   照らすと: murakumo の自前 did/storage 実装を減らしたのは **sekisho**
+   （生成 46 行→9 行、localStorage 直触 3→1）であって、apex/cookie 側では
+   なかった。**apex 機構が要るのはサーバ側 session を持つ app であり、
+   murakumo はそれに当たらない。**
+
+   何も使わない公開ホスト名を今作るのは、まさに本 ADR が止めようとしている
+   『先回りの面を増やす』行為なので作らない。
+
+   ### 有効化の条件（1 つの env var で足りる）
+
+   `AUTHN_APEXES` に apex を足し、その apex の host を authn Worker に route する。
+   **引き金は『サーバ側 session を読む app が実在すること』**であって、
+   apex が増えたことではない。
+
+   ## 実装順（各段で『重複が減った』ことを実測する）
+
+   1. ~~`auth.murakumo.cloud` を route し murakumo の `/signup` を置き換える~~
+      **棄却**（上記『現在地』参照。murakumo に session の消費者が居ない）。
+      置き換えの実体は sekisho が既に果たした
+   2. tenant（組織）モデルを DID に入れる。`did:web:kotobase.net:org:<org>` と
+      `…:tenant:<user>` の関係を決める。**ここは移行コストが高いので先に決める**
+   3. email 紐付け（復旧）
+   4. JWKS
+   5. itonami.cloud / babiniku.net を順に載せる
+
+   ## 意図的に受け入れる不利
+
+   - `kotobase.net` が全 apex の identity authority になるので、**DID にその名が
+     出る**。第三者に売る時にブランド上の違和感が出うる。それでも第 2 authority
+     より安い（DID namespace は後から変えられない、ブランドは変えられる）
+   - authn Worker が全サイトの単一障害点になる。ADR-2607252000 が独立 Worker に
+     したのはこのためだが、**落ちれば全サイトのログインが止まる**ことは変わらない
+
+   ## 検討して採らなかった置き場所
+
+   - **`nexus-x402` に載せる**: x402 は『口座を持たずに 1 回払う』仕組みで、
+     認証の**代替**。同じ場所に置くと『誰か』と『払ったか』が混ざる。
+     ただし nexus-x402 は既に **3 registered sellers のテナント登記を持つ
+     マルチテナント gateway** として稼働しており、**運用形は流用に値する** ——
+     repo ではなくパターンを借りる
+   - **`cloud-itonami` の 1 サービス**: あそこは ISIC コード付きの**事業**を
+     actor が回す場所。認証は事業ではなく**インフラ**で、他の全 repo が依存する
+     土台。多数の小サービスに埋めると依存の向きが逆転する"}]

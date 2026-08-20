@@ -1,0 +1,275 @@
+[{:db/id -1
+  :adr/id "2608610000-kotoba-cid-storage-database-graph-query-recommendation"
+  :adr/title "ADR-2608610000: kotoba の CID ベース storage / database / graph / query の推奨スタック —— 実測に基づく決定"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "kotoba-stack"
+  :adr/date "2026-08-06"
+  :adr/last_verified "2026-08-06"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/related ["2608590000-kotobase-capability-bench-orbit-ceramic-actordb"
+                "2608600000-semantic-merkle-lisp-db-block-granularity-measured"
+                "2608550000-cid-native-codebase-authoring-compile-discovery"
+                "2608580000-kotoba-hash-native-completion-kotobase-code-graph-projection"
+                "2608039970-kotobase-datom-plane-not-datalog"
+                "2608039000-no-d1-premise-in-decentralized-paths"
+                "2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane"
+                "2608070400-kotobase-client-held-security-and-searchable-encryption-tiers（D5 が本 ADR の D3 を訂正）"
+                "2608161600-ipfs-has-no-storj-client-encryption-compose-envelope-signal（convergent 禁止の確定）"]
+  :adr/authoritative_for
+  ["kotoba / kotobase の CID ベース storage・database・graph・query の既定構成"
+   "S3 等 object store を backend にしたときに最適化すべき対象（request でなく hop、そして pipelining）"
+   "client-side 暗号化の配置と、その配置ごとに失う性質（既定は per-tenant 鍵。convergent は ADR-2608070400 D5 で却下済み）"
+   "定義 identity をどの層の CID で取るか（source / S式 / checked KIR）"
+   "datom 面を data lake として使うときの投影の位置づけ"]
+
+  :adr/context
+  "オーナー質問（2026-08-06）「結論、kotoba 言語としておすすめの cid ベースのストレージ、
+データベース、グラフ、クエリーの方法は？数値で比較して」および続く「実際的には s3 を backend に
+した場合の query, index, range, put, get、hop ごとの query 性能、client 側暗号化前提の性能、
+S 式前提の cid、セキュリティ、datalake として成立するか」。
+
+この ADR は新しい設計提案ではなく、**3 本の実測（ADR-2608590000 / 2608600000 / 本 ADR で
+追加した storage 実測）から決定を確定させるもの**。既存の accepted ADR（identity = checked KIR、
+kotobase 面は projection、分散型経路に D1 を premise にしない、Datalog は surface の 1 つ）を
+変更せず、その上で『既定はこれ』を決める。
+
+実測装置は `kotoba-lang/kotobase` の `capability-bench/`（3 runner: `run.cljs` /
+`run-semantic.cljs` / `run-storage.cljs`）。**引用してよいのは block 数・request 数・hop 数・
+byte 数・無効化係数**で、ms は nbb/SCI 由来なので引用しない（AES と sha256 だけは Node native）。"
+
+  :adr/decision
+  "## 既定スタック
+
+```
+L0 block   content-addressed immutable block (dag-cbor + CIDv1/sha2-256) → object store
+L0 ref     linearizable CAS 1 本（分散型経路では inga。D1 を premise にしない）
+L1 datom   3–4 covering Prolly index + commit DAG ← 唯一の正本
+L1 code    定義単位 CID（checked KIR）。semantic-chunk は帯域律速の経路だけ
+L2 query   datom index 必須。Datalog は surface の 1 つ
+L2 graph   逆依存も同じ datom 面。別 graph DB を立てない
+L2 olap    columnar projection（削除・再構築可能な派生物）
+exec       pure は CID memo / effect は receipt。FVM 境界は commit 検証だけ
+crypto     per-tenant 鍵 + pqh-v1 を ciphertext-addressed で。convergent も random nonce も不可
+```
+
+### D1. database は kotobase 自身の形（3 index + commit DAG + 条件付き ref）を既定とする
+
+定常 1 txn: **14.32 block puts / 176,947 bytes**（append-only は 1 put / 158 bytes）。
+14 倍は非効率ではなく capability の値段で、払わない場合に消えるもの:
+
+| | 値検索 | 過去 basis の読み |
+|---|---|---|
+| kotobase | 3.46 gets（index） | **3 gets / 24.7 KB** |
+| orbit 形 | 0 gets だが毎回 4,000 entity 全走査 | **216 gets / 499 KB を毎回** |
+| ceramic 形 | 81.9 gets（projection 償却） | **unsupported** |
+
+**shard は必要になってから。** 8 shard で書き込み -43%、64 shard で -71% だが、値クエリの
+block read が 32 倍、shard 跨ぎ txn の message が 64 倍。Datalog join は ref 1 本しか届かない
+ので、分けるなら join できなくなるものを名指しする。
+
+### D2. S3 backend では request ではなく **hop** を最適化する。実装の最重要項目は pipelining
+
+4,000 entity / 20,000 datom、両 index とも height 2 の実測:
+
+| 操作 | GET | PUT | 読み bytes | **hops** |
+|---|---|---|---|---|
+| bulk load | 0 | 151 | — | 1 |
+| point read | 2.04 | 0 | 24.9 KB | **2** |
+| find by value | 3.6 | 0 | 44.8 KB | **2** |
+| range scan | 16 | 0 | 175 KB | **2** |
+| transaction | 10.08 | 5.78 | 118 KB | **5** |
+| replica sync (50 txn) | 74 | 0 | 1.11 MB | 2 |
+| point read + 1,000 block cache | **0.74** | 0 | 10.4 KB | 2 |
+
+**read 系の request 数は 8 倍ばらつくが hop 数は一定**（木の高さ 2）。range scan は 16 block
+読むが、住所は 1 つの root から全部わかるので 1 バッチで出せる。
+
+RTT 別モデル（serial = requests × RTT、pipelined = hops × RTT）:
+
+| RTT | point read | transaction | range scan |
+|---|---|---|---|
+| 10 ms | 20.4 / 20 ms | 158.6 / 50 ms | 160 / **20** ms |
+| 100 ms | 204 / 200 ms | 1,586 / 500 ms | 1,600 / **200** ms |
+
+**pipeline しない client は range scan で 8 倍、txn で 3 倍払う。** index チューニングより
+効果が大きい。次点が block cache: 1,000 block で point read の request が 2.04 → 0.74（-64%）
+—— 木の上位層は全 descent で共有されるので、小さい cache がちょうどそこを保持する。
+
+### D3. client-side 暗号化は **per-tenant 鍵 + ciphertext-addressed**。convergent は採らない
+
+> **2026-08-18 訂正 —— この節はもともと『convergent + ciphertext-addressed を既定に
+> する』と決めていた。翌日の ADR-2608070400 D5 がそれを否定し、ADR-2608161600 が
+> 『convergent 暗号を使わない』を禁止事項として固定した。下の実測は当時のまま正しい
+> —— 変わったのは実測から導いた決定の方である。**
+>
+> 否定の根拠は、もとの表の『equality 漏洩』列に既に書いてあった。convergent は
+> **同じ平文 → 同じ住所**なので、server は鍵を持たないまま等価を住所から学習する。
+> 実測（ADR-2608070400）で **tenant A の block の 35.12% が tenant B と byte 同一**。
+> 『server は持っていないものを漏らせない』（同 D1）に対して、dedup はその値段では
+> 買えない。したがって **per-tenant 鍵**とし、**cross-tenant の重複排除は捨てる**。
+> suite は `pqh-v1`（X25519+ML-KEM-768 / Ed25519+ML-DSA-65 / XChaCha20-Poly1305）。
+
+| 配置 | server が検証可 | dedup | equality 漏洩 | 木が canonical | 判定 |
+|---|---|---|---|---|---|
+| 無し | yes | yes | n/a | yes | 機密性を主張しない経路のみ |
+| convergent / ciphertext-addressed | yes | yes | **yes（tenant 間 35.12%）** | yes | **却下**（ADR-2608070400 D5） |
+| **per-tenant 鍵 / ciphertext-addressed** | **yes** | **tenant 内のみ** | **tenant 内のみ** | **yes** | **既定** |
+| random nonce / ciphertext-addressed | yes | **no** | no | **no** | 失格 |
+| 任意 mode / plaintext-addressed | **no** | yes | yes | yes | 失格 |
+
+**random nonce が失格である理由は変わらない。** 同一 430 block を 2 回独立に暗号化した
+実測で **決定的な暗号化は 430 個のまま、random は 860 個（duplicate factor 2.0）**。
+同じ論理ノードが毎回別の住所になるので、2 replica が同じデータから別の root を出す。
+content addressing が content addressing でなくなる。
+
+**未決 —— 封筒面を実装する前にここを決めること。** 上の 2 つを同時に満たすには、
+鍵が tenant ごとに違い、かつ **nonce が内容から決まっている**必要がある（tenant 内では
+決定的なので住所が安定し木が canonical、tenant を跨ぐと同じ平文でも別の住所なので
+等価が漏れない）。**その nonce 導出はどちらの ADR も明示しておらず、実装も無い。**
+ADR-2608070400 D5 は『重複排除は捨てる』としか書いていないので、tenant *内*の決定性
+まで捨てる読み方（= random nonce に落ち、この節の実測どおり木が canonical でなくなる）
+が残っている。この ADR の『測っていないこと』が挙げる鍵管理面の未測定と同じ穴である。
+
+コストは小さいが**ブロック粒度に比例する**（28 B/block 固定 = nonce 12 + GCM tag 16）:
+
+| block 母集団 | 平均サイズ | overhead % | encrypt | decrypt |
+|---|---|---|---|---|
+| index block | 12,225 B | **0.23%** | 0.21 ms | 0.03 ms |
+| 定義 block | 1,638 B | **1.71%** | 0.02 ms | 0.02 ms |
+
+→ **暗号化は細粒度チャンクを不利にする**（全ノード CID なら 14.9 block/定義 × 28 B =
+417 B/定義 対 定義単位 28 B）。D5 の粒度決定を補強する。
+
+**暗号化が高く付くのは AES ではなく不透明性。** server が index の値を見られないと値 prefix を
+引けず、client が属性レンジ全体を取って絞る:
+
+| | requests | 転送 rows |
+|---|---|---|
+| plaintext 値 prefix | 5 | 496 |
+| 不透明な属性レンジ | 14 | 4,000 |
+| **倍率** | **2.8×** | **8.06×** |
+
+cipher は 0.03 ms/block、不透明性は 8 倍の byte。
+
+### D4. 定義 identity は checked KIR の CID（S 式 CID では足りない）
+
+300 定義に対し、**意味を変えない**変更で CID が動く割合:
+
+| 変更 | source-text CID | S 式 CID | checked-KIR CID |
+|---|---|---|---|
+| 整形（空白のみ） | **100%** | 0% | 0% |
+| 全 local 束縛の rename | **79.3%** | **79.3%** | **0%** |
+| 全定義 + 全呼び出し側の rename | **100%** | **100%** | **0%** |
+| leaf 1 定義の実変更（対照） | 0.33% | 0.33% | 0.33% |
+| hub 10% の実変更（対照） | 10% | 10% | **100%** |
+
+**『S 式をそのまま CID にする』では足りない。** S 式を canonical data として hash すると整形
+非依存にはなる（100% → 0%）が、名前を全部持つので local rename で 79%、定義 rename で 100%
+が無効化される。**checked KIR だけが安定** —— 全定義と全呼び出し側を rename しても CID は
+1 つも変わらず、CID 集合が完全に保存される（実測 true）。
+
+最終行が代償で、これは本物: 依存が CID link なので hub の変更は全 dependent に伝播する
+（10% 編集 → 100% 変化）。text 系は伝播しないが、整形で動くので build cache key に使えない。
+**安定かつ非伝播な scheme は存在しない。伝播が正しさの対価。**
+
+### D5. block 粒度は定義単位（案 B）が既定、意味チャンク（案 C）は帯域律速の経路だけ
+
+2,000 定義 / 111,729 ノード実測:
+
+| 粒度 | blocks/定義 | bytes/定義 | **1 定義の hydrate** | 10% 編集の新規 bytes |
+|---|---|---|---|---|
+| 全ノード(A) | 14.9 | 2,133 | **47.1** | 1.85 MB |
+| **定義単位(B)** | **1.0** | **1,629** | **1** | 2.84 MB |
+| 意味チャンク(C) | 8.1 | 1,913 | 8.3 | 2.11 MB |
+
+hydrate 1 対 47 で B を既定に。C は「編集あたり bytes 26% 減 / blocks 5 倍」の交換なので、
+**帯域が律速な経路（closure 転送・同期）だけ**。D3 の 28 B/block がこの判断をさらに B 寄りにする。
+
+### D6. query は datom index を必須とする。graph も同じ面に載せる
+
+同じ 155 件の答え（effect を宣言する定義）: **index 2 block 対 object 面走査 4,000 block**。
+2,000 定義で 2,000 倍、以降線形。投影は最適化ではなく database の条件。
+
+逆依存も同じ index に載せる: hub 20 件 seed で **2,000 中 1,999 が影響**（index 4,032 block）、
+leaf 20 件なら 20 件（40 block）。別 graph engine を立てるとクエリ面が割れる割に、この規模で
+測定上の必要が無い。
+
+### D7. data lake として成立する。ただし transactional な形のままではない
+
+同じレンジ集計、同じ block store:
+
+| | requests | 走査 rows | skip した chunk | ms |
+|---|---|---|---|---|
+| **columnar + zone map** | **2** | **512** | 8 中 7 | **5.2** |
+| AVET Prolly index | 16 | 4,000 | — | 108 |
+
+**request 8 倍減 / rows 7.8 倍減 / 21 倍速。** footer の min/max で 8 中 7 chunk を読む前に
+捨てられる。構築は 46 PUT / 404 KB。
+
+→ **columnar projection は削除・再構築可能な派生物として持つ**（ADR-2608580000 が code graph に
+定めたのと同じ関係）。hop は両方 2 なので、object store 上での勝ちは帯域と request であって
+latency ではない。
+
+### D8. セキュリティ
+
+| | 実測 |
+|---|---|
+| 1 block の sha256 | 0.02 ms |
+| CID 組み立て込み（multibase 含む） | **0.45 ms** |
+| 1 byte 改竄の検出 | 検出（CID 不一致） |
+| convergent 暗号下の tenant 間 equality 漏洩 | tenant A の **35.12%** の block |
+| plaintext-addressed の住所漏洩 | 100%（住所が平文 hash そのもの） |
+
+**検証コストの約 22 倍は暗号ではない** —— pure cljs の base32 multibase 実装。content 検証が
+高いのではなく、この CID 文字列の組み立てが高い。**最適化対象であって、検証をやめる理由ではない。**"
+
+  :adr/consequences
+  "## この決定が縛ること
+
+1. 新しい永続経路は **datom 面 + Prolly index + commit DAG + 条件付き ref 1 本**から始める。
+   append-only log / per-stream event を*正本*にしない（同期・部分レプリカの機構としては可）。
+2. **object store backend の実装は pipelining を最優先**にする。hop 数を設計指標として記録し、
+   request 数だけを見ない。block cache は小さくてよいが必ず持つ（上位層が全 descent で共有）。
+3. 暗号化する経路は **per-tenant 鍵 + ciphertext-addressed**（ADR-2608070400 D5 /
+   ADR-2608161600）。**convergent は採らない** —— tenant 間で block の 35.12% が byte
+   同一になり、鍵を持たない server が等価を住所から学習する。random nonce の ciphertext
+   addressing も、content addressing を壊すので却下してよい。tenant 内で決定的にする
+   ための nonce 導出は未決（D3 の訂正を参照）。
+4. 定義 identity は **checked KIR**（既存 ADR-2608550000 の追認）。S 式 CID を identity に
+   昇格させない。source CID は provenance 専用に留める。
+5. **block 粒度の既定は定義単位。** 細粒度に振るときは「帯域律速である」ことを示す。
+6. 分析経路は **columnar projection**を別に持つ。transactional index で集計しない。
+7. `namespace-block` を Prolly Tree 化する（ADR-2608600000 で実測された唯一の現行実装欠陥。
+   1 定義の commit が 2,000 名前で 98 KB を書き直す → tree なら 19.8 KB）。
+8. base32 multibase 実装を最適化候補として登録する（検証 1 block 0.71 ms のうち 0.04 ms だけが hash）。
+
+## 測っていないこと（この ADR の結論に含めない）
+
+- **実 S3 は 1 度も叩いていない。** request と hop は数えたが latency は RTT モデル。
+  実 object store の per-request 分散・TTFB 分布・throttling は入っていない。
+- **S3 の range GET は未モデル。** packed block layout なら request をさらに減らせるが未測定。
+- **hop は宣言値**（アルゴリズムの依存構造から）であって自動検出ではない。
+- **Wasm 実行は未測定**（`kotoba.kir/execute` は一度も呼んでいない）。
+- **鍵管理面は未測定** —— 導出・rotation・tenant 階層・失効は範囲外。cipher work と構造的
+  帰結だけ。
+- **Pregel / 大規模推移閉包・Cypher/SPARQL/Gremlin の実装コスト**は未測定。
+- ms 値は nbb/SCI 由来（AES と sha256 は Node native）。**性能指標として引用しない。**
+- tenant 重複 35% はこの workload の性質であって定数ではない。
+- 1M 定義への外挿は線形。"
+
+  :adr/body
+  "実装・生データの正本は `kotoba-lang/kotobase` の `capability-bench/`:
+
+- `README.md` + `results/latest.{txt,edn}` —— アーキテクチャ比較（OrbitDB / Ceramic /
+  ActorDB / kotobase、FVM 境界、shard sweep）→ ADR-2608590000
+- `README-semantic.md` + `results/semantic.{txt,edn}` —— semantic code graph の粒度・投影・
+  namespace・CID キャッシュ → ADR-2608600000
+- `README-storage.md` + `results/storage.{txt,edn}` —— object store profile（request/hop/
+  latency モデル）、client-side 暗号化、identity scheme、data lake、セキュリティコスト
+  → 本 ADR
+
+runner: `run.cljs` / `run-semantic.cljs` / `run-storage.cljs`、共通の pinned 依存は
+`setup.cljs`（`codebase` / `prolly-tree` / `io-ipld` / `dag-cbor` / `io-multiformats` / `crdt`）。
+`verify.cljs` が 4 backend の答え一致を先に固定する。"}]

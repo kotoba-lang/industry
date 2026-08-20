@@ -1,0 +1,80 @@
+[{:db/id -1
+  :adr/id "adr-2608024400-gap-dag-and-the-instrument-that-collapsed-it"
+  :adr/title "adr-2608024400: gap の逆トポロジカルソートと、それを畳んだ計器 — 225 停止と 1 故障耐性は同じ 1 つの問題だった"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "gap-dag-and-view-divergence"
+  :adr/authoritative-for
+  ["gap の依存グラフと着手順"
+   "停止の原因診断（view 発散）"
+   "validator の計器（why-not-proposing / delivery / clock）"]
+  :adr/related ["adr-2608024300-a-laggard-had-no-way-to-learn-a-block-existed"]
+  :adr/evidence ["https://torihiki-validator.04-feasts-minded.workers.dev/head?w=w1"]
+  :adr/body
+  "# ADR-2608024400: gap の逆トポロジカルソートと、それを畳んだ計器
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## 1. 依存グラフを組み、逆トポロジカルに並べた
+
+13 の gap を実行可能な節点に割り直すと 2 つ割れて 15 になり、辺を引くと 4 層になった。
+
+```
+L0  G0 計器   G6 bridge   G3a 鍵を設定に焼く   G8 id 衝突   G9 注文種別   G12 publisher rotation
+L1  G1 225 停止   G2a view 同期        G7 stake snapshot
+L2  G2b view 鍵 leader   G5a 証拠伝播   G3b 鍵の on-chain 登録   G10 WS   G11 snapshot
+L3  G4 sequencer 撤去    G5b slashing
+```
+
+**分かったこと 3 つ:**
+
+- **G0 が最も多くを塞ぐ**（15 中 6 つが下流）。このセッションで直った停止はすべて「counter を 1 つ足したら分かった」もので、**計器は補助作業ではなく根**。
+- **G6（bridge）は根で、内部依存がゼロ。** ずっと「後で」に置いていたが、**経済側の半分を単独で塞いでおり、合意層と完全に並列に進められる。**
+- **疑わしい辺 `G1 ⇢ G2a`** —— 225 停止は「全員が同じ height・同じ root、誰も提案しない」で、**view が割れて誰も leader でなくなった状態と同じ形**に見えた。
+
+## 2. G0 を作った
+
+`/head` が「**なぜ提案しなかったか**」を返す —— `propose` が見る 3 条件と、どれが否と言ったか。加えて **peer ごとの配送成否**と、`/clock` で **alarm が実際に張られているか**。
+
+**それまでの counter はすべて「何が起きたか」を言っていた。停止は「起きなかったこと」で、その理由を誰も記録していなかった。**
+
+## 3. 3 つの停止が 3 回の読み取りで解けた
+
+（それぞれ従来は deploy 1 回・待機・推測を要した）
+
+1. **catch-up が投票せずに block を採用していた** —— 全員が持ち誰も投票していない block は永久に certify されない。`votes-for-tip 0` が 4 者とも。
+2. **`handle-proposal` が「投票を拒否した block」を採用していた** —— replica を「自分が支持しない chain」の上に置く。同じ症状の 1 層下。
+3. そして本命:
+
+```
+  w1 tip 2  votes-for-tip 2  view 16
+  w2 tip 2  votes-for-tip 2  view 16
+  w3 tip 1  votes-for-tip 0  view 21
+  w4 tip 2  votes-for-tip 2  view 51
+```
+
+**3 者が height 2 の block を 2 票で保持 —— quorum 3 に 1 票足りない。** 4 つ目は 1 block 遅れており、**その lock が「block では超えられない view を持つ証明書」から来ているので投票しない。** **view は 16, 16, 21, 51。**
+
+## 4. 結論: 疑わしい辺は本物だった
+
+**停止は view の発散**であり、pacemaker の安全規則は**誰も共有していない view で形成された lock に対して、正しく振る舞っている。**
+
+**G1 と G2a は同じ節点。** critical path は 1 段短くなり、**残る本丸は「収束する view 同期」の 1 つ**になった。
+
+## Consequences
+
+- (+) 計器（G0）が完成し、実際に 3 つ解いた。
+- (+) **G1 = G2a が確定** —— 直すものが 2 つから 1 つに。
+- (−) deploy 済み chain は依然停止（height 2 前後、quorum に 1 票足りない）。
+- (−) G6 は未着手（並列可能）。
+
+engi 218 tests / 1155 assertions、parity 不変、in-process harness は pass。
+"}]

@@ -1,0 +1,288 @@
+;; 分野特化タグ（編集判断。ただし 1 件ごとに根拠 URL を持つ）
+;; :focus/area は startup-vc / web3-crypto / ip-ai / labour-employer / labour-employee。
+;; :source/url は「その分野に注力していること」を実際に示すページ（事務所自身の
+;; 実務ページ、または事務所名を挙げた第三者記事）。根拠が取れないタグは載せない。
+;; Legal 500 のティア評価は別データセット（jp-law-firm-rankings）を参照。
+
+[
+ {:focus/firm-id "法律事務所ZeLo"
+  :focus/firm-name-ja "法律事務所ZeLo"
+  :focus/area "startup-vc"
+  :focus/note "事務所自身のスタートアップ/ベンチャー法務ページ"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://zelojapan.com/service/startup-venture-law"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "法律事務所ZeLo"
+  :focus/firm-name-ja "法律事務所ZeLo"
+  :focus/area "web3-crypto"
+  :focus/note "同ページが Web3・AI・Fintech を先端領域として明示"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://zelojapan.com/service/startup-venture-law"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "咲くやこの花法律事務所"
+  :focus/firm-name-ja "弁護士法人咲くやこの花法律事務所"
+  :focus/area "startup-vc"
+  :focus/note "事務所自身のベンチャー・スタートアップ法務ページ"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://kigyobengo.com/venture-legal"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "咲くやこの花法律事務所"
+  :focus/firm-name-ja "弁護士法人咲くやこの花法律事務所"
+  :focus/area "labour-employer"
+  :focus/note "企業側の労働問題を主要取扱分野として掲載"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://kigyobengo.com/media/useful/600.html"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "プロコミットパートナーズ法律事務所"
+  :focus/firm-name-ja "プロコミットパートナーズ法律事務所"
+  :focus/area "startup-vc"
+  :focus/note "スタートアップ特化を掲げる事務所の自社ページ"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://pcpl.jp/service/startup/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "桑原法律事務所"
+  :focus/firm-name-ja "桑原法律事務所"
+  :focus/area "startup-vc"
+  :focus/note "スタートアップ特化の顧問弁護士サービスページ"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://www.kuwahara-law.com/consulting/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "GVA法律事務所"
+  :focus/firm-name-ja "弁護士法人GVA法律事務所"
+  :focus/area "startup-vc"
+  :focus/note "スタートアップ支援を主力とする事務所サイト"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://gvalaw.jp/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "GVA法律事務所"
+  :focus/firm-name-ja "弁護士法人GVA法律事務所"
+  :focus/area "web3-crypto"
+  :focus/note "所内 WEB3 チームによるトークン投資の解説記事"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://gvalaw.jp/blog/c20220510/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "早稲田リーガルコモンズ法律事務所"
+  :focus/firm-name-ja "弁護士法人早稲田リーガルコモンズ"
+  :focus/area "web3-crypto"
+  :focus/note "クリプト/Web3.0 の専門ページ（2017 年からブロックチェーン法務）"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://legalcommons.jp/crypto"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "TMI総合法律事務所"
+  :focus/firm-name-ja "TMI総合法律事務所（弁護士法人）"
+  :focus/area "web3-crypto"
+  :focus/note "『Web3への法務Q&A』執筆情報"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://www.tmi.gr.jp/eyes/publication/2022/14161.html"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "森・濱田松本法律事務所"
+  :focus/firm-name-ja "弁護士法人森・濱田松本法律事務所"
+  :focus/area "web3-crypto"
+  :focus/note "同事務所パートナー増島雅和弁護士への Web3/NFT 法務インタビュー（日経クロストレンド）"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://xtrend.nikkei.com/atcl/contents/18/00830/00036/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "伊藤海法律事務所"
+  :focus/firm-name-ja "伊藤海法律事務所"
+  :focus/area "web3-crypto"
+  :focus/note "Web3 関連法の解説ページ"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://kai-law.jp/web3-legal/web3-laws/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "伊藤海法律事務所"
+  :focus/firm-name-ja "伊藤海法律事務所"
+  :focus/area "ip-ai"
+  :focus/note "生成AIと著作権の解説ページ"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://kai-law.jp/intellectual-property-right/copyright-of-generative-ai/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "創・佐藤法律事務所"
+  :focus/firm-name-ja "弁護士法人創・佐藤法律事務所"
+  :focus/area "web3-crypto"
+  :focus/note "Legal 500 フィンテック（国内独立系）Firms to watch 掲載"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://www.legal500.com/c/japan/fintech-independent-local-firms"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "STORIA法律事務所"
+  :focus/firm-name-ja "STORIA法律事務所"
+  :focus/area "ip-ai"
+  :focus/note "知的財産・IT・AI・ウェブビジネスを掲げる事務所サイト"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://storialaw.jp/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "中央総合法律事務所"
+  :focus/firm-name-ja "弁護士法人中央総合法律事務所"
+  :focus/area "ip-ai"
+  :focus/note "生成AIと著作権のコラム"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://www.clo.jp/column/5034/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "松田綜合法律事務所"
+  :focus/firm-name-ja "松田綜合法律事務所"
+  :focus/area "ip-ai"
+  :focus/note "著作権法・生成AI対応法務の専門ページ"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://jmatsuda-law.com/lp/copyright-ai/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "関真也法律事務所"
+  :focus/firm-name-ja "関真也法律事務所"
+  :focus/area "ip-ai"
+  :focus/note "生成AI・著作権の研究/執筆を掲げる事務所サイト"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://www.mseki-law.com/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "デイライト法律事務所"
+  :focus/firm-name-ja "弁護士法人デイライト法律事務所"
+  :focus/area "ip-ai"
+  :focus/note "生成AIと著作権のQ&Aページ"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://www.komon-lawyer.jp/qa/seisei/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "骨董通り法律事務所"
+  :focus/firm-name-ja "骨董通り法律事務所"
+  :focus/area "ip-ai"
+  :focus/note "エンタテインメント・著作権を専門とする事務所サイト"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://www.kottolaw.com/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "内田・鮫島法律事務所"
+  :focus/firm-name-ja "弁護士法人内田・鮫島法律事務所"
+  :focus/area "ip-ai"
+  :focus/note "知財（特許・技術法務）を専門とする事務所サイト"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://www.uslf.jp/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "高井・岡芹法律事務所"
+  :focus/firm-name-ja "高井・岡芹法律事務所"
+  :focus/area "labour-employer"
+  :focus/note "会社側・使用者側専門を掲げる事務所サイト"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://www.law-pro.jp/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "杜若経営法律事務所"
+  :focus/firm-name-ja "杜若経営法律事務所"
+  :focus/area "labour-employer"
+  :focus/note "使用者側専門の労働法事務所（顧問 900 社超と自称）"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://www.labor-management.net/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "ロア・ユナイテッド法律事務所"
+  :focus/firm-name-ja "ロア・ユナイテッド法律事務所"
+  :focus/area "labour-employer"
+  :focus/note "労務専門サイト"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://roumu.loi.gr.jp/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "森・濱田松本法律事務所"
+  :focus/firm-name-ja "弁護士法人森・濱田松本法律事務所"
+  :focus/area "sustainability-bhr"
+  :focus/note "日経『ビジネスと人権』弁護士ランキング首位に同事務所の梅津英明弁護士"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://www.nikkei.com/article/DGXZQOUC204KG0Q3A121C2000000/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "松田綜合法律事務所"
+  :focus/firm-name-ja "松田綜合法律事務所"
+  :focus/area "sustainability-bhr"
+  :focus/note "『ビジネスと人権に関する法務』の専門ページ"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://jmatsuda-law.com/lp/bhr/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "大江橋法律事務所"
+  :focus/firm-name-ja "弁護士法人大江橋法律事務所"
+  :focus/area "sustainability-bhr"
+  :focus/note "取扱分野『ビジネスと人権』（2021 年に ESG/サステナビリティ専門チーム設置）"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://www.ohebashi.com/jp/practice/b2-8.php"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "北浜法律事務所"
+  :focus/firm-name-ja "弁護士法人北浜法律事務所"
+  :focus/area "sustainability-bhr"
+  :focus/note "取扱業務『SDGs・サステナビリティ・ESG』"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://www.kitahama.or.jp/practices/16775/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "プロアクト法律事務所"
+  :focus/firm-name-ja "プロアクト法律事務所"
+  :focus/area "sustainability-bhr"
+  :focus/note "取扱分野『サステナビリティ法務』（人権DD・機関投資家対話）"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://proactlaw.jp/our-practices/sustainability_laws/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "ことのは総合法律事務所"
+  :focus/firm-name-ja "ことのは総合法律事務所"
+  :focus/area "sustainability-bhr"
+  :focus/note "同事務所の佐藤暁子弁護士が人権DD導入支援・政策提言（PwC 対談記事）"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://www.pwc.com/jp/ja/knowledge/column/business-and-human-rights/interview-part1.html"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "PwC"
+  :focus/firm-name-ja "PwC弁護士法人"
+  :focus/area "sustainability-bhr"
+  :focus/note "『ESG／サステナビリティ関連法務』のサービスページ"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://www.pwc.com/jp/ja/services/legal/esg.html"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "エース"
+  :focus/firm-name-ja "弁護士法人エース"
+  :focus/area "sustainability-bhr"
+  :focus/note "ビジネスと人権・人権デューデリジェンスの解説ページ"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://ace-law.or.jp/komonbengoshi/csr/business-human-rights/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "京橋・宝町法律事務所"
+  :focus/firm-name-ja "京橋・宝町法律事務所"
+  :focus/area "nonprofit-governance"
+  :focus/note "取扱分野『公益法人・非営利法人』（ガバナンス・内部統制・紛争）"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://www.uku-law.jp/practice/public-service-corporation/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "東京法律事務所"
+  :focus/firm-name-ja "東京法律事務所"
+  :focus/area "labour-employee"
+  :focus/note "労働者側の労働問題ページ"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://www.tokyolaw.gr.jp/labor/"
+  :source/retrieved "2026-07-29"}
+
+ {:focus/firm-id "旬報法律事務所"
+  :focus/firm-name-ja "旬報法律事務所"
+  :focus/area "labour-employee"
+  :focus/note "労働者・労働組合側を明示"
+  :source/dataset "jp-law-firm-focus"
+  :source/url "https://junpo.org/labor/"
+  :source/retrieved "2026-07-29"}
+
+]

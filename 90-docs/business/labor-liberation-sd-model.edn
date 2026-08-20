@@ -1,0 +1,370 @@
+;; labor-liberation-sd-model.edn — cloud-itonami / etzhayyim 労働解放 system dynamics モデル
+;;
+;; ADR-2607122100 の正本データ。ADR-2607121000（ISIC/ISCO 逆トポソート 5-wave）を含む
+;; 関連 ADR 群を集約し、目的関数を「価値捕捉 V」から「労働解放速度 dW/dt」に載せ替えて
+;; 最適順序を再計算するための機械可読モデル。
+;;
+;; ロード/導出: nbb scripts/labor-liberation-sd.cljs [verify|layers|rank|loops|plan|q]
+;; （npm datascript にロード。属性は裸文字列化される — manifest/edn-query.cljs と同じ制約）
+;;
+;; セマンティクス:
+;;   :edges  u → v。:edge/kind :requires = 「v の操業は u の産出を必須運転入力とする」
+;;           （ADR-2607121000 の辺定義と同一）。:enables = build-time/チャネル前提
+;;           （scaffold・工場・fixture・置換チャネル）。:flows = SD ストックへの流入
+;;           （トポソート対象外）。逆トポソート = :requires+:enables の DAG を
+;;           被依存の根から Kahn 層化。
+;;   :nodes  :node/labor-share = 全世界就業時間に占めるシェアの桁感（ILO ベース概算。
+;;           :wave2.isco-cognitive は職業レンズで産業レンズと重複 — 合計 1.0 にならない）。
+;;           :node/automatability-now = robot 無し・今日の LLM/agent での自動化可能度。
+;;           :node/asset-wedge = このリポ群に既にある資産のくさび（0-1）。
+;;           :node/lead-time-months = 着手から使える状態までのリードタイム（enabler 用）。
+;;   score   score(n) = unlocked-W(n) × automatability-now × (0.5 + 0.5×wedge)
+;;                      × loop-boost × gate-factor
+;;           unlocked-W = 自身 + 推移的被依存ノードの labor-share 総和（解放レバレッジ）。
+;;           loop-boost = 1 + Σ (reinforcing loop 参加分: broken-at その点=1.0 /
+;;                        active=0.5 / broken=0.4 / inactive=0.2)。
+;;           gate-factor = 閉じた gate の背後なら 0.15、それ以外 1.0。
+;;   数値は全て桁感（order-of-magnitude）。正確な市場・雇用調査は各 wave 着手時の
+;;   個別 ADR で行う（ADR-2607121000 の constraint を踏襲）。
+{:model/id :cloud-itonami.labor-liberation-sd
+ :model/version "2026-07-13.10"         ; .9: tick6-8 / .10: tick9-17 = 6910 95か国(50.5%) + 8291 満杯 20src + ISCO wave-0 安全在庫コンプリート (blueprint 50) + drift scan (2607131000: 真の乖離 2 件を test 実走の上 :implemented 同期)
+ :model/objective "maximize dW/dt — W = 解放された人間労働時間ストック。依存 DAG・gate・SD ループ制約下で"
+ :model/baseline {:industry-registry {:total 646 :implemented 131 :spec 494}
+                  :occupation-registry {:total 436 :implemented 23 :blueprint 61 :spec 353}
+                  :satellite-repos {:total 388 :with-src 185 :compiled-wasm ["6492" "6511"]}
+                  :itonami-cloud {:tenants 1 :external-registrations 0 :revenue 0}
+                  :ishokuju-scaffolds {:isic-10-14 3 :isic-4100 1
+                                       :landed "ADR-2607122200: 1010/1311/1410/4100 = :blueprint 衛星公開 + registry 昇格 (blueprint tier 36→40)"}}
+
+ :adrs
+ [{:adr/ref "2606271700" :adr/one-line "cloud-itonami business OS 初版 — 事業活動を LLM/agent で書き換える org の起点"
+   :adr/feeds [:infra.itonami-cloud]}
+  {:adr/ref "2607011000" :adr/one-line "robotics 前提 + ISIC 21/21 — 物理作業は robot、actor 提案 ⊣ 独立 governor gate。全 vertical に :robotics 必須"
+   :adr/feeds [:robot.governor-lib :gate.robotics]}
+  {:adr/ref "2607012000" :adr/one-line "ISCO-08 436 職業 registry + curated 9 blueprints"
+   :adr/feeds [:wave2.isco-cognitive :wave2.labor-exchange]}
+  {:adr/ref "2607020000" :adr/one-line "giemon 製品ライン集約 — Otete shipping / Hitogata・Caterpillar in-design（fixture・BOM 無し）"
+   :adr/feeds [:robot.giemon-otete :robot.giemon-hitogata]}
+  {:adr/ref "2607031500" :adr/one-line "m6910 global incorporation actor — 世界法人設立"
+   :adr/feeds [:wave1.incorporation-compliance]}
+  {:adr/ref "2607051621" :adr/one-line "murakumo AGPL 化 + L0-L3 4層収益モデル + treasury 切り出し（P0 クリティカルパスの正本）"
+   :adr/feeds [:infra.murakumo-lattice :infra.treasury :infra.l1-self-registration :infra.l2-protocol-fee]}
+  {:adr/ref "2607062330+2607062400" :adr/one-line "kototama actor:host ABI（JVM/Chicory + browser actor-host.js）— .kotoba→wasm E2E 実証"
+   :adr/feeds [:infra.kototama-host :infra.kotoba-wasm-emit]}
+  {:adr/ref "2607072530+2607072600" :adr/one-line "6511 保険 / 6492 与信の kototama wasm 実配備 — compiled 衛星 2 本の正体"
+   :adr/feeds [:wave0.insurance :wave0.finance-credit]}
+  {:adr/ref "2607062210" :adr/one-line "humanoid embodiment 発注 — honest-default で Otete のみ発注可。EMS 量産は business follow-up のまま"
+   :adr/feeds [:robot.ems-manufacturing :robot.hitogata-fixture]}
+  {:adr/ref "2607110600" :adr/one-line "4690 商社 general trading actor 起票（実装未着手）"
+   :adr/feeds [:wave2.trade-retail]}
+  {:adr/ref "2607111000" :adr/one-line "cloud-mamori 被害者支援 venture #11 — governed action は etzhayyim cluster、事業フロントは itonami portfolio"
+   :adr/feeds [:social.mamori]}
+  {:adr/ref "2607121000" :adr/one-line "ISIC/ISCO 逆トポソート 5-wave rollout 計画 — 本モデルの入力。V=TAM×fanout×automatability×wedge（価値捕捉目的）"
+   :adr/feeds [:wave0.finance-credit :wave2.labor-exchange :wave3.food-mfg]}
+  {:adr/ref "foreign:2605142200+2605142300" :adr/one-line "Giemon ブランド確立 + Kaigo 介護応用（ai-gftd-apps-gftdcojp 側）"
+   :adr/feeds [:robot.giemon-otete :wave4.healthcare-care]}]
+
+ :gates
+ [{:gate/id :gate.robotics :gate/open false
+   :gate/label "robotics premise gate（ADR-2607011000）"
+   :gate/opens-when "robot.fleet ストック > 0 かつ governor 運用実績（無事故 audit ledger）"
+   :gate/blocks [:wave3.agriculture :wave3.food-mfg :wave3.textiles-apparel
+                 :wave3.construction :wave3.manufacturing]}
+  {:gate/id :gate.trust :gate/open false
+   :gate/label "対人サービス信頼 gate（Wave 4）"
+   :gate/opens-when "wave0-2 の運用実績 + 事故ゼロ台帳 + 社会保護実績（mamori 等）の蓄積"
+   :gate/blocks [:wave4.healthcare-care :wave4.education :wave4.hospitality-food]}]
+
+ :nodes
+ [;; ---- infra（根） ----
+  {:node/id :infra.murakumo-lattice :node/kind :infra :node/status :live
+   :node/label "murakumo WASM lattice + DID/CID overlay"
+   :node/labor-share 0.0 :node/automatability-now 1.0 :node/asset-wedge 1.0}
+  {:node/id :infra.treasury :node/kind :infra :node/status :live
+   :node/label "treasury（USDC→Gnosis Safe 実稼働 + kotoba-lang/treasury 委譲済み。KV台帳関数の未移行は amendment による意図的スコープ外 — PR local-murakumo#31 merged 2026-07-05）"
+   :node/labor-share 0.0 :node/automatability-now 1.0 :node/asset-wedge 1.0}
+  {:node/id :infra.kototama-host :node/kind :infra :node/status :live
+   :node/label "kototama actor:host（JVM/Chicory + browser）"
+   :node/labor-share 0.0 :node/automatability-now 1.0 :node/asset-wedge 1.0}
+  {:node/id :infra.kotoba-wasm-emit :node/kind :infra :node/status :live
+   :node/label "kotoba wasm emit（.kotoba→wasm コンパイラ）"
+   :node/labor-share 0.0 :node/automatability-now 1.0 :node/asset-wedge 1.0}
+  {:node/id :infra.itonami-cloud :node/kind :infra :node/status :live
+   :node/label "itonami.cloud（Cloudflare Pages + CACAO/did:key。単一テナント）"
+   :node/labor-share 0.0 :node/automatability-now 1.0 :node/asset-wedge 1.0}
+  {:node/id :infra.wasm-factory :node/kind :infra :node/status :in-progress
+   :node/label "kernel 工場（実態 = cljs-first safety-kernel 抽出 discipline、owner 決定 07-12。wave-0 金融 18 衛星中 9 本着手済み・fleet 進行中。.kotoba emit は意図的未配線 — 扉は ADR-2607122300 で開けてある）"
+   :node/labor-share 0.0 :node/automatability-now 0.9 :node/asset-wedge 0.7
+   :node/lead-time-months 2}
+  {:node/id :infra.l1-self-registration :node/kind :infra :node/status :live
+   :node/label "L1 自己登録 — 実稼働確認済み 2026-07-12（POST register → 401 CACAO 要求で routed、open-business 動的版 count16。PR cloud-itonami#29 merged 2026-07-05。ADR-2607121000 の「未開通」は stale — 未開通なのはフローでなく外部登録数）"
+   :node/labor-share 0.0 :node/automatability-now 0.9 :node/asset-wedge 1.0}
+  {:node/id :infra.first-external-tenant :node/kind :infra :node/status :missing
+   :node/label "外部登録 1 社・実収益 > 0（R1 の断点）"
+   :node/labor-share 0.0 :node/automatability-now 0.7 :node/asset-wedge 0.2}
+  {:node/id :infra.market-entry-api :node/kind :infra :node/status :live
+   :node/label "market-entry gateway — 本番稼働 (ADR-2607122400+addendum: 188 か国、incorporation 101 か国 (52.1%)、compliance 17 か国/20 sources 満杯 (guard FULL) — loop tick 1-38)。POST propose-assess 設計固定済み (ADR-2607122500)"
+   :node/labor-share 0.0 :node/automatability-now 0.9 :node/asset-wedge 1.0}
+  {:node/id :infra.l2-protocol-fee :node/kind :infra :node/status :missing
+   :node/label "L2 オンチェーン protocol fee streaming"
+   :node/labor-share 0.0 :node/automatability-now 0.9 :node/asset-wedge 0.3}
+
+  ;; ---- robotics（embodiment チェーン） ----
+  {:node/id :robot.governor-lib :node/kind :robotics :node/status :live
+   :node/label "kotoba-lang/robotics（policy-not-control governor gate）"
+   :node/labor-share 0.0 :node/automatability-now 1.0 :node/asset-wedge 1.0}
+  {:node/id :robot.giemon-otete :node/kind :robotics :node/status :shipping
+   :node/label "giemon Otete（6軸アーム+クローラ。唯一発注可能な身体）"
+   :node/labor-share 0.0 :node/automatability-now 0.8 :node/asset-wedge 1.0}
+  {:node/id :robot.hitogata-fixture :node/kind :enabler :node/status :missing
+   :node/label "Hitogata articulation fixture + BOM（人型の実 BOM 化）"
+   :node/labor-share 0.0 :node/automatability-now 0.5 :node/asset-wedge 0.2
+   :node/lead-time-months 9}
+  {:node/id :robot.giemon-hitogata :node/kind :robotics :node/status :in-design
+   :node/label "giemon Hitogata（17軸二足）"
+   :node/labor-share 0.0 :node/automatability-now 0.4 :node/asset-wedge 0.2
+   :node/lead-time-months 12}
+  {:node/id :robot.ems-manufacturing :node/kind :enabler :node/status :missing
+   :node/label "EMS 実契約・量産経路（yoro-supply Pregel 発注 5-cell 再利用）"
+   :node/labor-share 0.0 :node/automatability-now 0.3 :node/asset-wedge 0.3
+   :node/lead-time-months 9}
+  {:node/id :robot.fleet :node/kind :robotics :node/status :missing
+   :node/label "実稼働 robot fleet（stock ≈ 0）"
+   :node/labor-share 0.0 :node/automatability-now 0.2 :node/asset-wedge 0.1
+   :node/lead-time-months 18}
+
+  ;; ---- enabler（衣食住 scaffold） ----
+  {:node/id :enabler.ishokuju-scaffolds :node/kind :enabler :node/status :done
+   :node/label "衣食住 scaffold 起票 — 完了 (ADR-2607122200: isic-1010/1311/1410/4100 :blueprint 衛星 + registry 昇格)"
+   :node/labor-share 0.0 :node/automatability-now 0.95 :node/asset-wedge 1.0
+   :node/lead-time-months 1}
+
+  ;; ---- wave 0（貨幣・情報の根） ----
+  {:node/id :wave0.finance-credit :node/kind :vertical :node/status :built-unwired :node/wave 0
+   :node/isic "6419/6492" :node/label "銀行・与信（wasm compiled 済・未配線）"
+   :node/labor-share 0.015 :node/automatability-now 0.9 :node/asset-wedge 1.0}
+  {:node/id :wave0.insurance :node/kind :vertical :node/status :built-unwired :node/wave 0
+   :node/isic "6511/6512" :node/label "保険（wasm compiled 済・underwriting governor 実装済）"
+   :node/labor-share 0.005 :node/automatability-now 0.9 :node/asset-wedge 1.0}
+  {:node/id :wave0.capital-markets :node/kind :vertical :node/status :spec :node/wave 0
+   :node/isic "6611/6612" :node/label "市場管理・仲介（kotoba log = 取引台帳）"
+   :node/labor-share 0.002 :node/automatability-now 0.8 :node/asset-wedge 0.6}
+  {:node/id :wave0.telecom-data :node/kind :vertical :node/status :spec :node/wave 0
+   :node/isic "6110/6190/6311(+6201 gap)" :node/label "通信・データ（murakumo.cloud 自体の ISIC 登録含む）"
+   :node/labor-share 0.01 :node/automatability-now 0.7 :node/asset-wedge 0.9}
+  {:node/id :wave0.finance-remaining :node/kind :vertical :node/status :in-progress :node/wave 0
+   :node/isic "div 64-66 全 18 衛星（kernel 済 9: 6419/6492/6499/6511/6512/6520/6611/6621/6622。残 9: 6411/6420/6430/6491/6530/6612/6619/6629/6630）"
+   :node/label "Wave0 金融の kernel 複製（fleet 進行中 — 本セッションは衝突回避のため不介入）"
+   :node/labor-share 0.008 :node/automatability-now 0.85 :node/asset-wedge 0.8}
+
+  ;; ---- wave 1（統治・専門職・エネルギー） ----
+  {:node/id :wave1.incorporation-compliance :node/kind :vertical :node/status :spec :node/wave 1
+   :node/isic "6910×8291×iso3166" :node/label "世界法人設立 × compliance gateway（223 か国資産）"
+   :node/labor-share 0.005 :node/automatability-now 0.8 :node/asset-wedge 0.9}
+  {:node/id :wave1.energy :node/kind :vertical :node/status :spec :node/wave 1
+   :node/isic "3510/3512" :node/label "電力（lattice 電力需要と垂直統合）"
+   :node/labor-share 0.01 :node/automatability-now 0.35 :node/asset-wedge 0.3}
+  {:node/id :wave1.professional :node/kind :vertical :node/status :spec :node/wave 1
+   :node/isic "69-74" :node/label "士業・専門職サービス"
+   :node/labor-share 0.03 :node/automatability-now 0.7 :node/asset-wedge 0.4}
+  {:node/id :wave1.public-admin :node/kind :vertical :node/status :spec :node/wave 1
+   :node/isic "8411" :node/label "公共行政（jpn-*/usa-* 省庁 scaffold 群あり）"
+   :node/labor-share 0.04 :node/automatability-now 0.5 :node/asset-wedge 0.6}
+
+  ;; ---- wave 2（流通・調整・労働市場） ----
+  {:node/id :wave2.logistics :node/kind :vertical :node/status :spec :node/wave 2
+   :node/isic "5210/5224/4920" :node/label "物流編成（編成は agent、実搬送は robot）"
+   :node/labor-share 0.07 :node/automatability-now 0.5 :node/asset-wedge 0.5}
+  {:node/id :wave2.trade-retail :node/kind :vertical :node/status :spec :node/wave 2
+   :node/isic "45-47（4690 商社 ADR 済未実装, 4711）" :node/label "商流・小売"
+   :node/labor-share 0.14 :node/automatability-now 0.45 :node/asset-wedge 0.5}
+  {:node/id :wave2.real-estate :node/kind :vertical :node/status :spec :node/wave 2
+   :node/isic "68" :node/label "不動産"
+   :node/labor-share 0.005 :node/automatability-now 0.6 :node/asset-wedge 0.4}
+  {:node/id :wave2.labor-exchange :node/kind :vertical :node/status :spec :node/wave 2
+   :node/isic "7810" :node/label "労働市場 = 人→agent→robot 置換取引所（解放の伝達機構）"
+   :node/labor-share 0.005 :node/automatability-now 0.8 :node/asset-wedge 0.6}
+  {:node/id :wave2.isco-cognitive :node/kind :vertical :node/status :blueprint :node/wave 2
+   :node/isic "ISCO 24/25/35/41-44(+261)" :node/label "純認知職の agent 化（wave-0 batch #8 完結、並行セッション含む。ISCO 全体: impl 144 / bp 0 / spec 292。wave0 55/55 完了。ADR-2607122700 Addenda 7-82）"
+   :node/labor-share 0.08 :node/automatability-now 0.85 :node/asset-wedge 0.5}
+
+  ;; ---- wave 3（生産・建設 = 衣食住の生産側。robotics gate） ----
+  {:node/id :wave3.agriculture :node/kind :vertical :node/status :spec :node/wave 3
+   :node/isic "01-03" :node/label "農業（食の根。世界最大の労働シェア）"
+   :node/labor-share 0.26 :node/automatability-now 0.1 :node/asset-wedge 0.3
+   :node/gate :gate.robotics}
+  {:node/id :wave3.food-mfg :node/kind :vertical :node/status :blueprint :node/wave 3
+   :node/isic "C10-12" :node/label "食品製造（食。~$8T。1010 :blueprint 衛星あり — ADR-2607122200）"
+   :node/labor-share 0.015 :node/automatability-now 0.15 :node/asset-wedge 0.25
+   :node/gate :gate.robotics}
+  {:node/id :wave3.textiles-apparel :node/kind :vertical :node/status :blueprint :node/wave 3
+   :node/isic "C13-14" :node/label "繊維・衣類（衣。1311/1410 :blueprint 衛星あり — ADR-2607122200）"
+   :node/labor-share 0.02 :node/automatability-now 0.15 :node/asset-wedge 0.25
+   :node/gate :gate.robotics}
+  {:node/id :wave3.construction :node/kind :vertical :node/status :blueprint :node/wave 3
+   :node/isic "F41-43（4100 :blueprint 衛星あり。4211/4321/4322 実装済）" :node/label "建設（住）"
+   :node/labor-share 0.075 :node/automatability-now 0.1 :node/asset-wedge 0.4
+   :node/gate :gate.robotics}
+  {:node/id :wave3.manufacturing :node/kind :vertical :node/status :partial-scaffold :node/wave 3
+   :node/isic "10-33 その他" :node/label "一般製造（isic-2xxx 衛星多数）"
+   :node/labor-share 0.10 :node/automatability-now 0.15 :node/asset-wedge 0.5
+   :node/gate :gate.robotics}
+
+  ;; ---- wave 4（対人サービス。trust gate） ----
+  {:node/id :wave4.healthcare-care :node/kind :vertical :node/status :spec :node/wave 4
+   :node/isic "8610/8710/8810" :node/label "医療・介護（長期 TAM 最大。日本高齢化くさび。giemon Kaigo）"
+   :node/labor-share 0.045 :node/automatability-now 0.25 :node/asset-wedge 0.4
+   :node/gate :gate.trust}
+  {:node/id :wave4.education :node/kind :vertical :node/status :spec :node/wave 4
+   :node/isic "85" :node/label "教育"
+   :node/labor-share 0.05 :node/automatability-now 0.5 :node/asset-wedge 0.4
+   :node/gate :gate.trust}
+  {:node/id :wave4.hospitality-food :node/kind :vertical :node/status :spec :node/wave 4
+   :node/isic "55-56" :node/label "宿泊・外食（食のサービス側）"
+   :node/labor-share 0.045 :node/automatability-now 0.15 :node/asset-wedge 0.4
+   :node/gate :gate.trust}
+
+  ;; ---- social / stock ----
+  {:node/id :social.mamori :node/kind :social :node/status :building
+   :node/label "cloud-mamori 被害者支援 venture #11（信頼ストックの供給源）"
+   :node/labor-share 0.001 :node/automatability-now 0.6 :node/asset-wedge 0.7}
+  {:node/id :stock.liberated-labor :node/kind :stock :node/status :accumulating
+   :node/label "W = 解放された労働時間ストック（目的関数）"
+   :node/labor-share 0.0 :node/automatability-now 0.0 :node/asset-wedge 0.0}]
+
+ :edges
+ [;; infra 配線
+  {:edge/from :infra.kotoba-wasm-emit :edge/to :infra.wasm-factory :edge/kind :requires}
+  {:edge/from :infra.kototama-host :edge/to :infra.wasm-factory :edge/kind :requires}
+  {:edge/from :infra.murakumo-lattice :edge/to :infra.wasm-factory :edge/kind :requires}
+  {:edge/from :infra.itonami-cloud :edge/to :infra.l1-self-registration :edge/kind :requires}
+  {:edge/from :infra.treasury :edge/to :infra.l1-self-registration :edge/kind :requires}
+  {:edge/from :infra.l1-self-registration :edge/to :infra.first-external-tenant :edge/kind :requires}
+  {:edge/from :wave0.finance-credit :edge/to :infra.first-external-tenant :edge/kind :requires}
+  {:edge/from :infra.first-external-tenant :edge/to :infra.l2-protocol-fee :edge/kind :requires}
+  {:edge/from :infra.itonami-cloud :edge/to :infra.market-entry-api :edge/kind :requires}
+  {:edge/from :infra.market-entry-api :edge/to :wave1.incorporation-compliance :edge/kind :enables}
+  ;; wave0 の運転基盤
+  {:edge/from :infra.murakumo-lattice :edge/to :wave0.finance-credit :edge/kind :requires}
+  {:edge/from :infra.kototama-host :edge/to :wave0.finance-credit :edge/kind :requires}
+  {:edge/from :infra.treasury :edge/to :wave0.finance-credit :edge/kind :requires}
+  {:edge/from :infra.murakumo-lattice :edge/to :wave0.insurance :edge/kind :requires}
+  {:edge/from :infra.kototama-host :edge/to :wave0.insurance :edge/kind :requires}
+  {:edge/from :infra.murakumo-lattice :edge/to :wave0.capital-markets :edge/kind :requires}
+  {:edge/from :infra.treasury :edge/to :wave0.capital-markets :edge/kind :requires}
+  {:edge/from :infra.murakumo-lattice :edge/to :wave0.telecom-data :edge/kind :requires}
+  {:edge/from :infra.murakumo-lattice :edge/to :wave0.finance-remaining :edge/kind :requires}
+  {:edge/from :infra.treasury :edge/to :wave0.finance-remaining :edge/kind :requires}
+  {:edge/from :infra.wasm-factory :edge/to :wave0.finance-remaining :edge/kind :enables}
+  {:edge/from :infra.wasm-factory :edge/to :wave0.capital-markets :edge/kind :enables}
+  {:edge/from :infra.wasm-factory :edge/to :wave0.telecom-data :edge/kind :enables}
+  ;; 決済（6419/6492）は全 vertical の必須運転入力（ADR-2607121000 Wave0 論理）
+  {:edge/from :wave0.finance-credit :edge/to :wave1.incorporation-compliance :edge/kind :requires}
+  {:edge/from :wave0.finance-credit :edge/to :wave1.energy :edge/kind :requires}
+  {:edge/from :wave0.finance-credit :edge/to :wave1.professional :edge/kind :requires}
+  {:edge/from :wave0.finance-credit :edge/to :wave1.public-admin :edge/kind :requires}
+  {:edge/from :wave0.finance-credit :edge/to :wave2.logistics :edge/kind :requires}
+  {:edge/from :wave0.finance-credit :edge/to :wave2.trade-retail :edge/kind :requires}
+  {:edge/from :wave0.finance-credit :edge/to :wave2.real-estate :edge/kind :requires}
+  {:edge/from :wave0.finance-credit :edge/to :wave2.labor-exchange :edge/kind :requires}
+  {:edge/from :wave0.finance-credit :edge/to :wave3.agriculture :edge/kind :requires}
+  {:edge/from :wave0.finance-credit :edge/to :wave3.food-mfg :edge/kind :requires}
+  {:edge/from :wave0.finance-credit :edge/to :wave3.textiles-apparel :edge/kind :requires}
+  {:edge/from :wave0.finance-credit :edge/to :wave3.construction :edge/kind :requires}
+  {:edge/from :wave0.finance-credit :edge/to :wave3.manufacturing :edge/kind :requires}
+  {:edge/from :wave0.finance-credit :edge/to :wave4.healthcare-care :edge/kind :requires}
+  {:edge/from :wave0.finance-credit :edge/to :wave4.education :edge/kind :requires}
+  {:edge/from :wave0.finance-credit :edge/to :wave4.hospitality-food :edge/kind :requires}
+  ;; 保険はリスク重い vertical の必須入力
+  {:edge/from :wave0.insurance :edge/to :wave2.logistics :edge/kind :requires}
+  {:edge/from :wave0.insurance :edge/to :wave1.energy :edge/kind :requires}
+  {:edge/from :wave0.insurance :edge/to :wave3.agriculture :edge/kind :requires}
+  {:edge/from :wave0.insurance :edge/to :wave3.construction :edge/kind :requires}
+  {:edge/from :wave0.insurance :edge/to :wave3.manufacturing :edge/kind :requires}
+  {:edge/from :wave0.insurance :edge/to :wave4.healthcare-care :edge/kind :requires}
+  ;; 通信・データは調整系の必須入力
+  {:edge/from :wave0.telecom-data :edge/to :wave2.logistics :edge/kind :requires}
+  {:edge/from :wave0.telecom-data :edge/to :wave2.trade-retail :edge/kind :requires}
+  {:edge/from :wave0.telecom-data :edge/to :wave2.labor-exchange :edge/kind :requires}
+  {:edge/from :wave0.telecom-data :edge/to :wave2.isco-cognitive :edge/kind :requires}
+  ;; wave1 → 下流
+  {:edge/from :wave1.incorporation-compliance :edge/to :wave2.labor-exchange :edge/kind :requires}
+  {:edge/from :wave1.incorporation-compliance :edge/to :wave2.trade-retail :edge/kind :requires}
+  {:edge/from :wave1.energy :edge/to :wave3.agriculture :edge/kind :requires}
+  {:edge/from :wave1.energy :edge/to :wave3.food-mfg :edge/kind :requires}
+  {:edge/from :wave1.energy :edge/to :wave3.textiles-apparel :edge/kind :requires}
+  {:edge/from :wave1.energy :edge/to :wave3.construction :edge/kind :requires}
+  {:edge/from :wave1.energy :edge/to :wave3.manufacturing :edge/kind :requires}
+  ;; wave2 → 下流（物流は生産の必須運転入力）
+  {:edge/from :wave2.logistics :edge/to :wave2.trade-retail :edge/kind :requires}
+  {:edge/from :wave2.logistics :edge/to :wave3.agriculture :edge/kind :requires}
+  {:edge/from :wave2.logistics :edge/to :wave3.food-mfg :edge/kind :requires}
+  {:edge/from :wave2.logistics :edge/to :wave3.textiles-apparel :edge/kind :requires}
+  {:edge/from :wave2.logistics :edge/to :wave3.construction :edge/kind :requires}
+  {:edge/from :wave2.logistics :edge/to :wave3.manufacturing :edge/kind :requires}
+  {:edge/from :wave2.logistics :edge/to :wave4.hospitality-food :edge/kind :requires}
+  ;; 7810 = 置換チャネル（人→agent→robot）
+  {:edge/from :wave2.labor-exchange :edge/to :wave2.isco-cognitive :edge/kind :enables}
+  {:edge/from :wave2.labor-exchange :edge/to :wave3.agriculture :edge/kind :enables}
+  {:edge/from :wave2.labor-exchange :edge/to :wave3.food-mfg :edge/kind :enables}
+  {:edge/from :wave2.labor-exchange :edge/to :wave3.textiles-apparel :edge/kind :enables}
+  {:edge/from :wave2.labor-exchange :edge/to :wave3.construction :edge/kind :enables}
+  {:edge/from :wave2.labor-exchange :edge/to :wave3.manufacturing :edge/kind :enables}
+  {:edge/from :wave2.labor-exchange :edge/to :wave4.healthcare-care :edge/kind :enables}
+  {:edge/from :infra.murakumo-lattice :edge/to :wave2.isco-cognitive :edge/kind :requires}
+  ;; robotics チェーン
+  {:edge/from :robot.hitogata-fixture :edge/to :robot.giemon-hitogata :edge/kind :requires}
+  {:edge/from :robot.giemon-hitogata :edge/to :robot.ems-manufacturing :edge/kind :requires}
+  {:edge/from :robot.giemon-otete :edge/to :robot.ems-manufacturing :edge/kind :enables}
+  {:edge/from :robot.governor-lib :edge/to :robot.fleet :edge/kind :requires}
+  {:edge/from :robot.ems-manufacturing :edge/to :robot.fleet :edge/kind :requires}
+  {:edge/from :robot.giemon-otete :edge/to :robot.fleet :edge/kind :enables}
+  {:edge/from :infra.l2-protocol-fee :edge/to :robot.ems-manufacturing :edge/kind :enables}
+  {:edge/from :robot.fleet :edge/to :wave3.agriculture :edge/kind :requires}
+  {:edge/from :robot.fleet :edge/to :wave3.food-mfg :edge/kind :requires}
+  {:edge/from :robot.fleet :edge/to :wave3.textiles-apparel :edge/kind :requires}
+  {:edge/from :robot.fleet :edge/to :wave3.construction :edge/kind :requires}
+  {:edge/from :robot.fleet :edge/to :wave3.manufacturing :edge/kind :requires}
+  {:edge/from :robot.fleet :edge/to :wave4.healthcare-care :edge/kind :enables}
+  ;; 衣食住 scaffold（build-time enabler。gate 無し・安い）
+  {:edge/from :enabler.ishokuju-scaffolds :edge/to :wave3.food-mfg :edge/kind :enables}
+  {:edge/from :enabler.ishokuju-scaffolds :edge/to :wave3.textiles-apparel :edge/kind :enables}
+  {:edge/from :enabler.ishokuju-scaffolds :edge/to :wave3.construction :edge/kind :enables}
+  ;; social
+  {:edge/from :infra.itonami-cloud :edge/to :social.mamori :edge/kind :requires}
+  {:edge/from :social.mamori :edge/to :wave4.healthcare-care :edge/kind :enables}
+  ;; SD ストック流入（トポソート対象外）
+  {:edge/from :wave2.labor-exchange :edge/to :stock.liberated-labor :edge/kind :flows}
+  {:edge/from :wave2.isco-cognitive :edge/to :stock.liberated-labor :edge/kind :flows}]
+
+ :loops
+ [{:loop/id :loop.r1-revenue-flywheel :loop/polarity :reinforcing
+   :loop/label "R1 収益フライホイール: 登録→収益→複製資本→vertical 増→登録"
+   :loop/nodes [:infra.l1-self-registration :infra.first-external-tenant
+                :infra.l2-protocol-fee :infra.wasm-factory :wave0.finance-remaining]
+   :loop/status :broken :loop/broken-at :infra.first-external-tenant
+   :loop/cycle-time-months 3}
+  {:loop/id :loop.r2-replication-learning :loop/polarity :reinforcing
+   :loop/label "R2 複製学習: vertical を1本 wasm 化するたび次の限界コストが下がる（現在 2/646）"
+   :loop/nodes [:infra.wasm-factory :wave0.finance-remaining :wave0.capital-markets]
+   :loop/status :inactive :loop/cycle-time-months 2}
+  {:loop/id :loop.r3-robot-fleet :loop/polarity :reinforcing
+   :loop/label "R3 robot 艦隊: 収益→capex→fleet→物理 vertical 収益（最長遅延 — enabler は今日着手）"
+   :loop/nodes [:infra.l2-protocol-fee :robot.ems-manufacturing :robot.fleet :wave3.manufacturing]
+   :loop/status :inactive :loop/cycle-time-months 18}
+  {:loop/id :loop.r4-labor-transmission :loop/polarity :reinforcing
+   :loop/label "R4 解放の伝達: 7810 置換→W 増→所得継続・社会的受容→trust→wave4 開門→W 増"
+   :loop/nodes [:wave2.labor-exchange :wave2.isco-cognitive :stock.liberated-labor :social.mamori]
+   :loop/status :inactive :loop/cycle-time-months 12}
+  {:loop/id :loop.b1-trust-gate :loop/polarity :balancing
+   :loop/label "B1 信頼 gate: 事故→信頼毀損→wave4 閉鎖（解放の上限を規定）"
+   :loop/nodes [:wave4.healthcare-care :social.mamori]
+   :loop/status :structural :loop/cycle-time-months 6}
+  {:loop/id :loop.b2-safety-governor :loop/polarity :balancing
+   :loop/label "B2 安全 governor: actuation 拒否権が throughput を意図的に制限（policy, not control）"
+   :loop/nodes [:robot.governor-lib :robot.fleet]
+   :loop/status :active :loop/cycle-time-months 1}
+  {:loop/id :loop.b3-capital-runway :loop/polarity :balancing
+   :loop/label "B3 資本制約: 収益ゼロのまま capex 先行→runway 縮小（現在 binding）"
+   :loop/nodes [:infra.first-external-tenant :robot.ems-manufacturing]
+   :loop/status :active :loop/cycle-time-months 3}]}

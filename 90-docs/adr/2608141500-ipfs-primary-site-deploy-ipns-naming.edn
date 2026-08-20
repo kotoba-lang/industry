@@ -1,0 +1,138 @@
+[{:db/id -1
+  :adr/id "ADR-2608141500"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "accepted"
+  :adr/date "2026-08-14"
+  :adr/last_verified "2026-08-15"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/title "ADR-2608141500: 公開 URL は {cid}.ipfs.itonami.cloud と {k51}.ipns.itonami.cloud。app/{repo} の deploy 既定は k51。{org}.itonami.cloud/{repo} は目次であり origin ではない"
+  :adr/topic "ipfs-primary-site-deploy"
+  :adr/repos ["orgs/network-awai/cloud-itonami"
+              "orgs/net-kotobase/ipfs"
+              "orgs/cloud-itonami/cloud-itonami-app"
+              "orgs/cloud-itonami/shirohan"]
+  :adr/related ["90-docs/adr/2608140500-ipfs-ipns-subdomain-execution-origin.edn"
+                "90-docs/adr/2607301300-itonami-cloud-org-repo-site-publishing-rule.edn"
+                "90-docs/adr/2608057000-org-is-a-host-not-a-path-segment.edn"]
+  :adr/supersedes ["90-docs/adr/2607301300-itonami-cloud-org-repo-site-publishing-rule.edn#bytes-in-pages"
+                   "90-docs/adr/2608140500-ipfs-ipns-subdomain-execution-origin.edn#human-url-is-org-repo"]
+  :adr/authoritative_for
+  ["公開してよい実行 URL は https://{cidv1b32}.ipfs.itonami.cloud/ （この版）と https://{k51}.ipns.itonami.cloud/ （名前。app/{repo} の deploy 既定）"
+   "k51 は Ed25519 の ipns.core/pubkey->name。R2 ipns/<k51> は protobuf IpnsEntry。JSON pointer は 502"
+   "itonami deploy app/{repo} は k51 origin を印刷する（--no-ipns で外す）。--file は CID-only が既定。org/repo ホストを『公開しました』と印刷しない"
+   "{org}.itonami.cloud/{repo} は fleet 目次。origin ではない。github.io 相当を正本にしない"
+   "bytes は R2 ipld/<cid>"
+   "app.itonami.cloud は fleet-dispatch のまま。{cid}.itonami.cloud は使わない"]
+  :adr/body "# ADR-2608141500: 公開 URL は CID と IPNS name
+
+## Status
+accepted — 2026-08-14（15:10 の決定で、人向け正本を org/repo から CID/k51 へ移した）。2026-08-15: `app/{repo}` の `itonami deploy` 既定を k51 にした。
+
+## Context
+
+ADR-2608140500 は実行 origin を `{cid}.ipfs.itonami.cloud` / `{k51}.ipns.itonami.cloud` にした。人向け URL は `{org}.itonami.cloud/{repo}` のまま、と書いてあった。
+
+公開の実体はまだ Cloudflare Pages（ADR-2607301300 『bytes は Pages。R2 ではない』）。github.io と同じ形である。
+
+2026-08-14 15:10 の問い: 安全性と汎用性を考えると、公開は CID か k51 の方が良く、github.io より CID/IPNS の方が安定する。
+
+それは正しい。org ホストを 302 pointer として残す案も、まだ github.io を『人が開く URL』にしている。
+
+## Decision
+
+### 1. 公開してよい URL は二つだけ
+
+必須（この版）:
+
+`https://{cidv1b32}.ipfs.itonami.cloud/`
+
+名前（再 deploy しても origin は同じ）:
+
+`https://{k51}.ipns.itonami.cloud/`
+
+**`app/{repo}` では k51 が deploy の既定。** `itonami deploy app/shirohan` は IPNS を付ける。`--no-ipns` で外す。`--file` と `app` 以外の org は CID-only が既定で、`--ipns` が opt-in。鍵が無ければ fail-closed（名前を発明しない）。
+
+`itonami deploy` が印刷するのは CID origin と、付けたなら k51 origin。org/repo ホストを『公開しました』と印刷しない。
+
+同じ bytes は `ipfs.kotobase.net/ipfs/{cid}` でも取れるが、そこは HTML を出さない（ADR-2608140500）。
+
+### 2. なぜ org/repo より CID / k51 か
+
+`{org}.itonami.cloud/{repo}` は `username.github.io/repo` と同じクラスである。
+
+- **安全性。** org ホストは、その org の全 repo が同一 origin。inkan の XSS が shirohan の storage を読む。github.io も user 単位で同じ。CID origin は版ごと、k51 origin はサイトごと（鍵ごと）に分かれる。ADR-2608057000 が org をホストにした理由（cockpit とサイトを分ける）の続きで、repo 同士も分ける。
+- **汎用性。** sites.edn に載っていない CID も公開できる。GitHub アカウントも org 登録も要らない。
+- **安定性。** github.io は GitHub と DNS に依存する。CID は内容。IPNS は鍵が authority（`ipns.core` — 登録局が無い）。itonami.cloud の Worker が止まっても、同じ CID は他 gateway で開ける。
+
+`{cid}.itonami.cloud` は使わない（org ホストと衝突）。`app.itonami.cloud` は fleet-dispatch のまま。
+
+### 3. `{org}.itonami.cloud/{repo}` は目次
+
+残す。fleet が『この repo のいまの CID / k51 はどれか』を索引する面。origin ではない。HTML をここで実行しない。付けてよいのは 302 か、CID/k51 へのリンク一覧。未登録は 404（KRP §4 rule 8）。
+
+sites.edn は『fleet が何を索引するか』であって、origin を決めるものではない。
+
+### 4. bytes と名前
+
+deploy は generator（あるなら）でサイトを作り、UnixFS に pack し、R2 `ipld/<cid>` に書く。Pages `public/sites/…` は正本ではない。
+
+**1 つの公開物に 1 つの Ed25519。** `k51…` は `ipns.core/pubkey->name`（名前が鍵）。秘密鍵は kagi（item は宣言する。org 名から導出しない）。shirohan の item は `itonami-site-ipns/app/shirohan`。2026-08-15 実測でこの item は kagi に無い。無い種で別 seed を発行すると別 k51 になるので、この公開名を保つなら元の 32-byte を戻す。新しい名前に替える判断は別である。
+
+R2 `ipns/<k51>` は **protobuf `IpnsEntry`**（`ipns.record`）。Worker は名前から公開鍵を復元し `signatureV2` を検証してから `/ipfs/<cid>` を返す。JSON pointer・署名なし・他人の鍵は **502**。R2 に書けても他人の k51 は奪えない。公開 DHT announce はこの ADR の外。`ipns.head` JSON を DHT にも origin にも載せない。
+
+実測 2026-08-15: Worker `0.2.6`。UnixFS directory walk は R2 から動く。shirohan の公開名は `https://k51qzi5uqu5dgxdm1x95y3dk2nzj9xnz7ntyv08jbrzfacpj53mncoebqe3m92.ipns.itonami.cloud/`（2026-08-14 の鍵。operator JSON `k51itonamishirohanv1` は拒否対象）。
+
+### 5. コマンド
+
+実装場所は `network-awai/cloud-itonami`。cloud-itonami-app の `bin/itonami sites *` はローカル下書き。portfolio `clojure -M:itonami` ではない。
+
+```
+itonami deploy app/{repo} [--no-ipns]
+itonami deploy {org}/{repo} [--ipns]
+itonami deploy --file <html> [--ipns]
+```
+
+`--file` は sites.edn に無い単体。汎用側。app の既定は k51。key 宣言（`:ipns-key-item` / `--seed` / `ITONAMI_IPNS_SEED`）が無ければ fail-closed。
+
+### 6. pack の段階
+
+- **v1**: 単一 raw（`bafkrei…`、root `/`）。inlined HTML。
+- **v2（着地）**: UnixFS directory（`bafybei…`）。Worker が R2 から DAG walk。ipfs.io に実行を依存させない。
+
+## 残すもの（この ADR の外）
+
+- DNSLink TXT と subdomain 符号化
+- 公開 IPNS DHT announce
+- PSL 登録
+- HEAD を Worker で受ける
+- catalog `/app/{repo}/` の 302（いまは 200 の目次。k51 に HTML が載ってから）
+
+## Resume (2026-08-15 close)
+
+Product は GitHub default-branch main に着地済み（API merge。PR は無い）。
+
+- `cloud-itonami/shirohan` `ed53c3cc` — G1 joins + `split-long-cubics`（93 tests / 234 assertions）
+- `network-awai/cloud-itonami` `87c6be87` catalog G1 on Pages; tip `8a0653f3` が k51 default deploy
+- この ADR + secrets map は `2684776` / merge `1a4b59cb`（main の祖先）
+
+Live G1 は Pages catalog `https://itonami.cloud/sites/app/shirohan/`。この k51 はまだ古い inlined HTML。`/shirohan/geom.cljs` に `g1-smooth-joins` が載るまで catalog を 302 しない。
+
+Blocker: kagi item `itonami-site-ipns/app/shirohan` が無い。新しい seed を発行しない（別 k51 になる）。
+
+種を戻したあとの最初のコマンド:
+
+```
+git worktree add -b agent/shirohan-k51-publish /tmp/cloud-itonami-k51-pub origin/main
+ITONAMI_IPFS_ROOT=/tmp/wt-ipfs-ipns-r2 nbb scripts/deploy-site.cljs app/shirohan --dry-run
+```
+
+`/tmp/wt-ipfs-ipns-r2` は他セッション。消さない。superproject `agent/shirohan-geom-live` はこの作業ではない。
+
+## Consequences
+
+- ADR-2607301300 の『bytes は Pages』は supersede。宣言レジストリ・未登録 404 は目次面として残す。
+- ADR-2608140500 の『人向け URL は org/repo のまま』は supersede。実行 origin のホスト形はそのまま。
+- 既存 Pages サイトは目次に残ってよい。`app/{repo}` の公開リンクは k51。
+"}]

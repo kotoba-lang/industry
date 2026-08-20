@@ -1,0 +1,282 @@
+[{:db/id -1
+  :adr/id "2607310100"
+  :adr/date "2026-07-30"
+  :adr/status "accepted"
+  :adr/title "ADR-2607310100: 電子署名の残り 7 件 — ASN.1 から PAdES までの 7 library と、時刻・消去・検索要件の app 統合"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body
+  "## Context
+
+ADR-2607310000 は cloud-itonami-app の電子署名面を landed させたうえで、「まだ無いもの」
+として 7 件を挙げた。オーナーの指示はその 7 件すべての設計実装。本 ADR はその作業と、
+作業中に確定した判断を記録する。
+
+7 件のうち 1・2・3 は同じ理由で塞がっていた: **workspace に ASN.1 実装が 1 つも無かった**。
+X.509・CMS・RFC 3161・RFC 4998・PAdES はすべて DER の上に立つので、下から順に起こす
+以外に道が無い。
+
+## Decision — 起こした 7 つの reverse-domain library
+
+命名は既存 taxonomy に従う（`org-ietf-*` = ietf.org、`org-etsi-*` = etsi.org、
+`org-jpki` = 公的個人認証。ADR-2607309400 の先例）。
+
+    org-ietf-asn1 ──┬─→ org-ietf-x509 ──┬─→ org-ietf-cms ──┬─→ org-ietf-rfc3161 ──→ org-ietf-ers
+                    │                    │                  ├─→ org-etsi-pades
+                    │                    │                  └─→ org-jpki
+                    └────────────────────┘
+
+| repo | 仕様 | tests |
+|---|---|---|
+| `org-ietf-asn1` | X.690 DER + OID registry | 11 / 135 |
+| `org-ietf-x509` | RFC 5280（検証に要る範囲） | 6 / 52 |
+| `org-ietf-cms` | RFC 5652 SignedData | 14 / 50 |
+| `org-ietf-rfc3161` | Time-Stamp Protocol | 9 / 45 |
+| `org-ietf-ers` | RFC 4998 Evidence Record | 11 / 37 |
+| `org-etsi-pades` | EN 319 142 B-B writer | 9 / 40 |
+| `org-jpki` | 署名用電子証明書の検証側 | 6 / 23 |
+
+**すべて実データに対してテストしている。** OpenSSL が出した証明書・CMS・timestamp
+token に対して検証し、`rfc3161` の request は `openssl ts -query` の出力と **byte 単位で
+一致**する。`ers` の hash tree の root は **9 行の Python** が独立に計算した値と照合する
+（自分自身とだけ照合する hash tree は、自分の間違いに同意する）。
+
+### 1. DER は厳格に読む — これは性能ではなく安全性の話（`org-ietf-asn1`）
+
+このスタックが扱う構造はすべて**署名されている**。署名はバイト列に対するものなので、
+**再エンコードして同一にならない値を受理する parser は、送信者が署名していないものに
+対して「有効な署名」を報告する**。だから DER が禁じる BER 形（不定長、非最小長、
+非最小 INTEGER、constructed OCTET/BIT STRING、末尾の余分バイト、`0xff` 以外の true）は
+**許容せず拒否**する。`der-round-trips?` がその性質を assert し、全 fixture がそれを通る。
+
+要素ごとに `:asn1/der`（自分自身の TLV）を保持する。CMS は `signedAttrs` を
+**`[0] IMPLICIT` から `SET` に付け替えて**ハッシュし、PAdES は触ってはいけない文書の
+中のバイト offset を要る。再計算は再エンコードを意味し、再エンコードこそ trust path から
+外すべきもの。
+
+OID は名前付き registry にした。**OID の打ち間違いは silent** —
+`1.2.840.113549.1.1.11` と `…1.1.5` は sha256WithRSA と sha1WithRSA で、間違えると
+全ての正しい署名を拒否するか、退役させたつもりの digest を受け入れるかのどちらかになる。
+
+### 2. signedAttrs があるとき、署名は content を覆っていない（`org-ietf-cms`）
+
+この namespace の大半はこの 1 つのバグのために書かれている。signedAttrs があるとき
+署名が覆うのは**属性**で、content には `messageDigest` 属性を通してしか届かない。
+その link は**誰かが確かめたときにだけ**存在する。
+
+間違いの形は: signedAttrs に対する署名を検証し、暗号学的に正しいことを確認し、content が
+署名されていると報告する — `messageDigest` を手元の content の digest と比べないまま。
+**どの content でも検証が通る。**
+
+そしてこのバグを持つ検証器は、**書かれ得るあらゆる肯定的テストを通る**（署名は本当に
+正しいので）。だから suite は正しい署名の下から content を差し替え、**検証が失敗すること
+と、属性への署名が依然として正しいことの両方**を assert する。後半が前半に意味を与える。
+
+同じ縫い目を守る拒否をあと 4 つ: `messageDigest` 欠落、`contentType` ≠ `eContentType`
+（RFC 3161 token への署名を data への署名として replay させない）、単一値属性の複数値、
+detached で content を渡されていない検証。署名者 0 件は「自明に true」ではなく false。
+
+### 3. timestamp は 3 値であって boolean ではない（`org-ietf-rfc3161` → app）
+
+`timeAttestation` は `app-attested` / `tsa-attested` / `accredited`。3 つは別の法的対象で、
+**電子帳簿保存法が名指しするのは 3 つ目だけ**（総務大臣認定 TSA の RFC 3161）。
+
+1 つに潰すと自己発行の token が認定タイムスタンプとして読める。これは仮想の脅威ではない
+— **この repo 自身の fixture がまさにそれ**（`openssl ts` と自前 CA で作った、暗号学的に
+完璧な token）。`org-ietf-rfc3161` は `:verified` と `:trusted` を分けて保持し、
+`:trusted?` 述語が無ければ答えは `:unknown` で、決して `true` にならない。
+
+**TSA の既定 URL は無い。** 出荷すれば「公式に見えてどこでも認定されていない」timestamp を
+生む。実装が省きがちな 2 点も入れた: TSA 証明書の EKU は critical かつ
+`id-kp-timeStamping` **単独**でなければならない（§2.3。TLS 鍵を兼ねる鍵は、
+timestamp でないものに署名させられ得る鍵）。nonce は `request` が生成しない —
+library が選んだ nonce は呼び出し側が確かめられない。
+
+**app 側で自分の設計ミスを 1 つ入れて直した。** 最初は timestamp が無い署名すべてを
+`:indeterminate` にした。時刻は署名の有効性とは**別の問い**で、これでは TSA 未設定の間
+すべてが `:indeterminate` になり、本当に indeterminate な署名（鍵の所在が示されていない等）
+が埋もれる。署名の状態は署名について答え、時刻は `:esign/time-attestation` で別に報告する。
+これは `:verified`/`:trusted` の分離そのもので、app 層で平らにしかけていた。
+
+### 4. hash renewal は元データを再ハッシュしなければ hash renewal ではない（`org-ietf-ers`）
+
+RFC 4998 の 2 つの renewal は別の操作で、混同が失敗モード:
+
+| | 覆うもの | 元データが要るか | コスト |
+|---|---|---|---|
+| timestamp renewal (§5.2) | 直前の **token** | 不要 | archive あたり token 1 個 |
+| hash renewal (§5.3) | `digest_new(data) ‖ digest_new(前の chain)` | **必要** | 全部再ハッシュ |
+
+データ無しで計算した hash renewal は、**古いアルゴリズムの digest の上に新しい
+アルゴリズムの名前を載せる**。だから `hash-renewal-digest` はデータ無しを拒否し、
+`verify` は `:hash-renewal-needs-data` を報告して chain を飛ばさない。
+
+§4.2 の**ソート結合**が、1 文書の path を archive の残りなしに運べるようにしている。
+ソートを飛ばすと自分としか相互運用しない実装ができ、自分のテストは通る。
+
+### 5. 消去は鍵を壊すこと（app: `esign/vault`）
+
+旧 `forget-content!` は state map から entry を消していた。`store/transact!` は
+`state.edn` を書き直して置き換えるので、消えるのは **live view だけ** — 古いファイル、
+バックアップ、上書きされていないディスクブロックはそのまま。**これは redaction であって
+個情法 / GDPR 17 条が求める削除ではない。**
+
+outline は envelope ごとの鍵で AES-256-GCM 暗号化して保存し、`forget-content!` は
+**鍵を壊す**。約束は正確に: **暗号文は今までどおり全ての場所に存在し、存在しない鍵なしには
+読めない。** `dissoc` より強く、物理破壊より弱い。コピーを回収できない複製環境で達成
+できるのはこちら。鍵を事前にコピーした攻撃者には効かないことも docstring に書いた。
+
+GCM の nonce 再利用は鍵の安全性を段階的にではなく完全に壊すので、**鍵は plaintext 1 つ
+だけ**を暗号化する。envelope id を AAD にしたので、別 envelope の記録に移された暗号文は
+復号せず認証に失敗する。
+
+### 6. 検索要件と暗号化の衝突は、決めることで解く（app: `esign/retention`）
+
+電子帳簿保存法は取引年月日・取引金額・取引先での検索（範囲・組み合わせ）を求める。
+暗号化されたものは検索できない（`contracts.clj` が kagi vault について既に記録している
+緊張）。道は 3 つで、正直なのは 1 つ:
+
+1. 平文をサーバ側で索引 → **最も個人情報になりやすい項目**の暗号化を無効化する
+2. クライアント側索引 → **誰もログインしていない時に検索が止まる**（＝税務調査時）
+3. **法が保存を義務づける 3 項目だけを content と分けて宣言的に持ち、そう明記する**
+
+(3) を採った。3 項目は平文で持ち、**`forget-content!` を生き延びる** — 署名者が読んだ文書と、
+法が保存を求める取引記録は**別の対象**で、法が別のことを求めている。
+
+代償は隠さない: 取引先名は個人情報になり得て消去後も残る。これは保存義務という
+**適法性の主張**であって技術的な主張ではなく、運用者のものなので、`entry` は
+`:retention/basis` の明示を要求し、`redactable-fields` が義務が切れた後の最小化対象を
+定義する。黙って名前を残して何も言わない namespace は、その主張を運用者に代わって
+してしまう。
+
+`compliance-gaps` は可視性・真実性の 2 本を別々に返し、**チェックマークは返さない**。
+真実性は事務処理規程でも満たせるが、このプロセスからは観測できないので入力にした。
+
+### 7. PAdES の gap は placeholder そのもの、角括弧込み（`org-etsi-pades`）
+
+`/ByteRange [0 a b c]` の穴は `/Contents <…>` を**角括弧ごと**覆う。間違え方は 2 つで
+どちらも silent: **穴が placeholder と正確に一致しないと**、署名バイトが署名範囲の内側に
+残るか、文書バイトが外側に出る。Acrobat は前者を invalid と報告し、**後者を valid と
+報告する** — 攻撃者が編集できる領域について。**埋めたときに幅が変わる数値**は後続の全
+バイトを動かす。だから固定幅ゼロ埋めで書いて in-place で patch し、`prepare` が長さ不変を
+assert する。
+
+suite は範囲を**ファイルに対して**照合する（それを計算したコードに対してではなく）:
+全バイトが署名済みか穴の中、両方であるものは無し、そして署名が**ファイル全体に対しては
+検証しない**ことを assert する — それが「動いているように読める」間違いだから。
+
+### 8. 失効を確認しない検証は、確認したふりをしない（`org-jpki`）
+
+JPKI の失効情報は**署名検証者として認定・届出をした事業者**だけが J-LIS から取得できる。
+だから `:revocation` は常に返り、常に `:not-checked`。省略すれば「確認した」と読まれる。
+
+失効確認なしで言えるのは「発行時点でこの鍵が本人のものだった」まで。「署名時点で有効
+だった」は言えない。両者を混ぜないことがこの namespace の一番大事な仕事で、
+`presumption-note` が電子署名法 3 条について**この実装が何を確かめたか**を文にする
+（法律判断ではない）。
+
+基本4情報は `parse-certificate` に含めず、`basic-four` を明示的に呼んだときだけ読む。
+
+## Consequences
+
+### app への配線（cloud-itonami-app main `4d83c5a`）
+
+    esign/timestamp.clj   RFC 3161 client、TSA 既定値なし、3 値の attestation
+    esign/vault.clj       AES-256-GCM per-envelope key、forget! は鍵を壊す
+    esign/retention.clj   電帳法 3 項目、範囲・組み合わせ検索、compliance-gaps
+    esign.clj             上記の統合、evidence に timestamps、検証時に token 再検証
+    server.clj            +3 routes（retention 記録 / 検索 / compliance）
+    web.clj               時刻 callout が 3 値に応じて変わり、一覧は最弱を表示
+
+検証時は保存された `timeAttestation` を**信用せず token を再検証する**。証拠記録は
+「この app を信じなくてよい」ためにあるので、この app の記録を信用する検証はその目的を
+打ち消す。
+
+UI と evidence の集約は **最も弱い** attestation を採る。規制当局が読むのは envelope
+単位で、最強を出すと 1 つの認定 token が 2 つの非認定を洗浄する。
+
+### 検証
+
+- app suite **619 tests / 2600 assertions, 0 failures**（新規 10 tests）
+- library 側 合計 **66 tests / 382 assertions**
+- **すべての suite でテストが実際に走ることを確認した**（assertion を意図的に壊して赤に
+  なるのを見てから戻す。7 repo すべてで実施）
+- clj-kondo: 全 repo errors 0 / warnings 0。app は warnings 13 で**すべて既存**
+- 生成 JS を `node --check`、server ns の compile も確認
+
+### west / registration
+
+`manifest/repos.edn :extra-projects` に 5 件（`org-etsi-pades` / `org-jpki` は本 ADR 時点で
+未登録 — follow-up）、`west.yml` に 5 entry を alphabetical 位置へ挿入。
+cloud-itonami-app の pin を `4d83c5a` へ前進（旧 pin から 3 ahead / 0 behind の
+fast-forward）。すべて GitHub API の single-entry commit 経路。
+
+### まだ無いもの（「実装済み」と読まないこと）
+
+1. **gap 7 — 実ブラウザ・実 Passkey での署名フロー検証は未実施。** UI の配線は routes を
+   live server に対して確認したところまで。`navigator.credentials.get` を通す完全なフローは
+   人の指を要し、CDP の virtual authenticator で代替すると
+   `credential_assurance.clj` が名指ししている hazard そのものを使うことになる（それが
+   証明するのは配線であって鍵の所在ではない）。**やる価値はあるが、証明できることを
+   正確に書いた上でやるべきで、本 ADR の時点では未実施。**
+2. **認定 TSA の実接続は未実施。** protocol は `openssl ts` に対して検証したが、
+   実際の総務大臣認定事業者に対して投げていない。`:esign {:timestamp {:url …
+   :accredited-roots […]}}` を設定するのは deployment 作業。
+3. **`org-jpki` の fixture は合成**。実カードとの相互運用性は未証明。
+4. **PAdES は B-B のみ**。B-T は CMS の unsigned attributes への timestamp 埋め込み、
+   B-LT は DSS、B-LTA は document timestamp が要る。`profile` が level を報告する。
+5. **ERS の archive 運用は app に未配線。** library はあり、envelope 単位の evidence には
+   token が入るが、複数 envelope を 1 つの hash tree に束ねて定期的に renewal を回す
+   orchestration は無い。
+6. **`org-etsi-pades` / `org-jpki` は west 未登録**（本 ADR と同時に follow-up）。
+7. **`documents/purge!` との関係は未整理。** `forget-content!` は envelope の outline を
+   shred するが、元文書は Drive に残る。両方を 1 つの削除要求として扱う経路は無い。
+
+### ADR-2607310000 との関係
+
+supersede しない。あの ADR の設計判断（commitment に束縛された challenge、exhaustive
+outline、content と evidence の分離、凍結 status list、ETSI 3 値）はすべて有効なまま。
+本 ADR が変えたのは「まだ無いもの」の 7 件のうち 6 件で、あの ADR の当該節は本 ADR を
+指すよう書き換えた。
+
+## 成熟度パス（2026-07-31）
+
+**「portable `.cljc`」は 7 library すべてが主張していて、どれも JVM でしか動かして
+いなかった。** nbb で回して 3 件のバグが出た。
+
+1. **rfc3161 の nonce が platform で違うバイト列になっていた。**
+   `0x7d82213101890cc3` が nbb で `…890c00`、JVM で `…890cc3`。ClojureScript の数値は
+   double なので encoder に届く前に丸められている。nonce は「古い応答の再生」と
+   「新しい応答」を区別するためにあるので、**cljs で作った request は毎回 nonce 検証に
+   落ちる** — 誰にも見えない理由で。`asn1/integer` は正確に表現できない値を拒否し、
+   `rfc3161` の `:nonce` は hex 文字列になった（破壊的変更）。
+2. **`org-iso-pdf/write-document` が cljs で全部ゼロを出していた**（上流で修正・merge、
+   kotoba-lang/org-iso-pdf#2）。String は JVM で Character、cljs で 1 文字の String として
+   反復されるので `(int c)` の意味が違う。同ファイルに `code` という helper が既にあり、
+   parser は使っていて writer は使っていなかった。
+3. **同じバグが `pades/text->` にもあった。** 自分のコード。2 つの library、1 ファイル
+   違いで同じ間違い。**`.cljc` を第 2 platform で誰も回さないと、これが起きる。**
+
+8 repo すべてに portable job を追加（すべて green）。`asn1` は同じ suite を両 platform で
+回すので 2 つが乖離しない。他は「署名の手前まで」を nbb で回す — JVM job より小さい主張
+であり、README と job のコメントにそう書いてある。
+
+### app の CI は全員に対して赤だった
+
+- **`setup-java` が無く、runner 既定の JDK 21 に ML-DSA-65（JDK 24+）が無かった。**
+  kagitaba の署名がそれを要求するので、その依存が入って以来 `main` の CI は
+  contracts-test で 11 errors。ローカルで通っていたのは local の `clojure` がたまたま
+  新しい JDK を拾っていたから。JDK 25 を pin して green。
+- **gitleaks の 3 件は全部誤検知**（テストの `did:key:z…`。DID は定義上、識別子が公開鍵
+  そのもの）。指紋を 1 件ずつ `.gitleaksignore` に列挙した。**regex allowlist は捨てた** —
+  最初の版（`regexTarget = \\\"line\\\"`）は DID の 2 行隣の実 secret まで黙らせ、狭めた版は
+  再現する回帰テストを書けなかった。**検証できない allowlist は赤い scan より悪い。**
+
+### 非 hermetic なテスト
+
+`scheduler_http_test` の \\\"and nothing was written\\\" が `(= [] items)` を assert していた。
+この endpoint は app の event と**マシンのカレンダー**を merge するので、これは
+オーナーの予定表についての assertion だった。カレンダーのあるマシンでは失敗し、失敗出力に
+実際の予定を 15 件印字していた。意図どおり「拒否された write が何も作らなかった」に直した。
+
+**805 tests / 3554 assertions, 0 failures** — このマシンで初めて suite 全体が通った。"}]

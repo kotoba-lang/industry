@@ -1,0 +1,195 @@
+[{:db/id -1
+  :adr/id "adr-2607254100-kotoba-lang-sigv4-shared-signer-and-kotoba-byte-slice"
+  :adr/doc_type "adr"
+  :adr/topic "kotoba-lang-sigv4-shared-signer-and-kotoba-byte-slice"
+  :adr/title "ADR-2607254100: kotoba-lang/sigv4 — 6重複していた AWS SigV4 の共通化と、percent-encoder の .kotoba 実装（Wasm、cljc と byte 等価）"
+  :adr/status "accepted"
+  :adr/date "2026-07-25"
+  :adr/last_verified "2026-07-28"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["workspace 内に AWS SigV4 実装が 6 箇所重複していたという実測と、kotoba-lang/sigv4 への共通化決定（6 consumer すべて移行完了、2026-07-28 検証）"
+   "共通化の境界（署名・検証・ICrypto は共有 / transport は各 consumer 固有）とその根拠"
+   "SigV4 のどの部分が .kotoba で実現可能かの実測境界と、その到達点・未到達点"
+   "kotoba wasm emitter / web(ESM) target の 2026-07-25 時点の実測制約（multi-module 不可 / memory op 不可）"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related
+  ["adr-2607254000-kotoba-lang-io-storj-s3-gateway-client"
+   "adr-2607201300-kotoba-safe-application-language-profile"
+   "adr-2606302300-org-taxonomy-library-placement"
+   "adr-2607176000"]
+  :adr/decision-summary
+  "{:repo \"kotoba-lang/sigv4\", :namespaces [sigv4.core sigv4.request sigv4.verify sigv4.crypto sigv4.protocols], :replaces-copies 6, :divergence-found [:charcodeat-utf16-in-verification-path :trailing-empty-key-split :encodeuricomponent-fixup-in-4-of-6], :shared [:signing :verification :composition :icrypto], :not-shared [:transport], :kotoba-slice {:module \"kotoba/pct_encode.kotoba\", :target :wasm, :wasm-bytes 503, :parity-inputs 147, :status :non-load-bearing}, :migrated [\"gftdcojp/net-kotobase\" \"gftdcojp/net-kotobase-ipfs\" \"kotoba-lang/kotobase-peer\" \"kotoba-lang/kotobase-protocols-worker\" \"kotoba-lang/shoko\" \"kotoba-lang/io-storj\"], :remaining-consumers 0}"
+  :adr/artifacts
+  "{:repo \"orgs/kotoba-lang/sigv4\", :core \"orgs/kotoba-lang/sigv4/src/sigv4/core.cljc\", :request \"orgs/kotoba-lang/sigv4/src/sigv4/request.cljc\", :verify \"orgs/kotoba-lang/sigv4/src/sigv4/verify.cljc\", :kotoba-module \"orgs/kotoba-lang/sigv4/kotoba/pct_encode.kotoba\", :kotoba-parity \"orgs/kotoba-lang/sigv4/scripts/verify-kotoba.cljs\", :evidence {:as-of \"2026-07-28 (local re-run at pin 477e2b0c)\", :jvm \"28 tests / 82 assertions, 0 failures 0 errors\", :cljs \"18 checks pass (WebCrypto)\", :kotoba \"147 inputs byte-identical (CLI v0.6.29, sha256-verified, 503-byte module); negative control confirmed\", :lint \"clj-kondo 0 errors 0 warnings\", :ci \"kotoba-lang/sigv4 jvm+cljs+kotoba all success; kotoba-lang/io-storj jvm+cljs success\", :io-storj \"23 tests / 74 assertions JVM; 7 checks cljs\"}}"
+  :adr/body
+  "# Context
+
+オーナー指示（2026-07-25）: 「共通化できる lib は kotoba-lang org で共通化してね, また .kotoba 言語で実現できないのかな?」
+
+ADR-2607254000 で io-storj に SigV4 を実装した直後の指摘。**その時点の判断（「今回は寄せない」）を
+オーナー判断で覆し、共通化する。**
+
+## 実測: SigV4 は 6 箇所で重複していた
+
+`rg 'AWS4-HMAC-SHA256|aws4_request|sigv4'` を `orgs/` 全体に対して実行:
+
+| repo | ns | 種別 |
+|---|---|---|
+| `gftdcojp/net-kotobase` | `kotobase.sigv4`(55L) | 署名・原本。他の 5 つはここから派生 |
+| `gftdcojp/net-kotobase-ipfs` | `kotobase-ipfs.sigv4`(60L) | 上記の **verbatim copy**（自ら docstring で明記） |
+| `kotoba-lang/kotobase-peer` | `object-store.s3-sigv4`(75L) | 編集済み copy |
+| `kotoba-lang/kotobase-protocols-worker` | `sigv4`(72L) | **検証**側 |
+| `kotoba-lang/shoko` | `archiveport` | JVM port（原本が cljs 専用で JVM から require できなかったため） |
+| `kotoba-lang/io-storj` | `storj.sigv4` | 新規実装、本 ADR の 2 日前（ADR-2607254000） |
+
+**初報で「8 箇所」と数えたのは誤りで、2 種類の数え間違いだった**（正本は
+`kotoba-lang/sigv4` の README。数え直しを繰り返さないためここにも残す）:
+`kotobase-peer-atomic` と `kotobase-peer-main-test` は **`kotobase-peer` の
+git worktree であって別リポジトリではない**（「3 つの byte identical なコピー」は
+1 ファイルを 3 つの checkout 越しに見たもの）。`kotobase-protocols` の
+`protocols.s3` は SigV4 を **out-of-scope として言及しているだけ**で実装していない。
+逆に `shoko` を数え落としていた。差し引き 6。
+
+**個々のコピーはいずれも当時正しい判断だった** — net-kotobase-ipfs は
+「single-purpose / low-privilege に保つため依存でなくコピー」と明示しており、
+`shoko` は「ClojureScript の signer は JVM から require できない」という実制約への対応。
+コストは集計してはじめて見える形で出ていた: **既に乖離していた**。
+
+**発見した実質的欠陥（3 件）**:
+
+- 検証側（`kotobase-protocols-worker`）の percent-encode は `charAt`/`charCodeAt`
+  ベースで、**UTF-16 code unit を出力する**。非 ASCII を含む key / query value は
+  AWS および全ての S3 SDK と**異なる署名になる**。しかもこれは**受理側**なので、
+  正しく署名された request を拒否する側に倒れる。
+- `kotobase-peer` は key の split に trailing-empty limit を付けていないため、
+  `/` で終わる key を**アドレスした key と別の key として署名する**。
+- 6 実装のうち **4 つが `encodeURIComponent` + `!'()*` 手当てパターン**で、
+  UTF-8 byte から encode する正しい規則だったのは `shoko` だけ。
+
+さらに **6 実装のうち 4 つは署名のテストを 1 つも持っていなかった**。
+`kotobase-peer` は 2278 行の object-store テストを持ちながら `Authorization`
+header に対する assertion がゼロ、他が copy した原本の `net-kotobase` も
+proxy テスト 25 件のうち署名を見るものはゼロ。**誰も実行しない signer は乖離し、
+症状は後日の不透明な `403 SignatureDoesNotMatch` だけ**という形で出る。
+
+# Decision
+
+## 1. `kotoba-lang/sigv4` を共通の正本にする
+
+命名は prefix 無し = reusable library（`loop-ux-kaizen` の
+`repository-rules.edn` taxonomy。`bencode` / `bytes` / `codec-primitives` と同列）。
+
+| ns | 役割 |
+|---|---|
+| `sigv4.core` | pure（encoding / canonicalization / scope / string-to-sign / presign params）。clock も cipher も I/O も持たない |
+| `sigv4.request` | 合成された signer（config in → `{:url :headers}` out、presigned URL も）。**文字列層だけでなく合成も共有する**（commit `9babf9f2`）— ここを各 consumer に残すと「同じ部品で違う順に組む」乖離が再発する |
+| `sigv4.verify` | 検証側（`Authorization` parse → 期待署名再計算 → **constant-time 比較**） |
+| `sigv4.crypto` | 既定 `ICrypto`（javax.crypto / WebCrypto） |
+| `sigv4.protocols` | host seam は `ICrypto` **のみ** |
+
+`service` を引数化した（io-storj 版は `\"s3\"` 固定だった）。S3 以外の AWS service
+にも使える。
+
+## 2. 共通化の境界 — crypto は共有、transport は共有しない
+
+`ICrypto` は **全 consumer が同じものを必要とする**ので signer 側に置く。
+transport は **どの2つの consumer も一致しない**（Worker の `fetch`、peer の
+object store、JVM client）ので各 repo に残す。io-storj の `storj.protocols` は
+`IHttp` だけになった。
+
+「signer は署名済み request を作る。それを線に乗せるのは接続を所有する側の仕事」
+という境界。
+
+## 3. 移行 — 6 consumer すべて完了（2026-07-28 実測）
+
+**初版のこの節は「io-storj のみ完了、残り 7 箇所は未着手」と書いていたが、
+その後 6 箇所すべてが移行された。** 現在地に合わせて書き換える（経緯は
+`git log -p` が持つ）。「共通化できる lib を作る」ことと「全 consumer を移行する」
+ことが別の作業であるという判断自体は変わっておらず、実際 1 つずつ着地した。
+
+| consumer | 消費経路 | 状態 |
+|---|---|---|
+| `kotoba-lang/io-storj` | `deps.edn` git dep | 移行済み（自前の sigv4/crypto/protocols を削除） |
+| `kotoba-lang/kotobase-peer` | `deps.edn` git dep | 移行済み |
+| `kotoba-lang/shoko` | `deps.edn` git dep | 移行済み（JVM port を削除） |
+| `kotoba-lang/kotobase-protocols-worker` | shadow-cljs `:source-paths` に `../sigv4/src` | 移行済み（UTF-16 欠陥ごと消えた） |
+| `gftdcojp/net-kotobase-ipfs` | shadow-cljs west sibling path | 移行済み |
+| `gftdcojp/net-kotobase` | `clj-edge/deps.edn` git dep + `protocols-worker` source-path | 移行済み。`kotobase.sigv4/*` の 7 export は実装ごと削除（workspace 全体を検索して参照ゼロを確認済み） |
+
+**Cloudflare Worker 系（shadow-cljs）は git dep でなく west sibling の
+`:source-paths` で消費する**という経路の違いが残った。deps.edn の git dep は
+pin を持つが source-path は west pin に従うので、**sigv4 の pin 前進が
+Worker 系に即座に効く**（逆に言えば pin 前進時は Worker 側のビルドも通す必要がある）。
+
+移行中に踏んだ実障害を 1 つ記録する: `net-kotobase` は `src/kotobase/proxy.cljc` が
+`sigv4.crypto`/`sigv4.request` を require するのに、その dep を `:cljs` alias の下だけに
+宣言していた。`proxy.cljc` は `:paths` の `src` に載っているので **top-level の依存**であり、
+下流の `kotobase-cf-wasm` が「required namespace sigv4.crypto is not available」で
+test と release build（= deploy）ごと壊れた。**alias 下の dep 宣言は、その ns を
+公開 path に載せている限り足りない。**
+
+振る舞いが変わっていないことは主張でなく証明になっている: `core_test` の期待署名は
+**この library ではなく spec から書いた別実装（Node crypto）**で生成したものなので、
+抽出後も同じ値が出ることがそのまま回帰検査になる。
+
+# .kotoba で実現できるか — 実測した境界
+
+**結論: percent-encoder は今日 `.kotoba` で実現できる。合成層はまだできない。**
+
+推測でなく、released native CLI **v0.6.29**（sha256 検証済み）で実際にコンパイル・
+実行して確認した。
+
+## できたこと
+
+`kotoba/pct_encode.kotoba` — RFC 3986 percent-encoder を Kotoba で実装し、
+**503 byte の Wasm module** として emit。`alloc` / `mem-byte-at` / `byte-store!` で
+linear memory を直接扱い、loop 構文が無いので **self-recursion** で 1 byte ずつ走査する。
+
+percent-encoding を選んだ理由: SigV4 の中で**最も間違いやすい 1 箇所**（S3 は
+`encodeURIComponent` が除外する文字を除外せず、大文字 hex を要求する）であり、
+かつ **map も sort も host capability も要らない純粋な byte 演算**だから。
+Kotoba が今日所有できるのはまさにこの形の部分。
+
+**検証**: `scripts/verify-kotoba.cljs` が Kotoba/Wasm 実装と `sigv4.core/uri-encode`
+に同じ入力を与え、**byte 等価を要求する** — 全 ASCII 128 code point（分類器の
+決定面すべて）+ multi-byte UTF-8 11 種 + 実際の S3 key/query 8 種 = **147 入力**。
+「コンパイルが通った」は一致の証拠にならないので、これを CI で回す（Linux runner で
+CLI を checksum 検証して download → emit → parity、`kotoba` job として success）。
+**negative control 実施済み**: hex を小文字に壊すと即座に FAIL する（`%0A` vs `%0a`）
+ことを確認した。
+
+## できなかったこと（そのまま記録する）
+
+- **合成層は不可**: header の sort、canonical query 組み立て、string-to-sign は
+  map・string collection・sort を要する。Wasm subset に無い。`.cljc` のまま。
+- **wasm target は multi-module 不可**: `:require` を跨ぐと `internal-error`
+  （v0.6.29）。そのため分類器を別 module に切らずインライン化した
+  （io-ipfs の ESM pilot が `status-bounds` を分けているのとは対照的）。
+- **web(ESM) target は memory op 不可**: `alloc` / `mem-byte-at` / `byte-store!` は
+  `operation has no admitted lowering` で拒否される。つまり **multi-module が使える
+  target では byte 演算ができず、byte 演算ができる target では multi-module が使えない。**
+
+## 位置づけ — load-bearing にはしていない
+
+consumer が呼ぶのは `sigv4.core/uri-encode` のまま。Kotoba 版は**第二の独立実装**
+として byte 等価を保証されている状態で置く。これは relabelling ではない（実際に
+`.kotoba` から released CLI がコンパイルした Wasm が動いている）が、**「実装済み」と
+宣言できる completion gate（application-profile.md の 6 項目）を通ってもいない**。
+昇格は合成層が追随できるようになった時点の判断。
+
+# Consequences
+
+- SigV4 の正本が 1 つになった。UTF-16 欠陥は `sigv4.core` では構造的に起きない
+  （UTF-8 byte から encode する）ので、移行とともに消えた。
+- **6 consumer すべての移行が完了した**（2026-07-28 に上流 default branch で確認）。
+  この ADR が作った作業は終わっている。以後 SigV4 を新規に書く理由は無い —
+  S3 互換 surface（B2 / R2 / Storj / AWS）はすべてこの library を通す。
+- Kotoba の application profile に対して、**具体的な到達点と 2 つの emitter 制約**が
+  実測として記録された。同種の「この関数を .kotoba にできるか」という問いには、
+  まず「map/sort が要るか、byte 演算だけか」で切り分けられる。
+"}]

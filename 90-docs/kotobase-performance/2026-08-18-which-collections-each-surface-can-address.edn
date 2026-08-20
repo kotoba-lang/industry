@@ -1,0 +1,63 @@
+{:receipt :kotobase/surface-collection-reachability
+ :date "2026-08-18"
+ :for "h7-parse-only-addressable-values"
+ :why
+ "h7's change is `parse only the collections the request's surface can
+  address`, and until now that phrase had no referent. A filter derived from a
+  guess is the dangerous version of this hypothesis: a surface that CAN reach a
+  collection we filtered out reads `not found` -- a silent wrong answer, and on
+  a write it would re-create the document and diverge the graph.
+
+  So the map is read out of the handlers rather than assumed."
+
+ :source "kotoba-lang/kotobase-protocols, src/kotobase/protocols/*.cljc,
+          grepped for the collection keys each handler actually passes to
+          IStore"
+
+ :map
+ {:atproto  #{:kotobase.at/records :kotobase.protocols/audit}
+  :s3       #{:kotobase.s3/objects :kotobase.protocols/audit}
+  :git      #{:kotobase.git/objects :kotobase.git/refs :kotobase.protocols/audit}
+  :pinning  #{:kotobase.protocols/pins :kotobase.protocols/audit}
+  :blocks   #{:kotobase.protocols/blocks :kotobase.protocols/cid-mismatch
+              :kotobase.protocols/audit}
+  :issues   #{:kotobase.issue/issues :kotobase.issue/proposals
+              :kotobase.issue/reviews :kotobase.issue/id-seq
+              :kotobase.protocols/audit}
+  :sparql   :everything
+  :cypher   :everything
+  :gremlin  :everything
+  :graphql  :everything}
+
+ :the-four-query-surfaces-get-no-filter
+ "They query the whole document space by definition, so h7 cannot help them and
+  must not try. They are also the four that answer 401 to a self-issued CACAO,
+  so they are not the surfaces organic traffic would use."
+
+ :what-the-map-implies-before-any-bench-runs
+ {:census-from "test/kotobase_protocols_worker/hydrate_phase_bench.cljs, seed of
+                the real production graph"
+  :seed-bytes 4930593
+  :in-s3-objects 4312242
+  :in-git-objects 158281
+  :in-the-other-15-collections 460070
+  :consequence
+  "An atproto request addresses `:kotobase.at/records` and audit. It currently
+   parses all 526 s3 objects -- 87.5% of the seed by bytes -- plus the git
+   objects, on every request. The s3 collection is not even reachable from this
+   graph by an s3 request any more: since 2026-08-10 `graph/for-request` routes
+   an s3 request for a bucket to `s3-bucket/<bucket>`, its own chain. Only the
+   four credential-gated query surfaces can still reach those documents here."}
+
+ :the-hazard-this-map-exists-to-prevent
+ "A filter is a PREDICTION about reachability, and a wrong prediction is silent:
+  the read returns nothing rather than failing. Two rules follow --
+   1. the map is derived from the handlers, and moves when they move;
+   2. an unknown surface filters NOTHING. Fail open on the parse, because the
+      failure mode of filtering too little is cost and the failure mode of
+      filtering too much is a wrong answer."
+
+ :not-yet-implemented
+ "This is the input h7 needs, not h7. Landing order is unchanged: the phase
+  bench re-measures h1/h6/h7 first, because their :after-harness values were
+  all taken against the old decode2 and are overstated."}

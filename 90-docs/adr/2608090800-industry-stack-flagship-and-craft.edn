@@ -1,0 +1,65 @@
+[{:db/id -1
+  :adr/id "2608090800"
+  :adr/doc_type "adr"
+  :adr/status "accepted"
+  :adr/date "2026-08-09"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/title "industry stack — flagship product maturity + shirohan-class craft depth, parallel waves"
+  :adr/related ["2607122300" "2607189300" "2608011100" "2607023000" "2608070000" "2608080000"]
+  :adr/body "# ADR-2608090800: Industry stack — flagship + craft, parallel waves
+
+**Status**: accepted
+**Date**: 2026-08-09
+
+## Context
+
+Owner directive: raise industries to flagship maturity and implement fine-grained
+process engines like `shirohan`, progressing **all industries in parallel via
+subagents**. Two axes must not be conflated:
+
+| Axis | Meaning | Source |
+|---|---|---|
+| A Flagship product | 7-item checklist (demo/quickstart/freshness/business/demo-field/billing) | ADR-2607122300 / 2607189300 |
+| B Craft depth | Deterministic pure `.cljc` process engines | ADR-2608011100 (shirohan), ADR-2607023000 |
+
+Flagship alone yields coordination demos without process truth. Craft alone
+yields engines without a governed business face. The industry **stack** is both.
+
+## Decision
+
+### 1. Three parallel lanes per wave
+
+- **Lane A** — flagship generator template on shape-matched ISIC (≤6 repos/wave)
+- **Lane B** — wire existing craft into industry actors (≤4)
+- **Lane C** — new craft engines (≤3)
+
+Bounded fan-out; independent re-verification; wave failure rate >20% halves fan-out.
+No single agent scaffolds the whole fleet. No mock demo HTML. No new GitHub Actions
+workflows (fleet-ci). No force-push.
+
+### 2. Resume surfaces
+
+- `90-docs/business/industry-stack-ledger.edn` — append-only, one map per wave
+- `90-docs/business/craft-catalog.edn` — craft ↔ isic ↔ surface index
+
+### 3. Wave 0 targets (locked)
+
+- A: sector-diverse no-demo isic (inventory picks)
+- B1: shirohan → isic-1313 prepress ops
+- B2: inkan → best-fit document/legal isic
+- C1: `seihan` paper prepress craft (boundary vs shirohan)
+- C2: isic-1410 blueprint → minimal `:implemented` (pattern craft later)
+
+### 4. Craft invariants (from shirohan)
+
+Coordinates/quantities are not LLM-owned. Unreadable input must produce findings.
+Writer/reader separation for exports. DADS UI on itonami.cloud surfaces.
+
+## Consequences
+
+Parallel waves replace serial single-industry perfectionism. Quality is enforced by
+gates and spot re-verification, not by batch size=1 forever. OS connect
+(ADR-2608070000) and maturity-improve (ADR-2608080000) remain separate programs —
+stack work may feed them but does not replace their ticks.
+"
+  :adr/decision-summary "{:axes [:flagship :craft], :lanes [:A :B :C], :wave0 true, :ledger industry-stack-ledger.edn}"}]

@@ -1,0 +1,181 @@
+[{:db/id -1
+  :adr/id "adr-2607253500-kotoba-cloudflare-workers-storage-capabilities"
+  :adr/doc_type "adr"
+  :adr/topic "kotoba-cloudflare-workers-storage-capabilities"
+  :adr/title "ADR-2607253500: .kotoba から Cloudflare D1/KV/R2 を扱う capability 層 — 同期 host-import ではなく typed effect-command plane"
+  :adr/status "accepted"
+  :adr/date "2026-07-25"
+  :adr/last_verified "2026-07-25"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["Cloudflare Workers の storage binding (KV/D1/R2) を .kotoba application code から扱うための capability 層の設計正本"
+   "この family を kotoba-core-contracts の同期 :host-imports に登録しないという決定と、その技術的根拠"
+   "kotoba-lang/com-cloudflare-workers の存在理由と kotoba-lang/com-cloudflare との責任境界"
+   "application-profile.md の 6 項目 completion gate に対する本 family の到達状況（誇張しない正本）"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related
+  ["adr-2607201300-kotoba-safe-application-language-profile"
+   "adr-2607062330-kototama-tender-chicory-execution-runtime"
+   "2607173000"
+   "adr-2607184000-kotoba-transport-provider-components"]
+  :adr/decision-summary
+  "{:repo \"kotoba-lang/com-cloudflare-workers\", :plane :effect-command, :profile :kotoba/app, :rejected :synchronous-host-imports, :reason :workerd-cannot-block, :capability-kinds [:cf/kv-read :cf/kv-write :cf/d1-read :cf/d1-write :cf/r2-read :cf/r2-write], :sql-posture :statement-id-only, :batch-semantics :fail-closed-abort, :completion-gate {3 :done 4 :done 1 :partial 5 :partial 6 :partial 2 :not-started}}"
+  :adr/artifacts
+  "{:repo \"orgs/kotoba-lang/com-cloudflare-workers\", :descriptors \"orgs/kotoba-lang/com-cloudflare-workers/resources/cloudflare/workers/capability_descriptors.edn\", :conformance \"orgs/kotoba-lang/com-cloudflare-workers/test/cloudflare/workers/conformance_test.cljc\", :guest-example \"orgs/kotoba-lang/com-cloudflare-workers/examples/session_planner.kotoba\", :evidence {:nbb \"42 tests / 221 assertions, 0 failures\", :jvm \"34 tests / 191 assertions, 0 failures\", :lint \"clj-kondo 0 errors 0 warnings\"}}"
+  :adr/body
+  "# Context
+
+オーナー質問（2026-07-25）: 「kotoba-lang repo に cloudflare d1, kv, r2 などを .kotoba 言語で扱う repo はある?」
+
+調査結果は **無い**。実測:
+
+- `kotoba-lang/com-cloudflare` は存在するが **コントロールプレーン専用**（API v4: zone / DNS / Workers routes / Pages / analytics / logpush）。D1/KV/R2 のデータプレーンは扱わない。
+- `kotoba-lang/com-cloudflare-compat` に `schema/cloudflare.kotoba` があり、これが kotoba-lang 全体で唯一 Cloudflare に触れる `.kotoba` ファイルだが、中身は Zone / DNSRecord / WorkerScript / Certificate / PageRule / LoadBalancer の entity 定義のみで **D1/KV/R2 の entity は無い**。加えてこのファイルは `deepen_actors.py` 生成の brace 構文であり現行 kotoba 構文ではない。
+- kotoba-lang 配下の `.kotoba` は 2441 ファイルあるが、**D1/KV/R2 を参照するものはゼロ**。
+- 実際に binding を叩いているのは全て cljs / 生 JS: `kotobase-protocols`（KV `GIT_STORE` / D1 `GIT_DB` / R2 `GIT_OBJECTS` を `worker/git-worker.mjs` から）、`kotobase-protocols-worker`（R2 `STATE_BUCKET` を `kotobase_r2.cljs` から）、`shoko/archiveport.cljc`（R2 を S3 API + SigV4、JVM-only）。
+- 言語側 capability 表（`kotoba-core-contracts/resources/kotoba/runtime/capability_contract.edn`）にも Cloudflare binding 形の capability は一つも無い。`db_*` / `pg_*` / `fs_*` / `http_*` / `kgraph_*` はあるが `kv_` / `r2_` / `d1_` は無い。
+
+オーナー指示: 「ok, 作って, adr にまとめて、安全性を優先」。
+
+# Decision
+
+## D1. 新規 repo `kotoba-lang/com-cloudflare-workers` を起こす
+
+`com-cloudflare`（コントロールプレーン）とは別 repo にする。両者はコードを共有せず、答える問いが違う（「このホスト名は何が serve しているか」 vs 「この Worker は今どの key に書いてよいか」）。命名は vendor surface 規約に従い `com-cloudflare-workers`（Workers runtime の binding surface）。`-clj` suffix は禁止規約どおり付けない。
+
+## D2. 同期 host-import を closed contract に **追加しない**
+
+素直な設計は `kv_get` / `d1_query` / `r2_put` を `kotoba-core-contracts` の `:host-imports` に `pg_*` / `db_*` の隣へ足すことだが、**この family ではそれは不健全**。理由:
+
+**Wasm の host import は同期であり、D1/KV/R2 は非同期で、しかも Worker はブロックできない。** JVM host は `pg_query` の中でスレッドをブロックできる。browser host は COOP/COEP 下で SharedArrayBuffer + `Atomics.wait` によりブロックできる（`host-parity.edn` が `http-post` を `:coop-or-inject` としているのはこのため）。workerd はそのどちらも提供しない — request thread に blocking wait は無く、JSPI も無い。したがって同期 `kv_get` import は「stale な値を返す」「空を返す」「isolate を wedge させる」のいずれかの嘘をつくことでしか実装できない。
+
+**履行できない capability を closed contract に足さない。** これは能力の問題ではなく誠実性の問題であり、`application-profile.md` の「Documentation can mark a family planned before this gate passes, but must not claim runtime support」と同じ原則をコントラクト側に適用したもの。
+
+## D3. typed effect-command plane を採る（`kotoba/app` profile）
+
+`application-profile.md` の `state + event -> next-state + effects` モデルに乗せる:
+
+```
+[host]  宣言された read を materialize（非同期）
+          v  input
+[guest] 純粋な planner: state + event -> next state + effect commands
+          v  commands（不活性なデータ）
+[host]  admission: policy ∩ grants ∩ request -> quota -> execute -> receipts
+          v  typed result events
+```
+
+guest には新しい import も handle も `env` も渡らない。**漏らせる capability が無い — そもそも渡していないから。** guest が出せるのは *提案* であり、実行するかは host が決める。この構造は非同期問題を回避すると同時に、最小権限の観点でも同期 import 版より厳密になる。
+
+## D4. 安全性設計（実装済み・テスト済み）
+
+1. **guest 由来の SQL は「濾過」ではなく「表現不能」**。D1 コマンドは statement id（例 `order-by-id`）を名指しするだけで、SQL 本文は host policy 側にある。`:sql` を持つコマンドは `:raw-sql-forbidden` として **名前付きで** 拒否する（総称的な shape エラーに埋もれさせない）。sanitize 工程が無いので sanitize を間違えようがない。
+2. **必要 capability は statement の登録内容から導出する**。policy が `insert-order` を `:mode :write` と登録していれば、guest が何と呼ぼうと `:cf/d1-write` が要る。read-only grant を「読み取りだと言い張る」ことで広げられない。
+3. **不在は決して許可しない**。`:caps` 無し = 何も許可しない / `:key-prefixes` 無し = どの key にも届かない / `:statements` 無し = D1 呼び出し不能 / `:policy/forbid-wildcard` の既定は **true**。`kotoba.host-providers/resource-scope`（network allowlist 不在 = 全 URL 拒否）と同じ思想で、**何も書かなければ安全な設定になる**。
+4. **command map は閉じている**。未知の key は拒否（`:unknown-command-key`）。policy より先に provider option を知った guest がそれを密輸できない。
+5. **batch は単位として fail-closed**。guest は「行を書いてから key を張る」を 1 つの思考として計画する。末尾が拒否されたときに先頭だけ実行すると、guest が一度も推論していない状態が storage に残る。既定は `:on-deny :abort` で **何も実行しない**。`:skip` は明示要求時のみ。
+6. **ambient fallback 無し**。policy が名指しする binding を deployment が持たない場合は失敗であり、黙ってスキップも in-memory 代用もしない（D1 無しで deploy された Worker が「動いているように見えて何も書かない」を防ぐ）。binding の *種別* は shape（`getWithMetadata` / `prepare` / `head`）で検証するので、R2 bucket を KV と書いた policy は使用前に捕まる。
+7. **全 attempt を receipt に残す（拒否も含む）**。`capability-semantics.edn` の `:attempt-always-receipted` に従う。さらに拒否（`:denied`）と provider 失敗（`:failed`）を **区別する** — 「許可されていない」と「動かなかった」を混ぜると認可バグと可用性バグを同時に隠す。
+8. **pure core は clock を読まない**。`now` は全経路で引数。現在時刻に手を伸ばす pure core は誰も付与していない authority を取っている（かつテスト不能になる）。
+
+補助: quota は per-invocation（commands / write-bytes / d1-statements / reads）で、operator 指定値も hard ceiling で clamp し、clamp したことを `:policy/quota-clamped` に記録して可視化する。batch envelope（提出コマンド数）は個々の admission より **先に** 検査するので、拒否されると分かっているコマンドを大量に投げて host の admission 予算を消費させられない。`provider/execute!` は呼び出し側から渡された admitted list を信用せず **自分で admission をやり直す**ので、将来のリファクタを含めどの経路からも gate を迂回して `env.DB` に到達できない。
+
+## D5. completion gate の到達状況を誇張しない
+
+`application-profile.md` の 6 項目に対して:
+
+| # | 項目 | 状況 |
+|---|---|---|
+| 1 | closed capability contract の typed descriptor | partial — 本 repo 内では typed かつ closed。kind の `kotoba-lang/kotoba-lang` 登録は follow-up |
+| 2 | effect inference と compiler admission | **未着手** — guest frame ABI と、2 つの core repo にまたがる `effect-for-kind` / `op->kind` 登録が必要 |
+| 3 | ambient fallback 無しの policy-gated provider | done |
+| 4 | positive / denial conformance fixtures | done（denial reason 1 つにつき 1 fixture） |
+| 5 | quota / cancellation / fuel / audit | partial — quota と audit は done。request abort による cancellation は `execute!` に未配線 |
+| 6 | 2 runtime 以上の parity | partial — core は done（nbb + JVM Clojure、同一 `.cljc`）。provider は適用可能な runtime が 1 つ（workerd）で miniflare 実機テストは未実施 |
+
+**したがって「`.kotoba` から D1/KV/R2 が使える」とは主張しない。** 現時点で実在し検証済みなのは host 側 gate であり、ClojureScript から今日使える。guest→provider 経路は未配線で、`examples/session_planner.kotoba` は冒頭にその旨を明記している。
+
+# Consequences
+
+- `kotoba-lang` に Cloudflare storage の **データプレーン**の置き場ができた。今後 Worker を書く子リポは `kotobase-protocols` のように生 JS で binding を直接叩くのではなく、この gate を通せる。
+- kotoba の closed capability contract は汚さずに済んだ。将来 workerd が JSPI を提供したら、同期 import 版を *追加* 検討できるが、その時も effect-command plane の方が最小権限として優れている点は変わらない。
+- `com-cloudflare`（control）と `com-cloudflare-workers`（data）の 2 repo 体制になった。混同しないよう両 README に相互参照を書いた。
+- gate 項目 2 が未着手である以上、この family は当面 **cljs consumer 向けライブラリ**として機能する。これを「`.kotoba` 対応済み」と読み替えないこと。
+
+# Alternatives considered
+
+**A1. 同期 host-import を追加（`kv_get` 等を `:host-imports` へ）** — 却下。D2 のとおり workerd で履行不能。実装すれば「動いているように見えて嘘の値を返す」経路を closed contract に焼き込むことになる。
+
+**A2. Asyncify で wasm を後処理して同期に見せる** — 却下。binaryen による wasm 変換が emit pipeline に必要になり、`kotoba wasm emit` の出力が「そのまま動く artifact」でなくなる。fuel/memory 会計も変換後にずれる。得られるのは「同期に見える」という見た目だけで、安全性は何も向上しない。
+
+**A3. guest から生 SQL を渡させ、host 側で sanitize/parse する** — 却下。sanitize は間違えうるが、statement id 方式は間違えようがない（表現不能）。SQL parser を host に置くと、その parser 自体が新しい攻撃面になる。
+
+**A4. `env` を guest に薄く wrap して渡す** — 却下。ambient authority そのもの。`kotoba/app` profile が明示的に禁じている（no ambient DOM / filesystem / network / credential / provider-SDK access）。
+
+**A5. `com-cloudflare` に namespace を足す** — 却下。あちらは injectable `:http-fn` を持つ control-plane REST クライアントで、依存も実行文脈（どこからでも呼べる）も違う。data plane は Worker 内でしか意味を持たず、policy と receipt という別の関心を持ち込む。
+
+# Evidence
+
+- `npm test`（nbb）: 42 tests / 221 assertions, 0 failures
+- `clojure -M:test`（JVM、同一 `.cljc` core）: 34 tests / 191 assertions, 0 failures
+- `clojure -M:lint`（clj-kondo）: 0 errors, 0 warnings
+- conformance: admission gate が生成しうる denial reason 23 種すべてに到達する fixture を持ち、`every-declared-denial-reason-is-reachable` が集合一致を検証する（列挙されているが到達不能な reason は「誰も形を確認していない gate 分岐」なので許さない）
+- provider: stub binding（実 workerd と同じ shape 判別メンバを持つ）に対し、拒否された batch が **何も実行しない**こと、binding 不在が silent skip ではなく `:failed` になること、D1 が policy 側 SQL を実行し guest は params しか渡していないことを検証済み
+
+# 実装時に踏んだ罠（記録）
+
+`cloudflare.workers.policy/placeholder-count`（SQL の `?` を数えて宣言 arity と突き合わせる）を最初 `(int (nth sql j))` で書いたところ、**ClojureScript の `int` は `(bit-or x 0)` なので非数値文字列を 0 に強制する** — `(int \",\")` が `0` になり、数字 `0` と区別が付かず「全ての文字が数字に見える」バグになった。JVM では `nth` が Character を返すため通り、nbb でのみ失敗する典型的な `.cljc` 非対称性。reader conditional による `char-code` ヘルパに書き換えて解消（`command.cljc` の UTF-8 byte 計算は最初からこの形だったので無傷）。**同一 `.cljc` を 2 runtime で走らせる parity が、まさにこれを捕まえた。**\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-25 — note
+
+着地確認 + 実装中に踏んだ運用インシデント5件（gen-west-manifest の無関係pin混入 / ADR id 衝突 / 共有checkout干渉2件 / ledger seq 衝突）と deps.edn 後追い修正
+
+## 着地状態（2026-07-25 検証）
+
+- repo: kotoba-lang/com-cloudflare-workers (public), pin 1b2a7a461b2e
+- west 登録済み（manifest/west.yml + repos.edn :extra-projects、single-entry diff 5行）
+- 検証: nbb 42 tests / 221 assertions、JVM Clojure 34 / 191（同一 .cljc）、clj-kondo 0 errors 0 warnings
+
+## deps.edn 後追い修正（pin 1b2a7a461b2e）
+
+:test alias が `-n` で3つの namespace を列挙していたため、後から .cljc テストを追加しても JVM 実行から黙って漏れる状態だった — **parity 証拠が「失敗するテスト」を一つも出さずに劣化する**形。`-d test` による discovery に変更した。cognitect test-runner は .clj/.cljc のみ走査するので、workerd 専用の provider_test.cljs は列挙ではなく構造的に除外される。
+
+## 運用インシデント（記録）
+
+### 1. gen-west-manifest.cljs --entry が無関係な pin を書き込んだ
+
+`--entry com-cloudflare-workers` を指定したにもかかわらず、west.yml に **24 件の無関係な pin 変更**（cloud-itonami-assoc-* / isic-1101 / dynamics / kagami / loop-system-dynamics）と 6 件の rad-rid userdata 追加が書き込まれた。スクリプト自身が「対象外の変更 pin 24 件は検証しません(呼び出し側が書き込む entry のみ検証)」と表示しており、**検証していない pin を書き込むこと自体は止めない**。
+
+これらはローカル子リポ checkout の HEAD 由来で前進とは限らない（実際、後の push guard 検証で isic-1020/1101/1200/3520/3530/4912・com-cloudflare・dynamics 等が status=behind = pin 退行と判定された）。CLAUDE.md「再生成はローカル working HEAD で pin するので、子が遅れていると黙ってロールバックする＝pin 退行の罠」の再現。
+
+対応: west.yml を HEAD から復元し自分の 5 行 entry のみをテキスト挿入（API single-entry route と同等の最小 diff）。**follow-up 候補: --entry 指定時は対象 entry 以外の pin 変更を書き込まない、または明示 opt-in を要求するようスクリプトを直す。**
+
+### 2. ADR id 衝突（2607252300）
+
+採番時にローカル 90-docs/adr/ を確認して空きと判断したが、作業中に並行セッションが upstream で 2607252300 を確保していた（2607252300-murakumo-gpu-market-page-affiliate-monetization + ledger seq 69）。origin/main から worktree を切った時点で初めて気付き、2607253500 に採番し直した（ADR / README / capability_descriptors.edn の参照も更新）。
+
+教訓: **採番前に必ず origin/main を fetch する。** ローカルのみの確認では並行セッションの取得分が見えない。
+
+### 3. 共有 checkout での並行セッション干渉（2件）
+
+(a) 自分の commit 作成後、共有 working tree の west.yml に並行セッションが 4 件の pin 変更（cloud-itonami-isco-1213/1222 ほか）を書き込み、それが自分の commit に混入した。→ working tree のコピーを退避 → west.yml を HEAD~1 から再構築 → 自分の entry のみ commit → 退避コピーを書き戻して相手の WIP を温存。
+
+(b) ローカル main の後片付けで `git reset --soft HEAD~1` を実行したところ、その間に並行セッションが自分の commit の上に commit（074f05dbbc0）しており、**相手の commit をブランチから外した**。reflog から `git reset --soft 074f05dbbc0` で即座に復元し、index が HEAD 一致であることを確認。
+
+教訓: CLAUDE.md「superproject 本体 checkout は統合・閲覧専用」は正しい。**共有 checkout の main に対する reset/commit は、自分の commit を戻すだけの目的でも行わない** — HEAD が今も自分のものである保証がないため。作業は sibling worktree に閉じる。
+
+### 4. ledger seq 衝突（このイベント自身）
+
+本 note を最初に共有 checkout で append したところ seq 68 が割り当てられたが、**upstream には既に別 ADR の seq 68（:amend, adr-2607252100）と seq 69 が存在**していた。共有 checkout が origin/main から 58 commits 遅れているため、スクリプトが stale なファイルから次 seq を計算したことによる。
+
+対応: 自分が追加した行だけを取り除いて共有 checkout を元の状態に戻し（並行セッションの 65-67 行は温存）、origin/main から切った worktree で append し直して正しい seq を得た。
+
+教訓: **adr-ledger への append は origin/main と同期した checkout（または origin/main から切った worktree）で行う。** append スクリプトは同一ファイルへの同時書き込みは lock で守るが、**stale なファイルから採番することは防げない**。follow-up 候補: append 時に origin/main の ledger 末尾 seq と突き合わせて遅れを検出する。
+
+### 5. ローカル main の重複 commit（未解消・引き継ぎ）
+
+登録 commit 2068fb15577 がローカル main にあり、upstream には cherry-pick 版 dd0e5a708af として着地済み。ローカル main は origin/main から大きく behind。同期時に repos.edn（単一巨大行）で衝突しうる。上記 3(b) を踏まえ自分では触らず、乖離解消と併せて git-cleanup-conflict skill で扱うべき事項として残した。
+"}]

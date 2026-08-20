@@ -1,0 +1,184 @@
+[{:db/id -1
+  :adr/id "adr-2608121000-vendored-payment-code-has-drifted-on-live-paths"
+  :adr/title "ADR-2608121000: pay / treasury の vendored コピーが 6 repo にあり、うち複数が課金の認可経路で古い規則を走らせている —— 「Diff to check drift」と書いてあるが誰も diff していない"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-12"
+  :adr/last-verified "2026-08-12"
+  :adr/last_verified "2026-08-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "vendored-copy-drift-payment-path"
+  :adr/tags "vendoring, drift, payment, x402, treasury, pay, security, owner-decision"
+  :adr/related ["adr-2608120600-two-repos-shipping-one-namespace"
+                "adr-2608120800-the-kami-namespace-collisions-are-two-designs-not-a-stale-copy"]
+  :adr/supersedes ""
+  :adr/superseded_by ""
+  :adr/authoritative true
+  :adr/authoritative-for
+  ["pay / treasury の vendored コピーがどこにあり、どれだけ遅れているか（2026-08-12 実測）"
+   "そのうち課金の認可経路に載っているもの"
+   "vendoring 規約に関して決まっていないこと"]
+  :adr/body
+  "# ADR-2608121000: 「Diff to check drift」と書いてあるが、誰も diff していない
+
+**Status**: accepted（記録であって修正ではない）
+**Date**: 2026-08-12
+
+## Context
+
+namespace 衝突の調査（ADR-2608120600）で `pay/*.cljc` と `treasury/core.cljc` が
+複数 repo から出ていることが分かった。消費者を実測したところ、これは衝突ではなく
+**vendoring**（ライブラリのファイルを消費側の `src/` に写す）で、**しかも自己申告
+されている** —— どのコピーも `;; VENDORED from kotoba-lang …` ヘッダを持ち、多くは
+pin SHA 付きで、ヘッダ自身が **\"Diff to check drift\"** と書いている。
+
+**その diff を実行するものは、どこにも無い。**
+
+## 実測（2026-08-12、checkout 済み repo）
+
+vendoring している repo は指摘済みの 4 つではなく **6 つ**だった
+（`network-awai/club-shinshi-app` と `network-awai/net-kotobase` が追加）。
+**依存として宣言している repo はゼロ** —— つまり「vendor と dep の二重」による
+classpath 上の二重コピーは起きていない。危険なのは**純粋な陳腐化**の方。
+
+### 課金の認可経路に載っていることを確認した
+
+- `nexus-x402/src/nexus/worker.cljs` が `treasury/verify-payment` を呼び、
+  `handle-settle` が `fac/settle` を呼ぶ（有料リソースの配信を認可し settlement を書く）
+- `cloud-murakumo/src/cloud_murakumo/x402.cljs` が LLM proxy の 402 gate で
+  `treasury/verify-payment` を使う
+- `adserver/src/adserver/worker.cljs` が `treasury/receipt->onchain` で
+  **on-chain 観測から広告主クレジットを発行**する
+
+いずれも鍵は保持しない。しかし**支払いが済んだかの判定**はこれらのコピーが下している。
+
+### 遅れているだけでなく、規則が違うもの
+
+| 箇所 | 内容 |
+|---|---|
+| **`net-kotobase` の treasury** | **`finite-number?` ガードが無い**（commit `8c4306b`）。ライブラリ側の修正コメントは、これが無いと `verify-payment` の `(< confs min-confirmations)` を黙って無効化し「**未確認の支払いが確認済みとして通りうる**」と書いている。**fleet 中で最悪のコピー** |
+| **4 コピーの treasury** | 削除済みの **CREATE2 助言**を今も載せている。ライブラリは `0612e7b` でそれを消し、「その助言に従って L2 へ回すと**資金を焼く**」と警告を書き換えた |
+| **`nexus-x402` の facilitator** | ライブラリの 4 commit・**32 defs 中 24 が欠落**。`spend-verdict` / `spend-key` が無い＝**replay 保護が無い**。`gate` の `:challenge` 分岐も `:accepts` を返せず挙動が違う |
+| **3 コピーの `verify-payment`** | `:wrong-asset` 判定が無い（`nexus-x402` / `club-shinshi` / `net-kotobase`） |
+
+`nexus-x402` の `:wrong-asset` 欠落について精査済み: production 経路は
+`receipt->onchain` を通り、そこは実 USDC コントラクトアドレスで照合してから
+`:asset \"USDC\"` を固定するので**現時点では潜在**。ただし
+`etherscan-row->onchain`（攻撃者が選べる `tokenSymbol` をそのまま写す）を呼ぶ経路が
+できた瞬間に露出する。**どのビルドが実際に edge にデプロイされているかは未確認**
+（ソースを読んだだけ）。
+
+### pin 注記は信用できない
+
+`nexus-x402/src/pay/x402.cljc` は `8a77e516` を名乗るが中身は `848158d` 以降。
+`nexus-x402` と `adserver` の treasury コピーには SHA が無い。
+`cloud-murakumo` の facilitator ヘッダは、自分の兄弟ファイルが取り残されていることを
+自分で書いている。
+
+### 影が落ちた事故は既に 1 件記録されている
+
+`gftdcojp/cloud-murakumo/src/treasury/core.cljc` のヘッダ:
+「`scripts/x402-ingest.cljs` はこの repo の `src` を classpath に載せて走るので、
+**古い vendored コピーが本物のライブラリを SHADOW し、シンボルが解決しなくなる**。
+それがこの pin 注記の存在理由」。
+
+## Decision
+
+### 1. ここでは production code を直さない
+
+6 repo・課金経路・複数の別々の判断（どのコピーを更新するか、そもそも vendoring を
+やめるか）。**まとめて 1 つの PR にできる類ではない。** 記録して決定可能にする。
+
+### 2. 規約そのものが未決であることを明記する
+
+vendoring を定めた ADR は**存在しない**。同期の方針も、CI 検査も無い。
+そして `cloud-murakumo` 自身の `deps.edn` は逆の立場を書いている ——
+「**この repo に写しを残さない**のが要点で、写しがあると少しずつ違う実装になり…」。
+**規約が 2 つあって、片方は書かれていない。**
+
+### 3. 次の 1 手は drift 検出器
+
+ヘッダが provenance を自己申告している（`VENDORED from kotoba-lang (pay/core.cljc),
+pay pinned at edf58beb`）ので、**それを読んでライブラリ側の当該 SHA と突き合わせる
+機械検査は書ける**。ヘッダが「Diff to check drift」と言っている diff を、実際に走らせる。
+検出器が無いことが、6 コピーが誰にも知られず離れていった理由そのもの。
+
+## 検出器を書いた（同日）—— そして書式を 1 つしか知らない scan は嘘をつく
+
+`scripts/verify-vendored-copies.cljs`。ヘッダの provenance を読み、
+**その copy が名乗る commit** と **ライブラリの HEAD** の両方と本文を突き合わせる
+（比較は最初の `(ns ` から始めるので、ヘッダ自身は drift に数えない）。
+
+**PIN-HONEST と CURRENT を分ける。** stale は必ずしも欠陥ではない
+（vendoring は意図的なスナップショット）。**自分の pin と一致しない copy は欠陥**である ——
+provenance がそれしか無いのに、それが嘘だから。
+
+実測: **24 file / 11 current / 13 stale / 1 が自分の pin と不一致**
+（`nexus-x402/src/pay/x402.cljc`。`8a77e516` を名乗るが中身は HEAD 相当）。
+
+**この 24 という数字に辿り着くまでに 2 回、少なく数えた。**
+
+1. 最初は `<repo>/src` しか歩かず **15 件**。`net-kotobase` の 3 件は
+   `kotobase-api-gateway-cljs/src` にあり、その中には本 ADR が「fleet 中で最悪」と
+   書いた treasury copy が含まれていた。**1 つのレイアウトしか知らない scan は、
+   そのレイアウトに従う copy だけを見つける。**
+2. 次にヘッダ書式が 1 種類だと仮定して **18 件**。実際には 2 種類あり
+   （`VENDORED from kotoba-lang (pay/core.cljc), pay pinned at <sha>` と
+   `VENDORED from kotoba-lang/treasury (treasury/core.cljc, ADR-…), pinned at commit <sha>`）、
+   後者を取りこぼしていた。**両方を受けて 24 件。**
+
+どちらも「見つからなかった」ではなく「**探し方が狭かった**」であり、
+検出器が緑であることを安心の根拠にする前に、何を歩いて何を読んでいるかを
+確かめる必要がある。
+
+gate には載せない（既知の stale が 13 件あるので常に赤くなる）。群が片付いてから。
+
+## 訂正: 「13 stale」は 9 stale + 4 誤ラベルだった（同日、検出器を直した）
+
+**同じ穴に 3 度目に落ちたのは、私が書いた検出器そのものだった。**
+
+`upstream-body` が上流パスを `\"src/\" + <括弧内の文字列>` で組んでいた。ところが
+ヘッダの綴りは 3 通りあり、括弧に入るものが違う:
+
+| ヘッダ | 括弧内 | 組んだパス | 結果 |
+|---|---|---|---|
+| `(pay/core.cljc)` | `pay/core.cljc` | `src/pay/core.cljc` | 当たる |
+| `(src/i18n/core.cljc)` | `src/i18n/core.cljc` | **`src/src/i18n/core.cljc`** | 外れる |
+| `(core.cljc)` | `core.cljc` | **`src/core.cljc`** | 外れる |
+
+外れると `git show` が空を返し、`:current?` が `nil` になり、**`(remove #(true? …))`
+が nil を stale 側に落とす**。その結果 **HEAD と byte 単位で同一の 4 コピーが
+STALE と報告されていた。**
+
+修正: 候補パスを 3 通り試し、**上流を読めなかったものは `UNRESOLVED`** として
+stale と別に数える。実測は **24 件中 15 current / 9 stale / 0 unresolved /
+1 が自分の pin と不一致**（不一致の 1 件は `nexus-x402/src/pay/x402.cljc` で、
+**遅れているのではなく先に進んでいる** —— v2 codec を取り込んでヘッダを直し忘れている）。
+
+**`drifted` と `見ていない` を同じ箱に入れる検出器は、検出器が無いより悪い。**
+間違っている方のラベルが自信を持って出るからで、しかも今回それは
+**gate に載せようとしていた成果物**だった。
+
+## Consequences
+
+- **オーナー判断が要る点**（優先順）:
+  1. `net-kotobase` の NaN ガード欠落（未確認の支払いが通りうる）
+  2. 4 コピーに残る、資金を焼くと警告された助言
+  3. `nexus-x402` の replay 保護欠落 —— ただし `worker.cljs` が URL から `:seller` を
+     強制し `ADMIN_TOKEN` を要求するので**第三者からは到達不能**と確認済み。
+     **安全は vendored コード側ではなく host 側にある**
+  4. `:wrong-asset` 欠落 3 件
+  5. vendoring 規約の不在
+- **正しく依存している repo もある**（`local-murakumo` / `net-babiniku` / `marketplace` /
+  `swap` / `crowdfunding` / `kekkai`）。vendoring は普遍でも必然でもない。
+- 調査は checkout 済み repo のみ。**どのビルドが実際に稼働しているかは見ていない。**
+
+## Evidence
+
+- read-only の並列調査で file:line 付きに裏取り。ヘッダの pin SHA は
+  `kotoba-lang/pay` / `kotoba-lang/treasury` の実 git 履歴と突き合わせて検証済み
+- `pay/core.cljc` は 2 つの cloud-murakumo checkout で md5 一致（同一 repo の 2 checkout、
+  ADR-2608120600 の訂正のとおり）
+"}]

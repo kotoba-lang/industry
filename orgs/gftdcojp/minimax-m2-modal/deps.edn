@@ -1,0 +1,10 @@
+{:paths ["src" "resources"]
+ :deps {org.clojure/clojure {:mvn/version "1.12.0"}
+        org.clojure/data.json {:mvn/version "2.5.1"}
+        org.babashka/http-client {:mvn/version "0.4.23"}}
+ :aliases
+ {:test {:extra-paths ["test"]
+         :main-opts ["-m" "minimax-m2-modal.test-runner"]}
+  :client {:main-opts ["-m" "minimax-m2-modal.client-main"]}
+  :bench {:main-opts ["-m" "minimax-m2-modal.bench-main"]}
+  :kotoba {:main-opts ["-m" "minimax-m2-modal.kotoba"]}}}

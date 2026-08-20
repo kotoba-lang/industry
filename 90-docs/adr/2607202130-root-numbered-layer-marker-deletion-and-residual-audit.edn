@@ -1,0 +1,85 @@
+[{:db/id -1
+  :adr/id "2607202130"
+  :adr/doc_type "adr"
+  :adr/status :accepted
+  :adr/date "2026-07-20"
+  :adr/title "root 旧番号レイヤー marker 完全削除と repo-wide residual audit"
+  :adr/source-format "edn"
+  :adr/related ["2607173200"]
+  :adr/authoritative_for ["etzhayyim/root の旧番号レイヤー完全削除"
+                          "gftdcojp/root の旧番号レイヤー完全削除"
+                          "superproject exact root pin"
+                          "2026-07-20 repo-wide residual inventory"]
+  :adr/context "west multirepo 移行後も etzhayyim/root と gftdcojp/root に 10-/20-/30-/40-/60- の marker-only directory が残っていた。owner は Git 履歴を provenance として marker 自体を完全削除することを決定した。"
+  :adr/decision "root の retired numbered layers は marker を含めて存在させない。移行 provenance は Git 履歴と正規 EDN ADR に置く。root-owned workflow、workspace、guard、constitutional verifier は旧 path の存在を要求せず、旧 layer の不在を検証する。flat west path orgs/<org>/<repo> は維持する。"
+  :adr/execution
+  {:etzhayyim-root
+   {:revision "edea9848ef5cef195109f13c30cd384427e469d9"
+    :deleted-layers ["10-protocol" "20-actors" "30-graph" "40-engine" "60-apps"]
+    :deleted-files 728
+    :verification {:targeted-tests "27 passed"
+                   :pre-commit :passed
+                   :pre-push :passed
+                   :operational-legacy-paths 0}}
+   :gftdcojp-root
+   {:revision "7ba47a934020b3567d574373e2b822e23cdcfd44"
+    :pull-request 1555
+    :deleted-layers ["10-protocol" "20-actors" "60-apps"]
+    :retained-shared-layers ["00-contracts" "50-infra" "70-tools" "80-data" "90-docs"]
+    :verification {:boundary-negative-test :passed
+                   :ignored-junk 0}}
+   :superproject
+   {:merge-revision "94161a2043aa14aa73f574a3d770a414201dc48c"
+    :pull-request 811
+    :root-pins {:etzhayyim "edea9848ef5cef195109f13c30cd384427e469d9"
+                :gftdcojp "7ba47a934020b3567d574373e2b822e23cdcfd44"}
+    :verification {:generator :up-to-date
+                   :extracted-coverage "307/307"
+                   :revision-mismatch 0
+                   :orphan 0
+                   :unregistered 0
+                   :local-root-broken 0
+                   :strict-invalid 0
+                   :strict-orphan 0
+                   :strict-missing 0}
+    :ci-note "3 checks failed before steps=0 because of runner infrastructure; no executed code step failed."}}
+  :adr/residual-audit
+  {:scope "superproject manifest plus locally checked-out orgs/*/*; candidate repositories were checked against the exact west revision and origin/main"
+   :numbered-layer-projects
+   [{:path "orgs/gftdcojp/app-aozora"
+     :west-revision "3f91d61a01bed47ea9c76ced55024677a3a35484"
+     :origin-main "2f74a0cd1299e98bd96c8a2492a11025865ba572"
+     :layers ["10-protocol" "20-actors" "40-engine" "60-apps"]
+     :classification :active-monorepo-residual
+     :next-action :extract-or-prune}
+    {:path "orgs/jk-luxury/club-shinshi"
+     :west-revision "21f94874e4fcfa8180cac21624202d3feda57042"
+     :origin-main "684fab9a1cba78f0f12793e1e8e313fdf834e5aa"
+     :layers ["20-actors" "60-apps"]
+     :classification :active-monorepo-residual
+     :next-action :extract-or-prune}]
+   :local-sync-drift
+   [{:path "orgs/etzhayyim/root"
+     :state :checkout-still-shows-deleted-markers
+     :authoritative-remote "edea9848ef5cef195109f13c30cd384427e469d9"
+     :next-action :west-update}
+    {:path "orgs/gftdcojp/ai-gftd-apps-gftdcojp"
+     :state :checkout-still-shows-deleted-markers
+     :authoritative-remote "7ba47a934020b3567d574373e2b822e23cdcfd44"
+     :next-action :west-update}]
+   :go-language-residual
+   [{:path "orgs/gftdcojp/m365-archive/onedrive/Workspace/2311-darkwebspider"
+     :files ["go.mod" "go.sum"]
+     :classification :historical-archive
+     :next-action :prune-if-go-deprecation-is-repo-wide}]
+   :moved-marker-files
+   {:local-count 511
+    :outside-stale-root-checkouts 0
+    :interpretation "all locally observed MOVED.edn/*-MOVED.edn files are from the two stale root checkouts, not another registered child repository"}}
+  :adr/consequences
+  {:closed ["etzhayyim/root marker layers" "gftdcojp/root marker layers" "root exact repin" "307 extracted repository coverage"]
+   :open ["app-aozora numbered-layer extraction/prune"
+          "club-shinshi numbered-layer extraction/prune"
+          "shared checkout west update for both roots"
+          "m365-archive Go module disposition"]}
+  :adr/body "# ADR-2607202130: root 旧番号レイヤー marker 完全削除と residual audit\n\nGit 履歴を migration provenance とし、etzhayyim/root と gftdcojp/root の marker-only 番号レイヤーを完全削除した。superproject は両 root の exact SHA に repin 済みで、coverage 307/307、revision mismatch / orphan / strict findings はすべて 0。repo-wide 再走査では別 repo の app-aozora と club-shinshi に active な番号レイヤーを確認したため、root 完了とは分離した次の migration scope とする。共有 checkout の二つの root は remote main より古く、見えている marker は local sync drift である。Go/TinyGo の残件は m365-archive 内の historical go.mod/go.sum 1 module のみ。"}]

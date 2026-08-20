@@ -1,0 +1,321 @@
+[{:doc/type :graceful-rust-drain-procedure
+  :doc/id "month-3-graceful-rust-drain"
+  :doc/title "Month 3 Graceful Rust Fleet Drain Procedure (2026-09-13 15:00 JST to completion)"
+  :doc/date "2026-07-21"
+  :doc/author "Claude Code Agent"
+  :doc/status "ACTIVE"
+
+  :drain/overview
+  "Graceful Rust fleet drain is the final step of Month 3 canary (Stage 3b completion).
+   After 100% traffic is migrated to cljc fleet (2026-09-13 14:00 JST),
+   the Rust fleet must be shut down gracefully: close new connections, drain in-flight requests,
+   verify session migration, then deactivate pool. Total process: ~60 minutes."
+
+  :drain/preconditions
+  {:time "2026-09-13 15:00 JST (start of drain procedure)"
+   :traffic-state "100% cljc fleet (0% Rust)"
+   :gating "Requires Stage 3b gate PASS decision (99% → 100% cutover successful)"
+   :slo-state "p99 ≤ 100ms, 5xx ≤ 0.01%, memory stable"
+   :team-ready "Traffic-controller, monitoring-lead, escalation-lead on standby"}
+
+  :drain/phase-1-stop-new-connections
+  {:seq 1
+   :name "Stop Accepting New Connections on Rust Fleet"
+   :time-window "2026-09-13 15:00 to 15:01 JST"
+   :duration-minutes 1
+   :owner "murakumo-ops-lead (traffic-controller)"
+
+   :procedure
+   ["1a. Execute: set Rust pool drain flag in load balancer config"
+    "    Command: `murakumo-cli pool drain-start --pool rust-kotoba-server --no-new-connections`"
+    "1b. Verify: load balancer stops routing NEW requests to Rust pool"
+    "    Check: Cloudflare / Kubernetes load balancer rules (confirm Rust pool is excluded from new connections)"
+    "1c. Existing connections: still alive (in-flight requests continue)"
+    "1d. Monitor: Rust pool active connection count should begin to decrease"]
+
+   :monitoring
+   {:metric "murakumo_rust_pool_active_connections"
+    :expected-trend "Stable or slight decrease (as in-flight requests complete)"
+    :alert-threshold "If connections INCREASE (e.g., requests being routed despite drain flag) → ABORT"}
+
+   :completion-criteria
+   ["✓ Drain flag set on Rust pool"
+    "✓ Load balancer verified to not route new requests"
+    "✓ Existing connections remain alive (no forced closure)"]
+
+   :next-step "Proceed to Phase 2 (drain in-flight requests)"}
+
+  :drain/phase-2-drain-in-flight-requests
+  {:seq 2
+   :name "Drain In-Flight Requests (Grace Period: 60 seconds)"
+   :time-window "2026-09-13 15:01 to 15:02+ JST (up to 16:00 JST)"
+   :duration-minutes 60
+   :owner "murakumo-ops-lead (traffic-controller) + murakumo-metrics-lead (monitoring)"
+
+   :procedure
+   ["2a. WAIT: let existing connections complete naturally (graceful closure)"
+    "    Rationale: client requests should finish within normal latency (~100ms p99)"
+    "    Most requests (p95) complete within 95ms"
+    "    Tail requests (p99) complete within 100ms"
+    "    Grace period 60s is 600x the p99 latency (very generous)"
+    ""
+    "2b. MONITOR: Rust pool connection count every 10 seconds"
+    "    Report to monitoring-lead: 'T+10s: 150 connections, T+20s: 120 connections, ...'"
+    "    Expected: exponential decay (connections drop rapidly first 30s, then tail)"
+    ""
+    "2c. EXPECTED TIMELINE:"
+    "    T+10s: ~70% of connections completed (p95 latency window)"
+    "    T+30s: ~95% of connections completed"
+    "    T+60s: ~99% of connections completed"
+    "    Remaining 1% are extremely long-lived requests (rare, but possible)"
+    ""
+    "2d. HANDLE TAIL REQUESTS:"
+    "    If connections still exist after 60s grace period:"
+    "    - Identify: which endpoints/users are holding connections?"
+    "    - Are they truly in-flight or hung/stuck?"
+    "    - Log: final connection details (source, endpoint, duration)"
+    "    - FORCE: timeout remaining connections (acceptable per SLA)"
+    ""
+    "2e. VERIFY: cljc fleet stability during drain"
+    "    Watch for: no 5xx errors, no connection resets"
+    "    If cljc has issues: ABORT drain, keep Rust pool online"]
+
+   :monitoring-dashboard
+   {:connection-count "murakumo_rust_pool_active_connections (should → 0 by T+60s)"
+    :error-rate "murakumo_errors_5xx (should remain ≤ 0.01%, no spike)"
+    :latency-p99 "drama_profile_http_latency_p99 (should remain ≤ 100ms)"
+    :cljc-pool-health "murakumo_cljc_pool_active_connections (should stay stable, no unusual drops)"
+    :memory "jvm_memory_heap_used (cljc fleet, should not spike from drain)"}
+
+   :abort-conditions
+   ["If Rust connections not decreasing → possible hung request, investigate"
+    "If cljc fleet 5xx rate spikes → drain may be causing issues, ABORT"
+    "If latency p99 spike > 150ms during drain → cljc under stress, ABORT"]
+
+   :abort-procedure
+   ["1. Escalation-lead: [ABORT DRAIN] Connection drain stalled. Investigating."
+    "2. Restore Rust pool: `murakumo-cli pool drain-abort --pool rust-kotoba-server`"
+    "3. Resume accepting new connections on Rust (if traffic needed for recovery)"
+    "4. Escalate to canary-lead: unresolved issue, consider returning to Phase 2"
+    "5. Post-incident: analyze why connections were hung (network issues? stuck request?)"]
+
+   :force-shutdown-policy
+   "If grace period (60s) expires and connections still > 5% of peak:
+    - Log details of remaining connections (source, endpoint, duration)
+    - Force timeout: set connection TCP timeout to 5 seconds (kill hanging connections)
+    - Log: '[FORCE SHUTDOWN] Remaining connections force-closed after grace period.'
+    - This is acceptable per SLA (graceful drain was attempted, hard deadline enforced)"
+
+   :completion-criteria
+   ["✓ Rust pool active connections → 0 (or < 5 remaining)"
+    "✓ No errors or cascading failures on cljc fleet"
+    "✓ Drain completed within 60-second grace period"
+    "✓ All connection details logged for audit"]
+
+   :next-step "Proceed to Phase 3 (verify session migration)"}
+
+  :drain/phase-3-verify-session-migration
+  {:seq 3
+   :name "Verify Session Data Migration (100% in cljc)"
+   :time-window "2026-09-13 16:00 to 16:10 JST"
+   :duration-minutes 10
+   :owner "murakumo-metrics-lead (monitoring)"
+
+   :procedure
+   ["3a. QUERY: count total sessions in cljc fleet"
+    "    Query kgraph: SELECT COUNT(*) FROM sessions WHERE active = true"
+    "    Expected: N sessions (where N = active sessions at start of canary)"
+    ""
+    "3b. COMPARE: cljc session count vs Rust baseline"
+    "    Before canary: Rust had N sessions"
+    "    After 100% migration: cljc should have N sessions"
+    "    If discrepancy: investigate data loss"
+    ""
+    "3c. SAMPLE-CHECK: random 100 sessions"
+    "    Pick: 100 random session IDs from cljc fleet"
+    "    Verify: data integrity (all fields present, no corruption)"
+    "    Compare: spot-check against Rust baseline (if still available)"
+    "    Pass: all 100 sessions match"
+    ""
+    "3d. SPOT-CHECK: critical data paths"
+    "    Check: user authentication state (session token valid?)"
+    "    Check: user preferences/settings (migrated correctly?)"
+    "    Check: transaction state (in-progress transactions safe?)"
+    "    Check: cache consistency (no stale data in cljc cache?)"
+    ""
+    "3e. DOCUMENT: session migration verification record"
+    "    Create: 90-docs/deployment/MONTH-3-SESSION-MIGRATION-RECORD.edn"
+    "    Content: timestamp, session count, sample size, verification result"]
+
+   :abort-conditions
+   ["If cljc session count < Rust baseline - 10: possible data loss, ABORT drain"
+    "If sample check finds missing fields or corruption: ABORT drain"
+    "If discrepancy in critical data paths: ABORT drain"]
+
+   :abort-procedure
+   ["1. Escalation-lead: [ABORT DRAIN] Session migration incomplete/corrupted."
+    "2. Immediately: keep Rust pool on STANDBY (do not deactivate)"
+    "3. Investigate: what data was lost? Can it be recovered?"
+    "4. Escalate to owner: manual decision (restore from Rust, or investigate cljc data loss)"
+    "5. If forced to restore: move traffic back to Rust pool (partial rollback)"
+    "6. Post-incident: analysis of migration failure"]
+
+   :completion-criteria
+   ["✓ Session count: cljc = Rust baseline (±5 for rounding)"
+    "✓ Sample check: 100/100 sessions intact"
+    "✓ Critical data paths: all verified correct"
+    "✓ No data loss or corruption detected"]
+
+   :success-message "Session migration verification PASS. Ready to deactivate Rust pool."
+
+   :next-step "Proceed to Phase 4 (deactivate Rust pool)"}
+
+  :drain/phase-4-deactivate-rust-pool
+  {:seq 4
+   :name "Deactivate Rust Pool (7-Day Standby)"
+   :time-window "2026-09-13 16:10 to 16:15 JST"
+   :duration-minutes 5
+   :owner "murakumo-ops-lead (traffic-controller)"
+
+   :procedure
+   ["4a. SET RUST POOL STATUS: from DRAINING → STANDBY"
+    "    Command: `murakumo-cli pool status --pool rust-kotoba-server --state STANDBY`"
+    "    Effect: Rust pool is no longer accepting any traffic (new or in-flight)"
+    "    Infrastructure: Rust nodes remain UP and running (for emergency restore)"
+    ""
+    "4b. DOCUMENT: deactivation timestamp"
+    "    Record: when Rust pool went 0% traffic"
+    "    Reason: graceful drain completed"
+    "    Standby duration: 7 days (until 2026-09-20 16:15 JST)"
+    ""
+    "4c. NOTIFY: team and stakeholders"
+    "    Slack #prod-gates-wave5: '[RUST POOL DEACTIVATED] Graceful drain complete. Standby: 7 days.'"
+    "    Internal: notify murakumo-owner, ops-lead, platform-lead"
+    "    Email: brief summary to all team"
+    ""
+    "4d. STANDBY POLICY (7 days, until 2026-09-20):"
+    "    Rust pool remains operational (can be restored if emergency rollback needed)"
+    "    Estimated restore time: ~5 minutes (nodes already running, just switch traffic)"
+    "    Reason: if cljc fleet encounters catastrophic failure, Rust is fallback"
+    "    After 7 days: if no rollback → can safely decommission Rust infrastructure"
+    ""
+    "4e. POST-DEACTIVATION MONITORING:"
+    "    Watch: cljc fleet for full 48 hours"
+    "    SLOs: must remain stable (p99 ≤ 100ms, 5xx ≤ 0.01%)"
+    "    If issues found during 48h window → can still restore Rust within grace period"
+    "    If no issues by 2026-09-15 22:00 JST → high confidence in cljc"]
+
+   :completion-criteria
+   ["✓ Rust pool status set to STANDBY"
+    "✓ Deactivation timestamp recorded"
+    "✓ Team notified"
+    "✓ Standby SLA documented (7 days)"]
+
+   :success-message "Rust pool deactivated. cljc fleet now 100% production traffic. Standby: 7 days."}
+
+  :drain/post-drain-validation
+  {:seq 5
+   :name "Post-Drain Validation (2026-09-13 16:15 onwards)"
+   :duration "48+ hours"
+   :owner "murakumo-metrics-lead"
+
+   :validation-checklist
+   ["✓ cljc fleet handling 100% traffic"
+    "✓ p99 latency ≤ 100ms sustained (no regression with 100% load)"
+    "✓ 5xx error rate ≤ 0.01% (no application errors)"
+    "✓ Memory stable: per-instance < 256MB"
+    "✓ GC pause p99 ≤ 30ms (no GC regression)"
+    "✓ Connection pool healthy (active connections stable, no leaks)"
+    "✓ Session state consistent (parity N/A, but data integrity checks pass)"
+    "✓ No customer-facing incidents (support tickets, complaints)"
+    "✓ Zero errors in Rust pool event logs (post-deactivation)"]
+
+   :monitoring-window-1 "2026-09-13 16:15 to 2026-09-14 16:15 (24 hours)"
+   :monitoring-window-2 "2026-09-14 16:15 to 2026-09-15 16:15 (24-48 hours post-drain)"
+
+   :alert-thresholds
+   {:latency-p99 "If > 110ms → escalate to canary-lead (may indicate cljc load issue)"
+    :error-5xx "If > 0.05% → escalate (application issues)"
+    :memory-spike "If > 300MB peak → escalate (memory issue)"
+    :connection-leak "If active connections grow unbounded → escalate (pool leak)"}
+
+   :final-sign-off
+   {:date "2026-09-15 22:00 JST"
+    :decision-maker "murakumo-owner"
+    :options
+    ["✓ DECLARE DRAIN SUCCESSFUL: no issues observed in 48h window"
+     "⚠ DECLARE WITH CAVEATS: minor issues found but acceptable (document SLA)"
+     "✗ DECLARE RESTORE RUST: critical issue requires rollback within grace period"]}
+
+   :next-step "If SUCCESSFUL → decommission Rust pool after 7-day standby (2026-09-20)"}
+
+  :drain/emergency-restore-procedure
+  {:scenario "After Rust pool deactivated, cljc fleet encounters catastrophic failure (e.g., all nodes crash)"
+   :recovery-objective "Restore Rust pool to take 100% traffic (emergency fallback)"
+   :estimated-restore-time "~5 minutes (Rust nodes already running)"
+   :authorization "Owner decision (canary-lead or platform-lead)"
+
+   :restore-procedure
+   ["1. Escalation-lead: '[EMERGENCY RESTORE] cljc fleet failure. Restoring Rust pool to 100% traffic.'"
+    "2. Traffic-controller: execute restore command: `murakumo-cli pool restore --pool rust-kotoba-server --traffic-percentage 100`"
+    "3. Verify: Rust pool receiving 100% traffic within 2 min"
+    "4. Monitor: Rust pool health (latency, errors, connections)"
+    "5. If Rust pool stable: declare incident recovery"
+    "6. Post-incident: analyze cljc fleet failure, determine if canary can be retried"]
+
+   :restore-success-example
+   "cljc fleet crashes (all 12 nodes OOM) at 2026-09-14 10:30 JST
+    Escalation-lead alerts: cljc fleet down, Rust standby online
+    Owner authorizes emergency restore
+    Traffic-controller: restore Rust to 100% (T+30s)
+    Monitoring confirms: Rust handling 100%, latency normal (p99=98ms)
+    Incident declared resolved (T+3 min from detection)"
+
+   :restore-vs-retry-decision
+   [{:restore-scenario "cljc failure is transient (e.g., node reboot, temporary resource exhaustion)"
+    :decision "Restore Rust, investigate cljc issue, retry canary after fix"
+    :decision-timeline "Restore now, retry decision after 24h investigation"}
+    {:abort-scenario "cljc failure is structural (e.g., semantic bug, data corruption)"
+    :decision "Keep Rust on 100%, abort Month 3 canary, extend investigation to next month"
+    :decision-timeline "Return to Phase 2 investigation, plan retry for Month 4"}]}
+
+  :drain/standby-to-decommission
+  {:standby-end-date "2026-09-20 16:15 JST (7 days after drain completion)"
+   :pre-decommission-check
+   ["✓ 48h post-drain validation: PASS (no issues observed)"
+    "✓ 7-day stability window: no rollbacks or incidents"
+    "✓ cljc fleet healthy and performant"
+    "✓ No customer impact or data loss"]
+
+   :decommission-procedure
+   ["1. Escalation-lead: '[DECOMMISSION SCHEDULED] Rust pool decommissioning 2026-09-20 16:15 JST.'"
+    "2. Backup: capture final Rust pool metrics and health state (archive to Backblaze B2)"
+    "3. Graceful shutdown: stop all Rust nodes (clean drain, no force-kill)"
+    "4. Infrastructure: deallocate Rust pool resources (Kubernetes nodes, AWS instances)"
+    "5. Documentation: update Month 3 final report (Rust fleet retired, cljc live)"
+    "6. Archive: store Rust pool decommission record in 90-docs/"]
+
+   :decommission-success
+   "Rust fleet successfully retired. cljc kotoba-server is now sole production fleet.
+    Month 3 canary complete. Fleet migration from Rust to cljc finished.
+    All metrics stable. No outstanding issues. Ready for post-incident review."}
+
+  :drain/rollback-from-drain
+  {:scenario "During graceful drain (Phase 2), monitoring detects cljc fleet issue. Owner decides to rollback."
+   :current-state "Rust pool drain in progress: 50% connections remaining"
+   :owner-decision "Revert to 50% Rust traffic (abort drain)"
+
+   :rollback-procedure
+   ["1. Escalation-lead: '[ROLLBACK FROM DRAIN] cljc issue detected. Aborting drain.'"
+    "2. Traffic-controller: execute abort: `murakumo-cli pool drain-abort --pool rust-kotoba-server`"
+    "3. Restore: resume accepting new connections on Rust pool"
+    "4. Traffic: ramp Rust traffic back to 50% (from 0%)"
+    "5. Verify: Rust pool stable, load balanced"
+    "6. Document: '[ROLLBACK FROM DRAIN] Rolled back to 50% Rust due to cljc issue at T+20min. Investigating.'"
+    "7. Next decision: return to Phase 2 investigation (50% / 50%), or abort Month 3?"]
+
+   :estimated-rollback-time "< 2 minutes to restore Rust traffic"
+   :data-safety "Session data: cljc fleet still has 100% (no data loss). Can roll back to Rust anytime during drain."}
+
+  :adr/related ["2607072100-kotoba-server-fleet-deployment-strangler-fig.edn"
+                "2607072400-kaisha-pod-murakumo-fleet-deployment.edn"]}]

@@ -1,0 +1,488 @@
+[{:db/id -1
+  :adr/id "ADR-2608102000"
+  :adr/title "cloud-itonami flagship を 9 → 34 本に。item 7 の実体は Payment Link ではなく vertical ごとの価格策定だった"
+  :adr/status "accepted"
+  :adr/date "2026-08-10"
+  :adr/deciders "Jun Kawasaki（並列 agent での価格調査と Gftd Japan 口座への Payment Link 作成を明示承認）+ Claude Code"
+  :adr/supersedes ""
+  :adr/relates-to "ADR-2607122300 / ADR-2607189300（flagship チェックリストの正本）, ADR-2608052000（7 軸成熟度）, ADR-2607300900（GitHub Actions 撤去）, ADR-2608080000（成熟度向上 loop）"
+  :adr/body
+  "# ADR-2608102000: flagship を 9 → 34 本に
+
+**Status**: accepted / **Date**: 2026-08-10
+
+## 問い
+
+オーナー指示「flagship に相当する repo をさらに増やして」。
+
+## 何が止めていたのかを先に測った
+
+ADR-2607189300 の 7 項目チェックリストを ISIC actor 465 本に対して機械的に測った
+（入力: `manifest/itonami-maturity-evidence.edn` 2026-08-09 scan +
+`orgs/kotoba-lang/industry/resources/kotoba/industry/registry.edn` + 実 HTTP）。
+
+| item | 内容 | 465 本中の充足 |
+|---|---|---|
+| 1 | governed actor（5 部品以上） | 448 |
+| 2 | demo ページ | 445 |
+| 3 | operator-quickstart | 422 |
+| 4 | nightly 再生成 | 122 |
+| 5 | business/pricing docs | 425 |
+| 6 | registry の `:demo` | 88 |
+| 7 | Managed Starter（Stripe） | **10** |
+
+**非 flagship で 6/7 を満たす repo が 74 本あり、欠けているのは全部 item 7 だけだった。**
+74 本の demo URL は全件 HTTP 200 を実測（GitHub Pages は `build_type: legacy` なので
+Actions 無効化後も配信は生きている）。
+
+## item 7 は「リンクを貼る」作業ではなかった
+
+当初 item 7 を「Payment Link が無いだけ」と読み、全 vertical で tier も価格も同一
+（¥80,000/月 flat）だと仮定して**共有リンク 1 本に統一する案**を出した。
+オーナーが「repo ごとにビジネスモデルが違うのでは?」と指摘し、測り直した結果:
+
+- 既存 10 本の Managed Starter は**価格が揃っていない** ——
+  ¥80,000（4921/4922/5820/6310/6399/7810）/ ¥25,000（851/852）/ ¥20,000（853/854）。
+- 昇格候補 25 本のうち Managed Starter の価格を持っていたのは **1 本だけ**（7310）。
+  残り 24 本の `docs/business-model.md` は Open Business Blueprint という別ジャンルで、
+  価格の**形**（flat fee per incorporation / monthly platform fee 等）しか書いていない。
+
+**つまり item 7 の実体は「vertical ごとに価格を決める」ことであり、`buy.stripe.com` の
+URL はその結論の置き場所にすぎなかった。** 共有リンク案は取り下げた。
+
+### 副産物として見つかった fleet 規模の問題
+
+`¥50,000-150,000/月` という帯（ADR-2607189300 系が「HR/採用/CRM の per-seat SaaS
+由来であり他産業へ持ち越すな」と明記しているもの）が、**162 本の
+`business-model.md` に generated baseline として書かれている**。4210 の調査担当が
+自力でこれを見つけ、実測（¥11,000-87,750）と 1 桁違うと報告した。
+今回の 25 本のうち実際にこの帯を持っていたのは 4210 の 1 本だけで、そこは実測値へ
+置き換えた（`gen-actor-business-model.cljs` で再生成すると誤った帯に戻るため、
+ファイル冒頭の Generated baseline 注記にも例外を明記してある）。
+**残り 161 本は未処理の gap。**
+
+## 決定
+
+### 1. 24 vertical の価格を実競合ベンチマークから導出した
+
+8 つの並列 agent が 1 本ずつ調査した。共通の規律:
+
+- 競合を 5 社前後、日本市場と海外の両方から特定する。
+- **各社について価格を公開しているか否かを記録する。非公開であることも観測結果**
+  として書く（多くの B2B SaaS は要問い合わせ）。
+- 公開している社は**実額が書かれているページの URL** を出す。
+- **一次ソースで確認できなかった数値は採用しない**（実際に Clio / TaxDome の公式
+  ページが 403、Kwanti が 429 を返し、第三者集計値は根拠から除外した）。
+- actor の実スコープを README から読み、フル機能 SaaS の価格を持ち込まない。
+
+結果（円/月 flat、確度は公開価格が取れた社数に依存）:
+
+| repo | 産業 | 実測帯 | 決定 | 確度 |
+|---|---|---|---|---|
+| 8299 | 業務支援 | 6,000-16,500 | 15,000 | high |
+| 6312 | ポータル/POI | 3,850-45,000 | 20,000 | high |
+| 9522 | 家電修理 | 24,000-36,750 | 22,000 | high |
+| 6311 | 市場データ | 3,300-34,350 | 25,000 | high |
+| 4210 | 道路・鉄道 | 11,000-87,750 | 30,000 | high |
+| 6622 | 保険代理店 | 17,250-72,600 | 30,000 | medium |
+| 6810 | 不動産仲介 | 17,600-48,000 | 30,000 | high |
+| 9200 | 公営競技 | 14,850-44,850 | 30,000 | medium |
+| 9411 | 業界団体 | 3,000-56,250 | 30,000 | high |
+| 2620 | PC 製造 | 35,000-150,000 | 35,000 | high |
+| 3600 | 水道 | 0-22,350 | 35,000 | **low** |
+| 4630 | 食品・酒類卸 | 19,800-89,850 | 35,000 | medium |
+| 6201 | マーケ運用 | 20,000-148,000 | 35,000 | high |
+| 6420 | 持株会社 | 20,000-312,500 | 35,000 | high |
+| 6612 | 証券仲介 | 29,850-67,500 | 35,000 | medium |
+| 0610 | 原油採掘 | 28,800-46,800 | 38,000 | medium |
+| 6202 | サポート運用 | 28,500-172,500 | 40,000 | high |
+| 6910 | 会社設立 | 43,780-312,500 | 40,000 | high |
+| 5320 | ラストマイル配送 | 30,000-202,350 | 45,000 | high |
+| 6512 | 損害保険 | 14,850-94,800 | 45,000 | medium |
+| 6920 | 会計・監査 | 60,000-223,500 | 50,000 | high |
+| 2910 | 自動車製造 | 50,000-150,000 | 60,000 | medium |
+| 5210 | 石油ターミナル | 28,800-42,000 | 60,000 | **low** |
+| 7820 | 人材派遣 | 22,000-240,000 | 60,000 | high |
+| 7310 | 広告 | （2026-07-25 に策定済み） | 80,000 | 既存 |
+
+**24 本すべてが ¥50,000 を下回った**（2910 のみ ¥60,000）。162 本に焼かれている
+¥50k-150k は、実測に照らすと大半が過大である。
+
+### 2. 価格の「形」も根拠づけた
+
+金額だけでなく課金の形を選んだ理由を各 `business-model.md` に残した。特筆:
+
+- **9200（公営競技）は従量課金を構造的に拒否した** ——「賭け量に連動した課金は、
+  プレイを止めるはずの層の収益を、止め損ねたプレイの量に結びつける」。
+  pricing preference ではなく structural conflict として除外。
+- **6202 は per-seat を拒否** —— Governor の仕事量はエージェント人数ではなく
+  ケース件数に比例するので、席数課金は価値と価格が乖離する。
+- **6420 は per-entity を拒否** —— 1 ストラクチャ flat にすることで子会社が増えても
+  請求が動かない（EntityKeeper 型の entity ブロック課金と競合しない）。
+- **7820 は隣接 repo の数字を意図的に使わなかった** —— 派遣の課金ドライバは内勤席数
+  ではなく稼働スタッフ数（HRstation ¥800/人、e-staffing ¥1,000/人 が実測でそれを
+  示す）で、7810（職業紹介）の per-seat CRM 帯とは根本的に違う。
+
+### 3. 確度の低さを隠さなかった
+
+- **5210（石油ターミナル）low** —— TAS/TMS 本体 4 製品の月額公開は 0 件。Implico の
+  `> 50k` は通貨記号が印字されておらず実装費込みの一時予算なので月額換算しない。
+  Titan Cloud の $50-250/site/month は第三者レビューサイトの推定でベンダー開示では
+  ないため不採用。本文に「隣接層からの外挿であって market-validated price として
+  引用するな」と明記。
+- **3600（水道）low** —— 検証可能な公開価格は年次水質報告の 1 機能に限られ、無償の
+  EPA iWriter が現実の下限として存在する市場。Klir / 120Water の帯は第三者推定なので
+  採用しない。
+- **2910 medium** —— 自動車向け MES と型式認証まわりは 1 製品も価格を公開しておらず、
+  ホモロゲーションは製品市場ですらなく役務市場だった。¥60,000 は「市場検証済みの値
+  ではなく、改訂可能な初期配置」と本文に明記。
+
+### 4. Stripe
+
+Gftd Japan 株式会社の live 口座（`acct_1AFjSQ...`）に product + price + payment link を
+25 組作成した。既存 10 本のリンクは**別口座**にあり（この口座の payment_links は 0 件
+だった）、そちらへは触れていない。全 25 リンクの HTTP 200 と JPY を実測確認済み。
+metadata に `service=cloud-itonami` / `isic` / `tier=managed-starter` / `repo` を持たせ、
+後から口座側だけで vertical を引けるようにしてある。
+
+**有償契約は 1 件も無い。** 各 `business-model.md` に「live で動く checkout であって、
+既存収益の主張ではない」と明記した（isic-851 の先例に合わせた）。
+
+### 5. designate
+
+`scripts/itonami-maturity-dynamics.cljs` の `flagship-paths` を 9 → 34 本にした。
+**この集合に repo を足すのは指定であって測定ではない。** 6/7 を満たす repo は他に
+49 本あるが、item 7 の価格策定が済んでいないので入れていない。スコアが高いことを
+理由にここへ足さないこと。
+
+## 証拠（すべて各 repo の main に着地済み）
+
+| repo | merge |
+|---|---|
+| 0610 | 89cdbb1 |
+| 2620 | 32c6ac3 |
+| 2910 | 7b2a06c |
+| 3600 | d611b3d |
+| 4210 | bd2afe9 |
+| 4630 | 4bae7a9 |
+| 5210 | d418391 |
+| 5320 | 90e1e8d |
+| 6201 | 0afffac |
+| 6202 | c742694 |
+| 6311 | 833bad9 |
+| 6312 | e1a3f8d |
+| 6420 | 0574894 |
+| 6512 | 66adf5c |
+| 6612 | 7676882 |
+| 6622 | 9302cb3 |
+| 6810 | ba19060 |
+| 6910 | 3f0a685 |
+| 6920 | 0d02ad9 |
+| 7310 | d3be8e4 |
+| 7820 | fa47348 |
+| 8299 | fdcef1c |
+| 9200 | 9bcc009 |
+| 9411 | facd401 |
+| 9522 | f620a36 |
+
+変更は各 repo の `docs/business-model.md` 1 ファイルのみ。共有 checkout は
+detached HEAD のまま触れていない（全作業は superproject 外の worktree）。
+force-push / rebase 無し。
+
+## 残る gap（正直に）
+
+1. ~~**item 4（nightly 再生成）は全 repo で死んでいる。**~~ → **2026-08-10 に 17/25 を
+   fleet へ移した（同日追記）。** 下の「item 4 の fleet 移行（2026-08-10 実施）」節を見ること。
+   残り 8 本は `regenerate.yml` 自体が壊れていることが gate で判明し、修正には
+   `workflow` OAuth scope が要るため未着手。以下は移行前に測った内容で、そのまま残す:
+
+   既存 flagship 9 本を含め、
+   最後に走ったのは 2026-08-04 —— GitHub Actions を fleet 全体で無効化した日
+   （ADR-2607300900）と一致する。`gh api .../actions/runs` で実測。
+   **したがって item 4 は現在すべての flagship で名目だけである。**
+   移行先は murakumo fleet で、必要な作業は測ってある:
+   - 25 本すべてに `regenerate.yml` があり全部に push ステップがある。
+   - 兄弟 repo の取り方が 2 系統。`run:` 内の `git clone`（6201/6202）は
+     **現状の gate でそのまま動く**（ノードの github.com egress は 2026-08-05 に
+     10 台で実測済み）。`uses: actions/checkout` + `with: {repository: ...}`（23 本）は
+     translator が**無条件で no-op にする**ため、classpath が消えたまま
+     「実行した」ことになる。
+   - 必要な修正は `scripts/fleet-ci/gates/github_workflow_run.cljs` の `step-kind` で
+     「`repository:` 付き checkout を実 clone に翻訳する」1 点と、push ステップの扱い
+     （gate は検証専用なので push せず、生成物 drift で fail させる）。
+     tick.cljs に新機構は要らない。
+   - 兄弟 repo の総和は 11 個（langchain / langgraph / langchain-store / css / html /
+     kototama / robotics / logistics / okaimono / omise / cloud-itonami-isic-8291）。
+   - **6201/6202 は兄弟 clone を自前で持つので、gate が落ちることの実証に使える
+     最小スライス。**
+2. **161 本の `business-model.md` に無根拠な ¥50k-150k 帯が残っている。**
+   生成器 `gen-actor-business-model.cljs` 側を直さないと再生成で戻る。
+3. **`manifest/west.yml` の pin が 25 本ぶん遅れている。** 各 repo の main が
+   1 merge commit 進んだ。`west-pin-advance` 経路で別途進める。
+   **これが済むまで成熟度を測り直さないこと** —— scan は `orgs/` の実 checkout を
+   読むので、pin が遅れている今スキャンすると今日着地した仕事を「無い」と測る。
+   したがって `90-docs/system-dynamics/itonami-maturity.datoms.edn` は本 ADR の
+   `flagship-paths` 変更を**まだ反映していない**（次の
+   scan → dynamics で 9 → 34 本の層構成に変わる）。正しい順序は
+   pin 前進 → `west update` → `itonami-maturity-scan.cljs` → `itonami-maturity-dynamics.cljs`。
+4. **`90-docs/pricing-intelligence/pricing-intelligence-ledger.edn` に今回の 24 件を
+   追記していない。** `:rec/vertical` が catalog への lookup ref なので、ISIC repo が
+   catalog に無い場合に面全体を壊すリスクを避けた。catalog 側の vertical 追加と
+   セットで行う。
+5. **5210 / 3600 の価格は確度 low。** 実見積が 1 件でも観測できたら改定する。
+
+## item 4 の fleet 移行（2026-08-10 実施）
+
+`scripts/fleet-ci/gates/github_workflow_run.cljs` を直し、`gates.edn` に 17 本を登録した。
+
+### 直した穴 2 つ（どちらも「黙って嘘をつく」形だった）
+
+1. **`actions/checkout` が `noop-actions` に入っていた。** `with: {repository: ...}`、
+   つまり**別の repo** を持ってくる checkout まで no-op になり、classpath が消えたまま
+   `:runnable` と判定されていた。25 本中 **23 本**がこの形（兄弟 repo 2〜7 個）。
+   checkout は `checkout-kind` が中身を見て `:checkout-self` / `:checkout-repo` に分ける。
+2. **YAML パーサが flow map を文字列のまま返していた。** ファイル冒頭は
+   「複雑なフロー map は読めたら例外にする、黙って無視しない」と書いていたのに、
+   実際は黙って無視していた。`with: {repository: kotoba-lang/langchain, path: ...}` が
+   丸ごと 1 個の文字列になり `(get with \"repository\")` が nil を返す ——
+   **これが 1 の穴を見えなくしていた本体。** `flow-map` を足した。
+
+### gate がやること
+
+使い捨て workspace を組み、配られた tree を workflow が要求する位置
+（`path: orgs/cloud-itonami/<repo>`）へ置く → `repository:` 付き checkout を実 clone に
+翻訳 → 実 actor で demo を再生成 → **`git push` を含む step は実行しない**（gate は検証で
+あって公開ではない）→ **実行前後の sha256 を突き合わせ、committed 済みの生成物が
+動いたら落とす**。
+
+**workspace は self-path の有無に関わらず必ず作る。** 6201/6202 は `run:` の中で
+`git clone … ../../kotoba-lang/crm` と checkout の外へ書くので、in-place で走らせると
+手元では **west 管理の共有 checkout を汚す**（実測して気づいた）。
+
+drift 判定を workflow 自身の `git diff --quiet` に任せないのは、配られる tree が
+tar 展開で `.git` を持たず、`git diff` が「差分なし」ではなく *not a git repository* で
+落ちるため。実行前から在ったファイルだけを比較するので `npm install` の生成物は
+drift に数えない。
+
+### 落ちることを確かめた（実測 2026-08-10）
+
+| 対象 | 期待 | 実測 |
+|---|---|---|
+| isic-9522 無改変 | pass | **exit 0**（`no drift — 28 committed file(s)`） |
+| isic-9522 の committed な `operator-console.html` を 1 セルだけ手編集した copy | fail | **exit 1**（`drift docs/samples/operator-console.html`）。**workflow 自身の grep 2 本と行数検査は 3 つとも通ったまま** —— Actions 経路では構造的に検出できなかった形 |
+| isic-6910（依存欠落） | fail | **exit 1**（`Local lib io.github.cloud-itonami/inkan not found`） |
+| isic-9522 を `:include-ext` 相当（30→28 file）に絞った tree | pass | **exit 0** |
+| isic-6910 を egress 無しで analyze | unsupported | **`checking out 3 other repo(s) needs network egress`** |
+
+### gate が見つけた本物の欠陥
+
+**6910 の夜間再生成は 2026-08-09 から壊れていた。** `inkan` 依存が deps.edn に入った
+のが 08-09（commit 5aa714a）で、`regenerate.yml` は今も checkout していない。
+Actions の最終成功は 08-04 —— **依存が入った時点で CI は既に止まっていたので、
+壊れたことを誰にも報告されなかった。** これは ADR-2607300900 が言う「動いていない CI は
+green に見えたまま何も検査しない」の実例で、今回はさらに **workflow ファイルが残って
+いるせいで『検査されている』という誤った印象**まで与えていた。
+
+同じ検査を 25 本に当てると、**8 本の `regenerate.yml` が `deps.edn` の `:local/root` を
+全部 checkout していない**: 6910←inkan / 6311←org-ethereum-jsonrpc /
+6312←isic-6311 / 7310←langchain-store / 6420←kototama,langchain-store /
+2910←isic-0710,isic-2410,isic-2930 / 6612←kototama / 6622←kototama。
+
+**この 8 本は gates.edn に載せず、理由と共に名指しで残した。**「落ちるから外した」の
+ではない —— 直すには workflow ファイルの編集が要り、**このワークスペースの token は
+`workflow` OAuth scope を持たない**（CLAUDE.md に既出の制約）。scope が得られ次第
+checkout 行を足して登録する。
+
+### 追記（同日）— workflow を読む方式をやめ、murakumo native にした
+
+オーナー指示（2026-08-10）「workflow は github は使わずに, murakumo を使うようにして」。
+`gates/github_workflow_run.cljs` 経由をやめ、**`.github/workflows/` を一切読まない**
+`gates/itonami-regenerate.cljs` に置き換えた。25 本すべてをこれで登録している。
+
+**なぜこれが上の『8 本は直せない』を解くのか。** 8 本が落ちていた理由は fleet ではなく
+**workflow が `deps.edn` の `:local/root` を書き写し損ねていた**ことだった。つまり
+「checkout 一覧を人が workflow に書き写す」工程そのものが故障点で、6910 はその工程が
+2026-08-09 に破れたまま誰にも報告されなかった。**依存の正本は deps.edn であって
+workflow ではない** —— そこから推移的に辿れば書き忘れは構造的に起きない。
+
+実測: **8/8 が workflow を 1 行も触らずに PASS**。isic-6910 は workflow が宣言して
+いなかった `inkan` と `jp-go-dds` を含む 5 本、isic-6420 は推移依存 18 本を解決した。
+`workflow` OAuth scope が無いという制約は、**迂回したのではなく無関係になった**。
+
+gate は使い捨て workspace に `orgs/<org>/<repo>` の形で tree を置き（`:local/root` が
+`../../<org>/<x>` と `../<x>` の 2 形なので深さ 2 が要る）、deps.edn を推移的に辿って
+足りない依存を clone し、`clojure -M:dev:render-html` を回し、実行前後の sha256 を
+突き合わせる。
+
+**実装中に踏んだ罠 2 つ（どちらも「相対パスを、それが書かれている場所から解決する」
+という 1 つの原則の違反）**:
+
+1. `../<name>` を「検査対象 repo と同じ org」と決め打ちした。しかし `../<name>` は
+   **推移依存の中**にも現れる —— isic-6420 → kototama（kotoba-lang）→ `../kotoba`。
+   kototama から見れば `kotoba-lang/kotoba` なのに `cloud-itonami/kotoba` を clone
+   しようとして落ちた（6420/6612/6622 の 3 本）。org は解決後の絶対パスから採る。
+2. lib 座標（`io.github.<org>/<name>`）から org を導こうとした。isic-6910 は
+   `io.github.com-junkawasaki/langchain-clj` が `../../kotoba-lang/langchain` を指す ——
+   改名前の座標が残っており座標と実 repo が一致しない。**パスの方が正しい。**
+
+### gate が見つけた 2 つ目の本物の欠陥 — 公開中の demo が古かった
+
+**isic-5210 の公開 demo は tank-7/8/9 の 3 基が抜けていた。** 夜間再生成が止まって
+いた 08-04 以降に actor の出力へ入ったデータで、`operator-console.html` だけが
+古いまま公開され続けていた。sha256 の drift として検出し、再生成して着地させた
+（`c23fd22`）。**committed 済みの値を読むだけの経路では原理的に検出できない種類の
+ずれ**で、これがこの gate を作った理由そのものである。
+
+### 追記（同日、その2）— 実ノードで回して、CI 自体が死んでいたのを見つけた
+
+**gate をローカルで 25/25 通した後、実ノードで 1 周回したら 2 つ壊れていた。**
+
+1. **fleet CI 全体が 2026-08-07 から動いていなかった。** `tick.cljs` が kagami の
+   `bin/fleet.cljs` を決め打ちで探していたが、kagami は同日 `bc7cdce`
+   「this repo is kagami, so its namespaces are kagami.*」で `bin/kagami.cljs` へ
+   改名しており、tick は毎回 `FATAL kagami tree missing bin/fleet.cljs` で
+   **gate を 1 本も実行せずに即死**していた。`manifest/fleet-ci.edn` の最終 receipt が
+   `2026-08-07T03:47Z` で止まっているのが証拠。
+   **GitHub Actions を撤去した後の唯一の CI がこれなので、この 3 日間このワークスペース
+   には動く CI が 1 つも無かった。** しかも誰にも報告されなかった —— ADR-2607300900 が
+   「動いていない CI は green に見えたまま何も検査しない」と書いたその失敗を、
+   移行先の側で繰り返していた。両方の名前を試すようにした。
+2. **gate が実ノードでだけ落ちた。** `itonami-regenerate.cljs` が `JAVA_HOME` を
+   敷いておらず、ノードの非対話 ssh は JDK が見えない（`/usr/bin/java` は stub）ので
+   `clojure` が即死した。**手元の macOS では JDK が既定で引けるのでこの差は出ない** ——
+   ローカル 25/25 通過後に実ノードで初めて出た。`github_workflow_run.cljs` は同じ理由で
+   最初からこれを export していた。
+
+**実測（実ノード、`tick --only cloud-itonami-isic-9522 --dry-run`）**: 修正前 exit 1
+（gate 未実行）→ 修正後 **exit 0**、`benjamin` 上で gate 実行、`no drift — 27 files`、
+receipt `0a7f4749d323` 署名済み。
+
+### 追記（同日、その3）— 残りの gap を閉じた
+
+- **無根拠な `¥50k–150k/月` 帯を 153 repo から除去した。** 文言は完全に一様
+  （`packages are the revenue, in the same ¥50k–150k/月 band the sibling flagships
+  anchor against real competitor SaaS`）で、GitHub Contents API で 153/153 を
+  置換（fail 0 / skip 0）。**残る 5 本は触っていない** —— 6399/6310/7810/5820 は
+  その帯が HR/採用/CRM で実際に根拠づけられた元 flagship、4210 は自分の訂正注記。
+  置換後の文は価格を主張せず、「この vertical はまだ値付けされていない。24 vertical を
+  実測したら全部 ¥15,000–60,000 に落ちた。自分の競合を測れ」と書いてある。
+- **pricing-intelligence に 25 件を追記し、08-08 から壊れていた面を直した。**
+  `query.clj`（EDN が本当に transactable であることの runnable proof）が
+  `entid-strict` で落ちていた —— 08-08 の追記が catalog に無い
+  `:vertical/isco-1212` と `:product/{jinjer,smarthr,kaonavi,hrbrain,cloudflare-r2}` を
+  参照していたため。**origin/main の内容だけで再現する**ので、追記時に proof が
+  回されていなかったということ。6 entity を足して解消し、catalog 179 / ledger 182 が
+  実 DataScript に載ることを実測した。band に通貨記号を前置していた表示バグも直した。
+- **既存 flagship 9 本のうち 6 本を gate に載せた**（851/852/853/854/4921/5820、6/6 PASS）。
+  **6399/6310/7810 は意図的に載せていない** —— あの 3 本の再生成は実在の求人ボード API から
+  live データを取るので、出力は世の中が変われば正当に変わる。つまり *publisher* であって
+  *verifier* ではなく、drift 契約と噛み合わない（載せれば求人が 1 件動くたびに赤くなる）。
+
+### 本番で復旧したことの証拠（closing 時に実測、2026-08-10）
+
+`manifest/fleet-ci.edn` の receipt を日付で数えると、停止と復旧が数字で出る:
+
+| 日付 | receipt |
+|---|---|
+| 2026-08-07 | 31 件（kagami 改名の**前**） |
+| 2026-08-08 | **0 件** |
+| 2026-08-09 | **0 件** |
+| 2026-08-10 | 10 件（修正の**後**） |
+
+しかも 08-10 の receipt が記録している tip は `b5096f414a4d…` ——
+**tick を直したその commit そのもの**である。常駐 tick が修正を拾い、
+`levi` 等で検証を再開し、署名付き receipt を書き始めた。**`--dry-run` での
+1 回きりの確認ではなく、本番の常駐経路が動いている。**
+
+### 復活した CI が出した赤の内訳（2026-08-10、closing 後の追記）
+
+CI を直した直後、`manifest/fleet-ci.edn` の fail は 08-07 の **3 種**から 08-10 の
+**8 種**に増えた。当初これを「盲目だった 3 日間に積まれた 4 件の退行」と読んだが、
+**1 件ずつ当たったら内訳は違った**:
+
+| gate | 実体 |
+|---|---|
+| `net-kotobase` | **既に上流で直っていた**。現 tip `93d176d`（別セッションの「the DO test went with its subject; gate is green again」）で gate 全体が OK |
+| `amu-jdk-free` | **既に上流で直っていた**。赤は sha `2644eb9` の判定で、現 tip `3b45ae11` では `LOCK-FRESH` |
+| `root-repository-roles` | **現 tip でも本当に赤**。`amu` の `:depends-on` が 8 本なのに実 production 依存は 13 本 —— #1835 の IR 抽出で入った `kotoba-hir`/`kotoba-object`/`kotoba-sema` と、以前から漏れていた `io-ipld`/`io-multiformats`。**修正して着地**（`kotoba-lang/amu` `c2ff8799`、`verify-repository-roles: OK deps=13`）+ pin 前進（`bbddac0`） |
+| `root-itonami-org-id` | **本当に赤**。intake が `(str/replace \".\" \"-\")` で順方向導出していた。**修正して着地**（`network-awai/cloud-itonami` `d8888896`）+ pin 前進（`e39ff47`）。ただし gate は **live** を見るので**デプロイするまで赤のまま** |
+| `root-permit-index` | 射影が正本とずれていた。**再生成して着地**（`e7748f5`）。ただし下記のとおり fleet では緑にならない |
+| `root-observatory-registry` | 本当に赤。hayari の登録が `${REPO}` 起点でない `/tmp/…` を指し、台帳から hayari・hirameki が落ちている（`--only` の部分実行で全体を上書きした疑い）。observatory loop の持ち主の領域なので未着手 |
+| `test-cloud-itonami` | sites bundle 4 checks。pin を前進させたので次の tick で再評価される |
+
+**したがって「3 日間で 4 件退行した」は正しくない。** 正しくは
+「**3 日ぶんの判定が止まっていたので、古い赤と新しい赤と直った赤が同じ画面に並んだ**」。
+receipt の sha を見ずに直しにいくと、既に直っているものを直そうとする。
+この教訓は CLAUDE.md「赤い gate を直す前に 3 つ確かめる」に規則として書いた。
+
+### `root-permit-index` は fleet では構造的に緑にならない
+
+`gen-permit-index.cljs` は `<root>/orgs/cloud-itonami` を読むが、
+`git ls-files orgs/cloud-itonami` は **0 件**（west 管理で root repo の外）。fleet が
+配るのは root repo の tree だけなので、**射影をどう直しても再生成側が空を見る**。
+射影自体は正しくなった（本体で `permit-index-check: OK`、1657 行 / 188 法域）が、
+gate を緑にするには `manifest/projection-verify.cljs` の contract 方式へ寄せるか、
+`orgs/` が実在する場所で回す設計変更が要る。**未着手。**
+
+### 実ノードでの最終確認（2026-08-11、closing 時）
+
+`manifest/fleet-ci.edn` の最新判定:
+
+- **`itonami-regenerate-*` 31 本すべて PASS**（実ノード、tip ごとの判定）。
+  item 4 は名目ではなく実際に回っている。
+- `amu-jdk-free` PASS / `net-kotobase` PASS。
+- `root-repository-roles` は **失敗対象が移動した** —— `amu` は解消し、次に
+  `kotoba-lang/kotoba-kir`（`dag-cbor` / `io-multiformats` / `kotoba-hir` が
+  宣言漏れ）が出た。同じ IR 抽出由来の同型で、**修正して着地**
+  （`kotoba-lang/kotoba-kir` `c1ab9c7e`、`verify-repository-roles: OK deps=4`）+
+  pin 前進（`4d4ab97`）。
+- `root-itonami-org-id` / `root-permit-index` は既知の理由で赤のまま
+  （前者はデプロイ待ち、後者は入力が repo 外）。
+
+**この『直すと次が出る』形は劣化ではない。** 3 日間 CI が止まっていた間に
+複数 repo で宣言が実依存から離れており、gate は最初の 1 件しか報告しない。
+1 件直すごとに次が見える。**赤が動くのは検査が生きている証拠**である。
+
+### 次の agent への resume point
+
+1. **本番 tick を `--dry-run` 無しで通す**（landing / commit status / CD が未検証）。
+   `FLEET_CI_SIGNER_PEM=$HOME/.gftd/fleet-ci-signer-tip.pem nbb scripts/fleet-ci/tick.cljs --only cloud-itonami-isic-9522`
+2. **31 本を同時に回したときの負荷を測る**（maven 解決の初回が重いはず）。
+   `nbb scripts/fleet-ci/tick.cljs --all --dry-run`
+3. **6399 / 6310 / 7810 の publisher 経路**。live データを取る再生成なので drift gate
+   では表現できず、「実行して commit する」仕組みが要る。この 3 本の夜間更新は
+   2026-08-04 から止まったままである。
+4. **gate を 1 本でも足したら、必ず「壊して赤くなる」ことを見てから landed とする。**
+   無改変で `nbb scripts/fleet-ci/gates/itonami-regenerate.cljs orgs/cloud-itonami/cloud-itonami-isic-9522 --org cloud-itonami` が exit 0、
+   committed な生成物を 1 セル手編集した copy に対して exit 1 になることを実際に見る。
+
+**この作業では、壊れていることが 3 回とも「実行するまで見えなかった」。**
+gate をローカルで 25/25 通しても実ノードの `JAVA_HOME` 差は出ず、fleet CI が 3 日
+死んでいたことも実ノードで 1 周回すまで誰も気づかず、pricing-intelligence が
+DataScript に載らなくなっていたことも `query.clj` を実際に回して初めて出た。
+**「書いた」と「動く」の間を、毎回実行で埋めること。**
+
+### まだ確かめていないこと（正直に）
+
+- ~~実ノードでの 1 周は回していない~~ → **回した**（上の「その2」）。ただし通したのは
+  **1 repo（9522）だけ**で、31 本ぶんを同時に回したときの挙動は見ていない。
+- **31 本ぶんの maven 解決がノードに乗る負荷**は測っていない。LPT スケジューラが
+  配分するが、初回は `~/.m2` が温まるまで重いはず。
+- **6399 / 6310 / 7810 の publisher 経路は未着手。** live データを取る再生成なので
+  drift gate では表現できず、「実行して commit する」別の仕組みが要る。
+  この 3 本の夜間更新は 2026-08-04 から止まったままである。
+- **今日の gate は 1 回も本番 tick（`--dry-run` 無し）を通っていない。** landing /
+  commit status / CD 経路は未検証。
+
+## 手順上の実測（再発防止）
+
+- **west 管理の子リポは remote 名が `origin` とは限らない。** 実測では大半が
+  `cloud-itonami`、一部（6311 / 6312 / 8299 / 7820）が `origin`。決め打ちすると
+  `fatal: 'origin' does not appear to be a git repository` で落ちる。
+  `R=$(git remote | head -1)` で解決する。
+- **`branch-create-main-sync-guard.cljs` は shell の cwd を見る。** 複合コマンドの
+  中の `cd` は評価されないので、`git worktree add` は対象 repo のディレクトリから
+  独立した呼び出しで実行する。`<remote>/main` を明示すれば通る。
+- **初回の grep は `¥50k-150k` 表記に当たらなかった。** `¥[0-9,]+/月` で数えて
+  「25 本中 2 本しか価格を持たない」と報告したが、実際は `¥50k-150k` 形式の
+  baseline が別にあった。**価格表記の揺れを 1 つのパターンで数えない。**"}]

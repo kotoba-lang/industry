@@ -1,0 +1,148 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-05"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-05.edn"
+  :doc/date "2026-08-18"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "AArch64 speed versus LLVM -O3"
+  :coscientist/iteration 5
+  :coscientist/subject "kotoba-lang/kotoba-native, bench/runtime-comparison/kernel.kotoba"
+  :coscientist/engine "90-docs/codegen/speed_coscientist.cljc"
+  :coscientist/ported-from "kotobase-performance.cost-coscientist (Elo K=32, base 1200); loop shape from design-quality.coscientist / isekai ADR-0007"
+  :coscientist/generated 8
+  :coscientist/rejected-by-reflection 3
+  :coscientist/ranked-first "h-inline-loop-artifact"
+  :coscientist/refuted 1
+  :coscientist/wip "h-inline-loop-artifact"
+  :coscientist/carries-forward "iteration-03: this core does not charge for register-to-register moves"
+
+  :doc/body
+  "# Codegen co-scientist, iteration 5
+
+Owner override: beat LLVM, not Cranelift. ADR-2608189100. The judge is min
+ns/call on this kernel (Apple M4, oracle 1830338420), not instruction count
+and not an LLM.
+
+Iteration 3 (x86-64, same day, same kernel) already measured that a
+register-to-register move on this class of core is renamed, not executed.
+This iteration does not re-learn that. It asks a different question: what
+closes the 1.24x against LLVM -O3 on AArch64.
+
+## Generate
+
+| id | hypothesis | predicted min ns |
+|---|---|---:|
+| h-inline-loop-artifact | put the 100k timed loop in the native artifact; inline the leaf | 12.40 |
+| h-a64-coalesce-direct-results | write producers into phi/return registers | 15.05 |
+| h-fused-srem | fuse quotient-constant + msub at encode time | 15.05 |
+| h-licm | hoist loop-invariant arithmetic | 15.05 |
+| h-autovec | SIMD the eight rounds | 15.05 |
+| h-range-mersenne-later-rounds | drop sign correction once v >= 0 | 13.20 |
+| h-fma | contract into FMA | rejected |
+| h-pgo | profile-guided layout | rejected |
+
+Baseline amu 15.05. LLVM 12.19. Cranelift 14.65 (checkpoint, already met
+at the minimum).
+
+## Reflect
+
+- **h-range-mersenne-later-rounds rejected, unsound.** Exported `kernel(n)`
+  admits arbitrary i64. A proof that holds only for the bench's n=200 is
+  not a compiler invariant.
+- **h-fma / h-pgo rejected, policy.** FMA that changes rounding, PGO, and
+  an optimizer inside kototama remain refused (ADR-2608039500).
+- **h-fused-srem admitted as a control, then refuted for this shape.**
+  `compile-kir-module :aarch64` of the eight-round kernel already emits
+  LLVM's 7-instruction round (madd + smulh + add + asr + add-lsr#63 +
+  sub-lsl#31 + add). Completeness for a one-use divisor; zero on this bench.
+- **h-licm / h-autovec admitted, predicted zero.** Serial loop-carried
+  multiply-add. The leaf cache already keeps the constants.
+- **h-inline-loop-artifact admitted.** LLVM's dump inlines `kernel` into
+  `main`. Ours calls `kexe_fn8` 100k times from C. That is the 1.24x.
+- **h-a64-coalesce-direct-results admitted, predicted zero ns.** It removes
+  a register MOV. Iteration 3 measured that this core does not charge for
+  that. Unmerged since a3ed13b (2026-08-12).
+
+## Rank
+
+Elo K=32, base 1200, round-robin on predicted ns saved. Ran 2026-08-18:
+
+```
+nbb --classpath 90-docs/codegen -e \"(require '[speed-coscientist :as s]) (s/print-ranking (s/run))\"
+```
+
+| elo | id | after | saves | basis | risk |
+|---:|---|---:|---:|---|---|
+| 1260 | h-inline-loop-artifact | 12.40 | 2.65 | measured-shape | low |
+| 1231 | h-licm | 15.05 | 0 | measured-shape | low |
+| 1199 | h-autovec | 15.05 | 0 | measured-shape | low |
+| 1169 | h-a64-coalesce-direct-results | 15.05 | 0 | predicted | medium |
+| 1141 | h-fused-srem | 15.05 | 0 | measured-and-refuted-for-this-shape | high |
+
+## Evolve
+
+The tournament scores one change against 15.05 ns and therefore cannot see
+that arithmetic is already LLVM's. Fused-srem looks like 'the remainder
+pass' until the module is dumped. The pair that closes the gap is (keep
+the 7-inst round) + (put the loop in the artifact). That pair is worth
+the inline hypothesis alone, not the sum with fused-srem.
+
+WIP=1 this iteration is the Elo winner: put the 100k loop in the
+artifact. Coalescing landed in kotoba-native in the same session because
+it was :S and finished; iteration 3 forbids claiming ns from it.
+Iteration 04 (wide kernel / allocator, 9x) is a different workload and
+stays at iteration-04.edn.
+
+## Measure (loop-in-artifact)
+
+Same artifact, same host, oracle 1830338420, 5 samples after 10k warmup,
+100k work units. `bench` is one native invoke with `remaining=calls`.
+`kernel` is 100k C calls of the 1-arg leaf.
+
+| shape | min ns/call | helper |
+|---|---:|---|
+| rustc → LLVM -O3 | 12.19 | inlined 7-inst rounds |
+| amu `kernel`, 100k C calls | **12.79** | 272-byte GMIR leaf |
+| amu `bench`, 1 invoke × 100k | **71.27** | 1052-byte loop helper |
+
+The looping helper has **0 BL** (tail is `b`) and **82 LDR + 72 STR**.
+The 7-instruction register round did not survive the extra live values
+(`n`, `left`, `last`, plus the sixteen temporaries). That is the
+iteration-04 allocator finding on this harness: putting the loop in the
+artifact predicted 12.40 only if the body stayed in registers. It did
+not.
+
+The published runner therefore still extracts `kernel` and calls it
+100k times. Shipping `bench` as the timed export would be a 5.6×
+regression. `bench` stays in the fixture as the measured refutation.
+
+The 12.79 vs 12.19 (1.05×) on this quieter host is **not** a perfgate
+seal. Five samples, not 25; do not claim LLVM beaten.
+
+## Measure (coalescing)
+
+Landed in kotoba-native: `a64-coalesce-direct-results` after
+`a64-fuse-multiplies`. 156 tests, 2157 assertions, 0 failures. `(+ a b)`
+is now `add x0,x0,x1; ret`. Phi edge MOVs on
+`(+ 1 (if a (* a 2) (- a 3)))` are gone. The live-in join still keeps a
+move. **Not re-timed.** Claiming a ns win would repeat iterations 1-3.
+
+## Meta-review
+
+- **The first ranking that used LLVM as the judge refuted the pass that
+  looked most like LLVM.** Remainder fusion copies LLVM's lowering. The
+  dump says it is already there.
+- **Ownership still matters.** Dump a *module*, not `compile-expression`
+  (GMIR v1 never selects `:mir/quotient-constant`).
+- **Iteration 3's machine model applies on AArch64 too.** Do not spend the
+  next WIP slot on another register MOV.
+- **Do not claim LLVM beaten from a golden.** perfgate, this kernel, min
+  quantile, oracle 1830338420.
+
+## Next
+
+Allocator. Iteration 04 already has the workload (`kernel_wide`, 9×).
+This iteration showed the same cost on the published kernel as soon as
+the loop added live values. Self-tail past the fuel prologue is still
+open, but it is not the 5.6×. Do not re-rank fused-srem or another
+register MOV."}]

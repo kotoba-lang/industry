@@ -1,0 +1,383 @@
+{:doc/type :execution-board-instance
+ :doc/id "week11-m5-execution-board-20260819"
+ :doc/title "Week 11 M5 Production Gate Execution Board"
+ :doc/date-created "2026-07-21"
+ :doc/date-activated "2026-08-18"
+ :doc/status "ACTIVE"
+
+ :week/metadata
+ {:week-number 11
+  :phase "M5"
+  :start-date "2026-08-18"
+  :end-date "2026-08-24"
+  :checkpoint-monday "2026-08-19 09:00 AM JST"
+  :checkpoint-friday "2026-08-22 16:00 JST"
+  :gate-type "M5 Critical Path Baseline"
+  :attendance-required ["team-lead-m5-core" "team-lead-m5-integration" "team-lead-m6-platform" "phase-owner-m5" "phase-owner-m6" "platform-lead" "metrics-lead" "escalation-lead"]}
+
+ :execution-boards/trello
+ {:m5-core-board
+  {:board-id "trello-m5-core-wave5"
+   :board-name "Wave 5 Execution — M5 Core (Week 11)"
+   :team-lead "m5-core-team-lead"
+   :lists
+   [{:name "🎯 Week 11 M5 Core Critical Path"
+     :position 1
+     :cards
+     [{:id "card-m5c-001"
+       :title "M5 Core — Core functionality integration tests pass"
+       :labels ["critical-path" "M5" "core"]
+       :due-date "2026-08-22T16:00:00+0900"
+       :assignment "m5-core-team-lead"
+       :checklist
+       ["[ ] Unit tests for core modules passing (100%)"
+        "[ ] Integration test suite > 92% coverage"
+        "[ ] Merge to main branch"
+        "[ ] Metrics collected (build times, coverage)"]
+       :status "In Progress"}
+      {:id "card-m5c-002"
+       :title "M5 Core — Dependency pin verification"
+       :labels ["critical-path" "M5" "dependency"]
+       :due-date "2026-08-22T16:00:00+0900"
+       :assignment "m5-core-team-lead"
+       :checklist
+       ["[ ] All upstream repo pins advanced to latest"
+        "[ ] Merge conflicts resolved"
+        "[ ] CI builds cleanly"
+        "[ ] Ready for Friday gate"]
+       :status "In Progress"}]}
+    {:name "🚨 Blockers & Risks"
+     :position 2
+     :cards
+     [{:id "card-m5c-blocker-001"
+       :title "Potential: Upstream CI latency affecting nightly builds"
+       :labels ["blocker" "P2" "monitoring"]
+       :severity "watch"
+       :assigned-to "m5-core-team-lead"
+       :due-date "2026-08-20T09:00:00+0900"
+       :description "Monitor upstream build times through Mon checkpoint. If build-times p99 > 15 min, escalate to phase owner."
+       :mitigation-plan "Have fallback CI queue available"}]}
+    {:name "📊 Metrics This Week"
+     :position 3
+     :cards
+     [{:metric "Build Times (p99)" :target "< 12 min" :dashboard-link "https://grafana.internal/d/wave5-m5m6?var-team=m5-core"}
+      {:metric "Test Coverage" :target ">= 92%" :dashboard-link "https://grafana.internal/d/wave5-m5m6?var-team=m5-core"}
+      {:metric "Deployment Success" :target ">= 99.5%" :dashboard-link "https://grafana.internal/d/wave5-m5m6?var-team=m5-core"}]}
+    {:name "✅ Done (Week 11)"
+     :position 4
+     :cards []}]}
+
+  :m5-integration-board
+  {:board-id "trello-m5-integration-wave5"
+   :board-name "Wave 5 Execution — M5 Integration (Week 11)"
+   :team-lead "m5-integration-team-lead"
+   :lists
+   [{:name "🎯 Week 11 M5 Integration Critical Path"
+     :position 1
+     :cards
+     [{:id "card-m5i-001"
+       :title "M5 Integration — API integration suite passes (M5 Core → M6 Platform)"
+       :labels ["critical-path" "M5" "integration"]
+       :due-date "2026-08-22T16:00:00+0900"
+       :assignment "m5-integration-team-lead"
+       :checklist
+       ["[ ] API contract tests passing"
+        "[ ] End-to-end integration smoke tests pass"
+        "[ ] Cross-team dependency verification"
+        "[ ] Integration metrics collected"]
+       :status "In Progress"}
+      {:id "card-m5i-002"
+       :title "M5 Integration — Staging deployment validation"
+       :labels ["critical-path" "M5" "staging"]
+       :due-date "2026-08-22T16:00:00+0900"
+       :assignment "m5-integration-team-lead"
+       :checklist
+       ["[ ] Staging environment stable (4h minimum)"
+        "[ ] Smoke test scenarios pass"
+        "[ ] Rollback procedure documented + tested"
+        "[ ] Ready for Friday gate"]
+       :status "In Progress"}]}
+    {:name "🚨 Blockers & Risks"
+     :position 2
+     :cards []}
+    {:name "📊 Metrics This Week"
+     :position 3
+     :cards
+     [{:metric "Build Times (p99)" :target "< 12 min" :dashboard-link "https://grafana.internal/d/wave5-m5m6?var-team=m5-integration"}
+      {:metric "Test Coverage" :target ">= 92%" :dashboard-link "https://grafana.internal/d/wave5-m5m6?var-team=m5-integration"}
+      {:metric "Deployment Success" :target ">= 99.5%" :dashboard-link "https://grafana.internal/d/wave5-m5m6?var-team=m5-integration"}]}
+    {:name "✅ Done (Week 11)"
+     :position 4
+     :cards []}]}
+
+  :m6-platform-board
+  {:board-id "trello-m6-platform-wave5"
+   :board-name "Wave 5 Execution — M6 Platform (Week 11)"
+   :team-lead "m6-platform-team-lead"
+   :lists
+   [{:name "🎯 Week 11 M6 Platform Critical Path"
+     :position 1
+     :cards
+     [{:id "card-m6p-001"
+       :title "M6 Platform — Platform infrastructure readiness verification"
+       :labels ["critical-path" "M6" "infrastructure"]
+       :due-date "2026-08-22T16:00:00+0900"
+       :assignment "m6-platform-team-lead"
+       :checklist
+       ["[ ] K8s clusters healthy (all nodes ready)"
+        "[ ] Service mesh functional"
+        "[ ] Monitoring + alerting live"
+        "[ ] Capacity planning verified for M6"]
+       :status "In Progress"}
+      {:id "card-m6p-002"
+       :title "M6 Platform — Prepare M6 launch checklist"
+       :labels ["critical-path" "M6" "planning"]
+       :due-date "2026-08-22T16:00:00+0900"
+       :assignment "m6-platform-team-lead"
+       :checklist
+       ["[ ] M6 launch sequence documented"
+        "[ ] Rollback scenarios planned"
+        "[ ] Team runbook reviewed"
+        "[ ] Cross-team handoff confirmed"]
+       :status "In Progress"}]}
+    {:name "🚨 Blockers & Risks"
+     :position 2
+     :cards []}
+    {:name "📊 Metrics This Week"
+     :position 3
+     :cards
+     [{:metric "Build Times (p99)" :target "< 12 min" :dashboard-link "https://grafana.internal/d/wave5-m5m6?var-team=m6-platform"}
+      {:metric "Test Coverage" :target ">= 92%" :dashboard-link "https://grafana.internal/d/wave5-m5m6?var-team=m6-platform"}
+      {:metric "Deployment Success" :target ">= 99.5%" :dashboard-link "https://grafana.internal/d/wave5-m5m6?var-team=m6-platform"}]}
+    {:name "✅ Done (Week 11)"
+     :position 4
+     :cards []}]}
+ }
+
+ :execution-boards/jira
+ {:m5-core-project
+  {:project-key "M5W5"
+   :project-name "M5 Wave 5 Week 11"
+   :team-lead "m5-core-team-lead"
+   :issues
+   [{:issue-key "M5W5-101"
+     :type "gate-readiness-check"
+     :title "Gate: Week 11 M5 Core — Friday 2026-08-22 16:00"
+     :assignee "m5-core-team-lead"
+     :status "Open"
+     :due-date "2026-08-22"
+     :checklist
+     ["[ ] Critical path complete (M5 Core integration tests pass)"
+      "[ ] Metrics healthy (Grafana dashboard live)"
+      "[ ] Blockers resolved or escalated"
+      "[ ] Cross-team dependencies verified"
+      "[ ] Rollback plan documented"]
+     :description "Week 11 M5 Core gate readiness assessment. Decision: Go/No-Go."}
+    {:issue-key "M5W5-102"
+     :type "weekly-metrics-snapshot"
+     :title "Metrics Report — Week 11 M5 Core"
+     :assignee "metrics-lead"
+     :status "Open"
+     :due-date "2026-08-22"
+     :description "Weekly metrics snapshot for M5 Core team.\n\nBuild Times (p99): [TBD] (target: < 12 min)\nTest Coverage: [TBD] (target: >= 92%)\nDeployment Success: [TBD] (target: >= 99.5%)\nGate-Blocker Detection: [TBD] (target: < 2 min)\nTeam Velocity: [TBD]\n\nTrending: [ ] On track [ ] Slight slip [ ] Major risk"}]}
+ }
+  :m5-integration-project
+  {:project-key "M5IW5"
+   :project-name "M5 Wave 5 Week 11 Integration"
+   :team-lead "m5-integration-team-lead"
+   :issues
+   [{:issue-key "M5IW5-101"
+     :type "gate-readiness-check"
+     :title "Gate: Week 11 M5 Integration — Friday 2026-08-22 16:00"
+     :assignee "m5-integration-team-lead"
+     :status "Open"
+     :due-date "2026-08-22"
+     :checklist
+     ["[ ] API integration tests pass"
+      "[ ] Staging deployment stable"
+      "[ ] Metrics healthy (Grafana dashboard live)"
+      "[ ] Cross-team dependencies verified"
+      "[ ] Rollback plan documented and tested"]
+     :description "Week 11 M5 Integration gate readiness assessment. Decision: Go/No-Go."}
+    {:issue-key "M5IW5-102"
+     :type "weekly-metrics-snapshot"
+     :title "Metrics Report — Week 11 M5 Integration"
+     :assignee "metrics-lead"
+     :status "Open"
+     :due-date "2026-08-22"
+     :description "Weekly metrics snapshot for M5 Integration team.\n\nBuild Times (p99): [TBD] (target: < 12 min)\nTest Coverage: [TBD] (target: >= 92%)\nDeployment Success: [TBD] (target: >= 99.5%)\nGate-Blocker Detection: [TBD] (target: < 2 min)\nTeam Velocity: [TBD]"}]}
+ }
+  :m6-platform-project
+  {:project-key "M6W5"
+   :project-name "M6 Wave 5 Week 11 Platform"
+   :team-lead "m6-platform-team-lead"
+   :issues
+   [{:issue-key "M6W5-101"
+     :type "gate-readiness-check"
+     :title "Gate: Week 11 M6 Platform — Friday 2026-08-22 16:00"
+     :assignee "m6-platform-team-lead"
+     :status "Open"
+     :due-date "2026-08-22"
+     :checklist
+     ["[ ] Platform infrastructure verified"
+      "[ ] K8s clusters ready"
+      "[ ] M6 launch checklist prepared"
+      "[ ] Metrics healthy (Grafana dashboard live)"
+      "[ ] Cross-team dependencies verified"]
+     :description "Week 11 M6 Platform gate readiness assessment. Decision: Go/No-Go."}
+    {:issue-key "M6W5-102"
+     :type "weekly-metrics-snapshot"
+     :title "Metrics Report — Week 11 M6 Platform"
+     :assignee "metrics-lead"
+     :status "Open"
+     :due-date "2026-08-22"
+     :description "Weekly metrics snapshot for M6 Platform team.\n\nBuild Times (p99): [TBD] (target: < 12 min)\nTest Coverage: [TBD] (target: >= 92%)\nDeployment Success: [TBD] (target: >= 99.5%)\nGate-Blocker Detection: [TBD] (target: < 2 min)\nTeam Velocity: [TBD]"}]}
+ }
+ }
+
+ :checkpoints/week11
+ {:monday-checkpoint
+  {:date "2026-08-19"
+   :time "09:00 AM JST"
+   :duration-min 30
+   :type "progress-review"
+   :attendees ["team-lead-m5-core" "team-lead-m5-integration" "team-lead-m6-platform" "metrics-lead"]
+   :agenda
+   ["(5 min) Opening: schedule recap, checkpoint expectations"
+    "(20 min) Status updates per team: velocity, blockers, metrics baseline"
+    "(3 min) Metrics health check (Prometheus + Grafana dashboard live?)"
+    "(2 min) Closing: Friday gate expectations, escalation reminder"]
+   :outputs-required
+   ["Trello: update critical path cards with current status"
+    "Jira: add Monday checkpoint notes to gate-readiness-check issue"
+    "Slack: #prod-gates-wave5 post summary (by 10:00 AM)"]
+   :success-criteria
+   ["All teams report status (velocity, blockers)"
+    "Metrics baseline collected (Prometheus scrape successful)"
+    "No data collection blockers"
+    "Team leads understand Friday gate expectations"]}
+
+  :friday-checkpoint
+   {:date "2026-08-22"
+    :time "16:00 (4 PM) JST"
+    :duration-min 45
+    :type "gate-review-and-decision"
+    :attendees ["team-lead-m5-core" "team-lead-m5-integration" "team-lead-m6-platform" "phase-owner-m5" "phase-owner-m6" "platform-lead" "metrics-lead" "escalation-lead"]
+    :decision-rule "consensus (all teams must agree for GO)"
+    :agenda
+    ["(10 min) Metrics snapshot review (live Grafana dashboard walkthrough)"
+     "(10 min) Critical path status per team (Trello board review)"
+     "(10 min) Dependency check (cross-team verification)"
+     "(10 min) Gate decision (consensus vote: Go / No-Go / Hold)"
+     "(5 min) Escalation summary if any, next week forecast"]
+    :decision-options
+    [{:option "Go"
+      :meaning "All critical path items complete, metrics healthy, no blockers. Proceed with Week 12."
+      :action "Archive completed Trello cards. Create Week 12 critical path. Publish gate memo."}
+     {:option "No-Go"
+      :meaning "One or more teams blocked on critical path. Escalate per protocol."
+      :action "Escalation protocol activated. Issue escalation memo. Phase owners decide hold/rework/slip."}
+     {:option "Hold"
+      :meaning "Metrics questionable or cross-team dependency unclear. Extend decision to Monday."
+      :action "Request additional data/verification by Monday 09:00. Stakeholder notification."}]
+    :outputs-required
+    ["Jira: gate-readiness-check issue updated with decision (Go/No-Go/Hold)"
+     "Jira: weekly-metrics-snapshot issue populated with final numbers"
+     "Slack: #prod-gates-wave5 post gate decision memo (by 17:00)"
+     "Email: gate decision summary to all attendees (by 17:30)"
+     "Trello: Week 11 cards archived, Week 12 critical path prepared"]
+    :success-criteria
+    ["All 8 attendees present (or represented via backup)"
+     "Decision made by 16:45 (15 min buffer before 17:00 deadline)"
+     "Consensus achieved (all teams agree or escalation protocol active)"
+     "Metrics snapshot complete + archived"
+     "Week 12 forecast published"]
+    :escalation-trigger
+    ["Any team unable to commit to Go vote"
+     "Metrics data incomplete or anomalous"
+     "Cross-team dependency unresolved"]}
+ }
+
+ :metrics/collection-status
+ {:prometheus-live? false
+  :grafana-dashboard-live? false
+  :ci-gate-bot-live? false
+  :metrics-baseline-collected? false
+  :data-freshness-last-update "2026-07-21T00:00:00Z (pre-deployment)"
+  :collection-schedule
+  [{:metric "build-times" :interval "15min" :status "staging"}
+   {:metric "test-coverage" :interval "1h" :status "staging"}
+   {:metric "deployment-success" :interval "1h" :status "staging"}
+   {:metric "gate-blockers" :interval "5min" :status "staging"}
+   {:metric "team-velocity" :interval "1h" :status "staging"}]
+  :smoke-test-status
+  {:scheduled-date "2026-08-10"
+   :test-procedure-ready? true
+   :test-checklist "90-docs/gates/smoke-test-checklist-20260810.edn"
+   :expected-outcome "All metrics live, alert routing confirmed, dashboard rendering"}}
+
+ :escalation/status-week11
+ {:escalation-protocol-armed? true
+ :escalation-ledger-file "90-docs/gates/wave5-escalation-ledger.edn"
+  :active-escalations-count 0
+  :sla-targets
+  {:alert-response "4 hours"
+   :critical-blocker-response "2 hours"
+   :gate-failure-decision "same-checkpoint (Friday 17:00 deadline)"}
+  :escalation-example
+  {:scenario "Team reports blocker on Friday 14:00 (2h before gate)"
+   :response-path "Team lead → phase owner (L2) → platform lead (L3)"
+   :timeline "L1: 1h triage, L2: 2h decision, L3: 4h final authority"
+   :action "If unresolved by Friday 16:00, gate decision: No-Go or Hold"}}
+
+ :next-week-forecast
+ {:week-12-date "2026-08-25"
+  :week-12-phase "M5 — First Sync Point"
+  :forecast-status "prepared by Friday 2026-08-22 16:00"
+  :critical-path-prep
+  [{:team "M5 Core" :next-milestone "M5 Core merge to release branch"}
+   {:team "M5 Integration" :next-milestone "First production-like staging run"}
+   {:team "M6 Platform" :next-milestone "M6 launch readiness assessment"}]
+  :dependencies-to-watch
+  [{:from "M5 Core" :to "M5 Integration" :item "Pin advancement"}
+   {:from "M5 Integration" :to "M6 Platform" :item "Staging env handoff"}]}
+
+ :communications/week11
+ {:slack-channel "#prod-gates-wave5"
+  :email-list "gates-escalation@gftd.group"
+  :pagerduty-service "prod-gates"
+  :notification-schedule
+  [{:event "Monday 09:00 checkpoint start" :send-to "slack" :template "checkpoint-start"}
+   {:event "Monday 10:00 progress summary" :send-to "slack+email" :template "progress-summary"}
+   {:event "Friday 16:00 gate review start" :send-to "slack" :template "gate-start"}
+   {:event "Friday 16:45 gate decision" :send-to "slack+email+pagerduty" :template "gate-decision"}
+   {:event "Any escalation triggered" :send-to "pagerduty+slack+email" :template "escalation-alert"}]}
+
+ :documentation/references
+ {:core-procedures "90-docs/gates/week-11-checkpoint-procedures.md"
+  :decision-rules "90-docs/gates/decision-rule-and-escalation-summary.md"
+  :escalation-protocol "90-docs/gates/escalation-protocol-reference.edn"
+  :metrics-pipeline "90-docs/gates/metrics-collection-pipeline.edn"
+  :team-boards-template "90-docs/gates/weekly-execution-boards-template.edn"
+  :master-schedule "90-docs/gates/wave-5-m5-m6-execution-kickoff.edn"
+  :kickoff-slides "90-docs/gates/kickoff-meeting-slides.md"}
+
+ :success-metrics
+ {:execution
+  ["Kickoff meeting completed 2026-08-18 with all attendees"
+   "Week 11 boards live (Trello + Jira) and team-accessible by 2026-08-18"
+   "Metrics collection started (smoke test passed 2026-08-10)"
+   "Monday 2026-08-19 checkpoint held on time"
+   "Friday 2026-08-22 gate decision made by 16:45"
+   "Zero gate halts due to missing infrastructure"
+   "Escalation protocol tested with zero issues"]}
+
+ :archive-location
+ {:week11-reports-dir "90-docs/gates/weekly-reports/wave5-m5m6/week-11/"
+  :naming-convention "week-11-{date}-{artifact-type}.{ext}"
+  :artifacts-to-archive
+  ["gate-decision-memo (Jira export)"
+   "metrics-snapshot (JSON + Grafana export)"
+   "trello-board-state (end-of-week)"
+   "escalation-ledger-updates"
+   "slack-message-transcript (Slack export)"]}}

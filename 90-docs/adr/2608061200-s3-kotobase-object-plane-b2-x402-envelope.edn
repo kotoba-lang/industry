@@ -1,0 +1,264 @@
+[{:db/id -1
+  :adr/id "adr-2608061200-s3-kotobase-object-plane-b2-x402-envelope"
+  :adr/title "ADR-2608061200: s3.kotobase.net — object bytes leave the datom plane onto a B2-backed block plane, compressed at rest, client-sealable, with opt-in x402 paid reads"
+  :adr/status "accepted"
+  :adr/date "2026-08-06"
+  :adr/deciders "Jun Kawasaki"
+  :adr/doc-type "adr"
+  :adr/topic "kotobase-s3-object-plane"
+  :adr/source-format "edn"
+
+  :adr/authoritative-for
+  ["s3.kotobase.net が object の本体バイトをどこに置くか（datom 面ではなく block 面）"
+   "その block 面の backend 選択（B2 / 任意の S3 互換 / R2 fallback）と、なぜ B2 に ref を置かないか"
+   "保存時圧縮の codec 決定規則（誰が決めるか・sealed body に何をしてはいけないか）"
+   "client-side 暗号化の境界（server は envelope を保持するだけで復号鍵を持たない）"
+   "s3 surface における x402 有料読み取りの適用範囲（per-object opt-in であること）"]
+
+  :adr/repos
+  ["orgs/network-awai/net-kotobase"
+   "orgs/kotoba-lang/kotobase-protocols"
+   "orgs/kotoba-lang/kotobase-protocol-s3"]
+
+  :adr/related
+  ["adr-2608039970-kotobase-base-is-the-datom-plane-not-datalog"
+   "adr-2608039000-no-d1-as-premise-on-decentralized-paths"
+   "adr-2607263000-kotobase-drive-mail-envelope"
+   "adr-2607093100-x402-integration"
+   "adr-2608051000-kotobase-one-repo-one-capability-deployment-split"
+   "adr-2607299200-kura-erasure-coded-storage-network"]
+
+  :adr/body
+  "## 何を聞かれたか
+
+「s3.kotobase.net で B2 backed な、kotoba の認証制御・x402 などを含めた proxy はあるか。
+圧縮や Storj のような client 暗号化も統合された上で」。
+
+調査した結果、**成立していたのは認証制御だけ**だった（2026-08-06 実測）。
+
+| 要素 | 調査時の状態 |
+|---|---|
+| kotoba 認証制御 | ✅ Bearer / AWS SigV4 / CACAO(DID) の 3 経路が live |
+| B2 backed | ❌ R2 バケット 1 本（`kotobase-protocols-state`） |
+| x402 | ❌ apex 側 `kotobase.net/x402/ipfs/{cid}` にはあるが s3 host には無い |
+| 圧縮 | ❌ object 経路に codec のヒット 0 件 |
+| client 暗号化 | ❌ `envelope` は Drive/Mail に配線済み、s3 には未配線 |
+
+そして調査の途中で、**要求された 4 要素のどれも足せない構造的な理由**が見つかった。
+
+## Context — object の本体が datom 面に載っていた
+
+`kotobase.protocols.s3/handle` は object の値を
+`{:bytes <body> :content-type :etag :last-modified}` として
+`[:kotobase.s3/objects <bucket>]` の doc に置いていた。つまり**本体バイトが
+kotobase chain の datom として commit されていた**。ここから 3 つが従う。
+
+1. **ワークスペース規則違反**（ADR-2608039970「byte を datom 面に載せない。s3 の
+   object body は block 面に直行する」）。実際、全 GET が prolly-tree 経由で object
+   全体を hydrate し、全 PUT がそれを novelty として commit していた。
+2. **binary-unsafe だった。** deploy shell は router に渡す前に body を `TextDecoder`
+   で文字列化する。UTF-8 として不正なバイト列は U+FFFD に潰れるので、**PNG を PUT
+   して GET すると別のファイルが返る**。これは仮説ではなく、E2E テストで再現した。
+3. **圧縮も暗号化も置く場所が無かった。**「client が送ったバイト」と「chain が保存
+   する値」の間に層が無いので、そこに挟むものが挟めない。
+
+つまり 4 要素が無かったのは配線漏れではなく、**バイトの置き場所が間違っていた**結果。
+
+## Decision
+
+### 1. bytes は block 面へ、datom 面には有界な metadata だけ
+
+datom 面が持つのは
+`{:cid :etag :size :stored :codec :content-type :last-modified :sealed :x402}`
+だけにする（`kotobase-protocols-worker.objects/meta-record`）。
+
+- `:cid` は**保存後**（圧縮後）バイトの CIDv1。`:etag` は**受信時**バイトの sha-256 hex
+  で、保存形式に関係なく client が送ったものを指す。S3 の ETag は MD5 だが WebCrypto に
+  MD5 は無く、multipart を実装していないこの surface では ETag は不透明でよい。
+- `:size`（元の長さ）と `:stored`（保存された長さ）を両方持つ。差分が圧縮の実効を
+  答える唯一の正直な方法で、**測れない比率は主張であって計測ではない**。
+- **書き込み順序は blob 先・metadata 後。** 途中で落ちると参照されない block が残るが、
+  content-addressed な block は誰も名指さなければ不可視でストレージ代だけの問題。逆順
+  だと「書かれていないバイトを指す metadata」が残り、読み取り 500 と破損が区別できない。
+
+**legacy な inline `:bytes` record は恒久的に読み続ける。** これは形式の追加であって
+移行ではない。書き換えパスは要らない。
+
+### 2. B2 は block を持てる。ref は持てない
+
+`kotobase-storage` は全 backend に ref profile の宣言を要求し、B2 は
+`:single-writer-ref`（native/S3 互換の**どちらの API にも conditional PUT が無い**。
+`If-Match` を受理し、無視し、成功を返し、他方の commit は消える）。
+
+**その制約は block には当たらない。block は immutable で自分のハッシュが名前だから。**
+同じ CID を 2 人が書けば同じバイトを書いている。負けた側が負けたことは事象ではない。
+**B2 にできない CAS は、block が必要としない CAS。** よって chain head は R2
+（`onlyIf.etagMatches` を R2 が実際に評価する）に残し、バイトだけ B2 に置く —
+`kotobase-storage-kura` が取ったのと同じ分割（block は shard 面、ref は本物の CAS を
+持つ delegate）。
+
+**B2 は同一 key の再 PUT で version を増やし課金する**ので、`put!` は先に HEAD して
+存在すればスキップする。content-addressed store ではこの検査は厳密（key がハッシュ
+なので、その key にある object が別物ということはあり得ない）。
+
+backend は env で決まる（`BLOB_ENDPOINT`/`BLOB_BUCKET`/`BLOB_ACCESS_KEY_ID`/
+`BLOB_SECRET_ACCESS_KEY`/`BLOB_REGION`）。**部分設定は R2 fallback に倒す** —
+欠けた secret が request 経路の実行時エラーになってはならず、空鍵で署名すると config
+の問題が credential rotation の問題に見える 403 になる。
+
+### 3. 圧縮は「するかどうか」を objects が決め、「回す」のは host
+
+gzip は platform の `CompressionStream`（workerd 提供）で、移植 DEFLATE ではない。
+`kotoba-lang/org-ietf-deflate` が同じバイトを platform 外で読めるので、保存形式は
+この Worker 無しでも読める。
+
+codec を選ばない条件は 3 つ、順序が意味を持つ:
+
+1. **sealed（client 暗号化済み）→ 常に無圧縮。** 動作する AEAD の出力は乱数と区別が
+   つかないので圧縮の余地が無い。それ以上に**これは server の決めることではない** —
+   暗号化前の圧縮が平文長を漏らす（CRIME/BREACH の形）ので、そのリスクを weigh できる
+   のは鍵を持つ側だけ。**圧縮したい client は seal の前に自分で圧縮する。この surface が
+   後から黙ってやってはいけない。**
+2. 1 KiB 未満 → 無圧縮（gzip の header+trailer 18 バイトが object の無視できない割合）。
+3. 既に entropy-coded な content-type（image/ video/ audio/ zip/gzip/pdf/wasm/zstd…）
+   → 無圧縮。
+
+なお **datom 面の block は `kotobase-block-codec` が既に DEFLATE している**ので、
+ここの gzip は object 面のもので、同じ仕事を二度やってはいない。
+
+### 4. client 暗号化 — server は envelope を持つだけ
+
+Storj 型（server が平文を持たない）を満たすには、暗号化は**client 側**でなければ
+ならない。server が暗号化するならそれは server-side encryption であって別物。
+
+したがって: client は `kotoba-lang/envelope`（AES-256-GCM content key を X25519 で
+recipient ごとに wrap。共有は鍵の再 wrap であって object の再暗号化ではない）で封緘し、
+ciphertext を PUT し、descriptor を `x-amz-meta-kotoba-envelope` に載せる。server は
+それを**逐語的に保存して GET で返すだけ**で、意味として parse しない。
+
+descriptor には上限（8 KiB）を置き、**超過は切り詰めずに 400 で拒否する**。半分の
+envelope は小さい envelope ではなく、後で復号に失敗する record であり、その時点では
+平文がもうどこにも無いかもしれない。
+
+### 5. x402 は per-object opt-in。これは譲れない
+
+s3 は tenant object storage で、その read は credential 必須（ADR-2607263000 D2）。
+**x402 はそれを緩めない。1 つの object について、その owner が明示的に頼んだ場合に
+限って、認可の 2 本目の経路を足すだけ。**
+
+「s3 が x402 に対応した」を「匿名の呼び手が任意の key を 0.1 円で買える」と読むなら、
+それは決済機能ではなく**値札の付いた情報漏洩**である。したがって:
+
+- owner が認証済み PUT で `x-amz-meta-x402-price` を付けた object だけが購入可能になる
+- 付いていない object は x402 以前と全く同じ 401 を返し、有料経路は走らない
+- marker は object 自身の metadata にあるので per-object。bucket 単位でも deployment
+  単位でもなく、**surface 全体を有料化できる設定はどこにも存在しない**
+- **存在しない key への匿名 read も 401**（404 ではない）。404 と 401 を撃ち分けると
+  private namespace の存在オラクルになり、credential 要求が防いでいるものより悪い
+- 認証済みの owner は価格付き object も無料で読む（自分のファイルを読むのに課金しない）
+- **匿名の PUT は決して通らない。払っても write は買えない。**
+
+検証は facilitator（`network-awai/nexus-x402`、x402.nexus）に委譲する。この Worker は
+鍵を持たず chain を見ない。`POST /settle` を使う（`/verify` と同じ on-chain 判定を
+行い、加えて settlement を記録するので、verify→settle だと同じ RPC を二度払い、
+「読ませたのに attribution されていない」窓が空く）。facilitator が遅い場合は
+**402 に倒す**。ここで fail-open すると、facilitator を遅くできる者に object がタダで渡る。
+
+## Consequences
+
+- **s3 の GET/PUT/HEAD は shell が処理し、ListObjectsV2 と DELETE は従来どおり pure
+  library が処理する。** 後者は datom 面しか触らないので、blob 経路に通すのは XML の
+  二重実装でしかない。
+- **`kotobase.protocols.s3` に 1 箇所の後方互換変更が要る**（`kotobase-protocols` facade と
+  split 済みの `kotobase-protocol-s3` の両方）。listing の Size と HEAD の content-length が
+  `(count (:bytes o))` 固定だったので、inline bytes を持たない record では 0 になる。
+  `(or (:size o) (count (:bytes o)) 0)` に変えた。**この修正が無いと listing は parse でき、
+  validation も通り、全部の size が嘘という一番気付かれない形で壊れる。**
+  併せて、off-plane record への library 経由の GET は 501 を返すようにした（正しい
+  content-length と空 body の 200 は、全 client に「切り詰められた object」と読まれる）。
+- **B2 に置くのは block だけ。head CAS は R2 のまま。** これは性能上の妥協ではなく
+  正しさの要件で、B2 に ref を置いた瞬間に lost update が無言で通る。
+- **未解決**: multipart upload は未実装のままなので、単一 request に収まらない object は
+  置けない。range GET も未実装（現状は block 全体を取得して復号/展開する）。どちらも
+  大きい object で効いてくるが、今回の変更はそれを悪化させていない（inline 時代は
+  もっと小さい上限で詰まっていた）。
+
+## 実測（2026-08-06）
+
+- worker suite: **44 tests / 163 assertions → 84 tests / 320 assertions、0 failures**。
+  内訳は objects（codec 決定・envelope 上限・record 形状・request 分類）、x402（有料化
+  されていない object が買えないことを中心に）、blobs（gzip 往復・binary 往復・
+  同一バイトの重複排除・欠損 block が nil）、s3-e2e（実 `js/Request` を `worker/handler`
+  に通す往復、PNG の往復、匿名 401、価格付き object の 402 challenge、owner の無料読み）。
+- library suite: `kotobase-protocol-s3` 4 tests → 6 tests / 27 assertions、0 failures。
+  **この gate は落ちることを確認済み** — `object-size` を旧実装に戻すと
+  `<Size>0</Size>` を検出して 2 件が失敗する。
+- 調査時の live: `GET https://s3.kotobase.net/_diag/health` → 200
+  `{\"graph\":\"kotobase-protocols-v2\",\"chain_present\":true,\"novelty_size\":18}`。
+  匿名の PUT/GET/list はいずれも 401。
+- **production deploy 済み**（Worker `kotobase-protocols-worker`、version
+  `789655fa-dff7-4921-998d-978adfe4d8b9`、2026-08-06）。secret は
+  `BLOB_ENDPOINT`/`BLOB_BUCKET`/`BLOB_REGION`/`BLOB_PREFIX`/`BLOB_ACCESS_KEY_ID`/
+  `BLOB_SECRET_ACCESS_KEY`/`X402_PAY_TO` を投入済み。
+
+### 実 B2 に繋いだ workerd での全経路検証
+
+**production を書き込み credential で叩くことはできなかった**（下記 gap）。代わりに
+実 B2 バケットに繋いだ `wrangler dev`（workerd 本体）で全経路を通した:
+
+| 検証 | 結果 |
+|---|---|
+| text PUT→GET | 200 / 5,800 bytes / **byte-identical** |
+| HEAD | 200、content-length 5800（blob 面に触らず metadata だけで応答） |
+| ListObjectsV2 | `<Size>5800</Size>`（0 ではない = library 修正が効いている） |
+| **binary**（PNG magic + 不正 UTF-8） | PUT/GET とも 200、**byte-identical** — inline 時代が壊していたもの |
+| sealed 暗号文 | 逐語で往復、envelope header がそのまま返る |
+| envelope 8 KiB 超 | 400（切り詰めではなく拒否） |
+| 匿名 GET（価格なし） | 401 |
+| 匿名 GET（存在しない key） | **401**（404 ではない = 存在オラクルにならない） |
+| 匿名 GET（価格あり） | **402** + challenge（payTo=0xA0036623… / 1000 base units / USDC / base） |
+| owner の GET（価格あり） | 200、無課金 |
+| 匿名 PUT | 401（払っても write は買えない） |
+
+**B2 に落ちた block の実測が codec の 4 つの判断をそのまま映している**（CIDv1 4 件、
+`s3-kotobase-devprobe/blocks/bafkrei…`）:
+
+| object | 元 | B2 保存 | 効いた規則 |
+|---|---|---|---|
+| 反復の多いテキスト | 5,800 | **78** | gzip（74×） |
+| PNG | 18 | 18 | `image/*` は既に entropy-coded |
+| `\"for sale\"` | 8 | 8 | 1 KiB 未満 |
+| sealed 暗号文 | 6,000 | **6,000** | **sealed は絶対に圧縮しない** |
+
+検証後、probe の 4 block は B2 から削除済み（204×4、prefix 配下 0 件）。
+
+### 未解決の gap — operator credential が読み戻せない
+
+**`WRITE_TOKEN` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` の operator copy が
+deploy 済みの値と一致しない。** Keychain `cf:kotobase-protocols-worker` の
+`WRITE_TOKEN` は存在する（64 文字）が production は 401 を返し、`S3_*` の 2 件は
+Keychain に無い。Worker 側には 3 つとも設定されている（`wrangler secret list` で確認）
+ので、**値は Cloudflare の中にだけあって読み出せない**状態。
+
+`secrets-location-map` が `MURAKUMO_GENERATION_TOKEN_SECRET` /
+`MURAKUMO_CHAT_TOKEN_SECRET_2` / `itonami-marketplace-kotobase-seed` で繰り返し
+記録しているのと同じ乖離の 4 例目。
+
+**再発行しなかった。** この 3 つは共有の write credential で、既存の caller が
+いるかどうかを確かめる手段がこちらに無い。**確認できない blast radius を持つ
+rotation は、検証の便宜のためにやってよい操作ではない。** オーナーが再発行を
+承認するなら、新値を kagi（compartment `net-kotobase`）に置いてから Worker secret を
+更新し、本マップを更新するのが手順。
+
+## 記録しておく副産物
+
+- **deploy 済み Worker が west pin より進んでいた。** live の 401 メッセージ
+  （`this surface's reads require a credential`）が、ローカル checkout の
+  `core.cljc`（当時は write のみ認証）に存在しなかった。ローカルの `net-kotobase`
+  checkout は origin/main から 520 commits 遅れており、これを読んで設計していたら
+  現行と食い違う前提の上に作っていた。
+- **共有 `orgs/kotoba-lang/*` checkout は作業中に別セッションが動かす。** build が
+  一度通った後に `kotobase.blockcodec.core` → `deflate.core` →
+  `kotobase.projection.statistics` と依存が順に欠け始めた。1 件ずつ追わず、
+  classpath 上の全 ns を走査して不足 repo を一括で解決した（不足は 3 件）。
+  `shadow-cljs.edn` に理由付きで追記済み。"}]

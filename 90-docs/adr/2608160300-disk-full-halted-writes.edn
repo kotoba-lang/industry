@@ -1,0 +1,102 @@
+[{:db/id -1
+  :adr/id "adr-2608160300-disk-full-halted-writes"
+  :adr/title "このマシンのディスクが 100% になり書き込みが止まった — 安全に回収してよいもの、触ってはいけないもの"
+  :adr/status "accepted"
+  :adr/date "2026-08-16"
+  :adr/last-verified "2026-08-16"
+  :adr/last_verified "2026-08-16"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "operator-machine-capacity"
+  :adr/related ["ADR-2608160100" "ADR-2608124400"]
+  :adr/authoritative-for
+  ["operator machine のディスクが埋まったときに、何を回収してよく何を触ってはいけないか"
+   "worktree 作成が No space left on device で失敗したときの回避経路"
+   "この機械の容量の内訳（2026-08-16 実測）"]
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body "## Context
+
+2026-08-16、`git worktree add` が **`No space left on device`** で失敗し、続いて
+agent harness 自身の task 出力すら書けなくなった（`ENOSPC`）。この時点で
+`/System/Volumes/Data` は **460Gi 中 415Gi 使用、空き 122Mi**。
+
+これは 1 セッションの問題ではない。**同じ機械で走る全ての並行セッションが同時に
+壊れる**種類の障害で、しかも症状は無関係な場所（checkout 失敗・テスト失敗・
+receipt が書けない）に出る。
+
+## 実測した内訳（2026-08-16）
+
+| 場所 | 実測 | 性質 |
+|---|---|---|
+| `/Library/Developer/CoreSimulator` | **49G** | iOS simulator runtime。再ダウンロード可能だが**この機械は iOS 自動化を実際に走らせている** |
+| `~/github/com-junkawasaki` | 71G | superproject + 4,000 checkout。業務データ |
+| `/Library` | 61G | 上記 CoreSimulator を含む |
+| `/opt/homebrew` | 41G | うち約 9.5G が古い版とダウンロード |
+| `~/Library/Application Support` | 32G | Claude 8.7G / Cursor 8.4G / Google 7.0G |
+| `/Applications` | 22G | |
+| `~/Pictures` | 18G | 個人データ |
+| `~/Library/Group Containers` | 9.7G | |
+| `~/Library/Developer` | 5.9G | DerivedData は 0B（既に空） |
+| `~/.npm` | 1.8G | キャッシュ |
+| `/private/tmp` の agent worktree 25 本 | 各 ~160M | 他セッションの残骸 |
+
+Time Machine の local snapshot は **無かった**（`tmutil listlocalsnapshots /` が空）。
+100% の Mac で最初に疑う対象だが、ここではそれではない。
+
+## Decision
+
+### 回収してよいもの（再生成される。実行して 9.5G 空いた）
+
+```bash
+npm cache clean --force     # 1.4G
+brew cleanup -s             # 9.5G ← 最も効いた
+xcrun simctl delete unavailable   # ここでは 0（不整合な device が無かった）
+```
+
+`~/Library/Developer/Xcode/DerivedData` も純粋なビルドキャッシュだが、この機械では
+既に 0B。
+
+### 触ってはいけないもの
+
+- **`/Library/Developer/CoreSimulator`（49G）を消さない。** 単体で最大の回収余地だが、
+  この workspace は iOS simulator を実際に自動運転している（`game-autoplay-ios-sim-capture` /
+  `ios-publishing-capability`）。runtime を消せば再ダウンロードまで、それらの loop は
+  「原因不明で失敗する」状態になる。**容量が足りないなら owner に判断を仰ぐ。**
+- **他セッションの worktree を消さない。** 25 本あり合計 4G 程度で、割に合わない上に
+  生きているセッションの作業を壊しうる。掃除するなら
+  skill `git-cleanup-conflict` の retirement 手順（未コミットが無いこと・HEAD が
+  `origin/main` に含まれることを確認してから）を通す。
+- `~/Pictures`・`/Applications`・`~/Library/Application Support` は個人データ / アプリ
+  状態であって agent の裁量の対象ではない。
+
+### ディスクが埋まっている間の回避経路
+
+**superproject の worktree を新しく作らない。** 231k ファイルの checkout は、
+sparse であっても数百 MB を要求し、途中で ENOSPC を踏むと**壊れた worktree が残る**
+（`.git` が無効なディレクトリになり `git worktree list` にも出ない）。実際に 1 本
+作ってしまい、`rm -rf` + `git worktree prune` で撤去した。
+
+west.yml の pin 前進は checkout を必要としない正経路がある:
+
+```bash
+nbb scripts/west-pin-put.cljs <entry> <sha>
+```
+
+これは tip から west.yml を読み、fast-forward を GitHub の compare API で検証し、
+同じ blob SHA を precondition にして single-entry commit を PUT する。ディスクを
+使わない。実際にこの障害中、`kotobase-storage-pack` の pin をこの経路で進めた。
+
+⚠ **payload を書く処理と `gh api PUT` を同じコマンドに入れない。** PreToolUse hook は
+コマンド実行**前**に走るので、同じ呼び出しに入れると hook は存在しないファイルか
+前回の残骸を検証することになり、拒否される（実際に拒否された。正しい挙動）。
+
+## Consequences
+
+- 空き 11G / 98% で書き込みは通るが、**まだ余裕は無い**。CoreSimulator の 49G を
+  どうするかは owner の判断待ちで、それが最大の残余。
+- 容量の監視は無い。埋まったことは「何かが謎に失敗した」形でしか分からなかった。
+  監視を入れるなら、それ自体はこの ADR の対象外の別作業。"}]

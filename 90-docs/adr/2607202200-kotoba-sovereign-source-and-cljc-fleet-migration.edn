@@ -1,0 +1,341 @@
+[{:db/id -1
+ :adr/id "2607202200-kotoba-sovereign-source-and-cljc-fleet-migration"
+ :adr/status :accepted
+ :adr/date "2026-07-20"
+ :adr/title "Kotoba sovereign source and CLJC fleet migration"
+
+ :decision
+ {:runtime-priority [:safety :determinism :bounded-resources :portability]
+  :production-jvm :forbidden
+  :extensions
+  {".clj" {:language :clojure :role :compatibility-source}
+   ".cljs" {:language :clojurescript :role :compatibility-source}
+   ".cljc" {:languages [:clojure :clojurescript :kotoba]
+            :role :shared-migration-source}
+   ".cljk" {:language :kotoba :role :clj-to-kotoba-correspondence}
+   ".kotoba" {:language :kotoba :role :sovereign-source}
+   ".kotobas" {:language :kotoba-script :role :browser-script-source}}
+  :pipelines
+  [{:source [".kotoba" ".cljk"]
+    :compiler :kotoba-lang/compiler
+    :runtime :kototama
+    :targets [:reference :wasm32-browser :native-aot]}
+   {:source [".kotoba" ".kotobas"]
+    :compiler :kotoba-lang/kotoba-script
+    :target :restricted-javascript}]
+  :web-rule "JavaScript is an untrusted host target; capability admission, bounded values, and fail-closed host validation remain Kotoba authority."
+  :migration-rule "Do not rename .cljc mechanically. Admit source through the Kotoba grammar/type/effect/resource gates, add cross-target evidence, then change the extension and authority declaration."
+  :kami-placement "Kami owns 3D, physics, rendering, simulation, and game-engine providers. Kotoba owns language, compiler, values, capability admission, and portable domain programs."
+  :cross-host-conformance "Require valid and instantiable Wasm plus observable semantic, typed-ABI, effect, resource-bound, and fail-closed rejection conformance across compiler hosts. Do not compare compiler output byte-for-byte. Exact bytes are gated only when bytes themselves are the external contract: signatures, cryptographic vectors, canonical wire encodings, and package integrity. Hashes are provenance, integrity, and cache identities, never language semantics."}
+
+ :qualified-evidence
+ [{:repo "kotoba-lang/kotoba-script"
+   :pr 49
+   :sha "fa47c5f7cb24a7ac94de4eb51edaac37809dd5ce"
+   :evidence "restricted JavaScript compact string-index and disjoint-set operations; 42 tests / 142 assertions"}
+  {:repo "kotoba-lang/compiler"
+   :pr 151
+   :sha "899ae1da92d6d74e1ae68640b5adea3edbec46a3"
+   :evidence "typed ABI v10, reference/JS/Wasm/browser-host compact graph values; 340 tests / 4057 assertions locally and all CI platforms green"}
+  {:repo "kotoba-lang/kami-articulated"
+   :pr 7
+   :sha "4cca28739aea0b44ccacf2efa1c2eb944e3bec5c"
+   :evidence "128-link/127-joint arbitrary-order graph admitted; 129-link, cycles, duplicates, missing references, and multiple parents rejected across reference, restricted JS, and typed Wasm; 12 tests / 63 assertions"}
+  {:repo "kotoba-lang/kotoba-script"
+   :pr 50
+   :sha "6b918ee5d2ebb676f6c24d36be72e23f9667d4e5"
+   :evidence "bounded canonical :document runtime and pure constructors/lookups/persistent updates; 43 tests / 145 assertions"}
+  {:repo "kotoba-lang/kotoba-script"
+   :pr 51
+   :sha "63c08537f47660cef3fb31a2cc395fef94a39c1a"
+   :evidence "bounded keyword-from-string supports exact W3C @context without ambient keyword construction; 44 tests / 147 assertions"}
+  {:repo "kotoba-lang/compiler"
+   :pr 159
+   :sha "e4dfcbc006f0749d88db8f2d710446a2d4459808"
+   :evidence "bounded canonical :document across frontend, reference evaluator, restricted JavaScript, typed Wasm ABI v11 tag 18, and hostile browser host; 349 tests / 4083 assertions locally and 18/18 CI jobs green"}
+  {:repo "kotoba-lang/annotation"
+   :pr 1
+   :sha "775081a4cdca8f25d8ab60f5a7f8e27f4a09a099"
+   :evidence "first real fleet migration: core.cljc removed, core.kotoba admitted, exact W3C @context preserved, reference/restricted-JS/typed-Wasm behavior executed, no JVM production runtime, GitHub CI green"}
+  {:repo "kotoba-lang/cartpole-math"
+   :pr 2
+   :sha "7c6cb3076689165b9aa63487e39ef119841beca4"
+   :evidence "second real fleet migration: both production CLJC files removed; fixed golden replaced by parameterized Kotoba physics over bounded vector-f64 configuration/state; reference/restricted-JS/typed-Wasm semantic parity, force clamping, short-vector rejection, forged-externref rejection, no ClojureScript dependency, extension-authority CI, and both GitHub CI jobs green"}
+  {:repo "kotoba-lang/rtx-native"
+   :pr 1
+   :sha "c5e3c1584fc5b2f03066f4ec0e9df5eaad1c3ec9"
+   :evidence "third real fleet migration: production rtx_native.cljc removed; reservation metadata exposed through typed Kotoba string getters and explicit :bool activation contract; observable reference/restricted-JS/typed-Wasm semantic parity; no ClojureScript production path; extension-authority CI and both GitHub CI jobs green"}
+  {:repo "kotoba-lang/compiler"
+   :pr 166
+   :sha "d4d3cd8605712134c9b6ff5ef4a3ae5d52f4ee45"
+   :evidence "closed f64 top-level constants lower through canonical IEEE-754 bits; compatibility gates use semantic/ABI/resource/rejection conformance rather than Wasm byte identity; 366 tests / 4163 assertions locally and all 24 CI checks green"}
+  {:repo "kotoba-lang/compiler"
+   :pr 167
+   :sha "6309aefa02e22f06cce11b0ae145e5a47eaf1093"
+   :evidence "bounded non-empty keyword-set constants lower to canonical typed-set values; empty, heterogeneous, oversized, computed, and host-derived sets reject; 371 tests / 4153 assertions, 25 JVM-free cases, all 24 CI checks green, and 8 fleet target probes advance"}
+  {:repo "kotoba-lang/compiler"
+   :pr 168
+   :sha "abf9e5b8125040b1c32956ed5af133f5f962298b"
+   :evidence "declared-only nested constant aliases resolve without evaluation or host lookup; unknown, namespaced host, and cyclic references reject; 372 tests / 4160 assertions, 26 JVM-free cases, all 24 CI checks green, and ghosthacker-echoes advances on Web and Wasm"}
+  {:repo "kotoba-lang/pbrt"
+   :pr 1
+   :sha "17bcaf807eb0fcd548d861d283fd10a0427e2502"
+   :evidence "fourth real fleet migration: production pbrt.cljc removed and one sovereign pbrt.kotoba metadata contract added; reference/restricted-JS/instantiated-Wasm values agree; Kami retains rendering/WebGPU/Dr.Jit authority; 3 tests / 10 assertions, lint clean, and both CI jobs green"}
+  {:repo "kotoba-lang/kami-usd-native"
+   :pr 1
+   :sha "e56fffc291406a5871ee4cd11969a42e8ece3bd2"
+   :evidence "fifth real fleet migration: production usd_native.cljc removed; all scalar and former vector metadata preserved by 11 typed string getters through reference/restricted-JS/instantiated-Wasm; inactive USD/native/device work remains a gated Kami provider; 3 tests / 15 assertions, lint clean, and both CI jobs green"}
+  {:repo "kotoba-lang/app"
+   :pr 1
+   :sha "f57bfb3cfd3d94ece0bcfa94ae95ff56e20780f1"
+   :evidence "first verified empty-shell retirement: the production CLJC contained only ns and no behavior, so source, smoke test, and JVM project configuration were removed without creating a misleading empty .kotoba file; docs-only authority ADR and both CI jobs green"}
+  {:repo "kotoba-lang/bridge" :pr 1
+   :sha "650ca7a27dcfbf3b4c08e2320b24ad445c3e8c6e"
+   :evidence "verified ns-only CLJC retirement; no empty .kotoba replacement; bridge/runtime authority remains Kami; JVM config removed and both docs-only CI checks green"}
+  {:repo "kotoba-lang/demo" :pr 1
+   :sha "a73aca78646e7f9260660a24058839ac846f8edb"
+   :evidence "verified ns-only CLJC retirement; no empty .kotoba replacement; demo/application authority remains Kami; JVM config removed and both docs-only CI checks green"}
+  {:repo "kotoba-lang/kami-app" :pr 1
+   :sha "4ae4615811e1320f96fbeea2c20a550207aacc5e"
+   :evidence "verified ns-only CLJC retirement; no empty .kotoba replacement; application/engine authority remains Kami; JVM config removed and both docs-only CI checks green"}
+  {:repo "kotoba-lang/replicator" :pr 1
+   :sha "d875a29eeea27299bb778201ca277b07a7e3e866"
+   :evidence "sixth real fleet migration: production reservation metadata CLJC removed and replaced by four typed Kotoba getters; reference/restricted-JS/instantiated-Wasm observable values agree, production source authority is enforced, synthetic-data and randomization execution remains a future capability-gated Kami provider, and both CI jobs are green"}
+  {:repo "kotoba-lang/kami-app-quarry-walk" :pr 1
+   :sha "b55cf842993bf11670a2b9c917463ef2f0c55e9b"
+   :evidence "seventh real fleet migration: open-ended CLJC configuration maps replaced by 17 closed typed Kotoba exports; reference/restricted-JS/instantiated-Wasm behavior passes 3 tests / 21 assertions, rendering/input/terrain/WebGPU/physics/game-loop authority remains capability-gated Kami, and both CI jobs are green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6120-usa-ctia" :pr 1
+   :sha "82d5eb414b1772761445e8d75f3c9c68874740de"
+   :evidence "sole production association_facts.kotoba preserves absent establishment dates, month-only versus complete revision precision, and both ordered topic sets; 3 tests / 13 assertions and all JDK 17/21 CI green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6201-usa-gtia" :pr 1
+   :sha "44f33df61290cdeeeadb597fa3bc7997d433ba5b"
+   :evidence "sole production association_facts.kotoba preserves year-only founding, absent dates, governance/ethics, and rejects unsupported CompTIA certification authority; 3 tests / 13 assertions and all JDK 17/21 CI green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6411-jpn-boj" :pr 1
+   :sha "ffefb7c2182ac853e83bc409f9fe7fa18619c76e"
+   :evidence "sole production association_facts.kotoba preserves both official citations, full dates, the absent second revision, and ordered governance/operations/transparency; 3 tests / 12 assertions and all JDK 17/21 CI green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-are-ubf" :pr 1
+   :sha "ff157a754293d376782eb6fefb112c60c377051f"
+   :evidence "sole production association_facts.kotoba preserves year-only 1982/2017, absent revision dates, provenance, and distinct topics; 3 tests / 13 assertions and all JDK 17/21 CI green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-aus-aba" :pr 1
+   :sha "5701e10f893ab6adb31d075c272e0094843bc3d5"
+   :evidence "sole production association_facts.kotoba preserves year-only 1985/1997 milestones without inventing a founding date and returns ordered governance coverage; 3 tests / 13 assertions and all JDK 17/21 CI green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-che-sba" :pr 1
+   :sha "3d15430d0f189b3c83e875a2f32805b77506fb5a"
+   :evidence "sole production association_facts.kotoba preserves year-only 1912/2020 and distinct Wikipedia/official provenance without importing the unconfirmed 1977 date; 3 tests / 13 assertions and all JDK 17/21 CI green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-deu-bankenverband" :pr 1
+   :sha "b9293b9b8801eb3e2a416e8dd8966ba414626ded"
+   :evidence "sole production association_facts.kotoba preserves absent establishment dates, month-only 2024-04/2023-10 revisions, and asymmetric topic sets; committed compiler caches removed; 3 tests / 13 assertions and all JDK 17/21 CI green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-fra-fbf" :pr 1
+   :sha "e7fcce22ae44a33e861657b190b7d8f78e730b71"
+   :evidence "sole production association_facts.kotoba preserves UTF-8 French titles, both absent establishment/revision dates, official citations, and asymmetric governance versus consumer-protection/fair-transaction topics; committed compiler caches removed; semantic reference/restricted-JS/typed-Wasm conformance passes 3 tests / 13 assertions and all JDK 17/21 CI green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-esp-aeb" :pr 1
+   :sha "e8e467d169830853ad0e5b42dbce38bd2038d1dc"
+   :evidence "sole production association_facts.kotoba preserves the year-only 1977 founding and 1985 federation-entry milestones, both absent revision dates, ordered governance coverage, and exact official citation values; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-jpn-zenginkyo" :pr 1
+   :sha "7857f218a9879cda9ff1dbef99159be8c077b41a"
+   :evidence "sole production association_facts.kotoba preserves complete 2005-11-22/2022-09-15 dates, absent arrangement dates, Japanese titles, official citations, and distinct ordered topic sets; seven committed JVM host cache files removed; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-phl-bap" :pr 1
+   :sha "c6b4ee6b65b0db024a398dd8f874b98ef7cc14f5"
+   :evidence "sole production association_facts.kotoba preserves official complete 1949-03-29/1964-08-24 dates, both absent revision dates, and ordered governance coverage while excluding the conflicting secondary-source 1947 claim; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-vnm-vnba" :pr 1
+   :sha "2ace31cd6e9d01855dd573179fb9dca151b5b1aa"
+   :evidence "sole production association_facts.kotoba preserves official complete 1994-05-14 approval and 1995-09-29 ASEAN admission dates, both absent revision dates, and ordered governance coverage without inventing a separate launch entry; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-nga-cibn" :pr 1
+   :sha "593352bc5872986f5bcff136ef3b7a2338740e29"
+   :evidence "sole production association_facts.kotoba preserves official complete 1963-11-28 founding and 1990-05-18 chartered-status dates, both absent revision dates, and ordered governance coverage without inventing a separate 2007 reenactment entry; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-tur-tbb" :pr 1
+   :sha "7810acc58d3055f6904c3d056dd3180a13556971"
+   :evidence "sole production association_facts.kotoba preserves the complete 1958-10-08 founding date, year-only 2007 arbitration-board date, both absent revision dates, Turkish UTF-8 titles, official citations, and distinct governance/consumer-protection topics; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 16 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6511-jpn-seiho" :pr 1
+   :sha "cb9c43a8ead5e6f4396e51d7cfd1c3d6cd9e2d65"
+   :evidence "sole production association_facts.kotoba preserves both absent establishment dates, the first absent revision date, complete 2026-02-26 second revision date, Japanese UTF-8 titles, official citations, and distinct ordered topic sets; seven committed JVM host cache files removed; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 14 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6512-jpn-sonpo" :pr 1
+   :sha "c9588469421d3a87386cf9fc615891a458ce2950"
+   :evidence "sole production association_facts.kotoba preserves the complete 1991-10-17 establishment and 2024-03-21 revision dates, the second absent establishment date, month-only 2026-01 revision date, Japanese UTF-8 titles, official citations, and asymmetric ordered topic sets; seven committed JVM host cache files removed; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6512-usa-naic" :pr 1
+   :sha "c824e3f2a8a8b15a0f7a985dfc8bcc9e12690e4d"
+   :evidence "sole production association_facts.kotoba preserves NAIC's standard-setting/model-law distinction, both absent establishment dates, the first absent revision date, literal 2024 (Spring 2024 edition) second revision value, official citations, and asymmetric ordered topic sets; seven committed JVM host cache files removed; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6612-jpn-jsda" :pr 1
+   :sha "9e1112ec4f6b4a3426914b94ebc521aa00a04e45"
+   :evidence "sole production association_facts.kotoba preserves the first entry's absent establishment/revision dates, complete 1975-02-19 establishment and 2026-06-16 revision dates for the second entry, Japanese UTF-8 titles, official citations, and asymmetric ordered topic sets; seven committed JVM host cache files removed; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-0126-idn-gapki" :pr 1
+   :sha "f6d90ced5c648ad91f5c2a266d3036a0e719976a"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves every field and topic for both verified GAPKI citations through bounded count/index access; unknown associations/fields/topics/indexes fail closed with no declared effects; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 18 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-0126-mys-mpoa" :pr 1
+   :sha "43dbe2be9c2569d4c40a88e230c32f6d8973af7f"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves every field and topic for both verified MPOA citations through bounded count/index access; unknown associations/fields/topics/indexes fail closed with no declared effects; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 18 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-0150-usa-afbf" :pr 1
+   :sha "33777c38bcbcdd0f758d9be615ce8e79f7e512fd"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves every present field, the deliberately absent second established date, and distinct governance/advocacy topics; unknown values fail closed with no declared effects; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 18 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-0610-usa-api" :pr 1
+   :sha "22d9e11a5969b7c1758b575976bf692702f74135"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves every scalar field and the complete one-or-many ordered topic sets; unknown values fail closed with no declared effects; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 19 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-2011-usa-acc" :pr 1
+   :sha "ec5424b74e42341ed5c1ef31653f26dfed88b91b"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves year-only source precision, all scalar fields, kinds, and ordered topics; unknown values and indexes fail closed with no declared effects; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 16 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-2100-usa-phrma" :pr 1
+   :sha "8b88d98ebd5bc511b5561d927c81450d67f0bfd3"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves both PhRMA citations, all scalar fields, and source date precision through bounded typed option access; unknown values fail closed with no declared effects; reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-2910-deu-vda" :pr 1
+   :sha "44ff7fb22c1e1da22631f97fe260ca0cf0a75b52"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves both VDA citations, every present scalar field, the absent unverified date, the year-only 1901 date, and all ordered topics without inventing missing source facts; reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-2910-gbr-smmt" :pr 1
+   :sha "5e6efcbd3f78c310cd348c048497781501d9d0b2"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves both SMMT citations, every scalar field, full-date versus year-only precision, and both distinct topics; reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-3510-usa-eei" :pr 1
+   :sha "ae8f36448ad6bcca9a1c05359633cd8020302620"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves both EEI citations, every present scalar field, the absent unverified date, the year-only 1933 date, and all ordered topics without inventing missing source facts; reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-3600-usa-awwa" :pr 1
+   :sha "07543191511f50da1628a884e45ed86b8fcb9279"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves both AWWA citations, every scalar field, all full-date values, and all ordered topics without weakening source date precision; reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 16 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-4100-usa-agc" :pr 1
+   :sha "5985b98ddcb4c66273dfd64681f39e89231bd242"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves both AGC citations, every present scalar field, missing versus year-only date precision, and all ordered topics without inventing missing source facts; reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 16 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-4719-usa-nrf" :pr 1
+   :sha "240389f7fa032702743b3d275069755e13e56e9e"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves both NRF citations, every present scalar field, missing versus year-only date precision, and all ordered topics without inventing missing source facts; reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-4923-usa-ata" :pr 1
+   :sha "cffb64dba5ebbc27e80702a9a331139202a8ec8d"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves ATA's complete founding date and deliberately absent safety-policy date through a bounded typed ABI; unknown associations/fields/topics/indexes fail closed; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-5010-nor-rederiforbundet" :pr 1
+   :sha "433848e06ddc943165ea5d81746746acc9b2e6d2"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves the complete 1909-09-15 founding date and year-only 1999 award date through a bounded typed ABI; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 14 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-5110-usa-a4a" :pr 1
+   :sha "e967362ca044fbd92ae6e290efe1b549d2605c79"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves Spec 2000's deliberately absent date and the history profile's year-only 1936 date through a bounded typed ABI; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-5510-usa-ahla" :pr 1
+   :sha "b604a7c45bb7279bab626c3baf1973f030439e6f"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves complete establishment/revision dates, the year-only 1910 date, and absent-revision state through bounded typed field/topic access; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-5610-usa-nra" :pr 1
+   :sha "e6514a92a8ec2cad5bd435bbafcaa2a8f6406c6d"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves the complete 1919-03-13 founding date and ServSafe's deliberately absent date, disambiguating the National Restaurant Association; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 14 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6020-usa-nab" :pr 1
+   :sha "bf07efc6d37d3de7ba9f3d008ee381827a1654df"
+   :evidence "backfilled 2026-07-21 entry: sole production association_facts.kotoba preserves year-only revision 2014, year-only founding 1923, and their distinct absent fields through bounded typed field/topic access; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6612-usa-finra" :pr 1
+   :sha "612b69cb66d8da19db876a9b0edba19364ab37ea"
+   :evidence "sole production association_facts.kotoba preserves both entries' absent establishment/revision dates, official finra.org citations, and the asymmetric ordered topic sets (three for the rulebook, one for the by-laws); this closes the cloud-itonami-assoc-* wave — every pre-ADR-2607202200 CLJC-origin association repo is now sovereign Kotoba and all post-ADR repos in the family were scaffolded Kotoba-native; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 16 assertions, clj-kondo lint is clean, committed compiler caches removed, and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "kotoba-lang/app" :pr :already-merged
+   :sha "f57bfb3cfd3d94ece0bcfa94ae95ff56e20780f1"
+   :evidence "matrix-retirement backfill 2026-07-22: fresh clone at the exact recorded merge head confirmed zero tracked CLJC (the prior verified empty-shell retirement had never been retired from the canonical admission matrix); retired via scripts/retire-kotoba-cljc-canonical-repositories.mjs"}
+  {:repo "kotoba-lang/bridge" :pr :already-merged
+   :sha "650ca7a27dcfbf3b4c08e2320b24ad445c3e8c6e"
+   :evidence "matrix-retirement backfill 2026-07-22: fresh clone at the exact recorded merge head confirmed zero tracked CLJC; retired via scripts/retire-kotoba-cljc-canonical-repositories.mjs"}
+  {:repo "kotoba-lang/demo" :pr :already-merged
+   :sha "a73aca78646e7f9260660a24058839ac846f8edb"
+   :evidence "matrix-retirement backfill 2026-07-22: fresh clone at the exact recorded merge head confirmed zero tracked CLJC; retired via scripts/retire-kotoba-cljc-canonical-repositories.mjs"}
+  {:repo "kotoba-lang/kami-app" :pr :already-merged
+   :sha "4ae4615811e1320f96fbeea2c20a550207aacc5e"
+   :evidence "matrix-retirement backfill 2026-07-22: fresh clone at the exact recorded merge head confirmed zero tracked CLJC; retired via scripts/retire-kotoba-cljc-canonical-repositories.mjs"}
+  {:repo "kotoba-lang/kami-usd-native" :pr :already-merged
+   :sha "e56fffc291406a5871ee4cd11969a42e8ece3bd2"
+   :evidence "matrix-retirement backfill 2026-07-22: fresh clone at the exact recorded merge head confirmed zero tracked CLJC (the earlier count in the local matrix predated this fifth fleet migration's actual retirement); retired via scripts/retire-kotoba-cljc-canonical-repositories.mjs"}
+  {:repo "kotoba-lang/pbrt" :pr :already-merged
+   :sha "17bcaf807eb0fcd548d861d283fd10a0427e2502"
+   :evidence "matrix-retirement backfill 2026-07-22: fresh clone at the exact recorded merge head confirmed zero tracked CLJC; retired via scripts/retire-kotoba-cljc-canonical-repositories.mjs"}
+  {:repo "kotoba-lang/rtx-native" :pr :already-merged
+   :sha "c5e3c1584fc5b2f03066f4ec0e9df5eaad1c3ec9"
+   :evidence "matrix-retirement backfill 2026-07-22: fresh clone at the exact recorded merge head confirmed zero tracked CLJC; retired via scripts/retire-kotoba-cljc-canonical-repositories.mjs"}
+  {:repo "kotoba-lang/kami-engine-core" :pr 1
+   :sha "97c64f48b97b7c6e4946b79067d15f2050852204"
+   :evidence "eighth real fleet migration, empty-shell class: the production kami_engine_core.cljc contained only an ns declaration and docstring (already documented as an archived clj-wgsl migration placeholder, ADR-2607102200 addendum 8-9, not the implementation SSoT), so source, smoke test, and JVM project configuration were removed without creating a misleading empty .kotoba file; docs-only authority CI green, retired from the canonical matrix at exact live head with zero tracked CLJC"}
+  {:repo "kotoba-lang/kami-engine-engine" :pr 1
+   :sha "8ba8080ec2d413568d03ec25cad3fbd814fb85bf"
+   :evidence "same empty-shell class as kami-engine-core (ADR-2607102200 addendum 8-11); docs-only authority CI green, retired from the canonical matrix at exact live head with zero tracked CLJC"}
+  {:repo "kotoba-lang/kami-engine-io" :pr 1
+   :sha "046bc379926a4b2e54704e5eaf24a61c04bbe8ac"
+   :evidence "same empty-shell class as kami-engine-core (ADR-2607102200 addendum 8-11); docs-only authority CI green, retired from the canonical matrix at exact live head with zero tracked CLJC"}
+  {:repo "kotoba-lang/kami-engine-render" :pr 1
+   :sha "93a7f0352adb0d8de2975adf5a558031c2dc65db"
+   :evidence "same empty-shell class as kami-engine-core (ADR-2607102200 addendum 8-9); docs-only authority CI green, retired from the canonical matrix at exact live head with zero tracked CLJC"}
+  {:repo "kotoba-lang/kami-engine-script-runtime" :pr 1
+   :sha "9341cfb735ad96e95170acb897c80669915871e6"
+   :evidence "same empty-shell class as kami-engine-core (ADR-2607102200 addendum 8-9); docs-only authority CI green, retired from the canonical matrix at exact live head with zero tracked CLJC"}
+  {:repo "kotoba-lang/kami-engine-web" :pr 1
+   :sha "6c019a9b256b510979a8a3340b9069192c622f6b"
+   :evidence "same empty-shell class as kami-engine-core; canonical implementation lives in webgpu/kami-web (ADR-2607102200); docs-only authority CI green, retired from the canonical matrix at exact live head with zero tracked CLJC"}
+  {:repo "com-junkawasaki/ghosthacker-vamos" :pr 1
+   :sha "541d7ab9688533d330f4478d73cbde6633c26830"
+   :evidence "bounded-profile-split, additive (core.cljc/roster.cljc retained as general oracle, not replaced): src/ghosthacker_vamos/bounded.kotoba computes each of the fixed four-player roster's tally from a flat 24-element vector-i64 (reaction-tap target=42/close-window=5, quick-pick correct-index=0, sequence-recall canonical-order=[0 1 2 3]), fails closed on any other input length; both expected tallies (all-270, and boundary-mixed [270 70 120 0] pinning the close-window boundary exactly at diff=5) were hand-derived from the legacy judgment tables before compiling and confirmed against both the reference Web build and instantiated typed WebAssembly, not just internal self-consistency; unchanged legacy suite 22 tests / 63 assertions and clj-kondo lint both clean; hosted CI blocked by the same account-level GitHub Actions billing hold already recorded for ghosthacker-family/memorize/timemachine/sha256d (reverification-required true), merged on local reference+Web+Wasm conformance evidence per that established precedent"}
+  {:repo "kotoba-lang/mining-pool" :pr 1
+   :sha "73720fa6b8f08f9fd2cd0f6965ea215d5f1f4c08"
+   :evidence "bounded-profile-split, additive (vardiff.cljc retained as general oracle, not replaced): src/mining_pool/bounded_vardiff.kotoba ports adjust-difficulty's f64 clamp arithmetic (current/observed-seconds-per-share/target-seconds-per-share/max-adjust-factor) with min-difficulty pinned to the Stratum-standard 1.0 floor rather than taken as a fifth parameter, working around a real compiler bug found and isolated during this migration: functions with five or more :f64-typed parameters miscompile to Wasm (invalid local index at instantiation) even though five params is within the compiler's own declared max-parameters admission limit, reproduced down to the exact 4-vs-5 boundary with minimal standalone functions independent of this repo's logic; separately, cross-file :require of an :f64-returning function fails project-linking (kotoba.compiler.project/stub-value has no :f64/:f32 case), so kernel and conformance were kept in one file per the pbrt/kami-usd-native/rtx-native single-file precedent; all 5 legacy test.cljc cases hand-derived independently before compiling and confirmed via f64-to-bits equality (= does not admit raw :f64 operands) against both the reference Web build and instantiated typed WebAssembly; unchanged legacy suite 15 tests / 29 assertions and clj-kondo lint both clean; both JDK 17/21 hosted CI jobs green (kotoba-lang org runners, not billing-blocked)"}
+  {:repo "kotoba-lang/face-match" :pr 1
+   :sha "0ae505f7d5e83951d3cf4661e4e2cbe00d12f5b5"
+   :evidence "bounded-profile-split, additive (core.cljc/model.cljc/ports.cljc retained as general oracle and IFaceMatcher injection seam, not replaced): src/face_match/bounded_no_matcher.kotoba covers the only path any caller in this org exercises today (no IFaceMatcher injected -- none exists anywhere in the org) -- a verifiable, capability-free guarantee that this system never auto-verifies or auto-flags a face-match check on that path, always {:status :review :confidence-present false :reason :not-implemented :non-adjudicating true}; no .github/workflows/ci.yml existed in this repo before, added one; found two more compiler gaps on top of the two already filed as kotoba-lang/compiler#206: [:option :f64] as an option payload type fails the subset gate, and bare (option-none)/(option-some? ...) with no record or parametric wrapper compiles for js-browser but fails wasm32-browser Wasm typed lowering (both filed to the same issue), routed around by modeling confidence as a plain :confidence-present bool since the no-matcher path never had a confidence value to represent in the first place; unchanged legacy suite 6 tests / 16 assertions and clj-kondo lint both clean; both JDK 17/21 hosted CI jobs green"}
+  {:repo "kotoba-lang/cron" :pr 2
+   :sha "b5924d1e3aa29736442c6984694be1be562543ab"
+   :evidence "bounded-profile-split, additive (cron.model/parse, cron.validate, and everything downstream of the parsed cron structure retained as general oracle, not replaced): src/cron/bounded_civil.kotoba ports only the proleptic-Gregorian calendar arithmetic underlying weekday/fires-at?/next-fire (Howard Hinnant's days_from_civil/civil_from_days) -- independently portable since it has no dependency on cron expression parsing (which needs regex, unavailable, and produces field sets up to 60 members, exceeding the compiler's 32-item typed-set limit) at all; found and fixed a real compiler codegen bug along the way, filed separately as kotoba-lang/compiler#225 since it is a silent runtime miscompile rather than a rejected-or-unsupported operation: a let binding whose value expression references a same-named enclosing binding (idiomatic, valid Clojure) compiles to JS where the inner reference resolves to the new not-yet-initialized const instead of the outer one (temporal-dead-zone ReferenceError at runtime, reproduced with a two-line minimal function), worked around by renaming the shadowing binding; 7 cases cross-checked against Python's independent datetime module before compiling, including three negative-day-number dates exercising the floor-mod path, confirmed against both the reference Web build and instantiated typed WebAssembly; unchanged legacy suite 17 tests / 46 assertions and clj-kondo lint both clean (2 pre-existing warnings in untouched files); both JDK 17/21 hosted CI jobs green"}
+  {:repo "kotoba-lang/atprotocol" :pr 1
+   :sha "41ef11e30836ccfc1f69b326bfe91971e8dfdd2e"
+   :evidence "bounded-profile-split, additive (atprotocol.projection/app-record/profile retained as general oracle, not replaced): src/atprotocol/bounded_boundary.kotoba ports atprotocol.boundary's fixed 12-concern ADR-2607071500 responsibility-boundary table verbatim (owner/delegated?) -- a tamper-evident, capability-free declaration of which system owns which architectural concern, with unknown concerns resolving to :unknown matching the legacy nil-for-unknown contract; projection.cljc (function-valued codec contract validation) and app-record.cljc/profile.cljc (open-ended JSON-shaped maps via reduce-kv over arbitrary keys, same bounded-arbitrary-keyed-map gap as kotoba-lang/search and kotoba-lang/sheets) were reviewed and excluded, only the fixed dependency-free boundary table is independently portable; all 12 entries plus the unknown-concern case cross-checked directly against atprotocol.atprotocol-test/boundary-splits-cleanly before compiling; this repo's deps.edn has a :local/root sibling dependency on kotoba-protocol unresolvable in an isolated review checkout, so local clojure -M:test/-M:lint could not run, but the hosted CI job (which clones the sibling and runs the full legacy suite) passed cleanly, giving stronger confirmation than the local read-only check; Web and instantiated typed-Wasm conformance both pass, zero required capabilities; noted (not filed, working-as-designed) that kotoba-lang/compiler's = operator types as :i64 not :bool, so a :bool-declared function returning a bare (= a b) needs an explicit (if (= a b) true false) wrapper"}
+  {:repo "kotoba-lang/actor-ipc" :pr 1
+   :sha "149cdb1e8953e3cae24dd61e884eff21cc7e8c17"
+   :evidence "bounded-profile-split, additive (actor_ipc.cljc/actor.cljc/ipc.cljc retained as general oracle, not reviewed this pass): src/actor_ipc/bounded_clock.kotoba ports actor_ipc.time's fixed-timestep GameClock (make-clock/advance-clock/accessors/clock-alpha/wrap32, originally kami-engine/kami-core's Rust src/time.rs) as a fixed 4-field :record instead of the legacy open map, every field always present; case A matches actor_ipc_test.cljc's game-clock-advance test verbatim (tick-rate 60, elapsed 1s -> 60 ticks), cases B/C and the tick-counter wraparound-at-2^32 boundary checks independently computed with a Python re-implementation of the identical arithmetic before compiling; hit and worked around a compiler quirk along the way (not filed, precise trigger not conclusively isolated): a single deeply-nested (~15 levels) let/if check function failed with \"let requires one result expression\" at a diagnostic span not corresponding to any actual multi-body let in the source, resolved by flattening into four shallowly-nested top-level check functions; unchanged legacy suite 6 tests / 19 assertions and clj-kondo lint both clean; hosted CI green; Web and instantiated typed-Wasm conformance both pass, zero required capabilities"}
+  {:repo "kotoba-lang/ic-packaging" :pr 1
+   :sha "f9c5df6c545996dba21d99eff96d9ccdf14f00cf"
+   :evidence "bounded-profile-split, additive (ic-packaging.package/bonding retained as general oracle, not reviewed this pass): src/ic_packaging/bounded_thermal.kotoba ports ic-packaging.thermal's junction/case temperature formula (simple thermal-resistance network, forced-airflow 1/sqrt(1+v) factor via f64-sqrt) split into two <=4-param functions (theta_ca_effective computed separately) to avoid the known 5+-:f64-param Wasm-lowering bug (kotoba-lang/compiler#206) that the original 5-input calculate-thermal would have hit exactly; case A mirrors ic_packaging_test.cljc's thermal-junction-temp-above-ambient test exactly, case B mirrors airflow-reduces-theta-ja with exact expected float values rather than just the legacy test's inequality, case C is a third independently-computed configuration, all cross-checked bit-exact against a Python re-implementation before compiling; unchanged legacy suite 6 tests / 10 assertions and clj-kondo lint both clean; hosted CI green (unmodified legacy workflow, since .github/workflows/ci.yml could not be updated -- the pushing OAuth token lacks the workflow scope required to create or modify GitHub Actions workflow files, discovered this session; verification was still run in full locally, matching every other migration's rigor, and scripts/verify-kotoba.mjs documents the exact check a workflow-scoped follow-up would wire into CI); Web and instantiated typed-Wasm conformance both pass, zero required capabilities"}
+  {:repo "kotoba-lang/org-synopsys-sdc" :pr 1
+   :sha "fbbd67bae3e5be67782692df082206d07ea7abca"
+   :evidence "bounded-profile-split, additive (sdc.create-clock/io-delay/path-exception/parser retained as general oracle): src/sdc/bounded_duty_cycle.kotoba ports sdc.clock/duty-cycle (create_clock waveform duty-cycle computation, including the inverted-waveform wraparound case) as a {:valid :bool :percent :f64} record instead of the legacy Option<f64> return, since [:option :f64] does not currently type-check (same gap as kotoba-lang/face-match, kotoba-lang/compiler#206) and unlike face-match's always-absent case this function legitimately needs to report a present value; all cases cross-checked directly against sdc.clock-test/duty-cycle-computation and duty-cycle-invalid-period before compiling (default 50%, two asymmetric waveforms, an inverted wraparound case, two invalid-period cases); create-clock (plain map constructor)/io-delay/path-exception (open-ended pin identifiers and sets, same gap as search/sheets/atprotocol)/parser.cljc (regex-driven TCL subset parser, same gap as search/cron/org-ibis) were reviewed and excluded; unchanged legacy suite 14 tests / 69 assertions and clj-kondo lint both clean; hosted CI green (unmodified legacy workflow, same workflow-OAuth-scope constraint as ic-packaging); Web and instantiated typed-Wasm conformance both pass, zero required capabilities"}
+  {:repo "kotoba-lang/states" :pr 2
+   :sha "8c65e1e6633066ffc81f58a6e6cc92bcc07dbb6c"
+   :evidence "BREAKTHROUGH for the bounded-arbitrary-keyed-map gap that had retained kotoba-lang/search, kotoba-lang/sheets, kotoba-lang/atprotocol's app-record/profile, kotoba-lang/sigma, and kotoba-lang/edu-berkeley-spice this session: src/states/bounded_model.kotoba ports states.model's ASL-as-EDN state-machine accessors using kotoba-lang/compiler's canonical typed-map ([:map :string state-value-type], max-typed-map-entries 31), the same string/record-keyed bounded map primitive already production-qualified by kotoba-lang/crdt's orset/document CRDTs -- proving it works for a genuinely open-shaped legacy domain, not just CRDT internals; scoped to task states carrying a single :next transition plus succeed/fail terminal states (the exact shape states.core-test's own linear-machine fixture uses), replaying that fixture (task A -next-> task B -next-> succeed C) as the conformance suite: 3-entry typed-map count, membership, start-at, per-state kind/next-name/terminal? for both a :task and a :succeed state; choice/parallel/map states and the full ASL interpreter (states.execute) stay CLJC oracle, not reviewed this pass; hit one new gotcha (not filed, working as designed): = does not admit :string operands either (string=? required, same restriction already known for :f64); unchanged legacy suite 16 tests / 38 assertions and clj-kondo lint clean (6 pre-existing warnings in untouched files); hosted CI green (unmodified legacy workflow, same workflow-OAuth-scope constraint as ic-packaging/org-synopsys-sdc); Web and instantiated typed-Wasm conformance both pass, zero required capabilities. The 5 retained repos above should be revisited with this same tool."}]
+
+ :canonical-snapshot
+ {:artifact "90-docs/migration/kotoba-cljc-canonical-admission-matrix.json"
+  :authority :verified-retirement-delta-plus-live-github-repository-metadata
+  :canonical-repositories 2026
+  :local-checkouts 2443
+  :duplicate-checkouts 417
+  :tracked-cljc-files 12455
+  :production-cljc-files 8372
+  :github-verified 2025
+  :github-inaccessible 1
+  :current-default-branch 844
+  :stale-against-default-branch 1180
+  :incomplete-worktree 1
+  :github-unverified 1
+  :classification-counts {:capability-bound 315 :generated 6 :host-adapter 2763
+                          :macro-compiler-time 9 :portable-direct-candidate 591
+                          :portable-refactor-required 4467 :security-host-bound 227
+                          :test-only 4075}
+  :direct-probes {:repositories 0 :probes 0}
+  :note "FINRA retired from a clean exact-live-head zero-CLJC fresh clone via scripts/retire-kotoba-cljc-canonical-repositories.mjs, removing exactly one repository and one production CLJC file. Separately, 18 more cloud-itonami-assoc-* repositories (gapki/mpoa/afbf/api/acc/phrma/vda/smmt/eei/awwa/agc/nrf/ata/rederiforbundet/a4a/ahla/nra/nab) were discovered already migrated to sovereign Kotoba on 2026-07-20/21 by prior unlogged sessions and are now backfilled into :qualified-evidence; their local checkouts were never canonical-matrix entries (some were Kotoba-native from repository creation, matching the post-ADR-2607202200 scaffold default) so that backfill did not change matrix counts. 2026-07-22 second pass: 7 kotoba-lang repositories (app/bridge/demo/kami-app/kami-usd-native/pbrt/rtx-native) were already merged-and-empty on GitHub but stale (never retired) in the local matrix -- confirmed via fresh clone at their recorded merge heads and retired. A further 6 kotoba-lang/kami-engine-{core,engine,io,render,script-runtime,web} repositories were reviewed, found to be ns-only empty-shell CLJC in packages already documented as archived clj-wgsl placeholders (ADR-2607102200 addendum 8-9/8-11, not the implementation SSoT), migrated via the same verified-empty-shell-retirement pattern as kotoba-lang/app, PR'd, CI-qualified, merged, and retired from the matrix. Live GitHub refreshes may reclassify unrelated local snapshots between current and stale. Hashes are provenance/integrity evidence, not semantic conformance gates."}
+
+ :remaining-gaps
+ [:fresh-default-branch-source-snapshots
+  :reviewed-per-namespace-dispositions
+  :portable-source-admission-matrix
+  :production-jvm-launch-path-audit
+  :macro-and-host-branch-replacement
+  :hostile-browser-and-csp-qualification
+  :fleet-wide-extension-and-runtime-ci
+  :cloud-itonami-isic-isco-iso3166-unspsc-cofog-gtin-actor-wave-unreviewed-294-repositories-2120-production-cljc-files]
+
+ :session-closeout
+ {:as-of "2026-07-22"
+  :state :safe-to-resume
+  :last-retired "kotoba-lang/kami-engine-web"
+  :last-merge "6c019a9b256b510979a8a3340b9069192c622f6b"
+  :second-pass-2026-07-22 "Ninth through fourteenth real fleet migrations plus a 7-repository stale-matrix backfill, all logged above: (1) kotoba-lang/app, bridge, demo, kami-app, kami-usd-native, pbrt, rtx-native were already merged-and-empty on GitHub (some since the ADR's original session) but had never been retired from the local canonical matrix -- fresh-cloned at their recorded merge heads, confirmed zero tracked CLJC, retired. (2) kotoba-lang/kami-engine-{core,engine,io,render,script-runtime,web} were reviewed, found ns-only empty-shell CLJC in packages already documented as archived clj-wgsl placeholders (ADR-2607102200 addendum 8-9/8-11), migrated via the verified-empty-shell-retirement pattern (PR/CI/merge per repo, all green), and retired from the matrix. Source: 90-docs/migration/kotoba-cljc-canonical-admission-matrix.json classification_counts.portable-direct-candidate, sorted by production_cljc_count ascending -- the smallest, most tractable unreviewed candidates surfaced these 13 as either already-done or trivially retirable, rather than requiring new design work like the wave-2 actor pattern."
+  :cloud-itonami-assoc-wave :complete
+  :cloud-itonami-assoc-wave-note "All 37 cloud-itonami-assoc-* repositories (gh repo list, 2026-07-21) now carry a sole production src/association_facts.kotoba with zero tracked CLJC; every entry is logged in :qualified-evidence. No further :next-reviewed-wave-candidate exists within this sub-family."
+  :next-wave-survey-candidate "cloud-itonami org isic-*/isco-*/lei-*/iso3166-*/unspsc-*/cofog-*/gtin-* families: full census (356 repositories, every one queried live via GitHub API for src/*.cljc|*.kotoba, 2026-07-22, zero API errors). 294 repositories still carry production CLJC and zero Kotoba (isic 133 repos/997 files, isco 68 repos/264 files, iso3166 81 repos/777 files, unspsc 5 repos/37 files, cofog 5 repos/37 files, gtin 2 repos/8 files -- 2120 production CLJC files total, none migrated, none already sovereign). 62 repositories (lei 46, iso3166 15, gtin 1) have no src/ at all -- pure-data or scaffold-only repos and are explicitly out of scope, not remaining work. review-source-semantics has now run on two exemplars (cloud-itonami-isco-8114 mineralplant and its origin template cloud-itonami-isco-7211 foundrycoord, full-file read, 2026-07-22) and the class is NOT YET ACTIONABLE: these are langgraph.graph Advisor/Governor actor repos requiring the kotoba/app capability profile (LLM effect, actor/state-machine effect, mutable-store provider), whose fleet-wide completion gate (docs/lang/application-profile.md) has not passed -- the named proving slice gftdcojp/ai-gftd-ghosthacker-shiropico has migrated exactly one pure decision function and still carries its actor/advisor/store loop as CLJC. Independently, mineralplant.governor's safety-critical defense-in-depth check does case-folded substring search over free text, and kotoba-lang/compiler's string-operations set (string-byte-length/string=?/string-concat/string-replace-all/keyword-from-string/keyword-name) has no substring-search or case-fold primitive, so even a bounded pure-kernel extraction would have to silently drop that safety layer -- forbidden by :policy. Full finding recorded as a :dispositions entry (:kind :retain-cljc-pending-application-profile-and-string-search-gates) in kotoba-cljc-project-gap-dispositions.edn. Do not attempt migration in this wave until both gates are tracked as landed; re-run review-source-semantics per repo even then, since the 292 unreviewed repositories are only expected (not proven) to share this shape."
+  :resume-order [:fresh-clone-default-branch :review-source-semantics
+                 :implement-sovereign-kotoba :semantic-reference-js-wasm
+                 :four-way-ci :merge :exact-head-zero-cljc-retirement
+                 :regenerate-probes :update-adr-and-ledger]
+  :non-negotiable [:no-production-jvm-authority :no-mechanical-rename
+                   :fail-closed :typed-abi :bounded-resources
+                   :no-compiler-output-byte-identity-gate]}
+
+ :completion-criteria
+ [:canonical-repository-inventory
+  :per-repo-authority-classification
+  :no-production-jvm
+  :kotoba-admission-before-extension-change
+  :reference-js-wasm-conformance-for-portable-code
+  :capability-manifest-for-effects
+  :bounded-resource-profile
+  :fleet-ci-enforces-no-regression]}]

@@ -1,0 +1,133 @@
+[{:db/id -1
+  :adr/id "2608197800"
+  :adr/title "kaizen loop の観測辺を作る — 反応を読む。ただし「届かなかった」「何も出していない」「反応が無い」を 1 つにしない"
+  :adr/status "accepted"
+  :adr/date "2026-08-19"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/tags "atproto, engagement, observation, kaizen, bots, aozora, pds, observatory, loop"
+  :adr/body
+  "## 問い
+
+「bots が hermes agent を通じて作品を生成・投稿し、atproto の like / comment を見て
+kaizen する loop は?」（オーナー、2026-08-19）
+
+## 答え — どの辺も繋がっていない
+
+`hermes-agent` と `cloud-itonami-app` は**繋がっている**。Hermes が app の MCP server を
+子プロセスとして起動している（実測: `hermes_cli/tools/mcp_stdio_watchdog.py --ppid 86609
+-- sh -c 'cd ~/.cloud-itonami/app && exec clojure -M:mcp'`）。繋がっていないのはその先。
+
+**90 体の bot 全部が同一の 8 tool しか持たない**（実測、例外ゼロ）:
+
+    git_commit  git_diff  git_log  git_status
+    workspace_list  workspace_read  workspace_search  workspace_write_file
+
+app の tool registry には約 40 tool（`browser_*` `computer_*` `fleet_call`
+`virtual_shell` `cli_agent` `payment_*` …）が在るが、**atproto tool も画像/動画生成
+tool も 1 つも無い**。bot に配られていないのではなく、**app に存在しない**。
+
+したがって 2026-08-19 に登録した 20 体の work steward を含め、**bot は作品を 1 枚も
+生成できず、1 件も投稿できず、反応を 1 件も読めない**。
+
+⚠ **`content.publish :voice-required` を実行権限と読まないこと。** `registry.cljc` 自身が
+*The projection carries semantic capability decisions **for explanation. It is not an
+execution grant***と書いている。**方針は在り、機構が無い。**
+
+## 部品は bot fleet の外に在る
+
+| 部品 | 実体 | 常駐 |
+|---|---|---|
+| 生成 | `shinshi-video-actor`（generation ⊣ CatalogGovernor ⊣ ledger） | している |
+| atproto 投稿 | `shinshi-growth-actor/src/growth/aozora.clj`（`com.atproto.repo.createRecord` + CACAO 自己発行） | **していない** |
+| kaizen | `kaiyu-kaizen`（回遊 → 提案） | している |
+
+どれも Claude Code の loop / actor が動かすもので、**bot fleet からは届かない**。
+そして growth actor が読むのは shinshi.club の web metrics
+（`/_metrics/revenue`、`/_d1` の organic_pageviews / d7_return_pct 等）で、
+**atproto の like / comment ではない**。`getLikes` / `likeCount` / `replyCount` は
+`app-aozora-appview`（人間向け閲覧 UI）に**しか**存在しない。
+
+**投稿する辺は在り、反応を読む辺が無い。だから閉じていない。**
+
+## 決定（オーナー判断 2026-08-19）
+
+1. **観測辺から作る。** これが無いと他の辺を作っても評価できない。
+2. **投稿は提案止まりのまま。** bot は内容を提案し、実際の createRecord は人か既存
+   actor が行う。`content.publish` を実行権限に昇格させない。
+
+## 作ったもの
+
+`scripts/atproto-engagement-collect.cljs` + `manifest/atproto-surfaces.edn`。
+日次 launchd（`com.gftd.atproto-engagement`）で常駐。
+
+**この collector の仕事の大半は、3 つの答えを取り違えないことである。**素朴に書くと
+全部 0 で返ってくる:
+
+    A  面に到達できなかった              exit 2
+    B  到達したが、こちらの公開物が 0 件   exit 3
+    C  record を読み、反応を数えた         exit 0
+
+**C だけが反応についての主張である。** B を C として報告する collector は、
+**公開が止まっていることを「不人気」として報告し続ける**。
+
+## 測定 2026-08-19 — 答えは B
+
+`pds.aozora.app` は live（describeServer 200）で 9 repo を持つが、**record はゼロ**。
+`listRecords` と `describeRepo` という**独立に実装された 2 method が一致**した。
+9 repo のうち 8 つは診断用アカウント（`hito-*` / `federation-pilot` /
+`minidrama-fedtest`）。`pds.etzhayyim.com` は **down**（Cloudflare 1033）。
+
+⚠ **3 つ目の method で誤読しかけた。** `com.atproto.sync.getRepo` は全 repo に
+90 バイトを返し、2 repo の応答は **sha1 まで同一**だった。空の CAR に見えたが中身は
+`{\"error\":\"NotImplemented\"}` で、`aozora/pds/router.cljc` に handler が無い。
+**「測れなかった」が「測って空だった」と同じ顔をしていた**（ADR-2608136000 の型）。
+
+`shinshi-growth-actor` は createRecord の実装を持ち、その did:key repo は空である。
+**書ける実装が在ることと、書いたことがあることは別の主張。**
+
+## 走らせて初めて見つかった欠陥 3 件（読んでいては出なかった）
+
+1. **`:unread-detail` がエラー本文を捨てていた** —— `(select-keys .. [:status :why])`。
+   **この file 自身の docstring が「捨てるな」と書いている欠陥**。捨てられていた本文は
+   `Could not find repo: did:plc:yk4...` で、`listRepos` が返す deactivated アカウントを
+   `listRecords` が 400 で拒む正常な条件だった。今は `listRepos` が既に持っている
+   `active` flag で除外し、**除外した件数を印字する**。
+2. **成功行が `--max-repos` 実行で「written to <path>」と印字していた** —— その経路は
+   dry-run を強制するので何も書いていない。**自分の出力を誤報する collector は、
+   何も書かない collector より悪い。**
+3. **系列が自分を上書きしていた** —— 「反応は増えたか」が問いの全部なのに。今は追記。
+   ただし**単一 EDN vector のまま**にした: `edn-query` は `slurp-edn` で読むので、
+   行区切り EDN は**黙って 1 行目に切り詰められ、完全な読み込みとして報告される**。
+   既存の行区切り ledger 2 件がそれぞれ専用ローダを持つのはこのため。
+
+## 実証（stub ではなく実在の面に対して）
+
+    A  pds.etzhayyim.com      → exit 2、本文（CF 530）を保持
+    B  pds.aozora.app         → exit 3、9 repo 到達・record 0
+    C  実 Bluesky PDS host    → exit 0、active 3 repo / 900 record / 反応 2 / 除外 1
+
+`--max-repos` は診断用の境界付き実行で、**dry-run を強制する** —— 標本が完全な観測の
+顔をして durable plane に入らないようにするため。
+
+## 系列は git に置かない
+
+`.gitignore` へ（`:output-gitignored true` を宣言している既存 observatory 3 件と同じ判断）。
+日次で追記されるファイルを commit すると**共有 checkout が毎日 dirty になり**、
+CLAUDE.md の「統合・閲覧専用」と衝突し、2 セッションの測定が conflict する。
+実際にこの ADR を書く途中で、resident が追記した差分が `merge --ff-only` を
+**ブロックした**（退避して復元した）。系列自体が load-bearing になるなら、
+git ではなく B2/annex による durable retention が要る。
+
+## まだ無いもの（この ADR は loop を閉じていない）
+
+- **生成辺** —— bot から murakumo / ComfyUI を叩く経路
+- **投稿辺** —— bot が提案した内容を createRecord まで運ぶ経路（意図的に人が持つ）
+- **外部からの反応** —— appview を持たない単独 PDS では、外から来た like は
+  **構造的に見えない**。datom に `:engagement/scope :within-pds` を付けたのはこのため。
+  0 を全数と読まないこと
+- **`animeka` / `gameka` / `dougaka` は atproto 参照が 0 件**（mangaka と yukkuri は 3 件ずつ）
+
+**次に効く 1 手は、1 件でも実際に公開すること。** そうすれば collector は B から C へ
+移り、この loop で初めて意味のある数が出る。
+"}]

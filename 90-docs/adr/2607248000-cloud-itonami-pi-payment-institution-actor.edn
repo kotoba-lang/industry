@@ -1,0 +1,85 @@
+[{:db/id -1
+  :adr/id "adr-2607248000-cloud-itonami-pi-payment-institution-actor"
+  :adr/title "ADR-2607248000: cloud-itonami-pi — PSD2 Annex I Payment Institution (PI) actor の新設"
+  :adr/status "accepted"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/authoritative-for "cloud-itonami フリートにおける PI (Payment Institution, PSD2 Annex I の意味での決済機関) actor のスコープ・governor 設計・R0成熟度境界・sibling actor (isic-6419/isic-6619/cloud-itonami-emi/cloud-itonami-card-issuing) との責務境界の正本"
+  :adr/topic "cloud-itonami-pi-payment-institution-actor"
+  :adr/related "adr-2607246000-adult-content-payment-processor-banking-jurisdiction-research, adr-2607031500-cloud-itonami-m6910-global-incorporation-actor"
+  :adr/last-verified "2026-07-25"
+  :adr/body "## Context
+
+`90-docs/adr/2607246000-adult-content-payment-processor-banking-jurisdiction-research.edn`（決済業界の一次調査。並行して `90-docs/adr-ledger/adr-ledger.edn` にamendment有り）が発端。この調査の過程で、cloud-itonami フリートには banking（`cloud-itonami-isic-6419`、預金取扱）・credit（`cloud-itonami-isic-6492`）・card-processing/acquiring（`cloud-itonami-isic-6619`）の actor は既に存在するが、**PSD2 (Directive (EU) 2015/2366) Annex I の意味での PI（Payment Institution）ライセンス区分をカバーする actor が一つも存在しない**ことが判明した。最も近い既存 actor である `-isic-6619` はカード acquiring/決済処理という狭いメカニクスに特化しており、money remittance・payment initiation services (PIS)・account information services (AIS) を含むより広い PI サービス集合はカバーしない。本 ADR はこのギャップを埋める新規 actor `cloud-itonami-pi` の起票決定を記録する。
+
+PSD2 Annex I が定義する決済サービスは以下の7種（本 actor が対象とするのは 2・5・6・7、詳細は Decision 参照）:
+
+1. 口座への現金の預入・払出を可能にするサービス
+2. 口座上の決済取引（口座振替・カード決済・振込）の実行
+3. 資金が信用枠でカバーされている場合の決済取引の実行
+4. 決済手段の発行および/または決済取引のアクワイアリング
+5. money remittance（為替送金業）
+6. payment initiation services（決済指図伝達サービス、PIS）
+7. account information services（口座情報サービス、AIS）
+
+本 actor は**業界横断の汎用目的**（any legitimate payment use case）として設計する。2607246000 のアダルト業界向け決済調査はこの actor を起票する契機であって、actor 自体のスコープをアダルト業界に限定するものではない。
+
+## Decision
+
+### 1. スコープ: PSD2 Annex I サービス 2・5・6・7 を governed actor としてカバーする
+
+`cloud-itonami-pi`（repo: `cloud-itonami/cloud-itonami-pi`）は本フリート共通の「封じ込め + 独立 governor + 不変台帳」actor パターン（langgraph-clj StateGraph、advisor は proposal のみ返す、独立 governor が censor、実アクチュエーションは governor + phase の2層で常に人間専用）で実装する。**PaymentOps-LLM ⊣ PIGovernor**。
+
+対象 op: `:account/intake`（口座intake）・`:compliance/verify`（AML/KYC評価、法域spec-basis必須）・`:sanctions/screen`（制裁スクリーニング、無条件評価）・`:consent/register-pis`／`:consent/register-ais`（PSD2オープンバンキング同意登録、governed writeだが非actuation）・`:actuation/execute-payment`（決済実行、実アクチュエーション）・`:actuation/remit-payout`（送金実行、実アクチュエーション）。
+
+Annex I service 1（現金入出金）は本 R0 では独立opとして分離せず account intake の一部として扱う。service 3（信用枠カバーの決済実行）も service 2 から未分離。いずれも正直な既知ギャップとして `pi.facts` / README に明記する（水増ししない）。
+
+### 2. Non-goals: e-money 発行・銀行預金・カードacquiring・issuer-side card program との重複回避
+
+- **e-money を発行・保有しない。** PSD2 の PI ライセンスと EMD2 の EMI（Electronic Money Institution）ライセンスは制度上別区分であり、PI は e-money を発行できない。並行して起票される `cloud-itonami-emi` actor がその責務を持つ。両 actor は統合しない（制度上の分離をコード上の分離としても保持する）。
+- **銀行免許の意味での預金は取らない。** `cloud-itonami-isic-6419`（Community Monetary Intermediation）の責務。PI の顧客資金は safeguarding（分別管理/保険付保、PSD2 Art. 10 相当）の対象であり、銀行の預金とは法的性質が異なる——`pi.facts` の evidence checklist に `safeguarding-of-funds-arrangement-record` という 6419 の checklist に無い項目を持たせ、この違いをコード上でも表現する。
+- **カード acquiring/決済処理の具体的メカニクスを複製しない。** `cloud-itonami-isic-6619` の責務。本 actor の `:actuation/execute-payment`／`:actuation/remit-payout` は PI 自身の決済口座レベルの実行・越境送金モデルであり、カードネットワークのacquiring/interchange/scheme決済メカニクスではない——重複実装せず、6619 を sibling として cross-reference する（README に明記）。PSD2 Annex I service 4（決済手段発行/acquiring）はこの理由で本 actor のスコープ外とする。
+- **issuer-side のカードプログラム/BINスポンサーシップは持たない。** 並行して起票される `cloud-itonami-card-issuing` actor の責務。
+
+### 3. Governor 設計: 8チェック（7 HARD + 1 SOFT）
+
+`pi.governor`: ①effect-matches-op（advisor自己申告`:effect`とrequestの`:op`の一致——`cloud-itonami-isic-6910`のADR-0001 Addendum 12が実機再現で発見した「無害なopに見える提案がより高stakeなeffectを密輸できる」バグクラスを、本actorはR0の時点で最初から塞ぐ）②spec-basis（`pi.facts`への公式ソース引用必須）③evidence-incomplete（AML/KYC checklist充足）④IBAN checksum invalid（ISO 7064 MOD 97-10の独立再計算——`cloud-itonami-isic-6419`が確立した同一アルゴリズムを、standalone repoとして他actorへの依存を持たせないため本repo内で独立に再実装）⑤sanctions-flag-unresolved（無条件評価）⑥pis-consent-missing（PISチャネル実行時、`pi.store/consent-of`に有効な同意記録が無ければHARD hold——PSD2におけるPISの法的根拠そのものが顧客の明示的同意であるため）⑦already-executed／already-remitted（二重アクチュエーション防止、`cloud-itonami-isic-6492`のstatus-lifecycleバグ、ADR-2607071320、から学んだ「専用booleanで判定、statusでは判定しない」規律）。SOFT: confidence-floor + actuation-gate（`:actuation/execute-payment`／`:actuation/remit-payout`は常にescalate）。
+
+### 4. 実アクチュエーションは governor + phase の2層で構造的に常に人間専用
+
+`pi.governor`の actuation gate と `pi.phase`のフェーズ表（`:actuation/execute-payment`／`:actuation/remit-payout`はどのフェーズの`:auto`集合にも含まれない）の両方が独立に強制する。`test/pi/phase_test.clj`の`actuation-never-auto-at-any-phase`でリグレッションを機械的に検出する。
+
+### 5. R0 成熟度境界: MemStore-only、9法域spec-basis、DatomicStore/実オープンバンキング統合は次のシーム
+
+本actorは`cloud-itonami-isic-6910`の初期R0と同じ成熟度で公開する: 実際に動くactor loop（advisor/governor/phase/registry/store/operation）、**MemStore-only**永続化（`DatomicStore`/`langchain.db`未実装、`cloud-itonami-isic-6419`/`-6910`が既に実証した`:db-api`駆動パターンを適用できる見込みだが本ADRの対象外）、全ての破壊的/規制対象アクションを人間承認でゲート。法域spec-basisは9法域（DEU/FRA/IRL/NLD/LTU/GBR/JPN/SGP/USA-NY/BRA）のみ——`pi.facts/coverage`で常に正直に報告し、水増ししない。50 tests / 180 assertions green、clj-kondo clean、`clojure -M:dev:run`で intake→AML/KYC→制裁スクリーニング→PIS同意登録→PISチャネル決済実行(承認)→送金実行(承認)の一連の流れと、二重実行・未解決制裁フラグ・法域spec-basis欠如・IBAN checksum不正・PIS同意欠如の複数HARD holdケース（1リクエストで複数違反が同時収集されることも確認）を実機確認済み。
+
+### 6. 配置: `cloud-itonami` org 直下に新規 repo `cloud-itonami-pi`、manifest 登録なし
+
+既存の `cloud-itonami-{ISIC}` 系列と同じ open business blueprint 慣例（ADR-2607011000/2607012000/2607012100）に従い、public/AGPL-3.0-or-laterでcloud-itonami org直下に直接発行する。PIはISICコードではなくライセンス種別（PSD2の意味でのPayment Institution）で分類されるため、repo名は`cloud-itonami-isic-XXXX`ではなく`cloud-itonami-pi`とする。既存の`cloud-itonami-{ISIC}`系列と同様、`manifest/repos.edn`/`manifest/west.yml`への登録は本ADRの対象外（standalone。west登録は並行スキャフォールドされる複数actorが揃った後、別ステップでオーケストレータが一括登録する）。
+
+Repo URL: https://github.com/cloud-itonami/cloud-itonami-pi
+
+## Consequences
+
+- (+) cloud-itonami フリートに欠けていたPSD2 Annex Iの意味でのPI actorのギャップを埋め、`-isic-6419`（銀行）・`-isic-6619`（カード処理）・`cloud-itonami-emi`（EMI、並行起票）・`cloud-itonami-card-issuing`（issuer-side、並行起票）との責務境界を明文化した。
+- (+) `cloud-itonami-isic-6910`のADR-0001が15のAddendumを経て実機再現の末に発見したgovernance-bypassバグクラス（特にeffect-mismatch）を、本actorはR0の時点で設計に織り込み済み。
+- (-) 法域カバレッジ9/194（`pi.facts/coverage`）。追加は1エントリ=1本物の公式ソース引用が原則。
+- (-) `DatomicStore` backend未実装（MemStoreのみ）、実オープンバンキング(XS2A)ゲートウェイ・実決済レール・実KYC/制裁スクリーニングプロバイダ統合は対象外（operatorの責務、設計通り）。
+- (-) Annex I service 1（現金入出金）・service 3（credit-line-covered execution）を独立opとして区別していない——正直な既知ギャップ。
+- superprojectへの反映: 本ADRのみ（既存の`cloud-itonami-{ISIC}`blueprint群と同じ慣例により`manifest/repos.edn`/`manifest/west.yml`には本ADR起票時点では登録しない=standalone。west登録は別ステップ）。
+
+## References
+
+- https://github.com/cloud-itonami/cloud-itonami-pi （実装リポジトリ、README.md + docs/adr/0001-architecture.md が対）
+- `90-docs/adr/2607246000-adult-content-payment-processor-banking-jurisdiction-research.edn`（起票の契機となった一次調査）
+- `90-docs/adr/2607031500-cloud-itonami-m6910-global-incorporation-actor.edn`（同型actorパターンの直近の先例、R0成熟度の手本）
+- `cloud-itonami-isic-6419`（banking.governor、IBAN/ISO 7064 MOD 97-10の先行実装）
+- `cloud-itonami-isic-6619`（カード処理/acquiring、本actorとスコープが隣接するがオーバーラップしないsibling）"
+  :adr/decision-summary "{:new-actor \"cloud-itonami-pi\", :repo \"https://github.com/cloud-itonami/cloud-itonami-pi\", :pattern \"sealed PaymentOps-LLM advisor + independent PIGovernor + append-only audit ledger (same shape as cloud-itonami-isic-6419/-6910)\", :scope \"PSD2 Annex I services 2/5/6/7 (execution of payment transactions, money remittance, PIS, AIS) -- general-purpose, not adult-industry-specific\", :non-goals [\"e-money issuance (see cloud-itonami-emi)\" \"banking-license deposits (see cloud-itonami-isic-6419)\" \"card-acquiring settlement mechanics (see cloud-itonami-isic-6619)\" \"issuer-side card program/BIN sponsorship (see cloud-itonami-card-issuing)\"], :actuation-invariant \"`:actuation/execute-payment`/`:actuation/remit-payout` are never members of any `pi.phase` phase's `:auto` set, and `pi.governor`'s actuation high-stakes check always escalates them -- two independent layers enforce the same structural fact\", :license \"AGPL-3.0-or-later\", :org \"cloud-itonami\", :manifest-registration \"none yet -- standalone at ADR time, per the existing cloud-itonami-{ISIC} blueprint convention; west registration deferred to a separate batch step\", :r0-scope {:jurisdictions-with-spec-basis [\"DEU\" \"FRA\" \"IRL\" \"NLD\" \"LTU\" \"GBR\" \"JPN\" \"SGP\" \"USA-NY\" \"BRA\"], :store-backend \"MemStore only (Datomic/kotoba-server backend is a planned seam, not implemented)\", :tests \"50 tests / 180 assertions, lint clean\"}}"
+  :adr/deciders ["Jun Kawasaki" "Claude"]
+  :adr/date "2026-07-25"
+  :adr/amends []
+  :adr/supersedes []
+  :adr/superseded_by []}]

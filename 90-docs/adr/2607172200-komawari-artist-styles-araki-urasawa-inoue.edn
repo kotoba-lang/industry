@@ -1,0 +1,95 @@
+[{:db/id -1
+  :adr/id "adr-2607172200-komawari-artist-styles-araki-urasawa-inoue"
+  :adr/title "ADR-2607172200: komawari artist styles 拡張 — :araki / :urasawa / :inoue"
+  :adr/status "accepted"
+  :adr/date "2026-07-17"
+  :adr/last_verified "2026-07-17"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "komawari-artist-styles-araki-urasawa-inoue"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["adr-2607051520" "adr-2607051530" "adr-2607141700"]
+  :adr/body "## Context
+
+ADR-2607051530 の komawari artist-style カタログは :toriyama / :togashi の
+2作家で閉じていた(『同じ効果を正反対の幾何で達成する2人』)。オーナー指示
+(2026-07-17)『浦沢・井上・荒木なども分析してモデル化』を受け、公刊資料を
+調査してスタイル語彙を5作家に拡張した。v1 と異なり参照ページの現物提供では
+なく公刊資料ベースのため、全主張に grounding 等級を付ける:
+primary(本人の書籍/動画/インタビュー) / secondary(記名のクラフト分析) /
+consensus(通説だが著者言明未発見) / design-value(観測を束ねる本カタログの
+設計値) / inferred(一次資料からの推定)。
+
+調査の要点(詳細な出典 URL は komawari_styles.edn v2 の :source):
+- 荒木飛呂彦:『荒木飛呂彦の漫画術』の統治原理は『ページを最後まで
+  めくらせる』『全コマに意図』(primary)。斜めガター/コマ重なり/枠越えは
+  JoJo の代名詞だが著者自身の理論化は未発見(consensus)。⚠ 同書の
+  『美の黄金比』は顔の比率の話で、コマの φ 加重の典拠にはならない。
+- 浦沢直樹: 本人 YouTube『基本のキ』(見開き右上が要/コマ数を絞る)、
+  小津安二郎公式サイトインタビュー(定点カメラ・構図反復の意識的適用、
+  『PLUTO は SF を小津の画角で描く実験』)、顔→手→ページめくり→全身の
+  insert-cut reveal(いずれも primary)。水平バンド構造・ノド側に断ち切り
+  無しは secondary(benzilla.com)。『コマを傾けない』は author-stated
+  rule としては未確認 → inferred として tilt off。
+- 井上雄彦: 山王戦 vol.31 pp.91-154 の無音シークエンス(オノマトペは
+  p.120 ドックン / p.134 パスッ のみ、p.154 見開きで解放; secondary、
+  ページ番号付き)。対角線のエネルギーはガターでなくコマ内部のアクション
+  軸に宿り、枠は矩形のまま人物が枠を越える(secondary: canmom)。
+
+## Decision
+
+1. **engine**(`kotoba-lang/kami-mangaka-page` の `kami.mangaka.komawari`、
+   ADR-2607141700 で確立した commons home):
+   - `styles` を5作家に拡張。新 style opts: per-style tilt caps
+     (:impact-tilt-max / :tension-tilt-max — :araki は 45°/15°、既定は
+     従来どおり φ 対角の 31.7°/10°)、:weight-of(named weight table —
+     :urasawa は √φ の :subdued table、large:small が φ²でなく φ で読める)、
+     :character-bleed?(:beat/breakout → tag \"character-bleed\" +
+     :panel/bleed + :panel/z 3 — :araki / :inoue のみ。非対応 style では
+     :beat/inset 同様 silently strip)。
+   - `tilt-for` に caps 3-arity、`validate-layout` に {:style} 2-arity
+     (:araki の 45° impact shear は {:style :araki} でのみ通り、既定の
+     φ bound では従来どおり弾く。全高パネルの 45° shear は bleed 許容
+     [-0.4,1.4] を本当に超えるので governor が正しく弾く — テストは
+     現実的な3段ページで検証)。
+   - :toriyama / :togashi の既存出力は bit 単位で無変更(既存テスト無改変
+     で通過)。
+2. **catalog**(`gftdcojp/ai-gftd-mangaka` の
+   `clj/resources/komawari_styles.edn`)を version 2 に: 3作家の :styles
+   エントリ(engine パラメータと一致) + :grounding 等級 + :rhythm(幾何では
+   ない authoring-side デバイス: :page-turn-hook / :fixed-camera-repetition /
+   :insert-cut-reveal / :silent-beat / :spread-release /
+   :repetition-micro-difference を新語彙として分離 — 幾何の :dynamism と
+   混ぜない) + 観測8件追加(計12件)。φ 加重は Toriyama 分析由来の engine
+   共有機構であり荒木に帰属させない旨を明記。
+3. **スタイル設計の要約**: :araki = 全部乗せ(急シアー + panel-in-panel +
+   character-bleed)、:urasawa = 全部オフ(矩形バンド + subdued √φ、劇性は
+   反復とページめくりという authoring 側)、:inoue = 矩形ガター +
+   character-bleed + 最大コントラスト(既定 φ table)。5作家で『動きを
+   どこに宿らせるか』(枠自体 / 枠越え / 反復 / 余白 / コマ内部)の直交する
+   選択肢が揃った。
+
+## Consequences
+
+- 利用側は `propose-page-layout rows {:style :araki|:urasawa|:inoue}` と
+  `validate-layout panels {:style ...}` だけで新スタイルを使える。
+  `ai-gftd-mangaka` の `mangaka.layout.komawari` re-export は :local/root
+  参照のため自動追従(再 export 追加不要 — 新規 public var なし、既存 var の
+  arity 拡張のみ)。
+- :rhythm デバイスは幾何エンジンの範囲外(ページ列・ネーム側の語彙)。
+  compose-komawari graph 側で beat 配置指針として使うのは follow-up。
+- 検証: JVM `clojure -M:test` 23 tests / 92 assertions / 0 failures
+  (+3 tests/+22 assertions)、nbb(cljs) 実行検証(araki tilt 40° + governor
+  通過、urasawa large:small = φ ちょうど、inoue breakout tag/z)。
+  カタログ EDN は inner blob 4種とも edn/read-string 通過を確認。"
+  :adr/authoritative_for
+  ["kami.mangaka.komawari の styles は :toriyama :togashi :araki :urasawa :inoue の5作家。style opts の意味: :tilt-enabled? / :frame-break? / :character-bleed? / :impact-tilt-max / :tension-tilt-max / :weight-of(:default|:subdued または table map)"
+   ":beat/breakout は character bleed(人物が自分のコマ枠を越える)の beat hint — :character-bleed? style でのみ tag \"character-bleed\" + :panel/bleed + :panel/z 3 になり、他 style では strip される(:beat/inset の非 frame-break style での扱いと同型)"
+   "validate-layout の tilt bound は {:style k} 2-arity で per-style cap に切り替わる — :araki の 45° impact shear は {:style :araki} でのみ合法、引数なしでは従来の φ bound (31.7°/10°)"
+   "φ 加重(:phi-weighted)は Toriyama 分析由来の engine 共有機構であり、荒木・浦沢・井上のいずれにも帰属させない(『漫画術』の黄金比は顔の比率の話)。:urasawa の √φ :subdued table と :araki の 45°/15° cap は観測を束ねる design-value と明記済み"
+   "komawari_styles.edn v2 の :grounding 等級(primary/secondary/consensus/design-value/inferred)は新規主張の必須メタデータ — 以後スタイルを足す時も同じ等級付けをする"
+   ":rhythm(page-turn-hook / fixed-camera-repetition / insert-cut-reveal / silent-beat / spread-release / repetition-micro-difference)は幾何でなく authoring-side デバイスの語彙で、:dynamism(幾何)と混ぜない"]
+  :adr/artifacts "{:kami-mangaka-page \"kotoba-lang/kami-mangaka-page@205d646b (merge of agent/komawari-artist-styles; engine styles + tests)\", :ai-gftd-mangaka \"gftdcojp/ai-gftd-mangaka@98984d50 (merge of agent/komawari-artist-styles; komawari_styles.edn v2 + re-export docstring)\", :research \"WebSearch/WebFetch survey 2026-07-17 — full source URLs recorded in komawari_styles.edn v2 :source\"}"}]

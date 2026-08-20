@@ -1,0 +1,223 @@
+[{:db/id -1
+  :adr/id "2608059100-public-internet-account-directories-corpus"
+  :adr/title "ADR-2608059100: 公開インターネットアカウント・ディレクトリを保全し、ディレクトリとプロフィールの線を機械検査にする（DataLad 2 dataset + catalog/corpus）"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "public-internet-account-directories"
+  :adr/date "2026-08-05"
+  :adr/last_verified "2026-08-06"
+  :adr/deciders ["Jun Kawasaki（オーナー指示「do it」）"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["インターネットアカウントの収集範囲（ディレクトリとプロフィールの境界）と、その強制方法"
+   "アカウント面の catalog / corpus 境界、および DataLad dataset との責任分割"
+   "統合クエリ面に載せるもの（catalog / coverage / service）と載せないもの（account 行）"
+   "wave-1 の対象ディレクトリと、そのカバレッジの申告方法"]
+  :adr/related ["2608041800-global-legislation-full-text-corpus"
+                "adr-2608012000-gleif-lei-universe-and-property-ownership-on-the-query-plane"
+                "adr-2607252000-unified-query-plane-cross-repo-company-join"
+                "2607256100"
+                "2608039700-agent-loop-git-datalad-source-kotobase-query-projection"]
+  :adr/scope ["orgs/etzhayyim/global-accounts-datoms"
+              "orgs/etzhayyim/directory.plc"
+              "orgs/etzhayyim/software.diaspora.nodeinfo"
+              "manifest/edn-query.cljs"
+              "manifest/repos.edn"]
+
+  :adr/context
+  "オーナーの問い（2026-08-05）:「cloud-itonami で世界中の不動産、法律、企業、ページ、本、
+   PR、広告、インターネットアカウント、dns、ip、商品などを収集して edn, datalad で保存して
+   永続化、query ができるようにするのは設計されている?」
+
+   実測の答えは「9 ドメインは設計済みで実データがあり、**インターネットアカウントだけ面が
+   無い**」だった。近いものは 2 つあるが、どちらも corpus ではない:
+   `gftdcojp/tia`（なりすまし account の巡回・判定。人が報告した個別 account を裁く actor）と
+   ADR-2608050200（メールは account 単位、という protocol 側の設計）。「世界の公開アカウント
+   ディレクトリを保全して query する」面は 1 つも無かった。
+
+   オーナー指示「do it」を受けて着手。"
+
+  :adr/decision
+  "## 1. 線は「ディレクトリ」と「プロフィール」で引く
+
+   ディレクトリ項目は protocol が *機械がこのアカウントに到達するため* に公開している
+   識別子 —— identifier・handle・host。プロフィールは本人が自分について書いたもの。
+   **前者を mirror するのは relay や client が設計どおりにやっていること**で、
+   後者を大規模に収穫するのは query 面のついた監視であり、「公開されていた」は何も変えない。
+
+   正本は `global-accounts-datoms/policy/collection.edn`。禁止クラスを**名指しで列挙**する
+   （プロフィール文 / 画像 / 投稿 / ソーシャルグラフ / 連絡先 / ネットワーク観測 /
+   鍵と署名 / 自然人への紐付け）—— 将来の寄稿者が雰囲気ではなく特定の行と議論できるように。
+
+   ## 2. 強制は prose ではなく gate
+
+   `bin/verify-policy.cljs` が schema と**投影された全 shard**を走査し、ceiling 外の属性が
+   1 つでもあれば exit 1。schema だけでなく shard を見るのが要点で、builder が schema に
+   無い key を assoc すれば DataScript は黙って受け入れる —— 誰もレビューしない経路で
+   ceiling を迂回できてしまう。
+
+   ## 3. 2 層構成は legislation と同型にする
+
+   | 層 | 何を答えるか | 実測 |
+   |---|---|---|
+   | catalog | どの protocol にどんな公開ディレクトリが在るか | 20 directory / 12 protocol |
+   | corpus | 実際に保全されたアカウントとサーバ | 174,592 account / 790 service |
+
+   **catalog の一番効く行は `:directory/kind :none` の 6 件**（did:web / WebFinger /
+   Matrix user directory / NIP-05 / OIDC discovery）—— 「そもそも列挙できるものが無い」を
+   述べる。corpus の欠落はこの行の隣でしか読めない。
+
+   ## 4. wave-1 は 2 つ、粒度は protocol が決める
+
+   - `etzhayyim/directory.plc`（AT Protocol）: plc.directory の operation log。
+     **account 粒度**。上流が replication のために全文公開している（relay がこれに依存する）。
+   - `etzhayyim/software.diaspora.nodeinfo`（ActivityPub）: NodeInfo 2.x。
+     **server 粒度**。ActivityPub にディレクトリは無く、account を列挙する唯一の道は
+     145,880 ホストを crawl して個人プロフィールを読むことなので、**この層は server 層で
+     止まる。これは暫定ではない。**
+
+   ## 5. 統合クエリ面には account 行を載せない
+
+   `manifest/edn-query.cljs` が load するのは catalog（20）+ coverage（2）+ service（790）
+   だけで、174,592 の account 行は載せない。**容量ではなく到達性の判断**: account が
+   join できる先は `:account/service-host` → `:service/domain` だけで、その join は面に
+   service さえ在れば成立する。個人識別子 174,592 件を全 query の作業集合に常駐させる理由が
+   無い。account を引く query は repo 側の `adapters/read_only.clj`（公開 query のみ）を通す。
+
+   ## 6. 辺を materialize しない
+
+   legislation は `:law.rel` を持つが、それは上流が述べる事実で他に復元手段が無いから。
+   ここでの「誰がホストしているか」「handle はどのドメインの下か」は account 行から
+   文字列操作で**導ける**ので属性（`:account/service-host` / `:account/handle-domain`）に
+   した。導出できる 320,000 辺を git に置いても 40 MB 増えるだけで事実は 1 つも増えない。"
+
+  :adr/consequences
+  "## 実測（2026-08-06、収集ループを数十反復回した後の現在地）
+
+   | dataset | 保全 | 投影 | 分母 |
+   |---|---|---|---|
+   | `directory.plc` | 38 窓 / 3,800,000 operation（annex → B2） | **3,426,324 account**, 878 PDS | 上流は総数を公開せず。保全は 10^8 オーダーの約 3.8% |
+   | `xyz.farcaster.fnames` | 全ログ 1,449,414 transfer / 14,495 ページ | **1,444,862 account** | **完走**（空ページが終端） |
+   | `software.diaspora.nodeinfo` | 60 パス（4 partial を明示） | **26,393 server / 330+ 実装** | 145,943 ドメイン、distinct 試行 71%+ |
+
+   **corpus 合計 4,871,186 account**（開始時 174,592 の 28 倍）。統合クエリ面に載るのは
+   catalog(20) + coverage(3) + service(27,000 弱) のみで、account 行は載せない。
+
+   ## 3 つの source が 3 種類の「終わらなさ」を示した
+
+   これがこの corpus の中心的な発見で、収集を数十回反復して初めて定量化できた:
+
+   - **`fnames` は終わる。** 追記ログを id で walk し、空ページが終端。`:complete? true` は
+     主張ではなく検査結果。維持は resume による差分取得だけ。
+   - **`nodeinfo` は標本としては終わる。** 分母（seed 4 台の peer list 和集合 145,943）を
+     全部試せる。ただし**完了しても「fediverse を覆った」にはならない** —— 分母自体が
+     seed 依存で、彼らが連合していないサーバは分母にすら入らない。パスを増やしても解消しない。
+   - **`plc` は終わらない。** `bin/gaps.cljs` の実測で 1 窓 ≈ 0.6 日、最大の穴は 161 日。
+     1 つの穴を埋めるのに約 250 窓・2,500 万 operation を要し、その間に上流は成長する。
+     accounts は歩留まり 93〜99% で増え続けるが、帯は完成しない。
+
+   ## 窓の配置は測定になった（誤った規則とその訂正を両方残してある）
+
+   歩留まり（新規 account / 100,000 operation）の 5 点:
+
+   | 配置 | 歩留まり |
+   |---|---|
+   | head と重複（`late2022`） | 50% |
+   | 広い隙間 | 96% / 93.6% |
+   | **開始日の隙間で判断（誤った規則）** | **31.4%** |
+   | **既存窓の `:to` から開始（訂正後）** | **99.1%** |
+
+   誤った規則は「late2023 が 01-15 開始、mid2024 が 03 開始なので 01-25 は 5 週間の穴」と
+   読んだもの。窓の**期間**を数えておらず、当時の密度では 1 窓 ≈ 2.5 週間なので新窓は旧窓の
+   内側だった。訂正: **窓は既存窓の `:to` の後に置く。`:from` の後ではない。開始日の隙間は
+   隙間ではない。** これを `bin/gaps.cljs` として実行可能にし、次の `--after` が出力される。
+   **誤った予測を catalog から消していない** —— それが無いと規則が恣意的に読める。
+
+   ## gate を 8 種に増やした。すべて『壊れているのに正常に見える』形を潰したもの
+
+   1. **落ちない gate** —— CLJS の `(str #\"x\")` は `\"/x/\"` を返し、`js/RegExp` に渡すと
+      何にもマッチしない。汚染 shard に対し「0 violations」で exit 0 していた。
+   2. **終了しない fetcher** —— 完了済み sweep が 13/46/115 分常駐し、`fetch A; fetch B` の
+      B が永久に始まらない。明示 exit を追加。
+   3. **0 件取得の成功偽装** —— zsh が単語分割しないため `--after` が壊れ、上流が全リクエストに
+      400 を返したが exit 0。3 窓を取得したと報告する寸前だった。0 ページで exit 1 に。
+   4. **記述の無い窓** —— fetcher が中断されるとページだけ残り report が無い。index は全
+      `*.jsonl` を fold するので**記述されていない窓の operation が corpus に混入**する。
+      逐次 report（10 ページごと）+ **検査の基準を report からページへ移動**（report を
+      基準にするとバグの住む死角を見ることになる）。
+   5. **世代混在の投影** —— 中断されたビルドが shard を位置指定で上書きし、53/73 が新世代・
+      残りが旧世代・manifest は旧世代。名前も個数も一致するので他の全検査が緑。
+      **manifest の per-shard sha256 だけがこれを見た。**
+   6. **古い index からの投影** —— catalog(38) と raw(38) は一致、index だけ 36。corpus の
+      `:coverage/sampling` は index 由来なので「36 窓」と記述される。層間の鮮度検査を追加。
+   7. **partial pass の未記録** —— undici クラッシュ / ハーネス停止 / timeout の 3 種すべてで
+      `:completed` と `:partial?` を記録。分母は `:requested` ではなく完了数から引く。
+   8. **ゼロを主張する検査** —— `:cross-protocol-host-overlap` を `empty?` で守っていたが、
+      標本が育って破れた。ベースライン集合に変更。**`empty?` のままなら最初の正当な例外で
+      検査ごと削除され、その後の観測機会が永久に失われていた。**
+
+   ## 投影のヒープ問題 —— 5 回の修正が足りず、6 回目に構造を変えた
+
+   同じ症状（V8 fatal、`node::Start` で終わるスタック）で原因が毎回違った:
+   shard の materialize → `let` 束縛の head 保持 → CLJS 永続ヒストグラム →
+   `mapcat` の `apply` が全入力ファイルを実体化 → **関数パラメータ自身**の head 保持。
+   各修正は規模の上限を 1 ラウンド分ずつ押し上げただけで、5 回目も 158/162 shard で落ちた。
+
+   **CLJS に locals clearing が無い以上、let・パラメータ・loop のどの束縛でも head を掴みうる。
+   探索に終わりが無い。** 6 回目に「ファイルをまたぐシーケンスを作らない」構造（1 ファイル
+   読む → 変換 → 1 shard 書く → 捨てる）に変え、ピークが規模に依存しなくなって完走した。
+
+   **process note**: 4 回目の推測は測定にすべきだった。プローブを書いたら**プローブ自体が
+   落ちて**問題の種類が 1 回で判明した。読んで分かるつもりで 4 回進めたのは効率が悪い。
+
+   **gate は 6 回の失敗すべてで機能した。** 部分ビルドは毎回コミット前に拒否され、
+   **修正を何度間違えても損害は再ビルド時間だけで、corpus は一度も壊れていない。**
+
+   ## cross-protocol ホスト —— 3 例でカテゴリが 2 回変わった
+
+   `:service/domain` を共通キーに 3 protocol を別々に集めたからこそ見える構造:
+
+   | ホスト | ActivityPub | AT Protocol |
+   |---|---|---|
+   | `stevebate.social` | fedisky（両者のブリッジ実装）3 users | 2 account の PDS |
+   | `allykotetsu.com` | WordPress + AP プラグイン 1 user | 9 account の PDS |
+   | `arankwende.com` | 標準 Mastodon 4.4.3、1 user | 1 account の PDS |
+   | `fed.brid.gy` | **Bridgy Fed、141,518 users**、activitypub / atprotocol / nostr / webmention を宣言 | 1 account の PDS |
+
+   カテゴリは 2 回変わった。1 例目では「ブリッジ運用者」と読め、2 例目がそれを否定し
+   （ブリッジではない同居）、3 例目で「**全て個人の自己ホスティング**（fediverse 側
+   3/1/1 users）でインフラ事業者ではない」と一般化した。**その一般化を 4 例目が反証した** ——
+   Bridgy Fed は 14 万ユーザのインフラで、4 protocol を宣言している。
+
+   正しいカテゴリは「**1 ドメインから複数プロトコルを提供するホスト**」で、個人と事業者の
+   両方を含む。**3 サンプルは十分に見えた**という事実を残すため、誤った一般化を消さずに
+   併記する。単独 protocol の観測では原理的に見えない構造。
+
+   ## fediverse の実装多様性は飽和しない（実測）
+
+   645 server で 45 実装 → 26,393 server で **330 実装**。直近 1,127 server 増で 11 の新実装。
+   分母の 71% を試した時点で頭打ちが見えない。**「fediverse は数個の実装で代表できる」という
+   前提を持つ分析への、標本ベースの反証データ**になる。ヒストグラムは要約せず
+   `index/manifest.edn` に全数を置く。
+
+   ## 意図的にやっていないこと（変更なし）
+
+   - **repo は private のまま。** 姉妹の legislation dataset は public だが、これは実在の
+     480 万件の識別子で、公開リポ化は CLAUDE.md が事前確認を要する操作。
+     **元データが公開であることと、索引付き query 可能な成果物を新たに公開することは別。**
+   - **`gftdcojp/tia` に接続していない**（`connections/actors.edn` に理由記録済み）。
+   - **account を自然人に紐付ける属性を 1 つも持たない**（`coverage/registry.edn`
+     `:prohibited-joins`）。handle が join するのはドメインとホストであって人物ではない。
+   - **標本の `:service/users-total` を合計しない。** 誰も測っていない数の算術。"
+
+  :adr/alternatives
+  "- **プロフィールも集める**（Bluesky AppView の actor search 等）: 却下。同じ「どの account が
+     存在するか」に plc.directory がプロフィール抜きで答える。catalog に
+     `:directory/wave :never` + 理由つきで記録した。
+   - **fediverse を account 粒度で集める**: 却下。ディレクトリが存在せず、唯一の道が
+     プロフィール crawl。server 粒度を**天井として**記録した。
+   - **1 つの巨大 corpus repo にまとめる**: 却下。legislation と同型の
+     「DataLad が保全 / datoms が投影」を踏襲した。投影の再構築に 118 MB の
+     `datalad get` を要求しない。
+   - **account 行も統合クエリ面に載せる**: 却下（上記 5）。
+   - **辺を materialize する**: 却下（上記 6）。"}]

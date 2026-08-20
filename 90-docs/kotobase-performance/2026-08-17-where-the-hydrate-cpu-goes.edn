@@ -1,0 +1,237 @@
+{:receipt :kotobase/where-the-hydrate-cpu-goes
+ :date "2026-08-17"
+ :graph "kotobase-protocols-v2"
+ :head "bafyreiehotlnqouj5u35gqh535ctxr52smxiphdjhiydtmivc2v6tqx3ye"
+ :decision "ADR-2608172100"
+
+ :question
+ "Which materialised view should kotobase build first? The hypothesis under test:
+  the biggest materialisable thing is not a query view but the LocalStore SEED
+  itself -- a pure function of the chain head CID, content-addressed and
+  immutable -- so materialising it collapses the hydrate to a range read and
+  needs no knowledge of the query mix."
+
+ :verdict
+ {:hypothesis :right-about-the-key-wrong-about-the-size
+  :because "The hydrate is not dominated by fetching 84 blocks. It is dominated by
+            turning stored EDN text back into Clojure values, which a materialised
+            seed still has to do -- the consumer is a SYNCHRONOUS
+            kotobase.local/LocalStore over a plain Clojure map. Block fetch +
+            decode + tree walk + novelty merge is 23% of the CPU; the value decode
+            is 64%."
+  :and "The single largest lever is not a view at all: 91 documents carrying inline
+        object bodies are 85% of everything every request parses, and since
+        2026-08-10 no s3 request on this graph can even reach them."}
+
+ ;; ------------------------------------------------- 1. cost, in workerd, measured
+ :workerd-cpu
+ {:how "`wrangler tail kotobase-protocols-worker --format json`, reading the
+        cpuTime/wallTime fields of each event. atproto is a public-read surface
+        (core/public-read-surfaces), so a hydrating request needs no credential.
+        Two windows, 14 hydrating requests."
+  :hydrating-request {:cpu-ms [2329 4416] :wall-ms [2851 6184] :n 14 :outcome "ok"}
+  :diag-hydrate-route {:cpu-ms [1 3] :wall-ms [1 3]
+                       :reading "the diagnostic really is O(1) and cannot cause the
+                                 work it reports"}
+  :reading "CPU is 68-85% of wall. This path is CPU-bound, not I/O-bound -- which
+            matters because the isolate block cache already removes most of the
+            I/O and a seed materialisation is aimed at the same half."}
+
+ ;; ------------------------------- 2. the diagnostic that shipped this morning lied
+ :io-wait-ms-is-not-a-cost
+ {:finding "`/_diag/hydrate`'s `ms` under-reported by up to 112x."
+  :mechanism "Date.now() inside a Cloudflare Worker advances only at I/O
+              boundaries -- the clock is frozen across synchronous execution, a
+              deliberate timing-attack mitigation. A delta taken around the hydrate
+              therefore measures accumulated I/O WAIT and charges nothing for CPU."
+  :method "Eight paired probes: one hydrating request immediately followed, ON THE
+           SAME CONNECTION, by a read of /_diag/hydrate, with `wrangler tail`
+           running. Each sample's `at` falls inside its request's window, which is
+           what makes the pairing an observation rather than an assumption."
+  :rows
+  [{:probe "pair-1" :cpu-ms 2802 :wall-ms 4119 :reported-ms 820}
+   {:probe "pair-2" :cpu-ms 2488 :wall-ms 3790 :reported-ms 819}
+   {:probe "pair-3" :cpu-ms 4163 :wall-ms 5883 :reported-ms 1251}
+   {:probe "pair-4" :cpu-ms 4416 :wall-ms 6184 :reported-ms 1822}
+   {:probe "pair-5" :cpu-ms 3890 :wall-ms 4745 :reported-ms 43}
+   {:probe "pair-6" :cpu-ms 4046 :wall-ms 5092 :reported-ms 36}
+   {:probe "pair-7" :cpu-ms 2682 :wall-ms 3809 :reported-ms 780}
+   {:probe "pair-8" :cpu-ms 2511 :wall-ms 3701 :reported-ms 898}]
+  :the-inversion "The two worst under-reports are the ones where the isolate block
+                  cache was WARM -- there was no I/O left to time. The number is
+                  smallest exactly when it is most misleading."
+  :fixed "Renamed io_wait_ms, `cost_note` served in the body, blocks_from_cache /
+          blocks_from_r2 added. Deployed; both directions observed live:
+          io_wait_ms=1220 from_cache=0 from_r2=84, then the same work at
+          io_wait_ms=44 from_cache=84 from_r2=0."}
+
+ ;; --------------------------------------------- 3. the split, over production bytes
+ :phase-split
+ {:fidelity
+  {:bytes "REAL. All 118 blocks reachable from the production head were fetched
+           read-only (scripts/fetch-graph-blocks.cljs) and seeded into an in-memory
+           bucket under their real CIDs; the head pointer is production's own chain
+           CID. Nothing was re-committed."
+   :self-check "The engine verifies block CIDs on decode. The first version of the
+                harness seeded Node Buffers, whose `.buffer` is the shared POOL and
+                not the block, and it failed with `chain: block CID mismatch` rather
+                than silently measuring a neighbouring block's bytes."
+   :code "The shipped `ks/hydrate-run-persist!` itself, :advanced-optimized."
+   :mirror "Phase B is a copy of hydrate!'s fold, so it is checked against
+            `ks/hydrate!` over the same bytes with `=` on every run. Disagreement
+            aborts instead of reporting a split of something that is not the
+            hydrate. It agreed on every run."}
+  :units "process.cpuUsage() user+system. Node is NOT workerd -- see :workerd-cpu.
+          The RATIO between phases is what transfers."
+  :rows
+  [{:phase :whole-served-hydrate :cpu-ms [1720 2232] :share 1.00
+    :block-gets 84 :distinct 84 :duplicate 0 :bytes 11462579}
+   {:phase :a-hot-datoms :cpu-ms [491 538] :share 0.23
+    :what "84 block gets + dag-cbor decode + prolly-tree scan + novelty merge"}
+   {:phase :b-fold-and-decode2 :cpu-ms [1386 1473] :share 0.64
+    :what "group-by :e, then decode2 (edn/read-string TWICE per stored value) and
+           build the nested {:docs {coll {k v}}} map"}
+   {:phase :remainder :cpu-ms 300 :cpu-ms-note "approximate: whole minus (a + b)" :share 0.13
+    :what "head read, before/after :docs diff, the counters"}]
+  :rows-scanned 4530
+  :seed-shape {:collections 17 :docs 888 :streams 2 :revision 1821}}
+
+ ;; ------------------------------------------- 4. what a materialised seed would cost
+ :seed-decode-candidates
+ {:note "Each is a whole-seed materialisation keyed by the chain CID. They differ
+         only in how many values get parsed, which is the whole finding."
+  :rows
+  [{:encoding :edn :bytes 4930593 :decode-cpu-ms [887 919]
+    :verified "result `=` the hydrate's own state" :vs-hydrate -0.60}
+   {:encoding :cbor-structure-plus-edn-values :bytes 4933159 :decode-cpu-ms [836 951]
+    :verified ":docs `=` the hydrate's :docs" :vs-hydrate -0.57}
+   {:encoding :cbor-structure-only-values-never-parsed :bytes 4933159
+    :decode-cpu-ms [2.5 6.8] :vs-hydrate -0.997
+    :caveat "NOT a usable seed on its own -- LocalStore would hand a handler a
+             string where a map belongs. Measured as the FLOOR: what the decode
+             costs if value parsing can be made per-collection or lazy."}]
+  :reading "A seed materialisation removes phase A outright. Phase B survives ANY
+            encoding that has to produce the plain Clojure map a synchronous
+            LocalStore holds. What separates -60% from -99.7% is not where the
+            bytes come from; it is how many values get parsed."}
+
+ ;; ------------------------------------------------------- 5. and WHICH values
+ :census
+ {:per-collection
+  [{:coll "[:kotobase.s3/objects \"etzhayyim-xyz-farcaster-fnames\"]" :docs 526
+    :edn-bytes 4312242 :parse-cpu-ms 421.8}
+   {:coll "[:kotobase.git/objects \"kotoba-lang/kotobase-protocols-worker\"]" :docs 75
+    :edn-bytes 158281 :parse-cpu-ms 15.9}
+   {:coll "[:kotobase.git/objects \"kotoba-lang/kotobase-protocols-v2-verified\"]" :docs 85
+    :edn-bytes 77827 :parse-cpu-ms 7.9}
+   {:coll "[:kotobase.git/objects \"kotoba-lang/kotobase-protocols-v2-final\"]" :docs 75
+    :edn-bytes 69869 :parse-cpu-ms 7.2}
+   {:coll "[:kotobase.git/objects \"kotoba-lang/kotobase-protocols-v2-clean2\"]" :docs 75
+    :edn-bytes 69869 :parse-cpu-ms 6.3}
+   {:coll "[:kotobase.git/objects \"kotoba-lang/kotobase-protocols-v2-clean\"]" :docs 31
+    :edn-bytes 40405 :parse-cpu-ms 3.6}
+   {:coll "…11 more, each under 600 bytes" :docs 21 :edn-bytes 2200}
+   {:coll "[:kotobase.at/records \"did:web:v2test.example\" \"net.kotobase.doc\"]" :docs 1
+    :edn-bytes 15 :parse-cpu-ms 0.01
+    :note "the entire atproto surface's share of this graph"}]
+
+  :inline-bodies
+  {:in "[:kotobase.s3/objects \"etzhayyim-xyz-farcaster-fnames\"]"
+   :docs 526
+   :docs-with-:bytes-key 91
+   :bytes-in-those 4198531
+   :share-of-whole-seed 0.852
+   :clean-split "every document over 1 KB is one of the 91; the median document in
+                 that collection is 262 bytes of ordinary metadata
+                 ({:cid … :etag … :size … :content-type … :codec …})"
+   :largest-doc-bytes [46279 46249 46249 46239 46233]
+   :what-they-are "an inline object body under a :bytes key, from before
+                   ADR-2608061200 moved object bodies to the blob plane"
+   :and-unreachable "Since 2026-08-10 `graph/for-request` sends EVERY s3 request for
+                     that bucket (object-level, LIST and DELETE alike --
+                     objects/bucket-of is the wide predicate) to the graph
+                     `s3-bucket/etzhayyim-xyz-farcaster-fnames`. On
+                     kotobase-protocols-v2 these 91 documents are reachable only by
+                     the four query surfaces, all credential-gated. Every request to
+                     every surface parses them regardless, because hydrate! builds
+                     the whole seed before the router picks a branch."}}
+
+ ;; ------------------------------------ 6. why the existing memo does not cover this
+ :query-memo-cannot-cover-the-hydrate
+ {:asked "A per-isolate memo already exists and the hydrate still costs ~800 ms. Why
+          does the memo not already cover this?"
+  :answer "Not cold isolates. Structure. `query/memo-version` keys on `(:docs
+           state)`, and `state` is the hydrate's OUTPUT -- computing the memo key
+           requires having already finished the hydrate. The memo is downstream of
+           the hydrate by construction and can never remove one. What it memoises is
+           `bridge/db-for`'s materialisation, a different layer."
+  :also "It is only attached where `query/queryable?` holds -- the four query
+         surfaces. Live, on every isolate probed: size 0, hits 0, misses 0."}
+
+ ;; ------------------------------------------------------------ 7. the served mix
+ :served-query-mix
+ {:measured "ZERO organic requests."
+  :window "5 minutes, 2026-08-17T12:33:41Z - 12:38:41Z, `wrangler tail`, whole
+           Worker (all six routed hostnames)."
+  :events 2 :both-of-them "the marker requests this probe fired itself"
+  :evidence-floor
+  "The FIRST attempt at this produced a 0-byte tail file, which is
+   indistinguishable between `no traffic` and `the tail never connected` -- the
+   same failure this receipt's §2 is about. It was discarded, not reported. The
+   window above is bracketed by two marker requests precisely so that a non-empty
+   result proves the tail was connected AND that nothing else arrived."
+  :consequence "The view could not be chosen from the served query mix, because
+                there is no served query mix. That is a second reason the seed view
+                was chosen: it is the one candidate that does not need one."}
+
+ :what-this-does-not-show
+ ["Memory in workerd. Decoding a 4.9 MB seed into Clojure structures is the thing an
+   isolate's 128 MB limit would bite. Node reported heapUsed 165-184 MB after the
+   hydrate, which is an upper bound on a DIFFERENT runtime's accounting and not an
+   estimate. `wrangler tail` distinguishes exceededMemory from exceededCpu; measure
+   there before trusting the seed's size."
+  "The Node-to-workerd CPU ratio, precisely. Node 1,720-2,232 vs workerd 2,329-4,416
+   is 1.1-2.0x, but the two were taken under different load and different
+   concurrency. Only the phase RATIO is claimed to transfer."
+  "Per-surface cost AFTER a seed view. The per-collection parse costs above are
+   measured; the per-surface totals derived from them are arithmetic."
+  "The write path under partial materialisation. `diff->tx-data!` was READ, and it
+   turned up a real hazard -- `new-events` derives seq from
+   `(count (get-in before [:streams stream]))`, so partially materialising streams
+   would collide seq numbers with existing events. The conclusion that partially
+   materialising DOCS is safe is reading, not testing."
+  "Other graphs. Everything here is kotobase-protocols-v2. `s3-bucket/*` and
+   `atproto-repo/*` have different shapes and very different write rates."
+  "Whether the 91 documents are still needed by anyone. That is a data question for
+   the owner, not a measurement."]
+
+ :reproduce
+ {:blocks "cd protocols-worker && nbb scripts/fetch-graph-blocks.cljs /tmp/kb-blocks kotobase-protocols-v2
+           (read-only `wrangler r2 object get`; prints the head CID. The blocks are
+           NOT committed -- they carry production payloads.)"
+  :build "node scripts/resource-guard.mjs run build -- npx shadow-cljs release hydrate-bench"
+  :run "node --expose-gc --max-old-space-size=8192 out/hydrate-phase-bench.js
+        --blocks /tmp/kb-blocks --head <chain-cid> --graph kotobase-protocols-v2"
+  :workerd "npx wrangler tail kotobase-protocols-worker --format json, then
+            curl a hydrating public route:
+            https://atproto.kotobase.net/xrpc/com.atproto.repo.describeRepo?repo=x"
+  :landed "net-kotobase/control-plane merges 21dcc464e7f and 483305390aa;
+           Cloudflare version 2660dd72-ce7d-4e9f-8d4b-a2effb8f4bc5"}
+
+ :measurement-environment
+ {:host "Darwin 25.3.0 arm64, Node v26.3.0, shadow-cljs 3.4.12, :advanced"
+  :loadavg-1m-during-runs [21.4 62.0]
+  :note "Load is recorded because this workstation runs many concurrent agent
+         sessions. CPU time is the primary metric for that reason; wall-clock here
+         is not comparable to anything."
+  :colo "NRT (all live probes)"
+  :builds-serialized "every build through scripts/resource-guard.mjs, waiting on
+                      'already running' rather than bypassing"}
+
+ :boundaries-observed
+ ["No production writes. R2 access was read-only GETs of immutable content-addressed
+   blocks plus one read of the head pointer."
+  "The deploy changed only the diagnostic surface: no handler, no auth, no fold, no
+   permission, no secret, no binding."
+  "Nothing was added that can cause a hydrate, and the route stays O(1) to read."
+  "New code is ClojureScript / nbb. No .mjs, no .sh."]}

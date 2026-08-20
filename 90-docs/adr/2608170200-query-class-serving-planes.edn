@@ -1,0 +1,112 @@
+[{:db/id -1
+  :adr/id "ADR-2608170200"
+  :adr/title "Query class ごとに serving plane を分ける — 世界を 1 ref の Datalog に載せない"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :adr/deciders "Jun Kawasaki（「では設計実装実現」）"
+  :adr/relates-to "ADR-2608039970（datom 面が正本、Datalog は surface）, ADR-2608011400（query plane は差し替え可能な source）, ADR-2608610000（既定スタック）, ADR-2608159100（kotobase.net が live durable 境界）, ADR-2608160100（block/pack/object）, ADR-2608170100（relay 読み取り崩壊）"
+  :adr/repos ["kotoba-lang/datom-source" "kotoba-lang/search"]
+  :adr/body
+  "# ADR-2608170200: query-class serving planes
+
+**Status**: accepted / **Date**: 2026-08-17
+
+## 1. 決定
+
+Google 級の問いに 1 本の covering datom index + 全 hydrate Datalog で答えない。
+CID は identity / 転送。問いは class ごとに別の serving plane に載せる。
+どの plane も **消して datom（またはその class の入力）から再構築できる**
+（D1 規則と同じ削除・再構築テスト）。join の到達範囲は引き続き ref 1 本
+（ADR-260726）。shard は query locality が要求してから。
+
+| class | plane | コスト | 禁じる戦略 |
+|---|---|---|---|
+| equality / join | covering datom (`IPatternSource`) | O(log n + result) | hydrate-then-scan, GraphSync selector, IPLD Schema walk |
+| range | `IRangeSource` / lake | O(log n + result) | HMAC-blind range, ExploreRange on maps |
+| search | inverted postings | O(df + result) | full-doc-scan, Datalog over tokens |
+| olap | columnar projection | granules touched | aggregate on AVET |
+| multi-hop | adjacency (brick 4) | sum of degrees | full-scan hop |
+| feed | materialized view | lookup | per-request attr-scan |
+
+機械可読な正本は `datom.source.plane/catalog`。`admit` は data を返す。
+未知 class・strategy 欠落・空 catalog はすべて `:ok false`。沈黙は合格ではない。
+
+IPLD codec / Schema / ADL / GraphSync は下位層のまま。query premise にしない。
+Kubo 0.25 は GraphSync を「使われていない」として外した。公開 web の検索・
+feed・join はどれも GraphSync ではない（ATProto AppView SQL/Scylla、
+Ceramic `@createIndex`、OrbitDB local iterator）。
+
+## 2. このセッションで着地したもの
+
+証明スライス。Google QPS を主張しない。引用してよいのは lookups / posting
+entries / examined quads で、ms ではない。
+
+### 2.1 `datom.source.plane`（契約）
+
+6 class の閉表。`:search {:strategy :hydrate-then-scan}` は
+`:forbidden-strategy`。`:search {:strategy :postings-intersect}` は通る。
+未知 class `:graphsync` は `:unknown-class`（Datalog に落ちない）。
+
+### 2.2 `datom.source.adjacency`（brick 4）
+
+ADR-2608011400 の訂正どおり、multi-hop は **書けないのではなく遅かった**。
+本 brick は速さ: out/in 隣接 map。`IPatternSource` でもあるので
+conformance を通す（outgoing-only 実装は `:by-object` で REJECT）。
+
+実測（決定論、wall-clock ではない）: 100 段の `:next` chain + 10,000 noise
+quad。`hop-n` 2 段は **out-lookups = 2**。同じ 1 hop を `of-quads` の
+pattern scan でやると **examined = 10,100**。
+
+これは in-memory 投影。prolly に pack した隣接は未着手。retraction は
+rebuild。view と同じく source を追わない。
+
+### 2.3 `search.postings`（転置索引）
+
+既存 `search.model/search` は全 document を score する O(corpus) で、
+Pages の小索引向けのまま残す。scale 経路は term → ソート済み doc-id、
+AND は two-pointer intersect。
+
+- 空 index / 空 query / 欠ける term は `:empty-index` / `:empty-query` /
+  `:no-match` で区別する。hits=[] を合格と読まない。
+- AND は OR（`union`）と一致しないことをテストが強制する。
+- 3 rare ∩ 1003 common: hits 3 件、`:posting-entries-read` = 1006。
+  corpus 1003 の 2 倍より小さい。
+- `from-datoms` は同一 hits を再構築する（投影）。
+
+tokenize は引き続き `search.model` の regex（kotoba compiler に code-point
+primitive が無い。bounded_index.kotoba と同じ境界）。
+
+## 3. 着地していないもの（正直に）
+
+1. **live `kotobase.net` の relay-bsky ~35s/500。** ADR-2608170100 の resume
+   は「worker ソースが manifest から読めない」と書いたが、**それは名前の誤り**。
+   ソースは `net-kotobase/control-plane/kotobase-graph-database`
+   （standalone GitHub repo ではない）。`peer/hot-datoms` に `:async-get-fn` は
+   **既に渡している**（`xrpc.cljs`）。欠ける配線をこのセッションで足してはいない。
+   35s は hydrate/novelty/fold の残件であって「async が無い」ではない。
+2. postings の prolly/pack 永続化。今日の index はメモリ。
+3. adjacency を `arrangement` / `kotobase-peer` の hop 経路に差すこと。
+4. inverted index の term-shard（Google の形）。必要になってから。
+5. feed の IVM。`view`/`absorb` は既にある。live AppView がそれを使っているかは
+   ADR-2608170100 §4 の未切り分け。
+
+## 4. 使ってはいけない実装
+
+- GraphSync / IPLD Schema / ADL を query engine として新しく書く
+- 1 Worker に世界 snapshot を hydrate して Datalog する
+- 書き込み TPS のために先に shard する（find-by-value が shard 数倍、
+  横断 join は ref 1 本規則で消える）
+- `search.model/search` の全件 score を corpus 成長のまま本番検索に使う
+
+## 5. 検証
+
+- `datom-source`: `clojure -M:test` — 23 tests / 74 assertions、0 fail。
+  壊した outgoing-only は `:by-object` で落ちる。空 graph の hop は `#{}`。
+- `search`: `clojure -M:test` — 8 tests / 22 assertions、0 fail。
+  AND=OR なら `and-is-not-or` だけが落ちる。
+
+## 6. resume
+
+次の具体的な仕事は live の 35s を **fold 実行記録で切り分ける**こと
+（ADR-2608170100 §4）。plane catalog を理由に worker を差し替えない。
+packed adjacency / packed postings は、その切り分けの後。"}]

@@ -1,0 +1,100 @@
+[{:db/id -1
+  :adr/id "adr-2608010930-kotobase-chain-and-evm-compatibility-scope"
+  :adr/title "ADR-2608010930: kotobase はチェーンを自作しない — EVM 互換は「読む側」に限定し、実行系をやるなら Kotoba app-chain"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-01"
+  :adr/last-verified "2026-08-01"
+  :adr/last_verified "2026-08-01"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotobase-chain-and-evm-compatibility-scope"
+  :adr/authoritative-for
+  ["kotobase が blockchain / EVM 互換チェーンとして成立するかの判断"
+   "EVM 互換をどこまで名乗るか（read subset か、実行系か、proof か）"
+   "Merkle-Patricia Trie を採るか、content-addressed state のままにするか"
+   "実行系をやる場合の hot path が EVM かどうか"]
+  :adr/related
+  ["adr-2608010940-evm-state-datom-indexer"
+   "adr-2607198300-kotoba-native-aot-no-jvm-node-rust-at-runtime"
+   "adr-2607093100-x402-per-request-billing"
+   "adr-260726-kotobase-query-plane-is-one-ref"
+   "adr-2607022600-kotoba-database-crates-cljc-migration-roadmap"]
+  :adr/evidence
+  ["https://spec.filecoin.io/systems/filecoin_vm/state_tree/"
+   "https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0054.md"
+   "https://docs.filecoin.io/reference/json-rpc/eth"
+   "https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/hyperevm/dual-block-architecture"
+   "https://hyperliquid.gitbook.io/hyperliquid-docs"]
+  :adr/body
+  "# ADR-2608010930: kotobase はチェーンを自作しない — EVM 互換は「読む側」に限定し、実行系をやるなら Kotoba app-chain
+
+**Status**: accepted
+**Date**: 2026-08-01
+
+## Context
+
+「今の kotobase.net は EVM 互換性があるか」「チェーンとしても成立するか」というオーナーの問いに対する調査結果と、そこから導いた方針。
+
+### 現在地（2026-08-01 実測）
+
+- **EVM 実行系はゼロ。** `SSTORE` / `CALLDATALOAD` / opcode dispatch を kotoba-lang 全体に grep してヒットなし。EVM インタプリタは存在しない。
+- **EVM 決済は稼働中。** kotobase.net は x402 で Base の USDC を受け取る（`KOTOBASE_TREASURY_ADDR` = `0xA00366234D29d4F882088048c0B2fa0dB7302D4E`）。検証は自前 facilitator（`treasury/core.cljc`）が Base 公開 RPC に `eth_getTransactionReceipt` / `eth_blockNumber` を投げ、USDC Transfer ログ（topic0 `0xddf252ad…`）を parse して 3 confirmations で認可する。
+- **EVM ウォレット認証は無い。** CACAO は SIWE メッセージ形式を使うが署名は Ed25519 did:key のみ（`edge_cacao.cljc` / `kotobase-cf-wasm` の `auth.cljs` 双方）。docs（`USING-AS-A-PIN-SERVICE.md` / ADR-2606060002）が謳う EIP-191 secp256k1・ERC-1271 は「backend-only」とされていたが、その backend（Rust kotoba pod）は 2026-06-24 に retire 済みで、後継の cljs 再実装は Ed25519 のみ。**secp256k1 CACAO を受け付ける経路は現存しない** — docs が実装より先走っている。
+- **チェーンの部品は既にある。** `kotoba-lang/chain`（parent-linked content-addressed commit chain、`prev` は tag-42 IPLD link、`verify-chain`/`head` 付き。README 自身が「CommitDag IS the write-ahead log」と書く）、`prolly-tree` / `arrangement`（eavt/aevt/… の 4 index root）、signed IPNS head、CACAO 署名付き書き込み、`bitcoin-consensus`（utxo/script/sighash/versionbits/chainstate/block/sync が cljc で実在）、`base-l2`（MST root の Base anchor + ERC-4337 paymaster）。
+- **具体的ブロッカー。** `eth-crypto`（Keccak-256 / secp256k1）は JVM-only で「zero CLJS portability」と `base-l2` の README 自身が書いている。kotobase が動くのは Cloudflare Workers（CLJS/ESM）なので、**EVM の基礎暗号が動く場所と kotobase が動く場所が一致していない**。`abi` / `l2` / `paymaster` が全部 `.clj` なのはこれが理由。
+
+### 外部事例の調査
+
+**Filecoin FEVM — CID-native state で EVM は動く。** Filecoin の on-chain state は address → actor を束ねる IPLD **HAMT** で、各 actor の `state` は actor が自由に定義できるグラフへの IPLD ポインタ。FIP-0054 の FEVM は `SLOAD` / `SSTORE` を **KAMT**（任意長キーを許す HAMT 変種。キーはハッシュ済み固定幅前提でハッシュ工程を省く）への read/write に写像する。**Merkle-Patricia Trie は使っていない。** それでも Lotus は 42 個の `eth_*` を提供し `eth_getStorageAt` も動く（ローカル call を FVM で実行して解決する）。**ただし `eth_getProof` はサポート一覧に無い。**
+
+→ これは我々の設計上の二択（MPT を二重に持つか / MPT を捨てるか）に対する実証済みの答えである。**Filecoin は後者を選び、代償はちょうど `eth_getProof` 1 メソッドで済んでいる。** CID / IPLD ネイティブな状態モデルは EVM のホストとして成立する。
+
+**Hyperliquid — 速い取引の hot path は EVM ではない。** HyperBFT（HotStuff 派生、金融レイテンシ特化）+ HyperCore（Rust VM のフルオンチェーン CLOB）で **median 0.2s / p99 0.9s 未満のファイナリティ、20 万 orders/sec**。一方 HyperEVM は**別の、遅い**実行環境で、dual-block architecture により **small block 1 秒 / gas 3M、large block 1 分 / gas 30M**。
+
+→ つまり Hyperliquid は「EVM 互換 L1 を作って、その上に取引所を書いた」のではない。**取引エンジンをチェーンそのものとして作り、EVM は後から横に足した composability surface**であり、意図的に 5〜300 倍遅い。`app.hyperliquid.xyz` の速度は EVM 互換性から来ていない — **EVM 互換性を hot path から外したから**出ている。
+
+## Decision
+
+1. **kotobase を L1 チェーンとして立てない。EVM 互換チェーンを自作しない。** EVM 互換 L2 は OP Stack / Arbitrum Orbit で数日で立つコモディティであり、自前 EVM は gas schedule 完全一致・precompile・hardfork 分岐という「間違えると即死するが差別化しない」保守負債を恒久的に背負うだけ。kotobase の非自明な資産はチェーンではなく、**状態に対する Datalog / SPARQL / Cypher / Gremlin クエリ**（`protocols-worker` が既に `sparql|cypher|gremlin.kotobase.net` を配信中）。
+
+2. **EVM 互換は「読む側」に限定する。** `eth_*` JSON-RPC の read subset を消費し、EVM チェーンの状態を datom 面に載せてクエリさせる。設計は ADR-2608010940 に委譲。これは合意も EVM 実行も要らず、既存資産（`chain` / `prolly-tree` / `arrangement` / `org-ethereum-jsonrpc` / protocols-worker）がそのまま効く。
+
+3. **Merkle-Patricia Trie は採らない。** 状態は `chain` + `prolly-tree`/`arrangement` の content-addressed 面のままとし、Filecoin と同じく **`eth_getProof` を捨てる**。代償を名指しで記録する: **light client の trustless state proof と、MPT proof に依存する canonical bridge が作れない。** `eth_getStorageAt` 相当は「保持した state を読む」ことで提供でき、`eth_getBalance` / `eth_getCode` / `eth_getLogs` も同様。**この代償を黙って負わない — 将来 bridge 要件が出たら、この ADR に戻って MPT を再検討する。**
+
+4. **実行系をやるなら EVM ではなく Kotoba app-chain。** 実行エンジンは自前 opcode ではなく `kotoba-lang/compiler` の native/wasm backend を使う（`backend/x86_64.cljc` / `backend/aarch64.cljc` に **fuel 計測が実装済み = gas 相当**、ADR-2607198300）。EVM は Hyperliquid の HyperEVM と同じ位置 — **hot path の外に置く composability surface** であって、実行の正本ではない。
+
+5. **合意層は「単一 writer + CAS = sequencer であって consensus ではない」と正直に呼ぶ。** 今の DO 直列化 + D1 は L2 sequencer の形であり、L1 の合意ではない。分散合意を名乗るまでは名乗らない。`bitcoin-consensus` が cljc で書けている事実は「やれば書ける」ことの証拠だが、**書いていないものを書いたことにしない。**
+
+6. **x402 の `exact`（EIP-3009）は実装済みで、testnet なら credential 無しで証明できる。**
+   Base mainnet の `exact` は keyed facilitator（実質 Coinbase CDP）が要り、これは owner
+   判断。ただし無料の public facilitator（`x402.org/facilitator`）は **base-sepolia でなら
+   `exact` を settle する**ので、`KOTOBASE_X402_NETWORK=base-sepolia` +
+   `KOTOBASE_X402_FACILITATOR=https://x402.org/facilitator` を入れれば **全経路
+   （402 challenge → requirement 選択 → payload 検証 → facilitator settle → receipt）が
+   実際に動くところを見られる**。protocol shape は実 facilitator に投げて確認済み:
+   `{isValid false, invalidReason \"invalid_exact_evm_signature\", payer \"0x…01\"}` —
+   payload を parse し payer を抽出した上で、dummy 署名だけを弾いている。
+   ⚠ この過程で罠を1つ塞いだ: asset を `treasury.core` の table から引くと**未知チェーンで
+   黙って Base に fallback する**ため、testnet の 402 が**mainnet USDC を支払い対象として
+   広告**しかねなかった（自分の 402 に従った買い手が実弾を送る）。asset は
+   `evm-index` 側から network に従って引くようにした。
+
+7. **順序: x402 の settlement 1 件目が先。** 2026-08-01 時点で `/metrics` は challenges 5 / submissions 3 / **settlements 0**、signups 5。決済レールが一度も成立していない段階でチェーンを足すのは順序が逆。ADR-2607093100 の rail を実際に通すことが、どのチェーン設計より優先。
+
+## Consequences
+
+- **kotobase は「EVM 互換」を名乗らない。** 名乗ってよいのは「Base で USDC 決済を受け取る」「EVM チェーンの状態をクエリできる」まで。`eth_getProof` を出せない以上、無条件の EVM 互換主張は嘘になる。
+- **docs の訂正が必要。** `docs/USING-AS-A-PIN-SERVICE.md:34` と ADR-2606060002 の「SIWE / Ethereum (EIP-191 secp256k1)」「ERC-1271」は現存しない経路を記述している。実装するか、記述を落とすか、どちらかを行う（この ADR は判断を保留し、gap として名指しするに留める）。
+- **secp256k1 / keccak を edge で使うなら `eth-crypto` は経路にならない。** JVM-only。Workers 側は既に `@noble/curves` を Ed25519 で使っているので、`@noble/hashes` の `keccak_256` + `@noble/curves` の secp256k1 で解ける。ただし cljc library 層は書き直しになる。
+- **one-ref 規則がチェーン設計を縛る。** ADR-260726 のとおり Datalog join は ref 1 本しか届かない。チェーン状態を join 可能に保つなら **全部を 1 ref に置く必要があり、それは単一 writer を意味する**。DB としては痛い制約だが、**チェーンはそもそも単一の全順序ログなので、この制約は制約にならない** — もし 4 を実行に移すなら、この一致は設計上の追い風になる。
+
+## Alternatives considered
+
+- **EVM 互換 L2 を自作（OP Stack ではなく自前実装）。** 却下。差別化ゼロ、保守負債は恒久。
+- **OP Stack / Arbitrum Orbit で L2 を立てる。** 却下しないが、今やる理由が無い。x402 の settlement すら通っていない。将来やるなら「自作しない」というこの ADR の 1 と矛盾しない（既製 stack の利用であって EVM の自作ではない）。
+- **MPT を持って完全 EVM 互換を目指す。** 却下。状態を datom 面と MPT の二重に持つことになり、実装量と不整合リスクが倍。Filecoin が代償 1 メソッドで済ませた前例がある以上、二重持ちを選ぶ根拠が無い。
+- **Hyperliquid 型の高速 CLOB を kotobase 上に作る。** 現時点では却下。0.2s ファイナリティ / 20 万 ops/sec は BFT 合意と専用 VM の共同設計から来ており、Cloudflare Workers + D1 + CAS の上には載らない（D1 の往復と CAS 再試行だけでその予算を使い切る）。**やるなら DO を単一 sequencer にした「取引所であってチェーンではない」ものになり、それは chain ではなく matching engine の設計判断として別途 ADR 化する。**
+"}]

@@ -1,0 +1,87 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-24"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-24.edn"
+  :doc/date "2026-08-19"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "allocator: what actually threw :spill-required on count-loop with back-edge? false"
+  :coscientist/iteration 24
+  :coscientist/subject "kotoba-lang/kotoba-mir 6ccc30eb, entry-argument-plan :non-prefix-argument, count-loop and countdown"
+  :coscientist/action "locate the throw; it is :non-prefix-argument not last-uses; put arguments first; measure :call-live with back-edge? false; keep the predicate; do not implement cfg-liveness"
+  :coscientist/measured "label-before-argument: allocate-without-spills throws {:problem :spill-required :instruction {:problem :non-prefix-argument}} on both shapes, both ISAs. Arguments as prefix: scanner completes. with-redefs back-edge? false, both modules, both targets, policy :call-live. Override live (pos? @calls). Production still :all-vregs via the guard. kotoba-mir 45 tests / 1006 assertions / 0 fail. west-pin mir 0501c1bd. amu and native not moved."
+  :coscientist/refuted "iteration 23's claim that the terminating-loop scanner set is empty because last-uses is textual. After lower-phis, latch last-uses are after their defs (n1@16 acc1@17). The fixtures started with a preheader label, so entry-argument-plan never reached last-uses. Also that the named next was cfg-liveness: that was a drive-by of a false diagnosis."
+  :coscientist/carries-forward "iteration-18: kernel_call* is not a conformance corpus; iteration-22: the corpus executes; iteration-23: production call+loop is still all-vreg by contract; ADR-2608136000 fourth form; :cfg-liveness remains false; :llvm-beaten remains false. Do not overwrite 04-23"
+
+  :doc/body
+  "# Codegen co-scientist, iteration 24
+
+Iteration 23 asked for `:cfg-liveness` or keep all-vreg forever. This file
+does neither. It locates the throw that 23 read as last-uses.
+
+Do not overwrite 04-23.
+
+## The throw
+
+With `back-edge?` rewritten to false, `allocate-without-spills` never
+scans count-loop or countdown. `entry-argument-plan` requires
+`:mir/argument` as a prefix. Both fixtures started with
+`:mir/label :test.label/preheader`. That is `:non-prefix-argument`,
+tagged `:spill-required`, so `allocate-with-policy` falls to all-vreg.
+Ex-data is not an instruction.
+
+After `lower-phis`, latch values are merge-stored after their defs.
+last-uses of the iteration-23 lowered count-loop: `n1@16 acc1@17`, defs
+at 14 and 13. The header phi is gone.
+
+## The measurement
+
+Arguments first, preheader label after them, `back-edge?` still false:
+both shapes, both targets, policy `:call-live`. Override live
+(`pos? @calls`). Test:
+`v3-prefix-argument-call-loops-complete-the-scanner`.
+
+Production still `:all-vregs` via the guard
+(`v3-call-plus-back-edge-is-routed-to-all-vregs`).
+
+Judah: kotoba-mir **45 tests, 1006 assertions, 0 failures**.
+
+## What this is not
+
+Not cfg-liveness. Not predicate removal. Not amu execution of the
+scanner path. amu's count-loop copy was not moved; it still executes
+all-vreg. Remove `back-edge?` when that path runs in amu, not against
+encodings.
+
+## Pins
+
+Allocator code is still kotoba-mir `ac14016d` / kotoba-native `69e364e`.
+This iteration is fixtures + paper + one test.
+
+- kotoba-mir `6ccc30eb4a90548c94bc62a912e91386197a069e` (merge of
+  `agent/prefix-arg-loop-scanner`, feature
+  `173e04a30276f45537b712e29455be46566227f7`).
+  west-pin `0501c1bdd47159c4045630eb0d297ab1b1b384ec`
+- amu not moved
+- kotoba-native not moved (`69e364edf3154aa8fdf7d87535ca73179b4d2716`)
+
+## Meta-review
+
+- **A fallback tagged :spill-required is not evidence about last-uses.**
+  Read `:instruction :problem`.
+- **Named Next is a hypothesis.** 23 named cfg-liveness because it
+  explained the green. The green was an unstarted scanner.
+- **Do not remove `back-edge?` because encodings now complete.** That is
+  iteration 22's judgement with a working corpus. The remaining gate is
+  amu execution.
+
+## Next
+
+amu execution of count-loop (prefix arguments) with `back-edge?` false,
+or keep the guard. Still missing: call + back-edge across a spill.
+`:cfg-liveness` is still false and is not this week's work.
+kotoba-mir / kotoba-native still do not execute compiled programs.
+
+Do not chase fused-srem, extra MOV, FMA, PGO, kototama optimizer, a
+timed `bench` export, or rematching leaf vs LLVM. Do not overwrite
+04-23. Do not claim LLVM beaten. Do not remove `back-edge?`. Do not
+implement cfg-liveness as a drive-by of this location."}]

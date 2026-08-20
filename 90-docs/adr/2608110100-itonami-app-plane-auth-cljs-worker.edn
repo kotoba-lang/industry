@@ -1,0 +1,185 @@
+[{:db/id -1
+  :adr/id "2608110100"
+  :adr/title "ADR-2608110100: itonami の app plane の認証面を ClojureScript Worker にする — RP は itonami.cloud のまま、TS/Svelte の app-auth は廃止、Pages 由来の 3 gap を Durable Object で塞ぐ"
+  :adr/status "accepted"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-11"
+  :adr/last-verified "2026-08-11"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "itonami-app-plane-auth"
+  :adr/repos ["orgs/cloud-itonami/app-auth"
+              "orgs/network-awai/cloud-itonami"
+              "orgs/network-awai/net-kotobase"
+              "orgs/kotoba-lang/webauthn"
+              "orgs/kotoba-lang/authentication"]
+  :adr/related ["adr-2607302145-passkey-first-cacao-authentication-and-cross-device-recovery"
+                "2608039950"
+                "adr-2607252000-authn-kotobase-net-identity-service"
+                "adr-2608080100"
+                "adr-2608050300-enrolment-is-not-authentication-session-assurance-gap"]
+
+  :adr/authoritative-for
+  ["itonami の app plane（app.itonami.cloud/*）の人間向けサインイン面は cloud-itonami/app-auth の ClojureScript Worker であること"
+   "その WebAuthn RP は itonami.cloud であり、authn.kotobase.net の RP に寄せないこと"
+   "app-auth は enrolment を持たず、KEK binding も持たないこと（署名できないことが構成上の性質）"
+   "credential の KV namespace は複製せず id で共有すること"]
+
+  :adr/context
+  "オーナーの問い（2026-08-11）は『app.itonami.cloud/auth で cleak(Clerk) みたいな
+   認証 app は設計実装されている?』、続いて『ts, svelte じゃなくて kotoba or cljs で
+   設計実装』。実測してから設計した。
+
+   ## 実測した現在地（3 実装が並存していた）
+
+   | 実装 | 言語 | 状態 |
+   |---|---|---|
+   | `net-kotobase/authn`（authn.kotobase.net） | cljs + jp-go-dds | **live**。passkey / OAuth / email / CACAO / tenant / SCIM |
+   | `network-awai/cloud-itonami`（itonami.cloud/signin/） | cljc + 手書き inline JS | **live**。passkey-first、custody 鍵を発行 |
+   | `cloud-itonami/app-auth` | TypeScript + SvelteKit | **死んでいる** |
+
+   `app-auth` は `etzhayyim/root/60-apps/etzhayyim-project-auth` から 2026-07-19 に
+   verbatim 切り出したもので、route は `auth.etzhayyim.com` /
+   `accounts.etzhayyim.com`。**2026-08-11 実測でどちらも DNS 解決しない。**
+   `MIGRATION-TODO.md` は今も `TRANSFORM — codemod pending` のまま。
+
+   `app.itonami.cloud/auth` は 404、`app.itonami.cloud/` は fleet-dispatch Worker
+   （`/{repo}/{path}`）で、ADR に記録された mount は `/mangaka/` `/kaisya`
+   `/kekkai` `/yotei` `/img/` のみ。**認証面は app plane に無かった。**
+
+   ## 決定的だった 1 つの事実
+
+   `cloud-itonami.edge.webauthn` の `rp-id` は `itonami.cloud` で、`allowed-origins`
+   に **`https://app.itonami.cloud` が既に入っている**（kaisya のために 2026-08-07
+   に追加）。WebAuthn は origin が自分の登録可能 suffix を RP に使うことを許すので、
+   **app plane は既存 passkey がそのまま通る origin だった。**
+
+   逆に `authn.kotobase.net` の RP は `authn.kotobase.net` で、そこへ寄せると
+   itonami の既存 passkey は全部孤児になる（ADR-2608039950 が実測済みの制約）。
+   Related Origin Requests を足しても RP that differs は救えない。"
+
+  :adr/decision
+  "## 決定 1 — `cloud-itonami/app-auth` の中身を cljs Worker に入れ替える
+
+   新 repo を作らない。identity は `<org>/<name>` のパス（ADR-2608040170）で、
+   `cloud-itonami/app-auth` は既に west 登録済みの role 面の名前。同一面・同一主題の
+   2 個目を作らないという規則にも、これが従う唯一の形。
+
+   port ではなく **replace**。向き先のドメインが消えており、codemod が 3 ヶ月未消化で、
+   移植先の substrate（`kotoba-lang/webauthn` / `authentication` / `jp-go-dds`）が
+   TypeScript 実装より新しい。
+
+   ## 決定 2 — RP は `itonami.cloud` のまま（オーナー選択、2026-08-11）
+
+   継承であって選択ではない。passkey はブラウザが 1 つの登録可能ドメインに束縛し、
+   変えれば既存 credential が全部孤児になる。**既存の itonami passkey が deploy 当日に
+   そのまま通る**ことがこの決定の中身。
+
+   credential の KV namespace（`e9857fe8…`）は **複製せず id で bind する**。
+   複製すると『誰が enroll 済みか』について 2 面が食い違いうる集合を作ることになる。
+
+   ## 決定 3 — Pages ではなく Worker（これがこの repo の存在理由）
+
+   ADR-2607302145 は cloud-itonami 側の既知 gap を 3 つ記録し、**3 つとも
+   『platform の差であって設計判断ではない』**と書いている:
+
+   1. clone 検出の baseline が KV にあり read-your-writes が無い ——
+      **2026-08-03 に live で false negative を実測**（clone signal として拒否される
+      べき assertion が通り、再実行では正しく拒否された）
+   2. cron rotation sweep が無い（Cron Trigger は Workers の機能）
+   3. Durable Object を持てない（DO class の deploy には Worker が要る）
+
+   Worker には DO がある。`itonami.auth.durable` が challenge の consume・clone の
+   比較・session の失効を**それぞれ 1 つの不可分な手順**にする。
+   `store/touch-credential!` が採用した count を共有 KV に書き戻すので、
+   もう一方の面の baseline がこちらの利用中に古くならない。
+
+   ## 決定 4 — enrolment を持たない。KEK も bind しない
+
+   registration は server-custodied な Ed25519 鍵を KEK で包んで発行する
+   （`cloud-itonami.edge.webauthn`）。ここに 2 本目を作れば同じ custody が 2 実装に
+   なり、しかも **その KEK をこの Worker に渡すことになる** —— それは侵害時に
+   全利用者として署名できる秘密そのもの。
+
+   **KEK を bind しないので、この Worker は誰としても署名できない。方針ではなく構成上
+   そうである。** enrolment は custody が在る `itonami.cloud/signin/` に残す。
+
+   ## 決定 5 — page script は手書き JS ではなくコンパイルした cljs
+
+   `itonami.auth.config` を Worker と page bundle の**両方に**コンパイルする。
+   endpoint path と JSON の field 名は 2 者間の契約で、2 箇所に書けば必ずずれる ——
+   しかも失敗は無言（誰も serve しない path への fetch は利用者には
+   『サインインできませんでした』としか見えない）で、必ず本番で出る。
+
+   先行実装（`authn/resources/authn/passkey.js`、`cloud-itonami/resources/site/signin.js`）
+   はどちらも手書き JS。CLAUDE.md の『新規に .mjs/.js を書かない』にも、ここで実際に
+   効く理由がある。
+
+   ## 決定 6 — 1 文書・1 バンドル・1 mount（ADR-2608080100）
+
+   sign-in / signed-in / unsupported の 3 view を 1 文書に出し、script が
+   `data-active` を切り替える。2 つ目の HTML を作らないので、2 つ目の app shell が
+   design system 移行に取り残される事故（ADR-2608080100 の実例）が構造的に起きない。"
+
+  :adr/consequences
+  "## 着地したもの（2026-08-11、本番実測）
+
+   `cloud-itonami/app-auth` main = `7e06367`（PR #2）。Worker
+   `itonami-app-auth` version `852340a4-e471-4992-98bd-29a8e27463b3`、
+   route `app.itonami.cloud/auth*`。
+
+   live 実測:
+
+   - `GET /auth` 200 HTML、CSP は `default-src 'none'; script-src 'self'` ほか
+   - `GET /auth/app.js` 200（コンパイル済み cljs、106 KB）
+   - `GET /auth/health` → `{ok:true, service:\"itonami-app-auth\", rpId:\"itonami.cloud\"}`
+   - `GET /auth/v1/session` → `{valid:false}`（cookie 無し）
+   - **challenge の単回性を本番の DO で確認**: 同一 challenge の 1 回目は
+     `sign-in failed`（credential 不在で落ちる）、2 回目は
+     `challenge expired or already used` —— 署名を見る前に challenge が尽きている
+   - `origin: https://evil-itonami.cloud` → **403**（suffix ではなく明示集合）
+   - `POST /auth/v1/logout` → `Max-Age=0` で cookie を消す
+   - `/authority` → 404（prefix が同じだけの path は取らない）
+   - `return_to=https://evil.example/x` は文書に到達せず `/auth` に落ちる
+
+   検証:
+
+   | | |
+   |---|---|
+   | `clojure -M:test` | 8 tests / **52 assertions** / 0 failures |
+   | `nbb test/worker_smoke.cljs` | **26 checks** 全通過。ビルド済み `js/auth-worker.js` を、**実物の** `AuthStore` class を Map storage で動かして検査 |
+   | `wrangler deploy --dry-run` | 370.38 KiB / gzip 70.30 KiB |
+   | design-quality audit | **100.00 / 100**（min 95 gate PASS） |
+   | negative check | `safe-return-to` の protocol-relative ガードを外すと open-redirect テストが実際に落ちる。戻して緑 |
+
+   ## 意図的に受け入れる不利
+
+   - **サインイン面が 3 つになった**（authn.kotobase.net / itonami.cloud/signin/ /
+     app.itonami.cloud/auth）。ADR-2608039950 は『authority は 1 つ』と決めており、
+     authority（DID namespace）は増えていない —— 増えたのは serving surface で、
+     同 ADR の決定 4 が明示的に許している区分。それでも**面の数は減っていない**。
+     減らす道は itonami.cloud/signin/ の enrolment をこの Worker に引き取ること
+     だが、それには KEK を渡すことになり決定 4 と衝突する。**未解決として記録する。**
+   - **clone baseline が 2 箇所にある**（KV と DO）。`viewer/baseline-seed` が
+     常に高い方を採り、どちらの側も上げられて下げられないので弱い門にはならないが、
+     1 箇所ではない。
+   - **dark mode が無い**。DADS に dark palette が無いため（jp-go-dds の既知の代償）。
+
+   ## 既知の gap（隠さず書く）
+
+   1. **credential inventory endpoint が無い。** account が持つ passkey の一覧には
+      account model が要り、それは enrolment 面の側にある。**『自分が使った 1 本しか
+      知らないので 1 本と表示する inventory』は inventory が無いより悪い** ——
+      その画面は人が『予備がまだ在るか』を判断する場所だから。
+   2. **CACAO を発行しない。** custody が在る面に残してある（決定 4）。app plane の
+      Worker が必要とするのは cookie session であって CACAO ではない。
+   3. **cron rotation sweep をまだ持っていない。** Worker なので持てる（それが
+      ADR-2607302145 の gap 2）が、この repo は custody 鍵を持たないので回す対象が
+      まだ無い。enrolment を引き取る判断をした時に同時に要る。
+   4. **実機での cross-device 検証は未実施。** 本番で確認したのは challenge・origin・
+      cookie・routing であって、実際の passkey assertion ではない（実機と指が要る）。
+      **『サインインできた』とはまだ言えない** —— 言えるのは『ceremony の前後の門が
+      本番で正しく閉じている』まで。
+   5. **fleet-ci gate をまだ足していない。** `scripts/fleet-ci/gates.edn` に
+      `:nbb-script` として worker smoke を載せるのが自然な次の一手。"}]

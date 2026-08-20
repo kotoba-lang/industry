@@ -1,0 +1,308 @@
+[{:db/id -1
+  :adr/id "ADR-2608131001"
+  :adr/title "ADR-2608131001: Two scheduled jobs that could not fail"
+  :adr/status "accepted"
+  :adr/date "2026-08-13"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body "# ADR-2608131001: Two scheduled jobs that could not fail
+
+**Status**: accepted
+**Date**: 2026-08-13
+**Follows**: ADR-2608124400 (shallow was not retired everywhere) -- findings 1 and 2 of its
+launchd audit, deliberately left unfixed there
+**Touches**: ADR-2607173100 (murakumo-main SSoT alias) / ADR-2607172800 (SSE is the public route)
+
+## Which two jobs, and how they were identified
+
+ADR-2608124400 described both by behaviour rather than by name. Both were identified
+from their logs and their code, and the identification is unambiguous.
+
+**Job 1 -- `com.gftd.playtest-coscientist`**, running `~/.gftd/run-playtest-coscientist.cljs`
+weekly (plist `StartCalendarInterval` = Weekday 1, Hour 5, i.e. Monday 05:00). Its log
+`~/.gftd/playtest-coscientist.log` is 1,465 lines. Line 1461 is the last line of a run
+that really happened (`[run-playtest] done; server stopped`, preceded by a Clojure stack
+trace through `isekai.capture$capture_game`). Lines 1462-1465 are four byte-identical
+copies of
+
+    [standing-playtest] no changes — no candidate beat baseline this run
+
+with nothing between them, and `grep -c` finds exactly four occurrences of that string in
+the whole file. Last write 2026-08-10 05:00. That is the ADR's \"four consecutive weekly
+no-ops\" exactly.
+
+**Job 2 -- `com.gftd.shinshi-kaizen-tick`**, running `~/.gftd/run-shinshi-kaizen-tick.cljs`
+daily at 09:13. Its log is 21 lines for 21 expected runs: twenty
+`[shinshi-kaizen-tick] ERROR: LLM HTTP 400` and one `... HTTP 502`, in that order, ending
+2026-08-12 09:13. Never a success line.
+
+## What job 1 was actually doing
+
+`network-isekai` moved org. It is now `orgs/network-awai/network-isekai` in
+`manifest/west.yml` (`remote: network-awai`, 855 commits, `is-shallow: false`). The script
+hardcoded
+
+    (def wt \".../orgs/gftdcojp/network-isekai-playtest\")
+
+and passed it as `:cwd` to every `spawnSync`. **`spawnSync` with a nonexistent `cwd` does
+not throw** -- it returns an object with `status` = nil and `.error` set to an ENOENT
+spawn error. The script's `run` helper discarded the return value entirely. So all seven
+commands -- fetch, checkout, reset, clean, npm ci, build, the playtest itself -- silently
+did nothing, and the final
+
+    (let [dirty (out \"git\" [\"status\" \"--porcelain\"] {})]
+      (if (empty? dirty) (println \"...no candidate beat baseline...\")))
+
+read an empty string from a command that never ran and printed the benign line. Exit 0.
+
+**Reproduced before changing anything.** Running the pre-fix script verbatim, unmodified,
+from the backup copy:
+
+    [standing-playtest] no changes — no candidate beat baseline this run
+    ORIGINAL EXIT CODE: 0
+
+That single line is the whole run. It is not a false report -- an empty diff of nothing is
+empty -- which is precisely why it survived four weeks of `launchctl` showing green.
+
+There was a **second** staleness the path fix alone would not have caught: this checkout's
+git remote is named `network-awai`, not `origin`, so `git fetch origin main` would have
+failed too.
+
+## What job 2 was actually doing -- not the cause on the record
+
+ADR-2608124400 recorded the cause as a hardcoded model id against a legacy hostname. That
+diagnosis is **wrong about the 400s**, and the correction matters more than the fix.
+
+The `murakumo-main` alias does resolve to a different endpoint than the one baked in --
+measured today, `GET https://api.murakumo.cloud/infer/models/murakumo-main` returns
+`alias-for: qwen3.6-35b-a3b`, `endpoint: https://infer.murakumo.cloud/v1/chat/completions`,
+while the script hardcoded `https://qwen-gad.gftd.ai/v1/chat/completions`. But that
+hostname was never dead: a small hand-built request to it returned **HTTP 200** with a
+normal completion. Replaying the script's own prompt against **both** endpoints returned
+the same 400, with the same body:
+
+    {\"error\":{\"code\":400,\"message\":\"Expected 'messages' to be an array\",\"type\":\"invalid_request_error\"}}
+
+The request body was built with a `#js {...}` literal. **`#js` is shallow.** `:messages`
+stayed a ClojureScript vector containing a ClojureScript map, and `JSON.stringify`
+serialised the PersistentVector's *internal fields*:
+
+    {\"model\":\"m\",\"messages\":{\"G\":null,\"I\":1,\"shift\":5,\"root\":{...}},...}
+
+against the correct `clj->js` output of
+
+    {\"model\":\"m\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":8}
+
+So every request since the job was created was malformed, independently of endpoint and
+model. The server said so in plain words each time, and the script threw the body away:
+`(throw (js/Error. (str \"LLM HTTP \" (.-status r))))`. Twenty identical uninformative
+lines were the result of discarding the one sentence that would have ended this in a
+minute.
+
+A third defect was hiding behind the second. Once the body was well-formed, the request
+still failed -- **HTTP 524 at ~128 s**. The public endpoints sit behind Cloudflare, whose
+edge gives up if the origin has not *started* responding within roughly 100 s, and a
+non-streaming completion of this ~38,000-character prompt buffers until generation
+finishes. The same request with `stream: true` returned **HTTP 200, first byte at 17.9 s,
+complete at 47.0 s**. ADR-2607172800 already names SSE as the public route; the job simply
+was not using it. The original 120 s client-side `AbortSignal.timeout` was under the
+measured completion time as well.
+
+## What changed
+
+### `~/.gftd/run-playtest-coscientist.cljs`
+
+The path correction is the small half. The durable half is that a wrong path can no longer
+be quiet.
+
+- **Every child process goes through one checked helper.** A spawn `.error`, a **nil**
+  `status`, or any non-zero `status` prints `FAIL(<named-cause>)` and exits non-zero.
+  There is no unchecked `spawnSync` left in the file. `kagi get MURAKUMO_CRITIC_TOKEN` is
+  the single deliberate exception -- the loop documents a degraded offline-heuristic critic
+  when the token is absent -- and it still reports.
+- **The repo path is resolved from `manifest/west.yml` by project NAME**, not hardcoded to
+  an org. A rename is what broke this job; the name is what survives a rename. If the
+  project ever leaves the manifest, that is itself a named failure
+  (`project-not-in-manifest`) rather than a guess.
+- **The remote name is resolved**, not assumed to be `origin`.
+- **The dedicated worktree is created on demand**, and **never with `--depth`** -- linked
+  worktrees share `.git/shallow` with the parent repository, which is the re-shallowing
+  vector ADR-2608124400 identified.
+- `PLAYTEST_REPO_PATH` and `PLAYTEST_MANIFEST` override the resolution for operators; they
+  are also what made the guard testable against the unmodified script.
+
+### `~/.gftd/run-shinshi-kaizen-tick.cljs`
+
+- `clj->js` instead of `#js`, so the body converts recursively.
+- **Model and endpoint resolve per ADR-2607173100**: env override (`GFTD_LLM_URL` /
+  `GFTD_LLM_MODEL`), then the `murakumo-main` KV alias, then an endpoint-only fallback.
+  **No concrete model id is baked anywhere** -- on the fallback path the model name is read
+  back from that endpoint's own `/v1/models`, which is what \"bake only an endpoint\" means
+  operationally.
+- **Streaming**, with an SSE reader that accumulates `choices[0].delta.content`.
+- The client timeout moved from 120 s to 600 s, and HTTP failures now carry the server's
+  own message instead of just a status number.
+
+Its existing `run!` helper was checked and is **not** vulnerable to job 1's trap: measured
+in nbb, `(zero? nil)` returns false rather than throwing, so `(when-not (zero? status)
+(throw ...))` already hard-fails on a nil status.
+
+## Firing the guard
+
+A guard nobody has watched fire is not a guard. All four failure branches were fired
+against the **unmodified, installed** script, and the two that matter are the two the old
+code silently swallowed.
+
+    # the exact path the original hardcoded -- the original's failure condition
+    $ PLAYTEST_REPO_PATH=.../orgs/gftdcojp/network-isekai-playtest nbb run-playtest-coscientist.cljs
+    [standing-playtest] FAIL(git-remote): git [\"remote\"] could not run:
+      spawnSync git ENOENT (cwd=\".../orgs/gftdcojp/network-isekai-playtest\")
+    EXIT: 1
+
+    # directory exists, is not a git repo -> the non-zero branch
+    $ PLAYTEST_REPO_PATH=$(mktemp -d) nbb run-playtest-coscientist.cljs
+    [standing-playtest] FAIL(git-remote): git [\"remote\"] exited 128 (cwd=\"/var/folders/...\")
+      stderr=fatal: not a git repository (or any of the parent directories): .git
+    EXIT: 1
+
+    # project renamed out of the manifest -- the next org move, simulated
+    $ PLAYTEST_MANIFEST=/tmp/west-renamed.yml nbb run-playtest-coscientist.cljs
+    [standing-playtest] FAIL(project-not-in-manifest): no `- name: network-isekai` entry in
+      /tmp/west-renamed.yml — the project was renamed or removed; this run cannot guess a path.
+    EXIT: 1
+
+    $ PLAYTEST_MANIFEST=/tmp/nope.yml nbb run-playtest-coscientist.cljs
+    [standing-playtest] FAIL(manifest-missing): /tmp/nope.yml does not exist
+    EXIT: 1
+
+**Deliberately avoided a fake demonstration.** Breaking something the script never reads
+would also have produced a clean-looking pass. Both negative cases above break the value
+the script's *first* child process consumes, and there is no `existsSync` pre-check on the
+repo path -- it was removed on purpose, so that a missing checkout is caught by exactly the
+spawn guard that was absent before, rather than by a separate check that would leave the
+spawn guard untested.
+
+**The positive direction found a real breakage rather than a synthetic one.** With no
+overrides, the script resolved `orgs/network-awai/network-isekai` from the manifest,
+resolved remote `network-awai`, fetched, created the worktree
+`orgs/network-awai/network-isekai-playtest`, hard-synced it to `network-awai/main`
+(fcca735), and ran `npm ci` to completion -- all returning 0, which is the evidence that
+the guard does not false-positive. Then:
+
+    Error building classpath. Manifest file not found for kotoba-lang/org-threejs in
+      coordinate #:local{:root \".../orgs/kotoba-lang/org-threejs\"}
+    [standing-playtest] FAIL(build): node [... \"npm\" \"run\" \"build\"] exited 1
+    EXIT: 1
+
+`orgs/kotoba-lang/org-threejs` was a **half-populated west checkout**: it had a `.git`, a
+`node_modules/` and one source file, but no `HEAD` and no `deps.edn`. This is a real
+breakage of the job's build, present for an unknown time, that the old script would have
+swallowed along with everything else. It was repaired: the two untracked files blocking
+`west update` (`.gitignore`, `src/org_threejs/vrm.cljs`) were confirmed **byte-identical**
+to the pinned revision 606854d by `git hash-object` before removal, and
+`west update --fetch smart org-threejs` then landed the pin cleanly.
+
+## What was not exercised, and why
+
+- **Job 1's build/playtest/push tail was not run to completion.** Three attempts were made
+  after repairing `org-threejs`; all three were refused by the shared resource governor,
+  which is correct behaviour -- concurrent sessions held the `build` lock
+  (`resource-guard: build is already running (pid=..., repo=/private/tmp/wtroot/...)`),
+  and the guard named it (`FAIL(build) ... exited 2`). Everything up to and including
+  `npm ci` ran for real and returned 0. The playtest itself launches Playwright browsers
+  and can push a branch, so it was not forced.
+- **Job 2 was not run end to end, on purpose.** It commits, pushes and **auto-merges to
+  `main` of a live repo** (`gh api repos/jk-luxury/club-shinshi-app/merges`), and that is
+  the owner's decision, not this session's. What *was* exercised is the LLM path in
+  isolation, with the script's own `resolve-llm` / `read-sse!` / `call-llm` extracted
+  verbatim from the installed file and driven with the real 38,149-character prompt built
+  from the real repo state: **HTTP 200 via the murakumo-main alias, a 20,860-character
+  reply, parseable `===FILE:` blocks.** Nothing was written, committed, pushed or merged.
+  The whole file was additionally compile-checked by loading it with the trailing
+  `(-main)` stripped.
+- One consequence worth stating plainly: a week in which another session holds the build
+  lock will now show a **red** job. That is the intended trade. `resource-guard` exit 2
+  means \"someone else is building\", not \"the build is broken\", and a wait-and-retry would
+  be a change to when a scheduled job runs -- the owner's call, not made here.
+
+## Finding 3 -- `~/.gftd`: the blocker named in ADR-2608124400 is already gone
+
+The brief for this work assumed the migration was blocked because the plists carry
+absolute paths. **Measured today, that blocker no longer exists**, and the count in
+ADR-2608124400 is off.
+
+**The count.** 25 plists in `~/Library/LaunchAgents` match the string `.gftd`, but 13 of
+those match only because their *Label* contains it (`ai.gftd.monitor`, `com.gftd.*`).
+**12 plists actually reference the directory `~/.gftd`**, and all 12 are loaded in
+`launchctl list`. Of those 12, only **five execute code stored there**:
+
+| plist | what it runs from `~/.gftd` |
+| --- | --- |
+| `ai.gftd.murakumo` | `run-murakumo-daemon.sh` |
+| `com.gftd.hayari-mirror` | `hayari-mirror/bin/tick.cljs` (inside a git clone of `cloud-itonami/hayari`) |
+| `com.gftd.playtest-coscientist` | `run-playtest-coscientist.cljs` |
+| `com.gftd.shinshi-kaizen-tick` | `run-shinshi-kaizen-tick.cljs` |
+| `com.gftdcojp.itonami.state-snapshot` | `bin/itonami-state-snapshot.sh` |
+
+The other seven only write logs there, or read one credential path
+(`com.gftd.fleet-ci-tip-tick` sets `FLEET_CI_SIGNER_PEM` / `FLEET_CI_GH_TOKEN_DIR`;
+`com.gftd.murakumo-actions-runner` cats a token file). **Nothing that merely logs there
+needs to move**, which shrinks the problem by more than half before any plan is written.
+
+**The relocation is unnecessary, and a session a few hours earlier already did the right
+thing instead.** `~/.gftd` is under version control **in place**, with the git dir
+deliberately outside the work tree at `~/.gftd-vcs.git`:
+
+    git --git-dir=$HOME/.gftd-vcs.git --work-tree=$HOME/.gftd <cmd>
+
+commit `1e58e22` \"Put ~/.gftd's scheduled scripts under version control, in place\".
+Nothing moved, no plist changed, no file was renamed. A plain `git init` there would have
+changed git repository *discovery* for every subdirectory -- including
+`~/.gftd/fleet-ci-cache`, which holds thousands of deliberately git-less extracted repo
+trees that a launchd job refreshes every five minutes, and whose git-less-ness some gates
+rely on to refuse a false pass. `.gitignore` is deny-by-default (`*` plus an explicit
+allowlist), so a new credential dropped in that flat namespace is excluded unless someone
+opts it in. Seven scripts are tracked. **The two fixes in this ADR were committed there**
+as `f29be83`, which is the first time either of these scheduled scripts has had a
+reviewable diff.
+
+**What is still open, and what an owner would need to approve.** The honest residual is
+not relocation:
+
+1. **`~/.gftd-vcs.git` has no remote.** The history that protects these scripts lives on
+   the same disk as the scripts. A remote (a small private repo, or a bare repo on B2 via
+   the existing tooling) is one `git remote add` plus one push, and needs only a decision
+   about where. This is the single highest-value follow-up.
+2. **`scripts/audit-gftd-scripts.cljs` is still wired to nothing.** It works -- run today
+   it reports 3 violations, all `.sh` files, one of them (`run-murakumo-daemon.sh`) live
+   under `ai.gftd.murakumo`. ADR-2608125000 landed a home for exactly this class of
+   detector (`manifest/orgs-detectors.edn`, surfaced by the SessionStart hook
+   `.claude/hooks/session-start-orgs-detectors.cljs`, both on `main`), but only two
+   detectors are registered and this is not one of them -- because registering a detector
+   that reports a standing red is itself against that ADR's rule. The prerequisite is
+   therefore deciding the three `.sh` files' fate (migrate to nbb, or record an explicit
+   exemption), **then** registering it. A fleet-ci gate cannot substitute: fleet ships a
+   repo tree to a node, and `~/.gftd` is not in any tree -- the same structural reason
+   `root-permit-index` could not pose its question.
+3. **The remaining unversioned executable surface is the four nested git clones**
+   (`club-shinshi-app-kaizen`, `hayari-mirror`, `hayari-tick`, `hayari-data`). These are
+   working copies of repos that already have upstreams; they are correctly excluded by the
+   allowlist and need no migration, only the awareness that `com.gftd.hayari-mirror`
+   executes from one of them, so its code review happens in `cloud-itonami/hayari`, not
+   here.
+
+No relocation was performed, and none is recommended.
+
+## Consequences
+
+- Both jobs can now fail. Job 1 will go red on a stale path, a renamed project, a missing
+  manifest, a broken sibling dependency, or a held build lock -- each with a named cause on
+  one line. Job 2 will report the server's own error text.
+- The class of defect is worth naming beyond these two files: **a scheduled job whose
+  success line is computed from a command that never ran**. The log line was true; the
+  inference from it was not. Any standing job that reports an outcome derived from a child
+  process it did not check has the same shape.
+- `#js` is shallow, and this is the second time in this workspace that a nested
+  ClojureScript collection inside a `#js` literal produced a wrong wire payload that a
+  server rejected with a precise message nobody read. Prefer `clj->js` for anything that
+  reaches `JSON.stringify`, and never discard an HTTP error body."}]

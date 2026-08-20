@@ -1,0 +1,182 @@
+[{:db/id -1
+  :adr/id "2608079400"
+  :adr/title "選挙: 運動の適法性・手続き・受領を 1 つの表で結ぶ（senkyo + isic-9492 拡張 + isic-8411-electoral）"
+  :adr/status "accepted"
+  :adr/date "2026-08-07"
+  :adr/tags ["senkyo" "cloud-itonami" "isic-9492" "isic-8411-electoral" "ooyake"
+             "compliance" "elections" "kotoba-lang"]
+  :adr/supersedes ""
+  :adr/body
+  "## 前提 — 実測した穴
+
+オーナーの問い（2026-08-07）「今の cloud-itonami に政治活動・キャンペーン・手続き・
+チラシ配布・ポスター貼り付けを支援する itonami は設計されているか。国家側の法規制、
+手続きの受領側も設計されているか。主要国家ごとに設計統合されているか」に対して、
+索引と grep で実測した結果:
+
+**在ったもの**
+
+| repo | 何を持っていたか |
+|---|---|
+| `cloud-itonami/cloud-itonami-isic-9492` | ISIC 9492 政治団体の活動。会員 intake / 表示義務 screen / 見解公表の 4 op、maturity `:implemented`。法域カタログ 5 件（JPN/USA/GBR/DEU/CAN） |
+| `cloud-itonami/moushibumi` | 市民の民主参加。**選挙は INFO-ONLY**（G3 が campaigning / canvassing / GOTV / endorsement を明示禁止、non-goals N1–N4） |
+| `kotoba-lang/ooyake` | 選挙管理機関 **63 件**を `gov.<iso3>.electoral` として atlas 収録。read-only の civic wayfinding map |
+| `cloud-itonami-isic-8411/8412/8413` | 行政側 actor。ただし汎用行政手続で選挙管理を含まず、8412/8413 は「許認可の決定はしない」を hard boundary にしている |
+
+**無かったもの（3 つの穴）**
+
+- **A. 運動手段そのものの適法性。** 9492 が持つのは campaign-finance-disclosure /
+  imprint（表示義務）だけで、「その法域でその手段を使ってよいか」を見るものが無かった。
+  `立候補|届出書|収支報告|供託金|ポスター掲示` を cloud-itonami 全体に grep しても、
+  ヒットは moushibumi の「選挙公報」（INFO-ONLY のポインタ）1 件だけだった。
+  ポスター・チラシに最も近い `kotoba-lang/okugai`（屋外広告物）/ `denchu`（電柱広告）は
+  純商業広告で、公選法 §143 の選挙運動用文書図画への言及はゼロ。
+- **B. 受領側。** 選管が立候補届出・収支報告書を**受け取る**側の actor が無い。
+  ooyake は選管を地図に載せているだけで手続きも様式も持たない。
+- **C. 統合。** 9492 の `:owner-authority` は `\"Federal Election Commission (FEC)\"`
+  という**文字列**で、ooyake の `gov.usa.electoral` + Wikidata QID と何一つ結び付いて
+  いなかった。「この法域の規制」と「この法域の選管」が別々に増えていく構造だった。
+
+## 決定
+
+オーナー選択（2026-08-07、AskUserQuestion）: 3 本立て / posture は compliance-first。
+
+### D1. `kotoba-lang/senkyo` を共有ライブラリとして起こす
+
+純 `.cljc`。**当初は依存ゼロだったが、2026-08-07 に ADR-2608079500 で 期限の算法を `kotoba-lang/tetsuzuki`（一般行政手続きの型）へ委譲し、tetsuzuki 1 本に依存する形へ載せ替えた**（tetsuzuki 自身は依存ゼロ）。分野が独自の期限算法を持たないことのほうが重要と判断したため。`okugai.facts` と同型で **普遍カテゴリ × 法域別 instrument** に
+層を分ける（`:attribution` `:quantity-limit` `:placement-authority` `:period-window`
+`:contact-conduct` `:spend-report` の 6 カテゴリ × 8 手段）。
+
+**この層が必要な理由は「まだ実装していない差」ではなく、実際に反対向きの法があること。**
+
+| | JPN | USA | CAN |
+|---|---|---|---|
+| 戸別訪問 | 公職選挙法 §138 で全面禁止・罰則付き | 許可制自体が違憲（Watchtower v. Stratton, 536 U.S. 150 (2002)） | 管理者は妨げてはならない（CEA s.81） |
+| 運動期間 | §129 で立候補届出後〜投票日前日 | 連邦の期間制限なし | 事前運動の一般禁止なし |
+| ビラ | §142 で種類・枚数が法定、選管の証紙 | 連邦の枚数制限なし（開示で縛る） | 支出上限で縛る |
+| 候補者性 | 届出で発生 | 金額（$5,000 超）で発生 | 届出（official agent 選任が要件） |
+
+米国の常識で日本の運動計画を立てると**犯罪になる**。逆に日本の常識でカナダの戸別訪問を
+「できない」と答えるのも誤り。LLM に手段を選ばせる前に必ず法域を経由させる。
+
+収録は 5 法域 / 31 instrument / 14 手続き。`coverage` は収録数だけでなく**人口 1 億超で
+未収録の 12 法域を名指しで**返す。
+
+### D2. verdict は 5 値。`:undetermined` を `:permitted` に倒さない
+
+`:no-spec-basis` / `:prohibited` / `:undetermined` / `:permitted-with-obligations` /
+`:permitted`。`:local`（国レベルで決まらず自治体・州が決める。米国の掲示物規制、
+ドイツの Sondernutzungserlaubnis）は `:unknown` として残し、**国の表では答えが出ない
+ことを答えとして返す**。
+
+### D3. 条文番号の確度を持ち歩く
+
+`:reg/confidence` が `:high` でないものは法律レベルでは正しいが項番号が改正で動きうる。
+`:require-high-confidence?` を渡したとき `:medium` は**除外されず `:deferred` 枠に出る**
+—— 除外すると「その義務は無い」と読めてしまうため。
+
+### D4. 境界は共有ライブラリ側に 1 か所だけ置く
+
+`senkyo.screen/out-of-scope-intents` = `#{:voter-targeting :vote-persuasion-script
+:candidate-ranking :turnout-operation :distribution-dispatch :opinion-profiling
+:eligibility-adjudication}`。**未実装ではなく設計として持たない。**
+
+境界を各 actor に書くと actor の数だけ文言が分岐して、どれが正か分からなくなる。
+9492 は `partyops.material/out-of-scope-intents` としてそのまま再輸出し、
+8411-electoral は受領側固有の裁定系 3 つ（`:acceptance-refusal`
+`:candidate-assessment` `:result-determination`）を**足す**（置換しない）。
+
+### D5. 9492 に `:material/screen` を足す（既存 op は触らない）
+
+既存の `:disclaimer/screen` は「表示義務が入っているか」という 1 点の boolean。ビラは
+完璧な表示義務を備えていても頒布自体が違法でありうる。governor に HARD check を 2 つ
+追加:
+
+- `:campaign-conduct-not-permitted` — position の法域から**独立に再計算**した verdict が
+  blocking
+- `:screen-verdict-mismatch` — advisor の主張と再計算が食い違う。知らないことは hold、
+  違う答えを主張することは別建ての違反
+
+3 つの規律（それぞれ外すと落ちるテストつき）: ①法域は position レコードから取る
+（提案に書かせると advisor が裁かれる法を選べる）②advisor の主張した verdict を入力と
+して読まない ③`:undetermined` も HARD（承認で通せる未決ではない）。
+
+### D6. `cloud-itonami-isic-8411-electoral` を受領側として起こす
+
+命名は既存の suffix 付き ISIC 命名先例（`isic-8129-facade` `-6910-legalsupport`
+`-6311-chainexplorer` `-6611-cryptoexchange`）に従う。
+
+**提出側と受領側が同じ表を読む。** 9492 が `senkyo.procedure` を「何を出すか」として
+読み、この repo が同じ entry を「何を受け取り、何を形式審査し、いつが期限か」として
+読む。別々のカタログを持つと食い違いは**候補者が技術的理由で権利を失う形でしか表面化
+しない**。テストが `identical?` で同一 entry であることを固定する。
+
+6 HARD check: `:no-procedure-basis` / `:wrong-receiving-authority`（日本の供託は法務局が
+受ける）/ `:filing-deadline-not-satisfied` / `:formal-review-incomplete` /
+`:out-of-scope-intent` / `:already-published`。
+
+**期限は fail-closed。** `:past` だけでなく `:unresolved`（基準日未提供）
+`:unknown-filing`（提出日未記録）`:no-basis`（手続きが表に無い）も止める。
+`:unknown-anchor` を `:no-deadline` に丸めると「確認しなかった」が「確認すべきものが
+無かった」に変わり、届出はそのまま台帳に載る。基準日は actor の設定ではなく**実行の
+文脈**として渡す（前回の日付を抱えた actor は自信を持って間違える）。
+
+台帳登載・形式審査・不備通知はどの phase でも auto にしない。auto 対象は
+`:filing/receive`（書類が届いたという記録）だけで、これは誰の地位も変えない。
+
+### D7. ooyake への join は片方向で数えない
+
+`senkyo.authority` は当局を ooyake の `:gov.unit` へ join するが、**ooyake が完全である
+ことに依存しない** —— 当局名・根拠法は senkyo が一次情報として持ち、
+`gov.<iso3>.electoral` は任意の join key として重ねるだけ。
+
+`join-report` は**両方向**を返す。実測 2026-08-07: ooyake の electoral registry は
+63 件あるが、senkyo が規制を収録した 5 法域のうち atlas に unit があるのは USA と GBR
+だけで、**JPN・DEU・CAN は無い**。逆に 63 件のうち 61 件は senkyo に規制カタログが無い。
+片方向だけ数えれば統合されているように読めてしまう。
+
+## 帰結
+
+- 「主要国家ごとに設計統合されているか」への答えは、**5 法域について統合された。
+  ただし世界の ~194 法域のうち 5 であり、ooyake の 63 選管のうち 2 としか join できて
+  いない。** その 2 つの穴は `join-report` が毎回返す。
+- **ooyake に JPN / DEU / CAN の選挙管理機関 unit が無い**ことが実測で判明した。
+  追加には Wikidata QID の独立検証が要るので、この ADR では**行っていない**
+  （検証できない QID を書けば ooyake の `:maintainer-verified` が嘘になる）。
+  follow-up として名指しで残す。
+- 受領側は実質判断を持たないので、この actor だけでは選挙は運営できない。**それが意図**
+  であり欠落ではない。
+- 9492 の README にあった stale なカバレッジ記述（「4 seeded (JPN, USA, GBR, DEU)」だが
+  `facts.cljc` は CAN を含む 5 件）も同時に修正した。
+
+## 検証
+
+| 対象 | 結果 |
+|---|---|
+| `kotoba-lang/senkyo` | 35 tests / 327 assertions green（nbb）。JPN の戸別訪問禁止を `:always` に壊すと **5 件**落ちる |
+| `cloud-itonami-isic-9492` | 45 tests / 192 assertions green、clj-kondo 通過。governor check を外し `:material/screen` を phase 3 の auto に入れると **28 件**落ちる |
+| `cloud-itonami-isic-8411-electoral` | 33 tests / 160 assertions green、clj-kondo 0 errors / 0 warnings。`clojure -M:dev:run` で clean 3 件 + HARD hold 5 件。期限判定を `#{:past}` に縮め台帳登載を auto にすると **7 件**落ちる |
+
+3 つとも「落ちることを確かめてから landed とする」を通している。
+
+## 後続 ADR
+
+ADR-2608079500（2026-08-07）が**この ADR の下の層**を置いた。オーナー指摘
+「先に各国の法的手続きに基づいて各省庁・自治体・行政機関の itonami は」の
+とおり順序が逆で、選挙分野を先に実装したあとで一般行政手続きの型
+（`kotoba-lang/tetsuzuki`）を切り出し、`senkyo` をそこへ retrofit した。
+本 ADR の設計判断（D1–D7）は有効だが、`senkyo.procedure` の期限の算法と
+entry の形は tetsuzuki の共有形に置き換わっている。
+
+## follow-up（実施していないことを名指しで残す）
+
+1. **ooyake に JPN / DEU / CAN の選挙管理機関 unit を足す。** 中央選挙管理会 /
+   Bundeswahlleiterin / Elections Canada。Wikidata QID の独立検証が前提。
+2. **`:reg/confidence` `:medium` の項を `:high` に上げる。** GBR の
+   advertisement-consent、DEU の PartG §25 閾値、CAN の Part 18 条番号、
+   JPN の記載事項の項番号。原文確認が要る。
+3. **法域の追加。** 未収録の大人口法域 12（IND / CHN / IDN / PAK / NGA / BRA / BGD /
+   RUS / MEX / ETH / PHL / EGY）。1 法域 = `senkyo.facts/regulations` と
+   `senkyo.procedure/procedures` への map 1 件ずつ。
+4. **fleet-ci gate。** senkyo の nbb test と 2 actor の JVM test を
+   `scripts/fleet-ci/gates.edn` に登録する（GitHub Actions は使わない、ADR-2607300900）。"}]

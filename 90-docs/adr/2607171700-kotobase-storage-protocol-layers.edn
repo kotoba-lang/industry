@@ -1,0 +1,37 @@
+[{:db/id -1
+  :adr/id "adr-2607171700-kotobase-storage-protocol-layers"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607171700: kotobase の上に storage/protocol 層を統合 — kotoba-lang/kotobase-protocols（s3 / ipfs / atproto / git surfaces、KRP projection）"
+  :adr/topic "kotobase-storage-protocol-layers"
+  :adr/status "accepted"
+  :adr/date "2026-07-17"
+  :adr/last_verified "2026-07-17"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["kotobase を backend にした protocol surface 群（S3 / IPFS gateway / AT-Proto XRPC data-plane / git dumb-HTTP）の正本実装: kotoba-lang/kotobase-protocols（pure cljc、IStore 上の handler）"
+   "*.kotobase.net の subdomain surface 計画（s3. / atproto. / git. は本 ADR が新設。ipfs. の公開 route の所有は ADR-2607072000 の gftdcojp/net-kotobase-ipfs のまま不変）"
+   "protocol surface と KRP（90-docs/protocols/kotoba-resource-protocol.edn）の対応: s3=Location(§3.4) / ipfs=Content(§3.3) / atproto=Record(§3.2) / git=Name+Location(§3.1/§3.4)"
+   "IStore collection 名前空間の予約: :kotobase.protocols/blocks（共有 block 空間）・:kotobase.protocols/audit（append-only 監査 stream）・[:kotobase.s3/objects <bucket>]・[:kotobase.at/records <did> <nsid>]・[:kotobase.git/refs|objects <repo>]"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related
+  ["90-docs/protocols/kotoba-resource-protocol.edn"
+   "90-docs/adr/2607072000-gftdcojp-net-kotobase-ipfs-gateway-split.edn"
+   "90-docs/adr/2607072300-actor-public-data-git-journal-kotobase-index.edn"
+   "90-docs/adr/2607062200-gftdcojp-legacy-gftd-ai-hosts-retirement-wave2.edn"
+   "90-docs/adr/2607051410-net-kotobase-distributed-storage-mesh-design.edn"
+   "90-docs/adr/2607032500-kotoba-kotobase-clojure-datomic-relationship.edn"
+   "orgs/kotoba-lang/kotobase (IStore/ITransactionalStore + LocalStore, PR #5)"
+   "orgs/kotoba-lang/kotobase-cljc-worker / kotobase-browser-worker (deploy-shell 先例)"]
+  :adr/problem
+  "kotobase.net には git.kotobase.net / atproto.kotobase.net / ipfs.kotobase.net / s3.kotobase.net のような kotobase-backed storage API 群の統合設計が存在しなかった（2026-07-17 調査: 明示設計済みは ipfs.kotobase.net のみ＝ADR-2607072000、s3/atproto/git subdomain は言及ゼロ）。一方で部品は揃っている: kotoba-lang/kotobase が IStore/ITransactionalStore（docs + streams + revisioned tx、PR #5 で main 着地）を提供し、KRP 0.1 が Web/AT/IPFS/Git/Datomic を跨ぐアドレッシング契約を定義済み。欠けていたのは『1つのデータ平面を複数のワイヤプロトコルとして話す』統合層だった。"
+  :adr/decision
+  "kotoba-lang/kotobase-protocols（public、Apache-2.0）を新設し、S3 / IPFS gateway / AT-Proto XRPC / git dumb-HTTP の4 surface を kotobase.store/IStore 上の pure cljc handler として実装する。全 surface は KRP の projection: 1つの論理リソースが s3(Location) / ipfs(Content) / atproto(Record) / git(Name) の各 identity で見える。共有 block 空間（:kotobase.protocols/blocks、CID キー）を ipfs gateway と atproto sync.getBlob が共用し、全書き込みは :kotobase.protocols/audit stream に append-only 監査を残す。router は subdomain（s3.<apex> 等、apex 注入可能）+ single-origin path-prefix fallback で dispatch。transport/auth（CACAO / SigV4）は deploy shell の責務で、handler には持ち込まない（kotobase-cljc-worker 先例と同型）。runtime は nbb/cljs first（bin/run_tests.cljs、24 tests / 87 assertions green）、:clj は compat。"
+  :adr/consequences
+  ["既存 ADR との整合（変更しない境界を明文化）: ①ipfs.kotobase.net 公開 route の所有は gftdcojp/net-kotobase-ipfs のまま（ADR-2607072000）— 本 repo の ipfs handler は self-hosted/local-first 用で、当該 hostname への採用はあちらの repo の判断 ②atproto surface はテナント data-plane であり social PDS ではない — aozora.app 集約（ADR-2607062200）不変、app.bsky.*/firehose/handle 解決は実装しない ③actor 公開データの git-journal 一次ソース原則（ADR-2607072300）不変 — 本 repo は kotobase を git プロトコルで serve 可能にするだけで、主従を逆転しない"
+   "storage mesh 設計（ADR-2607051410）の L7 Edge/API 層に protocol 多面性が入る: mesh peer は同じ handler 群を任意 apex で提供できる"
+   "not-decided（別 ADR / follow-up が必要）: ①*.kotobase.net への実 DNS/route cutover と Worker deploy shell（credentials・route は本 ADR では一切作らない）②真の content addressing（blake3/CIDv1、kotoba multiformats）— 現 ETag は FNV fingerprint であり CID ではない（KRP §3.3 を repo 内 docstring でも明記済み）③S3 SigV4 検証・git smart protocol（upload-pack）・binary body（v0.1 は string body）④ITransactionalStore を使った multi-key 原子性（現状は last-writer-wins put + 監査 stream）"
+   "検証: nbb --classpath 'src:test:<kotobase>/src' bin/run_tests.cljs が 24 tests / 87 assertions で all green（2026-07-17 実測、kotobase pin bbf57df9dde5c1869182012860129a598382e088 = PR #5 transactional IStore 込み main）。CI（GitHub Actions）も同一経路。"]
+  :adr/body
+  "# ADR-2607171700: kotobase の上に storage/protocol 層を統合\n\n## Status\naccepted — 2026-07-17（設計と library 実装の確定。*.kotobase.net への実 deploy/DNS cutover は not-decided、別 ADR）\n\n## Context\n- 2026-07-17 調査: kotobase.net に git/atproto/ipfs/s3 subdomain の統合 storage API 設計は無し。ipfs.kotobase.net のみ ADR-2607072000（net-kotobase-ipfs、実装済み未稼働）。\n- kotoba-lang/kotobase が IStore（docs: put/get/list、streams: append/read）+ ITransactionalStore（revisioned snapshot/transact、PR #5）を提供。LocalStore が JVM/cljs 同一挙動の oracle。\n- KRP 0.1（90-docs/protocols/kotoba-resource-protocol.edn）が Name/Record/Content/Location の4 identity と HTTP/AT/IPLD projection を定義済み — 欠けていたのは実装層。\n\n## Decision\nkotoba-lang/kotobase-protocols を新設。構成:\n- kotobase.protocols.http — ring-shaped request/response（純データ）\n- kotobase.protocols.json — 依存ゼロの JSON encode/parse（cljc、string キー保持）\n- kotobase.protocols.hash — FNV fingerprint（非暗号・非CID と明記、ETag 用）\n- kotobase.protocols.blocks — 共有 content-addressed block 空間（CID はキー、mint しない）\n- kotobase.protocols.s3 — PUT/GET/HEAD/DELETE + ListObjectsV2（XML）。bucket → [:kotobase.s3/objects b]\n- kotobase.protocols.ipfs — GET/HEAD /ipfs/{cid} 読み取り専用 gateway、content-type allowlist（net-kotobase 慣習踏襲）、/ipns は 501\n- kotobase.protocols.atproto — XRPC com.atproto.repo.{get,put,delete,list}Record* + sync.getBlob。(did,nsid) → [:kotobase.at/records did nsid]\n- kotobase.protocols.git — dumb-HTTP read（info/refs・HEAD・loose objects）+ library 書き込み（put-object!/set-ref!/set-head!、sha 形式検証）\n- kotobase.protocols.router — subdomain dispatch（apex 注入）+ /s3 /git /xrpc /ipfs prefix fallback\n\n原則: handler は pure（(handle ctx req) → resp、ctx = {:store IStore :now :apex}）。auth/transport は deploy shell。書き込みは監査 stream に残す。\n\n## Rejected\n- net-kotobase（gftdcojp）への直接実装 — org 境界: エンジン非依存の protocol projection は kotoba-lang の library に置き、product Worker は消費者にする（kotobase-cljc-worker と同じ分割）\n- ~~surface ごとの別 repo 4 連発~~ — **2026-08-04 に撤回（ADR-2608051000）**。当時の根拠（共有 block 空間と router を跨ぐ）は、共有部分を kotobase-protocol-core として独立させれば解ける。library は kotobase-protocol-{core,s3,ipfs,atproto,git} に分割し、deploy shell も capability ごとに分ける（本 ADR が『将来 surface ごとに分けられる』と書いた将来にあたる）\n- Rust / 生 JS 実装 — repo-wide runtime 優先順位に反する\n\n## Verification\nnbb bin/run_tests.cljs: 24 tests / 87 assertions / 0 failures（json round-trip・S3 CRUD+list+tombstone・ipfs gateway sanitization・XRPC round-trip・git dumb-HTTP・router dispatch）。"}]

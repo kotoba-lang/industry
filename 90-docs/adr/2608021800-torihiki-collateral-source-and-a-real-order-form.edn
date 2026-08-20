@@ -1,0 +1,95 @@
+[{:db/id -1
+  :adr/id "adr-2608021800-torihiki-collateral-source-and-a-real-order-form"
+  :adr/title "adr-2608021800: collateral の出所を名指しし、order form の絵を本物にする — 誰でも collateral を鋳造でき、position panel は client が渡す literal のゼロを描いていた"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "torihiki-collateral-source-and-a-real-order-form"
+  :adr/authoritative-for
+  ["torihiki の collateral の出所 (:bridge-authority)"
+   "torihiki-terminal の署名・注文送信経路"
+   "devnet が collateral について何を主張するか"]
+  :adr/related
+  ["adr-2608020230-torihiki-authenticated-transactions"
+   "adr-2608021630-engi-quorum-is-one-predicate"]
+  :adr/evidence
+  ["https://torihiki.pages.dev"
+   "https://torihiki-node.04-feasts-minded.workers.dev/head"]
+  :adr/body
+  "# ADR-2608021800: collateral の出所と、本物の order form
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context — 2 つの、種類の違う嘘
+
+### 1. collateral がどこからも来ていなかった
+
+`:deposit` は**署名した account を誰であれ credit していた**。任意の account が任意の額の collateral を無から作れた。
+
+そして **downstream の数値はすべて厳密に正しいまま**だった —— initial/maintenance margin、4 段の liquidation waterfall、insurance fund、ADL。**それが見えなかった理由**である: 算術に誤りは無く、入力が何にも裏付けられていないだけ。**imaginary money 上で証明可能に正しい margin engine は、正しい margin engine ではない。**
+
+### 2. order form は order form の**絵**だった
+
+Buy/Sell ボタン、価格・数量フィールド、flag chip 3 個、\"Connect wallet\" ボタン —— **どれも何もしなかった。** その隣で position panel が、client が渡す **literal のゼロ**（`:position {:size 0 :entry 0 :upnl 0}`、`:equity 0`）を描画していた。**node には一度も聞いていない。**
+
+**page はそれを一言も言っていなかった。**
+
+聞いてもいない position を描く terminal は「未完成」ではなく**誤り**であり、**最も気づきにくい panel は、常にもっともらしい数値を出す panel** である —— 「No open position」は正当な答えなので、壊れているようには見えない。
+
+## Decision
+
+### 1. exchange は bridge authority を名指しできる
+
+設定すれば、**その account だけが他を credit できる。** `:oracle-publishers` が直接の price setter を閉じるのと**同じ形**: 両方の口を開けたままにすると authority が装飾になる（攻撃者は検査しない方の口を使う）。
+
+**withdraw は gate しない。** 自分の collateral を出すのに署名以上の authority は要らず、clearinghouse は free collateral を超えて取らない。**明示する限界**: 残高を減らすだけで、どこにも払い出さない。
+
+### 2. devnet は bridge を設定せず、`/head` がそう言う
+
+```
+\"collateral\": \"unbacked — any account may credit itself (devnet faucet)\"
+```
+
+`:consensus` を明示するのと同じ理由 —— **黙っていれば、もう一方だと仮定される。**
+
+### 3. terminal は実際に署名して送信する
+
+- **session key**（WebCrypto Ed25519、localStorage）。**wallet とは呼ばない** —— この devnet の外では何も持たず、サイトデータを消せば失われる。より立派な語を使えば、誰かがそれを wallet として扱う。
+- **署名 payload は engine 自身の `torihiki.auth/signing-payload` を呼ぶ**（この 1 用途のために git dep を追加）。JavaScript で書き直すのは「node と byte 単位で一致し続けなければならない唯一のもの」の 2 つ目の実装であり、**ずれた時の症状は `bad-signature`** —— 暗号の問題に見えて暗号の問題ではないもの。
+- **nonce は毎回 node から読む。** 手元の counter は request が 1 つ落ちた瞬間にずれ、症状は**トレーダーが値段を見ている当の注文への拒否**。
+- **拒否理由は chain が返したものを表示する。** 「失敗」と出すのは、答えの唯一有用な部分を捨てること。
+- faucet ボタンは **\"mint\" と書く** —— bridge が無い以上、deposit とはそれのことだから。
+
+## 実測（主張ではなく）
+
+live node に対して:
+
+```
+鍵2つ生成 → 入金 → 板に載る買い → 食う売り
+deposit 受理 block 25 / order block 26 / 約定 block 30
+position と tape が一致
+well-formed だが誤った署名 → bad-signature、nonce は未消費のまま
+terminal 自身の keys.cljs で pkcs8 round-trip → live node が block 31 で受理
+```
+
+torihiki 140 tests / 420 assertions。JVM と nbb の state root 一致。design-quality 100.00。
+
+## 書いている途中で見つけたバグ（hardcode されたゼロが隠していた）
+
+`/account` は positions を market id で keying し、**JSON は整数キーを文字列にする**ので `js->clj :keywordize-keys` は `:1` を返す。整数 `1` で引くと**何も見つからず、フラットな account として描画される。** ゼロを直書きしている限り、この経路は一度も走らなかった。
+
+## Consequences
+
+- (+) collateral の出所が engine の概念になった。
+- (+) terminal が実際に取引できる。app.hyperliquid.xyz/trade との最大の可視ギャップ。
+- (−) **browser の DOM 配線は未検証。** Chrome extension が接続できず、実ブラウザで click していない。暗号側は Node の WebCrypto（同一仕様）で live node まで通した。
+- (−) bridge 本体は無い。deposit の相手側（他チェーンで実際に価値を受け取る何か）が存在しない。
+- (−) 残る: TWAP/scale/chase、resting reduce-only、WebSocket 購読、snapshot、publisher rotation。
+"}]

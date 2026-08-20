@@ -1,0 +1,10 @@
+;; gen-quality — murakumo self-hosted OSS video-model output-quality scoring (ADR-2607180000).
+{:readme/purpose "aozora creator 動画パイプラインの生成モデル (murakumo fleet self-hosted OSS 優先) の出力品質をモデルごとに数値化する。fal.ai/Seedance は opt-in へ降格 (owner 指示 2026-07-17)。"
+ :readme/files {"gen-quality.datoms.edn" "schema + :model/* catalog + :axis/* catalog (transactable)"
+                "gen-quality-ledger.edn" "append-only スコアイベント (1行1 EDN map、手編集禁止・追記のみ)"
+                "score-video.cljs" "nbb 決定論スコアラー (ffprobe/ffmpeg → axis スコア → ledger 行)"}
+ :readme/score-one "npx nbb 90-docs/gen-quality/score-video.cljs --model <model-id> --run-id gq-$(date -u +%Y%m%d)-<tag> --file <path.mp4> [--target-dur <s>] >> 90-docs/gen-quality/gen-quality-ledger.edn"
+ :readme/query "nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q '[:find ?m ?s :where [?e \"eval/axis\" \"axis/composite\"] [?e \"eval/model\" ?m] [?e \"eval/score\" ?s]]'"
+ :readme/axes "resolution fps native-audio bitrate-density temporal-motion duration-fidelity → composite (重み付き平均)。temporal-motion + bitrate-density が最大重み: placeholder (静止 container) を実生成から分離する軸。"
+ :readme/fail-closed "ファイル不在は exit 2 — 存在しない artifact に捏造スコアを出さない。"
+ :readme/note "gad (ROCm ComfyUI) はこの Mac の tailnet に不可視。fleet 到達 or artifact コピー後に ltx-2.3 の pixel 軸 / wan2.2 / wan-dancer をスコア。judge (3-panel visual) 層は follow-up。"}

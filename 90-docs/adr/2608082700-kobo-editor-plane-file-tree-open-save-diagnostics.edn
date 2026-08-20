@@ -1,0 +1,196 @@
+[{:db/id -1
+  :adr/id "2608082700"
+  :adr/title "kobo editor plane: 木・開く・保存・位置付き診断を、コマンド実行と同じ規律で入れる"
+  :adr/status "accepted"
+  :adr/date "2026-08-08"
+  :adr/tags ["kobo" "kuro" "editor" "ide" "terminal" "lsp" "app-files" "mokuroku"
+             "capability" "kotoba-lang" "adr-2606301000"]
+  :adr/supersedes ""
+  :adr/body
+  "## 出発点 — 「vscode のような code editor はあるか」
+
+オーナーの問い（2026-08-08）に対する現在地の実測。索引（`manifest/concept-vocabulary.edn`
+の `:editor` / `:terminal`）と `manifest/west.yml` と各 README を引いた結果:
+
+- **`kotoba-lang/kobo`**（workbench = editor + terminal + agent loop + 監査）と
+  **`kotoba-lang/kuro`**（terminal model）が ADR-2606301000 として 2026-06-30 から在る。
+  ADR は目標を明言している —— **「VS Code clone ではなく」**、コード・コマンド・実行・
+  監査・権限を kotoba の datom/CID モデルに落とし、実行は aiueos の capability surface で
+  隔離する。
+- 部品も在る: `lsp`（LSP のデータ契約）・`lsp-rpc`（JSON-RPC の wire）・`editor`
+  （構造化 EDN エディタ）・`mokuroku` + `mokuroku-ui`（catalog kernel）・`app-files`
+  （fs/browse の seam と Finder のルール）・`capability-fs-browse` / `capability-fs-app-data`。
+- **足りなかったのは「ファイルを開く」だった。** `kobo.editor` は buffer を持てたが、
+  その text がどこから来たのか、session がそれを取ってよかったのかを言うものが無かった。
+  受領証の無い buffer は、誰かが手で打ち込んだものと区別できない。
+
+なお **README の「Not yet built」は当時から古かった** —— 「event wiring と command entry が
+無く console は read-only」と書いてありながら、`kobo.server` には `/run` `/stdin` `/kill` と
+write surface が既に在った。この ADR で記述を実態に合わせた。
+
+## 決定
+
+**ファイルを読むことは、コマンドを走らせることと同じ種類の行為**として扱う。したがって
+`kuro` が実行に課している規律をそのまま適用する: **effect の前に capability を検査し、
+拒否は落とさず記録し、結果は固定形の receipt（bytes の CID 付き）にする。**
+
+新しい名前空間（すべて `kotoba-lang/kobo`）:
+
+| ns | 役割 |
+|---|---|
+| `kobo.file` | open/save/browse を intent として持つ。repo 相対パスの正規化、file を名指しする denial、固定形 receipt |
+| `kobo.explorer` | ファイル木。listing の半分は `app-files` + `mokuroku` のもの、階層だけがここ |
+| `kobo.diagnose` | 文字オフセットを返す区切り記号スキャナ + `kotoba-lang/lsp` の position / diagnostic 契約 |
+| `kobo.host.fs-node` | 実際に filesystem に触る唯一の場所（nbb / Node） |
+
+既存の変更: `kobo.workbench`（explorer・active path・file receipts / denials・
+per-file diagnostics）、`kobo.ui`（sidebar の木、active buffer の editor pane、
+1-based の line:column）、`kobo.server`（`/toggle` `/open` `/edit` `/save`）。
+
+## 効いている判断
+
+### 1. capability の語彙を 2 つのまま置く
+
+検査するのは `kuro` の session grant（`repo/read` / `repo/write`）。host が注入する
+provider が `fs/browse` / `fs/app-data` 級の authority を使う。**1 つの文字列で両方を
+名乗らせない** —— kobo が見たこともない authority package を enforce していると主張する
+ことになる。
+
+実務上の帰結を明言する: **既定の `:terminal-repo` セッションはファイルを開けるが保存
+できない。** `repo/read` は持ち `repo/write` は持たないからで、保存は「どのファイルの
+どの capability が足りないか」を言う denial として返る。これは ADR-2606301000 の
+**inline grant view**（なぜこれが実行できる／できないか）そのものであって、迂回すべき
+不具合ではない。編集したい人は `--mode terminal-build` で起動する。**「編集できないと
+不便だから」で既定の権限を広げない** —— 広げるとコマンド実行側の grant（`net/fetch` を
+含む）まで一緒に広がる。
+
+### 2. 既存を使う。木だけが新しい
+
+`app-files.model/entry->item`・columns・「ディレクトリにサイズは無い / dotfile に拡張子は
+無い」・`fs/browse` の seam・`mokuroku.query` が回す `directories-first` の全順序は、
+**すべて向こうのものを呼ぶ**。ここに書いたのは階層の復元だけで、それは
+`mokuroku.item` の docstring 自身が消費者の仕事だと書いている（「tree 形の source は
+`:item/parent` を持ち、木は本当に木が要る者が復元する」）。W4 の再帰的論理値が着地したら
+この復元は kernel 側に移る。
+
+`kotoba-lang/drive` も候補として見たが採らない —— あれは workspace / 共有ロール /
+バージョンを持つドキュメント管理モデルで、木は keyword 識別の item であって checkout の
+パスではない。エディタの sidebar に共有ロールを持ち込むことになる。
+
+### 3. 空・拒否・失敗は 3 つの状態
+
+`app-files.source/denied` は「空のディレクトリと拒否された grant はリストの上で同じに
+見え、直せるのは片方だけ」という理由で在る。ここで 3 つ目が要ることが分かった:
+**host が読もうとして失敗した**（EACCES 等）。denial（grant が足りない）とも空とも別の
+事実で、しかも listed として扱わないと `needs-listing` が同じ失敗を永久に再試行する。
+`:kobo.explorer/errors` を分けて持つ。
+
+### 4. 半端に開くくらいなら拒否する
+
+3 つを拒否する。どれも「半端版が黙ってデータを失う」から:
+
+- **読み取り上限を超えるファイル** —— 切り詰めた buffer を保存できると、それは
+  file-shredder になる（画面に出た分を書き戻し、残りは消える）
+- **NUL を含むファイル** —— bytes を UTF-8 として解釈して書き戻すのは非可逆で、
+  失われるのは誰も見ていない bytes
+- **repo の外に出るパス** —— textual な `..` は `kobo.file/normalize` が結果で判定して
+  弾く（`a/../../etc` は先頭に `..` を持たないが外に出る）。**symlink は portable な検査
+  では見えない**ので host 側が `realpath` で両側を解決して比較する
+
+保存は同一ディレクトリの一時ファイル + `rename`。読み手は旧か新のどちらかを見て、
+半分書けたものは見ない。
+
+### 5. HTTP 境界が信頼できない入力を検査する
+
+`kobo.file/intent` は repo の外に出るパスで **throw する**（設計）。workbench の中から
+見ればそれは呼び出し側のバグであって grant の問題ではない。だが POST されたパスは
+任意なので、**server が先に検査して 400 を返す**。そうしないと handler が死んで
+リクエストは答えを持たないまま残り、client からは「壊れたサーバ」に見える（「拒否された
+リクエスト」ではなく）。`/toggle` は root が正当なディレクトリなので `normalize`、
+それ以外は `file-path`。
+
+`/open` `/edit` `/save` `/toggle` も `/run` と同じ token + Origin の検査を通す。
+**読むだけの経路も含める** —— 他所のページから GET できる形にすると、この repo の中身を
+外へ流す口になる。
+
+## レビューで見つけて直した 1 件 — fragment が本文を運ぶようになった
+
+SSE の live 更新は `#kobo-root` の中身を丸ごと差し替える。editor pane を入れた
+ことで、**その中身に開いているファイルの全文が入った**。実測: buffer が空なら
+4 KB、84 KB のファイルを開くと 89 KB。そして `on-chunk` は pipe の chunk ごとに
+呼ばれるので、饒舌なコマンドを走らせながら大きいファイルを開いていると、
+**全文が chunk の数だけ再直列化されて流れる**（読み取り上限は 1 MiB）。
+
+`broadcast!` を 80 ms に 1 回へまとめた。**末尾の 1 回は必ず送る** —— 窓の中の
+呼び出しを捨てるだけの間引きだと、最後の変化が窓に落ちたときそれが永久に届かず、
+画面が 1 手前で止まる。止まった画面は遅い画面より悪い（読み手はそれを現在だと思う）。
+
+**この gate は「落ちること」を先に確かめた。** 最初に書いたテストは throttle を
+無効にしても緑のままだった —— `(repeat n (POST ...))` が**同じ Promise を n 個
+並べていて**、要求が 1 本しか出ていなかった。`repeatedly` に直したら、無効時は
+「6 件の重なった変更で 6 回送信」で落ち、有効時に通る。**数えるテストは、数える
+対象が実際に起きていることを先に確かめないと劇場になる。**
+
+## 実測で見つけた 2 件（どちらも効く場所に書いた）
+
+### `kotoba.lang.lsp/text-document` は最終行を落とす
+
+`(:line-count (lsp/text-document \"a\\nb\\nc\\n\"))` は **2**。`clojure.string/split-lines`
+は既に末尾の空文字列を落としているので、「phantom line」を防ぐための `drop-last` が
+**実在する行**を消している。ソースファイルはほぼ必ず改行で終わるので、そのまま使うと
+**ほぼすべての診断が 1 行ずれる**。
+
+`kobo.diagnose/document` で seam を補正した（末尾が改行でない source を上流に渡し、
+本物の source を戻す）。fork ではない: 上流が直ればこの関数は `lsp/text-document` に
+なるだけで、**直した版に対しても同じ結果を返す**ので、他人の正しい commit で赤くならない。
+**上流 `kotoba-lang/lsp` 側の修正は follow-up**（このセッションは push scope の外）。
+
+### browser glue が「ロジックを置くな」を越えた
+
+`kobo.server` の inline JS は「配線だけ。分岐が要るようになったら cljs ビルドを入れる
+合図」と自分で書いていた。editor plane を入れたことで、それが ①act 接頭辞ごとの分岐
+②入力の debounce ③再描画をまたぐ textarea の値・カーソル・フォーカスの復元、の 3 つを
+持った。**合図は出ている。** それでも今回 cljs ビルドを入れないのは、editor plane と
+build 経路を 1 つの変更に混ぜないためであって、「まだ小さいから」ではない。次に glue に
+足したくなった行が、その決定を先に済ませるべき合図になる。
+
+③ が要るのは、SSE の再描画が `#kobo-root` を丸ごと差し替えるから —— これが無いと、
+コマンド出力が 1 行届いただけで打ちかけの行が消える。`/edit` を debounce して server に
+預けるのは、その再描画が**ユーザーの編集を含んだ状態**で描かれるようにするため。
+
+## 検証
+
+- `clojure -M:test` — **63 tests / 189 assertions, 0 failures**（変更前は 18 / 55）
+- `npm run test:host`（nbb, 実ファイルシステム・実 HTTP）— **44 tests / 124 assertions, 0 failures**
+- `clojure -M:lint` — 0 errors / 0 warnings
+- design-quality gate（ADR-2607132300）— 木のみ / 編集中の両方で **>= 95**
+- console を端から端まで駆動: `--mode terminal-build` で起動 → `/toggle src` →
+  `/open src/a.clj` → 画面に `src/a.clj:1:1` の未閉じ括弧診断 → `/save` → ディスク上の
+  ファイルが直り、診断が消える
+
+`:terminal-repo` での保存が denial になり**ディスクが変わらない**こと、symlink 経由の
+脱出が拒否されること、一時ファイルが残らないことは、いずれも実ファイルシステム上の
+テストで確認している（モックしない —— 偽のファイルシステムはモデルの信じている通りに
+答えるので、symlink という「portable な検査に見えないもの」を検証できない）。
+
+## まだ無いもの（正直に）
+
+- **本物の PTY** —— 子プロセスは pipe なので全画面プログラムは動かない
+- **editor tabs** —— active な buffer は 1 つで、他はリスト
+- **外部 language server** —— `kobo.diagnose` は `lsp` のデータ契約を話し `->lsp` で
+  publish できるが、`lsp-rpc` で実サーバを駆動するものはまだ無い。今出ている診断は
+  kobo が自分で計算したもの
+- **`kobo.agent`**（durable loop）と **`kobo.repo`**（kotoba-rad/git bridge）
+- **ClojureScript の browser ビルド**（上記のとおり、次に触るときの先決事項）
+- **DADS への移行** —— kobo は legacy の kotoba-ui / liquid-glass スタックの上に在る。
+  2026-08-05 の規則で新規 UI の基盤は `jp-go-dds` だが、既存 app のスタック移行は
+  editor plane とは別の変更。**2 つの design system を混ぜない**ために今回は既存側で
+  完結させた
+
+## 着地
+
+- 実装は `kotoba-lang/kobo` に属する（west project であり、superproject の tree では
+  ない）。このセッションの GitHub scope は `com-junkawasaki/root` のみで、
+  `kotoba-lang` への push は proxy が credential を出さない（cross-tier add も不可）。
+  **この ADR が superproject 側の正本で、コード本体は kobo に別途着地させる。**
+- この ADR の記述と実装の対応が崩れたら、崩れた側を直す。"}]

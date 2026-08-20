@@ -1,0 +1,150 @@
+[{:db/id -1
+  :adr/id "ADR-2608100400"
+  :adr/title "DefCID は canonical に計算できているが、kotoba CLI はそれを出さない（出るのは全部 sha256）"
+  :adr/status "accepted"
+  :adr/date "2026-08-10"
+  :adr/last_verified "2026-08-10"
+  :adr/supersedes ""
+  :adr/context
+  "オーナー質問（2026-08-10）「今の kotoba ではちゃんと kotoba cli で defcid などで
+   ちゃんと canonical cid になっている?」。実測して答えた記録。
+
+   計測対象: compiler `875e388` / kotoba-kir `9a70bf1` / kotoba-lang `a5f52b5`。"
+
+  :adr/decision
+  "## 結論は 2 つに分かれる
+
+   **① DefCID のアルゴリズムとエンコーディングは canonical で正しい。**
+   **② CLI 面には一切出ていない。**
+
+   ### ① 中身は正しい
+
+   authority は **2026-08-10 に `kotoba-kir` へ移った**（kotoba-kir #50
+   『Own golden-preserving DefCID』/ #51、kotoba-lang `e0ea505`『Delegate DefCID
+   authority to KIR』）。ADR 0222（compiler）が『明示的な golden-preserving 抽出まで
+   kotoba-lang が唯一の DefCID authority』と書いていた、その抽出が完了した形。
+   `kotoba.lang.code-identity` は互換 facade になった。
+
+   凍結ベクタ `lang/code-identity-vectors.edn` の `:pure-const` を再計算した実測:
+
+   | 項目 | 値 |
+   |---|---|
+   | payload-version | 2 |
+   | 再計算 CID | `bafyreiarrzdga4uwvk6miw6rdndih4z56xgtd4qz25tb3gxld7toolyaiu` |
+   | 凍結 CID | 同一 |
+   | canonical hex（dag-cbor） | 一致 |
+   | `cid?` 検証 | true |
+   | effect row の封印 | 同一 KIR で pure と `#{:host/http}` が別 CID |
+
+   `bafyrei…` は **CIDv1 / dag-cbor / sha2-256**。凍結ベクタ 11 本 +
+   `lang/code-identity-conformance/{manifest,positive,negative}`（CI6
+   cross-implementation）付き。
+
+   payload v1 の 2 欠陥も authority に明記され v2 で両方直っている ——
+   ①effect row が封じられておらず pure と effectful が同じ CID を持った
+   ②**`pr-str` の出力を dag-cbor と称してアドレスしていた**（実装間で byte 一致しない）。
+
+   ### ② CLI からは出ない
+
+   | CLI 経路 | 出るもの |
+   |---|---|
+   | `kotoba -M inspect a.kotoba` | interface EDN + `:sha256`（interface のダイジェスト） |
+   | `kotoba -M compile --target js` | artifact に `sourceDigest` / `kirDigest` = **裸の sha256 hex** |
+   | provenance EDN | `hir-sha256` / `policy-sha256` / … 全部 sha256 |
+
+   compile が生成した全ファイルに `grep 'bafy'` をかけて **0 件**。usage 一覧にも
+   `defcid` / `cid` サブコマンドは無い。**DefCID を得る経路は library API
+   （`kotoba.kir.definition-identity/definition-cid`）だけ。**
+
+   ### ③ 1 箇所、名前だけ CID の sha256 がある
+
+   `compiler/src/kotoba/compiler/test_profile.clj:140`:
+
+       :test-definition-cid (artifact/sha256
+                             (select-keys kir [:format :exports :signature
+                                               :effects :functions]))
+
+   **`definition-cid` を名乗る sha256。** authority が payload v1 の欠陥として
+   名指しした *codec-mislabelled* と同じ形。test report のフィールドで admission に
+   使われていないので実害は限定的だが、**名前が実体と食い違っている。**"
+
+  :adr/consequences
+  "- 『DefCID は canonical か』への答えは **yes（中身）/ no（CLI 面）** であり、
+     どちらか一方だけを引用すると誤解になる。
+   - 現状 CLI が出す digest はすべて sha256 で、**identity ではなく完全性検査**に
+     使える種類のもの。lock / admission / 再現性の主張に CLI 出力の
+     `sourceDigest` / `kirDigest` を使わないこと（DefCID が封じている
+     effect row・desugar contract version を含まないため）。
+   - **【2026-08-10 訂正】初版はここに『identity payload が要求する 6 要素は
+     compiler が既に全部持っている。配線の問題であって設計の問題ではない』と
+     書いた。それは誤りだった。** 実際に配線しようとして 2 つが取れないことが
+     分かった:
+
+     | 封印される入力 | 実態 |
+     |---|---|
+     | typed KIR | 取れる（`compile-source` の `:kir` の `:functions`） |
+     | effect-row | 取れる（関数の `:effects`） |
+     | interface | 取れる（HIR の `:param-types` / `:result`） |
+     | 直接依存 | 閉じたモジュールなので KIR body から辿れる |
+     | **desugar-contract-version** | 【**再訂正 2026-08-10**】**存在する。** `kotoba-lang/lang/elaboration-pipeline.edn` の `:contract-versions` に `:desugar-contract 1` として、しかも『Contract versions sealed into definition identity』という注釈付きで宣言されている。私の grep は `desugar-contract-version` という**綴りだけ**を見ており、`:contract-versions` の中のキー名 `:desugar-contract` を見落とした |
+     | **profile-version** | 【**再訂正**】**同じ場所に `:language-profile` として存在する。** 出典が無いのではなく、**3 つに食い違っていた**（elaboration-pipeline 4 / version-policy 5 / surface-status 6）。しかも identity に封印される 4 が最も古かった |
+
+     **したがって当初の『配線の問題』という結論は、遠回りして正しかった —— ただし
+     理由が違う。** 6 要素はすべて存在し、authority も 1 箇所
+     （`elaboration-pipeline.edn` の `:contract-versions`）にある。欠けていたのは
+     **その authority が、自分が写している数字と一致しているかを誰も検査して
+     いなかった**こと。
+
+     ## この誤診を 2 回した経緯（同じ種類の誤り）
+
+     1 回目: 『6 要素は全部持っている、配線の問題』→ 綴り検索で 2 つ見つからず。
+     2 回目: 『生成側が fleet に無い』→ **`:contract-versions` の中を見ていなかった。**
+
+     どちらも **`grep <正確な綴り>` の結果を不在の証拠として使った**。CLAUDE.md の
+     「『無い』と結論する前に索引を引く」は repo の不在について書かれているが、
+     **同じ誤りがフィールド名でも起きる**。宣言は `:desugar-contract-version` では
+     なく `:contract-versions {:desugar-contract 1}` と書かれていた。
+
+     ## 実際にやった安全化（kotoba-lang `5b69f51`）
+
+     `grammar-authority` に `:pipeline/contract-version-drift` を追加。
+     **他のファイルが宣言している数字を写している entry は、その宣言と一致する
+     ことを検査する**（language-profile / guest-grammar / surface-status /
+     elaboration-pipeline）。`:desugar-contract` `:typed-kir` `:semantic-cid`
+     `:portable-effect` はここが**一次宣言**で比較対象が無いので、その旨と
+     「desugar の形が変わったら上げる」を注釈に明記した。
+
+     `:language-profile` を 4 → **6**（authority と一致）。4 に戻すと 4 failures が
+     6 になる。
+
+     `version-policy` の `:release/language-profile 5` は**変えずに drift を明示**。
+     これを上げることは『profile 6 を released と宣言し `:supported` に加える』
+     ことであり、**写し間違いの修正ではなく出荷内容の宣言**なのでオーナー判断。
+     identity 軸は強制、release 軸は開示、という分け方にした。"
+
+  :adr/next
+  "- `kotoba -M defcid <file>` は **authority が揃ったので着手できる**。compiler が
+     `elaboration-pipeline.edn` の `:contract-versions` を読み、`:language-profile`
+     と `:desugar-contract` を identity payload に渡す。**compiler 側にこの値を
+     再宣言しない** —— それが今回直した drift の作り方そのもの。
+   - `version-policy :release/language-profile` を 6 へ上げるか（= profile 6 を
+     released と宣言し `:supported` に加える）はオーナー判断。
+   - **`compiler/resources/kotoba/lang/version-policy.edn` は kotoba-lang の写し
+     ですらなく、別スキーマの別ファイル**
+     （`:kotoba.lang.version-policy/current-profile 5`）。profile 番号の 4 つ目の
+     宣言であり、これも stale。しかも `vendor-drift` は **guest-grammar しか
+     検査していない**ので、`capability-catalog` と `version-policy` の写しは今も
+     未検査。別スライス。
+   - ~~`:test-definition-cid` を改名する~~ **完了**（amu `3b45ae1`、
+     `:test-kir-sha256`。テストは旧キーが不在であることも assert する）。
+   - CLI が DefCID を出せるようになったら、`lang/code-identity-conformance` の
+     positive/negative を CLI 経由でも回して cross-implementation を CLI 面まで
+     広げる。"
+
+  :adr/references
+  "compiler ADR 0222 (sema と IR の repository 境界、DefCID authority の移管条件) /
+   kotoba-kir #50 #51 (golden-preserving DefCID の移管) /
+   kotoba-lang e0ea505 (Delegate DefCID authority to KIR) /
+   kotoba-lang lang/code-identity.edn (identity の正本) /
+   kotoba-lang lang/code-identity-vectors.edn (凍結ベクタ 11 本) /
+   ADR-2608100300 (この計測が出た session)"}]

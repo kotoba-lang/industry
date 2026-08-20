@@ -1,0 +1,105 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-16"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-16.edn"
+  :doc/date "2026-08-18"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "call-clobber in the linear scanner so a caller with calls and control flow stops taking all-vreg"
+  :coscientist/iteration 16
+  :coscientist/subject "kotoba-lang/kotoba-mir 7f7c5569, kotoba-lang/kotoba-native f07d260e, bench/runtime-comparison/kernel_call*.kotoba"
+  :coscientist/action "land the allocator closer iteration 8 measured; break/unbreak on frame policy, slots, instruction count; execute the oracle; do not rank ns on a loaded host"
+  :coscientist/measured "24-live + one if: :call-live, 17 slots, 168 insns, kernel 652 B AArch64 (was :all-vregs, 99 slots, 325 insns, 1344 B). Straight-line twin stays ADR 0006 :call-live at 24 slots / 191 insns / 808 B. 8-live + if: :call-live, 1 slot, 248 B. Native kexe-benchmark at extract offset 52, n=7, 1 call: chained 8-live 6210431302, independent 24-live 21432348; twins match the interpreter. Offset 0 is step(7)=337898 on every module."
+  :coscientist/refuted "that a function with calls and a branch must take allocate-with-spills. Also the conversation that treated 6210431302 as the 24-live oracle: that value is kernel_call (chained 8-live) at n=7; kernel_call_deep at n=7 is 21432348. extract-native :offset on this pin is 52, not the 72 iteration 8 saw."
+  :coscientist/carries-forward "iteration-04: do not ship a timed bench export; iteration-08: an oracle is the only check on a duration, necessary not sufficient, and :offset is not always 0; iteration-14: perfgate refused the leaf ranking; iteration-15: already used this number for the amu pin, so this file is 16; do not overwrite 04-15; do not bump amu's native pin without a timed win; do not rank on loadavg ~47"
+
+  :doc/body
+  "# Codegen co-scientist, iteration 16
+
+Iteration 15 already existed when this session said \"next\". It is the amu
+pin, not call-clobber. This file does not overwrite it. Iteration 8 left a
+closer: a function with calls and control flow still took all-vreg. That is
+the only measured gap this loop still owned after the leaf closed inside
+noise.
+
+## What landed
+
+`kotoba-mir` `7f7c55691697ba25abf6d732870a159433ce1fab` (ADR 0012): the linear
+scanner accepts calls. Non-leaf pool is scratch then preserved. Values whose
+last use follows a call prefer a preserved register at definition. Remaining
+live caller-saved values are stored at their definition, which dominates both
+arms. Call-site moves of live-across values into preserved are not used —
+they are CFG-unsafe. Straight-line callers keep ADR 0006 `allocate-call-live`.
+Leftover pressure still fails into all-vreg. Successful scan declares
+`:call-live`.
+
+`kotoba-native` `f07d260e79e0ab5c5c01df9b85808624b5c86498` pins that mir.
+West pins: kotoba-mir `91b24675`, kotoba-native `47b76357`. amu's native pin
+is unchanged.
+
+Mir 42 tests / 985 assertions. Native 168 tests / 2199 assertions. Both green
+before merge.
+
+## Break / unbreak (AArch64, pin f07d260e)
+
+compile-gmir on the four fixtures. Helper `step` is a leaf (`:allocator`, 0
+slots) in every case.
+
+| kernel | live | path | policy | slots | insns | kernel bytes | n=7 oracle |
+|---|---:|---|---|---:|---:|---:|---:|
+| `kernel_call` | 8 chained | straight | `:call-live` | 8 | 48 | 240 | 6210431302 |
+| `kernel_call_branch` | 8 chained | one `if` | `:call-live` | 1 | 46 | 248 | 6210431302 |
+| `kernel_call_deep` | 24 | straight | `:call-live` | 24 | 191 | 808 | 21432348 |
+| `kernel_call_deep_branch` | 24 | one `if` | `:call-live` | **17** | **168** | **652** | 21432348 |
+
+Iteration 8's conservative path on the 24-live branch was **99 slots, 325
+insns, 1344 B**. The same source now takes the linear scanner and does not
+store every SSA value. x86-64 agrees on policy: 24-live branch is `:call-live`
+at 20 slots / 172 insns, not all-vreg.
+
+The 24-live branch is now *smaller* than its straight-line twin. Straight-line
+still uses ADR 0006, which materializes every live-across value into a slot.
+The CFG path prefers preserved registers at definition. That difference is
+real and is not this iteration's ranking question. The ranking question was
+whether the extra `if` paid all-vreg. It does not.
+
+## Oracle, offset, execute
+
+Twins agree with the interpreter at n=7 and n=200. extract-native / KIR
+export offset for `kernel` is **52** on this pin (iteration 8 saw 72). Timing
+offset 0 still runs `step`; `step(7)` is 337898.
+
+`compile-kir-module` wrote the AArch64 bytes; `kexe-benchmark` (isa hoisted)
+ran them at offset 52. n=7, 1 call after 1 warmup:
+
+| kernel | result |
+|---|---:|
+| `kernel_call` | 6210431302 |
+| `kernel_call_branch` | 6210431302 |
+| `kernel_call_deep` | 21432348 |
+| `kernel_call_deep_branch` | 21432348 |
+
+Offset 0 on every module returns 337898 (`step(7)`). The 24-live branch's
+taken arm is the same arithmetic as the straight-line twin, executed, not
+only encoded. x86-64 encodings were produced in the same dump (24-live
+branch 1010 B, `:call-live`, 20 slots); this host does not run them natively.
+
+loadavg was `{ 47 39 28 }`. Elapsed nanoseconds on a 1-call sample is not a
+ranking. No perfgate claim.
+
+## What this is not
+
+- Not a leaf rematch. Iteration 14's refusal stands.
+- Not a timed ranking of the 33% tax. The tax's *cause* is gone from the
+  encodings. Sealing a ns/call number needs a quiet host and
+  `perfgate.core/qualify`.
+- Not an amu pin bump. Same rule as 11-14: encodings are not a timed win on
+  a published export.
+- Not fused-srem, extra MOV, FMA, PGO, or a kototama optimizer.
+- Not a call-site move of live-across values into preserved.
+
+## Next
+
+Time the 24-live pair on a quiet M4 (judah; skip this Air while loadavg ≳ 10)
+through the hoisted `kexe-benchmark`, offset from extract-native, oracle
+21432348 at n=7. Judge is still min ns/call against the straight-line twin,
+then perfgate. Do not overwrite 04-15."}]

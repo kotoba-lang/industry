@@ -1,0 +1,486 @@
+[{:db/id -1
+  :adr/id "2608150900"
+  :adr/title "受付 — 飲食店の電話予約を AI が自動で受ける（denwaban × yotei × isic-561 の設計統合）"
+  :adr/status "accepted"
+  :adr/date "2026-08-15"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/tags "denwaban, yotei, isic-561, koe, voice, reservation, restaurant, capacity, delegation, consent, g5, g7"
+  :adr/body
+  "## 決定
+
+**飲食店にかかってきた電話を AI が受け、席を押さえ、確定した 予約 を
+`cloud-itonami/yotei` に作る経路を実装した。** 部品は全部そろっていたが、
+互いを呼んでいなかった。統合にあたって 2 つの構造的な衝突を正面から解いた
+（回避ではなく設計変更）。
+
+着地した実装（3 repo とも main）:
+
+| repo | 追加 | main |
+|---|---|---|
+| `cloud-itonami/yotei` | `yotei.seat`（席=容量）/ `yotei.delegation`（受付委任）/ `yoyaku/confirm-yoyaku-delegated` | `e85ae891` |
+| `kotoba-lang/koe` | `koe.media` / `koe.carrier` / `koe.arrival` / `koe.bridge`（電話側の共通部分） | `1ebb0acd` |
+| `kotoba-lang/com-whisper` | `whisper.engine`（実エンジン結合 + fleet 実測） | `8ec472c5` |
+| `kotoba-lang/kotoba-sema` | `:stream/accept`(25) / `:stream/send`(26) の登録 | `77175066` |
+| `kotoba-lang/provider` | `provider.stream-ingress`（参照実装） | `509fe9e5` |
+| `kotoba-lang/compiler` | `stream-ingress-v1` kit + `base64-kit` + guest 実行の証明 | `53d44bab` |
+| `cloud-itonami/denwaban` | `uketsuke`（会話）/ `yoyaku`（予約委譲）/ `consent` / `kikitori`（決定論抽出）/ `serifu`（事前レンダ）/ `ws`（socket） | `f0f56d82` |
+| `cloud-itonami/cloud-itonami-isic-561` | `restaurantops.yotei-intake`（確定 予約 → 検証済み記録） | `1264639a` |
+
+## 統合の前に在ったもの（実測 2026-08-15）
+
+「無い」と結論する前に索引を引く規則どおり `repo-search` / `concept-lookup` を
+引いた結果、**サービスの骨格は既に在った**:
+
+- `cloud-itonami/denwaban`（電話番）— 着信応対 + 音声対話 + 自動予約の voice
+  receptionist。ただし `run-session` が G7 で raise し、実発着信ゼロ
+- `cloud-itonami/yotei` — 予約 の正本（Calendly の逆・no-double-book・封筒暗号・
+  owner 署名確定）
+- `kotoba-lang/koe` — 再利用 voice-session kernel（ports + dialog loop）
+- `kotoba-lang/reservation` — 在庫・hold・rate plan の純関数
+- `cloud-itonami/cloud-itonami-isic-561` — 飲食店の back-office 調整 actor
+  （卓・予約スケジューリングを scope に持つ）
+
+**足りていなかったのは部品ではなく接続**で、接続を阻んでいたのが次の 2 点である。
+
+## 衝突 1 — yotei は 1 カレンダー = 1 リソース排他だった
+
+`yotei.yoyaku/is-free?` は「その区間に確定 予約 が 1 件でもあれば埋まっている」と
+答える。人のカレンダーには正しく、飲食店には誤りである。**19 時は埋まっていて
+同時に空いている**（卓が 12 あるから）。
+
+### 採った形: 卓が 1 つのカレンダー
+
+`yotei.seat` は**新しい『空き』の定義を持たない**。各卓が自分の `calendarDid` を
+持ち、区間の判定は `is-free?` そのまま。この namespace が足すのは「どの卓か」
+（人数と席数の関数）だけ。
+
+**容量カウンタを 予約 ログの隣に置く案は退けた。** `yotei.availability` の
+docstring が既に書いているとおり、『どのスロットが在るか』を決めるものが 2 つ
+あると、片方が提示した枠をもう片方が拒否する。各卓に `is-free?` を訊いて数える
+方式は、要約しようとしている不変条件そのものを呼ぶので、ずれようがない。
+
+### 席時間はスロットである
+
+飲食店の 予約 は「19:00」ではなく「19:00 から 90 分」で、終わったら次が座る。
+それは `:yotei/slot-min` が既に意味していることなので、**新しい時間モデルは
+足していない** — 卓のカレンダーは `slot-min` = 席時間、`windows` = 営業時間、
+`notice-min` = 直前予約の締切、`horizon-days` = 何日先まで。
+
+### 意図的にやらないこと
+
+- **卓の結合**（4人卓 2 つ → 6人）。物理的にくっつけられるかは席数からは導けず、
+  推測すると存在しない卓を 6 名に約束することになる
+- **公開の場で数える**。`open-times` は卓を跨いで **重複排除した instant** を返す。
+  これは最適化ではなく性質で、『残り 2 席』は G6 の希少性圧力であると同時に、
+  その店の日々の入り具合の公開でもある
+
+## 衝突 2 — 確定には人が鍵を持っている必要があった（G5）
+
+`confirm-yoyaku` は member 由来の署名以外を拒否する。それが「yotei が侵害されても
+予約 を捏造できない」理由である。同時に、**確定の瞬間に誰かが秘密鍵を握っている**
+ことを要求する。電話の相手は待っている。『後ほどご連絡します』は答えではない
+——それは店が止めようとしていた『無理です』と同じものである。
+
+### 採った形: 店主が事前に「売ってよい範囲」に署名する
+
+`yotei.delegation`。店主が 1 度だけ、**読める文**に署名する:
+
+```
+yotei/uketsuke/v1
+delegate=did:web:denwaban.etzhayyim.com#uketsuke-2026-08
+restaurant=did:web:app.itonami.cloud:calendar:torikai
+notAfter=<epoch-min>
+maxParty=6
+seatingMin=90
+noticeMin=60
+horizonDays=30
+tz=Asia/Tokyo
+table=<did>:2
+table=<did>:4
+table=<did>:6
+window=thursday:17:30-22:00
+```
+
+受付鍵は、**その 予約 の全項目がこの文の内側に再導出できるときだけ**確定できる。
+弱めた G5 ではない理由が 3 つある:
+
+1. **封筒が部屋そのもの。** 卓も営業時間も署名された文から出てくる。サーバ状態を
+   読まないので、侵害された yotei が卓を足すことも営業時間を広げることもできない
+   ——どれを変えても店主が署名した文が変わる
+2. **再導出であって申告ではない。** 「4 名が入る」という受付側の主張は読まない。
+   `yotei.seat` が封筒の卓リストから計算し直し、`is-free?` が重なりを計算し直す
+3. **期限があり、境界がある。** `notAfter` は必須。期限の無い封筒は手順の多い
+   サーバ鍵にすぎない
+
+**店主が手放すものは実在するので、はっきり書く**: その封筒の内側では、予約 は
+店主抜きで確定する。それが「機械に電話を取らせる」という取引であり、封筒は
+**どこまでかを店主自身が言う場所**である。
+
+### 実装上の形
+
+- `confirm-yoyaku` は無改変（既存の G5 の扉はそのまま）
+- 第 2 の扉 `confirm-yoyaku-delegated` は 3 つを要求する: delegate 由来の署名 /
+  `yotei.delegation/admit` からの**リテラル `true`** / 記録すべき封筒の文。
+  **truthy では通らない** —— 封筒を評価できなかった呼び出し側が、手元にある値を
+  渡して通ってしまう経路を塞ぐ
+- G4 は両方の扉で再検査する。封筒は『何を売ってよいか』を言うだけで、
+  『いまこの卓が空いている』とは決して言わない
+- 確定した 予約 は `confirmedVia=delegate` と `authorizedBy=<封筒の文>` を持つ。
+  **誰も読まずに確定した 予約 は、常に店主が署名した文まで辿れる**
+- `admit` は**失敗した境界を全部**返す（最初の 1 つではない）。1 つで拒否には
+  足りるが、電話の相手への答えには足りない ——『営業時間外です』と『その卓は
+  埋まっています』は次の質問が違う
+
+## 電話の同意は attested であって署名ではない（denwaban G9）
+
+yotei の G8 は member DID 署名の同意を求める。電話の相手は DID も passkey も
+持たない。選択肢は『電話予約を全部断る』か『弱いものを認める』かで、後者が安全
+なのは**後から強い方として読まれ得ないとき**だけである。
+
+`denwaban.consent` は同意を **attested**（署名ではない）として記録し、
+`consentKind` を 予約 に刻む。刻印は 予約 の一生ついて回るので、下流の誰も
+この仕組みを知らずに『DID 署名の同意ではない』と分かる。
+
+**録音は載せない。** G1 は通話が既定で transient だと言っており、録音を運ぶ
+attestation は 予約 のたびに一般人の音声記録を残す。運ぶのは『同意が与えられた
+こと・時刻・どの文に対してか』であって、与えた声ではない。
+
+## 会話 — モデルは何も決めない
+
+`denwaban.uketsuke`。「明日の 7 時に 4 人で」から事実を取り出すのは言語モデルの
+仕事である。**その事実が 予約 になるかを決めるのは違う** —— 席数と営業時間と
+署名された封筒に対する算術であり、governor が計算し直して同じ答えを得られねば
+ならない。
+
+したがって抽出（`:extract`、production は KotobaLLM = G4、テストは fixture）
+より後ろは全部 pure。モデルは『これは予約してよいか』を一度も見ない。
+
+- **聞いていない事実を推測しない。** 人数が無ければ訊く。2 名と仮定しない
+- **順序は人数が先。** 人数がどの時間帯が存在するかを決めるので、先に時間を
+  訊くと次の答えで消える時間を提示することになる
+- **確定できないなら details を集めない**（G10）。封筒が期限切れ、または署名を
+  検証できないときは、折り返しで終わり、そう伝える。行えない行為のために
+  個人情報を取るのは、ただの収集である
+
+## G7 の位置が変わった（何も緩めていない）
+
+以前は `run-session` が丸ごと raise していて、それは正直だった —— 受話器を人間が
+取っても 予約 にはならなかった。いま `run-call` は**渡された**チャネルの上で
+会話を最後まで走らせ、`run-session`（チャネルを**開く**方）だけが G7 を見る。
+
+公衆に届くのは『開ける』行為である。残りはテストでも operator のソフトフォンでも
+実回線でも同じ算術で、`run-call` を live 回線に対して呼べる者は、**既に問題の
+ゲートを通っている**。
+
+`:actor/status` の 1 語は、この変化を両方向に隠していた（『R0 scaffold』は動く
+ものを過小に、それ以上の語は出られない電話を過大に言う）。能力ごとに
+`:actor/reach` で記録する形に変えた。
+
+## 検証 — 落ちることを確かめた
+
+| suite | 結果 |
+|---|---|
+| yotei | 170 tests / 540 assertions |
+| koe | 49 tests / 129 assertions |
+| com-whisper | 13 tests / 62 assertions |
+| denwaban | 98 tests / 323 assertions |
+| isic-561 | 23/23（nbb） |
+
+変異で discriminate を実測した（壊したものと報告されたものが一致することも確認）:
+
+- `(true? verified?)` を truthy に緩める → *unevaluated-signature* だけが落ちる
+- 封筒に無い卓を通す → *signed-room* だけが落ちる
+- propose が封筒の席時間を無視 → end-to-end 通話テストが落ちる
+- 委譲せず確定を捏造 → **期限切れ封筒のテスト**が落ちる（捏造なら期限切れでも
+  予約 が取れてしまうため、これが正しい信号）
+- 署名の無い『確定』を受け入れる → isic-561 の当該テストだけが落ちる
+
+**同意の門が 2 枚あり、end-to-end テストはそのどちらも証明していなかった。**
+片方ずつ外しても、もう片方が捕まえるので suite は緑のままだった（推測ではなく
+実測）。多層防御は層ごとにテストが要る —— さもないと『たまたま発火した層』に
+ついての証拠にしかならない。いまは層ごとに 1 本ずつある。
+
+## まだ電話は鳴らない —— 残っているもの
+
+正直に言って、この ADR が実装したのは『会話 → 席 → 確定した 予約』であって
+『電話が鳴る』ではない。残りは 3 つで、**どれも技術的な難所ではない**:
+
+1. **telephony provider の実接続**（Twilio / Telnyx / Vonage いずれか）。
+   provider-neutral な `koe.ports/ITelephony` と fail-closed admission
+   （`denwaban.transport`）は在る。要るのは**アカウント・電話番号・課金**で、
+   これは安全床①②（認証情報を自分でフォーム入力しない・資金を動かさない）に
+   触れるのでオーナーの手が要る
+2. **G7 を開ける決定**（Council Lv6+ と named operator と明示フラグ）。
+   `g7-open?` は 3 つとも値で検査する（truthy では開かない）
+3. **yotei worker の JSON 経路**。現在の Worker の公開面は HTML フォーム
+   （`step=select` / `step=propose`）と owner の `POST /confirm/<id>` だけで、
+   受付が話せる JSON API が無い。いまは in-process client（同じ判断コード、
+   ネットワーク無し）で通しており、これは単一店舗のデプロイには実用だが、
+   `app.itonami.cloud/yotei` 経由にするなら route を足す必要がある
+
+## 実測した別の問題（この作業の範囲外・要対応）
+
+**`app.itonami.cloud` が全部 404 を返している。** yotei の CLAUDE.md は
+`https://app.itonami.cloud/yotei/c/<calendar>` を ✅ live と記録しているが、
+2026-08-15 の実測では `/yotei/c/jun` も `/yotei/` も**ルート `/` も** 404。
+Worker はデプロイ済みでもルーティングが生きていない可能性が高い。yotei の
+公開面はこの ADR の経路の外側だが、『実際に使える』の一部なので記録しておく。
+
+
+## global 前提での追記（2026-08-15、オーナー指示「global でやりたい、最初は転送で ok」）
+
+対象を日本 1 国から global に広げ、初期展開を**店の既存回線からの転送**にする、と
+決めた。**この 2 つの前提が、上の設計のうち 2 箇所を静かに壊す**ことが分かったので、
+封筒に署名が始まる前に直した。どちらも「動いているように見えて間違う」型である。
+
+### 壊れ 1 — 封筒が offset に署名していた（zone ではなく）
+
+日本には DST が無いので `tz=540` は永久に正しく、**誤りが観測できなかった**。
+パリの店で `tz=60` に署名すると、営業時間の記述は半年だけ正しい。しかも `admit` は
+その封筒に対して**再導出する**ので、残り半分は**署名付きで強制される**。
+
+被害は「1 時間ずれる」ではない。1 時間の誤差は**全ての instant を席のグリッド
+（17:30 / 19:00 / 20:30）から外す**ので、客が望む席は拒否され、その 1 時間隣の
+「席ではない時刻」が代わりに確定する。両方向をテストにした。
+
+offset は店の性質ではなく **zone の、その日付における性質**である。したがって
+封筒は **zone に署名**し、`:yotei/offset-at` を注入して**その 予約 の instant で
+解決**する（host は `Intl.DateTimeFormat` / `ZoneId` を持つ。clock も tz DB も持たない
+純 `.cljc` は持たないし、持つふりをすべきでない）。これは `now-epoch-min` と同じ
+信頼クラスであって新しい露出ではない。委譲していないのは**店主が署名した zone**
+そのものである。解決できなければ `:timezone-unresolved` で**拒否**し、UTC に
+落とさない —— 東京の店で 19:00 を「閉店」、04:00 を「営業中」と答えるのは、
+「分からなかった」が真の答えである場面での自信のある誤答である。
+
+**先にやった理由**: この項目は**署名される文の中**にある。封筒が実在してから
+直すと、全部を署名し直すことになる。
+
+### 壊れ 2 — 転送で入ると発信者番号が店自身の番号になりうる
+
+転送された通話で提示される発信者番号は、その事業者が Diversion / P-Asserted-Identity /
+Remote-Party-ID で元の発信者を渡すかどうかに依存し、**事業者と国によって違う**。
+保証は無い。そして最初のテストは直接ダイヤルで通るので、**そこでは必ず動く**。
+
+`uketsuke` は連絡先を「既に手にある事実」として扱い、**だから訊かない**。したがって
+転送通話では**店の番号を客への連絡先として封をし**、それを全予約で、確信を持って、
+一度も訊かずに行う —— 予約 は完全に整って見えたまま、**誰も連絡できない客のために
+卓が押さえられる**。**間違った事実は、欠けている事実より悪い。**
+
+`denwaban.arrival` を足し、番号は**出自が「発信者のもの」と言うときだけ**事実になる
+（`:network-caller` のみ。allowlist なので、まだ誰も考えていない出自は使えない側に
+倒れる）。**転送元と一致する番号は、事業者が何と label しようと発信者ではない。**
+使えないときは `:contact` が単に不在になり、通常の slot-filling が訊く。
+
+### 言語
+
+返答は日本語定数だった。特に同意文が問題で、G9 は**特定の文**への同意を attest する。
+**話者が解さない文への同意は同意ではない。** 文を locale ごとに持ち、attestation に
+**どの文を言ったか**を記録し、**同意文の無い locale は fallback せず拒否**する
+（言われていない文に同意したと記録するのは、起きていないことの attestation である）。
+
+**方針と文言は別の map にした。** locale ごとに 1 つの map にすると `:escalate?` を
+翻訳のたびに言い直すことになり、最初の誤訳が「期限切れの封筒で予約を取り続ける言語」
+になる。方針は 1 つ、言語は言い回しだけを持つ。
+
+### 層ごとの検査（同意の門で学んだこと）
+
+zone は **propose と confirm の 2 箇所**で検査される。両方あるので、**片方を外しても
+通話レベルのテストは緑のまま**である（同意の門で実測した通り）。propose 側は denwaban に、
+confirm 側は yotei に、**それぞれ独立したテストを置いた**。
+
+### まだ手をつけていない global 課題（正直に）
+
+- **`cloud.itonami.app.authority.voice` の allowlist**。空の allowlist は「全部拒否」で、
+  これは正しい既定である。しかし飲食店の公開回線では**全ての発信者が未知**なので、
+  「公開回線」を**明示的に宣言する**経路が要る。黙って許可的にするのは最悪の直し方
+  なので、これはポリシー判断としてオーナーに残す
+- **番号の規制要件は国ごとに違う**（日本は Regulatory Bundle と 2 営業日の審査）。
+  転送前提なら各国で**地理番号である必要は無い**が、**その国の番号**ではある必要が
+  ある（国際転送は店側の通話料が跳ねる）
+- **転送通話料は店の負担**で従量。固定費だけで読みたいなら予約専用番号を告知する方が安定する
+- **GDPR 等での controller / processor の切り分け**。録音しない（G1 transient）ことと
+  連絡先が店主の鍵でしか開かないことは有利に働くが、**書けば済む話ではない**ので
+  法務判断が要る
+
+### コストの実測（2026-08-15、global 前提）
+
+限界費用の支配項は STT+LLM+TTS ではなく**回線だけ**である（murakumo が推論を持つため）。
+3 分の予約通話 1 本で **$0.042 ≈ ¥6**（着信 $0.010/分 + Twilio Media Streams $0.004/分）。
+
+| | 月額/番号 | 着信 | 自前 STT へ流す |
+|---|---|---|---|
+| Twilio 050 | $4.75 | $0.0100/分 | Media Streams **+$0.0040/分** |
+| Twilio 0ABJ | $20.00 | $0.0100/分 | 同上 |
+| Telnyx local | **$1〜$5** | $0.002/分 + SIP trunk | SIP 直結（この項目が無い） |
+
+**global では固定費が効く。** 番号は店ごと・国ごとに 1 本なので、$4.75 と $1 の差は
+店舗数だけ効く。Telnyx が有力だが**日本 inbound の実レートが公開ページから取れず**
+（価格表 PDF が要る）、断定していない。**最初の一手は「一番安い」ではなく
+「一番早く実測できる」を採る** —— `koe.ports/ITelephony` が provider-neutral で
+`denwaban.transport` に admission があるので、乗り換えコストが構造的に低い。
+
+
+## closing（2026-08-15）— 現在地と、Kotoba で実装する場合の不足
+
+### 動くもの / 動かないもの
+
+**動く**: 着信 webhook（署名検証込み）→ 応答文書 → メディア WS 接続 → フレーム受信 →
+発話の区切り → ローカル STT → 決定論抽出 → 対話 → 席の割当 → 封筒による認可 →
+確定した 予約 → 事前レンダ音声の返送。**socket は実ポートを開いてテスト済み。**
+
+**動かない**: 電話が鳴ること。**残っているのはキャリア契約だけ**（アカウント・番号・
+支払い・本人確認。安全床①②によりオーナーの手が要る）と、fleet への配備
+（whisper-server 常駐化 + `clojure -M:media` を公開 ingress に載せる）。
+
+### 応答遅延（実測、合成音声に対する上限値）
+
+| 段 | 前 | 今 |
+|---|---|---|
+| STT | 1.45 s | **0.90 s**（whisper 常駐化） |
+| 抽出 | ~10 s | **~0 s**（`kikitori`。モデルは fallback） |
+| TTS | 0.65–1.14 s | **0.02 s**（`serifu` 事前レンダ） |
+| **合計** | **12.6 s** | **~0.95 s** |
+
+**0.92 s の STT が底である。** whisper 内部は encode 1005 ms / decode 67 ms で、
+処理時間は音声長に依らず一定（30 秒窓）。encoder を削る 4 手（small / medium /
+`-ac 768` / q5_0）を測り、**4 手とも「六名」= 人数を落とした**（q5_0 はむしろ遅い）。
+人数は卓を決めるので採らない。
+
+### Kotoba で実装する場合に不足しているもの（2026-08-15 実測）
+
+**まず分類する。** CLAUDE.md の規則どおり「恒久の安全設計」と「backend 未達」を
+混ぜない。前者を後者と誤ると自己制限が残り続け、後者を前者と誤ると要らない
+capability を作る。
+
+**capability kit は 9 つ**（`compiler/resources/kotoba/lang/capability-kits/`):
+clock / http-ingress / http / llm / log / state / storage / stream-object / ui。
+**9 つとも `:reference :implemented` だが `:wasm-aot` `:native-aot` `:jit` は
+すべて `pending`** —— つまり今日 Kotoba で書けば **KIR インタプリタ（JVM ホスト）の
+上で動く**のであって、独立した native/wasm 成果物にはならない。
+
+`capability-*` の atomic authority package は **13 件中 4 件が
+`reference-implemented`**（`hash-sha256` / `random-bytes` / `data-json` /
+`clock-monotonic`）、残り 9 件が `contract-only`。
+
+> **訂正（同日）。** この節は最初「実測したものがすべて contract-only」と書いた。
+> **誤りである。** `capability-hash-sha256` は wasm core provider（`sha256_hex`、
+> host ABI `(i32 i32 i32 i32) → i32`）と JVM 参照実装を持つ
+> `reference-implemented` で、私の grep が `` `backtick` `` を期待して
+> `**bold**` を取り落としていた。測り方が答えを決めた例なので残す。
+
+### 実測しなおした結果 —— 不足は capability でも言語機能でもなかった
+
+**base64 と HMAC は capability ではない。** どちらも純関数で、権限を要さない。
+Kotoba は capability を「世界に影響する権限」に使うのだから、純粋な計算に
+capability を付けるのは言語のモデルに反する。
+
+> **訂正（同日、2 度目）。** この節は一度「shift の lowering が 4 バックエンド
+> 全部に無いので base64 は書けない」と書いた。**誤りである。**
+> 私が試したのは Clojure の演算名（`bit-shift-left`）で、Kotoba の名前は
+> `i64-shift-left` / `i64-shift-right` / `u64-shift-right` である
+> （`frontend.cljc:119` の `i64-operations`）。**正しい名前では 4 バックエンド
+> 全部で通る。** authority の `:admitted-builtins` を読んだのも外し方で、あれは
+> memory ABI であって source surface ではない。
+>
+> **同じ形の誤りをこのセッションで 4 回やった** —— Twilio のテストベクタ、
+> epoch-day 定数、WAV ヘッダ長、そしてこれ。**共通しているのは「実物に当てる前に
+> 別のものを読んで結論した」こと。** コンパイルすれば 1 回で分かった。
+
+### 実際に測った結果（`kotoba-lang/compiler` d3443d96 に conformance kit として landed）
+
+```
+                                       wasm32  cljs  x86_64  aarch64
+bit-and / bit-or / bit-xor / bit-not      OK    OK      OK      OK
+i64-shift-left / -right / u64-shift-right OK    OK      OK      OK
+i32 shifts                                OK     ✗      OK      OK   (cljs は別 profile)
+```
+
+**バイト容器は `:vector-i64`**（`vector-count` / `vector-at` / `vector-conj` /
+`vector-assoc` / `vector-drop`）。`:bytes` 型は存在するが `bytes-empty` しか
+持たないので**実質使えない** —— 空しか作れない。
+
+**base64 を実際に Kotoba で書き、RFC 4648 §10 のベクタ 9 件で検証した。**
+空文字列・1〜6 バイトの全ケースを含み、パディング
+0/1/2 個の三通りすべて一致。conformance kit `:base64-kit` として登録済み
+（61/61 dual-backend、golden 再生成済み、変異 3 種で discriminate を実測）。
+
+> kit も 2 度書いた。最初の版は 6 バイト（= 2 group ちょうど）だけを
+> 符号化して「base64 が動く」と主張していた。**パディングの分岐が一度も実行されず**、
+> パディング文字を `'='` から `'A'` に変えても緑のままだった。いまは 6/5/4 バイトを
+> 通す。**canonical なベクタが canonicalization を試していない**のは、今日の
+> Twilio 署名テストと同じ形である。
+
+### 不足の一覧 —— 全部塞いだ（2026-08-15、closing 時点）
+
+| | 状態 |
+|---|---|
+| **双方向 stream ingress** | ✅ **landed**。capability 2 つ（`:stream/accept` 25 / `:stream/send` 26）+ 参照 provider + kit + **guest 実行の証明** |
+| base64 | ✅ **書けることを証明**（`:base64-kit`、RFC 4648 の全パディングケース）。stdlib 収録は `:frozen` の governed 手続きなので別件 |
+| ~~shift の lowering~~ | 不要だった（名前が違っただけ） |
+| ~~hash/HMAC kit~~ | 不要（sha256 は provider 実装済み、HMAC はその上の純粋な構成） |
+| process / exec | **足さない**。ambient authority そのもので、Kotoba が拒否している当のもの |
+
+**stream ingress の設計判断 2 つ:**
+
+- **capability を 2 つに分けた。** ストリームを聞いてよい guest が、そこに話して
+  よいわけではない。`:stream/transact` 1 つでは、聞く受付と話す受付が同じ許可に
+  なる。accept だけを admit した policy の下で send を呼ぶと **`capability denied`
+  で実際に止まる**（instantiate ではなく**呼んだ瞬間**。実測した場所にテストを置いた）
+- **満杯のキューはストリームを閉じる。フレームは捨てない。** 捨てられた音声フレームは
+  プログラムには何も起きていないように見え、**電話の相手にだけ聞こえる**故障である。
+  シーケンス番号も同じ理由で、欠番が無ければ**取りこぼしの多い回線と静かな回線が
+  同じ観測**になる
+
+**`:reference :implemented` は実行して主張した。** ソースからコンパイルした guest が、
+cap 25/26 だけを admit する policy の下で reference runtime 経由で provider に届き、
+`:opened` → `:frame` をペイロード込みで受け、フレームを送り、host がそれを見る。
+kit の宣言と provider の実装が一致することもテストが押さえている（overflow 方針と
+wire id を動かすと落ちる）。
+
+### したがって、いま Kotoba に移せるもの / 移せないもの
+
+**移せる（決定核。今日 KIR で動く）**:
+
+- `koe.media` の区切り判定 —— フレーム列に対する算術。μ-law 復号も整数演算
+- `koe.bridge` —— fold そのもの。I/O を返すだけで実行しない設計が既に Kotoba 向き
+- `denwaban.kikitori` の数詞・時刻の解釈 —— ただし**正規表現に依存している**ので、
+  移行前に「走査をやめて宣言データにする」設計変更が要る（CLAUDE.md の
+  「正規表現でテキストを走査して構造を得る設計は、移行ではなく設計変更を先に」）
+- `yotei.delegation/admit` —— 封筒に対する再導出。純粋な比較の集合
+- `yotei.seat` —— 席数と重なりの計算
+
+**移せない（ホスト側の機構のまま）**: socket、process 起動、ファイル I/O、
+WebCrypto。これは Kotoba の弱点ではなく**境界の置き方**である。
+
+**注意**: どれを足しても `:native-aot :pending` は変わらない。
+「Kotoba で書ける」と「Kotoba だけで配れる」は別の到達点である。
+
+### 次に着手するときの最初のコマンド
+
+```bash
+# 予約の経路が壊れていないこと（3 repo）
+cd orgs/cloud-itonami/yotei    && clojure -M:test      # 170 tests
+cd orgs/cloud-itonami/denwaban && clojure -M:test      # 98 tests（socket 込み）
+cd orgs/kotoba-lang/koe        && clojure -M:test      # 49 tests
+
+# fleet 側の STT（levi に常駐させる）
+ssh levi 'nohup whisper-server -m ~/.whisper/models/ggml-large-v3-turbo.bin --host 127.0.0.1 --port 8178 -l ja -t 4 &'
+
+# 台詞を書き出してから socket を上げる
+cd orgs/cloud-itonami/denwaban && clojure -M:serifu resources/serifu && clojure -M:media 1344
+```
+
+## 代替案として退けたもの
+
+- **容量を yotei の `is-free?` に足す**（1 予約 が席数を持つ）。G4 の定義そのものを
+  書き換えることになり、監査済みの不変条件を触る。卓 = カレンダーなら不変条件は
+  無改変のまま容量が出る
+- **`kotoba-lang/reservation` の bucket を空き計算に使う。** hold / 認可済み
+  overbooking / 料金は正しくこのライブラリのものだが、**空きの正本を 2 つ**
+  作ってしまう。飲食店の 予約 に料金計算は要らないので、今回は使っていない
+  （席と料金が両方要る vertical——宿泊・交通——では逆に使うべき）
+- **電話では仮予約にして店が承認する。** 正直だが『自動受付』にならない。
+  封筒の**外側**（大人数・営業時間外・期限切れ）ではこれが正しい振る舞いなので、
+  エスカレーション経路として残してある
+- **受付にサーバ鍵を持たせる。** 境界の無いサーバ鍵は G5 の否定そのもの"}]

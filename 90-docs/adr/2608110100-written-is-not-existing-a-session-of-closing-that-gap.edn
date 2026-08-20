@@ -1,0 +1,152 @@
+[{:db/id -1
+  :adr/id "ADR-2608110100"
+  :adr/title "「書いてある」は「在る」ではない — cljc→.kotoba 移行から始まり identity 面の 5 件の虚偽を直したセッションの総括"
+  :adr/status "accepted"
+  :adr/date "2026-08-11"
+  :adr/last_verified "2026-08-11"
+  :adr/supersedes ""
+  :adr/context
+  "オーナー指示は 2 段階だった。①「今の kotoba-lang の semi, compiler などの最新の
+   成熟度は?」②「cljc, cljs から .kotoba への refactor はもう進められる?」→「進め」。
+   途中で「defcid などでちゃんと canonical cid になっている?」が入り、そこから
+   identity 面の調査に分岐した。
+
+   結果として **2 つの独立した仕事**になった:
+
+   - **W6 移行**: jp-go-dds を 6 スライス（bridge / dark-mirror / dark-declarations /
+     button / components / select-banner）
+   - **identity 面の是正**: 同じ形の虚偽が 5 件見つかり、全て直した
+
+   個別の記録は ADR-2608100300（jp-go-dds）/ 2608100400（DefCID と CLI）/
+   2608100500（ABI の cid? と下流移行）にある。**この ADR はその 3 本を束ね、
+   共通する 1 つの形と、私自身が繰り返した誤りを記録する。**"
+
+  :adr/decision
+  "## 見つかった 1 つの形 — 「書いてある」は「在る」ではない
+
+   独立に見えた 5 件は同じ構図だった。**宣言・名前・配置が実態を保証していない。**
+
+   | # | 何が嘘をついていたか | 直し方 |
+   |---|---|---|
+   | 1 | `:test-definition-cid` が **sha2-256** だった（守るテスト自身が `#\"[0-9a-f]{64}\"` を assert） | `:test-kir-sha256` に改名（amu `3b45ae1`） |
+   | 2 | `:contract-versions` が『identity に封印される』と書きながら、**写した数字を誰も突き合わせていなかった** → 1 軸に 4 / 5 / 6 の 3 数字、identity に入るのは最も古い 4 | drift 検査を追加、authority と一致させた（kotoba-lang `5b69f51`） |
+   | 3 | `:identities` の 2 entry が **`:status` を持たず**、「何を証明するか」だけ書いていた | 全 entry に `:status` を強制（kotoba-lang `41969a0`） |
+   | 4 | **BuildCID** が、計算されている 3 つと並べて書かれていた（producer も consumer も無い） | ADR 2 本を実態に合わせた（amu `c12ffdc` / kotoba-kir `4a5368e`） |
+   | 5 | `version-policy.edn` が **写しの場所に写しの名前で置かれた別スキーマの別ファイル**（4 つ目の profile 宣言、誰も読まない） | 削除（amu `f9f12a5`） |
+
+   さらに 2 件、**判定が緩くて嘘を通していた**:
+
+   - **ABI の `cid?` が `#\"b.+\"`** だった。`\"banana\"` が通る。公開 conformance
+     vector 自身が `\"bafyportablehostcontract\"` を identity として配っていた
+     （abi `32ee84b` で復号する判定に。旧 regex に戻すと 7 failures）
+   - **`definition-error` が `:kir` に `map?` しか要求していなかった。** compiler の
+     function map を渡すと **CID が返ってきた** —— canonical に見えて他の誰も
+     生成しない形を封印した CID（kotoba-kir `e24eea5` で `:op` 必須に。外すと
+     5 failures + 4 errors）
+
+   ## 下流まで届かせた
+
+   強化した述語が pin の向こうで効いていない状態を解消。**5 consumer 全て**で
+   pin を進め、fixture を実 CID に替え、1 件を偽に戻して落ちることを確認:
+   code-graph `9a30ab0` / kotobase `cd19cbb` / aiueos `3dea605` / kototama
+   `88f42f5` / amu `2644eb9`。
+
+   実測で分かったこと: **122 件の CID 風文字列のうち `cid?` を通るのは一部**
+   （kotobase 34→24、amu 16→**1**）。**数えるより pin を進めて失敗を読む方が正確**
+   だった。aiueos の 12 失敗のうち 8 件は CID ではなく **TCB inventory / SBOM の
+   供給網ゲート**で、dep の SHA を変えた以上それは設計どおりの反応だった。
+
+   ## 写しを検査する側も直した
+
+   `vendor-drift` は guest-grammar しか見ておらず、**kotoba-sema の写し（sema は
+   今や frontend の所有者）・capability-catalog・host-parity が未検査**だった。
+   registry 化（kotoba-lang `34977d9`）。実際に腐っていたのは**検査していない方**で、
+   kotoba の host-parity は 4,054 バイト・7-18 のまま authority は 23,338 バイト・
+   7-31 —— カタログの 6 分の 5 が存在しない版を読んでいた（kotoba `f4fb351` /
+   grammar `01ec195` で再 vendor）。"
+
+  :adr/consequences
+  "## W6 移行（jp-go-dds、6 スライス）
+
+   | slice | commit | 中身 |
+   |---|---|---|
+   | 1 | `38b8a8e` | `--hig-*` bridge の決定核（正規化・breakout guard・除外・content identity） |
+   | 2 | `d59e60e` | dark ramp の鏡映 `i → n-1-i` |
+   | 3 | `bf9d067` | palette を宣言データ化し、dark の 3 宣言セットを載せた |
+   | 4 | `16a86aa` | button の属性決定 |
+   | 5 | `5fc7fa2` | 残り 7 component |
+   | 6 | `e526073` | select の option 状態と banner の icon 表 |
+
+   最終 **85 tests / 1,753 assertions（JVM）+ 46 / 1,460（nbb）**、全スライスで
+   mutation 確認済み。consumer API は 1 つも変えていない。
+
+   ### 実測した恒久制約と一時制約の区別
+
+   - **恒久**: document container 32 / node 256（71 件の bridge は 1 値に入らない）、
+     関数引数 5（`:intentional-security-constraint`）
+   - **一時**: string 述語が `:i64`（下記で解消）、native の word 型 gate
+   - **サイズは理由ではなかった**: `dds.css` は 72,114 バイトで string 上限超だが
+     `:root` は 8,617 で収まる。走査を移せないのは**正規表現だから**
+
+   ## 進め方として効いたもの
+
+   1. **判断だけ切る** —— markup でも走査でも rendering でもなく、既定値・分岐・
+      優先順位・規則。切る単位が『判断』のとき parity gate が自然に書ける
+   2. **走査は移さず、先に宣言データにする**
+   3. **前提は実データに対して assert する**（scrim の綴り・white が ramp base で
+      ないこと・ramp が 32 に収まること）
+   4. **gate は壊して落ちることを見てから landed とする** —— 全スライス・全是正で実施
+
+   ## 私が繰り返した誤り（記録として残す）
+
+   **同じ種類の誤りを 5 回した。全て『不在の証明に弱い証拠を使った』。**
+
+   | 回 | 誤り | 実際 |
+   |---|---|---|
+   | 1 | `grep desugar-contract-version` が空 →『生成側が無い』 | `:contract-versions {:desugar-contract 1}` として存在 |
+   | 2 | 同上の綴り検索で profile-version も『出典が無い』 | 同じ map に `:language-profile` |
+   | 3-4 | **stale なローカル checkout を authority として測った**（vendor drift、2 回） | 6 commit 古く、drift が二転三転 |
+   | 5 | `amu` の README を stale checkout で読み『名乗っていない』 | origin/main は `# Amu`、concept-vocabulary も登録済み |
+
+   **どれも `git show origin/main:<path>` を使えば起きない。** CLAUDE.md の
+   「『無い』と結論する前に索引を引く」は repo の不在について書かれているが、
+   **同じ誤りがフィールド名でも、比較の基準点でも起きる**。
+
+   皮肉なことに、このセッションで入れた仕組み（authority と写しを突き合わせる
+   registry、写した数字の drift 検査）は、**私自身が繰り返した誤りの構造そのもの**
+   —— 基準点を確かめずに『一致している / していない』を言うと、どちらが本物か
+   分からなくなる。"
+
+  :adr/next
+  "## 半分だけ着地している 1 件
+
+   **string 述語 `:bool` 化** —— 言語側 landed（kotoba-sema `171e23f`、profile 6 に
+   入れた）、**amu の移行が未了**（8 failures + 5 errors、一覧は ADR-2608100500）。
+   amu は旧 pin のままなので**今日赤いものは無い**。golden digest を理解せずに
+   再生成しないこと —— それはこの ADR が直してきた形の同型。
+
+   ## オーナー判断が残っているもの
+
+   - `version-policy :release/language-profile` 5 → 6（**上の amu 移行完了後**。
+     profile 6 に中身が入ってから宣言する順序）
+   - `select` を `button` に揃える（ライブラリが勝つ向きへ。独立・小）
+
+   ## 設計が先に要るもの
+
+   - **`defcid`**: typed KIR の producer が無い。compiler の `:body` は生フォーム
+     `(+ a b)`、`{:op …}` は手書き fixture にしか存在しない。lowering の設計
+   - `resolve-dark`（走査結果の上のグラフ探索）/ `root-css`（入力の取り方から）
+
+   ## 機械的に残っているもの
+
+   - jp-go-dds の `skin.cljc`(145) / `css.cljc`(81) / `table`
+   - kototama の既存 6 failures（`browser.cljc` の digest drift 等。私は触っていない）"
+
+  :adr/references
+  "ADR-2608100300 (jp-go-dds の 6 スライス、実測した制約) /
+   ADR-2608100400 (DefCID は canonical だが CLI に出ない、typed KIR の不在) /
+   ADR-2608100500 (ABI の cid? と 5 consumer の移行、string 述語) /
+   compiler ADR 0191 (profile 5 = bool-typed predicates) /
+   compiler ADR 0222 (sema と IR の repository 境界) /
+   ADR-2607279200 (Kotoba-centered migration の方向) /
+   ADR-2608650000 (『書けない』には恒久と一時の 2 種類がある)"}]

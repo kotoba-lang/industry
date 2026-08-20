@@ -1,0 +1,121 @@
+[
+;;; Iteration 23 (2026-07-26). ADR-2607257200.
+;;; Infrastructure- and resource-owning community forms that earlier passes
+;;; missed, plus two occupational diving/waste communities.
+;;; Counts llm-recall-unverified unless pinned.
+
+{:org/id :org-global-energy-cooperatives
+ :org/name "Community energy cooperatives (Burgerenergiegenossenschaften, Danish wind guilds, community solar)"
+ :org/entity-kind :org-form
+ :org/form-family :family-cooperative-enterprise
+ :org/category :cat-resource-commons
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["DE" "DK" "NL" "GB" "JP" "AU"]
+ :org/founding-date 1980
+ :org/founding-note "Danish wind guilds in the 1980s put turbines under local ownership before utilities entered the market."
+ :org/instance-count-estimate 2000
+ :org/member-count-basis "unknown — Germany alone is commonly described as having on the order of a thousand energy cooperatives with hundreds of thousands of member-shareholders, and Denmark once had majority local ownership of its wind fleet; there is no reliable aggregate count."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Neighbours buying a wind turbine, a solar array or a heat network together and voting on how it is run — a community that owns generating plant, which places it simultaneously in civil society and in the electricity market."
+ :org/related-org "org-global-ica-cooperatives"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-community-mesh-networks
+ :org/name "Community mesh and broadband networks (Guifi.net, Freifunk, NYC Mesh, rural fibre co-ops)"
+ :org/entity-kind :org-form
+ :org/form-family :family-cooperative-enterprise
+ :org/category :cat-resource-commons
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["ES" "DE" "US" "GR" "AR" "ZA"]
+ :org/founding-date 2004
+ :org/instance-count-estimate 500
+ :org/member-count-basis "unknown — Guifi.net has published node counts in the tens of thousands and Freifunk operates thousands of access points, but nodes are not people and volunteer operators are not counted."
+ :org/legal-registration :mixed
+ :org/registration-note "Some incorporate as foundations or telecom operators to hold spectrum and peering agreements; many are unincorporated groups with a rooftop and a router."
+ :org/governance-model :meritocratic
+ :org/mission-statement "Volunteers building and operating the network itself — antennas on balconies, fibre trenched by villagers — where the community owns the infrastructure rather than buying service over someone else's."
+ :org/related-org "org-global-hackerspaces"
+ :org/related-category :cat-online
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-housing-cooperatives
+ :org/name "Housing cooperatives and Genossenschaft housing (Zurich, Vienna, HSB, 住宅生協)"
+ :org/entity-kind :org-form
+ :org/form-family :family-cooperative-enterprise
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["CH" "AT" "SE" "DE" "CA" "JP" "UY"]
+ :org/founding-date 1900
+ :org/member-count-basis "unknown in aggregate — Zurich's cooperative sector is commonly described as around a quarter of the city's housing stock and Vienna's limited-profit sector larger still, but international totals are not compiled."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Residents collectively owning their buildings through a cooperative that allocates flats by rules the members set, with rents at cost rather than at market — housing as a membership rather than a purchase."
+ :org/related-org "org-global-community-land-trusts"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-kor-haenyeo-ama
+ :org/name "Haenyeo and ama diver communities (해녀, 海女)"
+ :org/entity-kind :org-form
+ :org/form-family :family-commons-management
+ :org/category :cat-traditional
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-asia-east
+ :org/countries ["KR" "JP"]
+ :org/founding-date 1600
+ :org/founding-note "Jeju haenyeo culture was inscribed on the UNESCO intangible heritage list in 2016."
+ :org/member-count-basis "unknown but declining sharply — Jeju's haenyeo are commonly reported in the low thousands with a majority over 70, and Japanese ama in the low thousands; both are counted locally and irregularly."
+ :org/legal-registration :mixed
+ :org/registration-note "Diving rights are held through fishery cooperatives, so the economic right is registered while the diving community itself is customary."
+ :org/governance-model :consensus
+ :org/mission-statement "Women's breath-hold diving collectives that allocate harvest areas, enforce seasons and size limits, run their own bulwark (bulteok) meeting places and train successors — a female-led commons regime with an average age above 65."
+ :org/related-org "org-global-fishery-tenure"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-waste-picker-communities
+ :org/name "Waste picker cooperatives and settlements (catadores, Zabbaleen, safai karmachari collectives)"
+ :org/entity-kind :org-form
+ :org/form-family :family-labor-union
+ :org/category :cat-labor-coop
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-south-america
+ :org/countries ["BR" "EG" "IN" "CO" "ZA" "PH"]
+ :org/founding-date 1980
+ :org/member-count-basis "unknown — Brazil's catadores are commonly estimated in the hundreds of thousands with a minority in registered cooperatives; Cairo's Zabbaleen are a settled community of tens of thousands whose recycling rates exceed most municipal systems."
+ :org/legal-registration :mostly-unregistered
+ :org/registration-note "Cooperatives register in order to win municipal collection contracts, which is often the only route from criminalized scavenging to recognized work."
+ :org/governance-model :democratic
+ :org/mission-statement "Communities that live from and sort the city's discards, organizing into cooperatives to hold contracts, set prices against middlemen and resist eviction — recycling infrastructure owned by the people the city classifies as its poorest."
+ :org/related-org "org-global-streetnet-homenet"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-cleanup-adoption-groups
+ :org/name "Volunteer cleanup and adoption groups (Adopt-a-Highway, 河川愛護会, beach cleans, Clean Up the World)"
+ :org/entity-kind :org-form
+ :org/form-family :family-gift-and-sharing
+ :org/category :cat-resource-commons
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "JP" "AU" "GB" "IN" "PH"]
+ :org/founding-date 1985
+ :org/member-count-basis "unknown — adoption programmes register the group that adopts a stretch of road or river, but participation is per-event and uncounted; Clean Up the World has claimed tens of millions of participants annually across affiliated events."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Groups that formally adopt a stretch of road, river or beach and clean it on a schedule — the smallest unit of stewardship over public space, and one of the few community forms a public authority actively recruits."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+]

@@ -1,0 +1,85 @@
+[{:db/id -1
+  :adr/id "ADR-2608196700"
+  :adr/title "30 of 76 vendored-copy findings came from reading `app.cljc` as a namespace"
+  :adr/status "accepted"
+  :adr/date "2026-08-19"
+  :adr/tags "detectors false-positives vendored-copies regex co-scientist"
+  :adr/body
+  "## How this started
+
+The SessionStart hook reported **58 NEW** vendored-copy findings in one tick. A
+mass-NEW burst usually means the detector's view changed, not the world, so it was
+worth reading before acting.
+
+It was neither. The detector had only run twice, four days apart, and 58 was
+simply the difference. But reading the findings turned up something else: **37 of
+76 said `library repo not checked out here -- provenance unverifiable`**, and the
+first ones pointed at `.wt-run/`, `.cloud-itonami-app-adopt/` and
+`cloud-itonami-app/data/agent-worktrees/session-.../` -- agent worktrees. That
+hypothesis was also wrong: only **3** of the 37 were worktree artifacts. Measuring
+twice cost two commands and saved a wrong fix each time.
+
+## The actual defect
+
+`verify-vendored-copies` deliberately parses **prose obligations** -- *keep in sync
+with*, *mirror of*, *1:1 port of*, *Faithful port of* -- because (its own comment)
+*31 files declare an obligation nothing was checking*. The target is matched with:
+
+    #\"(?:...|[Ff]aithful port of|...)\\s+`?([a-z][a-zA-Z0-9_-]*(?:\\.[a-z][a-zA-Z0-9_-]*)+)`?\"
+
+**`app.cljc` matches that shape exactly**: lowercase segments joined by a dot. So
+*\"Faithful port of app.cljc's b2 read helpers\"* was read as the namespace
+`app.cljc`, converted to the path `app/cljc.cljc`, found in no repo, and reported
+as a missing checkout -- sending the reader to run `west update` for a repo that
+was never missing.
+
+Measured across the tree: **30 of the detector's 76 findings (39%)** were this,
+from two names -- `app.cljc` (net-kotobase gateway ports) and `policy.kotoba`.
+
+## Change
+
+A trailing segment from a set of source extensions (`clj cljs cljc edn kotoba js
+ts …`) makes the name a file, not a namespace. Those become their own finding:
+
+    warn  file-target:<path>   declares a sync obligation against `app.cljc`, which is a
+                               FILE NAME, not a namespace -- nothing can resolve which
+                               repo's app.cljc is meant. The obligation is real and
+                               unchecked; name the namespace (or add a VENDORED header)
+                               to make it checkable
+
+**The obligation is not dropped.** It is real and nothing checks it; what changes
+is that the finding now says something a reader can act on, and stops claiming a
+repo is missing.
+
+    before   2 pin-dishonest, 37 stale, 37 unresolved  (all fail)
+    after    2 pin-dishonest, 37 stale,  7 unresolved  (fail)
+                                        30 file-target (warn)
+
+The summary line splits the same way, so `37 UNRESOLVED` no longer folds
+*could not find* together with *cannot be resolved by construction*.
+
+## Both directions, in an isolated sandbox
+
+Two copies of one file, differing only in what their header names:
+
+    header says `foo.core`  (a real namespace, upstream committed in a git repo)
+      old: stale, drift vs HEAD: 2 line(s)      new: identical -- unaffected
+    header says `app.cljc`  (a file name)
+      old: fail  unresolved: library repo not checked out here
+      new: warn  file-target: ... is a FILE NAME, not a namespace
+
+## Expect churn, once
+
+Thirty findings change key (`unresolved:<path>` -> `file-target:<path>`), so the
+next tick will report **30 RESOLVED and 30 NEW**. Nothing regressed and nothing was
+fixed by it: the same 30 files, re-diagnosed. Recorded here so the burst is not
+read as an event.
+
+## Where this leaves the detector
+
+The 7 remaining `unresolved` are genuine -- a named library that is not checked
+out, where `west update --fetch smart <name>` is the right action. The 37 `stale`
+are unexamined by this ADR. Vendored copies of `kotoba/datom.cljc` exist in four
+repos (`com-etzhayyim-kotoba-datom`, `actor-ibuki`, `tadori`, and the canonical
+`kotoba-lang/kotoba-datom`), which is the kind of thing this detector exists to
+keep visible."}]

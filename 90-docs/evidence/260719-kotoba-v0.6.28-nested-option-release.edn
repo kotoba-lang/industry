@@ -1,0 +1,37 @@
+{:schema "kotoba-installed-release-evidence/v1"
+ :recorded-on "2026-07-19"
+ :release
+ {:version "0.6.28"
+  :commit "6902fd65e4f69b8668e978e4ece92b40756ffa70"
+  :compiler-commit "3e4e46921fa80953351d0b3513e9b51d9fc566d0"
+  :native-run "https://github.com/kotoba-lang/kotoba/actions/runs/29664685259"
+  :platforms [:darwin-arm64 :darwin-amd64 :linux-amd64]
+  :status :passed}
+ :shell-install
+ {:clean-prefix true :platform :darwin-arm64 :checksum-verified true
+  :selfhost-check :passed}
+ :crdt-register
+ {:repository "kotoba-lang/crdt"
+  :pr "https://github.com/kotoba-lang/crdt/pull/2"
+  :commit "d99da793236020bcfc304f5a0a2ae12cf3905fab"
+  :profile :kotoba.crdt.register/string-v1
+  :project-digest "1b92223cc4e18da0a17a7da219f9b0c9c51e8f1d14074e376bcdf64399f520c5"
+  :web {:compile :passed :runtime-main 42
+        :artifact-sha256 "d527e43dc92ec3433c66662fa64277c0b8d28ba219cf3fb06001e7fa641c7fab"}
+  :wasm {:compile :passed :runtime-main 42 :value-abi :externref-v1
+         :artifact-sha256 "d3843685b14b3617fa09b927aeede7bcf61caab3a0acc981ab18b38df31171fd"}
+  :legacy-arbitrary-value-domain-retained true
+  :consumer-cutover false}
+ :homebrew
+ {:formula-pr "https://github.com/kotoba-lang/homebrew-kotoba/pull/38"
+  :bottle-run "https://github.com/kotoba-lang/homebrew-kotoba/actions/runs/29665017673"
+  :bottle-pr "https://github.com/kotoba-lang/homebrew-kotoba/pull/39"
+  :bottle-formula-commit "741dd1b0cb37287a61f8764b1bba230373e7ba08"
+  :platforms
+  [{:platform :arm64-sequoia :install :passed :test :passed
+    :sha256 "e2391c550bfc0f82bbc49ee332d980817480ad4b8c9d5418859421ca26143336"}
+   {:platform :sequoia :install :passed :test :passed
+    :sha256 "bfeb93ef8a148ec97b9936db0e304733343b7ba7c006cc342281aca5372fb7bd"}
+   {:platform :x86-64-linux :install :passed :test :passed
+    :sha256 "11084b4d0d6a19900ce554d1985fef7f837f1e96947fb1471bd1fd6ec3bc3531"}]
+  :status :passed}}

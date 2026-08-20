@@ -1,0 +1,96 @@
+[{:db/id -1
+  :adr/id "adr-2608540000-murakumo-waste-engine-disk-streamed-experts"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "accepted"
+  :adr/date "2026-08-03"
+  :adr/last_verified "2026-08-03"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/title "ADR-2608540000: murakumo に :engine :waste を足す — trunk 常駐 + expert を disk からストリームする単一ノード経路。律速は RAM ではなく disk で、Kimi K3 はこの fleet では container が置けない"
+  :adr/topic "murakumo-waste-engine-disk-streamed-experts"
+  :adr/repos ["orgs/com-junkawasaki/root"
+              "orgs/kotoba-lang/murakumo"]
+
+  :adr/authoritative_for
+  ["murakumo が sqliteai/waste（trunk 常駐 + expert の disk ストリーム）を第3の単一ノードエンジンとして持つという決定"
+   "waste 経路のプランナで disk を RAM より先に判定するという順序の決定"
+   "エンジンの予算解決（cap = usable - usable/8、working-set 単位の step down）を Kotoba pure core に移植して murakumo の正本とするという決定"
+   "解析値（memplan.py 移植）と実測値（waste plan --json）の優先順位と、どちらを使ったかを :floor-source で可視化するという決定"
+   "Kimi K3 を今の fleet / このローカル Mac で回せるかという問いに対する数値付きの回答"]
+
+  :adr/context
+  "オーナーからの問い（2026-08-03）: HN item 49123386（sqliteai/waste、『Run Kimi K3 using 29 GB of RAM at 0.50 tok/s』）を参考に、murakumo と kotoba で今のローカル Mac の 32 GB で Kimi K3 を infer できる設計・実装はあるか。
+
+実測した現在地: murakumo には同型の抽象が既にあった。murakumo.infer.moe（`:engine :mlx-moe`）は『1ノード・expert 部分常駐・usable RAM から cache capacity を導出』であり、infer.clj:201 は自分で `engine mlx-moe (single-node, SSD-paged experts)` と出力していた。純計算は既に Kotoba guest（kotoba/infer_moe_core.kotoba → resources/murakumo/oracle/*.kir.edn、W6/T6.4 で host mirror 削除済み）に落ちている。
+
+欠けていたのは waste adapter そのものより、**waste 経路で実際に決定要因になる disk**。fleet probe は :disk-free-bytes を infer.clj:71/99 で既に採っていた（cmd-probe が DISK-FREE 列を出す）が、それを使っていたのは schedule.cljc:54 の media モデル用 :model/min-free-bytes ゲートだけで、MoE プランナは一切見ていなかった。K3 の container は 982 GB で、毎トークンそこから expert を読む。
+
+さらに構造的な問題: 変換は 1.56 TB の公開重みに対する片道 ~5 時間の作業で、`waste plan` は**変換後の** container の manifest.json を読む。murakumo は provision の前に『どのノードか、そもそも載るか』に答える必要があるので、変換前に答えを出せる経路が要る。"
+
+  :adr/decision
+  "murakumo に `:engine :waste` を単一ノードエンジンとして追加する（child repo 側 ADR-260803-waste-engine-disk-streamed-experts.md が詳細の正本）。
+
+1. kotoba/infer_waste_core.kotoba（oracle :infer-waste、31 exports）。2つのモデルをどちらも**上流から移植する（発明しない）**:
+   - 事前 RAM floor ← waste tools/memplan.py。HuggingFace config.json だけから trunk / KDA・MLA state / scratch / 最小 expert cache を計算する。
+   - エンジン自身の予算解決 ← waste src/waste.c の waste_open。cap = usable - usable/8（12% を OS に残す）、推奨 floor + 3*working-set を working-set 単位で cap 以下まで**下げる**。cap までの端数は使わない —— それがキャッシュヒットをページフォルトに変える境界で、上流実測で 0.63 → 0.07 tok/s。
+   整数のみなので bit 幅は milli-bits（trunk 4250 / expert 2120）、Gate-5 ヒット曲線も milli 補間。capability 不要なので kotoba/pure に収まる。
+
+2. murakumo.infer.waste — config->shape / memplan / budget / throughput / verdict / plan。plan は moe/plan と同じ 2-arg 形なので infer.clj の probe-and-plan がそのまま駆動する。**候補ノードの順序は RAM より先に container が載るかで決める。**
+
+3. :saturating-budget-bytes —— expert 全体がキャッシュに載り disk が decode ループから外れる予算。エンジン自身はこれを選べない（推奨が floor + 3 working set 止まりなので、マシンより小さいモデルでは RAM を余らせたまま毎トークン disk を読み続ける）。これが『waste を手で叩く』ではなく『murakumo で計画する』ことの具体的な価値。
+
+4. 実測値は解析値に優先し、どちらを使ったかを :floor-source で出す。:model/ram-floor-bytes / :model/expert-set-bytes / :model/working-set-bytes が override。
+
+5. engine/waste-cmd + waste-serve-cmd、engine/commands の :waste。予算はバイトで渡す（parse_size が素の数値をバイトとして取る）。serve は 0.0.0.0 に bind する。
+
+6. cmd-serve-waste にはローカル経路がある（container はどこかの NVMe 上のファイル木で、それが操作者自身のマシンなら SSH ホップは無い）。
+
+7. registry に kimi-linear-48b / kimi-k3 を登録する。"
+
+  :adr/measurements
+  "予算解決は waste README の実行を厳密に再現する: 64 GB マシンで K3、cap 56.00 GB / budget 46.25 GB / cache 17.56 GB —— README の印字『no --budget, using 46.25 GB of 64.00 GB (expert cache 17.56 GB)』と一致。
+
+memplan は tools/memplan.py の印字桁で一致する（port として忠実であることの確認）:
+  Kimi-Linear-48B @ctx4096 — TRUNK 1.01 / FLOOR 1.18 / expert set 12 / working set 0.4 GiB
+  Kimi-K3 @ctx4096 — TRUNK 16.38 / FLOOR 17.51 / expert set 1344 / working set 24.0 GiB
+
+**Kimi-Linear を実際に変換して実推論した（2026-08-03、同日）。** 92 GB の公開重みを取得し、waste 0.6.3 の tools/convert.py --jobs 3 で約54分（M4）かけて変換（26 layers × 651 MB + trunk 1354 MB）、container 19,171,317,244 bytes。
+
+**訂正**: 初版で『Kimi-Linear は上流公表値と ~1% 一致』と書いたのは**単位の取り違え**だった。上流の \"1.28 GB minimum RAM\" は GiB で、比較対象にした 1.27 は decimal GB。実測との差は:
+  RAM floor    解析 1.18 GiB  vs 実測 1.28 GiB   -8%
+  expert set   解析 11.63 GiB vs 実測 16.53 GiB  -30%
+  working set  解析 0.36 GiB  vs 実測 0.54 GiB   -32%
+原因は2つ、どちらも検証可能: (1) memplan.py は expert を 2.12 bits/weight と仮定するが実際の container は 682,622,976 B/layer ÷ (256 × 3*2304*1024 params) = 3.014 bits/weight。(2) waste は embed_tokens を disk に残す（src/waste.c が resident trunk の合計から除外）のに memplan.py は数えている（ここでは 383 MB）。floor だけ 8% で済んで expert set が 30% 外れるのは、この2つの誤差が部分的に打ち消し合うため。方向も一般化しない —— K3 では RAM に低く（17.5 GiB vs 29.06 GB）disk に高く（1344 GB vs 982 GB）外れる。
+
+**saturating budget の効果を実測した**（同一 prompt / container / マシン、-n 48）:
+  2.89 GB（エンジン既定）  cache 1.65 GB  hit 78%  0.13 tok/s
+  19.08 GB（saturating）   cache 17.7 GB  hit 94%  0.44 tok/s   = 3.4x
+エンジン自身は選べない値（推奨が floor + 3 working set 止まり）から出た差。
+
+**0.44 であって上流の 10.65 でない理由は storage**。tools/diskbench 実測: 上流 M5 Pro 内蔵 12.78 GB/s / このマシン内蔵 2.89 GB/s / **container を置いた USB ボリューム 0.03 GB/s**。内蔵の空きが 15 GiB しかなく 17.9 GiB の container が置けなかったため。この1つの数字で両方の run が説明できる（既定予算 run: miss 2236 × 2.67MB ≈ 6.0GB → 30MB/s で ~199s + trunk 1.4GB、実測 378s / saturating run: 599 × 2.67MB ≈ 1.6GB → ~53s + 47s、実測 108s。どちらも ~10% 以内）。time も 193s wall に対し CPU 84 秒で「待っていただけ」を裏付ける。**このノードは2桁 storage-bound で、効く対処は予算増ではなく内蔵 SSD の空き ~3 GiB**（オーナーのデータなので記録に留め、実行しない）。
+
+既知のギャップ: Gate-5 ヒット曲線は既定予算の cache 9.3% で ~52% を予測したが実測 78%。kimi-linear 用 chat template が無く CLI が raw continuation に落ちるため出力が反復的になり expert 局所性が異常に高かった。曲線が誤りというより別 workload で測られたもので、推定値としてラベルされている。
+
+このマシン（Apple M4 / 32 GiB / macOS 26.3.1、内蔵 460 GB 中 空き 15 GiB、外付 926 GiB 中 空き 844 GiB）での結論:
+  Kimi-Linear-48B: **動く**（実推論で確認）。ただし storage が USB で 0.03 GB/s。
+  K3: **no-container-space**。982 GB の container に対し外付けの空きは 906 GB、内蔵は 15 GiB。RAM（floor 29.06 GB vs usable 29.26 GB）は紙一重で足りるが置く場所が無い。上流 README も『32 GB machine can open the model but will page heavily』と書いており 64 GB が実用最小。fleet 全体でも gad の NVMe が 466 GB で載らない。"
+
+  :adr/consequences
+  "・murakumo の infer プランナが disk を第一級の制約として持つようになった。既に採っていた :disk-free-bytes に初めて意味が付いた。
+・oracle catalog が 32 → 33 cores。
+・K3 は『未記述』ではなく『数値付きで no-container-space』になった。回すには 1 TB 級の内蔵 NVMe + 64 GB RAM のノードを 1 台立て、murakumo の既存 relay / gateway 経由で使う（これは別の調達判断であってコードの問題ではない）。
+・waste は llama.cpp / mlx-moe と同じく外部エンジンバイナリとして spawn する。C は一切書いていないので CLAUDE.md の『Rust を書かない / C は機構層のみ』に触れない。
+・throughput は disk-bound の**上限**であって予測ではない（compute が入っていない）。Gate-5 ヒット曲線は上流が Kimi-Linear batch-1 decode で実測したもので、K3 の 896-expert routing では異なりうる。"
+
+  :adr/evidence
+  ["orgs/kotoba-lang/murakumo commit c34ae751b123c873b9d5d8dfcc4e1770d5e98c19（main）"
+   "orgs/kotoba-lang/murakumo docs/adr/ADR-260803-waste-engine-disk-streamed-experts.md（Addendum 1 に実変換・実推論・訂正）"
+   "test/murakumo/infer_waste_kotoba_parity_test.clj —— .kotoba の新規コンパイルと shipped KIR 実行の host 経路の一致"
+   "test/murakumo/infer_waste_test.cljc —— 上流 golden、実測値、disk-before-RAM の順序、engine コマンド文字列"
+   "waste テスト 18 tests / 110 assertions グリーン。full suite 617 tests / 5592 assertions（残る失敗は overlay QUIC の live テストで、実行ごとに別 namespace が落ちる環境フレークであることを clean checkout と worktree の交互実行で確認済み）"
+   "実 container /Volumes/260317/waste/kimi-linear-48b.waste（19,171,317,244 bytes）と waste plan --json の出力"
+   "manifest/west.yml pin c5c3576 → 71b0d0a（33f09c9）→ c34ae75（ee37305）"]
+
+  :adr/body
+  "本文は :adr/context / :adr/decision / :adr/measurements / :adr/consequences / :adr/evidence を参照。child repo 側の docs/adr/ADR-260803-waste-engine-disk-streamed-experts.md が実装詳細の正本。"}]

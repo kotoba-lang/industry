@@ -1,0 +1,48 @@
+[{:checklist/type :m4-distribution-timeline
+  :checklist/date "2026-07-21"
+  :checklist/activation-signal "90-docs/deployment/PRODUCTION-ACTIVATION-SIGNAL-2026-07-21.edn"
+  :email-wave-1-kickoff-invitation {:task-id :email-wave-1
+                                   :email-type :kickoff-invitation
+                                   :scheduled-send "2026-08-01T09:00:00+09:00"
+                                   :recipient-group :all-stakeholders
+                                   :subject-draft "[M4] Production Distribution Timeline ACTIVATED — Phase 1 Begins 2026-08-01"
+                                   :body-draft "M4 Week 8 gate: PASS (151/151 tests). Production deployment timeline is now ACTIVE. First distribution email goes out 2026-08-01. Execution lead assignment pending."
+                                   :execution-lead-assignment :pending
+                                   :status :awaiting-exec-lead-assignment}
+  :wave-1-blockstore-abstract {:milestone-name "BlockStore abstract"
+                              :phase :wave-1
+                              :due-date "2026-07-25"
+                              :current-progress "60%"
+                              :days-remaining 4
+                              :checkpoint-type :completion-verification
+                              :status :in-progress
+                              :blocker-escalation-required false}
+  :manifest-verification {:task-id :manifest-verification
+                         :method :gen-west-manifest-check
+                         :status :pending
+                         :canonical-check :required
+                         :kotobase-peer-pin :requires-verification}
+  :platform-stakeholder-notification {:task-id :platform-notification
+                                     :notification-type :internal
+                                     :recipients :platform-ops
+                                     :content "M4 PRODUCTION ACTIVATION SIGNAL: Deployment timeline now active. Distribution begins 2026-08-01. Standup daily standup review required."
+                                     :status :pending
+                                     :delivery-method :internal-comms}
+  :m4-to-v1-transition {:phase :activation
+                       :checkpoint-1 {:name "PR #33 merged"
+                                     :status :complete
+                                     :date-completed "2026-07-21"}
+                       :checkpoint-2 {:name "Manifest canonical verified"
+                                     :status :pending
+                                     :due-date "2026-07-21"}
+                       :checkpoint-3 {:name "Distribution timeline activated"
+                                     :status :complete
+                                     :date-completed "2026-07-21"}
+                       :checkpoint-4 {:name "Wave 1 BlockStore abstract"
+                                     :status :in-progress
+                                     :due-date "2026-07-25"
+                                     :days-remaining 4}}
+  :deployment-authority "Autonomous agent (standing authorization: external-impact operations + production deploy approved per CLAUDE.md)"
+  :checklist-status :in-progress
+  :next-action "Assign Execution Lead for Email Wave 1. Verify manifest canonical. Track Wave 1 progress daily through 2026-07-25."
+  :last-updated "2026-07-21T21:00:00Z"}]

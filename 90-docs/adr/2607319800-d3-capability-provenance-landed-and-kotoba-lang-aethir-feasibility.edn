@@ -1,0 +1,206 @@
+[{:db/id -1
+  :adr/id "adr-2607319800-d3-capability-provenance-landed-and-kotoba-lang-aethir-feasibility"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "accepted"
+  :adr/date "2026-07-31"
+  :adr/last_verified "2026-07-31"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/title "ADR-2607319800: D3（capability provenance）実装着地 — および Aethir の分配構造の実測分解と、kotoba-lang で同等の経済圏が組めるかの層別検証"
+  :adr/topic "d3-capability-provenance-and-kotoba-lang-aethir-feasibility"
+  :adr/repos ["orgs/kotoba-lang/murakumo" "orgs/kotoba-lang/engi" "orgs/kotoba-lang/pay"
+              "orgs/kotoba-lang/engi-witness-escrow" "orgs/kotoba-lang/witness-quorum"]
+
+  :adr/authoritative_for
+  ["capability provenance の意味論: `:capability/source` は :measured を明示宣言した時だけ :measured、欠落・未知値はすべて :declared。値から推測しない"
+   "`uniform-capability-cohorts` が宣言に依存しない検出器であること。byte 単位で同一の :mem-bytes を申告するノード群は、本人が何を宣言していても定数の証拠として報告される"
+   "`credits/settle` の既定は :permissive で歴史的挙動と byte 単位で同一であること。stored feed の replay 意味論を遡って書き換えない"
+   "`:run/unallocated` による会計恒等式: total = treasury + head + Σshares + unallocated が全 policy で成立すること"
+   "mt-sum = 0 の2つの意味を混ぜないこと。:permissive では『重みがゼロ』（head が pool を保持）、:measured-only では『重みが未知』（未配分にする）"
+   "Aethir の分配構造の実測値: protocol take 20.0%・供給側 80%・保有者還流 $0（DefiLlama methodology + 実数、2026-07-31 取得）"
+   "kotoba-lang で Aethir 型経済圏を組む際の層別現在地。とくに『動いていない2層が同じ1つの理由で止まっている』という診断"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends
+  ["90-docs/adr/2607319500（D3 を proposed から実装済みへ。D1/D2/D4-D7 は proposed のまま）"]
+
+  :adr/related
+  ["90-docs/adr/2607319500-murakumo-aethir-shaped-developer-compute-two-workloads.edn（本 ADR が実装した D3 の出典）"
+   "90-docs/adr/2607319000-murakumo-operator-awai-and-crypto-value-accrual-comparison.edn（value-accrual cohort）"
+   "90-docs/adr/2607259800（『宣言させ、推測しない』『未計測は 0 ではない』の方法論）"
+   "90-docs/adr/2607300100（duplicated-truth 欠陥クラスと『差分を検出するチェックを置く』規則）"
+   "90-docs/adr/2607995000 §5（1つの bond 市場・role タグ）/ 2607994000（equivocation slashing）"]
+
+  :adr/problem
+  "オーナー指示（2026-07-31）: 「d3, かつ Aethir を分析して, kotoba-lang で 同様の経済圏、分散が実現できるか確認、検証」。
+
+ADR-2607319500 が proposed として置いた D3（node registry の一本化と capability provenance）を実装し、あわせて Aethir を分配構造まで分解し、kotoba-lang のどの層が既にあってどの層が無いかを**推測でなく実測で**確定させる。"
+
+  :adr/decision
+  "### 1. D3 実装 — kotoba-lang/murakumo `e8af1e66`
+
+**`murakumo.infer.join`**
+
+- `capability-provenance` / `measured-capability?` — `:measured` は joiner が**自分で測ったと明示宣言した時だけ**。欠落・未知値は `:declared`。**値からは推測しない**（ADR-2607259800 の『性質は宣言させ、推測しない』。32 GiB は捏造の証拠ではないし、半端な数字は probe の証拠ではない）
+- `uniform-capability-cohorts` — **ノードの正直さに依存しない**方の検査。byte 単位で同一の `:mem-bytes` を申告するノード群を報告し、`:declared-measured` でそのうち何台が `:measured` を主張しているかを併記する。**非ゼロなら宣言と検出器が食い違っている**ことになり、ADR-2607300100 の規則どおり黙って解決せず表に出す
+- `enrollment` は `:capability/source` を **`:node/caps` の内側**に載せる。capability をその出自から切り離したことが、44 台が同一の 32 GiB を申告しても誰も気付けない状態を作った
+
+**`murakumo.infer.credits`**
+
+- `settle` に 2-arity `{:capability-policy :permissive | :measured-only}` を追加。**既定は `:permissive` で歴史的挙動と byte 単位で同一**。`settle` は stored feed が replay する pure fold なので、既定を変えると**過去の run の意味を遡って書き換える** —— `balances` を permissive のまま残して `ledger-violations` を隣に置いた時と同じ理由
+- `:measured-only` は未実測の assignment を memory×time の**分母から落とす**（0 として分母に入れない）。落とした分は `:run/capability-excluded` にデータとして報告する
+- `:run/unallocated` が全ケースで会計恒等式を閉じる: **total = treasury + head + Σshares + unallocated**
+- **mt-sum = 0 の2つの意味を混ぜない**: `:permissive` では『誰も重みを持たなかった』→ head が pool を保持（歴史的挙動）。`:measured-only` では『重みが未知』→ **未配分**。ここで head に渡すのは、測定による裏付けが最も薄いノードに払うことになる
+
+検証: **31 tests / 143 assertions, 0 failures**（変更前 21 / 103）。新規テストは実観測した 44 台の定数を再現し、1-arity fold の不変性を pin し、mt-sum=0 の head フォールバックを**別テストとして pin**（この作業がそれを動かせないように）、両 policy での会計恒等式を assert する。
+
+### 2. Aethir の分配構造（実測分解、2026-07-31）
+
+DefiLlama `/summary/fees/aethir` の methodology は文章で分配を宣言しており、数値と一致する:
+
+> Fees: 'Service fees paid by **developers** to use aethir GPU services'
+> Revenue: '**20%** protocol fees charged by aethir'
+> SupplySideRevenue: '**80%** of the service fees goes to GPU service providers'
+> ProtocolRevenue: 'All revenue goes to protocol'
+
+| | trailing 1y | all-time | 30d |
+|---|---|---|---|
+| fees（開発者が払った総額） | $88,262,729 | $173,606,087 | $3,062,621 |
+| revenue（protocol 取り分） | $17,652,553 | $34,721,221 | $612,523 |
+| **供給側**（GPU 提供者） | **$70,610,176** | $138,884,866 | $2,450,098 |
+| **保有者還流** | **$0** | $0 | $0 |
+
+protocol take 実測 **20.0%**（$17,652,553 / $88,262,729）。宣言と数値が一致する。
+
+**構造として読むべき3点:**
+
+1. **$70.6M/yr を供給側に払っている。** これは分配の宣言ではなく実際の資金移動であり、**他者の資金を custody して分配する仕組みが本番で動いている**ことを意味する
+2. **保有者還流は $0。** 最大の AI compute 収益を持つネットワークが token 保有者に何も渡していない（ADR-2607319000 の主要な発見の再確認）
+3. **分類は Developer Tools**。DePIN カテゴリ全体（6 プロトコル）の合計が $6.23M/yr であるのに対し、1社でその 14 倍
+
+**水準は参考にしない**: 30d を年率換算すると $37.27M で、trailing 1y はその **2.37 倍**。$88.26M は現在の run-rate ではない。
+
+### 3. kotoba-lang での実現可能性 — 層別検証
+
+Aethir が回すのに必要な6層を、kotoba-lang の実在コードに対して実測で照合した:
+
+| # | Aethir の層 | kotoba-lang の該当物 | 実測した状態 |
+|---|---|---|---|
+| 1 | 計量された役務提供 | `murakumo.infer.credits`（unit-prices / job-cost / settle / memory×time） | **✅ 実装・テスト済み**。本 ADR の D3 で capability provenance も入った |
+| 2 | 80/20 の自動分配 | `settle` の head-frac 1/10 + protocol-frac 1/20 | **✅ 機構あり**。比率は 85/10/5 で Aethir の 80/20 とは違う（D5 は proposed のまま） |
+| 3 | 供給者の担保 | `engi.stake`（pure cljc）+ `engi-witness-escrow`（Solidity） | **⚠️ pure logic のみ**。contract の README が『**local-test-only design exercise … not deployed to any real network … holds no real funds anywhere**』。かつ `default-bond-policy` の `:recompute` は **nil = fail-closed**（『policy が供給するまでこの role は admissible でない』）—— **compute 検証者を1人も受け入れられない** |
+| 4 | 役務提供の検証 | `witness-quorum` + `murakumo.overlay.witness-ledger/ledger-quorum-fn` | **⚠️ 実装 + 実 QUIC の E2E テストあり。production caller ゼロ**（grep 実測: 参照は `test/` の5箇所のみ、`src/` からの呼び出しなし） |
+| 5 | 決済レール | `pay.facilitator`（`register-seller` / `credits-gate` / `protocol-fee` / `settlement-record` / `credits-requirements` / `credits-accepting-sellers`、remote main で全数確認）+ x402 offer が live（$0.01/req、USDC on Base） | **✅ 実装済み・offer は live。ただし `protocol-fee` は `:collectible?` が常に false** —— facilitator は鍵を持たず、x402 の `payTo` は1つしか無いので、原子的な分割には未デプロイの splitter contract が要る |
+| 6 | 企業需要 | storefront SKU / Enterprise プラン | **❌ settled 0 / Stripe 有効サブスク 0 / acceptance density は density 1・holdable 0** |
+
+### 4. 検証の結論 — 止めているのはコードではない
+
+**6層のうち4層は pure logic として実装され、テストが通っている。機能していない2層（③ 担保 と ⑤ の手数料徴収）は、どちらも同じ1つの理由で止まっている —— 他者の資金を custody する contract が1つもデプロイされていない。**
+
+- ③ は escrow contract が未デプロイなので bond できず、`:recompute` floor が nil なので admit もできない
+- ⑤ は splitter contract が未デプロイなので、宣言した 500 bps を1円も徴収できない
+
+そして **Aethir の $70.6M/yr の供給側支払いは、まさにその custody が本番で動いていることの帰結である。**
+
+したがって「kotoba-lang で同等の経済圏・分散が実現できるか」への検証済みの答えは:
+
+> **コードとしては組める。** 計量・分配・staking の判定ロジック・検証プロトコル・決済レールはすべて実在し、テストが通っている。
+> **止めているのは1つの意思決定であって、コードベースではない** —— 第三者の資金を custody する contract をデプロイするかどうか。ADR-2607995000 の note が『第三者の資金を custody する contract のデプロイは別個のより重い判断』と書いて先送りしたその1点が、③ と ⑤ の両方を同時に止めている。
+
+**これは「あと少し」という意味ではない。** その1つの決定は、法的構成（AWAI Network は米国法人）・鍵管理・監査・清算責任をまとめて引き受けることであり、ADR-2607299900 が発行体の法的構成を owner + 弁護士の領域に置いたのと同じ重さを持つ。ただし**技術的な残作業と法的・custody の決定を混同しない**ことが、この検証の要点である。"
+
+  :adr/known-gaps
+  "[{:gap \"D3 は :measured-only を呼ぶ production caller をまだ持たない\"
+     :note \"settle の 2-arity と検出器は実装済みだが、cloud-murakumo / local-murakumo の worker がどちらの policy で settle するかは未配線。既定 :permissive のままなので挙動は変わっていない —— つまり本 ADR は『測れるようにした』のであって『測った結果で払うようにした』のではない\"}
+    {:gap \"browser ノードに実測 capability を申告させる側（クライアント）は未実装\"
+     :note \"infer_view.cljc のブートストラップが WebGPU/RAM を probe すると docstring にあるが、実際に enroll される値が 44 台で同一だった以上、probe 結果が使われていないか probe 自体が定数を返している。どちらかは本 ADR では切り分けていない\"}
+    {:gap \"uniform-capability-cohorts を live registry に対して回す運用経路が無い\"
+     :note \"関数は pure で live データに対して手で回せば 44 台の cohort を返すが、定期実行して報告する経路は無い\"}
+    {:gap \"Aethir の Checker/Container node の内部設計は分解していない\"
+     :note \"本 ADR が実測したのは分配構造（80/20・holders $0・Developer Tools 分類）と金額であって、Aethir のノード種別・staking 額・検証アルゴリズムの一次資料には当たっていない。層別照合の『Aethir 側』は methodology 記述からの再構成である\"}
+    {:gap \"層別照合は kotoba-lang 側の存在確認であって、性能・規模の検証ではない\"
+     :note \"『実装されテストが通っている』と『$70.6M/yr を分配できる』の間には運用・規模・障害対応の距離がある。本 ADR はその距離を測っていない\"}
+    {:gap \"orgs/kotoba-lang/pay のローカル checkout は他セッションの未コミット変更で ff-only merge がブロックされている\"
+     :note \"`M src/pay/x402.cljc` / `M test/pay/x402_test.cljc`。破棄せず温存し、本 ADR の pay 側の確認は remote ref（kotoba-lang/main 6fd2874）から読んだ\"}]"
+
+  :adr/body
+  "# ADR-2607319800: D3 着地 と kotoba-lang の Aethir 型実現可能性検証
+
+## 一行で
+
+**6層のうち4層は実装済みでテストも通る。動いていない2層は、同じ1つの理由で止まっている —— 他者の資金を custody する contract が1つもデプロイされていない。**
+
+## D3 で入れたもの
+
+`/infer/nodes` の 44 台が byte 単位で同一の 32 GiB を申告していた件に対して、2つの独立した仕組みを入れた:
+
+```
+宣言に依存する側    :capability/source  → :measured は明示宣言時のみ。欠落は :declared
+宣言に依存しない側  uniform-capability-cohorts → 同一値のノード群を検出し、
+                    そのうち何台が :measured を主張しているかを併記
+```
+
+後者が要る理由は単純で、**前者は嘘をつけるから**である。44 台が全部 `:measured` を主張しても、byte 単位で一致する以上それは定数であり、検出器はそれを報告する。宣言と検出器が食い違ったとき、どちらが正しいかを黙って決めない —— ADR-2607300100 が定めた「差分を検出するチェックを置く」の適用である。
+
+そして経済側では **既定を変えなかった**。`settle` は stored feed が replay する pure fold なので、既定を `:measured-only` にすると**過去の run の意味が遡って変わる**。`balances` を permissive のまま残して `ledger-violations` を隣に置いたのと同じ判断をした。
+
+一番細かいが一番効いている決定は **mt-sum = 0 の扱い**である:
+
+| policy | mt-sum = 0 の意味 | 帰結 |
+|---|---|---|
+| `:permissive` | 誰も重みを持たなかった（span 0 等） | head が pool を保持（歴史的挙動） |
+| `:measured-only` | 重みが**未知** | **未配分**（`:run/unallocated`） |
+
+未知を 0 と同じに扱うと、**測定による裏付けが最も薄いノード（head）に全額が行く**。ADR-2607259800 の「未計測は 0 ではない」をここで守った。
+
+## Aethir を分解して分かったこと
+
+DefiLlama の methodology は分配を文章で宣言しており、**数値と一致する**（protocol take 実測 20.0%）:
+
+```
+fees   $88,262,729/yr  ← 開発者が払った総額
+  ├ protocol  $17,652,553  (20.0%)
+  ├ 供給側    $70,610,176  (80.0%)   ← 実際に動いている資金
+  └ 保有者    $0           (0%)
+```
+
+構造として重いのは **$70.6M を供給側に配っている**という事実である。分配率の宣言は誰でも書けるが、これは**他者の資金を custody して分配する仕組みが本番で回っている**ことの帰結であり、そこが Aethir と kotoba-lang を分けている。
+
+（水準は参考にしない: 30d 年率換算 $37.27M に対し trailing 1y はその 2.37 倍。$88M は現在の run-rate ではない。）
+
+## 層別検証の結果
+
+```
+① 計量された役務提供   murakumo.infer.credits          ✅ 実装・テスト済み
+② 80/20 の自動分配     settle head/protocol frac        ✅ 機構あり（比率は 85/10/5）
+③ 供給者の担保         engi.stake + engi-witness-escrow ⚠️ pure logic のみ／contract 未デプロイ
+                                                          :recompute floor = nil で admit 不可
+④ 役務提供の検証       witness-quorum + ledger-quorum-fn ⚠️ 実装 + E2E あり／production caller 0
+⑤ 決済レール           pay.facilitator + x402 live       ✅ 実装済み／protocol-fee は徴収不能
+⑥ 企業需要             storefront SKU                    ❌ settled 0
+```
+
+**③ と ⑤ が止まっている理由は同じ1つである。**
+
+- ③ escrow contract が未デプロイ → bond できない → `:recompute` floor が nil → admit もできない
+- ⑤ splitter contract が未デプロイ → 宣言した 500 bps を1円も徴収できない
+
+どちらも「第三者の資金を custody する contract をデプロイするか」という**1つの決定**に依存している。ADR-2607995000 の note が『第三者の資金を custody する contract のデプロイは別個のより重い判断』として先送りした、まさにその点である。
+
+## 検証済みの答え
+
+> **コードとしては組める。** 計量・分配・staking 判定・検証プロトコル・決済レールはすべて実在し、テストが通っている。
+> **止めているのは1つの意思決定であって、コードベースではない。**
+
+**ただしこれは「あと少し」という意味ではない。** その1つの決定は、法的構成（AWAI Network は米国法人）・鍵管理・監査・清算責任をまとめて引き受けることを意味し、ADR-2607299900 が発行体の法的構成を owner + 弁護士の領域に置いたのと同じ重さを持つ。
+
+本検証の要点は、**技術的な残作業と、法的・custody の決定とを混同しないこと**にある。前者は小さく、後者は小さくない。そして④（検証層の production 配線）と⑥（需要）は custody とは独立に進められる —— ④ は caller を1本足すだけで、⑥ は token も contract も要らない。
+
+## 正直な限界
+
+- D3 は **『測れるようにした』のであって『測った結果で払うようにした』のではない**。`:measured-only` を呼ぶ production caller はまだ無く、既定は `:permissive` のままである
+- browser ノードに実測値を申告させるクライアント側は未実装。44 台が同一値だった原因が「probe 結果が使われていない」のか「probe が定数を返す」のかは切り分けていない
+- Aethir 側の層は methodology 記述からの再構成であり、Checker/Container node の一次資料には当たっていない
+- 層別照合は**存在確認であって規模の検証ではない**。「実装されテストが通る」と「$70.6M/yr を分配できる」の間の距離は測っていない"}]

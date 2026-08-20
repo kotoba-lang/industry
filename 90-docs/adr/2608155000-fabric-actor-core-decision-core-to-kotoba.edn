@@ -1,0 +1,149 @@
+[{:db/id -1
+  :adr/id "ADR-2608155000"
+  :adr/title "fabric actor の名乗り・pulse 文・終了状態を .kotoba の決定核に切り出す（superproject の clj→kotoba 移行、1 反復目）"
+  :adr/status "accepted"
+  :adr/date "2026-08-15"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :source/dataset "adr"
+  :adr/related
+  ["ADR-2608098000"
+   "ADR-2607279200"
+   "ADR-2608136000"
+   "ADR-2608122000"
+   "ADR-2608650000"
+   "ADR-2607173000"]
+  :adr/repos ["com-junkawasaki/root"]
+  :adr/body
+  "## 何をしたか
+
+`scripts/register_fabric_actors.clj` と `scripts/publish_fabric_actor_status.clj`
+（`*-organism.aozora.app` の 9 体を動かしている JVM script）が持っていた**判断**を
+`scripts/kotoba/fabric_actor_core.kotoba`（`kotoba/pure`、capability 0）へ切り出し、
+参照実装を `scripts/gftd/fabric_actor_core.cljc` の 1 本にまとめ、
+両者の完全一致を fleet gate `root-fabric-actor-core` で毎回見るようにした。
+
+分担は `manifest/org-id.kotoba` + `scripts/org_id_derivation.cljs` +
+`root-org-id-derivation`（ADR-2608098000）と同型で、この repo で 2 例目になる。
+
+## なぜこの 2 本だったか（対象選定の実測）
+
+superproject が追跡している `.clj` は 22 本。うち sparse cone の中に在るのは 5 本で、
+残り 17 は cone 外（`git cat-file` で読んだ）。5 本の内訳:
+
+| file | 判定 |
+|---|---|
+| `scripts/probe-kotoba-cljc-batch.clj` | **移行対象ではない** — kotoba compiler を JVM でホストする harness。移行の道具であって対象ではない |
+| `scripts/mk1_cfd.clj` | **移行対象ではない** — D3Q19 LBM の host-runner。数値カーネルは `kami-engine-cfd`（別 repo）にあり、この file に在るのは編成だけ |
+| `90-docs/pricing-intelligence/query.clj` | **移行対象ではない** — DataScript への一回限りの検証 query。全部 effect |
+| `scripts/register_fabric_actors.clj` | **対象** — 下記 |
+| `scripts/publish_fabric_actor_status.clj` | **対象** — 下記 |
+
+cone 外 17 本のうち 11 本は `*_test.clj`（JVM の test harness）で、これは移行後も
+残る側である。`orgs/personal/bin/datomic/*`（1,223 行）と `orgs/kawasakijun/pregel_planner.clj`
+は cone 外・未検査で、**「移行不要」ではなく「まだ見ていない」**として残す。
+
+対象 2 本を選んだ理由は行数ではない。この 2 本は
+
+  - product 一覧（9 件）
+  - handle の作り方（`<product>-organism.aozora.app`）
+  - Keychain の service 名（`aozora.app/actor-seed/<handle>`）
+  - 「1 件でも失敗したら exit 1」
+
+を**それぞれ独立に書いていた**。CLAUDE.md が名指しする mirror（同じ判断の 2 実装が
+別々に直る）そのもので、しかも 1 本は launchd で毎週外へ投稿している。
+
+## 決定核の境界
+
+`.kotoba` に在るのは「何と名乗るか・何と言うか・何を成功と呼ぶか」だけ。HTTP・
+Keychain・CACAO 鋳造・receipt の JSON 書き出しは `.clj` に残る。`.cljc` の
+`pulse-for`（`/health/fabric.json` の形を知っている橋渡し）も host 側。
+repo 全体を移そうとせず、スカラと文字列で表せる判断だけを切る
+（`kotoba-lang/murakumo` の `kotoba/*_core.kotoba` と同じ単位）。
+
+## 移行で直した実バグ 2 件
+
+**1. 欠測が 0 と同じ顔をしていた。** 旧 pulse 文は
+`(str (get-in activity [:runtime :healthy]))` で、値が無いと空文字だった。
+`runtime=/` は「0 台が健全」とも「測れなかった」とも読める。kernel の
+`count-text` / `text-or-unknown` は欠測（件数は負の番兵、文字列は空）を
+`unknown` と綴る。ADR-2608136000 の「測れなかった検査が、測って問題が無かった
+検査と同じ値を返す」を出力文に当てたもの。**値が揃っている通常ケースの文言は
+1 バイトも変わっていない**（実測で確認済み）。
+
+**2. 0 件処理が成功だった。** `(when (some ... ) (System/exit 1))` は、対象が
+空のまま走った run を exit 0 にする。`exit-code` は
+`attempted < 1` を **2**（0 でも 1 でもない = 答えられなかった）にする。
+`register` 側は `fresh`（今回試した分）だけで判定するようにした —— 旧実装は
+receipt に残る過去の失敗まで見ていたので、直っていない別 product のせいで
+今回の run が永遠に赤くなる形だった。
+
+## 併せて直した別件（この移行が原因ではない）
+
+**launchd `com.junkawasaki.fabric-actor-cadence` は 2026-08-10 以降ずっと死んでいた。**
+`/tmp/fabric-actor-cadence.err` の中身は毎回
+
+    Error building classpath. Cannot invoke \"java.io.File.getAbsolutePath()\"
+    because the return value of \"clojure.java.io$file.invokeStatic(Object)\" is null
+
+で、superproject root の `deps.edn` が Clojure の deps マニフェストではなく
+workspace メタデータ（datom の vector）であるため、root を cwd にした `clojure` が
+classpath 構築の時点で落ちていた。**落ちていたのではなく 1 行も走らずに終わっていた**
+ので、receipt が更新されないだけで誰も気づかなかった。
+
+`90-docs/pricing-intelligence/query.clj` と `scripts/mk1_cfd.clj` は既に同じ罠を
+文書化して回避している（root を引数で受け、repo の外から起動する）。同じ回避を
+`scripts/publish-fabric-actor-status` に入れ、root は `FABRIC_ROOT` で渡すようにした。
+
+## gate
+
+`root-fabric-actor-core`（`scripts/fleet-ci/gates/fabric-actor-core-check.cljs`）が
+4 つを見る:
+
+  1. **artifact <-> source** — `.mjs` の `sourceDigest` == `.kotoba` の sha256。
+     ノードに kotoba ツールチェーンは無い（fleet が配るのはこの repo の tree だけで、
+     `orgs/` の amu は入らない）ので、org-id gate と同じくコンパイル済み artifact を
+     配って import する。
+  2. **purity** — `requiredCapabilities` が空。**読めなかったときを空と読まない**。
+  3. **parity** — case 表の全件で kernel == cljc。ε は無い（全部 string と i64）。
+  4. **evidence floor** — 走った case が `--min 150` 未満なら落とす。
+
+**落ちることを確認済み**（2026-08-15、無改変で exit 0 / ran 198 cases / 0 failing）:
+
+    cljc の pulse 文を 1 語変える        -> 36 件の parity 不一致で exit 1
+    .kotoba を触って再コンパイルしない   -> artifact<->source: BROKEN で exit 1
+    product 一覧を 1 件に縮める          -> 一覧の乖離を名指しして exit 1
+
+`:include-ext` で絞った tree（2,558 ファイル）でも緑になることを別途確認した ——
+手元の完全な tree で緑でも fleet で赤になる、という実測済みの罠を踏まないため。
+
+## 実測した言語側の制約（**定数として引用しないこと**）
+
+これは 2026-08-15 にこの pin で測った値であって、言語の恒久的な性質ではない。
+`kotoba-lang/lang/surface-status.edn` の `:disposition` が分類の正本で、
+`:not-yet-implemented` は安全上の禁止ではない（ADR-2608650000）。
+
+  - **比較は i64 のみ。** `>=` に `:f64` を渡すと
+    `expression type mismatch: expected i64, got f64` でコンパイルが落ちる。
+    この kernel に現れる数はすべて件数なので影響しないが、これは
+    **`70-tools/bmc` の score / gate / funnel を次に移すときに効く** —— あれらは
+    浮動小数の閾値比較と平均で、そのままでは移せない。整数 basis point 化
+    （`90-docs/system-dynamics/kotoba/itonami_maturity_kernel.kotoba` が採った形）が
+    要るので、公開済みスコアの値が truncation で動く。別の反復として扱う。
+  - **文字列の等値は `string=?`。** `string=` は
+    `operation has no admitted lowering` になる。
+  - **`string-from-i64` は在る。** css 移行時（2026-07-27）の「数値→文字列の
+    組み込みが無い」はこの pin では解消している。
+  - **arity 上限 5。** pulse 文は runtime を先に 1 本の文字列へ畳んで 5 に収めた。
+  - **`:i64` の seam は BigInt。** 数をそのまま渡すと `invalid-i64` で trap する
+    （ADR-2608122000 が数える host<->guest 非対称の 2 番目）。戻り側は throw
+    しないので、変換を忘れると「不一致」ではなく「静かに別の値」になる。
+
+## まだやっていないこと
+
+  - `70-tools/bmc` の `score.cljc` / `gate.cljc` / `funnel.cljc`（上記の bp 化が要る）。
+    `allocate.cljc` は `Math/log` / `Math/exp` を使うので現状の kernel には載らない。
+  - `90-docs/design-quality/audit.cljc` は正規表現でテキストを走査する設計なので、
+    移行ではなく設計変更が先（CLAUDE.md）。
+  - cone 外の `orgs/personal/bin/datomic/*` と `orgs/kawasakijun/pregel_planner.clj`
+    は未検査。"}]

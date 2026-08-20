@@ -1,0 +1,924 @@
+[{:db/id -1
+  :adr/id "2800002800-cljc-codec-toward-ffmpeg-parity"
+  :adr/title "ADR-2800002800: ffmpeg 相当を目指す純 cljc codec 経路 — 実測駆動の kaizen、filter 層の家、AAC encode と native 化の残り"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "cljc-media-codec-performance"
+  :adr/date "2026-07-30"
+  :adr/last_verified "2026-07-30"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["純 cljc codec 経路の性能現在地と、そこへ至った実測手順"
+   "org-iso-h264 encoder の最適化不変条件（bit-identity を崩さない）"
+   "画素 filter の置き場所（utsushi 層④、douga ではない）"
+   "ffmpeg 置換に残っている穴（AAC encode / 精度差 / native 化）"
+   ".kotoba guest の上限が security 由来ではないこと、および guest 改善の入口"]
+  :adr/related
+  ["adr-2607299960-dougaka-murakumo-compute-kotobase-storage"
+   "adr-2800002700-ka-production-three-layer-split"
+   "adr-2607198300-kotoba-native-aot-no-jvm-node-rust"
+   "adr-2607072000-kotoba-lang-rust-to-cljc"
+   "adr-2607122000-h264-r05-pixel-decode-scope"
+   "adr-2606272200-utsushi-video-edn-filtergraph"
+   "adr-2607279200-kotoba-centered-migration-plan"]
+  :adr/body
+  "# ADR-2800002800: ffmpeg 相当を目指す純 cljc codec 経路
+
+**Status**: accepted
+**Date**: 2026-07-30
+**Deciders**: Jun Kawasaki（指示: 「2, 3 を kaizen して ffmpeg 相当まで改善する計画を立てて, kotoba-lang repo で完結したい」→「設計実装」→「p1, p2」）
+
+## Context
+
+ADR-2607299960 で dougaka の制作は murakumo 計算 + kotobase 保管に載ったが、
+**組み立て段（concat / mix / scale / pad）は ffmpeg のまま**だった。
+オーナーから「ffmpeg の代わりの codec が kotoba-lang にあったはず」との指摘があり、
+実際に存在した。当初私は「ffmpeg の代わりは無い」と述べており、**これは誤りだった**。
+
+実在するもの（すべて `kotoba-lang`、portable `.cljc`）:
+
+| repo | 中身 |
+|---|---|
+| `org-iso-h264` | H.264 encode + decode。CAVLC + CABAC、intra + P-slice inter、sub-pel MC。逆変換は FFmpeg リファレンスから 1:1 移植で bit-exact |
+| `org-iso-isobmff` | MP4 の mux / demux / remux（`concat-streams` 込み） |
+| `codec-primitives` | DCT / quant / scan / motion の共有プリミティブ |
+| `audio` | mixer / filter / effects / wav / synth |
+| `org-aomedia-av1` | AV1（encode + decode） |
+| `org-w3-webcodecs` | WebCodecs バインディング（ブラウザのハードウェア経路） |
+
+## 測定が計画を決めた
+
+**方法**: 実 murakumo 生成クリップから 720x1280 の生 YUV を取り出し、
+`h264.encode/encode-idr-luma-frame` に通す。**5 回実行の median**（このマシンは
+並行セッションで同一ビルドが 1.4 倍ばらつくため。単発測定は使わない）。
+
+### Phase 0 — 現在地
+
+初回測定 11,957 ms/frame。1800 フレーム（60 秒 @30fps）換算で **5.5 時間**。
+ffmpeg は同じものを数秒で焼く。**3〜4 桁の差**。
+
+原因の特定に 3 段の検証を要した:
+
+1. **boxed vector 説は外れた** — 要素アクセスは 0.042 µs/px（全体 12.97 µs/px の 0.3%）
+2. **`solve-ac-levels` が実質 100%** — 4x4 ブロックごとに Clojure の**有理数演算**で
+   15x16 + 15x15 の行列積。合成ベンチで 13,923 ms/frame（~242 µs/block）
+3. **達成可能な下限は 21 ms/frame** — 行列を 1 本に畳んで配列 + 固定小数点の
+   タイトループ（661×）
+
+### Phase 1 — 実装した 3 増分
+
+| 増分 | 内容 |
+|---|---|
+| **AC solve の畳み込み** | `(MacT·Mac)⁻¹·MacT` はブロックに依存しない固定 15x16 行列。QP ごとに 1 回畳み、**行ごとの共通分母上の厳密な整数**として持つ |
+| **`sad` / `inverse-4x4`** | 前者は nested `map`/`reduce` で 1 回 ~272 cons、後者は `assoc` ごとに 16 要素ベクトルを作り直し（1 回 32 個）。両方タイトループへ。加えて **DC のみ入力の閉形式** `((dc+32)>>6)` を追加（全係数域で検証、仮定せず） |
+| **residual の二重計算** | 同じブロックを `raw-dc` と AC ループで 2 回抽出。115,200 → 57,600 回 |
+
+**結果（同条件・5 回 median）**:
+
+```
+baseline (0939fb5):  9,373 ms  (min 8,739 / max 11,780)  → 281 分/エピソード
+増分1後:             2,039 ms                              →  61 分
+増分2後:             1,226 ms  (2940 1601 1225 1164 1032)  →  37 分
+```
+
+**7.6×、出力は全段 byte-identical**（66,677 bytes の Annex B）。
+
+### 守った不変条件
+
+**bit-identity。** このリポは「memorized MF table は cross-coefficient leakage
+~20%、この pipeline は ~2%」という測定を根拠に厳密解を選んでいる。速くする代わりに
+その性質を買い戻したら**勝利に見せかけた退行**なので、新経路は**全 52 QP ×
+ランダム 20 本 + 丸め境界の退化ベクトル**で有理数経路と一致することを assert した。
+`inverse-4x4` は decoder も使い、そちらは FFmpeg 参照実装に bit-exact なので同様。
+
+行ごとの分母にしたのも設計判断で、行列全体の共通分母では worst-case accumulator が
+62 bit になる。行ごと + gcd 約分で 54 bit（long に 9 bit 余裕）。テストはこの上限と
+**下限**の両方を assert する（数字が黙って陳腐化しないため）。
+
+### 残っている裾
+
+```
+encode-macroblock! 自身の body  最大
+chroma-component-plan            12%
+solve-ac-levels                  10%  （元は ~100%）
+reconstruct-chroma-plane          9%
+sad                               7%  （元は 634 ms）
+choose-pred-mode / chroma         5% / 5%
+inverse-4x4                      top10 圏外（元は 17.7%）
+```
+
+**単一のホットスポットは無く長い裾** = JVM 側の伸び代が減ったシグナル。
+
+### ⚠ この裾の profile と「37 分/エピソード」は intra フレームのものだった（2026-07-30 訂正）
+
+上の裾も 1,226 ms/frame も **`encode-idr-luma-frame`（intra のみ）** の測定で、
+**1800 フレーム中 1799 は P フレーム**である。P 経路を測っていなかった。実測
+（128x128 = 64 MB、IDR は 5 回 median、GOP は 3 回 median、MB 数で 720x1280 に換算）:
+
+```
+IDR :  65.2 ms =  1.019 ms/MB  →  1.88 s/frame @720x1280
+P   : 846.6 ms = 13.228 ms/MB  → 63.78 s/frame @720x1280   （IDR の 13 倍）
+1800 フレーム（1 IDR + 1799 P）→ 約 32 時間   ← 37 分ではない
+```
+
+（この初回測定は `4ff6584` = 4.6x 時点のツリーで取った。west pin/tip の `7777425`
+= 7.6x で取り直すと P は 17.01 ms/MB → 約 30.6 時間。下記 fused SAD 後は
+9.93 ms/MB → **約 17.9 時間**。いずれも 128x128 の per-MB からの換算。）
+
+**32 時間は 128x128 の per-MB コストからの換算で、720x1280 での実測ではない**
+（frame が大きいほど per-MB は悪化する方向なので下限寄り）。かつ内容依存で、実アニメの
+平坦領域は P_Skip になるので実素材では速くなる。
+
+P フレーム 1 枚の sampling profile（1393 sample、最深の `h264.*` frame に帰属）:
+
+```
+42.5%  h264.interp/sample          ← per-pixel の clamp 付き accessor
+10.9%  h264.encode/sad
+ 8.6%  h264.encode/mat-vec-mul     ┐ 有理数 residual solve
+ 8.4%  h264.interp/mc-luma-block   │
+ 7.0%  h264.interp/quarter-pel-luma│
+ 2.4%  h264.interp/six-tap-h       │
+ 1.4%  h264.encode/mat-mul         ┘
+ 1.2%  h264.interp/center-j
+→ interpolation + MC ≒ 61.5%、+ sad = 動き推定/補償が約 72%
+→ 有理数 solve は約 10%
+```
+
+**読んで立てた仮説 2 件を測定が殺した。両方とも報告せず捨てた:**
+
+1. **「全探索 ME が支配的、diamond search で 10〜100×」** —— `search-range` を 8→1
+   （整数候補 289→9）にしても時間は約 5% しか動かず、3 回測定のノイズ内。候補数は
+   レバーではない。効いているのは per-pixel accessor
+2. **「畳んでいない有理数 solver が P の 32%」** —— microbench では
+   `solve-regular-levels` が 258.30 µs/block（folded intra の `solve-ac-levels`
+   13.46 µs の **19 倍**、`inv` は `Ratio`/`BigInt`）で、×16 block/MB = 4.13 ms/MB
+   ＝ 13 ms/MB の 32% と計算した。**profiler は 10% と言う** —— 全 MB が 16 block
+   すべてを非ゼロで符号化するわけではない。**microbench の外挿ではなく profiler を正とする**
+
+### 実装したもの: fused SAD + 早期打ち切り（`org-iso-h264` `4d943ab`、1.71x）
+
+下記レバー 3。`sad-mc` は候補ブロックを**実体化せず** SAD を計算し、走行和が現在の best を
+超えた時点で**打ち切る**。`best-mv` が `me-full-search` / `me-subpel-refine` の
+`apply min-key` を置き換える。1 画素あたりの補間呼び出しは不変で、消えるのは
+①候補ごとに確保して捨てる 256 要素 grid（既定探索幅で 1 MB あたり 338 個）
+②既に負けている候補を最後まで計算するコスト。
+
+**交互測定**（このマシンは他セッションの JVM が 9 個・load average 12〜18 で、
+非交互比較は測りたい効果より大きくドリフトした）:
+
+```
+P frame 128x128、3 round: 17.66/16.42/17.01 → 9.93/10.36/9.06 ms/MB
+median 17.01 → 9.93 ms/MB = 1.71x   （720x1280 換算で 61.3 → 35.8 s/frame）
+出力は全 round で byte 一致、122 tests / 3954 assertions green
+```
+
+微妙なのは **tie 処理**で、ここは推論せずテストで固定した。`apply min-key` は
+**最後の最小**を保持する（`min-key` に直接当てて確認、記憶に頼らない）ので `best-mv` は
+`<=` で更新し、`sad-mc` は cutoff を**超えた**ときだけ打ち切る（等しくなっただけの候補は
+完走させる）。`h264.me-test` が、テクスチャあり／実際に動く内容／同点が多い粗量子化／
+**全候補が同点になる平坦面**の 4 条件で参照実装と一致することを検査する。最後のテストは
+`<=` を `<` に弱めると（最後でなく最初の候補を選んで）落ちることを確認済み —— つまり
+飾りでなく証拠である。
+
+### 撤回した実装: interp の support window（1.3x 遅くなった）
+
+レバー 1 として実装し、**測って撤回した**。`sample` が P フレームの 42.5% なので、
+ブロックの支持領域を密な配列に写せば直ると考えたが、**交互測定で 3 round とも 1.3x 遅い**
+（出力は byte 一致）。理由は 2 つ:
+
+1. **読み取りを減らさず移しただけ** —— 21x21 の窓を作るのに 441 回の plane 読み + 441 回の
+   配列書き込みを払い、そのあと補間器は元の読み取りを全部その複製に対して行う
+2. **元の読み取りは既に cache 常駐だった** —— 支持領域は 32 要素 leaf を数十個しか跨がず、
+   trie walk は miss ではなく予測可能なコストだった
+
+fraction ごとに padding を変える（fraction が 0 の軸は padding 無し）と損は減ったが解消せず。
+**ME の整数探索（既定探索幅で 1 MB あたり 338 候補中 289）は 1 画素を 1 回しか読まない**ので、
+共通ケースでは複製そのものが overhead だから。
+
+**42.5% は呼び出し「回数」の問題だった** —— `center-j` は 1 出力画素につき `six-tap-h` を
+6 行で評価し、隣接画素はそのうち 5 行を再読する。これを消すには水平パスを**中間バッファに
+1 回だけ**計算して垂直パスをそれに対して回す（= FFmpeg の two-pass `h264_qpel_hv_lowpass`。
+`center-j` の docstring 自身がこの形を説明しつつ採らなかったと書いている）。
+**次に測るべきはそれで、support window ではない。** この否定的結果は次の人が見る場所
+（`h264.interp` の namespace docstring）に書いた。
+
+### 実装したもの: inter residual solve の fold（`org-iso-h264` `b490bfe`、関数単体 17.4x）
+
+下記レバー 4。intra 側の `ac-solver-int` と**同一の変換**を inter 側に適用した
+（`inv·Mᵗ` を QP ごとに 1 回、行ごと共通分母の厳密整数 16x16 行列へ畳み、
+1 行につき整数内積 1 回 + `round-div`）。
+
+**なぜ取り残されていたか**は明快で、記録に値する: intra の fold を駆動した profile が
+`encode-idr-luma-frame` で取られており、そこは `solve-regular-levels` を一度も通らない。
+一方 1799 フレームは P で、1 MB あたり 16 回通る。
+
+**負荷に頑健な指標で測った**（load average 12〜18、他セッションの JVM 9 個。約 15% の効果に
+対し wall-clock A/B は解像しなかった —— **baseline 自身が run 間で 8.2〜16.5 ms/MB と
+ばらついた**。median で誤魔化さずそう書く）:
+
+```
+solve-regular-levels : 258.30 → 14.86 µs/block = 17.4x
+                       （folded intra の 12.66 µs と同水準になった）
+1 MB の luma 16 block: 4.13 → 0.24 ms
+P frame の sampling profile（同一 run 内比率なので負荷が相殺する）:
+  mat-vec-mul  12.6% → 消滅
+  mat-mul       2.3% →  3.0%（QP ごと 1 回の fold だけになった）
+→ 除去シェアから全体 1.14x 程度の見込み。これは profile からの予測で wall-clock 実測ではない
+```
+
+bit-identity は全 52 QP ＋ 丸め境界の退化ベクトルで、テスト内に全文を書いた有理数経路に対して
+assert した（intra と同じ基準・同じ理由。memorized MF table は ~20% の
+cross-coefficient leakage、この pipeline は ~2%。速い solve が level を 1 つでも動かせば
+その leakage を買い戻すことになる）。encoder 出力は全ベンチ run で byte 一致。
+
+**accumulator の上限は継承せず導出し直した —— そして最初のテストはまさにその理由で落ちた**
+（AC 経路の 2^50 床を、そこに全く届かない数値に当てていた）。regular solver は `ac-solver` が
+除外する DC 列を含み、素の 16x16 `Mᵗ·M` は DC を抜いた行列よりずっと条件が良いので、
+worst accumulator は **18,957,811,712（約 2^34.1）** —— AC 経路の約 2^54 に対して
+long に 28 bit の余裕（AC は 9 bit）、かつ **cljs double の mantissa 内**（AC は 1 bit 外）。
+テストはこの 3 つの境界すべてを assert する。
+
+### 実装したもの: sub-pel 探索の half-sample 面共有（`org-iso-h264` `380c741`、2.32x）
+
+**呼び出し元別に帰属させた**ところ（最深フレームではなく、stack に含まれる stage で分類）、
+`me-subpel-refine` が **P フレームの約 61%** —— 整数探索・residual 符号化・最終再構成の
+合計より大きかった。49 候補が画素ごとに参照面から 6-tap を再実行していた。
+
+**再実行は不要だった。** 4 の倍数の周り ±3 quarter-sample は整数位置 `ix-1` か `ix` に
+しか落ちないので、**49 候補は同じ小さな整数近傍を読む**。そして §8.4.2.2.1 の 16 位置は
+どれも「整数サンプル」か「3 つの half-sample 値のうち 2 つの丸め平均」である。よって
+`interp/subpel-planes` が探索ごとに **1 回だけ**その面を作る。水平 6-tap 和は**二重に**
+共有される —— `half-h` はその丸めであり、`center-j` はその上の垂直 6-tap（これは FFmpeg の
+`h264_qpel_hv_lowpass` の two-pass 形そのもので、`h264.interp` 自身の注記が
+「説明はしたが採らなかった」と書いていた形）。
+
+```
+sub-pel 段の参照面読み取り（1 MB あたり）: 529   ← 約 231,000 から
+```
+
+**そこで第 2 のコストが露出した**（この commit が 2 部構成である理由）: 読み取りが消えると、
+残ったのは **fraction を決める 16 分岐 cond が画素ごとに**（1 MB で 12,544 回）走ることだった
+—— fraction は候補ごとに定数なのに。`interp/subpel-selector` が 1 回だけ
+`{:a array :ao offset :b array :bo offset}` に解決し、内側ループは配列 2 読み + 平均になる。
+stage share: **48.4% → 29.3%**（面の共有）→ **20.4%**（dispatch の巻き上げ）。
+
+**交互測定・4 round の median**（load average 13、他セッションの JVM あり）:
+
+```
+P frame 128x128: BASE 11.80/13.87/13.61/17.60 → AFTER 4.74/5.98/5.87/6.70 ms/MB
+median 13.74 → 5.93 ms/MB = 2.32x       （720x1280 換算 49.5 → 21.3 s/frame）
+```
+
+この段の効果は**ノイズに対して頑健**である —— 本作業の前半で扱った 15% 級の効果と違い、
+**新しい 4 run の最も遅いものが、古い 4 run の最も速いものより速い**。出力は全 8 run で
+byte 一致、`h264.me-test` の等価性テスト（全候補が同点になる場合を含む）も不変で通る。
+
+### 実装したもの: 整数探索の whole-pel SAD 経路（`org-iso-h264` `26b077d`、1.17x）
+
+レバー 5。`me-full-search` の候補は**すべて whole-pel** で補間の必要が無いのに、画素ごとに
+汎用の quarter-sample 入口に入り、dispatch を歩き、座標 2 つを clamp して、1 回の
+plane 読みに辿り着いていた。`sad-mc-integer` が直接読む。内側ループから出したのは 2 つ:
+行の基底インデックス（行ごと 1 回）と、行分割が完全に画面内という共通ケースの判定
+（**ブロックごと 1 回**、以降 clamp を一切しない）。範囲内の座標の clamp は恒等写像なので
+bit-identical で、端に掛かるブロック用の clamp 経路は残してある。
+
+**測定は控えめで、そう報告する。** 交互 10 round の median 5.617 → 4.783 ms/MB = **1.17x**、
+10 round 中 7 round が新側優位、ただし**両分布は重なる**（BASE 4.69〜6.55、AFTER 3.63〜5.75）。
+このマシンでは 1.17x を明快には解像できない —— sub-pel の 2.32x と違い、ノイズが効果と同程度。
+疑いが無いのは機構（1 サンプルあたり厳密に演算が減り、増える演算は無い）と、出力が
+全 20 run で byte 一致すること。
+
+**速度以外に 2 つの理由でこれを入れた**（測定が控えめでも入れる根拠）:
+
+- `best-mv` が cost 関数を取る形になり、整数探索と sub-pel 探索がそれぞれ自分の位置に
+  特化した SAD を使いつつ、**選択規則（tie で最後を採る）が 1 箇所だけ**に戻った。
+  面共有の実装時に `me-subpel-refine` へ複製していた —— 規則の複製は間違える機会の複製
+- 任意 fraction 用の汎用 `sad-mc` を**削除**した。両探索が特化形を得た時点で dead になり、
+  codec の dead path は負債。cutoff/tie の根拠は残る 2 つの上の節コメントへ移した
+
+### 実装したもの: `avc1`/`avcC` —— そして音声+映像の mp4 が実際に再生された
+
+**ADR が謳っていた目的に到達した。** `isobmff.mux/avcc` + `avc-stsd` + `avc-track`
+（`org-iso-isobmff` `491ca74`）で映像トラックの codec 宣言が書けるようになり、
+**1 つの mp4 に音声と映像の両方を入れて実 ffmpeg が両方読む**ことを確認した:
+
+```
+ffprobe av_both.mp4:
+  Stream #0:0  Video: h264 (Baseline) (avc1 / 0x31637661), yuv420p, 128x96, 30 fps
+               encoder : kotoba-lang/org-iso-h264
+  Stream #0:1  Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, mono
+ffmpeg 復号: video 276,480 bytes / audio 47,104 bytes —— いずれも期待値ちょうど、警告なし
+→ PCM と画素から mp4 までの生成経路に ffmpeg が 1 箇所も無い
+```
+
+`avcC` の検証は field 一致より強い: **ffmpeg 自身の parameter set を与えると、この writer は
+ffmpeg の bytes と完全一致する**（AAC 側は ffmpeg が optional な SBR sync extension を
+足すので一致しなかった）。profile/compatibility/level は引数ではなく **SPS から読む**
+（記録が SPS と食い違えば decoder 側の問題になるから）。High profile は拡張が要るので
+黙って切り詰めず throw する。
+
+**箱よりも間違えやすいのは sample 側だった**: mp4 は **length-prefix された NAL** を運び、
+Annex B の start code ではない。かつ parameter set は `avcC` に属し sample には入らない。
+Annex B をそのまま `mdat` に写した muxer は、**parse でき codec も解像度も正しく報告され、
+それでも何も復号されない**ファイルを作る。`annexb->sample` を独立関数にして単体で
+テストしたのはこのため。`tkhd` も width/height を運ぶようにした（従来 0 固定。remux では
+source の値が要らないので生き延びていたが、ここで起こすトラックでは致命的。宣言しない
+トラックは 0 のまま = remux 出力は不変、これも assert）。
+
+### ffmpeg 側を初めて実測した —— 差は 1,120 倍で、アルゴリズム差ではない
+
+これまで「ffmpeg は数十秒」は**二次情報の引き写しで、一度も測っていなかった**。同一の
+720x1280 YUV を、x264 を**我々と同じスコープ**（B なし・参照 1 枚・CAVLC・16x16 のみ・
+trellis なし）＋**同じ全探索（`me=esa` merange=8）**＋**同じ 1 thread** に設定して測った:
+
+```
+x264 (esa ±8, subme=7, 1 thread) : 16.2 ms/frame   → 1800 フレームで 29 秒
+我々（289 + 49 候補, 1 thread）  : 18,140 ms/frame → 9.07 時間
+                                   1,120 倍
+x264 を dia+subme=1 に落としても 10.8 ms —— esa との差は 1.5 倍しかない
+```
+
+**探索範囲・候補数・thread 数を揃えてこの差である。探索を賢くしても埋まらない。**
+（この 18,140 ms は 720x1280 の**実測**。従来の数字はすべて 128x128 からの換算だったが、
+換算値 4.783 に対し実測 5.039 ms/MB で、外挿は妥当だった。）
+
+### 内訳を実測で分解した
+
+同じ 16x16 SAD を、**表現だけ**変えて測る:
+
+```
+行ベクタのベクタ + nth（当時の実装） 3051 ns/SAD  11.92 ns/px
+フラット persistent vector + nth     4051 ns/SAD  15.83 ns/px
+int-array + aget                      183 ns/SAD   0.72 ns/px   ← 16.6x
+byte-array + aget                     195 ns/SAD   0.76 ns/px
+```
+
+| 要因 | 倍率 | 根拠 |
+|---|---|---|
+| **データ表現** | **16.6x** | 上表の実測 |
+| SIMD | ~10x | **推定**。ARM64 NEON は 1 命令 16 byte、最良スカラ 0.72 ns/px から幅で割った値 |
+| その他（補間構築・残差・エントロピー・候補ごとの間接） | ~7x | 上 2 つで割った残り |
+
+### 実装したもの: ME 経路の配列化（`org-iso-h264` `30f36c0`、1.26x）
+
+`interp/plane->array` が参照面を**フレームに 1 回**、`grid->array` が 16x16 source block を
+**MB に 1 回**配列化する（それぞれに対する読みは 10⁶ 回規模）。撤回した support window との
+違いはここで、あれは候補ごとに**複製する仕事を足した**が、これは**読みが通る表現を変えて
+仕事を減らす**。残差・エントロピー経路は row-vector grid のまま —— 読みが集中しているのは
+ME だけだから。
+
+```
+交互 10 round median: 5.150 → 4.095 ms/MB = 1.26x（7/10 round 優位、分布は重なる）
+出力は全 20 run で byte 一致
+```
+
+**1.26x であって 16.6x ではない —— そしてこの 2 つの差が要点である。** 16.6x は 1 関数を
+単体で測った値で、フレームには sub-pel 面構築・残差符号化・再構成・エントロピー符号化・
+intra フレームがあり、kernel 測定はそれらを含まない。この ADR は有理数 solver の推定が
+3 倍外れたときに既に「**microbench からの外挿も「読んで分かった」と同じ罠**」と書いていたのに、
+ここで同じことを繰り返した（予測 33 分/エピソード、実測 約 7.2 時間 —— **1 桁以上の外れ**）。
+
+達成できたことは時計ではなく profile に出ている: **P フレームの 37.9% だった
+`interp/sample` が上位から消え、profile が平坦になった**（最大 15.6%：sad-mc-integer 15.6 /
+sad-mc-planes 9.2 / subpel-planes 9.2 / encode-macroblock! 7.5）。**残っているのは
+アクセスではなく演算である。**
+
+### SIMD —— kotoba-lang に基盤が存在しない（調査結果、2026-07-30）
+
+「SIMD を入れる」指示に対して、まず基盤の実在を確認した。**無い。**
+
+```
+kotoba-lang/compiler の src/ docs/ lang/ を横断:
+  v128  0件   simd  0件   i8x16  0件   neon  0件   avx  0件
+（docs/ の xmm 1件は native backend baseline が「無い」と書いている箇所）
+kotoba-lang 全 repo:  jdk.incubator.vector / IntVector / ByteVector  0件
+```
+
+したがって SIMD の選択肢は現在:
+
+1. **JVM Vector API** —— JVM 専用（cljs target が死ぬ）、incubator（CI の JDK 17/21 で
+   API が違う）、全 consumer に `--add-modules jdk.incubator.vector` が必要。そして
+   **CLAUDE.md の runtime 優先順位では JVM は最後の手段**であり、そこに SIMD を積むのは
+   方針と逆行する。**採らない**
+2. **kotoba compiler が wasm SIMD proposal / native の vector register を獲得する** ——
+   未実装。これが本来の置き場所で、`docs/native-aot-baseline.md` の値モデル
+   （8 byte ワード + 2 ワード heap pair のみ）と同じ層の欠落
+3. **既に実在する hardware 経路 = `org-w3-webcodecs`** —— ブラウザの hardware encode/decode。
+   macOS なら VideoToolbox が同位
+
+### 結論: scalar Clojure で x264 に追いつく路線は成立しない
+
+**900 倍を残した状態で profile は平坦になった。** つまり JVM 側のデータ構造作業で取れる
+ぶんは概ね取り終わっており、残りは演算そのもの —— SIMD 無しには縮まない。そして SIMD の
+基盤は無い。
+
+したがって **「純 cljc encoder を x264 の速度に近づける」は目標として成立しない**。
+この経路の価値は速度ではなく:
+
+- **可搬性** —— native 依存ゼロで、ブラウザでも nbb でも同じ bitstream を出す
+- **適合性の oracle** —— 実 ffmpeg が復号でき byte 一致する参照実装として、
+  hardware 経路の出力を検証できる
+- **W4 が要求している representative performance workload** ——
+  `kotoba-lang/lang/performance-workloads.edn` の既存 2 case は 12 要素の collection で、
+  ABI 判断は「representative real programs + allocation profile + lookup latency profile」を
+  要求している。**上記の profile と 16.6x 測定がまさにその証拠**である
+
+**実運用で 900 倍を埋める手は platform の hardware encoder への dispatch**
+（`org-w3-webcodecs` / VideoToolbox）であり、scalar 最適化の追加増分ではない。
+
+### 実装したもの: backend カタログと選択（`utsushi` `de77ca1`）
+
+**utsushi 自身が最初からこの結論を書いていた。** 層③の CLAUDE.md:
+
+> libavcodec を `.kotoba`/cljc で再実装しない。codec 内側ループは純 cljc では framerate で
+> 回らない（**SIMD/threads 無し**・fuel・streaming 不可）
+
+上の 1,120 倍の実測はこの不変条件を**裏付けた**。そして `utsushi.codec/decode` / `/encode` は
+第一引数に `_policy` を取りながら**使っておらず**、docstring は「実体は capability-gated
+native host word」と書いていた —— つまり「どの実装が走るか」を決める場所が用意されたまま
+空だった。新しい層を作らず、そこを埋めた。
+
+**設計で 2 つの能力を分けたのが要点で、最初これを混同して既存テスト 4 件を壊した**:
+
+| | 何をするか | codec | 実体 |
+|---|---|---|---|
+| `facade-ops`（`:encode`/`:decode`） | opaque passthrough + コンテナ metadata | **任意**（`:h265` も通る） | `:opaque` backend = 既存契約そのもの |
+| `pixel-ops`（`:encode-pixels`/`:decode-pixels`） | 実画素処理 | h264/aac 等 | façade は**一切やっていない** —— 画素は `utsushi.pipeline.*` が org-iso-h264 を直接呼び、façade を通らない |
+
+つまり **native host word の座は、画素については今も空である**。
+
+status が主張を制御する。**`:executor-absent` は「使える」ではない** —— `select` は既定で
+選ばない。`:webcodecs` は `org-w3-webcodecs` に**実物の binding があり**（能力プローブ
+`video-encoder-config-supported!` まで）、無いのは utsushi 側の executor。そう書いてあることが
+重要で、「hardware 対応済み」と読めてはいけない。`:ffmpeg` は `:out-of-layer` ——
+utsushi は「①②④ は純 cljc + EDN、外部依存ゼロ」なので spawn は書かず**宣言だけ**置く。
+宣言する理由は、**production が現に ffmpeg に依存している事実を、隠れた前提から選択対象に
+引き上げる**ため。
+
+`select` は選べないとき**却下理由を全 backend ぶん添えて投げる** ——「backend が無い」だけでは
+platform 違いか status か codec 非対応かが呼び手に伝わらない。
+
+policy への配線 2 点:
+
+- `check-graph` が backend の実行可能性まで見る。既定は façade op として（既存契約を保つ）、
+  `:require-pixel-backend? true` のときだけ画素として検査する。**実行時に VideoEncoder
+  undefined を踏むより早く、原因も具体的に落ちる**
+- `graph-gas` / `node-gas` が backend の実測倍率を掛ける。同じ `:encode` node のコストが
+  `:cljc` 18,140 ms/frame と `:ffmpeg` 16 ms/frame で**3 桁違う**ので、op だけで決めた
+  見積りはどちらが走るかによって 1000 倍外れる
+
+**測定値は測ったものだけを書く**（`:measured/ms-per-frame` が nil = 測っていない、の意味で
+あり「速い」の省略ではない）。テストがそれを検査する —— 実測値には必ず測定条件が付くこと、
+oracle を主張するのは `:cljc` だけであること、実行可能 status は `:opaque` と `:cljc` だけで
+あること。**カタログが将来「hardware 対応済み」に読み替わらないための歯止め**である。
+
+### 実装したもの: provider による executor 注入（`utsushi` `0d00c52`）—— hardware 経路が使える状態に
+
+**設計の前に kototama / compiler / aiueos を確認した**（指示による）。結果が設計を決めた:
+
+| repo | 確認結果 |
+|---|---|
+| **kototama** | **本物の機構があった。** `kototama.contract` の actor:host import surface（`:import/id`/`:import/effects`）と、`component-provider` の provider 契約 + grant 強制。maturity は R1 stable（JVM/Chicory が実 `.wasm` を fuel/memory 制限付きで実行）、R2 qualified（browser 14/14 linkable） |
+| **compiler** | `kotoba.compiler.accelerator` は**本物のコンパイラ** —— WGSL/CUDA/MSL を実際に emit し content-addressed に seal し regeneration まで検証する。だが **runtime/provider が無く**（grep で触るのは自身とテストと ADR 2 本だけ）、dtype は `:f32` のみ・op は ewise(add/sub/mul/div) と reduce(sum/max/min) のみで **SAD が書けない**（`abs` が無く、2D block/stride addressing も無い）。GPU 経路の正しい置き場所ではあるが、今日は codec を表現できない |
+| **aiueos** | broker/virtio/net/image/execute はあるが、codec / hardware encoder の capability は無い |
+| **`bind_evm`/`bind_btc`** | utsushi の docstring が引用しているが **kototama にも compiler にも 0 件** —— 存在しないパターンを指していた |
+
+したがって executor 機構は発明せず、**`kototama.component-provider/prepare!` を写した**。
+あちらが強制する 3 点をそのまま強制する: ①providers のキーは granted と厳密一致
+②capability 名だけでは authority ではない ③provider は invocation adapter を露出する。
+
+**設計の要点は「status を書き換えないこと」である。** カタログの `:webcodecs`
+`:executor-absent` は「utsushi 単体では executor が無い」という**恒久的に正しい事実**で、
+provider の有無は**その deployment の**事実だから、policy 側に住む。`select` は provider が
+あれば status を待たずに実行可能として扱うが、**platform 制約は超えられない**
+（browser で外部プロセスは動かない）。`invoke!` は provider が無ければ投げる ——
+**カタログに在ることと実行できることの区別を実行時に潰さない**。
+
+**使える状態であることを実物で確かめた。** utsushi の**外**に書いた ffmpeg provider
+（production の呼び手が書く形そのもの）を注入して:
+
+```
+selection  : :ffmpeg（status は :out-of-layer のまま、executor 注入済み）
+             provider 無しなら :cljc
+check-graph: OK
+gas 見積り : ffmpeg 16  vs  cljc 18000   ← 3 桁差がコストモデルに反映される
+invoke!    : 実 ffmpeg が 274,625 bytes を生成（720x1280 12 frame）
+ffprobe    : h264,720,1280,12
+```
+
+**spawn するコードは utsushi に 1 行も入っていない** —— 「①②④ は純 cljc + EDN、
+外部依存ゼロ」は保たれる。WebCodecs provider は同じ形で、`w3.webcodecs` の呼び出しに
+置き換えて browser 側で登録するだけである。
+
+### 次のレバー（実測シェア順、いずれも推測でなく上記 profile 由来）
+
+面共有まで入れた後の stage 帰属（514 sample、IDR の絶対時間は不変なのでその share が物差し）:
+
+```
+33.1%  me-full-search                    ← 現在の最大 stage
+24.5%  encode-idr / intra（不変）
+20.4%  me-subpel-refine                  （48.4% から）
+10.3%  encode-inter-16x16（residual）
+ 8.4%  mc-predict（最終再構成）
+```
+
+（面共有より前、fused SAD + inter fold の 2 段だけ入れた時点の最深フレーム profile は
+840 sample で以下。interpolation cluster が約 57% だった:）
+
+```
+37.9%  h264.interp/sample     ┐
+ 7.6%  h264.interp/six-tap-h  │ interpolation cluster 約 57%
+ 7.0%  h264.interp/quarter-pel-luma
+ 2.9%  h264.interp/six-tap-v  │
+ 1.0%  h264.interp/half-v     ┘
+ 9.8%  h264.encode/sad-mc
+ 4.9%  h264.encode/encode-macroblock!
+ 3.0%  h264.encode/mat-mul    ← QP ごと 1 回の fold のみ（元 14.9%）
+```
+
+1. ~~**`h264.interp/sample` を support window で**~~ —— **実装して撤回**。
+   two-pass 形は **`subpel-planes` の中で実現した**（水平 6-tap 和を 1 回計算して
+   `half-h` と `center-j` で共有）—— つまりレバー 1 の「正しい形」は独立した変更ではなく、
+   レバー 2 の bit-identical 版の一部として入った
+2. ~~**`me-subpel-refine` の 49 候補**~~ —— **bit-identical 版を実装済み**（面共有、2.32x。上記）。
+   **候補数そのものを削る案は入れていない**: 候補集合を変えれば選ばれる MV が変わり
+   bitstream が変わるので、Decision 2 の不変条件の**明示的な例外**であり、速度と同時に
+   rate/歪みの代償を測らずに入れてはいけない。面共有で 1 候補あたりのコストが大きく
+   下がった今、候補削減の見返りは以前より**小さい**
+3. ~~**`sad`（10.9%）**~~ —— **実装済み**（fused SAD + 早期打ち切り、1.71x。上記）
+4. ~~**`solve-regular-levels`（14.9%）**~~ —— **実装済み**（inter fold、関数単体 17.4x。上記）
+5. ~~**`me-full-search`（33.1%）**~~ —— **実装済み**（whole-pel SAD 経路、1.17x。上記）
+0. ~~**hardware executor**~~ —— **seam は実装済み**（provider 注入、実 ffmpeg で実証）。
+   残っているのは各 platform の provider 実装であって機構ではない:
+   - **WebCodecs provider**（browser）: `w3.webcodecs` の binding は揃っているので、
+     `:encode-pixels` を `make-video-encoder` → `configure-video-encoder!` →
+     `encode-video-frame!` → `video-encoder-flush!` の列に落とすだけ。**browser でしか
+     検証できない**ので、`org-w3-webcodecs/test/e2e/run_e2e.cljs` の harness を使う
+   - **VideoToolbox provider**（macOS）: FFI が要り、CLAUDE.md の Rust 禁止と JVM 最後手段の
+     両方に触るので**設計判断から**始める必要がある。JVM なら Panama、node なら native addon
+   - **GPU provider**: `kotoba.compiler.accelerator` が正しい置き場所だが、KIR が
+     `:f32` の ewise/reduce しか表現できず SAD が書けない。runtime も無い。
+     **kernel 語彙（整数 dtype・`abs`・2D block addressing）と provider の両方が要る**
+   現時点の production の正解は **`:ffmpeg` provider を注入すること**で、それは今日できる
+6. **これ以上の scalar 最適化は「次のレバー」ではない** —— 上記の結論のとおり、profile が
+   平坦になり残りは演算で、SIMD 基盤が無い。続けるなら取れるのは `mc-predict`（10.9%）と
+   残差/再構成経路（約 19.5%）の配列化で合計 1.3〜1.4x 程度 —— **900 倍に対して意味を持たない**。
+   優先すべきは hardware dispatch（`org-w3-webcodecs` / VideoToolbox）と、
+   compiler 側の SIMD 基盤（wasm SIMD proposal / native vector register）
+7. **interpolation の残り** —— `mc-predict`（最終再構成、8.4%）と decoder 側の
+   `mc-luma-block` はまだ画素ごとに 6-tap を再実行している。`subpel-planes` と同型の
+   共有が効くはずだが、**1 MB に 1 回しか呼ばれない**ので 49 候補ぶんの償却が無い。
+   着手前に必ず再 profile する
+8. **エピソード全体を実素材で 1 度通す** —— 現状すべて 128x128 の合成映像・9〜15 フレームの
+   実測からの換算である。**720x1280 の実クリップで 1 本通すまで、時間の数字は換算値**
+
+### 現在地（closing 時点、2026-07-30）
+
+```
+h264 P frame : 720x1280 の実測 5.039 ms/MB = 18.14 s/frame（配列化の前、org-iso-h264 26b077d）
+               配列化で 1.26x → 約 7.2 時間/エピソード
+x264 同条件   : 16.2 ms/frame → 1800 フレームで 29 秒        差は約 1,120 倍
+```
+
+**720x1280 の実測はこの 1 点だけで、他はすべて 128x128 の per-MB からの換算である**
+（換算 4.783 に対し実測 5.039 ms/MB だったので、換算自体は妥当だった）。配列化後の
+720x1280 は測っていない —— 7.2 時間は「実測 5.039 × 交互測定の 1.26x」であって実測値ではない。
+
+**各段の交互測定比を掛け算しないこと**（1.71 × ~1.14 × 2.32 × 1.17 × 1.26 = 6.6x になるが、
+実測の絶対値の比はそこまで行かない）。各比はそれぞれ自分の baseline を自分の負荷窓で測った
+もので、このマシンは負荷が窓ごとに 2 倍違った。**信頼できるのは「各段の交互比」と
+「現在の絶対値」の 2 つで、両者を掛け合わせて総合比を作る操作は正しくない。**
+
+### このセッションで default branch に着地したもの
+
+| repo | commit | 内容 | 検証 |
+|---|---|---|---|
+| `org-iso-aac` | `f9053399` | AAC-LC encode 一式（順 MDCT / 量子化 + rate control / Huffman encode / ADTS + ASC） | 33 tests・932 assertions。実 ffmpeg が復号し 2 LSB 一致 |
+| `org-iso-isobmff` | `bf8d0b5` | `mp4a` + `esds`（MP4 音声トラック） | ffprobe が `aac (LC) (mp4a)` と認識、復号 PCM は ADTS 経路と byte 一致 |
+| `org-iso-isobmff` | `491ca74` | `avc1` + `avcC`（MP4 映像トラック） | 25 tests・232 assertions。**ffmpeg 自身の `avcC` と byte 一致**、復号 YUV は Annex B 経路と byte 一致 |
+| `org-iso-h264` | `4d943ab` | fused SAD + 早期打ち切り | 1.71x、byte 一致 |
+| `org-iso-h264` | `b490bfe` | inter residual solve の fold | 関数単体 17.4x、byte 一致 |
+| `org-iso-h264` | `380c741` | sub-pel の half-sample 面共有 + dispatch 巻き上げ | 2.32x、byte 一致 |
+| `org-iso-h264` | `26b077d` | 整数探索の whole-pel SAD 経路 | 1.17x（ノイズと同程度）、byte 一致 |
+| `org-iso-h264` | `30f36c0` | ME 経路の配列化 | 1.26x、byte 一致。124 tests・7077 assertions |
+| `utsushi` | `de77ca1` | codec backend カタログと選択（層③ façade の空席を埋める） | 49 tests・319 assertions |
+| `utsushi` | `0d00c52` | provider による executor 注入 | 実 ffmpeg provider を注入して端から端まで実証 |
+
+**closing 時点の検証**: 4 repo 合計 **231 tests / 8,560 assertions、0 failures / 0 errors**、
+lint は全 repo で errors 0（warning 2 件はいずれも本作業以前からのもの）。
+west pin は 4 件とも `HEAD == pin == remote main` を確認済み。
+
+### 到達したことと、到達していないこと
+
+**到達**: PCM と画素から mp4 まで、**生成経路に ffmpeg が 1 箇所も無い**
+（`av_both.mp4` を実 ffmpeg が音声・映像とも読み、いずれも期待バイト数ちょうど）。
+そして速い実装を選べる seam（provider 注入）が動く。
+
+**未到達**: h264 encode は**約 7.2 時間/エピソード**で x264 の 29 秒に対し**まだ 3 桁差**。
+profile は平坦で残りは演算、SIMD 基盤は kotoba-lang に存在しない。
+**したがって scalar 最適化の追加増分でこの差は埋まらない** —— 埋めるのは各 platform の
+provider 実装である（下記レバー 0）。
+
+## Phase 2 — filter 段の家は `douga` ではなく `utsushi` だった
+
+私は当初「filter 段は `douga` の領域」と述べたが、**確認せずに言っていた**。実際は
+`kotoba-lang/utsushi`（映し）が「ffmpeg 的な時間ベースメディアを扱う純 cljc + EDN
+ライブラリ」として存在し、**層④ = filtergraph** が設計済みだった（`utsushi.graph` が
+DAG を正規化 EDN で組み、`utsushi.policy` が effect/gas を持つ）。`douga` は ffmpeg の
+argv builder で別の役割。
+
+層④ にはオーケストレーションはあったが**画素 op が無く**、op 語彙は
+`:demux/:decode/:encode/:mux` だけだった。実際の filter は全部 ffmpeg の `-vf`
+文字列として外で組まれていた。
+
+**`utsushi.raster` を追加**（`80379b3c`）: `scale` / `pad` / `fit`(scale+pad) /
+`hold`(`tpad=stop_mode=clone`) / `zoompan`(4 モーション)。平面表現は
+**`h264.encode` が既に使っている形**（フラット row-major + `:width`/`:height`）に
+合わせたので、filter の出力がそのまま encoder の入力になる。新しいフレーム型は作らない。
+
+`utsushi.policy` への配線も同じ commit に入れた —— コードにあって policy に無い op は
+graph 検査を素通りするか弾かれるかのどちらかで両方壊れている。effect は 5 つとも nil
+（純粋。`:media-decode` を付けたら effect モデルが嘘になる）、gas は実測に合わせて
+encode より 1 桁小さく、画素 4 つは `per-frame?` に入れた（**漏らすと 1800 フレームの
+graph が 1 フレーム分の見積りで通る**）。
+
+**精度は ffmpeg と同一ではない。** 実フレームで
+`ffmpeg -vf scale=360:640:flags=bilinear` と比較して **平均絶対差 1.001 / 最大 32 /
+1 以内 83.8%**、速度 67 ms（ffmpeg ~5 ms、13×）。swscale の \"bilinear\" は教科書的な
+双線形ではない（固定小数点のタップ生成と彩度考慮が違う）。生成映像を素材にする用途では
+視認できないが、docstring に明記し、既存出力のバイト再現が必要な場面は ffmpeg を使えと
+書いた。
+
+## `.kotoba` guest の上限は security 由来ではない
+
+「guest 側を改善してもいいのでは? security 的な問題? compiler の成熟度の限界?」への
+調査結果:
+
+1. **grammar 全体で security 由来の上限は 1 つだけ** ——
+   `:abi-bound {:max-arity 5 :disposition :intentional-security-constraint}`。
+   128 要素 vector / 32 pair / Cartesian 16-4-2 には security disposition が無い
+2. **なぜ 128 か** —— `:doseq {:desugars-to \"admission-bounded guarded vector unroll\"}`。
+   コンパイラがループを実際に展開するので、128 は unroller の限界
+3. **この設計の安全性は別の場所から来る** —— 「安全性の境界は purity ではなく
+   ambient authority の排除」。サイズ上限は determinism と fuel 会計のためで、
+   W4 はそれを「小さな固定上限」から「明示的な node/depth/byte budget」に置き換える計画
+4. **W4 は handle/linear-memory 方式を名指しで否定している** ——
+   \"Implementations may use arenas and handles, but **handles are not the
+   application programming model**\"。私が当初勧めかけた `mem-i32-at` 方式はこれに反する
+5. **W4 は止まっていて、待っているものが我々の手にある** ——
+   \"**Add representative performance workloads before selecting** HAMT/vector-trie,
+   arena, rope, or region implementations\"
+
+したがって **guest 改善は許されているどころか次の一手として文書化されており、
+代表的な性能ワークロードの提供を待っている**。codec の hot kernel がそれである。
+
+## native 化 — AOT は正解、Rust は方針で閉じている
+
+「compiler だと jvm に依存しないようにできるのでは? aot, jit or rust runtime」への回答:
+
+- **AOT は実在する** —— `compiler/src/kotoba/compiler/backend/x86_64.cljc`（43 KB）/
+  `aarch64.cljc`（40 KB）が生の機械語を cljc から emit し、
+  `native_executor_test.clj`（859 行）が実プロセス実行を証明。ADR-2607198300 が
+  「実行は最終的に JVM/Node/Rust を経由しない」を定めている。**JIT は不要**（AOT で
+  機械語まで落ちる）
+- **Rust は選択肢に入らない** —— ADR-2607072000 が kotoba-lang 全体に「Rust が必要な
+  実装は全て cljc」を定め、根拠は kotoba 自身の約 38 万行 Rust crate 群の撤去実績。
+  CLAUDE.md にもオーナー指示として明記
+- **障害は backend ではなく入口** —— native backend がコンパイルするのは `.kotoba` で
+  codec は `.cljc`。「JVM 無しで codec を走らせる」= hot kernel の `.kotoba` 移植を
+  意味し、そこが上記 W4 の値モデルに依存する
+- **具体的に何が足りないか（2026-07-30 追記、`compiler/docs/native-aot-baseline.md`
+  = compiler repo 自身の native track 用 running summary が authority）** ——
+  native の値の世界は **8 byte の機械語ワード 1 個**（rax/x0）＋ **heap arena の
+  `pair`（2 ワード固定セル。string は `pair(offset,length)` そのもの）**だけ。
+  record / variant（ADR 0062/0063）は **独立した実行時表現を持たない** ——
+  codegen 時に synthetic stack slot へ書き換えられ、**関数境界を越えない**
+  （引数にも戻り値にもならない）。f64 field は不可、case 数も「a handful」まで。
+  したがって **921,600 要素の画素面を保持できる型が無い** —— pair chain にすれば
+  16 byte/画素かつ O(n) access で、今の JVM persistent vector より確実に悪い。
+  つまり不足しているのは capability ではなく**値モデル**
+- **W4 のゲートは実在し、待っているものが特定できた** ——
+  `kotoba-lang/lang/performance-workloads.edn`。既存 2 case は **12 要素の collection**
+  で、`:abi-decision` は tagged trie を検討する条件を
+  `:minimum-evidence [:representative-real-programs :allocation-profile
+  :lookup-latency-profile :artifact-size-delta]` ＋
+  \"material end-to-end improvement, not a microbenchmark-only win\" と定めている。
+  **codec kernel はまさにこの representative real program**で、上の P フレーム
+  profile が `:allocation-profile` / `:lookup-latency-profile` の実データになる
+- **capability は codec の律速ではない** —— codec kernel は画素 in / bit out の
+  純関数（`kotoba/pure`）で、clock も storage も http も ui も要らない。これは重要で、
+  native AOT の最も弱い部分がまさに capability だから: 同 doc は
+  \"there is still no native provider/capability mechanism of any kind\" を**2 度**明記し、
+  Wasm track と同等に達するには native の string/keyword 付き record・入れ子・
+  provider/linking 機構が全部必要だと書いている（どれも未実装）。**actor を native 化
+  するなら capability が壁だが、codec なら壁ではない** —— だから codec は
+  「値モデルだけを要求する最も安い最初の native workload」であり、W4 が欲しがっている
+  証拠の種類と要求が一致している
+
+## Phase 3 — AAC encode（実装済み、`org-iso-aac` `f9053399`）
+
+下記 Not done の筆頭だった AAC encode を実装した。4 段すべてと、mono(SCE)/
+stereo(CPE, per-band mid/side)/rate control が入っている。
+
+| 段 | 実装 |
+|---|---|
+| ①順 MDCT | `aac.mdct`。`aac.imdct/decode-frame` の厳密な TDAC 逆 |
+| ②量子化 + rate control | `aac.quant` + `aac.encode`。per-band scalefactor、bit budget の二分探索 |
+| ③Huffman encode | `aac.huffman` の encode 節。**decode と同一の Annex 4.A テーブル**を逆引き（`h264.cavlc` の先例どおり） |
+| ④ADTS / ASC | `aac.adts/write-header`（`parse-header` の逆）+ `audio-specific-config`（MP4 `esds` 用 2 byte） |
+
+### 順 MDCT の scale は spec に無いので導出し、テストで固定した
+
+encoder 側は informative なので `2/N` に対応する前方係数は spec に書いていない。
+aliasing 恒等式 `Σ_k c(m,k)c(n,k) = (N/4)(δ + (-1)^j)` から
+`y[n] = (s/2)(z[n] ∓ alias)` を出し、overlap-add が alias を消すには先頭係数が 1
+＝ `s = 2` と決まる。**この導出を信用せず、round-trip が両 window shape で
+1e-6 まで復元することと、scale を 0.5×/2× にすると壊れることの両方を assert した**
+——「round trip が通る」だけのテストは、定数倍ずれた自己整合ペアを通してしまう。
+
+### 検証は golden-vector を逆向きに回した
+
+decoder は「実 ffmpeg の stream を読んで ffmpeg の PCM と一致」で検証したが、
+encoder に同じ手は使えない —— 適合する 2 つの AAC encoder は全く違う bitstream を
+出し、どちらも間違っていない。**主張できるのは「独立した実 decoder が我々の
+bitstream を読んで音を復元する」だけ**なので、向きを反転させて **我々が encode し、
+実 ffmpeg が decode する**。結果:
+
+```
+ffmpeg の decode ⇔ 本リポの decode : 最大 2 LSB（decode 側と同じ許容）
+source 復元       : 38.2 dB (mono 125.6 kbps) / 37.9 dB/ch (stereo 182.5 kbps)
+channel 入れ替わり: 無し（同 ch 37.9 dB vs 交差 8 dB 以下）
+silence           : max_sfb 0、payload 4 byte/frame、PCM は厳密に 0
+```
+
+ffmpeg の答えを fixture に commit したので CI に ffmpeg は要らない。**fixture との
+byte 一致は意図的に assert しない** —— `Math/pow` / `Math/cos` は platform 間の
+bit 一致を要求されておらず（`StrictMath` だけが要求される）、量子化境界上の係数が
+1 ulp で反転しうる。byte 比較は correctness check ではなく portability の罠になる。
+
+### 測って見つけた 2 件（どちらも構造検査は全部通っていた）
+
+1. **8191 の量子化上限を超えた係数が黙って clamp されていた。** spectral peak 1 本の
+   clamp で 75 dB のフレームが ~0 dB に落ち、交互フレームが clip して stream 全体が
+   14 dB になっていた。ADTS も section も scalefactor も完全に整合していたので、
+   構造検査では一切見えない。修正は古典的 encoder の inner loop（band ごとの
+   scalefactor 下限 `min-scalefactor`）。**回帰テストは「floor で clip しない」だけでなく
+   「floor の 1 段下では同じ spectrum が overflow して 40 dB 落ちる」も assert する**
+   —— でないと「この信号が無害だった」ことの証拠にしかならない。
+2. **rate control が安価な上界で二分探索していて target を 12% 下回っていた**
+   （128 kbps 要求に 112 kbps）。上界が無視していたのは、その後 optimiser が実際に
+   行う section merge そのものだった。厳密コストで二分探索するよう変更。
+
+### 測ってから決めた 2 件
+
+- **丸め規則**: 慣習の `floor(v^(3/4) + 0.4054)` の 0.4054 は魔法の数ではなく
+  `1 - (1/2)^(3/4)` ——**q=0→1 の境界としては厳密だが、q が増えると 0.5 へ漂う**
+  （q=1 で 0.470、q=10 で 0.486）。既定は厳密な nearest-reconstruction-level 規則にし、
+  **同一 bit budget での優劣を実測**した: nearest が 96/128/192 kbps すべてで勝つ
+  （128 kbps で 38.60 vs 38.51 dB）。rate loop が閉じているので biased が節約した bit は
+  タダにならない —— loop が細かい scalefactor に使ってしまう。
+- **noise shaping 指数 α**: power law 自体が noise を軽く shaping しているため
+  **α=1/4 が「scalefactor 一定」に対応する**（α=0 の平坦 noise 床は loud band の
+  scalefactor を*下げる*必要がある）。既定は 1/4 ——「perceptual に最良だから」ではなく
+  **masking model が無い本リポが唯一正当化できる値だから**。実測 SNR も 128 kbps で
+  最良（38.60 vs α=0 の 38.19、α=1 は 13.71）だが、SNR は perceptual 指標ではない。
+
+### 速度（5 回 median）
+
+```
+forward MDCT      22.0 ms/frame  (43%)
+rate loop + write  28.7 ms/frame  (57%)  ← 二分探索 8 probe が主
+mono 合計         ~45 ms/frame → 60 秒クリップで約 2 分
+stereo 合計       ~97 ms/frame
+```
+
+video 側（37 分/エピソード）に比べれば音声は問題にならない。
+
+### mp4 の音声トラックまで通した（`org-iso-isobmff` `bf8d0b5`）
+
+AAC encode だけでは足りなかった —— **mp4 は codec を宣言する箱を要求する**のに
+`isobmff` は codec config を opaque に扱う設計（`minimal-stsd` は config を持たず、
+remux は source の stsd を丸ごと再利用）で、「これは AAC だ」と書く場所が無かった。
+`isobmff.mux/esds` + `aac-stsd` + `aac-track` を追加してこれを埋めた。
+
+**この repo で唯一「codec config を組み立てる」例外**であることは README に明記した
+（video 側には未だ無い。下記 Not done）。検証は 2 つの独立した reference に対して行った:
+①**実 ffmpeg 自身の箱** —— 既存 fixture `av_sample.mp4` の中に ffmpeg が書いた
+`mp4a`/`esds` があるので、同じ引数を与えたときに同じ field 値・同じ descriptor 入れ子に
+なることを要求する ②**writer とは別に書いた parser** —— それが ffmpeg の bytes も
+読めることを要求する（writer/reader が同じ誤った長さ符号で合意しても捕まる）。
+
+ffmpeg との差分 1 件を「既知の差」として固定した: **ffmpeg の DecoderSpecificInfo は
+mono AAC-LC でも 5 byte** —— 2 byte の AudioSpecificConfig ＋ optional な 0x2B7
+sync extension で `extensionAudioObjectType = SBR, sbrPresentFlag = 0` を明示している
+（素の AAC-LC config は暗黙に同じ意味）。テストがこの bit 列を復号して assert する。
+
+end-to-end（実 ffmpeg）:
+
+```
+PCM → org-iso-aac encoder → aac-track → isobmff.mux → aac_mono.mp4
+ffprobe : Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, mono   （警告なし）
+ffmpeg  : 復号 PCM が ADTS 経路の復号 PCM と byte 完全一致
+        → container は誤差を一切足していない / esds は意図どおり読まれている
+```
+
+### 限界は機能でなく限界として書いた
+
+- **block switching が無い** ——transient に short window を与えないので pre-echo が出る。
+  打楽器系は ffmpeg より**可聴に**悪い。定常素材（ナレーション/BGM = 実際の consumer）は問題ない
+- **psychoacoustic model が無い** ——同 bitrate で ffmpeg より **SNR は高いのに音は良くない**
+  という関係になる。**この SNR を品質の証拠として読まない**
+- TNS / PNS / intensity stereo / LTP / pulse / SBR-PS は無い（mid/side はある）
+
+## Decision
+
+1. **純 cljc codec 経路を維持し、実測駆動で kaizen する。** 推測で最適化しない。
+   before/after は同一手法（5 回 median）で測る。単発測定を根拠にしない
+2. **bit-identity を最適化の不変条件とする。** 精度特性を買い戻す高速化はしない
+3. **画素 filter は `utsushi` 層④に置く。** `douga` は argv builder のまま
+4. **ffmpeg との精度差は明記する。** 「相当」と「同一」を混同しない
+5. **guest 改善（W4）は codec の hot kernel を representative workload として駆動する。**
+   handle/linear-memory 方式を programming model にしない。上限は削除ではなく
+   budget に置き換える
+6. **Rust runtime は導入しない。** native 化は kotoba compiler の AOT backend で行う
+7. **encoder の限界は「未実装項目」として明示する。** block switching 無し・
+   psychoacoustic model 無しは隠さず docstring と README に書き、**SNR を品質の
+   証拠として提示しない**（perceptual encoder は同 bitrate で SNR が低いまま音は良い）
+8. **既存の検証済み decoder を持つ format の encoder は、decoder の厳密な逆として
+   作る。** Annex 4.A テーブル・field 順・escape 規則は decoder 側が実 ffmpeg
+   bitstream で bit 単位に固定済みなので、同じテーブルを逆引きすれば
+   「片方向だけ正しい転記ミス」が構造的に起きない。AAC encode の見積りが「週規模」
+   だったのに 1 セッションで済んだのは、この非対称性のため（新規 format を
+   ゼロから起こすコストと混同しない）
+
+## Not done
+
+- **AAC priming の edit list。** `aac-track` は `elst` を出さないので、先頭 1024 サンプル
+  （filterbank の priming = `aac.encode/encoder-delay`）が再生される。`edts`/`elst` か
+  `iTunSMPB` で隠すのが通例。**映像と音声の頭が 1024 サンプル（約 23 ms）ずれる**ので、
+  A/V sync を気にする用途ではこれが最初に効く
+- **B-frame / `ctts`。** encoder が B を出さないので composition offset は要らないが、
+  出すようになれば `mux` 側に `ctts` が必要になる
+- **Phase 1 の裾**（`encode-macroblock!` body / chroma 経路）。あと 2〜3× は見込めるが
+  単一ホットスポットは無い
+- **`.kotoba` への移植と native AOT**。W4 の値モデル待ち
+- **音声 mix の配線** —— `audio.mixer`/`filter` は実在するが filtergraph op として
+  未登録（video 側 5 op のみ入れた）
+- **encoder の block switching（`EIGHT_SHORT_SEQUENCE`）。** decoder 側も未対応なので
+  両方いる。これが無い間、打楽器系素材は pre-echo が出る
+- **1800 フレームのエピソード全体を cljc 経路で通した実績は無い。** 単一フレームの
+  実測から外挿している（音声側も 8192 サンプル = 9 フレームの実測からの外挿）
+
+## Consequences
+
+- (+) 5.5 時間 → 37 分。まだ ffmpeg（数十秒）には 2 桁足りないが、**性質が変わった**
+  —— 単一のホットスポットから長い裾へ
+- (+) 全段 byte-identical なので、既存の出荷物と差が出ない
+- (+) filter 段が native 依存ゼロの経路を得た。層④の op 語彙が初めて実際の
+  パイプラインを表現できる
+- (+) W4 が要求していた「hot kernel はどこか」という情報が副産物として出た
+- (+) AAC encode ＋ `mp4a`/`esds` が入り、**mp4 の音声トラックを純 cljc で作れる**
+  ようになった（実 ffmpeg が `aac (LC) (mp4a)` として再生、復号 PCM は ADTS 経路と
+  byte 一致）。音声側の速度は video 側に対して無視できる（60 秒で約 2 分）
+- (+) **mp4 の生成経路から ffmpeg が消えた** —— 音声 + 映像を 1 ファイルに入れて実 ffmpeg が
+  両方読む（`avc1`/`avcC` + `mp4a`/`esds`、上記）。**「機能として作れない」段階は終わった**
+- (−) **それでも実運用では ffmpeg を外せない。理由は「機能の欠落」から「速度と精度」に
+  移った**:
+  ①h264 encode は約 **8.6 時間/エピソード**（ffmpeg は数十秒）で、4 段の kaizen 後も
+  **まだ 3 桁差**。ここが実運用の律速
+  ②`plane-scale` は ffmpeg と bit-identical でない（MAE 1.001）ので既存出力の再現に使えない
+  ③AAC priming の edit list が無いので A/V の頭が約 23 ms ずれる
+  **穴の位置が変わっただけで「もう外せる」ではない**ことを明示する。①は 3 桁差なので、
+  「あと数段の kaizen で追いつく」類の距離ではない
+- (−) `plane-scale` は ffmpeg と bit-identical ではないので、既存出力の再現には使えない
+- (−) 外挿に依拠している。エピソード全体を通す実測はまだ
+- (−) `MURAKUMO_TOKEN_SECRET_2` を使い切った件（ADR-2607299960）と同様、
+  ここでも「測ってから決める」を守るコストが時間として乗る
+
+## 訂正した自分の誤り（記録）
+
+このセッションで、確認せずに述べて後に実測で覆した主張が 4 件ある。再発防止のため記録する。
+
+1. **「ffmpeg の代わりは無い」** —— あった。`org-iso-h264` は CABAC の算術符号化
+   エンジンまで書かれている
+2. **「filter 段は `douga` の領域」** —— `utsushi` 層④が設計済みだった
+3. **「2.9× 改善」** —— 単発測定。同一ビルドが 1.4 倍ばらつくマシンでの単発は根拠に
+   ならない。5 回 median で測り直して撤回・訂正した
+4. **「gcd 約分後 47 bit」（docstring）** —— 再測定しておらず実際は 54 bit。テストに
+   下限を入れて陳腐化を検出できるようにした
+5. **「37 分/エピソード」（この ADR 自身に書いた数字）** —— `encode-idr-luma-frame`
+   だけを測って 1800 フレームに外挿していた。**1799 フレームは P で、実測すると
+   IDR の 13 倍**。正しくは約 32 時間（換算値）。この ADR は「1800 フレーム全体を
+   通した実績は無い、単一フレームから外挿している」と自ら注記していたのに、
+   **その注記が守るべきだったのは「フレーム数」ではなく「フレームの種類」だった**
+6. **P 経路の最適化候補を 2 回、読んだだけで確信した** —— ①全探索 ME が支配的
+   ②畳んでいない有理数 solver が P の 32%。前者は `search-range` sweep が、後者は
+   sampling profiler が否定した（実際は per-pixel accessor が 42.5%）。
+   **microbench からの外挿も「読んで分かった」と同じ罠**である
+
+いずれも「作る前に / 主張する前に確認する」で防げたものであり、実際に確認した 3 回
+（codec の実在 / filter の家 / guest 上限の根拠）はすべて結論を変えた。
+5 と 6 が示す追加の教訓: **「測った」と言えるのは、実際に走る経路を、その経路の
+支配的な形で測ったときだけ**。
+"}]

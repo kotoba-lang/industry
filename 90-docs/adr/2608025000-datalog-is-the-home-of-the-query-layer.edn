@@ -1,0 +1,124 @@
+[{:db/id -1
+  :adr/id "adr-2608025000-datalog-is-the-home-of-the-query-layer"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/title "query 層の本拠は kotoba-lang/datalog — arrangement は依存する側に回る"
+  :adr/topic "datalog-is-the-home-of-the-query-layer"
+  :adr/status "accepted"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+
+  :adr/authoritative-for
+  ["L7(query)と L5(index)のコードがどの repo に住むか"
+   "arrangement と datalog の依存の向き"
+   "抽出した lib を『追加のみ』で放置しないという規律"]
+
+  :adr/related
+  ["adr-2607312100-kotobase-layering-block-ref-split-signed-head"
+   "adr-2608012800-kotobase-layer-decomposition-execution"
+   "adr-2608011400-kotobase-query-plane-as-composable-sources"]
+
+  :adr/decision-summary
+  ["D1: query 層(index + triple-pattern routing + Datalog)の本拠は kotoba-lang/datalog。arrangement は依存する側に回り、自分のコピーを削除する"
+   "D2: 畳む案(datalog を arrangement に戻す)は中立ではなく後退。datom-model が arrangement 依存になり、io-ipld と prolly-tree が L5 に引き戻される"
+   "D3: 後方互換のため arrangement.query / arrangement.datalog は当面 facade として残す。除去は consumer が直接 datalog を向いた後の follow-up"
+   "D4: 『抽出は追加のみ、向け直しは後で』を既定にしない。コピーが 2 つある期間がドリフトを生む"]
+
+  :adr/verify
+  ["gh api repos/kotoba-lang/datalog/contents/src/datalog/core.cljc | ... | sed -n '/(:require/,/))/p'   ; storage 依存が無いこと"
+   "cd <datom-model> && clojure -Spath | tr ':' '\\n' | grep -ci 'ipld\\|multiformat\\|prolly'   ; => 0"]
+
+  :adr/body
+  "# Context
+
+`kotoba-lang/datalog` は `arrangement` から **追加のみ**で切り出された。arrangement は
+その後も開発が続き、20 commit のあいだに `datalog.cljc` が **+322/-21**、`query.cljc` が
++41/-13 動いた（hash join / limit pushdown / projection / cardinality）。結果、
+抽出した lib は**黙って陳腐化し**、query 層を名乗りながらそれらを欠いていた。
+現行 main から再抽出して復旧させたが（58/83 → 86/138 tests）、
+**同じことは再発する** —— コピーが 2 つある限り。
+
+そこで「どちらを本拠にするか」を決める必要が生じた。両方を残すのが最悪の選択肢で、
+それが実際にドリフトとして表面化した。
+
+# Decision
+
+## D1. 本拠は `datalog`
+
+    arrangement ──→ datalog ──→ datom-source
+    (永続化 / IPLD)   (index + query)   (protocol)
+
+`arrangement` は `datalog` に依存し、自分の query/index コピーを削除する。
+コピーが 1 つになれば**ドリフトは構造的に起こり得なくなる**。
+
+## D2. 畳む案は中立ではなく後退
+
+これが決め手だった。`datom-model` は現在 **`datalog` だけ**に依存している。
+`datalog` を `arrangement` に畳むと、`datom-model` は `arrangement` に依存せざるを得ず、
+**`io-ipld` と `prolly-tree` が L5(モデル層)に引き戻される**。
+
+`datom-model` の「storage も IPLD も入らない」は `clojure -Spath` で機械検証した実測値で
+あって努力目標ではない。**畳む案だけが、既に得た検証済みの性質を失う。**
+
+## 依存の向きは既にきれい（実測）
+
+- **循環なし。** `datalog` の require は `datalog.index` / `datalog.query` /
+  `datom.source` / `clojure.string` / `clojure.set` だけ。src に現れる
+  `arrangement` / `ipld` / `prolly-tree` の文字列は**すべて docstring の散文**。
+- **arrangement の永続化半分が index に要求するのは 2 つだけ** ——
+  `assert-quad`(4 箇所) と `empty-db`(3 箇所)。細い下向きの依存。
+
+## 速度の懸念は実測すると小さい
+
+「1 日 20 commit」は定常ではなくバーストだった。稼働日ごとの commit 数は
+5, 1, 10, 11, 3, 2, 2, 2, 2, 4, 1, 4 で、07-09→07-17→07-25 に数日の空白がある。
+20 commit は 1 回の最適化キャンペーンに集中したもの。
+
+**正直なコスト**: query 半分は最も熱いコードである（直近 src 変更の内訳は
+`datalog.cljc` 12 / `core.cljc` 8 / `query.cljc` 2）。つまり cross-repo の摩擦は
+いちばん忙しいファイルに当たる。緩和策は**バースト中は `datalog` で作業し、
+バーストの終わりに arrangement の pin を 1 回上げる**こと —— commit ごとではない。
+
+これが実運用で耐えられないと判明した場合の退避先は「畳む」ではなく、
+**永続化半分を arrangement から出して arrangement を薄い IPLD シェルにする**方向。
+
+## D3. facade を当面残す
+
+`arrangement.core` / `.query` / `.datalog` は公開面で、`kotobase-peer` が
+`qs` / `kqe` / `datalog` として使っている。同期した複数 repo 変更は consumer を
+取り残しやすいので、`arrangement.query` / `arrangement.datalog` は
+**`datalog.*` を再輸出する薄い shim として残す**。`ref?` の
+`ipld/link?` 既定値も arrangement 側が供給する（`datalog.index` は明示要求のため）。
+shim の除去は consumer が直接 `datalog` を向いた後の follow-up。
+
+## D4. 規律 —— 『追加のみ、向け直しは後で』を既定にしない
+
+この ADR が記録すべき一般的な教訓はこれ。**抽出を追加のみで着地させ、
+向け直しを後回しにすると、その期間の長さに比例してドリフトが溜まる。**
+実測: `datalog` +322/-21、`datom-model` +121/-25。一方 `merkle-lsm` は
+ドリフト 0 のまま向け直せた —— **抽出から向け直しまでが短かったから**。
+
+抽出する時は、向け直しまでを 1 つの作業として計画する。分けるなら、
+その期間に上流が動くことを前提に、**再同期のコストを見積もっておく**。
+
+# 現在地
+
+- `datalog` は現行 main から再抽出済み（86 tests / 138 assertions、両 runtime green、
+  runtime 依存は `datom-source` のみを機械確認）。
+- **`arrangement` の向け直しは完了**（`096523f`）。src 957 行削除（正味 -788）、
+  test 804 行削除。`arrangement.query`/`.datalog` は compatibility shim として残り、
+  `facade_test.cljc` が **`ns-publics` の包含関係**を assert するので、上流に public var が
+  増えても shim から漏れると落ちる。
+- **shim は `defn` wrapper であって `(def q dc/q)` の alias ではない。** ClojureScript の
+  analyzer は `def` の `:arglists` を init 式から導出して宣言済みのものを上書きするため、
+  alias だと 8 個すべてが cljs で signature を `()` と報告した（JVM では正しい）。
+  **JVM だけのテストなら通って出荷されていた。**
+- `datom-model` の再同期も完了（`6910ef9`、65/124 → 69/134）。
+- **危うく踏んだ罠**: `datalog` @ `8dde87c` は arrangement が revert した limit pushdown を
+  まだ持っていた。「byte 一致」という前提のまま pin していたら、数時間前に revert した
+  病理を静かに再導入していた。抽出 lib の再同期は**上流の revert も運ぶ**必要がある。
+- `merkle-lsm` は向け直し完了（peer から src 1,480 行 + test 890 行を削除、
+  カバレッジは 44 tests / 165 assertions が 1:1 で移動）。
+"}]

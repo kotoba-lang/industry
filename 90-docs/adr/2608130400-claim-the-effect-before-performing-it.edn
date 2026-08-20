@@ -1,0 +1,84 @@
+[{:db/id -1
+  :adr/id "ADR-2608130400"
+  :adr/title "承認済み effect は、実行する前に claim する — 掃き出しの再実行を止める"
+  :adr/status "accepted"
+  :adr/date "2026-08-13"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body
+  "cloud-itonami の approval sweep は、承認された effect を実行してから記録していた。
+`approved-effects` は文字通りの `:approved` を選ぶので、handler の呼び出し中に
+プロセスが死ぬと、その effect は次の掃き出しでもう一度選ばれる —— メールをもう一度
+送り、Stripe オブジェクトをもう一度作り、GPU ジョブをもう一度課金する。
+
+着地: network-awai/cloud-itonami の merge `40c86a3276d849c9aed1fdf0c57665af6cbb747b`。
+west pin を `c59f66603cd5` から前進させた（fast-forward、verify-west-pins で確認）。
+
+## 修正は 1 つであって 2 つではない
+
+`merge!` は handler の前に `:executing` を claim し、後に `:executed` で決着させる。
+これだけを入れると、crash は「二重送信」から「黙って飛ばされた送信」に変わる ——
+別のバグであって修正ではない。だから idempotency key と同じ 1 つの変更として入れた。
+provider にキーが届く経路では retry が無料になり、無料だからこそ先に claim してよい。
+
+- Resend / Stripe はどちらも `Idempotency-Key` を 24 時間尊重する。
+- Stripe は **別々のキーが 2 本要る** —— キーだけで replay を判定するので、
+  product と price の POST に同じキーを使うと price の応答として product が返る。
+- **murakumo はどちらも持たない**。`vrm_http.clj` の `submit!` は `:job-id` を
+  渡さず、サーバは呼び出しごとに新しい uuid を作る。無視されるヘッダを送るのは
+  劇場なので、ここでは local claim が防御のすべてであり、`generation.cljc` が
+  そう書いている。
+
+## brief に入っていなかった半分
+
+依頼は JVM 側の 4 箇所だった。実測すると **JVM の drain は一度も走っていない** ——
+`tick-loop` / `approval-drain` / `mail send` を起動する launchd job は無く、常駐の
+`mail-drain` は `ingest`（受信側）を回している。store の全履歴を `git log -S` で
+辿っても `:approved` / `:executed` になった effect は 1 件も無い。
+
+**しかし edge は生きている。** `POST /api/{org}/{repo}/effects/{id}/{action}` は
+404 ではなく **401** を返す。そして `approve-with-priming!` は store を永続化する
+**前に** 実際の Stripe / Resend 呼び出しを行うので、送信と保存の間で Worker が死ねば
+effect は `:proposed` のまま残り、operator の自然な再試行が二重に送る。
+
+つまり「潜在的」ではなかった。edge 側 3 ファイルにも同じ修正を広げ、生成物
+`functions/edge/cacao-edge-core.js` を再生成して commit した。**deploy はしていない**
+—— 本番デプロイは main を包含した checkout からのみ行う。
+
+## 併せて直したもの
+
+`with-file-store!` が sweep の最後に一度だけ保存していたため、sweep が throw すると
+**既に送ったメールすべての claim と監査行が捨てられていた**。`finally` に移し、
+プロセス死に備えて `:checkpoint!` を足した。Stripe の product id も記録するようにした。
+
+## 証拠
+
+| | tests | assertions | fail | error |
+|---|---|---|---|---|
+| baseline | 1658 | 16589 | 9 | 40 |
+| after | 1665 | 16613 | 9 | 40 |
+
+失敗集合は baseline と **1 件ずつ同一**。`src/` だけを戻して test を残すと
+**新しい 24 assertion のうち 13 が fail、error は 0**。効いている 1 本は実際の赤:
+
+    FAIL in (a-crash-between-the-effect-and-its-record-does-not-re-send-on-the-next-sweep)
+    the external effect must NOT run a second time...
+    expected: (= 1 (deref sends))
+      actual: (not (= 1 2))
+
+推論した二重送信ではなく、観測した二重送信である。7 本のうち 2 本は両方で通る
+positive control。**test は新しい var を import せず `:executing` を自分で綴っている**
+ので、修正前の tree に対してもコンパイルが通る —— 読み込みに失敗して落ちる test は
+何も証明しない。
+
+## 記録しておく形
+
+`mail.cljc` の docstring は欠陥を**既に書いていた** —— 冪等キーがどこにも無いので
+失敗したと見えた送信を operator が再承認すれば Resend が同じメールをもう一度送る、と。
+言語化されていて、手は入っていなかった。ADR-2608124600 の 1 番目と 3 番目と同じ形。
+**欠陥を正確に記述した docstring は、その欠陥が直っている証拠ではない。**
+
+`:executing` は `policy-risk` の code 表には**入れていない**。あの kernel は未知を
+-1 に写し、docstring が意図をそう書いている（新しい中間状態は明示分類まで書き換え
+可能のまま）。-1 は non-terminal かつ not-approved かつ decision-open を与えるので、
+分類を足すことは `policy_risk.kotoba` と parity gate を編集する対価に見合わない。"}]

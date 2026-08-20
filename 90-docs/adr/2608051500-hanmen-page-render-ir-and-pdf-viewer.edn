@@ -1,0 +1,490 @@
+[{:db/id -1
+  :adr/id "ADR-2608051500"
+  :adr/title "ADR-2608051500: hanmen（版面）— ページを「置かれた印」として持つ共通 lib と、cloud-itonami-app の PDF ビューア統合"
+  :adr/status "accepted"
+  :adr/date "2026-08-05"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/tags "viewer pdf svg cljc kotoba-lang cloud-itonami-app csp app-preview"
+  :adr/body
+  "## Context
+
+`cloud-itonami-app` は 2026-08-05 時点で PDF を**保持できるが表示できなかった**。
+`documents/upload!` は任意バイト列を受け、`previewable-media-types` は
+ラスタ画像 5 種のみなので、PDF は `application/octet-stream` +
+`Content-Disposition: attachment` でしか出ていかない。「何が届いたのか」への答えが
+「ダウンロードして別のアプリで開け」になっていた。
+
+ADR-0007（cloud-itonami-app）は内製 4 種（docs/sheets/forms/slides）について
+「レンダリングされたものが既定のビューである」を決めたが、PDF はその対象外だった。
+理由は正しい: 他人がアップロードしたバイト列をこの origin から inline 配信するのは
+stored XSS であり、PDF はスクリプトを運べる。
+
+### 既存資産（新規に作る前に索引を引いた結果）
+
+| repo | 何を持っているか |
+|---|---|
+| `kotoba-lang/app-preview` | **Apple Preview 相当は既に存在する**。ただし mokuroku カタログ上の**ページ一覧**（label/No./Size/Text/Rotation）であって、ページを描画しない |
+| `kotoba-lang/org-iso-pdf` | COS オブジェクトモデル。`parse`/`pages`/`page-text`/`page-images`。**`extract-text` は BT/ET 間の文字列を集めるだけで位置を持たない** |
+| `kotoba-lang/mokuroku` / `mokuroku-ui` | カタログ kernel と window chrome |
+| `kotoba-lang/canvaskit` | viewport 数学（pan / anchored zoom / fit / hit-test） |
+| `kotoba-lang/kasane` | Adobe/バイナリ形式の decode |
+| `kotoba-lang/tsuzuri` | ブラウザ内 PDF editor（別系統） |
+
+「ページの重さ」（app-preview）と「ページの中身」（org-iso-pdf）の間に、
+**ページが何に見えるかを述べる値**が無かった。だから描くものが無かった。
+
+## Decision
+
+### 1. 共通 lib `kotoba-lang/hanmen`（版面）を起こす
+
+portable `.cljc`、依存は `org-iso-pdf` 1 本、host effect なし。3 名前空間:
+
+- `hanmen.page` — **render-IR**。`{:page/width :page/height :page/rotation :page/items}`、
+  item は `:text` / `:rule` / `:frame` の閉じた 3 種。
+- `hanmen.pdf` — content stream を走らせて IR を埋める。CTM スタック（q/Q/cm）、
+  テキスト行列（Tm/Td/TD/T*/TL）、advance の累積、TJ カーニング、
+  合成フォントの `/ToUnicode`。
+- `hanmen.svg` — 閉じた語彙から SVG を書く。
+
+**`org-iso-pdf` に入れない理由**: content stream は COS オブジェクトモデルの一部では
+なく、小さなスタック言語の**プログラム**である。走らせるにはグラフィクス状態・
+テキスト状態・行列スタックが要り、オブジェクトモデルがそれらを所有する理由は無い。
+`pdf.core` が DCTDecode を不透明バイト列のまま返すのと同じ境界。
+
+### 2. 座標系は「読み手の空間」に一度だけ倒す
+
+PDF は原点左下・y 上向き、SVG / Canvas / ラスタバッファは原点左上・y 下向き。
+反転を各描画側でやると**二重反転**が起き、上下逆のページは人間の目でしか気付けない。
+`/Rotate` も同じ理由でここで適用し、`:page/width` は**見えるとおりの幅**にする
+（app-preview.model が既に「未回転の箱を報告すると thumbnail grid が全部崩れる」と
+学習済み）。
+
+### 3. run の開始位置は厳密、幅は「測れたときだけ」
+
+開始位置は行列から出る算術。幅はフォントの `/Widths` 次第で、文書が積んでいる
+ことも積んでいないこともある。**積んでいなければ推定せず欠落させる** —— 推定値は
+出力上で実測値と区別できず、文書ごとに違う量だけ間違う。欠落は consumer が
+行動できる事実である。測れたときは `textLength` + `lengthAdjust=\"spacingAndGlyphs\"`
+で、読み手のフォントが何であれ run が文書どおりの幅を占める。
+
+### 4. 描けないものは「置いて印を付ける」。飛ばさない
+
+画像 XObject、form XObject、`/ToUnicode` を持たない `/Type0` run —— それぞれ
+`:frame` に label と reason を付ける。黙って落とすと**完成したページと見分けが
+つかない**。`hanmen.svg/emit-item` は未知の kind で throw する（片側だけに
+4 つ目の kind を足せないようにする）。
+
+### 5. SVG は `default-src 'none'` の中で不活性
+
+**アップロードされた SVG を拒否する方針と矛盾しない。** 拒否されるのは
+「ユーザーが書いた任意の要素集合」で、これは「閉じた 3 kind の語彙から
+このコードが生成した markup」である。文書の中身が要素名・属性名になる経路は
+存在せず、エスケープされたテキストノードか属性**値**にしかならない。
+`serialize` が allowlist で二重に強制する（URL を取る要素が 1 つも無い）。
+
+`data:` URI の `<img>` ではなく**ページ内の markup** にしたのは、`data:` は
+*load* であり `default-src 'none'` を広げる必要があるから。markup は load では
+ないので CSP は 1 文字も変えていない。**ADR-0007 の `img-src data:` follow-up は
+開いたまま** —— ページが何を *load* してよいかは独立した決定であって、
+ビューアを足した副作用で決めるものではない。
+
+### 6. 色もフォントも選ばない
+
+すべて `currentColor` + class。ホストの token が見た目を決める。これが 1 つの
+レンダリングが light/dark 両方で正しくなる唯一の方法で、文書の黒は暗いページ上の
+読み手の黒ではない。**インクの濃さは保存する**（60% グレーの罫線は黒より薄いまま、
+`fill-opacity` 経由）—— 濃さは文書の意味であり、絶対色はそうではない。
+モデル側は PDF の `/G`（0=黒）を反転して `:item/ink`（1=最大濃度）で持つ。
+形式中立なモデルに形式の反転規約を持ち込むと、2 番目の producer が全部の罫線を
+ネガで描く。
+
+### 7. cloud-itonami-app への統合
+
+`cloud.itonami.app.pageview` +
+`GET /api/workspace/drive/documents/:id/pages[/:n]`（JSON、`:svg` フィールド）。
+`image/svg+xml` レスポンスにしないのが `/preview` との差 —— SVG *document* を
+この origin から出すのが `previewable-media-types` の避けている hazard そのもの。
+UI は Drive 詳細ペインでページ送り。`app-css` に `hanmen.svg/stylesheet` を連結。
+
+**4 つの拒否**（1 つの失敗ではなく、行き先が違うから）:
+`:pageview/not-viewable` 415 / `:pageview/undecodable` 422 /
+`:pageview/no-pages` 422 / `:pageview/too-large` 413。どの場合も**ファイルは
+今までどおり download できる**。Drive quota は 1 GiB なので「ユーザーが上げた」は
+parse の上限にならない（`render-limit-bytes` 32 MiB）。
+
+## Consequences
+
+- **route は request `cond` の外に置いた。** これは JVM の事実であって好みではない:
+  `cond` は 1 メソッドにコンパイルされ、メソッドは 64 KB で頭打ちで、
+  この 2 route を inline で書いたら実際に超えた（`Method code too large!`）。
+  次に route を足す人も同じ壁に当たる。
+- **`core-test` の docstring guard を `app-css` から `base-css` へ移した。**
+  `app-css` は `str` 呼び出しになったので docstring は docstring であって
+  「黙って切られた stylesheet」ではない。名前ではなく hazard を追った ——
+  `app-css` に残せば pass しながら何も守らない assertion になっていた。
+- **`org-iso-pdf` の phantom page を hanmen 側で落とした。** root が nil のとき
+  `collect-pages` は `:else` で `[{}]` を返す = 空 map 1 個 = 1 ページ。
+  PDF でないファイルが「1 ページの白紙」として描画され、存在しなかった文書の
+  中身を探しに行かせる答えになっていた。consumer 側のテストが見つけた。
+
+## 検証
+
+- `hanmen`: 38 tests / 125 assertions、0 failures。clj-kondo 0 errors 0 warnings。
+  配置の assertion はすべて**テストが書いた PDF に対する座標**であって、
+  誰かが眺めて良さそうだと思ったレンダリングではない。
+- `cloud-itonami-app`: 1088 tests / 4521 assertions、0 failures / 0 errors。
+  clj-kondo 0 errors、warnings 9 はすべて既存で触ったファイルには 1 件も無い。
+  `node --check` 通過。
+- **out of sample**: このマシン上の実 PDF 30 件のうち **29 件が描画**。
+  Word 由来の日本語契約書（株式譲渡契約書等）を含み、CJK は `/ToUnicode` 経由で
+  復号できている。30 件目は `org-ietf-deflate` から
+  `zlib: unsupported compression method` を投げた —— これが
+  `:pageview/undecodable` の存在理由（この app が壊れているのではなく、
+  この形式の decoder が誰にも書かれていない、と言う）。
+
+### テストが名指しした 2 つのバグ
+
+1. **90° 回転行列が反時計回りだった。** flip を畳み込んだ行列は行列式 −1 に
+   なるべきで、+1 の行列は鏡像ページ。最初の版は他のあらゆる面で妥当に見えた。
+2. **PDF のグレー（0=黒）が反転されずに形式中立モデルに届いていた。**
+
+## 残っていた 7 件のうち 6 件を解消した（2026-08-05 後刻）
+
+**文書は最新状態のみを表す**（ADR-2607257000）ので、下記は当時の一覧を現在地に
+書き換えたもの。
+
+1. ~~ラスタは描かない~~ → **描く**。image XObject は `:image` item として置かれ、
+   **ページ上の index を持ち /XObject 名は持たない**（名前はファイル由来で URL に
+   入りうる。整数は文書が書いたものを一切運べない）。`hanmen.pdf/page-images` が
+   **index を割り当てたのと同じ走査**で bytes に解決する — ページの `/XObject`
+   辞書は resource 順で、form を呼ぶ文書では両者が一致しない。
+   **DCTDecode は既に JPEG** なので decoder 不要で素通し（実測 57 枚中 12 枚）。
+   残りは生サンプルで、そのために **`org-w3-png` に `png.encode` を起こした**
+   （decoder しか無かった。round-trip は `png.core` と `javax.imageio` の両方で検証）。
+   **CSP は `data:` ではなく `img-src self`** — ADR-0007 が開けたままにしていた
+   選択肢のうち狭い方。
+2. ~~読み順は主張しない~~ → **`reading-order` / `reading-text` を追加**。列に分けて
+   下→右に並べ、baseline を帯に丸める（上付き文字が本文語を追い越さない）。
+   2 段組は「両半分が実際にテキストを持ち、ほぼ何も溝を跨がない」時だけ推定し、
+   3 段は推定しない。**`text-of`（事実）とは別関数のまま** — 事実が要る呼び出し側が
+   推測を opt-out する必要は無い。
+3. ~~`/ToUnicode` 無しはほぼ枠~~ → **枠が「何があれば読めるか」を名乗る**
+   （`Adobe-Japan1` 等の Registry-Ordering）。実測 30 件中 3 件・553 run、うち 550 は
+   LaTeX-CJK 1 文書。**復号自体は未実装**（predefined CMap リソースが要る）。
+4. ~~ページ送りのたびに再 parse~~ → **object-ref（PieceCID = 内容の名前）で cache**。
+   無効化は存在しない（内容が変わらないので無効化するものが無い）。**cache は
+   `file-bytes` の *後* に読む** — 先に読めば速く間違って答える。**拒否は cache
+   しない**（decoder を足す deploy を跨いで答えが残る）。
+5. ~~`app-preview` は未配線~~ → **選択したページを描く**。`mokuroku-ui` に
+   `:detail` slot を足した（Photos は写真、Music はジャケット、Preview はページ —
+   suite 共通の関心事であって Preview 専用の特例ではない）。**capability 設計は不変**:
+   app-preview は今もファイルを読まず、grant を使った host がページ値を渡す。
+6. ~~実ブラウザ未検証~~ → **見た**。Chrome MCP が未接続だったので skill
+   `computer-use` の直 AppleScript 経路（キーストローク無し）で 3 文書を確認:
+   LaTeX 論文 / 日本語のデータ消去証明書（CJK が `/ToUnicode` 経由で復号され、
+   ラベル・値の表が揃う）/ 「scanned, no text」と誤報告していた 24 MB のポスター
+   （2 段組の見出し付きポスターとして描画）。
+
+### 見たことで初めて出た 3 件（テストでは出なかった）
+
+1. **`k` / `sc` / `scn` が ink を記録していなかった。** `g` と `rg` しか追って
+   おらず、CMYK や名前付き色空間の塗りは「色を記録しない = PDF 既定の黒 = 全 ink」に
+   なっていた。**仕様上正しいので明らかな bug に見えない。** operand の **arity** で
+   選ぶよう変更（1=grey / 3=RGB / 4=CMYK。pattern 名は数値 operand を持たないので
+   直前の色を維持 — pattern の平均色は知りようがない）。
+2. **テキストが色を一切持っていなかった。** 黒地に白抜きの見出しが、下の帯と
+   同じ ink で描かれていた（＝読めない）。**白地に黒の文書では不可視の欠陥**なので、
+   誰も気づかない。低 ink のテキストは `var(--hanmen-paper, canvas)` で描く。
+   **opacity ではなく閾値** — ink 0.3 のテキストは薄い文字ではなく読めない文字で、
+   文書が言っているのは「ink か、その不在か」の 2 値。
+3. **ページ外に描かれた mark が items に入っていた**（2384×3370 のページに対し
+   (9321, 10277) の rule）。drawer の viewBox は切るが、mark の数・digest・自前で
+   配置する consumer は切らない。**遠い側だけ・item 自身の開始点だけ**で落とす —
+   最初の版は「幅未計測のテキスト run を幅 0 とみなし」、kerning で原点より左に
+   出た `TJ` の後半を削除した。自分のテストが捕まえた。
+
+## 残り 6 件も解消した（2026-08-05 さらに後刻）
+
+オーナー指示の順（6→1→2→3→4→5）。**測ってから直した**ので、1 件は「直さない」が
+答えになった。
+
+### 6. 目視 — 27 件が未確認だった
+
+**contact sheet で 48 文書を一度に見た。** 最初の sample は 48 件中 35 件が
+`IOException: Operation timed out` —— レンダラの失敗ではなく **cloud placeholder で
+バイトがローカルに無い**（0 バイトの businesscard と同じ罠）。実バイトを持つ 927 件に
+絞って再抽出したら 48 件中 47 件が描画した。
+
+**見て初めて分かった欠陥**: producer が **1 グリフ 1 `Tj`** を出す（監査報告書の表紙で
+1 行 52 run）。`text-of` が 1 文字ずつの配列を返しており **検索が壊れていた**し、
+文書のフォントでない字形を各グリフの座標に置くので `Cont r act s` と読めた。
+`coalesce` を追加 —— pen の終端位置は advance から分かるので**等値判定**であって
+近接推測ではない。gap は 3 通り: 無し=1 語 / word space=1 句（空白を戻す）/ それ以上=
+run を切る（2 段組の行が 1 文になるのを防ぐ）。実測 47 文書で run 11,568→5,681、
+1 文字 run 72.4%→38.0%、文字数 20,909→**27,276**（増えたのが空白の復活）。
+
+### 1. ベジエパス
+
+`re … f` しか解釈していなかったので、図・ロゴ・署名が**等しく不可視**だった。構築
+（`m l c v y h re`）と描画（`f F f* B b S s n`）を全部実装。実測 **28,966 path が
+新たに描かれる**。`v`/`y` は制御点 1 つを補う曲線で、直線扱いは「ほぼ動くレンダラ」に
+見える。`n` は描かない（clip 用）。矩形だけの path は `:rule` のまま（`re … f` が
+文書の大半で、box は path より下流に価値がある）。fill と stroke は別 ink（小文字が
+fill、大文字が stroke。同一視すると罫線がセル背景の色になる）。bbox は制御点の凸包
+なので **ink より小さくなることはない** —— 捨てる判断をする値として安全な向き。
+
+### 2. `/ToUnicode` 無しの CID —— **直さないのが答えだった**
+
+素直な fallback は「埋め込みフォント自身の cmap を逆引き」で、そのために
+`opentype.cmap` を書いた（`org-iso-opentype` に着地・9 tests）。**配線する前に測った**:
+160 文書・576 の `/Type0` フォントのうち **549 が `/ToUnicode` を持ち**（既に読めている）、
+**25 が持たず `CIDFontType0C`**、2 が埋め込み無し、そして **SFNT は 0 件** ——
+cmap 経路が効く文書が 1 つも無い。
+
+`CIDFontType0C` は素の CFF で **cmap テーブルを持たない**。復号には CFF charset と
+registry CMap リソース（Adobe-Japan1-UCS2 等）が要り、どちらも workspace に無い。
+**0/576 でしか発火しない経路のために依存を足すのは依存ではない**ので配線を revert し、
+代わりに frame の label が **ordering と埋め込みフォント種別の両方**を名乗るようにした
+（次の人が同じ袋小路に入らないように）。
+
+### 3. encode できない画像形
+
+16bit は**切り捨て**（線形同レンジなので上位バイトが 8bit 値。捨てていると明記 ——
+原本は `/download` が無加工で渡す）、indexed は RGB base の palette 経由、CMYK は
+`hanmen` の fill と同じ素朴変換（画像と罫線が色について一致する）。それ以外は
+**名指しで拒否**（誤 encode した画像は「開ける」）。`hanmen` が `:bits`/`:colorspace`/
+`:palette` を報告するようにした —— バイト数だけでは 16bit gray と 8bit RGB を
+区別できない（同じ bytes/pixel）。**テストが実バグを捕まえた**: samples-per-pixel が
+整数除算で、4px に 5 バイトが「1 sample/px」になり encoder まで届いていた。
+
+### 4. clip path
+
+`W n` を解釈。実測 47 文書で **文書が見せていない 112 の text run** を落とす。
+**box として**追跡し、誤差の向きを選んでいる: 円形 clip の box は角を残すので
+「文書より少し多く見せる」。多いのは文書が何も描かなかった場所に印が出るだけだが、
+少ないのは印の**欠落**で、読み手は欠落と元から無いのを区別できない。clip は graphics
+state なので `q`/`Q` が保存・復元する —— `Q` は merge の前に dissoc する（merge は
+キーを**不在**に戻せないので、pair 内で設定した clip が残ってページの残りを飲む）。
+
+### 5. cache の並行性
+
+上限も thread-safety も**主張であって測定ではなかった**。16 並列 reader × 20 文書
+（cache 容量超）で「各 reader が隣の文書ではなく自分の文書を得る」「map が上限を
+超えない」を assert。`swap!` がしないこと —— 同一文書の同時 parse は両方走って両方
+書く（無駄であって誤りではない）—— も書いた。promise per key にすると「throw する
+parse で request thread を deadlock させる」経路と交換になるので 8 件規模では割に
+合わない、という**判断として**記録した。実際の天井は 8 × `render-limit-bytes` 相当の
+object graph で、上げるならそこを見る。
+
+### 追記: 1 の CID 復号は解消した（`kotoba-lang/com-adobe-cmap`）
+
+**前回の見立ては半分間違っていた。** Identity-H では**コードがそのまま CID** なので、
+CFF charset はテキスト経路に一切関与しない。足りなかったのは collection の
+**CID→Unicode 表だけ**だった。
+
+Adobe が 5 つの character collection について公開している表
+（`adobe-type-tools/mapping-resources-pdf`、BSD-3-Clause）を**バイト単位でそのまま
+vendor** した新 repo `kotoba-lang/com-adobe-cmap`。23,000 件の対応表を書き写せば
+誰にも見つけられない誤りが入る —— 価値は「Adobe の表であること」なので、テストも
+ここで書いた fixture ではなく**公開 collection の値**（CID 1=空白、34=A、843=あ、
+1125=亜）に対して当てている。
+
+**実測: no-tounicode frame 254 → 6、文字数 10,349 → 11,846、影響文書 5 → 3。**
+
+表は `hanmen` に**注入する**（`:cid->unicode`）。1 MB の resource を classpath に
+要求するのは「ファイルを読まない」library の設計に反するので、`:image-href` と
+同じく host が配線する。**`/ToUnicode` を持つフォントではそちらが勝つ** —— producer が
+「こう読め」と言ったことは、collection が言うことに優先する（private に subset された
+フォントでは公開表の方が間違う）。
+
+`bfrange` の読み違いを 2 つともテストしている: destination は**増加する**（1 つの
+文字列の繰り返しではない —— 逆に読むと範囲全体が同じ文字になり「全グリフが同じ
+フォント」に見える）、そして増加するのは**最後の UTF-16 code unit**（`<D842DF9F>`
+はサロゲートペアで、数値として +1 すると上位サロゲートが動く）。
+
+### 追記: 「shading・pattern・透明」は測ったら別のものだった
+
+一覧の 1 番は shading だったが、86 文書を数えたら **`sh` が 0 件・`/Shading` resource
+0 件・`/SMask` 0 件・非 Normal の `/BM` 0 件**。実際にそこにあったのは **`gs`（1,100 回、
+うち 217 が stroke alpha < 1）で、これを完全に無視していた**。
+
+30% alpha の hairline を全 ink で描けば、文書がグレーの線を引いたところに黒い線が出る
+—— しかも**全部同じ濃さ**になる。実測: **distinct ink level 319 → 485**。
+
+`/ca`・`/CA` は別チャンネルにせず ink に掛ける。紙の上の 1 層なら厳密（黒インク 50% は
+グレー）で、重なった瞬間に近似になる —— それが compositor の仕事で、これは compositor
+ではない、とコードに書いた。
+
+**動かすのに 2 つの前提が要り、corpus が「変化なし」を返し続けることで両方見つかった**:
+
+- **初期色は仕様どおり黒**。nil 始まりは「まだ色演算子が来ていない」と「読めない色」を
+  同じ値にしており、**最初の色演算子より前に設定された alpha を全部落としていた**
+  （`gs` が先に来るのが普通なので、ほとんどが該当）。
+- **form XObject は自分の `/ExtGState`・`/Pattern` を引く**。form が `/G1` と書いたら
+  それは form の G1 であって、page の G1 を引くと「page がたまたま G1 と呼んだ alpha」で
+  スタンプが描かれる。
+
+pattern fill は**そうだと言う**ようにした（`:item/pattern`）。従来は `scn` に名前が来ると
+直前の色が残り、**無関係な色を文書の色として**塗っていた。tiling は敷き詰めずに印を付ける
+—— 何回敷くかを決める必要があり、2pt のタイルはページに数千枚になる。
+
+**shading のコードは書いていない。** corpus に 0 件で、実ファイルで検証できない soft mask は
+信用できない —— embedded-cmap fallback と同じ判断を同じ理由で。
+
+### 追記: 残り 5 件も解消（そのうち 1 件は自分が入れた欠陥だった）
+
+**Shift-JIS 系の predefined encoding。** `Identity-H`（コード = CID）は最も多いだけで、
+`90ms-RKSJ-H` は Shift-JIS —— **1 バイトか 2 バイトか**が CMap 自身の
+`codespacerange` に書いてある。固定 2 バイト分割は ASCII 文字を全部半分に割っていた。
+`com-adobe-cmap` に vendor + 合成（code → CID → Unicode、どちらも公開表）。
+**実測: 復号不能 run 1,133 → 14、文字数 50,174 → 52,288。** 日本語の法律文書 2 件が
+全文読めるようになった。残る 14 は `Adobe-Identity`（公開表が存在しない = 答え）。
+
+**clip を path として持つ。** box では円形 clip の角が残る。`:page/clips` + 各 mark の
+`:item/clip`、SVG は `<clipPath>` + `<g clip-path>`。実測 **379 region / 11,549 mark 中
+4,399**。入れ子は**互いを指す** —— 1 つの `clipPath` 内の複数 path は union で、
+2 回 clip した文書の意図の逆。グループ化は clip 単位ではなく **run 単位**（clip は
+mark の間で on/off するので、まとめるとページの描画順が壊れる）。
+
+**cache が single-flight。** entry を `delay` にして、共有されるのが map で
+**guard されるのが parse**。32 MiB の文書で 1 回 parse と 16 回 parse の差。
+`delay` は例外も憶えるので、失敗した entry は throw を通す前に削除する ——
+ただし**まだ失敗した本人である場合だけ**（そうしないと他スレッドが入れた良い parse を
+evict して、使うほど遅くなる cache になる）。
+
+**目視の後追い —— そして自分が入れた欠陥を見つけた。** デスクトップが空いたので
+48 文書の contact sheet を高解像度で確認したところ、監査報告書の表紙が
+`F o r m  a l V e r i f i c a t i o n` と表示されていた。**文字の間に空白が入っていた。**
+
+原因は 2 つで、1 つ目が 2 つ目に隠れていた:
+
+1. **advance を CTM でしか掛けていなかった（text matrix を掛けていない）。**
+   `Tf 1` にして `Tm` で拡大する producer —— 非常に多い —— では幅が**フォントサイズ 1 個分**
+   小さくなる。実測 0.61 に対し実際の送りは 14.90。全ての run が次と離れて見えていた。
+2. **`coalesce` がその隙間を「単語間空白」と解釈して空白を挿入していた。** 当該ページの
+   隙間分布を測ると 0.30〜0.90 em に**切れ目なく連続**していて、letter-spacing と
+   word-space を分ける閾値は存在しない。どの閾値でもどこかで文字を捏造する。
+
+**空白の挿入を廃止**し、advance を両方の行列で掛けるようにした。すると隙間が消えて
+グリフが自然に単語へまとまる —— 閾値は不要だった。**実測: 45 文書で捏造空白 6,289 個を
+削除。** ブラウザで確認: `Formal Verification of OpenZeppelin (May - June 2022)`。
+
+`::end-x` にも同じ scaling bug があり、**`:width` だけ直しても何も変わらなかった**
+（join が読むのは `::end-x`）。同じ量に 2 つの名前があり、どちらの行列が効くかで
+食い違っていた。
+
+合成フォントの `/W`・`/DW` も読むようにした（`/Type0` に `/Widths` は無いので、
+CJK と subset-CFF は**測定された advance を 1 つも持っていなかった**）。
+
+### 追記: 成熟度を上げ続ける local loop（`kotoba-lang/loop-render-fidelity`）
+
+このセッションで見つけた欠陥は**全て実ファイル由来**で、fixture からは 1 つも出ていない。
+一方で測定は `/tmp` の使い捨てスクリプトで、**私自身が 3 回測り間違えた**
+（fill と stroke を `or` で潰す / advance を gap と誤認 / 空 run が満点 baseline）。
+これを反復可能にする。
+
+```text
+corpus を探す → 描画 → 証人と突き合わせ → ratchet → evidence 追記 → 次の的を名指し
+```
+
+**証人は fixture ではなく第 2 実装。** `pdf.core/extract-text` は行列も状態機械も持たず
+BT/ET 間の文字列を集めるだけ —— **配置には全く使えない**（だから hanmen がある）。
+その使えなさが証人として良い理由で、**interpreter と一切コードを共有しない**ため、
+「どの文字がページにあるか」で両者が一致することは証拠になる。空白を全部落として比較し、
+比較対象は**全フォントが simple なページのみ**（証人は composite font を読めないので、
+そこで一致を要求するのは「証人と同じだけ間違え」と要求すること）。
+
+**文字を落とすのは報告のみ。文字を捏造したら 1 文字で fail**（corpus がどれだけ
+大きくても）。この 2 つは対称ではない —— 復号できないフォントがあるのは正当だが、
+誰も書いていない文字を足すのは決して正当でない。**これがこの loop の存在理由**:
+捏造空白 6,289 個が 45 文書に入っている間、あらゆる rate は健全に見えていた。
+
+**閾値ではなく ratchet。** 「正しい undrawn 数」は存在せず、同じ corpus で
+昨日より多いか少ないかだけが分かる。比較は count でなく **rate**（local corpus は
+動く —— ファイルが同期し placeholder が退避する。それを regression と呼ぶ gate は
+1 週間で切られる）。
+
+**local である理由。** corpus は他人の文書で commit できない。commit するのは
+**metric** の方。`scripts/fleet-ci` の node は tailnet だけで文書を 1 つも持たないので、
+どれだけ gate に見えてもこれは fleet gate になれない。
+
+**loop 自身が自分のバグを 2 つ、走らせることで見つけた**: 空 run が rate 1.0 で
+満点 baseline を記録していた（分母 0）／`unix:blocks` はこの platform に存在せず、
+文書だらけのディレクトリで 0 件を返していた。「バイトがここにある」は今
+**「読み取りが即座である」**と定義している —— それが実際の性質そのものだから。
+
+**初回実行（40 件中 31 件計測）が次の的を出した**: 比較可能 6 ページ中 5 ページ一致
+（1 ページで 1 文字欠落）、undrawn 6 件は全て `:font/no-tounicode`、そして
+**9 文書が計測不能で signature は 3 種**（`/M under radix 16` 系 ×4、
+`zlib: stream ends…Adler-32 trailer` ×2、`/A under radix 16` ×2）。
+1 つの message で 8 文書落ちるなら書くべき decoder があり、8 つの message で
+8 文書なら corpus の問題 —— これは 3 種なので前者に近い。
+
+## セッション終了時の状態（2026-08-06 closing）
+
+**全て default branch に着地済み。** 未 merge の branch も worktree も残していない。
+
+| repo | main | 検証 |
+|---|---|---|
+| `kotoba-lang/hanmen` | `cffae2d` | 73 tests / 253 assertions・lint 0/0 |
+| `kotoba-lang/com-adobe-cmap` | `e02ad46` | 13 / 44・lint 0/0 |
+| `kotoba-lang/loop-render-fidelity` | `3b0a1b0` | 9 / 19・lint 0/0 |
+| `kotoba-lang/org-iso-opentype` | `8604a2c` | 9 / 21・lint 0/0 |
+| `kotoba-lang/org-w3-png` | `8948070` | 11 / 36・lint 0/0 |
+| `kotoba-lang/mokuroku-ui` | `f950a4b` | 10 / 44・design-quality 100.0 |
+| `kotoba-lang/app-preview` | `c80d546` | 13 / 36・design-quality 100.0 |
+| `cloud-itonami/cloud-itonami-app` | closing 時 main | **1176 tests / 4803 assertions**・lint 0 errors |
+
+いずれも closing 時に default branch tip で再実行し **0 failures / 0 errors** を確認した
+（app は他 session が main を先に進めているため、`e49f783` 時点の数値と closing 時の
+再実行の両方を記録）。
+
+### 次の反復の入口（loop が出した的）
+
+```sh
+cd orgs/kotoba-lang/loop-render-fidelity
+bin/run-fidelity-loop <実文書のあるディレクトリ> 40 ./evidence
+```
+
+初回実行の結果がそのまま優先順位:
+
+1. **`/M under radix 16` 系で 6 文書が parse 不能** —— hex parser が content を hex と
+   誤読している。40 件中 9 件の parse 失敗のうち最大の signature で、**未調査の実バグ**。
+2. `zlib: stream ends before its Adler-32 trailer` 2 件（`org-ietf-deflate` 上流）
+3. 比較可能 6 ページ中 1 ページで**文字が 1 つ落ちる**（証人との不一致）
+4. `:font/no-tounicode` 6 件（`Adobe-Identity` = 原理的に復号不能）
+
+### このセッションで自分がやった間違い（再発防止のため残す）
+
+- **lint の `errors: 1` を読む前に merge した（2 回）。** `:clj` だけの `:require` と
+  `.cljc` の `format`。**どちらもテストは全部緑**で、まだ ClojureScript で走らせて
+  いないから —— linter があって suite に無い理由そのもの。
+- **ADR の本文に生の二重引用符を入れて EDN を壊した（3 回目はこの一文自体だった）。** 1 回目は repo の edn gate が止め、2 回目と
+  3 回目は自分の parse 検証で気付いた —— **3 回目は「生の引用符を入れるな」と
+  書いている行の中で起きた。****自分の検証は「有効な EDN・短い body」を
+  見て何も言わなかった** —— 壊れ方が「切り詰め」なので、パースが通ることは検証にならない。
+- **測定を 3 回間違えた。** fill と stroke を `or` で潰した / advance を gap と誤認した /
+  空 run が満点 baseline を作った。`loop-render-fidelity` はこの 3 つを code にして
+  test を付けたもの。
+- **セッション再起動で未 commit の app 作業を 1 度失った**（scratchpad が消えた）。
+  以降は各ステップで commit してから次へ進んだ。
+
+## まだ無いもの（「実装済み」と読まないこと）
+
+1. **`Adobe-Identity` を名乗るフォントは誰にも復号できない。** 「CID の意味はフォントが
+   決める」という宣言なので公開表が存在しない。実測で残る 14 件はこれ。
+2. **shading・soft mask・blend mode は読まない。** 86 文書で**実測 0 件**。
+   検証できない機能のコードは書かない。
+3. **tiling pattern（34 件）は印を付けるだけで敷き詰めない。** 何回敷くかを決める
+   必要があり、2pt のタイルはページに数千枚になる。
+4. **parse が落ちる文書がある**（loop 初回で 40 件中 9 件）。signature は 3 種で、
+   `/M under radix 16` 系 6 件と `zlib: stream ends before its Adler-32 trailer` 2 件。
+   前者は hex parser がコンテンツを hex と誤読しており **未調査の実バグ**。
+   loop が毎回この数を報告する。
+3. **clip は box であって path ではない。** 円形 clip の角が残る（誤差の向きは意図的）。
+4. **目視の後追いができていない。** coalesce 前は 30 文書を Chrome で確認したが、
+   **修正後の再確認は他 session の terminal がデスクトップを占有して撮れていない**
+   （数値では検証済み: run 半減・空白復活）。
+5. **cache は同一文書の同時 parse を重複させる。** 意図的な判断（上記 5）。
+6. **`:frame` が残るのは 286 箇所**（47 文書）。ほぼ全て上記 1 の CFF フォント。"}]

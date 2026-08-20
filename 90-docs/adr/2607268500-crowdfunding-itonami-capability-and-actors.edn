@@ -1,0 +1,253 @@
+[{:db/id -1
+  :adr/id "2607268500-crowdfunding-itonami-capability-and-actors"
+  :adr/title "crowdfunding を etzhayyim の TypeScript アプリから cloud-itonami に移し、Kickstarter 同等規模の能力層 + 4 アクターとして設計実装する"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "crowdfunding"
+  :adr/last_verified "2026-07-27"
+  :adr/body "# Context
+
+オーナー指示 (2026-07-26): 「crowdfunding を itonami に移行して, kickstarter などと同等規模まで設計実装」。
+
+## 移行前の実測
+
+`etzhayyim/com-etzhayyim-app-crowdfunding` が唯一の crowdfunding 実装だった。実測:
+
+- **TypeScript 646 行**（`kotoba/src/{types,campaign,pledge,settlement,tithe}.ts` + テスト 143 行）。
+  リポジトリ規約（CLAUDE.md の runtime 優先順位: kotoba wasm > clojurewasm > cljs > nbb、
+  および「新規に生 JS/TS を書かない」）に反する状態で 2026-05-21 から `MIGRATION-TODO.md`
+  が TRANSFORM 待ちのまま滞留していた。
+- ドメインは **campaign / pledge / on-chain settlement / 10% tithe** の 4 概念のみ。
+  Kickstarter が持つもののうち、**リワード在庫・アドオン・配送地域別価格・締切での一括請求・
+  請求失敗と再試行・脱落率・手数料・創作者への支払と留保・公開前審査・発見(ランキング)・
+  アンケートと配送責任** はいずれも存在しなかった。
+- `cloud-itonami`（GitHub 1,510 repo）に crowdfunding 系は **0 件**。隣接するのは
+  `marketplace-*` 7 アクターと `commitment-ledger` のみ。
+
+## 判断の分岐点
+
+`marketplace`（ADR-2607264000）が先例を与えている: **純 .cljc の能力ライブラリを
+`kotoba-lang/` に置き、機能分割したガバナー付きアクターを `cloud-itonami/` に置く**。
+crowdfunding も同じ形にする。
+
+# Decision
+
+## D1. `kotoba-lang/crowdfunding` — 純 .cljc 能力ライブラリ（11 名前空間）
+
+`campaign` / `reward` / `pledge` / `funding` / `collection` / `fee` / `payout` /
+`passthrough` / `trust` / `discovery` / `fulfillment`。ネットワーク I/O なし、時計なし、
+鍵の保持なし。`pay`（整数分割・端数規約）と `marketplace`（エスクロー・支払先・手数料表の
+形）を **合成する**（再実装しない）。
+
+**この分野の全ての規則が従う 1 つの事実: 支援は authorization であって payment ではない。**
+支援者は存在しないものに今日の価格で約束し、数週間後に（目標を達成していれば）請求される。
+
+| 帰結 | 実装箇所 |
+|---|---|
+| `:live -> :collecting` の辺を作らない（決定済み結果を必ず経由する） | `campaign/transitions` |
+| pledged / collected / at-risk の 3 つの総額を折り畳まず報告する | `funding/tally` |
+| 承認から請求までにカードは失効する。脱落は一級の数値 | `collection/finalize` |
+| 手数料は回収額にのみ課す。約束額には課さない | `fee/campaign-fees` |
+| 締切前の支援者は無条件に取り消せる | `pledge/cancellable?` |
+| 創作者は出荷前に支払われる。だから留保は支援者が読める分割表 | `payout/staged` |
+
+**不変条件 3 つ（すべて計算して結果に載せる。コメントで主張しない）:**
+
+1. **非預託** — 何も動かさず、鍵も持たず、ネットワークにも触れない。`payout-plan` は
+   計算であり、実行はアクター側の人間承認ステップ。
+2. **保存則** — `platform + processing + tithe + net = charged`、`tranches = net` が
+   全 pledge・全 plan で厳密に成立。`:fee/conserved?` / `:payout/tranches-conserved?` を
+   結果に載せるので、将来の編集で壊れたらテストが落ちる。端数は創作者へ、しかも**最も早い**
+   トランシェへ。
+3. **非裁定** — `approve` も、証拠を読んで結論を返す `resolve-dispute` も存在しない。
+   `trust/review` は所見を返す。`trust/decision` / `payout/resolve-hold` /
+   `campaign/reinstate` / `fulfillment/failure-disclosure` は **名前のある人間**が
+   決めたことを記録し、名前が無ければ nil を返して拒否する。
+
+### D1a. 固定価格は唯一の価格モデルではない（ADR-2607268000 との接続）
+
+同日の ADR-2607268000 は、叢雲 MK-1 について **固定価格 crowdfunding を採らない**と決めた
+（DDR5 が 12 か月で +448%。固定価格は部材の無ヘッジショート）。したがって
+`:campaign/pricing-model` は `:fixed` と `:deposit-plus-settlement` の 2 つを取り、後者を
+`crowdfunding.passthrough` が実装する: **build slot の頭金 + 固定円建て差益 + 部材実費の
+pass-through、ただし支援者が合意した上限で必ず止まる。**
+
+- `settle` に上限を超えて請求する分岐は**存在しない**。超過分は
+  `:settlement/creator-absorbs-minor` として創作者の負担になり、`campaign-exposure` が
+  それを集計する（1 台の超過は誤差、900 台の超過は会社の終わり。両者を区別できるのは集計だけ）。
+- 上限を超えるには `reconsent`（名前のある支援者・厳密に高い新上限）しかない。
+- **差益は円建て固定であって部材費の百分率ではない** — 百分率にすると創作者が部材インフレで
+  儲かる。それが pass-through 価格を信用できなくする当の誘因。
+
+自分たちのハードウェア campaign が選んだ構造を表現できないプラットフォームを作らない、
+というのがこの節の趣旨。
+
+## D2. `cloud-itonami/cloud-itonami-crowdfunding-{campaign,pledge,collection,payout,fulfillment}` — 5 アクター
+
+いずれも既存 `cloud-itonami-marketplace-settlement` と同型（advisor 1 ノード封じ込め +
+独立ガバナー + phase 0-3 + append-only 台帳 + langgraph StateGraph + `interrupt-before`
+による人間承認）。
+
+| アクター | 所有する決定 | 常時エスカレート（phase 3 含む） |
+|---|---|---|
+| campaign | 公開審査・公開・停止 | launch / suspend / concern |
+| pledge | 支援の受付・変更・取消 | concern、および**プラットフォーム主導の**取消 |
+| collection | 締切での一括請求・再試行・確定 | plan-collection / finalize / concern |
+| payout | 支払計画・支払先登録・解放・留保・返金 | destination / release / hold / refund / concern |
+| fulfillment | アンケート・配送・説明責任 | disclose-failure / concern |
+
+**設計上いちばん効いている 3 点:**
+
+1. **all-or-nothing はコードの構造として存在する。** collection のプランは
+   `:funding-succeeded` / `:collecting` 以外では**作られない**。`:live` から
+   `:collecting` への辺が状態表に無く、ガバナーが独立に再確認する。利用規約の文言ではない。
+2. **支援者の権利は権利であって恩恵ではない。** `:cancel-pledge` は phase 3 で自動コミット
+   対象。締切前の取消を承認キューに通す設計は、権利を静かに恩恵に変える。一方
+   `platform-initiated?` はプラットフォーム主導の取消だけを人間に上げる — 同じ op に見えて
+   別の行為だから。
+3. **事実は自動、判断は人間。** `:record-attempt`（決済レールが返した結果）は自動。
+   拒否を記録しないことで拒否が消えるわけではない。`:plan-collection`（今日数千人が
+   引き落とされる）と `:finalize-collection`（創作者が生産計画を立てる数値）は必ず人間。
+4. **fulfillment が書く記録が payout の gate を解錠する。** payout は
+   `:on-first-shipment` / `:on-fulfillment-complete` に対してトランシェを解放するが、
+   その事実を書くのは fulfillment アクターである。だから `:shipped` は
+   **支援者が確認できる追跡番号が無ければ拒否する** — この検査があって初めて
+   `:ship-line` を phase 3 で自動コミットしてよくなる（創作者が自分について主張する
+   だけで自分に支払わせられる op になってはならない）。fulfillment には
+   `:refunded` へ至る経路が存在せず（返金は payout の人間承認）、住所・電話・氏名の
+   実体を持ち込む提案も拒否する（回答は参照のみ。value tree 全体を走査する — 想定して
+   いる失敗は悪意ではなく「便利なフィールドの追加」だから）。
+
+## D3. 発見（discovery）に親指を置かない
+
+crowdfunding では **掲載順位が資金調達そのもの**。`discovery/rank` は boost 引数を取らず、
+創作者由来の重みを持たず、除外理由付きの `:ranking/exclusions` を返し、順位キーの構成要素を
+`:ranking/key-fields` として結果に載せる。掲載されなかった創作者が結果を再現して理由を
+読める。同点は campaign id で割る（全順序 = 全訪問者が同じ feed を見る）。
+`marketplace.catalog/buy-box` の規律を feed に適用したもの。
+
+**支援ゼロの campaign も掲載する。** 除外すると feed が rich-get-richer のループになり、
+新しいものが何も始められなくなる。市場とリーダーボードの違いはそこ。
+
+## D4. etzhayyim の実装は supersede するが破棄しない
+
+`etzhayyim/com-etzhayyim-app-crowdfunding` は残す（非破壊）。ドメインはこのライブラリに
+吸収済みで、**10% tithe は `fee/fee-schedule` の `:tithe-bps` オプションとして生き残る**
+（既定 0）。`:tithe-bps 1000` で元の TitheRouter の分割（10% 切り捨て、剰余は net 側）が
+**厳密に一致することをテストで固定した**（`fee_test.cljc` の parity テスト）。汎用の
+crowdfunding プロトコルが 1 事業者の契約を焼き込んではならないが、その事業者がそれを
+失ってもならない。
+
+# Consequences
+
+## 検証（実測。2026-07-27）
+
+| repo | test | lint |
+|---|---|---|
+| `kotoba-lang/crowdfunding` | 134 tests / 426 assertions / 0 failures | 0 errors 0 warnings |
+| `cloud-itonami-crowdfunding-campaign` | 22 tests / 67 assertions / 0 failures | 0 errors 0 warnings |
+| `cloud-itonami-crowdfunding-pledge` | 33 tests / 80 assertions / 0 failures | 0 errors 0 warnings |
+| `cloud-itonami-crowdfunding-collection` | 25 tests / 81 assertions / 0 failures | 0 errors 0 warnings |
+| `cloud-itonami-crowdfunding-payout` | 28 tests / 100 assertions / 0 failures | 0 errors 0 warnings |
+| `cloud-itonami-crowdfunding-fulfillment` | 24 tests / 81 assertions / 0 failures | 0 errors 0 warnings |
+
+5 アクターすべて `clojure -M:dev:run` のオフライン sim が実行可能で、拒否・人間承認・
+台帳記録まで通る。
+
+## 実装中に見つけて直したもの
+
+**1. `collection/finalize` が、価格を確定できない pledge を総額から黙って落としていた。**
+`funding/tally` には同じ状況を報告する `:funding/unresolved` があるのに、finalize には
+無かった。脱落率をその集合上で計算すると **実際より良い数値が出る**。
+`:collection/unresolved` を追加し、アクター側テストでも固定した。ライブラリが自分で
+掲げた原則（除外したものは必ず名指しで報告する）に自分が違反していた例。アクター側の
+テストを書いていて期待値が合わず、期待値のほうを直しかけて気付いた。
+
+**2. `passthrough` と campaign の価格モデルの整合が呼び出し側の規律任せだった。**
+`:deposit-plus-settlement` の campaign に見積の無い pledge が混ざると、その支援者には
+頭金も差益も **上限も無い** — 部材費がいくらになろうと請求されうる、この名前空間が
+防ぐために存在するまさにその状態になる。逆に `:fixed` の campaign に見積が付いていると、
+適用されることのない上限に合意したつもりの支援者ができる。どちらも campaign 単体でも
+pledge 単体でも見えないので、`passthrough/campaign-quote-errors` として campaign 単位で
+検査する。**規律に依存する不変条件はこのライブラリが他の場所で拒否している形**なので、
+gap として書き残すのではなく閉じた。
+
+## 残るギャップ（正直な列挙）
+
+1. **discovery アクターが無い。** ランキングは純関数として存在するが、index を持つ
+   surface はまだ無い。`search` との結線は `discovery/search-doc` まで。
+2. **CI ワークフローを置いていない。** deps が `:local/root` なので単独 checkout の
+   GitHub Actions では classpath が解決しない。参照実装
+   （`cloud-itonami-marketplace-settlement`）の ci.yml は「deps.edn は :git/sha で
+   pin している」と書いているが実際は `:local/root` で、**その CI は今も嘘をついている**。
+   落ちる CI を足すより無いほうがましと判断した。恒久対応は monorepo 側の集約 CI か、
+   push 済み SHA での git 座標化。
+3. **advisor は決定論的 mock。** 3 アクターの先例と同じで、実 LLM 接続は
+   `murakumo-main` alias 経由の別作業。
+4. **fulfillment の記録を書く上流が人間/外部システム前提。** 追跡番号や配送不能理由は
+   配送業者から入ってくる想定だが、その取り込み経路（`logistics` との結線）は未実装。
+   現状は request 経由で渡す。
+
+## 着地状況（2026-07-27 時点。すべて default branch 上）
+
+| repo | pin (= HEAD) | test | lint |
+|---|---|---|---|
+| `kotoba-lang/crowdfunding` | `ae91376` | 134 / 426 | 0 / 0 |
+| `cloud-itonami-crowdfunding-campaign` | `2fea408` | 22 / 67 | 0 / 0 |
+| `cloud-itonami-crowdfunding-pledge` | `265b7e9` | 33 / 80 | 0 / 0 |
+| `cloud-itonami-crowdfunding-collection` | `fe64b64` | 25 / 81 | 0 / 0 |
+| `cloud-itonami-crowdfunding-payout` | `be4336f` | 28 / 100 | 0 / 0 |
+| `cloud-itonami-crowdfunding-fulfillment` | `8f5e238` | 24 / 81 | 0 / 0 |
+
+superproject: `c76daa6`（初回登録）→ `9f55c9d`（fulfillment + cap check）。
+etzhayyim 側の supersede 記録: `585de82` → `75d3983`。
+**未 merge の branch / PR / worktree は残っていない。**
+
+## 次に着手する場合の起点（resume point）
+
+再開時の最初の 3 コマンド:
+
+```bash
+cd orgs/kotoba-lang/crowdfunding && clojure -M:dev:test   # 134 tests が通ることを確認
+cd orgs/cloud-itonami/cloud-itonami-crowdfunding-fulfillment && clojure -M:dev:run
+nbb scripts/verify-west-pins.cljs --baseline origin/main --candidate manifest/west.yml --only crowdfunding,cloud-itonami-crowdfunding-fulfillment
+```
+
+優先順位つきの次作業:
+
+1. **discovery アクター**（gap 1）。`crowdfunding.discovery/rank` と `search-doc` は
+   純関数として完成しているので、`search` への index 投入と、除外理由を返す
+   read surface を持つアクターを作るだけ。money を触らないので governor は軽い。
+2. **fulfillment の上流結線**（gap 4）。追跡番号・配送不能理由を `logistics` から
+   取り込む経路。現状は request 経由。
+3. **実 LLM advisor**（gap 3）。`murakumo-main` alias 解決 → endpoint-only fallback の
+   既存パターン（`70-tools/bmc` の `GFTD_LLM_*`）に合わせる。
+4. **CI**（gap 2）。`:local/root` のままでは単独 checkout で解決しないので、
+   monorepo 側の集約 CI か push 済み SHA での git 座標化のどちらかを選ぶ判断が要る。
+
+**運用上の注意（実測）**: `nbb scripts/gen-west-manifest.cljs --entry <name>` は
+この機で **1 回あたり 20 分以上**かかり、ローカル `repos.edn` に当該 entry が無いと
+「生成結果に entry がありません」で失敗したあと **sleep ループで固まる**（実測 30 分、
+CPU 0%）。west.yml の 1〜数 entry の更新は、`origin/main` から worktree を切って
+該当ブロックだけ手で splice し、`scripts/verify-west-pins.cljs --only <names>` で
+サーバ側検証する方が速く確実（数秒）。CLAUDE.md が正経路とする API single-entry commit
+と同じ保証が得られる。
+
+## 改訂履歴
+
+- **2026-07-27（同日、後続作業）**: 初版で gap として挙げた 2 件を閉じた。
+  ① `passthrough/campaign-quote-errors` を pledge アクターのガバナーの 7 番目の
+  HARD チェックに結線（`:deposit-plus-settlement` の campaign に見積の無い pledge =
+  上限の無い青天井の約束、を拒否。逆に `:fixed` に見積が付く鏡像も拒否。価格モデルは
+  store から再導出し、見積は pledge と一緒に保存する — 後の支援者の上限は同じ campaign
+  でも別の合意だから。変更時は既存の見積を持ち越すので、tier 変更が副作用で上限を
+  外すことがない）。② **fulfillment アクターを新設**（上記 D2 の 4 点目）。
+  これに伴い D2 は 4 アクターから 5 アクターになった。
+
+# Related
+
+- ADR-2607264000 — marketplace federated commerce layer（library + アクター機能分割の先例）
+- ADR-2607268000 — 叢雲 MK-1: 固定価格 crowdfunding を採らない（D1a の出所）
+- ADR-2607171600 — 90-docs は EDN only
+- ADR-2607173000 — nbb only script host / 生 JS を新規に書かない
+"}]

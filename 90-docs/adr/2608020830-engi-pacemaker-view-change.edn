@@ -1,0 +1,84 @@
+[{:db/id -1
+  :adr/id "adr-2608020830-engi-pacemaker-view-change"
+  :adr/title "ADR-2608020830: engi に pacemaker（view change）を入れる — safety だけの protocol は「何も提案しない」で実装できる"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "engi-pacemaker-view-change"
+  :adr/authoritative-for
+  ["engi の view change / liveness 規則"
+   "lock と liveness clause の意味論"
+   "timeout certificate の要件"
+   "engi 合意層に残っているもの"]
+  :adr/related
+  ["adr-2607993000-engi-l1-byzantine-consensus-en-currency"
+   "adr-2607994000-engi-l1-permissionless-staking-equivocation-slashing"
+   "adr-2608011200-torihiki-trading-dedicated-chain-hypercore-replacement"
+   "adr-2608020730-torihiki-oracle-median-aggregation"]
+  :adr/evidence ["https://github.com/kotoba-lang/engi"]
+  :adr/body
+  "# ADR-2608020830: engi の pacemaker
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+ギャップ #7。ADR-2607993000 は chained HotStuff の**安全規則**を実装し（quorum 算術・QC・3-chain commit・round-robin leader、155 行）、**pacemaker / view-change は follow-up**として残していた。ADR-2608011200 のギャップ分析でも「自作 BFT が死ぬのはほぼ常にここ」と記録した。
+
+**safety だけの protocol は「何も提案しない」で実装できる。** 片方しか無い状態は、正しさの半分ではなく、動かない protocol である。
+
+## Decision
+
+`engi.pacemaker` を新設。4 つの部品、どれも load-bearing。
+
+### 1. lock — view change を跨ぐ安全性の全論拠
+
+ある block の**連続 2 つの認証済み子孫**を見た replica はその block に lock される。commit の根拠にした以上、**それを落とす枝に投票してはならない。**
+
+これが無いと、view change で新 leader が**既に commit された block を落とす枝**を提案でき、矛盾する 2 つの commit が成立する——protocol 全体が防ぐために存在するもの。
+
+### 2. liveness clause — lock だけでは chain が止まる
+
+block の justification が **lock より後の view** から来ているなら投票してよい。それは「自分の quorum と交差する quorum が既に先へ進んだ」ことの証明。
+
+これが無いと、**負けた枝に lock された replica は二度と投票できず**、全員が個別には安全なまま chain が停止する。
+
+### 3. timeout certificate — 2f+1 の**相異なる** witness
+
+`consensus/qc` が distinct-by-witness を数えるのと同じ理由: **Byzantine 1 人が自分の new-view を再送して view change を単独で捏造できてはならない。**
+
+TC は**誰かが報告した最高の QC** を運ぶ。これが次の leader に「何を延長すべきか」を教える経路であり、**view change が commit 済み block を落とせない理由**そのもの。
+
+### 4. 指数バックオフ
+
+**固定 timeout は分断下で view change を永久に繰り返し、一度も前進しない。** 6 回で頭打ちにするのは、長い分断からの復帰が分断と同じだけかかるのを防ぐため。**連続**失敗を数えるので、1 時間に 1 回つまずく chain が 1 時間の view を持つことにはならない。
+
+### 5. leader は view で選ぶ。height ではない
+
+**何も produce しなかった view も交代する。** でないと crash した leader が再選され続けて chain が止まる。
+
+### 6. すべて純粋なデータ関数
+
+clock も socket も timer も持たない。`now` は引数。**だから 4 replica の view change を、分断とその回復も含めて、値としてテストに書ける。**
+
+## Consequences
+
+- (+) engi の合意層が「安全だが動かない」から「動きうる」に変わった。
+- (+) 分断→view change→回復で commit 済み block が落ちないことを、値として assert した。
+- (−) **p2p transport が無い。** pacemaker は「何をすべきか」を決めるが、**メッセージを運ぶものが無い。** ADR-2607993000 が再利用予定とした murakumo overlay の QUIC は `.clj` = JVM 限定（ADR-2608011200 で実測）。
+- (−) **署名集約が無い。** validator が増えると 2f+1 個の署名が帯域を食う。
+- (−) **catch-up sync が無い。** TC で view は飛べるが、欠けた block 本体を取りに行く経路が無い。
+- (−) パラメータ（base-timeout 1000、max-doublings 6）は選定値で、実ネットワークでの較正をしていない。
+- (−) **実運用は依然として単一運営者。** ADR-2607993000 の命名規律は不変——「分散型」を名乗らない。
+
+## 残りギャップ
+
+1〜6 完了。**7 は pacemaker のみ完了**、p2p・署名集約・catch-up sync が残り。8 bridge・監査。
+"}]

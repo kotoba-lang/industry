@@ -1,0 +1,139 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-06"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-06.edn"
+  :doc/date "2026-08-18"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "register allocation on both ISAs"
+  :coscientist/iteration 6
+  :coscientist/subject "kotoba-lang/kotoba-mir, kotoba-lang/kotoba-native, bench/runtime-comparison/kernel_wide.kotoba"
+  :coscientist/action "the pool grows on demand instead of ending at four"
+  :coscientist/measured "kernel_wide 4.15x on AArch64, 3.07x on x86-64; 9.10x LLVM becomes 1.62x"
+  :coscientist/carries-forward "iteration-04: the benchmark was the bottleneck; iteration-05: allocator next, do not re-rank another register MOV"
+
+  :doc/body
+  "# Codegen co-scientist, iteration 6
+
+Iterations 4 and 5 both ended on the same word. Four wrote *the ranked next
+candidate is now allocation rather than any peephole*; five, arriving from the
+other ISA, wrote *Allocator. Iteration 04 already has the workload.* This is
+that.
+
+## What was actually there
+
+The pool was four registers per target, and running out was a cliff rather
+than a slope: `allocate-without-spills` fails whole, and `allocate-with-spills`
+then gives every value its own stack slot. Measured by handing the allocator
+dummy registers and counting frame slots:
+
+| pool | kernel_wide frame slots |
+|---:|---:|
+| 4 through 9 | 166 |
+| 10 and up | 0 |
+
+**One register was the difference between all of memory and none of it**, and
+it read the same on both ISAs.
+
+## The change
+
+Both ABIs make more registers available than four. Two tiers now sit behind
+the original scratch tier:
+
+- **leaf** — caller-saved, offered only to functions that call nothing:
+  x86-64's incoming argument registers, dead once the entry plan has copied
+  the arguments out, and AArch64's temporaries below the encoder's scratch
+  pair. Free; nothing is saved.
+- **preserved** — callee-saved, available everywhere, at the cost of a save
+  and a restore for exactly the registers a body names.
+
+The decision that mattered was **not** how wide to make the pool. It was to
+hand it out **one register at a time, and only once the free list is empty and
+there is no dying operand to reuse.**
+
+The first attempt offered the whole pool up front. It was correct and it was
+worse: the free list is a queue, so allocation round-robins, and a body needing
+three registers touched all nineteen — reaching the preserved tier and paying
+saves for registers it never needed. It also moved every value in every small
+body, which turned 43 byte-exact tests red at once. Growing on demand leaves
+what already fit exactly where it was: **the benchmark kernel that fits
+compiles to byte-identical output on both ISAs.**
+
+## Measure
+
+21 rotated samples per pair, Apple M4, each pair built from the same amu and
+differing only in the allocator. Every variant answered 8896821931.
+
+| workload | ISA | before | after | |
+|---|---|---:|---:|---:|
+| kernel | AArch64 | 272 B | 272 B | byte-identical |
+| kernel | x86-64 | 474 B | 474 B | byte-identical |
+| **kernel_wide** | **AArch64** | **1940 B / 41.4 ns** | **612 B / 10.0 ns** | **4.15x** |
+| **kernel_wide** | **x86-64 (Rosetta)** | **3793 B / 78.2 ns** | **1044 B / 25.5 ns** | **3.07x** |
+
+Against LLVM on the same rotation, AArch64 native: `kernel_wide` is **1.62x**
+where iteration 4 measured **9.10x**. The eight-lane kernel now runs at roughly
+the speed of the one-lane kernel while doing eight times the arithmetic.
+
+## The check that had to be built
+
+A frame that saves a callee-saved register and forgets to restore it is silent
+where the defect is: the caller keeps running with a corrupted register and the
+wrong number surfaces somewhere else. The first harness written for it reported
+`preserved` against deliberately broken code — because AArch64's `kernel_wide`
+never reaches the preserved tier at all (its leaf tier is seven wide), so
+there was nothing to clobber and nothing to notice.
+
+What discriminates: x86-64 does reach it. Restoring into the wrong register,
+dropping the AArch64 restore, and restoring the pairs in the wrong order each
+turn exactly one test red, and the runtime harness names precisely the four
+registers the compiler said it saved.
+
+**The two ISAs reach the preserved tier at pressures that do not overlap** —
+seven to eleven live values on x86-64, twelve to nineteen on AArch64. Below the
+window the leaf tier still has room; above it the allocator gives up and
+everything takes a slot. No single test body exercises both.
+
+## Two things found while measuring, neither about allocation
+
+- **kotoba-mir's main could not validate its own backend's output.** The
+  fused-multiply and constant-divisor selection kotoba-native emits lived only
+  on an unmerged branch. Running kotoba-native's suite against kotoba-mir main
+  gave 10 failures and 3 errors; nobody saw it because kotoba-native's pinned
+  deps.edn named a commit on that branch, so anything resolving the closure
+  got the branch and worked. Merged, clean, both suites green.
+- **amu's test suite had not been able to load since that morning.** One
+  closing paren too many in a test file; the reader fails before any test runs.
+  The suite reports COMPLETE only at 130 of 130 namespaces, which is why the
+  difference between *no tests ran* and *all tests passed* was visible at all.
+
+## Meta-review
+
+- **Both prior iterations named the same next step and neither was wrong about
+  it.** The convergence was the signal; the cost was visible from two ISAs and
+  two workloads.
+- **The win was in how the resource is handed out, not how much of it there
+  is.** Widening the pool alone would have been a regression on everything
+  small. Byte-identical output for what already fit is the evidence that the
+  change is additive rather than a redistribution.
+- **A check that cannot reach the thing it checks reports success.** The
+  callee-saved harness passed on broken code for a real reason — the workload
+  never reached that tier. Same shape as iteration 4's benchmark, one layer
+  down.
+- **Three test failures out of seventeen were the improvement showing up.**
+  Five entry arguments no longer spill; a value-position `if` needs no phi
+  transports on AArch64. Recorded as what they now are, renamed where the old
+  name described the old behaviour.
+- **Five more were tests pinning a register when they meant an instruction.**
+  They looked for `cmp rcx, <bound>`; the bound check was still there with the
+  length in RDX or R8. Matching the instruction rather than the register is
+  what they were about — confirmed by changing the bound, which turns all five
+  red.
+
+## Next
+
+**The cliff is moved, not removed.** `allocate-without-spills` still fails
+whole and `allocate-with-spills` still gives every value a slot; a body needing
+twelve live values on x86-64 falls exactly as far as one needing five used to.
+Proportional spilling — spill what does not fit, keep the rest in registers —
+is the next piece, and unlike everything in iterations 1 through 5 there is now
+a workload on each side of the cliff to say whether it worked."}]

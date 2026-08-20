@@ -1,0 +1,101 @@
+[{:db/id -1
+  :adr/id "adr-2607309900-three-public-sites-on-dads"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/topic "three-public-sites-on-dads"
+  :adr/title "ADR-2607309900: kotobase.net / murakumo.cloud / x402.nexus を jp-go-dds 本体で作る — token bridge から component への移行、ブランド accent の放棄、そして skin と component を併用したときに初めて出た2つの上流欠陥"
+  :adr/status "accepted"
+  :adr/date "2026-07-30"
+  :adr/last-verified "2026-07-30"
+  :adr/last_verified "2026-07-30"
+  :adr/deciders ["owner" "claude-opus-5"]
+  :adr/source-format "edn"
+  :adr/tags ["uiux" "jp-go-dds" "design-system" "kotobase" "murakumo" "nexus-x402"
+             "deploy" "west-pins"]
+
+  :adr/context
+  "オーナー指示: 「今の kotobase.net, murakumo.cloud の uiux を jp-go-dads を使った uiux にして」、続けて「nexus-x402 も jp-go-dads に」。
+
+**実測した現在地（着手前）。** 3サイトはすべて 2026-07-29 に `jp-go-dds.tokens/bridge-css` を当てた状態で止まっていた。つまり **markup と component は kotoba-ui のまま、色だけ DADS** という中間状態。したがって「DADS を使う」指示は既に一度満たされており、今回求められているのはその先 —— **component 自体を DADS にすること**だと読んだ。
+
+- **kotobase.net**（`net-kotobase/clj-edge`）: 4つの Worker ページ（landing / signup / admin / explore shell）が `kotoba-ui.core/->page` + shell scaffold + uikit panel。`site-skin` は vendored CSS の `:root` ブロックだけを切り出して bridge を当てていた（dads-* markup が無いので component 規則は dead weight、という当時正しい判断）。
+- **murakumo.cloud**（`cloud-murakumo`）: 生成静的ページ（docs / gpu-market / blog index + 4記事）が kotoba-ui、SPA landing は `ui/views.cljc` の pure UI IR + `index.html` に約75行の `--hig-*` 手書き CSS。`bridge-css-except` でブランド indigo `#7C9CFF` を byte-exact で保持していた。
+- **x402.nexus**（`nexus-x402`）: **3つの中で最も未移行**。design system が一切無く、`x402/directory.cljc` の自前 palette と `nexus/worker.cljs` の `cohort-page` にハードコードされた dark hex（`#0b1020` / `#141c31` / `#377dff` 等）。
+
+**さらに、探索して初めて見つかった2ページ。** murakumo には generator の外に手書き dark ページが残っていた —— `public/gpu/index.html`（GPU 収益計算機、96行、独自 dark palette 一式）と `public/join/mobile.html`（PWA 同意フロー、`color-scheme:dark`）。kotoba-ui 移行が届いていなかった面で、放置すれば light な DADS サイトの中で2ページだけ dark になる。"
+
+  :adr/decision
+  "**1. 完全に DADS 準拠。ブランド accent は放棄する。**
+
+`jp-go-dds.tokens/brand-tokens` / `bridge-css-except` は「typography・neutral・spacing は DADS、accent だけ自社色」を選べるように用意されており、ライブラリ自身の docstring が『これは DADS を使うという指示から自明に導かれる結果ではない』と明記している。実際 murakumo は indigo を、kotobase は teal `#0f766e` を持っていた。**この分岐はオーナーに確認し、「完全に DADS 準拠」を選択**（2026-07-30）。結果:
+
+- 3サイトすべて accent = デジタル庁 key blue `#0017c1`
+- `dads-*` component を app CSS から一切上書きしない
+- kotobase の `site-theme/theme`（唯一 hex が許された場所）と murakumo の `chrome/theme` は**削って**いる。減らすのではなく消す —— full DADS では app code に hex が1つも要らない
+
+**2. component は DADS、長文 prose は skin。** 「全部 component に書き換える」は murakumo の blog 4記事・60行の価格表で**内容を落とすリスク**の方が大きい。`jp-go-dds.skin` は『意味的 markup + 小さな class 語彙を markup を触らずに DADS へ寄せる』ためにあり、まさにこの形。したがって:
+
+- chrome / button / heading / table / chip / notification-banner は `dds/*` component
+- layout は `dds-ext-*` scaffold
+- 長文 prose は素の hiccup のまま `skin-css` が担当
+
+両者は競合しない（skin は素の `h1`/`h2`、component は `.dads-heading`、class selector が element selector に勝つ）。
+
+**3. CSS 配布は面ごとに変える。** DADS の設計方針は「各ページに inline、外部リクエストゼロ」。だが murakumo は同一 origin の静的 6 ファイルなので **1本の `/css/dds.css` を link**（85KB × 6 の複製を避ける）。kotobase の Worker ページは従来どおり inline（移行前も kotoba-ui theme bundle を約70KB inline していたので、77–93KB は同じ size class）。nexus は Worker response なので inline。
+
+**4. x402.directory は generic のまま、override は consumer 側に置く。** `x402/directory.cljc` は任意の facilitator が使える再利用ライブラリで、`:branding {:css … :theme-color …}` を既に公開している。日本の政府デザインシステムを default に焼くのは他の運用者にとって誤りで、しかもライブラリの dark palette を失う。よって `nexus.theme` を新設して consumer から差し込む。
+
+**5. 上流の欠陥は上流で直す。** 移行中に2つ見つかり、どちらも consumer 側の回避策ではなく所有者の層で修正した（design-quality-ledger 2026-07-26 の『gap は design-system 層のものなので upstream で直した』と同じ判断）。"
+
+  :adr/consequences
+  "**light 固定になった。** DADS に dark palette は無い（vendored CSS に `prefers-color-scheme` 規則ゼロ）。3サイトすべて `color-scheme: light` を meta と CSS の両方で宣言する。kotobase は 2026-07-29 まで `:auto` で「公開ページは OS の外観に従う」と書いていたが、その要件は design system の選択と引き換えに手放した。dark が要るアプリは kotoba-ui skin を選ぶ、がライブラリの示す正しい分岐。
+
+**ブランド識別性を失った。** 3サイトが同じ官公庁ブルーになる。government design system としては統一が目的なので設計意図どおりだが、プロダクトの見分けは wordmark と copy だけが担う。戻す場合の経路は `bridge-css-except brand-tokens`（ライブラリに残っている）。
+
+**上流に landed した2つの修正。**
+
+1. `kotoba-lang/html` (aa57f27, PR #4) —— pretty-printer が **`<pre>` / `<textarea>` の内側を indent していた**。`[:pre [:code \"…\"]]` が `<pre>\\n  <code>…` になり、code block の先頭に空行と2スペースが入り、copy-paste にも乗っていた。両要素は仕様上 whitespace を literal に描くので renderer の整形はその境界で止まらねばならない。kotobase の landing がまさにこの形で curl 例を書いており、既存の回帰テストが（このバグを持たない renderer に対して書かれていたため）検出した。
+
+2. `kotoba-lang/jp-go-digital-design-system` (6300c53) —— **skin の `table` 規則が DADS 自身の table component を壊していた**。上流は `.dads-table__table` に `display` を書いていない（`border-collapse` だけ）ので、skin の `[\"table\" {:display \"block\" …}]` が component にも当たり、**表が block 化して列が崩れる**。`:not(.dads-table__table)` で除外。**README が勧める `dds.css` + `skin-css` の併用で初めて表面化する**類の欠陥で、素の表だけ / component だけの consumer では出ない。`jp-go-dds.skin-test` が再発を止める。
+
+**まだ上流に返していない ordering hazard（consumer 側で回避、要検討）。** `skin-css` は `body{padding: 2rem 1rem 4rem}` を、`a11y-css` は `padding-left/right/bottom: env(safe-area-inset-*, 0px)` を書く。この順に連結すると longhand が勝ち、**inset を持たない環境では `env()` が 0px fallback に解決して左右 padding が消える**（desktop Chrome で本文が viewport 端に貼り付くのを実測）。逆順にすると safe-area 対応を失う。nexus では `max()` で両取りして回避したが、`skin-css` + `a11y-css` を素直に連結する consumer は誰でも踏む。murakumo/kotobase は `.dds-ext-container`（padding-inline が既に inset 対応）を使っているため露出しなかった。**ライブラリ側の contract をどう直すかは別途判断が必要**（a11y-css の body 規則を捨てて container に寄せるのか、`max()` を焼くのか）。
+
+**deploy が黙って成功する経路を1つ踏んだ。** kotobase の wrangler `main` は `worker/js/kotobase-worker.js`（`shadow-cljs release **entry**` の出力）を再 export しているのに、`release worker` だけを走らせて deploy した。**deploy は成功と報告し、kotobase.net は移行前のページを配り続けた。** 生成 HTML を確認するのではなく **live HTML を確認した**ことで捕まえた（`data-appearance=\"light\"` かつ `color-scheme` meta 無しが旧 renderer の署名）。clj-edge の npm `build` が両 target を走らせるのはこのためで、片方だけ走らせてはいけない。
+
+**murakumo の PWA が offline で崩れる穴を1つ塞いだ。** `mobile_sw.cljs` は3 asset を cache していて stylesheet を含んでいなかった。link 先が `/css/theme.css` から `/css/dds.css` に変わったので、そのままなら offline install が無 style で描画される。cache list に追加し cache name を v3 へ。
+
+**pin 前進は「最後の commit の後」に行う。** 今回 cloud-murakumo の pin を前進させた後にもう1つ commit（SPA shell の color-scheme 宣言）を landed + deploy したため、west.yml が main より2 commit 遅れ、**fresh clone + west update では deploy 済みの状態を再現できない**状態が一時的に生じた。closing の pin 監査（pin == main tip を全件照合）で検出して修正。deploy と pin 前進が別操作である限り、この順序ミスは再発しうる。
+
+**west pin を5件前進させた。** 子 checkout 3件が remote より遅れており（net-kotobase は着手時 180 commits）1件はオーナーの未 commit WIP を抱えていたため、`gen-west-manifest --entry` はローカル HEAD を pin する罠になる。GitHub API の server-side single-entry commit（blob SHA の optimistic lock）で書き、5件すべて compare API で `status=ahead` / `behind_by=0` を確認した。"
+
+  :adr/related ["adr-2607141915-jp-go-digital-design-system"
+                "adr-2607122200-kotoba-uiux-paved-road"
+                "adr-2607132300-design-quality-score"
+                "adr-2607262000-dads-token-bridge"
+                "adr-2607301200-p2p-quota-aura-free-equivalent"]
+
+  :adr/authoritative-for
+  ["kotobase.net の4ページ（landing/signup/admin/explore shell）は jp-go-dds component で書く。site-skin は vendored dds.css 全体 + a11y-css を出し、token bridge は出さない（--hig-* を発行する資産がもう無い）"
+   "murakumo.cloud の6ページ + SPA は 1本の /css/dds.css を link する（vendored + ext + skin + a11y + app + spa）。public/css/theme.css は削除済み"
+   "murakumo の SPA UI IR（ui/views.cljc）は dads-*/dds-ext-* を直接 emit する。表は data-table helper が上流構造（.dads-table > .dads-table__table > th.dads-table__col-header）を組む"
+   "x402.nexus は nexus.theme 経由で x402.directory の :branding {:css :theme-color} に差し込む。x402.directory 自体の default は generic なまま変えない"
+   "3サイトともブランド accent を持たない —— accent はデジタル庁 key blue #0017c1。app CSS は dads-* class を一切 override しない"
+   "3サイトとも light 固定（DADS に dark palette が無い）。dark が要るなら kotoba-ui skin を選ぶ"
+   "kotobase の Worker bundle は release worker と release entry の**両方**を走らせてから deploy する（entry だけが wrangler main に届く）"]
+
+  :adr/evidence
+  ["kotobase: clojure -M:site-test 27 tests / 150 assertions green（content・全 public href・signup JS の DOM 契約・SLA を過大に言わない assertion をすべて維持）。生成4ページは 77–93KB（移行前 75–89KB）で、budget 回帰テストを追加"
+   "kotobase: 移行で消した .kb-cta を kotobase.explore（Worker bundle 内で文字列組み立て、jp-go-dds を require できない）がまだ emit しており /explore の検索ボタンが無 style になるところだった。dads-button markup を literal で書き、jp-go-dds.core/button の出力と一致することを test で pin"
+   "kotobase: component-test は origin/main 時点で既に3件失敗（worker-artifact-contract が worker/js/*.js の不在を期待するが commit 済み、provider-source-catalog 2件）。今回の変更とは無関係で未修正"
+   "murakumo: clojure -M:site が8ファイル再生成。shadow-cljs release app/worker/mobile/mobile-sw すべて 0 warnings。SPA は display:table（skin 修正が効いている）・legacy class 0件・577px で横スクロール無し"
+   "nexus: shadow-cljs release worker 0 warnings / 295KB。clojure -M:test 44 tests / 182 assertions green。pay ボタンが rgb(0,23,193) = #0017c1、min-height 56px。dark hex 残0"
+   "nexus: clojure -M:lint は test/nexus/apply_test.cljc に警告1件（unresolved clojure.string）—— 触っていない既存分"
+   "html: clojure -M:test 22 tests / 86 assertions green（<pre>/<textarea> の新規テスト含む）"
+   "jp-go-dds: clojure -X:test 30 tests / 255 assertions green（skin_test.cljc 新規 + core_test の table selector 更新）"
+   "live 検証（deploy 後、curl で実 HTML）: kotobase / signup / admin / explore、murakumo /docs /blog/ /gpu-market /gpu/ /join/mobile、x402.nexus / /cohort —— 全て 200 かつ dads-*/dds-ext-* を含み --hig-* / kotoba-shell__ を含まない"
+   "murakumo /css/theme.css は deploy 後 404（一時的に 200 を返したのは CDN cache の残り）"
+   "net-kotobase は作業中に origin/main が4 commit 進み（ADR-2607301200 の P2P quota 512 MiB / 50 pins）、生成 HTML 4件が conflict。marker 手編集ではなく再生成で解決し、新 quota copy が DADS ページに届いていることを確認してから merge した"
+   "west.yml: 変更行はちょうど5行（entry ごとに revision 1行のみ）。commit 9965b1c"
+   "SPA shell（public/index.html、手書きで generator の外）は color-scheme/theme-color/viewport-fit の宣言が漏れていたため追加し再 deploy（dbd6521、version 86e7c58d）。生成ページは chrome/document から得ていた"
+   "closing の pin 監査で cloud-murakumo の pin が main より2 commit 遅れているのを検出（上の SPA 修正を pin 前進の後に landed したため）。dbd6521 へ修正（commit 7795ebd）—— 5件すべて pin == main tip を再確認"
+   "live SPA を browser で確認: dads-button 5 / dads-table 1（display:table）/ dds-ext-card 5、legacy class 0、stylesheet は /css/dds.css 単独、横スクロール無し"]}]

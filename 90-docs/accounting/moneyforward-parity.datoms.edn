@@ -1,0 +1,351 @@
+;; MoneyForward パリティ —— **測った denominator。手で数字を書き足さない**
+;;
+;; 再測定: この面は live な MF Cloud Accounting API（読み取りスコープの MCP）
+;;         から取る。credential が要るので生成器は置いていない。取り直したら
+;;         :mf.snapshot/measured-at と件数を必ず一緒に動かす。
+;; 検査:   nbb --classpath ".:scripts/nbb_compat" scripts/verify-moneyforward-parity.cljs
+;;
+;; ## なぜこの面が要るのか
+;;
+;; ADR-2608208000 §7 は cloud-itonami の会計面の到達度を
+;;
+;;     cloud-itonami-isco-4311 (元帳/仕訳帳/消費税申告)  219/904  = 24%
+;;     cloud-itonami-isco-4313 (年末調整/社会保険)       239/1287 = 19%
+;;     keihi (経費)                                     137/570  = 24%
+;;     shiharai-actor                                   188/1280 = 15%
+;;     shokyaku (減価償却)                                33/517  =  6%
+;;
+;; と書いた。**この 5 行は到達度ではない。** 出典 ADR-2608197200 の表は
+;; `tests/assertions` の列で、各 repo の README が同じ数を
+;; 「129 tests / 429 assertions green」と書いている。219/904 は「904 のうち
+;; 219 ができている」ではなく「219 本のテストが 904 個の表明を通した」——
+;; 分数に見える形をしていただけで、分母は存在しなかった。
+;;
+;; ADR-2608197200 自身がこの階級を名指している:「A check that could not run
+;; returning what a check that ran and found nothing returns」「a coverage
+;; figure with no denominator」。**分母の無い被覆率は、測って足りていた場合と
+;; 同じ顔をする。** ここはその分母を、置き換える対象そのものから取る。
+;;
+;; ## 分母の取り方
+;;
+;; 一般論としての「MoneyForward の機能一覧」ではなく、**実際に契約していて
+;; 実際に記帳している 1 事業者の実データ**を分母にする。カタログの機能数は
+;; 使っていない機能まで数えてしまい、使っている機能の抜けを隠す。
+;;
+;; ⚠ したがってこの分母は Gftd Japan株式会社 1 社のものであって、MoneyForward
+;;   の全機能ではない。他社に横展開するときは測り直す。
+
+[{:mf.snapshot/id "gftd-japan-2026-08-20"
+  :mf.snapshot/measured-at "2026-08-20"
+  :mf.snapshot/source "MF Cloud Accounting API (読み取りスコープの MCP)"
+  :mf.snapshot/office-code "9007-2846"
+  :mf.snapshot/office-name "Gftd Japan株式会社"
+  :mf.snapshot/office-type "CORPORATE"
+  ;; is_manufacturing true —— これが効く。製造原価報告書 (COST_REPORT) が
+  ;; この事業者では任意ではない。
+  :mf.snapshot/manufacturing? true
+  :mf.snapshot/accounting-periods 9
+  :mf.snapshot/earliest-period "2018-01-01"
+  :mf.snapshot/accounts 200
+  :mf.snapshot/sub-accounts 512
+  :mf.snapshot/categories 46
+  :mf.snapshot/tax-categories 151
+  :mf.snapshot/departments 20
+  :mf.snapshot/api-operations 21
+  :mf.snapshot/note
+  "勘定科目は available=true のみ。categories は (financial_statement_type, category) の対で数える —— BEGINNING_INVENTORY / ENDING_INVENTORY / TRANSFERS_TO_OTHER_ACCOUNTS は COST_REPORT と PROFIT_LOSS の両方に現れ、category 名だけで数えると 43 になって 3 つ取りこぼす。"}
+
+ ;; --------------------------------------------------------------------------
+ ;; 財務諸表区分 —— 46 対。:mf.category/shohyo-section が nil なら
+ ;; kotoba.shohyo.jp に置き場所が無く、その勘定は :unknown-section になる。
+ ;; --------------------------------------------------------------------------
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "APPROPRIATED_RETAINED_EARNINGS"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :other-retained-earnings}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "CAPITAL_STOCK"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :capital-stock}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "CASH_AND_DEPOSITS"
+  :mf.category/accounts 8
+  :mf.category/sub-accounts 17
+  :mf.category/shohyo-section :current-assets}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "DEFERRED_ASSETS"
+  :mf.category/accounts 2
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :deferred-assets}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "INTANGIBLE_ASSETS"
+  :mf.category/accounts 3
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :intangible-fixed}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "INVENTORIES"
+  :mf.category/accounts 5
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :current-assets}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "INVESTMENTS_AND_OTHER_ASSETS"
+  :mf.category/accounts 12
+  :mf.category/sub-accounts 9
+  :mf.category/shohyo-section :investments-other}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "LEGAL_CAPITAL_SURPLUS"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :legal-capital-surplus}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "LEGAL_RETAINED_EARNINGS"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :legal-retained-earnings}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "MARKETABLE_SECURITIES"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :current-assets}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "NON_CURRENT_LIABILITIES"
+  :mf.category/accounts 3
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :fixed-liabilities}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "OTHER_CAPITAL_SURPLUS"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :other-capital-surplus}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "OTHER_CURRENT_ASSETS"
+  :mf.category/accounts 16
+  :mf.category/sub-accounts 76
+  :mf.category/shohyo-section :current-assets}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "OTHER_CURRENT_LIABILITIES"
+  :mf.category/accounts 14
+  :mf.category/sub-accounts 180
+  :mf.category/shohyo-section :current-liabilities}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "PROPERTY_PLANT_AND_EQUIPMENT"
+  :mf.category/accounts 5
+  :mf.category/sub-accounts 4
+  :mf.category/shohyo-section :tangible-fixed}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "RETAINED_EARNINGS_BROUGHT_FORWARD"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :other-retained-earnings}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "STOCK_SUBSCRIPTION_DEPOSITS"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :new-share-subscription-deposits}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "SUBSCRIPTION_RIGHTS_TO_SHARES"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :subscription-rights-to-shares}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "SUNDRIES"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :current-assets}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "TRADE_PAYABLES"
+  :mf.category/accounts 2
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :current-liabilities}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "TRADE_RECEIVABLES"
+  :mf.category/accounts 3
+  :mf.category/sub-accounts 68
+  :mf.category/shohyo-section :current-assets}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "TREASURY_STOCK"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :treasury-stock}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "TREASURY_STOCK_SUBSCRIPTION_DEPOSITS"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :treasury-stock-subscription-deposits}
+ {:mf.category/statement "BALANCE_SHEET"
+  :mf.category/id "VALUATION_AND_TRANSLATION_ADJUSTMENTS"
+  :mf.category/accounts 2
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :valuation-adjustments}
+ {:mf.category/statement "COST_REPORT"
+  :mf.category/id "BEGINNING_INVENTORY"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :beginning-inventory}
+ {:mf.category/statement "COST_REPORT"
+  :mf.category/id "BEGINNING_MATERIALS"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :beginning-materials}
+ {:mf.category/statement "COST_REPORT"
+  :mf.category/id "BEGINNING_WORK_IN_PROCESS"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :beginning-work-in-process}
+ {:mf.category/statement "COST_REPORT"
+  :mf.category/id "COST_OF_MATERIALS"
+  :mf.category/accounts 2
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :material-purchases}
+ {:mf.category/statement "COST_REPORT"
+  :mf.category/id "ENDING_INVENTORY"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :ending-inventory}
+ {:mf.category/statement "COST_REPORT"
+  :mf.category/id "ENDING_MATERIALS"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :ending-materials}
+ {:mf.category/statement "COST_REPORT"
+  :mf.category/id "ENDING_WORK_IN_PROCESS"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :ending-work-in-process}
+ {:mf.category/statement "COST_REPORT"
+  :mf.category/id "LABOR_COSTS"
+  :mf.category/accounts 6
+  :mf.category/sub-accounts 2
+  :mf.category/shohyo-section :labor-costs}
+ {:mf.category/statement "COST_REPORT"
+  :mf.category/id "MANUFACTURING_EXPENSES"
+  :mf.category/accounts 20
+  :mf.category/sub-accounts 6
+  :mf.category/shohyo-section :manufacturing-overhead}
+ {:mf.category/statement "COST_REPORT"
+  :mf.category/id "TRANSFERS_TO_OTHER_ACCOUNTS"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :transfers-to-other-accounts}
+ {:mf.category/statement "PROFIT_LOSS"
+  :mf.category/id "BEGINNING_INVENTORY"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :beginning-inventory}
+ {:mf.category/statement "PROFIT_LOSS"
+  :mf.category/id "CORPORATE_INCOME_TAXES_CURRENT"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :income-taxes}
+ {:mf.category/statement "PROFIT_LOSS"
+  :mf.category/id "CORPORATE_INCOME_TAXES_DEFERRED"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :deferred-income-taxes}
+ {:mf.category/statement "PROFIT_LOSS"
+  :mf.category/id "COST_OF_PURCHASED_GOODS"
+  :mf.category/accounts 2
+  :mf.category/sub-accounts 2
+  :mf.category/shohyo-section :purchases-or-cost-of-goods-manufactured}
+ {:mf.category/statement "PROFIT_LOSS"
+  :mf.category/id "ENDING_INVENTORY"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :ending-inventory}
+ {:mf.category/statement "PROFIT_LOSS"
+  :mf.category/id "EXTRAORDINARY_INCOME"
+  :mf.category/accounts 6
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :extraordinary-income}
+ {:mf.category/statement "PROFIT_LOSS"
+  :mf.category/id "EXTRAORDINARY_LOSSES"
+  :mf.category/accounts 4
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :extraordinary-loss}
+ {:mf.category/statement "PROFIT_LOSS"
+  :mf.category/id "NET_SALES"
+  :mf.category/accounts 6
+  :mf.category/sub-accounts 11
+  :mf.category/shohyo-section :net-sales}
+ {:mf.category/statement "PROFIT_LOSS"
+  :mf.category/id "NON_OPERATING_EXPENSES"
+  :mf.category/accounts 9
+  :mf.category/sub-accounts 3
+  :mf.category/shohyo-section :non-operating-expense}
+ {:mf.category/statement "PROFIT_LOSS"
+  :mf.category/id "NON_OPERATING_INCOME"
+  :mf.category/accounts 9
+  :mf.category/sub-accounts 5
+  :mf.category/shohyo-section :non-operating-income}
+ {:mf.category/statement "PROFIT_LOSS"
+  :mf.category/id "SELLING_GENERAL_AND_ADMINISTRATIVE_EXPENSES"
+  :mf.category/accounts 37
+  :mf.category/sub-accounts 129
+  :mf.category/shohyo-section :sga}
+ {:mf.category/statement "PROFIT_LOSS"
+  :mf.category/id "TRANSFERS_TO_OTHER_ACCOUNTS"
+  :mf.category/accounts 1
+  :mf.category/sub-accounts 0
+  :mf.category/shohyo-section :cost-of-sales}
+
+ ;; --------------------------------------------------------------------------
+ ;; 面ごとの現在地。**「無い」は測ったもので、推測ではない**
+ ;; --------------------------------------------------------------------------
+
+ {:mf.facet/id "chart-of-accounts"
+  :mf.facet/jp "勘定科目・補助科目"
+  :mf.facet/owner "kotoba-lang/shohyo"
+  :mf.facet/status :partial
+  :mf.facet/note
+  "shohyo は chart を client ごとに登録させ、既定の勘定科目表を持たない（README: 「refuses to guess what an account is」）。これは設計上正しいが、MF の 200 勘定科目 / 512 補助科目を移すには、その 712 行の登録データが要る。**まだ 1 行も書かれていない。**"}
+
+ {:mf.facet/id "financial-statement-sections"
+  :mf.facet/jp "財務諸表区分"
+  :mf.facet/owner "kotoba-lang/shohyo"
+  :mf.facet/status :complete
+  :mf.facet/note
+  "2026-08-20 に閉じた。第七十六条の純資産の部と第九十三条/第九十四条の税等・当期純損益金額（merge ffd8aa016b33eb0689bb91f121b014c659c0d474）、続いて 財務諸表等規則 第七十五条 の売上原価の内訳と製造原価明細書（merge 38fba34884419473c928a6ac8868e55eb3c02732）。着地前は 23/46 対・151/200 勘定だった。件数は verify-moneyforward-parity.cljs が毎回ソースから数え直す —— **ここに数字を書かない。**"}
+
+ {:mf.facet/id "cost-report"
+  :mf.facet/jp "製造原価報告書"
+  :mf.facet/owner "kotoba-lang/shohyo (kotoba.shohyo.genka)"
+  :mf.facet/status :partial-authority
+  :mf.facet/note
+  "この事業者は is_manufacturing true で、MF の chart は COST_REPORT を 10 区分 35 勘定持つ。2026-08-20 に kotoba.shohyo.genka を追加して置き場所を作った。⚠ **権威が途中で切れる面** —— 財務諸表等規則 第七十五条第一項（売上原価は 3 科目、第三号は控除科目）と第二項（明細書の添付）は法令であり読んである。しかし 材料費/労務費/経費 の三分類は 原価計算基準（企業会計審議会 1962）のもので、法令ではなく e-Gov 法令 API に無い —— 財務諸表等規則 の全文に 材料費 も 労務費 も **0 回**しか出ない。したがって section は :source :observed、算出結果は :checked ではなく :checked-arithmetic-only を返し、:genka/authority が :shape-read? false を伴って**戻り値の中を**旅する。"}
+
+ {:mf.facet/id "tax-categories"
+  :mf.facet/jp "税区分"
+  :mf.facet/owner "cloud-itonami/cloud-itonami-isco-4311"
+  :mf.facet/status :partial
+  :mf.facet/note
+  "MF は 151 税区分を持ち、各々に tax_rate が付いている。bookkeeping.shohizei は 消費税法 第四十五条第一項 の「税率の異なるごとに区分した」を満たすために rate 別の集計を要求し、chart が rate を宣言していなければ :rates-not-declared を返す。**MF の 151 行がその宣言そのもの**だが、まだ取り込まれていない。"}
+
+ {:mf.facet/id "departments"
+  :mf.facet/jp "部門"
+  :mf.facet/owner nil
+  :mf.facet/status :absent
+  :mf.facet/note
+  "MF は 20 部門を 2 階層（parent_id）で持ち、うち 10 は【廃止】/【移動】/【合併消滅】。仕訳は部門を持てる。bookkeeping の journal entry には部門の次元が無く、posting にも無い。部門別 P/L は現状**表現できない**。"}
+
+ {:mf.facet/id "account-aggregation"
+  :mf.facet/jp "連携口座"
+  :mf.facet/owner "kotoba-lang/statement-fetch + kakeibo + banking"
+  :mf.facet/status :by-design-different
+  :mf.facet/note
+  "ADR-2608208000 は「MF が持っていて cloud-itonami に無い機能が「連携口座」である」と書いたが、部品は在る —— statement-fetch が取得、kakeibo が行→複式仕訳、banking が台帳契約。**無いのは自動化であって面ではない**: statement-fetch の認証は :handoff step で、handoff は argv に一切コンパイルされない（agent が構造的にパスワードを打てない）。MF は credential を預かって自動巡回する。これは能力差ではなく**別の安全設計**で、埋めるなら credential 保管を受け入れるかどうかの判断が先に要る。⚠ さらに kakeibo の resources/mappings/ は :mapping/unverified true のまま —— 実銀行エクスポートを 1 本も通していない（ADR-260726）。"}
+
+ {:mf.facet/id "api-surface"
+  :mf.facet/jp "API 操作面"
+  :mf.facet/owner "cloud-itonami/cloud-itonami-isco-4311"
+  :mf.facet/status :partial
+  :mf.facet/note
+  "MF Cloud Accounting の MCP は 21 操作を露出する。bookkeeping.edge.endpoints は 7 route。ただし**この 2 つは同じ土俵にない** —— MF は汎用 API、bookkeeping は :on-demand の actor で「露出しない」ことが設計（:issue-invoice / :close-period は常に人間判断へ escalate するので socket から届かない）。数の差を欠落として読まない。"}
+
+ {:mf.facet/id "modules-contracted"
+  :mf.facet/jp "契約中モジュール"
+  :mf.facet/owner nil
+  :mf.facet/status :measured
+  :mf.facet/note
+  "2026-07 の請求書 No.25369018（ADR-2608208000 §7）: 会計 / 請求書 / 経費(チーム+オペレーター入力) / 契約(mid+案件管理) / 人事管理 / 年末調整 / 経費アクティブユーザー従量 / 請求書登録メンバー従量 / AI-OCR。月 ≈¥40,850。オーナー判断は「残すべきは会計と連携口座だけ」。⚠ 2026-08-18 の決済失敗により **2026-08-25 に 18 商品が自動解約**される予告が出ている。これは縮小ではなく全喪失で、記帳と連携明細が同時に消える。MF 管理画面のログインが要るのでオーナー作業。"}]

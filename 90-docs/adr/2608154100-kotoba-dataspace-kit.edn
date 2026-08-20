@@ -1,0 +1,650 @@
+[{:db/id -1
+  :adr/id "ADR-2608154100"
+  :adr/title "Kotoba dataspace kit — Syndicate 風の協調を OCap カーネルの capability kit として足す"
+  :adr/status "accepted"
+  :adr/date "2026-08-15"
+  :adr/body
+  "## 発端
+
+2026-08-15 の mapping: Syndicate / Goblins / OCapN は Kotoba 言語カーネルに
+**入っていない**。入っているのは Clojure 形の `.kotoba`、EDN 的な inert 値、
+ambient authority の排除、capability で閉じた effect。オーナー指示は
+「では設計、実装」— 新しい言語を作らず、OCapN / Preserves / Goblins vat /
+ValueFlows をカーネルに持ち込まず、既存 OCap カーネルの上に Syndicate 風
+dataspace 協調の proving slice を 1 本着地させる。
+
+## 決定
+
+1. **意味のカーネルは変えない。** source は Clojure 形 `.kotoba`
+   （ADR-2607279200 / `guest-grammar.edn`）。値は EDN 的 inert。wire は
+   `kotoba.value.v1`（DAG-CBOR）。セキュリティは ambient 排除、caps は
+   host handle / grant∩policy。`#cap` は権限を mint しない。
+2. **足りない層は協調 (coordination) である。** Syndicate に着想した
+   dataspace を **capability kit** として足す。第二言語でも新しい store
+   でもない。resource は dataspace インスタンス（プロセス全体ではない）。
+3. **assertion / pattern は普通の EDN**（vector / map）。例:
+   `[:temperature :room/a 21]` に対し `[:temperature :room/a ?t]` または
+   `_` / `:_` wildcard。Clojure thesis の `'?t` はデータとしては
+   `(quote ?t)`。guest が quote する必要はなく、pattern は EDN 値。
+   map は「pattern 側の key が在ること」でマッチし、余分な key は許す。
+4. **ops:** `assert` / `retract` / `observe` / `facet-enter` / `facet-leave`
+   （kit の `typed-cap-call` 境界。Clojure の `assert!` ではない）。
+   Facet を抜けるとその facet が publish した assertion を retract し、
+   その facet の observation を捨てる。
+5. **ambient dataspace は無い。** すべての op は dataspace capability
+   （この slice では wire id 24 / `:dataspace/transact`）の所持を要する。
+6. **observe の callback / facet body は guest 閉包ではない。** guest は
+   inert な request を返す。matching と lifecycle は host provider
+   （ADR-2607201300 `state+event → effects`）。observe は
+   (a) 登録して現在の matches を返す (b) 後続 assert の asserter `:notices`
+   に binding を載せる (c) matching assert を observer mailbox へ
+   `:document` notice として enqueue し、同じ facet+pattern の次の
+   `:observe` が drain する。guest `fn` / `future` / vat / `<-` は足さない。
+7. **assertion のシリアライズも `#cap` / `#cap-ref` も権限を復元しない。**
+   解決は既存 cap（`intersect-grants` / 実行時 allow 集合 / host 表）。
+8. **encoding:** in-process host matching still uses Clojure EDN values.
+   kit ABI assertions / patterns / notices / bindings are `:document`
+   （KIR bounded tagged document。opaque EDN string ではない）。wire は
+   `kotoba.value.v1`。Preserves ではない。
+9. **この slice の外:** Goblins vat を guest に入れること、`<-` eventual
+   send、OCapN、Preserves、ValueFlows-in-kernel、user `defmacro`、
+   Clojure/JVM ambient、actor family (`<-` / spawn) の compiler kit。
+10. **vat の対応物:** kototama tender / reference runtime が single-turn
+    scheduler。guest に unbounded concurrency は無い
+    （`future`/`agent`/`send` は `:intentional-security-constraint`）。
+11. **置き場:** 新規 GitHub repo は作らない。`nbb scripts/concept-lookup.cljs
+    dataspace|syndicate` は語彙に無く、`repo-search` も dataspace kit を
+    返さなかった。実装は既存 `kotoba-lang/compiler`（kit + reference host +
+    tests）と `kotoba-lang/kotoba-lang`（catalog / semantics / cap values）。
+12. **既存の隣接実装を捨てない。** `kotoba.lang.incidence` は既に
+    Syndicate 風 assert/retract/observe/facet を **CID 付き incidence ブロック**
+    として持っている。`incidence-ocapn` は CapTP 下書きであり、**この kit には
+    入れない**。本 kit は guest が書く **EDN tuple space**。guest の
+    `kgraph-assert!` は i64 EAV host-op であり kit ABI ではない。host は
+    `kotoba.kgraph` の EDN EAV（`assert-datom` / `retract-datom` / `query` /
+    `get-objects`）を `:dataspace/transact` の inject-able store にしてよい
+    （gap 6）。D1 は premise にしない。identity CID と archive Location は混ぜない。
+
+## 現在地 vs 目標（正直に）
+
+| 面 | 今日 | 目標ではないもの |
+|---|---|---|
+| kit `dataspace-v1` | reference + `:wasm-aot` (typed browser) + `:native-aot` (real kexe process) + `:jit` (`:js-kotoba-v1` / kotoba-script V8) implemented for wire 24 | `:wasm32-kotoba-v1`（clock の i64 `kotoba:cap/call`）は pending。clock `:native-aot` も pending。KIR `ir/execute` は jit ではない |
+| wire id 24 | named `:dataspace/transact` landed。numeric `typed-cap-call 24` も残る | named が通ったことと wasm-aot を混同しない。wasm-aot は typed browser host の E2E |
+| reference host | `kotoba-lang/provider` `provider.dataspace`（amu は inject するだけ） | compiler-local host に戻さない |
+| provider-conformance 閉集合 | **10** application capabilities（旧 9-kit + `:dataspace/transact`）。component-model inventory は id 24 まで | count と inventory を片側だけ動かさない |
+| kit ABI | `:document`（runtime は tagged document 以外を KIR で拒否） | opaque EDN string / Preserves |
+| Goblins / OCapN | 統合していない | 統合したと書かない |
+| observe | host-owned in-process notice delivery（observer mailbox、次の `:observe` が drain） | guest vat / callback 関数 |
+| backing store | default in-memory `{:q :transact!}`。kgraph EAV inject 可 | D1 / guest `kgraph-assert!` / identity CID を Location にしない |
+
+## この slice で実装したもの
+
+### compiler = `kotoba-lang/amu`（GitHub は `compiler` → `amu` にリダイレクト）
+
+- `resources/kotoba/lang/capability-kits/dataspace-v1.edn` — 閉 effect 集合、deny-by-default、resource=dataspace
+- `test/kotoba/compiler/dataspace_match_test.clj` — `provider.dataspace-match` を見る
+- `test/kotoba/compiler/dataspace_provider_test.clj` — named `:dataspace/transact` で `provider.dataspace` を inject。cap 無し deny、facet retract、observe bind、`#cap` 拒否、偽 handle 拒否
+- `resources/kotoba/lang/application-language.edn` に `:dataspace` kit を記録
+- `test/kotoba/compiler/test_runner.clj` に ns を追加
+- ~~`src/kotoba/compiler/dataspace/{match,provider}.cljc`~~ **removed** — host は provider へ（gap 2）
+
+### provider = `kotoba-lang/provider`
+
+- `src/provider/dataspace.cljc` — host（wire id 24, `:document` ABI）。atom は `{:q :transact!}` store の後ろ。default = in-memory reference
+- `src/provider/dataspace_store.cljc` — memory store（同じ request/result 契約）
+- `src/provider/dataspace_kgraph.clj` — kgraph EAV adapter（`assert-datom` / `retract-datom` / `query` / `get-objects`）。entity incidence は `get-objects`、attr join は `query`
+- `src/provider/dataspace_match.cljc` — 純 EDN matcher（`.cljc` のまま。native recursive map walk は未 qualified）
+- `test/provider/dataspace_test.clj` / `dataspace_match_test.clj`
+- provider-conformance inventory に **載せた**（amu 閉集合は 10。provider 側 inventory も `:dataspace` を含む）
+
+### kotoba-lang（worktree `/tmp/kotoba-lang-dataspace`、branch `agent/dataspace-kit`）
+
+- `lang/capability-catalog.edn` と `resources/kotoba/lang/capability-catalog.edn` に `:dataspace/transact` wire id 24
+- `lang/capability-semantics.edn` の `:kinds` と `capability_values.cljc` の `effect-for-kind`
+- `test/kotoba/lang/dataspace_cap_test.clj` — `#cap` reader は mint しない、grant 無しは deny
+
+### 着地（2026-08-15）
+
+- `kotoba-lang/amu` main `003db3eb8ec1e2222f38b26821a04b4ca493d14e`
+  （merge of `2b697f513c29e1cc7f66be673b2ffdeae5411929`）
+  https://github.com/kotoba-lang/amu/commit/003db3eb8ec1e2222f38b26821a04b4ca493d14e
+- `kotoba-lang/kotoba-lang` main `f67c9cbc16b1b1045805f1786692913bbefc34a0`
+  （merge of `57f1de81bc252c98daccd122d64643b622734693`）
+  https://github.com/kotoba-lang/kotoba-lang/commit/f67c9cbc16b1b1045805f1786692913bbefc34a0
+- `kotoba-lang/kotoba-sema` main `6afc350c447e1ffcfed0649e3b503f480a7a750c`
+  named `:dataspace/transact`（wire id 24）vendor + frontend
+  https://github.com/kotoba-lang/kotoba-sema/commit/6afc350c447e1ffcfed0649e3b503f480a7a750c
+- `kotoba-lang/amu` named frontend + backend-qualification
+  `2375cfcd91f7f52caada865bb7ff53bcaf451a37`
+  （provider-conformance は 9-kit のまま。`:capability-count` 9）
+  https://github.com/kotoba-lang/amu/commit/2375cfcd91f7f52caada865bb7ff53bcaf451a37
+- west pin: kotoba-sema `0d1b8c4b239cfd9c6e68d1c62c54951b3ad01270`、
+  amu `9db85a92ef58c712006853173c0d8160628de437`
+- 本 ADR は superproject `agent/kotoba-dataspace-kit`。west pin は `amu` と
+  `kotoba-lang` を上記 SHA へ前進させる（`compiler` という旧 west 名は
+  同じ GitHub repo のリダイレクトであり、この slice では `amu` を正とする）。
+  named 面の pin は kotoba-sema / amu を上記 SHA へ前進済み。
+
+- gap 2 host move（2026-08-15）:
+  - `kotoba-lang/provider` main `e6fcf7379c89952266553a01b3b6702804e9a2c5`
+    （merge of `1780292a21c9b2a2f0aeb97b9f7c9dfa14c3a088`）
+    https://github.com/kotoba-lang/provider/commit/e6fcf7379c89952266553a01b3b6702804e9a2c5
+  - `kotoba-lang/amu` main `cfc6721866b6628b9e9d919afc088ba432658454`
+    （merge of `a867b8a9ff227504d881161cdb68621f3d165f74`）
+    https://github.com/kotoba-lang/amu/commit/cfc6721866b6628b9e9d919afc088ba432658454
+  - west pin: provider `edd6368f90b048a2c776a52c92a12e82cb488867`、
+    amu `0649486c0604830889bba03543f2c9a79d035925`
+
+- gap 3+4（閉集合編入 + `:document` ABI、2026-08-15）:
+  - `kotoba-lang/provider` main `7d5934bd629c4e129889d04bcbcf8fe03b958c7d`
+    （merge of `51b7b7e` document ABI + inventory）。17 tests / 53 assertions。
+    break: assert-type `:string` に戻すと `abi-assertions-are-documents-not-edn-strings` が落ちる。unbreak 緑。
+    https://github.com/kotoba-lang/provider/commit/7d5934bd629c4e129889d04bcbcf8fe03b958c7d
+  - `kotoba-lang/kotoba-sema` main `c13458983f589bb21d3b96ebd5e48983fcb903f7`
+    frontend + guest-grammar request-boundary `:document`。17 tests / 94 assertions。
+    https://github.com/kotoba-lang/kotoba-sema/commit/c13458983f589bb21d3b96ebd5e48983fcb903f7
+  - `kotoba-lang/kotoba-component` main `b44c99a85d956b6606c769a566f087710304a76f`
+    component-model inventory id 24、count 23→24。8 tests / 42 assertions。
+    https://github.com/kotoba-lang/kotoba-component/commit/b44c99a85d956b6606c769a566f087710304a76f
+  - `kotoba-lang/amu` main `4292eae78b796ef9f11633fcfb6b1b6cd2506101`
+    provider-conformance `:capability-count` 10、manifest sha256
+    `f90f2906d65f30a8d717a79ae38897babdbc7b00202d9f06105e3ad8feaa26b8`。
+    dataspace + conformance + qualification + named-cap = 34 tests / 166 assertions。
+    `stale-capability-count-nine-fails-closed` が count 9 を拒否。
+    runtime は non-document を `value is not a tagged document node` で KIR 拒否。
+    https://github.com/kotoba-lang/amu/commit/4292eae78b796ef9f11633fcfb6b1b6cd2506101
+  - west pin: provider `04ed56635d97de3df7c482d3d27a8c035ab0a763`、
+    kotoba-sema `d0895d6896625a93571de6d1be27ffa951ea7ef2`、
+    kotoba-component `7da91151c7b076a98b77ad79341aca737a7f9cdb`、
+    amu `fa176e95fa340615c96e5c21c54853bd8753d5c3`。
+
+- gap 6（swappable kgraph store、2026-08-15）:
+  - `kotoba-lang/provider` main `c0ee70978cf9ef7e6bbf74364ced3e4d4b4cfec0`
+    （merge of `6c490e487a3f81a0b4f7824ce2301d10710740f6`）。
+    21 tests / 61 assertions（dataspace + match）。
+    break: kgraph `:facet-leave` が owned assertion を retract しないと
+    `injected-kgraph-store-honors-assert-retract-observe-facet-leave` が落ちる。
+    unbreak 緑。`store-that-drops-facet-leave-retracts-fails-closed` が壊れた store を拒否。
+    https://github.com/kotoba-lang/provider/commit/c0ee70978cf9ef7e6bbf74364ced3e4d4b4cfec0
+  - `kotoba-lang/amu` main `b88cb6c0f276ab8f98bd2b62adeef0ae5ec7ffcd`
+    （merge of `72a4d166dcea66fb349b9ac899ddebc0db4f89dc`）。
+    provider git dep → `c0ee70978cf9ef7e6bbf74364ced3e4d4b4cfec0`。
+    dataspace + match + conformance = 18 tests / 79 assertions。
+    https://github.com/kotoba-lang/amu/commit/b88cb6c0f276ab8f98bd2b62adeef0ae5ec7ffcd
+  - west pin: provider `71dc952d05c7586bdf8071a4e3e78ea8371ecd55`、
+    amu `80ac3bc94b4ec82668d3593ebc71b968f1374f24`。
+
+## テストの回し方と結果（2026-08-15 実測）
+
+compiler（対象 ns だけ。フル `clojure -M:test` は native/wasm を含むのでこの slice では回していない）:
+
+```
+cd /tmp/kotoba-compiler-dataspace
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.dataspace-provider-test))
+    (apply clojure.test/run-tests
+           (quote [kotoba.compiler.dataspace-match-test
+                   kotoba.compiler.dataspace-provider-test]))'
+```
+
+結果: **11 tests / 32 assertions、0 fail / 0 error。**
+
+両方向: `missing-grant-denies-before-provider-invoke` は allow 集合が空なら
+`capability denied`（cap 無し assert/observe は落ちる）。
+`facet-exit-retracts-owned-assertions-and-drops-observations` は leave 後の
+observe が `[]`（retract が動かなければ bindings が残る）。
+
+kotoba-lang:
+
+```
+cd /tmp/kotoba-lang-dataspace
+clojure -M:test -n kotoba.lang.dataspace-cap-test -n kotoba.lang.capability-catalog-test
+```
+
+結果: **6 tests / 17 assertions、0 fail / 0 error。**
+
+gap 2（host を provider へ、2026-08-15）:
+
+provider（cognitect test-runner、対象 ns）:
+```
+cd /tmp/provider-dataspace-host
+clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+```
+結果: **13 tests / 36 assertions、0 fail / 0 error。**
+両方向: `:default` tagged-literal 拒否を外すと `tagged-cap-literal-cannot-mint-authority` が `:edn-invalid` になって落ちる。戻すと緑。
+`dataspace-qualifies-alone-without-joining-the-9-kit-set` は capability-count 1 の単独 suite と、inventory に `:dataspace` が無いことを同時に見る。
+
+amu（`clojure -M:test -n` は無視される。clojure.main で対象 ns）:
+```
+cd /tmp/amu-dataspace-host
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.provider-conformance-test))
+    (apply clojure.test/run-tests
+           (quote [kotoba.compiler.dataspace-match-test
+                   kotoba.compiler.dataspace-provider-test
+                   kotoba.compiler.provider-conformance-test]))'
+```
+結果: **14 tests / 64 assertions、0 fail / 0 error。** provider-conformance `:capability-count` は **9 のまま**。guest は named `:dataspace/transact`。
+
+gap 3+4（2026-08-15）:
+
+provider:
+```
+cd /tmp/provider-dataspace-gaps
+clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+```
+結果: **17 tests / 53 assertions、0 fail / 0 error。**
+
+kotoba-sema:
+```
+cd /tmp/kotoba-sema-dataspace-gaps
+clojure -M:test -n kotoba.sema-test
+```
+結果: **17 tests / 94 assertions、0 fail / 0 error。**
+
+kotoba-component:
+```
+cd /tmp/kotoba-component-dataspace-gaps
+clojure -M:test -n kotoba.component-wit-test
+```
+結果: **8 tests / 42 assertions、0 fail / 0 error。**
+
+amu（`clojure -M:test -n` は無視される）:
+```
+cd /tmp/amu-dataspace-gaps
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.provider-conformance-test)
+            (quote kotoba.compiler.backend-qualification-test)
+            (quote kotoba.compiler.frontend-named-capability-test))
+    (apply clojure.test/run-tests
+           [(quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.provider-conformance-test)
+            (quote kotoba.compiler.backend-qualification-test)
+            (quote kotoba.compiler.frontend-named-capability-test)])'
+```
+結果: **34 tests / 166 assertions、0 fail / 0 error。** `:capability-count` **10**。
+
+gap 6（2026-08-15）:
+
+provider:
+```
+cd /tmp/provider-dataspace-kgraph
+clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+```
+結果: **21 tests / 61 assertions、0 fail / 0 error。**
+両方向: kgraph store の facet-leave から owned retract を外すと
+`injected-kgraph-store-honors-assert-retract-observe-facet-leave` が落ちる。戻すと緑。
+`store-that-drops-facet-leave-retracts-fails-closed` は facet-leave で assertion を
+root に戻す store を `not (facet-leave-retracts?)` で拒否。
+
+amu（`clojure -M:test -n` は無視される）:
+```
+cd /tmp/amu-dataspace-kgraph
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.provider-conformance-test))
+    (apply clojure.test/run-tests
+           [(quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.provider-conformance-test)])'
+```
+結果: **18 tests / 79 assertions、0 fail / 0 error。** guest は named `:dataspace/transact`。count 10。
+
+- observer delivery（in-process notices、2026-08-17）:
+  - `kotoba-lang/provider` main `4888ab1217980836b2bc6c288c8e647feb9fd02c`
+    （merge of `a52a180eeae810187be853f25838e9accc14be6a`）。
+    25 tests / 81 assertions（dataspace + match）。
+    break: memory store の `:assert` が mailbox enqueue しないと
+    `matching-assert-delivers-document-notice-to-observer` が落ちる。unbreak 緑。
+    `store-that-swallows-observer-notices-fails-closed` が drain-all store を拒否。
+    https://github.com/kotoba-lang/provider/commit/4888ab1217980836b2bc6c288c8e647feb9fd02c
+  - `kotoba-lang/kotoba-sema` main `91eff5a970e27792a718d6318a548103ef608115`
+    （merge of `c2af8ff`）。observe! result の `:matches` に `:notices :document`。
+    18 tests / 100 assertions。
+    https://github.com/kotoba-lang/kotoba-sema/commit/91eff5a970e27792a718d6318a548103ef608115
+  - `kotoba-lang/amu` main `1dd42bb223ae0d53e34f291fbad3c0c3e1c5d889`
+    （merge of `254a129`）。provider `4888ab12` + sema `91eff5a`。count 10。
+    dataspace + match + conformance + named-cap = 32 tests / 136 assertions。
+    https://github.com/kotoba-lang/amu/commit/1dd42bb223ae0d53e34f291fbad3c0c3e1c5d889
+  - west pin: provider `f88d88d2c6802f36b00fb37fc62ac85fa0a9977d`（entry `4888ab12`）、
+    kotoba-sema `6020097f13f54321f540317dd1df13fb1d797b6a`（entry `91eff5a`）、
+    amu `15b67b84c29bdd9d740396596bcda2166855be6c`（entry `1dd42bb`）。
+
+## テストの回し方と結果（2026-08-17 実測、observer delivery）
+
+provider:
+```
+cd /tmp/provider-dataspace-next
+clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+```
+結果: **25 tests / 81 assertions、0 fail / 0 error。**
+両方向: enqueue を外すと observer の次の observe の `:notices` が `[]` になり 4 fail。戻すと緑。
+
+kotoba-sema:
+```
+cd /tmp/kotoba-sema-dataspace-next
+clojure -M:test -n kotoba.sema-test
+```
+結果: **18 tests / 100 assertions、0 fail / 0 error。**
+両方向: `:matches` から `:notices` を外すと
+`dataspace-source-forms-lower-to-one-typed-effect-kernel` が落ちる。戻すと緑。
+
+amu（`clojure -M:test -n` は無視される）:
+```
+cd /tmp/amu-dataspace-next
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.provider-conformance-test)
+            (quote kotoba.compiler.frontend-named-capability-test))
+    (apply clojure.test/run-tests
+           [(quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.provider-conformance-test)
+            (quote kotoba.compiler.frontend-named-capability-test)])'
+```
+結果: **32 tests / 136 assertions、0 fail / 0 error。** guest は named `:dataspace/transact`。count 10。
+
+## 残ギャップ（次の agent へ）
+
+1. **DONE.** kotoba-sema の `capability-catalog.edn` と cljs fallback に id 24 を vendor し、named `dataspace/transact` と `(:capabilities #{:dataspace/transact})` を通した。
+2. **DONE.** `kotoba-lang/provider` へ reference host を移した。kit EDN は amu に残す。
+3. **DONE.** provider-conformance 閉集合と component-model inventory を一緒に動かした。`:capability-count` 9→10。amu `stale-capability-count-nine-fails-closed` が旧 count を拒否。component-model id 24 / count 24。
+4. **DONE.** kit ABI は `:document`。opaque EDN string ではない。wire は `kotoba.value.v1`。amu 経路は KIR が non-document を拒否し、provider 直呼びは `:dataspace/document-invalid`。
+5. **SKIP with evidence（re-check 2026-08-17）。** matcher は `.cljc` のまま。native recursive map walk は未 qualified:
+   - `kotoba-kir` GitHub main はまだ `933c148a3d810795966d92948f9abe9fe5383145`
+   - `native-word-value-type?` は `#{:i64 :bool :string}` plus recursive `:option`/`:result`（`:document` 無し）
+   - これは backend gap（ADR-2608650000）であって言語の天井ではない。`.kotoba` へ移さない。
+6. **DONE.** `provider.dataspace` の atom は `{:q :transact!}` store。default = memory。inject した `provider.dataspace-kgraph` が assert/retract/observe/facet-leave を同じ契約で満たす。D1 なし。identity CID を Location にしない。guest ABI 不変。capability-count 10 のまま。
+7. **DONE（2026-08-17）。** matching assert は observer に `:document` notice を届ける。`:observe` は facet+pattern で upsert し mailbox を drain。facet-leave は assertion と undelivered mailbox を落とす。guest vat / `<-` は無い。capability-count 10 のまま。
+8. **DONE（2026-08-17）。** `:wasm-aot :implemented` for dataspace-v1 on the typed browser host. Not clock's i64 `:wasm32-kotoba-v1`. `:native-aot` / `:jit` stay pending. No vat.
+
+- `kotoba-lang/amu` main `147d3677b40cbe170acc655b7fefc2bfe9198a02`
+  （merge of `90c8e925130021a5fe32c9fa310fd67167e0fc40`）。
+  `runtime/browser-host.mjs` が host-built variant/record を `admitHostResult` する
+  （以前は `assertValue` だけなので kit ABI の新しい compound が forged で落ちた。
+  http wasm proof は request echo なのでこの穴を踏まない）。
+  guest は named `:dataspace/transact`。inject は `typedCapCall`（http wasm と同じ seam）。
+  JVM `provider.dataspace` は coord guest（kit ABI types）で走る。
+  当時 sugar `observe!` の `:matches` は sema pin `105309ca` では `:notices` が無く、
+  provider 側 kit と契約がずれた（IPLD merge が sema `91eff5a` を戻した）。
+  その slice では sugar を wasm に、coord を JVM provider に分けた。count 10。
+  2026-08-17 追記: amu の kotoba-sema pin は既に `f4de940e`（`91eff5a` を含む）。
+  sugar `observe!` の notices 契約は次節。
+  https://github.com/kotoba-lang/amu/commit/147d3677b40cbe170acc655b7fefc2bfe9198a02
+- west pin: amu `c6905bff4528d6eeb7ccab9e9af36cca91de8ec0`（entry `147d3677`）。
+
+## テストの回し方と結果（2026-08-17 実測、wasm-aot）
+
+amu（`clojure -M:test -n` は無視される）:
+```
+cd /tmp/amu-dataspace-wasm-aot
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-wasm-aot-test)
+            (quote kotoba.compiler.wasm32-kotoba-v1-qualification-test)
+            (quote kotoba.compiler.wasm-typed-test)
+            (quote kotoba.compiler.backend-qualification-test)
+            (quote kotoba.compiler.provider-conformance-test)
+            (quote kotoba.compiler.test-runner-completeness-test))
+    (apply clojure.test/run-tests
+           [(quote kotoba.compiler.dataspace-wasm-aot-test)
+            (quote kotoba.compiler.wasm32-kotoba-v1-qualification-test)
+            (quote kotoba.compiler.wasm-typed-test)
+            (quote kotoba.compiler.backend-qualification-test)
+            (quote kotoba.compiler.provider-conformance-test)
+            (quote kotoba.compiler.test-runner-completeness-test)])'
+```
+結果: **49 tests / 218 assertions、0 fail / 0 error。** dataspace-wasm-aot 単独は 8 / 26。
+capability-count 10。`:wasm32-kotoba-v1` は dataspace でも pending。clock の wasm-aot は pending のまま。
+
+両方向: `cap-call` の `admitHostResult` を `assertValue` に戻すと
+`named-dataspace-guest-runs-on-browser-wasm-typedCapCall` と
+`host-built-dataspace-variant-is-admitted` が落ちる（forged / unfrozen compound）。
+戻すと緑。allow 24 無しは `capability-denied`。scalar `7n` 結果は `invalid-typed-value`。
+
+10. **DONE（2026-08-17）。** amu の kotoba-sema git dep は既に origin/main
+    `f4de940e403c567473e5f29f28684f58f6e8cfe4`（`91eff5a` を含む）。deps-lock も
+    同じ SHA。この slice では pin を動かさず、sugar `observe!` の JVM coord を
+    契約どおりにした。`:matches` は `[:bindings :document] [:notices :document]`。
+    未マッチは空 mailbox、matching assert の次の `observe!` が `:document` notice
+    を返し、再 observe で drain、facet-leave は undelivered mail を落とす。
+    capability-count 10。`:native-aot` / `:jit` は pending のまま。matcher は
+    `.cljc`。kgraph を `.cljc` にしない。`provider.incidence` / vat / `<-` は無い。
+
+- `kotoba-lang/amu` main `cf49da1c63e7743a4c784c3fe7caa3ad4fbdc32e`
+  （merge of `698f842242d098225a494f00b076645a4954ed98`）。
+  https://github.com/kotoba-lang/amu/commit/cf49da1c63e7743a4c784c3fe7caa3ad4fbdc32e
+- `kotoba-lang/kotoba-sema` main `f4de940e403c567473e5f29f28684f58f6e8cfe4`
+  https://github.com/kotoba-lang/kotoba-sema/commit/f4de940e403c567473e5f29f28684f58f6e8cfe4
+- west pin: amu `e7a06a0e9bcf49237a64ac449610276bdd3f9c02`（entry `cf49da1c`）。
+
+## テストの回し方と結果（2026-08-17 実測、sugar observe! notices）
+
+amu（`clojure -M:test -n` は無視される）:
+```
+cd /tmp/amu-dataspace-sema-notices
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.frontend-named-capability-test)
+            (quote kotoba.compiler.provider-conformance-test))
+    (apply clojure.test/run-tests
+           [(quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.frontend-named-capability-test)
+            (quote kotoba.compiler.provider-conformance-test)])'
+```
+結果: **33 tests / 145 assertions、0 fail / 0 error。**
+provider-conformance 単独でも capability-count 10。
+
+両方向: kotoba-sema を `105309ca84b2cb02a6ffd67d92c1431e12cd2f18` に戻すと
+sugar guest の `:matches` から `:notices` が消え、
+`native-source-forms-cross-hir-kir-and-provider` /
+`native-facet-forms-clean-up-owned-state` /
+`sugar-observe-facet-leave-drops-undelivered-mail` が
+`provider contract does not match guest contract` で 3 error。
+`f4de940e` に戻すと緑（16 tests / 83 assertions on provider+conformance）。
+
+## 残ギャップ（次の agent へ）
+
+9. **SKIP with evidence（re-check 2026-08-17；leftover 13 で supersede）。** 当時 `:native-aot` は pending。
+   `kotoba-kir` GitHub main `933c148a3d810795966d92948f9abe9fe5383145` の
+   `native-word-value-type?` は `#{:i64 :bool :string :option-i64 :result-i64}`
+   plus recursive `:option`/`:result`。`:document` も document ops も native
+   admission に無い。これは backend gap（ADR-2608650000）であって言語の天井
+   ではない。bounded native `:document` は compiler/kir epic なのでこの slice
+   では触らない。kit `:native-aot` を implemented にしない。matcher は `.cljc`。
+   kgraph は `.clj` のまま wrap しない。`:jit` も pending。
+
+11. **DONE（2026-08-17）。** Syndicate current-set replay。first observe of a
+    facet+pattern delivers already-present matching assertions as `:document`
+    notices。re-observe drains mailbox only（replay は mailbox に残さない）。
+    facet-leave は undelivered mailbox を落とす。新しい observer は surviving
+    current-set を replay する（dead mailbox の duplicate は無い）。
+    encode EDN は `*print-namespace-maps* false`（`#:cap{...}` dispatch を
+    document-edn-read が拒否するため）。capability-count 10。vat / `<-` 無し。
+
+- `kotoba-lang/provider` main `d399b72ce5e4fd874e77611255169499bc83cd6f`
+  （merge of `f0d2c58a8403e704a21b3b17130df927ee65d2b1`）。
+  27 tests / 90 assertions（dataspace + match）。
+  break: memory store の first observe が current-set を返さないと
+  `observe-replays-current-matching-assertions-as-document-notices` が落ちる
+  （4 fail）。unbreak 緑。
+  `store-that-skips-current-set-replay-fails-closed` が first-observe を空にする
+  store を拒否。
+  https://github.com/kotoba-lang/provider/commit/d399b72ce5e4fd874e77611255169499bc83cd6f
+- `kotoba-lang/amu` main `4603d6d861de6947705e73c269bc426fcb060e47`
+  （merge of `35ae9c649e3f48e0653fcab7ebc1e1324fddf29f`）。
+  provider `d399b72`。dataspace + match + named-cap + conformance =
+  34 tests / 149 assertions。wasm-aot + qualification 15 / 75。
+  https://github.com/kotoba-lang/amu/commit/4603d6d861de6947705e73c269bc426fcb060e47
+- west pin: provider `7bac5648d2aff76dbb8040983e5a65cec2c2c463`（entry `d399b72`）、
+  amu `332591d76574da1834fd829bc14357aced4c476e`（entry `4603d6d`）。
+
+## テストの回し方と結果（2026-08-17 実測、current-set replay）
+
+provider:
+```
+cd /tmp/provider-dataspace-replay-20260817
+clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+```
+結果: **27 tests / 90 assertions、0 fail / 0 error。**
+両方向: first observe の current-set を `[]` に戻すと 4 fail。戻すと緑。
+
+amu（`clojure -M:test -n` は無視される）:
+```
+cd /tmp/amu-dataspace-replay-20260817
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.frontend-named-capability-test)
+            (quote kotoba.compiler.provider-conformance-test))
+    (apply clojure.test/run-tests
+           [(quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.frontend-named-capability-test)
+            (quote kotoba.compiler.provider-conformance-test)])'
+```
+結果: **34 tests / 149 assertions、0 fail / 0 error。** guest は named `:dataspace/transact`。count 10。
+
+12. **DONE（2026-08-17）。** Syndicate retraction notices。matching assertion の
+    retract は observer の同じ observe mailbox に `:document` notice を載せる。
+    notice 形は `{:kind :assert|:retract :assertion … :bindings …}`。新しい
+    cap / op / mailbox は無い。first observe の current-set replay は
+    `:kind :assert` のまま。非マッチ retract は届かない。facet-leave は
+    undelivered mail（retract 含む）を落とす。`#cap` fail-closed。
+    capability-count 10。memory + kgraph とも緑。vat / `<-` 無し。
+
+- `kotoba-lang/provider` main `9d6c59ac4dbe891de1044fcc8d564447a6aa5c70`
+  （merge of `fb601b1cf2f73c0a9c211cdade4a316a48ec8cd3`）。
+  33 tests / 105 assertions（dataspace + match）。
+  break: memory store の retract enqueue を落とすと 4 fail。unbreak 緑。
+  `store-that-drops-retraction-enqueue-fails-closed` が retract 後に mailbox を
+  drain する store を拒否。
+  https://github.com/kotoba-lang/provider/commit/9d6c59ac4dbe891de1044fcc8d564447a6aa5c70
+- `kotoba-lang/amu` main `105c98804a3ed5d5a3b244dfd08238f245eca260`
+  （merge of `64c4ca3aa4f66d9d3bebc08f09529b1118dc1d48`）。
+  provider `9d6c59ac`。dataspace + match + named-cap + conformance =
+  37 tests / 159 assertions。wasm-aot + qualification + conformance 18 / 110。
+  https://github.com/kotoba-lang/amu/commit/105c98804a3ed5d5a3b244dfd08238f245eca260
+- west pin: provider `9d7a501aa7bf29a038d16d22c2bfbd9bf72a74e1`（entry `9d6c59ac`）、
+  amu `05507480d4f009edd3dc995729a78b78e4a503ff`（entry `105c9880`）。
+
+## テストの回し方と結果（2026-08-17 実測、retraction notices）
+
+provider:
+```
+cd /tmp/provider-dataspace-retract-20260817
+clojure -M:test -n provider.dataspace-test -n provider.dataspace-match-test
+```
+結果: **33 tests / 105 assertions、0 fail / 0 error。**
+両方向: retract enqueue を落とすと 4 fail。戻すと緑。
+
+amu（`clojure -M:test -n` は無視される）:
+```
+cd /tmp/amu-dataspace-retract-20260817
+CP=$(clojure -Spath -A:test)
+java -cp \"$CP\" clojure.main -e \\
+  '(require (quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.frontend-named-capability-test)
+            (quote kotoba.compiler.provider-conformance-test))
+    (apply clojure.test/run-tests
+           [(quote kotoba.compiler.dataspace-provider-test)
+            (quote kotoba.compiler.dataspace-match-test)
+            (quote kotoba.compiler.frontend-named-capability-test)
+            (quote kotoba.compiler.provider-conformance-test)])'
+```
+結果: **37 tests / 159 assertions、0 fail / 0 error。** guest は named `:dataspace/transact`。count 10。
+
+## 残ギャップ（次の agent へ）
+
+13. **DONE（2026-08-17）。** `:native-aot` と `:jit` を同じ honesty で上げた。
+    第二の jit エンジンは作っていない。vat / `<-` / OCapN は無い。
+    capability-count 10。matcher は `.cljc`。`provider.incidence` は始めていない。
+
+### 設計（native `:document`）
+
+Application model は kit ABI の `:document`（KIR tagged document / EDN）。
+native 表現は既存 string/pair arena 上の 1 word handle、`pair(offset, length)`
+over canonical UTF-8 EDN。`:string` と同じ幅。guest はこの slice で
+recursive document node を native 上で歩かない。handle は実装であり
+「Kotoba の書き方」ではない（ADR-2608650000）。
+`document-edn-read` / `document-edn-print` は native では identity
+（bytes はそのまま）。host inject が同じ UTF-8 EDN を intern する。
+
+`:jit` は kit の qualification slot。既存経路は `:js-kotoba-v1` /
+kotoba-script（V8 `instantiateKotoba(grants)`）。KIR `ir/execute` は
+`:reference` であって jit ではない。script 側の unblock は
+`callTypedCapability` + host-result intern（`assertTypedValue`）。
+`:document` は jit が既に運べた。
+
+### 何が実際に走ったか
+
+| 面 | 走ったこと | 走っていないこと |
+|---|---|---|
+| native-aot | 実 kexe プロセスが `typed-cap-call` 24 を実行。guest は packed i64 127 を返した（facet-enter / empty observe / assert notices / observe-after-assert / retract count / retract notice / facet-leave） | entry は variant を返せない。clock `:native-aot` は pending のまま |
+| jit | 同じ guest を `:js-kotoba-v1` に compile。Node `instantiateKotoba({24: dataspaceInject})` が `127n` を返した | KIR interpreter を jit と呼んでいない |
+| まだ pending | `:wasm32-kotoba-v1`（clock の i64 `kotoba:cap/call`）。clock `:native-aot`。native matcher `.kotoba`。`provider.incidence` | stub flag で上げていない |
+
+native の実測 blocker: retracted result は `pair(1, pair(count, 0))` で
+retract *request* に見える。validator が `checked_pair_get` で terminator 0
+を歩くと SIGILL。predicate は peek する（trap しない）。
+
+### SHAs（GitHub main / server-side merge）
+
+- `kotoba-lang/kotoba-kir` `f3d255b52f85040815057426f5da557714b09b3a`
+  （`:document` を native-word に入れ、cap 24 provider contract）
+- `kotoba-lang/kotoba-gmir` `820a3d01c80a4e38753632e2945f86e716ce054b`
+  （`:dataspace-v1` kind 5）
+- `kotoba-lang/kotoba-script` `65da9677b4c4f017427ea416204e46cfb03bb58f`
+  （`callTypedCapability` + typed host-result intern）
+- `kotoba-lang/kotoba-verifier` `b1b94e0e45738921d0b41eadb8b1dc45426b20b8`
+  （cap 24 + `provider-result-schema` で variant-match）
+- `kotoba-lang/kotoba-mir` main `386af2fb70df4629a9267d6e58cf0d707c1102a0`
+  （calling-convention 表に `:dataspace-v1`。native の deps は madd pin
+  `dd7bbfdc` を使う。madd 枝は mir main に merge しない）
+- `kotoba-lang/kotoba-native` `40de27fd0c5f0fe624c59f7d3289267d926c62ef`
+  （dataspace provider-boundary を pair handle に lower）
+- `kotoba-lang/artifact` `c766786728addffbc3eb73d3e20f53c713aad544`
+  （loader SHA `f28b175fd240f542bae9ea45b8942066d57b5e820572d7e6b0b2496c201d4d3f`）
+- `kotoba-lang/amu` `51cc14dbecf9a7836b27846adce995253dda0911`
+  （merge of `be2130e70b884663255bf446edbff17bf9508308`）。
+  kit `:native-aot` / `:jit` `:implemented`。
+  https://github.com/kotoba-lang/amu/commit/51cc14dbecf9a7836b27846adce995253dda0911
+
+### テスト（2026-08-17 実測、この workstation は aarch64）
+
+amu（`clojure -M:test -n` は無視される。`:test` alias は full runner）:
+```
+cd /tmp/amu-dataspace-native-20260817
+clojure -Sdeps '{:aliases {:focus {:extra-paths [\"test\"] :extra-deps {io.github.kotoba-lang/provider {:git/url \"https://github.com/kotoba-lang/provider.git\" :git/sha \"9d6c59ac4dbe891de1044fcc8d564447a6aa5c70\"} io.github.kotoba-lang/kototama-native {:git/url \"https://github.com/kotoba-lang/kototama-native.git\" :git/sha \"0cf9f4d896798843d5bb5c0482c89631e78fec73\"}}}}}' \\
+  -M:focus -e '(require (quote clojure.test) (quote kotoba.compiler.dataspace-native-aot-test) (quote kotoba.compiler.dataspace-jit-test)) (clojure.test/run-tests (quote kotoba.compiler.dataspace-native-aot-test) (quote kotoba.compiler.dataspace-jit-test))'
+```
+結果: **4 tests / 6 assertions、0 fail / 0 error。** native 127。jit `127n`。
+
+両方向:
+- jit: non-i64 `typed-cap-call` を `callCapability` に落とすと
+  `TypeError: Cannot read properties of undefined (reading 'result')`。
+  `callTypedCapability` に戻すと 127。
+- native: facet-enter を request handle の identity にすると guest は
+  bool payload を facet record として歩き SIGILL、127 にならない。
+  `ds_result_facet` に戻すと 127。
+
+14. `provider.incidence` は始めない（1–3 の incidence 前提がこの slice の外）。
+    `:wasm32-kotoba-v1` と clock `:native-aot` は pending のまま。
+"}]

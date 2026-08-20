@@ -1,0 +1,88 @@
+[{:db/id -1
+  :adr/id "2608051200"
+  :adr/title "aiueos as a USB-bootable murakumo.cloud node: prove the boot path, mirror the join decision, and split the workload across two profiles"
+  :adr/status "accepted"
+  :adr/date "2026-08-05"
+  :adr/tags ["aiueos" "murakumo" "boot" "usb" "kotoba-native" "fleet" "evidence"]
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/context
+  "Asked for one deliverable: aiueos compiled with the Kotoba native toolchain, bootable from a USB stick, with the murakumo CLI integrated so the node runs as an \"AI mining server\". The owner clarified the workload: AI mining here means joining murakumo.cloud and serving generation (text, image, video, audio) — not proof-of-work, not the Monero/XMRig fleet the /uriage skill tracks.
+
+Four measured facts decided the shape, and two of them closed off the obvious approaches.
+
+1. The release image was ALREADY a bootable GPT disk (protective MBR, FAT32 ESP, independent FAT16 recovery ESP, aiuefs data partition, plus an El Torito ISO), but every gate attached it as a fixed drive. A physical stick goes through the firmware's USB stack, reports itself removable, and boots the removable-media fallback \\EFI\\BOOT\\BOOTX64.EFI with no NVRAM entry pointing at it. \"Produces a bootable image\" and \"boots from a stick on someone else's machine\" are different claims, and only the second was asked for.
+
+2. The bare-metal profile has NO network stack. PCI enumerates virtio RNG, BLK, INPUT and GPU; there is no NIC driver, no TCP/IP, no sockets. src/aiueos/net.cljc is 41 lines of URL allowlist for host adapters, not a stack. A bare-metal node therefore cannot reach murakumo.cloud, cannot connect to a gateway, and cannot serve inference. No packaging changes this.
+
+3. murakumo's participation logic is ALREADY Kotoba — 33 kotoba/*_core.kotoba pure cores compiled to shipped KIR, including infer_join_core (tiers, relay need, residency clamp, work-kind eligibility) and infer_credits_core (the memory-times-time earning ledger). That is the natural seam with an OS whose decisions are already compiler-emitted Kotoba objects.
+
+4. Those cores do NOT compile to any aiueos native target today. Measured against the current compiler: infer_join_core.kotoba to x86_64-aiueos-user-v1 is rejected with \"typed values currently require the kotoba-script web target, typed Wasm/CLJS target, or the qualified native one-word string/record/variant/option/result slice\". kotoba.kir/only-native-word-typed-features? admits record-get only on a directly-nested record-new of the same schema, and every upstream core projects records arriving as PARAMETERS. Entryless export libraries are separately restricted to the js/wasm/cljs backends. Reusing the shipped cores verbatim on bare metal is compiler work in kotoba-lang/compiler, not packaging work in aiueos."
+
+  :adr/decision
+  "Split across the two profiles that already exist, and let each claim only what it can demonstrate. Owner chose the staged option (both profiles) when presented with the fork.
+
+BARE-METAL PROFILE — boot authority (implemented).
+
+Boot transport became an explicit axis: smoke-qemu-uefi.sh gained AIUEOS_BOOT_TRANSPORT (disk default | usb), where usb attaches the same image behind qemu-xhci as usb-storage with removable=on.
+
+USB boot is proved by EQUIVALENCE, not by a second green check. smoke-qemu-usb-boot.cljs boots the same image file over both transports and requires: the USB run booted through a USB device path, the disk run did not, the aiueos evidence of both is byte-identical, and both reach the same terminal state. Equality is the load-bearing assertion — a USB run that merely also passed could have diverged silently; identical evidence cannot. Observed boot path PciRoot(0x0)/Pci(0x2,0x0)/USB(0x0,0x0), 33 identical evidence lines.
+
+Two things are excluded from that comparison, each for a stated and separately asserted reason. The firmware banner NAMES the boot device so it must differ — that difference is the positive proof. And each application processor writes a one-character liveness marker straight to the debug port while the bootstrap processor writes its evidence lines, so those characters race: BAAIUEOS_... on one boot and ABAIUEOS_... on the next, of the SAME transport. Comparison therefore starts at each line's own AIUEOS_ marker.
+
+flash-usb.cljs is deny-by-default: it inspects unless --confirm repeats the device path, refuses internal disks / non-removable devices / partitions, asks the OS whether a device is removable rather than pattern-matching its name, requires the image to match its build receipt, and re-reads the written bytes afterwards (cheap flash media can acknowledge a write and store something else). There is deliberately no device auto-detect.
+
+kotoba/murakumo-join-plan.kotoba mirrors murakumo.infer.join in the scalar-i64 slice the object ABI admits, packing the record/option/string shapes upstream uses; os/aiueos/contracts/murakumo-node-v1.edn is the encoding authority. Parity is CHECKED, not asserted: test/murakumo/aiueos_join_plan_parity_test.clj drives it across the full tier x kind x memory x residency matrix — 777 assertions, 0 failures — and the object's own main re-checks five vectors so it fails on the node too, not only in CI.
+
+murakumo gained the operator surface: murakumo.aiueos (image | verify | flash | enroll). enroll deliberately does not reimplement the decision — it calls murakumo.infer.join and prints the wire arguments aiueos's mirror receives for the same node, so the parity the test asserts is the parity the command uses.
+
+HOSTED PROFILE — workload authority (planned, NOT implemented).
+
+Serving generation needs a network stack, TLS and an inference runtime. ADR-0011's Linux-hosted PID-1 profile has the first two for free and is where that workload belongs. Not implemented here and not claimed."
+
+  :adr/consequences
+  "A USB-booted aiueos node can DECIDE its murakumo participation and cannot yet ACT on it. Named in os/aiueos/contracts/usb-boot-v1.edn and murakumo-node-v1.edn rather than left implicit, because \"AI mining server OS\" otherwise reads as though it were already serving.
+
+USB boot is proved under OVMF in QEMU ONLY. No physical machine has booted this image; real-hardware firmware quirks (USB 2 vs 3 enumeration, per-vendor fallback-path handling) are untested.
+
+The gate does not hardcode a passing exit status. On this host (QEMU 10.0.3) the shared UEFI suite fails at AIUEOS_VIRTIO_INPUT_FAIL queue-or-envelope — a virtio-input device-model difference unrelated to boot transport, reproduced identically on the UNMODIFIED disk path before any change was made. The gate reports AIUEOS_USB_BOOT_EQUIVALENT with the shared status rather than claiming a pass neither transport earned, and AIUEOS_USB_BOOT_OK when the suite passes. This repo has no CI QEMU pin (GitHub Actions was removed by ADR-2607300900), so the environment-specific failure is not otherwise caught.
+
+The join-plan object is a VERIFIED ARTIFACT, not an admitted application. It compiles to x86_64-aiueos-user-v1, but verify-kotoba-user-elf.py pins the runtime-v2 context to the smoke app's shape (fuel 256, capability allow-bitmap byte 60 = cap-call 2,3,4,5, trampoline at 0x1E1020). A pure decision object declares no capabilities and is rejected — measured: \"invalid Kotoba aiueos runtime-v2 context\". Admission is a design choice about what a node may DO with the decision, plus the offline RSA signer (correctly absent from the repo), not a packaging detail.
+
+Exporting it as a KERNEL object would need an entry in kotoba-lang/kotoba-native's elf64.clj kernel-object-entries allow-list — a reviewed ABI change in a third repo. Not taken: murakumo participation is application policy, not kernel mechanism.
+
+The Apple M4 fleet cannot host this profile at all: aiueos bare-metal is x86_64 UEFI and Apple Silicon cannot USB-boot a custom OS. The bootable target is x86_64 PC hardware.
+
+aiueos scripts/tasks.edn, empty since the babashka retirement (ADR-2607173000), now carries the two USB tasks. The os/aiueos/scripts build chain stays sh + Python stdlib: pulling it behind nbb would put Node in the boot-evidence path. New scripts are nbb per the repo-wide no-new-sh rule."
+
+  :adr/alternatives
+  "Compile murakumo's shipped cores directly for aiueos — rejected today on measurement, not preference (the native typed slice rejects record parameters). This is the right long-term answer and unblocks when the slice widens.
+
+Claim the release image was already USB-bootable and stop — it very likely was; nothing asserted it, and \"very likely\" is not what this stack accepts as evidence.
+
+Put the workload on bare metal by writing a NIC driver and TCP/IP stack — correct eventually, far beyond this change, and would have shipped a half-finished stack instead of a working boot path.
+
+Report the USB gate as passing by pinning the transports' shared failure — rejected: it would convert an environment-specific virtio-input failure into a claim that USB boot passes here, which is true of neither transport."
+
+  :adr/evidence
+  "aiueos ed6bc80 (main), murakumo 2ec6218 (main), west pins advanced in root 2da35e37 (both verified fast-forward via gh api compare: ahead 3, behind 0).
+USB gate: AIUEOS_USB_BOOT_PATH BdsDxe: starting Boot0001 \"UEFI QEMU QEMU USB HARDDRIVE 1-0000:00:02.0-1\" from PciRoot(0x0)/Pci(0x2,0x0)/USB(0x0,0x0); AIUEOS_USB_BOOT_EQUIVALENT removable-media xhci-usb-storage evidence-identical lines=33 status=1.
+Parity: Ran 5 tests containing 777 assertions, 0 failures, 0 errors.
+Compiled object executed under nbb via the cljs backend: main => 42, all five vectors matching an independent re-derivation.
+Regression: the unmodified disk path produces the same 33 evidence lines and the same status after the transport change as before it.
+Flash guards exercised against a real internal disk (dry-run, nothing written): refused with \"/dev/disk0 is an INTERNAL disk\"; receipt digest verified as matching."
+
+  :adr/gaps
+  "[{:gap :bare-metal-network :state :partial :note \"SUPERSEDED IN PART by ADR-2608052200: the LINK layer exists (virtio-net, frame admission in Kotoba, AIUEOS_VIRTIO_NET_OK). A node still cannot post its join plan -- ARP cache + IPv4, TCP, TLS 1.3 and HTTPS all remain.\"}
+    {:gap :real-hardware-usb-boot :state :unverified :note \"proved under OVMF/QEMU only; no physical machine has booted the image\"}
+    {:gap :join-object-admission :state :blocked :note \"runtime-v2 context pins the smoke app's capability shape; offline RSA signer absent from repo\"}
+    {:gap :upstream-cores-native :state :resolved :note \"CLOSED by ADR-2608052000: the native typed slice now admits record parameters, option/result and keyword at a boundary, and native targets carry entryless libraries. murakumo shipped cores compiling natively went 0/33 to 14/33; the remaining 19 are tracked there, not here.\"}
+    {:gap :hosted-profile-workload :state :planned :note \"generation serving belongs to ADR-0011 PID-1 profile; not implemented\"}
+    {:gap :shared-uefi-suite-on-qemu-10 :state :corrected :note \"THIS ENTRY WAS TOO BROAD. It said the shared UEFI suite fails on QEMU 10.0.3. Measured 2026-08-05 while building the link layer: the suite PASSES on this same host and QEMU (AIUEOS_UEFI_SMOKE_OK, exit 0) on the default ESP-directory boot path, both with and without a NIC. The AIUEOS_VIRTIO_INPUT_FAIL observed earlier was on the GPT DISK-IMAGE path (AIUEOS_DISK_IMAGE set), which is the only path it was ever measured on. Whether it still fails there is unmeasured -- a re-run was started and abandoned when the host reached load average ~250, where a TCG boot is indistinguishable from a hang. The USB equivalence gate is unaffected either way: it asserts the two transports agree, not that either passes.\"}]"
+
+  :adr/authoritative-for ["aiueos-usb-boot" "aiueos-murakumo-node" "murakumo-aiueos-operator-surface"]
+  :adr/child-adr "kotoba-lang/aiueos 90-docs/adr/0019-usb-removable-boot-and-murakumo-node-profile.md"
+  :source/dataset "adr"}]

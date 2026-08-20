@@ -1,0 +1,131 @@
+[{:db/id -1
+  :adr/id "ADR-2608112300"
+  :adr/title "http は async の前に作れない — 宣言を機械で解決させる"
+  :adr/status "accepted"
+  :adr/date "2026-08-11"
+  :adr/last_verified "2026-08-11"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "wasi-03-http-ordering-and-declaration-check"
+  :adr/tags ["kotoba" "wasi" "component-model" "http" "async" "contract-check"]
+
+  :adr/authoritative-for
+  ["wasmtime gap の依存順序（http provider と bounded async のどちらが先か）"
+   "`component-model-v1.edn` の `:provider-wasi` 宣言を検査する仕組みと、その射程"]
+
+  :adr/related
+  ["2608112200" "2608110400"
+   "compiler docs/adr/0036-component-model-first-wasi-capabilities"
+   "compiler docs/adr/0049-component-application-language-gap-ledger"]
+
+  :adr/context
+  "ADR-2608112200（clock を WASI 0.3 に繋いだ）が『次の 1 手は http provider を
+   同じ形で `wasi:http/outgoing-handler@0.3.0` に繋ぐこと』と書いた。着手前に
+   実測したところ、その 1 文に**誤りが 2 つ**あった。"
+
+  :adr/decision
+  "## 実測 1 — `wasi:http/outgoing-handler@0.3.0` は存在しない
+
+   `WebAssembly/WASI@3ee2a59:proposals/http/wit/` を読むと、0.3.0 が定義する
+   interface は `types` / `handler` / `client` の 3 つで、**`outgoing-handler` は
+   どこにも無い**（0.2.x の名前）。外向き HTTP に対応するのは `client`
+   （*Most components are expected to import this interface to provide the
+   capability to send HTTP requests* と WIT 自身が書いている）。
+
+   **これは ADR-2608112200 が clock で見つけた `wall-clock` の誤りと同じクラスで、
+   同じファイルの中にもう 1 件あった** —— しかも `:http/post` と
+   `:http/get-stream` の 2 entry。
+
+   ## 実測 2 — http は async を迂回できない
+
+   ```wit
+   interface client { send: async func(request: request) -> result<response, error-code>; }
+   interface handler { handle: async func(request: request) -> result<response, error-code>; }
+   ```
+
+   さらに `request.new` は `contents: option<stream<u8>>` と
+   `trailers: future<result<option<trailers>, error-code>>` を取り、
+   `tuple<request, future<result<_, error-code>>>` を返す。**stream と future が
+   引数と戻り値の両方に出るので、async profile 抜きで http provider を作る道は無い。**
+
+   clock は `now: func() -> instant` という sync func だったので手書き WAT で
+   足りた。**http は同じ手順の繰り返しではない。**
+
+   ## したがって gap の順序を訂正する
+
+   compiler ADR 0049 の 'Next completion order' は
+
+   1. recursive structured Canonical codecs → 2. **production provider Components
+   for all nine capabilities** → 3. Wasmtime 43+ qualification →
+   4. native → 5. **bounded WASI 0.3 async**
+
+   と並べている。**http について、この 2 と 5 は逆である。** 9 capability のうち
+   WASI を宣言するのは clock と http だけで、clock は済み、残る http は 5 に
+   依存する。つまり `:production-provider-components` を『9 分の 9』にする道は
+   `:bounded-wasi-0.3-async` を通る。
+
+   ## 決めたこと — 宣言を記憶ではなく機械で解決させる
+
+   同じ誤りが同じファイルで 2 回起き、2 回ともレビューを通過した。理由は
+   構造的である: **誰も import していない宣言には失敗のしかたが無い。**
+   使おうとした日に、原因の行から遠く離れた toolchain エラーとして現れる。
+
+   `kotoba.component.wasi-contract` を追加した:
+
+   - `resources/wasi/0.3.0/<proposal>/*.wit` に pinned revision から vendor した
+     WIT を置く（clocks は ADR-2608112200 で、http は今回）
+   - `:provider-wasi` の全 entry について、**その interface が pinned WIT に
+     実在するか**を解決する
+   - **vendor されていない package は『検査できないから合格』ではなく error**
+     （`:package-not-vendored`）
+
+   ## 射程を明示する（これ以上には読まない）
+
+   この検査は **pinned package の中に interface 名が在るか**しか見ない。
+   関数シグネチャは見ないし、`wit-component` の resolve も走らせない。
+   **実在する interface の中の存在しない関数を宣言した場合は通過し、
+   package 時に落ちる。** http の deps（cli / random / clocks）を vendor して
+   いないのもこのため —— 名前の解決には要らない。provider を実装する日には要る。
+
+   ## async 依存をデータで持つ
+
+   `:requires-profile :async` を http の 2 entry に付けた。テストが
+   『wasi:http を import する capability は必ずこれを宣言する』
+   『clock は宣言しない』の両方向を検査する。**順序の制約を prose ではなく
+   データにしたので、覚えていなくても検査できる。**"
+
+  :adr/consequences
+  "## 証拠
+
+   `clojure -M:test -n kotoba.wasi-contract-test` → **5 tests / 15 assertions /
+   0 failures**。
+
+   **落ちることを確かめた**: 契約を元の `wasi:http/outgoing-handler@0.3.0` に
+   戻すと、検査は該当 2 capability を名指しで報告して落ちる ——
+   `[{:capability :http/post, :reason :interface-absent-from-package}
+     {:capability :http/get-stream, :reason :interface-absent-from-package}]`。
+
+   テストは歴史的な 2 つの綴りを名指しで持っている（`wall-clock` /
+   `outgoing-handler`）。**どちらかが再び解決するようになったら、検査が壊れた
+   ということ。**
+
+   ## 現在地（変わっていないこと）
+
+   `:wasmtime` は `:pending` のまま。`:production-provider-components` は
+   **9 分の 1**（clock）。この ADR は provider を 1 本も増やしていない ——
+   増やせない理由を測って記録し、次に同じ誤りが起きないようにした。
+
+   ## 次の 1 手
+
+   **`:bounded-wasi-0.3-async`**。http はその後。着手前に測るべきこと:
+
+   - `wasm-tools component new` が async lowering に要求する名前マングリング
+     （clock で使った `cm32p2|<iface>@<ver>` + 関数名の async 版）
+   - wasmtime 47 の `-S http` が p3 の `wasi:http/client@0.3.0` を実際に供給するか
+     （`-S help` は `http` と `p3` を別スイッチとして持つ）
+   - stream/future を手書き WAT で扱えるか、それとも先に compiler 側の
+     lowering が要るか —— **どちらの側から始めるかを、測ってから決める**
+     （ADR-2608110400 が native 側で記録した同じ教訓）"}]

@@ -1,0 +1,175 @@
+[{:db/id -1
+  :adr/id "2608072100"
+  :adr/doc_type "adr"
+  :adr/topic "kaiyu-shared-visit-telemetry-and-third-consumer"
+  :adr/title "回遊の語彙を kotoba-lang/kaiyu に引き上げ、kotobase.net を 3 つ目の consumer にする — 語彙は host のものではない"
+  :adr/status :accepted
+  :adr/date "2026-08-07"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["アクセス解析（回遊）の共有語彙をどこが持つか"
+   "kotobase.net が何を測り、何を測らないか"
+   "shinshi / babiniku を kaiyu に載せ替える順序と、まだ載せ替えていないという事実"]
+  :adr/supersedes []
+  :adr/body
+  "# Context
+
+ADR-2608060900 が「2 つのプロダクトの回遊を同じ形で比較できる。3 つ目が出てきたら
+`kotoba-lang` の共有ライブラリに引き上げるのが自然」と書いていた。その 3 つ目を
+作るのが本 ADR。
+
+引き上げる前に索引を引いた（`repo-search` / `concept-lookup`）。近いものは 2 つ
+あり、どちらも別物だった:
+
+- **`kotoba-lang/log`** — trace/span の構造化ログ。オブザーバビリティであって
+  プロダクト分析ではない（ADR-2608060900 が既に同じ判断をしている）
+- **`kotoba-lang/senden`** — campaign / funnel / attribution を `chobo.ledger` の
+  上に載せた marketing ライブラリ。「どこに払ったか」を答える。回遊は「入ったあと
+  どう動いたか」で、モデルも保存も違う。**consumer ゼロの senden に無理に
+  押し込むと、campaign 台帳と訪問カウンタが 1 つの語彙に同居する**
+
+したがって新しい小さなライブラリを作った。
+
+# Decision
+
+## D1. `kotoba-lang/kaiyu`（回遊）— 語彙だけを共有する
+
+保存と転送は host のもの（Worker が D1 に書く / Pages Function が KV に書く /
+ブラウザが beacon を送る）。**語彙は host のものではない** —— 各サイトが独自に
+バケット境界を決めると、比較できるように見えて比較できない数字ができる。
+
+`kaiyu.core` が持つもの: dwell バケット / acquisition バケット / route 正規化
+（whitelist）/ 遷移エッジ / レポート window / `collected-since` の意味。
+`kaiyu.session` は browser 側の計上を純粋な reducer にしたもの
+（`(step state event) -> [state' emissions]`）。
+
+**不変条件は「訪問者を識別する値を一切持たない」。** session id も自前 cookie も
+fingerprint も秒数も path も query 値も持たない。代償（3 ホップ以上の経路・
+per-user funnel・離脱の因果・コホート別行動差）は README に明記した ——
+機能の不足ではなく、privacy 方針を変えないと買えないもの。
+
+**API は語彙を引数に取る。** `normalize-route` が vocabulary を受け取り、
+`sanitize` を提供しない。sanitizer は「予期しない値を加工して通す」ので、scene id
+や検索語が『counts and dates only』のテーブルに入る経路になる。
+
+## D2. 4 つの誤りをシナリオテストとして固定する
+
+`kaiyu.session` のテストは、両実装が同じ順で踏んだ誤りをそのまま並べたもの:
+背景タブの計上 / タブ復帰後の読了の欠落 / `pagehide` の二重報告 / 同一 view 再入を
+遷移と数える。**どれも部品の単体テストでは見えない** —— 部品は全部正しく、
+session が壊れる。純粋な reducer にしたのはこれをブラウザ無しで再現するため。
+
+## D3. kotobase.net は server 側の 2 信号だけを測る（dwell は測らない）
+
+kotobase.net は multi-page なので、acquisition と first-order transition は
+**client script も cookie も無しで** 取れる —— 遷移は同一 origin の `Referer` が
+そのまま辺になる（SPA はブラウザが二度と尋ねてこないので client 側で作るしかない）。
+
+**dwell は測っていない。** 滞在時間はブラウザでしか観測できず、この site の HTML は
+kotoba-ui の authoring ns から build 時に生成される。beacon を足すのはその pipeline を
+変えることで、片手間でやると中途半端に landed する。`kaiyu/section` が dwell を
+「空の分布」ではなく `:not-measured` として返すので、レポートは「誰も滞在していない」
+ではなく「まだ誰にも訊いていない」と読める —— これがこの区別を型に持たせた理由。
+
+保存は funnel と同じ KV の `kaiyu:` prefix。cardinality の上界は kaiyu の閉じた
+語彙が与える（1 日あたり 5 + (routes+2)²）ので、検索語や document id が key に
+なることが構造的に起きない。
+
+# 実装済み（着地・live 確認済み）
+
+| repo | commit | 内容 |
+|---|---|---|
+| `kotoba-lang/kaiyu` | `69012a9` | 新規。17 tests / 101 assertions（nbb・JVM 両方） |
+| `com-junkawasaki/root` | `5ae6e1ad` / `e323c0cd` | repos.edn + west.yml（API single-entry） |
+| `network-awai/net-kotobase` | `968ff076` / `a4d0eb51` / `b6b5b72e` | 3 つ目の consumer。340 tests / 1724 assertions |
+
+live 検証（kotobase.net）:
+
+- `GET /api/kaiyu` → secret 無し **401** / 未 provision なら **503** / secret 有り **200**
+- 実際に 2 ページを踏んで counter を発生させ、`visits [{direct 2}]` /
+  `transitions [{home→pricing 1}]` を確認 → **検証用 counter は削除**して 0 から開始
+  （`kaiyu:since` は残した。収集は実際に今日始まったので）
+- gate が落ちることを確認: same-origin 判定を外すと 1 failure、kaiyu の whitelist を
+  外すと 4 failures
+
+## 実測した落とし穴
+
+- **KV の list は eventually consistent。** 書き込み直後の read で rows が空に見え、
+  一瞬「read path が壊れている」と誤診した。key を直接 list すると存在していた。
+  60 秒ほどで一致する。
+- **deploy 直後の 1 回の probe を結論にしない**（ADR-2608060900 と同じ罠に再度
+  はまった）。`/api/kaiyu` は最初 404 を返し、伝播後に 200 になった。
+- **route 語彙を推測しない。** 最初 `/docs` を語彙に入れていたが、この site に
+  `/docs` は無く docs は `/resources` だった。推測した語彙は「実在ページが黙って
+  `other` に落ちる」形で外れる —— 数字は正しいまま、意味だけ壊れる。
+
+# Consequences
+
+- 3 サイトの回遊が同じ語彙で測れる。**ただし今、実際に kaiyu を require して
+  いるのは kotobase だけ**（下記 Gaps）
+- 新しいサイトを足すときに決めることは「語彙（route 集合）」と「保存先」だけになった
+- `senden` は consumer ゼロのまま。回遊とは別の面（campaign / attribution）なので、
+  `kaiyu/acquisition-source` が返す**バケット名**が両者の継ぎ目になる —— campaign id は
+  渡さない
+
+# 2026-08-08 追記: 載せ替えたら、2 実装は同じ形ではなかった
+
+shinshi と babiniku を kaiyu に載せ替えた（下表）。**その過程で、この ADR が
+「同じ形に収束していた」と書いた 2 実装が、実は 1 点で食い違っていたことが
+分かった** —— しかも library は 3 つ目の答えを持っていた。
+
+| | タブ非表示のとき |
+|---|---|
+| shinshi / babiniku（出荷済み） | dwell を**閉じて emit**。戻ったら新しい行 |
+| kaiyu 初版（2026-08-07） | 秒数を持ち越して**1 行にまとめる** |
+
+どちらも妥当で、答える問いが違う（1 行 = 途切れない注視 1 区間 / 1 行 = その
+view 訪問の合計注視）。**library の既定を `:on-hide :close`（出荷済みの意味）に
+直した** —— 既に集まっている行の意味を、library を切り出したことを理由に
+書き換えない。`:pause` は明示指定で残した。
+
+さらに **blur（可視のままフォーカスを失う）** が抜けていた。両実装は毎秒 tick の
+`visible AND focused` 条件でこれを表現していたので、素朴に載せ替えると blur が
+`:hide` になり、**1 回の読了が「よそ見の回数だけ行が増える」形に割れる**。
+時計だけを止める `:pause` / `:resume` を足した。
+
+**教訓**: 「2 つが同じ形に見える」は、3 つ目を書いたときではなく、**1 つ目を
+載せ替えたときに検証される**。ライブラリ側のテストは自分の想定を確認するだけで、
+既存実装との差は出てこない。
+
+## 載せ替えの結果
+
+| repo | commit | 形 |
+|---|---|---|
+| `network-awai/club-shinshi-app` | `93a78ad` | **vendor**（`src/kaiyu/`、上流 sha を header に固定） |
+| `network-awai/net-babiniku` | `07e9f7a` | **:git/sha 依存** + Function 側は写し + parity テスト |
+| `com-junkawasaki/root` | `41e1040` `b745846` | fleet gate `vendored-kaiyu-parity` |
+
+**shinshi が vendor なのは deps を嫌ったからではない** —— ADR-2607078100 が
+`treasury.core` で記録したとおり、この repo の CI と本番 deploy は repo 単体を
+checkout するので、west sibling も :git/sha も開発機でしか解決しない。代わりに
+fleet gate が「header が主張する sha の中身と一致するか」を GitHub から引いて
+検査する。誰も検査しない vendor は、名前が紛らわしいだけの fork でしかない。
+
+**babiniku の Pages Function は写しのまま**（素の JS、cljs build step が無いので
+import できない）。`ROUTES`/`SOURCES`/`BUCKETS` を export し、nbb テストが kaiyu と
+突き合わせる。無いと、library で境界が変わったとき endpoint は「受け付けていた
+beacon を黙って落とす」ようになり、静かな週と見分けが付かない。
+
+検証: shinshi 143 tests / 3248 assertions（載せ替え前と同数・同緑）、babiniku
+track_api 16 checks（12 → 16）、kaiyu 19 tests / 107 assertions。両サイト本番
+デプロイ済み、`/_metrics/audience` は 508 pv を返し続けている（載せ替えで読み取りが
+壊れていないことの確認）。gate は壊すと落ちることを確認済み。
+
+# Gaps
+- **kotobase の dwell は未計測**（D3）。beacon を入れるなら kotoba-ui の authoring
+  pipeline 側の作業になる
+- **kotobase が pin している kaiyu は `69012a9`（初版）で、`:on-hide` 修正の前。**
+  kotobase は `kaiyu.session` を使っていない（server 側だけ）ので影響は無いが、
+  **fleet に 2 つの版が同時に居る**状態ではある。次に kotobase を触るときに上げる
+- **`kaiyu.session` は shinshi / babiniku 両方の client で稼働中**（2026-08-08）。
+  ただし**実トラフィックによる dwell 行はまだ 0 件** —— 載せ替え後にまだ人が
+  来ていないだけなのか、beacon が動いていないのかは、次に読むときに
+  `collected-since` で区別すること
+- **KV の read-modify-write は非原子。** funnel と同じ既知の性質で、増分の取りこぼしは
+  許容している。トラフィックが増えたら Durable Object 経由の直列化が必要になる"}]

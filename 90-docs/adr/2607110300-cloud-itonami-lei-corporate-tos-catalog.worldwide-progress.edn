@@ -1,0 +1,408 @@
+[
+ {:progress/schema-note "cloud-itonami-lei WORLDWIDE-scope extension progress tracker. Sibling to 2607110300-cloud-itonami-lei-corporate-tos-catalog.{progress,isco-progress}.edn. The original .progress.edn ISIC top-3 rollout is COMPLETE (see its :progress/resume-from) and is heavily US-skewed. This file tracks the OWNER-DIRECTED new scope (2026-07-19, /loop '全世界の法人情報を取得して、連携統合'): broaden the catalog toward genuine worldwide coverage by acquiring real GLEIF parent-entity LEIs for global leaders BEYOND the already-done top-3, prioritizing the jurisdictional gaps (JP/EU/Asia utilities flagged absent), then run the existing 連携統合 pipeline (scripts/kotobase-ingest-cloud-itonami-lei.cljs fold into kotobase.net + scripts/lei-site-enrich.cljs). Same no-fabrication policy: real GLEIF parent-entity LEI + real fetchable ToS/legal page only; LEIs verified but reg.status LAPSED are still real and on-record (same convention as isic-6492 Discover Financial). This file is the resume point for the next /loop tick."
+  :progress/scope "worldwide-broadening"
+  :progress/owner-direction "2026-07-19 /loop 全世界の法人情報を取得して、連携統合"
+  :progress/resume-from "ITERATION 1 (2026-07-19) COMPLETED ACQUISITION for batch JP-UTIL-1 (8 Japanese electric/gas/telecom parent entities, all real GLEIF-verified, JP jurisdiction, correct parent not subsidiary). All 8 are :lei-verified, NONE yet ToS-fetched/scaffolded. NEXT TICK: (1) ToS/legal-page fetch gate for each (JP corporate sites are mostly server-rendered, unlike US consumer SPAs, so success rate expected higher than the isic-6110/4711 consumer-retail verticals); (2) scaffold cloud-itonami-lei-<lei-lowercased> repos for successes via the existing pattern; (3) register in manifest/fleet-db.edn; (4) run scripts/kotobase-ingest-cloud-itonami-lei.cljs to fold into kotobase.net (= 連携統合). Then proceed to next worldwide batch (EU utilities: EDF/Engie/Iberdrola/National Grid/RWE/Enel; Asia: KEPCO/CLP)."
+  :db/id -1}
+ {:batch/id "JP-UTIL-1"
+  :batch/jurisdiction "JP"
+  :batch/theme "Japanese electric / gas / telecom utility parents (fills the '0 JP utilities' gap flagged 2026-07-19)"
+  :batch/acquired "2026-07-19"
+  :batch/status :lei-verified
+  :batch/next-step :tos-fetch-gate
+  :batch/companies
+  [{:company/legal-name "東京電力ホールディングス株式会社"
+    :company/legal-name-en "Tokyo Electric Power Company Holdings, Incorporated"
+    :company/lei "5299004EMJ3R4RVR5Y75"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/5299004EMJ3R4RVR5Y75"
+    :company/jurisdiction "JP"
+    :company/hq "東京都"
+    :company/isic-rev5 "3510"
+    :company/sector :electric-utility
+    :company/reg-status "LAPSED"
+    :company/reg-note "real GLEIF-issued entity-verified LEI, not annually renewed; same convention as isic-6492 Discover Financial"
+    :company/candidate-website "https://www.tepco.co.jp"
+    :company/status :lei-verified
+    :company/next-step :tos-fetch-gate}
+   {:company/legal-name "関西電力株式会社"
+    :company/legal-name-en "The Kansai Electric Power Company, Incorporated"
+    :company/lei "353800PFUKP5ONPJNZ86"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/353800PFUKP5ONPJNZ86"
+    :company/jurisdiction "JP"
+    :company/hq "大阪府大阪市北区"
+    :company/isic-rev5 "3510"
+    :company/sector :electric-utility
+    :company/reg-status "ISSUED"
+    :company/candidate-website "https://www.kepco.co.jp"
+    :company/status :lei-verified
+    :company/next-step :tos-fetch-gate}
+   {:company/legal-name "中部電力株式会社"
+    :company/legal-name-en "Chubu Electric Power Company, Inc."
+    :company/lei "529900A76GOP0PGNHT63"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/529900A76GOP0PGNHT63"
+    :company/jurisdiction "JP"
+    :company/hq "愛知県名古屋市東区"
+    :company/isic-rev5 "3510"
+    :company/sector :electric-utility
+    :company/reg-status "ISSUED"
+    :company/candidate-website "https://www.chuden.co.jp"
+    :company/status :lei-verified
+    :company/next-step :tos-fetch-gate}
+   {:company/legal-name "東京瓦斯株式会社"
+    :company/legal-name-en "Tokyo Gas Co., Ltd."
+    :company/lei "353800678EIJLOQSWZ83"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/353800678EIJLOQSWZ83"
+    :company/jurisdiction "JP"
+    :company/hq "東京都港区"
+    :company/isic-rev5 "3520"
+    :company/sector :gas-utility
+    :company/reg-status "ISSUED"
+    :company/candidate-website "https://www.tokyo-gas.co.jp"
+    :company/status :lei-verified
+    :company/next-step :tos-fetch-gate}
+   {:company/legal-name "大阪瓦斯株式会社"
+    :company/legal-name-en "Osaka Gas Co., Ltd."
+    :company/lei "353800024KMNOPQRWZ02"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/353800024KMNOPQRWZ02"
+    :company/jurisdiction "JP"
+    :company/hq "大阪府大阪市中央区"
+    :company/isic-rev5 "3520"
+    :company/sector :gas-utility
+    :company/reg-status "ISSUED"
+    :company/candidate-website "https://www.osakagas.co.jp"
+    :company/status :lei-verified
+    :company/next-step :tos-fetch-gate}
+   {:company/legal-name "KDDI株式会社"
+    :company/legal-name-en "KDDI CORPORATION"
+    :company/lei "5299003FU7V4I45FU310"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/5299003FU7V4I45FU310"
+    :company/jurisdiction "JP"
+    :company/hq "東京都新宿区"
+    :company/isic-rev5 "6110"
+    :company/sector :telecom-wired
+    :company/reg-status "ISSUED"
+    :company/candidate-website "https://www.kddi.com"
+    :company/status :lei-verified
+    :company/next-step :tos-fetch-gate}
+   {:company/legal-name "ソフトバンクグループ株式会社"
+    :company/legal-name-en "SoftBank Group Corp."
+    :company/lei "5493003BZYYYCDIO0R13"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/5493003BZYYYCDIO0R13"
+    :company/jurisdiction "JP"
+    :company/hq "東京都港区"
+    :company/isic-rev5 "6120"
+    :company/sector :telecom-wireless
+    :company/reg-status "ISSUED"
+    :company/candidate-website "https://www.softbankgroup.com"
+    :company/status :lei-verified
+    :company/next-step :tos-fetch-gate}
+   {:company/legal-name "ＮＴＴ株式会社"
+    :company/legal-name-en "Nippon Telegraph and Telephone Corporation (NTT)"
+    :company/lei "353800VHQU5VIXVUA841"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/353800VHQU5VIXVUA841"
+    :company/jurisdiction "JP"
+    :company/hq "東京都"
+    :company/isic-rev5 "6110"
+    :company/sector :telecom-wired
+    :company/reg-status "ISSUED"
+    :company/candidate-website "https://www.ntt.co.jp"
+    :company/note "disambiguated from JP subsidiary entities (NTTセキュリティ, NTTリミテッド・ジャパン, NTTアノードエナジー) which were correctly excluded per the no-subsidiary-substitution policy"
+    :company/status :lei-verified
+    :company/next-step :tos-fetch-gate}]}
+ {:batch/id "EU-UTIL-1"
+  :batch/jurisdiction "EU/GB"
+  :batch/theme "European electric/gas utility parents (next worldwide batch, NOT YET ACQUIRED)"
+  :batch/status :queued
+  :batch/candidates ["Électricité de France SA (EDF)"
+                     "Engie SA"
+                     "Iberdrola SA"
+                     "National Grid plc"
+                     "RWE AG"
+                     "Enel SpA"
+                     "SSE plc"
+                     "E.ON SE"]}
+ {:batch/id "ASIA-UTIL-1"
+  :batch/jurisdiction "KR/CN/HK/SG"
+  :batch/theme "Asia-Pacific electric utilities (later batch, NOT YET ACQUIRED)"
+  :batch/status :queued
+  :batch/candidates ["Korea Electric Power Corporation (KEPCO)"
+                     "CLP Holdings Limited"
+                     "Tenaga Nasional Berhad"
+                     "State Grid Corporation of China (note: may have no GLEIF parent LEI like CRRC/Gazprom — verify, do not fabricate)"]}
+ {:iteration/num 2
+  :iteration/date "2026-07-19"
+  :iteration/phase :tos-fetch-gate
+  :iteration/batch "JP-UTIL-1"
+  :iteration/summary "5/8 PASS, 3 FAIL (honestly recorded). JP corporate sites are mostly server-rendered -> markedly higher success than the US consumer-retail verticals (isic-4711/5510 were ~0-1/3). This is the resume point."
+  :gate/pass
+   #{{:company/legal-name "東京電力ホールディングス株式会社" :company/lei "5299004EMJ3R4RVR5Y75" :company/tos-source-url "https://www.tepco.co.jp/legal/" :company/doc-type :terms-of-service :company/tos-text-chars 3208}
+     {:company/legal-name "中部電力株式会社" :company/lei "529900A76GOP0PGNHT63" :company/tos-source-url "https://www.chuden.co.jp/privacy/" :company/doc-type :privacy-policy}
+     {:company/legal-name "東京瓦斯株式会社" :company/lei "353800678EIJLOQSWZ83" :company/tos-source-url "https://www.tokyo-gas.co.jp/utility/privacy/index.html" :company/doc-type :privacy-policy}
+     {:company/legal-name "KDDI株式会社" :company/lei "5299003FU7V4I45FU310" :company/tos-source-url "https://www.kddi.com/corporate/kddi/public/privacy-portal/" :company/doc-type :privacy-policy}
+     {:company/legal-name "ソフトバンクグループ株式会社" :company/lei "5493003BZYYYCDIO0R13" :company/tos-source-url "https://www.softbankgroup.com/en/privacy" :company/doc-type :privacy-policy}}
+  :gate/fail
+   #{{:company/legal-name "関西電力株式会社" :company/lei "353800PFUKP5ONPJNZ86" :company/reason "only corporate-philosophy page (経営理念) reachable in 2 passes; no dedicated 利用規約/免責事項 page located — honestly recorded, not fabricated"}
+     {:company/legal-name "大阪瓦斯株式会社" :company/lei "353800024KMNOPQRWZ02" :company/reason "homepage reachable (200) but no legal/terms page located via footer-scan or candidate URL patterns"}
+     {:company/legal-name "ＮＴＴ株式会社" :company/lei "353800VHQU5VIXVUA841" :company/reason "www.ntt.co.jp returns HTTP 410 Gone (site migrated to group.ntt); group.ntt policy page not located this pass — retry with corrected URL next tick"}}
+  :iteration/next "ITERATION 3: scaffold cloud-itonami-lei-<lei-lowercased> repos for the 5 :gate/pass companies (fetch full ToS/privacy text -> 80-data/public/tos.journal.edn + blueprint.edn + README.md + NOTICE, following the exact pattern in e.g. cloud-itonami-lei-2138004jbxwwjkiurc57), then register in manifest/fleet-db.edn and run scripts/kotobase-ingest-cloud-itonami-lei.cljs (= 連携統合). Also retry NTT via group.ntt. Then proceed to EU-UTIL-1 acquisition."}
+
+ {:iteration/num 3
+  :iteration/date "2026-07-19"
+  :iteration/phase :repo-scaffold
+  :iteration/batch "JP-UTIL-1"
+  :iteration/summary "Scaffolded + pushed all 5 gate-passing cloud-itonami-lei-* repos to GitHub (TEPCO terms-of-service + Chubu/Tokyo Gas/KDDI/SoftBank privacy-policy archives), each with blueprint.edn + README.md + NOTICE + LICENSE(AGPL) + 80-data/public/tos.journal.edn (5 quads: full-text/source-url/retrieved-at/sha256/doc-type). This is the resume point."
+  :repo/created
+   #{{:company/legal-name "東京電力ホールディングス株式会社" :company/lei "5299004EMJ3R4RVR5Y75" :repo/name "cloud-itonami-lei-5299004emj3r4rvr5y75" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-5299004emj3r4rvr5y75" :company/doc-type :terms-of-service :company/tos-source-url "https://www.tepco.co.jp/legal/"}
+     {:company/legal-name "中部電力株式会社" :company/lei "529900A76GOP0PGNHT63" :repo/name "cloud-itonami-lei-529900a76gop0pgnht63" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-529900a76gop0pgnht63" :company/doc-type :privacy-policy :company/tos-source-url "https://www.chuden.co.jp/privacy/"}
+     {:company/legal-name "東京瓦斯株式会社" :company/lei "353800678EIJLOQSWZ83" :repo/name "cloud-itonami-lei-353800678eijloqswz83" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-353800678eijloqswz83" :company/doc-type :privacy-policy :company/tos-source-url "https://www.tokyo-gas.co.jp/utility/privacy/index.html"}
+     {:company/legal-name "KDDI株式会社" :company/lei "5299003FU7V4I45FU310" :repo/name "cloud-itonami-lei-5299003fu7v4i45fu310" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-5299003fu7v4i45fu310" :company/doc-type :privacy-policy :company/tos-source-url "https://www.kddi.com/corporate/kddi/public/privacy-portal/"}
+     {:company/legal-name "ソフトバンクグループ株式会社" :company/lei "5493003BZYYYCDIO0R13" :repo/name "cloud-itonami-lei-5493003bzyyycdio0r13" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-5493003bzyyycdio0r13" :company/doc-type :privacy-policy :company/tos-source-url "https://www.softbankgroup.com/en/privacy"}}
+  :iteration/cleanup "Deleted my own just-created typo repo cloud-itonami-lei-5493003bzyycdio0r13 (LEI lowercase misspelled 2-Y vs correct 3-Y; contained KDDI content via a cd-failure mishap). Own erroneous artifact created seconds earlier, not others' data."
+  :iteration/next "ITERATION 4: (1) register 5 new repos in manifest/fleet-db.edn (shared/main-racing — API single-entry commit via parents:[MAIN] FF recipe); (2) run scripts/kotobase-ingest-cloud-itonami-lei.cljs (= 連携統合); (3) retry NTT via group.ntt + Kansai alt URL; (4) start EU-UTIL-1 acquisition."}
+
+ {:iteration/num 4
+  :iteration/date "2026-07-19"
+  :iteration/phase :integration-ingest-attempt
+  :iteration/summary "連携統合 ingest ATTEMPTED but the live run (scripts/kotobase-ingest-cloud-itonami-lei.cljs) hung at startup — did not reach identity generation or -main, 0 bytes output, ~0 CPU over 10+ min, killed. This is the resume point."
+  :iteration/diagnosis "Readiness CONFIRMED: node fetch to backend.kotobase.net OK (200), @noble/curves v1.9.7 (correct, package.json requires v1), 5 new repos enumerable via gh api + fetchable via raw.githubusercontent. Ruled OUT: node network sandbox, noble/curves version, repo enumeration. SUSPECT: nbb compile of kotobase-client ns, OR client/make-client did:web:kotobase.net resolution / XRPC handshake with no timeout (low-CPU blocked state fits a hanging network init)."
+  :iteration/next "ITERATION 5: debug ingest startup — add (println) before requires + time a standalone (client/make-client {...}) call to isolate ns-load vs make-client; add fetch timeouts; if fixed, run live ingest = 連携統合 of the 5 JP-UTIL-1 repos (+ existing) into kotobase.net cloud-itonami-lei-catalog graph. In parallel: NTT retry via group.ntt, Kansai alt-URL, start EU-UTIL-1 acquisition. NOTE: manifest/fleet-db registration of the 5 repos still pending (needed for west checkout but NOT for ingest, which reads raw.githubusercontent directly)."}
+
+ {:iteration/num 6
+  :iteration/date "2026-07-19"
+  :iteration/phase :catalog-v2-design
+  :iteration/summary "OWNER SCOPE EXPANSION (2026-07-19): beyond ToS/policy archives, also record 子会社関係 (subsidiaries), IR, 株主/大株主 (shareholders/major shareholders), 主要商品 (main products), balance sheet. Designed catalog v2 data model + source strategy. GLEIF structure data is NULL for all 8 JP-UTIL-1 (apex listed companies, JP cos don't report GLEIF hierarchy) -> v2 structure/financials MUST come from regulatory filings (EDINET 有価証券報告書 for JP, SEC EDGAR 10-K for US). This is the resume point."
+  :v2/data-model
+   {:blueprint.edn-extends "add :company/edinet-code (JP FSA filer), :company/listed-exchange, :company/direct-parent-lei, :company/ultimate-parent-lei (GLEIF, null for these)"
+    :structure.edn-new "80-data/public/structure.edn — :company/subsidiaries [{:lei :name :jurisdiction :ownership-pct}] + :company/parent, provenance {:source :edinet|:gleif :document-id :filed-date :url}"
+    :shareholders.journal.edn-new "major shareholders top-10 [{:name :address :shares :percent :type}], provenance"
+    :balance-sheet.journal.edn-new "assets/liabilities/equity (current/non-current) by period, provenance {:filing :period-end :unit :currency}"
+    :products.journal.edn-new "main business segments/products [{:segment :description :revenue :segment-pct}], provenance"}
+  :v2/source-strategy "JP listed -> EDINET 有価証券報告書 (XBRL via EDINET API v2, single source covers 連結子会社/大株主/財務諸表/事業内容); US listed -> SEC EDGAR 10-K XBRL; GLEIF -> identity + sparse parent LEI; company IR pages -> fallback/supplementary."
+  :v2/finding-gleif "GLEIF directParent/ultimateParent = NULL for all 8 JP-UTIL-1 LEIs (5299004EMJ3R4RVR5Y75, 353800PFUKP5ONPJNZ86, 529900A76GOP0PGNHT63, 353800678EIJLOQSWZ83, 353800024KMNOPQRWZ02, 5299003FU7V4I45FU310, 5493003BZYYYCDIO0R13, 353800VHQU5VIXVUA841) — all apex listed holdings/operating companies; relationship-records empty. GLEIF identity already captured in blueprint.edn; structure/financials need EDINET."
+  :iteration/next "ITERATION 7+: (1) ingest verification (background bqo2hwduj, 129 repos); (2) set up EDINET API v2 pipeline (key via secrets-location-map skill, XBRL parse for 子会社/大株主/BS/事業) and pilot on TEPCO (有価証券報告書); (3) fix ingest script argv[2] bug (identity path -> scripts/); (4) manifest registration of 7 repos; (5) 関西/大阪 retry; (6) EU-UTIL-1 acquisition."}
+
+ {:iteration/num 7
+  :iteration/date "2026-07-19"
+  :iteration/phase :integration-identity-blocker
+  :iteration/summary "CRITICAL FINDING: canonical LEI ingest identity (CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED, ADR-2607113500) is NOT available in this environment. Therefore the canonical 連携統合 ingest (into the canonical kotobase.net cloud-itonami-lei-catalog graph) CANNOT be run locally — any local run mints a FRESH divergent identity -> divergent graph. My iter5 background ingest did exactly this and was STOPPED. This is the resume point."
+  :identity/availability "NOT AVAILABLE locally: (1) local kagi vault has ISIC/fleet keys but NOT CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED (item missing); (2) op CLI is signed in as jun784@gmail.com (personal my.1password.com) which lacks the gftdcojp vault -> op://gftdcojp/gftd.kotobase/... unreadable; (3) no filesystem mirror of scripts/.kotobase-ingest-...hex exists anywhere on disk."
+  :identity/divergent-graph-created "iter5 background ingest (bqo2hwduj) minted a NEW identity did:key:z6Mkj49YuUBKMfnV8PLYy1TELM2jy8owGQCQ74DYGjzHk3FS and transacted ~50/129 repos into a DIVERGENT graph on kotobase.net (STOPPED before completion). The divergent seed is preserved at ./.kotobase-ingest-cloud-itonami-lei-identity.hex (root, due to argv[2] bug) for potential retraction. The CANONICAL graph was NOT touched (different did)."
+  :edinet/key-unavailable "Separately: no EDINET API key in secrets-location-map -> v2 data acquisition (subsidiaries/major-shareholders/balance-sheet/business via 有価証券報告書) is BLOCKED pending owner-provided EDINET API key (free, FSA registration) or a fallback no-key source."
+  :iteration/correction "連携統合 ingest is the CANONICAL ROUTINE's job (murakumo cell with the provisioned identity, ADR-2607182400); it enumerates GitHub via gh api and will pick up the 7 new repos. DO NOT run ingest locally again until the canonical identity is provisioned (kagi add CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED to net-kotobase compartment, or op signed into the gftdcojp account). Iter5 claims of '連携統合 実行' into kotobase.net were a divergent-graph mistake, corrected here."
+  :iteration/next "PIVOT to the 取得 pillar (race-free, my actual job): EU-UTIL-1 acquisition (EDF/Engie/Iberdrola/National Grid/RWE/Enel/SSE/E.ON), 関西/大阪 retry. Owner/ops follow-ups: provision canonical ingest identity locally + EDINET key for v2 data + retract the divergent graph (using the preserved divergent seed). manifest registration of 7 repos still pending."}
+
+ {:iteration/num 8
+  :iteration/date "2026-07-19"
+  :iteration/phase :acquisition
+  :iteration/batch "EU-UTIL-1"
+  :iteration/summary "Acquired EU-UTIL-1 batch: 6 European electric-utility parent-entity LEIs GLEIF-verified, 2 honestly recorded as lei-lookup-failed (parent LEI not surfaced via name search, only subsidiaries — same no-subsidiary-substitution policy as isic-0610 Chevron / isic-3020 CRRC). This is the resume point."
+  :batch/acquired
+   #{{:company/legal-name "ELECTRICITE DE FRANCE" :company/lei "549300X3UK4GG3FNMO06" :company/jurisdiction "FR" :company/isic-rev5 "3510" :company/candidate-website "https://www.edf.fr" :company/status :lei-verified}
+     {:company/legal-name "IBERDROLA SA" :company/lei "5QK37QC7NWOJ8D7WVQ45" :company/jurisdiction "ES" :company/isic-rev5 "3510" :company/candidate-website "https://www.iberdrola.com" :company/status :lei-verified}
+     {:company/legal-name "NATIONAL GRID PLC" :company/lei "8R95QZMKZLJX5Q2XR704" :company/jurisdiction "GB" :company/isic-rev5 "3510" :company/candidate-website "https://www.nationalgrid.com" :company/status :lei-verified}
+     {:company/legal-name "ENEL SPA" :company/lei "WOCMU6HCI0OJWNPRZS33" :company/jurisdiction "IT" :company/isic-rev5 "3510" :company/candidate-website "https://www.enel.com" :company/status :lei-verified}
+     {:company/legal-name "SSE PLC" :company/lei "549300KI75VYLLMSK856" :company/jurisdiction "GB" :company/isic-rev5 "3510" :company/candidate-website "https://www.sse.com" :company/status :lei-verified}
+     {:company/legal-name "E.ON SE" :company/lei "Q9MAIUP40P25UFBFG033" :company/jurisdiction "DE" :company/isic-rev5 "3510" :company/candidate-website "https://www.eon.com" :company/status :lei-verified}}
+  :batch/lookup-failed
+   #{{:company/legal-name "ENGIE SA" :company/jurisdiction "FR" :company/reason "GLEIF name search (fulltext + exact legalName, jur=FR) surfaces only subsidiaries (ENGIE ALLIANCE, ENGIE FINANCE, ENGIE E&P INTERNATIONAL, etc.); parent 'ENGIE SA' LEI not surfaced — not fabricated, not substituted with a subsidiary LEI"}
+     {:company/legal-name "RWE AG" :company/jurisdiction "DE" :company/reason "GLEIF name search (fulltext + exact legalName, jur=DE) surfaces only subsidiaries (RWE Renewables, RWE Generation, RWE Offshore Wind, RWE Pensionsfonds, etc.); parent 'RWE AG' LEI not surfaced — not fabricated"}}
+  :iteration/next "ITERATION 9+: scaffold the 6 verified EU-UTIL-1 cloud-itonami-lei-* repos (ToS/legal gate + blueprint/README/NOTICE/tos.journal, same recipe as JP-UTIL-1). EU corporate sites are often bot-protected (cf isic-3510 National Grid/Duke were 403 in the US rollout) — expect mixed gate results, record honestly. Continue with ASIA-UTIL-1 (KEPCO/CLP/Tenaga/State Grid). Owner/ops follow-ups unchanged: canonical ingest identity provisioning + EDINET key + retract divergent graph + manifest registration of 7 JP repos."}
+
+ {:iteration/num 9
+  :iteration/date "2026-07-19"
+  :iteration/phase :repo-scaffold
+  :iteration/batch "EU-UTIL-1"
+  :iteration/summary "Scaffolded 3 of 6 EU-UTIL-1 repos (the 3 gate-passes). 3 bot-blocked at home page (HTTP 403, no evasion). This is the resume point."
+  :repo/created
+   #{{:company/legal-name "Electricité de France SA" :company/lei "549300X3UK4GG3FNMO06" :repo/name "cloud-itonami-lei-549300x3uk4gg3fnmo06" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-549300x3uk4gg3fnmo06" :company/doc-type :legal-notice :company/tos-source-url "https://www.edf.fr/mentions-legales" :company/jurisdiction "FR"}
+     {:company/legal-name "Enel S.p.A." :company/lei "WOCMU6HCI0OJWNPRZS33" :repo/name "cloud-itonami-lei-wocmu6hci0ojwnprzs33" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-wocmu6hci0ojwnprzs33" :company/doc-type :legal-disclaimer :company/tos-source-url "https://www.enel.com/legal-disclaimers" :company/jurisdiction "IT"}
+     {:company/legal-name "SSE plc" :company/lei "549300KI75VYLLMSK856" :repo/name "cloud-itonami-lei-549300ki75vyllmsk856" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-549300ki75vyllmsk856" :company/doc-type :privacy-policy :company/tos-source-url "https://www.sse.com/privacy-notice/" :company/jurisdiction "GB"}}
+  :gate/failed-bot-blocked
+   #{{:company/legal-name "Iberdrola SA" :company/lei "5QK37QC7NWOJ8D7WVQ45" :company/reason "iberdola.com home returns HTTP 403 to plain HTTP client; no evasion attempted per CLAUDE.md safety floor ④"}
+     {:company/legal-name "National Grid plc" :company/lei "8R95QZMKZLJX5Q2XR704" :company/reason "nationalgrid.com home returns HTTP 403 (same as isic-3510 US rollout National Grid/Duke); no evasion"}
+     {:company/legal-name "E.ON SE" :company/lei "Q9MAIUP40P25UFBFG033" :company/reason "eon.com home returns HTTP 403; no evasion"}}
+  :iteration/next "ITERATION 10+: ASIA-UTIL-1 acquisition (KEPCO/CLP/Tenaga Nasional/State Grid — verify parent LEIs, do not fabricate). Defer EU 403s to a JS-capable fetch path (not in this env). Owner/ops follow-ups unchanged: canonical ingest identity provisioning + EDINET key + retract iter5 divergent graph + manifest registration of 10 repos (7 JP + 3 EU)."}
+
+ {:iteration/num 10
+  :iteration/date "2026-07-19"
+  :iteration/phase :acquisition
+  :iteration/batch "ASIA-UTIL-1"
+  :iteration/summary "Acquired ASIA-UTIL-1 batch: 5 Asia-Pacific electric-utility parent-entity LEIs GLEIF-verified (KEPCO, CLP Holdings, Tenaga Nasional, Power Grid Corp of India, NTPC Limited), 1 honestly lei-lookup-failed (State Grid Corporation of China — no self-registered parent LEI in GLEIF, same as isic-3020 CRRC). This is the resume point."
+  :batch/acquired
+   #{{:company/legal-name "한국전력공사 (Korea Electric Power Corporation, KEPCO)" :company/lei "988400QG33WS7JEIV602" :company/jurisdiction "KR" :company/isic-rev5 "3510" :company/candidate-website "https://www.kepco.co.kr" :company/status :lei-verified}
+     {:company/legal-name "中電控股有限公司 (CLP Holdings Limited)" :company/lei "25490002BUTSMP94GO68" :company/jurisdiction "HK" :company/isic-rev5 "3510" :company/candidate-website "https://www.clpgroup.com" :company/status :lei-verified}
+     {:company/legal-name "TENAGA NASIONAL BERHAD" :company/lei "549300FV8X6UID6I1413" :company/jurisdiction "MY" :company/isic-rev5 "3510" :company/candidate-website "https://www.tnb.com.my" :company/status :lei-verified}
+     {:company/legal-name "POWER GRID CORPORATION OF INDIA LIMITED" :company/lei "3358009SHWZ3DZEQ4Z56" :company/jurisdiction "IN" :company/isic-rev5 "3510" :company/candidate-website "https://www.powergrid.in" :company/status :lei-verified}
+     {:company/legal-name "NTPC LIMITED" :company/lei "335800Q4TRGJXNLVMB81" :company/jurisdiction "IN" :company/isic-rev5 "3510" :company/candidate-website "https://www.ntpc.co.in" :company/status :lei-verified}}
+  :batch/lookup-failed
+   #{{:company/legal-name "State Grid Corporation of China" :company/jurisdiction "CN" :company/reason "no self-registered parent-entity LEI in GLEIF (fulltext 'State Grid Corporation of China' = 0 results globally; 'STATE GRID' only returns unrelated National Grid Corporate Services LLC). Same pattern as isic-3020 CRRC / isic-0610 Gazprom — not fabricated, not substituted with a subsidiary."}}
+  :iteration/next "ITERATION 11+: scaffold the 5 verified ASIA-UTIL-1 repos (ToS/legal gate — KR/HK/MY/IN corporate sites, expect mixed bot-protection; record honestly). Then consider further regional batches (AU Origin/AGL, JP-secondary, LATAM). Owner/ops follow-ups unchanged: canonical ingest identity provisioning + EDINET key + retract iter5 divergent graph + manifest registration of 10 scaffolded repos (7 JP + 3 EU)."}
+
+ {:iteration/num 11
+  :iteration/date "2026-07-19"
+  :iteration/phase :repo-scaffold
+  :iteration/batch "ASIA-UTIL-1"
+  :iteration/summary "Scaffolded 2 of 5 ASIA-UTIL-1 repos (KEPCO, Tenaga Nasional). 3 tos-fetch-failed (CLP 403, Power Grid India conn-fail, NTPC Radware CAPTCHA — no evasion per safety floor ④). Fixed a KEPCO empty-text incident. This is the resume point."
+  :repo/created
+   #{{:company/legal-name "KEPCO (Korea Electric Power Corporation)" :company/lei "988400QG33WS7JEIV602" :repo/name "cloud-itonami-lei-988400qg33ws7jeiv602" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-988400qg33ws7jeiv602" :company/doc-type :legal-notice :company/tos-source-url "https://www.kepco.co.kr/home/service/legalnotice/conts.do" :company/jurisdiction "KR"}
+     {:company/legal-name "Tenaga Nasional Berhad" :company/lei "549300FV8X6UID6I1413" :repo/name "cloud-itonami-lei-549300fv8x6uid6i1413" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-549300fv8x6uid6i1413" :company/doc-type :terms-of-service :company/tos-source-url "https://www.tnb.com.my/terms-policy" :company/jurisdiction "MY"}}
+  :gate/failed
+   #{{:company/legal-name "CLP Holdings Limited" :company/lei "25490002BUTSMP94GO68" :company/reason "clpgroup.com home returns HTTP 403 (bot-block); no evasion"}
+     {:company/legal-name "Power Grid Corporation of India Limited" :company/lei "3358009SHWZ3DZEQ4Z56" :company/reason "powergrid.in home connection failed (HTTP 000); no evasion"}
+     {:company/legal-name "NTPC Limited" :company/lei "335800Q4TRGJXNLVMB81" :company/reason "ntpc.co.in legal page is a Radware CAPTCHA interstitial (not real content); no CAPTCHA evasion per safety floor ④"}}
+  :iteration/incident-kepco "KEPCO initial scaffold produced a 0-byte empty tos.journal.edn full-text — the .do action URL returned empty body on a plain repeat fetch (worked in the gate pass). Re-fetched with a Referer header -> real ~6.8kch 법적고지 content; overwrote the repo's journal via GitHub API (commit on repo main). Lesson recorded: dynamic .do/.action pages may require Referer/session; VERIFY non-empty text before push (the scaffold pipeline now should assert len>0)."
+  :iteration/next "ITERATION 12+: further regional acquisition (AU Origin/AGL Energy, LATAM Eletrobras/Enel Americas, Middle East DEWA/SEC). Defer bot-blocked repos to JS-capable fetch path. Owner/ops follow-ups unchanged: canonical ingest identity provisioning + EDINET key + retract iter5 divergent graph + manifest registration of 12 scaffolded repos (7 JP + 3 EU + 2 ASIA)."}
+
+ {:iteration/num 12
+  :iteration/date "2026-07-19"
+  :iteration/phase :acquisition
+  :iteration/batch "AU-ME-UTIL-1"
+  :iteration/summary "Acquired AU-ME-UTIL-1 batch: 3 parent-entity LEIs GLEIF-verified (Origin Energy AU, AGL Energy AU, DEWA AE), 2 honestly lei-lookup-failed (Eletrobras BR parent name not surfaced; Saudi Electricity Company has no GLEIF LEI — الشركة السعودية للطاقة is a DIFFERENT entity 'Saudi Energy' not 'Saudi Electricity لكهرباء', not substituted). Worldwide coverage now spans JP/EU/Asia-Pacific/AU/ME. This is the resume point."
+  :batch/acquired
+   #{{:company/legal-name "ORIGIN ENERGY LIMITED" :company/lei "ZSN2LWNPYW6ISMRUC664" :company/jurisdiction "AU" :company/isic-rev5 "3510" :company/candidate-website "https://www.originenergy.com.au" :company/status :lei-verified}
+     {:company/legal-name "AGL ENERGY LIMITED" :company/lei "549300QAZ8A74DEDXO80" :company/jurisdiction "AU" :company/isic-rev5 "3510" :company/candidate-website "https://www.agl.com.au" :company/status :lei-verified}
+     {:company/legal-name "DUBAI ELECTRICITY AND WATER AUTHORITY (DEWA)" :company/lei "213800K4OJF8DKATLT41" :company/jurisdiction "AE" :company/isic-rev5 "3510/3600" :company/candidate-website "https://www.dewa.gov.ae" :company/reg-status "LAPSED" :company/reg-note "real GLEIF entity-verified LEI, not annually renewed (government authority); same convention as Discover/TEPCO" :company/status :lei-verified}}
+  :batch/lookup-failed
+   #{{:company/legal-name "Eletrobras (Centrais Elétricas Brasileiras SA)" :company/jurisdiction "BR" :company/reason "exact legalName 'CENTRAIS ELETRICAS BRASILEIRAS' jur=BR returned no results; fulltext surfaces only unrelated 'AXIA ENERGIA S.A.'. Parent LEI not cleanly surfaced — not fabricated."}
+     {:company/legal-name "Saudi Electricity Company" :company/jurisdiction "SA" :company/reason "no GLEIF LEI for 'Saudi Electricity Company' / 'الشركة السعودية للكهرباء' (exact, jur=SA). LEI 549300FXO4ZXUIAXGP41 'الشركة السعودية للطاقة' is a DIFFERENT entity ('Saudi Energy/Power', طاقة ≠ كهرباء/electricity) — correctly NOT substituted."}}
+  :iteration/next "ITERATION 13+: scaffold backlog — 8 acquired-but-not-scaffolded LEIs across EU (Iberdrola/NG/E.ON bot-blocked, need JS path) + ASIA (CLP/PowerGrid/NTPC bot-blocked, KEPCO/Tenaga done) + AU-ME (Origin/AGL/DEWA pending scaffold, likely AU sites reachable). Owner/ops follow-ups unchanged: canonical ingest identity + EDINET key + retract iter5 divergent graph + manifest registration of 12 repos."}
+
+ {:iteration/num 13
+  :iteration/date "2026-07-19"
+  :iteration/phase :catalog-v2-pilot
+  :iteration/summary "v2 corporate-profile data layer PROVEN end-to-end WITHOUT EDINET API key: extracted TEPCO's real top-10 major shareholders (大株主, as-of 2026-03-31) from the TEPCO IR 株式等の状況 HTML page and committed a new 80-data/public/shareholders.journal.edn to the TEPCO repo. This unblocks the v2 'shareholders' attribute from the EDINET-key dependency. This is the resume point."
+  :v2/pilot-result "TEPCO repo (cloud-itonami-lei-5299004emj3r4rvr5y75) now contains shareholders.journal.edn alongside tos.journal.edn. 4 quads: :shareholders/as-of '2026年3月31日', :shareholders/source-url, :shareholders/retrieved-at, :shareholders/list [{:rank :name :shares-thousand :percent} x10]. Top: 原子力損害賠償・廃炉等支援機構 1,940,000千株 54.75%, 日本マスタートラスト信託銀行(信託口) 5.56%, 日本カストディ銀行(信託口) 1.51%, 東京電力グループ従業員持株会 1.37%, 東京都 1.20%, State Street 0.77%, 日本生命 0.75%, BNY Mellon 0.67%, JP Morgan 0.62%, 三井住友銀行 0.51%. Real, structured, provenance-tracked, no fabrication."
+  :v2/key-insight "EDINET API key is NOT required for v2 shareholders/products — company IR pages publish 大株主/事業セグメント as parseable HTML. EDINET remains the scalable source for FULL balance-sheet/連結子会社 (in 有価証券報告書 PDFs), but those are ALSO self-published by issuers: TEPCO publishes its 有報 at /about/ir/library/securities_report/ (no key). So even the EDINET-API dependency is avoidable via issuer-published filings. The v2 pipeline can proceed now with IR scraping."
+  :iteration/next "ITERATION 14+: extend v2 shareholders journal to other JP-UTIL-1 companies (Chubu/Kansai/Tokyo Gas IR pages, same scrape recipe). Pilot v2 products.journal.edn (business segments) and balance-sheet from IR/有報. Continue breadth acquisition. Owner/ops follow-ups unchanged: canonical ingest identity (for 連携統合) + manifest registration of 12 repos + retract iter5 divergent graph. EDINET key now OPTIONAL (not blocking)."}
+
+ {:iteration/num 14
+  :iteration/date "2026-07-19"
+  :iteration/phase :catalog-v2-expansion
+  :iteration/summary "Extended v2 shareholders to other JP-UTIL-1 — MIXED/per-company-variable result. TEPCO (iter13) was a clean case; per-company IR HTML structures vary widely so the same scrape recipe does not transfer cleanly. This is the resume point."
+  :v2/kansai-shareholders-acquired "関西電力 (LEI 353800PFUKP5ONPJNZ86) major-shareholders extracted from kepco.co.jp/ir/stockholder/shareholders/index.html (as-of 2026-03-31, 11 rows): 氏名又は名称 所有株式数 （千株）千株(発行済株式総数に対する 所有株式数の割合（%）%); 日本マスタートラスト信託銀行株式会社（信託口） 146,008千株(13.10%); 大阪市 68,287千株(6.13%); 株式会社日本カストディ銀行（信託口） 54,513千株(4.89%); STATE STREET BANK AND TRUST COMPANY 505001 37,142千株(3.33%). REAL data — but Kansai has NO cloud-itonami-lei repo (its ToS/legal gate failed in iter3 — only 経営理念 philosophy page reachable, no dedicated legal/ToS page). So this v2 dataset is REPO-LESS until a Kansai legal page is found (or the 有報 PDF route provides both ToS-equivalent + shareholders)."
+  :v2/chubu-tokyogas "Chubu Electric + Tokyo Gas shareholder extraction FAILED via IR HTML heuristics (their IR 株式 pages use different structures — likely 有報/PDF or JS-rendered tables). Need the 有価証券報告書 route for reliable extraction."
+  :v2/finding "v2 IR-scraping is per-company-variable (TEPCO clean, Kansai shareholders-only, Chubu/TG not found). The RELIABLE v2 path is the 有価証券報告書 (issuer self-published, e.g. TEPCO /about/ir/library/securities_report/) which standardizes 大株主/連結子会社/財務諸記 — but those are PDF/XBRL (parse setup needed), not HTML tables. Recommend building a 有報-PDF/XBRL extraction step for uniform v2 data."
+  :iteration/next "ITERATION 15+: either (a) build the 有報 PDF/XBRL extraction for reliable uniform v2 data (大株主/連結子会社/財務), or (b) continue per-company IR adaptation. Also continue 取得 breadth. Owner/ops unchanged: canonical ingest identity (連携統合) + manifest registration + retract iter5 divergent graph."}
+
+ {:iteration/num 15
+  :iteration/date "2026-07-19"
+  :iteration/phase :repo-scaffold
+  :iteration/batch "AU-ME-UTIL-1"
+  :iteration/summary "Scaffolded 1 of 3 AU-ME-UTIL-1 repos (Origin Energy AU — Terms of Use 26kch). 2 bot-blocked (AGL 403, DEWA 403). Catalog now 13 worldwide repos. This is the resume point."
+  :repo/created
+   #{{:company/legal-name "Origin Energy Limited" :company/lei "ZSN2LWNPYW6ISMRUC664" :repo/name "cloud-itonami-lei-zsn2lwnpyw6ismruc664" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-zsn2lwnpyw6ismruc664" :company/doc-type :legal-notice :company/tos-source-url "https://www.originenergy.com.au/terms-of-use" :company/jurisdiction "AU"}}
+  :gate/failed-bot-blocked
+   #{{:company/legal-name "AGL Energy Limited" :company/lei "549300QAZ8A74DEDXO80" :company/reason "agl.com.au home returns HTTP 403 (bot-block); no evasion"}
+     {:company/legal-name "Dubai Electricity and Water Authority (DEWA)" :company/lei "213800K4OJF8DKATLT41" :company/reason "dewa.gov.ae home returns HTTP 403 (bot-block); no evasion"}}
+  :iteration/next "ITERATION 16+: continue breadth acquisition (LATAM Eletrobras-name-retry, Middle East, Africa) or scaffold more from backlog. The two owner-blockers persist: (1) canonical ingest identity for 連携統合 (local provisioning needed); (2) v2 reliable extraction (有報 PDF/XBRL route). Bot-blocked repos (AGL/DEWA/Iberdrola/NG/E.ON/CLP/PowerGrid/NTPC/関西/大阪) accumulate — collectively need a JS-capable fetch path not present in this env."}
+
+ {:iteration/num 16
+  :iteration/date "2026-07-19"
+  :iteration/phase :acquisition
+  :iteration/batch "LATAM-UTIL-1"
+  :iteration/summary "Acquired LATAM-UTIL-1: 2 parent LEIs (Cemig BR, ISA Colombia), 2 lookup-failed (Eletrobras — no GLEIF LEI under CENTRAIS ELETRICAS BRASILEIRAS/ELETROBRAS exact; EDP Energia do Brasil — no result). Worldwide coverage now 6 continents. ACQUISITION PILLAR APPROACHING DIMINISHING RETURNS without owner unblocks. This is the resume point."
+  :batch/acquired
+   #{{:company/legal-name "COMPANHIA ENERGETICA DE MINAS GERAIS-CEMIG" :company/lei "254900W703PXLDSEM056" :company/jurisdiction "BR" :company/candidate-website "https://www.cemig.com.br" :company/status :lei-verified}
+     {:company/legal-name "INTERCONEXION ELECTRICA S.A. E.S.P. (ISA)" :company/lei "5493007GMWK7ZHVQ5362" :company/jurisdiction "CO" :company/reg-status "LAPSED" :company/candidate-website "https://www.isa.co" :company/status :lei-verified}}
+  :batch/lookup-failed
+   #{{:company/legal-name "Eletrobras (Centrais Elétricas Brasileiras)" :company/reason "no GLEIF result for 'CENTRAIS ELETRICAS BRASILEIRAS' or 'ELETROBRAS' exact in BR — parent LEI not registered/surfaced; not fabricated"}
+     {:company/legal-name "EDP Energia do Brasil" :company/reason "no GLEIF result; name may differ (EDP São Paulo etc.) — not fabricated"}}
+  :loop/status-note "16 iterations in. 取得 (acquisition) pillar is well-developed (24 entities across 6 continents, 13 repos live, 1 v2 pilot). The 連携統合 (integration) half remains owner-blocked (canonical ingest identity not locally available). v2 uniform extraction needs 有報-PDF/XBRL build (multi-tick). Without owner unblocks, autonomous progress narrows to incremental acquisition + per-company v2 scraping. Decision point surfaced for owner."
+  :iteration/next "OWNER DECISION POINT: (a) provision canonical ingest identity locally -> unblocks 連携統合 for 13+ repos; (b) authorize 有報-PDF/XBRL extraction build -> uniform v2 data; (c) continue incremental acquisition (Africa/Middle East remaining utilities). Bot-blocked backlog (10 companies) needs JS-capable fetch path (separate from this env)."}
+
+ {:iteration/num 17
+  :iteration/date "2026-07-25"
+  :iteration/phase :repo-scaffold
+  :iteration/batch "LATAM-UTIL-1"
+  :iteration/summary "Closed out the LATAM-UTIL-1 backlog (both companies had been :lei-verified since iter16 but never ToS-fetch-gated): CEMIG PASSED (real Privacy Policy page + real DPO contact email), ISA FAILED (site down). This is the resume point for LATAM-UTIL-1 (now fully closed — 1 repo live, 1 honestly blocked)."
+  :gate/pass
+   #{{:company/legal-name "COMPANHIA ENERGETICA DE MINAS GERAIS-CEMIG" :company/lei "254900W703PXLDSEM056" :company/tos-source-url "https://www.cemig.com.br/governanca/privacidade-e-transparencia/politica-de-privacidade-para-clientes-e-publico-geral/" :company/doc-type :privacy-policy :company/contact-email "privacidade@cemig.com.br" :company/contact-email-note "DPO (Encarregado)/data-privacy contact published on the company's own governance page; no separate general-inquiry email found this pass"}}
+  :gate/failed
+   #{{:company/legal-name "INTERCONEXION ELECTRICA S.A. E.S.P. (ISA)" :company/lei "5493007GMWK7ZHVQ5362" :company/reason "https://www.isa.co (and https://isa.co/en/, https://www.isa.co/en/) all return HTTP 500 consistently across 2 independent fetch paths (direct curl + WebFetch tool) and multiple retries; genuine server-side error, not a bot-block — no evasion attempted or needed since there is nothing to evade. www.isa.com.co (an alternate/related domain) refused/timed-out the connection on both fetch paths too. Not fabricated, not substituted."}}
+  :repo/created
+   #{{:company/legal-name "Companhia Energética de Minas Gerais - CEMIG" :company/lei "254900W703PXLDSEM056" :repo/name "cloud-itonami-lei-254900w703pxldsem056" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-254900w703pxldsem056" :company/doc-type :privacy-policy :company/tos-source-url "https://www.cemig.com.br/governanca/privacidade-e-transparencia/politica-de-privacidade-para-clientes-e-publico-geral/" :company/jurisdiction "BR"}}
+  :iteration/next "ITERATION 18: new AFRICA-UTIL-1 batch acquisition + scaffold, extending the owner's new-this-tick contact-info discovery scope to every company touched."}
+
+ {:iteration/num 18
+  :iteration/date "2026-07-25"
+  :iteration/phase :acquisition+repo-scaffold
+  :iteration/batch "AFRICA-UTIL-1"
+  :iteration/summary "First African-continent batch (fills the 'no Africa coverage' gap after JP/EU/Asia/AU-ME/LATAM). 4 real GLEIF parent-entity LEIs acquired, 3 ToS-fetch-gate PASS + scaffolded (Eskom ZA, Copperbelt Energy ZM, NNPC NG), 1 gate-FAIL (ONEE Morocco — site unreachable, not a bot-block). Sonatrach (Algeria, LEI 213800NI74QTT3F18469, DZ, ISSUED) was found real and GLEIF-verified during candidate search but NOT pursued further this tick (deferred, not fabricated as a failure) — bounded-batch discipline. **New this tick (owner-approved scope): every company below also got a real, site-published contact-email and/or inquiry-form-url discovery pass** (read-only; no form submitted, no email sent, no account created, per the hard out-of-scope boundary in this tick's instructions)."
+  :batch/acquired
+   #{{:company/legal-name "Eskom Holdings SOC Ltd" :company/lei "3789001900ED06F65111" :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/3789001900ED06F65111" :company/jurisdiction "ZA" :company/isic-rev5 "3510" :company/sector :electric-utility :company/candidate-website "https://www.eskom.co.za" :company/status :lei-verified}
+     {:company/legal-name "Copperbelt Energy Corporation Plc" :company/lei "213800F5XJIMCMJLLQ70" :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/213800F5XJIMCMJLLQ70" :company/jurisdiction "ZM" :company/isic-rev5 "3510" :company/sector :electric-utility :company/candidate-website "https://www.cec.com.zm" :company/note "actual live domain is cec.com.zm, NOT cec.co.zm (that domain does not resolve) — verified via web search before fetching" :company/status :lei-verified}
+     {:company/legal-name "Nigerian National Petroleum Company Limited" :company/lei "9845007375EBB04C6F49" :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/9845007375EBB04C6F49" :company/jurisdiction "NG" :company/isic-rev5 "0610" :company/sector :oil-and-gas :company/candidate-website "https://www.nnpcgroup.com" :company/status :lei-verified}
+     {:company/legal-name "ONEE (Office National de l'Électricité et de l'Eau Potable)" :company/lei "254900EJF6QVN7XNDV64" :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/254900EJF6QVN7XNDV64" :company/jurisdiction "MA" :company/isic-rev5 "3510/3600" :company/sector :electric-and-water-utility :company/candidate-website "https://onee.ma" :company/status :lei-verified}}
+  :gate/pass
+   #{{:company/legal-name "Eskom Holdings SOC Ltd" :company/lei "3789001900ED06F65111" :company/tos-source-url "https://www.eskom.co.za/wp-content/uploads/2021/10/WEBSITE-TERMS-AND-CONDITIONS_Sep2021.pdf" :company/doc-type :terms-of-service :company/tos-text-chars 24005 :company/contact-email "MediaDesk@eskom.co.za" :company/contact-email-note "published on the site's own Contact Information page; a media-desk address, no separate general-enquiry email found this pass"}
+     {:company/legal-name "Copperbelt Energy Corporation Plc" :company/lei "213800F5XJIMCMJLLQ70" :company/tos-source-url "https://www.cec.com.zm/terms-conditions/" :company/doc-type :terms-of-service :company/tos-text-chars 22189 :company/inquiry-form-url "https://support.cec.com.zm/support/tickets/new" :company/contact-email-note "no email address published on the Contact Us page — only phone/fax numbers and this 'Online Enquiries' ticket-form button; recorded honestly as inquiry-form-url only"}
+     {:company/legal-name "Nigerian National Petroleum Company Limited" :company/lei "9845007375EBB04C6F49" :company/tos-source-url "https://www.nnpcgroup.com/terms-of-use" :company/doc-type :terms-of-service :company/tos-text-chars 21459 :company/contact-email "contactus@nnpcgroup.com" :company/contact-email-note "published on the site's own Contact Us page"}}
+  :gate/failed
+   #{{:company/legal-name "ONEE (Office National de l'Électricité et de l'Eau Potable)" :company/lei "254900EJF6QVN7XNDV64" :company/reason "onee.ma (and the www subdomain) is unreachable — DNS lookup fails (NXDOMAIN for www.onee.ma; bare onee.ma resolves for MX only, not for HTTP/HTTPS) across two independent fetch paths (curl and the WebFetch tool both failed with connection-level errors, not an HTTP status). Genuine connectivity failure, not a bot-block — no evasion attempted or possible."}}
+  :repo/created
+   #{{:company/legal-name "Eskom Holdings SOC Ltd" :company/lei "3789001900ED06F65111" :repo/name "cloud-itonami-lei-3789001900ed06f65111" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-3789001900ed06f65111" :company/doc-type :terms-of-service :company/tos-source-url "https://www.eskom.co.za/wp-content/uploads/2021/10/WEBSITE-TERMS-AND-CONDITIONS_Sep2021.pdf" :company/jurisdiction "ZA"}
+     {:company/legal-name "Copperbelt Energy Corporation Plc" :company/lei "213800F5XJIMCMJLLQ70" :repo/name "cloud-itonami-lei-213800f5xjimcmjllq70" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-213800f5xjimcmjllq70" :company/doc-type :terms-of-service :company/tos-source-url "https://www.cec.com.zm/terms-conditions/" :company/jurisdiction "ZM"}
+     {:company/legal-name "Nigerian National Petroleum Company Limited" :company/lei "9845007375EBB04C6F49" :repo/name "cloud-itonami-lei-9845007375ebb04c6f49" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-9845007375ebb04c6f49" :company/doc-type :terms-of-service :company/tos-source-url "https://www.nnpcgroup.com/terms-of-use" :company/jurisdiction "NG"}}
+  :v3/contact-info-scope-note "This is the FIRST tick under the owner's newly-approved narrow scope extension (read-only discovery of already-public contact email / inquiry-form URL alongside the existing LEI+ToS pipeline). Applied to all 4 companies touched this tick (3 scaffolded + CEMIG catch-up from iter17). NOT retroactively back-filled onto the other ~150 existing repos this tick (out of scope for a single bounded batch — a natural follow-up for a future tick, same opportunistic approach the owner described)."
+  :iteration/next "ITERATION 19: register the 4 new repos (Eskom/CEC/NNPC/CEMIG) in manifest/repos.edn (:extra-projects) + manifest/west.yml (gen-west-manifest.cljs --entry, minimal diff) done in an isolated sibling worktree, land via clean-branch PR. Then attempt scripts/kotobase-ingest-cloud-itonami-lei.cljs (connectivity/vault situation may have changed since iter7's owner-blocker finding — re-check before assuming still blocked). Deferred candidates for a future batch: Sonatrach (DZ, LEI 213800NI74QTT3F18469, real+verified, not yet site-fetched), Kenya Power, Egyptian Electricity Holding Co, Ethiopian Electric Power, Transmission Company of Nigeria, Electricity Company of Ghana (all searched, 0 GLEIF results this pass — may need alternate legal-name phrasing, not concluded as 'no LEI exists')."}
+
+ {:iteration/num 19
+  :iteration/date "2026-07-25"
+  :iteration/phase :manifest-registration
+  :iteration/summary "Registered the 4 new AFRICA-UTIL-1/LATAM-UTIL-1-catchup repos in west/fleet-db, closing the 'manifest registration pending' gap this task family has carried since iter7 (note: the OLDER 12-repo backlog from iter7-16 was separately closed by other fleet-maintenance work sometime before this tick — verified: all 155 pre-existing cloud-itonami-lei-* repos were already present in manifest/repos.edn and manifest/west.yml when this tick started)."
+  :manifest/registered
+   #{"cloud-itonami-lei-3789001900ed06f65111" "cloud-itonami-lei-213800f5xjimcmjllq70" "cloud-itonami-lei-9845007375ebb04c6f49" "cloud-itonami-lei-254900w703pxldsem056"}
+  :manifest/method "Isolated sibling worktree (outside the superproject root, per CLAUDE.md's parallel-agent convention) + sparse-checkout(manifest,90-docs/adr,scripts) + ordinary FULL (non-shallow — this repo family retired --depth clones repo-wide per ADR-2607211600) local clone of just the 4 new child repos (needed because gen-west-manifest.cljs's --entry path reads each project's LOCAL working-tree HEAD via `git rev-parse HEAD`, not a GitHub API call, to compute the pin) + `nbb scripts/gen-west-manifest.cljs --entry <4 names>` (server-side GH_TOKEN-backed pin verification: all 4 OK, new-entry + reachable-from-main) + minimal 20-line west.yml diff (alphabetically inserted, matching the existing convention) + a 4-string addition to manifest/repos.edn's :manifest.repos/extra-projects vector (appended at the end, matching the precedent set by commit beedaa56f86fd which also appended rather than alphabetically inserted for a later batch). `--check` reports STALE in this worktree, which is the SAME known-benign artifact noted in commit beedaa56f86fd's message (only a handful of the 3676 total projects are cloned in this isolated worktree, not a real drift) — NOT hand-edited fleet-db.edn (that projection is reconciled automatically by CI per CLAUDE.md's fleet-db section)."
+  :iteration/next "Land this worktree's branch via the documented clean-branch flow (push + server-side merge to main, no rebase/force-push). Then re-attempt scripts/kotobase-ingest-cloud-itonami-lei.cljs now that these repos are west-registered (registration is not actually required for ingest — ingest reads raw.githubusercontent.com directly — but do it in the natural order: register, then ingest, then record the combined result)."}
+
+ {:iteration/num 20
+  :iteration/date "2026-07-25"
+  :iteration/phase :integration-ingest
+  :iteration/summary "連携統合: re-attempted scripts/kotobase-ingest-cloud-itonami-lei.cljs. GOOD NEWS: the canonical ingest identity (CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED) that iter7 found unavailable is NOW retrievable — 1Password `gftdcojp` vault access that failed in iter7 now works (item `gftd.kotobase/CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED`, id lpf5325gjayijaap57lzamvcpi), so this ran under the REAL canonical identity, not a fresh divergent one. PARTIAL RESULT, run left active/incomplete: 9 OK / 6 FAIL (and climbing) (Cloudflare Worker 'exceeded resource limits' 503s on backend.kotobase.net, increasing in frequency — looks like a real backend capacity/rate-limit issue, not a client bug) out of 159 repos as of report time, alphabetically only as far as the '2549...' LEI prefix — has NOT yet reached 2 of the 3 new AFRICA-UTIL-1 repos (Eskom 3789..., NNPC 9845...) or the CEMIG catch-up repo (254900w703pxldsem056 — 254900w sorts after 2549009 so likely close). The new CEC repo (213800f5xjimcmjllq70) DID succeed (OK, entities=2, datom_count=14). This is the resume point for 連携統合 completion."
+  :ingest/identity-did "did:key:z6Mkh6mnYrfXNjDSoRQfRK9a2QanvaSAVAqDFK44Vpss5ZSA"
+  :ingest/tally-at-report-time {:ok 9 :fail 6 :total-repos 159 :backend-error "HTTP 503, Cloudflare error 1102 'Worker exceeded resource limits' on backend.kotobase.net"}
+  :ingest/incident-divergent-identity "HONEST DISCLOSURE: the FIRST invocation attempt this tick (before finding/placing the real identity file correctly) hit the SAME class of path-resolution bug iter4/iter7 flagged (`script-dir` is computed from `(aget js/process.argv 2)`, which is actually the literal string \"--classpath\" when invoked per the script's own documented `nbb --classpath \"src\" <path>` form, NOT the script path — `path/dirname(\"--classpath\")` = \".\", i.e. cwd-at-launch, not the script's directory). Invoking it while cwd was `orgs/kotoba-lang/kotobase-client` caused it to mint a FRESH throwaway identity there (did:key:z6Mkwb5QGfgthet5Uc4ewMXTfrY9r4ifhXNpU9rtgGWXUB8r) and transact 3 entities (cloud-itonami-lei-06btx5uwzd0gq5n5y745, -0eeb8gf0w0npcihzx097, -1b4s6s7g0tw5ee83bo58) into a NEW divergent kotobase.net graph before this was caught (repo count printed, first 3 OK lines appeared) and the process was killed. Unlike iter5's precedent, the divergent identity's seed file was deleted before being backed up (an oversight) — it is NOT recoverable, so this divergent graph cannot be retracted the way iter7 preserved its own for future cleanup. Impact assessed as low: only 3 entities, on a side graph, not the canonical one — but recorded honestly per this project's no-silent-gaps discipline. ROOT-CAUSE FIX for next tick: the identity-path resolution bug is real and reproducible on every invocation that follows the script's own documented usage — a genuine one-line source fix (compute script-dir from `import.meta.url` or a hardcoded relative path instead of argv[2]) would prevent this recurring across future ticks; flagging for whoever next touches this script, not fixed here (out of this tick's scope, and editing the ingest script itself was not requested)."
+  :iteration/next "ITERATION 21: check on scripts/kotobase-ingest-cloud-itonami-lei.cljs's background run (left running past this report; may have made further progress, stalled entirely on the 503s, or need a restart — it is idempotent/cardinality-one upsert per its own docstring, so re-running is always safe). If backend 503s persist, that is an ops/infra concern for backend.kotobase.net's Worker resource limits, separate from this catalog-acquisition task. Continue worldwide-broadening acquisition: Sonatrach (DZ) site-fetch, Kenya/Egypt/Ethiopia/Ghana/Nigeria-TCN utilities need alternate legal-name search strategies (0 GLEIF hits this tick under the names tried). Contact-info discovery (this tick's new scope) should be extended opportunistically to more of the ~155 pre-existing repos over time, not all at once."}
+
+ {:iteration/num 21
+  :iteration/date "2026-07-25"
+  :iteration/phase :acquisition+repo-scaffold+manifest-registration+backfill
+  :iteration/batch "SONATRACH-CLOSEOUT + AFRICA-UTIL-2-partial"
+  :iteration/summary "NOTE: scripts/kotobase-ingest-cloud-itonami-lei.cljs was deliberately NOT touched or re-run this tick (a separate parallel task is doing an ingestion bug-fix/resume concurrently — out of scope here per this tick's explicit instructions). This tick instead: (1) closed out the deferred Sonatrach candidate (site-fetch + contact-info + scaffold), (2) retried GLEIF for Kenya/Egypt/Ethiopia/Ghana/Nigeria-TCN utilities with alternate legal-name strategies, finding one genuine new hit (Ethio telecom, ET) and confirming genuine 0-hit exhaustion for the other four, (3) registered both new repos in west/repos.edn via an isolated sibling worktree, (4) opportunistically backfilled contact-info onto 10 of the ~155 pre-existing repos. This is the resume point."
+  :sonatrach/closeout
+   {:company/legal-name "SONATRACH" :company/lei "213800NI74QTT3F18469" :company/jurisdiction "DZ" :company/lei-note "real GLEIF-verified LEI, ISSUED/ACTIVE (re-confirmed this tick), deliberately deferred at iter18 per bounded-batch discipline" :company/tos-source-url "https://sonatrach.com/en/privacy-policy-ofsonatrach/" :company/doc-type :privacy-policy :company/tos-text-chars 3136 :company/contact-email "sonatrach@sonatrach.dz" :company/inquiry-form-url "https://sonatrach.com/en/contact-us/" :company/contact-email-note "general contact email published on the site's own Contact Us page (labeled 'Email' info box); the Privacy Policy page separately publishes a narrower DPO/data-rights contact contact_DonneesPerso@sonatrach.dz (Law 18-07 rights requests) — recorded as a distinct, narrower address, not conflated with the general contact"}
+  :batch/acquired
+   #{{:company/legal-name "ETHIO TELECOM" :company/lei "2549003PWMAF5SDUL432" :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/2549003PWMAF5SDUL432" :company/jurisdiction "ET" :company/isic-rev5 "6110" :company/sector :telecom-wired :company/reg-status "LAPSED" :company/reg-note "real GLEIF entity-verified LEI, entity status ACTIVE, not annually renewed; same convention as TEPCO/DEWA/Discover Financial" :company/candidate-website "https://www.ethiotelecom.et" :company/status :lei-verified :company/discovery-note "found via a broader ET-jurisdiction full-roster retry (only 16 total GLEIF entities registered under jurisdiction ET) after the initial 'Ethiopian Electric Power'/'Ethiopian Electric Utility' name searches returned 0 hits — Ethiopian Airlines Group (254900Y8K8COJ8AOU726) also surfaced this way but was not pursued further this tick (deferred, not fabricated as a failure)"}}
+  :gate/pass
+   #{{:company/legal-name "ETHIO TELECOM" :company/lei "2549003PWMAF5SDUL432" :company/tos-source-url "https://www.ethiotelecom.et/privacy-policy/" :company/doc-type :privacy-policy :company/tos-text-chars 3736 :company/contact-email "994@ethionet.et" :company/contact-email-note "general customer-service contact published in the site's footer/contact widget (also reachable via SMS/call to short-code 994); no separate general-inquiry address beyond this found this pass"}}
+  :lookup-failed/kenya
+   #{{:company/legal-name "Kenya Power and Lighting Company (KPLC) / KenGen / KETRACO / Kenya Pipeline Company" :company/jurisdiction "KE" :company/reason "genuinely exhausted this tick: fulltext searches for 'Kenya Power and Lighting', 'The Kenya Power and Lighting Company', 'Kenya Electricity Generating Company', 'KenGen', 'Kenya Pipeline Company', 'Kenya Electricity Transmission Company' all returned 0 GLEIF hits; cross-checked against the FULL roster of all 306 GLEIF entities registered under jurisdiction KE (paginated, all 306 names inspected for POWER/ELECTRIC/KPLC/KENGEN/ENERGY/UTILITY/PIPELINE/TRANSMISSION/KETRACO keywords) — none matched any Kenyan state utility. Not fabricated, not substituted."}}
+  :lookup-failed/egypt
+   #{{:company/legal-name "Egyptian Electricity Holding Company (EEHC) / Egyptian Electricity Transmission Company / Egyptian General Petroleum Corporation (EGPC)" :company/jurisdiction "EG" :company/reason "genuinely exhausted this tick: fulltext searches for 'Egyptian Electricity Holding Company', 'Egyptian Electricity Transmission Company', 'Egyptian Electric Utility', 'Egyptian Holding Company for Electricity', 'Egyptian General Petroleum Corporation' all returned 0 GLEIF hits; cross-checked against the FULL roster of all 333 GLEIF entities registered under jurisdiction EG (paginated) — matches on POWER/ELECTRIC/ENERGY/PETROLEUM/UTILITY/HOLDING keywords were all unrelated private-sector entities (Elsewedy Utility, EFG Hermes, Beltone, Orascom Investment Holding, etc.), none were the state utility/petroleum holding companies. Not fabricated, not substituted."}
+     {:company/legal-name "Suez Canal Authority" :company/jurisdiction "EG" :company/reason "0 GLEIF hits, included in the same EG-jurisdiction full-roster cross-check above"}}
+  :lookup-failed/ghana
+   #{{:company/legal-name "Electricity Company of Ghana (ECG) / Volta River Authority (VRA) / Ghana Grid Company (GRIDCo) / Ghana National Petroleum Corporation (GNPC)" :company/jurisdiction "GH" :company/reason "genuinely exhausted this tick: fulltext searches for all 4 legal names + 'Bulk Oil Storage and Transportation' returned 0 GLEIF hits; cross-checked against the FULL roster of all 137 GLEIF entities registered under jurisdiction GH (paginated) — only unrelated private entities matched ENERGY/POWER keywords (Ramyra Energy Ltd, Early Power Limited). Not fabricated, not substituted."}}
+  :lookup-failed/nigeria-tcn
+   #{{:company/legal-name "Transmission Company of Nigeria (TCN)" :company/jurisdiction "NG" :company/reason "genuinely exhausted this tick: fulltext searches for 'Transmission Company of Nigeria', 'Nigerian Electricity Regulatory [Commission]', 'Nigeria Electricity Supply [Industry]', 'Power Holding Company of Nigeria', 'TCN Nigeria' all returned 0 GLEIF hits. Unlike Kenya/Egypt/Ghana, a full jurisdiction-roster cross-check was not attempted for NG (Nigeria's GLEIF roster is far larger than KE/EG/GH, not enumerable in a bounded pass) — this is a narrower confirmation than the other three countries in this batch; recorded honestly with that caveat rather than claimed as exhaustive. NNPC (oil/gas, LEI 9845007375EBB04C6F49) was already acquired in iter18 as a separate, already-registered Nigerian parent entity."}}
+  :repo/created
+   #{{:company/legal-name "SONATRACH" :company/lei "213800NI74QTT3F18469" :repo/name "cloud-itonami-lei-213800ni74qtt3f18469" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-213800ni74qtt3f18469" :company/doc-type :privacy-policy :company/tos-source-url "https://sonatrach.com/en/privacy-policy-ofsonatrach/" :company/jurisdiction "DZ"}
+     {:company/legal-name "ETHIO TELECOM" :company/lei "2549003PWMAF5SDUL432" :repo/name "cloud-itonami-lei-2549003pwmaf5sdul432" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-2549003pwmaf5sdul432" :company/doc-type :privacy-policy :company/tos-source-url "https://www.ethiotelecom.et/privacy-policy/" :company/jurisdiction "ET"}}
+  :manifest/registered #{"cloud-itonami-lei-213800ni74qtt3f18469" "cloud-itonami-lei-2549003pwmaf5sdul432"}
+  :manifest/method "Isolated sibling worktree (outside the superproject root, per CLAUDE.md's parallel-agent convention: /private/tmp/.../scratchpad/root-manifest-wt, branch agent/cloud-itonami-lei-iter21-manifest off origin/main) + sparse-checkout(manifest,scripts,this progress-tracker file only) + full (non-shallow) gh-repo-clone of just the 2 new child repos into orgs/cloud-itonami/ within the worktree + `nbb scripts/gen-west-manifest.cljs --entry cloud-itonami-lei-213800ni74qtt3f18469,cloud-itonami-lei-2549003pwmaf5sdul432` (server-side GH_TOKEN-backed pin verification: both OK, new-entry + reachable-from-main) + a 10-line west.yml diff (alphabetically inserted) + a 2-string appended addition to manifest/repos.edn's :manifest.repos/extra-projects vector (matching the append-at-end precedent from iter19/commit beedaa56f86fd). `--check` reports STALE in this worktree — the SAME known-benign artifact noted in iter19 (only a handful of the ~3676 total projects are cloned in this isolated worktree, not real drift). Before creating this worktree, the superproject root was found 3 commits BEHIND origin/main (routine PR #1242 had merged since the last check earlier in this tick) and was fast-forwarded (`git merge --ff-only origin/main`) WITHOUT disturbing the unrelated uncommitted change to scripts/kotobase-ingest-cloud-itonami-lei.cljs left by the parallel ingestion-fix task (verified the incoming 3 commits touched only 90-docs/business/* files, no overlap) — that file was left untouched throughout this tick, per this tick's explicit scope boundary."
+  :contact-info-backfill/summary "Opportunistically backfilled real, site-published contact-email and/or inquiry-form-url onto 10 of the ~155 pre-existing cloud-itonami-lei-* repos (read-only discovery; no form submitted, no email sent, no account created, per the hard out-of-scope boundary). Committed directly via the GitHub Contents API (get blob sha, PUT updated blueprint.edn) to each independent repo's own main branch — no local edits to the shared west-managed orgs/cloud-itonami/ checkout were made, avoiding any conflict with other concurrent sessions."
+  :contact-info-backfill/updated
+   #{{:repo/name "cloud-itonami-lei-549300hqv672rj7rqv66" :company/legal-name "Amdocs Limited" :company/inquiry-form-url "https://www.amdocs.com/contact"}
+     {:repo/name "cloud-itonami-lei-2138009tf1syomqlbj60" :company/legal-name "The Go-Ahead Group Limited" :company/contact-email "communications@go-ahead.com"}
+     {:repo/name "cloud-itonami-lei-969500j9kg4hf67vc976" :company/legal-name "RATP Developpement" :company/contact-email "ratpdev.communication@ratpdev.com"}
+     {:repo/name "cloud-itonami-lei-254900ug5d8yst164n14" :company/legal-name "Xero Limited" :company/contact-email "ceo@xero.com" :note "escalation address, explicitly published as such on the company's own Contact page"}
+     {:repo/name "cloud-itonami-lei-52990063s23n13hu4e98" :company/legal-name "Deutsche Bahn AG" :company/contact-email "fahrkartenservice@bahn.de"}
+     {:repo/name "cloud-itonami-lei-2549005o5pva2jch6q33" :company/legal-name "ComfortDelGro Corporation Limited" :company/inquiry-form-url "https://www.comfortdelgro.com/contact/"}
+     {:repo/name "cloud-itonami-lei-96950020qiohaak9v551" :company/legal-name "Sopra Steria Group" :company/inquiry-form-url "https://www.soprasteria.com/footer/contact-us"}
+     {:repo/name "cloud-itonami-lei-213800mzgbgcjipobb41" :company/legal-name "YouGov plc" :company/contact-email "press@yougov.com"}
+     {:repo/name "cloud-itonami-lei-9695002oy2x35e9x8w87" :company/legal-name "Ipsos SA" :company/inquiry-form-url "https://www.ipsos.com/en/contact"}
+     {:repo/name "cloud-itonami-lei-7245009eaauuqj0u4t57" :company/legal-name "Randstad N.V." :company/contact-email "privacyofficer@randstad.com"}}
+  :contact-info-backfill/attempted-no-result "Also attempted (in the same 15-company sweep, all homepages reachable HTTP 200, none bot-blocked) but no static-fetchable general contact-email or contact-form markup found this pass: Endava plc (JS-rendered contact page), Keolis SA (contact page has no visible email/form in static HTML), Trenitalia S.p.A. (no dedicated contatti/scrivici link located), SBS Transit Ltd (enquiries page form appears JS-driven, no static markup), Flixbus/Flix SE (support.flixbus.com has no static email/form markup) — not fabricated, simply not found via plain HTTP fetch; candidates for a future tick or a JS-capable fetch path."
+  :iteration/next "ITERATION 22: land this worktree's branch (agent/cloud-itonami-lei-iter21-manifest) via push + server-side merge to main (no rebase/force-push), then remove the worktree and delete the local+remote branch. Check on scripts/kotobase-ingest-cloud-itonami-lei.cljs's parallel bug-fix/resume task status (separate task, not touched here) — once it's confirmed stable, re-attempt 連携統合 for the now-157 total repos including this tick's Sonatrach + Ethio telecom additions. Continue worldwide-broadening acquisition: Nigeria-TCN needs a proper full-roster GLEIF cross-check (not attempted this tick, NG roster too large for a bounded pass — consider narrower fulltext variants or a different verification strategy); Ethiopian Airlines Group (LEI 254900Y8K8COJ8AOU726, real GLEIF hit, deferred this tick) is a ready candidate for the next batch. Contact-info backfill has now covered 14 of ~157 repos total (4 from iter17/18 + 10 this tick) — continue opportunistically in future ticks, not all at once."}
+
+]
+

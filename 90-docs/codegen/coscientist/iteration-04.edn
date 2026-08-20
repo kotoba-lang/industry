@@ -1,0 +1,77 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-04"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-04.edn"
+  :doc/date "2026-08-18"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "x86-64 and AArch64 code generation"
+  :coscientist/iteration 4
+  :coscientist/subject "kotoba-lang/amu, bench/runtime-comparison/kernel_wide.kotoba"
+  :coscientist/action "change the workload rather than the compiler"
+  :coscientist/measured "9.07x LLVM on x86-64, 9.10x on AArch64"
+
+  :doc/body
+  "# Codegen co-scientist, iteration 4
+
+## The move
+
+Iteration 3 said the generator was exhausted before the domain was, and that
+every candidate in three iterations came off one disassembly of one kernel
+whose shape hides what allocation costs. This iteration changes the workload
+instead of the compiler.
+
+`kernel_wide.kotoba` is the same eight-round Lehmer step in eight independent
+lanes, all live until a final sum. The x86-64 allocator hands out four
+registers. Eight lanes do not fit in four registers.
+
+## Measure
+
+21 rotated samples per pair, every implementation answering 5224842816:
+
+| workload | ISA | amu | rustc → LLVM | ratio |
+|---|---|---:|---:|---:|
+| kernel (fits) | x86-64 | 14.9 ns | 12.4 ns | 1.20x |
+| **kernel_wide** | **x86-64** | **85.1 ns** | **9.4 ns** | **9.07x** |
+| **kernel_wide** | **AArch64** | **59.2 ns** | **6.5 ns** | **9.10x** |
+
+On `kernel_wide`, amu's x86-64 output is 671 instructions: **221 stack loads,
+166 stack stores, 80 push/pop — 70% memory traffic.** LLVM performs zero stack
+loads for the same source, because the machine has sixteen general registers.
+
+Both ISAs show the same factor. A cost that lands identically on two encoders
+is not in either encoder.
+
+## What this says about the day
+
+Four peephole passes landed today took the narrow kernel from 896 bytes to 474
+and its time from 1.81x to 1.20x. All four are correct and all four are
+measured. **And the largest remaining difference is 9x, in a place none of them
+touched, on a shape the only benchmark could not express.**
+
+The corrected cost model from iteration 3 predicted this exactly: this core
+charges for memory traffic. A four-register allocator on a workload needing more
+than four produces memory traffic and nothing else does.
+
+## Meta-review
+
+- **The benchmark was the bottleneck, not the compiler.** Three iterations of
+  candidate generation, ranking and refutation ran against a workload that
+  could not express the dominant cost. Every conclusion drawn was locally
+  correct and globally beside the point.
+- **A ratio measured on one workload is a statement about that workload.**
+  \"1.20x LLVM\" and \"9.07x LLVM\" are both true of the same compiler on the same
+  day. Neither is the compiler's number; the compiler does not have one.
+- **Ask what the benchmark cannot express before optimizing against it.** The
+  cheap version of that question: what resource does this workload not exhaust?
+  This one never needed a fifth register, and that was visible in its source
+  from the beginning.
+- The four peepholes stay. They are real and they compound with anything that
+  follows; they were simply ranked against a number that had already stopped
+  moving.
+
+## Next
+
+The allocator, and now it can be measured. Handing out more of the sixteen
+registers x86-64 has, or eight of AArch64's thirty-one, should move a number
+that is currently 9x — and unlike everything in iterations 1 through 3, there
+is now a workload that will say whether it did."}]

@@ -1,0 +1,187 @@
+[{:db/id -1
+  :adr/id "ADR-2608158000"
+  :adr/title "BMC / YC 成熟度スコアの算術を .kotoba の決定核へ — 整数 basis point 化と、それで動いた 9 個の公開値"
+  :adr/status "accepted"
+  :adr/date "2026-08-15"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :source/dataset "adr"
+  :adr/related
+  ["ADR-2608155000"
+   "ADR-2608098000"
+   "ADR-2607021700"
+   "ADR-2608052000"
+   "ADR-2607203000"
+   "ADR-2608136000"
+   "ADR-2608122000"
+   "ADR-2608650000"
+   "ADR-2607279200"]
+  :adr/repos ["com-junkawasaki/root"]
+  :adr/body
+  "## 何をしたか
+
+`70-tools/bmc/src/gftd/score.cljc` が持っていた**スコアの算術**を
+`70-tools/bmc/kotoba/score_core.kotoba`（`kotoba/pure`、capability 0）へ切り出し、
+`score.cljc` をその参照実装にし、両者の完全一致を fleet gate `root-score-core`
+（`scripts/fleet-ci/gates/score-core-check.cljs`）で毎回見るようにした。
+
+分担は ADR-2608155000（fabric actor core）/ ADR-2608098000（org-id）と同型で、
+この repo で 3 例目。**食い違ったら kernel が正しく、cljc を直す。**
+
+移したもの: `completeness` / `hypothesis` / `validation` の点の付け方、rubric 値の
+スケール、BMC・YC 複合スコアの加重平均。
+残したもの: canvas の索引・仮説の列挙・`render-table` / `render-md` / `render-datoms`・
+`dim-source`・`score-all`・allocate。**反復の順序は host、算術は kernel。**
+
+## 表現の変更 — 浮動小数から整数 basis point へ
+
+kotoba の比較・算術は i64 のみ（`<` に `:f64` を渡すと
+`expression type mismatch: expected i64, got f64` でコンパイルが落ちる。2026-08-15 実測）
+なので、閾値を持つ `completeness` は浮動小数では書けない。
+`90-docs/system-dynamics/kotoba/itonami_maturity_kernel.kotoba` と**同じスケール・
+同じ語彙**（`clamp-bp` / `ratio-bp` / 加重平均アキュムレータ）を使う:
+
+- **10000 bp = 1.0**。0–5 の次元はその最大値に対する bp（5.0 → 10000、1.5 → 3000）、
+  複合スコア（0–100 点）は 1.0 に対する bp（100 点 → 10000）。
+- 除算は `quot`（切り捨て）。端数は常に下側へ倒れる（甘い側に倒れない）。
+- **`score.cljc` も bp で計算する。** kernel だけ bp にして host が float のままだと
+  ε 無しのパリティが書けない。`:dims` / `:score` の小数は `bp->dim` / `bp->points`
+  による**表示用の派生値**で、浮動小数の計算を並置してはいない。
+
+### 複合スコアは 2 つとも「次元 bp の加重平均」ちょうどだった
+
+    BMC  100*(Σ/25)              = Σ_bp/5            = 5 次元の単純平均
+    YC   50*(Σd/30) + 50*(Σt/15) = (Σd_bp+2Σt_bp)/12 = design 重み 1・traction 重み 2 の加重平均
+
+これに気付いたので kernel に合成専用の関数を置いていない（置くと同じ判断の 2 実装に
+なる）。`acc-num` / `acc-den` / `acc-mean` の 3 本だけで、YC の「traction は 2 倍の
+重み」という rubric の文言がそのまま式になる。切り捨ても複合ごとに 1 回だけになった
+（YC を 2 項に分けて割ると切り捨てが 2 回入る）。
+
+### アキュムレータが pair でない理由（実測）
+
+maturity kernel は `pair` をアキュムレータにする。**この kernel では使えない。**
+実測 2026-08-15: `(defn acc-init [] :i64 (pair 0 0))` はコンパイルは通るが、
+コンパイル済み `:js-kotoba-v1` artifact 越しに呼ぶと戻り値の marshalling が
+**`invalid-i64` で trap** する。`pair` を関数の *中* で使う分には動く（同じ artifact の
+`(pair-first (pair 4 5))` は 4 を返す）。maturity 側の parity harness が引数ゼロの
+関数を生成して KIR インタプリタで回しているのはこのためで、あちらは host に
+ハンドルを渡していない。fleet ノードに kotoba ツールチェーンは無いので gate は
+artifact を import するしかなく、したがってアキュムレータは
+**(分子, 分母) の 2 本の i64 に平坦化**した。意味は maturity の `acc-step` /
+`acc-mean` と同一。
+
+## 挙動の変更 — 動いた公開値（隠さず全部）
+
+`nbb 70-tools/bmc/run-tests.cljs`: 移行前 49 tests / 294 assertions / 0 failures →
+移行後 49 tests / 295 assertions / 0 failures。**動いた assertion は 1 件だけ**:
+
+- `gftd.bmc-test/scoring`「yc = design 50% + traction 50%」
+  `43.33333333333333` → **`43.33`**（(40000 + 2*6000)/12 = 4333 bp）。
+  切り捨てによる期待値の移動なので期待値を更新し、`:score-bp` = 4333 の assertion を
+  1 件足した（+1 assertion はこれ）。**それ以外の理由で動いた test は無い。**
+
+`90-docs/business/maturity-scores.edn`（`gftd score md`、markdown 本文・小数第 1 位）は
+**1 バイトも変わらなかった** —— 丸めの桁が粗いので切り捨ての差が出ない。
+
+`90-docs/business/maturity-scores.datoms.edn`（`gftd score datoms`、生の数値）は
+181 entity 中 **9 個の値**が動いた。全件:
+
+| entity | was | now |
+|---|---|---|
+| `:dim nexus-x402.validation` | 1.6666666666666667 | 1.6665 |
+| `:score app-aozora` yc | 46.666666666666664 | 46.66 |
+| `:score cloud-itonami` yc | 56.666666666666664 | 56.66 |
+| `:score cloud-manimani` yc | 43.333333333333336 | 43.33 |
+| `:score cloud-murakumo` yc | 51.66666666666667 | 51.66 |
+| `:score club-shinshi` yc | 68.33333333333333 | 68.33 |
+| `:score net-kotobase` yc | 63.333333333333336 | 63.33 |
+| `:score network-isekai` yc | 49.99999999999999 | **50** |
+| `:score nexus-x402` bmc | 70.66666666666666 | **70.66** / yc 39.99999999999999 → **40** |
+
+最大の移動は 0.0067 点。**2 件は上へ動いている**（49.99999999999999 → 50、
+39.99999999999999 → 40）—— これは切り捨てではなく、浮動小数の誤差が消えた分である。
+順位は 1 つも入れ替わっていない。
+
+これは意図した挙動変更であり、**float を残して回避しない**。回避すれば
+「どこまでズレてよいか」を誰かが決めることになり、その判断が検査から漏れる。
+
+## gate — `root-score-core`
+
+`scripts/fleet-ci/gates/score-core-check.cljs`。ノードに kotoba ツールチェーンは
+無い（配られるのは repo の tree だけで `orgs/` の amu は入らない）ので、
+コンパイル済み `.mjs` を配って import する。4 つ見る:
+
+1. **artifact ↔ source** — `.mjs` の `sourceDigest` == `.kotoba` の sha256
+2. **purity** — `requiredCapabilities` が空。**読めなかったとき（re-find が nil）を
+   「空」と読まない**
+3. **parity** — case 表 390 件で kernel == cljc。ε は無い
+4. **evidence floor** — `--min` 未満なら fail（`when (seq …)` の中に入れない）
+
+### 床が 1 つでは足りなかった（実測して直した）
+
+3 通りの壊し方で赤を出す作業中、**「case 表の入力源を縮める」だけが緑のまま
+通り抜けた**: `status-inputs` を 13 件から 1 件に削っても 378 件が残り、床 300 を
+上回って exit 0 になった。総数の床は「絞り込みが壊れて 0 件」は捕まえるが、
+**1 種別だけ骨抜き**は捕まえない —— 他の種別が総数を支えてしまう。
+
+そこで種別ごとの床（`case-floors`）と、**rubric が名指しする status の綴りを全部
+踏むこと**（`required-statuses` + 未知の綴りが 1 件以上あること）を別に見るように
+した。後者は件数ではなく「kernel が答えを持つ入力の集合」そのもので、1 つでも
+踏まれていなければその分岐は誰も見ていない。
+
+### 実際に見た赤（壊したものと報告されたものが一致することを確認済み）
+
+| 壊し方 | 報告 | exit |
+|---|---|---|
+| cljc の `status-bp \"refuted\"` を 4000 → 4001 | `FAIL status-bp [\"refuted\"] — kernel says \"4000\" but cljc says \"4001\"`（1 件だけ） | 1 |
+| `.kotoba` の `traction-weight` を 2 → 3 にして再コンパイルしない | `artifact<->source: BROKEN` + sha256 の両方を印字 | 1 |
+| `status-inputs` を 13 → 1 件に縮める | 種別の床・欠けた 5 綴り・未知綴りゼロ、の 3 件を名指し | 1 |
+
+無改変で `ran 390 cases, 0 failing` / exit 0。
+
+### `:include-ext` に `.cljs` が要る（実測）
+
+`.kotoba .mjs .cljc .edn` だけで絞った tree では gate が
+`could not run … Could not find namespace: scripts.nbb-compat` で赤になる ——
+`gftd.canvas` が cljs 側で `scripts.nbb-compat` を require し、その実体
+`scripts/nbb_compat.cljs` が配られないため。`.cljs` を足した tree（3,248 files / 80 MB）
+では `ran 390 cases, 0 failing`。**「ローカルで緑」は「fleet で緑」ではない**の実例が
+もう 1 つ増えた形で、これは絞り込みを当ててから回して初めて見えた。
+
+（この検証自体でも 1 つ踏んだ: 絞り込み tree を作る script が `git ls-files` の
+stdout を丸ごと受けて**黙って途中で切れ**、3,248 件中 2,978 件しか届かず
+`scripts/` が丸ごと欠けていた。つまり最初の「.cljs を足しても赤」という観測は
+偽で、pathspec を git に渡して測り直した。この repo は 232,883 files を追跡している。）
+
+## qwen（murakumo fleet）に何を書かせたか — 正直な内訳
+
+オーナー指示に従い `scripts/murakumo-codegen.cljs` 経由で
+`api.murakumo.cloud`（`murakumo-main` alias → qwen-agentworld-35b-a3b）に下書きを
+出させた。実効 7.8 tok/s。**採用できたのは 1 関数だけ**:
+
+- 採用: `status-bp` の case 表（6 綴り + fallback の入れ子 `if`）。正しく出た。
+- 不採用: `clamp-bp` を **2 引数で呼ぶ** `ratio-bp`（arity 違反）/ 使うなと言った
+  `let` を使い、平均の判定を `items*2 < blocks*9` と誤った `completeness-bp` /
+  bp スケールを最後に 10000 で割って捨てる cljc 版 `completeness-bp` /
+  2500 で割る `bmc-bp` / 切り捨てを 2 回入れる `yc-bp`。
+- 3,000 token の job は HTTP 524（timeout）で 1 件落ちた。1,000 token に割って再投。
+
+**bp 算術・アキュムレータの平坦化・複合が加重平均に一致するという代数・
+`score.cljc` の書き換え・gate はすべて人（この agent）が書いた。**
+qwen の出力は「もっともらしいが違う」形で出るので、compiler と parity gate が
+唯一の審判である。
+
+## 残した gap
+
+- **未記録の facts は今も 0 点として分母に入る。** `score-product` は
+  `(get f k 0)` を読み、`render-datoms` が `:dim/recorded?` でそれを申告している。
+  アキュムレータは「踏んだ次元だけ分母に入る」形なので**混ぜないことは書ける**が、
+  この移行で挙動は変えていない（変えるなら別の決定として、ADR-2607203000 の
+  「測っていない次元を 0 として混ぜない」を根拠に）。
+- **`:dim/value-bp` / `:score/*-bp` を投影に載せていない。** 公開されている数値は
+  依然として小数で、整数の bp は `score-product` の戻り値の中だけにある。
+  監査可能性は bp の方が高いので、`manifest/schema.edn` の再生成とセットで
+  後続にする。
+- **native backend では未検証。** kernel は word 型だけで書いてあるが、
+  `:native-aot` で回してはいない。"}]

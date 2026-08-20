@@ -1,0 +1,140 @@
+[{:db/id -1
+  :doc/id "revenue-agent-loop-run-0036-gleif-owner-dogfood-and-nexus-catalog"
+  :doc/doc_type "revenue-agent-loop-run"
+  :doc/title "Run 0036 — owner-authorized $0.001 GLEIF fulfill (dogfood) and nexus catalog; not external revenue"
+  :doc/path "90-docs/business/revenue-agent-loop/runs/0036-gleif-owner-dogfood-and-nexus-catalog.edn"
+  :doc/run_number 36
+  :doc/status "completed"
+  :doc/date "2026-08-14"
+  :doc/source "revenue-agent-loop RUN-TEMPLATE (ADR-2607246100)"
+  :doc/body "# Run 0036 — owner-authorized $0.001 GLEIF fulfill (dogfood) and nexus catalog
+
+**Status:** completed — owner dogfood 200 + company/edges; gleif on live x402.nexus catalog; external payments remain 0
+**Started / ended:** 2026-08-14
+**Owner:** agent (owner authorized the $0.001 send)
+**Mode:** cash-first
+**Prior run:** 0035 (Base Safe custody remeasure; catalog deferred; do not pay)
+
+## Hypothesis
+
+If the live 402 scheme matches what `x402.nexus` `/settle` actually verifies (`transaction` + `txHash`, not EIP-3009 `exact`), then one owner-authorized 1000-micro USDC transfer on Base can fulfill `GET /v1/lei/:lei` with 200 + legal-name + edges, and only then may gleif appear in the nexus catalog. The transfer is dogfood. It is not a non-owner payment and does not raise demand priors.
+
+## Capital governor
+
+| Field | Value/evidence |
+|---|---|
+| Current tranche | T1 |
+| Released / committed / spent | ¥300,000 / ¥0 / ¥0 |
+| This run cash-at-risk ceiling | owner dogfood $0.001 USDC + Base gas; not acquisition |
+| Paid acquisition allowed? | no |
+
+Missing financial inputs are `unknown`, not zero.
+
+| Unit economics | Hypothesis before | Observed after |
+|---|---|---|
+| Collected revenue | 0 | 0 (dogfood excluded) |
+| Refunds + payment fees | 0 | 0 |
+| Variable delivery cost | 0 | 0 |
+| Contribution | 0 | 0 |
+| Attributable acquisition spend | 0 | 0 |
+| New paying customers | 0 | 0 |
+| CAC | unknown | unknown |
+| Monthly contribution | 0 | 0 |
+| Payback months | unknown | unknown |
+| Founder hours / shadow rate | ~3 h / unknown | ~3 h / unknown |
+| Capital efficiency | unknown | unknown |
+
+## Before
+
+| Funnel stage | Count/value | Evidence |
+|---|---|---|
+| Verified external payments | 0 | run 0035 |
+| Revenue / gross profit | 0 | |
+| Live 402 on present LEI | yes | workers.dev; scheme was `exact` until this run |
+| Live 404 on missing LEI | yes | including with X-PAYMENT |
+| Fulfilled paid LEI read | no | funds floor; 0035 forbade send |
+| Nexus catalog gleif | absent | SELLERS_KV + SELLERS_JSON |
+
+## Score before (this action)
+
+| Axis | 0–5 | Reason |
+|---|---:|---|
+| P(payment ≤30d) | 1 | no non-owner buyer observed |
+| Speed to evidence | 5 | live 402; owner authorized the micro-send |
+| Existing external demand | 1 | none measured for LEI lookup |
+| Payment readiness | 4 | 402 live; query fulfill unproven; advertised scheme was `exact` |
+| 12m expected gross profit | 2 | micropay, volume unknown |
+| Repeat likelihood | 3 | lookup is naturally repeat |
+| Gross margin | 5 | already-computed projection |
+| Learning value | 5 | whether settle+fulfill work on this listing |
+| Spillover | 5 | same family payTo / transaction scheme as other sellers |
+| Evidence confidence | 4 | Base custody same-day; demand still unknown |
+
+**Total:** 57/100 (run 0035 after)
+
+Hard gate yellow: owner authorized this one send. Counsel still forbids paid solicitation. Self-purchase is not external evidence.
+
+## Hard gates
+
+- [x] safety/content/consent/region — CC0 identity only; no officers/UBO
+- [x] payment verification and fulfillment — on-chain Transfer to family payTo; nexus settle; 200 + X-PAYMENT-RESPONSE; missing LEI still 404
+- [x] honest product/entitlement — joined tier; 402 advertised `transaction` before the send
+- [x] applicable legal/refund/operator boundary — no outreach; dogfood labelled dogfood
+- [x] secret/treasury/privacy — Worker holds no keys; new payer EOA is not a treasury; family payTo unchanged; key never on argv
+
+**Gate:** yellow with scope
+**Scope restriction:** one owner-authorized 1000-micro transfer + catalog after 200. Do not solicit. Do not claim 3.4M. Do not count this payment as external revenue. Do not invent a second treasury.
+
+## One selected action
+
+WIP=1: (1) land live 402 `scheme: transaction` so `/settle` can verify a USDC `txHash`; (2) send 1000 USDC micros on Base from payer `0xb201E44B2317aFFd4c2C20aa15a636cC35e8dd19` to family payTo; (3) `GET /v1/lei/01ERPZV3DOLNXY2MLB90` with X-PAYMENT; (4) if 200, upsert gleif into live `SELLERS_KV` registry (ADR-0001 primary path; not a wrangler bytecode deploy).
+
+Not selected: non-owner buyer (none); itonami outreach (counsel gate); SELLERS_JSON bootstrap rewrite + nexus Worker redeploy (live catalog is KV; JSON remains the shinshi fallback).
+
+## Success / continue / stop
+
+- Success: 200 + legal-name + parents/children + X-PAYMENT-RESPONSE; catalog lists gleif GET `/v1/lei/` at $0.001 to family payTo.
+- Continue: wait for a non-owner paid read. Do not solicit.
+- Stop: if fulfill required claiming universe coverage or billing a miss.
+- Timebox: 14 days or 20 person-hours, whichever comes first.
+
+## Result
+
+**Person-hours:** ~3
+**External evidence:**
+
+- Live 402 before pay: `scheme` `transaction`, `payTo` family Safe, `maxAmountRequired` `1000`
+- Scheme fix (required; `exact` would have wasted the USDC): gleif main `3d55c54fcda9c58ddc3bae31a51ccd5a59d829f0`; west pin `7e1d42a4faa26625ff74aa08d012040b7dc10b36`; Worker `036fa916-a9e8-4195-bb5b-6cd387a19ff6`
+- Base tx `0x70ed18103c7f96813ca5315f4c309a9be4d03ab0cafeb2239ecc8e4d70704cfa` status `0x1`; Transfer 1000 micros USDC from `0xb201…dd19` to `0xA00366…D4E`; ≥3 confirmations (measured 20)
+- `GET /v1/lei/01ERPZV3DOLNXY2MLB90` with X-PAYMENT: **200**; legal-name Libertyville Bank & Trust Company, National Association; parents include `Q774KI4AW80FHFW33O61`; `X-PAYMENT-RESPONSE` success/base/same tx / payer `0xb201…`
+- Payer USDC after send: 0. Family payTo unchanged as treasury.
+- Nexus catalog: `GET https://x402.nexus/catalog` count 7; gleif GET `/v1/lei/` usd 0.001 payTo family Safe; gateway `https://x402.nexus/gateway/gleif/v1/lei/…`
+- Registry write: `SELLERS_KV` key `registry` (binding id `8817c62a9fe94f2798acf492c360e233`). `SELLERS_JSON` bootstrap not rewritten. No nexus Worker redeploy.
+- Apex: https://gleif-lei-datasource.04-feasts-minded.workers.dev
+
+| Funnel stage | Before | After | Delta |
+|---|---|---|---|
+| Verified external payments | 0 | 0 | 0 |
+| Revenue / gross profit | 0 | 0 | 0 |
+| Owner dogfood paid LEI read | no | yes (200) | rail |
+| Nexus catalog gleif | absent | present | discovery |
+| Live 402 scheme | exact (unsettleable) | transaction | honesty |
+
+Self-purchase / internal dogfood / test payment are not external demand. Tranche does not move.
+
+## Score after
+
+P(payment) 1 — unchanged; the payer was the owner. Demand 1 — unchanged. Payment readiness 4 → 5 because a real Base transfer settled and the Worker returned company+edges. Evidence confidence 4 — rail is measured; buyers are not. **Total:** 59/100.
+
+The +2 is payment-path completeness, not booked revenue.
+
+## Decision
+
+`continue`
+
+Reason: the listing can fulfill. Next single action is a non-owner paid read on the same path, or stop spending time if none appears. Do not solicit cloud-itonami tenants. Do not claim 3.4M. Do not treat this $0.001 as T2 evidence.
+
+**Tranche verdict:** `hold`
+
+No non-owner receipt. No T2 release.
+"}]

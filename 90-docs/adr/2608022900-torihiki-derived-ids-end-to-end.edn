@@ -1,0 +1,71 @@
+[{:db/id -1
+  :adr/id "adr-2608022900-torihiki-derived-ids-end-to-end"
+  :adr/title "adr-2608022900: 導出 id を live まで通す — engine・node・browser の 3 者が 1 つの導出に合意する"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "torihiki-derived-ids-end-to-end"
+  :adr/authoritative-for
+  ["torihiki.address の導出規則（正本）"
+   "deploy 済み node / terminal の account id 規則"]
+  :adr/related ["adr-2608022800-torihiki-a-key-may-only-claim-its-own-id"]
+  :adr/evidence
+  ["https://torihiki.pages.dev"
+   "https://torihiki-node.04-feasts-minded.workers.dev/head"]
+  :adr/body
+  "# ADR-2608022900: 導出 id を live まで通す
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+ADR-2608022800 で `torihiki.auth` は「鍵は自分から導出された id しか主張できない」規則を持ったが、**導出そのものは注入で、deploy 済みの node と terminal はどちらも旧来の first-use のままだった。** 直したのが engine だけなら、直っていない。
+
+## Decision
+
+### 1. `torihiki.address` が唯一の導出
+
+engine・node・browser の**3 者が合意しなければならないので、実装は 1 つ**にする。**browser が自分のアドレスを計算し、chain が別のものを計算する**のは「**見せられている account に対して署名できない利用者**」であり、症状は「account を名指しした拒否」——**権限の問題に見えて算術の問題**である。
+
+**test は既知の鍵 2 本を既知の id 2 つに pin する**: 導出が drift すれば誰かが締め出され、**他に気づくものが無い。**
+
+### 2. node は `:derive-account` を渡す（`code-version 8`）
+
+`/head` が `account-ids: derived from the key (torihiki.address)` と言う —— **黙っていればもう一方だと仮定される。**
+
+### 3. terminal は歩くのをやめる
+
+id は鍵から導出されるので、**node に何も訊く前に分かっている。**
+
+**保存済み id があればそれが勝つ**: 導出以前の session は歩いて id に辿り着き**その id に鍵を束縛済み**で、束縛は不変。導出 id を見せると**空の account を見せ、残高を「まだ署名できる鍵」の裏に置き去りにする。**
+
+## 実測（実ブラウザ、deploy 済み）
+
+```
+scripts: [\"https://torihiki.pages.dev/js/app.js\"]
+status: live · block 37 | account: 20412066049928 | nonce: 1
+FAUCET -> accepted at block 38     collateral $100,000.00  nonce 2
+BUY    -> accepted at block 39     nonce 3
+VERIFY: pass
+```
+
+**1 回目の verify は失敗した** —— `account: 568865726`（旧 seed 形式の 9 桁）で `not-your-account` に拒否された。**CDN が旧 bundle をまだ配っていた。** `script/verify.cljs` がそれを捕まえた。**deploy 直後の検証は伝播レースを踏む** —— 今回で 2 度目なので、**pass するまで再実行する**運用として記録する。
+
+## Consequences
+
+- (+) 導出 id が **live で end-to-end** に動く。engine だけでなく deploy 済みの経路。
+- (+) 導出の実装が 1 つで、pin された test がある。
+- (−) **既存 account は first-use で束縛済み**のまま（設計どおり不変）。それらの id は導出値ではないので、**「id を見れば所有鍵が分かる」性質は新規 account にしか無い。**
+- (−) **衝突は残る**（数千万 account 規模、拒否されるので silent ではない）。
+- (−) `torihiki-node` は依然として単一 sequencer。**4 replica は 1 プロセス内の harness で deploy されていない。**
+- (−) 証拠は保持されるが slash されない。証拠は伝播しない。
+
+torihiki 148 tests / 440 assertions、state root は JVM/nbb で不変。
+"}]

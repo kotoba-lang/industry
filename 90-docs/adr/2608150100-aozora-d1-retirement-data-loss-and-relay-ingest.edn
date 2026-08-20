@@ -1,0 +1,201 @@
+[{:db/id -1
+  :adr/id "ADR-2608150100"
+  :adr/title "aozora の D1 撤去で失われたもの、R2 backed への現在地、bsky relay 取り込みの再有効化"
+  :adr/status "accepted"
+  :adr/date "2026-08-15"
+  :adr/supersedes []
+  :adr/body
+  "## なぜこれを書くか
+
+> **2026-08-16, 訂正**: この ADR の `:adr/supersedes` は
+> 「ADR-2607022330 add.3（relay ingest 無効化）の無効化部分のみ」と書いていたが、
+> **ADR-2607022330 に add.3 は無い**。あれは passkey-PRF バックアップ /
+> QR デバイスリンク / リカバリーフレーズの ADR で、relay も ingest も bsky も
+> 一度も出てこない —— `.edn` 6 commit と削除済み `.md` 8 commit の全履歴を
+> `git log -S` で見ても `relay` と `add.3` はどちらも一度も現れない。
+> 出典は ADR ではなく `app-aozora/40-engine/cljs/pds/wrangler.jsonc:68` の
+> `// relay ingest DISABLED (ADR-2607022330 add.3)` という**コメントの誤引用**で、
+> 本 ADR がそれをそのまま持ち込んだ。したがって本 ADR が supersede する ADR は
+> 無い（`[]` に訂正）。無効化したのはそのコード側の規則であって、経緯は下の本文が
+> 全部持っている。**コメント側の誤引用は子リポにあり未修正。**
+
+2026-08-14〜15 の 1 セッションで、aozora の永続面が D1 から R2 backed
+kotobase へ移り、その過程で **aozora のデータが運ばれないまま旧 D1 が
+削除された**。並行セッションと同じ対象を同時に触ったため、経緯が
+commit 単体からは読めない。ここに現在地を固定する。
+
+## 何が起きたか（時系列、実測のみ）
+
+1. `kotobase-storage-d1.aozora.app` の裏 D1 `kotobase-d1-verification` が
+   **10 GB 上限**に張り付き、書き込みが全部失敗。worker はそれを
+   `{\"ok\":false,\"error\":\"InternalError\"}` に潰していたが、tail の本文は
+   `D1_ERROR: Exceeded maximum DB size` と言っていた。
+   論理データは 1 GB 未満（blocks 207.9 MB / datom 37.7 万行）で、
+   残りは削除済み行の空きページ（last_row_id 2,773 万に対し実行数 40 万）。
+
+2. 並行セッションが `KOTOBASE_URL` を `kotobase.net` に切り替え
+   （commit 3 ファイル、**データ移行なし**）、旧 D1 を削除した。
+   `pds/wrangler.jsonc` には `The D1 database is retained read-only for
+   export/rollback evidence` と書かれたが、Cloudflare の逐語は
+   `D1 database 6f42fbb0-… has been deleted`。
+   前回 2607270400 の cutover が `migrated verbatim … verified by exact
+   datom count match` と明記していたのに対し、今回それに相当する記述は無い。
+
+3. その後 D1 は account 全体で **38 → 29** に減少（`aozora-pds` /
+   `kotobase-heads-production` / `kotobase-heads-testnet` 等）。
+
+4. **オーナー判断（2026-08-15）: 失われた中身はほぼテストデータであり、
+   dump / 復元は不要。** よって `yoro-social-v2` の復旧は追わない。
+
+## 退避してあるもの
+
+削除直前の D1 から canonical 面を R2 へ退避済み:
+`kotobase-storage-r2` の `kotobase/blocks/<cid>` に **blocks 18,506**
+（旧 D1 と同数）、`kotobase/refs/<name>` に **refs 144**。
+engine が実 datom を歩けることを実測済み（actor repo で verdict READABLE、
+`yoro-social-v2` の head は削除前に記録した rev2836 の CID と一致）。
+テストデータ主体と判明した今、価値は evidence であって復旧材料ではない。
+
+## 現在の永続面（実測）
+
+```
+PDS ─ KOTOBASE_URL=kotobase.net ─→ kotobase-graph-database (kotobase-cf-wasm)
+                                     └─ binding は R2 のみ
+                                        kotobase-graph-database-production
+                                        756,530 objects / 72.5 GB
+                                     └─ physical-index/prolly-peer/v1
+```
+PDS worker / graph-database worker とも **D1 binding は無い**。
+唯一 D1 に依っていた `fold` は `503 Unauthorized` で失敗し続けている（未解決）。
+
+## keyed read は engine の性質で決まる（測定）
+
+同じ 1,626 datom のグラフに対して:
+
+| | |
+|---|---|
+| kotobase-peer engine + R2（keyed read） | グラフ全体を hydrate。**19.7 秒**。大きい graph は Worker の CPU 上限超過 |
+| prolly engine（keyed read） | **block GET 3 本** / 1.9〜2.3 秒 |
+| prolly engine（全走査） | block GET 9 本 |
+
+miniflare の予測（3 / 11）が実 R2・実データでそのまま出た
+（`kotobase-storage-s3@5a45f01` に計器を landed）。
+**projection という別 store は、keyed read が本当に keyed なら要らない。**
+kotobase.net はこの prolly 索引を最初から持っており、独自に建てた
+D1-free worker（`kotobase-r2.aozora.app`）はその再実装だった。
+
+## bsky relay 取り込みを再有効化した
+
+無効だった理由（ADR-2607022330 add.3）は
+`it pulled the global bsky jetstream firehose into the SHARED yoro-social
+operator db` —— **取り込みではなく行き先**が問題だった。
+`per-actor?` は write-routes 限定なので relay は素通りで `YORO_DB_NAME`
+（共有 AppView 索引そのもの）に落ちていた。
+
+router に route 単位の `:db-env` を足し、relay の 2 route を
+`RELAY_DB = relay-bsky` に隔離（`CREATOR_TICK_DB` と同じ形）。
+既定値は `relay-bsky` で、**`YORO_DB_NAME` にフォールバックしない** ——
+設定漏れが元の肥大に戻る経路を作らないため。
+
+実測: `{\"relay\":{\"ok\":true,\"source\":\"jetstream:app.bsky\",
+\"events\":100,\"entities\":201,\"cursor\":1786763406045649}}`、
+次 tick で cursor が 1786763406287184 へ前進（= checkpoint が R2 backed
+store に永続し読み戻されている）。共有索引への外部 DID 混入は 0 件。
+
+## importGraph（app.aozora.admin.importGraph）
+
+operator の署名鍵は Cloudflare secret の中にしか無く読み戻せないので、
+書き戻しは鍵が在る場所＝PDS の中で行う口を作った。認証は
+`GRAPH_IMPORT_TOKEN` の bearer 一致のみで **未設定なら誰も通さない**
+（単体 6/6、本番で 403 実測）。既存の `relay-ingest-authorized?` は
+`(nil? required)` を true とし router の cond 順序に依存して安全が成立して
+いるが、これは真似ていない。
+
+**未解決の 2 点:**
+- `mode retract` は engine が `Doesn't support name: ` で 502。
+  **この口で入れたものをこの口で取り消せない。**
+- `kotobase-client` は書き込みを常に `kotobase/db/<operator-did>/<db-name>`
+  に束ねるので **per-actor graph には書けない**。復元できるのは
+  operator 所有の graph だけ。
+- 実際に踏んだ: `db` に repo を指定して別 actor の firehose 台帳 1,626 件を
+  operator の `repo` graph に入れ、**取り消せていない**（不活性: firehose は
+  `yoro-social-v2` を読み、collections は `:atproto.record/*` を見る）。
+
+## 併せて直したもの
+
+- `kotobase-client` が **User-Agent を一度も設定していなかった**。
+  Workers の fetch は既定で付けないため上流に空で届き、PDS の datoms が
+  `429 empty User-Agent datoms traffic is rate limited` で絞られ、
+  describeRepo が 502 になっていた。3 経路すべてに付与。
+- `app-aozora-appview` の release build が `jp-go-dds.core` 不在で落ちており、
+  **画像同期を含む deploy 全体が止まっていた**。canvaskit と同じ形で git dep を追加。
+
+## 2026-08-15 close: relay-bsky を Aozora の read 面へ接続した
+
+上記 3 の実装を完了した。AppView の discover feed だけを
+`DISCOVER_DB_NAME=relay-bsky` に向け、既存の YORO route は
+`YORO_DB_NAME=yoro-social-v2` のまま維持した。AppView は generic な
+`at://.../app.bsky.feed.post/...` も投稿として materialize する。
+
+公開 read は server-side proxy を通さない。browser の
+`kotobase-client` が `https://kotobase.net` を直接 query し、gateway は次の
+**1 graph × 2 operation の完全一致 allowlist** だけを匿名許可する。
+
+```
+owner = did:key:z6MkvXVYfX3duzGkqW2YPRfXJpDDLmbaLN3jHuPphXCoMWFH
+graph = bafyreieq24o5wxv4lpcczopcs7xhngntyxv2qahv3leo7bqdeurrfk5k5q
+ops   = datomic.datoms, datomic.view
+```
+
+未登録 graph は 401、匿名 `datomic.transact` も 401。公開 graph の
+anonymous read と、browser が所有 seed から mint する read 限定 CACAO は
+別の境界である。後者は audience / graph / `datom:read` / 5 分 expiry を固定し、
+`x-kotoba-did` とともに直接送る。`atproto.kotobase.net` も browser origin から
+使える CORS preflight を返す。
+
+missing view の fallback が `scan-yoro` 自身へ再帰していたため、初回 query が
+止まる不具合も修正した。fallback は `scan-eavt-full` を直接呼ぶ。空 feed cache は
+削除し、cache generation を `relay-bsky-v1` に進め、旧空値が再利用されないようにした。
+
+本番実測:
+
+- 公開 graph: HTTP 200、14,043 datom、`:yoro.post/uri` 150 件
+- discover feed `limit=30`: cold 17.785 秒 / 30 件、その後 cache hit 0.1245 秒
+- `aozora.app`: HTTP 200、同 feed は最終確認 0.219 秒 / 30 件
+- CORS preflight: 204 / `Access-Control-Allow-Origin: *`
+- allowlist 外 graph と匿名 write: ともに 401
+
+本番 version は gateway `f3bac6f5-22a7-4048-880c-f0c43bd85565`、graph database
+`c34b121a-6ba2-4855-96dd-2f2237187434`、atproto
+`b5bcbf2f-c0c3-488c-9767-bed55543263f`、AppView
+`a8047116-2436-4a55-b4ef-727039f305b0`、SPA
+`2e00ebe2-0ab1-4fd9-980e-eee99434d97e`。
+
+## 残る境界
+
+private read の CACAO は現在 **graph owner の自己発行**だけを受ける。
+別主体へ共有する private graph の read delegation / operator-signed grant は
+未実装であり、実装済みと扱わない。
+
+また次は未解決のまま:
+
+1. `fold` の 503（D1 削除と整合。別系統）
+2. retract が通らない原因を engine 側で見る —— **直すまで importGraph で
+   本番 graph に入れない**（入れて戻せない状態を増やす）"
+
+  :adr/evidence
+  "app-aozora-engine@382af99（relay 隔離 + main のビルド修正）/
+   app-aozora-engine@4f84a22, 0538ba1（importGraph）/
+   app-aozora-engine@0dad8fd（データ不在の記録）/
+   app-aozora-appview@02c81a0（生成物の再生成）/
+   app-aozora-appview@c94b9d3（jp-go-dds 依存）/
+   kotobase-client@e5acb13（User-Agent）/
+   kotobase-storage-s3@5a45f01（keyed read の計器）/
+   loop-ka-production@c91dc1d, 07209f2（shiropico の :ffmpeg 除去ほか）/
+   control-plane@e9bf207（公開 graph allowlist）/
+   app-aozora-appview@fa1d389（relay-bsky discover read）/
+   kotobase-client@7a9d27a（browser read CACAO）/
+   app-aozora-engine@684761c（direct query / cache generation / fallback 修正）/
+   root@ee4733f（west pin）/ root@ba0780f（genpon reconcile）。
+   検証: gateway 424 tests / 2,059 assertions、graph 362 / 1,120、
+   SPA 283 / 910、client 71 / 219、AppView release build 0 warnings。"}]

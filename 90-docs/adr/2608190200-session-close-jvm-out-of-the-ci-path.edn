@@ -1,0 +1,155 @@
+[{:db/id -1
+  :adr/id "ADR-2608190200"
+  :adr/doc_type "adr"
+  :adr/status "accepted"
+  :adr/date "2026-08-19"
+  :source/dataset "adr"
+  :adr/topic "runtime-priority"
+  :adr/title "ADR-2608190200: Session close — CI 経路から JVM を外した分と、外さなかった分の理由"
+  :adr/authoritative_for
+  ["which gates moved from :jvm-test to :nbb-test on 2026-08-19, and which did not"
+   "the two nbb/SCI defect classes and how narrow they actually are"
+   "the resume point for the remaining JVM gates"]
+  :adr/related
+  ["ADR-2608190100"
+   "adr-2608180200-session-close-jvm-dependency-audit"
+   "2608180200-biscuit-as-delegation-center"
+   "2608136000-five-questions"]
+  :adr/body
+"# ADR-2608190200 — session close
+
+**Status**: accepted / **Date**: 2026-08-19
+
+会話履歴なしで再開できる粒度の引継ぎ。起点はオーナー指示
+「jvm じゃなくて kotoba, cljscript でやってほしい」と、その後の `kaizen`。
+
+## 着地したもの（すべて default branch 上で確認済み）
+
+| repo | commit | 内容 |
+|---|---|---|
+| kotoba-lang/kotobase-server | `15d44fc` | nbb 移行と、nbb だけが見える 3 欠陥の修正 |
+| kotoba-lang/tana | `09eb0e7` | pin 検査が classpath を読むようになった |
+| kotoba-lang/kotobase-peer | `722fc00` | async 腕の試験追加 + 同型 2 欠陥の修正 |
+| com-junkawasaki/root | `cb639df` | kotobase-server gate を `:nbb-test` へ |
+| com-junkawasaki/root | `290496e` | ADR-2608190100 |
+| com-junkawasaki/root | `2ada492` | receipt が件数を持つ + psa/worklaw/shohyo 移行 |
+| com-junkawasaki/root | `4251aaa` | detector `verify-silent-js-callbacks` 登録 + ADR 訂正 |
+| com-junkawasaki/root | `2af9a68` | kotobase-peer pin 前進 |
+
+west pin は 4 件とも landed commit と一致（kotobase-server 15d44fc / tana 09eb0e7 /
+kotobase-peer 722fc00 / authority 232eef9）。
+
+## 検証（fleet 実測。ノードと件数）
+
+| gate | JVM/shadow | nbb |
+|---|---|---|
+| kotobase-server | 154 / 578 | 154 / 578 |
+| tana | 39 / 1105 | 39 / 1105 |
+| macaroon | 18 / 39 | 18 / 39 |
+| authority | 37 / 122 | 37 / 122 |
+| org-biscuitsec | 71 / 172 | 71 / 172（兄弟在り）/ 161（ノード、drift 検査が SKIPPED） |
+| psa | 62 / 159 | 62 / 159 |
+| worklaw | 42 / 194 | 42 / 194 |
+| shohyo | 104 / 536 | 104 / 536 |
+
+kotobase-peer は gate を持たない（手元 nbb で 222 / 682、修正前 221 / 680）。
+
+## 移さなかったもの — 理由は「できない」ではない
+
+`:jvm-test` は 81 本残る。同じ試験を通した 15 本のうち **移したのは 3 本だけ**:
+
+- **11 本は既に `nbb-cross-runtime-*` gate を持つ。** そこでの `:jvm-test` は
+  *もう一方の runtime* であって旧世代ではない。反転すれば nbb 2 本・JVM 0 本になり、
+  **新しい検査は増えないまま parity harness が重複に変わる。しかも全 gate は緑のまま。**
+  この workspace が繰り返し見つける「何も赤くならないから進歩に見える変更」。
+- **nekko は portable runner が意図的な部分集合**（49/84）。chain を歩く namespace は
+  `ipld.core/Link` の deftype を SCI が読めず、別の ClojureScript runner が担当する。
+  移せば 35 tests が黙って消えた。その補集合は今日 **JVM ホストの cljs コンパイラを要する**
+  （cljs.main）ので、nekko を完全に JVM から外す道は現時点で無い。
+
+## 2 つの欠陥クラス（詳細は ADR-2608190100）
+
+1. **nbb/SCI は async 境界を越えた throw を包む** —— `ex-data` を 1 段だけ読む classifier は
+   marker を見失う。kotobase-server で 2 箇所、kotobase-peer の試験で 1 箇所。
+2. **letfn の名前が兄弟束縛の中から JS コールバックへ渡ると呼ばれない** ——
+   ⚠ **最初この主張は広すぎた。** 4 方向の実測で、壊れるのは「複数束縛 × 兄弟の中から」
+   だけと判明（単一束縛・letfn 本体から・直接呼び出しは動く）。広い方のままなら
+   `kotobase-peer` の本番 `hydrate-db` を「直し」に行っていた（実測では正しく db を組む）。
+
+## detector の 13 件は全部閉じた（2026-08-19、closing 後の続き）
+
+**`verify-silent-js-callbacks` は 0 findings。** 直す前に「なぜ 6 複製が在るのか」を
+問うたのが効いた —— **6 複製の実体は 3 repo・4 ファイル**だった。
+`net-kotobase/control-plane` と `network-awai/net-kotobase` は**同じ GitHub repo**
+（id 1258823862、org 改名によるリダイレクト）の二重 checkout で、後者は west 未登録・
+324 commit 遅れ。**上流で既に直っている「幽霊」を 3 件報告していた。**
+
+| repo | commit | 修正前（nbb 実測） | 修正後 |
+|---|---|---|---|
+| kotobase-protocols-worker | `685b102` | async miss が retry されない | RETRIED |
+| kotobase-worker-shell | `acbfa89` | 同上 | RETRIED |
+| net-kotobase/control-plane（r2 ×2） | `2677b75` | 同上 | RETRIED |
+| kotobase-engine | `54ff90b` | 同上 | RETRIED |
+| net-kotobase/control-plane（worker.cljs） | `69b6a73` | **書き込みを実行せず pending claim を応答として返す** | ok/commit を返す |
+| network-awai/net-babiniku | `bf4311f` | `.then json!` が発火せず生 Response が下流へ | detector 0 件 |
+
+west pin は 5 件とも main tip と一致。
+
+**いちばん重い挙動は control-plane の冪等書き込み** —— 初回要求で `claim-absent!` が
+発火せず、**エラーではなく成功の形をした応答**（pending レコード）が返り、書き込みは
+起きない。`with-redefs` が効かず実際の書き込みが最後まで走ったので、修正後の証拠は
+むしろ強い。
+
+### 途中で測り直した 2 つの仮定
+
+- **自己参照は安全。** detector が `handle-job!` の自己参照を除外していたのは
+  *未測定の仮定*だったので測った —— 多束縛 letfn でも自己参照は発火する（除外は正しい）。
+- **`.then` の失敗モードは拒否ではなく「値の素通し」。** ハンドラが走らないと変換前の
+  値がそのまま下流へ行く。babiniku では生の Response が parsed body として扱われる
+  —— エラーにならない分たちが悪い。
+
+### detector 自身の 3 つ目の欠陥
+
+未登録 checkout を走査して幽霊を数えていた。**内容ハッシュでは重複除去できない**
+（登録側を直した瞬間に本当に別物になる）ので west 登録を基準にし、**飛ばした 253 tree を
+出力に明示**した（黙って減らすと今度は「測っていない」欠陥になる）。
+13 → 6 → 0、走査 32,741 → 29,429、自己検査 10/10。
+
+## 残っている gap（優先順）
+
+1. **`orgs/` 配下に west 未登録の checkout が 253 個**。うち 1 つは registered repo の
+   324 commit 遅れの写しで、detector に幽霊を出させていた。`west-orphan-audit` の領域。
+2. **`net-kotobase/engine` に gate が無い**（`file:` npm sibling を持つため構造的に不可）。
+   live worker で biscuit 検証を持つのに自動検査が無い。
+3. **`:shadow-test` gate 種別は利用者ゼロ**（tick.cljs の dead code）。engine が使えない
+   以上、撤去か engine の依存形状の是正かを決める必要がある。
+4. **検証手段を持たない repo がある** —— `kotobase-engine` の package.json は npm の
+   既定プレースホルダだけで（no test specified）、今回の修正は probe が唯一の検証。
+   `net-babiniku` の試験は API 側で、直した promise 鎖は通らない。
+5. **kotobase-server PR #33**（別セッションの rescue WIP）が exit 90 で赤。head に
+   `test/run_portable.cljs` が無いだけで内容とは無関係。**他セッションの branch なので
+   触っていない。**
+6. 本セッション前半からの持ち越し: revocation set の**配布**（検証側は live、
+   epoch/generation 未配線）/ biscuit **writer** は意図的に未実装 /
+   `foundation-identity-didwebvh` repo 未作成 / production 経路の移行（オーナー判断待ち）。
+
+## 再開の一手
+
+detector は 0 件なので、次はここではない。優先度 1 の未登録 checkout を見るなら:
+
+```bash
+nbb scripts/west-orphan-audit.cljs --blocking
+```
+
+同型の欠陥をこれから防ぐ側は landing 済み（`verify-silent-js-callbacks`、6 時間間隔）。
+**修正の形**は kotobase-server `15d44fc` の `ex-data-chain` + inline `fn` ラップ、
+**試験の形**は kotobase-peer `722fc00` の「async 腕を直接駆動する」テスト、
+**検証の形**は各 repo で「修正前に落ちること」を先に見せてから直すこと。
+
+## 保全した他者の作業
+
+- root 共有 checkout の `90-docs/observatory/observatory.datoms.edn` はセッション開始時から
+  未コミット。**触っていない。**
+- 別セッションの worktree `…/ecc7c492-…/scratchpad/wt-r8`（branch `agent/gate-green-record`）
+  と、その remote branch。**触っていない。**
+- 自分が作った worktree / branch は全て撤去済み。stash 無し。"}]

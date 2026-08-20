@@ -1,0 +1,182 @@
+[{:db/id -1
+  :adr/id "2608197300"
+  :adr/title "起動時の identity — did が軸、passkey は重ねる、委譲は biscuit、判定器は増やさない"
+  :adr/status "accepted"
+  :adr/date "2026-08-19"
+  :adr/body "## Context
+
+`hermes-agent` を起動して分かったこと（2026-08-18 実測）: Desktop は何も聞かずに使えるのに、
+`cloud-itonami-app` は sign-in を要求する。差は厳しさの好みではなく、**この機械の上に主体が
+何人いると数えているか**にある。
+
+- `hermes_cli/web_server.py:640` の `should_require_auth` —
+  `host == loopback → False (no auth — local-only, trusted operator)`
+- `cloud-itonami-app/README.md` — *a process listening on `127.0.0.1` is close rather than trustworthy*
+
+Hermes が持つのは 2 つだけで、どちらも**人を名指ししない**: ファイル所有権（`~/.hermes` 0700 /
+`.env` 0600）と、プロセス生存期間のランダム token。実測（Desktop backend 127.0.0.1:54550、
+token 無し）: `/api/status` 200 / `/api/health` 200 / `/api/config` 401 / `/api/sessions` 401。
+機微 API は塞がっているが、token の出所が env である以上、境界の強さはファイル所有権と同じ。
+**identity が無いのではなく、identity が要る場所まで行っていない。**
+
+## Decision
+
+### 1. 起動時の状態は 3 つで、2 つではない
+
+`key が無い = 初回` と畳んではならない。畳むと端末ごとに別人が生まれ、「同期」という語が
+意味を失う（端末 A と B が別人なら、同期ではなく共有）。
+
+| 状態 | 条件 | serve |
+|---|---|---|
+| `:key-present` | device key + 生きた委譲 | `:full` |
+| `:mint` | identity がどこにも無い | `:public-only` |
+| `:link` | identity は在るが、この端末が未認可 | `:public-only` |
+| `:undecidable` | **まだ誰も答えていない** | `:public-only`、人に聞く |
+
+4 番目が肝。「他所に identity が在るか」はこの機械が持つ事実ではないので導出できない。
+**答えられない問いを pass と同じ値で返さない**（ADR-2608136000）。
+
+### 2. did が軸。passkey などはその上に重ねる（オーナー判断 2026-08-19）
+
+**identity を passkey から導出しない。** 導出すると名前が credential と同じだけ短命になる ——
+端末を替えれば別人になる。`did:key` を subject に置き、passkey / TouchID / TOTP / CACAO は
+**人が居ることを証明する方法**として上に重ねる。追加も失効も did を動かさない。
+
+これは旧 Alternative 1（passkey を root にする、itonami と同人格）とは**別の形**である。
+itonami の `did.clj` は WebAuthn credential の COSE 鍵から did を導出しており、そちらは
+「passkey が identity」。ここで採ったのは「did が identity、passkey は認証」。副次的に、
+itonami README が構造的欠落と呼んだもの（*a Passkey ... cannot produce a Data Integrity
+proof*）はこの形では問題にならない —— passkey は proof を作る必要がなく、認可すればよい。
+
+### 3. 委譲は biscuit、判定は authority、認証は authentication
+
+ADR-2608180200 の配分に従う。**決定器を増やさない。**
+
+| 問い | owner | 状態 |
+|---|---|---|
+| factor を束ねて水準に達したか | `authentication.core/decide` | 既存 |
+| その decision は**この did のもので、束縛済み authenticator から来たか** | **`identity.authenticators`** | **新規・landed** |
+| 保持権限が要求 scope を覆うか | `authority/chain-authorize` | 既存（**唯一の認可判定器**） |
+| この runtime は誰かとして動いてよいか | **`identity.startup`** | **新規・landed** |
+
+委譲の wire は **biscuit**（`org-biscuitsec`）。検証に要るのは **root の公開鍵だけ**なので、
+同じ token をローカル backend・リモート・Worker・他 actor が秘密を配らずに検証できる。
+これが「持ち運べる名前」の実体。**失効リストを新設しない** —— 失効は既存の generation
+（aiueos）/ epoch（kototama）面に乗る。
+
+⚠ **初版（2026-08-19 朝）は device delegation に CACAO を使うと書いていた。**
+ADR-2608180200 に反するので同日改めた。CACAO は消えず、human consent の wire として残る。
+
+### 4. 既に在るので作らないもの
+
+| repo | 何を持っているか |
+|---|---|
+| `kotoba-lang/authentication` | factor 合成の decision substrate（FaceID/TouchID/WebAuthn/OTP/CACAO/OIDC）、`IFactorVerifier` の同期・非同期 2 形、decision ledger |
+| `kotoba-lang/webauthn` | passkey 登録/assertion の EDN substrate、**`webauthn.assurance`**（その credential が実際に何を証明しているか。DevTools の virtual authenticator は `platform` を名乗って人の指なしに署名する） |
+| `kotoba-lang/org-w3-webauthn` | W3C ceremony data as EDN、zero-dep |
+| `org-biscuitsec` / `authority` / `org-w3-did` / `kagi` | 委譲 / 認可判定 / did:key / 鍵保管 |
+
+**新規に書いたのは 2 本だけで、どちらも既存が答えていない問いだけを持つ。**
+
+### 5. Hermes への差し込みは plugin。fork しない
+
+`plugins/dashboard_auth/{basic,drain,nous,self_hosted}` の 5 番目。hook は
+`ctx.register_dashboard_auth_provider`。`complete_login` → `Session(user_id = did:key)`、
+`verify_token` → `TokenPrincipal(principal = did, scopes = grants)`。
+**検証を Python で書き直さない**（2 つ目の決定器になる）。nbb を subprocess で呼び、
+`biscuit.token/verify` → `biscuit.kotoba/->delegated` → `authority.chain/authorize` を通す。
+
+## 現在地（2026-08-19）
+
+**landed** — `kotoba-lang/identity`（pure `.cljc`、zero-dep、west pin `8eeb1a0`）
+
+| namespace | 決めること | 検証 |
+|---|---|---|
+| `identity.startup` | 起動時の 4 状態と serve 水準 | nbb 9 tests / 24 assertions。`:undecidable` を `:mint` に畳むと 3 件赤 |
+| `identity.authenticators` | その decision はこの did のもので、束縛済み authenticator から来たか | nbb 10 tests / 22 assertions。credential-id 照合を緩めると 2 件赤 |
+
+**biscuit → authority を実 Ed25519 で端から端まで実測**（nbb、JVM 不要）:
+
+| # | 測ったこと | 結果 |
+|---|---|---|
+| 1 / 2 | root の**公開鍵だけ**で検証 / 攻撃者の鍵 | true / false |
+| 3 | device が root の知らない鍵で減衰 | `notes` が落ち `acme` だけ残る |
+| 4 | **権限を増やそうとした block** | 権限が**全部消える**（`[]`） |
+| 5 / 6 | startup 状態 | `:key-present`/`full`、`:undecidable`/`public-only` |
+| 7-9 | authority 判定 | in-scope true、減衰済み false、escalated false |
+| 10 | 閉じた kind の外 | 無視でなく `:grant/rejected` |
+
+**再現**: `scripts/identity-startup-e2e.cljs`（nbb、JVM 不要）。測定値と\"測っていないもの\"は
+`90-docs/evidence/260819-identity-startup-biscuit-authority.edn`。pin 済み checkout で
+19 tests / 46 assertions / 0 failures。
+
+**consumer も landed**（2026-08-19）: `scripts/identity-verify.cljs`（stdin から EDN、
+exit 0/1/3）と `scripts/hermes-dashboard-auth-did/`（Hermes plugin、`supports_token`）。
+実測は `90-docs/evidence/260819-hermes-did-plugin-verifier.edn`。
+
+## 次の一手（resume point）
+
+**1 と 2 は 2026-08-19 に landed。** 実測は
+`90-docs/evidence/260819-hermes-did-plugin-verifier.edn`。
+
+| # | | 現在地 |
+|---|---|---|
+| 1 | Hermes `dashboard_auth/did` plugin | **landed** — `scripts/hermes-dashboard-auth-did/`（版管理の正本。Hermes は他者の repo なので install は copy）。`supports_token`、6 経路を probe で実測 |
+| 2 | nbb verifier CLI | **landed** — `scripts/identity-verify.cljs`。stdin から EDN、exit 0/1/3 |
+| 3 | kagi に鍵を置く | **未** — probe の鍵は決定論的 test seed で、kagi にも Keychain にも触れていない |
+| 4 | 両方向の gate を実 Hermes で | **半分** — plugin seam までは両方向を実測。**非 loopback で起動して HTTP 401/200 を往復させてはいない** |
+| 5 | factor verifier の配線 | **未** — `kotoba-lang/authentication` の `IFactorVerifier` に WebAuthn を挿す |
+
+**exit code を 3 つに分けたのが効いた。** `0 allowed / 1 denied / 3 undecided` と
+し、plugin 側で `1 -> None`（401 経路、次の provider へ）/ `3 -> ProviderError`
+（503 経路）に対応させた。これは `DashboardAuthProvider` の契約そのもの —
+*\"Raise ProviderError ONLY for a genuine backing-store outage\"* — と一致する。
+
+⚠ **ただし exit code だけでは足りなかった。** nbb は namespace を読めないと
+**exit 1** で死ぬ。verifier の `denied` と同じ値なので、code だけを読む初版は
+*classpath が壊れた瞬間に全 token を 401 にしていた* —— 資格情報が正しい相手に
+「あなたの token が無効だ」と言い、検査が走っていないことはどこにも出ない。
+現在は **stdout の verdict を先に読み、exit code は裏付けにしか使わない**。
+verdict が無ければ exit code が何であれ outage として扱う。
+
+**壊れた token は `denied` であって `undecided` ではない。** 読めない資格情報は
+拒否された資格情報であり、それを裁くのが verifier の仕事。初版はここも `undecided`
+にしていて、あらゆる不正 token が呼び出し側には 503 に見えていた。
+
+**holder は token から導出する。** `:holder` を入力に取ると、認証の主体を
+呼び出し側が名乗ることになる。最終 block の `next-public-key` から `did:key` を
+導出し、`:holder` が渡された場合は一致しなければ `:holder-mismatch` で deny。
+
+**未実装**: kagi への鍵保管、非 loopback 実 Hermes での 401/200 往復、mint/link の
+UI 2 択、pairing 文字列の経路、`authentication` の factor verifier 配線、
+session 半分（`complete_login` / `verify_session`。現在 `supports_session=false`）。
+
+**意識的に保留**: `.kotoba` 決定核 + parity gate。`identity` は zero-dep 方針の repo で、
+compiler を足すのは別の決定（先例は `session_handoff_core.kotoba` と murakumo の parity test）。
+
+## 変わるもの / 変わらないもの
+
+**変わる**: 名前が端末を越える。監査に「誰が」が入る。loopback を離れても platform IdP 無しで
+認証できる。同じ鍵で他 actor に名乗れる。認証方法を足しても名前が動かない。
+
+**変わらない — ローカルの境界**。device key を無人で使える場所に置く以上、その OS アカウントを
+取れる者は agent として振る舞える。`cloud-itonami-app` の `agent_session.clj` が同じ結論に
+達している —— *Requiring a Passkey on top of that proves nothing extra*。
+**DID は局所的な壁ではなく、持ち運べる名前である。**
+
+## Alternatives
+
+1. ~~root を passkey にする~~ — **2026-08-19 に否決**。identity が credential と同じだけ短命に
+   なる。採ったのは §2 の「did が軸、passkey は重ねる」形。itonami と人格を共有する経路は
+   残っており、その場合 Hermes は itonami 発行の委譲を検証する consumer になる。
+2. **session token を即置換** — 鍵が壊れたとき自分の機械から締め出される。移行期は両方受ける。
+3. **`did:web` を identity にする** — DNS/TLS の運用が identity の前提になる。did:web は
+   **名前**であって identity ではない（ADR-2608148200）。
+
+## 残る gate
+
+- 鍵が無い状態で機微 API が 401、鍵を入れて 200 に戻ることを**両方向**で見せる
+- **link を選んだのに mint される経路が無い**ことを test で固定する（landed）
+- **束縛していない authenticator が通らない**ことを test で固定する（landed）
+- pairing 文字列が URL・ログ・redirect に出ないことを検査する
+"}]

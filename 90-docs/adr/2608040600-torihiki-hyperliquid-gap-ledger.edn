@@ -1,0 +1,836 @@
+[{:db/id -1
+  :adr/id "ADR-2608040600"
+  :adr/title "torihiki ⊖ Hyperliquid — gap 台帳（2026-08-04 実測）"
+  :adr/status "accepted"
+  :adr/date "2026-08-04"
+  :adr/tags ["kotoba-lang" "torihiki" "hyperliquid" "gap-ledger" "roadmap"]
+  :adr/body
+  "## この文書の性質
+
+オーナー質問（2026-08-04）『残りの gap は? hyperliquid との差分を記して』への
+回答。**実装を読んで書いた**（記憶ではなく `src/torihiki/*.cljc` の grep と
+live endpoint の実測）。
+
+比較対象の Hyperliquid 側は**公開仕様とドキュメントから既知の範囲**であって
+コードではない —— HyperCore は closed source（`hyperliquid-dex/node` は署名済み
+バイナリとドキュメントを配るだけ）で、torihiki 自身の README がそう書いている。
+したがってこの表は『実装 vs 実装』ではなく『実装 vs 公表された振る舞い』であり、
+HL 側に非公開の差がある可能性は消せない。
+
+**差分には 4 つの性質がある**（末尾の分類を参照）。全部を『やること』として
+読むと設計判断まで巻き込むので、分類を先に見ること。
+
+## A. 板とマッチング
+
+| | Hyperliquid | torihiki | |
+|---|---|---|---|
+| price-time priority | ✓ | ✓ intrusive FIFO + 4 段 bit ladder、実測 3.15M ops/sec | 同等 |
+| 指値 GTC | ✓ | ✓ | 同等 |
+| ALO / post-only | ✓ | ✓ `flag-post-only 2` | 同等 |
+| IOC | ✓ | ✓ `flag-ioc 1` | 同等 |
+| reduce-only | ✓（板に**載る**） | ✓ `flag-reduce-only 4`、**載らない** | **意図的な差** |
+| 成行注文 | 専用 | 攻撃的指値 + IOC で等価。**専用 tx は無い** | 実質同等 |
+| SL / TP trigger | ✓ | ✓ 発火順を作成順に固定（consensus rule 化）| 同等 |
+| TWAP | ✓ | ✗ | 未実装 |
+| Scale orders | ✓ | ✗ | 未実装 |
+| Chase | ✓ | ✗ | 未実装 |
+| 注文の修正（amend） | ✓ | ✗ cancel + 再発注のみ | 未実装 |
+| cancel-all / client order id | ✓ | ✗ `:cancel` は order id 単位のみ | 未実装 |
+
+reduce-only が載らない理由は README に書かれている: 発注時に 1 回だけ検査するのが
+健全なのは、注文が検査対象のポジションより長生きしない場合だけ。HL は載せる。
+**明示された差**であって欠落ではない。
+
+## B. 清算とリスク
+
+| | Hyperliquid | torihiki | |
+|---|---|---|---|
+| cross / isolated margin | ✓ | ✓ 両方（`clearing.cljc`） | 同等 |
+| margin tier | ✓ | ✓ 最終 tier を上限外にも適用 | 同等 |
+| open interest cap | ✓ | ✓ 保守側に倒す（over-reject が安全な向き） | 同等 |
+| maker / taker fee | ✓ | ✓ `fees-collected` に積む | 同等 |
+| funding | 1h ごと F/8、クランプ | ✓ 同型（4%/h cap、5 秒 × 720 サンプル/h） | 同等 |
+| mark price | oracle + clamp(impact-mid − oracle, ±band) | ✓ 同式 | 同等 |
+| oracle | validator の**stake 加重**中央値 | publisher 中央値 + quorum + stale 停止。**stake 加重ではない** | 差分 |
+| 清算 waterfall | book → backstop → insurance → ADL | ✓ 4 段とも実行される | 同等 |
+| **清算の駆動** | 状態機械が自前で走る | **`:liquidate` tx が要る** | **差分（keeper 依存）** |
+| backstop の出し手 | HLP（外部出資を受ける vault） | 普通の口座としての vault。**出資を受ける仕組みが無い** | 差分 |
+
+清算駆動の差は小さく見えて運用上は大きい: 誰も `:liquidate` を送らなければ
+不良債権が積み上がる。HL は誰の善意にも依存しない。
+
+## C. 資産と入出金 —— **最大の欠落**
+
+| | Hyperliquid | torihiki |
+|---|---|---|
+| bridge | Arbitrum USDC →（後にネイティブ） | **seam のみ**。`:bridge-authority` は実装済みだが devnet は nil ＝ **誰でも自分に入金できる**。`/head` が自白する |
+| 出金 | 実際に出る | 残高を減らすが**出金先が存在しない** |
+| spot 板 | ✓ | ✗ |
+| HIP-1 トークン / spot deploy オークション | ✓ | ✗ |
+| HyperEVM | ✓ | ✗ |
+| vault（HLP / ユーザ vault） | ✓ | ✗ |
+| staking / delegation | ✓ | ✗ |
+
+**この列は『実装が足りない』ではなく『取引所として片肺』を意味する。** 執行層が
+どれだけ正しくても、担保が何にも裏付けられていなければ全部の数字が同じだけ
+無意味になる。torihiki README がこれを最初に書いているのは正しい。
+
+## D. 合意と運用
+
+| | Hyperliquid | torihiki |
+|---|---|---|
+| consensus | HyperBFT（本番稼働） | `engi` は chained-HotStuff の safety rule と stake/slashing **のみ**。pacemaker / view change / p2p / 署名集約は無い |
+| validator set / stake 加重 | ✓ | ✗（devnet は 4 replica 固定、鍵は名前から導出） |
+| slashing の実運用 | ✓ | ロジックはあるが運用されていない |
+| **snapshot** | 当然ある | **無い**。boot が O(chain) —— 2026-08-04 の全断（ADR-2608040400）の根本原因で、ページ分割で有界化したが **O(chain) invocation は残っている** |
+| light client 証明 | — | state root は **flat digest**。SHA-256 で署名可能だが Merkle ではないので、**1 残高だけを replay 無しで検証できない** |
+| multi-market | 多数 | 構造（`:books` の map）はあるが **single market しか回していない** |
+| **tx が着地しない**（validator） | — | **2026-08-04 実測、未解明**。nonce が進まず `txs-in-chain` 4 のまま。単一シーケンサには着地する |
+
+## E. データと API
+
+| | Hyperliquid | torihiki |
+|---|---|---|
+| WebSocket 購読 | ✓ | ✗（HTTP polling のみ、1.5 秒） |
+| **candles / 履歴** | ✓ | ✗ tape は **200 件の ring buffer** |
+| user fills 履歴 | ✓ | ✗（`fills-since` はブロック内のみ） |
+| L2 板 | ✓ | ✓ `/book` |
+| open orders / order status | ✓ | 部分（`account-state`） |
+| REST info | 広い | 6 endpoint（`/head /market /book /account /trades /tx`） |
+
+candles の不在が `torihiki-chart` の履歴 200 件制限の直接の原因
+（ADR-2608040300）。**深度図は板から描くのでこの制約を受けない。**
+
+## F. 経済・成長機能
+
+| | Hyperliquid | torihiki |
+|---|---|---|
+| builder codes | ✓ | ✗ |
+| referral | ✓ | ✗ |
+| volume 別 fee tier | ✓ | ✗（固定 maker/taker） |
+| sub-account | ✓ | ✗ |
+| agent / API wallet（委任鍵） | ✓ | ✗ 鍵 = 口座、委任の概念が無い |
+| multi-sig | ✓ | ✗ |
+
+## G. 差分の 4 分類 —— **ここを先に読む**
+
+**1. 意図的な差（直す対象ではない）**
+reduce-only が板に載らない / x 軸がブロックで時刻でない / 全部整数（i53）/
+wall clock を持たない / rejection も state root に入る。
+どれも決定性と検証可能性のために選んだ差で、README とテストが理由を持っている。
+
+**2. 構造的に先に潰さないと他が積めないもの**
+- **snapshot が無い**（boot が O(chain)）—— 今日一度 chain 全体を落とした
+- **state root が flat**（Merkle でない）—— light client が原理的に作れない
+- **bridge が無い**（担保が裏付けられていない）—— 上の全部の数字の前提
+
+**3. 単に未実装（設計上の障害は無い）**
+TWAP / scale / amend / cancel-all、fee tier / builder / referral、
+sub-account / agent wallet、WebSocket / candles / 履歴 API、multi-market の実運用、
+oracle の stake 加重、清算の自動駆動。
+
+**4. 今日の実測で見つかった不具合**
+validator に transaction が着地しない（ADR-2608040400 の未了節）。
+
+## H. 順序についての意見
+
+執行層はもう HyperCore に対して機能被覆が高く、**そこを伸ばしても価値は増えない**。
+次に効くのは、この順:
+
+1. **snapshot**（分類 2）—— これが無い限り運用が続かない。今日の障害が証拠
+2. **validator の tx 着地**（分類 4）—— 直らないと本番で誰も取引できない
+3. **candles / 履歴 endpoint**（分類 3）—— chart が 200 件の窓から出られない
+4. **bridge**（分類 2）—— ただしこれは技術ではなく「何に裏付けられるか」の決定
+5. **Merkle state root**（分類 2）—— light client を主張するなら必須
+
+spot / HyperEVM / vault / staking は**別プロダクトの規模**であり、上の 5 つが
+片付く前に着手すると、動かない土台の上に面積を足すことになる。
+
+## 改訂 2026-08-05 —— この台帳の多くは古い
+
+同日の作業で **17 件の gap を閉じた**（`90-docs/task-graphs/task-graph.datoms.edn` の `torihiki-gap-closure` が正本、17/17 completed）。この本文のうち以下は**もう現在地ではない**:
+
+| 台帳の記述 | 2026-08-05 の現在地 |
+|---|---|
+| D「snapshot が無い、boot が O(chain)」 | **解消**（S1/S3）。checkpoint boot を本番で観測。さらに S9 で 3-chain 走査を committed 高さで打ち切り、1067 ブロック replay の hash が 1,133,160 → 2,128 |
+| D「state root は flat digest、light client が作れない」 | **解消**（S7）。merkle-sum の認証木。state を持たない client が `/proof` から collateral を検証し、1 バイト改竄で false を確認 |
+| D「consensus: pacemaker / view change / p2p / 署名集約は無い」 | **engi 時代の記述で誤り。** inga には pacemaker・sync・wire・attest が全て在る |
+| D「tx が着地しない（未解明）」 | **解消**（S4） |
+| E「candles / 履歴が無い、tape は 200 件 ring」 | **解消**（S5）。ただし validator に届いたのは同日夕方（それまで sequencer にしか無く、端末は validator を読んでいた） |
+| C「bridge は seam のみ、誰でも自分に入金できる」 | **解消**（S6、オーナー判断で「自前の証書」）。自己 mint は credit 0、bridge が 1 account 1 回だけ発行、4 replica が合意 |
+
+## 同日に**新しく見つけた**もの
+
+- **validator の秘密鍵が公開 chain-id から計算できた**（S15）。実証済み: 導出した公開鍵が 4 台の live の公開鍵と一致した。**BFT 保証はゼロで、端末は `4 replicas, agreeing` と表示していた。** 実鍵 + genesis の validator set + TOFU 廃止で解消。
+- **見知らぬアカウントが oracle を動かせた**（S6 系）。live で 1000→1001、mark が追従。証拠金と清算は mark を読むので全員清算が可能だった。機構は正しく、**publisher が一人も設定されていなかった**。
+- **`/wipe` `/reset` が無認証だった。** 誰でも replica を破壊でき、leader を消せば chain が止まった。
+- **再起動した replica の view が同期せず、それが leader だと chain が止まる**（S14）。今日 3 回起きた。根本原因は「new-view が運ぶ証明書を同期 verify-fn が検証できず、メッセージごと捨てていた」—— S12 で sync-response に対して直した穴が new-view 側に残っていた。
+- **README と公開ページの `3,155,313 ops/sec = HyperCore の 15.8 倍` は再現しない。** 同じベンチで 5,639 / 25,314（負荷のある機械、下限値）。**取り下げた**。
+
+## 性能の現在地（2026-08-05 実測）
+
+| | torihiki（本番 4 replica） | Hyperliquid（公表） |
+|---|---|---|
+| ブロック間隔 | 604 ms（1.66 blocks/sec） | — |
+| 送信 → 反映 | 2,648 ms | 中央値 ~0.07 s |
+
+**エンドツーエンドで約 40 倍遅い。** 実行層の絶対値は現在**主張なし**（静かな環境で測るまで）。
+
+## H「順序についての意見」の 5 件は全て閉じた
+
+snapshot → tx 着地 → candles → bridge → Merkle root。次に効くのは、この台帳が書いていなかったもの:
+
+1. **block store と head ref**（S16 の残り）。ブロックの同一性は CIDv1 dag-cbor になり parent は tag-42 link だが、**CID から bytes を引く先は今も Durable Object storage**。`inga.ref`（quorum 証明書＝条件付き書き込み）と provider（`io-storj` / `io-filecoin` / `io-ipfs`）は未接続
+2. **出金の出口**（残高は減るが払い出し先が無い）
+3. **`:bridge-authority` が state root にコミットされていない**
+4. **準備金証明**（collateral の非負を不変条件にすれば、merkle-sum の葉 sum を collateral にするだけで root が準備金証明になる）
+5. sequencer chain は authority nil のまま
+
+分類 3（単に未実装）は変わらず: TWAP / scale / amend / cancel-all、fee tier / builder / referral、sub-account / agent wallet、WebSocket、user fills 履歴、multi-market、oracle の stake 加重、清算の自動駆動。
+
+## 改訂 2026-08-13 —— 上の 5 件のうち 3 件と、分類 3 の 2 件が閉じた
+
+**閉じたものは torihiki main に着地済みだが、まだ deploy されていない**（下記の
+fork の節を読むこと）。socket だけは符号化に触らないので deploy 済み。
+
+| 前回の残件 | 現在地 |
+|---|---|
+| 2. 出金の出口 | **閉じた**（torihiki `4d59b1ee`）。`:withdrawals` の請求権が leaf。escrow を持つ者に inclusion proof を渡せる。請求権の葉が amount を sum に持つので、**出金では root の合計が動かない** —— 合計を下げるのは settle だけで、実際に誰かに払うのも settle だけ |
+| 3. `:bridge-authority` が root に無い | **閉じた**（torihiki `f43481c9`）。`:oracle-publishers` も一緒に。設定の違う 2 replica が同じ root を出しながら誰が mint できるかで食い違う状態を解消 |
+| 4. 準備金証明 | **閉じた**（torihiki `dfd438d1`）。台帳の予告どおり非負性が前提で、`clearing/settle-deficit` が不良債権を負の collateral から正の `:deficit` へ移す。葉 sum が collateral、root の sum が `commit/reserves` |
+| 1. block store と head ref | **未着手**。CID から bytes を引く先は今も Durable Object storage。`inga.ref` と provider は未接続 |
+| 5. sequencer chain の authority nil | **未着手** |
+
+分類 3 のうち 2 件:
+
+- **清算の自動駆動 — 閉じた**（torihiki `04b6abe3`）。`apply-block` が transaction の
+  あと全市場を sorted order で sweep する。**準備金証明を入れた今、keeper 依存は
+  矛盾でもあった** —— 誰かが起きている間だけ信用できる数は attestation ではない。
+  同時に、mark の無い市場への `:liquidate` が `throw` して chain を止められた穴も
+  塞いだ（`apply-block` の docstring が自分で禁じている「1 transaction で全 validator が
+  同じ場所で止まる」に該当していた）。
+- **WebSocket 購読 — 閉じた**（torihiki-node `544859a0` + `c94b56cc`、terminal `9d8df4c`）。
+  deploy 済み。
+
+## socket は latency の最大単独項だった
+
+端末の 1500 ms polling は、実測 end-to-end 約 2,600 ms のうち平均 750 ms を占めていた。
+ブロックは ~336 ms 間隔なので、**ページは見ている chain より 4 倍遅く、height の
+約 7 割を一度も観測していなかった。**
+
+**最初の実装は commit で起こしていて、置き換えた poll より遅かった。** live A/B で
+中央値 625 ms の負け。chained HotStuff は 3 ラウンド遅れて commit するので
+`committed` は `height` より約 2 ブロック後ろで、`/head` が報告し端末が表示するのは
+`height` の方だった。tip で起こすよう直して測り直した:
+
+```
+                        commit で起こす      tip で起こす
+  poll がどれだけ遅いか   中央値 -625 ms      中央値 +529 ms
+                        p90    -186 ms      p90    +1370 ms
+  push が見た height          69                 86
+  poll が一度も見なかった      42                 60
+```
+
+**この教訓を一般化しておく: 置き換えた相手に対して測っていなければ、この回帰は
+気付かれずに landed していた。**「push は poll より速いに決まっている」は
+測定ではない。
+
+## 残る latency —— ここから先は Cloudflare を出ないと動かない
+
+socket が消したのは待ち時間であって、合意そのものではない。残りの内訳（実測）:
+
+| 区間 | 実測 | 効く手 |
+|---|---|---|
+| ブロック間隔 | 336–420 ms | 20 ms にするには配送が 1 ms 未満である必要。DO 間 HTTP は数十 ms |
+| commit 深さ | 3 ラウンド | Jolteon / DiemBFT 型の 2-chain commit で 1 ラウンド分 |
+| pacemaker deadline | 980 ms | ブロック間隔の 3 倍。詰められる |
+| 端末の反映 | **解消** | socket |
+
+ADR-2608025400 の実測（`NET_DELAY=20` で committed blocks が 0）が効いてくる。
+**Hyperliquid の ~0.07 s は同一 DC の co-location でしか出ない** —— HL 自身が
+validator を co-locate しているのは同じ制約への同じ答え。
+
+## 改訂 2026-08-13（後半）—— 「fork するので genesis reset が要る」は誤りだった
+
+この台帳は直前の改訂でこう書いていた: torihiki main の 3 件（governance leaf /
+`:deficit` / `:withdrawals`）はすべて state 符号化を変え、両側の replica は
+同一 state に別の root を計算するので **rolling upgrade は成立せず、genesis から
+やり直すのが正しい形**。数時間、破壊的操作の承認待ちとして扱っていた。
+
+**誤りだった。実装を読めば分かることを、読まずに推論していた。**
+
+block は `height / parent-hash / proposals / proposer / ts`
+（`inga.consensus/canonical-block`）がすべてで、**state root を運ばない**。
+`inga.consensus` は root に一度も言及せず、`inga.replica/state-root` は
+**報告のため**に machine state から都度計算される。
+**合意は transaction を並べるだけで、それを実行して何ができたかを比較しない。**
+
+だから符号化変更はただの deploy だった。実測（deploy 後、同一 height）:
+
+```
+  w1 h=1289730 root=60ed7b82ed  cv=100
+  w2 h=1289730 root=60ed7b82ed  cv=100
+  w3 h=1289730 root=60ed7b82ed  cv=100
+  w4 h=1289731 root=ae5da1bc2a  cv=100   ← 1 block 先、期待どおり
+```
+
+**教訓は「合意層が何を比較していないか」を確かめずに、最も破壊的な選択肢を
+既定にしていたこと。** 同じ session で起きた semantic fork（cancel 認可修正の
+deploy 中に replica が境界を別々に跨いだ）も、この区別が付いていなかった
+ことの帰結: **符号化が同じでも block の結果は変わりうる**（それは起きた）し、
+**符号化が違っても合意は割れない**（それは起きなかった）。
+
+## live になったもの（torihiki-node `d567068b`）
+
+準備金証明 / 出金の請求権 / governance が root の下 / 不良債権が `:deficit` /
+清算が block 駆動 / cancel-all / amend。`/reserves` を新設。
+
+live 実測 2 件。**準備金は bridge が credit したときだけ動く**:
+
+```
+  before   total 0          accounts 0    ← 自己 mint は not-the-bridge で拒否
+  faucet   ok, amount 10000000, bridge 29766895614364
+  after    total 10000000   accounts 1
+  totals   10000000 x 4                   ← 4 replica 一致
+```
+
+**出金は請求権を立て、総額を動かさない**:
+
+```
+  funded     total 20000000
+  withdraw   4000000
+  after      total 20000000, pending-withdrawals count 1 amount 4000000
+  collateral 6000000
+```
+
+担保は口座を出て、請求権がその額を持ち、誰も払われていないので総額は不変。
+下がるのは settle だけ。
+
+## latency の現在地（実測、1 点 45 秒、4 replica 通期サンプル）
+
+```
+  tick   interval   blocks/s   catching-up   equivocators   split roots
+   200     462 ms      2.17         0%            none          none
+   100     345 ms      2.89         0%            none          none
+    50     259 ms      3.86         0%            none          none
+    25     185 ms      5.40         0%            none          none   ← 採用
+    10     126 ms      7.96         0%            none          none
+     5    STOPPED      0.00       6.5%            none          none
+```
+
+**崖であって坂ではない。** 5 で chain は遅くならず止まった（67 秒で 0 ブロック）。
+その間どの replica もエラーを出さず equivocate せず root でも食い違わない ——
+**沈黙以外の症状が無い。** ADR-2608025400 が反対側から測ったのと同じ形。
+
+10 ではなく 25 を採った。10 は健全に測れたが、症状が沈黙だけの崖の 1 歩手前で、
+`witnesses` の docstring が余裕ゼロの代償を既に記録している。
+**測定上の最良値を採ることは、同じ間違いを別の変数で繰り返すこと。**
+
+残る Hyperliquid の ~0.07 s との距離は定数ではなく transport（isolate 間 HTTP、
+数十 ms）で、co-location が答える。
+
+## state transfer（torihiki-node `d4ca1990`）
+
+分岐した replica は合意では直せない —— `inga.sync` が運ぶのは block で、
+食い違っているのは「適用して何ができたか」。全 peer の snapshot をこちらで
+restore してこちらで root を計算し、quorum が一致したときだけ採用する。
+tick から 60 秒ごとに自問する（button 式の修復は、誰も見ていない間ずっと
+壊れたまま）。**この機構は今回の分岐を直していない** —— 収束は deploy 由来の
+再起動 + 統一コードでの replay によるもので、`adopted` は全台 null。
+次に同じことが起きたときのためのもの。
+
+## 改訂 2026-08-13（最終）—— 分類 3 は全て閉じた。塞がっているのは deploy
+
+engine（torihiki main、274 tests / 726 assertions）で実装され gate に守られて
+いるもの:
+
+| | |
+|---|---|
+| TWAP | block 単位の予定表。提出 block では約定せず、端数は最後のスライス |
+| scale order | 1 tx で階段。step は板から離れる向きにしか歩かない |
+| amend / cancel-all | 縮小は待ち行列の位置を保つ。増加は最後尾 |
+| fee tier | 出来高別。窓は block epoch（engine に時計は無い） |
+| builder code | 上限 10 bps、payer は trader、maker は無関係 |
+| referral | venue の取り分から。一度だけ束縛、自己紹介は拒否 |
+| agent wallet | 出金・settle・agent 発行・revoke は禁止。期限は block 高さ |
+| user fills | tape が全市場と所有者を持つ。side は各自の視点 |
+| multi-market | 上場 tx、amend tx、未値付け市場を一度だけ開ける経路 |
+| oracle stake 加重 | bond があればそれ、無ければ genesis map、無ければ素の中央値 |
+| vault | 外部出資と持分。持分は equity ではなく collateral で値付け |
+| staking / delegation | bond は移動でなく請求権。unbond は block 数だけ待つ |
+| spot | 残高の交換。裏付けは扉で見る、resting は予約する |
+
+このうち **spot 以外はすべて live で実測して動いている。**
+
+## 塞がっているのは deploy であって実装ではない
+
+```
+  wrangler deploy → 新しい Version ID
+  数分後、4 replica すべて code-version=100（新しいのは 101）
+```
+
+**Durable Object は起動時のコードを evict されるまで走らせ続け、これらは
+数十 ms ごとに alarm を撃つので恒久的に idle にならない。**
+ADR-2608020330 の「deploy 済みと稼働中は別の事実」がそのまま出た。
+
+`code-version` はこれを見るために在る仕組みで、**今日の大半、私はそれを使わず
+「deploy したから走っている」と推論していた。** どの修正が live で効いたかは、
+今後 code-version でしか確かめられない。
+
+塞がっている理由:
+- `code-version` を DO 名に入れる技は ADR-2608036300 で撤回済み（捨てられた
+  世代が投票し続けた）
+- `/wipe` `/reset` は admin token を要求し、手元に無い
+
+**恒久的に忙しい object を、破壊せずに再起動させる経路が現状ない。** これが
+次に必要な決定。
+
+## 今日 live で起こした障害と、その原因（すべて実測で特定）
+
+1. **semantic fork** —— cancel 認可修正の deploy 中に replica が境界を別々に
+   跨いだ。「符号化に触らないから割れない」という私の推論が不完全だった:
+   **符号化が同じでも block の結果は変わる。**
+2. **equivocation** —— 私の state transfer が peer の投票 watermark ごと採用し、
+   自分が既に投票した高さで再び投票できるようにしていた。
+   `inga.replica/snapshot` が「少なく拒否することは equivocation」と書いている。
+3. **chain 全停止 + tx が着地しない** —— build に未上場の spot 市場を置くと、
+   `listMissingMarkets` が**存在しない市場への価格 tx**を作り、
+   厳密に逐次な nonce 列に必ず無効な tx が居ることで後続が全部詰まった。
+   engine は無実（live checkpoint に spot 版 engine で deposit を適用して確認）。
+
+## 反証した仮説（推測を結論にしないための記録）
+
+nonce 推測（実在したが別の欠陥）/ leader にしか mempool が無い / equivocator の
+提案が採用されない / 未知の拒否理由が符号化で throw / 入れ子の spec が wire を
+通れない —— **5 つとも測って否定した。**
+
+## transport —— コードで縮む分は縮めた（2026-08-13、inga `c014edc0`）
+
+**3-chain commit を 2-chain にした。finality が 1 ラウンド短くなる。**
+
+安全性の議論: 3-chain 則は「最も高い QC に lock する」だけの view change を
+安全にするために在る —— round が失敗した証拠が運ばれないなら、replica は
+「正当に飛ばした leader」と「歴史を書き換える leader」を区別できないので、
+3 つ目の block を待つ。**inga はその証拠を運んでいる**: `entitled-round` は親の
+1 つ先の round しか与えず、それより先を主張する提案は飛ばした round の
+new-view quorum を示せない限り拒否される。だから `round(b0)+1` の `b1` は
+競合枝がその round で生きている間に誰も作れなかった block —— 3 つ目の link が
+代役をしていた性質そのもの。Jolteon の規則に同じ前提から辿り着いた。
+
+実 socket の harness（`inga/script/network.cljs`、Byzantine validator と forger
+を内包）で測った:
+
+```
+             tip   committed        安全検査
+  3-chain    128       126     pass（forgery 0、equivocator 検出）
+  2-chain    128       127     pass（同上）
+  NET_DELAY 0 / 20 / 60 の 3 点すべてで差は 2 → 1
+```
+
+既定は `:three-chain` のまま。`:commit-rule :two-chain` を渡した replica だけが
+使う —— view change の検査を緩めた deployment には戻れる先が要る。
+
+**live には載っていない**（deploy 経路が塞がっている）。
+
+## 次に効く候補（測定から始められる）
+
+**投票の宛先。** `inga.replica` は投票を `:to :all` で全 replica に配る。
+HotStuff は次の leader にだけ送る —— 1 round あたりの message が n 分の 1 に
+なり、この harness は round-trip 律速なので直接効く。
+
+**ただし小さい変更ではない**: inga は各 replica が受け取った投票から自分で
+証明書を組む（`/head` の `tip-certificate origin: fold-vote` がそれ）。
+leader だけに送るなら、証明書は leader が組んで次の提案に載せる形に変わる。
+**証明書の組み立て経路そのものを作り替える。**
+
+harness があるので測定はできる。deploy が通らないうちに合意層をこれ以上
+動かすかは、実測できる範囲と出荷できる範囲のどちらを優先するかの判断。
+
+## 残る差（コードではないもの）
+
+- ~~**transport の床** —— isolate 間 HTTP が数十 ms。~0.07 s は同一 DC の
+  co-location が答える~~ **測ったら違った。下の節を見よ。**
+- **出金の払い出し先** —— 請求権は root が commit しているが escrow が無い
+- **HyperEVM**
+
+## 分類 3 の残り
+
+**無い。** 上の表がその一覧で、全て実装済み。
+
+## 「reset が効く、原因は未解明」を閉じた（2026-08-13 実測）
+
+前回この台帳に残した一行 ——「deploy を重ねると mempool の tx が block に入らなく
+なり、4 台の `/reset` で必ず回復する。なぜ提案に入らないのかは掴めていない」——
+の答え。**運用の癖ではなく、3 つの欠陥で、うち 2 つは計器そのものだった。**
+
+### 計器が嘘をついていた（2 つ）
+
+`why-not-proposing` は `:qcs` と `:votes` を `block-hash` で引いていた。replica は
+それらを **CID** で鍵付けする（`:hash-fn` は `block-cid`）。だから正常に commit
+している chain でも `tip-certified false` / `votes-for-tip 0` と読めた。**この読み
+を症状だと思って 2 度、無い票を探しに行った。**
+
+`propose` は断るとき `[state []]` を返して何も言わなかった。だから Worker は
+「誰の番か」を外から組み立て、**高さ**で決めた —— inga は **round** で決める。
+view が高さより先に走った後では別の replica を指す。計器は、提案していない replica
+について `blocked-by nothing, would-propose true` と表示していた。**証拠つきの誤答
+で、答えが無いより悪い。**
+
+### 本体: replay が過去の view で戻ってきていた
+
+`propose` が理由を喋り出した直後の読み（deployed v2、再起動直後）:
+
+    w1  not-my-round               height 6800  round 7530  leads w3  view 6703
+    w2  not-my-round               height 6800  round 7530  leads w3  view 6703
+    w3  no-certificate-for-the-tip height 6794  round 6795  leads w4  view 6703
+
+全員が「次は round 7530、率いるのは w3」で一致し、全員が 800 view 足りず、その w3
+は 6 block 遅れていた。leadership は round で回る。`replay` は chain・証明書・
+投票済みの高さを復元しながら **view だけ新品の pacemaker のまま**にしていた ——
+block の中の証明書は「親を certify した view」しか言わず、`pm/on-qc` は view を
+動かさない。
+
+**`/reset` が効いたのは、round もろとも 0 に戻して view と round を噛み合わせ直して
+いたからだった。** 魔法ではなかった。
+
+block の round は証明書と同じ意味で証拠である（その block を adopt して投票した以上、
+quorum はその view にいた）。そこまで view を上げる（単調）。
+
+### 一緒に直した 2 つ
+
+- **未証明の末尾で segment 全体を捨てない。** chained HotStuff では証明書は次の
+  block に載るので、どの segment も末尾は構造上未証明。「持っている分を全部渡す」
+  peer は必ず未証明の末尾を含み、証明済みの前半ごと捨てられていた。全体拒否は
+  主張していた安全性を最初から買えていない —— **peer は前半だけを送ることが常に
+  できる**。
+- **署名に失敗した票で高さを使い切らない。** ただし最初の版は広すぎて、署名を
+  dispatch に委ねるこの deployment（WebCrypto は非同期なので `sign-fn` を持たない）
+  を止めた。`could-not-sign` が tick ごとに増え、元の bug より強く止まった。
+  **測って、絞って、戻した。** 署名関数を持っていて何も返らないのが失敗であり、
+  持たないのは失敗ではない。
+
+### 実地の検証
+
+修正を載せた後、**`/reset` を一度も打たずに** 6793 で固まっていた chain が自力で
+回復した（6800 → 6878 → 6918、4 台が揃って前進）。e2e PASS。その状態で **もう一度
+deploy して貫通した**（7437 → 7446、4 台とも cv117）。e2e 2 回 PASS。
+
+残る窓: deploy 直後の 1 回だけ、再起動中に submit した tx が 1 本落ちる。恒久的な
+停止ではなく、次の実行で通る。
+
+gate はいずれも実装を外すと落ちることを確認済み:
+`the-certified-prefix-survives-a-bad-tail` /
+`a-vote-that-cannot-be-signed-does-not-spend-the-height` /
+`a-replica-that-signs-elsewhere-still-votes` /
+`a-replica-that-does-not-propose-says-which-condition-said-no` /
+`a-replay-does-not-come-back-behind-its-own-tip`。
+socket harness は forgery 0・equivocator 検出のまま pass。
+
+## transport は gap ではなかった（2026-08-13 実測）
+
+この台帳は「残る差（コードではないもの）」の筆頭に transport を置き、`tick-ms` の表も
+「Hyperliquid の ~0.07 s までの残りの距離は transport にある。co-location が答える」で
+締めていた。**その一文は測られていなかった** —— timing していない費用に、見てもいない
+分散に対して、対策の名前だけが付いていた。
+
+### object の内側から測った RTT
+
+    w1 NRT   w2 KIX   w3 NRT   w4 NRT
+
+    同一 colo (NRT↔NRT)  min 2-4 ms   p50 3-18 ms
+    NRT↔KIX (w2 のみ)    min 8-14 ms  p50 24-36 ms
+
+co-location は確かに不完全（w2 だけ大阪）だが、**床は数十 ms ではなく 2-4 ms**。
+colo は object 自身の outbound request から取る —— 入ってくる request の `cf.colo` は
+「呼んだ側に一番近い edge」で、測定者の laptop のことになる。
+
+### block の 185 ms の内訳
+
+    tick gap   min 25   p50 29    max 1960
+    tick work  min  0   p50  0    max 1922
+    block      min 54   p50 247   max 1960
+
+**block の最小は 54 ms** —— 床は既に Hyperliquid と同水準にある。差は中央値と tail で、
+tail は tick work に追従していた。原因は `dispatch` が peer ごとの `fetch` を
+`Promise.all` で待ち、tick がそれを待って終わること ——
+**自分の時計が一番遅い replica の速度で動いていた。**
+
+待ちに上限（40 ms、送信は止めない）を入れて tick work の max は 1922 → 40 になった。
+**ただし block の中央値は動いていない**（180-290 ms）。残る犯人は tick gap の tail
+（max 370-1547 ms）で、配送ではなく **alarm の刻みと tick あたりの storage 仕事**。
+
+### 台帳としての訂正
+
+「~0.07 s に届かないのは transport だから、co-location を買うしかない」は**誤り**。
+床は既に届いている。届いていないのは中央値で、それは **コードで到達できる場所**
+（Durable Object の alarm 刻みと per-tick の永続化）にある。**資金判断を待つ項目
+ではなくなった。**
+
+## engine か基盤か —— 2 つの基盤で同じコードを走らせた（2026-08-13）
+
+前の節で transport が gap ではないと分かった後、残ったのは「Durable Object の
+invocation 粒度」という**推論**だった。推論のまま資金判断を求めるべきではないので、
+測定に変えた。
+
+### Cloudflare Durable Objects の上（deployed v2、4 replica）
+
+replica 間を **常設 WebSocket** にした（message ごとの HTTP POST から）。
+64 サンプル × 4 台:
+
+              min          p50          max
+    POST     34-66 ms   160-195 ms   1372-1970 ms
+    WS       25-37 ms   184-211 ms    1980-2507 ms
+
+床は 25 ms —— **Hyperliquid の ~0.07 s を下回る**。中央値は動かない。
+
+`tick-ms` を 10 に下げて測り直した（表は旧 transport で取ったものだった）:
+
+    tick gap   min 14-50   p50 42-57   max 55-1015
+
+**alarm は 10 ms では鳴らない。** 10 を頼んで 42-57、25 を頼んで 33-43 ——
+短く頼むほど遅くなる。Durable Object の alarm には 35-55 ms 付近の床がある。
+
+### alarm の無い基盤の上（inga の実 socket harness、ローカル、4 replica）
+
+    418 block / 20 s = 48 ms/block
+
+**harness の clock は 120 ms** —— Cloudflare の 25 ms より遅い。それでも 48 ms
+ごとに block が出る。進行は clock ではなく message で駆動されており、**engine は
+48 ms を出せる。Hyperliquid より速い。**
+
+### 結論（測定であって推論ではない）
+
+同じ合意コードが:
+
+    alarm の無い基盤   48 ms/block   （clock 120 ms）
+    Durable Object    184-211 ms    （clock 25 ms、床 40 ms）
+
+**差は engine ではなく基盤にある。** deployed の block 最小 25-37 ms がそれと符合
+する: event 駆動の経路（socket 着 → 投票 → 証明書 → 提案）は Cloudflare 上でも
+目標より速い。中央値が落ちないのは、その経路が毎 block 発火せず、落ちたときの
+受け皿が 40 ms 刻みの clock だから。
+
+### だから残る 3 件は、すべてオーナー判断である
+
+- **中央値** —— platform 内の最適化は測って尽きた。次は実行基盤の選択（専用
+  プロセス / 別ランタイム）で、費用と運用の判断
+- **escrow** —— 資金判断
+- **HyperEVM** —— 独立した大規模設計の着手判断
+
+コードで到達できる範囲は、この台帳の分類 3 と合わせて**尽きた**。
+
+—— と書いた直後にオーナーから「1, 2, 3 を設計実装、escrow には thorchain」の指示が
+あり、3 件とも着手した。以下がその結果である。
+
+## 3 項目の決着（2026-08-13）
+
+### 1 実行基盤 —— 基盤を替えた
+
+通常プロセスの validator (`torihiki-node.standalone`) を書いた。
+
+    block  min 1-2 ms   p50 8-11 ms   （4 replica、実 socket、2 市場の実 exchange）
+
+**Hyperliquid の ~0.07 s の 6-9 分の 1。** 併せて閉じた: 再起動を跨ぐ append-only
+log、500 block ごとの checkpoint（起動時間が有界）、そして **quorum が証明しなかった
+chain に乗った replica の自力復帰** —— block を 1 つ改竄した履歴を持たせた replica が
+`repaired from the quorum at height 193` と言って復帰し、height 450 の hash が一致した。
+
+配置物（systemd unit / env / health check / 手順）は `deploy/`。**残るのはホストで
+あってコードではない。**
+
+### 2 escrow —— THORChain、両方向とも証言で
+
+`:deposit-attest` と `:withdraw-attest`。bond された validator 3 名が、同じ txid・
+口座・額・資産（出金は同じ claim・txid・宛先）を言って初めて動く。食い違う証言は
+上書きさせず拒否し、txid で一度だけ credit する。鍵 1 本の `:deposit` /
+`:withdraw-settle` は残すが足場ではない —— **1 本で mint も「払っていない claim の
+settle」もできる。**
+
+`torihiki.thorchain` は純粋で、memo は `TORIHIKI:<digits>` 完全一致のみ（THORChain の
+memo は既に命令語なので、緩い parser は他人の命令を入金として読む）。
+
+**未検証**: 実 API の応答形に当てていない（この環境から thornode へ到達できない）。
+
+### 3 HyperEVM —— 橋・RPC・interpreter
+
+precompile（position / collateral / freeCollateral / markPx / oraclePx、position は
+2 の補数）、JSON-RPC（`eth_call` `eth_getCode` `eth_chainId` `eth_blockNumber`）、
+interpreter（算術・符号付き・shift・memory・storage・log・**keccak256**・
+`CALL` / `DELEGATECALL` / `CREATE2`）。keccak は自前で、lane を 32bit の対で持つので
+両ランタイムで厳密に同じ。CREATE2 は **EIP-1014 の公表ベクタと一致**。
+
+**contract の code は chain の状態** (`:evm`、state root 内)。node に持たせれば 2 台が
+`eth_call` に違う答えを返しても root が黙る。署名した `:evm-deploy` が block に入り、
+client が独立に計算した番地に着地し、`eth_call` が bytecode を実行して 42 を返した。
+
+### この作業で見つけた「静かな間違い」6 件
+
+CID と block-hash の取り違え / 落ちなかった leaf の置換 / 無視された `:to` /
+片側にしか無い `bigint` / 同じ名前の下の 2 つの失敗 / checkpoint の無い高さで
+`no-checkpoint` を返す `/snapshot`。**どれもエラーを出さず、もっともらしい値を返す。**
+gate を root と両ランタイムに向け直した理由がこれである。
+
+### 同等性の現在地
+
+| | torihiki | Hyperliquid |
+|---|---|---|
+| 機能（分類 3） | 全実装 | — |
+| block 中央値 | **8-11 ms** | ~70 ms |
+| escrow | 実装済み・**資金未投入** | 稼働 |
+| EVM | 橋 + RPC + interpreter | 稼働 |
+| 稼働 | **未配置** | 稼働 |
+
+残るのは (a) ホストに置くこと、(b) vault に資金を入れること。**どちらも実行そのものが
+オーナーの操作であり、コードでは代われない。**"}
+ {:db/id -2
+  :adr/id "ADR-2608141900"
+  :adr/title "torihiki ⊖ Hyperliquid — gap 台帳 追記（2026-08-14 実測、前回の数字の訂正を含む）"
+  :adr/status "accepted"
+  :adr/date "2026-08-14"
+  :adr/tags ["kotoba-lang" "torihiki" "hyperliquid" "gap-ledger" "escrow" "consensus"]
+  :adr/body
+  "## まず、前の entry の数字を訂正する
+
+ADR-2608040600 の末尾の表は torihiki の block 中央値を **8-11 ms** と書き、
+Hyperliquid の ~70 ms と並べていた。**あの数字は止まった chain で測ったもので、
+比較として成立していない。**
+
+止まった Durable Object は仕事をしていないので RTT が短い。負荷が乗った状態で
+測り直すと `/clock` が 42-50 ms、`/msg` が 24-56 ms で、1 block はおよそ 2 往復
+なので **~90 ms** が実体だった。8-11 ms は『速い』の証拠ではなく『動いていない』
+の証拠だったことになる。
+
+台帳が答えるべき問いそのものについて、台帳が誤っていた。訂正を先頭に置くのは
+そのためである。
+
+## escrow —— 実装済みから、稼働して実証済みへ
+
+前回は『実装済み・資金未投入・実 API に未検証』だった。今回変わった点。
+
+THORChain の REST は **Cloudflare の bot challenge の裏**にあり、Worker からも
+普通の shell からも `Just a moment` しか返らない（Workers 固有の制限ではない）。
+到達不能は前回の推測どおりだったが、理由は名前解決ではなく bot 判定だった。
+
+そこで観測を**発生元の chain 側**に移した。ETH の入金は THORChain Router への
+call であり、Router の `Deposit(address,address,uint256,string)` が vault / asset /
+amount / memo を全部持つ。topic は repo の keccak から導出し、**実 log と一致**する
+ことを確認した（Router 0xD37B...7146）。
+
+live chain で通した経路:
+
+    Ethereum log → deposits-from-logs → scaled-amount → attest!
+                 → bonded quorum 3/4 → credit
+
+**2,500,000 micro-USDC (2.50 USDC) が 8 秒で着地し、4 通目の attestation では
+増えなかった（exactly-once）。** 他人の実 deposit に対しては memo を正しく decode
+した上で `memo-is-not-ours` で拒否する（実 log で確認）。
+
+実 log を読んで見つかった実バグ 3 件:
+
+1. **金額が i53 に収まらない。** DAI 50,000 は 5x10^22。無変換だと
+   `torihiki.fixed` が `apply-block` の中で throw する —— 拒否ではなく合意層の
+   クラッシュ。読み方自体も runtime で割れていた（JVM は例外、JS は
+   5.0000000000000004e22）。
+2. **asset の allowlist が無かった。** Router は公開契約なので誰でも任意の
+   ERC-20 を memo 付きで送れる。allowlist が無ければ今朝作った token が額面で
+   担保になる。decimals も設定から来る必要がある（推測は 10^12 倍の誤入金）。
+3. **test helper が cljs で何も検証していなかった。** `(int c)` は ClojureScript
+   では NaN（文字型が無い）。memo が全部 NaN になり、JVM では緑、nbb では中身の
+   無い corpus を読んでいた。
+
+3 は parity gate の穴でもあった。`script/tests-on-nbb.cljs` を追加し、**328 tests /
+850 assertions が両 runtime で緑**になることを担保した（従来の loads-on-nbb は
+『読めるか』しか見ないので、この層は捕まえられない）。
+
+**まだ資金は入っていない。** 入金先 vault は THORChain の churn で数日ごとに
+変わり、その一覧を取る API に到達できないので、`THOR_VAULT` は観測由来の
+allowlist（設定に記録済み、根拠と限界も併記）。実入金の前に、その時点の
+inbound address が list にあることの確認が要る。
+
+## 合意層 —— 10 件の実バグ
+
+前回の台帳は consensus を差分として扱っていない。今回、**deploy された chain が
+高さ 26,110 で完全に固着した**ことをきっかけに 10 件が出た。すべて実測起点で、
+inga 394 tests 緑。
+
+1. `propose` が **tip** の certificate を要求 —— 提案が quorum に届かない瞬間に
+   永久停止（HotStuff の leader は highest QC を延長する）
+2. `proposable-round` が proposer 自身の view まで飛び、round が私的な番号になる
+3. skip の根拠が『ちょうど round-1 の new-view quorum』。round は height 付近、
+   new-view は view 付近に居るので、**壊れているときにだけ使えない**
+4. `vote-on-tip` が 1 view 1 票の枠を古い tip で使い切る
+5. `on-tick` の timeout 分岐が return し、**leader が一度も propose を訊かれない**
+6. 再構築閾値 4 view が短すぎ、**高さが下がっていた**（10 block 消失）
+7. **backoff が失敗でリセットされる** —— timeout certificate は view 失敗の証拠
+   なのに `failures` を 0 に戻す。止まると毎 view TC ができるので backoff が
+   永久に効かない（実測: view が毎秒 0.62 の完全な定速、10 分間減速なし）
+8. checkpoint が取引所全体を **storage 操作 1 回**で書き、育つと platform の
+   timeout を超える
+9. `:new-views` が無制限に増える（Durable Object は memory 上限のある長寿命
+   プロセス）
+10. `high-qc-block` が certificate を持たない block を返す —— `propose` はそこまで
+    chain を切り詰めてから拒否する。毎 round 捨てて何も作らない
+
+**8 が特に重い。** 実機から捕獲した文言:
+
+    Durable Object storage operation exceeded timeout which caused object to be reset.
+
+これで replica が reset され、4 台中 3 台になり、quorum 3 では余裕がゼロなので
+次に 1 台遅れると chain が止まる。**3 回起きて、3 回とも consensus の停止に
+見えていた。** state と履歴を別々の write に分けて解消した。
+
+途中で**自分の修正 7 と 3 が打ち消し合う回帰**も出した（backoff を効かせると
+new-view が溜まらず skip 根拠が枯れる）。特定して、skip の根拠を量への依存から
+切り離した。`vote-on-tip` を timeout 分岐へ移す案は departure spec を壊したので
+revert しており、入っていない。
+
+## 残る限界は、コードではなく基盤
+
+もう一つの捕獲:
+
+    Durable Object is overloaded. Requests queued for too long.
+
+論理バグでも storage timeout でもない。**DO は単一スレッドで、処理できる速度を
+超えて要求が届いていた。** 既存の tick 表が反対側から同じ現象を記録している ——
+`tick-ms 5` で chain は遅くなるのではなく停止し、どの replica も何も報告しなかった。
+その表は今回の 10 件より前に取られたもので、**修正は block 生成速度を上げた**ため、
+tick 25 が確保していた余裕は使い切られていた。50 に戻した。
+
+構造として:
+
+- DO は単一スレッド、DO 間 RTT は実測 ~45 ms
+- validator 4 台・quorum 3 なので、**1 台が応答不能になった瞬間に余裕がゼロ**
+- その基盤上で replica は断続的に応答不能になる
+
+**4 台はこの基盤には少なすぎる。** 7 台（quorum 5、2 台の障害を許容）にすれば
+断続的な応答不能を吸収できる。これは『Cloudflare のまま』という判断と両立する
+構造的な次の一手であり、genesis validator set の変更なので新チェーンになる。
+
+## 同等性の現在地（前 entry の表を差し替える）
+
+| | torihiki | Hyperliquid |
+|---|---|---|
+| 機能（分類 3） | 全実装 | — |
+| block 中央値 | **~90 ms**（訂正） | ~70 ms |
+| 持続稼働 | **不可** —— 断続的に replica が応答不能 | 稼働 |
+| escrow | **稼働・経路実証済み・実資金は未投入** | 稼働 |
+| EVM | 橋 + RPC + interpreter | 稼働 |
+| market 数 | **4** | 数百 |
+| 実取引量 | **ゼロ** | 実流動性 |
+| validator | **4（quorum 3、余裕ゼロ）** | 成熟した構成 |
+| ecosystem | **無し** | 確立 |
+
+**同等ではない。** 板・流動性・market 数・ecosystem のどの軸でも比較を行って
+おらず、行える段階にない。今回進んだのは escrow と合意層の土台であって、
+運用上の同等性ではない。
+
+この台帳がこれまで『同等性の現在地』を機能面と block 時間だけで書いてきたことも、
+今回の訂正の対象に含める —— **機能が揃っていることと venue として成立している
+ことは別の主張であり、前者だけを並べた表は後者を示唆してしまう。**
+
+## 次に意味のある順序
+
+1. validator 7 台（基盤の断続的な応答不能を吸収する。新 genesis）
+2. それが 1 時間停止せず走ることの確認
+3. 実 vault への少額入金（その時点の inbound address の確認が先）
+4. **そこで初めて**板・流動性・market 数の話"}]
