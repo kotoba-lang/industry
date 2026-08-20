@@ -136,7 +136,31 @@
 {:schema 1
 
  :detectors
- [{:id       :verify-source-nul-bytes
+ [{:id :verify-wasm-toolchain-pin
+   :title "the Wasm toolchain amu pins, against the versions the nodes actually have"
+   :why "2026-08-20: amu's contract (kotoba-component's component-model-v1.edn,
+              [:spec-baseline :wasi :toolchain]) pins {:wasm-tools \"1.243.0\"
+              :wac-cli \"0.10.1\"} and refuses any other version before running.
+              The fleet satisfies that from ~/.gftd/wasm-pin/bin, and the
+              amu-jvm-test gate depends on it. When the contract moves, those
+              binaries stay put and the gate goes red saying `wasm-tools version
+              is not pinned` -- which reads as a repo failure and is not one. It
+              is ADR-2608198600's shape (a node answering about itself, recorded
+              as a verdict on the code), created by the change that added the
+              gate. This says it in the right name, before the gate says it in
+              the wrong one. Cannot be a fleet gate: the comparison needs
+              kotoba-component's resource AND scripts/fleet-ci/nodes.edn, and no
+              single shipped tree holds both. Measured while writing it -- the
+              first version read the contract from amu, where it does not exist,
+              and the refusal path is what caught that rather than a clean 0."
+   :argv ["nbb" "{{repo}}/scripts/verify-wasm-toolchain-pin.cljs" "--findings" "--root" "{{root}}"]
+   :cwd :root
+   :findings :protocol
+   :writes :none
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :timeout-ms 300000
+   :interval-ms 43200000}
+{:id       :verify-source-nul-bytes
    :title    "raw control bytes in source, which make grep answer as if a word is absent"
    :why      "2026-08-18/19: one NUL byte makes file(1) classify a source file as
               `data`, and grep then SKIPS it silently -- `grep -c MessageDigest
