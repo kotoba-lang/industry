@@ -194,7 +194,40 @@
      :file "test/langgraph/kotoba_checkpoint_test.cljc"
      :find ":result_edn (wildcard-result-edn (or entity {}))"
      :replace ":entity_edn (wildcard-result-edn (or entity {}))"
-     :must-fail ["state-round-trips-identically-through-both-substrates" "put-and-get-latest"]}]}
+     :must-fail ["state-round-trips-identically-through-both-substrates" "put-and-get-latest"]}
+
+    ;; 以下 4 件（2026-08-21）は checkpoint.cljc が定義する **protocol の約束**で、
+    ;; 4 件とも「別の実装では既に pin されているのに、この実装では誰も見ていない」
+    ;; という同じ形をしていた。45 test / 156 assertion の suite に当てて 4 件とも
+    ;; 緑だったのを実測し、test/langgraph/checkpoint_test.cljc（実装を跨いで同じ
+    ;; 契約を回す conformance suite）を足して 4 件とも赤くなるのを見た。
+    {:id :langgraph/get-state-at-is-not-exact
+     :why "time travel の述語が等号でなくなること。`<=` に緩めても返るのは実在する整った checkpoint —— ただし**訊いていない step のもの**なので、呼び手には見分けが付かない。監査が「人間が承認した step」を訊いて隣の state を受け取り、それを step N だと信じる。retention で古い行が消えた・部分 export から復元した・単に無い step を訊いた、のどれでも起きる"
+     :file "src/langgraph/checkpoint.cljc"
+     :find "(some #(when (= step (:step %)) %) (list-checkpoints cp thread-id))"
+     :replace "(some #(when (<= step (:step %)) %) (list-checkpoints cp thread-id))"
+     :must-fail ["get-state-at-answers-only-for-the-step-it-was-asked-for"]}
+
+    {:id :langgraph/mem-history-not-ascending
+     :why "protocol の docstring が言う「ascending by :step」を mem 実装が守ること。datomic 側は :langgraph/history-ascending で pin 済みだが mem 側は誰も書き込み順を崩さないので sort を消しても緑だった。順序は飾りではない —— get-state-at がこの列を先頭から読んで最初の一致を取る。前進する graph では挿入順と step 順が一致するので、backfill・replay・archive からの復元まで露見しない"
+     :file "src/langgraph/checkpoint.cljc"
+     :find "      (-list-checkpoints [_ tid] (vec (sort-by :step (get @store tid []))))"
+     :replace "      (-list-checkpoints [_ tid] (vec (get @store tid [])))"
+     :must-fail ["list-checkpoints-is-ascending-by-step-however-it-was-written"]}
+
+    {:id :langgraph/mem-put-returns-nil
+     :why "put! が渡された checkpoint を返すこと。kg 実装では put-returns-ckpt が既に pin しているのに mem では誰も見ていない。返り値を繋ぐ呼び手（host が永続化した checkpoint を自分の呼び手へ返す等）だけが、実行時に、書き込まれた先のプロセスで気付く"
+     :file "src/langgraph/checkpoint.cljc"
+     :find "      (-put! [_ tid ckpt] (swap! store update tid (fnil conj []) ckpt) ckpt)"
+     :replace "      (-put! [_ tid ckpt] (swap! store update tid (fnil conj []) ckpt) nil)"
+     :must-fail ["put!-returns-the-checkpoint-it-persisted"]}
+
+    {:id :langgraph/datomic-put-returns-nil
+     :why "同上を datomic 実装で。transact! の戻り値に置き換わっても型も arity も文句を言わない。2 実装で別々に壊せるので mutation も 2 件在る —— 片方だけの gate は protocol の約束ではなく 1 実装の性質しか検査していない"
+     :file "src/langgraph/checkpoint.cljc"
+     :find "                      :checkpoint/status status}])\n         ckpt)"
+     :replace "                      :checkpoint/status status}])\n         nil)"
+     :must-fail ["put!-returns-the-checkpoint-it-persisted"]}]}
 
   {:repo "orgs/kotoba-lang/prolly-tree"
    :label "prolly-tree inclusion proof"
