@@ -1299,7 +1299,23 @@
    :interval-ms 21600000                 ; 6h -- landing a var is a human act
    :timeout-ms  120000                   ; 2m -- 34x the measured run
    :writes   :none
-   :measured "2026-08-20 on this machine: 3.5s wall, 13 claims, 3 findings, exit 1.
+   :measured "2026-08-20 on this machine: 5s wall, 13 claims, 9 findings, exit 1.
+              Two defects were found by USING it, both of the class it reports:
+                specs were read from the working tree while implementations were read
+                from the ref -- the asymmetry it exists to catch, in its own input. Specs
+                now come from the ref, and a local file that differs is reported, with
+                `git status` asked whether it is MODIFIED or merely BEHIND rather than
+                asserted: six differed and only one was a local edit; the other five were
+                a checkout 52 commits behind.
+                execSync`s default 1 MiB maxBuffer THROWS rather than truncating, and this
+                helper turned that into nil, which every caller reads as absent. Two 2.25 MB
+                spec files were reported `unreadable`; the same path runs over
+                implementation files, where a large namespace would have produced a silent
+                var-missing for every var in it. Raised to 64 MiB.
+              A transient run returned exit 2 while another session held git in the same
+              repo. That is the design working, not a flake to paper over: an unanswerable
+              run must not report clean. Three consecutive runs after it: exit 1, 9 findings.
+              
               Only `git show`/`cat-file`/`remote` against already checked-out repos and
               fs reads; no network.
               Three states produced deliberately before registering:

@@ -63,9 +63,20 @@
   counted, never silently treated as empty."
   ["orgs/kotoba-lang/kotoba-lang/lang"])
 
+(def max-buffer
+  "64 MiB. Node's execSync default is 1 MiB and it does not truncate -- it
+  THROWS, which this helper would have turned into nil, which every caller
+  reads as `absent`. Measured 2026-08-20: lang/q9-inventory.edn and
+  lang/q9-kotoba-candidate-verification.edn are 2.25 MB each and were reported
+  `unreadable`. The same path runs over implementation files, where the answer
+  would not have been an honest `unreadable` but a silent `var-missing` for
+  every var in a large namespace."
+  (* 64 1024 1024))
+
 (defn sh [& args]
   (try (str/trim (.toString (cp/execSync (str/join " " args)
-                                         #js {:stdio #js ["pipe" "pipe" "pipe"]})))
+                                         #js {:stdio #js ["pipe" "pipe" "pipe"]
+                                              :maxBuffer max-buffer})))
        (catch :default _ nil)))
 
 (defn finding! [severity key detail]
@@ -179,16 +190,80 @@
 (def claims (atom []))
 (def missing-dirs (atom 0))
 
+(def spec-uncommitted (atom []))
+
+(defn spec-repo-of
+  "`[repo rel]` for a spec dir inside a checkout, or nil.
+
+  `orgs/<org>/<repo>/lang` -> `[\"orgs/<org>/<repo>\" \"lang\"]`."
+  [d]
+  (let [segs (str/split d #"/")]
+    (when (>= (count segs) 4)
+      [(str/join "/" (take 3 segs)) (str/join "/" (drop 3 segs))])))
+
+;; Spec files are read from the DEFAULT REF, not from disk.
+;;
+;; The first version of this detector read implementations from the ref and
+;; specs from the working tree. That asymmetry is the very thing it exists to
+;; report, and it was in its own input: measured 2026-08-20, the shared
+;; kotoba-lang checkout had lang/value-codec.edn uncommitted while the run was
+;; treating it as the spec. It happened not to change the answer -- the claim
+;; was committed and the local edit only moved it -- but nothing in the output
+;; would have said so either way. A local edit to a spec must not silently
+;; become what the detector checks.
 (doseq [d spec-dirs]
-  (if-not (fs/existsSync d)
-    (swap! missing-dirs inc)
-    (doseq [f (fs/readdirSync d) :when (str/ends-with? f ".edn")]
-      (let [fp (path/join d f)]
-        (try (collect-claims (edn/read-string (fs/readFileSync fp "utf8")) fp claims)
-             (catch :default e
-               (finding! "high" (str "unreadable:" fp)
-                         (str "spec file does not parse, so its claims were not checked: "
-                              (.-message e)))))))))
+  (if-let [[repo rel] (spec-repo-of d)]
+    (let [ref (ref-for repo)
+          listing (when ref (sh "git -C" repo "ls-tree -r --name-only" ref "--" rel))
+          files (when listing (filter #(str/ends-with? % ".edn")
+                                      (remove str/blank? (str/split listing #"\n"))))]
+      (cond
+        (nil? ref)
+        (do (swap! missing-dirs inc)
+            (finding! "medium" (str "spec-no-ref:" d)
+                      (str "no remote-tracking default branch resolved for " repo
+                           ", so its spec files could not be read from a ref."
+                           " Nothing was checked against the working tree instead:"
+                           " that is the substitution this detector reports.")))
+
+        (empty? files)
+        (swap! missing-dirs inc)
+
+        :else
+        (doseq [f files]
+          (let [text (sh "git -C" repo "show" (str ref ":" f))
+                on-disk (let [abs (path/join repo f)]
+                          (when (fs/existsSync abs) (fs/readFileSync abs "utf8")))]
+            (when (and on-disk text (not= (str/trim on-disk) (str/trim text)))
+              ;; Dirty and stale look identical from the bytes alone, and the
+              ;; first version of this finding asserted `local edits` for both.
+              ;; Measured 2026-08-20: six spec files differed from the ref and
+              ;; only two were modified -- the other four were a checkout 52
+              ;; commits behind. git is asked which it is rather than told.
+              (swap! spec-uncommitted conj
+                     [f (if (str/blank? (or (sh "git -C" repo "status --porcelain --" f) ""))
+                          :behind :modified)]))
+            (if (nil? text)
+              (finding! "high" (str "unreadable:" f)
+                        (str "spec file could not be read from " ref))
+              (try (collect-claims (edn/read-string text) f claims)
+                   (catch :default e
+                     (finding! "high" (str "unreadable:" f)
+                               (str "spec file does not parse on " ref
+                                    ", so its claims were not checked: "
+                                    (.-message e))))))))))
+    (swap! missing-dirs inc)))
+
+(doseq [[f why] @spec-uncommitted]
+  (if (= :modified why)
+    (finding! "medium" (str "spec-modified:" f)
+              (str f " has uncommitted local modifications. The claims checked here"
+                   " are the ones on the default branch; the local edits were NOT"
+                   " checked and are not reported as drift."))
+    (finding! "low" (str "spec-behind:" f)
+              (str f " is clean but differs from the default branch -- this checkout"
+                   " is behind. The claims checked here are the ones on the branch,"
+                   " which is correct; the local file is simply older."))))
 
 (def all (distinct @claims))
 
