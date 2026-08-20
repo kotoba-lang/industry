@@ -2157,6 +2157,45 @@
   {:name "kotoba-kir" :id "kotoba-kir-jvm-test" :gate :jvm-test :cap :jvm :cd false}
   {:name "kotoba-verifier" :id "kotoba-verifier-jvm-test" :gate :jvm-test :cap :jvm :cd false}
 
+  ;; The remaining three 綾 (ADR-2608139980). 49347203 gated the three layers
+  ;; amu is BUILT from; these are the three it EMITS through, and they were
+  ;; the last of the five with no gate of their own -- seen by the fleet only
+  ;; as a resolved git dep inside someone else's run.
+  ;;
+  ;; Same eligibility check as the three above: `grep -c :local/root deps.edn`
+  ;; is 0 for all three, and every git dep they name is a public kotoba-lang
+  ;; repo, so a node clones them without a credential.
+  ;;
+  ;; **The caps are not all :jvm, and the difference is measured rather than
+  ;; assumed.** kotoba-wasm and kotoba-component both reach for the pinned
+  ;; binary in their suites -- `wasm-tools validate` in
+  ;; `component_heap_test.clj` and `object_get_stream_provider_component_test
+  ;; .clj`, through `kotoba.wasm.tools/run-command!`. That is a bare
+  ;; `ProcessBuilder.start`, so an absent binary is an IOException and a red
+  ;; gate, not a skip -- and `assert-version!` pins the version exactly, which
+  ;; is why the cap is :wasm-tools (the tick puts ~/.gftd/wasm-pin/bin ahead of
+  ;; Homebrew for precisely this) and not :jvm. Giving these :jvm would put
+  ;; them on nodes where they cannot pass. kotoba-script shells out to nothing
+  ;; and takes :jvm, so it reaches the wider set.
+  ;;
+  ;; Measured at each origin/main before landing, all exit 0:
+  ;;
+  ;;   kotoba-script      64 tests,  225 assertions   :jvm
+  ;;   kotoba-wasm        95 tests,  425 assertions   :wasm-tools
+  ;;   kotoba-component  182 tests, 1250 assertions   :wasm-tools
+  ;;
+  ;; ⚠ Local, on a workstation that has the toolchain. Per this file's own
+  ;; rule none of the three is landed until it has been green once on a node;
+  ;; the shipped tree is not the tree measured here, and "local green" has
+  ;; been wrong in that direction before. Read the receipts before quoting
+  ;; these as covered.
+  ;;
+  ;; :cd false -- matching the neighbours. Green means this repo's suite
+  ;; passed; it is not a reason to advance a west pin.
+  {:name "kotoba-script" :id "kotoba-script-jvm-test" :gate :jvm-test :cap :jvm :cd false}
+  {:name "kotoba-wasm" :id "kotoba-wasm-jvm-test" :gate :jvm-test :cap :wasm-tools :cd false}
+  {:name "kotoba-component" :id "kotoba-component-jvm-test" :gate :jvm-test :cap :wasm-tools :cd false}
+
   {:name "amu" :id "amu-native-fuzz" :gate :nbb-script
    :script "gates/amu-native-fuzz-check.cljs" :cd false}
 
