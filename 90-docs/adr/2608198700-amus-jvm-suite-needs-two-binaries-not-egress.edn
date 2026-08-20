@@ -67,10 +67,53 @@ folklore から nodes.edn の欄に移すこと。誰かが 1 台に入れれば
 
 実行後の nodes.edn の diff は `:probed-at` と空き容量だけで、cap 面は不変。
 
+## 訂正（2026-08-20、同日）— 「2 本」ではなく「3 本 + 固定 version」
+
+**上の次の一手（1 台に 2 本入れて cap を確認し、gate を足す）を実行したら、
+その手順自体が誤りだと分かった。**
+
+benjamin に `brew install wasm-tools wasmtime` して再 probe すると `:wasm-tools`
+cap は**実際に立った**（初めての live 確認で、synthetic な self-test の主張が
+現実と一致することは確かめられた）。しかし suite を回すと:
+
+    87 errors → 79 errors
+    `Cannot run program \"wasm-tools\"` 82 件
+      → `wasm-tools version is not pinned` 76 件
+
+amu の言語契約（`kotoba/lang/component-model-v1.edn` の
+`[:spec-baseline :wasi :toolchain]`）が要求するのは
+**`{:wasm-tools \"1.243.0\" :wac-cli \"0.10.1\"}`** で、Homebrew は最新しか配らない
+（その日 1.257.1）。さらに **`wac` は Homebrew に存在しない**
+（`No available formula with the name \"wac\"`）。
+
+つまり必要なのは **3 本、しかも固定 version**。「2 本入れれば gate できる」は
+測る前の推測だった。
+
+### そして cap 自体が、防ぐはずの欠陥そのものだった
+
+benjamin は 2 本を持って `:wasm-tools` を獲得したが、suite は動かない。
+`:cap :wasm-tools` の gate を足していたら benjamin に置かれ、**repo ではなく
+ノードについて赤を出していた** —— ADR-2608198600 で直したのと同じ形を、
+それを直した本人が 1 日で再導入していた。
+
+**修正**: cap は 3 本の連言にした。今日はどのノードも獲得しない（`wac` が
+入手経路すら無い）。**それが正しい答え**で、この suite を回せるノードは
+現在ゼロである。
+
+version は cap の条件に入れず、**記録**する（`:wasm-tools-version` 等）。
+pin は amu 側の所有物で、この file に他 repo の pin の写しを置くと必ず腐る
+（zig の先例と同じ: probe は `zigv` を記録し、gate が未知 version を
+fail-closed にする）。benjamin の欄には `1.257.1` が出るので、要求 `1.243.0`
+との差はファイルを見れば分かる。
+
+self-test は 8 件に増やし、**旧 2 本ルールに戻すと「wac 無しの pair」ケースが
+落ちる**ことを確認した —— 落ちるのは benjamin がちょうどその状態だった実例。
+
 ## 残っていること
 
-- JVM suite の gate 化は**していない**。1 台に 2 本入れて cap が立つのを確認して
-  から `:cap :wasm-tools` の entry を足す、が順序。
+- JVM suite の gate 化は**していない**。順序は: `wasm-tools` を **1.243.0** に
+  固定する経路を用意し、**`wac-cli` 0.10.1** を brew 以外（cargo / release
+  binary）で入れ、cap が立つのを確認してから entry を足す。
 - 3 件の `cli exited during a test that did not expect it` は未調査。
   wasm-tools 由来かどうか分かっていない。
 - したがって **native の 20 case は今も ungated** のまま
