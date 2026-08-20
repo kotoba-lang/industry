@@ -81,13 +81,20 @@
 ;; として扱う —— そこでは `(defn fem-elastoplastic …)` は存在せず、`(defmethod
 ;; solver/solve :fem-elastoplastic …)` が能力の在処である。marker の綴りを間違えて
 ;; :absent と報告するのが、この audit で一番起きやすい嘘なので kind を分けて持つ。
-(def ^:private dispatch-re #"(?m)^\(defmethod\s+[A-Za-z0-9._/-]*solve\s+:([A-Za-z0-9*!?<>+-]+)")
+(defn- dispatch-re
+  "Dispatch values registered on one multimethod. `:axis/dispatch-of` names it
+   (default `solve`, for cae-solver). The registry IS the capability claim in
+   both places this is used —— `cae.solver/solve` and `brep.feature/apply-feature`
+   —— so measuring the registered set measures the claim, not a restatement of it."
+  [multi]
+  (re-pattern (str "(?m)^\\(defmethod\\s+[A-Za-z0-9._/-]*" (or multi "solve")
+                   "\\s+:([A-Za-z0-9*!?<>+-]+)")))
 
 (defn- top-level-defs
   "ファイル群の marker 名の集合。行頭に固定するので、docstring やコメントの中の
    同名語は拾わない（grep との差はここ）。"
-  [files kind]
-  (let [re (if (= kind :dispatch) dispatch-re def-re)]
+  [files kind multi]
+  (let [re (if (= kind :dispatch) (dispatch-re multi) def-re)]
     (reduce (fn [acc f]
               (let [src (try (fs/readFileSync f "utf8") (catch :default _ ""))]
                 (into acc (map second (re-seq re src)))))
@@ -154,7 +161,7 @@
                                   (str/join ", " (:axis/paths axis)))})
 
       :else
-      (let [defs (top-level-defs files (:axis/marker-kind axis :def))
+      (let [defs (top-level-defs files (:axis/marker-kind axis :def) (:axis/dispatch-of axis))
             markers (:axis/markers axis)
             found (vec (filter defs markers))
             missing (vec (remove defs markers))
