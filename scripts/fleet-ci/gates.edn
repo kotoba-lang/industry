@@ -208,6 +208,14 @@
   {:name "org-ietf-ed25519" :gate :jvm-test :cd true}
   {:name "org-ietf-cbor" :gate :jvm-test :cd true}
   {:name "io-multiformats" :gate :jvm-test :cd true}
+  ;; did:webvh 1.0 (root ADR-2608202000). `:jvm-test` rather than `:nbb-test`
+  ;; for tana's reason: the nbb harness needs five SIBLING checkouts on the
+  ;; classpath (jcs, multiformats, ed25519, vc-data-integrity, did) and the
+  ;; fleet ships one repo's tree, while deps.edn carries them as git deps that
+  ;; `ship-git-deps!` does deliver. The two runs are the same 25 tests / 59
+  ;; assertions -- measured 2026-08-20, and the ClojureScript one is what
+  ;; found the `(int c)` defect the JVM run could not see.
+  {:name "foundation-identity-didwebvh" :gate :jvm-test :cd true}
   {:name "io-ipld" :gate :jvm-test :cd true}
   ;; UnixFS file DAGs. Its fixtures are real kubo CIDs, so this gate answers
   ;; "does `ipfs add` still agree with us" and not "do we agree with
