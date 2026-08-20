@@ -1566,6 +1566,21 @@
    ;; repo-taxonomy の `:repo/path` と同形ではなく org/repo 表記なので join には注意。
    ;; `:parity/coverage` entity を 1 件持ち、測定できていない面を申告する。
    ["engine-parity" (io/file root "90-docs" "maturity" "engine-parity.datoms.edn")]
+   ;; threed-parity — CAD / CAM / DCC / render / CAE の能力軸を、**tree から測った**
+   ;; 生成物（ADR-2608200100、`scripts/threed-maturity-audit.cljs`、`--check` あり）。
+   ;; engine-parity（手書きの Unity/Roblox 比較）とは別の dataset で、こちらは
+   ;; 判断が入るのは語彙（`90-docs/maturity/threed-capability-axes.edn`）だけ。
+   ;;
+   ;; ⚠ **`:parity/status` を 2 値として読まないこと。** `:working` は behavior probe
+   ;; が通った軸、`:declared` は marker だけ通って **まだ測っていない**軸で、後者を
+   ;; 実装済みに数えると測っていないものが緑になる。`:hollow` は marker が在って
+   ;; probe が落ちた軸 —— grep でも行数でも LLM 採点でも緑に見えるので、これが最悪。
+   ;; `:coverage/kind "threed-parity-coverage"` の 1 entity が、probe を書いた軸数と
+   ;; 走査ファイル数を申告する。
+   ;;
+   ;; join: `:parity/subject` は org/repo 表記（repo-taxonomy の `:repo/path` とは同形
+   ;;       ではない）。gtm-icp の `:icp/proof-axes` が `:parity/axis` を名指しする。
+   ["threed-parity" (io/file root "90-docs" "maturity" "threed-parity.datoms.edn")]
    ;; gtm-icp — 誰に売るかの機械可読な定義（手書きの「現在値」文書。ADR-2608042000）。
    ;; `:icp/product` は BMC の product id と同形。`:icp/coverage*` を持つ entity を
    ;; 1 件持ち、ICP の述語のうちデータ面が評価**できない**ものを申告する —— target
