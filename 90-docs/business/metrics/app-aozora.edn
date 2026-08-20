@@ -8,32 +8,32 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 14680,
-  "app-aozora-appview" 12873,
-  "app-aozora-spa" 12850},
+ {"app-aozora-pds" 14752,
+  "app-aozora-appview" 12952,
+  "app-aozora-spa" 12852},
  :zone
- {:requests-7d 241932,
-  :pageviews-7d 12721,
-  :uniques-7d-sum 1032,
+ {:requests-7d 242182,
+  :pageviews-7d 12723,
+  :uniques-7d-sum 1036,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/__cache/relay-repos-index-v1", :requests 169503}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4388}
+  [{:path "/__cache/relay-repos-index-v1", :requests 169480}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4392}
    {:path
     "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
-    :requests 165}
+    :requests 164}
    {:path "/.env.development", :requests 64}
    {:path "/erp/config.env", :requests 60}
    {:path "/cache/.env", :requests 60}
    {:path "/admin/phpinfo", :requests 60}
    {:path "/info1.php", :requests 60}],
-  :status-mix {:ok 176195, :client-error 639, :server-error 4471},
+  :status-mix {:client-error 638, :ok 176090, :server-error 4433},
   :window "24h"},
  :as-of "2026-08-20",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 2},
  :top-paths
- "上位 page (24h, 2xx/3xx): /__cache/relay-repos-index-v1 169503 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4388 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 165 · /.env.development 64 · /erp/config.env 60 | 4xx(probe) 0% · 5xx 2%",
+ "上位 page (24h, 2xx/3xx): /__cache/relay-repos-index-v1 169480 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4392 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 164 · /.env.development 64 · /erp/config.env 60 | 4xx(probe) 0% · 5xx 2%",
  :signal
- "aozora.app 実測 241932 req/7d・1032 uniques(日次和)・うち4xx probe 0%(24h)、workers 40403 inv/7d"}
+ "aozora.app 実測 242182 req/7d・1036 uniques(日次和)・うち4xx probe 0%(24h)、workers 40556 inv/7d"}
