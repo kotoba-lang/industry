@@ -16,6 +16,7 @@
   {:analysis "orgs/network-awai/cloud-murakumo/docs/gtm/jp-bto-under-400k-2026-08-15.md"
    :storefront "orgs/network-awai/cloud-murakumo/src/cloud_murakumo/storefront.cljc"
    :observed-at "2026-08-15"
+   :gmktec-rfq "gmail thread 1a0147e09d0adcf1 / 2026-08-18 send, 2026-08-19 GMKtec reply, 2026-08-20 follow-up"
    :sources
    ["https://www.chusho.meti.go.jp/zaimu/zeisei/tokurei/syougaku_shisan.html"
     "https://www.nta.go.jp/publication/pamph/hojin/kaisei_gaiyo2026/pdf/G.pdf"
@@ -98,6 +99,58 @@ GMKtec RFQは数量1/10/50/100台について、税込日本社着価格、各pr
 - 補助金採択、節税成立、推論速度を保証する販売表示はしない。取得価額、供用日、税務適格性は顧客の税理士確認事項とする。
 - 専用VRAMと共有VGMを同じ表現で販売しない。帯域は理論値と明記し、実機ベンチ値と混同しない。
 
+## GMKtec RFQ 実測（2026-08-19 返信 / 2026-08-20 再照会）
+
+Decision 4 と Decision 5 が未確認としていた項目のうち、GMKtec Channel Director からの
+書面回答で埋まったものを記録する。**単価だけは依然として未回答**である。
+
+送信は 2026-08-18、jun784@gmail.com から richard.han@gmktec.com 宛（julian@gmktec.com CC）。
+返信は 2026-08-19、Richard Han, Channel Director。対象機種は M6 Ultra / M7 Ultra、
+32GB DDR5、256GB NVMe、OS なし、仕向地 日本、数量 10/50/100台。
+
+| 項目 | GMKtec 回答 | ADR の前提との差 |
+|---|---|---|
+| OEM/ODM の MOQ | 500台 | 未確認だった。500台で確定 |
+| ロゴ・梱包・BIOS splash | MOQ 充足時に可 | 段階導入の分岐点が 500台と確定 |
+| 保証 | 1年 | ADR は 3年保証込みの完成原価 304,800円以下を採用条件にしている |
+| リードタイム | GMKtec ブランドなら 2週間 + 物流 1週間 | 新規 |
+| PSE 適合 AC アダプター | 可 | 未確認だった |
+| 無線 技適 / TELEC | 可 | 未確認だった |
+| 補修用マザーボード・ファン・AC アダプター | 可 | 未確認だった |
+| 将来ロットでの同一マザーボード / BIOS リビジョン | 可 | 未確認だった |
+| RAM 16GB x 2 のデュアルチャネル | 可 | 新規 |
+| 単価（10/50/100台） | **未回答** | 正式見積り未取得のまま |
+
+GMKtec 側からは、そのスペックでローカル推論はできないのでクラウド前提かという
+確認が入った。回答は否である。推論モデルと OS を自社開発しており、16GB の
+システムメモリ内で完結してオンデバイスで動く。したがってこの RFQ の対象機種は
+Decision 4 が候補にした EVO-X2 64GB/1TB ではなく、共有 64GB を前提にしない
+M6 Ultra / M7 Ultra 帯である。**EVO-X2 を候補から外す決定はしていない** —
+16GB で足りるため、より安価な機種帯が候補に加わったという意味である。
+16GB と 32GB の両方で見積りを要求している。
+
+### 保証年数の差分は未解決
+
+GMKtec の卸保証は 1年である。Decision 1/2/3 の SKU は 3年保証を基本構成に含み、
+Decision 4 の採用条件も 3年保証込みで完成原価 304,800円以下としている。
+したがって GMKtec 経由の完成品 mini PC は、当社が 2年分の延長保証を引き当てるか、
+3年保証を商品表示から外すかのどちらかになる。**単価が出るまでこの選択はしない** —
+引当費用を完成原価に載せられるかどうかが単価で決まるためである。
+
+### 500台 MOQ 前の 10台 PoC は回答待ち
+
+2026-08-20、10台規模の PoC 購入について照会した。OEM カスタマイズを求めず、
+GMKtec ブランド・標準梱包のまま卸で購入し、日本で自社 OS とモデルを載せて
+検証・バーンイン後に顧客へ納入する形が卸条件下で許容されるか、日本での
+reseller / distribution 契約が必要かを確認している。この段階では OEM 顧客ではなく
+system integrator / reseller として動く立て付けである。あわせて 10/100/500台の
+単価と FOB / DDP の別、連続稼働向けの機種推奨、保証の一次窓口と RMA 経路、
+no-OS 出荷、支払条件を要求した。
+
+**これは照会であって発注ではない。** 回答が Yes なら 10台の PoC を発注し、
+顧客の sign-off 後に 500台以上の OEM へ進む。No なら 500台まで直販不可という
+ことなので、代理店経由の調達経路を別途設計する必要がある。
+
 ## Verification status
 
-仕様、帯域、公開価格、GMKtecのカスタム/OEM表明は一次情報で2026-08-15に再確認した。cloud-murakumoの分析根拠は `orgs/network-awai/cloud-murakumo/docs/gtm/jp-bto-under-400k-2026-08-15.md` に保持する。未検証なのは、テックウインド/アプライド/GMKtecの正式OEM価格、EVO-X2固有のロゴ・名義変更可否とMOQ、3年保証、量産個体でのUbuntu/ROCm/XPU性能である。したがって調達契約については**正式OEM見積り未取得**"}]
+仕様、帯域、公開価格、GMKtecのカスタム/OEM表明は一次情報で2026-08-15に再確認した。cloud-murakumoの分析根拠は `orgs/network-awai/cloud-murakumo/docs/gtm/jp-bto-under-400k-2026-08-15.md` に保持する。GMKtec の MOQ・保証年数・PSE・技適・補修部材・BIOS リビジョン維持・リードタイムは 2026-08-19 に書面で回答を得た。未検証なのは、テックウインド/アプライドの正式OEM価格、GMKtec の単価（2026-08-19 時点で唯一の未回答項目）、EVO-X2 固有のロゴ・名義変更可否、3年保証の引受先、量産個体での Ubuntu/ROCm/XPU 性能、および 500台 MOQ 前に 10台を購入して顧客へ納入できるかである。したがって調達契約については依然として**正式OEM見積り未取得**"}]
