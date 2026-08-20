@@ -124,6 +124,13 @@
   [m path]
   (reduce-kv (fn [acc k v]
                (cond
+                 ;; `:override-deps` REPLACES a coordinate's resolution; it does
+                 ;; not add a second dependency. Flattening it made every
+                 ;; offline-dev override look like a second revision on the
+                 ;; classpath -- and that was the last thing this check was
+                 ;; still reporting. `:extra-deps` is additive and stays in.
+                 (= :override-deps k) acc
+
                  (and (map? v) (contains? v :git/sha))
                  (conj acc {:lib (str k) :sha (:git/sha v) :url (:git/url v)
                             :kind :git :in path})
@@ -132,6 +139,25 @@
                  (map? v) (into acc (dep-entries v path))
                  :else acc))
              [] m))
+
+(defn resolution
+  "WHERE a dependency entry actually points -- a git sha, or a normalised
+  local path. Two coordinates for one repository only collide if they resolve
+  DIFFERENTLY; pointing both at the same checkout is a redundant name, not two
+  revisions on one classpath.
+
+  Measured 2026-08-20: this distinction removed most of what the check was
+  reporting. Repositories like `cloud-itonami-commitment-ledger` name both
+  `io.github.com-junkawasaki/langchain-clj` and `io.github.kotoba-lang/
+  langchain` and pin BOTH to `{:local/root \"../../kotoba-lang/langchain\"}` --
+  deliberately, with a comment saying so, precisely so one revision is loaded.
+  The check called that `the same namespaces from two revisions`, which was
+  false, and said it in the same confident sentence it used for real ones."
+  [{:keys [sha root in]}]
+  (cond
+    (seq (str sha)) (str "sha:" sha)
+    (seq (str root)) (str "path:" (p/normalize (p/join (str in) (str root))))
+    :else "unresolved"))
 
 (defn repo-of
   "The repository a dependency entry resolves to. Exported because the whole
@@ -195,44 +221,66 @@
     ;; name) also collides and is not resolved here, because resolving it
     ;; means building the real dependency graph. The bound is stated rather
     ;; than the gap being left silent.
-    (let [active (for [[repo rs] multi
+    (let [redundant (atom 0)
+          active (for [[repo rs] multi
                        :let [per-dir (group-by :in rs)
                              clashing (for [[d es] per-dir
-                                            :when (> (count (set (map :lib es))) 1)]
-                                        {:dir d :libs (sort (set (map :lib es)))})]
+                                            :when (> (count (set (map :lib es))) 1)
+                                            :let [rez (set (map resolution es))]
+                                            ;; Two names, ONE target = redundant.
+                                            :when (or (> (count rez) 1)
+                                                      (do (swap! redundant inc) false))]
+                                        {:dir d :libs (sort (set (map :lib es)))
+                                         :resolutions (sort rez)})]
                        :when (seq clashing)]
                    {:repo repo :clashing (vec clashing)})
           active (vec active)]
       (println (str "CENSUS\trepos=" (count by-repo) "\tmulti-coordinate=" (count multi)
-                    "\tACTIVE=" (count active) " (both coordinates in one deps.edn)"
+                    "\tACTIVE=" (count active) " (two coordinates, DIFFERENT revisions, one deps.edn)"
+                    "\tREDUNDANT=" @redundant
+                    " (two coordinates pinned to the SAME target -- untidy, not a collision)"
                     "\tLATENT=" (- (count multi) (count active))
                     " (two names across the fleet, no single graph yet takes both)"))
       (doseq [{:keys [repo clashing]} active]
-        (doseq [{:keys [dir libs]} clashing]
+        (doseq [{:keys [dir libs resolutions]} clashing]
           (println (str "FINDING\tfail\tactive-collision:" repo
                         "\t" dir " names " (str/join " and " libs)
-                        " -- one classpath, the same namespaces from two revisions"))))
+                        " -> " (str/join "  VS  " resolutions)
+                        " -- one classpath, two revisions"))))
       (when (zero? (count active))
         (println (str "  no DIRECT collision: every multi-coordinate repository is named "
                       "under one coordinate per deps.edn. Transitive collisions are not "
-                      "measured here, so this is a lower bound, not an all-clear."))))
+                      "measured here, so this is a lower bound, not an all-clear.")))
     (doseq [b (take 5 broken)]
       (println (str "FINDING\twarn\tunparseable:" (:dir b)
                     "\tdeps.edn did not parse, so its dependencies were not examined: "
                     (:error b))))
+    ;; WARN, not fail. Two names for one repository is a real maintenance
+    ;; hazard -- two pins to move, and moving one looks done -- but it is not
+    ;; the classpath corruption the sentence used to claim, and measurement
+    ;; says none of these actually collide. A check must not spend its exit
+    ;; code on the thing it did NOT measure.
     (doseq [[repo rs] multi]
-      (println (str "FINDING\tfail\tmulti-coordinate:" repo
+      (println (str "FINDING\twarn\tmulti-coordinate:" repo
                     "\treached as " (str/join " and " (sort (set (map :lib rs))))
                     " across " (count rs) " references"
-                    " -- tools.deps dedupes by coordinate, so both can land on one classpath")))
+                    " -- two pins to move; moving one looks done")))
     (println)
-    (let [n (+ (count multi) (count broken))]
-      (if (pos? n)
-        (do (println (str n " finding(s): " (count multi)
-                          " repositor(y|ies) reachable under two coordinates"
-                          (when (seq broken) (str ", " (count broken) " unparseable deps.edn"))))
+    ;; The exit code answers ONE question: does any single dependency graph pull
+    ;; two coordinates for one repository at DIFFERENT revisions. That is the
+    ;; failure the docstring describes and the only one worth a red gate.
+    (let [n-active (count active)
+          hard (+ n-active (count broken))]
+      (println (str "  " (count multi) " repositor(y|ies) under two coordinates: "
+                    n-active " colliding, " @redundant
+                    " pinned to one target, " (- (count multi) n-active) " latent"))
+      (if (pos? hard)
+        (do (println (str hard " blocking finding(s)"
+                          (when (seq broken)
+                            (str ", incl. " (count broken) " unparseable deps.edn"))))
             (js/process.exit 1))
-        (println (str "OK — all " (count by-repo)
-                      " in-house repositories are reached under exactly one coordinate."))))))
+        (println (str "OK — no dependency graph reaches one repository at two "
+                      "revisions. The " (count multi) " duplicate names above are "
+                      "reported as warnings, not as this failure.")))))))
 
 (-main)
