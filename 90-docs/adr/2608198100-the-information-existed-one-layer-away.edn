@@ -1,0 +1,77 @@
+[{:db/id -1
+  :adr/id "adr-2608198100-the-information-existed-one-layer-away"
+  :adr/title "情報は在ったが、読める場所の 1 層手前で捨てられていた — 同じ欠陥を 1 日で 3 回"
+  :adr/status "accepted"
+  :adr/date "2026-08-19"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/tags "bots, observability, error-reporting, internal-error, timeout, recurrence-prevention"
+  :adr/body
+  "## 再発防止の対象は、個別のバグではなく形
+
+2026-08-19 の 1 日で、**同じ形の欠陥を 3 回**見つけた。3 つとも別のバグに見えるが、
+同型である:
+
+| どこ | 保持したもの | 捨てたもの |
+|---|---|---|
+| `claude-bridge` の `:unread-detail` | HTTP status | **応答本文** |
+| `provider/parse-arguments` | error type | **不正だった引数** |
+| `bots/record-turn!` の失敗経路 | error type | **例外メッセージ** |
+
+**3 つとも「情報は存在していて、読める場所の 1 層手前で捨てられていた」。**
+どれも取得に失敗したのではない。取得したものを、使う人に届く前に落としていた。
+
+## 3 つ目の実測（これが一番高くついた）
+
+**205 件の resident run が `:internal-error` として記録され、そのうち 196 件の中身は
+「request timed out」だった。**
+
+それを知るために **3,926 件の goal event を手で歩く**必要があった。メッセージは
+`append-goal-event!` が**ずっと記録していた**が、`record-turn!` が落としており、
+**読み手が実際に開く面**（`bots_list` の turn）には `:internal-error` としか出ない。
+
+`:internal-error` は **`:type` を持たない例外の fallback** である。つまり
+**分類が何も言わず、メッセージだけが全てを言う場合**そのものであり、そこが唯一
+落とされていたフィールドだった。
+
+### 副次的に分かったこと — 直っていた修正が見えていなかった
+
+event log の切り替わりが正確に見える:
+
+    07:29 まで  :internal-error     「request timed out」
+    07:42 から  :provider/timeout   「model provider request timed out」
+
+境目は **この deployment を `agent/provider-timeout-type` に載せて再起動した時刻**。
+**あの修正は正しく効いていた。** 効いていることが丸一日見えなかったのは、
+分類されなかった側が何を言っていたかを、どの面も出していなかったからである。
+**「直った」ことすら観測できなかった。**
+
+## 直したもの
+
+`public-turn` が `:error-message` を返し、2 つの fallback 失敗経路（resident goal /
+interactive turn）が記録する。**300 字・1 行に制限**（UI が読む record に乗る。
+stack trace はそれを溺れさせる）。**何も無いときは nil**（「メッセージが無い」と
+「空のメッセージ」を読み手が区別できるように）。
+
+1694 tests / 0 failures。
+
+## 規則 —— 分類を記録する経路は、根拠も記録する
+
+**error type を記録する場所で、その type の根拠になった値を捨てない。**
+特に **fallback の type**（`:internal-error` のような「分類できなかった」を意味する値）は、
+**根拠こそが唯一の情報**なので、必ず一緒に運ぶ。
+
+検査の 5 問（ADR-2608136000）に、この 1 問を足して読む:
+
+> **その失敗を、読み手が実際に開く面だけを見て診断できるか。**
+> できないなら、情報は在っても無いのと同じである。
+
+## この ADR が主張しないこと
+
+- timeout そのものの**原因**は扱っていない（分類は直った。なぜ murakumo が
+  timeout するかは別問題で、`request-timeout-seconds` と実測 decode 速度の
+  突き合わせが要る）
+- `:internal-error` の残り 9 件（`(no message)` 4 / `closed` 3 /
+  `Connection reset` 1 / streaming 1）は**まだ説明していない**。ただし
+  **次に出たときは面から読める。**
+"}]

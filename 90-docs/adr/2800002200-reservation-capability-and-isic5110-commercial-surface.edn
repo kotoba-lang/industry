@@ -1,0 +1,35 @@
+[{:db/id -1
+  :adr/id "adr-2800002200-reservation-capability-and-isic5110-commercial-surface"
+  :adr/title "ADR-2800002200: kotoba-lang/reservation を新設し、cloud-itonami-isic-5110(旅客航空運送)に商用面(運賃見積・座席予約)を実装 — ガバナーが在庫と運賃を「再計算」して検証する"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "reservation-capability-and-isic5110-commercial-surface"
+  :adr/date "2026-07-27"
+  :adr/last_verified "2026-07-27"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative_for
+  ["kotoba-lang/reservation(予約在庫・hold・料金プラン・見積の capability library)の設計方針の正本"
+   "『ガバナーは advisor の主張を再述するのではなく、同じ ground truth から再計算して検証する』という設計原則の正本"
+   "cloud-itonami-isic-5110 の商用面(:quote-fare / :place-booking)とその phase 4 ゲーティングの正本"
+   "reservation が float と clock を持たない理由(再計算が bit-identical でなければ検証にならない)の記録"
+   "並行セッションが同一 actor を同時実装した際の衝突解決(先着の実装を保持し上に載せる)の記録"]
+
+  :adr/problem
+  "オーナーから『飛行機の管制塔・航空会社の全運行・予約・管理・人材・メンテナンス、およびホテルの建築から予約・運営まで cloud-itonami は設計実装されているか』という問いがあり、実測の結果、該当する棚(リポジトリ)は全て存在し west 登録・GitHub push 済みである一方、**予約を担う業種が『在庫が本当にあるか』『提示した運賃が本当にその運賃か』を検証できない**ことが判明した。\n\n実測(2026-07-27):\n\n- ISIC 5110(旅客航空運送)は **src/ が1行も無い docs-only blueprint** だった。にもかかわらず kotoba-lang/industry の registry は当該 entry を `:maturity :implemented` と主張していた(虚偽の readiness 表明)。\n- 予約系の他業種(7911 travel agency / 7912 tour operator / 7990 other reservation / 5590 hostel / 5510 accommodation)は `log-booking-record` / `log-reservation-record` 等の**記録ログとフラグのみ**を持ち、在庫・空室・料金・チャネル管理の実体を持たない。\n- kotoba-lang 側を全数確認したところ、**在庫/料金エンジンに相当する capability library は存在しなかった**。`retail` は SKU と手持ち在庫をモデル化するが日付付きキャパシティ・hold・オーバーブッキングを扱わない。`pricing-oracle` は『自己申告価格の無い市場の価格帯を比較対象から推定する』ものであって rate engine ではない。`pnr` は Place-and-Route(半導体)であり Passenger Name Record ではない。\n\nつまり actor は『予約記録が存在した』ことは書けても、**その予約が売れる座席だったのか、その運賃が届出運賃だったのかを一切検証できない**状態だった。LLM は運賃を『それらしい数字』として生成できてしまうため、これは実害のあるギャップである。"
+
+  :adr/decision
+  "### 1. kotoba-lang/reservation を新設(capability library、Apache-2.0)\n\n`kotoba.reservation`(zero-dep, portable `.cljc`) + `.ui` + `.export`。`kotoba/logistics` `kotoba/retail` と同型の3名前空間構成。\n\n提供するもの: 在庫バケット(resource × date × class × capacity)、`available`/`oversold?`/`sellable?`、期限付き hold(place/release/confirm/purge-expired)、料金プラン(基本額・曜日/日付修正・手数料・税)、見積(明細 + 合計)、booking。\n\n**設計上の中心は API ではなく『独立再計算(recompute)』の座**である:\n\n- `quote-matches-claim?` — 料金プランと請求内容から見積を**再計算**し、主張された合計と一致するか返す\n- `availability-supports?` — 座席バケットから空きを**再計算**し、その予約が成立するか返す\n\nこれは actor の governor が advisor を信用せずに検証するための seam であり、それが成立するには再計算が**どの runtime でも同一の答え**でなければならない。したがって:\n\n- **float を一切使わない**。金額は通貨の最小単位の整数(JPY: 1 = 1円)、料金修正は basis point の整数(10000bp = 100%)、適用は切り捨て整数除算。切り捨ては明示的な決定であり、修正が運賃を1単位未満**下げる**ことはあっても上げることはない。別の丸めが必要な事業者は自らの運賃届出でそれを行い、その結果を `:rate/base-amount` として渡す — このライブラリが事業者に代わって丸め規約を選ばない。\n- **clock も calendar も持たない**。`expired?` は `now` を引数で取り、`quote-for` は各日付の曜日を**データとして**受け取る。内部で時刻を読むと数分後に再計算した governor が別の答えを得て検証が無意味になる。\n\nまた `:inv/overbook`(事業者が明示的に承認したオーバーブッキング枠)を capacity とは**別フィールド**にした。`available` はその枠まで販売してよいが、`oversold?` は**物理キャパシティに対する真実**を報告し続ける — 枠を使うことと、機材を超えて売った事実を見失うことは別である。\n\n39 tests / 113 assertions、clj-kondo clean。\n\n### 2. cloud-itonami-isic-5110 に商用面を実装\n\n**衝突の発生と解決**: 本作業中に並行セッションが同一 actor の**運航面**(`:log-flight-record` / `:schedule-flight-operation` / `:coordinate-maintenance` / `:flag-flight-safety-concern`、5223 groundops と同型の汎用4op テンプレート)を実装し main に先着 landing した(6 commits)。当方の実装は同一 `airlineops` 名前空間を使っており衝突した。\n\n**解決方針: 先着実装を保持し、その上に商用面を載せた**。先着分を破棄することは CLAUDE.md が禁じる『最後に実行した人が勝つ』であり、当方分を破棄することはオーナーの依頼そのもの(予約側の在庫・料金エンジン)を落とすことになる。当方の独立実装は `agent/implement-airline-actor` ブランチに push 済みで remote に保全してある。\n\n**追加した2op**: `:quote-fare`(自社届出料金プランからの運賃見積ドラフト)、`:place-booking`(自社座席在庫に対する**仮押さえ**)。\n\n**追加した2つのガバナー検査 — これが他 actor と質的に異なる点**:\n\n- **fare-mismatch** — governor が `kotoba.reservation/quote-for` を当該便の届出料金プランに対して**再実行**し、提示合計が一致しなければ HARD hold。advisor は数字を主張できるが、実際に計算した保証は無い。\n- **oversell** — governor が `availability-supports?` を当該便の座席バケットに対して**再実行**し、存在しない座席の販売を HARD hold。\n\nいずれも**再述ではなく再計算**である。そして **検査が実行できない場合(料金プランが無い/請求内容が無い/合計の主張が無い/在庫が無い)それ自体を HARD violation とした** — 検証できないときに遵守を仮定しない。デモ(`clojure -M:dev:run`)は『計算していない運賃を主張する advisor』を実際に走らせ、hold されることを示す。\n\n**phase 4 の新設**: 商用2op は phase 4 でのみ書き込み可能。運航opより**後**に置いたのは、事業者が本 actor の運航面だけを運用し商用面を一切有効化しない選択を取れるようにするため。両opとも**どの phase でも auto-commit しない** — `:place-booking` は実在庫を動かし金銭が在庫に従うため、`:quote-fare` は何も動かさないが乗客が依拠しうる商用コミットメントであるため。\n\n**永久にスコープ外(HARD・人間承認でも解除不可)**: 発券、決済捕捉、運賃の当局届出、座席の売却確定を `finalize-authority-phrases` に追加。`:place-booking` は hold であって販売ではなく、store は `confirm-hold` を**呼ばない**。\n\n60 tests / 272 assertions(先着分38を保持、22追加)、clj-kondo clean、MemStore と DatomicStore が同一契約を通過。\n\n### 3. レジストリの虚偽 readiness 表明を訂正\n\n- kotoba-lang/technology: `:reservation` capability を追加(`:operational-risk :high` — retail/logistics の `:medium` と異なる。ここでの誤答は便をオーバーブックし、届出の無い運賃を乗客に請求する)。\n- kotoba-lang/industry: 5110 entry の `:robotics` を required から optional へ(物理層は未実装であり、required-and-implemented として列挙すると `readiness` が誰も作っていない capability に対し `ready? true` を返す)。`:reservation` を required に追加。`:maturity :implemented` の主張は**今回初めて真になった**。\n- manifest/west.yml: `kotoba-lang/reservation` を登録し 5110 pin を前進(GitHub API single-entry commit、2 entry / 7行のみ。楽観ロックが並行書き込みを1度 409 で弾いたため再取得して再適用した — 設計どおりの挙動)。"
+
+  :adr/consequences
+  "**得られたもの**: 予約を担う actor が初めて『その座席は実在するか』『その運賃は届出運賃か』を**自分の advisor を信用せずに**検証できるようになった。この seam は 5110 専用ではなく、5510(宿泊)・5590(hostel)・7911/7912/7990(旅行業・予約サービス)が同じ `quote-matches-claim?` / `availability-supports?` を使って同じ検査を持てる。これらは現在いずれも記録ログのみであり、次の適用先である。\n\n**残るギャップ(正直な記録)**:\n\n- 5110 の robotics 物理層(地上ハンドリング・手荷物・整備点検ロボット)は未実装。blueprint では optional に降格済みで、実装したと主張していない。\n- `:place-booking` は hold までで、hold→販売の確定(発券・決済)は意図的にスコープ外。実運用には事業者側の発券システムとの統合が必要。\n- reservation は GDS/PSS/channel manager/PMS と通信しない。運賃の届出も空席の公開もしない。事業者システムが**検証可能である**ために必要な算術のみを提供する。\n- **5510/5590/7911/7912/7990 への reservation 適用は完了した(2026-07-27)。**詳細と、適用の過程で見つかった3種類の実在欠陥は ADR-2800002300 を参照。\n- ATC(管制)は 5223 および isco-3154 で**恒久的にスコープ外**(clearance 発行・separation 指示は hard permanent block)であり、本 ADR はそれを変更しない。\n\n**訂正**: 調査初期に『ISIC 5120(航空貨物)はリポジトリ自体が存在しない』と報告したが誤りであった。5120 は実装済み(`src/airfreightops`)で west 登録済みであり、ローカル checkout に展開されていなかっただけである。\n\n**並行実装衝突について**: 同一 actor を2セッションが同時実装した事象は、CLAUDE.md の worktree 分離規律が『作業ツリーの WIP 衝突』は防いでも『同じ仕事を2人が始めること』は防がないことを示している。今回は後着(当方)が先着を保持して上に載せることで解決したが、着手前に対象リポジトリの `origin/main` を確認する習慣だけでは足りない(当方の着手時点では main は docs-only だった)。"
+
+  :adr/related
+  ["90-docs/adr/2607141600 — langchain-store(store 共通機構、~190 repo の重複 enc/dec* を集約)"
+   "cloud-itonami-isic-5223 — 空港運営・グランドハンドリング。ATC clearance を恒久スコープ外とする同型の規律"
+   "cloud-itonami-isco-3154 — 航空管制。administrative support のみ、clearance/separation は hard permanent block"
+   "cloud-itonami-isic-5120 — 航空貨物(airfreightops)。実装済み"
+   "kotoba-lang/reservation — 本 ADR で新設した capability library"
+   "kotoba-lang/technology — :reservation capability entry"
+   "kotoba-lang/industry — ISIC 5110 の required/optional technologies 訂正"]}]

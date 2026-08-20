@@ -1,0 +1,333 @@
+[{:db/id -1
+  :adr/id "2608098000"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "accepted"
+  :adr/date "2026-08-08"
+  :adr/last_verified "2026-08-09"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/title "ADR-2608098000: cloud-itonami の org id 受付が逆順規則と食い違っていた —— 検出は fleet gate、恒久の解は導出を `.kotoba` の 1 モジュールに畳むこと"
+  :adr/topic "itonami-org-id-intake-drift-and-the-kotoba-single-derivation"
+  :adr/repos ["com-junkawasaki/root"
+              "network-awai/cloud-itonami"
+              "kotoba-lang/compiler"]
+
+  :adr/authoritative_for
+  ["org id の受付（POST /api/onboarding/challenge）が逆順規則に従うことを検査する門の所在"
+   "その門が規則を再実装せず :org-domain vocabulary を期待値として読む規則"
+   "org id の導出の恒久的な正本を .kotoba の 1 モジュールに置く決定"
+   "kotoba check が消せる穴の種類と、消せない穴の種類の区別"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["2608062100" "2608040170" "2608040100" "2607262100" "2607301300"]
+
+  :adr/body
+  "## 何が見つかったか
+
+ADR-2608062100 は「予約語以外の org id は registrable domain のラベル逆順」と決め、
+門を **intake と `generate-sites-registry.cljs` の 2 箇所**に置くと書いた。
+
+registry 側は fleet gate `cloud-itonami-sites-check` が repo 自身の `--check`
+（= `org-id/admit`）を呼ぶので覆われている。**intake 側を見るものは 1 本も無かった。**
+
+実測 2026-08-08、live の `POST https://itonami.cloud/api/onboarding/challenge` は
+逆順ではなく**順方向**を返す:
+
+| ドメイン | ADR の規則 | intake の実際 |
+|---|---|---|
+| `awai.network` | `network-awai` | `awai-network` |
+| `junkawasaki.com` | `com-junkawasaki` | `junkawasaki-com` |
+| `gftd.co.jp` | `jp-co-gftd` | `gftd-co-jp` |
+| `kotoba-lang.org` | `org-kotoba-lang` | `kotoba-lang-org` |
+| `etzhayyim.com` | `com-etzhayyim` | `etzhayyim-com` |
+| `jk.luxury` | `luxury-jk` | `jk-luxury` |
+
+上 3 件の「規則の答え」は **west.yml の remote 名そのもの**である。つまり誤りは
+理論上のものではなく、intake が発行する org id が、同じ組織を指す既存の名前と
+一致しない。`itonami.cloud` だけは `reserved-domain` で正しく拒否される。
+
+**根の原因は導出が 2 つあること。** 規則の実装は `cloud-itonami.org-id`（純関数）だが、
+intake はそれを通っていない。ADR-2608062100 の closing 節が、まさにこの `org-id` が
+bare nbb で `Could not find namespace` になって門が起動していなかったことを自分で
+記録している —— 同じ形の失敗が受付側に残っていた。
+
+## 決定 1 —— 検出を fleet に置く
+
+`scripts/fleet-ci/gates/itonami-org-id-check.cljs`（gate id `root-itonami-org-id`）。
+
+**規則を再実装しない。** 期待値は `manifest/repository-rules.edn` の `:org-domain`
+vocabulary が持つ `:domain` -> `:reversed` をそのまま読む。gate が 3 つ目の導出を
+書くと、導出が 2 つある問題を 3 つある問題にして直したことにしてしまう。
+
+**観測できないことを合格にしない。** 到達不能は INCONCLUSIVE として exit 1。
+「検査できなかった」と「検査して合格した」を区別できないと、片方がもう片方に化ける
+（`cloud_itonami/app/fleet.clj` が timeout/DNS/TLS を分けているのと同じ理由）。
+
+**両方向を確認済み**: live itonami.cloud に対して 6 件の不一致で exit 1、規則どおりに
+導出する stub に対して 0 件で exit 0。落ちない gate は劇場、という規則に従う。
+
+## 決定 2 —— 導出の正本は `.kotoba` の 1 モジュールにする
+
+`kotoba check` が消せるのは lint できる誤りではなく、**導出が 2 つ在りうるという状態
+そのもの**である。project は閉じたモジュールグラフで、ambient な require も eval も
+interop も無いので、intake と registry が同じ project の中で同じモジュールを import
+すれば、片方だけ違う規則を持つことが構造的に作れない。
+
+実際に書いて通した（下記 §モジュール）。`kotoba -M check`:
+
+```
+{:ok true, :effects #{}, :admission {:admitted? true, :required #{},
+ :minimal-policy {:allow #{}}, :unused-grants #{}}}
+```
+
+`:effects #{}` / `requiredCapabilities: []` —— これは `kotoba/pure` に収まる。
+ドメイン文字列から org id を作るのに ambient authority は要らない。
+
+`--target js` でコンパイルして実行した結果:
+
+```
+awai.network       shape=1 -> network-awai
+gftd.co.jp         shape=1 -> jp-co-gftd
+junkawasaki.com    shape=1 -> com-junkawasaki
+itonami.cloud      shape=1 -> cloud-itonami
+localhost          shape=0 -> (rejected)
+a..b               shape=0 -> (rejected)
+.x.com             shape=0 -> (rejected)
+```
+
+**逆順にするための反転工程が無い。** 左から走査して acc の *前* へ積むので、
+逆順は走査の副産物として出る。PSL を持たないので `co.jp` のような多段 suffix は
+判定せず、「その形をしていないもの」（単一ラベル・空ラベル）だけを落とす ——
+ADR-2608062100 の「推測で通さない」をそのまま実装している。
+
+**fuel は instance ごとに尽きる。** 1 つの instance を 7 リクエストで使い回したら
+7 本目で `fuel-exhausted` が出た。バグではなく封じ込めが効いている ——
+受付エンドポイントに置く導出としてはこれが欲しい性質で、1 リクエスト 1 instance
+にする。この事実を知らずに常駐 instance を持つと、負荷ではなく**呼んだ回数**で
+落ちる。
+
+## 何が build 時に見つかり、何が見つからないか
+
+| 穴 | build 時 | 手段 |
+|---|---|---|
+| org id の導出が 2 つある | **消せる** | `kotoba check --project` の閉じたモジュールグラフ。lint ではなく構造的な排除 |
+| 宣言した service に surface が無い（`docs`/`sheets` が step 4 に出るが kaisya にタブが無い） | 見つかる | surface 索引と宣言の join。型では出ない |
+| onboarding step 4 に kaisya への導線が無い | **見つからない** | 型でも索引でも出ない。E2E の仕事 |
+| 公開済み TXT が期待値と違う | **見つからない** | 定義上 build 時に無い情報（世界の側の状態）。monitor の仕事 |
+
+**`kotoba check` を万能の網と扱わない。** 消せるのは「同じ規則が 2 箇所に在る」形の
+穴だけで、UI の欠落も DNS の drift も型は見ない。
+
+## 決定 3 —— workspace 内側の導出も 1 つに畳んだ（着地済み）
+
+同じ規則は cloud-itonami の外、**この superproject の中でも 2 つあった**:
+
+- `manifest/repository-rules.edn` の `:org-domain` が持つ**手書きの `:reversed` 列**
+- `scripts/verify-repository-roles.cljs` の `domain->prefix`（origin 面の検査に使う）
+
+7 org 分しかないので `:reversed` は手で合っていたが、**合っている理由が「たまたま」**
+だった —— 一致を見るものが無かった。
+
+着地したもの:
+
+| 何 | どこ |
+|---|---|
+| 導出の正本 | `manifest/org-id.kotoba`（`kotoba/pure`、capability 0） |
+| コンパイル済み成果物 | `manifest/org-id.mjs`（+ provenance / manifest） |
+| cljs 側の唯一の実装 | `scripts/org_id_derivation.cljs` |
+| 検査 | fleet gate `root-org-id-derivation` |
+
+`verify-repository-roles.cljs` は `domain->prefix` の本体を持たなくなり、
+`scripts.org-id-derivation` を require する。**`--name-audit` の出力は移動の前後で
+byte 一致**（1,452 origin-plane / 18 anchors、差分ゼロ）。
+
+`:reversed` 列は**残した**。手書きが残っているのは一致が検査できるからで、導出に
+置き換えると突き合わせる相手がいなくなる。
+
+gate は規則を実装しない（3 箇所を 4 箇所にするだけなので）。突き合わせるのは
+①`org-id.mjs` の `sourceDigest` == `org-id.kotoba` の sha256 —— `kotoba -M compile` が
+sha256 をそのまま焼くので、**ノードに kotoba ツールチェーンが無くても** source <->
+artifact の束縛を確かめられる ②`requiredCapabilities` が空のまま ③記録された 94
+ドメインで kotoba == cljs（cljs は子プロセスで**実際に呼ぶ**。gate は単一ファイルで
+配られ classpath を持たないので、`cloud-itonami-sites-check` と同じ形）
+④手書きの `:reversed` 7 件 == 導出 ⑤形の判定の一致。
+
+**3 通りの壊し方で落ちることを確認済み**（2026-08-08）:
+
+```
+ソースを触って再コンパイルしない  -> (1) で 1 件、exit 1
+:reversed を 1 つ逆にする         -> (4) で 2 件、exit 1
+cljs から reverse を抜く          -> (3) で 95 件、exit 1
+無改変                            -> 0 件、exit 0
+```
+
+## 決定 4 —— 「1 つに畳んだ」は最初は嘘だった（2026-08-08、レビューで判明）
+
+決定 2/3 を着地させた時点で主張していたのは「規則は 1 つで、gate が一致を押さえる」
+だったが、**2 実装は等価ではなかった。** レビューで実測:
+
+| 入力 | kotoba | cljs |
+|---|---|---|
+| `www.ietf.org` | `org-ietf-www` | `org-ietf` |
+| `IETF.ORG` | `org-ietf` | `ORG-IETF` |
+| `日本.jp` | **trap** `string-code-point-boundary` | `jp-日本` |
+| 254 バイト | `registrable-shape` が **trap** `fuel-exhausted` | 判定できる |
+
+4 つとも、gate が緑だったまま存在していた。**記録済みドメイン 95 件が全て bare・
+小文字・ASCII・短いものだったから**で、正規化の 4 つの分岐すべてが corpus の外に
+隠れていた。**corpus が偶然そろっていたことを「一致」と読んでいた。**
+
+これは gate の書き方の誤りであって、実装の誤りだけではない。「両実装を突き合わせる」
+と書いたが、突き合わせる**入力を実装から取っていた**（記録済みドメイン = 両実装が
+実際に見てきたもの）ので、見たことのない入力での分岐は原理的に出てこなかった。
+
+### 直したもの
+
+**正規化の順序を契約にして、両実装に同じ順序で書いた**:
+
+```
+1. 長さ（バイト）が 253 を超えたら不正   —— DNS の上限
+2. case fold                              —— ドメインは大小を区別しない
+3. 先頭の `www.` を落とす
+4. 非 ASCII が 1 つでもあれば不正         —— punycode 前の IDN は受けない
+5. ラベルが 2 未満、または空ラベルがあれば不正
+```
+
+4 は ADR-2608062100 が既に決めていたこと（`:not-a-registrable-domain`）で、新しい
+制限ではない。A-label（`xn--wgv71a.jp`）は通る。
+
+**受け付けないものは trap ではなく「不正」として返す。** 拒否できずに fault するのは
+拒否とは違う —— 受付エンドポイントなら、拒否すべき入力で 500 を返すことになる。
+そのために 2 つ直した: `registrable-shape` を 2 パスから 1 パスにして 253 バイトで
+fuel が尽きるのをやめ、`scan-start` の `www.` 比較を `string-substring 0 4` から
+code point の短絡比較に変えた（多バイト文字の途中を切ると、非 ASCII を弾く前に
+`string-substring-code-point-boundary` で trap する）。
+
+**gate に敵対的入力列（18 件）を足した。** corpus に加えて、正規化 4 段の分岐を
+名指しで踏む。1 段外すごとに名指しで落ちることを確認済み: case fold 3 件 /
+`www.` 除去 3 件 / ASCII 判定 2 件 / 長さ上限 1 件。
+
+### gate 自身の穴も 5 つ直した
+
+| 穴 | なぜ効く |
+|---|---|
+| purity 検査が fail-open | `re-find` が外れると `caps` は nil で `(str nil)` は空文字列になり、「capability 無し」で緑。隣の digest 検査は外れれば落ちるのに、こちらだけ素通しだった |
+| 床が `when (seq rules)` の中 | 0 件こそ床の存在理由なのに、0 件のときだけ床を飛ばしていた |
+| rules 側に床が無い | vocabulary が改名されれば check ④ が 0 回の反復に縮む |
+| kotoba の trap が import の `.catch` に落ちる | 診断が「artifact を import できない」になり原因を取り違える。以降の検査も止まる |
+| HTTP status を見ない | 429/502 の本文を「導出が違う」と誤診する |
+
+最後のものは直した最初の版が**別の誤りを入れた**: status を見始めたら、
+`itonami.cloud` の `reserved-domain` が **HTTP 403** で返ることに当たり、
+設計どおりの拒否を「到達不能」に落とした。分けるのは status ではなく
+**本文が判断を持っているか**（5xx は常に INCONCLUSIVE）。
+
+## やっていないこと
+
+- **cloud-itonami 側に着地していない。ブロッカーは session の形ではなく GitHub App の
+  認可である**（2026-08-09 に修正。初版はここを取り違えていた）。当初は「repo scope が
+  `com-junkawasaki` に固定されていて `add_repo` が cross-tier を拒否する」と書き、
+  **「あの repo を初期ソースにしたセッションを起こせばよい」を remedy として示していたが、
+  2026-08-09 にそれを実際に試したところ通らない**:
+
+  | 経路 | 結果 |
+  |---|---|
+  | `add_repo` | `cross-tier adds are not supported in v1` |
+  | GitHub MCP | `repository ... is not configured for this session` |
+  | HTTPS clone | `could not read Username` — private、proxy が credential を注入しない |
+  | **当該 repo を `source_url` にした `create_session`**（= 初版の remedy） | **`github_repo_access_denied`** |
+
+  4 つ目が決定的で、**GitHub App が `network-awai/cloud-itonami` へのアクセスを
+  持っていない。** セッションをどう起こしても同じ壁に当たる。**先に必要なのは
+  GitHub 設定でこの repo へのアクセスを許可すること**で、それが済むまで着地経路は
+  1 本も無い。`gftdcojp/cloud-itonami`（サイトが AGPL source として指す先）も同様に private。
+
+  アクセスが通った後にやることは変わらない: `manifest/org-id.kotoba` を持って行って
+  `cloud-itonami.org-id` の導出をそれに差し替え、**受付が同じモジュールを通るようにする**。
+  intake がインラインで持っているコピーを消すところまでやらないと、導出が 2 つある状態に
+  戻る。
+- **`itonami.cloud` の live intake は今も順方向を返す**（2026-08-09 に再実測、7 件中 6 件
+  不一致で `root-itonami-org-id` は exit 1。`itonami.cloud` の `reserved-domain` 403 だけが
+  設計どおり）。gate は赤で着地する —— 実在する不一致を報告しているので、それが正しい
+  状態である。同日 `root-org-id-derivation` は exit 0（記録済み 98 件 + 敵対的入力 18 件で
+  kotoba ⇔ cljs 一致、artifact↔source bound、capabilities none）—— **workspace 内側は
+  畳めており、残っているのは向こう側だけ**、という現在地は変わっていない。
+- **`kotoba-lang/compiler` の `deps-lock.edn` が main で stale**（別件、下記）。
+
+## 副次的に見つけた別件 —— compiler の lock が main で stale
+
+`kotoba-lang/compiler` の `4c9650e`(main) で `deps.edn` の sha256 は
+`0993ebb4794b23afa631823b198af045d1a27798cadffd7d0fd53d98301c9f8e` だが、
+`deps-lock.edn` が束縛しているのは `0126d9e8690e12f2cb3c7d1b7c8ab216b6b66bfb5a847cae62b2b5c9c70c92a5`。
+`f137554`（advance the stack pins）が deps.edn を動かして lock を再生成していない。
+
+deps.edn 自身のコメントが「同じ commit で再生成しろ」「stale は後で見つかるエラーでは
+なく、黙って `clojure -Spath` に戻して JDK-free の性質を誰にも知らせず失う」と書いており、
+実際 `bin/kotoba` はその通りに fallback した（JDK が無ければそこで死ぬ）。
+fleet gate `compiler-jdk-free` はこれを見るので、走っていれば赤のはず。
+
+## モジュール（`manifest/org-id.kotoba`、着地済み）
+
+```clojure
+;; cloud-itonami の org id 導出 —— ADR-2608062100 の規則を 1 箇所で持つ。
+;;
+;; 規則: 予約語以外の org id は registrable domain のラベル逆順。
+;;   awai.network     -> network-awai
+;;   gftd.co.jp       -> jp-co-gftd
+;;   junkawasaki.com  -> com-junkawasaki
+;;
+;; 導出は一方向（domain -> id）だけ。id からドメインを逆算しない。
+(ns cloud-itonami.org-id)
+
+;; '.' の code point。`.kotoba` に文字リテラルは無いので数で持つ。
+(defn dot-code-point [] :i64 46)
+
+;; ラベル 1 本を先頭へ足す。acc が空なら区切りを入れない。
+(defn prepend-label [label :string acc :string] :string
+  (if (string=? acc \"\")
+    label
+    (string-concat (string-concat label \"-\") acc)))
+
+;; 左から走査し、区切りを見つけるたびに acc の**前**へ積む。
+;; 前へ積むこと自体が逆順なので、別に反転する工程が要らない。
+(defn scan [domain :string i :i64 start :i64 acc :string] :string
+  (if (< i (string-length domain))
+    (if (= (string-code-point-at domain i) (dot-code-point))
+      (scan domain (+ i 1) (+ i 1)
+            (prepend-label (string-substring domain start i) acc))
+      (scan domain (+ i 1) start acc))
+    (prepend-label (string-substring domain start i) acc)))
+
+;; 空ラベル（先頭・末尾・連続する区切り）が 1 つでもあれば 0 を返す。
+(defn labels-nonempty [domain :string i :i64 start :i64] :i64
+  (if (< i (string-length domain))
+    (if (= (string-code-point-at domain i) (dot-code-point))
+      (if (= start i) 0 (labels-nonempty domain (+ i 1) (+ i 1)))
+      (labels-nonempty domain (+ i 1) start))
+    (if (= start i) 0 1)))
+
+(defn label-count [domain :string i :i64 seen :i64] :i64
+  (if (< i (string-length domain))
+    (if (= (string-code-point-at domain i) (dot-code-point))
+      (label-count domain (+ i 1) (+ seen 1))
+      (label-count domain (+ i 1) seen))
+    (+ seen 1)))
+
+;; registrable domain の**形**をしているか。PSL は持たないので `co.jp` のような
+;; 多段 suffix は判定できない —— だから「その形をしていないもの」（単一ラベル・
+;; 空ラベル）を落とすだけにする。推測で通さない。
+(defn registrable-shape [domain :string] :i64
+  (if (= (labels-nonempty domain 0 0) 0)
+    0
+    (if (< (label-count domain 0 0) 2) 0 1)))
+
+;; 唯一の導出。呼ぶ前に `registrable-shape` が 1 であることを確かめること。
+(defn derive-org-id [domain :string] :string
+  (scan (string-fold-case domain) 0 0 \"\"))
+
+(defn main [] :string
+  (derive-org-id \"awai.network\"))
+```
+"}]

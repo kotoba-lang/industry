@@ -1,0 +1,70 @@
+[{:db/id -1
+  :adr/id "2608060100"
+  :adr/title "kernel-in-u8/u32: the missing half of port I/O, and the shortest path to an OS with no C in it"
+  :adr/status "accepted"
+  :adr/date "2026-08-06"
+  :adr/tags ["kotoba" "compiler" "aiueos" "kernel" "memory-safety" "drivers"]
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/context
+  "Owner asked why aiueos needs C at all, and directed the loop at compiling the whole OS memory-safely in Kotoba.
+
+The premise of the question was right, and the answer is narrower than 'because kernels need C'.
+
+A ZERO-C BOOT PATH ALREADY EXISTS AND IS ENFORCED. `os/aiueos/native/kernel.kotoba` compiles for x86_64-aiueos-kernel-v1 and `package-aiueos-boot` wraps it into BOOTX64.EFI; `build-kotoba-native-boot.sh` then fails the build if any .c/.o/.obj/.a/.so reached its output. What runs there today is a minimal kernel (validates the loader handoff, writes the debug-exit port), not because C is required beyond it, but because the primitive set stops there.
+
+The existing C is also already decision-free by ADR-2607241100 / aiueos ADR-0015: crypto verification, ELF/catalog/journal admission, capability issue and revocation, dispatch planning are all compiler-emitted Kotoba objects. C owns mechanism only. So the memory-safety exposure is confined to mechanism, and shrinking it is a question of primitives rather than architecture.
+
+Measured 2026-08-05, the kernel target's primitive set was:
+  memory     kernel-load-u8 / -u8-4k / -u8-16k, kernel-store-u8 / -u8-4k,
+             kernel-load-u32, kernel-store-u32, kernel-subregion
+  privileged kernel-read-cr2 / -cr3, kernel-write-cr3, kernel-invlpg,
+             kernel-cli / -sti / -hlt / -pause, kernel-boot-info
+  ports      kernel-out-u8, kernel-out-u32   <-- WRITE ONLY
+
+There was no port READ. PCI configuration space is addressed by writing port 0xCF8 and then READING 0xCFC, so with write-only port I/O, PCI enumeration was not expressible in Kotoba at all -- and PCI enumeration is the root of every driver. That single asymmetry, not any property of kernels, is why pci.c (1,178 lines, the largest C file in the OS) had to stay C."
+
+  :adr/decision
+  "Add `kernel-in-u8` and `kernel-in-u32` (arity 1, the port) across the four repos that each independently admit a kernel primitive: the compiler frontend's arity/type table, kotoba-kir's privileged and kernel-native sets, kotoba-verifier's four independent sites, and kotoba-native's x86-64 codegen.
+
+The kernel-native set in kir's `lower` is the easy one to miss and matters: it is what marks a module kernel-native and thereby suppresses constant-oracling, which would otherwise try to evaluate a port read at compile time.
+
+AArch64 gets nothing, deliberately. That backend has no privileged operations at all, and x86 port I/O has no ARM equivalent; the reads fall through to 'operation not implemented on this backend' exactly as the writes already do. Both are added to isa_parity_test's pinned x86-only list, which is what makes the omission an assertion rather than silence."
+
+  :adr/consequences
+  "PCI configuration access is now expressible in Kotoba. Verified against the PUBLISHED pins rather than local overrides: a PCI-shaped function (out to 0xCF8, in from 0xCFC) compiles for x86_64-aiueos-kernel-v1 and its disassembly carries both directions --
+  d1: ef  outl %eax,%dx
+  e0: ed  inl  %dx,%eax
+
+Encoding was proved by disassembling the emitted object, not by reading the encoder. The u8 form clears eax before `in al,dx` because that instruction writes only al; the u32 form does not, because a 32-bit write zeroes bits 63:32 by itself, and emitting a redundant clear into a kernel is worse than the asymmetry.
+
+WHAT THIS DOES NOT DO: no instruction has been executed. Proof stops at correct encoding, correct register discipline, and admission through frontend -> KIR -> verifier -> codegen. Running `in` needs ring 0, which needs a boot, which was not done in this change.
+
+REMAINING PRIMITIVES before the C mechanism can actually be retired, in the order they block work:
+  1. runtime-established MMIO regions -- a bounded load must NAME a region, so a BAR address discovered at runtime is not expressible today. This is the next blocker and the largest.
+  2. interrupt entry -- an ISR needs a defined stack frame and iretq.
+  3. MSR access (rdmsr/wrmsr) -- SYSCALL setup needs STAR/LSTAR/EFER/FMASK.
+  4. descriptor table loads (lgdt/lidt).
+
+The boundary in one sentence: Kotoba can compute over regions handed to it, and cannot yet discover or establish them. C currently does only the latter.
+
+Found while testing, and worth fixing separately: `isa_execution_test` writes its loader and code to FIXED shared paths under java.io.tmpdir with one name per ISA and no per-run uniqueness. Two sessions running that suite concurrently clobber each other's binary and each runs the other's program, producing 29 spurious failures that look like miscompilation. Confirmed by lsof against the other session's cwd."
+
+  :adr/gaps
+  "[{:gap :kernel-in-execution :state :unverified :note \"The `in` instruction has never been executed -- proof stops at encoding and admission. A boot that reads a real port is the next evidence.\"}
+    {:gap :runtime-mmio-regions :state :not-implemented :note \"A bounded load must name a region; a BAR address discovered at runtime cannot be expressed. Largest remaining blocker to porting pci.c.\"}
+    {:gap :interrupt-entry :state :not-implemented :note \"No primitive for an ISR stack frame / iretq.\"}
+    {:gap :msr-access :state :not-implemented :note \"rdmsr/wrmsr absent; SYSCALL setup stays C.\"}
+    {:gap :descriptor-tables :state :not-implemented :note \"lgdt/lidt absent.\"}
+    {:gap :isa-execution-test-shared-tmp :state :open :note \"Fixed per-ISA paths under java.io.tmpdir make concurrent runs clobber each other. Latent cross-session flake generator.\"}]"
+
+  :adr/evidence
+  "kotoba-kir d895d1f0961c77e91737f29210b9fd6eda1beb6e, kotoba-native 8e7c0530b18b7c4d9ea3b3b28dc40c989ea03470, kotoba-verifier ccf37fedc56f54181cfc119333a58f6ec42bf926, compiler db4418056579ec3158c46b6082c82f2e49f8a1e6 -- all on main, all verified fast-forward before the west pins advanced (root 1bf8498, f4b8ad0, 0da31d6, 3cac4a9).
+Suites: kotoba-kir 499 assertions green; kotoba-native 2230 green (+12 from the new x86-only parity rows); kotoba-verifier 84 green after merging main's :bool-boundary work; compiler 929 tests / 7026 assertions with the same 30-31 pre-existing failures as the untouched base.
+Negative paths: arity 2 rejected by the frontend; non-kernel target rejected by the verifier; aarch64 kernel target rejected by the backend."
+
+  :adr/authoritative-for ["kotoba-kernel-port-io"]
+  :source/dataset "adr"}]

@@ -1,0 +1,98 @@
+[{:db/id -1
+  :adr/id "2608011200"
+  :adr/title "不動産ローンの各国「手続き・公的支援・組織」を1つの面に載せる — mortgage-registry の新設、isic-6492 の regime delta、EMF assoc の追加"
+  :adr/status "accepted"
+  :adr/date "2026-08-01"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/tags ["cloud-itonami" "mortgage" "isic-6492" "isic-6810" "assoc" "compliance-fact" "coverage-honesty"]
+  :adr/supersedes ""
+  :adr/superseded-by ""
+
+  :adr/context
+  "オーナーの問い: 「不動産ローンの各国の手続き、支援、また組織を収集、対応させた cloud-itonami はある?」
+
+cloud-itonami の 1,715 repo（manifest 登録 1,714 と一致、ローカル checkout はほぼ全数）を repo 名・blueprint.edn・各 actor の facts catalog・全文検索で調べた結果、答えは **無い**。ただし3つの面が別々の repo にバラバラに存在していた。
+
+1. 与信側 — `cloud-itonami-isic-6492`（Other credit granting、Credit-LLM ⊣ Credit Governor、Pages で稼働中）。`credit.facts/catalog` に JPN/USA/GBR/DEU/IDN の5法域。ただし README 自身が『no credit-score weighting, no loan-purpose/collateral analysis』と明記しており、住宅ローンの引受は対象外。
+2. 物件移転側 — `cloud-itonami-isic-6810`（real estate、Realtor-LLM ⊣ RealtorGovernor）。`realty.facts/catalog` に JPN/USA-CA/GBR/DEU/NLD/AUS-NSW/CAN-ON の7法域。ローン絡みは NLD の必要書類『mortgage redemption/discharge statement』に現れる程度。
+3. 組織 — `cloud-itonami-assoc-*` 80件。金融/不動産系は 6419 銀行協会11か国 + 6411-jpn-boj + 6810-jpn-recaj。**ISIC 6492 の assoc は1件も無かった。**
+
+そして『支援』（公的支援・補助・保証）を各国分集めた面は、workspace 全体で **ゼロ**だった（`subsidy|補助金|助成金|first-time buyer|Help to Buy|フラット35` の全文検索でヒットするのは jpn-meti の事業補助金と toritsugi の日本の行政窓口手続きのみ）。借り手が最初に聞く部分が丸ごと欠けていた。
+
+型は既にあった: `saisei` が債務整理を4法域分 `data/procedure-registry.edn` に持つ先例。
+
+オーナーは提示した3案（catalog 拡張 / 新規 registry / assoc 追加）に対し「1, 2, 3」と回答した。"
+
+  :adr/decision
+  "3つとも実施した。
+
+**(A) 新規 repo `cloud-itonami/mortgage-registry`（west 登録済み）** — 6492 と 6810 の間に空いていた中間層を埋める read-only reference catalog。Advisor ⊣ Governor ではない（LLM node を持たず、提案も actuation もしないので governor を必要としない）。`mortgage.facts/catalog` は iso3 をキーに3面を持つ:
+- `:procedure` — ローンが不動産にどう担保されるか（security instrument、steps、6492/6810 への cross-reference）
+- `:support` — 公的支援制度（operator 付き）
+- `:organizations` — 上記2面が参照する機関。`:isic` + `:country` を必ず持ち、assoc-* family への join key になる
+
+seed は6法域（JPN/USA/GBR/DEU/FRA/NLD）、8支援制度、16組織。すべて公式出典を実際に fetch し verbatim で採録した。フラット35のご利用条件（総返済負担率 年収400万円未満30%/以上35%、融資額100万円以上1億2,000万円以下、融資期間の算式）、KfW 300 Merkblatt（Stand 12/2025、世帯所得90,000ユーロ+子1人ごと10,000ユーロ、170,000〜270,000ユーロ）、NHG（2026年 grens 470,000ユーロ、borgtochtprovisie 0.4%）、PTZ（過去2年 主たる住居の所有者でないこと）、Shared Ownership（世帯収入 £80,000 / ロンドン £90,000）、FHA 203(b)（約96.5%融資、CY2026 floor $541,287 / ceiling $1,249,125）、TRID（LE は申込受領後3営業日以内、CD は consummation の3営業日前まで）。
+
+**(B) `cloud-itonami-isic-6492` に `real-property-secured-delta` を追加** — 不動産担保ローンにおいて既存 catalog が『不足している』のではなく『別の規制を指している』ケースをデータとして記録した。検証済みの2例:
+- JPN: catalog は貸金業法・総量規制を引くが、金融庁は「総量規制が適用されるのは、貸金業者から個人が借入れを行う場合です。銀行からの借入れや法人名義での借入れは対象外です」と明記し、住宅ローンは銀行法下でそもそも貸金業法の外。さらに「住宅ローンなど、一般に低金利で返済期間が長く、定型的である一部の貸付けについては、総量規制は適用されません」。
+- GBR: catalog は CCA1974/CONC を引くが、2016-03-21 以降 MCOB 1.6 が『Virtually all agreements secured on land will now be subject to MCOB』とし、CONC は残余ケース。
+USA（TRID が加算）と DEU（§491 の Immobiliar 区分 + §311b が加算）は additive 側として記録。`generic-entry-misleading-for-mortgage?` により Credit Governor が誤った entry を引いた mortgage proposal を hold できる。
+
+**(C) `cloud-itonami-assoc-6492-eu-emf`（west 登録済み）** — European Mortgage Federation。assoc-* family 初の ISIC 6492、かつ初の supranational entry。
+
+**方向の規律: delta は authority を指すだけで内容を再掲しない。** (B) は (A) を指し、(A) は 6810/6492 を指す。3 repo が同じ事実を持たないので黙って drift できない。"
+
+  :adr/consequences
+  "**得たもの。** 『不動産ローン』という1つの問いに対して、手続き・支援・組織が同じキー（iso3）で引けるようになった。組織面は `(:isic, :country)` で assoc-* に join できる。既存2 actor の誤用（mortgage に consumer-credit catalog を引く）が governor で捕まえられるようになった。
+
+**払ったコスト・限界。**
+- **6/194 法域**。これは seed であって survey ではない。未登録法域は nil を返し、permissive default に落ちない。
+- **fetch できなかった面がある。** FCA Handbook は rule text を client-side render するため MCOB の逐語は取れず、`mba.org` / `ukfinance.org.uk` / `pfandbrief.de` は WebFetch を 403/404 で拒否した。この制約が (C) の対象を MBA/UK Finance ではなく EMF（hypo.org は fetch 可能）にした — 選定理由が『最も代表的な団体』ではなく『検証可能な団体』である点は明示的な妥協。
+- **(C) は siblings より弱い。** 7件の located source のうち fetch して引用できたのは2件、self-regulatory code は0件。EMF/消費者団体の Voluntary Code of Conduct on Pre-contractual Information for Home Loans（MCD の ESIS の前身）は hypo.org 上に発見できず、記憶から URL を捏造せず gap として記録した。
+
+**捏造ゼロを構造で強制した。** 3 repo すべてで honesty contract を test にした（mortgage-registry 21 tests/229 assertions、assoc-6492-eu-emf 7 tests/69 assertions、isic-6492 は既存4に4追加して 8 tests/35 assertions、いずれも nbb で green）。強制内容:
+- 出典 URL と retrieved-at の無い主張を置けない
+- `:verification :not-verified` が空だと test が落ちる（『完全である』と読める状態を作れない）
+- verbatim 引用は実際に fetch したページにしか付けられない（`:url-provenance` を site / site-index / site-file の3段階に分離）
+- `by-kind :self-regulatory-code` が空であることを test で固定 — 将来 code を足すなら同じ commit で README の主張も書き換わる
+- delta が nil であることは『未調査』であって『generic entry がそのまま適用される』ではない、と test で明記
+
+**次に効く follow-up（優先順）。**
+1. JPN 住宅ローン控除の当年度 rate/ceiling を再取得（fetch したページは2021年入居分の数値だった）
+2. FRA / NLD の procedure 面（offre de prêt の10日 délai de réflexion、BW art.260）を一次出典で埋める
+3. Fannie Mae / Freddie Mac / FHFA / VA / USDA、KfW 308、Lifetime ISA / First Homes、starterslening
+4. MBA / UK Finance を assoc に追加（WebFetch が 403 を返すため別経路が要る）"
+
+  :adr/evidence
+  "**新規 repo（いずれも public、west 登録済み・server-side pin 検証 OK）**
+- https://github.com/cloud-itonami/mortgage-registry — main ce2c80d7ed417a8e83378d988d96ceb546ac6fe6（初期 seed fba6629 → 全世界 coverage plan を追加。plan は ADR-2608011800 が正本）
+- https://github.com/cloud-itonami/cloud-itonami-assoc-6492-eu-emf — 初期 commit 9634b2f
+
+**既存 repo への変更**
+- cloud-itonami/cloud-itonami-isic-6492 — feature branch → server-side merge、main = 3e4b047f4d87b33c221c51fbc57e6cc8138d82bf（agent/mortgage-delta は merge 後に削除済み）
+
+**superproject**
+- manifest/repos.edn `:extra-projects` に2件追加、manifest/west.yml に `--entry` で3 entry（新規2 + pin 前進1）。wholesale 再生成はしていない。
+
+**一次出典（2026-08-01 に fetch）**
+- https://www.flat35.com/loan/lineup/flat35/conditions/index.html
+- https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/1213.htm
+- https://www.consumerfinance.gov/rules-policy/regulations/1026/19/
+- https://www.hud.gov/hud-partners/single-family-sfh203b, https://www.hud.gov/news/hud-no-25-145
+- https://www.gov.uk/shared-ownership-scheme/who-can-apply, https://www.gov.uk/government/news/government-extends-mortgage-guarantee-scheme
+- https://www.kfw.de/PDF/Download-Center/Förderprogramme-(Inlandsförderung)/PDF-Dokumente/6000005060_M_300_WEF.pdf （Merkblatt Kredit Nr. 300, Stand 12/2025）
+- https://www.service-public.gouv.fr/particuliers/vosdroits/F10871
+- https://www.nhg.nl/over-nhg/over-nhg/, https://www.nhg.nl/nhg-actueel/nhg-grens-in-2026-vastgesteld-op-470000/
+- https://www.fsa.go.jp/policy/kashikin/qa.html, https://www.fsa.go.jp/policy/kashikin/kihon.html
+- https://www.handbook.fca.org.uk/handbook/MCOB/1/6.html （逐語は公式ページの検索インデックス経由。直接 fetch は client-side render のため不可）
+- https://hypo.org/about-emf, https://hypo.org/emf"
+
+  :adr/related
+  ["2608011800 — 全世界 188 法域への coverage plan（この ADR の後続。wave / 近道 / 実測コスト / 未決定3件）"
+   "2607141700-cloud-itonami-compliance-fact-federation — assoc-* family の設計 ADR"
+   "cloud-itonami-isic-6492 docs/adr/0002-http-edge-loan-intake.md"
+   "cloud-itonami-isic-6810 docs/adr/0002-netherlands-owner-sale-profile.md"
+   "2607173000 — script host は nbb のみ（3 repo とも bb.edn / .sh を持たない）"
+   "2607022900 — west pin のサーバ側検証（--entry の最小 diff で登録）"]}]

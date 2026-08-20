@@ -1,0 +1,198 @@
+[{:db/id -1
+  :adr/id "ADR-2608144000"
+  :adr/title "cleanup 一周（2026-08-14）: ラッパーの exit code は 4 回とも嘘をつき、GB 級の肥大は履歴だった"
+  :adr/status "accepted"
+  :adr/date "2026-08-14"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :source/dataset "adr"
+  :adr/body
+  "cleanup を一周し、続けて owner 指示で大容量バイナリを B2 へ退避した。着地したものと、
+着地しなかったものと、その理由を記録する。
+
+---
+
+## 1. 一番効いた発見: **背景コマンドの exit code は 4 回とも嘘だった**
+
+`west update --fetch smart > log 2>&1; echo \"EXIT=$?\"` のような形で走らせると、
+harness が報告する終了コードは**最後の `echo`（あるいはパイプ末尾の `tail`）のもの**であって、
+測りたいコマンドのものではない。実測 4 回、全部 0 が返り、全部当てにならなかった。
+
+うち 1 回は実害寸前だった —— west の報告は exit 0 だが、**ログ末尾は
+`ERROR: update failed for multiple projects`** で、実際には **96 project が skip されていた**。
+「完走・skip 0」と報告する直前だった。runbook は『west の skip 集合こそがローカル専用作業の
+母集団』と書いているので、これを 0 件と誤読すると **cleanup の入力そのものが消える**。
+
+**規則: 背景で走らせたコマンドの成否を exit code で判定しない。** 出力の中身か、
+対象の状態を測って判定する。これは ADR-2608136000 の『測れなかった検査が、測って問題が
+無かった検査と同じ値を返す』の一種で、今回はラッパーが同型の欠陥を持ち込んでいた。
+
+---
+
+## 2. GB 級の repo 肥大は「今のファイル」ではなく「履歴」だった
+
+owner 依頼『大きいファイルを datalad, b2 に保存』に対し、まず測った:
+
+| repo | worktree | .git | 判定 |
+|---|---|---|---|
+| `gftdcojp/m365-archive` | — | 31.81 GB | 既に datalad + B2。実体が手元に居ただけ |
+| `com-junkawasaki/ghosthacker` | **0.09 GB** | 9.21 GB | **99% が履歴**。annex では 1 バイトも縮まない |
+| `gftdcojp/ai-gftd-apps-gftdcojp` | — | 10.83 GB | 同型 |
+| `gftdcojp/apps-gftdcojp` | 0.47 GB | 5.81 GB | 92% が履歴 |
+| `com-junkawasaki/org-spirit-in-physics-comics` | **1.50 GB** | 1.50 GB | 実体が現存。移行対象 |
+
+**最大の tracked ファイルは 9〜21 MB しかない。** GB は中サイズ画像の大量リビジョンで
+できており、縮めるには履歴書き換え + force-push が要る —— CLAUDE.md が恒久承認の対象外と
+定める操作。owner 判断で**履歴書き換えは行わない**とし、ghosthacker と apps-gftdcojp は
+手つかずで残す。
+
+**規則: 「大きいファイルを annex へ」を実行する前に worktree と .git を別々に測る。**
+両者が桁で違うなら、その repo に対して annex は答えではない。
+
+---
+
+## 3. 着地したもの
+
+### m365-archive: 32 GB → 371 MB
+
+`drop (ok: 102589)`。ディスク空き 94 GB → 133 GB。custody は主張ではなく検査で示した ——
+事前に `annex-custody-verify`（84,624 annexed、全件 off-machine copy あり、標本を B2 から
+fsck）、事後に `whereis calendar/Calendar.jsonl` = **1 copy: b2**。手元に残った 20 件の
+`facts/*.edn` は copies=2 なので穴ではない。
+
+**副次発見: 孤児化した `git annex whereis` が 38 時間 annex ロックを握っていた**
+（PID 47521、ppid=1、CPU 0%、cwd が m365-archive）。drop は起動後 44 秒間 1 バイトも
+進まず、kill 直後に 92.7% CPU で走り出したのでブロック元は確定。fleet 全体を走査して
+同種の孤児が他に無いことも確認（0 件）。
+
+### org-spirit-in-physics-comics: 1,307 ファイル / 1,525.8 MB を B2 へ
+
+全件到達を検査で確認: `git annex find --branch f82c2b0 --in b2` → **1307 / 1307**。
+振り分けは `.gitattributes` で**拡張子指定**。annex 既定の largefiles は中身 sniffing なので、
+テキストな `.edn` コーパスが git に残り目的を外す。
+
+west の `datalad` group には**入れない**。`kami-app-sip` と `com-etzhayyim-sip` が
+`:local/root` 経由で `resources/images` を読んでおり、既定 group-filter が `-datalad` なので
+移すと `:local-root-broken` を作る。
+
+### superproject の cleanup
+
+14 branch 退役（全て origin/main の ancestor、diff=0 bytes を確認）、12 worktree 撤去、
+stash 0、PR 4 本 merge（#2167 additive / #2168 review / #2169 observatory / #2172 archived-scope）。
+archive は `.git/stash-archive-2026-08-14/`（124 MB、後述）。
+
+### archived repo を cleanup 対象外に（#2172）
+
+owner 判断『archive repo は対象外でいいよ』。**prose では効かないのでコードで落とした** ——
+fleet の archived repo 43 件のうち **38 件が west 登録 + local checkout 済み**で survey が
+全部歩いており、GitHub は read-only（blob/tree/commit/ref 作成も PR close も 403、
+`241001-lifescience-web#559` に実投して確認）。`canonical-slug` → `canonical-repo` にし、
+`.full_name` を引く**既存の 1 往復に `.archived` を相乗り**させた。
+
+2 つ意図的にやらなかった: (a) 引けなければ `:archived nil` を返し `false` にしない
+（『判定できなかった』を『archived でない』と同じ値にしない）(b) skip は専用 summary 行に
+出し additive/review の計数から外す（『飛ばした』と『合格した』を出力で区別する）。
+両方向を commit 済みバイト列 × 実 orgs/ tree で実測（archived → skip / additive=0、
+live `kotoba-lang/drive` → 通常どおり 1 repo 処理）。**sparse worktree では `対象 0 repo` を
+返して何も測らない**ので、そこでは検証していない。
+
+### west の 96 skip を 1 ファイルずつ判定
+
+無損失と言えるのは 2 通りだけ ——「`D` = tracked 削除（内容は git に在る）」と
+「`M` = 作業ツリーの bytes が上流と byte 一致」。結果:
+
+- **69 件 SAFE** → archive → 復元 → 再 update。**69/69 clean**
+- **25 件 UNSAFE**（本物のローカル変更）→ 触っていない
+- 2 件 判定不能（`lab` / `toshokan` は remote ref が引けない）→ 触っていない
+
+`com-adyen` はサンプル上は他の `com-*` と同型に見えたが per-file 検査で UNSAFE に落ちた。
+**推測で一括処理していれば壊していた。**
+
+さらに**自分の検査の穴も出た**: tracked の `M`/`D` しか見ておらず、**untracked と incoming の
+衝突**を見ていなかった（`mail` で発覚）。その 2 ファイルは過去 revision `9b33128` と byte 一致で
+object database に在ることを確認してから外した。
+
+### preservation PR 16 件の disposition
+
+`:preservation-pr-disposition` は『DO-NOT-MERGE は判定ではなく駐車場』と定める。16 件を判定し
+**9 件 close / 7 件は決定条件を書いて open**。
+
+close した 6 件（`drive` `mail` `toshokan` `nekko` `langchain` `control-plane`）は
+**追加ではなく削除**だった —— 古い pin に居る checkout の未コミット状態を cleanup-land が
+『前進』として拾ったもの。`drive#11` は `ancestors`/`path` を含む 102 行と test 138 行を消す。
+`orgs/kotoba-lang/drive` が remote main より 26 commit 遅れていることを確認して裏付けた。
+残り 3 件は動かない GitHub Actions の bump（`{\"enabled\": false}` を実測）。
+
+`bonsai#16` は削除 0・drift 0・overlap 0 で自動 merge の条件を満たすが、追加ファイルが
+`#!/usr/bin/env bb`（ADR-2607173000 で禁止）なので nbb 移植待ちとした。
+
+---
+
+## 4. 着地しなかったもの（と理由）
+
+### comics の git 側変更は PR のまま（comics#8）
+
+**バイト列は B2 に載っている（依頼は達成）。git 側のモデル変更だけが未 merge。**
+
+作業を**共有 west checkout でやったのは判断ミス**だった。この repo には live writer
+（manga loop、12:22 / 12:52 / 13:56 / 14:06 / 14:26 と 20〜30 分間隔で commit）がおり、
+作業中に main が `fcc5640` → `dc6f778` へ進んで**私の commit の上から checkout された**。
+commit は object database に残っていたので失っていないが、CLAUDE.md が禁じている
+『共有 checkout での作業』をやった結果そのもの。branch と `git-annex` branch を push して
+durable にし、共有 checkout は clean（changes=0）に戻して相手を妨げないようにした。
+
+branch は main に対し 3 ahead / 5 behind。merge 前に載せ直しが要る。
+
+### ledger を持つ 3 branch は残す
+
+`agent/kubo-independent-pins` / `-reconcile` / `native-page-table-activation-land` は
+`fleet-db.ledger.edn` の 20 event を抱える。実体は全て main により後の seq で着地済み
+（branch ~8118 / main 10448）だが、`:append-only-ledger-gate` は行不一致での drop を禁じ、
+古い seq を末尾に足すのも誤り（`fold` はファイル順 replay）。event を verbatim archive して
+branch は残した。
+
+### その他
+
+- `/private/tmp/kotobase-pins-v2.ava1wc` の dirty worktree（stale reconcile 5 件）は
+  撤去に `--force` が要る = WIP 削除なので触らない
+- archived repo の 30 PR は 403 で閉じられない（owner が unarchive → close → re-archive）
+- `ghosthacker` 9.2 GB / `apps-gftdcojp` 5.8 GB（履歴書き換えが要る）
+
+---
+
+## 5. owner 判断待ち
+
+1. **`90-docs/adr/2608136600-owner-decision-register.edn`** —— main（launchd reload の発見）と
+   worktree（gitignore 実測 + 数値訂正）が同じ 1 行 EDN body を独立に書いた。どちらを取っても
+   他方が消える。両版は archive に在る
+2. **m365-archive のコピーは B2 バケット 1 本のみ**（numcopies 未設定 = 1）。2 本目が要るなら
+   別 bucket / 別鍵で `datalad-b2-init.cljs` を再実行
+3. **B2 の鍵が作業ログに平文で出た** —— `b2-creds.cljs` が設計上 `export B2_APP_KEY='...'` を
+   stdout に書くため。ファイルにも PR にも書いていないが、露出は起きた。ローテート判断
+4. **manga loop は plain `git add` で PNG を追加する** —— annex filter を通るか要確認。
+   通らなければ移行が徐々に効かなくなる（壊れはしない）
+5. 25 件の本物のローカル WIP は中身未判定。次の `cleanup.cljs --unlanded` の対象
+
+---
+
+## 6. archive（すべて削除前に退避済み）
+
+`.git/stash-archive-2026-08-14/`:
+
+- `branches/` —— local branch 18 本の diff + log
+- `worktree-wip/` —— dirty worktree 2 件の patch と untracked 実体
+- `unlanded-ledger-events-2026-08-14/` —— 20 event を verbatim + provenance
+- `preservation-prs/` —— PR 16 件の diff + メタデータ
+- `west-blocked-restores/` —— 復元した 69 repo の patch/status、`mail` の untracked 実体は
+  **ファイルとして** copy（`git diff` patch は gitignore された中身を 1 バイトも保存できない）
+
+---
+
+## 7. 次の一手
+
+```bash
+nbb scripts/cleanup.cljs --unlanded   # west が通った今、初めて意味のある結果が出る
+```
+
+west update は 96 skip のうち 69 を解消した状態。この survey が子リポの landing ladder
+（untracked / dirty / unpushed / nopr）を出す。"}]

@@ -1,0 +1,170 @@
+[{:db/id -1
+  :adr/id "ADR-2608120700"
+  :adr/title "bounded async は compiler の仕事で、手書き WAT の仕事ではない"
+  :adr/status "accepted"
+  :adr/date "2026-08-12"
+  :adr/last_verified "2026-08-12"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "bounded-wasi-03-async-measurement"
+  :adr/tags ["kotoba" "wasi" "component-model" "async" "future" "stream" "wasmtime"]
+
+  :adr/authoritative-for
+  ["WIT `async func` に対して pinned toolchain が実際に要求するもの"
+   "bounded async の作業を compiler 側から始める根拠"]
+
+  :adr/related ["2608112300" "2608112200"
+                "compiler docs/adr/0036-component-model-first-wasi-capabilities"
+                "compiler docs/adr/0049-component-application-language-gap-ledger"]
+
+  :adr/context
+  "ADR-2608112300 が `:bounded-wasi-0.3-async` を次の一手とし、着手前に測るべき
+   3 点を挙げた。全部測った。**結果は 3 点のうち 2 点で私の予想と違い、
+   gap の大きさと着手する側の両方が変わった。**
+
+   測定環境: wasm-tools 1.243.0 / wac-cli 0.10.1 / pinned wasmtime 47.0.3。"
+
+  :adr/decision
+  "## 測定 1 — async の「呼び出し」はほぼ無料だった
+
+   `tick: async func(n: u64) -> u64` に対し、**素の core import
+   `(param i64) (result i64)` が `--reject-legacy-names` で受理され、実行も通った**
+   （合成して 42 を返した）。task も waitable set も callback も要らない。
+   名前マングリングは clock と同じ `cm32p2|<iface>@<ver>` + 関数名で、
+   **async 専用の接頭辞は無い。** export 側も同様に、素の core 関数が
+   `async func` として lift される。
+
+   ADR-2608112300 は『stream と future が引数と戻り値の両方に出るので、
+   async profile 抜きで http provider を作る道は無い』と書いた。
+   **呼び出し ABI に関する限り、この含意は強すぎた。**
+
+   ## 測定 2 — ただし「ブロックする task 自身が async」でなければならない
+
+   同じ artifact で export を `run: func()` に戻すと、wasmtime は
+   **`wasm trap: cannot block a synchronous task before returning`** で落ちる。
+
+   これが設計を決める制約である: **async import に届きたい capability は、
+   Kotoba 側の export も async でなければならない。** つまり
+   `component-model-v1.edn` の `:requires-profile :async` は provider の内部事情
+   ではなく、**interface の形そのもの**に及ぶ。
+
+   ## 測定 3 — future / stream は「値」ではなく handle で、guest は作れない
+
+   `future<u64>` を渡す probe で `i32.const 0` を渡すと
+   **`unknown handle index 0`** で trap する。per-instance の handle table への
+   index であり、populate できるのは canonical built-in だけ。
+   `export make: async func() -> future<u64>` を素の WAT で書いても同じく trap する。
+
+   **そして重要なのは、これが build 時ではなく run 時に落ちることである。**
+   `wasm-tools component embed` も `component new` も通り、
+   `wasm-tools validate --features all` も通る。**完成したように見える artifact が
+   できる。**
+
+   ## 測定 4（2026-08-12 追記、上の記述を訂正する）— intrinsic は在る
+
+   **本 ADR は当初『素の WAT からは到達路が無い』と書いた。これは強すぎる。**
+   `wit-component` は future/stream の canonical built-in を core import として
+   受け付ける（`crates/wit-component/src/validation.rs`、v1.243.0）:
+
+   | intrinsic | 名前 | core 署名 |
+   |---|---|---|
+   | `future.new` | `[future-new-<N>]<func>` | `(result i64)` |
+   | `future.write` | `[future-write-<N>]<func>` | `(param i32 i32) (result i32)` |
+   | 他 | `[future-read-/cancel-/drop-*]`, `[stream-*]` 同型 | 同ファイル 2236-2323 |
+
+   `<N>` は「その関数の何番目の future/stream か（入れ子含め順に数える）」、
+   `<func>` は当該 interface の関数名。
+
+   ## 測定 5（2026-08-12）— 綴りの問題ではなかった。standard32 に面が無い
+
+   **`impl NameMangling for Standard` は `future_new` / `future_write` /
+   `future_read` / `*-cancel-*` / `*-drop-*` を全て `None` で返す**
+   （`validation.rs` v1.243.0, 1779-）。intrinsic を実装しているのは `Legacy`
+   だけである。
+
+   1 変数に絞って実測した（`kotoba.async-abi-prerequisite-test`）:
+
+   | module | `--reject-legacy-names` | 結果 |
+   |---|---|---|
+   | `cm32p2`-prefixed な regular import のみ | あり | **ACCEPTED** |
+   | 同上 + `[future-new-0]foo` | あり | **REJECTED**（intrinsic を名指し） |
+   | 同じ intrinsic、legacy 名 | なし | **ACCEPTED** |
+
+   上流 fixture（`crates/wit-component/tests/components/async-streams-and-futures`）
+   も同じ挙動で、legacy では通り `--reject-legacy-names` では拒否される。
+
+   **したがって『まだ綴りを当てられていない』も誤りで、正しくは
+   『この repo が使う mangling には intrinsic 面が存在しない』。**
+   ADR 0039 が standard32 を選んでいるので、これは設計上の分岐になる:
+
+   1. future/stream を要する provider だけ legacy 名にする（mangling が混在する）
+   2. wasm-tools に `Standard` 側の実装を入れる（上流貢献）
+   3. `component new` を通さず component binary を直接 emit する
+
+   **加えて、私自身の probe の作りに誤りがあった**: `head -0` を挟んだ判定で
+   2 つの署名を『ACCEPTED』と読んだが、どちらも実際は拒否されていた。
+   **出力を捨てる判定で合格を報告しかけた** —— 測定の作法として記録する。
+
+   ## それでも compiler 側から始める（理由が変わる）
+
+   理由は「不可能だから」ではなく、**intrinsic を KIR から emit するのは
+   どのみち compiler の仕事**であり、9 capability ぶんを手書き WAT で持つのは
+   `clock` 1 本ですら 100 行あった実績から見て維持できないから。
+
+   `wasi:http/client@0.3.0` の `send` は `request` resource を取り
+   `result<response, error-code>` を返す。`request.new` は `option<stream<u8>>` と
+   `future<result<...>>` を要求する。測定 1 で効いた sync lowering の近道は
+   `send` には届かず、
+   妥当な 3 つの sync 署名（`(param i32 i32)` / `(param i32)(result i64)` /
+   `(param i32 i32)(result i32)`）はいずれも
+   `failed to resolve import cm32p2|wasi:http/client@0.3::send` で拒否された
+   （網羅探索はしていない。**「sync 署名は見つからなかった」であって
+   「存在しないことを証明した」ではない**）。
+
+   ADR-2608110400 が native 側で記録した『どちらの側から始めるかを、測ってから
+   決める』の wasm 側での適用結果は: **compiler 側。**"
+
+  :adr/consequences
+  "## 機械が守る形にした
+
+   `kotoba.async-abi-prerequisite-test`（4 tests / 10 assertions、全緑）が上記 3 点を
+   pinned toolchain に対して固定する。**この repo のテストではなく、
+   計画が立っている前提のテスト**である。目的は 2 つ:
+
+   - 後から来た者が『手で WAT を書けばいい』を 1 日かけて再発見しないこと
+   - toolchain を上げたときにこの規則が変わったら**そこで落ちる**こと
+     （沈黙のうちに計画の価値が変わらないように）
+
+   `wasm-tools validate` は**既定の feature set で async 合成物を拒否する**ことも
+   固定した（`--features all` が要る）。合成物を検証する経路はここを opt-in しないと
+   **動く async component を invalid と報告する。**
+
+   ## 現在地（変わっていないこと）
+
+   `:wasmtime` は `:pending`。provider は clock の 1 本のみ（9 分の 1）。
+   この ADR も provider を増やしていない。
+
+   ## 副次的に測れたこと — http の WIT 依存閉包
+
+   `wasi:http@0.3.0` を resolve するには **http / clocks / random / cli /
+   filesystem / sockets の 6 package** を vendor する必要がある
+   （`cli/imports.wit` が filesystem と sockets を include するため）。
+   clock は clocks 1 package で足りた。**provider を作る日には、
+   使わない権限の WIT まで手元に置くことになる** —— WIT を持つことは
+   権限を持つことではないが、vendor する量は 1 桁増える。
+
+   ## 次の 1 手
+
+   compiler 側で `future<T>` / `stream<T>` の canonical built-in
+   （`future.new` 等）を KIR から emit できるようにする。着手前に測ること:
+
+   - **上の 3 択のどれを採るか（オーナー判断）。** 測定 5 で
+     『standard32 に intrinsic 面が無い』ことが確定したので、これは調査では
+     なく設計判断である。テストが upstream の追加を検出する形で pin 済み
+   - bounded の意味 —— `component-model-v1.edn` の `:async` profile が既に
+     `:requires [:declared-async-effect :cancellation :deadline :item-budget
+     :byte-budget]` を宣言しているので、**5 つとも満たさないものを
+     async profile と呼ばない**"}]

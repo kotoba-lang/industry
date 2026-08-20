@@ -1,0 +1,206 @@
+[{:db/id -1
+  :adr/id "2608180100-stale-config-outages-shinshi-chat-and-image-gateway"
+  :adr/doc_type "adr"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/last_verified "2026-08-18"
+  :adr/topic "stale-config-outages"
+  :adr/title "ADR-2608180100: two live outages whose only cause was a configuration value nobody updated"
+  :adr/authoritative_for
+  ["shinshi.club agentChat resolving the murakumo-main alias rather than a concrete model id"
+   "api.murakumo.cloud GATEWAY_URL binding for /v1/images/generations"
+   "the failure shape: a value that was correct when written and became a lie without changing"]
+  :adr/related
+  ["2607173100-murakumo-main-alias"
+   "2608136000-five-questions-before-trusting-green"
+   "2607300900-ci-cd-is-murakumo-fleet"]
+  :adr/body
+  "# ADR-2608180100: two live outages whose only cause was a configuration value nobody updated
+
+## Status
+
+accepted (2026-08-18)
+
+## Context
+
+The owner asked what of shinshi.club's operation is actually automated. Measuring
+that turned up two production outages, neither of which anything had reported.
+
+**Both were dark, not broken.** No test failed, no gate went red, no bot noticed.
+The club-shinshi workforce has ten resident bots on 6-24h cadences, and on the day
+these were found four of its last turns had failed outright and the other six had
+returned `Provider returned no final answer ... No write or external effect was
+attempted`. QA's own last turn was an `internal-error`. Nothing in that loop was
+positioned to see either outage, and nothing in it could have fixed one: 72 of the
+fleet's 74 bots carry `writes=false`.
+
+### Outage 1 — the site's headline feature answered 502 to every visitor
+
+`POST /xrpc/ai.gftd.apps.shinshi.agentChat` returned
+`502 {\"error\":\"chat gateway error\",\"upstreamStatus\":500}`.
+
+`companion.cljs` sent `model: \"qwen3.6-35b-a3b\"`, a concrete id hardcoded
+2026-07-15. Measured against the live gateway with a chat-scope token:
+
+    model=qwen3.6-35b-a3b -> 500  SyntaxError: Unexpected token 'e',
+                                  \"error code: 502\" is not valid JSON
+    model=murakumo-main   -> 200  real Japanese text, Qwen3.8-27B-Q4_K_M.gguf
+
+The concrete model's tunnel 502s; the bridge cannot parse that non-JSON body and
+returns 500. **The murakumo KV registry still lists `qwen3.6-35b-a3b` as
+`status: \"serving\"`**, so the registry could not be used to notice this either --
+a self-declaration is not a measurement.
+
+ADR-2607173100 already forbids exactly this (`concrete な model id を … ハード
+コードしない`, resolve `murakumo-main` instead). The rule existed and was violated,
+and **the test suite pinned the violation**: `companion_test.cljs` asserted
+`(= \"qwen3.6-35b-a3b\" (:model body))` with the comment `公式常駐モデル`. A test
+that asserts the bug keeps the bug.
+
+### Outage 2 — image generation had been 503 for 20 days
+
+`POST api.murakumo.cloud/v1/images/generations` returned
+`503 {\"error\":\"no GATEWAY_URL configured\"}`, surfacing on shinshi.club's
+`requestScene` as `502 upstreamStatus:503`.
+
+`local-murakumo`'s `wrangler.toml` left `GATEWAY_URL` unset on 2026-07-29 when
+`gateway.gftd.ai` was retired -- a correct decision at the time, taken so the path
+would fail honestly rather than point at a host that 502s. The comment recorded
+what was needed to restore it: *a Cloudflare DNS/Tunnel decision about which
+hostname fronts them, not a value here.*
+
+**That decision was made on 2026-08-07.** `gateway.murakumo.cloud` (Tunnel
+c75a3e83 -> comfy-openai-bridge on gad:8189 -> ComfyUI on gad:8188) was created
+and documented in `cloud-murakumo/services/comfy-openai-bridge/README.md`, which
+records that it restored image generation for awai.network the same day. Nothing
+carried it back into this config, so for 11 more days the note asked for a
+decision that already existed.
+
+Measured link by link before changing anything:
+
+    api.murakumo.cloud/v1/images/generations -> 503 no GATEWAY_URL configured
+    gateway.murakumo.cloud/health            -> 200 {\"ok\": true}
+    gad:8189 (bridge) /health                -> 200 {\"ok\": true}
+    gad:8188 (ComfyUI) /system_stats         -> 200
+    POST gateway.murakumo.cloud/v1/images/generations
+                                             -> 200, 789,992-byte PNG in 51s
+
+**Only the first link was broken.** The GPUs, the tunnel, the bridge and the models
+were all healthy the entire time, and the whole outage was one absent string.
+
+## Decision
+
+1. **`companion.cljs` resolves the alias.** `default-chat-model` is
+   `\"murakumo-main\"`; `MURAKUMO_CHAT_MODEL` overrides it at the call site so a
+   single deployment can still be pinned for an experiment without a code edit.
+   The test now asserts the alias plus a shape check -- no parameter-count in the
+   id -- so it fails on ANY concrete id rather than only on this one.
+   Landed `d008d72` (network-awai/club-shinshi-app).
+2. **`GATEWAY_URL = \"https://gateway.murakumo.cloud\"`** in local-murakumo's
+   `[vars]`, with the stale note replaced by the measured chain and the date the
+   tunnel decision was actually made. Landed `071d587`.
+3. **`/v1/workflows/run` is NOT restored and is not claimed to be.** The bridge's
+   `do_POST` serves `/v1/images/generations` only, so that path moves from an
+   honest 503 to the bridge's 404. Both are honest; neither works. A caller needing
+   custom ComfyUI graphs should extend `build_workflow`, not add a second gateway.
+
+## Consequences
+
+Verified after deploy, against the public surface, not against a build:
+
+    shinshi.club agentChat        -> 200, real persona reply (41s)
+    api.murakumo.cloud images     -> 200, 923,079-byte PNG (35s)
+    shinshi.club requestScene     -> 200 {\"url\":\"/b/6792f807...\"}
+    GET that url                  -> 200, 1,708,790 bytes, image/png
+    scene-drain --chars 1         -> 5/5 generated, 0 failures
+    coverage before -> after      -> zero 873->872, complete 489->490,
+                                     drainRemaining 977->976
+
+The drain moving is the part that matters: the site's own coverage endpoint
+confirms the loop closes, so the remaining 976 undrained characters are now a
+question of running the batch, not of a broken capability.
+
+**Chat latency is 41s and that is not fixed here.** `murakumo-main` is one
+production slot on Qwen3.8-27B. A 41-second first token is a product problem even
+though the endpoint is now correct; recording it rather than letting `200 OK` read
+as `healthy`.
+
+## What actually generalizes
+
+Both outages have the same shape, and it is not `someone wrote the wrong value`:
+
+> **The value was right when it was written. The world moved and the value did
+> not, and nothing was watching the join.**
+
+A concrete model id is correct until the fleet swaps. `GATEWAY_URL` unset is
+correct until a tunnel exists. Neither config was ever edited into a wrong state;
+both simply stopped being true, silently, while continuing to look deliberate --
+each carried a confident comment explaining why it was that way.
+
+Three things follow, none of which is `be more careful`:
+
+1. **An alias is not a style preference, it is where the staleness is allowed to
+   live.** ADR-2607173100 exists so that exactly one place has to be updated when
+   the fleet changes. Every consumer that inlines a concrete id re-opens the hole
+   the alias was dug to close.
+2. **A test that asserts today's value pins today's value.** The chat test was
+   green throughout the outage because it asserted the broken constant. Assert the
+   *property* (`resolves an alias`, `carries no parameter-count`) rather than the
+   current literal.
+3. **A comment describing a pending decision needs an expiry, because it will
+   outlive the decision.** The `GATEWAY_URL` note was accurate for nine days and
+   misleading for eleven, and it read identically in both periods. The reader
+   cannot tell those apart, which is the same failure mode ADR-2608136000 names
+   for gates: `測れなかった` and `測って問題が無かった` returning the same value.
+
+**No new gate is landed here.** ADR-2608136000 is explicit that a gate is not
+landed until it has been seen to fail for the right reason and to pass on the real
+distributed tree, and neither of these checks has been built or discriminated yet.
+The honest statement is that these two outages were found by measuring, not by a
+detector, and that a detector for `a live endpoint that a config claims is
+configured` does not exist yet. Writing one is follow-up work, not a claim of this
+ADR.
+
+## Follow-ups
+
+**Done since this ADR was written (same day):**
+
+- The probe landed as `scripts/verify-endpoint-health.cljs` +
+  `manifest/endpoint-health.edn`, discriminated in seven directions.
+  **It is not the probe this section originally described.** Two derived
+  detectors were built first and thrown away after measuring them:
+  probing every declared upstream origin (118 of 164 dead, but chat's declared
+  upstream was ALIVE and images had no declared upstream at all -- catches
+  neither outage), and flagging env vars a worker reads but its config never
+  declares (25 hits in one repo, 24 deliberate, and the one that mattered was
+  itself deliberate for its first nine days). What works is the un-clever
+  version: call our own endpoints and check the promise. Both outages were
+  visible from outside in one request.
+- It became resident on gad under a systemd timer
+  (`scripts/endpoint-health-resident.cljs`), `:slot/anonymous`, using
+  `kotoba-lang/uptime` for the availability statement rather than a second
+  implementation. A tick that cannot measure writes NO observations, so
+  `uptime` reports that window `:unobserved` rather than filling it with
+  `:inconclusive` rows that would look monitored.
+- The statement is mirrored into `network-awai/cloud-itonami` as
+  `docs/endpoint-health-receipt.edn`, carrying `:measured-at` and `:pulled-at`
+  separately, and cloud-itonami's QA objective now names it.
+
+**Still open:**
+- Chat latency: one slot on Qwen3.8-27B gives ~41s. Either more slots, a smaller
+  model for companion chat, or a streamed response.
+- The 976 remaining undrained characters: `tools/scene-drain.cljs` is resumable and
+  now works, but nothing schedules it.
+- `/signup` returns 404 on shinshi.club -- it is in `routes/segments` but not in
+  `root-pages`. A conversion funnel answering 404 is its own finding, unrelated to
+  these two, and is not fixed here.
+- The bot workforce's inability to complete a resident turn was diagnosed and
+  fixed the same day -- see ADR-2608180200. It was not a model-quality problem:
+  resident ticks cap output at 1024 tokens and a reasoning model spent the whole
+  cap thinking. That ADR also records the authority change that lets a corrected
+  registry reach running Bots without a browser.
+- The receipt mirror is refreshed by hand
+  (`nbb scripts/endpoint-health-pull.cljs`). Nothing schedules it. Bots only run
+  while the workspace machine is live, so the window this misses is small, but a
+  reader who ignores `:mirror-age-minutes` will still mistake a stale mirror for
+  a quiet fleet."}]

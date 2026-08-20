@@ -1,0 +1,216 @@
+[{:db/id -1
+  :adr/id "ADR-2608140200"
+  :adr/title "laguna-xs-2.1 は fleet で動く — ただし ollama を上げてから。main は qwen のまま据え置く"
+  :adr/status "accepted"
+  :adr/date "2026-08-13"
+  :adr/repo "scripts/fleet-ci"
+  :adr/doc_type "adr"
+  :adr/topic "fleet-main-model-evaluation"
+  :adr/last_verified "2026-08-13"
+  :adr/authoritative_for ["laguna-xs-2.1 の fleet 適合判定"
+                          "16GB M4 mac mini における 33B-A3B クラスの文脈上限"
+                          "モデル比較を実行可能課題で測る手順"]
+  :adr/related ["ADR-2607173100" "ADR-2608139600" "ADR-2608136000"]
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body
+  "## Context
+
+オーナー質問（2026-08-13）「laguna-xs-2.1 は murakumo mac mini fleet で動く?」
+続いて「では性能試験, 速度, 性能を qwen 35 と比較」。
+
+Laguna XS 2.1 は poolside が 2026-07 に出した 33B total / 3B active の MoE。
+公称 256K 文脈、agentic coding 向け、OpenMDW-1.1。fleet が今 serve している
+Qwen3.6-35B-A3B（ADR-2608139600 で 10 台に配備、UD-IQ2_XXS 10.8 GB）と同じサイズ帯
+なので、footprint としては置き換え候補になりうる。
+
+## 測定環境（実測、2026-08-13）
+
+| 項目 | 値 |
+|---|---|
+| ノード | judah（fleet 10 台とも `Mac16,10` = Mac mini M4 base） |
+| メモリ | `hw.memsize` = 17179869184 = 16 GB、10 台とも同一 |
+| GPU 上限 | `iogpu.wired_limit_mb` = 13312 |
+| 常駐 ollama | **0.30.7**（fleet 全ノード） |
+| 比較用 ollama | 0.32.9 を judah の `/tmp/ollama-0329` に side-by-side、ポート 11500。**常駐 11434 には触れていない** |
+| 比較対象 | `hf.co/bartowski/Laguna-XS-2.1-GGUF:IQ2_XS`（10.39 GB）vs `qwen35-iq2`（IQ2_XXS、10.76 GB） |
+
+**両モデルとも同じ ollama 0.32.9・同じ options（temperature 0 / seed 42 / num_ctx 8192）
+で測り直している。** 最初 qwen だけ 0.30.7 で測っていたが、runtime の差が結果に混ざるので破棄した。
+
+## Decision 1 — 動く。ただし fleet の ollama では動かない
+
+**`ollama 0.30.7` は Laguna を読めない**:
+
+```
+error loading model: missing tensor 'blk.0.attn_g.weight'
+```
+
+Laguna 2.1 対応が入ったのは **ollama v0.32.3（2026-07-23）** ——
+release notes: `Added chat, thinking, and tool calling support for Laguna 2.1 models,
+including a Metal inference fix`。fleet は 0.30.7 で、対応の 2 マイナー手前にいる
+（brew stable は 0.32.9）。
+
+つまり最初の関門はメモリではなく **runtime のバージョン**である。
+0.32.9 を side-by-side で入れたら即座に動いた。
+
+## Decision 2 — 16 GB に載る量子化は IQ2 系だけ
+
+公式 ollama tag は最小が `nvfp4` 19 GB / `q4_K_M` 20 GB で、**13 GB の wired 上限に入らない**。
+入るのはコミュニティ GGUF の IQ2 系:
+
+| 配布物 | サイズ | 16 GB 機 |
+|---|---|---|
+| ollama 公式 `q4_K_M` / `latest` | 20 GB | 不可 |
+| ollama 公式 `nvfp4` | 19 GB | 不可 |
+| bartowski `IQ2_XXS` | 9.40 GB | 可 |
+| bartowski `IQ2_XS` | **10.39 GB** | 可（本 ADR の測定対象） |
+| bartowski `IQ2_S` | 10.62 GB | 可 |
+| `IQ2_M` 11.64 / `Q2_K` 12.16 | | KV の余地がほぼ残らない |
+| `IQ3_XXS` 以上 | 14.29 GB〜 | 不可 |
+
+現 main が IQ2_XXS 10.76 GB なので、**同じ運用点にそのまま収まる**。
+
+## Decision 3 — 速度は laguna の勝ち（1.4 倍）
+
+| | laguna IQ2_XS | qwen IQ2_XXS |
+|---|---|---|
+| decode（3 回中央値） | **45.2 tok/s** | 32.5 tok/s |
+| prefill @ 4K | 348 tok/s | 346 tok/s |
+| prefill @ 32K | 206 tok/s | 212 tok/s |
+
+decode は全課題を通じて 43–48 / 31–33 tok/s に収まり、ばらつかない。
+prefill は同等——差が出るのは decode だけで、これは重みのバイト数の差
+（10.39 vs 10.76 GB）とアーキテクチャの差で説明がつく。memory-bandwidth bound。
+
+## Decision 4 — 正答率は thinking を有効にすると逆転する
+
+判定は **LLM-judge を使わない**。15 問の実行可能課題（LRU、トポロジカルソート、
+バグ入り二分探索の修正、トークンバケット、スタック VM、ログ parse、JSON path、
+EDN シリアライズ、diff、リトライ、semver、SQL where 評価器、strict JSON、
+存在しない関数を答えさせない）を出し、**出力の python を実際に走らせて PASS/FAIL** を取る。
+
+| 条件 | laguna | qwen |
+|---|---|---|
+| thinking off | **10/15** | 9/15 + 予算切れ 1 |
+| thinking on（落とした問題を再挑戦） | 5 問中 **1 問**回復 → 11/15 | 6 問中 **4 問**回復 → **13/15** |
+| 回復 1 問あたりのコスト | 8,000 tok / 約 200 s | 3,300–8,100 tok / 105–262 s |
+
+**thinking off なら laguna がわずかに上で、しかも 1.4 倍速い。**
+**thinking on なら qwen が明確に上**（13 対 11）。laguna は thinking に
+8,000 トークン払っても 5 問中 4 問を落としたままで、これは打ち切りではなく
+思考し切った上での不正解なので、予算を増やしても変わらない。
+
+落ちる問題は互いに違う。laguna は `lru-cache` / `edn-emit` を落として qwen は通し、
+`json-paths` / `token-bucket` / `stack-vm` は laguna が通して qwen が落とす。
+**同点ではなく得意分野が別。**
+
+## Decision 5 — 公称 256K 文脈は 16 GB 機では使えない。しかも laguna の方が先に壊れる
+
+`num_ctx` を上げながら GPU 常駐率と実 decode を測った（2 回再現）:
+
+| num_ctx | laguna decode / GPU% | qwen decode / GPU% |
+|---|---|---|
+| 8K | 45.4 tok/s / 100% | 32.5 tok/s / 100% |
+| 64K | 41.5 tok/s / 99% | 32.8 tok/s / 100% |
+| 128K | **4.3 tok/s** / 69% | 25.3 tok/s / 92% |
+| 256K | — / 19% | — / 89% |
+
+**laguna は 64K までしか GPU に載らず、128K で 10 分の 1 に崩れる。**
+qwen は 128K でも 25.3 tok/s を保つ。重みは laguna の方が小さいのに文脈耐性は逆で、
+KV の形状の差がそのまま出ている。256K を売りにするモデルが、この筐体では
+**その売りの部分だけ使えない**。
+
+needle-in-a-haystack は 4K / 16K / 32K のいずれも両モデル正解した。ただし
+**laguna は 3 回とも `murakumo` を `murakuma` と綴り崩した**（passphrase 自体は正確）。
+qwen では起きない。IQ2 の劣化が固有名詞の再生に出ている兆候として記録する。
+
+## Decision 6 — main は qwen のまま。alias を動かさない
+
+`murakumo-main` は `qwen3.6-35b-a3b` のまま据え置く（ADR-2607173100 の切替機構は
+そのまま有効で、本 ADR はそれを supersede しない）。理由:
+
+1. 切替には **10 台の ollama を 0.32.3 以上へ上げる**作業が先に要る。今日の
+   ADR-2608139600 で常駐を LaunchDaemon 化したばかりで、その直後に runtime を
+   入れ替える理由が弱い。
+2. 速度は 1.4 倍だが、**reasoning を使う経路では正答率が下がる**。fleet の
+   consumer は advisor / critic 系が多く、thinking 側の質が効く。
+3. 公称 256K が使えない以上、laguna を採る主な動機（長文脈 agentic coding）が
+   この筐体では成立しない。
+
+**再評価の条件**（これが満たされたら測り直す）:
+
+- fleet の ollama が別の理由で 0.32.3 以上に上がったとき（追加コストが消える）
+- 16 GB より大きいノードが fleet に入ったとき（IQ3 以上が載り、IQ2 の劣化が外れる）
+- laguna 側に IQ2 より上でこの筐体に載る量子化が出たとき
+
+## Decision 7 — モデル比較で「答えられなかった」を「間違えた」と数えない
+
+**最初の laguna 測定は 15 問中 13 問が fail に見えた。実際は 1 問も間違えていない。**
+thinking が num_predict を全部使い切り、`thinking-chars 12295 / content-chars 0`
+——本文を 1 字も出さないまま打ち切られていた。これをそのまま集計していれば
+「laguna は 2/15 で使い物にならない」という**正反対の結論**を出していた。
+
+ADR-2608136000 の 5 問（入力が無いとき何を返すか / 実行できないとき何を返すか /
+飛ばしたと合格が出力で区別できるか）はモデル比較にもそのまま当たる。対策として
+harness は `:pass` `:fail` `:truncated` の 3 値を持ち、`out-tok >= num_predict` を
+truncated として分離し、集計で別に数える。
+
+同型の落とし穴をもう 1 つ踏んでいる: **qwen だけ古い ollama で測った初回結果**。
+0.30.7 と 0.32.9 の数字を並べれば runtime の差がモデルの差に見える。破棄して測り直した。
+
+## Decision 8 — 評価用に立てた 2 本目の ollama が常駐推論を落とした
+
+closing で片付けたつもりの側で **judah の本番推論が `Compute error` で止まっていた**。
+原因は自分の teardown が不完全だったこと:
+
+```
+pkill -f 'ollama-0329/ollama serve'     # 当たらない
+```
+
+`cd /tmp/ollama-0329 && ./ollama serve` で起動したプロセスの argv は
+**`./ollama serve`** なので、ディレクトリ名を含むパターンに一致しない。
+ディレクトリを `rm -rf` してもプロセスは生き続け、その runner
+（`/private/tmp/ollama-0329/llama-server`）が 10 GB を掴んだままだった。
+16 GB の機械に 10 GB のモデルが 2 本居る状態になり、常駐側が確保できずに落ちていた
+（実測: `Pages free` 3,749 ページ = 61 MB）。PID 指定で 2 本殺したら復旧
+（32.7 tok/s、`6*7` に `42` を返す）。
+
+**評価のために本番ノードへ 2 本目の serving を立てるときは、閉じるのを
+`pkill` のパターンに頼らない。`ps aux | grep llama-server` で runner ごと見て
+PID で殺し、その後に本番側で 1 回実際に推論させて確かめる。**
+「消したつもり」と「消えた」は別の主張である。
+
+## 隣接して観測した gap（本 ADR の範囲外、未着手）
+
+fleet 全 10 台の ollama を見たときに、ADR-2608139600 が言う
+「推論は LaunchDaemon で常駐する」がまだ全台では成立していない:
+
+| ノード | 観測 |
+|---|---|
+| `asher` | plist は在るが `launchctl` に `com.murakumo.ollama` が無く、serve プロセスも無い |
+| `zebulun` | daemon はロード済み・serve プロセスも在るが、`127.0.0.1:11434` が応答しない |
+| `benjamin` | **plist が無い**。serve は動いているが ad-hoc（0.30.6）なので再起動で消える |
+
+いずれも本 ADR の測定で触ったノードではない（触ったのは judah のみ）。
+決定を変えるものではないので ADR-2608139600 は書き換えていないが、
+「10 台に常駐している」を前提に読むと外れる。
+
+## 再現手順
+
+計測 harness は **`scripts/model-eval/`**（`tasks.cljs` に 15 問、`bench.cljs` が
+`speed` / `tasks` / `needle` / `ctx`）。ノードの ollama は localhost 固定なので
+トンネル越しに叩く:
+
+```
+ssh -N -L 11435:127.0.0.1:11434 judah &
+nbb --classpath . bench.cljs tasks <model>
+THINK=on ONLY=lru-cache,semver nbb --classpath . bench.cljs tasks <model>
+nbb --classpath . bench.cljs ctx <model>
+```
+
+本 ADR の数字は judah の `/tmp/ollama-0329`（0.32.9、ポート 11500、使い捨て）で
+取った。そのサーバとモデル blob は撤去済みで、judah は 0.30.7 / `qwen35-iq2` のみ
+という測定前の状態に戻っている。再評価するときは 0.32.3 以上を同じやり方で
+立て直す（Decision 8 の閉じ方に従うこと）。
+"}]

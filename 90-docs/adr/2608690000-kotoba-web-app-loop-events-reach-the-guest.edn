@@ -1,0 +1,213 @@
+[{:db/id -1
+  :adr/id "2608690000"
+  :adr/doc_type "adr"
+  :adr/topic "kotoba-web-app-loop-events-reach-the-guest"
+  :adr/title "kotoba だけで web app が書けるようになった — DOM app driver で state+event ループを閉じ、`:attrs` を deny-by-default で reconciler に通す"
+  :adr/status :accepted
+  :adr/date "2026-08-11"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["ブラウザで動く Kotoba アプリの guest 契約（pure な init / view / step の 3 export）"
+   "host が event を guest に戻す経路（container 委譲リスナ → nominal `data-k` → step）の決定"
+   "`:attrs` を DOM reconciler が適用する規約と、その deny-by-default 許可リスト"
+   "アプリのために新しい capability を切らない（ungranted で成立させる）という決定"
+   "web target が JDK を要する唯一の出荷 target であるという実測の記録"
+   "ui-v1 kit（flat node + pull event）と `:document` 経路の役割分担と、ui-v2 への引き継ぎ事項"]
+  :adr/supersedes []
+  :adr/related ["2607279200" "2607270100" "2608650000" "2608080100" "2608039700" "2607300900"]
+  :adr/repos ["kotoba-lang/amu" "com-junkawasaki/root"]
+  :adr/body
+  "## 決定
+
+`.kotoba` だけで書いたアプリケーションが、実ブラウザで実ユーザ操作に応答する。
+そのための host 側の半身を `kotoba-lang/amu` の `runtime/dom-driver.mjs` として置き、
+`runtime/browser-host.mjs` の `reconcileUiDocument` に **deny-by-default の `:attrs`
+適用**を足した。
+
+guest が供給するのは pure な 3 export だけ:
+
+```clojure
+(defn init [] :document)                        ; 初期状態
+(defn view [state :document] :document)         ; 状態 → UI document
+(defn step [state :document                     ; 状態 + イベント → 次の状態
+            target :string kind :string value :string] :document)
+```
+
+**この 3 つはいずれも effect ではないので、アプリは `requiredCapabilities: []` で
+コンパイルされ、host は何も grant しない。** 新しい capability kit は 1 つも切っていない。
+
+driver は instance ではなく **factory**（`instantiate: () => module.instantiateKotoba(grants)`）
+を取る。理由は下記「fuel は 1 インタラクション 1 予算」。
+
+## なぜこれが必要だったか
+
+W4 で `:document` が DOM に届くようになった（`document_dom_reconcile_test`）が、
+**逆向きが空いたままだった** —— 描画はできるがクリックに応答できないページしか作れず、
+「Kotoba で web app を書く」は成立していなかった。本 ADR はそこだけを閉じる。
+
+## なぜ安全性を弱めないか
+
+増えたのは *guest が受け取る値の形* であって *host が渡す authority* ではない。
+
+- guest は DOM API を名指さず、host object を受け取らず、callback を登録しない。
+  **リスナは全て driver が所有し、mount container に張る**（guest が名指したノードにではない）。
+- guest に渡るのは 3 本の string、返るのは host が描画を選ぶ値。
+- したがって `no-interop` と safety-claims の t3-confinement は無傷。ungranted な
+  capability が到達不能なのは、**そもそも capability が 1 つも経路上に無い**ため。
+- ADR 0025（declarative UI kit）の 3 つの除外は文字どおり維持する: HTML injection なし
+  （`innerHTML` を一度も書かない）/ CSS evaluation なし（`style` は許可リストに載せない）/
+  event handler なし（`on*` は許可リストの *手前* で拒否するので、将来許可リストを
+  編集しても開かない）。
+
+### イベントがどう戻るか（nominal identity、handle ではない）
+
+guest はノードに `:data-k` で名前を付ける。driver は `event.target` から container まで
+遡って最も近い `data-k` を探し、**その guest が選んだ文字列**を `target` として渡す。
+ラベルの無い部分木で起きたイベントは推測せず捨てる。ノード handle は一度も guest に渡らない。
+
+## `:attrs` を通した理由（新機能ではなく parity の回復）
+
+W4 の UI 語彙には既に `:attrs` があり、`kotoba-lang/html` の文字列レンダラ
+（`html_document.kotoba` の `render-attrs` / `render-attr-entry`）は既にそれを出力していた。
+**DOM reconciler だけが無視していたので、同じ guest 値に対して 2 つのレンダラが食い違って
+いた** —— この bridge が存在する理由である dual-renderer parity そのものが破れていた。
+加えて属性が無ければ class 一つ付かず、DADS ベースの UI は載らない。
+
+許可の形（`browser-host.mjs`）:
+
+- 名前は `^[a-z][a-z0-9-]*$`、`on*` と `style` は許可リストの手前で拒否
+- 許可リスト + `aria-*` / `data-*` 接頭辞
+- `href` / `src` の値は `https?://` `/` `./` `../` `#` `mailto:` のいずれかで始まること
+  （`javascript:` と `data:` はこれで閉じる。URL parser を持ち込まずに済む）
+- ノードあたり 32 属性、名前 64 byte、値 1024 byte
+- **消えた属性は削除する**（さもないと過去の状態が付いた属性を溜め続ける）
+- `[\"bool\" true]` は空値の present 属性、`false` は不在（文字列レンダラの `bool-attr` と同じ読み）
+
+## fuel は 1 インタラクション 1 予算（設計の中心）
+
+`instantiateKotoba()` は `let fuel=512` で開き、**補充されない**（`script.clj:2291`）。
+したがって **1 つの instance は無限のセッションを支えられない** —— 実測で、instance を
+共有すると **8 回目のインタラクションの描画中に `fuel-exhausted`** で死ぬ。
+
+そこで driver は **インタラクションごとに新しい instance を作る**。これは fuel モデルの
+回避ではなく、モデルどおりの使い方である: **1 ユーザ操作 = 1 つの有界・計量された計算**で、
+暴走した guest はその操作を潰せてもページを固められない。これが成立するのは guest が
+pure だから —— state は host が持つただの `:document` で instance identity を持たないので、
+次の状態を計算する instance が前の状態を計算した instance である必要がない。
+
+実測: **200 dispatch を完走**（202 instantiations）、**1 インタラクション約 17.5 ms**
+（instantiate + step + view + reconcile、負荷のかかったこのマシンで）。
+
+## 実測（2026-08-11）
+
+| 何を | 結果 |
+|---|---|
+| `examples/todo-app.kotoba`（add / toggle / delete / filter） | `--target js` / `js-browser` とも compile 成功、`requiredCapabilities: []` |
+| Node mock DOM 上の loop（新規 `dom_app_driver_test`） | 5 tests / 10 assertions green |
+| gate が落ちることの確認 | `applyUiAttrs` の呼び出しを 1 行潰すと 4 failures |
+| instance 共有時の死に方 | 8 インタラクション目で `fuel-exhausted`（test が形を pin している） |
+| factory 経路の持続 | 200 dispatch 完走 / 202 instantiations / 約 17.5 ms per interaction |
+| 画面の天井 | `doc-node-limit` —— この layout で約 7 行 |
+| 実ブラウザ（Playwright、実 trusted event） | chromium / firefox / webkit desktop + Pixel 7 / iPhone 15 emulation の 5 profile |
+| 近隣 document 系 test | `document-dom-reconcile` / `document-ui-render` green |
+
+### 途中で見つけた本物のバグ 2 件（どちらも mock が隠していた）
+
+**① `value` が属性にしか書かれていなかった。** 実 DOM の form control はユーザが編集した
+時点で属性の追跡をやめる（dirty value flag）ので、**guest が自分で所有するフィールドを
+永久に clear できなかった。** Node の mock DOM が `setAttribute(\"value\")` を property に
+ミラーしていたためこれを隠しており、**Chromium の実行で初めて落ちた。**
+
+対処は 2 つ:
+
+1. `applyUiAttrs` が `INPUT`/`TEXTAREA`/`SELECT` の `value`（と `INPUT` の `checked`）を
+   **property としても**書く。値が違う時だけ書く（毎描画で代入するとキャレットが飛ぶ）。
+2. **mock からミラーを外した。** プラットフォームより親切な mock は、mock が無いより悪い。
+
+**② fuel 枯渇**（上記）。これも Node の短いテストでは 8 回に届かず表に出ず、ブラウザで
+実操作を並べて初めて出た。どちらも **「mock で緑、実物で赤」** の同じクラスで、
+mock を実物に寄せることでしか防げない。
+
+## 主張しないこと
+
+- **ui-v1 capability kit を置き換えない。** kit（flat 32 node + revision + bounded pull event、
+  `:reference :implemented` / `:wasm-aot :pending`）は capability 経路の正本のまま。ここで
+  閉じたのは `:document` 経路。**UI が 2 系統ある状態は解消していない。**
+- **wasm 経路では未証明。** この driver は restricted-ESM artifact を駆動する。
+- **`:attrs` は W4 の UI 語彙の DOM 側適用であって、新しい ability ではない。**
+
+## 分かった制約（正直に記録する）
+
+- **web target は JDK を要する唯一の出荷 target。** `bin/kotoba` は wasm32 / native を
+  nbb fast path に載せるが、web backend（`kotoba-lang/kotoba-script` の `src/kotoba/script.clj`）
+  は JVM-only Clojure で nbb entrypoint が無く、`--target js` / `js-browser` は
+  `clojure -M:run` に落ちる。browser matrix はこの 1 artifact のためだけに JDK を要するように
+  なったので、`browser-matrix.cljs` がその旨を実行時に出力する（silent cap にしない）。
+  fleet gate はこの matrix を回していない（`gates.edn` の amu 節が egress 無しを理由に明記）
+  ので、gate は赤くならない。
+- **画面の天井は fuel ではなく `:document` のノード予算（256）。** 実測でこの layout は
+  **約 7 行**で `doc-node-limit` に当たる。fuel より先にこちらに当たるので、
+  「Kotoba の画面はどれだけ表示できるか」の答えは今日 **256 ノード**である。
+  これは cljs 相当を名乗るには小さい。
+- **アプリ側の 2 つの bound は Kotoba の穴に由来する。** todo は最大 26 件、カウンタは
+  9 まで —— **integer→string の builtin が無い**ので、識別子も桁も literal から
+  `string-substring` で引いている（css 移行が踏んだのと同じ穴）。回避策を一般化するのではなく、
+  この builtin を足すのが正しい。
+- **soft perf budget `dual-renderer-soft-performance-workload` は赤いが、本変更とは無関係。**
+  未改変の main でも 17.2s（budget 5s）で落ちる（改変後 19.1s、同一マシンの負荷ノイズの範囲）。
+  この機械は mining fleet と並行セッションを抱えているため wall-clock budget が当てにならない。
+
+## 次にやること（順序つき）
+
+1. **`:document` のノード予算を上げる**（今日 256、約 7 行で尽きる）。これが今の
+   「Kotoba で作れる画面の大きさ」を直接決めているので、UI 方面で最も効く 1 手。
+   depth 8 / container items 32 も同時に見直す。
+2. **ui-v2 kit** — `:ui/commit` の payload を flat node set から `:document` に上げ、
+   event は bounded pull のまま。flat 32 node は実アプリには小さすぎる（DADS のボタン 1 個で
+   数ノード消える）。これで UI の 2 系統が 1 本になる。
+3. **integer→string builtin**（`i64->string`）。アプリ側の 2 つの bound はこれ 1 つで消える。
+4. **stdlib の穴** — `for` / `mapv` / `sort-by` / `keep` / `remove` / `str/*`。
+5. **web backend を nbb に載せる**（`script.clj` → `.cljc` + `js_cli.cljs`）。これで
+   「JDK-free」が全 target で真になり、fleet gate に browser lane を載せられる。
+6. **DX** — source map、runtime 共有チャンク（hello で 57 KB の同梱ランタイム）、
+   digest 再検証としての hot reload。
+
+## 置き場所について
+
+driver は `amu/runtime/` に置いた（`browser-host.mjs` / `worker-host.mjs` / `wasi-host.mjs` と
+同じ「host runtime」の棚で、Playwright matrix が同じ repo にあるので 3 エンジンの証明が
+その場で取れる）。**2 つ目の consumer が現れたら切り出す。**
+
+## 着地（2026-08-11）
+
+| 何 | どこ |
+|---|---|
+| 実装 PR | `kotoba-lang/amu#589`（merge commit `e78241dca15000f6bb3976e97f493c70b0137dcf`） |
+| 実装 commit | `319505e197d39b9e78f7cfa7b2074b3a698a262f` |
+| CI | merged commit で **26/26 success**（`browser-matrix` は ubuntu-latest / windows-2025 とも pass、`safari` も pass） |
+| west pin | `76d05a13a1792d71b0a3497b196a9d6e3142c5db`（`scripts/west-pin-put.cljs amu <sha>`、806f5ce→e78241dc は ahead=2 / behind=0） |
+| この ADR | `04c133071d6acf3f7e7c6fbf14bf2872f220abff` |
+
+**手続き上の逸脱を 1 件記録する。** PR #589 は **CI 完了前にマージされた** —— merge は
+`10:24:33Z`、最後の check（`test (macos-14)`）の完了は `10:47:15Z`。最初に打った
+`gh pr merge` が（出力を確認しないまま）通っていたのに、その後「checks を待ってから
+マージする」と述べて待機していた。**結果としては同一 commit に対し 26/26 が success
+なので実害は無いが、順序は主張どおりではなかった。** 次回は `gh pr merge` の出力を
+確認してから待機に入る。
+
+## 引き継ぎ（open items）
+
+1. **`orgs/kotoba-lang/amu` の共有 checkout に別セッションの未コミット WIP がある**
+   （`deps.edn` / `deps-lock.edn` / `package.json` に `test-value-runtime-host`、
+   `runtime/browser-host.mjs`、`test/kotoba/compiler/aiueos_target_test.clj`）。
+   **本 ADR の変更も `runtime/browser-host.mjs` を触っている**ので、その WIP は
+   main の新しい内容と reconcile が要る。**触っていない**（他者の WIP）。
+2. **`dual-renderer-soft-performance-workload` は赤いまま。** 本変更とは無関係
+   （未改変 main でも 17.2s / budget 5s）。このマシンの負荷で wall-clock budget が
+   機能していないので、budget を上げるか計測方法を変えるかの判断が要る。
+3. **safari lane はこの loop を検査していない。** `safari` job は Playwright ではなく
+   `scripts/safari-webdriver.mjs` の独自ハーネスで、`browser.spec.mjs` を走らせない。
+   WebKit エンジン自体は Playwright の `webkit-desktop` で緑だが、**Safari 実機での
+   app loop は未証明**。
+4. 次の 1 手は上記「次にやること」の 1（`:document` ノード予算）。**約 7 行**という
+   実測値がそのまま UI の天井なので、ui-v2 より先に効く。"}]

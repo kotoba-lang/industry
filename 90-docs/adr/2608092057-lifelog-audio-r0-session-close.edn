@@ -1,0 +1,102 @@
+[{:db/id -1
+  :adr/id "adr-2608092057-lifelog-audio-r0-session-close"
+  :adr/title "ADR-2608092057: 常時音声ライフログ端末 R0 session close — architecture freeze と bench handoff"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "lifelog-audio-r0-session-close"
+  :adr/date "2026-08-09"
+  :adr/last_verified "2026-08-09"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["2026-08-09 lifelog audio R0 session の決定・成果物・検証・未実施"
+   "次sessionがbench proofを再開する位置"
+   "設計済みと実機検証済みを混同しないcompletion boundary"]
+  :adr/related
+  ["adr-2608092006-lifelog-audio-device-r0-tsukuru"
+   "90-docs/hardware/lifelog-audio-r0-product-spec.edn"
+   "90-docs/hardware/lifelog-audio-r0-parts.datoms.edn"
+   "90-docs/hardware/lifelog-audio-r0-model-input.edn"
+   "90-docs/hardware/lifelog-audio-r0-bench-plan.edn"
+   "scripts/lifelog-audio-r0-model.cljs"
+   "2800003200-tsukuru-manufacturing-integration-four-phases"]
+  :adr/body "# ADR-2608092057: 常時音声ライフログ端末 R0 session close — architecture freeze と bench handoff
+
+## Session objective
+
+市販の完成品を購入するのではなく、`tsukuru` を製造面として使う自前の常時音声ライフログ
+端末について、既存設計の有無を調査し、オーナーが選択した R0 を durable な製品要求と
+architecture freezeへ進める。
+
+## Decisions landed
+
+1. 専用設計は既存でなかった。既存の `tsukuru` はfactory discovery、production order、QC、
+   CAE gate、artifact custodyを提供する製造面であり、端末固有の回路/PCB/筐体/firmware/BOM/
+   privacy boundaryは新設する。
+2. R0 product idは`lifelog-audio-r0`。胸元clip、EVT 10台、55x42x15mm以下/45g以下をtargetとする。
+3. R0のauthoritative audioは16kHz/16-bit/mono PCM、60秒独立chunk。codecをreliability pathに
+   入れず、32GB local storage、USB-C verified read/ack、BLEはstatus/clock/pairingだけにする。
+4. local-first: phone/network/cloud無しでcaptureを継続する。文字起こし・話者推定・検索は
+   ingest/lifelog actor側に分離する。
+5. privacy floorは回路で強制する。物理switchがmicrophone power railを切り、recording LEDは
+   同じrailから駆動する。remote recording start、mic-on/LED-off、covert modeは恒久非目標。
+6. candidate partsはNINA-B306-00B、T5838 x2、ATECC608C、BQ25188、TPS62840、BQ27427、
+   USBLC6-2SC6。storage、battery、switch/LED、package suffixはbench/ECADで未freeze。
+7. `tsukuru-actor` live cross-actor chainは既知blockedなので、EVTはmanual approvalをauthorityに
+   する。CAD/ECADをconfidentialにする場合、現状encryption-noneのartifact custodyへbytesを
+   置かない。
+
+## Artifacts
+
+- `2608092006-lifelog-audio-device-r0-tsukuru.edn`: accepted PRD/architecture ADR。
+- `lifelog-audio-r0-product-spec.edn`: P0 11 gateを持つ機械可読product requirement。
+- `lifelog-audio-r0-parts.datoms.edn`: source URL、採用理由、blocking gate付きcandidate parts。
+- `lifelog-audio-r0-model-input.edn` + `lifelog-audio-r0-model.cljs`: storage/current budget model。
+- `lifelog-audio-r0-bench-plan.edn`: capture/storage/security/USB/power-thermal/acousticの6 fixture。
+
+## Verification evidence
+
+- 6 EDN filesを`cljs.reader/read-string`で読込: all OK。
+- model実行: arithmetic/spec consistency OK、`:model/qualification :not-qualified`。
+- model output: 16h PCM=1,843,200,000 bytes、32GBの80%利用で9.26日、12h+10% reserveの
+  average current ceiling=75mA、estimate=25.87mA、worst assumption=50.32mA/19.87h。
+- negative gate: `scripts/lifelog-audio-r0-model.cljs --require-measured`はbench measurement不在で
+  exit 1。仮定値を実測passへ昇格できないことを確認。
+- 変更7 filesをstageした`git diff --cached --check`: OK。
+
+workspace全体gateには本変更以前からの別問題がある。`verify-adr-identity`は既存の新規衝突
+`2608082000`/`2608089000`と曖昧参照2件でFAIL、`docs-edn-only verify`はbaseline外 `.md` 4件で
+FAILする。本sessionはそれらを変更せず、focused verificationとPR checksを分離して報告する。
+
+## Not implemented / not claimed
+
+- schematic、PCB layout、enclosure CAD/STEP、firmware、USB wire protocol実装。
+- frozen BOM/SBOM、supplier quote、部品購入、development fixture購入。
+- microphone/storage/battery/current/thermal/USB/securityの実bench measurement。
+- EVT 10台、per-device QC、法規/EMC/電池輸送評価、量産認証。
+- live `tsukuru` production order。datasheet/model/designの存在を実機12h動作済みとしない。
+
+## Open decisions
+
+1. open hardwareかconfidential designか。後者は専用暗号化artifact custodyとNDA判断がschematic
+   publishより先。
+2. storage候補3種、protected 1S 1000mAh battery、switch/LED、TPS62840/BQ27427 package suffix。
+3. ATECC608C TrustFLEX slot/provisioning/recovery policy。
+4. 人を実録音する前の場所別 consent、表示、retention、削除運用。法的結論は別review。
+
+## Next-session handoff
+
+次sessionは`90-docs/hardware/lifelog-audio-r0-bench-plan.edn`のB0から始める。
+
+1. EVK-NINA-B306またはnRF52840 DKとT5838 x2 fixtureでPDM DMA captureを作る。
+2. 16kHz/16-bit/mono、60秒chunk、sample counter付きでまず1h、次に12hを走らせる。
+3. current profilerでcontroller/PDM/mic/storageを別々に測り、model inputの`:assumption`を
+   measurement recordへ置換する。平均値だけでなくpeak/duty/raw traceを保管する。
+4. dropped frame 0を満たすまでstorage/encryption/USBを同じpathへ足さない。
+5. B0 evidenceが揃った時だけschematic freezeへ進む。実機/治具が無ければ購入を自動実行せず、
+   exact procurement listと見積を提示してauthorityを確認する。
+
+## Close condition
+
+本sessionのcloseは、上記成果物をready PRとして作成し、required checks/mergeabilityを確認して
+default branchへmergeし、merge commitから本ADRとR0 ADRを読み戻した時点で成立する。"}]

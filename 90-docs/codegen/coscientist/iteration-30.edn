@@ -1,0 +1,162 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-30"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-30.edn"
+  :doc/date "2026-08-19"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "first LLVM ranking of production count-loop (call+loop) on quiet judah"
+  :coscientist/iteration 30
+  :coscientist/subject
+  "judah Apple M4, kexe-benchmark (isa hoisted), count-loop GMIR, amu 27d69898 / native 4bb08b9 / mir 767d3c0 vs rustc 1.97.1 -C opt-level=3"
+  :coscientist/action
+  "25 scored rotated samples after 12 discarded frequency-warmup rotations; two LLVM arms (folded ceiling and shape-matched call); perfgate.core/qualify; no seal. Do not rematch kernel_wide. Do not ship rust into amu. Do not overwrite 04-29. Do not ship a timed bench export."
+  :coscientist/measured
+  "judah loadavg { 1.60 1.63 1.68 } throughout. n=50, 100k calls, 10k warmup, offset 4, oracle 50 on every sample. amu prod.bin min/mean 38.74/38.848 ns. folded LLVM min/mean 0.605/0.611 ns (loop deleted). shape-matched llvm-call min/mean 36.782/37.129 ns. min ratio vs folded 64.03x; vs llvm-call 1.053x. Both perfgate refusals: folded improvement -62.55 (required +0.05), shape -4.63% (required +5%). No claim artifact. :llvm-beaten remains false."
+  :coscientist/refuted
+  "that ranking production count-loop against rustc -O3 without reading the asm is a call+loop ranking. The ceiling arm proves count_loop(n)==n and deletes the inner loop; its min 0.605 ns is the identity band from iteration 14. #[inline(never)] alone does not keep the call: LLVM IPO still folded until black_box forced the loop to survive."
+  :coscientist/carries-forward
+  "iteration-14: leaf kernel_wide vs LLVM inside noise, perfgate refused; do not rematch that. iteration-29: production :call-live vs :all-vregs sealed on this fixture (claim 1010495960). This file does not overwrite 04-29. Do not ship a timed bench export. :cfg-liveness remains false. :llvm-beaten remains false."
+
+  :doc/body
+  "# Codegen co-scientist, iteration 30
+
+This is the first timed ranking of production count-loop against LLVM.
+Iteration 29 ranked the same GMIR against the old all-vreg policy.
+This file ranks it against rustc `-O3`. Encodings are not a ranking.
+
+Two LLVM arms, one paper. The folded ceiling is not a call+loop ranking.
+The shape-matched arm is. Both go through `kotoba-lang/perfgate`.
+Neither seals. `:llvm-beaten` stays false.
+
+Do not overwrite 04-29. Do not rematch `kernel_wide` (iteration 14).
+Do not ship rust sources into amu.
+
+## What was timed
+
+amu arm reuses the iteration-29 production bytes. Same GMIR
+(`call-and-back-edge-module`, export `count-loop`): acc=0, while n≠0
+call `id(1)`, acc+=stepped, n-=1, return acc. Oracle n=50 → 50.
+
+| arm | what ran | sha256 |
+|---|---|---|
+| amu | iter-29 `prod.bin` `:call-live`, 92 B, offset **4** | `d420fd28183a74f36c10728b80e6d7f744ff0bb6dddb7ff70efc47060e346f73` |
+| llvm (ceiling) | rustc `-O3` `count_loop`, identity `id` inlinable | `9c88737d95f109af7d11e83a0b53f08709dff26c77c6551d139079d751fd918e` |
+| llvm-call (shape) | rustc `-O3` `count_loop_call`, `#[inline(never)]` + `black_box` | `d8f626606e24c91cc16566533393504ae7b118e6290bc7faa81829e83e3a8bf3` |
+
+`id` sits at offset 0 (4-byte `ret`). Offset 4 is the count-loop export.
+
+LLVM binaries were compiled on this Air (`rustc 1.97.1 (8bab26f4f 2026-07-14)`,
+`--edition 2021 -C opt-level=3 -C codegen-units=1`, aarch64-apple-darwin)
+because judah has no rustc. Timing ran on **judah**. This Air is not a
+ranking host.
+
+## The ceiling is a mov
+
+`count_loop.s` timed loop `LBB6_3` stores and loads `n` (`black_box`) and
+compares the outer call counter. There is no `bl` to `id`, no add, no
+inner `subs`. LLVM proved `count_loop(n)==n` and deleted the work.
+Local one-shot result 50 is real; the work is gone. min 0.605 ns is the
+same band as iteration-14 LLVM identity (0.605 ns). Ranking amu 39 ns
+against this is ranking a loop+call against a mov.
+
+`#[inline(never)]` on `id` was not enough. The first `count_loop_call.s`
+was identical to the ceiling: IPO still saw identity. `black_box` on
+`id`'s result and on `acc` is what kept the loop. Verified: symbol
+`__RNv…count_loop_call2id`, inner `LBB7_9` does `bl id`, add, `subs`,
+`b.ne`. That arm is the actual call+loop ranking.
+
+Do not chase the folded ceiling with allocator or isel.
+
+## Oracle
+
+Harness `warmup=0` and `n=0` are outside the admitted range. One-shot
+used 1 call and 1 warmup. Result **50** on all three arms, no
+`KEXE_TRAP`. The same result held on every scored sample.
+
+## Times
+
+12 discarded frequency-warmup rotations (three arms rotated), then 25
+scored rotated samples. Judge: **min ns/call** reported; **perfgate
+uses means**.
+
+judah loadavg `{ 1.60 1.63 1.68 }` start and end. load1 stayed under 4.
+
+| arm | min | mean | median | p95 | max | rel stdev |
+|---|---:|---:|---:|---:|---:|---:|
+| amu (`:call-live`) | 38.74 | 38.848 | 38.81 | 39.11 | 39.29 | 0.0033 |
+| llvm (folded) | 0.605 | 0.611 | 0.607 | 0.647 | 0.648 | 0.0199 |
+| llvm-call (shape) | 36.782 | 37.129 | 37.093 | 37.698 | 38.183 | 0.0084 |
+
+min ratio amu/folded **64.03×**. mean ratio **63.55×**.
+min ratio amu/llvm-call **1.053×**. mean ratio **1.046×**.
+mean improvement vs llvm-call **-4.63%**.
+
+Dump: `/tmp/iter30-dump/` on judah and the workstation (`count_loop`,
+`count_loop_call`, `*.s`, `*.rs`, `rank.py`, `samples.json`, `arms.edn`,
+`qualify.edn`). amu bytes remain `/tmp/iter29-dump/prod.bin`. Runner:
+`/tmp/kexe-benchmark-iter29`.
+
+## perfgate
+
+`perfgate.core/qualify` twice on the 25 ns/call vectors. Candidate =
+amu, metric `:wall-ns`, unit `\"ns/call\"`. Machine descriptor
+`:measured` from the same judah sysctl as iteration 29 (ncpu 10,
+pagesize 16384, cachelinesize 128, l1d 65536, l2 4194304, brand Apple
+M4). ways not reported; not fabricated. perfgate `d4417d77`, machine
+`4f57144a`.
+
+### Ceiling (baseline = folded LLVM)
+
+- mean improvement **-62.55** (required +0.05)
+- gap **38.236 ns** > summed stdev **0.141 ns** (separated)
+- `:improvement-below-threshold`
+- `:qualified? false`
+- **no claim artifact**
+
+Correct refusal. This arm is not a call+loop. Do not write 64× into
+`amu/docs/performance.md`.
+
+### Shape-matched (baseline = llvm-call)
+
+- mean improvement **-4.63%** (amu slower)
+- gap **1.718 ns** > summed stdev **0.439 ns** (separated from noise)
+- relative stdev 0.0033 / 0.0084 (allowed 0.10)
+- `:improvement-below-threshold` (required +5%)
+- `:qualified? false`
+- **no claim artifact**
+
+The arms are apart. The gap is smaller than the gate. Do not claim
+amu beats LLVM. Do not claim LLVM beats amu. Do not write 1.053× into
+`amu/docs/performance.md`.
+
+`:llvm-beaten` remains false. The leaf ranking (iteration 14) stays
+refused. Do not rematch leaf vs LLVM.
+
+## Pins
+
+No pin bump. The ranking used the pins iteration 28 already landed:
+
+- kotoba-mir `767d3c0b418f85d1d177f78b0648c106a79bfb62`
+  west-pin `efebb442d71c3ad6da6d515c8486ea6cdcb5b88f`
+- kotoba-native `4bb08b9228bc41168ab42bf6d7d2e60150104aff`
+  west-pin `82e0ae925b8383dc57380bcb90123d0012b38ee5`
+- amu `27d69898aca60db492d2c415eae31d7a72a07243`
+  west-pin `115ea914ce4a734c8f842a48695dc23a91a8ebb0`
+- perfgate `d4417d77c2333047dd4e478675e5ed13e1c6b1b8` (= origin/main)
+- machine `4f57144aa6d3c240eb23c44dacab0b7ad5f5c505` (= origin/main)
+
+## What this does not change
+
+- Timed `bench` export stays refused (iteration 4 / 5).
+- `:llvm-beaten` remains false. Leaf refusal (14) stands.
+- `:cfg-liveness` remains false. last-uses are still textual.
+- Production `:call-live` vs all-vreg (29) stays sealed.
+- rustc arms stay in `/tmp/iter30-dump/`. They are not amu sources.
+- west pins were not moved.
+
+## Next
+
+The leftover on this week's LLVM map is the quiet rematch of
+`kernel_deep` versus LLVM (iteration 07 said 1.44×; never rematched on
+quiet judah + hoisted runner). That is a new WIP, not this paper.
+Do not rematch `kernel_wide`. Do not overwrite 04-29."}]

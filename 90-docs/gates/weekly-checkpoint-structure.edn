@@ -1,0 +1,286 @@
+{:doc/type :weekly-checkpoint-structure
+ :doc/id "checkpoint-structure-wave5"
+ :doc/title "Wave 5 Weekly Checkpoint Framework (Mon 9 AM + Fri 4 PM)"
+ :doc/status "ACTIVE"
+
+ :checkpoint/rhythm
+ {:week-cycle
+  [{:day "Monday"
+    :time "09:00 AM JST"
+    :duration "30 minutes"
+    :event "Progress Review & Blocker Triage"
+    :attendees "team-leads + metrics-lead"}
+   {:day "Friday"
+    :time "16:00 (4 PM) JST"
+    :duration "45 minutes"
+    :event "Gate Review & Go/No-Go Decision"
+    :attendees "team-leads + phase-owners + platform-lead + metrics-lead"}]
+  :cycle-duration "1 week"
+  :sync-points-per-phase
+  {:m5-weeks "11, 12, 13, 14 (4 weeks M5)"
+   :m6-weeks "15, 16 (2 weeks M6)"}}
+
+ :monday-09am-progress-review
+ {:name "Weekly Progress Review & Blocker Triage"
+  :time "09:00 AM JST (30 min)"
+  :attendees
+  ["Team Lead M5-Core"
+   "Team Lead M5-Integration"
+   "Team Lead M6-Platform"
+   "Metrics Lead"
+   "Optional: Phase Owners (listen-only)"]
+
+  :pre-meeting-prep
+  ["Update Trello board (move completed cards from In Progress → Ready for Gate)"
+   "Tally metrics from Grafana (p99 build-times, coverage, deploy-success)"
+   "List new blockers (Jira: status = Blocked, added this week)"
+   "Prepare velocity trending (story points completed vs. forecast)"
+   "QA: Any infrastructure issues to report?"]
+
+  :agenda
+  [{:item "Metrics Health Check" :time "5 min"
+    :content
+    ["Metrics Lead presents: build-times p99, test-coverage, deploy-success, blocker count"
+     "Teams respond: any surprising patterns?"
+     "Trending: on-track / slight-slip / major-risk"]}
+   {:item "Team Progress Review" :time "10 min"
+    :content
+    ["Each team-lead (2 min each):"
+     "- Critical path completed: [items]"
+     "- Critical path in progress: [items, % done]"
+     "- Forecast for Friday gate: Go/No-Go / risk factors"]}
+   {:item "Blocker Triage & Escalation" :time "10 min"
+    :content
+    ["Review Jira: Blocked issues (age, severity, owner)"
+     "New P1 blockers: decide immediately or escalate?"
+     "Aging blockers: status update, ETA, or escalate?"
+     "Cross-team dependencies: any unmet by other team?"]}
+   {:item "Velocity Trending & Next Week Forecast" :time "5 min"
+    :content
+    ["Story points completed (actual vs. forecast)"
+     "Burndown slope: on-target or sliding?"
+     "Next week critical path: dependencies ready?"]
+    :artifact "Update Trello + Jira with next-week cards"}]
+
+  :output
+  {:update-boards "Trello: refresh Metrics card + move completed. Jira: update blocker status."
+   :slack-message "#prod-gates-wave5: Progress update (2-3 bullet summary) + blocker count + velocity"
+   :next-steps "If blockers unresolved, escalate to phase-owner. Schedule follow-up 1-on-1 if needed."
+   :document "Monday Review Notes (comment in Jira, issue type: weekly-progress-review)"}
+
+  :decision-rule
+  "None (Monday is *not* a gate decision point — Friday is. Monday is triage + forecast.)"
+
+  :failure-mode
+  {:trigger "Monday review didn't happen or happened with incomplete data"
+   :impact "Friday gate review blind (no baseline metrics, blockers not triaged)"
+   :mitigation "Metrics Lead sends 5 AM JST Slack message with pre-populated metrics card (auto)"}}
+
+ :friday-16pm-gate-review
+ {:name "Weekly Gate Review & Go/No-Go Decision"
+  :time "16:00 (4 PM) JST (45 min)"
+  :attendees
+  ["Team Lead M5-Core"
+   "Team Lead M5-Integration"
+   "Team Lead M6-Platform"
+   "Phase Owner M5 (decision-maker)"
+   "Phase Owner M6 (decision-maker)"
+   "Platform Lead (escalation authority)"
+   "Metrics Lead (data provider)"]
+  :decision-rule "Consensus (all team-leads + phase-owners must agree)"
+
+  :pre-meeting-prep
+  ["Update Trello: move all completed items to Done column"
+   "Finalize Jira: mark Ready for Gate issues (blocker status confirmed)"
+   "Prepare gate-readiness-check issue (template: Jira)"
+   "Collect final metrics (last 2h snapshot from Grafana)"
+   "Prepare escalation summary if any P1 blockers remain"
+   "Confirm: next week's critical path (backlog ready?)"]
+
+  :agenda
+  [{:item "Gate Readiness Assessment (All Teams)" :time "10 min"
+    :content
+    ["Each team reports (3 min):"
+     "1. Critical path status (% complete)"
+     "2. Blocker count + severity (P1, P2)"
+     "3. Metrics health (passes SLA?)"
+     "4. Recommendation: Go/No-Go"]
+    :data-source "Trello board + Jira + Grafana dashboard"}
+   {:item "Critical Path Verification" :time "10 min"
+    :content
+    ["Cross-check: Is critical path complete for all teams?"
+     "Dependencies: Do M5 deliverables unblock M6?"
+     "Metrics: Do all KPIs pass SLA (build p99 < 12m, coverage >= 92%, deploy >= 99.5%)?"
+     "Blocker fallout: Any P1 unresolved?"]
+    :decision-point "Consensus check: ready to Go?"}
+   {:item "Cross-Team Dependency Check" :time "5 min"
+    :content
+    ["M5 → M6 handoff: Are M5 outputs ready for M6 to consume?"
+     "Platform dependencies: Is infrastructure stable?"
+     "Upstream pins: Have all child repos advanced to latest?"]
+    :artifact "Dependency matrix (Jira issue comment)"}
+   {:item "Escalation Summary (If Needed)" :time "5 min"
+    :content
+    ["If P1 blockers or metrics breach: Phase-owner + Platform-lead discuss"
+     "Options: (a) delay gate 48h, (b) authorize workaround, (c) halt gate"
+     "Timeline: 15 min to decide (extend if multi-phase impact)"]
+    :escalation-protocol "See 90-docs/gates/escalation-protocol-reference.edn"}
+   {:item "Gate Decision & Next Week Prep" :time "5 min"
+    :content
+    ["Phase-owners + Platform-lead consensus: Go/No-Go"
+    "If Go: prepare next week's critical path (backlog → Trello cards)"
+    "If No-Go: document hold reason + ETA to unblock"
+    "All: confirm: are you ready for next week?"]
+    :decision-artifact "Gate decision memo (Jira issue type: gate-readiness-check)"}
+   {:item "Post-Gate Logistics" :time "2 min"
+    :content
+    ["Archive completed Trello cards (Done column)"
+     "Post weekly metrics snapshot (Jira issue type: weekly-metrics-snapshot)"
+     "Announce decision: post to #prod-gates-wave5 + email stakeholders"]
+    :communication "Slack message (3 bullet summary) + email memo"}]
+
+  :output
+  {:artifacts
+   ["Gate Decision Memo (Jira issue: gate-readiness-check)"
+    "Weekly Metrics Snapshot (Jira issue: weekly-metrics-snapshot)"
+    "Escalation Summary (if any) (Jira issue: blocker-escalation)"
+    "Next Week Critical Path (Trello cards, backlog → Week N+1)"
+    "Archive Summary (to 90-docs/gates/weekly-reports/wave5-m5m6/week-N.edn)"]
+   :slack-notification "#prod-gates-wave5: Gate decision (Go/No-Go) + KPI summary + next steps"
+   :email-stakeholders "gates-escalation@gftd.group: Decision memo + metrics"
+   :automation "CI job: auto-generate weekly-metrics-snapshot (Monday 9 AM) + archive"}}
+
+ :escalation-response-window
+ {:timeline "48 hours after alert"
+  :checkpoints "Every Mon 9 AM + Fri 4 PM"
+  :tracking-location "90-docs/gates/wave5-escalation-ledger.edn"
+  :escalation-protocol "See 90-docs/gates/escalation-protocol-reference.edn (L1 → L2 → L3 chain)"}
+
+ :checkpoint/templates
+ {:jira-issue-gate-readiness-check
+  {:type "standard-template"
+   :fields
+   ["Summary: Gate: Week [N] — [Team] — [Go/No-Go]"
+    "Description:"
+    "---"
+    "Gate Readiness Check (Week N)\n"
+    "## Critical Path\n"
+    "- [ ] M5-Core: [deliverables]\n"
+    "- [ ] M5-Integration: [deliverables]\n"
+    "- [ ] M6-Platform: [deliverables]\n\n"
+    "## Metrics\n"
+    "- Build p99: [X min] (target < 12 min)\n"
+    "- Coverage: [X%] (target >= 92%)\n"
+    "- Deploy Success: [X%] (target >= 99.5%)\n"
+    "- Blockers: [N] (P1: [n], P2: [n])\n\n"
+    "## Blockers (if any)\n"
+    "- [Blocker 1]: owner, ETA\n"
+    "- [Blocker 2]: owner, ETA\n\n"
+    "## Decision\n"
+    "- [ ] Go (all teams agree)\n"
+    "- [ ] No-Go (reason: ...)\n"
+    "- [ ] Halt (reason: ...)\n\n"
+    "Approved by: @[phase-owner-m5] @[phase-owner-m6] @[platform-lead]"]
+   :labels ["gate" "week-N" "M5" "M6" "gate-review"]}
+
+  :jira-issue-weekly-metrics-snapshot
+   {:type "standard-template"
+    :fields
+    ["Summary: Metrics — Week [N]"
+     "Description:"
+     "---"
+     "Weekly Metrics Snapshot (Week N)\n"
+     "Generated: [auto] | [manual]\n\n"
+     "## Performance Metrics\n"
+     "- Build Times (p99): [X min] (target < 12 min)\n"
+     "- Test Coverage: [X%] (target >= 92%)\n"
+     "- Deployment Success: [X%] (target >= 99.5%)\n"
+     "- Gate-Blocker Detection Latency: [X min] (target < 2 min)\n\n"
+     "## Team Metrics\n"
+     "- M5-Core Velocity: [X sp] (forecast: [Y sp])\n"
+     "- M5-Integration Velocity: [X sp] (forecast: [Y sp])\n"
+     "- M6-Platform Velocity: [X sp] (forecast: [Y sp])\n\n"
+     "## Trending\n"
+     "- [ ] On track\n"
+     "- [ ] Slight slip (within buffer)\n"
+     "- [ ] Major risk (needs escalation)\n\n"
+     "## Graph Data (embed in Jira)\n"
+     "- [Link to Grafana panel: metrics trending]"]
+    :labels ["metrics" "week-N" "dashboard"]}
+
+  :trello-card-critical-path
+   {:template "List: Week N Critical Path"
+    :card-title "[Team] — [Deliverable Name]"
+    :fields
+    ["Description: [brief description]"
+     "Checklist: [ ] Code complete, [ ] Tests pass, [ ] Merge to main"
+     "Due: [Fri 16:00]"
+     "Labels: [critical-path] [Team: M5-Core / M5-Integration / M6-Platform] [status: in-progress / ready]"
+     "Attachment: [link to Jira epic / stories]"]}
+
+  :slack-message-progress-update
+   {:template "Monday Progress Update (09:00 AM JST)"
+    :format
+    ["📊 Week [N] Progress Update"
+     ""
+     "**Metrics**"
+     "• Build p99: [X min] / Coverage: [X%] / Deploy: [X%]"
+     "• Blockers: [N] (P1: [n], ages: [list])"
+     ""
+     "**Team Status**"
+     "• M5-Core: [% done] | Forecast: [Go/No-Go/Risk]"
+     "• M5-Integration: [% done] | Forecast: [Go/No-Go/Risk]"
+     "• M6-Platform: [% done] | Forecast: [Go/No-Go/Risk]"
+     ""
+     "**Action Items**"
+     "• [Blocker 1]: escalating to L2 (ETA 2h)"
+     "• [Dependency]: awaiting upstream (confirm by [time])"
+     ""
+     "🔗 Dashboard: https://dashboard.internal/wave5-m5m6"
+     "📋 Trello: https://trello.com/b/[board-id]"]}}
+
+ :quality-gates
+ {:readiness-check
+  {:criteria
+   ["Critical path items marked Ready for Gate (Jira status = Ready for Gate)"
+    "All metrics collected and available in Grafana (no data gaps > 15 min)"
+    "Blockers triaged (P1/P2, owner assigned, ETA given or escalated)"
+    "Cross-team dependencies confirmed (explicit check in meeting)"
+    "Next week critical path backlog prepared (Trello cards created)"]
+   :pass-go "All criteria met → Go (advance to next week)"
+   :fail "Any criteria unmet → escalate or No-Go"}}
+
+ :success-criteria
+ {:per-checkpoint
+  ["Checkpoint started on time (Mon 09:00 ± 2 min, Fri 16:00 ± 2 min)"
+   "All required attendees present (or recorded async for async-friendly teams)"
+   "Decision artifacts created (Jira issues or memo)"
+   "Slack notification sent (#prod-gates-wave5)"
+   "Next checkpoint prep started (backlog for following week)"]
+ :per-week
+  ["2 checkpoints completed (Mon + Fri)"
+   "Zero gate-halts due to missing data or unclear decision"
+   "All team-leads report: process clear and SLA achievable"
+   "Metrics dashboard available and used in decision"]}
+
+ :failure-modes
+ {:missing-metrics
+  {:trigger "Prometheus down, Grafana unavailable, or collection job failed"
+   :mitigation "Metrics-lead activates fallback (last-known good snapshot) + escalates infra team"
+   :impact-on-checkpoint "Proceed with Go/No-Go based on team assessment (metrics as context only)"}
+
+ :blocker-ambiguity
+  {:trigger "P1 blocker unresolved, unclear if it blocks gate"
+   :mitigation "Phase-owner makes emergency call (15 min) to decide: halt vs. proceed with risk"
+   :escalation "Platform-lead if no consensus after 15 min"}
+
+ :checkpoint-no-show
+  {:trigger "Team lead not available at Mon 09:00 or Fri 16:00"
+   :mitigation "Async update (Jira comment) or reschedule by 1h max"
+   :escalation "Phase-owner notified, may substitute team-lead representation"}}
+
+ :communication-defaults
+ {:primary-channel ["#prod-gates-wave5" :slack]
+  :secondary "email (gates-escalation@gftd.group) for decisions"
+  :metrics-dashboard "https://grafana.internal/d/wave5-m5m6"
+  :tracking-boards "Trello (team-specific) + Jira (shared gate tracking)"}}

@@ -1,0 +1,512 @@
+[
+;;; SCHEMA DEFINITIONS FOR RELIGIOUS-COMMUNITY MENTAL MODEL FRAMEWORK
+;;; Entity definitions for :tradition/*, :axis/*, :org/*, :doctrine/*, :actor/*, :charter/*, :lexicon/*
+
+;;; ============================================================
+;;; TRADITION DEFINITIONS
+;;; ============================================================
+
+{:db/id -1000
+ :tradition/id :tradition-christian-reformed
+ :tradition/name "Christianity - Reformed"
+ :tradition/parent-tradition nil
+ :tradition/founding-approx-year 1500
+ :tradition/primary-languages [:en :de :fr :nl]
+ :tradition/estimated-members 120000000}
+
+{:db/id -1001
+ :tradition/id :tradition-christian-orthodox
+ :tradition/name "Christianity - Orthodox"
+ :tradition/parent-tradition nil
+ :tradition/founding-approx-year 1054
+ :tradition/primary-languages [:en :ru :el :uk]
+ :tradition/estimated-members 300000000}
+
+{:db/id -1002
+ :tradition/id :tradition-islamic-sunni
+ :tradition/name "Islam - Sunni"
+ :tradition/parent-tradition nil
+ :tradition/founding-approx-year 632
+ :tradition/primary-languages [:ar :en :ur :tr]
+ :tradition/estimated-members 1500000000}
+
+{:db/id -1003
+ :tradition/id :tradition-islamic-shia
+ :tradition/name "Islam - Shia"
+ :tradition/parent-tradition nil
+ :tradition/founding-approx-year 1500
+ :tradition/primary-languages [:ar :en :fa]
+ :tradition/estimated-members 300000000}
+
+{:db/id -1004
+ :tradition/id :tradition-buddhist-theravada
+ :tradition/name "Buddhism - Theravada"
+ :tradition/parent-tradition nil
+ :tradition/founding-approx-year -500
+ :tradition/primary-languages [:pi :en :th :my]
+ :tradition/estimated-members 150000000}
+
+{:db/id -1005
+ :tradition/id :tradition-buddhist-mahayana
+ :tradition/name "Buddhism - Mahayana"
+ :tradition/parent-tradition nil
+ :tradition/founding-approx-year 100
+ :tradition/primary-languages [:zh :ja :ko :en]
+ :tradition/estimated-members 400000000}
+
+{:db/id -1006
+ :tradition/id :tradition-hindu-brahmo
+ :tradition/name "Hinduism - Brahmo Samaj"
+ :tradition/parent-tradition nil
+ :tradition/founding-approx-year 1828
+ :tradition/primary-languages [:en :hi :bn]
+ :tradition/estimated-members 500000}
+
+{:db/id -1007
+ :tradition/id :tradition-jewish-reformed
+ :tradition/name "Judaism - Reform"
+ :tradition/parent-tradition nil
+ :tradition/founding-approx-year 1800
+ :tradition/primary-languages [:he :en :yi]
+ :tradition/estimated-members 1500000}
+
+{:db/id -1008
+ :tradition/id :tradition-synthetic-etzhayyim
+ :tradition/name "Synthetic - etzhayyim"
+ :tradition/parent-tradition nil
+ :tradition/founding-approx-year 2026
+ :tradition/primary-languages [:ja :en :he]
+ :tradition/estimated-members 1}
+
+{:db/id -1009
+ :tradition/id :tradition-labor-syndicalist
+ :tradition/name "Labor - Syndicalist"
+ :tradition/parent-tradition nil
+ :tradition/founding-approx-year 1900
+ :tradition/primary-languages [:en :es :fr]
+ :tradition/estimated-members 200000000}
+
+{:db/id -1010
+ :tradition/id :tradition-economic-cooperative
+ :tradition/name "Economic - Cooperative"
+ :tradition/parent-tradition nil
+ :tradition/founding-approx-year 1844
+ :tradition/primary-languages [:en :es :eu]
+ :tradition/estimated-members 1200000000}
+
+{:db/id -1011
+ :tradition/id :tradition-education-university
+ :tradition/name "Education - University"
+ :tradition/parent-tradition nil
+ :tradition/founding-approx-year 1088
+ :tradition/primary-languages [:en :la]
+ :tradition/estimated-members 200000000}
+
+{:db/id -1012
+ :tradition/id :tradition-technical-meritocratic
+ :tradition/name "Technical - Meritocratic (Open Source)"
+ :tradition/parent-tradition nil
+ :tradition/founding-approx-year 1983
+ :tradition/primary-languages [:en]
+ :tradition/estimated-members 999999999}
+
+;;; ============================================================
+;;; MENTAL MODEL AXES (14-axis framework)
+;;; ============================================================
+
+{:db/id -2000
+ :axis/id :axis-governance
+ :axis/name "Governance Legitimacy"
+ :axis/description "Council/representative legitimacy; how many decision-seats are filled and functional?"
+ :axis/scale-min 0
+ :axis/scale-max 100
+ :axis/scale-semantics "0=no formal governance, 100=all seats filled, quorum met"
+ :axis/is-binary? false
+ :axis/origin-tradition :tradition-synthetic-etzhayyim
+ :axis/universality :universal}
+
+{:db/id -2001
+ :axis/id :axis-economic
+ :axis/name "Sustainable Funding"
+ :axis/description "Treasury health and funding pipeline sustainability"
+ :axis/scale-min 0
+ :axis/scale-max 100
+ :axis/scale-semantics "0=unsustainable/no revenue, 100=stable endowment"
+ :axis/is-binary? false
+ :axis/origin-tradition :tradition-synthetic-etzhayyim
+ :axis/universality :universal}
+
+{:db/id -2002
+ :axis/id :axis-identity
+ :axis/name "Member Identity Coverage"
+ :axis/description "Formal membership, DID/SBT infrastructure, identity verification"
+ :axis/scale-min 0
+ :axis/scale-max 100
+ :axis/scale-semantics "0=no formal records, 100=cryptographic identity for all members"
+ :axis/is-binary? false
+ :axis/origin-tradition :tradition-synthetic-etzhayyim
+ :axis/universality :universal}
+
+{:db/id -2003
+ :axis/id :axis-agency
+ :axis/name "Organizational Agency"
+ :axis/description "Infrastructure for delegating decisions to agents (AI or autonomous actors)"
+ :axis/scale-min 0
+ :axis/scale-max 100
+ :axis/scale-semantics "0=human-only decision-making, 100=LLM agent infrastructure + autonomous cell delegation"
+ :axis/is-binary? false
+ :axis/origin-tradition :tradition-synthetic-etzhayyim
+ :axis/universality :universal}
+
+{:db/id -2004
+ :axis/id :axis-social-delivery
+ :axis/name "Real-World Service/Care Delivery"
+ :axis/description "Social coverage; hospitals, food programs, disaster aid, counseling, community services"
+ :axis/scale-min 0
+ :axis/scale-max 100
+ :axis/scale-semantics "0=no services, 100=comprehensive coverage across target demographics"
+ :axis/is-binary? false
+ :axis/origin-tradition :tradition-synthetic-etzhayyim
+ :axis/universality :universal}
+
+{:db/id -2005
+ :axis/id :axis-physical-presence
+ :axis/name "Physical Infrastructure"
+ :axis/description "Temples, hospitals, schools, HQs, robotics systems, physical asset ownership"
+ :axis/scale-min 0
+ :axis/scale-max 100
+ :axis/scale-semantics "0=purely virtual, 100=extensive property/facilities/robotics"
+ :axis/is-binary? false
+ :axis/origin-tradition :tradition-synthetic-etzhayyim
+ :axis/universality :universal}
+
+{:db/id -2006
+ :axis/id :axis-public-trust
+ :axis/name "Community Trust"
+ :axis/description "External perception, reputation, trust by non-members and government entities"
+ :axis/scale-min 0
+ :axis/scale-max 100
+ :axis/scale-semantics "0=widely distrusted, 100=high community trust"
+ :axis/is-binary? false
+ :axis/origin-tradition :tradition-synthetic-etzhayyim
+ :axis/universality :universal}
+
+{:db/id -2007
+ :axis/id :axis-legal-contract
+ :axis/name "Legal/Constitutional Maturity"
+ :axis/description "Formalized charter, bylaws, legal status, contract clarity"
+ :axis/scale-min 0
+ :axis/scale-max 100
+ :axis/scale-semantics "0=no written constitution, 100=comprehensive legal framework"
+ :axis/is-binary? false
+ :axis/origin-tradition :tradition-synthetic-etzhayyim
+ :axis/universality :universal}
+
+{:db/id -2008
+ :axis/id :axis-land-resource
+ :axis/name "Land/Physical-Asset Stewardship"
+ :axis/description "Trust registry, land holdings, physical asset accountability"
+ :axis/scale-min 0
+ :axis/scale-max 100
+ :axis/scale-semantics "0=no land/assets, 100=comprehensive trust registry"
+ :axis/is-binary? false
+ :axis/origin-tradition :tradition-synthetic-etzhayyim
+ :axis/universality :universal}
+
+{:db/id -2009
+ :axis/id :axis-education
+ :axis/name "Knowledge/Doctrinal Transmission"
+ :axis/description "Seminaries, schools, study groups, knowledge distribution to next generation"
+ :axis/scale-min 0
+ :axis/scale-max 100
+ :axis/scale-semantics "0=no formal education, 100=comprehensive seminary/school network"
+ :axis/is-binary? false
+ :axis/origin-tradition :tradition-synthetic-etzhayyim
+ :axis/universality :universal}
+
+{:db/id -2010
+ :axis/id :axis-dispute-resolution
+ :axis/name "Conflict Resolution Mechanisms"
+ :axis/description "Formal processes for resolving internal disputes, disciplinary procedures"
+ :axis/scale-min 0
+ :axis/scale-max 100
+ :axis/scale-semantics "0=no formal process, 100=robust mediation/arbitration/court system"
+ :axis/is-binary? false
+ :axis/origin-tradition :tradition-synthetic-etzhayyim
+ :axis/universality :universal}
+
+{:db/id -2011
+ :axis/id :axis-external-recognition
+ :axis/name "Peer/Institutional Recognition"
+ :axis/description "Recognition by peer organizations, interfaith/inter-org councils, accreditation"
+ :axis/scale-min 0
+ :axis/scale-max 100
+ :axis/scale-semantics "0=isolated, 100=widely recognized by peers"
+ :axis/is-binary? false
+ :axis/origin-tradition :tradition-synthetic-etzhayyim
+ :axis/universality :universal}
+
+{:db/id -2012
+ :axis/id :axis-member-engagement
+ :axis/name "Active Participation Rate"
+ :axis/description "What fraction of members actively participate in governance/rituals/activities?"
+ :axis/scale-min 0
+ :axis/scale-max 100
+ :axis/scale-semantics "0=passive members only, 100=all members actively engaged"
+ :axis/is-binary? false
+ :axis/origin-tradition :tradition-synthetic-etzhayyim
+ :axis/universality :universal}
+
+{:db/id -2013
+ :axis/id :axis-doctrine-clarity
+ :axis/name "Doctrinal/Ideological Coherence"
+ :axis/description "How clear and internally consistent are the foundational beliefs and doctrines?"
+ :axis/scale-min 0
+ :axis/scale-max 100
+ :axis/scale-semantics "0=chaotic/contradictory doctrines, 100=coherent, well-defined theology"
+ :axis/is-binary? false
+ :axis/origin-tradition :tradition-synthetic-etzhayyim
+ :axis/universality :tradition-specific}
+
+;;; ============================================================
+;;; REGION DEFINITIONS
+;;; ============================================================
+
+{:db/id -3000 :region/id :region-north-america :region/name "North America"}
+{:db/id -3001 :region/id :region-europe :region/name "Europe"}
+{:db/id -3002 :region/id :region-middle-east :region/name "Middle East"}
+{:db/id -3003 :region/id :region-asia-east :region/name "East Asia"}
+{:db/id -3004 :region/id :region-asia-south :region/name "South Asia"}
+{:db/id -3005 :region/id :region-southeast-asia :region/name "Southeast Asia"}
+{:db/id -3006 :region/id :region-africa :region/name "Africa"}
+{:db/id -3007 :region/id :region-south-america :region/name "South America"}
+{:db/id -3008 :region/id :region-oceania :region/name "Oceania"}
+
+;;; ============================================================
+;;; DOCTRINES (sample foundational beliefs)
+;;; ============================================================
+
+{:db/id -4000
+ :doctrine/id :doctrine-trinity
+ :doctrine/name "Trinity (Father, Son, Holy Spirit)"
+ :doctrine/tradition [:tradition/id :tradition-christian-reformed]
+ :doctrine/category :cosmology
+ :doctrine/origin-text "John 1:1, Matthew 28:19"
+ :doctrine/summary "The Christian doctrine that God is one God in three persons: Father (creator), Son (Jesus Christ, redeemer), and Holy Spirit (sanctifier). Central to Christian theology since the Council of Nicaea (325 CE)."
+ :doctrine/conflicting-with [[:doctrine/id :doctrine-monotheism-allah]]
+ :doctrine/historical-evolution "Defined at Nicaea, refined at Constantinople (381). Remains core to Catholic, Orthodox, and Reformed traditions but rejected by some Protestant groups (unitarians) and explicitly by Islam and Judaism."}
+
+{:db/id -4001
+ :doctrine/id :doctrine-monotheism-allah
+ :doctrine/name "Strict Monotheism - Allah"
+ :doctrine/tradition [:tradition/id :tradition-islamic-sunni]
+ :doctrine/category :cosmology
+ :doctrine/origin-text "Quran, Surah Al-Ikhlas (112)"
+ :doctrine/summary "Islamic doctrine of absolute monotheism: there is only one God (Allah), and Muhammad is his final messenger. Rejects any notion of trinity or divine incarnation. 'La ilaha illallah' (There is no god but God)."
+ :doctrine/conflicting-with [[:doctrine/id :doctrine-trinity]]
+ :doctrine/historical-evolution "Foundational to Islam since 610 CE. Distinguishes Islamic monotheism from Christian trinity and Jewish interpretation of monotheism."}
+
+{:db/id -4002
+ :doctrine/id :doctrine-four-noble-truths
+ :doctrine/name "Four Noble Truths"
+ :doctrine/tradition [:tradition/id :tradition-buddhist-theravada]
+ :doctrine/category :soteriology
+ :doctrine/origin-text "Dhammacakkappavattana Sutta (First Sermon)"
+ :doctrine/summary "Buddhist foundational doctrine: (1) Suffering (Dukkha) is inherent in existence; (2) Suffering arises from craving (Samudaya); (3) Cessation of suffering is possible (Nirodha); (4) The path to cessation is the Eightfold Path (Magga)."
+ :doctrine/conflicting-with nil
+ :doctrine/historical-evolution "Universal across Theravada, Mahayana, and Vajrayana schools. Unchanged since Buddha's first sermon ~2500 years ago."}
+
+{:db/id -4003
+ :doctrine/id :doctrine-karma-rebirth
+ :doctrine/name "Karma and Rebirth"
+ :doctrine/tradition [:tradition/id :tradition-hindu-brahmo]
+ :doctrine/category :eschatology
+ :doctrine/origin-text "Bhagavad Gita, Upanishads"
+ :doctrine/summary "Hindu doctrine that actions (karma) in one lifetime determine circumstances in the next rebirth (samsara). Brahmo Samaj emphasizes karma within a framework of moral progress toward enlightenment."
+ :doctrine/conflicting-with nil
+ :doctrine/historical-evolution "Core Hindu teaching for 3000+ years. Brahmo Samaj (1828+) reinterpreted it within monotheistic framework, de-emphasizing idolatry and caste hierarchy."}
+
+{:db/id -4004
+ :doctrine/id :doctrine-sola-scriptura
+ :doctrine/name "Sola Scriptura (Scripture Alone)"
+ :doctrine/tradition [:tradition/id :tradition-christian-reformed]
+ :doctrine/category :epistemology
+ :doctrine/origin-text "Martin Luther, 95 Theses (1517)"
+ :doctrine/summary "Protestant doctrine that the Bible is the sole authoritative source of religious doctrine, superseding papal authority, church tradition, and ecclesiastical hierarchy. Central to Reformed Christianity."
+ :doctrine/conflicting-with [[:doctrine/id :doctrine-papal-infallibility]]
+ :doctrine/historical-evolution "Developed during Protestant Reformation (1517). Remains core to Reformed, Lutheran, and Evangelical Protestantism. Rejected by Catholic and Orthodox traditions."}
+
+{:db/id -4005
+ :doctrine/id :doctrine-papal-infallibility
+ :doctrine/name "Papal Infallibility"
+ :doctrine/tradition [:tradition/id :tradition-christian-orthodox]
+ :doctrine/category :epistemology
+ :doctrine/origin-text "Vatican I (1870)"
+ :doctrine/summary "Catholic doctrine (defined at Vatican I) that the Pope is preserved by God from error when speaking ex cathedra on matters of faith and morals. Rejected by Orthodox, Reformed, and most Protestants."
+ :doctrine/conflicting-with [[:doctrine/id :doctrine-sola-scriptura]]
+ :doctrine/historical-evolution "Formally defined in 1870. Orthodox churches rejected this at the time and continue to do so, emphasizing conciliar (synodal) decision-making."}
+
+{:db/id -4006
+ :doctrine/id :doctrine-labor-dignity
+ :doctrine/name "Labor Dignity and Syndicalism"
+ :doctrine/tradition [:tradition/id :tradition-labor-syndicalist]
+ :doctrine/category :ethics
+ :doctrine/origin-text "IWW Constitution, Marx/Engels, Modern labor theory"
+ :doctrine/summary "Secular doctrine emphasizing workers' inherent dignity, right to organize collectively, and opposition to capital exploitation. Syndicalism advocates for direct action (strikes, boycotts) and eventual worker ownership of production."
+ :doctrine/conflicting-with nil
+ :doctrine/historical-evolution "Emerged in late 19th century. Syndicalism was prominent in 1920s–1940s; labor unions today emphasize negotiation and contract law over revolutionary syndicalism."}
+
+{:db/id -4007
+ :doctrine/id :doctrine-democratic-cooperation
+ :doctrine/name "Democratic Cooperation and Mutualism"
+ :doctrine/tradition [:tradition/id :tradition-economic-cooperative]
+ :doctrine/category :governance
+ :doctrine/origin-text "Rochdale Principles (1844), ICA Cooperative Identity"
+ :doctrine/summary "Cooperative movement doctrine: democratic decision-making (one member, one vote), equitable benefit-sharing, and mutual aid among members. Worker/consumer ownership, not external capital."
+ :doctrine/conflicting-with nil
+ :doctrine/historical-evolution "Formalized in Rochdale Principles (1844). Remains globally relevant; 1.2+ billion cooperative members worldwide embrace variants of this doctrine."}
+
+;;; ============================================================
+;;; CHARTER/GOVERNANCE DOCUMENTS (sample)
+;;; ============================================================
+
+{:db/id -5000
+ :charter/id :charter-etzhayyim-rider
+ :charter/name "CHARTER-RIDER v3.5"
+ :charter/date-adopted "2026-05-01"
+ :charter/date-last-amended "2026-07-15"
+ :charter/amendment-process "5-of-7 Council unanimous approval"
+ :charter/authority-level :lv7-unanimity
+ :charter/full-text-blob "Apache 2.0 License with etzhayyim Charter Compliance Rider §1–§8. See /CHARTER-RIDER.md for full text."}
+
+{:db/id -5001
+ :charter/id :charter-reformation-augsburg
+ :charter/name "Augsburg Confession"
+ :charter/date-adopted "1530"
+ :charter/date-last-amended "1580 (Formula of Concord)"
+ :charter/amendment-process "Ecumenical council of Lutheran bishops"
+ :charter/authority-level :lv7-unanimity
+ :charter/full-text-blob "Foundational document of Lutheranism. Asserts that salvation is by faith alone (sola fide) and Scripture alone (sola scriptura)."}
+
+{:db/id -5002
+ :charter/id :charter-islamic-shura
+ :charter/name "Shura (Consultation) Principle"
+ :charter/date-adopted "632 CE (Islamic founding)"
+ :charter/date-last-amended "Quran 42:38 (immutable)"
+ :charter/amendment-process "Qiyas (legal analogy) by Islamic scholars; no amendment to Quran"
+ :charter/authority-level :immutable
+ :charter/full-text-blob "Islamic governance principle: 'And their affair is by consultation among themselves' (Quran 42:38). Shura councils advise rulers; final authority traditionally rests with Caliph or Ayatollah."}
+
+{:db/id -5003
+ :charter/id :charter-mondragon-bylaw
+ :charter/name "Mondragon Cooperative Corporation Bylaws"
+ :charter/date-adopted "1956"
+ :charter/date-last-amended "2020"
+ :charter/amendment-process "General Assembly vote (simple majority)"
+ :charter/authority-level :simple-majority
+ :charter/full-text-blob "Democratic governance of Mondragon: one worker, one vote. Salary ratios capped at 5–8:1 (worker:executive). Profit-sharing mandated."}
+
+;;; ============================================================
+;;; LEXICON DEFINITIONS (sample)
+;;; ============================================================
+
+{:db/id -6000
+ :lexicon/id :lex-christian-sacraments
+ :lexicon/name "Christian Sacraments and Rituals"
+ :lexicon/language :en
+ :lexicon/tradition [:tradition/id :tradition-christian-reformed]
+ :lexicon/scope :ritual
+ :lexicon/entries [
+   {:lexicon-entry/term "Baptism" :lexicon-entry/pronunciation "BAP-tiz-um" :lexicon-entry/definition "Sacrament of initiation into Christian church, symbolizing cleansing from sin and entry into covenant." :lexicon-entry/usage-context "Performed on infants (Catholic/Orthodox) or believers (Protestant)" :lexicon-entry/cognates "Baptism (Gk: baptizo), Taufe (German), Baptême (French)"}
+   {:lexicon-entry/term "Eucharist/Communion" :lexicon-entry/pronunciation "YOO-ka-rist" :lexicon-entry/definition "Sacrament commemorating Christ's last supper; consumption of bread and wine." :lexicon-entry/usage-context "Regular (weekly/monthly) practice in most churches" :lexicon-entry/cognates "Eucharist (Gk: eukharistia, thanksgiving), Lord's Supper, Mass (Catholic)"}
+ ]}
+
+{:db/id -6001
+ :lexicon/id :lex-islamic-pillars
+ :lexicon/name "Islamic Five Pillars (Arkan al-Islam)"
+ :lexicon/language :en
+ :lexicon/tradition [:tradition/id :tradition-islamic-sunni]
+ :lexicon/scope :doctrinal
+ :lexicon/entries [
+   {:lexicon-entry/term "Shahada" :lexicon-entry/pronunciation "shah-HAH-dah" :lexicon-entry/definition "Declaration of faith: 'There is no god but Allah, and Muhammad is his messenger.'" :lexicon-entry/usage-context "Recited at conversion, daily prayer, and near death" :lexicon-entry/cognates "Shahada (Ar: شهادة, testimony)"}
+   {:lexicon-entry/term "Salat" :lexicon-entry/pronunciation "sah-LAHT" :lexicon-entry/definition "Ritual prayer performed five times daily, facing Mecca." :lexicon-entry/usage-context "Obligatory for adult Muslims; core religious practice" :lexicon-entry/cognates "Salat (Ar: صلاة, prayer)"}
+   {:lexicon-entry/term "Zakat" :lexicon-entry/pronunciation "zah-KAHT" :lexicon-entry/definition "Obligatory almsgiving; typically 2.5% of annual wealth to support the poor." :lexicon-entry/usage-context "Annual obligation, especially during Ramadan" :lexicon-entry/cognates "Zakat (Ar: زكاة, purification)"}
+   {:lexicon-entry/term "Sawm" :lexicon-entry/pronunciation "SAWM" :lexicon-entry/definition "Fasting from dawn to sunset during the Islamic month of Ramadan." :lexicon-entry/usage-context "Obligatory for adult Muslims in good health; spiritual discipline" :lexicon-entry/cognates "Sawm (Ar: صوم, fasting)"}
+   {:lexicon-entry/term "Hajj" :lexicon-entry/pronunciation "HADJ" :lexicon-entry/definition "Pilgrimage to Mecca; required once in a lifetime for Muslims with financial/physical capacity." :lexicon-entry/usage-context "Major spiritual journey; typically 5–6 days in Islamic month of Dhul-Hijjah" :lexicon-entry/cognates "Hajj (Ar: حج, pilgrimage)"}
+ ]}
+
+{:db/id -6002
+ :lexicon/id :lex-buddhist-pali
+ :lexicon/name "Buddhist Pali (Theravada)"
+ :lexicon/language :pi
+ :lexicon/tradition [:tradition/id :tradition-buddhist-theravada]
+ :lexicon/scope :doctrinal
+ :lexicon/entries [
+   {:lexicon-entry/term "Dukkha" :lexicon-entry/pronunciation "DOOK-kah" :lexicon-entry/definition "Suffering, unsatisfactoriness, stress inherent in conditioned existence." :lexicon-entry/usage-context "First of Four Noble Truths" :lexicon-entry/cognates "Dukkha (Pali: दुक्ख, suffering)"}
+   {:lexicon-entry/term "Nirvana" :lexicon-entry/pronunciation "nir-VAH-nah" :lexicon-entry/definition "Extinguishing of craving and ignorance; liberation from cycle of rebirth." :lexicon-entry/usage-context "Ultimate goal of Buddhist practice" :lexicon-entry/cognates "Nirvana (Pali: निर्वाण, blowing out)"}
+   {:lexicon-entry/term "Sangha" :lexicon-entry/pronunciation "SANG-hah" :lexicon-entry/definition "Community of practitioners; monastic order of monks and nuns." :lexicon-entry/usage-context "One of Three Jewels (Buddha, Dharma, Sangha); central to Buddhist society" :lexicon-entry/cognates "Sangha (Pali: संघ, assembly)"}
+ ]}
+
+;;; ============================================================
+;;; ETZHAYYIM RETROACTIVE MAPPING
+;;; Core etzhayyim org and initial axis instantiation
+;;; ============================================================
+
+{:db/id -9000
+ :org/id :org-etzhayyim
+ :org/name "etzhayyim"
+ :org/canonical-name "etzhayyim (עץ חיים / Tree of Life)"
+ :org/type :religious-corp
+ :org/tradition [:tradition/id :tradition-synthetic-etzhayyim]
+ :org/founding-date 2026
+ :org/founding-location "Digital / Decentralized"
+ :org/member-count 1
+ :org/primary-regions [[:region/id :region-asia-east] [:region/id :region-north-america]]
+ :org/governance-model :democratic
+ :org/mission-statement "Human labor liberation through synthetic religion uniting Japanese (八百万/縁起/産霊/和) and Protestant Christian (Sola Scriptura/万人祭司/Reformed Just War/Tree of Life) values."
+ :org/charter [:charter/id :charter-etzhayyim-rider]
+ :org/primary-language :ja}
+
+;;; ETZHAYYIM AXIS INSTANTIATION (retroactive assignment of 11 stock axes)
+;;; Measurement date: 2026-07-18; basis: existing CLAUDE.md + system dynamics simulation
+
+{:db/id -9100 :org-axis/org [:org/id :org-etzhayyim] :org-axis/axis [:axis/id :axis-governance] :org-axis/current-value 90 :org-axis/measurement-date "2026-07-18" :org-axis/measurement-basis "simulation" :org-axis/caveat "SBT-based 5-of-7 Council; seats not yet fully filled. Simulation assumes design-intent operational."}
+{:db/id -9101 :org-axis/org [:org/id :org-etzhayyim] :org-axis/axis [:axis/id :axis-economic] :org-axis/current-value 10 :org-axis/measurement-date "2026-07-18" :org-axis/measurement-basis "assumption" :org-axis/caveat "Nascent org; no commercial revenue yet. Theoretical endowment not materialized."}
+{:db/id -9102 :org-axis/org [:org/id :org-etzhayyim] :org-axis/axis [:axis/id :axis-identity] :org-axis/current-value 100 :org-axis/measurement-date "2026-07-18" :org-axis/measurement-basis "simulation" :org-axis/caveat "SBT infrastructure designed; not yet deployed at scale."}
+{:db/id -9103 :org-axis/org [:org/id :org-etzhayyim] :org-axis/axis [:axis/id :axis-agency] :org-axis/current-value 95 :org-axis/measurement-date "2026-07-18" :org-axis/measurement-basis "simulation" :org-axis/caveat "LLM agent architecture (kotodama Tier-A/B actors) fully designed; Tier-B ops not yet live."}
+{:db/id -9104 :org-axis/org [:org/id :org-etzhayyim] :org-axis/axis [:axis/id :axis-social-delivery] :org-axis/current-value 5 :org-axis/measurement-date "2026-07-18" :org-axis/measurement-basis "assumption" :org-axis/caveat "Care substrate (iyashi) designed but not deployed. No active service delivery yet."}
+{:db/id -9105 :org-axis/org [:org/id :org-etzhayyim] :org-axis/axis [:axis/id :axis-physical-presence] :org-axis/current-value 0 :org-axis/measurement-date "2026-07-18" :org-axis/measurement-basis "fact" :org-axis/caveat "Purely digital/decentralized. No physical temples or robotics deployed."}
+{:db/id -9106 :org-axis/org [:org/id :org-etzhayyim] :org-axis/axis [:axis/id :axis-public-trust] :org-axis/current-value 5 :org-axis/measurement-date "2026-07-18" :org-axis/measurement-basis "assumption" :org-axis/caveat "Very new; minimal public awareness. Trust not yet earned."}
+{:db/id -9107 :org-axis/org [:org/id :org-etzhayyim] :org-axis/axis [:axis/id :axis-legal-contract] :org-axis/current-value 95 :org-axis/measurement-date "2026-07-18" :org-axis/measurement-basis "fact" :org-axis/caveat "CHARTER-RIDER v3.5 + Mission Charter ADR comprehensive; legal status in most jurisdictions unclear (nascent)."}
+{:db/id -9108 :org-axis/org [:org/id :org-etzhayyim] :org-axis/axis [:axis/id :axis-land-resource] :org-axis/current-value 0 :org-axis/measurement-date "2026-07-18" :org-axis/measurement-basis "fact" :org-axis/caveat "LANDS.md registry exists but no land yet held in trust."}
+{:db/id -9109 :org-axis/org [:org/id :org-etzhayyim] :org-axis/axis [:axis/id :axis-education] :org-axis/current-value 30 :org-axis/measurement-date "2026-07-18" :org-axis/measurement-basis "assumption" :org-axis/caveat "ADR corpus (195 docs) constitutes proto-seminary; no formal education delivery yet."}
+{:db/id -9110 :org-axis/org [:org/id :org-etzhayyim] :org-axis/axis [:axis/id :axis-dispute-resolution] :org-axis/current-value 80 :org-axis/measurement-date "2026-07-18" :org-axis/measurement-basis "simulation" :org-axis/caveat "Council 5-of-7 structure supports mediation/arbitration; not yet tested at scale."}
+{:db/id -9111 :org-axis/org [:org/id :org-etzhayyim] :org-axis/axis [:axis/id :axis-external-recognition] :org-axis/current-value 0 :org-axis/measurement-date "2026-07-18" :org-axis/measurement-basis "fact" :org-axis/caveat "Not yet recognized by interfaith councils or peer organizations."}
+{:db/id -9112 :org-axis/org [:org/id :org-etzhayyim] :org-axis/axis [:axis/id :axis-member-engagement] :org-axis/current-value 100 :org-axis/measurement-date "2026-07-18" :org-axis/measurement-basis "fact" :org-axis/caveat "1 founding member (JK); trivial denominator but 100% participation by definition."}
+{:db/id -9113 :org-axis/org [:org/id :org-etzhayyim] :org-axis/axis [:axis/id :axis-doctrine-clarity] :org-axis/current-value 95 :org-axis/measurement-date "2026-07-18" :org-axis/measurement-basis "fact" :org-axis/caveat "Mission Charter + Charter Rider comprehensive; synthesis of Christian + Japanese values fully articulated."}
+
+;;; ============================================================
+;;; DOCTRINES SPECIFIC TO ETZHAYYIM (retroactive)
+;;; ============================================================
+
+{:db/id -4020
+ :doctrine/id :doctrine-etzhayyim-eight-hundred-myriads
+ :doctrine/name "Kami: Eight Hundred Myriads (八百万)"
+ :doctrine/tradition [:tradition/id :tradition-synthetic-etzhayyim]
+ :doctrine/category :cosmology
+ :doctrine/origin-text "Japanese Shinto mythology, etzhayyim Mission Charter"
+ :doctrine/summary "Doctrine that divinity is distributed across all things—eight hundred myriads of kami (spirits/aspects of divinity) permeate nature, humanity, and creation. Opposes monotheistic exclusivity. Etzhayyim synthesizes this with Protestant monotheism."
+ :doctrine/conflicting-with [[:doctrine/id :doctrine-monotheism-allah]]
+ :doctrine/historical-evolution "Ancient Shinto; reinterpreted in etzhayyim as compatible with Christian God understood as both transcendent (one) and immanent (many manifestations)."}
+
+{:db/id -4021
+ :doctrine/id :doctrine-etzhayyim-sola-scriptura-sola-experience
+ :doctrine/name "Sola Scriptura + Sola Experientia (Scripture and Experience)"
+ :doctrine/tradition [:tradition/id :tradition-synthetic-etzhayyim]
+ :doctrine/category :epistemology
+ :doctrine/origin-text "etzhayyim CHARTER-RIDER §2, ADR-2605192200"
+ :doctrine/summary "Synthesis: Scripture is authoritative (Sola Scriptura, Protestant), but personal spiritual experience and empirical observation are co-authoritative epistemic sources. Rejects both papal infallibility and pure textual fundamentalism."
+ :doctrine/conflicting-with [[:doctrine/id :doctrine-papal-infallibility] [:doctrine/id :doctrine-monotheism-allah]]
+ :doctrine/historical-evolution "Novel to etzhayyim; not a historical doctrine. Attempts to bridge Reformed Protestantism (sola scriptura) with experiential / contemplative traditions (Buddhism, Kabbalah)."}
+
+]

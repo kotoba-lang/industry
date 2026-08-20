@@ -1,0 +1,105 @@
+[{:db/id -1
+  :adr/id "ADR-2608040300"
+  :adr/title "torihiki-chart — 足は時間ではなくブロック。取引所チャートを cljc で自前実装する"
+  :adr/status "accepted"
+  :adr/date "2026-08-04"
+  :adr/tags ["kotoba-lang" "torihiki" "chart" "svg" "d3" "cljc" "hyperliquid" "jp-go-dds"]
+  :adr/body
+  "## 課題
+
+オーナー指示（2026-08-04）: 『chart なども kotoba-lang repo で独自に設計実装,
+cljs, kotoba。また uiux は jp-go-dds を利用』。
+
+現在地の実測:
+
+- `torihiki.pages.dev` の terminal は session / order entry / positions /
+  ticker / order book / trades / chain の 7 パネルを持つが、**chart は無い**
+  （`torihiki_terminal/view.cljc` に該当する defn が存在しない）。
+- node の `/trades` は **200 件の ring buffer** で、要素は
+  `{:level :qty :side :h}`。**wall clock を持たない。**
+- `/candles` も履歴 API も無い。
+
+## 決定 1 — ゼロから作らない。`kotoba-lang/d3` と `org-w3-svg` の上に置く
+
+索引を引いた結果、必要なものの大半は既に在った:
+
+- **`kotoba-lang/d3`** — d3-scale / d3-shape の native cljc 再実装（JS interop
+  ではない、外部依存ゼロ）。`linear-scale` `log-scale` `band-scale`
+  `point-scale` `ordinal-scale` と `line-generator` `area-generator`
+  `arc-generator` `pie-layout`。出力は hiccup の `[:path {:d …}]` にそのまま
+  入る。`band-scale` が `{:start :end :width}` を返すのは、まさに candle の
+  body が必要とする形。
+- **`kotoba-lang/org-w3-svg`** — hiccup SVG。
+
+足りないのは **candlestick の幾何**と**軸**だけ。新しい repo が所有するのは
+その差分と、tape → OHLC の集計。
+
+## 決定 2 — 足はブロック足であって時間足ではない
+
+これがこの repo の設計の中心で、他のどの取引所チャートとも違う点。
+
+`torihiki` は決定性のために **wall clock を持たない**（README:
+『No wall clock. Logical time arrives in the block header』)。`/trades` の
+tape 要素にあるのは `:h`（block height）だけで、時刻は無い。
+
+したがって OHLCV のバケットは **N ブロック単位**であり、x 軸は block height。
+これを『時間足に見えるように』時刻へ変換して描くことはしない —— 変換に使える
+真実がどこにも無く、作れば嘘になる。**1 ブロックの実時間はブロックレートに
+依存して動く**（validator は tick 200ms を目標に走るが、view change や
+Durable Object の eviction で伸びる。2026-08-04 の復旧直後の実測で
+tip 10 → 33 が約 1 分）ので、等間隔の block 足を等間隔の時間として読むのは
+誤読になる。**軸ラベルは `#h` を明示して、時刻でないことを見た目で示す。**
+
+将来 block → 時刻の対応を持ちたければ、それは chain 側が block header の
+`:engi.block/ts` を公開する話であって、chart が推測する話ではない。
+
+## 決定 3 — 集計は整数のまま。float はジオメトリの最後の 1 段だけ
+
+`torihiki` は i53 の整数演算で閉じており（`torihiki.fixed`)、価格は tick、
+数量は lot の整数。OHLC の集計（open / high / low / close / volume）は
+**その整数のまま**行う。
+
+理由は表示の綺麗さではなく **同一性**。tape は誰でも読めるので、2 つの
+クライアントが同じ tape から同じ candle を出せることには意味がある
+（チャートが食い違えば、どちらかが嘘をついている）。集計に float が入ると
+丸めの差でそれが崩れる。
+
+float に落ちるのは `d3` の scale に渡す最後の 1 段だけで、そこは画素座標なので
+差が出ても値ではなく描画の 1px に留まる。
+
+## 決定 4 — 純関数。DOM も fetch も持たない
+
+`kotoba-lang/d3` と同じ形（データ → 幾何 → hiccup）。取得は消費者側
+（terminal の `client.cljs`）の仕事。これは `torihiki` 本体が
+『no consensus, no networking, no I/O inside it』としているのと同じ分離。
+
+## 決定 5 — 言語は cljc。`.kotoba` は今日は選べない
+
+`torihiki` 自身が README で `.kotoba` を退けた理由（native backend が record を
+関数境界越しに運べない / capability 機構が無い / recursive value 未着地）は
+そのまま当てはまる。加えて chart は hiccup という**任意深度の入れ子**を返すので、
+`ADR-2607279200` の W4（recursive logical values）が着地するまで `.kotoba` では
+表現できない。
+
+ただし中身は純関数（データ → 幾何）なので、W4 後の移行先としては第一候補。
+そのため **capability を一切要求しない形**に保つ。
+
+## 決定 6 — UI/UX は jp-go-dds、dark は今日足した反転層を使う
+
+オーナー指示に従い terminal の design system は jp-go-dds に寄せる。上流
+デジタル庁に dark palette は無かったので、同日 `jp-go-dds.dark` を実装した
+（ramp を index で鏡映する反転層、primitive 層で反転するので `--hig-*` bridge も
+`dads-*` component も無改造で追従。実測 contrast は README の表）。
+
+chart の色は **raw hex を書かず** `--color-*` / `--hig-*` の token 参照にする。
+そうすれば light / dark の切り替えに chart が自動で追従する。上下（買い / 売り）
+は `--color-semantic-success-1` / `--color-semantic-error-1` を使う。
+
+## 未決 / 既知のギャップ
+
+- **履歴が 200 件しかない。** ring buffer を超える足を出すには node 側に集計を
+  置く必要がある（別タスク）。それまで chart が描けるのは直近 200 fill 分。
+- **深度図（depth chart）** は book snapshot から描けるので tape の制約を受けない。
+- 上下の色分けは block 足の中の taker side の集計で決めるが、1 ブロックに
+  両側の fill が入るので『この足は買い』は近似。何を根拠にしたかを docstring に
+  書く。"}]

@@ -1,0 +1,1006 @@
+[{:db/id -1
+  :adr/id "ADR-2608170400"
+  :adr/title "Kotoba/Kotobase IPLD substrate — 着地済み境界、代替経路、残りの成熟度 gap"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :adr/deciders "Jun Kawasaki（IPLD Data Model / codecs / Schema / ADL / GraphSync / trustless pathing / IPNS PubSub / transports / Prolly range diff を順次実装し成熟度を上げる指示）"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/relates-to "ADR-2606271700（Read/Live transport planes）, ADR-2606271800（WebRTC/TURN）, ADR-2607309970（IPNS record+DHT）, ADR-2608039970（datom plane）, ADR-2608112035（Kubo-independent retrieval）, ADR-2608160100（CARv2 pack）, ADR-2608170100（IPLD調査とrange境界）, ADR-2608170200（query serving planes）, ADR-2608171256（production HTTP Gateway 0.19.0 maturity）"
+  :adr/repos ["kotoba-lang/io-ipld" "kotoba-lang/amu" "kotoba-lang/kotoba-sema"
+              "kotoba-lang/tech-ipfs-specs-ipns" "kotoba-lang/prolly-tree"
+              "kotoba-lang/kotoba" "kotoba-lang/kotobase" "net-kotobase/control-plane"]
+  :adr/body
+  "# ADR-2608170400: Kotoba/Kotobase IPLD substrate maturity
+
+**Status**: accepted / **Date**: 2026-08-17
+
+## 1. 問いと結論
+
+一連の問いは、Kotoba/Kotobase が次の形になっているか、IPLD の各仕様を名前だけでなく
+適切な境界で使えているか、さらに何を入れるべきか、であった。
+
+> Clojure-like code-as-data を表面、IPLD を persistent semantic address space、
+> CARv2 を物理 pack、capability を security primitive、causal DAG を distributed
+> history、Wasm/Substrait/Pregel/Actor を execution backends とする content-addressed
+> distributed operating + database + compute substrate。
+
+**方向として yes、完成した単一製品としては no。** これは一枚の巨大 runtime ではなく、
+明示した面の合成である。現在、Data Model、canonical codec、selector、Schema lens、ADL、
+CARv2、CID/IPNS、capability-gated Wasm 実行は実装証拠を持つ。一方 GraphSync の任意 extension、
+全 transport の live 配備、遠隔 Prolly range diff、全 Schema grammar conformance は残る。
+
+本 ADR は「存在する primitive」「実経路へ配線済み」「live で実測済み」を分ける。
+テストが green でも fleet / public route / browser NAT の実証には数えない。
+
+## 2. 決定する層
+
+| 層 | 正本 / 役割 | 置かないもの |
+|---|---|---|
+| source | Clojure-like inert code-as-data → checked HIR/KIR | ambient JVM/Clojure authority |
+| semantic value | IPLD Data Model + canonical DAG-CBOR + CIDv1 | storage URL、pack offset、mutable name |
+| structural view | Schema lens / DMT / ADL | query planner、ACL、保存先 |
+| history | parent-linked commit/causal DAG + signed receipts | global total order の強制 |
+| security | typed capability、grant∩policy、deny-by-default provider | CID所持だけで authority を得ること |
+| physical | immutable block + CARv2 pack/index + object store range GET | CAR index を ordered query index と読むこと |
+| naming | IPNS record（署名付き mutable pointer）/ delegated routing / PubSub router | IPNS をデータ暗号やDB CASと読むこと |
+| retrieval | CID-over-HTTP/trustless path、selector/cursor、必要時 GraphSync | transport peer を信頼根にすること |
+| live mesh | QUIC、WebRTC、relay/dcutr/autonat、必要時 WebTransport/WSS | Read/Object correctness の前提 |
+| query | datom covering index、range、postings、columnar、adjacency、view | Schema walk / GraphSync selector をDB query engineにすること |
+| execution | Wasm、native、Substrait、Pregel、Actor/tender adapter | backend固有 authority を source semantics に逆流させること |
+
+identity / naming / location を混ぜない。CID は意味内容、IPNS は可変な名前、
+CARv2 `(pack CID, offset, length)` と HTTP endpoint は location である。
+
+## 3. 今回までに着地したもの
+
+### 3.1 IPLD Data Model、codec、selector、cursor
+
+`kotoba-lang/io-ipld` に以下が merge 済み。
+
+- PR #13 `aa751442...`: Data Model、Schema、selector、bounded traversal。
+- PR #14 `31977fd1...`: Data Model kind count の訂正。
+- PR #15 `6c74d97b...`: canonical selector codec。
+- PR #16 `aad6274c...`: bounded recursive selectors。
+- PR #17 `87e5fab7...`: resumable selection cursor。
+- PR #18 `f6e0e59d...`: durable cursor checkpoints。
+
+Data Model は block store や Clojure map の別名ではない。Node kind、Link、canonical bytes、
+bounded traversal の共通契約である。DAG-CBOR tag 42 link と canonical encoding を identity
+hot path に使い、非決定的 codec や LLM 出力を CID 算出に入れない。
+
+selector は取得範囲の宣言であり query language ではない。`ExploreRange` は list index、
+map key range ではない。`InterpretAs` が無い経路で ADL-aware remote traversal を
+実装済みと名乗らない。
+
+### 3.2 Schema DSL、DMT、representation lens、ADL
+
+`io-ipld` の merge:
+
+- PR #19 `84bfab92...`: Schema DSL と bounded DMT unification。
+- PR #20 `dccade41...`: representation lenses。
+- PR #21 `77fe5cd9...`: union と ADL schema lenses。
+- PR #22 `8fa47c12...`: Schema DMT hardening と ADL metering。
+- PR #23 `1a2e10cf...`: content-addressed Wasm ADL boundary。
+
+Schema は optional な構造 lens であり、schema が無くても Data Model node は読める。
+DMT は型付き表現変換、ADL は同じ Data Model interface の背後で高度な layout を解釈する。
+どちらも ACL、物理 store、Datalog engine の代用にしない。
+
+### 3.3 Kotoba source → bounded Wasmtime ADL
+
+`kotoba-lang/amu` の連続 slice:
+
+| PR | merge SHA | 到達点 |
+|---|---|---|
+| #615 | `35b25e2c...` | import-free module を実 C Wasmtime engine で fuel/time/memory/output bound 付き実行 |
+| #616 | `b1b6157a...` | Kotoba source の identity ADL を checked HIR→専用KIR→Wasm ABI へ compile |
+| #617 | `07c5fc75...` | runner artifact、module/input/output CID、fuel/memory を署名付き execution receipt に束縛 |
+| #618 | `538633a1...` | literal bool、identity、canonical empty bytes の closed non-identity lowering |
+| #619 | `15c362ef...` | `(= (bytes-count value) N)` を ABI input length へ lowering |
+| #620 | `6d222fc5...` | `(= (bytes-at value I) N)` を operand-length bounds trap 付き unsigned byte read へ lowering |
+| #621 | `651f90fc...` | `(bytes-slice value START END)` を copy しない bounded view へ lowering（decode/encode body） |
+| #622 | `64dd35d3...` | `(bytes-concat A B)` を operand の後ろへ書く per-byte copy へ lowering |
+| #623 | `6f0aecc3...` | subrange / join の lowering を 1 本の expression compiler へ畳み、bump cursor で合成を可能に |
+| #624 | `c38f79d2...` | guest 出力の canonical DAG-CBOR roundtrip を capability で強制（receipt 署名の前） |
+
+`kotoba-sema` PR #10（merge `105309ca...`）は `bytes-count(bytes) -> i64` を、
+PR #11（merge `d96e9341...`）は `bytes-at(bytes, i64) -> i64` を、
+PR #12（merge `9da24d86...`）は `bytes-slice(bytes, i64, i64) -> bytes`（half-open）を、
+PR #13（merge `f4de940e...`）は `bytes-concat(bytes, bytes) -> bytes` を typed pure operation
+として追加した。いずれも bounds は typing で決まらない run-time の事実なので、docstring が
+backend 側の義務として明記する（下記 P0-1 / P0-2 / P0-3）。
+
+実 runner では 4-byte input が canonical DAG-CBOR true、1-byte input が false。
+io-IPLD projection、署名 receipt、fuel exhaustion、timeout、forbidden import、fixed memory、
+output bound を同じ C Wasmtime runner で確認した。ADL source の未対応 body は identity に
+置換せず fail-closed。これは arbitrary Kotoba を Wasm 化した証拠ではなく、閉じた ADL profile
+の証拠である。
+
+### 3.4 CARv2 physical plane
+
+ADR-2608160100 の境界を採用する。canonical value identity は block CID、物理配置は CARv2 pack。
+CARv2 index は exact multihash lookup 用で、ordered/range query は提供しない。B2 の ranged GET で
+要求 frame の byte range を読み戻す実測はある。pack chain/bootstrap wiring は
+ADR-2608170300。production write default はなお `:block-per-object` であり、pack write gate は
+off と記録されているため「全データがCARv2化済み」とは言わない。
+
+### 3.5 IPNS、DHT、PubSub router
+
+IPNS は本物の signed record として検証し、name は key から導出する。value は head CID。
+delegated routing の publish/resolve と public application の live record 証拠は既存 ADR にある。
+`tech-ipfs-specs-ipns` PR #2（merge `274ac7dd...`）で PubSub Router state machine が着地した。
+
+PubSub router は announcement/liveness の最適化であり、record validity、sequence、expiry、
+name-key binding を省略しない。PubSub delivery を durable history や CAS 成功の証拠にしない。
+
+### 3.6 transport と NAT
+
+Read/Object は CID-over-HTTP を共通の correctness path とする。受信側が CID を再計算するため、
+gateway/CDN/peer は availability source であって trust root ではない。
+
+Live/Mesh は transport 非固定:
+
+- native QUIC + Noise は既存経路。
+- libp2p WebRTC transport、TURN credential XRPC、UDP relay listener、murakumo reach wiring は
+  ADR-2606271800 の P1/P2 code と test が着地。
+- circuit-relay-v2 / dcutr / autonat は native mesh の NAT vocabulary として存在。
+- WebTransport と WSS は補完 transport。Read correctness には不要。
+
+ただし「コードが在る」と「現在の fleet binary が feature を有効化し、public browser から
+TURN fallback を通った」は別証拠である。本 ADR 作成時には後者を再測定していない。
+
+### 3.7 Prolly tree と query boundary
+
+`prolly-tree` には `scan-range` / `scan-range-async` primitive がある。HMAC-blinded key は
+等値を保つが順序を壊すため、blind value range には使えない。CARv2 index、HAMT、GraphSync
+selector を ordered query index として使わない。
+
+query は ADR-2608170200 の class-specific serving planesへ送る。equality/join、range、search、
+OLAP、multi-hop、feed はそれぞれ covering datom、range source、postings、columnar、adjacency、
+materialized view を持つ。IPLD/ADL/GraphSync はその下の identity/retrieval/layout 層である。
+
+## 4. GraphSync と trustless pathing の扱い
+
+GraphSync は selector に従う graph transfer と extension negotiation に有用だが、正しさの唯一経路
+にはしない。実装が任意 extension を全て持つ必要はない。現在の必須経路は次で代替できる。
+
+production HTTP Gateway の raw/CARv1/UnixFS/IPNS surface と buffer/streaming gap G1-G7 は
+ADR-2608171256 がより具体的な正本である。本 ADR はそれを置換せず、Kotoba compiler、IPLD core、
+CARv2、transport、query、execution を横断する上位の成熟度境界を固定する。
+
+| 要求 | 現在の必須経路 | GraphSync の位置 |
+|---|---|---|
+| block取得 | CID-over-HTTP + CID再検証 | peer transfer optimization |
+| bounded graph取得 | canonical selector + resumable cursor/checkpoint | selector exchange/stream optimization |
+| web trustless path | path→CID/block、各block検証 | transport option |
+| ordered range | Prolly/IRangeSource | selectorでは代替しない |
+| query | class-specific serving plane | query engineにしない |
+
+従って任意 GraphSync extension 未実装は correctness gap ではない。ただし
+ADL-aware remote traversal を選ぶ場合、`InterpretAs` 相当の意味運搬、extension budget、
+resume token、重複block抑止、malicious responder negative test が必要になる。
+
+## 5. 残りの gap（優先順）
+
+### P0 — 現在の閉じた ADL を実用変換へ広げる
+
+1. ~~`bytes-at(bytes, i) -> i64`~~ **closed（2026-08-17、kotoba-sema #11 + amu #620）**。
+   bounds check・unsigned byte・out-of-range trap を固定した。
+
+   **効いた設計判断は bounds の置き場所である。** linear memory は 2 page、ABI は入力を
+   offset 1024 へ copy するので、**operand を越えた index も memory の中に着地する** ——
+   load は成功し、validator は自分の入力でない byte について自信を持って答える。Wasm 自身の
+   bounds check は *memory* のものであって *operand* のものではない。したがって
+   `length <= index` の trap を load の前に明示的に emit する。unsigned load
+   （`i32.load8_u`）が 0xFF を 255 として読ませる。
+
+   **index は literal に限る。これは profile の制限であって言語の制限ではない** ——
+   `bytes-at` は任意の i64 index を型付けする。literal に閉じるのは emit した bounds check
+   を compile 時に決定可能に保つため。負 index と 0..255 外の比較は名前つきで拒否する
+   （後者は恒偽で、admit すると source の誤りを「常に no と答える validator」へ静かに
+   compile してしまう）。
+
+   **測定して分かったこと（仮定ではない）**: schema capability 経由で駆動すると ADL が
+   受け取るのは **DAG-CBOR encode 済み node** であって payload bytes ではない。3-byte 値に
+   対して byte 0 == 1 を主張する module は `adl-rejected` で落ち、67（`0x43`、length 3 の
+   CBOR byte-string header）を主張する module は署名 receipt つきで通る。
+   `validate-representation` が representation を見るのは正しいが、自明ではない。
+
+   六面の証拠: sema typing（19 tests/111 assertions）/ 専用 KIR admission
+   `[:input-byte-at-eq I N]` / wasm-tools validation / 実 Wasmtime の positive・negative
+   （true、false、index 3、out-of-range trap、empty trap、oversized allocation trap）/
+   署名 receipt（capability 経由）/ mutation test。**mutation は両方向を見せた** ——
+   guard を消した module は *Wasm としては依然 valid* で、unit assertion が捕らえ、harness は
+   1-byte 入力の index 3 でちょうど落ちる（trap しなくなる）。
+
+   ⚠ `clojure -M:test`（amu 全体）はこのマシンでは `cli-test` の
+   `wasm-tools version is not pinned` で exit 70 する。**無改変の origin/main が同じ test で
+   同じ exit をすることを別 worktree で確認済み** —— 本 slice の regression ではない。
+2. ~~`bytes-slice(bytes, start, end) -> bytes`~~ **closed（2026-08-17、kotoba-sema #12 + amu #621）**。
+   `0 <= start <= end <= len`、overlap/alias 規則、max-output bound を lowering と runner の
+   両方で強制した。
+
+   **alias 規則は「view であって copy ではない」に落ちた。** 結果は operand 自身の pointer を
+   START だけ進めたもので、長さは `END-START`。**module は linear memory へ一度も書かない**ので、
+   規則は「結果は operand を alias し、host は input buffer を再利用する前に読み出さねばならない」
+   の一文になる（runner は既にそうしている）。しかもこれは**検査できる** —— emit した module に
+   `store` / `memory.copy` / `memory.fill` が無いことを test が主張する。
+
+   **bounds は P0-1 と同じ罠で、slice は二重に食らう** —— offset と結果長の両方を支配する。
+   `length < END` を pointer 形成の前に trap させる。この guard が無い module は
+   **Wasm として依然 valid で、pointer も返す** —— 2 page memory の中で input の後ろに
+   続く何かを指して。`0 <= START <= END` は compile 時に決まるので名前つきで拒否する。
+
+   **max-output は両側で強制し、どちらも他方を包含しない**: lowering 側は module 固定の
+   input capacity を越える END を「trap しかありえない」として compile 時に拒否する
+   （host の limit は見えない）。runner 側は host が選んでいない view にも `max_output` を
+   適用する（source の offset は見えない）。
+
+   **conformance script が値を hardcode するのをやめた必然的な理由**: subrange が schema を
+   round-trip するのは**その subrange 自身が DAG-CBOR node であるとき**だけで、それは値に依存する。
+   `0x41 0x05` の encoding は `42 41 05`、`[1,3)` は `0x05` を持つ CBOR byte string。よって
+   representation と期待 logical 値を引数化し、slice lowering を capability と署名 receipt
+   経由でも走らせた（既存の呼び出しは既定で不変）。
+
+   六面の証拠: sema typing（20 tests/125 assertions）/ 専用 KIR admission `[:input-subrange S E]` /
+   wasm-tools validation / 実 Wasmtime（`[1,3)`、隣の identity encode、空 subrange が trap では
+   なく整形式の答えであること、out-of-range と empty-input の trap、runner の output bound）/
+   署名 receipt / mutation test（unit assertion と harness の両方が捕らえ、restore で両方緑）。
+3. ~~`bytes-concat(a,b) -> bytes`~~ **closed（2026-08-17、kotoba-sema #13 + amu #622）**。
+   overflow・allocation・fuel を入力長に比例させた。
+
+   **これは「書く」最初の body である。** P0-2 が拠っていた 2 つの性質が両方失効し、
+   捨てるのではなく置き換わった:
+
+   - slice の alias 規則は「module に store が無い」だった。join は必ず書くので、規則は
+     **「書き込み先が operand の後ろから始まる」**になる。書き込みカーソルは最初の store の
+     前に `pointer + length` から初期化される。これは構造的にも**振る舞いとしても**検査
+     できる —— fixture は入力を**回転**させ、byte 0 を bytes 1..2 の**後**に copy するので、
+     重なった書き込み先は「行儀が悪い」ではなく**間違った bytes を返す**。
+   - slice は自分の場所を必要としなかった。join は必要とするので、**operand + 結果**を
+     module 固定 capacity に対して書き込み前に検査する。
+
+   **fuel を byte 単位で課すのは意図的なコストである。** `memory.copy` なら同じ bytes を
+   1 命令分の fuel で動かせてしまう —— それがこの slice の閉じるべき穴なので、copy は
+   明示 loop にした。wasmtime 47.0.3 実測で固定 ~16.6k + **byte あたり ~20 fuel**
+   （8 byte で 16597、8192 byte で 180277）。**regression が主張するのは数値ではなく形** ——
+   同じ module・同じ budget で小さい入力は完走し大きい入力は尽きる。bulk copy なら両方
+   完走してしまう。
+
+   **max-output は 3 箇所で、どれも他を包含しない**: join の定数部分は compile 時に拒否、
+   operand 依存の残りは実行時に trap、runner の `max_output` は host が sizing していない
+   結果にも適用される。
+
+   **nested join は拒否する** —— join の中の join は自分の書き込み先と 2 度目の copy を
+   要求し、それは closed expression grammar（P0-4）であってここではない。
+
+   六面の証拠: sema typing（21 tests/137 assertions）/ 専用 KIR admission
+   `[:input-join [part part]]` / wasm-tools validation / 実 Wasmtime（回転の byte 一致、
+   隣の identity encode、out-of-range trap、fuel の両方向、3x 入力での capacity trap、
+   runner の output bound）/ 署名 receipt / mutation test（書き込み先を operand に向けると
+   unit assertion と harness の両方が捕らえ、harness は回転の比較でちょうど落ちる）。
+4. ~~encode/decode で上記を合成できる closed expression grammar~~ **closed（2026-08-17、amu #623）**。
+   `E ::= value | (bytes-empty) | (bytes-slice E START END) | (bytes-concat E E)`。
+   loop / recursion / host import は別 profile のまま。
+
+   **kotoba-sema の変更は不要だった** —— `bytes-slice` / `bytes-concat` は既に expression
+   operand を取り、nested join も既に型付いていた。この slice は完全に lowering 側である。
+
+   **2 つの特殊形は「並べる」のではなく「畳んだ」。** 同じ grammar を 2 経路が認識する形は
+   CLAUDE.md が名指しで警告する形（同じ判断を 2 実装が持ち片方だけ直る）である。畳んで安全
+   だったのは **P0-1..3 の振る舞い harness があったから** —— byte 一致も trap も 1 件も
+   変わらなかった。壊れたのは KIR 表現の 3 assertion と、**受理されるようになった** nested
+   join と、message 名 1 つだけ。
+
+   **本体は buffer discipline である**（resume note の予告どおり）。各 node が
+   (pointer, length) の slot 対を post-order で compile 時に持つ。subrange は view のまま
+   何も確保しない。join は **operand の後ろから始まり上にしか動かない bump cursor** で
+   materialise し、子は親が場所を取る前に emit される。よって alias 規則は
+   **「operand の後ろ」**（join が 1 つの間はこれで足りた）から**「生きている全 operand の
+   上」**へ一般化する。
+
+   **その一般化を弁別するのが新しい fixture である。** cursor で inner join を作り、
+   outer join には operand の**後ろ側**の断片を**先に** copy させる —— inner の場所を
+   再利用する書き込み先は読む前に潰し、`01 61 61 A1` ではなく `01 01 61 A1` を返す。
+   cursor の前進を消すと **P0-1..3 の全 case は通ったまま**（join が高々 1 つなので）
+   ここだけが落ちる。fixture が飾りでなく荷重を負っている証拠。
+
+   **output bound の compile 時分は式全体の関数になる** —— cursor は下がらないので必要な
+   空間は全 join の総和。operand 依存の残りは emit した trap、その両方が見えない分は
+   runner の `max_output`。node 数は 32 で bound。
+
+   六面の証拠: sema typing（変更不要、既存 21 tests/137 assertions が包含）/ 専用 KIR
+   admission `[:input-expression <tree>]` / wasm-tools validation / 実 Wasmtime（合成の
+   byte 一致、materialise 済み結果への subrange、各 nest 段での短い operand の trap、
+   および P0-1..3 の全 case 無変更）/ 署名 receipt / mutation test（cursor 前進を止めると
+   unit 2 件と harness が合成 fixture でちょうど落ちる）。
+
+   ⚠ **畳んだことで 1 つの assertion が静かに弱くなり、直した。** subrange の bound 検査は
+   `local.get 2 ... i32.lt_u` に match していたが、長さが slot へ移った後も——**正しい slot
+   を使っているかに関わらず**——match し続けた。今は backreference で slot を束縛する。
+   *通っているが何も検査していない test* は、この repo の ADR 群が繰り返し名指ししている
+   失敗形そのものである。
+5. ~~canonical DAG-CBOR を壊す transform を Schema/codec roundtrip で拒否~~
+   **closed（2026-08-17、amu #624）**。
+
+   grammar は byte 列に閉じているので、**完璧に忠実に lower された transform が
+   canonical DAG-CBOR の書かない bytes を返せる**。値 `0x18 0x05` の encoding は
+   `42 18 05` で、`(bytes-slice value 1 3)` は `18 05` —— これは整数 5 として
+   **decode は綺麗に通る**。
+
+   ⚠ **これが閉じた穴を誤って主張しないこと。** `ipld.schema` は既にこの出力を
+   自前で `:adl-wasm-output-not-canonical` として拒否している。私は
+   `ipld.core/decode` を単体で測って（単体では確かに `18 05` を受理する）逆を推論し、
+   **mutation で初めて誤りに気づいた**。単体を測って系に一般化した典型例である。
+
+   **実際に開いていたのは別の 2 箇所**:
+   - **receipt。** 署名は capability の中で起きるので、この検査が無いと executor は
+     「この module がこの bytes を出した」と**署名してから**、後段が「それは node では
+     ない」と判断する。codec が拒否する bytes を receipt が保証してはならない。
+   - **`ipld.schema` 以外の consumer 全部。** capability は raw output bytes を返す
+     public entry point で、その下の engine 経路には codec 検査が**一切ない** ——
+     raw runner は今日でも truncated な `41` を `status:ok` で返す。
+
+   **schema 境界は ADL の ex-data を通さない** —— message を `:message` に入れ、自分の
+   `:problem` を報告する。したがって構造化 code の assertion は raise される層
+   （capability の test）に置き、harness は message で照合する。
+
+   **harness の reject mode は「何かが throw した」ではなく「capability 自身の理由」を
+   要求する。** これが弁別性の要 —— 検査を消しても schema が拒否するので、「throw した」
+   だけの assertion は通り続けてしまう。
+
+   六面の証拠: sema typing（変更不要）/ KIR 変更なし（これは capability 層の決定）/
+   wasm-tools validation（既存）/ 実 Wasmtime（非 canonical を返す実 module が end-to-end
+   で capability の理由により拒否される）/ 署名 receipt（**拒否された出力は attest され
+   ない**ことを test が固定）/ mutation（re-encode 比較を消すと unit 4 assertion が落ち、
+   harness の拒否者が schema 側に変わって「拒否者が違う」で落ちる）。
+
+完了証拠は sema typing、専用KIR admission、Wasm validation、real Wasmtime positive/negative、
+signed receipt、壊した実装が落ちる mutation test の六面。
+
+### P1 — spec conformance を幅で閉じる
+
+1. ~~Data Model 全kind、DAG-CBOR canonical/invalid corpus、Link/tag42 の相互運用 corpus~~
+   **closed（2026-08-17、io-ipld #25）**。`resources/ipld/dag-cbor-corpus.edn` に
+   canonical 19 行 / invalid 13 行、両方向 test 駆動で着地。
+
+   **corpus を書く前に測ったら、conforming reader が拒否すべき 3 つを受理していた:**
+
+   | bytes | 読まれ方 | canonical |
+   |---|---|---|
+   | `18 05` | 整数 5 | `05` |
+   | `a2 61 62 01 61 61 01` | map | key 順は `a` が先 |
+   | `a2 61 61 01 61 61 02` | last-wins | 重複 key は禁止 |
+
+   **この層では cosmetic ではない。** DAG-CBOR は canonical —— 任意の node に対し妥当な
+   encoding はちょうど 1 つ —— なので、これを受理すると**同じ値を表す 2 つの byte 列が
+   別々の CID を持つ**。content-addressed identity 層が唯一許せないことである。
+
+   **直し方は checklist ではなく identity。** 順序と重複の事実は `cbor/decode` が map を
+   返した時点で失われているので後から検査できない。よって decode は**往復が identity で
+   あること**を要求する —— 入力が、それが表す node に対して encoder が書いたはずの byte 列
+   そのものであること。3 つ同時に、かつ他の非 canonical encoding も捕まる。**それが
+   canonical の定義だから**であって、思いついた違反を列挙したのではない。代償は decode
+   あたり encode 1 回、canonical form が全仕事である層で払う。
+
+   **既存 78 test が strict decode 下で緑のままだった**ことが、この repo 自身のデータが
+   既に canonical だった証拠（`encode` が canonical を出す以上そうでなければならない）。
+
+   corpus は両方向 driven（canonical 行は encode が出すべき byte 列と decode の復元を、
+   invalid 行は拒否を固定）。**invalid 列が静かに空になるのを防ぐ guard test 付き** ——
+   negative を失った corpus は「何も test せずに緑」になる。identity 検査を外すと
+   **動機となった 3 行ちょうど**が落ちる。
+2. ~~Schema DSL の upstream grammar 対応表~~ **closed（2026-08-17、io-ipld #24）**。
+   `resources/ipld/schema-dsl-coverage.edn` に **test が駆動する表**として着地。
+
+   **測るのに 3 回かかり、その食い違いこそが表の存在理由である。** `dsl/parse` で測ると
+   `copy` を含め全 construct が「通る」、`compile-schema` で測ると 1 つを除いて通る、
+   `representation->logical!` に代表値を通して初めて本当の答えが出る。**parser や
+   test 数から読んだ coverage 主張は間違っていた。**
+
+   **結果は ADR の想定と違った。** coverage はほぼ完全で、struct / map / union / enum の
+   upstream representation はすべて round-trip し、`optional` / `nullable` / `implicit` /
+   `rename` も通る。**通らないのはちょうど 2 つ**で、code つきで名指しした:
+
+   | construct | 拒否される層 | code |
+   |---|---|---|
+   | `type A = copy B` | parse | `:unknown-record` |
+   | `unit representation empty` | compile | `:invalid-unit-representation` |
+
+   **表は書き置きではなく実行される。** `:round-trips` の行は decode できねばならず、
+   `:rejected` の行は**記録した code で**落ちねばならない（「何かが throw した」では駄目 ——
+   別の理由で落ちるようになったのは別の事実である）。無い support を主張すれば落ち、
+   probe の無い行を足せば落ち、行を消しても落ちる。**両方向を mutation で確認済み。**
+
+   ⚠ **表は著者自身を捕まえた。** 初稿は `advanced` を「schema が compile できた」ことを
+   根拠に round-trips と記録していたが、test が拒否した —— `advanced` は capability 無しに
+   round-trip できない。probe は in-process identity ADL を渡して測り直した。
+   **3 層を測れと自分で決めた直後に同じ誤りをやり、test に捕まった。**
+
+   **`:round-trips` が意味しないこと**もファイルに明記した: 代表値 1 個・片方向であって
+   **spec conformance ではない**。corpus へ広げるのは P1-1 / P1-3。
+3. ~~DMT/lens roundtrip、union ambiguity、recursive depth/node/byte budget の property test~~
+   **closed（2026-08-17、io-ipld #28）**。
+
+   **3 つのうち 2 つは既に健全だった。** lens は全 representation が round-trip する
+   （decode→encode で元の representation が戻る: struct map/tuple/stringjoin/stringpairs/
+   listpairs、map listpairs/stringpairs、union keyed/envelope/stringprefix、enum string/int、
+   field rename）。**lens にとってはこれが本質** —— 情報を落とす lens は片方向の test を
+   すべて通しながらデータを壊す。union ambiguity は **schema compile 時**に拒否される
+   （値がたまたま重なりに当たった時ではない —— 後者は fixture が別 member を選ぶ限り
+   すべての test をすり抜ける値依存バグである）。
+
+   **budget 側に穴があった。** `max-depth` / `max-nodes` は typed structure を正しく縛るが、
+   **`any` の branch は値を walk せず `true` を返していた** —— node 自身は課金され、その下は
+   一切課金されない。caller が `:max-depth 8` を渡して **10 万段ネストした値を受け取れた**
+   （実測。仮説ではない）。**効いた limit と、そもそも適用されなかった limit が区別できない。**
+
+   これは P1-5 の opt-in determinism、G1 の buffered read と**同型** ——
+   何かが壊れているのではなく、**誰にも分からないことが壊れている**。`any` は他の kind と
+   同じ accounting で children を walk するようにした（診断さえ合えば 1 行）。
+   戻すと `any` の budget assertion **ちょうど 2 件**が落ち、他は落ちない。
+
+   ⚠ **この suite は一度 exit 137 で落ちたが、それは load average 51 のマシンであって
+   変更ではない**（同じ tree が clean に通る）。**kill された run は fail した run ではなく、
+   どちらももう一方の証拠にならない。**
+4. ~~selector の残り、とくに `ExploreConditional` / `InterpretAs` の採否を決める~~
+   **closed（2026-08-17、io-ipld #26）**。`resources/ipld/selector-coverage.edn` に
+   10 kind の表と**決定**を pin。
+
+   **測ったら書くコードは無かった** —— `&` と `~` は既に
+   `unsupported selector union member` で名指し拒否されていた。**欠けていたのは理由**である。
+   「決めて入れなかった kind」と「誰も手を付けなかった kind」は外からは区別できず、
+   P1-4 はまさにその区別のために在る。
+
+   - **`ExploreConditional` — 不採用。** selector は**何を取るか**の宣言であって何が
+     match するかではない。条件付き探索は filtering であり、本 ADR §7 が「selector を
+     query engine と呼ぶ」を禁止近道に挙げている。filtering は class 別 serving plane が
+     持つ。**復帰条件**: serving plane で答えられず、かつ条件を requester ではなく
+     **responder 側**で評価する必要がある用途が出たとき。
+   - **`ExploreInterpretAs` — 現時点で不採用、gate 付き。** これは ADL-aware remote
+     traversal の運搬子で、そのコストは §4 が既に列挙している（意味運搬・extension budget・
+     resume token・重複 block 抑止・malicious responder negative）。**syntax だけ先に
+     受理すると、traversal が安全に解釈できない ADL を selector が名指しできてしまう** ——
+     本 ADR が禁じる「名前だけ実装済み」そのもの。**復帰条件**: その 5 つを揃えて、同時に。
+
+   **両方の決定に復帰条件を持たせ、test がそれを要求する** —— 復帰条件の無い決定は
+   時間が経つと「手を付け忘れ」に退化する。表は実行され、implemented は round-trip し、
+   not-adopted は拒否されねばならない。
+5. ~~ADL registration/name collision、unknown ADL、nondeterministic transform の negative corpus~~
+   **closed（2026-08-17、io-ipld #27）**。
+
+   ADL は representation と「CID が決定するはずの logical value」の間に立つ**未信頼の
+   guest code** である。5 例のうち **4 例は既に名指しで拒否されていた**: 未供給の ADL /
+   別名で供給された ADL（部分的な答えではなく答えでない）/ 重複宣言 /
+   determinism 検査 ON での非決定的 transform。
+
+   **5 例目だけが違った。** `:check-adl-determinism?` は opt-in（全 operation の 2 回実行を
+   要するため）で、**OFF だと非決定的 ADL が静かに受理される**。結果として caller から見て
+   **「検査していない」と「検査して問題なかった」が同じ**になる —— P1-1 の
+   「非 canonical が綺麗に decode される」と同型で、**何かが壊れているのではなく、
+   誰にも分からないことが壊れている。**
+
+   既定を ON にすれば全 caller に 2 倍実行を課すので、代わりに**結果がどちらの run かを
+   言う**ようにした: `:adl-determinism-checked?` を `representation->logical!` /
+   `logical->representation!` / `unify!` の結果に追加し、corpus が両方向を固定する。
+
+   ⚠ **この変更の最初の mutation は通ってしまい、その理由が重要である** ——
+   `representation->logical!` が**返さない** 2 箇所を編集していたので、検査は
+   「走って一致した」のではなく**走れなかった**。関数が実際に返す箇所を mutate すると
+   落ちる。**緑の mutation は証拠ではなく、mutation が着弾したかという問いである。**
+
+### P2 — retrieval interoperability
+
+1. ~~trustless path vector: path→block request→CID verification→missing/duplicate/wrong-codec
+   rejection~~ **closed（2026-08-17、io-ipld #30）**。
+
+   **4 つは既に正しかった**: path は値と、それが横切る root-first の block **ちょうど**を返す /
+   2 度到達する block は 1 度だけ証明に入る / 欠損 block は `:ipld/missing-block` /
+   **store が「その CID ではない bytes」を返したら `:ipld/cid-mismatch`**（これが path を
+   trustless にしている検査で、既に効いていた）。
+
+   **5 つ目は正しいが理由が間違っていた。** raw codec の CID への link は
+   `:ipld/cid-mismatch` として拒否されていた —— 検証が bytes に対して **dag-cbor** の CID を
+   再計算し、別の文字列になるから。**拒否は正しく、説明は正しくない**: store は本当のことを
+   言っており、**そのエラーを読んだ人は在りもしない破損を探しに行く**。
+
+   よって CID に「宣言している codec」を訊いてから hash を再計算するようにし、異codec は
+   codec 番号つきで `:ipld/unsupported-codec` として報告する（CIDv1 header の bounded
+   LEB128 読み。`mf/cid->bytes` が既に公開している）。**受理される block は 1 つも変わって
+   いない** —— 変わったのは「2 つの全く違う出来事のどちらが起きたか」をエラーが言うこと。
+2. GraphSync baseline interop を独立実装と実測。extension はまず resume/budget/ADL interpretation の
+   うち load-bearing なものだけ。
+   ⚠ **この環境のコードでは閉じられない**（2026-08-17 判定）—— 「独立実装と実測」は
+   独立した GraphSync peer を要する。gateway ADR の G5 と同型の外部条件待ちであり、
+   **実装しても「閉じた」と書かないこと**。
+3. ~~disconnect→checkpoint→resume が同じ root/result を返す soak。cursor state 自体も
+   content-addressed または署名付きで改ざんを拒否~~ **closed（2026-08-17、io-ipld #29）**。
+
+   **両半分を先に測った。resume は既に正しかった** —— 途中で checkpoint して resume した
+   結果は、通しで走らせた結果と一致する。**改ざん側は正しくなかった** ——
+   `restore-cursor` は envelope の shape と version しか見ておらず、**編集された checkpoint
+   はそのまま復元できた**。
+
+   **これは見た目より悪い。復元後の traversal は他のすべてについて律儀だからである。**
+   記録された root を差し替えると、以後読む block は**すべて CID 検証を通る —— 間違った
+   root に対して**。結果は自信を持って、完全な形で、**誰も頼んでいない graph について**
+   返ってくる。
+
+   checkpoint は「再開される作業」であり、**移動する** —— peer に渡り、storage に置かれ、
+   返ってくる。よって envelope は cursor state の **content address** を持ち、restore が
+   再計算する。root 差し替え・resource limit の緩和・match の捏造は**同じ 1 つの検査**で
+   拒否される（守るべき field を列挙するのではなく **state を address する**から）。
+
+   version は 2 へ。version 1 の checkpoint は digest 不一致ではなく**未知の version**と
+   して拒否する —— version field はそのために在る。**古い token には「古い」と言うべきで、
+   改ざんを探しに行かせるべきではない。**
+
+   ⚠ **test が自分を捕まえた。** 最初の「累積 match の書き換え」case は `:matches` を空に
+   していたが、work 1 単位の時点で既に空 —— **何も検査せずに通る no-op 編集**だった。
+   捏造は「足す」ものでなければならないので、**在りもしない match を足す**形に直した。
+4. ~~GraphSync 不在時に HTTP path が同じ結果を返す fallback parity~~
+   **closed（2026-08-17、io-ipld #31）**。
+
+   **字義どおりに読むと空虚である** —— GraphSync が存在しない間、「GraphSync 不在時に
+   HTTP path が同じ結果を返す」は自明に真。**荷重を負っているのは 1 層下だった。**
+
+   `ipld.graph` は自ら「GraphSync adapter と trustless HTTP/CAR gateway の共通 correctness
+   core」と名乗るが、**通り道が 2 本あり、コードを共有していない**:
+   `select-blocks` は `selector/select-graph` に委譲し、`advance-cursor` は**自前の task
+   loop** を回す。**1 つの traversal 意味論に対する 2 実装** —— CLAUDE.md が名指しする
+   「同じ判断を 2 実装が持ち片方だけ直る」形そのもの。
+
+   **今日は一致している**（matcher / explore-all 深さ 3 / link を跨ぐ named fields /
+   edge つき explore-recursive / union）。**だがそれを言うものが無く、一致しなくなっても
+   誰も気づかなかった。** よって matrix が「同じ値を同じ順で選ぶこと」と「証明に読む block
+   数が同じであること」の両方を固定し、matrix 自身が 1 個の自明な selector に縮んでも通って
+   しまわないよう guard を付けた。
+
+   cursor 上に作られた adapter と `select-blocks` 上に作られた gateway が同じ selector に
+   別の答えを返す —— それがこの test の防いでいる失敗である。
+
+### P3 — transport operational qualification
+
+1. current fleet binary の QUIC feature/identity/peer reach を実測。
+2. real browser→WebRTC→native の data channel、direct と TURN fallback の両方向。
+3. symmetric NAT / relay-only / relay failure / credential expiry / replay を試験。
+4. WebTransport は対応 browser + H3 server、WSS は edge/DO で必要になった時だけ追加。
+5. connect.edn 宣言と実 listener inventory が一致しない時は placement を fail-closed。
+   ⚠ **この項目は 3 つの部品を前提にするが、2 つが存在しない**（2026-08-17 実測）——
+   宣言（`connect.edn`）は在る、**observed listener inventory は無い**
+   （`murakumo.fleet.inventory` は tailscale 到達性を merge するだけで transport は見ない）、
+   よって比較器も無い。**永久に空の inventory に対して比較器を作れば「走れない検査」になる**
+   ので作らない。P3-1..4 と同じく **observed inventory の取得（実 fleet probe）待ち**。
+
+   **ただし測って隣接する実物が出た**（murakumo #313 で着地）。`eligible-nodes` は
+   labels / roles / reach で候補を絞るが、**reach は block せず degrade する** ——
+   connect 宣言が無ければ全 node が通る。degrade は意図的で test も
+   「degrades, never blocks」と書いており、**そこは変えていない**。
+
+   変えたのは **degrade が黙っていたこと**。「この node 群は browser-live を提供する」と
+   「誰も確認していない」が、呼び出し側にはどちらも同じ名前の list として返っていた。
+   `eligible-report` の `:reach-evaluated?` は、**reach が要求されて skip された時だけ
+   false** になる。`eligible-nodes` は名前を返し続ける。
+   **これは inventory が出来る前に真にできる半分**であり、出来た時の接続点でもある。
+
+### P4 — physical/query optimization
+
+1. CARv2 pack write gate を canary→read-after-write→fallback→promotion の順で production 化。
+2. pack catalog/chain の再構築、欠損pack、壊れたindex、range over/under-fetch の recovery drill。
+   **2026-08-17 着地**（`kotobase-storage-pack` b5b0ba3c、west pin 前進済み）。
+   drill は `test/kotobase/storage/pack_recovery_test.cljc`。**破る前に測ったら、
+   4 つのうち 4 つが黙っているか誤診していた。**
+
+   | 壊したもの | 実測（変更前） |
+   |---|---|
+   | 3 pack chain の中央を削除 | tip pack の 3 entry を返す = **健全な 1-pack store と同じ値** |
+   | tip を削除 | `[]` = budget 0 と同じ、空 store とも同じ（**4 状態 2 値**） |
+   | index 破壊 | throw。**既に回収した 2 pack を捨て、どの pack かも言わない** |
+   | object 切り詰め | frame を黙って省略、counter は全て健全 |
+   | store が Range を無視 | `car: unsupported CID version {:version 13217}` —— **store のバグを pack のせいにする** |
+
+   直したのは 3 点。①walk が**終わり方**を返す（`:chain-start` / `:missing-pack` /
+   `:unreadable-pack` / `:budget-exhausted` / `:cycle`）。理由を置く場所が無い
+   entries-only の `bootstrap-catalog!` は、本物の失敗 3 種で **throw する** ——
+   回収済み entry は ex-data に載るので、catalog と名乗るのを拒んでも何も失わない。
+   ②壊れた pack が walk 全体を道連れにしない。③**受け取らなかった byte は省略して
+   数える / 受け取った byte が間違っていれば throw** という線を引き、
+   `:evidence :degraded` を `:served` の隣に置いた（100 中 99 を返した read は
+   99-block の成功ではない —— その request count は何の測定でもない）。
+
+   **P4-2 が名指ししていない 2 件が drill から出た。** catalog が別 frame の offset を
+   指すと、その frame が**自分の CID で返って result に merge されていた**（要求した
+   CID は欠落、counter は健全）。もう 1 つは async driver —— nbb では `.then` 内の
+   `throw` を SCI が `:sci/error` で包み、shadow-cljs でビルドした Worker では
+   ex-info がそのまま reject される。**1 つの driver を共有する前提が、失敗値では
+   崩れていた**（`js/Promise.reject` に統一）。
+
+   ⚠ **test を先に書いて drill に否定された。** 「最初の block は run が offset 0 から
+   始まるので読める」と書いたが、CARv2 の data 領域は byte 51 から始まるので
+   **offset 0 の frame は存在しない**。検出器は確率的ではなく**全数**だった。
+   mutation は 6 本（各 check 1 本）、**6 本とも意図した drill test だけを落とした**。
+   R2 実測も併走させ、read-ahead window が全 pack の末尾を越えて要求する以上
+   偽陽性を出しうる range check が、実 binding で偽陽性を出さないことを確認した。
+3. Prolly tree `range-diff(old-root,new-root,lo,hi)` を CID equality で枝刈りし、変更leafだけ返す。
+   **2026-08-17 着地**（`prolly-tree` 3ab08bf5、west pin 前進済み）。`diff` は既に
+   CID 一致で枝刈りしていた。足したのは**鍵順が可能にするもう 1 つの枝刈り** ——
+   span が `[lo, hi)` に届かない subtree は、**変わっていても**読まない。2 つは独立で、
+   `:pruned {:by-cid n :by-range n}` は**別々に数える**（range 枝刈りを外した実装は
+   依然として正しく、返り値に関する assertion を全部通り、大半が変わった木では
+   依然として速く見える）。
+
+   実測（4,000 鍵・200 鍵変更・全 leaf が dirty）: `diff` は**何が欲しくても 40 block
+   読んで 200 件返す**。10 鍵の窓が欲しい呼び手は 40 読んで 199 件を捨てていた。窓は **5**。
+
+   ⚠ **mutation 6 本のうち 3 本が最初の回で生き残った。3 本とも同じ欠陥** ——
+   suite が span 演算を**境界で**試していなかった:
+
+   - `upper` と `lo` の比較を `>=` から `>` に —— **chunk 境界ごとに鍵を 1 個落とす**。
+     **擬似乱数の窓 60 本が 1 度も捕まえなかった**（`lo` が 16 境界のどれかに
+     ぴったり乗ることは、乱択では起きない）。境界は木から導出して窓を置く形に直した。
+   - `lower` と `hi` の比較を `<` から `<=` に —— 届かない subtree を残す。
+     **これは cost のバグで、返り値に関する assertion では原理的に見えない**。
+     block 数の**厳密値**（境界ちょうどで 4、1 文字先で 6）で捕まえる。
+   - 最終 child を自分の max-key で bound する。**この test は 1,000 鍵の `build-tree`
+     を使っていた —— 私はその日すでに「1,000 鍵は単一 leaf」と測っていた**のに、
+     span コードに到達しない fixture で書いた。しかも通常 API では**原理的に試せない**
+     （`insert` は `build-tree` と byte-identical なので最終 max-key は常に最大鍵）。
+     max-key を過少申告した node を手で組む形に直し、**「通常の test が覆っている」と
+     読めないよう source に明記**した。
+
+   **6 本とも、意図した test だけを落とすようになった。**
+
+   ⚠ **README に書いた 2 つの数字が両方とも間違っていた。** `:blocks-read 4` /
+   `:by-range 16` を、**その呼び出しを実行しないまま測定の体裁で**書いた。実際は
+   **5 と 26**。4 の根拠（root 対 + leaf 対 1 組）は**両木が同じ形だと仮定**していたが、
+   200 個の値を変えると leaf の CID が変わり、**この木の内部境界は child の CID で
+   hash される**ので上の fanout も変わり、children は 1 対 1 に整列しない。
+   **今はどちらも印字値で、docs にどちらの種類の数字かを書いた。**
+4. `kotobase-peer` / `IRangeSource` へ配線し、全hydrateとの差を visited nodes/bytes で測る。
+   **2026-08-17 着地**（`arrangement` 3c5b9c89、west pin 前進済み）。
+
+   ⚠ **まず「未配線だ」と結論しかけた。原因は stale checkout。** 手元の
+   `arrangement` が origin/main より **5 commit 遅れ**ており、配線はその 5 commit
+   （`agent/value-range-scan`、2026-08-14）に入っていた。**west pin は最新だった** ——
+   遅れていたのは checkout だけ。ADR-2608136800 が言う 3 つの別物そのもので、
+   **結論の前に origin/main を読んだから捕まえた**。
+   なお **item が名指しする `kotobase-peer` は 2026-08-04 に feature-frozen**
+   （extraction による retire 中）。配線の実体は `arrangement` の 2 source にある。
+
+   **欠けていたのは配線ではなく測定。** 既存の block 数 test は *pattern* scan を
+   測っており、range ではなく、しかも **block しか数えていなかった**。
+
+   実測（`score` が 21,000 quad 中 1,000）:
+
+   | 経路 | blocks | bytes | 返した quad |
+   |---|---|---|---|
+   | full hydrate | 90 | 4,279,111 | — |
+   | range 窓 10 件 | 11 | 248,177 | 10 |
+   | range 無制限 | **11** | **248,177** | 1,000 |
+
+   **attribute の切断は本物**（block 8 倍・byte 17 倍）。**value の切断は厳密にゼロ** ——
+   10 件と 1,000 件が **byte 単位で同じ**。blinded leaf key は HMAC で順序を保たないので
+   区間を key で刈れない（`CursorSource/-scan-range` の comment が既にそう書いていた。
+   **今回それを数字にした**）。**これは P4-5 が変えようとしている前提そのもの。**
+
+   **退化ケースも固定した**（要約が落とす方）: 全 quad が同一 attribute だと切る先が無く、
+   **range scan は DB 全体を hydrate するより高い**（103 blocks vs 96）。
+   「cursor は hydrate より安い」は片方の形で真、もう片方で偽 ——
+   **どちらの形かを言わない主張は主張ではない**。⚠ この測定の初稿は単一 attribute の
+   corpus を使っており、「value が刈れない」と「この corpus では全 scan が full scan」を
+   **分離できていなかった**。
+
+   **block の隣に bytes を足した。** 90 block を 11 block で答えた store は
+   *どれだけ動かしたか*を言っていない。round trip **と** 転送量の両方が cost model の
+   面（ADR-2608160100）では、bytes の無い block 数は半分の主張。
+
+   ⚠ **自分の tripwire 主張を弱めた。** 「P4-5 が着地した日に落ちる」と書いたが、
+   mutation が示したのは **narrow と whole が乖離したとき落ちる**ことで、乖離させた
+   mutation は correctness も壊していた。**本物の改善は返り値を 1 件も変えずに cost
+   だけ下げる**ので、その simulation には**存在しない pruning が要る** ——
+   memoize した get-fn での試行は **11 block のまま何も変えなかった**（＝no-op mutation、
+   このセッションで 2 度目）。ただしその失敗が実測を 1 つ残した:
+   **1 回の scan 内で cursor は同じ block を 2 度読まない。**
+5. encrypted/blinded index は equality と range を別indexにし、漏洩budgetを明示する。
+   **2026-08-17 着地**（`arrangement` 37cd9c1a、west pin 前進済み。
+   `arrangement.range-index` + `commit!` の 7 引数 arity + `scan-range-report`）。
+
+   **P4-4 が測った問題**: blinded leaf key は決定的 MAC で順序を保たないので、
+   10 件返す range と 1,000 件返す range が **byte 単位で同じ** 11 blocks /
+   248,177 bytes。同じ corpus・同じ query に **partition を宣言した後**:
+
+   | | blocks | bytes |
+   |---|---|---|
+   | partition 無し・窓 10 件 | 11 | 248,177 |
+   | partition 無し・全件 | 11 | 248,177 |
+   | **partition 有り・窓 10 件** | **3** | **96,145** |
+   | partition 有り・全件 | 5 | 212,788 |
+
+   **窓が全件より厳密に安くなり、pruned と unpruned の答えが完全一致する。**
+   行を落として安くなった cut は cut ではなく、**小さい答えの中に「本当はもっと
+   大きいはず」と言うものは何も無い** —— この oracle が要の assertion。
+
+   **何を漏らすか**（item の後半、機構がこの形である理由）: attribute の値域を
+   **宣言された** boundary で分割し、**bucket 序数だけを leaf key に平文で**書く。
+   他の component は blinded のまま。観測者が新たに知るのは
+   **その attribute の全値の bucket**（1 値あたり最大 log2(b) bit + leaf を数えれば
+   **正確な histogram**）と **bucket 間の順序**。**値そのもの・bucket 内の順序・
+   宣言されていない attribute については何も**知らない。equality 漏洩は不変
+   （元から在る。`blind` の README が値スロットについて同じ cost を書いている）。
+
+   **`budget-bits` は必須かつ検査される field。** boundary 100 個で「2 bit」と
+   宣言すれば **拒否**され、error が実際の数を言う。**prose にしか無い budget は
+   誰も間違えられない budget** で、ここで効くのは間違えられることの方。
+   **過大申告も拒否する** —— 対称性の礼儀ではなく、実際より多く漏らすと主張する
+   partition は**緩すぎる threat model に対して評価され**、次に広げる人が
+   「その主張は既に自分を覆っている」と読むから。**検証は write path で走る**ので、
+   未申告 budget は block に到達できない。
+
+   **データから boundary を導出する関数は意図的に存在しない**（test が「無いこと」を
+   検査する）。corpus から cut 点を選ぶと **corpus の分布が平文 parameter として
+   公開される** —— budget した開示より厳密に大きく、しかも**静かに**起こる
+   （結果は「よく調律された index」に見える）。boundary は attribute の**宣言された
+   値域**から来る。**強制は「関数が無いこと」で、それは無いままである限りだけ強制**。
+
+   **`scan-range-report` は P4-4 の教訓の実装**: quad と一緒に `:pruned?` /
+   bucket span / `:budget-bits` を返す。**それ以前は cut と scan を呼び手が
+   区別できなかった** —— query は選択的に見え、cost はそうではなく、
+   どちらかを言うものが無かった。**その区別を持たない range 面は、構造上この ADR が
+   繰り返し見つけている失敗そのもの。**
+
+   **partition 無しの commit は 6 引数版と byte 単位で同一の snapshot** を作る
+   （assert 済み）。整頓の話ではない: `kotobase-peer/fold!` は**同一 state が同一 CID**
+   を出すことに依存して並行 fold を収束させており、これは `blind` の決定的 nonce が
+   守っている性質と同じ。**黙って全 snapshot に range index が現れれば壊れていた。**
+
+   mutation 5 本、すべて意図した test に着弾。名指しに値するのは
+   **`key-bounds` の上界が `to+1` でなく `to`** —— **最終 bucket 全体を落とす**、
+   P4-3 で擬似乱数の窓 60 本を生き延びたのと同型の off-by-one。
+   **今回は列挙した境界 test と oracle の両方が捕まえた。**
+   budget 検査を外すと **budget の test だけ**が落ちる —— これが budget を
+   「correctness の副産物」ではなく**独立した gate** にしている。
+
+### P5 — distributed history と execution backend parity
+
+1. causal DAG merge/conflict semantics、actor authority、revocation、receipt parent chain の横断test。
+   **2026-08-18 着地**（`chain` b2ba6c7f、west pin 前進済み。`chain.authorized`）。
+
+   **4 つは個別には健全で、だから join が誰にも捕まらなかった。** `chain` は
+   `authority` と `actor` を**記録するが検査しない**と comment で明言し、
+   `revoked?`/`expires-at` を持つ grant の形は**別 org の repo**（gftdcojp/
+   net-kotobase-git の `authority_basis`）に在る。**書かれる前に revoke された
+   authority を名乗る commit が、stack の全検査を通過できた。**
+
+   `chain.authorized` も validity を**決めない** —— `resolve-grant` は注入で、
+   **訊く**。足したのは「誰かが訊く」こと自体。
+
+   **既定値を持たない宣言が 2 つ**（他の no-silent-default と同じ理由）:
+
+   - **`:as-of`** —— **Lamport clock は順序であって時刻ではなく**、grant は
+     wall-clock で失効する。**この 2 つは変換できない**。誤魔化すのがここでの
+     面白い失敗なので、**instant は caller が名乗り、verdict がそれを返す**。
+     suite は**同じ commit・同じ grant・違う `:as-of`** が逆の答えを出すことを示す。
+   - **`:revocation`** = `:retroactive`（その鍵は最初から信頼できなかった＝
+     compromise の意味）か `:prospective`（履歴は「その時何が許されたか」の記録＝
+     receipt の意味）。**一般に正しい方は無い。だから既定値が無い。**
+
+   **merge は洗浄しない**: 到達可能な commit が 1 つでも落ちれば `:ok?` は false。
+   authorized な枝に unauthorized な枝を merge した履歴は unauthorized になる。
+   **merge commit 自身の authority が覆うのは merge であって、引き込んだもの全部ではない。**
+   逆の規則は「正当なものに merge する」を**何でも祝福する手段**にする ——
+   そして**誰も書かなければ読み手はそちらを仮定する**。
+
+   ⚠ **P5-1 の test が `walk-causal` の欠陥を見つけた。形はこの ADR の pattern の反転。**
+   `verify-causal` は固有の診断を文書化していた（「存在しない親を引用することは、
+   何も無いのに provenance に読める」）し、**その検査は正しかった**。しかし
+   `walk-causal` が欠損 CID を先に decode して throw し、`verify-causal` が
+   `:reason :threw` で捕まえていた。**固有の診断は到達不能だった** ——
+   block を失った store の operator は、walk のどこで起きた予期せぬ例外とも
+   区別できない汎用値を受け取っていた。**「走れなかった検査が合格と同じ値を返す」
+   ではなく「固有の診断が汎用に潰れる」** —— 失うのは行動に必要な情報で、同じ。
+   store が出せない親は decode せず**skip**するようにし、引用元が**名指しで**
+   missing-parent に落ちるようにした。**test を `:threw` 期待に書き換えることも
+   できた** —— それは docstring が「無い」と言っている欠陥を隠すことだった。
+
+   **拒否されて分かったことが 2 つ。** `commit!` は引用する親を全て fetch + CID 検証
+   するので、**この API 経由では不正な履歴を書けない**。`authority` は型付き IPLD link
+   なので**でっち上げの識別子も入らない**。つまりこの検証が対象にするのは
+   **書き込みの後に来る破損**か**他所から来た履歴**で、これは `arrangement` と
+   `kotobase-storage-pack` が既に名指ししている threat model と同じ
+   （「bytes は engine が信頼しない store から来た」）。suite の orphan は
+   だから**親を削除して**作り、grant は実際に content-addressed にした。
+
+   mutation 6 本、すべて意図した test に着弾（`walk-causal` の修正を含む ——
+   次にその `try` を「整理」する人が、到達不能な診断を静かに復活させられない）。
+2. Wasm/Substrait/Pregel/Actor 各backendで同じ checked KIR/effect envelope を再検証。
+3. backend間 result parity を適用可能なpure subsetで測り、backend固有非決定性をreceiptへ記録。
+4. transport断、重複配送、順序逆転、再実行に対する idempotency / exactly-onceを混同しない。
+   **2026-08-18 着地**（`kototama` 238e4af9、west pin 前進済み。
+   `kototama.delivery-semantics-test`）。`linear-journal` は既に prose で核心を
+   書いていた（**content addressing は idempotence ではない。CID は 2 度目の実行を
+   止めない**）が、**delivery の次元が測られていなかった**。4 つのうち 1 つは**否定的結果**。
+
+   | 性質 | 提供されるか |
+   |---|---|
+   | idempotent **storage**（同一 entry → 同一 CID、canonical） | ✅ ただし**何も止めない** |
+   | **at-most-N**（budget、restart を跨いで durable） | ✅ |
+   | **at-most-once**（claim 単位） | ✅ |
+   | **at-least-once** | ❌ 提供しない（**test として記録**、仮定にしない） |
+   | **exactly-once** | ❌ **入手不能。ただしその穴は可視** |
+
+   **混同を実演した**: `claim!` は `(lease-id, import)` で数えるだけで、
+   **entry のどこにも「どの配送か」が無い**。だから「うちの書き込みは
+   content-addressed だから重複配送は no-op」と考える呼び手は、**block store に
+   ついては正しく、authority については間違っている** —— 1 リクエストの 2 度目の
+   配送は重複レコードではなく**次の ordinal** で、budget をもう 1 単位使う。
+   test は「1 レコードが 2 度書かれた」ではなく**2 つの異なる ordinal** を assert する。
+
+   **exactly-once が届かない理由は構造的**（未実装ではない）: claim は provider 実行の
+   **前に** fsync される。だから応答を失うと **authority は使われ、結果は誰も知らない**。
+   `unreceipted` がそれを映す —— **静かにではなく可視に**。そして
+   **後続の成功配送が先行分を遡って説明しない**ことも assert した。
+
+   **at-least-once を「提供しない」と test に書いた**（仮定にしない）。2 つの保証は
+   逆方向に引く: at-least-once が欲しければ retry するしかなく、**retry こそが
+   上で budget を使う操作**。この journal は意図して片方を選んでいる。
+
+   **順序逆転は「効く向き」で test した**: 存在しない ordinal への receipt は
+   **誰も使っていない authority の記録**になるので拒否。順不同で届いた receipt は
+   正しい claim に付く。loss/duplication/reordering が混ざった履歴も **chain として
+   検証を通る** —— **これらは破損ではなく**、破損と呼ぶ checker は実 journal で無用。
+
+   **2 条件 2 形状**（test が見つけた）: 不完全な receipt は **throw**（呼び手のバグ）、
+   存在しない claim への receipt は **nil**（race）。P5-1 の `walk-causal` 修正と同じ原則。
+
+   ⚠ **mutation 5 本のうち `unreceipted` の 1 本が最初 SKIP した**（pattern 不一致）。
+   **harness が pass ではなく SKIP と言った** —— **着弾しなかった mutation が、
+   生き延びた mutation のふりをせずに自己申告した**。正しく当て直すと**6 test が落ちる**
+   （両方の否定的結果を含む）。`unreceipted` が黙って空を返せるなら、
+   **この file が引いた区別ごと「問題なし」に潰れる**。
+
+## 6. 成熟度 100% の定義
+
+100% は「仕様名が repo にある」「green suite」「一度HTTP 200」ではない。次を全て満たす状態とする。
+
+| gate | 100% 条件 |
+|---|---|
+| semantic | 対応する Data Model/codec/Schema/selector/ADL matrix が明記され、unknownはfail-closed |
+| safety | capability/effect/resource admission、forbidden import、revocation/expiry、negative corpus |
+| determinism | canonical bytes/CID、同一入力同一出力、nondeterminismは明示receipt |
+| storage | blockとCARv2双方のrebuild/recovery、実object store range、production write/read canary |
+| retrieval | HTTP fallback parity + 選択したGraphSync interop + resume/attack tests |
+| naming | IPNS publish/resolve/expiry/replay/pubsub/DHT、name-key binding、複数router実測 |
+| transport | native/browser/edge の宣言した全経路、direct/relay/NAT failure、live fleet inventory |
+| query | class別計算量のcounter evidence、full hydrateへ静かにfallbackしない |
+| execution | real engine、signed measured receipt、backend parity、fresh install/fleet execution |
+| operations | murakumo fleet gate、release/pin/genpon closure、rollback、soak、default-branch再検証 |
+
+各行に current main SHA、再現コマンド、positive/negative、測定日時、production/local の区別が要る。
+一行でも未証明なら全体は100%ではなく、その行の成熟度を報告する。
+
+## 7. 禁止する近道
+
+- IPLD Schema/ADL/GraphSync を query engine と呼ぶ。
+- CARv2 index を ordered range index と呼ぶ。
+- IPNS/PubSub を暗号化、CAS、consensus、durable history と呼ぶ。
+- capability confinement を Rust ownership/memory safety と呼ぶ。
+- WebRTC/WebTransport のコード存在を live NAT traversal 証拠と呼ぶ。
+- identity transform だけで arbitrary ADL compiler 完成と呼ぶ。
+- local green を production/fleet/fresh-install/interop の証明へ昇格する。
+
+## 8. 着地と再開点
+
+root pin は `amu c38f79d2c1af...`（west commit `1069d90b...`）、
+`kotoba-sema f4de940e403c...`（west commit `91650f61...`）。genpon は ledger event
+11472 で reconcile 済みで、`kagami reconcile --check` は clean。
+
+**P0 は 5 項目すべてが 2026-08-17 に着地した**（P0-1 `bytes-at` / P0-2 `bytes-slice` /
+P0-3 `bytes-concat` / P0-4 closed expression grammar / P0-5 canonical codec refusal）。
+**P0 / P1 は全項目、P2 は P2-1 / P2-3 / P2-4 が 2026-08-17 に着地した。**
+**P2-2 だけが残り、それは外部条件待ち**（独立した GraphSync peer）。
+
+**着手できる item は無い**（**P5-1 / P5-4 とも 2026-08-18 着地**）
+（**P4-2 / P4-3 / P4-4 / P4-5 は 2026-08-17 着地。P4 で残るのは P4-1 のみで、
+それは production canary 待ち**）。
+**P3 は 5 項目すべてが外部条件待ち**（P3-1..4 は実 fleet binary / 実ブラウザ / 実 NAT /
+H3 server、**P3-5 は observed listener inventory** —— 上記）。**P4-1・P5-2・P5-3** も
+外部条件待ち（production canary / 未実装 backend）。
+
+P4-5 で確定した、以降に持ち込むこと:
+
+- **budget は checked argument にする。** prose の budget は誰も間違えられない ——
+  つまり誰も検査できない。**数を引数にして、機構が導出できる値と突き合わせる。**
+- **危険な便利関数は「書かない」ことで強制する。** データから boundary を導出する
+  関数は静かに開示を広げる。**無いものは誤って呼べない**（ただし無いままである限り。
+  test で「無いこと」を検査する）。
+- **既定の挙動を 1 byte も変えないことを assert する。** 新機能が opt-in であることは、
+  **opt-out していない経路の出力が同一である**ことを測って初めて主張になる。
+- **cost の主張には「刈ったか」を同梱する。** 返り値だけでは cut と scan が同じ顔をする。
+
+P4-4 で確定した、以降に持ち込むこと:
+
+- ⚠ **「無い」と言う前に origin/main を読む —— repo だけでなく checkout にも当たる。**
+  今回 pin は最新で checkout だけが 5 commit 遅れており、**その差分に答えが入っていた**。
+- **item が名指しする repo が凍結されていることがある。** 名前ではなく**実体がどこにあるか**を
+  measure してから書く。
+- **測定は 2 つの形で取る。** 片方の corpus 形状では結論が逆に出る（range が hydrate より
+  高い）。**1 つの形しか測っていない測定は、どちらの効果を見ているか分離できていない。**
+- **block を数えるなら bytes も数える。** 逆も同じ。
+
+P4-3 で確定した、以降に持ち込むこと:
+
+- **乱択は境界を見つけない。** 60 本の擬似乱数窓が、鍵を落とす本物のバグを 1 度も
+  捕まえなかった。**境界は列挙する** —— しかも**対象自身から導出する**
+  （content hash で決まる境界を literal で書けば、encoding が変わった日から
+  test は通り続けたまま何も試さなくなる）。
+- **cost のバグは返り値に映らない。** 「正しいが 1 block 余計に読む」変異は、
+  返り値に関する assertion を全部通る。**厳密値の counter でしか捕まらない。**
+- ⚠ **自分が測った事実を、次の test で使い損ねる。** 「1,000 鍵は単一 leaf」を
+  その日に印字しておきながら、1,000 鍵の fixture で span の test を書いた。
+  **測定は、参照されなければ持っていないのと同じ。**
+- ⚠ **docs に予測値を測定の体裁で書いた**（2 つとも外れた）。**印字してから書く。
+  書いたあとで印字するなら、印字値で置き換える。**
+
+P4-2 で確定した、以降に持ち込むこと:
+
+- **drill は「直す前に走らせる」。** 4 つの失敗のうち事前に予想できていたのは 1 つで、
+  残り 3 つは走らせて初めて出た（うち 2 つは P4-2 の文面が名指ししていない）。
+  **「たぶんこうなる」で直すと、直したものと壊れているものが一致しない。**
+- **自分が test に書いた説明が間違っていることがある。** 「offset 0 から始まるので
+  読める」は drill に即否定された。**test の日本語は assertion ではない** ——
+  走らせるまでは仮説。
+- **runtime をまたぐ driver は、成功値だけでなく失敗値も同じか確かめる。**
+  nbb と shadow-cljs で例外の形が違い、それが見えたのは drill が `:type` で
+  照合したから。**成功経路の parity test はこれを一度も見ていなかった。**
+
+P2 で確定した、以降に持ち込むこと:
+
+- **item を字義どおり読むと空虚なことがある。** P2-4 は字義では自明に真で、荷重は 1 層下の
+  「2 実装が一致しているか」に在った。**「この item は何を防ぐのか」を先に言い直す。**
+- **同じ意味論の 2 実装は、一致している間も gap である。** 一致は事実であって保証ではない。
+- **正しい拒否でも理由が間違っていることがある**（P2-1 の codec）。受理/拒否だけを見て
+  「正しい」と結論しない —— **エラーを読む人が次に何をするか**まで見る。
+
+⚠ **P2 以降は P0/P1 と性質が違い、大半がこの環境のコードでは閉じられない。**
+P2-2 は独立実装との GraphSync interop 実測、P3 は実ブラウザ・実 NAT・live fleet、
+P4-1 は production canary、P5 は複数 backend を要する。**着手前に「これは実測で閉じるのか、
+外部条件待ちか」を先に判定すること** —— gateway ADR の G5/G6/G7 で同じ判定を既に行い、
+「コード側の債務は尽きた」と記録した先例がある。
+
+P0 全体を通して確定した、P1 に持ち込むべきこと:
+
+- **⚠ 単体を測って系に一般化しない。** P0-5 でこれをやり（`ipld.core/decode` が `18 05` を
+  受理するのを見て系が受理すると推論したが `ipld.schema` は拒否していた）、**P1-2 でも
+  形を変えて再発した** —— `dsl/parse` を測って coverage を結論しかけ、さらに `advanced` を
+  「compile できた」から round-trips と記録した。**2 回とも mutation / test が捕まえた。**
+  P1 の残りでも同じ形が出ると想定して、**どの層で測ったかを主張の中に書く**こと
+  （P1-2 の表は `:measured-through` を持つ）。
+- **P1-1 / P1-2 で分かった実務的な事実、ただし互いに逆向き**: Schema DSL の coverage は
+  想定に反してほぼ完全だった（未対応は 2 つ）。一方 DAG-CBOR canonical 強制には**本物の穴が
+  3 つ**あった。**どちらも「測ってから書いた」から分かったのであって、事前の見立ては両方
+  外れていた。** P1-3 / P1-4 / P1-5 も同じ順序でやること —— 「たぶん未実装」でも
+  「たぶん大丈夫」でも始めない。
+- **corpus / 表には必ず『空にならない』guard を付ける。** negative を失った corpus は
+  何も検査せずに緑になる。P1-1 は invalid 行数の下限を、P1-2 は unsupported 列が空でない
+  ことを、P1-4 は not-adopted 行が理由と復帰条件を持つことを test で固定した。
+- **P1 全体の結果: 5 項目のうち実装の変更を要したのは 3 つ**（P1-1 の canonical 強制、
+  P1-3 の `any` budget、P1-5 の determinism 可視化）**で、2 つは記録だけだった**
+  （P1-2 の coverage 表、P1-4 の selector 決定）。**どれも測る前には判別できなかった。**
+- **gap には少なくとも 4 つの形がある**（今日 1 日で全部出た）:
+  ①未実装（P0-1..4）②実装が間違っている（P1-1 の非 canonical 受理）
+  ③**実装は正しく記録だけが無い**（P1-4 の selector 決定）
+  ④**検査が opt-in で、未検査と合格が区別できない**（P1-5 の determinism、
+  G1 の buffered path も同型）。**「gap = 未実装」と決めてかからない。**
+- ⚠ **緑の mutation は証拠ではない。** P1-5 で最初の mutation が通り、理由は
+  「対象関数が返さない箇所を編集していた」＝**走れなかった**からだった。
+  mutation が緑なら、まず**着弾したか**を疑うこと。
+- **mutation は両方向必要で、方向は項目ごとに違う。** P0-1..4 は「正しい出力を壊す」、
+  P0-5 は「壊れた出力を通す」だった。**assertion が「何かが起きた」ではなく
+  「誰が/何が起きた」を見ているかを確かめること** —— P0-5 の harness は検査を消しても
+  別の層が拒否するので、「throw した」だけでは通り続けた。
+- **層をまたぐと構造化エラーは平坦化される。** schema 境界は ADL の ex-data を落として
+  `:message` + 自分の `:problem` にする。構造化 assertion は raise される層に置く。
+
+**この ADR は現状を100%と宣言しない。100%へ進むため、何が correctness、何が代替transport、
+何がextension、何がoptimizationかを固定する正本である。**"}]

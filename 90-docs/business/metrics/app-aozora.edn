@@ -1,0 +1,41 @@
+{:engagement
+ {:dau nil,
+  :active-authors-window {:window 200, :distinct-authors 1},
+  :posts 6,
+  :human {:posts 6, :engagement 0},
+  :organism {:posts 0, :engagement 0},
+  :organism-engagement-ratio nil},
+ :health-status 200,
+ :zone-name "aozora.app",
+ :workers-invocations-7d
+ {"app-aozora-pds" 13489,
+  "app-aozora-appview" 11341,
+  "app-aozora-spa" 11849},
+ :zone
+ {:requests-7d 236745,
+  :pageviews-7d 11723,
+  :uniques-7d-sum 974,
+  :zone "aozora.app"},
+ :sources [:cloudflare :health :emitter],
+ :paths
+ {:ok
+  [{:path "/__cache/relay-repos-index-v1", :requests 170144}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4348}
+   {:path
+    "/bafyreicy2go3fqwsoh7zup3asioqghz3qykjuednggzcmpaacu7fpao2sm",
+    :requests 255}
+   {:path
+    "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
+    :requests 185}
+   {:path "/erp/config.env", :requests 60}
+   {:path "/cache/.env", :requests 60}
+   {:path "/beta/linusadmin-phpinfo.php", :requests 60}
+   {:path "/admin/phpinfo", :requests 60}],
+  :status-mix {:ok 177317, :client-error 510, :server-error 22640},
+  :window "24h"},
+ :as-of "2026-08-20",
+ :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 11},
+ :top-paths
+ "上位 page (24h, 2xx/3xx): /__cache/relay-repos-index-v1 170144 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4348 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 255 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 185 · /erp/config.env 60 | 4xx(probe) 0% · 5xx 11%",
+ :signal
+ "aozora.app 実測 236745 req/7d・974 uniques(日次和)・うち4xx probe 0%(24h)、workers 36679 inv/7d"}

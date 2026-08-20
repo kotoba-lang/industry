@@ -1,0 +1,26 @@
+{:id "isic-9601"
+ :title "クリーニング営み"
+ :author "cloud-itonami"
+ :source "https://github.com/cloud-itonami/cloud-itonami-isic-9601"
+ :tags ["itonami" "idle" "tycoon" "governed-actor" "isic-9601" "laundry"]
+ :runtime :kami-clj
+ :files ["src/itonami/isic_9601/logic.cljc"]
+ :license "AGPL-3.0-or-later"
+
+ ;; ------------------------------------------------------------------------
+ ;; Everything below this line is NOT part of the network-isekai `game.edn`
+ ;; schema (which is exactly the eight keys above, per ADR-2607091830). It is
+ ;; carried here so the staged copy is self-describing until the port lands,
+ ;; and should be dropped -- not invented into the schema -- when this moves
+ ;; into `network-awai/network-isekai:public/games/itonami/isic-9601/`.
+ ;; ------------------------------------------------------------------------
+ :staging
+ {:canonical-home "network-awai/network-isekai:public/games/itonami/isic-9601/"
+  :status :prototype
+  :missing ["scene.edn -- the sprite/scene description, which cannot be
+             authored until the eight existing itonami games can be read for
+             their actual schema (network-isekai is private and was not in
+             this session's repository scope)"]
+  :adr "90-docs/adr/2608100000-cloud-itonami-isic-9601-laundry-idle-tycoon.edn"
+  :verified {:unit "63 checks, nbb, test/logic_test.cljs"
+             :browser "7 checks, headless Chromium, preview/smoke.cljs"}}}

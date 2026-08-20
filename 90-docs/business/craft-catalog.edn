@@ -1,0 +1,31 @@
+;; craft-catalog.edn — craft engine index (hand-maintained catalog, not generated)
+{:catalog/version 3
+ :catalog/as-of "2026-08-09"
+ :catalog/crafts
+ [{:craft/id "shirohan"
+   :craft/path "orgs/cloud-itonami/shirohan"
+   :craft/domain :garment/prepress
+   :craft/api [:plan :films :preview :findings]
+   :craft/wired-to ["cloud-itonami-isic-1313"]
+   :craft/intended-isic ["1313"]
+   :craft/surface "https://itonami.cloud/cloud-itonami/shirohan/"
+   :craft/status :live}
+  {:craft/id "inkan"
+   :craft/path "orgs/cloud-itonami/inkan"
+   :craft/domain :seal/composition
+   :craft/api [:seal :layout]
+   :craft/wired-to ["cloud-itonami-isic-6910"]
+   :craft/intended-isic ["6910" "8219"]
+   :craft/surface "https://itonami.cloud/cloud-itonami/inkan/"
+   :craft/status :live}
+  {:craft/id "seihan"
+   :craft/path "orgs/cloud-itonami/seihan"
+   :craft/domain :print/prepress-paper
+   :craft/api [:plan :findings]
+   :craft/wired-to ["cloud-itonami-isic-1811" "cloud-itonami-isic-1812"]
+   :craft/intended-isic ["1811" "1812"]
+   :craft/surface nil
+   :craft/status :live
+   :craft/repo "https://github.com/cloud-itonami/seihan"
+   :craft/sha "b022bd26c398e148187bd0ba8f9944b65afa081f"
+   :craft/boundary "Paper commercial prepress; NOT garment underbase (that is shirohan)."}]}

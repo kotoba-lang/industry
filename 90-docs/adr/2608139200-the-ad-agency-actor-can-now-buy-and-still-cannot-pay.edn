@@ -1,0 +1,144 @@
+[{:db/id -1
+  :adr/id "ADR-2608139200"
+  :adr/title "広告代理店 actor は買えるようになったが、まだ支払えない — 出稿面の拡張と actuation seam"
+  :adr/status "accepted"
+  :adr/date "2026-08-13"
+  :adr/repo "orgs/cloud-itonami/cloud-itonami-isic-7310"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body
+  "## Context
+
+オーナーの問い（2026-08-13）は 3 段だった: (1) cloud-itonami に広告出稿を代理店
+として行う repo はあるか / x402 支払いの仕組みは (2) その成熟度を上げよ
+(3) google ads・X・LINE・Telegram・YouTube・Instagram、対応 adnetwork は
+→ 設計実装 → 実課金まで進めよ。
+
+現在地の回答（実測）:
+
+- 代理店 actor は `cloud-itonami/cloud-itonami-isic-7310`（ISIC Rev.5 7310）。
+  `blueprint.edn` は `:implemented`。
+- x402 受領は `network-awai/nexus-x402`（live、x402.nexus）+ `kotoba-lang/pay`
+  + `treasury` + `x402-directory`。接点は `cloud-itonami/adserver` の
+  `POST /topup`（広告主が USDC 前払いでキャンペーン予算をチャージ）。
+- **『対応している adnetwork』は実質ゼロだった。** 在ったのは ①4 媒体分の
+  ポリシー台帳（実行未配線）②オーガニック投稿用 API クライアント群
+  （com-x / com-youtube / com-instagram / com-line-messaging / com-telegram-api
+  — いずれも広告枠の買付ではない）③自前 first-party 網（adserver + adnet）。
+  外部 adnetwork で実在するのは ExoClick の**収益 CSV 取り込みだけ**。
+
+## Decision / 実装したもの（すべて cloud-itonami/main に着地済み）
+
+### 1. 成熟度 1 反復（merge 4b6cec73、pin 6c344f0b）
+
+`itonami-maturity-improve` の 1 反復。tick 1 位は kotoba-lang/langchain-store の
+axis-test だったが、オーナーが 7310 を名指ししたため対象を差し替え、その中で
+targetable な最弱軸 axis-ingest（4285bp）を狙った。`advertising.facts` に
+IND（ASCI Code + Influencer Guidelines、公開ラベル一覧を転記）と AUS（ACCC +
+Competition and Consumer Act 2010）を追加。**AUS には disclosure basis を付けて
+いない** — AANA Code のページが 404 で PDF も読めず、当局から読んだものが 1 つも
+無かったため（CHN と同じ姿勢を 2 法域目に適用）。KOR は law.go.kr が 200 を返す
+が本文が JS 描画で読めず、行を書かずに落とした。
+
+### 2. 媒体ポリシー台帳 4 → 8（merge 584f7212、pin 2624382）
+
+`x-ads` / `telegram-ads` / `youtube-ads` / `line-yahoo-ads` を直接読んで転記。
+2 つは既存モデルに収まらず、**モデルの方を直した**:
+
+- **`:policy-read :partial`** — LINEヤフーの列挙された掲載基準は JS 描画で
+  読めず、公開されている変更文書だけを読了。open-set 規則のままなら未読
+  カテゴリが全部 `:permitted` に落ちる（読んでいないものを通す）。第 3 の
+  disposition `:not-transcribed` を返し Governor が HOLD、detail は
+  『媒体が拒否した』ではなく『我々が読んでいない』と書く。
+- **`:categories-incorporated-from`** — YouTube の概要が自ら『To place ads on
+  YouTube, you'll have to comply with: Google Ad Policies』と述べるので、
+  カテゴリも**制限カテゴリの国別ルールも** google-ads 経由で解決する。国別
+  ルールを一緒に運ばないと継承側が継承元より自由になる穴が開く。
+
+副産物: `:distinguishable-from-product-ui` は `:generative-surface?` の別名では
+なくなった（YouTube のサイト要素模倣禁止・LINEヤフーのデザイン模倣禁止 —
+非生成面 2 つが同じ義務を自前で公開している）。
+
+### 3. actuation seam（merge b40eece2、pin 60e469e2）
+
+`advertising.placer`。既定は dry-run（リクエストを組み立てて送らない）、live は
+注入された `:http-fn` 経由、アダプタの無い媒体は `:unsupported`。**すべての
+`:actuation/place-campaign` commit が receipt を台帳に書く** — これ以前は
+`:campaign/mark-placed` が『何か買ったのか』を言わずに台帳へ入っていた。
+
+### 4. 実課金の経路（merge 0a9595f3、pin 1dcb92cb）
+
+`advertising.buy` — このリポジトリで唯一ソケットを開くファイル。
+
+- **live と spending は別の決定**。PAUSED で作れば実アカウント上の実キャンペーン
+  でありながら課金ゼロ。`--live` 単独は必ず PAUSED、`--spend` を足して初めて
+  ENABLED。
+- **ceiling は 2 本、出所が違う**。Governor が再計算する案件自身の承認予算と、
+  オペレータが `--max-spend-jpy` で置く独立した上限（ネットワーク直前の最後の
+  関数で検査）。守る対象は『内部整合が取れていて、かつ間違っている案件レコード』。
+- 認証情報は env 4 本のみ。不完全なら**名前を挙げて**着手前に拒否。receipt にも
+  台帳にも値は載らない。
+- **`campaigns:mutate` 単発は不正だった** — 実際は budget リソース → それを
+  参照する campaign の 2 リクエスト。返った `resourceName` を繋ぎ、返らなければ
+  推測を拒否する。
+
+### 5. 規約の追随（merge cca5cdb3、pin ff0e499d）
+
+子リポの ADR-0006 起票、CLAUDE.md（layout に placer/buy、`no network calls` に
+『placer は純粋・buy が唯一のソケット・buy を import するな』、新しい不変条件
+2 つ）、operator-guide の buy runbook。**この repo 自身の規約が ADR を要求して
+いたのに、直前 3 回の landing で欠けていた**ため補った。
+
+## 検証（実測値。すべて cloud-itonami/main で green）
+
+- テスト **134 → 159**、assertion **881 → 1168**、0 failures、clj-kondo 0/0
+- **mutation 6 件**で discriminate を実演し、壊した箇所と報告箇所の一致を確認:
+  ASCI ラベル 1 個削除 → IND ラベルテストのみ赤 / AUS に根拠なき tie-up
+  checklist → AUS テストと catalog 不変条件 / LINE を :index-complete に戻す →
+  partial-read テストと Governor hold / :categories-incorporated-from 削除 →
+  incorporation テストと YouTube hold / receipt の append 削除 → 台帳テスト /
+  live-placer を throw させず degrade → refuse-to-exist テスト
+- CLI を実際に実行（dry run の receipt / live 未認証時の拒否メッセージ）
+- **実行して初めて見つけたバグ**: 全 receipt が `:placement-number nil` を出して
+  いた。`commit-record!` は両バックエンドともストアを返し結果を返さないためで、
+  placement record を手で渡す unit test では見えなかった。`placement-history`
+  から読み戻すよう修正し actor 層のテストで固定。
+
+## 未実装 / できないこと
+
+- **実課金は未実施。技術ではなく手続きが blocker。** このワークスペースに Google
+  系の認証情報は 1 つも無い（secrets-location-map の Google 項は『Google Play —
+  何も無い』のみ、env にも repo にも `GOOGLE_ADS_*` はゼロ、`kotoba-lang/
+  com-googleads` は clean-room 互換実装であって実クライアントではない）。必要な
+  のは ①Google Ads アカウント + 支払い方法 ②開発者トークン ③OAuth クライアント
+  + リフレッシュトークン ④顧客 ID / ログイン顧客 ID の 4 つで、いずれも会社の
+  身元と支払い情報を伴うため**安全床①②により agent が代行できない**。
+- **8 媒体中 6 つは policy-only**（買付アダプタ無し）。receipt が `:unsupported`
+  と言う。対称性のために埋める種類の穴ではない — 1 本ごとに実認証情報と実請求書
+  が付く。
+- **LINE の列挙された掲載基準は未読**（それを `:policy-read :partial` が記録して
+  いる）。X の 'Unacceptable Content' / 'Prohibited Content for Minors' の下位
+  ページも未読。KOR は行を書いていない。
+- DEU の provenance URL（werberat.de）はこの端末の LibreSSL で TLS handshake が
+  通らず再検証できていない（既存・本セッションの変更とは無関係）。
+
+## Resume point（次の agent が会話履歴なしで再開するための最初の 1 手）
+
+鍵が揃ったら:
+
+```bash
+export GOOGLE_ADS_DEVELOPER_TOKEN=... GOOGLE_ADS_ACCESS_TOKEN=... \\
+       GOOGLE_ADS_CUSTOMER_ID=... GOOGLE_ADS_LOGIN_CUSTOMER_ID=...
+cd orgs/cloud-itonami/cloud-itonami-isic-7310
+clojure -M:buy --campaign campaign-10 --live      # まずこれ。実アカウント・PAUSED・課金ゼロ
+clojure -M:buy --campaign campaign-10 --live --spend --max-spend-jpy 50000
+```
+
+**中段を先に回すこと。** 認証情報・2 段階作成・Governor 経路を全部通しつつ課金
+だけしない。中段が落ちるなら下段は金を取ったあとに落ちていた。
+
+鍵の所在が kagi 等に登録されたら `secrets-location-map` に Google 項を追記する
+（総当たり列挙はしない。既知の識別子で 1 件だけ狙い撃つ）。
+
+媒体を増やすなら順序は『ポリシーを読んで platform.cljc に転記』→『買付アダプタ』
+であって逆ではない。前者は無料で安全、後者は金を使う。"}]

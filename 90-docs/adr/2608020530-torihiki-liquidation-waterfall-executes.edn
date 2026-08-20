@@ -1,0 +1,84 @@
+[{:db/id -1
+  :adr/id "adr-2608020530-torihiki-liquidation-waterfall-executes"
+  :adr/title "ADR-2608020530: 清算 waterfall を stage 1 の先まで動かす — 符号バグ 2 件と、実行しない最終防衛線"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "torihiki-liquidation-waterfall-executes"
+  :adr/authoritative-for
+  ["清算 waterfall の各段の意味論"
+   "ADL の執行価格と未吸収分の扱い"
+   "テストが無い層についての主張の禁止"]
+  :adr/related
+  ["adr-2608011200-torihiki-trading-dedicated-chain-hypercore-replacement"
+   "adr-2608012330-torihiki-mark-price-not-last-print"
+   "adr-2608020430-torihiki-terminal-live-one-renderer"]
+  :adr/evidence ["https://github.com/kotoba-lang/torihiki"]
+  :adr/body
+  "# ADR-2608020530: 清算 waterfall を実際に動かす
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+ギャップ #5。ADR-2608011200 は「ADL は ranking 止まりで実行は設計だけ」と記録していた。実装を読み直したところ、**それだけではなかった。**
+
+stage 2・3・4 に**テストが 1 つも無く、うち 2 つが間違っていた。** どちらも「金が消える」形でしか表面化しない。
+
+## 見つかった 3 件
+
+### stage 2 — vault 引受が建玉を**倍にしていた**
+
+`delta` は清算対象の建玉を**閉じる** fill。だから清算される口座に渡すべきものを、**符号反転して**渡していた。結果、閉じるはずの建玉が倍になり、vault は逆側を掴んだ。
+
+### stage 3 — insurance fund が支払うたびに**増えていた**
+
+shortfall を符号反転して計算していたので負値になり、`(update :insurance-fund - covered)` が負値を引く＝**増やす**。同時に、破綻口座は救済されるどころかさらにマイナスへ押し込まれていた。
+
+### stage 4 — ADL が**実行されていなかった**
+
+counterparty を ranking して返すだけだった。**最終防衛線が「リストを計算して return する」なら、それは防衛線ではない。**
+
+## Decision
+
+### 1. ADL は bankruptcy 価格で執行する
+
+mark ではなく bankruptcy 価格で counterparty を閉じる。これが**贈与ではなく移転**にする条件——counterparty は「破綻口座が払えなかった利益」をちょうど手放し、それ以上は失わない。
+
+### 2. 吸収しきれなかった分は vault に残し、**報告する**
+
+`:adl-unfilled` として返す。黙って捨てない。
+
+### 3. テストの無い層について主張しない
+
+これは本 ADR の一番重い教訓で、**このセッションで 3 度目の同型**である:
+
+- ADR-2608012100: 片方のランタイムでしか実行していない `.cljc` は、もう片方について主張してはいけない（cljs 経路が壊れていた）
+- ADR-2608020030: 「フラグを渡した」ことと「強制された」ことは別（trigger の reduce-only が素通り）
+- 本 ADR: **stage 1 しかテストしていない waterfall について「4 段ある」と書いてはいけない**
+
+`torihiki.liquidation` の ns docstring は 4 段を丁寧に説明していた。**説明は正しく、コードは違った。**
+
+## Consequences
+
+- (+) 清算が最後まで動く。ADL が実際に counterparty を閉じる。
+- (+) stage 2/3/4 にテストが付いた。
+- (−) **段階証拠金と OI 上限は未着手**（#5 の残り）。建玉サイズによらず証拠金率が一定なので、大口が過小担保になる。
+- (−) ADL の counterparty 選定は mark 時点の ranking を使い、執行中の価格変動を考慮しない。
+- (−) vault 自身が liquidatable になる場合の扱いは未定義。
+
+## 自分のテストも 2 行間違えた
+
+新しい assertion のうち 2 つが初回に落ちたが、**間違っていたのはテストの方**だった（片方は無意味な算術、片方は符号反転）。エンジンは正しかった。落ちたテストを見て即座にコードを疑わないこと——ADR-2608012330 と同じ。
+
+## 残りギャップ
+
+1〜4 完了。**5 は ADL 実行のみ完了**、段階証拠金・OI 上限が残り。6 oracle 集約、7 engi 合意層、8 bridge・監査。
+"}]

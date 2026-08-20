@@ -1,0 +1,615 @@
+[{:db/id -1
+  :adr/id "adr-2608021000-namidb-comparison-and-the-read-path-trampoline"
+  :adr/title "ADR-2608021000: NamiDB との比較 — 比較の土俵を materialized view 経路に移し、hydration の逐次項は prolly-tree ではなく novelty cons-chain だと実測した"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-01"
+  :adr/last-verified "2026-08-01"
+  :adr/last_verified "2026-08-01"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotobase-query-plane"
+  :adr/authoritative-for
+  ["NamiDB (namidb.com) と kotobase を比較するときの正しい土俵"
+   "ADR-2607310900 訂正4 が求めた block DAG の深さ/幅の実測結果"
+   "hydration の逐次 round trip の内訳 (prolly-tree vs novelty cons-chain)"
+   "LDBC SNB Interactive を kotobase の query surface で測るときの harness と前提"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/body "## Context
+
+namidb.com の調査から始まった。NamiDB は object storage ネイティブの graph
+database (Rust、Cypher/GQL + vector + BM25、LSM + columnar SST + manifest CAS、
+CSR adjacency を RAM に常駐、BSL 1.1、pre-release) で、LDBC SNB Interactive の
+IC02/07/08/09 を Kuzu / Neo4j と並べて公表している (warm p50 で IC02 1.09ms /
+IC08 0.95ms / IC09 2.88ms、cold は Kuzu・Neo4j の warm-disk より 5-50x 遅いと
+自分から書いている)。
+
+kotobase の公表値は 2026-07-25 の 3 本の head-to-head (Datomic / Neo4j /
+RisingWave) だが、そこで測ったのは **単一属性の point lookup と full scan** で、
+receipt 自身が \"no joins, no history queries, no concurrent load -- this is a
+first receipt, not a TPC substitute\" と書いている。つまり NamiDB の数字と
+kotobase の数字は**同じ質問に答えていない**。さらに production
+(kotobase.net) の p50 は 2,491ms で、その 92% が hydration である
+(ADR-2607310900 訂正3)。
+
+そこで 3 つ進めた: ①比較の土俵を materialized view 経路に移す ②ADR-2607310900
+訂正4 が\"次に試す前に\"と条件づけた DAG の深さ/幅の実測 ③LDBC SNB を
+kotobase の query surface で測る harness。
+
+## Decision
+
+### 1. 実測: 逐次項は prolly-tree ではなく novelty cons-chain だった
+
+`kotobase-peer` に `bench/kotobase_peer/dag_shape_bench.clj`
+(`clojure -M:dag-shape-bench`) を追加した。production の `hydrate!` が実際に
+発行する読み (`doc/coll`+`doc/key`+`doc/val` を :aevt 全 prefix scan) を、
+**本物の `pt/scan-prefix` を本物の with-blocks リトライアルゴリズム**
+(throw-on-miss の sync get-fn + 頭からの再実行) の下で走らせ、逐次 round trip
+数と node decode 数を数える。wall-clock ではなく **count** を測るので、
+この workstation の負荷 (計測中 load average 130-195、並行 agent セッション多数)
+に汚染されない。
+
+receipt: `kotobase-peer/bench/results/2026-08-01-dag-shape.edn`。
+
+| datoms | tree height | widths | sync RT | sync decodes | async waves | async decodes | RT 削減 |
+|---|---|---|---|---|---|---|---|
+| 3,000 | 2 | [1 10] | 11 | 66 | 2 | 11 | 5.5x |
+| 15,000 | 3 | [1 2 48] | 51 | 1,326 | 3 | 51 | 17x |
+| 60,000 | 3 | [1 2 227] | 230 | 26,565 | 3 | 230 | **77x** |
+
+**prolly-tree は幅広で浅い。** データが 20 倍になっても height は 2→3→3 と
+対数的にしか伸びず、幅 (最下層 10→48→227) が線形に伸びる。sync trampoline の
+逐次 round trip は block 数 O(n) に比例するが、async の waves は木の高さ
+O(log n) で頭打ちになる — 60,000 datom で 230 対 3。つまり ADR-2607310900 訂正4 が
+\"breadth-first の並列化が round trip を減らすのは DAG が横に広いときだけ\"
+と書いた条件を、この木は**満たしている**。訂正4 の\"深くて細い\"という
+推測は prolly-tree については誤りだった。
+
+**ところが hydrate 全体の逐次項の 97% は木ではない。** 未 fold の novelty は
+`{\"e\" tx-link \"rest\" rest-link}` の **cons chain** で、後続 CID は前任を
+decode するまで存在しない — 幅 1、深さ = 未 fold tx 数の、原理的に
+prefetch 不能なポインタチェイス。
+
+| 未 fold tx | 木の async waves | novelty hops | hydrate 合計 (async) | novelty の占有率 |
+|---|---|---|---|---|
+| 0 | 2 | 0 | 2 | 0% |
+| 20 | 2 | 20 | 22 | 91% |
+| 64 | 2 | 64 | 66 | **97%** |
+
+64 は `default-fold-threshold` — まともに動いている graph が fold 間に抱える
+最大の novelty である。**つまり fold 直前の hydrate は、逐次 round trip の
+97% を「novelty を数え上げる」ためだけに使っている。**
+
+これは訂正4 が観測した 2 つの事実をどちらも説明する: ①並列 block prefetch
+(net-kotobase#266) が効かず 24% 悪化したのは、逐次項が block DAG ではなく
+novelty chain にあり、prefetch は無関係な仕事を増やしただけだったから。
+②\"empty graph が full graph と同じコストだった\"のは、コストが data 量では
+なく novelty 長で決まるから (上表で木の round trip は novelty 0/20/64 を
+通じて一定)。
+
+規模の一致も取れる: production の novelty は fold 閾値まで 0-64 を往復するので
+平均 ~32 hops、訂正4 が見積もった 1 round trip ~90ms なら ~2.9 秒 — 実測の
+hydration 2,282ms と同じ桁である (整合するという以上の主張はしない)。
+
+### 2. 訂正: async 経路は production では既に有効だった
+
+調査の途中で「read path が sync trampoline に載っている」と読んだが、
+**それは kotoba-lang/kotobase-protocols-worker (ライブラリ側の写し) の話で、
+実際に kotobase.net を配信している network-awai/net-kotobase/protocols-worker
+は 2026-07-18 の `0c700e6` で既に `hydrate!` に `async-get-fn` を通していた**
+— 2026-07-31 に 2,282ms を測ったときには既に有効だった。だから
+`scan-prefix-async` への切り替えは production の残り時間の説明にならない。
+上の実測が示すとおり、残っているのは async 化しても逐次のままの項
+(novelty 数え上げ) である。
+
+`hot-datoms` の async arity は snapshot 半分を `cold-datoms-async` へ、
+novelty の **tx-block 読み** を `read-tx-block-async` へ回すが、
+**novelty chain の数え上げ `(novelty-cids get-fn state)` は sync get-fn の
+まま** — ここが残った理由。
+
+### 3. 打った手と、その実測 (2026-08-07 更新)
+
+**この節は当初「次にやること」だった。landed し、測った。**
+
+- **実装**: kotobase-peer `c8e4f96`（2026-08-02）「Batch the novelty queue 16 entries
+  to a block, so enumerating it stops being linear」。`novelty-segment-size` = 16、
+  `push-novelty!` は bounded な head segment に追記し、`node-entries` が旧
+  単一エントリ節と新 segment の**両方**を読むので、既存 chain は書き換えずに
+  segment を上に伸ばす（移行ステップ無し）。west pin `530f2d1` に入っている。
+  テスト: `clojure -M:test` 229 tests / 680 assertions / 0 failures
+  （`kotobase-peer.novelty-segments-test` を含む）。
+
+- **実測（2026-08-07、この ADR が求めた検証）**: landed から 5 日、**変更後の
+  receipt が無かった** —— 「64 hops → 4 hops」は予測のままだった。同じ
+  `dag_shape_bench` を west pin で回し直した:
+
+  | 未 fold tx | novelty 逐次 hops | hydrate async round trips | novelty の占有率 |
+  |---|---|---|---|
+  | 0 | 0 → 0 | 2 → 2 | 0% → 0% |
+  | 20 | 20 → **2** | 22 → **4** | 90.9% → **50.0%** |
+  | 64（fold 閾値） | 64 → **4** | 66 → **6** | 96.9% → **66.7%** |
+
+  **novelty 半分は 16 倍（= segment size そのもの）、hydrate 全体は 11 倍。**
+  16 倍でなく 11 倍なのは snapshot 半分（2 waves）が変わらないからで、**それが要点**
+  —— novelty は支配項ではなくなった。receipt:
+  `90-docs/kotobase-performance/2026-08-07-novelty-segmentation-dag-shape.edn`
+  （7 セル全部。本 ADR の前身が完走できなかった (20000, 64) を含む）。
+
+- **帰属を分けた**: 5000 doc のセルは snapshot 側の prolly-tree が別事情で
+  height 3 → 2 に変わっているので**統制されていない**。1000 と 20000 は木の形が
+  完全一致（height/widths/nodes とも）なので、そちらから帰属する。receipt の
+  `:snapshot-half-controlled?` がセルごとに記録している。
+
+- **測定器の欠陥を 1 件直した**: `novelty-shape` は subject directory の \"entries\"
+  キーしか知らず、queue の \"es\" segment を **1 tx として数えていた**（64 tx の
+  backlog が `:txs 4` と出る。hops は正しいが tx 数が嘘で、**自分と矛盾する receipt**
+  は誤読を招く）。今回の数値はこの修正を当てて取った。patch は receipt の
+  `:follow-ups` に入れてあるが、**upstream には未反映**（このセッションに
+  kotoba-lang への write 権限が無い）。
+
+- **本番に届いたかは未確認**。ライブラリ経路は届いている（`kotobase-protocols-worker`
+  は `shadow-cljs.edn` で \"../kotobase-peer/src\" を**相対パス**参照するので、
+  west pin の kotobase-peer をそのままコンパイルする）。しかし実際に kotobase.net を
+  配信しているのは `network-awai/net-kotobase` の protocols-worker で、**private で
+  このセッションからは読めない**。本 ADR §2 が記録したとおり、この 2 つは以前も乖離
+  していた（library 側が sync に見えて deployed 側は既に async だった）ので、
+  **ライブラリが持っていることは deployment が持っていることの証拠にならない。**
+  2,282ms という hydration の実測値も変更前のものである。
+
+当初の記述（残す）:
+
+**novelty queue を、subject directory と同じ手法で bounded segment 化する。**
+`append-novelty-index!` は既に 16 entry/segment のチェインを作っている
+(`novelty-index-segment-size` = 16)。同じ形を novelty queue 自体
+(`push-novelty!` の front/back cons chain) に適用すれば、数え上げは
+64 hops → 4 hops になる。パターンは既にこのコードベースの中にある。
+
+やらないこと: ①block DAG の並列 prefetch の再挑戦 — 木は既に 2-3 waves で、
+削れる余地が無い ②fold 閾値を下げて novelty を短く保つ — 読みの逐次項を
+書きの fold コストに移すだけで、fold は 60,000 datom 規模で数十秒かかる。
+
+なお `commit!` は `blind-fn` を渡された 6-arity のときだけ subject index を
+作るが、production は 5-arity で呼んでいる。ただし subject index は
+`hydrate-transaction-slice` の枝刈り用で `novelty-cids` を短くしないので、
+これは別の話 (5-arity のままでよい)。
+
+### 4. 比較の土俵は materialized view 経路にする
+
+NamiDB の 1-3ms は「常駐 Rust プロセスが CSR adjacency を RAM に持ち、
+3 層 cache を snapshot 間で共有し、manifest CAS の小さい pointer 1 個で
+整合を取る」構成の数字である。kotobase の hydrate 経路は Cloudflare Worker
+の isolate ごとに chain を hydrate し直すので、そもそも同じ構成ではない
+(memo は per-isolate で、production 12 リクエストは 4 isolate に散った —
+ADR-2607310900 訂正3)。
+
+同じ設計圏にあるのは **materialized view 経路**である: 事前に pack した
+immutable object への range GET。既存 receipt
+(`2026-07-21-materialized-view-100k.edn`、100k rows / 196 blocks / 8.3MB pack)
+では local query kernel が point p50 13.1ms、実 R2 range GET (NRT) が p50
+21ms、合成して warm point ~34ms。**速さを語るならこちらの数字を出す。**
+
+NamiDB の公表値 (namidb.com/benchmarks、LDBC SNB SF1 = 540K elements、
+bench client は LATAM、cloud worker は Hetzner CCX13 / 独、R2 EU) と、
+kotobase の既存 receipt を並べるとこうなる:
+
+| | NamiDB | kotobase |
+|---|---|---|
+| warm query (server-side) | 0.95-2.88 ms (IC02/07/08/09) | hydrate 経路 2,491 ms / MV 経路 ~34 ms |
+| cold | ~370 ms (IC09)、Kuzu・Neo4j の warm-disk より 5-50x 遅いと自認 | hydration 2,282 ms |
+| bulk write | 51.5K elem/s (cloud in-region) / 394K (engine in-mem) | 732-1,235 rows/s (暗号化 + content addressing 込み) |
+| 検証規模 | 540K elements | 10M datoms (2026-07-25 gate) |
+| Neo4j local との比 | IC02 で 1.09 対 0.61 ms (1.8x 遅い) | LDBC harness の receipt 待ち |
+
+注意すべき非対称: ①NamiDB の R2 microbench (PUT 1KiB p50 845ms、GET cold
+432ms、TTFB 140-170ms) は LATAM→EU の大陸横断で、cloud write の 31.9K elem/s も
+これ。プラットフォームの床ではない ②kotobase は全値 AES-256-GCM 暗号化・
+全キー HMAC blind・CID 検証を通っており、NamiDB は平文 — write の差の相当部分は
+製品定義の差である ③NamiDB の 1-3ms は多段 traversal、kotobase の既存
+head-to-head は単一属性 point lookup で、**そもそも同じ質問に答えていない**
+(これを埋めるのが §5 の harness)。
+
+NamiDB が持っていて kotobase が持たないもの: vector search (DiskANN)、BM25、
+RRF hybrid、`CALL algo.*` (PageRank/Louvain/FastRP)、Bolt 互換、Cypher の
+完全な surface。kotobase が持っていて NamiDB が持たないもの: content
+addressing による不変履歴と time travel、commit DAG、CACAO 認証テナント分離、
+edge worker で動くこと。
+
+### 5. LDBC SNB harness (公表値と同じ土俵)
+
+`kotobase-peer` に `bench/kotobase_peer/ldbc_snb_bench.clj`
+(`clojure -M:ldbc-snb-bench <dir> [posts] [samples]`) を追加した。
+**実物の LDBC SNB Interactive v1 SF1** (Datagen v1.0.0、
+CsvComposite/LongDateFormatter、SURF/CWI repository。合成模造ではない) を
+読み、IC02/IC07/IC08/IC09 を kotobase の hot db と Neo4j embedded に対して
+**同一 JVM・同一データ**で走らせる。Neo4j を両側で測るのは、機械が違っても
+比が残る共通のものさしにするため (NamiDB も Neo4j local の列を公表している)。
+
+subset は決定的で、内訳を receipt に書く: 全 person (9,892) と全 knows
+(180,623) はそのまま — IC02/IC09 の fan-out が依存する社会トポロジは
+サンプルしない。message は creationDate 降順で N 件の Post + その返信木を
+丸ごと (IC08 の返信・IC07 の like が実際の深さを持つように)。
+
+**receipt が出た (2026-08-01、4 回目の実行で完走)。**
+`kotobase-peer/bench/results/2026-08-01-ldbc-snb-interactive.edn`。
+
+**まず正しさ**: IC02/IC07/IC08/IC09 の 4 本すべてで両エンジンの答えが
+一致した (`:answers-agree {:ic02 true :ic07 true :ic08 true :ic09 true}`)。
+時間を測る前にこれを assert する設計で、通った。
+
+dataset: 実 LDBC SNB SF1 の subset 210,389 elements (person 9,892 / knows
+180,623 / message 7,355 = post 3,000 + comment 4,355 / hasCreator 7,355 /
+replyOf 4,355 / like 809)。kotobase 側は 409,877 quads (knows 両方向 +
+like の reify)。build: kotobase 8.9s / Neo4j load 47.3s。
+
+**p50 (15 start person、同一 JVM、同一データ):**
+
+| | kotobase | Neo4j embedded | 比 |
+|---|---|---|---|
+| IC02 recent messages | 182.5 ms | 23.7 ms | 7.7x |
+| IC07 recent likers | 20.9 ms | 3.4 ms | 6.2x |
+| IC08 recent replies | 105.6 ms | 1.1 ms | 97.5x |
+| IC09 friends-of-friends | **21,008 ms** | 246 ms | **85.3x** |
+
+**これは 2026-07-25 の receipt をちょうど反転させる。** 単一属性の point
+lookup では kotobase が Neo4j embedded に 10x 勝ち、**graph database が
+実際に判定されるクエリでは 1〜2 桁負ける**。どちらも前から真だったが、
+測られていたのは片方だけだった。
+
+**IC09 の 21 秒が、手を打つ価値のある発見である。** 機械のノイズではない —
+同じプロセスの中で同じデータに対し Neo4j が 246ms で答えている。
+
+計測時の host は load average ~190 で、それは p95 に出ている (Neo4j IC08 は
+p50 1.1ms / p95 1,652ms)。**絶対値は輻輳しており、静かな機械で採った数字
+(NamiDB の公表値を含む) と直接比べてはならない。** 使えるのは、両エンジンが
+1 つの JVM の中で同じ輻輳下に交互に走った**クエリ内の比**だけである。
+同じ理由で、この receipt の Neo4j 値 (IC02 p50 23.7ms) は NamiDB が公表する
+Neo4j local (IC02 0.61ms) と 39 倍違う — **ものさし自体が安定していないので、
+Neo4j 経由で NamiDB と正規化比較することは現時点でできない。**
+
+その 4 回の試行で harness 側の欠陥が 3 つ見つかり、**receipt が存在する前に**
+直した (2 つは kotobase に、1 つは Neo4j に不利な数字を出すところだった —
+どれも「データベースについての数字」ではなく「harness についての数字」に
+なっていた): ①IC09 が 1-2 hop の友人集合を解いた後、**到達した人ごとに
+point query を発行**していた (高次数 start person で ~1,300 回)。これは
+Neo4j の可変長パス展開に対して Clojure のループを測っていた — 2 本の join の
+union に直した。②loader が `comment_0_0.csv` と likes 2 本を全行 vector 化
+してから捨てており、数 % しか残さない subset に対して RSS 4.7GB を使っていた
+— streaming に直した。③Neo4j の relationship 投入が `MATCH (a:X {..}),
+(b:Y {..})` のカンマ形 + 平文 index だった。カンマ形は 2 つの node scan の
+cartesian product に計画されうるので、unique constraint + MATCH 句分離に
+直した。
+
+**③の根拠として当初挙げた観察は誤りだった (訂正)。** 「store ファイルが
+一切成長しない」と書いたが、それは ⑴ディレクトリ全体の `du` が
+**preallocate されたファイル**に支配されていたこと ⑵Neo4j の store ファイルは
+**checkpoint まで 0 バイトのまま**で、進捗が出るのは
+`neostore.transaction.db.0` の方であること、の二重の誤読だった。実際には
+transaction log は伸びており、書き込みは進んでいた。**③が直した Cypher は
+どちらにせよ正しい書き方だが、当時の停滞の原因は cartesian product ではなく
+単に CPU 枯渇 (load 300-430) だった可能性が高い。** 4 回目が完走したのは
+load が下がったからであって、③の修正が効いたからだと主張できる証拠は無い。
+
+harness が受け入れた 3 つの非対称性 (平均で均さず receipt に明記する):
+①kotobase の query language に ORDER BY / LIMIT が無いので、top-20 は join
+結果に対して harness の Clojure で行う (Neo4j は Cypher の中で行う) —
+これ自体が query surface の gap である ②knows は無向だが datom model に
+無向辺が無いので両方向を assert する (Neo4j は `-[:KNOWS]-` で native)
+③LDBC の likes 辺は creationDate という**辺のプロパティ**を持つが、
+kotobase に辺プロパティが無いので like を entity に reify する (3 datom/like)。
+両エンジンの答えが一致することを**時間を測る前に assert する**。
+
+### 6. 実施した 3 件 (2026-08-01/02) と、次にやるとよいこと
+
+#### 6-1 実施済み: IC09 の join — 仮説は外れ、真因は別だった
+
+「plan を印字してから」の指示どおり印字した結果、**私の仮説
+(planner が `:in` 束縛を無視して順序を誤る) は誤り**だった。
+`datalog-query-plan` は束縛を probe パターンに代入しており、選んだ順序も正しい。
+receipt: `2026-08-01-ic09-diagnosis.edn`。45.3 秒の内訳:
+
+| | | |
+|---|---|---|
+| cardinality probes | 4.0 s | 9% |
+| planning | 3.4 s | 7% |
+| **join 実行** | **35.6 s** | **79%** |
+
+同一プロセス・同一データの 1-hop 対照は probes 187ms / join 819ms — 膨張は
+binding 数が爆発する段に固有で、機械のせいではない。
+
+**真因**: `arrangement.datalog/join-clause` が **binding ごとに 1 回 scan を
+発行**していた。2-hop の段は約 31,750 bindings を運ぶが、それらは数千通りの
+パターンにしか展開されない — つまり同じ質問を何万回も繰り返し、毎回結果
+セットを構築し `visible?` を回していた。
+
+**修正** (`kotoba-lang/arrangement` `db55c493`): binding を展開後パターンで
+グループ化し、**distinct パターンごとに 1 回だけ scan**。意味論は不変。
+91 tests / 204 assertions、0 failures。
+
+**効果の検証** (`2026-08-02-ic09-after-join-batching.edn`): two-hop の
+end-to-end 45,308ms → 2,652ms、生の比で 17x。**ただし 17x はコードの効果では
+ない。** 同じ receipt の中で **probe パスは未変更コード**なのに 3.66x 速く
+なっている (同じ 361,246 行に対し 3,859.7ms → 1,071.3ms) — baseline は
+load 150-190、再測定は 40-80 で走った。割り戻すと**コード起因は約 4.7x**。
+行数は同一 (6,733) で何も引き換えにしていない。
+**未変更パスを同じ receipt に残していたことが headline より価値があった** —
+無ければ 17x と報告して 4 倍間違えていた。
+
+#### 6-2 実施済み: ORDER BY / LIMIT — 言えるようになったが、まだ安くない
+
+`:order-by [[?date :desc] [?msg :asc]]` / `:limit 20` を
+`arrangement.datalog/q` に追加。`:find` に無いキーはエラー (黙って任意順を
+返さない)。順序を要求されたときだけ戻り値が **set → vector** になる
+(順序付き結果は集合では表現できない)。
+
+**limit は完成した射影に適用されるので join は全仕事をする。** top-N を
+「言えるように」しただけで「安く」はしていない。LDBC harness が全結果を
+host 側で sort していたのを言語側に移せる。join への押し下げは、順序節から
+反復を駆動すれば可能 (値順インデックスは既に `[p o s]` を `o` 順に返す) が、
+それは別の変更でありこの変更の主張ではない。
+
+#### 6-3 実施済み: novelty queue の segment 化
+
+1 tx = 1 ブロックを **16 entry/segment** に (`novelty-index-segment-size` と
+同じ値・同じ形)。64 hops → 4 hops。`kotoba-lang/kotobase-peer` `13bfd2bd`、
+268 tests / 832 assertions、0 failures。
+
+**移行は無い。** live chain は単一 entry ノードだらけなので walker が両方の形を
+読み、legacy な head は書き換えず新 entry が新セグメントを作ってそれを指す。
+**代償**: push が head セグメント (≤16 entry) を読んで再エンコードする。
+これは kotobase-peer#16 への逆戻りではない — あの issue は
+**backlog と共に増える**構造の再エンコードの話で、こちらは 16 で上限が決まる。
+読みから線形項を消すために、書きに有界な定数を払う取引。
+
+最初のテスト実行で自分のバグを 2 件捕まえた: `newest-novelty-cid` が
+セグメントを知らず NPE、legacy テストの fixture ビルダーが旧ノード形しか
+読めなかった。
+
+#### 6-4 次にやるとよいこと (優先順)
+
+#### 6-4 実施済み: hash join — 効いた。そして LDBC を測り直した
+
+節の関係全体が小さいとき 1 回スキャンして hash join する。判断に必要な数値は
+新たに計算していない — **planner が節の順序を決めるために既に測っていた
+`:estimated-rows` を executor に渡した**だけ。予算は 4x。
+`kotoba-lang/arrangement` `7a0a2002` + `kotobase-peer` `6cf50d55`。
+97 tests / 211 assertions、0 failures (等価性テスト6本: 2-hop、出鱈目な
+ヒント、節内リテラル、negation、or-join、部分ヒント)。
+
+**IC09 診断での効果** (`2026-08-02-ic09-after-hash-join.edn`): two-hop の
+execute は per-binding 35,641ms → per-pattern 2,092ms → hash 1,580ms。
+**生の累積 22.6x は嘘で、実際は約 11.5x** (hash join 単体 ~2.5x)。
+未変更の probe パスが load average と**逆のこと**を言った — load は
+「静か (30-35 対 40-80)」、probe は「1.86x 忙しい (1,104ms → 2,052ms、
+同じ 361,246 行)」。同じプロセスで同じ仕事を測っている方が正しい。
+**負荷対照は 2 回とも報告を救った。**
+
+**LDBC 再測定** (`2026-08-02-ldbc-snb-after-join-work.edn` /
+`2026-08-02-ldbc-snb-ic02-hypothesis-refuted.edn`)。同一データ 210,389
+elements、3 回とも 4 クエリの答え一致。**絶対値ではなく比を読むこと** —
+Neo4j は全実行で未変更コードで、それ自体が 1.6-4.9x 動く (host)。
+
+| | baseline | batch+hash | +IC02 試行 |
+|---|---|---|---|
+| IC09 | 85.3x | 35.8x | 21.6x |
+| IC08 | 97.5x | 53.3x | 38.7x |
+| IC07 | 6.2x | 7.0x | 6.0x |
+| IC02 | 7.7x | 14.7x | 19.2x |
+
+**⚠ この表の値はすべて壊れた計器で採られている (2026-08-02 判明)。**
+harness は kotobase を 15 サンプル全部走らせてから Neo4j を 15 サンプル走らせて
+おり、比を「負荷不変の列」として提示していたのに**両者は同じ分を見ていなかった**。
+交互実行に直して同じ arrangement main で測り直した値
+(`2026-08-02-ldbc-interleaved.edn`):
+
+| | この表 (逐次) | **交互実行での実測** |
+|---|---|---|
+| IC09 | 21.6x | **12.8x** |
+| IC08 | 38.7x | **12.6x** |
+| IC07 | 6.0x | **2.4x** |
+| IC02 | 19.2x | **17.8x** |
+
+**IC08 と IC09 は実際の約 3 倍悪く報告していた。** join の作業の方向は残る
+(両者ともセッションを通じて大きく改善し、それを示した scan カウント
+143,270 → 885 はこの修正を必要としない) が、**この行以前の比の大きさを
+引用しないこと。**
+
+**IC02 は自分の変更による回帰で、しかも私の説明は間違っていた。**
+「batching の group-by の代償だけ払っている」と考えて修正したが、
+IC02 は回復せず**逆に遅くなった** (80.9 → 102.2ms、同じ実行で Neo4j の
+IC02 は 5.5 → 5.3ms と安定していたので host のせいではない)。
+**修正は revert 済み** (`5519c5eb`) — 「証明されていない最適化を
+performance-critical path に置かない」は、このリポジトリが
+kotobase-protocols-worker `313e298` で既に自分に課した基準である。
+
+3 回を通じて頑健なのは IC09 と IC08 の方向と大きさ、そして IC02 が毎回
+悪化していること。単発 15 サンプルの p50 は 20-30% の変動を帰属させるには
+足りず、この receipt はそれをしていない。
+
+**35.8x も 21.6x も「改善」であって「良い」ではない** — Neo4j は IC08 を
+0.7-0.8ms で返す。
+
+#### 6-5 実施済み: 本番 deploy (C) — 出荷した。速くなった証拠はまだ無い
+
+`kotobase-protocols-worker` を deploy (version `047b3afa`、7 ドメイン:
+s3 / atproto / pinning / sparql / cypher / gremlin / graphql .kotobase.net)。
+テスト 44 tests / 163 assertions、0 failures。
+
+**載せたもの**: join batching + hash join、B-1 (planner が count する)、
+B-3 (projection pushdown)、novelty queue の segment 化、read path の async 化
+(`hydrate!` は 2026-07-18 から本番済み、`doc-point-query` を今回追加)。
+**載せなかったもの: B-2** — revert 済みで、pin を戻し `ordered-driver` 0 件を
+確認してからビルドした。
+
+**deploy 後の検証**: 7 ドメインすべて応答。6 つは deploy 前と同じ 401
+(認証要求 = 正常)。`atproto.kotobase.net` だけ `/` が 404 / p50 3.4s。
+
+**これは回帰ではない。** 同じホストで `/_diag/health` (hydrate しない) が
+0.13s、`/health` (hydrate する) が 4.5s — ADR-2607310900 訂正3 とまったく
+同じ形である。`/_diag/health` は `novelty_size: 18` を返しており、
+`2026-08-01-dag-shape.edn` の機構 (未 fold novelty 1 件 = 逐次 round trip
+1 回) で 18 hops × 90-250ms = 1.6-4.5s、実測と一致する。直前の deploy は
+2026-07-31 で今日の変更を一切含まないので、この遅さはそれ以前から在る。
+
+**正直に言うべきこと: この deploy で hydration が速くなる証拠はまだ無い。**
+segment 化が圧縮するのは **deploy 後に書かれた novelty だけ**で、既存の 18
+ノードは単一 entry のまま残る (移行しない設計なので当然)。今この瞬間に改善が
+見えないことは、機構と整合している。
+
+**反証可能な予測**: fold 閾値は 64、現在 18。この graph が書き込みを積んで
+次に 64 に達するとき、novelty は 64 ノードではなく **4 ノード**になるはず。
+そこで `/health` の p50 を測れば改善したか否かが決まる。測るまで
+「本番が速くなった」とは言わない。
+
+**⚠ この予測の算術が間違っている（2026-08-17 訂正）。** 直前の段落が正しく
+書いているとおり、既存の 18 ノードは単一 entry のまま残る。だから 64 entry に
+達したときの node 数は 4 ではなく **18 + ceil(46/16) = 21**。予測を 4 と書いて
+おくと、21 を測った次の agent は「segment 化が効いていない」と読む —— 実際には
+機構どおりである。**予測値は「新規分だけが 16 で割れる」形で書くこと。**
+
+**2026-08-17 の実測（この予測はまだ決着していない）。**
+`_diag/health` は `novelty_size: 63` / `should_fold: false`。閾値 64 に**まだ
+届いていない** —— 15 日で 18 → 63 まで積み上がったが、一度も fold していない。
+その状態の hydrating `/health` は warm p50 で **sparql 4,449ms / cypher 7,141ms /
+gremlin 4,192ms / graphql 4,337ms / s3 3,985ms**、同ホストの存在しないパスへの
+control が 11–17ms。2026-08-08 の handler 分 2,422ms に対して **約 1.8 倍**だが、
+**これは回帰ではなく予期された鋸歯**である（未 fold tx に比例する項が伸びただけ）。
+
+上の算術を当てると node 数は 18 + ceil(45/16) = **21**、prolly-tree の 2 wave を
+足して 23 round trip、handler 分 3,974–4,437ms を割ると **1 往復あたり 173–190ms**
+—— ADR-2607310900 の見積り 90–250ms の中に収まり、独立した 4 ホストが 12% 以内で
+一致する。**したがって今日の数字は segment 化が効いていないことの証拠ではない。**
+（`novelty_size` は O(1) の `novelty-count`、すなわち **entry 数であって node 数
+ではない**。63 entry を 63 hops と読まないこと。）
+
+**未解決の不整合**: 2026-08-08 の 2,422ms は同じ per-hop で割ると ~13 往復になり、
+既に存在していたはずの 18 個の単一 entry ノードより**少ない**。18 という数・
+「08-02 から 08-17 の間に fold が走っていない」という仮定・per-hop が vantage に
+依らないという仮定のどれかが誤っている。**latency だけでは切り分けられない**ので、
+都合のよい枝を選ばずに不整合として記録する。切り分けは chain を歩いて
+`\"es\"`（segment）と `\"e\"`（単一）の**ノードを数える**こと —— 認証付きの block walk
+1 回で、推論ではなく観測になる。
+
+receipt: `90-docs/kotobase-performance/2026-08-17-live-latency-and-deployed-fold-threshold.edn`
+
+**そして、この予測が 15 日決着しなかったこと自体が答えである。**
+`protocols-worker/kotobase_store.cljs` の `fold-if-due!` は 2-arity の
+`eng/should-fold?` を呼ぶので閾値 64 のまま。同じ repo
+（`net-kotobase/control-plane`）の `kotobase-graph-database` は閾値 **8**
+（`KOTOBASE_FOLD_THRESHOLD` で上書き可）で、その理由を自分のコメントに書いている
+——「engine の既定 64 は*書き込み*の償却を最適化する。read-heavy な BaaS は
+novelty 税を*読み*のたびに払うので、もっと早く fold する」。**閾値を下げる機構は
+同じ repo の隣のディレクトリに既に在る。**「本番 novelty の再測定」を待つ前に、
+そもそも fold が発火する閾値にすること。
+
+**deploy 手順で 3 回同じ失敗をした**ので記録する。依存 20 repo の照合で
+①source-paths を `head` で切って 12 個と読み (実際は 21) ②全部 west に
+あると仮定し (`datom-source` は未展開) ③clean かどうかだけ見て
+**revision を pin と照合しなかった** (5 個が不一致)。どれもビルドエラーが
+教えてくれたが、最初から 20 件を機械的に突き合わせれば 1 回で済んだ。
+**deploy は判断ではなく照合の作業である。**
+
+他セッションの WIP (`kotobase-protocols` 15 dirty、`kotobase` 21 dirty) は
+一切動かしていない — pin の revision を別途 clone した隔離ツリーでビルドした。
+
+#### 6-6 セッション closing (2026-08-02/03) — 着地状態と再開点
+
+**main に landed**:
+| repo | commit | 内容 |
+|---|---|---|
+| `kotoba-lang/arrangement` | join batching / hash join / ORDER BY・LIMIT / `cardinality` / projection pushdown | 106 tests・240 assertions、0 failures |
+| `kotoba-lang/kotobase-peer` | `c63468f4` | novelty segment 化、planner が count、bench 4本 + receipt 9本 |
+| `kotoba-lang/kotobase-protocols-worker` | `2c965e88` | read path の async 化 + guardrail 拡張 |
+| `network-awai/net-kotobase` | deploy `047b3afa` | 本番 7 ドメイン、44 tests・163 assertions |
+
+**意図的に landed していないもの**: B-2 (limit の join 押し下げ)。
+`kotoba-lang/arrangement` branch `agent/limit-pushdown-v2` (`a8333b31`) に保全。
+**正しいが速いという証拠が無い** — 3 回の試行と欠陥は
+`2026-08-02-limit-pushdown-third-attempt.edn` に全部記録済み。
+
+**再開点 (この順)**:
+1. **B-2 を静かな機械で測る**。`arrangement` を `agent/limit-pushdown-v2` に
+   `:local/root` で向け、両ピンを**同一窓**で
+   `clojure -M:ldbc-snb-bench <sf1>/dynamic 3000 15`。
+   交互実行版の `:paired-ratio` を見る。IC02 が改善し IC08 が悪化しなければ
+   着地、しなければ捨てる。
+2. **本番 novelty の検証** (§6-5 の反証可能な予測)。`atproto.kotobase.net/_diag/health`
+   が `novelty_size` を返す。64 に達したとき novelty が 4 ノードなら segment 化が
+   効いている。`/health` の p50 で確認。
+3. `:query-statistics` を実際に使う (B-1 で fallback は安くなったが probe は残る)。
+4. **540K elements で再測**。現在 210,389 は NamiDB 公表規模の 4 割で、
+   NamiDB との正規化比較はまだ成立しない。
+
+**触っていない他セッターの WIP** (報告のみ、移動も削除もしていない):
+`orgs/kotoba-lang/kotobase-protocols` 15 dirty (`rescue/wip-20260718`、pin より
+35 commit 遅れ、`cid.cljc` 不在でビルド不可)、`orgs/kotoba-lang/kotobase` 21 dirty
+(`agent/persist-execution-identities`)。本番ビルドはこの 2 つを pin から
+別 clone した隔離ツリーで行った。
+
+**このセッションで一番効いた変更は最適化ではなく計器**だった。未変更コードを
+対照に残す・同一窓でしか比較しない・2 エンジンは交互に測る、の 3 つが、
+17x→4.7x、22.6x→11.5x→3.5x、38.7x→12.6x という 3 段階の訂正を生んだ。
+**カウントだけが最初から動かなかった。**
+
+#### 6-7 次にやるとよいこと (優先順)
+
+**1. B-2 (limit の join 押し下げ) をやり直す。** 一度実装して **revert した**
+(`arrangement 6a179a31`)。同値性テストは全部通ったが**遅くなった** — 値グループ
+ごとに残り節を最初から再実行するので、駆動変数に依存しない節がグループ数だけ
+再導出される。IC02 では `[?person knows ?friend]` の 882 行が 7,355 回で
+6.5M 行。正しい形は「駆動独立な節をループ外で1回評価し、グループごとには
+依存節だけ走らせて semi-join する」= join の並べ替え。**最初の見立て
+(executor + planner) が正しく、途中で「planner は不要」と翻したのが誤りだった。**
+
+**2. 本番 novelty の再測定。** §6-5 の反証可能な予測 —— この graph が fold
+閾値 64 に達したとき novelty が 64 ノードでなく 4 ノードになるはず —— を、
+そのタイミングで `/health` の p50 を採って検証する。
+
+**3. IC02 の LDBC 比を「未解決の回帰」として引用しない。** 3 回の receipt で
+7.7x → 14.7x → 19.2x と見えたが、`2026-08-02-scan-instrumentation.edn` で
+**回帰ではなかった**ことが確定している (両ピンで scan 1,793 / rows 2,702 が
+完全一致)。分母の Neo4j IC02 が 5ms と小さすぎて対照にならなかっただけ。
+
+**2. `:query-statistics` を実際に使う。** `[?f1 \"knows\" ?f2]` の probe は
+静かな機械でも 361,246 行を毎回セットに materialize して 1,071ms 使う —
+ただ数を知るためだけに。これをスキップする入力は既に存在し、使われていない。
+
+**3. limit の join 押し下げ / projection pushdown。** 6-2 は top-N を言える
+ようにしただけ。値順インデックスが `[p o s]` を `o` 順に返すので、順序節から
+反復を駆動すれば早期打ち切りできる。あわせて IC09 の `:find` は
+`[?f2 ?msg ?date]` なのに bindings が `?f1` を最後まで運んでおり、
+≤9,892 の distinct `?f2` で足りるところに ~31,750 bindings が存在している。
+
+**4. subset を 540K elements まで上げて静かな機械で再測**。今回は 210,389
+elements で NamiDB 公表規模の 4 割、しかも load 190 下。**静かな機械で**
+採り直せば、Neo4j をものさしにした NamiDB との正規化比較が初めて成立する
+(今回は Neo4j 側が 39 倍ぶれていて成立しなかった)。6-1 の「未変更パスを
+対照に置く」やり方は、この再測定でもそのまま使うこと。
+
+**やらないこと**: block DAG の並列 prefetch 再挑戦 (木は既に 2-3 waves)、
+fold 閾値の引き下げ (読みの逐次項を書きへ移すだけ)、
+輻輳した機械での再計測を「速くなった」の根拠にすること。
+
+## Consequences
+
+- 「kotobase は Datomic の 144x 速い」は単一属性 point lookup の話であって、
+  graph database としての主張ではない。**receipt が出た今、正しい言い方は
+  「最も安いクエリでは Neo4j embedded より 10x 速く、多段 traversal では
+  6-100x 遅い」である。** 片方だけを引用しない。
+- NamiDB との query engine 比較は**まだできない**。Neo4j をものさしに
+  正規化するつもりだったが、輻輳下で採った Neo4j 値が NamiDB 公表の
+  Neo4j local と 39 倍違い、ものさしが安定しなかった。静かな機械での
+  再測が前提条件 (§6-4)。
+- 速さの主張を出す場所は materialized view 経路。hydrate 経路の p50 を
+  NamiDB や Neo4j Aura と並べない (ADR-2607310900 の同じ結論を維持)。
+- `dag_shape_bench` は count を測るので、負荷の高い共有 workstation でも
+  再実行して比較できる。wall-clock の projection は別に測った R2 RTT を
+  掛けたものであって end-to-end 測定ではない、と receipt に書いてある。
+- kotoba-lang/kotobase-protocols-worker (ライブラリ側) は production の写しに
+  対して `hydrate!` の async 引数が抜けていた。揃えた上で、guardrail
+  (`bin/lint_engine_calls.cljs`) を `eng/fold!` だけでなく `eng/hot-datoms`
+  にも広げた — 関数を名指しする guardrail は 1 関数しか守らず、実際に
+  同じ級のバグが read path に残っていた。
+"}]

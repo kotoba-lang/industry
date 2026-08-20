@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "generatedAt": "2026-07-17T13:40:53.427Z",
+  "repo": "orgs/gftdcojp/cloud-murakumo",
+  "origin": "git@github.com:gftdcojp/cloud-murakumo.git",
+  "head": "8fae084d60d243bd915d1054b664eab35cdb669f",
+  "overlays": [
+    {
+      "path": "wrangler.jsonc",
+      "sha256": "1f91bbd31ba1228e7f637a23e46e29fa6edf783a18b82454c5f65073918cf243"
+    },
+    {
+      "path": "src/cloud_murakumo/site_worker.cljs",
+      "sha256": "4884a475c8253212c0b8a19dd02975f558b5fd28dc6ce8290506d601fbb29156"
+    },
+    {
+      "path": "public/health/fabric.json",
+      "sha256": "975915526e0fca80e82507f18f8ad8653229f264099f4c8ef4092e2f001071da"
+    },
+    {
+      "path": "public/organism/pulse.json",
+      "sha256": "5a7315205cd53e53806745e929b8bbfaed88fc7c2e83d281f9798e8af59701fe"
+    }
+  ],
+  "dependencies": [
+    {
+      "path": "../../kotoba-lang/kisekae",
+      "head": "fe145a2af46cde60a8b058a04f8262c1700b5d8e"
+    },
+    {
+      "path": "../../kotoba-lang/org-ietf-ed25519",
+      "head": "e96c4d0390b3f7d7c29f981e17ab666e16dc0fe0"
+    },
+    {
+      "path": "../../kotoba-lang/kotoba-ui",
+      "head": "3fe990359833a50a1044f96293b7a112357772ff"
+    },
+    {
+      "path": "../../kotoba-lang/uikit",
+      "head": "e637761e8e483c9f83e655dee690ea0d40caa57a"
+    },
+    {
+      "path": "../../kotoba-lang/org-vrmc-vrm",
+      "head": "1435914f66c4bcecbd53cb30769628f07de3b69d"
+    },
+    {
+      "path": "../../kotoba-lang/org-khronos-glb",
+      "head": "7c62014ce6814df2e55971964084c209466c07d3"
+    },
+    {
+      "path": "../../kotoba-lang/kotoba-lang",
+      "head": "ec360a802ce174d32627732ae069c8395c8b34d9"
+    },
+    {
+      "path": "../../kotoba-lang/shitsuke",
+      "head": "73a68a1773b8d8f6c6ebab419d6de156e7a9f949"
+    },
+    {
+      "path": "../../kotoba-lang/liquid-glass-ui",
+      "head": "17671db0657f783e9f079fa787a140c973cc578c"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "dist/worker.js",
+      "sha256": "fe427f20c1179704df34856bab1c4048047325487257010f26719eec6a824b19"
+    },
+    {
+      "path": "public/js/main.js",
+      "sha256": "73cbe94d8af891ddd6b8b52d0985fe9fbb0296f644a89b99175e2ff407c0cb89"
+    },
+    {
+      "path": "public/murakumo.edn",
+      "sha256": "0126c403692ccba1bd09b50dc14e5bc513a31c875a6ed411641420e8100e052d"
+    }
+  ],
+  "build": [
+    "npm",
+    "run",
+    "release"
+  ],
+  "isolation": "git-archive-plus-content-addressed-allowlist",
+  "command": [
+    "npx",
+    "wrangler",
+    "deploy"
+  ],
+  "result": {
+    "status": 0,
+    "cloudflareVersionId": "18f240ae-3018-413d-b677-ae13ef8c6a86",
+    "stdoutTail": "\n ⛅️ wrangler 4.103.0 (update available 4.112.0)\n───────────────────────────────────────────────\n\nCloudflare collects anonymous telemetry about your usage of Wrangler. Learn more at https://github.com/cloudflare/workers-sdk/tree/main/packages/wrangler/telemetry.md\n🌀 Building list of assets...\n✨ Read 19 files from the assets directory /private/var/folders/h_/bx1m0lv90qxb1sdrx5tqn8b80000gn/T/fabric-release-cloud-murakumo-nbXF1U/workspace/orgs/gftdcojp/cloud-murakumo/public\n🌀 Starting asset upload...\n🌀 Found 1 new or modified static asset to upload. Proceeding with upload...\n+ /health/fabric.json\nUploaded 1 of 1 asset\n✨ Success! Uploaded 1 file (13 already uploaded) (0.89 sec)\n\nTotal Upload: 241.23 KiB / gzip: 48.02 KiB\nWorker Startup Time: 1 ms\nYour Worker has access to the following bindings:\nBinding                                                                  Resource                  \nenv.KAIZEN_STATE (4efac27a07e043f99aa3c82352d66836)                      KV Namespace              \nenv.APP_NAME (\"murakumo.cloud\")                                          Environment Variable      \nenv.APP_FRAMEWORK (\"cljc-ui-ir+cljs-dom-adapter\")                        Environment Variable      \nenv.APP_SUBSTRATE (\"clj+kotoba+datomic\")                                 Environment Variable      \nenv.APP_KIND (\"distributed-gpu-cloud\")                                   Environment Variable      \nenv.MURAKUMO_OPENAI_URL (\"https://api.murakumo.cloud/v1\")                Environment Variable      \nenv.MURAKUMO_OPENAI_MODELS (\"qwen3.6-35b-a3b\")                           Environment Variable      \nenv.MURAKUMO_GENERATION_URL (\"https://murakumo-generation.gftd.ai\")      Environment Variable      \n\nUploaded murakumo-cloud (6.79 sec)\nDeployed murakumo-cloud triggers (2.79 sec)\n  murakumo.cloud (custom domain)\n  www.murakumo.cloud (custom domain)\n  Consumer for murakumo-kaizen\nCurrent Version ID: 18f240ae-3018-413d-b677-ae13ef8c6a86\n",
+    "stderrTail": ""
+  }
+}

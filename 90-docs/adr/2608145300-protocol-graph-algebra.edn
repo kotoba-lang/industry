@@ -1,0 +1,42 @@
+[{:db/id -1
+  :adr/id "ADR-2608145300"
+  :adr/title "kotoba-protocol の 2 種 link は表ではなく graph 代数として検証する"
+  :adr/status "accepted"
+  :adr/date "2026-08-14"
+  :adr/last_verified "2026-08-16"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "protocol-graph-algebra"
+  :adr/repos ["orgs/kotoba-lang/kotoba-protocol"]
+  :adr/related ["90-docs/adr/2608145200-protocol-planes-two-link-kinds.edn"
+                "90-docs/adr/2608145100-public-resource-identity-is-cid-and-ipns.edn"
+                "90-docs/adr/2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane.edn"]
+  :adr/authoritative_for
+  ["kotoba.protocol.graph の put-node / merkle-child / create-link / neighbors / walk"
+   "同じ CID へ merkle を足すと :cid-mismatch"
+   "create-link 前後で :nodes が ="
+   "kotoba.protocol.address の output/input と Holochain of-what"
+   "kotoba.protocol.surfaces の URL/DNS/HTTP/Git/pkg/RPC 投影"
+   "kotoba.protocol.discover の IPNI record が CID を変えないこと"]
+  :source/dataset "adr"
+  :adr/body
+  "ADR-2608145200 は面と link 種を決めた。この ADR はそれを fail するテスト付きの代数にした。
+
+## Status
+accepted — 2026-08-14。実装は `kotoba-lang/kotoba-protocol`。
+
+## 不変条件（テストが落とす）
+
+1. Entry A に CreateLink で B を足しても A の CID は同じ。merkle walk は B に届かない。action walk は届く。
+2. A の中に B の hash を埋め込む（merkle）と、同じ CID での put は `:cid-mismatch`。新しい CID だけが B を child に持つ。
+3. recipe の CID は input。その bytes 自体は output。両方 identity 面。
+4. EntryHash / ActionHash / DnaHash は naming ではない。AgentPubKey は authorization。
+5. HTTP URL と DNS は identity ではない。IPNI advertise は CID を書き換えない。UnixFS path は rejected。
+
+## 置かないもの
+
+Holochain conductor。無順序 DHT 書き込み面。公開 URI への path。IPNI origin 面は ADR-2608160300（2026-08-14 の「IPNI 専用 repo」禁止はその条を supersede）。IPNI advertise が CID を書き換えること。
+
+## 改訂履歴
+
+2026-08-14: accepted。
+2026-08-16: 「IPNI 専用 repo」禁止を ADR-2608160300 が supersede。IPNI record が CID を変えないことは維持。"}]

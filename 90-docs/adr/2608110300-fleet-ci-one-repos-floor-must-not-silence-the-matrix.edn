@@ -1,0 +1,110 @@
+[{:db/id -1
+  :adr/id "adr-2608110300-fleet-ci-one-repos-floor-must-not-silence-the-matrix"
+  :adr/title "ADR-2608110300: fleet-ci は「入力が信用できない gate」を拒否したまま、その拒否で tick 全体を落とさない — 無音の receipt 欠落は「未実行」と見分けがつかない"
+  :adr/status "accepted, implemented"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-11"
+  :adr/last-verified "2026-08-11"
+  :adr/last_verified "2026-08-11"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "fleet-ci-gate-input-rejection-isolation"
+  :adr/tags "fleet-ci, murakumo, gate, receipt, observability, min-files"
+  :adr/related ["adr-2607300900-github-actions-removal-murakumo-fleet-ci"
+                "adr-2608110100-selfhost-analyzer-was-removed-not-progressing"
+                "adr-2607178000-fleet-ci-tip-verify"]
+  :adr/supersedes ""
+  :adr/superseded_by ""
+  :adr/authoritative true
+  :adr/authoritative-for
+  ["gate 入力の拒否（:min-files 床 / argv 天井 / :max-ship-mb / archive 失敗）の影響範囲"
+   "receipt が無いことを「未実行」と読まないための表現"]
+  :adr/body
+  "# ADR-2608110300: 1 repo の床割れが matrix 全体を黙らせない
+
+**Status**: accepted, implemented
+**Date**: 2026-08-11
+
+## Context
+
+ADR-2608110100 の作業で `kotoba-selfhost-contracts` を fleet-ci gate に登録し、
+ノード上で緑になることを確認した。その後 `manifest/fleet-ci.edn` に receipt が
+**着地しないまま**になった。coverage.edn に自分で書いた降格条件
+（「receipt を出さなくなったら :m3 に落とす」）が発火した形である。
+
+原因は私の gate ではなかった:
+
+```
+2026-08-11T08:14:56 pathspec-filter kotoba-lang/amu 1949567f7fe4 : 67 files [\".c\" \".cljs\"]
+2026-08-11T08:14:56 FATAL filter found only 67 files for kotoba-lang/amu (expected >= 70)
+                     — refusing to build a gate input that would trivially pass
+```
+
+`amu-windows-loader-cross` gate の `:min-files 70` は現 main（`.c`/`.cljs` 77 件）に
+合わせた床で、**古い sha `1949567`（当時 67 件）に当たって割れた**。
+
+そして `die` は `js/process.exit 1` である。**同 batch 以降の全 work item が
+receipt を得ないまま tick が終了した** —— `kotoba-selfhost-contracts` は既に
+ノードへ割り当てられていた。
+
+## なぜこれが重いか
+
+**症状が「行が無い」なので、「拒否された」と「まだ実行されていない」が
+区別できない。** 台帳を見る側には両者が同じに見える。gate を登録した本人が
+「次の周で落ちるだろう」と読み、実際には**永久に落ちない**。
+
+fleet-ci は 2026-07-30 に GitHub Actions を置き換えた経路（ADR-2607300900）で、
+その撤去理由は **「落ちるのではなく走らないので、repo が green に見えたまま
+何も検査されていなかった」** ことだった。今回の形はその再現である —— 対象が
+Actions ではなく fleet の tick に移っただけで、**無音の不検査**という性質は同じ。
+
+## Decision
+
+### 1. 拒否は残す
+
+`:min-files` 床・argv 天井（20,000）・`:max-ship-mb`・archive 失敗は、いずれも
+**その gate の入力が信用できない**という正しい判断であり、緩めない。入力が
+検証できない gate は走らせてはならず、通してもならない。
+
+### 2. 拒否の影響範囲をその gate に閉じる
+
+`die`（プロセス終了）から `reject-input!`（`ex-info`）へ。work item の準備を
+try/catch で包み、拒否された item は `:outcome :input-rejected` として
+`results` に入れ、残りの matrix はそのまま走る。
+
+- `GATE-INPUT-REJECTED <id> <sha> — <理由>` を必ず出す
+- `tick done` の一覧に `:input-rejected` として現れる
+- `failed` に含まれるので rad 通知の対象になる
+- **batch の全件が拒否された場合は ci-verify を呼ばない** —— 空の repo リストに
+  receipt を署名するのは、receipt が無いことより悪い
+
+### 3. amu の床は下げない
+
+割れたのは古い sha に現在の床を当てたためで、床自体は正しい。下げれば
+「filter が壊れて 0 件 → trivially pass」を防ぐ機能が弱まる。修正後はその gate
+だけが `:input-rejected` として報告される。
+
+## Evidence
+
+床を到達不能値にした実測:
+
+```
+GATE-INPUT-REJECTED kotoba-selfhost-contracts 5e46bdc — filter found only 20 files
+  for kotoba-lang/kotoba-selfhost-contracts (expected >= 99999) — refusing to build
+  a gate input that would trivially pass
+batch 0 — all 1 work items refused their input; nothing to run
+tick done — [[\"kotoba-selfhost-contracts\" :input-rejected]]
+```
+
+修正前はこの位置でプロセスが終了していた。
+
+## Consequences
+
+- **receipt の不在を「未実行」と読まない。** 拒否は拒否として台帳外のログと
+  `tick done` に出る。
+- **gate を登録しただけで maturity を主張しない。** coverage.edn の
+  `:selfhost :maturity-evidence` は「registered」ではなく「receipt が出ている」
+  ことを条件にしてある。今回はその条件が正しく発火した。
+- 一般化: **「安全のために止める」機構を書くとき、止める範囲を測る。**
+  正しい拒否でも、範囲が広すぎると無関係な検査を無音で消す。"}]

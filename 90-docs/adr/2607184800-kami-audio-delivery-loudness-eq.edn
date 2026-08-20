@@ -1,0 +1,48 @@
+[{:db/id -1
+  :adr/id "adr-2607184800-kami-audio-delivery-loudness-eq"
+  :adr/title "KAMI adds loudness-safe DAW delivery and shared NLE EQ authority"
+  :adr/date "2026-07-18"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/topic "kotoba-lang-media-authoring"
+  :adr/supersedes ["adr-2607184700-kami-direct-clip-proxy-preview"]
+  :adr/decision
+  {:daw {:loudness-filter :browser-biquad-k-weight-equivalent
+         :loudness-block-ms 400
+         :loudness-step-ms 100
+         :absolute-gate-lufs -70
+         :relative-gate-lu -10
+         :true-peak-oversampling 4
+         :normalization-gain :minimum-of-target-lufs-and-true-peak-ceiling
+         :delivery-report [:measured-lufs :measured-dbtp :gain-db :predicted-lufs :predicted-dbtp]
+         :broadcast-certification false}
+   :nle {:eq-bands {:low {:type :lowshelf :frequency-hz 120}
+                    :mid {:type :peaking :frequency-hz 1000 :q 0.8}
+                    :high {:type :highshelf :frequency-hz 8000}}
+         :gain-range-db [-12 12]
+         :authorities [:clip/audio-eq :project/master-eq]
+         :shared-graph [:decoded-preview :media-recorder-export]
+         :dissolve-secondary-eq true
+         :project-reopen-resync true}
+   :maturity {:kami-app-daw :逍遥 :kami-app-nle :逍遥}
+   :remaining-commercial-gates {:shared ["persistent directory grants" "streaming package I/O above 512 MiB"]
+                                :daw ["plugin hosting" "bus automation" "certified broadcast loudness conformance" "bundled multichannel stems"]
+                                :nle ["independent multitrack audio lanes" "integrated loudness delivery" "color management" "persistent/background proxy jobs" "additional containers"]}}
+  :adr/implementation
+  {:daw-commits ["984ef97ac49c287016ea0460c41bf847d81d2ef1"]
+   :nle-commits ["2d8e109bde7718aa1358244dd70087dc2dc8ed95"]
+   :pull-requests ["kotoba-lang/kami-app-daw#6" "kotoba-lang/kami-app-nle#6"]
+   :evidence ["DAW passes 14 tests and 56 assertions; NLE passes 16 tests and 60 assertions, including gating, ceiling gain, EQ bounds, validation and render-segment authority."
+              "Both shadow-cljs production releases completed through the repository resource guard."
+              "DAW Chrome measured the oscillator master at -19.0 LUFS and -7.9 dBTP, applied +5.0 dB, reported -14.0 LUFS and -2.9 dBTP, and produced a WAV download without console errors."
+              "NLE Chrome decoded a real AAC/H.264 fixture, created nine Biquad nodes, applied +6 dB clip low EQ and -4 dB master high EQ, and persisted both authorities in recovery EDN without console errors."
+              "The NLE graph connects the same clip and master filters to browser preview output and MediaStreamDestination export, and explicitly resynchronizes master EQ before both play and export."
+              "Automated browser contexts and local HTTP servers were closed after verification."
+              "Both application pull requests were reviewed and squash-merged."
+              "The prescribed freshness and ledger verifier scripts are absent from this root revision; direct EDN parsing verified accepted status, supersedes authority and the non-certification boundary."]}
+  :adr/consequences
+  ["DAW delivery can target a requested loudness without crossing its configured true-peak ceiling."
+   "Reported DAW loudness is a deterministic browser-native production aid, not a claim of certified EBU/ATSC meter conformance."
+   "NLE clip and master tone shaping survives project recovery and controls both monitoring and production export."
+   "Independent audio-only lanes, automation and delivery loudness remain separate NLE maturity work."]
+  :adr/source-format "edn"}]

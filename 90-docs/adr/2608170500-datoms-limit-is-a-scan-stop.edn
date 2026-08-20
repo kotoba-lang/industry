@@ -1,0 +1,46 @@
+[{:db/id -1
+  :adr/id "ADR-2608170500"
+  :adr/title "relay-bsky の datoms :limit 1 が 35s なのは fold 欠如ではなく、limit が decrypt の後だった"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :adr/deciders "Jun Kawasaki（「next」）"
+  :adr/relates-to "ADR-2608170100（resume: fold 記録で切り分け）, ADR-2608170200（serving plane）, ADR-2607032430（hot-datoms が scale-safe という主張）"
+  :adr/repos ["kotoba-lang/prolly-tree" "kotoba-lang/kotobase-peer"]
+  :adr/body
+  "# ADR-2608170500: :limit は scan の停止条件であって post-filter ではない
+
+**Status**: accepted / **Date**: 2026-08-17
+
+## 測ったもの
+
+| 呼び出し | 結果 |
+|---|---|
+| `POST kotobase.net/.../datoms` relay-bsky CID, `limit=1` | **http 500, 37.2s** — ADR-2608170100 と同じ崩壊 |
+| `GET appview.aozora.app/.../getDiscoverFeed?limit=5` | **http 200, 193ms, feed に投稿あり** |
+
+Discovery は回復している。§4 の「view が materialize されていない」は、少なくとも AppView 経路については今は当たらない。残っているのは **公開 datoms の EAVT 全走査**。
+
+`:async-get-fn` は `kotobase-graph-database` の `read-store-extras` に **既にある**。O(N^2) trampoline ではない。
+
+## 原因
+
+`hot-datoms` → `cold-datoms-async` → `scan-prefix-async` は prefix 空（components 無し）で **木全体** を返す。その後すべての ciphertext を decrypt し、最後に `(take limit)`。
+
+`prolly-tree` の `scan-prefix` / `scan-prefix-async` に limit 引数は無かった。だから `limit=1` でも CPU は O(graph)。~35s で Worker が死ぬ。
+
+Novelty 半面は今も全 novelty block を読む。今日の修正は snapshot 半面。novelty が fold 閾値を大幅に超えていれば、limit を scan に載せてもまだ死ぬ。
+
+## 着地
+
+1. `prolly-tree` `da30b75` — `scan-prefix` / `scan-prefix-async` の optional `limit`。2000 key で limit=1 の get 数 < 全走査。cljs は limit 時に子を左から順に歩き、並列全子 fetch をしない。
+2. `kotobase-peer` `2ed76f5` — `cold-datoms` / `cold-datoms-async` が limit を scan に渡す。`visible?` の後の `take` は残す。dropping `visible?` は `:limit` 未満で止まりうる。公開経路は `(constantly true)`。
+
+## 着地していない
+
+live Worker（`kotobase-cf-wasm-staging`）はまだ古い peer。公開 datoms は今も ~35s。peer pin を control-plane に上げて deploy するまで効かない。
+
+## 使ってはいけない次の手
+
+- 動いている `kc/view` を `:avet` に置き換える（ADR-2608170100 で取り下げ済み）
+- GraphSync を query にする
+- fold 記録が取れるまで scan limit を入れない（Discovery が生きている時点で切り分けは済んでいる）"}]

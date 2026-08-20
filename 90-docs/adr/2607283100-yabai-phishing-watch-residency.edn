@@ -1,0 +1,343 @@
+[{:db/id -1,
+  :adr/id "adr-2607283100-yabai-phishing-watch-residency",
+  :adr/title "ADR-2607283100: フィッシング判定を常駐化 — CT log 供給 + tamaki exec + LaunchAgent、murakumo は幅",
+  :adr/status "accepted, implemented, live",
+  :adr/doc_type "adr",
+  :adr/date "2026-07-28",
+  :adr/deciders ["Jun Kawasaki (+ Claude)"],
+  :adr/topic "yabai-phishing-watch-residency",
+  :adr/related ["adr-2607283000-yabai-phish-infra-cljc-port"
+                "adr-0004-ct-watch-worldwide-supply-and-residency"
+                "adr-0003-phish-infra-brand-impersonation-scorer"
+                "adr-2607255100-toshokan-self-growing-resident-ingest"
+                "adr-2607251552-toshokan-patents-worldwide-patent-resident-harvest"
+                "adr-2607256000-murakumo-task-plane-distributed-execution"],
+  :adr/supersedes [],
+  :adr/superseded_by [],
+  :adr/repos ["com-junkawasaki/root" "cloud-itonami/yabai-actor" "etzhayyim/tamaki"],
+  :adr/authoritative true,
+  :adr/authoritative_for ["ドメインのフィッシング判定が常駐している実体（LaunchAgent com.etzhayyim.yabai.ct-watch-tick + tamaki exec）"
+                          "決定論 tick を tamaki loop ではなく tamaki exec で表現する区別"
+                          "murakumo を heartbeat ではなく幅（fan-out）に使う判断"],
+  :adr/last_verified "2026-07-29",
+  :adr/body "# ADR-2607283100: フィッシング判定の常駐化
+
+**Status**: accepted, implemented, live
+**Date**: 2026-07-28
+
+## Context
+
+ADR-2607283000 でドメインのフィッシング判定器（yabai `phish_infra`）を作ったが、
+**母集団供給が無い**ことを残ギャップとして明記していた。オーナー指示:
+「これが tamaki cli, murakumo で 常駐化するように整えて」。
+
+供給が無いまま常駐させれば、同じ 150 件を永遠に再スコアするだけの見せかけになる。
+したがって常駐化は「供給を作ること」と不可分だった。設計・実測の正本は子リポの
+**ADR-0004**。ここは superproject 側の位置づけだけを記す。
+
+## Decision
+
+### 供給 = Certificate Transparency log の直接 tail
+
+crt.sh は 1 ドメイン指定には正しいが（ADR-0002）、母集団供給には**使えない**ことを実測した
+（`?q=mastercard.com` → 503、`?q=%25mastercard%25` → 502/404）。CT log 本体の
+`get-sth` / `get-entries` は鍵不要の機械向けインタフェースで、地球上で発行された公開信頼
+証明書すべてを記録している（argon2026h2 = 22 億件）。
+
+**順序が設計の要**: CT は firehose なので、純粋な lexical prefilter を全件へ先に通し、
+生き残った一握りだけが DNS/ASN でネットワークに触れる（実測 3035 名 → 11 件）。
+
+### 常駐 = LaunchAgent + `tamaki exec`（toshokan パターン）
+
+`com.etzhayyim.yabai.ct-watch-tick`（毎時）→ `~/.gftd/run-yabai-ct-watch-tick.cljs`（nbb）
+→ **`tamaki exec`** → `bb -m yabai.methods.ct-watch --live --score --commit`。
+
+**`tamaki loop` ではなく `tamaki exec` を使う。** loop（`loops/*.edn`）は runner
+（codex/claude/grok）を回す**モデル入り**の成熟度ループで、本 tick は決定論。混ぜると
+「モデルが判定している」と読める記録になる。`exec` は `:agent.run/mode :external` として
+実 argv と exit code のまま記録し、`tamaki status` に出る。
+
+murakumo WASM on-tick にはしない — ADR-2607255100 §4 が toshokan で下したのと同じ判断で、
+LaunchAgent が今日の正直な production 経路（`toshokan-tick` / `toshokan-patents-tick` /
+`fleet-ci-murakumo-tick` と同クラス）。
+
+### murakumo = heartbeat ではなく「幅」
+
+`ct_watch --plan N` が `murakumo task run --tasks` にそのまま渡せる batch を出す。実測:
+4 slice を `murakumo task plan --tasks` に通し、planner が fleet（11/12 node・132 cores）へ
+配置することを確認（**実行はしていない** — `plan` は純粋プレビュー）。
+毎時の心拍を fleet に散らすのではなく、広域 sweep をしたいときだけ fan-out する。
+
+### tamaki 側の登録（判断作業は loop、心拍は exec）
+
+`etzhayyim/tamaki` に `actors/yabai-phishing-watch.edn` +
+`loops/yabai-phishing-watch.edn` を追加した。これは **watch 本体ではなく、その周りの
+判断作業**（brand roster を増やす・CT shard を増やす・fan-out を実行可能にする）。
+`bin/tamaki-supervisor` は `TAMAKI_LOOP_SPEC` を 1 つしか見ないので、**spec を置いても
+勝手には起動しない** — 起動は明示的に
+`bin/tamaki loop ensure --spec loops/yabai-phishing-watch.edn`。
+`:loop/auto-approve false`、`:external-effect :voice-required`（abuse report は第三者を
+名指しして estate の外に出る）。
+
+## Live 確認（2026-07-28）
+
+```
+launchctl                com.etzhayyim.yabai.ct-watch-tick loaded、RunAtLoad で初回 tick 実行
+tick 実測                2000 entries → 3411 SAN → 15 candidate → 13 解決 → cumulative 63
+tamaki status            run-1785239117549-7bfecc85 :mode :external :status :succeeded
+自己 commit/push         chore(ct-watch): argon2026h2 2204345286..2204347286 … を origin/main へ
+                         （checkout は clean を維持 = west update を塞がない）
+実検出                   whatsapp-income-assistance-center.com.ph /
+                         whatsapp-income-redeeming.com.ph（同一 Linode IP）を candidate 820
+偽陽性                   同 slice の CDN 上 containment ノイズ 9 件はすべて claim なし
+tests                    49 tests / 10083 assertions green
+```
+
+## 続き（2026-07-28、同日）— 自律ループの最適化対象
+
+「成熟度を自律的に ai agent が上げるには」への答えは **tamaki が上げる側・murakumo は基盤**だが、
+機構は両方すでに動いており、足りなかったのは**数値**だった。子リポ **ADR-0005** で決定論的な
+fitness function を入れた（`bb -cp src -m yabai.methods.maturity` → `docs/maturity.edn`、
+初回 231/1000）。floors（benign 36 件が claim ゼロ / 明白な偽装 7 件を取りこぼさない）が
+gradient（coverage 寄りの 5 次元）をゲートし、**閾値を緩める改悪は score 0** になる。
+tamaki の `loops/yabai-phishing-watch.edn` はこの score を `:loop/fitness` として名指す。
+
+**supervisor の挙動について前言を訂正する**: `bin/tamaki-supervisor` は `actors/*.edn` を
+**全部自動発見して 60 秒ごとに `actor reconcile --execute` する**。`loops/` が
+`TAMAKI_LOOP_SPEC` 1 本なのは正しいが、actors には当てはまらない。したがって
+`actors/yabai-phishing-watch.edn` は supervisor の checkout が main に同期した時点で
+自律的に run を spawn し始める（現在その checkout は main から乖離しており未稼働）。
+
+**radicle の成長も止まっていた**: identity は west manifest にあり node も稼働していたが、
+checkout に rad remote が無く rad 側 main は `cebe2b4` で 7 commits 遅れていた。
+`actor.edn` の `:rad-rid` + tick の `mirror-to-radicle!` で両プレーンに流れるようにし、
+GitHub / radicle とも `e2c1d48` に揃えた。
+
+## Closing 状態（2026-07-28 セッション終了時点）— 次の agent への resume point
+
+**稼働中**: `com.etzhayyim.yabai.ct-watch-tick`（毎時、最終 exit 0）·
+`dev.kotoba.tamaki.supervisor`（restart 済み、稼働中）。
+maturity は **231 → 256**（`bb -cp src -m yabai.methods.maturity`）。上がったのは
+infra-breadth 0.317→0.45 と observation-volume 0.111→0.132 で、tick が観測を貯めた分だけ。
+cumulative observations 63 → 104。
+
+**「tamaki checkout が自壊した」という前言を撤回する（2026-07-29 訂正）**:
+この ADR は当初、`orgs/kotoba-lang/tamaki` の共有 checkout が supervisor 稼働中に
+2 度中身を失った（`.tamaki/` だけが残り書き込まれ続けていた）と記録し、原因未特定と
+していた。**これは誤りで、原因は私の path 誤りだった。**
+
+west manifest における tamaki の path は **`orgs/etzhayyim/tamaki`** であり、
+`orgs/kotoba-lang/tamaki` は west project ではない。登録側の checkout は
+**一度も消えておらず**、今も clean・`family.clj` の修正入り・`bin/tamaki status`
+応答可能な状態にある（2026-07-29 確認、HEAD `17e50d2`）。`orgs/kotoba-lang/tamaki`
+に残っていた `.tamaki/` は、**`TAMAKI_STATE_DIR` 未設定の tamaki が cwd 配下に作る
+ただの state ディレクトリ**——私の runner のコメント自身がその挙動を説明している。
+私はそれを「repo が自分で消えた痕跡」と読み、他コンポーネントの障害として
+ADR 2 本と commit message に書いた。yabai 側の `TAMAKI_BIN` 既定値が
+未登録 path を指していただけで、**症状は最初から最後まで私の typo だった**。
+
+再発防止として残す教訓は cleanup 手順ではなく判断の側にある: **他コンポーネントの
+異常を疑う前に、自分の設定がそのコンポーネントの正本（ここでは west manifest の
+`path:`）と一致しているかを確認する。** 修正は `3450f00`（yabai）。
+なお fast-forward 前後で committed な作業の喪失は無い（GitHub / radicle に全て存在）。
+
+**その過程で fleet 全体の障害を発見・修正した**: `619bede7` が
+`(catch java.nio.file.AtomicMoveNotSupportedException ...)` を `family.clj` に入れており、
+**bb の SCI がこのクラスを解決できず analysis 時に `kotoba.tamaki.cli` 全体が load 失敗**。
+`bin/tamaki` は bb で動くので、supervisor・loop 3 本・yabai tick が**すべて exit 1** に
+なっていた。`java.io.IOException`（supertype）を catch する 1 行修正で復旧（`e5f4fed`、
+261 tests / 784 assertions green）。west pin も `619bede7 → e5f4fedd` へ前進させた
+（CLI が起動しない commit を pin し続ける方が悪い）。
+
+## 2026-07-29 — 常駐が「動いているように見えて動いていなかった」3 点
+
+前日の closing は「毎時 exit 0・6 shard・両プレーンへ push」と書いたが、
+**そのうち 2 つは実際には成立していなかった**。いずれも同じ型の欠陥
+——**失敗が成功として表示される**——で、テスト中に順に露出した。
+
+1. **LaunchAgent の env override が全部死んでいた。** nbb では
+   `(.-env.FOO js/process)` が `process.env.FOO` に解決されず **nil** を返す
+   （実測: dotted nil / `(.. js/process -env -FOO)` と `aget` は正常）。
+   したがって plist の `YABAI_CT_LOG=all` は一度も効いておらず、
+   **常駐 tick は argon2026h2 1 本だけを見ていた**。「6 shard を tail している」
+   という前日の記述は branch 上の事実で、production の事実ではなかった。
+   env は helper 経由に統一し、既定値自体を `\"all\"` にして
+   「override が届かないと壊れる」構造をやめた。
+2. **push 成否を stdout の grep で判定していた。** git は rejection も
+   `fatal:` も **stderr** に書き、`sh` は stderr と exit code を捨てていたので、
+   **失敗した push は必ず成功として記録された**。`sh*` が
+   `{:out :err :exit}` を返し exit code で判定するよう変更（origin と radicle
+   の両方）。実 rejection に対して `:pushed false` + exit 1 を確認。
+3. **`TAMAKI_BIN` が west 管理外の path を指していた**（上の訂正節）。
+
+**この 2 番目の修正が即座に本物の障害を 1 件掘り当てた**: **radicle plane は
+成長していない。** 鍵が ssh-agent に無く（`Radicle key … is not registered`）、
+rad 側 main は `77be244` で GitHub `674fa52` から **4 commits 遅れ**。
+旧判定ではこれが毎時 `:pushed true` と記録されていた。
+**この identity（alias `junkawasaki`、`z6MkpPKis…`）の passphrase は kagi にも
+Keychain にも無い**（secrets-location-map を訂正済み — 従来「到達不能な別端末の
+もの」と書かれていたが、実際にはこの Mac の `~/.radicle` に存在し、単に
+保管されていない）。安全床①により agent は passphrase を推測も入力もしない
+——**オーナーが `rad auth` を実行し kagi `personal/radicle-junkawasaki-passphrase`
+に保存するまで、radicle の成長は止まったまま**。GitHub 側は無影響。
+
+**6 shard 化で露出した精度欠陥も 1 件修正した**: argon2027h1 の 94 candidate の
+うち 70 が AWS 中国/EU リージョンと Microsoft Fabric 内部ホストだった。
+home 判定が**登録可能ドメイン**同士の比較だったため、`amazonaws.com.cn` /
+`microsoft-int.com` のような地域・内部 estate に届いていない。home を
+**任意の dot-suffix 一致**に変え、estate を 3 件追加。実測 tick の全候補 212 件で
+**212 → 15**（197 drop）、実検出 2 件——`microsoft.com.244778543667.umadb.ro`
+（`.com` を挟んだ subdomain 偽装）と `instagram.novu.eu`——は保持。
+suffix 一致が広すぎて subdomain 偽装を飲み込まないことを、この 2 件を
+テストに固定して担保した。
+
+**現在の実測状態**: 全 6 shard tick が exit 0 で完走
+（`3450f00..674fa52` を GitHub へ、`tamaki exec` 経由で
+`:mode :external :status :succeeded`）。100 tests / 13509 assertions green。
+
+## 2026-07-29（続き）— 「測っていた数値」が測っていなかったものを直した
+
+**repo が移動した**: `etzhayyim/com-etzhayyim-yabai` → **`cloud-itonami/yabai-actor`**
+（別セッションの作業）。west path も `orgs/cloud-itonami/yabai-actor` に変わった。
+本 ADR 中の旧 path 表記はこの新 path に読み替えること。
+
+### fitness function が最大の欠陥を見られなかった（ADR-0005 を改訂）
+
+既存 5 次元はすべて **自分の山**（brand 数・累積 domain 数・ASN 数）を測っており、
+**watch がレースに負けていること自体を表現できなかった**。実測: 6 cursor が head から
+**29,206,861 entries 遅れ**、消費は **1,998 entries/時**、argon2026h2 の head だけで
+私が 333 取る間に約 230 万進む。山は確かに育つので、全次元がそれを「前進」と読んだ
+（score 508/1000、実カバレッジは発行量の 0.1% 台）。**動かすべきものを動かしても
+動かない指標は、指標が無いより悪い**——それを最適化する agent は永久に同じ細流を
+汲み続ける。
+
+`:issuance-coverage`（消費レート ÷ 発行レート、weight 0.25 で brand-coverage と同率
+最重）を追加し、`:observation-volume` を 0.20 → 0.10 に半減（最も甘く最も情報量が
+少ない項）。tick が `:history`（epoch-ms・head・cursor、96 sample ≈ 4 日）を書くので
+**scoring 時に時計を読まない**（timestamp はデータ）。
+嘘をつきうる 2 経路は塞いでテストで固定した: **測れない時は nil を返し 0 でも 1 でもない**
+（score は次元を落として重みを再正規化し `:maturity/incomplete` と
+`:maturity/scored-out-of` を報告する。0 は新規 clone を罰し、1 は「未測定」を「満点」に
+化けさせる）／**head が止まったら nil**（死んだ upstream を達成カバレッジに見せない）。
+
+### 消費が少なかった真因は fleet ではなく定数だった
+
+`collect-names!` が **64 リクエスト固定 guard** を持ち、argon は 1 応答 ≈ 32 entries を
+返すので、`--entries` が何であれ **1 shard ≈ 2,019 entries で打ち止め**だった
+（4096 要求 → 2019 を実測）。外からは「予算を使い切った」と「guard を使い切った」が
+同一に見えるため、誰も報告しなかった。guard をリクエスト比例（32 + n/16）にし、
+`:stopped`（`:budget`/`:request-cap`/`:log-stalled`）と `:behind` を報告させた。
+併せて **6 shard を並行実行**（log 間のみ並行、log 内は逐次＝1 事業者あたり同時 1 request）。
+共有 cursor は `update-state!` が **lock 内で読み直して**書く——read-once/write-whole-map
+のままなら最後に終わった shard が他 5 本の cursor を 1 時間巻き戻していた。
+
+実測: 36,000 entries の live tick が **wall 278s、全 shard `:stopped :budget`**、
+129 entries/秒（従来の実効 0.55/秒）。常駐 tick を 36,000/時に引き上げ済み（**18 倍**）。
+
+### 正規化が「誰も書いていないブランド」を作っていた
+
+`:contains` が label 境界を越えて一致していた。`<hex>.sni.cloudflaressl` は
+`snicloudflaressl` に正規化され、**dot を消したせいでだけ** `icloud` を含む。CT で最も
+ありふれた名前の一群が毎 tick 全部通過していた。`:contains` は **1 つの dot-label 内**で
+brand が生き残る場合のみに限定した（`mast-crade` のための hyphen 除去は維持）。
+
+**この欠陥は前日すでに見つけており、テストに「MEASURED COST」として固定していた** —
+説明を書き、価格として受け入れていた。価格ではなかった。**欠陥について丁寧な注記を
+書くことと、欠陥だと認識することは別物**で、注記があるぶん「意図的」に見えて 36k tick
+の物量が問題を突きつけるまで生き延びた。当該テストは今は逆を主張し、理由を書いている。
+
+### fan-out は「実行されたことが一度も無い」プレビューだった
+
+`--plan` が吐く task の `:cmd` は `cd <ローカル repo-root> && bb -cp src` ——このラップトップ
+にだけ在り、どの fleet node にも無い path。**接触した瞬間に失敗する batch のプレビュー**
+だったので、ADR-0004 以来一度も実行されていなかった。
+
+`--fanout` を実装した（`rsync src/ → node` → **node 上で純粋 prefilter まで実行** →
+候補だけ返す → ローカルで DNS/scoring/fold）。**firehose は node に留まる**のが設計の要で、
+実測 22,000 entries が node 上で 47,470 SAN 名を処理し、帰ってきたのは 167 名だけ。
+`--slots 1`（1 node あたり同時 1 request）は tuning ではなく設計制約——CT log は公共財で、
+ここを throughput 問題として扱う誘惑に対する明示的な歯止め。
+
+初版が `{:ok true, :attempts 0}`（**1 task も配置していない fan-out を成功と報告**）を
+返した——`task run` は cwd 基準で fleet.edn を解決する。`sh*` に作業ディレクトリを持たせ、
+`:ok` を `(pos? succeeded)` にし、失敗時は murakumo の stderr を判定と一緒に返すようにした。
+
+実測 fan-out（1 コマンド・10 node）: wall 393s / 12 task / 14 attempt / 12 成功 / 2 再試行、
+22,000 entries、167 候補 → 154 解決。前回の手動 fan-out は 11 confirmed / 24 candidate を
+産み、`facebook-account-login-*.{org,net}.ph` クラスタと `instagram-followers-*` 群という
+**常駐 tick が数時間到達しない slice からの実検出**だった。
+
+### fleet 実容量の回復と path 追随
+
+`bb` が naphtali / dan / issachar に**未インストール**だった（PATH ではなく実体が無い）。
+brew で導入し、joseph は一時的 SSH timeout だった。**利用可能 node 8 → 11**
+（xavier は fleet.edn 既知の未解決 host）。
+
+**silent divergence を 1 件未然に潰した**: repo 移動後も常駐 tick は旧 path に書いていた。
+`west update` すれば **新 path に 2 つ目の checkout ができて静かに分岐**し、tick は片方に、
+west/CI/新規 clone は他方を読む状態になっていた。GitHub の redirect が push を通し続ける
+ぶん、誰も気づかない類の破損。`YABAI_ROOT`・runner 既定・未設置の heartbeat plist を
+新 path に追随させ、west pin を `64cb11c → 858d038`（pure ff、単一行 diff）に前進させた。
+
+### 検証
+
+`110–112 tests / 14,029–17,599 assertions green`（変更ごとに実行）。live 検証は
+36,000-entry tick（exit 0、GitHub push 成功）と 1 コマンド fan-out（exit 0）。
+
+**次の一手（優先順）**:
+1. **radicle — オーナー作業待ち（唯一の human blocker）**。鍵が ssh-agent に無く
+   rad main が GitHub から遅れ続けている。この identity（alias `junkawasaki`,
+   `z6MkpPKis…`）の passphrase は kagi にも Keychain にも無い（安全床①により agent は
+   推測も入力もしない）。`rad auth` 実行 → kagi `personal/radicle-junkawasaki-passphrase`
+   に保存、で解ける。
+2. **`:issuance-coverage` はまだ未測定**（shard あたり history 1 sample、rate には 2 必要）。
+   次の hourly tick で自動的に測定可能になる。**そこで初めて score が全 weight で出る** —
+   それまでの数値は `:maturity/incomplete` 付きの暫定値として読むこと。
+   この次元は**下がる方向に効くはず**（実カバレッジは 1% 未満）なので、
+   score が下がっても退行ではない。
+3. **orphan checkout `orgs/etzhayyim/com-etzhayyim-yabai`** が残っている（west 管理外）。
+   in-flight tick のデータが push 済みであることを確認してから `git-cleanup-conflict` で
+   retire する。**消す前に確認すること** — 常駐 tick が最後に書いた先はここ。
+4. `actors/yabai-phishing-watch.edn` は `{:spawn 1 :desired 1 :running 0}` のまま
+   **一度も run を spawn していない**。「AI agent が自律的に成熟度を上げる」の自律側は
+   依然として仮説で、ここまでの改善はすべて人手（私）による。
+5. 残る coverage の重り: brand roster 25/50・CT log 6/12。
+   なお **log を増やすと `:issuance-coverage` は下がる**（発行量の分母が増える）——
+   これは指標の欠陥ではなく、正直な会計。
+
+**参考: `cloud-itonami/yabai-actor` は public**（2026-07-29 確認）。私は visibility を
+変更していない。脅威インテル corpus が world-readable である事実として記録する。
+
+## Consequences
+
+**Good**
+
+- ADR-2607283000 が残した**母集団ギャップが閉じた**。判定器に世界規模の供給が毎時流れ込む。
+- 常駐が `tamaki status` から見える。決定論 tick をモデル実行と偽らない形で記録される。
+- tick が自分の成果物を commit/push するので、共有 west checkout が dirty のまま残らない
+  （= `west update` と他 agent の作業を塞がない）。git 履歴が成長ログになる。
+
+**Bad / 負債**
+
+- **sampling であって完全網羅ではない。** 毎時 2000 entries は世界の発行量のごく一部。
+  コーパスに無いことは「未サンプル」であって「フィッシングでない」ではない。
+- **fan-out の実行は未検証**（`task plan` は通ったが、`task run` には各 node に yabai
+  checkout が要る）。
+- **brand roster は 5 件のまま** — firehose を流しても roster 外のブランド偽装は素通りする。
+  ここが次に効く最大の投資で、tamaki loop の objective 第 1 項にした。
+- **tick が毎時 commit するので west pin は恒常的に古くなる**（toshokan と同じ性質）。
+  pin は「その時点で到達可能な commit」として扱う。
+- `orgs/kotoba-lang/tamaki` の共有 checkout は `origin/main` から乖離している
+  （自律サイクルの commit `58e0117` が main に無い）。本 ADR では触っていない —
+  pin は GitHub 側 main（`312e8ae`）を検証して入れた。解消は `git-cleanup-conflict` 案件。
+
+## 併せて行った pin 前進
+
+| project | from | to | 理由 |
+|---|---|---|---|
+| `com-etzhayyim-yabai` | `d7809d8a` | `5f436931` | ADR-0004 + 常駐 tick の初回 commit |
+| `murakumo` | `faa83d6a` | `8fcc93f5` | ローカルが 105 commits 遅れで task plane（ADR-2607256000）が不在だった |
+| `tamaki` | `1edd86f1` | `312e8ae7` | loop/actor spec 追加。ローカル checkout は乖離のため GitHub main を検証して採用 |
+
+いずれも `verify-west-pins` で fast-forward を確認済み。
+"}]

@@ -1,0 +1,128 @@
+[
+;;; Iteration 24 (2026-07-26). ADR-2607257200.
+;;; Exchange systems and movement infrastructure — two clusters the corpus had
+;;; touched only at the edges. Counts llm-recall-unverified unless pinned.
+
+{:org/id :org-che-wir-mutual-credit
+ :org/name "WIR mutual credit circle and business barter networks (Sardex, LETS for firms)"
+ :org/entity-kind :named-org
+ :org/form-family :family-cooperative-enterprise
+ :org/category :cat-labor-coop
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-europe
+ :org/countries ["CH" "IT" "AR" "GB"]
+ :org/founding-date 1934
+ :org/founding-note "Founded in the Depression as a mutual credit circle among Swiss SMEs; still operating as a cooperative bank."
+ :org/member-count 50000
+ :org/member-count-basis "source-pinned, dated: more than 50,000 participating SMEs — commonly given as around 17% of Swiss businesses — transacting in a parallel unit (CHW) alongside francs; a 2013 figure put annual WIR-denominated turnover near CHF 1.43 billion. Current participation and turnover were not confirmed, so treat both as historical markers."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "A closed circle of small firms extending each other credit in their own unit of account, counter-cyclical by design — a community whose shared asset is a currency, and the longest-running such system in the world."
+ :org/source-name "WIR Bank Genossenschaft profiles / Monneta complementary currency database"
+ :org/source-url "https://monneta.org/en/wir-bank-switzerland/"
+ :org/source-date "2013"
+ :org/source-tier :secondary
+ :org/source-caveat "The 50,000 / CHF 1.43bn figures are widely repeated but the most concrete source found is a decade old."
+ :org/refresh-checked "2026-07-26"
+ :org/refresh-result "Checked Bank WIR's investor-relations and annual-report pages (gb.wir.ch, wir.ch/kennzahlen): they publish balance sheet, profit and equity — 2024 record profit CHF 17.5M, balance sheet CHF 6.6bn — but NOT the number of participating SMEs or WIR-currency turnover. The institution reports what a bank reports; the community metric is not among them, so there is no newer participation figure to pin."
+ :org/pinned-on "2026-07-26"
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-local-currencies
+ :org/name "Local and community currencies (Chiemgauer, Bristol Pound, 地域通貨, Ithaca Hours)"
+ :org/entity-kind :org-form
+ :org/form-family :family-gift-and-sharing
+ :org/category :cat-mutual-aid
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["DE" "GB" "JP" "US" "BR" "KE"]
+ :org/founding-date 1932
+ :org/founding-note "Wörgl's 1932 stamp scrip is the canonical experiment; most current schemes date from the 1990s onward."
+ :org/instance-count-estimate 3000
+ :org/member-count-basis "unknown — several thousand schemes have been launched worldwide and a large share have since folded; surviving ones publish circulation rather than membership."
+ :org/legal-registration :mixed
+ :org/governance-model :democratic
+ :org/mission-statement "Currencies issued by an association and accepted within a district, usually with demurrage or a redemption levy funding local causes — a community that constitutes itself by agreeing what counts as money."
+ :org/related-org "org-global-time-banks-lets"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-street-medics
+ :org/name "Street medic and protest first-aid collectives"
+ :org/entity-kind :org-form
+ :org/form-family :family-volunteer-emergency
+ :org/category :cat-emergency-volunteer
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "FR" "CL" "HK" "SD" "MM"]
+ :org/founding-date 1965
+ :org/founding-note "Medical Committee for Human Rights volunteers at US civil rights marches are the acknowledged origin."
+ :org/member-count-basis "unknown — collectives train in cohorts and operate pseudonymously; membership records would expose volunteers to prosecution in several jurisdictions."
+ :org/legal-registration :unregistered
+ :org/registration-note "Non-registration here is protective: in a number of countries treating injured protesters has itself been prosecuted."
+ :org/governance-model :consensus
+ :org/mission-statement "Trained volunteers providing first aid inside protests and disasters where ambulance access is blocked — a medical service that exists precisely in the places formal services cannot or will not enter."
+ :org/related-org "org-sdn-resistance-committees"
+ :org/coverage-note "Descriptive coverage of a mutual-aid form; the corpus takes no position on any protest movement."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-legal-observers
+ :org/name "Legal observer and court support networks"
+ :org/entity-kind :org-form
+ :org/form-family :family-civic-movement
+ :org/category :cat-civic-political
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "GB" "DE" "PH" "KE" "BR"]
+ :org/founding-date 1968
+ :org/member-count-basis "unknown — observer corps are trained per jurisdiction and rostered per event; court support circles form around individual defendants and dissolve after sentencing."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Volunteers who record arrests, accompany defendants and fill public galleries — a community organized around witnessing, whose product is a record that would otherwise not exist."
+ :org/related-org "org-global-reentry-prisoner-families"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-gleaning-networks
+ :org/name "Gleaning networks and farm-surplus harvest volunteers"
+ :org/entity-kind :org-form
+ :org/form-family :family-gift-and-sharing
+ :org/category :cat-mutual-aid
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["GB" "FR" "US" "ES" "JP" "AU"]
+ :org/founding-date 1979
+ :org/founding-note "Modern gleaning organizations revive a right of access to post-harvest fields recorded in Leviticus and in medieval custom."
+ :org/member-count-basis "unknown — gleaning days are organized per farm and per season with volunteers recruited by mailing list; tonnage recovered is reported, participants are not."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Volunteers harvesting crops a farm cannot sell and routing them to food banks and community kitchens — a revived customary right operating as scheduled volunteering."
+ :org/related-org "org-global-food-sharing"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-mycological-foraging-societies
+ :org/name "Mycological and foraging societies (きのこの会, mushroom clubs, wild food circles)"
+ :org/entity-kind :org-form
+ :org/form-family :family-hobby-society
+ :org/category :cat-hobby-interest
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["CZ" "PL" "IT" "US" "JP" "RU"]
+ :org/founding-date 1896
+ :org/member-count-basis "unknown — national mycological societies count members in the thousands, but the foraging communities around them (village mushroom seasons in Central Europe, Japanese きのこ狩り) are cultural practices with no roll."
+ :org/legal-registration :mixed
+ :org/governance-model :meritocratic
+ :org/mission-statement "Clubs running identification walks, species records and poison-line duty for hospitals — a hobby community that is also the informal expert layer a health system calls at 2am."
+ :org/related-org "org-global-citizen-science"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+]

@@ -1,0 +1,68 @@
+[{:db/id -1
+  :adr/id "adr-2607279500-remaining-4-service-binding-xrpc-sdk"
+  :adr/doc_type "adr"
+  :adr/topic "datomic-client-api"
+  :adr/title "ADR-2607279500: Remaining-4 — Service Binding, XRPC policy, Cognitect harness, SDK /api/*"
+  :adr/status "accepted"
+  :adr/date "2026-07-27"
+  :adr/last_verified "2026-07-27"
+  :adr/superseded-by "adr-2607279600-closing-slo-cognitect-session"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["KOTOBASE_XRPC_DATOMIC off|legacy|on"
+   "Service Binding KOTOBASE_D1 for edge→D1 p50"
+   "SDK POST /api/* Client API transport"
+   "Cognitect synthetic harness expansion (not wire golden)"]
+  :adr/repos ["gftdcojp/net-kotobase" "kotoba-lang/kotobase-storage-d1"]
+  :adr/related ["adr-2607279400-datomic-gaps-1-2-3-closure"
+   "adr-2607279000-kotobase-datomic-client-api-maturity"
+   "adr-2607279100-client-api-edge-d1-bridge"]
+  :adr/body "## Context
+
+Residual four after dual-path + SLO (ADR-2607279400):
+
+1. XRPC datomic hard-disable
+2. p50 (edge→D1 public HTTPS hop)
+3. Cognitect wire harness
+4. SDK still XRPC-primary
+
+## Decision
+
+### 1. KOTOBASE_XRPC_DATOMIC ∈ off | legacy | on
+
+- off → datomic.* XRPC returns 410 Gone + prefer POST /api/*
+- legacy (default) → serve with Deprecation/Sunset 2026-11-01
+- on → serve without deprecation pressure
+
+### 2. Service Binding KOTOBASE_D1 → kotobase-storage-d1
+
+proxy/d1-fetch + client_api proxy use env.KOTOBASE_D1.fetch when bound;
+fallback public KOTOBASE_D1_URL. Header x-kotobase-d1-transport:
+service-binding | public-https. Primary p50 lever for /api/* and XRPC
+datomic bridge.
+
+### 3. Cognitect harness
+
+Expanded synthetic Transit fixtures + scripts/cognitect-wire-check.cljc.
+captured/ empty until owner Cloud MITM. Shape-compatible only — not
+client-cloud wire golden.
+
+### 4. SDK rewrite
+
+kotobase.sdk.client implements POST /api/* EDN Client API. Facade
+re-exports q/transact/pull/datoms/db/tx-range/with/qseq/connect.
+README preferred surface is /api/* not XRPC.
+
+## Consequences
+
+Flip KOTOBASE_XRPC_DATOMIC=off after clients migrate. Service binding
+requires stable Worker name kotobase-storage-d1. Cognitect live golden
+remains owner-blocked.
+
+## Closing note (2026-07-27)
+
+Auth-path SLO re-qualify (edge Service Binding + D1 direct) green — see
+ADR-2607279600 and evidence EDN under both repos. Cognitect wire still
+owner-blocked (shape only). This ADR remains accepted for remaining-4
+design; session handoff is ADR-2607279600.
+"}]

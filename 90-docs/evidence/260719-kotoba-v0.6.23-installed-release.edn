@@ -1,0 +1,52 @@
+{:evidence/schema :kotoba.installed-release/v1
+ :evidence/date "2026-07-19"
+ :release/tag "v0.6.23"
+ :release/commit "e3cbae8e8b0f607a11fd19e5a75e37652e7f9eb1"
+ :release/url "https://github.com/kotoba-lang/kotoba/releases/tag/v0.6.23"
+ :release/workflow-run 29657545712
+ :release/native-matrix {:darwin-arm64 :pass :darwin-amd64 :pass :linux-amd64 :pass}
+ :release/source-archive-sha256 "580527ad8961aa957a0595efea41afecb77aa5f3e3f6d79c2405414a02ac437a"
+ :release/archives
+ {:darwin-arm64 "bafd50e53b662090711ce58573bd7dc05206be2937ceb59d935a18a32b803fff"
+  :darwin-amd64 "f52b1c2fbc711fc7d4953e47e9eb4e76deb2d763277d7b959d85867c0f227825"
+  :linux-amd64 "5998b8be5c3f5a6af75bf5173ceed2305ff267cee9007ec0d9ca6fbb652c0830"}
+ :release/darwin-arm64-binary-sha256 "744c05a839487ed4f5b0a42b72b946cff063225a08df3395af56dda906998aa9"
+ :release/evidence
+ {:runtime :native-jvm-free
+  :source-extensions {:kotoba :pass :cljk :pass :cljc :pass}
+  :structured-rejection :pass
+  :syntax-aware-authority-names :pass}
+ :installed-shell
+ {:platform :darwin-arm64
+  :checksum :pass
+  :web-compile :pass
+  :node-runtime :pass
+  :timing-boundaries {:at-window 1 :past-window 0 :absent 0}
+  :provenance-manifest :pass}
+ :homebrew
+ {:formula-pr 27
+  :formula-merge "bc8696155916b4d8fe97ae3905722becb4003649"
+  :formula-version "0.6.23"
+  :resource-checksums :pass
+  :formula-ruby-syntax :pass
+  :local-audit :blocked-by-command-line-tools-26.3
+  :bottle-workflow-run 29657900081
+  :bottle-matrix {:darwin-arm64 :pass :darwin-amd64 :pass :linux-amd64 :pass}
+  :brew-install-and-test-in-workflow :pass
+  :bottle-formula-pr 28
+  :bottle-formula-merge "bed3f06ad9bbf355464bdb94a36d117ecebc3d72"
+  :bottle-digests
+  {:arm64-sequoia "61773d77ff3227c89b134a6e7484fae3445d66d16fb6c8fb500318a2b43bbd18"
+   :sequoia "04dbc2febde9b54deae4b29ae1d25168ae9a951052b59ebe3bb1bc9f911ff798"
+   :x86-64-linux "9ad01f5ce04b92e68fe3975138d24e4e60d1ebb89fbd7c78c9dd18a70fd669cd"}
+  :local-bottle-install :pass
+  :local-cellar-binary "/opt/homebrew/Cellar/kotoba/0.6.23/bin/kotoba"
+  :local-safe-identifier-runtime :pass
+  :local-structured-rejection :pass
+  :linked-command :blocked-by-pre-existing-command
+  :pre-existing-shadow "/opt/homebrew/bin/kotoba"
+  :shadow-overwritten false}
+ :in-repository-formula
+ {:pr 364 :merge "1f1c2b7b1024f994cf8dabe0c662548feaa5cba0" :ci :pass}
+ :gate/status :complete
+ :gate/remaining []}

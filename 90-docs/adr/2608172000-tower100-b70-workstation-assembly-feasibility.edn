@@ -1,0 +1,166 @@
+[{:db/id -1
+  :adr/id "adr-2608172000-tower100-b70-workstation-assembly-feasibility"
+  :adr/doc_type "adr"
+  :adr/topic "tower100-b70-workstation-assembly-feasibility"
+  :adr/title "ADR-2608172000: Tower 100 + Arc Pro B70 Creator 構成を 3D モデル化して組み立て成立性を検査した — 成立(阻却 0)。律速は GPU 長さでも PSU でもなく『余裕ゼロが 3 箇所』。私の初期推測は 2 件とも外れ、初版の sim は測っていない基板座標から干渉 3 件を捏造した"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :adr/last_verified "2026-08-17"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["Tower 100 + Arc Pro B70 Creator 構成の部材カタログ(90-docs/hardware/tower100-b70-parts.datoms.edn)"
+   "同構成の組み立て成立性の判定と、その判定がどの grade の根拠に立っているか"
+   "市販ケースを対象にするときの検査手法(公表クリアランス契約 vs 推定内部座標 sim の分離)"]
+  :adr/source-format "edn"
+  :adr/related
+  ["adr-2607270000-murakumo-mk1-enclosure-cad-assembly-sim"
+   "adr-2607267000-murakumo-mk1-arc-pro-b70-ai-workstation"
+   "adr-2608136000"
+   "adr-2607072000-kotoba-lang-no-rust"
+   "adr-2607173000-nbb-only-script-host"]
+
+  :adr/context
+  "オーナー指示(2026-08-17): murakumo と kotoba org の 3D / CFD で、見積の 7 品目構成を 3D モデルにして組み立てが成立するか調査する。
+
+   対象構成(見積 税抜): ASRock Intel Arc Pro B70 Creator 32GB 204,364 / ADATA AD5U56008G-DT (DDR5 8GB x2) 28,619 / NZXT F140Q x2 2,691 / PNY M280CS2241-500 (M.2 2280 Gen4 500GB) 14,528 / AMD Ryzen 5 7500F BOX 26,346 / ASRock PRO-750B 750W 6,255 / Thermaltake The Tower 100 Racing Green + ASRock B650I Lightning WiFi(価格記載なし)。部材計 282,803 円 + 筐体 + マザー。
+
+   **先行資産があった。**ADR-2607270000(叢雲 MK-1)が、同じ B70 を軸にした AI ワークステーションの筐体 CAD・組み立て sim・ケーブル経路・公差 stack-up・CFD を既に通しており、道具立て(org-iso-10303 の brep kernel / kami-engine-cfd の kami-cfd.duct)もそこで成熟させてある。ゼロから設計せず、これを消費者として使った。
+
+   **ただし前提が正反対である。**MK-1 は自社板金なので『部材 envelope + クリアランス規則から筐体寸法を導出』した。今回は **市販ケース**なので寸法は与えられており、逆に導出すべきは内部座標である。そして市販ケースの内寸は公表されていない —— 公表されているのは VGA 330 / CPU クーラー 190 / PSU 180 / 拡張スロット 2 という 4 つのクリアランス制限だけ。"
+
+  :adr/decision
+  "1. **組み立ては成立する。公表クリアランスに対する阻却要因 0 件。**再現は `nbb --classpath orgs/kotoba-lang/org-iso-10303/src:orgs/kotoba-lang/kami-engine-cfd/src scripts/tower100-b70-cad.cljs`。
+
+   2. **判定を 2 段に分け、混ぜない。**[A] 公表クリアランスに対する判定(grade :spec/:datasheet)= **これが契約**。[B] 推定内部座標に対する AABB sim(grade :estimate)= 補助。市販ケースでは内部形状が非公表なので、写真から内寸を推定して AABB を作ると『実測していない数値』が『検査した』顔をする。**契約側だけが可否を決める。**
+
+   3. **私の初期推測は 2 件とも外れていた。実測が覆した。**①『Tower 100 は SFX PSU のみ対応だから ATX の PRO-750B は入らない』→ 誤り。公式仕様は Standard PS2 PSU・最大 180mm で、PRO-750B は 140mm。②『Tower 100 は 120mm ファンのみだから F140Q(140mm)は載らない』→ 誤り。Top / Rear / Power Cover の 3 箇所すべてが 120mm/140mm 両対応。**どちらも「よくある SFF ケースの制約」からの類推で、この個体の仕様表を読めば 1 分で分かった。**
+
+   4. **CPU クーラーが BOM に無いのは欠品ではない。**AMD 公式仕様の Supplied Thermal Solution (PIB) が Wraith Stealth なので 7500F BOX に同梱される。65W TDP / PPT 88W に対し定格どおりで、190mm 制限に対して余裕 136mm。**別途購入は不要**(静音や OC を狙うなら別問題)。
+
+   5. **律速は単一の部材ではなく『余裕がゼロの箇所が 3 つある』こと。**GPU 長さは 271+30=301mm / 制限 330mm で余裕 29mm(最悪ケース 27mm)と最も逼迫して**いない**。余裕ゼロは (a) 拡張スロット 2/2 (b) マザー 170/170mm (c) B70 の 2-slot 厚が筐体スロット数ちょうど。**いずれも規格上ぴったり嵌まる設計なので問題ではないが、どれか一つでも仕様変更すると即不成立になる。**3-slot GPU も microATX も入らない。
+
+   6. **この筐体で幅を決めるのは CPU クーラーではなく GPU のカード高さ 112mm。**張り出しは GPU が 119.6mm、クーラーは 61.6mm。MK-1 で幅を決めていたのが GPU でも クーラーでもなく **PSU の 125mm** だったのと同じ種類の発見で、**律速部材は毎回変わる。思い込みで設計を始めると余剰を見落とす。**
+
+   7. **12V-2x6 は変換アダプタ不要で、経路も MK-1 より素直。**PRO-750B は ATX 3.1 の native 12V-2x6(450W)を持ち、B70 は 1x を要求する。加えてこの筐体は PSU が底・GPU コネクタがカード下端(= 吊り下げなので下)なので両者が近く、MK-1 で問題になった長い引き回しと曲げ半径不足が起きない。ケーブル 3 本とも最小曲げ半径を満たす(atx24 137.8 vs 要求 39 / eps8 229.5 vs 27 / pcie12vhp 197.8 vs 40)。
+
+   8. **GPU 下端の逃げは 59mm あり、ASRock 要求の +30mm を満たす。**ASRock は B70 について『電源ケーブル取り付けのため長さ方向に +30mm を空けること』を明記しており、この筐体では GPU が天面から吊り下がるのでその 30mm は**カード下端の下**に要る。PSU カバー上端 105mm に対し GPU 下端 164mm。
+
+   9. **電力に問題は無い。**上界合計 352W(B70 230 + 7500F PPT 88 + 他)に対し PSU 750W で負荷率 47%。B70 単体の推奨 600W も満たす。**750W はむしろ過大**で、効率最良点(50% 付近)にはちょうど乗る。
+
+   10. **熱は MK-1 と比べて桁違いに楽。**発熱密度 10.7 W/L(32.75L 筐体)に対し MK-1 は 40.4 W/L(8.22L)。加えて B70 が blower で、この筐体では**ブラケットが天面にあるので排気がそのまま上に抜ける** —— 縦長筐体の煙突効果と向きが一致する。
+
+   11. **ただし LBM でこの筐体の流れは解けない。数値を出さないという判断を計算で裏づけた。**`kami-cfd.duct/reachable-reynolds` に実際に問うた結果、物理 Re = 41,667(2.5 m/s x 0.25 m / 1.5e-5)に対し格子側の安定域上限は 1,250、必要な tau は 0.5(LBM は tau→0.5 で安定性を失う)、沈静化 3.47e7 step。**:feasible? false。**したがって CFM / 流速 / 停滞率を LBM から報告しない。ソルバ自身の検証(力駆動平面 Poiseuille vs 閉形解)は同一実行内で回して相対 L2 = 1.44%(許容 2%)で PASS しているので、**『使えるソルバだが、この問題には使えない』**が正確な記述。
+
+   12. **言えるのは通過流の定常エネルギー保存(CFD ではない)だけ。**F140Q 2 個の公称 205.8 CFM に対し、実装後の実効を 50% と置くと排気 ΔT = 6.2K、保守側 30% で 10.3K。**これは空気が通り抜ける間の上昇であって素子温度ではない。**素子温度には共役熱伝達が要り、このソルバは持たない。**したがって「通風設計は妥当そうだが未検証」が現在地。**
+
+   13. **[方法論] 初版の sim は、測っていない基板内部の座標を発明し、そこから干渉 3 件(RAM 対 CPU / クーラー / GPU)を報告した。撤去した。**あれは基板の設計ではなく私が置いた座標の産物で、**『測れなかった検査が、測って問題が無かった検査と同じ顔で答えを返す』**(ADR-2608136000)の変種 —— こちらは沈黙が緑になるのではなく、**推測が赤になる**。どちらも読み手には区別がつかない。基板内クリアランスを担保しているのは AABB ではなく規格である: AM5 ソケットのキープアウト(Wraith Stealth は AMD 純正なのでその内側に設計されている)と Mini-ITX の DIMM / x16 配置。**judgement を規格に帰し、sim は筐体レベル(bench 先組み一体 / GPU / PSU)だけを見る。**
+
+   14. **モデルの分解能を数値で申告する。**内部座標は『PSU 86mm + カバー 19mm = 105mm、その上に VGA 制限 330mm を積んでブラケット面 435mm』と逆算した。この逆算が正しければブラケット面の上に Top 140mm ファン(厚 25mm)が載る隙間が残るはずで、実際に残ったのは 462.8-435-25 = **2.8mm**。**これがこの spec 逆算モデルの分解能そのもので、これより細かい内部寸法の主張はこのモデルからは出せない。**
+
+   15. **検査の判別能力を実測した。3/3。**壊したカタログのコピーで赤くなることを確認した: GPU 320mm カード → `vga-length` 阻却(かつ `gpu-cable-gap` も連鎖して阻却。これはバグではなく、長いカードは実際にケーブル逃げを食う)/ PSU 200mm 奥行 → `psu-length` 阻却 / 140mm ファン 5 個 → `fan-mounts` 阻却。**無改変では 0 件。**
+
+   16. **[副産物] 判別実測が committed な成果物を静かに上書きしていたので塞いだ。**壊したコピーでの実行が `tower100-b70-chassis.step` と `tower100-b70-assembly.edn` を書き換えていた。既定カタログのときだけ書くガード(`write-artifacts?`)を入れた。**検査を確かめる行為が検査対象を汚染する**のは、それ自体が一つの class。
+
+   17. **Rust は書かない。3D は kami-engine stack の権限内に留める。**新規 crate も新規 renderer も作らず、既存 `.cljc` kernel(brep.kernel / tessellate / step / assembly、kami-cfd.duct)を読み取り専用の消費者として使った。スクリプトは nbb のみ。STEP は実際に出て往復も通る(6 面 / 12 稜線 / 8 頂点、体積 32,745,877 mm3)。"
+
+  :adr/consequences
+  "**組み立て可否とは別に、この構成には用途適合の問題が 2 つある。どちらも組み立てを阻却しないので、上の『成立』だけを読むと見落とす。**
+
+   ・**システム RAM 16GB に対し VRAM 32GB。**この構成の最大の弱点。B70 の 32GB は『32GB のモデルを載せられる』ことを売りにしているのに、そのモデルをディスクから GPU へ運ぶ経路の中継地が 16GB しかない。加えて Mini-ITX は DIMM 2 枚きりなので、増設は**買い足しではなく買い直し**になる。8GB x2 を選ぶ判断は、後で 32GB x2 を買い直すコストを内包している。
+
+   ・**マザーの x16 スロットは PCIe 4.0 であって 5.0 ではない。**ASRock B650I Lightning WiFi の Gen5 は M.2(M2_1)側で、x16 は Gen4。B70 は Gen5 x16 カードなので Gen4 x16 で動く(帯域は半分)。定常推論はカード上で完結するので影響は小さいが、モデルのロード時間と CPU↔GPU をまたぐ処理には効く。**不具合ではないが、Gen5 カードを買った理由の半分はここで消える。**
+
+   その他の帰結:
+   ・7500F は **iGPU 非搭載(F)**。GPU を抜くと映像出力が無いので、切り分けが必要な場面で不便。
+   ・筐体には 120mm 排気が Top / Rear に 2 個プリインストール済みなので、F140Q 2 個は『追加』ではなく **置換 + 1 箇所増設**になる。3 箇所すべてを排気にすると吸気が完全に passive になるため、Power Cover の 1 個は吸気向きに置くのが妥当(未検証の推奨)。
+   ・PSU は非モジュラー(flat cable)なので、使わないケーブルの収納先が要る。32.75L あるので体積の問題ではなく置き場所の問題。
+   ・総質量 10.62 kg(部材 3.72 + ファン 0.30 + 筐体 6.60)。重心の高さ比 0.45 で低重心。
+
+   **手法上の限界(明示):**
+   ・AABB は『重ならない』の意味であって、メッシュ精度の衝突判定ではない。ヒートシンクのフィンやコネクタの張り出しは見ていない。
+   ・**基板内部のクリアランスはこのモデルでは検査していない**(決定13)。規格に帰しただけで、実測でも sim でもない。
+   ・内部座標は公表クリアランスからの逆算で、分解能 2.8mm(決定14)。**内寸は実測していない。**
+   ・熱は未決着。LBM は適用範囲外(決定11)、経験式は一次近似。**素子温度は出していない。**
+   ・Wraith Stealth の寸法は :estimate(出典により 43-55mm と割れる)。190mm 制限に対して余裕が桁違いなので判定は変わらないが、静音性の評価には使えない。
+   ・部材はすべて `:part/measured false`。実物は 1 つも採寸していない。
+
+   **未実施:** 実部材の採寸、筐体内寸の実測、熱の決着(実機実測または OpenFOAM 経路)、ファン配置の最適化、BIOS バージョンと 7500F の互換確認(B650I Lightning WiFi は 7000 系対応だが個体の出荷 BIOS は未確認)。"
+
+  :adr/alternatives
+  "却下: (a) **MK-1 の 8.22L 自社板金筐体を使う** — ADR-2607270000 が設計済みだが、板金は未発注で熱も未決着、かつ今回の見積は市販ケースを前提にしている。**32.75L は MK-1 の 4 倍の容積だが、そのおかげで発熱密度が 1/4 になり熱の難易度が桁違いに下がる。**趣旨が違う(MK-1 は製品、これは 1 台の実機)。
+   (b) **写真やレビューから Tower 100 の内寸を推定して完全な内部 3D モデルを作る** — 見た目の精度は上がるが、**推定した数値が検査結果の顔をする**。公表クリアランスを契約として使う方が、主張できることが少ない代わりに主張が正しい。
+   (c) **nagare(有限体積 CFD)や cae.industrial(:cfd)で熱を出す** — nagare は乱流モデル(RANS)が未着地(S3 planned)、cae.industrial は `:reduced-order` / `:screening-only` を自己申告する経験式。**LBM が届かないから経験式に落とす、は解決ではない**(MK-1 の決定20b が同じ結論に達している)。熱は実機実測で決めるのが最も安い。
+   (d) **kami-engine / WebGPU で 3D ビューアを作る** — ADR-2607102200 の権限内だが、寸法導出・干渉検出・STEP 出力という今回の目的には不要。可視化は別途 artifact で足りる。
+   (e) **GPU を 2 枚にする** — 拡張スロット 2 に対し B70 が 2-slot なので**物理的に不可能**。Mini-ITX なので x16 スロットも 1 本きり。"
+
+  :adr/resume
+  "**現在地と再開点(2026-08-18 セッション終了時点)。**会話履歴なしで再開できる粒度で書く。
+
+   -- 着地した commit --
+   com-junkawasaki/root main = **5d5296ce981**(merge)/ 内容は **845ff599ff2**
+     branch agent/tower100-b70-assembly-check(サーバ側 merge 済み・撤去済み)
+   9 ファイル / +1941 行。子リポの変更は無い(既存 kernel を読み取り専用で使っただけ)。
+
+   -- 何が main に在るか --
+   90-docs/hardware/tower100-b70-parts.datoms.edn   部材カタログ(**正本。寸法はここだけ直す**)
+   90-docs/hardware/tower100-b70-assembly.edn       検査結果(生成物)
+   90-docs/hardware/tower100-b70-chassis.step       STEP / ISO 10303-21(生成物)
+   90-docs/hardware/tower100-b70-views.svg          直交三面図(生成物)
+   90-docs/hardware/tower100-b70-report.html        報告ページ / standalone(生成物)
+   scripts/tower100-b70-cad.cljs                    検査本体
+   scripts/tower100-b70-drawing.cljs                三面図生成
+   scripts/tower100-b70-report.cljs                 報告ページ生成
+   90-docs/adr/2608172000-...edn                    本 ADR
+
+   -- 固定した検証(すべて 0 failure) --
+   公表クリアランス 5 項目 + ファン受け口: 全 PASS。
+   STEP 往復: 6 面 / 12 稜線 / 8 頂点 一致。
+   AABB sim: 内包NG 0 / 干渉 0 / 挿入不可 0 / 公差 worst-case NG 0 / ケーブル曲げ NG 0。
+   CFD ソルバ検証: Poiseuille 相対 L2 = 1.44%(許容 2%)PASS。
+   適用範囲: reachable-reynolds が :feasible? false(意図どおり)。
+   **判別能力の実測 3/3**(決定15)。無改変では 0 件。
+
+   -- 未解決 gap(優先順) --
+   1. **実物が 1 つも採寸されていない。**全部材 `:part/measured false`。
+      発注・購入したら現物を測って parts.datoms.edn を更新し、再実行する。
+   2. **筐体内寸が未実測。**公表クリアランスからの逆算で分解能 2.8mm(決定14)。
+      Tower 100 が手元に来たら内寸を測って `side-allow` / `psu-cover` を実測値に置換する。
+   3. **熱が未決着。**LBM は適用範囲外(決定11)。実機実測が最も安い。
+   4. 基板内クリアランスは規格に帰しただけ(決定13)。実測でも sim でもない。
+   5. 出荷 BIOS と 7500F の互換(B650I Lightning WiFi は 7000 系対応だが個体は未確認)。
+
+   -- 次に打つ最初の手(具体) --
+   a. 再実行:
+      nbb --classpath orgs/kotoba-lang/org-iso-10303/src:orgs/kotoba-lang/kami-engine-cfd/src \\
+          scripts/tower100-b70-cad.cljs
+      nbb scripts/tower100-b70-drawing.cljs
+      nbb scripts/tower100-b70-report.cljs 90-docs/hardware/tower100-b70-report.html --standalone
+   b. 用途適合の 2 件(RAM 16GB / PCIe 4.0 x16、:adr/consequences)は**発注前の判断**。
+      とくに DIMM 2 枚きりなので、8GB x2 で発注すると増設が買い直しになる。
+   c. 熱を決めるなら実機。CFD 経路に戻るなら kami-engine-cae-solver の OpenFOAM runner。
+
+   **何も購入・発注していない。この時点で外部への不可逆な支出・約束は無い。**"
+
+  :adr/verification
+  "再現:
+     nbb --classpath orgs/kotoba-lang/org-iso-10303/src:orgs/kotoba-lang/kami-engine-cfd/src \\
+         scripts/tower100-b70-cad.cljs
+   寸法を変えるときは 90-docs/hardware/tower100-b70-parts.datoms.edn だけを直す(他は生成物)。
+   第 1 引数にカタログのパスを渡すと差し替えられるが、そのときは成果物を書かない(決定16)。
+
+   実施した検証:
+   ・**公表クリアランス 5 項目 + ファン受け口** — 全項目 PASS。GPU 301/330(余裕 29、最悪ケース 27) / スロット 2/2 / クーラー 54/190 / PSU 140/180 / マザー 170/170 / ファン 2 個 ≦ 受け口 3 箇所。
+   ・**STEP 往復** — write-step 出力(4,894 chars, ISO 10303-21)を read-step で読み戻し、6 面 / 12 稜線 / 8 頂点の一致を確認。
+   ・**AABB sim(筐体レベル)** — 内包 NG 0 / 干渉 0 / 挿入不可 0 / 公差 worst-case NG 0。
+   ・**ケーブル最小曲げ半径** — 3 本とも PASS。
+   ・**CFD ソルバ自身の検証** — 力駆動平面 Poiseuille vs 閉形解、相対 L2 = 1.44%(許容 2%)、ny=21 / 4,000 step、PASS。
+   ・**適用範囲の判定** — reachable-reynolds が :feasible? false を返すことを確認(決定11)。
+   ・**判別能力の実測(3/3)** — 決定15 のとおり、壊した 3 種のコピーがそれぞれ対応する 1 件を阻却し、無改変では 0 件。**壊したものと報告されたものが一致することを確認した。**
+   ・**成果物の再読** — tower100-b70-assembly.edn が EDN として読め、:model/id が取れることを確認。
+
+   **未検証(明示):** ①実部材の採寸(全部材 `:part/measured false`)②筐体内寸の実測 ③熱・気流 ④基板内部のクリアランス(規格に帰しただけ) ⑤ファン配置 ⑥出荷 BIOS と 7500F の互換 ⑦Wraith Stealth の実寸。
+
+   **手法上の限界(明示):** AABB はメッシュ精度の衝突判定ではない。内部座標は公表値からの逆算で分解能 2.8mm。熱式は CFD ではない。assembly の制約は幾何を拘束しない(kernel の solve は参照検証のみ)。"
+
+  :source/dataset "adr"}]

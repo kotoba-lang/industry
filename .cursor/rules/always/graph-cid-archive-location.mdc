@@ -1,0 +1,22 @@
+---
+description: L2 graph CID is hasher identity; kotobase archive Location may be the raw CID of the same bytes
+alwaysApply: true
+---
+
+# graph CID identity ≠ archive Location
+
+公開 identity は hasher が付けた CID（オブジェクト自身の codec）。
+kotobase `PUT /ipfs/:cid` は raw CIDv1 だけを受ける
+（`parse-raw-cid` prefix `[0x01 0x55 0x12 0x20]`、拒否は 400 `not-raw-sha256`）。
+
+- L2 graph CID は `chain.core/commit!`（ADR-2608145400）。protocol は hash しない。
+- codec が raw でない bytes を archive するときは、**同じ bytes の raw CID** を
+  Location として PUT する。identity の CID 文字列（`bafy…`）を PUT しない。
+- `:kotoba.graph/cid` は identity。archive の raw CID は `:kotoba.*` に載せない。
+- `:kotoba.graph/head` は naming（IPNS）。snapshot の publish で勝手に付けない。
+- session kgraph の datoms は公開 resource ではない。overlay は明示した
+  CreateLink だけ（親 CID は変わらない）。
+- document が raw なら identity と Location の文字列は一致してよい。
+  dag-cbor commit では一致しない。それをバグにしない。
+
+正本: ADR-2608148200。

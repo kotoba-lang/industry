@@ -1,0 +1,100 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-10"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-10.edn"
+  :doc/date "2026-08-18"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "timed kernel_wide after CSE encoding match"
+  :coscientist/iteration 10
+  :coscientist/subject "kotoba-lang/kotoba-native c15026ff, bench/runtime-comparison/kernel_wide.kotoba vs rustc -C opt-level=3"
+  :coscientist/action "time the CSE artifact against LLVM; do not compile another pass"
+  :coscientist/measured "21 rotated samples, n=200, 100k calls, 10k warmup, oracle 5224842816 on every sample. Artifact 576 B, 1 MUL + 8 MADD. min ns/call amu 15.68 / LLVM 11.06 = 1.42x. loadavg 24. Not a seal."
+  :coscientist/refuted "that matching LLVM's scalar encoding is enough to replace iteration 6's 1.62x, or to claim LLVM beaten. This machine was not quiet; medians are contention."
+  :coscientist/carries-forward "iteration-04: do not ship a timed bench export; iteration-06: 10.0 ns / 1.62x remains the last quiet ranking; iteration-08: call/all-vreg is a different workload; iteration-09: encoding, not this file"
+
+  :doc/body
+  "# Codegen co-scientist, iteration 10
+
+WIP=1 after iteration 9 was to **time**, not to compile. Round 1 already
+matches LLVM's scalar shape (one mul of n, eight constant adds). Round 2 is
+unique-use madd. Remainder is Mersenne. The leftover named in 9 is harness
+and fuel, not another isel pass. This iteration measures that leftover
+without changing it.
+
+## What was timed
+
+Pair, Apple M4, same protocol as iteration 6:
+
+- amu native leaf via `kexe-benchmark` (`kexe_fn8`, context v3, `fuel = 512`
+  rewritten every call)
+- LLVM: `rustc --edition 2021 -C opt-level=3 -C codegen-units=1` of
+  `kernel_wide.rs`, kernel inlined into the timed loop
+- n=200, 100k calls, 10k warmup
+- 21 rotated samples (even runs amu first, odd LLVM first)
+- Judge: min ns/call
+
+Native override only: amu still pins `314f9be9`. Compile used
+`:local/root` of the CSE commit (`f3c8103`, merge `c15026ff` on origin/main).
+amu pin was not bumped. nbb `bin/amu compile` still ICEs on bigint 48271;
+JVM `clojure -M:run compile` produced the artifact.
+
+Dump: `/tmp/kernel-wide-time-260818/`.
+
+## Encoding of the timed bytes
+
+Extracted `kernel` is 576 B at offset 0 (iteration 6 after the pool: 612 B).
+
+| insn | count |
+|---|---:|
+| MUL (Ra=31) | 1 |
+| MADD | 8 |
+| SMULH | 16 |
+
+SMULH is the Mersenne remainder, not a first-round multiply. This is the
+iteration-9 encoding, actually running.
+
+## Oracle
+
+Every sample, both arms, answered **5224842816**. Same value as iteration 4
+and the one-shot LLVM probe in this session.
+
+## Times
+
+loadavg `{ 24.40 24.66 26.58 }` at start and end. This is not a quiet
+machine. Medians are contention. Min is the judge and still not a seal.
+
+| arm | min | median | p95 | max |
+|---|---:|---:|---:|---:|
+| amu native | 15.68 | 26.50 | 32.70 | 35.89 |
+| LLVM rustc -O3 | 11.06 | 19.26 | 24.12 | 34.52 |
+
+min ratio **1.42x**. median ratio 1.38x.
+
+Iteration 6 on a quieter machine: amu 10.0 ns, **1.62x** LLVM (LLVM then
+about 6.2 ns). This session's LLVM min is 11.06 ns — roughly 1.8x slower
+host than that ranking. Scaling 10.0 ns by that host factor lands near
+18 ns; this min is 15.68 ns. That is **not** evidence CSE closed the LLVM
+gap. It is evidence the host was noisy and the encoding change did not
+move the ranking enough to replace 1.62x.
+
+Do not write 1.42x into `amu/docs/performance.md`. Do not bump amu.
+
+## What this does not change
+
+- Fuel-on-entry remains. `kexe-benchmark.c` stores `context.fuel = 512`
+  before every invoke. LLVM has none.
+- LLVM still inlines into the 100k loop. amu still calls a function
+  pointer. Putting that loop in the artifact was refuted in iteration 5
+  (5.6x worse).
+- The call / all-vreg path is unchanged (iteration 8).
+- Seal only via `kotoba-lang/perfgate`, this kernel, min quantile, 25
+  rotated samples, on a machine whose LLVM min is in the same band as
+  iteration 6.
+
+## Next
+
+The leaf encoding already matches. The remaining gap on this workload is
+the published runner (call + fuel), not another isel pass. Do not land
+fused-srem, extra MOV peepholes, FMA, PGO, a kototama optimizer, or a
+timed `bench` export. Do not overwrite iterations 04–09. Do not claim
+LLVM beaten."}]

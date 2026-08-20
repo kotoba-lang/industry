@@ -1,0 +1,169 @@
+[{:db/id -1
+  :adr/id "2800002900-isekai-dads-hud-murakumo-apikey"
+  :adr/title "ADR-2800002900: isekai.network を DADS へ移行、per-game HUD の解放、murakumo 連携と API key 発行経路の復旧"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "isekai-uiux-games-murakumo"
+  :adr/date "2026-08-01"
+  :adr/last_verified "2026-08-01"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["isekai.network の UI/UX が DADS(デジタル庁デザインシステム)に載っていること"
+   "scene.edn が自分の HUD を組めること(:hud :layout)"
+   "kami.sprite2d の :image primitive(生成アートがゲームに入る唯一の経路)"
+   "murakumo API key の発行経路(CLI / MCP)がどこにあるか"
+   "murakumo の各エンドポイントがどの秘密で認証されるか"]
+  :adr/supersedes ["ADR-2607122200 の isekai.network 部分(kotoba-ui/HIG paved road)"]
+  :adr/body
+  "## 決定（オーナー、2026-07-31〜08-01）
+
+1. **isekai.network の UI/UX を DADS に移行**する。light 固定、ブランド accent
+   `#0071e3` は維持、markup も `dads-*` へ書き換える。
+2. **ゲームの品質を上げる**。まず 2 本(goriketsu / plumbing-rounds)を縦に貫通させる。
+3. **ウェブ画面で murakumo API を使ってゲーム開発**できるようにする。既存 /play に足す。
+4. **murakumo API key を CLI / MCP から発行**できるようにする。
+
+## 「なぜ全ゲームが同じ見た目なのか」— 実測
+
+オーナーの問い(スクリーンショット付き)に対する測定結果。原因は表現層に集中していた。
+
+- **HUD がホスト固定**: `isekai.game/hud-spec` は 3 種類のレイアウトを直書きしており、
+  scene が渡せるのは文字列だけ。41 本が同じ顔になる主因。
+- **絵が 4 種類のベクタ図形だけ**: 全ゲーム合計 724 primitive / 4 種
+  (`:circle` 301 / `:rect` 226 / `:arc` 108 / `:ellipse` 89)。ラスター参照 **0 件**、
+  `public/` 内の画像は **1 枚**のみ。
+- **itonami 8 本は実質 1 本**: ジョブ座標が 8 本とも完全一致、状態骨格も同一で
+  **差はブール 1 個**。`logic.cljc` 自身が \"same ring every itonami depot-loop game uses\"
+  と書いていた。
+- **ただし「ほとんどのゲームに独自性が無い」は不正確**: ghosthacker 10 本はリズム /
+  記憶 / シューター / 経営シム / 対話 / ローグライクと機構的に分化していた。
+  **中身は違うのに上記 2 点で見た目が潰れていた**、が実態。
+
+## 実装（すべて default branch 着地済み）
+
+### DADS 移行 — network-awai/network-isekai#274 → `075d73e`
+- `isekai.site.dads` を新設。ブランド ramp は `--color-primitive-blue-*` を上書きする
+  (`--color-key-*` ではない — 上流 ~20 箇所が primitive を直参照しており、key だけ
+  上書きすると 1 ページに 2 種類の青が出る)。13 段 `hsl(210 100% L)`、DADS の明度段を
+  900 を軸に piecewise 再写像(素の 800 は brand より暗く、そのまま入れると 800/900 が
+  反転して hover/active 関係が壊れるため)。
+- 実測 contrast: 900 `#0071e3` on white **4.70:1**(AA)、1000 **7.93:1**。
+  DADS 純正 `#0017c1` の 11.10:1 からは低下 — ブランド維持の代償として明記。
+- light 固定、`dads-*` markup、nav は `dads-utility-link`(prose 用の下線を避ける)。
+- 副産物: 生成 HTML が cljc source から drift しており、`Live` nav link・dance の
+  syntax-highlight editor・studio の cohort-table が本番に出ていなかった。再生成で解消。
+- `bb render-site` が babashka 退役で動かなくなっていたため `npm run render-site`
+  (`:render-site` alias、`:replace-deps`)に置換。
+
+### per-game HUD + 2 本の縦貫通 — #275 → `7e3cf77`
+- `:hud :layout` を追加。既存 widget 語彙(`:panel`/`:text`/`:bar`/`:minimap`)を
+  scene 側から組める。`{{name}}` はホスト算出値**と guest global を名前で**解決。
+  未知の名前は空、壊れた `:bar` は 0 — HUD は chrome でありゲームを落としてはならない。
+  **完全に追加的**(:layout 無しの 40 本は従来どおり、byte-identical を確認)。
+- goriketsu: 追走ゲームなので hearts と wave ゲージを左下(親指の下)、score は左上へ。
+- plumbing-rounds: リングを**街路**へ。8 軒が南北に左右交互、バンは南端、止水栓は中間。
+  サインオフ往復距離が奥ほど伸びる / live-line 2 件は止水栓の**奥** / 道を何度も横断、
+  と遊びが変わる。HUD にサインオフと止水栓の 2 ゲートを表示(従来は画面に一切出ておらず、
+  ライフを取られる規則が不可視だった)。
+
+### :image primitive — kotoba-lang/sprite2d#1 → `601296b`
+`draw-shape!` は 4 分岐 + `nil` フォールバックで、**生成アートがゲームに入る経路が
+物理的に存在しなかった**。`[:image {:dx :dy :w :h :src :alpha}]` を追加。
+ロードは非同期・描画は同期のまま(未ロードはそのパーツだけ描かずベクタに degrade、
+失敗は `:failed` として記憶し毎フレーム再試行しない)。`crossOrigin=anonymous` は
+visual-capture gate の readback を壊さないため。
+
+### murakumo in /play — #275 に同梱
+`functions/api/murakumo-chat.js`(同一オリジン proxy、`MURAKUMO_API_KEY` を
+`x-api-key` に、config-gated / fail-closed / per-IP rate limit)。**モデルは never pinned**
+— 常に `murakumo-main` alias を送る(ADR-2607173100)。具体的モデル ID はコメントにも書かない。
+エンジン切替(cloud 既定)と 🎨 Art(text→image → 同一オリジン `artifactUrl` →
+chat モデルが `[:image {:src …}]` を挿入。EDN の構造編集は文字列操作でなくモデルに委譲)。
+
+### API key 発行 — kotoba-lang/murakumo#267 → `6d7628e`、#270 → `070bde0`
+ゲートウェイの 401 は `bb murakumo token issue` を案内するが、**babashka 退役以降
+実行不能**(`murakumo.core` は `babashka.process` 依存の .clj、`bb.edn` は削除済み)。
+murakumo 自身の `scripts/tasks.edn` 冒頭も `token` を「runnable entrypoint が無い」
+一覧に挙げていた。cloud-murakumo 側にも `:token` alias / token サブコマンドは**無い**。
+→ `murakumo.apikey`(mk1 wire format を Node crypto で直接実装)+ nbb CLI
+(`token issue|verify`)+ MCP server(`murakumo.issue_api_key` / `verify_api_key`)。
+CLI と MCP は同一実装を共有し drift しない。
+
+**#270 は #267 で自分が入れた欠陥の修正**: scope を `#{chat image all}` に固定して
+いたが、ゲートウェイの `scope-allows?` は語彙を持たない単純な文字列一致であり、
+`generation`(生成バックエンドが実際に使う scope)を**拒否していた**。scope は開いた
+集合とし、未知の scope は警告付きで発行する(タイプミス検出は残す)。
+
+## 検証
+
+| 対象 | 結果 |
+|---|---|
+| DADS ブランド ramp | hue 210.0 / S 100% / 単調、contrast 4.70・7.93・11.10 を算出で確認 |
+| DADS ランタイム | ブラウザで `--color-key-900` が brand を継承、`--hig-` 参照 **0**、theme.css 消滅、`color-scheme: light` |
+| keyboard focus | Tab で DADS の 4px 黒 outline + 黄 glow(従来の 2px 青より強い) |
+| 決定論 HIG/WCAG audit | 100 → 91.67。残る `focus-visible` 指摘は **source 文字列走査の偽陰性**(DADS の focus は linked bundle 側)。`color-scheme` の低下は**実バグ**で修正済み |
+| :image | 実ペインタで `drawImage` 1回/フレーム、src と宣言サイズ 200x200 一致 |
+| HUD | goriketsu 3 panel が本番で描画、plumbing(:layout 無し時)は byte-identical |
+| itonami data gate | **32/32** assertions / 8 games |
+| API key parity | **29 assertions / 0 failures**、実 `cloud-murakumo.token/verify` を通し byte 一致も確認 |
+| CLI / MCP 実行 | CLI 発行・MCP 発行の両方を実ゲートウェイ実装が受理。secret 無しは両方拒否 |
+| 本番 art 経路 | isekai.network で 202 → done → **512x512 PNG 388KB** を同一オリジンで取得 |
+
+## murakumo エンドポイントの認証対応（今回判明、要注意）
+
+| ホスト | worker | 認証 | 発行可否 |
+|---|---|---|---|
+| `api.murakumo.cloud/v1/messages` | **local-murakumo** | `ANTHROPIC_PROXY_TOKEN`(静的共有 secret を直接比較) | 発行という概念が無い |
+| `murakumo.cloud/api/v1/messages` | cloud-murakumo site worker | **mk1**(本 ADR の CLI が発行) | 可(ただし下記) |
+| `generation.murakumo.cloud` | murakumo-generation-proxy | mk1(caller が `MURAKUMO_CALLER_SECRET` から都度 mint) | isekai は設定済みで**稼働中** |
+
+`api.murakumo.cloud` では `/api/v1/messages` は 404、`/v1/messages` が本体。**別 worker・
+別認証**であり、mk1 は効かない。
+
+## 未解決 / 次の一手
+
+1. **chat gate の署名鍵が失われている**。`MURAKUMO_CHAT_TOKEN_SECRET_2` は
+   `~/.kagi` にも repo vault にも無く(`MURAKUMO_CRITIC_TOKEN` も無し、
+   `MURAKUMO_GENERATION_TOKEN_SECRET` は有り)、**chat 用 key を発行できない**。
+   skill `secrets-location-map` は同型の消失を既に 2 件記録しており、これで 3 件目。
+   → オーナー判断待ち: (A) `murakumo-cloud` worker の `MURAKUMO_TOKEN_SECRET_2` に
+   新値を設定(**追加であって rotation ではない**ので primary 署名 token は無効化されない)
+   → kagi 保管 → scope=chat を発行 → isekai proxy を `MURAKUMO_API_URL` env var で
+   `murakumo.cloud/api/v1/messages` へ向ける(**コード変更不要**)。
+   リスク: `_2` を現在使っている別 consumer がいれば壊れる。
+   (B) `ANTHROPIC_PROXY_TOKEN` 流用 — blast radius が広い。
+2. `/api/murakumo-chat` は本番で **503 fail-closed**(鍵未設定のため設計どおり)。
+   1 が決まれば解ける。
+3. cloud-murakumo の 401 文言が今も `bb murakumo token issue`(実行不能)を案内している。
+   別リポなので未修正。`nbb scripts/run-task.cljs token issue` に直すべき。
+4. 生成アートはまだどのゲームにも入っていない(経路は実証済み、投入は未実施)。
+5. 残り 39 本は共有 HUD のまま、itonami 他 7 本はリングのまま。
+6. `isekai.ui.views` / `isekai.play_ai` の kotoba-ui component ~22 箇所は未変換。
+   live.html の player(`kotoba.hls.view`)は別リポ所有のため 3 つの `--hig-*` を
+   `isekai.site.dads/hls-compat-vars` で補っている。
+
+## 既知の環境上の問題（本セッションで踏んだもの、いずれも既存）
+
+- network-isekai の CI(`gates` / `visual-capture-e2e`)は 2026-07-26 以降 main で
+  継続的に赤。原因は runner が `:local/root` の兄弟 checkout を解決できないこと
+  (`io.github.kotoba-lang/hls not found`)。本セッションの変更とは無関係。
+- 共有 checkout の劣化: `orgs/kotoba-lang/kami-engine` は `kami-render/deps.edn` を
+  持たない古い branch 上、`orgs/network-awai/network-isekai` は `chore/edn-nbb` 上で
+  `package.json` の scoped 名が壊れている(`hashes` / `three-vrm`)。ビルドはこれらを
+  迂回して行った(別 worktree + symlink farm)。
+- sprite2d の JVM test suite は `ca031b0` 時点で既に壊れている
+  (`kotoba.sprite2d` が JVM で load できない)。"
+  :adr/consequences
+  ["isekai.network は light 固定になり dark mode を失った(DADS に dark palette が無いため、オーナー決定)"
+   "DADS の heading scale は段階的(fluid でない)ため、hero と game card title は 640px で段階的に縮む"
+   "DADS が link を所有するため visited は magenta になり、focus ring は黒 outline + 黄 glow になった"
+   ":image により raster art がゲームに入れるようになったが、まだどのゲームも使っていない"
+   "murakumo API key は CLI と MCP の両方から発行できるが、chat gate の署名鍵が無いため chat scope だけは発行できない"]
+  :adr/evidence
+  ["network-awai/network-isekai#274 -> 075d73e (DADS)"
+   "network-awai/network-isekai#275 -> 7e3cf77 (HUD + murakumo + 2 games)"
+   "kotoba-lang/sprite2d#1 -> 601296b (:image)"
+   "kotoba-lang/murakumo#267 -> 6d7628e (apikey CLI + MCP)"
+   "kotoba-lang/murakumo#270 -> 070bde0 (scope は allowlist ではない)"
+   "本番 deploy: isekai.network(Pages branch main、build+asset gate 通過後)"]}]

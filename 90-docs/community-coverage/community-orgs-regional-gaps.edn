@@ -1,0 +1,328 @@
+[
+;;; Iteration 2 (2026-07-25): regional gap-fill. ADR-2607257200 iteration 1
+;;; recorded thin coverage of Central Asia, Central/West Africa, the Caribbean,
+;;; the Pacific, non-Gulf Middle East, Eastern Europe and much of Latin America.
+;;; These entries close part of that gap, using the existing 8+7 categories.
+;;; All counts :org/data-provenance "llm-recall-unverified" — not measurements.
+
+{:org/id :org-cas-hashar
+ :org/form-family :family-labor-exchange
+ :org/name "Hashar / ashar (Central Asian collective work parties)"
+ :org/entity-kind :org-form
+ :org/category :cat-mutual-aid
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-asia-south
+ :org/countries ["UZ" "KG" "TJ" "KZ" "AF" "TM"]
+ :org/founding-date 1500
+ :org/member-count-basis "unknown — hashar is an event form (a day of collective labor summoned by a household or mahalla), so 'membership' is the neighborhood itself."
+ :org/legal-registration :unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Summoned collective labor for house-building, canal clearing and funerals; obligation is reciprocal and reputational, and post-Soviet states have repeatedly tried to conscript it for public works."
+ :org/related-org "org-uzb-mahalla"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-cau-compatriotic-unions
+ :org/form-family :family-diaspora-hometown
+ :org/name "Caucasus village councils and compatriotic unions (hayrenaktsakan miutyun, temi)"
+ :org/entity-kind :org-form
+ :org/category :cat-traditional
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-middle-east
+ :org/countries ["AM" "GE" "AZ"]
+ :org/founding-date 1880
+ :org/member-count-basis "unknown — diaspora compatriotic unions are numerous, often dormant, and counted by no one."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Village-of-origin associations that rebuild schools and churches at home from diaspora funds; a durable form of long-distance village community after mass displacement."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-pol-kolo-gospodyn
+ :org/form-family :family-neighborhood-assembly
+ :org/name "Koła Gospodyń Wiejskich (Polish rural women's circles) and Eastern European village clubs"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-europe
+ :org/countries ["PL" "LT" "SK" "RO"]
+ :org/founding-date 1866
+ :org/instance-count-estimate 12000
+ :org/member-count-basis "unknown, but now locatable: Poland maintains a public national register of rural housewives' circles (Krajowy Rejestr Kół Gospodyń Wiejskich) at krkgw.arimr.gov.pl following the 2018 law, and county-level extracts are published; no aggregate total was confirmed here. Circles are commonly cited above 11-12k."
+ :org/source-name "Krajowy Rejestr Kół Gospodyń Wiejskich (ARiMR)"
+ :org/source-url "https://krkgw.arimr.gov.pl/"
+ :org/source-date "2025"
+ :org/source-caveat "Registry located but not queried for a total — this is a pointer, not a pin."
+ :org/legal-registration :mixed
+ :org/registration-note "Historically informal; a 2018 statute created a light registry, so this is a rare documented case of an unregistered form being partly formalized."
+ :org/governance-model :democratic
+ :org/mission-statement "Village women's circles running food, craft, festival and increasingly local enterprise — the backbone of Polish rural sociability."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-rus-dacha-cooperatives
+ :org/form-family :family-cooperative-enterprise
+ :org/name "Dacha and garden cooperatives (СНТ) and subbotnik labor"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-europe
+ :org/countries ["RU" "BY" "UA" "KZ"]
+ :org/founding-date 1949
+ :org/instance-count-estimate 80000
+ :org/member-count 20000000
+ :org/member-count-basis "llm-recall-unverified: dacha-holding households in Russia are commonly cited in the tens of millions; SNT association counts are a rough order of magnitude."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Plot-holder cooperatives governing roads, water and electricity for garden settlements, with collective labor days (subbotnik) as a residual norm."
+ :org/related-org "org-global-allotments"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-wafr-age-grade
+ :org/form-family :family-customary-council
+ :org/name "Igbo age-grade associations and women's councils (otu ogbo, umuada)"
+ :org/entity-kind :org-form
+ :org/category :cat-traditional
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-africa
+ :org/countries ["NG" "GH" "CM"]
+ :org/founding-date 1500
+ :org/member-count-basis "unknown — age grades are universal within participating communities and are not enumerated."
+ :org/legal-registration :unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Birth-cohort associations that levy dues, build roads and bridges, and discipline members; umuada (daughters of the lineage) hold parallel authority over marriage and funeral disputes."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-caf-chefferie-committees
+ :org/form-family :family-customary-council
+ :org/name "Chieftaincy and village development committees (Central Africa)"
+ :org/entity-kind :org-form
+ :org/category :cat-traditional
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-africa
+ :org/countries ["CD" "CG" "CM" "CF" "AO"]
+ :org/member-count-basis "unknown — customary chieftaincies are recognized unevenly by statute and are not centrally counted."
+ :org/legal-registration :mixed
+ :org/governance-model :hierarchical
+ :org/mission-statement "Customary land allocation and dispute settlement at village level, in practice the operative government where state presence is thin; village development committees are the donor-facing counterpart."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-car-mas-camps
+ :org/form-family :family-festival-society
+ :org/name "Carnival mas camps, steelband yards and friendly societies (Caribbean)"
+ :org/entity-kind :org-form
+ :org/category :cat-hobby-interest
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-south-america
+ :org/countries ["TT" "JM" "BB" "GB"]
+ :org/founding-date 1838
+ :org/member-count-basis "unknown — a large mas band fields thousands of masqueraders for one season; year-round membership is much smaller and uncounted."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :hierarchical
+ :org/mission-statement "Year-round production communities (costume camps, panyards) that peak at carnival; historically also friendly societies providing burial and sickness benefit."
+ :org/related-category :cat-mutual-aid
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-png-wantok
+ :org/form-family :family-indigenous-descent-group
+ :org/name "Wantok networks and nakamal/kava circles (Melanesia)"
+ :org/entity-kind :org-form
+ :org/category :cat-traditional
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-oceania
+ :org/countries ["PG" "VU" "SB" "FJ"]
+ :org/member-count-basis "unknown — wantok obligation follows language group (PNG alone has ~840 languages) and is not enumerable as membership."
+ :org/legal-registration :unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Language-group solidarity networks carrying employment, housing and cash obligations; nakamal serve as the men's meeting house where disputes and chiefly matters are settled."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-tur-hemsehri
+ :org/form-family :family-diaspora-hometown
+ :org/name "Hemşehri dernekleri (Turkish hometown associations) and Levantine family associations"
+ :org/entity-kind :org-form
+ :org/category :cat-mutual-aid
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-middle-east
+ :org/countries ["TR" "LB" "JO" "SY" "DE"]
+ :org/founding-date 1960
+ :org/instance-count-estimate 20000
+ :org/member-count-basis "llm-recall-unverified: Turkish hemşehri associations are numerous in every large city and in the German diaspora; the count is an order-of-magnitude estimate."
+ :org/legal-registration :mixed
+ :org/governance-model :hierarchical
+ :org/mission-statement "Rural-to-urban migrant networks organized by province of origin, providing housing, jobs, marriage brokerage and bloc political weight; Levantine family associations play the same role by lineage."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-irn-heyat
+ :org/form-family :family-religious-lay-committee
+ :org/name "Hey'at (Iranian mourning and neighborhood religious associations)"
+ :org/entity-kind :org-form
+ :org/category :cat-traditional
+ :org/type :faith-based-org
+ :org/scope :national
+ :org/region-primary :region-middle-east
+ :org/countries ["IR" "IQ"]
+ :org/founding-date 1600
+ :org/member-count-basis "unknown — hey'at are numerous, neighborhood- or guild-based, and mostly unregistered."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Neighborhood, guild or bazaar associations that organize Muharram mourning processions and year-round charity; a primary unit of Iranian urban social life and mobilization."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-tha-funeral-societies
+ :org/form-family :family-burial-society
+ :org/name "Thai funeral aid societies (ฌาปนกิจสงเคราะห์) and wat committees"
+ :org/entity-kind :org-form
+ :org/category :cat-mutual-aid
+ :org/type :faith-based-org
+ :org/scope :national
+ :org/region-primary :region-southeast-asia
+ :org/countries ["TH" "LA" "KH"]
+ :org/instance-count-estimate 4000
+ :org/member-count 10000000
+ :org/member-count-basis "llm-recall-unverified: registered funeral-aid societies number in the thousands with membership in the millions; temple committees are separate and uncounted."
+ :org/legal-registration :mixed
+ :org/governance-model :democratic
+ :org/mission-statement "Per-death levy societies guaranteeing cremation costs, usually anchored to a temple whose lay committee also runs school and festival funds."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-vnm-dinh-ho
+ :org/form-family :family-customary-council
+ :org/name "Vietnamese village đình committees and họ lineage councils"
+ :org/entity-kind :org-form
+ :org/category :cat-traditional
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-southeast-asia
+ :org/countries ["VN"]
+ :org/founding-date 1400
+ :org/member-count-basis "unknown — lineage councils revived strongly after Đổi Mới and maintain genealogies (gia phả) without registration."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :hierarchical
+ :org/mission-statement "Communal house committees running village tutelary-spirit festivals, and patrilineage councils maintaining ancestral halls, graves and scholarship funds."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-bgd-samity
+ :org/form-family :family-rosca
+ :org/name "Samity / shomiti (Bangladeshi village societies) and Sri Lankan Sarvodaya Shramadana"
+ :org/entity-kind :org-form
+ :org/category :cat-mutual-aid
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-asia-south
+ :org/countries ["BD" "LK" "IN"]
+ :org/founding-date 1958
+ :org/instance-count-estimate 15000
+ :org/member-count-basis "llm-recall-unverified: Sarvodaya commonly claims activity in ~15,000 Sri Lankan villages; Bangladeshi samity are the group unit beneath Grameen/BRAC lending and number in the hundreds of thousands."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Village societies combining shramadana (gift of labor) work camps, savings and collective decision-making; the operative unit beneath South Asian microfinance."
+ :org/related-org "org-global-shg-microfinance"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-col-juntas-accion-comunal
+ :org/form-family :family-neighborhood-assembly
+ :org/name "Juntas de acción comunal / juntas de vecinos (Latin American neighborhood boards)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-south-america
+ :org/countries ["CO" "CL" "VE" "EC" "BO"]
+ :org/founding-date 1958
+ :org/instance-count-estimate 62553
+ :org/member-count 6300000
+ :org/member-count-basis "source-pinned (Colombia only): 62,553 Juntas de Acción Comunal plus 1,500 Asociaciones de Juntas grouped into 35 Federaciones, with at least 6,300,000 affiliated people per the Ministerio del Interior — described as the largest organized civil structure in Colombia. Chilean juntas de vecinos and the other countries listed are NOT included in these figures."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Elected neighborhood boards with legal standing to contract public works, mediate disputes and channel municipal funds."
+ :org/refresh-checked "2026-07-26"
+ :org/refresh-result "Re-checked and the precise figure was KEPT over a divergent official one. The Unidad para las Víctimas (a Colombian state agency) publishes approximately 70,000 JAC, approximately 10 million affiliates and approximately 1,300 asociaciones, undated and stated as approximations; the Ministerio del Interior figures recorded here are 62,553 / 6,300,000 / 1,500 and are precise. Two state sources disagree by roughly 12 percent on bodies and 60 percent on people, and neither dates its count. The corpus keeps the precise, attributable figure and records the disagreement rather than averaging them."
+ :org/source-name "Ministerio del Interior de Colombia figures, via Wikipedia (Juntas de Acción Comunal)"
+ :org/source-url "https://es.wikipedia.org/wiki/Juntas_de_Acci%C3%B3n_Comunal"
+ :org/source-date "2024"
+ :org/source-tier :secondary
+ :org/source-caveat "Secondary; the datos.gov.co JAC president registry (2022-2026) would give a directly countable primary figure."
+ :org/pinned-on "2026-07-25"
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-per-comedores-populares
+ :org/form-family :family-gift-and-sharing
+ :org/name "Comedores populares and ollas comunes (Andean community kitchens)"
+ :org/entity-kind :org-form
+ :org/category :cat-mutual-aid
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-south-america
+ :org/countries ["PE" "CL" "BO"]
+ :org/founding-date 1978
+ :org/instance-count-estimate 15000
+ :org/member-count-basis "llm-recall-unverified: Peruvian comedores populares are commonly cited in the ~15k range with a strongly female membership; the 2020 olla común wave was larger and never fully counted."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :democratic
+ :org/mission-statement "Women-run collective kitchens buying and cooking in bulk for a neighborhood — a crisis-born institution that repeatedly outlives the crisis."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-swe-studiecirklar
+ :org/form-family :family-popular-education
+ :org/name "Study circles and folkrörelse associations (Nordic popular movements)"
+ :org/entity-kind :org-form
+ :org/category :cat-education-parent
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-europe
+ :org/countries ["SE" "NO" "DK" "FI"]
+ :org/founding-date 1902
+ :org/instance-count-estimate 250000
+ :org/member-count 1500000
+ :org/member-count-basis "source-pinned, with a live contraction: Folkbildningsrådet distributes state grants to the study associations, which in a normal year engage close to a million people across study circles, cultural events and other folkbildning. The sector SHRANK in 2024 — budget cuts closed two associations, taking the number from ten to eight. Circle counts in the hundreds of thousands are participations, not distinct people."
+ :org/source-name "Folkbildningsrådet / Studieförbunden"
+ :org/source-url "https://folkbildningsradet.se/om-oss/translations/english/the-study-associations/"
+ :org/source-date "2024"
+ :org/source-tier :primary
+ :org/pinned-on "2026-07-26"
+ :org/legal-registration :mixed
+ :org/governance-model :democratic
+ :org/mission-statement "State-subsidized small peer-learning groups (5-12 people, no teacher) that historically carried temperance, labor and free-church movements and still underpin Nordic associational density."
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-kor-apartment-councils
+ :org/form-family :family-neighborhood-assembly
+ :org/name "입주자대표회의 / 부녀회 (Korean apartment resident councils)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-asia-east
+ :org/countries ["KR"]
+ :org/founding-date 1979
+ :org/instance-count-estimate 20000
+ :org/member-count-basis "unknown — one council per qualifying apartment complex; the count scales with the ~60% of Korean households living in apartments."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Statutory resident councils controlling management fees, maintenance contracts and communal space in high-rise complexes — the dominant form of Korean neighborhood governance."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+]

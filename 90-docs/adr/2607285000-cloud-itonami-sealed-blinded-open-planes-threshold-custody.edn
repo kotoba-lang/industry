@@ -1,0 +1,275 @@
+[{:db/id -1
+  :adr/id "adr-2607285000-cloud-itonami-sealed-blinded-open-planes-threshold-custody"
+  :adr/doc_type "adr"
+  :adr/topic "cloud-itonami-sealed-plane"
+  :adr/title "ADR-2607285000: cloud-itonami を sealed / blinded / open の3面に割り、sealed 面は threshold custody で守る"
+  :adr/status "accepted"
+  :adr/date "2026-07-28"
+  :adr/last_verified "2026-07-29"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/related ["adr-2607263000-kotobase-net-e2ee-mail-drive"
+   "adr-2607051000-ciphertext-over-cid-persistence-design"
+   "adr-2607061900-gftdcojp-recipient-set-capability-grant-epoch-rotation"
+   "adr-2607184000-kotobase-net-tenant-graph-read-acl-and-cloud-itonami-5820-store-backend"
+   "adr-2607262000-kotobase-storage-git-backend"
+   "adr-2607261700-net-kotobase-three-plan-responsibility-structure"
+   "adr-2607110300-kotoba-lang-net-kotobase-cloud-murakumo-decentralization-roadmap"
+   "adr-2607286000-cloud-itonami-llm-compute-placement"]
+  :adr/authoritative_for
+  ["cloud-itonami のデータを sealed / blinded / open の3面に割る決定と、各面の鍵の持ち主・保管形式・クエリ能力・演算場所の対応"
+   "鍵階層: KOTOBA_SEED 1本が DEK/blind key/nonce key/IPNS 署名鍵を兼ねる状態を解く決定と、murakumo overlay/keyring.cljc の文字列連結 SHA-256 を HKDF 化する決定"
+   "sealed 面への operator 操作を threshold custody (m-of-n、単独復号不可) にする決定と、その機構である kotoba-lang/custody の存在理由"
+   "threshold が飾りかどうかを判定する independence gate (captured-by / min-domains-to-open / can-deny / sound?) の定義"
+   "custody を面ではなく1レコード単位で記録する規律 (:self / :server / :threshold / :pseudonymized)"
+   "cloud-itonami について対外的に名乗ってよい範囲と、言ってはいけない主張の列挙"]
+
+  :adr/decision-summary
+  "cloud-itonami のデータを sealed / blinded / open の3面に割り、面ごとに鍵の持ち主・保管形式・クエリ能力・演算場所を固定する。sealed 面は tenant 鍵で envelope に封入し operator は平時 wrap を持たない。break-glass は kotoba-lang/custody (新規) の m-of-n threshold custody で、operator は1 share しか持たず単独では復号できない。threshold が意味を持つかは custody.model/independence が判定し (単独で threshold に達する domain があれば sound? = false)、これを deployment gate にする。KOTOBA_SEED 1本が4用途を兼ねる状態の解消が Phase 0 で最優先。exit の自由 (tenant が storage provider を選べること) を分散型の最初の実質とし、Phase 4 未到達のうちは分散型と名乗らない。"
+
+  :adr/body
+  "# ADR-2607285000: cloud-itonami を sealed / blinded / open の3面に割り、sealed 面は threshold custody で守る
+
+**Status**: accepted（3面分類・鍵階層・custody 機構は決定。実装は段階的、下記「現在地」参照）
+**Date**: 2026-07-28
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナー指示（2026-07-28）:「cloud-itonami を分散型かつ proton 的な基盤にする。sealed 面の operator 操作についてはより安全、分散暗号的に信頼性が高い方法で」。
+
+着手前に現在地を実測した。
+
+### 実測: cloud-itonami が今どこに載っているか
+
+| 面 | 実体 | 根拠 |
+|---|---|---|
+| アプリ状態（大半） | Cloudflare KV `ITONAMI_DATA` + D1 `workspace-journal` + R2 `cloud-itonami-drive`/`-backup` | `cloud-itonami/wrangler.jsonc` |
+| Datom 面 | kotobase.net tenant graph → `backend.kotobase.net` → **B2（S3互換）content-addressed block + 署名付き IPNS 風 head** | `net-kotobase/worker/wrangler.jsonc` の `KOTOBA_BACKEND_URL`、`kotobase-cf-wasm/wrangler.jsonc` |
+| ops（承認/PR駆動経営） | git-backed だが**既定で無効**。`ITONAMI_OPS_REPO_DIR` は repo 内のどこからも設定されていない | `ops_ledger.cljc:19`、ADR-2607141700 |
+
+つまり **S3(B2) backed** であり、p2p でも git-backed でもない。`kotobase-storage-{postgres,sqlite,d1,s3,ipfs,git}` の6 provider（ADR-2607262000）は cloud-itonami からまだ1つも使われていない。
+
+「p2p」という語が2つの別物を指している点に注意する: storage provider としての `kotobase-storage-ipfs` と、ADR-2607261700 の課金プラン名 `p2p`（= operator が運用責任を負わないティア）。後者は transport の話ではない。IPNS head も DHT ではなく kotobase.net 自身の registry で解決する（ADR-2607061800、`head.cljs:1-20`）。
+
+### 実測: 暗号の現在地
+
+**あるもの** — B2 の block は AES-256-GCM で暗号化されて置かれる（`kotobase-cf-wasm/crypto.cljs`）。blind index は HMAC-SHA256。head は Ed25519 署名 + 単調 sequence で、検証に失敗した record は「存在しない」と同じ扱いになる。認証は CACAO/did:key、WebAuthn 秘密鍵は KEK で AES-GCM wrap、パスワードは PBKDF2。
+
+**ないもの** — age は cloud-itonami の経路に一切ない（workspace 内の age 利用は etzhayyim の SOPS 用と tamaki の replication example のみ）。Signal（`kotoba-lang/org-signal`、X3DH + Double Ratchet + sender-keys）は実在して動くが、consumer は app-aozora / aozora-appview / kotobase-messenger で、cloud-itonami の deps にも src にも登場しない。`kotobase/sealed_store.cljc`（hybrid PQC 必須の fail-closed adapter）も実装済みだが cloud-itonami は `:deployment-profile :production` を渡していないので通っていない。
+
+なお `src/cloud_itonami/kyber.cljc` は ML-KEM ではなく PLM/ERP 製品の Kyber であり、暗号の在庫として数えない。
+
+### 実測: 5つの構造的ギャップ
+
+1. **非 E2E。サーバが復号鍵を持つ。** ADR-2607184000 が「at-rest AES-256-GCM だが、サーバー自身が復号鍵（`KOTOBA_SEED`）を保持する非 E2E モデル」と明記。ADR-2607051000 の受理時に compromised-Worker は明示的に out of scope とされた。
+2. **`KOTOBA_SEED` 1本が全部を兼ねる。** HKDF で DEK/blind key/nonce key を導出し、同じ seed が IPNS head の Ed25519 署名鍵でもある（`xrpc.cljs:105` と `operator-secret-key`）。鍵ローテーションが全 graph の再暗号化 + operator identity 変更（= graph CID namespace 変更）と不可分。同じ病理が murakumo 側にもある: `overlay/keyring.cljc:17-25` の `derive-key` は `sha256(operator-seed \":\" overlay \":murakumo-overlay-key:\" epoch)` という文字列連結 SHA-256 で、HKDF ですらない。
+3. **本番は `KOTOBASE_SECURITY_MODE=legacy-public`。** policy が無ければ行は見える。`private`/`sealed` は `AUTHORITY_REGISTRY`/`KEY_UNWRAPPER`/`CLAIM_STORE`/`AUDIT_SINK` 未 provision で fail-closed により起動しない。ADR-2607174500 の行レベル redaction は本番で効いていない。raw graph CID 直接指定の read 経路は content-addressed の意図的設計として残されている（ADR-2607184000）。
+4. **実データの大半が kotobase に載っていない。** Drive の workspace は KV に `pr-str` した平文 EDN、実体は R2、outbox は D1 に `payload_edn` を平文で journal する（`drive_store.cljc:29-31`、`projection_outbox.cljc:10-19`）。Cloudflare の at-rest 暗号はあるが鍵は Cloudflare 持ちで、アプリ層の暗号化はゼロ。
+5. **分散していない。** 単一 Cloudflare アカウント・単一 B2 bucket・単一 operator。`env.witness1/2` は定義だけで edge のルーティングに入っておらず、ADR 自身が failure-domain isolation only であって multi-operator decentralization ではないと書いている。
+
+### 既に存在する部品
+
+- **`kotoba-lang/envelope`** — per-object content key を X25519 公開鍵に wrap（ADR-2607263000 D3/D4/D5）。`envelope.model` が pure `.cljc`、`envelope.seal` が `.cljs`（AES-256-GCM + X25519 + HKDF、`org-signal` を消費）。20 tests / 61 assertions が実 Web Crypto で green。ネガティブ側が本体で、鍵違い・1bit 改竄・chunk 入れ替え・truncation・別 object への chunk 移送・別 envelope への wrap 貼り付けがすべて open しない。`revoke` は `:requires-rotation?` を返す。
+- **`envelope` の custody 記録パターン** — ADR-2607263000 Phase 3 の `:mail/custody` が `:self`（本当に zero-access）と `:server`（封入はされているがサービスは開けてしまう）を1通ごとに記録する。
+- **`kotobase-peer` の blind index** — ブラインド済み component の prefix seek で prolly tree を引ける（`core.cljc:1509-1566`）。
+- **ADR-2607061900** — recipient-set / capability-grant / epoch rotation。ただしそれが依拠した `kotoba-custody` Rust crate は Rust 撤去（ADR-2607072000）で消失しており、後継が存在しなかった。`witness-quorum` は署名 quorum であって鍵分割ではない。
+
+## Decision
+
+### D1. データを sealed / blinded / open の3面に割る
+
+面ごとに保管形式・鍵の持ち主・クエリ能力・演算場所が決まる。一律にしない。
+
+| 面 | 中身 | 鍵 | 保管 | クエリ | 演算場所 |
+|---|---|---|---|---|---|
+| **sealed** | Drive 本体・mail・契約書・HR・m365 facts・CRM の PII | tenant | `envelope`（per-object content key → X25519 wrap） | 不可 | tenant 境界内のみ |
+| **blinded** | activity→decision→effect→audit ledger の構造、関係グラフ | tenant（blind key） | `blind-fn`（HMAC keyed MAC）+ AEAD | 等価 join / prefix seek | fleet 可（構造のみ） |
+| **open** | isic/isco/cofog/unspsc blueprint、lei ToS catalog | なし | 平文 | 制約なし | どこでも |
+
+blinded 面が効くのが cloud-itonami 固有の強みである。ledger の因果構造を暗号化したまま Datalog で追える面は Proton にはない。open 面まで暗号化しても得はなく advisor が死ぬだけなので、そうしない。
+
+### D2. 鍵階層 — 1本の seed が全部を兼ねる状態を解く
+
+```
+tenant root key（tenant 保管、operator は触れない）
+├── content keys      per-object、envelope が生成 → X25519 wrap
+├── blind key         HMAC keyed MAC（クエリ語のブラインドは client 側）
+└── device keys       ADR-2607022330 の device link を再利用
+
+operator key（operator 保管、tenant データを開けない）
+├── head signing      Ed25519（IPNS head 署名専用）
+├── overlay epoch key HKDF, per-overlay per-epoch
+└── attestation key   witness-quorum 署名
+```
+
+**不変条件: operator の鍵で tenant の平文に到達できる経路を1本も作らない。** 例外を作った時点で zero-access は宣伝文句になる。`murakumo/overlay/keyring.cljc` の文字列連結 SHA-256 も HKDF に置き換える（同じ Phase 0 の対象）。
+
+### D3. sealed 面への operator 操作は threshold custody にする（本 ADR の中心）
+
+「operator は sealed 面に触れない」という宣言だけでは、legal hold・tenant recovery・abuse 調査といった正当な必要が生じた時に例外経路が作られ、宣言が名目化する。そこで**平時は operator が wrap を持たない**うえで、break-glass 経路を単独では誰も実行できない形にする。
+
+- **通常経路: operator に wrap は存在しない。** threshold にかけるものが無い。
+- **break-glass 経路**: 復旧鍵を Shamir で `n` 分割し、各 share を別々の custodian の X25519 公開鍵に wrap する。復元には `m` share が要り、**operator は1 share しか持たない**。
+- **custodian は異なる failure/legal domain に置く。** ここが機構の全てで、3-of-5 の share が3つとも1つの operator の手中にあれば、それは着ぐるみを着た 1-of-1 であり、代数はそれを検知しない。
+- **epoch と deal で束縛する。** 退役世代の share の replay、別 deal の share の混入、custodian が他人の座標を提示する差し替えを、すべて構造的に拒否する。
+- **release は署名付き append-only 記録**にし、理由を書く。理由を書けない台帳は名ばかりの監査証跡である。
+
+実装として **`kotoba-lang/custody`（新規、pure `.cljc`）** を起こした。ADR-2607061900 が依拠していた `kotoba-custody` Rust crate の後継であり、その `GrantedShare` の形（epoch・deal binding・per-requester re-wrap）を `share-aad` と `quorum-error` で再構成している。
+
+この repo で最も重要な API は分割そのものではなく `custody.model/independence` である:
+
+- `:independence/captured-by` — 単独で threshold に達する domain。非 nil なら threshold は飾り。
+- `:independence/min-domains-to-open` — 開けるのに必要な最小の異なる当事者数。`1` は同じ失敗を数値で言ったもの。
+- `:independence/can-deny` — 拒否によって復旧を不能にできる domain。**報告はするが `sound?` の判定には入れない**。自分の復旧を止められる tenant は通常は設計意図どおりであり、それができる operator は人質状態である。ライブラリはどちらを意図したか推測しない。
+- `:independence/sound?` — deployment を gate すべき不変条件（capture が無く、かつ2 domain 以上必要）。
+
+Shamir 単体では誤った quorum が「もっともらしい別の秘密」を無言で返す（代数に冗長性が無い）。そのため deal は `:deal/secret-digest` を持ち、`model/open` が検証する。`shamir/combine` は意図的に未検証プリミティブのままにし、テスト `a-wrong-quorum-returns-a-plausible-secret-instead-of-an-error` がこの挙動を pin している——復旧作業中に発見するのではなく、テストスイートを読めば分かる形にするため。
+
+`model/rotate` は custodian と digest を消した殻を返す。epoch を上げるだけの rotation は帳簿上の操作であって、既に unwrap 済みの custodian に忘れさせることはできない（`envelope.model/revoke` が deleted wrap について言っているのと同じ正直さ）。
+
+### D4. custody を1レコードごとに記録する
+
+ADR-2607263000 Phase 3 の `:mail/custody` を全面に横展開する。`:self`（本当に zero-access）/ `:server`（サービスが開けてしまう）/ `:threshold`（m-of-n が要る）/ `:pseudonymized`（暗号ではない）を、面ではなくレコード単位で持つ。security property と宣伝文句の差はここでしか担保できない。
+
+### D5. exit の自由を「分散型」の最初の実質とする
+
+`kotobase-storage` は `IBlockStore`/`IRefStore` の2ポートだけなので、**tenant が backend を選べる**ようにするのが witness quorum より先に効く。特に git provider は `git push`/`fetch` がそのまま複製プロトコルで `git log` で履歴が読める。「いつでも自分の手元に全部持って出られる」は Phase 4 を待たずに売れる性質である。
+
+### D6. 名乗ってよい範囲を機構で縛る
+
+ADR-2607110300 が「Phase 4（第三者 operator が stake を負う）まで対外的に分散型と名乗らない」と決めている。それを維持したうえで:
+
+| 言ってよい | 言ってはいけない |
+|---|---|
+| sealed 面は operator が単独では復号できない（D3 実装後） | 「E2E 暗号化」（外部宛 mail は zero-access であって E2E ではない） |
+| backend を選んでいつでも持ち出せる | 「分散型ネットワーク」（Phase 4 未到達） |
+| recompute を witness が検証する | 「ノードがログを取らないことを証明済み」 |
+
+## Phases
+
+```
+Phase 0  鍵の分離         KOTOBA_SEED 4用途分割 + murakumo keyring.cljc を HKDF 化
+Phase 1  envelope 配線    drive_store が最小実証
+Phase 2  面の分類         sealed/blinded/open を schema に。custody を全面で記録
+Phase 3  平文の移行       KV/D1/R2 の pr-str 平文を封入形式へ
+Phase 4  演算の割り付け   ADR-2607286000 に委譲
+Phase 5  exit の自由      storage provider 選択を tenant へ開放
+```
+
+**Phase 0 が最優先。** 鍵が1本のままなら、どれだけ封入しても1回の漏洩で全部やり直しになる。
+
+受け入れ条件（ADR-2607263000 Phase 2 と同じ規律）:
+
+- Phase 1: **保存された blob を実際に読んで平文が含まれないことを確認する**。共有相手が復号でき、共有解除後は復号できない。
+- Phase 3: 移行後の KV/D1 の値を読んで `pr-str` された平文 EDN が残っていないこと。
+- Phase 5: tenant が git backend を選び、`git clone` して `git log` で自分の履歴を読めること。
+
+## 現在地（2026-07-28）
+
+**landed:**
+
+- **`kotoba-lang/custody`（新規 repo、west 登録済み）** — D3 の機構。`custody.shamir`（GF(2^8) Shamir、pure）+ `custody.model`（deal / share-aad / independence / quorum-error / open / rotate）。crypto primitive を持たず、`rand-bytes-fn` と `digest-fn` を注入する（portable な namespace が全ランタイムで安全な CSPRNG を主張できないため。`rand-int` に黙って fallback するライブラリは、意見を持たないライブラリより悪い）。22 tests / 83 assertions が **JVM と nbb の両方で green**。
+  - `one-share-short-of-the-threshold-determines-nothing` は情報理論的安全性を主張ではなく**全単射の提示**で証明している（share を1つ固定し、もう1つを全 256 値動かすと秘密が 256 通りすべてを1回ずつ取る = 1 share は何も絞り込まない）。
+  - 隠さないものを docstring と test で明示: **秘密の長さは漏れる**（share は秘密と同じ長さ）、**Shamir 単体は誤りを検知しない**。
+
+- **`kotoba-lang/envelope` に `wrap-bytes`/`unwrap-bytes` を追加**（`ccb3d16`）。`wrap-for` が envelope 自身の AAD を焼き込んでいたため custody が同じ ECIES を再利用できず、workspace に2本目の X25519 が生まれるところだった。AAD を引数にし、`wrap-for`/`unwrap-with` はそれを呼ぶだけにした。envelope の既存 20 tests は無改変で green（22 tests / 67 assertions）。
+
+- **`custody.seal`（`ee234a9`）— threshold を実行可能にした。** `split-and-wrap!` / `release!` / `open!`。pure 半分が意図的に選ばない CSPRNG と SHA-256 をここで1回だけ供給し、wrap は `envelope.seal/wrap-bytes` に委譲する。**`split-and-wrap!` は既定で `independence/sound?` を gate する** — 3 share が1つの operator に集まった 3-of-5 を返さず拒否する（`:require-sound? false` で強行可能だが、それは記録に残る）。実 Web Crypto / @noble/curves によるネガティブテストが本体: operator 単独は `:below-threshold`、自分の鍵で他人の wrap・自分の wrap を別座標に貼り替えたもの・別 epoch を主張する deal は**どれも復号しない**（`share-aad` が束縛しているので AES-GCM が拒否し、custody 側のコードには検査が1行も無い）。JVM 22/83、nbb 28/103。
+
+- **Phase 1 着地（`584cf40`、cloud-itonami）— Drive の sealed upload。** `upload-sealed-version` は ciphertext chunk と envelope descriptor（wrap のみ、content key 無し）を不透明に保存する。**Worker はこの経路で暗号処理を一切行わない**（`envelope.model` のみ require し `envelope.seal` は require しない）——これが「Worker は中身を読めない」と言える唯一の構造的根拠。全 version が `:drive.version/custody`（`:self` / `:server`）を1行ごとに記録し、`download!` / `resolve-share!` が応答で明示する。`:drive.policy/sealed-required?` を立てた tenant は平文経路を 409 で拒否される（黙って downgrade しない）。`sealed-upload-error` は鍵素材を載せた envelope を fail-closed で拒否する（content key を ciphertext と一緒に post する client バグは、そうしないと「サービスが開ける形で保存されたのに誰も気付かない」になる）。テストは実 Web Crypto + X25519 で封入してから**実際に書かれたものを読んで canary 文字列を探す** — R2 object にも KV workspace にも現れず、かつ holder は開ける。edge suite 368 tests / 993 assertions。
+
+- **Phase 0 着地・本番 deploy 済み（`71f3013`、net-kotobase）— 暗号鍵を operator identity から分離した。** `kotobase-cf-wasm.keyring` が `KOTOBA_SEED`（署名 = operator identity、graph CID がここにぶら下がるので rotate = 全 graph の改名）と `KOTOBASE_CRYPTO_SEED` + `KOTOBASE_CRYPTO_EPOCH`（暗号鍵、rotate 可能）を分ける。両世代が同時に live で、B2 の既存 block は epoch 0 のまま旧鍵で開き続ける——rotation を非破壊にしているのは「古い ciphertext を書き直すこと」ではなく「古い鍵がまだそこにあること」。新規書き込みは `KTB1` + epoch(4, BE) の header を持つ。
+  - **この作業で一番効いているテストは分離側ではなく `legacy-derivation-is-byte-identical` と `legacy-keys-match-the-pre-split-golden-vector`。** B2 の全 block は元の HKDF label と元の blob layout で封入されており、deploy がそのどちらかを1バイト動かしたら、誰かが読もうとするまで**エラーも出さずに**全部が読めなくなる。前者は keyring が `derive-keys` の1引数形と一致することを見るが、両方がこの tree にあるので label を動かす refactor は両側を一緒に動かして素通りする——なので後者を足した: keyring が存在しなかった時点（origin/main）の label から計算した 32 byte × 3 の固定値で、コードと一緒には動かない。
+  - **無料ではないものを2つ明記した**（発見ではなく設計として）。①nonce は HMAC(nonce-key, plaintext) なので、nonce-key が変われば同じ平文が別の nonce・別の ciphertext・**別の CID** になる。rotation は content addressing の意図的な不連続であり、`snapshot!`/`fold!` の冪等性は世代内でしか成立しない。②rollback した deployment は rotate 後に書かれたものを読めず、GCM 失敗ではなく `:unknown-crypto-epoch` で落ちる（「この node は世代3の鍵を渡されていない」と「この ciphertext が壊れている」は別の運用問題で、午前3時に同じ顔をしてはいけない）。
+  - **黙ってデータを壊す組み合わせは startup で fail closed**: 別 seed を epoch 0 で使うと、その blob は bucket に既にある legacy blob とバイト上区別が付かず、どちらの鍵も全体を開けなくなる。書き込み時には何もエラーにならないので、startup が拒否できる最後の安い瞬間になる。`/_health` が keyring の provenance（separated? / epoch / 読める世代、鍵素材は出さない）を返し、拒否された構成では 503 になる——「rotate したつもりで実はしていない node」が、operator が既に見ている場所に出る。
+  - 109 tests / 242 assertions、`e2e-b2-smoke` ALL GREEN、testnet → production の順に deploy 済み。production `/_health` は `ok: true` / `keyring: {ok: true, separated: false, epoch: 0, readable_epochs: [0]}` を返す ——**まだ分離されていないと正直に言っている**（`KOTOBASE_CRYPTO_SEED` 未投入 = 挙動はバイト単位で従来どおり）。機構が landed しただけで、鍵の投入と最初の rotation は別作業。
+
+**未着手:**
+
+- **`KOTOBASE_CRYPTO_SEED` の投入と最初の rotation**（Phase 0 の残り半分）。機構は live だが `separated: false` のまま。
+- Phase 1–3、Phase 5。
+- Phase 1 の残り: Drive の client 側（分割・並列 upload・range GET・再開）と、mail / CRM / HR など sealed 面の他の store。既存の `:server` version は移行していない（サービスが読める状態のまま。移行は別作業）。
+- **sealed 面が隠さないもの**: item title・フォルダ構造・サイズ・timestamp は workspace map に平文で入る。封入されるのは version の content だけで、metadata 封入は ADR-2607263000 自身の open question のまま。
+
+## Phase 0 の deploy 検証中に判明した、本 ADR の前提を覆す事実（2026-07-29）
+
+**本 ADR は cloud-itonami の datom 面が `backend.kotobase.net`（kotobase-cf-wasm、B2 + AES-256-GCM）に載っている前提で gap を測った。その前提は既に成り立っていない。** 2026-07-27 の D1 移行（ADR-2607279000 / 2607279100）で、`kotobase.net` の datomic トラフィックは `kotoba-lang/kotobase-storage-d1` に向いている。実測: `GET https://kotobase.net/health` → `xrpc_datomic_backend: d1`、`d1_backend: https://kotobase-storage-d1.aozora.app`。edge の `proxy/datomic-prefer-d1?` は `KOTOBASE_D1_URL` が設定されていれば true を返し、production の `worker/wrangler.jsonc` はそれを設定している（`KOTOBASE_STORAGE_MODE` が `backend` のままでも D1 が勝つ）。cloud-itonami は `KOTOBASE_URL: https://kotobase.net` なので、CRM / HR / workspace の datom はこの経路に載っている。
+
+**その D1 面は、暗号化されていない。** `kotobase/storage/d1_worker.cljs` の `database` は engine を次の seam で開いている:
+
+- `:encrypt-fn #(js/Promise.resolve %)` — 恒等関数
+- `:decrypt-fn #(js/Promise.resolve %)` — 恒等関数
+- `:blind-fn #(js/Promise.resolve (pr-str %))` — blind ですらない、平文の `pr-str`
+
+さらに block bytes だけの話ではない。migration `0003_datomic_projection.sql` は datom を関係テーブルに**平文で射影**する: `kotobase_datoms_current(ref_name, e_edn, a_edn, v_edn, tx_cid)` に AEVT / AVET / VAET の covering index が張られる。つまり entity・attribute・**値そのもの**が SQLite に平文で入り、検索用に索引されている。これは bug ではなく D1 設計の目的そのもの（SQL Datalog compiler がクエリを SQLite に push down するための射影）。
+
+**したがって、本 ADR の3面モデルと現行 D1 面は構造的に両立しない。** value を封入すれば射影が引けなくなり、射影を保てば value は平文のままになる。blind index は等値と prefix seek までしか支えないので、範囲クエリ・集計・任意の Datalog は封入と引き換えになる。これは実装の遅れではなく設計上の二者択一であり、**本 ADR の claims discipline（証明できないことを証明したと書かない）に従えば、現時点で cloud-itonami の datom 面を sealed と呼ぶことはできない。custody は `:server` である。**
+
+同じくらい問題なのは、**この posture がどこにも書かれていないこと**。ADR-2607279000 に暗号化・平文・at rest の語は1度も現れない。live な datom 面が B2 の AES-256-GCM から D1 の平文へ移ったのに、その移動が確認できる文書が無い。
+
+Phase 0 で landed した鍵分離は B2 面（kotobase-cf-wasm）に対するもので、**その面は現在 live な datomic 経路ではない**。機構としては正しく、D1 面が同じ epoch モデルを採るときにそのまま効く（epoch 0 = 現行の平文、epoch ≥1 = 封入、header の有無で判別）が、Phase 0 単独では live な平文を1バイトも減らしていない。
+
+**次に決めるべきこと（本 ADR の Open questions に追加）:**
+
+1. cloud-itonami の datom を D1 の射影に載せ続けるのか（= service-readable tier として明示し、sealed 面には別 store を使う）、それとも射影を blinded value の上に作り直して等値のみに落とすのか。**どちらを選ぶかを書かずに sealed と名乗ることだけはしない。**
+2. `kotobase-storage-d1` に custody の自己申告を持たせる（`:server` を health で明示する）。面が自分の posture を言わない限り、上位はそれを推測する——そして推測は毎回 sealed の側に倒れる。
+3. Drive（R2 `ITONAMI_DRIVE`）は D1 面と独立しており、Phase 1 の sealed upload はこの発見の影響を受けない（確認済み）。影響するのは datom 面だけ。
+
+## 作業中に判明した manifest の不整合（未修正、要判断）
+
+`cloud-itonami` は **`gftdcojp` から `network-awai` org へ移動済み**で（両 URL が同じ HEAD を返す = GitHub redirect）、west の登録も `orgs/network-awai/cloud-itonami` になっている。superproject の checkout に `orgs/gftdcojp/cloud-itonami` が存在しないのはこのためで、消えたわけではない。
+
+そのうえで2点:
+
+1. **west の pin が古い** — `6d6290d6`（本作業の merge `584cf40` を含まない）。
+2. **`gen-west-manifest.cljs --entry cloud-itonami` は既存 entry を更新せず、2つ目の `- name: cloud-itonami` を追加してしまう**（実測。project 数が 3831→3832 になる）。west.yml に同名 project が2つできるのは壊れた状態なので、**本作業では cloud-itonami の pin 前進を意図的に見送った**（envelope と custody のみ前進）。生成器側の同定ロジック（remote が異なる同名 project の扱い）を直してから pin を進める必要がある。
+
+## Consequences
+
+- (+) sealed 面の break-glass が「operator を信じる」から「m-of-n が異なる domain で揃う」に変わる。`independence/sound?` を deployment gate にすれば、threshold が飾りになった構成が landing しない。
+- (+) `custody` は sealed 面以外にも使える（fleet 署名鍵、kagi vault の復旧）。
+- (-) custodian の運用コストが増える。異なる legal domain の当事者を実際に置かない限り `sound?` は false のままで、それは正しい挙動だが、**本 ADR だけでは custodian は実在しない**。誰を custodian にするかは別途決める必要がある（Open questions）。
+- (-) sealed 面は operator の LLM から見えなくなる。advisor の設計に影響するため ADR-2607286000 で扱う。
+- (-) Phase 0 が本番の共有鍵に触るため、他の Phase より慎重な段取りが要る。
+
+## Alternatives considered
+
+- **operator に復旧用の wrap を1つ持たせる（threshold 無し）** — 却下。それは非 E2E モデルそのものであり、現状から何も変わらない。
+- **operator を完全に締め出し break-glass を作らない** — 却下ではなく、tenant がそう選べるようにする（custodian を全員 tenant domain に置けば `captured-by` は tenant になり、operator は原理的に開けない）。既定にはしない: 鍵を失った tenant の復旧不能はサポート上の実問題であり、選択肢として提示するのが誠実。
+- **threshold を witness-quorum で代用する** — 却下。witness-quorum は署名の M-of-N であって鍵分割ではない。attestation は recompute の一致を証明するが、復号を分散しない。
+- **Shamir でなく threshold ElGamal / BLS** — 却下（今は）。復号そのものを分散できる点で優れるが、実装量とレビュー負荷が桁違いで、`.cljc` に新規の楕円曲線 threshold 実装を書くことは「新しい crypto primitive を書かない」という本 workspace の規律に反する。share を wrap する現行設計は復元時に1箇所で秘密が再構成される点が弱いが、それは監査可能な1点であり、退避先として明示できる。将来 `org-signal` の外に検証済みの threshold KEM が現れたら再評価する。
+
+## Open questions
+
+- **custodian を誰にするか。** `sound?` を満たすには最低2 domain、実用上は tenant / operator / 独立した第三者（顧問弁護士・公証・別法人）の3系統が要る。第三者 custodian が実在しない間、`independence` は正直に false を返し続ける。
+- **D1 面をどうするか（2026-07-29 に判明、上記の節が本体）。** live な datom 面は平文の SQL 射影であり、封入と射影は同時に成り立たない。service-readable tier として明示するか、射影を等値のみの blinded index に落とすかを決めるまで、cloud-itonami の datom 面の custody は `:server` と書く。
+- Phase 0 の epoch 移行手順（既存 B2 block の再暗号化をどう段階化するか）。
+- 面の分類を schema にどう持たせるか（属性 prefix か、entity 単位か）。
+
+## 2026-08-20 実測 —— 上の D1 の記述は、もう現在地ではない（再測定が要る）
+
+`GET https://kotobase.net/health?deep=1` は 2026-08-20 時点で
+`xrpc_datomic_backend: graph-database` / `client_api_backend: kotobase-graph-database`
+を返す。**上の 2026-07-29 の addendum が前提にした `d1` ではない。**
+
+したがってこの ADR の中で最も強い主張 —— 生きている datom 面が D1 の平文射影に
+載っており、cloud-itonami の datom 面を sealed と呼べない —— は、**その面が
+もう live ではないという理由で、そのままでは引用できない。**
+
+⚠ **これは「直った」という報告ではない。** 新しい面が暗号化されているかどうかは
+**測っていない**。measured なのは health のラベルが変わったこと 1 点だけである。
+`kotobase-graph-database` は ADR-2608070100 の改名（capability で名指す）に由来し、
+`net-kotobase` 側の repo 構成も当時から変わっている（当 ADR が参照する
+`worker/wrangler.jsonc` は現在のツリーに無い）。
+
+**次に誰かがこの面を sealed と呼ぶ前にやること**: 新しい backend の
+encrypt-fn / decrypt-fn / blind-fn が恒等関数でないことと、datom の値が
+関係テーブルに平文で射影されていないことを、コードで確かめる。**確かめるまでは
+custody は `:server` のままとする** —— この ADR が自分で書いたとおり、面が自分の
+posture を言わない限り、上位はそれを推測し、推測は毎回 sealed の側に倒れる。
+"
+
+  :adr/supersedes []
+  :adr/superseded_by []}]

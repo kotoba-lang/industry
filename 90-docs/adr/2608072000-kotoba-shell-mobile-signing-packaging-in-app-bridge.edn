@@ -1,0 +1,196 @@
+[{:db/id -1
+  :adr/id "adr-2608072000-kotoba-shell-mobile-signing-packaging-in-app-bridge"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/topic "kotoba-shell-mobile-signing-packaging-in-app-bridge"
+  :adr/title "ADR-2608072000: kotoba-shell に署名・release packaging・アプリ内 provider bridge を入れ、iOS/Android を「ビルドできる」から「配れる」へ動かした"
+  :adr/status "accepted"
+  :adr/date "2026-08-07"
+  :adr/last-verified "2026-08-08"
+  :adr/last_verified "2026-08-08"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative-for
+  ["kotoba-lang/shell が scaffold したアプリを iOS/Android/macOS に配布する経路の正本"
+   "アプリ内 provider bridge（web bundle → native capability）の設計と policy の二重実装が一致する根拠の正本"
+   "cloud-itonami-app がモバイルに載らない理由の正本"]
+  :adr/related
+  ["adr-2607081015-kotoba-lang-rust-audit-shell-dom-gpu-browser-smoke-gate"
+   "adr-2607300900-github-actions-retirement-murakumo-fleet-ci"
+   "adr-2607313000-itonami-app-resident-install-and-agent-session"]
+  :adr/body "
+# ADR-2608072000: shell の mobile 配布経路
+
+**Status**: accepted / **Date**: 2026-08-07 / **last verified**: 2026-08-08
+**pin**: kotoba-lang/shell `fae4ee4`（west.yml、superproject main 上で一致確認済み）
+
+## 出発点（実測した現在地）
+
+`kotoba-shell` は Tauri 的な native-host bridge を名乗り、iOS/Android の
+`app scaffold` / `app build` は実機シミュレータ・エミュレータ起動まで検証済み
+だった。しかし**配布経路は3か所で切れていた**。
+
+1. **ビルドターゲットが開発用のみ** — iOS は `xcodebuild -sdk iphonesimulator`、
+   Android は `assembleDebug`。Play が要求する `.aab` も、実機に入る `.ipa` も
+   出せない。
+2. **署名が構造的に無効** — XcodeGen spec が `CODE_SIGNING_ALLOWED: NO` 固定、
+   `app/build.gradle` に `signingConfigs` が無い。`release sign` / `store request`
+   は実行計画と evidence を返す関数で、実際に通した記録が無い。
+3. **出荷アプリにネイティブ provider が入らない** — `bin/kotoba-shell-host-ios`
+   / `-android` の実体は `xcrun simctl spawn` と `adb shell` を呼ぶ shell script。
+   開発機に繋がった端末を叩く経路であって、配られた `.ipa`/`.apk` の中には
+   存在しない。provider catalog の `:required-targets [:macos :ios :android]` は
+   **CLI については真、ビルドについては偽**だった。
+
+## 決定
+
+3つとも埋めた。設計上の分岐点は次の3つ。
+
+### `app build` と `app package` を別コマンドにする
+
+同じコマンドにフラグを足すと「iOS はビルドできる」がどちらの意味か区別できない
+まま残る。`app build` は開発ループ（simulator SDK / assembleDebug / 無署名）、
+`app package` は配布（device SDK / Release / `xcodebuild archive` +
+`-exportArchive` / `gradle bundleRelease`）。
+
+**`app package` は署名が構成されていなければ拒否する。** 誰も install できない
+`.ipa` と Play が弾く `.aab` はどちらも exit 0 で出てくるので、**exit code が
+その差を呼び出し側に伝えられる唯一の場所**。
+
+署名は manifest が team を名乗ったとき（`:apple/team-id` / `--team-id`）と
+Gradle が keystore を見つけたときだけ有効になる。無指定は従来どおり無署名
+simulator 経路（既存の consumer と CI をそのまま通す）。
+
+### policy はアプリの中でも評価する
+
+bridge を入れると policy 評価器が CLI と native の2つになる。**片方が許して
+片方が拒む状態はどちら向きでも穴**なので、`app scaffold` が同じ `:allow`/`:deny`
+から JSON asset を書き、Swift と Java が
+`kotoba.shell.launcher/policy-decision` を節ごとに再現する。policy asset が
+読めなければ**全拒否**（packaging 事故は fail closed）。
+
+一致は信用でなくテストで押さえる（全 command について3者の判定を突き合わせ）。
+superproject 側には fleet-ci gate `shell-native-bridge-parity` を置いた
+（`scripts/fleet-ci/gates.edn`、`:nbb-script`）。
+
+### bridge に載せるのは portable な 10 command だけ
+
+`contacts` / `calendar` / `webauthn` は catalog どおり macOS 限定のまま。
+各 platform の実装が要るものを載せると、**catalog が既に一度やって訂正した
+誤り**（実装ゼロで iOS/Android 対応を主張する）を繰り返す。
+
+## 検証（file-presence ではなく実物）
+
+| 対象 | 実測 |
+|---|---|
+| iOS Simulator（iPhone 17 Pro, iOS 26.5） | clipboard 往復 / fs write-append-read 往復 / `..` 脱出拒否 / keychain policy-denied / example.com から実 200 |
+| Android Emulator（android-34 google_apis arm64） | 同上 + 通知の実投稿（`notifications-enabled: true`） |
+| macOS packaging | `Apple Development: … (U7W6HNNJCS)` 署名、`flags=0x10000(runtime)`、`codesign --verify --deep --strict` 通過 |
+| iOS packaging | device `.ipa`、`iOS Team Provisioning Profile` 埋め込み |
+| Android packaging | `.aab` を `jarsigner -verify` が verified と報告 |
+| 拒否経路 | `team-id-required` / `keystore-required`、step 実行数 0 |
+| **実プロダクト**（`local-manimani` の `web/dist`、shadow-cljs 出力） | **iOS Simulator で実 UI が描画**（ヘッダー・マスコット・project カード・CALENDAR・7 タブのタブバー、日本語込み） |
+| suite | 72 tests / 541 assertions、clj-kondo 0 |
+
+**未検証: 実際のアップロード。** App Store Connect の審査も Play track も通して
+いない。`store request` / `release submit` は実行可能だが実績が無い。
+
+## 途中で見つかった既存バグ（3件とも landed）
+
+- **`policy-decision` が `http/fetch` と `notify/show` で例外を投げていた。**
+  token を `#{command capability \"*\"}` という set literal で作っており、
+  command と capability が同綴りだと `Duplicate key` で落ちる。この2つの
+  provider に対する policy 判定は**書かれてから一度も成功していなかった**。
+  CLI と bridge の一致テストが見つけた。
+- **`notify/show` が provider 呼び出しの中で通知許可を要求していた。** iOS では
+  システムダイアログに誰かが答えるまで callback が来ないので、**provider 呼び出しが
+  人間のタップ待ちでブロックし、結果がタップの速さに依存**していた。起動時に1回
+  だけ要求し、provider は結果を読むだけにした（Android の MainActivity が同じ
+  理由で startup に要求しているのと揃えた）。
+- **scaffold したアプリが自分の名前を名乗らなかった**（2026-08-08、`fae4ee4`）。
+  Info.plist が `CFBundleName` を設定せず `$(PRODUCT_NAME)` にフォールバックする
+  ため、`:ios/product-name` 未設定の consumer では shell 自身の既定
+  `KotobaShell` になる。実測: local-manimani の実バンドルはアプリ内では
+  「manimani」と表示しながら、**ホーム画面と権限シートでは「KotobaShell」と
+  名乗っていた**。`app run` は直前の 2 commit で macOS の Dock / メニューバー
+  向けにこれを直していたが、**scaffold 経路は直っていなかった**（Android は
+  `android:label` が最初から `:app/name` を使っていて正しかった）。
+  `CFBundleName` / `CFBundleDisplayName` を `:app/name` から設定する。
+  - **既知の観測上の注意**: 同一デバイスで先に古い名前で認可要求を出していると、
+    **権限シートの表示名は `usernotificationd` のデバイス単位キャッシュのまま**
+    変わらない。plist 側の問題ではない。ホーム画面ラベルは即座に反映される
+    （そちらで確認した）。
+
+## 訂正した記述
+
+- **「Android の WebView は WebChromeClient 無しで JS console を logcat に出す、
+  WKWebView より観測性が良い」は誤り**（shell README）。WebView 113.0.5672.136 で
+  測り直したところ `[INFO:CONSOLE]` は1行も出ず、bridge の smoke をデバッグする
+  1パスを消費した。scaffold は `WebChromeClient` を入れて tag `kotoba-shell` に
+  転送する（**debuggable ビルドのみ** — release アプリがページの console 出力を
+  他アプリから読めるログに書くべきではない）。
+- **shell README が local-manimani 側の未解決バグとして名指ししていた
+  `Could not find namespace kotoba-ui.theme.` は、現在のツリーに参照が1件も無い**
+  （2026-08-08 実測）。バンドルが scittle（`cljs/public`、CDN 読み込み）から
+  shadow-cljs（`web/dist`、`js/main.js`）へ移っており、README の記述は当時の
+  もの。**直すべきバグは存在しなかった** —— README 側は未訂正（follow-up）。
+
+## Android の origin を変えた
+
+`file:///android_asset/index.html` から `WebViewAssetLoader`
+（`https://appassets.androidplatform.net/assets/…`）へ。opaque origin には
+DOM storage も IndexedDB も無く、document-start 注入が照合する origin も無い —
+**Apple 側が `file://` を custom scheme に替えて直したのと同じクラスの問題**。
+
+## cloud-itonami-app への含意（この ADR の範囲外だが記録する）
+
+**cloud-itonami-app は依然としてモバイルに載らない。** インタフェースを JVM の
+loopback server（`clojure -M:server`、port 1338、ADR-2607313000 の常駐 install）が
+提供しているため、iOS にも Android にも JVM が無いという一点で詰まる。ここで
+埋めたのは packaging と capability であって、**サーバランタイムの移植ではない**。
+
+モバイルに載るのは**サーフェスが web bundle であるアプリ**で、その場合
+`kotoba.shell.client` から native capability に届く。cloud-itonami-app を載せたい
+なら、server 側を別ランタイムへ移すか、リモートに寄せるかの決定が別途要る。
+
+**同じ形の問題を local-manimani で実測した**（2026-08-08）: iOS で実 UI は
+描画されたが、画面に `TypeError: Load failed` が出る —— アプリがローカル API を
+fetch しようとして、端末上にそのサーバが無い。**local-first なアプリを端末に
+載せると、バンドルは載るがサーバは載らない**という構図がそのまま現れている。
+これは local-manimani 側の設計判断（サーバをどこに置くか）であり、ここでは
+触っていない。
+
+## 残っている gap（優先順）
+
+1. ~~**local-first アプリのサーバ配置**が未決定。~~ **cloud-itonami-app については 2026-08-08 に決着**: サーバは Cloudflare Workers 上の ClojureScript へ移す（ADR-2608081500）。local-manimani は未決のまま。以下は決着前の記述: cloud-itonami-app と
+   local-manimani が同じ壁に当たっている（上記）。ここが決まらないと、
+   「モバイルで動く」は「UI が描画される」止まりになる。
+2. **実アップロード未実施 —— この経路では**（App Store Connect / Play の審査 track を通していない）。⚠ **ワークスペース全体としては誤読しないこと**: 別経路（Capacitor + fastlane）では 2026-02 に build 2 本を ASC へアップロード済みで、`Spirit in Physics` 1.0 は審査に到達して REJECTED になっている。Apple の有料アカウント・DISTRIBUTION 証明書・ASC API キーはすべて稼働中。実測は ADR-2608081200。
+3. **local-manimani の実バンドルは Android 未検証** —— bridge 自体は fixture で
+   Android 実機検証済みだが、実 UI の描画確認は iOS のみ。
+4. **iOS の `notify/show` の authorized 経路が headless で検証できない** —
+   `xcrun simctl privacy` に notifications service が無い。Android では
+   `pm grant` で検証済み。
+5. **fleet gate が見ているのは対称性だけ** — 実 xcodebuild/gradle と実機起動を
+   fleet に移すには node に Xcode と Android SDK が要る。
+6. **Windows は scaffold のみ**（従来どおり）。
+7. **shell README の local-manimani バグ記述が古い**（上記「訂正した記述」）。
+8. **shell の GitHub Actions は 2026-08-04 以降 inert**（ADR-2607300900）。
+   それ以降の commit は手で検証している。
+
+## 次に着手するときの起点
+
+```bash
+# shell CLI を superproject 外の worktree に出す（共有 checkout は別セッションが使う）
+git -C orgs/kotoba-lang/shell worktree add --detach /tmp/shell-cli origin/main
+# test alias は ../../etzhayyim/tamaki を :local/root で引くので west と同じ相対配置が要る
+#   <X>/orgs/kotoba-lang/shell と <X>/orgs/etzhayyim/tamaki（dom-gpu / browser / aiueos /
+#   kototama / kotobase / hil も symlink すれば ui check / e2e stack まで通る）
+clojure -M:test    # 72 tests / 541 assertions
+# bridge の実機 smoke
+./bin/kotoba-shell app scaffold --target ios --web-dist-dir test/web/bridge-smoke ...
+# Android は JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home が要る
+#   （AGP 8.5.0 は JDK 24 だと androidJdkImage 変換で落ちる）
+```
+"}]

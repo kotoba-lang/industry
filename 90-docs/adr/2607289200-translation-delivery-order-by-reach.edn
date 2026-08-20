@@ -1,0 +1,47 @@
+[{:db/id -1
+  :adr/id "adr-2607289200-translation-delivery-order-by-reach"
+  :adr/doc_type "adr"
+  :adr/topic "translation-delivery-order-by-reach"
+  :adr/title "ADR-2607289200: 翻訳の納品順は話者数順を既定にする（選択肢1）— 総時間は変えずに、長時間ジョブを中断可能にする"
+  :adr/status "accepted"
+  :adr/date "2026-07-28"
+  :adr/last_verified "2026-07-28"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["翻訳ジョブの locale 納品順の既定は :tier/reach（話者数降順）。
+    正本は cloud-itonami-translation の translation.order"]
+  :adr/context
+  "1,259 キー × 83 locale のカタログ生成は実測で約9時間かかる。アルファベット順
+   （実質ランダム）で回すと、その9時間のあいだ**どの locale も部分的**で、
+   オペレータの手元には何も無い。中断すれば全部が中途半端に残る。
+
+   これは技術ではなく製品の判断である。総所要時間は順序を変えても1秒も変わらない。
+   変わるのは『途中で止めたときに何が手元にあるか』だけ。"
+  :adr/decision
+  "`:tier/reach`（話者数 L1+L2 降順、Ethnologue 2026 の桁）を既定にする。
+   `:tier/uniform`（アルファベット順・全部完了して初めて価値が出る従来挙動）は
+   **比較可能にするためだけ**に残す。`:tier/listed` は呼び出し側の明示指定。
+
+   併せて `coverage-curve` / `locales-for-share` を提供し、『到達人口の何割が
+   何 locale 目で満たされるか』を**主張ではなく数字**にする。
+
+   数値は順位付けにのみ使い、事実として表示しない（絶対値には諸説あるが順位は安定）。"
+  :adr/consequences
+  "- 長時間ジョブが**中断可能**になる。上位5 locale（es/ar/pt/id/ru ≈ 19億人）が
+     最初の数%の時間で揃うので、そこで止めても成果が残る。
+   - 話者数の少ない言語は**後回しになる**。これは明示的な選択であり、
+     『対応しない』ではない。順序を人手で決めたい場合は :tier/listed を使う。
+   - 到達人口テーブル（translation.order/reach）は 84 locale 分を持つ。
+     新 locale を足したらここにも足す。欠けている locale は reach 0 として
+     最後尾に回る（壊れはしないが、意図しない後回しになる）。
+   - 総時間は改善しない。容量の話は ADR-2607289400 が扱う。"
+  :adr/evidence
+  "実測（2026-07-28）: 1,259 キー × 83 locale、12 並列で約9時間。
+   coverage-curve のテスト: [es ar pt id ru as or] の reach 順で、
+   5 locale 目までに到達人口シェア 0.9 超。
+   cloud-itonami-translation の order テストで固定（reach-order-front-loads-value /
+   coverage-curve-makes-the-tradeoff-arguable / locales-for-share-answers-what-must-finish）。"
+  :adr/refs
+  ["ADR-2607289100（親: 翻訳を調達事業として立てる）"
+   "orgs/cloud-itonami/cloud-itonami-translation/src/translation/order.cljc"]}]

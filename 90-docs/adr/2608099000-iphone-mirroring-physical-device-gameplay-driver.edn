@@ -1,0 +1,152 @@
+[{:db/id -1
+  :adr/id "adr-2608099000-iphone-mirroring-physical-device-gameplay-driver"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/topic "iphone-mirroring-physical-device-gameplay-driver"
+  :adr/title "ADR-2608099000: 実機 iPhone を iPhone ミラーリング越しに操作する — computer-use の iOS driver（Appium も WebDriverAgent も導入しない）"
+  :adr/status "accepted"
+  :adr/date "2026-08-08"
+  :adr/last_verified "2026-08-08"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/repos ["com-junkawasaki/root" "kotoba-lang/computer-use"]
+
+  :adr/authoritative_for
+  ["実機 iOS デバイスの操作面の正本は `kotoba-lang/computer-use` の `computeruse.ios-mirroring` であり、新しい iOS 自動化 repo を起こさない。`computeruse.android`（adb）の兄弟として同じ `IComputer` を実装する"
+   "この経路に Appium / WebDriverAgent / XCUITest / idb を導入しない。ADR-2608081500 が欠落 ① として挙げた『入力注入』は、実機に対しては iPhone ミラーリングの窓が埋める"
+   "iOS Simulator（`kotoba-lang/shell` + `hinshitsu`）と実機（本 driver）は別経路であり、どちらかがどちらかを置き換えるものではない。simulator は決定的で速く実機を持たない、実機は本物で遅く multitouch を持たない"
+   "『画面を見て遊ぶ』policy の正本は LLM sampling loop（`computeruse.agent`）であり、`loop-game-autoplay` の進化する線形 policy とは別物である。前者は見えるが遅く、後者は速いが見えない"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+
+  :adr/related
+  ["adr-2608081500-game-autoplay-ios-sim-capture-evolution-inventory"
+   "adr-2608082500-game-autoplay-evolution-implementation"
+   "kotoba-lang/computer-use"
+   "kotoba-lang/loop-game-autoplay"
+   "kotoba-lang/shell"
+   "kotoba-lang/hinshitsu"
+   "adr-2608108000-agent-visual-game-loop-cli-mcp"]
+
+  :adr/context
+  "オーナー指示（2026-08-08）「iPhone ミラーリング越しに実機のネイティブゲームを」。前段の問い（「iphone ミラーリングを操作する repo はある? 遺伝的学習の train はある? 画面を見てゲームをクリアさせる LLM を作りたい」）に対する在庫調査で、次の 3 点が実測で確定していた。
+
+1. **iPhone ミラーリングを操作する repo は無い。** `manifest/west.yml` の 4,150 project 名と workspace 全文に対する `iphone.?mirror` / `ミラーリング` / `scrcpy` / `vnc` の grep が 0 件。ADR-2608081500 が別経路（checkout 済み全 README + CLAUDE.md）から同じ結論に達しており、Appium / WebDriverAgent / XCUITest / idb も 0 件。
+2. **遺伝的学習によるゲーム自動プレイは在る。** 同日 ADR-2608082500 で `kotoba-lang/loop-game-autoplay` + `kotoba-lang/shinka` が着地済み。実機 iPhone 17 Simulator で 904.7 秒 / 318 MB / 35,719 frames の receipt つき。
+3. **ただしそれは『画面を見る LLM』ではない。** policy は `a = W·obs + b` の線形写像で、observation は game state の 12 数値。`loop-game-autoplay` の README は pixel observation を**意図的に閉じない**と明記している（解像度・テーマ・device scale に policy が依存するため）。
+
+一方で**両隣は在った**。`computeruse.macos` は実 macOS desktop の driver（`screencapture` / `osascript` / `cliclick`）、`computeruse.android` は **実機** Android の driver（`adb screencap` + `input tap/swipe`）、`computeruse.agent` は Anthropic computer tool の action 語彙をそのまま回す LLM sampling loop。つまり『画面を見て操作する LLM』の機構は完成しており、**iOS の実機に届く channel だけが無かった**。
+
+iPhone ミラーリング（macOS 15+）はその channel である: 実機の画面を映す窓であり、その窓へのポインタ入力とキーボード入力を実機へ転送する。adb の代わりに窓を使う、という 1 点だけが新しい。"
+
+  :adr/decision
+  "**`kotoba-lang/computer-use` に `computeruse.ios-mirroring` を足す。新しい repo を起こさない。**
+
+`computeruse.android` の兄弟として同じ `IComputer` を実装する。channel の構成:
+
+| 動作 | 実装 |
+|---|---|
+| screenshot | `screencapture -R <窓の rect>` → `sips -Z` → base64 image block |
+| tap | `cliclick c:` （窓の中の絶対座標） |
+| swipe | `cliclick dd / dm… / du` を **1 回の invocation** で |
+| long press | `cliclick dd → w:700 → du`（同一点） |
+| text / keys | `osascript` System Events（iPhone ミラーリングを frontmost にしてから） |
+
+## 静かに間違う 2 点（これが設計の中身）
+
+どちらも「落ちない」。タップが**もっともらしい別の場所**に落ちるだけなので、実機を見ていても原因に辿り着かない。両方とも pure 関数として切り出し、原点が非ゼロで縦横比の異なる窓を使ったテストで固定した。
+
+1. **原点。** capture は crop なので、model の座標は `content-origin + model * scale` へ写る。原点を足し忘れると**窓のデスクトップ上の位置ぶんだけ全タップがずれる**。
+2. **point と pixel。** `screencapture -R` は point を取り、Retina では**その 2 倍の pixel** で PNG を書く。したがって scale は「**point** での content サイズ ÷ model の pixel 幅」である。撮れた pixel から計算すると係数がちょうど backing scale factor ぶん小さくなり、**全タップが左上の象限に寄る**。
+
+## 強制ではない写像（選んだので記録する）
+
+- **`right_click` = 長押し。** iOS に副ボタンは無く、副次ジェスチャは press-and-hold である。
+- **`scroll_direction` = 指の進行方向。** `computeruse.android` と同じ。外部の慣習（「下スクロール = 表示が下へ」）と食い違うが、**同一ライブラリ内の 2 つの device driver が食い違う方が悪い**。
+- **`key \"home\"` / `\"appswitcher\"` / `\"spotlight\"` → iPhone ミラーリング自身の ⌘1 / ⌘2 / ⌘3。** タップできるホームボタンが無いので、これが無いとゲームを起動する手段そのものが無い。
+- **swipe に中間サンプルを入れる。** 押下と解放だけの gesture は iOS 側で tap か無効として分類される。1 プロセス呼び出しで送るのは、点ごとに `cliclick` を起こすと動きが途切れて複数ジェスチャに分解されるため。
+
+## できないこと（発見させずに書く）
+
+- **multitouch は無い。** ポインタは 1 本。pinch / rotate / 2 本指は表現が無く、これを要求するゲームは『遅い』のではなく**対象外**である。
+- **フレーム精度は無い。** iPhone ミラーリングはローカルネットワーク越しのライブ映像で、観測は数十 ms 遅れ負荷時にフレームを落とす。1 フレーム内の反応を要する policy は成立しない。**ターン制と低速リアルタイムが誠実な対象。**
+- **電話を手に取ると止まる。** iPhone ミラーリングは iPhone がロックされ近傍にあることを要求する。
+
+## simulator 経路との関係
+
+置き換えではない。**ADR-2608081500 の『iOS Simulator に拘るか web に寄せるかで新規実装量が桁で変わる』は今も有効**で、本 ADR は 3 本目の経路を足しただけである:
+
+| 経路 | 観測 | policy | 対象 |
+|---|---|---|---|
+| `loop-game-autoplay` | game state 12 数値 | 進化する線形写像 | web ゲーム（改変せず driver 注入） |
+| 本 driver + `computeruse.agent` | 実機の画面 pixel | LLM | **App Store のネイティブゲーム** |
+| `kotoba-lang/shell` + `hinshitsu` | screenshot | （人間 / QA gate） | simulator 上の WKWebView |
+
+同日の ADR-2608108000（proposed、agent-visual-game-loop）とは**対象が違う**ので統合しない。あちらは**この workspace が作っている web ゲーム**の状態・描画・比較を CLI / MCP から扱えるようにして開発と debug を目で行う話で、観測対象は自前のゲームの内部状態である。本 ADR は**他者が作った App Store のネイティブゲーム**を実機の画面越しに遊ぶ話で、内部状態には触れられない。『agent がゲームを見る』という語が同じだけで、機構も対象も交わらない。
+
+**進化と LLM を接続する経路は、本 ADR では作っていない。** `shinka` の genome は double のベクタで、LLM policy の探索単位（prompt / 戦略記述）はそこに載らない。接続するなら別 ADR とする。"
+
+  :adr/consequences
+  "**positive**
+
+- 実機 iOS の操作面が既存 repo の 1 namespace で埋まり、Appium / WebDriverAgent / XCUITest という外部依存の導入判断が発生しなかった。ADR-2608081500 の欠落 ① は、実機に限れば**要件でなくなった**。
+- 幾何・ジェスチャ・キースクリプトが `#?(:clj)` 境界の**上**にあるため、Mac も iPhone も無い環境（この CI コンテナを含む）でテストできる。`computeruse.android` は全体が `#?(:clj)` の中にあり、実機なしでは 1 行も検査できない —— 本 driver はその構造を踏襲しなかった。
+- 『できないこと』が docstring と README にあるので、multitouch を要するゲームに対して policy を延々チューニングする時間が発生しない。
+
+**negative**
+
+- **shell-out 層は 1 度も実行されていない。** Mac・ペアリング済み iPhone・2 つの権限が要る。窓の rect を System Events から読めるという前提（`process \"iPhone Mirroring\"` の `window 1`）は**未検証**で、読めなかった場合のために `:rect` の明示指定を逃げ道として残してある。既定の title bar inset `[0 26 0 0]` も実測値ではない。
+- **`:model-width 480` は根拠のある既定ではない。** 縦長の画面で token と細部のどちらを取るかの当て推量であり、実機で最初に調整すべき値である。
+- **multitouch の欠落は driver の限界であってこの経路の限界ではない。** 将来これが問題になったとき、答えは『この driver を厚くする』ではなく WebDriverAgent の導入判断に戻ることであり、それは別 ADR である。
+- 本 driver は `com-junkawasaki` セッションからは push できない tier にある（下記 verification）。**superproject 側の west pin 前進は、上流 PR の merge 後に別途行う必要がある。**"
+
+  :adr/verification
+  "**実測した（2026-08-08、この ADR を書いたセッション）**:
+
+- **不在の確認**: `manifest/west.yml` の 4,150 project 名 grep（`mirror|iphone|ios|scrcpy|vnc|screencap|appium` 他）と workspace 全文の `iphone.?mirror|ミラーリング` grep → **該当 0 件**。`nbb scripts/repo-search.cljs` と `concept-lookup` も引いた（後者の語彙に `ios` / `game` は無い）。
+- **JVM テストスイート全体**: `clojure -M:test` → **30 tests / 121 assertions / 0 failures**（新規追加前の baseline は 17 / 70。本 driver が 13 tests / 51 assertions）。
+- **cljs でも走ること**: `nbb --classpath src:test` で同じ 13 tests / 51 assertions / 0 failures。pure 部分が `#?(:clj)` の上にある証拠。
+- **gate が落ちることを確認した**（CLAUDE.md「落ちない gate は劇場」）:
+  - `model->screen` から content 原点を落とす変異 → **10 assertions 失敗**
+  - `swipe-path` から中間サンプルを落とす変異 → **4 assertions 失敗**
+  - 変異を戻すと 0 failures。
+- **lint**: `clojure -M:lint` → **errors 0**。新規 warning は 1 件で、`computeruse.macos` / `computeruse.android` が既に出しているのと同種（clj-kondo が `#?(:clj (do …))` の中の使用を見ない）。
+- **`:clj` 分岐の解決**: テストが `computeruse.ios-mirroring` を require して通っているので、`#?(:clj [computeruse.macos :as macos])` の条件付き require と `macos/activate-application!` の解決は JVM 上で実際に効いている（Clojure は関数本体の未解決 var を load 時に落とす）。
+- **README の test 数**: 記載の `13 tests, 60 assertions` は**本変更以前から陳腐化していた**（実測 baseline は 17 / 70）。実測値 30 / 121 に訂正した。
+
+**検証していないこと（重要）**:
+
+- **shell-out を 1 度も実行していない。** `screencapture` / `cliclick` / `osascript` / System Events はこの Linux コンテナに存在しない。したがって次はすべて**未検証の設計上の主張**である: iPhone ミラーリングの窓が System Events から `window 1` として見えること、title bar inset が 26 point であること、`cliclick` の drag 語彙を iOS が swipe として分類すること、⌘1/⌘2/⌘3 が転送されること。
+- **実機のゲームを 1 本もプレイしていない。** `examples/iphone_game_agent.clj` は配線であって receipt ではない。ADR-2608082500 が『繋いだら 3 つの実バグが出た』と記録しているとおり、**繋いでいないものは動いていない**。
+- **`loop-game-autoplay` の evidence を再現していない。** 引用した 904.7 秒 / 35,719 frames は当該 repo の evidence を読んだものであり、本セッションが走らせたものではない。
+
+**着地の経路と、その設計を 1 度間違えたこと**: 本セッションは `com-junkawasaki` を source とするため `kotoba-lang/computer-use` へ push できない（git proxy が 403 で credential を注入しない。`add_repo` も cross-tier add を拒否）。driver の commit はこの branch の `.handoff/computer-use-ios-mirroring.patch` に置いてある。
+
+当初、これを `kotoba-lang/computer-use` を source とする子セッションから匿名 clone させて着地させる計画を立て、実行した。**この計画は誤りで、子セッションは着地できずに停止した。** 誤りの原因は測り方にある: このコンテナから `git clone https://github.com/com-junkawasaki/root` が成功したことを『root は public』の証拠として採ったが、**成功したのは root が本セッションの authorized set に入っており proxy が credential を注入したから**であって、public だからではない。GitHub API で確認すると `\"private\": true` / `\"visibility\": \"private\"`。`raw.githubusercontent.com` は `main/README.md` すら 404 を返す。
+
+**教訓は『権限のある経路で到達できたことは、権限の無い経路でも到達できることの証拠にならない』**であり、これは索引の規則（『手元に無いことは存在しないことではない』）の裏返しの形をしている —— 到達できたことも、誰にとって到達できたのかを言わなければ意味を持たない。
+
+**着地した経路（2 度目）**: `kotoba-lang/computer-use` を initial source とするセッションに、patch ではなく**ファイルの内容を prompt で直接渡して**着地させた。公開 repo への転送用 branch push（byte-exact だが無関係な公開 repo を汚す）と、使い捨て転送 repo の作成（`manifest/repository-rules.edn` の命名規則違反）は、どちらも採らなかった。
+
+結果: **`kotoba-lang/computer-use` PR #10**（draft、head `4956af5`）。
+
+**転写ずれは起きていない。実測で確認した:**
+
+- push された tree を clone し、手元の検証済み commit と `git diff --stat` → **空**（tree 完全一致）。
+- 4 ファイルの sha256 が全て一致（`8726d4a2…` / `ad8d69b2…` / `ab07618c…` / `8c26325d…`）。**これは test が届かない `#?(:clj)` 内の shell-out 約 150 行も含めて保証する** —— test だけでは、あの領域の転写ずれは捕まらなかった。
+- push された tree に対して**こちらで独立に** `clojure -M:test` を回し、30 tests / 121 assertions / 0 failures を再現（子セッションの自己申告ではない）。
+- upstream PR #10 の本文が『shell-out は 1 度も実行していない・実機ゲーム未プレイ・inset 26pt と model-width 480 は当て推量』を保持していることを確認。
+
+**upstream は merge 済み**（PR #10 → `kotoba-lang/computer-use` main の `172f57a`、squash）。merge 後の main の tree が手元の検証済み commit と byte 一致することを確認し（4 ファイルの sha256 全一致 + `git diff --stat` 空）、merge 後の main に対して独立に `clojure -M:test` を回して 31 tests / 124 assertions / 0 failures を再現した。west pin も `2d66086` → `172f57a` に前進済み。
+
+## review で自分のコードに見つけた 2 件（merge 前に直した）
+
+**どちらもテストを落とさない。読んで見つけるしかない種類のものだった。**
+
+1. **`sips -Z` は幅ではなく長辺を縛る。** `-Z` は `--resampleHeightWidthMax` で、デスクトップは横長だから `computeruse.macos` では長辺＝幅で一致する。その idiom をそのまま持ってきたが**電話は縦長**なので、400×874 の crop に `-Z 480` を掛けると 480 になるのは**高さ**で、幅は約 220px になっていた。scale は実測 dims から導くので**座標は壊れず、何も失敗しない** —— ただ『画面を見て遊ぶ』ための driver がモデルに**サムネイルを渡していた**。決定的だったのはテスト側で、fixture の `(def model [480 1049])` は 400×874 に対して**幅 480** を仮定しており、コメントは `; as if sips -Z 480` ——**意図はテストに書かれていて実装がそれと違い、間違いはコメントに書き残されていた**。`--resampleWidth` に変更。
+2. **観測前の scale が `[1.0 1.0]` に fallback していた。** スクリーンショット前に操作すると model 座標を point としてそのまま扱い、**タップがもっともらしい別の場所に落ちる** —— この namespace が存在する理由そのものの失敗である。しかも同じファイルの `mirroring-window-rect` は「既定値を返さず throw する」と明記して逆をやっていた。拒否するように変更し、あわせて**座標解決を focus より前**に移した（呼び出し側のミスが窓を前面に引き出す前に表面化する。副産物として Mac 無しで検査可能になり、実際に test を足した）。新 gate は変異で落ちることを確認済み（`[1.0 1.0]` を戻すと 3 操作が error）。
+
+**教訓**: 1 は「隣の driver で正しい idiom を、前提が違う場所へ運んだ」誤りで、2 は「同じファイルの中で自分の原則と逆をやった」誤り。どちらも test 緑・lint 緑のまま通っていた。
+
+**pin 検証について正直に**: `scripts/verify-west-pins.cljs` は `gh` CLI を要求するがこのコンテナに無く、**実行できていない**。代わりに同じ 3 条件を個別に確認した ——(1) 存在: `git ls-remote` で `172f57a` が実在、(2) default branch 到達性: `172f57a` が `refs/heads/main` **そのもの**（server 確認）、(3) 前進: full 履歴を取得した上で `git merge-base --is-ancestor 2d66086 172f57a` が真、4 commit 先行。shallow 由来の誤判定（CLAUDE.md の警告）は unshallow 済みなので該当しない。"}]

@@ -1,0 +1,484 @@
+[{:db/id -1
+  :adr/id "adr-2608055000-slash-objective-fault-only-honest-actor-invariants"
+  :adr/title "ADR-2608055000: slash は客観的 fault にのみ発火する — 正直者の免疫 5 条と、murakumo / kotobase / kotoba(inga) の役割再配置"
+  :adr/status "accepted (session closed 2026-08-05. G1..G6 landed on main + 2 self-review follow-ups; I4/I5 closed in inga, MITIGATED-not-closed in escrow; 2 open gaps recorded with resume points)"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-05"
+  :adr/last-verified "2026-08-05"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/topic "slashing-objective-fault-only"
+  :adr/repos ["orgs/kotoba-lang/inga"
+              "orgs/kotoba-lang/witness-quorum"
+              "orgs/kotoba-lang/engi"
+              "orgs/kotoba-lang/engi-witness-escrow"
+              "orgs/kotoba-lang/murakumo"
+              "orgs/network-awai/cloud-murakumo"]
+  :adr/related ["adr-2607994000-engi-l1-permissionless-staking-equivocation-slashing"
+                "adr-2607995000-kotoba-three-sphere-economy"
+                "adr-2607110300-kotoba-lang-net-kotobase-cloud-murakumo-decentralization-roadmap"
+                "adr-2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane"]
+  :adr/authoritative-for
+  ["slashable fault の唯一の定義: 告発者を信頼せず・ネットワーク状態を知らず・時刻を知らずに、
+    手元の署名検証だけで第三者が真偽を確定できる不正のみ。今日それを満たすのは equivocation
+    （同一鍵・同一 height・異なる block-hash の 2 署名）だけである"
+   "正直者の免疫 5 条（沈黙は無償 / 不一致は無償 / 告発は検証されねば記録されない / 裁定者は
+    存在しない / 出口は誰にも塞げない）を slash 面の不変条件とし、機械検査の対象にする"
+   "役割の再配置: 判定と順序は inga、外部担保 escrow は保管のみ（slash を実行しない）、
+    murakumo の witness-quorum は役務の品質管理であって slash 面ではない、kotobase は slash 面を
+    持たない（持たないことが正しい）"
+   "recompute mismatch は slashable ではない。非決定性（浮動小数・モデル版・seed）と区別できない
+    ため、支払い留保と役割剥奪で扱う。cloud-murakumo/verify/compute.cljc の
+    『mismatch is the slashing signal』は本 ADR で撤回する"
+   "witness-quorum の minority slashing（多数派と違う投票・および escalate を bond 没収の
+    根拠にする実装）は ADR-2607995000 が定めた zone-wide の equivocation-only 規則に違反して
+    いる。撤去対象とする"
+   "G1..G6 のゲートを全て通すまで、第三者から bond を受け入れない"]
+  :adr/evidence
+  ["orgs/kotoba-lang/inga/src/inga/stake.cljc:46-54 equivocation-only の根拠と liveness 非対象の理由"
+   "orgs/kotoba-lang/inga/src/inga/stake.cljc:357-368 liveness-drop は active set 除外のみ・没収なし"
+   "orgs/kotoba-lang/inga/src/inga/stake.cljc:199-246 quorum-met? が :sybil-resistant? を in-band で返す"
+   "orgs/kotoba-lang/inga/src/inga/replica.cljc:1014-1021 unverifiable evidence is how one node frames another"
+   "orgs/kotoba-lang/inga/src/inga/replica.cljc:1037-1059 handle-evidence は検証してから記録し初見のみ転送"
+   "orgs/kotoba-lang/inga/src/inga/power.cljc:128-151 :slash fold は bond の存在しか検査しない（証拠は同梱されない）"
+   "orgs/kotoba-lang/witness-quorum/src/kotoba/lang/witness_quorum/quorum.clj:104,107,119 :minority (into rejects escalates)"
+   "orgs/kotoba-lang/witness-quorum/src/kotoba/lang/witness_quorum/slashing.clj:38-42 minority-keys を stake/slash!"
+   "orgs/kotoba-lang/witness-quorum/src/kotoba/lang/witness_quorum/stake.clj:1-11 NOT real money / no external custody"
+   "orgs/kotoba-lang/engi-witness-escrow/src/EngiWitnessEscrow.sol:185-206 slash は onlyArbiter・evidenceRef は非検証"
+   "orgs/kotoba-lang/engi-witness-escrow/src/EngiWitnessEscrow.sol:236-239 updateUnbondDelay に上限も遡及禁止も無い"
+   "orgs/kotoba-lang/murakumo/src/murakumo/overlay/witness_treasury.clj:28-36 単一運用者の crash-fault であり Byzantine ではない"
+   "orgs/network-awai/cloud-murakumo/src/cloud_murakumo/verify/compute.cljc:3-7 mismatch is the slashing signal（本 ADR で撤回）"
+   "orgs/kotoba-lang/inga/README.md:541-559 slashing is implemented and does not fire"]
+  :adr/decision
+  {:summary "slash の根拠を客観的 fault 一種類に絞り、正直者の免疫を不変条件として明文化する"
+   :slashable-fault {:equivocation {:evidence "同一 witness 鍵・同一 height・異なる block-hash の 2 署名"
+                                    :verifiable-by :any-third-party-offline
+                                    :status :implemented
+                                    :fires? false
+                                    :why-not-firing "bond source 未デプロイ / ordering floor = 0"}}
+   :not-slashable {:liveness :active-set-removal-only
+                   :censorship :active-set-removal-only
+                   :minority-verdict :reputation-only
+                   :escalate-abstain :nothing
+                   :recompute-mismatch :payment-withhold-and-role-removal
+                   :retrieval-sample-failure :role-removal-only}
+   :honest-actor-invariants
+   {:i1 {:name "沈黙は無償" :status :implemented :where "inga.stake/liveness-drop"}
+    :i2 {:name "不一致は無償" :status :implemented
+         :where "witness-quorum/outcome.clj（stake ledger を引数に取らない）+ murakumo/overlay/witness_write.clj"
+         :closed-by ["kotoba-lang/witness-quorum 73fef67a3c6ea7621a96c786fbfd998c12a730d0"
+                     "kotoba-lang/murakumo 41588c578a8949ef06bda6edb9c836f8cf1db0f5"]}
+    :i3 {:name "告発は検証されねば記録されない" :status :implemented :where "inga.replica/handle-evidence"}
+    :i4 {:name "裁定者は存在しない"
+         :status :partially-implemented
+         :consensus-plane {:status :implemented
+                           :where "inga.power/apply-event :slash が evidence 必須・fold 内検証"
+                           :closed-by "kotoba-lang/inga fdc1dcf06f257f8b37cbbcc709e6f38c2ac134b8"}
+         :custody-plane {:status :mitigated-not-closed
+                         :where "EngiWitnessEscrow"
+                         :why "EVM の ecrecover は secp256k1 のみ。契約は Ed25519 証拠を
+                               再検証できないので、on-chain の slash は依然 arbiter の主張であって
+                               証明ではない。timelock + 公開 + guardian veto + 提案失効で
+                               『単独・即時』を消したが、arbiter と guardian が共謀すれば
+                               証明の無い没収は依然可能"
+                         :permanent-fix "証拠自体の on-chain 検証（Ed25519 precompile もしくは
+                                         inga の quorum 証明書）。そこに到達したら arbiter と
+                                         guardian は縮小ではなく消滅させる"
+                         :mitigated-by ["kotoba-lang/engi-witness-escrow 406dd4f062c8633fe2f163cc4e589c38e51d1312"
+                                        "kotoba-lang/engi-witness-escrow 002b03d9b98e54ac687a46467e7352c3fe00adcb (再提案による凍結の開示)"]}}
+    :i5 {:name "出口は誰にも塞げない"
+         :status :partially-implemented
+         :delay-door {:status :implemented
+                      :where "MAX_UNBOND_DELAY_SECONDS（immutable）+ requestUnbond での deadline snapshot"
+                      :closed-by "kotoba-lang/engi-witness-escrow 406dd4f062c8633fe2f163cc4e589c38e51d1312"}
+         :slashing-door {:status :mitigated-not-closed
+                         :why "expireSlash は『不滅の 1 提案』を潰すが、提案の SEQUENCE は潰さない。
+                               悪意ある arbiter は evidenceRef を毎回変えて再提案し続けることで
+                               （1 サイクル ≒ timelock + 7 日）bonded witness の出金を無期限に阻止できる。
+                               guardian は毎サイクル veto できるが、常時 present かつ willing である必要がある"
+                         :inherent? true
+                         :why-inherent "slash されうる bond は告発によって凍結されうる。告発を
+                                        accountable にする唯一の手段は告発を『検査できること』であり、
+                                        それはこの契約にできないこと。I4 を裏側から見たものであり同じ fix で解ける"
+                         :disclosed-in ["kotoba-lang/engi-witness-escrow 002b03d9b98e54ac687a46467e7352c3fe00adcb"
+                                        "kotoba-lang/engi e81fea799ed58cdde79ccb347b7ee1ae5d1db74e (勧誘文書)"]}}}
+   :plane-roles {:kotoba-inga :adjudication-and-ordering
+                 :escrow :custody-only
+                 :murakumo-witness-quorum :service-quality-not-slashing
+                 :kotobase :no-slash-plane-by-design}
+   :gates {:g1 {:what "witness-quorum の minority slash 撤去（最低でも escalates を :minority から外す）"
+                :blocks "第三者 witness の受け入れ"
+                :status :closed
+                :closed-on "2026-08-05"
+                :how ["quorum.clj: :abstained を :minority から分離（3 箇所）"
+                      "slashing.clj → outcome.clj。stake ledger を引数に取らないので不変条件が型で守られる"
+                      "reputation.clj: abstainer は correct/incorrect のどちらにも記録せず observation も増やさない"
+                      "stake.clj: slash! は残すが、quorum verdict から呼ぶことを docstring で禁止"
+                      "orchestrator: precommit-and-slash → -and-record、:slashed → :outcomes、旧名は deprecated alias"
+                      "murakumo: 唯一の caller を更新し deps.edn pin を前進"]
+                :evidence ["witness-quorum 55 tests / 149 assertions, 0 failures; clj-kondo 0 errors 0 warnings"
+                           "murakumo overlay-witness-* 4 ns: 15 tests / 46 assertions, 0 failures（1 回目）"
+                           "de-raced split-verdict test: 3 連続 green"]}
+           :g2 {:what "inga.power の :slash に evidence を同梱し fold 内で verify する"
+                :blocks "power table を根拠にした没収"
+                :status :closed :closed-on "2026-08-05"
+                :closed-by "kotoba-lang/inga fdc1dcf06f257f8b37cbbcc709e6f38c2ac134b8"
+                :how ["apply-event を 3-arity 化し opts で :verify-sig-fn を注入（table は data のまま）"
+                      ":slash は evidence 必須。4 つの拒否理由 :no-evidence /
+                       :evidence-names-another-witness / :evidence-did-not-verify / :already-punished"
+                      "拒否は throw せず :rejected-slashes に記録。slash は誰でも誰にでも出せる
+                       adversarial input なので throw は proposer への halt 権限になる。
+                       検証結果は commit 済み bytes の関数なので拒否は決定論的で divergence しない"
+                      ":verify-sig-fn 欠如は throw（deployment 誤設定であり divergence 要因）"]
+                :evidence ["inga 307 tests / 1413 assertions, 0 failures"
+                           "parity digest power:2/1/1/1/4 が JVM と nbb で一致（適用と拒否の両方を含む）"]}
+           :g3 {:what "escrow の arbiter 裁量除去、または timelock + 公開 evidence + 誰でも呼べる異議申立て"
+                :blocks "escrow デプロイ"
+                :status :closed-as-mitigation :closed-on "2026-08-05"
+                :closed-by "kotoba-lang/engi-witness-escrow 406dd4f062c8633fe2f163cc4e589c38e51d1312"
+                :how ["slash を proposeSlash → (vetoSlash | 待機) → executeSlash の 2 段階化"
+                      "evidenceRef を提案時に emit（資金移動より前に公開される）"
+                      "guardian を arbiter と分離。veto はできるが propose はできず、自分で自分を rotate する"
+                      "veto 済み evidenceRef は再提案不可（veto を決定にする）"
+                      "executeSlash は誰でも呼べる / expireSlash で提案が失効し出金が解除される"]
+                :honest-limit "これは adjudication ではない。arbiter と guardian が共謀すれば
+                               証明の無い没収は依然可能。契約自身が docstring と README でそう述べている"
+                :requires-owner-decision true
+                :owner-decision-remaining "実ネットワークへのデプロイ可否（設計側の作業は完了）"}
+           :g4 {:what "unbond delay の遡及変更禁止（bond 時点の値で固定）"
+                :blocks "escrow デプロイ"
+                :status :closed :closed-on "2026-08-05"
+                :closed-by "kotoba-lang/engi-witness-escrow 406dd4f062c8633fe2f163cc4e589c38e51d1312"
+                :how ["MAX_UNBOND_DELAY_SECONDS = 30 days を immutable constant に（governable な上限は上限ではない）"
+                      "maturity deadline を requestUnbond 時に snapshot し withdraw はそれを読む"
+                      "MIN/MAX_SLASH_TIMELOCK_SECONDS。上限が無いと uint64 cast が過去に truncate して
+                       全提案が即時実行可能になる（forge lint 由来の実バグ、テストで固定）"]}
+           :g5 {:what "recompute mismatch を slash 経路から外す"
+                :blocks ":recompute role への bond 受け入れ"
+                :status :closed :closed-on "2026-08-05"
+                :closed-by "network-awai/cloud-murakumo 8fddb4b0ab11d415c6c8c8838a8457ee2e51f13b"
+                :how ["ns docstring から『mismatch is the slashing signal』を撤回"
+                      ":reject verdict に :consequence を同梱（:slashable? false / :payment :withhold /
+                       :role :remove-from-next-epoch）— 散文でなくデータで渡す"]
+                :note "production caller は存在せずテストのみだったので挙動変更はゼロ。
+                       ただし主張は誤りで、配線する実装者を誤った consequence に導いた"}
+           :g6 {:what "witness-recruitment.md の bond 額提示と escrow 不在の矛盾解消"
+                :blocks "外部勧誘"
+                :status :closed :closed-on "2026-08-05"
+                :closed-by "kotoba-lang/engi 0d8cc56b3eaf5128932b83775de7af1ef65d95df"
+                :note "500 USDC の矛盾自体は 2026-07-25 に解消済みだった。残っていたのはより悪い誤り —
+                       『slashing は自動で異議申立て不可、証拠は暗号学的事実』という記述は inga には
+                       真だが、資金を保管する escrow には偽（ecrecover は secp256k1 のみ）。
+                       実際に何に晒されるかを Risks に明記した"
+                :how ["on-chain の slash は arbiter の主張であって証明ではない、と明記"
+                      "escrow が提供する保護（timelock / guardian veto / 失効）と、その限界を明記"
+                      "出口の保証（30 日上限・snapshot・誰でも expire）を明記"
+                      "slashable でないものの列挙（沈黙・障害・censorship・少数意見・棄権）"
+                      "engi.consensus / engi.stake → inga への移動を反映（読者を誤った repo に送っていた）"]}}
+   :owner-decisions ["escrow を実ネットワークにデプロイするか"
+                     "ordering bond floor を 0 から動かすか（trigger は engi.metrics の
+                      :external-counterparties > 0 で既に測定可能）"]
+   :not-provided {:victim-compensation
+                  "equivocation の被害者（二重支払いを掴まされた counterparty）は 95% burn から
+                   何も受け取らない。被害額は counterparty の私的評価であり protocol は知り得ない
+                   （inga.stake.cljc:109-116 が既に述べている理由）ので、補填は protocol の外に置く。
+                   本設計が提供するのは『正直者が罰されないこと』だけであり、
+                   『損が補填されること』ではない"}}
+  :adr/body
+  "# ADR-2608055000: slash は客観的 fault にのみ発火する
+
+**Status**: accepted（設計統合。コードは未変更 — G1..G6 はすべて open）
+**Date**: 2026-08-05
+
+## なぜ書き直すか
+
+2026-08-05 の実測監査で、slash の設計が 2 系統に分裂し、しかも**動いている方が
+zone-wide 規則に違反している**ことが分かった。
+
+- `inga` は equivocation-only で、正直者を守る設計として正しく書けている。だが
+  bond source が無いので**発火しない**（README:558 が自ら書いている）。
+- `witness-quorum` は**多数派と違う投票をしたこと**を没収の根拠にしており、しかも
+  `escalate`（判断保留）まで `:minority` に畳み込む（quorum.clj:104）。これが
+  murakumo の overlay に実配線されている唯一の slash 経路である。
+- ADR-2607994000 の `:superseded_by` は ADR-2607995000 が
+  「Decision #5 の equivocation-only 原則を **zone-wide** の slashing 規則に昇格した」
+  と記録している。つまり動いている実装が zone 規則違反である。
+
+本 ADR は 2 系統を 1 つに畳み直し、『正直者が救われる』を検査可能な不変条件に落とす。
+
+## 1. slashable fault の唯一の定義
+
+> **slashable = 告発者を信頼せず、ネットワーク状態を知らず、時刻も知らない第三者が、
+> 手元の署名検証だけで真偽を確定できる不正。**
+
+この 1 文が設計全体を決める。今日この条件を満たすのは equivocation
+（同一鍵・同一 height・異なる block-hash の 2 署名）**だけ**である。
+
+条件から自動的に落ちるもの — 個別に禁止列挙する必要はない:
+
+| fault | 落ちる理由 | 代わりの扱い |
+|---|---|---|
+| 沈黙 / liveness | 正直な障害と区別できない | active set 除外のみ |
+| censorship | 観測者の視点に依存する | active set 除外のみ |
+| 少数意見 | 多数派が正しい保証が無い | reputation のみ |
+| 判断保留 (escalate) | 正直な申告である | 何もしない |
+| recompute 不一致 | 非決定性と区別できない | 支払い留保 + 役割剥奪 |
+| retrieval sample 失敗 | 瞬間の可用性でしかない（inga README:330-341 が自ら述べている） | 役割剥奪のみ |
+
+**recompute mismatch を slash から外すのは、今日の実装からの変更である。**
+`cloud_murakumo/verify/compute.cljc:3-7` は「mismatch is the slashing signal」と
+書いているが、GPU 浮動小数の差・モデル版差・sampling seed の差は不正と区別できない。
+支払いを止めるのは正当（役務が確認できなければ払わない）だが、担保を没収するのは
+上の定義を満たさない。
+
+## 2. 正直者の免疫 — 5 条
+
+『正直者が救われる』を、感想ではなく検査対象にする。
+
+**I1 沈黙は無償。** ネットワーク障害・停電・再起動で投票できなかった witness は
+active set から外れるだけで、bond に触れない。→ `inga.stake/liveness-drop` で実装済み。
+
+**I2 不一致は無償。** 多数派と違う verdict、escalate、棄権は bond に触れない。
+reputation にのみ効く。→ **違反中**。`witness-quorum/slashing.clj:38-42`。
+
+**I3 告発は検証されねば記録されない。** 証拠は受信側が独立に再検証し、通らなければ
+捨てる。→ `inga.replica/handle-evidence` で実装済み。同 ns の docstring が理由を
+名指ししている:『unverifiable evidence is how one node frames another』。
+
+**I4 裁定者は存在しない。** 誰の裁量でも bond を減らせない。slash は evidence を伴う
+決定論的 fold の結果としてのみ起きる。→ **違反中、2 箇所**。
+`EngiWitnessEscrow.slash` は `onlyArbiter` で `evidenceRef` を検証しない。
+`inga.power` の `:slash` fold は bond の存在しか検査せず、証拠が block に載らない。
+
+**I5 出口は誰にも塞げない。** unbond delay は bond した時点の値で固定され、後から
+延長できない。→ **違反中**。`updateUnbondDelay` に上限も遡及禁止も無いので、
+arbiter は全 bond holder の出金を無期限に凍結できる。
+
+I1 と I3 は既に正しい。**I2・I4・I5 が open であり、それが本 ADR の作業リストである。**
+
+## 3. 面の役割 — 誰が何を持つか
+
+**kotoba / inga = 判定と順序。** evidence を block に載せ、fold の中で検証し、
+power table を決定論的に変える。ここに裁定者は居ない。
+
+**外部担保 escrow = 保管のみ。** slash を『実行』してはいけない。inga の commit を
+根拠にしか動かない。Ed25519 のオンチェーン検証が v1 で無理（EVM の `ecrecover` は
+secp256k1 のみ）なのは事実だが、**裁量を消せないなら、裁量に遅延と可視性を強制する** —
+timelock + evidence の公開 + 誰でも呼べる異議申立て。今は代替が何も無い。
+
+**murakumo / witness-quorum = 役務の品質管理であって slash 面ではない。** verdict は
+支払い・reputation・役割割当にのみ効かせ、bond には触れない。今日の実害が限定的なのは
+`witness-quorum/stake.clj` が架空単位であり、murakumo 側も単一運用者の crash-fault だと
+申告しているから（witness_treasury.clj:28-36）。危険なのは、この shape のまま第三者を
+入れた瞬間に規則が本物になること。
+
+**kotobase = slash 面を持たない。持たないことが正しい。** storage/ref 面の不正は
+『CID が合わない』で自己検証されるので、経済的罰ではなく retrieval 失敗として現れる。
+`:storage` role を power table に載せる場合も、sample 失敗は I2 に従い役割剥奪のみ。
+
+## 4. 提供しないもの — 被害者補填
+
+『正直者が救われる』には 3 段階がある: (1) 罰されない (2) 損が補填される
+(3) 得をする。**本設計が提供するのは (1) だけである。**
+
+whistleblower reward 5% は (3) の芽だが、(2) は存在しない。equivocation の被害者
+——二重支払いの EN を掴まされた counterparty——は 95% burn から何も受け取らない。
+理由は `inga.stake.cljc:109-116` が既に述べている: 損失額は counterparty の私的な
+評価であって、protocol は EN に外部価格を付けない限り知り得ない。**補填は protocol の
+外に置く。** これは制限であり、隠さず書く。
+
+## 5. ゲート — bond を受け入れる前に閉じること
+
+| | 内容 | 何を塞いでいるか |
+|---|---|---|
+| G1 | witness-quorum の minority slash 撤去（最低でも escalates を `:minority` から外す） | 第三者 witness の受け入れ |
+| G2 | `inga.power` の `:slash` に evidence を同梱し fold 内で verify | power table を根拠にした没収 |
+| G3 | escrow の arbiter 裁量除去、または timelock + 公開 evidence + 異議申立て | escrow デプロイ（**owner 判断**） |
+| G4 | unbond delay の遡及変更禁止 | escrow デプロイ |
+| G5 | recompute mismatch を slash 経路から外す | `:recompute` role への bond |
+| G6 | witness-recruitment.md の bond 額提示と escrow 不在の矛盾解消 | 外部勧誘（**owner 判断**） |
+
+**owner 決定が要るもの**（agent が決めない）: escrow を実ネットワークにデプロイするか。
+ordering bond floor を 0 から動かすか——この trigger は既に測定可能で、
+`engi.metrics` の `:external-counterparties` が 0 を超えたときである。
+
+## 6. G1 実施記録（2026-08-05）
+
+着地: witness-quorum `73fef67a3c6ea7621a96c786fbfd998c12a730d0` /
+murakumo `41588c578a8949ef06bda6edb9c836f8cf1db0f5`（どちらも main）。
+
+`slashing.clj` は `outcome.clj` に置き換えた。**新しい `apply-quorum-outcome` は
+stake ledger を引数に取らない** —— 旧挙動を戻すには signature を変える必要があり、
+不変条件が「テストされているだけ」から「型で守られている」に上がる。`quorum.clj` は
+`:abstained` を `:minority` から分離し、`reputation.clj` は abstainer を correct/incorrect
+のどちらにも記録せず observation も増やさない（＝abstention が `below-threshold?` に
+到達しない）。`stake/slash!` は bond の算術として残したが、quorum verdict から呼ぶことを
+docstring で明示的に禁止した。
+
+**副次的に見つけて直したもの**: murakumo の split-verdict テストは元から race だった。
+`create-overlay-witness-transport` が各 witness を `future` で並行 dial し、
+`collect-quorum` が threshold 到達で early-exit するため、反対票が
+`:rejected` 確定後に届いて `:minority` が空になることがある。**baseline
+（無改変 origin/main、旧 slashing assertion のまま）で 2 回とも同じ失敗を再現**した
+うえで、latch で順序を固定した（3 連続 green）。
+
+**直していない既知の flaky**（本変更とは無関係、baseline で同一に失敗することを実測）:
+`overlay_witness_write_test/write-record-with-real-quorum-reaches-witnessed-over-real-quic`
+と `overlay_witness_ledger_test/ledger-quorum-fn-reaches-witnessed-over-real-quic`。
+どちらも実 localhost QUIC listener を固定ポートで立て、固定 400ms sleep で待つ設計で、
+このマシンは多数の並行セッションが常時 build を回している。slash とは無関係の別件。
+
+## 7. G2..G6 実施記録（2026-08-05、同日）
+
+| ゲート | repo | main commit |
+|---|---|---|
+| G2 | kotoba-lang/inga | `fdc1dcf` |
+| G3 + G4 | kotoba-lang/engi-witness-escrow | `406dd4f` |
+| G5 | network-awai/cloud-murakumo | `8fddb4b` |
+| G6 | kotoba-lang/engi | `0d8cc56` |
+
+**G2** — `:slash` は evidence を同梱し、fold が `verify-sig-fn` で検証する。拒否は
+throw せず `:rejected-slashes` に記録する。ここが重要な設計判断で、`:default` の
+unknown-event が throw するのとは理由が違う: **「type が unknown か」は replica の
+コード版に依存するが、「evidence が検証を通るか」は commit 済み bytes の関数**なので、
+拒否しても divergence しない。逆に throw すると、偽の告発 1 件で全 replica を止められる
+——slash は「誰でも誰にでも出せる」唯一のイベントで、定義上 adversarial input である。
+`:already-punished` も足した: 証拠は期限切れしないので、これが無いと一度 slash されて
+再 bond し以後正直な witness を、古い証明で永久に何度でも没収できる。
+
+**G3/G4** — escrow は propose → (veto | 待機) → execute の 2 段階になり、`guardian` が
+arbiter から分離された（veto はできるが propose はできず、自分で自分を rotate する）。
+出口は immutable な 30 日上限と request 時 snapshot で守られる。**`forge lint` が実バグを
+1 件見つけた**: timelock に上限が無いと `uint64` cast が過去に truncate し、全提案が即時
+実行可能になる——timelock が自分自身を無効化する。
+
+**G3 は「緩和」であって「解消」ではない。** EVM の `ecrecover` は secp256k1 のみなので、
+契約は Ed25519 証拠を再検証できない。**arbiter と guardian が共謀すれば、証明の無い没収は
+依然として可能**である。契約自身と README がそう書いている。恒久解は証拠自体の on-chain
+検証で、そこに到達したら 2 つの鍵は縮小ではなく消滅させる。
+
+**G5** — `verify/compute.cljc` の「mismatch is the slashing signal」を撤回し、`:reject`
+verdict に `:consequence`（`:slashable? false` / `:payment :withhold` /
+`:role :remove-from-next-epoch`）をデータとして同梱した。production caller は無く
+テストのみだったので挙動変更はゼロだが、主張は誤りで、配線する実装者を誤った consequence に
+導いた。
+
+**G6** — 500 USDC の矛盾は 2026-07-25 に既に解消済みだった。残っていたのは**より悪い誤り**で、
+「slashing は自動・異議申立て不可、証拠は暗号学的事実」という記述は `inga` には真だが、
+**資金を保管する escrow には偽**である。実際に何に晒されるか（on-chain の slash は arbiter の
+主張であって証明ではないこと、escrow の保護とその限界、出口の保証、slashable でないものの
+列挙）を Risks に明記した。`engi.consensus` / `engi.stake` の参照も inga へ修正——読者を
+存在しない場所に送っていた。
+
+## 8. 自己レビューで見つけた 2 件（同日、follow-up として着地）
+
+**どちらも「自分が今日入れたコードの穴」で、ツールや他人が見つけたものではない。**
+
+**(1) `:rejected-slashes` が攻撃者制御の無制限ベクタだった**
+（`inga` `7b292e968a676c950a8915cfbeb882f2a665c790`）。G2 で「adversarial input に
+チェーンを *止め* させない」ことは丁寧に考えたのに、代わりに *膨らませ* させていた。
+拒否記録は chain 全体に fold され state root に hash される state で、proposer は
+block 空間のコストだけで無限に積める。`{witness {reason count}}` に変え、
+witness 集合 × 固定 reason 集合で有界にした。`:slashes` はベクタのまま残す——
+**成功した slash しか append されず、1 件ごとに違反者が bond 全額を失う**ので、
+攻撃者が選べる量ではない。この非対称性をテストで固定した。
+
+**(2) `expireSlash` は「1 提案」しか塞いでいなかった**
+（`engi-witness-escrow` `002b03d`、勧誘文書 `engi` `e81fea7`）。I5 を閉じたと
+書いたが、閉じたのは *不滅の 1 提案* だけで、*提案の連鎖* は閉じていない。
+悪意ある arbiter は evidenceRef を毎回変えて再提案し続け、出金を無期限に阻止できる。
+**これは巧妙な state machine で塞げる種類の穴ではない**——slash されうる bond は
+告発で凍結されうるのが構造であり、告発を accountable にする唯一の手段は
+「検査できること」で、それはこの契約にできない。I4 を裏側から見たものなので
+同じ fix（on-chain 検証）で同時に解ける。コードでは直せないので**開示した**:
+契約 docstring・`expireSlash` 自身・README・勧誘文書の Risks。
+
+## 9. Session close 記録（2026-08-05）
+
+### 着地したもの（すべて default branch 上で確認済み）
+
+| | repo | main commit |
+|---|---|---|
+| G1 | kotoba-lang/witness-quorum | `73fef67a3c6ea7621a96c786fbfd998c12a730d0` |
+| G1 | kotoba-lang/murakumo | `41588c578a8949ef06bda6edb9c836f8cf1db0f5` |
+| G2 (+follow-up) | kotoba-lang/inga | `7b292e968a676c950a8915cfbeb882f2a665c790` |
+| G3+G4 (+follow-up) | kotoba-lang/engi-witness-escrow | `002b03d9b98e54ac687a46467e7352c3fe00adcb` |
+| G5 | network-awai/cloud-murakumo | `8fddb4b0ab11d415c6c8c8838a8457ee2e51f13b` |
+| G6 (+follow-up) | kotoba-lang/engi | `e81fea799ed58cdde79ccb347b7ee1ae5d1db74e` |
+| ADR + west pin ×6 | com-junkawasaki/root | `83ab1ae634156fe7a720bffeb73bb474cb88c06e` |
+
+west pin 6 件は子リポの main tip と**完全一致を実測**（6/6）。`verify-west-pins` は
+変更 4 件をすべて fast-forward と判定。
+
+### 検証（実行したもの・件数）
+
+- witness-quorum `clojure -M:test` 55 tests / 149 assertions, 0 failures。`-M:lint` 0/0
+- inga `clojure -M:test` 309 tests / 1,419 assertions, 0 failures。`-M:lint` 0 errors
+  （warning 9 件はすべて既存、test/ 内）。parity digest `power:2/1/1/1/4` が
+  **JVM と nbb で一致**（適用された slash と拒否された slash の両方を含む）
+- engi-witness-escrow `forge test` 42 tests, 0 failures。`forge build` の
+  unsafe-typecast warning 0
+- cloud-murakumo `clojure -M:test -n …compute-test` 6 tests / 15 assertions, 0 failures
+- murakumo overlay-witness-* 4 ns 15 tests / 46 assertions, 0 failures（1 回目）
+
+### 残 gap 1 — edn-query が落ちるのは corpus の型不整合（未修正・要 owner 判断）
+
+`nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q` に
+`clojure.string/includes?` を含む述語を渡すと `a.indexOf is not a function` で
+**クエリ全体が落ちる**。
+
+**真因（実測で確定）**: `adr/id` の束縛 2,837 件のうち **169 件（約 6%）が文字列で
+なく整数**（例 `2799007316`）。該当 ADR ファイルは **171 件**で、規約の
+`:adr/id \"adr-<id>-<slug>\"` ではなく `:adr/id 2799007316` と裸の整数。
+`includes?` は `.indexOf` にコンパイルされるので整数に当たった瞬間に落ちる。
+
+**誤診を 1 度した記録**: 最初のスタックが `js->clj` を最内フレームに見せたため
+そこを修正したが、パッチ後も同じエラーで落ちて仮説は棄却（パッチは revert 済み）。
+A/B で確定 —— 同じクエリの述語を `=` に変えるだけで通る。
+
+**再現**:
+```bash
+nbb ... manifest/edn-query.cljs q '[:find ?id :where [?e \"adr/id\" ?id] [(clojure.string/includes? ?id \"2607994000\")]]'   # 落ちる
+nbb ... manifest/edn-query.cljs q '[:find ?id :where [?e \"adr/id\" ?id] [(= ?id \"adr-2607994000-…\")]]'   # 通る
+grep -rlE ':adr/id +[0-9]+' 90-docs/adr/*.edn | wc -l   # => 171
+（--classpath は \".:scripts/nbb_compat\"）
+```
+
+**なぜ直さなかったか**: 171 件の `:adr/id` を文字列化するのは **identity 値の変更**で、
+`:adr/related` 等の相互参照を壊しうる corpus migration。slash 設計のセッションで
+巻き込みで実行する範囲を超える。回避策は述語を `=` にすること。
+
+### 残 gap 2 — murakumo の live QUIC テスト 2 件が flaky（未修正・別スコープ）
+
+`overlay_witness_write_test/write-record-with-real-quorum-reaches-witnessed-over-real-quic`
+と `overlay_witness_ledger_test/ledger-quorum-fn-reaches-witnessed-over-real-quic`。
+実 localhost QUIC listener を固定ポートで立て固定 400ms sleep で待つ設計で、
+このマシンは多数の並行セッションが常時 build を回している。
+
+**本変更由来ではないことを実測済み**——無改変の `origin/main` で同一に失敗する
+（ledger 側は行番号まで一致）。修正には `quic-driver/serve-once-rpc!` に readiness
+signal を足す production API 変更が要り、slash 設計とは別の変更。
+
+なお **split-verdict テストの race は直した**（latch で順序固定、3 連続 green）。
+これも baseline で 2 回とも同じ失敗を再現してから着手している。
+
+### 次に着手するなら
+
+**I4/I5 の恒久解 = 証拠自体の on-chain 検証**（Ed25519 precompile もしくは inga の
+quorum 証明書）。ここに到達したら escrow の `arbiter` と `guardian` は**縮小ではなく
+消滅**させる。共謀による証明なし没収も、再提案による出金凍結も、同時に消える。
+
+**owner 判断が要るもの（agent が決めない）**: ①escrow を実ネットワークにデプロイするか
+②`:ordering` bond floor を 0 から動かすか（trigger は `engi.metrics` の
+`:external-counterparties > 0` で既に測定可能）。
+
+## 10. 付随して直すもの
+
+`inga/README.md:558-559` の Not-here-yet 一覧が
+『equivocation evidence is recorded and does not propagate』と書いているが、
+同 README:462-496 が propagation の実装と `BYZANTINE_SPLIT=1` の実測表を載せており、
+コードにも存在する（`replica.cljc:643-644, 1037-1059`）。末尾一覧が stale。
+
+`edn-query.cljs:1798` は述語節を含む `q` の結果で `js->clj` が落ちる
+（`a.indexOf is not a function`）。本 ADR の調査中に踏んだ別件。"}]

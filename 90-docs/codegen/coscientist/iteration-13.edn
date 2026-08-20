@@ -1,0 +1,86 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-13"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-13.edn"
+  :doc/date "2026-08-18"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "published kexe-benchmark call versus a 4-byte ret identity"
+  :coscientist/iteration 13
+  :coscientist/subject "kotoba-lang/amu c944751, bench/runtime-comparison/kexe-benchmark.c; identity leaf via kotoba-native d4b050ae"
+  :coscientist/action "time a ret identity through the published runner; hoist isa dispatch out of the timed loop"
+  :coscientist/measured "identity.bin is 4 bytes, d65f03c0 (ret). 21 samples: published identity min 6.29 ns vs direct 1.08 ns vs LLVM identity 1.03 ns (loadavg 10). After hoist, identity min 1.07 ns vs LLVM 1.08 ns (loadavg 24). The leftover on the published call was strcmp, not guest work."
+  :coscientist/refuted "that the ~2.8 ns leftover after iteration 12 was the AArch64 kexe_fn8 ABI. A ret through the old runner paid ~5 ns of strcmp every call. The hoisted runner's identity matches LLVM's black_box identity."
+  :coscientist/carries-forward "iteration-04: do not ship a timed bench export; iteration-12: last quiet kernel_wide ranking is 9.22 ns / 1.44x LLVM; this file does not replace that ranking"
+
+  :doc/body
+  "# Codegen co-scientist, iteration 13
+
+WIP=1 after iteration 12 was the published runner's call. This iteration
+isolates that call. It does not compile another isel pass and it does not
+put a 100k loop in the artifact.
+
+## What was timed
+
+A diagnostic identity, not a published export:
+
+```
+(defn kernel [n :i64] :i64 n)
+```
+
+`extract-native` reports offset 0, length 4. Bytes `c0035fd6` = AArch64
+`ret`. n=200, oracle **200**. Same 100k calls / 10k warmup as kernel_wide.
+
+Arms:
+
+- published `kexe-benchmark`: `strcmp` of isa inside every invoke
+- direct / hoisted: isa resolved once, then `kexe_fn8`
+- LLVM: `black_box(n)` in the timed loop (`identity.rs`, /tmp only)
+
+kernel_wide (556 B, 1 MUL + 8 MADD, native `d4b050ae`) ran in the same
+rotation as a sanity check. That host was contended (loadavg 10 then 24).
+Those kernel mins are not a ranking. Iteration 12 remains the last quiet
+kernel_wide number.
+
+Dump: `/tmp/kernel-wide-call-isolate/`.
+
+## Identity ranking
+
+First rotation, 21 samples, loadavg `{ 10.77 10.13 11.55 }`:
+
+| arm | min | median | max |
+|---|---:|---:|---:|
+| published identity | 6.29 | 7.63 | 13.93 |
+| direct identity | 1.08 | 1.15 | 2.95 |
+| LLVM identity | 1.03 | 1.08 | 4.13 |
+
+`strcmp` on the identity is **5.21 ns** of min. Direct identity matches
+LLVM identity.
+
+Second rotation, 21 samples, loadavg `{ 24.78 17.72 14.52 }`, identity
+only, published harness after the hoist versus the old binary:
+
+| arm | min | median | max |
+|---|---:|---:|---:|
+| old published identity | 7.65 | 8.03 | 16.49 |
+| hoisted identity | 1.07 | 1.27 | 2.10 |
+| LLVM identity | 1.08 | 1.15 | 1.23 |
+
+The hoist is the published runner. Recursive exports still get
+`context.fuel = 512` every call. The identity does not read it.
+
+## What this does not change
+
+- Do not overwrite iteration 12's kernel_wide 9.22 ns / 1.44x. This
+  session never had a quiet kernel versus LLVM pair.
+- Do not bump kotoba-native. Do not write a kernel number into
+  `amu/docs/performance.md`.
+- Do not ship a timed `bench` export. Iteration 5 still stands for that.
+- Do not claim LLVM beaten.
+
+## Next
+
+Quiet rematch of kernel_wide through the hoisted harness versus LLVM.
+The identity leftover is gone. The remaining question is whether the
+eight-lane leaf, once the runner stops paying strcmp, still trails the
+inlined rustc loop. Do not land fused-srem, extra MOV, FMA, PGO, or a
+kototama optimizer. Do not overwrite iterations 04–12."}]

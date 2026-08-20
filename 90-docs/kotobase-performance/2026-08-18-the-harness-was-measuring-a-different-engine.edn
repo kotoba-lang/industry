@@ -1,0 +1,121 @@
+{:receipt :kotobase/harness-built-from-unpinned-checkouts
+ :date "2026-08-18"
+ :supersedes-the-open-question-in
+ "90-docs/kotobase-performance/2026-08-18-the-harness-no-longer-reproduces-its-own-baseline.edn"
+ :status :root-cause-found
+
+ :the-question-it-answers
+ "Why the phase bench reported 38,062 cpu-ms for work its own docstring
+  measured at 2,201 -- same blocks, same head, same release target -- while
+  production was unchanged at 2,058 cpu-ms."
+
+ :the-cause
+ "`protocols-worker/shadow-cljs.edn` lists 26 `:source-paths` of the form
+  `../../../kotoba-lang/<lib>/src`. Those resolve to the AMBIENT shared
+  checkout of each library -- whatever revision that working tree happens to be
+  sitting at -- and not to the revision `manifest/west.yml` pins.
+
+  Measured 2026-08-18: **24 of the 26 differ from their pin.** Where the pin
+  object was present locally the checkout was BEHIND, by 2 to 17 commits:
+
+      pay                            17 behind
+      kotobase-lake                   4 behind
+      kotobase-protocols              4 behind
+      datom-source                    2 behind
+      org-apache-tinkerpop-gremlin    2 behind
+      org-graphql-http                2 behind
+      kotobase-peer / kotobase-server / arrangement / prolly-tree
+        differ; distance not computable without fetching the pin
+
+  So the bench was compiling and measuring a DIFFERENT ENGINE from the one
+  kotobase.net serves."
+
+ :what-that-invalidates
+ {:levels
+  "Every absolute number the phase bench has ever produced, including the
+   2,201 cpu-ms baseline in its own docstring. Each describes whichever
+   revisions those working trees held on the day it ran, and nothing recorded
+   which those were. Two runs a week apart are not comparable and were being
+   compared."
+  :not-invalidated
+  "Ratios taken WITHIN one run, where the build is its own control: the phase
+   A/B split of that run, the per-collection parse costs of that run, the
+   opaque-decode floor of that run. The unknown factor cancels."
+  :also-affected
+  "The h8 test suite. `131 tests, 828 assertions, 5 failures` was run against
+   this same tree, so it exercised libraries production does not run. It still
+   proved what it claimed about the code under test, but `it passes here` was a
+   weaker statement than it read as."}
+
+ :what-it-explains-without-any-regression
+ "No code got 17x slower. The harness changed engines underneath its own
+  baseline and nobody could see it, because a source-path has no revision in it
+  and nothing compares it to one."
+
+ :the-seam-census-that-led-here
+ {:instrument "protocols-worker/test/kotobase_protocols_worker/seam_census.cljs"
+  :built-from :unpinned-checkouts
+  :sync-seam {:entries 5 :distinct 5 :duplicates 0}
+  :async-seam {:entries 143 :distinct 79 :duplicates 64
+               :cids-asked-more-than-once 16 :top-frequency 5}
+  :store {:gets 84 :misses 0 :bytes 11462579}
+  :reading
+  "The trampoline is NOT the cost -- 5 entries. The async wave asks 16 blocks
+   five times each (80) and 63 blocks once each (63); 80 + 63 = 143, and 63 is
+   this graph's unfolded transaction count. The store still sees 84 because the
+   isolate cache absorbs the repeats, which is why production's aggregate
+   counter and this one disagreed.
+
+   Two hypotheses about this were stated today and BOTH were wrong before it was
+   measured: first that h8 caused it (control: identical), then that the sync
+   trampoline's re-runs caused it (census: 5 entries). The measurement was worth
+   more than either guess."}
+
+ :the-fix-applied
+ "26 worktrees, one per source-path, each detached at its west pin, with the
+  library tree the build reads pointed at them. `kotobase-peer` now resolves to
+  688a752ab58b, which is what west.yml says."
+
+ :and-the-fix-was-verified-by-re-running-the-census
+ {:same-file :same-blocks :same-head true
+  :unpinned {:hot-datoms-cpu-ms 36219.05 :loadavg 101.5
+             :async {:entries 143 :distinct 79 :duplicates 64}
+             :sync {:entries 5 :distinct 5 :duplicates 0}
+             :store {:gets 84 :misses 0}}
+  :pinned {:hot-datoms-cpu-ms 7842.584 :loadavg 75.1
+           :async {:entries 79 :distinct 79 :duplicates 0}
+           :sync {:entries 5 :distinct 5 :duplicates 0}
+           :store {:gets 84 :misses 0}}
+  :what-changed
+  "The 64 duplicate async asks are GONE -- not reduced, gone -- and CPU fell
+   4.6x. The sync seam and the store are untouched, which is what makes this an
+   attribution rather than a coincidence: only the thing the stale libraries
+   controlled moved.
+
+   79 async + 5 sync = 84, and 84 is exactly what production's own
+   /_diag/hydrate reports for this graph. **The harness and production now agree
+   about how many times the read asks for a block.** That agreement is the
+   first evidence in this whole investigation that the two are running the same
+   thing."
+  :what-is-still-not-comparable
+  "7,842 cpu-ms is a DEV build against production's 2,058. Dev is unoptimised
+   and the load differs (75 vs whatever the docstring's run had, which it did
+   not record). This settles the COUNTS, which are build-independent. It does
+   not yet settle a level, and no level should be quoted until a release build
+   from these same pins produces one."}
+
+ :the-detector-this-earns
+ "`verify-shadow-source-paths` already exists and checks that a `:source-path`
+  EXISTS. It cannot see this: every one of these paths existed and resolved.
+  What is missing is a check that a relative source-path into another
+  west-managed repository resolves to that repository's PINNED revision -- and
+  that a build which cannot answer `which revision did I compile` is not a
+  reproducible measurement."
+
+ :the-shape-this-is-the-third-instance-of-today
+ "A measurement that cannot name its inputs. The scaling constant that decayed
+  when one of its two inputs moved (iteration-03). The premise inferred from a
+  counter that answered a different question (iteration-04). And now a build
+  input that has no revision in it. Each was invisible in exactly the same way:
+  the number came back, it looked like a number, and nothing in it said what it
+  was a number ABOUT."}

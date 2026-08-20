@@ -1,0 +1,144 @@
+[
+ {:db/id -1
+  :adr/id "2608042000"
+  :adr/title "ADR-2608042000: LEI catalog loop に runner を付け、kotobase.net / murakumo.cloud の ICP を機械可読にする — そして母集団が ICP と合っていないことを実測で確定させる"
+  :adr/status "accepted"
+  :adr/decided "2026-08-04"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/tags ["gtm" "sales" "loop" "lei-catalog" "icp" "net-kotobase" "cloud-murakumo"]
+  :adr/links ["adr-2607182400" "adr-2607110300" "adr-2607113500" "adr-2607173400" "adr-2607022600"]
+  :adr/body "## 背景
+
+オーナー質問（2026-08-04）「kotobase.net, murakumo.cloud として営業活動 /
+direct marketing をしたい。企業情報の収集と、EDN / DataLad / kotobase Datomic
+query 可能な状態にする loop・actor は設計されているか」。
+
+調査の結果、**収集側はほぼ全部実在して動いていた**:
+
+| 面 | 実体 |
+|---|---|
+| 収集 loop | `kotoba-lang/loop-lei-catalog`（observe→evaluate→decide→act→record-evidence、rubric は `catalog-maturity` に委譲） |
+| 取得 | `scripts/lei-discover-candidates.cljs`（Wikidata で選び GLEIF で裏取り）→ `scripts/lei-acquire.cljs` |
+| HP からの連絡先発見 | `scripts/lei-contact-discover.cljs`（GET only、role アドレス allowlist + 問い合わせフォーム URL） |
+| 正本 | `cloud-itonami-lei-<LEI>` repo の `blueprint.edn` + `80-data/public/tos.journal.edn`（git） |
+| projection | D1 `cloud-itonami-lei-catalog` / kotobase.net graph（`scripts/kotobase-ingest-cloud-itonami-lei.cljs`、ADR-2607113500）/ superproject datom 面 |
+| DataLad | `cloud-itonami/cloud-itonami-gtm-data`（annex remote b2、634 tenant の sales list / outreach draft、全件 `:status :proposed`） |
+| 送信側 actor | `cloud-itonami.marketing/propose-outreach!`（`:external-send`・承認キュー）+ `cloud-itonami.mail-send`（Resend） |
+
+欠けていたのは 4 点で、本 ADR はそのうち 2 点（定期実行、ICP）を閉じる。
+
+## 決定
+
+### D1. loop-lei-catalog に runner を付ける
+
+ADR-2607182400 が murakumo cell として計画しながら \"Next iteration\" のまま
+だった定期実行を、この workspace が実際に使っている経路（LaunchAgent +
+`tamaki exec`）で入れた。
+
+- `~/.gftd/run-lei-catalog-tick.cljs` — 1 tick = 1 bounded cycle。cycle の前に
+  loop repo を `origin/main` に fast-forward し、cycle 後に ledger 行を
+  commit + push する。**ledger の publish は loop ではなく runner の仕事**にした:
+  loop の仕事は測って動くことで、証拠がこのマシンから出ないサイクルは
+  「走らなかったサイクル」と区別がつかない。
+- `~/Library/LaunchAgents/com.kotoba-lang.lei-catalog-tick.plist` — 6h 間隔
+  （他の gftd/kotoba-lang tick と同じ）、`RunAtLoad false`。
+- `--contact-limit 40` で bound する。reachability の work list は「連絡経路の
+  無い全社」なので、1 tick で drain すると ledger 行がどの fetch がスコアを
+  動かしたか言えなくなる。
+
+**diverge したら cycle を回さない。** push が拒否された次の tick は、append-only
+ledger の衝突をスケジューラが独断で解決しないよう、理由を出して skip する。
+
+### D2. dry run を ledger で label する（`kotoba-lang/loop-lei-catalog` `1ee8413`）
+
+runner を配線する検証で dry-run を 1 回回したところ、その entry が実サイクルと
+**見分けがつかなかった**（同じ軸、同じ `:action-ok true`、before == after）。
+`:event/dry-run` を追加した。entry を書かない選択はしていない —— ledger が
+「この loop が走った全回数の記録」であることをやめてしまうため。
+
+### D3. ICP を機械可読にする（`90-docs/business/gtm-icp.datoms.edn`）
+
+`cloud-murakumo-gtm-country-plan.edn`（accepted 2026-07-05）は EU 週5–8 に
+「ターゲット企業 10–20 社リストアップ」と書いているが、**どの企業がターゲットか
+を機械が判定できる形では書いていない。** 散文の ICP はリストを作る段で毎回
+解釈し直され、「なぜこの会社を選んだか」が後から再現できない。
+
+6 つの ICP entity を起こした（`murakumo-us` / `murakumo-eu` / `murakumo-cn` /
+`kotobase-regulated` / `kotobase-ai-app-teams` / `kotobase-selfserve-individual`）。
+各 entity は述語を 3 つに分けて持つ:
+
+- `:icp/checkable-edn` — 今日のデータ面で評価できる述語
+- `:icp/unevaluable-edn` — ICP の定義には要るが**どのデータ源にも今日は無い**述語
+- `:icp/disqualifier-edn` — 当たったら外す条件
+
+`unevaluable` を空欄にせず名指しで持つのは `loop-system-dynamics` の
+`:uncomputable-until-measured` と同じ規律。非ターゲット（CN watch-only、
+kotobase の個人 self-serve）も**明示的に載せる** —— canvas に segment として
+書かれている以上、誰かが後から outbound 対象に戻すのを防ぐため。
+`kotobase-selfserve-individual` の除外根拠は実測（human signup funnel 0/295 = 0%、
+上位 path は `/llms.txt`・`/.well-known/did.json`・`/ipfs/*` で観衆は AI agent /
+crawler。正しい転換は x402 の agent-originated payment）。
+
+datom 面の `index-sources` に `gtm-icp` として登録済み。`:icp/coverage*` entity を
+1 件持ち、評価できない述語をカバレッジとして申告する。
+
+### D4. `scripts/gtm-target-list.cljs`
+
+ICP を D1 catalog に当てて対象を返す。**outbound の下書きは作らない・送らない**
+（送信は `propose-outreach!` の承認キューが担う）。status が active でない ICP は
+理由を出して**生成そのものを拒否する** —— 保留中の判断を、リストが出てしまった
+という既成事実で追い越さないため。出力 EDN は `:target-list/unevaluated` を必ず
+運ぶ。
+
+## 実測（2026-08-04、live D1）
+
+catalog: **185 社 / 43 法域 / 連絡経路あり 78 / ToS 文書 178**、US 偏り 47.6%。
+loop の maturity 0.7587（最弱軸 reachability 0.422）。
+
+| ICP | matched（評価できた述語のみ） | 非営業窓口で脱落 | targets |
+|---|---|---|---|
+| `murakumo-us` | 41 | 7 | **34** |
+| `murakumo-eu` | 5 | 3 | **2** |
+
+**この 2 行が本 ADR の主要な発見である。**
+
+- `murakumo-us` の ICP は「indie AI/ML 開発者・1–50 名・LLC/S-corp」。返ってきた
+  34 社は Walmart・Verizon・American Express・Avis Budget。**ICP と正面から
+  反対の population。**
+- `murakumo-eu` の ICP は「中堅 SaaS/AI、CTO/DPO」。残った 2 社は Ipsos SA と
+  Sopra Steria Group（いずれも大型上場、到達経路は `/contact` フォーム）。
+
+原因は歩留まりではなく**母集団**。catalog は `lei-discover-candidates.cljs` が
+Wikidata の**売上順**で選んでいるので、構造的に最大手が集まる。これは catalog
+自身の目的（世界の主要企業の ToS を LEI 主キーで保全する）には正しく、GTM の
+取得面としては間違っている。
+
+加えて **ICP の述語のうち catalog が評価できるのは国と連絡経路だけ**:
+`isic_rev5` は 185 社中 6 社、`sector` は 1 社しか埋まっておらず、従業員数・
+技術スタック・公表コンプライアンス姿勢は属性そのものが無い。
+
+非営業窓口の判定は 2 度直した。`fahrkartenservice@bahn.de`（発券窓口）は
+exact-token 規則をすり抜け、`ratpdev.communication@ratpdev.com`（広報）は
+先頭セグメントのみを見る規則をすり抜けた。どちらも営業対象として提案されて
+いた。現在は local part の**任意のドット区切りセグメント**の接頭辞で判定する。
+
+## 帰結
+
+- LEI catalog は **GTM の取得面ではない。** ここから直接 prospect list を作る
+  経路は、本 ADR の数字をもって閉じる。catalog は既存企業の ToS / 法人実体の
+  正本であり続ける。
+- GTM に使うには**第二の取得軸**が要る。murakumo EU なら「AI Act / GDPR 対応を
+  公言している中堅 SaaS/AI」を選べる source（`80-data/public/tos.journal.edn`
+  の全文検索、または web research 経由の `propose-outreach!`。後者は
+  `cloud-itonami-gtm-data` の 634 tenant で実績がある）。murakumo US は
+  country-plan §2 が元々そう設計していたとおり catalog ではなくコミュニティ経路
+  （HN/X・会計士コミュニティ）。
+- `net-kotobase` には accepted な国別計画が存在しない。`kotobase-regulated` の
+  5 か国は UVP からの導出であって決定ではなく、`pending-owner-review` のまま
+  target-list の生成を拒否する。**ここは owner の 1 決定で解ける。**
+- 本 ADR では扱っていない残り 2 ギャップ（オーナー提示の 4 点のうち）:
+  (2) 収集データの暗号化保存が無い（LEI catalog は public git の平文、gtm-data は
+  public repo + 実測 `encryption=none` の B2 annex）、(1) 電話・住所・代表者は
+  `lei-contact-discover` が hard line として意図的に収集していない。どちらも
+  設計変更 + 法域別の根拠づけを要するため別 ADR。"}
+]

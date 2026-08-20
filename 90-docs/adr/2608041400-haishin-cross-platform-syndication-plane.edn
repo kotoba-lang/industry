@@ -1,0 +1,233 @@
+[{:db/id -1
+  :adr/id "2608041400"
+  :adr/title "haishin 配信 — creator 出力の外部 social 配信面（kotoba-lang/haishin、public）"
+  :adr/status "accepted"
+  :adr/date "2026-08-04"
+  :adr/depends-on "ADR-2607071000（app-aozora video upload）/ ADR-2607071300（aozora creator actors）/ ADR-2607173200（west triple sync）"
+
+  :adr/context
+  "オーナー質問（2026-08-04）「dougaka, mangaka, animeka, ongakuka など
+   cloud-itonami と instagram, youtube, tiktok, x, vimeo, linkedin などの
+   social post は連携統合している?」に対する実測調査の結果は **統合されていない**
+   だった。以下はすべてローカル checkout に対する実測。
+
+   ## 実測した現在地（2026-08-04）
+
+   1. **`*ka` actor の公開先は app-aozora のみ。** `dougaka-actor` /
+      `animeka-actor` の README がどちらも『公開は app-aozora /videos
+      （app.aozora.embed.video、ADR-2607071000 経路）』と明示しており、
+      生成 → Governor 検閲 → 台帳 commit → 自前 appview の R2 blob で経路が
+      終わっている。外部プラットフォームへの出口が無い。
+
+   2. **`kotoba-lang/social-publication` は dry-run 専用。** `build-live` が
+      無条件 throw（'R0: live social posting is Council Lv6+ + operator +
+      member/actor-signature gated'）。プラットフォーム固有コードは一切無く、
+      出典2件以上を要求してテキストを組むだけ。依存する 12 repo
+      （cloud-itonami: amime/kenchi/kuni-umi/atsurae/ainori/denwaban/kaname/mio、
+      etzhayyim: mimamori/hokorobi/hoshimori/inochi）は全部ガバナンス/観測系で、
+      **`*ka` 系は1つも依存していない**。
+
+   3. **プラットフォーム側の現有戦力は片肺だった。**
+      `com-youtube` = 実在の upload client（OAuth2 refresh、resumable
+      videos.insert、captions、thumbnails）。
+      `com-x` = reply-tweet! / send-dm! のみ（publish でなく engagement）。
+      `com-vimeo` = clean-room の API 互換 **サーバ**（client ではない）。
+      Instagram = `com-meta-webhook` の send-message!（DM のみ）。
+      TikTok / LinkedIn = 何も無し。
+
+   4. **実在する外部 social API 呼び出しは広告と取り込みだけ。**
+      `cloud-itonami/adnetwork_providers.cljc` が Meta / TikTok Business /
+      LinkedIn / X Ads / Pinterest / Snapchat 等 20 以上を持つが、これは
+      **広告 API** であって organic post ではない。akashi は Meta Ad Library の
+      **取り込み**（ADR-2607100000）。
+
+   5. **統合に見えて違うもの。** aozora `/videos` の『TikTok 型縦動画フィード』は
+      TikTok **風 UI**。aozora worker の `twitter:card` は OG シェアカード（受け身）。
+      `dougaka/manifest.cljc` の `(def channels #{:aozora :youtube})` は
+      **`:youtube` がソース全体でこの1箇所のみ**の enum 値で、upload 実装が無い
+      —— 意図された連携ポイントの唯一の痕跡が、宣言だけで中身が無かった。
+
+   つまり欠けていたのは transport ではない（com-youtube が1プラットフォーム分は
+   既に解いている）。**1つの作品を6つのプラットフォームの互換性の無い規則へ写像し、
+   送る前に各々が受け取れるかを判定し、実際に何が起きたかを記録する層**が無かった。"
+
+  :adr/decision
+  "`kotoba-lang/haishin`（配信、public、no name prefix = reusable library）を
+   起こし、cross-platform syndication plane とする。純 `.cljc`・**依存ゼロ**。
+
+   ## 設計上の決定
+
+   1. **transport も credential も持たない。** HTTP client も JSON codec も
+      環境変数読みも認証情報探索も無く、`deps.edn` に依存が無いので隠す場所も無い。
+      `execute!` は caller が `:senders` で渡した関数を呼ぶだけで、その関数が
+      自分の auth を閉じ込める。これは間接化のための間接化ではない —— ネットワークに
+      届きうるライブラリは『届かないと信頼される』必要があるが、ここでは能力が
+      **制限されているのではなく存在しない**。副次的に、既存 client が職を失わない:
+      `:youtube` sender は `com-youtube` への短いアダプタであって再実装ではない。
+
+   2. **grant は fail closed。** `execute!` は `:grant`（今まさに認可する target 集合）を
+      必須にする。planned だが未 grant → `:skipped` receipt。grant されたが sender が
+      無い → `:skipped` receipt。sender が throw → `:failed` receipt、他 target は続行。
+      grant の指定漏れは『何も出ない』を意味し、決して『レビュー無しに何かが出る』に
+      ならない。Kotoba runtime の `capability-grant-mismatch` と同じ形。
+
+   3. **rejection は target 単位で、batch 単位ではない。** 4分の縦動画は妥当な
+      YouTube upload であり不正な X post である。正解は YouTube に出して X を
+      なぜ飛ばしたか報告することで、何も出さないことではない。`plan` は
+      `:plan/entries` と `:plan/rejected` を並べて返す。
+
+   4. **plan は再現可能。** `plan` は clock を読まない（`:at` は caller 供給）。
+      同じ artifact を2回 plan すると同一の値になる —— これが governor によるレビューと
+      CI での assert を可能にする（workflow script が `Date.now()` 不可で走るのと同じ規律）。
+
+   5. **tamaki seam: `:executable?` がそのまま grant。** `*ka` actor が既に出している
+      secret-free publication handoff（`dougaka.manifest/artifact-manifest` +
+      `publication-plan`、契約上 upload せず credential を運ばない）の
+      `:executable? true` は『publish-ready かつ人間承認済み』を意味し、これは
+      target を grant してよい条件と厳密に一致する。`plan->grant` がこれを
+      `:grant` に直結するので、**人間承認境界がフラグを確認し忘れる余地なく構造的に保たれる**。
+      `:aozora` は grant から落とす（producer 自身の appview であり syndicate 対象外）。
+
+   6. **limit の出自をデータに含める。** 各 constraint が
+      `:constraint/checked-at` / `:constraint/source` / `:constraint/provenance` を持つ。
+      `:in-repo-corroborated`（この workspace の独立実装が同じ値を持つ）/
+      `:vendor-doc` / `:unverified`。**現時点で `:youtube` のみ corroborated**
+      （`com-youtube` が title/description を 100/5000 に clamp、動く Python client から
+      1:1 移植）。**他5 target は `:unverified` であり、そう名乗る** ——
+      `unverified-targets` が集合を返し、該当 target の plan entry には毎回
+      `:target/limits-unverified` warning が乗る。plan 自体は禁止しない
+      （plan は offline で無料、間違った limit は読める rejection として表面化する方が
+      『動かないライブラリ』より有用）。
+
+   7. **`social-publication` は一切変更しない。** dry-run-only 憲章は 12 の
+      ガバナンス actor が依存する不変条件であり、そこに live posting を足すのは誤り。
+      haishin は disjoint な charter を持つ別 repo として共存する。"
+
+  :adr/consequences
+  "## 着地済み（default branch 上の事実、2026-08-04 closing 時点で確認）
+
+   - `kotoba-lang/haishin` **public 公開済み**: https://github.com/kotoba-lang/haishin
+     default branch `main`、pin `9397c4690928da4ae786ed14fbb8c7812c77c95e`。
+   - superproject **`main` に merge 済み**: merge commit
+     `80c0e057e624aa49e9a3c1eef21c7f77f54efe07`（サーバ側 merge、rebase も
+     force-push も使わず）。west entry `haishin`
+     （`orgs/kotoba-lang/haishin`、groups [kotoba-lang]）と本 ADR は
+     `main` 上に存在する。作業 branch `feat/social-haishin` は merge 後に
+     local / remote とも削除済み、worktree も撤去済み。**未着地の作業は無い。**
+   - 登録経路: `repos.edn :extra-projects` へ登録 →
+     `gen-west-manifest.cljs --entry haishin` で **5行・当該 entry のみの最小 diff**。
+     サーバ側 pin 検証 OK（『新規 entry, pin 9397c46 は main から到達可能』）。
+   - 完了ゲート `nbb scripts/west-orphan-audit.cljs --blocking` **exit 0**
+     （true-orphan-git 0 / local-root-broken 0）。
+
+   ## 検証（固定）
+
+   - **20 tests / 82 assertions が nbb（primary）と JVM（`clojure -M:test`）の
+     両方で green。** `.cljc` 可搬性は主張でなく実測。
+   - **公開後に clean clone でも再実行して green** — `git clone` した独立 checkout が
+     pin と同一 SHA `9397c469` を指しており、そこで 20 tests が通ることを確認した。
+     『手元では通る』ではなく『公開物が通る』を押さえている。
+   - **失敗は無い。未実行のものも無い**（このライブラリのテストは外部 I/O を
+     持たないので、skip される条件が存在しない）。
+   - この過程で**実バグを1件発見して修正した**:
+     `\\p{L}` / `\\p{N}` の Unicode property escape は JS 正規表現では `u` flag が
+     無いと不活性で、CLJS 経路で**日本語タグが丸ごと消えていた**（`#街歩き` → `#`）。
+     この workspace のタグは日常的に日本語なので、失敗は部分的でなく全面的だった。
+     reader conditional で `(js/RegExp. \"...\" \"gu\")` を明示して解決。
+   - **プロセス上の記録**: push guard（`west-pin-verify-guard`）が、古い base 由来の
+     west.yml が無関係な 9 件の pin を退行させることを正しく検知してブロックした。
+     最新 origin/main tip の上で再生成し直して着地させている。**guard が無ければ
+     静かな pin 退行が main に入っていた** —— CLAUDE.md が警告する罠が実際に発火した実例。
+
+   ## 未了（正直に。ライブラリは着地済みだが、まだ1件も実投稿していない）
+
+   **現状で live 投稿は1件も起きない。** haishin は sender が無ければ何も送らない
+   設計なので、これは故障ではなく既定状態である。実際に配信を有効化するには
+   下記 R1〜R3 が要る。
+
+   - **R1: `:unverified` な5 target の limit を照合する。**
+     `:youtube` のみ `com-youtube` の独立実装と一致していて corroborated。
+     Instagram / TikTok / X / Vimeo / LinkedIn は未照合。照合したら
+     `haishin.constraints/targets` の該当 entry の `:constraint/provenance` を
+     `:vendor-doc` に、`:constraint/checked-at` を照合日に書き換える
+     （文書は最新状態のみを表す。履歴は git が持つ）。
+     退行検知: `(haishin.core/unverified-targets)` を自分の suite で assert する。
+     **2026-08-04 追記（ADR-2608041800）**: 『workspace 内の既存 lib から裏を取れば
+     よい』は**不可能だと確定した**。org 全 1,999 repo を走査した結果、publish する
+     repo が `com-youtube` しか無く、**publish しない repo は publish の制約を
+     encode する理由が無い**ため。よって R1 は vendor doc に当たるか、下記 R2 の
+     client を実際に叩いて確かめるかのどちらか —— **実質 R2 が R1 を兼ねる。**
+
+   - **R2: target ごとの sender を書く。** `:youtube` は `com-youtube` の
+     `youtube.videos/insert-video!` への短いアダプタで済む（haishin の
+     `:youtube/videos-insert` request body は `youtube.videos/video-metadata` と
+     同形にしてあるので remap 不要）。**sender は haishin に入れない**
+     —— 認証情報がこのライブラリに入らないことが不変条件そのもの。
+     **2026-08-04 更新**: 残り4つの client を新規に書いて公開済み（ADR-2608041800）:
+     `com-instagram` / `com-tiktok` / `com-linkedin` / `com-vimeo-upload`
+     （いずれも依存ゼロ・I/O 注入・27 tests / 58 assertions が nbb と JVM 双方で green）。
+     `:x` だけは publish client がまだ無い —— `com-x` は返信と DM のみで、
+     post 作成と media upload を持たない。**R2 の残りは「4 client を haishin の
+     `:senders` に橋渡しする薄いアダプタ」と「com-x への publish 追加」**であり、
+     プロトコル実装そのものはもう残っていない。
+     capability `social/publish`（wire id 257）も同 ADR で新設済み。
+
+   - **R3: `dougaka` engine 側の配線。** `channels #{:aozora :youtube}` の
+     `:youtube` は 2026-08-04 時点で enum 値だけで upload 実装が無い。
+     seam は `haishin.adapt/tamaki-content->artifact` + `plan->grant` として
+     実装済み・test 済みなので、engine 側は sender を1つ書いて `syndicate!` を
+     呼ぶだけになる。**未実施の理由**: canonical な `ai-gftd-dougaka` engine repo が
+     west に登録されておらず、実測できたのが agent worktree
+     （`orgs/gftdcojp/.ai-gftd-dougaka-tamaki--content-dougaka-grok-0`）だけだったため。
+     着手前にまずこの engine repo の canonical な所在を確定させること。
+
+   - **構造的制約（設計で解けない、順序の問題）**: Instagram は
+     `:media/requires-public-url true` —— API が asset を URL から fetch するので、
+     **aozora 側で公開 URL が出てからでないと post をそもそも作れない**。
+     したがって syndication は aozora publish の *後* にしか走れない。
+     この制約は plan entry の `:target/pulls-from-url` warning として毎回出る。
+
+   ## resume point（次の agent 向け、会話履歴なしで再開できる粒度）
+
+       git clone git@github.com:kotoba-lang/haishin.git && cd haishin
+       nbb run_tests.cljs            # 20 tests / 82 assertions、green のはず
+       clojure -M:test               # JVM 側も同数 green
+
+   R1 に着手するなら `src/haishin/constraints.cljc` の `targets` map だけを触る
+   （他の ns は limit の値を知らない）。R2 に着手するなら sender は消費側の repo に
+   置き、`haishin.core/execute!` の `:senders` に渡す —— 呼ぶ先の client は
+   `kotoba-lang/{com-youtube,com-instagram,com-tiktok,com-linkedin,com-vimeo-upload}`
+   に揃っている（`:x` の publish だけ未実装）。
+
+   - receipt は `:source/dataset \"haishin-receipts\"` を持つので、workspace の
+     EDN plane にそのまま transact でき、fleet の他の事実と join できる。"
+
+  :adr/body
+  "実装: `orgs/kotoba-lang/haishin`
+   - `haishin.artifact` — canonical artifact（platform 中立の1形）+ 検証
+   - `haishin.constraints` — 6 platform の limit をデータとして（出自メタ付き）
+   - `haishin.target` — 6 target の適応と request 記述の構築（1 ns に集約:
+     各 builder は『このプラットフォームは他とどう違うか』だけなので並べて読める方がよい）
+   - `haishin.plan` — 純粋な fan-out、entries と rejected を分離
+   - `haishin.execute` — grant 必須、caller の sender のみ呼ぶ
+   - `haishin.receipt` — 試行ごとの append-only 記録
+   - `haishin.adapt` — tamaki content contract からの変換、`:executable?` → grant
+   - `haishin.core` — single entry（kotoba-ui と同じ規律）
+
+   テスト: `nbb run_tests.cljs`（primary）/ `clojure -M:test`（JVM、secondary）。
+
+   使用例:
+
+       (require '[haishin.core :as haishin])
+       (def p (haishin/plan artifact [:youtube :instagram :x] {:at now}))
+       (println (haishin/summary p))
+       (haishin/execute! p {:grant #{:youtube} :senders {:youtube my-sender}})
+
+   tamaki producer 向けの一発経路:
+
+       (haishin/syndicate! artifact-manifest publication-plan
+                           {:public-url ... :senders {...} :at now})
+       ;; :decision :approval-required なら
+       ;;   {:run/tally {:skipped 1}
+       ;;    :haishin/grant-note \"no grant — plan decision is :approval-required;
+       ;;                         human approval boundary not crossed\"}"}]

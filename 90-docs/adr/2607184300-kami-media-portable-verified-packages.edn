@@ -1,0 +1,42 @@
+[{:db/id -1
+  :adr/id "adr-2607184300-kami-media-portable-verified-packages"
+  :adr/title "KAMI media applications package projects with verified source media"
+  :adr/date "2026-07-18"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/topic "kotoba-lang-media-authoring"
+  :adr/supersedes ["adr-2607184200-kami-media-persistent-project-history"]
+  :adr/decision
+  {:shared {:container :zip
+            :extension ".kami.zip"
+            :required-entries ["project.edn" "media.edn"]
+            :media-entry-pattern "media/[0-9]+"
+            :media-integrity :sha-256
+            :asset-coverage :exact
+            :entry-names-unique true
+            :compressed-and-expanded-limit-bytes 536870912
+            :missing-runtime-media :reject-export}
+   :daw {:import-result [:audio-buffer :waveform :source-blob]
+         :undecodable-audio :reject}
+   :nle {:import-result [:object-url :source-blob :decode-source]
+         :old-object-urls :revoked}
+   :maturity {:kami-app-daw :逍遥 :kami-app-nle :逍遥}
+   :remaining-commercial-gates {:shared ["streaming package I/O above 512 MiB" "search paths" "duplicate-content policy"]
+                                :daw ["loop and comp recording" "input monitoring" "plugin hosting" "LUFS/true-peak"]
+                                :nle ["pointer trim gestures" "proxy/cache" "color management" "additional containers"]}}
+  :adr/implementation
+  {:daw-commits ["c61dbd8"]
+   :nle-commits ["d5d510f"]
+   :pull-requests ["kotoba-lang/kami-app-daw#1" "kotoba-lang/kami-app-nle#1"]
+   :evidence ["DAW passes 11 tests and 39 assertions; NLE passes 11 tests and 40 assertions, including manifest coverage, entry presence and project hash agreement."
+              "Both guarded shadow-cljs production releases completed with zero compiler warnings."
+              "DAW Chrome imported a real WAV, downloaded a three-entry package, reloaded, reopened the package, rebuilt its waveform and AudioBuffer, and played it without console errors."
+              "DAW Chrome rejected a SHA-consistent package whose media bytes were not decodable audio instead of leaving import pending."
+              "NLE Chrome imported a real MP4, downloaded a three-entry package, reloaded, reopened the package and restored its Blob object URL without console errors."
+              "Both application pull requests were reviewed and squash-merged; both GitHub Pages workflows completed tests, release compilation and deployment successfully."]}
+  :adr/consequences
+  ["Projects can move between browser sessions with their source media and no manual relink step."
+   "Every packaged asset is covered exactly once by a manifest entry and verified before becoming runtime media."
+   "ZIP expansion and source payloads are bounded to reduce browser memory exhaustion risk."
+   "The synchronous in-memory package path is intentionally capped at 512 MiB; streaming archival workflows remain future work."]
+  :adr/source-format "edn"}]

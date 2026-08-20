@@ -1,0 +1,249 @@
+[{:db/id -1
+  :adr/id "adr-2607287100-kotoba-lang-drpc-wire-format"
+  :adr/doc_type "adr"
+  :adr/topic "kotoba-lang-drpc-wire-format"
+  :adr/title "ADR-2607287100: kotoba-lang/drpc — DRPC wire format（frame + packet 再組立）を独立 library として実装、および proto.wire の varint overflow 修正"
+  :adr/status "accepted"
+  :adr/date "2026-07-28"
+  :adr/last_verified "2026-07-29"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["DRPC wire format を io-storj-node でなく独立 repo kotoba-lang/drpc に置く決定と、その根拠"
+   "reader が拒否する条件（id 単調性 / 新 id は未完 packet を破棄 / kind 不変 / payload 上限 / control の粘着）とそれぞれの理由"
+   "incomplete と malformed を区別する契約（長さ超過は待つ、終端しない varint だけが不正）"
+   "proto.wire の varint shift が JVM long を overflow し 2 runtime で挙動が割れていた欠陥と修正"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related
+  ["adr-2607287000-kotoba-lang-io-storj-node-protocol-core"
+   "adr-2607254100-kotoba-lang-sigv4-shared-signer-and-kotoba-byte-slice"]
+  :adr/decision-summary
+  "{:repo \"kotoba-lang/drpc\", :namespaces [drpc.wire drpc.client drpc.session drpc.server], :in-scope [:frame-codec :packet-reassembly :split :reader-state-machine :unary-call-sequence :error-decoding :call-multiplexing :server-side :streaming-calls], :out-of-scope [:tls :sockets :service-dispatch :code-generation :concurrency], :deps [io.github.kotoba-lang/proto], :verification [:storj-drpc-own-output :per-kind-and-per-flag-vectors :two-runtime-parity :negative-controls :live-call-answered-by-storj-drpc :live-call-from-drpcconn-to-this-server :streams-both-directions-against-drpcconn], :defect-found-in-dependency :varint-shift-long-overflow}"
+  :adr/artifacts
+  "{:repo \"orgs/kotoba-lang/drpc\", :pin \"9cf1783dce7f7074de3c4ba765a9e37cdc1d5384\", :vector-generator \"orgs/kotoba-lang/drpc/testdata/gen_vectors.go\", :vectors \"orgs/kotoba-lang/drpc/testdata/vectors.edn\", :call-vector \"orgs/kotoba-lang/drpc/testdata/client-vectors.edn (echo_server.go -dump, a real drpcconn over a recording transport)\", :echo-server \"orgs/kotoba-lang/drpc/testdata/echo_server.go (storj.io/drpc, no generated code)\", :proto-fix \"kotoba-lang/proto cd8b83ade7a2 (varint shift cap)\", :evidence {:drpc {:jvm \"74 tests / 285 assertions, 0 failures 0 errors\", :cljs \"nbb — same 74 / 285\", :lint \"clj-kondo clean\", :negative-controls \"wire: kind shift 14 failures, keeping abandoned bytes 1; client: 8/8 including flat message ids, omitted CloseSend, little-endian error code, dropped foreign streams\"}, :proto {:jvm \"11 tests / 67 assertions\", :cljs \"9 tests / 57 assertions\"}}}"
+  :adr/body
+  "# Context
+
+ADR-2607287000 は io-storj-node の最大の欠落を **DRPC over TLS** と記録し、
+着手順を「DRPC framing → peer TLS → check-in → settlement」とした。
+オーナー指示（2026-07-28）「自前実装したいので、そこはがんばろう」を受け、
+その 1 段目を実装する。
+
+# Decision
+
+## 1. 独立 repo にする — DRPC は Storj 専用ではない
+
+`kotoba-lang/drpc`（namespace `drpc.*`）。DRPC は gRPC の代替として
+storj.io が公開している**汎用 RPC**であり、Storj に固有ではない。
+`io-storj-node` に埋めると、DRPC を使う別のものが現れたときに 2 つ目の実装が
+生える（ADR-2607254100 が SigV4 で数えた代償と同じ形）。
+命名は `repository-rules.edn` の taxonomy に従い prefix 無し = reusable library。
+
+## 2. スコープ — framing だけ
+
+対象: frame の encode/parse、packet への再組立（reader 状態機械）、
+packet の frame 分割（`split`）。
+非対象: socket、TLS、service dispatch、コード生成。
+host が接続を所有し、read が返したバイトをそのまま `feed` に渡す
+（frame 境界に揃える必要は無い）。
+
+## 2.5. unary call — packet 列としての RPC（2026-07-29 追加、`drpc.client`）
+
+`drpc.wire` は packet ↔ bytes までだった。**呼び出しが「どの packet の列か」**を
+`drpc.client` が持つ。`drpcconn.Conn.doInvoke` は 4 write + 1 read:
+
+    InvokeMetadata   metadata がある時だけ
+    Invoke           body は rpc 名（/contact.Contact/PingNode 等）
+    Message          body は encode 済み request
+    CloseSend        空 body — もう送らない
+    → Message        応答
+    Close
+
+**message id は stream 内で 1 から始まり packet ごとに進む**（`newFrameLocked` が
+frame を作る前に inc する）。だから caller に委ねず library が計算する ——
+**id をやり直す呼び出しは、相手側が replay として捨てる**。
+
+### socket に触らない
+
+`drpc.client` は packet を出し、受けた packet を畳むだけで socket を持たない。
+同じ記述が JVM stream でも Node socket でも、socket を一切開かないテストでも動く。
+socket があるのは harness の `scripts/call.cljc` 一箇所だけ。
+
+### 明示した 2 つの判断
+
+**他 stream の packet は捨てずに `:ignored` へ退避する** —— 1 本の接続は生涯に複数の
+呼び出しを運ぶので、他の呼び出しの応答を黙って捨てると**エラーではなくハング**になる。
+
+**UTF-8 の不正バイトは 1 バイトにつき 1 個の U+FFFD を出す** —— Go の
+`utf8.DecodeRune` 規約（不正時に size 1 を返す）に合わせた。ブラウザが使う
+maximal-subpart 規則なら切り詰めた 3 byte 列は U+FFFD 1 個になる。どちらも妥当だが
+**参照実装が Go なので Go に合わせ、docstring にどちらかを書いた**。
+
+## 3. reader は「拒否」が本体
+
+`feed` は状態機械で、規則はすべて実際に効く:
+
+- **frame id は後退できない**（単調）。後退は protocol error であって並べ替え
+  対象ではない。
+- **新しい id は進行中の packet を破棄する。** これは DRPC の意図的な設計で
+  非同期割り込みの表現なので、**破棄したバイトを次の packet の先頭に混ぜない**。
+- **1 packet の frame は kind が一致していなければならない。**
+- **payload には上限がある**（既定 4 MiB）。無いと、peer は `done` を立てない
+  だけでメモリを掴み続けられる。
+- **control は粘着する。** 1 つでも control frame があれば packet 全体が
+  control になり、後続 frame がそれを下ろすことはできない。
+
+## 4. incomplete と malformed を混同しない
+
+**宣言した長さより届いたバイトが少ない frame はエラーではない。**
+参照実装の reader も「まだ足りない」と「長さが手持ちを超える」を区別しない
+——どちらも「もっと読む」。不正なのは**終端しない varint だけ**。
+両者を混同すると、frame が TCP セグメント境界を跨ぐたびに健全な接続を
+落とすことになる。
+
+# Verification
+
+期待値は `storj.io/drpc` 自身の出力（`testdata/gen_vectors.go` が
+`drpcwire.AppendFrame` / `SplitN` を呼ぶ）。checked in した
+`testdata/vectors.edn` を CI が再生成して diff し、さらに各 hex が
+テストに現れることを検査する。
+
+**この小ささの format でこそ交差検証が要る**: control byte は kind・done・
+control を 8 bit に詰めており、**kind の shift 量を間違えても自分の codec の
+中では完全に round-trip する**——相互運用しないだけ。だから round-trip
+property でなく **kind ごと・flag ごとのベクタ**を置いた。実際に shift を
+1→2 に変える negative control は **14 assertion を落とす**（もう 1 件、
+破棄バイトを次 packet に残す変更も 1 件落ちる）。
+
+実測: JVM 20 tests / 141 assertions、nbb で同じ 20/141、clj-kondo clean。
+
+## 依存側で見つけた実欠陥 — proto.wire の varint shift overflow
+
+`drpc.wire` を書いている最中に `proto.wire/read-varint` の欠陥が出た。
+**全バイトが `0x80` の varint**（終端しない）は payload が全ゼロなので
+accumulator が伸びず、長さガードだけが止められる。ところが `shift` が
+無制限に 128 倍され、**10 byte 目で 2^63 に達して JVM の long を overflow**
+する。結果:
+
+- JVM: `long overflow`（算術例外）
+- ClojureScript: double は overflow しないので通過し、意図どおり
+  `longer than 10 bytes` を報告
+
+**同じバイト列で 2 runtime の挙動が割れていた。** しかもこのバイト列は
+peer が自由に送れる。既存テストが見逃したのは、over-long varint の
+ケースで payload が非ゼロだったため accumulator 側が先に発火して
+shift が大きくならなかったから。
+
+修正（`kotoba-lang/proto` `cd8b83a`）: shift は accumulator の上限
+（2^53-1）を超えたら伸ばすのをやめる。近似ではなく安全——その位置に
+非ゼロ payload byte が来れば shift の正確な値に関係なく accumulator が
+上限を超えて次のパスで落ちる。
+
+**これは「2 runtime で回す」ことが理屈でなく実利だった実例**として記録する。
+
+## 呼び出しが実際に通ることの確認（2026-07-29 追加）
+
+`testdata/echo_server.go` は **`storj.io/drpc` で組んだ DRPC サーバ**。生成コードは
+無い —— `drpc.Handler` は 1 メソッド、`drpc.Encoding` は 2 メソッドなので、bytes を
+素通しする encoding で unary 呼び出しに答えられる。protoc を fixture に持ち込まずに済む。
+
+応答は **`<rpc>:<request>`** なので、通れば「bytes が返った」ではなく
+**rpc 名がルーティングされた**ことの証拠になる。CI は両 runtime から呼ぶ。
+
+送信バイト列も自分に対して assert しない: `echo_server.go -dump` が**書き込みを記録する
+transport の上で本物の `drpcconn.Conn` を回す**ので、期待値は参照実装の出力そのもの。
+`drpc.client/request` はそれと **byte 一致**。
+
+### 自分の作業で踏んだ 2 件
+
+1. `go run echo_server.go -dump > vectors.edn` で**既存の frame fixture を上書き**した
+   （git が持っていたので復元。以後 `client-vectors.edn` に分けた）。
+2. nbb 側の client で `let` の `{:keys [state ...]}` が**同名の外側 atom を隠し**、
+   `reset!` に map を渡していた。JVM 側は loop で state を回すので同じ形にならず、
+   **片方の runtime だけで出る欠陥**だった。
+
+## 2.6. 多重化とサーバ側（2026-07-29 追加）
+
+### `drpc.session` —— どの packet がどの待機中の呼び出しのものか
+
+stream id は増加のみ（reader が退行を拒否）で `NewClientStream` は last+1。この 2 つから:
+**id は再利用しない**（共有すると互いの答えを受け取り合い、どちらも気付かない）、
+**完了した呼び出しは忘れる**（node の satellite 接続は長寿命なので溜め込みは
+「スタックトレースの無いリーク」）、**待機者のいない stream 宛の packet は捨てず報告する**
+（健全なサーバなら起きない。黙って捨てると「ハングする呼び出し」になる）。
+
+`collect` に 3 引数版（畳み込み）を足したが、**それを外す control が全テストを通過した** ——
+実装ではなくカバレッジの穴で、「同じ stream に完了させない packet → 完了させる packet」を
+誰も検査していなかった。
+
+### `drpc.server` —— client 専用ライブラリでは storage node になれない
+
+uplink は node を **dial する側**。それまでこのライブラリは dial しかできず、
+その上に建つものは「自己紹介はできるが何も訊かれない」状態だった。
+
+サーバは Invoke / Message / CloseSend を認識し、**Message → CloseSend**（または Error）で
+答える。**Close ではない** —— それは client がその stream を終える時に送るもので、
+サーバが送ると「答えを読む前に stream は死んだ」と伝えることになる。
+
+順序が直感と逆なものが 2 つあり、**うち 1 つは逆に実装していた**:
+- **CloseSend が来るまで呼び出しは ready でない**（最初の Message で走るハンドラは、
+  途中までしか聞いていない要求に答える）
+- **`InvokeMetadata` は `Invoke` の *前* に来る**（`doInvoke` がそう書く）。
+  invoke 先行を要求するのは「同じ自明な規則」に見えて、**metadata 付きの実クライアントの
+  呼び出しを全部拒否する**。テストが指摘するまでそう出荷していた。
+
+dispatch は意図的に置かない —— どのハンドラが `/piecestore.Piecestore/Upload` を
+serve するかはアプリケーションの領分で、ここに routing table を置くと
+「packet を読む前に全呼び出し側が登録を強いられる registry」になる。
+
+### 証拠の向きがもう一方向に
+
+**本物の `drpcconn.Conn` が、このライブラリで組んだサーバを呼ぶ**（JVM / nbb 両方、
+エラー経路は参照クライアントが「reply でなく error」として報告することまで確認）。
+
+## 2.7. stream — Upload と Download が実際に取る形（2026-07-29 追加）
+
+`Upload` / `Download` / `SettlementWithWindow` / `RetainBig` は**全部 stream** で、
+どれも unary 呼び出しでは表現できない。node がこの上で「自己紹介し、質問に答え、
+1 byte も保存できない」状態だったのはそのため。
+
+stream を開くのは **invoke を書いて止まる**こと（`doNewStream` がまさにそれで、
+開いたままにするから stream になる）。以降 message を好きなだけ送り `end-send` で
+送信側を閉じる。
+
+### 変わる規則は「受信がいつ終わるか」
+
+unary は**最初の message** で終わる。stream は**相手が言った時**（`CloseSend`）に終わる。
+**unary の規則を download に当てると、最初のチャンクを読んでファイル完了と見なす。**
+両方の種類が同じ接続に同時に開くので、session がどちらかを覚える（呼び出し側に
+覚えさせない）。
+
+送信側の message id も session が持つ —— stream 内で packet ごとに進むので、
+呼び出し側が自分で追うと**2 本目の stream が開いた瞬間に番号を間違える**。
+
+### サーバ側は 2 つ報告する
+
+`feed` は「client が話し終わった呼び出し」と「到着した message」の両方を返す。
+upload のハンドラが欲しいのは後者 —— stream 全体を待つのは、**1 byte も書く前に
+ピースをメモリに丸ごと貯める**ことを意味する。
+
+### 3 つの形をすべて参照実装に当てた
+
+実 `drpcconn` の 3 message stream をこのライブラリのサーバへ（`3/6` で応答）、
+同じ形を逆向きに、そして **server-streaming**（Go が 5 message を出し、こちらが 5 件
+全部読む）—— 最後のは first-message 規則が間違える唯一のケースで、unary のテストは
+全部通ったままになる。
+
+# Consequences
+
+- io-storj-node の最大の欠落の 1 段目が埋まった。残りは peer TLS →
+  check-in → settlement。
+- **まだ satellite と会話できない。** framing はバイト列の話で、接続には
+  TLS と Storj の peer certificate 規則が要る。
+- `proto.wire` の varint は hostile input に対して 2 runtime で同じ挙動に
+  なった。socket から直接 varint を読む利用者（まさに drpc）にとっては
+  robustness の問題であって美観ではない。
+"}]

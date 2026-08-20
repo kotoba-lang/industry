@@ -1,0 +1,209 @@
+[{:db/id -1
+  :adr/id "ADR-2608040200"
+  :adr/title "Entra ID federation — 自前 identity を置き換えず、初期パスワードの位置に足す"
+  :adr/status "accepted"
+  :adr/date "2026-08-04"
+  :adr/tags ["cloud-itonami" "identity" "entra" "m365" "federation" "auth"]
+  :adr/body
+  "## 課題
+
+オーナー確認（2026-08-04）: 『entra, microsoft account を cloud-itonami-app,
+cloud-itonami の認証に統合連携できている?』
+
+実測した現在地:
+
+- **`network-awai/cloud-itonami`（本体）**: Entra ID の OIDC サインインは**一度
+  作られたが 2026-07-26 に退役**（ADR-2607262300）。`native/access.cljc` /
+  `native/signin.cljc` / `native/onboarding.cljc` の3 ns すべてに
+  『⚠ SUPERSEDED … 新しいコードからこの ns を require しない』が付いている。
+  現行は自前 identity（`/api/auth/discover` → 初期パスワード引換券 →
+  `/api/auth/enroll-passkey` → DID）。
+- **`cloud-itonami/cloud-itonami-app`**: `:microsoft` は provider-catalog に
+  **live で在る**が、それは**連携アカウント**（Graph API でメール同期）であって
+  認証ではない。アプリへのログイン自体は Passkey → `did:key`。
+- SSO フェデレーションは**無い**。Microsoft アカウントでどちらにもサインイン
+  できない。
+
+退役した `access.cljc` の判定内容そのものは**正しかった**（Entra には `hd` が無い・
+`tid` が正本・issuer はテナントごと・`email_verified` は既定で出ない・`acct` は
+optional）。正しい知識が live 経路の外に置かれ、誰も回していない状態だった。
+
+## 決定
+
+### 1. ADR-2607262300 を覆さない。選択肢として足す
+
+自前 identity（引換券 → パスキー → DID）はそのまま生きている。federation が
+足すのは**選択肢**であって置き換えではない。`/api/auth/discover` は federation
+済みドメインに対して `\"entra\"` を **methods に足す**（passkey を外さない）。
+
+外さない理由は互換性ではなく可用性: **IdP 側の障害でその組織が誰も入れなくなる
+状態を作らない。**
+
+### 2. federation は『初期パスワードの位置』に入る。パスキーの位置ではない
+
+このアプリの認証子は **DID（パスキー）** で、`directory-store/user-for-did!` は
+DID で人を引く。Entra は DID を作れないので、Entra を『サインインの最終段』に
+すると DID とは別の並行セッション機構が生えて、**認証面が2つになる**。
+
+だから Entra が入るのは**初期パスワードの位置**——『このアドレスは確かにこの人だ』を
+一度証明する役——であり、その先は既存の `POST /api/auth/enroll-passkey` にそのまま
+合流する。`callback` の応答は `/api/auth/password` と**同じ形**
+（`enrollmentToken` + `mustEnrollPasskey`）で、クライアントはこの先の段を1つも
+変えなくてよい。
+
+組織にとっての意味は『初期パスワードを口頭やチャットで配らなくてよくなる』で
+あって、パスキーをやめることではない。初期パスワードの最悪の性質（必ず安全でない
+経路を通って人に渡る）が消え、引換券が1回で消費される性質は残る。
+
+### 3. federation は sign-in ドメインの属性である
+
+設定を独立した表に置かず、`:organization.domain/federation` として**ドメイン
+レコードに載せる**。こうすると `organization-domain/may-sign-in?` のゲート
+（`:alias` は受信専用 / `:verified` のみ（`:grace` を弾く）/ `:sign-in` は管理者
+承認必須）を federation が**自動的に継承**する。
+
+独立した表にすると、ドメインが `:grace` に落ちても federation 設定だけが生き残り、
+『受信は止まったのにサインインは通る』が作れる。**federation はドメインがサイン
+イン面に載る権利より長生きしてはいけない。**
+
+未知の `:idp` は素通りではなく**拒否**する（設定ミスが『federation が効いて
+いない』ではなく『誰でも通る』にならないように）。
+
+### 4. tid が正本。テナントは URL に固定する
+
+| | Google Workspace | Microsoft Entra ID |
+|---|---|---|
+| 組織 binding | `hd`（ドメイン文字列） | **`tid`（テナント GUID）** |
+| issuer | 全組織で共通 | **テナントごと** `.../{tid}/v2.0` |
+| `email_verified` | 出る | **既定では出ない** |
+
+- `iss` は `tid` から**決定的に導出**する。別々に設定できると、その2つの食い違いが
+  そのまま穴になる。
+- 認可 / token / JWKS の全 URL を**テナント固定**にする。`/organizations/` や
+  `/common/` の multi-tenant エンドポイントで受けて後から `tid` を検証する形は、
+  検証を1箇所書き忘れた経路がそのまま『どのテナントでも通る』になる。固定して
+  おけばその穴は構造的に存在しない。
+- **`email_verified` を要求しない。** Entra は既定で発行しないので、Google 版の
+  『未検証メールは通さない』を持ち込むと**常に deny になる**。
+- `acct`（0=member, 1=guest）は optional claim。**出ていなければドメイン不一致を
+  ゲストとみなす** —— 判定不能を『member 扱い』に倒さない。B2B ゲストは我々の
+  `tid` を持つので、ここを見落とすと『テナントに招待された外部の誰か』が入る。
+
+### 5. 署名を確かめる前に claims を読まない
+
+`federation/verify` は claims を判定するが、その claims が本物かは判定しない。
+`edge/entra-jwt` がその手前の層。
+
+- **`alg` はトークンから読まない。** JWT header はトークン自身の一部なので、
+  header の `alg` で検証方式を選ぶと攻撃者が方式を選べる（`alg:none`、RS256→HS256
+  confusion）。**RS256 に固定**し、header の `alg` は固定値と一致するかの確認に
+  しか使わない。
+- **`jku` を一切見ない。** JWKS URL は設定済み `tenant-id` から導出する。
+- **`kid` が見つからないときだけ取り直す。** ただし**キャッシュ由来のときだけ** ——
+  冷たいキャッシュから取れたての鍵束に無い kid は、もう一度取っても無い（同じ
+  往復を2回して認証面の応答時間を IdP 2往復にする理由が無い）。取り直しても
+  無いものは通さない。
+- 署名が通ったときだけ claims を返す（落ちたときに返すと、呼び出し元が
+  『とりあえず中身は見られる』という理由で使う）。
+
+### 6. 認証 ≠ 認可。federation は Membership を作らない
+
+`verify` が答えるのは『この ID token は本当にこのテナントの、ゲストでない人の
+ものか』だけ。既定 `:auto-provision?` false で、アカウントが無ければ
+`:no-account`（**ここで作らない**）。
+
+`organization-domain` の既存方針『Matching an email address alone never grants
+Membership』と同じ。true にするのは『Entra テナントの名簿をそのまま在籍者名簿と
+みなす』という別の決定で、組織が明示的に選ぶ。callback はどちらの結果でも同じ
+401 を返す —— auto-provision は招待経路の決定であって、認証の callback が握って
+よい権限ではない（provision を実行する経路はこの ADR の範囲に無い）。
+
+### 7. 失敗理由を利用者に返さない
+
+`auth-endpoints/generic-denial` と同じ規約。『そのアドレスのアカウントが無い』と
+『ゲストだった』を出し分けると、総当たりでテナントの在籍者名簿を復元できる。
+運用者向けの理由はログにだけ残す。`state` / `nonce` / PKCE は3つとも必須で、
+transaction は callback で読んだら**検証が落ちても**即座に消す（同じ state で
+試行を繰り返させない）。
+
+## 実装
+
+- `src/cloud_itonami/federation.cljc` — 純粋・可搬。config / methods / claims 判定 /
+  admit。
+- `src/cloud_itonami/edge/entra_jwt.cljc` — RS256 + JWKS 署名検証（CLJS、
+  `js/crypto.subtle`）。
+- `src/cloud_itonami/edge/entra_endpoints.cljc` — `POST /api/auth/entra/start` /
+  `GET /api/auth/entra/callback`。
+- `src/cloud_itonami/edge/auth_endpoints.cljc` — discover の `:methods` を
+  `fed/methods-for` に。
+- `functions/api/auth/entra/{start,callback}.js` + `shadow-cljs.edn` の `:auth-api`
+  export 2件。
+
+## 検証
+
+- `federation_test.cljc` **25 tests**（primary portable cljs gate）: alias/grace/
+  未承認 sign-in ドメインは federation できない・未知 idp は拒否・passkey は消えない・
+  tid/issuer/aud/exp/nonce・`email_verified` 無しで通る・acct 欠落はゲスト扱い・
+  認証と Membership の分離・理由で文言を出し分けない。
+- `edge/entra_jwt_test.cljc` **10 tests**（primary edge cljs gate）: **本物の RSA 鍵で
+  本物の署名**を作って検証する（検証をスタブすると一番大事なことがテストの外に出る）。
+  別鍵署名・payload 改竄・`alg:none`・HS256・kid ローテート・冷たいキャッシュで
+  2回取りに行かない。
+- PRIMARY portable cljs gate **689 tests / 6123 assertions, 0 failures**。
+  PRIMARY edge cljs gate は追加 ns 1つを除き baseline と同一。lint の error 1件は
+  `origin/main` と同一（`billing_x402_test.cljc`、本変更と無関係）。
+
+## `cloud-itonami-app` の Microsoft 連携を did:key に結ぶ（2026-08-04 追記）
+
+オーナー指示「microsoft 連携も passkey, did:key に連携するようにしてね」。
+
+app の `:microsoft` は引き続き**連携アカウント**（サインイン手段ではない）だが、
+**その連携が誰のものかが記録されていなかった**。このアプリの identity は Passkey が
+確立した `did:key` なのに、接続レコードがそれを持っていない。実測した帰結:
+
+| 症状 | 原因 |
+|---|---|
+| 2人目の Microsoft 接続が1人目を**静かに上書き** | 接続 ID が `{org}:{provider}` で組織に provider 1枠しか無い。1人目の Keychain エントリは存在しない接続レコードに属することになる |
+| 同期が**別人の grant** で回る | token 解決が `first`。mail-sync 自身が『machine 上の token を手当たり次第に掴むアプリは、向けられてもいないメールを読むアプリだ』と書いているのに、**app 内部の接続一覧に対して同じことをしていた** |
+| 2人目が自分のアカウントを繋がない | `:connected?` が state のどこかに接続があれば true（**組織すら跨ぐ**）。『接続済み』と出るので繋がず、同期は1人目の grant で回り続ける |
+| 同僚の接続に Disconnect を押せる | `:connections` が organization で絞られていた |
+
+決定:
+
+- **`start-oauth!` は Passkey 未登録なら拒否**し、DID を往復に持ち回る（callback で
+  session を読み直すと『ブラウザが戻ってきた時にサインインしている人』に結ばれる）。
+  callback ではなく**開始時**に拒否するので同意画面自体が出ない。
+- 接続は **DID で keying** し `:user-did` を記録。同じ外部 subject を2つ目の DID に
+  結べない（1つの Microsoft アカウントは1人）。
+- `connection-for` は DID を取り、DID 無しは**一意なときだけ**解決して複数あれば
+  拒否する（誰かを選ばない）。単一利用者の配備ではコストゼロ。
+- token cache は `[provider did]`、公開ビューは本人スコープで**誰の接続かを表示**。
+- **Keychain の account 名は変えない。** DID で keying し直すと既存 token が誰も
+  引かない名前の裏に取り残され、症状は『接続済みと表示されるのに同期が全部失敗』に
+  なる。DID が選ぶのは *どの接続か* で、Keychain は同じ secret を同じ名前で指す。
+- legacy 接続は `ensure-did-links!` が `:user-id` から DID を導出する（必須。
+  `:user-did` の無い接続は DID 単位の検索から漏れ『未接続』として読める）。
+
+実装: `cloud-itonami/cloud-itonami-app` PR #35（`43942c4`）。検証:
+**980 tests / 4204 assertions, 0 failures**、新規 `oauth_did_binding_test.clj`
+11 tests（上表の4症状がテスト名）、clj-kondo は main と同一。
+
+**app へのサインイン自体は従来どおり Passkey → `did:key`** で、Entra federation
+（この ADR の本体）は app には持ち込んでいない —— app は loopback bind で脅威モデルが
+違い、`identity.clj` は Keychain 前提の別実装。持ち込むかは別途判断。
+
+## 未着手（正直に）
+- **live 配備が無い。** `ENTRA_CLIENT_ID` / `ENTRA_CLIENT_SECRET` /
+  `ENTRA_REDIRECT_URI` は未設定で、Entra 側のアプリ登録も未実施。実テナントに
+  対する end-to-end は一度も走っていない。
+- `:auto-provision? true` を実際に provision する経路が無い（`:provision` は
+  outcome として返るが、callback は 401 にする）。
+- UI に『Microsoft でサインイン』のボタンが無い（discover は `\"entra\"` を返すが、
+  `org-signin.cljc` の状態機械はまだこの段を知らない）。
+- **app 側**: `connection-for` の曖昧拒否は**呼び出し元がまだ DID を渡していない**
+  経路で発火しうる。`mail-sync` は背景ループで session を持たないため DID 無しで
+  呼んでおり、同一 provider に2人が接続した配備では
+  `:oauth/ambiguous-connection` で同期が止まる。**黙って他人の grant を使うより
+  正しい**が、複数利用者配備で同期を続けるには『どの DID として同期するか』の
+  設定（`mail-sync` の `:delegated-credential` と同型の明示的な指名）が要る。
+  今日そこまで到達した配備は無い（実測: 接続は各配備1件）。"}]

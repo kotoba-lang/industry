@@ -1,0 +1,201 @@
+[{:db/id -1
+  :adr/id "adr-2607249000-cloud-itonami-card-issuing-actor"
+  :adr/title "ADR-2607249000: cloud-itonami-card-issuing — カード発行者(issuer)側プログラム管理を行う新規actorの新設"
+  :adr/status "accepted"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/authoritative-for "cloud-itonami-card-issuing actorのスコープ定義(BIN/レンジのスポンサーシップ調整・カード会員口座プロビジョニング・issuer側リアルタイム与信/オーソリ判断ポリシー・カードライフサイクル管理・issuer側ディスピュート/チャージバック起票)、isic-6619(acquirer/カード処理側)との境界、cloud-itonami-emi(将来のe-money発行体actor)・cloud-itonami-pi(将来のPSD2 payment-service execution actor)との境界、governor gate設計(何が自動承認され何が人間ゲート必須か)、R0成熟度境界"
+  :adr/topic "cloud-itonami-card-issuing-actor"
+  :adr/related "adr-2607246000-adult-content-payment-processor-banking-jurisdiction-research, adr-2607031500-cloud-itonami-m6910-global-incorporation-actor"
+  :adr/last-verified "2026-07-25"
+  :adr/body "# ADR-2607249000: cloud-itonami-card-issuing — カード発行者(issuer)側プログラム管理を行う新規actorの新設
+
+**Status**: accepted
+**Date**: 2026-07-25
+**Deciders**: Jun Kawasaki (+ Claude、オーナー承認のうえ実行)
+
+## Context
+
+`90-docs/adr/2607246000-adult-content-payment-processor-banking-jurisdiction-research.edn`
+の複数ラウンド調査（特に2026-07-24〜25の追記、`90-docs/adr-ledger/adr-ledger.edn`
+`:event/seq 44`）で、cloud-itonami fleetのカード関連actor実装状況を棚卸しした結果、
+以下が判明した:
+
+- `cloud-itonami-isic-6619`（Card Advisor ⊣ Card Settlement Governor）は実装済み
+  （maturity `:implemented`）だが、そのスコープは**カード取引処理・清算
+  ── acquirer/加盟店(merchant)側**である: トランザクションintake、不正審査
+  （fraud screening）、決済確定（settlement finalization）、チャージバック
+  保留解除。README自身が明記する通り「PAN/Luhn検証・ISO 8583メッセージ処理を
+  直接実装しない」「操作するトランザクションは既に存在するカードを前提とする」
+  ── つまりカードそのものを**発行する側**の業務は最初からスコープ外である。
+- **issuer側（カードを実際に発行する銀行/EMI/PI が担う、BINレンジのスキーム
+  スポンサーシップ、カード会員口座のプロビジョニング、カードそのものの
+  real-timeオーソリ判断、カードのライフサイクル管理）を担うactorは
+  fleet中に存在しない。**
+- 同じ棚卸しで、e-money発行体（EMI）そのものを発行するactorも存在しないこと
+  （ISIC 6499の枠は無関係なVCファンドactorに転用済み）が判明しており、
+  並行して `cloud-itonami-emi` actorが別途新設される計画である。本actorは
+  そのe-moneyウォレットを**資金源(funding source)の一つとして参照するだけ**
+  で、e-money自体の発行ロジックは持たない（下記Non-goals参照）。
+
+本ADRは、この欠落を埋める新規actor `cloud-itonami-card-issuing` の新設を
+決定する。この actor は特定の業種（アダルト/AIコンパニオン等）に限定しない
+**汎用のカード発行業務actor**として設計する ── 2607246000のアダルト決済調査は
+新設の動機（originating motivation）にすぎず、actor自体のスコープを限定しない。
+
+## Decision
+
+新規actor `cloud-itonami-card-issuing` を、既存fleetと同型の
+「封じ込め + 独立governor + 不変台帳」actorパターン（`cloud-itonami-isic-6419`
+banking、`cloud-itonami-isic-6910`会社設立代行、`cloud-itonami-isic-6619`
+カード処理と同じ langgraph-clj StateGraph + Advisor ⊣ Governor）で実装し、
+`cloud-itonami` org直下にpublic/AGPL-3.0-or-laterのopen business blueprintとして
+発行する。**Card Issuing Advisor ⊣ Card Issuing Governor**。
+
+### Scope（ドメイン）
+
+1. **BIN/レンジ・スポンサーシップ調整** — どのカードスキーム(Visa/Mastercard等)、
+   どのスポンサー銀行/EMI、どのBIN/レンジ割当かのトラッキングと、実際の
+   スポンサーシップ関係の締結（`:bin/assess` で法域/スキーム要件のドラフト、
+   `:bin/sponsor` で実際の締結 ── 常にactuation）。
+2. **カード会員口座プロビジョニング** — カードを、その裏付けとなる資金源
+   （funding account）に紐付ける。資金源は `cloud-itonami-isic-6419` の
+   銀行預金口座、並行新設中の `cloud-itonami-emi` のe-moneyウォレット、
+   `cloud-itonami-isic-6492` の与信枠、のいずれかでありうる ── 本actorは
+   その**紐付けのみ**を行い、資金源自体の開設・発行ロジックは持たない。
+3. **カードのライフサイクル管理** — 発行(issue)・有効化(activate)・
+   ブロック(block)・再発行(reissue)・解約(close)。
+4. **issuer側リアルタイム・オーソリ判断ポリシー** — velocity limit
+   （速度制限）・MCC(merchant category code)制限・残高/与信枠チェックに
+   基づく承認/拒否判断。
+5. **issuer側ディスピュート/チャージバック起票** — カード会員が異議を
+   申し立てた取引について、issuer側からカードスキームへディスピュートを
+   起票する（`cloud-itonami-isic-6619`のacquirer/加盟店側チャージバック
+   処理とは別方向）。
+
+### Non-goals（明示的スコープ外）
+
+- **加盟店acquiring・トランザクション決済/清算** — これは
+  `cloud-itonami-isic-6619`の担当。本actorはacquirer側の実装を複製しない。
+  取引そのものの受付・不正審査・決済確定・（acquirer側の）チャージバック
+  保留解除は `card.*`（6619）の責務のまま。
+- **e-money自体の発行** — これは並行新設中の `cloud-itonami-emi` の担当。
+  本actorはe-moneyウォレットを資金源の一つとして**参照**するだけで、
+  e-money発行そのものは行わない。
+- **PSD2 payment-service executionの広いスコープ** — これは並行新設中の
+  `cloud-itonami-pi` の担当。本actorはissuer固有の業務（BIN sponsorship・
+  カード発行・オーソリ判断・カードライフサイクル）に限定する。
+- **実際の物理カード製造・EMVチップのパーソナライゼーション物流** — これは
+  外部ベンダー統合ポイントであるとみなし、本actorのドメインロジックには
+  モデル化しない（`docs/adr/0001-architecture.md`に将来の統合境界として
+  明記する）。
+- 生のPAN（Primary Account Number）は一切扱わない。`cloud-itonami-isic-6619`
+  と同じ立場（PCI-DSSスコープの生PANトークナイゼーションはoperatorの責任、
+  actorのSSoTにPANフィールドは存在しない）を踏襲する ── ただし本actor自身の
+  ドラフト記録には、Luhnアルゴリズムで検算可能な**合成(synthetic)な
+  カード参照識別子**（実際のネットワーク発行PANではない）を用いる。これは
+  `cloud-itonami-isic-6910`のLEI/ISO 7064 MOD 97-10 独立再計算チェックと
+  同じ設計判断（実アルゴリズムで検算可能な非機密ドラフト値を用いる）である。
+
+## Governor gate設計
+
+`cloud-itonami-isic-6910`の`:filing/submit`ゲートパターンを踏襲し、
+**実際の資金/信用/カード発行網に触れる操作は構造的に常に人間専用**とする
+（governor の actuation gate と phase table の`:auto`集合排除の2層で独立に
+強制、片方の実装ミスをもう片方が吸収する）:
+
+- **常にhuman-gated（`:stake :actuation`、どのphaseでも`:auto`に含まれない）**:
+  `:bin/sponsor`（実際のBIN/レンジ・スポンサーシップ締結）、`:card/issue`
+  （実際のカード発行）、`:card/lifecycle`（activate/block/reissue/closeの
+  実際の適用）、`:authorization/decide`（実際の資金/与信枠に対する
+  リアルタイム・オーソリ判断）、`:dispute/initiate`（実際のディスピュート
+  起票）。
+- **governor-gatedだが非actuation（低confidenceならescalate）**:
+  `:bin/assess`（BIN/スキーム要件ドラフト、spec-basis引用必須）、
+  `:kyc/screen`（カード会員KYC/制裁スクリーニング）。
+- **唯一の自動commit対象（phase 3、governor-clean時のみ）**:
+  `:cardholder/intake`（カード会員口座の事前ドラフトデータ正規化 ──
+  資金源参照・氏名・法域の入力のみ、カード発行状態やカード参照番号は
+  一切設定できない。`cloud-itonami-isic-6910`の`:application/intake`と
+  同じ「唯一の自動commit op」パターンで、その `intake-fabrication`
+  ガード（一度発行済み(`:issued`以降)のカード会員レコードへのintake経由
+  書き換えを遮断する`post-issue-intake-block`を含む）も同型で実装する。
+
+HARD violation（人間承認でも上書き不可）は、spec-basis未引用・制裁/KYC
+未完了・資金源未検証・BIN未スポンサー・カード参照番号のLuhn検算失敗
+（`banking.registry`のIBAN MOD 97-10チェックと同じ「独立再計算・提案の
+自己申告を信用しない」ディシプリン）・二重発行・不正なライフサイクル遷移・
+velocity limit超過・MCC制限違反・二重オーソリ判断・不正なディスピュート
+対象、の各違反とする。
+
+## R0成熟度境界
+
+`cloud-itonami-isic-6910`と同じR0水準（`:itonami.blueprint/maturity`
+フィールドは`cloud-itonami-isic-6910`同様に未設定 = maturity unknown扱い）
+で新設する:
+
+- Store は **MemStoreのみ**（Datomic/kotoba-server backendは次のシームとして
+  文書化するが未実装）。
+- 実LLM統合は`langchain.model/ChatModel`経由の`llm-advisor`を用意するが、
+  デフォルトは決定論的`mock-advisor`。
+- spec-basisカタログ（`cardissuing.facts`）は少数法域（JPN/USA/GBR/DEU）
+  のみ、正直なcoverage報告（`coverage`関数）で拡張は追加のみ・捏造禁止。
+- `cloud-itonami-isic-6619`が既に持つWASM kernel tier（`wasm/*.kotoba`、
+  `kototama.tender`ホスト）は本actorには実装しない。将来のmaturity昇格
+  パスとして`docs/adr/0001-architecture.md`に明記するに留める。
+
+## 姉妹actorとの関係
+
+- `cloud-itonami-isic-6419`（banking、maturity `:implemented`）── 銀行預金
+  口座は本actorのカード会員口座がひも付きうる資金源の一つ。本actorは
+  `banking.*`のnamespaceやコードを再利用しない（別repo、疎結合）。
+- `cloud-itonami-isic-6492`（credit、`:implemented`）── 与信枠も同様に
+  資金源の一つになりうる。
+- `cloud-itonami-isic-6619`（card processing/acquiring、`:implemented`）──
+  カード取引のacquirer/加盟店側。本actorが発行したカードで実際に行われる
+  取引の処理・清算はisic-6619の担当で、本actorはissuer側のBIN
+  sponsorship・カード発行・オーソリ判断・ライフサイクルに専念する。
+- `cloud-itonami-emi`（並行新設中）── e-money発行体そのもの。本actorは
+  そのウォレットを資金源として参照するのみ。
+- `cloud-itonami-pi`（並行新設中）── より広いPSD2 payment-service
+  execution。本actorはissuer固有業務に限定。
+
+## Consequences
+
+- (+) cloud-itonami fleetのカード決済カバレッジが「acquirer/加盟店側のみ」
+  から「issuer/カード会員側」まで拡張され、カードネットワークの両側
+  （4-party model の issuer と acquirer）が揃う。
+- (+) 実アクチュエーション不変条件（BIN sponsorship締結・カード発行・
+  ライフサイクル適用・オーソリ判断・ディスピュート起票は常に人間専用）は
+  `test/cardissuing/phase_test.clj`の構造的invariantテストで機械的に
+  リグレッション検出できる。
+- (-) MemStoreのみ、spec-basisは少数法域のみ、実カードスキーム
+  （Visa/Mastercard等）との統合・実PCI-DSSインフラ・実EMVチップ
+  パーソナライゼーション物流はoperatorの責任範囲としてスコープ外。
+- (-) `cloud-itonami-emi`とのfunding-source連携は、両actorが独立に
+  新設されるため、本ADR時点ではインターフェース（funding-account-ref
+  の形式）の申し合わせのみで、実際のクロスactor統合テストは無い
+  （`cloud-itonami-isic-6910`の`formation.corporate-intel`と
+  `cloud-itonami-isic-8291`の関係と同型の、将来のopt-in cross-reference
+  として位置づける）。
+- superprojectへの反映: 本ADRのみ。`cloud-itonami-card-issuing`は既存の
+  `cloud-itonami-{ISIC}`blueprint群と同じ慣例により、`manifest/repos.edn`/
+  `manifest/west.yml`へのwest登録は別ステップ（複数の並行actor新設が
+  完了した後にまとめて実施、単一行ファイルへの並行書き込み衝突を避ける
+  ため）で行う。
+
+## References
+
+- リポジトリ: https://github.com/cloud-itonami/cloud-itonami-card-issuing
+- `orgs/cloud-itonami/cloud-itonami-card-issuing/docs/adr/0001-architecture.md`
+  （実装側ADR、本ADRと対）
+- `90-docs/adr/2607246000-adult-content-payment-processor-banking-jurisdiction-research.edn`
+  （新設の動機となった一次調査、`:event/seq 44`のcloud-itonami実装状況棚卸し）
+- `90-docs/adr/2607031500-cloud-itonami-m6910-global-incorporation-actor.edn`
+  （同型actorパターンの先例）
+- `cloud-itonami-isic-6619`README「Scope: what this actor does and does not
+  do」節（acquirer/加盟店側の境界を定義する対の文書）
+- `cloud-itonami-isic-6419`（banking）・`cloud-itonami-isic-6492`（credit）
+  ── funding-source候補の実装済みactor"}]

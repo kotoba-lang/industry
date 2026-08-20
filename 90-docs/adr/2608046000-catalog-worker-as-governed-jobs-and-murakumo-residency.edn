@@ -1,0 +1,134 @@
+[
+ {:db/id -1
+  :adr/id "2608046000"
+  :adr/title "ADR-2608046000: LEI catalog worker を cloud-itonami の job/queue として登録する。murakumo 常駐は capability 分割が前提で、まだ動いていない"
+  :adr/status "accepted"
+  :adr/decided "2026-08-04"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/tags ["ops-runner" "job-queue" "cloud-itonami" "murakumo" "lei-catalog" "capability"]
+  :adr/links ["adr-2607141700" "adr-2608042000" "adr-2608043000" "adr-2607178000" "adr-2607182400"]
+  :adr/body "## 背景
+
+catalog の収集は 1 台のラップトップの LaunchAgent で動いていた（ADR-2608042000）。
+動くが、**見えない**: 検査できるキューが無く、個人データを書く job に承認が無く、
+他人が監査できる receipt が無い。ADR-2607182400 が murakumo cell として計画した
+常駐化も未実装のまま残っていた。
+
+cloud-itonami には既に、まさにこのための機構がある（ADR-2607141700）:
+提案 = lane ref、governor と risk tier が merge 可否を決め、`ops-runner/run!` が
+**at-most-once** で実行して audit chain に receipt を追記する。
+
+## 決定
+
+### D1. catalog worker を ops-runner の job として登録する（`cloud-itonami.ops-catalog`）
+
+lane `:catalog`、3 kind。**risk tier の割り当てがこの設計の要点**:
+
+| kind | risk | 何をするか |
+|---|---|---|
+| `:catalog/contact-discover` | `:read-only` | role inbox / 問い合わせフォームのみ。個人データ無し |
+| `:catalog/acquire` | `:read-only` | GLEIF 検証済み候補から repo を作る |
+| `:catalog/profile-enrich` | **`:personal-data`** | 代表者（自然人）を書く |
+
+**旧タイマーが無人で撃っていたのは 3 つ目**である。この反転を直すのが目的。
+
+CLI: `clojure -M:ops-catalog propose|pending|merge|run|run-dry <ops-repo.edn>`。
+
+handler は superproject の nbb スクリプトに **shell out** する。再実装しない ——
+あれが検証済みの経路（捏造しない・bot 検出を回避しない・person 面を public に
+書かない）であり、job runner の中に第二の実装を置くのは 2 つが食い違い始める作り方。
+loop-lei-catalog が自分の action について述べている規則と同じ。
+
+### D2. `:personal-data` risk tier を新設した（`ops-repo/risk-merge-policy`）
+
+`:external-send` を流用すれば早かったが、**送信していないものに送信のタグを貼るのは
+後から読む人への嘘**になる。`:read-only` を流用すれば、取り返しの最も難しい種類の
+job だけが auto-merge される。quorum は `:external-send` と同じ 1 署名、**名前が違うのは
+署名を求める理由が違うから**。未知の tier は従来どおり fail closed。
+
+## murakumo 常駐 — 設計と、実測した障害
+
+### D3. capability を分割する（fleet-ci の先例に倣う）
+
+`run-fleet-ci-murakumo-tick` は murakumo ノードで**計算だけ**させ、署名と git への
+着地は制御側が行う。catalog worker も同じ形を取る必要がある:
+
+- **ノード側**: ページ取得と抽出（読み取りのみ。GitHub write token も age identity も要らない）
+- **制御側**: `blueprint.edn` への書き込みと PII record の暗号化
+
+理由は 1 つで、**`:catalog/profile-enrich` は age identity を必要とし、それを共有
+ノードに置いた時点で capability モデルが消える**。復号鍵を配って回るなら、
+private repo も HMAC ファイル名も意味を失う。全部をリモートに移す設計は取れない。
+
+### D4. 現在地（2026-08-04 実測、正直に）—— **常駐はまだ動いていない**
+
+| ノード | 持っているもの | 欠けているもの |
+|---|---|---|
+| `asher` (arm64) | nbb, git, brew | **`gh` 無し・GitHub 認証情報無し・superproject checkout 無し** |
+| `zebulun` | clojure | **nbb 無し** |
+
+つまり今日、どちらのノードでも catalog スクリプトは動かない。`brew install gh` は
+些事だが、**書き込み権限のある GitHub token を共有ノードに置くのはセキュリティ姿勢の
+変更**であって、パッケージ導入と同列に扱うべきではない。fleet-ci が同じ問題を、
+「ノードは push しない・制御側が着地させる」で回避しているのは偶然ではない。
+
+したがって本 ADR は常駐を**設計として確定させ、実装は未完のまま明示的に残す**。
+`ops-catalog` は今日ローカルで動く（JVM で ns の読み込みを確認済み）。job/queue と
+承認と receipt は今日から使える。変わっていないのは**どこで実行されるか**だけ。
+
+## 登録は 1 か所ではなかった（2026-08-04、実走で判明）
+
+「登録した」と最初に報告したのは **runner に対してだけ**だった。実際に job を流すと
+merge が止まった:
+
+    unknown proposal kind :catalog/contact-discover — fail closed
+
+`kernels.substance` の allowlist は `in-range kind-billing kind-media` という**数値範囲**で
+既知 kind を判定している。定数を足しても**上限を一緒に動かすまで新しい kind は見えない**。
+fail-closed は設計どおり働いており、抜けていたのは登録の方だった。リストではなく範囲で
+書かれていることが、見落としやすさの理由である。
+
+3 kind に code は 1 つ（`kind-catalog`）。governor の問いは 3 つとも同じ（「実行可能な
+catalog job か」）で、**merge に何を要するか**は risk tier の仕事だから
+—— `:catalog/profile-enrich` が `:personal-data`、他 2 つが `:read-only`。
+
+CLI にも実走で 2 つ出た: (1) 0 署名層なのに merge が seed-spec を要求していた
+（自動マージ層が署名層と区別できない）(2) 無署名の `:personal-data` merge が
+`resolve-seed` の NullPointerException で落ちていた —— 正しい拒否を crash として
+届けており、伝わるのは「何か壊れた」であって「この層は署名が要る」ではない。
+
+## 検証（2026-08-04、実測）
+
+    propose  → proposed contact-discover / risk :read-only / commit bafyrei…
+    pending  → 1 件（refs/itonami/proposals/catalog/catalog:contact-discover:…）
+    merge    → merged / risk :read-only / signed false    ; governor pass
+    run-dry  → status :executed
+               summary = checked: 5  found: 0  not-found: 3  blocked: 2
+
+負の対照: 無署名の `:catalog/profile-enrich` は
+`merge refused: risk tier :personal-data requires 1 signature(s)` で止まる。
+その job は現在も**署名待ちで queue に残っている**（`data/ops-repo.edn` に commit 済み）。
+
+`clojure -M -e` で `cloud-itonami.ops-catalog` を require し、ns 読み込みを確認。
+**この actor の test suite は走らせていない** —— 実走で 3 欠陥を出したので優先度は
+そちらに割いた。suite 未実行は次の担当への申し送り事項である。
+
+## 帰結
+
+- 個人データを書く job は、もう無人では走らない。1 署名が要る。
+- **cloud-itonami-app からは見えない。** MCP が公開するのは `business_*` / `tenant_*` /
+  `portfolio_matrix` だけで、lane・proposal・receipt を読む口が無い。`business_list` の
+  6 面（canvas / model / leverage / adoptions / repos / lei）に job 面は存在せず、
+  登録済み business は `cloud-itonami-vc` 1 件のみでその LEI 面は `unbound`。
+  見えるようにするには business として登録して LEI 面を bind するか、app に
+  queue/receipt の face を足すかのどちらかが要る。**どちらも未着手。**
+  （別件の実バグ: `portfolio_matrix` は internal_error で落ちる —— java.io.File を
+  JSON に直列化できない、というメッセージ。今回の変更とは無関係。）
+- キューは検査できる（`pending`）、実行は at-most-once、結果は audit chain に残る。
+- LaunchAgent は当面残す。**キュー経由の実行に完全移行するまでは 2 経路が並存する**
+  —— これは移行期の負債であって設計ではない。片方を消す前に、もう片方が実際に
+  回っていることを確認する。
+- **未了**: (a) `asher` への nbb 経路整備と、書き込みを制御側に残す fetch/extract
+  分割の実装、(b) その分割に合わせたスクリプトの再構成、(c) 常駐 tick の実発火検証。
+  (c) が通るまで「murakumo で常駐している」とは書かない。"}
+]

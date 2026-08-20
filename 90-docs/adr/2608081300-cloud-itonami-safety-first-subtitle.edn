@@ -1,0 +1,137 @@
+[{:db/id -1
+  :adr/id "adr-2608081300-cloud-itonami-safety-first-subtitle"
+  :adr/doc_type "adr"
+  :adr/topic "cloud-itonami-brand"
+  :adr/title "ADR-2608081300: cloud-itonami / cloud-itonami-app のサブタイトルを safety first（緑十字）にする"
+  :adr/status "accepted"
+  :adr/date "2026-08-08"
+  :adr/last_verified "2026-08-08"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["cloud-itonami / cloud-itonami-app の名乗り（サブタイトル）が safety first（緑十字）であるという決定"
+   "緑十字を glyph でなく SVG + 意味づけトークンで描くという実装上の決め"
+   "cloud-itonami の生成 HTML のうち再生成してはならない 4 ファイルの一覧"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["adr-2607261600-cloud-itonami-jp-go-dds-adoption"
+                "adr-2607141915-jp-go-digital-design-system"]
+  :adr/artifacts "{:site-source \"orgs/network-awai/cloud-itonami/src/cloud_itonami/site/shell.cljc\"
+                   :app-source \"orgs/cloud-itonami/cloud-itonami-app/src/cloud/itonami/app/web.clj\"
+                   :site-merge \"ff62758d6b5a5b678f4db6bb2d5c61d4041e845d\"
+                   :app-merge \"073651492dfe8047a3c1ae1da3691dcfd5d822c7\"
+                   :west-pin-commit \"0ac3a1c3c6bd6702208f29d3ef164d1f5b97ae1e\"
+                   :pages-deployment \"https://21511920.cloud-itonami.pages.dev\"}"
+  :adr/body
+  "## 決定
+
+オーナー指示（2026-08-08）により、`network-awai/cloud-itonami` と
+`cloud-itonami/cloud-itonami-app` の**サブタイトル（名乗り）を safety first / 緑十字**に
+する。
+
+変更前の実測:
+
+| repo | 画面のサブタイトル | GitHub の説明 |
+|---|---|---|
+| `cloud-itonami` | `business operating loop` | `manimani enterprise edition: gftdcojp business OS…` |
+| `cloud-itonami-app` | `LOCAL-FIRST` | `Local-first AI workspace powered by Kotoba…` |
+
+**local first になっていたのは app の方だけ**で、`cloud-itonami` 本体は
+`business operating loop` だった。両方を safety first に揃えた。
+
+## 実装
+
+- **サイト**（`site/shell.cljc`）— サイドバーのブランド名直下を
+  緑十字 SVG + `safety first` に。
+- **アプリ**（`app/web.clj`）— ブランド名の上の eyebrow を
+  緑十字 SVG + `SAFETY FIRST` に。page の meta description と README 冒頭も揃えた。
+- **GitHub の repo description**（= repo 名の下に出る literal な「サブタイトル」）を両方更新。
+
+### 緑十字は glyph でなく SVG
+
+`✚`(U+271A) や `十` は字形がフォント依存で、環境によっては十字に見えない。
+`viewBox=\"0 0 12 12\"` の 12×12 パスで描き、装飾なので `aria-hidden` を付けて
+意味は隣の文字列に持たせる。色は生の hex を持たず意味づけトークンを引く
+（サイト = `--hig-palette-green`、アプリ = DADS の `--color-semantic-success-1`）。
+これは `kotoba-uiux` の「raw hex 禁止」規約そのまま。
+
+CSS の詳細が 1 つ: `.brand span {display:block}` が (0,1,1) なので、flex にする
+規則は `.brand .brand__sub` (0,2,0) にして勝たせている。
+
+### local-first をやめたわけではない
+
+app の README は「ローカルに置くのは安全であることの手段の 1 つであって目的では
+ない」と書き足し、**fail-closed であるという実際の性質は残した**
+（`local-first-policy-is-fail-closed` テストと `worker.clj` が持つ）。
+プロバイダ選択がローカル優先である旨の Chat 画面の説明文も事実なので触っていない。
+**変わったのは名乗りであって、アーキテクチャではない。**
+
+## 再生成してはならない生成 HTML（この ADR の再利用価値はここ）
+
+`cloud-itonami` は Cloudflare Pages が `public/` を **committed のまま**配信するので、
+hiccup を直しただけでは公開物が動かない。`clojure -M:local:site` で 16 route を
+再生成した。ただし次の 4 ファイルは**再生成してはならない**:
+
+| ファイル | 理由 |
+|---|---|
+| `public/index.html` | `src/cloud_itonami/site/generate.clj` の ns docstring と `-main` の docstring が名指しで禁じている（built HTML に手で当てた enrichment が source に未 backport。同 docstring は ADR-2607185000 Addendum 2 を参照するが、これは**子 repo 側の ADR 番号空間**であって superproject の同番号 ADR ではない） |
+| `public/isic-6492/index.html` | 同上 |
+| `public/marketplace/index.html` | 別の生成器（`scripts/generate-marketplace.cljs`）が持つ |
+| `public/industries/index.html` | 別の生成器が持つ |
+
+この 4 つは brand の span 1 箇所だけを外科的に置換した。置換後の文字列は再生成
+された route の出力と byte 一致で、`public/index.html` の `itonami-free-claim*`
+タグが 5 件残っていることを確認済み。**これは生成物への手当てであって、きれいでは
+ない** —— 恒久解は enrichment を source へ backport することだが、今回はスコープ外。
+
+## 検証（実際に走らせたもの）
+
+- **app**: `page-html` を実レンダーし、`SAFETY FIRST` / `brand__safety-mark` /
+  新 meta description が出力に在り `LOCAL-FIRST` が消えていることを確認。
+- **site**: `clojure -M:local:site` が exit 0 で 12 route を出力。
+  repo 全体の grep で `business operating loop` が 0 件になったことを確認。
+- **本番**: `wrangler pages deploy public --project-name=cloud-itonami --branch=main`
+  を `origin/main` を包含した worktree から実行。live の `itonami.cloud/` に
+  新サブタイトルが在り旧文言 0 件、`itonami.cloud/css/theme.css` に
+  `.brand .brand__sub` と `.safety-mark` の両規則が在ることを確認。
+- **この ADR 自体**: `clojure.edn/read-string` で 1 entity としてパースできることを確認。
+  `manifest/docs-edn-only.cljs verify` は **FAIL するが、これは既存の失敗**である
+  —— この ADR を置いた状態と外した状態の両方で offending な `.md` はどちらも 16 件で
+  同一、失敗一覧に本 ADR は現れない（`90-docs/kura/README.md` 等、既存の未移行 md）。
+  今回の追加が壊したものではない。
+- **走らせていないもの**: 両 repo のテストスイート全体（今回の変更は view の
+  文字列と CSS のみで、テストは触っていない）。`gen-west-manifest.cljs --check` も
+  未実行 —— 共有 checkout が pin より遅れており、`--check` は構造的に STALE を
+  返す（CLAUDE.md の「ローカル pin 退行の罠」）。pin の正しさは代わりに
+  `gh api compare` のサーバ側 fast-forward 判定で確認した。
+
+## 着地
+
+| | commit | 確認 |
+|---|---|---|
+| `cloud-itonami-app` main | `073651492` | 2026-08-08 再確認、そのまま tip |
+| `cloud-itonami` main | `ff62758d` | 2026-08-08 再確認、以後 14 commit 進んだが**変更は生きている** |
+| west pin（`com-junkawasaki/root`） | `0ac3a1c3` | API single-entry commit、diff は revision 2 行のみ |
+
+`cloud-itonami` の main はその後 `65b2645e` まで進み、**並行セッションが同じ
+`shell.cljc` の nav を大改修（25 項目 → 5 つの問い）して着地させたが、
+緑十字のサブタイトルは正しく残っている**（現 main の 132-134 行目）。
+
+## 既知のギャップ
+
+1. **`cloud-itonami-app` の docs はまだ local-first を前提に書かれている。** 名乗りは
+   変えたが、`docs/adr/0002` 等の本文は未追随。名乗りと文書の不一致は残っている。
+2. **生成 HTML 4 ファイルの enrichment が source に未 backport。** 上記のとおり。
+   これがある限り、あの 4 ファイルに触る作業は毎回この外科手術を要求する。
+3. **`public/css/theme.css` の drift**。committed な生成物が pin 済みの
+   liquid-glass-ui / shitsuke の現在の出力より古かった（focus-ring / status / ink
+   トークンの追加と順序変更）。今回の再生成で解消したが、**これは今回の変更とは
+   無関係**で、同じことは他の生成物でも起きうる。
+
+## One-line summary
+
+**名乗りだけを safety first（緑十字）に変えた —— アーキテクチャは変えていない。
+緑十字は字形がフォント依存なので SVG、色は意味づけトークン。`cloud-itonami` の
+公開物は committed HTML なので再生成が要るが、4 ファイルだけは再生成禁止で
+外科的置換が必要。**"}]

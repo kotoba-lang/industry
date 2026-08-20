@@ -1,0 +1,117 @@
+{
+  "title": "サイバーインシデント対応訓練 v20",
+  "speaker": 3,
+  "speaker_label": "OpenAI nova",
+  "start": "gate-guard",
+  "scenes": {
+    "gate-guard": {
+      "label": "プラント正門・守衛室",
+      "narration": "プラントの正門に新たな配送車両が到着しています。守衛は普段通り入構手続きを進めていますが、警備記録に記載のない USB メモリが先ほど構内で拾われたとの報告も上がっています。まず最初に確認するのは。",
+      "choices": [
+        { "label": "中央制御室で操業状況を確認", "next": "central-control-room" },
+        { "label": "SOC モニタリング室でログを確認", "next": "soc-monitoring" },
+        { "label": "サーバ室の物理アクセス記録を確認", "next": "server-room" }
+      ]
+    },
+    "central-control-room": {
+      "label": "中央制御室 (CCR)",
+      "narration": "中央制御室の DCS 画面に、複数の流量計と温度計の値が同時に異常域へドリフトする兆候が出ています。当直オペレータは異常通知を受けて警報を確認中。次の判断は。",
+      "choices": [
+        { "label": "エンジニアリング WS で制御ロジックを確認", "next": "engineering-ws" },
+        { "label": "PLC 盤室で安全系の状態を直接確認", "next": "plc-panel-room" },
+        { "label": "SOC モニタリング室で侵入痕跡を照合", "next": "soc-monitoring" }
+      ]
+    },
+    "engineering-ws": {
+      "label": "計装エンジニアリング室",
+      "narration": "エンジニアリング・ワークステーションの SCADA 構成ツールを開くと、直近 24 時間内にラダーロジックの一部が無告知で変更された痕跡が残っています。次の対応は。",
+      "choices": [
+        { "label": "サーバ室で配信元ホストを特定", "next": "server-room" },
+        { "label": "SOC モニタリング室で攻撃チェーンを再構成", "next": "soc-monitoring" },
+        { "label": "中央制御室に戻り運転員と現状をすり合わせる", "next": "central-control-room" }
+      ]
+    },
+    "soc-monitoring": {
+      "label": "サイバー SOC モニタリング室",
+      "narration": "SOC の SIEM ダッシュボードに、エンジニアリング WS から PLC ネットワークセグメントへの異常な書き込み通信が連続して観測されています。優先行動は。",
+      "choices": [
+        { "label": "サーバ室で C2 通信のホストを隔離", "next": "server-room" },
+        { "label": "PLC 盤室で物理ロジックの実体を確認", "next": "plc-panel-room" },
+        { "label": "対策会議室に集約して意思決定", "next": "incident-room" }
+      ]
+    },
+    "server-room": {
+      "label": "OT/IT サーバ室",
+      "radius": 6,
+      "narration": "サーバ室の特定ラックでログ書き込みが急増しています。担当 IT 技師はネットワークスイッチのポートを物理的に切り離す準備をしています。次に行うのは。",
+      "choices": [
+        { "label": "計装エンジニアリング室でクライアント側を確認", "next": "engineering-ws" },
+        { "label": "PLC 盤室で実機側の波及を点検", "next": "plc-panel-room" },
+        { "label": "対策会議室に状況を報告", "next": "incident-room" }
+      ]
+    },
+    "plc-panel-room": {
+      "label": "安全 PLC 盤室",
+      "narration": "PLC 盤室では電気主任技術者が安全 PLC の入出力端子をテスタで一つずつ確認しています。インターロック動作には大きな異常は見られませんが、念のため次のステップは。",
+      "choices": [
+        { "label": "現場ジャンクション BOX で信号を確認", "next": "field-junction" },
+        { "label": "ESD ステーションで緊急停止準備", "next": "esd-station" },
+        { "label": "中央制御室にフィードバック", "next": "central-control-room" }
+      ]
+    },
+    "field-junction": {
+      "label": "現場ジャンクション BOX",
+      "narration": "屋外プラント上の現場ジャンクション BOX を開けて配線状態を確認しています。物理的な改竄痕は確認されず、計装信号は健全のようです。次のアクションは。",
+      "choices": [
+        { "label": "反応器エリアで実プロセスの状態を目視確認", "next": "reactor-floor" },
+        { "label": "タンクヤードで物理影響を評価", "next": "tank-yard" },
+        { "label": "PLC 盤室に戻り盤側もクロスチェック", "next": "plc-panel-room" }
+      ]
+    },
+    "reactor-floor": {
+      "label": "反応器・プロセスフロア",
+      "narration": "反応器エリアでは、現場担当が各反応槽の表示計と配管温度をタブレットで照合しています。プロセス値は正常範囲を保っていますが、設定変更の影響評価が必要です。次は。",
+      "choices": [
+        { "label": "クリーンルーム側の影響を確認", "next": "cleanroom" },
+        { "label": "タンクヤードで二次系の状態を確認", "next": "tank-yard" },
+        { "label": "ESD ステーションで停止判断", "next": "esd-station" }
+      ]
+    },
+    "tank-yard": {
+      "label": "タンクヤード (屋外)",
+      "narration": "屋外タンクヤードでは、白塗装の貯槽 5 基に物理的な漏洩や圧力異常は見られません。フレアスタックも安定。次のフローは。",
+      "choices": [
+        { "label": "反応器フロアの操業継続可否を判断", "next": "reactor-floor" },
+        { "label": "対策会議室で全体報告と方針決定", "next": "incident-room" },
+        { "label": "ESD ステーションで安全側停止を選択", "next": "esd-station" }
+      ]
+    },
+    "esd-station": {
+      "label": "ESD 緊急停止ステーション",
+      "narration": "緊急停止盤の前に立つ当直幹部が、押下手順書を再確認しています。判断を誤ると製品損失が大きいため慎重に。次は。",
+      "choices": [
+        { "label": "対策会議室で最終承認を得る", "next": "incident-room" },
+        { "label": "中央制御室で運転員と協調停止", "next": "central-control-room" },
+        { "label": "ESD を押下せず監視継続", "next": "central-control-room" }
+      ]
+    },
+    "cleanroom": {
+      "label": "クリーンルーム",
+      "narration": "クリーンルーム内では作業者がタブレットで装置の状態を確認しています。パーティクルカウントは正常、二次汚染の兆候はありません。次の行動は。",
+      "choices": [
+        { "label": "反応器フロアに戻り操業判断", "next": "reactor-floor" },
+        { "label": "対策会議室で集約報告", "next": "incident-room" },
+        { "label": "正門守衛室で外部委託の入構制限を確認", "next": "gate-guard" }
+      ]
+    },
+    "incident-room": {
+      "label": "対策会議室",
+      "narration": "対策会議室には工場長・セキュリティ責任者・運転員・緊急対応担当が集まり、各拠点からの報告を集約しています。次の方針は。",
+      "choices": [
+        { "label": "ESD 緊急停止を発動", "next": "esd-station" },
+        { "label": "中央制御室で限定運転に切替", "next": "central-control-room" },
+        { "label": "演習を終了し総括", "next": "gate-guard" }
+      ]
+    }
+  }
+}

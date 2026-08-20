@@ -1,0 +1,97 @@
+[{:db/id -1
+  :adr/id "ADR-2608110900"
+  :adr/title "fleet gate から JDK 依存を外す。ClojureScript を JVM 無しで検査する道は無かったので、問いの方を変えた"
+  :adr/status "accepted"
+  :adr/date "2026-08-11"
+  :adr/deciders "Jun Kawasaki（「java に依存しないようにしてほしい」）+ Claude Code"
+  :adr/supersedes "ADR-2608110800 の gate 実装（テストスイート実行）を置き換える。同 ADR の測定と『前提の訂正』は有効"
+  :adr/relates-to "ADR-2608110700（live gate）, ADR-2608110800（置き換え元）, kotoba-lang/amu ADR-0202（JDK-free 経路の先例）, net-kotobase docs/adr/2608110600"
+  :adr/body
+  "# ADR-2608110900: fleet gate から JDK 依存を外す
+
+**Status**: accepted / **Date**: 2026-08-11
+
+## Context
+
+ADR-2608110800 が入れた `net-kotobase-gateway-tests` gate は `npm ci && npm test`
+を回す。実バグ（`client_api.cljc` の閉じ括弧）を実際に捕まえたが、`npm test` は
+shadow-cljs であり **JVM を要求する**。オーナー指示: 「java に依存しないように
+してほしい」。CLAUDE.md の runtime 優先順位（JVM は最後の手段）とも整合する。
+
+## JDK-free 化を試して、できないと分かった（実測）
+
+先例は `kotoba-lang/amu` の JDK-free 経路（lock + git で依存閉包を解決し、
+JVM を PATH から隠して走らせ、stub が呼ばれたら fail）。同じことを試した:
+
+1. **repo 側の Closure 依存は 1 箇所だけだった。** `transit.cljc` の
+   `goog.typeOf`。これは除去した（`object?` に置換。入力は `JSON.parse` 出力で
+   配列は前の分岐が取るので同値。shadow-cljs で 368 tests 無回帰を確認）。
+   これは単体で価値がある —— repo の source が Closure コンパイラ無しの
+   ClojureScript host に載る条件が 1 つ減った。
+2. **`shadow.resource/inline` は runtime shim で回避できた**（同じファイルを
+   実行時に読むだけ。値は同一で、読む瞬間だけが違う）。
+3. **git 依存は JVM 無しで解決できた** —— `sigv4` / `kaiyu` を pin ごと
+   `git clone --filter=blob:none` で取得（どちらも public）。
+4. **それでも nbb では動かない。** Worker の経路で `nbb_core.js` 内部が
+   `Cannot read properties of undefined (reading 'length')` で落ちる。
+   **スタックにアプリのフレームが 1 つも無い** —— 直せる行が存在しない、
+   nbb/SCI 側の限界。client-api の 6 test が 6/6 失敗した。
+5. **JDK-free な ClojureScript コンパイラはこの workspace に無い**
+   （`repo-search` / `concept-lookup` とも該当なし。squint / cherry も無い）。
+
+**さらに、仮に nbb で通せたとしてもそれは正しくない。** デプロイされるのは
+shadow-cljs が出したバンドルなので、nbb で緑にすることは**出荷されるのとは
+別の runtime を検査すること**であり、このセッションが潰してきた
+「緑だが出荷物を見ていない」を別の形で作り直すだけになる。
+
+## Decision
+
+**gate を削るのではなく、問いを変える。**
+
+バンドルを*作る*には JVM が要るが、**作られたものが古いかどうかを見るのに
+JVM は要らない** —— sha256 で足りる。`net-kotobase-gateway-tests` を
+`net-kotobase-bundle-freshness` に置き換えた。
+
+これは仮想的なリスクではない。`kotobase-api-gateway/js/kotobase-worker.js` は
+wrangler の `main` が指す**デプロイ成果物であり、かつ commit 済み**で、
+**実際に食い違った実績がある**: 2026-08-10 に source 変更が main に入り、
+再ビルドは翌 02:58 UTC の別 PR（#398）だった。その間、main の source と
+デプロイ可能な artifact は別物だった。
+
+正本は net-kotobase の `scripts/bundle-manifest.cljs`（nbb）。ビルドが
+`npm run build` の一部として manifest を書き、gate はそれを `check` で検証する。
+gate 側に検査ロジックを複製しない。
+
+## 落ちることを確かめた ―― JVM を隠した PATH で
+
+judah 上で `java` `javac` `clojure` `clj` `shadow-cljs` を**全部 stub に
+差し替えた PATH** で実測（amu と同じ基準: 「JDK 無しで通った」だけでなく
+「JVM 経路に一度も落ちなかった」まで見る）。**stub は一度も呼ばれなかった。**
+
+| 条件 | 結果 |
+|---|---|
+| 一致する tree | **exit 0**（87 inputs） |
+| source を 1 行動かす（再ビルド無し） | **exit 1**、両 digest を提示 |
+| verifier 不在 | **exit 90** |
+
+同じ PATH で `net-kotobase-live-planes` も **exit 0**（15 checks）。
+
+## 結果: net-kotobase の fleet gate は 3 本とも JDK 不要
+
+hermetic（tree の lint）/ bundle-freshness（出荷物が source と一致するか）/
+live-planes（production が答えるか）。
+
+## 正直に残す穴
+
+- **merge 前に壊れたコードを止める目は、fleet に無くなった。** テストスイートは
+  operator 側の `npm test` のまま。これは ADR-2608110800 が持っていて本 ADR が
+  手放した能力で、代替は無い。ClojureScript を JVM 無しで、かつ出荷される
+  runtime で検査する方法が現れたら戻す。
+- **hermetic gate は別の理由で不安定**（本 ADR の作業中に発見、未修正）:
+  `check-metadata` が埋め込み python で `tomllib` を使うが、**fleet 5 ノード中
+  4 台が python 3.9.6 で tomllib を持たない**（simeon だけ 3.14.5）。
+  つまりこの gate の判定は**どのノードに落ちたかで変わる**。冒頭で見た
+  `test-net-kotobase-<sha>-murakumo-<node>` の赤/緑の揺れの正体はこれで、
+  コードの問題ではない。`kotoba-lang/toml` が在るので、埋め込み python を
+  nbb に寄せるのが筋。
+"}]

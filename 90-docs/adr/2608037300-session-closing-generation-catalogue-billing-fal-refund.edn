@@ -1,0 +1,105 @@
+[{:db/id -1
+  :adr/id "adr-2608037300-session-closing-generation-catalogue-billing-fal-refund"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "accepted"
+  :adr/date "2026-08-03"
+  :adr/last-verified "2026-08-03"
+  :adr/deciders "Jun Kawasaki"
+  :adr/topic "session-closing-summary"
+  :adr/title "ADR-2608037300: セッション closing —— 生成カタログ公開・credits 課金結線・fal 一般化・失敗返金"
+  :adr/authoritative-for ["2026-08-03 の murakumo 生成/課金セッションの実装済み・未実装・resume point"]
+  :adr/related ["90-docs/adr/2608036800-murakumo-generation-catalogue-and-model-status.edn"
+                "90-docs/adr/2608036900-generation-credits-billing-wired.edn"
+                "90-docs/adr/2608037100-fal-adapter-generalization.edn"
+                "90-docs/adr/2608037200-refund-failed-generations.edn"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/body
+  "
+# ADR-2608037300: セッション closing —— 生成カタログ公開・credits 課金結線・fal 一般化・返金
+
+**Status**: accepted — closed（2026-08-03）
+**Date**: 2026-08-03
+**Deciders**: Jun Kawasaki
+
+## このセッションが何だったか
+
+オーナー質問『murakumo.cloud で 19 モデルに対応できているか、marketing リソースは
+公開されているか』から始まり、4 つの ADR に分かれた。共通しているのは
+**『仕組みは完成しているのに、その間の 1 本が無い』** を繰り返し見つけたこと。
+
+| ADR | 何を直したか | 発見された欠落 |
+|---|---|---|
+| 2608036800 | per-model :status と公開カタログ・/models ページ | モデルの現在地を持つ場所が無く、壊れた既定モデルが 8 日間残っていた |
+| 2608036900 | 生成の credits 課金を結線 | 値付け・見積もり・残高判定・寄与率 floor 検査が全部あって、生成経路が 1 つも呼んでいなかった |
+| 2608037100 | seedance を fal モデル記述子へ一般化 | frontier tier は価格だけあって実行経路が無かった |
+| 2608037200 | 失敗ジョブの返金 | 課金が submit 時点なので、失敗すると顧客が払い損だった |
+
+## 着地（すべて default branch）
+
+- kotoba-lang/murakumo `cae4038`
+- network-awai/cloud-murakumo `f532ab6`
+- network-awai/local-murakumo `bf10395`
+- superproject: ADR 4 件 + west pin 前進 4 回
+- 本番: murakumo.cloud / api.murakumo.cloud とも反映済み
+
+## 検証（実測値）
+
+- cloud-murakumo 357 tests / 25,879 assertions
+- murakumo 621 tests / 5,610 assertions
+- local-murakumo 139 tests / 744 assertions
+- compiled Worker への nbb smoke: 課金・返金 15 checks + カタログ 10 checks
+- live: 公開カタログ 10 video モデル（fleet 4 / hosted 6）、生成 401（gate 内）、
+  /infer/spend と /infer/refund とも 401（write gate 内）
+
+**既知の未修正 8 件**（本セッションの前から存在、無関係）: x402-offer 3 /
+treasury.core 5。未着手のまま残す。
+
+## 本セッションで起こした本番リグレッション 2 件
+
+**どちらも『テストでは見えず、live を叩いて初めて分かった』種類。**
+
+1. **利用規約の CSAM/NCII 条項が約 15 分欠落**（ADR-2608036800）。
+   リリース手順に prep を組み込んだ結果、古い legal/terms.md が新しい
+   public/legal/terms.md を上書きした。生成物を tracked のまま .gitignore に
+   入れると『ソースと公開コピーのどちらが新しいか』を誰も検査しない状態ができ、
+   prep を強制する変更はその不整合を直すのではなく出荷する。
+2. **課金の service token 欠落で約 10 分、全 submit が停止**（ADR-2608036900）。
+   /infer/spend は write gate の内側で、header を落として出荷した。課金が
+   fail-closed なので課金対象の生成が全部止まった。テストは台帳を stub して
+   おり、stub は何でも受け取っていた。
+
+**教訓（両方に共通）**: 結線の検証は『動くこと』ではなく『実際の依存先が受け取る
+こと』でなければならず、それは stub では終わらない。少なくとも 1 回は live を叩く。
+どちらも修正時に、同じ欠落でテストが落ちるようにした（terms は source/published
+の一致検査、token は stub が受け取った Authorization の assert）。
+
+## 引き継ぎ（優先順）
+
+1. **fal の live round-trip。** veo-3.1-fast / veo-3.1-silent / veo-3.1 /
+   wan-2.7 は :unverified。スキーマは fal の queue OpenAPI から実測して組んだが
+   実 API キーで走らせていない。$0.10/秒 × 4 秒 ≈ $0.40 で 1 本確認でき、通れば
+   :production へ。**売れる状態への最後の一歩。**
+2. **upstream の完了通知。** 返金の観測点が顧客の状態ポーリングなので、
+   ポーリングされないジョブは返金されない（ADR-2608037200 の既知の代償）。
+3. **画像系 fal モデル**（seedream v5 / flux-2 / nano-banana）。出力の
+   images 配列は記述子が対応済みで、残るはダウンロード側の拡張子分岐。
+4. **3D 原価の実測。** trellis / hunyuan3d-2.1 は fal 同等品の代理値のまま。
+5. **既存 8 test failure**（x402-offer / treasury）。本セッション中ずっと放置。
+
+## 保全した他セッションの作業
+
+- superproject に orgs/personal/mail/messages/index.jsonl の未コミット変更
+  （mail sync）。触っていない。
+- セッション中、cloud-murakumo に sekisho 導入の WIP（ADR-2608039950）が
+  一時的に存在した。破棄も stash もせず、その間の出荷を見送った（後に当該
+  セッションが着地させた）。
+
+## 状態
+
+superproject・子リポ 3 つとも origin/main と同期。私の branch・worktree・stash は
+remote/local とも残っていない。
+"}]

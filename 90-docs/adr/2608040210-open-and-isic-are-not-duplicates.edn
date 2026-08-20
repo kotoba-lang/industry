@@ -1,0 +1,118 @@
+[{:db/id -1
+  :adr/id "adr-2608040210-open-and-isic-are-not-duplicates"
+  :adr/title "ADR-2608040210: open-* と cloud-itonami-isic-* は重複ではなく相補的な層。ファイル重複ゼロにつきアーカイブ条件を満たさず、9 件すべて archive しない"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-05"
+  :adr/last-verified "2026-08-05"
+  :adr/last_verified "2026-08-05"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "open-isic-disposition"
+  :adr/authoritative-for
+  ["open-* と cloud-itonami-isic-* が同一 subject の別レイヤであり重複ではないこと"
+   "9 件すべてがアーカイブ条件（古い または 不要）を満たさないこと"
+   "ISIC 側が blueprint + governance、open-* 側が BPMN/DMN/DoDAF/実装であること"
+   "bpmn- 3 件が対象外であること、およびそのうち 1 件が gftdcojp ではないこと"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2608040200-murakumo-dougaka-renamed-open-and-bpmn-held"
+   "adr-2608040170-authority-path-is-org-plus-name"
+   "manifest/repository-rules.edn"]
+
+  :adr/body
+  "# ADR-2608040210: open-* と ISIC は重複ではない
+
+**Status**: accepted
+**Date**: 2026-08-05
+**Deciders**: Jun Kawasaki（+ Claude、standing authorization）
+
+## Context
+
+オーナー指示: **「1 は個別に判断、isic などを優先して、open- が古い、または不要で
+あれば archive」**。
+
+個別に判断した結果、**9 件すべてがアーカイブ条件を満たさない**。しかも
+その過程で、**この件について私が以前記録した前提が誤っていた**ことが判明した。
+
+## 前提の訂正 — 「二重実装」ではなかった
+
+ADR-2608040170 と `:gap/open-star-duplicates-the-isic-family` は
+**「同じ ISIC 業種が 2 つの命名体系の下で二重に実装されている」**と記録した。
+根拠はファイル数が近いこと（`open-banking` 38 files / `isic-6419` 40 files）
+だった。**ファイル数を中身と取り違えていた。**
+
+実際にファイル一覧を突き合わせると、**4 ペアすべてで共通ファイルがゼロ**である:
+
+| ペア | open のみ | isic のみ | **共通** |
+|---|---:|---:|---:|
+| open-banking / isic-6419 | 38 | 40 | **0** |
+| open-denki / isic-3510 | 27 | 31 | **0** |
+| open-gas / isic-3520 | 33 | 27 | **0** |
+| open-ports / isic-5222 | 33 | 25 | **0** |
+
+重複ではなく、**同じ業種の別レイヤ**だった:
+
+- **`cloud-itonami-isic-*`** = `blueprint.edn` + governance 一式
+  （LICENSE / GOVERNANCE.md / CONTRIBUTING.md / CODE_OF_CONDUCT.md）+ `deps.edn`
+  —— itonami fleet の **Open Business Blueprint actor**
+- **`open-*`** = `bpmn/` の実行可能プロセス定義、`dmn/` の決定表、`dodaf/` の
+  アーキテクチャビュー、`forms/`、`kotoba/`、`worker/` —— **稼働サービスの
+  プロセス・アーキテクチャ成果物**（`open-banking.etzhayyim.com — Core-Banking
+  MVP (OSS)`）
+
+## Decision — 9 件すべて archive しない
+
+オーナーの条件は「**古い、または不要であれば**」である。どちらも満たさない。
+
+**古くない**: ISIC 側の方が**先に**作られている（isic-6419 は 2026-06-30、
+open-banking は 2026-07-19）。open-* は etzhayyim からの移設日で止まっている
+だけで、ISIC 側より新しい。
+
+**不要でない**: 各 27〜76 ファイルが**他のどこにも存在しない**。archive すれば
+実行可能な BPMN / DMN / DoDAF ビューが失われる。とくに **`open-robo`（76 files）は
+`cad/` `cad-spec/` `bom/` `firmware/` `appview/` を持つハードウェア製品一式**
+（Giemon ロボットキット）で、これを消すのは業種 repo の整理ではない。
+
+残り 5 件も形は同じ（`blueprint.edn` を持たず、bpmn/dmn/dodaf/kotoba/worker を持つ）:
+
+| repo | files | 内容 |
+|---|---:|---|
+| `open-rail` | 33 | bpmn/dmn/dodaf/forms/kotoba/worker |
+| `open-network` | 34 | 同上 |
+| `open-robo` | 76 | appview/bom/cad/cad-spec/clj/firmware/marketing |
+| `open-patent` | 34 | kotoba/lg/lg-clj |
+| `open-otology-uhl-r` | 30 | svelte/worker/PROJECT.jsonld |
+
+## 正しい処分（実行せず、提案として記録）
+
+**ISIC を優先する**というオーナーの意図は、命名の権威を ISIC 側に置くこと
+として実現できる。ただしそれは archive ではなく**内容の合流**である:
+
+1. `open-*` のプロセス成果物を対応する `cloud-itonami-isic-*` の下へ移し、
+   blueprint と同じ repo に同居させる
+2. 移送を確認してから `open-*` を archive する
+
+順序が逆だと unique な成果物を失う。**移送は命名操作ではなく内容作業**なので、
+本 ADR では提案に留める。
+
+## bpmn- は対象外
+
+オーナー判断により対象外。ただし**前提を 1 つ訂正する**: 3 件のうち
+**gftdcojp は 2 件**（`bpmn-engine-ts` / `bpmn-sdk-rs`）で、**`bpmn-sdk` は
+`kotoba-lang`** にある。gftdcojp を対象外とする基準ではこの 1 件が残るが、
+bpmn- 全体を対象外として扱った。必要なら `kotoba-lang/bpmn-sdk` →
+`org-omg-bpmn-sdk` だけ後で実行できる（authority は omg.org、ADR-2608040200）。
+
+## Consequences
+
+- **archive は 1 件も実行していない。** 条件が満たされないため
+- `:gap/open-star-duplicates-the-isic-family` の「二重実装」という記述を訂正した
+- 教訓: **ファイル数の近さは内容の重複を意味しない。** 4 ペアで数字は
+  近かった（38/40, 27/31, 33/27, 33/25）が重複は全ペアでゼロだった。
+  数えるのではなく突き合わせること
+"}]

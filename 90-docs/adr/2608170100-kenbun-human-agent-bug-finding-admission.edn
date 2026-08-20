@@ -1,0 +1,431 @@
+[{:db/id -1
+  :adr/id "2608170100"
+  :adr/title "kenbun（検分）— 人間と AI が申告した bug を選別する admission gate"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/tags "kenbun, cloud-itonami, bug, issue, kotoba-issue, admission, evidence, agent, qa"
+  :adr/body
+  "## 決定
+
+`cloud-itonami/kenbun`（検分）を起こす。**人間と AI の両方が提出する bug 申告を、
+issue になる前に 3 値で選別する決定ランタイム**である。pure `.cljc`、依存は
+`kotoba-lang/kotoba-issue` のみ。
+
+repo: https://github.com/cloud-itonami/kenbun （public、AGPL-3.0、west 登録済み）
+
+## 経緯
+
+オーナー質問（2026-08-17）: 「https://bugspot.com/ と同じような 人間と ai で bug を
+発見, issue 報告をする サービスは cloud-itonami にある?」
+
+索引を引いた結果（`repo-search` で bug / issue / bounty / tracker / defect /
+vulnerability / backlog / kanban、`concept-lookup` で bug / qa、surface 索引、
+cloud-itonami 全 README の grep）——**cloud-itonami には無い**。1,800 project の
+うち分類系（isic / isco / iso3166 / municipality / assoc / lei）を除いた 718 の
+実サービス repo に該当なし。`hakken`（発見）は名前が紛らわしいが OEM 候補の
+マッチング決定ランタイムで無関係。
+
+部品は kotoba-lang 側に分散して実在していた:
+
+| repo | 持っているもの |
+|---|---|
+| `kotoba-lang/kotoba-issue` | issue → proposal → review → merge → audit の状態機械 + `IssueStore` 契約（依存 `data.json` のみ） |
+| `kotoba-lang/kotobase-protocol-issues` | `/issues/*` の実 API 面（`git.kotobase.net`、deploy 済み） |
+| `kotoba-lang/qa-governor` | LLM の自己申告スコアを evidence と突き合わせる governor |
+| `kotoba-lang/app-reviewer` | 提出アプリの自動チェック → 人間レビュー → 判定 |
+| skill `isekai-qa-loop` | agent が実際にプレイして欠陥を見つける稼働中の loop |
+
+つまり **tracker 面と AI 発見面と人間+自動の合流面が別々に在り、束ねる 1 本が
+無かった**。kenbun がその 1 本。
+
+## なぜ tracker の複製ではないのか
+
+bugspot.com を実際に fetch して確認した（2026-08-17）。**bug を発見するサービス
+ではなく bug tracker** である——小規模チーム（5〜50 人）向け、seat 課金でなく
+tier 課金の Linear / Jira 競合。「人間と AI が発見する」面は掲げていない。
+
+tracker として同じものを作る意味は薄い。意味があるのは**申告者に AI が混じった
+瞬間に tracker が壊れる**ところで、そこが kenbun の対象領域である:
+
+- AI は**自信のある散文を無限に**生成できる。再現しない欠陥も同じ流暢さで書ける
+- 人間も報奨がかかれば同じことをする
+
+このとき tracker に溜まるのは欠陥ではなく**未検証の主張**であり、検証済みの欠陥と
+**同じ顔**をしている。これは CLAUDE.md「検査を書く前・緑を信じる前の 5 問」
+（ADR-2608136000）の——測れなかった検査が測って問題が無かった検査と同じ値を返す、
+沈黙が緑として蓄積する——**ちょうど裏返し**であり、未再現の申告が bug として
+蓄積する。同じ class なので、同じ直し方（3 値 + evidence floor）が効く。
+
+## 設計
+
+```
+申告（人間 or agent）
+   ▼  kenbun.finding    形を整える。severity 不明は既定値に落とさず nil のまま
+   ▼  kenbun.evidence   3 値の admission ← repo の中心
+   ▼  kenbun.dedupe     判別内容の指紋。同じ欠陥の別表現は 1 issue + 2 witness
+   ▼  kenbun.triage     severity × witness → lane と gate に渡す risk tier
+   ▼  kotoba.issue.gate issue/proposal/review/merge の状態機械 + 全遷移の audit
+   ▼  kenbun.credit     報告者の取り分（整数。値は動かさない）
+```
+
+`kenbun.intake` だけが store に書く（`kotoba.issue.store` の 4 関数契約経由なので、
+kotobase / Datomic / in-memory を差し替えても intake は変わらない）。他は pure。
+
+### 中心的判定は 3 値である
+
+| verdict | 意味 |
+|---|---|
+| `:admitted` | evidence が判別に足りている |
+| `:rejected` | evidence を**見た上で**主張を支えないと判断した |
+| `:undecidable` | 検査そのものが**走らなかった**（未知 severity / 未知 reporter 種別 / title 空） |
+
+`:undecidable` を他の 2 つに畳むことがこの repo の防ぎたいバグそのものなので、
+`admit-batch` は 3 つのカウントを別々に返し `:clean?` のような**単一 boolean を
+持たない**。`:kenbun.admission/scanned` が evidence floor で、空 batch を
+「問題 0 件」と読めないようにしている。
+
+### 申告者の種別はバーを変えない
+
+`:human` / `:agent` は**記録されるが判定に入らない**（`admit` は kind を「既知か」
+しか見ない）。記録が変えるのは**何が残るか**だけで、agent の申告は model と
+prompt-cid も残す——後の監査が「どのモデルが再現しない申告を出したか」を問える
+ように。corroboration も種別を見ない: **裏づけているのは再現であって再現者ではない**
+ので、agent が人間を裏づけても人間が agent を裏づけても同じ 1 witness。
+
+### その他の実装判断
+
+- **expected と observed の両方が要る。** 片側だけ、あるいは両側が同じことを
+  言っている申告は、散文がどれだけ長くても欠陥を述べていない
+- **正規化で桁を落とさない。** `returns 404` と `returns 500` は別の欠陥。落とすのは
+  大文字小文字と空白だけ
+- **hedge は severity 依存。** 「再現できなかった」「たぶん」を含む evidence は
+  `:high` 以上の主張と矛盾するので reject、`:low` では通す——断続的な欠陥を正直に
+  断続的と書いた報告を罰しないため
+- **dedupe は完全一致キーで比較し hash は索引ハンドル。** hash 衝突で 2 つの実在の
+  欠陥が併合されると片方が黙って消える。短いキーより正しさを取る
+- **fingerprint は自前 FNV-1a。** `hash` は clj / cljs で一致が保証されないので、
+  保存されるハンドルに使うと runtime が変わった時点で issue の履歴が割れる
+- **high / critical は witness が何人いても人間に回る。** 「この系に致命的な欠陥が
+  ある」と公開するのは外向きの行為で、同意した agent の数はその代わりにならない
+  （gate の risk tier も `:external-send` になり `gate/route` が review に回す）
+- **裏づけ者の取り分は申告者の取り分から割らない。** 割る設計は申告者に裏づけを
+  潰すことを教える。bonus は witness が何人来ても 1 回だけ払う（per-witness にすると
+  agent を 20 体走らせる誘因になる）
+- **`kenbun.credit` は値を動かさない。** 整数を返すだけで送金レールも台帳書き込みも
+  持たない。純関数なので二者が再計算して突き合わせられる——それが監査可能性の中身で
+  あり、CLAUDE.md 安全床②（資金の移動をしない）とも整合する
+
+## 最近接 repo との境界（CLAUDE.md 命名規則の要求）
+
+- **`kotoba-lang/kotoba-issue` には依存する。** 状態機械は再実装しない。kenbun は
+  「issue にする価値があるか」だけを決め、決まった後は全部あちらに渡す
+- **`kotoba-lang/qa-governor` には依存しない。** 述語が逆向きである: あちらは
+  「高スコアの主張が失敗 evidence と矛盾しないか」、こちらは「欠陥の主張を支える
+  再現 evidence が在るか」。形（`{claim, evidence} → approved/rejected`）は似ているが
+  判定が違う。加えてあちらの `:paths` は langgraph を引き込むので、pure な決定
+  ランタイムに重い推移依存が乗る
+- **`kotoba-lang/app-reviewer`** は対象が違う。あちらは**提出物**を審査する、
+  こちらは**提出物についての申告**を審査する
+- **`kotoba-lang/kip`** は提案であって欠陥ではない
+
+## 命名
+
+`kenbun`（検分）= 現場へ行って自分の目で確かめ、確かめた内容を記録に残すこと。
+role 面の repo で、prefix は `hakken` / `tehai` / `meisai` / `kago` と同じく
+省略している（CLAUDE.md「既存 family の形が elision に優先する」）。メタファ名なので
+**README 冒頭で名乗り**、`manifest/concept-vocabulary.edn` にも登録した。
+
+## 検証
+
+- `clojure -M:dev:test` → **20 tests / 70 assertions / 0 failures / 0 errors**
+- `clojure -M:lint`（clj-kondo）→ **0 errors / 0 warnings**
+- **両方向を出した。** 全 assertion が拒否する入力と受理する入力の両方を持つ
+- **landing 前に壊して確かめた。** admission の中心的主張（`:undecidable` が
+  `:admitted` に畳まれない）を壊すと **7 failure**。内訳は `admit-batch` の
+  undecidable カウントが 1→0、`intake-report` も 1→0、そして undecidable な申告が
+  `:filed` になり **store に実際に issue が開かれた**。壊したものと報告されたものが
+  一致することを確認してから戻した（CLAUDE.md ADR-2608136000 の「壊し方を間違えた赤は
+  成功した実演に見える」への対応）
+
+## 永続 store（2026-08-17 追加。`kenbun.store.kotobase`）
+
+kotobase の datom 面に載る `IssueStore` を実装した。`src` ではなく **`src-kotobase`**
+に置き `:kotobase` alias で opt-in——`mem-store` で足りる利用者に datom 面を
+引かせないため。finding / issue / proposal / review / audit は**全部 1 ref**
+（`open` は `:ref-name` を 1 つしか取らない。分けると『どの報告者の finding が
+merge された修正になったか』が query で辿れない）。代償は全書き込みが 1 ref に
+直列化すること。
+
+**「契約は 4 関数だから薄いはず」は外れた。** 実測（`kotobase.storage.memory` に対して。
+仮定していない）で、素朴に書くと壊れる面の性質が 3 つ出た:
+
+1. **`transact!` は上書きせず蓄積する。** `status` を 2 回書くと両方残り `q` は set を
+   返すので、:proposed→:approved→:merged と動いた proposal は**任意の 1 つ**として
+   読み戻る。merge 済みが未レビューに見える。対策は既存値を**名指しで retract してから
+   assert**（同一 tx 内）。`[:db/retract s p nil]` のワイルドカードは**効かない**ことも実測
+2. **`Date` が `pr-str` ではなく `str` で文字列化される。** `\"Thu Jan 01 09:00:00 JST 1970\"`
+   になり読み戻せない。`kotoba.issue.gate` の audit レコードは**全部** Date を持つ。
+   対策は値を一律 `pr-str` / `edn/read-string`（`#inst` が読める）
+3. **`nil` が `\"\"` になり**、本物の空文字列と区別できない。一律エンコードで解消
+
+一律エンコードの実費: 外部 Datalog query は `\":critical\"` とエンコード後の形で当てる
+必要がある。ただし**見える**代償（query が何も返さない）であって、型ごとに使い分けた
+ときの**黙った誤読**ではない。`entity-from-triples` は 1 predicate に複数値が在ったとき
+**1 つを選ばず throw する**——ここで推測すると防いでいるバグを自分で作り直す。
+
+### 途中で見つけて塞いだ 2 つの穴（どちらも同じ形）
+
+**走らなかった検査が、走って通った検査と同じ green を報告する**——この repo の主題
+そのものが自分の harness に出た:
+
+- `cognitect.test-runner` の既定ディレクトリは `test` **1 つだけ**。`:extra-paths` に
+  `test-kotobase` を足しても **classpath に載るだけで 1 本も走らず**、base suite の
+  20 tests green が adapter を覆っているように見えた。`-d` を 2 つ明示して解消
+- `:lint` が `src test` しか名指ししておらず、adapter を開かずに clean を報告していた。
+  4 つの source root すべてを名指しして解消
+
+### 検証（追加分）
+
+- **30 tests / 108 assertions / 0 failures**、clj-kondo 0 warnings（4 root すべて）
+- `intake-behaves-identically-on-both-stores` が同一シナリオを `mem-store` と
+  kotobase の**両方**に流し、adapter が真の代替物であることを示す
+- **retract-then-assert を外すと 4 error**、全部「複数値なので 1 つを選ぶのを拒否する」
+  分岐。壊したものと報告されたものが一致することを確認して戻した
+
+### この adapter にまだ無いもの
+
+- **ClojureScript / Worker 経路。** `kotobase.core` は cljs では **Promise を返す**が
+  `IssueStore` は同期 protocol なので **JVM 専用**。Worker には非同期の issue-store
+  契約が要り、それは**ここにも上流にも無い**。実在する gap であって見落としではない
+- **durable provider での実測。** adapter は provider 非依存だが検証は
+  `storage.memory` に対してのみ。sqlite / s3 / postgres では測っていない——
+  **測っていないものを『動く』と書かない**
+
+## HTTP 面（2026-08-17 追加。`kenbun.http`）
+
+**pure な `.cljc` 関数** `(handle ctx req) → resp`。I/O も host JSON も transport も
+持たず、store は注入される——`kotobase.protocols.issue` と同じ seam なので、自前の
+server を持たずにその隣に mount できる。wire は **EDN**（あちらと同じ理由: 外部仕様が
+JSON を強制しておらず、データは下まで Clojure 形）。
+
+### この面が存在する理由は 1 行に尽きる: 報告者は ctx から取り、body からは取らない
+
+`kenbun.credit` は admitted な finding を「名前の付いた報告者への取り分」に変える。
+したがって **body が名乗る報告者 id は「submitter が指名した相手に払え」という指示**に
+なる。全 handler は ctx の認証済み principal から報告者を作り、`:reporter` を積んだ
+body は**無視ではなく reject** する——黙って落とすと、クライアントから見て
+**尊重されたのと見分けがつかない**。
+
+同じ理由で `:reproduced-by` も body から受け取らない: 自分で witness を名乗れると
+credit を水増しでき、しかも `:needs-second-repro` を自力で抜けて `:auto-file` に
+入ってしまう。principal の**認証**は shell の仕事だが、**信用するか**はこの ns が
+決めることではない——principal の無い write は 401 で、匿名の報告者を発明しない。
+
+### 3 値は wire でも 3 値のまま
+
+`:rejected` → **422**（理解した上で処理しない）、`:undecidable` → **409**
+（server がどちらとも断定するのを拒む）。同じ status に畳まない。
+
+`GET /report` は **submission 総数を報告しない**。reject / undecidable は entity を
+残さないので、store に在るものを「提出された全部」として数えるのは admission gate が
+拒んでいる collapse そのもの。それに答えるのは `intake/intake-report` の仕事で、
+結果の集合が要る。
+
+### review lane に出口を付けた
+
+`intake/review!` + `intake/merge-handlers`。これが無いと、**high / critical——
+`:needs-human-review` に回される唯一の種類——だけが永久に解決しない**。
+`merge!` は当該 proposal に scope する（無 scope 版は他人の決定待ちの :approved まで
+掃く）。保存された payload は `clojure.core/read-string` ではなく `clojure.edn` で
+読む（前者はデータ中の reader literal を評価する）。
+
+### 検証（追加分）
+
+- **48 tests / 167 assertions / 0 failures**、clj-kondo 0 warnings（4 root）
+- **中心的主張を壊すと 3 failure**——body に報告者を名乗らせると、それを名指しする
+  test が status / reason / 「何も filed されない」の 3 点で落ちる。戻した
+- ついでに**常に通る空検査を 1 件見つけて直した**: 新しく作った store に対して
+  「空か」を訊いていた（答えが 1 つしかない問い）
+
+## Deploy（2026-08-17。live）
+
+**https://kenbun.04-feasts-minded.workers.dev** — Cloudflare Worker。
+**Durable Object 1 個を直列化器、D1 を storage** に使う。build は `worker/`
+（shadow-cljs `:esm`、resource-guard 経由）。
+
+### なぜ DO + D1 か
+
+read-modify-write は 2 リクエストが交差すると**黙って**更新を落とす(両方 201 を返し
+片方の finding が消える)。DO は globally unique・single-threaded なので
+「書き手はちょうど 1 人」を write lease も fencing epoch も**書かずに**得られる。
+storage を DO の中でなく D1 に置くのは CLAUDE.md 規則(DO は直列化器、ストレージは
+共有バックエンド)。
+
+**R2 が第一候補だったが使えない** —— この account の OAuth token に **`r2` scope が
+無い**(ADR-2607299900 と同じ blocker、2026-08-17 に `wrangler whoami` で再実測)。
+D1 は**アプリの DB** として使っており、分散を名乗る経路の premise ではない
+(消せば kenbun は履歴を失う。だから kenbun はその主張をしない)。
+
+### 永続の形
+
+`IssueStore` は同期、D1 は非同期。全 ns を promise 版に分裂させる代わりに
+**hydrate → 同期 handler → 差分 commit**(1 batch = 1 transaction)にした。
+`kotobase-protocols-worker` が同じ不一致に対して実証した形(ADR-2607177500)。
+
+### 出荷前に捕まえた 2 件
+
+1. **`:advanced` が binding lookup をリネームしていた。** `env.PRINCIPALS` が
+   `env.rc`、`env.KENBUN_STORE` が `env.qc` になり、実行時は両方 `undefined`。
+   **binding も DB も見つからない Worker が、リクエストが来るまで何も異常を報告しない。**
+   `goog.object/get` + 文字列リテラル、外部オブジェクトは全部 `^js` に変更。
+   build の `:infer-warning` を 0 にし、**emit 後の bundle に文字列が生存していることを
+   grep で確認**した
+2. **routes を宣言しない。** custom domain は単一所有で、最後に deploy した側が勝ち
+   **どちらにも conflict が出ない**(`kotobase-protocols-worker` は 2026-07-17 に
+   これで `git.kotobase.net` を失った)。v0.1 は workers.dev だけに出し、ホスト名は
+   副作用ではなく明示的に取りにいく
+
+### deploy 時に止まった 2 件（迂回せず直した）
+
+- **workspace 自身の deploy guard がブロックした** —— `:local/root` 依存
+  (`kotobase-storage`)が west pin より後ろ。bundle には入らない依存だが、
+  guard が stale 依存由来の artifact を警戒するのは正しいので、**迂回せず pin に
+  同期**した(clean だったので WIP のリスク無し)
+- **この account は KV 裏の DO namespace を受け付けなくなっている**(API error 10099)。
+  migration を `new_sqlite_classes` に変更。DO は state を持たない(直列化のために在り、
+  行は D1)
+
+### live 実測（2026-08-17。ローカル harness ではなく実サービスに対して）
+
+```
+/health                        principals-configured / bindings-present を申告
+POST 未認証                     401 no-authenticated-principal
+POST human, 良い evidence       201 filed
+POST agent, 同じ欠陥・別の言葉   200 corroborated（reproduced-by #{\"agent-7\"}、issue は 1 本）
+POST 再現手順なし                422 no-repro-steps
+POST 未知 severity               409 unknown-severity（422 とは別 status）
+POST body が :reporter を名乗る  400、かつ何も filed されない
+POST body が :reproduced-by      400
+POST review :approve             200 → :merged → confirmed
+```
+
+**永続は API 越しでなく DB で確認した**: D1 に `finding 1 / issue 1 / proposal 1 /
+review 1`、audit は順序どおり 5 件(`issue:opened → propose → corroborated →
+review:approved → merge:merged`)。**corroboration の成立自体が hydrate の証明**——
+後続リクエストが先行の欠陥を見つけるには D1 から読み戻す必要がある。
+**reject / undecidable は 1 行も残していない。**
+
+### D1 を選んだのは誤りだった（2026-08-17、オーナー指摘で訂正）
+
+オーナー指摘: **「kotobase.net 自体が graph baas なので、それで作れるように
+なっていない?」** —— 正しい。この節は当初「この行は共有 datom 面に無い」を
+*必然*として書いていた。**必然ではなく、私の調査不足の結果である。**
+
+私は埋め込みエンジン `kotobase.core` だけを見て「cljs では Promise を返すから
+JVM 専用」と結論し、**kotobase.net が hosted BaaS であることを検討せずに** D1 へ
+飛んだ。実測(2026-08-17)すると:
+
+- **`kotoba-lang/kotobase-client` は ClojureScript** —— つまり **Worker で動く**。
+  `q` / `datoms` / `pull` / `transact` / `fold` を持ち、CACAO を自分で mint する
+- **kotobase.net は live**(`/health` 200、`datomic.kotobase.net` 200)
+- **async は障害にならない** —— D1 のために既に書いた hydrate → 同期 handler →
+  差分 commit の橋が、backend を差し替えるだけでそのまま効く。**「同期 protocol だから
+  無理」という私の論拠は、自分が既に解いていた問題を未解決として引用していた**
+
+さらに `identity-seeds` の記述が、オーナーの元の指摘と同じ理由を持っている:
+**`:apex` は graph scope == issuer DID を要求するので、鍵の本数がそのまま Datalog で
+結合できる範囲になる**(2026-07-30 オーナー判断で艦隊 1,197 actor が seed 1 本を共有)。
+kenbun を艦隊 seed に載せれば、`repo-taxonomy` / `repo-maturity` との join は
+**塞がらない**。
+
+### いま実際に止まっているのは鍵の所在（能力ではない）
+
+**`itonami-fleet-kotobase-seed` は kagi に存在しない**(`no such item`、2026-08-17 実測)。
+`itonami-marketplace-kotobase-seed` も同様。`secrets-location-map` が
+「記述と実在の乖離」として数えている既知の class の **5 例目**で、seed の投入先は
+Worker secret(`KOTOBASE_SECRET_KEY`)であり**読み戻せない**。
+
+**新しい seed を発行して埋めない。** 新 seed = 新 DID = **新しい graph** であり、
+それはオーナーが 2026-07-30 に明示的に退けた分割そのもの——「actor ごとに鍵を持つと
+1,197 ref に割れ、セクター横断の問いが永久に立てられなくなる」。ここで黙って鍵を
+足すのは、この指摘が直そうとしている問題を作り直すことになる。したがって
+**鍵の回復はオーナー判断に返す**。
+
+### 加えて、鍵が入っても実測が 1 つ残る
+
+`put-entity!` は**マージ**を要求する。datom 面で `[:db/add e a v]` が
+cardinality-one として**置換**するのか、cardinality-many として**蓄積**するのかは
+graph の schema 次第で、**これは埋め込みエンジンで実際に踏んだ silent corruption と
+同じ問い**(あちらは蓄積した)。**鍵が無いと probe できないので、この store は
+未検証のまま出さない。**
+
+## 現状の deploy（D1。暫定）
+
+live なのは D1 backend の方で、上記のとおり**恒久の設計ではなく暫定**である。
+
+## まだ無いもの（正直に）
+
+- ~~custom domain 未取得~~ **完了**(2026-08-17)。`kenbun.itonami.cloud`。
+  claim の**前に**未使用を確認した(DNS 無し、workspace のどの wrangler config も
+  この名前を持たない)——単一所有で最後の deploy が勝ち conflict が出ないため。
+  両ホストが同じ store を見ることを `/report` の一致で実測
+- ~~fleet gate 未登録~~ **完了**(2026-08-17)。`gates.edn` に
+  `{:name \"kenbun\" :org \"cloud-itonami\" :gate :jvm-test :cd true}`、node `joseph` で
+  緑(`38 tests / 129 assertions / 0 failures`、ローカルと同数 = 配られた tree で
+  実際に走った証拠)。**覆うのは base + HTTP だけ**で `test-kotobase` と worker build は
+  走らない(gates.edn に明記)
+- **Worker が datom 面に載っていない**(非同期 IssueStore 契約が上流に無い)
+- **hydrate が毎リクエスト全件を読む（上限は強制済み）。** 正しい直し方は fingerprint で
+  候補を絞ることで、**backend 確定後**にやる(今 D1 に索引を作ると捨てる作業)。
+  それまで**黙って越えないようにした**: `/health` が上限を publish し、越えたら
+  `:store-failure` ではなく **`:hydrate-ceiling-exceeded` を実数付きで 503**。
+  `HYDRATE_CEILING` を 0 にして **live で発火を確認**(`{:entities 4 :ceiling 0}`)、
+  既定に戻して 200 も確認——**一度も発火したことのない上限は、効くか誰も知らない上限**
+- **認証が共有 secret 表**(持てる最弱の identity)。CACAO 検証への差し替えが次。
+  ⚠ **訂正(2026-08-17)**: 一度「datom 面移行と同じ鍵で解ける」と書いたが**不正確**。
+  **outbound(kenbun → kotobase.net)は艦隊 seed で解けるが、inbound(報告者 → kenbun)の
+  CACAO 検証は別問題**である。`kotobase.cacao` は `mint-cacao` を持つが **verify を
+  持たない**(cljs 側で inbound を検証する実装の所在は未確認)。着手前にまず
+  「cljs で CACAO を verify できる実装はどこか」を索引で引くこと——無いと決めつけない
+- **credit の決済面が無い**(意図的。上記)
+
+## 再開点（次に触る人へ）
+
+**1 手目**: `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get itonami-fleet-kotobase-seed`
+
+- **在れば**: `cd orgs/cloud-itonami/kenbun/worker && npx wrangler secret put KOTOBASE_SECRET_KEY`
+  で入れ、`curl -sS https://kenbun.itonami.cloud/health` の `:kenbun/backend` が
+  `:kotobase` に変わることを確認する。**コード変更は要らない**。切替後に
+  `POST /findings` → `GET /report` まで通し、D1 側の行は残るが参照されなくなる
+  (撤去は別判断。消す前に移行の要否を決める)
+- **無ければ**(2026-08-17 時点は `no such item`): オーナーが kagi へ復元中。
+  **新しい seed を発行して埋めない**——新 DID = 新 graph で、2026-07-30 に
+  明示的に退けられた分割になる
+
+**2 手目**: inbound CACAO 検証(上記の訂正を読んでから)。
+
+**触る前に読む**: `orgs/cloud-itonami/kenbun/README.md`。wire の実測表と
+`npm run inspect` / `npm run e2e` がそこにある。**encoding を疑ったら再導出せず再測定**。
+
+## durable provider 実測（2026-08-17。gap を閉じ、実バグを 1 件出した）
+
+`kotobase-storage-sqlite` に対して JVM adapter を測った(`:kotobase-sqlite` alias)。
+「provider 非依存」は memory でしか確かめていない主張だったので、**実ファイルを開き、
+閉じ、同じファイルを開き直した 2 個目の database に、1 個目が書いたものを訊く**形にした。
+
+**実バグが出た**: `append-audit!` の連番が record 内の atom で、開き直すと **0 から
+振り直す**。2 個目の session の記録が 1 個目と衝突し、audit の順序が
+`[opened, review/approved, merge/merged, proposal/proposed]` に壊れた。
+**memory provider では原理的に出ない**——開き直しが無いので、バグの出る場所が無い。
+連番は既存の最大値から seed するよう修正。
+
+**テストは先に本物のバグで落ち、修正後に通った**——人工的に壊すより良い両方向の実証。
+なお concurrent writer 同士の race はこの adapter では解いておらず、**解いたふりも
+していない**(Worker 側は DO を前に置いてそれを解く。JVM 呼び出し側は自前で直列化が要る)。
+
+53 tests / 187 assertions / 0 failures、clj-kondo 0 warnings。
+s3 / postgres provider では引き続き測っていない。
+- **LLM 発見側（agent がどう申告を作るか）は範囲外。** kenbun は入口であって
+  発見器ではない。`isekai-qa-loop` 系の loop が申告を投げ込む側になる"}]

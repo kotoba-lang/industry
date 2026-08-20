@@ -1,0 +1,71 @@
+[{:db/id -1
+  :adr/id "adr-2608024500-views-converge-on-f-plus-one-evidence"
+  :adr/title "adr-2608024500: view は f+1 の証拠で収束する — quorum は「合意されたこと」を、f+1 は「信じてよいこと」を決める"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "engi-view-synchronisation"
+  :adr/authoritative-for
+  ["engi の view 同期規則（f+1 evidence）"
+   "engi.quorum/one-honest の適用範囲"]
+  :adr/related ["adr-2608024400-gap-dag-and-the-instrument-that-collapsed-it"]
+  :adr/evidence ["https://github.com/kotoba-lang/engi/commit/8b57f482dcf89080a3d3fcaa56996589b87db4b4"]
+  :adr/body
+  "# ADR-2608024500: view は f+1 の証拠で収束する
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+replica は独立に timeout するので **view が散る** —— deploy 済み chain で **16, 16, 21, 51**。そして `pm/timeout-certificate` は**同じ view の new-view しか束ねない**ので、**一度散ると証明書は二度と形成されず、誰も戻れない。**
+
+**これは liveness の些事ではない。** **lock は形成された view を運び、`safe-to-vote?` はそれを比較する** —— **後の view で lock された replica は、前の view で justify された block に投票しない。正しく。** そして chain は**3 者が quorum に 2 票足りない block を持ったまま止まる。**
+
+## Decision
+
+**f+1 の distinct witness が、より上の view に「居るか、通過している」時、replica はそこへ跳ぶ。**
+
+**quorum ではなく f+1 なのは、仕事が違うから**: **quorum は「何が合意されたか」を決め、これは「何を信じてよいか」を決める。** f+1 には**本当にそこに居る正直な replica が少なくとも 1 つ含まれる。**
+
+**view 9000 を名乗る Byzantine 1 つは、誰も動かさない。**
+
+**候補以上のすべての view を横断して数える** —— **view 51 の replica は 21 も通過している。** 21 を改めて言わせる設計は、**収束を「全員が同じ瞬間に timeout すること」に依存させる** —— それは**起きていないことそのもの。**
+
+## 適用範囲を明示する
+
+`engi.quorum/one-honest` は **head count 専用。** stake 加重の対応物は「bond 総量の 1/3 超」で、**未実装。** permissionless admission では **Sybil が head 数え quorum を破るのと同じやり方でこれも破る**ので、**`head-count` から黙って継承させない。**
+
+## 実測
+
+**収束した**: 16/16/21/51 → **246/246/246/247**。
+
+**そして chain はまだ止まる**:
+
+```
+  w1 tip 2  votes-for-tip 2  view 246
+  w2 tip 2  votes-for-tip 2  view 246
+  w3 tip 1  votes-for-tip 2  view 246
+  w4 tip 2  votes-for-tip 2  view 247
+```
+
+**全員が quorum 3 に 1 票足りず、票は 2 つの height に割れている** —— height 1 の block に 2 票、height 2 の block に 2 票。**w3 は height 2 へ動かないので、その票は certify する 3 票に合流できず、certify できる 3 者はそれぞれ 2 票を持っている。**
+
+**収束は必要だったが十分ではない。**
+
+## Consequences
+
+- (+) view が収束する（実測 246 前後で 4 者が揃う）。
+- (+) 「quorum と f+1 は別の仕事」が規則として書かれた。
+- (−) **chain はまだ止まる。** 残りは「w3 が、親を持っている block を採用しないのはなぜか」—— **次の読み取り**。
+- (−) `one-honest` は stake 加重に対応していない（明記済み）。
+
+engi 222 tests / 1160 assertions、parity 不変、in-process harness は pass。
+期待値が 1 つコードより先に間違っていた（12 度目）—— 1 者しか居ない view へ跳ぶことを期待していた。**それこそ f+1 が拒否するために存在する場合。**
+"}]

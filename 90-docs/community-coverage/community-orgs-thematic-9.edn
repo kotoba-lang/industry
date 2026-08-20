@@ -1,0 +1,126 @@
+[
+;;; Iteration 17 (2026-07-26). ADR-2607257200.
+;;; Counts llm-recall-unverified unless pinned.
+
+{:org/id :org-global-repair-cafes
+ :org/form-family :family-gift-and-sharing
+ :org/name "Repair Cafés and community repair networks"
+ :org/entity-kind :org-form
+ :org/category :cat-mutual-aid
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["NL" "DE" "BE" "FR" "GB" "US" "IN" "JP"]
+ :org/founding-date 2009
+ :org/founding-note "Amsterdam, 2009; the Repair Café International Foundation licenses the name and supplies a starter kit."
+ :org/instance-count-estimate 3652
+ :org/member-count-basis "source-pinned, discrepancy kept: 3,652 Repair Cafés registered with the Repair Café International Foundation, while other 2025 reporting gives ~3,200 across more than 40 countries on six continents. Volunteer repairers per café are not aggregated. Impact is reported as material diverted (over 1.4 million pounds of appliances kept out of landfill in 2023) rather than as membership."
+ :org/legal-registration :mostly-unregistered
+ :org/registration-note "The foundation is registered; the local cafés are typically volunteer groups meeting in a library or community hall with no legal entity."
+ :org/governance-model :consensus
+ :org/mission-statement "Monthly free repair sessions where volunteer fixers work WITH the owner rather than for them — explicitly a skills-transfer and anti-obsolescence community, not a repair service."
+ :org/source-name "Repair Café International Foundation / 2025 reporting"
+ :org/source-url "https://www.repaircafe.org/en/about/"
+ :org/source-date "2025"
+ :org/source-tier :primary
+ :org/pinned-on "2026-07-26"
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-beekeeping-associations
+ :org/form-family :family-hobby-society
+ :org/name "Beekeeping associations (BBKA, Apimondia member bodies, 養蜂組合)"
+ :org/entity-kind :org-form
+ :org/category :cat-hobby-interest
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["GB" "DE" "US" "JP" "KE" "AR"]
+ :org/founding-date 1874
+ :org/member-count 26000
+ :org/member-count-basis "source-pinned (BBKA only): the British Beekeepers' Association is a membership charity with about 26,000 members (some sources say it represents 30,000 hobbyist beekeepers). Globally, Apimondia federates 83 full and 48 associate members from more than 120 countries since 1895, but the number of individual beekeeping associations worldwide is not published anywhere."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "County and district associations running apiaries, mentoring, swarm collection rotas and disease reporting — a hobby community that doubles as a distributed animal-health surveillance network."
+ :org/source-name "British Beekeepers' Association / Apimondia"
+ :org/source-url "https://www.bbka.org.uk/"
+ :org/source-date "2025"
+ :org/source-tier :primary
+ :org/source-caveat "BBKA pinned; no global association count exists."
+ :org/pinned-on "2026-07-26"
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-tool-libraries
+ :org/form-family :family-hobby-society
+ :org/name "Tool libraries and libraries of things"
+ :org/entity-kind :org-form
+ :org/category :cat-mutual-aid
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "CA" "GB" "DE" "AU" "JP"]
+ :org/founding-date 1976
+ :org/instance-count-estimate 700
+ :org/member-count-basis "unknown — directories list several hundred tool libraries, but many are a shelf inside a public library or makerspace and are counted under the host instead."
+ :org/legal-registration :mixed
+ :org/governance-model :democratic
+ :org/mission-statement "Membership lending collections for drills, ladders, pressure washers and party equipment — collective ownership of the things a household needs three times a decade."
+ :org/related-org "org-global-community-libraries"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-pigeon-racing-clubs
+ :org/form-family :family-hobby-society
+ :org/name "Pigeon racing clubs and fanciers' federations"
+ :org/entity-kind :org-form
+ :org/category :cat-hobby-interest
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["BE" "GB" "CN" "TW" "PT" "ZA"]
+ :org/founding-date 1850
+ :org/member-count-basis "unknown — national federations register lofts and ring numbers, and membership has collapsed in Western Europe while growing in China and Taiwan; no current global figure."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Working-class clubs organized around timed liberations and clock verification, historically one of the densest male sociability networks in industrial towns — a community form whose decline tracks deindustrialization almost exactly."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-jpn-minzoku-geino-hozonkai
+ :org/form-family :family-festival-society
+ :org/name "民俗芸能保存会 (folk performing arts preservation societies)"
+ :org/entity-kind :org-form
+ :org/category :cat-traditional
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-asia-east
+ :org/countries ["JP" "KR" "TW"]
+ :org/founding-date 1950
+ :org/founding-note "The 1950 Cultural Properties Protection Act created the designation that most preservation societies organize around."
+ :org/instance-count-estimate 6000
+ :org/member-count-basis "unknown — designated intangible folk cultural properties number in the hundreds nationally, but the village societies that actually perform kagura, shishimai, nenbutsu odori and bon dance are far more numerous and are not centrally counted."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Village societies that hold the right and duty to perform a specific dance or ritual, train successors and maintain masks, costumes and instruments — communities whose asset is a repertoire and whose failure mode is having nobody left to dance."
+ :org/related-org "org-jpn-ujiko-miyaza"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-community-cat-tnr
+ :org/form-family :family-animal-care
+ :org/name "Community cat and animal rescue volunteer networks (地域猫, TNR colonies, street dog feeders)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-asia-east
+ :org/countries ["JP" "US" "TR" "IN" "GR" "TW"]
+ :org/founding-date 1990
+ :org/member-count-basis "unknown — TNR and feeding rotas are organized street by street, often through LINE or WhatsApp groups, with municipal registration only in schemes like Japan's 地域猫 model."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Neighbors coordinating trap-neuter-return, feeding rotas and vet funds for street animals — one of the few community forms organized around obligations to non-human residents, and a frequent source of neighborhood conflict because the obligation is not shared."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+]

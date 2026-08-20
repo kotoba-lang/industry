@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>Fusion: gekiga × togashi</title>
+<style>
+:root{color-scheme:dark;--bg:#0e0e10;--panel:#1a1a1f;--fg:#e8e8ec;
+      --muted:#8b8b95;--accent:#4cb5ff;--gold:#ffd54c;--border:#2a2a32}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,"Hiragino Sans",sans-serif}
+header{padding:16px 24px;border-bottom:1px solid var(--border)}
+h1{font-size:18px} h1 small{color:var(--muted);font-weight:400;margin-left:8px}
+main{padding:20px;max-width:1700px;margin:0 auto}
+.note{background:var(--panel);padding:12px 16px;border-radius:8px;margin-bottom:16px;
+      font-size:13px;color:var(--muted)}
+.note code{background:#000;padding:2px 6px;border-radius:3px;font-size:11px;color:var(--fg)}
+section{margin-bottom:32px}
+section h2{font-size:14px;color:var(--accent);margin-bottom:12px;
+           padding:8px 12px;background:var(--panel);border-radius:6px}
+section.ref h2{color:var(--gold)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.cell{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px}
+.cell.ref{border:2px solid var(--gold);background:#1d1a12}
+.cell.ref::before{content:"★ previous winner";color:var(--gold);font-size:10px;display:block;margin-bottom:4px;font-weight:600}
+.cell img{width:100%;height:auto;border-radius:4px;background:#fff;cursor:zoom-in}
+.cell h3{font-size:13px;font-weight:600;color:var(--fg);margin:8px 0 4px;
+         font-family:ui-monospace,monospace}
+.cell .meta{font-size:11px;color:var(--muted);font-family:ui-monospace,monospace;
+            line-height:1.5;word-break:break-all}
+.cell .vote{margin-top:8px;display:flex;gap:6px}
+.cell .vote button{flex:1;background:transparent;color:var(--muted);
+                    border:1px solid var(--border);border-radius:4px;padding:6px;
+                    cursor:pointer;font:inherit;font-size:12px}
+.cell .vote button:hover{background:var(--border);color:var(--fg)}
+.cell .vote button.on{background:var(--accent);color:#000;border-color:var(--accent)}
+#lb{position:fixed;inset:0;background:rgba(0,0,0,0.92);display:none;
+    align-items:center;justify-content:center;z-index:99;cursor:zoom-out}
+#lb.on{display:flex}
+#lb img{max-width:95vw;max-height:95vh}
+.tally{margin-top:24px;padding:16px;background:var(--panel);border-radius:8px}
+.tally h2{font-size:14px;margin-bottom:8px;color:var(--accent)}
+.tally pre{font:11px/1.5 ui-monospace,monospace;color:var(--muted)}
+</style></head><body>
+<header><h1>Fusion: gekiga × togashi
+<small>p01 Nei entering 3-B · 2 refs + 6 fusions · CFG=7.0, seed=42</small></h1></header>
+<main>
+<div class="note">
+<b>Test:</b> 前回 winner 2 つ (M-gekiga, A-togashi) を組み合わせて、最大の画風変化を探す。
+<br><b>Refs (gold):</b> 比較基準として両 winner を再生成
+<br><b>F1-F6:</b> 重み変更 + 補強タグで 6 バリエーション
+</div>
+
+<section class="ref"><h2>★ Reference (previous winners)</h2>
+<div class="grid">
+  <div class="cell ref" data-k="ref-gekiga"><img src="file:///tmp/fusion-ref-M-gekiga.png">
+    <h3>ref · M-gekiga</h3>
+    <div class="meta">gekiga, heavy_shading, rough_lines, dramatic_lighting, noir_atmosphere</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+  <div class="cell ref" data-k="ref-togashi"><img src="file:///tmp/fusion-ref-A-togashi.png">
+    <h3>ref · A-togashi</h3>
+    <div class="meta">togashi_yoshihiro:1.3 (only)</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+</div>
+</section>
+
+<section><h2>F · Fusion variants</h2>
+<div class="grid">
+  <div class="cell" data-k="F1"><img src="file:///tmp/fusion-F1-gekiga+togashi.png">
+    <h3>F1 · gekiga + togashi</h3>
+    <div class="meta">togashi:1.2 + gekiga:1.3 + heavy_shading + rough_lines + noir</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+  <div class="cell" data-k="F2"><img src="file:///tmp/fusion-F2-gekiga+togashi+xhatch.png">
+    <h3>F2 · + crosshatch</h3>
+    <div class="meta">togashi:1.2 + gekiga:1.3 + crosshatch:1.4 + deep_shadow:1.4 + noir (max dark)</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+  <div class="cell" data-k="F3"><img src="file:///tmp/fusion-F3-gekiga+togashi+thin.png">
+    <h3>F3 · + thin/sharp lines</h3>
+    <div class="meta">togashi:1.3 + gekiga:1.2 + thin_lines:1.3 + sharp_lines:1.3</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+  <div class="cell" data-k="F4"><img src="file:///tmp/fusion-F4-togashi-dom.png">
+    <h3>F4 · togashi-dominant</h3>
+    <div class="meta">togashi:1.4 (heavy) + scratchy_lines:1.3 + rough + gekiga:1.1</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+  <div class="cell" data-k="F5"><img src="file:///tmp/fusion-F5-gekiga-dom.png">
+    <h3>F5 · gekiga-dominant</h3>
+    <div class="meta">gekiga:1.5 + heavy_shading:1.4 + togashi:1.1 (light) + noir</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+  <div class="cell" data-k="F6"><img src="file:///tmp/fusion-F6-3mangaka.png">
+    <h3>F6 · 3-mangaka mix</h3>
+    <div class="meta">togashi:1.2 + obata:1.1 + gekiga:1.3 + crosshatch + deep_shadow</div>
+    <div class="vote"><button data-v="best">Best</button><button data-v="good">Good</button><button data-v="meh">Meh</button></div>
+  </div>
+</div>
+</section>
+
+<div class="tally"><h2>Verdict</h2><pre id="tally">no votes yet</pre></div>
+</main>
+<div id="lb" onclick="this.classList.remove('on')"><img id="lbimg"></div>
+<script>
+const SK='fusion-vote';
+const v=JSON.parse(localStorage.getItem(SK)||'{}');
+function render(){
+  document.querySelectorAll('.cell').forEach(c=>{
+    const k=c.dataset.k;
+    c.querySelectorAll('.vote button').forEach(b=>b.classList.toggle('on',b.dataset.v===v[k]));
+  });
+  const bests=Object.entries(v).filter(([_,vv])=>vv==='best').map(([k])=>k);
+  const goods=Object.entries(v).filter(([_,vv])=>vv==='good').map(([k])=>k);
+  document.getElementById('tally').textContent=
+    (bests.length?'★ Best:\n  '+bests.join('\n  ')+'\n\n':'')+
+    (goods.length?'+ Good:\n  '+goods.join('\n  '):'') || 'no votes yet';
+}
+document.querySelectorAll('.vote button').forEach(b=>b.addEventListener('click',e=>{
+  const cell=e.target.closest('.cell'),k=cell.dataset.k;
+  v[k]=v[k]===e.target.dataset.v?null:e.target.dataset.v;
+  if(!v[k])delete v[k];
+  localStorage.setItem(SK,JSON.stringify(v));render();
+}));
+document.querySelectorAll('.cell img').forEach(img=>img.addEventListener('click',()=>{
+  document.getElementById('lbimg').src=img.src;
+  document.getElementById('lb').classList.add('on');
+}));
+render();
+</script>
+</body></html>

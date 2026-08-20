@@ -1,0 +1,52 @@
+[{:db/id -1
+  :adr/id "ADR-2608147100"
+  :adr/title "kotoba-vm — FVM-shaped IPLD actor invocation kernel, injected into inga.state, not Filecoin's FVM"
+  :adr/status "accepted"
+  :adr/date "2026-08-14"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :source/dataset "adr"
+  :adr/related
+  ["ADR-2608038000"
+   "ADR-2608010930"
+   "ADR-2608059000"
+   "ADR-2608590000"
+   "ADR-2608610000"]
+  :adr/repos ["orgs/kotoba-lang/kotoba-vm"]
+  :adr/body
+  "inga.state already has F1 (hydratable CID state root, actor = {code, state, nonce, balance}), F2 (fuel as a state value), F3 (power table), and an :invoke-fn seam that writes only the callee's record. codebase.actor fills that seam with a pure (state, message) -> next-state. What was missing is the FVM Kernel analogue: IPLD syscalls, invocation-local handles, a message-local overlay that flushes on success and drops on revert, nested sync actor/call, fuel charged before effect.
+
+This ADR lands that kernel as kotoba-lang/kotoba-vm.
+
+---
+
+## Decision
+
+1. **New repo `kotoba-lang/kotoba-vm`**, family `kotoba-` + subject `vm`, public, Apache-2.0. Not `io-filecoin-fvm` (this is not a Filecoin spec implementation). Not inside inga (consensus must not import an application). Not inside codebase (that repo must stay usable without a VM). Not inside kototama (Wasm host / runtime-link, not an IPLD actor tree). Not an extension of kotoba-lang/machine (hardware CPU/cache descriptors).
+
+2. **Stack is FIP-0030 in shape, capability in mechanism.** Guest talks only to kotoba.vm syscalls. Kernel owns handles and the overlay. Call Manager owns the stack, fuel, and revert. Machine `apply-message` is the whole-tree entry. Externs are io-ipld's `get-fn` / `put!`. The thin `invoke-fn` wraps a single-actor `apply-message` and maps exits onto inga.state/refusal-reasons. Nested mutations of other actors need `apply-message`; the consensus seam still cannot write another actor's record.
+
+3. **Syscall catalogue (integer costs, charge before effect):** `:ipld/open` 10, `:ipld/read` 4+size/32, `:ipld/write` 4+size/32, `:ipld/link` 20, `:ipld/stat` 2, `:self/root` 2, `:self/set-state` 2, `:actor/call` 100, `:guest/op` 1. Exhaustion is a value on the context, never a throw, never a Wasm `unreachable` trap. A nested call snapshots the overlay; child failure restores it (caller writes from before the call stay; callee writes do not). Child exhaustion of the shared budget stops the parent; any other child failure is a value the parent can ignore. Call depth cap 8. Handles are invocation-local.
+
+4. **v1 guest is a register machine in an IPLD code block** `{\"kotoba.vm/guest\" 1, \"methods\" {name [ops…]}}`, or a test-only `\"host\"` name looked up in `:host-guests`. The host-fn object does not expose `:get-fn` / `:put!` / `:overlay`. Wasm is not the production path.
+
+5. **CID mismatch throws**, not `{:refused …}`. Same discipline as codebase.actor: a corrupt store is not an actor that misbehaved.
+
+6. **Do not put this kernel on the kotobase query/index hot path.** ADR-2608610000 measured that a prolly-tree transaction through an FVM-style host/guest boundary is tens of crossings and a half-megabyte copy. This kernel runs committed messages.
+
+7. **Do not depend on actual Filecoin.** Production `:deps` is `{io-ipld}`. `io-filecoin`, `cloud-filecoin`, Lotus, builtin-actors, ref-fvm, FIL gas, HAMT, EVM, PoRep/PoSt are other repos or rejected mechanisms. A gate (`vm_deps_test`) fails if a Filecoin coordinate appears in deps.edn or `clojure -Stree`. Concept-vocabulary spellings (`fvm`, `filecoin vm`) are index aliases, not a dependency.
+
+8. **The inga bind is a test extra-dep, not a production import.** `inga.state/machine` with `:invoke-fn (kotoba.vm/invoke-fn …)` is constructed in `test/kotoba/vm_inga_bind_test.clj`. kotoba-vm `src/` does not require inga. inga `src/` does not require kotoba-vm (inga's own runtime-deps gate already forbids interpreters). A VM that imports consensus becomes that consensus layer's VM.
+
+## Proving slice (what the tests discriminate)
+
+Determinism of two machines on the same message. Fuel exhaustion as a value with unchanged actors and no store flush. IPLD write-link-open-read with a verified CID. Cross-actor call via apply-message (both records move). Nested exhaust reverts the whole message (shared tank). Nested abort drops the child's overlay and lets the parent land. Guest cannot put except through flush. invoke-fn matches the inga shape. Corrupt store throws. An inga.state machine whose invoke-fn is this kernel advances only the callee's state CID; the block's cost-fn is the VM budget; CID mismatch still throws through that seam. Production classpath is `{io-ipld}` and names no Filecoin coordinate.
+
+## Explicitly out of this slice
+
+Wasm as production guest. FIL gas market / base-fee / refunds. HAMT. EVM opcodes. PoRep/PoSt. Expected Consensus. Putting the kernel on the DB hot path. Any runtime dependency on Filecoin protocol clients or on inga.
+
+## Consequences
+
+inga keeps injecting `:invoke-fn`. The bind is proven, not postponed: kotoba-vm tests construct the real machine; neither production graph imports the other. apply-message is the entry for any app-chain that needs nested actor writes in one message. Filecoin remains an analogy of shape.
+"}]

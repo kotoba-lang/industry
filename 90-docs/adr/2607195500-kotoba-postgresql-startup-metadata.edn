@@ -1,0 +1,60 @@
+[{:db/id -1
+  :adr/id "adr-2607195500-kotoba-postgresql-startup-metadata"
+  :adr/title "ADR-2607195500: Bounded PostgreSQL startup metadata state machine"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-19"
+  :adr/last-verified "2026-07-19"
+  :adr/last_verified "2026-07-19"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "repo-wide-cljc-to-kotoba-source-migration"
+  :adr/authoritative-for ["PostgreSQL startup metadata component state machine"]
+  :adr/related
+  ["orgs/kotoba-lang/kotoba/providers/db_transport.kotoba"
+   "orgs/kotoba-lang/kototama/test/kototama/tender_test.clj"
+   "orgs/kotoba-lang/kotoba-lang/lang/transport-component-abi.edn"]
+  :adr/supersedes ["adr-2607195400-kotoba-browser-sab-http-bridge"]
+  :adr/superseded-by []
+  :adr/decision-summary
+  {:startup-order [:authentication-ok :parameter-status* :backend-key-data* :ready-for-query]
+   :startup-buffer-bytes 4096
+   :parameter-status :exactly-two-nul-terminated-nonempty-fields
+   :backend-key-data-bytes 13
+   :unknown-or-error-message :reject-and-close
+   :duplicate-authentication :reject-and-close
+   :password-authentication :not-yet-implemented
+   :production-qualified false
+   :executable-evidence
+   [{:cwd "orgs/kotoba-lang/kototama"
+     :command "clojure -M:test"
+     :result "117 tests, 400 assertions, 0 failures"}
+    {:cwd "orgs/kotoba-lang/kotoba"
+     :command "targeted clojure.test: transport-component-test and wasm-map-keyword-test"
+     :result "11 tests, 61 assertions, 0 failures"}]}
+  :adr/body
+  "# ADR-2607195500: Bounded PostgreSQL startup metadata state machine
+
+**Status**: accepted
+**Date**: 2026-07-19
+
+## Decision
+
+The Kotoba PostgreSQL provider no longer assumes a fixed 15-byte
+AuthenticationOk plus ReadyForQuery response. It reads at most 4,096 bytes and
+admits one AuthenticationOk followed by bounded ParameterStatus and
+BackendKeyData messages and one final ReadyForQuery. ParameterStatus must
+contain exactly two non-empty NUL-terminated fields. BackendKeyData must have
+the protocol-defined 13-byte frame size.
+
+Malformed lengths, unknown tags, ErrorResponse, authentication repetition,
+metadata before AuthenticationOk, data after ReadyForQuery and buffer
+exhaustion fail closed and close the channel.
+
+## Maturity boundary
+
+This establishes the no-password startup metadata state machine. SCRAM-SHA-256,
+secret custody, server-final verification, cancellation and production
+PostgreSQL interoperability remain separate qualification gates."}]

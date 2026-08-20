@@ -1,0 +1,41 @@
+[{:db/id -1
+  :adr/id "adr-2607199960-cloud-itonami-lei-top10-universe-expansion"
+  :adr/title "ADR-2607199960: cloud-itonami-lei — top-3から top-10への深度拡張 + 全世界上場企業ユニバーストラックの新設"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/date "2026-07-19"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "cloud-itonami-lei-top10-universe-expansion"
+  :adr/related ["90-docs/adr/2607110300-cloud-itonami-lei-corporate-tos-catalog.edn"
+                "90-docs/adr/2607173000-fleet-babashka-to-nbb.edn"
+                "90-docs/adr/2607182200-isic-8291-houjin-bangou-canonical-business-registry.edn"
+                "90-docs/adr/2607182300-cloud-itonami-isic-8291-formal-actor-identity-discovery-pipeline.edn"
+                "90-docs/adr/2607182400-cloud-itonami-lei-update-routine-automation.edn"
+                "90-docs/adr/2607182400-isic-8291-commoncrawl-web-presence-enrichment.edn"
+                "90-docs/adr/2607182500-cloud-itonami-lei-site-enrichment.edn"
+                "90-docs/adr/2607182600-isic-8291-lei-site-archive-enrichment.edn"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["cloud-itonami-lei-* rollout target depth is 10 real companies per applicable? true
+    ISIC/ISCO vertical (raised from 3), and every applicable? false (skipped) vertical
+    must be re-evaluated against the 10-slot bar rather than carried over as permanently
+    skipped"
+   "a new company-source track, separate from ISIC/ISCO classification sampling, is
+    added: real published stock-index constituent lists (S&P 500 / Nikkei 225 / TOPIX
+    100 / FTSE 100 / DAX 40 / STOXX Europe 600 / Hang Seng / CSI 300 / ASX 200 / TSX 60
+    etc.), tracked in 90-docs/adr/2607199960-cloud-itonami-lei-universe-progress.edn,
+    as the operational (verifiable, non-fabricated) approximation of literal global
+    listed-company coverage -- GLEIF's full Golden Copy LEI file is NOT used directly
+    as a discovery source since it does not distinguish listed from unlisted entities"
+   "this remains a long-running, /loop-resumable project executed via the same
+    per-company discipline as the existing 111+ repos (real GLEIF LEI only, real ToS
+    fetch, never fabricate, never substitute a subsidiary LEI for a parent, record
+    fetch/lookup failures honestly) -- no bulk automated pipeline exists yet"
+   "this superproject checkout has heavy concurrent multi-session activity (observed
+    2026-07-19: direct local edits to progress.edn/isco-progress.edn were silently
+    reverted by a concurrent session's git sync mid-session) -- future /loop iterations
+    on this catalog should prefer a worktree outside the superproject + feature branch +
+    `gh api .../merges` server-side merge over direct edits in the shared checkout"]
+  :adr/last_verified "2026-07-19"
+  :adr/source-format "edn"
+  :adr/body "\n# ADR-2607199960: cloud-itonami-lei — top-10化 + 全世界上場企業ユニバース拡張\n\n**Status**: accepted\n**Date**: 2026-07-19\n**Deciders**: Jun Kawasaki (+ Claude, オーナー承認のうえ設計)\n**関係**: ADR-2607110300 の対象規模を拡張する（設計・規律自体は継承、上書きしない）\n\n## Context\n\nADR-2607110300 で確立した `cloud-itonami-lei-<LEI>` パターン（実在上場企業ごとに\nToS/法的文書をLEIキーで1リポジトリ、GLEIF検証済みLEIのみ・捏造禁止・失敗は正直に\n記録）は、2026-07-19時点で ISIC 144業種 + ISCO 90職種の分類ベース top-3サンプリング\nとして運用され、111リポジトリが実在（isic 102社 + isco 9社、両ロールアウトとも\n\"ROLLOUT COMPLETE\" とマークされていた）。オーナーからのセッション要望:\n「今の cloud-itonami-lei-* で全産業の top10 と全世界の上場企業まで lei を拡張実装」。\n\nオーナー確認済みのスコープ（本セッションでの選択）:\n\n1. top10化の対象範囲 → **skip済み業種も再評価**（3社基準で除外した判定を10社基準で\n   見直す）\n2. 「全世界の上場企業」の定義 → **文字通り全上場企業（世界で5万社超）を目指す長期\n   プロジェクト**\n3. 実行方式 → **`/loop` による自己ペース継続**（既存 progress tracker の\n   resume-from 慣例と合致）\n\n調査の結果:\n\n- 既存の自動化試み（`cloud-itonami-isic-8291` actor の `bin/collect.bb` /\n  `collect.cljs` / `collect-routine.clj`、ADR-2607182200/2607182300/2607182400/\n  2607182600、いずれも2026-07-18付）は「既知企業1社の補完情報取得」（サイト情報・\n  GLEIF照会・houjin-bangou登録番号照会・Common Crawl由来のURL単位エンリッチメント）\n  止まりで、**大量発見（bulk discovery）の手段を提供しない**。\n- `bin/collect.bb` は ADR-2607173000（2026-07-17、bb全廃・nbb一本化のrepo-wide\n  mandate）成立の**翌日**に bb で新規作成されており、この場でのコンプライアンス上の\n  ギャップとして記録する。同actor repo（west管理下、共有checkout）には別セッションの\n  uncommitted WIPが存在するため、本ADRではこのギャップの是正を強制せず、別\n  ワークストリームに委ねる（共有checkoutへの直接編集はしない — CLAUDE.md「並行\n  エージェント運用」節）。murakumo hourly routine（ADR-2607182400）も\n  `manifest/fleet-db.edn` 未登録で未実装のまま。\n- GLEIF自体のフルデータ（\"Golden Copy\" LEI-CDF、日次更新CSVで260万件超のLEI）は\n  「上場企業」のサブセットを直接示さない——ファンド・非上場子会社・SPV等が大半で、\n  ISIN/ティッカーとの相関なしには「上場企業」を機械的に切り出せない。\n- 現実的に「全世界の上場企業」を検証可能な形で近似するには、各国・地域の主要株価\n  指数の構成銘柄リスト（指数運営会社/取引所が公表する公開情報）を段階的に取り込む\n  のが最も捏造リスクの低い経路——GLEIFのLEI検索と組み合わせれば、既存の「1社ずつ\n  GLEIF照会→ToS取得→リポジトリ作成」という手順をそのまま流用できる。\n- **本セッション中に実測: このsuperproject checkoutは重い並行マルチセッション\n  活動下にある。** `progress.edn`/`.isco-progress.edn` へのローカル直接編集が、\n  作業中に別セッションの `git` 操作（checkout/pull起因と推定）で無言のうちに\n  巻き戻された（実測: `git status` clean = HEADと一致 = 未commitの編集が消失、\n  `.git`にロックを保持する別`git`プロセスの存在も確認）。これはCLAUDE.mdの\n  「並行エージェント運用」節が警告する既知ハザードそのもの——以後、この\n  ファミリーへの追加作業は superproject 外の worktree + feature branch +\n  `gh api .../merges` サーバ側マージを標準経路とする。\n\n## Decision\n\n### 1. 深度: top-3 → top-10（既存 applicable? true 業種/職種）\n\n`2607110300-....progress.edn` / `.isco-progress.edn` の各行の目標社数を3から10に\n引き上げる。既存の `:company/status :done` 行は据え置き、追加枠（4社目〜10社目）を\n既存と同じ規律（実在LEI・実ToS取得・失敗は `:tos-fetch-failed` / `:lei-lookup-failed`\nとして正直に記録・代替は実在企業のみ・子会社LEIの代用禁止）で埋める。bot対策で\n取得できない企業が多いことは既に実証済み（100業種超の実績で判明）なので、10社に\n届かない業種があることは許容し、届かなかった理由を `:industry/note` に残す（従来と\n同じ discipline）。本ADR採択と同セッションで isic-3510（電力）を3→6、isic-4950\n（パイプライン）を3→5に前進済み（詳細は各行の `:industry/note`）。\n\n### 2. skip判定の再評価（applicable? false → 10枠基準で再判定）\n\n既存の `:industry/skip-reason \"fragmented/local\"` 等で除外された業種・職種も、\n10社という枠であれば「グローバルに一貫したtop企業概念」が成立するケースがあり得る\nため、全件を10枠基準で再評価する。再評価してもなお成立しないと判断した場合は\n`:industry/status :skipped` のまま残し、判定理由を更新する（「3社基準で除外」から\n「10社基準でも再評価の上、除外」に変える——判定根拠を上書きせず追記する）。\n\n### 3. 新トラック: 株価指数構成銘柄ベースの「世界上場企業ユニバース」\n\nISIC/ISCO分類ベースのサンプリングとは別に、新しい進捗ファイル\n`90-docs/adr/2607199960-cloud-itonami-lei-universe-progress.edn` を追加する。主要な\n公開株価指数（S&P 500 / Nikkei 225 / TOPIX 100 / FTSE 100 / DAX 40 / STOXX Europe\n600 / Hang Seng / CSI 300 / ASX 200 / TSX 60 / BSE SENSEX / KOSPI 200 / Ibovespa /\nCAC 40 / SMI 等、将来追加可）を1行1指数として登録し、各構成銘柄についてISIC/ISCO側で\n既に登録済みのLEI（重複リポジトリを作らない——事前に登録済みLEI一覧と突合してから\nGLEIF照会に進む）を除いて同じ「GLEIF照会→ToS取得→リポジトリ作成」パイプラインを\n回す。これが「文字通り全世界の上場企業」への現実的な近似経路であり、GLEIFのフル\nLEIデータ（上場/非上場を区別しない260万件）そのものを対象にするわけではない——指数\n構成銘柄という「実在する、検証可能な、既に上場が確定した企業のリスト」を情報源と\nする。本ADR採択と同セッションで sp500 の初回シード（8社試行、6社成功）を実施済み。\n\nこの新トラックは長期プロジェクトであり、一度のセッションで完了しない。指数を1つ\nずつ、各指数内も逐次処理する形で `/loop` により複数セッションをまたいで継続する\n——resume-fromの慣例（`:progress/resume-from` プレーンテキストで次に何をすべきかを\n記述、`2607110300` の isic/isco progress ファイルが既に確立した形式）をそのまま\n`universe-progress.edn` にも適用する。\n\n### 4. スケール上の限界を正直に記録する\n\n- 1社のオンボーディングは現状も手動複数ツール呼び出し（GLEIF照会・ToS取得・\n  `gh repo create`・スキャフォールド・push・progress更新）であり、自動化された\n  一括パイプラインはまだ存在しない（上記のbb/nbbギャップ参照）。自動化が用意される\n  まではこのADRも既存の手動パターンを踏襲する。\n- 「全世界の上場企業」は5万社超と推定され、この規模を手動パターンのまま /loop で\n  踏破するには非常に長い期間（数ヶ月〜それ以上）を要する。これはオーナーが承知の\n  上で選択した長期プロジェクトとして進める——単一セッションでの完了を目指さない。\n- bot対策・JS-rendered SPA等による取得失敗率は業種によって高い（既存実績で時に\n  0/3〜1/3）ことが分かっており、10社・全世界規模でも同程度以上の失敗率が見込まれる。\n  失敗は今まで通り正直に記録し、捏造・代用（子会社LEI等）はしない。\n\n## Consequences\n\n- (+) 既存のADR-2607110300設計・規律をそのまま延長するため、新しい構造を発明しない。\n- (+) 「全世界上場企業」という際限なく見える目標に、指数構成銘柄という検証可能な\n  現実的マイルストーンの連なりを与える。\n- (-) 自動化パイプライン（bb→nbb移行含む）が未完成のため、当面は低速な手動プロセス\n  のまま——真のスケールには次のワークストリーム（nbb製一括オンボーディングスクリプト）\n  の完成を要する。\n- (-) 5万社規模は非現実的に長い期間を要する可能性があり、期待値をオーナーと共有して\n  おく必要がある。\n- (-) 共有checkoutの並行編集ハザードが実測された——今後この系列への作業は\n  worktree隔離を既定にする追加コストがある。\n\n## Alternatives considered\n\n- **GLEIF Golden Copyフルダウンロードを直接対象にする** — 却下。260万件のLEIの大半は\n  非上場・SPV・ファンド等で「上場企業」のフィルタがない。ISIN/ティッカー相関データ\n  （別途取得が必要、コスト高）なしには使えない。\n- **top-3のまま「全世界」だけ拡張** — 却下。オーナーは明示的にtop10への深度拡張も\n  要求した。\n- **bb製 `collect.bb` をそのまま採用して自動化を急ぐ** — 却下。ADR-2607173000の\n  repo-wide mandateに反する。別セッションの進行中WIPを尊重し、本ADRでは是正を\n  強制しない（別ワークストリーム）。\n\n## References\n\n- ADR-2607110300（本ADRが拡張する設計本体）\n- ADR-2607173000（bb→nbb repo-wide mandate、collect.bbのコンプライアンスギャップの\n  根拠）\n- ADR-2607182200/2607182300/2607182400/2607182600（isic-8291 actorの既存エンリッチ\n  メント能力、いずれも「既知企業の補完」止まりで一括発見には未対応と確認済み）\n"}]

@@ -1,0 +1,149 @@
+[{:db/id -1
+  :adr/id "ADR-2608179400"
+  :adr/title "x86-64 gets the AArch64 codegen passes; Cranelift is the parity target, not LLVM"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :adr/supersedes ""
+  :adr/superseded-by "ADR-2608189100 (decision 2 only: Cranelift is a checkpoint, not the ceiling)"
+  :adr/tags "kotoba-native amu codegen x86-64 aarch64 benchmark"
+  :adr/body
+  "# x86-64 gets the AArch64 codegen passes
+
+## Context
+
+`kotoba-native` emits machine code for both ISAs out of one machine IR in
+`src/kotoba/native/machine_ir.cljc`. Measured 2026-08-17 that file carries **60
+`:x86-64/*` encodings and 57 `:aarch64/*` encodings** — x86-64's instruction
+coverage is not behind, it is slightly ahead.
+
+What x86-64 does not have is the **optimization passes**. `instruction-tokens`
+applies `a64-cache-leaf-constants` and `a64-fold-adjacent-add-sub-immediates`
+only when the ISA is `:aarch64`, and the Mersenne reduction and multiply fusion
+are likewise `a64-` prefixed. Those passes landed on 2026-08-17 after sitting
+finished and unmerged since 2026-08-12 (kotoba-native 9487205, 0a87847).
+
+### Correction to record
+
+An earlier reading of this same code concluded that x86-64 had **no** machine
+IR and went only through the older stack-machine emitter in `x86_64.cljc`. That
+was wrong, and the way it was wrong is worth keeping: the grep was for
+`:x86_64/` with an underscore, and the keys are spelled `:x86-64/` with a
+hyphen. Zero hits was read as absence rather than as a mis-spelled query. The
+same session then wrote a constant encoder into `x86_64.cljc`, rebuilt the
+kernel, and got a byte-identical artifact — which is what surfaced the mistake.
+**A change that produces identical output is evidence about the query, not
+about the code.**
+
+## What the passes were worth on AArch64
+
+Same kernel (`bench/runtime-comparison/kernel.kotoba`, eight Lehmer rounds),
+before and after the three merged branches plus the Mersenne reduction:
+
+| | before | after |
+|---|---:|---:|
+| instructions | 294 | 78 |
+| `sdiv` | 8 | 0 |
+| `smulh` | 0 | 8 |
+| `madd` / `msub` | 0 / 0 | 8 / 0 |
+| `movk` | 147 | 2 |
+| divide guards | 50 | 0 |
+| bytes | 1,176 | 272 |
+
+Twenty-five rotated samples on an Apple M4 under load average 33-44, every
+engine agreeing on 1830338420:
+
+```
+                     min     p25   median
+amu (AArch64)       15.05   15.68   26.66
+rustc -> Cranelift  14.65   16.59   22.47
+rustc -> LLVM       12.19   13.31   17.32
+```
+
+Medians on that host are dominated by contention — min to median is a wider
+spread than the gap between engines — so the low quantiles carry the signal.
+Cranelift leads by 2.7% at the minimum, amu leads by 5.5% at p25. **That is
+parity, not a win in either direction, and only for this kernel.**
+
+## Decision
+
+1. **Port the AArch64 passes to x86-64**, in this order, each landing with its
+   own evidence: constant caching, add/sub immediate folding, multiply fusion
+   where the ISA has a fused form, Mersenne reduction. The IR is shared, so
+   these are new `x86-` passes over the same instruction vector rather than a
+   new backend.
+
+2. **The parity target was Cranelift, not LLVM.** Cranelift is a production
+   backend of roughly 100k lines and sits at 1.26-1.32x LLVM on this workload;
+   amu's code generator is 3,350 lines. Reaching LLVM additionally requires
+   inlining, instruction scheduling and a register allocator that sees across
+   the timed loop — the same things that separate Cranelift from LLVM. For a
+   scalar kernel with no allocation and no library, `rustc -C opt-level=3`
+   **is** LLVM, so the honest label on the existing table is \"versus LLVM -O3
+   through rustc\".
+
+   **Superseded in part, 2026-08-18 (ADR-2608189100).** Decisions 1, 3 and 4
+   stand. Decision 2's *ceiling* does not: the owner set LLVM+ as the speed
+   goal. Cranelift remains the checkpoint this table already meets at the
+   minimum. The process that ranks the remaining gap is the Co-Scientist loop
+   in `90-docs/codegen/speed_coscientist.cljc`; a win seals only through
+   `kotoba-lang/perfgate`.
+
+3. **Narrowing an encoding is only sound when the value is final before the
+   width is chosen.** `resolve-program-layout` reserves each token's width in a
+   first pass and demands exactly that width back, and it rejected a narrowed
+   data-address token with `token encoder violated its reserved width
+   {:reserved 10, :encoded 5}`. Compile-time constants may narrow; addresses
+   resolved by layout may not. `x86-mov-imm` / `x86-mov-imm-fixed` is that
+   split (kotoba-native 48f27b7).
+
+4. **A Rosetta measurement is evidence about compilers, not about x86-64
+   hardware — and that first half is worth having.** x86-64 code runs on this
+   arm64 workstation through `cc -arch x86_64` plus Rosetta 2. Comparing two
+   x86-64 binaries under the same translator holds the host, the workload and
+   the translator fixed and varies only the emitted instruction stream, which
+   is a real comparison; the first draft of this ADR refused it outright and
+   was too blunt. What may not be claimed is that the resulting ratio is what
+   x86-64 silicon would show.
+
+   Measured 2026-08-17, 21 rotated samples under load average 35-44, all
+   agreeing on 1830338420:
+
+   ```
+                            min     p25   median   vs LLVM
+   amu x86-64 (today)     31.44   34.70    52.35     1.49x
+   amu x86-64 (magic div) 34.96   46.16    59.85     1.71x
+   amu x86-64 (idiv)      39.04   54.44    60.44     1.72x
+   rustc x86-64 -> LLVM   21.13   22.01    35.08     1.00x
+   ```
+
+   **The distortion is measurable and points one way.** Replacing 8 `idiv`
+   with a reciprocal multiply moved the median by 1% and the minimum by 10%,
+   which is far less than it should be worth: Rosetta lowers an x86-64 `idiv`
+   onto an ARM `sdiv` at roughly 7-10 cycles, where the instruction it stands
+   for costs roughly 40-100 on x86-64 silicon. So Rosetta **under**-reports the
+   value of removing a division, and a Rosetta ratio is a conservative reading
+   of a change that removes one. It is not a safe reading of a change whose
+   cost model runs the other way; those still need an x86-64 host.
+
+   A corollary worth stating because it was violated first: a single sample is
+   not a measurement. One run of the reciprocal build was 3.5x slower than the
+   `idiv` build here, which twenty more samples showed to be noise.
+
+## Consequences
+
+- x86-64 already received the one pass that lives in shared selection rather
+  than in an `a64-` pass: constant division. `idiv` went 8 to 0 on the kernel,
+  `imul` 16 to 24. Its code grew 783 to 896 bytes, which is a smaller number of
+  far cheaper instructions rather than a regression — an `idiv r64` is roughly
+  40-100 cycles against 3-5 for an `imul`.
+- Narrowest-form constants then took x86-64 from 896 to 784 bytes with the
+  instruction count unchanged at 224, `movabs` 33 to 8. The survivors carry the
+  reciprocal magic, which genuinely needs 64 bits.
+- The remaining x86-64 gap is the passes, and the largest single item visible
+  in the disassembly is the stack round trip the 128-bit multiply forces:
+  `push rax; push rdx; ... pop rdx; pop rax` around each division, six memory
+  operations per round that a register-aware pass could remove.
+- Golden byte assertions move when encodings improve. Prefer deriving a width
+  from the encoder that produces it, as `false_argument_test` now does, over
+  pinning a literal that the next improvement leaves stale — a stale literal
+  invites whoever hits it to choose the number that makes the test pass."}]

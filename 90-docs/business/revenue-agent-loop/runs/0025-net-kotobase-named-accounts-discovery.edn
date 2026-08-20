@@ -1,0 +1,171 @@
+[{:db/id -1
+  :doc/id "revenue-agent-loop-run-0025-net-kotobase-named-accounts-discovery"
+  :doc/doc_type "revenue-agent-loop-run"
+  :doc/title "Run 0025 — net-kotobase named accounts (AI agent / GraphRAG durable memory)"
+  :doc/path "90-docs/business/revenue-agent-loop/runs/0025-net-kotobase-named-accounts-discovery.edn"
+  :doc/run_number 25
+  :doc/status "running"
+  :doc/date "2026-08-13"
+  :doc/source "revenue-agent-loop RUN-TEMPLATE (ADR-2607246100)"
+  :doc/body "# Run 0025 — net-kotobase named accounts (AI agent / GraphRAG durable memory)
+
+**Status:** running — list built; Beekle official-form send blocked on Turnstile (not sent)
+**Started:** 2026-08-13
+**Owner:** agent, under owner direction (リード集めから進めて)
+**Mode:** cash-first
+**Prior run:** 0022 (net-kotobase commercial re-measure, no-go)
+
+## Hypothesis
+
+If one buyer segment (AI agent / GraphRAG teams that currently join a graph,
+object store and custom provenance) is named from official public sources,
+and the first message is a 30-minute problem interview rather than a paid
+pitch, then at least one qualified reply or discovery call appears within
+14 days. Payment is not requested while commercial go/no-go is no-go.
+
+## Capital governor
+
+| Field | Value/evidence |
+|---|---|
+| Current tranche | T1 |
+| Released / committed / spent | ¥300,000 / ¥0 / ¥0 |
+| This run cash-at-risk ceiling | ¥0 |
+| Paid acquisition allowed? | no |
+
+## Score before
+
+| Axis | 0–5 | Reason |
+|---|---:|---|
+| P(payment ≤30d) | 1 | commercial no-go; checkout 0 |
+| Speed to evidence | 4 | public list in hours; reply in days |
+| Existing external demand | 3 | funnel 2891 visitors / 24 signups / 0 checkout (2026-08-13 live) |
+| Payment readiness | 1 | Terms DRAFT; privacy/DPA missing as of run 0022 |
+| 12m expected gross profit | 4 | Secure Managed ¥19,800/mo if it converts |
+| Repeat likelihood | 4 | subscription |
+| Gross margin | 4 | modeled ~88% |
+| Learning value | 5 | tests whether the agent-memory segment replies |
+| Spillover | 3 | MCP/agent positioning reusable |
+| Evidence confidence | 2 | priors before outreach |
+
+**Total:** 56/100
+
+## Hard gates
+
+- Official business inquiry paths only. No scraped personal emails.
+- Discovery / unpaid 14-day alpha only. No paid solicitation.
+- Do not claim SLA, DPA, Neo4j wire compatibility, or published Terms.
+- Identify Gftd Japan K.K. as operator.
+- One relevant message per organization; opt-out by ignoring.
+
+**Gate:** yellow — research and discovery-only contact. Paid pitch remains red.
+
+## One selected action
+
+Build the DESIGN-PARTNER-OFFER first-10 mix for one segment and send the first
+message only through a form that explicitly welcomes tool/partner introductions
+(Beekle). WIP=1. Do not buy ads.
+
+## Result so far
+
+Named accounts: 10 researched, written to
+`90-docs/business/net-kotobase-named-accounts.edn`.
+
+Excluded as competitors: GraphX, ストックマーク SAT, JAPAN AI AGENT,
+Panasonic Connect in-house KG-RAG, LegalOn CorporateOn.
+
+### 2026-08-13 slice — Beekle send attempted, not completed
+
+Corrected discovery copy (売り込み, not 卒い込み) was filled on the official
+form `https://beekle.jp/contact`:
+
+- type = `partner` / 開発パートナー・協業のご相談（開発会社・SIer様）
+- name = Jun Kawasaki
+- email = hello@gftd.co.jp
+- company = Gftd Japan 株式会社
+- paid pitch = none; 30-minute problem interview + optional 14-day unpaid alpha
+
+**Submit was not completed.** Cloudflare Turnstile (`challenges.cloudflare.com`)
+did not render in automated Chrome for Testing (0 iframes, submit button stayed
+disabled). CAPTCHA was not bypassed and the form was not POSTed around the
+widget. Cursor IDE browser tabs did not stay open in this session. OS-level
+keystrokes into the owner's Chrome were aborted after a focus/URL check showed
+the front window was not Beekle. Laboro.AI and Enison were **not** contacted
+(workaround forbidden while Beekle is blocked).
+
+Evidence of fill (not send): `/tmp/beekle-filled.png` — grey disabled
+「この内容で送る」, no thank-you page.
+
+| Funnel stage | Before | After | Delta |
+|---|---:|---:|---:|
+| Qualified named accounts | 0 | 10 researched | +10 research |
+| Outreach sent | 0 | 0 | 0 |
+| Replies | 0 | 0 | 0 |
+| Checkout | 0 | 0 | 0 |
+| Verified external payments | 0 | 0 | 0 |
+
+Live product funnel (unchanged this slice): visitors 2891 / signups 24 /
+checkouts 0. External revenue 0.
+
+## Score after
+
+Unchanged. A filled-but-unsent form is not external demand. Do not raise score.
+
+**Total:** 56/100
+**Decision:** `continue`
+
+Next single action: owner (or an interactive Chrome session that can complete
+Turnstile) submits the one Beekle official form with the corrected copy. Do not
+message other firms until that send has a thank-you/success state. Do not scale
+to 100 names until one reply exists.
+
+### 2026-08-13 slice — Cursor Automations drafted (no send)
+
+Three Cursor Automation drafts were written for this run. They do not send
+forms, do not bypass Turnstile, and do not raise score.
+
+| Draft | Trigger | Job |
+|---|---|---|
+| kotobase reply watcher | every 4 hours | Log inbound to hello@gftd.co.jp from named orgs. Gmail was unauthenticated at draft time; watcher fail-closes (SCANNED=0 is not zero replies). |
+| kotobase next-form reminder | weekdays 09:00 JST | Surface only Beekle until a thank-you exists. Skip Helpfeel. |
+| kotobase funnel pulse | every 6 hours | GET https://kotobase.net/api/funnel. Silence is not a pass. |
+
+Helper: `90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljs`
+(exit 2 = unanswered). Ledgers: `metrics/net-kotobase-funnel-pulses.edn`,
+`metrics/net-kotobase-reply-scans.edn`.
+
+URL confirm 2026-08-13 (still must not be suggested until Beekle is sent):
+
+- ELYZA official form = https://share.hsforms.com/1qADCnvotTtqczD__SC5VTQcnma3
+  (linked from https://elyza.ai/ お問い合わせ). https://elyza.ai/contact = 404.
+- iASYS homepage form = https://iasys.jp/ (same fields on https://iasys.jp/neo4/).
+
+These drafts are not enabled until saved in Cursor Automations. Enabling them
+is not external demand. Score stays 56/100.
+
+### 2026-08-14 slice — session close (work already on main)
+
+This agent session closed. Revenue-lane WIP remains run 0025 (continue).
+Session artifacts were already on default branch via
+https://github.com/com-junkawasaki/root/pull/2170
+(`b26ce8c794a cleanup: land the net-kotobase run 0025 revenue-lane work`).
+
+Also in this session, not part of PR 2170:
+
+- `cloud-itonami/hc` docs axis landed on that repo's `main` as
+  `6f04de6d12b9d84c2b621431da9ab2ec702d6395`. Superproject west pin for `hc`
+  already matches that SHA. ADR component of docs stays 0 (intentional).
+- Next-form reminder draft was opened in the Cursor Automations editor
+  (weekday 09:00 JST). Save/enable is owner-side. Gmail was still disconnected;
+  reply watcher must not be given a Gmail tool until that connection exists.
+- `.cursor/automations/kotobase-*.json` stay gitignored local drafts.
+
+**Landed:** named-accounts list, run 0025, helper, funnel/reply ledgers, SCORECARD
+current selection 0025.
+**Not landed / not done:** Beekle form send (Turnstile). Laboro.AI / Enison not
+contacted. Score still 56/100. External revenue 0. Checkout 0.
+**Do not treat as demand:** filled-unsent Beekle form, automation drafts, hc README.
+
+Resume: submit the one Beekle official form in interactive Chrome that can
+complete Turnstile. Then enable remaining automations after Gmail is connected.
+Do not pad to 100 names until one reply exists.
+"}]

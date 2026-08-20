@@ -1,0 +1,195 @@
+[
+;;; Iteration 11 (2026-07-25): forms still absent after ten passes, plus the
+;;; 200-org mark. ADR-2607257200.
+;;; Counts are llm-recall-unverified unless a source is pinned.
+
+{:org/id :org-jpn-rojin-club
+ :org/form-family :family-elder-sociability
+ :org/name "老人クラブ (Japanese senior citizens' clubs)"
+ :org/entity-kind :org-form
+ :org/category :cat-health-support
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-asia-east
+ :org/countries ["JP"]
+ :org/founding-date 1950
+ :org/instance-count-estimate 103281
+ :org/member-count 4380000
+ :org/member-count-basis "source-pinned, with the decline as the point: membership peaked at 8.87 million in 1998 and had fallen to 4.38 million by 2022, while the 65+ population GREW from 20.51M to 36.23M — participation collapsed from 43% to 12% of the age group. A separate federation figure of 103,281 clubs / 5,879,616 members circulates and appears to be an older snapshot; both are recorded rather than silently reconciled (全国老人クラブ連合会 令和5年度 老人クラブ実態調査)."
+ :org/legal-registration :mixed
+ :org/governance-model :democratic
+ :org/mission-statement "Neighborhood clubs for older residents running exercise, hobby, traffic-safety and friendly-visit activities — the largest formal senior membership structure in Japan, and a rare case where a community form's decline is measured precisely enough to be undeniable."
+ :org/coverage-note "Target population nearly doubled while membership halved. Aging societies do not automatically produce senior communities."
+ :org/source-name "公益財団法人 全国老人クラブ連合会「老人クラブ実態調査報告書（令和5年度）」"
+ :org/source-url "http://www.zenrouren.com/siryou/pdf/r5_hokokusho.pdf"
+ :org/source-date "2023"
+ :org/source-tier :primary
+ :org/source-caveat "Two membership figures are in circulation (4.38M for 2022 vs 5.88M in an undated federation summary); the discrepancy is unresolved here."
+ :org/pinned-on "2026-07-25"
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-book-clubs
+ :org/form-family :family-hobby-society
+ :org/name "Book clubs and reading circles"
+ :org/entity-kind :org-form
+ :org/category :cat-hobby-interest
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "GB" "BR" "IN" "JP" "NG"]
+ :org/founding-date 1634
+ :org/founding-note "Reading societies are attested from the 17th century; the modern living-room book club spread through 20th-century women's clubs."
+ :org/member-count-basis "unknown — structurally unmeasurable. A book club is typically 6-12 people meeting in a home with no name, no account and no external existence; only publisher-run and library-run clubs are countable."
+ :org/legal-registration :unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Small recurring reading groups with rotating hosting and an implicit obligation to show up — probably the most common formal-ish community form among educated adults and almost entirely invisible."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-ballroom-houses
+ :org/form-family :family-status-based-community
+ :org/name "Ballroom houses and chosen-family kinship networks"
+ :org/entity-kind :org-form
+ :org/category :cat-identity-rights
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "BR" "FR" "JP" "ZA" "PH"]
+ :org/founding-date 1970
+ :org/member-count-basis "unknown — houses have mothers, fathers and children by designation rather than descent; membership is publicly performed at balls but never registered."
+ :org/legal-registration :unregistered
+ :org/governance-model :hierarchical
+ :org/mission-statement "Kinship structures created by Black and Latino LGBTQ+ communities — a 'house' provides housing, mentorship, discipline and competitive identity at balls, functioning as family for people expelled from theirs."
+ :org/coverage-note "Included because it is a lineage-and-obligation institution built from scratch within living memory — the same functional slot as a clan, invented by people denied one."
+ :org/related-category :cat-traditional
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-dojo-communities
+ :org/form-family :family-sport-club
+ :org/name "Martial arts dojo, gym and training-hall communities"
+ :org/entity-kind :org-form
+ :org/category :cat-sports
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-asia-east
+ :org/countries ["JP" "KR" "BR" "TH" "US" "RU"]
+ :org/founding-date 1600
+ :org/member-count-basis "unknown — federations count graded practitioners in some arts (judo, taekwondo, BJJ belts) but the dojo as a community — sempai/kohai obligation, cleaning duty, lifelong affiliation — is not counted anywhere."
+ :org/legal-registration :mixed
+ :org/governance-model :hierarchical
+ :org/mission-statement "Training halls organized around a teacher lineage, with seniority obligations, shared cleaning and cross-generational membership — a transmission structure that outlives individual teachers."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-csa-farmers-markets
+ :org/form-family :family-commons-management
+ :org/name "Community-supported agriculture and farmers market communities (CSA, 産消提携, teikei)"
+ :org/entity-kind :org-form
+ :org/category :cat-resource-commons
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["JP" "US" "FR" "DE" "GB" "CN"]
+ :org/founding-date 1971
+ :org/founding-note "Japanese teikei (産消提携) in the 1970s is the acknowledged ancestor of both American CSA and European AMAP."
+ :org/instance-count-estimate 15000
+ :org/member-count-basis "unknown — national counts exist for France's AMAP and US CSA farms but definitions differ (box scheme vs. shared-risk membership); no aggregated figure is reliable."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Households buying a season's harvest in advance and sharing crop risk with a farmer — a contract between a community and a piece of land, usually with no legal instrument at all."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-intentional-communities
+ :org/form-family :family-intentional-community
+ :org/name "Intentional communities, ecovillages and cohousing (GEN, FIC-listed)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["DK" "DE" "US" "IN" "CO" "AU"]
+ :org/founding-date 1962
+ :org/instance-count-estimate 10000
+ :org/member-count-basis "unknown — the Global Ecovillage Network and the Foundation for Intentional Community list thousands of projects each, with heavy overlap, self-listing bias and no verification of whether a listed community still exists."
+ :org/legal-registration :mixed
+ :org/governance-model :consensus
+ :org/mission-statement "Groups that deliberately co-locate and share governance, land or income — cohousing clusters, ecovillages, ashrams and secular communes — the rare case of community formed by explicit design rather than by inheritance or proximity."
+ :org/related-org "org-mondragon-cooperative"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-housing-occupation-movements
+ :org/form-family :family-civic-movement
+ :org/name "Housing occupation and anti-eviction movements (PAH, MTST, squats)"
+ :org/entity-kind :org-form
+ :org/category :cat-civic-political
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["ES" "BR" "ZA" "IT" "NL" "US"]
+ :org/founding-date 2009
+ :org/instance-count-estimate 300
+ :org/member-count-basis "unknown — Spain's PAH has had hundreds of local nodes and MTST mobilizes tens of thousands into occupations, but membership is participation in assemblies and actions, not enrolment."
+ :org/legal-registration :unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Assemblies of people facing eviction who block repossessions, negotiate collectively with banks and occupy vacant housing — mutual aid organized around a shared legal jeopardy."
+ :org/related-org "org-global-tenant-unions"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-motorcycle-car-clubs
+ :org/form-family :family-hobby-society
+ :org/name "Motorcycle and car clubs (HOG chapters, 走り屋, lowrider clubs, boda associations)"
+ :org/entity-kind :org-form
+ :org/category :cat-hobby-interest
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "JP" "MX" "DE" "ID" "KE"]
+ :org/founding-date 1903
+ :org/member-count-basis "unknown — manufacturer-sponsored owner groups publish membership, but the club layer (patches, chapters, runs) is mostly unregistered and deliberately opaque."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :hierarchical
+ :org/mission-statement "Chapter-based riding and building communities with insignia, initiation and territory — a fraternal form that migrated onto vehicles, ranging from charity-ride clubs to outlaw formations."
+ :org/coverage-note "Criminal motorcycle organizations remain out of scope per the corpus's stated exclusion; the club FORM is recorded, not the criminal instances."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-student-unions-halls
+ :org/form-family :family-school-linked
+ :org/name "Student unions, residence halls and university communities (nations, 学生自治会, JCR)"
+ :org/entity-kind :org-form
+ :org/category :cat-education-parent
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["SE" "GB" "JP" "DE" "ZA" "IN"]
+ :org/founding-date 1663
+ :org/founding-note "Uppsala's student nations date from the 17th century and still allocate housing and run their own buildings."
+ :org/member-count-basis "unknown — union membership is often automatic on enrolment (so it measures the university, not the community), while the active layer of societies, nations and hall committees is uncounted."
+ :org/legal-registration :mixed
+ :org/governance-model :democratic
+ :org/mission-statement "Self-governing student bodies running bars, housing, welfare and representation — one of the few community forms with mandatory complete turnover every few years, which forces ritualized handover."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-reentry-prisoner-families
+ :org/form-family :family-peer-support
+ :org/name "Prisoner family support and reentry circles"
+ :org/entity-kind :org-form
+ :org/category :cat-health-support
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "GB" "BR" "ZA" "JP" "RU"]
+ :org/founding-date 1972
+ :org/member-count-basis "unknown — support circles for people leaving prison and for the families of the incarcerated are small, stigmatized and rarely registered; the population they serve is countable (prison populations) but the communities are not."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Visiting-day networks, family support groups and circles of support and accountability that accompany someone through release — communities formed around a status the surrounding society treats as disqualifying."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+]

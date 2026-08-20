@@ -1,0 +1,161 @@
+[
+;;; Iteration 22 (2026-07-26): entries added specifically to give standalone
+;;; forms a cross-national analogue, rather than relabelling them into an
+;;; existing family. ADR-2607257200.
+
+{:org/id :org-global-lay-magistrates
+ :org/name "Lay magistrates, mediators and volunteer justice officers (JPs, 調停委員, konfliktråd, escabinos)"
+ :org/entity-kind :org-form
+ :org/form-family :family-lay-public-office
+ :org/category :cat-civic-political
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["GB" "JP" "NO" "DE" "BR" "KE"]
+ :org/founding-date 1361
+ :org/founding-note "England's justices of the peace date from 1361 and are still unpaid."
+ :org/member-count-basis "unknown in aggregate — England and Wales have on the order of ten thousand serving lay magistrates and Japan several thousand 調停委員, but no cross-national count of unpaid judicial volunteers exists."
+ :org/legal-registration :statutory-no-personality
+ :org/registration-note "Holders of a public office with real powers, individually appointed, belonging to no incorporated body — the same shape as 民生委員 and 保護司."
+ :org/governance-model :hierarchical
+ :org/mission-statement "Unpaid citizens exercising judicial or quasi-judicial authority — sentencing in summary courts, mediating family and civil disputes, chairing conflict councils — recruited from and returning to the community they judge."
+ :org/related-org "org-jpn-minsei-iin"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-recurring-salons
+ :org/name "Recurring salons and fixed-place gatherings (Stammtisch, tertulia, adda, mahfil, coffee-house circles)"
+ :org/entity-kind :org-form
+ :org/form-family :family-recurring-salon
+ :org/category :cat-fraternal
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["DE" "ES" "IN" "BD" "IR" "AT"]
+ :org/founding-date 1700
+ :org/member-count-basis "unknown — a Stammtisch is a reserved table and a standing evening, an adda a Bengali habit of long unstructured conversation; membership is attendance and nothing is recorded anywhere."
+ :org/legal-registration :unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Standing gatherings at a fixed place and time, whose only membership criterion is showing up regularly — the minimal viable community, and historically the seedbed of political parties, unions and literary movements."
+ :org/related-org "org-kwt-diwaniya"
+ :org/coverage-note "Added to give the Gulf diwaniya a cross-national analogue: the same institution appears wherever there is a room, a schedule and no agenda."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-donor-call-networks
+ :org/name "Emergency blood donor call networks (WhatsApp/Facebook donor groups, Dhoondh-type registries)"
+ :org/entity-kind :org-form
+ :org/form-family :family-blood-donation
+ :org/category :cat-health-support
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-asia-south
+ :org/countries ["IN" "PK" "BD" "NG" "EG" "PH"]
+ :org/founding-date 2012
+ :org/member-count-basis "unknown — donor groups form per city and per blood type on messaging platforms; membership churns and no registry aggregates them."
+ :org/legal-registration :unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Volunteer donor pools activated by a message when a hospital cannot supply a rare type — the informal counterpart to membership donor associations like AVIS, and in much of South Asia the actual supply mechanism."
+ :org/related-org "org-global-blood-donor-associations"
+ :org/related-category :cat-online
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-boat-dwelling-communities
+ :org/name "Boat-dwelling and mobile-home communities (narrowboat, woonboot, sampan, Traveller sites)"
+ :org/entity-kind :org-form
+ :org/form-family :family-mobile-dwelling
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["GB" "NL" "FR" "HK" "US" "IE"]
+ :org/member-count-basis "unknown — UK continuous-cruiser licences and Dutch houseboat berths are countable, but the communities they form (mooring neighbourhoods, towpath networks) are not."
+ :org/legal-registration :mostly-unregistered
+ :org/registration-note "Residence without a fixed address repeatedly blocks registration for services, schooling and voting — a mobility penalty shared with Travellers and showmen."
+ :org/governance-model :consensus
+ :org/mission-statement "Neighbourhoods that move: mooring communities, towpath mutual aid, and site-based Traveller and showmen communities whose territory is a circuit or a waterway rather than a plot."
+ :org/related-org "org-global-showmen-fairground"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-fra-loi-1901-associations
+ :org/name "Loi 1901 associations and equivalent association-law sectors (France, Japan 任意団体, US small 501(c)(3))"
+ :org/entity-kind :org-form
+ :org/form-family :family-association-law-sector
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["FR" "JP" "US" "IT" "BE" "SN" "LU"]
+ :org/founding-date 1901
+ :org/instance-count-estimate 1500000
+ :org/member-count-basis "llm-recall-unverified: France is commonly described as having well over a million active loi 1901 associations with tens of millions of memberships and roughly a fifth of adults volunteering in one; Japanese 任意団体 are unregistered by definition and uncounted."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "The default legal shell a country offers to voluntary groups — the French 1901 law, the German e.V., the Japanese NPO法人 and 任意団体 distinction. What the shell requires (and how cheap it is) shapes how much of a nation's community life is visible at all."
+ :org/related-org "org-deu-vereine"
+ :org/coverage-note "Recorded because this corpus's central variable — whether a community is registered — is largely determined by what registration COSTS in a given jurisdiction, not by the community's own nature."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-community-security-patrols
+ :org/name "Community security patrols (siskamling, serenazgo vecinal, chowkidar rotas, 自警団)"
+ :org/entity-kind :org-form
+ :org/form-family :family-neighborhood-security
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-southeast-asia
+ :org/countries ["ID" "PE" "IN" "JP" "NG" "BR"]
+ :org/member-count-basis "unknown — night-watch rotas are organized per neighbourhood and often mandatory in practice for adult men; nobody counts them."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Rotating resident night patrols and gate watches, usually organized through the neighbourhood association — with the standing hazard that self-policing slides into vigilantism where police presence is weak."
+ :org/related-org "org-gbr-neighbourhood-watch"
+ :org/coverage-note "Descriptive. Several of these forms have documented histories of mob violence; recording the institution is not endorsing it."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-village-youth-organizations
+ :org/name "Village and rural youth organizations (青年団, 4-H clubs, Young Farmers, Komsomol successors)"
+ :org/entity-kind :org-form
+ :org/form-family :family-youth-organization
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-asia-east
+ :org/countries ["JP" "US" "GB" "KE" "IN" "PL"]
+ :org/founding-date 1902
+ :org/member-count 6000000
+ :org/member-count-basis "source-pinned (4-H only), with the spread kept: USDA/NIFA and university extension pages give about 6 million 4-H participants and over 25 million alumni, while other official extension pages say over 7 million youth aged 5-19 — different counting methods for the same programme, present in every US county. Japanese 青年団 have collapsed from a near-universal village institution to a residual one and publish no current national figure."
+ :org/source-name "USDA National Institute of Food and Agriculture, 4-H Youth Development"
+ :org/source-url "https://www.nifa.usda.gov/4-h"
+ :org/source-date "2025"
+ :org/source-tier :primary
+ :org/source-caveat "6M vs 7M+ both appear in official US extension material."
+ :org/legal-registration :mixed
+ :org/governance-model :democratic
+ :org/mission-statement "Age-bounded village organizations that run festivals, fire-watch, agricultural projects and youth training — the structure through which rural societies historically handed responsibility to the next cohort."
+ :org/related-org "org-ind-yuva-mandal"
+ :org/pinned-on "2026-07-26"
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-animal-rescue-networks
+ :org/name "Volunteer animal rescue, wildlife rehab and shelter networks"
+ :org/entity-kind :org-form
+ :org/form-family :family-animal-care
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "GB" "AU" "IN" "TR" "JP"]
+ :org/member-count-basis "unknown — licensed wildlife rehabilitators are registered in some jurisdictions, but foster networks and transport relays run on volunteer chains coordinated by messaging groups."
+ :org/legal-registration :mixed
+ :org/governance-model :consensus
+ :org/mission-statement "Foster homes, transport relays and rehabilitation volunteers moving animals between finder, vet and adopter — a logistics community assembled entirely from spare rooms and car journeys."
+ :org/related-org "org-global-community-cat-tnr"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+]

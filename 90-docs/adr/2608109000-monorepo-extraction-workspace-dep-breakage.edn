@@ -1,0 +1,108 @@
+[{:db/id -1
+  :adr/id "ADR-2608109000"
+  :adr/title "monorepo 抽出が残した workspace:* が 5 repo の install を止めていた —— 依存宣言は抽出時に書き換える"
+  :adr/status "accepted"
+  :adr/date "2026-08-10"
+  :adr/deciders "root@junkawasaki.com"
+  :adr/related "ADR-2608059100 (cloud-itonami/media の kouryaku 面), ADR-2607300900 (CI は murakumo fleet)"
+  :adr/last_verified "2026-08-10"
+  :adr/body
+  "## 何が起きていたか
+
+`cloud-itonami/media` の worker（A→B link medium）を deploy しようとして、
+`media.gftd.ai` が 522 を返す原因を追ったところ、**media 固有の問題ではなく
+monorepo 抽出の残骸が 5 repo を同時に止めている**ことが分かった。
+
+`gftdcojp/ai-gftd-apps-gftdcojp`（pnpm monorepo）から個別 repo へ切り出した際、
+`package.json` の `workspace:*` をそのまま持っていった。monorepo の外では
+`workspace:` プロトコルは解決できないので、`npm install` が
+`EUNSUPPORTEDPROTOCOL` で落ちる。
+
+**しかも 2 段になっていた**:
+
+```
+cloud-itonami/media  ──workspace:*──▶  @gftd/magatama-host-sdk
+                                        └──workspace:*──▶  @etzhayyim/xrpc
+```
+
+## 決め手 —— monorepo 側の workspace 指定も stale だった
+
+「`workspace:*` を書き換えると monorepo の build が壊れるのでは」が唯一の
+懸念だったが、**壊れる build は存在しなかった**。`pnpm-workspace.yaml` の
+member 指定が参照する path が既に無い（実測 2026-08-09）:
+
+| workspace member | 実在 | west での実体 |
+|---|---|---|
+| `../ai-gftd-magatama-host-sdk` | **MISSING** | `gftdcojp/magatama-host-sdk` |
+| `../../etzhayyim/com-etzhayyim-xrpc` | **MISSING** | `kotoba-lang/xrpc` |
+
+どちらも改名済みで、旧名は west にも登録されていない。つまり `workspace:*` は
+**どこからも解決できない**状態だった。裏付けとして、この SDK を使う 5 repo の
+配信面は全滅していた —— `news.gftd.ai` / `media.gftd.ai` / `mamori.gftd.ai`
+いずれも応答なし（media は 522、他は接続不能）。
+
+## Decision
+
+**west が管理する repo 間の依存は `workspace:*` ではなく west sibling の
+`file:` 相対パスで書く。** 配置は `orgs/<org>/<repo>` で固定されているので、
+`file:../../<org>/<repo>` はどの consumer からも同じ形で解決する。
+
+適用済み:
+
+- `gftdcojp/magatama-host-sdk@8a64442`: `@etzhayyim/xrpc` を
+  `file:../../kotoba-lang/xrpc` へ
+- `cloud-itonami/media@0ad75ff`: `@gftd/magatama-host-sdk` を
+  `file:../../gftdcojp/magatama-host-sdk` へ + transitive な npm 依存を明示
+
+## ⚠ 消費側は `npm install --install-links` が要る
+
+**既定の symlink install では直らない。** `file:` 依存は既定で symlink になり、
+実体は repo の外（`orgs/<org>/<repo>`）に置かれる。すると SDK の *中* から出る
+`@etzhayyim/xrpc/*` の解決が、node の上方向探索で **consumer の node_modules に
+届かない**（探すのは SDK 自身の側）。
+
+`--install-links` は実体をコピーして入れるので、transitive が普通に解決する。
+実測: alias を 7 本書いて誤魔化そうとしたが、`--install-links` に変えたら
+**alias は全部不要になった**。効いていない設定を残さないこと。
+
+`package.json` に `\"install:deps\": \"npm install --install-links\"` を置いて、
+これが必須であることをコマンドとして残す。
+
+## 抽出するときの規則
+
+**repo を monorepo から切り出す作業は、依存宣言の書き換えまでが 1 セット。**
+ファイルを移して push した時点では終わっていない。切り出し後に
+`npm install` と build が通ることを確認するまでが抽出。
+
+これを怠ると、**壊れたことに誰も気付かない**。今回の 5 repo は数ヶ月
+「repo は存在し、コードもあり、wrangler 設定もあるのに、誰も deploy できない」
+状態で放置されていた。CI がこれを捕まえなかったのは、GitHub Actions が
+org 単位で止まっていた時期と重なるため（ADR-2607300900）。
+
+## Verification（2026-08-09 実測）
+
+- `cloud-itonami/media` で `npm run install:deps` → `wrangler deploy --dry-run` が
+  **3519 KiB / gzip 507 KiB** で通り、Queue binding と env var 7 件が全て解決
+- west checkout の clean install（`node_modules` / `package-lock.json` 削除後）でも再現
+
+## 未検証・未着手
+
+- **他 4 repo は未検証。** SDK 側の修正は `cloud-itonami/news` /
+  `gftdcojp/ai-gftd-media` / `gftdcojp/ai-gftd-news` / `gftdcojp/mamori` にも
+  効くはずだが、それぞれの `package.json` にも同じ書き換えが要り、build を
+  通して確かめていない。**次に着手するならここがレバレッジが高い。**
+- **media worker は deploy していない。** build は通るがランタイム前提が 3 つとも
+  未達（Queue `media-analysis` 未作成 / Secret `KOTOBA_BEARER` 未設定 /
+  `MEDIA_POD_URL` = `media-actor.gftd.ai` が応答なし）。この worker は hourly cron で
+  共有 datom 面（`kotobase.net` / `media-link-v1`）に operator として書くので、
+  認証情報なしで走らせない。**build が通ることと動くことは別。**
+  手順は `cloud-itonami/media` の CLAUDE.md に記載。
+- `pnpm-workspace.yaml` の stale な member 指定（上表）は**直していない**。
+  monorepo 側を触る人が改名後の path に直すか、member から外す判断が要る。
+
+## 付随して直したもの
+
+`npx shadow-cljs` が `npm ERR! cb.apply is not a function` で起動しない。
+shadow-cljs は clojure CLI 経由（`clojure -M:cljs -m shadow.cljs.devtools.cli
+release worker`）で動くので、`package.json` の script と `wrangler.jsonc` の
+`build.command` の両方をその形にした。"}]

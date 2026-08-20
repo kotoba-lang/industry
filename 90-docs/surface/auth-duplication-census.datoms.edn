@@ -1,0 +1,115 @@
+;; auth 面の重複 census（2026-08-03）
+;;
+;; `cacao-duplication-census` と同じ形。あちらは CACAO の写しを md5 で数えた。
+;; これは **同じ機能を別実装で作ってしまった** 件を数える。
+;;
+;; ## 何が起きたか
+;;
+;; CLAUDE.md には既に『作る前に、同種の重なる仕組みが既にないか確認する』と
+;; 書いてある。**それを読んだうえで 1 日に 4 件重複させた。** しかも同じ日に
+;; ADR-2608039950 で『重複を止める』と書きながら、その重複を 1 つ増やした。
+;;
+;; 原因は意思ではなく **見る場所が無かった**こと。`west.yml` は 4,050 個の
+;; repo 名を持つが「どのホストがどのパスを提供しているか」を持たない。
+;; 対策として `surface.datoms.edn`（生成物）と `duplication-warn` hook を作った。
+;;
+;; ## なぜ記録するか
+;;
+;; 数えないと再発が見えない。次に同じことが起きたとき、
+;; 『前もあった』ではなく『4 件目から 5 件目になった』と言えるようにする。
+
+[{:db/id -1
+  :dup/id "2608030001-signup-page"
+  :dup/concept :signin
+  :dup/built "orgs/network-awai/cloud-murakumo /signup（hosted UI を手書き）"
+  :dup/existing "authn.kotobase.net/sign-in（net-kotobase-enterprise-wave2/authn、稼働中）"
+  ;; 2026-08-03 更新: 「置き換え予定」と書いていたが、**その置き換えは棄却した**
+  ;; （ADR-2608039950）。cloud-murakumo の checkout は did をリクエスト引数で
+  ;; 受け取るだけで session cookie を読まないので、apex 側 cookie を出しても
+  ;; 読む者が居ない。重複を減らしたのは sekisho（生成 46 行→9 行、
+  ;; localStorage 直触 3→1）であって apex 機構ではなかった。
+  ;;
+  ;; **意図を残したままにすると、次に読む人が未着手の TODO と誤読する。**
+  :dup/status :superseded-by-decision
+  :dup/cost "実装 + デプロイ + 実ブラウザ検証。置き換えは棄却（ADR-2608039950）"
+  :dup/why-missed
+  "authn Worker が `orgs/<org>/<repo>/<subdir>/wrangler.jsonc` にあり、repo 名からは
+   機能が読めなかった。surface 索引の初版もこの階層を見落としていた（深さ 2 まで
+   しか降りていなかった）—— **索引を作る動機になった当の面を拾えていなかった**。"
+  :source/dataset "auth-duplication-census"
+  :source/file "90-docs/surface/auth-duplication-census.datoms.edn"}
+
+ {:db/id -2
+  :dup/id "2608030002-email-otp"
+  :dup/concept :email
+  :dup/built "着手前に発見（設計だけ）"
+  :dup/existing "authn.kotobase.net /v1/email/start・/v1/email/verify（稼働中）"
+  :dup/status :caught-before-build
+  :dup/cost "設計時間のみ"
+  :dup/why-missed
+  "`kotoba-lang/authentication` に email adapter があることは把握していたが、
+   **consumer が既に稼働している**ことを知らなかった。ライブラリの存在と
+   サービスの稼働は別の事実で、前者を見ても後者は分からない。"
+  :source/dataset "auth-duplication-census"
+  :source/file "90-docs/surface/auth-duplication-census.datoms.edn"}
+
+ {:db/id -3
+  :dup/id "2608030003-hosted-ui"
+  :dup/concept :signin
+  :dup/built "着手前に発見（『authn 側へ移設する』という計画として）"
+  :dup/existing "authn.kotobase.net /sign-in・/login・/start・/callback（稼働中）"
+  :dup/status :caught-before-build
+  :dup/cost "計画時間のみ"
+  :dup/why-missed "同上。ADR-2608039950 に『足りない 5 つ』として書いてしまった。"
+  :source/dataset "auth-duplication-census"
+  :source/file "90-docs/surface/auth-duplication-census.datoms.edn"}
+
+ {:db/id -4
+  :dup/id "2608030004-passkey"
+  :dup/concept :passkey
+  :dup/built "未着手"
+  :dup/existing
+  "authn.kotobase.net /v1/passkey/{register,login}/{options,verify}（稼働中、
+   KV に AES-256-GCM で wrap した秘密鍵を保持）"
+  :dup/status :caught-before-build
+  :dup/cost "なし"
+  :dup/why-missed
+  "sekisho の設計で『passkey PRF で包む方が安全だが別の設計』と書いた時点で、
+   既に実装されていた。"
+  :source/dataset "auth-duplication-census"
+  :source/file "90-docs/surface/auth-duplication-census.datoms.edn"}
+
+ ;; ── 重複ではなかったもの（記録して区別する）────────────────────────────
+ {:db/id -5
+  :dup/id "2608030005-sekisho"
+  :dup/concept :signin
+  :dup/built "kotoba-lang/sekisho（didkey / tenant / account / browser）"
+  :dup/existing "kotoba-lang/authentication（factor の substrate）"
+  :dup/status :not-a-duplicate
+  :dup/cost "—"
+  :dup/why-missed
+  "**これは重複ではない。** `authentication` は factor 統合の substrate で、
+   sekisho は口座・組織・復旧というプロダクト層の判断。層が違う。
+   ただし `sekisho.browser` が解いた問題（各サイトの WebCrypto/localStorage 重複）は
+   実在し、cloud-murakumo で localStorage 直触 3→1・生成 46 行→9 行を実測した。
+   **重複を数えるときは『似ている』と『同じ』を区別する** —— 区別しないと
+   正当な分離まで止めることになる。"
+  :source/dataset "auth-duplication-census"
+  :source/file "90-docs/surface/auth-duplication-census.datoms.edn"}
+
+ ;; ── 重複ではなく「宣言と実装のずれ」（同じ根、別の面）─────────────────────
+ {:db/id -6
+  :dup/id "2608030006-x402-sold-paths"
+  :dup/concept :billing
+  :dup/built "Worker が `/x402/` を route 表で課金判定（priced-resources を見ない）"
+  :dup/existing "cloud-murakumo.x402-offer/priced-resources（唯一の正）"
+  :dup/status :fixed
+  :dup/cost "売っていない path で 402 を出し、払わせ、履行できずに終わっていた"
+  :dup/why-missed
+  "`x402_offer` の docstring は『この namespace が防ぐために存在する drift は
+   まさに二箇所が売り物について食い違うこと』と書いていた —— **その二箇所目が
+   Worker 自身だった。** 宣言を 1 箇所にしても、消費側が別の表を見ていれば
+   ずれは残る。`sells?` / `sold-paths` を足して Worker と 404 文言の両方を
+   宣言から導出させた（2026-08-03、deploy 204b1e46）。"
+  :source/dataset "auth-duplication-census"
+  :source/file "90-docs/surface/auth-duplication-census.datoms.edn"}]

@@ -1,0 +1,198 @@
+[{:db/id -1
+  :adr/id "ADR-2608170600"
+  :adr/title "datalake の write surface —— s3 PUT が catalog を書く。そこで見つけた「圧縮すると range 読みが死ぬ」"
+  :adr/status "accepted"
+  :adr/date "2026-08-17"
+  :adr/deciders "Jun Kawasaki（「next」）"
+  :adr/repos ["net-kotobase/control-plane" "net-kotobase/lake" "kotoba-lang/kotobase-lake"]
+  :adr/relates-to "ADR-2608110600（query surface。『次に作るべきは write surface』と書いた側）, ADR-2608054000（gap 台帳）, ADR-2608042000（format 非依存 catalog）, ADR-260726（join 到達範囲は ref 1 本）, ADR-2608039970（byte を datom 面に載せない）"
+  :adr/body
+  "# ADR-2608170600: datalake の write surface
+
+**Status**: accepted
+**Date**: 2026-08-17
+
+## Context
+
+ADR-2608110600 が query surface（`net-kotobase/lake`）を deploy し、**着地して
+いないもの**の第 1 位にこう書いた:
+
+> **catalog document を書くものが 1 つも無い。** `kotobase.lake.catalog/admit` が
+> quads を作り、この Worker がそれを読むが、**`admit` を呼ぶ deploy 済み経路は
+> 存在しない**。したがって live plane に対してこの surface は全オブジェクトに
+> 正しく `404 NoSuchObject` を返し、**gate を実データに対して 1 度も開いていない**。
+
+本 ADR はそれを作った記録である。**エンジンは 8/05 に、query surface は 8/17 の
+早朝に着地しており、欠けていたのは「誰かが `admit` を呼ぶ」ことだけだった。**
+
+## Decision 1 — 書き手は `kotobase-protocols-worker` の s3 PUT 経路
+
+新しい Worker を作らない。既存の s3 面が既に 3 つとも満たしていた:
+
+| 必要なもの | 既にそこにあった |
+|---|---|
+| object の bytes が lake の読む場所にある | `blobs/store!` が `objects/blocks/<cid>` に置く。lake が range する key そのもの |
+| 検証済みの principal | この surface で唯一 DID を名乗れるのは CACAO 経路 |
+| head を CAS する権利 | 既に CAS している。**4 つ目の writer を足さない**（ADR-2608110600 D2） |
+
+**catalog は object の metadata と同じ hydrate→commit cycle で書く。** 別 commit に
+すると「object は在るが誰も保持していない」窓が開き、2 回目の失敗が lake から
+恒久的に見えないオブジェクトを作る。1 diff・1 head CAS・両方入るか両方入らないか。
+
+## Decision 2 — range-readable な形式を codec で包まない（本番の挙動が変わる）
+
+**作業中に、live に既に在ったバグが 1 件出た。** `objects/codec-for` は 1 KiB 超で
+entropy-coded でない content-type を gzip し、**`:cid` は圧縮後のバイトを指す**。
+Parquet と Arrow は `precompressed-types` に無かったので、**lake 自身の 2,427 byte
+fixture を s3 に上げると gzip として格納される。**
+
+これは失敗として現れない —— PUT は通り、GET は通り、`blobs/load` が展開するので
+round trip も一致する。**通らないのは footer 読みだけ**で、gzip に random access が
+無いため 4 range の scan が丸ごとダウンロードになる。`columnar` の存在理由が、
+reader からは見えない storage の判断ひとつで消える。
+
+`range-readable?` を足し、**observed（sniff）を decisive にした** —— s3 client は
+`.parquet` を `application/octet-stream` で送るのが既定なので、宣言だけ読むと
+gzip し、しかも catalog は（sniff するので）scannable と広告し続ける。
+**codec の判断と `claim/observed-media-type` は同じ 1 回の観測から出す。**
+
+## Decision 3 — 逆にすると静かに壊れる 3 つの規則（`lake-catalog` ns）
+
+1. **tenant は検証済み DID か、さもなくば claim を書かない。** `acquire/holds?` が
+   gate なので、誰も認証していない tenant を名乗る claim は**文字列に対して開く
+   gate**である。`WRITE_TOKEN` / SigV4 は principal を持たない bearer credential
+   なので、その経路は catalog に何も書かない。**そこで tenant を捏造することは、
+   認可を捏造すること。**
+2. **`object/size` は CID が指すバイトの長さ**（`:stored`。client が送った `:size`
+   ではない）。lake はこれを `columnar.bytes` に「seek する対象の長さ」として渡す。
+3. **観測は「格納されたバイト」についての観測。** gzip された CSV は、格納物としては
+   gzip container である。`catalog/envelope-formats` が既にこれを `:conflict` では
+   なく `:enveloped` としてモデル化している。
+
+`cacao-principal` は **`operator-allowed?` を再検査しない** —— 入場は ladder の
+仕事、identity は署名の仕事。ここに allowlist の写しを置くと、s3 が
+（`cacao.cljs` が『まだ無い』と書いている）per-DID の resource identity を得た日に、
+**まさにその権利を得た tenant の claim が静かに記録されなくなる。**
+
+## Decision 4 — encoding は library に移す
+
+`net-kotobase-lake.catalog-docs` は「writer と reader が別々に encode したら
+`acquire/holds?` が偽になり、それは gate の拒否と**バイト単位で区別が付かない**」と
+いう理由で両方向を 1 名前空間に置いていた。**その論拠は、writer が別 repo の別
+Worker になった瞬間に『同じ 1 つを両者が load している』ことを要求する。**
+`kotobase.lake.docs` として library 側へ移し、deploy shell は require するだけにした。
+
+`admitted->docs` を足した理由も同型: 呼び手が `:quads` を掴んで自前で encode する
+のがまさに防ぎたい drift であり、`:admitted?` を見ない呼び手は refusal map の
+**存在しない `:quads` を空 entry として保存**し、reader が `:no-such-object` を返す
+オブジェクトについて ingest 成功を報告する。
+
+## 実測
+
+- **116 tests / 746 assertions**（protocols-worker）。e2e は**実際に export された
+  `fetch`** を叩き、その結果を **lake Worker 自身の 5 呼び出し**（head → chain →
+  `hydrate!` → `docs/from-state` → `acquire/holds?`）で読み戻す —— 別の組み方で
+  読むと「何かが書かれた」ことしか証明できない。
+- **両方向を確認**: catalog 書き込みを外すと e2e の 7 assertion が赤、codec 規則を
+  外すと objects の 5 assertion が赤、`admitted?` guard を外すと library の 1 件が
+  赤。**壊したものと報告されたものが一致することを毎回確認した**（ADR-2608136000）。
+- `kotobase-lake` は **84 tests / 276 assertions** が JVM と `cljs.main` で一致。
+- `npm run build` 0 warnings、waitUntil evidence gate OK。deploy 後の
+  `smoke:public` は gremlin / sparql / graphql / cypher すべて 200。
+
+## 着地したもの
+
+- `kotoba-lang/kotobase-lake` `6696337` —— `kotobase.lake.docs`
+- `net-kotobase/lake` `b6b4af0`（facade 撤去）/ `ec389e6`（README）
+- `net-kotobase/control-plane` `978187b` —— write surface + codec 規則
+- `net-kotobase/control-plane` `4fee88b` —— `collections` の全順序化（上の追記 1）、
+  `x-kotobase-object-cid` / `x-kotobase-catalogued`（追記 2）、
+  `scripts/lake-ingest-probe.cljs`
+- deploy: `kotobase-protocols-worker` version `af28248e-6936-473e-9811-84f2d38c8a56`
+  → **現行 `f2048337-b4d2-4576-8a26-3c81a66326d9`**（s3 / atproto / pinning /
+  sparql / gremlin / graphql の 6 custom domain。deploy 後の `smoke:public` は 4 面とも 200）
+
+## 追記（2026-08-17 夜）—— gate は開いた。そして「経路は既に通っている」は誤りだった
+
+**この節は同じ日の夕方まで「残る 1 手は権限の判断だけで、経路は既に通っている」と
+書いていた。実際に通してみると、通っていなかった。**
+
+実 pyarrow parquet を、実 Cloudflare edge 上で走る実 `kotobase-protocols-worker` の
+`fetch`（`wrangler dev --remote`、R2 binding は本番の `kotobase-protocols-state`、
+`CACAO_OPERATOR_DIDS` に probe の DID）へ CACAO で PUT し、その CID を **deploy 済みの**
+lake Worker に問うと **200 / binding 1 件 / rounds 4 / 1,627 of 2,427 bytes**。
+別 DID には 404。**gate は実データに対して開いた**（詳細は ADR-2608110600）。
+
+その過程で、この ADR が landed とした write surface のバグが 2 つ出た。
+
+### 1. 最初に catalog を書いた PUT が、その bucket を次のリクエストから落としていた
+
+`query/enrich` は `run-once` の全リクエストで hydrate 済み `:docs` の key を `sort` し、
+key の形は書いた surface が決める —— s3 は `[:kotobase.s3/objects \"<bucket>\"]`
+（vector）、catalog は `\"lake-catalog\"`（string）。`compare` は String と
+PersistentVector を比べられず throw する。
+
+**最初の PUT は成功する**（空の seed を sort したから）。**壊れるのは 1 リクエスト
+後**で、write も read も（502 / 500）、しかも catalog と無関係な経路で。
+`lake_catalog_e2e_test` はどのケースも fake bucket 1 個につき PUT 1 回しかしないので、
+**書いた本人のテストが構造的に見られない位置に落ちていた。**
+
+本番で潜在していたのは allowlist が空だからにすぎず、**「残る 1 手」を実行した瞬間に
+最初の upload で発火していた。** `sort-by pr-str` で修正（`4fee88b` /
+deploy `f2048337-b4d2-4576-8a26-3c81a66326d9`）。**collection key の形を 1 つに
+法制化しない** —— surface が key を選べるだけで graph が落ちる性質のほうを消す。
+
+### 2. claim された本人が、対象を名指しできなかった
+
+catalog は CID で引かれ、lake は `?cid=` で問われる。しかし PUT が返す識別子は
+**ETag だけ**で、ETag は**受信時**の bytes、CID は**格納後**の bytes —— codec が
+走ると別物になる。つまり client は `objects/codec-for` の判断を再実装して hash し直す
+以外に、自分が今上げた object の CID を知る方法が無かった。**Decision 4 が
+「writer と reader が別々に encode したら区別が付かない」と書いたのと同じ形の穴が、
+identifier 側にも空いていた。**
+
+`x-kotobase-object-cid` と `x-kotobase-catalogued` を返すようにした。後者が無いと、
+principal を持たない PUT（＝ catalog に何も書かない、この ADR の Decision 3.1）が、
+書いた PUT と**ワイヤ上で区別できない** —— 200 + ETag で同一で、差は後に lake の
+404 として現れる。
+
+### 検査
+
+`scripts/lake-ingest-probe.cljs` が 2 つの Worker をまたいで全経路を driving する
+（PUT → `SELECT` → 別 DID が拒否されること）。**質問できなかった場合は 0 でも 1 でも
+なく exit 2**。protocols-worker は **123 tests / 769 assertions**。両方向を毎回確認:
+CID header に etag を返すと新 e2e 2 件だけ赤、`catalogued` を定数 true にすると
+bearer のケース 1 件だけ赤、`collections` の修正を外すと second-request のケース
+1 件だけ赤。
+
+## 正直に —— 本番の ingest はまだこの経路を通れない。理由は 1 つではなく 2 つ
+
+1. **principal が無い。** `CACAO_OPERATOR_DIDS` は `wrangler.jsonc` で `\"\"`。
+   `operator-allowed?` は空 allowlist を **fail-closed** に扱うので、live の s3 PUT は
+   CACAO では通らず（実測: probe が `https://s3.kotobase.net` に対して **401**）、
+   principal を持たず、catalog に何も書かない。**どの DID を admin 相当にするかは
+   権限の判断**であり、機械的な手順ではないのでここで決めない。
+2. **bytes が lake の読める場所に無い（これは 2026-08-17 夜に初めて実測した）。**
+   `GET https://s3.kotobase.net/_diag/health` は `blob_backend:\"s3\"` /
+   `s3.us-west-004.backblazeb2.com` を返す。**本番の object bytes は B2 に在り、
+   lake は R2 の `<prefix>objects/blocks/<cid>` しか range しない。**
+   ADR-2608110600 はこれを「S3/B2 backend で構成された deployment では」という
+   条件節で書いていたが、**条件は本番で成立している。**
+
+**片方だけ直しても gate は開かない。** 1 だけ直せば catalog は書かれるが query は
+`ObjectBytesNotFound`、2 だけ直しても catalog が空のままである。
+
+なお本 ADR が本番で当日変えたのは **Decision 2（Parquet/Arrow を gzip しない）**で、
+これは credential を問わず全 PUT に効く。
+
+## 併せて記録する 2 つの事実
+
+- **s3 の書き込みは `s3-bucket/<bucket>` に載る**（shared admin graph ではない）。
+  catalog も object と同じ graph に置いたので、query は
+  `?cid=…&graph=s3-bucket/<bucket>`。shared graph に置くと全 bucket の claim が
+  1 head に乗り、`s3-graph-prefix` が実測に基づいて取り除いた bucket 間の競合が
+  戻る。**これは e2e が最初に赤で教えてくれた**（shared graph を hydrate していた）。
+- **`protocols-worker` の sibling は `upstream-lock.json` が pin している。**
+  手元の west checkout ではない。`io-ipld` の手元 checkout が 6 日古く
+  `ipld.schema` を持たないせいで最初のビルドが落ちたが、これは lock 経路を使えば
+  起きない（`npm run upstream:checkout`）。"}]

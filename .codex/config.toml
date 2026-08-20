@@ -1,0 +1,17 @@
+[mcp_servers.cloud-itonami-app]
+command = "/bin/sh"
+args = [
+    "-c",
+    'cd "$HOME/.cloud-itonami/app" && exec clojure -M:mcp',
+]
+
+[mcp_servers.cloud-itonami-app.env]
+CLOUD_ITONAMI_DATA_DIR = "/Users/junkawasaki/.cloud-itonami/data"
+
+[mcp_servers.cloud-itonami-license]
+command = "nbb"
+args = [
+    "--classpath",
+    "orgs/gftdcojp/cloud-itonami/src:orgs/kotoba-lang/kyoninka/src:orgs/kotoba-lang/org-anthropic-mcp/src",
+    "orgs/gftdcojp/cloud-itonami/scripts/mcp-server.cljs",
+]

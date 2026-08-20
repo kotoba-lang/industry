@@ -1,0 +1,154 @@
+[{:db/id -1, :adr/id "adr-2607262600-cloud-itonami-isic-6311-chainexplorer", :adr/doc_type "adr", :adr/topic "cloud-itonami-isic-6311-chainexplorer", :adr/title "ADR-2607262600: cloud-itonami-isic-6311-chainexplorer — read-only チェーンエクスプローラを、記述される側の人を守る hard gate 付きで新設する", :adr/status "accepted", :adr/date "2026-07-26", :adr/deciders "Jun Kawasaki (owner instruction) + Claude", :adr/authoritative true, :adr/source-format "edn", :adr/authoritative_for ["cloud-itonami-isic-6311-chainexplorer -- the whole actor: explorer.facts (closed attribution catalog, identity fields, allegation kinds), explorer.chain (finality classification from the chain's own finalized tag, reorg classification, multi-endpoint corroboration), explorer.policy (ExplorerGovernor, 7 checks / 5 HARD), explorer.phase (labels and reorgs in no auto set), explorer.llm (sealed advisor + mock emitting the real failure modes), explorer.operation (langgraph StateGraph), explorer.rpc (read-only multi-endpoint transport, :rpc alias only)" "the rule that this workspace's chain explorer never links an address to a natural person and never labels by heuristic/vendor score/LLM inference -- structural (closed catalog + no-override gate), not a policy someone can relax"], :adr/related ["adr-2607262100-cloud-itonami-isic-6311-direct-venue-crypto-feeds" "adr-2607111500-cloud-itonami-isic-6311-market-data-actor" "kotoba-lang/org-ethereum-jsonrpc read-only whitelist (ADR-2607172600)" "cloud-itonami-isic-6611-cryptoexchange (role-suffix naming precedent)" "cloud-itonami-isic-6311-chainexplorer docs/adr/0001-architecture.md (child-repo record)"], :adr/supersedes [], :adr/superseded_by [], :adr/amends [], :adr/body "# ADR-2607262600: cloud-itonami-isic-6311-chainexplorer — read-only チェーンエクスプローラを、記述される側の人を守る hard gate 付きで新設する
+
+**Status**: accepted
+**Date**: 2026-07-26
+**Deciders**: Jun Kawasaki (オーナー指示「では設計実装」) + Claude
+**子リポ ADR**: `cloud-itonami-isic-6311-chainexplorer` の `docs/adr/0001-architecture.md`
+
+## Context
+
+ADR-2607262100（暗号資産価格の直接収集）を生んだ調査は、オーナーの3つの問いに
+答えた。「暗号資産の価格収集はあるか」「エクスプローラーはあるか」「株式・FX・
+コモディティは」——このうち **エクスプローラーだけは答えが「無い」だった**。
+この workspace にあったのは read-only な chain *ライブラリ*
+（`kotoba-lang/org-ethereum-jsonrpc` の whitelist 付き JSON-RPC クライアント、
+`org-bitcoin-p2p`、`treasury` の Etherscan 行検証）で、いずれも
+「エクスプローラー API を使う側」であり、運営する側は存在しなかった。
+
+素直な作り方は「ブロックを index して UI を出す」だが、**エクスプローラーが
+実際に害をなすのはそこではない**。可用性の話ではなく、記述される第三者の話である:
+
+1. **証拠なき帰属（attribution）。** エクスプローラーの商品価値の中心はラベル
+   ——「Binance のホットウォレット」「既知の詐欺師」「このクラスタは同一主体」。
+   その大半は clustering ヒューリスティクスか分析ベンダのスコアで、反論できない
+   当事者について大規模に公開され、読者には事実として扱われる。
+2. **匿名性の剥奪。** アドレスと実在人物の紐付けは、エクスプローラーができる
+   最も商業価値が高く、最も有害な行為である。
+3. **finality の演出。** 1 confirmation の tx に緑のチェックマークを付ける表示は、
+   長い損失リストの直接原因になってきた。
+4. **単一プロバイダの真実。** 1つの RPC プロバイダを読むエクスプローラーは、その
+   プロバイダのチェーン観を自社ブランドで再配信しているだけで、読者には判別できない。
+
+LLM をこのループに入れると 1 と 2 は改善せず悪化する。「このアドレスは誰のものか」
+と尋ねれば、確信に満ちた・もっともらしい・反証不能な答えが毎回返る。これは
+敵対的な入力ではなく**既定の挙動**である。
+
+## Decision
+
+fleet の actor パターン（ExplorerAdvisor-LLM ⊣ ExplorerGovernor、langgraph
+StateGraph、append-only 台帳）で実装し、**上記4つの失敗をドキュメントではなく
+HARD gate にする。**
+
+### 1. `:identity-gate` — 自然人への紐付けは恒久的に不可、承認経路も無い
+
+構造的検出（`explorer.facts/identity-fields`、`:subject-type :natural-person`、
+1階層のネストも対象）で HARD 違反として拒否し、**人的承認の経路そのものを持たない**
+——「承認が要る」でも「institutional tier のみ」でもない。store のスキーマにも
+人物・KYC・IP・device id を置く場所が無いので、仮に gate を迂回しても書き込み先が無い。
+
+企業/プロトコルへの帰属は通常どおりスコープ内。曖昧な中間は人物側として扱う。
+
+**本文テキストではなく構造で判定する**のは意図的で、散文中の氏名を見つける方式は
+「まさに重要な時に外す」ルールだから。
+
+### 2. `:attribution-gate` — 再検証可能な5クラスの閉じた集合のみ
+
+`explorer.facts/catalog` は **読者が独立に検証できる**クラスだけを許す
+（`:recheckable-by` を全エントリの必須フィールドにした）: on-chain 自己表明 /
+主体自身が公開したアドレスリスト / 制裁当局自身の 公表 / 検証済み
+コントラクトソース / on-chain レジストリの回答。`:ref` の非空も必須——クラスだけ
+あって座標が無い引用は再検証できず、クラスを絞った意味が消える。
+
+`excluded-classes` に**拒否するもの**（heuristic clustering、
+common-input-ownership、ベンダ risk score、SNS 報告、LLM 推論）を明示列挙し、
+テストで固定した。これらは公開エクスプローラーが実際に使っている手法そのもので、
+「うっかり漏れている」ではなく「意図して排除した」と読めるようにするため。
+
+### 3. `:finality-gate` — finality は事実に付随する属性であって、横のバッジではない
+
+`explorer.chain/finality-class` は `:pending` → `:probabilistic` → `:confirmed`
+→ `:final` を返し、**チェーン自身の `finalized` タグ**が取れる時はそれを権威とする。
+取れない時 `:final` には到達できない——深さヒューリスティクスが経済的 finality の
+代役を務めることは無い。`tx-view` は必ず finality を伴い、**finality を欠いた
+トランザクションを運べる形が存在しない**。governor はデータが支えるより強い
+finality 主張の開示を拒否する。
+
+### 4. `:corroboration-gate` — 独立ノード2つ以上、しかも多数決をしない
+
+`explorer.chain/corroboration` は N 個の**異なる**エンドポイントが同一ブロック
+ハッシュを報告し、**競合ハッシュが1つも無い**ことを要求する。2対1 の分裂で多数派
+ハッシュを採用しない——分裂は live reorg か誤ったノードのどちらかで、どちらも
+この actor が黙って投票するのでなく人間が見るべき事象だから。governor は
+呼び出し側が渡した `:ok?` を信用せず自分で再計算する。
+
+### 5. reorg は黙って書き換えない
+
+`apply-block` は reorg 時にチェーンを**変更せずに**返し、衝突を分類する。
+`:reorg/resolve` はどの phase でも auto 対象にならない——reorg は「既に開示した
+事実が今や偽かもしれない」という意味であり、その扱いは推論ではない。
+
+### 6. 疑義ラベルもラベル一般も必ず人間に届く
+
+否定的性格付け（`:sanctioned` `:scam` `:hack-proceeds` …）は、**完璧に出典が
+付いていても**どの phase・どの confidence でも必ず escalate する——制裁指定は実在の
+事実だが、それを当事者について大規模に公開することは依然として「判断」だから。
+より広く、`:label/assert` はどの phase の `:auto` にも入っていない: 他人のアドレスに
+名前を付ける行為を無人で行わない。
+
+### 7. read-only は上流で強制
+
+チェーンアクセスは全て `kotoba-lang/org-ethereum-jsonrpc` を通り、その
+`eth-method-whitelist` が read 以外を throw する。トランザクションの構築・署名・
+ブロードキャストは無く、鍵も扱わない。依存するのは `explorer.rpc` のみで、
+`:rpc` alias にだけ宣言したのでテスト経路はオフラインのまま
+（ADR-2607262100 の `marketdata.feed-eth` と同じ隔離）。
+
+## Consequences
+
+- (+) `clojure -M:dev:test` 51 tests / 193 assertions, 0 failures。
+  `clojure -M:lint` エラー0・警告0。
+- (+) **live 検証済み（2026-07-26）**: 独立した公開エンドポイント2つ
+  （publicnode / drpc）が block 25617339 のハッシュで一致 → commit、同じブロックを
+  1エンドポイントだけ → corroboration-gate で hold。実 finalized head 25617272 と
+  head 25617344 をそれぞれ `:final` / `:probabilistic` に分類。
+- (+) オフラインデモが全 disposition に到達し、うち3つの HARD hold は mock advisor が
+  confidence 0.92〜0.93 で出した提案に対して発火する——hard gate が confidence を
+  一切参照しないことの証明になっている。
+- (−) **商用エクスプローラーが売っているラベルこそ、これが作らないと決めたもの。**
+  heuristic clustering とベンダ risk score は Etherscan 系プロダクトの体感価値の
+  大半である。その事業をやりたい operator は、このブループリントからは
+  「クラスを追加する」以外の方法で手に入れられない——そしてその変更は
+  可視かつテストで落ちる形にしてある。
+- (−) Ethereum のみ、かつ operator が index したヘッダ連鎖と tx のみ。
+  log/event インデックス・トークン転送ビュー・アドレス履歴ページングは未実装
+  （いずれも `explorer.chain` の上に作れるが、作っていない）。
+- (+) **公開 Web UI を実装・deploy 済み**（2026-07-26、子リポ ADR-0002。上記の「まだ無い」を
+  解消）: https://cloud-itonami.github.io/cloud-itonami-isic-6311-chainexplorer/ 。
+  **バックエンド無し** — 読み手のブラウザが読み手自身のエンドポイントを読み、
+  `explorer.chain`（governor と同じ名前空間を生成器がページ横にコピーする）が裏取りと
+  finality をクライアント側で計算する。`verify_page.cljs` が「配信コピーが src と
+  byte-identical であること」を検証する——乖離した瞬間にページの中心的主張が静かに
+  偽になるから。gate がそのまま UI: finalized タグが無ければ赤字で `:final` 到達不能と
+  表示、quorum 未満・ノード不一致では**ハッシュを一切描画しない**、単一エンドポイントは
+  読み取り自体を拒否。design-quality audit 100.00 / verify_page 14 checks / 実ブラウザ
+  live 検証（head 25617524 vs finalized 25617432 → probabilistic / final、2ノード一致で
+  corroborated、1ノードでは拒否だけを描画）。UI は DADS（kotoba-uiux からの明示的
+  opt-out、ADR-2607141915。理由は兄弟の operator console と fleet カタログに揃えるため）。
+- (+) その live ブラウザ検証が**実バグを1件検出**した: 拒否時に直前の成功した
+  corroboration が画面に残り、拒否が「裏取り済み＋警告」に読めていた——このページが
+  防ぐべき誤読そのもの。全アクションで先に出力をクリアするよう修正し、harness の2
+  チェックで再発を固定した。
+- (−) corroboration はブロックハッシュ単位。同一上流プロバイダにぶら下がる2つの
+  エンドポイントは「独立でないのに一致」してしまう。エンドポイントの独立性は
+  この actor には検証不能で、operator の責任として明記した。
+
+## 着地
+
+- 新規リポジトリ `cloud-itonami/cloud-itonami-isic-6311-chainexplorer`（public、
+  AGPL-3.0-or-later、初回コミット `f56cc74b23c3df656970934aef214e07e719e168`）。
+  ISIC 6311 の role-suffix サテライトという命名は
+  `cloud-itonami-isic-6611-cryptoexchange` / `-6910-legalsupport` の先例に従う。
+- superproject: 本 ADR + `manifest/repos.edn` の `:extra-projects` 追加
+  + `manifest/west.yml` への1エントリ登録（いずれも GitHub API single-entry、
+  diff はそれぞれ 1 行 / +5 行）。
+", :adr/decision-summary "{:pattern \"a read-only chain explorer actor whose HARD gates are about the third parties it describes, not about its own uptime: no natural-person attribution (no approval path at all), re-checkable attribution classes only, finality that travels with every fact, and multi-endpoint corroboration with no majority voting\" :gates-hard \"identity-gate (no override path), attribution-gate (closed 5-class catalog, each with a required :recheckable-by, plus non-blank :ref), finality-gate (claim may not exceed actual; :final unreachable without the chain's own finalized tag), corroboration-gate (>=2 distinct endpoints, zero competing hashes, recomputed by the governor), licensed-disclosure (contracted tier; labels+citations are pro-tier, raw is institutional)\" :gates-soft \"allegations (sanctioned/scam/hack-proceeds/...) always reach a human at any phase and confidence even when perfectly sourced; :label/assert is in no phase's auto set; :reorg/resolve never auto-applies\" :excluded-by-construction \"heuristic clustering, common-input-ownership, chain-analytics/vendor risk scores, social reports, LLM inference — no catalog class exists for any of them, which is how most public explorers actually label addresses\" :no-silent-rewrite \"apply-block returns the chain UNCHANGED on a reorg and classifies the conflict; an index operation can never overwrite a height already published\" :read-only \"all chain access goes through kotoba-lang/org-ethereum-jsonrpc's eth-method-whitelist (enforced in code); explorer.rpc is the only dependent and lives in the :rpc alias only, so the test suite stays offline and CI needs no third checkout\" :verification \"51 tests / 193 assertions 0 failures; lint 0/0; offline demo reaches every disposition with 3 HARD holds firing at 0.92-0.93 advisor confidence; live 2026-07-26 two independent public endpoints agreed on block 25617339 -> commit, same block single-endpoint -> hold, finalized head 25617272 vs head 25617344 classified :final / :probabilistic\" :not-done \"Ethereum only; header linkage + txs only (no log/event index, no token-transfer view, no address-history pagination); public web page shipped 2026-07-26 (ADR-0002: no backend, the governor's own chain code client-side, verified live); no address/label browsing surface; endpoint independence is an operator responsibility this actor cannot verify\" :landing \"new public repo cloud-itonami/cloud-itonami-isic-6311-chainexplorer at f56cc74b23c3df656970934aef214e07e719e168; superproject repos.edn :extra-projects + west.yml single-entry registration via GitHub API (1-line / +5-line diffs)\"}"}]

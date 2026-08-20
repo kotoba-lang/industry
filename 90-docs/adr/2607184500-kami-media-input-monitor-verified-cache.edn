@@ -1,0 +1,46 @@
+[{:db/id -1
+  :adr/id "adr-2607184500-kami-media-input-monitor-verified-cache"
+  :adr/title "KAMI media applications add safe input monitoring and verified media cache"
+  :adr/date "2026-07-18"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/topic "kotoba-lang-media-authoring"
+  :adr/supersedes ["adr-2607184400-kami-media-comp-recording-pointer-trim"]
+  :adr/decision
+  {:daw {:input-monitor-default :off
+         :activation :explicit-headphone-control
+         :gain-range [0 1]
+         :graph :dedicated-media-stream-source-gain-analyser-destination
+         :meter :dbfs
+         :teardown [:take-end :cancel :error :toggle-off :page-unload]
+         :stream-owner :recorder}
+   :nle {:cache-database "kami-app-nle-media"
+         :cache-version 1
+         :cache-store "media-v1"
+         :cache-key :sha-256
+         :restore-verification :full-blob-sha-256
+         :corrupt-hit :delete-and-report-missing
+         :rebuild [:blob-object-url :decode-source]
+         :user-clear true
+         :clear-current-runtime-media false}
+   :maturity {:kami-app-daw :逍遥 :kami-app-nle :逍遥}
+   :remaining-commercial-gates {:shared ["streaming package I/O above 512 MiB" "search paths" "duplicate-content policy"]
+                                :daw ["clip drag handles" "plugin hosting" "LUFS/true-peak" "bus automation"]
+                                :nle ["proxy generation" "color management" "multitrack audio lanes/EQ" "additional containers"]}}
+  :adr/implementation
+  {:daw-commits ["db0dccd"]
+   :nle-commits ["6915c9b"]
+   :pull-requests ["kotoba-lang/kami-app-daw#3" "kotoba-lang/kami-app-nle#3"]
+   :evidence ["DAW passes 12 tests and 46 assertions, including monitor gain clamping."
+              "NLE passes 13 tests and 47 assertions, including cache request selection and project/hash hit acceptance."
+              "Both guarded shadow-cljs production releases completed with zero compiler warnings."
+              "DAW Chrome activated a dedicated monitor graph during a fake-microphone take at gain 0.2, updated its input meter and removed the active state after take completion without console errors."
+              "NLE Chrome cached a real MP4, reloaded, verified and restored it with a Blob object URL, then detected and deleted a tampered cached blob without console errors."
+              "NLE Chrome also cleared persistent cache through the user control while preserving the currently decoded runtime media."
+              "Both application pull requests were reviewed and squash-merged; both GitHub Pages workflows completed tests, release compilation and deployment successfully."]}
+  :adr/consequences
+  ["Performers can hear an explicitly armed recording input with bounded gain and visible level while playback and monitoring retain separate lifecycle ownership."
+   "Monitoring never survives beyond the recorder stream lifecycle or page lifetime, reducing feedback and resource-leak risk."
+   "Previously verified NLE media can recover automatically after reload without a manual file picker or package import."
+   "IndexedDB is treated as an untrusted cache: every hit is rehashed, corrupt bytes are removed, and users retain explicit storage control."]
+  :adr/source-format "edn"}]

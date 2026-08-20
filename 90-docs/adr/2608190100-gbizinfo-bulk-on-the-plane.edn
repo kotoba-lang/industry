@@ -1,0 +1,154 @@
+[{:db/id -1
+  :adr/id "ADR-2608190100"
+  :adr/title "gBizINFO を面に載せた —— トークンは既に共有されていて、記録が無かった"
+  :adr/status "accepted"
+  :adr/date "2026-08-19"
+  :adr/last_verified "2026-08-19"
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/related ["ADR-2608181000" "ADR-2608180800" "ADR-2608182000" "ADR-2607252000"]
+  :adr/authoritative_for ["gBizINFO の ingest 経路" "gBizINFO projection の tier" "gBizINFO トークンの保管場所"]
+  :adr/body "# ADR-2608190100: gBizINFO を面に載せた —— トークンは既に共有されていて、記録が無かった
+
+**Status**: accepted
+**Date**: 2026-08-19
+**Deciders**: Jun Kawasaki（「do it, 以前 gbizinfo token は共有、保存したような」）
+
+## Context
+
+前日の調査（ADR-2608182000 の親スレッド）で、gBizINFO は「API も bulk も
+トークン必須、そのトークンは既知の名前では見つからない」で止まっていた。
+
+オーナーの記憶が正しかった。**トークンは過去セッションで共有されており、
+過去の transcript に残っていた。** どこにも「保管した」記録が無かっただけで、
+`secrets-location-map` にも gBizINFO の項が無かった。
+
+**値を共有した時点で場所を書いていれば、1 セッション分の探索は要らなかった。**
+索引がある理由そのものなので、今回それを書いた。
+
+## Decision
+
+### 1. トークンを 2 箇所に保管し、場所を索引に書いた
+
+macOS Keychain の `gbizinfo-api-token`（既存の collector 2 本が既定で見る場所）と
+kagi の `GBIZ_TOKEN`。**環境変数名が 2 つある**（`GBIZINFO_TOKEN` と `GBIZ_TOKEN`）
+ことも書いた —— 新しい collector は Keychain を既定にし、env は override にする。
+
+### 2. lookup ではなく bulk を ingest 経路にした
+
+面には法人番号が **9,142 件**あり、既存の `gbizinfo_refresh.cljs` は 7 aspect を
+1 社ずつ引く —— **63,924 リクエスト**。データダウンロードは同じ authority を
+**5 ファイル・約 30 秒**で出す（1,033,446 行）。ADR-2608181000 が国税庁について
+引いた線と同じ: **lookup は「この 1 社について今どうなっているか」、bulk は
+「面に載せる」。どちらも他方を置き換えない。**
+
+実装は `kotoba-lang/property`（`caec071`）:
+`src/kotoba/property/gbizinfo_zenken.cljc`（行の意味）と
+`scripts/collect_gbizinfo_zenken.cljs`（I/O）。既存の `_zenken` 2 本と同じ分割。
+
+### 3. tier を分けた —— 99.5% は自治体だった
+
+面の 9,142 番号に一致したのは 125,820 行。そのうち **125,144 行 (99.5%) は
+国税庁 government tier の団体**（交付金を受ける自治体）で、追っている会社の行は
+**676** しかなかった。全部列挙すると 45 MB になり、面は**クエリのたびに**
+DataScript へ load する。
+
+- `gbizinfo-zenken-joined.datoms.edn` — 676 行（0.29 MB）
+- `gbizinfo-zenken-government-summary.datoms.edn` — 2,358 団体の集計（0.60 MB）
+
+**行は捨てていない。** corpus に在り、`--summarise` を外せば列挙できる。
+
+### 4. 既存の API 経路を上書きしなかった
+
+`jp-go-gbiz-info` の `gbizinfo-joined.datoms.edn` は別セッションが API 経路で
+作ったもので、**特許 319 件・職場情報・資本金・従業員数・業種コード**という
+bulk に無いものを持っている。危うく同じファイル名で上書きするところだった
+（worktree を切った時点の checkout が古く、main は既に進んでいた）。
+
+語彙も既存に合わせた: 金額を持つ 2 aspect が `:grant/*`、届出認定は
+`:certification/*`（API 経路が既にその名前で書いている）、会社自身の属性は
+`:company/*`。**同じ authority の同じ事実を 2 つの語彙で持つと、片方だけが直る
+mirror になる。**
+
+## Verification
+
+- 全件 5 ファイルの実測: 補助金 545,877 / 調達 308,661 / 届出認定 132,500 /
+  財務 29,697 / 表彰 16,711 行。
+- 面の count: `gbizinfo` **3,413 entity**（サンプル 28 から）。
+- **join が実際に通ることを 1 クエリで示した** —— mk1 prospect pool（1,014 社）×
+  gBizINFO の届出認定を法人番号で結合して **299 組**:
+  `株式会社タカハシテクノ / 経営力向上計画認定`、`（株）山東電気 / 競争参加資格`、
+  `（有）椿工業 / 事業継続力強化計画認定` …
+- 単体 6 tests / 32 assertions。
+
+### 測って直した 2 つのバグ
+
+1. **`\\\\A` / `\\\\z` は Java 専用。** JavaScript の RegExp ではただの文字 `A`/`z` に
+   なるので、`#\"\\\\A[0-9]{13}\\\\z\"` は nbb で何にも一致しない。**JVM の test は
+   通ったまま**、9,141 件の番号ファイルが `no 13-digit numbers` で拒否された。
+   両 host で落ちる test を足した。
+2. **失敗が 200 で返る。** トークン無しの POST は 200 と HTML を返す。status code
+   を成功判定に使わず、Content-Disposition と ZIP magic を見て exit 3 で止まる。
+
+## Consequences
+
+- 補助金・調達・届出認定・財務・表彰は**面に載った**。ADR-2608181000 が
+  「このワークスペースのどこにも無い」と書いた 4 つが埋まった。
+- **定期実行はまだ無い。** 全件は月次更新なので、kouhou のような launchd 配線が
+  次の一手。今回は 1 パスを手で回しただけ。
+- **特許・職場情報は API 経路のまま。** bulk にも `Tokkyojoho` / `Shokubajoho` が
+  あるので、次のパスで足せば API の 63,924 リクエストがさらに減る。
+- corpus（103 万行）は git に無い。`~/.cache/gbizinfo` に落ちて、既定では
+  ZIP も CSV も run の最後に消える（`--keep-zip` で残る）。**kotobase / annex に
+  預けていない** —— kouhou の raw feed と同じ扱いにするかは未決。
+
+
+## 追記（2026-08-19）: 日次配線、corpus の custody、R2 の答え
+
+### 日次にした（`com.gftd.gbizinfo-ingest`、07:17）
+
+全件の更新は月次だが、**publish 日を事前に知る方法が無い** —— 配布ファイル名
+（`Hojokinjoho_UTF-8_20260819.zip`）は**ダウンロードした日**であって publish 日では
+ない。だから毎日引いて、**content の sha256 が前回と同じなら publish 変化なしと
+言う**。約 28 MB/日 のダウンロードは払う —— 払わないと「いつ変わったか」を
+後から言えない。
+
+07:17 は kouhou (06:41) / newsfeed (05:23) / fleet-ci-sweep (04:17) からずらした。
+
+### corpus を kotobase と b2 に預けた
+
+`jp-go-gbiz-info` を annex 化し、`raw/**` だけを annex に送る（`.gitattributes`、
+SHA256E）。projection は git の blob のまま —— diff で読めることに意味がある。
+
+初回 run の実測:
+
+```
+publish: 前回と同じ内容 (5 ファイルの sha256)
+custody (VERIFIED by exit code): kotobase=5/5, b2=5/5
+push main ok / push git-annex ok
+```
+
+**custody は location log ではなく exit code で数える**（ADR-2608131100）。
+`raw/` は working tree 上 0 バイト（symlink）で、実体は 2 つの off-machine remote に在る。
+
+### R2 は wrangler からは取れない（実測 2026-08-19）
+
+- `wrangler login --scopes-list` の**全 scope に `r2` が無い**。`account:read` で
+  bucket 一覧は見えるが、S3 互換の鍵は出せない。
+- `POST /accounts/{id}/r2/temp-access-credentials` を wrangler の OAuth token で
+  叩くと **401 (10002 Unauthorized)**。
+
+**したがって R2 直の annex remote はオーナー作業**（ダッシュボード → R2 → API
+トークン発行）。ただし **s3.kotobase.net の blob backend は R2**（`STATE_BUCKET` の
+`objects/` prefix、ADR-2608100100）なので、**kotobase remote に預けた時点で
+中身は R2 に載っている**。R2 直が要るのは、kotobase の per-bucket head CAS を
+迂回して bulk 転送を速くしたいときだけ。
+
+### ⚠ 別セッションの API runner が日曜に起きる
+
+`com.gftd.gbizinfo-refresh`（週次・日曜 09:00）は token 待ちで **exit 3** を出し
+続けていた。token を Keychain に置いたので**次の日曜から本当に走る** —— 9,142 社 ×
+7 aspect = **63,924 リクエスト**、そして削除された `gbizinfo-joined.datoms.edn`
+（26,116 行）を作り直す。bulk と同じ token を使うので、throttle されれば
+こちらも止まる。**意図的にそう設計されたものなので触っていない。**"}]

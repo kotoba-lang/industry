@@ -1,0 +1,75 @@
+[{:db/id -1
+  :adr/id "ADR-2608145800"
+  :adr/title "protocol 残成熟度ループ。ゴールは 8 面が ready か named-block"
+  :adr/status "accepted"
+  :adr/date "2026-08-14"
+  :adr/last_verified "2026-08-16"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "protocol-remaining-maturity-loop"
+  :adr/repos ["orgs/kotoba-lang/kotoba-protocol" "orgs/kotoba-lang/io-libp2p-specs-kad-dht"]
+  :adr/related ["90-docs/adr/2608145700-protocol-route-lookup-live.edn"
+                "90-docs/adr/2608145200-protocol-planes-two-link-kinds.edn"]
+  :adr/authoritative_for
+  ["kotoba.protocol.layers/plane-maturity が残成熟度の観測表"
+   "ゴール: 8 面すべて :algebra/:live が :ready か :n/a/:blocked（理由つき）"
+   "live HTTP は routing v1 が書く op だけ。kad 所有の signer も DHT node もこの process では作らない"
+   "tick 1 = naming lookup-live / publish-live（GET/PUT /ipns/{k51}）"
+   "tick 2 = govern fail-closed overlay。拒否は action log に届かない"
+   "tick 3 = transport 代数（sockets 無し）。live は :blocked-until :dht-node-transport"
+   "tick 4 = session 代数。docs は mux-and-head.md。session.md は作らない"
+   "stop: 8 面は ready か named-block。この loop は再武装しない"]
+  :source/dataset "adr"
+  :adr/body
+  "8 面の docs は揃っている。欠けていたのは「壊したら赤くなる代数」と「spec が書く HTTP 継ぎ目」。点数を足す仕事ではない。影を直接動かさない（ADR-2608080000 と同型）。
+
+## ゴール（stop）— 到達
+
+`layers/plane-maturity` が 8 面すべてについて次のどちらか:
+
+1. `:algebra :ready`（不変条件を壊すとテストが赤）かつ `:live` が `:ready` か `:n/a`
+2. `:live :blocked` で `:blocked-until` が名前付き。この process で偽造しない
+
+WIP=1。1 tick = 1 面の 1 軸（algebra か live）。live を上げてよいのは routing v1 が文書化している op だけ。
+
+transport / session の live をこの process で `:ready` にしない。それは DHT node になることであり、ゴールの外。
+
+## 観測表（tick 4 後 = stop）
+
+| 面 | algebra | live | 備考 |
+|---|---|---|---|
+| identity | ready | n/a | `ref` |
+| naming | ready | ready | tick 1。`naming/lookup-live` `publish-live`。`1a7ed667` |
+| routing | ready | ready | `route/lookup-live` |
+| discovery | ready | ready | `discover/lookup-live` `advertise-live` |
+| content-protocol | ready | n/a | `graph` 代数 |
+| authorization | ready | n/a | tick 2。`govern/write-overlay`。`ca72b830` |
+| transport | ready | blocked | tick 3。`transport/hop` `dial-live`。`6d3af5ab`。`:dht-node-transport` |
+| session | ready | blocked | tick 4。`mux/coords` `at-head?` `open-live`。`47471130`。`:transport` |
+
+## tick 1
+
+指定済みで未接続だったのは `GET`/`PUT /routing/v1/ipns/{k51}`。kad は `resolve`/`publish` を既に持つ。protocol は kad を require しない。finder が別の k51 を返すと `:name-mismatch`。
+
+## tick 2
+
+`kotoba.protocol.govern/write-overlay`。既定 `decide` は署名を検証しない（crypto は cacao）。自 graph の depth-1 自己 mint は allow。他人の chain は `:foreign-chain`。host 文字列は `:not-a-key`。`governor-fn` nil は deny（allow にしない）。拒否した intent の action log は増えない。親 CID も動かない。
+
+## tick 3
+
+`kotoba.protocol.transport`。hop は multiaddr + capability。`:identity?` は常に false。`ipfs://` / `ipns://` / `https://` を addr にすると `:not-a-multiaddr`。`attach` が CID / peer を書き換えると mismatch。`gateway` は location 投影で CID は動かない。`dial-live` は常に `:not-a-dht-node`。sockets は開かない。この process を DHT node と名乗らない。
+
+## tick 4
+
+`kotoba.protocol.mux`。mux と head は別座標。生きている stream は stale head を current にしない。dialer の stream-id は奇数、0 は予約。`place-call` は identity が先。`open-live` は常に `:not-a-dht-node`。docs は `mux-and-head.md`。`session.md` は作らない。
+
+## 置かないもの
+
+kad 所有の provide signer。この process を DHT node と名乗ること。UnixFS path を identity に戻すこと。`:algebra :ready` を README の長さで買うこと。transport の sockets。`session.md` / `authorization.md`（docs は `mux-and-head.md` / `who-may-write.md`）。IPNI origin 面は ADR-2608160300。この loop は stop 済みで再武装しない。
+
+## 改訂履歴
+
+2026-08-14: accepted。tick 1 landed `kotoba-protocol@1a7ed667`。
+2026-08-14: tick 2 landed `kotoba-protocol@ca72b830`。次は transport 代数（sockets 無し）。
+2026-08-14: tick 3 landed `kotoba-protocol@6d3af5ab`。次は session 代数（`mux-and-head.md`）。
+2026-08-14: tick 4 landed `kotoba-protocol@47471130`。stop。この loop は再武装しない。
+2026-08-16: 「IPNI 専用 repo」禁止を ADR-2608160300 が supersede。本 loop の stop と DHT node 禁止は維持。"}]

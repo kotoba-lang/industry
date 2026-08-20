@@ -1,0 +1,265 @@
+[{:db/id -1
+  :adr/id "adr-2607299900-kotobase-head-conditional-write-plane"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/topic "kotobase-head-plane"
+  :adr/title "ADR-2607299900: kotobase の head plane に本物の条件付き書き込みを入れる — B2 read-back から D1 CAS へ、および「成功と言った書き込みが消える」不変条件の計測"
+  :adr/status "accepted"
+  :adr/date "2026-07-29"
+  :adr/last-verified "2026-07-29"
+  :adr/last_verified "2026-07-29"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative-for
+  ["kotobase-cf-wasm の head plane（backend.kotobase.net）が B2 単独から D1 条件付き書き込みへ移行する決定と、その3モード（off / shadow / authoritative）の意味の正本"
+   "「serving read のフロアは head GET である」という測定と、その根拠（response cache が chain-cid keyed であること）"
+   "head record の受理条件に :name == graph を加える決定"
+   "CAS retry backoff に full jitter を要求する根拠（instant CAS が herd を作るという実測）"
+   "write-contention probe の corruption 判定を『acknowledged == final』に強める決定"]
+  :adr/related
+  ["adr-2607142200-strong-transactions-native-ipld-federation"
+   "adr-2606231200-pod-less-datascript-cf-worker-kotobase"
+   "adr-2607250100-kotobase-maturity-bar-vs-production-databases"
+   "adr-2607201600-kotobase-merkle-lsm-istore-retirement"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/artifacts
+  "{:repo \"net-kotobase (network-awai/net-kotobase)\", :merges [\"167be1cf\" \"65414e8f\"], :branch \"agent/head-d1-cas\", :files [\"kotobase-cf-wasm/src/kotobase_cf_wasm/head.cljs\" \"kotobase-cf-wasm/src/kotobase_cf_wasm/xrpc.cljs\" \"kotobase-cf-wasm/slo/resilience_probe.cljs\" \"kotobase-cf-wasm/migrations/0001_kotobase_heads.sql\"], :receipt \"kotobase-cf-wasm/slo/receipts/2026-07-29-head-d1-cas.edn\", :d1 {:testnet \"kotobase-heads-testnet 7f4d4031-eb47-4375-878c-080721ae8b8a\", :production \"kotobase-heads-production 7eae8695-0270-462f-8219-e0bf706ed63b\"}}"
+  :adr/body
+  "# Context
+
+オーナー指示（2026-07-29）: 前段の分析（ref/head の置き場所がボトルネックで、データ構造ではない）を受けて「では改善してみて」。
+
+## 出発点の実測（この日、live）
+
+- `slo/probe.cljs` の testnet read: **p50 176ms / p95 2986ms**（p95 は SLO 2500ms を超過）。
+- 原因はコードで確定できる: `xrpc.cljs` の response cache は **chain-cid をキーにしている**ので、head を読むまで cache を引けない。`store.cljs` は「head だけは意図的にキャッシュしない（唯一変わるもの）」と書いており、つまり**全ての read が必ず B2 への head GET を1回払う**。これが serving のフロアであって、merkle 構造でも block 取得でもない。
+- write path は B2 へ 4 直列 RTT（head GET → block PUT → head PUT → read-back GET）。
+- B2 は native / S3 互換のどちらにも条件付き書き込みが無い（`head.cljs` の docstring が公式ドキュメント確認済みとして記録）。だから CAS の代わりに「無条件 PUT して即 read-back」で race を*検出*している。
+
+## R2 ではなく D1 を選んだ理由
+
+R2 は `onlyIf.etagMatches` を持ち最有力だったが、**この環境の Cloudflare OAuth トークンに `r2` scope が無い**（`workers` / `workers_kv` / `d1` 等はある）。R2 バケットを作る権限が無いので、実行可能な選択肢は D1（`UPDATE ... WHERE sequence = ?` の `meta.changes`）だった。これは能力の優劣ではなく**今この鍵でできること**による選択で、R2 scope が付いたら再評価に値する。
+
+# Decision
+
+`kotobase-cf-wasm.head` に**任意有効化の D1 plane**を入れる。`KOTOBASE_HEAD_DB` binding と `KOTOBASE_HEAD_D1` var の**両方**が揃ったときだけ有効（var 単独では絶対に有効化されない）。
+
+- **off**（既定 / binding 無し）— 従来どおりの B2 read-back。
+- **shadow** — B2 が read も write も authoritative のまま、成功した write と**serve した read の両方**から D1 に mirror/seed する。観測可能な振る舞いは変わらない。
+- **authoritative** — D1 が read に答え、write を真の CAS で裁定する。B2 は won CAS の後に**待ち合わせて**書かれ、durable record であり続ける（recovery / portability / Worker 以外の読み手）。D1 に無い graph は B2 から読んで seed する。
+
+**ADR-2607142200 の制約を維持している**: 正しさは B2 単独で成立し（off が既定、全 D1 経路は B2 に fallback、D1 障害時は B2 scheme に degrade して write を拒否しない）、acknowledged write は B2 に durable になるまで ack しない。
+
+## 併せて変えた2点（どちらも測定が見つけたもの）
+
+1. **CAS retry backoff に full jitter を入れた**（`(min 800 (* 50 attempt))` → `(rand-int (min 400 (* 25 2^attempt)))`、attempts 5→8）。決定論的 backoff は B2 scheme が遅かったからこそ生き延びていた（1.7s の RTT ゆらぎが writer を勝手に脱同期させていた）。CAS が即答になった瞬間、敗者全員が同じミリ秒に起きて群れで再突入し、**1 retry round につき勝者ちょうど1人**になった（25 writer 中 6 = attempt 数と一致）。
+2. **head record の受理条件に `:name == graph` を加えた**。署名は record 自身のフィールドを覆うので、**別 graph 用に署名された record は完全に valid**で、キーを間違えて（あるいは意図的に）置かれれば その graph の head として受理されていた。拒否は `console.error` で loud にする（graph が黙って空に見えるのは、record が verify しなくなったことを知る最悪の方法）。
+
+# 測定（すべて live、receipt: `kotobase-cf-wasm/slo/receipts/2026-07-29-head-d1-cas.edn`）
+
+| | before | after |
+|---|---|---|
+| testnet read p50 | 176ms | **45ms** |
+| testnet read p95 | 2986ms（SLO 違反） | **258ms**（pass） |
+| sustained load p50 / p95 | 195 / 1695ms | **120 / 832ms** |
+| 25-writer contention | ok 22 / 409 3 / **final 7** | ok 12 / 409 13 / **final 13** |
+
+## contention の行が本題
+
+before は `ok 22` だが最終 graph の datom は 7（seed + 6）。**16 件は 200 を返しておきながら結果の graph に存在しない。** これは `head.cljs` の docstring が「起こりうる」と正直に書いていた read-back race window が実際に起きていたということであり、probe の corruption 判定が `(>= final-datoms 1)` という**不変条件になっていない式**だったので合格していた。
+
+after は 3 回とも `final == ok + 1` が厳密に成立（0 件消失）。**200 が減ったことが修正であって、劣化ではない** — 嘘の ack が 409（retry 可能）に変わった。durable な throughput 自体も 6 → 10〜12 に増えている。
+
+probe の判定は `:all-acknowledged-writes-present (= final-datoms (inc oks))` に強めた。ADR-2607142200 の invariant「成功した transaction は完全に見えるか完全に見えないか」を実際に検査する式であり、**2026-07-25 の receipt はこれで落ちる**。
+
+## D1 primitive の実地確認
+
+mock を信じずに実 D1 に対して直接確認してから deploy した: `INSERT ... ON CONFLICT DO NOTHING`（行あり→changes 0）/ `UPDATE ... WHERE sequence` 不一致→0・一致→1 / `DO UPDATE ... WHERE excluded.sequence >` 逆行→0。
+
+# 現在地（2026-07-29）
+
+- **testnet**: authoritative で稼働。legacy graph（B2 sequence 9）の seed も live で確認済み。
+- **production（backend.kotobase.net）**: **shadow で稼働**。authoritative への flip は**証拠待ちでブロック中**。
+
+理由を明確にしておく: **保存済みの production head record が今も verify を通るかは、Worker の外からは確認できない**（record は公開されておらず、production edge は本物の tenant 認証を要求し、4 分の `wrangler tail` では traffic が捕まらなかった）。`:name == graph` の追加は B2 経路にも効くので、B2 に留まっても de-risk されない。そこで shadow に**read でも seed する**性質を持たせた: `kotobase_heads` テーブルが「live traffic が触れて、かつ record が verify を通った graph」の一覧になる。**flip の条件はこのテーブルが実 graph を並べること。** 現時点で 0 行（deploy 後に production の head read がまだ無い）。
+
+# Consequences
+
+- serving の read フロアが cross-cloud GET から Cloudflare 内 D1 read に置き換わり、p50 が 3.9x / p95 が 11.6x 改善した（testnet 実測）。
+- write の race window が構造的に消え、ack が真実になった。失われる write が 409 として可視化される。
+- D1 が増えたが**依存にはなっていない**（off 既定 + 全経路 fallback）。B2 は durable record のまま。
+- 環境ごとに独立した D1 を持つ（own bucket / own seed の隔離方針に合わせた）。
+
+# 追補（2026-07-29、同日の後続作業）
+
+前節の残件 1〜3 に着手した。2 件は着地し、1 件は**作って計測して外した**。
+receipt: `kotobase-cf-wasm/slo/receipts/2026-07-29-head-followups.edn`。
+
+## 1. signer pin — 実装済み（testnet enforce / production warn）
+
+`ipns/verify-head` は **record 自身が持つ公開鍵**に対して署名を検証するので、storage に
+書ける者が自分の鍵で署名した head は完全に verify を通っていた。head.cljs の
+「integrity は署名から来る、B2 の access control を信頼していない」は**改竄には正しく
+差し替えには成り立っていなかった**。
+
+`KOTOBASE_HEAD_SIGNER` = `off | warn（既定）| enforce` を追加し、record の signer を
+**この deployment 自身の seed が生む did:key** と比較する。**enforce は operator 鍵を
+導出できないとき warn に降格する** — seed が無いことが「graph が空に見える」理由に
+なっては絶対にいけない。testnet は enforce（その環境の record は全てその環境の seed で
+署名されている、既存 graph の解決を live 確認済み）。production は warn のまま。
+
+## 2. write path の内訳 — 計測して確定（そして自分の推論を2回否定した）
+
+`KOTOBASE_TIMING=1` で phase ごとの wall time を出す。testnet 実測（1 write あたり）:
+
+| phase | ms |
+|---|---|
+| head-read（D1） | 15–16 |
+| engine | **0** |
+| flush（3 block → B2） | 709–1381 |
+| head-write（B2 mirror） | 307–867 |
+
+**write の ~95% は B2 への 2 往復**で、engine は 0。head-read が 15ms なのは本 ADR の
+D1 化の効果（以前は ~400ms の serving floor）。
+
+同じセッション中に私はこの結論を**逆に**述べた: 12 write の上昇列（1076→5928ms）を
+見て「往復ではなく成長が支配的」と書いた。実際はそれは **auto-fold の spike + 分散**で
+あって成長ではなく（`novelty_size` は auto-fold で **reset する**）、その裏にあると疑った
+O(chain) walk は **O(1) のカウンタ**だった（`kotobase-peer.core/novelty-size` は維持された
+`novelty-count` を読む）。**推論2回に対し、計測1リクエストで決着した。**
+
+したがって「mirror を waitUntil に逃がす」案は**採らない**: 節約は全体の ~25% で、
+引き換えに「ack した write は recovery 面に durable」を失う。効くのは往復の**回数**を
+減らすこと、つまりバッチングであり、それが次項。
+
+## 3. バッチング — 実装し、計測し、**外した**
+
+設計: graph ごとの queue、N 件を**1 回の hydration** に対して順に適用し、1 回の head CAS で
+publish。store.cljs の `head-get`/`head-put!` を chain buffer にすることで成立する
+（`do-transact` が head-put! を「呼び出し側が使うバッファ」と元々規定している）。
+
+**動いた**: commit は正しく連鎖し（各 `previous_commit` が直前の commit）、各 caller は
+自分の結果を受け取った。
+
+**外した理由（2026-07-30 に実測して確定。当初の説明は誤りだった）**: 当初この ADR と commit 34843f7 は「runner が subrequest / CPU / wall 予算を使い切った」と書き、翌朝 RangeError を見て「無限再帰」と書いた。**どちらも誤り**——前者は失敗リクエストの cpuTime が 3ms で engine phase は 0ms、かつこの account は Workers Paid（subrequest 上限 1000）。後者の RangeError は翌朝の error-labelling 変更で自分が入れた別バグ（parse-json の自己呼び出し、b4e078f → 77c2d4d で修正）で、batch 失敗より 1 日後のもの。\n\n実測した答えはもっと単純だった: **isolate-local な queue はほとんど batch しない。** `KOTOBASE_WRITE_BATCH_MAX=4` と意図的な 50ms gather window を付けて 1 graph に 8 並行 write を投げたところ、publish された batch は **size 1 と 2 だけ**（26 batch 観測、single colo）。Cloudflare は並行リクエストを colo 内の多数の isolate に散らすので、queue で出会うはずの writer がそもそも同じ isolate に来ない。**天井があるのではなく、機構がほぼ no-op**。最良でも約 2 倍、しかも稀——queue と cross-request の解決経路を抱える代償に見合わない。receipt: `slo/receipts/2026-07-30-batch-diagnosis.edn`。\n\n**正しい置き場所は Durable Object** — ただし理由は「予算」ではなく、**1 graph の writer 全員が出会える場所がそこしか無い**（`idFromName` で graph 単位に addressable）から。なお DO は cross-request の制約を自動で解決しない（ある DO request が別の DO request が開始した I/O を await する形は isolate と同じ制約に当たる）ので、現実的な設計は alarm handler から publish して caller は poll / socket で受け取る形になる。**「queue を DO に移すだけ」ではない。**
+ADR-2607142200 は「CF 固有機構を *required* にしない」限りこれを許す — D1 head plane と
+同じ optional 形にすればよい。別変更・別検証とする。**batch-max を小さくして誤魔化さない**
+（この並行度で症状が隠れるだけで構造は変わらない）。
+
+**残した2つ**（単独で正しいから）:
+- **store.cljs の chain buffer**: `head-get` が定数を返す実装は、将来のバッチャを
+  「未対応」ではなく**黙って誤動作**させる。trampoline 再実行でリセットされることまで
+  unit test 済み。
+- **`claim-fold!`/`release-fold!`**: graph あたり同時 1 fold。fold はこの Worker で最も
+  高価な操作で、並行 writer が閾値を跨ぐと各自が fold を投げていた。
+
+## 最終計測（testnet、本 ADR の全変更込み）
+
+- contention 25 writer: **ok 14 / 409 11 / other 0 / 5xx なし**、`final == ok + seed`（消失 0）
+- sustained load: p50 **97ms** / p95 **361ms**（セッション開始時 195 / 1695ms）
+- read: p50 **42ms** / p95 **100ms**（開始時 176 / 2986ms）
+- SLO probe **pass** / unit 133 tests・304 assertions・0 failures
+
+## この作業中に自分で起こした事故（記録）
+
+バッチング撤去のテキスト編集が、削除範囲に同居していた `transact-finish` も消し、
+unit suite がそこを覆っていなかったため、**壊れた bundle が testnet に出た**（全 transact が
+`400 invalid JSON body: Cannot read properties of undefined`）。resilience probe（ok 1 /
+other 19）で検知し、3 リクエストの burst で body を読んで特定、production 前に修正。
+
+**教訓**: `handle-transact` は chain 全体を1つの `.catch` で包み、あらゆる失敗を
+「invalid JSON body」と**誤ラベル**する。ここは狭めるべきで、かつ「deploy 検証済み」の
+条件に **transact が 1 件成功すること**を含めるべき。
+
+# 残件
+
+- **R2 の再評価**: OAuth トークンに `r2` scope が付いたら、head を R2 ETag CAS に置く
+  選択肢を測り直す価値がある（D1 より近い可能性がある）。今回 D1 を選んだのは能力の
+  優劣ではなく **この鍵で今できること**による。
+- **バッチングの Durable Object 版**: 上記のとおり、往復回数を減らす唯一の道。
+- **production の authoritative flip**: `kotobase_heads` が実 graph を並べたら。
+- **`handle-transact` の包括 catch**: あらゆる失敗を「invalid JSON body」と誤ラベルする。
+
+# production の現在地（2026-07-29 時点）
+
+`shadow` + signer `warn` で稼働（version 8c8a9c66、backend/apex とも health 200）。
+`authoritative` への flip は**依然として証拠待ち**: `kotobase_heads` は 0 行のままで、
+shadow deploy 以降 production の head read が発生していない。
+
+# Resume point（会話履歴なしで再開するための具体手順、2026-07-30 時点）
+
+作業ツリーは `orgs/network-awai/net-kotobase/kotobase-cf-wasm`（west path が正。ローカルの
+`orgs/gftdcojp/net-kotobase` は旧 org path の残置 checkout）。
+
+## A. production authoritative — 完了（2026-07-30、version a677fec7）
+
+**flip 済み。** shadow window は意図した証拠を出さなかった: `kotobase_heads` は
+~20 時間 0 行のままで、backend.kotobase.net が datom head read を 1 件も
+serve しなかった（shadow は traffic が触れたものしか記録しない）。待っても変わらない。
+
+**それでも安全だった理由**: shadow が hedge していたリスクはこの flag に無い。
+締めた record 検査（name == graph）は `verified-state` にあり B2 経路も通るので、
+shadow 期間中ずっと live だった（その間 production は healthy）。この flag が足すのは
+「D1 が read に答える」だけで、D1 行は **検査を通った B2 record か勝った CAS 以外から
+生まれない**。全 D1 経路は error 時 B2 に fallback し、`wrangler rollback --env=` で戻せる。
+
+flip 後の検証: backend/apex health 200（3 連続）、edge-gate は 401 のまま（security 不変）。
+
+## A-2. signer enforce — 証拠に到達できず（3 経路を実際に潰した）
+
+production の**既存** head record が締めた検査を通るかは、以下すべてが塞がっている。
+
+1. **traffic 待ち** — 上記のとおり 20 時間 0 件。cloud-itonami 等の consumer worker は
+   存在するが idle。
+2. **認証付き read** — backend への直接呼び出しは CACAO を積んでも
+   `401 this backend is reachable only through the kotobase.net edge`。edge
+   （kotobase.net）は authn service の viewer を要求し、生の CACAO では 401。
+   **副作用の発見**: これは `scripts/kotobase-ingest-cloud-itonami-lei.cljs` の
+   documented invocation（endpoint = backend.kotobase.net 直）が**もう動かない**
+   ことを意味する。あの job は edge 経由に直すか、operator 用の bypass が必要。
+3. **B2 record を offline 検査** — live kagi vault（`$HOME/.kagi`）が
+   `plaintext identity requires migration` で落ち、非対話では secret を 1 件も
+   取り出せない。**kagi 依存の他の経路（fleet-ci の Radicle 反映、marketplace seed
+   等）も同じ理由で今は読めない。** これは head plane より広い影響を持つ別件。
+
+**owner が塞げるもの（どちらか一方で足りる）**:
+- kagi の identity migration を通す → B2 key を狙い撃ちで取り、`ipns/` を list して
+  record の `name` と `public_key_multibase` を offline で検算できる。
+- kotobase.net に 1 回ログインして既存 graph を read する → authoritative なので
+  seed-on-read が走り、`kotobase_heads` に行が入る。行が入れば下の SQL で signer が
+  1 種類か判定でき、それが enforce の可否をそのまま決める。
+
+判定 SQL: SELECT json_extract(record, '$.public_key_multibase') AS signer, COUNT(*)
+FROM kotobase_heads GROUP BY signer;
+
+**code から言えること（測定ではない、と明示して扱う）**: この bucket の
+`ipns/<graph>.json` を書いたのは常にこの Worker だけで、`write-head!` は必ず
+`:name graph` を operator seed で署名する。だから name 検査は構造的に通るはずで、
+signer も 1 種類のはず。**これは論拠であって receipt ではない** — これに基づいて
+enforce へ上げるなら、そう明記して上げること。
+
+## B. バッチングを Durable Object でやり直す
+
+**削除したコードは git 履歴に無い**（2026-07-30 実測: `git log --all -S` が `enqueue-write!` / `batch-attempt` / `batched head publication` のいずれも見つけない）。実装から撤去までを 1 つの worktree 内で行い、**commit する前に消した**ため——撤去を説明するコメントだけが landed していて、実装は landed していない。本 ADR は当初「履歴にある、`git log -S` で辿れる」と書いていたが誤りで訂正した。再実装が必要で、生き残っているのは `store.cljs` の chain buffer と `claim-fold!` だけ。設計はそのまま使える。isolate 版が
+落ちた実測と DO に移す理由は上記のとおり。**必須条件は DO を required にしないこと**
+（binding が無ければ現状動作に degrade する、D1 head plane と同じ形）。
+
+## C. 現状の合格状態を再現する検証コマンド
+
+       cd orgs/network-awai/net-kotobase/kotobase-cf-wasm
+       node <root>/scripts/resource-guard.mjs run build -- npm run test:cljs
+       node test/smoke-live.mjs https://kotobase-cf-wasm-testnet.aozora.app
+       node test/write-bench.mjs https://kotobase-cf-wasm-testnet.aozora.app 6
+       npx nbb slo/resilience_probe.cljs https://kotobase-cf-wasm-testnet.aozora.app
+
+期待値: unit 133 tests / 304 assertions / 0 failures、smoke ALL GREEN、contention は
+`final-datom-count == ok + 1`（消失ゼロ）かつ 5xx なし。write phase の内訳を見るには
+testnet の `KOTOBASE_TIMING=1`（既に on）と `wrangler tail`。
+
+# Alternatives considered
+
+- **Durable Object を直列化器にする** — ADR-2607142200 が「KV も DO も read/write/recovery/sequencing に *required* にしてはならない」と定めており、また ADR-260726（query plane is one ref）が DO storage を durable plane にしないと定めている。DO を*任意の*直列化器として使う案は今も有効だが、D1 の方が「binding が無ければ完全に元の挙動」という degrade が素直に書ける。
+- **KV を head の hot cache にする** — ADR が optional hot cache として明示的に許しているが、KV は結果整合なので read が古い head を返しうる。head は「唯一変わるもの」であり、そこに bounded staleness を入れるのは serving の意味論を変える。却下。
+- **read-back を単に消す** — B2 に CAS が無い以上、race の検出手段そのものを捨てることになる。却下。"}]

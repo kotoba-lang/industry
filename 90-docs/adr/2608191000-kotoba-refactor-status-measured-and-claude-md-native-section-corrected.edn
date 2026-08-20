@@ -1,0 +1,190 @@
+[{:db/id -1
+  :adr/id "adr-2608191000-kotoba-refactor-status-measured-and-claude-md-native-section-corrected"
+  :adr/title "clj→kotoba refactor の現在地を測った —— .kotoba は 1 つの数字ではなく 3 つ、CLAUDE.md の native 節は 4 箇所ずれていた"
+  :adr/status "accepted"
+  :adr/date "2026-08-19"
+  :adr/topic "kotoba-migration"
+  :adr/doc_type "adr"
+  :source/dataset "adr"
+  :adr/repos "com-junkawasaki/root"
+  :adr/commits "root ba0e8124921 (CLAUDE.md native 節), root c689b88ba8d (merge)"
+  :adr/authoritative_for ["the measured clj->kotoba position on 2026-08-19, with the command that produced each number"
+                          "why a .kotoba count is three numbers, not one -- half of the tracked files are a legacy schema DSL sharing the extension"
+                          "that ADR-2608189400's workspace-wide 4,189 does not reconcile with two independent measurements, while its per-repo numbers do"
+                          "the four stale values corrected in the CLAUDE.md native-status section, and why the fix removed values instead of refreshing them"
+                          "the resume point for native-aot, kbb, and backend parity"]
+  :adr/related ["ADR-2608139980" "ADR-2608189400" "ADR-2608189100" "ADR-2608650000"
+                "ADR-2608136000" "ADR-2608136800" "ADR-2608190200" "ADR-2607279200"]
+  :adr/body "
+## 訊かれたこと
+
+オーナー「clj から kotoba native, amu, aya への refactor の状況は?」(2026-08-19)。
+続けて `next` → CLAUDE.md の訂正、`closing`。
+
+**「aya(綾)」は repo 名ではない。** ADR-2608139980 が「`kotoba-wasm` / `kotoba-native` /
+`kotoba-script` / `kotoba-component` は amu が織る柄が違うだけ = 綾。`aya` や `katashiro`
+への改名はしない（面が backend なら target 名が正直で、存在名は権限を持たない層に付けない）」
+と決めた呼称である。`repo-search aya` は 0 件で、これが理由。
+
+## `.kotoba` は 1 つの数字ではない — 3 つある
+
+これが今回いちばん効いた発見。**同じ workspace に対して、測り方で 2 倍以上ずれる。**
+
+| 測り方 | 件数 |
+|---|---|
+| tracked（`git ls-files '*.kotoba'` × 4,459 checkout） | 2,044 |
+| working tree（`find`、node_modules 除外） | 2,346 |
+| うち node_modules 由来 | 0 |
+| **`schema/` 配下の legacy DSL**（C 風構文、`deepen_actors.py` 生成） | 994 |
+| **Clojure 形の実 source**（先頭 40 行の行頭に `(ns ` か `(defn ` がある） | **986** / 254 repo |
+| 対する clj-family | 38,123（`.clj` 9,279 / `.cljc` 25,193 / `.cljs` 3,651） |
+
+**tracked の約半分は Kotoba 言語の source ではない。** 拡張子の衝突は
+`kotoba-lang/lang/q9-migration.edn` が `:legacy-schema-dsl-extension-collision`
+（2026-07-18 時点で 1,052 中 853）として既に名指ししているが、**現在値がどこにも
+記録されていなかった**ので、`.kotoba` の総数がそのまま移行の進捗として読まれうる。
+
+実 source の上位: `amu` 122 / `kotoba` 104 / `provider` 78 / `aiueos` 50 /
+`murakumo` 35 / `kotoba-lang` 35 / `cloud-itonami` 26。
+（`orgs/kotoba-lang/compiler` の 128 は amu 改名前の凍結 checkout で、二重計上。）
+
+**比率 2.5% は失敗の指標ではない。** ADR-2608650000 が「移行の単位は決定核であって
+repo 全体ではない」と決めており、murakumo が 33/33 native に載ったのは移植したから
+ではなく判断だけを切り出したからである。
+
+## ADR-2608189400 の「4,189 本」は再現しなかった
+
+同 ADR（accepted、2026-08-18）は「workspace 全体の `.kotoba` 4,189 本」と記す。
+**上表のどちらの測定とも一致しない**（tracked 2,044 / working tree 2,346、
+node_modules の寄与は 0、superproject 本体の orgs 外は 6 本）。
+
+一方で**同 ADR の repo 単位の数字は正確**である（「amu 134 本」は
+`git ls-tree amu/main` と完全一致）。ずれているのは workspace 全体の集計だけ。
+
+本文に測り方が書かれていないため、(a) 別の root を歩いた (b) glob が二重に当たった
+(c) 手元に無い checkout を含む のどれかは**判定できない**。したがって:
+
+**この数字を method 抜きで引用しない。** そして新しく workspace 規模の計数を書くときは
+コマンドを併記する —— ADR-2608136000 の「測れなかった検査が、測って問題が無かった検査と
+同じ顔をする」の計数版で、**方法を書かない集計は、検証できない集計と同じ顔をする**。
+
+## コンパイラ側は活発（2026-08-19 実測、origin/main）
+
+| repo | tip | 最終 commit |
+|---|---|---|
+| `amu` | `27d6989` | 3h — iter28、production call+loop が `:call-live` |
+| `kotoba-native` | `4bb08b9` | 3h — 定数除算最適化、kotoba-mir pin 前進 |
+| `kotoba-kir` | `e5b71f4` | 4h — native vector 境界 |
+| `kotoba-script` | `65da967` | 2d |
+| `kotoba-component` | `b44c99a` | 4d — dataspace/transact を component id 24 に登録 |
+| `kototama` | `238e4af` | 31h |
+
+speed 目標は ADR-2608189100 で Cranelift → **LLVM 超え**に引き上げ済み（オーナー override）。
+
+**手元 checkout は全て遅れていた**（amu −215 / kotoba −195 / kotoba-native −108 /
+kotoba-lang −52 / murakumo −35）。west pin は amu について main tip と一致。
+ADR-2608136800 のとおり **checkout・west pin・repo の main は 3 つの別物**で、
+この質問に答えるだけでも 6 repo で `origin/main` を読み直す必要があった。
+
+## capability kit の native 到達度（2026-08-19、amu/main の kit ファイル実測）
+
+- kit は **11 本**（8 本ではない）
+- `dataspace-v1` が `:native-aot :implemented` —— **effect を持つ kit で初めて native に届いた**
+- `:wasm-aot` と `:jit` はそれぞれ 7/11 が implemented
+- `:native-aot` は 1/11
+- `clock-v1` は `:wasm32-kotoba-v1 :implemented`（ADR 0257 が `:wasm-aot` と別 ABI だと明記）
+
+KIR の admission gate（`only-native-word-typed-features?` / `native-word-value-type?`）も
+広がっており、`:document` が string と同じ pair(offset,length) として入り、
+`typed-cap-call` は固定 4 型対に加えて `native-provider-contract?` が認めた provider 契約
+（dataspace = cap 24）を通す。
+
+## CLAUDE.md「native の現在地の読み方」が 4 箇所ずれていた → 修正済み
+
+| 旧記述 | 実測 |
+|---|---|
+| 「8 kit すべて `:native-aot :pending`。native に qualified なものは 1 本も無い」 | 11 kit、`dataspace-v1` が implemented |
+| 「ADR 系列は 0221 まで」/「compiler の 0219 / 0220 / 0221」 | amu は **0257** |
+| admission gate の型集合 | `:document` の記載漏れ |
+| 「`typed-cap-call` は … の **4 組のみ**」 | 4 組 **＋** provider 契約 |
+
+**根の一因は読む先が `compiler/` だったこと。** 綾 分割で `amu` に改名され、west には
+古い pin の `compiler` entry が別 checkout として残っているので、あの節に従うと
+**凍結した tree を読んで古い答えが出る**構造だった。
+
+**直し方: 値を今日の値に更新せず、値を消して引き方だけ残した。** この節の陳腐化は
+3 度目で（CLAUDE.md 自身が fleet-ci egress 値と kit qualification 値の 2 件を同じ理由で
+記録している）、いずれも「日付付きで書いたが、引用する側が日付を落とした」形である。
+同じ節に今日の実測値を書けば 4 度目を仕込むことになる。
+
+**この ADR には値を書いている。** それは矛盾ではない —— ADR は日付を持つ測定記録で、
+CLAUDE.md は日付を持たない常時指示である。**同じ値でも、置き場所で寿命が違う。**
+
+## 隣接する記述で、検証して変更しなかったもの
+
+直下の可搬 stdlib 段落は `kotoba-lang/lang/stdlib/core.kotoba` に対して実測し、
+「在る」9 個は全て存在、「無い」7 個（`get-in` `sort-by` `juxt` `mapv` `keep` `remove` `for`）は
+全て不在で**正確だった**ので変更していない。陳腐化した記述の隣にあると疑いたくなるが、
+疑いは測定の代わりにならない。
+
+## 着地したもの
+
+| commit | 内容 |
+|---|---|
+| `ba0e8124921` | CLAUDE.md native 節の修正（+19/−11） |
+| `c689b88ba8d` | 上記のサーバ側マージ（`origin/main` の祖先であることを確認済み） |
+
+worktree / local branch / remote branch は撤去済み。共有 checkout は FF 済み。
+他者の WIP（`90-docs/observatory/observatory.datoms.edn` の未コミット変更、
+別セッションの worktree `wt-r11` / branch `agent/closures-tier`）には触れていない。
+
+## 検証 — 実行したものと、していないもの
+
+実行した:
+
+- 4,459 checkout に対する `git ls-files` 計数（並列 16）、`find` 計数、node_modules 計数
+- `amu/main` の kit ファイル 11 本を EDN reader で読んで `:qualification` を出力
+  （**grep は使っていない** —— 行の折り返しで静かに切れる）
+- `kotoba-kir/main` の admission gate を実際に読む
+- `lang/stdlib/core.kotoba` の 行頭 `(defn ` 抽出による stdlib 段落の検証
+- CLAUDE.md の着地は `git show origin/main:CLAUDE.md` を読み直して確認（旧文字列 5 つが 0 件）
+
+**実行していない: テストスイートを 1 本も走らせていない。** このセッションは測定と
+文書修正のみで、コードを 1 バイトも変えていない。amu / kotoba-native / kotoba-kir の
+green は他セッションの fleet receipt に依っており、**私は確認していない**。
+
+## resume point
+
+1. **native-aot は 11 kit 中 1 本（dataspace）。** 次に効くのは effect を持つ 2 本目を
+   native に載せること。`ui-v1` の pending 理由は「未着手」ではなく
+   `[:set [:record …]]` が one-word 値でないという**測定された拒否**なので、kit ファイルの
+   pending 理由を読んでから対象を選ぶ。
+2. **`kbb`（Kotoba script host）は依然不在** → `kotoba-script` の cutover は
+   W6 inventory で blocked のまま。ops script は nbb 据え置きが正。
+3. **backend parity harness が無い。** `lang/surface-status.edn` 自身が
+   「`:implementation` は assertion であって evidence ではない」「`:kotoba-cljs` は
+   19 エントリで主張されているがどの conformance case からも entail されていない」と
+   申告している。3 つの backend 語彙（`surface-status` の `:implementation` /
+   `kir/target.cljc` の `compatibility-targets` / conformance manifest の `:backends`）が
+   1 トークンも共有しておらず、これは検査ではなく**権威の決定**を要する。
+4. **`.kotoba` の計数を検出器にする。** 今回の「Clojure 形かどうか」の判定は
+   先頭 40 行の ad-hoc な grep で、`orgs` 依存 detector にはなっていない。
+   `verify-*` として登録すれば、legacy DSL と実 source の比が毎回出る。
+5. **fleet gate: `:jvm-test` 117 / `:nbb-test` 36 / `:nbb-script` 133 / `:shadow-test` 1**
+   （`scripts/fleet-ci/gates.edn` 実測）。ADR-2608190200 が残 81 本の内訳と
+   「11 本は nbb-cross-runtime の対向 runtime であって旧世代ではない」を持つ。
+
+## 追記（2026-08-19、同日）—— resume point 5 件の成熟度を上げた
+
+adr-2608191100-maturity-pass-on-the-five-kotoba-refactor-resume-points に記録:
+
+- **#4 は着地した。** census は `scripts/verify-kotoba-source-census.cljs` として
+  registry に登録済み。分類規則を直した結果、source は 986 ではなく **1,019**
+  （`;;` の長いヘッダで最初の form が 40 行目より後ろに来るものが 18 件、
+  および EDN データという第 3 のクラスを見落としていた）。
+- **#5 の数字は誤っていた。** ここに書いた `:jvm-test 117 / :nbb-test 36 /
+  :nbb-script 133` は gates.edn に対する grep の出現数で、reader で読むと
+  **80 / 22 / 127**、移行候補は 59 repo。
+- **#1 は clock-v1。** cap 7 は dataspace より 6 日早く native の
+  `native-provider-contract?` に seal されており、不足は provider と実行証拠だけ。
+"}]

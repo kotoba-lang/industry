@@ -1,0 +1,170 @@
+[{:db/id -1
+  :adr/id "2800004400"
+  :adr/doc_type "adr"
+  :adr/topic "workstation-disk-exhaustion-broke-the-toolchain"
+  :adr/title "disk が満杯になり Claude Code の install が黙って壊れた —— npm allow-scripts・APFS clone の会計・/private/tmp の退役漏れ"
+  :adr/status :accepted
+  :adr/date "2026-08-12"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authors ["Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["この workstation で npm 経由の Claude Code install が壊れる 2 つの原因と、その恒久対策"
+   "disk 使用量を測るときに du を信じてよい範囲（APFS clone の扱い）"
+   "/private/tmp に堆積した agent scratch の実測値と、削除してよい/いけない判定手順"]
+  :adr/related ["2607211600" "2800004100" "2800004200" "2800004300" "2607011345" "2607300900"]
+  :adr/repos ["com-junkawasaki/root"]
+  :adr/evidence
+  ["df: 702 MiB free / 460 GiB (100%) → 38 GiB (92%)"
+   "npm 11.16.0 warn allow-scripts: @anthropic-ai/claude-code@2.1.228 (postinstall: node install.cjs)"
+   "claude doctor: No installation issues found (2.1.228, darwin-arm64)"
+   "/private/tmp: 265 git checkout / 104 が未着地 WIP / 161 clean"
+   "root-etzhayyim-corpus-clone.JLGY3u は 51 worktree の共有 object store"
+   "Chrome code_sign_clone 34 個削除 = du 48 GB 相当 / 実回収 8 MB"
+   "superproject .git の tmp_pack_* 23 個 = 実回収 1,394 MB"]
+  :adr/body
+  "# ADR-2800004400: disk が満杯になり Claude Code の install が黙って壊れた
+
+**Status**: accepted / **Date**: 2026-08-12
+
+## Directive
+
+オーナーが `claude doctor` を実行。**コマンド自体が PATH に無かった。**
+
+## 原因は 2 つあり、独立していた
+
+今日 15:22 の auto-update（2.1.228）が中途半端に着地した。原因は 1 つではない。
+
+### 原因 1: disk が 100% だった
+
+460 GiB 中 **702 MiB** しか空いていなかった。native binary の展開が途中で切れ、
+`claude-code-darwin-arm64/` に 255 MB の `claude` が `package.json` 抜きで残った。
+この binary は実行すると **SIGKILL**（切り詰められた Mach-O）。npm の temp 成果物
+（staging dir `.claude-code-2DTsDk1V`、bin の `.claude-WV2akNWU`）も残った。
+
+### 原因 2: npm の allow-scripts が postinstall を黙って skip した
+
+これは disk とは無関係で、**空き容量があっても再現した**:
+
+    npm warn allow-scripts 1 package has install scripts not yet covered by allowScripts:
+    npm warn allow-scripts   @anthropic-ai/claude-code@2.1.228 (postinstall: node install.cjs)
+
+`install.cjs` が走らないと `bin/claude.exe` は 500 byte の
+`Error: claude native binary not installed.` スタブのまま残る。**これが本体の壊れ方**で、
+disk はそこに 2 つ目の壊れ方を重ねただけだった。
+
+## なぜ誰も気付かなかったか
+
+**走っていた session は生き延びていた。** npm が unlink した古い binary の inode を
+開いたまま掴んでいたからで、`lsof` は削除済みの 285 MB を `txt` として見せる。
+つまり **既存 session が動いていることは install が健全である証拠にならない。**
+次に起動しようとした瞬間に初めて壊れる。
+
+## 恒久対策（landed）
+
+`~/.npmrc` に **unpinned** で追加した:
+
+    allow-scripts[]=@anthropic-ai/claude-code
+
+- **`npm approve-scripts` は global install に使えない**（`EGLOBAL`。`-g` でも拒否）。
+  だから `.npmrc` に直接書くのが唯一の経路。
+- **pin してはいけない。** `allow-scripts-pin = true` が既定なので approve 系は
+  `pkg@2.1.228` を書くが、それでは **次の auto-update でまた block される**。
+  版を固定しないことがこの設定の要件。
+
+## disk の会計 —— 何が本物で何が幻影だったか
+
+### 実際に回収できたもの（合計 40 GB）
+
+| 量 | 対象 | 性質 |
+|---|---|---|
+| 20.6 GB | `~/.gftd/fleet-ci-cache` | 再生成可能 |
+| 6.8 GB | neo4j 1e8 ベンチの DB | 競合ベースライン。checkpoint 1 MB は残した |
+| 5.8 GB | `/private/tmp/etzhayyim-data-wave` | 登録済み west repo の重複 clone 15 本 |
+| 4.9 GB | `~/Library/Caches` + `~/.cache` | 再生成可能 |
+| 1.4 GB | superproject `.git` の `tmp_pack_*` 23 個 | 中断した fetch の残骸 |
+| 229 MB | `~/.gftd/daemon.log` | 死んだ endpoint への 20 秒間隔リトライで肥大 |
+
+### 幻影だったもの —— du を APFS clone に対して信じない
+
+`/private/var/folders/.../X/com.google.Chrome.code_sign_clone` を du は **52 GB** と
+報告する。Chrome.app と同サイズ(1,407 MB)の clone が 37 個あるためだが、これは
+**APFS の block 共有 clone** で物理実体は 1 つ分しかない。実測: **34 個削除して
+回収 8 MB。**
+
+この 1 件で `/private` の見かけ 109 GB のうち 52 GB が消え、実体は 49 GB だった。
+**「du の大きい順に消す」は APFS 上で成立しない。**
+
+## 測り方で 3 回間違えた（同じ形の誤り）
+
+いずれも「観測していないものを観測したことにした」:
+
+1. **fetch していない remote ref に対する `merge-base --is-ancestor` を ahead と読んだ。**
+   data-wave の 4 repo (5.4 GB) を `AHEAD/diverged` = 未着地と判定したが、実際は
+   remote commit が local に無いだけ。`git fetch` 後は全部 `ahead=0 behind=2`。
+   `manifest/cleanup-workflow.edn` の `:push-state-is-measured-not-inferred` が
+   まさにこれを禁じている。
+2. **走り終わっていない background job の出力を集計した。** WIP checkout 数を 66 と
+   報告したが、audit 完了後の正しい値は **104**（母数も 181→265）。
+3. **1 回の測定でノイズを信号と読んだ。** clone 5 個削除で 708 MB 空いたのを
+   「clone ごとに 142 MB の固有 block がある」と解釈したが、29 個削除で 8 MB しか
+   動かず反証された。並行 agent が数十走るこの machine では df は常に ±100 MB 揺れる。
+
+## /private/tmp —— 265 checkout、104 が未着地
+
+worktree-per-agent（CLAUDE.md 並行エージェント運用）の scratch が退役されずに
+34 GB 堆積している。
+
+| 分類 | 数 |
+|---|---|
+| 未着地 WIP を持つ（untracked 46 / dirty 167 ファイル） | **104** |
+| clean だが upstream 無しで未計測 | 45 |
+| clean かつ計測済み | 116 |
+
+**生存プロセスが cwd を置いているのは 1 つだけ**（`amu-ci-deps`）。つまり
+「使用中だから消せない」のではなく **「未着地だから消せない」**。
+
+### size 順の削除が最も危険な構造
+
+- `root-etzhayyim-corpus-clone.JLGY3u`（3.1 GB、サイズ 3 位）は **51 個の worktree の
+  共有 object store**。消せば 51 本の履歴が消える。`amu-entry-spill` が 9 本、
+  `kotoba-full-migration` が 6 本を同様に支えている。
+- `kotoba-profile6` / `kotoba-lang-deploy` / `kotoba-release-v070` /
+  `kotoba-docs-maturity` は**自分は小さいのに 4〜6 本から symlink される hub**。
+
+**大きい dir ほど object store と toolchain で、小さい dir ほど捨ててよい葉。**
+
+### これは規約の不在ではなく検査の不在
+
+CLAUDE.md は既に「**着地後の後片付けまでがタスクの完了条件**」「merge したのに
+branch/worktree が残っている状態を作らない」と書いている。それでも 265 checkout /
+59 worktree 登録（prune 可能は 0 = 全部実在）が残った。ADR-2800004100 が cleanup の
+PR backlog について出した結論と同じ形で、**守られていないのではなく守られたことを
+測るものが無い。** 対応は fleet gate（`scripts/fleet-ci/gates.edn` に 1 行）で
+checkout 数と未 prune worktree 数に閾値を置くこと。GitHub Actions は使わない
+（ADR-2607300900）。
+
+## 併せて直したもの —— murakumo daemon
+
+`ai.gftd.murakumo` が死んだ control plane に 20 秒ごとに retry し、229 MB の log を
+書いていた。オーナー指示で `GFTD_MURAKUMO` を `murakumo.cloud` に向け直したが、
+**`/heartbeat` と `/poll` はどの host にも存在しない**（gftd.ai=404 /
+murakumo.cloud=405 静的 SPA / api.murakumo.cloud=JSON 404）。`api.murakumo.cloud/join`
+が案内する `/join/native.sh` も 404。binary は 2025-03-25 版。
+**retry 間隔が 20s→2s に悪化した**ため、daemon は停止・disable し、config だけ
+正しい向きで残した（`launchctl enable gui/501/ai.gftd.murakumo` で復帰）。
+
+## 残っている gap（resume point）
+
+| 量 | 対象 | 次の一手 |
+|---|---|---|
+| 6.4 GB | mactex | **phantom install**。receipt 2 つと installer だけ残り `/Library/TeX` も `/usr/local/texlive` も無い。`brew uninstall --cask mactex` は `pkgutil --forget` で **sudo が要る**ためオーナー実行 |
+| 6.4 GB | CoreSimulator | 未使用 device |
+| ~34 GB | `/private/tmp` | 104 を land してから 161 を退役。clean 判定は必ず fetch 後に測る |
+| — | `credentials.json` | `/private/tmp/kotobase-1e8-qualification/` に `secret_seed_hex` が残置。鍵の値は読んでいない。rotate 推奨 |
+| — | `~/.npmrc` | registry auth が平文。この session の出力に 1 度露出した |
+
+## 現在地
+
+`claude doctor` は `No installation issues found`。disk は **702 MiB → 38 GiB**。
+この repo のファイルは 1 つも変更していない（本 ADR を除く）。
+"}]

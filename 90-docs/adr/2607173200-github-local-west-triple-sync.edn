@@ -1,0 +1,82 @@
+[{:db/id -1
+  :adr/id "2607173200"
+  :adr/doc_type "adr"
+  :adr/status :accepted
+  :adr/date "2026-07-17"
+  :adr/closed "2026-07-17"
+  :adr/execution-status :closed
+  :adr/title "GitHub / local / west 三点同期プレーン（triple-plane sync）"
+  :adr/source-format "edn"
+  :adr/related ["2606272237" "2607022900" "2607160005" "2607121900"]
+  :adr/authoritative_for ["scripts/west-triple-sync.cljs"
+                          "scripts/west-orphan-audit.cljs"
+                          "manifest/west-triple-sync-workflow.edn"
+                          "GitHub·local·west 一致の完了条件と scope"
+                          "orphan retirement inventory archive/orphan-retire-20260717-index.txt"]
+  :adr/incident "2026-07-12→17: kotoba-lang/crm が GitHub に push 済みだが west 未登録・local 未 checkout。cloud-itonami-isic-5820/6201/6202 が {:local/root \"../../kotoba-lang/crm\"} を指し fresh checkout で壊れた。同日 orphan audit で true-orphan-git 62 / local-root-broken 19 を検出。"
+  :adr/context "west は clone 一覧と pin の投影、GitHub は内容の上流、local は作業 tree。三者が乖離すると (1) :local/root が解決しない (2) pin が stale/未 push HEAD (3) GH-only orphan が量産される。new-project-scaffold は作成時の登録を定義するが、事後の乖離回収と日常同期の単一入口が無かった。"
+  :adr/decision "GitHub / local / west を一つの invariant で結び、plan → apply → verify の workflow を正経路にする。実装は nbb scripts/west-triple-sync.cljs（dry-run 既定）と scripts/west-orphan-audit.cljs（分類）と gen-west-manifest.cljs --entry（最小 diff pin）。path-override 旧 path と *-clj successor leftovers は登録せず、clean なら archive 後に local 退役、dirty は WIP archive 後に退役可。"
+  :adr/invariant "managed project P について: (a) GitHub remote が存在する (b) west.yml に path=orgs/<org>/<name> と revision がある (c) revision は default branch から到達可能 (d) local が存在するなら HEAD は pin と一致するか、apply 後に pin が HEAD に揃う (e) 他 project の :local/root が P を指すなら local(P) が存在する。完了ゲート: west-orphan-audit --blocking exit 0 かつ対象 entry の pin 検証 OK。"
+  :adr/managed-set "次の union: (1) scope=blocking → local-root-broken の project (2) scope=managed → local に存在する west path (3) scope=names → --names 明示 (4) 常に path-override / personal / worktree-scratch は managed に入れない（誤登録禁止）。west に載るが local に無い 1000+ path は sparse 正常系であり、blocking/names 以外では自動 clone しない。"
+  :adr/phases [{:id :discover :ops ["west-orphan-audit --edn" "west path∩local" "optional GH compare for pin freshness"]}
+               {:id :ensure-github :ops ["gh api repos/<org>/<name> 存在確認" "無ければ fail（勝手に repo create しない — scaffold skill の領域）"]}
+               {:id :ensure-local :ops ["managed で dir 欠落なら git clone --depth 1" "dirty なら skip+report（WIP 破棄禁止）"]}
+               {:id :ensure-west :ops ["repos.edn :extra-projects へ surgical insert" "nbb scripts/gen-west-manifest.cljs --entry <name>（wholesale 禁止）"]}
+               {:id :align-latest :ops ["git fetch --depth 1 origin" "clean なら merge --ff-only origin/<default>" "working HEAD が push 済みなら --entry で pin 前進" "未 push HEAD は pin 化しない（ADR-2607022900）"]}
+               {:id :verify :ops ["west-orphan-audit --blocking" "verify-west-pins --only <names>" "gen-west-manifest --check（必要時）"]}
+               {:id :retire-leftovers :ops ["path-override 旧 path / *-clj successor leftovers を分類" "clean → meta archive 後 rm" "dirty → WIP patch archive 後 rm（後継 west がある場合）" "dot-github / personal は KEEP"]}]
+  :adr/never ["wholesale gen-west-manifest commit"
+              "path-override 旧 path の再登録"
+              "personal/* の west 登録"
+              "dirty working tree の force checkout（archive 無し）"
+              "force-push / rebase による pin 合わせ"
+              "west 全 2900 project の無差別 clone"
+              "未 push ローカル HEAD の pin 化"]
+  :adr/cli "nbb scripts/west-triple-sync.cljs plan|apply|verify [--scope blocking|managed|names] [--names a,b] [--no-pin-advance]\nnbb scripts/west-orphan-audit.cljs [--blocking|--all|--edn]"
+  :adr/fleet "Phase 1.5 dual-write: west.yml への --entry 書き込みは fleet-db に reconcile で吸収する。本 workflow は fleet-db を手編集しない。**2026-08-07 訂正: これを自動でやっていた CI fleet-projection-verify は 2026-07-30 に撤去済み（ADR-2607300900、GitHub Actions 廃止）。murakumo fleet 側に未 port なので reconcile は手で回すしかなく、実測で 24 pin ぶん遅れていた。** 遅れた fleet-db に `fleet sync` すると checkout が pin より後ろへ動くので、sync の前に必ず `fleet reconcile --west <origin/main の west.yml>` を通す。"
+  :adr/gaps
+  ["**scope 規則を強制するものが無い（2026-08-07 の resume point）。** 本 ADR と workflow edn は `:never` に「clone all west projects by default」を挙げ、CLAUDE.md にも 2026-08-07 に運用 rule を書いたが、いずれも散文であって機構ではない。実際 2026-08-06 に引数なし `west update` が走り 4,124 project を歩いて 10 分でタイムアウトした。次の一手は PreToolUse hook（`.claude/hooks/` の既存 6 本と同じ形、pure policy + `scripts/*-policy-test.cljs` は `west_pin_guard_policy.cljs` が先例）で ①引数なし `west update` ②stale な fleet-db への `fleet sync` ③共有 checkout での reconcile/sync を deny すること"
+   "**fleet-db ⇄ west.yml の drift を吸収するものが無い。** 検出は `scripts/fleet-sync-tick.cljs check` があるが、その docstring 自身が「書かない」と宣言している（無人 writer を main に置かない判断 + launchd 下で push credential が無い）。結果、drift は誰かが手で reconcile するまで積む。**速度を実測した（2026-08-08）: 前日に 0 まで落とした drift が 24 時間以内に 17 件 + fleet-db に未登録の repo 6 件まで戻った。**「たまに起きる」ではなく連続的に積む量で、手 reconcile は追いつく前提が成り立たない。当面の緩和は CLAUDE.md の rule（sync の直前に reconcile を通す）で、恒久策は吸収の自動化かつ `kagami sync` 側が stale db を検出して拒否すること"
+   "west.yml に 12 桁の短縮 revision が 1 件ある（cloud-itonami-app、2026-08-07 実測。他 4,122 件は 40 桁）。`verify-west-pins` は通っており実害は出ていないが、短縮 pin は照合スクリプトが `[0-9a-f]{40}` で書かれていると黙って取りこぼす（実際この drift 検出で 1 件見落とした）"]
+  :adr/evidence-2608070000
+  ["CLAUDE.md に「同期は動いたものだけ」節を追加（b4cdbe4）。scope 表 + zsh が変数もパイプも単語分割しないため xargs 必須 + reconcile 前置 + 共有 checkout で走らせない、を明記"
+   "kagami@8f04c56 — `fleet.sync/plan` の shallow 既定を撤去。`fetch --depth 1` を既定にし CLAUDE.md を根拠として引用していたが、その既定は 2026-07-21 に ADR-2607211600 が撤回済みで、EDN 駆動 sync が graft を 1 repo ずつ戻す経路になっていた。19 tests / 121 assertions、mutation 3 本すべて赤"
+   "fleet-db reconcile 24 件（480dc48）。入力は origin/main の west.yml、24 件すべて `status ahead / behind_by 0 / merge_base == 旧 pin` を gh api で確認してから吸収"
+   "効率の実測（reconcile 後、6 repo の dry-run）: {:noop 4, :advance 1, :skip-dirty 1} —— pin と一致する 4 repo では git を 1 回も起動しない"
+   "共有 checkout で走らせた最初の reconcile は 2 分後に別セッションに巻き戻された（同時刻に別セッションが manifest/repos.edn へ新規 project を登録中）。worktree で再実行して着地"]
+  :adr/execution
+  {:closed "2026-07-17"
+   :baseline {:local-root-broken 19 :true-orphan-git 62 :path-override-leftovers 24}
+   :final {:local-root-broken 0
+           :true-orphan-git 1
+           :true-orphan-git-kept ["orgs/cloud-itonami/dot-github"]
+           :path-override-leftovers 0
+           :west-projects-approx 2991}
+   :waves
+   [{:id :tools+blocking
+     :did ["west-orphan-audit / west-triple-sync / workflow+skills"
+           "crm/hil/org-threejs/usd register+clone"
+           "deps :local/root retarget (langchain-clj→langchain 等)"
+           "main merge chore/triple-sync-onto-main ≈60fbc318"]}
+    {:id :register-42
+     :did ["GH-backed true-orphan-git 42 件 west 登録（assoc/municipality/isic-7500, etzhayyim, gftdcojp, kotoba-actor-sdk/git/rad, inc…）"
+           "isic-7500/kotoba-git は origin/main pin（未 push / diverged 回避）"
+           "main merge chore/register-true-orphan-git ≈00f97216"]}
+    {:id :retire-leftovers
+     :did ["path-override leftovers 24 を clean 退役（meta → .git/orphan-retire-archive-20260717）"
+           "no-remote scaffold 退役"
+           "cze-spcr register + inventory archive/orphan-retire-20260717-index.txt"
+           "main merge chore/orphan-retire-and-cze-spcr ≈26f3f738"]}
+    {:id :retire-dirty-round2
+     :did ["browser-use-clj/comfyui-clj/computer-use-clj/time を WIP archive 後退役"
+           "com-nvdia-ngc-org（typo scaffold）file-copy archive 後退役"
+           "ind-cii / zaf-busa west 登録"
+           "main merge chore/orphan-retire-round2 ≈e86b20b1"]}]
+   :artifacts ["scripts/west-triple-sync.cljs"
+               "scripts/west-orphan-audit.cljs"
+               "manifest/west-triple-sync-workflow.edn"
+               "manifest/west-triple-sync-workflow.md"
+               "archive/orphan-retire-20260717-index.txt"
+               ".git/orphan-retire-archive-20260717/"]
+   :residual "true-orphan-git は cloud-itonami/dot-github のみ（org テンプレ・west 非対象 KEEP）。personal/* と worktree/scratch は west スコープ外。"}
+  :adr/body "# ADR-2607173200: GitHub / local / west 三点同期プレーン\n\n- Status: **Accepted + Closed** (2026-07-17)\n- 関連: ADR-2606272237 (API single-entry) / ADR-2607022900 (pin 検証) /\n  ADR-2607160005 (fleet-db) / ADR-2607121900 (crm 未登録の実害)\n\n## Context\n\nsuperproject の child repo は三つのプレーンにまたがる:\n\n1. **GitHub** — commit 内容の上流\n2. **west** (`manifest/west.yml` + `repos.edn` `:extra-projects`) — path と pin\n3. **local** (`orgs/<org>/<repo>`) — 作業 tree\n\n作成フロー（skill `new-project-scaffold`）は「起こす → push → 登録」を定義するが、\n**push だけで west を忘れる**と GH-only orphan になり、`:local/root` 消費者が\nfresh checkout で壊れる（crm × isic-5820/6201/6202）。また local だけある\n未登録 git、path-override 残骸、sparse で未 checkout の west path が混在し、\n「全部登録」も「全部 clone」も誤る。\n\n## Decision\n\n1. **三点 invariant** を managed set に適用する（上記 `:adr/invariant`）。\n2. **単一入口** `nbb scripts/west-triple-sync.cljs`（plan 既定 / apply 明示 /\n   verify）。分類は `west-orphan-audit`、pin 書き込みは\n   `gen-west-manifest.cljs --entry` のみ。\n3. **scope** で blast radius を制限する:\n   - `blocking` — `:local/root` 破壊を最優先で修復\n   - `managed` — 既に local にある west project の最新揃え\n   - `names` — 明示リストのみ\n4. west 全件 clone はしない（1090+ missing は sparse 正常系）。\n5. apply は dirty tree / 未 push HEAD / GH 不在を skip+報告し、破壊しない。\n6. path-override 旧 path と *-clj successor leftovers は **再登録しない**。\n   clean は meta archive 後に local 退役、dirty は WIP archive 後に退役可。\n\n## Execution closed (2026-07-17)\n\n| metric | baseline | final |\n|---|---:|---:|\n| local-root-broken (blocking) | 19 | **0** |\n| true-orphan-git | 62 | **1** (dot-github KEEP) |\n| path-override leftovers | 24 | **0** |\n\nWaves: tools+blocking → register 42 GH-backed orphans → retire path-override\nleftovers → retire dirty successor leftovers + register late assoc entries.\nInventory: `archive/orphan-retire-20260717-index.txt`（meta 本体は\n`.git/orphan-retire-archive-20260717/`）。\n\n## Consequences\n\n- (+) orphan 検出 → 修復 → 検証が一つの workflow になる\n- (+) scaffold の完了ゲートと cleanup skill が同じ audit を共有する\n- (+) fleet-db は CI reconcile に任せ、手編集しない\n- (+) path-override / *-clj leftovers の退役手順が確立（archive 必須）\n- (-) GH に無い repo の create は本 workflow の外（scaffold）\n- (-) deps.edn 旧 path の retarget は消費者側修正が別途必要（本実行では実施済み）\n- (-) 新規 assoc 等が checkout されると true-orphan-git が再増える —\n  日常は `west-orphan-audit` + `west-triple-sync apply --names`\n\n## CLI\n\n```bash\nnbb scripts/west-orphan-audit.cljs --blocking\nnbb scripts/west-triple-sync.cljs plan --scope blocking\nnbb scripts/west-triple-sync.cljs apply --scope blocking\nnbb scripts/west-triple-sync.cljs apply --names crm\nnbb scripts/west-triple-sync.cljs verify --scope blocking\n```\n\n## References\n\n- `manifest/west-triple-sync-workflow.edn`\n- `scripts/west-triple-sync.cljs` / `scripts/west-orphan-audit.cljs`\n- skill `git-cleanup-conflict` / `new-project-scaffold`\n- `archive/orphan-retire-20260717-index.txt`"}]

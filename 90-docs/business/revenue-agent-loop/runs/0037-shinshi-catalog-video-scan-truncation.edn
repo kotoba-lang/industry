@@ -1,0 +1,135 @@
+[{:db/id -1
+  :doc/id "revenue-agent-loop-run-0037-shinshi-catalog-video-scan-truncation"
+  :doc/doc_type "revenue-agent-loop-run"
+  :doc/title "Run 0037 — the scan cut before it filtered, so 95 unfilled characters read as an empty catalog"
+  :doc/path "90-docs/business/revenue-agent-loop/runs/0037-shinshi-catalog-video-scan-truncation.edn"
+  :doc/run_number 37
+  :doc/status "done"
+  :doc/date "2026-08-15"
+  :doc/source "revenue-agent-loop RUN-TEMPLATE (ADR-2607246100)"
+  :doc/body "# Run 0037 — the scan cut before it filtered
+
+**Status:** done — one clip generated, measured, published; two loop defects fixed and both directions shown
+**Started:** 2026-08-15
+**Owner:** agent, invoked by hand (`/shinshi-catalog-video`) on an owner request for self-hosted cosplay-character content
+**Mode:** catalog fill (dogfood — NOT revenue, per the skill's standing rule)
+**Prior context:** run 0030 fixed the quality gate's argv self-probe. Since then the loop has reported nothing to do.
+
+## What the loop said, and what was true
+
+`nbb scripts/shinshi-catalog-video-tick.cljs` on this machine:
+
+```
+UNANSWERED=true  reason=d1-exit-1 ... npm ERR! cb.apply is not a function
+SCANNED=0
+```
+
+Measured directly with the `wrangler` binary instead, the same query answered in 5.3 ms.
+D1 was never down. Two separate defects were stacked here.
+
+### Defect 1 — `npx --yes wrangler` is broken on the host that runs this loop
+
+npm 11.12.1 on this machine emits `npm ERR! cb.apply is not a function` for
+`npx --yes <pkg> <args>`. CLAUDE.md already records this hazard for gates; it
+reaches this loop too, in all three scripts (`tick`, `loop`, `publish-once`).
+
+`tick` reads the non-zero exit as *D1 unreachable* and raises `:unanswered`,
+which is the correct fail-closed behaviour — so **the loop was correctly
+reporting that it could not measure, every single tick, and nothing else
+happened.** The same call in `publish-once`/`loop` sits *after* the R2 upload,
+so a wake-path publish would have put the clip in R2 and left it out of D1.
+
+Fixed: probe for a `wrangler` binary on PATH once and call it directly; fall
+back to the old `npx` form when there isn't one, so environments where npx
+works are unchanged.
+
+### Defect 2 — `LIMIT 80` applied before the filters, not after
+
+```sql
+SELECT a.slug, a.did, COUNT(s.scene_id) AS scenes
+FROM actress a JOIN scene s ON s.slug = a.slug
+WHERE a.status='active' AND s.blob_key IS NOT NULL
+GROUP BY a.slug, a.did HAVING scenes >= 1
+ORDER BY scenes DESC, a.slug ASC LIMIT 80
+```
+
+Original-series membership and \"has no video yet\" were both applied in JS,
+*after* this cut. 593 rows qualify. The top 80 by scene count are the 5-scene
+characters, and those already have videos — so the JS filter received 80 rows
+and correctly found 0 matches in them.
+
+Measured 2026-08-15 over the whole table:
+
+| | count |
+|---|---|
+| active actresses with >= 1 blob-backed scene | 593 |
+| of those, original-series | 127 |
+| **of those, with no video** | **95** |
+
+The tick reported `SCANNED=80 MATCHES=0 UNANSWERED=false` — the skill's own
+documented reading of that is *\"measured empty; the catalog is full within this
+LIMIT\"*. It was not full. This is the ADR-2608136000 shape: a check that could
+not see the answer returned the same value as a check that looked and found
+nothing.
+
+Fixed by pushing the original-series slug filter into SQL (so the cut happens
+*after* the narrowing, not before), raising the cap to 400, and adding a
+`TRUNCATED` line so a future cut is never again indistinguishable from an
+empty result.
+
+The SQL prefilter was verified equivalent before adopting it: of the 127
+eligible original-series characters by `modelProfile.series`, **all 127** also
+match a slug suffix, and **0** eligible profile-declared characters lack one.
+IP exclusion is unchanged — it still runs through `series-of` reading the
+profile, which is why `*-final-fantasy` does not survive the `%-fantasy` LIKE.
+
+## Both directions, shown
+
+| | before | after |
+|---|---|---|
+| tick on this host | `SCANNED=0 UNANSWERED=true` | `SCANNED=133 MATCHES=94 TRUNCATED=false UNANSWERED=false` |
+| tick with `scan-limit` forced to 5 | (would print `MATCHES 0`, indistinguishable from empty) | `SCANNED=5 MATCHES=0 TRUNCATED=true` |
+
+The truncation flag was exercised by temporarily setting `scan-limit` to 5 and
+confirming it fires, then restoring 400. A flag that has never been true is
+not evidence.
+
+## The clip
+
+One character, per the skill's 1-iteration rule. Generated entirely self-hosted
+— gad ComfyUI 8188 + Wan2.2 ti2v 5B. No murakumo generation token, no Stripe
+credit, no hosted (fal.ai) model.
+
+- **slug:** `aya-amano-cafe` (Aya Amano / Cafe Corner), 5 scenes, 0 videos — the
+  head of the candidate list under the loop's own `scenes DESC, slug ASC` order
+- **reference:** scene 4 blob, 832x1216 PNG
+- **generate:** 165 s on gad; H3 (8191) was left running throughout — VRAM free
+  was 51.37 GB, well over the 20 GB floor, so the stop/restore path was not needed
+- **quality:** `verdict=pass luma=140.95 motion=9.51 frames=49 512x768 2.04s h264 183289 B`
+  (the all-black hazard is ~50939 B; the gate's `--self-test` was run first)
+- **published:** https://shinshi.club/b/1b7387956a4c12b557e29097aea4de684e7ec56fcafa769420e385d681f1b8e3
+- **page:** https://shinshi.club/video/actress/aya-amano-cafe
+
+Verified live rather than trusted: the blob returns `200 video/mp4 183289`, the
+D1 row `vid-1b7387956a4c` exists in `ai-gftd-pds-recordlog`, and
+`ai.gftd.apps.shinshi.listAuthorFeed` returns the clip in the character's feed
+alongside her five scene images. The actress page itself is a client-rendered
+SPA, so its HTML contains no `<video>` — checking the page body alone would
+have been a false negative.
+
+## Not done
+
+- The remaining **94** original-series characters. One per iteration is the
+  rule; the loop can now see them, which it could not before.
+- `wan-dancer-14b` (i2v dance/cosplay, the closest thing to a cosplay-specific
+  model in the fleet) is still `pending` in the murakumo catalog — weights
+  gated, graph unwired. Selection is fail-closed, so it cannot be picked by
+  accident.
+- IP-series characters (Genshin / Fate / Final Fantasy / ...) remain excluded.
+  They are the larger share of the catalog and they are not auto-publishable.
+
+## Next
+
+`nbb scripts/shinshi-catalog-video-tick.cljs` now names `aya-amano-campus`
+(Campus Life, 5 scenes, 0 videos) as the head of the queue.
+"}]

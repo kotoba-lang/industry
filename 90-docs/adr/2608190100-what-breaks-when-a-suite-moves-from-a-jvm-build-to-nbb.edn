@@ -1,0 +1,118 @@
+[{:db/id -1
+  :adr/id "adr-2608190100-what-breaks-when-a-suite-moves-from-a-jvm-build-to-nbb"
+  :adr/doc_type "adr"
+  :adr/status "accepted"
+  :adr/date "2026-08-19"
+  :source/dataset "adr"
+  :adr/topic "runtime-priority"
+  :adr/title "ADR-2608190100: JVM ビルドから nbb へスイートを移すと壊れる 3 つ —— 同じ数字が出るまで移行と呼ばない"
+  :adr/authoritative_for
+  ["what a shadow-cljs/JVM suite hits when it is run under nbb"
+   "why a gate's dependency-pin check must read the classpath"
+   "how to tell a port from a re-labelling"]
+  :adr/related
+  ["adr-2608180200-session-close-jvm-dependency-audit"
+   "2608180100-tana-table-root"
+   "2608136000-five-questions"]
+  :adr/body
+"# ADR-2608190100
+
+**Status**: accepted / **Date**: 2026-08-19
+
+## Decision
+
+**CLAUDE.md の runtime 優先順位（kotoba wasm > clojurewasm > ClojureScript > nbb、JVM は
+最後）に従って gate を移すとき、移行が済んだと言えるのは *両 runtime が同じ件数を報告した
+時*だけとする。** gate 種別のラベルを書き換えることは移行ではない。
+
+## 実測（2026-08-19、kotobase-server / tana / macaroon / authority / org-biscuitsec）
+
+`:shadow-test`（JVM でビルドして node で走らせる）から `:nbb-test` へ移した 5 本のうち、
+**ラベルの付け替えで済んだのは 1 本だけ**（authority は既に nbb entry を持ち、JVM gate と
+同じ 37 tests / 122 assertions を出していた —— `:jvm-test` 登録は能力の欠如ではなく設定
+の誤り）。残りは実際に壊れた。
+
+### 1. nbb/SCI は async 境界を越えた throw を **包む**
+
+throw が `.then` の継続を越えると、SCI は自分の error を作り、`ex-data` を
+`{:type :sci/error …}` にして**元の ex-info を `:cause` に押し込む**。したがって
+`(ex-data e)` を**1 段だけ**読んで marker で分岐する classifier は、その marker を見失う。
+
+kotobase-server で 2 箇所見つかった。どちらも**静かに壊れる**:
+
+- `with-blocks` が自分の signal（`:block-miss`）を見失い、**retry されるはずの miss が
+  retry されず**汎用エラーとして外へ出る。しかも同じファイルの上にある `block-miss?` は
+  正しく書かれていた —— trampoline 自身がそれを通らず `ex-data` を直に読んでいた。
+- `handle` の `err` が同じ形で、**policy 拒否が AccessDenied から InternalError に
+  劣化**した。これを名指しする試験（kg-ingest is exactly as write-gated as a datom write）は
+  nbb で赤・shadow で緑になる。
+
+対処は 1 箇所化（`kotobase.server.trampoline/ex-data-chain`、9 リンクで打ち切り
+—— 自己参照 cause が request を hang させないため）。JVM と shadow では鎖は 1 リンクなので
+挙動は不変で、**それがこの検査を両者に任せられない理由**でもある。
+
+### 2. `letfn` の名前が **兄弟束縛の中から** JS コールバックへ渡ると呼ばれない
+
+`(.catch fetch-and-retry)` は nbb/SCI で **handler が一度も実行されない**。例外も警告も
+出ないので、`.catch` を書いた本人はハンドラが在ると信じ続ける。
+
+**⚠ この節は最初「letfn の兄弟を名前で渡すと壊れる」と書いており、広すぎた。**
+4 方向で測り直した結果（2026-08-19）:
+
+| 形 | 結果 |
+|---|---|
+| 単一束縛の letfn を名前で渡す | **動く** |
+| 複数束縛、**letfn 本体から**名前で渡す | **動く** |
+| 複数束縛、**別の兄弟束縛の中から**名前で渡す | **発火しない** |
+| 兄弟を直接呼ぶ（コールバックでない） | **動く** |
+
+壊れるのは 3 番目だけで、SCI の相互再帰の機構がそこに在る。**広い方の主張を残していたら、
+動いているコードを直しにいくことになった** —— 実際 `kotobase-peer` の本番 `hydrate-db`
+（単一束縛）を欠陥として報告しかけ、実測すると db を正しく組み立てていた。detector
+`verify-silent-js-callbacks` はこの狭い形だけを見る（絞り込みで 32 件 → 13 件、うち
+nbb で実際に走る repo の件数は 4 → 0）。
+
+### 3. `#?(:cljs cljs.core.ExceptionInfo)` は shadow で解決し SCI で解決しない
+
+1 ファイル 6 箇所。`:default` に寄せると型は広がるが、`thrown-with-msg?` の実質
+（メッセージ照合）は残る。
+
+## 検査は runtime に依存させない
+
+上記 1 の修正は**その runtime でしか壊れない**ので、包んだ例外を**手で組み立てる**試験を
+足した。`ex-data-chain` を `[(ex-data e)]` に戻すと 5 assertion が落ち、戻すと通る。
+これが無ければ、修正を消しても JVM と shadow の run は緑のままになる。
+
+## gate の pin 検査は classpath を読む（tana）
+
+tana の nbb runner は依存を `../<lib>` に探し、それ以外を MISSING と呼んでいた。fleet の
+ノードは 1 repo の tree しか持たず、git 依存は `~/.gitlibs/libs/<lib>/<sha>/src` に入る
+—— **5 本とも pin 通りに存在していたのに全部 MISSING と判定され、テストを 1 本も走らせずに
+exit 2** した。gate は evidence floor（`Ran N tests` が無ければ exit 93）で正しく pass を
+拒否している。
+
+修正は `--classpath` を argv から読み、そこに実際に載っているものと pin を突き合わせる形。
+`~/.gitlibs/…/<sha>/src` は **sha が path に入っているので drift しえない**、兄弟 checkout は
+HEAD を訊く。旧検査は「読んでいるコードを検査している」と主張していたが、その主張は
+成立していなかった（`../<lib>` を見ても、それが classpath に載っているかは分からない）。
+
+## 結果
+
+| repo | JVM/shadow | nbb（fleet） |
+|---|---|---|
+| kotobase-server | 154 tests / 578 assertions | 154 / 578 |
+| tana | 39 / 1105 | 39 / 1105 |
+| macaroon | 18 / 39 | 18 / 39 |
+| authority | 37 / 122 | 37 / 122 |
+| org-biscuitsec | 71 / 172 | 71 / 172（兄弟 checkout 在り）/ 161（ノード） |
+
+org-biscuitsec の 11 の差は runtime 差ではない —— sibling checkout を要する drift 検査が
+ノードで SKIPPED を印字して飛ぶ設計で、その半分が 11 assertion（ADR-2608136000 の
+『飛ばしたと合格したが出力で区別できること』の実例）。
+
+## 適用範囲
+
+`:shadow-test` はこれで**利用者ゼロ**になった（`net-kotobase/engine` は `file:` npm sibling を
+持つため構造的に gate にできず、この種別を使えない）。`gates.edn` 全体では `:jvm-test` が
+まだ 84 本あり、本 ADR はそれらを一括で移す決定ではない —— **移すときに何を確かめるかを
+決めている**。"}]

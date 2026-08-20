@@ -1,0 +1,286 @@
+[{:db/id -1
+  :adr/id "2608031500-newsfeed-primary-source-ingestion"
+  :adr/title "ADR-2608031500: 一次情報の取得層（kotoba-lang/newsfeed）と、そこから aozora.app への 1 本目の動画"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "news-ingestion-a-layer"
+  :adr/date "2026-08-03"
+  :adr/last_verified "2026-08-03"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn-only (ADR-2607171600)"
+  :adr/repos ["kotoba-lang/newsfeed" "com-junkawasaki/root"]
+  :adr/authoritative_for
+  ["この workspace の一次情報取得（feed → article datom）が kotoba-lang/newsfeed に住むという決定"
+   "article 属性が cloud-itonami/news の news.schema（:news/* / :news.source/*）を流用するという決定"
+   "ledger は観測、catalog は評価であり、editorial field は読み出し時に catalog から再 join するという規則"
+   "ランキングと running order は別物で、per-source / per-class の上限は channel 側のデータで宣言するという規則"
+   "near-duplicate クラスタリング閾値 0.45 と、同一 source 同士は結合しないという規則"
+   "murakumo-gpu-ai / kotobase-storage の 2 チャンネル定義"]
+  :adr/related
+  ["adr-2607171800-ai-gftd-dougaka-vector-video-workflow"
+   "adr-2607299960-dougaka-murakumo-compute-kotobase-storage"
+   "adr-2607020910-newscaster-broadcast-actor"
+   "adr-2607300100-dead-gftd-host-prune-and-ipfs-kotobase-standup"
+   "adr-2607299000-repository-rules-workspace-authority"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/landed
+  ["kotoba-lang/newsfeed main 422300525ab7fab662b68f4a77e42720a85a81ed — 取得層一式"
+   "com-junkawasaki/root main 3d6cd3e9c870676327e4beef1a0a51618d7db3be — west 登録 + 本 ADR"
+   "cloud-itonami/dougaka-vector main 3bd75a99aef02b2d67564eb416e462b28fa86536 — per-run channel identity + brief 出典"
+   "network-awai/aozora-engine main 5207381fa5484c54ff2b7ba94a4707d04ed185ca — creator actor 登録（ただし効果なし。下記 D8）"
+   "aozora.app 実投稿: at://did:key:z6Mkv4HyP31wtiPQKXKctNc3oEepya6omEYkCrudbnYg9SbB/app.bsky.feed.post/co-design-attention"]
+  :adr/addendum-2608031700
+  "## 追記 2026-08-03: 海運・物流 channel と、feed を持たない発行者という壁
+
+問い: `https://www.mol.co.jp/pr/2026/26022.html` のような企業プレスリリースを取り込めるか。
+**取り込めない。MOL(商船三井) は RSS/Atom を公開していない。** press ページにもトップにも
+autodiscovery link が無く、推測した 4 URL は 200 で空文書。日本郵船・川崎汽船・国土交通省・
+日本海事協会も同じで、**一次情報が HTML しか無い発行者は本 ADR の取得層では構造的に扱えない**。
+測定値付きで 13 件を `resources/sources.edn` の `:rejected` に記録した。
+
+これは roster の穴ではなく取得層の設計境界である。埋めるには (a) HTML を扱う別経路
+(scraper / 構造化抽出) を足すか、(b) その発行者を報じる二次情報で代替するかの二択で、
+今回は (b) を採った。
+
+追加した 10 source (すべて repo の parser で fetch してから列挙、`:newsfeed/verified*` 付き):
+一次情報 = ONE(Ocean Network Express、日本 3 社のコンテナ部門合弁) / METI(この roster で
+唯一の日本語 feed)。トレード press = gCaptain / Splash 247 / The Maritime Executive /
+Container News / Offshore Energy / Journal of Commerce / FreightWaves / Supply Chain Dive。
+
+消費先 = `:itonami-supply-chain` channel(itonami.cloud)。実 digest で
+pool 1,569 -> in-window 177 -> above-threshold 105 -> running order 6 を確認。
+maritime-executive は 1 outlet で 56 item 出るので `max-per-source 2`、FreightWaves は
+トラック輸送・犯罪ニュース比率が高いので `source-bias -2`。
+
+### (b) は今回うまくいっていない — 実測
+
+1,569 article の実 ledger 上、曖昧でない表記での内訳:
+**商船三井 0 件 / 日本郵船 1 件(`NYK moves to absorb NS United in near $1bn deal`) /
+川崎汽船 0 件 / ONE 4 件(自社 feed)**。つまり MOL は発行者としても主題としても
+この 1 週間で 1 件も入らない。トレード press を足せば届く、とは言えない。
+
+### 3 文字略語で誤認しかけた
+
+当初 `MOL Group buys Shell's subsidiary in Cyprus for $720 million` (offshore-energy) を
+商船三井の記事と数え「出来事は届く」と書いたが、これは**ハンガリーの石油会社 MOL Nyrt.**
+だった。`MOL` を keyword にも判定にも使わないことを sources.edn にコメントとして固定し、
+channel の keyword は `商船三井` / `mitsui o.s.k.` という曖昧でない表記だけを持つ。
+**社名が略語の企業を keyword で追うときは、その略語が誰の略語かを先に確かめる。**
+
+### 残る穴
+
+日本語の一般紙・専門紙(日本海事新聞など)が roster に無く、日本語 feed は METI 1 本だけ。
+kawaraban(世界ニュース mirror)は「営利企業を mirror しない」を明示ポリシーに持つ一方、
+newsfeed は NVIDIA / ONE という営利企業の press を既に入れている — **2 つの取得層が
+別ポリシーで動いていることは、まだどこにも記録されていない。**"
+
+  :adr/verification
+  "実行して検証した（inspection ではない）。取得層: 17 feed すべてを実ネットワークで fetch し 1,336 article を parse、25 tests / 99 assertions が nbb と JVM の両方で green、クラスタリング閾値は実 261 記事の sweep で決定。動画: brief の topic から storyboard 生成（murakumo-main）→ 570 frame render → mp4（h264 1920x1080 / 19.0s / 30fps）→ aozora publish。フレームを実際に目視して黒背景・ネオンの意匠が出ていることを確認（単色板ではない）。publish 後に PDS から読み戻し、post record 取得可・blob は sha256 完全一致・resolveHandle が did:key を返すことを確認。dougaka-vector 23 tests / 116 assertions green。aozora-engine は creator-actors ns の 7 tests / 55 assertions を nbb で green（フルスイートは本変更以前から main で壊れている — byoubu-ui.core 欠落、無変更 checkout でも同一失敗を確認）。"
+
+  :adr/known-gaps
+  ["**最大の未解決（resume point）**: 投稿は PDS に実在し公開 URL で取得できるが、aozora.app/videos のフィードに出ない。getVideoFeed は appview の共有 index `yoro-social-v2` を読むが、この repo のレコードがそこに projection されていない（getProfile が not found、dougaka は postsCount 3）。キャッシュではないことを確認済み（未使用 URL limit=37 でも 6 件のまま）。PDS の wrangler.jsonc は PER_ACTOR_DB=1 で「各 write が YORO_DB_NAME へ projection する」と述べており、*/5 の fold cron もあるが、投稿から 20 分以上経っても現れなかった。次の一手は PDS の write path（aozora-engine/pds/src）を読み、projection がどの条件で発火するかを特定すること。"
+   "aozora-engine の creator-actors 登録は意図した効果を持たなかった。appview worker の router はこの ns を一切参照しておらず、消費者は別 repo（aozora-appview）の SPA 側。データ追加として無害で tests も green だが、これで /videos に出るようにはならない。判断を誤った箇所として残す。"
+   "aozora-engine の `npm test` は本変更以前から main で壊れている（byoubu-ui.core が kotoba_ui/theme.cljc から要求されるが解決しない）。無変更の共有 checkout でも同じ失敗を実測。フルスイートでの検証ができないため、変更した ns を nbb で直接検証してから deploy した。"
+   "storyboard actor は flaky。3 attempts では validator に落ち（:scene/template :none、copy-id 欠落）、5 attempts で 1 発目に通った。既定の attempts では足りない。"
+   "kotobase-storage チャンネルは 1 本も publish していないので did:key を持たず、creator-actors にも意図的に未登録（存在しない actor を宣言しないため）。"
+   "loop-ka-production の channels.edn への登録はまだ。そのため murakumo-news の cadence は :active? false（消費者のいない tick を出さないため）。"
+   "MURAKUMO_CHAT_TOKEN_SECRET_2 は secrets-location-map が kagi にあると書いているが live vault に存在しない（no such item）。2026-07-29 に generation secret で起きたのと同型の乖離がもう 1 件。回避策として MURAKUMO_API_TOKEN_SECRET から mk1 token を mint し api.murakumo.cloud/v1/chat/completions を使った（murakumo.cloud/api/v1 は 401）。"
+   "murakumo-news の publisher seed は ~/.gftd/murakumo-news-aozora-identity.edn にしかない。yukkuri の先例（ADR-2607299960）に倣えば kagi へ移すべきで、まだ移していない。"
+   "ledger はローカルファイル（state/articles.ledger.edn、gitignore 済み）。kotobase の durable plane に載せる ref は未決定。まだ一度も kotobase に書いていないので CLAUDE.md の『最初の write の前に ref を決めよ』には違反していないが、載せる前に決める必要がある。"
+   "YouTube は未着手（オーナー指示により aozora で確認できるまで保留）。OAuth の所在も未確認。"
+   "arXiv abstract の rightsPolicy を fair-use-quote としたが、arXiv の license は投稿ごとに異なる。headline + link + 短い引用の範囲では足りるが、本文を長く引くなら per-article license が要る。"
+   "Blocks & Files と Hugging Face は description が空なので title だけで採点され、summary を持つソースより構造的に低く出る（実測: 1064 対 1700-2000 台）。本文取得はしていない。"
+   "The Register は section 別 feed が存在せず、両チャンネルが同じ全 section feed を読んで gate で仕分けている。gate の誤りは両チャンネルに同時に出る。"]
+
+  :adr/body
+  "# ADR-2608031500: 一次情報の取得層を実際に作る
+
+**Status**: accepted
+**Date**: 2026-08-03
+**Deciders**: Jun Kawasaki（指示: 「do it」— murakumo.cloud / kotobase.net の
+YouTube チャンネル構想に対し、取得層から作ることを了承）
+
+## Context — 3 層すべてで途切れていた
+
+オーナーの問い「最新 news はどこから取得している?」を実測で辿った結果、
+**どこからも取得していなかった**。設計は 3 層あり、3 層とも別々の理由で切れていた。
+
+| 層 | repo | 実態 |
+|---|---|---|
+| A（一次収集） | `cloud-itonami/news` | RSS ingest の XRPC 口はあるが、fetch 自体は `NEWS_POD_URL/invoke` に委譲。**その pod の実装が workspace 内に存在しない**（`news.rss.resolveSources` / `news.rss.ingestSource` の grep は Worker 側の宣言と設計 md のみ）。host `news.gftd.ai` は Cloudflare DNS には残るが **15 秒でタイムアウト**（同一セッションで murakumo.cloud / kotobase.net は 200）。ADR-2607300100 が片付けた「Worker は消えたのに route だけ残る」6 host と同じ症状で、news.gftd.ai はその 6 件に**入っていない** |
+| B（編成・生成） | `cloud-itonami/newscaster` | 完成した放送 actor（rundown / anchor script / EditorialGovernor / YouTube publisher）。ただし `NewsFeed` port の実装は **`mock-feed` のみ**。README 自身が live 実装を follow-up と明記 |
+| 動画 | `cloud-itonami/dougaka-vector` | 3blue1brown 型のベクターアニメ pipeline。入口は**素の topic 文字列 1 個**で、取得層を持たない |
+
+さらに決定的だったのは、**workspace 全体に feed URL が 1 本も無かった**こと。
+`:news.source/feedUrl` という schema 属性は存在するが、source は runtime に
+Datomic へ登録する設計で seed が無い。「どこから取るか」のリスト自体が空だった。
+
+実際に外部から一次情報を取れているのは `cloud-murakumo-market-intel` の
+SEC EDGAR ingestion だけで、これは企業財務であってニュースではない。
+
+## Decision
+
+**`kotoba-lang/newsfeed`（public、prefix 無し = reusable library、`:execution :none`）
+を新設し、そこに取得層を置く。** 純 `.cljc` + IO は `bin/*.cljs`（nbb）のみ。
+loop も clock も publishing key も持たない。
+
+### D1. 死んだ host は復活させない
+
+`news.gftd.ai` の Worker / pod を作り直す選択肢は採らない。ADR-2607300100 が
+\"Retire rather than repoint\" を明示しており、`ipfs.gftd.ai` を新 Worker に
+向け直すことすら「退役させた決定を取り消す」として拒否している。取得層は nbb で
+書き、article datom を直接 workspace の EDN 面に置く。
+
+### D2. 属性名は借りる（新語彙を作らない）
+
+article は `:news/*`、source は `:news.source/*` を `cloud-itonami/news` の
+`news.schema` から**そのまま**流用する。`art-<sha256hex(url)>` の id 規約も、
+`rightsPolicy` の語彙（`fair-use-quote` / `public-domain` / `gov-open` / …）も同じ。
+A 層は今日到達不能だが、これがこの workspace の既存語彙であり、平行語彙を作れば
+A 層か後継が戻った日に翻訳層が要る。`newscaster` の EditorialGovernor が
+`publish-allowed?` で見るのもこの語彙なので、そのまま gate を通せる。
+
+### D3. ledger は観測、catalog は評価 — 読み出し時に再 join する
+
+`credibility` / `class` / `rightsPolicy` は「その情報源をこちらがどう評価するか」で、
+学習に応じて改訂される。append-only の ledger は改訂できない。したがって
+`newsfeed.catalog/enrich` が **読み出しのたびに現行 catalog を ledger の上に重ねる**。
+ingest 時の値も ledger に書くが、それは provenance（当時どう思っていたか）であって
+読み取り経路ではない。
+
+**これは実測で分かった**: `:news.source/class` を catalog に足しても、
+join が無い間は**何も変わらなかった** — ledger 内の全記事がその field より前に
+ingest されていたため。既存の per-class 上限が黙って per-source 上限に退化していた。
+
+### D4. ランキングは running order ではない
+
+初回の実データで、採点器は正しく動いたのに結果は編集として誤っていた:
+
+- GPU/AI チャンネルの上位 6 件中 **4 件が arXiv preprint**（abstract は構造上
+  キーワード密度が高い）
+- storage チャンネルの上位 6 件中 **5 件が単一の trade 媒体**
+
+どちらも false positive ではない — 全件が on-topic で正しく採点されていた。
+**だからこそ採点器は直す場所ではない。** 直したのは channel 側のデータ:
+`:channel/max-per-source` / `:channel/max-per-class` / `:channel/source-bias`。
+採点器に preprint を不当に低く見させるのは relevance についての嘘になる。
+
+### D5. near-duplicate 閾値は 0.45、かつ同一 source 同士は結合しない
+
+実 261 記事（2026-07-27〜08-03）に対する sweep:
+
+| 閾値 | merge | 内訳 |
+|---|---|---|
+| 0.55 | 0 | 当初の推測。何も結合しなかった |
+| **0.45** | **1** | **Kioxia 液冷 SSD（Tom's Hardware + StorageReview）。false 0** |
+| 0.35 | 2 | 無関係な long-context 論文 2 本を誤結合 |
+| 0.30 | 3 | さらに別々の Dell ノート PC レビュー 2 本を誤結合 |
+| 0.25 | 6 | true 4（AM5 firmware / MinIO / Nutanix-Dell）false 2 |
+
+0.25 は真の重複を 3 件多く拾うが**採らない**。誤りが非対称だから:
+under-merge は同じ話題が 2 回出るだけで、視聴者に見えて許される。
+over-merge は**実在の記事を無関係な記事の傍証として file し、消す** — 誰の目にも
+触れなくなる。冗長は可視、抑圧は不可視。
+
+加えて **同一 source の 2 記事は決して結合しない**。媒体は同じ話を 2 回は出さない
+ので、1 媒体内の高い title 重複は「関連記事」であって重複ではない（実測の
+Dell Pro 5 / Pro 7、Kioxia の別製品 2 件）。閾値を後から下げられても構造的に守る。
+
+### D6. `:channel/sources` は宣言どおり効かせる
+
+当初 digest は channel の source 宣言を無視して全記事を採点していた。宣言を
+honour する側に直した — 宣言していない feed から黙って引く channel は、自分の
+定義を読んでもレビューできない。source は複数 channel に重複して載ってよく
+（The Register は全 section feed 1 本しか無いので両方が読む）、何を取るかは
+keyword / url-hint gate が決める。
+
+## 2 つのチャンネル
+
+| channel | site | sources | window | min-score |
+|---|---|---|---|---|
+| `murakumo-gpu-ai` | murakumo.cloud | 12 | 7 日 | 4 |
+| `kotobase-storage` | kotobase.net | 8 | 7 日 | 4 |
+
+`:brief/topic` は **lead の見出しをそのまま**渡す（deterministic）。ここでモデルに
+言い換えさせると、pipeline が勘定していない 2 つ目の生成段が上流にできて、
+どの引用も主張していないことを動画が言い出す道になる。生成は
+`dougaka-vector` の storyboard actor 1 箇所に閉じたままにする。
+
+## Verification（2026-08-03、実行）
+
+- **17 feed すべてを実 fetch して parse 成功**、1,336 article。候補として probe して
+  落ちたものは `:rejected` に status 付きで残した（arXiv の広告 RSS は 200 で 0 件・
+  Atom API は動く / The Register に section 別 feed は無い / `blog.min.io/rss` は空 /
+  SNIA は非ブラウザ UA を 403）。
+- **25 tests / 99 assertions green を nbb と JVM の両方で**（同一 `.cljc`）。
+- TZ 変換の実測: `Fri, 31 Jul 2026 17:11:03 +0100` → `2026-07-31T16:11:03Z`、
+  `Sun, 02 Aug 2026 20:23:32 -0400` → `2026-08-03T00:23:32Z`（日付繰り上がり）。
+- 実 brief 2 本を生成。murakumo は NVIDIA Technical Blog を lead に vLLM release /
+  StorageReview の KV cache 記事 / Tom's Hardware / arXiv 1 件、kotobase は
+  KIOXIA CM10 を lead に ScaleFlux / The Register / Blocks & Files。
+
+## 実装中に出た 2 つの bug（どちらも消費者からは見えない）
+
+1. **`:score/*` のスケールが不揃いだった。** `:score/total` と `:score/source` は
+   ×100 なのに `:score/keywords` と `:score/url` は生値。合算も比較もできる単位に
+   見えて実際は混在していた。全部を「点の 1/100 単位の整数」に統一した。
+2. **テスト fixture が `clojure.core/cat` を shadow していた。** JVM が警告を出し、
+   名前を変えた際に 2 箇所の参照が `cat` のまま残り、`(catalog/channel cat :c1)` が
+   transducer に対して `:channels` を引いて nil を返していた。テストは通り続けていた —
+   nil channel は `for-channel` が「宣言なし = 全件」と解釈するため。**shadow は
+   テストを黙って無意味にする。**
+
+## D7. 取得層から動画までを実際に通した（2026-08-03）
+
+brief → storyboard → render → mp4 → aozora publish を実データで 1 本通した。
+
+- **LLM**: `api.murakumo.cloud/v1/chat/completions`（mk1 token）。`murakumo.cloud/api/v1` は
+  401 で、その gate の secret（`MURAKUMO_CHAT_TOKEN_SECRET_2`）は secrets-location-map が
+  kagi にあると書いているのに **live vault に無かった**。総当たり列挙はせず、既知の別識別子
+  `MURAKUMO_API_TOKEN_SECRET` で 1 件だけ引いて mint した。
+- **storyboard**: brief の lead 見出しをそのまま topic に渡して 5 scene / en+ja。**flaky** —
+  3 attempts では validator に落ち、5 attempts で通った。
+- **mp4**: 570 frame / 19.0s / 1920x1080 h264。フレームを目視し、黒背景・ネオンの
+  タイトルカードとフローダイアグラムが出ていることを確認した（57 kbps と低いのは
+  意匠が疎なためで、単色板ではない — ADR-2607299960 の事故と同じ疑いを実際に潰した）。
+- **publish**: aozora が主・YouTube は syndication という dougaka-vector の設計どおり、
+  YouTube より先に aozora へ出した（オーナー指示「まず youtube に投稿する前に aozora.app に
+  投稿して確認できるようにして」）。読み戻して blob が sha256 完全一致することを確認。
+
+### dougaka-vector に入れた変更（1 repo が複数チャンネルを回すため）
+
+`--display-name` / `--description` を per-run にした。handle だけでは identity にならず、
+murakumo のニュースを dougaka-vector 名義の displayName/description で出すのは誤帰属になる。
+`--brief` で newsfeed の brief を受け、**投稿本文が lead の出典と URL を名乗り**、catalog
+record が全 citation と topic を持つ。`news-post-text` は **URL を絶対に切らない** —
+切れた URL は引用に見えて何も解決しないので、無いより悪い。尺が足りなければ題が先に譲る。
+
+## D8. aozora の creator-actors 登録は効かなかった（判断の誤り）
+
+投稿は PDS に実在するのに aozora.app/videos に出ないので、appview の
+`aozora.appview.creator-actors` に登録すれば見えるようになると考え、登録・テスト・deploy
+まで実行した（aozora-engine `5207381`、appview version `0b400483`）。
+
+**しかし appview worker の router はこの ns を参照していない。** 消費者は別 repo
+（aozora-appview）の SPA 側で、しかも ADR-2607071300 自身が「profiles work today with no
+server-side graph write」と書いているとおり、これはプロフィール描画の projection であって
+実 post を feed に載せる仕組みではない。データ追加として無害で tests も green だが、
+**目的は達成していない。** 実際の索引経路は PDS 側の `PER_ACTOR_DB=1` による
+`yoro-social-v2` への projection で、なぜ発火しなかったかは未特定（resume point）。
+
+## Consequences
+
+- (+) `newscaster` の `NewsFeed` port に、初めて live 実装を書ける材料が揃った
+  （article 形が既に `news.schema` なので写像は恒等に近い）。
+- (+) `dougaka-vector` の topic が、手で渡す文字列ではなく出典付きの brief から来る。
+- (+) 引用が ledger の article id なので `cites ⊆ ingested` が構造的に満たされる。
+- (+) 閾値・上限・source の評価がすべて `resources/sources.edn` のデータで、
+  コードを読まずにレビューできる。
+- (−) ledger がまだローカルファイル。kotobase の durable plane に載せる ref は未決定
+  （CLAUDE.md の「最初の write の前に決めよ」に従い、載せる前に決める）。
+- (−) summary を持たない 2 ソースは構造的に低く出る。本文取得はしていない。
+- (−) source の credibility は編集上の重みで、真実性の主張ではない — が、数値で
+  書かれると後者に読まれやすい。catalog の冒頭に明記した。
+"}]

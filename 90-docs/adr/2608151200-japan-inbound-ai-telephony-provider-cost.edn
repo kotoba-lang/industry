@@ -1,0 +1,433 @@
+[{:db/id -1
+  :adr/id "2608151200"
+  :adr/title "日本で電話を AI に受けさせる — Telnyx / Twilio / Amazon Connect の実測コストと provider 選定"
+  :adr/status "accepted"
+  :adr/date "2026-08-15"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/tags "denwaban, koe, telephony, telnyx, twilio, amazon-connect, cost, japan, pstn, voice-ai, provider-selection, murakumo, isic-561"
+  :adr/body
+  "## 決定
+
+**日本の着信を AI に受けさせる経路は、Telnyx の 050 (national) 番号 + BYO
+（音声だけ取り出して自前 AI に流す）を採る。**
+
+**2026-08-15、オーナーが Telnyx を契約した。** この ADR は同日 `proposed` で
+起票し、契約をもって `accepted` に変えた。反転させる条件は下記に名指しで
+書いてある —— **契約したことは条件が消えたことを意味しない。** 0120 が要件に
+なる・人間へのエスカレーションが本番に入る、といった条件が真になれば、
+その時点で Amazon Connect が正しい答えになる（その場合この ADR を superseded
+にして後継を書く）。
+
+`cloud-itonami/denwaban` の `koe.ports/ITelephony` は provider-neutral な
+まま維持する。この ADR が決めるのは **どの adapter を最初に実装するか**で
+あって、他を排除することではない。
+
+## 契約後に配線したもの（2026-08-15）
+
+- **Telnyx remote MCP** を `.mcp.json` の `telnyx` に登録した
+  （`https://api.telnyx.com/v2/mcp`、streamable HTTP）。**OAuth ではなく
+  Bearer API キー**なので、駆動できる sign-in フローは存在しない。
+- **鍵の custody は kagi が正本、OS Keychain はキャッシュ。** `headersHelper`
+  が接続のたびに Keychain だけを読む。実測 2026-08-15 で `kagi get` は
+  3.8〜5.1 秒、Keychain は 0.02 秒、`headersHelper` の予算は 10 秒・キャッシュ
+  無し・接続ごと・401 リトライごとの再実行。**消して再構築できるか**の判定で
+  kagi = premise / Keychain = projection に分けた。詳細と再構築手順は
+  `.claude/skills/secrets-location-map/references/third-party-api.md`。
+- ⚠ **このキーの権限が唯一の境界。** `/v2/mcp` は本番アカウントに対して
+  番号購入・発信・AI assistant 作成ができる。権限を絞ったキーを発行するかは
+  用途が固まった時点で判断する。
+- 🔴 **初回キーは会話ログへ平文で貼られた。rotate 対象**（Portal で再発行 →
+  kagi 更新 → Keychain キャッシュ作り直し、の 3 手で 1 組）。
+
+## 現在地と resume point（2026-08-17 時点）
+
+**Telnyx の口座は 2 つある。** 下の表は日本向け（Gftd Japan）の話で、2026-08-17 に
+別法人 AWAI Network, L.L.C. の口座を新設した（次節）。**鍵を取り違えない。**
+
+| | |
+|---|---|
+| ✅ アカウント契約 | 済（Gftd Japan株式会社） |
+| ✅ API キー | kagi 正本 + Keychain キャッシュ。**認証必須エンドポイントで 200 を実測** |
+| ✅ MCP | `.mcp.json` の `telnyx`。**旧（Gftd Japan）の鍵を読む。**番号を持つのはこちら |
+| ✅ 住所レコード | id `3027096574225286557` / `Gftd Japan株式会社` / 3-2-1 Nihonbashi, Chuo-ku, Tokyo 103-0027 |
+| ⬜ **書類 2 件** | **未提出（`GET /v2/documents` = 0 件）。ここで止まっている** |
+| ⬜ 番号購入 | 未実行。**書類が承認されるまで注文しない** |
+
+**日本番号のブロッカーは AWAI 口座では外れない。** 日本の番号割当は日本法人・日本住所を
+要求するので、Delaware LLC に切り替えても書類提出は回避できない。AWAI 口座は
+US / 国際番号を運営主体の名義で持つためのものであって、この行の代替ではない。
+
+### ⚠ このアカウントは空ではない — 本番稼働中の US 番号がある
+
+**`+1 949 741 7223`**（US local、**active**、取得 2026-03-26、接続
+`celler-sip-gateway`、messaging profile 割当済み）。**Telnyx アカウント自体は
+2026-03 から稼働しており、2026-08-15 の「契約」は日本向けの新しい意図であって
+新規アカウントではない。**
+
+- **`celler-sip-gateway` の接続や messaging profile に触らない。** 日本の 050 を
+  足すのは既存構成への*追加*であって、置き換えではない。
+- 旧住所レコード `GFTD Co., Ltd.`（id `2924235927926605495`、2026-03-26 作成、
+  この US 番号と同日）は**削除しない** —— その番号の登録に紐づいている可能性が
+  ある。日本の注文では新しい `Gftd Japan株式会社` を指定するだけでよい。
+- **API キーの権限が唯一の境界**という注記（上記）は、この既存番号にも及ぶ。
+  番号の解放・発信・SIP 接続の変更が同じキーで可能である。
+
+**この事実は 1 日見落とされていた。** `GET /v2/phone_numbers` を鍵の疎通確認に
+使いながら **HTTP 200 だけ見て本文を捨てていた**ためで、`meta.total_results` に
+最初から 1 と書いてあった。CLAUDE.md ADR-2608136800 の 5 問のうち
+「受け取った本文を捨てていないか」に該当する。**疎通確認に使ったレスポンスにも
+答えが載っていることがある。**
+
+## AWAI Network, L.L.C. の口座（2026-08-17 新設）
+
+運営主体の名義を正すため、`network-awai` の operator record が定める
+**AWAI Network, L.L.C.**（Delaware file no. 10704996 / EIN 30-1502338）で
+2 つ目の口座を作った。番号 0 本・残高 $0.00。
+
+| item | 口座 | 見分け方 |
+|---|---|---|
+| `telnyx-api-key` | Gftd Japan株式会社 | `GET /v2/phone_numbers` = **1 件** |
+| `telnyx-api-key-awai` | AWAI Network, L.L.C. | `GET /v2/phone_numbers` = **0 件** |
+
+**どちらの鍵も 200 を返すので、認証が通ったことは口座の同定にならない。**
+
+### `.network` ドメインは Telnyx に登録できない（先方の正規表現バグ）
+
+`j@awai.network` での登録は拒否される。web フォームが理由を出しており、
+ブロックリストのパターンが `.work$` —— **ドットが未エスケープ**で、正規表現の
+`.` が任意の 1 文字に一致するため `awai.network` の末尾 `twork` に当たっている。
+意図は `.work` TLD の遮断で、正しくはドットをエスケープした形。実測で
+`junkawasaki.com` / `gftd.group` / `gftd.co.jp` は影響を受けない。
+
+- API 側は同じ拒否を error 10027（`source.pointer = /email`）として返す。
+  **API のエラー文は理由を書かない。web フォームの方が情報量が多かった。**
+- 2026-08-17 に support@telnyx.com へ報告済み（Request ID
+  `a64cc757-97a9-9dee-8e1a-8411379cf93d`）。返信あり・**未読**。
+- 回避策として **Telnyx Agent Inbox**（`agentmail.to` ドメイン）で口座を作った。
+  修正されたら口座メールを `j@awai.network` へ移し、この箱への依存を切る。
+
+### Agent Inbox — 未文書 API と、口座復旧経路であること
+
+`agent-signup.md` は Agent Inbox の request body を一切書いていない。実測した形:
+
+```
+POST /v2/agent_inboxes/challenges  {purpose: bot_signup}
+  -> {challenge_id, algorithm: sha256-v1, challenge, difficulty_bits: 20, expires_at}
+POST /v2/agent_inboxes             {purpose: bot_signup, pow: {challenge_id, nonce}}
+```
+
+- `purpose` は必須。値は `bot_signup` のみ受理（`signup` / `agent_inbox` /
+  `inbox` / `general` はいずれも 400）。
+- proof-of-work の構成も未公開。**受理されたのは `sha256(challenge + コロン + nonce)`**
+  で、素の `challenge + nonce` は拒否される。誤った構成は
+  `Invalid proof of work` で弾かれるだけなので順に試して安全に特定できる。
+- **読み取り専用。** 生きているのは messages の一覧と個別取得の 2 本だけで、
+  送信・スレッド・受信箱メタデータは 404。**この口座から人に返信する経路は無い。**
+- ⚠ **`account_key` は一度しか返らず、失うと受信箱ごと復旧できない。**
+  サインインリンクがここに届く以上、これが口座の復旧経路そのものである。
+  kagi（`personal`）と Keychain の両方に `telnyx-agent-inbox-key` として格納した。
+
+手順とアクセス方法は `scripts/telnyx-agent-signup.cljs` と
+`.claude/skills/secrets-location-map/references/third-party-api.md`。
+
+**次の 1 手**: 履歴事項全部証明書（Gftd Japan株式会社、発行 3 か月以内）と
+住所証明を用意し、`POST /v2/documents` → requirement group 作成 →
+在庫を引き直して `POST /v2/number_orders`。**在庫は動くので注文直前に引き直す。**
+
+**法人格は `Gftd Japan株式会社`**（オーナー確認済み、2026-08-15）。契約当初に
+登録されていた `GFTD Co., Ltd.`（id `2924235927926605495`、2026-03-26 作成）は
+**実体と一致しない**。旧レコードは削除していない（他所からの参照が不明なため）
+—— 注文時に新しい方を指定すること。
+
+### m365 アーカイブは使えない（探索済み、2026-08-15）
+
+「社内アーカイブから書類を出す」は**試して否定された**ので、次のセッションが
+同じ発掘を繰り返さないために結果を残す:
+
+- 登記・印鑑証明系は **2019 年 2 件 / 2020 年 4 件のみ**。要件は 3 か月以内。
+- しかも名義が `Gftd Japan株式会社` / `GW(GA)` / `㈱DE-SCHOOL` と割れており、
+  公共料金の記録は全部 **Gftd Labo合同会社・早稲田ニシカワビル**（別法人・別住所）。
+- **3 か月の窓（11,567 ファイル）の中で、公共料金・電力・ガス・水道・NTT・
+  納税・社会保険・領収・明細・invoice のヒットは全部 0。** 候補は
+  `mail/整理/請求経理/` の 10 通だけで、ファイル名がハッシュなので中身は不明。
+- **アーカイブ自体は最新**（最終 commit 2026-07-20、2024 年以降 83,851 ファイル）。
+  つまり**取得漏れではなく、最近の証明書が存在しない。**
+
+その 10 通は開けていない —— **annex の実体取得が GPG で止まった**（下記）。
+ただし窓内のヒットが 0 である以上、**開いても住所証明が出る見込みは低い。**
+書類は法務局と公共料金事業者から新規に取るのが正しい経路。
+
+## なぜ測ったのか
+
+`cloud-itonami/denwaban/docs/telephony-provider-architecture.md` は冒頭で
+**価格と規制は外部事実であり、使う前に測り直せ**と書いている。これはその
+測定の記録である。同 doc の provider 比較表は Telnyx を
+「best second CPaaS candidate」と書いていたが、**金額は 1 つも入っていな
+かった**。
+
+## 測り方（再現可能な形で残す）
+
+| provider | 出所 | 取り方 |
+|---|---|---|
+| Telnyx | `https://telnyx.com/pricing.md`（canonical price sheet、704 KB） | curl して grep |
+| Twilio | `https://www.twilio.com/en-us/voice/pricing/jp` | HTML の `<tr>` を実スクレイプ |
+| Amazon Connect | AWS Pricing API `AmazonConnect/current/ap-northeast-1` | JSON を parse |
+
+FX は 159 円/USD（2026-08-14 実測 159.15）。
+
+**Telnyx と AWS は機械可読な正本を公開している。Twilio は公開していない**
+（価格表は HTML の中）。これは再測定のコストに効く。
+
+## 実測 — 番号（2026-08-15）
+
+| | Telnyx | Twilio | Amazon Connect |
+|---|---|---|---|
+| 050 (national) | $4.5/月 + 初期 $8 | $4.75/月 | 日額課金（JP 額 UNVERIFIED） |
+| 03 (0ABJ local) | $5/月 + 初期 $5 | **$20/月** | 同上 |
+| 0120 (toll-free) | $35/月 + 初期 $30 | $25/月 | 日額課金 |
+
+**Twilio の 03 番号は $20/月で Telnyx の 4 倍。** 050 なら 3 社ほぼ横並び。
+
+## 実測 — 着信と AI（2026-08-15）
+
+| | Telnyx | Twilio | Amazon Connect |
+|---|---|---|---|
+| 着信 050 / 03 | **$0.004 / $0.010** | $0.010 | UNVERIFIED |
+| 着信 0120（固定/携帯） | $0.15 / $0.28 | $0.1854（区別なし） | **$0.08** |
+| マネージド AI | Voice AI Agent $0.05 | ConversationRelay $0.07（BYO LLM） | Connect AI $0.038 |
+| BYO 用の音声取り出し | Media Streaming $0.0035 | Media Streams $0.0044 | — |
+| **課金単位** | 60/60 切り上げ | 60/60 切り上げ | **秒課金（10 秒下限）** |
+
+参考（Telnyx 部品）: Deepgram Nova 3 STT $0.0074/分、Azure Neural HD TTS
+$0.00005/文字、Kimi K2.6 は $0.95/1M in・$4.00/1M out。
+参考（Twilio 部品）: streaming transcription $0.027/分、TTS Neural
+$0.0032/100 文字、TTS Generative $0.0130/100 文字。
+
+## 総額（月 500 件、159 円/USD）
+
+実通話 75 秒（受付 bot の現実的な長さ）:
+
+| | 円/通話 | 月額 |
+|---|---|---|
+| Telnyx 050 + 自前 (murakumo) | 3.0 | 2,226 |
+| Twilio 050 + MediaStreams + murakumo | 4.6 | 3,045 |
+| AWS Connect AI + DID | 9.5 | 4,913 |
+| Telnyx 050 + 自前 (Realtime mini) | 12.6 | 6,996 |
+| Telnyx 050 + Telnyx Voice AI | 19.1 | 10,256 |
+| Twilio 050 + ConversationRelay | 27.3 | 14,429 |
+
+実通話 180 秒:
+
+| | 円/通話 | 月額 |
+|---|---|---|
+| Telnyx 050 + 自前 (murakumo) | 4.5 | 2,981 |
+| Twilio 050 + murakumo | 6.9 | 4,190 |
+| Telnyx 050 + Realtime mini | 18.8 | 10,136 |
+| AWS Connect AI + DID | 22.9 | 11,591 |
+| Telnyx Voice AI | 28.6 | 15,026 |
+| Twilio ConversationRelay | 41.0 | 21,266 |
+
+0120（月 500 件 x 3 分）: AWS 28,600 円 < Twilio 66,300 円 < Telnyx 81,000 円。
+**順位が完全に入れ替わる。**
+
+## 効いたのは単価ではなく課金単位
+
+**この比較で一番効いた変数はレートシートに載っていない。**
+AWS だけが秒課金（10 秒下限）で、Telnyx と Twilio は 60/60 切り上げである。
+
+75 秒の通話は Telnyx/Twilio では **2 分課金**、AWS では **1.25 分課金**。
+マネージドスタック同士だと、**この一点だけで AWS が Telnyx より安くなる**
+（9.5 円 vs 19.1 円）。単価表の比較は実費を予測しない。
+
+BYO にすると回線代しか残らないので、60/60 のペナルティを払っても
+Telnyx 050 が最安のままになる。**BYO を選ぶ理由の一部は課金単位である。**
+
+系: **レイテンシがそのまま金になる。** 回線側も AI 側も秒で走っている。
+`denwaban/docs/latency.md` の 12.6 秒 → 0.95 秒（whisper 常駐化 + 台詞の
+事前レンダ）は体感品質の話として書かれているが、**60/60 の境界をまたぐか
+どうかを決めるので原価の話でもある。**
+
+## 決定を反転させる条件（名指しで書く）
+
+次のどれかが真になったら Amazon Connect が正しい答えになる。**満たされた
+ことに気付かないまま Telnyx を使い続けないために、条件の方を書いておく。**
+
+1. **0120 フリーダイヤルが要件になった** — AWS $0.08/分は他社の 2〜3 分の 1。
+   携帯からの着信が支配的な日本では、これ単独で他の全コストを圧倒する。
+2. **マネージドで済ませたい かつ 短い通話が主** — 秒課金が効いて AWS が最安。
+3. **人間へのエスカレーションが本番要件になった** — 席・キュー・ルーティング・
+   評価をまともに設計しているのは Connect だけ。denwaban には既に
+   「折り返しへのエスカレーション」が在るので、そこが実運用に入るなら再評価。
+4. **音声処理の国内完結が要件になった** — AWS は ap-northeast-1 で閉じられる。
+   Telnyx/Twilio はメディアが国外に出る可能性がある。**denwaban は同意
+   (consent) を刻む actor なので、これは価格より重い判断材料になり得る。**
+
+逆に、Twilio を選ぶ理由は現時点で 1 つある: **ConversationRelay は BYO LLM
+が前提**なので murakumo fleet の LLM をそのまま挿せる。Telnyx Voice AI は
+自社 GPU / フロンティアモデル前提。ただし BYO 経路を選ぶなら
+ConversationRelay 自体を使わないので、この差は消える。
+
+## 測れなかったこと（UNVERIFIED であって CONFORMANT ではない）
+
+**記録が無い = 未検証であって、適合の証拠ではない。** 下記を根拠にした判断を
+しない。
+
+- **AWS の Japan DID 着信単価と番号日額。** Pricing API にはサービス利用料
+  （$0.018/分、Connect AI は $0.038/分、ap-northeast-1 実測）しか無く、
+  telephony 側は機械可読な正本が見つからなかった。上表は $0.010/分・
+  $0.03/日を**仮置き**している。
+- **AWS の 0120 $0.08/分**は 2023-04 の値下げ発表が出典で、現在値は未確認。
+- **3 社とも ja-JP の実品質は資料から読めない。** 日本語受付は敬語と数え方で
+  壊れる（`latency.md` に 6 名 → 6 つな の実例がある）。実音声で比較すること
+  —— **契約はこの検証を済ませたことを意味しない。まだ済んでいない。**
+- ~~**番号の在庫。**~~ → **2026-08-15 に実測した。下記「在庫」節。**
+
+## 在庫 — 日本で実際に買えるのは 050 だけ（2026-08-15、契約済みアカウントで実測）
+
+**price sheet に載っている日本の 4 種類のうち、3 種類は買えない。**
+`GET /v2/available_phone_numbers` を契約済みの API キーで叩いた結果:
+
+| クエリ | 結果 | 読み方 |
+|---|---|---|
+| `JP / national`（050） | **在庫あり**。`+8150 3142 34xx` 等、`monthly_cost 4.50` / `upfront_cost 8.00` | API が price sheet と**完全一致**した |
+| `JP / local`（03 等） | クエリは有効・**`total_results: 0`** | 商品はあるが**在庫ゼロ** |
+| `JP / toll_free`（0120） | **`10015 No coverage found in the specified country`** | **国として提供が無い** |
+| `JP / mobile` | 同上 | 同上 |
+| 対照 `US / local` | 3 件 | — |
+| 対照 `US / toll_free` | 3 件 | — |
+
+**対照を取ったのは、0 件が「在庫が無い」なのか「クエリが間違っている」なのかを
+区別するため。** US で同じ形が結果を返すので、JP の 0 は query 由来ではない。
+
+**`local` の 0 件と `toll_free` の `No coverage` は別物として扱うこと。**
+前者は在庫が戻りうる（再測定の価値がある）、後者は国として提供されていない
+（待っても出ない）。
+
+**この実測は本 ADR の判断を 2 つ変える:**
+
+1. **「0120 が要件なら Amazon Connect」は選好ではなく物理的な壁だった。**
+   Telnyx では 0120 を購入できない。反転条件ではなく前提条件である。
+2. **「業種次第で 03 を選ぶ理由が立つ（`isic-561` の飲食店受付では 03 が自然）」は
+   Telnyx 上では実行不能。** 03 は在庫ゼロ。03 が要件なら provider を変えるか、
+   国内の事業者から取って SIP で持ち込む（BYOC）ことになる。
+
+したがって **050 + BYO は「選んだ案」ではなく「Telnyx で唯一取れる案」**である。
+選定の結論は変わらないが、**理由が変わった**ので、後から読む者が
+「他も検討したうえで 050 にした」と読まないようにここに書いておく。
+
+## 解決した UNVERIFIED（2026-08-15、`llms-full.txt`）
+
+**Telnyx の $0.05/分に何が含まれるか。** 起票時は同社資料内で矛盾していた
+（`pricing.md` の note は SIP + STT + LLM + TTS 込みと書き、marketing ページは
+LLM を add-on と書いていた）。オーナーが示した **agent 向け正本
+`https://telnyx.com/llms-full.txt`** が構造を明示していた:
+
+| Conversational AI | |
+|---|---|
+| base rate | $0.05/分 |
+| Speech-to-Text | **Included** |
+| Telnyx Natural / NaturalHD / Qwen3TTS / Telnyx Ultra TTS | **Included** |
+| AWS / Azure / ElevenLabs voices | 各 provider 課金 |
+| LLM | **1M トークン単位で別課金** |
+
+**つまり STT と Telnyx 系 TTS は込み、LLM は別。** 本 ADR の見積もりは安全側で
+LLM を加算していたので**そのまま正しい**。
+
+⚠ **ただし `llms-full.txt` は自分で「2026-04-29 の snapshot（一部のみ 2026-08-11
+訂正）」と申告している。** 現行価格の正本は引き続き `pricing.md` であり、
+llms-full から引いてよいのは**構造の主張**（何が bundle されるか）であって
+**価格の数値ではない**。実際 Telnyx TTS の単価は `pricing.md` が
+$0.000006/文字、`llms-full.txt` が $0.000003/文字で **2 倍ずれている** ——
+**同一ベンダの 2 つの公開正本が食い違う**ので、単一ソースを決定的として
+引用しないこと。
+
+## 規制（金額ではなく時間のコスト）— 契約済みアカウントで実測（2026-08-15）
+
+| provider | 入り口の摩擦 |
+|---|---|
+| Telnyx | セルフサーブだが**書類 2 件が注文の前提**（下記） |
+| Twilio | 同程度 |
+| Amazon Connect | **AWS サポートケース + 日本に事業所があることの書類。3 社で最も重い** |
+
+**`GET /v2/requirements?filter[country_code]=JP&filter[phone_number_type]=national`
+が返す注文要件は 4 件**（requirement id `d4beced0-bdb2-417f-ba3d-2a69036fc38e`）:
+
+| 要件 | 種別 | 状態 |
+|---|---|---|
+| Address (National) | address | **充足**（下記の住所レコード） |
+| Contact Information（担当者名・法人名・電話番号） | textual | 注文時に入力 |
+| Certificate of Contractor or Person in Charge | **document** | **未提出** |
+| Japan Proof of Address | **document** | **未提出** |
+
+**実測で分かった、事前に知らないと手戻りする 3 点:**
+
+1. **Telnyx の住所レコードは変更できない** ——
+   `Emergency addresses may not be altered. Please create a new address and use
+   it instead.` 法人名を間違えて登録したら**新規作成**しかない。
+2. **登記情報提供サービスの PDF は使えない。** 即時に PDF が取れるので最短に
+   見えるが、**証明文も公印も付かず法的証明力が無い**。Telnyx が要求するのは
+   *certificate* である。「オンラインで即 PDF」を探すとここに行き着くのが罠。
+3. **印鑑証明書を選ぶと遠回りになる。** オンライン請求には印鑑提出者の電子署名
+   （商業登記電子証明書）が必須。一方 **履歴事項全部証明書は電子証明書が不要**
+   （登記ねっと かんたん証明書請求、郵送 520 円 / 窓口受取 490 円）。
+   要件は **どちらか一方**なので、履歴事項全部証明書を選ぶ。
+   ⚠ **どちらも交付物は紙**（郵送か窓口受取）。スキャンして上げる。
+
+**住所証明のほうは即日 PDF が可能**（公共料金の Web 明細。電子証明書不要）。
+e-Tax の電子納税証明書も PDF だが、**法人が e-Tax を使うには電子証明書が要る**
+ので、未導入なら公共料金が早い（電子納税証明書は発行から 90 日でダウンロード不可）。
+
+050 は 110/119 が使えず、一部プランから発信できない。**単価は 03 より安いのに
+信用面で不利**という逆転があり、`isic-561` の飲食店受付なら本来 03 の方が自然
+である —— **が、上記の在庫実測どおり Telnyx に 03 は無い。** この不利は
+「選んだ結果」ではなく**引き受けている制約**なので、店に 050 を出すことが
+受け入れられるかは事業側の判断として別に要る。受け入れられないなら、
+provider を変えるか、国内事業者の 03 を BYOC で持ち込む。
+
+## 再測定の手順
+
+```bash
+# 価格の正本（現行値はこちら）
+curl -sS -L https://telnyx.com/pricing.md | grep -i japan
+# 構造の正本（何が bundle されるか）。数値は dated snapshot なので引かない
+curl -sS -L https://telnyx.com/llms-full.txt
+curl -sS -L https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonConnect/current/region_index.json
+# Twilio は機械可読な正本が無い。HTML の <tr> を取る
+curl -sS -L -A 'Mozilla/5.0' https://www.twilio.com/en-us/voice/pricing/jp
+
+# 在庫（価格ではなく「買えるか」）。-g が要る —— curl は [] を範囲指定と解釈する
+K=$(security find-generic-password -s telnyx-api-key -w)
+curl -sS -g --oauth2-bearer $K 'https://api.telnyx.com/v2/available_phone_numbers?filter[country_code]=JP&filter[phone_number_type]=national&filter[limit]=3'
+# phone_number_type を local / toll_free / mobile にも振る
+# 0 件を見たら必ず country_code=US で対照を取る
+# （在庫ゼロと query 誤りは同じ 0 に見える。実測 2026-08-15）
+```
+
+**この節に shell を書くときは二重引用符とバックスラッシュを使わない** ——
+`:adr/body` は EDN 文字列なので、二重引用符で括ったヘッダ指定や、行末に
+バックスラッシュを置く行継続をそのまま書くと、そこで文字列が終端して
+**文書全体が読めなくなる**。Bearer は `--oauth2-bearer` で渡し、長い行は
+折り返さない。
+
+実測 2026-08-15: これで `docs-edn-only verify` を 2 回 FAIL させた。**2 回目は、
+1 回目の再発防止として書いたこの注意書き自身が二重引用符を含んでいた**ため。
+検査を通すまで landed としない（gate が両方向を出すまで信じない、と同じ）。
+
+**この ADR の数値は 2026-08-15 の測定である。定数として引用しない。**
+CI/CD の egress で同じ誤りを踏んだ前例がある（CLAUDE.md の fleet gate 節、
+「実測して定数で持つな」と書いた節に実測値を書いた結果それが定数になった）。
+provider の価格は egress より速く動く。
+
+## 影響
+
+- `cloud-itonami/denwaban` — `koe.ports/ITelephony` の Telnyx adapter を
+  最初に実装する。G7（Council Lv6+ + named operator + 明示フラグ +
+  admitted carrier）は据え置き。**adapter が在ることと電話に出られることは
+  別**であり、この ADR は後者を開けない。
+- `cloud-itonami/denwaban/docs/telephony-provider-architecture.md` — 金額の
+  入っていない provider 比較表に、この ADR への参照を足す（follow-up）。
+- BYO を前提にするので、**STT/TTS/LLM は murakumo fleet 側で完結させる**
+  （`com-whisper` の常駐 whisper、`denwaban.serifu` の事前レンダ、
+  `murakumo-main` alias）。Telnyx の STT/TTS 部品は使わない —— 使うと
+  provider lock が音声パイプラインまで伸びる。"}]
