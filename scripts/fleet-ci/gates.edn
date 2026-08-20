@@ -208,6 +208,14 @@
   {:name "org-ietf-ed25519" :gate :jvm-test :cd true}
   {:name "org-ietf-cbor" :gate :jvm-test :cd true}
   {:name "io-multiformats" :gate :jvm-test :cd true}
+  ;; public-global is records only — no src, no JVM deps. Two gates because they
+  ;; answer different questions: `test/run.cljs` settles what the bytes can
+  ;; settle (parses, catalogue shape, the floor, and whether the README lists
+  ;; files that exist — which is how the phantom `wasm/` tree was found), and
+  ;; `tools/verify_citations.cljs` is the live one, worth what the network is
+  ;; worth when it runs. Registered 2026-08-20: the live gate had been in the
+  ;; repo since 83e5977 with nothing ever running it.
+  {:name "public-global" :gate :nbb-test :classpath "test:." :entry "test/run.cljs" :cd true}
   ;; did:webvh 1.0 (root ADR-2608202000). `:jvm-test` rather than `:nbb-test`
   ;; for tana's reason: the nbb harness needs five SIBLING checkouts on the
   ;; classpath (jcs, multiformats, ed25519, vc-data-integrity, did) and the
