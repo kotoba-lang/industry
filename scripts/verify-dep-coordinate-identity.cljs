@@ -44,6 +44,24 @@
   Only in-house orgs are examined. A third-party library legitimately appears
   under whatever coordinate its author published.
 
+  ## What it reads, and what that costs
+
+  Working trees, not `origin/main`. A finding therefore describes the deps.edn
+  that is CHECKED OUT, which in this workspace is regularly not the one that
+  exists upstream -- checkout, west pin and the repository's main are three
+  different things.
+
+  Measured the first time this ran: it reported
+  `orgs/etzhayyim/com-etzhayyim-isic`'s deps.edn as unparseable, and it was --
+  in a checkout four weeks behind, at the initial scaffold. That repository's
+  main had already closed the unterminated vector. The finding was true of the
+  tree and false of the repository.
+
+  Reading `origin/main` instead would trade this for a worse problem: it would
+  report on code nobody here can run, and it would need a fetch per checkout.
+  So the tree is the right input and the caveat belongs here rather than in a
+  reader's memory: before acting on a finding, check the repository's main.
+
   ## Refusing to answer
 
   Zero checkouts, or zero deps.edn files, is a detector pointed at the wrong

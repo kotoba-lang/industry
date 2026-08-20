@@ -1120,7 +1120,11 @@
               reported rather than counted as having no dependencies, because the second
               would turn a broken file into a clean one.
               `{{root}}` is passed explicitly: the script defaults to `.`, and a tick running
-              from a worktree would otherwise find no orgs/ and refuse."}
+              from a worktree would otherwise find no orgs/ and refuse.
+              ⚠ It reads WORKING TREES. Its first run reported com-etzhayyim-isic's deps.edn
+              as unparseable and it was -- in a checkout four weeks behind, whose main had
+              already fixed it. Checkout, west pin and the repository's main are three
+              different things (ADR-2608136800); check main before acting on a finding."}
 
   {:id       :verify-kotoba-source-census
    :title    ".kotoba files that are not Kotoba source, and repos holding both under one extension"
