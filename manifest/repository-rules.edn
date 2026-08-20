@@ -57,7 +57,26 @@
                      :durable-object-as-data-authority
                      :silent-production-fallback}
    :policy/excludes #{:git-edn-source-plane :datalad-large-artifact-plane
-                      :explicit-localhost :explicit-mock :explicit-testnet}}}
+                      :explicit-localhost :explicit-mock :explicit-testnet}}
+
+  ;; Admission for scaffold / deps edits — growth of :jvm-runtime-deps and
+  ;; production `.clj` is forbidden; standing debt is measured elsewhere
+  ;; (`verify-jvm-dependency-surface`). ADR-2608201300.
+  :jvm-new-surface
+  {:policy/authority "90-docs/adr/2608201300-jvm-new-surface-scaffold-guard.edn"
+   :policy/detector "scripts/verify-jvm-dependency-surface.cljs"
+   :policy/admission "scripts/jvm_new_surface_policy.cljs"
+   :policy/hook ".claude/hooks/jvm-new-surface-guard.cljs"
+   :policy/forbids #{:new-production-clj
+                     :new-top-level-jvm-runtime-third-party}
+   :policy/allows #{:edit-existing-clj
+                    :new-test-clj
+                    :workspace-git-deps
+                    :local-root-deps
+                    :alias-lint-test-build-coords
+                    :portable-cljc-cljs-kotoba
+                    :org.clojure/clojure}
+   :policy/override-env "JVM_NEW_SURFACE_ALLOW"}}
 
  :vocabularies
  [{:vocabulary/id :stack-tier

@@ -6,10 +6,15 @@ description: Standing-authorized flow for creating and registering a new project
 ## 標準作業の常時許可（standing authorization）
 
 - **次の「新規 project を起こして登録する」一連の流れは、毎回の確認なしに実行してよい**
-  （恒久承認。2026-06-28 オーナー指示）。ADR 起票 → 子リポの scaffold（`.cljc` 正本 +
-  `deps.edn` + README + test）→ `git init` + 初期コミット → **GitHub リポ作成
+  （恒久承認。2026-06-28 オーナー指示）。ADR 起票 → 子リポの scaffold（`.cljc` /
+  `.cljs` / `.kotoba` 正本 — **本番 `.clj` を新規に置かない**、ADR-2608201300 +
+  PreToolUse `jvm-new-surface-guard`）+ `deps.edn`（top-level `:deps` は
+  `org.clojure/clojure` + workspace git / `:local/root` のみ。**third-party maven /
+  external-git を top-level に足さない**；lint/test/build は alias）+ README +
+  test）→ `git init` + 初期コミット → **GitHub リポ作成
   （visibility は org 既定 — **kotoba-lang / etzhayyim = public、gftdcojp / com-junkawasaki = private**。repos.edn `:orgs :visibility` が SSoT、ADR-2607021330）+ push** → manifest 登録 → ADR/manifest の
   superproject 反映、までを一気通貫で進める。実例: `ai-gftd-router`（ADR-2606272330）。
+  検査: `nbb --classpath ".:scripts:scripts/nbb_compat" scripts/jvm_new_surface_policy.cljs self-test`。
 
 - 上記に含まれる個別操作で都度確認が不要なもの: 子リポの `gh repo create` + `git push`
   （子リポは plain-git。下記 `repos.edn :manifest-workflow :child-repos`）、

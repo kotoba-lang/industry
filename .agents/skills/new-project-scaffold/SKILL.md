@@ -6,17 +6,22 @@ description: Standing-authorized flow for creating and registering a new project
 ## 標準作業の常時許可（standing authorization）
 
 - **次の「新規 project を起こして登録する」一連の流れは、毎回の確認なしに実行してよい**
-  （恒久承認。2026-06-28 オーナー指示）。ADR 起票 → 子リポの scaffold（`.cljc` 正本 +
-  `deps.edn` + README + test）→ `git init` + 初期コミット → **GitHub リポ作成
+  （恒久承認。2026-06-28 オーナー指示）。ADR 起票 → 子リポの scaffold（`.cljc` /
+  `.cljs` / `.kotoba` 正本 — **本番 `.clj` を新規に置かない**、ADR-2608201300 +
+  PreToolUse `jvm-new-surface-guard`）+ `deps.edn`（top-level `:deps` は
+  `org.clojure/clojure` + workspace git / `:local/root` のみ。**third-party maven /
+  external-git を top-level に足さない**；lint/test/build は alias）+ README +
+  test）→ `git init` + 初期コミット → **GitHub リポ作成
   （visibility は org 既定 — **kotoba-lang / etzhayyim = public、gftdcojp / com-junkawasaki = private**。repos.edn `:orgs :visibility` が SSoT、ADR-2607021330）+ push** → manifest 登録 → ADR/manifest の
   superproject 反映、までを一気通貫で進める。実例: `ai-gftd-router`（ADR-2606272330）。
+  検査: `nbb --classpath ".:scripts:scripts/nbb_compat" scripts/jvm_new_surface_policy.cljs self-test`。
 
 - 上記に含まれる個別操作で都度確認が不要なもの: 子リポの `gh repo create` + `git push`
   （子リポは plain-git。下記 `repos.edn :manifest-workflow :child-repos`）、
   `nbb scripts/gen-west-manifest.cljs --entry <repo-name>` による west.yml 再生成
   （**当該 entry のみの最小 diff。引数なしは dry-run で west.yml を書かない。
   wholesale 再生成 commit は禁止** — 未 push HEAD 由来の壊れた pin を 44 件 main に
-  流した実事故 `90852b86` の再発防止。AGENTS.md「Git operations」の west-pin 検証節 /
+  流した実事故 `90852b86` の再発防止。CLAUDE.md「Git operations」の west-pin 検証節 /
   ADR-2607022900 が正本）、superproject への
   `chore(manifest)+docs(adr)` コミット、新規 ADR の作成（**EDN only** —
   `90-docs/adr/` は ADR-2607171600 で `.md` 廃止済み、`[{:db/id -1 :adr/id ...
@@ -40,7 +45,7 @@ description: Standing-authorized flow for creating and registering a new project
   target-listを作らない」に抵触し、danjo（弾正）の「公開政府データの事実ベース非裁定
   監査」スコープと重なるが danjo 自身はまだ R0 scaffold（Council Lv6+ 批准前）で
   named-party publication は SBT 投票ゲート済み、と判明してから設計をやり直した）。
-  各 etzhayyim actor の `AGENTS.md`/`README.md` には `G1-Gn` 憲章ゲート・
+  各 etzhayyim actor の `CLAUDE.md`/`README.md` には `G1-Gn` 憲章ゲート・
   `Non-Goals`・R0→R3 activation trigger が書かれている——これは通常の
   `manifest/repos.edn :manifest-workflow` のような技術的登録手順ではなく、
   **オーナー自身が設計した統治規約**なので、新規 actor が「実在の政府主体を
