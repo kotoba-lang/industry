@@ -88,14 +88,94 @@
    :axis/markers ["trimmed-surface" "tessellate-trimmed-surface" "point-in-trim?" "trim-loop"]
    :axis/behavior "nurbs-surface-trimmed"}
 
-  {:axis/id :kernel/fillet-chamfer
+  ;; ── feature registry ───────────────────────────────────────────────
+  ;; 2026-08-20: `brep.feature/apply-feature` を open な multimethod にした
+  ;; （ADR-2608200100 反復 4）。**method が登録されていることが、その kind を
+  ;; 評価できるという主張そのもの**で、「対応 kind の一覧」という第二のリストは
+  ;; 存在しない。したがってこの面の marker は `:dispatch` —— 願望としての
+  ;; 構築子名ではなく、registry に実在する dispatch 値を数える。
+  ;;
+  ;; 軸を feature ごとに割ってあるのは、**1 つ実装したら 1 つ点が動く**ように
+  ;; するため。以前は 4 機能が 1 軸に入っており、1 個実装しても測定が動かず、
+  ;; 実装が報われない形になっていた。
+  {:axis/id :kernel/feature-registry
    :axis/segment :kernel :axis/weight 5
-   :axis/target "SolidWorks / Parasolid の blend"
-   :axis/label "エッジ fillet / chamfer（実際に幾何を生む）"
+   :axis/target "SolidWorks / Parasolid の feature tree"
+   :axis/label "feature registry が自分の守備範囲を正直に答える"
    :axis/repo "kotoba-lang/org-iso-10303"
    :axis/paths ["src/brep/feature.cljc"]
-   :axis/markers ["fillet-feature" "chamfer-feature"]
-   :axis/behavior "fillet-chamfer"}
+   :axis/markers ["apply-feature" "supported-feature-kinds"]
+   :axis/behavior "feature-registry"}
+
+  {:axis/id :kernel/extrude
+   :axis/segment :kernel :axis/weight 5
+   :axis/target "SolidWorks の押し出し"
+   :axis/label "スケッチ profile からの押し出し"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/feature.cljc"]
+   :axis/marker-kind :dispatch :axis/dispatch-of "apply-feature"
+   :axis/markers ["extrude"]
+   :axis/behavior "feature-extrude"}
+
+  {:axis/id :kernel/loft
+   :axis/segment :kernel :axis/weight 4
+   :axis/target "SolidWorks / Rhino の loft"
+   :axis/label "複数 profile 間のロフト"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/feature.cljc"]
+   :axis/marker-kind :dispatch :axis/dispatch-of "apply-feature"
+   :axis/markers ["loft"]
+   :axis/behavior "feature-loft"}
+
+  {:axis/id :kernel/pattern
+   :axis/segment :kernel :axis/weight 3
+   :axis/target "SolidWorks の linear pattern"
+   :axis/label "直線パターン（本体の反復）"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/feature.cljc"]
+   :axis/marker-kind :dispatch :axis/dispatch-of "apply-feature"
+   :axis/markers ["pattern"]
+   :axis/behavior "feature-pattern"}
+
+  {:axis/id :kernel/sweep
+   :axis/segment :kernel :axis/weight 4
+   :axis/target "SolidWorks の sweep"
+   :axis/label "経路に沿った掃引"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/feature.cljc"]
+   :axis/marker-kind :dispatch :axis/dispatch-of "apply-feature"
+   :axis/markers ["sweep"]
+   :axis/behavior nil}
+
+  {:axis/id :kernel/chamfer
+   :axis/segment :kernel :axis/weight 4
+   :axis/target "SolidWorks / Parasolid の chamfer"
+   :axis/label "エッジ面取り"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/feature.cljc"]
+   :axis/marker-kind :dispatch :axis/dispatch-of "apply-feature"
+   :axis/markers ["chamfer"]
+   :axis/behavior nil}
+
+  {:axis/id :kernel/fillet
+   :axis/segment :kernel :axis/weight 5
+   :axis/target "SolidWorks / Parasolid の blend"
+   :axis/label "エッジ fillet（円弧ブレンド）"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/feature.cljc"]
+   :axis/marker-kind :dispatch :axis/dispatch-of "apply-feature"
+   :axis/markers ["fillet"]
+   :axis/behavior nil}
+
+  {:axis/id :kernel/shell
+   :axis/segment :kernel :axis/weight 3
+   :axis/target "SolidWorks の shell（薄肉化）"
+   :axis/label "薄肉化（オフセット + 差分）"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/feature.cljc"]
+   :axis/marker-kind :dispatch :axis/dispatch-of "apply-feature"
+   :axis/markers ["shell"]
+   :axis/behavior nil}
 
   {:axis/id :kernel/boolean-solid
    :axis/segment :kernel :axis/weight 5
@@ -105,15 +185,6 @@
    :axis/paths ["src/brep/mesh_csg.cljc" "src/brep/feature.cljc"]
    :axis/markers ["mesh-boolean" "boolean-feature" "boolean-ops"]
    :axis/behavior "boolean-solid"}
-
-  {:axis/id :kernel/sweep-loft-shell-pattern
-   :axis/segment :kernel :axis/weight 4
-   :axis/target "SolidWorks の sweep / loft / shell / pattern"
-   :axis/label "掃引・ロフト・薄肉化・パターンの feature 評価"
-   :axis/repo "kotoba-lang/org-iso-10303"
-   :axis/paths ["src/brep/feature.cljc"]
-   :axis/markers ["sweep-feature" "loft-feature" "shell-feature" "pattern-feature"]
-   :axis/behavior "sweep-loft-shell-pattern"}
 
   {:axis/id :kernel/revolve
    :axis/segment :kernel :axis/weight 3
