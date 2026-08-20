@@ -3276,5 +3276,37 @@
   {:name "aiueos" :id "nbb-cross-runtime-aiueos" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+
+  ;; Two stdlib libraries whose suites had NEVER run on a second runtime, and
+  ;; which were broken there. Measured 2026-08-20 by giving each an nbb entry
+  ;; and running its own .cljc suite:
+  ;;
+  ;;   bytes  sha1("abc") returned 71347bf0... instead of the FIPS vector
+  ;;          a9993e36.... JavaScript's `>>>` masks the shift COUNT modulo 32,
+  ;;          so the length block's high word was 24 instead of 0. The cljs
+  ;;          side of kotoba.turn.credential calls this directly, so HMAC-SHA1
+  ;;          credentials computed there did not match a compliant peer.
+  ;;
+  ;;   lint   every parse failure THREW on cljs -- `(.getMessage e)` inside a
+  ;;          catch clause that was itself written portably. And empty input
+  ;;          returned the STRING "nil" as its canonical text, because cljs
+  ;;          edn/read-string ignores the :eof option.
+  ;;
+  ;; Both are fixed. These gates are what stop them coming back: neither
+  ;; defect is visible to a JVM run, which is the only run either library had.
+  ;;
+  ;; **`lint` takes :min-files 4, not 5.** It has exactly four files matching
+  ;; :include-ext, and the floor is there to catch a truncated ship rather
+  ;; than to assert a size. Copying 5 from the neighbours would have made the
+  ;; gate reject a complete tree.
+  ;;
+  ;; :ship-git-deps -- lint reaches fmt/lsp/fs/coll; bytes is a leaf and does
+  ;; not need it, but carrying it is harmless and keeps the two entries alike.
+  {:name "bytes" :id "nbb-cross-runtime-bytes" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+  {:name "lint" :id "nbb-cross-runtime-lint" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
   ;; ────────────────────────────────────────────────────────────────────────
   ]}
