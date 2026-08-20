@@ -1,0 +1,129 @@
+[{:db/id -1
+  :adr/id "adr-2608200300-one-repository-two-coordinates-swept-and-three-times-i-measured-wrong"
+  :adr/title "同じ repo を 2 つの座標で参照していたのを fleet 規模で正準化した —— そして私は 3 度測り間違えた"
+  :adr/status "accepted"
+  :adr/date "2026-08-20"
+  :adr/topic "dependency-hygiene"
+  :adr/doc_type "adr"
+  :source/dataset "adr"
+  :adr/repos "com-junkawasaki/root, kotoba-lang/* (195 repos)"
+  :adr/authoritative_for ["that tools.deps dedupes by coordinate symbol, and what that cost this workspace: 260 closures with a duplicate, 189 of them loading different content"
+                          "that renaming one end of a closure while the other is stale CREATES the defect, measured and reverted 27 times"
+                          "that the coordinate detector counted only :git/sha and therefore saw under half the population"
+                          "that west.yml has ZERO duplicate registrations -- the duplication is on disk, 252 orphans and one divergent shadow"
+                          "the honest strength of the evidence: -Spath resolution for most, full suites for few"]
+  :adr/related ["adr-2608200200-clock-native-aot-is-refused-by-an-accepted-adr-not-unfinished"
+                "adr-2608200100-clj-to-kotoba-follow-through-cross-runtime-defect-and-a-detector-that-measured-absence-as-emptiness"
+                "ADR-2608139980" "ADR-2608136000" "ADR-2608136800" "ADR-2607102200"]
+  :adr/body "
+## 訊かれたこと
+
+オーナー（2026-08-20）「残りも subagent を使って効率的に進めて」以降の一連。座標の
+正準化を fleet 規模で実行した記録と、その過程で**自分が 3 度間違えた**記録。
+
+## 何が壊れていたか
+
+tools.deps は**座標シンボル**で dedupe する。同じ repo を指す 2 つのシンボルは別
+ライブラリなので、両方が classpath に載り、同じ namespace が 2 つの revision から
+読まれる。**何も error にならない。**
+
+実測（2026-08-20、4,461 checkout）:
+
+| | |
+|---|---|
+| in-house 依存 | 5,642 |
+| repo | 568 |
+| 複数座標で到達される repo | 45 |
+| **closure に重複を持つ repo** | **260** |
+| うち**内容も異なる**（実害） | **189** |
+
+主因: langchain 152 / amu 46 / ed25519 14 / langgraph 13。
+
+## 着地
+
+| batch | 内容 |
+|---|---|
+| compiler→amu | 158 repo 着地、west pin 154 件前進 |
+| tail（ed25519 / identity / hil / robotics / vrm / dance / host / playwright / sdk / oauth / jp-go-dds） | 19 repo / 20 merge、pin 17 件 |
+| 先行 batch（css / html / webauthn / oauth / kami-eizo-timeline / langchain 3 本） | 18 repo、pin 16 件 |
+
+`kakure` の classpath で修正前後を実測したものが代表例:
+
+    修正前  io.github.kotoba-lang/html/aa57f273…   （jp-go-dds 経由）
+            kotoba-lang/html/31a26731…            （直接宣言）
+    修正後  1 本
+
+## 制約が 1 つ見つかった —— 片端だけ直すと悪化する
+
+27 repo は `kotoba` を旧 pin で参照し、その `kotoba` の deps.edn はまだ `compiler` と
+言っていた。**両端が旧名なら dedupe されて 1 本**だが、近い側だけ改名すると壊れる:
+
+    before  [compiler/269846bb]                     → 1
+    after   [amu/269846bb, compiler/4b5e8e17]     → 2
+
+agent はこれを測って検知し、**27 件すべてを server 側 revert merge で戻した**（履歴
+書き換えなし）。解除条件は依存 pin の前進であってテキスト編集ではない。
+
+同型が tail batch でも出た。`ai-gftd-local` は identity が 1 → 2 に増え、原因は
+`oidc@2d3ca2b` が旧座標を名乗っていたこと。`authentication` の oidc pin を進めて 1 に
+戻してから landing した。**それができなければ revert する**、が正しい分岐。
+
+`cloud-itonami-app` は不変のまま残した。`:test :override-deps` が旧座標を名乗って
+おり、改名すると **override が何にも一致しなくなり compiler が静かに巻き戻る**。
+
+## 私が 3 度間違えた
+
+**① 計測器が半分しか見ていなかった。** detector は `:git/sha` だけを数え、`:local/root`
+を見ていなかった。`:local/root` も repo を名乗る座標で、しかも
+「座標は旧 repo・パスは新ディレクトリ」という形が大量にあった。含めた結果
+**2,665 → 5,642 依存、multi-coordinate 18 → 45、closure 衝突 1 → 260**。
+「あと 1 件」という報告は壊れた計測器の値だった。
+
+見つけ方も記録に値する: grep が 301 ファイル、reader が 0 と答え、**今回は grep が
+正しかった**。reader を既定にするのは正しいが、**reader が何を探すかが正しいとは
+限らない。**
+
+**② registry を壊した。** detector の修正を landing する際、`:why` 文字列の中に
+引用符を含む EDN 例を書き、文字列を途中で終端させた。`manifest/orgs-detectors.edn`
+が parse しなくなり、admission が全 detector を拒否した（今日 3 度目、今回は私）。
+landing した理由が悪い —— admit チェックが `no registry ... nothing to run` と出たのを
+**「確認した」と扱った**。それは pass ではなく「実行できなかった」値で、私は 1 時間前に
+まさにその形を捕まえる gate を書いていた。
+
+**③ west が二重登録していると報告した。偽だった。** agent の報告をそのまま伝えた。
+`verify-duplicate-registrations` を GitHub id で回すと **4,217 entry に二重登録 0**。
+二重なのは manifest ではなく**ディスク**で、正確には:
+
+    west.yml  4,217 entry、二重登録 0
+    disk      4,462 checkout、252 が west 未宣言
+              うち 1 が宣言済み entry の SHADOW —— network-isekai-playtest が
+              network-isekai と同じ repo を別パスで持ち、head が DIVERGENT
+              （76bb67b0 vs ffe4108d）
+
+なお verifier 自身にも穴がある: **redirect を解決しない**ので、
+`orgs/gftdcojp/cloud-murakumo`（remote が `network-awai/cloud-murakumo` へ redirect し、
+そちらは west 宣言済み）を実質 SHADOW なのに ORPHAN と分類する。252 orphan 全部に
+`gh api` を投げる必要があるので、registry が言う gh クラスの制約に当たる。
+
+## 検証の強さを正直に
+
+**188 のスイートは走らせていない。** このマシンは他セッションで load 200 超が続き、
+これらのスイートは `.kotoba` を amu 経由でコンパイルする。全走したのは compiler batch で
+1 本（`annotation` 14 tests / 64 assertions、前後同一）。残りの根拠は
+`clojure -Spath -M:test` が解決すること（解決しなければ commit しない driver で強制）で、
+**スイートより弱い証拠**である。tail batch は 8 件で 2→1 を個別に測っている。
+
+## 触っていないもの
+
+- **10 repo が classpath を組めない** —— `aiueos` が `:local/root` と `:git/sha` の
+  **両方の coord 型**で宣言されている。重複座標とは別クラスで、どちらの repo を
+  変えるかは設計判断
+- **252 の orphan checkout**（west 未宣言）と 1 件の DIVERGENT SHADOW
+- `:implementation` 語彙の権威、clock の `:wall`
+
+## 次
+
+1. blocked 27 repo の解除（`kotoba` pin 前進 + 改名を同一 commit で）
+2. `langchain-clj` 150 declarer
+3. aiueos の coord 型不一致（設計判断）
+"}]
