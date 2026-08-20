@@ -1,0 +1,69 @@
+[{:db/id -1
+  :adr/id "adr-2608202100-a-cljc-extension-is-a-claim-not-a-fact"
+  :adr/title ".cljc は主張であって事実ではない — 移植可能性は走らせて測る"
+  :adr/status "accepted"
+  :adr/date "2026-08-20"
+  :adr/related "adr-2608136000-five-questions-before-trusting-green adr-2608198500-unreachable-is-not-a-verdict"
+  :adr/body
+  "## 決定
+
+`.clj` → `.cljc` の改名を、**nbb で load できることを実測せずに landing しない**。
+さらに load は必要条件であって十分条件ではないので、**移植した経路を実際に走らせる
+テスト**を同じ commit に入れる。
+
+道具は `scripts/portability-load-triage.sh`（LOADS / BLOCKED / UNKNOWN の 3 値）。
+
+## 根拠 1 — grep は予測子として役に立たない
+
+219 の jvm-source repo に対する実測:
+
+| grep の判定 | repo | 実際に移植できた |
+|---|---|---|
+| interop 皆無 | 25 | **14**（56%） |
+| interop あり | 175 | **0**（1 件の LOADS は偽陽性） |
+
+grep が見落とすもの: bare な `(catch Exception _)` / `byte-array` / `bigint` /
+`unchecked-byte` / `clojure.lang.PersistentQueue/EMPTY` / JVM 専用**ライブラリ**
+（datalevin・cheshire・babashka.http-client）/ Kotoba host-import 記号 /
+`ns` form が無いファイル。**どれも名前ベースの検索では見えない。**
+
+## 根拠 2 — load は run ではない
+
+cljs は `(.foo x)` を問題なくコンパイルし、**実行時にだけ**失敗する。だから
+JVM のメソッド呼び出しが「テストが通らない枝」に居ると、load 検査も portable
+suite も緑のまま通る。同日 2 回起きた:
+
+- `kotoba.native.elf64` — portable suite が 2 経路しか覆っておらず、
+  `.getBytes` を戻しても緑のままだった。4 経路に広げたら error になった
+- `kotoba-object` — 「JVM なしで load する」と landing した suite が
+  `little-endian` しか覆っておらず、section 名の経路は cljs で動いていなかった
+
+## 根拠 3 — 実在した移植バグ 2 種（どちらも load は成功する）
+
+    (bit-shift-left 1 32)   JVM: 2^32 / cljs: 1（JS のシフト量は mod 32）
+    (int c) over a string   JVM: 符号点 / cljs: NaN（1 文字の文字列を反復するため）
+
+前者は amu の `signed-le` で、相対変位 4085 が「範囲外」として弾かれた。
+後者は kotoba-object の 6 箇所で、section 名が全部拒否された。
+**どちらも名前空間の load は完全に成功していた。**
+
+## 根拠 4 — `.cljs` 兄弟があると load は何も証明しない
+
+`org-signal` は `x25519.clj`（JVM）と `x25519.cljs`（@noble/curves）を両方持つ。
+nbb は `.cljs` を読むので require は成功し、**`.clj` は手つかずのまま**。
+triage は「そのファイルが読まれたこと」を確かめる必要がある。
+実測: jvm-source 219 のうち 5 repo がこの二重実装で、**debt ではない**。
+
+## 適用結果（2026-08-20）
+
+改名して landed: **19 ファイル / 18 repo**。中核 stack は
+`kotoba-native` 0 / `kotoba-object` 0 / `kotoba-kir` 0 / `artifact` 0 の `.clj`。
+amu は 24 → 20。
+
+拒否して `.clj` のまま残した: **11 repo**。すべて理由が実在する。
+
+## この ADR が縛らないこと
+
+- 既存の `.clj` を一括改名しない。規則が縛るのはこれから landing するもの
+- 残る約 200 repo は「拡張子の誤り」ではなく**本当に JVM が runtime**。
+  出口は capability 設計（HTTP・file・crypto・数値表現）であって改名ではない"}]
