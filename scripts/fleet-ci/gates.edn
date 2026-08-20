@@ -1967,9 +1967,31 @@
   ;; ためで、**pin が動く頻度からしてこれは通常の腐り方**）。
   ;;
   ;; :cd false — この gate が green でも意味するのは「JDK-free の不変条件が
-  ;; 保たれている」だけで、Amu の CI が通ったことではない（browser matrix /
-  ;; wasm-tools / cargo / clojure -M:test はノードの egress が無く載らない）。
+  ;; 保たれている」だけで、Amu の CI が通ったことではない。
   ;; 狭い slice を根拠に pin を前進させない。
+  ;;
+  ;; ⚠ **その理由を「ノードの egress が無い」と書いていたが、実測で誤り。**
+  ;; 2026-08-20 に benjamin で測った:
+  ;;
+  ;;   clojure -Spath -M:test   exit 0, 2.7s（provider / kototama-native /
+  ;;                            kgraph を実際に clone している）
+  ;;   clojure -M:test          74s で完走、1,099 tests / 87 errors
+  ;;
+  ;; **依存は解決するし suite は走る。** 87 errors の内訳は
+  ;; `Cannot run program "wasm-tools"` 82 件と `"wasmtime"` 2 件、残り 3 件が
+  ;; `cli exited during a test that did not expect it` —— つまり足りないのは
+  ;; egress ではなく**2 本のバイナリ**で、9 ノードのどれにも入っていない。
+  ;;
+  ;; 区別が要るのは、直し方が違うから: egress なら塞がっている経路を開ける、
+  ;; 工具なら `brew install` して cap を宣言する。前者には直すものが無い。
+  ;; ADR-2608198300 で直したのと同じ形（件数を読んで :min-files を下げに行く）
+  ;; の、コメント版である。
+  ;;
+  ;; probe.cljs は 2026-08-20 から `wasm-tools` / `wasmtime` を見て
+  ;; `:wasm-tools` cap を出す。**今日はどのノードにも付かない**が、それは
+  ;; 折り込み済みで、gap が folklore ではなく nodes.edn の欄になることが目的。
+  ;; JVM suite を gate 化したいなら、まず 1 台に 2 本入れて cap が立つのを
+  ;; 確認してから `:cap :wasm-tools` の entry を足す。
   ;;
   ;; :include-ext [".edn" ".cljs"] — resolver 本体・その test・lock・deps.edn。
   ;; 実測 84 件なので :min-files 60 を床にする（filter が壊れて空 tree を

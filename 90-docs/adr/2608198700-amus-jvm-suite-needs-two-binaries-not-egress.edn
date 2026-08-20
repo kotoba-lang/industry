@@ -1,0 +1,77 @@
+[{:db/id -1
+  :adr/id "adr-2608198700-amus-jvm-suite-needs-two-binaries-not-egress"
+  :adr/title "amu の JVM suite が fleet に載らない理由は egress ではなく 2 本のバイナリ"
+  :adr/status "accepted"
+  :adr/date "2026-08-20"
+  :adr/related "adr-2608198600-a-gate-that-needs-clojure-must-ask-for-it adr-2608198300-a-refusal-names-the-input-not-the-count"
+  :adr/body
+  "## 観測
+
+amu の fleet gate は 4 本とも `:nbb-script` で、**`clojure -M:test` は fleet で
+走らない**。gates.edn はその理由をこう書いていた:
+
+    browser matrix / wasm-tools / cargo / clojure -M:test は
+    ノードの egress が無く載らない
+
+**実測すると誤りだった**（2026-08-20、benjamin）:
+
+| 測ったもの | 結果 |
+|---|---|
+| `clojure -Spath -M:test` | **exit 0、2.7 秒**。provider / kototama-native / kgraph を実際に clone |
+| `clojure -M:test` | **74 秒で完走**、1,099 tests |
+| その内訳 | 0 failures / **87 errors** |
+
+依存は解決するし suite は走る。87 errors の中身は
+`Cannot run program \\"wasm-tools\\"` が 82 件、`\\"wasmtime\\"` が 2 件、
+残り 3 件が `cli exited during a test that did not expect it`。
+
+**足りないのは egress ではなく 2 本のバイナリ**で、9 ノードのどれにも入っていない
+（全台 `command -v` で確認）。
+
+## なぜ区別が要るか
+
+直し方が違う。egress なら塞がっている経路を開ける — **その作業は存在しない**。
+工具なら `brew install` して cap を宣言する。
+
+ADR-2608198300 で直したのと同じ形である。あちらは gate の拒否メッセージが件数を
+報告して読み手を `:min-files` を下げる方へ送っていた。ここではコメントが
+egress を報告して、読み手を**何も直すもののない場所**へ送る。
+
+## 決定
+
+1. **gates.edn のコメントを実測で置き換える。**
+2. **probe.cljs が `wasm-tools` / `wasmtime` を見て `:wasm-tools` cap を出す。**
+
+cap は `:jvm` を要求し、**2 本揃って初めて立つ**（amu の suite は両方を呼ぶので、
+片方だけのノードは結局答えられない）。
+
+**今日はどのノードにも付かない。それは折り込み済み**で、目的は gap を
+folklore から nodes.edn の欄に移すこと。誰かが 1 台に入れれば、このファイルを
+編集しなくても cap が現れる。
+
+## 検証
+
+`classify` は測定が配置判断に変わる唯一の場所なのに、**テストが 1 つも無かった**。
+`:wasm-tools` は fleet で実演できない（どのノードにも無い）ので、直接テストしない
+なら「一度も立つのを見ていない cap」を landing させることになる。
+
+`nbb scripts/fleet-ci/probe.cljs --self-test` に 6 件。両方向を確認:
+
+| 壊し方 | 落ちたもの |
+|---|---|
+| `and` → `or`（片方で立つ） | 「片方だけでは不十分」2 件 |
+| cap を `cond->` から外す（no-op 化） | 「2 本揃えば立つ」1 件 |
+
+2 つ目が要点で、**設定が正しく見えて何もしない**という、このワークスペースが
+繰り返し踏んでいる形をちょうど捕まえる。
+
+実行後の nodes.edn の diff は `:probed-at` と空き容量だけで、cap 面は不変。
+
+## 残っていること
+
+- JVM suite の gate 化は**していない**。1 台に 2 本入れて cap が立つのを確認して
+  から `:cap :wasm-tools` の entry を足す、が順序。
+- 3 件の `cli exited during a test that did not expect it` は未調査。
+  wasm-tools 由来かどうか分かっていない。
+- したがって **native の 20 case は今も ungated** のまま
+  （fleet が見る native は `jdk-free-native-conformance.cljs` の 3 source）。"}]
