@@ -22,12 +22,75 @@
 (def default-db-name "portfolio-bmc-ledger")
 (def datomic-ns "ai.gftd.apps.kotobase.datomic")
 
+(defn canonical
+  "A printed form that depends on a value's CONTENT, never on how it was built.
+
+  pr-str cannot be used directly: map and set iteration order is unspecified, so
+  {:a 1 :b 2} and {:b 2 :a 1} print differently and would digest differently --
+  the same event would get two ids, which is the exact failure this is meant to
+  prevent. Its own test caught that. Maps and sets are sorted here; vectors and
+  lists keep their order, because there the order IS the content."
+  [v]
+  (cond
+    (map? v) (str "{" (str/join "," (map (fn [[k val]] (str (canonical k) " " (canonical val)))
+                                         (sort-by (comp pr-str first) (seq v)))) "}")
+    (set? v) (str "#{" (str/join "," (sort (map canonical v))) "}")
+    (sequential? v) (str "[" (str/join "," (map canonical v)) "]")
+    :else (pr-str v)))
+
+(defn digest
+  "A stable non-cryptographic digest of any value.
+
+  djb2 over `canonical`, kept below 2^53 at every step (h < 2^32, so h*33 <
+  1.5e11) so a JS double and a JVM long compute the SAME number. `hash` cannot
+  be used here: it is runtime-specific, and an id that changes between clj and
+  cljs is not an id. Not a security primitive -- it only has to be
+  deterministic."
+  [v]
+  (let [s (canonical v)]
+    (loop [i 0 h 5381]
+      (if (>= i (count s))
+        h
+        (recur (inc i)
+               (mod (+ (* h 33)
+                       #?(:clj  (int (.charAt ^String s i))
+                          :cljs (.charCodeAt s i)))
+                    4294967296))))))
+
+(defn- seq-counts
+  "{seq → how many events carry it}, so a colliding seq can be told from a
+  unique one without re-reading the file."
+  [events]
+  (reduce (fn [m e] (if-let [s (:event/seq e)] (update m s (fnil inc 0)) m)) {} events))
+
 (defn event->entity
   "One stamped ledger event → one entity map for kotobase tx_edn.
-   Stable :db/id = event/seq so re-asserts are cardinality-one upserts."
-  [e]
-  (let [seq-n (:event/seq e)
-        eid (str "bmc.event/" (or seq-n (hash e)))]
+
+  :db/id is \"bmc.event/<seq>\" while that seq belongs to ONE event, so
+  re-asserting the same ledger is still a cardinality-one upsert and the id is
+  the readable thing it always was.
+
+  When a seq carries more than one event the id becomes
+  \"bmc.event/<seq>-<digest>\". It has to: gftd.ledger/append! stamps
+  (inc (max seq-of-the-local-file)) with nothing held between the read and the
+  write, so two loops -- or two checkouts whose appends git later merges --
+  hand the same number to different events. Measured 2026-08-20 on the
+  committed canvas-ledger: 333 seq values carried more than one event, and 353
+  events had no id of their own. Under cardinality-one the second does not land
+  beside the first, it REPLACES it.
+
+  This does not stop new collisions; that is the writer's bug, watched by
+  scripts/verify-ledger-seq-collision.cljs. It stops a collision from silently
+  eating an event when the projection runs."
+  ([e] (event->entity e nil))
+  ([e counts]
+   (let [seq-n (:event/seq e)
+         collides? (and seq-n (> (get counts seq-n 1) 1))
+         eid (str "bmc.event/"
+                  (cond
+                    (nil? seq-n) (digest e)
+                    collides? (str seq-n "-" (digest e))
+                    :else seq-n))]
     (cond-> {:db/id eid
              :bmc.event/type (str (or (:event/type e) :unknown))
              :bmc.event/actor (str (or (:event/actor e) "unknown"))
@@ -42,12 +105,17 @@
              (let [v (:event/value e)]
                (if (string? v) v (pr-str v))))
       (:event/reason e) (assoc :bmc.event/reason (str (:event/reason e)))
-      (:event/evidence e) (assoc :bmc.event/evidence (str (:event/evidence e))))))
+      (:event/evidence e) (assoc :bmc.event/evidence (str (:event/evidence e)))))))
 
 (defn events->tx-data
-  "Vector of stamped events → tx_edn entity-map vector."
+  "Vector of stamped events → tx_edn entity-map vector.
+
+  Counts seq values across the WHOLE batch first: whether an id is ambiguous is
+  a property of the corpus, not of one event, so event->entity cannot see it
+  alone."
   [events]
-  (mapv event->entity events))
+  (let [counts (seq-counts events)]
+    (mapv #(event->entity % counts) events)))
 
 (defn events->tx-edn [events]
   (pr-str (events->tx-data events)))

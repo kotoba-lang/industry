@@ -530,6 +530,42 @@
     (is (false? (kbase/enabled? (constantly "0") {})))
     (is (false? (kbase/enabled? (constantly nil) {:no-kotobase true})))))
 
+(deftest kotobase-colliding-seq-keeps-both-events
+  ;; gftd.ledger/append! stamps (inc (max seq-of-the-local-file)) with nothing
+  ;; held between the read and the write, so two loops -- or two checkouts whose
+  ;; appends git later merges -- give the same number to different events.
+  ;; Measured 2026-08-20 on the committed canvas-ledger: 333 seq values carried
+  ;; more than one event. :db/id was "bmc.event/<seq>" and the projection upserts
+  ;; cardinality-one, so the second event REPLACED the first -- 353 events had no
+  ;; id of their own. This is the check that was missing.
+  (let [a {:event/seq 7 :event/type :react/observation :event/actor "advisor:gate"
+           :event/at "t" :event/value "first"}
+        b {:event/seq 7 :event/type :react/observation :event/actor "advisor:llm+gate"
+           :event/at "t" :event/value "second"}
+        ids (mapv :db/id (kbase/events->tx-data [a b]))]
+    (is (= 2 (count (set ids)))
+        "two different events on one seq must not collapse onto one :db/id")
+    (is (every? #(str/starts-with? % "bmc.event/7-") ids)
+        "both are ambiguous, so neither may keep the bare id and win by position"))
+  (testing "a seq belonging to one event keeps the readable id it always had"
+    (let [solo [{:event/seq 9 :event/type :canvas/note :event/actor "a" :event/at "t"}]]
+      (is (= "bmc.event/9" (:db/id (first (kbase/events->tx-data solo)))))))
+  (testing "re-projecting the same corpus yields the same ids, or every run
+            would insert instead of upsert"
+    (let [evs [{:event/seq 7 :event/type :x :event/actor "p" :event/at "t"}
+               {:event/seq 7 :event/type :x :event/actor "q" :event/at "t"}
+               {:event/seq 8 :event/type :y :event/actor "r" :event/at "t"}]]
+      (is (= (mapv :db/id (kbase/events->tx-data evs))
+             (mapv :db/id (kbase/events->tx-data evs))))))
+  (testing "the digest is the same number on every runtime, or an id computed
+            under nbb would not match one computed on the JVM"
+    ;; not 5381: digest hashes the CANONICAL form, and "" prints as the two
+    ;; characters \"\" -- the assertion was wrong, the code was not
+    (is (= (kbase/digest "") (kbase/digest "")))
+    (is (= "{:a 1,:b \"x\"}" (kbase/canonical {:b "x" :a 1})))
+    (is (= (kbase/digest {:a 1 :b "x"}) (kbase/digest {:b "x" :a 1})))
+    (is (not= (kbase/digest {:a 1}) (kbase/digest {:a 2})))))
+
 (deftest compose-advisors-concat
   (let [a (fn [_] [{:proposal/action :canvas/add-item :event/value "a"}])
         b (fn [_] [{:proposal/action :canvas/add-item :event/value "b"}])
