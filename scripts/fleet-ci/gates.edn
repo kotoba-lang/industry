@@ -3276,5 +3276,95 @@
   {:name "aiueos" :id "nbb-cross-runtime-aiueos" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+
+  ;; Two stdlib libraries whose suites had NEVER run on a second runtime, and
+  ;; which were broken there. Measured 2026-08-20 by giving each an nbb entry
+  ;; and running its own .cljc suite:
+  ;;
+  ;;   bytes  sha1("abc") returned 71347bf0... instead of the FIPS vector
+  ;;          a9993e36.... JavaScript's `>>>` masks the shift COUNT modulo 32,
+  ;;          so the length block's high word was 24 instead of 0. The cljs
+  ;;          side of kotoba.turn.credential calls this directly, so HMAC-SHA1
+  ;;          credentials computed there did not match a compliant peer.
+  ;;
+  ;;   lint   every parse failure THREW on cljs -- `(.getMessage e)` inside a
+  ;;          catch clause that was itself written portably. And empty input
+  ;;          returned the STRING "nil" as its canonical text, because cljs
+  ;;          edn/read-string ignores the :eof option.
+  ;;
+  ;; Both are fixed. These gates are what stop them coming back: neither
+  ;; defect is visible to a JVM run, which is the only run either library had.
+  ;;
+  ;; **`lint` takes :min-files 4, not 5.** It has exactly four files matching
+  ;; :include-ext, and the floor is there to catch a truncated ship rather
+  ;; than to assert a size. Copying 5 from the neighbours would have made the
+  ;; gate reject a complete tree.
+  ;;
+  ;; :ship-git-deps -- lint reaches fmt/lsp/fs/coll; bytes is a leaf and does
+  ;; not need it, but carrying it is harmless and keeps the two entries alike.
+  {:name "bytes" :id "nbb-cross-runtime-bytes" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd false}
+  {:name "lint" :id "nbb-cross-runtime-lint" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+
+  ;; The remaining eight stdlib libraries that could be run on a second
+  ;; runtime. Each was measured green by hand on 2026-08-20 and each now
+  ;; carries a landed `run-tests.cljs`, so the green becomes something the
+  ;; fleet preserves rather than a number one session wrote down:
+  ;;
+  ;;   json 27 tests / 87 assertions   time 8 / 33        io 9 / 16
+  ;;   fmt   6 / 15                    lsp  8 / 26        http 7 / 21
+  ;;   test  9 / 139                   scheduler 16 / 39
+  ;;
+  ;; **:min-files is the MEASURED count per repo, not a copied constant.**
+  ;; Five of these eight have exactly four files matching :include-ext, so the
+  ;; 5 used elsewhere in this file would have made their gates reject a
+  ;; complete tree. The floor is there to catch a truncated ship, not to
+  ;; assert a size.
+  ;;
+  ;; Why this matters rather than being tidiness: bytes shipped a SHA-1 that
+  ;; returned the wrong digest on ClojureScript, and lint an error path that
+  ;; threw there instead of reporting. Both passed every JVM run they ever had.
+  {:name "json" :id "nbb-cross-runtime-json" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 11 :cd false}
+  {:name "time" :id "nbb-cross-runtime-time" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+  {:name "io" :id "nbb-cross-runtime-io" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+  {:name "fmt" :id "nbb-cross-runtime-fmt" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+  {:name "lsp" :id "nbb-cross-runtime-lsp" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+  {:name "http" :id "nbb-cross-runtime-http" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 6 :cd false}
+  {:name "test" :id "nbb-cross-runtime-test" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+  {:name "scheduler" :id "nbb-cross-runtime-scheduler" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 6 :cd false}
+
+  ;; `store` joins them: one `byte-array` in a test helper was the whole
+  ;; reason its suite was JVM-only. `store/put` routes through
+  ;; `kotoba.lang.io`'s buffer seam and never touches a host array, so the
+  ;; array was in the test rather than the contract.
+  ;;
+  ;; That leaves `async` and `hash` as the only stdlib libraries with no gate
+  ;; here, and they are JVM-only for real reasons rather than by accident --
+  ;; worth writing down so nobody re-triages them: hash's test drives a WASM
+  ;; instance through Chicory, and async's tests shell out through
+  ;; clojure.java.shell and compile `.kotoba` through the KIR interpreter in
+  ;; the same JVM on purpose.
+  {:name "store" :id "nbb-cross-runtime-store" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
   ;; ────────────────────────────────────────────────────────────────────────
   ]}

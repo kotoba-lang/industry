@@ -172,6 +172,29 @@
         (#(when-not (str/blank? %) %)))
     (catch :default _ nil)))
 
+(defn- git-head-sha
+  "The commit this row was measured FROM.
+
+  Without it a row cannot be checked against the pin it is supposed to
+  represent, and a checkout left behind its pin produces a confident row about
+  a tree that no longer exists — the axes it reports are the axes of older
+  work, so landed work reads as absent and the ranking sends the next round
+  back to a repo that was already raised.
+
+  The tick catches this today by comparing `:git/last-commit` against the
+  checkout's current commit time, but only for the top candidates it ranks.
+  Measured 2026-08-20: 26 of 1,835 cloud-itonami checkouts were behind their
+  pin, and only the ones that happened to surface in the top 24 were caught.
+  With the sha recorded, `evidence sha vs west pin` is one pass over the file."
+  [repo-abs]
+  (try
+    (-> (.execSync cp "git rev-parse HEAD"
+                   #js {:cwd repo-abs :encoding "utf8" :stdio #js ["ignore" "pipe" "ignore"]
+                        :timeout 15000})
+        str/trim
+        (#(when-not (str/blank? %) %)))
+    (catch :default _ nil)))
+
 (defn- git-commit-count [repo-abs]
   (try
     (-> (.execSync cp "git rev-list --count HEAD"
@@ -318,6 +341,7 @@
          :repo/has-blueprint? (has-file? "blueprint.edn")
          ;; --- vcs
          :git/last-commit (git-last-commit-iso root)
+         :git/head-sha (git-head-sha root)
          :git/commit-count (git-commit-count root)}))))
 
 ;; ---------------------------------------------------------------- render
