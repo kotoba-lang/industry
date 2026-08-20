@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 485168, "kotobase-cf-wasm-staging" 360807},
+ {"net-kotobase" 486511, "kotobase-cf-wasm-staging" 362455},
  :zone
- {:requests-7d 363334,
-  :pageviews-7d 2240,
-  :uniques-7d-sum 1284,
+ {:requests-7d 365275,
+  :pageviews-7d 2263,
+  :uniques-7d-sum 1293,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
@@ -33,8 +33,8 @@
     :requests 227}
    {:path
     "/bafyreibjlfky2zjqcemtk2voopxvt4k7ns7fmqy33nttac55oavz4bpf3m",
-    :requests 224}],
-  :status-mix {:client-error 643, :ok 7523, :server-error 5706},
+    :requests 227}],
+  :status-mix {:client-error 609, :ok 7592, :server-error 5787},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -46,26 +46,26 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-20",
- :traffic-quality {:window "24h", :probe-4xx-pct 5, :error-5xx-pct 41},
+ :traffic-quality {:window "24h", :probe-4xx-pct 4, :error-5xx-pct 41},
  :top-paths
- "上位 page (24h, 2xx/3xx): /bafyreia3xqvabdu6snyk6fo3sfuqwcjatijdmw… 347 · /bafyreiam6u7qaumen65uubia7tbbbal6xgfqhs… 287 · /bafyreiclspdobb7wzdotki34gwe7axvnnfewg6… 283 · /bafyreifgdytbsig2xxdi2vfayr5mx7oibje6uw… 270 · /bafyreid6kzu2v7dhupnnvd5x7jx7my5oruyq42… 247 | 4xx(probe) 5% · 5xx 41%",
- :funnel {:visitors 3590, :signups 28, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /bafyreia3xqvabdu6snyk6fo3sfuqwcjatijdmw… 347 · /bafyreiam6u7qaumen65uubia7tbbbal6xgfqhs… 287 · /bafyreiclspdobb7wzdotki34gwe7axvnnfewg6… 283 · /bafyreifgdytbsig2xxdi2vfayr5mx7oibje6uw… 270 · /bafyreid6kzu2v7dhupnnvd5x7jx7my5oruyq42… 247 | 4xx(probe) 4% · 5xx 41%",
+ :funnel {:visitors 3596, :signups 28, :checkouts 0},
  :signal
- "kotobase.net 実測 363334 req/7d・1284 uniques(日次和)・うち4xx probe 5%(24h)、workers 845975 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 365275 req/7d・1293 uniques(日次和)・うち4xx probe 4%(24h)、workers 848966 inv/7d、Stripe active subs 0",
  :x402
  {:unmetered-twin-ratio 0,
   :rejection-reasons {:malformed-header 1},
   :unmetered-twin-reads 0,
   :unpriced-plane-reads 0,
-  :challenges 20,
+  :challenges 21,
   :submissions 4,
   :settlement-rate 0,
   :rejections 4,
   :rejections-classified 1,
   :settlements 0,
   :rejections-unexplained 3,
-  :attempt-rate 0.2},
+  :attempt-rate 0.19047619047619047},
  :by-source
- {:visitors {:openai-ads 3, :organic 2068},
+ {:visitors {:openai-ads 3, :organic 2074},
   :signups {:organic 24, :other 1}, 
   :checkouts {}}}
