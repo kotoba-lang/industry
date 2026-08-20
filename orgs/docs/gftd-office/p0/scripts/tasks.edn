@@ -1,8 +1,0 @@
-;; Task registry for `nbb scripts/run-task.cljs <task>` (ADR-2607173000).
-;; Converted from bb.edn in ADR-2608135000. These two gftd-office prototypes were the LAST
-;; bb.edn files in the superproject's own tracked tree — missed by the 41-checkout conversion
-;; because they are not west projects but plain directories under orgs/docs/, so nothing that
-;; iterated over west entries ever saw them.
-{:test {:cmd ["nbb" "--classpath" "." "-e"
-              "(require 'office-test) (.exit js/process (office-test/-main))"]
-        :doc "P0 round-trip tests: document / org(+DID) / grant <-> datoms + access-DAG. Runs under nbb (verified 2026-08-13: 5 tests / 10 assertions, 0 failures)."}}
