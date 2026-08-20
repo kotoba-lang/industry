@@ -142,11 +142,43 @@ toolchain 由来**で、pin を揃えると消えた。前の節で「未調査�
 **両方向を実測してから landing した**: prefix 有りで `count=1099 exit=0`、
 prefix 無し（旧 PATH）で `79 errors exit=1`。PATH の 1 行は装飾ではない。
 
+## 第 2 のノードと、3 度目の同じ落とし穴（2026-08-20 追記）
+
+benjamin 1 台依存を外すため、他の 4 つの `:jvm` ノードに pinned prefix を配った。
+`wasmtime` は 4 台とも未導入だったので brew で入れた（**contract は wasmtime を
+pin していない**ので、pin する 2 本は prefix、しない 1 本は brew、と出所を分けた）。
+
+**工具が揃ったことを cap の根拠にしなかった。** 各ノードで実際に suite を回した:
+
+| node | Rosetta | 結果 |
+|---|---|---|
+| benjamin | yes | **0 errors** |
+| judah | yes | **0 errors** |
+| levi | no | **16 errors** |
+| simeon / joseph | no | （levi と同じ理由で落ちる） |
+
+levi の 16 件は全部
+`Cannot run program \"…kotoba-isa-probe-x86_64.bin\": Bad CPU type in executable`。
+**suite は x86_64 の native artifact を吐いて、それを実行する。** Apple Silicon
+では Rosetta 2 が要る。工具の有無とは無関係な、第 4 の条件だった。
+
+工具 3 本だけで cap を与えていれば、**3 台が cap を得て自分自身について赤を出す**
+—— ADR-2608198600 の形に、今日 3 度目、また別の方向から到達していた。
+
+`:wasm-tools` は Rosetta も要求する。結果、cap を持つのは **benjamin と judah の
+2 台**で、**どちらも実際に suite を 0 errors で完走させて確認済み**。
+levi / simeon / joseph は工具を持ちながら正しく除外され、nodes.edn に
+`:rosetta? false` として理由が残る。
+
+**Rosetta を 3 台に入れることはしなかった。**
+`softwareupdate --install-rosetta` はライセンス同意フラグを要し、**オーナーの
+代わりにライセンスへ同意することになる**。工具の配置とは別種の判断なので、
+やるならオーナーの指示で。
+
 ## 残っていること
 
-- **cap を持つのは benjamin 1 台**。`:kotoba`(judah 1 台) / `:zig`(2 台) と
-  同じ形だが、その 1 台が落ちればこの gate は動かない。他ノードへ prefix を
-  配るのは別作業。
+- cap は 2 台。1 台依存は解消したが、Rosetta を持つノードを増やすかは上記のとおり
+  オーナー判断。
 - pin の**追従**は誰も見ていない。amu が `component-model-v1.edn` の
   toolchain を上げたとき、prefix の binary は古いままになる。
   version は nodes.edn に出るので突き合わせは可能だが、**検査は無い**。
