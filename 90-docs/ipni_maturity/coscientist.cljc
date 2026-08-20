@@ -31,26 +31,26 @@
 ;; otherwise the roadmap ranks it as shippable and the batch quietly contains
 ;; work nobody can start.
 
-(defn- hypothesis [{:keys [axis headroom worst-score finding title] :as f} idx]
+(defn- hypothesis [identity? {:keys [axis headroom worst-score finding title] :as f} idx]
   (let [{:keys [change effort blocked-by shippable? observable?]}
         (case axis
           :discoverable-as-provider
           {:observable? true
            :change "advertise one CID end-to-end and confirm cid.contact returns the kotobase multiaddr, then IsRm and confirm it disappears — the ADR's own success criterion, both halves"
-           :effort :L :shippable? false
-           :blocked-by "publisher identity (a peer ID) and the advertisement signature"}
+           :effort :L :shippable? identity?
+           :blocked-by (when-not identity? "publisher identity — manifest/ipni-publisher.edn names no peer id")}
 
           :chain-published
           {:observable? true
            :change "build the first advertisement, PUT it to ipld/{ad-cid} in the block plane, write the CID to ipni/head, and announce it"
-           :effort :L :shippable? false
-           :blocked-by "publisher identity (a peer ID) and the advertisement signature"}
+           :effort :L :shippable? identity?
+           :blocked-by (when-not identity? "publisher identity — manifest/ipni-publisher.edn names no peer id")}
 
           :advertise-wired
           {:observable? true
            :change "drain the pin outbox: read the queued events, build an advertisement per event via ipni.advertise, clear on accept, leave queued on reject"
-           :effort :M :shippable? false
-           :blocked-by "an advertisement needs a signed Provider, so the drain cannot be finished before the identity exists"}
+           :effort :M :shippable? identity?
+           :blocked-by (when-not identity? "publisher identity — an advertisement needs a signed Provider")}
 
           :dependency-declared
           {:observable? false
@@ -61,6 +61,19 @@
           {:observable? false
            :change "implement ipni.hamt/as-set (HAMT-as-set per ipni/specs) so one advertisement is not capped at a single EntryChunk"
            :effort :M :shippable? true :blocked-by nil}
+
+          :publisher-identity
+          ;; Deliberately NOT shippable by the loop. Which identity kotobase
+          ;; publishes to the world under is an owner decision -- one peer id
+          ;; or twelve, fresh key or an existing seed -- and it is expensive
+          ;; to unmake, because changing it means re-announcing every
+          ;; advertisement ever published. The first run of this loop picked
+          ;; exactly this hypothesis as its top startable target, which is how
+          ;; the mislabelling was found.
+          {:observable? true
+           :change "decide which Ed25519 identity kotobase publishes under, derive its libp2p peer id, and record it in manifest/ipni-publisher.edn — every other blocked hypothesis waits on this"
+           :effort :S :shippable? false
+           :blocked-by "an owner decision, not a task: which identity kotobase publishes under"}
 
           :publisher-anonymous
           {:change "serve the publisher from a host that answers without a credential"
@@ -98,8 +111,11 @@
      :blocked-by blocked-by
      :observable? (boolean observable?)}))
 
-(defn generate [findings]
-  (vec (map-indexed (fn [i f] (hypothesis f i)) findings)))
+(defn generate
+  "`identity?` is measured, not assumed: it decides whether the observable
+  hypotheses are startable at all."
+  [identity? findings]
+  (vec (map-indexed (fn [i f] (hypothesis identity? f i)) findings)))
 
 ;; --- Reflect ----------------------------------------------------------------
 
@@ -152,7 +168,8 @@
 
 (defn run [probe]
   (let [before (audit/audit probe)
-        hyps (-> (:findings before) generate reflect)
+        identity? (= 1 (:identity/publisher probe))
+        hyps (-> (generate identity? (:findings before)) reflect)
         ranked (elo/rank hyps)
         evolved (evolve ranked)]
     {:probe probe :before before :meta (meta-review before ranked evolved)}))
@@ -261,4 +278,6 @@
       (println "  The score would rise; discoverability would not. Report the")
       (println "  blocked work instead of banking the gain."))))
 
-(apply -main *command-line-args*)
+;; No top-level invocation: this namespace is a LIBRARY. The entry point is
+;; run.cljs. Calling -main here meant `require`-ing it printed a full report as
+;; a side effect -- which is exactly what the growth loop did on its first run.

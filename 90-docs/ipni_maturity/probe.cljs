@@ -142,6 +142,23 @@
         {:hits (count hit-files) :repos (vec (distinct hit-repos))
          :manifests-read (count files) :repos-listed (count paths)}))))
 
+(defn- publisher-identity
+  "Whether a publisher identity has been DECIDED, measured as the presence of
+  `manifest/ipni-publisher.edn` naming a peer id.
+
+  This is the file the decision produces. Making it the measurement is what
+  lets the growth loop act on its own: while it is absent the three
+  externally-observable hypotheses are blocked and the loop holds; the moment
+  it exists they become startable and the loop wakes. A blocker hardcoded in
+  the hypothesis table instead would have made the wake path unreachable
+  forever, which is the shape of a gate that is never green."
+  [root]
+  (let [f (str root "/manifest/ipni-publisher.edn")]
+    (if-not (fs/existsSync f)
+      0
+      (let [txt (str (fs/readFileSync f "utf8"))]
+        (if (re-find #":peer-id\s+\"[^\"]+\"" txt) 1 0)))))
+
 (defn probe []
   (let [root (repo-root)
         orgs (str root "/orgs")
@@ -192,7 +209,8 @@
      :write/call-sites call-sites
      :write/declared-dependency declared-dep
      :write/dep-scan (if (map? dep-result) (dissoc dep-result :hits) :unknown)
-     :entries/hamt hamt-impl}))
+     :entries/hamt hamt-impl
+     :identity/publisher (publisher-identity root)}))
 
 (defn -main [& args]
   (let [argv (vec (or (seq args) (seq *command-line-args*) []))

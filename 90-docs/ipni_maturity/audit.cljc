@@ -93,6 +93,10 @@
    {:id :publisher-reachable :title "Publisher host is up" :weight 0.04
     :check (fn [p] (status-is (:publisher/health p) #{200} "publisher /health is not 200"))}
 
+   {:id :publisher-identity :title "A publisher identity has been decided" :weight 0.13
+    :check (fn [p] (count-at-least (:identity/publisher p) 1
+                                   "no publisher identity: manifest/ipni-publisher.edn does not name a peer id, and cid.contact rejects an announce whose address carries no /p2p/{peer-id}"))}
+
    {:id :entries-hamt :title "HAMT entry encoding" :weight 0.03
     :check (fn [p] (count-at-least (:entries/hamt p) 1
                                    "ipni.hamt returns :not-yet-implemented — honest, but caps an advertisement at one EntryChunk"))}])
