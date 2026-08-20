@@ -1,0 +1,130 @@
+[{:db/id -1
+  :adr/id "adr-2608211200-kernel-lock-not-compare-exchange-and-pins-track-tips"
+  :adr/title "amu#625 は名前付きロックとして着地させ、pin は upstream tip を既定状態にする"
+  :adr/status "accepted"
+  :adr/date "2026-08-20"
+  :adr/related ["adr-2607198300-kotoba-native-execution-without-jvm-node-rust"
+                "adr-2607241100-stack-topology-and-honest-c-boundary"
+                "adr-2608136000-five-questions-before-trusting-green"]
+  :adr/body "## 決定
+
+**amu#625 は汎用 compare-exchange ではなく「名前付きロック」として着地させた。**
+`kernel-try-lock-u32` / `kernel-unlock-u32`（どちらも `base length index`、arity 3、
+maximum 4096）。オーナーが 3 択から選択（2026-08-20）。
+
+**あわせて pin 運用のルールを 1 本立てた。** pin が upstream の default branch より
+遅れているのは平常状態ではなく是正対象。CLAUDE.md 本体に landed。
+
+## なぜ汎用 CAS ではないのか
+
+実測: aiueos の value runtime にある `kernel-compare-exchange-u32` の呼び出しは
+**12 箇所すべてが同一の二値 try-lock**だった。offset 0 で、取得は 0 を期待して 1 を書き、
+解放は 1 を期待して 0 を書く。カウンタも、データ上の CAS retry ループも、2 つ目の
+ロックワードも無い。汎用操作を露出すれば、観測されたどの用途もカバーしない分だけ
+面が広がる。
+
+そして代償が 2 つある:
+
+- **x86-64**: `lock cmpxchg` は comparand と結果を EAX に固定する。名前付き操作なら
+  backend が固定列の中で RAX を push/pop すればよい（`x86-quotient` が既にやっている）。
+  汎用演算子にすると **EAX がレジスタアロケータの新しい種類の制約になる**。
+- **aarch64**: ARMv8.1-LSE 未満に CAS は無い。可搬形は LDAXR/STLXR で、store は
+  競合が無くても失敗しうるので再試行が要る。try-lock は失敗を返してよいので、
+  **再試行を 1 つの命令選択の内側に閉じられる**。汎用 CAS だと guest 側の、
+  basic block を跨ぐ制御フローになる。
+
+## 実装（8 repo）
+
+| repo | 内容 |
+|---|---|
+| `kotoba-sema` | `kernel-memory-operations` に 2 entry。予約名・arity 検査・`:i64` 型付け・raw-memory taint gate は全部この表から駆動される |
+| `kotoba-kir` | interpreter は拒否（値は「この呼び出しが競争に勝ったか」であり、この interpreter に見えるものではない）。`lower` の kernel-native 判定集合にも追加し、定数 oracle が atomic RMW をコンパイル時評価しにいくのを止める |
+| `kotoba-gmir` | schema 2 op + index vreg 検査 + maximum=4096 |
+| `kotoba-mir` | schema・register 検査・maximum・value-ops・instruction-sources・spill 経路の 6 箇所 |
+| `kotoba-codegen` | MC schema 2 entry |
+| `kotoba-native` | 両 ISA の emitter、B.NE encoder、bounds-check の共通化、encoding test 2 本、ISA parity 契約の portable 側へ登録 |
+| `kotoba-verifier` | 既に admit 済みの family への追加 |
+| `amu` | pin 前進 |
+
+`:gmir/stored` / `:mir/stored` を**持たない**ことが、schema 層での「lock であって
+compare-exchange ではない」の言明になっている。書き込む値は操作が固定する。
+
+## 符号化の検証で 1 件見つかった
+
+`stlxr` の定数を手計算で `0x8811FE00` → `0x8910FE00` と桁上がり誤りしていた。
+**命令選択も layout も MC schema も通り、正しい長さのプログラムが出た。**
+`invalid` と言ったのは逆アセンブラだけ。clang に正解を出させて修正し、
+test はその誤りを戻すと赤くなって定数を名指しする。
+
+**手で組んだ符号は、自分の算術で二度検算しても検証にならない。**
+独立した逆アセンブラか assembler に当てる。
+
+## aiueos 側の結果
+
+12 箇所を機械的に書き換えた。取得の比較は「swap 前の値が 0」から「try-lock が 1 を
+返した」へ反転し、解放は返り値の真理値が同じなので行が変わらない。
+
+`value-handle-arena` の contract は **2026-08-14 の時点で `:required-opcode
+[240 69 15 177 19]`**（= `lock cmpxchg`）を持っていた。compiler がそれを出せるように
+なる 6 日前から、aiueos はその命令を要求していた。verifier が compile 済み object の
+中でそのバイト列を確認している。
+
+**11 objects, 11 failing → 11 objects, 7 failing。**
+
+## 見つかった横断的な形
+
+**失敗は積み重なる。** `value-handle-arena` は CAS で落ちていた裏に export refusal が
+最初から在り、CAS を外した瞬間にそれが出た。`kernel-value-provider-queue`（4 つ目の
+intrinsic）も CAS の裏に隠れていた。**failing の数が動かないことは前進が無いことでは
+なく、1 動いた時に実は 2 動いていることもある。**
+
+**要求が 1 箇所に住み、別の場所から検査されていた。** `verify-value-handle-plan` は
+書かれた時からずっと export を `kotoba_aiueos_value_handle_plan` と比較していたが、
+contract は何も言っていなかった。symbol は必須かつ未宣言で、producer 側から読めない。
+amu#626 の refusal がこの穴を作ったのではなく、**可視化した** —— 未登録名が黙って
+`kotoba_aiueos_probe` を受け取っていた間は、宣言が無いことは何のコストにもなっていな
+かった。
+
+**production が未 merge branch 上の commit を pin していた。** `kotoba-native` の
+deps.edn は `kotoba-codegen` を `c85088b` に固定していたが、それは codegen の main に
+無く、未 merge の `agent/aarch64-madd-mc` にしかなかった（main はそこから 5 commit
+遅れ、8 日間放置）。west pin には `verify-west-pins` があるが **deps.edn の pin には
+gate が無い**。
+
+## pin ルール（CLAUDE.md 本体、root 8bbce75）
+
+- 「pull」は 3 つの別物: (1) superproject を origin/main に (2) pin を各 repo の tip に
+  (3) checkout を pin に。**(2) だけコマンドが無い**ので、(1)(3) をいくら回しても
+  workspace は古いまま止まる
+- repo の中の pin（`deps.edn` の `:git/sha`、lock、焼いた sha）も同じ規則
+- **例外は「進めない理由を書いた」ときだけ。** 黙って遅れているのと、理由があって
+  留めているのは、出力から区別できなければならない
+- 引数なしの `west update` を回せ、という意味ではない
+
+**適用**: GraphQL で 4,216 project を 43 リクエストで実測（最新 3,747 / 遅れ 469 /
+測れなかったもの 0）。初回は 3 バッチが 502 で 300 件が測れず、それを「最新」に
+混ぜないよう再試行を入れて測り直した。**309 pin を 1 commit で前進**（root 2d7265d）。
+drop 160 の内訳: 154 は他セッションが先に進めて既に最新、6 は compare が 404、
+4 は tip に revision 行なし、**3 は clean forward move でないとして拒否**（pin 退行の阻止）。
+
+## 残り
+
+`kernel-value-provider-queue`(4) / `kernel-value-runtime-capability-table`(2) /
+`kernel-publish-current-domain`(1)。**3 つに見えて決定は 1 つ。** どれも
+`kernel-boot-info` と同じ隠しコンテキスト slot accessor（`mov r10,[r9+0x50]`）になり、
+kernel-image の context は 88 バイトで offset 80 が既に埋まっている。admit するには
+aiueos が自分の kernel と共有する context を広げ、kernel 側が slot を埋める必要がある。
+**compiler がオフセットを選べる話ではない。**
+
+決定が出れば compiler 側の追加は今回の lock より小さい（arity 0 と 1 の slot 読み書き、
+regalloc 制約も ISA 差も無い）。
+
+## 実行しなかったこと
+
+`native-executor-test` に lock の**実行**テストを書いて、通す代わりに消した。
+ハーネスは guest に「lock してよい書き込み可能アドレス」を渡す口が無いので、実行
+できるのは null base の guard だけで、そこに到達させるには verifier の oracle 規則を
+広げる必要があった。**guard のテストのために verifier の規則を緩めるのは割に合わない。**
+成功パスが実際に走るのは aiueos の QEMU evidence gate（kernel が渡したページの上）で、
+そこはまだ。証明済みなのは両 ISA で意図した命令列が出ることまで。
+"}]
