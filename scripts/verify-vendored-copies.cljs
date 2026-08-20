@@ -121,13 +121,35 @@
     (try (step dir []) (catch :default _ []))))
 
 (defn- source-root?
-  "`src`, or `src-cljs` / `src-clj` / `src-cljc` / `src-host` and friends.
+  "`src`, or `src-cljs` / `src-clj` / `src-cljc` / `src-host` and friends, and
+  `scripts`.
 
   Not any directory that merely contains Clojure: widening to `test` or to
-  every directory would turn a bounded scan into a full walk of 4,000 repos
-  for no finding — every vendored copy in the fleet is under a `src*` root."
+  every directory would turn a bounded scan into a full walk of 4,000 repos.
+
+  This docstring used to end `— every vendored copy in the fleet is under a
+  `src*` root`, and that clause was false when it was written. Measured
+  2026-08-21: the 185-repo `cloud-itonami/cloud-itonami-lei-*` archive family
+  keeps its verifier at `scripts/verify-facts.cljs`, and four repos had a copy
+  of it in three different shapes (334 / 429 / 463 lines, the largest a strict
+  superset of the others). This scan had reported nothing about any of them --
+  not `stale`, not `unresolved`, nothing -- because it never opened a `scripts`
+  directory. That is the same failure this file's own header describes twice
+  under `Where it looks`: a scan that knows one layout finds the copies that
+  follow it, and its silence about the rest reads as a clean bill of health.
+
+  The cost of the widening, measured before making it, across 4,725 checkouts:
+  `scripts` adds 516 directories and 1,250 files to 5,525 directories and
+  28,415 files, so roughly 4% more files to read. Wall clock is not measurably
+  worse: interleaved runs on 2026-08-21 at load 10.3 gave 41.2s / 38.4s narrow
+  against 41.7s / 36.1s wide -- the wide scan was the faster of the two on the
+  second pass, so the 4% is below this machine's run-to-run variance and no
+  single number for it would be honest.
+
+  `test` is still excluded -- a copy under `test` is a fixture, and the fleet
+  has thousands of them."
   [n]
-  (or (= n "src") (str/starts-with? n "src-")))
+  (or (= n "src") (str/starts-with? n "src-") (= n "scripts")))
 
 (defn- src-dirs
   "Every source root under `root`, to a bounded depth.
@@ -302,10 +324,30 @@
                                   (or (nil? n) (> (str/index-of text "VENDORED") n)))
              :body (body text)))))
 
+(def ^:private self-repo
+  "This superproject's own `<owner>/<repo>`, or nil if the remote cannot be read.
+
+  A vendored copy's upstream is not always a west project under `orgs/`. The
+  `cloud-itonami-lei-*` archive family vendors `scripts/lei-verify-facts.cljs`
+  from THIS repository, which is where the family's generators
+  (`lei-acquire.cljs`, `lei-register-manifest.cljs`, ...) already live. Without
+  this, `orgs/com-junkawasaki/root` does not exist, `library-dir` returns nil,
+  and every copy is reported as `library repo not checked out -- provenance
+  unverifiable`. That message sends a reader to run `west update` for a repo
+  that is not missing and never was: they are standing in it.
+
+  Derived from the remote rather than hard-coded, so a fork or a rename does
+  not turn every copy in the fleet into a phantom finding."
+  (some->> (sh "git remote get-url origin")
+           str/trim
+           (re-find #"[:/]([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?$")
+           second))
+
 (defn- library-dir
   "`source` is `<org>` (repo inferred from the path's first segment), an
   explicit `<org>/<repo>`, or -- spelling 5 -- a bare repo name with no org,
-  which is resolved by looking for it under each org."
+  which is resolved by looking for it under each org. It may also be this
+  superproject itself, which is not under `orgs/`; see `self-repo`."
   [source kind lib-path]
   (if (= kind :file-target)
     nil
@@ -325,10 +367,12 @@
                  :let [d (str "orgs/" o "/" source)]
                  :when (fs/existsSync d)]
              d))
-    (let [dir (if (str/includes? source "/")
-                (str "orgs/" source)
-                (str "orgs/" source "/" (first (str/split lib-path #"/"))))]
-      (when (fs/existsSync dir) dir))))))
+    (if (and self-repo (= source self-repo))
+      "."
+      (let [dir (if (str/includes? source "/")
+                  (str "orgs/" source)
+                  (str "orgs/" source "/" (first (str/split lib-path #"/"))))]
+        (when (fs/existsSync dir) dir)))))))
 
 (defn- upstream-candidates
   "The paths the library file could be at, given what the header wrote.
