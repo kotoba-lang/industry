@@ -159,13 +159,13 @@
   :icp/timing "—"
   :icp/batch-size 10
   :icp/requires-contact-route true
-  :icp/basis "実測（2026-08-20）: :cae/fem-static :cae/contact :cae/cfd はいずれも marker 完備だが **behavior probe 未着手（:declared）**。:cae/verification は :thin —— `manufactured-solution` が dispatch されず benchmark レコードのラベルとしてしか存在しない"
+  :icp/basis "実測（2026-08-20、反復 3 で更新）: :cae/fem-static :cae/contact :cae/cfd はいずれも **:working**。probe は数値が返ることではなく物理として筋が通ることを見ている —— 軸力バーはメッシュを 4→64 要素に細分すると L2 誤差が 6.8e-7 → 2.9e-9（238 倍、2 次収束相当）で解析解へ収束し代数残差は 8e-12、接触は荷重 2 倍で変位が単調に増え、LBM の平面ポアズイユは解析解 u(y)=g/(2ν)y(h−y) に対し相対 L2 誤差 1.4%（許容 5%）。:cae/verification は依然 :thin —— `manufactured-solution` が dispatch されず benchmark レコードのラベルとしてしか存在しない"
   :icp/proof-axes "[:cae/verification :cae/fem-static :cae/contact]"
-  :icp/anti-claim "**まだ売れる状態ではない。** 4 軸中 3 軸が未検証（:declared）で、看板である検証軸自体が :thin。ASME V&V を名乗る前に probe を書き、`manufactured-solution` を実際に解ける経路にすること"
+  :icp/anti-claim "**ASME V&V を名乗らない。** 収束は実測で示せるようになったが、看板である :cae/verification は依然 :thin（`manufactured-solution` が解ける経路として存在しない）。加えて `:nonlinear-contact` は自分の戻り値で `:status :screening-only` と申告している —— 一次スクリーニングであって設計判断の根拠ではない、と実装が自分で言っているものを、そう言わずに売らない。Ansys / Abaqus との機能面積の比較にも勝てない"
   :icp/checkable-edn "{:country #{\"JP\" \"DE\" \"US\"} :contact-route :required}"
   :icp/unevaluable-edn "[{:predicate :runs-fea :want \"FEA/CFD を日常的に回している\" :why \"どのデータ源にも無い\"} {:predicate :regulated :want \"解析証跡を求められる規制下に在る\" :why \"catalog に規制属性が無い\"}]"
   :icp/disqualifier-edn "[{:rule :needs-commercial-solver-parity :why \"Ansys / Abaqus の機能面積での比較を求める相手には勝てない。実測でそう出ている\"}]"
-  :icp/note "priority 2 だが status は pending-owner-review のまま据え置く —— 根拠となる軸が :working になってから outbound に出す。"}
+  :icp/note "反復 3（2026-08-20）で 3 軸が :working になったので、根拠は揃った。status は owner 判断のため pending-owner-review のまま置く —— 変えるのは測定ではなく人。次に外すべき障害は :cae/verification の :thin ひとつ。"}
 
  {:icp/id "threed-headless-interop"
   :icp/product "kotoba-lang/org-iso-10303"

@@ -86,7 +86,7 @@
    :axis/repo "kotoba-lang/kami-engine-modeling"
    :axis/paths ["src"]
    :axis/markers ["trimmed-surface" "tessellate-trimmed-surface" "point-in-trim?" "trim-loop"]
-   :axis/behavior nil}
+   :axis/behavior "nurbs-surface-trimmed"}
 
   {:axis/id :kernel/fillet-chamfer
    :axis/segment :kernel :axis/weight 5
@@ -150,7 +150,7 @@
    :axis/repo "kotoba-lang/kami-engine-modeling"
    :axis/paths ["src"]
    :axis/markers ["assembly" "mate" "interference" "solve-kinematics" "occurrence"]
-   :axis/behavior nil}
+   :axis/behavior "assembly-mates"}
 
   {:axis/id :mcad/bom
    :axis/segment :mcad :axis/weight 2
@@ -159,7 +159,7 @@
    :axis/repo "kotoba-lang/kami-engine-modeling"
    :axis/paths ["src"]
    :axis/markers ["bill-of-materials" "part-mass-properties" "assembly-mass-properties"]
-   :axis/behavior nil}
+   :axis/behavior "bom"}
 
   {:axis/id :mcad/gdt-pmi
    :axis/segment :mcad :axis/weight 3
@@ -529,7 +529,7 @@
    :axis/paths ["src"]
    :axis/marker-kind :dispatch
    :axis/markers ["fem-elastoplastic" "finite-strain-elastic" "axial-bar-fe"]
-   :axis/behavior nil}
+   :axis/behavior "cae-fem-static"}
 
   {:axis/id :cae/contact
    :axis/segment :cae :axis/weight 5
@@ -539,7 +539,7 @@
    :axis/paths ["src"]
    :axis/marker-kind :dispatch
    :axis/markers ["nonlinear-contact" "friction-contact" "friction-contact-3d"]
-   :axis/behavior nil}
+   :axis/behavior "cae-contact"}
 
   {:axis/id :cae/cfd
    :axis/segment :cae :axis/weight 4
@@ -548,7 +548,7 @@
    :axis/repo "kotoba-lang/kami-engine-cfd"
    :axis/paths ["src"]
    :axis/markers ["lbm-new" "lbm3-new" "collide!" "step" "feq"]
-   :axis/behavior nil}
+   :axis/behavior "cae-cfd"}
 
   {:axis/id :cae/verification
    :axis/segment :cae :axis/weight 5
