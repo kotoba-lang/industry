@@ -1195,6 +1195,24 @@
    :script "gates/adr-identity-check.cljs" :script-args ["--min" "1400"]
    :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
 
+  ;; The orgs-detector registry admits, checked HERE instead of six hours later
+  ;; on a machine nobody is watching. That tick refuses EVERY detector when one
+  ;; entry lacks a mandatory field, and when it does, its state file simply
+  ;; stops being written while SessionStart keeps rendering the last good run
+  ;; as if it were current. That happened TWICE on 2026-08-20 --
+  ;; :verify-error-provenance in the morning, :verify-bridge-guest-cannot-execute
+  ;; in the afternoon -- and both times it was found only because someone
+  ;; registering an unrelated detector noticed nothing ran.
+  ;;
+  ;; The gate spawns the tick's own `--admit-only` rather than restating its
+  ;; rules, so there is exactly one implementation of what a valid entry is.
+  ;; It reads no orgs/ -- admission does not need one -- which is why it can be
+  ;; a fleet gate at all while the detectors it admits cannot.
+  {:id "root-orgs-detectors-admission"
+   :name "root" :org "com-junkawasaki" :gate :nbb-script
+   :script "gates/orgs-detectors-admission-check.cljs"
+   :include-ext [".edn" ".cljs"] :min-files 100 :cd false}
+
   ;; superproject の parity 台帳 gate。**:id が必要**（:name は org / tip 解決に使う
   ;; repo 名のままにする必要があるため）。
   ;;
