@@ -109,11 +109,47 @@ fail-closed にする）。benjamin の欄には `1.257.1` が出るので、要
 self-test は 8 件に増やし、**旧 2 本ルールに戻すと「wac 無しの pair」ケースが
 落ちる**ことを確認した —— 落ちるのは benjamin がちょうどその状態だった実例。
 
+## 決着（2026-08-20、同日）— gate 化した
+
+上の順序をそのまま実行した。
+
+**入手経路**: 両方とも upstream の release binary が macOS arm64 用に在った
+（`wasm-tools-1.243.0-aarch64-macos.tar.gz` / `wac-cli-aarch64-apple-darwin`）。
+benjamin に cargo は無いので、ビルドではなく binary を
+`~/.gftd/wasm-pin/bin` という専用 prefix に置いた。**Homebrew を上書きしない**
+—— brew は最新しか配れず、`brew upgrade` のたびに pin が壊れるため。
+
+**測定**（benjamin、同一 tree、PATH だけを変えた 3 通り）:
+
+| PATH | 結果 |
+|---|---|
+| 工具なし | 87 errors（`Cannot run program` 82 + 2、その他 3） |
+| brew の 1.257.1 | 79 errors（`version is not pinned` 76、その他 3） |
+| **pin prefix（1.243.0 + wac 0.10.1）** | **0 failures 0 errors、exit 0、74 秒、1,099 tests / 8,302 assertions** |
+
+**3 件の「その他」（`cli exited during a test that did not expect it`）も
+toolchain 由来**で、pin を揃えると消えた。前の節で「未調査」と書いたが、
+別原因ではなかった。
+
+**着地したもの**:
+
+- `probe.cljs` は pin prefix を **PATH より先に**見る。PATH を先に見ると brew の
+  新しい方を報告し、**suite を回せないノードが cap を得る** —— 同日午前に
+  訂正したばかりの欠陥をもう一度踏むことになる。
+- `:jvm-test` の PATH に prefix を足した（prefix の無いノードでは no-op）。
+- gate `amu-jvm-test`（`:cap :wasm-tools`、`:cd false`、full tarball 1.0MB）。
+
+**両方向を実測してから landing した**: prefix 有りで `count=1099 exit=0`、
+prefix 無し（旧 PATH）で `79 errors exit=1`。PATH の 1 行は装飾ではない。
+
 ## 残っていること
 
-- JVM suite の gate 化は**していない**。順序は: `wasm-tools` を **1.243.0** に
-  固定する経路を用意し、**`wac-cli` 0.10.1** を brew 以外（cargo / release
-  binary）で入れ、cap が立つのを確認してから entry を足す。
+- **cap を持つのは benjamin 1 台**。`:kotoba`(judah 1 台) / `:zig`(2 台) と
+  同じ形だが、その 1 台が落ちればこの gate は動かない。他ノードへ prefix を
+  配るのは別作業。
+- pin の**追従**は誰も見ていない。amu が `component-model-v1.edn` の
+  toolchain を上げたとき、prefix の binary は古いままになる。
+  version は nodes.edn に出るので突き合わせは可能だが、**検査は無い**。
 - 3 件の `cli exited during a test that did not expect it` は未調査。
   wasm-tools 由来かどうか分かっていない。
 - したがって **native の 20 case は今も ungated** のまま

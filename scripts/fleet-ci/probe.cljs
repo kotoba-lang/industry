@@ -93,16 +93,35 @@
     ;; expected to be empty. That is the point: the gap becomes a field in
     ;; nodes.edn instead of folklore in a comment, and the day somebody
     ;; `brew install`s them it appears without anyone editing this file.
-    "echo wasmtools=$(command -v wasm-tools)"
-    "echo wasmtoolsv=$(wasm-tools --version 2>/dev/null | awk '{print $2}')"
+    ;; `~/.gftd/wasm-pin/bin` comes FIRST, and that ordering is the whole
+    ;; mechanism rather than a convenience.
+    ;;
+    ;; amu pins its Wasm toolchain (`component-model-v1.edn`,
+    ;; `{:wasm-tools \"1.243.0\" :wac-cli \"0.10.1\"}`) and refuses any other
+    ;; version outright -- measured 2026-08-20, Homebrew's 1.257.1 produced 76
+    ;; `wasm-tools version is not pinned` errors. Homebrew has no way to install
+    ;; an old version and no `wac` formula at all, so the pinned pair is
+    ;; installed from the upstream release binaries into a prefix of its own.
+    ;;
+    ;; Probing PATH first would report Homebrew's newer copy and the cap would
+    ;; be earned by a node that still cannot run the suite -- exactly the defect
+    ;; this cap was corrected for earlier the same day.
+    ;;
+    ;; Measured with the pinned pair on that prefix: amu's full suite runs on
+    ;; benjamin in 74s, 1,099 tests, 8,302 assertions, **0 failures 0 errors**,
+    ;; exit 0. Gates that want this cap must put the prefix on PATH the same
+    ;; way; the version recorded below is the one this prefix answers with.
+    "echo wasmpin=$HOME/.gftd/wasm-pin/bin"
+    "echo wasmtools=$(PATH=$HOME/.gftd/wasm-pin/bin:$PATH command -v wasm-tools)"
+    "echo wasmtoolsv=$(PATH=$HOME/.gftd/wasm-pin/bin:$PATH wasm-tools --version 2>/dev/null | awk '{print $2}')"
     "echo wasmtime=$(command -v wasmtime)"
     "echo wasmtimev=$(wasmtime --version 2>/dev/null | awk '{print $2}')"
     ;; `wac` is the third tool amu's component tests reach for, and the reason
     ;; the cap is a conjunction of three rather than two. It is NOT in Homebrew
     ;; ("No available formula with the name \"wac\"", measured 2026-08-20), so
     ;; unlike the other two it cannot be installed by the obvious route.
-    "echo wac=$(command -v wac)"
-    "echo wacv=$(wac --version 2>/dev/null | awk '{print $2}')"
+    "echo wac=$(PATH=$HOME/.gftd/wasm-pin/bin:$PATH command -v wac)"
+    "echo wacv=$(PATH=$HOME/.gftd/wasm-pin/bin:$PATH wac --version 2>/dev/null | awk '{print $2}')"
     "echo curl=$(command -v curl)"
     "echo tar=$(command -v tar)"
     "echo git=$(command -v git)"]))

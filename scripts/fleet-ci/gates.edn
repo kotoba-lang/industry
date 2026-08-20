@@ -2082,6 +2082,37 @@
   ;; wrapper は baseline SHA と summary の両方を要求する。空 corpus・stale baseline・
   ;; sanitizer failure のいずれも pass にならない。macOS fleet では deterministic
   ;; ASan/UBSan、Linux node が加われば同じ script が coverage-guided libFuzzer を使う。
+  ;; amu の JVM suite。**これが green になって初めて、native の 20 case が
+  ;; gate される** —— それまで fleet が見ていた native は
+  ;; `jdk-free-native-conformance.cljs` の 3 source だけで、
+  ;; `lang-native-conformance` の 20 case は「誰かが手元で `clojure -M:test` を
+  ;; 打ったときだけ」走っていた。
+  ;;
+  ;; :cap :wasm-tools —— 今日これを持つのは benjamin 1 台だけ。少なく見えるが
+  ;; :kotoba(judah 1 台) / :zig(2 台) と同じ形で、**持たないノードに置けば
+  ;; repo ではなくノードについて赤を出す**（ADR-2608198600）。cap は
+  ;; wasm-tools / wasmtime / wac の 3 本を要求し、version は
+  ;; nodes.edn に記録されるだけで cap の条件には入れない（pin は amu の所有物）。
+  ;;
+  ;; **実測してから landing している**（2026-08-20、benjamin、pinned な
+  ;; wasm-tools 1.243.0 + wac 0.10.1 を PATH に置いた状態）:
+  ;;
+  ;;   Ran 1099 tests containing 8302 assertions.
+  ;;   0 failures, 0 errors.        exit 0、74 秒
+  ;;
+  ;; 同じノードで pin 前は 87 errors（`Cannot run program "wasm-tools"` 82 /
+  ;; `"wasmtime"` 2 / その他 3）、brew の 1.257.1 では 79 errors
+  ;; （`version is not pinned` 76 / その他 3）。**3 件の「その他」も
+  ;; toolchain 由来で、pin を揃えると消える。**
+  ;;
+  ;; :cd false —— 他の amu gate と揃える。green は「JVM suite が通った」で
+  ;; あって pin を進める根拠ではない（それは 4 gate 全体の話）。
+  ;;
+  ;; tarball は full（1.0MB、上限 200MB）。deps はノードが自力で解決する
+  ;; （`clojure -Spath -M:test` が provider / kototama-native / kgraph を
+  ;; clone するのを実測済み）ので :ship-git-deps は要らない。
+  {:name "amu" :id "amu-jvm-test" :gate :jvm-test :cap :wasm-tools :cd false}
+
   {:name "amu" :id "amu-native-fuzz" :gate :nbb-script
    :script "gates/amu-native-fuzz-check.cljs" :cd false}
 
