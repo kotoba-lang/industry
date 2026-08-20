@@ -127,6 +127,66 @@
   :icp/exclusion-evidence "kotobase.net の human signup funnel は実測 0/295 = 0%。上位 path は /llms.txt・/.well-known/did.json・/ipfs/*（4xx probe 55–83%）で、観衆は human ではなく AI agent / crawler。この層に human 向け outbound を当てるのは category error であり、正しい転換は /llms.txt の x402 catalog 経由の agent-originated payment（nexus facilitator）"
   :icp/note "非ターゲットとして明示的に載せているのは、canvas に segment として書かれている以上、誰かが後から outbound 対象に戻すのを防ぐため。"}
 
+ {:icp/id "threed-ifc-ids-compliance"
+  :icp/product "kotoba-lang/org-iso-16739"
+  :icp/surface "（未配備 — 配信面は未決定。ここは需要側の定義のみ）"
+  :icp/status "pending-owner-review"
+  :icp/priority 1
+  :icp/countries ["JP" "DE" "NL" "FI" "NO" "SG"]
+  :icp/segment "IFC 納品を発注要件に持つ発注者・設計事務所・ゼネコンの BIM マネージャ、および IFC を受け取って検査する側（施主・行政・FM）"
+  :icp/buyer-role "BIM マネージャ / 情報マネジメント担当 / 品質保証"
+  :icp/hook "buildingSMART **IDS**（発注者要件の機械可読仕様）で受領 IFC を自動検査する。適合判定が **両方向を出す**ことを実測済み —— 合う要素に true、合わない要素に false（多くの検査ツールは『違反 0 件』と『検査できていない』が同じ顔をする）。検査は portable な .cljc で、デスクトップ seat も専用サーバも要らない"
+  :icp/timing "IFC 4.3 が ISO 16739-1:2024 になり、IDS 1.0 が 2024 に確定。発注要件への採用がここ 2 年で立ち上がっている"
+  :icp/batch-size 15
+  :icp/requires-contact-route true
+  :icp/basis "90-docs/maturity/threed-parity.datoms.edn の実測（2026-08-20）: :interop/ifc-spf と :interop/ids がともに :working（behavior probe が SPF の native entity 生成・押し出し形状・往復保存、および facet の両方向判定を実際に確かめている）"
+  :icp/proof-axes "[:interop/ifc-spf :interop/ifc-ids]"
+  :icp/anti-claim "Revit / Archicad / Solibri の置き換えを主張しない。オーサリング UI は無い。売るのは **検査と交換の自動化**であって、モデリング環境ではない"
+  :icp/checkable-edn "{:country #{\"JP\" \"DE\" \"NL\" \"FI\" \"NO\" \"SG\"} :contact-route :required}"
+  :icp/unevaluable-edn "[{:predicate :uses-ifc-deliverables :want \"IFC を発注要件に持つ\" :why \"どのデータ源にも無い。公共発注の BIM 要領（国交省 BIM/CIM、Statsbygg、RIBA 等）を人手で当たるしかない\"} {:predicate :ids-adoption :want \"IDS を書いている/書こうとしている\" :why \"buildingSMART の IDS 採用リストは機械可読に公開されていない\"} {:predicate :company-size :want \"設計事務所 20 名〜/ゼネコン\" :why \"catalog に従業員数属性が無い\"}]"
+  :icp/disqualifier-edn "[{:rule :needs-authoring-ui :why \"モデリング UI を求める相手はこの ICP ではない —— 実測で :working なのは交換と検査であってオーサリングではない\"}]"
+  :icp/note "この 3 本の 3D 系 ICP は **実測に紐付けてある**（:icp/proof-axes）。scripts/threed-maturity-audit.cljs が該当軸を :working 以外に落としたら、その ICP の hook は根拠を失う —— 営業資料を先に直すのではなく、ICP の status を先に落とすこと。"}
+
+ {:icp/id "threed-cae-verified"
+  :icp/product "kotoba-lang/kami-engine-cae-solver"
+  :icp/surface "（未配備）"
+  :icp/status "pending-owner-review"
+  :icp/priority 2
+  :icp/countries ["JP" "DE" "US"]
+  :icp/segment "解析結果に **検証の証拠**を求められる設計・解析部門（規制産業・受託解析）。Ansys / Abaqus を置き換えるのではなく、その周りで回る自動化と証跡を持たない組織"
+  :icp/buyer-role "解析リーダ / 品質保証 / 規制対応"
+  :icp/hook "ベンチマーク・合格ゲート・実験比較が **solver と同じ面に載っている**（`:benchmark-suite` `:qualification-gate` `:experimental-comparison` `:industrial-release-gate` が dispatch 可能な solver として在る）。解析そのものではなく『その解析を信じてよい理由』を機械可読に出せる"
+  :icp/timing "—"
+  :icp/batch-size 10
+  :icp/requires-contact-route true
+  :icp/basis "実測（2026-08-20）: :cae/fem-static :cae/contact :cae/cfd はいずれも marker 完備だが **behavior probe 未着手（:declared）**。:cae/verification は :thin —— `manufactured-solution` が dispatch されず benchmark レコードのラベルとしてしか存在しない"
+  :icp/proof-axes "[:cae/verification :cae/fem-static :cae/contact]"
+  :icp/anti-claim "**まだ売れる状態ではない。** 4 軸中 3 軸が未検証（:declared）で、看板である検証軸自体が :thin。ASME V&V を名乗る前に probe を書き、`manufactured-solution` を実際に解ける経路にすること"
+  :icp/checkable-edn "{:country #{\"JP\" \"DE\" \"US\"} :contact-route :required}"
+  :icp/unevaluable-edn "[{:predicate :runs-fea :want \"FEA/CFD を日常的に回している\" :why \"どのデータ源にも無い\"} {:predicate :regulated :want \"解析証跡を求められる規制下に在る\" :why \"catalog に規制属性が無い\"}]"
+  :icp/disqualifier-edn "[{:rule :needs-commercial-solver-parity :why \"Ansys / Abaqus の機能面積での比較を求める相手には勝てない。実測でそう出ている\"}]"
+  :icp/note "priority 2 だが status は pending-owner-review のまま据え置く —— 根拠となる軸が :working になってから outbound に出す。"}
+
+ {:icp/id "threed-headless-interop"
+  :icp/product "kotoba-lang/org-iso-10303"
+  :icp/surface "（未配備）"
+  :icp/status "pending-owner-review"
+  :icp/priority 3
+  :icp/countries ["JP" "US" "DE"]
+  :icp/segment "CAD/3D データを **人ではなくプログラムが**処理する側 —— 製造 SaaS・見積自動化・EC のコンフィギュレータ・デジタルツイン・AI で形状を生成する側。デスクトップ seat ではなくサーバ/ブラウザで動く交換層を必要とする"
+  :icp/buyer-role "プロダクト責任者 / バックエンド技術責任者"
+  :icp/hook "STEP AP203 / USD / glTF・GLB の読み書きが **往復で保存されることを実測済み**で、実装は portable `.cljc` —— JVM も native も要らず Workers / WASM に載る。seat 課金の CAD カーネルを 1 本も要求しない"
+  :icp/timing "—"
+  :icp/batch-size 20
+  :icp/requires-contact-route true
+  :icp/basis "実測（2026-08-20）: :interop/step-ap203 :interop/usd :interop/gltf :kernel/brep-topology :kernel/analytic-surfaces :kernel/nurbs-curve :kernel/boolean-solid :mcad/feature-tree :mcad/sketch-constraints が :working"
+  :icp/proof-axes "[:interop/step-ap203 :interop/usd :interop/gltf :kernel/boolean-solid]"
+  :icp/anti-claim "**AP242 は無い。IGES / JT / Parasolid / DWG も無い。** 実務の製造業が今日投げてくる STEP の多くは AP242 なので、『STEP 対応』と一言で言わない —— AP203 subset と言う。fillet / chamfer / sweep / loft は**構築子だけ在って幾何を生まない**（実測 :hollow）ので、形状編集を売らない"
+  :icp/checkable-edn "{:country #{\"JP\" \"US\" \"DE\"} :contact-route :required}"
+  :icp/unevaluable-edn "[{:predicate :processes-cad-programmatically :want \"CAD/3D をサーバ側で処理している\" :why \"どのデータ源にも無い。求人票・技術ブログ・SDK ドキュメントを人手で当たる経路しかない\"} {:predicate :seat-license-pain :want \"seat 課金のカーネルを嫌っている\" :why \"観測できない\"}]"
+  :icp/disqualifier-edn "[{:rule :needs-ap242 :why \"AP242 が要件なら今日は当たらない（実測 :absent）\"} {:rule :needs-authoring-app :why \"デスクトップ CAD の代替を求める相手はこの ICP ではない\"}]"
+  :icp/note "この ICP の hook は交換層に限っている。kami-app-* は GitHub Pages で配信されているが、**最終 commit は 2026-08-04 で、配信を担う pages.yml は org 単位で無効化された GitHub Actions**（ADR-2607300900）——『動いているアプリ』を根拠に売らないこと。"}
+
  {:icp/coverage "gtm-icp"
   :icp/coverage-as-of "2026-08-04"
   :icp/coverage-source "cloud-itonami-lei-catalog（D1、live 実測）"
