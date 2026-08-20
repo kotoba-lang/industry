@@ -2981,4 +2981,75 @@
   ;; down had it quoted back as a constant.
   {:name "aiueos" :gate :jvm-test :alias "test-fleet" :cd true}
   ;; ────────────────────────────────────────────────────────────────────────
+  ;; 2026-08-20: twenty SECOND gates, from a sweep of the sixty repos whose
+  ;; only gate was :jvm-test. Each :jvm-test entry above stays exactly as it
+  ;; is -- none of these replaces one, because for most of them the nbb run is
+  ;; a genuine SUBSET and flipping would cut coverage. The sweep triaged all
+  ;; sixty: roughly half are `.clj`-only suites, which are JVM-only by
+  ;; construction and not candidates at all.
+  ;;
+  ;; **All twenty land at `:cd false`, including where the sibling :jvm-test
+  ;; entry is `:cd true`.** That is this file's own bar, stated twice above: a
+  ;; gate that has never gone green on a node has not shown it can discriminate
+  ;; THERE, whatever it does on a workstation -- the fleet ships a `git archive`
+  ;; tree to a different machine. None of these has a receipt in
+  ;; manifest/fleet-ci.edn yet. Flip each to `:cd true` after its own green,
+  ;; the way arrow and ws-valueflo were flipped. The tick already holds a
+  ;; repo's pin when ANY of its gates is red in the same tick, so a mixed pair
+  ;; is safe meanwhile.
+  ;;
+  ;; Three real cross-runtime defects were found by RUNNING these, not by
+  ;; reading them, and are fixed in the pins advanced alongside this:
+  ;;   taxlaw       `(* subtotal rate)` tested with `integer?` -- a Double on
+  ;;                the JVM, but JS has one number type, so a ¥1000.5 subtotal
+  ;;                produced a confident tax figure instead of the refusal the
+  ;;                message already claimed it gave.
+  ;;   kotobase     `(.-state s)` on a deftype is `undefined` under SCI. The
+  ;;                file's own docstring named the hazard; it was described,
+  ;;                not fixed.
+  ;;   datom-source the same shape at six sites, and a cljs runner listing
+  ;;                three of four test namespaces -- 21/68 where the JVM ran
+  ;;                23/74, with nothing saying so.
+  ;;   inference    `(Integer/parseInt hex 16)` unqualified in `.cljc`; the
+  ;;                namespace could not LOAD under SCI.
+  ;;
+  ;; Measured both runtimes on every line. Where the counts differ the gap is
+  ;; named rather than absorbed: for the ten com-* repos it is exactly the
+  ;; JVM-only `kotoba-qualification-test` namespace; for xmile, langgraph and
+  ;; kotobase it is `.clj` namespaces the cljs runner cannot list.
+  ;;
+  ;; Deliberately NOT gated, each for a measured reason: kotobase (its entry is
+  ;; green here, but io-ipld and prolly-tree each appear at two shas in its
+  ;; graph -- tools.deps resolves that diamond and a per-(lib,sha) classpath
+  ;; walk cannot), org-w3-png (covers 7 of 12), nekko (red at main -- dag-cbor's
+  ;; `Tagged` deftype declares IEquiv/IHash, which SCI cannot resolve),
+  ;; tech-ipfs-specs-ipns (6 of 29, same upstream cause),
+  ;; tech-ipfs-specs-unixfs (exhausts Node's heap partway through),
+  ;; org-ietf-xdr and org-ietf-oncrpc (`+'`/`*'` do not exist in ClojureScript,
+  ;; and a plain `+` would silently lose precision above 2^53 in a wire codec).
+  ;;
+  ;; datom-source is the ONE that would qualify for a flip -- identical counts,
+  ;; 23/74 -- and is added rather than flipped anyway, so that this whole block
+  ;; is additive and nothing here can reduce what is checked.
+  {:name "taxlaw" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "kenbun" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :ship-git-deps true :cd false}
+  {:name "ws-valueflo-algorithms" :gate :nbb-test :classpath "src:test" :entry "test/run_portable.cljs" :ship-git-deps true :cd false}
+  {:name "ws-valueflo-vocabulary" :gate :nbb-test :classpath "src:test" :entry "test/run_portable.cljs" :cd false}
+  {:name "proto" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :ship-git-deps true :cd false}
+  {:name "org-oasis-open-xmile" :gate :nbb-test :classpath "src:test" :entry "test/run_portable.cljs" :ship-git-deps true :cd false}
+  {:name "langgraph" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :ship-git-deps true :cd false}
+  {:name "com-aadhaar" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-aave" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-abb-robotics" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-accela" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-accelbyte" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-ach-network" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-acorrd-standards" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-acquia" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-adobe" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "com-aftership" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "datom-source" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "credits" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
+  {:name "inference" :gate :nbb-test :classpath "cljc/src:cljc/test:resources" :entry "run-tests.cljs" :ship-git-deps true :cd false}
+  ;; ────────────────────────────────────────────────────────────────────────
   ]}

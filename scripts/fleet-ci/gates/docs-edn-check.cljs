@@ -116,5 +116,12 @@
                  ") — extraction or path is wrong, refusing to report pass")
         (js/process.exit 90))
     (seq @bad) (js/process.exit 1)
-    :else (println "OK — all" (count files) "edn files parse"
-                   (when strict-keys "and no symbol appears in key position"))))
+    ;; One string, not two arguments to println. `(when strict-keys ...)` is nil
+    ;; when the flag is off, and println prints that nil: the three repos that
+    ;; do not pass --strict-keys have been recording
+    ;; "OK — all 2347 edn files parse nil" in their fleet receipts since this
+    ;; flag landed. Harmless to the verdict and confusing in the one line a
+    ;; reader actually sees.
+    :else (println (str "OK — all " (count files) " edn files parse"
+                        (when strict-keys
+                          ", and no symbol appears in key position")))))
