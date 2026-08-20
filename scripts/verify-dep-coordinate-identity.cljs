@@ -94,25 +94,52 @@
           :when (fs/existsSync (p/join rd ".git"))]
       rd)))
 
-(defn- git-deps
-  "Every {:git/sha ...} entry anywhere in the map, at any nesting depth --
-  aliases put them two and three levels down."
+(defn- dep-entries
+  "Every dependency entry anywhere in the map, at any nesting depth -- aliases
+  put them two and three levels down.
+
+  BOTH coordinate kinds, because the first version of this took only
+  `:git/sha` and therefore could not see the larger half. A `:local/root`
+  entry names a repository just as a git coordinate does; it simply names it
+  by directory. `io.github.com-junkawasaki/langchain-clj {:local/root
+  \"../../kotoba-lang/langchain\"}` is a coordinate that says one repository
+  and a path that resolves to another, and tools.deps keys on the coordinate."
   [m path]
   (reduce-kv (fn [acc k v]
                (cond
                  (and (map? v) (contains? v :git/sha))
-                 (conj acc {:lib (str k) :sha (:git/sha v) :url (:git/url v) :in path})
-                 (map? v) (into acc (git-deps v path))
+                 (conj acc {:lib (str k) :sha (:git/sha v) :url (:git/url v)
+                            :kind :git :in path})
+                 (and (map? v) (contains? v :local/root))
+                 (conj acc {:lib (str k) :root (:local/root v) :kind :local :in path})
+                 (map? v) (into acc (dep-entries v path))
                  :else acc))
              [] m))
 
 (defn repo-of
-  "The GitHub repository a coordinate resolves to. Exported because the whole
-  report depends on it and it is the part most likely to be wrong."
-  [{:keys [lib url]}]
-  (-> (if (seq (str url))
+  "The repository a dependency entry resolves to. Exported because the whole
+  report depends on it and it is the part most likely to be wrong.
+
+  Three inputs, in order of authority: an explicit `:git/url`; a
+  `:local/root` path, normalised against the declaring repository and read
+  back as `orgs/<org>/<repo>`; otherwise the coordinate itself, which is what
+  tools.deps derives a URL from."
+  [{:keys [lib url root in]}]
+  (-> (cond
+        (seq (str url))
         (-> (str url) (str/replace #"^https?://github\.com/" "") (str/replace #"\.git$" ""))
-        (str/replace lib #"^io\.github\." ""))
+
+        (seq (str root))
+        (let [abs (p/normalize (p/join (str in) (str root)))
+              segs (str/split abs #"/")
+              i (.lastIndexOf (into-array segs) "orgs")]
+          (if (and (>= i 0) (> (count segs) (+ i 2)))
+            (str (nth segs (inc i)) "/" (nth segs (+ i 2)))
+            ;; A path that leaves orgs/ names something this check cannot
+            ;; identify. Fall back to the coordinate rather than inventing one.
+            (str/replace lib #"^io\.github\." "")))
+
+        :else (str/replace lib #"^io\.github\." ""))
       str/lower-case))
 
 (defn -main []
@@ -123,7 +150,7 @@
             (die-unanswered (str (count dirs) " checkouts, none with a deps.edn")))
         parsed (for [d files]
                  (let [f (p/join d "deps.edn")]
-                   (try {:dir d :deps (git-deps (edn/read-string (fs/readFileSync f "utf8")) d)}
+                   (try {:dir d :deps (dep-entries (edn/read-string (fs/readFileSync f "utf8")) d)}
                         (catch :default e {:dir d :error (.-message e)}))))
         parsed (vec parsed)
         broken (filterv :error parsed)
@@ -133,7 +160,7 @@
         multi (->> by-repo
                    (filter (fn [[_ rs]] (> (count (set (map :lib rs))) 1)))
                    (sort-by (fn [[_ rs]] (- (count rs)))))]
-    (println (str "SCANNED\t" (count rows) "\tin-house git deps in "
+    (println (str "SCANNED\t" (count rows) "\tin-house deps (git + local-root) in "
                   (count files) " deps.edn of " (count dirs) " checkouts"
                   (when (seq broken) (str "\tUNPARSEABLE\t" (count broken)))))
     (println (str "CENSUS\trepos=" (count by-repo) "\tmulti-coordinate=" (count multi)))
