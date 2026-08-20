@@ -2201,6 +2201,21 @@
   {:name "kotoba-kir" :id "kotoba-kir-jvm-test" :gate :jvm-test :cap :jvm :cd false}
   {:name "kotoba-verifier" :id "kotoba-verifier-jvm-test" :gate :jvm-test :cap :jvm :cd false}
 
+  ;; The two layers under those three. Added 2026-08-20 after porting code in
+  ;; both the same day and noticing nothing re-verified it -- `kotoba-object`
+  ;; twice (the `*'` bound, then `(int c)` over strings) and `artifact` once.
+  ;;
+  ;; They are dependencies of kotoba-native and amu, so a break here reaches the
+  ;; compiler; and like the three above, amu's gates being green says only that
+  ;; the PINNED sha of each was fine, never that their own tip is.
+  ;;
+  ;; :cap :jvm measured before landing, on simeon (a plain :jvm node with no
+  ;; Rosetta and no pinned wasm toolchain): both 0 failures / 0 errors, exit 0.
+  ;; Both carry a :test alias and no :local/root, which is what makes an alias
+  ;; resolvable on a node.
+  {:name "kotoba-object" :id "kotoba-object-jvm-test" :gate :jvm-test :cap :jvm :cd false}
+  {:name "artifact" :id "artifact-jvm-test" :gate :jvm-test :cap :jvm :cd false}
+
   ;; The remaining three 綾 (ADR-2608139980). 49347203 gated the three layers
   ;; amu is BUILT from; these are the three it EMITS through, and they were
   ;; the last of the five with no gate of their own -- seen by the fleet only
