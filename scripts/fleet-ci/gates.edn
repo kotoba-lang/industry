@@ -2216,6 +2216,26 @@
   {:name "kotoba-object" :id "kotoba-object-jvm-test" :gate :jvm-test :cap :jvm :cd false}
   {:name "artifact" :id "artifact-jvm-test" :gate :jvm-test :cap :jvm :cd false}
 
+  ;; The leaf repos ported from .clj to .cljc on 2026-08-20 (ADR-2608202100).
+  ;; Thirteen were ported; only these four can take a :jvm-test gate, and the
+  ;; reason the other nine cannot is worth recording rather than rediscovering:
+  ;;
+  ;;   :local/root   kiyaku 3, madoguchi 3, senden 3, soko 3, mise 2, chobo 1,
+  ;;                 fashion 2 -- a node holds ONE repo tree, so a :test alias
+  ;;                 reaching for siblings cannot resolve there. This gate kind
+  ;;                 says so in its own header.
+  ;;   no :test      karakuri, narashi have no test alias at all.
+  ;;
+  ;; Those nine are not ungated by oversight; they are ungatable in this shape.
+  ;; An :nbb-test entry is the plausible route for the ones with a cljs runner.
+  ;;
+  ;; :cap :jvm measured on joseph before landing: all four 0 failures / 0
+  ;; errors, exit 0.
+  {:name "kotobase-engine-prolly" :id "kotobase-engine-prolly-jvm-test" :gate :jvm-test :cap :jvm :cd false}
+  {:name "kami-mangaka-reader" :id "kami-mangaka-reader-jvm-test" :gate :jvm-test :cap :jvm :cd false}
+  {:name "apn" :id "apn-jvm-test" :gate :jvm-test :cap :jvm :cd false}
+  {:name "actor-fuchi" :id "actor-fuchi-jvm-test" :gate :jvm-test :cap :jvm :cd false}
+
   ;; The remaining three 綾 (ADR-2608139980). 49347203 gated the three layers
   ;; amu is BUILT from; these are the three it EMITS through, and they were
   ;; the last of the five with no gate of their own -- seen by the fleet only
