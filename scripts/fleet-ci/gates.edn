@@ -1105,8 +1105,23 @@
   ;; :cd true advances the murakumo pin only after a signed fleet receipt.
   {:name "murakumo" :gate :jvm-test :alias "fleet-infer-test" :cd true}
 
+  ;; `--strict-keys` was added 2026-08-20, after the corpus was measured clean.
+  ;; Parsing is not integrity: an unescaped quote inside a body string ends it,
+  ;; the following words are read as map keys, and when the quote count happens
+  ;; to balance the reader returns a value without complaint. Two documents here
+  ;; were in that state — `2607211400-wave-2-...` had `:scope` cut from 1,465
+  ;; characters to 604 with `commit-dag` and `|quad-store` as keys, and
+  ;; `2608198700-amus-jvm-suite-...` had four `\\"` sequences from a shell
+  ;; heredoc. Both are repaired in the same commit; the whole 2,350-document
+  ;; corpus passes.
+  ;;
+  ;; The rule is SYMBOL keys only, and the narrowing was measured: flagging
+  ;; every non-keyword key reddened 8 documents, 7 of them legitimate
+  ;; (`"p50"`, `".cljs"`, `"stripe.com"`, `0 1 2 3` — EDN takes string and
+  ;; integer keys and this corpus means them).
   {:name "root" :org "com-junkawasaki" :gate :nbb-script
-   :script "gates/docs-edn-check.cljs" :script-args ["--sub" "90-docs/adr" "--min" "1400"]
+   :script "gates/docs-edn-check.cljs"
+   :script-args ["--sub" "90-docs/adr" "--min" "1400" "--strict-keys"]
    :include-ext [".edn"] :min-files 1500 :cd false}
 
   ;; cloud-itonami-app の 90-docs。**同じ gate、隣の repo、対象外だっただけ**。

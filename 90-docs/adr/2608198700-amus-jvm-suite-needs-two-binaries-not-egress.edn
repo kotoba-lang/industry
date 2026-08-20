@@ -22,7 +22,7 @@ amu の fleet gate は 4 本とも `:nbb-script` で、**`clojure -M:test` は f
 | その内訳 | 0 failures / **87 errors** |
 
 依存は解決するし suite は走る。87 errors の中身は
-`Cannot run program \\"wasm-tools\\"` が 82 件、`\\"wasmtime\\"` が 2 件、
+`Cannot run program \"wasm-tools\"` が 82 件、`\"wasmtime\"` が 2 件、
 残り 3 件が `cli exited during a test that did not expect it`。
 
 **足りないのは egress ではなく 2 本のバイナリ**で、9 ノードのどれにも入っていない
