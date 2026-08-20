@@ -156,4 +156,27 @@ ADR-2608021200（共有メールボックスのアーカイブ）の実施に伴
 にもかかわらずスクリプトが無条件に「完了」と出力した。ライセンス剥奪の前に新しい
 セッションで再検証して `SharedMailbox` を確認している。**検証を伴わない完了メッセージを
 スクリプトに書かない。**
+
+## 2026-08-20 の追加変更 — Mail.Send.Shared をテナント全体へ付与
+
+共有メールボックス `somu@gftd.co.jp` の名義で対外文書（JustCo への契約終了確認・
+明渡し・最終精算の依頼）を送る必要が生じ、Entra アプリ `gftd-m365-archive`
+（appId `0ca452ab-2650-4c4e-b19d-32f81d26d36b`）の委任スコープに
+**`Mail.Send.Shared`** を追加した（`oauth2PermissionGrants` の AllPrincipals 付与を
+PATCH。2026-08-02 の `Mail.Read.Shared` と同型）。
+
+**`Mail.Send` だけでは共有メールボックス名義で送れない。** 実測: 付与前の
+`POST /users/somu@gftd.co.jp/sendMail` は **403 ErrorAccessDenied** を返し、
+付与後は **202** で送信されて `somu@` の送信済みアイテムに着地した
+（2026-08-20T00:12:34Z）。`Mail.Send` はサインインユーザー自身の受信箱にしか効かない。
+
+**既存のリフレッシュトークンが新しいスコープを拾った** —— 付与後に
+`m365 util accesstoken get --new` を叩くと `scp` に `Mail.Send.Shared` が入り、
+ブラウザでの再サインインは要らなかった。同型の変更をするときはこの順序で試す
+（アプリ登録の `requiredResourceAccess` は未更新のままなので、再同意が要る場面では
+そちらも揃える）。
+
+⚠ **これは「そのユーザーが権限を持つ任意のメールボックスの名義で送れる」スコープ**
+であり、読み取りの `Mail.Read.Shared` より影響が大きい。撤回は同じ PATCH で
+scope 文字列から `Mail.Send.Shared` を外すだけ。**不要になったら外す。**
 "}]
