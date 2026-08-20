@@ -1187,4 +1187,47 @@
               (3) That crash exited 1 -- indistinguishable from `the workspace has defects`.
                   The enumeration is now wrapped and exits 2, the class ADR-2608136000 names.
               `{{root}}` is passed explicitly: the script's default root is `.`, and a tick
-              running from a worktree would otherwise census a tree with no orgs/ and refuse."}]}
+              running from a worktree would otherwise census a tree with no orgs/ and refuse."}
+
+  {:id       :verify-mf-chart
+   :title    "the MoneyForward chart of accounts, checked against the articles that name its sections"
+   :why      "2026-08-20: the parity plane reports 46/46 財務諸表区分 and 200/200 勘定科目
+              (ADR-2608209000), and both figures are correct -- but they are measured at the
+              CATEGORY level, and a category is coarser than an account. Measured while
+              writing this: MF's VALUATION_AND_TRANSLATION_ADJUSTMENTS maps to
+              :valuation-adjustments, which 会社計算規則 第七十六条第七項 requires to be
+              subdivided into five, and TWO accounts (その他有価証券評価差額金 / 土地再評価差額金)
+              were parked directly on the container. The category-level check could not see it:
+              the container IS defined, so the name matched. Only feeding the chart to
+              kotoba.shohyo itself produces :section-requires-subdivision -- and only the real
+              library produces :section-type-conflict, which is the one that matters most
+              (tagging 売上原価 as :revenue keeps the accounting equation and inverts 第八十九条).
+              Cannot be a fleet gate: it loads orgs/kotoba-lang/shohyo/src, which is a west
+              project and is not in any single shipped tree. Its sibling
+              scripts/gen-mf-chart.cljs --check reads only root-repo files and IS gate-able;
+              they are two scripts for exactly that reason."
+   :argv     ["nbb" "--classpath"
+              "{{root}}/orgs/kotoba-lang/shohyo/src:{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-mf-chart.cljs" "--findings"
+              "--chart" "{{repo}}/90-docs/accounting/gftd-japan-chart.edn"
+              "--dataset" "{{repo}}/90-docs/accounting/moneyforward-parity.datoms.edn"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 86400000                 ; 24h -- the chart moves when MF is re-measured, which is manual
+   :timeout-ms  120000                   ; 2m -- 40x the measured run
+   :writes   :none
+   :measured "2026-08-20 on this machine, both directions observed before registering:
+                real chart                       ~3s  -> SCANNED 712, 0 findings, exit 0
+                override removed for one account      -> 1 finding, section-requires-subdivision,
+                                                         naming その他有価証券評価差額金, exit 1
+                one :revenue flipped to :expense      -> 1 finding, section-type-conflict,
+                                                         naming DE-SCHOOL売上, exit 1
+                one account deleted from the chart    -> exit 3, refuses, prints NO coverage
+                shohyo replaced by an empty stub      -> exit 3, refuses (bs=0 pl=0)
+              The stub case is the one worth having: with an empty namespace every check
+              passes cleanly, because nobody knows anything so nobody objects. The floor
+              asserts on VALUES (:current-assets present, :labor-costs present), not on the
+              require succeeding.
+              The break and the report were checked to match in every case -- ADR-2608136000's
+              warning that a mis-aimed break reads as a successful demonstration."}]}
