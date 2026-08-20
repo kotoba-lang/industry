@@ -72,7 +72,18 @@
                        (let [d (edn/read-string {:default (fn [_ v] v)}
                                                 (fs/readFileSync f "utf8"))
                              ms (filter map? (if (sequential? d) d [d]))
-                             nonkw (mapcat (fn [m] (remove keyword? (keys m))) ms)]
+                             ;; 切断は「keyword が並ぶ map に迷子が数個混ざる」形で
+                             ;; 現れる。**全 key が文字列の map は別物** ── lookup
+                             ;; table（manifest/ledger-seq-baseline.edn のような
+                             ;; path -> count）は意図してそう書かれており、
+                             ;; 切断ではない。混在だけを見る。
+                             ;;
+                             ;; 実測 2026-08-20: この区別が無かったため、正しい
+                             ;; baseline ファイル 1 件で gate が赤くなった。狼少年に
+                             ;; なった gate は読まれなくなる ── それはこの gate が
+                             ;; 防ごうとしている沈黙と同じ結果になる。
+                             mixed (remove (fn [m] (every? string? (keys m))) ms)
+                             nonkw (mapcat (fn [m] (remove keyword? (keys m))) mixed)]
                          (when (seq nonkw) {:file f :keys (vec (take 3 nonkw))}))
                        (catch :default e
                          ;; パースできないのは別の gate（docs-edn-check）の担当だが、
