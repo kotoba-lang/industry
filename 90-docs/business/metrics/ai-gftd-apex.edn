@@ -1,24 +1,25 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 7428, "ai-gftd-chat-shell" 347},
+ {"magatama-sh1n5h1x" 7438, "ai-gftd-chat-shell" 347},
  :zone
- {:requests-7d 443357,
-  :pageviews-7d 7496,
-  :uniques-7d-sum 5196,
+ {:requests-7d 446318,
+  :pageviews-7d 7590,
+  :uniques-7d-sum 5224,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
   [{:path "/signup", :requests 27}
+   {:path "/wsd.php", :requests 26}
    {:path "/css.php", :requests 23}
+   {:path "/cdn-cgi/challenge-platform/scripts/jsd/main.js",
+    :requests 23}
    {:path "/cdn-cgi/images/cf-icon-error.png", :requests 23}
    {:path "/cdn-cgi/images/cf-icon-cloud.png", :requests 22}
    {:path "/cdn-cgi/styles/main.css", :requests 22}
-   {:path "/auth/callback", :requests 22}
-   {:path "/sx.php", :requests 18}
-   {:path "/ho.php", :requests 18}],
-  :status-mix {:server-error 14198, :ok 1225, :client-error 1213},
+   {:path "/auth/callback", :requests 22}],
+  :status-mix {:server-error 14172, :ok 1215, :client-error 1183},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +31,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-20",
- :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 85},
+ :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 86},
  :top-paths
- "上位 page (24h, 2xx/3xx): /signup 27 · /css.php 23 · /cdn-cgi/images/cf-icon-error.png 23 · /cdn-cgi/images/cf-icon-cloud.png 22 · /cdn-cgi/styles/main.css 22 | 4xx(probe) 7% · 5xx 85%",
+ "上位 page (24h, 2xx/3xx): /signup 27 · /wsd.php 26 · /css.php 23 · /cdn-cgi/challenge-platform/scripts/jsd/… 23 · /cdn-cgi/images/cf-icon-error.png 23 | 4xx(probe) 7% · 5xx 86%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 443357 req/7d・5196 uniques(日次和)・うち4xx probe 7%(24h)、workers 7775 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 446318 req/7d・5224 uniques(日次和)・うち4xx probe 7%(24h)、workers 7785 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
