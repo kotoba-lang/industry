@@ -888,7 +888,13 @@
          (str "grep -q ':" alias-name "' deps.edn"
               " || fail 'no :" alias-name " alias in deps.edn' 91")
          (str "export JAVA_HOME=" (or (:java-home node) "/opt/homebrew/opt/openjdk"))
-         "export PATH=$JAVA_HOME/bin:$PATH"
+         ;; The pinned Wasm toolchain prefix, ahead of Homebrew on purpose.
+         ;; amu refuses any wasm-tools other than the version its language
+         ;; contract pins, and Homebrew can only ever install the newest, so the
+         ;; pinned pair lives in a prefix of its own. probe.cljs reads the same
+         ;; path and grants :wasm-tools only when all three tools are there, so
+         ;; the two must stay in step. A no-op on nodes without the prefix.
+         "export PATH=$HOME/.gftd/wasm-pin/bin:$JAVA_HOME/bin:$PATH"
          "java -version 2>&1 | head -1"
          (str "for i in $(seq 1 900); do mkdir " dep-lock " 2>/dev/null && break;"
               " [ -n \"$(find " dep-lock " -maxdepth 0 -mmin +20 2>/dev/null)\" ]"
