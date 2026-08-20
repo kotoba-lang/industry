@@ -8,17 +8,37 @@
 ;; classpath について落ち続ける。
 ;;
 ;; 代わりに repo 側が `:test-hermetic` を宣言し（namespace を明示列挙 —— runner の
-;; 既定スキャンは sibling を要する namespace まで読み込む）、この gate はそれを
-;; 回す。**検査できない部分は gate に含めない**。含めたふりをすると、赤の理由が
-;; 「依存が無い」なのか「コードが壊れた」なのか誰も区別できなくなる。
+;; 既定スキャンは、将来 sibling を要する namespace が増えたときにそれも読み込む）、
+;; この gate はそれを回す。**検査できない部分は gate に含めない**。含めたふりを
+;; すると、赤の理由が「依存が無い」なのか「コードが壊れた」なのか誰も区別できなく
+;; なる。
 ;;
-;; 何が覆われるか: `kototama.linear-journal`（at-most-once の消費台帳と、その
-;; content-addressed な chain）と `kototama.execution`（execution 値と memo 可否）。
-;; どちらも root ADR-2608160200 で landed した面で、**どちらも安全性に関わる**
-;; —— 前者は権限の二重消費、後者は「世界が変わったことに気づかない cache」。
+;; **この列挙は 2 namespace だった。実測していなかったからで、残りが sibling を
+;; 要するからではない。**（2026-08-20 実測）29 の test namespace は全部、この repo
+;; だけで組んだ classpath で **load する**。sibling が塞いでいたものは無かった。
+;; 足りていなかったのは**ファイル**で、それは repo ではなく gates.edn の
+;; `:include-ext` の問題だった:
 ;;
-;; 何が覆われないか: tender / Chicory / component authority / provider 群。
-;; sibling repo と実 WASM を要するので、ここでは検査しない。
+;;   .edn .clj .cljc .cljs だけ配る（旧）   207 tests, 12 failures + 1 error
+;;   .wasm .kotoba .mjs 等も配る（現）      205 tests,  0 failures
+;;
+;; 落ちていたのはコードではなくファイルである —— `tender-test` の emit fixture は
+;; `.wasm`/`.kotoba`、`host-parity-live-test` が駆動する host は `.mjs`、TCB
+;; inventory が hash する `workerd/kototama-core-host.mjs` も `.mjs`。
+;; **再現するのは repo ではなく、絞り込んだ後の tree である**
+;; （CLAUDE.md「赤い gate を直す前に 3 つ確かめる」4 と同型。あちらは唯一の
+;; production source が落ちた例、こちらは fixture が落ちた例）。
+;;
+;; 何が覆われるか（205 tests / 1,270 assertions）: linear-journal の at-most-once
+;; 消費台帳と content-addressed chain、execution 値と memo 可否（root
+;; ADR-2608160200）、delivery semantics、tender と Chicory の 74 tests、component
+;; authority / grant / platform / provider、guest・browser・contract の parity、
+;; TCB inventory の digest drift 検出。
+;;
+;; 何が覆われないか: `kototama.packaging-test` の 2 tests だけ。
+;; `deploy/validate-packaging.sh` が `deploy/bin/kototama-authority-daemon`
+;; ——**拡張子の無い** wrapper——を要求し、拡張子の allowlist では原理的に選べない。
+;; 黙って落とすのではなく、ここで名指しする。
 ;;
 ;; ## exit 0 を信用しない
 ;;
