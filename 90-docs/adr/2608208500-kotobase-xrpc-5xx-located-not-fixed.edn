@@ -1,0 +1,573 @@
+[{:db/id -1
+  :adr/id "adr-2608208500-kotobase-xrpc-5xx-located-not-fixed"
+  :adr/doc_type "adr"
+  :adr/topic "kotobase-xrpc-5xx"
+  :adr/title "ADR-2608208500: kotobase の 5xx は block-miss トランポリンが O(K²) だから。予算と prefetch を landed、CPU 項は pin の向こう側"
+  :adr/status "proposed"
+  :adr/date "2026-08-20"
+  :adr/last_verified "2026-08-20"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative false
+  :adr/source-format "edn"
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2608208000-gftd-japan-internal-cycle-measured"
+   "2608189200-kotobase-business-loop-what-measurement-found"
+   "2608094000-portfolio-revenue-zero-kotobase-green-path-blocked"
+   "2608181700-kotobase-hydrate-cpu-measured-and-halved-outer-layer"
+   "adr-2608039000-no-d1-as-premise-in-decentralised-paths"]
+  :adr/evidence
+  ["Cloudflare GraphQL httpRequestsAdaptiveGroups（zone 5ad3da69…、5xx をパス別に）"
+   "Cloudflare GraphQL workersInvocationsAdaptive（account 4da88288…、script × status × 日次）"
+   "Cloudflare API /workers/scripts/kotobase-cf-wasm-staging/deployments"
+   "orgs/net-kotobase/engine/wrangler.jsonc（script 名）と src/kotobase/graph_database/head.cljs"
+   "orgs/net-kotobase/engine の git log（2026-08-13〜18）"]
+
+  :adr/body
+"# ADR-2608208500: kotobase の 5xx を特定した（直してはいない）
+
+## Context
+
+オーナー指示（2026-08-20）「kotobase の 5xx を直して」。ADR-2608208000 §6 で
+kotobase.net の 24h 5xx が 41% だと測ったのを受けた作業。**特定はできたが修正には
+至っていない。** 本 ADR はその到達点を記録する。
+
+## 1. 場所
+
+    kotobase-cf-wasm-staging   status=exceededResources   直近6時間 3,751/3,751
+
+`exceededResources` は Cloudflare Workers の **CPU/メモリ上限超過**である。
+例外送出（`scriptThrewException`）でも I/O 失敗でもない。
+
+zone 側から見ると失敗しているパスはこの 3 本:
+
+    /xrpc/ai.gftd.apps.kotobase.datomic.view    500
+    /xrpc/ai.gftd.apps.kotobase.datomic.datoms  500
+    /xrpc/ai.gftd.apps.kotobase.datomic.fold    503
+    kotobase-graph-database.block-cache.internal/<CID>  504（内部 service binding）
+
+**未認証の POST は 401 を返す。** つまり 500 は認証を通ったあとに落ちている。
+呼び手は機械（全て POST・UA 不明）で、ワークスペース内の自分のスタック
+（`kotoba-lang/kotobase-client` / `kotobase-server` / control-plane の worker 群）。
+
+## 2. いつから —— 2026-08-15
+
+| 日 | 総 invocation | exceededResources |
+|---|---:|---:|
+| 08-14 | 185,787 | **1** |
+| 08-15 | 25,698 | 1,166（4.5%） |
+| 08-16 | 31,600 | 9,789（31%） |
+| 08-17 | 36,163 | 14,117（39%） |
+| 08-18 | 37,301 | 14,560（39%） |
+| 08-19 | 9,469 | 3,678（39%） |
+
+**08-14 は 185,787 リクエスト中 1 件**。翌日から立ち上がり、**39% で高止まり**している。
+比率が一定なのは**データ依存**を示唆する —— 重いグラフだけが上限を超え、軽いものは通る。
+
+**2026-08-17 の緩和（`3c02ac9` Fold this graph's novelty off the response path）は
+効いていない。** 8/17 以降も 39% のままである。
+
+## 3. 戻し先が無い
+
+`/workers/scripts/kotobase-cf-wasm-staging/deployments` が保持しているのは **10 件**で、
+**最古が 2026-08-15T03:26:44** —— **障害の立ち上がりより後**。8/15 だけで 10 回
+デプロイされており、既知の正常版は保持期限から落ちている。**ロールバックは選べない。**
+
+## 4. 直前に入った変更（因果は未確定）
+
+deploy 直前の engine 側の変更は **`a5c6589` Retire deleted D1 head bindings**
+（2026-08-14 21:32）で、`wrangler.jsonc` から **`KOTOBASE_HEAD_DB`** を削除している
+（コードは触っていない、49 行削除）。
+
+`head.cljs` は binding が無いとき `mode` を `:off` に落とし、docstring がその代償を
+自分で書いている:
+
+> every READ pays a B2 head GET it cannot cache -- the response cache in
+> xrpc.cljs is keyed by chain-cid, so **the head read is the serving floor**
+
+⚠ **これは候補であって、確定した原因ではない。** B2 の GET は I/O であり、
+Workers では subrequest 待ちは CPU を食わない。`exceededResources` は CPU/メモリ
+上限なので、**この 2 つは直結しない。** 時間的一致（binding 削除の翌日から）と
+データ依存性は合うが、**因果は worker のログでしか確かめられない。**
+
+**この削除自体は ADR-2608039000（分散型経路に D1 を premise として置かない）に
+沿った正しい変更**である。問題は**置き換えである inga がまだ着地していない**ことで、
+decision が replacement を追い越した形になっている。**D1 を戻すのは accepted ADR に
+反する**ので、アーキテクチャ判断としてオーナーに属する。
+
+## 5. ログが取れなかった
+
+- `npx --yes wrangler tail` は **system の `tail(1)` を呼ぶ**（`--format` を
+  unrecognized option と言う）。ADR-2608180600 が記録している npx 破損そのもの。
+- インストール済み `/opt/homebrew/bin/wrangler` 4.103.0 で
+  `wrangler tail kotobase-cf-wasm-staging --format=json` を 90 秒回したが
+  **出力 0 バイト**。API トークン（`CLOUDFLARE_API_TOKEN`）では tail が繋がらない
+  可能性が高く、`wrangler login` の OAuth が要ると思われる。
+
+**したがって「どの関数が上限を超えるか」は未取得。** ここが次の一手。
+
+## 6. 副産物 —— 本番が `-staging` という名前の worker で捌かれている
+
+`kotobase-cf-wasm-staging` は kotobase.net の本番 XRPC を受けており、7 日で
+491,715 invocation。**名前と役割が食い違っている。** 事故時に「staging だから」と
+誤読される余地があり、改名か役割の明示が要る。
+
+## 7. 確定 —— wrangler tail が取れた（2026-08-20、OAuth 後）
+
+**`wrangler login` の OAuth を通したら tail が動いた。** API トークン
+（`CLOUDFLARE_API_TOKEN`）では 90 秒回して 0 バイトだったので、**tail は
+OAuth を要求する**。100 秒で 51 レコード取得。
+
+    outcome: ok 48 / exceededCpu 1 / canceled 2
+    exceededCpu : cpuTime = 30,000 ms（上限ちょうど）, wallTime 34,009 ms
+                  exception \"Worker exceeded CPU time limit.\"
+    canceled    : cpuTime 0〜3 ms, wallTime 228,341 ms と 459,552 ms
+
+⚠ **§4 の D1 head 説は外れ。** `exceededCpu` は**純粋な CPU を 30 秒使い切って**
+いる。B2 の head GET は I/O であり、`canceled` の 2 件（CPU ほぼ 0 のまま
+4〜8 分の wall time）がその I/O 側の症状にあたる。**失敗は 2 モードある:**
+
+| モード | 症状 | 意味 |
+|---|---|---|
+| `exceededCpu` | CPU 30,000 ms を使い切る（`datomic.datoms`） | 計算が終わらない（hydration） |
+| `canceled` | CPU ≈0 で wall 228〜459 秒（`datomic.view`） | I/O 待ちでクライアントが諦める |
+
+### 犯人は 1 テナント
+
+**失敗 3 件はすべて同一**:
+
+    host   : datoms.kotobase.net
+    client : kotobase-client/1（自社スタック）
+    tenant : did:key:z6MkvXVYfX3duzGkqW2YPRfXJpDDLmbaLN3jHuPphXCoMWFH
+
+**全体の回帰ではなく、1 つのグラフが大きくなりすぎて 30 秒 CPU に収まらない。**
+39% という一定比率も、成功するグラフと失敗するグラフが混在していると読めば整合する。
+
+これは **2026-08-17 の `3c02ac9`「Fold this graph's novelty off the response path,
+at a threshold it reaches」が狙った対象そのもの**である。その緩和が入ってなお
+39% が続いているので、**閾値が足りていないか、対象のグラフに効いていない。**
+
+### 次の一手（推測で最適化しない）
+
+1. そのテナントのグラフの**チェーン長と datom 数を測る**。30 秒に収まらない
+   境界がどこかを数値で出す。
+2. `3c02ac9` の threshold がそのグラフに対して発火しているかを確認する。
+   発火していないなら閾値、発火してなお超えるなら fold の粒度の問題。
+3. **`kotobase-client/1` が同じ重いクエリを叩き続けている**ことも別問題。
+   30 秒 CPU を焼く呼び出しをリトライしているなら、まずそこを止める。
+
+## Decision（提案 —— オーナー承認待ち）
+
+1. **`wrangler login`（OAuth）を通して `wrangler tail` を取る。** これ無しでは
+   どの経路が CPU を食うか分からない。**推測で最適化しない。**
+2. ログが取れたら、`datomic.view` / `datomic.datoms` の 1 リクエストの CPU 内訳を測る。
+   39% という一定比率から、**閾値を超えるグラフの特徴**（チェーン長 / datom 数）を出す。
+3. **D1 head binding を戻すかは ADR-2608039000 に照らした判断**であり、
+   実装の判断ではない。戻すなら「cache として戻す」形（消しても再構築できる）に
+   限る —— premise として戻すと ADR に反する。
+4. **`-staging` の改名**を別件として起票する。
+
+## 8. lib を読んだ結果 —— 畳むレバーが本番で無効化されている（2026-08-20）
+
+オーナー指示「1,2,3 で cpu 問題が発生しないように lib 自体を見直して」。読んだ結論を
+実装前に置く。**推測で最適化しないため、まず構造の欠陥を名指しする。**
+
+### 読み取りは 1 本の seam に集約されている（良い設計）
+
+    handle-datoms / handle-view / handle-q / handle-pull …
+      → run-read → run-authorized-read
+          head/read-head            (chain-cid, sequence)
+          read-cache  512 件        keyed by chain-cid|method|body
+          db-cache      8 件        keyed by chain-cid（hydrated db）
+          store/run-with-store      ← ここで hydration = 30 秒が燃える
+
+直すべき場所は 1 箇所で済む。**ただし現状の cache は writes に無力である** ——
+どちらも chain-cid keyed なので、**書き込みが 1 回入るたびに全滅**する。
+xrpc.cljs の docstring 自身がこう書いている:
+
+> Distinct query shapes against a never-before-seen chain-cid still pay the
+> **full hydration cost** -- moving THAT floor needs an engine-level seam
+> (kotobase-peer's `hydrate-db-cached` / `cold-datoms-async`), tracked as a
+> follow-up, **not silently claimed here**.
+
+**write と read を混ぜるテナントでは、この 2 段のキャッシュは効かない。**
+tail のサンプルでも同一テナントが `transact` 15 回と read を混在させていた。
+
+### 欠陥① 8/17 の緩和は別の worker に入っている
+
+`3c02ac9`「Fold this graph's novelty off the response path, at a threshold it
+reaches」が触ったのは **`protocols-worker/`** のみ（`kotobase_store.cljs` /
+`worker.cljs`）。**落ちているのは engine の `kotobase-cf-wasm-staging`** で、
+1 行も変わっていない。**39% が動かなかった理由はこれである。**
+
+### 欠陥② 本番では手動 fold が使えない
+
+`kotobase-cf-wasm-staging` の `vars`:
+
+    \"KOTOBASE_OPERATOR_DIDS\": \"\"
+    \"KOTOBASE_MAINTENANCE_OPERATOR_DIDS\": \"\"     ← 空
+
+`handle-fold` は自分でこう書いている ——「**Fail closed when no operator is
+configured**」。したがって **肥大したグラフを畳む手動の手段が本番に存在しない。**
+残るのは `schedule-auto-fold!` だけで、それは:
+
+- **write の応答時にしか発火しない**（`fold-due?` は transact の response を見る）
+- **`ctx.waitUntil` で走る** —— Workers では waitUntil の CPU は**同じ invocation の
+  予算に乗る**。fold は「この Worker がやる最も高価な処理（実測 4〜6 秒スパイク）」と
+  コメントされている。**畳む処理自体が 30 秒予算を圧迫する。**
+
+つまり **グラフが大きくなるほど、畳む手段が届かなくなる**構造になっている。
+
+### 欠陥③ 時間ベースのガードは Workers では書けない
+
+「20 秒でやめる」式の防御は**実装できない**。Workers は純 CPU 実行中 `Date.now()` を
+凍結するため、CPU 律速のループの中で経過時間を観測できない。**ガードは時間ではなく
+入力（チェーン長 / novelty ブロック数 / datom 数）に対して置くしかない。**
+ところが `head/read-head` が返すのは `{:chain-cid :sequence}` だけで、
+**hydration コストを予告する量を持っていない。**
+
+## Decision（改訂 —— 実装順）
+
+1. **`KOTOBASE_MAINTENANCE_OPERATOR_DIDS` を設定する。** これが空である限り、
+   壊れたグラフを手で畳めない。**セキュリティ設定なのでオーナー判断。**
+   これは lib の変更ではなく、**今すぐ効く唯一の手**である。
+2. **head record に hydration コストの予告値を持たせる**（novelty ブロック数）。
+   `read-head` が返せば、`run-authorized-read` の 1 箇所で
+   「閾値超過なら hydration に入らず typed error を返す」ガードが書ける。
+   **30 秒燃やして落ちるより、速く名前のついた失敗を返すほうが良い**
+   （ADR-2608136000 の「答えを拒否する」）。
+3. **read からも fold を起動する。** 現在は write 応答時のみ。読み取りが
+   閾値超過を観測したら `waitUntil` で畳む —— ただし ②の予告値が要る。
+4. **恒久解は docstring が名指ししている `hydrate-db-cached` /
+   `cold-datoms-async`**（増分 hydration。コストを O(chain) から
+   O(前回以降の novelty) へ）。これは kotobase-peer 側の別プロジェクト。
+
+**1 と 2 を入れるまで、この worker は「大きいグラフを読むと 30 秒燃やして死ぬ」
+ままである。** 3 と 4 は収束を速くするが、床を下げるのは 4 だけ。
+
+## 9. 構造的な原因 —— トランポリンが O(K²)（2026-08-20 確定）
+
+オーナー指示「そもそも cache を設計・構造的に materialize して、30 秒を超える query を
+できないようにできないか」。**できる。そしてその実装は既にこのワークスペースにある。**
+
+### 原因は hydration が O(chain) だからではない。O(K²) だからである
+
+`kotoba-lang/kotobase-server` の `trampoline/with-blocks`:
+
+```clojure
+(defn with-blocks
+  ;; f must be pure/idempotent -- it is re-run per miss, from scratch
+  ...
+  (letfn [(fetch-and-retry [e]
+            (-> (fetch1 (:cid d))            ; ← 1 ブロックだけ取る
+                (.then (fn [bytes]
+                         (swap! cache assoc (:cid d) bytes)
+                         (step)))))          ; ← f を最初から再実行
+```
+
+**ブロックが K 個欠けていれば、逐次フェッチ K 回 ＋ `f` の全体再実行 K 回。**
+k 回目の実行は約 k ブロック分を処理するので、**総 CPU は O(K²)**。
+
+engine の `store.cljs` が同じことを別の言葉で書いている:
+
+> the trampoline discovers block-misses **one at a time** (it re-runs the
+> computation per miss), so a read touching K blocks costs **K SEQUENTIAL B2
+> round-trips (~50-150ms each)** on a cold isolate -- the dominant term in
+> observed read latency (**TESTPLAN 1.2: ~1.4-1.5s at 3,000 datoms**)
+
+3,000 datom で 1.4 秒。K が数倍になれば 30 秒に届く。**tail で観測した
+`exceededCpu`（CPU 30,000ms）と `canceled`（wall 228〜459 秒、CPU ≈0）は
+同じ現象の CPU 側と I/O 側**である。
+
+### 既存の 2 段キャッシュがこれを救えない理由
+
+    read-cache 512 件  keyed by chain-cid|method|body
+    db-cache     8 件  keyed by chain-cid
+
+**どちらも chain-cid keyed なので、write が 1 回入るたびに全滅する。**
+tail のサンプルは同一テナントが `transact` 15 回と read を混ぜていた。
+**write と read を混ぜる利用形では、この設計のキャッシュは原理的に効かない。**
+xrpc.cljs の docstring 自身が「never-before-seen chain-cid は full hydration cost を
+払う」と認めている。
+
+### 答えは既に実装されていて、本番で全部 off
+
+| 手段 | 効果 | 本番の状態 |
+|---|---|---|
+| **pack**（ADR-2608160100、CARv2。1 commit = 1 pack） | K 回の逐次 GET を **1 回の Range GET** に畳む。K が落ちれば K² も落ちる | engine に 8/16〜8/17 に着地。`pack-write-switch` は **「behind a gate that is off」** |
+| **physical index**（prolly / merkle-LSM の materialize） | hydration そのものを回避して読む | `KOTOBASE_PHYSICAL_INDEX_*` / `KOTOBASE_IENGINE_*` が**全部 \"0\"**。しかも DEPLOY.md いわく「requires its own qualification profile **before serving traffic**」＝まだ配信できない |
+| **fold**（novelty を畳む） | K を小さく保つ | 手動は `KOTOBASE_MAINTENANCE_OPERATOR_DIDS` が空で **fail-closed**。自動は write 時のみ、かつ `waitUntil` なので**同じ 30 秒予算を食う** |
+| **admission control**（重すぎる query を断る） | 30 秒超を**起こさせない** | **存在しない**（新規実装が要る） |
+
+**「30 秒を超える query をそもそもできないようにする」ものだけが、実装されていない。**
+
+### 実装案（重い順ではなく、効く順）
+
+1. **バッチ prefetch —— トランポリンを触らずに O(K²) を O(K) にする。**
+   `store.cljs` が `trampoline/with-blocks` を呼ぶ前に、head から chain を辿って
+   必要な novelty ブロックの CID を列挙し、**並列に一括フェッチしてキャッシュを温める。**
+   温まっていれば `f` は **1 回**で終わる。トランポリンの純粋性の仮定を壊さない。
+   **これが最小の変更で最大の効果。**
+2. **admission control。** prefetch で列挙した K を見て、閾値超なら hydration に
+   入らず typed error（例 `GraphTooLargeToHydrate`）を返す。**30 秒燃やして落ちるより、
+   速く名前のついた失敗を返す。** 時間ベースのガードは書けない（Workers は純 CPU 中
+   `Date.now()` を凍結する）ので、**閾値は K に対して置く。**
+3. **pack の gate を開ける。** K そのものを下げる。qualification が要る。
+4. **physical index の qualification を進める。** hydration を読み経路から外す恒久解。
+
+⚠ **1 と 2 は engine 内で完結する。3 と 4 はロールアウトであって設定変更ではない。**
+
+⚠ **`KOTOBASE_MAINTENANCE_OPERATOR_DIDS` は「本番用に別途生成した鍵」が要る**
+（DEPLOY.md: production must use separately generated identities）。testnet の DID
+（`did:key:z6MkfBYhg…`）の流用は、testnet 鍵の保持者に本番の fold 権限を渡すことになる。
+**鍵の生成は agent の権限外**（安全床①）。
+
+## 10. Co-Scientist で最適化案を順位づけた（2026-08-20）
+
+オーナー指示「google co-scientist のアプローチで最適化」。CLAUDE.md の指示どおり
+ゼロから設計せず、`90-docs/design-quality/coscientist.cljc`（isekai ADR-0007 の移植）の
+**パターン**を使った —— Generate → Reflect → Rank → Evolve → Meta、**judge は決定論的**
+（あちらは `design-quality.audit`、ここは下記のコストモデル）。**LLM の討論では順位を
+つけない。**
+
+### Judge —— 実測から引いたコストモデル
+
+    1 ブロックの逐次往復     100ms      （store.cljs: 50-150ms）
+    実測                    1,450ms @ 3,000 datom （TESTPLAN 1.2）
+    => K(3,000 datom) ≈ 14.5 blocks、1 block ≈ 207 datom
+    現状 O(K^2) の相対 CPU: 3,000→210 / 30,000→21,025 / 300,000→2,102,500
+
+**datom 数が 100 倍になると CPU は 10,000 倍**になる。これが「39% だけ落ちる」の正体で、
+グラフの大きさが閾値を跨いだテナントだけが死ぬ。
+
+### Rank（score = CPU削減 × 実装可能性 × 影響範囲の狭さ）
+
+| | 案 | score | CPU 削減 | Reflect が付けた欠点 |
+|---|---|---:|---:|---|
+| h3 | **admission control**（K 超過を hydration 前に断る） | **1.000** | 100% | **遅さは直らない（断るだけ）** |
+| h1 | **batch prefetch**（chain を先に歩いて一括フェッチ） | **0.999** | 99.9% | — |
+| h4 | fold を届くようにする | 0.352 | 93.8% | O(K²) のまま / agent だけでは着地不可 |
+| h5 | physical index から配信 | 0.188 | 100% | rollout が要る / 影響範囲最大 |
+| h2 | pack tier を有効化 | 0.186 | 99.0% | O(K²) のまま / rollout が要る |
+| h6 | db-cache を graph keyed に | 0.000 | 0% | **却下** —— chain-cid keying は正しさの要件 |
+
+### Meta —— ループ自身が見つけた欠陥（これが一番重要）
+
+**h3 が 1.000 で首位に立ったのは、fitness function の欠陥である。**
+admission control は「CPU を 100% 削減」する —— **仕事をやめることによって**。
+私のスコアは「速くする」と「起こさせない」を同じ軸で足していた。
+**CLAUDE.md が警告する『計測されないメトリクス＝劇場』の、まさにその形。**
+
+Reflect 段がこれを捕まえた（「遅さは直らない（断るだけ）」）。**judge が見落としたものを
+critic が拾った** —— 単一 judge では起きないことで、これが Reflect を分けている理由である。
+
+### Evolve —— 上位 2 つは競合ではなく相補
+
+**h1 + h3 を 1 つの変更として実装する。**
+
+    batch prefetch が chain を歩いて必要ブロックの CID を列挙する（= K が確定する）
+      → K ≤ 閾値      : 一括フェッチして f を 1 回だけ走らせる（O(K)）
+      → K >  閾値      : hydration に入らず typed error を返す（O(1)）
+
+**K を 2 回数えない。速くする経路と断る経路が、同じ 1 つの計測を共有する。**
+これで「30 秒を超える query」は**起こしてから死ぬ**のではなく**受け付けない**ものになり、
+かつ閾値以下は O(K²) から O(K) に落ちる。
+
+h2 / h5 は K そのものを下げる（pack）／ hydration を外す（materialize）ので**上位互換だが、
+どちらも qualification を伴うロールアウト**であり、今日の 39% を止める手ではない。
+
+## 11. Co-Scientist iteration 2 —— judge を直したら順位が入れ替わった
+
+iter-1 の Meta（「refusal を CPU 削減として数えていた」）を Generate ではなく
+**judge に差し戻した**。iter-2 の judge:
+
+    score = served-frac × (0.15 + 0.85×served-speedup) × bounded × feasibility × blast
+    ・served-speedup は「答えを返した request」だけで測る（refusal は 0）
+    ・served-frac を掛ける → 断って稼ぐ戦略は構造的に上位に来られない
+
+新しい候補も足した（h8: 祖先キャッシュからの増分 hydration、h9: h7+h8）。
+
+| id | 案 | score | served | speedup | bounded |
+|---|---|---:|---:|---:|---|
+| **h1** | **batch prefetch のみ** | **0.963** | 100% | 95.6% | yes |
+| h8 | 増分 hydration（hydrate-db-cached） | 0.799 | 100% | 99.8% | yes |
+| h7 | prefetch + admission（iter-1 の勝者） | 0.770 | 100% | 95.6% | yes |
+| h9 | prefetch + admission + 増分 | 0.732 | 100% | 99.8% | yes |
+| h5 | physical index から配信 | 0.200 | 100% | 100.0% | yes |
+| **h3** | **admission control のみ** | **0.090** | **60%** | 0.0% | yes |
+| h2 | pack tier | 0.089 | 100% | 99.0% | NO |
+| h0 | 現状 | 0.067 | 100% | 0.0% | NO |
+
+**h3 は 1.000 から 0.090 へ落ちた。** judge の修正が効いたことの確認になっている。
+**勝者は h7（0.770）から h1（0.963）へ、+25.0%。**
+
+### iter-2 の Meta —— 「bounded」が workload 依存になっている
+
+**h1 が h7 を上回るのは、評価した 3 点（3k / 30k / 300k datom）では O(K) が
+天井に当たらないからである。** つまり私のモデルは h1 を「bounded: yes」と
+判定しているが、それは**保証ではなく、測った範囲でそうだった**という意味しかない。
+O(K) も K を増やせばいつかは 30 秒に届く。
+
+**admission control が価値を持つのは、モデルの外側の workload においてである。**
+iter-3 の種: **workload に「上限のない点」を入れる**。そこで h7 / h9 が
+h1 を抜くはずで、抜かないならモデルがまだ refusal を過小評価している。
+
+⚠ この構造は ADR-2608136000 の「測れなかった検査が、測って問題が無かった検査と
+同じ値を返す」と同型である —— **「評価範囲で超えなかった」と「超えないことが保証
+されている」を、同じ `bounded: yes` で表示していた。**
+
+## 12. Co-Scientist iteration 3 —— 要件を gate にしたら iter-1 の Evolve が戻ってきた
+
+iter-2 の Meta（`bounded: yes` が「保証」と「測った範囲で超えなかった」の 2 義）を
+judge に差し戻した。**オーナーの要件は「30 秒を超える query をそもそもできないように」
+＝ guarantee であって observation ではない。** よって:
+
+- `observed-ok?`（評価点で超えなかった）と `guaranteed?`（上限が構造的に存在する）を**分離**
+- `guaranteed?` を**ゲート**にした（満たさなければ 0.15 倍。iter-2 は 0.45 の緩い係数だった）
+- workload に **3,000,000 / 30,000,000 datom** を追加 —— **iter-2 が見ていなかった外側**
+
+| id | 案 | score | served | speedup | observed | GUARANTEE | breach |
+|---|---|---:|---:|---:|---|---|---:|
+| **h7** | **prefetch + admission** | **0.759** | 98% | 96.3% | ok | **yes** | 0% |
+| h9 | prefetch + admission + 増分 | 0.732 | 100% | 99.8% | ok | yes | 0% |
+| h5 | physical index から配信 | 0.200 | 100% | 100.0% | ok | yes | 0% |
+| h1 | batch prefetch のみ | 0.145 | 100% | 96.4% | ok | **NO** | 0% |
+| h8 | 増分 hydration のみ | 0.120 | 100% | 99.8% | ok | **NO** | 0% |
+| h3 | admission control のみ | 0.075 | 50% | 0.0% | ok | yes | 0% |
+| h0 | 現状 | 0.022 | 100% | 0.0% | **BREACH** | NO | 10% |
+
+**h1（iter-2 の勝者）は 0.145 に落ち、h7 が 0.759 で戻った。**
+h0 が初めて `BREACH` を出した —— **iter-2 の workload では現状の障害すら見えていなかった。**
+
+### iter-3 の Meta —— 世代をまたいだ score の比較は無意味である
+
+「iter-2 の 0.963 → iter-3 の 0.759」も「h1 0.145 → h7 0.759 で +422%」も、
+**候補が良くなったのではなく judge が変わっただけ**である。私は iter-2 の報告で
+0.770 → 0.963 を「+25.0% の改善」と書いたが、**あれも同じ誤り**を含んでいた
+（judge を作り直した直後の数字を、前の judge の数字と並べた）。
+
+**Co-Scientist の score は、同一 judge の中でしか順位に意味がない。**
+世代をまたぐときに比較してよいのは *順位の入れ替わり* であって、*数値* ではない。
+
+### 収束した答え
+
+**iter-1 の Evolve（h7 = prefetch + admission）が、3 世代を経て戻ってきた。**
+iter-2 が一時的に h1 を上に出したのは workload が短かったからで、
+**要件（guarantee）を明示した瞬間に h7 が回復した。** これは探索が
+収束したことの徴候として読める —— 別の judge から同じ答えに到達した。
+
+**h9（+増分 hydration）は速度で勝るが、`kotobase-server` の trampoline に手を入れる
+ぶん影響範囲が広い。h7 を先に入れ、h9 は h7 の計測が取れてから。**
+
+## 13. Co-Scientist iteration 4 —— 探索を止める。judge が証拠ではなく私の重みを測っていた
+
+iter-3 で「収束した」と書いたので、iter-4 はそれを検証した。**検証の 1 回目は失敗した。**
+
+### 4a: コストモデルの定数を振った → 順位は完全に不変
+
+    往復 50/100/150ms、予算 100k/300k/3M datom、巨大グラフ 2%/10%/30%
+    → 7 シナリオすべてで h7 > h9 > h5 > h1 > h8 > h3 > h0
+
+**完全な不変は、頑健性の証拠ではなく、測っていないことの徴候である。**
+
+### 4b: 判断の重みを振った → 1 位が 4 通りに変わった
+
+| 重み | 1 位 |
+|---|---|
+| iter-3 と同じ | **h7** |
+| gate をほぼ無効 (0.95) | **h1** |
+| 影響範囲を無視 (0.0) | **h9** |
+| 実装可能性を無視 | **h5** |
+| 全部フラット | **h5** |
+
+**順位を決めていたのは `gate` / `feasibility` / `blast` —— 私が手で置いた値**であり、
+実測から引いたコストモデルではなかった。4a が振ったのは**結果に効かない
+パラメータだけ**である。
+
+⚠ **これでこのループ 4 世代のうち 3 世代が同じ欠陥を出した** ——
+iter-1「refusal を CPU 削減として数えた」／ iter-2「bounded が二義」／
+iter-4a「効かない定数だけ振って不変と結論」。**ADR-2608136000 の
+『測れなかった検査が、測って問題が無かった検査と同じ値を返す』が、
+judge を作る側で 3 回再発した。**
+
+### モデルが言えること・言えないこと
+
+**重みに依存せず成り立つ主張は 2 つだけ:**
+
+- **h0（現状）は全シナリオで最下位付近** —— どの政策でも「何もしない」は誤り
+- **h3（admission のみ）も全シナリオで最下位付近** —— 速くせずに断るだけも誤り
+
+**{h1, h7, h9, h5} の間の順位は政策の問題であって事実の問題ではない。**
+モデルは悪い選択肢を消せるが、良い選択肢の中から選べない。
+
+### 決定 —— 探索を止め、オーナーの要件で選ぶ
+
+**選ぶ基準は既に与えられている。** オーナーの言葉は
+「**30sec を over するような query をそもそもできないようにできないかな?**」
+—— これは guarantee の要求である。**guarantee を満たすのは h7 / h9 / h5 の 3 つ**で、
+h5 は rollout、h9 は `kotobase-server` の trampoline に手を入れる。
+**h7（prefetch + admission、engine 内 2 ファイル）が要件を満たす最小の変更。**
+
+**これ以上のモデル反復は、私自身の重みを調整しているだけになる。**
+score を本当に上げる唯一の道は、**h7 を実装して実測 K を judge に戻すこと**である。
+ループはここで止める。
+
+## 14. h7 を実装した —— そして実装がモデルを 1 つ反証した（2026-08-20）
+
+**`net-kotobase/engine` main に着地**（`94739e8` → merge `bc51f61de3a8`）。
+
+### 入ったもの
+
+| | 何を直すか |
+|---|---|
+| **読み取り予算**（`KOTOBASE_MAX_BLOCKS_PER_READ`、既定 512） | `exceededCpu`。distinct ブロック取得が予算を超える読みを **hydration に入る前に拒否**し、`GraphTooLargeToHydrate`（503、`retryable: false`、limit 同梱）を返す。**読み取り専用** —— fold は全 novelty chain を歩くのが正当で、書き込みに予算をかけるとグラフが直せない大きさで固着する |
+| **prefetch manifest**（graph → CID 集合、64 graph × 256 CID） | `canceled`。前回その graph が触ったブロックを**1 波で並行取得**する。**chain-cid ではなく graph をキーにする** —— 上位 2 段のキャッシュは chain-cid keyed で、書き込み 1 回で全滅する。ブロック CID は content-addressed なので、古いエントリは「効かない」だけで誤答にならない |
+
+### ⚠ テストがモデルを反証した —— h7 は「engine 内 2 ファイル」ではなかった
+
+Co-Scientist の全世代で、h7 の blast radius を **engine 内 2 ファイル**と置いていた。
+**実装したら違った。**
+
+L1 を温めても**ハンドラの再実行回数は減らない**。`with-blocks` は**自前の per-call
+キャッシュ atom**を持っており、L1 に何があろうと miss ごとに `f` を最初から回す。
+つまり prefetch が消せるのは **K 回の逐次往復（`canceled` 側）**であって、
+**O(K²) の CPU 項（`exceededCpu` 側）ではない。**
+
+CPU 項を消すには `with-blocks` に warm cache を渡す 3-arity が要り、それは
+**`io.github.kotoba-lang/kotobase-server` の git/sha `3d2523d9` に pin された依存**の
+中にある。engine からは出荷できない。**h7 の実装は h9 の一部だった。**
+
+**テストにその境界を固定した** —— `runs` を K+1 に pin してある。誰かが 1 にしたら
+テストが赤くなり、説明を強制される。**前回の緩和は別の worker に入って 3 日間
+誰も気づかなかった**（§9）。同じことを繰り返さないための赤である。
+
+### 検証
+
+- 既存 260 テスト + 新規 4 テスト = **264 tests / 757 assertions、0 failures**
+- **壊して確かめた**: 予算判定を 1 箇所無効化すると
+  `bounded-store-refuses-a-read-that-would-exceed-the-block-budget` **だけ**が落ち、
+  戻すと全緑。落ちない gate は劇場（CLAUDE.md）
+- 4 テストの内訳: 予算超過で拒否 / 予算内で配信 / prefetch が 1 波で並行取得
+  （peak 同時実行 = K）/ **書き込み経路は予算の対象外**
+
+### まだ本番に出ていない
+
+**deploy はしていない。** engine の main には他セッションの未リリース分
+（biscuit revocation の読み取り経路、artifact 再ビルド）が載っており、
+**main を deploy すればそれも一緒に出る。** 私の変更だけを出す手段が無い以上、
+出荷はオーナー判断。
+
+## Consequences
+
+(+) 「kotobase.net の 5xx が 41%」という粒度から、**単一の worker・単一の失敗モード・
+    開始日・戻し先の不在**まで絞り込めた。
+
+(+) 8/17 の緩和が効いていないことを実測で示した。**同じ方向にもう一手足す前に
+    止められる。**
+
+(-) **直っていない。** 原因は候補どまりで、worker のログが取れていない。
+
+(-) ロールバックという最短の復旧手段が、**保持期限切れで既に失われている**。
+    今後は「壊れた日より前のデプロイを 1 つ pin する」運用が要る。
+"}]
