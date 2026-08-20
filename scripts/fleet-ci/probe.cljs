@@ -120,6 +120,22 @@
     ;; the cap is a conjunction of three rather than two. It is NOT in Homebrew
     ;; ("No available formula with the name \"wac\"", measured 2026-08-20), so
     ;; unlike the other two it cannot be installed by the obvious route.
+    ;; Rosetta 2. amu's suite emits an x86_64 native artifact and EXECUTES it
+    ;; (`kotoba-isa-probe-x86_64.bin`), so on Apple Silicon the toolchain being
+    ;; present is not enough -- without Rosetta the run dies with
+    ;; `Bad CPU type in executable`.
+    ;;
+    ;; Measured 2026-08-20 by installing the pinned toolchain on four more nodes
+    ;; and running the suite on each rather than trusting the tools:
+    ;;
+    ;;   benjamin rosetta=yes  0 errors      judah rosetta=yes  0 errors
+    ;;   levi     rosetta=no   16 errors     simeon/joseph rosetta=no
+    ;;
+    ;; A perfect split. Had the cap been granted on tool presence alone, three
+    ;; nodes would have earned it and then gone red about themselves -- the
+    ;; defect this cap exists to prevent, reached for the third time from a new
+    ;; direction.
+    "echo rosetta=$(arch -x86_64 /usr/bin/true 2>/dev/null && echo yes || echo no)"
     "echo wac=$(PATH=$HOME/.gftd/wasm-pin/bin:$PATH command -v wac)"
     "echo wacv=$(PATH=$HOME/.gftd/wasm-pin/bin:$PATH wac --version 2>/dev/null | awk '{print $2}')"
     "echo curl=$(command -v curl)"
@@ -191,7 +207,7 @@
   clojure の maven cache / tarball 展開が数 GB 食うため — 空き 1–2GB のノードに
   JVM gate を投げると途中で落ちて false fail になる（naphtali/issachar が実際に
   この状態）。"
-  [{:keys [reachable? javahome clojure npx zig kotoba wasmtools wasmtime wac curl tar host] :as n}]
+  [{:keys [reachable? javahome clojure npx zig kotoba wasmtools wasmtime wac rosetta curl tar host] :as n}]
   (if (or (not reachable?) (contains? operator-hosts host))
     (assoc n :caps #{} :max-parallel 0
            :role (if (contains? operator-hosts host) :operator :unreachable))
@@ -232,7 +248,8 @@
           ;; fail-closes on an unknown one), which is why the versions are
           ;; recorded below rather than compared here -- this file must not
           ;; carry a copy of another repo's pin.
-          wasm-tools? (and jvm? (seq wasmtools) (seq wasmtime) (seq wac))]
+          wasm-tools? (and jvm? (seq wasmtools) (seq wasmtime) (seq wac)
+                           (= "yes" rosetta))]
       (assoc n
              :cores cores
              :free-gb free
@@ -252,40 +269,38 @@
         base {:host "t" :reachable? true :cores 10 :freegb "40"
               :curl "/usr/bin/curl" :tar "/usr/bin/tar" :loopback "yes"
               :javahome "/jdk" :clojure "/bin/clojure" :npx "/bin/npx"}
+        full {:wasmtools "/bin/wasm-tools" :wasmtime "/bin/wasmtime"
+              :wac "/bin/wac" :rosetta "yes"}
         caps-of (fn [extra] (:caps (classify (merge base extra))))]
     (check (= #{:jvm :node} (caps-of {}))
            "a plain jvm+node machine carries neither zig nor wasm-tools")
-    (check (contains? (caps-of {:wasmtools "/bin/wasm-tools" :wasmtime "/bin/wasmtime"
-                                :wac "/bin/wac"})
-                      :wasm-tools)
-           "all three present -> :wasm-tools appears (no node can demonstrate
-            this today, which is exactly why it is tested here)")
-    (check (not (contains? (caps-of {:wasmtools "/bin/wasm-tools"
-                                     :wasmtime "/bin/wasmtime"})
-                           :wasm-tools))
+    (check (contains? (caps-of full) :wasm-tools)
+           "all three tools AND Rosetta -> :wasm-tools appears")
+    (check (not (contains? (caps-of (dissoc full :rosetta)) :wasm-tools))
+           "the three tools WITHOUT Rosetta is not enough. Measured: levi had
+            exactly this and produced 16 x `Bad CPU type in executable`, because
+            the suite executes an x86_64 artifact it emitted")
+    (check (not (contains? (caps-of (assoc full :rosetta "no")) :wasm-tools))
+           "and an explicit rosetta=no is refused, not merely a missing key")
+    (check (not (contains? (caps-of (dissoc full :wac)) :wasm-tools))
            "wasm-tools + wasmtime WITHOUT wac is not enough. This is the case
             that was wrong when the cap first landed: benjamin had exactly this
             pair, earned the cap, and still could not run the suite")
-    (check (not (contains? (caps-of {:wasmtools "/bin/wasm-tools" :wac "/bin/wac"})
-                           :wasm-tools))
+    (check (not (contains? (caps-of (dissoc full :wasmtime)) :wasm-tools))
            "nor wasm-tools + wac without wasmtime")
-    (check (not (contains? (caps-of {:wasmtime "/bin/wasmtime" :wac "/bin/wac"})
-                           :wasm-tools))
+    (check (not (contains? (caps-of (dissoc full :wasmtools)) :wasm-tools))
            "nor wasmtime + wac without wasm-tools")
-    (check (not (contains? (caps-of {:javahome "" :clojure ""
-                                     :wasmtools "/bin/wasm-tools"
-                                     :wasmtime "/bin/wasmtime"})
-                           :wasm-tools))
+    (check (not (contains? (caps-of (assoc full :javahome "" :clojure "")) :wasm-tools))
            "without a JVM the cap is withheld: there is no gate that wants these
             without one, and a cap nothing can use is a promise that misleads")
     (check (empty? (:caps (classify (assoc base :reachable? false))))
            "an unreachable node carries no caps at all")
     (if (zero? @fails)
-      (println "probe: self-test OK (8 cases)")
+      (println "probe: self-test OK (10 cases)")
       (do (println "probe: self-test FAILED" @fails) (js/process.exit 1)))))
 
 (defn edn-node [n]
-  (let [{:keys [host reachable? os cores free-gb javahome clojure node nodev npx zig zigv kotoba wasmtools wasmtoolsv wasmtime wasmtimev wac wacv caps max-parallel detail loopback role]} n]
+  (let [{:keys [host reachable? os cores free-gb javahome clojure node nodev npx zig zigv kotoba wasmtools wasmtoolsv wasmtime wasmtimev wac wacv rosetta caps max-parallel detail loopback role]} n]
     (str "  {:host " (pr-str host)
          " :reachable? " (pr-str (boolean reachable?))
          (when os (str " :os " (pr-str os)))
@@ -309,6 +324,7 @@
          (when (seq wasmtimev) (str " :wasmtime-version " (pr-str wasmtimev)))
          (when (seq wac) (str "\n   :wac " (pr-str wac)))
          (when (seq wacv) (str " :wac-version " (pr-str wacv)))
+         (when (and reachable? (= "no" rosetta)) (str "\n   :rosetta? false"))
          (when (and reachable? (= "no" loopback))
            (str "\n   :loopback? false"))
          (when reachable? (str "\n   :caps " (pr-str (or caps #{})) " :max-parallel " (or max-parallel 0)))
