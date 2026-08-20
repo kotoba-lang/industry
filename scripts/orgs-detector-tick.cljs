@@ -446,6 +446,25 @@
 
     (when-not (:detectors registry)
       (log! "no registry at" registry-file "— nothing to run") (js/process.exit 2))
+
+    ;; `--admit-only`: run admission and stop. It exists so the check that
+    ;; refuses a malformed entry can run where the entry LANDS -- a fleet gate
+    ;; on this repository's own tree -- instead of only when the tick next
+    ;; fires. Admission is all-or-nothing by design, so one entry missing its
+    ;; mandatory fields refuses every detector; that happened twice on
+    ;; 2026-08-20 (:verify-error-provenance, then
+    ;; :verify-bridge-guest-cannot-execute), and both times the tick's own
+    ;; state simply stopped being written while SessionStart kept rendering the
+    ;; last good run with nothing saying it was frozen.
+    ;;
+    ;; It runs BEFORE the orgs/ check on purpose: a fleet node has no orgs/,
+    ;; and admission does not need one. Calling `admit!` here rather than
+    ;; copying its rules into the gate keeps one implementation of them.
+    (when (flag "--admit-only")
+      (admit! (:detectors registry))
+      (println (str "SCANNED\t" (count (:detectors registry))
+                    "\tregistry entries admitted from " registry-file))
+      (js/process.exit 0))
     (when-not (.existsSync fs (str root "/orgs"))
       ;; The entire point of this home is that it has orgs/. If it does not,
       ;; every detector would scan nothing and the evidence floor would record

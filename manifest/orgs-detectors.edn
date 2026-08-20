@@ -201,7 +201,19 @@
               whose output is its own argument, and could not fail."
    :argv     ["nbb" "{{repo}}/scripts/verify-bridge-guest-cannot-execute.cljs"]
    :cwd      :repo
-   :findings :protocol}
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 21600000                 ; 6h
+   :timeout-ms  300000                   ; 5m -- far above the measured run, sized for load
+   :writes   :none
+   :measured "2026-08-20 on this machine: 0.17s at load 6.5, exit 0, `SCANNED\t1 bridge`,
+              0 findings. It reads one config and spawns nothing.
+              These four fields were missing when the entry landed the same day, and
+              admission is all-or-nothing, so every detector was refused. That is the SECOND
+              time this happened on 2026-08-20 -- :verify-error-provenance was the first --
+              which is why `--admit-only` and the root-orgs-detectors-admission gate exist
+              now. The rule was written down; what was missing was anything that checked it
+              where an entry LANDS rather than when the tick next fires."}
 
   {:id       :verify-error-provenance
    :title    "errors classified from an exception that record none of it"
@@ -1063,6 +1075,52 @@
    :evidence "SCANNED\t[1-9][0-9]*"
    :timeout-ms 600000
    :interval-ms 21600000}
+
+  {:id       :verify-dep-coordinate-identity
+   :title    "one repository reachable under two dependency coordinates"
+   :why      "tools.deps dedupes by the coordinate SYMBOL, so two symbols naming the same
+              GitHub repository are two libraries to it: both land on the classpath, each at
+              its own pin, and the same namespaces load twice from two revisions. Nothing
+              errors. Measured 2026-08-20 across 4,460 checkouts -- 2,665 in-house git
+              dependencies naming 421 repositories, of which 25 are reached under more than
+              one coordinate. The two largest are kotoba-lang/langgraph (454 references, as
+              both io.github.kotoba-lang/langgraph and io.github.com-junkawasaki/langgraph-clj)
+              and jp-go-digital-design-system (447, also as jp-go-dds).
+              This is what the fleet's nbb-cross-runtime gate reports as its long CONFLICT:
+              line, and it is one mechanism by which a repository stays pinned behind a fix
+              that already exists -- two names are two pins to move, and moving one looks
+              done. Four repositories were unblocked on 2026-08-20 by moving pins alone
+              (nekko, tech-ipfs-specs-ipns, org-ietf-xdr, org-ietf-oncrpc), each having been
+              recorded as blocked on an upstream defect that had already been fixed.
+              Two shapes, both reported: rename-shaped, where the old repository name
+              survives as a coordinate (compiler for amu, ed25519, mcp, svg), and
+              group-shaped, where the group segment differs (kotoba-lang/css beside
+              io.github.kotoba-lang/css, org.kotoba-lang/io-multiformats). The second works,
+              because a bare group forces an explicit :git/url, and is still a second
+              identity for one library."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-dep-coordinate-identity.cljs" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 86400000                 ; 24h -- deps.edn moves in days
+   :timeout-ms  300000                   ; 5m -- 200x the slower measured run
+   :writes   :none
+   :measured "2026-08-20 on this machine, twice: 1.37s and 0.98s at load 5.9, identical
+              output both times -- SCANNED 2665, CENSUS repos=421 multi-coordinate=25,
+              26 findings, exit 1. It reads deps.edn only, so it is far cheaper than the
+              detectors that walk trees.
+              Both directions observed before landing: a synthetic tree with one repository
+              under one coordinate exits 0; adding a second checkout that names the same
+              repository as `kotoba-lang/css` with an explicit :git/url -- the exact shape
+              found in the real tree -- exits 1 with the finding. A tree with no orgs/ and a
+              tree of checkouts with no deps.edn both exit 2.
+              The 26th finding is not a coordinate: orgs/etzhayyim/com-etzhayyim-isic's
+              deps.edn does not parse (`Unmatched delimiter }`). An unparseable file is
+              reported rather than counted as having no dependencies, because the second
+              would turn a broken file into a clean one.
+              `{{root}}` is passed explicitly: the script defaults to `.`, and a tick running
+              from a worktree would otherwise find no orgs/ and refuse."}
 
   {:id       :verify-kotoba-source-census
    :title    ".kotoba files that are not Kotoba source, and repos holding both under one extension"
