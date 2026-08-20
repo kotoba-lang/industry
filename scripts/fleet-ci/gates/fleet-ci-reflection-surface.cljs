@@ -156,7 +156,10 @@
     "kotoba-lang/shohyo"
     "kotoba-lang/tana"
     "kotoba-lang/user-test"
-    "kotoba-lang/worklaw"})
+    "kotoba-lang/worklaw"
+    ;; the fourth arrival on 2026-08-19/20. Public, so registering a RID
+    ;; clears it; nothing here is a decision.
+    "cloud-itonami/cloud-itonami-app"})
 
 (def baseline-without-surface
   "The union: every gated repo known on 2026-08-18 to have nowhere to report a failure."
