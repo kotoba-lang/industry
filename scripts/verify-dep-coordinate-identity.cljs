@@ -83,16 +83,33 @@
   (println (str "UNANSWERED\t" msg))
   (js/process.exit 2))
 
+(def worktrees-skipped (atom 0))
+
+(defn- linked-worktree?
+  "A linked worktree has `.git` as a FILE (`gitdir: ...`); a checkout has it as
+  a directory. Worktrees are the SAME repository with the same deps.edn, so
+  counting them inflates every number here -- measured 2026-08-20, 298 of them
+  under orgs/, and 7 of the 16 reported collision sites were one `apex`
+  worktree counted seven times. A census that counts the same repository once
+  per in-flight agent session is measuring sessions, not repositories."
+  [dir]
+  (let [g (p/join dir ".git")]
+    (and (fs/existsSync g) (not (.isDirectory (fs/statSync g))))))
+
 (defn- checkouts []
   (let [o (p/join root "orgs")]
     (when-not (fs/existsSync o) (die-unanswered (str "no orgs/ under " root)))
-    (for [org (sort (fs/readdirSync o))
-          :let [od (p/join o org)]
-          :when (.isDirectory (fs/statSync od))
-          repo (sort (fs/readdirSync od))
-          :let [rd (p/join od repo)]
-          :when (fs/existsSync (p/join rd ".git"))]
-      rd)))
+    (vec
+     (for [org (sort (fs/readdirSync o))
+           :let [od (p/join o org)]
+           :when (.isDirectory (fs/statSync od))
+           repo (sort (fs/readdirSync od))
+           :let [rd (p/join od repo)]
+           :when (fs/existsSync (p/join rd ".git"))
+           :when (if (linked-worktree? rd)
+                   (do (swap! worktrees-skipped inc) false)
+                   true)]
+       rd))))
 
 (defn- dep-entries
   "Every dependency entry anywhere in the map, at any nesting depth -- aliases
@@ -162,6 +179,9 @@
                    (sort-by (fn [[_ rs]] (- (count rs)))))]
     (println (str "SCANNED\t" (count rows) "\tin-house deps (git + local-root) in "
                   (count files) " deps.edn of " (count dirs) " checkouts"
+                  (when (pos? @worktrees-skipped)
+                    (str "\tWORKTREES-SKIPPED\t" @worktrees-skipped
+                         " (linked worktrees are the same repository, not another one)"))
                   (when (seq broken) (str "\tUNPARSEABLE\t" (count broken)))))
     ;; LATENT vs ACTIVE. "50 repositories are reachable under two coordinates"
     ;; is a count of names, not of damage, and the two are not the same
