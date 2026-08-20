@@ -159,6 +159,26 @@
    :timeout-ms  1800000                  ; 30m -- ~6x the measured 5m runtime
    :writes   :none}
 
+  {:id       :verify-bridge-guest-cannot-execute
+   :title    "the claude-bridge guest keeping the tools it is documented not to have"
+   :why      "ADR-2608200200, 2026-08-20: the bridge's own header and the commit that
+              shipped it both said a guest executing tools would be an agent running
+              commands nobody sanctioned. The invariant was ASSERTED and never tested,
+              and it was false -- `--allowedTools \"\"` is a PERMISSION allowlist, not an
+              availability list, so all 25 built-ins stayed advertised and under
+              permissionMode auto the guest ran Bash for real (`Run: echo
+              hello-from-guest` -> tool_use Bash -> tool_result). The flag that removes
+              availability is `--tools \"\"` (measured 25 -> 0). That fix landed and was
+              checked by hand against a stub that was never committed, so nothing stops
+              the next reader reaching the same wrong conclusion and deleting it. Static
+              mode catches exactly that regression; --live is the only mode that proves
+              the property, and it must probe with a value the model cannot produce
+              without reading something -- the first attempt asked for `echo <marker>`,
+              whose output is its own argument, and could not fail."
+   :argv     ["nbb" "{{repo}}/scripts/verify-bridge-guest-cannot-execute.cljs"]
+   :cwd      :repo
+   :findings :protocol}
+
   {:id       :verify-error-provenance
    :title    "errors classified from an exception that record none of it"
    :why      "ADR-2608198100, 2026-08-19: CLAUDE.md question 3 of five -- 受け取ったエラー本文を
