@@ -3308,5 +3308,48 @@
   {:name "lint" :id "nbb-cross-runtime-lint" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+
+  ;; The remaining eight stdlib libraries that could be run on a second
+  ;; runtime. Each was measured green by hand on 2026-08-20 and each now
+  ;; carries a landed `run-tests.cljs`, so the green becomes something the
+  ;; fleet preserves rather than a number one session wrote down:
+  ;;
+  ;;   json 27 tests / 87 assertions   time 8 / 33        io 9 / 16
+  ;;   fmt   6 / 15                    lsp  8 / 26        http 7 / 21
+  ;;   test  9 / 139                   scheduler 16 / 39
+  ;;
+  ;; **:min-files is the MEASURED count per repo, not a copied constant.**
+  ;; Five of these eight have exactly four files matching :include-ext, so the
+  ;; 5 used elsewhere in this file would have made their gates reject a
+  ;; complete tree. The floor is there to catch a truncated ship, not to
+  ;; assert a size.
+  ;;
+  ;; Why this matters rather than being tidiness: bytes shipped a SHA-1 that
+  ;; returned the wrong digest on ClojureScript, and lint an error path that
+  ;; threw there instead of reporting. Both passed every JVM run they ever had.
+  {:name "json" :id "nbb-cross-runtime-json" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 11 :cd false}
+  {:name "time" :id "nbb-cross-runtime-time" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+  {:name "io" :id "nbb-cross-runtime-io" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+  {:name "fmt" :id "nbb-cross-runtime-fmt" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+  {:name "lsp" :id "nbb-cross-runtime-lsp" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+  {:name "http" :id "nbb-cross-runtime-http" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 6 :cd false}
+  {:name "test" :id "nbb-cross-runtime-test" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 4 :cd false}
+  {:name "scheduler" :id "nbb-cross-runtime-scheduler" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 6 :cd false}
   ;; ────────────────────────────────────────────────────────────────────────
   ]}
