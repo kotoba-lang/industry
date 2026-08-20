@@ -184,4 +184,27 @@ target への写像を宣言するか」。**それが決まるまで `:implemen
    （ADR-2608190200 の `authority` は「能力の欠如ではなく設定の誤り」だった）
 3. census の 4 つの mixed repo（com-cloudflare-compat / com-stripe / kotoba-v2025 / lab）
 4. `:implementation` 語彙の権威決定（#3）
+
+## 訂正（2026-08-20）—— 「clock-v1 が次の候補」は誤りだった
+
+本文の #1 は「cap 7 は既に seal されているので、不足は provider と実行証拠だけ」と
+書いた。**その順位付けは間違っている。** 委譲した調査（ADR-2608200200 に記録）が
+amu の accepted ADR 2 本を見つけた:
+
+- **ADR 0240**（amu、2026-08-11 accepted）は kexe loader を **oracle であって
+  production の native effect surface ではない**と定め、production を
+  `:aiueos-c-free-bare-metal-v1` 1 本に絞っている。loader の seccomp allowlist には
+  `clock_gettime` が無く（macOS は `(deny default)`）、実クロックの追加は
+  case 文の追加ではなく **TCB の sandbox policy 拡大**になる。
+- **ADR 0084** は wasm surface で決定的な合成クロックを実装した上で、
+  「packaging evidence ≠ production host-time」として `:wasm-aot` の flip を
+  **自ら見送っている**。loader の合成カウンタは同じ構造なので、同じ理由で通らない。
+
+**dataspace が先例にならない理由も測定された** —— `dataspace_inject` は
+プロセス内の有界メモリで決定的、新しい syscall を 1 つも要さない。clock は
+意味論そのものが時刻源なので、その逃げ道が無い。
+
+したがって clock は「あと少しの候補」ではなく、**現在の実装では構造的に拒否されて
+いる**。実測: guest は compile し、`valid_typed_value` に `KEXE_TYPED_CLOCK_V1` の
+case が無いため SIGILL で trap する。
 "}]

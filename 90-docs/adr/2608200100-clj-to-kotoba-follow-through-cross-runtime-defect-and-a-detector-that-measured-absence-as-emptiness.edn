@@ -144,4 +144,24 @@ ADR-2608191100 に 3 つの語彙を並べたところまでが私の担当で�
 2. pack の `@noble/hashes` を親ディレクトリ解決に頼らない形にする
 3. `:jvm-test` 単独 57 本（59 − 上記 2 本）は entry が無い。1 本ずつ書くしかない
 4. `:implementation` 語彙の権威決定（オーナー判断）
+
+## 追記（2026-08-20）—— #1 は「ADR 0073 を読んでから」ではなく、既に決まっていた
+
+本文は「ADR 0073 が決めている可能性が高く、それを読んでから着手すべき」と書いた。
+委譲した調査の結果、**決めていたのは 0073 ではなく ADR 0240 と ADR 0084 で、
+しかも結論は「できる」ではなく「この経路では通らない」**だった。詳細と
+証拠（seccomp allowlist の実内容、SIGILL トレース、1099 tests / 8302 assertions の
+baseline）は ADR-2608200200 と amu 側の ADR。
+
+本文の見積りに対する 3 つの機械的訂正も記録しておく:
+
+- 生きている emitter 経路は `machine_ir.cljc`（`typed-capability-kinds` /
+  `a64-capability-call`）であって、`x86_64.cljc` / `aarch64.cljc` の
+  `emit-typed-cap-call` の cond は **legacy** である（後者は kind 1–3 しか扱わず
+  clock 境界で throw する）
+- `kexe_loader_windows.c` の omission は**意図的**で、`kotoba-lang/artifact` の
+  pinned digest がその日付で止まっていることで裏付けられる
+- loader を 1 バイトでも編集すると `kotoba-lang/artifact` の
+  `loader-source-sha256` が無効になる。つまり将来やるとしても **3 repo にまたがる
+  変更**（amu → artifact → amu の deps pin）で、dataspace の `be2130e` がそうしていた
 "}]
