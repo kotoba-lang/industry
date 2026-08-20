@@ -133,6 +133,14 @@
               "oauth" "did:key" "cacao" "認証"]
   :note "surface 索引（90-docs/surface/）と duplication-warn hook が面レベルを持つ。"}
 
+ :did-rotation
+ {:label "DID の鍵回転 / 検証可能な更新履歴（did:webvh・署名回転ログ）"
+  :spellings ["webvh" "did:webvh" "did-webvh" "didwebvh" "did:tdw" "tdw"
+              "key rotation" "pre-rotation" "nextKeyHashes" "updateKeys"
+              "witness threshold" "scid" "rotation log" "rootkey"
+              "鍵回転" "事前回転" "回転ログ" "失効" "did rotation"]
+  :note "**`did:key` が root のまま、回転と naming は `did:webvh` に載る**（ADR-2608200400 / ADR-2608209300、オーナー判断 2026-08-20）。実装は kotoba-lang/foundation-identity-didwebvh（identity.foundation を逆順にした origin 面の名前なので、名前から webvh に辿り着けない —— それがここに登録する理由）。⚠ **`updateKeys` は multisig ではない** —— 複数列べてもどれか 1 本で有効な entry が署名でき、m-of-n は `witness` の側にしかない（resolver が強制する）。⚠ **webvh を biscuit root key の authority にしない** —— org-biscuitsec の `biscuit.rootkey` 署名回転ログが 12,000 fetches/月・DNS/HTTPS 不要、webvh は 16,000 で auth path に DNS と HTTPS を戻す（ADR-2608039000）。上流 README: webvh can still be the transport, it just is not the authority。live: network-awai/cloud-itonami が did:webvh:QmQ2Erkh…:itonami.cloud を genesis 済み（鍵は 0 本 —— ADR-0044 の『持っていない鍵を書くのは custody の嘘』を維持）。"}
+
  :terminal-emulator
  {:label "端末エミュレータ（VT/ANSI 解釈）"
   ;; 素の "ansi" は入れない。この workspace では American National Standards
