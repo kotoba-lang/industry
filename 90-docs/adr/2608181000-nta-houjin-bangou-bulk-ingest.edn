@@ -1039,7 +1039,46 @@ annex-custody-verify: projects=1 ok=1 fail=0 unverified=0 skipped=0
 
 ⚠ **同じ事故を 1 日に 2 度起こした。** `export $(cmd)` が空を返すと env 全体が印字され、
 API キーが transcript に載る。1 度目に「以後使わない」と書き、**同じ形をもう一度書いた**。
-値を読む必要があるときは `eval "$(cmd)"` で環境に入れるだけにし、印字しない。
+値を読む必要があるときは `eval \"$(cmd)\"` で環境に入れるだけにし、印字しない。
+   ⚠ **この注意書き自身が、引用符をエスケープせずに書かれて ADR の EDN を壊していた**
+   （実測 2026-08-20、closing の検査で発覚）。`:adr/body` は 1 つの文字列なので、
+   本文中の `\"` は必ずエスケープする。
+
+## 現在地（2026-08-20 セッション終了時）
+
+**面に載っている dataset と、その保管・検査の状態。** すべて `main` に着地済み。
+
+| dataset | 面の件数 | gate | 常駐 | 原典の保管 |
+|---|---|---|---|---|
+| houjin-bangou（joined / closures） | 36 + 52 | ✅ nta-projections | ✅ 日次（judah） | ✅ B2（月次 zip） |
+| invoice-registry | 3,228 | ✅（同上） | ✅（同上） | ✅（同上） |
+| gbizinfo（joined / government summary） | 3,036 | ✅ gbiz-info-projections | 週次（operator、トークン） | ✅ B2（週次 zip） |
+| kanpou-kessan / -chotatsu / -kaisan | 990 / 673 / 5,777 | ✅ kanpou-projections | ✅ 日次 11:00（judah） | ✅ B2（220 PDF、32 節） |
+| jgrants | 3,751 | ✅ jgrants-projections | — | — |
+| web-presence / press-wire / domain-facts | 194 / 799 / 190 | ✅ cwp-projections | ✅ 日次 12:30（judah） | — |
+| gyousei-review（3 版） | 10,541 | ✅ gyoukaku-review-projections | ✅ 日次 index 監視（judah） | 原典は公表継続 |
+
+**見張り**: `public-money-route-coverage` detector（日次、operator）が 3 経路の沈黙と
+「申告があるのに載っていない」を検出する。fleet gate は 6 本すべて現 tip で pass。
+
+## 次の一手（resume point）
+
+1. **官報 archive の自動化**（32 節の残る穴）。今は operator が窓の内側で回収する運用で、
+   窓が閉じる前に取り込めなければ落ちる。ノードに B2 鍵を置かない不変条件があるので、
+   「ノードが cache を保持 → operator が定期回収」か「ノード→operator への転送」を選ぶ。
+2. **官報の落札公示 × 原典の調達行**（3 源泉目の突き合わせ）。単位と粒度が違う
+   （官報は 1 件ごとの円、原典は会社 × 府省の百万円合計）ので、設計から。
+3. **press-wire の未解決発表者 122 社**。住所を取っても名寄せできない残りで、
+   60 日の台帳で再訪する。
+4. **`--dropped-out` の残り 1,940 名**。法人格の語を持たない小規模事業者が中心で、
+   法人番号が無く join できない —— 拡張するなら別の識別子が要る。
+
+**最初に叩くコマンド**:
+
+```bash
+nbb --classpath \".:scripts/nbb_compat\" scripts/report-public-money-coverage.cljs
+nbb --classpath \".:scripts/nbb_compat\" scripts/annex-custody-verify.cljs
+```
 
 ## Consequences / まだ無いもの（正直に）
 
