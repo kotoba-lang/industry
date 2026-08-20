@@ -102,4 +102,49 @@ wall clock を持たない（「control loop の `clock()` は cycle counter で
 語彙を EDN reader で読んで確認し、拒否の語彙が無ければ `:pending` を残したまま
 理由と解除条件を追加する additive な形にする（CLAUDE.md が読み手に kit の
 `:qualification` を引けと言っている以上、値域の変更は reader を壊しうる）。
+
+## 着地（2026-08-20）
+
+| commit | 内容 |
+|---|---|
+| `df4d181` | amu: ADR 0261 + `clock-v1.edn` の注記 + qualification test 2 本 |
+| `3971647` | root: west pin `a41a510→df4d181`（verify-west-pins が fast-forward を確認） |
+
+**語彙は発明しなかった。** 11 kit を EDN reader で読んだ結果、`:qualification` が取る
+status 値は `:implemented` と `:pending` の 2 つだけで、拒否の語彙は存在しない。
+そこで `:native-aot :pending` を据え置き、**sibling key `:native-aot-blocked-by`** を
+足した（`:kind :undecided-host-authority` / `:not :schema` / 実測した trap /
+`:adr [261 240 84 227]` / seccomp allowlist / `:exit-condition` /
+`:open-sub-question`）。この形は repo に既に 2 例ある（`:wasm-aot-surface` 7 kit、
+`clock-v1.edn` 自身の `:wasm32-kotoba-v1-surface`）—— **1 つの qualification key を
+説明する top-level sibling** で、block が主張より長生きしないよう guard 付き。
+
+### tree に実在した誤りが 1 つ見つかった
+
+qualification test の docstring が **偽の一般化**を書いていた:
+
+> The kits at `:native-aot :pending` are pending because of their own schemas,
+> not because the backend is unavailable.
+
+log と storage については真、**clock については偽**（schema は seal され admit され、
+実プロセスに到達している）。**これは ADR-2608650000 が名指しする harm そのもの**が
+コード内に実在していた例である。docstring は両方の種類を名乗るよう直され、
+2 つを区別し続ける test が 2 本入った。
+
+### 検証
+
+    pristine  Ran 11 tests containing  84 assertions.  0 failures, 0 errors.
+    after     Ran 13 tests containing 103 assertions.  0 failures, 0 errors.
+    break 1（block を削除）        7 failures
+    break 2（block を storage に複製） 2 failures
+    amu 全体                       Ran 1104 tests containing 8337 assertions. 0 failures
+
+**break の 1 回目は失敗している。** 中括弧を 1 つ多く消して EDN 自体を壊し、
+9 *errors* が出た —— それは EDN が壊れたことの証明であって guard の証明ではない。
+捨てて やり直した。CLAUDE.md が「壊し方を間違えた赤は成功した実演に見える」と
+警告しているクラスで、記録に残す価値がある。
+
+なお agent は ADR に `8,331` と**測る前に書いてしまい**、実測後 `8,337` に訂正した
+とも報告している。baseline が作業中に動いた（main が `ff7371f→a41a510` へ前進、
+ADR 0260）ぶんも突き合わせて説明されている。
 "}]
