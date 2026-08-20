@@ -2131,6 +2131,32 @@
   ;; clone するのを実測済み）ので :ship-git-deps は要らない。
   {:name "amu" :id "amu-jvm-test" :gate :jvm-test :cap :wasm-tools :cd false}
 
+  ;; **amu が組み上がる元の 3 層。** amu には gate が 5 本ある一方、amu が
+  ;; sha で pin している依存側には 1 本も無かった（実測 2026-08-20）:
+  ;;
+  ;;   kotoba-native    機械語 backend        170 deftest   gate 無し
+  ;;   kotoba-kir       native admission gate 138 deftest   gate 無し
+  ;;   kotoba-verifier  独立検証器             54 deftest   gate 無し
+  ;;
+  ;; amu の gate が緑でも、それは **pin された sha の依存**についての判定で
+  ;; あって、依存側 main の tip についての判定ではない。壊れた commit は
+  ;; 誰かが pin を進めるまで無検査で座り続ける —— `kotoba-native` は
+  ;; **機械語がそこから出てくる場所**なので、そこが一番効く。
+  ;;
+  ;; :cap :jvm で足りることを実測してから landing している（2026-08-20、
+  ;; simeon = Rosetta を持たない素の :jvm ノード）。3 本とも
+  ;; `0 failures, 0 errors` / exit 0。amu と違って Rosetta も
+  ;; pinned wasm toolchain も要らないので、cap は 2 台ではなく **5 台**に届く。
+  ;;
+  ;; :test alias は 3 repo とも `:local/root` を持たない（:jvm-test の
+  ;; 前提条件。sibling を掴む alias はノードで解決しない）。
+  ;;
+  ;; :cd false —— 他と揃える。green は「その repo の suite が通った」で
+  ;; あって west pin を進める根拠ではない。
+  {:name "kotoba-native" :id "kotoba-native-jvm-test" :gate :jvm-test :cap :jvm :cd false}
+  {:name "kotoba-kir" :id "kotoba-kir-jvm-test" :gate :jvm-test :cap :jvm :cd false}
+  {:name "kotoba-verifier" :id "kotoba-verifier-jvm-test" :gate :jvm-test :cap :jvm :cd false}
+
   {:name "amu" :id "amu-native-fuzz" :gate :nbb-script
    :script "gates/amu-native-fuzz-check.cljs" :cd false}
 
