@@ -94,7 +94,15 @@
     ;; nodes.edn instead of folklore in a comment, and the day somebody
     ;; `brew install`s them it appears without anyone editing this file.
     "echo wasmtools=$(command -v wasm-tools)"
+    "echo wasmtoolsv=$(wasm-tools --version 2>/dev/null | awk '{print $2}')"
     "echo wasmtime=$(command -v wasmtime)"
+    "echo wasmtimev=$(wasmtime --version 2>/dev/null | awk '{print $2}')"
+    ;; `wac` is the third tool amu's component tests reach for, and the reason
+    ;; the cap is a conjunction of three rather than two. It is NOT in Homebrew
+    ;; ("No available formula with the name \"wac\"", measured 2026-08-20), so
+    ;; unlike the other two it cannot be installed by the obvious route.
+    "echo wac=$(command -v wac)"
+    "echo wacv=$(wac --version 2>/dev/null | awk '{print $2}')"
     "echo curl=$(command -v curl)"
     "echo tar=$(command -v tar)"
     "echo git=$(command -v git)"]))
@@ -164,7 +172,7 @@
   clojure の maven cache / tarball 展開が数 GB 食うため — 空き 1–2GB のノードに
   JVM gate を投げると途中で落ちて false fail になる（naphtali/issachar が実際に
   この状態）。"
-  [{:keys [reachable? javahome clojure npx zig kotoba wasmtools wasmtime curl tar host] :as n}]
+  [{:keys [reachable? javahome clojure npx zig kotoba wasmtools wasmtime wac curl tar host] :as n}]
   (if (or (not reachable?) (contains? operator-hosts host))
     (assoc n :caps #{} :max-parallel 0
            :role (if (contains? operator-hosts host) :operator :unreachable))
@@ -183,11 +191,29 @@
           ;; Same shape as zig: the gate is an nbb-script that shells out to
           ;; the compiler, so it needs npx as well as `kotoba`.
           kotoba? (and base? (seq npx) (seq kotoba) (>= free 5))
-          ;; `:wasm-tools` means the pair, not either one: amu's suite reaches
-          ;; for both, so a node with one of them still cannot answer. Requiring
-          ;; :jvm as well keeps the cap honest about what it is for -- there is
-          ;; no gate today that wants these without a JVM.
-          wasm-tools? (and jvm? (seq wasmtools) (seq wasmtime))]
+          ;; All THREE, not the two this started as. Corrected 2026-08-20 after
+          ;; installing the first two on benjamin and running amu's suite there:
+          ;; the 82 `Cannot run program "wasm-tools"` errors became 76
+          ;; `wasm-tools version is not pinned`, because amu's language contract
+          ;; (`kotoba/lang/component-model-v1.edn`, `[:spec-baseline :wasi
+          ;; :toolchain]`) requires `{:wasm-tools "1.243.0" :wac-cli "0.10.1"}`
+          ;; and Homebrew ships only latest -- 1.257.1 that day.
+          ;;
+          ;; So the cap as first written was the very defect it was meant to
+          ;; prevent: benjamin earned `:wasm-tools` while being unable to run the
+          ;; suite, and any gate declaring that cap would have landed there and
+          ;; gone red about the node rather than the repo (ADR-2608198600).
+          ;;
+          ;; Requiring `wac` too makes the cap honest, and today that means NO
+          ;; node earns it -- `wac` is not in Homebrew at all. That is the
+          ;; correct answer: nothing can run this suite yet.
+          ;;
+          ;; Presence is still not qualification. The pinned VERSIONS are amu's
+          ;; to check (the `zig` precedent: probe records `zigv`, the gate
+          ;; fail-closes on an unknown one), which is why the versions are
+          ;; recorded below rather than compared here -- this file must not
+          ;; carry a copy of another repo's pin.
+          wasm-tools? (and jvm? (seq wasmtools) (seq wasmtime) (seq wac))]
       (assoc n
              :cores cores
              :free-gb free
@@ -210,15 +236,23 @@
         caps-of (fn [extra] (:caps (classify (merge base extra))))]
     (check (= #{:jvm :node} (caps-of {}))
            "a plain jvm+node machine carries neither zig nor wasm-tools")
-    (check (contains? (caps-of {:wasmtools "/bin/wasm-tools" :wasmtime "/bin/wasmtime"})
+    (check (contains? (caps-of {:wasmtools "/bin/wasm-tools" :wasmtime "/bin/wasmtime"
+                                :wac "/bin/wac"})
                       :wasm-tools)
-           "both binaries present -> :wasm-tools appears (the case no node can
-            demonstrate today, which is exactly why it is tested here)")
-    (check (not (contains? (caps-of {:wasmtools "/bin/wasm-tools"}) :wasm-tools))
-           "wasm-tools alone is not enough -- amu's suite reaches for both, so a
-            node with one of them still cannot answer")
-    (check (not (contains? (caps-of {:wasmtime "/bin/wasmtime"}) :wasm-tools))
-           "and neither is wasmtime alone")
+           "all three present -> :wasm-tools appears (no node can demonstrate
+            this today, which is exactly why it is tested here)")
+    (check (not (contains? (caps-of {:wasmtools "/bin/wasm-tools"
+                                     :wasmtime "/bin/wasmtime"})
+                           :wasm-tools))
+           "wasm-tools + wasmtime WITHOUT wac is not enough. This is the case
+            that was wrong when the cap first landed: benjamin had exactly this
+            pair, earned the cap, and still could not run the suite")
+    (check (not (contains? (caps-of {:wasmtools "/bin/wasm-tools" :wac "/bin/wac"})
+                           :wasm-tools))
+           "nor wasm-tools + wac without wasmtime")
+    (check (not (contains? (caps-of {:wasmtime "/bin/wasmtime" :wac "/bin/wac"})
+                           :wasm-tools))
+           "nor wasmtime + wac without wasm-tools")
     (check (not (contains? (caps-of {:javahome "" :clojure ""
                                      :wasmtools "/bin/wasm-tools"
                                      :wasmtime "/bin/wasmtime"})
@@ -228,11 +262,11 @@
     (check (empty? (:caps (classify (assoc base :reachable? false))))
            "an unreachable node carries no caps at all")
     (if (zero? @fails)
-      (println "probe: self-test OK (6 cases)")
+      (println "probe: self-test OK (8 cases)")
       (do (println "probe: self-test FAILED" @fails) (js/process.exit 1)))))
 
 (defn edn-node [n]
-  (let [{:keys [host reachable? os cores free-gb javahome clojure node nodev npx zig zigv kotoba wasmtools wasmtime caps max-parallel detail loopback role]} n]
+  (let [{:keys [host reachable? os cores free-gb javahome clojure node nodev npx zig zigv kotoba wasmtools wasmtoolsv wasmtime wasmtimev wac wacv caps max-parallel detail loopback role]} n]
     (str "  {:host " (pr-str host)
          " :reachable? " (pr-str (boolean reachable?))
          (when os (str " :os " (pr-str os)))
@@ -251,7 +285,11 @@
          ;; the whole reason these are probed is that the previous answer to
          ;; "why is there no JVM gate for amu" was a guess nobody could check.
          (when (seq wasmtools) (str "\n   :wasm-tools " (pr-str wasmtools)))
-         (when (seq wasmtime) (str " :wasmtime " (pr-str wasmtime)))
+         (when (seq wasmtoolsv) (str " :wasm-tools-version " (pr-str wasmtoolsv)))
+         (when (seq wasmtime) (str "\n   :wasmtime " (pr-str wasmtime)))
+         (when (seq wasmtimev) (str " :wasmtime-version " (pr-str wasmtimev)))
+         (when (seq wac) (str "\n   :wac " (pr-str wac)))
+         (when (seq wacv) (str " :wac-version " (pr-str wacv)))
          (when (and reachable? (= "no" loopback))
            (str "\n   :loopback? false"))
          (when reachable? (str "\n   :caps " (pr-str (or caps #{})) " :max-parallel " (or max-parallel 0)))
