@@ -256,6 +256,9 @@ ADR-2608189300 のとおり 3 つは別の名前で、Datomic は他社の製品
    **3 つ目の boundary 形を発明しない。** それが第 7 節の訂正が意味することで、
    「incidence に開く」が 1 つの目的地を指していると読んだのがこの ADR の初版の
    誤りだった。
+
+   **2026-08-20 決着: (b) を採り、そして Atom は広げない。** 詳細は D6 ——
+   (b) には sign も mult も無いので、triple 面は既に厳密な符号化である。
 4. Conjunction は順序付きのまま canonical form を決める（並べ替えではなく、
    束縛順序を保つ正規形）
 
@@ -272,6 +275,45 @@ ADR-2608189300 のとおり 3 つは別の名前で、Datomic は他社の製品
 
 `Link` と `Name` を同じ Term 位置に座らせない —— immutable identity と mutable
 pointer の混同は、第 8 節で警戒したのと同じ事故の別の面である。
+
+### D6. step 3 の分岐は (b) 実装モデルを採る。そして triple 面は劣化ではなかった
+
+**2026-08-20 決定。** 第 7 節が開いた 2 択（(a) inc/EAF の `{role, sign, mult}` /
+(b) `kotoba.lang.incidence` の roles map）は **(b)** を採る。
+
+理由はこの ADR 自身の採点基準（D3 末尾）—— *primitive を減らして説明力が増える
+ものを採る*。(b) は `sign` と `mult` を持たない分 primitive が 2 つ少なく、仕様・
+実装・conformance vectors・query 面（`observe`）・durable provider が既に在る。
+(a) は Lean で商定理まで検証された一般理論で、**(b) はその特殊ケース**
+（mult ≤ 1、sign 一定）なので、採用は (a) を否定しない。
+
+**そして測った結果、step 3 が想定していた作業は必要なかった。**
+(b) の下では **triple 面は labelled 面の劣化ではなく厳密な符号化**である:
+
+    role → non-empty set of participants   ==  participant 1 つにつき triple 1 本
+    集合の意味（順序なし・重複なし）        ==  triple 集合の意味
+
+失われるはずだった `sign` と `mult` が **(b) には存在しない**ので、失うものが無い。
+`kotoba.lang.incidence/datoms` ⇄ `from-datoms` の往復が恒等であることを
+`lang/incidence-vectors.edn` の凍結ベクタと、多参加者 role・複数 role・3 つの
+構造集合・構造述語と衝突する fact キーに対して assert してある
+（kotoba-lang `5239f36e`、249 tests / 1376 assertions、新規失敗 0）。
+
+したがって **arity 3 の engine は labelled 面に対して既に十分**で、
+**labelled 面が待っていたのは広い Atom ではなく projection だった。**
+
+符号化の作法（往復が恒等であるために必要な非対称）:
+
+- **role は自分の keyword を述語にする。** role は edge であり、edge の形が join
+  する形だから —— `[?i :organization/constituent ?p]` はそのまま読める。
+- **fact は `[:incidence/fact k]` に修飾する。** fact は edge ではなく属性で、
+  修飾しておけば fact キーが構造述語とも role とも衝突しない。
+- **構造述語と衝突する role キーは平坦化せず拒否する。** 劣化した projection が
+  無劣化に見えるのが、この往復が防ぐべき当の失敗である。
+
+**第 3 節の「args を positional にすると role が消える」は依然として正しい** ——
+ここで守られたのは、positional にしなかったからである。**`sign` か `mult` が
+(b) に入った日にこの符号化は劣化し、往復テストがそう言う。**
 
 ## 帰結
 
