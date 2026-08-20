@@ -3082,5 +3082,26 @@
   {:name "datom-source" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
   {:name "credits" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd false}
   {:name "inference" :gate :nbb-test :classpath "cljc/src:cljc/test:resources" :entry "run-tests.cljs" :ship-git-deps true :cd false}
+  ;; 2026-08-20, second pass. Both of these were reported as blocked upstream
+  ;; on "dag-cbor's Tagged deftype". They were not: that repository is now
+  ;; org-ietf-cbor, its main replaced the deftype with a defrecord months of
+  ;; commits ago, and both consumers were simply pinned behind it -- nekko by
+  ;; 54 commits through io-ipld's `Link`, ipns by 18 through a coordinate that
+  ;; still named the OLD repository and only resolved through GitHub's
+  ;; redirect. Bringing the pins current is what unblocked them; no upstream
+  ;; change was needed. Reading before dispatching is the whole lesson.
+  ;;
+  ;; nekko now reports the JVM's numbers exactly -- 84 tests / 172 assertions,
+  ;; 13 namespaces -- and did not before, in two separate ways: it could not
+  ;; load at all, and once it could, the runner listed ten of thirteen
+  ;; namespaces. The three it omitted are `.cljc` and run unchanged.
+  ;;
+  ;; ipns is 27 / 98 against the JVM's 29 / 108, and the whole of that gap is
+  ;; two `#?(:clj ...)` deftests in head-test for the JCA Ed25519 path. Its
+  ;; suite also turned up `.contains` (a Java String method, no JS
+  ;; counterpart) in a namespace that landed the same day and had never been
+  ;; run on cljs.
+  {:name "nekko" :gate :nbb-test :classpath "src:test" :entry "test/run_portable.cljs" :ship-git-deps true :cd false}
+  {:name "tech-ipfs-specs-ipns" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :ship-git-deps true :cd false}
   ;; ────────────────────────────────────────────────────────────────────────
   ]}
