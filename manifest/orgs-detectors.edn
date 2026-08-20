@@ -1121,6 +1121,14 @@
               would turn a broken file into a clean one.
               `{{root}}` is passed explicitly: the script defaults to `.`, and a tick running
               from a worktree would otherwise find no orgs/ and refuse.
+              ⚠ 2026-08-20, same day: its first version took only `:git/sha` deps and therefore
+              could not see the larger half. A `:local/root` entry names a repository too --
+              by directory rather than by URL -- and the workspace is full of coordinates that
+              name one repository with a path resolving to another
+              (`io.github.com-junkawasaki/langchain-clj {:local/root "../../kotoba-lang/langchain"}`).
+              Counting both took the population from 2,665 deps / 421 repos / 18 multi-coordinate
+              to 5,642 / 568 / 45. A conclusion drawn from the first number was measuring
+              less than half of what exists.
               ⚠ It reads WORKING TREES. Its first run reported com-etzhayyim-isic's deps.edn
               as unparseable and it was -- in a checkout four weeks behind, whose main had
               already fixed it. Checkout, west pin and the repository's main are three
