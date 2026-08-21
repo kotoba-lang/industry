@@ -43,9 +43,20 @@ micro-TCB を kototama core に戻さない（同 ADR 決定 4）。`wasm-webcom
 kotoba     言葉        言語は何か
 amu        編む        言葉を一つの反物にする（compile + プロジェクト link）
 kototama   言霊        反物を宿し、許された手にだけ結ぶ（run + 実行時 link）
-aiueos     あいうえお   どの手を貸すか（grant + OS）
+grant      —           どの手を貸すか（判断。2026-08-21 に分離）
+aiueos     あいうえお   手そのもの（機械 = OS）
 murakumo   叢雲        どこに置くか（配置。grant しない）
 ```
+
+**2026-08-21 改訂（ADR-2608219500）**: `aiueos` の行は grant と OS の 2 つを
+兼ねていた。オーナー判断で分離し、判断は `kotoba-lang/grant` に出た。`aiueos` は
+Linux / macOS / Windows と同じ位置の OS になる。実測では両者はほぼ同じ大きさで
+（判断 約6,430 行 / 機構 約6,070 行 + C・asm 7,054 行）、片方が他方の一部では
+なかった。`grant` に存在名は付けない — 判断は権限の面であって、この表が名付ける
+「在るもの」ではない（名前はオーナー指定 `kotoba-lang/grant`）。判定の束は
+`kotoba-lang/authority` の 1 本のままで、`grant` はその上の broker。ただし
+`grant.authority` は今も 2 つ目の covering relation を持っており、統合は
+ADR-2608219500 の gap として残っている。
 
 `tender` は Solo5 の海事スラング（客を走らせる係）であり、権限語彙ではない。
 役割の説明には残してよい。製品名、README 冒頭の名乗り、概念索引の見出しには
