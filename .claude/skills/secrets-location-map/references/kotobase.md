@@ -44,6 +44,18 @@ content-addressed graph の名前空間ごと変わる — 障害ではなく**�
   読み戻せなかった**ため、2026-07-29 にオーナー承認のもと再発行した
   （workspace 全体を grep して consumer ゼロを確認した上で交換）。
   取得: `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get KOTOBASE_ARCHIVE_TOKEN`。
+- ⚠ **2026-08-21 実測: この item は kagi vault に存在しない。**
+  `kagi get KOTOBASE_ARCHIVE_TOKEN` は **`no such item`**（exit 1、2 回再現）。
+  vault 自体は開けている —— 同じ呼び方の `KOTOBASE_ARCHIVE_TOKEN_2` は同一 invocation で
+  値を返すので、これは「vault が開けなかった」ではなく**その名前の item が無い**という測定。
+- ⚠ **手元の `KOTOBASE_ARCHIVE_TOKEN_2` は live Worker に受理されない**（同日実測、`PUT` → 401）。
+  ADR-2608147400 が記録しているとおり、2026-08-14 に **Worker の slot 2 へ kagi item
+  `KOTOBASE_ARCHIVE_TOKEN` の値**を入れている。つまり live が受理する値は
+  **kagi に無い方の名前**で保管されていたことになり、`..._2` という kagi item は
+  deploy されていない別の値を持っている。**custody 記録と deployment がずれている。**
+  Worker secret は書き込み専用で読み戻せない（本ファイル冒頭の注記）ので、
+  解消はオーナー操作 —— 現行値を documented な名前で kagi に入れ直すか、
+  手元の `..._2` の値を Worker の空きスロットに入れるか、のどちらか。
 - **使い方**: raw CIDv1（`bafkrei…` = 本体バイト列の sha2-256）を自分で計算し、
   `PUT https://kotobase.net/ipfs/<cid>` に Bearer で置く。サーバが digest を再計算して
   不一致は 422 で弾く。読みは無認証の `GET /ipfs/<cid>`。**未設定だと 403（feature off）**。

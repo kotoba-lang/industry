@@ -9,6 +9,13 @@
   で検証する **mk1 capability token の署名鍵**。同じ値が Worker secret
   `MURAKUMO_TOKEN_SECRET` に入っている（wrangler で投入済み、redeploy を跨いで永続）。
   取得: `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get MURAKUMO_API_TOKEN_SECRET`。
+- ⚠ **2026-08-21 実測: この item も kagi vault に存在しない**（`no such item`）。
+  本ファイルは既に 2 箇所（`LOCAL_MURAKUMO_SERVICE_TOKEN` / `MURAKUMO_GENERATION_TOKEN_SECRET`
+  系）で同じ形の欠落を記録しており、これで **3 例目**。
+  この日の作業では **mk1 トークンを発行できず**、`POST https://api.murakumo.cloud/v1/messages`
+  は 401（`authentication_error`）のまま測定不能として記録した。
+  **gate 1 本のために Worker の署名鍵をローテートしない** —— 発行済みトークンが全部無効になる。
+  復旧はオーナー操作（現行値を documented 名で kagi に入れる、または再発行して両側を揃える）。
 - **新規発行**（2026-08-01）。この Worker には従来 mk1 の署名鍵が存在せず、
   共有の静的 `ANTHROPIC_PROXY_TOKEN` / `_2` しか無かった（本マップの
   「Murakumo chat gate secondary secret」節が『api.murakumo.cloud は別の secret』と
