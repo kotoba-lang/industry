@@ -262,7 +262,7 @@
    :axis/repo "kotoba-lang/kami-engine-modeling"
    :axis/paths ["src"]
    :axis/markers ["feature-control-frame" "gdt-symbols" "import-pmi" "pmi-validation-errors"]
-   :axis/behavior nil}
+   :axis/behavior "mcad-gdt-pmi"}
 
   {:axis/id :mcad/drawing-2d
    :axis/segment :mcad :axis/weight 3
@@ -271,7 +271,7 @@
    :axis/repo "kotoba-lang/kami-engine-modeling"
    :axis/paths ["src/kami/modeling/drawing.cljc"]
    :axis/markers ["section-view" "detail-view" "auxiliary-view" "paper-sizes" "export-dxf" "export-pdf" "export-svg"]
-   :axis/behavior nil}
+   :axis/behavior "mcad-drawing-2d"}
 
   {:axis/id :mcad/sheet-metal
    :axis/segment :mcad :axis/weight 3
@@ -279,7 +279,12 @@
    :axis/label "板金（曲げ・展開）"
    :axis/repo "kotoba-lang/kami-engine-modeling"
    :axis/paths ["src"]
-   :axis/markers ["sheet" "bend-mesh" "valid-sheet?"]
+   ;; ⚠ 以前の marker は "sheet" "valid-sheet?" で、これは **図面のシート**
+   ;; （`kami.modeling.drawing/sheet`）に当たっていた。板金とは無関係の関数に
+   ;; 当たった marker が、無い能力を :declared に見せていた。実際の板金 ——
+   ;; 展開・曲げ代・K ファクタ —— は tree に一つも無い（2026-08-21 実測）。
+   ;; `bend-mesh` は汎用のメッシュ変形 modifier であって板金の曲げではない。
+   :axis/markers ["unfold" "flat-pattern" "bend-allowance" "k-factor"]
    :axis/behavior nil}
 
   {:axis/id :mcad/healing
@@ -301,14 +306,22 @@
    :axis/markers ["read-step" "write-step" "parse-file" "parse-entity"]
    :axis/behavior "step-ap203"}
 
+  ;; ⚠ この軸は 2026-08-21 に **:absent から測り直した**。以前の marker は
+  ;; org-iso-10303 に存在しない名前（"ap242" "write-ap242"）を探しており、
+  ;; AP242 がどこにも無いと報告していた。実際には kami-engine-modeling の
+  ;; `kami.modeling.step` が AP242 の schema 名を書き出し、PMI を読む。
+  ;; **この台帳自身が CLAUDE.md「『無い』と結論する前に検索する」を破っていた** ——
+  ;; marker の綴りを間違えた absent は、実在する能力を消して見せる。
+  ;; 実装は自分で「documented Kotoba AP242 subset, not full AP242 conformance」と
+  ;; 言っているので、probe も「AP242 対応」ではなく subset の往復を測る。
   {:axis/id :interop/step-ap242
    :axis/segment :interop :axis/weight 5
    :axis/target "STEP AP242（現在の製造業の実務標準）"
-   :axis/label "AP242（PMI 付き STEP）"
-   :axis/repo "kotoba-lang/org-iso-10303"
-   :axis/paths ["src/brep/step.cljc" "src/iso_10303/part21.cljc"]
-   :axis/markers ["ap242" "ap242-schema" "write-ap242"]
-   :axis/behavior nil}
+   :axis/label "AP242 subset（schema 宣言・profile 判定・対応外の報告）"
+   :axis/repo "kotoba-lang/kami-engine-modeling"
+   :axis/paths ["src/kami/modeling/step.cljc"]
+   :axis/markers ["export-body" "import-body" "inspect-file" "import-pmi"]
+   :axis/behavior "interop-step-ap242"}
 
   {:axis/id :interop/iges
    :axis/segment :interop :axis/weight 2
@@ -326,7 +339,7 @@
    :axis/repo "kotoba-lang/kami-engine-modeling"
    :axis/paths ["src/kami/modeling/drawing.cljc"]
    :axis/markers ["export-dxf"]
-   :axis/behavior nil}
+   :axis/behavior "interop-dxf"}
 
   {:axis/id :interop/dxf-read
    :axis/segment :interop :axis/weight 3
@@ -383,7 +396,8 @@
    :axis/repo "kotoba-lang/org-materialx"
    :axis/paths ["src"]
    :axis/markers ["materialx->node-graph" "node-graph->materialx" "resolve-nodedef"]
-   :axis/behavior nil}
+   :axis/probe-extra-cp ["kotoba-lang/xml/src"]
+   :axis/behavior "interop-materialx"}
 
   {:axis/id :interop/alembic
    :axis/segment :interop :axis/weight 3
