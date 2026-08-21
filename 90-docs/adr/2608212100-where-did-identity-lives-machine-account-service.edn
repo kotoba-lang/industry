@@ -1,0 +1,259 @@
+[{:db/id -1
+  :adr/id "adr-2608212100-where-did-identity-lives-machine-account-service"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/topic "did-identity-layering"
+  :adr/status "accepted"
+  :adr/date "2026-08-21"
+  :adr/last_verified "2026-08-21"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/repos ["orgs/kotoba-lang/aiueos"
+              "orgs/kotoba-lang/kekkai"
+              "orgs/kotoba-lang/kotobase-client"
+              "orgs/net-kotobase/control-plane"
+              "orgs/kotoba-lang/murakumo"
+              "orgs/network-awai/cloud-itonami"
+              "orgs/kotoba-lang/org-w3-did"]
+  :adr/authoritative-for
+  ["machine identity / account identity / service capability token の 3 面を分ける決定の正本"
+   "aiueos が DID method 実装を持たない（device が鍵を所有し fleet が名前を所有する）決定の正本"
+   "SPKI pin set を DID resolution で置き換えない（boot 時の trust は解決不要でなければならない）決定の正本"
+   "404 を返す DID document は不在より悪い、という順序規則の正本"
+   "共有 bearer 秘密を principal 認証と記述しない、という規則の正本"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["adr-2608209300-did-webvh-is-the-premise-for-cloud-itonami-class-services"
+                "adr-2608212000-aiueos-consumes-kekkai-admission-not-the-data-plane"
+                "adr-2608212300-the-aiueos-cloud-round-trip-authority-pointer"
+                "ADR-2608136000"
+                "adr-2608211000-counting-the-absence-of-measurement-outside-code"
+                "ADR-2608147400"]
+  :adr/title "ADR-2608212100: DID は 3 面ある —— そして今日このスタックは 5 通りで認証しており、そのうち DID account credential は 1 つだけ"
+  :adr/body "# 決定
+
+**このスタックの identity は 3 面に分かれる。1 つの語で 3 つを指すのをやめる。**
+
+| 面 | 何を答えるか | 誰が所有するか |
+|---|---|---|
+| **machine** | この機械は自分が言う機械か / この機械は誰を信じるか | aiueos（鍵と pin）/ fleet（名前） |
+| **account / actor** | この主体は誰か、その鍵は今どれか | kotobase（`did:key` CACAO）/ cloud-itonami（`did:webvh`） |
+| **service capability** | この呼び出しは通してよいか | 各サービス |
+
+**3 面目は identity ではない。** token は *bearer* を認証するのであって principal を
+認証しない。ここを混ぜると「DID で認証している」と書ける面が増える。
+
+## 測定 —— 認証機構は今日 5 通りある（2026-08-21）
+
+この ADR の出発点だった問い（DID account authentication をどこに置くか）に対する
+一番重要な事実は、**今日このスタックが 5 通りの別々の方法で認証していて、そのうち
+DID account credential と呼べるのは 1 つだけ**だということである。
+
+| # | 面 | 機構 | principal を答えるか |
+|---|---|---|---|
+| 1 | kotobase **tenant datom plane**（`/xrpc/…`） | `authorization: CACAO <base64>` —— Ed25519 **`did:key`** が署名した SIWE/CAIP-122 message、DAG-CBOR envelope、`kotobase:pin` capability と `kotoba://graph/<…>` scope 付き。`x-kotoba-did` header を併送 | **答える** |
+| 2 | kotobase **block plane**（`PUT /ipfs/:cid`） | **共有 bearer 秘密**。`Authorization: Bearer <token>` が 2 つの Worker env secret（`KOTOBASE_ARCHIVE_TOKEN` / `_2`）のどちらかと**文字列一致**するだけ | **答えない** |
+| 3 | `api.murakumo.cloud` | `mk1` 対称 capability token（`x-api-key` / bearer） | **答えない** |
+| 4 | kekkai peer 間 | 署名済み netmap が publish する **Noise static key**（X25519）で張る相互認証 IK session | peer は答える（account ではない） |
+| 5 | aiueos → remote peer | **SPKI SHA-256 pin set**（`:aiueos.cloud/trust-anchors`） | 相手の鍵を答える（account ではない） |
+
+（artifact 面はさらに別で、aiueos の manifest 署名は ed25519、boot catalog は
+RSA-2048 PKCS#1 v1.5。これは主体ではなく**バイト**の認証。）
+
+**5 つのうち DID account credential は #1 だけ。#2 と #3 は共有秘密で、
+「どの principal がこれをやったか」に構造的に答えられない。**
+
+### 1 と 2 は同じホストの別の面である —— ここを取り違えていた
+
+`kotobase.net` には認証面が 2 つあり、**ADR-0041 が storage authority として
+名指ししているのは #2 の block plane の方**である。
+
+- **#1（tenant datom）** は `kotoba-lang/kotobase-client` が話す面。
+  `src/kotobase/client.cljs` が `authorization: CACAO <b64>` + `x-kotoba-did` を
+  組み立て、caps は書き込みなら `[datom:transact tx:create]`、読みなら
+  `[datom:read graph:query]`。`src/kotobase/cacao.cljs` の did:key CACAO は
+  byte-exact で、PDS が同じ source で検証する。**これは本物である。**
+- **#2（block）** は `orgs/net-kotobase/control-plane` の
+  `kotobase-api-gateway-cljs/src/kotobase/b2_write.cljc`。source を読むと:
+  `Bearer ` prefix は必須（prefix 無しの生 token を受理しない）、presented token が
+  `archive-put-tokens` の集合に含まれるかを見るだけ。**署名も scope も tenant も
+  DID も無い。** したがって **`CACAO …` header は `Bearer ` の prefix 検査で落ち、
+  verifier に届くことすらない。**
+  token が 1 つも設定されていなければ集合は空で **403 `archive put disabled`**
+  （fail-closed）。
+
+  **live 実測（2026-08-21）: `PUT https://kotobase.net/ipfs/<raw-cid>` は 401。**
+  403 ではなく 401 が返るということは、**token は設定されており機能は有効**である。
+
+### aiueos は #2 の要件を取り違えている（実測、要修正）
+
+`orgs/kotoba-lang/aiueos` の `src/aiueos/provider/cloud.clj` は、自分が書かない
+理由をこう書いている —— **`PUT /ipfs/:cid` は CACAO 認証された caller を要し、
+ここには credential 経路が無い**。
+
+**前半は間違いである。** 上のとおり block plane は CACAO を受け付けない。
+必要なのは共有 bearer 秘密である。
+
+**結論（書かない）は正しいまま、理由が違う。** そして理由が違うと、次に取る手が
+変わる —— CACAO 自己発行の実装を足しても `PUT /ipfs/:cid` は通らない。
+**これは ADR-2608136000 の形の変種**: 正しい結論が、間違った測定に支えられている。
+結論が正しいので誰も検算しない。
+
+### 共有秘密の代償が今日 1 件実測されている
+
+coordinator が本日 source から測った（この ADR の入力として受領）:
+
+- 保管の正本（`.claude/skills/secrets-location-map/references/kotobase.md`、
+  kagi compartment `net-kotobase`、item `KOTOBASE_ARCHIVE_TOKEN`）は
+  **`no such item`** を返す。
+- 兄弟 item `KOTOBASE_ARCHIVE_TOKEN_2` は**存在する**が、その値を live Worker は
+  **401 で拒否する**。
+- root ADR-2608147400 は、Worker の slot 2 が 2026-08-14 に
+  **`KOTOBASE_ARCHIVE_TOKEN` という名前の item の値**で埋められたと記録している。
+
+**つまり保管記録と deployment が乖離している。** そして共有秘密なので、
+**誰が今それを持っているかを問う手段が無い** —— principal が無いのだから、
+持ち主の集合も答えられない。`b2_write.cljc` の docstring 自身が理由を書いている:
+primary は write-only な Wrangler secret でどこにも保管が無く再取得できないため、
+rotation すると既存の保持者を黙って締め出す。だから rotation ではなく**追加**にした。
+
+**これは principal-bound credential を選ぶ論拠であって、意見ではなく証拠である。**
+#1 の CACAO には同じ問題が無い —— 鍵は主体が持ち、scope は capability に書かれ、
+失効は naming 面で答えられる。
+
+⚠ **この節の数と状態はすべて 2026-08-21 の値である。** 401 / `no such item` /
+403 の別は token 設定の状態に依存して動く。引用するときは測り直す。
+
+## その他の測定（2026-08-21）
+
+live probe（curl、`-o /dev/null -w '%{http_code}'`）:
+
+| 対象 | 結果 |
+|---|---|
+| `https://kotobase.net/` | 200 |
+| `https://api.murakumo.cloud/infer/models/murakumo-main` | 200 |
+| `POST https://api.murakumo.cloud/v1/messages`（無認証） | 401 |
+| `PUT https://kotobase.net/ipfs/<raw-cid>`（無認証） | 401 |
+| `https://itonami.cloud/.well-known/did.jsonl` | **404** |
+
+repo 側（`origin/main` に対して）:
+
+- `orgs/network-awai/cloud-itonami` は `public/.well-known/did.jsonl` に
+  `did:webvh:QmQ2Erkh…:itonami.cloud` の log を**実際に持っている**
+  （`versionId 1-QmWMtHYRim…`、`versionTime 2026-08-20T06:06:54Z`、
+  `method did:webvh:1.0`、`updateKeys`・`nextKeyHashes` あり）。
+  **repo に在り、wire に無い。** superproject の
+  `scripts/verify-itonami-did-webvh.cljs` が同じ finding を出し続けている。
+- `orgs/kotoba-lang/kekkai` は `src/kekkai/cacao.clj` で **CACAO 自己発行**をする
+  （鍵由来 IPNS name = 自分の kotoba graph）。control plane の `:node/admit` は
+  node の **`did:key`** を要求する（`docs/DESIGN.md`）。一方 netmap の
+  `:node/key` は **X25519 static key** である —— **kekkai の node identity は
+  面ごとに 2 つある**（ADR-2608212000）。
+- `orgs/kotoba-lang/murakumo` は fleet 全体で **1 つの operator DID** を共有する
+  （`MURAKUMO_OPERATOR_SEED` 由来、per-node identity は
+  `sha256(operator-seed : node-name)` で決定論的に導出）。README 自身が、
+  `fleet.edn` を編集して Tailscale で届く者は今日 fleet として扱われる、と書いている。
+
+## aiueos の現在地は「DID が無い」ではない —— 訂正
+
+このセッションの入力は **aiueos に DID 機構は無く、`did:` は test fixture 1 行だけ**と
+していた。**測ると違った。** `origin/main` f99a8e0 に対して `did:` は
+**10 ファイル 28 箇所**あり、うち 1 つは production source である:
+
+`src/aiueos/provider/device.clj` が per-device Ed25519 operational keypair を生成し
+（秘密鍵はこの process の memory の外に出ない）、possession proof が
+**public key / nonce / endpoint / purpose** の 4 つを束ねる。そして docstring が
+名前付けを**意図的にしない**と宣言している —— `did:key` の multibase/multicodec
+envelope を所有するのは `kotoba-lang/org-w3-did` であり、aiueos は
+dependency-minimal 不変条件があるので**生の公開鍵を export して fleet に名前を
+付けさせる**。原文の言い方はこう: **device が鍵を所有し、fleet が名前を所有する。**
+
+さらに `src/aiueos/enroll.cljc` の enrolment 決定層、`test/aiueos/authority_test.cljc`
+の `:principal/id` / `:grant/subject` / `:capability/principal` / `:receipt/principal` が
+すべて `did:key:…` 形の主体を取る。
+
+**つまり「aiueos に DID を持たせるか」は未着手の問いではなく、既に片側が答えられている。**
+答えは **持たない（名前は上の面が付ける）** であり、この ADR はそれを追認する。
+
+## 決定
+
+1. **aiueos に DID method 実装を入れない。** `org-w3-did` を aiueos の依存に
+   加えない。`provider/device.clj` の分割（鍵は device、名前は fleet）が正しく、
+   ADR-2608212000 で kekkai 側も同じ形をしていることが確かめられた。
+
+2. **remote-peer trust を DID resolution で置き換えない。** これが一番効く決定。
+   DID document を解決するには**その相手に届くネットワークが要る** —— つまり
+   「信頼してよいか」を決めるために、信頼してよいか未確定の経路を使うことになる。
+   aiueos の要点は **anchors を持たずに boot しない**こと（ADR-0065 の
+   `:sensitive-local` / `:regulated`）であり、pin は boot 時の答え、DID は
+   その上の naming / rotation の答えである。**層が違うので競合しない。**
+   root ADR-2608209300 が `did:key` を root に、`did:webvh` を naming/rotation に
+   置いたのと同じ配置。
+
+3. **404 を返す DID document は、無い DID document より悪い。** 消費者は cache し、
+   detector は「在る」として数える。これは ADR-2608136000 / ADR-2608211000 の形
+   そのもの —— **repo に在ることと wire で答えることが、出力で区別できていない。**
+   したがって順序規則:
+
+   > **どの層も、DID document に依存する前に、その document が自分の detector に
+   > 対して 200 を返していること。** 200 を見ていない依存は、依存ではなく仮定である。
+
+   `itonami.cloud/.well-known/did.jsonl` は今日 404。**この 404 が直るまで、
+   cloud-itonami の actor DID を前提にした新しい経路を足さない。**
+
+4. **共有 bearer 秘密を principal 認証と記述しない。** #2（kotobase block plane）と
+   #3（murakumo `mk1`）は capability token であって principal ではない。
+   **したがって「aiueos が kotobase に書けるようになった」は、それ自体では
+   identity の前進を 1 mm も含まない。** 記述するときは面を書く ——
+   *block plane に共有秘密で書ける* と *tenant datom plane に did:key で書ける* は
+   別の主張である。
+
+5. **どちらの kotobase 面に書くかを、write を実装する前に決める。**
+   ADR-0041 が storage authority と呼んだのは block plane（#2）だが、
+   principal を答えられるのは datom plane（#1）だけである。aiueos が
+   enrolment receipt や audit chain head を置くなら、**誰が置いたかが
+   答えられなければ receipt の意味が薄い。** これは実装順ではなく設計の問い。
+
+## aiueos 自身が DID を持つとしたら、その前に真でなければならないこと
+
+**順序（この順でなければ意味を持たない）:**
+
+1. **fleet 側の名前付けが 1 箇所に在る。** 今日 `did:key` を発行しうる場所は
+   kekkai の control plane、kotobase-client、murakumo の operator seed の 3 つ。
+   **同じ機械が 3 つの名前を持てる状態で aiueos に 4 つ目を持たせない。**
+2. **回転が答えられる。** `did:key` は回転を答えない（識別子が鍵そのもの）。
+   機械の鍵が回るなら naming は `did:webvh` 級が要る —— そしてそれは
+   決定 3 の 200 を先に満たす必要がある。
+3. **pin set と DID の関係が書かれている。** 機械が DID を持っても、
+   **その機械が誰を信じるかは pin set のまま**である。両方が在るとき
+   「どちらが勝つか」を書いていなければ、実装ごとに違う答えが出る。
+4. **enrolment record が 3 識別子の対応を持っている**（ADR-2608212000 決定 5）。
+
+**そして結論は、たぶん aiueos 自身は DID を持たなくてよい。** remote-peer trust は
+既に pinned key set で答えられており、machine identity は possession proof で
+答えられている。DID が足すのは *名前* であって、aiueos が今日答えられていない問いは
+名前の問いではない。**持たせるなら、どの問いが名前でしか解けないかを先に書く。**
+
+**ただし逆向きの含意が 1 つある。** 上の #2 の custody 乖離が示すのは、
+**principal を持たない credential は棚卸しできない**ということである。
+aiueos が cloud へ書き始めた瞬間、その credential が同じ性質を持つなら、
+同じ乖離が fleet の台数だけ増える。**aiueos に DID を持たせる最初の実需要は、
+たぶんここから来る** —— 名前が欲しいからではなく、**失効の対象を名指ししたいから**。
+
+## 決定しないこと
+
+- **cloud-itonami の did.jsonl をどう配信するか。** 404 の原因（build 出力に
+  含まれていない / route が無い / `.well-known` が静的配信から外れている）を
+  まだ切り分けていない。**切り分けていないので、原因を書かない。**
+- **kotobase block plane を principal-bound にするか。** それは
+  `orgs/net-kotobase/control-plane` の決定であってここではない。
+  この ADR が主張するのは**現状をそう記述しろ**ということだけ。
+- **kekkai の `did:key` と kotobase CACAO の `did:key` が同じ鍵であるべきか。**
+  actor が 1 つの鍵で両方を名乗るのは自然に見えるが、scope が違う
+  （overlay 参加 / storage 書き込み）ので減衰の話になる。
+- **murakumo の per-node principal 化。** murakumo 側の決定。
+- **`KOTOBASE_ARCHIVE_TOKEN` の custody 乖離の是正。** 別セッションが扱っている。
+  ここでは**証拠として引用するだけ**で、鍵に触れない。
+- **VC（claim）と capability（authority）の混同禁止**（root ADR-2608160200）は
+  引き続き有効で、この ADR はそれを緩めない。
+"}]
