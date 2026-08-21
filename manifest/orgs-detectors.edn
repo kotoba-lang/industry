@@ -260,16 +260,48 @@
               "{{repo}}/scripts/verify-delegation-surfaces.cljs" "--check" "--findings"]
    :cwd      :root
    :findings :protocol
-   :evidence "SCANNED\t[1-9][0-9]*\t"
+   ;; The floor pins the UNIT, not just a positive number. The old floor was
+   ;; satisfied by "3,588 repos with a src/ tree" for months while the walk was
+   ;; reading the wrong set -- a floor detects "measured nothing", never
+   ;; "measured the wrong thing", so the unit has to be part of what it pins.
+   :evidence "SCANNED\t[1-9][0-9]*\ttracked source file"
    :interval-ms 86400000                 ; 24h -- the shape changes slowly
-   :timeout-ms  1800000                  ; 30m -- 6x the measured runtime
+   ;; Raised from 30m on 2026-08-21. The walk reads the INDEX, so git
+   ;; decompresses blobs instead of the OS reading a checked-out tree -- that is
+   ;; what correctness costs here, and the runtime is load-dependent. Re-measure
+   ;; on a node rather than trusting the workstation number below.
+   :timeout-ms  3600000                  ; 60m -- 3.6x a heavily-loaded measurement
    :writes   :none
-   :measured "2026-08-19 on this machine: ~5m wall, 3,588 repos with a src/ tree, 1 file
-              matched and it folds into the lattice -- zero findings. `--self-test` is
-              what makes that zero readable: 5/5 cases, including the historical
-              cacao.core/covers? body, which the FIRST version of this scan did not
-              match. It reported zero findings then too. A detector that reports zero
-              and a detector that cannot see are the same output."}
+   :measured "2026-08-21 on this machine: 16m43s wall at load average 100-200 (this
+              workstation runs many parallel agents; a node will differ). SCANNED
+              34,860 tracked source files across 3,661 of 4,211 on-disk repos, SKIPPED
+              543 with no tracked source. 11 files in 5 repos hold both an authority
+              string and a comparison; 3 of those repos fold into the lattice; the 3
+              remaining findings are all test paths, reported at `info` and not failed
+              on -- exit 0.
+
+              The number that matters is not the zero, it is what the zero now means.
+              The 2026-08-19 measurement recorded here read `3,588 repos with a src/
+              tree, 1 file matched`, and was wrong in a way its own output could not
+              show: the walk admitted a repo only if `<repo>/src` existed, which
+              dropped 616 of 4,210 on-disk paths -- 132 of them holding Clojure source
+              -- including `net-kotobase/control-plane`, the production edge API
+              gateway of kotobase.net, whose `edge_chain.cljc` is titled `Delegation
+              chains at the edge`. Its 6 matching files are visible now, and it folds
+              into the lattice via `kotobase-api-gateway-cljs/deps.edn` -- which the
+              old root-only `depends-on-authority?` would have missed, so a fixed walk
+              alone would have produced 6 false findings. Blindness and misjudgement
+              had cancelled into `clean`.
+
+              `--self-test` now covers the WALK as well as the matchers: 6/6 matcher
+              cases and 5/5 walk cases, the latter building a real git repository
+              shaped like the hazard (source under a sub-project, one file tracked but
+              deleted from the worktree, a nested deps.edn) and asserting the scan
+              arrives. Proven in both directions on that fixture: the old walk answers
+              `present? false` and `lattice? false`; the new one returns both files and
+              `lattice? true`. See ADR-2608210300 -- the previous self-test proved the
+              matchers discriminate 5/5 and proved nothing about the walk, and the walk
+              was what was broken."}
 
   {:id       :verify-vendored-copies
    :title    "vendored copies vs the upstream they name"
