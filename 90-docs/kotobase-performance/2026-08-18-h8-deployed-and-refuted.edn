@@ -1,0 +1,74 @@
+{:receipt :kotobase/h8-refuted-in-production
+ :date "2026-08-18"
+ :hypothesis "h8-l2-cache-api"
+ :outcome :refuted
+ :severity "production outage, minutes, rolled back"
+
+ :what-was-deployed
+ {:version "e36410a5-e76b-44f0-ac30-8828d24ad44c"
+  :worker "kotobase-protocols-worker"
+  :routes ["s3" "atproto" "pinning" "sparql" "gremlin" "graphql" ".kotobase.net"]
+  :source "net-kotobase/control-plane 57b1f350f"
+  :build "shadow-cljs release worker, 0 warnings; verify:waituntil OK (3 sites)"}
+
+ :measured
+ {:before {:version "120f3e08" :probe-status 501
+           :wall-s-cold 3.34 :wall-s-warm 2.38}
+  :after  {:version "e36410a5"
+           :wall-s [18.93 32.34 41.88 31.21 14.22 40.84 30.43 27.12 40.69 24.92 16.67 24.98]
+           :n 12
+           :diag "sampled false on all 12 -- no isolate completed a hydrate"
+           :then "probe 503 at 31.3 s"}
+  :after-rollback {:version "120f3e08" :probe-status 501 :wall-s 3.51
+                   :surfaces {:sparql 200 :gremlin 200 :graphql 200 :s3 200}}}
+
+ :mechanism
+ "The tier adds one `cache.match` per block before the durable read, and one
+  AWAITED `cache.put` per block the durable store answered. A hydrate of this
+  graph touches 84 blocks and the novelty chain forces it to touch them ONE AT A
+  TIME -- the next CID does not exist until the previous block is decoded. So
+  the change inserted up to 168 sequential Cache API operations into a request
+  that previously made 84 R2 reads, and the request stopped fitting in a Worker."
+
+ :the-structural-finding
+ "Any PER-BLOCK auxiliary tier pays 84x on this path, and it cannot be
+  amortised by batching because there is no batch -- the reads are sequential by
+  construction. This is the same structural fact that already limits packing
+  here (root ADR-2608160100 / iteration-04's note on h4), arriving from the
+  other direction: packing cannot coalesce a chain the reader walks one link at
+  a time, and neither can a cache that is consulted one link at a time."
+
+ :the-reasoning-that-was-wrong
+ {:claim "the L2 write must be awaited, because an un-awaited cache write can be
+          cancelled when the request ends, and the sibling Worker awaits its own"
+  :both-clauses :true
+  :conclusion :false
+  :why "This repo already carries `ExecutionContext.waitUntil` and a
+        `verify:waituntil` gate precisely so work can outlive the response, and
+        the sibling's read path is not 84 sequential misses. The right primitive
+        was in the repo and was not used."
+  :and-plumbing-waituntil-would-not-fix-it
+  "It removes the awaits from the critical path and leaves all 84
+   `cache.match` calls, so it addresses less than half of what was measured."}
+
+ :what-the-tests-could-not-catch
+ "131 tests, 828 assertions, and a break/restore that produced exactly 2
+  failures in the new test and 0 collateral. All of it ran under Node with a
+  FAKE `caches` whose match/put are in-memory map operations -- microseconds.
+  The test proved the read path CONSULTS L2 and attributes the answer to it,
+  which is what it claimed. It could not price a real Cache API call, and
+  nothing in the suite had a cost floor that would notice 168 of them.
+
+  A test that verifies a tier is reached is not a test that the tier is
+  affordable, and the second question is the one the hypothesis was about."
+
+ :what-survives
+ "The idea, at a different granularity. h1-seed-materialisation is this same
+  move where the path can use it: ONE object keyed by the chain CID, one read,
+  one write. h8 was h1 applied per block, and per block is what this read cannot
+  afford. That makes h1 more interesting than its rank suggested, not less."
+
+ :cost-of-finding-out
+ "One deploy, ~12 probe requests at 15-42 s, one 503, one rollback. The graph
+  serves no organic traffic, so no user request is known to have been affected;
+  that is luck about this particular graph, not a property of the process."}

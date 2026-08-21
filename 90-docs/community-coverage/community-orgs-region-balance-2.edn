@@ -1,0 +1,133 @@
+[
+;;; Iteration 49 (2026-07-26). ADR-2607257200.
+;;; Second region-balance pass: south-america, oceania, southeast-asia,
+;;; middle-east. Counts llm-recall-unverified unless pinned.
+
+{:org/id :org-bra-quilombola-communities
+ :org/name "Quilombola communities and their associations (Brazil)"
+ :org/entity-kind :org-form
+ :org/form-family :family-indigenous-descent-group
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-south-america
+ :org/countries ["BR"]
+ :org/founding-date 1600
+ :org/founding-note "Quilombos were settlements founded by people who escaped slavery; the communities recorded here are their descendants, recognised by the 1988 constitution."
+ :org/instance-count-estimate 7666
+ :org/member-count 1327802
+ :org/member-count-basis "source-pinned: the 2022 IBGE census counted 1,327,802 quilombolas (0.65% of Brazil's population) in 473,970 households across 1,696 municipalities, in 8,441 quilombola localities associated with 7,666 communities declared by respondents. 906,337 of those people (68%) are in the Northeast, and Maranhão alone holds 24% of the localities. This was the FIRST census to count them at all."
+ :org/legal-registration :mixed
+ :org/registration-note "Three separate statuses that do not coincide: self-declaration (what the census counted), certification by the Fundação Cultural Palmares, and land titling by INCRA — each a smaller set than the last. A community can be counted by the census, uncertified, and untitled all at once, which is the normal case."
+ :org/governance-model :consensus
+ :org/mission-statement "Rural and periurban communities descended from those who escaped slavery, holding land collectively under a constitutional right, organised through community associations that are the legal vehicle for a collective title the state has been slow to issue."
+ :org/coverage-note "A second instance of the pattern already recorded for Nepal's forest user groups: the community-declared count (7,666) is far larger than the state's certification register, and no dated national certification total was located when searched — state-level figures only (Pará around 350). The census made visible a population that the administrative register still does not contain."
+ :org/related-org "org-col-consejos-comunitarios"
+ :org/source-name "IBGE, Censo Demográfico 2022: Quilombolas (Agência de Notícias IBGE)"
+ :org/source-url "https://agenciadenoticias.ibge.gov.br/agencia-noticias/2012-agencia-de-noticias/noticias/40704-censo-2022-brasil-possui-8-441-localidades-quilombolas-24-delas-no-maranhao"
+ :org/source-date "2022"
+ :org/source-tier :primary
+ :org/pinned-on "2026-07-26"
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-col-consejos-comunitarios
+ :org/name "Cabildos indígenas and consejos comunitarios de comunidades negras (Colombia, Ley 70)"
+ :org/entity-kind :org-form
+ :org/form-family :family-customary-council
+ :org/category :cat-resource-commons
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-south-america
+ :org/countries ["CO" "EC" "PE" "BO"]
+ :org/founding-date 1991
+ :org/founding-note "The 1991 constitution and Ley 70 of 1993 gave Afro-Colombian communities of the Pacific a route to collective title through elected community councils."
+ :org/member-count-basis "unknown here — the councils administer collective territories measured in millions of hectares, and the population inside them is counted by the census as ethnic self-identification rather than as council membership. Displacement by armed conflict means the people on the territory and the people belonging to it are different sets."
+ :org/legal-registration :registered
+ :org/registration-note "Registered and vested with public authority — a cabildo is a public entity of special character with jurisdiction, and a consejo comunitario is the legal holder of an inalienable collective title. This is the opposite pole from the unregistered forms that dominate this corpus: state-created legal personality granted specifically to sustain a pre-existing community."
+ :org/governance-model :democratic
+ :org/mission-statement "Elected councils that hold and administer collective land for indigenous and Afro-descendant communities — allocating use rights, consenting or refusing consultation on projects, and running their own justice within constitutional limits."
+ :org/related-org "org-bra-quilombola-communities"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-png-kula-exchange
+ :org/name "Kula ring and ceremonial exchange networks (Massim, moka, te and pig-exchange cycles)"
+ :org/entity-kind :org-form
+ :org/form-family :family-gift-and-sharing
+ :org/category :cat-traditional
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-oceania
+ :org/countries ["PG" "SB" "VU"]
+ :org/founding-date 1700
+ :org/member-count-basis "unknown — participation is a set of inherited partnerships held by individual men across islands, not a roll: a person's kula standing is the list of partners who will receive from him and send to him, and there is no body that holds those lists."
+ :org/legal-registration :unregistered
+ :org/registration-note "There is nothing to register. The institution consists of obligations between named individuals across a ring of islands, and no entity exists that could be a member of anything."
+ :org/governance-model :meritocratic
+ :org/mission-statement "A circulation of valuables — necklaces one way around the island ring, armshells the other — in which the objects are never kept, only held and passed on, and the reputation accumulated by passing them well is the actual holding."
+ :org/coverage-note "Recorded because it is the limiting case for this corpus's unit of analysis. There is no organisation here at all: the community is a network of dyadic obligations that nonetheless coordinates voyaging, alliance and trade across hundreds of kilometres of open sea."
+ :org/related-org "org-pac-outrigger-canoe-clubs"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-mel-mens-houses
+ :org/name "Men's houses and initiation grades (haus tambaran, ravi, nakamal grade-taking, Sepik and Highlands societies)"
+ :org/entity-kind :org-form
+ :org/form-family :family-status-based-community
+ :org/category :cat-traditional
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-oceania
+ :org/countries ["PG" "VU" "SB" "FJ"]
+ :org/founding-date 1500
+ :org/member-count-basis "unknown — membership is by initiation grade within a village, and the grades themselves are the structure; missions, schools and wage migration interrupted initiation in many places, so the living membership is smaller than the village and no one has counted either."
+ :org/legal-registration :unregistered
+ :org/governance-model :hierarchical
+ :org/mission-statement "Ritual houses holding a village's sacred objects and knowledge, entered by graded initiation, which have historically been where disputes were settled, war decided and boys made into men — an institution of authority as much as of ceremony."
+ :org/coverage-note "Recorded with the exclusion as part of the description, not a footnote: these institutions are constituted by keeping women and uninitiated men out, and their authority is inseparable from that exclusion. The corpus records the form as it is."
+ :org/related-org "org-wafr-poro-sande"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-phl-bodong-peace-pacts
+ :org/name "Bodong / pechen peace pacts and pact-holder institutions (Cordillera, Philippines)"
+ :org/entity-kind :org-form
+ :org/form-family :family-customary-council
+ :org/category :cat-civic-political
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-southeast-asia
+ :org/countries ["PH"]
+ :org/founding-date 1800
+ :org/member-count-basis "unknown — the unit is a bilateral pact between two ili (village domains), held by a named pact-holder on each side, so what could be counted is pacts rather than people; provincial bodong federations have attempted registers, and no complete count exists."
+ :org/legal-registration :unregistered
+ :org/registration-note "The pagta — the written code of a pact — is a body of law produced by communities with no legal personality, and Philippine law recognises indigenous justice systems in general without registering individual pacts."
+ :org/governance-model :consensus
+ :org/mission-statement "Peace agreements between village domains, each carried by a pact-holder who inherits or is chosen for the role, setting out territory, safe conduct, marriage, trade and the compensation owed when the pact is broken — a treaty system operated entirely by communities."
+ :org/coverage-note "Included because it is a community form whose subject is the relation BETWEEN communities. The corpus is otherwise built from bodies that face inward, and this one exists only as an obligation across a boundary."
+ :org/related-org "org-som-xeer-councils"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-isr-kibbutz-moshav
+ :org/name "Kibbutzim and moshavim (Israeli communal and cooperative settlements)"
+ :org/entity-kind :org-form
+ :org/form-family :family-intentional-community
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-middle-east
+ :org/countries ["IL"]
+ :org/founding-date 1910
+ :org/member-count-basis "unknown at a current date — figures found when searched were a decade or more old (around 270 kibbutzim and roughly 126,000-140,000 residents in 2010-2012 reporting, described then as rising), and no dated recent total was located. Recorded as unverified rather than pinned to a stale figure presented as current."
+ :org/legal-registration :registered
+ :org/registration-note "Registered cooperative societies with a statutory framework — but the register says nothing about whether a given kibbutz still practises common ownership, because most have 'privatised' to differential wages and individually held housing while keeping the legal form and the name."
+ :org/proxy-metric "number of registered kibbutzim"
+ :org/proxy-bias "Counts a legal form that most of its holders no longer operate in the sense the name implies. A count of kibbutzim overstates communal living, and there is no register of which ones remain collectivised."
+ :org/governance-model :democratic
+ :org/mission-statement "Settlements founded on collective ownership of production and, historically, of consumption and childrearing — the largest and longest-running intentional-community movement anywhere, now mostly converted to cooperative villages with a communal minority inside the same register."
+ :org/related-org "org-global-intentional-communities"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+]

@@ -1,0 +1,15 @@
+;; The newest record in this log. UNSIGNED, on purpose.
+;;
+;; A tip that is stale, missing, or planted by whoever can write here costs a
+;; resolution that fails or that lands on an older key set. It cannot
+;; introduce a key: every record is still checked against its predecessor's
+;; pre-rotation commitment and against the hash link (biscuit.rootkey/verify-log).
+;; The same argument the packed block plane makes for its own unsigned tip
+;; (ADR-2608170300) — what the pointer claims is re-checked downstream, so the
+;; pointer is a hint rather than an authority.
+;;
+;; What a hostile tip CAN do is withhold: serve an old tip and hide a
+;; rotation. That is a liveness failure, and a reader that cares compares
+;; :seq against what it last saw.
+{:tip "sha256:c21f1ecff46c5ffb266fa0e9326901af9042d2bfbbc5134165c1a07284d71653"
+ :seq 2}

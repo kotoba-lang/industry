@@ -1,0 +1,323 @@
+[{:doc/type :pre-flight-readiness-plan
+  :doc/id "month-3-preflight-readiness-plan"
+  :doc/title "Month 3 Pre-Flight Readiness Preparation (2026-07-21 to 2026-09-08)"
+  :doc/date "2026-07-21"
+  :doc/author "Claude Code Agent (Haiku 4.5)"
+  :doc/status "ACTIVE"
+  :doc/version "1.0"
+
+  :readiness/overview
+  "This document outelines the complete preparation workflow from 2026-07-21 (today) to 2026-09-08 (pre-flight gate).
+   All documentation is prepared. This plan focuses on team finalization, fire-drill execution, and pre-flight checklist validation.
+   Success criterion: All 7 pre-flight checklist items PASS by 2026-09-08 16:00 JST, enabling GO decision for canary start on 2026-09-11."
+
+  :readiness/current-status
+  {:date "2026-07-21"
+   :documentation-status "8/8 documents READY (100%)"
+   :team-assignments-status "3/5 core roles assigned, 4/4 backups TBD, 4/4 on-call shifts TBD"
+   :fire-drill-status "Scheduled for 2026-09-08 14:00-16:00 JST (PENDING)"
+   :pre-flight-checklist "7 items ready for validation, success criteria locked"
+   :overall-readiness "PHASE 2 of 3 (prep → execution → validation)"}
+
+  :readiness/work-phases
+  [{:phase 1
+    :name "Team Finalization & Assignment Lock (2026-07-21 to 2026-08-25)"
+    :duration-days 36
+    :dependencies
+    ["All documentation prepared (✓ COMPLETE)"
+     "Core team roles identified"
+     "On-call rotation pool identified"
+     "Backup assignments confirmed"]
+    :deliverables
+    [{:item "Core Role Assignments"
+      :owner "Platform Lead"
+      :due-date "2026-08-15"
+      :details
+      ["Canary Lead: murakumo-owner (Jun Kawasaki) + murakumo-ops-lead co-lead"
+       "Traffic Controller: murakumo-ops-lead (primary ops engineer)"
+       "Monitoring Lead: murakumo-metrics-lead (primary metrics engineer)"
+       "Escalation Lead: Assign from ops or platform team (TBD)"
+       "On-Call Engineer: Assign 4 engineers, 4 shifts (TBD)"]
+      :success-criteria
+      ["All 5 roles assigned to named individuals"
+       "Backup roles assigned for roles 1-4"
+       "On-call rotation confirmed in calendar (Google Calendar / PagerDuty)"
+       "All assignments recorded in manifest/fleet-db.edn"]}
+
+     {:item "Team Availability Confirmation"
+      :owner "Escalation Lead (once assigned)"
+      :due-date "2026-08-25"
+      :details
+      ["Each team member confirms 24/7 availability 2026-09-11 to 2026-09-14"
+       "Backup roles confirm backup availability"
+       "On-call engineers confirm shift assignments"
+       "Escalation contact info verified (phone, email, Slack)"]
+      :success-criteria
+      ["Slack message in #prod-gates-wave5 from each person: 'I confirm availability for Month 3 canary [ROLE]'"
+       "All confirmations captured in team-assignments doc"
+       "Zero gaps in coverage"]}
+
+     {:item "Record Assignments in manifest/fleet-db.edn"
+      :owner "Platform Lead"
+      :due-date "2026-08-25"
+      :details
+      ["Update manifest/fleet-db.edn with final team assignments"
+       "Create fleet-db entry: `:role/canary-lead`, `:role/traffic-controller`, etc."
+       "Link to MONTH-3-TEAM-ASSIGNMENTS.edn (source of truth)"
+       "Append-only ledger: `manifest/fleet-db.ledger.edn`"]
+      :success-criteria
+      ["manifest/fleet-db.edn updated + committed to main"
+       "All roles resolvable via edn query"
+       "No duplicate or conflicting role assignments"]}]
+
+   :gating-criteria "Phase 1 COMPLETE when: all 5 core roles assigned + backups confirmed + availability locked by 2026-08-25"}
+
+  {:phase 2
+    :name "Fire-Drill Execution (2026-09-08 14:00 to 16:00 JST)"
+    :duration-minutes 120
+    :dependencies
+    ["Team assignments finalized (Phase 1 complete)"
+     "All runbooks reviewed by team members"
+     "SLO thresholds locked in monitoring system"
+     "Staging environment ready (Rust + cljc fleet both available)"]
+    :deliverables
+    [{:item "Fire Drill: Latency Regression Rollback (Scenario 1)"
+      :duration-minutes 30
+      :owner "Canary Lead + Traffic Controller + Monitoring Lead"
+      :procedure
+      ["14:05-14:06: Monitoring-lead simulates p99 latency spike to 210ms (> threshold)"
+       "14:06-14:07: Monitoring-lead triggers rollback alert (manual, simulated alert fire)"
+       "14:07-14:08: Traffic-controller receives alert, executes rollback script"
+       "14:08-14:09: Traffic reverts from 75% → 50%, latency normalizes to 95ms"
+       "14:09-14:11: Verify Rust pool resumes taking traffic, no cascading failure"]
+      :success-criteria
+      ["Rollback script executes without error"
+       "Traffic reversion completes in < 2 min"
+       "Rust pool connection count increases, cljc decreases"
+       "Team confirms confidence in automatic rollback mechanism"]}
+
+     {:item "Fire Drill: Parity Divergence Full Rollback (Scenario 2)"
+      :duration-minutes 30
+      :owner "Monitoring Lead + Canary Lead"
+      :procedure
+      ["14:20-14:21: Monitoring-lead simulates parity failure 1.5% (> 1% threshold)"
+       "14:21-14:22: Parity checker detects divergence, automatic trigger fires"
+       "14:22-14:23: Traffic-controller executes FULL rollback (100% → Rust)"
+       "14:23-14:24: Verify Rust pool handles 100% traffic without error"
+       "14:24-14:26: Escalation-lead logs decision: 'Full rollback due to parity divergence'"]
+      :success-criteria
+      ["Full rollback script executes"
+       "Rust pool absorbs 100% traffic within 2 min"
+       "Parity metric stabilizes at 0%"
+       "Team understands full rollback is mandatory, not optional"]}
+
+     {:item "Fire Drill: Graceful Rust Drain Procedure (Scenario 3)"
+      :duration-minutes 40
+      :owner "Traffic Controller + Monitoring Lead + On-Call Engineer"
+      :environment "Staging (both Rust + cljc fleet available)"
+      :procedure
+      ["14:35-14:36: Pre-stage staging cljc fleet at 99%, Rust at 1% (simulating Stage 3b end)"
+       "14:36-14:37: Traffic-controller: set Rust pool drain flag (stop new connections)"
+       "14:37-14:42: Wait for in-flight requests to complete (monitor connection count)"
+       "14:42-14:44: Monitoring-lead: verify all sessions migrated to cljc"
+       "14:44-14:46: Traffic-controller: deactivate Rust pool (STANDBY)"
+       "14:46-14:50: Verify Rust infrastructure still alive (emergency restore readiness)"]
+      :success-criteria
+      ["Graceful drain completes in < 10 min (normal SLA is 60s)"
+       "Rust connection count drops to 0"
+       "Session migration verified 100%"
+       "Rust standby confirmed (can restore if needed)"
+       "Team confident in graceful shutdown procedure"]}
+
+     {:item "Fire Drill Debrief (14:50 to 15:00 JST)"
+      :duration-minutes 10
+      :owner "Canary Lead"
+      :procedure
+      ["Quick round-robin: each role reports confidence level (1-5 scale)"
+       "Identify any concerns or script fixes needed"
+       "Confirm all team members ready for canary execution"]
+      :success-criteria
+      ["All team members report confidence ≥ 4/5"
+       "Any blockers identified and fixed before gate"
+       "Team sign-off: 'Fire drill PASS, ready for canary'"]}]
+
+   :gating-criteria "Phase 2 COMPLETE when: all 3 scenarios execute successfully, team confidence high (≥ 4/5 each role)"}
+
+  {:phase 3
+    :name "Pre-Flight Checklist Validation (2026-09-01 to 2026-09-08)"
+    :duration-days 8
+    :dependencies
+    ["Phase 1 complete (team assignments)"
+     "Phase 2 complete (fire-drill executed)"
+     "All 7 checklist items in validation window"]
+    :weekly-cadence
+    [{:date "2026-09-01 (Monday)"
+      :activity "Weekly pre-flight readiness checkpoint (1 week before gate)"
+      :owner "Platform Lead"
+      :checklist
+      ["Confirm parity divergence rate trending toward < 0.01% (not increasing)"
+       "Confirm latency p99 stable around 95-100ms (no regression)"
+       "Confirm 5xx rate stable ≤ 0.01% (no reliability issues)"
+       "Confirm memory stable ≤ 256MB per-instance (no leak signal)"
+       "Confirm audit trail complete and rotated to B2"
+       "Confirm team assignments final and locked"
+       "Confirm fire-drill schedule confirmed for 2026-09-08 14:00-16:00"]
+      :decision "If any item concerning: escalate to owner, identify mitigation"
+      :update-doc "MONTH-3-PRE-FLIGHT-READINESS-PLAN.edn (append checkpoint result)"}
+
+     {:date "2026-09-08 (Friday) — Pre-Flight Gate Day"
+      :activity "Pre-flight gate meeting + decision"
+      :owner "Platform Lead + murakumo-owner + ops-lead"
+      :morning-prep "08:00-12:00 JST: Team final checks, any last-minute fixes"
+      :fire-drill "14:00-16:00 JST: Execute 3-scenario fire drill (Phase 2 above)"
+      :pre-gate-briefing "15:30-16:00 JST: 30-min executive briefing before gate"
+      :gate-meeting "16:00-16:45 JST: Combined with M5 Week 14 gate close (45 min)"
+      :gate-format
+      ["Attendees: Platform Lead, murakumo-owner, ops-lead, metrics-lead, escalation-lead"
+       "Agenda: Review all 7 checklist items (Seq 1-7 of pre-flight checklist)"
+       "Decision: GO / NO-GO / SLIP (if NO-GO, default slip is 2026-09-18, 1 week)"
+       "Outcome: Create MONTH-3-GO-NO-GO-DECISION.edn (decision record)"]
+      :decision-criteria
+      ["PASS: All 7 items PASS, no blocking issues, fire-drill successful"
+       "FAIL: Any item FAILED or red flag exists → NOT READY"
+       "DEFAULT: If team unconfident → DELAY, do not force GO"]
+      :output-artifact "MONTH-3-GO-NO-GO-DECISION.edn (created during gate)"}]
+
+    :hourly-updates "2026-09-01 to 2026-09-08: Daily status updates (Slack #prod-gates-wave5) — escalate if trending toward FAIL"
+    :alert-threshold-1 "If parity divergence > 0.005% and trending up → escalate to owner immediately"
+    :alert-threshold-2 "If latency p99 > 95ms consistently → investigate, may indicate saturation"
+    :alert-threshold-3 "If 5xx rate spike > 0.001% (1 per 100K) → root cause analysis required"
+
+    :gating-criteria "Phase 3 COMPLETE when: all 7 checklist items PASS + fire-drill successful + GO/NO-GO decision recorded"}]
+
+  :readiness/seven-item-checklist-brief
+  "The 7 pre-flight checklist items (source: MONTH-3-PRE-FLIGHT-CHECKLIST.edn):
+   1. Parity Validation: divergence < 0.01% (owner: metrics-lead)
+   2. Latency & Performance SLO: p99 ≤ 100ms (owner: performance-lead)
+   3. Reliability & Error Rates: 5xx ≤ 0.01% (owner: ops-lead)
+   4. Memory & Resource Utilization: heap ≤ 256MB stable (owner: performance-lead)
+   5. Audit Trail & Compliance: logs complete, rotated to B2 (owner: audit-lead)
+   6. Team & Infrastructure Readiness: fire-drill pass, on-call trained (owner: ops-lead)
+   7. Go/No-Go Decision Gate: platform-lead + owner + ops-lead consensus (owner: platform-lead)"
+
+  :readiness/critical-path-dependencies
+  ["2026-08-25: Team assignments FINAL (must complete before fire-drill)"
+   "2026-09-01: Parity rate checking (7-day sentinel has 7 days of data by this date)"
+   "2026-09-08 14:00-16:00: Fire-drill execution (must complete before gate meeting)"
+   "2026-09-08 16:00-16:45: Gate meeting (combined with M5 Week 14 gate)"
+   "2026-09-08 17:00: Decision recorded (GO-NO-GO-DECISION.edn created)"
+   "2026-09-11 09:00: Canary start (if GO decision)"]
+
+  :readiness/handoff-to-execution
+  {:timing "2026-09-08 17:00 JST (immediately after gate decision)"
+   :if-go-decision
+   ["Escalation-lead: notify team via Slack + email (canary starting 2026-09-11)"
+    "Traffic-controller: finalize ramp script deployment"
+    "Monitoring-lead: activate dashboards and alert rules (lock SLO thresholds)"
+    "On-call: confirm overnight shifts assigned and calendar updated"
+    "Canary-lead: send pre-canary team briefing (TBD details for next 48h)"
+    "Document GO decision in MONTH-3-GO-NO-GO-DECISION.edn"]
+   :if-no-go-decision
+   ["Escalation-lead: notify team (canary delayed to 2026-09-18)"
+    "Owner: schedule root cause analysis meeting (2026-09-09)"
+    "Team: identify 1-week mitigation plan (parity tuning / latency investigation / etc.)"
+    "Document NO-GO decision + remediation plan in MONTH-3-GO-NO-GO-DECISION.edn"
+    "Retest on 2026-09-18 (revised pre-flight gate)"]
+   :if-slip-decision
+   ["If blocking issue cannot be resolved by 2026-09-18: escalate to owner for larger decision"
+    "Options: (A) continue Phase 2 operation indefinitely, (B) scale back scope, (C) pivot strategy"]}
+
+  :readiness/risk-matrix
+  [{:risk "Team member unavailable on gate day or canary start"
+    :likelihood "MEDIUM"
+    :impact "HIGH"
+    :mitigation "Backup roles assigned by 2026-08-25, calendar locked, no PTO approved"}
+   {:risk "Pre-flight checklist item failing on gate day (parity spike, latency regression)"
+    :likelihood "LOW (7-day sentinel already running)"
+    :impact "CRITICAL"
+    :mitigation "Daily trending dashboard, escalation if > 0.005% divergence, 1-week contingency plan"}
+   {:risk "Monitoring system failure or alert misconfiguration on gate day"
+    :likelihood "LOW"
+    :impact "CRITICAL"
+    :mitigation "Staging env dry-run of all alert rules by 2026-09-05, runbook verification"}
+   {:risk "Fire-drill reveals critical issue in rollback procedure"
+    :likelihood "MEDIUM (fire drills find edge cases)"
+    :impact "MEDIUM (fixable before canary)"
+    :mitigation "2-hour fire-drill window, fixes implement + re-test by gate"}
+   {:risk "Load balancer misconfiguration during traffic ramp"
+    :likelihood "LOW"
+    :impact "CRITICAL"
+    :mitigation "Traffic-controller reviews ramp script in staging on 2026-09-05, confirms smoke test"}]
+
+  :readiness/artifact-locations
+  {:deployment-directory "/Users/junkawasaki/github/com-junkawasaki/90-docs/deployment/"
+   :documentation
+   ["MONTH-3-PRE-FLIGHT-CHECKLIST.edn (validation items, 7 gates)"
+    "MONTH-3-CANARY-EXECUTION-TIMELINE.edn (stage procedures, 4 gates)"
+    "MONTH-3-TEAM-ASSIGNMENTS.edn (role assignments, on-call rotation)"
+    "MONTH-3-AUTOMATIC-ROLLBACK-TRIGGERS.edn (alert rules, test scenarios)"
+    "MONTH-3-MANUAL-ROLLBACK-DECISION-TREE.edn (decision guidance, 15-min SLA)"
+    "MONTH-3-GRACEFUL-RUST-DRAIN.edn (drain procedure, standby policy)"
+    "MONTH-3-POST-CUTOVER-VALIDATION.edn (48h validation checklist)"
+    "MONTH-3-EXECUTION-COORDINATION-SUMMARY.edn (master summary)"]
+   :template-to-create
+   ["MONTH-3-GO-NO-GO-DECISION.edn (created after gate decision, 2026-09-08 17:00)"
+    "MONTH-3-CANARY-START-BRIEFING.edn (created if GO, 2026-09-10 (optional pre-briefing))"
+    "Post-canary results: MONTH-3-CUTOVER-COMPLETE.edn (if PASS)"]}
+
+  :readiness/communication-plan
+  {:primary-channel "#prod-gates-wave5 (Slack)"
+   :escalation-email "murakumo-owner@gftd.group, platform-lead@gftd.group"
+   :daily-updates "09:00 JST weekdays (2026-07-22 to 2026-09-08), status → green / yellow / red"
+   :alert-cadence "Immediate if threshold exceeded (parity > 0.005%, latency > 95ms sustained, etc.)"
+   :gate-notification "2026-09-08 15:30 JST: 30-min reminder before gate meeting"
+   :post-gate "Within 1 hour of decision: decision record + team notification"}
+
+  :readiness/success-definition
+  {:phase-1-success "All team assignments finalized + backups confirmed + availability locked by 2026-08-25"
+   :phase-2-success "Fire-drill 3/3 scenarios pass, team confidence ≥ 4/5, all procedures validated"
+   :phase-3-success "All 7 pre-flight checklist items PASS by 2026-09-08 16:00 JST"
+   :overall-success "GO decision at pre-flight gate (2026-09-08 16:45) → canary ready to start 2026-09-11 09:00"}
+
+  :readiness/owner-checklist
+  [{:task "Assign Escalation Lead (TBD → named person)"
+    :owner "Platform Lead"
+    :due-date "2026-07-25"
+    :notes "Role: decision logging, communication coordination. Recommend: ops coordinator or platform ops engineer"}
+   {:task "Identify 4 on-call engineers + assign shifts"
+    :owner "Ops Lead"
+    :due-date "2026-08-15"
+    :notes "Shifts: Tue 17:00-Wed 09:00, Wed 17:00-Thu 09:00, Thu 17:00-Fri 09:00, Fri 09:00-22:00. Cross-trained on alert triage + rollback."}
+   {:task "Verify SLO thresholds locked in monitoring system (Prometheus + Grafana)"
+    :owner "Metrics Lead"
+    :due-date "2026-09-05"
+    :notes "Lock: p99 budget 100ms, parity threshold 1%, 5xx threshold 1%, memory 512MB. No edits after this date."}
+   {:task "Dry-run ramp script in staging (50%→60%→75% traffic increments)"
+    :owner "Traffic Controller"
+    :due-date "2026-09-05"
+    :notes "Confirm load balancer rules apply cleanly, traffic split confirms via dashboard, no stuck connections."}
+   {:task "Verify alert routing: PagerDuty → Slack → email → phone call"
+    :owner "Escalation Lead + On-Call"
+    :due-date "2026-09-05"
+    :notes "Send test alert 2026-09-05 14:00, measure time-to-ack (target < 5 min). Document results."}
+   {:task "Publish MONTH-3-GO-NO-GO-DECISION.edn template (for gate recording)"
+    :owner "Escalation Lead"
+    :due-date "2026-09-08 15:00"
+    :notes "Ready to fill in immediately after gate meeting decision. Include: GO/NO-GO/SLIP choice, rationale, next steps."}
+   {:task "Confirm Rust fleet healthy + ready for graceful drain test"
+    :owner "Murakumo Owner"
+    :due-date "2026-09-05"
+    :notes "Staging: both Rust + cljc available. Production: Rust at 50% traffic (Phase 2), ready to ramp."}
+   {:task "Review runbooks with full team (60-min session)"
+    :owner "Escalation Lead + Canary Lead"
+    :due-date "2026-09-08 morning (before fire-drill)"
+    :notes "Walkthrough: automatic rollback triggers, manual override SLA (15 min max), graceful drain steps. Q&A."}]
+
+  :readiness/prepared-by "Claude Code Agent (Haiku 4.5)"
+  :readiness/prepared-date "2026-07-21"
+  :readiness/target-gate-date "2026-09-08 16:00 JST (combined with M5 Week 14 gate close)"
+  :readiness/canary-start-date-if-go "2026-09-11 09:00 JST"
+
+  :adr/related
+  ["2607072100-kotoba-server-fleet-deployment-strangler-fig.edn"
+   "2607072400-kaisha-pod-murakumo-fleet-deployment.edn"]}]

@@ -1,0 +1,119 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-17"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-17.edn"
+  :doc/date "2026-08-18"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "quiet timing of the 24-live call pair after call-clobber, versus the straight-line twin"
+  :coscientist/iteration 17
+  :coscientist/subject "judah Apple M4, kexe-benchmark (isa hoisted), kotoba-native f07d260e kernel_call_deep vs kernel_call_deep_branch"
+  :coscientist/action "25 scored rotated samples after 12 discarded frequency-warmup rotations; perfgate.core/qualify; seal if qualified"
+  :coscientist/measured "judah loadavg { 1.61 1.71 1.83 } throughout. n=7, 100k calls, 10k warmup, offset 52, oracle 21432348 on every sample. straight min/mean 14.55/14.628 ns, branch 13.48/13.544 ns. min ratio 0.926, mean improvement +7.41%. perfgate qualified: gap 1.084 ns > summed stdev 0.181 ns. claim sealed fingerprint 472685029, machine-id judah-m4-mini."
+  :coscientist/refuted "that after call-clobber the extra if still costs the iteration-8 33%. On this pin the branched caller is faster than its straight-line twin, because the CFG scan prefers preserved registers and ADR 0006 still stores every live-across value. Also that 6210431302 is the 24-live oracle (iteration 16): 24-live at n=7 is 21432348; offset 0 is still step(7)=337898."
+  :coscientist/carries-forward "iteration-04: do not ship a timed bench export; iteration-08: oracle before duration, offset is not always 0; iteration-14: leaf vs LLVM remains refused; iteration-15: do not overwrite a used number; iteration-16: encodings already closed all-vreg. Do not overwrite 04-16. Do not compare these ns to iteration 8's 62.2/82.5. A timed win on one fixture is not a pin bump: f07d260e failed 61 amu tests including let+recursion returning 4310433793. Discriminate against d4b050ae before claiming a regression."
+
+  :doc/body
+  "# Codegen co-scientist, iteration 17
+
+WIP=1 after iteration 16 was the missing duration. Encodings already said the
+24-live branch left all-vreg (17 slots / 168 insns / 652 B against 99 / 325 /
+1344). This file is the quiet-host timing of that pair, through the hoisted
+harness, judged against the straight-line twin, then `perfgate.core/qualify`.
+
+This workstation was loadavg ~59 and is not a ranking host. Samples ran on
+**judah** (Apple M4 mini, 10 cores, loadavg `{ 1.61 1.71 1.83 }` start and end).
+
+## What was timed
+
+native `f07d260e`, same bytes as iteration 16's dump:
+
+- `kernel_call_deep.bin` 860 B, kernel offset **52**, length 808
+- `kernel_call_deep_branch.bin` 704 B, kernel offset **52**, length 652
+- runner: `/tmp/kexe-benchmark-iter16` (isa hoisted, amu's `kexe-benchmark.c`)
+- n=7, 100k calls, 10k warmup
+- 12 discarded rotations to leave the frequency ramp (cold process walked
+  33 ns → 14 ns; folding that walk into the means is how a 7% gap becomes
+  noise)
+- 25 scored rotated samples, two arms
+- Judge: **min ns/call** reported; **perfgate uses means**
+- Oracle: **21432348** on every scored sample. Offset 0 is **337898**
+  (`step(7)`) on both modules.
+
+Dump: `/tmp/call-clobber-iter17/` on judah and the workstation
+(`samples.json`, `arms.edn`, `qualify.edn`).
+
+## Times
+
+| arm | min | mean | median | p95 | max | rel stdev |
+|---|---:|---:|---:|---:|---:|---:|
+| straight (`kernel_call_deep`) | 14.55 | 14.628 | 14.60 | 14.86 | 14.88 | 0.0060 |
+| branch (`kernel_call_deep_branch`) | 13.48 | 13.544 | 13.52 | 13.78 | 13.82 | 0.0068 |
+
+min ratio branch/straight **0.926**. mean improvement **+7.41%**.
+
+Do not subtract these from iteration 8's 62.2 / 82.5 ns. That pair was a
+different native pin on a different host. What this file answers is whether
+the extra `if` still costs a third. It does not. The branched caller is
+faster.
+
+## perfgate
+
+`perfgate.core/qualify` on the 25 ns/call vectors. Candidate = branch,
+baseline = straight, metric `:wall-ns`. Machine descriptor `:measured` from
+`ssh judah sysctl hw.ncpu hw.pagesize hw.cachelinesize hw.l1dcachesize
+hw.l2cachesize machdep.cpu.brand_string` (ncpu 10, pagesize 16384,
+cachelinesize 128, l1d 65536, l2 4194304).
+
+- mean improvement **+7.41%** (required +5%)
+- gap **1.084 ns** > summed stdev **0.181 ns**
+- relative stdev 0.006 / 0.007 (allowed 0.10)
+- `:qualified? true`
+- **claim sealed** fingerprint `472685029`, machine-id `judah-m4-mini`,
+  machine-fingerprint `1907307243`
+
+This is a claim that the CFG linear scan beats ADR 0006 on this 24-live
+caller with one `if`, on this mini. It is not a claim that LLVM is beaten.
+The leaf ranking (iteration 14) stays refused.
+
+## Why the branch is faster
+
+Iteration 16 already wrote it: straight-line still uses ADR 0006, which
+puts every live-across value in a slot (24 slots, 808 B). The CFG scan
+prefers preserved registers at definition (17 slots, 652 B). The duration
+follows the encodings. Closing that split is a different change than
+stopping all-vreg, and is not this file.
+
+## What this does not change
+
+- Timed `bench` export stays refused (iteration 4 / 5).
+- `kernel_wide` vs LLVM stays inside noise; do not rematch it here.
+- fused-srem / extra MOV / FMA / PGO / kototama optimizer stay refused.
+- amu's published pin stays `d4b050ae`. The timed win on the 24-live pair
+  is not enough to ship `f07d260e`.
+
+## Pin blocked
+
+`clojure -M:test` against native `f07d260e` on this worktree: 1094 tests,
+8166 assertions, **61 failures, 0 errors**. Two classes:
+
+1. `isa_execution_test` `the-verified-surface-executes-identically-on-every-available-isa`
+   -- `string-contains?` / `string-replace-all` rows, both AArch64 and
+   x86_64. ASCII contains that should return 1 returns 0. Some multi-byte
+   rows trap (exit 120).
+2. `native_executor_test` `let-composes-with-recursion-within-the-fuel-budget`
+   -- 50 non-tail self-calls from inside a `let` returned **4310433793**
+   instead of 50. That source is exactly calls plus control flow, the
+   path iteration 16 opened.
+
+The 24-live fixture's oracle is still 21432348. That is not a substitute
+for these tests. Do not bump amu until the same suite is green. This
+iteration did not re-run those two namespaces on `d4b050ae` (the build
+slot was held by another session); that discrimination is the next
+action, not a reason to ship.
+
+## Remaining after 17
+
+Do not ship `f07d260e` into amu. Discriminate the 61 failures against
+`d4b050ae`, then either fix the CFG scanner or leave the conservative
+path as the published one. Straight-line ADR 0006 still storing every
+live-across value is a later Generate. Do not overwrite 04-16."}]

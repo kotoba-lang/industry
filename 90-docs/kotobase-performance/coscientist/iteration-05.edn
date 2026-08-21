@@ -1,0 +1,97 @@
+{:iteration 5
+ :date "2026-08-18"
+ :loop :kotobase/cost-coscientist
+ :engine "90-docs/kotobase-performance/src/kotobase_performance/cost_coscientist.cljc"
+
+ :seed-from-iteration-04
+ "Deploy h8 and read blocks_from_l1 / blocks_from_l2 / blocks_from_r2 from the
+  same paired probe -- a measured zero is a reportable outcome and the counters
+  exist so it can be reported."
+
+ :what-happened
+ "Deployed. The outcome was not a measured zero; it was a 503. The counters
+  never reported anything because no isolate completed a hydrate."
+
+ :measurement
+ {:receipt "90-docs/kotobase-performance/2026-08-18-h8-deployed-and-refuted.edn"
+  :before {:version "120f3e08" :wall-s-cold 3.34 :wall-s-warm 2.38 :status 501}
+  :after {:version "e36410a5" :n 12 :wall-s-range [14.22 41.88]
+          :diag "sampled false x12" :terminal "503 at 31.3 s"}
+  :rolled-back {:version "120f3e08" :wall-s 3.51
+                :surfaces {:sparql 200 :gremlin 200 :graphql 200 :s3 200}}
+  :mechanism "one cache.match per block + one awaited cache.put per durable
+              answer, over 84 blocks the read must touch ONE AT A TIME, is up to
+              168 sequential Cache API operations inserted into a request that
+              previously made 84 R2 reads."}
+
+ :the-structural-finding
+ {:statement "Any PER-BLOCK auxiliary tier pays 84x on this path and cannot be
+              amortised, because the reads are sequential by construction and
+              there is no batch to amortise over."
+  :already-known-from-the-other-side
+  "iteration-04 recorded that h4 (CARv2 packing) is worth only $4.32 here
+   because each novelty cell is its own commit and therefore its own pack. That
+   is the same fact: a chain the reader walks one link at a time defeats
+   coalescing whether the coalescing is done by a pack or by a cache."
+  :what-it-implies
+  "h1-seed-materialisation is the version of this idea the path can use: ONE
+   object keyed by the chain CID, one read, one write. h8 was h1 applied per
+   block. This makes h1 MORE interesting than its rank suggests, not less."}
+
+ :what-the-tests-could-not-catch
+ "131 tests, 828 assertions, and a break/restore that produced exactly 2
+  failures in the new test with 0 collateral -- the discipline this workspace
+  asks for, followed, and it did not catch this. Every test ran under Node with
+  a FAKE `caches` whose match/put are in-memory map operations. The suite proved
+  the read path CONSULTS L2 and attributes the answer to it, which is what it
+  claimed. It could not price a real Cache API call, and nothing had a cost
+  floor that would notice 168 of them.
+
+  A test that a tier is REACHED is not a test that the tier is AFFORDABLE, and
+  affordability was the whole hypothesis."
+
+ :what-the-judge-could-not-catch
+ "`cost-per-million` prices CPU, class-B and requests. It has no term for `the
+  request does not complete`, so h8 scores $0.00 -- identical to a hypothesis
+  that changes nothing -- and it has no way to see 168 added Cache API calls,
+  which are neither CPU it models nor class-B it counts. Both are now recorded
+  in :what-the-judge-cannot-see. **A ranking is an ordering of candidates and
+  must never be the only gate before a deploy.**"
+
+ :ranking
+ [{:elo 1291 :id "h7-parse-only-addressable-values" :after 31.04 :saves 28.56 :risk :low}
+  {:elo 1272 :id "h1-seed-materialisation"          :after 35.22 :saves 24.39 :risk :low}
+  {:elo 1242 :id "h6-retract-inline-documents"      :after 38.10 :saves 21.50 :risk :high}
+  {:elo 1219 :id "h2-fold"                          :after 47.00 :saves 12.61 :risk :low}
+  {:elo 1189 :id "h4-carv2-pack"                    :after 55.28 :saves  4.32 :risk :high}
+  {:elo 1159 :id "h5-engine-pin"                    :after 59.60 :saves  0.00 :risk :low}
+  {:elo 1131 :id "h3-engine-materialisation"        :after 59.60 :saves  0.00 :risk :high}
+  {:elo 1097 :id "h8-l2-cache-api"                  :after 59.60 :saves  0.00 :risk :high
+   :note "refuted in production"}]
+
+ :batch
+ {:id "kotobase-cost-kaizen-4"
+  :members ["h7-parse-only-addressable-values"]
+  :order "h7 next; h8 was deployed and refuted"
+  :why "h7 is the larger half of a served read and the half no cache tier can
+        touch -- a warm isolate pays it in full, which is what 2.38 s warm
+        against 3.34 s cold showed before any of this."
+  :and-h7-is-not-per-block
+  "Worth stating after h8: h7 removes work from a fold that already has every
+   row in hand. It adds no per-block operation to a path that touches 84 blocks
+   one at a time, which is the property that killed h8."}
+
+ :process-change-this-iteration-earned
+ ["Before deploying a change that adds an operation per block, COUNT the
+   operations it adds at production shape and state the number. 84 blocks was
+   already in the baseline; 168 was derivable on paper and was not derived."
+  "A test using a fake for a metered external API proves reachability, not
+   affordability. Say which one the test proves."
+  "The judge cannot price failure. Deploy gates stay separate from ranking."]
+
+ :seed-for-iteration-06
+ "Run the phase bench over /tmp/kb-blocks and replace the stale :after-harness
+  values for h1, h6 and h7 -- they were all measured against the OLD decode2 and
+  are overstated by roughly the 28% the outer-string change already took off
+  phase B. Until then the top of this ranking is an upper bound. Then start h7,
+  whose first question is which collections each surface can actually address."}

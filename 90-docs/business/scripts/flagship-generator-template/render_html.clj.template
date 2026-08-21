@@ -1,0 +1,162 @@
+;; TEMPLATE -- not compiled as-is. Copy into a target repo as
+;; src/<domain>/render_html.clj, rename the ns, and fill in the four
+;; ADAPT blocks below using values you read out of THAT repo's own
+;; store.cljc / governor.cljc / operation.cljc / (sim.cljc if present).
+;;
+;; When this template applies (com-junkawasaki/root ADR-2607189300,
+;; Wave5 rollout ledger seq 6):
+;;   A target repo qualifies for this template if ALL of the following
+;;   hold (mechanically checkable, no judgment call):
+;;     1. `deps.edn` at repo root, no `package.json`, no `web/` dir
+;;        (this is the JVM-Clojure-only cluster, not the isic-6399/
+;;        6310/7810 nbb+cljs cluster -- that one already has its own
+;;        working template, `web/generate.cljs`, don't use this one).
+;;     2. Exactly one domain dir under `src/` (e.g. `src/realty/`),
+;;        containing `operation.cljc` + `governor.cljc` + `store.cljc`
+;;        (no `http.clj` -- that marks the smaller CRM/HTTP-service
+;;        cluster, isic-5820/6201/6202/6209, a DIFFERENT shape this
+;;        template does not fit).
+;;     3. `operation.cljc` contains a real `langgraph.graph` StateGraph
+;;        (`g/state-graph` / `g/add-node` / `g/compile-graph`), with
+;;        node names `:intake :advise :govern :decide :request-approval
+;;        :commit :hold` and `:interrupt-before #{:request-approval}`.
+;;        This is NOT a coincidence across repos -- this whole fleet
+;;        was generated from one shared blueprint, so the harness code
+;;        below (exec!/approve!, unchanged) is byte-identical across
+;;        every repo that matches. A 2026-07-18/19 fleet-wide filesystem
+;;        scan found **290 of 1,109** real local `cloud-itonami-*`
+;;        checkouts (26%) match all three conditions above -- by far
+;;        the largest homogeneous demo-generation gap in the fleet.
+;;        Evidence + methodology: `90-docs/business/
+;;        cloud-itonami-flagship-generator-template.edn`.
+;;   Proven end-to-end on 2 repos from this cluster (2026-07-18/19,
+;;   ledger seq 6): cloud-itonami-isic-851 (schoolops) and
+;;   cloud-itonami-isic-6820 (realty) -- see those repos' own
+;;   src/<domain>/render_html.clj for the filled-in, actually-shipped
+;;   versions this template was extracted FROM (extract-after-prove,
+;;   not designed-then-hoped-to-fit).
+;;
+;; BEFORE writing scenario code: run the target repo's own `sim.cljc`
+;; (`clojure -M:dev:run`) FIRST and check it actually produces sensible
+;; output against `store/seed-db`'s real ids. Do not assume it is
+;; correct. isic-851's own `schoolops.sim` turned out to be a latent
+;; bug -- copy-pasted from an unrelated eldercare/ISIC-873 actor, its
+;; request ids ("resident-1") don't exist in schoolops' own seeded data
+;; ("student-1"/"student-2"/"student-3"), so EVERY one of its calls
+;; actually HARD-holds on `:student-unverified` regardless of which
+;; "happy path" the printed banner claims -- confirmed by running it,
+;; not assumed. isic-6820's own `realty.sim` was, by contrast, correct
+;; and safe to mine directly for real scenario values. Check per repo;
+;; do not skip this step.
+;;
+;; NEVER invent numbers, ids, or outcomes. Every table cell in `render`
+;; must trace to a real field read off `db` after `run-demo!` actually
+;; executed the graph. If a target repo's actor can't produce real
+;; output easily (seed data missing, request shape unclear, sim.cljc
+;; too broken to safely adapt), STOP and pick a different repo rather
+;; than paper over it with fabricated content.
+
+(ns REPLACE-ME.render-html
+  "Build-time HTML renderer for `docs/samples/operator-console.html`.
+
+  Closes flagship checklist item 2 (com-junkawasaki/root ADR-2607189300).
+  Drives the REAL actor stack (<domain>.operation -> <domain>.governor
+  -> <domain>.store) through a scenario built from real seeded demo
+  data and renders the result deterministically -- no invented numbers,
+  no timestamps in the page content, byte-identical across reruns
+  against the same seed (verify by diffing two consecutive runs before
+  shipping).
+
+  Usage: `clojure -M:dev:render-html [out-file]`
+  (default `docs/samples/operator-console.html`)."
+  (:require [clojure.string :as str]
+            ;; ADAPT 1 of 4: require the target repo's own store/operation
+            ;; namespaces under short aliases (mirror the repo's own
+            ;; convention, e.g. [realty.store :as store] [realty.operation :as op]).
+            [REPLACE-ME.store :as store]
+            [REPLACE-ME.operation :as op]
+            [langgraph.graph :as g]))
+
+;; ----------------------------- harness (unchanged across every repo
+;; in this cluster -- do not rewrite, only copy) -----------------------
+
+(def ^:private operator
+  ;; ADAPT 2 of 4 (cosmetic only): pick an :actor-role that reads
+  ;; naturally for this domain (e.g. :property-manager, :school-office-
+  ;; coordinator). :phase 3 is the standard "supervised-auto" rollout
+  ;; phase every sibling actor's phase.cljc defines identically.
+  {:actor-id "op-1" :actor-role :REPLACE-ME-role :phase 3})
+
+(defn- exec! [actor tid request]
+  (g/run* actor {:request request :context operator} {:thread-id tid}))
+
+(defn- approve! [actor tid]
+  (g/run* actor {:approval {:status :approved :by "op-1"}}
+          {:thread-id tid :resume? true}))
+
+(defn run-demo!
+  "ADAPT 3 of 4 (the real work): build a scenario using ids that
+  actually exist in `store/seed-db`'s demo data (read store.cljc's
+  `demo-data` fn to find them -- do not guess), covering a genuine mix
+  of dispositions this actor can reach: at least one op that
+  auto-commits clean at phase 3, at least one op that ALWAYS escalates
+  (check governor.cljc's `always-escalate-ops` or equivalent) followed
+  by a human `approve!`, and 2-3 DISTINCT HARD-hold reasons (read
+  governor.cljc's own violation-check functions -- e.g. an unverified/
+  unregistered subject, a scope-exclusion, an amount mismatch) that
+  never reach a human. Every exec!/approve! call must use a real op
+  keyword from this repo's own governor.cljc `allowed-ops`/`write-ops`
+  set -- do not invent an op. Returns the resulting store -- every
+  field `render` below reads is real governor/store output."
+  []
+  (let [db (store/seed-db)
+        actor (op/build db)]
+    ;; ... exec!/approve! calls here, see isic-851 / isic-6820's shipped
+    ;; render_html.clj for two different worked examples ...
+    db))
+
+;; ----------------------------- rendering (structure unchanged;
+;; column labels + row extraction are domain-specific) -----------------
+
+(defn- esc [v]
+  (-> (str v)
+      (str/replace "&" "&amp;")
+      (str/replace "<" "&lt;")
+      (str/replace ">" "&gt;")))
+
+(defn- last-fact-for [ledger subject-id]
+  ;; ADAPT 4 of 4: the key name on commit-fact/hold-fact records that
+  ;; carries the subject varies per repo -- read operation.cljc's own
+  ;; `commit-fact`/`commit-record` and governor.cljc's `hold-fact` to
+  ;; find the ACTUAL key (seen so far: `:subject` (isic-6820/2910-style
+  ;; generic), `:student-id` (isic-851), `:field-id` (isic-0111
+  ;; cerealops-style stub), `:store-id`, `:site-id` -- it is NOT always
+  ;; the same name, do not assume).
+  (last (filter #(= (:REPLACE-ME-subject-key %) subject-id) ledger)))
+
+(defn- status-cell [ledger subject-id]
+  (let [f (last-fact-for ledger subject-id)]
+    (cond
+      (nil? f) "<span class=\"muted\">no activity</span>"
+      (= :committed (:t f)) "<span class=\"ok\">committed</span>"
+      (= :approval-granted (:t f)) "<span class=\"ok\">approved &amp; committed</span>"
+      (= :governor-hold (:t f))
+      (let [rule (-> f :violations first :rule)]
+        (str "<span class=\"critical\">HARD hold &middot; " (esc (name (or rule :unknown))) "</span>"))
+      (= :approval-requested (:t f)) "<span class=\"warn\">awaiting approval</span>"
+      :else "<span class=\"muted\">in progress</span>")))
+
+;; The rest of `render` (subject table, action-gate table describing the
+;; op contract, audit-ledger table, HTML/CSS shell) is copy-paste
+;; boilerplate -- see isic-851's or isic-6820's shipped render_html.clj
+;; for the full, working `render` + `-main` to copy verbatim and adjust
+;; only the table column headers / row-formatting fns for this domain's
+;; actual entity shape (student vs property vs whatever this repo's
+;; store protocol exposes).
+
+(defn -main [& args]
+  (let [out (or (first args) "docs/samples/operator-console.html")
+        db (run-demo!)
+        html "REPLACE-ME: (render db)"]
+    (spit out html)
+    (println "wrote" out)))

@@ -1,0 +1,31 @@
+{:policy/id :gftd-jk-luxury-kotobase-postgres
+ :policy/version 2
+ :policy/effective-date "2026-07-26"
+ ;; v1 (same day) named PostgreSQL-backed Kotobase as the default, based on a
+ ;; mistaken belief that Cloudflare D1 is PostgreSQL-backed. D1 is
+ ;; SQLite-backed, not PostgreSQL. v2 corrects the default to D1/SQLite per
+ ;; owner clarification. Postgres remains a valid opt-in provider choice
+ ;; (net-kotobase ADR-2607260930's Tier 2), just no longer the default.
+ :policy/organizations
+ {"gftdcojp"
+  {:database/api :kotobase.core
+   :database/backend :sqlite
+   :database/provider :kotobase-storage-d1
+   :database/access :cloudflare
+   :database/legacy-istore :migration-only
+   :database/memory :test-only}
+  "jk-luxury"
+  {:database/api :kotobase.core
+   :database/backend :sqlite
+   :database/provider :kotobase-storage-d1
+   :database/access :cloudflare
+   :database/legacy-istore :migration-only
+   :database/memory :test-only}}
+ :policy/ref-template "<org>/<repo>/<environment>"
+ :policy/host-owns
+ [:d1-transport :pooling :cacao :encryption :blind-index
+  :visibility-policy :tenant-binding :schema-migration :secrets]
+ :policy/application-owns
+ [:datoms :queries :domain-schema :retention-classification]
+ :policy/fail-closed-without-host-injection true
+ :policy/adr "90-docs/adr/260726-gftd-jk-luxury-kotobase-postgres-policy.edn"}

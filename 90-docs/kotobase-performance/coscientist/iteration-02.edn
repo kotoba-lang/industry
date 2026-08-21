@@ -1,0 +1,127 @@
+{:iteration 2
+ :date "2026-08-18"
+ :loop :kotobase/cost-coscientist
+ :engine "90-docs/kotobase-performance/src/kotobase_performance/cost_coscientist.cljc"
+ :runner "nbb --classpath 90-docs/kotobase-performance/src 90-docs/kotobase-performance/run.cljs"
+
+ :seed-from-iteration-01
+ "Close the CPU uncertainty first; it is the input every ranking rests on and
+  the only one that cannot be read from inside the isolate."
+
+ :what-the-seed-got-wrong
+ {:claim "nothing inside the isolate can see cpuTime, so this cannot be closed
+          from here"
+  :first-clause :true
+  :conclusion :false
+  :why "`wrangler tail` reads cpuTime from OUTSIDE the isolate, per request, and
+        always could. iteration-01 had already used it — the 4,046 ms n=1 sample
+        it quotes came from exactly this mechanism. The loop recorded a
+        limitation of one vantage point as a limitation of measurement."
+  :lesson "A constraint on where you were standing is not a constraint on what
+           can be measured. Both sentences are true of the isolate; only one is
+           true of the question."}
+
+ ;; ── the measurement ─────────────────────────────────────────────────────────
+ :measurement
+ {:probe "GET atproto.kotobase.net/xrpc/com.atproto.repo.describeRepo?repo=x"
+  :why-this-probe
+  "atproto is in `core/public-read-surfaces`, so a full shared-graph hydrate
+   needs no credential. This is what made the measurement possible at all:
+   sparql and cypher return 401 to a self-issued CACAO — they want an OPERATOR
+   CACAO, and `KOTOBASE_MAINTENANCE_OPERATOR_DIDS` is owner-blocked. Measuring
+   through them would have meant granting myself operator access to production,
+   which is not a measurement decision."
+  :returns-501 "The probe returns HTTP 501 MethodNotImplemented (`unsupported nsid: com.atproto.repo.describeRepo`) and that is EXPECTED: the shared-graph hydrate runs in the router BEFORE nsid dispatch, so the request performs the full hydrate and then declines the method. That is exactly why it works as a credential-free hydrate probe. Verified 2026-08-18 on ONE connection (curl --next, so the diagnostic lands on the same isolate): probe 501 in 3.9 s, then GET /_diag/hydrate reporting sampled true, block_gets 84, bytes 11462579, unfolded_txs 63. Separate connections land on different isolates and report sampled false, which is not evidence of anything."
+  :method "wrangler tail --format json, each request carrying a ?probe=<uuid>
+           marker so events match requests rather than being assumed to."
+  :against "the deployed worker, which now carries the read-path hoist and the
+            fetch coalescing landed 2026-08-17"
+  :cpu-ms [2411 2539 2133 2410 2491 2178 2384 2114 2267 3689]
+  :n 10 :median 2397 :mean 2462 :min 2114 :max 3689 :outcomes "10/10 ok"
+  :cpu-over-wall "60-83% — this path is CPU-bound, not I/O-bound"
+  :prior "2026-08-17, pre-fix, n=14: 2329-4416"}
+
+ :correction-applied
+ {:from 1976 :to 2397 :scale 1.2131
+  :rule "The harness measures the DECOMPOSITION reliably; its absolute level is
+         a Node proxy. Anchor the total to the measurement, preserve the
+         measured proportions."
+  :status "Every `:after` is now a MODELLED PROJECTION, not a measurement. Each
+           hypothesis keeps `:after-harness` so the correction is auditable."
+  :surprise "The proxy understated by 21%, not the several-fold iteration-01
+             feared from its single pairing. n=1 was pessimistic, not optimistic."}
+
+ ;; ── the ranking ─────────────────────────────────────────────────────────────
+ :baseline {:cost-per-million 78.48 :was 70.06 :delta "+12.0%"
+            :cpu-ms 2397 :class-b-ops 84 :source {:cpu-ms :live-workerd}}
+
+ :ranked
+ [{:elo 1286 :id "h1-seed-materialisation"          :after 35.36 :saves 43.12 :share 0.549 :was 40.80 :risk :low  :effort :L}
+  {:elo 1253 :id "h7-parse-only-addressable-values" :after 43.14 :saves 35.34 :share 0.450 :was 29.14 :risk :low  :effort :M}
+  {:elo 1231 :id "h2-fold"                          :after 50.02 :saves 28.46 :share 0.363 :was 27.44 :risk :low  :effort :S}
+  {:elo 1200 :id "h6-retract-inline-documents"      :after 50.20 :saves 28.28 :share 0.360 :was 23.32 :risk :high :effort :S}
+  {:elo 1173 :id "h4-carv2-pack"                    :after 71.28 :saves  7.20 :share 0.092 :was  7.20 :risk :high :effort :L}
+  {:elo 1145 :id "h3-engine-materialisation"        :after 78.34 :saves  0.14 :share 0.002 :was  0.12 :risk :high :effort :L}
+  {:elo 1113 :id "h5-engine-pin"                    :after 78.48 :saves  0.00 :share 0.000 :was  0.00 :risk :low  :effort :S}]
+
+ :what-changed
+ {:order :unchanged
+  :level "+12.0% — every price rises, because the thing being billed was
+          under-counted, not because anything got worse"
+  :crossover "0.93M -> 0.83M queries/month against one Neo4j Aura instance
+              ($65/mo flat). kotobase's advantage window SHRANK."
+  :the-real-move
+  "h2 and h6 collapsed from a 4.12 gap to 0.18 — a near-tie. Under the proxy
+   they were 4th and 5th with clear daylight; measured, choosing between them
+   is no longer a cost question. h2 is deployed, reversible and one write from
+   firing; h6 is owner-blocked and irreversible. The judge now says: take h2,
+   and stop treating h6 as a cost decision at all."
+  :honest-note
+  "Closing the loop's own dominant uncertainty did NOT reorder the roadmap.
+   That is worth recording — the measurement was still correct to take, but a
+   loop that reports every measurement as decisive is flattering itself."}
+
+ ;; ── the finding that outranks the ranking ───────────────────────────────────
+ :zero-traffic
+ {:observation "Twelve consecutive GET /_diag/hydrate returned `sampled: false`
+                — twelve isolates, none of which had ever hydrated."
+  :meaning "There are no organic served reads on this graph. This loop prices a
+            served read on a graph that currently serves none."
+  :why-it-is-not-a-defect-of-the-loop
+  "iteration-01 already said it: 'Today's value is the unit-economics crossover,
+   not saved CPU on traffic that is not there.' The measurement confirms it
+   rather than discovering it. What is new is that it is now countable: 12/12,
+   not an impression from a five-minute tail."
+  :consequence
+  "The ranking is FOR the crossover argument — at what volume kotobase beats a
+   flat-rate graph database — not for a latency or bill that anyone is paying
+   today. Any roadmap item justified by 'it saves CPU in production' is
+   currently justified by nothing."}
+
+ :also-fixed
+ {:what "The engine could not be loaded from where it lived."
+  :detail "ns `kotobase-performance.cost-coscientist` resolves to the directory
+           `kotobase_performance`, but the file sat in `kotobase-performance/`
+           beside the .edn receipts. `(require ...)` failed. iteration-01 was
+           produced from some other layout, so the landed engine had never been
+           run in place."
+  :fix "Moved to `src/kotobase_performance/` with a `run.cljs` beside the
+        receipts. Verified: the engine reproduces iteration-01's numbers exactly
+        (70.06 / h1 29.26 / h7 40.92 / h2 42.62 / h6 46.74) before the
+        correction was applied, which is what makes the diff above attributable
+        to the measurement rather than to the move."}
+
+ :seed-for-next
+ "Two candidates, and they are not the same kind of question.
+
+  (a) h7, the top UNBLOCKED build item: `decode2` is
+      `(edn/read-string (edn/read-string v_edn))` on every value of every doc on
+      every request, and the hydrate decodes the whole LocalStore map when a
+      point read addresses one key. The B half is 1,735 of 2,397 measured ms.
+      Risk is that the LocalStore contract is synchronous and plain — deferring
+      values changes a shape other code reads.
+
+  (b) Whether to keep pricing this at all. The crossover is the only live
+      argument, and it rests on Aura's $65/mo, which is second-hand because the
+      vendor page returned 403. A judge whose comparator is unverified is one
+      403 away from being decorative."}

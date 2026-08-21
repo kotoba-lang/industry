@@ -1,0 +1,68 @@
+{:receipt :kotobase/harness-does-not-reproduce
+ :date "2026-08-18"
+ :status :open-question
+ :severity "blocks iteration-05's seed; does NOT indicate a production regression"
+
+ :what-was-being-checked
+ "iteration-05's seed: re-run the phase bench and replace h1/h6/h7's
+  :after-harness values, which were all taken against the old decode2. The
+  bench was run twice at RELEASE, once from the h8 source and once from the
+  reverted source, over the same cached production blocks and the same head."
+
+ :the-two-runs
+ [{:build "5aaf565bbd61c7c0" :source "h8"
+   :whole-hydrate-cpu-ms 39242.581 :block-gets 148 :distinct 84 :bytes 56987151}
+  {:build "809484c88ed86589" :source "reverted (main)"
+   :whole-hydrate-cpu-ms 38062.356 :block-gets 148 :distinct 84 :bytes 56987151}]
+
+ :attribution
+ {:question "did h8 cause the duplicate gets and the CPU blowup?"
+  :answer :no
+  :evidence "the control is identical to three significant figures on every
+             counter, and its 148/84/56,987,151 are the same numbers"
+  :my-hypothesis-was-wrong
+  "I had written that h8's extra promise hop per block probably broke
+   `hot-datoms`' async batching and dropped the read back onto the O(N^2)
+   trampoline, and that this explained both the duplicates and the CPU. The
+   control refutes it. Recorded because the hypothesis was stated publicly
+   before it was checked, and it was checked because it was stated."}
+
+ :the-open-question
+ {:documented "2026-08-17, same harness, same blocks, same head, release build:
+               whole hydrate 2,201-2,232 cpu-ms, phase A 491-538, phase B
+               1,386-1,473"
+  :today "whole hydrate 38,062 cpu-ms, phase A 37,062, phase B 1,252"
+  :phase-b-reproduces
+  "1,252 against a documented 1,386-1,473 -- slightly lower, which is what the
+   outer-string change should do. Phase B is fine."
+  :phase-a-does-not "491-538 -> 37,062. About 70x."
+  :why-that-matters-for-attribution
+  "A measurement-wide artifact -- load, GC, a slower host -- would inflate BOTH
+   phases. Only phase A moved, so it is not the environment."
+  :and-production-is-unchanged
+  "`wrangler tail` on the deployed Worker measures 2,058 cpu-ms per served read
+   (n=10 median), and a probe today answered in 3.5 s wall. Production is not
+   regressed. Whatever this is, it is in the harness or in how the harness
+   drives the read, not in what kotobase.net serves."
+  :first-suspect
+  "`block_gets 148` against 84 distinct blocks, while the bench's OWN bucket
+   counter reports `{:gets 85 :distinct 85 :misses 0}` for the same run. The two
+   counters disagree because they count different things -- seam entries versus
+   durable reads -- and 148 seam entries for 84 blocks means the read path
+   re-entered the fetch 64 times and was answered from L1. Production reports 84
+   with 0 duplicates. That difference is the thread to pull."}
+
+ :what-was-NOT-done-because-of-it
+ "h1, h6 and h7 keep their stale :after-harness values. Replacing them from a
+  harness that no longer reproduces its own baseline, and that disagrees with
+  production by 18x, would put a worse number in the loop than the one already
+  labelled stale. The ranking's top entries therefore remain UPPER BOUNDS, as
+  iteration-04 and -05 already said."
+
+ :what-the-run-is-still-good-for
+ "Everything measured WITHIN one run, where the harness is its own control:
+  the phase A/B ratio, the per-collection parse costs (s3 collection 526 docs =
+  399.7 cpu-ms of a 1,252 ms phase B; every other collection together ~38 ms),
+  and the opaque-decode floor (3.1 cpu-ms to decode the seed without parsing
+  values, against 888 ms with). Those are ratios, and the disputed factor
+  cancels in them."}

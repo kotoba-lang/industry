@@ -1,0 +1,63 @@
+;; registry.edn — 個人アカウント宣言レジストリ (registry.toml から移行)
+;; 平文 (.gitattributes 参照)。秘密情報は不可 — token/passphrase は macOS Keychain / 1Password。
+;; 消費: orgs/personal/bin/registry (bb) → mail-sync.sh / takeout-watcher.sh / takeout-status.sh
+;; 変換: TOML [accounts.<slug>]/[accounts.<slug>.mail]→ネストマップ, [takeout."prefix"]→マップ
+{
+  :accounts {
+    :jun784 {
+      :email "jun784@gmail.com"
+      :provider "google"
+      :mail {
+        :sync true
+        :window "14d"
+        :authorized false}}
+    :jk-luxury {
+      :email "root@jk.luxury"
+      :provider "google"
+      :mail {
+        :sync true
+        :window "14d"
+        :authorized false}}
+    :gftd-group {
+      :email "jun@gftd.group"
+      :provider "google"
+      :mail {
+        :sync true
+        :window "14d"
+        :authorized false}}
+    :junkawasaki-com {
+      :email "root@junkawasaki.com"
+      :provider "google"
+      :mail {
+        :sync true
+        :window "14d"
+        :authorized false}}
+    :gftd-co-jp {
+      :email "j.kawasaki@gftd.co.jp"
+      :provider "microsoft"
+      :mail {
+        :sync true
+        :window "14d"
+        :authorized false}}}
+  :takeout {
+    :takeout-20260610T103007Z {
+      :account "jk-luxury"
+      :parts 85
+      :note "Drive-delivered export (u/1 Takeout folder)"}
+    :takeout-20260610T103006Z {
+      :account "jk-luxury"
+      :parts 1}
+    :takeout-20260610T102914Z {
+      :account "jun784"
+      :parts 60
+      :note "Drive-delivered export (Takeout folder). vmdk 281GB is excluded -> external/streaming"}
+    :takeout-20260610T102913Z {
+      :account "jun784"
+      :parts 1}
+    :takeout-20260609T040708Z {
+      :account "jun784"
+      :parts 61
+      :note "skip part 41 = 261GB -> external drive"}
+    :takeout-20260609T041224Z {
+      :account "jk-luxury"
+      :parts 85}}}

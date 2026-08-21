@@ -1,0 +1,241 @@
+[
+;;; ============================================================
+;;; COMMUNITY COVERAGE TAXONOMY
+;;; ============================================================
+;;; ADR-2607257200. Companion vocabulary for 90-docs/community-coverage/*.edn.
+;;;
+;;; Why this exists: 90-docs/religious-community/ models organizations with a
+;;; comparative mental-model schema but only instantiates 12 orgs (7 religious,
+;;; 5 secular). Worldwide community coverage — and in particular the vast
+;;; population of UNREGISTERED / informal organizations (町内会, 講/ROSCA,
+;;; ultras, clan councils, Discord servers) — was not represented at all.
+;;; This corpus reuses the same :org/* attribute names so both datasets join
+;;; on the unified query plane (manifest/edn-query.cljs), and is distinguished
+;;; by :source/dataset "community-coverage" (ADR-2607252000 convention).
+;;;
+;;; Loader note: manifest/edn-query.cljs assigns :db/id per file and flattens
+;;; keyword values to bare strings. Join keys are therefore written as flat
+;;; scalar keywords (:org/category :cat-local-place), NOT lookup-ref vectors
+;;; (which would be pr-str'd into opaque blobs).
+
+;;; ---------- category taxonomy (the 8 axes the owner named) ----------
+
+{:community-category/id :cat-local-place
+ :community-category/isic-hint "9499"
+ :community-category/itonami-actor "cloud-itonami-isic-9499"
+ :community-category/isic-note "Statutory neighborhood bodies (barangay, gram panchayat, 居委会) arguably sit under 8411 general public administration instead; ISIC has no class for a voluntary body that governs a place."
+ :community-category/name "地方・地縁 (local / place-based)"
+ :community-category/name-en "Local and place-based community"
+ :community-category/description "Membership follows from residence in a place: neighborhood associations, village assemblies, residents' committees, commons/land-holding collectives, homeowner associations."
+ :community-category/typical-registration :mostly-unregistered
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-sports
+ :community-category/isic-hint "9312"
+ :community-category/itonami-actor "cloud-itonami-isic-9312"
+ :community-category/isic-note "9312 activities of sports clubs. Facility operators fall under 9311; informal pickup play falls under nothing."
+ :community-category/name "スポーツ (sport)"
+ :community-category/name-en "Sport clubs, leagues and supporter communities"
+ :community-category/description "Amateur/community sport clubs, member-owned professional clubs, supporter and ultras groups, informal pickup play, running/parkrun style open events, esports clans."
+ :community-category/typical-registration :mixed
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-fraternal
+ :community-category/isic-hint "9499"
+ :community-category/itonami-actor "cloud-itonami-isic-9499"
+ :community-category/isic-note "Initiatory orders and service clubs both land in the residual class."
+ :community-category/name "結社 (fraternal / sworn societies)"
+ :community-category/name-en "Fraternal orders, service clubs and secret societies"
+ :community-category/description "Initiatory or oath-based membership bodies and service clubs: masonic and para-masonic orders, service clubs, collegiate fraternities, native-place and lineage-adjacent sworn societies."
+ :community-category/typical-registration :mixed
+ :community-category/scope-exclusion "Criminal organizations (mafia-type sworn groups) are deliberately out of scope for this corpus."
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-labor-coop
+ :community-category/isic-hint "9420"
+ :community-category/itonami-actor "cloud-itonami-isic-9420"
+ :community-category/isic-note "9420 trade unions; employer/business associations are 9411 and professional bodies 9412. Cooperatives are classified by what they DO (dairy co-op = dairy), not as cooperatives — the member-ownership that defines them is invisible to ISIC. Credit unions are 6419/6492."
+ :community-category/name "組合 (unions, cooperatives, guilds)"
+ :community-category/name-en "Labor unions, cooperatives and guilds"
+ :community-category/description "Worker organization and member-owned economic bodies: trade union confederations, cooperatives (consumer, agricultural, worker, credit), craft/merchant guilds, informal-sector worker associations."
+ :community-category/typical-registration :mostly-registered
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-mutual-aid
+ :community-category/isic-hint "6492"
+ :community-category/itonami-actor "cloud-itonami-isic-6492"
+ :community-category/isic-note "ROSCAs and burial societies are financial mutual aid (6492 other credit granting) but almost never appear in financial statistics; the welfare side maps to 8890 other social work without accommodation."
+ :community-category/name "相互扶助コミュニティ (mutual aid)"
+ :community-category/name-en "Mutual aid and rotating-savings communities"
+ :community-category/description "Reciprocal-obligation communities that mostly never register: rotating savings and credit associations (講/tanda/susu/stokvel/chit), burial societies, disaster volunteer networks, gift/Buy-Nothing groups, hometown associations, time banks."
+ :community-category/typical-registration :mostly-unregistered
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-international
+ :community-category/isic-hint "9499"
+ :community-category/itonami-actor "cloud-itonami-isic-9499"
+ :community-category/isic-note "Transnational membership movements have no dedicated class; humanitarian delivery arms map to 8890."
+ :community-category/name "国際 (transnational movements and INGOs)"
+ :community-category/name-en "International movements, INGOs and fellowships"
+ :community-category/description "Communities whose membership crosses borders by design: scouting, hospitality networks, anonymous fellowships, transnational social movements, diaspora networks, global federations of local clubs."
+ :community-category/typical-registration :mixed
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-traditional
+ :community-category/isic-hint "9491"
+ :community-category/itonami-actor "cloud-itonami-isic-9491"
+ :community-category/isic-note "9491 activities of religious organizations covers ritual bodies (氏子, hey'at, pagoda committees). Clan councils, age-sets and customary courts have no ISIC class at all and fall to 9499."
+ :community-category/name "伝統・慣習共同体 (traditional / customary)"
+ :community-category/name-en "Traditional, customary and indigenous communities"
+ :community-category/description "Authority derived from custom, descent or ritual rather than statute: indigenous confederacies and councils, clan/lineage associations, age-set systems, festival (matsuri) bodies, customary village assemblies, chiefly systems."
+ :community-category/typical-registration :mostly-unregistered
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-online
+ :community-category/isic-hint "9499"
+ :community-category/itonami-actor "cloud-itonami-isic-9499"
+ :community-category/isic-note "ISIC has NO class for platform-native community. Subreddits, Discord servers, DAOs and FOSS communities all fall into 9499 n.e.c. — a genuine blind spot in a classification designed around premises and payrolls."
+ :community-category/name "ネットコミュニティ (online-native)"
+ :community-category/name-en "Online-native communities"
+ :community-category/description "Communities constituted primarily through a network platform or protocol: FOSS project communities, wiki communities, forum/subreddit/Discord/Fediverse communities, fandoms, DAOs, guilds in games."
+ :community-category/typical-registration :mostly-unregistered
+ :source/dataset "community-coverage"}
+
+;;; ---------- iteration 2 additions (2026-07-25) ----------
+;;; The owner's list ("地方、スポーツ、結社、組合、コミュニティ、国際、伝統、
+;;; ネットコミュニティ、、") was explicitly exemplary (例えば / 、、), so these
+;;; seven forms are added rather than folded into the original eight.
+
+{:community-category/id :cat-emergency-volunteer
+ :community-category/isic-hint "8423"
+ :community-category/itonami-actor "cloud-itonami-isic-8423"
+ :community-category/isic-note "8423 public order and safety; ISIC 8425 fire service activities has no actor repo in the fleet. Volunteer corps are counted under the municipality that hosts them, not as organizations."
+ :community-category/name "消防団・救難ボランティア (volunteer emergency response)"
+ :community-category/name-en "Volunteer fire, rescue and civil-protection corps"
+ :community-category/description "Standing volunteer bodies that respond to fire, flood, avalanche, sea rescue and civil emergency. Often the largest per-capita membership organization in a country and structurally invisible to corporate registries because members serve through a municipality or an unincorporated corps."
+ :community-category/typical-registration :mixed
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-education-parent
+ :community-category/isic-hint "8569"
+ :community-category/itonami-actor "cloud-itonami-isic-8569"
+ :community-category/isic-note "8569 educational support activities. PTAs and alumni bodies are usually invisible because the school, not the parent body, is the classified unit."
+ :community-category/name "PTA・同窓会・学校支援 (school-linked communities)"
+ :community-category/name-en "Parent, alumni and school-support communities"
+ :community-category/description "Communities constituted by a school: parent-teacher associations, alumni associations, school-support foundations, dormitory and class-year bodies."
+ :community-category/typical-registration :mostly-unregistered
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-health-support
+ :community-category/isic-hint "8890"
+ :community-category/itonami-actor "cloud-itonami-isic-8890"
+ :community-category/isic-note "8890 other social work activities without accommodation. Peer-support groups with no staff and no premises rarely enter the statistic at all."
+ :community-category/name "患者会・自助グループ (health and peer support)"
+ :community-category/name-en "Patient, caregiver and peer-support communities"
+ :community-category/description "Disease-specific patient associations, caregiver circles, bereavement and hospice volunteer groups, peer-support groups outside the anonymous-fellowship model."
+ :community-category/typical-registration :mixed
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-identity-rights
+ :community-category/isic-hint "9499"
+ :community-category/itonami-actor "cloud-itonami-isic-9499"
+ :community-category/isic-note "Disability, Deaf, LGBTQ+ and veterans communities all fall to the residual class."
+ :community-category/name "当事者・権利コミュニティ (identity and rights communities)"
+ :community-category/name-en "Identity-based and rights communities"
+ :community-category/description "Communities formed around a shared social position: disability communities, LGBTQ+ communities, ethnic and linguistic minority associations, veterans' bodies, refugee and migrant self-organization."
+ :community-category/typical-registration :mixed
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-hobby-interest
+ :community-category/isic-hint "9499"
+ :community-category/itonami-actor "cloud-itonami-isic-9499"
+ :community-category/isic-note "9329 other amusement and recreation covers commercial provision, not member-run circles; allotment and hobby associations land in 9499."
+ :community-category/name "趣味・同好 (hobby and interest)"
+ :community-category/name-en "Hobby and interest communities"
+ :community-category/description "Voluntary interest communities with regular meetings and internal norms: amateur radio, allotment/community gardens, chess and go clubs, birdwatching, model/rail, doujin circles, choirs and brass bands, dance and theater troupes."
+ :community-category/typical-registration :mostly-unregistered
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-resource-commons
+ :community-category/isic-hint "0161"
+ :community-category/itonami-actor "cloud-itonami-isic-0161"
+ :community-category/isic-note "Irrigation and water-user associations map to 0161 support activities for crop production; forest user groups to 0240, fishery tenure to 0311/0322. The commons-governance function itself has no class."
+ :community-category/name "資源管理コモンズ (resource commons)"
+ :community-category/name-en "Resource-user and commons-management communities"
+ :community-category/description "Bodies that jointly manage a shared natural resource: water user and irrigation associations, forest user groups, fishery cooperatives with customary sea tenure, grazing commons, acequia and subak systems."
+ :community-category/typical-registration :mixed
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-civic-political
+ :community-category/isic-hint "9492"
+ :community-category/itonami-actor "cloud-itonami-isic-9492"
+ :community-category/isic-note "9492 activities of political organizations. Tenant unions and participatory-budgeting assemblies are not political organizations in the ISIC sense and fall to 9499."
+ :community-category/name "市民・政治 (civic and political grassroots)"
+ :community-category/name-en "Civic and political grassroots communities"
+ :community-category/description "Party branches and their volunteer bases, tenant unions, residents' referendum and anti-development committees, participatory budgeting assemblies, election-monitoring volunteer networks."
+ :community-category/typical-registration :mixed
+ :community-category/scope-note "Descriptive coverage of grassroots political community forms; this corpus takes no position on any party or platform (cf. cloud-itonami-isic-9492, whose governor blocks political-position decisions outright)."
+ :source/dataset "community-coverage"}
+
+;;; ---------- controlled vocabularies (documented, not enforced) ----------
+
+{:vocab/id :vocab-legal-registration
+ :vocab/attribute "org/legal-registration"
+ :vocab/values ["registered" "mostly-registered" "mixed" "mostly-unregistered" "unregistered" "statutory-no-personality" "unknown"]
+ :vocab/added-in-iteration-13 "statutory-no-personality (2026-07-26) — :mixed was flattening a distinct third state the data kept producing: bodies holding statutory powers and duties while having NO corporate personality of their own. 民生委員 and 保護司 are unpaid public servants commissioned by a minister; 消防団 members are non-permanent municipal officers; Samoa's village fono has enforcement powers under the Village Fono Act; Peru's rondas campesinas exercise constitutional jurisdiction (Art. 149); Bangladesh's CPP units carry state warning duties; Yemen's aqil al-hara is recognized by whichever authority holds the area. None is an incorporated organization and none is merely informal, so calling them 'mixed' hid the pattern."
+ :vocab/note "Answers 'does this body appear in a state registry (corporate, association, charity, union) as a legal person?'. The whole point of this corpus is that :mostly-unregistered and :unregistered bodies are the majority of human community life and are absent from LEI/company registries."
+ :source/dataset "community-coverage"}
+
+{:vocab/id :vocab-entity-kind
+ :vocab/attribute "org/entity-kind"
+ :vocab/values ["named-org" "org-form"]
+ :vocab/note "named-org = one identifiable body (Rotary International). org-form = a population-level organizational FORM with many instances and usually no apex body (町内会, stokvels, subreddits). Worldwide coverage of unregistered community is only expressible with org-form entities; :org/instance-count-estimate carries the population size."
+ :source/dataset "community-coverage"}
+
+{:vocab/id :vocab-scope
+ :vocab/attribute "org/scope"
+ :vocab/values ["global" "transnational" "national" "subnational" "local-class"]
+ :vocab/note "local-class = the entity describes a class of local bodies, not a single one."
+ :source/dataset "community-coverage"}
+
+{:vocab/id :vocab-data-provenance
+ :vocab/attribute "org/data-provenance"
+ :vocab/values ["llm-recall-unverified" "source-pinned" "primary-document"]
+ :vocab/note "Iterations 1-2 of this corpus were llm-recall-unverified across the board: figures were approximate public estimates recalled without fetching the source, and MUST NOT be read as measurements. Iteration 3 (2026-07-25) began flipping entries to source-pinned. Per the repo's system-dynamics rule (ADR-2607203000), an unmeasured entity is 'coverage not yet achieved', never 'out of scope' — and a recalled number is never presented as a computed one. Query `[?e \"org/data-provenance\" \"llm-recall-unverified\"]` to see what is still unpinned."
+ :source/dataset "community-coverage"}
+
+{:vocab/id :vocab-source-tier
+ :vocab/attribute "org/source-tier"
+ :vocab/values ["primary" "secondary"]
+ :vocab/note "primary = the figure was taken from the publishing body's own report or dataset (NABARD SOMFI, WOCCU Statistical Report, DOSB Bestandserhebung, 消防庁 press release, ICA facts page). secondary = the figure traces to that body but was read through a news article, encyclopedia or summary; :org/source-caveat then says what would be needed to promote it. Pinning a figure does NOT make it true — it makes it checkable and dated."
+ :source/dataset "community-coverage"}
+
+{:vocab/id :vocab-form-family
+ :vocab/attribute "org/form-family"
+ :vocab/values ["family-rosca" "family-burial-society" "family-neighborhood-assembly" "family-labor-exchange" "family-customary-council" "family-commons-management" "family-fraternal-order" "family-diaspora-hometown" "family-volunteer-emergency" "family-religious-lay-committee" "family-platform-native" "family-displaced-community" "family-peer-support" "family-elder-sociability" "family-school-linked" "family-popular-education" "family-hobby-society" "family-festival-society" "family-status-based-community" "family-labor-union" "family-cooperative-enterprise" "family-civic-movement" "family-international-club-network" "family-sport-club" "family-gift-and-sharing" "family-intentional-community" "family-foss-project" "family-indigenous-descent-group" "family-lay-public-office" "family-recurring-salon" "family-blood-donation" "family-mobile-dwelling" "family-association-law-sector" "family-neighborhood-security" "family-youth-organization" "family-animal-care" "family-chain-community" "family-fan-club"]
+ :vocab/note "Added 2026-07-26 (iteration 20). Categories answer 'what kind of thing is this?'; families answer 'what is this the local version OF?'. The corpus's comparative value is in the second question: 講 / stokvel / tanda / chama / gam'iya / sòl are one institution wearing twelve names, and 結 / 두레 / hashar / bayanihan / minga are another. Without the family key those analogues sit in the same category as unrelated entries and the cross-national comparison has to be reconstructed by hand every time. 250 of 258 orgs carry a family (36 families); the rest have no cross-national analogue in the corpus yet, which is itself a coverage signal."
+ :vocab/query-example "[:find ?fam ?n :where [?e \"org/form-family\" ?fam] [?e \"org/name\" ?n]]"
+ :source/dataset "community-coverage"}
+
+{:vocab/id :vocab-proxy-metric
+ :vocab/attribute "org/proxy-metric"
+ :vocab/note "Some communities publish nothing, and their size is INFERRED FROM AN ARTEFACT they leave behind — on-chain addresses, sequentially issued fan club membership numbers, club-recognised branch registers, validator counts. :org/proxy-metric names the artefact and :org/proxy-bias states which direction it distorts and roughly how far. Added 2026-07-26 when blockchain chain communities and subscription fan clubs turned out to share exactly this structure: both counts grow monotonically from an artefact while the live community can shrink, so both overstate. Crypto active-address counts overstate people by roughly 4-7x (a16z); Japanese fan club figures are cumulative issued numbers that never subtract lapsed members, which is why a group inactive since 2020 still ranks first. Where a proxy exists, the corpus records the proxy and the bias rather than laundering either into :org/member-count."
+ :source/dataset "community-coverage"}
+
+{:vocab/id :vocab-pinning-conventions
+ :vocab/attribute "org/member-count-basis"
+ :vocab/note "Three recurring traps this corpus makes explicit rather than silently absorbing: (1) MEMBERSHIPS vs PEOPLE — DOSB's 29.3M and ICA's 1B count memberships, so one person joining three bodies counts three times; (2) HOUSEHOLDS vs INDIVIDUALS — NABARD's 177.5M is households reached, not active members; (3) FEDERATION SCOPE — WOSM's 51.4M excludes WAGGGS, and Colombia's 62,553 JAC figure does not cover the other countries listed in :org/countries. Any entry that mixes these MUST say so in this field."
+ :source/dataset "community-coverage"}
+
+;;; ---------- corpus self-description ----------
+
+{:corpus/id :corpus-community-coverage
+ :corpus/name "Worldwide community coverage corpus"
+ :corpus/adr "ADR-2607257200"
+ :corpus/started "2026-07-25"
+ :corpus/iteration 1
+ :corpus/categories ["cat-local-place" "cat-sports" "cat-fraternal" "cat-labor-coop" "cat-mutual-aid" "cat-international" "cat-traditional" "cat-online"]
+ :corpus/coverage-claim "This corpus does NOT claim to enumerate every community on earth. It claims that no community type is categorically excluded from the schema, and it tracks per-category coverage honestly."
+ :corpus/known-gaps "Iteration 1: all counts llm-recall-unverified; no per-org 14-axis scores (deliberately omitted rather than fabricated); thin coverage of Central Asia, Central Africa, Pacific, Caribbean, Middle East non-Gulf; religious lay confraternities are held in 90-docs/religious-community/; criminal sworn societies excluded by policy."
+ :source/dataset "community-coverage"}
+]

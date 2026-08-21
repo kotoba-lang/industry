@@ -1,0 +1,123 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-28"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-28.edn"
+  :doc/date "2026-08-19"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "remove back-edge? routing so production call+loop uses :call-live"
+  :coscientist/iteration 28
+  :coscientist/subject "kotoba-lang/kotoba-mir 767d3c0, kotoba-lang/kotoba-native 4bb08b9, kotoba-lang/amu 27d69898"
+  :coscientist/action "WIP=1 was the largest remaining allocator lever: drop the (and calls? (back-edge?)) short-circuit in allocate-with-policy; production call+loop takes the scanner; leftover pressure still all-vreg via :spill-required; pin mir through native into amu; rewrite the four production all-vreg asserts; do not time ns; do not implement cfg-liveness; do not rematch leaf vs LLVM"
+  :coscientist/measured "judah. kotoba-mir 45 tests / 1005 assertions / 0 fail. kotoba-native 170 tests / 2212 assertions / 0 fail (encodings). amu classpath lock mir 767d3c0 via native 4bb08b9. Full test-runner after the pin: 1098 tests, 1 fail (aggregate-abi hardcoded native sha 69e364e), 87 error (judah wasm-tools baseline, same class as iteration 27). Pin string updated to 4bb08b9. Then aggregate-abi-test + isa-execution-test: 23 tests / 754 assertions / 0 fail / 0 error. Production count-loop [:call-live 0] both ISAs. Pressure-loop production :call-live; scratch-only still pos? store/load. kexe n in {0,1,5,50} equals n and n+31. Did not re-run the 138-namespace suite after the pin-string fix."
+  :coscientist/refuted "that production call+loop must take all-vreg. Iteration 27 already showed the scanner path on the suite except four policy asserts. Also that bumping native is encodings-only: the aggregate-abi pin-assert is a real fail until the sha moves with deps.edn."
+  :coscientist/carries-forward "iteration-07: every LLVM ratio in that file is from a leaf; call-containing functions had never been timed. iteration-14: leaf vs LLVM inside noise, perfgate refused. iteration-16: 24-live+if 99 slots became 17; that pair still untimed. iteration-23 contract :loops-with-calls :all-vregs is withdrawn. :cfg-liveness remains false. :llvm-beaten remains false. Do not overwrite 04-27"
+
+  :doc/body
+  "# Codegen co-scientist, iteration 28
+
+Iteration 27 named this: remove `back-edge?` against the suite
+evidence, or keep it. This file takes the removal. It is also the
+largest remaining whole-pipeline performance lever that is not a
+new export.
+
+Do not overwrite 04-27.
+
+## What remaining performance actually is
+
+Already taken. Do not redo:
+
+- Pool growth (iteration 06): kernel_wide 9.10x LLVM became 1.62x
+- Proportional spill (iteration 07): kernel_deep 7.87x became 1.44x
+- Fuel / ISA hoist (11-13). Identity leftover was strcmp
+- Leaf vs LLVM (14): 5.85 / 5.80 ns = 1.009x. perfgate refused
+- Scanner for call+if (16): 24-live 99 slots became 17
+- Call+loop encodings, kexe, spill, suite (22-27). Production was
+  still all-vreg whenever `back-edge?` was true
+
+This iteration. Production call+loop no longer spills every vreg:
+
+- count-loop: `[:all-vregs 8]` became `[:call-live 0]`
+- pressure-loop: production `:call-live` (AArch64 full pool still
+  does not measure a spill; scratch-only does)
+
+Not this week's timing, and not a ranking:
+
+- wide/deep leftover 1.44-1.62x is instruction selection on leaves,
+  not all-vreg. fused-srem / extra MOV / FMA / PGO / kototama
+  optimizer are refused
+- cfg-liveness is correctness for shapes textual last-uses cannot
+  see, not the first performance knob
+- packing / CARv2 / kexe loader are round-trips, not ns/call
+- self-tail past the fuel prologue (iteration 05) is a different
+  export
+- rematching leaf vs LLVM
+- a timed `bench` export
+
+The first *timed* claim this path can still make is call+loop
+production vs the old all-vreg policy, on quiet judah, through
+perfgate. Iteration 07: every ratio in that file is from a leaf.
+Iteration 16 named the 24-live pair. That is Next, not this file.
+
+## What landed
+
+`allocate-with-policy` no longer short-circuits
+`(and calls? (back-edge?))` to all-vreg. The scanner is the
+production path. Leftover pressure still falls back via
+`:spill-required`. `back-edge?` remains in source as the last-uses
+hazard; it is not a routing guard. `:cfg-liveness` is still false.
+
+ADR 0012 contract: `:back-edge` and `:loops-with-calls` are
+`:call-live`. `:fallbacks` is `#{:register-pressure}`.
+
+Pin chain (amu does not depend on kotoba-mir directly):
+
+- kotoba-mir `767d3c0b418f85d1d177f78b0648c106a79bfb62`
+- kotoba-native `4bb08b9228bc41168ab42bf6d7d2e60150104aff`
+  (deps pin of mir; encodings suite 170/2212/0)
+- amu `27d69898aca60db492d2c415eae31d7a72a07243`
+  (deps-lock mir `767d3c0`, native `4bb08b9`)
+
+amu tests: production count-loop `[:call-live 0]` both ISAs;
+pressure-loop production `:call-live`; scratch-only still asserts
+`pos?` spill-store/load. Execution oracles unchanged.
+
+## What this is not
+
+Not a ns/call ranking. Encodings and kexe are not perfgate.
+
+Not LLVM beaten. Leaf refusal (14) stands. Call+loop has never
+been timed against LLVM.
+
+Not cfg-liveness. last-uses are still textual.
+
+Not a claim that the 138-namespace suite was re-run after the
+aggregate-abi pin-string fix. The 1 fail on that run *was* the
+pin string. The two namespaces that encode this change are green
+(23/754/0). 87 errors are the judah wasm-tools baseline.
+
+## Pins
+
+- kotoba-mir `767d3c0b418f85d1d177f78b0648c106a79bfb62`
+  west-pin `efebb442d71c3ad6da6d515c8486ea6cdcb5b88f`
+- kotoba-native `4bb08b9228bc41168ab42bf6d7d2e60150104aff`
+  west-pin `82e0ae925b8383dc57380bcb90123d0012b38ee5`
+- amu `27d69898aca60db492d2c415eae31d7a72a07243`
+  west-pin `115ea914ce4a734c8f842a48695dc23a91a8ebb0`
+
+## Meta-review
+
+- **The largest remaining allocator lever was spilling every vreg
+  on call+loop.** That path is now `:call-live`.
+- **Amu would not have seen the mir change without the native pin.**
+  deps-lock is the classpath that runs.
+- **The aggregate-abi pin-assert is part of bumping native.** It is
+  not an allocator regression.
+
+## Next
+
+Time production call+loop (count-loop, and/or the iteration-16
+24-live pair) against the old all-vreg policy on quiet judah.
+Judge is min ns/call. Seal only via `kotoba-lang/perfgate`. Do not
+overwrite 04-27. Do not rematch leaf vs LLVM. Do not claim LLVM
+beaten. Do not implement cfg-liveness as a drive-by of a timing
+run. Do not ship a timed `bench` export."}]

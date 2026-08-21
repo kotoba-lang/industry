@@ -1,0 +1,82 @@
+;; Akash Network GPU 市場の実測（2026-08-03、console-api.akash.network）
+;;
+;; ADR-2608039800 の初版は Akash の価格を比較ブログ（二次情報）から引き、
+;; 『最安の常設先』と結論して移行トリガーまで計算していた。一次情報で
+;; 全部安すぎたことが判明したので、その訂正の根拠として記録する。
+
+[{:db/id -1
+  :measurement/id "2608030003-akash-gpu-market"
+  :measurement/at "2026-08-03"
+  :measurement/method "GET https://console-api.akash.network/v1/gpu-prices, /v1/network-capacity"
+  :source/dataset "procurement"
+  :provider/name "akash"
+
+  :network/gpu-total 447
+  :network/gpu-available 316
+  :network/gpu-active 129
+
+  ;; model → {総数 空き 最安 平均 最高}（USD/hour）
+  :akash/gpu-table
+  "{\"a100-80Gi\"    {:total 240 :available 196 :min 1.13 :avg 1.55 :max 1.83}
+    \"h100-80Gi\"    {:total 71  :available 22  :min 2.01 :avg 2.57 :max 3.16}
+    \"h200-141Gi\"   {:total 40  :available 12  :min 4.37 :avg 4.37 :max 4.37}
+    \"pro6000se-96Gi\" {:total 24 :available 24 :min 2.04 :avg 2.04 :max 2.04}
+    \"rtx3090-24Gi\" {:total 13  :available 9   :min 0.09 :avg 0.16 :max 0.28}
+    \"rtx5090-32Gi\" {:total 9   :available 8   :min 0.66 :avg 0.69 :max 0.71}
+    \"rtx4090-24Gi\" {:total 6   :available 6   :min 0.28 :avg 0.33 :max 0.38}}"
+
+  ;; 同日・同条件（reliability>=0.95、単GPU、VRAM 70G+ は 80G 級に限定）で
+  ;; Vast.ai を叩いた比較値
+  :vast/comparison
+  "{\"rtx4090-24Gi\" {:offers 100 :min 0.136 :median 0.364}
+    \"a100-sxm4-80Gi\" {:offers 14 :min 0.835 :median 1.043}
+    \"a100-pcie-80Gi\" {:offers 7  :min 1.002 :median 1.002}
+    \"h100-sxm-80Gi\"  {:offers 9  :min 1.491 :median 2.802}}"
+
+  :measurement/finding
+  "**Akash は最安ではない。** 比較可能なクラスの最安価格で Akash が勝つものは
+   1 つも無い:
+
+     RTX 4090   Akash $0.28  vs  Vast.ai $0.136   → Vast.ai が半額
+     A100 80G   Akash $1.13  vs  Vast.ai $0.835   → Vast.ai が安い
+     H100 80G   Akash $2.01  vs  Vast.ai $1.491   → Vast.ai が安い
+
+   中央値でみると H100 だけ Akash が有利（$2.57 vs $2.80）だが、これは
+   Vast.ai の分布が上に長いだけで、最安帯を取れるなら Vast.ai が勝つ。
+
+   4090 常設は $0.28/h × 730h = **月 $204** で、Vast.ai の warm worker
+   （月 $182.5）より高い。**ADR-2608039800 初版の『稼働率 43% で Akash へ』
+   というトリガーは成立しない。**
+
+   ## それでも Akash が持つもの
+
+   - **A100 80G を 240 基（空き 196）**。Vast.ai の同クラスは実測 21 件で、
+     供給が 1 桁違う。A100 をまとめて確保するなら Akash しかない
+   - **H200 141G（40 基）/ pro6000se 96G（24 基）** は Vast.ai の同条件検索に
+     出なかった
+   - USDC 決済で **Stripe を一切通らない**
+   - ネットワークに content policy が無い（判断は provider 個別）
+
+   逆に **全体で 447 基しかない**。Vast.ai は 4090 単独で 100 件が品質フィルタを
+   通る。**consumer GPU の市場としては小さい。**"
+
+  :measurement/caveats
+  "価格は Akash 自身の集計 API の値で、**実際に bid を出して得られる価格では
+   ない**。Akash はリバースオークションなので、実効価格は SDL の条件と
+   その時の provider 次第。Vast.ai 側は個々のオファーの実価格なので、
+   厳密には比較の粒度が違う。
+
+   **実デプロイの検証はできていない。** mainnet はエスクローに AKT/USDC の
+   実資金が要り（資金操作なのでオーナー実行）、sandbox
+   （`api.sandbox-01.aksh.pw` / `faucet.sandbox-01.aksh.pw`）は 2026-08-03 時点で
+   応答なし。したがって **Akash の provisioning 時間・cold start は未計測**で、
+   Vast.ai の 61 秒 / 346 秒に相当する数字を持っていない。
+
+   `available` は provider が申告した空き容量であって、実際に bid が通ることの
+   保証ではない。"
+
+  :measurement/lesson
+  "**調達の判断に二次情報の価格を使わない。** 初版が引いた比較ブログの数字
+   （4090 $0.10-0.20 / A100 $0.50-1.00 / H100 $1.50-2.00）は全て実際より安く、
+   それを根拠に『最安の常設先』という結論と移行トリガーまで組み立ててしまった。
+   売り手でも買い手でもない第三者の価格は、検証されないまま流通する。"}]

@@ -1,0 +1,659 @@
+;; threed-capability-axes.edn — 3D/CAD/CAM/render スタックの **能力軸カタログ**。
+;; 手書き（語彙）。ここだけが判断で、スコアは全部 scripts/threed-maturity-audit.cljs が
+;; tree から再計算する。ADR-2608200100。
+;;
+;; なぜ「行数」でも「LLM の採点」でもないのか。
+;;   ADR-2607132300 の実測 —— 3 体の LLM judge が 4 ライブラリを全軸 4.0–5.0/5 と採点した
+;;   裏で、tap-target / dvh / safe-area / theme-color の 4 つの具体的欠落を 1 つも指摘
+;;   しなかった。主観採点は「劇場」になる。行数も同じで、`fillet-feature` は 1 行の
+;;   データ構築子でありながら「fillet がある」ように見える。
+;;
+;; したがって各軸は 2 段で測る:
+;;
+;;   :axis/markers    — top-level `(def…` 名の集合。**在ることしか言わない**。
+;;                      通ると :declared。通らなければ :absent。
+;;   :axis/behavior   — 実際にその関数を呼んで不変条件を検査する probe の id
+;;                      （90-docs/maturity/probes/<id>.cljs）。通ると :working。
+;;                      **落ちると :hollow —— 宣言はあるが動かない。**
+;;                      probe が無い軸は :declared のまま止まり、**:working には
+;;                      決して繰り上がらない**（測っていないものを緑にしない）。
+;;
+;; :axis/status の値域と意味:
+;;   :working       markers あり + behavior probe PASS  → 使える
+;;   :hollow        markers あり + behavior probe FAIL  → 名前だけ在る（最悪。緑に見える）
+;;   :declared      markers あり + probe 無し           → 未検証。実装済みと数えない
+;;   :thin          markers 一部だけ                    → 部分実装（欠けている名前を出す）
+;;   :absent        markers ゼロ                        → 走査範囲に無い
+;;   :unmeasurable  checkout が無い / 読めない          → **答えられなかった**。
+;;                  pass 側にも fail 側にも数えない（CLAUDE.md 2608136000 の 5 問）
+;;
+;; ⚠ :absent は「走査した repo 集合の中に無い」であって「この workspace に無い」ではない。
+;;    走査範囲は :axis/repo が名指しする checkout だけ。west は 4,221 project を持ち、
+;;    checkout されていない repo は測定に映らない —— audit は毎回その件数を申告する。
+;;
+;; :axis/target は「その軸を産業で担っている実在の製品」。我々の repo をそこに
+;; 並べるのは比較のためであって、代替を主張するためではない。
+
+{:catalog/version 1
+ :catalog/measured-scope "orgs/ 配下の checkout のみ。west 未 checkout の project は :unmeasurable"
+ :catalog/depth-floor-note "loc / test の床は判断。床を下回る実装は :thin へ落とさず、床は :axis/depth-floor に別途記録して report が併記する（床は status を決めない —— 決めるのは marker と behavior だけ）"
+
+ :catalog/segments
+ {:mcad     "機械 CAD — SolidWorks / CATIA / Siemens NX / Creo / Inventor / Fusion 360 / Onshape"
+  :kernel   "幾何カーネル — Parasolid / ACIS / CGM / OCCT"
+  :aec      "建築・BIM — Revit / Archicad / AutoCAD / Tekla / Rhino+Grasshopper"
+  :dcc      "映像・ゲーム DCC — Maya / 3ds Max / Blender / Cinema 4D / Houdini / Modo"
+  :sculpt   "スカルプト・テクスチャ — ZBrush / Substance 3D Painter・Designer / Mari"
+  :render   "レンダリング — Arnold / V-Ray / Redshift / RenderMan / Cycles / KeyShot"
+  :realtime "リアルタイム — Unreal / Unity / Omniverse / Twinmotion"
+  :cam      "加工 — Mastercam / PowerMill / NX CAM / hyperMILL / Esprit"
+  :cae      "解析 — Ansys / Abaqus / Nastran / LS-DYNA / Star-CCM+ / OpenFOAM"
+  :interop  "交換 — STEP / IGES / JT / Parasolid / DWG / IFC / USD / glTF / Alembic / FBX"}
+
+ :catalog/axes
+ [;; ───────────────────── kernel: B-rep 幾何カーネル ─────────────────────
+  {:axis/id :kernel/brep-topology
+   :axis/segment :kernel :axis/weight 5
+   :axis/target "Parasolid / OCCT の topology"
+   :axis/label "B-rep トポロジ（vertex→edge→face→shell→solid）"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/kernel.cljc"]
+   :axis/markers ["brep-vertex" "brep-edge" "brep-face" "brep-shell" "brep-solid"]
+   :axis/behavior "brep-topology"}
+
+  {:axis/id :kernel/analytic-surfaces
+   :axis/segment :kernel :axis/weight 4
+   :axis/target "Parasolid / OCCT の解析曲面"
+   :axis/label "解析曲面（平面・円筒・円錐・球・トーラス）"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/kernel.cljc"]
+   :axis/markers ["plane-surface" "cylinder-surface" "cone-surface" "sphere-surface" "torus-surface"]
+   :axis/behavior "analytic-surfaces"}
+
+  {:axis/id :kernel/nurbs-curve
+   :axis/segment :kernel :axis/weight 4
+   :axis/target "Parasolid / OCCT の NURBS 曲線"
+   :axis/label "NURBS / B-spline 曲線の評価"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/kernel.cljc" "src/brep/spline.cljc"]
+   :axis/markers ["bspline-curve" "curve-evaluate" "expand-knots"]
+   :axis/behavior "nurbs-curve"}
+
+  {:axis/id :kernel/nurbs-surface-trimmed
+   :axis/segment :kernel :axis/weight 5
+   :axis/target "Parasolid / OCCT のトリム面"
+   :axis/label "トリム NURBS 曲面（trim loop 付き）"
+   :axis/repo "kotoba-lang/kami-engine-modeling"
+   :axis/paths ["src"]
+   :axis/markers ["trimmed-surface" "tessellate-trimmed-surface" "point-in-trim?" "trim-loop"]
+   :axis/behavior "nurbs-surface-trimmed"}
+
+  ;; ── feature registry ───────────────────────────────────────────────
+  ;; 2026-08-20: `brep.feature/apply-feature` を open な multimethod にした
+  ;; （ADR-2608200100 反復 4）。**method が登録されていることが、その kind を
+  ;; 評価できるという主張そのもの**で、「対応 kind の一覧」という第二のリストは
+  ;; 存在しない。したがってこの面の marker は `:dispatch` —— 願望としての
+  ;; 構築子名ではなく、registry に実在する dispatch 値を数える。
+  ;;
+  ;; 軸を feature ごとに割ってあるのは、**1 つ実装したら 1 つ点が動く**ように
+  ;; するため。以前は 4 機能が 1 軸に入っており、1 個実装しても測定が動かず、
+  ;; 実装が報われない形になっていた。
+  {:axis/id :kernel/feature-registry
+   :axis/segment :kernel :axis/weight 5
+   :axis/target "SolidWorks / Parasolid の feature tree"
+   :axis/label "feature registry が自分の守備範囲を正直に答える"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/feature.cljc"]
+   :axis/markers ["apply-feature" "supported-feature-kinds"]
+   :axis/behavior "feature-registry"}
+
+  {:axis/id :kernel/extrude
+   :axis/segment :kernel :axis/weight 5
+   :axis/target "SolidWorks の押し出し"
+   :axis/label "スケッチ profile からの押し出し"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/feature.cljc"]
+   :axis/marker-kind :dispatch :axis/dispatch-of "apply-feature"
+   :axis/markers ["extrude"]
+   :axis/behavior "feature-extrude"}
+
+  {:axis/id :kernel/loft
+   :axis/segment :kernel :axis/weight 4
+   :axis/target "SolidWorks / Rhino の loft"
+   :axis/label "複数 profile 間のロフト"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/feature.cljc"]
+   :axis/marker-kind :dispatch :axis/dispatch-of "apply-feature"
+   :axis/markers ["loft"]
+   :axis/behavior "feature-loft"}
+
+  {:axis/id :kernel/pattern
+   :axis/segment :kernel :axis/weight 3
+   :axis/target "SolidWorks の linear pattern"
+   :axis/label "直線パターン（本体の反復）"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/feature.cljc"]
+   :axis/marker-kind :dispatch :axis/dispatch-of "apply-feature"
+   :axis/markers ["pattern"]
+   :axis/behavior "feature-pattern"}
+
+  {:axis/id :kernel/sweep
+   :axis/segment :kernel :axis/weight 4
+   :axis/target "SolidWorks の sweep"
+   :axis/label "経路に沿った掃引"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/feature.cljc"]
+   :axis/marker-kind :dispatch :axis/dispatch-of "apply-feature"
+   :axis/markers ["sweep"]
+   :axis/behavior "feature-sweep"}
+
+  {:axis/id :kernel/mesh-topology
+   :axis/segment :kernel :axis/weight 4
+   :axis/target "Parasolid / OCCT が当たり前に持っている位相面"
+   :axis/label "三角形メッシュの位相（溶接・面隣接・二面角・凹凸・境界）"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/topology.cljc"]
+   :axis/markers ["topology" "weld-mesh" "orient-faces" "sharp-edges" "boundary-edges"
+                  "euler-characteristic"]
+   :axis/behavior "mesh-topology"}
+
+  ;; ⚠ chamfer / fillet / shell がこの順で残っているのは偶然ではない。
+  ;; `evaluate-mesh` の accumulator は `{:positions :indices}` の**三角形スープ**で、
+  ;; エッジ同一性も面隣接も持たなかった。一方 `chamfer-feature` / `fillet-feature` は
+  ;; `:edges`（BREP のエッジ id）で対象を指す —— メッシュ側にその id は無い。
+  ;;
+  ;; 反復 6（2026-08-21）で `brep.topology` を入れ、**位相は読めるようになった**
+  ;; （`sharp-edges` が「凸で二面角 N 以上のエッジ」を安定な `[i j]` で返す）。
+  ;; 残る障害は 2 つ:
+  ;;   (1) 面取り自体が頂点分割と角パッチを要する（立方体は全エッジが角で交わるので、
+  ;;       孤立エッジだけ扱う実装は即座に壊れる）
+  ;;   (2) **`mesh-boolean` が閉じたソリッドを返さない**（同反復で実測。交差していない
+  ;;       箱 2 つの union ですら境界エッジが出る）。開いたメッシュの上で面取りしても
+  ;;       正しい結果にならないので、CSG の方が先。
+  {:axis/id :kernel/chamfer
+   :axis/segment :kernel :axis/weight 4
+   :axis/target "SolidWorks / Parasolid の chamfer"
+   :axis/label "エッジ面取り"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/feature.cljc"]
+   :axis/marker-kind :dispatch :axis/dispatch-of "apply-feature"
+   :axis/markers ["chamfer"]
+   :axis/behavior nil}
+
+  {:axis/id :kernel/fillet
+   :axis/segment :kernel :axis/weight 5
+   :axis/target "SolidWorks / Parasolid の blend"
+   :axis/label "エッジ fillet（円弧ブレンド）"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/feature.cljc"]
+   :axis/marker-kind :dispatch :axis/dispatch-of "apply-feature"
+   :axis/markers ["fillet"]
+   :axis/behavior nil}
+
+  {:axis/id :kernel/shell
+   :axis/segment :kernel :axis/weight 3
+   :axis/target "SolidWorks の shell（薄肉化）"
+   :axis/label "薄肉化（オフセット + 差分）"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/feature.cljc"]
+   :axis/marker-kind :dispatch :axis/dispatch-of "apply-feature"
+   :axis/markers ["shell"]
+   :axis/behavior nil}
+
+  {:axis/id :kernel/boolean-solid
+   :axis/segment :kernel :axis/weight 5
+   :axis/target "Parasolid / OCCT の boolean"
+   :axis/label "ソリッド boolean（union / difference / intersection）"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/mesh_csg.cljc" "src/brep/feature.cljc"]
+   :axis/markers ["mesh-boolean" "boolean-feature" "boolean-ops"]
+   :axis/behavior "boolean-solid"}
+
+  {:axis/id :kernel/revolve
+   :axis/segment :kernel :axis/weight 3
+   :axis/target "SolidWorks の revolve"
+   :axis/label "回転体 feature"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/feature.cljc"]
+   :axis/markers ["revolve-feature"]
+   :axis/behavior "revolve"}
+
+  ;; ───────────────────── mcad ─────────────────────
+  {:axis/id :mcad/feature-tree
+   :axis/segment :mcad :axis/weight 5
+   :axis/target "SolidWorks / Inventor の履歴ツリー"
+   :axis/label "パラメトリック履歴ツリー（追加・並べ替え・抑制・再生成）"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/feature.cljc"]
+   :axis/markers ["feature-tree" "add-feature" "suppress" "unsuppress" "reorder"]
+   :axis/behavior "feature-tree"}
+
+  {:axis/id :mcad/sketch-constraints
+   :axis/segment :mcad :axis/weight 5
+   :axis/target "SolidWorks / Onshape の拘束スケッチ"
+   :axis/label "2D 拘束ソルバ（水平・垂直・一致・寸法）"
+   :axis/repo "kotoba-lang/kami-engine-cad"
+   :axis/paths ["src/kami/cad.cljc"]
+   :axis/markers ["constraint" "solve-sketch" "coincident" "horizontal" "vertical" "distance-constraint"]
+   :axis/behavior "sketch-constraints"}
+
+  {:axis/id :mcad/assembly-mates
+   :axis/segment :mcad :axis/weight 4
+   :axis/target "SolidWorks / NX のアセンブリ拘束"
+   :axis/label "アセンブリ・合致・干渉チェック・キネマティクス"
+   :axis/repo "kotoba-lang/kami-engine-modeling"
+   :axis/paths ["src"]
+   :axis/markers ["assembly" "mate" "interference" "solve-kinematics" "occurrence"]
+   :axis/behavior "assembly-mates"}
+
+  {:axis/id :mcad/bom
+   :axis/segment :mcad :axis/weight 2
+   :axis/target "SolidWorks / Windchill の BOM"
+   :axis/label "部品表（BOM）と質量特性"
+   :axis/repo "kotoba-lang/kami-engine-modeling"
+   :axis/paths ["src"]
+   :axis/markers ["bill-of-materials" "part-mass-properties" "assembly-mass-properties"]
+   :axis/behavior "bom"}
+
+  {:axis/id :mcad/gdt-pmi
+   :axis/segment :mcad :axis/weight 3
+   :axis/target "SolidWorks MBD / NX PMI"
+   :axis/label "GD&T / PMI（幾何公差の注記と検証）"
+   :axis/repo "kotoba-lang/kami-engine-modeling"
+   :axis/paths ["src"]
+   :axis/markers ["feature-control-frame" "gdt-symbols" "import-pmi" "pmi-validation-errors"]
+   :axis/behavior nil}
+
+  {:axis/id :mcad/drawing-2d
+   :axis/segment :mcad :axis/weight 3
+   :axis/target "AutoCAD / SolidWorks Drawing"
+   :axis/label "2D 図面（断面図・詳細図・補助投影・用紙・出力）"
+   :axis/repo "kotoba-lang/kami-engine-modeling"
+   :axis/paths ["src/kami/modeling/drawing.cljc"]
+   :axis/markers ["section-view" "detail-view" "auxiliary-view" "paper-sizes" "export-dxf" "export-pdf" "export-svg"]
+   :axis/behavior nil}
+
+  {:axis/id :mcad/sheet-metal
+   :axis/segment :mcad :axis/weight 3
+   :axis/target "SolidWorks Sheet Metal / Inventor"
+   :axis/label "板金（曲げ・展開）"
+   :axis/repo "kotoba-lang/kami-engine-modeling"
+   :axis/paths ["src"]
+   :axis/markers ["sheet" "bend-mesh" "valid-sheet?"]
+   :axis/behavior nil}
+
+  {:axis/id :mcad/healing
+   :axis/segment :mcad :axis/weight 3
+   :axis/target "SolidWorks Import Diagnostics / CADdoctor"
+   :axis/label "インポート形状の healing と公差診断"
+   :axis/repo "kotoba-lang/kami-engine-modeling"
+   :axis/paths ["src"]
+   :axis/markers ["heal-body" "tolerance-diagnostics" "valid-body?"]
+   :axis/behavior nil}
+
+  ;; ───────────────────── interop ─────────────────────
+  {:axis/id :interop/step-ap203
+   :axis/segment :interop :axis/weight 5
+   :axis/target "STEP AP203（ISO 10303-203）"
+   :axis/label "STEP Part21 の読み書き"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/step.cljc" "src/iso_10303/part21.cljc"]
+   :axis/markers ["read-step" "write-step" "parse-file" "parse-entity"]
+   :axis/behavior "step-ap203"}
+
+  {:axis/id :interop/step-ap242
+   :axis/segment :interop :axis/weight 5
+   :axis/target "STEP AP242（現在の製造業の実務標準）"
+   :axis/label "AP242（PMI 付き STEP）"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/step.cljc" "src/iso_10303/part21.cljc"]
+   :axis/markers ["ap242" "ap242-schema" "write-ap242"]
+   :axis/behavior nil}
+
+  {:axis/id :interop/iges
+   :axis/segment :interop :axis/weight 2
+   :axis/target "IGES（レガシー交換）"
+   :axis/label "IGES 読み書き"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src"]
+   :axis/markers ["read-iges" "write-iges"]
+   :axis/behavior nil}
+
+  {:axis/id :interop/dxf
+   :axis/segment :interop :axis/weight 3
+   :axis/target "AutoCAD DXF / DWG"
+   :axis/label "DXF の書き出し（読み込みは別軸）"
+   :axis/repo "kotoba-lang/kami-engine-modeling"
+   :axis/paths ["src/kami/modeling/drawing.cljc"]
+   :axis/markers ["export-dxf"]
+   :axis/behavior nil}
+
+  {:axis/id :interop/dxf-read
+   :axis/segment :interop :axis/weight 3
+   :axis/target "AutoCAD DXF / DWG の取り込み"
+   :axis/label "DXF の読み込み"
+   :axis/repo "kotoba-lang/kami-engine-modeling"
+   :axis/paths ["src"]
+   :axis/markers ["read-dxf" "import-dxf" "parse-dxf"]
+   :axis/behavior nil}
+
+  {:axis/id :interop/ifc-spf
+   :axis/segment :interop :axis/weight 5
+   :axis/target "IFC 4.3（ISO 16739）— Revit / Archicad / Tekla の共通面"
+   :axis/label "IFC SPF の読み書き（XML/IDS は別軸）"
+   :axis/repo "kotoba-lang/org-iso-16739"
+   :axis/paths ["src/ifc/core.cljc"]
+   :axis/markers ["read-spf" "write-spf" "read-document" "read-external-spf" "rewrite-spf"]
+   :axis/probe-extra-cp ["kotoba-lang/org-iso-10303/src"]
+   :axis/behavior "ifc-spf"}
+
+  {:axis/id :interop/ifc-ids
+   :axis/segment :interop :axis/weight 4
+   :axis/target "buildingSMART IDS（発注者要件の機械検査）"
+   :axis/label "IDS 仕様・facet・制約の適合判定"
+   :axis/repo "kotoba-lang/org-iso-16739"
+   :axis/paths ["src/ifc/ids.cljc"]
+   :axis/markers ["specification" "facet" "facet-matches?" "restriction" "matches-restriction?"]
+   :axis/probe-extra-cp ["kotoba-lang/org-iso-10303/src"]
+   :axis/behavior "ifc-ids"}
+
+  {:axis/id :interop/usd
+   :axis/segment :interop :axis/weight 5
+   :axis/target "OpenUSD（Omniverse / Maya / Houdini の共通面）"
+   :axis/label "USD crate（usdc）と usda の読み書き"
+   :axis/repo "kotoba-lang/org-openusd"
+   :axis/paths ["src"]
+   :axis/markers ["read-usdc" "write-usdc!" "parse-prim" "usda" "prim" "attr" "rel"]
+   :axis/behavior "usd"}
+
+  {:axis/id :interop/gltf
+   :axis/segment :interop :axis/weight 4
+   :axis/target "glTF 2.0 / GLB（Khronos）"
+   :axis/label "glTF / GLB の読み書き"
+   :axis/repo "kotoba-lang/org-khronos-gltf"
+   :axis/paths ["src"]
+   :axis/markers ["parse-gltf" "export-glb" "decode-accessor" "build-gltf-json"]
+   :axis/probe-extra-cp ["kotoba-lang/org-khronos-glb/src"]
+   :axis/behavior "gltf"}
+
+  {:axis/id :interop/materialx
+   :axis/segment :interop :axis/weight 3
+   :axis/target "MaterialX（Arnold / V-Ray / USD の材質交換）"
+   :axis/label "MaterialX ノードグラフの往復"
+   :axis/repo "kotoba-lang/org-materialx"
+   :axis/paths ["src"]
+   :axis/markers ["materialx->node-graph" "node-graph->materialx" "resolve-nodedef"]
+   :axis/behavior nil}
+
+  {:axis/id :interop/alembic
+   :axis/segment :interop :axis/weight 3
+   :axis/target "Alembic（映像パイプラインのキャッシュ標準）"
+   :axis/label "Alembic の読み書き"
+   :axis/repo "kotoba-lang/org-openusd"
+   :axis/paths ["src"]
+   :axis/markers ["read-abc" "write-abc" "alembic"]
+   :axis/behavior nil}
+
+  {:axis/id :interop/openvdb
+   :axis/segment :interop :axis/weight 2
+   :axis/target "OpenVDB（Houdini のボリューム標準）"
+   :axis/label "疎ボリュームグリッドの読み書き"
+   :axis/repo "kotoba-lang/kami-engine-sculpt"
+   :axis/paths ["src"]
+   :axis/markers ["vdb" "read-vdb" "write-vdb"]
+   :axis/behavior nil}
+
+  ;; ───────────────────── dcc ─────────────────────
+  {:axis/id :dcc/poly-edit
+   :axis/segment :dcc :axis/weight 5
+   :axis/target "Blender 編集モード / Maya のポリゴン編集"
+   :axis/label "ポリゴン編集操作（押し出し・インセット・ベベル・ナイフ・ループカット）"
+   :axis/repo "kotoba-lang/kami-engine-modeling"
+   :axis/paths ["src/kami/modeling.cljc"]
+   :axis/markers ["extrude-face" "inset-face" "bevel-face" "knife-face" "loop-cut-face"]
+   :axis/behavior "poly-edit"}
+
+  {:axis/id :dcc/modifier-stack
+   :axis/segment :dcc :axis/weight 4
+   :axis/target "Blender modifier stack"
+   :axis/label "非破壊 modifier スタック"
+   :axis/repo "kotoba-lang/kami-engine-modeling"
+   :axis/paths ["src/kami/modeling.cljc"]
+   :axis/markers ["modifier" "modifier-registry" "apply-modifier" "move-modifier" "remove-modifier"]
+   :axis/behavior nil}
+
+  {:axis/id :dcc/uv-unwrap
+   :axis/segment :dcc :axis/weight 4
+   :axis/target "Blender の Smart UV / Maya の UV Toolkit"
+   :axis/label "UV 展開（angle-based / LSCM などの歪み最小化）"
+   :axis/repo "kotoba-lang/kami-engine-modeling"
+   :axis/paths ["src/kami/modeling.cljc"]
+   :axis/markers ["planar-unwrap" "lscm-unwrap" "angle-based-unwrap" "uv-islands"]
+   :axis/behavior nil}
+
+  {:axis/id :dcc/subdivision
+   :axis/segment :dcc :axis/weight 4
+   :axis/target "OpenSubdiv（Maya / Blender の Catmull-Clark）"
+   :axis/label "細分割曲面（Catmull-Clark + crease）"
+   :axis/repo "kotoba-lang/kami-engine-modeling"
+   :axis/paths ["src/kami/modeling.cljc"]
+   :axis/markers ["subdivide-mesh" "catmull-clark" "crease"]
+   :axis/behavior nil}
+
+  {:axis/id :dcc/rig-skinning
+   :axis/segment :dcc :axis/weight 4
+   :axis/target "Maya のリグ / Blender のアーマチュア"
+   :axis/label "スケルトン・スキニング・IK"
+   :axis/repo "kotoba-lang/kami-engine-animation"
+   :axis/paths ["src"]
+   :axis/markers ["skeleton" "bone" "evaluate-skinning" "solve-two-bone-ik" "two-bone-ik-pose" "pose-constraint"]
+   :axis/behavior "rig-skinning"}
+
+  {:axis/id :dcc/anim-curves
+   :axis/segment :dcc :axis/weight 4
+   :axis/target "Maya の Graph Editor / Blender の F-Curve"
+   :axis/label "キーフレーム・補間・タンジェント"
+   :axis/repo "kotoba-lang/kami-engine-animation"
+   :axis/paths ["src"]
+   :axis/markers ["keyframe" "add-keyframe" "auto-tangents" "track" "timeline" "sample"]
+   :axis/behavior "anim-curves"}
+
+  {:axis/id :dcc/particles-vfx
+   :axis/segment :dcc :axis/weight 3
+   :axis/target "Houdini の SOP/DOP、Maya の nParticle"
+   :axis/label "パーティクル / プロシージャル VFX"
+   :axis/repo "kotoba-lang/kami-gen-procedural"
+   :axis/paths ["src"]
+   :axis/markers ["particle" "emitter" "solver-step" "vfx-graph"]
+   :axis/behavior nil}
+
+  {:axis/id :dcc/cloth-hair
+   :axis/segment :dcc :axis/weight 3
+   :axis/target "Marvelous Designer / Maya nCloth / Blender の物理"
+   :axis/label "布・髪のシミュレーション"
+   :axis/repo "kotoba-lang/kami-engine"
+   :axis/paths ["kami-physics/src"]
+   :axis/markers ["cloth" "hair" "cloth-step"]
+   :axis/behavior nil}
+
+  ;; ───────────────────── sculpt ─────────────────────
+  {:axis/id :sculpt/brushes
+   :axis/segment :sculpt :axis/weight 4
+   :axis/target "ZBrush のブラシ / Blender Sculpt Mode"
+   :axis/label "スカルプトブラシ・レイヤ・マスク・対称"
+   :axis/repo "kotoba-lang/kami-engine-sculpt"
+   :axis/paths ["src"]
+   :axis/markers ["brush" "apply-brush" "apply-mask-brush" "symmetry-brushes" "sculpt-layer"]
+   :axis/behavior "sculpt-brushes"}
+
+  {:axis/id :sculpt/remesh
+   :axis/segment :sculpt :axis/weight 4
+   :axis/target "ZRemesher / Blender の Voxel Remesh・QuadriFlow"
+   :axis/label "リメッシュ・リトポロジ・穴埋め"
+   :axis/repo "kotoba-lang/kami-engine-sculpt"
+   :axis/paths ["src"]
+   :axis/markers ["voxel-remesh" "remesh-document" "repair-topology" "fill-holes-document"]
+   :axis/behavior nil}
+
+  {:axis/id :sculpt/texture-paint
+   :axis/segment :sculpt :axis/weight 5
+   :axis/target "Substance 3D Painter / Mari / Adobe の材質オーサリング"
+   :axis/label "3D テクスチャペイントと PBR マテリアル層"
+   :axis/repo "kotoba-lang/kami-engine-sculpt"
+   :axis/paths ["src"]
+   :axis/markers ["texture-paint" "paint-stroke" "material-layer" "bake-texture"]
+   :axis/behavior nil}
+
+  ;; ───────────────────── render ─────────────────────
+  {:axis/id :render/realtime-gpu
+   :axis/segment :realtime :axis/weight 5
+   :axis/target "Unreal / Unity / Twinmotion のリアルタイム描画"
+   :axis/label "WebGPU リアルタイム描画（材質・影・LOD・SSAO・大気）"
+   :axis/repo "kotoba-lang/webgpu"
+   :axis/paths ["src"]
+   :axis/markers ["render-frame!" "render-scene!" "material" "shadow" "apply-lod" "adaptive-ssao-graph"]
+   :axis/behavior "realtime-gpu"}
+
+  {:axis/id :render/skinned-gpu
+   :axis/segment :realtime :axis/weight 3
+   :axis/target "Unreal / Unity のスキンメッシュ描画"
+   :axis/label "スキンメッシュの GPU 描画とサブミッションキャッシュ"
+   :axis/repo "kotoba-lang/webgpu"
+   :axis/paths ["src"]
+   :axis/markers ["render-skinned-frame!" "prepare-skinned-submission-packets!" "create-skinned-submission-cache"]
+   :axis/behavior nil}
+
+  {:axis/id :render/gpu-raytracing
+   :axis/segment :render :axis/weight 4
+   :axis/target "NVIDIA RTX / DXR のレイトレーシング"
+   :axis/label "BVH 構築と GPU ray query"
+   :axis/repo "kotoba-lang/raytrace"
+   :axis/paths ["src"]
+   :axis/markers ["build" "traverse" "tri-intersect" "wgsl-ray-query" "to-gpu"]
+   :axis/behavior "gpu-raytracing"}
+
+  {:axis/id :render/offline-pathtracer
+   :axis/segment :render :axis/weight 5
+   :axis/target "Arnold / V-Ray / Cycles / RenderMan"
+   :axis/label "オフライン path tracer（積分器・BSDF・光源サンプリング）"
+   :axis/repo "kotoba-lang/pbrt"
+   :axis/paths ["src"]
+   :axis/markers ["integrator" "bsdf" "sample-light" "path-trace" "film"]
+   :axis/behavior nil}
+
+  {:axis/id :render/color-management
+   :axis/segment :render :axis/weight 3
+   :axis/target "OpenColorIO / ACES（映像・製品ビジュアルの必須要件）"
+   :axis/label "色管理（ACES / OCIO コンフィグ）"
+   :axis/repo "kotoba-lang/webgpu"
+   :axis/paths ["src"]
+   :axis/markers ["ocio" "aces" "color-space" "transfer-function"]
+   :axis/behavior nil}
+
+  {:axis/id :render/denoise
+   :axis/segment :render :axis/weight 2
+   :axis/target "OptiX Denoiser / Open Image Denoise"
+   :axis/label "レンダリングのデノイズ"
+   :axis/repo "kotoba-lang/raytrace"
+   :axis/paths ["src"]
+   :axis/markers ["denoise" "denoiser"]
+   :axis/behavior nil}
+
+  ;; ───────────────────── cam ─────────────────────
+  {:axis/id :cam/toolpath-2d
+   :axis/segment :cam :axis/weight 4
+   :axis/target "Mastercam / Fusion CAM の 2.5D"
+   :axis/label "2.5D 加工（ポケット・穴あけ・面削り・輪郭）"
+   :axis/repo "kotoba-lang/org-iso-6983"
+   :axis/paths ["src/kotoba/cam/toolpath.cljc"]
+   :axis/markers ["generate-toolpath" "new-job" "add-operation" "offset-convex-polygon"]
+   :axis/behavior "toolpath-2d"}
+
+  {:axis/id :cam/toolpath-3axis-surface
+   :axis/segment :cam :axis/weight 5
+   :axis/target "Mastercam / PowerMill の 3 軸曲面加工"
+   :axis/label "3 軸曲面加工（raster / spiral / waterline / pencil）"
+   :axis/repo "kotoba-lang/org-iso-6983"
+   :axis/paths ["src/kotoba/cam/toolpath.cljc"]
+   :axis/markers ["surface-strategies"]
+   :axis/behavior "toolpath-3axis-surface"}
+
+  {:axis/id :cam/gcode
+   :axis/segment :cam :axis/weight 4
+   :axis/target "ISO 6983 G-code"
+   :axis/label "G-code の生成"
+   :axis/repo "kotoba-lang/org-iso-6983"
+   :axis/paths ["src/kotoba/cam/gcode.cljc"]
+   :axis/markers ["generate-gcode" "coordinate-system->str" "gcode-units"]
+   :axis/behavior "gcode"}
+
+  {:axis/id :cam/post-processor
+   :axis/segment :cam :axis/weight 5
+   :axis/target "Mastercam の post（Fanuc / Siemens / Heidenhain 各制御器）"
+   :axis/label "制御器別ポストプロセッサ"
+   :axis/repo "kotoba-lang/org-iso-6983"
+   :axis/paths ["src/kotoba/cam/gcode.cljc"]
+   :axis/markers ["post-processors" "machine-types"]
+   :axis/behavior "post-processor"}
+
+  {:axis/id :cam/collision-check
+   :axis/segment :cam :axis/weight 5
+   :axis/target "Vericut / Mastercam の干渉・削り残し検証"
+   :axis/label "工具・ホルダ干渉と削り込み検査"
+   :axis/repo "kotoba-lang/org-iso-6983"
+   :axis/paths ["src"]
+   :axis/markers ["gouge-check" "collision-check" "holder-clearance"]
+   :axis/behavior nil}
+
+  {:axis/id :cam/multi-axis
+   :axis/segment :cam :axis/weight 4
+   :axis/target "hyperMILL / NX CAM の 5 軸同時"
+   :axis/label "5 軸同時加工と工具軸制御"
+   :axis/repo "kotoba-lang/org-iso-6983"
+   :axis/paths ["src"]
+   :axis/markers ["tool-axis" "five-axis" "multi-axis"]
+   :axis/behavior nil}
+
+  ;; ───────────────────── cae ─────────────────────
+  {:axis/id :cae/fem-static
+   :axis/segment :cae :axis/weight 5
+   :axis/target "Ansys Mechanical / Abaqus の静解析"
+   :axis/label "線形・弾塑性 FEM"
+   :axis/repo "kotoba-lang/kami-engine-cae-solver"
+   :axis/paths ["src"]
+   :axis/marker-kind :dispatch
+   :axis/markers ["fem-elastoplastic" "finite-strain-elastic" "axial-bar-fe"]
+   :axis/behavior "cae-fem-static"}
+
+  {:axis/id :cae/contact
+   :axis/segment :cae :axis/weight 5
+   :axis/target "Abaqus / LS-DYNA の接触"
+   :axis/label "非線形接触・摩擦"
+   :axis/repo "kotoba-lang/kami-engine-cae-solver"
+   :axis/paths ["src"]
+   :axis/marker-kind :dispatch
+   :axis/markers ["nonlinear-contact" "friction-contact" "friction-contact-3d"]
+   :axis/behavior "cae-contact"}
+
+  {:axis/id :cae/cfd
+   :axis/segment :cae :axis/weight 4
+   :axis/target "Fluent / Star-CCM+ / OpenFOAM"
+   :axis/label "CFD（LBM / 圧縮性 FVM）"
+   :axis/repo "kotoba-lang/kami-engine-cfd"
+   :axis/paths ["src"]
+   :axis/markers ["lbm-new" "lbm3-new" "collide!" "step" "feq"]
+   :axis/behavior "cae-cfd"}
+
+  {:axis/id :cae/verification
+   :axis/segment :cae :axis/weight 5
+   :axis/target "ASME V&V 10/20（Ansys / Abaqus の検証責任）"
+   :axis/label "検証（製造解・ベンチマーク・合格ゲート）"
+   :axis/repo "kotoba-lang/kami-engine-cae-solver"
+   :axis/paths ["src"]
+   :axis/marker-kind :dispatch
+   ;; ⚠ `manufactured-solution` は defmethod の dispatch 値ではなく、benchmark レコードの
+   ;; `:implementation {:solver :manufactured-solution …}` というラベルとしてしか現れない。
+   ;; つまり「製造解による検証」は**名前として在り、解ける経路として無い**。marker を
+   ;; 落として緑にしない —— それがこの軸の実際のギャップである。
+   :axis/markers ["manufactured-solution" "benchmark-suite" "qualification-gate" "industrial-release-gate"]
+   :axis/behavior nil}]}

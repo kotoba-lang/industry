@@ -1,0 +1,82 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-12"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-12.edn"
+  :doc/date "2026-08-18"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "timed kernel_wide after omitting leaf entry fuel"
+  :coscientist/iteration 12
+  :coscientist/subject "kotoba-lang/kotoba-native d4b050ae, bench/runtime-comparison/kernel_wide.kotoba vs rustc -C opt-level=3"
+  :coscientist/action "time the fuel-free leaf against LLVM; split the dead C fuel store"
+  :coscientist/measured "21 rotated samples, n=200, 100k calls, 10k warmup, oracle 5224842816. amu min 9.22 ns, LLVM min 6.42 ns, 1.44x. Setting fuel once instead of every call is 9.25 ns — the C store is not the gap."
+  :coscientist/refuted "that the leftover after iteration 11 was kexe-benchmark rewriting fuel every call. That store is dead on this leaf and does not move min ns."
+  :coscientist/carries-forward "iteration-04: do not ship a timed bench export; iteration-06: 10.0 ns / 1.62x was the last pool ranking; iteration-10: loadavg 24 is not a ranking; iteration-11: encoding, not this file"
+
+  :doc/body
+  "# Codegen co-scientist, iteration 12
+
+WIP=1 after iteration 11 was the leftover on the published runner: call
+plus a C store of fuel that the leaf no longer reads. This iteration
+times that leftover. It does not compile another pass.
+
+## What was timed
+
+Same pair as iteration 6 and 10, plus one harness variant that is not
+landed:
+
+- amu native leaf via `kexe-benchmark` (published: `fuel = 512` every call)
+- amu-once: the same 556-byte artifact, fuel set once before warmup
+- LLVM: `rustc --edition 2021 -C opt-level=3` of `kernel_wide.rs`, kernel
+  inlined into the timed loop
+- n=200, 100k calls, 10k warmup
+- 21 rotated samples (three-arm rotation)
+- Judge: min ns/call
+- Artifact: kotoba-native `d4b050ae`, 556 B, 1 MUL + 8 MADD, first insn
+  is MOVZ of 48271. amu pin was not bumped.
+
+Dump: `/tmp/kernel-wide-leaf-fuel/`.
+
+loadavg `{ 9.36 6.87 10.63 }` at start and end. Spread is tight (amu
+9.22–9.51). This is a ranking, unlike iteration 10 (loadavg 24, amu
+15.68–35.89). It is still not a perfgate seal (21 samples, not 25).
+
+## Oracle
+
+Every sample, all three arms, answered **5224842816**.
+
+## Times
+
+| arm | min | median | p95 | max |
+|---|---:|---:|---:|---:|
+| amu published | 9.22 | 9.41 | 9.49 | 9.51 |
+| amu fuel-once | 9.25 | 9.47 | 9.63 | 9.66 |
+| LLVM rustc -O3 | 6.42 | 6.57 | 6.82 | 7.67 |
+
+min ratio **1.44x** (published). fuel-once **1.44x**. The two amu arms
+agree.
+
+Iteration 6 (pool, quieter session): 10.0 ns / **1.62x** LLVM.
+Iteration 11 removed 20 bytes of prologue. This session's LLVM min is
+6.42 ns, in the same band as iteration 6's implied ~6.2 ns. amu moved
+10.0 → **9.22** ns. That is the fuel skip, not a new isel pass.
+
+Do not write 1.44x into `amu/docs/performance.md`. Do not bump amu.
+
+## What this does not change
+
+- LLVM still inlines into the 100k loop. amu still calls a function
+  pointer. Putting that loop in the artifact was refuted in iteration 5
+  on the four-register cliff; this iteration did not re-open that export.
+- The C fuel store every call is dead on this leaf and is not the
+  remaining ns. Leave `kexe-benchmark.c` alone until a recursive export
+  is the timed body.
+- The call / all-vreg path is unchanged (iteration 8).
+
+## Next
+
+The leaf encoding matches LLVM's scalar shape, and the leaf no longer
+pays entry fuel. The remaining gap on this workload is the published
+runner's **indirect call versus LLVM's inlined loop**, about 2.8 ns on
+this host. Do not land fused-srem, extra MOV peepholes, FMA, PGO, a
+kototama optimizer, or a timed `bench` export. Do not overwrite
+iterations 04–11. Do not claim LLVM beaten."}]

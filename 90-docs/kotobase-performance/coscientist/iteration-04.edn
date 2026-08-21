@@ -1,0 +1,103 @@
+{:iteration 4
+ :date "2026-08-18"
+ :loop :kotobase/cost-coscientist
+ :engine "90-docs/kotobase-performance/src/kotobase_performance/cost_coscientist.cljc"
+
+ :seed-from-iteration-03
+ "Deploy, then measure the hit rate with the credential-free probe."
+
+ :what-happened-instead
+ "The deployment is still queued behind the repo-wide build governor, so the
+  hit rate is not measured. But setting up the probe measured something the
+  loop had been ASSUMING, and it was wrong."
+
+ ;; ── the measurement ─────────────────────────────────────────────────────────
+ :measurement
+ {:receipt "90-docs/kotobase-performance/2026-08-18-the-cold-isolate-rate-is-not-one.edn"
+  :question "when a request DOES hydrate, is L1 warm?"
+  :answer {:cold 6 :warm 4 :n 10 :cold-rate 0.6}
+  :why-it-was-never-asked
+  "Twelve bare /_diag/hydrate reads had reported `sampled: false` twelve times,
+   and that was read as `every request lands on a cold isolate`. It is not the
+   same claim. A bare diagnostic read does not hydrate; it can only report on
+   isolates that happened to have hydrated earlier. The question the cost
+   depends on needed a probe that hydrates AND a diagnostic on the same
+   connection."
+  :confound "ten requests in ~35 s warm the isolates the next may land on, so
+             0.6 is an upper bound on coldness under traffic and a lower bound
+             for an idle graph. Carried as a parameter, not folded in."}
+
+ ;; ── the defect it exposed, which is the SAME defect as iteration-03 ─────────
+ :the-control-caught-it-twice-in-one-session
+ {:first "iteration-03: `workerd-scale` was calibrated 2397/1976, the measured
+          CPU moved to 2058, and every CPU-neutral hypothesis was priced as a
+          +339 ms regression. h5-engine-pin -- the measured zero -- read
+          -$6.78. Fixed with `:cpu-ms :unchanged`."
+  :second "iteration-04: the class-B baseline moved 84 -> 50.4 while the
+           hypotheses still carried the cold-case literal 84. h5 immediately
+           read -$12.10. Fixed with `:class-b-ops :unchanged` and by scaling
+           every cold-case count by `cold-isolate-rate`."
+  :the-shape "A stale literal on EITHER axis reappears as a regression the
+              hypothesis does not cause. Both times the ONLY reason it was
+              caught is that a hypothesis with a measured zero is sitting in the
+              roadmap where its number can be read. A control is not decoration
+              in a loop whose inputs are re-measured."
+  :both-controls-now {:h5-engine-pin 0.0 :h3-engine-materialisation 0.0}}
+
+ ;; ── rank ────────────────────────────────────────────────────────────────────
+ :baseline {:cost-per-million 59.60 :cpu-ms 2058
+            :class-b-ops 50.4 :class-b-ops-cold-case 84
+            :cpu-term 41.16 :class-b-term 18.14 :request-term 0.30}
+ :ranking
+ [{:elo 1291 :id "h7-parse-only-addressable-values" :after 31.04 :saves 28.56 :risk :low}
+  {:elo 1272 :id "h1-seed-materialisation"          :after 35.22 :saves 24.39 :risk :low}
+  {:elo 1242 :id "h6-retract-inline-documents"      :after 38.10 :saves 21.50 :risk :high}
+  {:elo 1216 :id "h8-l2-cache-api"                  :after 46.00 :saves 13.61 :risk :medium}
+  {:elo 1187 :id "h2-fold"                          :after 47.00 :saves 12.61 :risk :low}
+  {:elo 1160 :id "h4-carv2-pack"                    :after 55.28 :saves  4.32 :risk :high}
+  {:elo 1131 :id "h5-engine-pin"                    :after 59.60 :saves  0.00 :risk :low}
+  {:elo 1101 :id "h3-engine-materialisation"        :after 59.60 :saves  0.00 :risk :high}]
+
+ :the-order-changed-and-the-measurement-changed-it
+ {:h8 {:iteration-03 {:rank 3 :saves 22.68 :batch-position :first}
+       :iteration-04 {:rank 4 :saves 13.61 :batch-position :landed}}
+  :was-the-landing-wrong? :no
+  :why "It is :S, reversible, semantically inert (blocks are immutable and
+        CID-verified), still worth $13.61, and it is the only actionable item
+        that needs neither a credential nor a write to the graph."
+  :was-the-ORDER-wrong? :yes
+  :why-that "It was placed first on a premise that had not been measured. The
+             premise was measured while preparing to verify the landing, and it
+             moved the item to fourth. Recorded rather than quietly re-sorted:
+             a loop that reorders itself without saying why is indistinguishable
+             from one that was right all along."}
+
+ :batch
+ {:id "kotobase-cost-kaizen-4"
+  :members ["h7-parse-only-addressable-values"]
+  :order "h7 next; h8 is landed and awaiting deployment"
+  :why "h7 is the larger half of a served read and the half NO cache tier can
+        touch: a warm isolate still pays it in full. That is visible from
+        outside as 2.38 s warm against 3.34 s cold -- the tier removes ~1.0 s of
+        round trips and leaves ~2.4 s of parse standing."
+  :how-it-can-fail
+  "h7's :after-harness was measured against the OLD decode2 and is stale by the
+   ~28% the outer-string change already took off phase B. $28.56 is an UPPER
+   bound. The phase bench that would fix it has been blocked by the build
+   governor all session."}
+
+ :what-the-judge-cannot-see
+ ["The L2 hit rate. Not deployed yet."
+  "Wall clock. Cloudflare bills CPU, so the ~1.0 s the gets cost a USER is
+   absent from cost-per-million entirely. A latency argument and a cost
+   argument can disagree about a cache tier, and here they do."
+  "THE TRAFFIC, unchanged: this graph serves no organic reads."
+  "The phase decomposition current as of the outer-string change; h1/h6/h7 are
+   still derived from the one before it and are therefore overstated."]
+
+ :seed-for-iteration-05
+ "Two measurements, in this order. (1) Deploy h8 and read blocks_from_l1 /
+  blocks_from_l2 / blocks_from_r2 from the same paired probe -- a measured zero
+  is a reportable outcome and the counters exist so it can be reported. (2) Run
+  the phase bench over /tmp/kb-blocks and replace h1/h6/h7's stale
+  :after-harness values. Until (2), the top of this ranking is an upper bound."}

@@ -1,0 +1,110 @@
+;; MF の仕訳が実際に使っている税区分と部門 —— **科目の既定値ではなく、記帳の実測**。
+;;
+;; 出典: MF Cloud Accounting `getJournals`（読み取りスコープの MCP）、2026-08-20、
+;;       Gftd Japan株式会社 code 9007-2846。
+;;
+;; ## なぜ要るのか
+;;
+;; `mf-tax-categories.edn` は「科目表が参照している税区分」12 件を持つ。それは
+;; **科目の既定値**であって、記帳で実際に使われた区分ではない。ADR-2608209000 は
+;; この差を open gap として名指していた（「仕訳側を測るには getJournals が要る（未実施）」）。
+;;
+;; ## 測った結果、分母は 151 でも 12 でもなかった
+;;
+;;     税区分マスタ                151 件
+;;     科目表が参照している         12 件
+;;     FY2026 の仕訳が使っている     4 件   ← 全ページ取得
+;;
+;; **そして FY2026 の 4 件は、この事業者が使う区分の集合ではない。** 過年度を
+;; 標本したところ 8%（軽減 8% と 共通課税仕入 8% を含む）が出た。したがって
+;; **税率の集合は {0, 0.1} ではなく {0, 0.08, 0.1}**。これが効くのは、
+;; 消費税法 第四十五条第一項 が要求する「税率の異なるごとに区分した」集計を
+;; 過年度に対して出すときで、0.08 を宣言しない chart はその期を正しく組み替えられない。
+;;
+;; ## 完全と下界を混ぜない
+;;
+;; `:usage/complete?` が true の期だけが「その期の全仕訳を見た」。false の期は
+;; **page 1 だけの下界**であり、`:usage/journals` / `:usage/total-journals` が
+;; 何分の何かを言う。**下界を「その期はこの 4 種しか使っていない」と読まない** ——
+;; ADR-2608136000 の「測れなかった検査が、測って問題が無かった検査と同じ値を返す」の
+;; データ側の形である。
+;;
+;; ⚠ 会計期間は 9 期ある（2018〜2026）。ここに在るのは 4 期分で、うち完全なのは 1 期。
+
+[{:usage/id "gftd-japan-journals-2026-08-20"
+  :usage/measured-at "2026-08-20"
+  :usage/source "MF Cloud Accounting getJournals (読み取りスコープの MCP)"
+  :usage/office-code "9007-2846"
+  :usage/accounting-periods-total 9
+  :usage/periods-sampled 4
+  :usage/periods-complete 1}
+ {:usage/period 2019
+  :usage/complete? false
+  :usage/journals 100
+  :usage/total-journals 777
+  :usage/pages-fetched 1
+  :usage/pages-total 8
+  :usage/posting-sides 207
+  :usage/tax-categories
+  {"共-課仕 8%" 1
+   "対象外" 144
+   "課仕 8%" 62}
+  :usage/departments
+  {"(none)" 143
+   "【廃止】早稲田（de‐School）事業" 64}}
+ {:usage/period 2020
+  :usage/complete? false
+  :usage/journals 100
+  :usage/total-journals 1117
+  :usage/pages-fetched 1
+  :usage/pages-total 12
+  :usage/posting-sides 205
+  :usage/tax-categories
+  {"対象外" 139
+   "課仕 (軽)8%" 4
+   "課仕 10%" 61
+   "課売 10%" 1}
+  :usage/departments
+  {"(none)" 134
+   "【廃止】早稲田（de‐School）事業" 71}}
+ {:usage/period 2023
+  :usage/complete? false
+  :usage/journals 100
+  :usage/total-journals 1828
+  :usage/pages-fetched 1
+  :usage/pages-total 19
+  :usage/posting-sides 283
+  :usage/tax-categories
+  {"対象外" 244
+   "課仕 10%" 32
+   "課売 10%" 5
+   "非売" 2}
+  :usage/departments
+  {"(none)" 268
+   "【廃止】早稲田（de‐School）事業" 11
+   "【合併消滅,使用不可】GftdLabo" 2
+   "【廃止】福祉事業部(GftdWorks）" 1
+   "【廃止】DE-SCHOOL" 1}}
+ {:usage/period 2026
+  :usage/complete? true
+  :usage/journals 459
+  :usage/total-journals 459
+  :usage/pages-fetched 5
+  :usage/pages-total 5
+  :usage/posting-sides 1141
+  :usage/tax-categories
+  {"対象外" 905
+   "課仕 10%" 217
+   "課売 10%" 11
+   "非売" 8}
+  :usage/departments
+  {"(none)" 821
+   "コーポレートエンジニアリング" 140
+   "サイバーセキュリティ事業部" 114
+   "ブランディング" 26
+   "研究開発" 17
+   "【廃止】早稲田（de‐School）事業" 11
+   "コーポレート" 10
+   "【廃止】DE-SCHOOL" 1
+   "【廃止：統合】PD事業部" 1}}
+]

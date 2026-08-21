@@ -1,0 +1,23 @@
+{:identity/publisher 0,
+ :write/call-sites 0,
+ :indexer/lists-kotobase 0,
+ :write/declared-dependency 0,
+ :indexer/knows-witness 1,
+ :method
+ {:http "live HTTP status, curl, 25s timeout",
+  :single-file
+  "git show <remote>/main:<path> — the repo's branch, not the checkout",
+  :dependencies
+  "every deps.edn / upstream-lock.json named by manifest/west.yml, read directly -- :write/dep-scan reports how many were read, so 0 hits cannot be read as 0 looked at",
+  :call-sites
+  "derived: a namespace cannot be required without its dependency on the classpath, so zero declarations implies zero call sites"},
+ :write/dep-scan {:repos [], :manifests-read 3480, :repos-listed 4218},
+ :publisher/health 200,
+ :gateway/serves 200,
+ :publisher/credentialed-alternative 401,
+ :publisher/head 404,
+ :measured-at "2026-08-20T06:56:50Z",
+ :publisher/ad-bytes 200,
+ :publisher/narrow-surface 404,
+ :read/cid-contact-router 1, 
+ :entries/hamt 0}

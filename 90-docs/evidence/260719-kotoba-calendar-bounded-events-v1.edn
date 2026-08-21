@@ -1,0 +1,29 @@
+{:schema "kotoba-migration-evidence/v1"
+ :recorded-on "2026-07-19"
+ :repository "orgs/kotoba-lang/calendar"
+ :profile :calendar/bounded-events-v1
+ :pr "https://github.com/kotoba-lang/calendar/pull/1"
+ :merge-commit "9470229ee056442b234d8a276fe7f57e3549f89d"
+ :limit-enforcement-pr "https://github.com/kotoba-lang/calendar/pull/2"
+ :limit-enforcement-commit "734bd82766452a0722c565fa0846a49bc1d35bb2"
+ :compiler {:merge-commit "bef32b78852212bc096849d1ff9779c8afae4796"
+            :typed-wasm-abi 2}
+ :sources {:model "src/calendar/model.kotoba"
+           :validation "src/calendar/validate.kotoba"
+           :conformance "test/calendar/conformance.kotoba"
+           :legacy ["src/calendar/model.cljc" "src/calendar/validate.cljc"]}
+ :domain {:calendar-id :keyword :event-id :keyword :time :i64
+          :maximum-events 8 :positive-duration true
+          :persistent-replacement true}
+ :verification
+ {:legacy {:tests 1 :assertions 3 :failures 0 :errors 0}
+  :project-digest "38ad522902ae1cb940f7c17a0ac6065ded1dce2ef71cb19188460840a440121f"
+  :web {:runtime-main 42 :artifact-sha256 "77ed8f0cb0e359b2f261abf082c3914aab8f3c9b892c387babbba7f6dccc247e"}
+  :wasm {:runtime-main 42 :artifact-sha256 "7f9ddb40bd2dd00fbc82d7e4ec4ef2790b75b3acee5f8a38007781fa5176197f"}
+  :required-capabilities [] :hosted-ci-runs 4 :hosted-ci :passed}
+ :negative-boundaries
+ [:non-positive-duration :missing-event :same-id-replacement
+  :nine-event-profile-overflow :forged-externref]
+ :excluded-open-domain
+ [:arbitrary-iso-time-strings :titles :attendees :resource-links]
+ :cutover {:bounded-profile-authorized true :open-schema-cljc-retained true}}

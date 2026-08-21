@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- 常駐の drift を遷移時に 1 回だけ知らせる（ADR-2608111721 の第 2 項目）。
+
+     XML コメントは `-` 2 連を含められない（XML 1.0 §2.5）。**以下、長オプションは
+     先頭の `-` 2 つを省いて書く** —— `check` は実際には `-` 2 つ + `check`。
+
+     判定は `scripts/residency-collect.cljs check`、通知は
+     `scripts/fleet-ci/residency-alarm.cljs`。閾値と drift の定義は collector 側
+     だけにある（2 箇所にあって片方だけ直る、を避ける）。
+
+     なぜ fleet gate ではなく operator の常駐か: drift の片側は `launchctl list`、
+     つまり *この機械で実際に何が動いているか* である。fleet gate はノードへ tree を
+     配って走らせるので、operator の launchd を見られない。
+
+     6 時間ごと。常駐の集合は分単位で変わるものではないし、鳴るのは遷移時だけ
+     なので、これ以上短くしても人に届く情報は増えない。
+
+     インストール:
+       cp scripts/fleet-ci/com.gftd.residency-alarm.plist ~/Library/LaunchAgents/
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.residency-alarm.plist
+       launchctl kickstart -p gui/$(id -u)/com.gftd.residency-alarm   # 1 回だけ手動起動
+
+     ログ: ~/.gftd/residency-alarm.log / state: ~/.gftd/residency-alarm-state.edn -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.gftd.residency-alarm</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>cd "$HOME/github/com-junkawasaki" &amp;&amp; exec /opt/homebrew/bin/nbb --classpath scripts/fleet-ci scripts/fleet-ci/residency-alarm.cljs</string>
+  </array>
+  <key>StartInterval</key><integer>21600</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>/Users/junkawasaki/.gftd/residency-alarm.log</string>
+  <key>StandardErrorPath</key><string>/Users/junkawasaki/.gftd/residency-alarm.log</string>
+  <key>ProcessType</key><string>Background</string>
+</dict>
+</plist>

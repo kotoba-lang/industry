@@ -1,0 +1,212 @@
+[{:doc/type :pre-flight-checklist
+  :doc/id "month-3-preflight-checklist"
+  :doc/title "Month 3 Pre-Flight Checklist — kotoba-server Fleet Migration (2026-09-08)"
+  :doc/date "2026-07-21"
+  :doc/author "Claude Code Agent"
+  :doc/status "ACTIVE"
+
+  :preflight/event
+  {:date "2026-09-08"
+   :phase "Month 3 Week 1"
+   :gate-name "M5 Close / M6 Prep gate (Wave 5 Week 14)"
+   :objective "Final validation before traffic migration cutover"
+   :duration-days 7
+   :decision-required true
+   :decision-maker "platform-lead + murakumo-owner + ops-lead"}
+
+  :preflight/timeline
+  {:month-3-week-1 "2026-09-01 to 2026-09-08"
+   :activity "Final validation sentinel (all metrics within SLO for 7 days)"
+   :gate-date "2026-09-08 (Friday)"
+   :gate-time "16:00 JST (M5 gate sync point)"
+   :decision-deadline "2026-09-08 17:00 JST"
+   :traffic-migration-start "2026-09-11 (if GO decision)"
+   :traffic-migration-stages "50% → 75% → 90% → 99% → 100%"}
+
+  :preflight/checklist
+  [{:seq 1
+    :category "Parity Validation (7-day sentinel)"
+    :item "Parity failure rate < 0.01% (production-ready threshold)"
+    :acceptance-criteria
+    ["Divergence count < 10 per 1M requests"
+     "Content-hash mismatch detection in parity-checker working"
+     "Both Rust (baseline) and cljc (canary) returning identical JSON responses"
+     "No asymmetric status codes (both 200 or both 400, not divergent)"]
+    :owner "murakumo-metrics-lead"
+    :due-date "2026-09-08"
+    :escalation-trigger "If parity > 0.01% on any day, pause and debug"
+    :measurement "murakumo/parity-checker metrics (Prometheus)"
+    :risk-level "CRITICAL"
+    :notes "This is the gate-critical item. Month 2 target was ≤0.05%, Month 3 must tighten to ≤0.01%"}
+
+  {:seq 2
+    :category "Latency & Performance SLO"
+    :item "All latency percentiles within budget (50% at 50% traffic)"
+    :acceptance-criteria
+    ["p50 ≤ 70ms (baseline ~60ms + overhead)"
+     "p95 ≤ 95ms (with variance tolerance)"
+     "p99 ≤ 100ms (hard budget, non-negotiable)"
+     "p99 sustained (not transient spike)"
+     "No GC pause outliers > 30ms (ZGC/Shenandoah tuned)"]
+    :owner "murakumo-performance-lead"
+    :due-date "2026-09-08"
+    :escalation-trigger "If p99 > 100ms sustained for > 5 min, automatic rollback to Phase 2 (25% traffic)"
+    :measurement "Grafana dashboard: murakumo-mesh-latency (drama-profile route)"
+    :risk-level "HIGH"
+    :notes "Variance acceptable during ramp, but at 50% (stable phase) all SLOs must hold"}
+
+  {:seq 3
+    :category "Reliability & Error Rates"
+    :item "HTTP 5xx rate < 0.01% (no unhandled exceptions in production)"
+    :acceptance-criteria
+    ["5xx error rate ≤ 0.01% (< 1 per 10K requests)"
+     "No panic / crash / SIGSEGV observed in JVM logs"
+     "No connection resets or timeouts > 0.01%"
+     "Graceful handling of load spikes (no cascading failures)"
+     "Alert noise < 2 per day (false positive rate < 0.1%)"]
+    :owner "murakumo-ops-lead"
+    :due-date "2026-09-08"
+    :escalation-trigger "If 5xx rate > 0.01% sustained for > 2 min, automatic rollback to Phase 2"
+    :measurement "murakumo/error-rate + Slack #prod-gates-wave5 alerts"
+    :risk-level "HIGH"
+    :notes "Watch for edge cases: rate limiting, cache misses, kgraph query timeout"}
+
+  {:seq 4
+    :category "Memory & Resource Utilization"
+    :item "JVM memory stable (no leak, predictable peak)"
+    :acceptance-criteria
+    ["Per-instance heap peak ≤ 256MB post-GC (at 50% traffic load)"
+     "No memory leak detected over 7-day stability window"
+     "GC collection frequency < 2 per minute (not pathological)"
+     "Heap profile shows stable allocation pattern"
+     "No Out-of-Memory errors"]
+    :owner "murakumo-performance-lead"
+    :due-date "2026-09-08"
+    :escalation-trigger "If memory peak > 512MB or leak detected, rollback to Phase 2 + investigate"
+    :measurement "JVM metrics (Prometheus jvm_memory_heap_used) + heap dump analysis"
+    :risk-level "MEDIUM"
+    :notes "7-day window is sufficient for garbage patterns to stabilize. If unstable, extend sentinel."}
+
+  {:seq 5
+    :category "Audit Trail & Compliance"
+    :item "Complete request/response audit log captured (no data loss)"
+    :acceptance-criteria
+    ["All canary requests (5% Phase 1 + ramp Phase 2 + 50% Phase 3) logged"
+     "Audit log rotated to Backblaze B2 (DataLad managed)"
+     "Log retention policy: 90 days minimum"
+     "Parity assertion results logged (pass/fail per request)"
+     "Rollback trigger conditions logged with timestamp"]
+    :owner "murakumo-audit-lead"
+    :due-date "2026-09-08"
+    :escalation-trigger "If audit log incomplete or corrupted, cannot proceed with traffic migration"
+    :measurement "Backblaze B2 audit-logs/ directory + manifest entry"
+    :risk-level "MEDIUM"
+    :notes "Audit trail is critical for post-incident forensics and rollback confidence"}
+
+  {:seq 6
+    :category "Team & Infrastructure Readiness"
+    :item "On-call team trained & ready for 2026-09-11 canary start"
+    :acceptance-criteria
+    ["On-call engineer briefing completed (2026-09-08)"
+     "Runbook review: automatic rollback triggers, manual rollback procedure"
+     "PagerDuty escalation policy tested (alert routing Slack → email → call)"
+     "Graceful shutdown procedure tested in staging"
+     "Rollback scripts (`murakumo/rollback.cljs`) deployed & tested"
+     "Fire drill: simulate latency regression trigger, execute rollback, verify Rust pool health"]
+    :owner "murakumo-ops-lead"
+    :due-date "2026-09-08"
+    :escalation-trigger "If runbook incomplete or fire drill fails, delay canary start"
+    :measurement "Team sign-off + runbook ✓ checklist"
+    :risk-level "HIGH"
+    :notes "On-call readiness is prerequisite for production traffic cutover"}
+
+  {:seq 7
+    :category "Go/No-Go Decision Gate"
+    :item "Platform lead + owner + ops lead consensus for traffic migration approval"
+    :acceptance-criteria
+    ["All 6 items above (Seq 1-6) PASSED"
+     "No blocking issues or mitigations outstanding"
+     "Rollback procedure validated + ready"
+     "Team trained + on-call assigned"
+     "Owner approval captured (Slack #prod-gates-wave5 + decision record)"]
+    :owner "platform-lead"
+    :due-date "2026-09-08 17:00 JST"
+    :escalation-trigger "If any item FAILED or red flag exists → NO-GO, extend validation, delay canary start to 2026-09-18"
+    :measurement "Decision artifact: `90-docs/deployment/MONTH-3-GO-NO-GO-DECISION.edn`"
+    :risk-level "CRITICAL"
+    :notes "This is the gate. GO = traffic migration 50%→99% starts 2026-09-11. NO-GO = return to Phase 2 debugging."}]
+
+  :preflight/success-criteria
+  {:all-7-items-passed "Traffic migration cutover scheduled for 2026-09-11"
+   :blocking-issue-found "Extend Month 3 timeline to 2026-09-18 (1 week slip)"
+   :catastrophic-failure "Return to Phase 2 (25% traffic), debug in staging, retest in Month 3 Week 2"}
+
+  :preflight/escalation
+  {:stage-1-alert "Any item trending toward FAIL (e.g., parity creeping 0.005% → 0.01%)"
+   :stage-1-response "2h (murakumo-metrics-lead reviews + mitigation plan)"
+   :stage-2-alert "Any item actually FAILED on 2026-09-08 morning"
+   :stage-2-response "immediate (emergency debugging + root cause analysis)"
+   :stage-3-decision "by 2026-09-08 16:00 JST (final go/no-go call)"
+   :escalation-contact "#prod-gates-wave5 + murakumo-owner@gftd.group"}
+
+  :preflight/gate-committee
+  [{:role "Platform Lead" :responsibility "Final GO/NO-GO decision" :contact "platform-lead@gftd.group"}
+   {:role "murakumo Owner" :responsibility "Technical approval (parity, performance, reliability)" :contact "murakumo-owner@gftd.group"}
+   {:role "Ops Lead" :responsibility "Infrastructure readiness, on-call readiness" :contact "ops-lead@gftd.group"}
+   {:role "Metrics Lead" :responsibility "SLO verification (latency, error rates, parity)" :contact "metrics-lead@gftd.group"}
+   {:role "Escalation Lead" :responsibility "Gate process, decision recording" :contact "escalation-lead@gftd.group"}]
+
+  :preflight/coordination-with-wave5-gates
+  {:wave5-week-14-gate "2026-09-08 16:00 JST"
+   :month-3-preflight-gate "2026-09-08 16:00 JST"
+   :conflict "SAME TIME SLOT (aligned)"
+   :mitigation "Both gates run in parallel. Wave 5 M5 close gate reviews metrics pipeline + general Wave 5 health. Month 3 preflight gate is *within* that time block (single 45-min combined meeting possible)"
+   :recommendation "Schedule combined gate meeting (45 min): first 20 min = Wave 5 M5 close review, next 25 min = Month 3 preflight review, final 10 min = joint GO/NO-GO decision for Week 14 + Month 3 canary."}
+
+  :preflight/next-steps-if-go
+  ["2026-09-11 09:00 JST: Start canary Stage 1 (50% → 75% traffic)"
+   "2026-09-11 to 2026-09-12: Monitor latency, parity, reliability (minimum 4h per step)"
+   "2026-09-12 to 2026-09-13: Continue 75% → 90% → 99%"
+   "2026-09-13 to 2026-09-14: Final 99% → 100% cutover + Rust graceful drain"
+   "2026-09-14+: Post-cutover monitoring (48h stability window)"]
+
+  :preflight/next-steps-if-no-go
+  ["2026-09-08 17:30 JST: Return to Phase 2 (50% traffic, reduce to 25%)"
+   "2026-09-08 to 2026-09-15: Root cause analysis (1 week debugging window)"
+   "2026-09-15: Retest + revalidate (parity, performance, reliability)"
+   "2026-09-22: Second attempt at Month 3 preflight gate (1 week slip)"]
+
+  :preflight/risk-matrix
+  [{:risk "Parity divergence not detected until production (100% traffic)"
+    :likelihood "MEDIUM"
+    :impact "CRITICAL"
+    :mitigation "7-day sentinel + parity-checker running continuously (< 2 min alert latency)"}
+   {:risk "GC pause spike causes p99 budget breach during traffic ramp"
+    :likelihood "MEDIUM"
+    :impact "HIGH"
+    :mitigation "ZGC/Shenandoah tuning completed in Month 2; GC latency monitoring in place"}
+   {:risk "Rust pool health degradation during graceful drain (slow shutdown)"
+    :likelihood "LOW"
+    :impact "HIGH"
+    :mitigation "Graceful shutdown procedure tested in staging; 30sec request timeout configured"}
+   {:risk "False positive rollback trigger (e.g., transient latency spike)"
+    :likelihood "MEDIUM"
+    :impact "MEDIUM"
+    :mitigation "Automatic rollback requires 5min sustained p99 > 100ms (not single spike)"}]
+
+  :preflight/documentation-status
+  [{:doc "MONTH-3-PRE-FLIGHT-CHECKLIST.edn" :status "ACTIVE" :revision "1.0"}
+   {:doc "MONTH-3-CANARY-DEPLOYMENT-PLAN.md" :status "ACTIVE" :revision "1.0"}
+   {:doc "MONTH-3-ROLLBACK-PROCEDURE.md" :status "ACTIVE" :revision "1.0"}
+   {:doc "MONTH-3-TIMELINE-INTEGRATION.md" :status "ACTIVE" :revision "1.0"}
+   {:doc "MONTH-3-GO-NO-GO-DECISION.edn" :status "PENDING" :note "Created after 2026-09-08 gate decision"}]
+
+  :preflight/contact-and-handoff
+  {:execution-lead "Claude Code Agent (Haiku 4.5)"
+   :main-coordinator-contact "report pre-flight readiness status by 2026-09-01"
+   :escalation-contact "#prod-gates-wave5 (Slack)"
+   :metrics-queries "metrics-lead@gftd.group"
+   :gate-decision-contact "platform-lead@gftd.group + murakumo-owner@gftd.group"
+   :next-review "2026-09-01 (weekly pre-flight readiness check, 1 week before gate)"}
+
+  :adr/related ["2607072100-kotoba-server-fleet-deployment-strangler-fig.edn"]}]

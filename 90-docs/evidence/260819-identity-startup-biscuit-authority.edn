@@ -1,0 +1,32 @@
+[{:db/id -1
+  :source/dataset "evidence"
+  :evidence/id "260819-identity-startup-biscuit-authority"
+  :evidence/date "2026-08-19"
+  :evidence/adr "ADR-2608197300"
+  :evidence/claim "起動時 identity の決定経路 — biscuit の委譲を authority が判定し、identity.startup が起動可否を決める — が実 Ed25519 で端から端まで動く"
+  :evidence/reproducer "scripts/identity-startup-e2e.cljs"
+  :evidence/command "nbb --classpath \"orgs/kotoba-lang/org-biscuitsec/src:orgs/kotoba-lang/org-biscuitsec/test:orgs/kotoba-lang/authority/src:orgs/kotoba-lang/org-w3-did/src:orgs/kotoba-lang/identity/src\" scripts/identity-startup-e2e.cljs"
+  :evidence/runtime "nbb (node 26.3.0), JVM 不要 — biscuit.ed25519 の cljs 分岐が node:crypto を使う"
+  :evidence/pins "kotoba-lang/identity 8eeb1a046c0b8c81ebbbc938e8b6c40383a5d6a9 / org-biscuitsec 1b69bd8 / authority 232eef9 / org-w3-did c430e98"
+  :evidence/measurements
+  "[1] root の公開鍵だけで chain 検証 = true
+[2] 攻撃者の root 鍵で同じ token = false
+[3] device が root の知らない鍵で減衰 -> :graph-read [\"kotoba://graph/acme\"]（notes は落ちる）
+[4] 権限を増やそうとした block -> grants [] （増えないのではなく、試みると全部失う）
+[5] startup(device key + live delegation) = :key-present / serve :full
+[6] startup(no key, 未回答) = :undecidable / serve :public-only / ask :mint-or-link
+[7] authorize kotoba://graph/acme = true
+[8] authorize kotoba://graph/notes（減衰で落ちた） = false
+[9] authorize kotoba://graph/everything（escalation） = false
+[10] 閉じた kind の外 -> granted [:graph-read] / rejected [{:kind :kernel/format-disk :resource \"/dev/sda\"}]"
+  :evidence/tests "identity.startup-test + identity.authenticators-test: 19 tests / 46 assertions / 0 failures（pin 8eeb1a0 の checkout で実行）"
+  :evidence/falsified
+  "両方向を確認済み。(a) :undecidable を :mint に畳むと startup の 3 assertion が赤。
+(b) authenticators の credential-id 照合を『同じ did の同じ factor-type なら通す』に緩めると 2 assertion が赤。
+どちらも壊した箇所と赤くなった検査が一致することを確認した。"
+  :evidence/limits
+  "測っていないもの: (1) Hermes の dashboard_auth/did plugin は未実装なので、この経路が実際の
+login/verify_token seam に繋がることは未証明。(2) 鍵は決定論的な test seed で、kagi にも
+Keychain にも触れていない。(3) WebAuthn の実 assertion は通していない — identity.authenticators は
+検証済み decision を消費する層で、検証そのものは kotoba-lang/authentication の verifier の仕事。
+(4) fleet gate には未登録（ローカル実行のみ）。"}]

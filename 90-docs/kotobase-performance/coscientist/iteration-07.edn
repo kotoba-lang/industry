@@ -1,0 +1,87 @@
+{:iteration 7
+ :date "2026-08-18"
+ :loop :kotobase/cost-coscientist
+
+ :seed-from-iteration-06
+ "Fix the harness before trusting another level from it. The thread is that
+  block_gets reports 148 seam entries for 84 distinct blocks while the bench's
+  own bucket counter reports 85 gets and 0 misses, and production reports 84
+  with 0 duplicates."
+
+ :the-thread-was-the-right-one-and-led-somewhere-else
+ {:step-1
+  "Split the aggregate counter by SEAM, per CID (`seam_census.cljs`, landed
+   net-kotobase/control-plane a219e7bb6). It refuted the standing guess
+   immediately: sync 5 entries / 0 duplicates -- the trampoline is not the cost
+   -- while async had 143 entries, 79 distinct, 64 duplicates, 16 CIDs asked
+   five times each."
+  :step-2
+  "Ask what the bench COMPILES. `shadow-cljs.edn` lists 26 :source-paths of the
+   form `../../../kotoba-lang/<lib>/src`, which resolve to the ambient shared
+   checkout of each library -- not to what west.yml pins. **24 of 26 differed
+   from their pin**, by 2 to 17 commits where the distance was computable."
+  :step-3
+  "Pin all 26 (one detached worktree each) and re-run:
+
+                     unpinned        pinned
+       hot-datoms    36,219 cpu-ms   7,842 cpu-ms
+       async         143/79/dup 64   79/79/dup 0
+       sync          5/5/0           5/5/0
+       store         84/0            84/0
+
+   Duplicates gone, CPU down 4.6x, sync seam and store untouched. And 79 + 5 =
+   84, which is exactly what production's /_diag/hydrate reports -- the first
+   evidence in this investigation that harness and production run the same
+   thing."
+  :receipt "90-docs/kotobase-performance/2026-08-18-the-harness-was-measuring-a-different-engine.edn"}
+
+ :two-guesses-were-wrong-before-this
+ ["h8 caused the duplicates and the CPU (iteration-06: the control was
+   identical, so no)"
+  "the sync trampoline's re-runs caused it (this iteration: 5 entries, so no)"]
+
+ :what-is-now-known-to-be-unusable
+ {:levels
+  "Every absolute number the phase bench has produced, INCLUDING the 2,201
+   cpu-ms baseline in its own docstring. Each describes whichever revisions
+   those working trees held that day, and nothing recorded which."
+  :and-the-h8-test-run
+  "`131 tests, 828 assertions, 5 failures` was compiled from the same tree, so
+   it exercised libraries production does not run. It still proved what it
+   claimed about the code under test; `it passes here` was just a weaker
+   statement than it read as."
+  :still-usable
+  "Ratios within one run, where the build is its own control. Every number
+   quoted in iterations 04-06 is of that kind, including the query finding."}
+
+ :no-hypothesis-moved
+ "The ranking is unchanged this iteration and that is the correct outcome: what
+  was found is that three of its entries rest on a basis whose build was never
+  identified. h1, h6 and h7 keep their upper-bound labels, and now the label has
+  a reason more specific than `stale`."
+
+ :the-detector-this-earns
+ {:existing "`verify-shadow-source-paths` checks that a :source-path EXISTS."
+  :gap "Every path here existed and resolved. What is missing is whether a
+        relative source-path into another west-managed repository resolves to
+        that repository's PINNED revision."
+  :proposed "verify-source-path-pins -- for each shadow-cljs/deps source-path
+             that crosses into orgs/<org>/<repo>, compare the checkout HEAD to
+             manifest/west.yml. Report drift with the distance. A build that
+             cannot answer `which revision did I compile` is not a reproducible
+             measurement, and 24 of 26 could not answer it."}
+
+ :the-shape-this-is-the-third-instance-of-today
+ "A measurement that cannot name its inputs.
+    iteration-03  a scaling constant that decayed when one of its two inputs moved
+    iteration-04  a premise inferred from a counter answering a different question
+    iteration-07  a build input with no revision in it
+  Each was invisible the same way: the number came back, it looked like a
+  number, and nothing in it said what it was a number ABOUT."
+
+ :seed-for-iteration-08
+ "Release build from the 26 pins, then run the phase bench once. That produces
+  the first level anyone can quote, and only then replace h1/h6/h7's
+  :after-harness. Do not compare it to the docstring's 2,201 -- that number's
+  build is unknown and it should be struck from the docstring rather than
+  reconciled with."}

@@ -1,0 +1,264 @@
+{
+  "node": "gad",
+  "ledger": "/home/gad/.murakumo/generation/jobs.json",
+  "health": {
+    "status": "ok",
+    "runtime": "murakumo-generation",
+    "capabilities": [
+      "model3d",
+      "vrm",
+      "voice",
+      "motion",
+      "effect",
+      "sound",
+      "image",
+      "video"
+    ],
+    "voiceLocales": [
+      "ar-SA",
+      "en-US",
+      "es-ES",
+      "fr-FR",
+      "hi-IN",
+      "ja-JP",
+      "zh-CN"
+    ]
+  },
+  "capabilityLabels": {
+    "os": "linux",
+    "device": "cuda:0 Radeon 8060S Graphics : native",
+    "vramBytes": 51539607552,
+    "pytorch": "2.10.0+rocm7.13.0a20260513",
+    "comfyui": "0.22.0"
+  },
+  "runtimeImage": {
+    "apiSourceSha256": "87b5dcf0e35ef87346c14da633d1dfd83ca61c3fe71ca17eceabc868221a9212",
+    "pipFreezeSha256": "06906df6cec3c85488039efc87aecca7a1aafd4552594dfb2e72b33cac838101",
+    "pipPackages": 77,
+    "runnerFiles": {
+      "MURAKUMO_3D_POSTPROCESSOR": {
+        "path": "/home/gad/src/orgs/kotoba-lang/kami-gen-ml3d/scripts/kami-heuristic-vrm-postprocess",
+        "sha256": "f544233ea9881bce47f0b3341ae776c65a7f154c4d77a589f07e810d2bb62871"
+      },
+      "HUNYUAN3D_PAINT_RUNNER": {
+        "path": "/home/gad/.murakumo/bin/hunyuan3d-paint",
+        "sha256": "8ed2ced89fcabbdfe8ae40445e376c9754d91503820e8d3384a0b8bb13a3aa4d"
+      },
+      "MURAKUMO_TTS_RUNNER": {
+        "path": "/home/gad/.murakumo/bin/murakumo-tts",
+        "sha256": "9eea941c3f4e9329811151b52e02df4faee311e9c7e743644bbccf48b3e776f3"
+      },
+      "MURAKUMO_VISEME_RUNNER": {
+        "path": "/home/gad/.murakumo/bin/murakumo-viseme",
+        "sha256": "9eea941c3f4e9329811151b52e02df4faee311e9c7e743644bbccf48b3e776f3"
+      },
+      "MURAKUMO_MOTION_RUNNER": {
+        "path": "/home/gad/.murakumo/bin/murakumo-motion",
+        "sha256": "9eea941c3f4e9329811151b52e02df4faee311e9c7e743644bbccf48b3e776f3"
+      },
+      "MURAKUMO_EFFECT_RUNNER": {
+        "path": "/home/gad/.murakumo/bin/murakumo-effect",
+        "sha256": "9eea941c3f4e9329811151b52e02df4faee311e9c7e743644bbccf48b3e776f3"
+      },
+      "MURAKUMO_SOUND_RUNNER": {
+        "path": "/home/gad/.murakumo/bin/murakumo-sound",
+        "sha256": "9eea941c3f4e9329811151b52e02df4faee311e9c7e743644bbccf48b3e776f3"
+      }
+    }
+  },
+  "modalities": {
+    "image": {
+      "jobId": "c9002a53dca34d6eae63cfb819730cbd",
+      "outputKind": "png",
+      "bytes": 2028228,
+      "contentHash": "sha256:73c59d886e202d093b3d02fdd8b73d7fb22cac507051b8b0716404c58c43bf94",
+      "artifactHash": "sha256:73c59d886e202d093b3d02fdd8b73d7fb22cac507051b8b0716404c58c43bf94",
+      "hashVerified": true,
+      "generatedAt": "2026-07-16T11:04:38.738444Z",
+      "model": "animagine-xl-4.0",
+      "capabilities": [
+        "image",
+        "png",
+        "model:animagine-xl-4.0"
+      ]
+    },
+    "3d": {
+      "jobId": "bf9d5475a963403081aa4f0a6c5f056a",
+      "outputKind": "glb",
+      "bytes": 1662620,
+      "contentHash": "sha256:bc7d4b4958412ffce1c22308480d503effb196257995bfbb802967f86e5aede9",
+      "artifactHash": "sha256:bc7d4b4958412ffce1c22308480d503effb196257995bfbb802967f86e5aede9",
+      "hashVerified": true,
+      "generatedAt": "2026-07-16T08:46:15.023516Z",
+      "model": null,
+      "capabilities": [
+        "shape",
+        "pbr",
+        "material",
+        "multiview-texture",
+        "auto-rig",
+        "skin-weights",
+        "motion",
+        "morph-targets"
+      ]
+    },
+    "rig": {
+      "jobId": "bf9d5475a963403081aa4f0a6c5f056a",
+      "outputKind": "glb",
+      "bytes": 1662620,
+      "contentHash": "sha256:bc7d4b4958412ffce1c22308480d503effb196257995bfbb802967f86e5aede9",
+      "artifactHash": "sha256:bc7d4b4958412ffce1c22308480d503effb196257995bfbb802967f86e5aede9",
+      "hashVerified": true,
+      "generatedAt": "2026-07-16T08:46:15.023516Z",
+      "model": null,
+      "capabilities": [
+        "shape",
+        "pbr",
+        "material",
+        "multiview-texture",
+        "auto-rig",
+        "skin-weights",
+        "motion",
+        "morph-targets"
+      ]
+    },
+    "motion": {
+      "jobId": "8fb50a87cd58460f8e20cbbe4477cf09",
+      "outputKind": "motion-json",
+      "bytes": 1390,
+      "contentHash": "sha256:9f66ac9ec6ed7a6b16b50282f32d8c65ee15c4af1e22d742f38ba65720ae4fa0",
+      "artifactHash": "sha256:9f66ac9ec6ed7a6b16b50282f32d8c65ee15c4af1e22d742f38ba65720ae4fa0",
+      "hashVerified": true,
+      "generatedAt": "2026-07-15T20:29:23.079957Z",
+      "model": null,
+      "capabilities": [
+        "motion",
+        "humanoid",
+        "skeleton:vrm-humanoid-1.0"
+      ]
+    },
+    "effect": {
+      "jobId": "146ebad54ce440f0b8ccb5280c5329e8",
+      "outputKind": "effect-json",
+      "bytes": 134,
+      "contentHash": "sha256:89107994c5755d45dd53d2164c6369275cc7a5ae619bcfa08e454fa694d7d6e3",
+      "artifactHash": "sha256:89107994c5755d45dd53d2164c6369275cc7a5ae619bcfa08e454fa694d7d6e3",
+      "hashVerified": true,
+      "generatedAt": "2026-07-15T20:29:23.075610Z",
+      "model": null,
+      "capabilities": [
+        "effect",
+        "bounded-preset",
+        "preset:sparkle"
+      ]
+    },
+    "vrm-compose": {
+      "jobId": "363c783700224ed08e0a2fc3175fe350",
+      "outputKind": "vrm",
+      "bytes": 2109412,
+      "contentHash": "sha256:37e895b0591fe04fc451cd5d6be4947d5ea29b35ce376749d05ae18b4b24ff56",
+      "artifactHash": "sha256:37e895b0591fe04fc451cd5d6be4947d5ea29b35ce376749d05ae18b4b24ff56",
+      "hashVerified": true,
+      "generatedAt": "2026-07-15T16:24:52.231901Z",
+      "model": null,
+      "capabilities": [
+        "shape",
+        "pbr",
+        "material",
+        "multiview-texture",
+        "auto-rig",
+        "skin-weights",
+        "motion",
+        "morph-targets",
+        "vrm-1.0",
+        "humanoid"
+      ]
+    },
+    "music": {
+      "jobId": "55c710988d2a4ea2870d517321c48fd2",
+      "outputKind": "sound-wav",
+      "bytes": 480044,
+      "contentHash": "sha256:ab151be7ab062d66dc7baac80b4c18dcea0ed2a5da89d094e192fb63e2d4a091",
+      "artifactHash": "sha256:ab151be7ab062d66dc7baac80b4c18dcea0ed2a5da89d094e192fb63e2d4a091",
+      "hashVerified": true,
+      "generatedAt": "2026-07-17T09:22:47.077228Z",
+      "model": null,
+      "capabilities": [
+        "sound",
+        "wav",
+        "sound-kind:music",
+        "loop"
+      ]
+    },
+    "sfx": {
+      "jobId": "66dbc83091884fd3bc4ee6c15aedd5bc",
+      "outputKind": "sound-wav",
+      "bytes": 240044,
+      "contentHash": "sha256:c4074d8b3e2744ccea9e32fe4726cbaa92ed9204003d35d6c9fd2191710379af",
+      "artifactHash": "sha256:c4074d8b3e2744ccea9e32fe4726cbaa92ed9204003d35d6c9fd2191710379af",
+      "hashVerified": true,
+      "generatedAt": "2026-07-15T20:29:23.113093Z",
+      "model": null,
+      "capabilities": [
+        "sound",
+        "wav",
+        "sound-kind:sfx"
+      ]
+    },
+    "voice": {
+      "jobId": "2eefca2f6d954e5fbd8f59d8a86dde68",
+      "outputKind": "wav",
+      "bytes": 43356,
+      "contentHash": "sha256:f8e8e087375a47176914b7d0660fc9927178fe8d767e1d5f444841a385587f8d",
+      "artifactHash": "sha256:f8e8e087375a47176914b7d0660fc9927178fe8d767e1d5f444841a385587f8d",
+      "hashVerified": true,
+      "generatedAt": "2026-07-16T10:00:02.371277Z",
+      "model": null,
+      "capabilities": [
+        "voice",
+        "tts",
+        "wav",
+        "locale:ja-JP",
+        "speaker:ja@espeak-ng-system",
+        "tts-engine:espeak-ng",
+        "model-license:unknown",
+        "visemes:kotoba.viseme-timeline/v1",
+        "viseme-timing:duration-derived/v1",
+        "prosody:espeak-prosody/v1",
+        "emotion:neutral"
+      ]
+    },
+    "video": {
+      "jobId": "d472c23012d147258a343dfea252fd82",
+      "outputKind": "mp4",
+      "bytes": 457054,
+      "contentHash": "sha256:d24df2075be817116879d58e06138e35c5987a6b6db4257a0db8914963493f84",
+      "artifactHash": "sha256:d24df2075be817116879d58e06138e35c5987a6b6db4257a0db8914963493f84",
+      "hashVerified": true,
+      "generatedAt": "2026-07-17T04:39:37.535610Z",
+      "model": "ltx-2.3",
+      "capabilities": [
+        "video",
+        "mp4",
+        "model:ltx-2.3",
+        "i2v"
+      ]
+    }
+  },
+  "schema": 1,
+  "generatedAt": "2026-07-17T11:50:37.281Z",
+  "requiredModalities": [
+    "image",
+    "3d",
+    "rig",
+    "motion",
+    "effect",
+    "vrm-compose",
+    "music",
+    "sfx",
+    "voice",
+    "video"
+  ],
+  "complete": true,
+  "missing": []
+}

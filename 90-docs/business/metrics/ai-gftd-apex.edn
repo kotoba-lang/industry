@@ -1,0 +1,39 @@
+{:health-status 200,
+ :zone-name "gftd.ai",
+ :workers-invocations-7d
+ {"magatama-sh1n5h1x" 7549, "ai-gftd-chat-shell" 1},
+ :zone
+ {:requests-7d 463650,
+  :pageviews-7d 6501,
+  :uniques-7d-sum 5344,
+  :zone "gftd.ai"},
+ :sources [:cloudflare :stripe :health],
+ :paths
+ {:ok
+  [{:path "/wpxml.php", :requests 32}
+   {:path "/cdn-cgi/styles/main.css", :requests 23}
+   {:path "/ww1.php", :requests 22}
+   {:path "/ops.php", :requests 21}
+   {:path "/gtc.php", :requests 21}
+   {:path "/cdn-cgi/images/cf-icon-cloud.png", :requests 21}
+   {:path "/gc-service.json", :requests 21}
+   {:path "/cdn-cgi/images/cf-icon-error.png", :requests 20}],
+  :status-mix {:client-error 1276, :ok 912, :server-error 13847},
+  :window "24h"},
+ :stripe
+ {:active-subscriptions 0,
+  :active-subscriptions-unpaid 0,
+  :active-subscriptions-account-wide 2,
+  :apex-active-subscriptions 0,
+  :murakumo-paid-charges 0,
+  :murakumo-paid-amount-minor 0,
+  :charges-total 90,
+  :last-charge-epoch 1604224274},
+ :as-of "2026-08-21",
+ :traffic-quality {:window "24h", :probe-4xx-pct 8, :error-5xx-pct 86},
+ :top-paths
+ "上位 page (24h, 2xx/3xx): /wpxml.php 32 · /cdn-cgi/styles/main.css 23 · /ww1.php 22 · /ops.php 21 · /gtc.php 21 | 4xx(probe) 8% · 5xx 86%",
+ :conversion {:pct 0},
+ :signal
+ "gftd.ai 実測 463650 req/7d・5344 uniques(日次和)・うち4xx probe 8%(24h)、workers 7550 inv/7d、Stripe active subs 0",
+ :subscription {:free 0, :plus 0, :conversion-pct 0}}

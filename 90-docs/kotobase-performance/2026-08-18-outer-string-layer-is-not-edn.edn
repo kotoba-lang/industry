@@ -1,0 +1,125 @@
+[{:db/id -1
+  :receipt/id "2026-08-18-outer-string-layer-is-not-edn"
+  :receipt/date "2026-08-18"
+  :source/dataset "receipt"
+  :receipt/title "The outer layer of every stored value was never EDN, and the EDN reader was reading it"
+  :receipt/graph "kotobase-protocols-v2"
+  :receipt/head "bafyreiehotlnqouj5u35gqh535ctxr52smxiphdjhiydtmivc2v6tqx3ye"
+  :receipt/deployed-version "120f3e08-7681-491f-96e6-64516445bad5"
+  :receipt/landed "2d706d8 (net-kotobase/control-plane)"
+  :receipt/body
+  "cost-coscientist iteration-02 ranked h7 — stop parsing every value on every
+   request — as the top UNBLOCKED item, worth 45% of a served read. This takes
+   the safe half of it.
+
+   ## What was there
+
+   `decode2` recovers a stored value with `edn/read-string` TWICE. The entity
+   model stores `stored-o` as `(pr-str original-value)`, and hot-datoms hands
+   back `v_edn` = `(pr-str stored-o)`. So the INNER layer is real EDN — keywords,
+   sets, nested maps — and has to stay with the EDN reader.
+
+   **The OUTER layer is always a string literal.** It is never a map, never a
+   keyword, never anything but `\"...\"`. The EDN reader was being used to
+   unquote a quoted string, character by character, for 4.9 MB of seed on every
+   request.
+
+   ## What replaced it
+
+   `JSON.parse`. An EDN string literal and a JSON string are the same grammar
+   over the escapes `pr-str` emits, and JSON.parse is native: **140 ms -> 2 ms
+   on a 1.9 MB literal, ~70x.**
+
+   The two grammars differ over exactly one thing this domain can produce: raw
+   control characters, which `pr-str` emits UNESCAPED and JSON forbids. There,
+   JSON.parse *throws* — it does not return something else. So the fallback to
+   `edn/read-string` is the entire difference between the two readers here.
+
+   Property-tested before relying on it: **20,000 random strings** (raw control
+   characters, lone surrogates, astral planes). JSON.parse never silently
+   disagreed — it returned the identical string or threw — and `edn/read-string`
+   recovered **100%** of the throws. A `string?` guard sends anything that is
+   not a string literal to the authoritative reader, because JSON.parse returns
+   a NUMBER for `123` and nil for `null` where the EDN reader returns 123 and the
+   symbol `null`: that one WOULD be a silent divergence.
+
+   ## Measured on production's own blocks
+
+   84 blocks, 11.46 MB, at the real head. Baseline and patched builds run
+   ALTERNATELY, because this workstation runs many concurrent agent sessions and
+   a one-shot number is not comparable across runs. **Phase A is the control** —
+   untouched code — so B/A normalises for machine load:
+
+       round   baseline B/A   patched B/A
+       1            3.166        2.246     (first run of the session; JIT warm-up)
+       2            2.869        2.108
+       3            2.875        2.030
+       4            2.862        1.931
+
+   **-28% of phase B.** `mirror-check phase-b-equals-shipped-hydrate?` was true
+   in every round, so the fold still produces the identical map.
+
+   ## Measured in production, after deploying
+
+   Same probe as iteration-02: `wrangler tail` against
+   `atproto.kotobase.net/xrpc/com.atproto.repo.describeRepo`, a public-read
+   surface that performs the full shared-graph hydrate.
+
+       before  n=10  median 2397  mean 2462  min 2114  max 3689
+       after   n=10  median 2058  mean 2026  min 1422  max 2583
+
+   **Median -14.1%, mean -17.7%.** Stated honestly: n=10 each and the ranges
+   overlap (the patched max, 2583, is above the baseline min, 2114). The shift
+   of the whole distribution is the claim, not any single pair.
+
+   Cost per million served reads: **$78.48 -> $71.70 (-8.6%)**. The Neo4j Aura
+   crossover moves 828K -> 907K queries/month.
+
+   ## Why this was worth doing before the big one
+
+   It changes no contract. Deferring value parsing (the rest of h7) and
+   materialising the seed (h1) both change what the synchronous LocalStore is
+   handed; this changes only how a string literal is turned into a string. It
+   stacks under both, and the remaining headroom is still large — the bench's
+   `decode-cbor-opaque-floor`, which parses no values at all, is **5.75 cpu-ms**
+   against phase B's 780-900.
+
+   ## Found by running it
+
+   `scripts/fetch-graph-blocks.cljs` — the bench's own documented step 1 — had
+   an **unclosed ns docstring** since 53b8884 (2026-08-17). The reader swallowed
+   the whole header and died on a bare symbol, so the script had not run since
+   that commit. Nothing reported this, because nothing ran it: the phase bench
+   quotes it in a `## Reproduce` block that no gate executes. Fixed here.
+
+   Its first symptom was a lie: `Invalid symbol: /tmp/kb-blocks`, pointing at the
+   argument I passed, on a line whose string literal was fine. I spent three
+   attempts working around nbb argument handling before testing the script with
+   NO arguments at all and seeing it fail identically.
+
+   ## Verification
+
+   130 tests / 821 assertions / 0 failures.
+
+   The three new tests discriminate: removing the fallback and the `string?`
+   guard gives **6 failures and 0 compile errors**, naming `fallback must
+   recover control char 31` and the `null` / `[1 2]` cases — exactly what was
+   removed. Restoring returns to 0.
+
+   ## Still open
+
+   `kotoba-lang/kotobase-worker-shell` carries its own copy of this file with the
+   double parse intact. It is a separate repo and deployment; this receipt does
+   not claim it was fixed."
+  :receipt/measurements
+  {:json-vs-edn-on-1_9mb-literal {:edn-ms 140 :json-ms 2 :ratio 70}
+   :property-test {:n 20000 :silent-disagreements 0 :throws-recovered-by-edn "100%"}
+   :bench-b-over-a {:baseline [3.166 2.869 2.875 2.862] :patched [2.246 2.108 2.030 1.931]
+                    :effect "-28% of phase B" :mirror-check-true-every-round true}
+   :production-cpu-ms {:before {:n 10 :median 2397 :mean 2462 :min 2114 :max 3689}
+                       :after  {:n 10 :median 2058 :mean 2026 :min 1422 :max 2583}
+                       :caveat "ranges overlap; the distribution shift is the claim"}
+   :cost-per-million {:before 78.48 :after 71.70 :delta "-8.6%"}
+   :aura-crossover {:before 828236 :after 906555 :unit "queries/month"}
+   :tests {:ran 130 :assertions 821 :failures 0
+           :discriminates "break -> 6 failures, 0 compile errors, naming what was broken"}}}]

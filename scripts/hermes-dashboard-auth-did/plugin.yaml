@@ -1,0 +1,19 @@
+name: did
+version: 0.1.0
+description: >-
+  Dashboard auth provider — a bearer token is a biscuit delegation, and the
+  principal it names is a did:key. Verification needs only the ROOT PUBLIC KEY,
+  so the same token is checkable here, by a remote, by a Worker and by another
+  actor without any of them holding a secret. The provider does not implement
+  the decision: it shells out to `scripts/identity-verify.cljs` in the
+  com-junkawasaki workspace, which runs biscuit.token/verify ->
+  biscuit.kotoba/->delegated -> authority.chain/authorize ->
+  identity.startup/resolve-state. Writing that check a second time in Python
+  would be a second decider (ADR-2608197300 §3, §5).
+  Token-only: it registers no login flow, so it neither offers nor accepts an
+  interactive session. Activates only when a root public key is configured.
+author: com-junkawasaki
+kind: backend
+requires_env:
+  - HERMES_DID_ROOT_PUBLIC_KEY
+  - HERMES_DID_WORKSPACE

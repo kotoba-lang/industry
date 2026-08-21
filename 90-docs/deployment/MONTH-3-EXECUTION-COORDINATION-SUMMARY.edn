@@ -1,0 +1,314 @@
+[{:doc/type :execution-coordination-summary
+  :doc/id "month-3-execution-coordination-summary"
+  :doc/title "Month 3 Canary Execution — Complete Coordination Summary (2026-09-08 to 2026-09-15)"
+  :doc/date "2026-07-21"
+  :doc/author "Claude Code Agent"
+  :doc/status "ACTIVE"
+
+  :coordination/overview
+  "This document summarizes all Month 3 canary execution components prepared for 2026-09-11 to 2026-09-14.
+   All coordination documents are now ready. This summary ties them together and provides a master checklist
+   for pre-flight readiness (2026-09-08) and execution handoff (2026-09-11)."
+
+  :coordination/complete-document-list
+  [{:seq 1
+    :filename "MONTH-3-PRE-FLIGHT-CHECKLIST.edn"
+    :purpose "Pre-flight gate (2026-09-08) validation checklist (7 items)"
+    :status "ACTIVE"
+    :created "2026-07-21"
+    :scope "Measures pre-deployment readiness"
+    :key-items
+    ["Item 1: Parity validation (7-day sentinel, < 0.01% failure rate)"
+     "Item 2: Latency & performance SLO (p99 ≤ 100ms)"
+     "Item 3: Reliability & error rates (5xx ≤ 0.01%)"
+     "Item 4: Memory & resource utilization (≤ 256MB per-instance)"
+     "Item 5: Audit trail & compliance (log capture, retention)"
+     "Item 6: Team & infrastructure readiness (on-call trained)"
+     "Item 7: Go/No-Go decision gate (platform lead approval)"]}
+
+   {:seq 2
+    :filename "MONTH-3-CANARY-EXECUTION-TIMELINE.edn"
+    :purpose "Detailed execution timeline with all 4 stages, gates, and post-cutover validation"
+    :status "ACTIVE"
+    :created "2026-07-21"
+    :scope "Stage-by-stage detailed procedures and timings"
+    :key-sections
+    ["Stage 1 (50% → 75%): 2026-09-11 09:00 to 2026-09-12 09:00 JST"
+     "Stage 2 (75% → 90%): 2026-09-12 09:00 to 2026-09-13 09:00 JST"
+     "Stage 3a (90% → 99%): 2026-09-13 09:00 to 2026-09-13 14:00 JST"
+     "Stage 3b (99% → 100%): 2026-09-13 14:00 to 2026-09-13 15:00 JST"
+     "Graceful Drain: 2026-09-13 15:00 to 2026-09-13 16:00 JST"
+     "Post-cutover validation: 2026-09-13 16:00 to 2026-09-14 22:00 JST"]}
+
+   {:seq 3
+    :filename "MONTH-3-TEAM-ASSIGNMENTS.edn"
+    :purpose "Team role assignments, on-call rotation, and fire-drill schedule"
+    :status "ACTIVE"
+    :created "2026-07-21"
+    :scope "Who does what, escalation paths, pre-flight training requirements"
+    :key-roles
+    ["Canary Lead (owner + ops-lead): overall coordination, stage gate decisions"
+     "Traffic Controller: execute ramps, rollbacks, graceful drain"
+     "Monitoring Lead: SLO tracking, alert response, gate sign-off"
+     "Escalation Lead: decision logging, communication coordination"
+     "On-Call Engineers (overnight): alert response, handoff to day shift"]}
+
+   {:seq 4
+    :filename "MONTH-3-AUTOMATIC-ROLLBACK-TRIGGERS.edn"
+    :purpose "4 automatic rollback triggers with monitoring rules and test procedures"
+    :status "ACTIVE"
+    :created "2026-07-21"
+    :scope "Autonomous rollback mechanisms, Prometheus alert rules, test scenarios"
+    :key-triggers
+    ["Trigger 1: Latency regression (p99 > 200ms sustained > 5 min)"
+     "Trigger 2: Parity divergence (> 1% sustained > 1 min) — FULL ROLLBACK"
+     "Trigger 3: Reliability failure (5xx > 1% sustained > 2 min)"
+     "Trigger 4: Memory exhaustion (heap > 512MB sustained > 2 min)"]}
+
+   {:seq 5
+    :filename "MONTH-3-MANUAL-ROLLBACK-DECISION-TREE.edn"
+    :purpose "Manual rollback decision scenarios and SLA (15 min max override)"
+    :status "ACTIVE"
+    :created "2026-07-21"
+    :scope "Owner discretion, edge case handling, deferral vs. abort decisions"
+    :key-scenarios
+    ["Scenario 1: Emerging parity divergence (trending toward critical)"
+     "Scenario 2: Application fix in-flight (deploy + verify < 15 min)"
+     "Scenario 3: False alert investigation (automatic trigger already fired)"
+     "Scenario 4: Business priority override (SLO margin allows acceleration)"
+     "Scenario 5: Team readiness gap (defer for confidence)"
+     "Scenario 6: Unresolvable issue (return to Phase 2 investigation)"]}
+
+   {:seq 6
+    :filename "MONTH-3-GRACEFUL-RUST-DRAIN.edn"
+    :purpose "Detailed graceful drain procedure (5 phases: stop connections, drain, verify, deactivate, standby)"
+    :status "ACTIVE"
+    :created "2026-07-21"
+    :scope "Rust pool shutdown with zero data loss and emergency restore capability"
+    :key-phases
+    ["Phase 1 (T+0): Stop accepting new connections on Rust (1 min)"
+     "Phase 2 (T+1): Drain in-flight requests (60 sec grace period)"
+     "Phase 3 (T+60): Verify session migration (100% migrated)"
+     "Phase 4 (T+70): Deactivate Rust pool (STANDBY, 7-day grace)"
+     "Phase 5 (T+ongoing): 48h post-drain validation"]}
+
+   {:seq 7
+    :filename "MONTH-3-POST-CUTOVER-VALIDATION.edn"
+    :purpose "48+ hour post-cutover validation checklist and final decision framework"
+    :status "ACTIVE"
+    :created "2026-07-21"
+    :scope "Production stability verification before Rust decommission"
+    :key-phases
+    ["Phase 1 (0-2.5h): Immediate checks (traffic, errors, latency, memory, drain)"
+     "Phase 2 (2.5-17.5h): Early validation (overnight window)"
+     "Phase 3 (17.5-48h): Extended 48h SLO tracking"
+     "Phase 4 (T+48h): Final decision (COMPLETE / WITH CAVEATS / ABORT)"]}
+
+   {:seq 8
+    :filename "MONTH-3-EXECUTION-COORDINATION-SUMMARY.edn"
+    :purpose "Master summary and cross-reference (this document)"
+    :status "ACTIVE"
+    :created "2026-07-21"
+    :scope "Tie together all 7 documents, coordination points, handoffs"}]
+
+  :coordination/critical-dates
+  {:pre-flight-gate "2026-09-08 16:00 JST (GO/NO-GO decision, combined with M5 Week 14 gate)"
+   :fire-drill "2026-09-08 14:00 to 16:00 JST (team readiness test, 2 hours before gate)"
+   :canary-start "2026-09-11 09:00 JST (if GO decision at pre-flight gate)"
+   :stage-1-gate "2026-09-12 09:00 JST (Stage 1 complete? Proceed to Stage 2?)"
+   :stage-2-gate "2026-09-13 09:00 JST (Stage 2 complete? Proceed to Stage 3a?)"
+   :stage-3a-gate "2026-09-13 14:00 JST (Stage 3a complete? Proceed to Stage 3b?)"
+   :stage-3b-gate "2026-09-13 15:00 JST (Stage 3b complete? Proceed to graceful drain?)"
+   :cutover-complete "2026-09-14 22:00 JST (100% cljc stable, Rust at 0%)"
+   :final-validation "2026-09-15 14:00 JST (48h validation gate, COMPLETE/CAVEATS/ABORT decision)"
+   :rust-decommission "2026-09-20 16:15 JST (if validation PASS, 7-day standby expires)"}
+
+  :coordination/key-escalation-paths
+  {:alert-monitoring-lead "PagerDuty + Slack #prod-gates-wave5 (immediate)"
+   :monitoring-to-canary-lead "Slack @murakumo-owner (SLO violation or gate recommendation)"
+   :canary-lead-to-owner "Email + Slack (critical decision needed)"
+   :canary-lead-to-platform-lead "Phone call (blocking issue, abort decision)"
+   :all-team "Slack #prod-gates-wave5 thread (decision log, status updates)"}
+
+  :coordination/communication-cadence
+  {:stage-active "Status update every 1 hour (Slack message)"
+   :alert-fires "Immediate alert (Slack + PagerDuty, escalate if unresolved > 5 min)"
+   :gate-approaching "30-min warning before gate time (verification email + Slack)"
+   :gate-decision "Within 1 hour of gate time (decision logged, documented)"
+   :post-cutover "24h and 48h status checks (email summary + Slack)"}
+
+  :coordination/go-decision-prerequisites
+  {:all-7-checklist-items "MUST PASS (Seq 1-7 of pre-flight checklist)"
+   :fire-drill-complete "MUST PASS (all 3 scenarios successful)"
+   :team-availability "MUST BE CONFIRMED (all core roles available 2026-09-11 to 2026-09-14)"
+   :runbook-review "MUST BE COMPLETED (all team members signed off)"
+   :escalation-contacts "MUST BE VERIFIED (phone numbers, email, availability)"
+   :backup-roles "MUST BE ASSIGNED (if primary unavailable)"
+   :no-blocking-issues "NO UNRESOLVED RED FLAGS (all concerns documented and mitigated)"}
+
+  :coordination/no-go-decision-scenarios
+  {:parity-failing "Parity divergence > 0.01% on gate day → NOT READY, extend Phase 2"
+   :latency-trending "p99 trending toward 100ms+ on gate day → NOT READY, investigate"
+   :team-unconfident "Team expresses low confidence (fire-drill failures, alerting concerns) → DELAY CANARY"
+   :blocking-issue "Critical infrastructure unavailable (monitoring system, load balancer) → NOT READY"
+   :timeline-slip "Any YES answer → slip canary to 2026-09-18 (1-week delay)"}
+
+  :coordination/handoff-points
+  {:handoff-1-preflight-to-canary "2026-09-08 17:00 JST (after gate decision)"
+   :handoff-1-activities
+   ["Document GO/NO-GO decision in 90-docs/deployment/MONTH-3-GO-NO-GO-DECISION.edn"
+    "Escalation-lead: notify team via Slack + email (canary starting 2026-09-11 or delayed)"
+    "Traffic-controller: finalize ramp script deployment"
+    "Monitoring-lead: activate dashboards and alert rules"
+    "On-call: confirm overnight shifts assigned"]
+
+   :handoff-2-stage-gates "Between each stage (e.g., Stage 1 → Stage 2)"
+   :handoff-2-activities
+   ["Monitoring-lead: provides SLO sign-off (PASS / FAIL)"
+    "Canary-lead: makes gate decision (PROCEED / HOLD / ROLLBACK)"
+    "Escalation-lead: documents decision + timestamp"
+    "Traffic-controller: receives ramp authorization for next stage"
+    "On-call: stands by for alert response"]
+
+   :handoff-3-shift-changes "Every 8-16 hours (day → night → day)"
+   :handoff-3-activities
+   ["Outgoing engineer: written status report (Slack thread)"
+    "Incoming engineer: reads report, confirms understanding"
+    "Escalation-lead: tracks handoff completion"
+    "Any pending decisions: escalate to canary-lead immediately"]
+
+   :handoff-4-post-cutover-validation "2026-09-14 22:00 JST (end of canary stages)"
+   :handoff-4-activities
+   ["Monitoring-lead: initiates 48h validation window"
+    "On-call: monitors for anomalies (overnight window)"
+    "Escalation-lead: tracks 48h SLO data"
+    "Owner: reviews results at T+48h (2026-09-15 14:00 JST)"]
+
+   :handoff-5-final-decision "2026-09-15 14:00 JST (after 48h validation)"
+   :handoff-5-activities
+   ["Owner: makes final decision (COMPLETE / CAVEATS / ABORT)"
+    "Escalation-lead: documents decision + creates deployment record"
+    "Team: acknowledges decision (Slack thread)"
+    "If COMPLETE: schedule Rust decommission for 2026-09-20"]}
+
+  :coordination/artifact-deliverables
+  {:by-preflight-gate "2026-09-08 16:00"
+   :documents-ready
+   ["MONTH-3-PRE-FLIGHT-CHECKLIST.edn (validation items)"
+    "MONTH-3-CANARY-EXECUTION-TIMELINE.edn (stage timings)"
+    "MONTH-3-TEAM-ASSIGNMENTS.edn (role assignments)"
+    "MONTH-3-AUTOMATIC-ROLLBACK-TRIGGERS.edn (alert rules)"
+    "MONTH-3-MANUAL-ROLLBACK-DECISION-TREE.edn (decision guidance)"
+    "MONTH-3-GRACEFUL-RUST-DRAIN.edn (drain procedure)"
+    "MONTH-3-POST-CUTOVER-VALIDATION.edn (validation checklist)"
+    "MONTH-3-EXECUTION-COORDINATION-SUMMARY.edn (this document)"]}
+
+   :during-canary "2026-09-11 to 2026-09-14"
+   :generated-documents
+   ["MONTH-3-GO-NO-GO-DECISION.edn (decision record, created after 2026-09-08 gate)"
+    "Stage gate decision logs (Slack thread, recorded in Escalation-lead notes)"
+    "Alert logs (Prometheus + Alertmanager records)"
+    "SLO dashboards (Grafana snapshots, archived)"]
+
+   :post-validation "2026-09-15 onwards"
+   :post-validation-documents
+   ["MONTH-3-CUTOVER-COMPLETE.edn (success record, if PASS)"
+    "MONTH-3-CUTOVER-COMPLETE-WITH-CAVEATS.edn (if PASS WITH CAVEATS)"
+    "MONTH-3-INCIDENT-*.edn (if ABORT or critical issue, root cause ADR)"
+    "MONTH-3-SESSION-MIGRATION-RECORD.edn (session verification results)"
+    "Metrics archive (Backblaze B2: murakumo/canary-metrics/month-3-*.json)"]
+
+  :coordination/success-criteria-summary
+  {:technical-success
+   ["Parity divergence: < 0.01% (maintained throughout canary)"
+    "Latency p99: ≤ 100ms (all stages, including 100% traffic)"
+    "Reliability 5xx: ≤ 0.01% (no unhandled exceptions)"
+    "Memory per-instance: ≤ 256MB (stable, no leak)"
+    "Session migration: 100% data integrity verified"
+    "Rust graceful drain: completed within SLA (< 60s grace period)"
+    "Post-cutover 48h: all SLOs stable, zero user impact"]}
+
+  :coordination/risk-mitigation-summary
+  {
+   :risk-latency-regression
+   {:mitigation "Automatic rollback trigger (p99 > 200ms sustained > 5 min) + manual monitoring"}
+   :risk-parity-divergence
+   {:mitigation "Automatic FULL rollback (> 1% divergence) + 7-day pre-flight sentinel"}
+   :risk-reliability-spike
+   {:mitigation "Automatic rollback trigger (5xx > 1% sustained > 2 min)"}
+   :risk-memory-leak
+   {:mitigation "Automatic rollback trigger (heap > 512MB sustained > 2 min) + heap dump analysis"}
+   :risk-graceful-drain-hang
+   {:mitigation "60-second grace period + force shutdown policy + Rust standby restore (5 min)"}
+   :risk-cascading-failure
+   {:mitigation "Circuit breaker + connection pool limits + automatic load reduction on error spike"}
+   :risk-team-fatigue
+   {:mitigation "24/7 on-call rotation (no single person > 8h shift) + clear escalation paths"}
+   :risk-communication-gap
+   {:mitigation "Hourly status updates + Slack thread for all decisions + email confirmation"}}
+
+  :coordination/metrics-and-monitoring
+  {:pre-flight-metrics
+   ["Parity checker: divergence count per 1M requests"
+    "Latency dashboard: p99 over 7-day window (must be ≤ 100ms)"
+    "Error rate: 5xx per minute (must be ≤ 0.01%)"
+    "Memory: per-instance heap (must be stable ≤ 256MB)"]}
+
+  :during-canary-metrics
+   ["Traffic split: % cljc / % Rust (real-time load balancer metric)"
+    "SLO tracking: p99 latency, parity rate, 5xx rate, memory (5-min averages)"
+    "Alert firing: count, type, response time (alert metrics)"
+    "Connection pool: active connections, wait time, pool exhaustion events"
+    "GC metrics: collection frequency, pause time, full GC count"]
+
+  :post-cutover-metrics
+   ["Same SLO tracking: sustained for 48+ hours"
+    "User impact: support ticket count, error reports (should be 0)"
+    "Data consistency: session spot-checks, business logic verification"
+    "Capacity headroom: utilization at 100% traffic (should use < 50% available capacity)"
+    "Rust standby: infrastructure status (for emergency restore readiness)"]
+
+  :coordination/next-steps-post-cutover
+  {:if-complete
+   ["2026-09-15 14:00: Declare cutover COMPLETE"
+    "2026-09-15 17:00: Create 90-docs/deployment/MONTH-3-CUTOVER-COMPLETE.edn"
+    "2026-09-20 16:15: Decommission Rust pool (7-day standby expires)"
+    "2026-09-20 17:00: Create decommission record in 90-docs/"
+    "2026-09-21: Post-incident review meeting (lessons learned)"
+    "2026-09-25: Close Month 3 project (all artifacts archived)"]
+   :if-caveats
+   ["2026-09-15 14:00: Declare COMPLETE WITH CAVEATS"
+    "Document follow-up items and SLA (e.g., 'GC tuning by 2026-09-22')"
+    "Defer Rust decommission until caveats resolved"
+    "Assign follow-up owner (canary-lead or ops-lead)"]
+   :if-abort
+   ["2026-09-15 14:00: Declare ABORT"
+    "Escalate to platform-lead (emergency decision call)"
+    "Option 1: Rollback to Rust (< 5 min restore)"
+    "Option 2: Keep cljc at 100%, investigate issue (high risk)"
+    "Post-incident: root cause ADR, retry plan for 2026-09-18 or later"]}
+
+  :coordination/document-location
+  {:directory "/Users/junkawasaki/github/com-junkawasaki/90-docs/deployment/"
+   :files
+   ["MONTH-3-PRE-FLIGHT-CHECKLIST.edn (validation, gate criteria)"
+    "MONTH-3-CANARY-EXECUTION-TIMELINE.edn (stage-by-stage procedures)"
+    "MONTH-3-TEAM-ASSIGNMENTS.edn (roles, on-call rotation, fire-drill)"
+    "MONTH-3-AUTOMATIC-ROLLBACK-TRIGGERS.edn (alert rules, test scenarios)"
+    "MONTH-3-MANUAL-ROLLBACK-DECISION-TREE.edn (decision guidance, SLA)"
+    "MONTH-3-GRACEFUL-RUST-DRAIN.edn (drain procedure, standby policy)"
+    "MONTH-3-POST-CUTOVER-VALIDATION.edn (48h validation, final decision)"
+    "MONTH-3-EXECUTION-COORDINATION-SUMMARY.edn (this master summary)"]
+   :also-related
+   ["MONTH-3-CANARY-DEPLOYMENT-PLAN.md (markdown overview)"
+    "MONTH-3-ROLLBACK-PROCEDURE.md (markdown rollback guide)"
+    "MONTH-3-PRE-FLIGHT-README.md (markdown pre-flight summary)"
+    "MONTH-3-TIMELINE-INTEGRATION.md (markdown weeks 11-16 coordination)"]}
+
+  :coordination/status "READY FOR EXECUTION"
+  :coordination/prepared-by "Claude Code Agent (Haiku 4.5)"
+  :coordination/prepared-date "2026-07-21"
+  :coordination/target-completion "2026-09-15 14:00 JST (Month 3 canary completion)"
+
+  :adr/related ["2607072100-kotoba-server-fleet-deployment-strangler-fig.edn"
+                "2607072400-kaisha-pod-murakumo-fleet-deployment.edn"]}]

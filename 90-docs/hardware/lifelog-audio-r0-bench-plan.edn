@@ -1,0 +1,49 @@
+{:bench/id "lifelog-audio-r0-bench-proof"
+ :bench/status :ready-for-hardware
+ :bench/authority "ADR-2608092006"
+ :bench/rule "datasheetは候補選定、benchはsystem qualification。測定無しをpassにしない。"
+ :fixtures
+ [{:fixture/id :b0-capture
+   :purpose "PDM DMAから60秒mono PCM chunkをdrop無しで作る"
+   :hardware ["EVK-NINA-B306 or nRF52840 DK" "TDK EV_T5838-FX2 or equivalent x2" "logic analyzer"]
+   :procedure ["16kHz/16-bit/monoで12h capture" "sample counterとDMA overrunを記録" "CPU/PDM/mic rail currentをtrace"]
+   :pass "12h dropped frame 0。current traceとfirmware hashを保存"}
+
+  {:fixture/id :b1-storage
+   :purpose "32GB候補3種の書込電力・power-cut・endurance入口を比較"
+   :hardware ["microSD candidate x3 types" "current profiler" "programmable power cut relay"]
+   :procedure ["60秒chunk相当を64KB bufferで12h連続write" "random power cut 100回/media" "再起動後AEAD/sequence/fsck"]
+   :pass "確定chunk破損0、各gap<=65s。average/peak currentを候補別に記録"}
+
+  {:fixture/id :b2-security
+   :purpose "device identity、chunk key wrap、signed boot、debug closure"
+   :hardware ["ATECC608C trust development fixture" "SWD debugger"]
+   :procedure ["slot policyをtest vector化" "valid/invalid firmware signature" "rollback attempt" "debug lock後key extraction attempt"]
+   :pass "invalid/rollback boot拒否、production stateでprivate key非抽出、recovery procedureが明記"}
+
+  {:fixture/id :b3-usb-ingest
+   :purpose "録音と競合しないUSB read/verified-ack"
+   :hardware ["USB protocol analyzer optional" "macOS/Linux host"]
+   :procedure ["recording継続中に確定chunkをread" "ACK前切断" "bad AEAD/欠番/duplicate注入" "ACK後delete"]
+   :pass "capture drop 0、ACK前delete 0、bad/欠番/duplicateをhostが区別"}
+
+  {:fixture/id :b4-power-thermal
+   :purpose "1000mAh battery、charger、buck、gaugeの12h/42C gate"
+   :hardware ["protected 1S LiPo candidates" "BQ25188EVM or prototype" "fuel gauge fixture" "thermocouples" "current profiler"]
+   :procedure ["recording loadで3 discharge/charge cycles" "charging+recording soak" "weak USB source" "NTC hot/cold simulation"]
+   :pass "10% reserve表示精度±5pp、12h後実残量>=10%、surface<=42C、faultがfail-closed"}
+
+  {:fixture/id :b5-acoustic-mechanical
+   :purpose "胸元装着でspeech utilityとrecording indicatorを確認"
+   :hardware ["1m speech fixture" "45dBA room target" "wind source" "fabric rub fixture" "lux meter"]
+   :procedure ["pinned phrase corpus" "mic orientation/mix比較" "wind/fabric rub" "LED day/night visibility" "physical switch truth table"]
+   :pass "quiet 1m WER<=20%、mic-on/LED-off state無し、OFF mic rail 0V、条件とmodel hashを保存"}]
+ :outputs
+ ["raw current traces"
+  "audio fixture chunks and transcript result"
+  "power-cut journal"
+  "secure-element provisioning/test vectors"
+  "USB protocol fixtures"
+  "candidate comparison EDN"
+  "BOM freeze decision"]
+ :procurement-note "development/evaluation boardsは測定治具であり、市販完成品を製品として採用する判断ではない。発注は本planの外。"}
