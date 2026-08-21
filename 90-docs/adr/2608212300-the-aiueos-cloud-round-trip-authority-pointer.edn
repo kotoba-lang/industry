@@ -1,0 +1,172 @@
+[{:db/id -1
+  :adr/id "adr-2608212300-the-aiueos-cloud-round-trip-authority-pointer"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/topic "cross-repo-authority"
+  :adr/status "accepted"
+  :adr/date "2026-08-21"
+  :adr/last_verified "2026-08-21"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/repos ["orgs/kotoba-lang/aiueos"
+              "orgs/net-kotobase"
+              "orgs/kotoba-lang/murakumo"
+              "orgs/kotoba-lang/kekkai"
+              "manifest"]
+  :adr/authoritative-for
+  ["aiueos cloud round trip について、どの決定がどの repo に住むか（root は指すだけで所有しない）の正本"
+   "round trip の現在地を root 側で読むときの入口 —— 何が landed で何が未着地かの正本"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["adr-2608212000-aiueos-consumes-kekkai-admission-not-the-data-plane"
+                "adr-2608212100-where-did-identity-lives-machine-account-service"
+                "adr-2608212200-install-to-internal-disk-waits-on-two-measurements"
+                "ADR-2608136000"
+                "adr-2608039000-d1-is-not-a-premise-in-decentralized-paths"
+                "adr-2607173100-fleet-main-model-switchability"]
+  :adr/title "ADR-2608212300: aiueos cloud round trip の権威ポインタ —— どの半分をどの repo が持ち、何がまだ閉じていないか"
+  :adr/body "# この ADR の役割
+
+**root は aiueos の cloud round trip について何も所有しない。指すだけである。**
+決定の正本は子 repo 側にあり、ここはその割り当てと、**root 側から読んだときの
+現在地**を持つ。子 repo の ADR と食い違ったら子 repo が勝つ。
+
+## 権威の割り当て
+
+| 何を決めるか | 正本 | 面 |
+|---|---|---|
+| aiueos が cloud-premised であること、gap ledger の順序 | `kotoba-lang/aiueos` ADR-0041 | 位置づけ |
+| cloud authority（kotobase / murakumo）を decision として表すこと | 同 ADR-0042 | decision |
+| hosted profile が socket を開き、届いたバイトを報告すること | 同 ADR-0043 | mechanism |
+| 機械が話す相手の鍵を名指しすること（SPKI pin） | 同 ADR-0044 | trust |
+| pin set の配布・sequence・overlap rotation・break-glass | 同 ADR-0045 / 0046 / 0047 | trust |
+| production profile が anchors 無しで boot しないこと | 同 ADR-0065 | trust |
+| decision と mechanism を分ける原理 | 同 ADR-0015 / ADR-2607241100 | 全体 |
+| model alias を焼かず名前で送ること | **root** ADR-2607173100 | inference |
+| 分散を名乗る経路に単一ベンダの条件付き書き込みを premise にしないこと | **root** ADR-2608039000 | storage |
+| `PUT /ipfs/:cid` が raw CIDv1 だけを受けること | **root** ADR-2608148200 | storage |
+| overlay membership を admission の消費に留めること | **root** ADR-2608212000 | network |
+| DID の 3 面分割 | **root** ADR-2608212100 | identity |
+| 内蔵ディスク install の条件 | **root** ADR-2608212200 | persistence |
+
+**root が持っているのは、複数 repo に同時に効く規則だけ**である。aiueos 単体で
+閉じる決定は 1 つも root に無い。
+
+## 現在地（測定 2026-08-21）
+
+### landed（aiueos `origin/main` f99a8e0）
+
+- **`src/aiueos/cloud.cljc`** —— kotobase と murakumo の decision 層。
+  CID が commit している digest を plan が運び、`admit-block` が観測 digest の
+  相違を拒む。digest を言えない provider は `:digest-missing`（**沈黙は pass では
+  ない**と namespace 自身が書いている）。`admit-model` は alias が解決した
+  endpoint を、resolver を admit したのと同じ allowlist に再度当てる。
+  `alias-for` の具体 model id を送ることは**拒否**される（root ADR-2607173100）。
+- **`src/aiueos/provider/cloud.clj`** —— hosted profile の mechanism。
+  JDK の既定 trust store を**置き換える**（拡張ではない）。redirect を追わない。
+  body に上限を置く。完了しなかった request は response ではなく
+  `:aiueos.provider.cloud/error` になり、status も digest も持たない。
+- **`src/aiueos/anchors.cljc`** —— pin 配布。空の anchor set は permissive では
+  なく brick として拒否。通常の回転は overlap を要求し、`:break-glass?` は
+  全 root key を要して `:one-way? true` と言う。
+- **`src/aiueos/provider/device.clj`** / **`enroll.cljc`** —— per-device 鍵と
+  enrolment の decision / mechanism 分割。
+
+### landed していない
+
+- **write。** `provider/cloud.clj` は自分の docstring で **書かない**と言っている。
+  **実測: HTTP verb は `.GET` のみ**（line 202）。
+  ⚠ **ただしその理由づけは間違っている。** docstring は `PUT /ipfs/:cid` が
+  **CACAO 認証された caller を要する**からだと書くが、実測すると block plane は
+  CACAO を受け付けない —— `orgs/net-kotobase/control-plane` の
+  `kotobase-api-gateway-cljs/src/kotobase/b2_write.cljc` は `Bearer ` prefix を
+  必須とし、token が 2 つの Worker env secret のいずれかと**文字列一致**するかだけを
+  見る。`CACAO …` header は prefix 検査で落ち、verifier に届かない。
+  **結論（書かない）は正しいまま、理由が違う。** 詳細と帰結は ADR-2608212100。
+- **murakumo client。** decision 層（`admit-model`）は在るが、
+  `/v1/messages` を呼ぶ mechanism は無い。
+- **live gate。** ADR-0041 の Consequences が今も正しい ——
+  機械は **`kotobase.net` にも `api.murakumo.cloud` にも接触したことがない**。
+
+### bare metal の gap ledger（step 1〜5、未着手）
+
+アドレス設定 / DNS stub resolver / 使える TCP stream / **TLS 1.3 client** /
+HTTP/1.1 client。ADR-0041 は step 6 と 7 は 1〜5 の上の小さな protocol client だと
+書いており、それは正しい。
+
+**TLS について「この workspace に実装が無い」と言う前に索引を引いた**
+（CLAUDE.md の規則）。`nbb scripts/repo-search.cljs tls` と
+`nbb scripts/concept-lookup.cljs tls` が返したもの:
+
+| repo | 実体 |
+|---|---|
+| `kotoba-lang/capability-crypto-tls` | **provider status: contract-only** —— capability の名前と CID であって handshake ではない |
+| `kotoba-lang/provider-transport` | **JVM の TLS に委譲する** Chicory tender plugin。`provider.tls-channel` は host 側 netlayer |
+| `kotoba-lang/org-ietf-x509` | RFC 5280 証明書 parsing —— TLS の部品であって TLS ではない |
+| `kotoba-lang/noise` | **別プロトコル**（kekkai-node が使う） |
+
+**したがって正確な言い方はこう: host 非依存の TLS 1.3（RFC 8446）record /
+handshake 実装は見つからなかった。** 在るのは名前だけの capability、JVM 委譲の
+provider、証明書 parser、そして別プロトコル。bare metal には JVM も OS の TLS も
+無いので、**どれも step 4 を埋めない。**
+⚠ 索引は README のある repo だけを見る（`concept-lookup` が未索引数を毎回申告する）。
+**索引に無いことは不在の証明ではない。** ここで主張しているのは
+**この検索で見つからなかった**であって、存在しないことではない。
+
+## 並走している作業 —— まだ着地していない
+
+入力として渡された引き継ぎは、`kotoba-lang/aiueos` の branch
+**`agent/cloud-live-round-trip`** が hosted profile に実 HTTP method dispatch
+（POST/PUT）・murakumo client（alias 解決 + `/v1/messages`）・kotobase write・
+operator 実行の三値 live gate を足し、ADR-0041 の**接触したことがない**という
+一文を閉じる、というものだった。
+
+**測定（2026-08-21、この ADR を書いている間に 2 回）:**
+
+| 測ったもの | 結果 |
+|---|---|
+| remote ref `heads/agent/cloud-live-round-trip` | **404 —— 存在しない** |
+| その名前の PR | **無い**（aiueos の PR 一覧に該当なし） |
+| local worktree の HEAD | `f99a8e0` = `origin/main` と同一 |
+| `origin/main..HEAD` の commit 数 | **0** |
+| working tree | 1 回目: clean。2 回目: `M src/aiueos/cloud.cljc` / `?? src/aiueos/json.cljc` |
+
+**したがって: 進行中であり、着地していない。** commit は 1 つも無く、push も
+されておらず、`origin/main` は 2026-08-20 の f99a8e0 で止まっている。
+
+**この ADR はその作業を過去形で書かない。** 上の「landed していない」の 3 行は
+今日の測定であって、branch の意図ではない。branch が着地したら、
+**その時に**この節と ADR-0041 の Consequences を書き換える
+（ADR-2607257000: 文書は最新状態のみを表し、履歴は git が持つ）。
+
+**これは ADR-2608136000 が名指しした形そのものである** —— 引き継ぎ文と wire の
+状態が食い違い、引き継ぎ文の方が完成して見えた。**片方だけを読むと、測っていない
+ものを測った値として受け取る。**
+
+## まだ閉じていないもの（優先順）
+
+1. **hosted profile の write 経路と、その credential。そして「どちらの面に
+   書くか」。** kotobase には認証面が 2 つあり、**ADR-0041 が storage authority と
+   呼んだ block plane（`PUT /ipfs/:cid`）は共有 bearer 秘密**、tenant datom plane
+   （`/xrpc/…`）は **`did:key` CACAO** である（ADR-2608212100 の測定）。
+   principal を答えられるのは後者だけなので、**enrolment receipt や audit chain
+   head を置くなら面の選択が先**で、実装はその後。どちらにせよ aiueos には
+   credential 経路が無く、**無いことは実装の遅れではなく決定が要る**
+   （安全床①: 認証情報を自分でフォーム入力しない、credential 専用ツール経由）。
+2. **live gate が三値であること。** pass / fail に加えて
+   **測れなかった**を別の値で返す（ADR-2608136000）。到達不能を pass にも
+   fail にもしない gate でなければ、round trip の主張は検証されない。
+3. **bare metal step 1〜5。** 順序どおり。step 4（TLS 1.3）が最大で、
+   上記のとおり流用できる実装が見つかっていない。
+4. **削除テストの 4 つの生存物**（ADR-2608212200 前提 2）。round trip が
+   出来た直後が、これを 1 つずつ測る唯一の good moment である —— まとめて
+   通ったことにしない。
+5. **overlay membership**（ADR-2608212000）—— hosted profile が先。
+
+## 帰結
+
+- **root 側から aiueos の cloud 主張を読むときは、必ずこの ADR を通る。**
+  そして子 repo の ADR-0041 / 0042 / 0043 を、その日の `origin/main` に対して
+  読み直す。**この ADR に書かれた現在地は 2026-08-21 の値である。**
+- **完了形で書かれた引き継ぎを、測定の代わりにしない。** 今日それが 1 件あった。
+"}]
