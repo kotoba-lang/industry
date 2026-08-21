@@ -535,7 +535,10 @@
    :axis/repo "kotoba-lang/webgpu"
    :axis/paths ["src"]
    :axis/markers ["render-skinned-frame!" "prepare-skinned-submission-packets!" "create-skinned-submission-cache"]
-   :axis/behavior nil}
+   ;; webgpu は約 20 の兄弟 git 依存を持つので、classpath は repo 自身の deps.edn から
+   ;; 解決させる。手で追うと、能力とは無関係な理由で UNMEASURABLE になる。
+   :axis/probe-classpath-from-deps true
+   :axis/behavior "render-skinned-gpu"}
 
   {:axis/id :render/gpu-raytracing
    :axis/segment :render :axis/weight 4

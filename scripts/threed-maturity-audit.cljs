@@ -157,8 +157,27 @@
         repo-dir (path/join orgs-root repo)
         paths (map #(path/join repo-dir %) (:axis/paths axis))
         files (vec (distinct (mapcat clj-files paths)))
-        cp-dirs (cons (path/join repo-dir "src")
-                      (map #(path/join orgs-root %) (:axis/probe-extra-cp axis)))]
+        ;; Some repos (webgpu has ~20 sibling git deps) cannot be put on a probe
+        ;; classpath by naming directories — chasing the transitive set by hand
+        ;; ends in a probe that reports UNMEASURABLE for a reason that has
+        ;; nothing to do with the capability. `:axis/probe-classpath-from-deps`
+        ;; asks the repo's own deps.edn instead. It costs one JVM start, which
+        ;; is why it is opt-in rather than the default.
+        resolved (when (:axis/probe-classpath-from-deps axis)
+                   (try (let [raw (str/trim (str (cp/execSync "clojure -Spath"
+                                                               #js {:cwd repo-dir :encoding "utf8"
+                                                                    :stdio #js ["ignore" "pipe" "ignore"]})))]
+                          ;; `-Spath` emits the repo's OWN paths relative ("src",
+                          ;; "resources"). nbb resolves those against ITS cwd, which
+                          ;; is the superproject — so they silently miss and the probe
+                          ;; fails to find the namespace it is about to test.
+                          (str/join ":" (map #(if (str/starts-with? % "/")
+                                                % (path/join repo-dir %))
+                                             (str/split raw #":"))))
+                        (catch :default _ nil)))
+        cp-dirs (concat [(path/join repo-dir "src")]
+                        (map #(path/join orgs-root %) (:axis/probe-extra-cp axis))
+                        (when resolved [resolved]))]
     (cond
       (not (exists? repo-dir))
       (merge axis {:axis/status :unmeasurable :axis/found [] :axis/missing (:axis/markers axis)
