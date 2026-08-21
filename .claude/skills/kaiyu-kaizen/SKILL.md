@@ -46,15 +46,40 @@ nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kaiyu/src" \
    止まったように見えないまま queue に 2 通目が積まれる。
 
    ```bash
-   grep -n "kaizen:<site>:<finding>:" 90-docs/kaizen/kaiyu-kaizen.ledger.edn
+   nbb --classpath ".:scripts/nbb_compat" -e '
+   (ns g (:require [clojure.edn :as edn] ["fs" :as fs]))
+   (def site "<site>")
+   ;; ファイル全体を 1 度に読む。**1 行 1 form で読まない** —— 台帳には複数行に
+   ;; pretty-print された entry が混在し、行単位の reader はそれを黙って落とす。
+   (def es (edn/read-string (str "[" (str (fs/readFileSync "90-docs/kaizen/kaiyu-kaizen.ledger.edn" "utf8")) "]")))
+   (println "ENTRIES" (count es))            ; ← 件数を必ず出す。evidence floor
+   (doseq [e es :when (and (= site (:site e)) (= :proposed (:status e)))]
+     (println "OPEN" (:at e) (:issue-id e)))'
    ```
 
-   prefix（window を除いた 3 節）で引き、当たった entry の `:status` を見る:
+   **grep で引かない。** documented guard は 2026-08-21 まで
+   `grep -n "kaizen:<site>:<finding>:"` で引いて「当たった entry の `:status` を
+   見る」と書いていたが、**複数行 entry では `:status` が開き括弧の行に、
+   `:issue-id` が別の行に載る**ので、grep が返す行に `:status` は無い。実測: その日
+   open だった 2 通はどちらも複数行 entry で、`grep -c '<id>.*:status'` = 0 ——
+   **いちばん答えてほしい entry（open な提案）についてだけ答えられない guard**
+   だった。1 行 1 form で reader に通す形も同じく壊れる（542 行 → 506 entry と
+   報告し、複数行 36 件を落として `:proposed` を **0 件**と答える。真値は 2 件）。
+   **読めなかったことが、読んで問題が無かったことと同じ値になる。**
 
-   - `:status :proposed` が 1 件でもある → **提案しない。** 問いの文言が同じなら、
-     人が答えるべき内容も同じで、2 通目は queue の深さを増やすだけ。
+   出力を prefix（window を除いた 3 節）と **site 全体**の両方で見る:
+
+   - prefix に `:status :proposed` が 1 件でもある → **提案しない。** 問いの文言が
+     同じなら、人が答えるべき内容も同じで、2 通目は queue の深さを増やすだけ。
      `:status :not-proposed-duplicate-question` で記録してその周は終わり
-   - `:not-proposed-duplicate-question` だけ、または 0 件 → 次へ
+   - prefix は 0 件でも、**site 全体に同じ section について open な問いが在る**なら
+     やはり提案しない —— **finding 節そのものが回る**（`-stopped-while-sibling-collects`
+     → `-empty-while-measured` は、最後の行が窓から出ただけで section も問いも
+     変わっていない）。prefix guard はこの回転を止められない
+   - どちらも無い → 次へ
+
+   **新しい行は 1 行 EDN で書く**（`pr-str` した map を 1 行）。複数行に
+   pretty-print すると、上記のとおり後続の周の guard を壊す。
 
    **これは重複を数える guard であって、dedup の意味論の決定ではない。**
    後者（open な間は (site, finding) で dedup して evidence を更新するか、
