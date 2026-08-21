@@ -624,8 +624,13 @@
    :axis/label "工具・ホルダ干渉と削り込み検査"
    :axis/repo "kotoba-lang/org-iso-6983"
    :axis/paths ["src"]
+   ;; ⚠ **部分実装**（2026-08-22）。対象への食い込み検査だけが在り、ホルダ・シャンク・
+   ;; 治具・機械包絡は無い。marker を 3 つのまま残すのは、この軸が :thin として
+   ;; 「一部だけ」と報告するのが実態だから —— 減らせば緑になるが、
+   ;; **通っても機械は壊れうる**という事実が台帳から消える。
+   ;; probe は「検査した範囲」と「検査していない範囲」が出力で区別できることまで見る。
    :axis/markers ["gouge-check" "collision-check" "holder-clearance"]
-   :axis/behavior nil}
+   :axis/behavior "cam-collision-check"}
 
   {:axis/id :cam/multi-axis
    :axis/segment :cam :axis/weight 4
