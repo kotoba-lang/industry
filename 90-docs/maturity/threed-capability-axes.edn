@@ -289,7 +289,7 @@
    :axis/repo "kotoba-lang/kami-engine-modeling"
    :axis/paths ["src"]
    :axis/markers ["heal-body" "tolerance-diagnostics" "valid-body?"]
-   :axis/behavior nil}
+   :axis/behavior "mcad-healing"}
 
   ;; ───────────────────── interop ─────────────────────
   {:axis/id :interop/step-ap203
@@ -420,7 +420,7 @@
    :axis/repo "kotoba-lang/kami-engine-modeling"
    :axis/paths ["src/kami/modeling.cljc"]
    :axis/markers ["modifier" "modifier-registry" "apply-modifier" "move-modifier" "remove-modifier"]
-   :axis/behavior nil}
+   :axis/behavior "modifier-stack"}
 
   {:axis/id :dcc/uv-unwrap
    :axis/segment :dcc :axis/weight 4
@@ -493,7 +493,7 @@
    :axis/repo "kotoba-lang/kami-engine-sculpt"
    :axis/paths ["src"]
    :axis/markers ["voxel-remesh" "remesh-document" "repair-topology" "fill-holes-document"]
-   :axis/behavior nil}
+   :axis/behavior "sculpt-remesh"}
 
   {:axis/id :sculpt/texture-paint
    :axis/segment :sculpt :axis/weight 5
