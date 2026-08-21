@@ -16,7 +16,8 @@
   {:analysis "orgs/network-awai/cloud-murakumo/docs/gtm/jp-bto-under-400k-2026-08-15.md"
    :storefront "orgs/network-awai/cloud-murakumo/src/cloud_murakumo/storefront.cljc"
    :observed-at "2026-08-15"
-   :gmktec-rfq "gmail thread 1a0147e09d0adcf1 / 2026-08-18 send, 2026-08-19 GMKtec reply, 2026-08-20 follow-up"
+   :gmktec-rfq "gmail thread 1a0147e09d0adcf1 / 2026-08-18 send, 2026-08-19 GMKtec reply, 2026-08-20 follow-up, 2026-08-20 Links referral reply"
+   :links-rfq "gmail threads 1a0221d8843ac0a8 (2026-08-21 RFQ to Liu), 1a0222a12359522b (2026-08-21 数量訂正 3台), 1a022c927244db51 (2026-08-21 松崎氏 確認照会と当社回答)"
    :sources
    ["https://www.chusho.meti.go.jp/zaimu/zeisei/tokurei/syougaku_shisan.html"
     "https://www.nta.go.jp/publication/pamph/hojin/kaisei_gaiyo2026/pdf/G.pdf"
@@ -99,10 +100,12 @@ GMKtec RFQは数量1/10/50/100台について、税込日本社着価格、各pr
 - 補助金採択、節税成立、推論速度を保証する販売表示はしない。取得価額、供用日、税務適格性は顧客の税理士確認事項とする。
 - 専用VRAMと共有VGMを同じ表現で販売しない。帯域は理論値と明記し、実機ベンチ値と混同しない。
 
-## GMKtec RFQ 実測（2026-08-19 返信 / 2026-08-20 再照会）
+## GMKtec RFQ 実測（2026-08-19 返信 / 2026-08-20 再照会 / 2026-08-20 代理店紹介）
 
 Decision 4 と Decision 5 が未確認としていた項目のうち、GMKtec Channel Director からの
-書面回答で埋まったものを記録する。**単価だけは依然として未回答**である。
+書面回答で埋まったものを記録する。**単価だけは依然として未回答**であり、
+その提示元は 2026-08-20 の代理店紹介により国内代理店リンクスインターナショナルへ移った
+（次節と「国内代理店 Links 経由の RFQ」節）。
 
 送信は 2026-08-18、jun784@gmail.com から richard.han@gmktec.com 宛（julian@gmktec.com CC）。
 返信は 2026-08-19、Richard Han, Channel Director。対象機種は M6 Ultra / M7 Ultra、
@@ -137,20 +140,45 @@ Decision 4 の採用条件も 3年保証込みで完成原価 304,800円以下�
 3年保証を商品表示から外すかのどちらかになる。**単価が出るまでこの選択はしない** —
 引当費用を完成原価に載せられるかどうかが単価で決まるためである。
 
-### 500台 MOQ 前の 10台 PoC は回答待ち
+### 500台 MOQ 前の小ロットは国内代理店経由 — 回答済み（2026-08-20）
 
 2026-08-20、10台規模の PoC 購入について照会した。OEM カスタマイズを求めず、
 GMKtec ブランド・標準梱包のまま卸で購入し、日本で自社 OS とモデルを載せて
 検証・バーンイン後に顧客へ納入する形が卸条件下で許容されるか、日本での
-reseller / distribution 契約が必要かを確認している。この段階では OEM 顧客ではなく
+reseller / distribution 契約が必要かを確認した。この段階では OEM 顧客ではなく
 system integrator / reseller として動く立て付けである。あわせて 10/100/500台の
 単価と FOB / DDP の別、連続稼働向けの機種推奨、保証の一次窓口と RMA 経路、
 no-OS 出荷、支払条件を要求した。
 
-**これは照会であって発注ではない。** 回答が Yes なら 10台の PoC を発注し、
-顧客の sign-off 後に 500台以上の OEM へ進む。No なら 500台まで直販不可という
-ことなので、代理店経由の調達経路を別途設計する必要がある。
+**同日 2026-08-20 に Richard Han 氏から回答があった**: GMKtec ブランドのままで
+よいなら、日本の正規代理店リンクスインターナショナル（links.co.jp）を紹介する。
+在庫と国内サービスを持つ、という内容で、ryu@links.co.jp（Liu 氏）を CC する形で
+仲介された。つまり 500台 MOQ 未満の小ロットは本社直販ではなく**国内代理店経由**が
+GMKtec の回答である。10台 PoC への Yes/No という二択に対しては、第三の経路
+（代理店に在庫・国内 RMA ごと委ねる）が示されたことになる。500台以上の
+OEM カスタマイズ（ロゴ・梱包・BIOS splash）は引き続き本社と直接協議する。
+
+## 国内代理店 Links 経由の RFQ（2026-08-21、見積待ち）
+
+紹介を受けて 2026-08-21 に ryu@links.co.jp（Liu 氏）宛へ見積依頼を送信した
+（GMKtec 本社 CC）。当初 10台と書いたが、同日中に**初回は 3台**へ訂正した ——
+先に社内でクラスター構成の検証を行い、検証完了後に顧客販売へ合わせて継続仕入れ
+する進め方のためである。依頼内容は: M7 Ultra の国内取り扱い可否（Links の
+GMKtec ブランドページに掲載が無い）、M6 Ultra / EVO-X2 の在庫・3台単価・納期、
+メモリ 16GB / 32GB + 256GB NVMe + OS なし構成、OS なし出荷可否、連続推論負荷への
+熱設計適性、保証・RMA の経路（当社が一次サポート、Links へ RMA）、取引口座開設・
+与信・支払条件、継続時の数量階段（10/50/100台）単価。
+
+同日、Links 営業部 松崎徹也氏から見積前提の確認照会があった: M6 Ultra および
+M7 Ultra シリーズ、メモリ 16GB および 32GB、SSD 256GB、OS レス、10/50/100台。
+当社はこの構成で相違ない旨を回答し、あわせて初回 3台の単価・納期の追加提示と、
+M7 Ultra の国内取り扱い可否の回答を依頼した（松崎氏の照会は 3台訂正メールと
+行き違いの可能性があったため、reply-all で明示した）。
+
+**Links からの見積は未着である。これは照会であって発注ではない。** 見積が出たら
+このセクションに観測日・数量階段・社着価格・保証条件を追記し、3年保証の引当か
+表示変更かの選択（前節）もその単価で判断する。
 
 ## Verification status
 
-仕様、帯域、公開価格、GMKtecのカスタム/OEM表明は一次情報で2026-08-15に再確認した。cloud-murakumoの分析根拠は `orgs/network-awai/cloud-murakumo/docs/gtm/jp-bto-under-400k-2026-08-15.md` に保持する。GMKtec の MOQ・保証年数・PSE・技適・補修部材・BIOS リビジョン維持・リードタイムは 2026-08-19 に書面で回答を得た。未検証なのは、テックウインド/アプライドの正式OEM価格、GMKtec の単価（2026-08-19 時点で唯一の未回答項目）、EVO-X2 固有のロゴ・名義変更可否、3年保証の引受先、量産個体での Ubuntu/ROCm/XPU 性能、および 500台 MOQ 前に 10台を購入して顧客へ納入できるかである。したがって調達契約については依然として**正式OEM見積り未取得**"}]
+仕様、帯域、公開価格、GMKtecのカスタム/OEM表明は一次情報で2026-08-15に再確認した。cloud-murakumoの分析根拠は `orgs/network-awai/cloud-murakumo/docs/gtm/jp-bto-under-400k-2026-08-15.md` に保持する。GMKtec の MOQ・保証年数・PSE・技適・補修部材・BIOS リビジョン維持・リードタイムは 2026-08-19 に書面で回答を得た。500台 MOQ 前の小ロット調達経路は 2026-08-20 に回答済み（国内代理店リンクスインターナショナル経由、在庫・国内サービスあり）。未検証なのは、テックウインド/アプライドの正式OEM価格、Links の単価（初回3台および 10/50/100台の数量階段 — 2026-08-21 時点で見積待ち）、M7 Ultra の国内取り扱い可否、OS なし出荷可否、Links 経由の RMA 経路と支払条件、EVO-X2 固有のロゴ・名義変更可否、3年保証の引受先、量産個体での Ubuntu/ROCm/XPU 性能である。したがって調達契約については依然として**正式見積り未取得**"}]
