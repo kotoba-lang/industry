@@ -1,24 +1,45 @@
-(ns probe-boolean-solid (:require [brep.feature :as f]))
-;; 不変条件: 大きい箱から小さい箱を :cut すると、頂点数が cut 無しと変わる。
+(ns probe-boolean-solid (:require [brep.feature :as f] [brep.topology :as t]))
+;; ⚠ この probe は 2026-08-21 に**強められた**。以前は「三角形数が変わったか」だけを
+;; 見ており、それは「何かが起きた」であって「正しいものが起きた」ではなかった。
+;; boolean の結果は **閉じたソリッド**でなければならない —— 体積も、STEP 書き出しも、
+;; CAM の除去量も、3D 印刷も、閉じていることに依存する。
+;;
+;; 不変条件: (1) 出発点の押し出しが閉じている（配管のせいではないことの確認）
+;;          (2) cut / union の結果も閉じている（境界エッジ 0、Euler 偶数、manifold）
 (try
-  (let [outer (f/sketch-feature 1 (f/sketch-plane-xy)
-                                [(f/sketch-line [0 0] [10 0]) (f/sketch-line [10 0] [10 10])
-                                 (f/sketch-line [10 10] [0 10]) (f/sketch-line [0 10] [0 0])])
-        inner (f/sketch-feature 2 (f/sketch-plane-xy)
-                                [(f/sketch-line [2 2] [5 2]) (f/sketch-line [5 2] [5 5])
-                                 (f/sketch-line [5 5] [2 5]) (f/sketch-line [2 5] [2 2])])
-        base (-> (f/feature-tree) (f/add-feature outer)
-                 (f/add-feature (f/extrude-feature 3 1 [0 0 1] 5 :new)))
-        cut  (-> base (f/add-feature inner)
-                 (f/add-feature (f/extrude-feature 4 2 [0 0 1] 9 :cut)))
-        [sb mb] (f/evaluate-mesh base)
-        [sc mc] (f/evaluate-mesh cut)]
+  (let [sq (fn [id x0 y0 x1 y1]
+             (f/sketch-feature id (f/sketch-plane-xy)
+               [(f/sketch-line [x0 y0] [x1 y0]) (f/sketch-line [x1 y0] [x1 y1])
+                (f/sketch-line [x1 y1] [x0 y1]) (f/sketch-line [x0 y1] [x0 y0])]))
+        base (-> (f/feature-tree) (f/add-feature (sq 1 0 0 10 10))
+                 (f/add-feature (f/extrude-feature 2 1 [0 0 1] 4 :new)))
+        topo-of (fn [tree] (let [[st m] (f/evaluate-mesh tree)]
+                             (when (= :ok st) (t/topology m))))
+        b (topo-of base)
+        cut (topo-of (-> base (f/add-feature (sq 3 3 3 7 7))
+                         (f/add-feature (f/extrude-feature 4 3 [0 0 1] 9 :cut))))
+        uni (topo-of (-> (f/feature-tree) (f/add-feature (sq 1 0 0 4 4))
+                         (f/add-feature (f/extrude-feature 2 1 [0 0 1] 2 :new))
+                         (f/add-feature (sq 3 20 20 24 24))
+                         (f/add-feature (f/extrude-feature 4 3 [0 0 1] 2 :add))))
+        open (fn [x] (count (t/boundary-edges x)))]
     (cond
-      (not= :ok sb) (println "PROBE boolean-solid UNMEASURABLE" (str "base 評価不可: " (pr-str mb)))
-      (not= :ok sc) (println "PROBE boolean-solid FAIL" (str ":cut の評価が失敗: " (pr-str mc)))
-      (= (count (:indices mb)) (count (:indices mc)))
+      (nil? b) (println "PROBE boolean-solid UNMEASURABLE" "出発点の押し出しが評価できない")
+      (not (:manifold? b))
+      (println "PROBE boolean-solid UNMEASURABLE"
+               "押し出し自体が閉じていない —— boolean 以前の配管の問題")
+      (or (nil? cut) (nil? uni))
+      (println "PROBE boolean-solid FAIL" "cut / union が評価できない")
+      (pos? (open cut))
       (println "PROBE boolean-solid FAIL"
-               (str ":cut しても三角形数が同じ（" (count (:indices mb)) "）— boolean が効いていない"))
+               (str "貫通穴の結果に境界エッジが " (open cut) " 本（Euler "
+                    (t/euler-characteristic cut) "）—— 閉じたソリッドではない。"
+                    "押し出し単体は閉じているので配管ではなく mesh-boolean 側"))
+      (pos? (open uni))
+      (println "PROBE boolean-solid FAIL"
+               (str "**交差していない**箱 2 つの union に境界エッジが " (open uni)
+                    " 本 —— 交わるものが無いのに漏れている"))
       :else (println "PROBE boolean-solid PASS"
-                     (str "indices " (count (:indices mb)) " → " (count (:indices mc))))))
+                     (str "cut Euler=" (t/euler-characteristic cut)
+                          " union Euler=" (t/euler-characteristic uni) " どちらも閉"))))
   (catch :default ex (println "PROBE boolean-solid UNMEASURABLE" (.-message ex))))
