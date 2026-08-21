@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 15818, "etzhayyim-xrpc-proxy" 681},
+ {"etzhayyim-did-web" 15958, "etzhayyim-xrpc-proxy" 682},
  :zone
- {:requests-7d 60567,
-  :pageviews-7d 1132,
-  :uniques-7d-sum 2566,
+ {:requests-7d 60954,
+  :pageviews-7d 1148,
+  :uniques-7d-sum 2578,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/actor/funadaiku/system-dynamics", :requests 6}
+  [{:path "/gov", :requests 6}
+   {:path "/actor/funadaiku/system-dynamics", :requests 6}
    {:path "/actor/business-manager/system-dynamics", :requests 6}
-   {:path "/gov", :requests 5}
    {:path "/actor/himotoki/system-dynamics", :requests 3}
    {:path "/actor/gov-municipality/system-dynamics", :requests 3}
    {:path "/actor/kawase-yui/did.json", :requests 2}
    {:path "/actor/hagukumi/system-dynamics", :requests 2}
    {:path "/actor/noroshi/did.json", :requests 2}],
-  :status-mix {:ok 433, :client-error 338, :server-error 295},
+  :status-mix {:ok 435, :client-error 340, :server-error 295},
   :window "24h"},
  :as-of "2026-08-20",
  :traffic-quality
  {:window "24h", :probe-4xx-pct 32, :error-5xx-pct 28},
  :top-paths
- "上位 page (24h, 2xx/3xx): /actor/funadaiku/system-dynamics 6 · /actor/business-manager/system-dynamics 6 · /gov 5 · /actor/himotoki/system-dynamics 3 · /actor/gov-municipality/system-dynamics 3 | 4xx(probe) 32% · 5xx 28%",
+ "上位 page (24h, 2xx/3xx): /gov 6 · /actor/funadaiku/system-dynamics 6 · /actor/business-manager/system-dynamics 6 · /actor/himotoki/system-dynamics 3 · /actor/gov-municipality/system-dynamics 3 | 4xx(probe) 32% · 5xx 28%",
  :signal
- "etzhayyim.com 実測 60567 req/7d・2566 uniques(日次和)・うち4xx probe 32%(24h)、workers 16499 inv/7d"}
+ "etzhayyim.com 実測 60954 req/7d・2578 uniques(日次和)・うち4xx probe 32%(24h)、workers 16640 inv/7d"}
