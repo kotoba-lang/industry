@@ -595,9 +595,13 @@
    :axis/target "OptiX Denoiser / Open Image Denoise"
    :axis/label "レンダリングのデノイズ"
    :axis/repo "kotoba-lang/raytrace"
-   :axis/paths ["src"]
-   :axis/markers ["denoise" "denoiser"]
-   :axis/behavior nil}
+   ;; 2026-08-22 に実装（`kotoba.raytrace.denoise`、a-trous + albedo/normal/depth
+   ;; の edge stop）。marker は実物の名前へ —— "denoiser" という綴りは無い。
+   ;; `gaussian` を marker に含めているのは、**比較対象を同じ repo が持っている
+   ;; こと自体が主張の一部**だから（「ぼかしに勝つ」を測れる形にしてある）。
+   :axis/paths ["src/kotoba/raytrace/denoise.cljc"]
+   :axis/markers ["denoise" "gaussian" "psnr" "rmse"]
+   :axis/behavior "render-denoise"}
 
   ;; ───────────────────── cam ─────────────────────
   {:axis/id :cam/toolpath-2d
