@@ -345,9 +345,9 @@
    :axis/target "AutoCAD DXF / DWG の取り込み"
    :axis/label "DXF の読み込み"
    :axis/repo "kotoba-lang/kami-engine-modeling"
-   :axis/paths ["src"]
-   :axis/markers ["read-dxf" "import-dxf" "parse-dxf"]
-   :axis/behavior nil}
+   :axis/paths ["src/kami/modeling/drawing.cljc"]
+   :axis/markers ["read-dxf" "dxf-readable-entities"]
+   :axis/behavior "interop-dxf-read"}
 
   {:axis/id :interop/ifc-spf
    :axis/segment :interop :axis/weight 5
