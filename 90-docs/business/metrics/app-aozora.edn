@@ -1,37 +1,38 @@
 {:engagement
  {:dau nil,
   :active-authors-window {:window 200, :distinct-authors 1},
-  :posts 6,
-  :human {:posts 6, :engagement 0},
+  :posts 7,
+  :human {:posts 7, :engagement 0},
   :organism {:posts 0, :engagement 0},
   :organism-engagement-ratio nil},
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 15283,
-  "app-aozora-appview" 13308,
-  "app-aozora-spa" 16672},
+ {"app-aozora-pds" 13051,
+  "app-aozora-appview" 11981,
+  "app-aozora-spa" 16268},
  :zone
- {:requests-7d 247410,
-  :pageviews-7d 16310,
-  :uniques-7d-sum 1056,
+ {:requests-7d 59115,
+  :pageviews-7d 15323,
+  :uniques-7d-sum 898,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4382}
-   {:path "/.env.development", :requests 67}
-   {:path "/admin/phpinfo", :requests 60}
-   {:path "/info1.php", :requests 60}
-   {:path "/sftp-config.json", :requests 60}
-   {:path "/core/.env", :requests 58}
-   {:path "/config/config.inc", :requests 56}
-   {:path "/media/linusadmin-phpinfo.php", :requests 48}],
-  :status-mix {:ok 5651, :client-error 203, :server-error 8},
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4348}
+   {:path "/i.php", :requests 23}
+   {:path "/core/.env", :requests 22}
+   {:path "/.aws/credentials", :requests 17}
+   {:path "/wp-content/plugins/hellopress/wp_filemanager.php",
+    :requests 13}
+   {:path "/randkeyword.php", :requests 12}
+   {:path "/service-account.json", :requests 12}
+   {:path "/xrawp.php", :requests 10}],
+  :status-mix {:ok 5023, :client-error 133, :server-error 24},
   :window "24h"},
- :as-of "2026-08-20",
+ :as-of "2026-08-21",
  :traffic-quality {:window "24h", :probe-4xx-pct 3, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4382 · /.env.development 67 · /admin/phpinfo 60 · /info1.php 60 · /sftp-config.json 60 | 4xx(probe) 3% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4348 · /i.php 23 · /core/.env 22 · /.aws/credentials 17 · /wp-content/plugins/hellopress/wp_filema… 13 | 4xx(probe) 3% · 5xx 0%",
  :signal
- "aozora.app 実測 247410 req/7d・1056 uniques(日次和)・うち4xx probe 3%(24h)、workers 45263 inv/7d"}
+ "aozora.app 実測 59115 req/7d・898 uniques(日次和)・うち4xx probe 3%(24h)、workers 41300 inv/7d"}
