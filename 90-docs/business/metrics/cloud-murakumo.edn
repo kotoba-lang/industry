@@ -1,25 +1,25 @@
 {:health-status 200,
  :zone-name "murakumo.cloud",
- :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 137062},
+ :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 138137},
  :zone
- {:requests-7d 892299,
-  :pageviews-7d 717,
-  :uniques-7d-sum 775,
+ {:requests-7d 898288,
+  :pageviews-7d 773,
+  :uniques-7d-sum 800,
   :zone "murakumo.cloud"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/v1/slow/workers/heartbeat", :requests 41725}
-   {:path "/v1/slow/work", :requests 41612}
-   {:path "/api/actions/jobs/claim", :requests 17054}
+  [{:path "/v1/slow/workers/heartbeat", :requests 41719}
+   {:path "/v1/slow/work", :requests 41598}
+   {:path "/api/actions/jobs/claim", :requests 17060}
    {:path "/api/v1/model-hosting/operations/fleet/promotions/next",
-    :requests 15065}
+    :requests 14850}
    {:path "/api/v1/model-hosting/operations/scanner/jobs/next",
-    :requests 15062}
-   {:path "/infer/hwmetrics", :requests 7906}
-   {:path "/v1/chat/completions", :requests 1785}
+    :requests 14845}
+   {:path "/infer/hwmetrics", :requests 7896}
+   {:path "/v1/chat/completions", :requests 1723}
    {:path "/infer/runs", :requests 1501}],
-  :status-mix {:ok 143739, :client-error 3543, :server-error 116},
+  :status-mix {:client-error 3543, :ok 143291, :server-error 113},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -33,7 +33,7 @@
  :as-of "2026-08-21",
  :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/slow/workers/heartbeat 41725 · /v1/slow/work 41612 · /api/actions/jobs/claim 17054 · /api/v1/model-hosting/operations/fleet/p… 15065 · /api/v1/model-hosting/operations/scanner… 15062 | 4xx(probe) 2% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /v1/slow/workers/heartbeat 41719 · /v1/slow/work 41598 · /api/actions/jobs/claim 17060 · /api/v1/model-hosting/operations/fleet/p… 14850 · /api/v1/model-hosting/operations/scanner… 14845 | 4xx(probe) 2% · 5xx 0%",
  :cost
  {:spot-ref
   {:spot-usd-per-hour 1.8,
@@ -41,11 +41,11 @@
    :fx-yen-per-usd 162.2},
   :federation {:active-demand-apps 1, :demand-apps ["grok-bots"]},
   :spot-yen-per-mtok 40.55,
-  :fleet-yen-per-mtok 106.59953473980966,
-  :ratio 2.628841793830078,
+  :fleet-yen-per-mtok 108.71104701407131,
+  :ratio 2.680913613170686,
   :coeffs {:load-w 64.1, :yen-per-kwh 40.49},
   :pass? false,
-  :fleet-tokens 32526,
+  :fleet-tokens 28877,
   :runs-count 200},
  :signal
- "murakumo.cloud 実測 892299 req/7d・775 uniques(日次和)・うち4xx probe 2%(24h)、workers 137062 inv/7d、Stripe active subs 0"}
+ "murakumo.cloud 実測 898288 req/7d・800 uniques(日次和)・うち4xx probe 2%(24h)、workers 138137 inv/7d、Stripe active subs 0"}
