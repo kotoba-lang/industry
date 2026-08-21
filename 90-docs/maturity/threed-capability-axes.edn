@@ -147,15 +147,29 @@
    :axis/markers ["sweep"]
    :axis/behavior "feature-sweep"}
 
+  {:axis/id :kernel/mesh-topology
+   :axis/segment :kernel :axis/weight 4
+   :axis/target "Parasolid / OCCT が当たり前に持っている位相面"
+   :axis/label "三角形メッシュの位相（溶接・面隣接・二面角・凹凸・境界）"
+   :axis/repo "kotoba-lang/org-iso-10303"
+   :axis/paths ["src/brep/topology.cljc"]
+   :axis/markers ["topology" "weld-mesh" "orient-faces" "sharp-edges" "boundary-edges"
+                  "euler-characteristic"]
+   :axis/behavior "mesh-topology"}
+
   ;; ⚠ chamfer / fillet / shell がこの順で残っているのは偶然ではない。
   ;; `evaluate-mesh` の accumulator は `{:positions :indices}` の**三角形スープ**で、
-  ;; エッジ同一性も面隣接も持たない。一方 `chamfer-feature` / `fillet-feature` は
-  ;; `:edges`（BREP のエッジ id）で対象を指す —— **メッシュ側にその id は存在しない。**
-  ;; id を勝手に対応づければ、違うエッジを面取りした形が「成功」として返る。
+  ;; エッジ同一性も面隣接も持たなかった。一方 `chamfer-feature` / `fillet-feature` は
+  ;; `:edges`（BREP のエッジ id）で対象を指す —— メッシュ側にその id は無い。
   ;;
-  ;; したがって次の一手は chamfer の実装ではなく、**メッシュに位相を与えること**
-  ;; （座標の溶接 → エッジ/面の隣接 → 二面角）。それが済めば chamfer・fillet・shell の
-  ;; 3 軸が同じ土台に乗る。表現が変われば梯子の順序も変わる、の実例。
+  ;; 反復 6（2026-08-21）で `brep.topology` を入れ、**位相は読めるようになった**
+  ;; （`sharp-edges` が「凸で二面角 N 以上のエッジ」を安定な `[i j]` で返す）。
+  ;; 残る障害は 2 つ:
+  ;;   (1) 面取り自体が頂点分割と角パッチを要する（立方体は全エッジが角で交わるので、
+  ;;       孤立エッジだけ扱う実装は即座に壊れる）
+  ;;   (2) **`mesh-boolean` が閉じたソリッドを返さない**（同反復で実測。交差していない
+  ;;       箱 2 つの union ですら境界エッジが出る）。開いたメッシュの上で面取りしても
+  ;;       正しい結果にならないので、CSG の方が先。
   {:axis/id :kernel/chamfer
    :axis/segment :kernel :axis/weight 4
    :axis/target "SolidWorks / Parasolid の chamfer"
