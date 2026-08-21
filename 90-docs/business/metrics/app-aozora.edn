@@ -8,40 +8,38 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 14967,
-  "app-aozora-appview" 14639,
-  "app-aozora-spa" 17615},
+ {"app-aozora-pds" 15053,
+  "app-aozora-appview" 14700,
+  "app-aozora-spa" 17914},
  :zone
- {:requests-7d 66632,
-  :pageviews-7d 16497,
-  :uniques-7d-sum 1143,
+ {:requests-7d 67299,
+  :pageviews-7d 16809,
+  :uniques-7d-sum 1149,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/__cache/relay-repos-index-v1", :requests 170187}
+  [{:path "/__cache/relay-repos-index-v1", :requests 170204}
    {:path
     "/kotobase-cf-wasm-testnet/ipns/bafyreidwhkvt3omcwb6ytmiy6npf42crhvbekxi7aovgxjhl6hgrmsnvcm.json",
-    :requests 3569}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 3493}
+    :requests 3594}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 3485}
    {:path
     "/kotobase-cf-wasm-testnet/ipns/bafyreidzuvbagutsqs4upmwjyvuxkgpc56thagtkbfj6mnduxuujitkbzy.json",
     :requests 309}
    {:path
     "/bafyreicy2go3fqwsoh7zup3asioqghz3qykjuednggzcmpaacu7fpao2sm",
-    :requests 176}
+    :requests 184}
    {:path
     "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
-    :requests 139}
-   {:path
-    "/bafyreiezivwicf3zbw3diuaxngntk4o2kwrw3lpa5tyrmwjvzojccf77ya",
-    :requests 126}
-   {:path "/robots.txt", :requests 124}],
-  :status-mix {:ok 179680, :client-error 1314, :server-error 22028},
+    :requests 140}
+   {:path "/robots.txt", :requests 133}
+   {:path "/liquid-glass/specular.js", :requests 71}],
+  :status-mix {:ok 179691, :client-error 1292, :server-error 21954},
   :window "24h"},
  :as-of "2026-08-21",
  :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 11},
  :top-paths
- "上位 page (24h, 2xx/3xx): /__cache/relay-repos-index-v1 170187 · /kotobase-cf-wasm-testnet/ipns/bafyreidw… 3569 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 3493 · /kotobase-cf-wasm-testnet/ipns/bafyreidz… 309 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 176 | 4xx(probe) 1% · 5xx 11%",
+ "上位 page (24h, 2xx/3xx): /__cache/relay-repos-index-v1 170204 · /kotobase-cf-wasm-testnet/ipns/bafyreidw… 3594 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 3485 · /kotobase-cf-wasm-testnet/ipns/bafyreidz… 309 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 184 | 4xx(probe) 1% · 5xx 11%",
  :signal
- "aozora.app 実測 66632 req/7d・1143 uniques(日次和)・うち4xx probe 1%(24h)、workers 47221 inv/7d"}
+ "aozora.app 実測 67299 req/7d・1149 uniques(日次和)・うち4xx probe 1%(24h)、workers 47667 inv/7d"}
