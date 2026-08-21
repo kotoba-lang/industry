@@ -497,10 +497,13 @@
    :axis/segment :dcc :axis/weight 3
    :axis/target "Marvelous Designer / Maya nCloth / Blender の物理"
    :axis/label "布・髪のシミュレーション"
-   :axis/repo "kotoba-lang/kami-engine"
-   :axis/paths ["kami-physics/src"]
-   :axis/markers ["cloth" "hair" "cloth-step"]
-   :axis/behavior nil}
+   ;; 2026-08-22 に実装（`kotoba.physics.cloth`）。repo は kami-engine ではなく
+   ;; `kotoba-lang/physics`（`kami.physics` の SSoT）で、`kami-physics/src` という
+   ;; パスは kami-engine に存在しない —— 無い場所を指した軸が absent を返していた。
+   :axis/repo "kotoba-lang/physics"
+   :axis/paths ["src/kotoba/physics/cloth.cljc"]
+   :axis/markers ["grid" "strand" "residual" "centre-of-mass" "step"]
+   :axis/behavior "dcc-cloth-hair"}
 
   ;; ───────────────────── sculpt ─────────────────────
   {:axis/id :sculpt/brushes
