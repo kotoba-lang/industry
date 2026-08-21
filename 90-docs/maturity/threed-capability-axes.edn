@@ -567,10 +567,15 @@
    :axis/segment :render :axis/weight 3
    :axis/target "OpenColorIO / ACES（映像・製品ビジュアルの必須要件）"
    :axis/label "色管理（ACES / OCIO コンフィグ）"
-   :axis/repo "kotoba-lang/webgpu"
+   ;; 2026-08-22: repo を webgpu から ocio へ移した。`kotoba-lang/ocio` は
+   ;; 以前から在ったが **依存する `kotoba-lang/yaml` が空だった**ので classpath が
+   ;; 組めず、config builder は一度も読み込まれたことが無かった —— 外からは
+   ;; 完成して見える repo（緑の README・落ちるテストが無い、走るテストが無いので）。
+   :axis/repo "kotoba-lang/ocio"
    :axis/paths ["src"]
-   :axis/markers ["ocio" "aces" "color-space" "transfer-function"]
-   :axis/behavior nil}
+   :axis/markers ["transform-matrix" "colour-spaces" "adaptation-matrix" "transfer-functions"]
+   :axis/probe-classpath-from-deps true
+   :axis/behavior "render-color-management"}
 
   {:axis/id :render/denoise
    :axis/segment :render :axis/weight 2
