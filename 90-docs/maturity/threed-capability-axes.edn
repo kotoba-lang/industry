@@ -277,14 +277,17 @@
    :axis/target "SolidWorks Sheet Metal / Inventor"
    :axis/label "板金（曲げ・展開）"
    :axis/repo "kotoba-lang/kami-engine-modeling"
-   :axis/paths ["src"]
    ;; ⚠ 以前の marker は "sheet" "valid-sheet?" で、これは **図面のシート**
    ;; （`kami.modeling.drawing/sheet`）に当たっていた。板金とは無関係の関数に
    ;; 当たった marker が、無い能力を :declared に見せていた。実際の板金 ——
    ;; 展開・曲げ代・K ファクタ —— は tree に一つも無い（2026-08-21 実測）。
    ;; `bend-mesh` は汎用のメッシュ変形 modifier であって板金の曲げではない。
-   :axis/markers ["unfold" "flat-pattern" "bend-allowance" "k-factor"]
-   :axis/behavior nil}
+   ;; 2026-08-22 に実装（`kami.modeling.sheet-metal`）。marker は実物の名前へ ——
+   ;; `flat-pattern` / `k-factor` という綴りの関数は無く、`flat-length` / `unfold` /
+   ;; `fold` / `bend-allowance` / `bend-deduction` / `k-factor-from-flat` である。
+   :axis/paths ["src/kami/modeling/sheet_metal.cljc"]
+   :axis/markers ["unfold" "fold" "bend-allowance" "bend-deduction" "k-factor-from-flat"]
+   :axis/behavior "mcad-sheet-metal"}
 
   {:axis/id :mcad/healing
    :axis/segment :mcad :axis/weight 3
