@@ -488,10 +488,13 @@
    :axis/segment :dcc :axis/weight 3
    :axis/target "Houdini の SOP/DOP、Maya の nParticle"
    :axis/label "パーティクル / プロシージャル VFX"
-   :axis/repo "kotoba-lang/kami-gen-procedural"
-   :axis/paths ["src"]
-   :axis/markers ["particle" "emitter" "solver-step" "vfx-graph"]
-   :axis/behavior nil}
+   ;; 2026-08-22 に実装（`kotoba.physics.particles`）。repo は
+   ;; `kami-gen-procedural`（キャラクタ生成パイプライン）ではなく
+   ;; `kotoba-lang/physics` —— 布と同じ solver 面に置いた。
+   :axis/repo "kotoba-lang/physics"
+   :axis/paths ["src/kotoba/physics/particles.cljc"]
+   :axis/markers ["system" "ballistic-position" "steady-state-count" "count-alive" "step"]
+   :axis/behavior "dcc-particles-vfx"}
 
   {:axis/id :dcc/cloth-hair
    :axis/segment :dcc :axis/weight 3
