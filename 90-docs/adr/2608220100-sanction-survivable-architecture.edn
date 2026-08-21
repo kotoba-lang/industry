@@ -1,0 +1,122 @@
+[{:db/id -1
+  :adr/id "adr-2608220100-sanction-survivable-architecture"
+  :adr/doc_type "adr"
+  :adr/topic "architecture"
+  :adr/status "accepted"
+  :adr/date "2026-08-22"
+  :adr/last_verified "2026-08-22"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative_for ["cloud-itonami / kotobase / aiueos が単一管轄（現状は US）のサービス停止・口座凍結を受けたときに、決済・手続き・活動を継続できる構成の正本"
+                          "どの層のどのベンダが critical path に直列で入っているかの実測記録（2026-08-22）"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["adr-2608039000-blockchain-decentralized-paths-must-not-presume-d1"
+                "ADR-2608038000"
+                "ADR-2608160100"
+                "ADR-2607101100"
+                "ADR-2607093300"
+                "ADR-2607241100"
+                "adr-2608136000-five-questions-before-trusting-green"
+                "adr-2608211000-counting-the-absence-of-measurement-outside-code"]
+  :adr/source-format "edn"
+  :adr/title "ADR-2608220100: 制裁を生き延びる設計 —— 直列の US 依存を並列化する。欠けているのは部品ではなく通電である"
+  :adr/body "# Context
+
+2026-08、米政権は大統領令に基づき国際刑事裁判所（ICC）の赤根智子所長らを制裁対象に指定した。ICC に客員専門家として勤務した平林佳江子弁護士が報じた実害は、USD 建て取引を行う金融機関での口座凍結と、Microsoft / Apple ID / Google Workspace など日常的な IT ツールの利用停止である。フランス・EU・国連はこれを ICC の独立性への不当な介入として抗議している。
+
+オーナーの問い（2026-08-21）は次のとおり: cloud-itonami / kotobase / aiueos は、同種の口座凍結・アカウント停止を受けても決済・手続き・活動を継続できるか。
+
+この ADR は、その実測結果と、実測から導いた到達目標の構成を正本として記録する。
+
+# 実測（2026-08-22）
+
+何と何を突き合わせたかを先に書く（ADR-2608211000 の要求）。
+
+- DNS: 主要 6 ドメインに `dig +short NS` を実行し、委任先を直接読んだ
+- Cloudflare 依存: `orgs/` 配下 maxdepth 4 の wrangler config を `find` で数え、`d1_databases` / `r2_buckets` を `grep -l` で数えた
+- repo 在庫: `scripts/repo-search.cljs` と SessionStart の外部仕様ミラー一覧（218 件）
+- 各 repo の自己申告: checkout 済み repo の README 冒頭
+
+## 依存表面
+
+| 層 | 実測値 | 管轄 |
+|---|---|---|
+| DNS | 6 ドメイン中 5 が Cloudflare NS（itonami.cloud / kotobase.net / awai.network / x402.nexus / murakumo.cloud）、junkawasaki.com が googledomains NS | 全て US |
+| 実行 | `orgs/` 配下に wrangler config 318 本（うち d1 binding 18、r2 binding 35） | Cloudflare（US） |
+| ソース | west 登録 4,227 project が GitHub | Microsoft（US） |
+| 大容量データ | DataLad / git-annex の実体が Backblaze B2 | US |
+| 決済 | `x402.nexus` の facilitator が Cloudflare Worker、`kotoba-lang/pay` が USDC on Base | Circle + Coinbase（US） |
+| 決済台帳 | `gftdcojp/engi` が transfer ID を D1 に記録 | Cloudflare |
+| CI/CD | murakumo fleet = 自前 Mac mini 10 台 | 自前ハード |
+| OS | `kotoba-lang/aiueos` は bare-metal、実行時のベンダ依存なし | なし |
+
+## 結論
+
+**現状は US 一点で直列に全部止まる。** しかも DNS が最初に死ぬので、Worker を他所へ移してもアドレスが存在しない。指定を受けてから移行する経路は存在しない。
+
+# Decision
+
+## 脅威モデル
+
+止まる原因は法の強制ではなく、**相手の自主的な de-risking** である。日本の銀行が凍結するのは日本法の要請ではなく、USD コルレス口座を失う恐怖による。したがって設計目標は「法的に許される経路を探すこと」ではなく **「裁量を持つ相手が critical path に居ない構造を作ること」** である。
+
+指定は予告なく来る。よって事後の移行計画は計画ではない。全ての代替経路は指定前から通電していなければならない。
+
+## 設計原則（6 つ。これが本体）
+
+1. **直列を並列にする。** 各層に、互いを拒否権にできない管轄を 2 つ以上置く。1 層でも直列が残れば全体が直列になる。
+2. **fallback は常時通電。** 本番トラフィックを一度も運んでいない経路は経路ではない。これは ADR-2608102000 の「一度も緑にならない gate も、誰も行動できないという意味で同じだけ無内容」をインフラに当てたもの。
+3. **裁量を持つ相手を消す。** 誰かが判断する箇所の数が、そのまま脆弱性の数である。プロトコルは判断しないが、相手は判断する。
+4. **名前ではなく内容で指す。** content address はレジストリを critical path から外す。
+5. **鍵と権限を人と管轄に分散する。** 個人 1 人の指定で法人が死なない構造にする。
+6. **設計を公開する。** 秘匿された耐性は evasion であり、公開された耐性は sovereignty である。これは倫理ではなく工学の判断で、公開設計は監査されるぶん実際に壊れにくい。EU の Blocking Statute（Council Regulation 2271/96）が示すとおり、恣意的なサービス停止に耐えること自体は正当な事業継続である。
+
+## 層ごとの到達目標
+
+| 層 | 生き延びる形 | 手持ちの部品 | 欠けているもの |
+|---|---|---|---|
+| 識別子 | `did:key` を根にし、`did:webvh` は discovery alias の 1 本に降格。鍵は閾値分散 | `nekko`（RID = CID）, `capability-identity-*`, `ed25519`, `cacao`, `inga`(quorum) | live 面が `did:web`。鍵が Apple Keychain / 1Password（US） |
+| 名前 | 3 経路を常時通電: ccTLD（.jp / JPRS）+ 非 US NS ／ IPNS ／ 直接 multiaddr | `tech-ipfs-specs-ipns`（実 publish 実績）, `io-libp2p-specs-kad-dht`, `io-libp2p-specs-transport`, `noise`, `io-multiformats` | .cloud / .net / .network は US レジストリなので非 US レジストラでも救えない |
+| 保管 | 3 事業者 × 3 管轄 + 自前 fleet。CARv2 pack が自己検証するので事業者を信頼する必要がない | `io-storj`, `io-filecoin`(+node, +signer), `io-ipfs`, `io-ipld-car`, `kotobase-storage` の契約 | B2 / R2 以外で本番が動いた実績がゼロ |
+| ref / 合意 | `inga`。2f+1 の証明書それ自体が条件付き書き込みなので、ベンダ primitive が経路から消える | `inga`（純 .cljc、依存集合が閉じている） | live 化していない。engi がまだ D1 |
+| 実行 | Workers を origin ではなく replica の 1 つに降格 | artifact が既に可搬。Kotoba → WASM component、閉じた capability import 表（`abi` / `kototama`）。同じ .wasm が Workers・aiueos・Linux・browser で動く | fleet が 1 拠点 1 ISP の Mac mini 10 台 |
+| OS / 機材 | `aiueos` を commodity hardware で動かし、OS 層から Apple を消す | `aiueos`（bare-metal、判断は全て Kotoba object、C は機構のみ） | 実機投入がまだ |
+| 決済 | ENGI/EN（`did:key` 間の net-zero・非発行の相互信用） | `kotoba-lang/engi`, `engi-node`, `inga` | engi が kotobase.net（CF）上、engi-node が CF Worker、inga 上で走っていない |
+| 外部収入 | XMR（受け取りと保有は検閲耐性あり） | マイニング fleet 10 台 | XMR から法定通貨への出口は取引所 = 裁量を持つ相手 |
+| コード | 自前 git origin + ミラー。git は元から分散で、west manifest がミラーを自明にする | full clone が既に手元にある | 自前 origin が無いだけ。最も安く直る層 |
+
+## 決済の核心 —— 凍結を実行できる主体を消す
+
+制裁に耐える通貨の条件は「分散台帳であること」ではなく **凍結を実行できる主体が存在しないこと** である。USDC は分散台帳の上にあるが Circle が凍結できる。よって `kotoba-lang/pay` と `treasury` の USDC 経路は耐性ゼロであり、非常時の帳簿から外す。
+
+**ENGI/EN が正解に近いのは、発行が無いからである。** 2 者間の net-zero な信用記録には、銀行も発行体もチェーンも介在しない。凍結しようにも、凍結対象の資産が存在しない。存在するのは 2 つの `did:key` 間の債権債務だけである。原則 3 を通貨層で満たす唯一の形がこれになる。
+
+XMR はその外側、外部から価値を受け取る口として使う。法定通貨への出口は必ず裁量を持つ相手を通るので、**出口を減らすのではなく、出口を必要としない範囲を広げる**。それが ENGI を実運用に乗せる意味である。
+
+## 生き延びないもの（正直に）
+
+- US サプライヤからの調達、USD 建て、US 経由で清算される支払いの全て
+- App Store / notarize 配布（Apple ユーザへのリーチ）
+- 取引相手が US 法人である取引の全て
+- 社会的コスト。技術は「止まらない」を作れるが「取引してもらえる」は作れない
+
+## 検証は制裁演習でやる
+
+設計が効いているかは、**各ベンダを 1 つずつ black-hole して何が答え続けるかを測る**ことでしか分からない。演習していない耐性は、緑に見えて何も検査していない CI と同じである（ADR-2608136000 の 5 問のうち「その検査は両方向を出したことがあるか」）。
+
+演習の合格条件は各段の完了条件（task graph の `:task/status-note` に書く）と同じで、いずれも **本番トラフィックが実際にその経路を通ったこと** である。
+
+# Consequences
+
+- 部品はほぼ全て揃っており、欠けているのは通電である。`aiueos` / `inga` / `ENGI` の 3 つは制裁下でも意味を持つ設計として既に正しく、そしてどれも live になっていない。
+- 段 0 の DNS だけが、部品が無く外部から調達する必要がある唯一の項目である。
+- ADR-2608039000（分散型経路に D1 を前提にしない）の適用範囲がここで広がる。同じ削除・再構築テストを D1 だけでなく **全ての US ベンダ**に当てる: それを今削除したときデータが失われるか、正しさが壊れるか。壊れるなら premise であり、遅くなるだけなら cache である。
+- 普通のアプリで Cloudflare / GitHub / B2 を使うことは引き続き問題ない。縛るのは、停止したときに事業が止まる経路だけである。
+
+# 未測定（無いでも危険でもなく、まだ測っていない）
+
+- レジストラ本体。NS の委任先は測ったが、各ドメインの registrar of record は引いていない
+- murakumo fleet の運用に Apple ID が実際にどこで要るか（activation / notarization / OS update の別）
+- Google Workspace 上に正本として乗っているものの一覧
+- 1Password / Keychain / kagi のどこにどの鍵があるかの、制裁観点での再分類（保管場所の索引は skill `secrets-location-map` にあるが、管轄別には分類されていない）"}]

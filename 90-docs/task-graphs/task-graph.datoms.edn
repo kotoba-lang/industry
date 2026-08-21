@@ -619,4 +619,86 @@
 
   ## Holochain
 
-  当たらない。agent-centric で全順序を持たないので CLOB の consensus 代替にならない。"}]
+  当たらない。agent-centric で全順序を持たないので CLOB の consensus 代替にならない。"}
+ {:db/id -24
+  :workflow/id "sanction-survivable-architecture"
+  :workflow/title "制裁を生き延びる構成へ通電する（ADR-2608220100 の 5 段）"
+  :workflow/created "2026-08-22"
+  :workflow/owner "Jun Kawasaki"}
+
+ {:db/id -25
+  :task/id "S0-dns-dual-jurisdiction"
+  :task/workflow "sanction-survivable-architecture"
+  :task/title "ccTLD（.jp / JPRS）を取得し、非 US NS（deSEC もしくは自前）へ二重委任する。bootstrap peer と CID を client に焼き込み、URL から取りに行かない"
+  :task/kind "infrastructure"
+  :task/repo "com-junkawasaki/root"
+  :task/requires []
+  :task/external-gate true
+  :task/status :pending
+  :task/status-note "完了条件: Cloudflare を black-hole しても名前が引けること。5 段のうち唯一、部品が手元に無く外部調達が要る項目（レジストラと NS 事業者）"}
+
+ {:db/id -26
+  :task/id "S0-git-origin-self-hosted"
+  :task/workflow "sanction-survivable-architecture"
+  :task/title "自前 git origin を立て、west 登録 4,227 project をミラーする。鍵を kagi に寄せ、閾値分散する"
+  :task/kind "infrastructure"
+  :task/repo "com-junkawasaki/root"
+  :task/requires []
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "完了条件: GitHub を black-hole しても clone と push ができること。git は元から分散しており full clone が手元にあるので、最も安く直る層"}
+
+ {:db/id -27
+  :task/id "S1-ipns-mirror-live"
+  :task/workflow "sanction-survivable-architecture"
+  :task/title "公開面を IPNS で常時ミラーし、CID 経路を通電させる"
+  :task/kind "deployment"
+  :task/repo "kotoba-lang/tech-ipfs-specs-ipns"
+  :task/requires ["S0-dns-dual-jurisdiction"]
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "完了条件: 実訪問が CID 経路を通った記録があること。実 IPNS record の publish 実績は既にある（fallback は常時通電の原則 2）"}
+
+ {:db/id -28
+  :task/id "S2-inga-live-ref-plane"
+  :task/workflow "sanction-survivable-architecture"
+  :task/title "inga を live ref plane に昇格し、D1 shim を撤去する（gftdcojp/engi の transfer ID 記録を含む）"
+  :task/kind "migration"
+  :task/repo "kotoba-lang/inga"
+  :task/requires []
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "完了条件: D1 を削除しても正しさが壊れないこと（ADR-2608039000 の削除・再構築テスト）。2f+1 の証明書それ自体が条件付き書き込みなので、ベンダ primitive が経路から消える"}
+
+ {:db/id -29
+  :task/id "S3-block-store-three-jurisdictions"
+  :task/workflow "sanction-survivable-architecture"
+  :task/title "block store を Storj / Filecoin / 自前 fleet の 3 系で本番稼働させる"
+  :task/kind "deployment"
+  :task/repo "kotoba-lang/kotobase-storage"
+  :task/requires ["S2-inga-live-ref-plane"]
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "完了条件: B2 を削除しても読めること。契約（IBlockStore / IObjectStore）と CARv2 pack の自己検証は既にあるので、欠けているのは通電のみ"}
+
+ {:db/id -30
+  :task/id "S4-engi-settlement-live"
+  :task/workflow "sanction-survivable-architecture"
+  :task/title "ENGI/EN を inga 上へ載せ、engi-node を Cloudflare Worker 以外にも配置し、USDC を非常時の帳簿から外す"
+  :task/kind "migration"
+  :task/repo "kotoba-lang/engi"
+  :task/requires ["S2-inga-live-ref-plane" "S3-block-store-three-jurisdictions"]
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "完了条件: 実際の請求が 1 件 ENGI で決済されたこと。did:key 間の net-zero 相互信用には発行体が無いので、凍結を実行できる主体が存在しない"}
+
+ {:db/id -31
+  :task/id "S5-sanction-drill"
+  :task/workflow "sanction-survivable-architecture"
+  :task/title "制裁演習: 各ベンダを 1 つずつ black-hole し、何が答え続けるかを測る"
+  :task/kind "verification"
+  :task/repo "com-junkawasaki/root"
+  :task/requires ["S1-ipns-mirror-live" "S4-engi-settlement-live"]
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "演習していない耐性は、緑に見えて何も検査していない CI と同じ（ADR-2608136000 の『その検査は両方向を出したことがあるか』）。測るのは経路ごとの生死であって、所要時間ではない"}]
