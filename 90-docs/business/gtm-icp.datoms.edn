@@ -179,12 +179,12 @@
   :icp/timing "—"
   :icp/batch-size 20
   :icp/requires-contact-route true
-  :icp/basis "実測（2026-08-20）: :interop/step-ap203 :interop/usd :interop/gltf :kernel/brep-topology :kernel/analytic-surfaces :kernel/nurbs-curve :kernel/boolean-solid :mcad/feature-tree :mcad/sketch-constraints が :working"
-  :icp/proof-axes "[:interop/step-ap203 :interop/usd :interop/gltf :kernel/boolean-solid]"
-  :icp/anti-claim "**AP242 は無い。IGES / JT / Parasolid / DWG も無い。** 実務の製造業が今日投げてくる STEP の多くは AP242 なので、『STEP 対応』と一言で言わない —— AP203 subset と言う。fillet / chamfer / sweep / loft は**構築子だけ在って幾何を生まない**（実測 :hollow）ので、形状編集を売らない"
+  :icp/basis "実測（2026-08-21 更新）: :interop/step-ap203 :interop/step-ap242（subset）:interop/usd :interop/gltf :interop/dxf :interop/materialx :kernel/brep-topology :kernel/analytic-surfaces :kernel/nurbs-curve :kernel/mesh-topology :mcad/feature-tree :mcad/sketch-constraints :mcad/drawing-2d :mcad/gdt-pmi :mcad/healing が :working。**:kernel/boolean-solid は :hollow に降格**（切る boolean が閉じたソリッドを返さない）"
+  :icp/proof-axes "[:interop/step-ap203 :interop/step-ap242 :interop/usd :interop/gltf :mcad/gdt-pmi]"
+  :icp/anti-claim "**IGES / JT / Parasolid / DWG は無い。** AP242 については 2026-08-21 に測り直した —— 以前この欄は『AP242 は無い』と書いていたが誤りで、`kami.modeling.step` が AP242 の schema 名を書き出し、profile を判定し、PMI（寸法・plus/minus 公差・データム・データム系）を読み、対応外 entity を名指しで報告する。ただし実装自身が『**documented Kotoba AP242 subset**, not full AP242 conformance』と言っているので、『AP242 対応』と一言で言わない —— **subset** と言い、何が対応外かは `inspect-file` の `:step/unsupported` がその場で答える、と言う。形状編集は売らない: fillet / chamfer / shell は evaluator に未登録（:absent）、mesh boolean は**切る場合に閉じたソリッドを返さない**（:hollow、2026-08-21 実測）"
   :icp/checkable-edn "{:country #{\"JP\" \"US\" \"DE\"} :contact-route :required}"
   :icp/unevaluable-edn "[{:predicate :processes-cad-programmatically :want \"CAD/3D をサーバ側で処理している\" :why \"どのデータ源にも無い。求人票・技術ブログ・SDK ドキュメントを人手で当たる経路しかない\"} {:predicate :seat-license-pain :want \"seat 課金のカーネルを嫌っている\" :why \"観測できない\"}]"
-  :icp/disqualifier-edn "[{:rule :needs-ap242 :why \"AP242 が要件なら今日は当たらない（実測 :absent）\"} {:rule :needs-authoring-app :why \"デスクトップ CAD の代替を求める相手はこの ICP ではない\"}]"
+  :icp/disqualifier-edn "[{:rule :needs-full-ap242-conformance :why \"AP242 の **完全準拠**が要件なら当たらない。subset は在る（2026-08-21 実測）が、実装自身が full conformance ではないと言っている\"} {:rule :needs-authoring-app :why \"デスクトップ CAD の代替を求める相手はこの ICP ではない\"}]"
   :icp/note "この ICP の hook は交換層に限っている。kami-app-* は GitHub Pages で配信されているが、**最終 commit は 2026-08-04 で、配信を担う pages.yml は org 単位で無効化された GitHub Actions**（ADR-2607300900）——『動いているアプリ』を根拠に売らないこと。"}
 
  {:icp/coverage "gtm-icp"
