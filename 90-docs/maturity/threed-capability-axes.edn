@@ -326,10 +326,14 @@
    :axis/segment :interop :axis/weight 2
    :axis/target "IGES（レガシー交換）"
    :axis/label "IGES 読み書き"
-   :axis/repo "kotoba-lang/org-iso-10303"
-   :axis/paths ["src"]
-   :axis/markers ["read-iges" "write-iges"]
-   :axis/behavior nil}
+   ;; 2026-08-22: repo は org-iso-10303 ではない。IGES は ISO 10303 ではなく
+   ;; ANSI/USPRO の規格なので、origin 面の名前は出所ドメイン（ansi.org）から出る。
+   ;; marker も実物の名前にした —— "read-iges" / "write-iges" という綴りの関数は
+   ;; 無く、`iges.core/parse` と `iges.core/write` である。
+   :axis/repo "kotoba-lang/org-ansi-iges"
+   :axis/paths ["src/iges/core.cljc"]
+   :axis/markers ["parse" "write" "entity-names" "card"]
+   :axis/behavior "interop-iges"}
 
   {:axis/id :interop/dxf
    :axis/segment :interop :axis/weight 3
