@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 7763, "ai-gftd-chat-shell" 1},
+ {"magatama-sh1n5h1x" 7773, "ai-gftd-chat-shell" 1},
  :zone
- {:requests-7d 486736,
-  :pageviews-7d 6827,
-  :uniques-7d-sum 5521,
+ {:requests-7d 490159,
+  :pageviews-7d 6836,
+  :uniques-7d-sum 5541,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/wpxml.php", :requests 42}
-   {:path "/gtc.php", :requests 33}
-   {:path "/ops.php", :requests 30}
-   {:path "/bs1.php", :requests 29}
+  [{:path "/wpxml.php", :requests 44}
+   {:path "/wp-admin/network/admin.php", :requests 41}
+   {:path "/bs1.php", :requests 37}
+   {:path "/ops.php", :requests 29}
    {:path "/css.php", :requests 29}
-   {:path "/wp-admin/network/admin.php", :requests 29}
-   {:path "/k.php", :requests 25}
-   {:path "/xingkong/index.php", :requests 24}],
-  :status-mix {:client-error 1559, :ok 1314, :server-error 13752},
+   {:path "/k.php", :requests 29}
+   {:path "/wp-sing.php", :requests 28}
+   {:path "/xingkong/index.php", :requests 27}],
+  :status-mix {:client-error 1577, :ok 1356, :server-error 13755},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +30,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-21",
- :traffic-quality {:window "24h", :probe-4xx-pct 9, :error-5xx-pct 83},
+ :traffic-quality {:window "24h", :probe-4xx-pct 9, :error-5xx-pct 82},
  :top-paths
- "上位 page (24h, 2xx/3xx): /wpxml.php 42 · /gtc.php 33 · /ops.php 30 · /bs1.php 29 · /css.php 29 | 4xx(probe) 9% · 5xx 83%",
+ "上位 page (24h, 2xx/3xx): /wpxml.php 44 · /wp-admin/network/admin.php 41 · /bs1.php 37 · /ops.php 29 · /css.php 29 | 4xx(probe) 9% · 5xx 82%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 486736 req/7d・5521 uniques(日次和)・うち4xx probe 9%(24h)、workers 7764 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 490159 req/7d・5541 uniques(日次和)・うち4xx probe 9%(24h)、workers 7774 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
