@@ -667,9 +667,9 @@
    :axis/repo "kotoba-lang/kami-engine-cae-solver"
    :axis/paths ["src"]
    :axis/marker-kind :dispatch
-   ;; ⚠ `manufactured-solution` は defmethod の dispatch 値ではなく、benchmark レコードの
-   ;; `:implementation {:solver :manufactured-solution …}` というラベルとしてしか現れない。
-   ;; つまり「製造解による検証」は**名前として在り、解ける経路として無い**。marker を
-   ;; 落として緑にしない —— それがこの軸の実際のギャップである。
+   ;; 2026-08-22 に解消。それまで `manufactured-solution` は defmethod の dispatch 値では
+   ;; なく、benchmark レコードの `:implementation` のラベルとしてしか現れていなかった ——
+   ;; **CAE ライブラリが、自分が judge される方法の名前を掲げて、それを走らせる経路を
+   ;; 持っていなかった。** marker を落として緑にしなかったのが正しく、実装が追いついた。
    :axis/markers ["manufactured-solution" "benchmark-suite" "qualification-gate" "industrial-release-gate"]
-   :axis/behavior nil}]}
+   :axis/behavior "cae-verification"}]}
