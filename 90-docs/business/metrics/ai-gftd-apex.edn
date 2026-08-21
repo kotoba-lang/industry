@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 7788, "ai-gftd-chat-shell" 1},
+ {"magatama-sh1n5h1x" 7801, "ai-gftd-chat-shell" 1},
  :zone
- {:requests-7d 496105,
-  :pageviews-7d 6852,
-  :uniques-7d-sum 5560,
+ {:requests-7d 499118,
+  :pageviews-7d 6862,
+  :uniques-7d-sum 5583,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/wpxml.php", :requests 44}
-   {:path "/wp-admin/network/admin.php", :requests 41}
-   {:path "/bs1.php", :requests 37}
-   {:path "/css.php", :requests 37}
-   {:path "/xingkong/index.php", :requests 29}
-   {:path "/ops.php", :requests 28}
-   {:path "/ww1.php", :requests 28}
-   {:path "/wp-sing.php", :requests 28}],
-  :status-mix {:client-error 1652, :ok 1476, :server-error 13775},
+  [{:path "/", :requests 1164}
+   {:path "/favicon.ico", :requests 160}
+   {:path "/wpxml.php", :requests 44}
+   {:path "/403.php", :requests 44}
+   {:path "/wp-content/x.php", :requests 42}
+   {:path "/wplogbak.php", :requests 35}
+   {:path "/wp-json/", :requests 33}
+   {:path "/css.php", :requests 33}],
+  :status-mix {:ok 3021, :client-error 1835, :server-error 13639},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -31,10 +31,10 @@
   :last-charge-epoch 1604224274},
  :as-of "2026-08-21",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 81},
+ {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 74},
  :top-paths
- "上位 page (24h, 2xx/3xx): /wpxml.php 44 · /wp-admin/network/admin.php 41 · /bs1.php 37 · /css.php 37 · /xingkong/index.php 29 | 4xx(probe) 10% · 5xx 81%",
+ "上位 page (24h, 2xx/3xx): / 1164 · /favicon.ico 160 · /wpxml.php 44 · /403.php 44 · /wp-content/x.php 42 | 4xx(probe) 10% · 5xx 74%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 496105 req/7d・5560 uniques(日次和)・うち4xx probe 10%(24h)、workers 7789 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 499118 req/7d・5583 uniques(日次和)・うち4xx probe 10%(24h)、workers 7802 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
