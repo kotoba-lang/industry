@@ -2112,7 +2112,10 @@
   ;; 93 0 件しか走らなかった / 94 JVM tool が呼ばれた。
   ;; 実測 2026-08-21、165 ファイルに絞った tree で 90 / 1 / 93 / 94 の 4 経路が
   ;; 実際に発火し、無改変で 0 になることを確認済み。
-  ;; ⚠ **fleet でまだ一度も緑になっていない。** それまでは landed ではない。
+  ;; fleet 実測 2026-08-21: `amu-portable-surface-6889fa7-murakumo-dan` = pass
+  ;; （`exit 0 — nbb: 6 tests, 14 passed, 0 failed, 0 errors`）。**dan は :jvm を
+  ;; 持たない 3 ノードの 1 つ** —— clojure CLI の無いマシンで緑になったことが、
+  ;; この gate の JDK-free 主張の実証そのもの。両方向を見せたので landed。
   {:name "amu" :id "amu-portable-surface" :gate :nbb-script :cap :node
    :script "gates/amu-portable-surface-check.cljs"
    :include-ext [".cljc" ".cljs" ".edn"] :min-files 120
