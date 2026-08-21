@@ -1,6 +1,0 @@
-# The value of the NEXT_PUBLIC_NODE_ENV is development or production
-NEXT_PUBLIC_NODE_ENV='development'
-NEXT_PUBLIC_WEB3_AUTH_CLIENT_ID='add_your_web3_auth_client_id'
-NEXT_PUBLIC_WEB3_AUTH_VERIFIER='add_your_auth0_verifier'
-NEXT_PUBLIC_AUTH0_CLIENT_ID='add_your_auth0_client_id'
-NEXT_PUBLIC_AUTH0_DOMAIN='add_your_auth0_domain'
