@@ -1,65 +1,76 @@
 (ns probe-cam-collision-check
   (:require [kotoba.cam.toolpath :as tp] [kotoba.cam.stock :as stock] [kotoba.cam.tool :as tool]
             [kotoba.cam.vec3 :as v3]))
-;; ⚠ この軸は **部分実装**。対象への食い込み検査（gouge）だけが在り、ホルダ・シャンク・
-;; 治具・機械包絡は無い。ここで測るのはその区別が **出力に出ている** ことも含む ——
-;; 「検査した」と「検査していない」が同じ顔をするのが一番危ない。
-;; 不変条件:
-;;   (1) 生成した仕上げパスが自分の gouge 検査を通る（弦公差の範囲で）
-;;   (2) 0.5mm 下げた経路は捕まり、深さが名指しされる（両方向）
-;;   (3) 細分を切ると 0.4mm 以上食い込む —— 適応細分が効いている証拠
-;;   (4) 検査点ゼロは合格ではない
-;;   (5) 工具半径を省くと拒否（許容高さがそれに依存するので推測は危険）
-;;   (6) :not-checked-for がホルダ・治具を名指しする
+;; 工具が工作物に届く経路は 2 つある: **低いから届く**（先端の食い込み）と、
+;; **太いから届く**（シャンク・ホルダ）。前者だけを見る検査は、正しい形を切りながら
+;; 治具を壊すプログラムを通す。ここで測るのは両方が独立に効くこと:
+;;   (1) 生成パスは弦公差内で自分の食い込み検査を通る
+;;   (2) 床の脇に高さ 25 の壁があると、**先端は公差内のままホルダだけが**衝突し、
+;;       違反にセクション名（:holder であって :shank ではない）が付く
+;;   (3) 6mm 工具を 5mm 溝に向けるとシャンクで捕まる
+;;   (4) 細分を切ると 0.4mm 以上食い込む（適応細分が効いている証拠）
+;;   (5) 工具を省くと拒否（先端より上の包絡が検査の主題そのもので推測できない）
+;;   (6) **まだモデル化していないもの**（治具・クランプ・機械包絡・未除去ストック）が
+;;       出力のフィールドに名指しで出る
 (try
-  (let [target {:positions [[-20 -20 0] [20 -20 0] [20 20 0] [-20 20 0]
-                            [-3 -3 4] [3 -3 4] [3 3 4] [-3 3 4]]
-                :indices [0 1 2 0 2 3 4 5 6 4 6 7]}
-        [lib _] (tool/add (tool/empty-library)
-                          {:id :bn6 :name "6mm" :tool-type :ball-nose :diameter 6.0
-                           :flute-length 20.0 :overall-length 60.0 :flute-count 2
-                           :corner-radius 3.0 :material :carbide})
-        run (fn [opts] (tp/generate-toolpath
-                        (-> (tp/new-job (stock/stock (stock/block 60 60 20) (stock/aluminum-6061)) lib)
-                            (tp/add-operation (merge {:op :surface-3d :tool-id :bn6 :stepover 4.0
-                                                      :strategy :raster :feed-rate 1200.0
-                                                      :target target} opts)))))
-        segs (run {})
-        ok (tp/gouge-check segs target {:tool-radius 3.0 :tolerance 0.02})
-        raw (tp/gouge-check (run {:max-bisections 0}) target {:tool-radius 3.0})
-        sunk (mapv (fn [s] (if (= :linear (:segment-type s))
-                             (-> s (update :start #(v3/v3 (:x %) (:y %) (- (:z %) 0.5)))
-                                 (update :end #(v3/v3 (:x %) (:y %) (- (:z %) 0.5))))
-                             s)) segs)
-        bad (tp/gouge-check sunk target {:tool-radius 3.0})
-        no-radius (try (do (tp/gouge-check segs target {}) :accepted) (catch :default _ :refused))]
+  (let [tl {:id :bn6 :name "6mm" :tool-type :ball-nose :diameter 6.0 :flute-length 8.0
+            :overall-length 40.0 :holder-diameter 12.0 :flute-count 2 :corner-radius 3.0
+            :material :carbide}
+        [lib _] (tool/add (tool/empty-library) tl)
+        run (fn [t opts] (tp/generate-toolpath
+                          (-> (tp/new-job (stock/stock (stock/block 60 60 30) (stock/aluminum-6061)) lib)
+                              (tp/add-operation (merge {:op :surface-3d :tool-id :bn6 :stepover 4.0
+                                                        :strategy :raster :feed-rate 1200.0
+                                                        :target t} opts)))))
+        flat {:positions [[-20 -20 0] [20 -20 0] [20 20 0] [-20 20 0]] :indices [0 1 2 0 2 3]}
+        ;; 適応細分の証拠には **曲率のある** 形が要る。平板は線形移動でぴたり追従する
+        ;; ので、細分を切っても食い込まない —— 検査の前提が成り立たない。
+        plateau {:positions [[-20 -20 0] [20 -20 0] [20 20 0] [-20 20 0]
+                             [-3 -3 4] [3 -3 4] [3 3 4] [-3 3 4]]
+                 :indices [0 1 2 0 2 3 4 5 6 4 6 7]}
+        wall {:positions [[-20 -20 0] [6 -20 0] [6 20 0] [-20 20 0]
+                          [6 -20 25] [8 -20 25] [8 20 25] [6 20 25]]
+              :indices [0 1 2 0 2 3 4 5 6 4 6 7]}
+        slot {:positions [[-20 -20 10] [-2.5 -20 10] [-2.5 -20 0] [2.5 -20 0] [2.5 -20 10] [20 -20 10]
+                          [-20 20 10] [-2.5 20 10] [-2.5 20 0] [2.5 20 0] [2.5 20 10] [20 20 10]]
+              :indices [0 1 7 0 7 6  1 2 8 1 8 7  2 3 9 2 9 8  3 4 10 3 10 9  4 5 11 4 11 10]}
+        ok (tp/collision-check (run flat {}) flat tl {:tolerance 0.02})
+        raw (tp/gouge-check (run plateau {:max-bisections 0}) plateau {:tool-radius 3.0})
+        w (tp/collision-check (run wall {}) wall tl {:tolerance 0.02})
+        s (tp/collision-check (run slot {}) slot tl)
+        no-tool (try (do (tp/collision-check (run flat {}) flat {}) :accepted)
+                     (catch :default _ :refused))
+        secs (set (map :section (get-in w [:above-tip :violations])))]
     (cond
-      (zero? (:checked ok))
+      (zero? (get-in ok [:gouge :checked]))
       (println "PROBE cam-collision-check FAIL" "検査点 0 —— 何も見ていない")
       (not (:passed? ok))
       (println "PROBE cam-collision-check FAIL"
-               (str "生成した仕上げパスが自分の検査を通らない（最悪 " (:worst-depth ok) "）"))
-      (> (:worst-depth ok) 0.01)
-      (println "PROBE cam-collision-check FAIL"
-               (str "弦公差 0.01 が守られていない（最悪 " (:worst-depth ok) "）"))
+               (str "平板の仕上げが通らない: gouge " (get-in ok [:gouge :worst-depth])
+                    " / 先端より上 " (count (get-in ok [:above-tip :violations]))))
       (< (:worst-depth raw) 0.4)
       (println "PROBE cam-collision-check FAIL"
-               (str "細分を切っても食い込まない（" (:worst-depth raw) "）—— 適応細分が効いている証拠が出ない"))
-      (or (:passed? bad) (< (:worst-depth bad) 0.4) (empty? (:violations bad)))
-      (println "PROBE cam-collision-check FAIL" "0.5mm 下げた経路を見逃す")
-      (not (every? #(and (:segment %) (:allowed-z %) (:programmed-z %)) (:violations bad)))
-      (println "PROBE cam-collision-check FAIL" "違反の場所と深さを名指ししない")
-      (not= :refused no-radius)
-      (println "PROBE cam-collision-check FAIL" "工具半径なしで検査を受理する")
-      (not (and (= #{:gouge-into-target} (:checked-for ok))
-                (contains? (:not-checked-for ok) :holder-collision)
-                (contains? (:not-checked-for ok) :fixture-collision)))
+               (str "細分を切っても食い込まない（" (:worst-depth raw) "）"))
+      (not (get-in w [:gouge :passed?]))
       (println "PROBE cam-collision-check FAIL"
-               "検査した範囲と検査していない範囲を出力で区別しない —— 部分実装が全部に見える")
+               (str "壁のある形で先端が公差を外れる（" (get-in w [:gouge :worst-depth])
+                    "）—— ホルダ検査を切り分けられない"))
+      (not= #{:holder} secs)
+      (println "PROBE cam-collision-check FAIL"
+               (str "高さ 25 の壁でホルダ衝突を切り分けられない: " (pr-str secs)))
+      (not (contains? (set (map :section (get-in s [:above-tip :violations]))) :shank))
+      (println "PROBE cam-collision-check FAIL" "6mm 工具の 5mm 溝をシャンクで捕まえない")
+      (not= :refused no-tool)
+      (println "PROBE cam-collision-check FAIL" "工具なしで検査を受理する")
+      (not (and (= #{:gouge-into-target :shank-into-target :holder-into-target} (:checked-for ok))
+                (= #{:fixture-collision :clamp-collision :machine-envelope :uncut-stock}
+                   (:not-checked-for ok))))
+      (println "PROBE cam-collision-check FAIL"
+               (str "検査した範囲と未モデル化の範囲が出力で区別されない: "
+                    (pr-str [(:checked-for ok) (:not-checked-for ok)])))
       :else (println "PROBE cam-collision-check PASS"
-                     (str "生成パスは検査点 " (:checked ok) " 点で合格（最悪 "
-                          (.toFixed (:worst-depth ok) 5) " ≤ 弦公差 0.01）/ 細分なしなら "
-                          (.toFixed (:worst-depth raw) 3) " 食い込む / 0.5mm 沈めた経路は "
-                          (count (:violations bad)) " 件を名指しで検出 / "
-                          "⚠ ホルダ・治具・機械包絡は :not-checked-for"))))
+                     (str "平板は合格（食い込み " (.toFixed (get-in ok [:gouge :worst-depth]) 5)
+                          "、細分なしなら " (.toFixed (:worst-depth raw) 3) "）/ 壁では先端公差内のまま "
+                          (count (get-in w [:above-tip :violations])) " 点でホルダのみ衝突 / "
+                          "5mm 溝はシャンクで検出 / ⚠ 治具・クランプ・機械包絡・未除去ストックは未モデル化"))))
   (catch :default ex (println "PROBE cam-collision-check UNMEASURABLE" (.-message ex))))
