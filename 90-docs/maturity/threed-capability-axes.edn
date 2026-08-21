@@ -576,10 +576,17 @@
    :axis/segment :render :axis/weight 5
    :axis/target "Arnold / V-Ray / Cycles / RenderMan"
    :axis/label "オフライン path tracer（積分器・BSDF・光源サンプリング）"
-   :axis/repo "kotoba-lang/pbrt"
-   :axis/paths ["src"]
-   :axis/markers ["integrator" "bsdf" "sample-light" "path-trace" "film"]
-   :axis/behavior nil}
+   ;; 2026-08-23 に実装。repo は `kotoba-lang/pbrt` ではない —— あれは自分で
+   ;; 「R1.0 path reservation、runtime code は無い」と書いている予約 repo で、
+   ;; status 定数しか持たない。実装は `kotoba-lang/raytrace`（BVH・vec3・WGSL
+   ;; 生成・denoise が既にあり、denoiser がこの出力を消費する）。
+   ;; marker も実物の名前へ —— "integrator" / "bsdf" / "path-trace" という綴りの
+   ;; 関数は無く、`radiance`（推定器）・`cosine-sample`（BSDF サンプリング）・
+   ;; `film`（蓄積）・`scene-error`（拒否）である。
+   :axis/repo "kotoba-lang/raytrace"
+   :axis/paths ["src/kotoba/raytrace/path.cljc"]
+   :axis/markers ["radiance" "cosine-sample" "film" "scene-error" "sphere"]
+   :axis/behavior "render-offline-pathtracer"}
 
   {:axis/id :render/color-management
    :axis/segment :render :axis/weight 3
