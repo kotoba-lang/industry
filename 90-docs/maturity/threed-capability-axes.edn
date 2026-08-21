@@ -157,19 +157,18 @@
                   "euler-characteristic"]
    :axis/behavior "mesh-topology"}
 
-  ;; ⚠ chamfer / fillet / shell がこの順で残っているのは偶然ではない。
-  ;; `evaluate-mesh` の accumulator は `{:positions :indices}` の**三角形スープ**で、
-  ;; エッジ同一性も面隣接も持たなかった。一方 `chamfer-feature` / `fillet-feature` は
-  ;; `:edges`（BREP のエッジ id）で対象を指す —— メッシュ側にその id は無い。
+  ;; chamfer がここまで残っていた理由と、解けた順序（2026-08-21）。
   ;;
-  ;; 反復 6（2026-08-21）で `brep.topology` を入れ、**位相は読めるようになった**
-  ;; （`sharp-edges` が「凸で二面角 N 以上のエッジ」を安定な `[i j]` で返す）。
-  ;; 残る障害は 2 つ:
-  ;;   (1) 面取り自体が頂点分割と角パッチを要する（立方体は全エッジが角で交わるので、
-  ;;       孤立エッジだけ扱う実装は即座に壊れる）
-  ;;   (2) **`mesh-boolean` が閉じたソリッドを返さない**（同反復で実測。交差していない
-  ;;       箱 2 つの union ですら境界エッジが出る）。開いたメッシュの上で面取りしても
-  ;;       正しい結果にならないので、CSG の方が先。
+  ;; 障害は 2 つあった。①`evaluate-mesh` の accumulator は三角形スープで、
+  ;; エッジ同一性が無い（`chamfer-feature` は BREP のエッジ id で対象を指すが、
+  ;; メッシュ側にその id は無い）②`mesh-boolean` が切る場合に閉じたソリッドを
+  ;; 返さなかった。①は反復 6 の `brep.topology` で、②は反復 11 の T 字接合修復で
+  ;; 解けた。**その 2 つが揃った次の反復で chamfer は素直に書けた** ——
+  ;; 平面のみの立体の面取りは平面カットそのもので、半空間を difference するだけ。
+  ;;
+  ;; **fillet は同じ手では解けない。** 円弧ブレンドはこのカーネルが表現を持たない
+  ;; 曲面なので、平面カットの一般化では届かない。順序は偶然ではなかったが、
+  ;; 理由は当初書いた「面取りが難しいから」ではなく「土台が無かったから」だった。
   {:axis/id :kernel/chamfer
    :axis/segment :kernel :axis/weight 4
    :axis/target "SolidWorks / Parasolid の chamfer"
@@ -178,7 +177,7 @@
    :axis/paths ["src/brep/feature.cljc"]
    :axis/marker-kind :dispatch :axis/dispatch-of "apply-feature"
    :axis/markers ["chamfer"]
-   :axis/behavior nil}
+   :axis/behavior "feature-chamfer"}
 
   {:axis/id :kernel/fillet
    :axis/segment :kernel :axis/weight 5
