@@ -42,6 +42,13 @@
                                                         :radius 0.5 :segments 16}))
         big (f/evaluate-mesh (f/add-feature base {:kind :fillet :id 3 :edges [e] :radius 6.0 :segments 8}))
         one-seg (f/evaluate-mesh (f/add-feature base {:kind :fillet :id 3 :edges [e] :radius 1.0 :segments 1}))
+        ;; 1 稜なら全分割数で通ること —— retry を入れる前は JVM が 9 中 2、
+        ;; nbb が 9 中 4 で落ち、しかも**別の分割数**で落ちていた。
+        sweep-failures (vec (for [segs [4 8 12 16 20 24 32 48 64]
+                                  :when (not= :ok (first (f/evaluate-mesh
+                                                          (f/add-feature base {:kind :fillet :id 3 :edges [e]
+                                                                               :radius 1.0 :segments segs}))))]
+                              segs))
         e3 (fn [x] (/ (js/Math.round (* 1e5 x)) 1e5))]
     (cond
       (not (contains? (f/supported-feature-kinds) :fillet))
@@ -64,16 +71,31 @@
                (str "弧が 90/分割 度の面で構成されていない: " (pr-str (into (sorted-map) (:angles r16)))))
       (chamfer? (:angles r16))
       (println "PROBE feature-fillet FAIL" "45 度の稜がある —— これは面取りであってフィレットではない")
-      (or (not= :error (first open-case)) (not (str/includes? (second open-case) "boundary edge")))
+      ;; 2 稜 16 分割は 8 通りの overshoot を全部外す既知の組。**成功しても
+      ;; よいが、開いた曲面を :ok で返してはならない** —— 見るのは「拒否した
+      ;; こと」ではなく「開いた立体を出荷しないこと」。retry で通るように
+      ;; なったら、それは進歩であって probe の落とし穴ではない。
+      (and (= :ok (first open-case))
+           (pos? (count (t/boundary-edges (t/topology (second open-case))))))
       (println "PROBE feature-fillet FAIL"
-               "開いた曲面を返す組み合わせ（2 稜 16 分割）を :ok で返している —— 体積が逆方向に間違った「立体」")
+               (str "開いた曲面を :ok で返している（2 稜 16 分割、境界 "
+                    (count (t/boundary-edges (t/topology (second open-case))))
+                    " 本）—— 体積が逆方向に間違った「立体」"))
+      (and (= :error (first open-case))
+           (not (str/includes? (second open-case) "could not be cut")))
+      (println "PROBE feature-fillet FAIL"
+               (str "拒否理由が boolean の破綻を名指ししない: " (second open-case)))
       (or (not= :error (first big)) (not (str/includes? (second big) "no closure check would reject")))
       (println "PROBE feature-fillet FAIL" "稜長の半分以上の半径を受理している")
       (or (not= :error (first one-seg)) (not (str/includes? (second one-seg) "is a chamfer")))
       (println "PROBE feature-fillet FAIL" "1 分割（= 面取り）を受理している")
+      (seq sweep-failures)
+      (println "PROBE feature-fillet FAIL"
+               (str "1 稜のフィレットが " (pr-str sweep-failures)
+                    " 分割で通らない —— boolean の破綻が残っている"))
       :else
       (println "PROBE feature-fillet PASS"
                (str "除去量が L·r²(1−π/4) に 2 次収束（相対 " (e3 (:rel r8)) "→" (e3 (:rel r16))
                     "→" (e3 (:rel r32)) "）/ 弧は 90/16 度の面 15 枚・45 度稜なし / "
-                    "開いた結果・過大半径・1 分割は拒否"))))
+                    "9 分割数すべてで 1 稜が通る / 開いた結果・過大半径・1 分割は拒否"))))
   (catch :default ex (println "PROBE feature-fillet UNMEASURABLE" (.-message ex))))
