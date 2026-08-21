@@ -6,6 +6,13 @@
 ;;
 ;; 不変条件: (1) 出発点の押し出しが閉じている（配管のせいではないことの確認）
 ;;          (2) cut / union の結果も閉じている（境界エッジ 0、Euler 偶数、manifold）
+;;
+;; ⚠ **軸を「切らない boolean」と「切る boolean」に割らないこと。** 2026-08-21 の
+;; 巻き方向修正で、交差しない union・接する union・当たらない difference・
+;; 交差の intersection は閉じるようになった。そこだけ別軸にすれば点は増えるが、
+;; 利用者が求めるのは「穴を開ける」「重なった体を合わせる」であって、そこが
+;; 開いている限りこの能力は届いていない。**点を取りに軸を割らない。**
+;; 進捗は FAIL の本文に出す —— 数字ではなく文章として。
 (try
   (let [sq (fn [id x0 y0 x1 y1]
              (f/sketch-feature id (f/sketch-plane-xy)
@@ -34,7 +41,9 @@
       (println "PROBE boolean-solid FAIL"
                (str "貫通穴の結果に境界エッジが " (open cut) " 本（Euler "
                     (t/euler-characteristic cut) "）—— 閉じたソリッドではない。"
-                    "押し出し単体は閉じているので配管ではなく mesh-boolean 側"))
+                    "押し出し単体は閉じているので配管ではなく mesh-boolean 側。"
+                    " ただし**切らない** boolean は 2026-08-21 の巻き方向修正で閉じた"
+                    "（交差しない union の境界エッジ " (open uni) " 本）"))
       (pos? (open uni))
       (println "PROBE boolean-solid FAIL"
                (str "**交差していない**箱 2 つの union に境界エッジが " (open uni)

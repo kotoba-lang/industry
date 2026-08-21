@@ -127,10 +127,21 @@
     (if-not (exists? f)
       {:probe/status :no-probe :probe/detail "probe file not written yet"}
       (let [r (cp/spawnSync "nbb" (clj->js (concat ["--classpath" (str/join ":" cp-dirs)] [f]))
-                            #js {:encoding "utf8" :cwd root :timeout 120000})
+                            #js {:encoding "utf8" :cwd root :timeout 600000})
             out (str (.-stdout r)) err (str (.-stderr r))
             line (first (filter #(str/starts-with? % "PROBE ") (str/split-lines out)))]
         (cond
+          ;; spawnSync kills a probe that exceeds :timeout and leaves stdout and
+          ;; stderr EMPTY. Without this branch that arrives as "produced no PROBE
+          ;; line" with nothing after `stderr=`, which reads like a broken probe
+          ;; rather than a machine that was too busy to finish one. Measured
+          ;; 2026-08-21: the CFD probe (4000 LBM steps) times out at load ~100 and
+          ;; its axis silently left the working column.
+          (some? (.-signal r))
+          {:probe/status :unmeasurable
+           :probe/detail (str "probe was killed by signal " (.-signal r)
+                              " (timeout, or the machine ran out of room) — "
+                              "this is NOT a failed invariant")}
           (nil? line)
           {:probe/status :unmeasurable
            :probe/detail (str "probe produced no PROBE line; stderr="
@@ -174,6 +185,11 @@
                      (seq missing)  :thin
                      (= :pass (:probe/status probe)) :working
                      (= :fail (:probe/status probe)) :hollow
+                     ;; A probe that could not run is NOT the same as an axis with
+                     ;; no probe. Collapsing them into :declared is this tool doing
+                     ;; the very thing it exists to catch — reporting "could not
+                     ;; measure" as something else. Found in it 2026-08-21.
+                     (= :unmeasurable (:probe/status probe)) :unmeasurable
                      :else :declared)]
         (merge axis
                {:axis/status status :axis/found found :axis/missing missing
