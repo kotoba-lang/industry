@@ -13,16 +13,24 @@
         base (-> (f/feature-tree)
                  (f/add-feature (sq 1 (f/sketch-plane-xy) 4))
                  (f/add-feature (f/extrude-feature 2 1 [0 0 1] 3 :new)))
-        [st msg] (f/evaluate-mesh (f/add-feature base (f/fillet-feature 9 [1] 1.0)))]
+        ;; :fillet was this probe's unregistered example until 2026-08-22.
+        ;; It is registered now, so the example has to move — which is the
+        ;; probe working: the assertion changed when the capability arrived,
+        ;; instead of the capability arriving unnoticed. `:revolve` has a
+        ;; constructor and no evaluator, so it plays that part now.
+        [st msg] (f/evaluate-mesh (f/add-feature base (f/revolve-feature 9 1 [0 0 1] 360 :new)))]
     (cond
       (contains? kinds :default)
       (println "PROBE feature-registry FAIL" ":default が supported-feature-kinds に混じっている")
       (not (contains? kinds :extrude))
       (println "PROBE feature-registry FAIL" (str "registry に :extrude が無い: " (pr-str kinds)))
+      (contains? kinds :revolve)
+      (println "PROBE feature-registry FAIL"
+               ":revolve が登録された —— この probe の「未登録の例」を別の kind に移すこと")
       (not= :error st)
       (println "PROBE feature-registry FAIL"
-               (str "未登録の :fillet が拒否されない（status=" st "）"))
-      (not (and (str/includes? msg ":fillet") (str/includes? msg ":extrude")))
+               (str "未登録の :revolve が拒否されない（status=" st "）"))
+      (not (and (str/includes? msg ":revolve") (str/includes? msg ":extrude")))
       (println "PROBE feature-registry FAIL"
                (str "拒否はするが、欠けている kind か登録済み集合のどちらかを言わない: " msg))
       :else (println "PROBE feature-registry PASS"

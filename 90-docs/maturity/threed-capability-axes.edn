@@ -187,7 +187,12 @@
    :axis/paths ["src/brep/feature.cljc"]
    :axis/marker-kind :dispatch :axis/dispatch-of "apply-feature"
    :axis/markers ["fillet"]
-   :axis/behavior nil}
+   ;; 2026-08-22 に実装。ブレンドは**テセレート**であって解析曲面ではない
+   ;; （`evaluate-mesh` は三角形メッシュを返すと自分で言っている）。probe は
+   ;; 除去量の 2 次収束と、**開いた結果を拒否していること**まで見る ——
+   ;; `brep.mesh-csg` は分割数によって散発的に破綻し、そのとき返るのは
+   ;; 「体積が逆方向に間違った立体」なので、閉包検査が実装の一部である。
+   :axis/behavior "feature-fillet"}
 
   {:axis/id :kernel/shell
    :axis/segment :kernel :axis/weight 3
