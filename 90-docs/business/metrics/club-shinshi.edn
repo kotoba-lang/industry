@@ -1,29 +1,31 @@
 {:health-status 200,
  :zone-name "shinshi.club",
  :zone
- {:requests-7d 10288,
-  :pageviews-7d 3822,
-  :uniques-7d-sum 2465,
+ {:requests-7d 10514,
+  :pageviews-7d 3829,
+  :uniques-7d-sum 2472,
   :zone "shinshi.club"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 95}
+  [{:path "/xrpc/ai.gftd.apps.shinshi.listAuthorFeed", :requests 126}
+   {:path "/", :requests 102}
    {:path "/xrpc/ai.gftd.apps.shinshi.listUnfilled", :requests 47}
-   {:path "/api/funnel", :requests 26}
+   {:path "/api/funnel", :requests 27}
    {:path "/xrpc/ai.gftd.apps.shinshi.requestScene", :requests 24}
    {:path "/xrpc/ai.gftd.apps.shinshi.coverage", :requests 24}
    {:path "/xrpc/ai.gftd.apps.shinshi.agentChat", :requests 24}
-   {:path "/robots.txt", :requests 16}
-   {:path "/_metrics/audience", :requests 10}],
-  :status-mix {:client-error 151, :ok 287},
+   {:path
+    "/b/e172a7613dd2547301c01fe9d92351d4eae58c312bf1580a4907bdb85529c4e7",
+    :requests 16}],
+  :status-mix {:client-error 154, :ok 497},
   :window "24h"},
  :source "shinshi.d1:pv_daily+chat_event_daily+pay_run",
  :window "7d",
  :as-of "2026-08-21",
- :traffic-quality {:window "24h", :probe-4xx-pct 34, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 24, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 95 · /xrpc/ai.gftd.apps.shinshi.listUnfilled 47 · /api/funnel 26 · /xrpc/ai.gftd.apps.shinshi.requestScene 24 · /xrpc/ai.gftd.apps.shinshi.coverage 24 | 4xx(probe) 34%",
- :funnel {:visitors 303, :chatters 78, :scenes 74, :paying 0},
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 126 · / 102 · /xrpc/ai.gftd.apps.shinshi.listUnfilled 47 · /api/funnel 27 · /xrpc/ai.gftd.apps.shinshi.requestScene 24 | 4xx(probe) 24%",
+ :funnel {:visitors 306, :chatters 79, :scenes 75, :paying 0},
  :signal
- "shinshi.club 実測 10288 req/7d・2465 uniques(日次和)・うち4xx probe 34%(24h)"}
+ "shinshi.club 実測 10514 req/7d・2472 uniques(日次和)・うち4xx probe 24%(24h)"}
