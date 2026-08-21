@@ -1,0 +1,126 @@
+[{:db/id -1
+  :adr/id "adr-2608210500-session-close-gftd-contract-audit-and-kotobase-read-budget"
+  :adr/doc_type "adr"
+  :adr/topic "session-close"
+  :adr/title "ADR-2608210500: セッション終了 —— 契約の棚卸しと kotobase の読み取り予算。何が着地し、何が誰かの 1 クリック待ちか"
+  :adr/status "accepted"
+  :adr/date "2026-08-21"
+  :adr/last_verified "2026-08-21"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["2026-08-20 のセッションで何が default branch に着地したかの正本"
+   "そのセッションが残した resume point の正本"]
+  :adr/source-format "edn"
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2608198400-gftd-japan-live-contract-inventory"
+   "adr-2608208000-gftd-japan-internal-cycle-measured"
+   "adr-2608208500-kotobase-xrpc-5xx-located-not-fixed"
+   "2608011100-m365-gftdcojp-tenant-identity-audit-and-offboarding"]
+
+  :adr/body
+"# ADR-2608210500: セッション終了
+
+「gftd.co.jp で無駄な契約が残っていないか調べて」から始まり、契約の棚卸し →
+内部サイクルの実測 → kotobase の 5xx 修正まで進んだ 1 セッションの終了記録。
+**branch で成功したことと `main` に在ることを混同しない**ため、着地の有無を明記する。
+
+## 1. default branch に着地したもの
+
+| repo | commit | 内容 |
+|---|---|---|
+| `com-junkawasaki/root` | `c4a9bf2a84d3` | ADR 3 本（契約棚卸し / 内部サイクル / M365 スコープ付与の追記） |
+| `com-junkawasaki/root` | `bece50df906`（別セッションが取り込み） | kotobase 5xx の ADR。**§14 まで含めて local と一致を確認済み** |
+| `com-junkawasaki/root` | `c12086caf690` | west pin: m365-archive を 8/20 catch-up へ前進 |
+| `gftdcojp/m365-archive` | `c6fbf64c3a3` | 共有 16 箱の差分取り込み（292 通） |
+| `gftdcojp/m365-archive` | `d24f709662d6` | **現役社員 2 名の保全**（38,634 通 / 5.6 GB）＋ `:staff` グループ新設 |
+| `net-kotobase/engine` | `bc51f61de3a8` | **読み取り予算 + prefetch manifest**（264 tests / 757 assertions） |
+
+## 2. 外部へ実際に送ったもの（3 通）
+
+| 宛先 | 内容 | 状態 |
+|---|---|---|
+| JustCo（`mai.kitakoga@`） | 契約終了の確認・明渡し・カード返却・最終精算の照会 | 返信待ち |
+| MF クラウド事務局 | 構成縮小の依頼＋8/25 自動解約時のデータ参照可否 | 返信待ち |
+| ソフトバンク UniTalk | 解約手続き・最低利用期間・4 番号の扱いの照会 | 返信待ち |
+
+⚠ **JustCo 宛には、確認していない事実（「カードは弊社にて保管しており」）を書いた。**
+送信後に keiri@ の未読から、JustCo が既にカードを抹消措置済みだと判明している
+（ADR-2608198400 §9）。**訂正のフォローは未送信。**
+
+## 3. 実行した解約・変更
+
+- **Microsoft Teams Phone Standard を解約**（管理センター GUI 経由、日割り返金対象、
+  90 日以内は再有効化可）。年 ¥23,748
+- **Business Standard の継続請求を ON に戻した** —— 放置なら 2026-10-24 に
+  **somu@ / keiri@ / c@ を含む全メールボックスが停止**していた
+- **Entra アプリに `Mail.Send.Shared` を付与**（共有メールボックス名義の送信に必須。
+  `Mail.Send` だけでは 403。**撤回手順は ADR-2608011100 の 2026-08-20 追記**）
+- Cloudflare の agent 用 plugin / marketplace を導入（**`/reload-plugins` は未実行**）
+
+## 4. 検証（何を、何件、どう確かめたか）
+
+- `net-kotobase/engine`: **264 tests / 757 assertions、0 failures**。
+  新規 4 本（予算超過で拒否 / 予算内で配信 / prefetch が 1 波で並行取得 /
+  書き込み経路は予算対象外）
+- **壊して確かめた**: 予算判定を 1 箇所無効化すると該当テスト**だけ**が落ち、
+  戻すと全緑。落ちない gate は劇場（CLAUDE.md）
+- `m365-archive`: 取り込み **成功 2 / 失敗 0**、commit に `.eml` 38,634 件を確認
+- **既知の別件 failure は無い**（このセッションの変更に起因しない赤は出ていない）
+
+## 5. resume point —— 次に座る人が最初に打つもの
+
+### 期限があるもの
+
+    2026-08-25  MF クラウドの決済。放置すると 18 商品が自動解約される。
+                原資 ¥250,000 は口座にある（8/3 +150,000 / 8/17 +100,000）
+    2026-09-16  Teams 電話リソースアカウント（無料枠 3 席）の更新
+    2026-09-22  JASA 情報セキュリティサービス基準 —— 更新しない
+    2026-10-24  Business Standard 更新。**11 席 → 2 席へ集約**（j.kawasaki + y.nishino）。
+                月額契約への変更もこの画面。ただし a.nakamura / t.ichihara は
+                「今は必要」なので、共有メールボックス化が先
+
+### kotobase —— 次の 1 手は測定であって最適化ではない
+
+```
+cd orgs/net-kotobase/engine
+wrangler tail kotobase-cf-wasm-staging --format=json   # ← OAuth 必須。API トークンでは 0 バイト
+```
+
+**残っている CPU 項は pin の向こう側にある。** `with-blocks` は自前の per-call
+キャッシュを持ち、L1 に何があろうと miss ごとに `f` を再実行する。3-arity で
+warm cache を渡す変更が要り、それは `io.github.kotoba-lang/kotobase-server`
+git/sha `3d2523d9` の中。**engine からは出荷できない**（ADR-2608208500 §14）。
+
+**本番未デプロイ。** engine の main には他セッションの未リリース分
+（biscuit revocation、artifact 再ビルド）が載っており、main を deploy すれば
+それも出る。**私の変更だけを切り出す手段が無いので出荷はオーナー判断。**
+
+### オーナーにしか出せないもの
+
+1. **MF の決済**（送金 / カード情報。安全床②①）
+2. **`KOTOBASE_MAINTENANCE_OPERATOR_DIDS` 用の本番鍵の生成** ——
+   DEPLOY.md が「production must use separately generated identities」と明記。
+   **空である限り、肥大したグラフを手で畳む手段が本番に存在しない**
+3. **Google Workspace `gftd.group`（年 ¥79,200）の用途** —— 2026-05-05 に
+   決済失敗から**能動的に再有効化**されているので、使途があるはず
+4. **GoDaddy の自動更新ドメイン一覧**（API 資格情報がワークスペースに存在しない）
+5. **Linode のアカウント解約**（トークン 2 本とも失効。ただし月 $0.09）
+6. **Claude で `/reload-plugins`**
+
+## 6. このセッションが繰り返した 1 つの誤り
+
+**「測れなかった」が「測って問題が無かった」と同じ値で出る。**
+ADR-2608136000 が repo 全体の規則として書いている失敗を、**それを知っている状態で
+5 回**踏んだ:
+
+1. 会計だけを見て「契約は止まっている」と読んだ（実際は決済失敗で生きていた）
+2. Co-Scientist iter-1: refusal を CPU 削減として数えた
+3. iter-2: `bounded` が「保証」と「測った範囲」の 2 義だった
+4. iter-4a: 結果に効かない定数だけ振って「頑健」と結論した
+5. prefetch が CPU 項も直すと仮定した（テストが反証した）
+
+**5 回とも、直したのは実装ではなく判定器のほうだった。**
+"}]
