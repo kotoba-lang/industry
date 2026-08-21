@@ -1,0 +1,91 @@
+[
+;;; Iteration 45 (2026-07-26): large named membership organizations the corpus
+;;; had not yet recorded. ADR-2607257200.
+
+{:org/id :org-global-ymca-ywca
+ :org/name "YMCA / YWCA (World Alliance of YMCAs, World YWCA)"
+ :org/entity-kind :named-org
+ :org/form-family :family-international-club-network
+ :org/category :cat-international
+ :org/type :faith-based-org
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["CH" "US" "GB" "IN" "KE" "JP" "BR" "PH"]
+ :org/founding-date 1844
+ :org/instance-count-estimate 12000
+ :org/member-count 920000
+ :org/member-count-basis "source-pinned, and the entry deliberately records the VOLUNTEER figure rather than the headline one: World YMCA describes more than 64 million BENEFICIARIES in 120 countries, with about 920,000 volunteers, nearly 90,000 staff and 12,000 branches. Beneficiaries are people served, not members — a swimmer using a Y pool is in that 64M — so the community here is the 920,000 volunteers and the branch memberships, not the reach figure. The World YWCA is a separate organisation with its own count, not included."
+ :org/proxy-metric "beneficiaries reached"
+ :org/proxy-bias "Reach counts service users, which is the single most common way a service organisation's community is overstated. This corpus records reach only when the entry says so, and never as :org/member-count."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Local associations offering sport, housing, language classes and youth work, federated into a world alliance — founded in 1844 as a Christian young men's association and now largely secular in programme while retaining the federated-association form."
+ :org/related-org "org-global-scouting"
+ :org/source-name "World Alliance of YMCAs (ymca.int)"
+ :org/source-url "https://www.ymca.int/"
+ :org/source-date "2025"
+ :org/source-tier :primary
+ :org/pinned-on "2026-07-26"
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-womens-service-clubs
+ :org/name "Women's service clubs (Soroptimist, Zonta, Inner Wheel, BPW)"
+ :org/entity-kind :org-form
+ :org/form-family :family-fraternal-order
+ :org/category :cat-fraternal
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "GB" "JP" "DE" "IN" "AU" "IT" "KE"]
+ :org/founding-date 1919
+ :org/founding-note "Soroptimist (1921) and Zonta (1919) were founded when Rotary and Lions admitted men only; Inner Wheel began as Rotarians' wives and became independent."
+ :org/member-count-basis "unknown in aggregate — each federation publishes its own membership in the tens of thousands (Soroptimist and Zonta each commonly cited around 25,000-70,000 depending on structure counted), and no combined figure exists. Japanese and Indian clubs are among the larger national bodies."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Service clubs founded by professional women excluded from the men's clubs, running scholarships, anti-trafficking and girls' education programmes — and now facing the same ageing-membership problem as the clubs that excluded them."
+ :org/related-org "org-global-rotary"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-disability-sport-clubs
+ :org/name "Disability sport clubs and Special Olympics / Paralympic community programmes"
+ :org/entity-kind :org-form
+ :org/form-family :family-sport-club
+ :org/category :cat-sports
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "GB" "DE" "JP" "KE" "BR" "IN" "AE"]
+ :org/founding-date 1968
+ :org/member-count 5000000
+ :org/member-count-basis "llm-recall-unverified: Special Olympics is commonly described as reaching around 5 million athletes across 170+ countries with roughly a million volunteers; those are programme-reach figures of the same kind flagged in the YMCA entry, and the club-level membership beneath them is not aggregated."
+ :org/proxy-metric "athletes reached by programme"
+ :org/proxy-bias "Programme reach again: an athlete who competed once in a school-based event counts alongside a club member who trains weekly."
+ :org/legal-registration :registered
+ :org/governance-model :hierarchical
+ :org/mission-statement "Local clubs and unified teams giving people with intellectual and physical disabilities a place to train and compete — with the volunteer coach and family network around each club usually larger than the athlete roster."
+ :org/related-org "org-global-disability-communities"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-volunteer-build-brigades
+ :org/name "Volunteer building brigades (Habitat-style builds, minga de construcción, 建て前)"
+ :org/entity-kind :org-form
+ :org/form-family :family-labor-exchange
+ :org/category :cat-mutual-aid
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "MX" "PE" "PH" "KE" "IN" "JP" "NP"]
+ :org/founding-date 1976
+ :org/member-count-basis "unknown — organized build programmes count volunteer-days and houses completed rather than members, and the far larger practice is unorganized: neighbours raising a roof together, which appears in this corpus as dugnad, bayanihan, minga and woola."
+ :org/proxy-metric "volunteer-days and houses completed"
+ :org/proxy-bias "Output measures, not community measures. A programme that builds 100 houses with 5,000 one-day volunteers and one that builds 100 with 200 repeat volunteers look identical."
+ :org/legal-registration :mixed
+ :org/governance-model :hierarchical
+ :org/mission-statement "Organised volunteer construction — a charity brings materials and coordination, neighbours and visiting volunteers bring labour, and the receiving household contributes 'sweat equity' — the formalised descendant of the mutual house-raising recorded elsewhere in this corpus."
+ :org/related-org "org-phl-bayanihan-damayan"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+]

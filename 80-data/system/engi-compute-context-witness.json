@@ -1,0 +1,70 @@
+{
+  "schema": "kotoba.fabric.compute-settlement-context/v1",
+  "observedAt": "2026-07-17T13:30:51.256Z",
+  "sourceWitness": "80-data/system/murakumo-fleet-witness.json",
+  "sourceWitnessCid": "bafkreigx3xmsftnvxeauv7jwn6g7ullqgdrymcw3jrphzygyankkyffwye",
+  "run": {
+    "schema": "murakumo.run/v1",
+    "purpose": "nexus-x402-production-settlement",
+    "sequence": 2
+  },
+  "runCid": "bafkreigtt2l64tpmm4ows4ku6jmidgugjhi3xbgwnhfzipkabk6o4sokyq",
+  "units": {"verifiedModalities": 10, "artifactBytes": 8684902},
+  "meter": {
+    "url": "https://meter.murakumo.cloud",
+    "workerVersion": "2fb6a906-f716-4b6e-acbe-016af7f447b1",
+    "publicKey": "pYV2SICUQGp8C-WhqsYMWekMyRve-MDoBhLRWAfbywA"
+  },
+  "meteringReceipt": {
+    "runCid": "bafkreigtt2l64tpmm4ows4ku6jmidgugjhi3xbgwnhfzipkabk6o4sokyq",
+    "receiptCid": "bafkreielbierqgjrv6cicgiu6csnghru76ipespjzj6bny3hs5wzrqhl54",
+    "witnessed": true,
+    "attestation": {
+      "signerDid": "did:web:meter.murakumo.cloud",
+      "alg": "Ed25519",
+      "signedCid": "bafkreielbierqgjrv6cicgiu6csnghru76ipespjzj6bny3hs5wzrqhl54",
+      "signature": "IKWXPneCu5H06chy1UwqAyHucw0crBPcE6jzfTLaE3djn64iIP5aZf2hW6Ewzxod5uTn_ioFiKtM1B0aEePsAg"
+    }
+  },
+  "engi": {
+    "url": "https://engi.gftd.ai",
+    "workerVersion": "45b79089-be79-491b-b279-1d81ab048565",
+    "publicKey": "4rJiexcAmRf_2HXRVjqwpTy6diuYvwLDqC24bNtSbXY"
+  },
+  "engiEntry": {
+    "runCid": "bafkreigtt2l64tpmm4ows4ku6jmidgugjhi3xbgwnhfzipkabk6o4sokyq",
+    "transferId": "bafkreic2sses4n4ddfmhx4lhsghnhqcj2njuaqhzq67uiq56ezptelpxwm",
+    "counterSigned": true,
+    "attestation": {
+      "signerDid": "did:web:engi.gftd.ai",
+      "alg": "Ed25519",
+      "signedCid": "bafkreic2sses4n4ddfmhx4lhsghnhqcj2njuaqhzq67uiq56ezptelpxwm",
+      "signature": "uWmqLn4uXIw9WytNlOhFhqSG_ZrTRApGFofdh9gtr3dCYcyGIIwNZwClWDRJk8Cxx9wAWvmuFnJOZGJQAEkdBA"
+    }
+  },
+  "ledger": {
+    "database": "engi-ledger",
+    "databaseId": "d5d0747c-b39e-4143-bf99-2a3fa1f62289",
+    "region": "APAC",
+    "replayConstraints": ["transferId", "runCid", "meteringReceiptCid"]
+  },
+  "payment": {
+    "network": "base",
+    "asset": "USDC",
+    "amountMicros": 10000,
+    "payTo": "0xA00366234D29d4F882088048c0B2fa0dB7302D4E",
+    "transaction": null,
+    "recipientBalanceMicrosAtVerification": 0
+  },
+  "nexus": {
+    "url": "https://x402.nexus/settle",
+    "workerVersion": "09980045-2b3c-4658-8097-9ef462510511",
+    "signedContextWithMissingTransaction": {
+      "http": 402,
+      "reason": "settlement-unverified",
+      "detail": "tx-not-found"
+    },
+    "tamperedAmount": {"http": 400, "error": "invalid settlement requirements"},
+    "tamperedPayTo": {"http": 400, "error": "invalid settlement requirements"}
+  }
+}

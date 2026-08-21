@@ -1,0 +1,425 @@
+[{:doc/type :automatic-rollback-triggers
+  :doc/id "month-3-automatic-rollback-triggers"
+  :doc/title "Month 3 Automatic Rollback Triggers — Monitoring & Enforcement (2026-09-11 to 2026-09-14)"
+  :doc/date "2026-07-21"
+  :doc/author "Claude Code Agent"
+  :doc/status "ACTIVE"
+
+  :rollback/overview
+  "This document defines 4 automatic rollback triggers that fire without requiring owner confirmation.
+   Each trigger is independently monitored by Prometheus + Alertmanager rules.
+   When a trigger fires, the monitoring system automatically executes the rollback script.
+   Monitoring-lead and escalation-lead are notified immediately for verification + logging."
+
+  :rollback/trigger-1-latency-regression
+  {:seq 1
+   :name "Latency Regression (p99 latency spike)"
+   :severity "CRITICAL"
+   :metric "drama_profile_http_latency_p99 (milliseconds)"
+   :baseline-value "100ms (from Phase 2 pre-flight validation)"
+   :trigger-threshold "100ms + 100ms = 200ms"
+   :sustained-duration-minutes 5
+   :trigger-condition "p99 latency ≥ 200ms sustained for ≥ 5 minutes"
+
+   :example-scenarios
+   [{:scenario "Stage 1 ramp to 75%"
+     :baseline-p99 "95ms"
+     :alert-threshold "95ms + 100ms = 195ms (for this stage)"
+     :observed "210ms sustained 5+ minutes → TRIGGER"}
+    {:scenario "GC pause causes spike"
+     :baseline-p99 "100ms"
+     :spike-value "250ms (10 second GC pause)"
+     :sustained-duration "3 minutes"
+     :result "Spike detected but < 5 min sustained, NOT TRIGGERED (need 5+ min)"
+     :note "Short transient spikes do not trigger (designed to avoid false positives)"}
+    {:scenario "Load gradually increases"
+     :baseline-p99 "100ms"
+     :progression "min 1: 105ms, min 2: 110ms, min 3: 125ms, min 4: 150ms, min 5: 195ms"
+     :result "At min 5, threshold reached and sustained → TRIGGER"}]
+
+   :automatic-action
+   [:step-1-detect-violation "Prometheus alert rule fires (p99 ≥ threshold sustained > 5 min)"
+    :step-2-route-alert "Alertmanager routes to #prod-gates-wave5 (Slack) + PagerDuty"
+    :step-3-execute-rollback "Automated script executes: murakumo/rollback.cljs --trigger latency --rollback-to <previous-stage>"
+    :step-4-notify-team "Slack alert: 'AUTOMATIC ROLLBACK: Latency regression (p99=XXms), reverted to YY% traffic'"
+    :step-5-verify-recovery "Monitoring-lead verifies: latency returns to normal within 2 min"
+    :step-6-log-decision "Escalation-lead logs: '[AUTOMATIC ROLLBACK] Latency regression at Stage X. Rolled back to Stage X-1.'"]
+
+   :rollback-targets
+   {:stage-1-rollback-to "Phase 2 (50% cljc / 50% Rust) — revert from 75%"
+    :stage-2-rollback-to "75% cljc / 25% Rust — revert from 90%"
+    :stage-3a-rollback-to "90% cljc / 10% Rust — revert from 99%"
+    :stage-3b-rollback-to "99% cljc / 1% Rust — revert from 100%"}
+
+   :prometheus-alert-rule
+   "groups:
+      - name: murakumo-latency-triggers
+        rules:
+          - alert: LatencyRegressionTrigger
+            expr: |
+              drama_profile_http_latency_p99 > 200
+              and
+              (drama_profile_http_latency_p99 > 200)[5m] > 0
+            for: 5m
+            labels:
+              severity: critical
+              team: murakumo-ops
+              action: automatic-rollback
+            annotations:
+              summary: 'Latency regression detected (p99={{ $value }}ms > 200ms threshold)'
+              description: 'Sustained p99 latency > 5 min. Automatic rollback to previous stage initiated.'
+              runbook: 'MONTH-3-ROLLBACK-PROCEDURE.md#trigger-1-latency-regression'"
+
+   :test-procedure
+   {:test-date "2026-09-08 (fire-drill day)"
+    :action "Simulate: inject synthetic latency spike on cljc fleet"
+    :method "Use Prometheus PromQL alert rule directly (manual query) or staging environment"
+    :expected-result "Alert fires after 5 min sustained, script executes rollback"
+    :verification "Confirm: traffic reverted within < 2 min"}
+
+   :tuning-notes
+   ["Threshold 200ms = baseline (100ms) + buffer (100ms) chosen to allow ±10% variance"
+    "5-minute sustained window filters out transient GC pauses (which typically <1 min)"
+    "If too many false positives: increase buffer to 120ms or 150ms"
+    "If missing real regressions: decrease buffer to 75ms or sustained window to 3 min"]}
+
+  :rollback/trigger-2-parity-divergence
+  {:seq 2
+   :name "Parity Divergence (data consistency failure)"
+   :severity "CRITICAL"
+   :metric "murakumo_parity_checker_divergence_rate (ratio)"
+   :baseline-value "< 0.01% (< 10 divergence per 1M requests)"
+   :trigger-threshold "1.0% divergence rate (10,000 divergence per 1M requests)"
+   :sustained-duration-seconds 60
+   :trigger-condition "Parity divergence rate ≥ 1% sustained for ≥ 60 seconds"
+
+   :what-is-parity "Parity checker compares Rust (baseline) and cljc (canary) response bodies (hash-based).
+                    If hashes diverge → data inconsistency (semantic bug or state desync).
+                    Parity trigger is ultra-conservative: ANY non-trivial divergence → full rollback."
+
+   :example-scenarios
+   [{:scenario "JSON field ordering difference"
+     :rust-response "{\"a\":1,\"b\":2}"
+     :cljc-response "{\"b\":2,\"a\":1}"
+     :hash-match "false (JSON order differs)"
+     :parity-fail "true"
+     :count-this-as "1 divergence"}
+    {:scenario "Numeric rounding (float precision)"
+     :rust-value "3.141592653589793"
+     :cljc-value "3.141592653589794"
+     :hash-match "false (byte differs)"
+     :parity-fail "true"
+     :note "This is a precision issue, likely acceptable. But parity treats as divergence."}
+    {:scenario "Missing field in cljc response"
+     :rust-response "{\"id\":1,\"name\":\"Alice\",\"email\":\"alice@example.com\"}"
+     :cljc-response "{\"id\":1,\"name\":\"Alice\"}"
+     :hash-match "false"
+     :parity-fail "true (critical data loss)"
+     :count-this-as "1 divergence"}
+    {:scenario "1000 divergence in 1 million requests"
+     :requests-sampled 1000000
+     :divergence-count 1000
+     :divergence-rate "0.1%"
+     :trigger-threshold "1.0%"
+     :result "0.1% < 1.0%, does NOT trigger (acceptable variance)"
+     :note "Phase 2 sentinel requires < 0.01%, but auto-trigger is 1% (allows some margin)"}
+    {:scenario "50,000 divergence in 1 million requests"
+     :requests-sampled 1000000
+     :divergence-count 50000
+     :divergence-rate "5.0%"
+     :sustained-duration "2+ minutes"
+     :result "5.0% > 1.0%, triggered immediately"
+     :action "Automatic FULL ROLLBACK to Phase 2"}]
+
+   :automatic-action
+   [:step-1-detect-violation "Parity checker alert fires (divergence rate ≥ 1% sustained > 60s)"
+    :step-2-route-alert "Alertmanager routes to #prod-gates-wave5 + PagerDuty"
+    :step-3-execute-rollback "Automated script: murakumo/rollback.cljs --trigger parity --rollback-to PHASE-2-FULL"
+    :step-4-notify-team "Slack alert: 'AUTOMATIC ROLLBACK: Parity divergence (XXX divergence per 1M requests), FULL rollback to Phase 2 (50% / 50%)'"
+    :step-5-escalate "Escalation-lead immediately alerts canary-lead + owner (parity failure is data consistency issue)"
+    :step-6-log-decision "Escalation-lead: '[AUTOMATIC FULL ROLLBACK] Parity divergence. Post-incident review required.'"]
+
+   :rollback-target-always "Phase 2 (50% cljc / 50% Rust) — FULL rollback, regardless of current stage"
+
+   :why-full-rollback "Parity divergence indicates data inconsistency or semantic mismatch.
+                       Reducing load (e.g., 90% → 75%) will NOT fix the bug.
+                       Must exit cljc fleet entirely and investigate root cause."
+
+   :prometheus-alert-rule
+   "groups:
+      - name: murakumo-parity-triggers
+        rules:
+          - alert: ParityDivergenceTrigger
+            expr: |
+              rate(murakumo_parity_checker_divergence_total[1m])
+              /
+              rate(murakumo_parity_checker_total_requests[1m])
+              >= 0.01
+            for: 1m
+            labels:
+              severity: critical
+              team: murakumo-ops
+              action: automatic-rollback-full
+            annotations:
+              summary: 'Parity divergence detected (rate={{ $value }}% >= 1% threshold)'
+              description: 'Data consistency failure detected. FULL automatic rollback to Phase 2 initiated.'
+              runbook: 'MONTH-3-ROLLBACK-PROCEDURE.md#trigger-2-parity-divergence'"
+
+   :test-procedure
+   {:test-date "2026-09-08 (fire-drill day)"
+    :action "Simulate: parity checker detects 1% divergence on 100K sample"
+    :method "Staging environment with intentional response delta (JSON field missing)"
+    :expected-result "Alert fires after 60s, full rollback script executes"
+    :verification "Confirm: traffic 100% Rust within < 2 min"}
+
+   :post-incident-investigation
+   {:trigger-action "STOP canary, full rollback to Phase 2"
+    :investigation-phase "Root cause analysis: what code path caused divergence?"
+    :questions
+    ["Which API endpoints diverged?"
+     "Which users/requests were affected?"
+     "Is this a transient bug or permanent semantic issue?"
+     "Can the bug be fixed in cljc without breaking Rust?"
+     "Do we need to add parity skip-list for acceptable divergence (e.g., field ordering)?"]}
+
+   :tuning-notes
+   ["Threshold 1% is conservative (Phase 2 pre-flight requires < 0.01%)"
+    "60-second sustained window prevents false positives from sampling variance"
+    "If parity checker is noisy: review skip-list (acceptable field reorderings, timestamp precision)"
+    "If divergence is structural (not just field order): likely semantic bug, needs fix in cljc code"]}
+
+  :rollback/trigger-3-reliability-spike
+  {:seq 3
+   :name "Reliability Failure (HTTP 5xx error spike)"
+   :severity "HIGH"
+   :metric "murakumo_errors_total (5xx bucket) / murakumo_requests_total"
+   :baseline-value "< 0.01% (< 1 error per 10K requests)"
+   :trigger-threshold "1.0% error rate (1 error per 100 requests)"
+   :sustained-duration-minutes 2
+   :trigger-condition "HTTP 5xx rate ≥ 1% sustained for ≥ 2 minutes"
+
+   :example-scenarios
+   [{:scenario "Connection pool exhaustion"
+     :cause "cljc fleet connection pool maxed out (too many concurrent requests)"
+     :observed-5xx-rate "3% (30 errors per 1000 requests)"
+     :duration "5+ minutes"
+     :result "Triggered immediately (> 1% * > 2 min)"
+     :action "Automatic rollback to previous stage (reduce load)"}
+    {:scenario "Temporary database outage"
+     :cause "kgraph datastore unreachable for 90 seconds"
+     :observed-5xx-rate "100% (all requests fail)"
+     :duration "90 seconds"
+     :result "Triggered after 2 min? NO, resolved by then. But if sustained > 2 min → triggered."
+     :note "Transient outages < 2 min are NOT triggered (allow time for automatic recovery)"}
+    {:scenario "Memory exhaustion GC"
+     :cause "Full GC pause causes response timeout (client sees 500)"
+     :observed-5xx-rate "5% spike for 30 seconds"
+     :duration "30 seconds"
+     :result "NOT triggered (< 2 min sustained)"
+     :note "GC-induced 5xx spikes should be short; if sustained > 2 min → likely deeper issue"}
+    {:scenario "Application bug: null pointer exception"
+     :cause "New code path in cljc causes NullPointerException"
+     :observed-5xx-rate "10% (100 errors per 1000 requests)"
+     :duration "sustained until rollback"
+     :result "Triggered at 2 min mark, rollback executes"}]
+
+   :automatic-action
+   [:step-1-detect-violation "Alert fires (5xx rate ≥ 1% sustained > 2 min)"
+    :step-2-route-alert "Alertmanager → #prod-gates-wave5 + PagerDuty"
+    :step-3-execute-rollback "Script: murakumo/rollback.cljs --trigger reliability --rollback-to <previous-stage>"
+    :step-4-notify-team "Slack alert: 'AUTOMATIC ROLLBACK: Reliability failure (5xx rate=XX%), reverted to YY% traffic'"
+    :step-5-investigate "Monitoring-lead retrieves error logs (last 5 min) from JVM logs / cljc fleet"
+    :step-6-log-decision "Escalation-lead: '[AUTOMATIC ROLLBACK] 5xx spike at Stage X. Error logs captured for root cause analysis.'"]
+
+   :rollback-targets
+   {:stage-1-rollback-to "50% cljc / 50% Rust"
+    :stage-2-rollback-to "75% cljc / 25% Rust"
+    :stage-3a-rollback-to "90% cljc / 10% Rust"
+    :stage-3b-rollback-to "99% cljc / 1% Rust"}
+
+   :prometheus-alert-rule
+   "groups:
+      - name: murakumo-reliability-triggers
+        rules:
+          - alert: ReliabilityFailureTrigger
+            expr: |
+              rate(murakumo_http_errors_5xx_total[1m])
+              /
+              rate(murakumo_http_requests_total[1m])
+              >= 0.01
+            for: 2m
+            labels:
+              severity: high
+              team: murakumo-ops
+              action: automatic-rollback
+            annotations:
+              summary: '5xx error spike detected (rate={{ $value }}% >= 1% threshold)'
+              description: 'HTTP 5xx error rate sustained > 2 min. Automatic rollback initiated.'
+              runbook: 'MONTH-3-ROLLBACK-PROCEDURE.md#trigger-3-reliability'"
+
+   :test-procedure
+   {:test-date "2026-09-08 (fire-drill)"
+    :action "Simulate: inject 5xx errors on cljc fleet (e.g., kill connection pool)"
+    :method "Staging environment, force 5% 5xx error rate"
+    :expected-result "Alert fires at 2 min, rollback executes"
+    :verification "Confirm: traffic reduced, 5xx rate drops"}
+
+   :error-classification
+   {:connection-pool-exhaustion "Escalate to canary-lead (need to scale cljc fleet or reduce traffic)"
+    :timeout-errors "Check kgraph latency (if elevated, may explain 5xx)"
+    :application-exception "Retrieve logs, identify code path, plan fix"
+    :cascading-failure "Immediate full rollback (do not wait for 2 min), escalate to owner"}
+
+   :tuning-notes
+   ["Threshold 1% is aggressive (Phase 2 pre-flight requires < 0.01%)"
+    "2-minute sustained window allows time for automatic circuit-breaker recovery"
+    "If cascading failures suspected: consider lowering threshold to 0.5% or duration to 90s"]}
+
+  :rollback/trigger-4-memory-exhaustion
+  {:seq 4
+   :name "Memory Exhaustion (JVM heap spike)"
+   :severity "HIGH"
+   :metric "jvm_memory_heap_used_bytes (per-instance)"
+   :baseline-value "< 256MB post-GC"
+   :trigger-threshold "512MB (2x baseline)"
+   :sustained-duration-minutes 2
+   :trigger-condition "Per-instance heap peak ≥ 512MB sustained for ≥ 2 minutes"
+
+   :example-scenarios
+   [{:scenario "Memory leak in new cljc code"
+     :heap-growth "starts 150MB, grows 50MB/min for 5 min"
+     :final-heap "400MB (still below 512MB)"
+     :result "NOT triggered (< 512MB threshold)"
+     :note "But trending suspicious, canary-lead should be alerted"}
+    {:scenario "Sudden memory spike"
+     :cause "Large data structure allocated (e.g., session cache)"
+     :heap-before "100MB"
+     :heap-after "700MB (within seconds)"
+     :gc-triggered "Full GC initiated, reclaims to 250MB"
+     :sustained "stays 300-400MB for 3+ minutes"
+     :result "Peak was 700MB > 512MB, and sustained 300MB+ for 3 min → TRIGGERED at 2 min mark"}
+    {:scenario "Heap oscillation (normal GC)"
+     :heap-pattern "150MB → 500MB (pre-GC) → 100MB (post-GC) → repeat"
+     :frequency "every 3 minutes"
+     :peak-value "500MB (touches but does not exceed 512MB)"
+     :result "NOT triggered (peak < 512MB, and GC is resolving)"
+     :note "If oscillation peak exceeds 512MB → triggered"}]
+
+   :automatic-action
+   [:step-1-detect-violation "Alert fires (heap peak ≥ 512MB sustained > 2 min on any node)"
+    :step-2-route-alert "Alertmanager → #prod-gates-wave5 + PagerDuty"
+    :step-3-execute-rollback "Script: murakumo/rollback.cljs --trigger memory --rollback-to <previous-stage>"
+    :step-4-notify-team "Slack alert: 'AUTOMATIC ROLLBACK: Memory exhaustion (heap peak=XXX MB on node YY), reverted to ZZ% traffic'"
+    :step-5-capture-heap-dump "Monitoring system automatically triggers heap dump (background, non-blocking)"
+    :step-6-investigate "Post-incident: analyze heap dump for leak patterns"
+    :step-7-log-decision "Escalation-lead: '[AUTOMATIC ROLLBACK] Memory exhaustion. Heap dump saved to Backblaze B2 for analysis.'"]
+
+   :rollback-targets
+   {:any-stage-rollback-to "Previous stage (reduce load, less memory pressure)"}
+
+   :prometheus-alert-rule
+   "groups:
+      - name: murakumo-memory-triggers
+        rules:
+          - alert: MemoryExhaustionTrigger
+            expr: |
+              (jvm_memory_heap_used_bytes / 1024 / 1024) > 512
+            for: 2m
+            labels:
+              severity: high
+              team: murakumo-ops
+              action: automatic-rollback
+            annotations:
+              summary: 'JVM heap peak alert ({{ $value }} MB > 512 MB threshold)'
+              description: 'Per-instance heap memory sustained > 2 min. Automatic rollback initiated.'
+              runbook: 'MONTH-3-ROLLBACK-PROCEDURE.md#trigger-4-memory'"
+
+   :test-procedure
+   {:test-date "2026-09-08 (fire-drill)"
+    :action "Simulate: inject memory leak on cljc fleet node"
+    :method "Allocate large object without releasing (e.g., unbounded cache)"
+    :expected-result "Heap grows to 600MB, alert fires at 2 min, rollback executes"
+    :verification "Confirm: heap pressure reduced after rollback"}
+
+   :post-incident-analysis
+   {:heap-dump-location "Backblaze B2: murakumo/heap-dumps/<timestamp>-heap.hprof"
+    :analysis-tool "Eclipse Memory Analyzer / JProfiler"
+    :questions
+    ["What objects are holding memory?"
+     "Is there a leak (growth unbounded) or temporary spike (GC resolves)?"
+     "Which cljc code is allocating?"
+     "Can the code be optimized or pooled to prevent leak?"]
+    :fix-deployment "If leak identified: hot-fix cljc code, redeploy, restart canary from same stage"
+    :scaling-alternative "If leak is fundamental: may need to scale cljc fleet (more instances, each using less)"}
+
+   :tuning-notes
+   ["Baseline 256MB chosen based on Phase 2 observations at 50% traffic"
+    "Trigger 512MB is 2x baseline (conservative, prevents OOM killer)"
+    "If cljc fleet consistently runs 300-400MB: adjust baseline up to 400MB (and trigger to 800MB)"
+    "If memory creeps toward 512MB without GC triggering: may indicate ZGC tuning issue → escalate"]}
+
+  :rollback/monitoring-and-testing
+  {:automated-monitoring "All 4 triggers are monitored continuously by Prometheus + Alertmanager"
+   :alert-routing
+   {:latency-alert "#prod-gates-wave5 (Slack) + PagerDuty"
+    :parity-alert "#prod-gates-wave5 (Slack) + PagerDuty (immediate escalation)"
+    :reliability-alert "#prod-gates-wave5 (Slack) + PagerDuty"
+    :memory-alert "#prod-gates-wave5 (Slack) + PagerDuty"}
+
+   :override-mechanism
+   {:automatic-rollback-can-be-delayed-by "Owner only (canary-lead decision)"
+    :delay-sla "Maximum 15 minutes (must document reason in Slack)"
+    :example-override "Owner: 'Delay rollback 10 min, deploying app fix to cljc fleet'"
+    :note "Override does NOT disable subsequent triggers; they still fire independently"}
+
+   :fire-drill-timeline
+   {:date "2026-09-08 (1 day before gate decision)"
+    :time "14:00 to 16:00 JST (2 hours)"
+    :scenario-1-time "14:05 to 14:15"
+    :scenario-1-name "Latency Regression Rollback (10 min)"
+    :scenario-2-time "14:20 to 14:30"
+    :scenario-2-name "Parity Divergence Full Rollback (10 min)"
+    :scenario-3-time "14:35 to 14:50"
+    :scenario-3-name "Reliability + Memory Combined (15 min)"
+    :debrief-time "14:50 to 16:00"}
+
+   :pre-deployment-verification
+   {:verification-date "2026-09-08 after fire-drill"
+    :checklist
+    ["✓ All 4 Prometheus alert rules deployed and firing correctly"
+     "✓ Alertmanager routing configured (Slack + PagerDuty)"
+     "✓ Rollback scripts deployed to traffic-controller node"
+     "✓ Scripts tested in staging (each trigger scenario)"
+     "✓ Team trained on alert response and escalation"
+     "✓ Runbook links in Prometheus annotations (point to MDN)"]
+    :sign-off-required "Monitoring-lead + ops-lead must sign off: 'All triggers operational'"}}
+
+  :rollback/documentation-and-audit
+  {:audit-log "Every rollback (automatic or manual) logged in #prod-gates-wave5 thread"
+   :log-template
+   "{:timestamp \"2026-09-11T13:05:00Z\"
+     :trigger \"latency-regression\"
+     :severity \"critical\"
+     :metric-value \"p99=210ms\"
+     :sustained-duration \"5m12s\"
+     :rollback-from \"75% cljc / 25% Rust\"
+     :rollback-to \"50% cljc / 50% Rust\"
+     :execution-time-seconds 87
+     :status \"success\"
+     :post-rollback-metric \"p99=95ms (normal)\"
+     :notes \"GC pause identified as root cause, needs tuning investigation\"}"
+
+   :incident-record
+   "If rollback required investigation or root cause unknown:
+    Create `90-docs/adr/MONTH-3-INCIDENT-<trigger-type>-<date>.edn`
+    (e.g., 90-docs/adr/MONTH-3-INCIDENT-PARITY-2026-09-11.edn)
+    Document trigger, timeline, root cause, fix plan, and post-incident prevention."
+
+   :metrics-for-post-incident
+   ["Time from trigger condition to alert (should be < 30s)"
+    "Time from alert to automatic rollback execution (should be < 2 min)"
+    "Time from rollback to SLO recovery (should be < 5 min)"
+    "False positive count (should be < 10% of total alerts)"]}
+
+  :adr/related ["2607072100-kotoba-server-fleet-deployment-strangler-fig.edn"
+                "2607072400-kaisha-pod-murakumo-fleet-deployment.edn"]}]

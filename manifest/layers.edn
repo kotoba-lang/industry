@@ -1,0 +1,110 @@
+;; manifest/layers.edn — layer taxonomy for the west multirepo workspace.
+;; ADR-2607171100 D6. 旧単一monorepo の番号 dir (00-〜90-) の後継。
+;; 消費者: scripts/gen-west-manifest.cljs (west groups 付与、Wave 2)
+;;         scripts/verify-layer-deps.cljs (依存方向 lint、Wave 3)
+{:manifest.layers/version 1
+ :manifest.layers/adr "adr-2607171100-west-layer-taxonomy-root-dissolution"
+
+ ;; layer 定義: 旧番号 dir → west group。:naming は repo 命名規約 (glob)。
+ :manifest.layers/layers
+ [{:layer :layer-contracts :legacy-dir "00-contracts"
+   :naming ["*-contracts" "*-lexicons"]
+   :doc "schema / lexicon / policy / 契約束。単一版で配布する"}
+  {:layer :layer-protocol :legacy-dir "10-protocol"
+   :naming ["<protocol-name>" "*-client"]
+   :doc "プロトコル実装は 1 プロトコル = 1 repo (xrpc, did-*, warifu, signal*)。旧 50-clients はここに吸収"}
+  {:layer :layer-actor :legacy-dir "20-actors"
+   :naming ["com-etzhayyim-*" "gftd-*-actor" "*-actor"]
+   :doc "ドメイン actor。1 domain = 1 repo"}
+  {:layer :layer-graph :legacy-dir "30-graph"
+   :naming ["kagami" "kg-*"]}
+  {:layer :layer-engine :legacy-dir "40-engine"
+   :naming ["kami-*" "*-engine"]
+   :doc "ADR-2607171000 engine split-now の一般化。Rust は git rev 依存、path 依存禁止"}
+  {:layer :layer-infra :legacy-dir "50-infra"
+   :naming ["*-infra" "*-did-web" "*-pds-*" "deploy-*"]}
+  {:layer :layer-app :legacy-dir "60-apps"
+   :naming ["app-*" "*-app" "ai-gftd-*"]}
+  {:layer :layer-tools :legacy-dir "70-tools"
+   :naming ["*-tools"]
+   :doc "workspace 横断 tool のみ superproject 70-tools/ に残留可"}
+  {:layer :layer-data :legacy-dir "80-data"
+   :naming ["*-datoms" "*-data"]
+   :doc "大容量は DataLad (datalad group, B2 annex) へ"}
+  {:layer :layer-docs :legacy-dir "90-docs"
+   :naming []
+   :doc "ADR は superproject 90-docs/adr に集約。org 固有 doc は各 repo 内 90-docs/"}]
+
+ ;; 依存方向 DAG: [依存する側 依存される側] のみ許可。逆方向は lint error。
+ ;; 旧番号の大小関係 (上位番号→下位番号に依存可) の後継。
+ :manifest.layers/dependency-dag
+ [[:layer-protocol :layer-contracts]
+  [:layer-actor :layer-protocol]
+  [:layer-actor :layer-contracts]
+  [:layer-graph :layer-protocol]
+  [:layer-graph :layer-contracts]
+  [:layer-engine :layer-protocol]
+  [:layer-engine :layer-contracts]
+  [:layer-app :layer-actor]
+  [:layer-app :layer-graph]
+  [:layer-app :layer-engine]
+  [:layer-app :layer-protocol]
+  [:layer-app :layer-contracts]
+  ;; layer-data は被依存のみ (どの層からも参照可)。
+  [:layer-protocol :layer-data]
+  [:layer-actor :layer-data]
+  [:layer-graph :layer-data]
+  [:layer-engine :layer-data]
+  [:layer-app :layer-data]]
+ ;; layer-infra / layer-tools は依存されない側 (deploy 対象・開発時 tool)。
+ ;; layer-docs は依存なし・被依存なし。
+ :manifest.layers/no-inbound-edges [:layer-infra :layer-tools :layer-docs]
+
+ ;; repo 内部に許可される番号 dir。これ以外 (00-〜70-) の新設は lint error。
+ :manifest.layers/repo-internal-allowed ["90-docs" "80-data"]
+
+ ;; 既存 repo の番号 dir 実績 (段階的平坦化対象、Phase 4)。新規追加のみ禁止。
+ ;; verify-layer-deps.cljs --report の実測から生成 (2026-07-17)。
+ ;;
+ ;; ⚠ このリストのキーは **west path** であって repo の identity ではない。
+ ;; GitHub の org 移管・rename で path が動くと、免除は動かずに残り、同じ repo が
+ ;; 新しい path で違反として再登場する。**免除が消えたのではなく、宛先が変わった
+ ;; だけ**なのに、出てくる形は「番号 dir が新設された」と区別がつかない。
+ ;; 2026-08-13 の実測 (ADR-2608132600): 標準 red 7 件は全てこれで、1 件も新設では
+ ;; なかった。同一性は GitHub repo id で確認し、番号 dir の追加日は
+ ;; `git log --diff-filter=A` で 2026-04-08〜06-26 — layers.edn がリストを凍結した
+ ;; 2026-07-17 より前であることを確かめた。
+ ;;
+ ;;   gftdcojp/app-aozora   → network-awai/app-aozora    (gh id 1275051908)
+ ;;   gftdcojp/club-shinshi → network-awai/club-shinshi  (gh id 1281275923)
+ ;;   etzhayyim/com-etzhayyim-kenchi → cloud-itonami/kenchi (gh id 1282142295)
+ ;;
+ ;; path を書き換えるときは gh id が一致することを必ず確認する。一致しないなら
+ ;; それは移管ではなく **新しい repo への免除の拡大**で、このリストがやってはい
+ ;; けないこと。
+ :manifest.layers/grandfathered-internal-dirs
+ ["orgs/cloud-itonami/kenchi"
+  "orgs/network-awai/app-aozora"
+  "orgs/network-awai/club-shinshi"]
+
+ ;; 参照ルール (ADR-2607171100 D3)
+ :manifest.layers/reference-rules
+ {:workspace-internal :local-root-relative   ; orgs/<org>/<repo> 固定パスが ABI
+  :version-authority :west-pin               ; deps に version を書かない
+  :workspace-external {:coords :git-url+git-sha :sha-must-equal :west-pin}
+  :rust :git-rev-no-path-deps
+  :vendoring :forbidden}
+
+ ;; freeze 対象 (Phase 0): 番号 dir 配下への新規追加を CI guard で拒否。
+ ;;
+ ;; `ai-gftd-apps-gftdcojp` は 2026-08 までに `apps-gftdcojp` へ rename されている
+ ;; (gh id 1136866292 が両方に解決する)。west.yml が登録しているのは新しい path
+ ;; だけだが、**古い path の checkout がディスク上に残っている** (2026-07-20 の tip、
+ ;; west 未登録の orphan)。verify-layer-deps は west ではなくディスクを歩くので、
+ ;; 片方だけを書くと必ずもう片方が違反として出る。両方を書き、orphan の掃除は
+ ;; ADR-2608122128 の orphan repair 側で扱う (掃除が済んだら下の行を消す)。
+ :manifest.layers/frozen-legacy-roots
+ ["orgs/etzhayyim/root"
+  "orgs/gftdcojp/apps-gftdcojp"
+  ;; ↓ west 未登録の orphan checkout。同一 upstream (gh id 1136866292)。
+  "orgs/gftdcojp/ai-gftd-apps-gftdcojp"]}

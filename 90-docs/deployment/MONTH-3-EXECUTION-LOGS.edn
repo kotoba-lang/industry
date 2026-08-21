@@ -1,0 +1,86 @@
+[{:deployment/id "month-3-strangler-fig-2026-09"
+  :deployment/adr "adr-2607072100-kotoba-server-fleet-deployment-strangler-fig"
+  :deployment/phase "3-final-validation-cutover"
+  :deployment/start-date "2026-09-11"
+  :deployment/end-date "2026-09-30"
+  :deployment/status "ready-for-execution"
+  :deployment/created-date "2026-07-21"
+  :deployment/owner "Jun Kawasaki"
+  :db/id -1
+
+  :execution/phase-3-1-sentinel [
+    {:date "2026-09-11" :day 1 :event "sentinel-start" :traffic-pct 50 :status "scheduled"}
+    {:date "2026-09-11" :time "09:00Z" :action "gather-24h-baseline-metrics" :status "scheduled"}
+    {:date "2026-09-11" :time "10:00Z" :action "compare-to-phase-2-baseline" :status "scheduled"}
+    {:date "2026-09-12" :day 2 :event "daily-review" :traffic-pct 50 :status "scheduled"}
+    {:date "2026-09-13" :day 3 :event "daily-review" :traffic-pct 50 :status "scheduled"}
+    {:date "2026-09-14" :day 4 :event "daily-review" :traffic-pct 50 :status "scheduled"}
+    {:date "2026-09-15" :day 5 :event "daily-review" :traffic-pct 50 :status "scheduled"}
+    {:date "2026-09-16" :day 6 :event "daily-review" :traffic-pct 50 :status "scheduled"}
+    {:date "2026-09-17" :day 7 :event "daily-review" :traffic-pct 50 :status "scheduled"}
+    {:date "2026-09-17" :time "15:00Z" :action "go-no-go-gate" :decision "pending" :status "scheduled"}
+  ]
+
+  :execution/phase-3-2-traffic-migration [
+    {:date "2026-09-18" :step 1 :from-pct 50 :to-pct 75 :event "traffic-ramp" :status "scheduled"}
+    {:date "2026-09-19" :window-day 1 :traffic-pct 75 :event "stability-window" :status "scheduled"}
+    {:date "2026-09-20" :window-day 2 :traffic-pct 75 :event "stability-window" :status "scheduled"}
+    {:date "2026-09-21" :step 2 :from-pct 75 :to-pct 90 :event "traffic-ramp" :status "scheduled"}
+    {:date "2026-09-22" :window-day 1 :traffic-pct 90 :event "stability-window" :status "scheduled"}
+    {:date "2026-09-23" :window-day 2 :traffic-pct 90 :event "stability-window" :status "scheduled"}
+    {:date "2026-09-24" :window-day 3 :traffic-pct 90 :event "stability-window" :status "scheduled"}
+    {:date "2026-09-25" :step 3 :from-pct 90 :to-pct 99 :event "traffic-ramp" :status "scheduled"}
+    {:date "2026-09-26" :window-day 1 :traffic-pct 99 :event "stability-window" :status "scheduled"}
+    {:date "2026-09-27" :window-day 2 :traffic-pct 99 :event "stability-window" :status "scheduled"}
+    {:date "2026-09-28" :window-day 3 :traffic-pct 99 :event "stability-window" :status "scheduled"}
+    {:date "2026-09-29" :step 4 :from-pct 99 :to-pct 100 :event "final-cutover" :status "scheduled"}
+  ]
+
+  :execution/phase-3-3-rust-shutdown [
+    {:phase "A" :name "disable-health-checks" :date "2026-09-25" :time "16:00Z" :status "scheduled" :description "Signal LB that Rust nodes are draining"}
+    {:phase "B" :name "drain-connections" :start-date "2026-09-26" :end-date "2026-09-28" :timeout-hours 72 :status "scheduled" :description "Wait for in-flight requests to complete"}
+    {:phase "C" :name "stop-rust-nodes" :date "2026-09-29" :status "scheduled" :description "Gracefully shutdown kotoba-server processes"}
+    {:phase "D" :name "verify-stopped" :date "2026-09-29" :status "scheduled" :description "Confirm all Rust nodes offline"}
+    {:phase "E" :name "archive-to-b2" :start-date "2026-09-29" :end-date "2026-09-30" :status "scheduled" :description "Archive logs/state to B2+DataLad"}
+    {:phase "F" :name "config-update" :date "2026-09-30" :time "12:00Z" :status "scheduled" :description "Update deployment config for cljc-only"}
+  ]
+
+  :metrics/slo-targets {
+    :p50-latency-ms {:target 70 :phase "3"}
+    :p95-latency-ms {:target 95 :phase "3"}
+    :p99-latency-ms {:target 100 :phase "3" :is-hard-gate true}
+    :parity-failure-pct {:target 0.01 :phase "3" :is-hard-gate true}
+    :http-5xx-pct {:target 0.01 :phase "3" :is-hard-gate true}
+    :memory-peak-mb {:target 256 :phase "3"}
+    :gc-pause-p99-ms {:target 30 :phase "3"}
+  }
+
+  :rollback/automatic-triggers [
+    {:trigger "p99 latency > baseline+100ms sustained 5min" :action "revert-to-previous-safe-state"}
+    {:trigger "parity divergence > 1% sustained 1min" :action "full-revert-to-rust"}
+    {:trigger "HTTP 5xx rate > 1% sustained 2min" :action "full-revert-to-rust"}
+    {:trigger "memory peak > 512MB sustained" :action "revert-and-increase-node-pool"}
+  ]
+
+  :success-criteria [
+    "Sentinel week (2026-09-11 to 2026-09-17): All SLO gates pass"
+    "Owner approve go/no-go decision (2026-09-17)"
+    "Traffic ramp: 50% → 75% → 90% → 99% complete (each step + 3-day stability)"
+    "Rust fleet graceful shutdown: All 6 phases complete"
+    "Final cutover: 100% traffic on cljc mesh nodes"
+    "Rust pool decommissioned: No processes, no health checks, archived"
+    "Config updated: cljc-only production mode active"
+    "Audit trail: Complete logs in B2 + DataLad"
+    "Monitoring: All dashboards transitioned to cljc-only"
+    "Post-deployment stabilization ready (Phase 4+)"
+  ]
+
+  :execution/notes [
+    "This log file tracks Month 3 execution (2026-09-11 to 2026-09-30)"
+    "Do NOT hand-edit. Use fleet-ops-log.cljs to append new events"
+    "Every event must include: date, time (UTC), action, status, any metrics deltas"
+    "Rollback events should include: trigger reason, from-state, to-state, root cause"
+    "Archive this file weekly to: 90-docs/deployment/month-3-strangler-fig-archive-YYYYMMDD.edn"
+  ]
+
+  :deployment/archive-location "90-docs/deployment/month-3-strangler-fig-2026-09-18.edn"}]

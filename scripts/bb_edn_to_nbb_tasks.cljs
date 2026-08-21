@@ -1,0 +1,284 @@
+#!/usr/bin/env nbb
+;; Convert a large bb.edn (mostly clojure/shell tasks) into nbb-native task runner.
+;;
+;;   nbb scripts/bb_edn_to_nbb_tasks.cljs --repo /path/to/repo [--dry-run] [--force-delete-bb]
+;;
+;; Emits:
+;;   scripts/tasks.edn      — shellable tasks
+;;   scripts/run-task.cljs  — self-contained nbb dispatcher (no superproject deps)
+;;   scripts/tasks-complex.edn — hand-port backlog
+;;   nbb.edn / package.json updates
+;; Deletes bb.edn when --force-delete-bb or zero complex tasks.
+(require '[clojure.edn :as edn]
+         '[clojure.string :as str]
+         '[scripts.nbb-compat :refer [slurp spit exit]])
+
+(def fs (js/require "node:fs"))
+(def path (js/require "node:path"))
+
+(defn- parse-args [args]
+  (loop [xs (vec args) m {:dry-run? false :force-delete? false :repo nil}]
+    (cond
+      (empty? xs) m
+      (= "--repo" (first xs)) (recur (subvec xs 2) (assoc m :repo (second xs)))
+      (= "--dry-run" (first xs)) (recur (subvec xs 1) (assoc m :dry-run? true))
+      (= "--force-delete-bb" (first xs)) (recur (subvec xs 1) (assoc m :force-delete? true))
+      :else (recur (subvec xs 1) m))))
+
+(defn- task-body [t] (if (map? t) (:task t) t))
+
+(defn- simple-args? [xs]
+  (every? #(or (string? %) (number? %)) xs))
+
+(defn- tokenize
+  "Split one shell command line into argv, honouring single and double quotes.
+
+  `babashka.process/shell` accepts EITHER a pre-split argv OR a single string
+  that it tokenizes itself, and `(shell \"cmd arg\")` is by far the commoner
+  spelling in the bb.edn files being converted. The generated runner spawns
+  with `:shell false` and uses `(first argv)` as the executable, so emitting
+  that single string unsplit produced `:cmd [\"echo hi\"]` — an attempt to exec
+  a binary literally named `echo hi`.
+
+  It failed silently: `spawnSync` on a missing executable returns
+  `status: nil`, the runner does `(or (.-status r) 1)`, and the spawn error is
+  discarded — so the task exited 1 having printed nothing at all. Measured
+  2026-08-13 against the unmodified generator.
+
+  Deliberately not a shell: no globbing, no substitution, no pipes. Those never
+  survived the conversion anyway, because the runner does not use a shell."
+  [s]
+  (loop [cs (seq s) cur nil out [] quote nil]
+    (if-not cs
+      (cond-> out cur (conj (apply str cur)))
+      (let [c (first cs) r (next cs)]
+        (cond
+          quote (if (= c quote)
+                  (recur r (or cur []) out nil)
+                  (recur r (conj (or cur []) c) out quote))
+          (or (= c \") (= c \')) (recur r (or cur []) out c)
+          (or (= c \space) (= c \tab))
+          (recur r nil (cond-> out cur (conj (apply str cur))) nil)
+          :else (recur r (conj (or cur []) c) out nil))))))
+
+(defn- form->cmd
+  "Return {:cmd [..] :pass-args? bool} or nil."
+  [form]
+  (cond
+    (nil? form) nil
+    (and (seq? form) (= 'shell (first form)))
+    (let [args (rest form)
+          args (if (map? (first args)) (rest args) args)]
+      (when (simple-args? args)
+        (let [strs (mapv str args)]
+          ;; One argument that contains whitespace is a command LINE, not an
+          ;; executable name -- see tokenize's docstring.
+          {:cmd (if (and (= 1 (count strs)) (re-find #"\s" (first strs)))
+                  (tokenize (first strs))
+                  strs)
+           :pass-args? false})))
+    (and (seq? form) (= 'clojure (first form)))
+    (let [args (rest form)]
+      (when (simple-args? args)
+        {:cmd (into ["clojure"] (map str args)) :pass-args? false}))
+    (and (seq? form) (= 'apply (first form)) (= 'clojure (second form)))
+    (let [args (drop 2 form)
+          fixed (vec (take-while string? args))]
+      (when (seq fixed)
+        {:cmd (into ["clojure"] fixed) :pass-args? true}))
+    (and (seq? form) (= 'apply (first form)) (= 'shell (second form)))
+    (let [args (drop 2 form)
+          ;; (apply shell "nbb" "-m" "x" *command-line-args*)
+          fixed (vec (take-while string? args))]
+      (when (seq fixed)
+        {:cmd fixed :pass-args? true}))
+    :else nil))
+
+(defn- expand-do-runs
+  "If body is (do (run 'a) (run 'b) …) return symbols a b …"
+  [form]
+  (when (and (seq? form) (= 'do (first form)))
+    (let [runs (rest form)]
+      (when (every? #(and (seq? %) (= 'run (first %)) (seq? (second %)) (= 'quote (first (second %))))
+                    runs)
+        (mapv #(second (second %)) runs)))))
+
+(defn- task-key-str [k]
+  (cond
+    (string? k) k
+    (keyword? k) (clojure.core/name k)
+    (symbol? k) (clojure.core/name k)
+    :else (str k)))
+
+(defn- classify-task [task-key t]
+  (let [body (task-body t)
+        s (pr-str t)
+        runs (expand-do-runs body)
+        cmd (form->cmd body)
+        nm (task-key-str task-key)]
+    (cond
+      runs
+      {:name nm :kind :alias :runs (mapv task-key-str runs) :doc (:doc t)}
+      cmd
+      {:name nm :kind :shell :cmd (:cmd cmd) :pass-args? (:pass-args? cmd) :doc (:doc t)}
+      (or (str/includes? s ":requires")
+          (str/includes? s "load-file")
+          (str/includes? s "System/"))
+      {:name nm :kind :complex :doc (:doc t) :form (pr-str body)}
+      :else
+      {:name nm :kind :unknown :doc (:doc t) :form (pr-str body)})))
+
+(defn- write! [p content dry?]
+  (if dry?
+    (do (println "--- would write" p "---") (println (subs content 0 (min 400 (count content)))))
+    (do (.mkdirSync fs (.dirname path p) #js {:recursive true})
+        (spit p content)
+        (println "wrote" p))))
+
+(def run-task-src
+  "#!/usr/bin/env nbb
+;; Auto-generated by bb_edn_to_nbb_tasks.cljs (ADR-2607173000).
+;;   nbb scripts/run-task.cljs <task> [args…]
+(require '[clojure.edn :as edn]
+         '[clojure.string :as str])
+
+(def fs (js/require \"node:fs\"))
+(def path (js/require \"node:path\"))
+(def cp (js/require \"node:child_process\"))
+
+(defn- sh [argv]
+  (let [r (.spawnSync cp (first argv) (to-array (rest argv))
+                      #js {:encoding \"utf8\" :stdio \"inherit\" :shell false})]
+    ;; A child that never started, and one killed by a signal, BOTH report
+    ;; status:null and land on the synthetic exit 1 -- with nothing printed,
+    ;; because stdio is inherited and there was no child to write anything.
+    ;; Say which it was: an exit 1 with no output is indistinguishable from a
+    ;; command that ran and failed quietly.
+    (when-let [e (.-error r)]
+      (js/console.error \"run-task: could not start\" (pr-str argv) \"--\" (.-message e)))
+    (when-let [sig (.-signal r)]
+      (js/console.error \"run-task:\" (pr-str (first argv)) \"killed by signal\" sig))
+    (or (.-status r) 1)))
+
+(def tasks-path (.join path (.dirname path *file*) \"tasks.edn\"))
+(def tasks (edn/read-string (.readFileSync fs tasks-path \"utf8\")))
+
+(defn- resolve-task [task]
+  (or (get tasks (keyword task))
+      (get tasks task)
+      (get tasks (symbol task))))
+
+(defn- run-one [task rest-args]
+  (let [t (resolve-task task)]
+    (when-not t
+      ;; js/console.error, NOT (binding [*out* *err*] (println …)) -- nbb does
+      ;; not honour that binding and the text lands on stdout (ADR-2608130600).
+      (js/console.error \"unknown task:\" task)
+      (js/console.error \"known:\" (str/join \", \" (map name (sort (keys tasks)))))
+      (.exit js/process 2))
+    (cond
+      (:runs t)
+      (doseq [r (:runs t)]
+        (let [code (run-one r rest-args)]
+          (when-not (zero? code) (.exit js/process code))))
+      (:cmd t)
+      (let [argv (if (:pass-args? t)
+                   (into (vec (:cmd t)) rest-args)
+                   (vec (:cmd t)))]
+        (sh argv))
+      :else
+      (do (js/console.error \"bad task entry\" task t)
+          (.exit js/process 2)))))
+
+(let [args (vec *command-line-args*)
+      args (if (and (seq args) (str/includes? (str (first args)) \"run-task\"))
+             (subvec args 1) args)
+      task (first args)
+      rest-args (vec (rest args))]
+  (when-not task
+    (js/console.error \"usage: nbb scripts/run-task.cljs <task> [args…]\")
+    (js/console.error \"tasks:\" (str/join \", \" (map name (sort (keys tasks)))))
+    (.exit js/process 2))
+  (.exit js/process (or (run-one task rest-args) 0)))
+")
+
+(defn convert! [repo {:keys [dry-run? force-delete?]}]
+  (let [bb-path (.join path repo "bb.edn")
+        bb (edn/read-string (slurp bb-path))
+        tasks (:tasks bb)
+        classified (mapv (fn [[k v]] (classify-task k v)) tasks)
+        shellable (filter #(#{:shell :alias} (:kind %)) classified)
+        complex (filter #(#{:complex :unknown} (:kind %)) classified)
+        tasks-edn
+        (into (sorted-map)
+              (for [t shellable]
+                [(keyword (:name t))
+                 (case (:kind t)
+                   :shell (cond-> {:cmd (:cmd t)}
+                            (:pass-args? t) (assoc :pass-args? true)
+                            (:doc t) (assoc :doc (:doc t)))
+                   :alias (cond-> {:runs (:runs t)}
+                            (:doc t) (assoc :doc (:doc t))))]))
+        complex-edn
+        (into (sorted-map)
+              (for [t complex]
+                [(keyword (:name t)) (select-keys t [:kind :doc :form])]))
+        nbb-edn (when (seq (:paths bb))
+                  (str ";; Generated by bb_edn_to_nbb_tasks.cljs (ADR-2607173000).\n"
+                       ";; Note: nbb does not resolve :deps from bb.edn; use sibling :paths or deps.edn+clojure.\n"
+                       (pr-str {:paths (vec (:paths bb))}) "\n"))
+        pkg-path (.join path repo "package.json")
+        pkg (when (.existsSync fs pkg-path)
+              (try (js->clj (js/JSON.parse (slurp pkg-path)) :keywordize-keys true)
+                   (catch :default _ nil)))
+        primary-keys [:test :test-jvm :check :lint :build :dev :release :provider :tui :runner :shell]
+        pkg-scripts (into {"task" "nbb scripts/run-task.cljs"
+                           "tasks" "nbb scripts/run-task.cljs"}
+                          (for [k primary-keys
+                                :when (contains? tasks-edn k)]
+                            [(name k) (str "nbb scripts/run-task.cljs " (name k))]))
+        ;; replace bare `bb ` invocations in existing scripts
+        cleaned-scripts
+        (into {}
+              (for [[k v] (or (:scripts pkg) {})]
+                [k (if (string? v)
+                     (-> v
+                         (str/replace #"\bbb check\b" "npm run check")
+                         (str/replace #"\bbb test\b" "npm test")
+                         (str/replace #"\bbb " "nbb scripts/run-task.cljs "))
+                     v)]))
+        new-pkg (-> (or pkg {:private true})
+                    (assoc :private true)
+                    (assoc :scripts (merge cleaned-scripts pkg-scripts)))]
+    (println "repo" repo)
+    (println "  shellable/alias" (count shellable) "complex" (count complex))
+    (write! (.join path repo "scripts/tasks.edn")
+            (str ";; Auto-generated from bb.edn (ADR-2607173000).\n"
+                 ";; nbb scripts/run-task.cljs <task> [args…]\n"
+                 (pr-str tasks-edn) "\n")
+            dry-run?)
+    (write! (.join path repo "scripts/run-task.cljs") run-task-src dry-run?)
+    (when (seq complex-edn)
+      (write! (.join path repo "scripts/tasks-complex.edn")
+              (str ";; Hand-port backlog from bb.edn (ADR-2607173000).\n"
+                   (pr-str complex-edn) "\n")
+              dry-run?))
+    (when nbb-edn
+      (write! (.join path repo "nbb.edn") nbb-edn dry-run?))
+    (write! pkg-path (str (.stringify js/JSON (clj->js new-pkg) nil 2) "\n") dry-run?)
+    (let [delete? (or force-delete? (empty? complex))]
+      (if delete?
+        (if dry-run?
+          (println "would delete" bb-path)
+          (do (.unlinkSync fs bb-path) (println "deleted" bb-path)))
+        (println "kept bb.edn —" (count complex) "complex; use --force-delete-bb after review")))
+    {:shellable (count shellable) :complex (count complex)}))
+
+(let [raw (vec *command-line-args*)
+      raw (if (and (seq raw) (str/includes? (str (first raw)) "bb_edn_to_nbb_tasks"))
+            (subvec raw 1) raw)
+      opts (parse-args raw)]
+  (when-not (:repo opts)
+    (println "usage: bb_edn_to_nbb_tasks.cljs --repo <path> [--dry-run] [--force-delete-bb]")
+    (exit 2))
+  (convert! (:repo opts) opts))

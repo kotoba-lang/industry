@@ -1,0 +1,312 @@
+[
+;;; Iteration 7 (2026-07-25): closing the three regions the coverage reporter
+;;; flagged as thinnest — Oceania (5 orgs, 3%), Southeast Asia (6, 4%) and the
+;;; Middle East (7, 5%). ADR-2607257200.
+;;; All counts :org/data-provenance "llm-recall-unverified" unless pinned.
+
+;;; ---------- OCEANIA ----------
+
+{:org/id :org-fji-mataqali-vanua
+ :org/form-family :family-commons-management
+ :org/name "Mataqali and vanua landowning units (Fiji)"
+ :org/entity-kind :org-form
+ :org/category :cat-traditional
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-oceania
+ :org/countries ["FJ"]
+ :org/founding-date 1880
+ :org/founding-note "Colonial codification (Native Lands Act) fixed pre-existing descent groups as the legal landholding unit."
+ :org/instance-count-estimate 6000
+ :org/member-count-basis "llm-recall-unverified: mataqali are registered in the Vola ni Kawa Bula (register of native landowners) and number in the thousands; the register is administrative, not published as a community count."
+ :org/legal-registration :registered
+ :org/registration-note "Unusual case: a customary descent group that the state DID register — roughly 87% of Fijian land is inalienable iTaukei land held by mataqali."
+ :org/governance-model :hierarchical
+ :org/mission-statement "Descent-based landholding units receiving lease income collectively, alongside kerekere (customary request/sharing obligation) and village work obligations (solesolevaki)."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-wsm-village-fono-komiti
+ :org/form-family :family-neighborhood-assembly
+ :org/name "Village fono and women's committees (komiti tumama, Samoa and Polynesia)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-oceania
+ :org/countries ["WS" "AS" "TO" "TV"]
+ :org/instance-count-estimate 300
+ :org/member-count-basis "unknown — one fono per village (Samoa has roughly 300 villages); the women's committees beside them are not separately counted."
+ :org/legal-registration :statutory-no-personality
+ :org/registration-note "Samoa's Village Fono Act gives village councils statutory recognition and enforcement powers — customary authority with legal backing rather than merely tolerated."
+ :org/governance-model :consensus
+ :org/mission-statement "Village councils of matai setting and enforcing village rules, paired with women's committees that historically ran village health, sanitation inspection and weaving cooperatives."
+ :org/related-org "org-wsm-matai"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-nzl-marae-committees
+ :org/form-family :family-indigenous-descent-group
+ :org/name "Marae committees and trustees (Aotearoa New Zealand)"
+ :org/entity-kind :org-form
+ :org/category :cat-traditional
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-oceania
+ :org/countries ["NZ"]
+ :org/instance-count-estimate 900
+ :org/member-count-basis "llm-recall-unverified: roughly 900+ marae are commonly cited nationally; each has a committee or trust, and affiliation is by whakapapa rather than enrolment."
+ :org/legal-registration :mixed
+ :org/registration-note "Marae reservations are administered under Te Ture Whenua Māori Act with appointed trustees — registered land, unregistered community."
+ :org/governance-model :consensus
+ :org/mission-statement "Committees maintaining the marae complex and running tangihanga (funerals), hui and kaumātua support — the operating unit of Māori community life beneath iwi and hapū."
+ :org/related-org "org-nzl-iwi-hapu"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-png-incorporated-land-groups
+ :org/form-family :family-commons-management
+ :org/name "Incorporated Land Groups and clan land trusts (Papua New Guinea, Melanesia)"
+ :org/entity-kind :org-form
+ :org/category :cat-resource-commons
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-oceania
+ :org/countries ["PG" "SB" "VU"]
+ :org/founding-date 1974
+ :org/instance-count-estimate 20000
+ :org/member-count-basis "unknown — ILG registrations number in the thousands to tens of thousands and are widely reported as containing fraudulent or contested entries, so the register is not a reliable community count."
+ :org/legal-registration :mixed
+ :org/registration-note "ILGs were created so customary clans could hold a legal identity for resource deals; the mechanism has repeatedly been used to manufacture consent for logging leases (the SABL scandal), which is a caution about formalizing customary groups."
+ :org/governance-model :consensus
+ :org/mission-statement "Clan-based legal vehicles for customary landowners negotiating logging, mining and palm-oil agreements — roughly 97% of PNG land is customary."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-pac-outrigger-canoe-clubs
+ :org/form-family :family-sport-club
+ :org/name "Outrigger canoe and voyaging clubs (Hawaiʻi, Polynesia, Aotearoa waka ama)"
+ :org/entity-kind :org-form
+ :org/category :cat-sports
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-oceania
+ :org/countries ["US" "PF" "NZ" "WS" "FJ"]
+ :org/founding-date 1908
+ :org/instance-count-estimate 500
+ :org/member-count-basis "unknown — national federations (Waka Ama NZ, Hawaiʻi canoe racing associations, Tahiti's va'a clubs) count thousands of paddlers each; there is no aggregated Pacific figure."
+ :org/legal-registration :mixed
+ :org/governance-model :democratic
+ :org/mission-statement "Paddling clubs that carry navigation knowledge, language and inter-island rivalry — one of the few community forms where cultural revival and competitive sport are the same activity."
+ :org/related-category :cat-traditional
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-mic-elder-councils
+ :org/form-family :family-customary-council
+ :org/name "Island elder councils (unimwane, Council of Iroij, traditional leaders' councils of Micronesia)"
+ :org/entity-kind :org-form
+ :org/category :cat-traditional
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-oceania
+ :org/countries ["KI" "MH" "FM" "PW" "NR" "TV"]
+ :org/member-count-basis "unknown — councils are per island or per atoll and are not enumerated regionally."
+ :org/legal-registration :statutory-no-personality
+ :org/registration-note "Several Micronesian constitutions give traditional councils a formal chamber or advisory role (Palau's Council of Chiefs, the Marshallese Council of Iroij)."
+ :org/governance-model :consensus
+ :org/mission-statement "Councils of elders and chiefs allocating land and lagoon rights, managing atoll resources and fronting climate-relocation negotiations for communities facing inundation."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-aus-indigenous-ranger-groups
+ :org/form-family :family-commons-management
+ :org/name "Indigenous ranger groups and Indigenous Protected Area communities (Australia)"
+ :org/entity-kind :org-form
+ :org/category :cat-resource-commons
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-oceania
+ :org/countries ["AU"]
+ :org/founding-date 1997
+ :org/instance-count-estimate 130
+ :org/member-count-basis "llm-recall-unverified: ranger groups number in the low hundreds employing a few thousand rangers, managing Indigenous Protected Areas that cover a large share of Australia's conservation estate."
+ :org/legal-registration :registered
+ :org/governance-model :consensus
+ :org/mission-statement "Community-controlled land and sea management combining customary obligation to country with contracted conservation work — fire management, feral control, biodiversity survey."
+ :org/related-org "org-aus-aboriginal-kinship"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+;;; ---------- SOUTHEAST ASIA ----------
+
+{:org/id :org-tha-village-funds
+ :org/form-family :family-rosca
+ :org/name "หมู่บ้าน village and urban community funds (Thailand)"
+ :org/entity-kind :org-form
+ :org/category :cat-mutual-aid
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-southeast-asia
+ :org/countries ["TH"]
+ :org/founding-date 2001
+ :org/instance-count-estimate 79610
+ :org/member-count 10743207
+ :org/member-count-basis "source-pinned and REFRESHED 2026-07-26: as of BE2567 (2024) the national fund office reports 75,000 village funds, 3,872 urban community funds and 738 military community funds, with committee members and fund members totalling 10,743,207 people. Registration status is published too — 77,927 funds registered as juristic persons, 1,683 not yet. This supersedes the 2012 World Bank appraisal (~80,000 committees reaching 30% of households) that this entry previously carried."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Elected village committees running a revolving credit fund seeded by the state — a national experiment in converting every village into a formal savings-and-credit community."
+ :org/source-name "สำนักงานกองทุนหมู่บ้านและชุมชนเมืองแห่งชาติ (สทบ.) fund structure data, BE2567"
+ :org/source-url "https://www.villagefundnews.com/archives/3400"
+ :org/source-date "2024"
+ :org/source-tier :secondary
+ :org/source-caveat "Structure figures reported through the fund office's news channel; villagefund.or.th would be the primary posting. Supersedes the 2012 World Bank appraisal."
+ :org/pinned-on "2026-07-26"
+ :org/refresh-checked "2026-07-26"
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-mmr-free-funeral-parahita
+ :org/form-family :family-burial-society
+ :org/name "Free funeral service societies and parahita welfare groups (Myanmar)"
+ :org/entity-kind :org-form
+ :org/category :cat-mutual-aid
+ :org/type :faith-based-org
+ :org/scope :national
+ :org/region-primary :region-southeast-asia
+ :org/countries ["MM"]
+ :org/founding-date 2001
+ :org/member-count-basis "unknown — free funeral societies spread to most townships in the 2000s and parahita groups run orphanages, clinics and monastic schools; neither is centrally counted, and reporting has become harder since 2021."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Volunteer societies providing free funerals, ambulances and disaster relief where state provision is minimal — the civil-society layer that mobilized fastest after Cyclone Nargis and in the COVID period."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-khm-pagoda-committees
+ :org/form-family :family-religious-lay-committee
+ :org/name "Pagoda committees (kanakammakar wat) and achar (Cambodia, Laos)"
+ :org/entity-kind :org-form
+ :org/category :cat-traditional
+ :org/type :faith-based-org
+ :org/scope :regional
+ :org/region-primary :region-southeast-asia
+ :org/countries ["KH" "LA"]
+ :org/instance-count-estimate 5000
+ :org/member-count-basis "unknown — Cambodia has on the order of 4,000-5,000 pagodas, each with a lay committee; committee membership is not aggregated."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Lay committees managing pagoda finances, festivals, funerals and village schooling — historically the village bank, school board and welfare office in one."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-mys-jkkk
+ :org/form-family :family-neighborhood-assembly
+ :org/name "JKKK village development and security committees (Malaysia, Brunei)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-southeast-asia
+ :org/countries ["MY" "BN"]
+ :org/founding-date 1962
+ :org/instance-count-estimate 25000
+ :org/member-count-basis "unknown — one committee per kampung/taman; the national total is administrative and not published as a community statistic."
+ :org/legal-registration :registered
+ :org/governance-model :hierarchical
+ :org/mission-statement "Appointed village committees channeling development funds, organizing gotong-royong work days and religious/festival events — the state's interface with the kampung, and a contested patronage channel."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-tls-suco-councils
+ :org/form-family :family-neighborhood-assembly
+ :org/name "Suco councils and aldeia assemblies (Timor-Leste)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-southeast-asia
+ :org/countries ["TL"]
+ :org/founding-date 2004
+ :org/instance-count-estimate 450
+ :org/member-count-basis "llm-recall-unverified: roughly 450 sucos, each electing a chief and council with reserved seats for women, youth and elders (lia-nain)."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Elected village councils that blend customary authority (lia-nain ritual leaders) with statutory local governance, including reserved representation for women and youth."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-vnm-to-dan-pho
+ :org/form-family :family-neighborhood-assembly
+ :org/name "Tổ dân phố / thôn residential groups and mass organizations (Vietnam, Laos)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-southeast-asia
+ :org/countries ["VN" "LA"]
+ :org/instance-count-estimate 100000
+ :org/member-count-basis "unknown — residential groups sit beneath every commune, and the Women's Union / Farmers' Union / Youth Union claim memberships in the tens of millions, but those are mass-organization rolls rather than voluntary community membership."
+ :org/legal-registration :registered
+ :org/governance-model :hierarchical
+ :org/mission-statement "Sub-commune residential groups handling household registration, dispute mediation and campaign mobilization, paired with the party-linked mass organizations that organize women, farmers and youth."
+ :org/related-org "org-vnm-dinh-ho"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+;;; ---------- MIDDLE EAST ----------
+
+{:org/id :org-kwt-diwaniya
+ :org/form-family :family-recurring-salon
+ :org/name "Diwaniya and majlis salons (Gulf states)"
+ :org/entity-kind :org-form
+ :org/category :cat-fraternal
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-middle-east
+ :org/countries ["KW" "SA" "QA" "BH" "AE"]
+ :org/founding-date 1900
+ :org/member-count-basis "unknown — a diwaniya is a household's regular open reception, not a body with members; Kuwait alone is described as having thousands meeting weekly."
+ :org/legal-registration :unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Recurring evening salons hosted in a dedicated room or annex where family, tribal, professional and political networks meet — in Kuwait an acknowledged part of electoral politics despite having no legal existence at all."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-pse-popular-committees
+ :org/form-family :family-displaced-community
+ :org/name "Popular and village committees (Palestinian territories, refugee camps)"
+ :org/entity-kind :org-form
+ :org/category :cat-civic-political
+ :org/type :secular-community
+ :org/scope :regional
+ :org/region-primary :region-middle-east
+ :org/countries ["PS" "LB" "JO" "SY"]
+ :org/founding-date 1987
+ :org/member-count-basis "unknown — camp popular committees exist in most of the 58 recognized refugee camps plus villages; membership is by appointment and faction balance, and is not published."
+ :org/legal-registration :unregistered
+ :org/registration-note "Committees administer camps that host states do not municipally govern — another case where a community has responsibilities without legal personality."
+ :org/governance-model :consensus
+ :org/mission-statement "Camp and village committees handling water, sanitation, dispute mediation and liaison with UNRWA and host authorities."
+ :org/related-org "org-global-refugee-block-committees"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-yem-aqil-al-hara
+ :org/form-family :family-customary-council
+ :org/name "Aqil al-hara neighborhood elders and Yemeni tribal mediation"
+ :org/entity-kind :org-form
+ :org/category :cat-traditional
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-middle-east
+ :org/countries ["YE"]
+ :org/founding-date 1600
+ :org/member-count-basis "unknown — one aqil per neighborhood or hamlet; no register exists and wartime conditions make any count unreliable."
+ :org/legal-registration :statutory-no-personality
+ :org/registration-note "The aqil is semi-official (recognized by whichever authority controls the area) while deriving standing from neighborhood consent."
+ :org/governance-model :consensus
+ :org/mission-statement "Neighborhood elders who register residents, vouch for identity, mediate disputes and allocate aid — in much of Yemen the only continuously functioning layer of governance."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+]

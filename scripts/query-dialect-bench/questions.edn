@@ -1,0 +1,147 @@
+;; scripts/query-dialect-bench/questions.edn — ADR-2608189300 の測定用の問い 20 件。
+;;
+;; 実データ 2 dataset に対する問い。**reference は既知正解**で、harness が実行して
+;; 期待値を作り、LLM の出力と結果集合として突き合わせる（順序非依存）。
+;;
+;;   market-intel   SEC EDGAR 財務（orgs/network-awai/cloud-murakumo-market-intel）
+;;   repo-taxonomy  repo の 3 面分類（manifest/repo-taxonomy.edn、4,033 repo）
+;;
+;; 2 つは `company/lei` で join できる（repo-taxonomy 側は 509 件が LEI を持つ）。
+;; **join 問題では dataset guard が要る** —— guard を落とすと両 dataset の entity が
+;; 混ざるので、これは実際に間違えうる箇所であって作り物の難所ではない。
+;;
+;; 問いは曖昧にしない。閾値は数値で与える（「大きい会社」ではなく「1e11 以上」）——
+;; 曖昧な NL は『別解だが妥当』を wrong-answer として数えてしまい、測定を汚す。
+
+{:datasets ["market-intel" "repo-taxonomy"]
+
+ :attributes
+ [["source/dataset"           "どの dataset の entity か。値は market-intel か repo-taxonomy"]
+  ;; --- market-intel（SEC EDGAR 財務）
+  ["company/lei"              "LEI（法人識別子、20 文字）。market-intel と repo-taxonomy の join キー"]
+  ["company/cik"              "SEC の CIK 番号（ゼロ埋め文字列）"]
+  ["company/ticker"           "ティッカーシンボル"]
+  ["company/name"             "会社名（SEC 表記、market-intel 側）"]
+  ["company/revenue-usd"      "売上（USD、数値）"]
+  ["company/net-income-usd"   "純利益（USD、数値。赤字なら負）"]
+  ["company/assets-usd"       "総資産（USD、数値）"]
+  ["company/shares-outstanding" "発行済株式数（数値）"]
+  ["company/as-of"            "会計基準日（\"2025-12-31\" 形式の文字列）"]
+  ["company/isic"             "ISIC 産業コード（文字列）"]
+  ["company/sic"              "SIC 産業コード（文字列）"]
+  ["company/fiscal-period"    "会計期間（\"FY2025\" 形式）"]
+  ;; --- repo-taxonomy（repo 分類）
+  ["repo/path"                "repo のパス（\"orgs/<org>/<name>\"）"]
+  ["repo/org"                 "repo の org セグメント"]
+  ["repo/name"                "repo 名"]
+  ["repo/kind"                "runtime 面の分類。actor / app / lib / service / corpus / tombstone / unclassified など"]
+  ["repo/kind-evidence"       "その分類を出した証拠の文字列"]
+  ["repo/present"             "checkout が存在するか（真偽値）"]
+  ;; --- repo-taxonomy の identity 面（repo とは別の entity。ここを取り違えると 0 件になる）
+  ["entity/kind"              "identity 面の種別。person / organisation / agent / organism"]
+  ["entity/id"                "identity の識別子（\"lei:06BTX...\" 形式）"]
+  ["entity/repo"              "その identity を記録している repo のパス。**repo/path とは別の属性**"]
+  ["company/legal-name"       "法人の正式名（repo-taxonomy の organisation entity 側）"]
+  ["company/jurisdiction"     "法域（repo-taxonomy の organisation entity 側）"]]
+
+ :questions
+ [;; ---- tier 1: 単一パターン
+  {:id :t1-tickers
+   :nl "market-intel の会社が持つティッカーシンボルを全部挙げて。"
+   :reference [:find ?t :where [?e "source/dataset" "market-intel"] [?e "company/ticker" ?t]]}
+
+  {:id :t1-actor-paths
+   :nl "repo-taxonomy で repo/kind が actor に分類された repo のパスを全部挙げて。"
+   :reference [:find ?p :where [?e "source/dataset" "repo-taxonomy"] [?e "repo/kind" "actor"] [?e "repo/path" ?p]]}
+
+  {:id :t1-cik-lookup
+   :nl "CIK が 0000001800 の会社の名前は?"
+   :reference [:find ?n :where [?e "company/cik" "0000001800"] [?e "company/name" ?n]]}
+
+  {:id :t1-company-count
+   :nl "market-intel に会社の entity は何件ある? 件数だけ返して。"
+   :reference [:find (count ?e) :where [?e "source/dataset" "market-intel"]]}
+
+  {:id :t1-kotoba-lang-repos
+   :nl "org が kotoba-lang の repo は何件? 件数だけ返して。"
+   :reference [:find (count ?e) :where [?e "source/dataset" "repo-taxonomy"] [?e "repo/org" "kotoba-lang"]]}
+
+  ;; ---- tier 2: 述語つきフィルタ
+  {:id :t2-big-revenue
+   :nl "売上が 1000 億 USD（1e11）以上の会社のティッカーを挙げて。"
+   :reference [:find ?t :where [?e "company/revenue-usd" ?r] [(>= ?r 1e11)] [?e "company/ticker" ?t]]}
+
+  {:id :t2-loss-makers
+   :nl "純利益が 0 未満（赤字）の会社の名前を挙げて。"
+   :reference [:find ?n :where [?e "company/net-income-usd" ?ni] [(< ?ni 0)] [?e "company/name" ?n]]}
+
+  {:id :t2-huge-assets
+   :nl "総資産が 1 兆 USD（1e12）を超える会社の名前と総資産額を挙げて。"
+   :reference [:find ?n ?a :where [?e "company/assets-usd" ?a] [(> ?a 1e12)] [?e "company/name" ?n]]}
+
+  {:id :t2-isic-2100
+   :nl "ISIC コードが 2100 の会社のティッカーを挙げて。"
+   :reference [:find ?t :where [?e "company/isic" "2100"] [?e "company/ticker" ?t]]}
+
+  {:id :t2-absent-repos
+   :nl "repo-taxonomy で checkout が存在しない（repo/present が false の）repo は何件? 件数だけ返して。"
+   :reference [:find (count ?e) :where [?e "source/dataset" "repo-taxonomy"] [?e "repo/present" false]]}
+
+  ;; ---- tier 3: dataset をまたぐ join（guard が要る）
+  {:id :t3-lei-join
+   :nl "market-intel と repo-taxonomy の両方に出てくる LEI について、その LEI と repo-taxonomy 側の法人正式名を挙げて。"
+   :reference [:find ?lei ?ln
+               :where
+               [?a "source/dataset" "market-intel"] [?a "company/lei" ?lei]
+               [?b "source/dataset" "repo-taxonomy"] [?b "company/lei" ?lei]
+               [?b "company/legal-name" ?ln]]}
+
+  {:id :t3-lei-revenue
+   :nl "repo-taxonomy に LEI が載っている法人のうち、market-intel に売上も載っている会社の SEC 側の名前と売上を挙げて。"
+   :reference [:find ?n ?r
+               :where
+               [?b "source/dataset" "repo-taxonomy"] [?b "company/lei" ?lei]
+               [?a "source/dataset" "market-intel"] [?a "company/lei" ?lei]
+               [?a "company/name" ?n] [?a "company/revenue-usd" ?r]]}
+
+  {:id :t3-legal-name-repo
+   :nl "repo-taxonomy の organisation entity について、法人正式名と、それを記録している repo のパスを挙げて。"
+   :reference [:find ?ln ?p
+               :where
+               [?e "source/dataset" "repo-taxonomy"] [?e "company/legal-name" ?ln] [?e "entity/repo" ?p]]}
+
+  {:id :t3-jurisdiction-of-lei-companies
+   :nl "market-intel にも載っている LEI を持つ repo-taxonomy の法人について、その法域を挙げて。"
+   :reference [:find ?j
+               :where
+               [?a "source/dataset" "market-intel"] [?a "company/lei" ?lei]
+               [?b "source/dataset" "repo-taxonomy"] [?b "company/lei" ?lei]
+               [?b "company/jurisdiction" ?j]]}
+
+  {:id :t3-join-count
+   :nl "market-intel と repo-taxonomy の両方に現れる LEI は何種類? 件数だけ返して。"
+   :reference [:find (count-distinct ?lei)
+               :where
+               [?a "source/dataset" "market-intel"] [?a "company/lei" ?lei]
+               [?b "source/dataset" "repo-taxonomy"] [?b "company/lei" ?lei]]}
+
+  ;; ---- tier 4: 集約
+  {:id :t4-max-revenue
+   :nl "market-intel に載っている売上の最大値は?"
+   :reference [:find (max ?r) :where [?e "company/revenue-usd" ?r]]}
+
+  {:id :t4-kind-histogram
+   :nl "repo-taxonomy の repo/kind ごとの件数を出して。"
+   :reference [:find ?k (count ?e) :where [?e "source/dataset" "repo-taxonomy"] [?e "repo/kind" ?k]]}
+
+  {:id :t4-jurisdiction-histogram
+   :nl "repo-taxonomy の法域ごとの件数を出して。"
+   :reference [:find ?j (count ?e) :where [?e "source/dataset" "repo-taxonomy"] [?e "company/jurisdiction" ?j]]}
+
+  {:id :t4-isic-histogram
+   :nl "market-intel の会社を ISIC コードごとに数えて。"
+   :reference [:find ?i (count ?e) :where [?e "source/dataset" "market-intel"] [?e "company/isic" ?i]]}
+
+  {:id :t4-org-histogram
+   :nl "repo-taxonomy の repo を org ごとに数えて。"
+   :reference [:find ?o (count ?e) :where [?e "source/dataset" "repo-taxonomy"] [?e "repo/org" ?o]]}]}

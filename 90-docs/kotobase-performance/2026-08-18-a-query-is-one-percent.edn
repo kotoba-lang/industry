@@ -1,0 +1,75 @@
+{:receipt :kotobase/a-query-is-one-percent
+ :date "2026-08-18"
+ :graph "kotobase-protocols-v2"
+ :instrument "net-kotobase/control-plane protocols-worker/test/kotobase_protocols_worker/query_bench.cljs (main 61d40715b)"
+
+ :why-this-had-never-been-measured
+ "Every latency figure this workspace holds for sparql / cypher / gremlin /
+  graphql came from `GET /health`. Since 2026-08-17 /health is answered from
+  four constants ABOVE the router (`2026-08-17-health-without-a-hydrate.edn`);
+  before that fix it measured the hydrate. **Neither version ever ran a query.**
+
+  And they cannot be measured from outside: all four answer 401 to a
+  self-issued CACAO -- they want an operator CACAO, and
+  KOTOBASE_MAINTENANCE_OPERATOR_DIDS is owner-blocked. Verified again today:
+  POST /graphql, /gremlin and GET /sparql all returned
+  `401 unauthorized: this surface's reads require a credential`. Measuring
+  through them would mean granting production operator access to a benchmark."
+
+ :method
+ "In-process, over the same real production blocks the hydrate bench replays.
+  Exactly the composition `worker/run-once` builds, minus the HTTP shell:
+  core/make-store -> query/enrich -> router/handle. CPU is
+  process.cpuUsage(); the load average is recorded beside every value. Dev
+  build, so read RATIOS and not levels."
+
+ :measured
+ {:hydrate {:cpu-ms 42726.578 :loadavg 96.7}
+  :rows
+  [{:surface "sparql"  :enrich-cpu-ms 12.330 :query-1-cpu-ms 632.791 :status 200 :query-2-cpu-ms 82.792}
+   {:surface "cypher"  :enrich-cpu-ms  0.677 :query-1-cpu-ms  17.459 :status 200 :query-2-cpu-ms  8.325}
+   {:surface "gremlin" :enrich-cpu-ms  1.382 :query-1-cpu-ms   6.799 :status 426 :query-2-cpu-ms  0.667}
+   {:surface "graphql" :enrich-cpu-ms  2.501 :query-1-cpu-ms  15.439 :status 400 :query-2-cpu-ms  1.643}]}
+
+ :two-rows-are-not-queries
+ "gremlin 426 and graphql 400 mean this bench's request shapes were rejected
+  before any work. Those two numbers measure a rejection path. They are kept in
+  the table so nobody reads them as query costs, and fixing the shapes is the
+  next change to this file."
+
+ :the-finding
+ {:sparql-share-of-request 0.0148
+  :cypher-share-of-request 0.0004
+  :statement
+  "A query is 0.04-1.5% of a request. The hydrate is the rest.
+
+   Applied to production's measured 2,058 cpu-ms per served read, the whole
+   query is ~30 ms. Optimising the query engine to ZERO saves about $0.62 per
+   million and cannot save more, because that is all there is."
+  :agrees-with
+  "h3-engine-materialisation reached the same answer from the other direction
+   in iteration-01 -- `the engine is ~6 ms of this request` -- and was ranked
+   at $0.00. This is that number measured at the SURFACE rather than inferred
+   at the engine."}
+
+ :the-memo-works-and-is-worth-almost-nothing
+ {:measured "sparql 632.8 -> 82.8 cpu-ms on the second identical query, 7.6x"
+  :share-of-request 0.013
+  :and-only-sometimes
+  "It is collected only on the SECOND query in one isolate, and 6 hydrating
+   requests in 10 land on an isolate that has never hydrated at all
+   (`2026-08-18-the-cold-isolate-rate-is-not-one.edn`). A memo whose payoff
+   requires a warm isolate is worth the warm fraction of a 1.3% saving."}
+
+ :enrich-is-cheap-and-that-was-not-obvious
+ "`query/enrich` runs on EVERY request and rebuilds `collections`, the GraphQL
+  resolvers and the memo version from the whole seed, which reads like a
+  per-request O(docs) walk worth attacking. Measured: 0.7-12.3 cpu-ms. It is
+  not worth attacking. Recorded because it is exactly the kind of code that
+  attracts optimisation on inspection alone."
+
+ :what-this-does-not-say
+ "Nothing about heavy queries. Every query here is LIMIT-1 class on purpose --
+  the question was what a surface costs to answer ANYTHING, and a heavy query
+  would fold the engine's own cost into a number about the shell. If a tenant
+  ever runs an expensive query the engine's cost is theirs, not this floor's."}

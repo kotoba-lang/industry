@@ -1,0 +1,66 @@
+;; sweep.edn — fleet ノードのディスク回収ポリシー（sweep.cljs の唯一の対象リスト）。
+;;
+;; なぜ要るか: 2026-07-30、`asher` がディスク 100%（空き 117MiB）で `tar` が
+;; "No space left on device" を返し、**gate は走る前に死んでいた**。CI が赤なのでは
+;; なく、実行される前に死ぬので何の signal も出ない。さらに `dan` 847MiB /
+;; `issachar` 1.2GiB も同状態で、この 4 ノードは probe の capability が空
+;; （= fleet の実行プールから外れていた）。
+;;
+;; ## 設計上の不変条件（壊さないこと）
+;;
+;; 1. **allowlist only。** 「cache っぽい path を消す」は絶対にしない。ここに
+;;    明示された entry だけが対象。`~/.ollama/models`（21G/ノードの実データ）や
+;;    `~/comfyui`（17-20G のモデル）は *列挙されていないので触られない* —
+;;    denylist だと新しい実データが増えたとき黙って巻き込む。
+;; 2. **孤児であることを消す前に証明する。** path 名を信用しない。`:require-*`
+;;    の前提が 1 つでも満たされなければ、その entry は skip して理由を出す。
+;;    実例: llama.cpp cache は 173G あったが、稼働中の推論は全ノード `ollama serve`、
+;;    llama バイナリは未インストール、参照する launchd service も 0、最終書き込みは
+;;    4 週間前だった。この 4 つが揃って初めて「退役した serving 経路の残骸」と言える。
+;; 3. **exit 0 を信用しない。** 回収量は df の前後差で実測する。コマンドの
+;;    終了コードは成功の証拠にしない（fleet-ci 全体と同じ規律）。
+;; 4. **実行中の作業を消さない。** gate scratch は `:older-than-min` より古い
+;;    ものだけ。gate timeout 30 分に対し 120 分は 4 倍の余裕。
+;; 5. **既定は dry-run。** 実際に消すのは `--apply` を明示したときだけ。
+;;
+;; 対象を増やすときは entry を 1 つ足す。前提を書けないものは足さない。
+{:policy "fleet-ci/sweep/v1"
+
+ ;; この空き容量を下回るノードだけを対象にする（--all で全ノード）。
+ ;; gate は tree を展開するので、数 GiB では足りない。
+ :low-water-gib 20
+
+ ;; 回収後もこれを下回るノードは警告する（sweep しても足りない = 実データが多すぎる）。
+ :alert-below-gib 5
+
+ :targets
+ [{:id :fleet-ci-scratch
+   :kind :prune-children
+   :path "/tmp/fleet-ci"
+   :older-than-min 120
+   :why "gate が展開した tree。1 回 ~40MB、1 日数百回。tick.cljs 側の prune と同じ床。"}
+
+  {:id :pip-cache
+   :kind :command
+   :command "pip3 cache purge >/dev/null 2>&1 || pip cache purge >/dev/null 2>&1 || true"
+   :why "wheel の再取得は帯域のみ。1.2-1.6G/ノード。"}
+
+  {:id :npm-cache
+   :kind :command
+   :command "npm cache clean --force >/dev/null 2>&1 || true"
+   :why "npx がノードで nbb を取るので育つ。0.67-0.85G/ノード。"}
+
+  {:id :brew-cache
+   :kind :command
+   :command "brew cleanup -s >/dev/null 2>&1 || true"
+   :why "古い formula の tarball。0.28-0.81G/ノード。"}
+
+  ;; 2026-07-30 に 173G を回収した entry。前提が崩れたら（= llama.cpp を再び
+  ;; serving に使い始めたら）自動的に skip される。
+  {:id :llama-cpp-orphan
+   :kind :rmrf
+   :path "~/Library/Caches/llama.cpp"
+   :require-absent-binaries ["llama-server" "llama-cli"]
+   :require-no-launchd-match "llama"
+   :require-untouched-days 7
+   :why "退役した serving 経路の残骸。稼働中の推論は ollama で、その models は別 path。"}]}

@@ -1,0 +1,344 @@
+;; フィールズ賞（Fields Medal）受賞者ナレッジ — 直近20年（ICM 2006〜2026）
+;; as-of 2026-07-19 / WebSearch/WebFetch で一次情報（IMU公式サイト・AMS Notices・
+;; Clay Mathematics Institute・London Mathematical Society・Fields Institute・
+;; Wikipedia）を横断確認した上で構造化。形式は 90-docs/knowledge/README.edn の
+;; 先行例（childrens-content-crude-humor.datoms.edn）と同じ kotoba-datomic /
+;; DataScript / Datomic transaction 互換 EDN vector。使い方・クエリ例は README.edn 参照。
+;;
+;; 捏造ゼロ方針: :award/confidence :high は本セッションで複数の一次/準一次ソースを
+;; 横断確認済み（IMU公式citation文言を含む）。:paper/confidence は個々の論文書誌
+;; （巻号・ページ・arXiv ID）をこのセッションで再検証したもののみ :high、それ以外は
+;; 学習知識由来のため :medium（外部引用前に一次ソースでの再確認を推奨）。
+;; ICM 2026（2026-07-23、フィラデルフィア開催予定）は本ファイル作成時点（2026-07-19）で
+;; IMUの公式発表前。ウェブサイト脆弱性による未確認リーク報道（Yu Deng・Hong Wang等の
+;; 名前が一部メディアで報じられた）が存在するが、公式未確定のため laureate/award
+;; entity は作らず :medal/icm2026 の :medal/note にリーク状況のみ記録する
+;; （実在の個人に受賞事実を断定的に紐付けるリスクを避けるため）。
+;;
+;; transact: (d/transact! conn <this-vector>)
+[
+ ;; ---- schema: medal（ICM開催年）--------------------------------------------------
+ {:db/ident :medal/id            :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :medal/year          :db/valueType :db.type/long    :db/cardinality :db.cardinality/one}
+ {:db/ident :medal/icm-location  :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :medal/ceremony-date :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; ISO date
+ {:db/ident :medal/status        :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :confirmed | :pending
+ {:db/ident :medal/note          :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
+ ;; ---- schema: laureate（受賞者）---------------------------------------------------
+ {:db/ident :laureate/id          :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :laureate/name-en     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :laureate/name-ja     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; 確度の高い定訳がある人物のみ
+ {:db/ident :laureate/birth-year  :db/valueType :db.type/long    :db/cardinality :db.cardinality/one}
+ {:db/ident :laureate/nationality :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :laureate/institution :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; 受賞当時の所属
+ {:db/ident :laureate/field       :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; 専門分野（日本語要約）
+
+ ;; ---- schema: award（受賞そのもの — medal × laureate の join）--------------------
+ {:db/ident :award/id         :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :award/medal      :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :award/laureate   :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :award/citation   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; IMU公式citation原文（英語）
+ {:db/ident :award/declined   :db/valueType :db.type/boolean :db/cardinality :db.cardinality/one} ; Perelmanのみ true
+ {:db/ident :award/note       :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :award/confidence :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :high | :medium
+
+ ;; ---- schema: paper（受賞理由に紐づく代表論文）------------------------------------
+ {:db/ident :paper/id           :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :paper/laureate     :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one} ; 受賞者側の主著者
+ {:db/ident :paper/related-award :db/valueType :db.type/ref    :db/cardinality :db.cardinality/one}
+ {:db/ident :paper/title        :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :paper/coauthors    :db/valueType :db.type/string  :db/cardinality :db.cardinality/many} ; laureate以外の共著者
+ {:db/ident :paper/venue        :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :paper/year         :db/valueType :db.type/long    :db/cardinality :db.cardinality/one} ; 出版年（arXiv投稿年と異なる場合あり）
+ {:db/ident :paper/arxiv        :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :paper/significance :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :paper/confidence   :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :high | :medium
+
+ ;; ==================================================================================
+ ;; medals（ICM開催年）
+ ;; ==================================================================================
+ {:medal/id :medal/icm2006 :medal/year 2006 :medal/icm-location "マドリード、スペイン"
+  :medal/ceremony-date "2006-08-22" :medal/status :confirmed}
+ {:medal/id :medal/icm2010 :medal/year 2010 :medal/icm-location "ハイデラバード、インド"
+  :medal/ceremony-date "2010-08-19" :medal/status :confirmed}
+ {:medal/id :medal/icm2014 :medal/year 2014 :medal/icm-location "ソウル、韓国"
+  :medal/ceremony-date "2014-08-13" :medal/status :confirmed}
+ {:medal/id :medal/icm2018 :medal/year 2018 :medal/icm-location "リオデジャネイロ、ブラジル"
+  :medal/ceremony-date "2018-08-01" :medal/status :confirmed}
+ {:medal/id :medal/icm2022 :medal/year 2022 :medal/icm-location "ヘルシンキ、フィンランド（本来はサンクトペテルブルク開催予定だったが、ロシアのウクライナ侵攻を受け式典のみヘルシンキへ移設・オンライン中継）"
+  :medal/ceremony-date "2022-07-05" :medal/status :confirmed}
+ {:medal/id :medal/icm2026 :medal/year 2026 :medal/icm-location "フィラデルフィア、アメリカ（予定）"
+  :medal/ceremony-date "2026-07-23" :medal/status :pending
+  :medal/note "本ファイル作成時点（2026-07-19）でIMU公式未発表（開会式・受賞式は2026-07-23予定）。2026-07-13頃、ICM2026公式サイトのフロントエンド脆弱性により講演スケジュールが早期に露出したとして、Yu Deng・Hong Wangの2名（いずれも北京大学出身と報道）を含むリークが一部中華圏メディア（BigGo Finance等）で報じられたが、IMUによる公式確認は無い。John Pardon・Jacob Tsimerman等の名前も予測市場（Polymarket等）で候補として言及されているが、これはリークではなく市場予想であり同様に未確認。公式発表（2026-07-23）後にこのentityとlaureate/award entityを追記すること。"}
+
+ ;; ==================================================================================
+ ;; ICM 2006（マドリード）
+ ;; ==================================================================================
+ {:laureate/id :laureate/okounkov :laureate/name-en "Andrei Okounkov" :laureate/birth-year 1969
+  :laureate/nationality "ロシア" :laureate/institution "プリンストン大学（アメリカ）"
+  :laureate/field "確率論・表現論・代数幾何学の橋渡し"}
+ {:laureate/id :laureate/perelman :laureate/name-en "Grigori Perelman" :laureate/name-ja "グリゴリー・ペレルマン" :laureate/birth-year 1966
+  :laureate/nationality "ロシア" :laureate/institution "無所属（元ステクロフ数学研究所サンクトペテルブルク支部）"
+  :laureate/field "幾何学的解析・リッチフロー"}
+ {:laureate/id :laureate/tao :laureate/name-en "Terence Tao" :laureate/name-ja "テレンス・タオ" :laureate/birth-year 1975
+  :laureate/nationality "オーストラリア" :laureate/institution "カリフォルニア大学ロサンゼルス校（アメリカ）"
+  :laureate/field "偏微分方程式・組合せ論・調和解析・加法的整数論"}
+ {:laureate/id :laureate/werner :laureate/name-en "Wendelin Werner" :laureate/birth-year 1968
+  :laureate/nationality "フランス" :laureate/institution "パリ第11大学（オルセー、フランス）"
+  :laureate/field "確率論（確率的Loewner発展、共形不変性）"}
+
+ {:award/id :award/okounkov-2006 :award/medal [:medal/id :medal/icm2006] :award/laureate [:laureate/id :laureate/okounkov]
+  :award/citation "For his contributions bridging probability, representation theory and algebraic geometry."
+  :award/confidence :high}
+ {:award/id :award/perelman-2006 :award/medal [:medal/id :medal/icm2006] :award/laureate [:laureate/id :laureate/perelman]
+  :award/citation "For his contributions to geometry and his revolutionary insights into the analytical and geometric structure of the Ricci flow."
+  :award/declined true
+  :award/note "ポアンカレ予想（および幾何化予想）の証明に対して授与が決定されたが、本人は受賞・賞金を辞退（クレイ数学研究所のミレニアム懸賞金100万ドルも2010年に辞退）。"
+  :award/confidence :high}
+ {:award/id :award/tao-2006 :award/medal [:medal/id :medal/icm2006] :award/laureate [:laureate/id :laureate/tao]
+  :award/citation "For his contributions to partial differential equations, combinatorics, harmonic analysis and additive number theory."
+  :award/confidence :high}
+ {:award/id :award/werner-2006 :award/medal [:medal/id :medal/icm2006] :award/laureate [:laureate/id :laureate/werner]
+  :award/citation "For his contributions to the development of stochastic Loewner evolution, the geometry of two-dimensional Brownian motion, and conformal field theory."
+  :award/confidence :high}
+
+ {:paper/id :paper/perelman-entropy-formula :paper/laureate [:laureate/id :laureate/perelman] :paper/related-award [:award/id :award/perelman-2006]
+  :paper/title "The entropy formula for the Ricci flow and its geometric applications"
+  :paper/venue "arXiv preprint（査読誌には未投稿）" :paper/year 2002 :paper/arxiv "math/0211159"
+  :paper/significance "ポアンカレ予想・幾何化予想証明の3部作の第1論文。リッチフローのエントロピー汎関数とκ非崩壊性を導入。"
+  :paper/confidence :high}
+ {:paper/id :paper/perelman-ricci-flow-surgery :paper/laureate [:laureate/id :laureate/perelman] :paper/related-award [:award/id :award/perelman-2006]
+  :paper/title "Ricci flow with surgery on three-manifolds"
+  :paper/venue "arXiv preprint（査読誌には未投稿）" :paper/year 2003 :paper/arxiv "math/0303109"
+  :paper/significance "3部作の第2論文。特異点でのリッチフロー手術（surgery）を構成し幾何化予想への道筋をつけた。"
+  :paper/confidence :high}
+ {:paper/id :paper/perelman-finite-extinction :paper/laureate [:laureate/id :laureate/perelman] :paper/related-award [:award/id :award/perelman-2006]
+  :paper/title "Finite extinction time for the solutions to the Ricci flow on certain three-manifolds"
+  :paper/venue "arXiv preprint（査読誌には未投稿）" :paper/year 2003 :paper/arxiv "math/0307245"
+  :paper/significance "3部作の第3論文。ポアンカレ予想部分の証明を完結させる有限消滅時間の議論。"
+  :paper/confidence :high}
+ {:paper/id :paper/green-tao-primes-arithmetic-progressions :paper/laureate [:laureate/id :laureate/tao] :paper/related-award [:award/id :award/tao-2006]
+  :paper/title "The primes contain arbitrarily long arithmetic progressions"
+  :paper/coauthors ["Ben Green"] :paper/venue "Annals of Mathematics, vol. 167" :paper/year 2008 :paper/arxiv "math/0404188"
+  :paper/significance "素数列が任意の長さの等差数列を含むことを証明（Green–Tao定理）。受賞理由（加法的整数論）の代表作。"
+  :paper/confidence :high}
+ {:paper/id :paper/lawler-schramm-werner-brownian-exponents-1 :paper/laureate [:laureate/id :laureate/werner] :paper/related-award [:award/id :award/werner-2006]
+  :paper/title "Values of Brownian intersection exponents I: Half-plane exponents"
+  :paper/coauthors ["Gregory Lawler" "Oded Schramm"] :paper/venue "Acta Mathematica, vol. 187" :paper/year 2001
+  :paper/significance "2次元ブラウン運動の交差指数を確率的Loewner発展（SLE）を用いて決定した3部作の第1論文。"
+  :paper/confidence :medium}
+
+ ;; ==================================================================================
+ ;; ICM 2010（ハイデラバード）
+ ;; ==================================================================================
+ {:laureate/id :laureate/lindenstrauss :laureate/name-en "Elon Lindenstrauss" :laureate/birth-year 1970
+  :laureate/nationality "イスラエル" :laureate/institution "エルサレム・ヘブライ大学（イスラエル）"
+  :laureate/field "エルゴード理論・測度剛性"}
+ {:laureate/id :laureate/ngo :laureate/name-en "Ngô Bảo Châu" :laureate/name-ja "ゴ・バオ・チャウ" :laureate/birth-year 1972
+  :laureate/nationality "ベトナム" :laureate/institution "パリ第11大学（オルセー、フランス）"
+  :laureate/field "保型形式論・代数幾何学（数論の幾何学化）"}
+ {:laureate/id :laureate/smirnov :laureate/name-en "Stanislav Smirnov" :laureate/birth-year 1970
+  :laureate/nationality "ロシア" :laureate/institution "ジュネーヴ大学（スイス）"
+  :laureate/field "統計力学・確率論（共形不変性）"}
+ {:laureate/id :laureate/villani :laureate/name-en "Cédric Villani" :laureate/name-ja "セドリック・ヴィラニ" :laureate/birth-year 1973
+  :laureate/nationality "フランス" :laureate/institution "リヨン高等師範学校（フランス）"
+  :laureate/field "気体分子運動論・最適輸送理論"}
+
+ {:award/id :award/lindenstrauss-2010 :award/medal [:medal/id :medal/icm2010] :award/laureate [:laureate/id :laureate/lindenstrauss]
+  :award/citation "For his results on measure rigidity in ergodic theory, and their applications to number theory."
+  :award/confidence :high}
+ {:award/id :award/ngo-2010 :award/medal [:medal/id :medal/icm2010] :award/laureate [:laureate/id :laureate/ngo]
+  :award/citation "For his proof of the Fundamental Lemma in the theory of automorphic forms through the introduction of new algebro-geometric methods."
+  :award/confidence :high}
+ {:award/id :award/smirnov-2010 :award/medal [:medal/id :medal/icm2010] :award/laureate [:laureate/id :laureate/smirnov]
+  :award/citation "For the proof of conformal invariance of percolation and the planar Ising model in statistical physics."
+  :award/confidence :high}
+ {:award/id :award/villani-2010 :award/medal [:medal/id :medal/icm2010] :award/laureate [:laureate/id :laureate/villani]
+  :award/citation "For his proofs of nonlinear Landau damping and convergence to equilibrium for the Boltzmann equation."
+  :award/confidence :high}
+
+ {:paper/id :paper/lindenstrauss-arithmetic-que :paper/laureate [:laureate/id :laureate/lindenstrauss] :paper/related-award [:award/id :award/lindenstrauss-2010]
+  :paper/title "Invariant measures and arithmetic quantum unique ergodicity"
+  :paper/venue "Annals of Mathematics, vol. 163" :paper/year 2006 :paper/arxiv "math/0503113"
+  :paper/significance "算術的量子一意エルゴード性（arithmetic QUE）予想の（分岐無し部分に対する）証明。測度剛性理論の代表作。"
+  :paper/confidence :medium}
+ {:paper/id :paper/ngo-fundamental-lemma :paper/laureate [:laureate/id :laureate/ngo] :paper/related-award [:award/id :award/ngo-2010]
+  :paper/title "Le lemme fondamental pour les algèbres de Lie"
+  :paper/venue "Publications Mathématiques de l'IHÉS, vol. 111" :paper/year 2010
+  :paper/significance "ラングランズ・プログラムの根幹をなす「基本補題」を、Hitchinフィブレーションを用いた代数幾何学的手法で証明。"
+  :paper/confidence :medium}
+ {:paper/id :paper/smirnov-percolation-cardy :paper/laureate [:laureate/id :laureate/smirnov] :paper/related-award [:award/id :award/smirnov-2010]
+  :paper/title "Critical percolation in the plane: conformal invariance, Cardy's formula, scaling limits"
+  :paper/venue "Comptes Rendus de l'Académie des Sciences, Série I, vol. 333" :paper/year 2001
+  :paper/significance "三角格子上の臨界パーコレーションについてCardyの公式を証明し共形不変性を示した。"
+  :paper/confidence :medium}
+ {:paper/id :paper/smirnov-ising-conformal-invariance :paper/laureate [:laureate/id :laureate/smirnov] :paper/related-award [:award/id :award/smirnov-2010]
+  :paper/title "Conformal invariance in random cluster models. I. Holomorphicity and Ising model"
+  :paper/venue "Annals of Mathematics, vol. 172" :paper/year 2010
+  :paper/significance "平面イジング模型の共形不変性を離散正則性の手法で証明。"
+  :paper/confidence :medium}
+ {:paper/id :paper/desvillettes-villani-boltzmann-trend :paper/laureate [:laureate/id :laureate/villani] :paper/related-award [:award/id :award/villani-2010]
+  :paper/title "On the trend to global equilibrium for spatially inhomogeneous kinetic systems: the Boltzmann equation"
+  :paper/coauthors ["Laurent Desvillettes"] :paper/venue "Inventiones Mathematicae, vol. 159" :paper/year 2005
+  :paper/significance "ボルツマン方程式の空間不均一系における平衡への収束（多項式レートではなく概指数的レート）を証明。非線形ランダウ減衰の研究と並ぶ受賞理由の柱。"
+  :paper/confidence :medium}
+
+ ;; ==================================================================================
+ ;; ICM 2014（ソウル）
+ ;; ==================================================================================
+ {:laureate/id :laureate/avila :laureate/name-en "Artur Avila" :laureate/birth-year 1979
+  :laureate/nationality "ブラジル" :laureate/institution "パリ第7大学 / CNRS（フランス）／ ブラジル純粋応用数学研究所（IMPA）"
+  :laureate/field "力学系理論（くりこみ理論）"}
+ {:laureate/id :laureate/bhargava :laureate/name-en "Manjul Bhargava" :laureate/birth-year 1974
+  :laureate/nationality "アメリカ（インド系）" :laureate/institution "プリンストン大学（アメリカ）"
+  :laureate/field "数論・数の幾何学"}
+ {:laureate/id :laureate/hairer :laureate/name-en "Martin Hairer" :laureate/birth-year 1975
+  :laureate/nationality "オーストリア" :laureate/institution "ウォーリック大学（イギリス）"
+  :laureate/field "確率偏微分方程式（正則性構造理論）"}
+ {:laureate/id :laureate/mirzakhani :laureate/name-en "Maryam Mirzakhani" :laureate/name-ja "マリアム・ミルザハニ" :laureate/birth-year 1977
+  :laureate/nationality "イラン" :laureate/institution "スタンフォード大学（アメリカ）"
+  :laureate/field "双曲幾何学・リーマン面のモジュライ空間"
+  }
+
+ {:award/id :award/avila-2014 :award/medal [:medal/id :medal/icm2014] :award/laureate [:laureate/id :laureate/avila]
+  :award/citation "For his profound contributions to dynamical systems theory, which have changed the face of the field, using the powerful idea of renormalization as a unifying principle."
+  :award/confidence :high}
+ {:award/id :award/bhargava-2014 :award/medal [:medal/id :medal/icm2014] :award/laureate [:laureate/id :laureate/bhargava]
+  :award/citation "For developing powerful new methods in the geometry of numbers, which he applied to count rings of small rank and to bound the average rank of elliptic curves."
+  :award/confidence :high}
+ {:award/id :award/hairer-2014 :award/medal [:medal/id :medal/icm2014] :award/laureate [:laureate/id :laureate/hairer]
+  :award/citation "For his outstanding contributions to the theory of stochastic partial differential equations, and in particular for the creation of a theory of regularity structures for such equations."
+  :award/confidence :high}
+ {:award/id :award/mirzakhani-2014 :award/medal [:medal/id :medal/icm2014] :award/laureate [:laureate/id :laureate/mirzakhani]
+  :award/citation "For her outstanding contributions to the dynamics and geometry of Riemann surfaces and their moduli spaces."
+  :award/note "フィールズ賞史上初の女性受賞者、かつ初のイラン人受賞者。2017年に乳がんのため39歳で死去。"
+  :award/confidence :high}
+
+ {:paper/id :paper/avila-forni-weak-mixing :paper/laureate [:laureate/id :laureate/avila] :paper/related-award [:award/id :award/avila-2014]
+  :paper/title "Weak mixing for interval exchange transformations and translation flows"
+  :paper/coauthors ["Giovanni Forni"] :paper/venue "Annals of Mathematics, vol. 165" :paper/year 2007
+  :paper/significance "区間交換変換・並進流のほとんど全ての場合の弱混合性を証明。くりこみ理論を統一原理として用いた代表作。"
+  :paper/confidence :medium}
+ {:paper/id :paper/bhargava-higher-composition-laws-1 :paper/laureate [:laureate/id :laureate/bhargava] :paper/related-award [:award/id :award/bhargava-2014]
+  :paper/title "Higher composition laws I: A new view on Gauss composition, and quadratic generalizations"
+  :paper/venue "Annals of Mathematics, vol. 159" :paper/year 2004
+  :paper/significance "ガウスの2元2次形式の合成則を再解釈し、より高次の合成則へ一般化した4部作の第1論文。低次数の環の個数計算・楕円曲線の平均階数上界の基礎となった。"
+  :paper/confidence :medium}
+ {:paper/id :paper/hairer-regularity-structures :paper/laureate [:laureate/id :laureate/hairer] :paper/related-award [:award/id :award/hairer-2014]
+  :paper/title "A theory of regularity structures"
+  :paper/venue "Inventiones Mathematicae, vol. 198" :paper/year 2014 :paper/arxiv "1303.5113"
+  :paper/significance "KPZ方程式など特異な確率偏微分方程式を厳密に扱う「正則性構造理論」を確立。受賞理由そのものの中心論文。"
+  :paper/confidence :high}
+ {:paper/id :paper/mirzakhani-simple-geodesics-wp-volumes :paper/laureate [:laureate/id :laureate/mirzakhani] :paper/related-award [:award/id :award/mirzakhani-2014]
+  :paper/title "Simple geodesics and Weil-Petersson volumes of moduli spaces of bordered Riemann surfaces"
+  :paper/venue "Inventiones Mathematicae, vol. 167" :paper/year 2007
+  :paper/significance "境界付きリーマン面のモジュライ空間のヴェイユ・ペーターソン体積を単純測地線の数え上げから計算する手法を確立。"
+  :paper/confidence :medium}
+ {:paper/id :paper/mirzakhani-growth-simple-closed-geodesics :paper/laureate [:laureate/id :laureate/mirzakhani] :paper/related-award [:award/id :award/mirzakhani-2014]
+  :paper/title "Growth of the number of simple closed geodesics on hyperbolic surfaces"
+  :paper/venue "Annals of Mathematics, vol. 168" :paper/year 2008
+  :paper/significance "双曲曲面上の単純閉測地線の個数の長さに関する漸近挙動を決定し、Thurstonのシンプレクティック構造との関係を示した。"
+  :paper/confidence :medium}
+
+ ;; ==================================================================================
+ ;; ICM 2018（リオデジャネイロ）
+ ;; ==================================================================================
+ {:laureate/id :laureate/birkar :laureate/name-en "Caucher Birkar" :laureate/birth-year 1978
+  :laureate/nationality "イギリス（クルド系イラン出身）" :laureate/institution "ケンブリッジ大学（イギリス）"
+  :laureate/field "代数幾何学（極小モデルプログラム）"}
+ {:laureate/id :laureate/figalli :laureate/name-en "Alessio Figalli" :laureate/birth-year 1984
+  :laureate/nationality "イタリア" :laureate/institution "スイス連邦工科大学チューリッヒ校（ETHチューリッヒ）"
+  :laureate/field "最適輸送理論・偏微分方程式"}
+ {:laureate/id :laureate/scholze :laureate/name-en "Peter Scholze" :laureate/name-ja "ペーター・ショルツェ" :laureate/birth-year 1987
+  :laureate/nationality "ドイツ" :laureate/institution "ボン大学（ドイツ）"
+  :laureate/field "数論幾何学（p進体上の算術幾何）"}
+ {:laureate/id :laureate/venkatesh :laureate/name-en "Akshay Venkatesh" :laureate/birth-year 1981
+  :laureate/nationality "オーストラリア（インド系）" :laureate/institution "プリンストン高等研究所 / スタンフォード大学（アメリカ）"
+  :laureate/field "数論・エルゴード理論・表現論の統合"}
+
+ {:award/id :award/birkar-2018 :award/medal [:medal/id :medal/icm2018] :award/laureate [:laureate/id :laureate/birkar]
+  :award/citation "For the proof of the boundedness of Fano varieties and for contributions to the minimal model program."
+  :award/confidence :high}
+ {:award/id :award/figalli-2018 :award/medal [:medal/id :medal/icm2018] :award/laureate [:laureate/id :laureate/figalli]
+  :award/citation "For contributions to the theory of optimal transport and its application to partial differential equations, metric geometry and probability."
+  :award/confidence :high}
+ {:award/id :award/scholze-2018 :award/medal [:medal/id :medal/icm2018] :award/laureate [:laureate/id :laureate/scholze]
+  :award/citation "For having transformed arithmetic algebraic geometry over p-adic fields through his introduction of perfectoid spaces, with application to Galois representations, and for the development of new cohomology theories."
+  :award/confidence :high}
+ {:award/id :award/venkatesh-2018 :award/medal [:medal/id :medal/icm2018] :award/laureate [:laureate/id :laureate/venkatesh]
+  :award/citation "For his synthesis of analytic number theory, homogeneous dynamics, topology, and representation theory, which has resolved long-standing problems in areas such as the equidistribution of arithmetic objects."
+  :award/confidence :high}
+
+ {:paper/id :paper/birkar-singularities-bab :paper/laureate [:laureate/id :laureate/birkar] :paper/related-award [:award/id :award/birkar-2018]
+  :paper/title "Singularities of linear systems and boundedness of Fano varieties"
+  :paper/venue "Annals of Mathematics, vol. 193 (pp. 347–405)" :paper/year 2021 :paper/arxiv "1609.05543"
+  :paper/significance "Borisov–Alexeev–Borisov（BAB）予想を証明。ε-対数的canonical特異点を持つd次元ファノ多様体の族が有界であることを示した。2016年プレプリント公開、受賞理由の中心的成果。本セッションでarXiv/Annals of Mathematics公式ページを直接確認済み。"
+  :paper/confidence :high}
+ {:paper/id :paper/de-philippis-figalli-w21-monge-ampere :paper/laureate [:laureate/id :laureate/figalli] :paper/related-award [:award/id :award/figalli-2018]
+  :paper/title "W^{2,1} regularity for solutions of the Monge–Ampère equation"
+  :paper/coauthors ["Guido De Philippis"] :paper/venue "Inventiones Mathematicae, vol. 192" :paper/year 2013
+  :paper/significance "モンジュ・アンペール方程式の解の2階微分の可積分性（W^{2,1}正則性）を証明。最適輸送写像の正則性理論の代表作の一つ。"
+  :paper/confidence :medium}
+ {:paper/id :paper/scholze-perfectoid-spaces :paper/laureate [:laureate/id :laureate/scholze] :paper/related-award [:award/id :award/scholze-2018]
+  :paper/title "Perfectoid spaces"
+  :paper/venue "Publications Mathématiques de l'IHÉS, vol. 116" :paper/year 2012 :paper/arxiv "1111.4914"
+  :paper/significance "「パーフェクトイド空間」の概念を導入し、p進体上の代数幾何学と標数pの世界を橋渡し。受賞理由そのものの基礎論文。"
+  :paper/confidence :high}
+ {:paper/id :paper/eilm-periodic-torus-orbits :paper/laureate [:laureate/id :laureate/venkatesh] :paper/related-award [:award/id :award/venkatesh-2018]
+  :paper/title "The distribution of periodic torus orbits on homogeneous spaces"
+  :paper/coauthors ["Manfred Einsiedler" "Elon Lindenstrauss" "Philippe Michel"] :paper/venue "Annals of Mathematics, vol. 170" :paper/year 2009
+  :paper/significance "等質空間上の周期的トーラス軌道の分布問題をエルゴード理論的手法で解明。数論的対象の同分布性に関する統合的アプローチの代表作。"
+  :paper/confidence :medium}
+
+ ;; ==================================================================================
+ ;; ICM 2022（ヘルシンキ）
+ ;; ==================================================================================
+ {:laureate/id :laureate/duminil-copin :laureate/name-en "Hugo Duminil-Copin" :laureate/birth-year 1985
+  :laureate/nationality "フランス" :laureate/institution "高等科学研究所（IHÉS、フランス） / ジュネーヴ大学（スイス）"
+  :laureate/field "確率論・統計力学（相転移）"}
+ {:laureate/id :laureate/huh :laureate/name-en "June Huh" :laureate/name-ja "ホ・ジュニ" :laureate/birth-year 1983
+  :laureate/nationality "アメリカ（韓国系）" :laureate/institution "プリンストン大学（アメリカ）"
+  :laureate/field "組合せ論・代数幾何学（ホッジ理論のマトロイド論への応用）"}
+ {:laureate/id :laureate/maynard :laureate/name-en "James Maynard" :laureate/birth-year 1987
+  :laureate/nationality "イギリス" :laureate/institution "オックスフォード大学（イギリス）"
+  :laureate/field "解析的整数論（素数の間隔）"}
+ {:laureate/id :laureate/viazovska :laureate/name-en "Maryna Viazovska" :laureate/birth-year 1984
+  :laureate/nationality "ウクライナ" :laureate/institution "スイス連邦工科大学ローザンヌ校（EPFL）"
+  :laureate/field "球充填問題・フーリエ解析"}
+
+ {:award/id :award/duminil-copin-2022 :award/medal [:medal/id :medal/icm2022] :award/laureate [:laureate/id :laureate/duminil-copin]
+  :award/citation "For solving longstanding problems in the probabilistic theory of phase transitions in statistical physics, especially in dimensions three and four."
+  :award/confidence :high}
+ {:award/id :award/huh-2022 :award/medal [:medal/id :medal/icm2022] :award/laureate [:laureate/id :laureate/huh]
+  :award/citation "For bringing the ideas of Hodge theory to combinatorics, the proof of the Dowling–Wilson conjecture for geometric lattices, the proof of the Heron–Rota–Welsh conjecture for matroids, the development of the theory of Lorentzian polynomials, and the proof of the strong Mason conjecture."
+  :award/confidence :high}
+ {:award/id :award/maynard-2022 :award/medal [:medal/id :medal/icm2022] :award/laureate [:laureate/id :laureate/maynard]
+  :award/citation "For contributions to analytic number theory, which have led to major advances in the understanding of the structure of prime numbers and in Diophantine approximation."
+  :award/confidence :high}
+ {:award/id :award/viazovska-2022 :award/medal [:medal/id :medal/icm2022] :award/laureate [:laureate/id :laureate/viazovska]
+  :award/citation "For the proof that the E₈ lattice provides the densest packing of identical spheres in 8 dimensions and further contributions to related extremal problems and interpolation problems in Fourier analysis."
+  :award/note "フィールズ賞史上2人目の女性受賞者、かつ初のウクライナ人受賞者。"
+  :award/confidence :high}
+
+ {:paper/id :paper/duminil-copin-smirnov-connective-constant :paper/laureate [:laureate/id :laureate/duminil-copin] :paper/related-award [:award/id :award/duminil-copin-2022]
+  :paper/title "The connective constant of the honeycomb lattice equals √(2+√2)"
+  :paper/coauthors ["Stanislav Smirnov"] :paper/venue "Annals of Mathematics, vol. 175" :paper/year 2012 :paper/arxiv "1007.0575"
+  :paper/significance "六角格子上の自己回避歩行の連結定数（connective constant）を厳密に決定。統計力学における相転移の確率論的解析の代表作。"
+  :paper/confidence :medium}
+ {:paper/id :paper/adiprasito-huh-katz-hodge-theory-combinatorial-geometries :paper/laureate [:laureate/id :laureate/huh] :paper/related-award [:award/id :award/huh-2022]
+  :paper/title "Hodge theory for combinatorial geometries"
+  :paper/coauthors ["Karim Adiprasito" "Eric Katz"] :paper/venue "Annals of Mathematics, vol. 188" :paper/year 2018 :paper/arxiv "1511.02888"
+  :paper/significance "任意のマトロイドに対しホッジ理論的構造（Hodge–Riemann関係式・Lefschetz型定理）を代数幾何を経由せず構成し、Heron–Rota–Welsh予想（マトロイドの特性多項式の対数凹性）を証明。受賞理由の中心的成果。"
+  :paper/confidence :high}
+ {:paper/id :paper/maynard-small-gaps-primes :paper/laureate [:laureate/id :laureate/maynard] :paper/related-award [:award/id :award/maynard-2022]
+  :paper/title "Small gaps between primes"
+  :paper/venue "Annals of Mathematics, vol. 181" :paper/year 2015 :paper/arxiv "1311.4600"
+  :paper/significance "有界な素数間隔（bounded gaps between primes）について、Zhang（張益唐）の結果を大幅に改善し上限を600未満に。多次元篩法の新しい枠組みを確立。"
+  :paper/confidence :high}
+ {:paper/id :paper/viazovska-sphere-packing-dim8 :paper/laureate [:laureate/id :laureate/viazovska] :paper/related-award [:award/id :award/viazovska-2022]
+  :paper/title "The sphere packing problem in dimension 8"
+  :paper/venue "Annals of Mathematics, vol. 185" :paper/year 2017 :paper/arxiv "1603.04246"
+  :paper/significance "8次元における最密球充填がE₈格子で実現されることを、モジュラー形式を用いて構成した魔法関数（magic function）により証明。受賞理由そのものの論文。"
+  :paper/confidence :high}
+]

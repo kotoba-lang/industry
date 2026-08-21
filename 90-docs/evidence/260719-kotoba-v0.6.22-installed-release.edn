@@ -1,0 +1,36 @@
+{:evidence/schema :kotoba.installed-release/v1
+ :evidence/date "2026-07-19"
+ :release/tag "v0.6.22"
+ :release/commit "1c025d81e417407a1968f7108bbb89a3f8adafb0"
+ :release/url "https://github.com/kotoba-lang/kotoba/releases/tag/v0.6.22"
+ :release/workflow-run 29655159577
+ :release/platform :darwin-arm64
+ :release/archive-sha256 "b985d1b81688a113daf134488d5d5904a791cd1f4a107ac9307aa6bd49b82582"
+ :release/binary-sha256 "278b2f20896a2f115fec65fc4dadd8764224e585de6d0c5fc3b866ba44294c7d"
+ :release/native-matrix {:darwin-arm64 :pass :darwin-amd64 :pass :linux-amd64 :pass}
+ :corpus
+ [{:extension ".kotoba" :expected 42 :shell-installer :pass}
+  {:extension ".cljk" :expected 42 :shell-installer :pass}
+  {:extension ".cljc" :expected 42 :shell-installer :pass}
+  {:extension ".kotoba" :case :forbidden-eval :expected :reject
+   :shell-installer :pass :diagnostic "kotoba.diagnostic/v1"
+   :absolute-path-disclosed false}]
+ :shell-installer
+ {:status :pass :checksum-verified true :jvm-required-at-runtime false
+  :isolated-prefix "/tmp/kotoba-v0622-shell"
+  :isolated-bin-dir "/tmp/kotoba-v0622-shell-bin"
+  :cli-contract :pass :native-release-corpus :pass}
+ :homebrew
+ {:formula "kotoba-lang/kotoba/kotoba" :tap-pr 25
+  :tap-merge "78f3b849c7d28b946e9a04805fe8328bdc5c7fab"
+  :formula-version "0.6.22" :resource-download :pass :resource-checksum :pass
+  :bottle-workflow-run 29655656220
+  :bottle-matrix {:darwin-arm64 :pass :darwin-amd64 :pass :linux-amd64 :pass}
+  :brew-install-and-test-in-workflow :pass
+  :local-bottle-install :pass
+  :local-cellar-binary "/opt/homebrew/Cellar/kotoba/0.6.22/bin/kotoba"
+  :local-cellar-corpus :pass
+  :linked-command :blocked-by-pre-existing-command
+  :pre-existing-shadow "/opt/homebrew/bin/kotoba" :shadow-overwritten false}
+ :gate/status :complete
+ :gate/remaining []}

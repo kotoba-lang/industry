@@ -1,0 +1,121 @@
+{:receipt :kotobase/health-without-a-hydrate
+ :date "2026-08-17"
+ :worker "kotobase-protocols-worker"
+ :version "3c9b7376-3205-4011-9618-0accaa0b2e19"
+ :merge "eb57e38095e"
+
+ :how-this-was-found
+ "By asking what produced a number I had already measured more than twenty
+  times in one day and never questioned. Every latency figure in today's
+  receipts came from GET /health, and I had described it throughout as `the
+  hydrate half of a served request` without once reading the handler."
+
+ :the-defect
+ "`kotobase.protocols.router/handle` answers /health from four constants --
+  :ok, :service, :surface, :apex -- and touches no store. The shell's hydrate
+  is unconditional and sits ABOVE the router, so every request rebuilt the
+  whole graph and then called a branch that reads none of it.
+
+  `handle-request` already short-circuits three paths before the hydrate:
+  /capabilities, /_diag/query-memo and /_diag/health. /health was simply not
+  among them. That is why /_diag/health answered in 0.1-0.24s all day while
+  /health took seconds -- the two differ by one line in a cond chain, not by
+  what they compute."
+
+ :cost-per-call
+ {:cpu-ms 1364 :r2-class-b-gets 85 :bytes 11400000
+  :returns "four constant fields"
+  :note "CPU and GET counts from the instrumented harness replaying this
+         graph's real blocks (2026-08-17-fold-cost-at-production-shape.edn),
+         not from workerd."}
+
+ :why-it-is-the-worst-possible-route-for-it
+ "Health is the most polled route a service has -- uptime checks, load
+  balancers, monitoring. Six hosts polled once a minute is ~259,200 calls a
+  month: 353M CPU-ms and 22M Class B operations, about $15/month at the rates
+  captured today, to return a constant. My own probing added several thousand
+  of those calls."
+
+ :measured
+ {:method "10 sequential GETs per host over one connection, immediately before
+           and after the deploy"
+  :before-ms {:sparql 6231 :gremlin 4827 :graphql 3935}
+  :after-p50-ms {:sparql 18 :gremlin 15 :graphql 15 :s3 12 :atproto 14 :pinning 14}
+  :factor "~300x"
+  :body-unchanged "{:ok true, :service :kotobase.protocols/sparql, :surface :sparql, :apex \"kotobase.net\"} -- byte for byte"}
+
+ :the-guard-that-makes-it-a-short-circuit
+ "`static-health` reproduces the router's own mounted-surface check and returns
+  nil when the router would NOT have taken its health branch, so an unmounted
+  surface falls through to exactly the old path. Assuming every host is mounted
+  would have turned a short-circuit into a behaviour change: the split
+  single-surface shells (net-kotobase/cypher) mount a subset via select-keys.
+  Dropping that guard turns exactly the unmounted-surface assertion red and
+  nothing else -- demonstrated, not asserted.
+  103 tests / 700 assertions, 0 failures."
+
+ :consequence-for-the-other-receipts
+ "/health is no longer usable as an external probe for hydrate cost, and that
+  is what every 2,800 ms and 4,400 ms figure in today's receipts was measuring.
+  Those numbers stand -- they measured the hydrate, correctly, and the
+  read-path fix that moved 4,400 -> 2,800 is unaffected -- but the probe point
+  is gone. Measuring hydrate from outside now needs an authenticated query or
+  an instrumented /_diag route. The fold-cost receipt is unaffected: it
+  measures CPU and R2 operations in an instrumented harness over this graph's
+  real blocks, not over HTTP."
+
+ :the-fix-existed-in-two-copies
+ {:found "Fixing the combined worker did not fix the split ones. Measured right
+          after that deploy: every host protocols-worker serves answered
+          /health in 60-180 ms while cypher.kotobase.net still took 8.9 s.
+          cypher is its own Worker (net-kotobase/cypher) over the shared
+          kotobase-worker-shell, which carried the same unconditional hydrate
+          above the same pure router branch."
+  :fixed "kotoba-lang/kotobase-worker-shell ba29bd6ac5a, west pin c4d80cd9a88,
+          net-kotobase-cypher version 2375f9d6. 45 tests / 169 assertions."
+  :measured {:before-ms [5956 5736 7857] :after-p50-ms 11 :factor "~600x"
+             :body-unchanged true}
+  :difference-from-the-first-fix
+  "Surfaces come from `cfg`, not from a constant. protocol-core's router keeps
+   an EMPTY built-in table on purpose -- `surfaces-for` is
+   `(or (:surfaces ctx) {})` and its docstring already says a surface absent
+   from :surfaces is not served `including its /health` -- so cfg is the whole
+   registry for a shell that mounts a subset."
+
+  :the-test-did-not-discriminate-at-first
+  "Worth recording because it nearly shipped. The first version asserted that a
+   host nobody defines declines -- and that PASSES with the bug applied, since
+   such a host is absent from both cfg and the global table. The case that
+   separates them is a surface that exists globally and is NOT in this cfg:
+   sourcing from a constant makes a cypher-only deploy answer /health for
+   sparql, exactly the capability ADR-2608051000 says a shell cannot serve.
+   With that assertion the break turns one test red; without it, none.
+
+   A second assertion in the same batch was simply wrong -- it expected s3, a
+   surface I assumed was a router built-in, to answer on a cypher-only shell.
+   It failed, and the code was right: protocol-core has no built-ins. Removed."
+
+  :swept-for-a-third-copy
+  "Two copies were not assumed to be all of them. Measured every kotobase
+   hostname afterwards: ipfs 145 ms, git 83 ms, datomic 63 ms, wiki 226 ms,
+   cypher 56 ms, sparql 135 ms, and the apex 37 ms. engine, authn, lake, sdk,
+   docs and control do not resolve -- they are repositories, not deployed
+   hostnames. No third copy is live."}
+
+ :sixth-of-its-kind-today
+ "Capability present, one wire missing. GraphSync: seven namespaces
+  implementing /ipfs/graphsync/2.0.0, required by no deployed worker. The
+  datalake: catalog, columnar, Parquet/Arrow readers and the prefetch
+  trampoline all landed, lake.kotobase.net still NXDOMAIN. Materialised views:
+  the whole projection library pinned and compiled into the bundle, zero views
+  declared on the production graph. `:query-statistics`: implemented, unused
+  for eleven days, and wiring it took IC08 from 11.4x to 1.85x. And this one --
+  a cond chain missing one line.
+
+  None of these needed new capability. All of them needed someone to connect
+  what was already built. That is worth stating as a property of this
+  workspace rather than as six separate incidents.
+
+  The cypher half adds a second lesson to the first: a fix applied to a copy
+  leaves the shared original broken, and the only reason it was caught is that
+  a host was measured after the deploy rather than assumed fixed by it."}

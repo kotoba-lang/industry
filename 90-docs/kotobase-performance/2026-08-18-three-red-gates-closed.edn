@@ -1,0 +1,84 @@
+[{:db/id -1
+  :receipt/id "2026-08-18-three-red-gates-closed"
+  :receipt/date "2026-08-18"
+  :source/dataset "receipt"
+  :receipt/title "The three red fleet gates on control-plane, and what each was actually saying"
+  :receipt/body
+  "2026-08-17 の作業で赤かった 3 gate を閉じた。3 つとも「壊れているから赤い」
+   のではなく、それぞれ違う種類のことを言っていた。
+
+   ## 1. net-kotobase-hermetic — 本物の負債（他セッションの取りこぼし）
+
+   `scripts/check-metadata.cljc` は `docs/adr/*.md` を列挙し、各 filename が
+   `README.md` に現れることを要求する。2026-08-17 に landed した 4 本の ADR
+   （2608170440 / 2608170820 / 2608170930 / 2608171100）が index 行を持たず、
+   以来赤かった。4 行足して閉じた。
+
+   判別性を確認済み: 行を消すと rc=1（`docs/adr/README.md missing ADR entries`）、
+   在ると rc=0。landed `9bf8d47` (net-kotobase/control-plane)。
+
+   ## 2. net-kotobase-live-planes — gate が受け入れ済みの決定と逆を強制していた
+
+   gate は `graphdb.kotobase.net/health` が 200 を返すことを assert していた。
+   **ADR-2608159100 は 2026-08-15 に `graph-database` / `backend` / `graphdb` の
+   3 host を Custom Domain と DNS から除去し、NXDOMAIN を確認し、「rollback alias
+   を含め production contract に再導入しない」と定めている。**
+   つまり gate は ADR が意図したとおりの理由で赤かった。
+
+   削除ではなく **反転**した: 3 つの retired hostname が解決しないことを検査する
+   ようにして、gate が決定を否定する側から強制する側へ回った。
+
+   **evidence floor を付けた。** 「host が解決しないこと」を pass にする検査は
+   「何も解決しないとき」も pass にする —— CLAUDE.md が名指しする
+   「測れなかった検査が、測って問題が無かった検査と同じ値を返す」形そのもの。
+   同じ run で live surface が 1 つでも答えていることを条件にし、そうでなければ
+   `cannot distinguish retirement from an outage` として fail する。
+
+   両方向を実測（壊したものと報告されたものが一致することを確認）:
+     無改変                    -> exit 0, 20 checks
+     retired host が 200 を返す -> exit 1, `it answered HTTP 200`
+     evidence floor を false に -> exit 1, `cannot distinguish retirement from an outage`
+   landed `2f04d32` (com-junkawasaki/root)。
+
+   ## 3. net-kotobase-bundle-freshness — manifest の書き忘れ 1 件
+
+   `37a7745` が worker.cljc / site_i18n.cljc を変更し **同じ commit で**
+   `kotobase-worker.js` を rebuild していた（正しい形）が、
+   `bundle-manifest write` を回していなかった。以来
+   bundle-moved=true inputs-moved=true。
+
+   **rebuild していない。** `37a7745..HEAD` で input が 1 つも動いていないことを
+   確認した上で write した —— つまり manifest は「たまたま commit されていた
+   bundle」を追認したのではなく、真である事実を記録している。
+   判別性: worker.cljc に 1 行足すと `SOURCE MOVED BUT THE BUNDLE DID NOT`（exit 1）、
+   戻すと 119 inputs で exit 0。landed `83c42de` (net-kotobase/control-plane)。
+
+   ## 自分が踏んだ罠
+
+   最初の `nbb scripts/bundle-manifest.cljs write` は
+   `bundle-manifest: missing kotobase-api-gateway/js/kotobase-worker.js` を返した。
+   ファイルは実在し tracked だった。原因は CLAUDE.md が既に文書化している罠:
+   `root` は `(first (remove #(str/starts-with? % \"--\") argv))` なので
+   **`write` が tree のパスになっていた**。`<dir>` を先頭に置くと通る。
+   規則を読んでいても、書かれた形と同じ形で踏む。
+
+   ## 検証（merged main に対して、作業コピーではなく）
+
+   control-plane main `83c42de` / root main `b1ca028`:
+     bundle-freshness  exit 0 — 119 source inputs
+     hermetic          exit 0 — 6/6（tenant-isolation / metadata 19 / syntax 21 /
+                                    python sdk / object-grant 17 / async-reader）
+     live-planes       exit 0 — 20 live checks against https://kotobase.net
+
+   ## 3 つに共通する形
+
+   赤い gate を見て直しにいく前の 3 問（ADR-2608102000）が 3 回とも効いた:
+   1 本は本物の負債、1 本は**受け入れ済みの決定と逆**、1 本は**書き忘れ 1 件**で
+   rebuild 不要だった。**赤の色は同じでも、原因の種類は 3 つとも違う。**"
+  :receipt/landed
+  ["9bf8d47 net-kotobase/control-plane — index the four ADRs written 2026-08-17"
+   "2f04d32 com-junkawasaki/root — live-planes enforces ADR-2608159100 instead of contradicting it"
+   "83c42de net-kotobase/control-plane — record the manifest for the bundle rebuilt in 37a7745"]
+  :receipt/verified-against
+  {:control-plane-main "83c42de" :root-main "b1ca028340d"
+   :bundle-freshness "exit 0" :hermetic "exit 0 (6/6)" :live-planes "exit 0 (20 checks)"}}]

@@ -1,0 +1,34 @@
+{
+  "name": "itonami-isic-9601-game",
+  "private": true,
+  "version": "0.1.0",
+  "description": "クリーニング営み — the cloud-itonami ISIC 9601 garment-care actor as an idle tycoon. Build tooling only; the game itself is the cljc in src/.",
+  "scripts": {
+    "play": "nbb --classpath src bin/kuriningu.cljs play",
+    "street": "nbb --classpath src bin/kuriningu.cljs street",
+    "render": "nbb --classpath src bin/render.cljs",
+    "test": "nbb --classpath src test/logic_test.cljs",
+    "test:state": "nbb --classpath src test/state_test.cljs",
+    "accept:state": "nbb --classpath src bin/accept_state.cljs",
+    "test:camera": "nbb --classpath src:../../../../../../orgs/kotoba-lang/webgpu/src:../../../../../../orgs/kotoba-lang/render/src test/camera_test.cljs",
+    "accept:camera": "nbb --classpath src:../../../../../../orgs/kotoba-lang/webgpu/src:../../../../../../orgs/kotoba-lang/render/src bin/accept_camera.cljs",
+    "test:annotate": "nbb --classpath src:../../../../../../orgs/kotoba-lang/webgpu/src:../../../../../../orgs/kotoba-lang/render/src test/annotate_test.cljs",
+    "accept:annotate": "nbb --classpath src:../../../../../../orgs/kotoba-lang/webgpu/src:../../../../../../orgs/kotoba-lang/render/src bin/accept_annotate.cljs",
+    "accept:board": "nbb --classpath src bin/accept_board.cljs",
+    "test:diff": "nbb --classpath src:bin test/diff_test.cljs",
+    "accept:visual": "nbb --classpath src:bin:../../../../../../orgs/kotoba-lang/webgpu/src:../../../../../../orgs/kotoba-lang/render/src bin/accept_visual.cljs",
+    "balance": "nbb --classpath src test/balance.cljs",
+    "build": "nbb preview/build.cljs",
+    "build:board": "nbb preview/build_board.cljs",
+    "render:webgpu": "nbb --classpath src bin/render.cljs -- --view street --backend webgpu",
+    "parity": "nbb test/parity.cljs",
+    "lint:squint": "nbb test/squint_unary_minus.cljs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.0",
+    "nbb": "1.3.201",
+    "playwright": "1.55.1",
+    "pngjs": "^7.0.0",
+    "squint-cljs": "0.8.147"
+  }
+}

@@ -1,0 +1,51 @@
+[{:wave/number 1
+  :wave/name "BlockStore Abstract Infrastructure"
+  :wave/due-date "2026-07-25"
+  :wave/phase :m4-production-launch
+  :wave/status :in-progress
+  :wave/progress-percent 60
+  :wave/current-date "2026-07-21"
+  :wave/days-remaining 4
+  :wave/checkpoint-created "2026-07-21T21:00:00Z"
+  :phase-gate-requirement "BlockStore abstract implementation complete, reviewed, and ready for production integration"
+  :dependencies [{:name "M4 Week 8 gate completion"
+                 :status :complete
+                 :date-completed "2026-07-20"}
+                {:name "PR #33 merge to main"
+                 :status :complete
+                 :date-completed "2026-07-21"}
+                {:name "Distribution timeline activation"
+                 :status :complete
+                 :date-completed "2026-07-21"}]
+  :deliverables [{:item "BlockStore abstract interface definition"
+                 :status :in-progress
+                 :completion-estimate "2026-07-23"}
+                {:item "BlockStore implementation suite"
+                 :status :in-progress
+                 :completion-estimate "2026-07-24"}
+                {:item "Integration tests (BlockStore + upper layers)"
+                 :status :pending
+                 :completion-estimate "2026-07-25"}
+                {:item "Performance validation"
+                 :status :pending
+                 :completion-estimate "2026-07-25"}
+                {:item "Documentation + ADR"
+                 :status :pending
+                 :completion-estimate "2026-07-25"}]
+  :risk-flags [{:risk "Insufficient completion by 2026-07-25"
+               :likelihood "low"
+               :impact "high"
+               :mitigation "Daily standup review. Escalate immediately if behind schedule."}
+              {:risk "Integration blockers discovered during testing"
+               :likelihood "medium"
+               :impact "high"
+               :mitigation "Parallel upstream review of integration points. Pre-flight testing of interfaces."}]
+  :escalation-protocol "If progress falls below 50% by 2026-07-23, escalate to core team immediately. Do not defer completion."
+  :checkpoint-schedule {:daily-checkin "09:00+09:00"
+                       :weekly-review :friday-eod
+                       :final-deadline "2026-07-25T23:59:59+09:00"}
+  :tracking/automated-notification true
+  :tracking/slack-channel :m4-production
+  :tracking/standup-board :wave-1-blockstore
+  :alert-thresholds {:days-remaining 3 :progress-threshold-percent 70}
+  :note "Wave 1 is the critical path item for production v1.0. Completion on 2026-07-25 gates Wave 2+ timeline. Any slippage triggers distribution timeline reassessment."}]

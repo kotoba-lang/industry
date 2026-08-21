@@ -1,0 +1,284 @@
+[
+;;; 地方・地縁 (local / place-based). ADR-2607257200, iteration 1 (2026-07-25).
+;;; All counts are :org/data-provenance "llm-recall-unverified" — approximate
+;;; public estimates recalled without fetching sources. Not measurements.
+
+{:org/id :org-jpn-chonaikai
+ :org/form-family :family-neighborhood-assembly
+ :org/name "町内会・自治会 (Japanese neighborhood associations)"
+ :org/name-en "Chonaikai / jichikai neighborhood associations"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-asia-east
+ :org/countries ["JP"]
+ :org/founding-date 1940
+ :org/founding-note "Consolidated nationally under wartime tonarigumi policy; abolished by GHQ 1947; re-formed voluntarily thereafter."
+ :org/instance-count-estimate 290054
+ :org/member-count-basis "source-pinned: 290,054 associations nationwide as of 2021-04-01 (総務省自治行政局市町村課 aggregation of all 1,741 municipalities). Household participation rate 71.8% in 2021, down from 78.0% in 2010 — 57.9% in cities over 500k population, 88.3% in municipalities under 10k. No absolute member-household total is published, so :org/member-count is deliberately not asserted (iteration 1 carried a recalled 30M figure that had no source)."
+ :org/legal-registration :mostly-unregistered
+ :org/registration-note "Most are voluntary bodies with no legal personality; a minority obtain 認可地縁団体 status under the Local Autonomy Act to hold property."
+ :org/governance-model :consensus
+ :org/mission-statement "Neighborhood self-management: festival and shrine support, waste-station upkeep, disaster preparedness, circulating notice board (回覧板), liaison with municipal government."
+ :org/source-name "総務省自治行政局市町村課「自治会等に関する市区町村の取組についてのアンケート とりまとめ結果」"
+ :org/source-url "https://www.soumu.go.jp/main_content/000808317.pdf"
+ :org/source-date "2021-04-01"
+ :org/source-tier :secondary
+ :org/source-caveat "The 総務省 PDF is image-based and could not be machine-parsed; the 290,054 / 71.8% figures were taken from summaries of that aggregation. Re-pin as :primary if the PDF is OCR'd."
+ :org/pinned-on "2026-07-25"
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-usa-community-associations
+ :org/form-family :family-neighborhood-assembly
+ :org/name "Community / homeowner associations (USA)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-north-america
+ :org/countries ["US"]
+ :org/founding-date 1960
+ :org/instance-count-estimate 369000
+ :org/member-count 77100000
+ :org/member-count-basis "source-pinned: an estimated 369,000 community associations covering 28.8 million housing units and 77.1 million residents in 2024 — roughly a third of the US housing stock — projected to reach ~373,000 at end-2025 and ~377,000 by end-2026 (Foundation for Community Association Research, US National and State Statistical Review). 'Residents' is a population under covenant, not a voluntary membership: you join by buying the house."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Covenant-based governance of shared residential property: assessments, common-area maintenance, architectural rules, dispute enforcement."
+ :org/source-name "Foundation for Community Association Research, U.S. National and State Statistical Review for Community Association Data (2024) / 2026 HOA Outlook"
+ :org/source-url "https://foundation.caionline.org/publications/factbook/"
+ :org/source-date "2024"
+ :org/source-tier :secondary
+ :org/source-caveat "Figures read through the Foundation's press coverage; the Fact Book itself is the primary artifact."
+ :org/pinned-on "2026-07-25"
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-chn-residents-committees
+ :org/form-family :family-neighborhood-assembly
+ :org/name "居民委員会 / 村民委員会 (Chinese residents' and villagers' committees)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-asia-east
+ :org/countries ["CN"]
+ :org/founding-date 1954
+ :org/instance-count-estimate 600000
+ :org/member-count-basis "unknown at a verified level, and the search itself is the finding: China's 2024 national statistical communiqué does NOT publish 村民委员会 / 居民委员会 counts, and the Ministry of Civil Affairs bulletins that do carry them were not retrieved here. The order-of-magnitude figures in circulation (roughly 490k villagers' committees and 110k urban residents' committees) remain unverified."
+ :org/refresh-checked "2026-07-26"
+ :org/refresh-result "Checked the 2024 国民经济和社会发展统计公报 directly: it covers macroeconomic and employment indicators and contains no grassroots self-governance organization counts. mca.gov.cn statistical bulletins are the right source and were not fetched."
+ :org/legal-registration :registered
+ :org/registration-note "Constitutionally 'mass self-governing organizations' rather than state organs, but registered and closely supervised."
+ :org/governance-model :hierarchical
+ :org/mission-statement "Grassroots administration: mediation, public security, sanitation, welfare distribution, and transmission of policy to households."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-idn-rt-rw
+ :org/form-family :family-neighborhood-assembly
+ :org/name "RT / RW (Rukun Tetangga / Rukun Warga, Indonesia)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-southeast-asia
+ :org/countries ["ID"]
+ :org/instance-count-estimate 1500000
+ :org/member-count-basis "unknown — instance count is an order-of-magnitude guess; RT units are counted per neighborhood of roughly 30-50 households."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Neighborhood mutual assistance (gotong royong), night watch (siskamling), vital-event reporting, distribution of aid."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-ind-gram-sabha
+ :org/form-family :family-neighborhood-assembly
+ :org/name "Gram Sabha / gram panchayat village assemblies (India)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-asia-south
+ :org/countries ["IN"]
+ :org/founding-date 1992
+ :org/founding-note "73rd Constitutional Amendment gave panchayati raj statutory footing; village assemblies long predate it."
+ :org/instance-count-estimate 264211
+ :org/member-count-basis "source-pinned (institution count only): 264,211 Gram Panchayats and equivalents as of 2026-03 per the Ministry of Panchayati Raj; the Union Budget 2025-26 cites ~2.68 lakh. NO membership figure is asserted: the gram sabha is by statute every registered adult voter of the village, so any number would be a rural-electorate population (order of several hundred million), not a membership. Iteration 1's 800M was exactly that conflation."
+ :org/legal-registration :registered
+ :org/source-name "Ministry of Panchayati Raj (India), Year End Review 2025 / panchayat.gov.in"
+ :org/source-url "https://www.pib.gov.in/PressReleasePage.aspx?PRID=2209532&reg=3&lang=2"
+ :org/source-date "2026-03"
+ :org/source-tier :secondary
+ :org/source-caveat "Figure read through PIB/ministry review summaries; panchayat.gov.in's own dashboard would be the primary count."
+ :org/pinned-on "2026-07-25"
+ :org/governance-model :democratic
+ :org/mission-statement "Direct village assembly: approval of local development plans, beneficiary selection, social audit of works, common-resource decisions."
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-phl-barangay
+ :org/form-family :family-neighborhood-assembly
+ :org/name "Barangay assemblies (Philippines)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-southeast-asia
+ :org/countries ["PH"]
+ :org/instance-count-estimate 42010
+ :org/member-count-basis "source-pinned: 42,010 barangays as of 2026, up from 42,001 at the 2023 barangay elections — the count is maintained by the Philippine Statistics Authority in the Philippine Standard Geographic Code and moves by a handful as barangays are created or merged. Every resident belongs by address, so no membership figure applies."
+ :org/source-name "Philippine Statistics Authority, Philippine Standard Geographic Code (PSGC)"
+ :org/source-url "https://psa.gov.ph/classification/psgc/barangays"
+ :org/source-date "2026"
+ :org/source-tier :secondary
+ :org/source-caveat "Count reported through PSGC listings and election coverage rather than a single dated PSA release."
+ :org/pinned-on "2026-07-26"
+ :org/legal-registration :registered
+ :org/registration-note "Smallest statutory administrative unit, but functions in daily life as a neighborhood community body (katarungang pambarangay mediation)."
+ :org/governance-model :democratic
+ :org/mission-statement "Neighborhood governance and compulsory pre-litigation mediation of local disputes."
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-uzb-mahalla
+ :org/form-family :family-neighborhood-assembly
+ :org/name "Mahalla committees (Uzbekistan and Central Asia)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-asia-south
+ :org/countries ["UZ" "TJ" "KG"]
+ :org/instance-count-estimate 9756
+ :org/member-count-basis "source-pinned, and the breakdown corrects the round number: 9,756 citizens' self-governing bodies operate in Uzbekistan — 8,115 mahallas plus 1,294 village, 190 town and 157 aul communities. The commonly repeated 'about 10,000 mahallas' folds four distinct body types into one label; the mahalla proper is 8,115."
+ :org/source-name "Uzbek official statistics on citizens' self-governance bodies, via Association of Mahallas / 2025 reporting"
+ :org/source-url "https://en.wikipedia.org/wiki/Association_of_Mahallas_of_Uzbekistan"
+ :org/source-date "2025"
+ :org/source-tier :secondary
+ :org/source-caveat "Breakdown reported through secondary compilations of Uzbek official figures; a primary Ministry of Mahalla release would be better."
+ :org/pinned-on "2026-07-26"
+ :org/legal-registration :mixed
+ :org/governance-model :consensus
+ :org/mission-statement "Quarter-level mutual support: life-cycle ceremonies, elder mediation, welfare targeting; increasingly used as an administrative arm."
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-mex-ejido
+ :org/form-family :family-commons-management
+ :org/name "Ejidos y comunidades agrarias (Mexico)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-north-america
+ :org/countries ["MX"]
+ :org/founding-date 1917
+ :org/instance-count-estimate 32000
+ :org/member-count 5000000
+ :org/member-count-basis "unknown at a verified level, with the authoritative source now identified: Mexico's Registro Agrario Nacional publishes the Atlas de la Propiedad Social de la Tierra 2024, the definitive cartographic record of certified ejidos and communities. It was located but not queried for totals, so the circulating ~29-32k ejidos / roughly half of national land figures stay unverified. One dated fragment found: 12,717 ejidos and communities covering 38.7 million hectares across 48% of hydrological regions."
+ :org/source-name "Registro Agrario Nacional, Atlas de la Propiedad Social de la Tierra en México 2024"
+ :org/source-url "https://www.gob.mx/ran/articulos/el-atlas-de-la-propiedad-social-de-la-tierra-en-mexico-2024-guia-cartografica-completa-sobre-ejidos-y-comunidades-en-el-pais"
+ :org/refresh-checked "2026-07-26"
+ :org/refresh-result "Authoritative source identified (RAN Atlas 2024) but not queried; recorded as a pointer rather than upgraded to a pin."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Communal landholding and its assembly government: land allocation, forestry/water commons, collective enterprise."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-per-comunidades-campesinas
+ :org/form-family :family-commons-management
+ :org/name "Comunidades campesinas y nativas (Peru / Andes)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-south-america
+ :org/countries ["PE" "BO" "EC"]
+ :org/instance-count-estimate 7000
+ :org/member-count-basis "llm-recall-unverified: roughly 6,000-7,000 recognized peasant communities in Peru plus native communities in Amazonia."
+ :org/legal-registration :mixed
+ :org/governance-model :consensus
+ :org/mission-statement "Recognized communal landholding with rotating unpaid office (cargo) and collective work parties (faena/minga)."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-jpn-iriai
+ :org/form-family :family-commons-management
+ :org/name "入会地・財産区 (Japanese commons collectives)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-asia-east
+ :org/countries ["JP"]
+ :org/instance-count-estimate 3000
+ :org/member-count-basis "unknown — iriai rights holders are counted per commons, and many commons survive only as customary rights without registry."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Customary collective rights over forest, grassland and coastal resources; a canonical Ostrom-style commons institution."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-deu-vereine
+ :org/form-family :family-association-law-sector
+ :org/name "Eingetragene Vereine (German registered association sector)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-europe
+ :org/countries ["DE"]
+ :org/instance-count-estimate 615750
+ :org/member-count 24200000
+ :org/member-count-basis "source-pinned: 615,750 Vereine in the register as of 2022-04, up ~50,000 since the first count in 2001, with 24.2 million people ENGAGED across all of them (ZiviZ gGmbH). 60.9% have 100 members or fewer — the sector is overwhelmingly small local associations with few active people and little money. Iteration 1's recalled 50M conflated engaged people with total memberships."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "The default legal shell of German associational life — sport, music, fire brigade, allotment, carnival, hobby — with statutory member assembly."
+ :org/source-name "ZiviZ gGmbH (Stifterverband), Vereine in Deutschland / ZiviZ-Survey"
+ :org/source-url "https://www.ziviz.de/ziviz-survey/vereine"
+ :org/source-date "2022-04"
+ :org/source-tier :primary
+ :org/pinned-on "2026-07-25"
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-gbr-neighbourhood-watch
+ :org/form-family :family-neighborhood-security
+ :org/name "Neighbourhood Watch schemes"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :transnational
+ :org/region-primary :region-europe
+ :org/countries ["GB" "US" "AU" "ZA" "NL"]
+ :org/founding-date 1982
+ :org/instance-count-estimate 100000
+ :org/member-count-basis "llm-recall-unverified: England and Wales alone commonly cited near 2.3M member households."
+ :org/legal-registration :unregistered
+ :org/registration-note "Individual schemes are informal; only the national umbrella bodies are registered charities."
+ :org/governance-model :consensus
+ :org/mission-statement "Resident-run crime prevention and street-level information sharing in cooperation with police."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-community-land-trusts
+ :org/form-family :family-intentional-community
+ :org/name "Community land trusts"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :transnational
+ :org/region-primary :region-north-america
+ :org/countries ["US" "GB" "BE" "KE" "PR"]
+ :org/founding-date 1969
+ :org/instance-count-estimate 500
+ :org/member-count-basis "unknown — CLT counts differ widely by definition (housing-only vs. land-commons)."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Community ownership of land held in perpetuity, with tripartite boards (residents, neighbors, public interest) governing resale-restricted housing."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+]

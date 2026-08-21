@@ -1,0 +1,375 @@
+;; manifest/concept-vocabulary.edn — 概念 → 綴り。**手で書く。生成しない。**
+;;
+;; ## なぜ手書きなのか（索引本体は手書きしないのに）
+;;
+;; `90-docs/concept/concept.datoms.edn` は生成物（手書きの索引は腐る）。だが
+;; 「端末 と terminal と TTY は同じものを指す」は repo の中身から導出できない。
+;; **これは推論できない事実の側**なので、小さく明示的に持つ。
+;;
+;; ## 語は経験から選ぶ
+;;
+;; 2026-08-03、`kotoba-lang に terminal, console は設計実装されている?` に
+;; 「無い」と答えた。実際には `kotoba-lang/kuro`（terminal model）と
+;; `kotoba-lang/kobo`（workbench）が 2026-06-30 から在り、ADR まで在った。
+;; grep は README に当たっていたが 4,050 repo 分の出力を `head -40` で切って
+;; いて、当の行を見ていない。**repo 名（kuro / kobo）が機能を一文字も示さない**
+;; ので、名前からも辿れなかった。
+;;
+;; 増やしすぎると雑音になる。今のところ「名前から機能が推測できない repo が
+;; 実在する」ことが確認できた概念だけを入れる。
+;;
+;; ## :ambiguous — 綴りの衝突を隠さない
+;;
+;; `console` はこの workspace で 3 つの別物を指す:
+;;   - 対話端末（kuro / kobo）
+;;   - operator console（read-only の運用ダッシュボード。23 repo の規約）
+;;   - 家庭用ゲーム機（gpu の backend tier）
+;; 概念を 1 つに畳むとどれかが消える。**別概念として並べ、同じ綴りを両方に
+;; 持たせる** —— `console` で引いた人には両方出るのが正しい。
+
+{:delegation
+ {:label "委譲 / capability token（減衰して他者へ渡す）"
+  :spellings ["biscuit" "macaroon" "delegation" "attenuation" "capability token"
+              "ucan" "cacao" "caveat" "委譲" "減衰" "権限委譲" "capability"
+              "offline attenuation" "bearer token"]
+  :note "**中心は kotoba-lang/org-biscuitsec（biscuit）**（ADR-2608180200）—— 公開鍵で鎖を作るので **検証に秘密が要らず edge で検証できる**。判定は常に kotoba-lang/authority の束 1 本で、biscuit も macaroon も CACAO も UCAN も wire（->grant で inert data に落ちてから決定に入る）。役割: biscuit=委譲 / cacao=人の同意・session 起点 / xyz-ucan=外部相互運用 / kotoba-lang/macaroon=root 秘密を持つ側だけが検証する狭い bearer / org-w3-vc=claim であって authority ではない。意味論の正本は kotoba の lang/capability-semantics.edn。⚠ wire 相互運用は未実装 —— biscuit protobuf も libmacaroons binary も書いておらず、外部実装が我々の token を読んだことは無い。まだどの経路も biscuit を使っていない（live は CACAO 自己発行）。"}
+
+ :table-root
+ {:label "テーブルルート / table manifest（述語 → バイト範囲）"
+  :spellings ["tana" "棚" "table root" "table manifest" "manifest list" "snapshot"
+              "iceberg" "partition pruning" "file skipping" "predicate pushdown"
+              "byte range" "row group" "footer" "統計による枝刈り" "テーブル manifest"]
+  :note "kotoba-lang/tana。名前が機能を示さない metaphor 名なので登録する（棚 = どの箱がどこにあるかを言うもの）。**「どのオブジェクトを読むべきか」を footer を 1 つも開かずに答える面。** 枝刈りの規則そのものは kotoba-lang/columnar（columnar.stats/skip?）が正本で、tana はそれを 2 段（chunk と manifest）に適用するだけ —— 第二の実装を持たない。format は kotoba-lang/org-apache-parquet / org-apache-arrow、catalog（何が landed したか・誰が何を主張したか、datom 面で Datalog に答える）は kotoba-lang/kotobase-lake、非同期ホストで同期スキャンを回す trampoline は net-kotobase/lake、block の置き場は kotobase-storage(-pack/-s3)。⚠ tana は format でも container でも catalog でも engine でもない —— 混同すると『小さな Parquet / 小さな Iceberg』を再発明する。ADR-2608180100。"}
+
+ :valueflows
+ {:label "Valueflows / REA（経済語彙）"
+  :spellings ["valueflows" "valueflo" "valueflo.ws" "rea" "resource event agent"
+              "economic event" "economic resource" "経済イベント" "経済資源"
+              "commitment" "recipe" "dependent demand" "critical path"
+              "value equation" "value rollup" "provenance" "cash flow"
+              "network based algorithms" "従属需要" "クリティカルパス" "価値方程式"]
+  :note "kotoba-lang/ws-valueflo-vocabulary が語彙（19 action の behaviour table を実行できる形で pin）、kotoba-lang/ws-valueflo-algorithms が network-based algorithm 8 本。ADR-2608153000 で cloud-itonami / 営み OS の経済語彙の正本になった。**同じ計算が別の名前で既にある場所を先に見る**: 従属需要は kotoba-lang/plm の MRP、価値方程式に近いのは cloud-itonami/credits の ENGI、lineage は CID/receipt 面。critical path だけは 2026-08-15 まで実在しなかった。⚠ system dynamics（kotoba-lang/dynamics / org-oasis-open-xmile）の flow は連続 rate で VF の flow ではない —— 変換できない別形式として並存する。⚠ cloud-itonami-commitment-ledger の commitment は融資コミットで vf:Commitment ではない（false friend。valueflows.mapping/false-friends に列挙）。"}
+
+ :amu-compiler
+ {:label "Amu / Kotoba compiler（編む）"
+  :spellings ["amu" "compiler" "kotoba compiler" "コンパイラ" "編む"
+              "weave" "project link" "プロジェクトリンク"]
+  :note "kotoba-lang/amu is the compiler orchestrator (formerly kotoba-lang/compiler). 編む = 言葉を一つの反物にする。プロジェクト閉グラフ（複数 .kotoba を一台の機にかける）もここ。実行時に import を provider へ結ぶのは kototama（ADR-2608139980）。:compiler roles, kotoba.compiler namespaces, kotoba-compiler/1 artifact compatibility, and the bin/kotoba-compiler shim remain compatible."}
+
+ :kototama-runtime
+ {:label "Kototama / 言霊（実行と実行時 link）"
+  :spellings ["kototama" "言霊" "runtime" "host" "execution" "tender"
+              "実行時リンク" "runtime link"]
+  :note "kotoba-lang/kototama が T3 の存在。成果物を宿し、aiueos が貸した named provider にだけ結ぶ。Solo5 の tender は役割語であって製品名ではない。宿は kototama-native（旧 tender-native、ns kototama.native.executor）/ kototama-component（旧 tender-component）/ wasm-webcomponent（browser）。kotodama は別 runtime（ADR-2607050900）。索引: ADR-2608139980。"}
+
+ :kotoba-vm
+ {:label "kotoba-vm（IPLD actor invocation kernel）"
+  :spellings ["kotoba-vm" "fvm" "filecoin vm" "filecoin virtual machine"
+              "invocation kernel" "actor vm" "ipld syscall"]
+  :note "kotoba-lang/kotoba-vm が FVM 型の Machine/Kernel/syscalls。合意は inga、純関数の actor は codebase.actor、Wasm host は kototama、Filecoin クライアントは io-filecoin、ハードウェア記述は kotoba-lang/machine。歴史的な etzhayyim Rust Pregel の同名 crate は別物。索引: ADR-2608147100。"}
+
+ :amu-backend
+ {:label "amu の綾 / T2 backend（存在ではない）"
+  :spellings ["kotoba-native" "kotoba-wasm" "kotoba-script" "kotoba-component"
+              "backend" "綾" "aya" "native backend" "wasm backend"]
+  :note "T2 は amu が織る柄。kotoba-native = KIR→x86_64/aarch64/ELF、kotoba-wasm = KIR→core Wasm、kotoba-component = Component 仕立て、kotoba-script = restricted JS。走らせない、grant しない。実行は kototama。"}
+
+ :visit-telemetry
+ {:label "回遊 / アクセス解析（訪問者を特定せずに動線を測る）"
+  :spellings ["回遊" "kaiyu" "visit telemetry" "access analytics" "アクセス解析"
+              "dwell" "滞在時間" "route transition" "遷移" "動線" "pageview"
+              "acquisition" "流入" "audience"]
+  :note "kotoba-lang/kaiyu が語彙（dwell バケット / route whitelist / acquisition / window / collected-since）。consumer は club-shinshi-app・net-babiniku・net-kotobase。observability の trace/span は kotoba-lang/log で別物、campaign と attribution は kotoba-lang/senden。heatmap は非目標（ADR-2608060900 D3）。"}
+
+ :terminal
+ {:label "対話端末 / terminal"
+  :spellings ["terminal" "tty" "pty" "shell session" "command line"
+              "端末" "ターミナル" "コンソール" "console"]
+  :note "kotoba-lang/kuro が model、kobo が workbench。PTY は未実装。"}
+
+ :operator-console
+ {:label "operator console（read-only 運用ダッシュボード）"
+  :spellings ["operator console" "console" "dashboard" "運用コンソール"
+              "ダッシュボード"]
+  :note "kotoba-lang 23 repo の規約。html+css で pure data → markup、write surface 無し。"}
+
+ :editor
+ {:label "code editor / IDE"
+  :spellings ["code editor" "text editor" "ide" "workbench" "buffer"
+              "エディタ" "エディター"]
+  :note "kotoba-lang/kobo（model + read-only console）。event 配線は未実装。"}
+
+ :document-viewer
+ {:label "document viewer / ページを見る"
+  :spellings ["viewer" "preview" "document viewer" "pdf viewer" "page render"
+              "版面" "hanmen" "ビューア" "ビューアー" "プレビュー" "閲覧"]
+  :note "kotoba-lang/hanmen が render-IR（置かれた印）+ PDF producer + SVG drawer、app-preview が mokuroku 上のページ一覧、org-iso-pdf が COS モデル、canvaskit が viewport 数学。名前が機能を示さないので登録（ADR-2608051500）。ラスタは描かない — 画像は :frame として置くだけ。"}
+
+ :design-system
+ {:label "design system / UI kit"
+  :spellings ["design system" "ui kit" "component library" "hig"
+              "デザインシステム"]
+  :note "css → html → shitsuke → liquid-glass-ui → kotoba-ui → appkit/uikit。skill kotoba-uiux。"}
+
+ :query-plane
+ {:label "query plane / datom 面"
+  :spellings ["datalog" "datom" "query plane" "datascript" "triple store"
+              "kotobase 方言" "kotobase dialect" "datomic" "datomic 方言"
+              "sparql" "cypher" "gremlin" "graphql" "text-to-query" "クエリ言語"]
+  :note "kotobase / arrangement / manifest/edn-query.cljs。⚠ 3 語は別物（ADR-2608189300）: **Datalog** = 形式（実装は kotoba-lang/datalog）/ **kotobase 方言** = 実際に書く EDN 記法 `[:find … :where …]`、系譜は Datomic だが所有はここ（`ref?` 既定が ipld.core/link?、`visible?` が required という Datomic に無い 2 点を持つ）/ **Datomic** = 他社製品、名乗ってよいのは kotoba-lang/datomic-client-shim だけ（shape 互換であって wire 互換ではない）。agent の query 入口は kotobase 方言、routine は GraphQL、Cypher / SPARQL / Gremlin は interop。surface は 6 つとも未 deploy（ADR-2608039975）。"}
+
+ :package-manager
+ {:label "package / dependency management"
+  :spellings ["package manager" "dependency resolution" "registry" "lockfile"]}
+
+ :scheduler
+ {:label "scheduler / durable loop"
+  :spellings ["scheduler" "cron" "durable loop" "agent tick" "supervisor"
+              "スケジューラ"]}
+
+ :auth
+ {:label "authentication / identity"
+  :spellings ["authentication" "sign-in" "signin" "login" "passkey" "webauthn"
+              "oauth" "did:key" "cacao" "認証"]
+  :note "surface 索引（90-docs/surface/）と duplication-warn hook が面レベルを持つ。"}
+
+ :did-rotation
+ {:label "DID の鍵回転 / 検証可能な更新履歴（did:webvh・署名回転ログ）"
+  :spellings ["webvh" "did:webvh" "did-webvh" "didwebvh" "did:tdw" "tdw"
+              "key rotation" "pre-rotation" "nextKeyHashes" "updateKeys"
+              "witness threshold" "scid" "rotation log" "rootkey"
+              "鍵回転" "事前回転" "回転ログ" "失効" "did rotation"]
+  :note "**`did:key` が root のまま、回転と naming は `did:webvh` に載る**（ADR-2608200400 / ADR-2608209300、オーナー判断 2026-08-20）。実装は kotoba-lang/foundation-identity-didwebvh（identity.foundation を逆順にした origin 面の名前なので、名前から webvh に辿り着けない —— それがここに登録する理由）。⚠ **`updateKeys` は multisig ではない** —— 複数列べてもどれか 1 本で有効な entry が署名でき、m-of-n は `witness` の側にしかない（resolver が強制する）。⚠ **webvh を biscuit root key の authority にしない** —— org-biscuitsec の `biscuit.rootkey` 署名回転ログが 12,000 fetches/月・DNS/HTTPS 不要、webvh は 16,000 で auth path に DNS と HTTPS を戻す（ADR-2608039000）。上流 README: webvh can still be the transport, it just is not the authority。live: network-awai/cloud-itonami が did:webvh:QmQ2Erkh…:itonami.cloud を genesis 済み（鍵は 0 本 —— ADR-0044 の『持っていない鍵を書くのは custody の嘘』を維持）。"}
+
+ :terminal-emulator
+ {:label "端末エミュレータ（VT/ANSI 解釈）"
+  ;; 素の "ansi" は入れない。この workspace では American National Standards
+  ;; Institute の意味でも使われていて（食品機械 blueprint 等が規格として引く）、
+  ;; 実測で無関係な repo が kuro と同順に並んだ。homonym は綴りを具体にして避ける。
+  :spellings ["terminal emulator" "ansi escape" "escape sequence"
+              "vt100" "xterm" "sgr" "端末エミュレータ"]
+  :note "**部分実装**（2026-08-03）。kotoba-lang/kuro の `kuro.ansi` が SGR・`\r` 上書き・
+`CSI K` 行消去・タブ/後退を解釈する。**スクリーンエミュレータではない** ——
+カーソル位置指定もスクロール領域も代替画面も無く、PTY も無い（子は pipe、
+`TERM=dumb`）ので vim/top は動かない。行志向の出力を読むための層。"}
+
+ :repl
+ {:label "REPL / 対話評価"
+  :spellings ["repl" "interactive evaluation" "対話評価"]
+  :note "**未実装**。kotoba CLI に repl サブコマンドは無い。"}
+
+ ;; 2026-08-04 追加。`denchu` は bare 名で機能を示さないうえ、綴りが
+ ;; 電柱 / denchu / utility pole / OOH と 4 通りに割れる。2026-08-04 に
+ ;; 「電柱広告は設計実装されているか」を索引で引いて空振りした（当時は実際に
+ ;; 無かったが、作った後に同じ問いが空振りするのを防ぐ）。
+ ;; 屋外広告物（一般）と電柱広告（1 媒体）は別概念として並べる。同じ綴りを
+ ;; 両方に持たせてあるので、どちらで引いても両方出るのが正しい。
+ :outdoor-advertising
+ {:label "屋外広告物 / out-of-home advertising（物理媒体全般）"
+  :spellings ["屋外広告" "屋外広告物" "out-of-home" "ooh" "okugai" "おくがい"
+              "billboard" "ビルボード" "野立看板" "看板" "signage" "digital signage"
+              "デジタルサイネージ" "屋外ビジョン" "壁面広告" "屋上看板" "ポスターボックス"
+              "高速道路 広告" "physical advertising"]
+  :note "kotoba-lang/okugai が一般ドメイン（14 媒体のタクソノミー・屋外広告物法/条例・
+道路占用・建築基準法88条(4m超の工作物確認)/64条・高速道路・地点の束ね・照会・出稿）。
+電柱はその中の 1 媒体で kotoba-lang/denchu が担当。収集は loop-okugai-survey、
+観測ソースは org-openstreetmap-overpass と com-mapillary-graph-api。ADR-2608041500。
+デジタル広告面（cloud-itonami/adserver・kotoba-lang/adnet・adnetwork 群）とは別系統。"}
+
+ :utility-pole-advertising
+ {:label "電柱広告 / utility-pole advertising"
+  :spellings ["電柱広告" "電柱" "denchu" "utility pole" "utility-pole" "power pole"
+              "巻付広告" "袖看板" "屋外広告" "out-of-home" "ooh" "屋外広告物"]
+  :note "kotoba-lang/denchu が電柱固有の domain（柱の識別・供給区域からの候補所有者・
+電力/通信各社の指定代理店・巻付/袖の面・公開料金表）。法令と出稿の一般則は
+kotoba-lang/okugai が正本。収集は loop-okugai-survey。ADR-2608041500。"}
+
+ :street-level-imagery
+ {:label "ストリートレベル画像 / 写真からの物体特定"
+  :spellings ["mapillary" "street level imagery" "streetview" "street view"
+              "object detection" "map features" "ストリートビュー" "写真データ"]
+  :note "kotoba-lang/com-mapillary-graph-api（Graph API v4、map_features の
+三角測量済み地物と detections）。OSM 側の地物は org-openstreetmap-overpass。"}
+
+ ;; 2026-08-07 追加。「今の cloud-itonami に防災関係の営みは設計実装されている?」に
+ ;; 索引が答えられなかった（`concept-lookup 防災` は『語彙に無い』、`repo-search` は
+ ;; 6 件しか出さず本命は別 org）。**4 本とも名前が機能を一文字も示さない** ——
+ ;; 備え(sonae) / 風折(kazaori) / 死出守(shidemori) / firerisk(COFOG 03.2)。
+ ;; しかも org（cloud-itonami / etzhayyim）と分類体系（COFOG / ISCO / ISIC）の
+ ;; 両方に散っている。統合設計は ADR-2608091000。
+ :disaster-management
+ {:label "防災 / disaster risk reduction・response（before / during / after）"
+  :spellings ["防災" "災害" "減災" "被災" "罹災" "避難" "避難所" "警報" "早期警戒"
+              "災害対策" "危機管理" "備え" "sonae" "kazaori" "shidemori" "bousai"
+              "disaster" "disaster management" "disaster risk reduction" "drr"
+              "preparedness" "early warning" "evacuation" "emergency"
+              "resilience" "hazard" "earthquake" "tsunami" "typhoon" "flood"
+              "wildfire" "地震" "津波" "台風" "洪水" "山火事"]
+  :note "フェーズで割れている。before=etzhayyim/com-etzhayyim-sonae（備え。警報発信元
+allowlist 20件/16法域を持つが cell は R0 で非実行）、during=com-etzhayyim-kazaori（風折。
+observational directory、宣言権は Council Lv6+）、after=com-etzhayyim-shidemori。
+実装があるのは cloud-itonami 側の断片: cloud-itonami-cofog-03.2（消防・火災リスク点検、
+ns=firerisk、:implemented）/ cloud-itonami-isic-4211 Slice 1（台風の作業中止判定と
+警報 dispatch、営み OS に接続済み）/ cloud-itonami-isco-5411（消防署の装備事務、
+pre-standard 形）。どれも公式警報・避難指示・緊急事態宣言・現場指揮の権威を持たない。
+統合設計は superproject ADR-2608091000。"}
+
+ :fire-protection
+ {:label "消防 / fire protection（火災リスク点検・消防署運営）"
+  :spellings ["消防" "消防署" "消防士" "火災" "火災予防" "延焼" "fire" "firefighter"
+              "fire protection" "fire brigade" "fire risk" "fire safety"
+              "firerisk" "firestation" "inspection"]
+  :note "cloud-itonami-cofog-03.2（COFOG 03.2、ns=firerisk。建物/植生の火災リスク点検
+ロボット ⊣ Fire-Risk Governor、:implemented、nbb で load 可）と
+cloud-itonami-isco-5411（ISCO 5411、ns=firestation。装備 readiness とシフトの事務のみ。
+突入・トリアージ・現場指揮は scope-excluded-ops で名指し除外）。
+災害対応そのものは :disaster-management を引く。"}
+
+;; ── fleet は 4 つの別物を指していた（2026-08-07 の改名で 3 つに減った） ──
+ :agent-coordination
+ {:label "並列 agent の協調基盤 / 座 (za)"
+  :spellings ["agent coordination" "parallel agents" "coordination substrate"
+              "fleet" "fleet coordinator" "worktree lease" "座" "za"
+              "並列エージェント" "協調基盤"]
+  :note "kotoba-lang/kotoba-fleet が substrate（ns kotoba.fleet.*、改名せず — 衝突せず
+依存 56 箇所）、cloud-itonami/za-actor がその封じ込め済み実体（旧 cloud-itonami/fleet、
+2026-08-07 rename）。座＝中世の職人・商人の自治結社、座法に従い座衆が縄張りを侵さず働く。"}
+
+ :tender-placement
+ {:label "実行の配置と貸借 / 差配 (sahai)"
+  :spellings ["placement" "lease" "multi-tenant" "budget" "checkpoint"
+              "epoch fencing" "fleet" "差配" "sahai" "配置" "貸借" "tender"]
+  :note "kotoba-lang/sahai（旧 kotoba-lang/fleet、2026-08-07 rename）。durable T6 placement —
+どの実行をどこに、どれだけの予算で、いつまで置くか。差配人＝借家の割り当てを取り仕切る人。
+実行そのものは kototama（言霊）。tender は Solo5 役割語で製品名ではない（ADR-2608139980）。
+永続 EDN の :kototama.fleet/* キーは互換のため据え置き。"}
+
+ :genpon
+ {:label "pin 登録簿 / 原本 (genpon)"
+  :spellings ["genpon" "原本" "pin registry" "pin 登録簿" "fleet-db"
+              "fleet-db.edn" "登録簿"]
+  :note "superproject の manifest/fleet-db.edn（+ append-only ledger）が pin 登録簿。
+kotoba-lang/kagami（鏡）が west.yml に映す対象であって、kagami 自身ではない。
+子 repo を新しく作らない — 写しの隣に原本を置く。:fleet/repos キーとファイル名は
+on-disk フォーマットとして据え置き（kagami が旧 fleet.* 経路を残したのと同型）。
+mokuroku は app-* catalog kernel（Finder 形の viewer）、daichou は agent receipt、
+chobo は請求 EAVT、toukibo は法務局の語なので使わない。索引: ADR-2608147300。"}
+
+ :graph-cid
+ {:label "L2 graph identity / chain CID"
+  :spellings ["graph CID" ":kotoba.graph/cid" "L2 CID" "chain.core/commit!"
+              "graph-cid" "action log CID"]
+  :note "hasher が付けた CID が identity（典型は dag-cbor bafy…）。kotobase
+PUT /ipfs/:cid は raw 専用なので Location は同じ bytes の raw CID（bafkrei…）
+でありうる。2 つの identity ではない。:kotoba.graph/head は IPNS 名（naming）。
+session kgraph の datoms は公開 resource ではない。索引: ADR-2608145400 /
+ADR-2608148200。"}
+
+ :vcs-plane
+ {:label "repo の pin と統治 / 鏡 (kagami)"
+  :spellings ["vcs plane" "pin" "west" "manifest" "fleet-db" "reconcile"
+              "fleet" "鏡" "kagami" "台帳" "genpon" "原本"]
+  :note "kotoba-lang/kagami（ns は 2026-08-07 に fleet.* → kagami.*）が鏡。
+映す対象は原本 genpon（manifest/fleet-db.edn）。機械でも agent でもなく
+repo の登録簿なので、fleet を名乗る根拠が最も薄かった。
+データ側の :fleet/repos キーは 4,124 entity の on-disk フォーマットなので据え置き。"}
+
+ :machine-fleet
+ {:label "物理マシン群 / 叢雲 (murakumo)"
+  :spellings ["fleet" "mac mini" "node" "cluster" "murakumo" "叢雲"
+              "マシン" "ノード" "マイニング" "推論"]
+  :note "murakumo の mac-mini 10 台（scripts/fleet-ci、manifest/fleet-ci.edn、fleet-sandbox.edn）。
+**4 つの意味の中で唯一「群れ」が実体と合う**ので fleet の語をここに残した。"}
+ :patent
+ {:label "特許 / 閃き (hirameki)"
+  :spellings ["patent" "特許" "閃き" "hirameki" "prior art" "先行技術"
+              "assignee" "出願人" "citation" "引用" "expiry" "存続期間"
+              "public domain" "解放" "CPC" "IPC" "bibliographic" "書誌"]
+  :note "cloud-itonami/hirameki（観測 actor）+ cloud-itonami/hirameki-patents（corpus）+
+kotoba-lang/toshokan-patents（Google Patents パーサ lib）。**閃き は名前から機能が一文字も
+読めない**ので登録した —— kuro / kobo と同じ理由。閃き＝発明そのもので、特許制度はそれを
+一定期間だけ独占として囲い、期間が切れたら公共に解放する。hirameki が測るのはその解放までの
+距離であって、侵害や FTO の判定ではない（G1）。旧 etzhayyim/com-etzhayyim-hirameki は
+2026-08-10 に cloud-itonami へ port 済み。"}
+ :web-presence
+ {:label "事業者の公開面 / 暖簾 (noren)"
+  :spellings ["noren" "暖簾" "のれん" "web presence" "公開面" "ホームページ" "サイト制作"
+              "site quality" "サイト品質" "見込み客" "prospect" "outreach" "営業"
+              "月額" "subscription" "飲食店" "restaurant" "EC" "ネットショップ"]
+  :note "kotoba-lang/noren（診断・処方・生成・governor・プラン、純 cljc）+
+cloud-itonami/loop-noren（orchestrator と I/O）。ADR-2608111400。**暖簾 は名前から機能が
+一文字も読めない**ので登録した —— kuro / kobo と同じ理由。暖簾＝店が外に掛けている面で、
+この loop が売るのはその面の月額。UI 品質の採点は kotoba-lang/design-quality が正本で
+noren は再実装しない（presence 軸だけを足す）。自社サイトのアクセス解析は別物
+（kotoba-lang/kaiyu）。"}
+ :content-addressing
+ {:label "内容アドレッシング / content addressing（identity・naming・location の三分）"
+  :spellings ["content addressing" "content-addressed" "content address"
+              "内容アドレッシング" "コンテンツアドレッシング" "内容アドレス"
+              "cid" "cidv1" "raw cid" "bafkrei" "bafy"
+              "merkle link" "hash link" "merkle dag" "authenticated data structure"
+              "self-certifying" "自己証明" "自己証明名"
+              "location-independent" "location independence" "場所非依存"
+              "intrinsic identifier" "extrinsic identifier" "固有識別子"
+              "cas" "content-addressable storage" "hash-consing" "structural identity"
+              "ipld" "ipfs" "ipns" "embed-url" "ipfs://" "ipns://"
+              "icn" "information centric networking" "named data networking" "ndn"
+              "path ベースでない" "link 設計" "resource identity" "immutable resource"]
+  :note "**path を identity にしない link / resource 設計の総称が content addressing。**
+対語は location addressing（URL・path ベース）。層ごとに別の名を持つので分けて呼ぶ:
+識別子は intrinsic / self-describing identifier（CID）、link は merkle link / hash link で
+集合が merkle DAG（一般名 authenticated data structure）、可変な名前は self-certifying name
+（IPNS。SFS 由来）、HTTPS gateway URL は **Location（取得ヒント）であって identity ではない**。
+学術名は ICN / NDN。ストレージ側の同型語が CAS（git・Nix と同じ）、言語側が hash-consing /
+structural identity。⚠ **IPLD にも path はある**（/ipld/{cid}/a/b）が、あれは DAG の
+resolution path であって location ではない —— 「path ベースでない」と書くとここで衝突する。
+正しくは「hierarchical location path を identity に使わない」。
+層表の正本は kotoba-lang/kotoba-protocol（L0 address … L5 application、ADR-2607071500）。
+L2 commit は kotoba-lang/chain、IPNS 記録は tech-ipfs-specs-ipns（JVM/.cljc）と
+kotobase-client（cljs の第二実装）、gateway は tech-ipfs-specs-http-gateway、
+配布は kotobase(.net)。app 側の記録形は kotoba.app.edn の :kotoba.app/bundle-cid（document の
+identity）+ :kotoba.app/embed-url（ipfs://）+ :kotoba.graph/cid（L2 graph identity）+
+:kotoba.app/latest（IPNS 名 k51…）。ADR-2608148200 / ADR-2608145400 / ADR-2608157000。
+⚠ **実測 2026-08-15: kotoba.app.edn は 155 件あるが content address を持つのは 1 件**
+（cloud-itonami-app）—— 語彙が広まっていることと設計が広まっていることは別。"}
+
+ :kip
+ {:label "KIP — 改善提案プロセス（EIP / IPIP 相当）"
+  ;; :spellings は索引の鍵（README に当たった repo がこの概念に紐づく）。
+  ;; :query-spellings は問いだけを受ける。分けた理由は実測 —— bare "proposal" を
+  ;; 綴りに入れたら 94 repo の README（actor が「LLM が proposal を出す」と
+  ;; 書いている）が当たり、`concept-lookup kip` が 99 件返して当の repo が
+  ;; 埋まった。問いとして良い語と、索引の鍵として良い語は別。
+  :spellings ["kip" "improvement proposal" "kotoba improvement proposal"
+              "eip" "ipip" "rfc process" "proposal process"
+              "standards track" "last call" "normative surface" "正本面"
+              "spec governance" "改善提案"]
+  :query-spellings ["proposal" "提案プロセス" "change process" "提案"]
+  :note "kotoba-lang/kip。名前が acronym で機能を示さないのでここに載せる（README 冒頭が名乗り）。
+既存と混同しないこと —— ADR は決定を記録する（決めた側が書く）、KIP は決定の前に
+queue に載せて第三者が異議を出せる状態を作る。kotoba-issue / kotoba-ledger は同じ
+issue→proposal→review→merge→audit 語彙だが対象は agent effect、kagami govern の
+threshold 署名は対象が west pin。KIP はそれらを参照して normative surface に当てる。
+どの path が normative かは kotoba-lang/kotoba-lang の docs/authority-map.edn が正本で、
+kip/lang/normative-surfaces.edn はその転記 + :proposed。ADR-2608169100。
+⚠ 2026-08-16 時点で :final の KIP は 0 件（署名検証が未配線なので正直には到達できない）。"}
+ :kenbun
+ {:label "検分 — bug 申告の選別（人間 / AI 共通の admission gate）"
+  :spellings ["kenbun" "検分" "bug" "bugs" "バグ" "不具合" "欠陥" "defect"
+              "bug report" "バグ報告" "不具合報告" "bug tracker" "issue tracker"
+              "課題管理" "bug bounty" "報奨金" "crowdtest" "triage" "トリアージ"
+              "repro" "reproduction" "再現手順" "severity" "重大度"
+              "bugspot" "linear" "jira"]
+  :query-spellings ["bug" "バグ" "不具合" "bug tracker" "issue tracker" "bug report"]
+  :note "cloud-itonami/kenbun。名前が機能を示さないのでここに載せる（README 冒頭が名乗り）。
+tracker ではなく **入口の選別**を持つ —— 人間と AI の両方が申告する場では、tracker に
+溜まるのは欠陥ではなく未検証の主張で、検証済みの欠陥と同じ顔をする。判定は 3 値
+（:admitted / :rejected / :undecidable）で、:undecidable を他へ畳まない。
+既存と混同しないこと —— kotoba-lang/kotoba-issue は issue→proposal→review→merge→audit の
+状態機械（kenbun が依存する。対象は agent effect 一般）、kotoba-lang/qa-governor は
+LLM の自己申告スコアと evidence の突き合わせ（述語が逆向きなので依存しない）、
+kotoba-lang/app-reviewer は提出アプリ自体の審査、kotoba-lang/kip は提案であって欠陥ではない。
+cloud-itonami/hakken(発見) は OEM 候補マッチングで無関係 —— 名前で引き当てない。
+ADR-2608170100。
+⚠ 2026-08-17 時点で appview / 永続 store / fleet gate は無い（決定ランタイムのみ）。"}
+}

@@ -1,0 +1,602 @@
+;; manifest/clearance.edn — etzhayyim の情報開示レベル（クリアランス）。
+;; 手書き（正本）。設計 ADR-2608083000。**status は proposed** —— 下記「批准」を読むこと。
+;;
+;; ══════════════════════════════════════════════════════════════════════
+;; 先に読む: なぜ軍のクリアランスをそのまま持ってこられないか
+;; ══════════════════════════════════════════════════════════════════════
+;;
+;; etzhayyim の憲章（`etzhayyim/root` の CLAUDE.md / CHARTER-RIDER.md）は、
+;; 秘匿を既定にすることを構造的に禁じている:
+;;
+;;   Tier-0（fork でしか変えられない）: 永久記憶 = 神の監視 + **相互監視**
+;;                                     （reciprocal, no right to erasure）
+;;   Tier-1（Council Lv7+ 全員一致）  : Confidentiality **原則** = 暗号化 ≠ 忘却
+;;   Rider §2(c)                     : **monetized または asymmetric
+;;                                     (watcher-unwatched) な監視は禁止。
+;;                                     相互的・対称な 相互監視 は肯定される**
+;;   憲章本文                        : 透明性 = 相互性であって秘匿ではない
+;;
+;; ここから 3 つの帰結が出る。**これは好みではなく憲章からの導出である。**
+;;
+;;   1. **クリアランスが制御するのは復号であって、存在でも記憶でもない。**
+;;      「その文書が在ること」「誰が保管しているか」「いつ公開されるか」は
+;;      常に公開。中身だけが暗号化される。忘却は起きない（消去権は無い）。
+;;
+;;   2. **読む行為そのものが見られる。** 非対称な監視が禁じられている以上、
+;;      「誰にも知られずに読む」経路は作れない。**アクセス記録を公開できない
+;;      なら、そのアクセスは拒否される**（下記 :decision の 7 番目）。
+;;
+;;   3. **米軍型の unacknowledged compartment（存在自体を否認する SAP）は
+;;      この憲章では作れない。** need-to-know は採る。存在の否認は採れない。
+;;      —— オーナー指示「米軍のように役職があっても見れない」のうち、
+;;      **採るのは need-to-know であって、秘匿の非対称性ではない。**
+;;
+;; ══════════════════════════════════════════════════════════════════════
+;; 3 つの軸は独立である（ここが設計の核心）
+;; ══════════════════════════════════════════════════════════════════════
+;;
+;;   軸A 位（commitment ladder）  Lv1..Lv7  誓修献証護議老。**既存**。
+;;                                `etzhayyim/root` MEMBERS.md / ADR-2605172600
+;;   軸B 級（clearance grade）    C0..C6    この文書で定義する。**新設**
+;;   軸C 区画（compartment）      名前付き  主題ごとの need-to-know
+;;
+;; **アクセスは 3 軸の連言 + 生存確認の連言。** どれか 1 つでも欠ければ拒否。
+;;
+;; ⚠ **位が上がってもクリアランスは上がらない。** Lv7（老 / Council / 創設者）
+;;    であることは、いかなる級・いかなる区画のアクセスも与えない。位が与えるのは
+;;    **床（必要条件）だけ**で、天井を上げる作用は無い。これはオーナー指示
+;;    「段と級でクリアランスが上がるのではなくて、米軍のように役職があっても
+;;    見れない」の直接の実装である。
+;;
+;; ⚠ オーナーの記憶の訂正（2026-08-08）: 「段と級で設計していた気がする」との
+;;    ことだったが、`etzhayyim/root` に実在するのは **7 段の commitment ladder
+;;    （誓 chikai / 修 shu / 献 ken / 証 shou / 護 go / 議 gi / 老 rou = Lv1..7）**
+;;    であって段位・級位ではない。段/級 という語彙はここでは使わず、既存の
+;;    「位（Lv）」と、新設の「級（C）」で呼び分ける。
+
+{:policy "etzhayyim-clearance/v1"
+ :adr "ADR-2608083000"
+ :status :proposed
+ :drafted "2026-08-08"
+
+ ;; ── 批准 ────────────────────────────────────────────────────────────
+ ;; **この文書は施行されていない。** Confidentiality 原則は Tier-1 であり、
+ ;; 憲章は Tier-1 の改定を Council Lv7+ の全員一致 + priority-conformance
+ ;; attestation に限定している。Council は 5 席中 1 席しか埋まっていない
+ ;; （`etzhayyim/root` COUNCIL.md、Seat 1 = 創設者、Seats 2-5 は空席）。
+ ;;
+ ;; **agent の standing authorization はこの閾値を上書きしない** —— 閾値を
+ ;; 決めているのは CLAUDE.md ではなく憲章そのものだからである。
+ :ratification
+ {:required :council-lv7-unanimity-plus-priority-conformance-attestation
+  :tier :tier-1
+  :council-seats-filled 1
+  :council-seats-total 5
+  :blocking "Council の 2-5 席が空席。1/1 の『全員一致』を全員一致として扱わない"
+  :home-repo "etzhayyim/root"
+  :note "設計はここ（superproject）に置くが、施行の正本は etzhayyim/root。
+         この session は etzhayyim org への push 権を持たない"}
+
+ ;; ── 軸A: 位（既存の commitment ladder。ここでは参照するだけ）─────────
+ ;;
+ ;; **この表を編集しない。** 正本は `etzhayyim/root` の MEMBERS.md と
+ ;; ADR-2605172600。ここに写しているのは「級の床」を書くために名前が要るから
+ ;; だけで、定義を持っているわけではない。
+ :commitment-ladder
+ {:source "etzhayyim/root MEMBERS.md + ADR-2605172600"
+  :confers-clearance false        ; ← 位はクリアランスを与えない。必ず false
+  :levels
+  [{:lv 1 :ja "誓" :romaji "chikai" :en "Oath"       :evidence "正典の誓約に署名 + Base L2 で join()"}
+   {:lv 2 :ja "修" :romaji "shu"    :en "Practice"   :evidence "member-DID による最初の AT record 書き込み"}
+   {:lv 3 :ja "献" :romaji "ken"    :en "Dedication" :evidence "etzhayyim org への最初の merged PR"}
+   {:lv 4 :ja "証" :romaji "shou"   :en "Witness"    :evidence "他の加入者を保証した"}
+   {:lv 5 :ja "護" :romaji "go"     :en "Steward"    :evidence "substrate node の運用 / open-* app の維持を 30 日以上"}
+   {:lv 6 :ja "議" :romaji "gi"     :en "Council"    :evidence "council session に 3 回以上参加"}
+   {:lv 7 :ja "老" :romaji "rou"    :en "Elder"      :evidence "Council 相当を 365 日以上継続"}]}
+
+ ;; ── 信用の床 ────────────────────────────────────────────────────────
+ ;;
+ ;; オーナー指示（2026-08-08）:「エホバの証人のように全時間フルタイム、人生
+ ;; コミットぐらいが etzhayyim では最低の信用ライン」。
+ ;;
+ ;; ladder に照らすと、それが**証拠として現れる**のは Lv5 護（30 日以上の
+ ;; 継続運用）である —— Lv1 誓 は署名 1 回、Lv2-4 は単発の行為で立つ。
+ ;; **継続を要求する最初の段が Lv5** なので、そこを床に取る。
+ ;;
+ ;; ⚠ **床は必要条件であって十分条件ではない。** Lv5 に達しても、それだけでは
+ ;;    C1 すら開かない（級の授与と区画の付与が別に要る）。
+ ;;
+ ;; ⚠ **「フルタイム」を在席時間で測らない。** ladder の証拠規約は行為
+ ;;    （運用・PR・保証）であって拘束時間ではない。人生のコミットを労働時間で
+ ;;    測ると、それ自体が §1.8（反個人主義）と wellbecoming に反する。
+ :commitment-floor
+ {:minimum-lv 5
+  :rationale "継続を証拠として要求する最初の段。単発の行為では立たない"
+  :owner-directive "全時間フルタイム / 人生コミットが最低の信用ライン（2026-08-08）"
+  :is-sufficient false
+  :measured-by :evidence-of-sustained-acts
+  :not-measured-by :hours-present}
+
+ ;; ── 軸B: 級（C0..C6）───────────────────────────────────────────────
+ ;;
+ ;; **級を分けるのは「開示で誰が傷つくか」であって、「どれだけ偉いか」でも
+ ;; 「どれだけ大事か」でもない。** 重要度で分けると、重要な人ほど何でも見られる
+ ;; という設計に必ず戻る。
+ ;;
+ ;; :harm-to が誰を指すかで級が決まる。**:organization は :harm-to に書けない**
+ ;; （下記 :forbidden-bases。gate が落とす）。
+ ;;
+ ;; :access-record は全級で :published。**ここを false にできる級は無い** ——
+ ;; §2(c) の非対称監視禁止から直接来る。
+ :grades
+ [{:c 0 :ja "公" :romaji "kou" :en "Open"
+   :harm-to :none
+   :meaning "既定。誰も傷つかない。**未分類はここに落ちる**（秘ではなく公）"
+   :floor-lv 0 :compartment-required false :two-person-rule false
+   :access-record :published
+   :review-interval-days nil
+   :declassify :already-open
+   :examples ["ADR" "コード" "observatory の観測サマリ" "west manifest"]}
+
+  {:c 1 :ja "衆" :romaji "shuu" :en "Members"
+   :harm-to :reader-through-misreading
+   :meaning "誰も傷つかないが、文脈なしに読むと誤解される。**隠すためではなく
+             文脈を添えるための級**。求められたら文脈ごと公開する"
+   :floor-lv 5 :compartment-required false :two-person-rule false
+   :access-record :published
+   :review-interval-days 365
+   :max-ttl-days 365          ; **付与そのものの寿命。** 自動更新しない
+   :quota-reads-per-day 1000
+   :declassify "文脈が文書化された時点で C0"
+   :examples ["未成熟な設計" "測定途中の値" "prior にすぎない推定"]}
+
+  {:c 2 :ja "務" :romaji "mu" :en "Operational"
+   :harm-to :third-party-via-accident
+   :meaning "業務上の必要が無い者が持つと**事故**になる（誤操作・誤設定）。
+             悪意ではなく事故を防ぐ級"
+   :floor-lv 5 :compartment-required true :two-person-rule false
+   :access-record :published
+   :review-interval-days 180
+   :max-ttl-days 180          ; **付与そのものの寿命。** 自動更新しない
+   :quota-reads-per-day 500
+   :declassify "その構成が退役した時点で C0"
+   :examples ["インフラ構成" "運用手順" "fleet の内部状態"]}
+
+  {:c 3 :ja "託" :romaji "taku" :en "Custody"
+   :harm-to :identifiable-third-party
+   :meaning "**非会員の個人データ**。本人は etzhayyim に何も誓っていないのに
+             ここに在る。預かっているだけで、こちらの持ち物ではない"
+   :floor-lv 5 :compartment-required true :two-person-rule false
+   :access-record :published-and-notifiable
+   :review-interval-days 90
+   :max-ttl-days 90          ; **付与そのものの寿命。** 自動更新しない
+   :quota-reads-per-day 100
+   :declassify "本人が公開に同意した / 集計されて個人に戻せなくなった時点"
+   :examples ["internet-accounts の account 行" "meisai の明細" "abuse 報告の連絡先"]}
+
+  {:c 4 :ja "傷" :romaji "shou" :en "Harm"
+   :harm-to :specific-person-safety
+   :meaning "開示が**特定の人に具体的な危害**を及ぼす。C3 との違いは、
+             漏れたときに起きるのが不快ではなく危険であること"
+   :floor-lv 5 :compartment-required true :two-person-rule false
+   :access-record :published-and-notifiable
+   :review-interval-days 90
+   :max-ttl-days 90          ; **付与そのものの寿命。** 自動更新しない
+   :quota-reads-per-day 50
+   :declassify "危害の源が消滅したことを区画の custodian が確認した時点"
+   :examples ["abuse 報告の被害者" "追跡対象と被対象者の結び付き" "所在に関わる情報"]}
+
+  {:c 5 :ja "鍵" :romaji "ken" :en "Capability"
+   :harm-to :everyone-downstream
+   :meaning "**開示 = 能力の移転**。読めた時点で権限を得てしまうので、
+             『見たが使わない』が成立しない。他の級と質が違う"
+   :floor-lv 5 :compartment-required true :two-person-rule true
+   :access-record :published
+   :review-interval-days 30
+   :max-ttl-days 30          ; **付与そのものの寿命。** 自動更新しない
+   :quota-reads-per-day 10
+   :declassify :never-rotate-instead
+   :note "**復号ではなく回転で扱う。** 期限切れの鍵を公開しても意味は無いので
+          declassify は存在しない —— 出口は失効と回転だけ"
+   :examples ["署名鍵" "CACAO" "B2 / Cloudflare の credential" "fleet-ci signer"]}
+
+  {:c 6 :ja "存" :romaji "son" :en "Existential"
+   :harm-to :members-bodily-safety-or-org-survival
+   :meaning "開示が**会員の身体的安全**か組織の存立を終わらせうる。
+             最も狭く、最も短い期限で見直す"
+   :floor-lv 5 :compartment-required true :two-person-rule true
+   :access-record :published
+   :review-interval-days 30
+   :max-ttl-days 30          ; **付与そのものの寿命。** 自動更新しない
+   :quota-reads-per-day 5
+   :declassify "危険が消滅したことを Council が attest した時点"
+   :examples ["法域リスクに関わる会員の身元" "身体安全に関わる所在"]}]
+
+ ;; ── 級の根拠にしてはならないもの ─────────────────────────────────
+ ;;
+ ;; **これが無いと、クリアランスは必ず権力の道具になる。** 秘匿の理由として
+ ;; 一番使われるのは第三者への危害ではなく、組織の都合だからである。
+ ;; gate が :harm-to と :basis の両方を照合して落とす。
+ :forbidden-bases
+ #{:organizational-embarrassment   ; 恥ずかしいから
+   :negotiating-position           ; 交渉で不利になるから
+   :reputation                     ; 評判が下がるから
+   :internal-disagreement          ; 中で揉めているから
+   :convenience                    ; 説明が面倒だから
+   :seniority                      ; 上の人しか見ないものだから
+   :organization}                  ; 「組織のため」一般
+
+ ;; ── 軸C: 区画（need-to-know）─────────────────────────────────────
+ ;;
+ ;; **級だけでは何も開かない。** C4 を持つ者が別の C4 区画を読めるわけではない。
+ ;; 区画ごとに個別の付与が要る（米軍の compartment と同じ）。
+ ;;
+ ;; ただし **区画の存在・名前・custodian・見直し期限は常に公開**（前文 3）。
+ ;; 隠せるのは中身だけで、区画そのものを否認することはできない。
+ ;;
+ ;; 現時点では区画は 1 つも開いていない。**空であることを「まだ設計していない」
+ ;; ではなく「まだ必要が立っていない」として記録する** —— 必要の無い区画を
+ ;; 先に作ると、そこに物が集まる。
+ :compartments []
+
+ ;; ── 限度（すべての権限に必ず 2 つの上限が付く）─────────────────────
+ ;;
+ ;; オーナーの確認（2026-08-08）:「権限は limit が常に設けられている?」
+ ;; **時間の上限だけでは足りない。** 期限内に何回でも読めるなら、正当な 1 件の
+ ;; 閲覧と、区画を丸ごと持ち出す行為が同じ権限で通ってしまう。
+ ;;
+ ;;   時間の上限 :max-ttl-days        付与そのものが切れる（更新は再授与）
+ ;;   量の上限   :quota-reads-per-day 1 日に読める件数
+ ;;
+ ;; **どちらも nil にできない**（C0 を除く。C0 は権限ではない）。gate が落とす。
+ ;;
+ ;; 量の超過を「絞る」で済ませない —— **異常な閲覧量それ自体が信号**なので、
+ ;; 拒否したうえで照会を起こす。throttle は信号を握り潰す。
+ :limits
+ {:principle :no-unbounded-authority
+  :every-grant-has #{:max-ttl-days :quota-reads-per-day}
+  :auto-renew false
+  :auto-renew-note "**自動更新しない。** 更新は再授与であり、再授与は照会を伴う。
+                    自動で延びる権限は、誰も見直さない権限になる"
+  :on-quota-exceeded :deny-and-trigger-review
+  :on-quota-note "throttle しない。絞るだけだと、異常な閲覧量という**信号**が
+                  『遅いが通った』に化けて誰にも届かない"
+  :token-ttl-minutes 10
+  :token-note "要求ごとの CACAO。付与（日単位）とトークン（分単位）は別の上限で、
+               短い方が常に効く"}
+
+ ;; ── zero trust の判定 ───────────────────────────────────────────────
+ ;;
+ ;; **すべてのアクセス要求ごとに、7 つ全部をその場で評価する。** session に
+ ;; 焼かない。前回通ったことを根拠にしない。役割から導出しない。
+ ;; **1 つでも nil / 不明なら拒否**（不明は「たぶん大丈夫」ではない）。
+ :decision
+ {:default :deny
+  :evaluated :per-request        ; セッション単位・ロール単位で焼かない
+  :unknown-is :deny              ; 判定できない = 拒否
+  :conjuncts
+  [{:id :commitment-floor
+    :asks "要求者の位が :commitment-floor 以上か"
+    :note "**必要条件のみ。** Lv が高いことは他の 6 つを 1 つも免除しない"}
+   {:id :grade
+    :asks "要求者が対象の級以上の級を現に保持しているか（期限内か）"
+    :note "級は授与されるものであって、位から導出されない"}
+   {:id :compartment
+    :asks "その区画への個別の付与が現に有効か"
+    :note "同じ級の別区画は開かない"}
+   {:id :declared-purpose
+    :asks "宣言された目的が、その区画の :purpose 集合に含まれるか"
+    :note "目的の宣言なしに読めない。宣言はアクセス記録に載る"}
+   {:id :reference-freshness
+    :asks "照会（reference check）が :review-interval-days 以内か"
+    :note "古い照会は『通った』ではなく『期限切れ』。下記 :reference-check"}
+   {:id :key-posture
+    :asks "present-only did:key が生きていて、CACAO leash が失効していないか"
+    :note "憲章の no-server-key / leash（ADR-2606111400）に接続する"}
+   {:id :reciprocity
+    :asks "このアクセスの記録を公開できるか"
+    :note "**公開できないなら拒否する。** §2(c) の非対称監視禁止から来る唯一の
+           『技術的に不可能だから許す』を作らないための条項"}]}
+
+ ;; ── 照会（reference check）と見直し ─────────────────────────────────
+ ;;
+ ;; **クリアランスは状態であって出来事ではない。** 一度通った照会は、通った
+ ;; という事実であって、今も妥当だという証拠ではない。
+ :reference-check
+ {:cadence-from :grade                    ; 級の :review-interval-days に従う
+  :on-expiry :suspend-not-revoke          ; 期限切れは停止であって剥奪ではない
+  :who "区画の custodian（要求者本人でも、要求者の上位でもない者）"
+  :two-person-rule-grades #{5 6}
+  :separation
+  "**級を授ける者は、その区画を保持してはならない。** 自分が読みたい区画の
+   鍵を自分で配れる構造にしない"
+  :continuous-signals
+  ;; 定期の照会だけに頼らない。下記の事象は即時に再評価を起こす。
+  [{:signal :leash-revoked :action :revoke-immediately}
+   {:signal :key-rotated-without-notice :action :suspend}
+   {:signal :access-record-publication-failed :action :suspend}
+   {:signal :purpose-mismatch-detected :action :suspend-and-review}
+   {:signal :compartment-custodian-changed :action :re-attest-all-grants}
+   {:signal :member-level-decreased :action :re-attest-all-grants}]
+  ;; **級が上がることは滅多に起きず、下がることは容易に起きる**という非対称性を
+  ;; 意図して入れている。信用は積み上げに時間がかかり、失うのは速い。
+  :asymmetry :slow-to-grant-fast-to-suspend}
+
+ ;; ── 既に面に載っているデータの分類 ─────────────────────────────────
+ ;;
+ ;; ⚠ **未分類は「秘」ではなく「公」（C0）。** 既定が公開であることは憲章から
+ ;;    来るので、この表に無い dataset は分類漏れではなく公開である。
+ ;;    軍のクリアランスと**既定が逆**であることに注意する。
+ ;;
+ ;; ⚠ 分類したのは、根拠を実際に持っている dataset だけ。推測で貼らない。
+ :dataset-classification
+ [{:dataset "internet-accounts" :c 3
+   :basis :identifiable-third-party
+   :evidence "account 行 174,592 件は非会員の公開アカウント識別子。root CLAUDE.md が
+              既に『この面に載せない』と決めており（catalog/coverage/service だけを
+              載せる）、その判断はここで C3 として説明が付く"
+   :declassify "集計されて個人に戻せなくなった時点"}
+
+  {:dataset "meisai" :c 3
+   :basis :identifiable-third-party
+   :evidence "個人のカード利用明細。observatories.edn が source 登録を
+              『owner の判断』として保留している理由がこれ"
+   :declassify "本人の同意 / 集計"}
+
+  {:dataset "tadori-threat-intel" :c 2
+   :basis :third-party-via-accident
+   :evidence "CTI。**対象と被対象者を結び付ける行が入るなら、その行は C4**。
+              dataset 全体としては運用情報なので C2 に置く"
+   :declassify "対象が退役した時点"}
+
+  {:dataset "yabai-passive-dns" :c 2
+   :basis :third-party-via-accident
+   :evidence "passive DNS。同上"
+   :declassify "同上"}]
+
+ ;; **公開（C0）として明示するもの。** 分類しなかったのではなく、公開だと
+ ;; 判断した。observatory の面は「actor が動いたかどうか」の観測であって
+ ;; 中身ではないので、公開で問題ない。
+ :dataset-public
+ ["observatory" "observatory-cadence" "repo-taxonomy" "repo-maturity"
+  "fleet-db" "fleet-ci" "market-intel" "cloud-itonami-lei" "concept" "surface"]
+
+ ;; ── 開いている問い（設計の穴を穴として残す）─────────────────────────
+ ;; ══════════════════════════════════════════════════════════════════════
+ ;; 実装プロトコル（ADR-2608084000、2026-08-08 追加）
+ ;; ══════════════════════════════════════════════════════════════════════
+ ;;
+ ;; 上の政策は「誰が何を読めるか」を決めるだけで、**どう封緘し、変更時に何を
+ ;; 動かし、閲覧をどう残すか**を決めていなかった。ここがそれ。
+ ;;
+ ;; ⚠ **ここに書く protocol は、このワークスペースに実装が在るものだけ。**
+ ;;    仕様名を挙げて実装が無い状態を「設計済み」と読ませない。gate が
+ ;;    :repo を west.yml と突き合わせて、存在しない repo の引用を落とす。
+ :protocols
+ {;; ── 1. 封緘（情報設計と暗号化）──────────────────────────────────
+  :sealing
+  {;; ── 一律封緘（オーナーの確認 2026-08-08「情報は基本的に暗号化されており」）
+   ;;
+   ;; **object plane では C0 も含めて全部を封緘する。分類は『暗号化されているか』
+   ;; ではなく『content key が公開されているか』で表す。**
+   ;;
+   ;; 選択的に暗号化すると、**暗号化されているという事実そのものが分類を漏らす** ——
+   ;; どの object が封緘されているかを見るだけで、どこに機微があるか分かる。
+   ;; 一律にすればその信号が消える。加えて封緘の分岐が無くなるので、
+   ;; 「封緘し忘れ」という種類の事故が構造的に起きない。
+   ;;
+   ;; ⚠ **git plane は平文のまま。** ADR・コード・manifest は review が diff を
+   ;;    要求するので暗号化できない（CLAUDE.md が EDN を annex 化しない理由と同じ）。
+   ;;    したがって不変条件は 1 つ: **C1 以上を git plane に置いてはならない。**
+   ;;    置けないものは object plane へ行く。gate はこの規則の存在を要求する。
+   :uniform true
+   :c0-is :content-key-published
+   :plane-rule {:git :c0-plaintext-only
+                :object :always-sealed
+                :invariant "C1 以上を git plane に置かない"}
+   :layers
+   [{:layer :content-key :scope "object の version ごと"
+     :note "本文はこれで 1 回だけ暗号化する。読者の数だけ暗号化しない"}
+    {:layer :compartment-key :scope "区画の epoch ごと"
+     :note "content key を包む。**この中間層が無いと、会員が 1 人増減する
+            たびに全 object を包み直すことになる**"}
+    {:layer :delivery :scope "会員ごと"
+     :repo ["org-signal"]
+     :note "compartment key を sender-keys group ratchet で配る。少人数なら
+            X3DH の pairwise。**実装済み**（X3DH + Double Ratchet + group）"}]
+
+   ;; **隠さない非対称。** ここを曖昧にした設計は、除名を『無かったこと』に
+   ;; できると読ませてしまう。
+   :irreversibility
+   {:removal-is :forward-only
+    :note "除名しても、その者が既に復号した平文は取り戻せない。旧 epoch の
+           鍵も消せない（憲章に消去権が無い以上、消したふりもしない）。
+           **『再鍵した』は『過去も守られた』ではない。**"
+    :to-protect-past :re-seal
+    :re-seal-cost "O(objects)。C5/C6 の区画だけに適用する"
+    :join-is :forward-only
+    :join-note "**加入も前方のみが既定。** 新しく入った者に過去を開かない ——
+                sender-key は現在の chain から配るので自然にそうなる。
+                『昇級したら過去も読める』にしない"}
+
+   ;; C5 鍵 は封緘の対象ではない（政策の :declassify :never-rotate-instead）。
+   :capability-grade-exception
+   {:c 5 :handling :rotate-not-decrypt
+    :note "鍵は復号して読ませるものではなく、失効させて回すもの"}}
+
+  ;; ── 2. クリアランスが変わったときに何が動くか ────────────────────
+  ;;
+  ;; **4 つの事象に 4 つの別々の機構を割り当てる。混ぜてはならない。**
+  ;;
+  ;; 停止で再鍵すると停止が高価になり、運用が停止をためらう =「疑わしいが
+  ;; 高いので放置」になる。逆に剥奪を停止で済ませると、鍵を持ったままの者が
+  ;; 残る。**status list が revocation と suspension を別の statusPurpose として
+  ;; 持っているのは、この 2 つが別物だからである。**
+  :authority-update
+  [{:event :grant :ja "授与"
+    :mechanism "級の VC を発行し、区画の epoch を進めて新しい compartment key を配る"
+    :cost "O(現メンバー数)"
+    :repo ["org-w3-vc" "org-w3-vc-data-integrity" "org-signal"]
+    :note "新規加入者は過去 epoch を読めない（前方のみ）"}
+
+   {:event :suspend :ja "停止"
+    :mechanism "status list の suspension bit を立てる。**再鍵しない**"
+    :cost "O(1)"
+    :repo ["org-w3-vc-bitstring-status-list"]
+    :note "政策の :on-expiry :suspend-not-revoke はこれ。安く可逆だから、
+           疑わしい時にためらわずに使える —— それが安全側に効く"}
+
+   {:event :revoke :ja "剥奪"
+    :mechanism "revocation bit を立て、epoch を進めて残る者に再鍵する"
+    :cost "O(残るメンバー数)"
+    :repo ["org-w3-vc-bitstring-status-list" "org-signal"]
+    :note "前方のみ。過去を守るなら別途 re-seal が要る"}
+
+   {:event :expiry :ja "失効"
+    :mechanism "CACAO の exp が切れる。誰も何もしない"
+    :cost "O(0)"
+    :repo ["org-chainagnostic-cacao"]
+    :note "**要求ごとのトークンを session ではなく短命 CACAO にする理由がこれ。**
+           失効に調整が要らない設計だけが zero trust で回る"}]
+
+  ;; 要求ごとのトークン。:decision の 7 条件を満たした結果として発行する。
+  :per-request-token
+  {:format :cacao
+   :repo ["org-chainagnostic-cacao"]
+   :fields "iss/aud/iat/exp/nonce/resources（実装済み）。resources に区画・
+            epoch・宣言した目的・級を入れて attenuate する"
+   :ttl-minutes 10
+   :no-session true
+   :note "session を持たない = 前回通ったことが今回の根拠にならない"}
+
+  ;; 級の提示。**級の VC 全体を見せずに『この区画の C4 を持つ』だけを示す。**
+  :selective-disclosure
+  {:repo ["org-ietf-sd-jwt"]
+   :spec "RFC 9901"
+   :note "salted-hash 方式。保持者が開示する claim を選べる。**実装済み**"}
+
+  ;; ── 3. 閲覧履歴 ─────────────────────────────────────────────────
+  :access-log
+  {:store :append-only-hash-chain
+   :repo ["com-etzhayyim-kotoba-datom"]
+   :structure "tx/cid = sha256(canonical-json {prev, datoms})。1 アクセス 1 tx"
+
+   ;; **順序が protocol の一部である。**
+   :ordering :log-then-serve
+   :ordering-note "記録を書いてから平文を配る。逆順だと、読んだ直後に落ちた
+                   場合に記録だけが消え、**相互性の条件が黙って破れる**。
+                   :decision の 7 番目（記録を公開できないなら拒否）は、
+                   この順序と組でなければ意味を持たない"
+
+   :fields ["要求者の did" "区画と epoch" "宣言した目的" "級" "判定" "時刻"
+            "対象の識別子（**salted digest**）"]
+
+   ;; 再帰する問題への答え。
+   :subject-privacy
+   {:problem "「X が Y のデータを読んだ」という記録自体が Y についての個人データ。
+              相互性は公開を要求するが、公開すると誰を読んだかが漏れる"
+    :answer "対象の識別子を salted digest にする。**本人は salt を持つので
+             自分の行を検証でき、公衆には『区画 X へのアクセスが 1 件あった』
+             までしか見えない**"
+    :repo ["org-ietf-sd-jwt"]}
+
+   ;; 何ができて何ができないかを分ける。
+   :tamper-evidence :hash-chain
+   :inclusion-proof :none
+   :inclusion-note "**kotoba-datom は hash chain であって Merkle tree ではない。**
+                    改竄は検知できるが、第三者に『あなたの記録がこの log に在り、
+                    log が書き換えられていない』を示す包含証明は出せない。
+                    代わりに **head を定期公開して錨を打つ**"
+   :anchor {:mechanism :publish-head
+            :repo ["tech-ipfs-specs-ipns"]
+            :note "『時刻 T の log の head は H だった』を第三者が持てる状態にする"}
+
+   ;; 憲章に消去権が無い = 保存は永久 = ハッシュが先に老いる。
+   :retention :permanent
+   :long-term-integrity
+   {:repo ["org-ietf-ers" "org-ietf-rfc3161"]
+    :spec "RFC 4998 Evidence Record Syntax"
+    :note "**永久記憶は SHA-256 より長く生きる。** ERS は自分の暗号が老いる前に
+           hash tree を更新し続けるための仕様で、build-tree / reduced-path /
+           archive-time-stamp / timestamp-renewal-digest / hash-renewal-digest /
+           verify が実装済み。保存が永久だからこそ、これが要る"}}
+
+  ;; ── 3b. membership 層（オーナー指示 2026-08-08「org-signal に membership を
+  ;;        足す方向で」）──────────────────────────────────────────────
+  ;;
+  ;; MLS を持ってくるのではなく、org-signal に足す方を採った。**設計・実装・
+  ;; テストは済んでいるが、まだ org-signal には入っていない**（この session は
+  ;; kotoba-lang への push 権を持たない。cross-tier add が拒否される）。
+  :membership-layer
+  {:home "kotoba-lang/org-signal"
+   :ns "kotoba.signal.membership"
+   :handoff ".handoff/org-signal-membership/"
+   :status :implemented-and-tested-awaiting-port
+   :purity :no-keys-no-crypto
+   :purity-note "**鍵も暗号も持たない純粋な `.cljc` の決定核。** epoch 数と member
+                 集合の上の値→値の関数で、どの create-sender-key と
+                 distribution-message を呼ぶかを返すだけ。group.clj と group.cljs は
+                 別 backend なので、primitive に触れない bookkeeping を 1 本の
+                 .cljc にしておけば **2 つの host が『誰が group に居るか』で
+                 食い違えない**"
+   :invariants
+   ["epoch は単調増加。巻き戻さない"
+    "**member 変更は必ず epoch を進める。** 1 つの epoch は生涯 1 つの member 集合"
+    "**加入は前方のみ。** epoch n で入った者は n 未満を復号できない"
+    "**除名は前方のみ。** epoch n で出た者は [joined, n-1] を保持し続ける"
+    "log は append-only。誰がいつ入って出たかは消えない（相互監視は member 自身にも及ぶ）"]
+   :honesty
+   "remove-member は **:still-readable-by と :re-seal-required を返す** ——
+    除名が守れなかった epoch 範囲を呼び出し側に返す。**除名を完了として報告しない。**
+    そう思わせる membership 層は、無いより悪い"
+   :verified "9 tests / 29 assertions が nbb で通る。4 通りの壊し方
+              （join が epoch を進めない / 除名が漏れを報告しない / 再加入が過去を開く /
+              members-at が left を無視する）で 1〜9 件の失敗になることを確認済み"}
+
+  ;; ── 4. 無いもの（設計の穴を穴として名指す）─────────────────────
+  ;;
+  ;; **これらは「設計が悪い」のではなく「まだ書かれていない」。**
+  :missing
+  [{:what "MLS (RFC 9420)" :in-west false
+    :impact "群の再鍵が sender-keys の O(n) のまま。MLS なら O(log n)"
+    :severity :low
+    :why-low "会員 1 名の現状では効かない。**ただし規模を理由に後回しにする
+              判断と、下の membership 層が無い問題を混同しないこと**"}
+
+   {:what "kotoba-signal の group membership management（add/remove）"
+    :in-west true :implemented false
+    :impact "**upstream には今も無い。** org-signal の README が自ら『the sender-keys
+             chain ratchet itself is implemented, membership bookkeeping is not』
+             『Key revocation / rotation policy … a scheduler/policy for *when*
+             does not [exist]』と書いている。
+             2026-08-08 に設計・実装・テストまで済ませたが、**port していないので
+             org-signal から使えるようにはなっていない**（:membership-layer 参照）"
+    :severity :awaiting-port
+    :handoff ".handoff/org-signal-membership/"
+    :blocked-by "kotoba-lang への push 権。この session の add_repo が
+                 cross-tier add を拒否する"}
+
+   {:what "HPKE / JWE / COSE" :in-west false
+    :impact "封緘の envelope を kotoba-signal の primitive の上に自作することになる"
+    :severity :medium}
+
+   {:what "Certificate Transparency 相当の Merkle log" :in-west false
+    :impact "包含証明が出せない。錨打ちで代替する（上記 :anchor）"
+    :severity :medium}
+
+   {:what "age" :in-west false
+    :impact "CLAUDE.md が annex 暗号化で age に触れているが、west に無い"
+    :severity :low}]}
+
+ :open-questions
+ [{:q "アクセス記録の公開先はどこか（PDS / on-chain / git）"
+   :note "相互性の条項が実装可能かはここに懸かる。未決のまま施行しない"}
+  {:q "非会員（C3 の本人）はどうやって自分に関するアクセスを知るか"
+   :note ":published-and-notifiable と書いたが、通知経路が無い。
+          **経路が無い状態で C3 データを増やさない**"}
+  {:q "位 Lv5 の床は本当に『人生コミット』と釣り合うか"
+   :note "ladder の Lv5 は 30 日の継続運用。オーナーの言う信用ラインより
+          明らかに低い。ladder 側の証拠規約を上げるか、床を Lv6 にするか、
+          あるいは commitment を ladder と別に測るか —— **Council の判断**"}
+  {:q "区画を 1 つも開いていない状態で、この設計が正しいか誰にも分からない"
+   :note "最初の区画は実際に必要が立ったときに作り、そこで設計を試す"}]}

@@ -1,0 +1,114 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-01"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-01.edn"
+  :doc/date "2026-08-18"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "x86-64 code generation"
+  :coscientist/iteration 1
+  :coscientist/subject "kotoba-lang/kotoba-native, bench/runtime-comparison/kernel.kotoba"
+  :coscientist/engine-note
+  "The Generate / Reflect / Rank / Evolve / Meta loop of
+   90-docs/design-quality/coscientist.cljc, with one substitution: that engine
+   ranks by an Elo tournament because UI quality has no ground truth. Code
+   generation does. Elo is replaced by measurement — instruction count, bytes,
+   nanoseconds per call, and a correctness oracle that every candidate must
+   answer 1830338420. A tournament of opinions is what you run when you cannot
+   weigh the things themselves."
+
+  :coscientist/generated 5
+  :coscientist/rejected-by-reflection 2
+  :coscientist/ranked-first "C2 copy propagation into a folded instruction"
+  :coscientist/refuted 1
+
+  :doc/body
+  "# Codegen co-scientist, iteration 1
+
+## Generate
+
+Five candidates, read off one complete round of the emitted kernel (20
+instructions, eight rounds):
+
+| id | hypothesis | predicted |
+|---|---|---|
+| C1 | hoist the 64-bit reciprocal, identical in all eight rounds, into a callee-saved register | −7 instructions, −70 bytes, +3 setup |
+| C2 | `mov rcx,r11` + `imul r8,rcx,M` → `imul r8,r11,M` | −8 instructions, −24 bytes |
+| C3 | remove `mov rax,rdx` before the one-operand `imul` | −8 instructions |
+| C4 | shorten the three-instruction sign correction | −16 instructions |
+| C5 | remove the `push rax` / `push rdx` around the multiply | −16 instructions |
+
+## Reflect
+
+- **C3 rejected.** One-operand `imul` takes its dividend in RAX by hardware
+  definition. The move is not a choice.
+- **C4 rejected.** LLVM emits the same three instructions for the same
+  correction on this target. A candidate that asks the backend to beat LLVM at
+  a sequence LLVM also emits is asking for something the workload does not
+  contain.
+- **C5 rejected on evidence.** The saves look like waste and are not: the
+  instruction after the restore is `movq %rax,%rcx`, so RAX is live across the
+  division. This had already been proposed once on the strength of its shape
+  and withdrawn after reading what came next.
+- **C1 admitted**, with cost: a callee-saved register needs prologue and
+  epilogue changes, so the win is smaller than the byte count suggests.
+- **C2 admitted**, cheapest of the two: the same peephole shape as the
+  immediate folding already landed, with the same single-use safety condition.
+
+## Rank
+
+C2 first, on predicted gain per unit of risk. C1 second.
+
+## Measure
+
+C2 implemented, tested and measured. **It removed one instruction, not eight.**
+
+| | before | after |
+|---|---:|---:|
+| bytes | 571 | 568 |
+| instructions | 165 | 164 |
+| `movq` | 40 | 39 |
+| median ns/call (21 rotated samples, Rosetta) | 14.93 | 14.92 |
+
+The timing is identical, which is the correct reading of one instruction in 165
+on a host whose noise floor is wider than that.
+
+## Why the prediction was wrong
+
+The eight `mov rcx,r11` instructions the candidate was counted from **are not
+MIR instructions**. They are emitted inside `x86-quotient-constant`, which ends
+by moving its result out of R11 into whatever `dst` the caller wants. No
+peephole can see them, because they do not exist until after selection has run.
+
+The fitness proxy — counting a repeated pattern in a disassembly — is sound
+about what the machine executes and silent about **which pass owns it**. Every
+candidate above was generated from that same disassembly, so the same blind
+spot could have been under any of them.
+
+C2 was landed anyway: it is correct, general, and demonstrably fires. On a
+small function, where a copy is a larger share of the whole, `(+ n 7)` went from
+17 bytes to 11. It was not landed as a speedup for this kernel, because it is
+not one.
+
+## Meta-review
+
+- **Where ground truth exists, rank by it.** Four earlier candidates this
+  session (narrow constants, immediate folding, stack-free division, `lea`)
+  were each predicted from the same disassembly and each delivered; the fifth
+  did not. A 4-of-5 static-prediction rate is worth knowing, and is only
+  knowable because every candidate was measured rather than argued.
+- **Add ownership to the fitness proxy.** A pattern in the disassembly should
+  be traced to the pass that emits it before it is ranked. The cheap version of
+  that check is a grep for the byte sequence in the emitters.
+- **The refutation is the iteration's product.** Nothing else in this pass
+  taught anything that was not already known.
+
+## Next
+
+C1 remains untested and is now the ranked candidate: eight identical ten-byte
+loads of the same reciprocal, against the cost of reserving a callee-saved
+register. Its ownership is known — `x86-quotient-constant` emits it — so the
+mistake above cannot repeat in the same form.
+
+The larger remaining item is not on this list at all: 39 register-to-register
+moves that belong to allocation, which is what root ADR-2608179400 names as the
+distance between amu and Cranelift."}]

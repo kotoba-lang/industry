@@ -1,0 +1,133 @@
+;; lifelog-audio-r0 — tsukuru に渡す R0 product requirement の正本。
+;; ADR: 90-docs/adr/2608092006-lifelog-audio-device-r0-tsukuru.edn
+;; これは設計要求であり、部品選定・実測・EVT 完了を意味しない。
+{:product/id "lifelog-audio-r0"
+ :product/revision "r0"
+ :product/status :architecture-accepted
+ :product/kind :wearable-audio-recorder
+ :product/form-factor :chest-clip
+ :product/owner "com-junkawasaki"
+ :product/manufacturing-plane "cloud-itonami/tsukuru-actor"
+
+ :scope
+ {:evt-quantity 10
+  :capture :continuous-audio
+  :processing :off-device
+  :network-required? false
+  :cloud-required? false
+  :open-hardware-decision :pending}
+
+ :industrial-design-target
+ {:outer-mm-max [55 42 15]
+  :mass-g-max 45
+  :mount :clothing-clip
+  :ports [:usb-c]
+  :prohibited [:camera :gps :speaker :cellular :wifi]}
+
+ :audio
+ {:microphones 2
+  :microphone-interface #{:pdm :i2s}
+  :authoritative-channels 1
+  :diagnostic-stereo? true
+  :sample-rate-hz 16000
+  :sample-format :signed-pcm-16le
+  :chunk-seconds 60
+  :calculated-bytes-per-hour 115200000
+  :calculated-bytes-per-16h 1843200000
+  :codec-r0 :none
+  :note "R0 は codec を reliability path に入れない。容量/電力改善は PCM gate 通過後。"}
+
+ :storage
+ {:minimum-capacity-gb 32
+  :medium-class :industrial-flash
+  :encryption :authenticated-per-chunk
+  :plaintext-fallback? false
+  :power-loss-max-gap-seconds 65
+  :overwrite-on-full? false
+  :host-delete-requires #{:durable-copy :aead-pass :sequence-pass :explicit-ack}}
+
+ :security
+ {:device-root :non-exportable-hardware-root
+  :firmware-update #{:signed :rollback-protected}
+  :production-debug :disabled
+  :pairing :physical-presence
+  :remote-recording-start? false
+  :audio-over-ble? false}
+
+ :physical-invariants
+ {:record-switch :cuts-microphone-power-rail
+  :record-led :powered-from-microphone-power-rail
+  :software-led-only-off-state? false
+  :firmware-can-override-physical-off? false}
+
+ :interfaces
+ {:usb-c #{:charge :chunk-read :verified-ack :firmware-update}
+  :ble #{:clock-sync :battery-status :fault-status :physical-presence-pairing}
+  :device-to-cloud :none}
+
+ :power-target
+ {:continuous-hours-min 12
+  :reserve-percent-min 10
+  :test-load #{:capture :record-led :storage-write :periodic-ble-advertising}
+  :ambient-c [20 25]
+  :surface-c-max-while-charging-and-recording 42}
+
+ :p0-gates
+ [{:gate/id :continuous-capture :sample-size 10 :pass "12h, dropped audio frame 0 on all devices"}
+  {:gate/id :battery :sample-size 10 :pass "12h後に残量 >= 10%"}
+  {:gate/id :crash-recovery :trials 20 :pass "確定chunk破損0、各欠落 <=65s"}
+  {:gate/id :storage-integrity :pass "全chunkでAEAD/sequence/sample-count検証、欠番明示"}
+  {:gate/id :physical-mute :pass "OFF時mic rail 0V、software/BLEから再開不能"}
+  {:gate/id :record-indicator :pass "mic rail ON iff recording LED ON、LED-only OFF stateなし"}
+  {:gate/id :offline :pass "phone/network/cloudなしで12h capture gate通過"}
+  {:gate/id :ingest :pass "録音継続中のread、verified ACK前のdeleteなし"}
+  {:gate/id :speech-utility :pass "pinned fixture/model、1m quiet speech WER <=20%"}
+  {:gate/id :thermal :pass "20–25C、charging+recordingで表面 <=42C"}
+  {:gate/id :provenance :pass "serial/PCB rev/firmware hash/public key/QC署名が10台すべて対応"}]
+
+ :manufacturing-package
+ [:product-spec-edn
+  :schematic-pdf
+  :ecad-source
+  :gerber
+  :drill
+  :pick-and-place
+  :pcb-stackup
+  :bom-with-approved-alternates
+  :firmware-source
+  :reproducible-build-manifest
+  :firmware-sbom
+  :program-and-lock-procedure
+  :enclosure-source
+  :step
+  :two-d-drawing
+  :assembly-instruction
+  :test-fixture
+  :microphone-calibration
+  :inspection-plan
+  :power-and-thermal-evidence
+  :signed-quality-inspection]
+
+ :tsukuru-boundary
+ {:evt-authority :manual-approval-until-live-chain-verified
+  :cae-qualified-auto-dispatch? false
+  :cae-not-qualified-stops-order? true
+  :personal-audio-on-marketplace-ref? false
+  :artifact-bytes :datalad-annex
+  :datom-content #{:cid :annex-key :metadata}
+  :confidential-upload :blocked-until-encrypted-dedicated-custody-and-human-approval}
+
+ :implementation-state
+ {:architecture :accepted
+  :product-spec :written
+  :candidate-parts :written-not-frozen
+  :power-storage-model :not-qualified
+  :bench-plan :ready-for-hardware
+  :schematic :not-started
+  :pcb :not-started
+  :enclosure-cad :not-started
+  :firmware :not-started
+  :bom :not-started
+  :bench-measurement :not-started
+  :evt-build :not-started
+  :production-order :not-started}}

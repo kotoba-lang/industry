@@ -1,0 +1,6 @@
+component	software	version	platform	purpose	notes
+language	Python	3.14.5	Darwin 25.3.0 arm64	independent reconstruction runtime	venv at .venv-audit; isolated from system python
+array	numpy	2.5.1	Darwin 25.3.0 arm64	numeric arrays	
+stats	scipy	1.18.0	Darwin 25.3.0 arm64	chi-square quantiles for lambda_GC	used instead of hand-rolled quantiles so the audit code is not less trustworthy than its target
+dataframe	pandas	3.0.5	Darwin 25.3.0 arm64	tabular IO	
+plotting	matplotlib	3.11.1	Darwin 25.3.0 arm64	Figure 1 rendering	Agg backend; SVG primary, PNG preview

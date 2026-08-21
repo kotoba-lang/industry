@@ -1,0 +1,19 @@
+#!/bin/zsh
+# 週次 fabric actor pulse（launchd com.junkawasaki.fabric-actor-cadence）。
+#
+# **repo の外から `clojure` を起動する。** superproject root の `deps.edn` は
+# Clojure の deps マニフェストではなく workspace メタデータ（datom の vector）で、
+# root を cwd にすると tools.deps がそれを読もうとして classpath 構築ごと落ちる:
+#
+#   Error building classpath. Cannot invoke "java.io.File.getAbsolutePath()"
+#   because the return value of "clojure.java.io$file.invokeStatic(Object)" is null
+#
+# 実測: この job は 2026-08-10 以降ずっとこれで死んでいた（/tmp/fabric-actor-cadence.err）。
+# **落ちていたのではなく、1 行も走らずに終わっていた** —— receipt が更新されない
+# だけなので、誰も気づかなかった。同じ回避を `90-docs/pricing-intelligence/query.clj`
+# と `scripts/mk1_cfd.clj` が先にやっている（root を引数/環境変数で渡す）。
+set -euo pipefail
+ROOT=/Users/junkawasaki/github/com-junkawasaki
+export FABRIC_ROOT="$ROOT"
+cd "$(mktemp -d)"
+exec /opt/homebrew/bin/clojure -Sdeps "{:paths [\"$ROOT/scripts\"] :deps {org.clojure/data.json {:mvn/version \"2.5.1\"} io.github.kotoba-lang/cacao {:local/root \"$ROOT/orgs/kotoba-lang/org-chainagnostic-cacao\"}}}" -M -m publish-fabric-actor-status

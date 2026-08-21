@@ -1,0 +1,388 @@
+;; manifest/origin-domains.edn — the origin plane's DATA.
+;;
+;; The RULE lives in manifest/repository-rules.edn (:vocabulary/id :origin).
+;; This file holds only the fact the rule needs: for a repository that
+;; implements someone else's specification or product, WHAT DOMAIN does that
+;; authority actually use.
+;;
+;; Everything else is derived. `com-` was never a semantic category meaning
+;; "commercial company" — it is what stripe.com reverses to. Nothing about a
+;; repository is classified here; a domain is recorded and the prefix falls
+;; out of it (ADR-2608040100).
+;;
+;; Direction matters: prefix is derived FROM domain, never parsed back OUT of a
+;; name. `com-yang-ming-api` cannot be split into a domain because a label may
+;; itself contain no hyphen while the subject does. The check is one-way —
+;; "does the repository name start with the derived prefix".
+;;
+;; Coverage is partial and stated as such. A domain absent from this file means
+;; UNVERIFIED, never CONFORMANT: silence must not read as a pass.
+
+{:schema "kotoba.origin-domains.v1"
+ :authority "90-docs/adr/2608040100-origin-plane-is-reverse-dns-of-the-real-domain.edn"
+
+ :derivation
+ {:steps ["take the authority's registrable domain (drop www and any host label"
+          " that carries no separate NS delegation — ec.europa.eu is recorded"
+          " as europa.eu, unstats.un.org as un.org)"
+          "split on '.'"
+          "reverse the label order"
+          "join with '-'  => the derived prefix"
+          "the repository name must equal the derived prefix, or begin with"
+          " the derived prefix followed by '-' and a subject"]
+  :examples {"stripe.com"            "com-stripe"
+             "ietf.org"              "org-ietf   (org-ietf-x509)"
+             "libp2p.io"             "io-libp2p  (io-libp2p-specs-kad-dht)"
+             "ipni.io"               "io-ipni    (io-ipni-specs)"
+             "ipfs.tech"             "tech-ipfs  (tech-ipfs-specs-ipns)"
+             "berkeley.edu"          "edu-berkeley (edu-berkeley-spice)"
+             "protobuf.dev"          "dev-protobuf"
+             "sel4.systems"          "systems-sel4"
+             "digital.go.jp"         "jp-go-digital (jp-go-digital-design-system)"
+             "boj.or.jp"             "jp-or-boj"}
+  :note "The examples above are not aspirational. Every one except sel4.systems
+         and boj.or.jp is an existing conformant repository name, which is the
+         evidence that this rule is already the de-facto convention and only
+         lacked a written form and a verifier."}
+
+ ;; DNS evidence: every domain below returned NS records (or, for the two host
+ ;; labels noted in :derivation, an A record under a delegated parent) on this
+ ;; date. That proves the domain exists and is delegated — it does NOT prove the
+ ;; domain belongs to the authority the repository implements. That second claim
+ ;; rests on assistant knowledge and owner review, and is recorded as such
+ ;; rather than dressed up as a measurement.
+ :dns-checked-at "2026-08-04"
+ :dns-checked-by "dig +short NS <domain>, 68 domains, 68 delegated"
+ :authority-binding-evidence :asserted-not-measured
+
+ ;; ── anchors ────────────────────────────────────────────────────────────
+ ;; Conformant repositories, recorded so the verifier proves the derivation
+ ;; against known-good names and not only against the misfiled set. If a change
+ ;; to the derivation breaks these, it is wrong.
+ :anchors
+ {"kotoba-lang/com-stripe"                  "stripe.com"
+  "kotoba-lang/com-docker"                  "docker.com"
+  "kotoba-lang/com-arm-isa"                 "arm.com"
+  "kotoba-lang/com-arm-cpu"                 "arm.com"
+  "kotoba-lang/com-qnx"                     "qnx.com"
+  "kotoba-lang/com-android-aosp"            "android.com"
+  "kotoba-lang/org-w3-webgpu"               "w3.org"
+  "kotoba-lang/org-ietf-x509"               "ietf.org"
+  "kotoba-lang/org-khronos-gltf"            "khronos.org"
+  "kotoba-lang/org-chainagnostic-cacao"     "chainagnostic.org"
+  "kotoba-lang/foundation-identity-didwebvh" "identity.foundation"
+  "kotoba-lang/org-sourceware-bzip2"        "sourceware.org"
+  "kotoba-lang/io-libp2p"                   "libp2p.io"
+  "kotoba-lang/io-ipni-specs"               "ipni.io"
+  "kotoba-lang/io-ipfs"                     "ipfs.io"
+  "kotoba-lang/tech-ipfs-specs-ipns"        "ipfs.tech"
+  "kotoba-lang/edu-berkeley-spice"          "berkeley.edu"
+  "kotoba-lang/dev-protobuf"                "protobuf.dev"
+  "kotoba-lang/jp-go-digital-design-system" "digital.go.jp"
+  "kotoba-lang/jp-hiroshiba-voicevox"       "hiroshiba.jp"}
+
+ ;; ── recorded domains ───────────────────────────────────────────────────
+ ;; Repositories whose authority domain has been looked up. The verifier derives
+ ;; each prefix and reports CONFORMANT or MISFILED. No status is stored here —
+ ;; storing a derived value by hand is how the two drift apart.
+ :domains
+ {;; connector plane (ADR-2608097000). One connector, one repository, named
+  ;; from the authority's registrable domain. Gmail is recorded under
+  ;; google.com rather than gmail.com because the API's authority is
+  ;; developers.google.com — and because recording the same domain for Drive,
+  ;; Gmail and Calendar is what lets connector.consent group all three into one
+  ;; grant. graph.microsoft.com is a host under microsoft.com, so the
+  ;; registrable domain is what is recorded.
+  ;; Connectors added to repositories that already owned the subject
+  ;; (ADR-2608097000 D3): a second repository for one subject in one plane is
+  ;; not allowed, so GitHub/Slack/Notion/Google Chat gained a connector.edn
+  ;; rather than a com-*-rest sibling. Recording the domains their descriptors
+  ;; now assert, so connector.validate/name-conformant? is checked against a
+  ;; fact and not against the name it is checking.
+  "kotoba-lang/com-github"          "github.com"
+  "kotoba-lang/com-slack"           "slack.com"
+  "kotoba-lang/com-notion"          "notion.com"
+  "kotoba-lang/com-google-chat"     "google.com"
+
+  "kotoba-lang/com-google-calendar" "google.com"
+  "kotoba-lang/com-google-drive"    "google.com"
+  "kotoba-lang/com-google-gmail"    "google.com"
+  "kotoba-lang/com-microsoft-graph" "microsoft.com"
+
+  ;; United States federal
+  "kotoba-lang/com-irs"            "irs.gov"
+  "kotoba-lang/com-fda"            "fda.gov"
+  "kotoba-lang/com-epa"            "epa.gov"
+  "kotoba-lang/com-cdc"            "cdc.gov"
+  "kotoba-lang/com-nih"            "nih.gov"
+  "kotoba-lang/com-nasa"           "nasa.gov"
+  "kotoba-lang/com-noaa"           "noaa.gov"
+  "kotoba-lang/com-fdic"           "fdic.gov"
+  "kotoba-lang/com-fbi-ucr"        "fbi.gov"
+  "kotoba-lang/com-uspto"          "uspto.gov"
+  "kotoba-lang/com-secgov-edgar"   "sec.gov"
+  "kotoba-lang/com-censusgov"      "census.gov"
+  "kotoba-lang/com-naics-codes"    "census.gov"
+
+  ;; treaty organisations using .int
+  "kotoba-lang/com-icao"           "icao.int"
+  "kotoba-lang/com-who"            "who.int"
+  "kotoba-lang/com-interpol"       "interpol.int"
+  "kotoba-lang/com-wipo"           "wipo.int"
+  "kotoba-lang/com-unfccc"         "unfccc.int"
+
+  ;; other intergovernmental bodies — .org / .eu / .ch, not .int
+  "kotoba-lang/com-imf"            "imf.org"
+  "kotoba-lang/com-worldbank"      "worldbank.org"
+  "kotoba-lang/com-wto"            "wto.org"
+  "kotoba-lang/com-oecd"           "oecd.org"
+  "kotoba-lang/com-iea"            "iea.org"
+  "kotoba-lang/com-ipcc"           "ipcc.ch"
+  "kotoba-lang/com-undata"         "un.org"
+  "kotoba-lang/com-isic-codes"     "un.org"
+  "kotoba-lang/com-edifact"        "unece.org"
+  "kotoba-lang/com-un-locode"      "unece.org"
+  "kotoba-lang/com-ecb"            "europa.eu"
+  "kotoba-lang/com-europol"        "europa.eu"
+  "kotoba-lang/com-eurostat"       "europa.eu"
+
+  ;; national
+  "kotoba-lang/com-boj"            "boj.or.jp"
+  "kotoba-lang/com-jis-standards"  "jisc.go.jp"
+  "kotoba-lang/com-boe"            "bankofengland.co.uk"
+  "kotoba-lang/com-din-standards"  "din.de"
+  "kotoba-lang/com-epo-patents"    "epo.org"
+
+  ;; standards bodies — several already have a conformant org-* family that
+  ;; these entries collide with head-on
+  "kotoba-lang/com-iso-standards"  "iso.org"
+  "kotoba-lang/com-iso-8583"       "iso.org"
+  "kotoba-lang/com-posix"          "ieee.org"
+  "kotoba-lang/com-w3c-specs"      "w3.org"
+  "kotoba-lang/com-webrtc-core"    "w3.org"
+  "kotoba-lang/com-openxr"         "khronos.org"
+  "kotoba-lang/com-ros-robotics"   "ros.org"
+  "kotoba-lang/com-ros2-nav"       "ros.org"
+  "kotoba-lang/com-asme-materials" "asme.org"
+  "kotoba-lang/com-astm-codes"     "astm.org"
+  "kotoba-lang/com-autosar"        "autosar.org"
+  "kotoba-lang/com-hl7-fhir"       "hl7.org"
+  "kotoba-lang/com-dicomweb"       "dicomstandard.org"
+  "kotoba-lang/com-snomed-ct"      "snomed.org"
+  "kotoba-lang/com-opc-ua"         "opcfoundation.org"
+  "kotoba-lang/com-modbus-tcp"     "modbus.org"
+  "kotoba-lang/com-edi-x12"        "x12.org"
+  "kotoba-lang/com-gtfs"           "gtfs.org"
+  "kotoba-lang/com-gbfs"           "gbfs.org"
+
+  ;; IETF protocol work — ietf.org, and org-ietf-* is already a 30-strong family
+  "kotoba-lang/com-tcp-ip"         "ietf.org"
+  "kotoba-lang/com-ipsec"          "ietf.org"
+  "kotoba-lang/com-ipv6-routing"   "ietf.org"
+  "kotoba-lang/com-bgp-routing"    "ietf.org"
+  "kotoba-lang/com-bgp-rpki"       "ietf.org"
+  "kotoba-lang/com-quic-http3"     "ietf.org"
+  "kotoba-lang/com-mpls"           "ietf.org"
+  "kotoba-lang/com-ntp-time"       "ntp.org"
+  "kotoba-lang/com-dns-root-zone"  "iana.org"
+
+  ;; operating systems and platforms
+  "kotoba-lang/com-freebsd"        "freebsd.org"
+  "kotoba-lang/com-linux-syscalls" "kernel.org"
+  "kotoba-lang/com-sel4"           "sel4.systems"
+  "kotoba-lang/com-kubernetes"     "kubernetes.io"
+  "kotoba-lang/com-mavlink-drones" "mavlink.io"
+  "kotoba-lang/com-riscv-isa"      "riscv.org"
+  "kotoba-lang/com-riscv-cpu"      "riscv.org"
+
+  ;; already com-, but under the wrong second label: the authority is the
+  ;; vendor, not the product. com-apple-* and com-microsoft-* both exist.
+  "kotoba-lang/com-macos-darwin"   "apple.com"
+  "kotoba-lang/com-ios-sdk"        "apple.com"
+  "kotoba-lang/com-windows-api"    "microsoft.com"
+  "kotoba-lang/com-x86-cpu"        "intel.com"
+  "kotoba-lang/com-x86-64-isa"     "amd.com"
+  ;; Recorded as an anchor at first, on the assumption that a British standards
+  ;; body under com- must already be right. The verifier's anchor check refused
+  ;; it: BSI's domain is bsigroup.com, so the derived prefix is com-bsigroup and
+  ;; the repo is misfiled on the SECOND label while the TLD was never in doubt.
+  ;; Left here as the demonstration that the plane is the whole prefix.
+  "kotoba-lang/com-bsi-standards"  "bsigroup.com"
+
+  ;; ── second batch, 2026-08-05: found by DNS sweep, not by reading names ──
+  ;; Method: for all 1,054 com-* repos, test whether the first label resolves as
+  ;; <label>.com. 1,029 do; 25 do not. Non-resolution is a real signal that the
+  ;; naive reading is wrong; RESOLUTION IS NOT a signal that it is right (yang.com
+  ;; resolves and says nothing about com-yang-ming-api), so only the 25 were
+  ;; pursued and the other 1,029 stay UNVERIFIED. 5 were already recorded above;
+  ;; these are the 20 new ones, minus 3 moved to :unresolvable.
+  "kotoba-lang/com-accelbyte"          "accelbyte.io"
+  "kotoba-lang/com-acorrd-standards"   "acord.org"
+  "kotoba-lang/com-b-pipe"             "bloomberg.com"
+  "kotoba-lang/com-billcom"            "bill.com"
+  "kotoba-lang/com-boschiot"           "bosch.com"
+  "kotoba-lang/com-d-wave"             "dwavesys.com"
+  "kotoba-lang/com-e-residency"        "gov.ee"
+  "kotoba-lang/com-epiconlineservices" "epicgames.com"
+  "kotoba-lang/com-feishu"             "feishu.cn"
+  "kotoba-lang/com-helion-energy"      "helionenergy.com"
+  "kotoba-lang/com-idnow"              "idnow.io"
+  "kotoba-lang/com-navblue"            "navblue.aero"
+  "kotoba-lang/com-omop-cdm"           "ohdsi.org"
+  "kotoba-lang/com-pix-brazil"         "bcb.gov.br"
+  "kotoba-lang/com-scaleai"            "scale.com"
+  "kotoba-lang/com-tensorrt"           "nvidia.com"
+  "kotoba-lang/com-zendesksell"        "zendesk.com"
+
+  ;; 2026-08-04 追加（ADR-2608041500、電柱広告の在庫候補ソース）
+  ;; Mapillary の API host は graph.mapillary.com だが、記録するのは登録可能
+  ;; ドメインなので mapillary.com。Overpass API の公開エンドポイントは
+  ;; overpass-api.de で運用されるが、タグ体系（power=pole / man_made=utility_pole）と
+  ;; データの authority は OSM 側にあるので openstreetmap.org を記録する。
+  "kotoba-lang/com-mapillary-graph-api" "mapillary.com"
+  "kotoba-lang/org-openstreetmap-overpass" "openstreetmap.org"
+
+  ;; 2026-08-15 追加（ADR-2608153000、Valueflows を営み OS の経済語彙に据える）
+  ;; valueflo.ws は登録可能ドメインそのもの（.ws は Samoa の ccTLD で、
+  ;; valueflo は第 2 レベル）。ラベル逆順 => ws-valueflo。
+  ;; DNS 実測 2026-08-15: NS 3 本（ns-5-a / ns-50-b / ns-84-c.gandi.net）、
+  ;; A は valueflows.codeberg.page。仕様本体の permanent identifier は
+  ;; w3id.org/valueflows/ont/vf だが、記録するのは authority が使っている
+  ;; ドメイン（= 公開サイト valueflo.ws）であって PURL リダイレクタではない。
+  "kotoba-lang/ws-valueflo-vocabulary" "valueflo.ws"
+  "kotoba-lang/ws-valueflo-algorithms" "valueflo.ws"
+
+  ;; 2026-08-15 追加（ADR-2608159400、UCAN Delegation v1 の外部仕様境界）
+  ;; UCAN Working Group の仕様公開元は ucan.xyz。登録可能ドメインの
+  ;; ラベル逆順は xyz-ucan。DNS 実測 2026-08-15: authoritative NS は
+  ;; scott.ns.cloudflare.com / sreeni.ns.cloudflare.com。
+  "kotoba-lang/xyz-ucan" "ucan.xyz"
+
+  ;; 2026-08-16 追加（ADR-2608160300）。IPNI 仕様の公開ドメインは ipni.io
+  ;; （GitHub org `ipni` の website）。ipni.org は Kew の植物名索引で別物。
+  ;; cid.contact は本番 indexer であって仕様の authority ではない。
+  ;; DNS 実測 2026-08-16: NS mona.ns.cloudflare.com / jarred.ns.cloudflare.com。
+  "kotoba-lang/io-ipni-specs" "ipni.io"}
+
+ ;; ── unresolvable ───────────────────────────────────────────────────────
+ ;; Names that carry an origin prefix but have no single authority domain to
+ ;; derive from. Recorded rather than guessed. These are not misfiled — the
+ ;; origin plane simply does not apply, and each needs an owner decision
+ ;; (move to the subject plane, or pick one of the competing authorities).
+ :unresolvable
+ [{:repo "kotoba-lang/com-rtos"
+   :why "a class of system, not a specification anyone publishes"
+   :candidates []}
+  {:repo "kotoba-lang/com-can-bus"
+   :why "Bosch published the original spec, ISO standardised it as 11898"
+   :candidates ["bosch.com" "iso.org"]}
+  {:repo "kotoba-lang/com-sic-codes"
+   :why "US SIC was retired in favour of NAICS; no body maintains it today"
+   :candidates ["census.gov" "osha.gov"]}
+  {:repo "kotoba-lang/com-gb-standards"
+   :why "Chinese GB standards moved between SAC and SAMR"
+   :candidates ["sac.gov.cn" "samr.gov.cn"]}
+  ;; From the 2026-08-05 DNS sweep: the first label does not resolve as a .com,
+  ;; and looking further found no publishing authority either.
+  {:repo "kotoba-lang/com-chatdev"
+   :why "a research project (OpenBMB), distributed as a GitHub repo with no
+         authority domain of its own"
+   :candidates []}
+  {:repo "kotoba-lang/com-cobot-assembly"
+   :why "a manufacturing practice, not a specification anyone publishes"
+   :candidates []}
+  {:repo "kotoba-lang/com-serdes-phy"
+   :why "a circuit block; the relevant specs sit under several bodies (OIF,
+         JEDEC, IEEE) with no single owner for the subject as named"
+   :candidates ["oiforum.com" "jedec.org" "ieee.org"]}]
+
+ ;; ── same-plane duplicates found by the sweep ───────────────────────────
+ ;; Forbidden by repository-rules.edn :same-plane-collision. Recorded here
+ ;; because the DNS sweep is what surfaced them: two names, one authority.
+ :same-plane-duplicates
+ [{:authority "epicgames.com"
+   :repos ["kotoba-lang/com-epic-online-services" "kotoba-lang/com-epiconlineservices"]
+   :note "the same product under two spellings of the same words; one is a
+          duplicate registration, not a second subject"}]
+
+ ;; ── domain migration ───────────────────────────────────────────────────
+ ;; The rule pins the domain AS OF REGISTRATION and does not chase a move.
+ ;; Recorded because it has already happened, not as a hypothetical.
+ :migrations
+ [{:authority "IPFS"
+   :from "ipfs.io" :to "ipfs.tech"
+   :repos-under-old ["kotoba-lang/io-ipfs" "kotoba-lang/io-ipld"
+                     "kotoba-lang/io-multiformats"]
+   :repos-under-new ["kotoba-lang/tech-ipfs-specs-ipns"
+                     "kotoba-lang/tech-ipfs-specs-http-gateway"]
+   :disposition :keep-both
+   :why "A repository name is a discovery alias, not identity — identity is the
+         semantic definition CID (ADR-2607289500). Renaming five repositories to
+         track a marketing domain move would churn west pins and every inbound
+         reference to buy nothing. Both prefixes are correct as of their own
+         registration date."}]
+
+ ;; ── coverage ───────────────────────────────────────────────────────────
+ ;; Stated so a reader never mistakes this file for a census. The verifier
+ ;; prints these counts on every run.
+ :coverage
+ {:measured-at "2026-08-05"
+  :measured-by "nbb scripts/verify-repository-roles.cljs --name-audit"
+  :workspace {:repos 4078 :origin-plane 1432 :unverified 1313}
+  :recorded-here 112
+  :anchors 18
+  :conformant 18
+  :misfiled 94
+  :unresolvable 7
+  :note "1,313 origin-plane repositories have no domain recorded. They are
+         reported UNVERIFIED, not CONFORMANT. It is deliberately not
+         auto-populated from the name, which would assume the answer the check
+         exists to test."
+  :honest-reading "conformant=18 does NOT mean 18 of 1,432 names are right. It
+                   means 18 have been CHECKED and passed. Every misfiling here
+                   was found by looking; none was found by counting."
+  ;; Why the remaining 1,313 cannot simply be batched: the repositories carry no
+  ;; authority URL anywhere (measured — READMEs name the vendor in prose and link
+  ;; nothing but github.com), so there is no in-repo evidence to extract. Each
+  ;; needs an external lookup. What CAN be done mechanically is narrow the
+  ;; worklist, which is what the DNS sweep below does.
+  :why-not-batched :no-authority-url-inside-the-repositories
+  ;; Entries recorded AFTER the run above. The counts are a dated measurement
+  ;; and are not hand-incremented; the additions are named instead, so
+  ;; recorded-here=112 stays true of 2026-08-05 rather than becoming a wrong
+  ;; number about today.
+  :added-after-last-measurement
+  [{:date "2026-08-15"
+    :repos ["kotoba-lang/ws-valueflo-vocabulary" "kotoba-lang/ws-valueflo-algorithms"]
+    :domain "valueflo.ws"
+    :dns-checked-at "2026-08-15"
+    :adr "ADR-2608153000"}
+   {:date "2026-08-15"
+    :repos ["kotoba-lang/xyz-ucan"]
+    :domain "ucan.xyz"
+    :dns-checked-at "2026-08-15"
+    :adr "ADR-2608159400"}]}
+
+ ;; ── DNS sweep, 2026-08-05 ──────────────────────────────────────────────
+ ;; A way to find candidates without asserting anything: for each com-* repo,
+ ;; test whether its first label resolves as <label>.com.
+ ;;
+ ;; The asymmetry is the whole point. NON-resolution proves the naive reading is
+ ;; wrong. RESOLUTION proves nothing — yang.com resolves and tells you nothing
+ ;; about com-yang-ming-api — so the 1,029 that resolved were left UNVERIFIED
+ ;; rather than quietly marked conformant.
+ :dns-sweep
+ {:date "2026-08-05"
+  :method "dig +short NS <first-label>.com over all com-* repos"
+  :tested 1054
+  :resolved 1029
+  :did-not-resolve 25
+  :already-recorded 5
+  :pursued 20
+  :outcome {:recorded-as-misfiled 17 :moved-to-unresolvable 3 :conformant 0}
+  :hit-rate "17 of 17 pursued-and-resolvable turned out misfiled"
+  :note "Non-resolution was a perfect predictor here, which says the sweep found
+         a genuine seam and not that 1,029 names are fine. Examples it caught:
+         com-acorrd-standards (ACORD, and misspelled), com-b-pipe (Bloomberg
+         B-PIPE), com-tensorrt (NVIDIA), com-pix-brazil (Banco Central do
+         Brasil), com-omop-cdm (OHDSI)."}}

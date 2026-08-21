@@ -1,0 +1,188 @@
+;; 叢雲 MK-1 — 部材カタログ (ADR-2607267000 / 2607268000 / 2607269000)
+;; 単位: 寸法 mm / 質量 g / 電力 W / 価格 USD。座標系は右手系で
+;;   X = 幅(sandwich の厚み方向) / Y = 高さ / Z = 奥行(前後)。
+;; :part/envelope は部品自身の AABB を [x y z] で与える(設置姿勢での値)。
+;; :part/insert-axis は組み立て時の挿入方向(この軸に沿って外から入れる)。
+;; transact: (d/transact conn (edn/read-string (slurp "…mk1-parts.datoms.edn")))
+;; query は datascript.js 向けに裸文字列属性を使う(CLAUDE.md の EDN query plane 参照)。
+[
+ ;; ---- schema ---------------------------------------------------------------
+ {:db/ident :source/dataset  :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :part/id         :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :part/name       :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :part/category   :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :part/envelope   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; pr-str [x y z]
+ {:db/ident :part/mass-g     :db/valueType :db.type/long    :db/cardinality :db.cardinality/one}
+ {:db/ident :part/power-w    :db/valueType :db.type/long    :db/cardinality :db.cardinality/one}
+ {:db/ident :part/qty        :db/valueType :db.type/long    :db/cardinality :db.cardinality/one}
+ {:db/ident :part/price-usd  :db/valueType :db.type/long    :db/cardinality :db.cardinality/one} ; @50台 目標
+ {:db/ident :part/interface  :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :part/insert-axis :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :part/mounts-on :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; 親部材 id(嵌合/搭載先)
+ {:db/ident :part/subassembly :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :bench = 筐体外で先組み
+ {:db/ident :part/mount-side :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :rear = PCB 裏面
+ {:db/ident :part/chamber    :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :board | :gpu | :psu
+ {:db/ident :part/fasteners  :db/valueType :db.type/long    :db/cardinality :db.cardinality/one}
+ {:db/ident :part/measured   :db/valueType :db.type/boolean :db/cardinality :db.cardinality/one} ; false = 公称/推定
+ {:db/ident :part/dim-grade  :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :spec(規格確定) :datasheet(公称) :estimate(推定)
+ {:db/ident :part/tolerance-mm :db/valueType :db.type/string :db/cardinality :db.cardinality/one} ; pr-str [tx ty tz] 片側公差
+ {:db/ident :cable/id       :db/valueType :db.type/string  :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :cable/name     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :cable/from     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :cable/to       :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :cable/bundle-dia-mm :db/valueType :db.type/long :db/cardinality :db.cardinality/one}
+ {:db/ident :cable/min-bend-factor :db/valueType :db.type/long :db/cardinality :db.cardinality/one} ; 最小曲げ半径 = factor x 径
+ {:db/ident :cable/waypoints :db/valueType :db.type/string :db/cardinality :db.cardinality/one} ; pr-str [[x y z] ...]
+ {:db/ident :part/source     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
+ ;; ---- 主要部材 -------------------------------------------------------------
+ {:part/id "gpu-b70" :part/dim-grade :datasheet :part/tolerance-mm "[0.5 0.5 1.0]" :part/name "Intel Arc Pro B70 32GB GDDR6"
+  :part/category :gpu :part/envelope "[39 110 267]"
+  :part/mass-g 1050 :part/power-w 230 :part/qty 1 :part/price-usd 1065
+  :part/interface "PCIe 5.0 x16 / 8-pin(2x4) at card END, not top edge"
+  :part/mounts-on "riser"
+  :part/insert-axis :-x :part/chamber :gpu :part/fasteners 2
+  :part/measured false
+  :part/source "267x110x39mm dual-slot blower (igorslab teardown / videocardz); 230W TBP; 608 GB/s; street $1,126, @50台目標 $1,065. 質量は同級 dual-slot 267mm カードからの推定"
+  :source/dataset "mk1-parts"}
+
+ {:part/id "mobo-b650i" :part/dim-grade :spec :part/tolerance-mm "[2.0 0.3 0.3]" :part/name "ASRock B650I Lightning WiFi (mini-ITX)"
+  :part/category :motherboard :part/envelope "[36 170 170]"
+  :part/mass-g 480 :part/power-w 15 :part/qty 1 :part/price-usd 152
+  :part/interface "AM5 / PCIe 5.0 x16 / 2x M.2 / 2x DDR5 DIMM / 2.5GbE / WiFi 6E"
+  :part/subassembly :bench
+  :part/insert-axis :+x :part/chamber :board :part/fasteners 4
+  :part/measured false
+  :part/source "mini-ITX 規格 170x170mm(確定)。X=36 は PCB 1.6 + 実装部品高さの推定を含む envelope。Micro Center $169.99 → @50台 $152"
+  :source/dataset "mk1-parts"}
+
+ {:part/id "cpu-7700" :part/dim-grade :spec :part/tolerance-mm "[0.2 0.2 0.2]" :part/name "AMD Ryzen 7 7700 (8C/16T, 65W)"
+  :part/category :cpu :part/envelope "[8 40 40]"
+  :part/mass-g 75 :part/power-w 65 :part/qty 1 :part/price-usd 262
+  :part/interface "Socket AM5 (LGA1718)"
+  :part/mounts-on "mobo-b650i" :part/subassembly :bench
+  :part/insert-axis :+x :part/chamber :board :part/fasteners 0
+  :part/measured false
+  :part/source "AM5 パッケージ 40x40mm(規格)。日本では Ryzen 店頭価格 +50% の報。@50台 $262"
+  :source/dataset "mk1-parts"}
+
+ {:part/id "cooler-lp" :part/dim-grade :datasheet :part/tolerance-mm "[0.5 0.5 0.5]" :part/name "低背 CPU クーラー 37mm / 95x95 (65W 対応, NH-L9a-AM5 級)"
+  :part/category :cooler :part/envelope "[37 95 95]"
+  :part/mass-g 385 :part/power-w 3 :part/qty 1 :part/price-usd 36
+  :part/interface "AM5 mounting / 4-pin PWM"
+  :part/mounts-on "cpu-7700" :part/subassembly :bench
+  :part/insert-axis :+x :part/chamber :board :part/fasteners 4
+  :part/measured false
+  :part/source "NH-L9a-AM5 級(95x95x37mm、AM5 65W 定格)。**初版は 120x120x47 を置いたが sim が DIMM と M.2 との干渉を検出したため 95x95x37 に変更** — 120mm 級の低背クーラーが mini-ITX の DIMM スロットに覆い被さるのは SFF の古典的な問題。高さ 37mm が board 側 X 予算の律速"
+  :source/dataset "mk1-parts"}
+
+ {:part/id "ram-ddr5" :part/dim-grade :spec :part/tolerance-mm "[0.3 1.0 0.3]" :part/name "DDR5-5600 16GB UDIMM"
+  :part/category :memory :part/envelope "[4 32 134]"
+  :part/mass-g 35 :part/power-w 6 :part/qty 2 :part/price-usd 196
+  :part/interface "DDR5 288-pin UDIMM"
+  :part/mounts-on "mobo-b650i" :part/subassembly :bench
+  :part/insert-axis :+x :part/chamber :board :part/fasteners 0
+  :part/measured false
+  :part/source "UDIMM 規格 133.35mm 長 / 31.25mm 高。2枚32GB で $392(=$196/枚)。2025-07比 +448% の shortage 価格"
+  :source/dataset "mk1-parts"}
+
+ {:part/id "ssd-m2" :part/dim-grade :spec :part/tolerance-mm "[0.5 0.2 0.2]" :part/name "1TB PCIe 4.0 NVMe M.2 2280"
+  :part/category :storage :part/envelope "[4 22 80]"
+  :part/mass-g 8 :part/power-w 7 :part/qty 1 :part/price-usd 141
+  :part/interface "M.2 M-key 2280 / PCIe 4.0 x4"
+  :part/mounts-on "mobo-b650i" :part/subassembly :bench :part/mount-side :rear
+  :part/insert-axis :+x :part/chamber :board :part/fasteners 1
+  :part/measured false
+  :part/source "M.2 2280 規格 80x22x3.5mm。NAND は 1Q25比 +246%。**PCB 裏面の M.2 スロットに実装する** — sim がクーラーとの干渉を検出したため。mini-ITX が M.2 を裏面に置くのはまさにこの理由で、ASRock B650I Lightning WiFi は 2x M.2 のうち1基が裏面"
+  :source/dataset "mk1-parts"}
+
+ ;; PSU: SFX-L(130mm 奥行)ではなく SFX(100mm)を選ぶ。理由は scripts/mk1-cad.cljs
+ ;; の長さ予算の導出結果 — SFX-L では board chamber の Z 余白に収まらない。
+ {:part/id "psu-sfx750" :part/dim-grade :spec :part/tolerance-mm "[0.3 0.5 0.3]" :part/name "750W SFX 80+ Gold (ATX 3.1 / 12V-2x6)"
+  :part/category :psu :part/envelope "[125 63 100]"
+  :part/mass-g 1000 :part/power-w 0 :part/qty 1 :part/price-usd 128
+  :part/interface "ATX 3.1 / 24-pin / 2x EPS / 12V-2x6 / IEC C14 inlet"
+  :part/insert-axis :bracket :part/chamber :psu :part/fasteners 4
+  :part/measured false
+  :part/source "SFX 規格 125x63.5x100mm(SFX-L は奥行 130mm)。**この 125mm 幅が筐体の X を決める律速** — GPU ではない。**取り外し可能な PSU ブラケットに載せる**: sim の挿入経路判定で、L 字隅(GPU の上・mobo の後ろ)に置いた PSU はどの単一軸からも挿入できないことが判明したため。筐体はモノコックではなく着脱式サブフレームを持つ必要がある(SFF ケースでは一般的な構造)"
+  :source/dataset "mk1-parts"}
+
+ {:part/id "riser" :part/dim-grade :estimate :part/tolerance-mm "[3.0 5.0 10.0]" :part/name "PCIe 5.0 x16 フレキシブルライザー 200mm"
+  :part/category :riser :part/envelope "[10 30 200]"
+  :part/mass-g 60 :part/power-w 0 :part/qty 1 :part/price-usd 45
+  :part/interface "PCIe 5.0 x16 (Gen5 認証必須 — Gen4 ライザーは B70 で不可)"
+  :part/mounts-on "mobo-b650i" :part/subassembly :bench
+  :part/insert-axis :+x :part/chamber :gpu :part/fasteners 0
+  :part/measured false
+  :part/source "assumption。Gen5 x16 ライザーは Gen4 品より高価で $40-60 帯。sandwich レイアウトの必須部品。**作業台で mobo の PCIe スロットに先付けする(:subassembly :bench)**"
+  :source/dataset "mk1-parts"}
+
+ {:part/id "fan-92" :part/dim-grade :spec :part/tolerance-mm "[0.3 0.3 0.3]" :part/name "92mm 吸気ファン (PWM)"
+  :part/category :fan :part/envelope "[92 92 25]"
+  :part/mass-g 110 :part/power-w 2 :part/qty 0 :part/price-usd 11
+  :part/interface "4-pin PWM"
+  :part/insert-axis :+x :part/chamber :board :part/fasteners 8
+  :part/measured false
+  :part/source "assumption。B70 は blower で背面 I/O から直接排気するため、筐体ファンは board 側の吸気/CPU 側排熱が主目的。**qty は sim の結果 2→1→0 になった。筐体ファンは載らない。** 92mm 角は board 室の X 帯(4.2-80.2mm)に収まらず、X を伸ばすと GPU 室に食い込み、前面 Z 帯 25mm は GPU の 8-pin ケーブル逃げと競合する。代わりに **前面は passive メッシュ**とし、送風は ①B70 blower の背面直排気(負圧で前面から makeup air を吸う。OEM が blower カードで使う正攻法)②CPU クーラー自身のファン に任せる。65W CPU + blower GPU の構成では妥当。エントリは将来 80mm 以下に変える場合の参照として残す"
+  :source/dataset "mk1-parts"}
+
+ {:part/id "cordset" :part/dim-grade :estimate :part/tolerance-mm "[2.0 2.0 100.0]" :part/name "◇PSE 取得済み JP 電源コードセット"
+  :part/category :accessory :part/envelope "[20 20 1800]"
+  :part/mass-g 180 :part/power-w 0 :part/qty 1 :part/price-usd 4
+  :part/interface "IEC C13 - JIS C 8303"
+  :part/insert-axis :+z :part/chamber :psu :part/fasteners 0
+  :part/measured false
+  :part/source "PC 本体は電気用品安全法の対象外だが、コードセットは取得済み部材を購入する(認証プロジェクト不要)"
+  :source/dataset "mk1-parts"}
+
+ ;; ---- ケーブル経路(SFF で「入らない」の最頻要因。AABB 部材だけでは守れない) ----
+ ;; waypoints は筐体座標 mm。始点/終点はコネクタ位置、中間点は経路の曲がり。
+ ;; bundle-dia は結束後の外径、min-bend-factor は最小曲げ半径 / 径。
+ {:cable/id "atx24" :cable/name "ATX 24-pin メイン電源"
+  :cable/from "psu-sfx750" :cable/to "mobo-b650i"
+  :cable/bundle-dia-mm 13 :cable/min-bend-factor 3
+  :cable/waypoints "[[65 120 200] [65 150 190] [60 150 110] [52 148 100]]"
+  :part/source "24 本 18AWG 結束で外径 12-14mm。ATX 3.1 標準。最小曲げ係数 3x は PSU ハーネスの実勢(初版の 5x は硬い coax/光の値で、実際の個別スリーブ線はもっと曲がる)"
+  :source/dataset "mk1-parts"}
+
+ {:cable/id "eps8" :cable/name "EPS 8-pin CPU 電源"
+  :cable/from "psu-sfx750" :cable/to "mobo-b650i"
+  :cable/bundle-dia-mm 9 :cable/min-bend-factor 3
+  :cable/waypoints "[[55 120 190] [55 178 185] [55 178 60] [50 176 40]]"
+  :part/source "8 本 18AWG 結束で外径 8-10mm。曲げ係数 3x"
+  :source/dataset "mk1-parts"}
+
+ {:cable/id "pcie12vhp" :cable/name "12V-2x6 GPU 電源"
+  :cable/from "psu-sfx750" :cable/to "gpu-b70"
+  :cable/bundle-dia-mm 10 :cable/min-bend-factor 4
+  :cable/waypoints "[[100 120 250] [110 118 312] [110 50 317] [110 50 272]]"
+  :part/source "**GPU の 8-pin はカード端(Z 前方)にあるため PSU から前方へ長く回す必要がある。**12V-2x6 は曲げに厳しく factor 4。加えて仕様上コネクタから 35mm 以内で曲げないこと(本モデルは折れ角のみを見るのでこの直線区間の要件は別途図面で担保する)"
+  :source/dataset "mk1-parts"}
+
+ {:cable/id "front-io" :cable/name "前面 I/O ヘッダ (USB/電源SW)"
+  :cable/from "chassis-mk1" :cable/to "mobo-b650i"
+  :cable/bundle-dia-mm 5 :cable/min-bend-factor 2
+  :cable/waypoints "[[70 20 290] [70 20 200] [65 20 120] [52 20 70]]"
+  :part/source "前面パネル USB/電源SW ヘッダ。筐体ファンを廃したので PWM 分は不要になった。細く自由度が高い"
+  :source/dataset "mk1-parts"}
+
+ ;; ---- 筐体(Phase 2 自社板金。Phase 1 は NR200 級市販品) -------------------
+ {:part/id "chassis-mk1" :part/name "叢雲 MK-1 筐体 (自社板金, Phase 2)"
+  :part/category :chassis :part/envelope :computed
+  :part/mass-g 1900 :part/power-w 0 :part/qty 1 :part/price-usd 60
+  :part/interface "SPCC 1.2mm 板金 / レーザー刻印バッジ / 前面メッシュ"
+  :part/insert-axis :none :part/chamber :none :part/fasteners 0
+  :part/measured false
+  :part/source "寸法は scripts/mk1-cad.cljs が部材 envelope + クリアランス規則から導出する(手で与えない)。単価 $60 は tsukuru RFQ 経由・金型 NRE $12,000 を 200台で償却する前提。Phase 1 は NR200 級市販 18.25L $60-75。質量 1900g は scripts/mk1-cad.cljs の板金体積計算 2173g(全面ソリッド前提の上限)から開口分を引いた推定"
+  :source/dataset "mk1-parts"}
+
+ ;; ---- クリアランス規則(筐体寸法の導出に使う。設計の正本) ------------------
+ {:part/id "rule-clearance" :part/name "クリアランス規則"
+  :part/category :design-rule :part/envelope "[0 0 0]"
+  :part/mass-g 0 :part/power-w 0 :part/qty 0 :part/price-usd 0
+  :part/interface "wall=1.2 / part-to-wall=3 / part-to-part=2 / riser-gap=10 / rear-io=8 / gpu-cable-end=40 / airflow-plenum=12"
+  :part/insert-axis :none :part/chamber :none :part/fasteners 0
+  :part/measured false
+  :part/source "gpu-cable-end=40 は B70 の 8-pin がカード**端**にあるため必要(上端ではない — igorslab)。riser-gap=10 は Gen5 フレキライザーの最小曲げ半径からの assumption"
+  :source/dataset "mk1-parts"}
+]

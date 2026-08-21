@@ -1,0 +1,84 @@
+;; MF 税区分 —— **科目表が参照している分 + 仕訳が実際に使っている分**。
+;;
+;; 出典: MF Cloud Accounting `getTaxes`（読み取りスコープの MCP）、2026-08-20、
+;;       Gftd Japan株式会社 code 9007-2846。
+;;
+;; ## なぜ 151 ではなく 12 なのか
+;;
+;; この事業者の税区分マスタは **151 件**ある（`moneyforward-parity.datoms.edn`
+;; の `:mf.snapshot/tax-categories`）。しかし勘定科目 200 + 補助科目 512 の
+;; いずれかが `tax_id` で指しているのは **12 件だけ**で、残る 139 件は
+;; 5% 世代・簡易課税の一〜六種・特定課税仕入など、この科目表からは 1 件も
+;; 参照されていない。
+;;
+;; ## 2026-08-20 追記 —— 仕訳側を測ったので 3 件足した
+;;
+;; `mf-journal-usage.edn` が `getJournals` で記帳側を測った結果、**科目表が
+;; 1 件も参照していない税区分が仕訳で使われていた**: 課仕 8% / 課仕 (軽)8% /
+;; 共-課仕 8%（いずれも過年度）。科目の既定値と、記帳で実際に使われた区分は
+;; 別物である、という予想どおりの形で出た。
+;;
+;; **税率が引けない区分は集計から静かに落ちる**ので、ここに足す。足したことで
+;; `verify-mf-tax-rate-coverage.cljs` の finding は
+;; 「区分が表に無い」から「元帳は 0.08 で記帳しているが chart が宣言していない」に
+;; 変わる —— 後者が本物の gap で、前者はこちらの表の欠落だった。
+;;
+;; ⚠ **15/151 も「税区分の到達度」ではない。** 標本した 4 期のうち完全なのは
+;;    FY2026 の 1 期だけで、残り 3 期は page 1 の下界。**下界に無い区分が
+;;    存在しないことの証明にはならない。**
+;;
+;; ## 何に使うか
+;;
+;; `scripts/gen-mf-chart.cljs` が chart を書き出すとき、各科目の `tax_id` を
+;; ここで引いて `:mf/tax-rate` を焼き込む。**引けない id が 1 つでもあれば
+;; 生成を拒否する** —— 既定 0% で埋めると、消費税法 第四十五条第一項 が要求する
+;; 「税率の異なるごとに区分した」集計が、税率を持たない科目を 0% として
+;; 静かに混ぜる。手で写した表が古びたことを、生成器が気付ける唯一の場所。
+;;
+;; :available は MF 側の有効フラグ。false のものは参照されていないので
+;; ここには 1 件も無い（12 件すべて available true）。
+
+{"HOjPa4QwygIDCqSN8LLJoQ%3D%3D"
+ {:name "不明" :abbreviation "不明" :rate 0 :available true}
+
+ "X3DSAI1Z3m0BykUBLzFXPQ%3D%3D"
+ {:name "対象外" :abbreviation "対象外" :rate 0 :available true}
+
+ "vbqSIpfpRHgRlq5Dp6F27Q%3D%3D"
+ {:name "対象外売上" :abbreviation "対象外売" :rate 0 :available true}
+
+ "kLOtqiD1oj%2FeGpzw%2BAHKuA%3D%3D"
+ {:name "課税売上 10%" :abbreviation "課売 10%" :rate 0.1 :available true}
+
+ "d1ST%2FNEUXKvUoacOoxZtxQ%3D%3D"
+ {:name "課税売上-返還等 10%" :abbreviation "課売-返還 10%" :rate 0.1 :available true}
+
+ "FVXT1bepOjpuSZhgtaQTnA%3D%3D"
+ {:name "課税売上-貸倒 10%" :abbreviation "課売-貸倒 10%" :rate 0.1 :available true}
+
+ "HnJI7o8oKOaIe4Caz4hP4w%3D%3D"
+ {:name "輸出売上 0%" :abbreviation "輸売 0%" :rate 0 :available true}
+
+ "ISVxnAD8yUeP3aE1ZHZ9UQ%3D%3D"
+ {:name "非課税売上" :abbreviation "非売" :rate 0 :available true}
+
+ "udkJsdLf0zpR%2Fhf5kDTAjw%3D%3D"
+ {:name "非課税売上-有価証券譲渡" :abbreviation "非売-有証" :rate 0 :available true}
+
+ "BFUjY0cHbLfNyaQ%2B%2Fzyy5A%3D%3D"
+ {:name "課税仕入 10%" :abbreviation "課仕 10%" :rate 0.1 :available true}
+
+ "Qkwy17tUvDmOvvbAzLFquw%3D%3D"
+ {:name "課税仕入-返還等 10%" :abbreviation "課仕-返還 10%" :rate 0.1 :available true}
+
+ "pI%2B1XO3se4rmF9cqOTVIEw%3D%3D"
+ {:name "非課税仕入" :abbreviation "非仕" :rate 0 :available true}
+ ;; --- 仕訳が使っていた（科目表は参照していない）。2026-08-20 実測 -----------
+ "qV3DsJ5zdrZuWaJRYfbKjg%3D%3D"
+ {:name "課税仕入 8%" :abbreviation "課仕 8%" :rate 0.08 :available true}
+
+ "oSvWQMJ2g%2BWG98ROGuA1Qw%3D%3D"
+ {:name "課税仕入 (軽)8%" :abbreviation "課仕 (軽)8%" :rate 0.08 :available true}
+
+ "DeJLddX7j4s3lQllsu3biA%3D%3D"
+ {:name "共通課税仕入 8%" :abbreviation "共-課仕 8%" :rate 0.08 :available true}}
