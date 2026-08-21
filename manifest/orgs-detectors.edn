@@ -1315,6 +1315,21 @@
               A transient run returned exit 2 while another session held git in the same
               repo. That is the design working, not a flake to paper over: an unanswerable
               run must not report clean. Three consecutive runs after it: exit 1, 9 findings.
+              2026-08-21: it went green on its own subject. The two working-tree-only
+              findings were kotoba.value.codec/value-cid and verify-value-cid; landing them
+              (io-ipld d25259e4) took the count from 10/13 to 12/13 with zero working-tree-only
+              -- a red-to-green transition on the real target, not a synthetic one.
+              The last standing finding was then this detector's OWN false positive:
+              :evidence-schema \"kotoba.release-evidence/v2\" is a schema VERSION, the same
+              kind of thing as :codec-id \"kotoba.value.v1\", and neither namespace surviving
+              that one's split defines a v2. Key selection is now an ALLOWLIST rather than a
+              denylist: a denylist needs a new entry per such key and until it gets one the
+              report is wrong in the direction that costs most, a finding nobody can act on
+              sitting next to findings they must. An allowlist is wrong the other way -- it
+              stays quiet about a key it does not know -- so SKIPPED reports how often that
+              happened and names the keys, and the evidence regex does not depend on it.
+              Now 12/12, exit 0, SKIPPED 1 (:evidence-schema). Still discriminates: putting
+              :evidence-schema back into the allowlist returns exit 1 with that finding.
               
               Only `git show`/`cat-file`/`remote` against already checked-out repos and
               fs reads; no network.

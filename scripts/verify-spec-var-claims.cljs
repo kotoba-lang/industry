@@ -99,9 +99,31 @@
   ;; so the prefix decides it without guessing.
   #"^(io|com|org|net)\.github\.")
 
-(def coordinate-keys
-  "Spec keys whose value is a dependency, not an implementation."
-  #{:lib :dep :deps :coordinate :artifact})
+(def implementation-keys
+  "Spec keys whose value names a VAR that must exist.
+
+  An allowlist, not a denylist, and that is the whole design. A qualified
+  symbol in a spec is not always a var: `:evidence-schema
+  \"kotoba.release-evidence/v2\"` is a schema VERSION, the same kind of thing
+  as `:codec-id \"kotoba.value.v1\"`, and neither of the two namespaces that
+  survived that one's split defines a `v2`. Measured 2026-08-21 -- it was this
+  detector's last standing finding and it was this detector's own false
+  positive.
+
+  A denylist would have needed a new entry for each such key as it appeared,
+  and until it got one the report would be wrong in the direction that costs
+  most: a finding nobody can act on, next to findings they must. An allowlist
+  is wrong in the other direction -- it stays quiet about a key it does not
+  know -- and `SKIPPED` reports how often that happened, so the silence is
+  visible rather than assumed to be zero."
+  #{:operation :verify-operation :entry :runner :implementation
+    :reference-implementation :wire-implementation
+    :wrapper :requires-wrapper :compatibility-api :type})
+
+(def skipped
+  "Qualified-symbol strings under a key `implementation-keys` does not list.
+  Counted and reported so an allowlist's silence is visible."
+  (atom []))
 
 (defn collect-claims
   "Every qualified-symbol-shaped string in `form`, with the key that carried it."
@@ -111,9 +133,10 @@
     (doseq [[k v] form]
       (when (and (string? v)
                  (re-find qualified-symbol-re v)
-                 (not (re-find dependency-coordinate-re v))
-                 (not (contains? coordinate-keys k)))
-        (swap! out conj {:file file :key k :claim v}))
+                 (not (re-find dependency-coordinate-re v)))
+        (if (contains? implementation-keys k)
+          (swap! out conj {:file file :key k :claim v})
+          (swap! skipped conj [file k v])))
       (collect-claims v file out))
     (coll? form) (doseq [x form] (collect-claims x file out))
     :else nil))
@@ -323,6 +346,10 @@
 (def unresolved (remove #(seq (:on-ref %)) results))
 
 (println (str "SCANNED\t" (count all) "\tclaim(s) in " (count spec-dirs) " spec dir(s)"))
+(println (str "SKIPPED\t" (count (distinct @skipped))
+              "\tqualified-symbol string(s) under a key not in implementation-keys"
+              (when (seq @skipped)
+                (str ": " (str/join ", " (sort (distinct (map second @skipped))))))))
 (println (str "verify-spec-var-claims: " (- (count all) (count unresolved)) "/" (count all)
               " resolve on a default branch"
               (when (seq unresolved)
