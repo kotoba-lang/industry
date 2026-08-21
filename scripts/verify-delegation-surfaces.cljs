@@ -97,7 +97,20 @@
   "Repos where the comparison IS the deliverable. Named, not inferred: a
   pattern that tried to spot them would also spot the next defect."
   #{"authority" "org-chainagnostic-cacao" "xyz-ucan" "org-biscuitsec" "macaroon"
-    "kotoba-lang" "aiueos"})
+    "kotoba-lang"
+    ;; `aiueos` was named here until 2026-08-21. It no longer holds a covering
+    ;; relation -- `grant` does (root ADR-2608219500), and the exemption moved
+    ;; with the code rather than staying with the repository name. Leaving it
+    ;; on aiueos would have exempted a repository that no longer decides
+    ;; anything, while the repository that does would have been measured
+    ;; against a rule nobody had decided to apply to it.
+    ;;
+    ;; This is still an exemption, not a clean bill: `grant.authority`'s
+    ;; `resource-match?` is a second answer to *does this grant cover this
+    ;; intent*, over `[action resource]` pairs with a `:*` wildcard rather than
+    ;; segment paths. Unifying it with `authority.scope` is a semantic change,
+    ;; and it has its own gap entry in ADR-2608219500.
+    "grant"})
 
 (def scheme-ere
   "Rule 0: an authority string of ANY kotoba scheme.
