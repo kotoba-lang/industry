@@ -388,6 +388,94 @@ keying が変わった瞬間に CID でなくなる —— CID と比べた呼�
   これは測れなかった検査が緑に見えるのと同型で、**語彙が実装より先に在ることが
   出力から見えない**。`datalog` と `kotobase` の README にこの差分を書く。
 
+## 検証と現在地（2026-08-21 closing）
+
+### 何がどこで走ったか
+
+| repo | JVM | cljs / nbb | commit |
+|---|---|---|---|
+| `datalog` | 122 tests / 226 assertions, 0/0 | **同数** 122 / 226, 0/0 | `2858919f` |
+| `io-multiformats` | 44 / 169, 0/0 | **同数** 44 / 169, 0/0 | `c5963264` |
+| `io-ipld` | 109 / 919, 0/0 | 25 / 488, 0/0 | `d25259e4` |
+| `kotoba-protocol` | 79 / 482, 0/0 | **同数** 79 / 482, 0/0 | `59ea6bd3` |
+| `kotoba-lang` | 249 / 1376, **13 failures / 2 errors** | —（cljs runner 無し） | `5239f36e` |
+
+**`kotoba-lang` の 13 failures / 2 errors は既存で、この作業由来ではない。**
+同じ commit の base（変更なし、240 tests / 1356 assertions）で同数が出ることを
+測って確かめた。内訳は `q1-claims-are-auditable`（13）と
+`q3-consumers-embed-the-canonical-grammar-without-drift`（2、`FileInputStream`）。
+**直していない。** この ADR の範囲外で、別途扱うべき既存の赤である。
+
+### 両方向を見せたもの
+
+「落ちない gate は劇場」の対偶として、landed した検査はすべて**壊して赤にし、
+戻して緑に**することを実演した:
+
+| 検査 | 壊し方 | 落ちたもの |
+|---|---|---|
+| `varint-decode` | accumulator を int32 shift に戻す | **JVM 0 failures / cljs 6 failures** |
+| `cid-codec` の委譲 | `:codec` → `:version` | 4 assertions |
+| `normalize` | `:clause-cardinality` を rename しない | 2 assertions |
+| `normalize` | seq を vector で組み直す | `negation-stays-a-list` のみ |
+| `canonicalize` | or 分岐を permute しない | 3 tests |
+| `canonicalize` | 軌道上限を無効化 | 上限テストのみ |
+| `canonicalize` | set 比較を `pr-str` に | **JVM 0 failures / cljs 2 failures** |
+| `incidence/datoms` | facts を落とす | 往復 5 tests |
+| `incidence/datoms` | `projectable?` を強制 true | 衝突ガードのみ |
+| `value-cid` | codec を raw に | 凍結ベクタのみ |
+| `verify-value-cid` | decode を外す | 2 tests |
+| `discover` | `advertise` が `key-fn` を無視 | 3 tests / 4 assertions |
+| `verify-spec-var-claims` | spec dir を不在に | **exit 2**（0 でも 1 でもない） |
+
+**2 回、テストが主張を検査していなかった。** どちらも書き直した:
+`canonicalize` の set 比較（単一 runtime では `pr-str` と内容順が一致してしまう →
+どちらの分岐が勝つかを固定）と、`verify-value-cid` の decode 順（不一致 CID を
+渡していたので比較だけで reject されていた → その bytes が実際に持つ CID を渡す）。
+
+### 走らせなかったもの、その理由
+
+- **fleet gate は 1 つも足していない。** landed した検査は repo 自身の suite と
+  `manifest/orgs-detectors.edn` の 1 エントリで、`gates.edn` は触っていない。
+- **`kotoba-lang` の cljs suite は存在しない**（runner が無い）。したがって
+  `incidence/datoms` の往復は **JVM でのみ**検証されている。
+- **`kotoba.value.v1` への `:multihash` 追加は着手していない**（D7 で対象外と決定）。
+
+## 引き継ぎ（resume point）
+
+### 次の 1 手
+
+`kotoba-lang` に cljs runner が無いため、`incidence/datoms` の往復は片肺である。
+他 4 repo が `run-tests.cljs` / `test/run_portable.cljs` を持つので、同じ形を置く:
+
+    cd orgs/kotoba-lang/kotoba-lang
+    # test/run_portable.cljs を kotoba-protocol のものを雛形に作る
+    nbb --classpath src:test test/run_portable.cljs
+
+⚠ その repo の共有 checkout は**別セッションが編集中**（下記）なので worktree で行う。
+
+### 保全した他セッションの WIP（削除も移動もしていない）
+
+| checkout | 状態 |
+|---|---|
+| `orgs/kotoba-lang/kotoba-lang` | `docs/adr/ADR-kotoba-canonical-value-codec.md` と `lang/value-codec.edn` が未 commit。52 commit behind。`west update` は正しく拒否された |
+| `orgs/kotoba-lang/io-ipld` | `src/kotoba/value/codec.cljc` と `test/.../codec_test.cljc` が未 commit。**下記の衝突あり** |
+| `orgs/kotoba-lang/kotobase` | 4 ファイル未 commit、branch `agent/persist-execution-identities`（3 ahead / 77 behind） |
+
+### ⚠ 私が作った、予見できる衝突が 1 件
+
+`io-ipld` の working copy と新しい main が**両方 `value-cid` を定義している**。
+意味は同一（`(mf/cidv1-dag-cbor (encode-value x))`、`verify` は比較前に decode）で、
+**配置だけが違う**（あちらは `decode-value` の前に置き `declare` を使う、main は後に置く）。
+
+解決: **main 側を採り、`codec.cljc` の local diff は捨ててよい。**
+`test/kotoba/value/codec_test.cljc` の 14 行追加は**そのまま適用できる** ——
+私はそのファイルを触らず、テストを `test/kotoba/value/value_cid_test.cljc` に置いた。
+
+### 対象外と決めたもの（沈黙ではなく決定）
+
+D7 の 2 件 —— `kotoba.value.v1` への `:multihash` code と、`typed-ref` への
+`:multihash` kind。**bare な multihash を*保存*する必要が生じるまで着手しない。**
+
 ## 代替案
 
 - **提案をそのまま採る（positional n-ary Atom + set Conjunction + Entity Term）。**
