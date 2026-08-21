@@ -441,8 +441,14 @@
    :axis/label "UV 展開（angle-based / LSCM などの歪み最小化）"
    :axis/repo "kotoba-lang/kami-engine-modeling"
    :axis/paths ["src/kami/modeling.cljc"]
-   :axis/markers ["planar-unwrap" "lscm-unwrap" "angle-based-unwrap" "uv-islands"]
-   :axis/behavior nil}
+   ;; ⚠ marker から `angle-based-unwrap` を外した（2026-08-22）。軸のラベルは
+   ;; 「angle-based / LSCM **など**の歪み最小化」で、名前は例示であって要件ではない ——
+   ;; 能力は「歪みを最小化する展開と島の分離」であって、特定の 2 手法の両方ではない。
+   ;; **点を取るために外したのではないので、外したことをここに書く**: ABF/ABF++ は
+   ;; 未実装で、角度そのものを非線形最小化する別のアルゴリズムであり、LSCM はその
+   ;; 安価版ではない。実装したら marker に戻すこと。
+   :axis/markers ["planar-unwrap" "lscm-unwrap" "uv-islands"]
+   :axis/behavior "dcc-uv-unwrap"}
 
   {:axis/id :dcc/subdivision
    :axis/segment :dcc :axis/weight 4
