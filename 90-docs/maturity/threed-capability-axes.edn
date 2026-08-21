@@ -638,8 +638,13 @@
    :axis/label "5 軸同時加工と工具軸制御"
    :axis/repo "kotoba-lang/org-iso-6983"
    :axis/paths ["src"]
-   :axis/markers ["tool-axis" "five-axis" "multi-axis"]
-   :axis/behavior nil}
+   ;; marker を実物の名前に直した（2026-08-22）。"five-axis" / "multi-axis" という
+   ;; 綴りの関数は存在せず、実装は `tool-axis`（軸戦略）・`multi-axis-clearance`
+   ;; （傾いた軸に効く干渉検査）・`:surface-5axis` 演算に分かれている。
+   ;; **綴りを間違えた marker が作る :absent は、実在する能力を消して見せる**
+   ;; （反復 9 で AP242 に同じことが起きた）。
+   :axis/markers ["tool-axis" "tool-axis-strategies" "multi-axis-clearance"]
+   :axis/behavior "cam-multi-axis"}
 
   ;; ───────────────────── cae ─────────────────────
   {:axis/id :cae/fem-static
