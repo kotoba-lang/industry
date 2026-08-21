@@ -229,7 +229,7 @@ ADR-2608189300 のとおり 3 つは別の名前で、Datomic は他社の製品
 | 論点 | 採否 | 理由 |
 |---|---|---|
 | Term を型にする | **採る** | `ref?` が必須引数になっているのは型になりたがっている証拠 |
-| `Hash` / `Link` 分離 | **採る** | 既存に対応物が無い、唯一の純粋な gain |
+| `Hash` / `Link` 分離 | **採る**（形は D7） | 既存に対応物が無い、唯一の純粋な gain。ただし着地は値の型ではなく index の鍵として |
 | IR の content-address | **採る** | 新 primitive ゼロ。足りないのは α 正規化だけ |
 | Atom を 1 種に | **方向は採る、形は保留** | positional n-ary ではない、までは決まる。開く先は第 7 節のとおり (a) 形式モデルと (b) 実装モデルの 2 つが在り、**どちらかは未決** |
 | Conjunction を集合に | **採らない** | 可換性を取ると safe-negation の静的検査が壊れる。decidable な検査を失う対称性は美しさではなく損失 |
@@ -314,6 +314,66 @@ pointer の混同は、第 8 節で警戒したのと同じ事故の別の面で
 **第 3 節の「args を positional にすると role が消える」は依然として正しい** ——
 ここで守られたのは、positional にしなかったからである。**`sign` か `mult` が
 (b) に入った日にこの符号化は劣化し、往復テストがそう言う。**
+
+### D7. 4 手すべて決着。`Hash` は codec 型ではなく「keying は決定である」として着地した
+
+**2026-08-21。** D4 の 4 手の現在地と、step 1 が当初の形では着地しなかった理由。
+
+| 手 | 決着 |
+|---|---|
+| 1. `Hash` を Term 型に | **形を変えて完了**（下記） |
+| 2. Var 正規化 + `value-cid` | **完了**（`normalize` / datalog `ee79d16a`、`value-cid` / io-ipld `d25259e4`） |
+| 3. Atom を開く | **不要と判明**（D6） |
+| 4. Conjunction の canonical form | **完了**（`canonicalize` / datalog `2858919f`） |
+
+#### step 1 が codec 型にならなかった理由
+
+当初の案は `kotoba.value.v1` に `:multihash` code を足すことだった。**やめた。**
+`io-ipld` には **45 repo** が依存し、`value-codec.edn` は
+`:evidence-required :shared-conformance-vectors` を課し、閉じた型集合への追加は
+codec-id の version bump を意味する。**そして gap の実害はそこに無かった。**
+
+実害はここに在った（実測 2026-08-21）:
+
+    kotoba.protocol.discover は provider index を CID 文字列でキーしており、
+    そう明言していなかった。IPNI は multihash でキーする。
+
+    bafkreifq7onuoxumrs7tnpdtx5lsnnulu5k24cj75y44sz4ot7n5kz4l5u
+    bafyreifq7onuoxumrs7tnpdtx5lsnnulu5k24cj75y44sz4ot7n5kz4l5u
+
+同じ bytes・1 文字違い（codec varint）・**1 つの multihash**。CID でキーした index は、
+provider を保持している内容に対して「provider 無し」と答える。
+
+**そのケースは一度もテストされていなかった。** それらしく見えたテスト
+（`ipni-record-does-not-mutate-cid`）は digest の異なる 2 fixture（codec 112 と 85、
+実測）を使っており、「無関係な CID は見つからない」しか主張していない。
+
+#### 着地した形
+
+`advertise` / `lookup` が **`key-fn` を必須引数**に取る（`datalog.index/ref?` の前例に
+倣う —— 黙って落ちてよい既定が無いので呼び手が言う）。`identity` は CID キー（codec に
+敏感）、`#(vec (mf/cid->multihash %))` は内容キー。**multiformats には依存しない** ——
+`kotoba-protocol` は `:deps {}` を宣言する repo なので、digest は `http-fn` /
+`hash-fn` / `sign-fn` と同じく注入される。実装は kotoba-protocol `59ea6bd3`。
+
+**つまり `Hash` は「値の型」ではなく「index の鍵は決定である」という形で型を得た。**
+D5 の表の `Hash → IPNI → どこに在るか` は、型の欠落ではなく**明言されていない既定**
+だった。前提として要った `cid->multihash` は io-multiformats `c5963264`。
+
+`cids` → `keys-with-providers` + 新 `advertised-cids`。前者は**鍵**を読んでおり、
+keying が変わった瞬間に CID でなくなる —— CID と比べた呼び手は何も見つからず、
+それを信じる。
+
+#### 残っている gap
+
+**無い。** ただし次の 2 つは「解消した」ではなく「対象外と決めた」ものとして記録する:
+
+- **`kotoba.value.v1` への `:multihash` code 追加。** 45 repo が依存する premise 層で、
+  conformance vector と version bump を要する。**bare な multihash を*保存*する必要が
+  実際に生じるまで着手しない** —— 今日の用途（どこに在るか）は index の鍵で足り、
+  鍵は保存された値ではない。
+- **`typed-ref` への `:multihash` kind 追加。** 同じ理由。`:cid`/`:did`/`:uri` は
+  incidence の*参加者*を型付けるもので、multihash は参加者ではなく位置の鍵である。
 
 ## 帰結
 
