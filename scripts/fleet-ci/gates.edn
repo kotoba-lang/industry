@@ -2086,6 +2086,43 @@
                    "test/nbb/classpath.cljs"]
    :cd false}
 
+  ;; amu の portable surface suite を **JVM 無しで実際に走らせる**。
+  ;; `amu-jdk-free` は resolver が fail-closed することを見るだけ、`amu-jvm-test`
+  ;; は JVM 上で全部走らせる —— どちらも「`.cljc` と名乗る namespace が cljs で
+  ;; 実行できるか」を見ていない。`.cljc` は主張であって事実ではなく、cljs は
+  ;; `(.getBytes s c)` を素通しでコンパイルして**実行時にだけ**落ちるので、
+  ;; load するだけの検査はこのクラスを構造的に捕まえられない（実測: elf64 の
+  ;; 未実行分岐に `.getBytes` を戻しても portable suite は緑のままだった）。
+  ;;
+  ;; :cap :node —— 兄弟の `amu-native-conformance` が `:cap :jvm` を要るのは
+  ;; `bin/kotoba` が lock を解けないとき `clojure -Spath` に落ちるからで、
+  ;; :jvm は実質「clojure CLI があるか」。この gate はその fallback を持たず、
+  ;; `kotoba.compiler.nbb.classpath/resolve-directories` を直接呼んで解けなければ
+  ;; exit 91 で終わる。**JVM から classpath を得たら「JVM 無しで動く」は
+  ;; 構造的に検査不能になる。** さらに gate 自身が java/clojure/clj/javac を
+  ;; PATH で stub し、呼ばれたら exit 94 —— 緑は「JVM を見なかった」ではなく
+  ;; 「JVM は参照されなかった」の証拠。
+  ;;
+  ;; :ship-git-deps true —— lock の依存がノードに実在する必要がある（resolver は
+  ;; gitlibs の HEAD sha を lock と照合するので、`git archive` 由来の `.git` の
+  ;; 無い展開では通らない。ADR-2608132000 の bundle 送付が前提）。
+  ;;
+  ;; exit code は「答えられなかった」を pass と別の顔にするため分けてある:
+  ;; 0 pass / 1 suite red / 90 入力欠落 / 91 実行不能 / 92 sentinel 無し /
+  ;; 93 0 件しか走らなかった / 94 JVM tool が呼ばれた。
+  ;; 実測 2026-08-21、165 ファイルに絞った tree で 90 / 1 / 93 / 94 の 4 経路が
+  ;; 実際に発火し、無改変で 0 になることを確認済み。
+  ;; ⚠ **fleet でまだ一度も緑になっていない。** それまでは landed ではない。
+  {:name "amu" :id "amu-portable-surface" :gate :nbb-script :cap :node
+   :script "gates/amu-portable-surface-check.cljs"
+   :include-ext [".cljc" ".cljs" ".edn"] :min-files 120
+   :require-paths ["run-portable-surface.cljs" "deps.edn" "deps-lock.edn"
+                   "src/kotoba/compiler/nbb/classpath.cljs"
+                   "src/kotoba/compiler/ios_aot.cljc"
+                   "test/kotoba/compiler/portable_surface_test.cljc"
+                   "test/fixtures/ios-aot-artifact.edn"]
+   :ship-git-deps true :cd false}
+
   ;; Amu の JDK-free native conformance。ADR-2608110900 の「fleet gate は JVM に
   ;; 依存させない」を守り、repo 自身の専用 script を呼ぶ。JVM tools を PATH で
   ;; trap したまま NBB compiler → sealed KEXE → 独立 extract-native → C loader の
