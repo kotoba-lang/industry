@@ -8,30 +8,30 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 15199,
-  "app-aozora-appview" 13250,
-  "app-aozora-spa" 16476},
+ {"app-aozora-pds" 15283,
+  "app-aozora-appview" 13308,
+  "app-aozora-spa" 16672},
  :zone
- {:requests-7d 246961,
-  :pageviews-7d 16119,
-  :uniques-7d-sum 1051,
+ {:requests-7d 247410,
+  :pageviews-7d 16310,
+  :uniques-7d-sum 1056,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4396}
-   {:path "/.env.development", :requests 66}
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4382}
+   {:path "/.env.development", :requests 67}
    {:path "/admin/phpinfo", :requests 60}
    {:path "/info1.php", :requests 60}
    {:path "/sftp-config.json", :requests 60}
    {:path "/core/.env", :requests 58}
    {:path "/config/config.inc", :requests 56}
    {:path "/media/linusadmin-phpinfo.php", :requests 48}],
-  :status-mix {:ok 5624, :client-error 204, :server-error 8},
+  :status-mix {:ok 5651, :client-error 203, :server-error 8},
   :window "24h"},
  :as-of "2026-08-20",
  :traffic-quality {:window "24h", :probe-4xx-pct 3, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4396 · /.env.development 66 · /admin/phpinfo 60 · /info1.php 60 · /sftp-config.json 60 | 4xx(probe) 3% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4382 · /.env.development 67 · /admin/phpinfo 60 · /info1.php 60 · /sftp-config.json 60 | 4xx(probe) 3% · 5xx 0%",
  :signal
- "aozora.app 実測 246961 req/7d・1051 uniques(日次和)・うち4xx probe 3%(24h)、workers 44925 inv/7d"}
+ "aozora.app 実測 247410 req/7d・1056 uniques(日次和)・うち4xx probe 3%(24h)、workers 45263 inv/7d"}
