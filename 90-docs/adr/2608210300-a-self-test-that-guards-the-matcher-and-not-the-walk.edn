@@ -1,0 +1,120 @@
+[{:db/id -1
+  :adr/id "adr-2608210300-a-self-test-that-guards-the-matcher-and-not-the-walk"
+  :adr/title "A self-test that guards the matcher and not the walk: verify-delegation-surfaces read the wrong set for months and reported clean"
+  :adr/status "accepted"
+  :adr/date "2026-08-21"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/related "adr-2608180200-biscuit-as-delegation-center, adr-2608136000-five-questions-before-trusting-green, adr-2608211900-a-sparse-worktree-commit-deleted-the-repository-twice"
+  :adr/body
+  "## Decision
+
+**A detector's `--self-test` must exercise the WALK, not only the matcher.**
+The walk case builds a real repository on disk whose *shape* is the hazard, and
+asserts the scan arrives at a file inside it. A self-test that only feeds text to
+a regex reports the same `5/5 cases` whether or not the scan ever reaches a file.
+
+**And the evidence floor must pin the UNIT, not just a positive number.**
+
+## What happened
+
+`verify-delegation-surfaces` — the detector for ADR-2608180200's invariant that
+authority is decided in exactly one place (`kotoba-lang/authority`) — reported
+`clean, scanned=3594` every day. Measured 2026-08-21, it held two bugs that
+cancelled into that clean.
+
+**Bug 1, the walk.** It admitted a repository only if `<repo>/src` existed:
+
+    (filterv #(fs/existsSync (str % \"/src\")) paths)
+
+Of 4,210 on-disk west paths, **616 have no top-level `src/`**, and **132 of those
+hold Clojure source**. Running the detector's own patterns over the skipped set
+found **6 files in one repo** — `net-kotobase/control-plane`, the production edge
+API gateway of kotobase.net, whose `edge_chain.cljc` is titled *Delegation chains
+at the edge* and implements the rule that a `kotoba://graph/` scope must name the
+root issuer of the chain. **The one repo the detector most needed to read was the
+one it structurally could not reach**, because control-plane is a multi-project
+repo and its source lives under `kotobase-api-gateway-cljs/src/`.
+
+**Bug 2, the lattice check.** `depends-on-authority?` read `<repo>/deps.edn`.
+control-plane has none; the gateway sub-project's deps.edn *does* declare
+`io.github.kotoba-lang/authority`. So fixing the walk alone would have reported
+all 6 files as findings against a repo that uses the lattice.
+
+**Blindness and misjudgement cancelled.** Neither bug was visible in the output.
+
+**A third gap, latent.** The scheme pattern was the literal `kotoba://`, and
+`kotoba-rad://` — one of the eight schemes `authority`'s README counts — does not
+contain it as a substring. Three files use `kotoba-rad://` with zero `kotoba://`;
+none currently holds the comparison shape, and none of those three repos depends
+on the lattice either.
+
+## Why the self-test did not catch it
+
+The detector already had a `--self-test`, and it was a good one. It proved the
+matchers discriminate 5/5, **including the historical `cacao.core/covers?` body
+that the first version of the scan could not match** — the author had already
+been bitten once by a matcher that reported zero because it could not see, and
+built the control that catches it. The manifest entry says so in as many words:
+
+> A detector that reports zero and a detector that cannot see are the same output.
+
+The awareness was complete. It lived in prose and in a matcher control, and the
+walk lived in code that nothing exercised.
+
+**This is not the first time a walk failed silently here.** The `walk` docstring
+of `verify-source-nul-bytes` records that its first version dropped symlinks —
+`(.isFile e)` is false for a git-annex pointer — so 118 files were *not scanned,
+not counted, not named, and therefore indistinguishable in the output from files
+that were read and found clean*. That was found by hand and fixed by hand. Its
+self-test exercises `has-nul?`, the matcher. It still does not exercise `walk`.
+
+Measured 2026-08-21: of **29** registered detectors, **8** have a `--self-test`
+and **3** build a fixture — and all three feed the fixture to a per-file checker
+(`has-nul?`, `check`) or to a live endpoint. **Detectors whose self-test guards
+the walk: 0 before this change, 1 after.**
+
+## The fix
+
+**One.** The walk is now `git grep --cached` / `git ls-files` over each repo,
+which makes four separate hazards unrepresentable rather than four things to
+remember: monorepo shape (the whole repo is in the index, wherever src lives),
+sparse checkout (the index is searched, so a cone-excluded file is scanned rather
+than silently absent), `node_modules` and `.claude/worktrees` (untracked,
+therefore not in the index). This is the same move `authority.scope` made when it
+replaced prefix comparison with segment equality: the failure is not rejected, it
+is unrepresentable.
+
+**Two.** The lattice check reads every tracked `*deps.edn` in the repo.
+
+**Three.** The scheme pattern is `kotoba[-a-z]*://`.
+
+**Four.** The self-test builds a real git repository whose shape is the hazard —
+source under a sub-project, one file tracked but deleted from the worktree, a
+nested `deps.edn` — and asserts the scan reaches both files and finds the lattice
+in the nested deps.edn. Verified in both directions on the same fixture: the old
+walk answers `present? false` (the repo is dropped before any grep runs) and
+`lattice? false`; the new walk returns both files, including the one absent from
+the worktree, and `lattice? true`.
+
+**Five.** The evidence floor moves from `SCANNED\\t[1-9][0-9]*\\t` to
+`SCANNED\\t[1-9][0-9]*\\ttracked source file`, and the run prints `SKIPPED<TAB>n<TAB>reason`
+lines. The old floor was satisfied by `3,588 repos with a src/ tree` for the whole
+time the walk was reading the wrong set. **A floor detects `measured nothing`; it
+never detects `measured the wrong thing`, so the unit has to be part of what it
+pins.** Findings on test paths are reported at severity `info` and do not fail
+`--check`, so nothing is hidden by being excluded from the scan.
+
+## Consequences
+
+- (+) The class has a name and a worked example. The pattern is copyable by the
+  other 28 detectors: build the shape, assert arrival.
+- (+) `git grep --cached` is strictly more correct than a working-tree walk in
+  this workspace, because sparse checkout is normal here and CLAUDE.md already
+  documents the reading half of that hazard.
+- (-) It is slower: the index is decompressed rather than the working tree read.
+- (-) **28 detectors still have unguarded walks. This ADR does not fix them**, and
+  the count of detectors that cannot see is not known — nobody has measured it.
+  Naming a class is not the same as clearing it, and the difference between those
+  two is exactly what this document is about, so it will not be blurred here:
+  **that is the next measurement, not this one.**"}]
