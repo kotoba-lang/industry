@@ -10,7 +10,9 @@
 ;; "検査を書く前・緑を信じる前の 5 問"):
 ;;
 ;;   0  every cited URL answered, and every recorded fact still matches
-;;   1  a citation is broken, or a recorded fact drifted from the live source
+;;   1  a citation is broken, a recorded fact drifted from the live source, or
+;;      GLEIF's parent and parent-reporting-exception endpoints contradict each
+;;      other at a consolidation level
 ;;   3  the check could not be performed -- refusing to report a pass
 ;;
 ;; Exit 3 covers: facts.edn missing or unreadable, zero facts in it, or every
@@ -64,13 +66,19 @@
 ;; permanently ignored.
 (def volatile-keys #{:source/retrieved-at :source/golden-copy-publish-date})
 
-;; A reporting exception is a real answer when it is present and a real answer
-;; when it is absent -- GLEIF returns 404 for "this entity reports no exception
-;; of that category". A 404 here is therefore not a broken citation. It still
-;; cannot pass silently: the entity simply stops being emitted, and the
-;; recorded-vs-live comparison reports it as GONE, which exits 1.
+;; Four endpoints answer 404 as a fact rather than as a failure. At each of the
+;; two consolidation levels GLEIF publishes EITHER a parent OR an exception
+;; explaining why there is none, and returns 404 for whichever one does not
+;; apply. A 404 here is therefore not a broken citation.
+;;
+;; It still cannot pass silently. Two mechanisms keep it honest: the entity
+;; stops being emitted, so the recorded-vs-live comparison reports it as GONE
+;; (exit 1); and `check-parent-levels!` below asserts the either/or, so a level
+;; that answers 404 on BOTH sides -- which would leave facts.edn saying nothing
+;; at all about this entity's parent -- fails instead of passing quietly.
 (def optional-404
-  #{"direct-parent-reporting-exception" "ultimate-parent-reporting-exception"})
+  #{"/direct-parent" "/ultimate-parent"
+    "/direct-parent-reporting-exception" "/ultimate-parent-reporting-exception"})
 
 (defn optional-404? [url]
   (boolean (some #(str/ends-with? url %) optional-404)))
@@ -125,6 +133,38 @@
            {:source/golden-copy-publish-date p})
          extra))
 
+(defn parent-fact
+  "The parent itself, when GLEIF reports one. Recorded from the child's side --
+   :company/lei names the parent, :relationship/child-lei names this repository's
+   entity -- which is the same convention the :direct-child facts use in the
+   other direction, so both edges join on :company/lei.
+
+   Added 2026-08-21. Until then this script fetched only the two reporting
+   EXCEPTION endpoints, which answer 404 precisely when a parent IS reported.
+   An entity with a parent therefore produced no parent fact and no failure:
+   facts.edn was silent, and the silence was indistinguishable from 'this
+   entity has no parent'. Measured on the family the day it was fixed --
+   549300TTCXZOGZM2EY83 has both parents reported (PONTEGADEA INVERSIONES SL)
+   and its archive recorded neither."
+  [r retrieved-at lei id kind rel]
+  (when (present? r)
+    (let [a (get-in r [:json "data" "attributes"])
+          e (get a "entity")]
+      (prov r retrieved-at
+            {:fact/id id
+             :fact/kind kind
+             :company/lei (get a "lei")
+             :company/legal-name (get-in e ["legalName" "name"])
+             :company/jurisdiction (get e "jurisdiction")
+             :company/status (get e "status")
+             :company/legal-address (addr (get e "legalAddress"))
+             :relationship/kind rel
+             :relationship/child-lei lei
+             :source/note (str "The entity GLEIF records as the "
+                               (if (= :direct-parent kind) "direct" "ultimate")
+                               " consolidating parent of " lei ". Its own record, "
+                               "including any parent above it, is at the cited URL.")}))))
+
 (defn exception-fact [r retrieved-at lei id]
   (when (present? r)
     (let [a (get-in r [:json "data" "attributes"])]
@@ -140,7 +180,7 @@
   "The single definition of what facts.edn contains. --write emits it, the
    default mode rebuilds it from the live sources and diffs. Both modes go
    through here, so the file cannot drift from its own generator."
-  [{:keys [record isins lou issuer ra elf dpre upre kid-pages]} lei retrieved-at]
+  [{:keys [record isins lou issuer ra elf dp up dpre upre kid-pages]} lei retrieved-at]
   (let [rec  (get-in record [:json "data" "attributes"])
         ent  (get rec "entity")
         reg  (get rec "registration")
@@ -287,6 +327,11 @@
               :elf/date-created (get elf* "dateCreated")
               :source/note "Resolves :company/entity-legal-form-id under ISO 20275."})
 
+       (parent-fact dp retrieved-at lei "gleif-direct-parent"
+                    :direct-parent "IS_DIRECTLY_CONSOLIDATED_BY")
+       (parent-fact up retrieved-at lei "gleif-ultimate-parent"
+                    :ultimate-parent "IS_ULTIMATELY_CONSOLIDATED_BY")
+
        (exception-fact dpre retrieved-at lei "gleif-direct-parent-reporting-exception")
        (exception-fact upre retrieved-at lei "gleif-ultimate-parent-reporting-exception")
 
@@ -355,7 +400,8 @@
    :authority/jurisdiction
    :elf/code :elf/local-name :elf/language :elf/country-code :elf/subdivision-code
    :elf/status :elf/date-created
-   :relationship/kind :relationship/parent-lei :relationship/direct-child-count
+   :relationship/kind :relationship/parent-lei :relationship/child-lei
+   :relationship/direct-child-count
    :relationship/exception-category :relationship/exception-reason
    :source/dataset :source/url :source/http-status :source/retrieved-at
    :source/golden-copy-publish-date :source/note])
@@ -377,6 +423,13 @@
        ";; (d/transact conn (edn/read-string (slurp \"facts.edn\"))) like every other EDN\n"
        ";; corpus in this workspace. :company/lei is the join key.\n"
        ";;\n"
+       ";; Both consolidation levels are always represented, in one of two ways: a\n"
+       ";; :direct-parent / :ultimate-parent entity naming the parent, or a\n"
+       ";; :parent-reporting-exception entity saying why there is none. GLEIF publishes\n"
+       ";; exactly one of the pair per level and 404s the other, and the generator fails\n"
+       ";; rather than write this file if that stops being true -- so a level missing\n"
+       ";; from here was never a level nobody asked about.\n"
+       ";;\n"
        ";; The two counts here -- :securities/isin-count and\n"
        ";; :relationship/direct-child-count -- are read from meta.pagination.total of a\n"
        ";; page this script actually fetched. Each one's :source/note says whether the\n"
@@ -393,6 +446,67 @@
 ;; ---------------------------------------------------------------- compare
 
 (defn stable [m] (apply dissoc m volatile-keys))
+
+(defn parent-level-findings
+  "GLEIF publishes, at each consolidation level, EITHER a parent OR a reporting
+   exception saying why there is none. Exactly one of the pair answers 200 and
+   the other answers 404. Measured 2026-08-21 across four entities in this
+   family, both ways round: 549300TTCXZOGZM2EY83 answered 200/404 at both
+   levels, ZSN2LWNPYW6ISMRUC664 / 529900WQB1ZU9KB6EL71 / 5586006WD91QHB7J4X50
+   answered 404/200 at both.
+
+   Returns a finding for any level that broke it. Neither present is the one
+   that matters: it is the only combination under which facts.edn ends up
+   saying nothing whatsoever about this entity's parent, and without this check
+   that emptiness reads exactly like a company that genuinely has none.
+
+   Only 200 and 404 are conclusive here, and a level is judged only when BOTH
+   of its endpoints gave one of those. A request that never got an HTTP answer
+   is an unasked question, and a 5xx is a broken citation; both are already
+   handled above, and answering them from here would report the wrong finding
+   -- two 500s are not an entity with no parent."
+  [pairs]
+  (for [[level parent exc] pairs
+        :when (and (#{200 404} (:status parent)) (#{200 404} (:status exc)))
+        :let [p? (present? parent) e? (present? exc)]
+        :when (= p? e?)]
+    (str level ": " (if p?
+                      (str "GLEIF answered 200 for BOTH the parent and the reporting "
+                           "exception, which are supposed to be exclusive")
+                      (str "GLEIF answered 404 for BOTH the parent and the reporting "
+                           "exception, so this file would record nothing at all about "
+                           "this level -- indistinguishable from an entity that has no "
+                           "parent"))
+         "\n    parent:    " (:status parent) " " (:url parent)
+         "\n    exception: " (:status exc) " " (:url exc))))
+
+(defn emitted-level-findings
+  "The same either/or as `parent-level-findings`, asserted one layer further
+   down: over the entity set this script is about to emit, rather than over the
+   HTTP responses it read.
+
+   The two are different claims, and only this one is the claim that matters to
+   a reader. Measured 2026-08-21, on the change that introduced the parent
+   facts: `build` destructured :dp and :up, the single call site never passed
+   them, and so every parent fact came out nil. GLEIF had answered 200. The
+   status-level check was satisfied. The output said nothing about either
+   level, and nothing failed -- the bug was found by reading the output of a
+   run against an entity known to have a parent, which is not a check.
+
+   Absence here is always this script's fault, never the registry's, which is
+   why the caller treats it as inconclusive (exit 3) rather than as drift."
+  [entities]
+  (let [kinds (into #{} (map :fact/kind) entities)
+        cats  (into #{} (comp (filter #(= :parent-reporting-exception (:fact/kind %)))
+                              (map :relationship/exception-category))
+                    entities)]
+    (for [[level parent-kind exc-substr]
+          [["direct-parent" :direct-parent "DIRECT_"]
+           ["ultimate-parent" :ultimate-parent "ULTIMATE_"]]
+          :when (not (or (contains? kinds parent-kind)
+                         (some #(and (string? %) (str/starts-with? % exc-substr)) cats)))]
+      (str level ": neither a :" (name parent-kind) " entity nor a "
+           ":parent-reporting-exception entity in a " exc-substr "* category was emitted"))))
 
 (defn compare-entities [recorded live]
   (let [by-id  (fn [xs] (into {} (map (juxt :fact/id identity) xs)))
@@ -435,11 +549,13 @@
                         (str api "/isins")
                         (str api "/managing-lou")
                         (str api "/lei-issuer")
+                        (str api "/direct-parent")
+                        (str api "/ultimate-parent")
                         (str api "/direct-parent-reporting-exception")
                         (str api "/ultimate-parent-reporting-exception")
                         (child-page-url api 1)])
             (.then
-             (fn [[record isins lou issuer dpre upre kid-1]]
+             (fn [[record isins lou issuer dp up dpre upre kid-1]]
                (when-not (present? record)
                  (if (:transport-error record)
                    (die! 3 "could not reach GLEIF at all:" (:transport-error record)
@@ -461,7 +577,7 @@
                      (.then
                       (fn [[ra elf & kid-more]]
                         (let [kid-pages (into [kid-1] kid-more)
-                              responses (into [record isins lou issuer dpre upre ra elf] kid-pages)
+                              responses (into [record isins lou issuer dp up dpre upre ra elf] kid-pages)
                               answered  (remove :transport-error responses)
                               bad       (filter #(and (:status %)
                                                       (not (<= 200 (:status %) 299))
@@ -472,13 +588,22 @@
                           (println (str "CHECKED\t" (count answered)))
                           (println (str "ENTITIES\t" (count recorded)))
                           (doseq [r absent]
-                            (println (str "NO-EXCEPTION\t" (:url r)
-                                          "\t404 -- GLEIF records no exception of this category")))
+                            (println (str (if (str/ends-with? (:url r) "-reporting-exception")
+                                            "NO-EXCEPTION\t" "NO-PARENT\t")
+                                          (:url r) "\t404 -- GLEIF publishes the other side of "
+                                          "this pair for this entity")))
 
                           (when (zero? (count answered))
                             (die! 3 "every request failed at the transport level"
                                   "-- cannot tell a dead citation from a dead network."
                                   "Refusing to report a pass."))
+
+                          (let [pf (parent-level-findings [["direct-parent" dp dpre]
+                                                           ["ultimate-parent" up upre]])]
+                            (when (seq pf)
+                              (die! 1 (count pf) "consolidation level(s) where GLEIF's parent and"
+                                    "reporting-exception endpoints are not exclusive:\n  "
+                                    (str/join "\n  " pf))))
 
                           (when (seq bad)
                             (die! 1 (count bad) "cited source(s) did not answer 2xx:\n"
@@ -486,9 +611,15 @@
                                                             " -- " (:body-head %)) bad))))
 
                           (let [live (build {:record record :isins isins :lou lou :issuer issuer
-                                             :ra ra :elf elf :dpre dpre :upre upre
+                                             :ra ra :elf elf :dp dp :up up :dpre dpre :upre upre
                                              :kid-pages kid-pages}
-                                            lei (.toISOString (js/Date.)))]
+                                            lei (.toISOString (js/Date.)))
+                                _ (when-let [ef (seq (emitted-level-findings live))]
+                                    (die! 3 (count ef) "consolidation level(s) that no entity in the"
+                                          "generated set describes:\n  " (str/join "\n  " ef)
+                                          "\n  The live sources answered, so this is this script"
+                                          "failing to carry their answer into the output."
+                                          "Refusing to write or pass."))]
                             (if write?
                               (do (fs/writeFileSync facts-path (emit live))
                                   (println (str "WROTE\t" (count live) "\t" facts-path))
