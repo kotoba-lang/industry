@@ -145,8 +145,17 @@
    :axis/paths ["src/brep/feature.cljc"]
    :axis/marker-kind :dispatch :axis/dispatch-of "apply-feature"
    :axis/markers ["sweep"]
-   :axis/behavior nil}
+   :axis/behavior "feature-sweep"}
 
+  ;; ⚠ chamfer / fillet / shell がこの順で残っているのは偶然ではない。
+  ;; `evaluate-mesh` の accumulator は `{:positions :indices}` の**三角形スープ**で、
+  ;; エッジ同一性も面隣接も持たない。一方 `chamfer-feature` / `fillet-feature` は
+  ;; `:edges`（BREP のエッジ id）で対象を指す —— **メッシュ側にその id は存在しない。**
+  ;; id を勝手に対応づければ、違うエッジを面取りした形が「成功」として返る。
+  ;;
+  ;; したがって次の一手は chamfer の実装ではなく、**メッシュに位相を与えること**
+  ;; （座標の溶接 → エッジ/面の隣接 → 二面角）。それが済めば chamfer・fillet・shell の
+  ;; 3 軸が同じ土台に乗る。表現が変われば梯子の順序も変わる、の実例。
   {:axis/id :kernel/chamfer
    :axis/segment :kernel :axis/weight 4
    :axis/target "SolidWorks / Parasolid の chamfer"
