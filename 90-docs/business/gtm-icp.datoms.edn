@@ -161,7 +161,7 @@
   :icp/requires-contact-route true
   :icp/basis "実測（2026-08-20、反復 3 で更新）: :cae/fem-static :cae/contact :cae/cfd はいずれも **:working**。probe は数値が返ることではなく物理として筋が通ることを見ている —— 軸力バーはメッシュを 4→64 要素に細分すると L2 誤差が 6.8e-7 → 2.9e-9（238 倍、2 次収束相当）で解析解へ収束し代数残差は 8e-12、接触は荷重 2 倍で変位が単調に増え、LBM の平面ポアズイユは解析解 u(y)=g/(2ν)y(h−y) に対し相対 L2 誤差 1.4%（許容 5%）。:cae/verification は依然 :thin —— `manufactured-solution` が dispatch されず benchmark レコードのラベルとしてしか存在しない"
   :icp/proof-axes "[:cae/verification :cae/fem-static :cae/contact]"
-  :icp/anti-claim "**ASME V&V を名乗らない。** 収束は実測で示せるようになったが、看板である :cae/verification は依然 :thin（`manufactured-solution` が解ける経路として存在しない）。加えて `:nonlinear-contact` は自分の戻り値で `:status :screening-only` と申告している —— 一次スクリーニングであって設計判断の根拠ではない、と実装が自分で言っているものを、そう言わずに売らない。Ansys / Abaqus との機能面積の比較にも勝てない"
+  :icp/anti-claim "**ASME V&V の全体を名乗らない。** ただし 2026-08-22 に :cae/verification が :working になった —— 製造解法（MMS）が実装され、`u` から `f` を導いて観測次数 1.990（期待 2）を出す。節点厳密になる族では次数を捏造せず `:exact-to-round-off` と報告する。加えて `:nonlinear-contact` は自分の戻り値で `:status :screening-only` と申告している —— 一次スクリーニングであって設計判断の根拠ではない、と実装が自分で言っているものを、そう言わずに売らない。Ansys / Abaqus との機能面積の比較にも勝てない"
   :icp/checkable-edn "{:country #{\"JP\" \"DE\" \"US\"} :contact-route :required}"
   :icp/unevaluable-edn "[{:predicate :runs-fea :want \"FEA/CFD を日常的に回している\" :why \"どのデータ源にも無い\"} {:predicate :regulated :want \"解析証跡を求められる規制下に在る\" :why \"catalog に規制属性が無い\"}]"
   :icp/disqualifier-edn "[{:rule :needs-commercial-solver-parity :why \"Ansys / Abaqus の機能面積での比較を求める相手には勝てない。実測でそう出ている\"}]"
