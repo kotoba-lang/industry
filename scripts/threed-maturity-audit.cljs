@@ -255,7 +255,13 @@
     (when (zero? scanned-files)
       (refuse! 3 (str "走査ファイル 0 件。orgs/ が解決していない（THREED_ORGS=" orgs-root "）")))
     (when (zero? resolved-repos)
-      (refuse! 3 "checkout が 1 つも解決しなかった"))
+      ;; 「解決しなかった」の他に「全部 :unmeasurable だった」でもここに来る ——
+      ;; `--axis` で 1 軸だけ測り、その probe が UNMEASURABLE を返した場合が
+      ;; それ（実測 2026-08-23、realtime-gpu の break check）。どちらであれ
+      ;; **報告できる測定が 0 件**なので拒否するのは正しいが、理由を 1 つに
+      ;; 決め打ちすると読み手が checkout を疑って時間を使う。
+      (refuse! 3 (str "報告できる測定が 0 件（" (count measured)
+                      " 軸すべてが :unmeasurable か、checkout が 1 つも解決しなかった）")))
 
     (let [datoms (vec (map-indexed ->datom measured))
           coverage {:db/id -9999 :source/dataset "threed-parity"

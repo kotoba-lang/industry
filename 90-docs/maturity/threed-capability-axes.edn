@@ -549,6 +549,10 @@
    :axis/repo "kotoba-lang/webgpu"
    :axis/paths ["src"]
    :axis/markers ["render-frame!" "render-scene!" "material" "shadow" "apply-lod" "adaptive-ssao-graph"]
+   ;; 2026-08-23: 測定不能を解消した。前版の probe は「nbb の Node に
+   ;; `navigator.gpu` が無い」で止まっていたが、**この repo は既に 8 本の
+   ;; Playwright テストを持っており**、実ブラウザで実 GPU（apple metal-3）に
+   ;; 描いて画素を数えている。測れなかったのは能力ではなく、探し方だった。
    :axis/behavior "realtime-gpu"}
 
   {:axis/id :render/skinned-gpu
