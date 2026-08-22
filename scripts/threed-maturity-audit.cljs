@@ -331,9 +331,16 @@
       (if (and only-axis (not check?))
         (println "PARTIAL\t--axis 指定のため threed-parity.datoms.edn は書き換えない")
       (if check?
-        (let [cur (when (exists? out-file) (fs/readFileSync out-file "utf8"))]
-          (if (= cur body)
-            (do (println "FRESH\tthreed-parity.datoms.edn は tree と一致") (js/process.exit 0))
+        ;; **秒数を除いて比べる。** `:parity/seconds` は実行ごとに揺れるので、
+        ;; 素朴な文字列比較だと `--check` が**常に** STALE を出す —— 常に赤い
+        ;; 検査は、常に緑の検査と同じだけ無内容である（CLAUDE.md 2608102000）。
+        ;; 比べたいのは測定された状態（status / evidence / marker）であって、
+        ;; そのとき何秒かかったかではない。
+        (let [strip #(str/replace (or % "") #",? ?:parity/seconds [0-9.]+" "")
+              cur (when (exists? out-file) (str (fs/readFileSync out-file "utf8")))]
+          (if (= (strip cur) (strip body))
+            (do (println "FRESH\tthreed-parity.datoms.edn は tree と一致（秒数の差は無視）")
+                (js/process.exit 0))
             (do (println "STALE\tthreed-parity.datoms.edn が tree と一致しない。再生成が要る")
                 (js/process.exit 1))))
         (fs/writeFileSync out-file body)))

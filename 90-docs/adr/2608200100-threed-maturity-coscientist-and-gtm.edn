@@ -54,8 +54,9 @@ Mari 相当）そのもので、UV・レイヤー・ブラシ・ベイク・マ�
    `:local/root \"../yaml\"` で兄弟 checkout を参照しており、/tmp の worktree
    では解決しない。harness 側で sibling も切り出すか、依存座標を git 参照に
 4. **`threed-parity.datoms.edn` の churn** —— `:parity/seconds` のせいで
-   audit のたびに 63 行全部が diff になる。秒を粗いバケットに丸めるか、
-   timing を別ファイルへ
+   audit のたびに 63 行全部が diff になる（git の noise のみ —— `--check` は
+   閉幕時に「秒を除いて比べる」よう直したので、常時 STALE ではない）。気に
+   なるなら秒を粗いバケットに丸めるか、timing を別ファイルへ
 5. **`:interop/vdb-file` は NanoVDB だけ** —— OpenVDB 本体の `.vdb` は未実装。
    容器の layout は NanoVDB.h から逐語で取れたので、`.vdb` も同じ経路
    （`gh api` + ローカル grep。**WebFetch は要約するので使えない**）で
