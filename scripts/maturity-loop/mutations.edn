@@ -1743,7 +1743,7 @@
      :must-fail ["it-refuses-rather-than-guessing"]}]}
 
   {:repo "orgs/kotoba-lang/voxel"
-   :label "VDB 木と .nvdb 容器 —— tile と圧縮"
+   :label "VDB 木と .vdb / .nvdb 容器 —— tile と圧縮と枠"
    :cmd ["clojure" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
@@ -1759,9 +1759,42 @@
      :file "src/voxel/nvdb.cljc"
      :find "        (pos? codec)"
      :replace "        false"
-     :must-fail ["it-refuses-what-it-cannot-read"]}]}
+     :must-fail ["it-refuses-what-it-cannot-read"]}
+    {:id :vdb-file/uuid-read-as-sixteen-bytes
+     :why "上流のコメントは「16-byte (128-bit) uuid」と書いていて、コードは 16*2+4 = **36 バイトの ASCII** を読む。コメントを信じると 20 バイト手前、metadata の個数の途中に着地し、uuid 文字列の末尾から**もっともらしい小さな数**を読む —— 実ファイルすべてで間違う最短経路"
+     :file "src/voxel/vdb_file.cljc"
+     :find "  \"The uuid is written as fixed-length ASCII: 32 hex digits plus 4 hyphens.\"\n  36)"
+     :replace "  \"x\"\n  16)"
+     :must-fail ["the-uuid-is-thirty-six-ascii-bytes-not-sixteen-binary"]}
 
-  {:repo "orgs/kotoba-lang/org-iso-10303"
+    {:id :vdb-file/metadata-byte-count-ignored
+     :why "metadata の値は各自のバイト数で枠付けされている。使わないと、知らない型の値バイトが**次の名前として読まれ**、そこから後ろが全部ずれる。新しい OpenVDB が書いたファイルが開けなくなるのはここ"
+     :file "src/voxel/vdb_file.cljc"
+     :find "          (recur (+ pos nbytes) (inc i)"
+     :replace "          (recur pos (inc i)"
+     :must-fail ["an-unknown-metadata-type-is-skipped-exactly-not-guessed"]}
+
+    {:id :vdb-file/claims-to-have-decoded-the-volume
+     :why "grid buffer は ZIP/BLOSC で圧縮されていて復号しない。`:grid/data-decoded?` を true にすると、**空の木を静かに返す reader が動いているように見える**"
+     :file "src/voxel/vdb_file.cljc"
+     :find ":grid/data-decoded? false}"
+     :replace ":grid/data-decoded? true}"
+     :must-fail ["it-does-not-claim-to-have-read-the-volume"]}
+
+    {:id :vdb-file/half-float-suffix-left-on-the-type
+     :why "`_HalfFloat` は型名の一部ではなく flag。残すと登録済みの型と一致せず、**誰も対応していない型が入ったファイル**に見える"
+     :file "src/voxel/vdb_file.cljc"
+     :find "                                            :grid/type (if half?"
+     :replace "                                            :grid/type (if false"
+     :must-fail ["the-half-float-suffix-is-a-flag-not-part-of-the-type"]}
+
+    {:id :vdb-file/cljs-char-encoding
+     :why "`#?(:clj int :cljs identity)` は文字列に対して**移植的に見えて移植的でない** —— JVM では code point、cljs では 1 文字の**文字列**を返し、byte vector に入って空白として読み戻る。実測 2026-08-24: この変異で `clojure -M:test` は 0 failures、`nbb test/run_portable.cljs` は 11 failures。**JVM 側が弱いのではなく構造的に見えない**"
+     :file "src/voxel/vdb_file.cljc"
+     :find "  (mapv #(#?(:clj int :cljs (fn [c] (.charCodeAt c 0))) %) x))"
+     :replace "  (mapv #(#?(:clj int :cljs identity) %) x))"
+     :cmd ["nbb" "--classpath" "src:test" "test/run_portable.cljs"]
+     :must-fail ["vdb-file-test"]}]}{:repo "orgs/kotoba-lang/org-iso-10303"
    :label "feature evaluator —— 拒否こそが実装"
    :cmd ["clojure" "-M:test"]
    :green-marker "0 failures, 0 errors"

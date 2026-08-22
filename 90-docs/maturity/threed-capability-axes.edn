@@ -462,13 +462,17 @@
    :axis/segment :interop :axis/weight 2
    :axis/label "VDB ファイルの読み書き"
    :axis/repo "kotoba-lang/voxel"
-   ;; 2026-08-24: `.nvdb` の容器を実装した（`voxel.nvdb`）。2 反復見送った理由は
-   ;; 「大きさは分かるが field が分からない」だったが、NanoVDB.h が struct を
-   ;; 全部宣言しており、**要約しない道具で読めば逐語で取れた**。
-   ;; **OpenVDB の `.vdb`（NanoVDB ではない方）は依然読み書きしない。**
-   :axis/target "NanoVDB `.nvdb` のバイナリ容器（`.vdb` は別）"
-   :axis/paths ["src/voxel/nvdb.cljc"]
-   :axis/markers ["read-segments" "segment" "read-metadata" "write-metadata" "segments-error"]
+   ;; 2026-08-24: `.nvdb` の容器（`voxel.nvdb`）と、同日 OpenVDB の `.vdb` の容器
+   ;; （`voxel.vdb-file`）。どちらも 2 反復見送った理由が「大きさは分かるが field が
+   ;; 分からない」だったが、**要約しない道具で上流を読めば逐語で取れた** ——
+   ;; 同じ教訓を 2 形式で 2 度学んだ。
+   ;; **grid buffer は依然復号しない**（ZIP / BLOSC）。`:grid/data-decoded? false`
+   ;; を返し、`:grid/tree` も `:grid/active-count` も**生やさない** —— 空の木を
+   ;; 静かに返す reader は動いているように見える。
+   :axis/target "OpenVDB `.vdb` と NanoVDB `.nvdb` のバイナリ容器"
+   :axis/paths ["src/voxel/nvdb.cljc" "src/voxel/vdb_file.cljc"]
+   :axis/markers ["read-segments" "segment" "segments-error"
+                  "read-archive" "write-archive" "header-error" "decoded-metadata-types"]
    :axis/behavior "interop-vdb-file"}
 
   ;; ───────────────────── dcc ─────────────────────
