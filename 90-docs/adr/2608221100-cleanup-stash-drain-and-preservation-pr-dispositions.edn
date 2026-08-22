@@ -1,0 +1,62 @@
+[{:db/id -1
+  :adr/id "adr-2608221100-cleanup-stash-drain-and-preservation-pr-dispositions"
+  :adr/title "cleanup 2026-08-22 — stash 全量退役・preservation PR の実測 disposition・kotobase-server#33 の着地"
+  :adr/status "accepted"
+  :adr/date "2026-08-22"
+  :adr/related ["ADR-2608136000" "ADR-2608102000" "adr-2608040100"]
+  :adr/body "## 何をしたか（全て origin/main / 各 repo default branch に着地済み）
+
+git-cleanup-conflict の 1 セッション（2026-08-21T23Z〜2026-08-22T02Z 頃）で、superproject の stash 35 本・3 repo に跨る preservation/rescue PR 8 本・west update skip 5 repo を全て決着させた。
+
+### 1. stash 35 → 0（canvas-ledger 未着地イベントの救出）
+
+全 35 stash が `90-docs/business/canvas-ledger.edn`（append-only 台帳）への advisor/BMC append の温存だった。`:append-only-ledger-gate` の意味キー照合（`:event/at` 除去・`:seq` 除去・部分文字列クロスチェック）で **224 distinct イベント（241 instance）が本当に main に無い**ことを確認 —— 2026-08-15 の測定（timestamp 差の重複）とは逆で、各 run 固有の測定値だった。他の内容（kaiyu ledger 行・kaiyu-kaizen SKILL.md 30 行・itonami-maturity datoms 1913 行・mail index）は全て着地済みか superseded と個別確認。
+
+処置: 全 patch を `.git/stash-archive-2026-08-22/` に退避 → 224 イベントを verbatim + provenance で `90-docs/business/canvas-ledger-unlanded/2026-08-22-stash-rescue-*.edn` として **root#2460 で main に着地**（台帳本体には触れていない）→ 35 本 drop。
+
+⚠ **台帳への reconcile はまだ行われていない。** tail 追記は fold のファイル順 replay で古い観測が新しい canvas 状態を上書きするため禁止。時系列マージはデータ判断として owner / fleet reconcile 側に残る。
+
+### 2. preservation PR 8 本の disposition（駐車場の解体）
+
+| repo | PR | 判定 | 根拠 |
+|---|---|---|---|
+| kotoba-wasm | #66 | **merge** | suite を head で実走: 111 tests / 503 assertions / 0 fail |
+| kotoba-wasm | #60 #67 | close-superseded | #67 の core.cljc は #66 より古い反復（typed-cap-call の i64/i64 fallback 無し）。ADR 群は main に着地済み（0045 byte 一致・0043→0046 renumber） |
+| kotoba-wasm | #68 | close-stale-revert | 唯一の差分が 0044 の Extends 参照を renumber 前の 0043 へ**巻き戻す**内容 |
+| kotobase-server | #38 | 訂正して **merge** | pattern_source 側の docstring（Cypher も切替済みという主張）は当時偽なので訂正 commit で落とし、sparql_protocol の doc 修正だけ着地 |
+| kotobase-server | #37 | close-stale-revert | merge すると main の hosted-Datomic schema 実装 306 行を削除 |
+| kotobase-server | #33 | **#39 として実装込みで着地**（下記 3） |
+| cloud-itonami | #529 | close-superseded | 部分集合。industries hunk は履歴内 blob と byte 一致 = 着地済みの巻き戻し |
+| cloud-itonami | #530 | close-superseded | 完全 snapshot を rescue branch に push した上で author read: site 三部作は 08-11 情報再設計 / 08-12 i18n 化の**前世代**（main の docstring 自身が系譜を叙述）。`/evidence/` 案も evidence.cljc として別途着地済み |
+
+### 3. kotobase-server#33 の着地（kotobase-server#39、merge 済み）
+
+hot-db → pattern-source の compiled SPARQL/Cypher 実行器切替を、fork 後に main が入れた可変長 path（`qx/execute` の adjacency 引数）対応込みで現 main に replay:
+
+- `compiled-patterns` を `:paths` / `:optional-paths`（edge attr は `[nil attr nil]` 全域 prefetch —— BFS 到達性を prefetch の偶然に依存させない）と WITH `:pipeline` 両段まで拡張
+- adjacency は同じ source 上の同じ engine-query で構成し 3 引数 `qx/execute` へ。`trampoline` require は main の block-miss 分類が使うので温存
+
+検証（両方向、nbb 1.5.212）: main 63a68399 = 154 tests / 578 assertions / 0 fail、branch = 155 / 581 / 0。clj-kondo は main と同数（変更ファイルの新規指摘 0）。
+
+**測定上の重要発見: ローカルの nbb 1.4.210 は pristine main ですら 197 test を落とす**（bundle 内 constructor が undefined に lastIndexOf を呼ぶ runtime バグ。classifier にスタック印字を仕込んで特定）。『ローカルで赤は fleet で赤ではない』の新しい実例。ローカル nbb の更新（`npm install -g nbb@latest`、現行 1.5.212 で green 確認済み）は owner 判断待ちで未実施。
+
+### 4. west skip 5 repo の治癒（全て pin で clean に）
+
+- kotoba-wasm / kotobase-server: 上記着地後、archive → 復元 → pin 前進（kotoba-wasm f6635d80 / kotobase-server 8e379821、いずれも server-side single-entry commit）→ west update
+- cloud-itonami: 全 dirty 状態を真の base で `rescue/wip-20260822-email-login-site` に commit・push（remote に現存）。email-login はほぼ着地済み（landed 8e1100bbd の 9 分前の draft）、industries 残骸 6 件は履歴内 blob と一致を確認して archive → 削除
+- yabai-actor: fsmonitor ノイズで実は clean
+- org-spirit-in-physics: submodule 時代の壊れた gitfile。`orgs/com-junkawasaki/org-spirit-in-physics.broken-gitdir-20260822` として保全し pin で再取得。**上流 history に無いのは 8 ファイルだけ**（旧 arXiv figure/tarball + 計算結果 JSON 2 件）
+
+## 温存したもの（次 agent へ）
+
+- **live loop の現行 WIP**: canvas-ledger の新規 append と maturity-loop の stash（close 時点で stash@{0} = fb0bebac、seq 9570+）。これは steady state であり退役対象ではない
+- owner の litigation 編集（`orgs/personal/litigation/` + 対応 ADR、superproject で dirty のまま）
+- `docs/design/tamaki-ui-concepts`（tamaki 系 WIP、untracked 6 ファイル）
+- `tamaki/community-coverage` branch（main の祖先・unique commit 0・tamaki workspace が checkout 中）
+- remote の preservation branch 群（close した PR の branch は全て残存。cloud-itonami の rescue branch には `docs/endpoint-health-receipt.edn` の『receipt を repo に置くか』という open question が駐車中）
+- fleet-wide UNLANDED 299 repo（大半は industry-wave loop の `.wave5/6-*` 隠し scratch。survey 全文はセッション scratchpad の unlanded-survey.txt に出力済みだが scratchpad は揮発 —— 再測は `nbb scripts/cleanup.cljs --unlanded`）
+- `.git/stash-archive-2026-08-22/`（このワークステーションのみ。全 stash patch・PR diff・industries 残骸・未着地イベント verbatim）
+
+## resume point
+
+superproject 共有 checkout は close 時点で origin/main から十数 commit 遅れ + 並行セッションが index.lock を保持。**同期はどの live loop でも次周で行われるので手動介入不要。** kotobase-server の共有 checkout は新 pin の 1 commit 手前で clean 停車（次の west sync で追従）。次に手を付けるなら: ① canvas-ledger 224 イベントの時系列 reconcile（データ判断）② `nbb scripts/cleanup.cljs --unlanded` の wave-scratch 棚卸し ③ ローカル nbb の更新。"}]
