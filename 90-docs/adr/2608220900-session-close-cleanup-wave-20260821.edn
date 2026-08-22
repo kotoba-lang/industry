@@ -1,0 +1,128 @@
+[{:db/id -1
+  :adr/id "adr-2608220900-session-close-cleanup-wave-20260821"
+  :adr/title "セッション closing — cleanup wave 2026-08-21/22（PR 24 本の判定・untracked 15 repo・branch 313 本の退役）"
+  :adr/status "accepted"
+  :adr/date "2026-08-22"
+  :adr/body "# セッション closing — cleanup wave 2026-08-21/22
+
+「整えていって」から始まり 24 反復回した cleanup。**測定 → 判定 → 着地/退役 → 記録**を
+1 単位として、fleet の未着地バックログを 3 つの層で処理した。
+
+## 1. 駐車場になっていた PR 24 本
+
+`review:` 19 + `DO-NOT-MERGE` 5 を、行単位の containment と overlap で 1 本ずつ測った。
+
+着地済みとして close 8: occupation#6/7/8/9（ISCO 1114 は main で :implemented、registry は
+全文 parse OK）/ kami-nv-compat#3（4 修正すべて main の warp.cljc に現存）/ bonsai#17（PR の
+repo/load は main で restore として着地、しかも上流 arr/restore に委譲）/ network-isekai#278
+（main の nbb.edn は superset で merge すると :paths 5 本が消える）/ num#10（265 行中 256 行が
+main に存在）/ etzhayyim-root#3392（実体 4 ファイルは着地済み、未着地 6,465 行は全部生成データ）。
+
+merge 1: cloud-itonami#519。overlap=0（main は 105 commit 進んだがこの 4 file に未接触）で、
+3 バグが main に現存することを file 本体で直接確認した。
+
+build 成果物だった 2 本は根本原因を直した: ai-gftd-dougaka#4 → PR#5 で .cpcache 14 件 untrack、
+kotobase-worker-shell#1 → PR#2 で .gitignore 新設 + node_modules/.shadow-cljs/out の 1,147 件 untrack。
+
+残る 12 本には測定値と「何を確かめれば決まるか」を書いて decision queue にした。
+
+## 2. untracked を持つ 15 repo
+
+最危険カテゴリ（どのブランチにも remote にも無い）を全件開けた。結果、**本物の未着地は
+kotoba だけ**で、残りは build cache 5 repo / stale checkout 5 repo / 改名残骸 5 dir だった。
+
+kotoba: untracked 146 のうち 124 は .clj-kondo/.cache（checkout が 197 commit 遅れ、main は既に
+ignore 済み）。実体 22 件のうち 20 が main にも kotoba-lang/codebase にも不在で、PR#485 として救出。
+さらに tracked 側にも 2,809 insertions / 10 file の未コミット作業があり
+rescue/kotoba-worktree-20260822 として退避（親は当時の HEAD 6f3e36e2 に固定）。
+両者は同じ一続きの作業で、untracked 側が require する semantic_code/semantic_codebase が
+dirty 側の本体だった。ただし現 main ではロード不能（compiler→amu 分離、semantic-code→
+kotoba.codebase.semantic-code 改名）。
+
+club-shinshi-app: untracked 125 / dirty 153 が全部 shadow-cljs cache。repo に .gitignore が
+存在せず tracked 5,190 中 4,767(92%) が成果物だった。PR#35 で untrack、tracked 5,190 → 424。
+
+meyasu: untracked の datom log は main(26 行)に対する 58 行の厳密な superset。先頭 26 行が
+byte 一致、27 行目の :tx/prev が main の最終 :tx/cid と一致、chain 全体に断裂なしを確認して
+32 tx を merge。drive は README の 3 行だけが実体で merge、murakumo は --api-key-file の
+23 行を現 main に replay して PR#322。
+
+## 3. nopr 312 branch
+
+push 済みで open PR が無い branch。live 212 本を PR state で分類し **313 本を退役**した。
+
+クラスタ掃討で 109: maturity-ci 28（Actions 退役方針で superseded、しかも token に workflow
+scope が無く merge 不能）/ option-or-migration 19（内容着地済み、deps.edn 側は改名前座標の
+再導入 = regression）/ kotodama-split-paths 14（**新しいパスも存在しない**）/
+root-content-migration 7（残余は禁止された .sh と移動/変換済みファイル）/
+deps-retarget 6 / homebrew-kotoba 20 / kotobase 25 / game 12 ほか。
+
+そして game を測る過程で**残留の原因**が分かった: 以前の cleanup pass は「advisory PR を開く →
+内容で判定 → 理由付きで close」まで正しくやったが、**close の後に branch を消していない**。
+survey の nopr は「push 済みで **open** PR が無い」なので、closed PR を持つ branch は毎回
+数え直される。
+
+これを使って live 212 を分類（MERGED 66 / CLOSED 101 / PR 無し 42 / OPEN 3）し、
+**CLOSED 101 件すべてに閉鎖理由が記録されている**ことを全件確認した上で 167 本を一括退役した。
+
+## 測り方について学んだこと
+
+**GitHub の pulls/N.base.sha は分岐点ではない。** これを分岐点として使い、open PR 10 本すべてで
+base の遅れと overlap を過小に報告した（torch#11 は誤 0 commit/overlap 0 → 正 108 commit/
+overlap 9）。9 本に訂正を投稿し、正しい取り方（compare(<default>...<head>).merge_base_commit.sha
+を取り、compare(mb...<default>) の files と PR の files の積集合）を記録した。
+merge 済みの cloud-itonami#519 は merge-base 基準でも overlap=0 で、判断は測り方に依存していなかった。
+
+**サンプルは全体を誤らせる。** 各 repo 1 ファイルだけ見て css の option-value-of 残存を見落とし、
+^\\(def の grep だけで defprotocol 内の publish! を「無い」と判定しかけた。どちらも全件・
+実ファイルを読んで訂正した。
+
+**「測れなかった」と「測って問題が無かった」は同じ顔をする。** find が timeout で殺されて
+空出力を wc -l が 0 と報告し、「kotoba-git を参照する repo は 0 件」と結論しかけた。深さを絞って
+測り直すと deps.edn は 3,588 本あり、coordinate 宣言は本当に 0 だった（結論は同じでも
+根拠が違う）。クラスタ測定でも measured=0 を 1 度捕捉した（入力ファイルが空だった）。
+
+**workflow scope の欠如は 404 として現れる。** 同一 repo・同一 API・パスだけ変えた対照実験で、
+PROBE.md は rc 0、.github/workflows/test.yml は HTTP 404。403 ではないので「repo が無い」と
+誤読しやすい。
+
+## 副産物として見つけた実バグ
+
+comfyui.native/seed が JVM で long overflow していた。`(bit-or 0 x)` は JavaScript では
+32bit 切り詰めだが JVM では no-op なので、h が無限に伸びて (* 31 h) が
+ArithmeticException を投げる。ソースからは見えない帰結が 2 つ: **2 つのプラットフォームが
+約 7 文字以降で違う seed を計算していた**ことと、**JVM は seed の計算自体をやめていた**こと。
+unchecked-multiply + unchecked-int で両方向を実測（85 tests 固定で errors 2→0）して PR#12 で merge。
+これは #11 を載せ直したときに出た 2 errors を「PR 由来か main 由来か」で切り分けた副産物で、
+対照実験（main 単体でも同じ 2 errors）が無ければ #11 のせいにしていた。
+
+## 退役してはいけないと分かったもの
+
+orgs/kotoba-lang/compiler は改名残骸（→ amu）に見えるが、.claude/worktrees/agent-* に
+**11 個の登録済み worktree** をホストしており、うち 1 つは dirty。ディレクトリ削除は
+他セッションの作業を壊す。この 1 件があるので、改名残骸カテゴリを一様に安全と扱わないことにし、
+残り 4 件の containment を測った上で削除は見送った。
+
+## 保全
+
+.git/stash-archive-20260821/ に集約。close/削除したものは full sha を全件記録しており
+1 コマンドで復元できる。stash 7 件はすべてラベル付き。ローカルの working tree は
+1 バイトも削除していない（同期でブロックされたものは stash 退避してから checkout した）。
+"
+  :adr/open-prs "kotoba-lang/kotoba#485 (draft) — untracked 20 件の救出。現 main ではロード不能なので置き場所の判断が要る
+kotoba-lang/murakumo#321 (draft) — #301 を現 main に載せ直した。残る 6 errors は arrangement の component-not-blindable で設計判断
+kotoba-lang/murakumo#322 — --api-key-file。merge には /etc/murakumo/fleet-origin.keys の配備と Worker secret の一致確認が要る
+cloud-itonami/animeka-actor#1 — 純追加 2 file、依存の閉包確認済み
+cloud-itonami/actor-kurashimori#5 / kawase-yui#7 — murakumo actor boundary、削除 0 行
+"
+  :adr/resume-point "1. nopr の残り: PR 無し 42 本 + OPEN 3 本。42 本は判定の記録が無いので個別に測る
+   （手順は .git/stash-archive-20260821/branches-bulk-20260822/README.txt）
+2. 上記 open PR 6 本のオーナー判断
+3. cloud-itonami の本番 deploy が未実行。#519 の修正は main に在るが live は修正前を配信中。
+   deploy-local-root-pin-guard が drive/bonsai/langchain の他セッション未コミット WIP でブロック中
+4. 改名残骸 4 dir の退役（compiler は除く。containment 測定済み）
+5. dependabot 78 本（うち 31 は archived repo で close 不能）
+6. kotoba-lang/css の css_utility.kotoba に option-value-of が 2 件。parity gate を回せる場所で移行する
+"
+  :adr/evidence ".git/stash-archive-20260821/ (index.txt 174 行 + 各 README/tsv)"
+  :adr/related "adr-2607300900 / adr-2608039000 / adr-2608136800 / adr-2608138400 / adr-2608124400"}]
