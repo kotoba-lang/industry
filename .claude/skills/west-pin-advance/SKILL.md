@@ -1,6 +1,6 @@
 ---
 name: west-pin-advance
-description: west manifest（manifest/west.yml）の pin を前進させる・repo を登録/改名する・local checkout を pin に合わせる・GitHub と local と west.yml の三点ずれを直すときの手順。生成物である west.yml を安全に変える唯一の経路（GitHub API single-entry commit）と、pin 退行・全 project 更新・topdir 誤認という 3 つの実測済みの罠を含む。「pin を進める」「west に登録」「west update」「pin がずれている」「manifest を再生成」で発火。west を動かす worktree の作り方もここ。
+description: west manifest（manifest/west.yml）の pin を前進させる・repo を登録/改名する・local checkout を pin に合わせる・GitHub と local と west.yml の三点ずれを直すときの手順。生成物である west.yml を安全に変える唯一の経路（GitHub API single-entry commit）と、pin 退行・全 project 更新・topdir 誤認・`--entry` の所要時間・`--check` が常に STALE・`repos.edn` の 1 行 conflict という 6 つの実測済みの罠を含む。repo 新規登録の repos.edn 側の編集（`:extra-projects` への conj）もここ。「pin を進める」「west に登録」「west update」「pin がずれている」「manifest を再生成」で発火。west を動かす worktree の作り方もここ。
 ---
 
 # west の pin を動かす
@@ -48,8 +48,10 @@ gh api "repos/<org>/<repo>/compare/<pinned-sha>...<default-branch>" \
 # 2) 先行していたら該当 project の checkout を最新化
 cd orgs/<org>/<repo> && git fetch origin && git merge --ff-only origin/<default-branch>
 # 3) manifest の pin を前進（当該 entry のみ最小 diff。wholesale 再生成は禁止）
-nbb scripts/gen-west-manifest.cljs --entry <repo-name>
-nbb scripts/gen-west-manifest.cljs --check
+nbb scripts/gen-west-manifest.cljs --entry <repo-name>   # ⚠ 数分〜1 時間。下記「罠 4」
+# 4) 自分の変更だけを見る。--check は使わない（下記「罠 5」）
+git diff origin/main -- manifest/west.yml
+nbb scripts/verify-west-pins.cljs
 ```
 
 これを終えてから本来の操作を実行する。
@@ -95,23 +97,149 @@ nbb --classpath orgs/kotoba-lang/kagami/src orgs/kotoba-lang/kagami/bin/kagami.c
 （同時刻に別セッションが `manifest/repos.edn` へ新規 project を登録中だった）。
 worktree で走らせて branch で着地させる。
 
+## 罠 4 — `--entry` は one-liner ではない。数分〜1 時間かかり、進捗を 1 行も出さない
+
+**`gen-west-manifest.cljs` は `--entry` を付けても `render` を全 project 分計算する。**
+`render` は path ごとに `project-entry` を呼び、その中の `working-head` が
+**`git -C <path> rev-parse --show-toplevel` と `git -C <path> rev-parse HEAD` の 2 回、
+別プロセスの git を起動する**。4,200 project 分である。
+
+**所要時間は「その checkout に子リポが何本実在するか」で決まる**ので、定数で持たない
+（測り方だけ持つ）。実測 2026-08-22 の 2 点:
+
+| 走らせた場所 | `orgs/*/*/.git` の数 | 所要 |
+|---|---|---|
+| 共有 checkout（子リポが全部在る） | 4,474 | 約 55 分 |
+| `origin/main` から切った空の worktree | 0 | 4 分 27 秒 |
+
+**その間、標準出力は完全に無音**である。読み手は hang したと判断して kill する
+（実測でそうなった）。長いと知った上で流し、**`timeout … | tail; echo EXIT=$?` で
+包まない** —— `$?` は pipe の最後（= `tail`）の値なので、`timeout` に殺されても
+`EXIT=0` が出る。`> file` に落としてから exit を採る（CLAUDE.md「検査を書く前・
+緑を信じる前の 5 問」）。
+
+**`--check` も同じコストを払う。** `render` は `(if check? …)` の**前**で評価される
+ので、「軽い検査」ではない。
+
+## 罠 5 — `--check` は無改変の `main` でも STALE。あなたの変更について何も答えない
+
+**`nbb scripts/gen-west-manifest.cljs --check` を「自分の変更が canonical か」の
+確認に使わない。** 対照実験（実測 2026-08-22、`origin/main` を checkout しただけの
+worktree、`git status --porcelain` が空）:
+
+```
+$ nbb scripts/gen-west-manifest.cljs --check
+west.yml is STALE. run: nbb scripts/gen-west-manifest.cljs
+CHECK_EXIT=1
+```
+
+**一時的な drift ではなく構造的に一致しない。** 理由は 2 つあり、どちらも
+「誰かが手で直せば消える」種類ではない:
+
+1. **順序が違う。** `render` は path を必ず `distinct sort` で出すが、west.yml の
+   実ファイルは sort 順に並んでいない（実測 2026-08-22: `path: orgs/` 行 4,223 本の
+   うち `diff` が 864 行を出す）。`--check` は
+   `(= (slurp out-file) rendered)` の**バイト完全一致**なので、順序が違えば
+   中身が同じでも STALE。
+2. **集合が違う。** `render` の path は
+   「west.yml の既存 path ∪ `repos.edn` の `:extra-projects` ∪ `kotoba-workspace` の
+   components」を union する。実測 2026-08-22 で render 側 **4,500** に対し
+   west.yml 側 **4,223** —— **282 path は登録口の側にだけ在って west.yml に entry が無く**、
+   5 path は `:path-overrides` で移動する。
+
+そして **`--check` の出力は 1 行の `STALE` だけで diff を出さない**ので、
+仮に一致していない理由が 2 つ以上あっても、**あなたの entry 由来の差分と、
+以前から在る drift とを分離できない**。
+
+**代わりに使う検査（どちらも自分の変更だけを見る）:**
+
+```bash
+git diff origin/main -- manifest/west.yml   # 自分が動かした entry だけが出る
+nbb scripts/verify-west-pins.cljs           # pin の存在・default branch 到達性・前進
+```
+
+`verify-west-pins` は生成器の中でも走る（下記「pin 検証」）ので、**pin の正しさは
+`--check` に依存していない**。`--check` が担っていたのは「生成器と west.yml が
+バイト一致か」だけで、それは今日 **どのみち一致しない**。
+
+## repo の新規登録 —— `repos.edn` 側にはスクリプトが無い
+
+**登録は 2 面ある。west.yml 側は `--entry`、`repos.edn` 側は自分で書く。**
+`scripts/` の似た名前の 2 本は**どちらもこの用途ではない**:
+
+- `register-archived-west-project.cljs` —— `:extra-projects` に conj するが、
+  **同時に `:manifest.repos/archived` に `{:group "archived" :note …}` を刻む。**
+  live な repo に使うと `archived` group へ隔離され、既定の group-filter `-archived`
+  で `west update` の対象から外れる。
+- `relocate-west-project.cljs` —— **既に在る** project の path を移す。新規登録ではない。
+
+**実際の編集は `:manifest.repos/extra-projects` ベクタへの `conj` 1 つ**である。
+`manifest/repos.edn` は **1 行・約 490 KB** の datomize 済み EDN（entity 1 個）だが、
+**reader → writer で byte 完全に round-trip する**（実測 2026-08-22:
+490,695 → 490,695、`byte-identical = true`）。だから reader/writer で編集してよく、
+そのほうが構造的に安全である。**文字列置換や `sed` でやらない。**
+
+```bash
+nbb -e '
+(require (quote [cljs.reader :as reader]) (quote ["fs" :as fs]))
+(let [p "manifest/repos.edn"
+      tx (reader/read-string (.readFileSync fs p "utf8"))
+      e  (first tx)
+      xs (vec (:manifest.repos/extra-projects e))
+      new-path "orgs/<org>/<repo>"]
+  (when-not (some #{new-path} xs)
+    (.writeFileSync fs p
+      (str (pr-str [(assoc e :manifest.repos/extra-projects (conj xs new-path))]) "\n"))))'
+git diff --stat -- manifest/repos.edn   # 1 行ファイルなので "1 insertion, 1 deletion" が正常
+```
+
+⚠ **`git diff` は 1 行ファイルの差分を全文で出す。** `--stat` で見て、中身は
+上の reader で読み直して確かめる（`(count (:manifest.repos/extra-projects e))` が
+1 増えていること）。
+
+## 罠 6 — 「conflict が構造的に発生しない」のは west.yml だけ。`repos.edn` は衝突する
+
+下記の single-entry commit 経路が conflict を消すのは **west.yml に対してだけ**である。
+**`repos.edn` は 1 行なので、行指向の 3-way merge が原理的に効かない。**
+branch を切って `gh api repos/<org>/root/merges` で着地させる経路を取ると、
+**その間に別セッションが 1 本でも repo を登録していれば必ず `409 Merge conflict`** になる。
+
+実測 2026-08-22（`org-ietf-tls` の登録）: 11:29 に自分の登録 commit、11:33 に
+別セッションが `repos.edn` を触る commit を main に入れ、merge は 409 で弾かれ、
+11:45 の `Merge origin/main into agent/register-org-ietf-tls`（`# Conflicts: manifest/repos.edn`）
+で解いた。**登録は 4 分あれば衝突する。**
+
+**安全な解き方は 1 つだけ:**
+
+1. `git checkout origin/main -- manifest/repos.edn` で**丸ごと origin/main 側を採る**
+2. 上の reader/writer で自分の 1 件を**append し直す**
+3. commit して再度 merge
+
+**1 行に付いた conflict marker を手で編集しない。** 490 KB の 1 行の中の
+`<<<<<<<` を人間が正しく解けることは無く、失敗しても reader は（marker が
+文字列の中に落ちれば）**黙って読めてしまう**ことがある。
+
 ## west.yml を変える唯一の正経路 — GitHub API single-entry commit
 
 **`manifest/west.yml` への変更（登録 / rename / pin 前進）は GitHub API の
 サーバ側 single-entry commit を「唯一の正経路」にする。** west.yml は生成物
-（`repos.edn` ＋ 各子repo HEAD → `gen-west-manifest.cljs`、手書き禁止 / `--check`）
+（`repos.edn` ＋ 各子repo HEAD → `gen-west-manifest.cljs`、手書き禁止）
 なので、行指向 pin を textual 3-way merge するのはアンチパターンで、conflict
 marker の手編集は **pin を静かに壊す**。代わりに: tip の west.yml と blob SHA を
 取得（dir listing から SHA を採ると巨大 base64 を避けられる）→ **当該 entry の
 行だけ**編集 → blob SHA 一致で PUT（`branch=` `sha=`）。**tip がずれれば 409**
-で弾かれる（取得し直してリトライ）ので **conflict が構造的に発生しない**。
-commit 前に **pin == 子repo HEAD を検証**。API 手編集は生成器を通らないので、
-落ち着いたら `nbb scripts/gen-west-manifest.cljs --check` で canonical 一致を確認。
+で弾かれる（取得し直してリトライ）ので **west.yml については conflict が構造的に
+発生しない**（`repos.edn` には効かない —— 上記「罠 6」）。
+commit 前に **pin == 子repo HEAD を検証**。API 手編集は生成器を通らないが、
+**その確認に `--check` を使わない**（無改変の main でも STALE を返す。罠 5）——
+`git diff origin/main -- manifest/west.yml` と `nbb scripts/verify-west-pins.cljs`
+で見る。
 
 やむを得ずローカル merge する場合のみ、west.yml の衝突は **marker 手編集でなく
 再生成で解決**: superset 側採用 → `west update` で子を目的 pin に揃える
 （⚠ 再生成はローカル working HEAD で pin するので、子が遅れていると黙って
-ロールバックする＝pin 退行の罠）→ `gen-west-manifest.cljs` → `--check`。子repo
+ロールバックする＝pin 退行の罠）→ `gen-west-manifest.cljs` →
+`git diff origin/main -- manifest/west.yml`（`--check` ではない。罠 5）。子repo
 自体は普通の git（branch/PR/push）。詳細は ADR-2606272237 / `repos.edn`
 `:manifest-workflow`。実例: PR #61/#62/#86、kenchi-actor→kenchi-clj rename
 （`34988dd`、diff は当該 entry のみ）。
