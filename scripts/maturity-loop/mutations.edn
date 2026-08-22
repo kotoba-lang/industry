@@ -1515,4 +1515,94 @@
      :file "src/etzhayyim/intel/contract.cljc"
      :find ":when (did-shell-file? p)"
      :replace ":when (and false (did-shell-file? p))"
-     :must-fail ["a-did-shell-file-is-a-violation"]}]}]}
+     :must-fail ["a-did-shell-file-is-a-violation"]}]}
+
+  ;; ── 3D/CAD/CAM/render の能力（2026-08-20〜24 の反復で着地）─────────────
+  ;;
+  ;; 着地時に手で mutation を当てて赤くなるのを見ている。**手で 1 度見ただけの
+  ;; 拒否は、次の改修で静かに噛まなくなる** —— それがこのファイルの存在理由なので、
+  ;; そのとき見た break をここに移した。下記は全て 2026-08-24 に、この harness
+  ;; 経由で赤くなるところを見たもの。
+
+  {:repo "orgs/kotoba-lang/physics"
+   :label "布と粒子 —— 見た目では気づけない保存量と記帳"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :physics/xpbd-lambda-not-accumulated
+     :why "XPBD の λ をステップ内で累積すること。毎パス現在の違反量から作り直すと compliance が「パスごとの緩和係数」になり、反復を重ねれば違反はゼロに寄る —— **柔らかいと宣言した布が、solver 設定を変えただけで剛体に近づく**。実装当時、docstring が iteration-independence を主張する一方で実装はそれを持っていなかった"
+     :file "src/kotoba/physics/cloth.cljc"
+     :find "(assoc lambdas k (+ lambda dlambda))"
+     :replace "lambdas"
+     :must-fail ["compliance-softens-without-depending-on-the-iteration-count"]}
+
+    {:id :physics/cloth-mass-weighting
+     :why "拘束が 2 粒子を**質量重み付きで**逆向きに動かすこと。**この mutation は最初 噛まなかった** —— 重心のテストが「拘束が全部満たされた格子・重力なし」から始めており、projection の補正が常に 0 で、重み付けが何であれ重心は動きようがなかった。テストが何も測らずに緑だった典型で、この harness が見つけた（2026-08-24）。1 粒子をずらす fixture を足して初めて噛む。なおその fixture の最初の版も誤りで、position だけ動かすと Verlet では速度を与えたことになり、正しい実装でも重心が等速で動いた（0.2514→0.3208）—— previous も一緒に動かす"
+     :file "src/kotoba/physics/cloth.cljc"
+     :find "(update-in [i :particle/position] v- (vs n (* wi dlambda)))"
+     :replace "(update-in [i :particle/position] v- (vs n (* 0.5 dlambda)))"
+     :must-fail ["a-free-cloth-does-not-move-its-own-centre-of-mass"]}
+
+    {:id :physics/emission-drops-the-remainder
+     :why "放出はレートであってフレーム当たりの個数ではないこと。秒 30 個・60fps はフレーム 0.5 個で、端数を捨てる実装は**永久に 0 個**放出する —— バグではなく「調整の問題」に見えるので数週間残る"
+     :file "src/kotoba/physics/particles.cljc"
+     :find "(+ (:particles/pending sys) (* (:particles/rate sys) dt))"
+     :replace "(* (:particles/rate sys) dt)"
+     :must-fail ["emission-is-a-rate-not-a-per-frame-count"]}]}
+
+  {:repo "orgs/kotoba-lang/raytrace"
+   :label "デノイザとパストレーサ —— 絵では測れない主張"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :raytrace/denoise-ignores-features
+     :why "特徴バッファ（albedo/normal/depth）の重みを無視すると a-trous は**ただの Gaussian** になる。ノイズは同じだけ減るので PSNR だけ見ていると気づけない —— 落ちるのは「エッジでの優位」だけ"
+     :file "src/kotoba/raytrace/denoise.cljc"
+     :find "w (* k (feature-weight buffers i j sigmas))"
+     :replace "w k"
+     :must-fail ["it-beats-a-blur-and-beats-it-hardest-at-the-edges"]}
+
+    {:id :raytrace/path-drops-one-over-pi
+     :why "Lambertian BRDF の 1/π。落とすと白炉が厳密に L を返さなくなる —— ノイズではなくバイアスなので 1spp で見える。この項が cos と pdf と打ち消し合うことが、この推定器の正しさの全部"
+     :file "src/kotoba/raytrace/path.cljc"
+     :find "(/ cos-s (* pi pdf))"
+     :replace "(/ cos-s pdf)"
+     :must-fail ["two-estimators-reach-the-same-integral"]}]}
+
+  {:repo "orgs/kotoba-lang/io-alembic"
+   :label "Ogawa 容器と Alembic object 層 —— 静かに壊れる 2 つ"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :alembic/ignores-frozen-byte
+     :why "Alembic は書き込み中に byte 5 へ 0 を置き、完了時に 0xff を打つ。見ない reader は**まだ書かれている途中のファイル**を「部分的にある木」として返す"
+     :file "src/ogawa/core.cljc"
+     :find "(not= frozen-byte (nth bytes 5))"
+     :replace "false"
+     :must-fail ["it-refuses-what-is-not-a-finished-ogawa-archive"]}
+
+    {:id :alembic/object-headers-keep-the-hashes
+     :why "packed object header の末尾 32 バイトはハッシュ。飛ばさない reader は digest の中に名前長を見つけて**オブジェクトを捏造する**"
+     :file "src/alembic/objects.cljc"
+     :find "(let [buf (subvec bs 0 (- (count bs) 32))"
+     :replace "(let [buf bs"
+     :must-fail ["the-last-thirty-two-bytes-are-hashes"]}]}
+
+  {:repo "orgs/kotoba-lang/voxel"
+   :label "VDB 木と .nvdb 容器 —— tile と圧縮"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :voxel/tile-written-without-expanding
+     :why "tile は 512 ボクセルを代表する。展開せずに書き込むと **512 個全部が変わる** —— 書いた座標では正しく見えたまま"
+     :file "src/voxel/vdb.cljc"
+     :find "  (if (tile? node)\n    (into {} (for [a (range dim) b (range dim) c (range dim)] [[a b c] (:tile node)]))\n    (or node {})))"
+     :replace "  (if (tile? node) {} (or node {})))"
+     :must-fail ["writing-into-a-tile-does-not-rewrite-the-tile"]}
+
+    {:id :voxel/reads-compressed-segments
+     :why "ZIP / BLOSC は metadata の後に続くものを変える。読み進めれば圧縮バイト列が「grid」として返り、下流ではエラーではなく**ノイズ入りの grid** になる"
+     :file "src/voxel/nvdb.cljc"
+     :find "        (pos? codec)"
+     :replace "        false"
+     :must-fail ["it-refuses-what-it-cannot-read"]}]}]}
