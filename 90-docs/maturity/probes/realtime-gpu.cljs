@@ -1,92 +1,61 @@
 (ns probe-realtime-gpu
-  (:require ["child_process" :as cp] ["fs" :as fs] ["path" :as path] ["os" :as os]
-            [clojure.string :as str]))
-;; リアルタイム描画は実 GPU が要る。**nbb の Node に `navigator.gpu` が無いことは、
-;; この能力が測れないことを意味しない** —— 2026-08-23 に測り直したところ、
-;; `kotoba-lang/webgpu` は既に **8 本の Playwright テスト**を持っており、実ブラウザで
-;; 実 GPU（"real GPU: apple metal-3"）に描いて**画素を数えて**いる。
-;; 前版の probe は「Node に navigator.gpu が無い」で止まり、**別の経路で測れることを
-;; 探さずに UNMEASURABLE を出していた** —— 測れない理由の報告としては正しく、
-;; 測定の試みとしては不足だった。
+  (:require ["fs" :as fs] ["path" :as path] ["child_process" :as cp]
+            [clojure.edn :as edn] [clojure.string :as str]))
+;; リアルタイム描画は実 GPU が要る。測定そのものは `scripts/threed-gpu-receipt.cljs`
+;; が 1 回だけ行い、この probe は**受領書を読む**。
 ;;
-;; ここで守る 3 つ:
-;;   (1) ブラウザが無い機械では **FAIL ではなく UNMEASURABLE**（機械の話であって
-;;       ライブラリの話ではない）
-;;   (2) **evidence floor** —— 走ったテスト数と assertion 数に床を置く。0 件を
-;;       「失敗 0 件」として緑にしない
-;;   (3) **実 GPU の証拠**を出力から要求する。SwiftShader へ落ちた実行を
-;;       「WebGPU リアルタイム描画が動く」と読ませない
-(defn- chrome-binary
-  "ms-playwright キャッシュから Chrome for Testing を**探して**返す。パスを定数で
-  持たない —— バージョン付きディレクトリは playwright の更新で動く。"
-  []
-  (let [root (path/join (os/homedir) "Library" "Caches" "ms-playwright")]
-    (when (fs/existsSync root)
-      (->> (fs/readdirSync root)
-           (filter #(str/starts-with? % "chromium-"))
-           sort
-           reverse
-           (map #(path/join root % "chrome-mac-arm64"
-                            "Google Chrome for Testing.app" "Contents" "MacOS"
-                            "Google Chrome for Testing"))
-           (filter fs/existsSync)
-           first))))
-
+;; 直接回していた版（2026-08-23 の最初の形）は、単体では通るのに**全軸 audit の
+;; 中では 600 秒の上限に当たって UNMEASURABLE になった** —— 実測で load 100 と 308 の
+;; 両方で再現。軸の状態がマシンの混み具合で揺れるのは、「測れなかった」と正直に
+;; 言えていても判断には使えない。
+;;
+;; 受領書を使うことで緑が安くなってはいけないので、3 つを要求する:
+;;   (1) **revision の一致** —— 受領書の sha が `kotoba-lang/webgpu` の現 HEAD と
+;;       違えば PASS を出さない。古い測定で緑にするのは、測っていないものを
+;;       緑にすることと同じ
+;;   (2) **evidence floor** —— テスト数と assertion 数に床（8 / 30）
+;;   (3) **実 GPU の申告** —— SwiftShader へ落ちた実行を「動く」と読まない
 (try
-  (let [orgs (or (aget js/process.env "THREED_ORGS")
-                 (path/join (js/process.cwd) "orgs"))
+  (let [orgs (or (aget js/process.env "THREED_ORGS") (path/join (js/process.cwd) "orgs"))
         repo (path/join orgs "kotoba-lang" "webgpu")
-        exe (chrome-binary)]
+        receipt-file (path/join (js/process.cwd) "90-docs" "maturity" "receipts" "realtime-gpu.edn")
+        head (when (fs/existsSync repo)
+               (str/trim (str (.-stdout (cp/spawnSync "git" #js ["-C" repo "rev-parse" "HEAD"]
+                                                      #js {:encoding "utf8"})))))
+        receipt (when (fs/existsSync receipt-file)
+                  (try (edn/read-string (str (fs/readFileSync receipt-file "utf8")))
+                       (catch :default _ nil)))]
     (cond
-      (not (fs/existsSync repo))
+      (nil? head)
       (println "PROBE realtime-gpu UNMEASURABLE"
                (str "kotoba-lang/webgpu の checkout が無い（" repo "）"))
-      (nil? exe)
+      (nil? receipt)
       (println "PROBE realtime-gpu UNMEASURABLE"
-               "Chrome for Testing が ms-playwright キャッシュに無い —— この機械では実ブラウザ E2E を回せない（ライブラリの状態ではない）")
+               (str "受領書が無いか読めない（" receipt-file "）—— "
+                    "nbb --classpath \".:scripts/nbb_compat\" scripts/threed-gpu-receipt.cljs で作る"))
+      (not= head (:receipt/revision receipt))
+      (println "PROBE realtime-gpu UNMEASURABLE"
+               (str "受領書は別の revision のもの（受領書 "
+                    (subs (str (:receipt/revision receipt)) 0 (min 8 (count (str (:receipt/revision receipt)))))
+                    " / 現在 " (subs head 0 8) "）—— 測り直すこと。"
+                    "古い測定で緑を出さない"))
+      (or (< (:receipt/tests receipt 0) 8) (< (:receipt/assertions receipt 0) 30))
+      (println "PROBE realtime-gpu FAIL"
+               (str "走った本数が床を下回る: " (:receipt/tests receipt) " tests / "
+                    (:receipt/assertions receipt) " assertions（床 8 / 30）"
+                    " —— 静かに減った suite は「全部通った」と同じ顔をする"))
+      (or (pos? (:receipt/failures receipt 1)) (pos? (:receipt/errors receipt 1)))
+      (println "PROBE realtime-gpu FAIL"
+               (str "実ブラウザの描画テストが落ちている: " (:receipt/failures receipt)
+                    " failures / " (:receipt/errors receipt) " errors"))
+      (str/blank? (str (:receipt/gpu receipt)))
+      (println "PROBE realtime-gpu FAIL"
+               "受領書に実 GPU の申告が無い —— SwiftShader へ落ちた実行を「リアルタイム描画が動く」と読まない")
       :else
-      (let [r (cp/spawnSync "clojure" #js ["-M:test" "-r" "playwright.*-test$"]
-                            #js {:cwd repo :encoding "utf8"
-                                 :env (js/Object.assign #js {} js/process.env #js {"PW_EXE" exe})
-                                 :timeout 900000})
-            out (str (.-stdout r) (.-stderr r))
-            ;; **最後の**要約を取る。cognitect の runner は名前空間ごとにも
-            ;; 「Ran N tests」を出すので、`re-find` は最初の 1 名前空間分
-            ;; （実測 1 tests / 3 assertions）を掴み、床に引っかかって
-            ;; 「本数が減った」と誤報する。合計は最後の行にある。
-            ran (last (re-seq #"Ran (\d+) tests containing (\d+) assertions" out))
-            fails (last (re-seq #"(\d+) failures, (\d+) errors" out))
-            n (when ran (js/parseInt (nth ran 1)))
-            a (when ran (js/parseInt (nth ran 2)))
-            real-gpu (re-find #"real GPU: ([^\n]+)" out)]
-        (cond
-          (= "SIGTERM" (.-signal r))
-          (println "PROBE realtime-gpu UNMEASURABLE" "playwright スイートが 900 秒で切れた")
-          ;; ブラウザが起動できなかったのは**機械の話**で、ライブラリが
-          ;; 壊れている話ではない。床の検査より先に切り分ける —— さもないと
-          ;; 「8 本中 1 本しか走らなかった」という**本当だが誤解を招く**理由が
-          ;; 報告される（実測: 壊れた PW_EXE で 1 tests / 1 assertion）。
-          (re-find #"Failed to launch|executable doesn't exist" out)
-          (println "PROBE realtime-gpu UNMEASURABLE"
-                   (str "ブラウザを起動できない: "
-                        (first (re-find #"(executable doesn't exist at [^\n]+)" out))))
-          (nil? ran)
-          (println "PROBE realtime-gpu UNMEASURABLE"
-                   (str "テストが走った形跡が出力に無い: " (str/join " / " (take-last 3 (str/split-lines (str/trim out))))))
-          ;; evidence floor —— 0 件を「失敗 0 件」として緑にしない
-          (or (< n 8) (< a 30))
-          (println "PROBE realtime-gpu FAIL"
-                   (str "走った本数が床を下回る: " n " tests / " a " assertions（床 8 / 30）"
-                        " —— 静かに減った suite は「全部通った」と同じ顔をする"))
-          (not= ["0 failures, 0 errors" "0" "0"] (vec fails))
-          (println "PROBE realtime-gpu FAIL"
-                   (str "実ブラウザの描画テストが落ちている: " (first fails)))
-          (nil? real-gpu)
-          (println "PROBE realtime-gpu FAIL"
-                   "出力に実 GPU の申告が無い —— SwiftShader へ落ちた実行を「リアルタイム描画が動く」と読まない")
-          :else
-          (println "PROBE realtime-gpu PASS"
-                   (str "実ブラウザ E2E が " n " tests / " a " assertions で通る（"
-                        (str/trim (nth real-gpu 1)) "）—— sky/mesh/frame/vertex-layout/"
-                        "rect-extent/anim/webgl2 を実画素で検査")))))) 
+      (println "PROBE realtime-gpu PASS"
+               (str "実ブラウザ E2E が " (:receipt/tests receipt) " tests / "
+                    (:receipt/assertions receipt) " assertions で通る（" (:receipt/gpu receipt)
+                    "、" (:receipt/seconds receipt) "s、load1 "
+                    (js/Math.round (or (:receipt/load1 receipt) 0)) "）"
+                    " / 受領書は現 HEAD " (subs head 0 8) " のもの"))))
   (catch :default ex (println "PROBE realtime-gpu UNMEASURABLE" (.-message ex))))
