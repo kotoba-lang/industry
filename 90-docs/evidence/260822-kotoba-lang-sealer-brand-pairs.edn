@@ -6,7 +6,7 @@
   :evidence/claim "sealer / unsealer（brand pair）で、identity を一切問わずに『これは自分が発行したものか』に答えられる。純粋・依存ゼロ・registry なし"
   :evidence/repo "kotoba-lang/kotoba-lang"
   :evidence/base-commit "5239f36e3473effe9718b252203e4229a57b4f0c"
-  :evidence/patch "90-docs/evidence/patches/260822-kotoba-lang-sealer-brand-pairs.patch"
+  :evidence/patch "90-docs/evidence/patches/260822-kotoba-lang-sealer-and-principal.patch"
   :evidence/runtime "Clojure CLI (scratchpad にインストール) + JVM。前件（biscuit）と違い JVM 経路で実行できた"
   :evidence/command "clojure -M:test -n kotoba.lang.sealer-test / clojure -M:test / clojure -M:lint"
   :evidence/result "sealer-test 単体 9 tests / 35 assertions / 0 failures"
@@ -72,5 +72,5 @@
 適用:
 
   git -C orgs/kotoba-lang/kotoba-lang am \\
-    90-docs/evidence/patches/260822-kotoba-lang-sealer-brand-pairs.patch"
+    90-docs/evidence/patches/260822-kotoba-lang-sealer-and-principal.patch"
 }]

@@ -1,8 +1,8 @@
 From 9034e99e50aefc46ae18dfdb71485cd69c599633 Mon Sep 17 00:00:00 2001
 From: Jun Kawasaki <jun784@gmail.com>
 Date: Sat, 22 Aug 2026 01:50:40 +0000
-Subject: [PATCH] sealer: brand pairs, so provenance stops being an identity
- question
+Subject: [PATCH 1/2] sealer: brand pairs, so provenance stops being an
+ identity question
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -347,6 +347,294 @@ index 0000000..28124ea
 +                       unsealers))]
 +      (is (= [:r :b] (mapv #(open [(:unsealer red) (:unsealer blue)] %) boxes)))
 +      (is (= [:r nil] (mapv #(open [(:unsealer red)] %) boxes))))))
+-- 
+2.43.0
+
+
+From 818fb904ecb47dc6478ce17e36c34d7ea0acdf7d Mon Sep 17 00:00:00 2001
+From: Jun Kawasaki <jun784@gmail.com>
+Date: Sat, 22 Aug 2026 04:03:18 +0000
+Subject: [PATCH 2/2] type-system: :principal, and a signature cannot mint one
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The language contract already had `[:cap kind resource]` — an opaque
+capability whose presence in a parameter forces the matching effect into the
+signature. It had no way to say who an execution runs as, so every consumer
+that needed one reached for a string, and a string is a claim.
+
+`:principal` is added as an OPAQUE type, deliberately not a primitive: every
+primitive is inhabitable by writing one down, and a principal a program can
+write down is a principal it claims rather than one it was given.
+
+Two properties follow, and both are asserted rather than described:
+
+- **A principal is not authority.** `implied-effects` reads `:cap` and
+  nothing else, so a `:principal` parameter forces no effect. Being told who
+  is calling permits nothing on its own; deciding what may proceed from who
+  is calling is the ambient-authority mistake this language exists to not
+  make. Identity is for designation and accountability, the capability is
+  what permits.
+- **A signature cannot produce a principal it was not given.** A return that
+  mentions `:principal` while no parameter does is rejected as
+  `:principal/minted`, at any depth — `[:option :principal]`,
+  `[:result :principal E]`, `[:vector :principal]`, `[:map K :principal]`.
+  Wrapping is not laundering. Passing one on is fine, because there the
+  principal came in through a parameter. Move gets this from a VM that is the
+  only thing able to construct a `signer`; a type contract cannot enforce
+  provenance that way, so it enforces the part it can see: the shape of the
+  signature.
+
+Recorded in `lang/surface-status.edn` as an `:intentional-security-constraint`
+invariant beside `:no-ambient-authority`, and the entry says plainly that
+**only the type contract is done**: `:backends #{}`,
+`:not-implemented #{:guest-grammar :kir :wasm32 :restricted-esm :native}`.
+No backend represents a `:principal` value and the grammar has no way to bind
+one. `docs/lang/surface-matrix.md` regenerated — the on-disk-matrix test
+caught the staleness, which is that gate working.
+
+Two things this does NOT check, named so the silence is not read as coverage:
+that a principal cannot be rendered to `:string` is the absence of any such
+operation in the surface, not a rule stated here; and that a runtime hands one
+in rather than a program constructing one is a property of the grammar.
+
+Measured: 5 tests / 26 assertions / 0 failures. Full suite 258 -> 263 tests,
+1399 -> 1425 assertions, with the identical 5 failures / 3 errors before and
+after (all sibling checkouts absent from this environment). Lint 0 errors, no
+new warnings.
+
+Each claim was shown to discriminate: unwiring the mint rule reddens 7
+assertions, making `mentions-principal?` shallow reddens 6, moving
+`:principal` into `primitive-types` reddens the no-literal assertion, and
+making a principal parameter imply an effect reddens 7.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01H2BE7EX3cjLVRdv97GuwFu
+---
+ docs/lang/surface-matrix.md         |  1 +
+ lang/surface-status.edn             | 20 ++++++++
+ src/kotoba/lang/type_system.cljc    | 58 +++++++++++++++++++++-
+ test/kotoba/lang/principal_test.clj | 77 +++++++++++++++++++++++++++++
+ 4 files changed, 155 insertions(+), 1 deletion(-)
+ create mode 100644 test/kotoba/lang/principal_test.clj
+
+diff --git a/docs/lang/surface-matrix.md b/docs/lang/surface-matrix.md
+index 2ef9c8e..735d40c 100644
+--- a/docs/lang/surface-matrix.md
++++ b/docs/lang/surface-matrix.md
+@@ -35,6 +35,7 @@ WBS: **T2.2**. Disposition meanings live under `:dispositions` in the EDN source
+ | `no-guest-macros` | `intentional-security-constraint` |  | The safe component surface must be statically inspectable before execution. |
+ | `no-interop` | `intentional-security-constraint` |  | Arbitrary JVM/JS object and method access bypasses capability admission. |
+ | `no-unbounded-concurrency` | `intentional-security-constraint` |  | Component scheduling and resources must remain tender-controlled and bounded. |
++| `principal-is-received-not-minted` | `intentional-security-constraint` |  | A :principal is who an execution runs as. It has no literal, so a             program can only hold one it was handed, and a public signature             whose return mentions :principal while no parameter does is             rejected as :principal/minted. Identity is for designation and             accountability; the capability is what permits. A :principal             parameter therefore implies no effect, unlike [:cap kind resource],             which implied-effects forces into the signature. |
+ 
+ ## Collections
+ 
+diff --git a/lang/surface-status.edn b/lang/surface-status.edn
+index 9393989..7cbb95f 100644
+--- a/lang/surface-status.edn
++++ b/lang/surface-status.edn
+@@ -34,6 +34,26 @@
+    :reason "Components cannot manufacture code or authority from ambient process state."
+    :adr "docs/adr/ADR-safe-capability-language.md"
+    :adr-covers "S1 deny-by-default: eval / read-string / require / use / import / in-ns / resolve."}
++  :principal-is-received-not-minted
++  {:disposition :intentional-security-constraint
++   :surface #{}
++   :reason "A :principal is who an execution runs as. It has no literal, so a
++            program can only hold one it was handed, and a public signature
++            whose return mentions :principal while no parameter does is
++            rejected as :principal/minted. Identity is for designation and
++            accountability; the capability is what permits. A :principal
++            parameter therefore implies no effect, unlike [:cap kind resource],
++            which implied-effects forces into the signature."
++   :type-contract :kotoba.lang.type-system/opaque-types
++   :backends #{}
++   :implemented #{:type-contract}
++   :not-implemented #{:guest-grammar :kir :wasm32 :restricted-esm :native}
++   :adr "adr-2608220100-capability-grants-are-addressed-and-the-address-is-checked"
++   :adr-covers "Superproject ADR. Records that identity is received rather
++                resolved, so that evaluating it stays free of effect and the
++                Execution CID memo rule (ADR-2608160200) still holds. This
++                entry is the type contract only: no backend represents a
++                :principal value yet, and the grammar has no way to bind one."}
+   :no-interop
+   {:disposition :intentional-security-constraint
+    :surface #{import new . ..}
+diff --git a/src/kotoba/lang/type_system.cljc b/src/kotoba/lang/type_system.cljc
+index ae81cc2..6fd9608 100644
+--- a/src/kotoba/lang/type_system.cljc
++++ b/src/kotoba/lang/type_system.cljc
+@@ -10,6 +10,30 @@
+ (def primitive-types
+   #{:nil :bool :i32 :i64 :f32 :string :bytes :keyword :value})
+ 
++(def opaque-types
++  "Types with no literal syntax: the only way a program holds one is to have
++  been handed one.
++
++  `:principal` is who this execution runs as. It is deliberately NOT in
++  `primitive-types`, because every member of that set is inhabitable by
++  writing one down, and a principal a program can write down is a principal
++  it can claim rather than one it was given.
++
++  A principal is not authority. `[:cap kind resource]` is authority, and
++  `implied-effects` makes a capability parameter force the matching effect
++  into the signature; a `:principal` parameter forces nothing, because being
++  told who is calling permits nothing on its own. Deciding what may proceed
++  from who is calling is the ambient-authority mistake this language exists
++  to not make -- identity is for designation and accountability, and the
++  capability is what permits.
++
++  Two properties this namespace does NOT check, named so the silence is not
++  read as coverage. That a principal cannot be rendered to `:string` is the
++  absence of any such operation in the surface, not a rule stated here; and
++  that a runtime hands one in rather than a program constructing one is a
++  property of the grammar, which has no principal literal."
++  #{:principal})
++
+ (def non-nil-primitives
+   "S1b: public returns must not be bare :nil. Use [:option T] for absence."
+   (disj primitive-types :nil))
+@@ -36,6 +60,8 @@
+   (cond
+     (contains? primitive-types t) []
+ 
++    (contains? opaque-types t) []
++
+     (not (vector? t)) [{:problem :type/invalid :type t}]
+ 
+     :else
+@@ -120,6 +146,34 @@
+     (= :cap (first t)) #{(second t)}
+     :else (into #{} (mapcat capability-kinds (rest t)))))
+ 
++(defn mentions-principal?
++  "Whether T is, or contains at any depth, the `:principal` type."
++  [t]
++  (cond
++    (= :principal t) true
++    (not (vector? t)) false
++    :else (boolean (some mentions-principal? (rest t)))))
++
++(defn principal-mint-problems
++  "A signature may not produce a principal it was not given.
++
++  This is the contract-level form of the decision that identity is RECEIVED,
++  never resolved: a function whose return mentions `:principal` while none of
++  its parameters do is claiming to answer who is calling out of nothing, and
++  the only honest sources for that answer are the caller and a runtime that
++  authenticated one. Passing a principal on, wrapping it in `[:option ...]`,
++  or returning it inside a `[:result ...]` are all fine, because in each of
++  those the principal came in through a parameter.
++
++  Move's `signer` gets this from its VM, which is the only thing that can
++  construct one. A type contract cannot enforce provenance the way a VM can,
++  so it enforces the part it can see: the shape of the signature."
++  [params returns]
++  (if (and (mentions-principal? returns)
++           (not (some mentions-principal? (or params []))))
++    [{:problem :principal/minted :type returns}]
++    []))
++
+ (defn implied-effects
+   "Effects made visible by capability parameters. Unknown kinds remain their
+   own effect keyword so a typo cannot be treated as pure." 
+@@ -150,7 +204,9 @@
+                    (contains-region? returns)
+                    (conj {:problem :region/escape :type returns})
+                    true
+-                   (into (no-nil-return-problems returns)))
++                   (into (no-nil-return-problems returns))
++                   true
++                   (into (principal-mint-problems params returns)))
+         required (implied-effects (or params []))
+         missing (if (effect-row? effects)
+                   (set/difference required effects)
+diff --git a/test/kotoba/lang/principal_test.clj b/test/kotoba/lang/principal_test.clj
+new file mode 100644
+index 0000000..842029e
+--- /dev/null
++++ b/test/kotoba/lang/principal_test.clj
+@@ -0,0 +1,77 @@
++(ns kotoba.lang.principal-test
++  "`:principal` in the language type contract: identity is received, not minted.
++
++  The companion decision is the superproject's
++  adr-2608220100-capability-grants-are-addressed-and-the-address-is-checked."
++  (:require [clojure.edn :as edn]
++            [clojure.test :refer [deftest is testing]]
++            [kotoba.lang.type-system :as ts]))
++
++(def ^:private acme "kotoba://graph/acme")
++
++(deftest principal-is-a-type-but-has-no-literal
++  (testing "it is well-formed, so it can appear in a signature"
++    (is (ts/type? :principal))
++    (is (ts/type? [:option :principal]))
++    (is (ts/type? [:result :principal :string])))
++  (testing "and it is deliberately not a primitive: every primitive is
++            inhabitable by writing one down, and a principal a program can
++            write down is one it claims rather than one it was given"
++    (is (not (contains? ts/primitive-types :principal)))
++    (is (contains? ts/opaque-types :principal))))
++
++(deftest a-principal-is-not-authority
++  (testing "a capability parameter forces its effect into the signature"
++    (is (= #{:graph-read}
++           (ts/implied-effects [[:cap :graph-read acme]]))))
++  (testing "a principal parameter forces nothing — being told who is calling
++            permits nothing on its own, and deciding from it is the ambient
++            authority mistake"
++    (is (= #{} (ts/implied-effects [:principal])))
++    (is (= #{} (ts/implied-effects [:principal :string [:option :principal]])))
++    (is (:ok? (ts/validate-signature
++               {:params [:principal :string] :returns :string :effects #{}})))))
++
++(deftest a-signature-cannot-mint-a-principal
++  (testing "producing one out of nothing is the whole thing being refused"
++    (let [r (ts/validate-signature {:params [:string] :returns :principal
++                                    :effects #{}})]
++      (is (false? (:ok? r)))
++      (is (= [:principal/minted] (mapv :problem (:problems r))))))
++  (testing "no parameters at all is the same claim, more plainly"
++    (is (false? (:ok? (ts/validate-signature
++                       {:params [] :returns :principal :effects #{}})))))
++  (testing "and it is refused at depth, since wrapping is not laundering"
++    (doseq [returns [[:option :principal]
++                     [:result :principal :string]
++                     [:vector :principal]
++                     [:map :string :principal]]]
++      (is (false? (:ok? (ts/validate-signature
++                         {:params [:string] :returns returns :effects #{}})))
++          (str "minting through " (pr-str returns))))))
++
++(deftest passing-one-on-is-not-minting
++  (testing "the principal came in through a parameter, so the signature is
++            answering with what it was given"
++    (doseq [sig [{:params [:principal] :returns :principal :effects #{}}
++                 {:params [:principal] :returns [:option :principal] :effects #{}}
++                 {:params [:string [:option :principal]] :returns :principal
++                  :effects #{}}
++                 {:params [[:vector :principal]] :returns :principal :effects #{}}]]
++      (is (:ok? (ts/validate-signature sig)) (pr-str sig))))
++  (testing "and a signature that never mentions one is untouched by the rule"
++    (is (empty? (ts/principal-mint-problems [:string] :string)))))
++
++(deftest the-invariant-is-recorded-where-the-language-records-invariants
++  (testing "surface-status.edn is the authority for what the surface does;
++            a rule enforced in code and absent from that file is a rule the
++            next reader has no way to find"
++    (let [entry (get-in (edn/read-string (slurp "lang/surface-status.edn"))
++                        [:invariants :principal-is-received-not-minted])]
++      (is (some? entry))
++      (is (= :intentional-security-constraint (:disposition entry)))
++      (testing "and it says plainly that only the type contract is done —
++                no backend represents a :principal value yet"
++        (is (= #{} (:backends entry)))
++        (is (= #{:type-contract} (:implemented entry)))
++        (is (contains? (:not-implemented entry) :guest-grammar))))))
 -- 
 2.43.0
 

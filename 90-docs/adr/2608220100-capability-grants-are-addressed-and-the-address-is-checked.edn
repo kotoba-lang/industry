@@ -136,7 +136,8 @@ Cedar / RBAC（決定を再中央集権化し、decider が 3 つになる）。
 
 ## まだやっていないこと（優先順）
 
-1. **`:principal` を guest grammar に入れる。** 1 ワードの opaque handle
+1. **`:principal` を guest grammar に入れる。** 型契約は 2026-08-22 に landed
+   （下記『3 件目』）。**残りは backend と grammar** —— 1 ワードの opaque handle
    （`:document` / vector と同じ形）にすれば native の admission gate を通る。
    ゲストにできることは比較・`:cap/holder` への設置・受け渡しの 3 つだけとし、
    **文字列化させない**（させると guest 内で ACL 文字列マッチが始まる）。
@@ -188,6 +189,52 @@ brand に置き換えた実例は 0 件。guest への露出も無い（`:princi
 public な `->Unsealer` を生成し、型に付けた `^:private` はそれを抑止しない。
 主張の側を狭い真の性質（**export するもので brand core を渡すものは無い**）に
 書き換え、interop 表面は contract test で名指しした。
+
+## 3 件目に landed したもの —— `:principal` が言語 core に入った（2026-08-22）
+
+**`kotoba.lang.type-system` は `[:cap kind resource]`（不透明な capability。
+パラメータに在ると `implied-effects` が対応する effect を signature に強制する）
+を既に持っていたが、『この実行は誰として走っているか』を言う型が無かった。**
+だから必要とした消費者は全員 string に手を伸ばし、**string は主張である。**
+
+`:principal` を **opaque type** として足した。primitive にしなかったのは意図的で、
+**primitive は全部リテラルで書けるから** —— 書ける principal は、与えられた
+principal ではなく**名乗った** principal である。
+
+そこから 2 つの性質が出て、どちらも記述ではなく assertion にした:
+
+- **principal は authority ではない。** `implied-effects` は `:cap` しか読まないので
+  `:principal` パラメータは effect を 1 つも強制しない。誰が呼んでいるかを
+  知らされることは、それ自体では何も許可しない。**そこから通してよいかを決めるのが
+  ambient authority の誤り**であり、この言語がしないと決めたことである。
+- **signature は、与えられていない principal を作れない。** 返り値が `:principal` に
+  触れているのにパラメータが触れていなければ `:principal/minted` で拒否する。
+  **深さを問わない** —— `[:option :principal]` / `[:result :principal E]` /
+  `[:vector :principal]` / `[:map K :principal]`。**包むことは洗浄ではない。**
+  受け渡しは通る（そこでは principal がパラメータから入ってきている）。
+  Move はこれを VM から得る（`signer` を構築できる唯一の存在が VM）。型契約は
+  provenance をそのようには強制できないので、**見える部分＝signature の形**を強制する。
+
+`lang/surface-status.edn` に `:no-ambient-authority` の隣の
+`:intentional-security-constraint` invariant として記録した。
+
+**⚠ 入ったのは型契約だけである。** entry 自身が
+`:backends #{}` / `:not-implemented #{:guest-grammar :kir :wasm32 :restricted-esm :native}`
+と申告している —— **`:principal` 値を表現する backend は 1 つも無く、grammar に
+principal を束縛する構文も無い。したがって今日 `.kotoba` のソースに principal は
+書けない。**
+
+検査: 単体 **5 tests / 26 assertions / 0 failures**。全スイート
+**258 → 263 tests / 1399 → 1425 assertions**、失敗は前後で同一の 5 FAIL + 3 ERROR。
+lint errors 0、新規警告なし。break/unbreak 4 回（mint 規則を外す / 再帰をやめる /
+primitive に入れる / effect を含意させる）——すべて意図したテストだけが赤くなった。
+
+### 生成物の gate が 1 度正しく赤くなった
+
+surface-status.edn に invariant を足した時点で `on-disk-matrix-matches-regenerated`
+が落ちた。`docs/lang/surface-matrix.md` は surface-status.edn の射影なので、
+**生成物が stale になったことを gate が捕まえた**。再生成して解消（差分 1 行）。
+落ちるべき時に落ちる gate の実例として記録する。
 
 ## この ADR 自身が、記録した class の欠陥で 1 度落ちた
 
