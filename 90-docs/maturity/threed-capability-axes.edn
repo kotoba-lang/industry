@@ -419,13 +419,31 @@
    :axis/markers ["read-abc" "write-abc" "alembic"]
    :axis/behavior nil}
 
-  {:axis/id :interop/openvdb
+  ;; 2026-08-23: 1 軸を 2 つに割った。元の軸は「疎ボリュームグリッドの読み書き」で
+  ;; **データ構造と容器を 1 つの主張にまとめていた**。木は実装して厳密に測れるが、
+  ;; `.vdb` / `.nvdb` のバイト配置は推測せずには書けない（同日、上流 3 ファイルを
+  ;; 確認 —— GridHandle.h は配置を定義せず、io/IO.h は大きさだけ（FileHeader 16B /
+  ;; FileMetaData 176B）を述べ、NanoVDB.h の struct 本体は取得できなかった）。
+  ;; **1 つの偽より 2 つの真**を catalog に置く。容器の軸は absent のまま残り、
+  ;; 重みが増えるので score は上がらない —— 分割で数字を作らないこと。
+  {:axis/id :interop/vdb-tree
    :axis/segment :interop :axis/weight 2
-   :axis/target "OpenVDB（Houdini のボリューム標準）"
-   :axis/label "疎ボリュームグリッドの読み書き"
-   :axis/repo "kotoba-lang/kami-engine-sculpt"
-   :axis/paths ["src"]
-   :axis/markers ["vdb" "read-vdb" "write-vdb"]
+   :axis/target "OpenVDB の Tree4<T,5,4,3>（疎ボリュームのデータ構造）"
+   :axis/label "疎ボリューム木（固定分岐 + tile）"
+   :axis/repo "kotoba-lang/voxel"
+   :axis/paths ["src/voxel/vdb.cljc"]
+   :axis/markers ["grid" "set-voxel" "prune" "topology-op" "active-voxels"]
+   :axis/behavior "vdb-tree"}
+
+  {:axis/id :interop/vdb-file
+   :axis/segment :interop :axis/weight 2
+   :axis/target "OpenVDB `.vdb` / NanoVDB `.nvdb` のバイナリ容器"
+   :axis/label "VDB ファイルの読み書き"
+   :axis/repo "kotoba-lang/voxel"
+   :axis/paths ["src/voxel/vdb.cljc"]
+   ;; magic 番号は確認済みで source に記録してあるが、**読み書きは無い**。
+   ;; marker をこの名前にしてあるのは、書いた瞬間に軸が動くようにするため。
+   :axis/markers ["read-vdb" "write-vdb"]
    :axis/behavior nil}
 
   ;; ───────────────────── dcc ─────────────────────
