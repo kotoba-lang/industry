@@ -1,0 +1,61 @@
+[{:db/id -1
+  :adr/id "adr-2608220200-session-close-tls-http-dhcp-and-the-sixth-question"
+  :adr/title "ADR-2608220200: closing — 自前 TLS/HTTP でクラウドに届き、bare metal がアドレスを得た日、そして 6 問目"
+  :adr/status "accepted"
+  :adr/date "2026-08-22"
+  :adr/body "# 何が着地したか
+
+すべて各 repo の default branch 上にあり、west pin も tip と一致している（closing 時点で 7 repo とも `pin == tip`）。
+
+| repo | commit | 内容 |
+|---|---|---|
+| kotoba-lang/org-ietf-tls | b91d4a14 | RFC 8446 TLS 1.3 クライアント（新規 repo）。公開インターネットに対して実際に握手する |
+| kotoba-lang/http | d53ebfd1 | HTTP/1.1 wire クライアント。transport 注入型で TLS を知らない |
+| kotoba-lang/aiueos | 1af48744 | 自前 TLS+HTTP でクラウド権威に届く経路（既定は JDK のまま）、bare metal の DHCPv4、hosted profile の締め直し |
+| kotoba-lang/grant | 2745c17d | cloud 判断層（admit-inference / admit-write / host 束縛 anchor）と、境界に従って移動したテスト |
+| kotoba-lang/kotoba-native | f099186e | DHCP 2 objects の kernel-object-entries と専用 fuel tier |
+| kotoba-lang/amu | e8b1d91e | kotoba-native pin の前進（1 行、最小） |
+| kotoba-lang/org-ietf-x509 | 80a0686a | subjectAltName の dNSName reader |
+
+superproject 側: ADR 5 本（kekkai 参加 / DID の 3 面 / internal-disk install / cloud round trip の権威ポインタ / TLS repo 起票）、custody のずれの記録、public-runtime-owners 検査の evidence floor、CLAUDE.md の 6 問目、TLS の fleet gate 登録。
+
+# 何を私自身が再実行して確かめたか
+
+agent の報告を根拠にしていない。以下は closing を書いた本人が clean clone / worktree から走らせた実測である。
+
+- org-ietf-tls: `clojure -M:report` が `RFC8448-VECTORS-COMPARED 43` / `REFUSALS-EXERCISED 40` / `550 passed, 0 failed` / `OK`。`clojure -M scripts/live_kotobase.clj` が kotobase.net:443 と握手し `HTTP/1.1 200` / `Content-Length: 6391` を取得。pin を 1 桁壊すと `:peer-not-pinned` で握手が落ち、観測した鍵を報告する。
+- aiueos: `clojure -M:cloud-live check --transport own` が 5 レグすべて ADMITTED で exit 0、受領証に `:transport :own`。3 ホスト・3 pin・3 回の独立した TLS セッション。
+- aiueos / grant のテスト数の増減は境界移動によるもので、両側を測って確認した（aiueos 341/8647、grant 422/1315、どちらも 0 failures）。
+- kotoba-native の 2 entry と aiueos 側の contract / .kotoba / .o / gate script が default branch 上に実在することを確認。
+
+⚠ **この検証中に私自身が 1 度誤った測定をしている。** 共有 checkout の origin/main ref が stale な worktree で `--transport own` を走らせ、そのフラグが存在しない revision を測っていた。フラグは黙って無視されるので出力は成功に見える。受領証に `:transport` 行が無いことだけが違いだった。fetch し直して測り直した。
+
+# 閉じていないもの（優先度順）
+
+1. **bare metal は gap ledger row 2（DNS stub resolver）と row 3（使える TCP ストリーム）が未着手。** TLS も HTTP も hosted profile にしか居ない。row 1（アドレス設定）は今日 DHCPv4 で閉じたが、**リースを誰も消費していない** —— driver は今もコンパイル時定数のアドレスから送る。
+2. **chain validation はどちらの経路にも存在しない。** peer 認証は SPKI pin のみ。失効確認・CT・name constraints・発行者署名・有効期限も同様に未実装で、これは docstring だけでなく返り値の `:not-checked` に入る。
+3. **物理マシンはこのイメージを 1 度も起動していない。** USB boot の証拠は OVMF-under-QEMU の transport 等価性のみ。
+4. **kotobase への live write は 401。** block 面は CACAO ではなく静的 bearer token（Authorization: Bearer + 2 つの Worker secret との文字列一致）で、documented な kagi item が vault に無い。オーナー操作が要る。
+5. **credential を要する murakumo の面（/v1/messages）は未測定。** mk1 署名鍵の documented な item も vault に無い。gate 1 本のために live Worker の署名鍵をローテートしていない（発行済みトークンが全部無効になるため）。
+6. **TLS の fleet gate はまだノードで 1 度も走っていない。** このワークスペースの規則では gate は fleet で 1 度緑になるまで landed としない。最初の tick が測定になる。
+7. 自前 transport は既定ではない。接続再利用なし、https のみ、ALPN / HTTP/2 なし、IPv6 リテラル不可、全体の deadline なし。プリミティブは今も JDK のもので、出ていったのは java.net.http であって JDK ではない。
+
+# 次のセッションが最初にやること
+
+1. 走行中の agent 2 本（下記）のマージを確認し、**west pin を進める**: `nbb scripts/west-pin-put.cljs aiueos <sha>` / `... org-ietf-tls <sha>`。pin 前進は agent にやらせていない。
+2. fleet gate の最初の tick 結果を見る: `manifest/fleet-ci.edn` の `org-ietf-tls` 行。赤なら、原因は egress（maven の test-runner と git の org-ietf-x509 / org-ietf-asn1）である可能性が高い —— この fleet の egress は一様ではない。
+3. bare metal を続けるなら row 3（TCP ストリーム）。`os/aiueos/kotoba/tcp-seq-acceptable.kotoba` は RFC 9293 §3.10.7.4 として書かれ parity テストもあるが、**どの kernel も link していない**（export が allow-list に無い）。書かれていることと繋がっていることは別である。
+
+# closing 時点で走行中の agent
+
+どちらも自分で server-side マージする。west pin は進めない（私が進める運用）。
+
+- bare metal row 2: DNS stub resolver + DHCP リースの消費。`os/aiueos/**` と、必要なら kotoba-native の kernel-object-entries。ADR 0078 予定。
+- org-ietf-tls: 呼び出し側が渡す anchor 集合に対する chain validation。pin モードは 1 バイトも変えない、既定にもしない、という制約付き。
+
+# このセッションで見つかった検査の欠陥
+
+CLAUDE.md の 5 問に 6 問目を足した（root main 4a90cf2）: **その検査は、自分が名乗っている理由で拒否したことがあるか。** 1 日で別々の repo の 4 agent が同型を踏んでいる。最悪のものは出荷された —— tls.cert が provider の答えを truthy で判定し、契約の拒否値が空でないベクタだったため、**却下された署名がすべて成功として通っていた**。発見は「truthy 判定に戻すと拒否が到達不能になる」ことの実測であり、欠陥はコードではなく assertion の側にあった。
+
+併せて記録した実測: `gen-west-manifest.cljs --check` は無改変の main でも構造的に STALE を返し、自分の変更について何も判定できない（west.yml の path が未ソートで renderer は常にソートして出す、かつ renderer の path 集合の方が多い）。`--entry` と同じコストを払う。`repos.edn` の登録にスクリプトは無く、1 行 EDN なので branch 経路では衝突する。
+"}]
