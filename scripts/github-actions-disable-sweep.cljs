@@ -40,6 +40,11 @@
 (def apply? (flag? "--apply"))
 (def recheck? (flag? "--recheck"))
 (def only-owner (opt "--owner"))
+;; --repo owner/name（複数可）。列挙を経由せず 1 件だけ扱う。
+;; 列挙が通らない環境で handle-repo / decide-permissions の分岐を実際に走らせて
+;; 確かめるために要る —— 走らせたことのない分岐を landed としない。
+(def only-repos
+  (vec (keep-indexed (fn [i a] (when (= a "--repo") (nth args (inc i) nil))) args)))
 (def concurrency (js/parseInt (or (opt "--jobs") "6") 10))
 
 ;; 走査対象のアカウント。west.yml の remote が正だが、ここは「GitHub 上の
@@ -59,8 +64,14 @@
 (defn log [& xs]
   (println (str "[" (.toISOString (js/Date.)) "] " (str/join " " (map str xs)))))
 
+;; gh が無い環境（remote container / CI）でも動くように env へ落ちる。
+;; gh があるときは従来どおり gh が勝つ。
 (def token
-  (str/trim (str (.execFileSync cp "gh" #js ["auth" "token"] #js {:encoding "utf8"}))))
+  (or (try (str/trim (str (.execFileSync cp "gh" #js ["auth" "token"]
+                                         #js {:encoding "utf8" :stdio "pipe"})))
+           (catch :default _ nil))
+      (.-GH_TOKEN js/process.env)
+      (.-GITHUB_TOKEN js/process.env)))
 
 (defn sleep [ms] (js/Promise. (fn [res] (js/setTimeout res ms))))
 
@@ -113,6 +124,11 @@
                              {:status :error :error (str e)})))))]
      (attempt 1))))
 
+;; 列挙できなかったページを覚えておく。**これが無いと、1 件も列挙できなかった
+;; sweep が「scanned 0 | errors 0」= 掃き切ったのと同じ出力になる**（実測
+;; 2026-08-22、proxy が repo listing を 403 で拒否した run が exit 0 を返した）。
+(def listing-failures (atom []))
+
 (defn list-repos
   "アカウントの全 repo（ページング）。-> promise of [full_name …]"
   [{:keys [name kind]}]
@@ -121,7 +137,9 @@
               (-> (api (str base "?per_page=100&page=" n))
                   (.then (fn [{:keys [status body]}]
                            (if-not (= 200 status)
-                             (do (log "WARN" name "repo listing page" n "status" status)
+                             (do (swap! listing-failures conj (str name " page " n " -> " status))
+                                 (log "UNVERIFIED-LISTING" name "repo listing page" n
+                                      "status" status)
                                  acc)
                              (let [rs (mapv #(.-full_name %) (array-seq body))]
                                (if (< (count rs) 100)
@@ -163,13 +181,23 @@
 (defn- decide-permissions [full-name n]
   (-> (api (str "/repos/" full-name "/actions/permissions"))
       (.then (fn [{:keys [status body]}]
-               (let [enabled? (and (= 200 status) (.-enabled body))]
-                 (cond
-                   (not enabled?) (js/Promise.resolve
-                                   {:repo full-name :workflows n :already-disabled true})
-                   (not apply?) (js/Promise.resolve
-                                 {:repo full-name :workflows n :would-disable true})
-                   :else (disable! full-name n)))))))
+               (cond
+                 ;; permissions が読めなかったことを「無効」と読まない。
+                 ;; 最初の版は `(and (= 200 status) (.-enabled body))` を
+                 ;; enabled? とし、403 も 404 も network error も
+                 ;; `:already-disabled` に落としていた —— **答えられなかった
+                 ;; repo が、確かめて無効だった repo と同じ列に並ぶ。**
+                 (not= 200 status)
+                 (js/Promise.resolve {:repo full-name :workflows n
+                                      :unverified (str "permissions " status)})
+
+                 (not (.-enabled body))
+                 (js/Promise.resolve {:repo full-name :workflows n :already-disabled true})
+
+                 (not apply?)
+                 (js/Promise.resolve {:repo full-name :workflows n :would-disable true})
+
+                 :else (disable! full-name n))))))
 
 (defn handle-repo [state full-name]
   (if (contains? state full-name)
@@ -177,29 +205,42 @@
     (-> (api (str "/repos/" full-name "/actions/workflows"))
         (.then (fn [{:keys [status body]}]
                  (cond
-                   ;; Actions が repo で無効だと workflows は 404 を返す。
-                   ;; これは「対象外」であって失敗ではない。
-                   (= 404 status) (js/Promise.resolve
-                                   {:repo full-name :workflows 0 :note :actions-off})
-                   (not= 200 status) (js/Promise.resolve
-                                      {:repo full-name :error status})
-                   :else (let [n (.-total_count body)]
-                           (if (zero? n)
-                             (js/Promise.resolve {:repo full-name :workflows 0})
-                             (decide-permissions full-name n)))))))))
+                   ;; **404 だけでは「Actions が無効」と言えない。** Actions が
+                   ;; 無効な repo も 404 を返すが、見えない repo・改名された repo・
+                   ;; scope の足りない token も同じ 404 を返す。1 つの status に
+                   ;; 1 つの原因を割り当てると、答えられなかったものが答えの中に
+                   ;; 混ざる。だから 404 では判定せず、permissions に訊きに行って
+                   ;; そちらに答えさせる（読めれば confirmed、読めなければ
+                   ;; :unverified になる）。
+                   (= 404 status) (decide-permissions full-name 0)
 
-(defn -main []
+                   (not= 200 status)
+                   (js/Promise.resolve {:repo full-name :unverified (str "workflows " status)})
+
+                   ;; **workflow が 0 本でも permissions を必ず引く。**
+                   ;; 「登録された workflow が無い」は「Actions が無効」ではない。
+                   ;; 実測 2026-08-22: com-junkawasaki/root は `.github/` を
+                   ;; 1 ファイルも持たないのに registered workflow を 3 本持つ
+                   ;; （Dependabot の dynamic 2 本 + 削除済みファイルの stale 1 本）。
+                   ;; 逆に、本当に 0 本でも Actions が有効なままなら、workflow が
+                   ;; 1 つ載った瞬間に走り出す —— 0 本は無効化を省く理由にならない。
+                   :else (decide-permissions full-name (.-total_count body))))))))
+
+(defn- sweep! []
   (log (if apply? "APPLY mode — Actions will be disabled" "dry-run (pass --apply to act)"))
   (let [state (atom (read-state))
         accts (if only-owner (filterv #(= only-owner (:name %)) accounts) accounts)]
-    (-> (reduce (fn [p acct]
+    (-> (if (seq only-repos)
+          (do (log "explicit targets:" (count only-repos) "repo(s) — no listing")
+              (js/Promise.resolve only-repos))
+          (reduce (fn [p acct]
                   (.then p (fn [acc]
                              (-> (list-repos acct)
                                  (.then (fn [rs]
                                           (log (:name acct) ":" (count rs) "repos")
                                           (into acc rs)))))))
-                (js/Promise.resolve [])
-                accts)
+                  (js/Promise.resolve [])
+                  accts))
         (.then (fn [repos]
                  (log "scanning" (count repos) "repos with pool" concurrency
                       "(" (count @state) "already recorded)")
@@ -207,7 +248,9 @@
                          (fn [r i]
                            (-> (handle-repo @state r)
                                (.then (fn [res]
-                                        (when-not (:skipped res)
+                                        ;; 答えられなかった repo を state に書かない。
+                                        ;; 書くと次回 skip され、非回答が回答として固定される。
+                                        (when-not (or (:skipped res) (:unverified res) (:error res))
                                           (swap! state assoc (:repo res) (dissoc res :repo))
                                           (when (zero? (mod (inc i) 200))
                                             (write-state! @state)
@@ -220,19 +263,44 @@
                        disabled (filter :disabled results)
                        would (filter :would-disable results)
                        already (filter :already-disabled results)
+                       unver (filter :unverified results)
                        errs (filter :error results)]
                    (log "scanned" (count results)
                         "| with workflows" (count with-wf)
                         "| disabled now" (count disabled)
                         "| already disabled" (count already)
                         "| would disable" (count would)
+                        "| UNVERIFIED" (count unver)
                         "| errors" (count errs))
                    (doseq [r (take 40 (concat disabled would))]
                      (println "  " (if (:disabled r) "DISABLED" "would-disable")
                               (:repo r) (str "(" (:workflows r) " workflow(s))")))
+                   (doseq [r (take 20 unver)]
+                     (println "   UNVERIFIED" (:repo r) (:unverified r)))
                    (doseq [r (take 10 errs)]
                      (println "   ERROR" (:repo r) (:error r)))
-                   (println "state:" state-path))))
+                   (println "state:" state-path)
+                   (doseq [f @listing-failures] (println "   UNVERIFIED-LISTING" f))
+                   ;; 走り切ったことと掃き切ったことは別。答えられなかった repo が
+                   ;; 1 つでもあれば exit 0 にしない —— 呼び出し側（loop / routine）が
+                   ;; 「sweep は通った」と読めてしまう。列挙自体が失敗していたら、
+                   ;; 走査 0 件は「対象が無かった」ではなく「訊けなかった」なので 2。
+                   (cond
+                     (seq @listing-failures)
+                     (do (println (str "Refusing to report a clean sweep: "
+                                       (count @listing-failures)
+                                       " repo listing(s) failed. Zero scanned here means"
+                                       " 'not asked', not 'nothing to disable'."))
+                         (set! (.-exitCode js/process) 2))
+                     (or (seq unver) (seq errs) (seq would))
+                     (set! (.-exitCode js/process) 1)))))
         (.catch (fn [e] (log "FATAL" (str e)) (set! (.-exitCode js/process) 1))))))
+
+(defn -main []
+  ;; token が無いのは「掃くものが無かった」ではない。走らずに 2 で終わる。
+  (if token
+    (sweep!)
+    (do (log "Refusing to sweep: no token (gh auth token / GH_TOKEN / GITHUB_TOKEN).")
+        (set! (.-exitCode js/process) 2))))
 
 (-main)

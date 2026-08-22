@@ -191,6 +191,29 @@ GitHub Actions ではない。
   **repo は green に見えたまま何も検査されていなかった**。無効化すればチェックマーク自体が
   出ないので、誤読しようがない。
 
+### 「Actions を止めた」は、GitHub 側に訊くまで未測定（2026-08-22、ADR-2608221300）
+
+**workflow ファイルの有無から Actions の状態を推測しない。** `.github/` を 1 ファイルも
+持たない repo が registered workflow を持つことがある（Dependabot の `dynamic/*` と、
+削除済みファイルの stale entry）。それらは `ls` にも `git ls-files` にも映らないので、
+**ファイル走査は見えないものを「無い」と報告する。**
+
+- 状態を訊くのは `GET /repos/{o}/{r}/actions/permissions`。**読めなかった応答を
+  「無効」と読まない** —— 403 も 404 も network error も、無効と同じ形で返ってくる。
+  読めなかったなら `UNVERIFIED` であって `disabled` ではない（実測 2026-08-22、
+  掃除機がまさにこれを `:already-disabled` として state に書き込んでいた）。
+- **workflow が 0 本であることは無効化を省く理由にならない。** 有効なまま放置された
+  repo は、workflow ファイルが 1 つ載った瞬間に走り出す。
+- **課金を言うときは `/actions/runs/{id}/timing` の `billable` を引く。**
+  壁時計は課金ではない（実測: 30〜45 分回る run の `billable.total_ms` が 0）。
+  引いていないなら「未測定」と書く。
+- 道具の分担: 現在地を測るのは `scripts/github-actions-billable-audit.cljs`
+  （対象は `--repo` / `--owner` で明示。引数なしで全アカウントを歩かない）、
+  止めるのは `scripts/github-actions-disable-sweep.cljs`。tree の側は fleet gate
+  `root-no-github-workflows` が保つ —— ただし**その緑が言うのは「この tree は
+  GitHub に workflow を渡していない」だけ**で、GitHub 側の設定は credential を
+  要するのでノードでは引けない。
+
 ### fleet gate の書き方（実測した制約つき）
 
 | gate | 要件 | 落とし穴 |
