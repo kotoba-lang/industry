@@ -17,6 +17,23 @@
 ;;   … --axis :kernel/fillet-chamfer     # 1 軸だけ測る
 ;;   … --no-behavior                     # marker だけ（速い。ただし :declared 止まり）
 ;;
+;; ## 実測: 全 64 軸で 290 秒（load 4.6、2026-08-24）
+;;
+;;     :cae/cfd  93.4s   :dcc/cloth-hair 45.4s   :cam/collision-check 40.0s
+;;     :render/offline-pathtracer 31.3s   :render/denoise 20.3s   :kernel/fillet 12.8s
+;;     残り 58 軸で 47 秒
+;;
+;; **この audit は元から高くなかった。高かったのはマシンである。** 同じ probe が
+;; load 5 で 13 秒、load 100 で 91 秒（fillet）。全体でも load 70〜150 の測定では
+;; 524〜1357 秒だったものが、load 5 では 290 秒に収まる。
+;;
+;; 3 tick にわたって「高い probe」を順位付けして削ったが、**その順位は競合の
+;; 産物だった** —— 実際に削った 2 件（collision-check の板を半分、cloth-hair の
+;; 振り子と compliance）はどちらも切り分けを保ったまま安くなっているので誤りでは
+;; ないが、動機は水増しされていた。負荷を秒数の隣に書くようにして初めて見えた。
+;; **これ以上は削らない。** 最大の `:cae/cfd` は docstring が「刻みを減らすと
+;; L2 が 4.8% → 10.9%」と書いており、安くする道が主張を弱める道と一致している。
+;;
 ;; ⚠ **これは fleet gate にできない。** 判定は `orgs/` 配下の checkout を読むが、
 ;; fleet が配るのはその repo の tree だけで `git ls-files orgs/` は 0 件である
 ;; （CLAUDE.md「gate が要求する入力が repo に無いことがある」）。gate 化すると
