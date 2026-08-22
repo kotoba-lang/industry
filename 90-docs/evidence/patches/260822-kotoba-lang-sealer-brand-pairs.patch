@@ -1,0 +1,352 @@
+From 9034e99e50aefc46ae18dfdb71485cd69c599633 Mon Sep 17 00:00:00 2001
+From: Jun Kawasaki <jun784@gmail.com>
+Date: Sat, 22 Aug 2026 01:50:40 +0000
+Subject: [PATCH] sealer: brand pairs, so provenance stops being an identity
+ question
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A large share of the places that look like they need identity are not asking
+who are you. They are asking did this come back from me — is this the
+capability I minted, the ticket I issued. An identity answer needs a
+principal, a proof, a registry and a comparison. A brand answers it with
+object identity and nothing else, and it is pure: sealing performs no effect,
+consults nothing, reaches nothing outside its arguments. A decision that
+resolves an identifier becomes an effect, which ADR-2608160200's Execution CID
+memo rule forbids; a brand has no such cost, so the cases it covers should be
+spent here rather than on identity.
+
+`brand-pair` returns the two rights separately because the split is the
+mechanism: handing out the sealer confers the right to put values into the
+brand and confers nothing else. Two pairs made with the same label are
+unrelated — the label is for receipts, is never compared, and a brand is not
+its name. `unseal` returns `{:ok? false :reason ...}` rather than throwing,
+per the `:explicit-errors` invariant, over a closed reason set that keeps
+`:not-sealed` (a hand-built look-alike) distinct from `:wrong-brand` (a real
+box from elsewhere).
+
+An earlier draft of the docstring claimed no public constructor could widen a
+sealer into an unsealer. The test written to demonstrate that failed:
+`deftype` emits a public `->Unsealer` on every platform and `^:private` on the
+type does not suppress it. The claim is now the narrower true one — nothing
+this namespace exports hands out a brand core — and the interop surface is
+named in a contract test so that adding a widening function here reddens
+something instead of reddening nothing.
+
+Measured: 9 tests / 35 assertions / 0 failures. Full suite 249 -> 258 tests,
+1364 -> 1399 assertions, with the identical 5 failures / 3 errors before and
+after (all of them sibling checkouts this environment does not have —
+`../kotoba/...` — which is the drift the `:ocapn-test` alias comment already
+describes). `clojure -M:lint` 0 errors, and the one warning this change
+introduced is fixed rather than accepted.
+
+Each behaviour was shown to discriminate: comparing labels instead of brand
+identity reddens 2 tests, letting `unseal` accept a sealer reddens 1, and
+collapsing `:not-sealed` into `:wrong-brand` reddens 3.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01H2BE7EX3cjLVRdv97GuwFu
+---
+ src/kotoba/lang/sealer.cljc      | 160 +++++++++++++++++++++++++++++++
+ test/kotoba/lang/sealer_test.clj | 121 +++++++++++++++++++++++
+ 2 files changed, 281 insertions(+)
+ create mode 100644 src/kotoba/lang/sealer.cljc
+ create mode 100644 test/kotoba/lang/sealer_test.clj
+
+diff --git a/src/kotoba/lang/sealer.cljc b/src/kotoba/lang/sealer.cljc
+new file mode 100644
+index 0000000..c0993bc
+--- /dev/null
++++ b/src/kotoba/lang/sealer.cljc
+@@ -0,0 +1,160 @@
++(ns kotoba.lang.sealer
++  "Brand pairs: recognising a value you made earlier, without asking who anyone is.
++
++  A large share of the places that look like they need identity are not asking
++  *who are you*. They are asking *did this come back from me* — is this the
++  capability I minted, the continuation I handed out, the ticket I issued. An
++  identity answer to that question needs a principal, a proof, a registry and a
++  comparison; a brand answers it with object identity and nothing else.
++
++  This is E's `makeBrandPair`, and it matters here for a reason particular to
++  Kotoba: **it is pure.** Sealing performs no effect, consults nothing, and
++  reaches nothing outside its arguments. A design that resolves an identifier
++  in order to decide something turns that decision into an effect, which is
++  what ADR-2608160200's Execution CID memo rule forbids. A brand has no such
++  cost, so the cases it covers should be spent here rather than on identity.
++
++  ## The pair is two values because the split is the point
++
++      (let [{:keys [sealer unsealer]} (brand-pair \"ticket\")] ...)
++
++  Handing out the `sealer` confers the right to put values into this brand and
++  confers nothing else — the holder cannot read what anyone else sealed, and
++  cannot derive the `unsealer` from it. That asymmetry is the whole mechanism,
++  and it is why `brand-pair` returns two values rather than one object with two
++  methods.
++
++  ## A brand is not its label
++
++      (identical-brand? (brand-pair \"x\") (brand-pair \"x\"))  ;=> false
++
++  The label exists so a receipt can say which brand refused a box. It is not
++  the brand, it is not compared, and two pairs made with the same label are
++  unrelated. Treating the name as the identity is the error this namespace
++  exists to avoid making elsewhere.
++
++  ## Refusal is a value, not a throw
++
++  `unseal` returns `{:ok? false :reason ...}` rather than throwing, following
++  the language's `:explicit-errors` invariant. The reasons are closed:
++  `:wrong-brand`, `:not-sealed`, `:not-an-unsealer`.
++
++  ## What this does NOT defend against
++
++  Opacity here is opacity **to values**: a sealed box does not print its
++  payload, does not answer `get`, and cannot be destructured. It is not a
++  defence against host interop — Clojure code on the same heap can reach a
++  `deftype` field, and `deftype` emits a public `->Sealed` / `->Unsealer`
++  constructor on every platform which `^:private` on the type does not
++  suppress. That is the same boundary `kotoba.lang.ocapn-handoff`'s admitted
++  gifts sit on. The guest language admits no interop, so the property holds
++  where it is load-bearing; claiming more than that would be claiming a
++  boundary that is not here.
++
++  An earlier draft of this docstring did claim more — that no public
++  constructor could widen a sealer into an unsealer — and the test written to
++  demonstrate it failed instead. What is true, and is what the test now
++  asserts, is narrower: **nothing this namespace exports hands out a brand
++  core**, `-core` being a private protocol method."
++  (:refer-clojure :exclude [seal]))
++
++;; ---------------------------------------------------------------------------
++;; The brand core: one fresh object per pair, compared only by identity.
++
++(deftype ^:private BrandCore [label])
++
++(defprotocol ^:private Branded
++  (^:private -core [x]))
++
++(deftype ^:private Sealer [core]
++  Branded
++  (-core [_] core))
++
++(deftype ^:private Unsealer [core]
++  Branded
++  (-core [_] core))
++
++(defprotocol ^:private Boxed
++  (^:private -box-core [b])
++  (^:private -box-payload [b]))
++
++(deftype ^:private Sealed [core payload]
++  Boxed
++  (-box-core [_] core)
++  (-box-payload [_] payload))
++
++(defn sealer? [x] (instance? Sealer x))
++(defn unsealer? [x] (instance? Unsealer x))
++(defn sealed? [x] (instance? Sealed x))
++
++(defn brand-pair
++  "A fresh brand, as the two rights it decomposes into.
++
++  -> `{:sealer <Sealer> :unsealer <Unsealer> :label label}`
++
++  `label` is for receipts and error messages only. Two calls with the same
++  label produce unrelated brands; nothing in this namespace compares labels."
++  [label]
++  (let [core (BrandCore. label)]
++    {:sealer (Sealer. core)
++     :unsealer (Unsealer. core)
++     :label label}))
++
++(defn label-of
++  "The label of the brand a sealer, unsealer or box belongs to, for receipts.
++
++  A label is not authority and does not identify a brand — `unseal` never
++  consults it. It is here so a denial can say which brand refused, which a
++  receipt cannot say from an opaque object identity."
++  [x]
++  (cond
++    (sealed? x) (.-label ^BrandCore (-box-core x))
++    (or (sealer? x) (unsealer? x)) (.-label ^BrandCore (-core x))
++    :else nil))
++
++(defn seal
++  "Put `value` into `sealer`'s brand. Pure: no effect, no registry, no clock.
++
++  Returns an opaque box. Sealing the same value twice yields two boxes that
++  are not `=` to each other and both unseal to the same value — a box is a
++  wrapper, not a name for what is inside it."
++  [sealer value]
++  (when-not (sealer? sealer)
++    (throw (ex-info "seal requires a sealer" {:phase :sealer})))
++  (Sealed. (-core sealer) value))
++
++(defn unseal
++  "Open `box` if it belongs to `unsealer`'s brand.
++
++  -> `{:ok? true :value v}` | `{:ok? false :reason kw :label l}`
++
++  Reasons are closed: `:not-an-unsealer` (the first argument is not one — a
++  sealer is refused here, which is the asymmetry the pair exists for),
++  `:not-sealed` (the second argument was not produced by `seal`; a
++  hand-built look-alike lands here), `:wrong-brand` (a real box from a
++  different brand).
++
++  The comparison is `identical?` on the brand core and nothing else. No label,
++  no principal, no lookup."
++  [unsealer box]
++  (cond
++    (not (unsealer? unsealer))
++    {:ok? false :reason :not-an-unsealer}
++
++    (not (sealed? box))
++    {:ok? false :reason :not-sealed :label (label-of unsealer)}
++
++    (identical? (-core unsealer) (-box-core box))
++    {:ok? true :value (-box-payload box)}
++
++    :else
++    {:ok? false :reason :wrong-brand :label (label-of unsealer)}))
++
++(defn mine?
++  "Did this box come back from me — answered without naming anyone.
++
++  The narrow question this namespace exists for, spelled out so callers reach
++  for it instead of comparing a `:cap/holder` string when what they meant was
++  provenance rather than identity."
++  [unsealer box]
++  (:ok? (unseal unsealer box)))
+diff --git a/test/kotoba/lang/sealer_test.clj b/test/kotoba/lang/sealer_test.clj
+new file mode 100644
+index 0000000..28124ea
+--- /dev/null
++++ b/test/kotoba/lang/sealer_test.clj
+@@ -0,0 +1,121 @@
++(ns kotoba.lang.sealer-test
++  (:require [clojure.string :as str]
++            [clojure.test :refer [deftest is testing]]
++            [kotoba.lang.sealer :as s]))
++
++(deftest a-box-does-not-render-what-is-in-it
++  (let [{:keys [sealer]} (s/brand-pair "ticket")
++        box (s/seal sealer {:secret "correct-horse"})]
++    (is (s/sealed? box))
++    (testing "the ordinary ways a value gives itself up"
++      (is (not (str/includes? (pr-str box) "correct-horse")))
++      (is (nil? (get box :payload)))
++      (is (nil? (get box :secret)))
++      (is (not (map? box)))
++      (is (not (coll? box))))
++    (testing "the label is available, because a receipt needs to name the brand"
++      (is (= "ticket" (s/label-of box))))))
++
++(deftest only-the-matching-unsealer-opens-it
++  (let [a (s/brand-pair "a")
++        b (s/brand-pair "b")
++        box (s/seal (:sealer a) 42)]
++    (is (= {:ok? true :value 42} (s/unseal (:unsealer a) box)))
++    (is (= :wrong-brand (:reason (s/unseal (:unsealer b) box))))
++    (is (true? (s/mine? (:unsealer a) box)))
++    (is (false? (s/mine? (:unsealer b) box)))))
++
++(deftest a-brand-is-not-its-label
++  (testing "two pairs made with the same label are unrelated — the name is not
++            the identity, and this is the error the namespace exists to avoid"
++    (let [one (s/brand-pair "same")
++          two (s/brand-pair "same")
++          box (s/seal (:sealer one) :v)]
++      (is (= "same" (s/label-of box) (s/label-of (:unsealer two))))
++      (is (= :wrong-brand (:reason (s/unseal (:unsealer two) box)))))))
++
++(deftest a-sealer-is-not-an-unsealer
++  (testing "handing out the right to seal must not hand out the right to read;
++            that asymmetry is why brand-pair returns two values"
++    (let [{:keys [sealer unsealer]} (s/brand-pair "asym")
++          box (s/seal sealer :v)]
++      (is (false? (s/unsealer? sealer)))
++      (is (false? (s/sealer? unsealer)))
++      (is (= {:ok? false :reason :not-an-unsealer} (s/unseal sealer box)))
++      (testing "and this namespace's API offers no way to derive one from the
++                other: -core is a private protocol method, so a sealer's brand
++                cannot be read back out through anything exported here"
++        (is (:private (meta (ns-resolve 'kotoba.lang.sealer '-core))))))))
++
++(deftest the-public-surface-is-what-it-claims
++  (testing "listed rather than described, so that adding a function which
++            widens a sealer into an unsealer — or hands out a brand core —
++            turns this red instead of turning nothing red"
++    (is (= '#{sealer? unsealer? sealed? brand-pair label-of seal unseal mine?
++              ->BrandCore ->Sealer ->Unsealer ->Sealed}
++           (set (keys (ns-publics 'kotoba.lang.sealer))))))
++  (testing "the four ->X factories are deftype's generated constructors, not
++            API. deftype emits them publicly on every platform and ^:private on
++            the type does not suppress them, so they are part of the interop
++            surface the namespace docstring already declines to defend — named
++            here so the claim and the code agree"
++    (doseq [f '[->BrandCore ->Sealer ->Unsealer ->Sealed]]
++      (is (some? (ns-resolve 'kotoba.lang.sealer f))
++          (str f " — if this disappeared, the docstring's disclaimer is now
++                  stronger than it needs to be and should be tightened")))))
++
++(deftest a-hand-built-look-alike-is-refused
++  (testing "distinct from :wrong-brand — a forgery and a foreign box are
++            different facts, and a denial that renders them identically cannot
++            be acted on"
++    (let [{:keys [unsealer]} (s/brand-pair "forge")]
++      (is (= :not-sealed (:reason (s/unseal unsealer {:core :fake :payload :v}))))
++      (is (= :not-sealed (:reason (s/unseal unsealer nil))))
++      (is (= :not-sealed (:reason (s/unseal unsealer "a box, honest")))))))
++
++(deftest sealing-is-pure
++  (let [{:keys [sealer unsealer]} (s/brand-pair "pure")
++        v {:a 1}
++        one (s/seal sealer v)
++        two (s/seal sealer v)]
++    (testing "a box is a wrapper, not a name for what is inside it"
++      (is (not= one two))
++      (is (not (identical? one two))))
++    (testing "and both open to the same value"
++      (is (= v (:value (s/unseal unsealer one))))
++      (is (= v (:value (s/unseal unsealer two)))))
++    (testing "the identical value comes back, not a copy"
++      (is (identical? v (:value (s/unseal unsealer one)))))))
++
++(deftest the-case-this-replaces-an-identity-check-for
++  (testing "a host mints a capability, hands it to something it does not trust,
++            and later has to decide whether what came back is the one it minted.
++            No principal, no proof, no registry, no :cap/holder comparison."
++    (let [{:keys [sealer unsealer]} (s/brand-pair "kotoba://graph/acme")
++          mint (fn [cap] (s/seal sealer cap))
++          issued (mint {:cap/kind :graph-read :cap/resource "kotoba://graph/acme"})
++
++          ;; Somewhere else entirely, with its own brand, minting its own
++          ;; look-alike carrying exactly the same capability map.
++          elsewhere (s/brand-pair "kotoba://graph/acme")
++          impostor (s/seal (:sealer elsewhere) {:cap/kind :graph-read
++                                                :cap/resource "kotoba://graph/acme"})]
++      (is (true? (s/mine? unsealer issued)))
++      (is (false? (s/mine? unsealer impostor))
++          "same label, same payload, different brand — only identity of the
++           brand distinguishes them, and that is the point")
++      (is (= {:cap/kind :graph-read :cap/resource "kotoba://graph/acme"}
++             (:value (s/unseal unsealer issued)))))))
++
++(deftest rights-amplification-needs-both-halves
++  (testing "a third party holding two unsealers can read both brands; holding
++            one reads one. Amplification is having the unsealer, not being
++            anybody in particular."
++    (let [red (s/brand-pair "red")
++          blue (s/brand-pair "blue")
++          boxes [(s/seal (:sealer red) :r) (s/seal (:sealer blue) :b)]
++          open (fn [unsealers box]
++                 (some (fn [u] (let [r (s/unseal u box)] (when (:ok? r) (:value r))))
++                       unsealers))]
++      (is (= [:r :b] (mapv #(open [(:unsealer red) (:unsealer blue)] %) boxes)))
++      (is (= [:r nil] (mapv #(open [(:unsealer red)] %) boxes))))))
+-- 
+2.43.0
+

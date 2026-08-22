@@ -1,0 +1,76 @@
+[{:db/id -1
+  :source/dataset "evidence"
+  :evidence/id "260822-kotoba-lang-sealer-brand-pairs"
+  :evidence/date "2026-08-22"
+  :evidence/adr "adr-2608220100-capability-grants-are-addressed-and-the-address-is-checked"
+  :evidence/claim "sealer / unsealer（brand pair）で、identity を一切問わずに『これは自分が発行したものか』に答えられる。純粋・依存ゼロ・registry なし"
+  :evidence/repo "kotoba-lang/kotoba-lang"
+  :evidence/base-commit "5239f36e3473effe9718b252203e4229a57b4f0c"
+  :evidence/patch "90-docs/evidence/patches/260822-kotoba-lang-sealer-brand-pairs.patch"
+  :evidence/runtime "Clojure CLI (scratchpad にインストール) + JVM。前件（biscuit）と違い JVM 経路で実行できた"
+  :evidence/command "clojure -M:test -n kotoba.lang.sealer-test / clojure -M:test / clojure -M:lint"
+  :evidence/result "sealer-test 単体 9 tests / 35 assertions / 0 failures"
+  :evidence/regression
+  "全スイートを本変更の有無で 2 回走らせ、差が新規テスト分だけであることを確認した。
+
+  変更あり: 258 tests / 1399 assertions / 5 failures / 3 errors
+  変更なし: 249 tests / 1364 assertions / 5 failures / 3 errors
+
+  失敗の内訳は両方で同一:
+    5 FAIL  safety-qualification-test/q1-claims-are-auditable
+    2 ERROR grammar-authority q3-consumers-embed-the-canonical-grammar-without-drift
+    1 ERROR host-cljs-cases-produce-their-recorded-cljs-expect
+
+  いずれもこの環境に clone していない兄弟 checkout（../kotoba/...）を読みに行く
+  もので、repo 自身の :ocapn-test alias のコメントが『full suite は sibling
+  vendor copy も見るので無関係な checkout drift で落ちうる』と予告している事象。
+  本変更由来の失敗は 0 件。"
+  :evidence/lint
+  "clojure -M:lint = errors 0（gate は --fail-level error）。
+  警告は 23 -> 22。減った 1 件は本変更が持ち込んだ
+  `sealer_test.clj:10 Unresolved namespace clojure.string` で、
+  受け入れずに require を足して直した。残る 22 件は既存。"
+  :evidence/discrimination
+  "壊し方と報告された失敗が一致することを 3 回確認した。
+
+  [A] unseal が brand identity ではなく label を比較する版に戻す
+      -> FAIL a-brand-is-not-its-label
+         FAIL the-case-this-replaces-an-identity-check-for
+         2 failures / 9 tests
+
+  [B] unseal が sealer も受け付ける（unsealer? guard を外す）
+      -> FAIL a-sealer-is-not-an-unsealer
+         1 failure / 9 tests
+
+  [C] :not-sealed を :wrong-brand に畳む（偽造と他ブランドを区別しない）
+      -> FAIL a-hand-built-look-alike-is-refused (3 assertions)
+         3 failures / 9 tests
+
+  無改変に戻すと 3 回とも 0 failures。"
+  :evidence/self-caught
+  "初版の docstring は『sealer を unsealer に広げる公開コンストラクタは無い』と
+  書いていた。それを実演するために書いたテストが**落ちた** —— deftype は
+  どのプラットフォームでも public な ->Unsealer を生成し、型に付けた ^:private は
+  それを抑止しない。主張の側を実態に合わせて narrower な真の性質
+  （このネームスペースが export するもので brand core を渡すものは無い、
+  -core は private protocol method）に書き換え、interop 表面は contract test で
+  名指しした。**測定が自分のドキュメントの過大主張を捕まえた例**として記録する。"
+  :evidence/not-measured
+  "測っていないものを pass として数えない（ADR-2608136000）。
+
+  - cljs / nbb 経路での実行 —— ソースは .cljc だが、テストは repo の慣習どおり
+    .clj で JVM でしか回していない。cljs でも deftype と identical? は同じ意味を
+    持つが、それは仕様知識であって実測ではない。
+  - guest（.kotoba）からの利用 —— 露出していない。sealer が guest 値になるのは
+    :principal 型と同じ工事（guest grammar + 1 ワード handle）で、本件に含まない。
+  - murakumo fleet 上での実行 —— 未実行。
+  - 既存の capability 経路（capability_values / capability_host / effective）での
+    使用 —— まだ 1 箇所も呼んでいない。本件は道具を置いただけで、
+    identity 比較を brand に置き換えた実例は 0 件。"
+  :evidence/landed
+  "kotoba-lang/kotoba-lang には push していない（cross-tier add 拒否、前件と同じ）。
+適用:
+
+  git -C orgs/kotoba-lang/kotoba-lang am \\
+    90-docs/evidence/patches/260822-kotoba-lang-sealer-brand-pairs.patch"
+}]
