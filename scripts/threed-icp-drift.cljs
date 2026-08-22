@@ -65,7 +65,25 @@
    "色管理" ":render/color-management"
    "布" ":dcc/cloth-hair"
    "パーティクル" ":dcc/particles-vfx"
-   "Ogawa" ":interop/ogawa"})
+   "Ogawa" ":interop/ogawa"
+   ;; 2026-08-24 追加。**ICP の anti-claim に実際に現れる語だけを足した** ——
+   ;; 現れない語を足しても検査したことにならず、語数だけが増えて
+   ;; 「広く見ている」という誤った印象を与える。
+   "PMI" ":mcad/gdt-pmi"
+   "boolean" ":kernel/boolean-solid"
+   "図面" ":mcad/drawing-2d"})
+
+(defn- unknown-axes
+  "`capability-words` が指す軸のうち、catalog に無いもの。
+
+  **これが空でなければ答えられない。** 軸を改名すると、その語は
+  `(= \":working\" (get status axis))` が false になって**黙って検査対象から
+  外れる** —— 語が増えたまま、見ている面は減る。この loop で実際に
+  `:interop/openvdb` → `:interop/vdb-tree` / `:interop/vdb-file`、
+  `:interop/alembic` → `:interop/ogawa` / `:interop/alembic-objects` と
+  2 回改名しているので、起こりうるどころか起きる。"
+  [status]
+  (remove #(contains? status (val %)) capability-words))
 
 (defn -main []
   (when-not (and (fs/existsSync parity-file) (fs/existsSync icp-file))
@@ -75,6 +93,11 @@
         icp (edn/read-string (str (fs/readFileSync icp-file "utf8")))
         findings (atom [])]
     (when (empty? status) (refuse! "parity datoms が 0 件 —— 先に audit を回すこと"))
+    (when-let [dead (seq (unknown-axes status))]
+      (refuse! (str "capability-words が catalog に無い軸を指している: "
+                    (pr-str (into {} dead))
+                    " —— その語は黙って検査対象から外れる。軸を改名したなら"
+                    " ここも直すこと")))
     (doseq [e icp]
       ;; (1) 引用された軸
       (when-let [pa (:icp/proof-axes e)]
