@@ -229,8 +229,16 @@
     (if-not (exists? root)
       {:repo/path rel :repo/org org :repo/name repo :repo/present? false}
       (let [{:keys [files truncated? depth-pruned?]} (walk-files root 6 6000)
-            src-files   (filterv #(and (str/starts-with? % "src/") (src-ext (ext-of %))) files)
-            test-files  (filterv #(and (str/starts-with? % "test/") (src-ext (ext-of %))) files)
+            ;; Source roots: the repo root and every first-level dir with its
+            ;; own deps.edn (clj/src, lg-clj/src …). Same rule as
+            ;; scripts/repo-taxonomy.cljs; measured 2026-08-23 on
+            ;; ai-gftd-dougaka, whose 43 KB of src and 13 KB of tests under
+            ;; clj/ scored substrate 0 / test 0 while :uncounted/* held them.
+            roots       (into [""] (keep #(when-let [[_ d] (re-matches #"([^/]+)/deps\.edn" %)] (str d "/")) files))
+            under?      (fn [sub] (let [ps (map #(str % sub) roots)]
+                                    (fn [f] (boolean (some #(str/starts-with? f %) ps)))))
+            src-files   (filterv #(and ((under? "src/") %) (src-ext (ext-of %))) files)
+            test-files  (filterv #(and ((under? "test/") %) (src-ext (ext-of %))) files)
             kotoba-files (filterv #(= "kotoba" (ext-of %)) files)
             src-bytes   (reduce + 0 (map #(file-size (str root "/" %)) src-files))
             test-bytes  (reduce + 0 (map #(file-size (str root "/" %)) test-files))
@@ -263,12 +271,12 @@
             ;; fleet-gain が変わる —— それはオーナー判断であって scan の判断ではない。
             ;; 一方「見えていない」ことを報告しないのは、未測定を 0 として蓄積する
             ;; ことなので、報告だけは今する。
-            uncounted-src   (filterv #(and (not (str/starts-with? % "src/"))
-                                           (not (str/starts-with? % "test/"))
+            uncounted-src   (filterv #(and (not ((under? "src/") %))
+                                           (not ((under? "test/") %))
                                            (re-find #"(^|/)src/" %)
                                            (src-ext (ext-of %)))
                                      files)
-            uncounted-test  (filterv #(and (not (str/starts-with? % "test/"))
+            uncounted-test  (filterv #(and (not ((under? "test/") %))
                                            (src-ext (ext-of %))
                                            (re-find #"(?i)(^|/)tests?/|_test\.|\.test\.|\.spec\.|(^|/)test_" %))
                                      files)
