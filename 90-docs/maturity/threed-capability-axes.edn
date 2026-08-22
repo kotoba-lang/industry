@@ -431,11 +431,15 @@
    :axis/target "Alembic の object model（AbcGeom の PolyMesh / Xform / 時間サンプリング）"
    :axis/label "Alembic オブジェクトモデル"
    :axis/repo "kotoba-lang/io-alembic"
-   ;; 2026-08-24 に object 層を実装（`alembic.objects`）。上流の AbcCoreOgawa を
-   ;; 逐語で読んで書き起こした。**property / sample 層は依然無い** —— この軸が
-   ;; 答えるのは「このファイルに何が入っているか」であって幾何ではない。
-   :axis/paths ["src/alembic/objects.cljc"]
-   :axis/markers ["read-archive" "object-paths" "object-headers" "indexed-metadata" "archive-error"]
+   ;; 2026-08-24 に object 層を実装（`alembic.objects`）、同日 property / sample 層
+   ;; （`alembic.properties`）も着地。どちらも上流の AbcCoreOgawa を逐語で読んで
+   ;; 書き起こした。**この軸はもう「何が入っているか」だけではなく、PolyMesh の点を
+   ;; 取り出せる**。ただし string / wstring / float16 の sample は**拒否する**
+   ;; （復号を書き起こしていない —— 推測した数は正しい数と見分けが付かない）。
+   ;; schema の解釈（`P` が点列であること）は AbcGeom の面で、ここには無い。
+   :axis/paths ["src/alembic/objects.cljc" "src/alembic/properties.cljc"]
+   :axis/markers ["read-archive" "object-paths" "property-headers" "read-sample"
+                  "stored-index" "read-elements"]
    :axis/behavior "interop-alembic-objects"}
 
   ;; 2026-08-23: 1 軸を 2 つに割った。元の軸は「疎ボリュームグリッドの読み書き」で
@@ -577,8 +581,8 @@
    :axis/label "3D テクスチャペイントと PBR マテリアル層"
    :axis/repo "kotoba-lang/kami-engine-sculpt"
    :axis/paths ["src"]
-   :axis/markers ["texture-paint" "paint-stroke" "material-layer" "bake-texture"]
-   :axis/behavior nil}
+   :axis/markers ["paint-stroke" "material-layer" "bake-texture" "pbr-material" "dilate"]
+   :axis/behavior "sculpt-texture-paint"}
 
   ;; ───────────────────── render ─────────────────────
   {:axis/id :render/realtime-gpu
