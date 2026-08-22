@@ -62,16 +62,41 @@ hot-db → pattern-source の compiled SPARQL/Cypher 実行器切替を、fork �
 
 `gftd.ledger/append!` は `(inc (max seq-of-local-file))` で採番し、read と write の間に何も無い。呼び出し元は `gftd/cli.cljc` の 4 箇所（256 / 584 / 743 / 1076 行）のみ。`gftd/kotobase.cljc:74` は既に `bmc.event/<seq>-<digest>` に id を変えて projection 側の upsert 衝突を回避済みだが、**台帳側の採番は未修正**。verifier（`scripts/verify-ledger-seq-collision.cljs`）が root cause（ADR-2607254000 と同型: 同一 FS の排他 lock だけでは足りず、append 前に origin から sync が要る）を名指ししている。実装方針の候補: (a) `append!` 直前に origin/main の台帳 tail から max を取る（`ledger-land.cljs` の blobs 経路が再利用できる）(b) seq を `:event/at` + actor の content-hash に置換して採番自体を無くす —— (b) は `:event/seq` を読む fold / score / kotobase projection の全てに波及するので ADR が要る。**コードは 1 バイトも変えていない。**
 
-## 温存したもの（次 agent へ）
+### 7. 第 4 セッション — 駐車場の解体と loop 由来の台帳残差（2026-08-22 06Z〜08Z）
 
-- **live loop の現行 WIP**: canvas-ledger の新規 append と maturity-loop の stash（close 時点で stash 2 本、いずれも maturity-loop の温存）。これは steady state であり退役対象ではない
-- owner の litigation 編集（`orgs/personal/litigation/` + 対応 ADR、superproject で dirty のまま）
-- `docs/design/tamaki-ui-concepts`（tamaki 系 WIP、untracked 6 ファイル）
-- `tamaki/community-coverage` branch（main の祖先・unique commit 0・tamaki workspace が checkout 中）
-- remote の preservation branch 群（close した PR の branch は全て残存。cloud-itonami の rescue branch には `docs/endpoint-health-receipt.edn` の『receipt を repo に置くか』という open question が駐車中）
-- fleet-wide UNLANDED 299 repo（大半は industry-wave loop の `.wave5/6-*` 隠し scratch。survey 全文はセッション scratchpad の unlanded-survey.txt に出力済みだが scratchpad は揮発 —— 再測は `nbb scripts/cleanup.cljs --unlanded`）
-- `.git/stash-archive-2026-08-22/`（このワークステーションのみ。全 stash patch・PR diff・industries 残骸・未着地イベント verbatim）
+§5 が「steady state」として残した stash 2 本と、§「温存」に挙げた remote の preservation/routine branch 群を、同じ意味キー照合で決着させた。前半で cloud セッション 6 本の draft PR（root#2469 #2472 #2471 #2461 #2465 #2464）を検証して merge したのはこの cleanup の前段（別件）。
+
+**superproject**
+
+- **stash 2 → 0**（maturity-loop の advisor:auto append、seq 9570–9580）。14 イベント全てが main に無く、seq は main の別イベントと衝突。#2460 と同じ形で `canvas-ledger-unlanded/2026-08-22-stash-rescue-events-2.edn`（+ provenance-2）に verbatim 駐車し、`:react/observation` 4 件だけ fold 不変（9,978 main events で `(= f0 f1)` = true、add-item 10 件では false）を証明して台帳 tail に seq 11644–11647（then-max 10643 の +1000 gap）で着地 —— **root#2476**。
+- **共有 checkout の dirty `canvas-ledger.edn`**: advisor tick（03:33Z）が commit せずに積んだ 7 イベント（seq 10644–10650、衝突なし）。verbatim tail append で **root#2477**、着地後に local 全行が main に在ることを確認して checkout を main に揃えた。
+- **local branch 9 → 1**（残るは `tamaki/community-coverage`、tamaki workspace が checkout 中・main の祖先）。codex/* 7 本は fleet-db の pin を `:fleet/repos` の EDN 比較で全件 SAME-AS-MAIN / SAME-AS-V2、ledger 行は意味キーで全件 main に在り → landed / superseded-by-v2。archive 後に削除。
+- **worktree 9 → 5**: `/private/tmp/cloud-itonami-pin-*` 2（Codex 残置、clean・landed）と tamaki の detached scratch 2 を削除。`.git` が symlink 化されていて `git worktree remove` が validation で落ちるので `rm -rf` + `prune`。`.codex/worktrees/*` 3 つは稼働中セッションなので据え置き。
+- **remote branch 22 → 3**（`main` / `git-annex` / `synced/git-annex`）。routine/itonami-* 未 merge 6 本は ledger 残差を **seq 非依存の意味キー**（`:event/at` / `:seq` / `:rescued-from-seq` を落とす —— #2460 が seq を振り直しているため、§5 の照合キーでは rescue 済みの観測が「無い」と出る）で測り直し、observation は全件 rescue 済み、**`:canvas/add-item` 9 件だけが残差** → `canvas-ledger-unlanded/2026-08-22-routine-branch-parked-*.edn` に駐車（**root#2478**）してから archive → 削除。landed 済み 10 本（routine/itonami-2026082115〜2200、bmc-operate、stash-rescue、agent/counting-absence、codex/reconcile-titlebar-drag-v2）も archive → 削除。
+- ⚠ **測定の罠 2 つ（両方踏んだ）**: ① zsh は `*.ledger.edn` の glob 不一致でコマンド全体を落とすので、`git diff -- <glob>` の「0 行」は測れていない ② `git status | wc -l` は stderr（fsmonitor の IPC 行）を数えるので clean な worktree が dirty に見える。どちらも「測れなかった」が「問題なし」の顔をする ADR-2608136000 の形。
+
+**fleet（4,546 checkout）**
+
+- `cleanup.cljs --unlanded`: **UNLANDED 303**（untracked 持ち 82、うち 93 行は `.w5-*` / `.wt-item2-*` / `_w7b-*` / `.tamaki-*` / `.kakeibo-*` の loop 隠し worktree）。PR 照会 200/200 往復で 22 branch は打切り（`nopr=?`）、ls-remote で 44 branch の unpushed 偽陽性を除去。
+- `cleanup-land.cljs` dry-run: **additive=0 / review=4**。apps-gftdcojp は submodule の dirty pointer（対象なし）、loop-consumability は launchd 常駐 loop の live 台帳（16:38 更新、退役対象外）。残り 2 本を `--apply`:
+  - **net-kotobase/control-plane#484** → **:close-stale-revert-risk**。Codex WIP（08-09/10、未 push branch `codex/scale-maturity`）の Rust SDK 拡張だが、main は 08-10 の `9811103` で `sdk/kotobase-rust` を丸ごと撤去済み。archive + PR branch に保全して close。
+  - **network-awai/app-aozora#96** → **:needs-review**（open のまま）。一度も track されたことのない生成 webp 254 枚。大容量バイナリ方針（annex/B2）の owner 判断が要るのでコメントして残した。
+- `west-orphan-audit`: **blocking 0 / true-orphan-git 0**。path-override 残骸 8・nongit 3（`maxwell-mac`、`org-spirit-in-physics.broken-gitdir-20260822`、`tamaki.remnant-20260728`）は報告のみ。
+- **`west update` 全量は回していない**（CLAUDE.md: 引数なし west update を既定にしない。4,546 checkout で数時間）。skip 集合の代わりに survey の dirty/untracked を母集団にした。
+
+## 温存したもの（次 agent へ）— 第 4 セッション後の現在地
+
+- **live loop の現行 WIP**: `loop-consumability` の `evidence/consumability.ledger.edn`（+168 行、launchd 常駐）と、advisor tick が次周で共有 checkout に積む canvas-ledger append。steady state であり退役対象ではない —— ただし **advisor tick は commit 経路を持たず、積んだ行は cleanup が拾うまで共有 checkout に残る**（#2477 がその 1 回目）
+- owner の litigation 編集（`orgs/personal/litigation/ell-edutek/` 5 ファイル + 対応 ADR、Codex セッション 2026-08-22 10:20–12:34 の WIP、superproject で dirty のまま）
+- `docs/design/tamaki-ui-concepts`（tamaki 系 WIP、untracked）
+- `tamaki/community-coverage` branch + `~/github/tamaki-workspaces/community-coverage` worktree（main の祖先・unique commit 0・clean。tamaki agent の workspace なので据え置き）
+- `.codex/worktrees/{8613,a864,fe63}`（稼働中 Codex セッション）
+- **canvas-ledger の駐車 add-item: 158 + 10 + 9 = 177 件**（`canvas-ledger-unlanded/` 3 組）。fold を変えるので data 判断
+- **app-aozora#96**（:needs-review、open）と、close 済み control-plane#484 の元になった `codex/scale-maturity` の dirty 4 ファイル（共有 checkout に残存。次の `cleanup-land --apply` で再計画される）
+- fleet-wide UNLANDED 303 repo の残り（大半が loop の隠し scratch worktree と、nopr の agent/* branch 177 件。survey 全文はセッション scratchpad `unlanded.log` —— 再測は `nbb scripts/cleanup.cljs --unlanded`、約 40 分）
+- `.git/stash-archive-2026-08-22/`（index.txt 63 行: stash 37 本 + branch 56 組 + 未着地イベント verbatim）。このワークステーションのみ
 
 ## resume point
 
-superproject 共有 checkout は close 時点で origin/main から十数 commit 遅れ + 並行セッションが index.lock を保持。**同期はどの live loop でも次周で行われるので手動介入不要。** kotobase-server の共有 checkout は新 pin の 1 commit 手前で clean 停車（次の west sync で追従）。次に手を付けるなら: ① **append race の根治**（§6 の方針 (a) が最小。最初のコマンド: `git show origin/main:70-tools/bmc/src/gftd/ledger.cljc` と `grep -n 'ledger/append!' 70-tools/bmc/src/gftd/cli.cljc`、検証は `nbb --classpath .:scripts/nbb_compat scripts/verify-ledger-seq-collision.cljs` が新規衝突 0 で緑になること）② 158 add-item イベントの処遇（owner 判断）③ `nbb scripts/cleanup.cljs --unlanded` の wave-scratch 棚卸し。"}]
+superproject: `origin/main` と 0/0、open PR 0、stash 0、remote branch は main / git-annex のみ。次に手を付けるなら: ① **append race の根治**（§6 の方針 (a)。advisor tick が共有 checkout に直書きして commit しない経路もここで閉じる —— 最初のコマンド: `grep -n 'ledger/append!' 70-tools/bmc/src/gftd/cli.cljc`）② 駐車 add-item 177 件の処遇（owner）③ app-aozora#96 の方針（annex へ移すか serve するか）④ fleet の nopr=177 branch の disposition（repo ごとの `gh pr list` は survey が出している）。
+"}]
