@@ -1,0 +1,22 @@
+[{:db/id -1
+  :adr/id "adr-2608220200-authn-kotobase-net-is-nxdomain-the-live-host-is-auth"
+  :adr/title "ADR-2608220200: authn.kotobase.net は NXDOMAIN で、live なのは auth.kotobase.net —— 14 本の ADR と surface 索引が死んだ名前を指し、worker 自身がその名前を名乗っている"
+  :adr/status "accepted"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-22"
+  :adr/last-verified "2026-08-22"
+  :adr/authoritative true
+  :adr/topic "authn-host-name-drift"
+  :adr/repos ["com-junkawasaki/root" "orgs/network-awai/net-kotobase"]
+  :adr/related ["adr-2607252000-authn-kotobase-net-identity-service"
+                "2608039950"
+                "2608110200"
+                "adr-2608179000-kotobase-locale-continuity-across-the-signin-hop"]
+  :adr/authoritative-for
+  ["identity service の live なホスト名が auth.kotobase.net であること"
+   "authn.kotobase.net が NXDOMAIN であること（2026-08-22 実測）"
+   "worker の /health が返す service 名が live host と一致していないこと"
+   "surface 索引は生成物なので入力を直してから再生成すること"]
+  :adr/body
+  "## 測定（2026-08-22、独立した 2 つの resolver）\n\n`authn.kotobase.net` は **NXDOMAIN** である。ゾーン `kotobase.net` は Cloudflare 上で\n正常に応答するが、このホスト名だけが存在しない。\n\n    dns.google        authn.kotobase.net  -> Status 3 (NXDOMAIN)\n    cloudflare-dns    authn.kotobase.net  -> Status 3 (NXDOMAIN)\n    dns.google        auth.kotobase.net   -> 172.67.206.34 / 104.21.37.83\n    cloudflare-dns    auth.kotobase.net   -> 104.21.37.83 / ...\n\nlive probe:\n\n    GET https://auth.kotobase.net/health    200\n    GET https://auth.kotobase.net/sign-in   200\n    GET https://kotobase.net/signup         200、本文の data-authn は https://auth.kotobase.net\n\n`auth.murakumo.cloud` も NXDOMAIN で、これは ADR-2608110200 が\ncustom domain を未配線（`AUTHN_APEXES` 未設定）と数えていることと一致する。\n\n## 何が問題か —— 名前が 2 つあり、権威のある側が死んでいる\n\nlive なホストは `auth.kotobase.net`（ADR-2608179000 の `:adr/deployed` が\nworker `kotobase-authn` / host `auth.kotobase.net` と 2026-08-17 に記録している）。\nところが:\n\n- **14 本の ADR が `authn.kotobase.net` を service surface として名指ししている。**\n  そこには authority を定める側が全部入っている —— ADR-2607252000（identity service\n  そのもの）・ADR-2608039950（authority は 1 つ、apex は多数）・ADR-2608110200\n  （Clerk parity と ISIC-6311 事業化）。\n- live な名前を書いているのは 3 本だけ（2608152300 / 2608170700 / 2608179000）で、\n  どれも 8 月中旬以降のもの。\n- 生成物である `90-docs/surface/surface.datoms.edn` も `authn.kotobase.net` を\n  host として持つ（2 箇所）。索引を引いた者は死んだ名前を得る。\n\n## いちばん悪い形 —— worker 自身が死んだ名前を名乗る\n\n    $ curl https://auth.kotobase.net/health\n    {ok:true, service:authn.kotobase.net, version:0.1.0}\n\n**到達性を確かめる正規の手段が、間違った名前を確認として返す。** 200 を見た者は\n「authn.kotobase.net は動いている」と読み、その名前で次の probe を書き、\nNXDOMAIN を「一時的な障害」と読む。CLAUDE.md の『測れなかった検査が、測って\n問題が無かった検査と同じ値を返す』の名前版である。\n\n## 未測定として残すもの（不在と書かない）\n\n`GET https://auth.kotobase.net/v1/usage` は 404 を返した。ADR-2608110200 の\nconsequences は `GET /v1/usage`（fail-closed）が本番で動いていると書いている。\n**この 404 が「経路が無い」なのか「この呼び方では答えない」なのかを、こちらは\n区別できていない**（認証ヘッダ無し・method 1 通りしか試していない）。\nしたがってここに書けるのは **未測定** であって、後退の報告ではない。\n同じ理由で `.well-known/oauth-authorization-server` と SCIM の 404 も未測定とする。\n\n## 決定\n\n1. **live surface の名前は `auth.kotobase.net`。** これから書く文書・probe・\n   設定はこの名前を使う。\n2. **`authn.kotobase.net` を名乗る 14 本の ADR は、現在地を表すよう直す**\n   （CLAUDE.md の『文書は最新状態のみを表す』）。一括置換はしない —— ホスト名が\n   *当時の実測ログ* として出てくる箇所（ADR-2607252000 の probe 表など）は歴史で\n   あって現在地ではなく、直すべきなのは『いま何がどこで動いているか』を述べている\n   文である。\n3. **`surface.datoms.edn` は生成物なので手で直さない。**\n   `scripts/gen-surface-index.cljs` の入力（各 repo の wrangler 設定 / source）を\n   直してから再生成する。この作業には nbb と子リポの checkout が要る。\n4. **worker の `/health` が返す `service` を live host に合わせる。**\n   自己申告が索引より参照されるので、ここが最後まで残ると再発する。\n\n## この ADR 自身の限界\n\n上の値はすべて 2026-08-22 に、remote container から agent proxy 経由で測ったもの。\nDNS は DoH で 2 resolver に当てているが、**引用する前に測り直すこと**。\nNXDOMAIN は設定 1 行で変わる。\n"}]
