@@ -1,0 +1,29 @@
+;; gpr.candidate-core の判定表。
+;;
+;; この表は「どの実装が答えても同じでなければならない値」を固定する。
+;; kotoba/candidate_core.kotoba を amu でコンパイルできる環境では、この表を
+;; そのまま流して突き合わせる（parity harness は未実装 — README の「未検証」節）。
+;;
+;; ⚠ 表に載っている数値は**式の検査**であって、現場で妥当な閾値ではない。
+;;    実測データが 1 本も無い段階で「現実的な閾値」を名乗る値をここに置かない。
+
+{:schema "gpr.candidate-decision-vectors.v1"
+ :report
+ {:args [:r2-milli :velocity-mm-per-ns :n-picks :aperture-mm :amplitude-ratio-milli
+         :min-r2-milli :min-picks :min-aperture-mm :min-amplitude-ratio-milli]
+  :cases
+  [{:in [950 100 40 2000 800  900 5 1000 500] :out 0 :why "全条件を満たす"}
+   {:in [850 100 40 2000 800  900 5 1000 500] :out 1 :why "r2 が閾値未満"}
+   {:in [990  20 40 2000 800  900 5 1000 500] :out 2 :why "速度が水より遅い"}
+   {:in [990 400 40 2000 800  900 5 1000 500] :out 2 :why "速度が空気より速い"}
+   {:in [990 100  3 2000 800  900 5 1000 500] :out 3 :why "ピック不足が最優先で返る"}
+   {:in [990 100 40  500 800  900 5 1000 500] :out 4 :why "測線が短い"}
+   {:in [990 100 40 2000 100  900 5 1000 500] :out 5 :why "反射が弱い"}
+   {:in [850 400  3  500 100  900 5 1000 500] :out 3 :why "複数該当時はピック不足が勝つ"}]}
+ :clearance
+ {:args [:candidate-depth-mm :depth-uncertainty-mm :planned-depth-mm :required-margin-mm]
+  :cases
+  [{:in [1200 100  300 300] :out 0 :why "余裕 800mm > 要求 300mm"}
+   {:in [1200 100  900 300] :out 1 :why "余裕 200mm < 要求 300mm"}
+   {:in [1200 100 1100 300] :out 2 :why "計画深度が最浅推定に届く"}
+   {:in [1200 900  300 300] :out 2 :why "誤差が大きく最浅推定が計画深度に届く"}]}}
