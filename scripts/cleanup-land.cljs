@@ -485,6 +485,79 @@
           {landed true differs false} (group-by same? (filter on-base? paths))]
       [(vec (remove on-base? paths)) (vec landed) (vec differs)])))
 
+(defn- tracked-safety-gate!
+  "`:review`（tracked 変更）にも credential / junk / size の網をかける。
+   -> [残り 落としたもの info]
+
+  **`classify-file` は untracked にしか当たっていなかった。** `plan-repo` は
+  `grouped (group-by #(classify-file dir %) untracked)` で untracked だけを分類し、
+  `:tracked` は一切の検査を通らずに `server-commit!` まで到達する。つまり
+  credential 網・秘密内容の走査・2 MB 上限・ビルド副産物の除外は、どれも
+  **:additive 専用**だった。
+
+  実測 2026-08-21（この gate ができた回、両方とも :review 経由で PR になった）:
+
+  | PR | 中身 |
+  |---|---|
+  | `kotoba-lang/kotobase-worker-shell#3` | 103 件すべて `.shadow-cljs/builds/test/dev/` のコンパイラ出力、**+29,071 行** |
+  | `cloud-itonami/ai-gftd-dougaka#6` | `clj/.cpcache/*` 3 件。中身は `/Users/junkawasaki/.m2/…` という**このマシンの絶対パス** |
+
+  `junk-re` は `.cpcache` も `.shadow-cljs` も最初から持っている。当たらなかった
+  のは*パターン*ではなく*経路*である。同じ穴が credential 側にも空いている ——
+  **tracked な鍵ファイルをローカルで編集すれば、そのまま PR に載って push される。**
+
+  落とし方はクラスで変える:
+
+  - **credential / 秘密内容** — 無条件で落とす。安全床①に例外を作らない。
+  - **size 超過** — 落とす。
+  - **junk パス** — `base` に**無いときだけ**落とす。base に在るなら、その repo は
+    そのファイルを意図して track している（生成物を commit する方針の repo は実在
+    する）ので、黙って捨てるほうが危険。base に在る junk は残して人が読む。
+
+  `base-map` が引けなかったときは junk の判定ができない。そのときは credential と
+  size だけを当て、`:applied :partial` を返して**そう印字する** —— 『測れなかった』が
+  『測って問題が無かった』と同じ顔をしてはならない（ADR-2608136000）。
+
+  ローカルの working tree には触らない。落としたものは repo ごとの
+  `.git/stash-archive-<date>/tracked-modifications.patch` に既に入っている。"
+  [dir base-map paths]
+  (let [have-base? (seq base-map)
+        classify (fn [p]
+                   (let [f (io/file dir p)
+                         size (try (.-size (.statSync node-fs (.getPath f)))
+                                   (catch :default _ 0))]
+                     (cond
+                       (re-find credential-re p)           :skip-credential
+                       (> size max-bytes)                  :skip-large
+                       (secret-content? f)                 :skip-credential
+                       (and (re-find junk-re p)
+                            have-base?
+                            (not (contains? base-map p)))  :skip-junk-new
+                       (re-find junk-re p)                 :kept-tracked-junk
+                       :else                               :take)))
+        grouped (group-by classify paths)
+        dropped (into {} (for [[k v] grouped
+                               :when (contains? #{:skip-credential :skip-large :skip-junk-new} k)]
+                           [k (vec v)]))]
+    [(vec (concat (:take grouped) (:kept-tracked-junk grouped)))
+     dropped
+     {:applied (if have-base? true :partial)
+      :scanned (count paths)
+      :kept-junk (vec (:kept-tracked-junk grouped))}]))
+
+(defn- report-tracked-safety! [dropped info]
+  (if (= :partial (:applied info))
+    (println (format "  ⚠ tracked safety gate: base tree が引けず junk 判定は未適用（credential/size のみ・scanned %d）"
+                     (:scanned info)))
+    (when (zero? (reduce + (map (comp count val) dropped)))
+      (println (format "  tracked safety gate: 落とすものは無し（scanned %d）" (:scanned info)))))
+  (doseq [[k v] dropped]
+    (println (format "  skip %-18s %d 件（:review から除外）: %s"
+                     (name k) (count v) (str/join ", " (take 4 v)))))
+  (when (seq (:kept-junk info))
+    (println (format "  note tracked-junk %d 件は base に在るので残す（この repo は生成物を track している）: %s"
+                     (count (:kept-junk info)) (str/join ", " (take 3 (:kept-junk info)))))))
+
 (defn- ns-source-candidates
   "Namespace symbol -> the source paths it could live at in this repo."
   [ns-sym]
@@ -1100,7 +1173,11 @@
             ;; パス的に additive でも compile を壊す（unresolved-refs-gate! の
             ;; docstring / kotoba-kir b0472c3 の実例）。
             [additive unresolved uinfo] (unresolved-refs-gate! dir base additive)
-            tracked (vec (concat tracked demoted suspects unresolved))]
+            tracked (vec (concat tracked demoted suspects unresolved))
+            ;; :review にも credential / junk / size の網をかける。
+            ;; classify-file は untracked にしか当たっていない
+            ;; （tracked-safety-gate! の docstring）。
+            [tracked ts-dropped ts-info] (tracked-safety-gate! dir base-map tracked)]
         (when (seq demoted)
           (println (format "  ⚠ untracked だが %s に既存・内容差あり: %d 件 → :review（auto-merge しない）"
                            base (count demoted)))
@@ -1111,6 +1188,7 @@
                            (count unresolved) (:scanned uinfo)))
           (doseq [[p syms] (:findings uinfo)]
             (println (str "      " p "  " (str/join ", " syms)))))
+        (report-tracked-safety! ts-dropped ts-info)
         (record-planned! dir additive tracked)
         (when (seq additive) (println (format "  plan :additive  %d files → PR → merge" (count additive))))
         (when (seq tracked) (println (format "  plan :review    %d files → PR のみ（merge しない）" (count tracked)))))
@@ -1129,8 +1207,11 @@
             [additive unresolved uinfo] (unresolved-refs-gate! dir base additive)
             ;; base に存在するのに untracked と報告されたものは :additive ではない。
             ;; :review へ落として auto-merge の対象から外す（PR #444 の再発防止）。
-            tracked (vec (concat tracked tracked-differs demoted suspects unresolved))]
+            tracked (vec (concat tracked tracked-differs demoted suspects unresolved))
+            ;; dry-run と同じ位置・同じ理由（tracked-safety-gate! の docstring）。
+            [tracked ts-dropped ts-info] (tracked-safety-gate! dir base-map tracked)]
         (record-planned! dir additive tracked)
+        (report-tracked-safety! ts-dropped ts-info)
         (when (seq unresolved)
           (println (format "  ⚠ 参照が解決しない %d 件 → :review（scanned %d）"
                            (count unresolved) (:scanned uinfo)))
@@ -1277,6 +1358,59 @@
 (println (str "cleanup-land " (if apply? "APPLY" "DRY-RUN（--apply で実行）")))
 (println "分類: :additive=untracked のみ→merge / :review=tracked 変更→PR のみ / annex は対象外")
 (println "改名で死んだパスの残骸は :additive から外す（residue gate）。ローカルは無傷。")
+
+
+;; ── tracked-safety-gate! の自己検査 ────────────────────────────────────
+;; `--selftest-tracked-gate` で、fleet 走査に入る前に両方向を実演して終わる。
+;; 「落ちること」を確かめずに landed としない、という repo の規則（CLAUDE.md
+;; 「gate は劇場になりうる」）を、この gate については誰でも再実行できる形にする。
+;; 実ファイルを触るので一時ディレクトリに作って必ず消す。
+(when (argset "--selftest-tracked-gate")
+  (let [dir (str (.tmpdir node-os) "/cleanup-land-gate-selftest")
+        w! (fn [rel content]
+             (let [f (io/file dir rel)]
+               (.mkdirSync node-fs (.getPath (.getParentFile f)) #js {:recursive true})
+               (.writeFileSync node-fs (.getPath f) content)))
+        _ (do (try (.rmSync node-fs dir #js {:recursive true :force true}) (catch :default _ nil))
+              (w! "clj/.cpcache/1.basis" "{:classpath {\"/Users/x/.m2/foo.jar\" {}}}")
+              (w! ".shadow-cljs/builds/test/dev/out/cljs-runtime/a.js" "goog.provide('a');")
+              (w! "src/app/core.cljc" "(ns app.core)\n(defn go [] :ok)\n")
+              (w! "secrets/id_ed25519" "-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\n-----END OPENSSH PRIVATE KEY-----\n"))
+        paths ["clj/.cpcache/1.basis"
+               ".shadow-cljs/builds/test/dev/out/cljs-runtime/a.js"
+               "src/app/core.cljc"
+               "secrets/id_ed25519"]
+        ;; (1) base tree が引けて、junk が base に無い = 新しいビルド副産物
+        [kept-a drop-a info-a] (tracked-safety-gate! dir {"src/app/core.cljc" "deadbeef"} paths)
+        ;; (2) 同じ junk が base に在る = その repo は意図して track している
+        [kept-b drop-b _] (tracked-safety-gate!
+                            dir {"src/app/core.cljc" "deadbeef"
+                                 "clj/.cpcache/1.basis" "cafe"
+                                 ".shadow-cljs/builds/test/dev/out/cljs-runtime/a.js" "cafe"}
+                            paths)
+        ;; (3) base tree が引けない = junk 判定は下せない。credential だけ落として申告する
+        [kept-c drop-c info-c] (tracked-safety-gate! dir {} paths)
+        n (fn [m] (reduce + (map (comp count val) m)))]
+    (println "tracked-safety-gate! selftest")
+    (println (format "  (1) junk が base に無い    -> kept=%d dropped=%d %s  applied=%s"
+                     (count kept-a) (n drop-a) (pr-str (into {} (for [[k v] drop-a] [k (count v)]))) (:applied info-a)))
+    (println (format "  (2) junk が base に在る    -> kept=%d dropped=%d %s"
+                     (count kept-b) (n drop-b) (pr-str (into {} (for [[k v] drop-b] [k (count v)])))))
+    (println (format "  (3) base tree が引けない   -> kept=%d dropped=%d %s  applied=%s"
+                     (count kept-c) (n drop-c) (pr-str (into {} (for [[k v] drop-c] [k (count v)]))) (:applied info-c)))
+    (let [ok (and (= #{"src/app/core.cljc"} (set kept-a))
+                  (= 2 (count (:skip-junk-new drop-a)))
+                  (= 1 (count (:skip-credential drop-a)))
+                  (= true (:applied info-a))
+                  (= 3 (count kept-b))
+                  (nil? (:skip-junk-new drop-b))
+                  (= 1 (count (:skip-credential drop-b)))
+                  (= 1 (count (:skip-credential drop-c)))
+                  (nil? (:skip-junk-new drop-c))
+                  (= :partial (:applied info-c)))]
+      (try (.rmSync node-fs dir #js {:recursive true :force true}) (catch :default _ nil))
+      (println (if ok "  SELFTEST PASS" "  SELFTEST FAIL"))
+      (js/process.exit (if ok 0 1)))))
 
 (def repos
   (->> (sh "find" "orgs" "-maxdepth" "3" "-name" ".git" "-type" "d")
