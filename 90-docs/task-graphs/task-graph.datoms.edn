@@ -649,6 +649,28 @@
   :task/status-at "2026-08-22"
   :task/status-note "2026-08-22 実測（ADR-2608220200 発見 4）: simeon に Routing.Type=dht + Gateway.ExposeRoutingAPI=true を設定し Kubo v0.41.0 daemon を起動。自前 IPNS 名 k51qzi5uqu5dklk9myzcglshccfgdro93kfkqoxtukriattjuvavchzmi1535x を publish し、**自前 router 経由で HTTP 200 / 365 byte の署名付き record として解決**（経路に DNS も US router も含まない）。delegated-ipfs.dev で同一 byte 数を確認し global DHT 実在を裏取り。**残る gap 3 つ**: (1) launchd 永続化に失敗（bootstrap: 5 I/O error）＝再起動を跨がない (2) NAT 配下で peers 9〜11・p2p-circuit 12 件＝到達性の修復が要る (3) 1 台のみ。この 3 つが片付くまで production の唯一経路にしない"}
 
+ {:db/id -36
+  :task/id "S6-hardware-second-source"
+  :task/workflow "sanction-survivable-architecture"
+  :task/title "非 Apple / 非中国組立の機材を fleet に混ぜ、更新経路の代替を持つ"
+  :task/kind "infrastructure"
+  :task/repo "com-junkawasaki/root"
+  :task/requires []
+  :task/external-gate true
+  :task/status :pending
+  :task/status-note "2026-08-22 の XMILE シミュレーション（ADR-2608220400）で、ロードマップ着地後の拘束層が US/CN/RU/EU の**4 管轄すべてで hardware になる**と出た。稼働中の 10 台は止まらないが更新経路に代替が無く、復旧速度も最も遅い（0.06/月）。**次に効く投資はソフトウェアではない。** CN 制裁は実行・保管・名前に触れず、組立・部材・レアアースを通じて更新だけを止める"}
+
+ {:db/id -37
+  :task/id "S7-home-jurisdiction-risk"
+  :task/workflow "sanction-survivable-architecture"
+  :task/title "本国（JP）指定リスクの評価 —— 技術では動かないので、法務・ドミサイルの問題として扱う"
+  :task/kind "legal"
+  :task/repo "com-junkawasaki/root"
+  :task/requires []
+  :task/external-gate true
+  :task/status :pending
+  :task/status-note "2026-08-22 の XMILE シミュレーション（ADR-2608220400）で、S0a〜S4 を**全部着地させても JP 生存性は 0 のまま（0→0、差 ±0）**と出た。本国は法人格・登記・税・全銀口座を握っており技術的代替が存在しない。**生存性の報告を 2 本立てにする**（外国ベンダ喪失=技術で動く / 本国指定=技術で動かない）。1 つの数字に畳まない"}
+
  {:db/id -34
   :task/id "S0d-kubo-free-libp2p-node"
   :task/workflow "sanction-survivable-architecture"
