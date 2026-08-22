@@ -4,7 +4,8 @@
   :adr/status "accepted"
   :adr/date "2026-08-22"
   :adr/repo "etzhayyim/openicc"
-  :adr/related ["adr-2605301600-danjo-public-accountability-oversight"
+  :adr/related ["adr-2608221500-kosatsu-durability-plane-anchor-delegation"
+                "adr-2605301600-danjo-public-accountability-oversight"
                 "adr-2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane"
                 "adr-2608039000-no-d1-as-premise-on-decentralised-paths"
                 "adr-2608136000-five-questions-before-writing-a-check"]
@@ -166,6 +167,26 @@ repository, that is where it goes. The two planes may hold the same subject
 - No live deployment, no lease, no real nodes, no anchor, nothing ever
   dispatched. `dispatch-fn` and `anchor-fn` are injected with no defaults: a
   defaulted destination is a destination nobody chose.
+
+- **KNOWN GAP, opened the same day (2026-08-22).** D5 above defines an anchor
+  record shape inside `openicc.bot.registry`. Later that day, while giving
+  `cloud-itonami/kosatsu` a durability plane, `kotoba-lang/kotobase-anchor-fevm`
+  was found: it already owns chain-neutral checkpoint receipts, its default
+  provider needs no chain, gas or RPC, and its receipts carry only salted opaque
+  commitments. kosatsu delegates to it
+  (adr-2608221500-kosatsu-durability-plane-anchor-delegation D1) precisely
+  because a second anchor format is a second answer to the question the anchor
+  plane exists to answer.
+
+  openicc has that second format. It was written before the existing one was
+  searched for, which is the failure the workspace rule about consulting the
+  index exists to prevent, and it is recorded here rather than left for a reader
+  to discover from the divergence. Nothing depends on it yet: `anchor-fn` is
+  injected, no adapter exists, and nothing has been anchored. **The fix is to
+  make `openicc.bot.registry/anchor-record` produce a
+  `kotobase.anchor.checkpoint` payload behind the existing `:inga`-style
+  provider alias, keeping `src/` dependency-free.** That is the first item of
+  unfinished work from this session.
 
 ## Evidence
 

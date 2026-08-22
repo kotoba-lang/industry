@@ -1,0 +1,144 @@
+[{:db/id -1
+  :adr/id "adr-2608221500-kosatsu-durability-plane-anchor-delegation"
+  :adr/title "高札 gets a durability plane by delegation, and the sourcing mode goes inside the commitment"
+  :adr/status "accepted"
+  :adr/date "2026-08-22"
+  :adr/repo "cloud-itonami/kosatsu"
+  :adr/related ["adr-2608220100-openicc-autonomous-icc-procedure-bots"
+                "adr-2608039000-no-d1-as-premise-on-decentralised-paths"
+                "adr-2608136000-five-questions-before-writing-a-check"
+                "adr-2608221600-a-claim-nothing-checks-decays-into-a-claim-about-the-past"]
+  :adr/body
+  "## Context
+
+The owner asked whether this workspace already holds a repository that
+preserves sanction facts — who did what, historically and objectively, kept
+permanently, in the manner of the biblical Books of Kings. It does, in three
+layers with different jobs:
+
+* `cloud-itonami/kosatsu` (高札) — attributed crime and sanctions designations,
+  delistings and competing claims. Preserves authority attribution and event
+  history, exposes disagreement, issues no verdict and no score.
+* `kotoba-lang/innen` (因縁) + `loop-innen` — a sourced dependency record over
+  human history; bitemporal, BCE-capable, unsourced edges inadmissible.
+* `cloud-itonami/danjo` (弾正) — factual, non-adjudicating observation of
+  public government data.
+
+`cloud-itonami/sanctions` is the closest NAME and the emptiest tree: zero data
+files, two disjoint implementations that disagree on schema, and a live
+contradiction about whether screening belongs in it that the repository does not
+resolve. It is not the place to go for this subject.
+
+The Kings comparison is exact enough to be useful. That book does three things:
+records each reign in order, cites its sources (`the annals of the kings of
+Israel`), and JUDGES. This workspace holds the first two in kosatsu and innen
+and deliberately withholds the third — kosatsu is chartered `never issues a
+verdict or score`, danjo is non-adjudicating. The only repository that judges is
+`etzhayyim/openicc`, chartered the day before, and it cannot publish a named
+finding alone. The division is the same one Kings has between the annals and the
+Deuteronomistic historian who assessed them.
+
+What was missing was durability. kosatsu's log is a content-addressed commit
+DAG, so tampering is detectable BY ANYONE HOLDING THE LOG. It cannot prove to a
+third party that a head existed at a time: whoever controls the file can rewrite
+the chain from genesis and hand out a consistent lie. Gate G4 (`a delisting is a
+NEW datom; nothing is overwritten`) was therefore a promise rather than a
+checkable property.
+
+## Decision
+
+### D1 — delegate anchoring; do not grow a second anchor format
+
+`kotoba-lang/kotobase-anchor-fevm` already owns chain-neutral checkpoint
+receipts, and its DEFAULT provider is a signed append-only transparency log
+requiring no chain, no gas and no RPC; public-chain notarisation is optional.
+`kosatsu.methods.anchor` delegates to it.
+
+The reason is the same one the repository already applies to itself: 高札
+authors no designation of its own, and a consensus or anchor plane must not hold
+two answers to the question it exists to answer. This was the first thing
+checked, and finding the existing implementation changed the design — the
+alternative was writing an anchor record format inside kosatsu.
+
+### D2 — an anchored head makes G4 falsifiable
+
+If the record ever moves under a previously anchored head, the commitment no
+longer opens. That converts `nothing is overwritten` from a statement about our
+intentions into a statement a stranger can test.
+
+### D3 — G10-anchor: representative records may not reach a public chain
+
+Article G10 requires `:representative` versus `:authoritative` on every datom.
+From outside, a commitment over the synthetic seed and one over real
+designations are THE SAME 32 BYTES. A public-chain artefact is permanent and
+carries no room to say `this was synthetic`, so notarising the seed there would
+leave a durable, externally citable record implying 高札 had captured real
+designations.
+
+Therefore `:evm` is refused unless the log is wholly `:authoritative`, and the
+sourcing mode is carried INSIDE the commitment: `database-id` is
+`kosatsu/representative`, `kosatsu/authoritative`, `kosatsu/mixed` or
+`kosatsu/unsourced`. A receipt separated from its context still says which kind
+of record it covers.
+
+### D4 — the anchor carries a commitment, never the record
+
+`{database-id, epoch, logical-checkpoint-root}`; the root is an opaque CID. No
+subject label, no authority id, no datom crosses it. G5 (subject-dignity /
+no-doxxing) would be violated by an anchor that leaked who is designated, and
+the anchor is the one artefact here designed to be permanent and public. This is
+CHECKED (`discloses-nothing?`) rather than asserted, because the payload shape is
+owned upstream and could grow without anything here noticing.
+
+### D5 — three more refusals, each with a reason
+
+* an empty log is `{:ok? false :checked 0 :reason :empty-log}` — checked-zero
+  must never read as verified-intact
+* `checkpoint` throws on an unverified chain rather than returning nil, because
+  a caller that ignores a nil anchors nothing and reports success
+* `provider` is required with no default — a defaulted destination is a
+  destination nobody chose, and one of the two is irreversible
+
+### D6 — the test gate was measuring 4% of itself, and that is now fixed
+
+`clojure -M:test` ran `kosatsu.murakumo-test` ALONE — 9 tests, 31 of 729
+assertions — and printed `0 failures`. The cognitect runner defaults to
+`#\".*-test$\"` and twelve of thirteen namespaces are named
+`kosatsu.methods.test-*`. The alias now passes `-d test -r \".*\"`.
+
+Fixing it surfaced two breaks that only `bb test` had hidden, both because
+babashka is more permissive than the JVM: `cheshire` missing from the test
+classpath (bb bundles it) and three tests calling a `defn-` var directly (SCI
+does not enforce privacy). cheshire is KEPT rather than replaced: `ingest.cljc`
+ships a self-contained JSON reader on purpose, and cheshire is the independent
+writer its fixtures come from, so the reader is checked against someone else's
+JSON instead of against itself.
+
+## Consequences
+
+- The committed seed is `:representative`, so every plan kosatsu produces today
+  is `kosatsu/representative` and the public chain is closed to it by
+  G10-anchor. That is the design working, not a limitation to route around.
+- Live full-universe ingest (OFAC SDN / EU consolidated / UN SC / UK OFSI /
+  JP-MOF / Interpol) remains G8-gated: Council Lv6+ plus operator plus member
+  signature. That is a governance gate, not a technical one, and the standing
+  authorisation for agent-judged external effects does not cover it.
+- No adapter is deployed. Nothing has been anchored. `plan` returns a plan.
+- `etzhayyim/openicc` still carries its OWN `anchor-record` shape, written
+  before `kotobase-anchor-fevm` was found. That is exactly the second
+  implementation D1 refuses, now sitting in a sibling repository, and it is the
+  first item of unfinished work from this session.
+
+## Evidence
+
+Measured 2026-08-22 at `cloud-itonami/kosatsu` 7d8ebed:
+
+- `clojure -M:test` — 173 tests / 729 assertions, 0 failures (was 9 / 31)
+- breaking the G10-anchor guard reds exactly
+  `test-representative-records-are-refused-a-public-chain`; breaking the
+  empty-log floor reds `test-empty-log-is-not-intact`. Both restored to green.
+- `clojure -M:lint` — 13 errors across 8 files, ALL pre-existing and in files
+  this change does not touch (`src/kosatsu/mesh.clj` 3, `ingest.cljc`,
+  `weave.cljc`, five test namespaces). The two new files contribute none. The
+  lint gate was already red before this change and remains so; recorded in the
+  README rather than silently carried."}]
