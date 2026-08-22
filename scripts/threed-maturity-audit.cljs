@@ -236,7 +236,11 @@
    :parity/evidence (str (:probe/detail m) (when (:axis/why m) (str " | " (:axis/why m))))
    :parity/loc (:axis/loc m)
    :parity/files (:axis/files m)
-   :parity/test-files (:axis/tests m)})
+   :parity/test-files (:axis/tests m)
+   ;; 測るのにかかった秒数。**絶対値として引用しない** —— このマシンは並行
+   ;; agent で load が 70〜300 の間を動く。高い probe を見つけるための相対値で
+   ;; あって、ベンチマークではない。
+   :parity/seconds (:axis/probe-seconds m)})
 
 (defn -main []
   (when-not (exists? catalog-file)
@@ -246,7 +250,22 @@
         axes (cond->> (:catalog/axes catalog)
                only-axis (filter #(= only-axis (str (:axis/id %)))))
         _ (when (empty? axes) (refuse! 3 "測る軸が 0 件（--axis の指定が catalog に無い可能性）"))
-        measured (mapv measure axes)
+        ;; 1 軸ずつ、**測り終えるたびに** stderr へ出す。以前は全部終わるまで
+        ;; 何も出さなかったので、実測 28 分無音のとき「遅い」のか「止まった」のかを
+        ;; 区別できなかった —— 沈黙が進行中と同じ顔をする。所要秒数も一緒に出す
+        ;; ので、どの probe が高いかが測らずに分かる。
+        measured (vec (map-indexed
+                       (fn [i axis]
+                         (let [t0 (.now js/Date)
+                               m (measure axis)
+                               dt (/ (- (.now js/Date) t0) 1000.0)]
+                           (binding [*print-fn* *print-err-fn*]
+                             (println (str "  [" (inc i) "/" (count axes) "] "
+                                           (pad (:axis/id axis) 34)
+                                           (pad (:axis/status m) 14)
+                                           (.toFixed dt 1) "s")))
+                           (assoc m :axis/probe-seconds (js/parseFloat (.toFixed dt 2)))))
+                       axes))
         by-status (frequencies (map :axis/status measured))
         scanned-files (reduce + (map :axis/files measured))
         resolved-repos (count (distinct (map :axis/repo (remove #(= :unmeasurable (:axis/status %)) measured))))]
