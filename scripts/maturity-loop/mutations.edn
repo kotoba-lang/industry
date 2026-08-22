@@ -2036,4 +2036,97 @@
      :find "  {5120 127 5121 255 5122 32767 5123 65535})"
      :replace "  {5120 127 5121 256 5122 32767 5123 65535})"
      :must-fail ["decode-accessor-normalized-unsigned-byte"]}]}
-]}
+
+
+  {:repo "orgs/kotoba-lang/kami-engine-cad"
+   :label "CAD —— 有理曲線の分割・拘束ソルバの収束報告"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :cad/split-drops-the-weights
+     :why "有理 Bezier の分割は**同次座標で**やる。重みを落として制御点だけ補間すると、重み 1 の曲線では**完全に一致する** —— 円弧のような重み != 1 の形だけが静かに歪む。しかも歪みは滑らかなので、見て気づけない"
+     :file "src/kami/cad.cljc"
+     :find "                                         (homogeneous c)))"
+     :replace "                                         (mapv #(conj (vec %) 1.0) (:cad/control-points c))))"
+     :must-fail ["exact-split-and-trim"]}
+
+    {:id :cad/solver-always-reports-converged
+     :why "`:converged?` は**残差から計算する**。true 固定にすると、過拘束スケッチが「解けた」と報告される —— 図面は出るし、寸法だけが指定と違う"
+     :file "src/kami/cad.cljc"
+     :find "     (assoc solved :sketch/solver {:converged? (every? #(<= % tolerance) residuals)"
+     :replace "     (assoc solved :sketch/solver {:converged? true"
+     :must-fail ["coincident-and-overconstrained-diagnostics"]}
+
+    {:id :cad/unknown-constraint-silently-zero
+     :why "知らない拘束種別の残差を 0 にすると、**その拘束は満たされていることになる**。スケッチは解けたと報告され、拘束は一つも効いていない"
+     :file "src/kami/cad.cljc"
+     :find "      (throw (ex-info \"unknown sketch constraint\" {:constraint c})))))"
+     :replace "      0.0)))"
+     :must-fail ["an-unknown-constraint-is-refused-not-treated-as-satisfied"]}]}
+
+  {:repo "orgs/kotoba-lang/kami-engine-cfd"
+   :label "CFD —— bounce-back の運動量交換と壁"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :cfd/no-momentum-exchange-at-the-body
+     :why "抗力は物体リンクでの**運動量交換**として積算する。落とすと抗力が 0 になる —— 流れ場は正しく見えたまま、力だけが消える"
+     :file "src/kami_cfd.cljc"
+     :find "                      (swap! drag + (* 2.0 (aget ^ints ex i) fi)))"
+     :replace "                      nil)"
+     :must-fail ["block-drag-is-finite-and-positive"]}
+
+    {:id :cfd/body-does-not-bounce-back
+     :why "物体セルへ向かう分布を反射せずに素通しすると、**物体が流体になる** —— 解は安定なまま収束し、形の違いが抗力に出なくなる"
+     :file "src/kami_cfd.cljc"
+     :find "                    (solid-at? body xn yn)"
+     :replace "                    (and false (solid-at? body xn yn))"
+     :must-fail ["bluff-beats-streamlined"]}]}
+
+  {:repo "orgs/kotoba-lang/org-materialx"
+   :label "MaterialX —— nodedef の解決と XML の往復"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :materialx/unresolved-node-does-not-say-so
+     :why "curated subset の外の node は `:unresolved? true` を付けて**構造として残す**（この org の「黙って fallback しない」規約）。flag を落とすと、綴り間違いの node が**解決できた node と同じ顔**で下流へ流れる —— レンダリングは走り、質感だけが説明のつかないものになる"
+     :file "src/materialx/core.cljc"
+     :find "      {:node node-name :type output-type :unresolved? true}))"
+     :replace "      {:node node-name :type output-type}))"
+     :must-fail ["resolve-nodedef-known-and-unknown"]}
+
+    {:id :materialx/node-index-keyed-without-the-output-type
+     :why "nodedef は **[node 名, 出力型]** の組で引く。型を落として名前だけで引くと、`multiply` の float 版と color3 版が**同じ nodedef に潰れる** —— グラフは組み上がり、型だけが違う"
+     :file "src/materialx/core.cljc"
+     :find "  (into {} (map (fn [[id {:keys [node output-type]}]] [[node output-type] id])) node-defs))"
+     :replace "  (into {} (map (fn [[id {:keys [node output-type]}]] [[node nil] id])) node-defs))"
+     :must-fail ["resolve-nodedef-known-and-unknown"]}]}
+
+  {:repo "orgs/kotoba-lang/org-openusd"
+   :label "USD —— 合成アークと variant の往復"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :usd/list-op-arcs-lose-their-form
+     :why "`references` `payload` `inherits` などは **list-op** で、単一値と列で書式が違う。同一に扱うと USD 側が読めない、あるいは**別の合成順序**として読む"
+     :file "src/usd/core.cljc"
+     :find "(def ^:private list-op #{:references :payload :inherits :specializes :apiSchemas :variantSets})"
+     :replace "(def ^:private list-op #{})"
+     :must-fail ["composition-arcs"]}]}
+
+  {:repo "orgs/kotoba-lang/webgpu"
+   :label "WebGPU —— 実行器とパイプライン表が同じ語彙を持つ"
+   ;; **suite 全体は回さない。** この repo の test/ には Playwright の実ブラウザ
+   ;; 試験が 8 本あり、1 変異ごとに全部回すと realtime-gpu の probe が実測した
+   ;; 657 秒級になる。namespace を名指しして、その不変条件を検査する 1 本だけ
+   ;; 走らせる —— 検査の範囲を狭めたことは `:cmd` に書いてあるので、
+   ;; 「全部通った」と読み違えようがない。
+   :cmd ["clojure" "-M:test" "-n" "graph-blend-test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :webgpu/blend-vocabulary-drifts-from-the-table
+     :why "実行器の `blend-modes` と `kami.pipelines` の `:blend` は**同じ語彙でなければならない**。片側だけに mode を足すと、graph が名乗った blend が実行器で unknown になる。ADR-2608040400 の時は逆で、実行器が `:blend` を**一度も読まず**、alpha 合成のパイプライン 4 本が全部不透明に描かれていた —— 絵は出るので、誰も気づかなかった"
+     :file "src/kami/webgpu.cljs"
+     :find "  {:alpha #js {:color #js {:srcFactor \"src-alpha\" :dstFactor \"one-minus-src-alpha\" :operation \"add\"}"
+     :replace "  {:alfa #js {:color #js {:srcFactor \"src-alpha\" :dstFactor \"one-minus-src-alpha\" :operation \"add\"}"
+     :must-fail ["blend-vocabulary-matches-pipeline-table"]}]}]}
