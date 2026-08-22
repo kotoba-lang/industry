@@ -456,14 +456,16 @@
 
   {:axis/id :interop/vdb-file
    :axis/segment :interop :axis/weight 2
-   :axis/target "OpenVDB `.vdb` / NanoVDB `.nvdb` のバイナリ容器"
    :axis/label "VDB ファイルの読み書き"
    :axis/repo "kotoba-lang/voxel"
-   :axis/paths ["src/voxel/vdb.cljc"]
-   ;; magic 番号は確認済みで source に記録してあるが、**読み書きは無い**。
-   ;; marker をこの名前にしてあるのは、書いた瞬間に軸が動くようにするため。
-   :axis/markers ["read-vdb" "write-vdb"]
-   :axis/behavior nil}
+   ;; 2026-08-24: `.nvdb` の容器を実装した（`voxel.nvdb`）。2 反復見送った理由は
+   ;; 「大きさは分かるが field が分からない」だったが、NanoVDB.h が struct を
+   ;; 全部宣言しており、**要約しない道具で読めば逐語で取れた**。
+   ;; **OpenVDB の `.vdb`（NanoVDB ではない方）は依然読み書きしない。**
+   :axis/target "NanoVDB `.nvdb` のバイナリ容器（`.vdb` は別）"
+   :axis/paths ["src/voxel/nvdb.cljc"]
+   :axis/markers ["read-segments" "segment" "read-metadata" "write-metadata" "segments-error"]
+   :axis/behavior "interop-vdb-file"}
 
   ;; ───────────────────── dcc ─────────────────────
   {:axis/id :dcc/poly-edit
