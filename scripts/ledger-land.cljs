@@ -44,15 +44,25 @@
 
 (def argv (vec *command-line-args*))
 (def dry-run? (boolean (some #{"--dry-run"} argv)))
+(def message (or (some #(when (str/starts-with? % "--message=") (subs % (count "--message="))) argv)
+                 "kaizen: land one ledger line from the loop that wrote it"))
 (def pos (vec (remove #(str/starts-with? % "--") argv)))
 (def slug (nth pos 0 nil))
 (def ledger-path (nth pos 1 nil))
 (def line-file (nth pos 2 nil))
 
-(defn- gh [& args]
-  (let [r (.spawnSync cp "gh" (clj->js (vec args))
-                      #js {:encoding "utf8" :timeout 60000
-                           :stdio #js ["ignore" "pipe" "pipe"]})]
+(defn- gh
+  "First arg may be an opts map {:input <string>} to feed gh's stdin
+   (for `--input -`). maxBuffer is raised because a ledger blob response is
+   base64 of the whole file — canvas-ledger is ~3 MB, ~4 MB as base64, and
+   spawnSync's 1 MB default would truncate it into a phantom failure."
+  [& args]
+  (let [[opts args] (if (map? (first args)) [(first args) (rest args)] [{} args])
+        r (.spawnSync cp "gh" (clj->js (vec args))
+                      (clj->js (cond-> {:encoding "utf8" :timeout 120000
+                                        :maxBuffer (* 256 1024 1024)
+                                        :stdio [(if (:input opts) "pipe" "ignore") "pipe" "pipe"]}
+                                 (:input opts) (assoc :input (:input opts)))))]
     {:status (or (.-status r) 1)
      :out (str/trim (str (or (.-stdout r) "")))
      :err (str (or (.-stderr r) ""))}))
@@ -67,25 +77,45 @@
 (defn- b64-encode [s] (.toString (.from js/Buffer s "utf8") "base64"))
 
 (defn- land-once
-  "1 回試す。-> :landed / :already / :conflict"
+  "1 回試す。-> :landed / :already / :conflict
+
+  ⚠ 本文は contents API の `.content` からは読まない。あれは **1 MB を超える
+  ファイルで `content: \"\"` / `encoding: \"none\"` を返す**（実測 2026-08-22、
+  canvas-ledger.edn 2.9 MB）。旧実装はそれを『空のファイル』と区別せず、
+  次の書き込みが台帳全体を自分の行だけで置換するところだった —— 測れなかった
+  ことが、測って空だったことと同じ顔をする形（ADR-2608136000）。
+  contents API からは sha と size だけを取り、本文は git blobs API（100 MB まで
+  返る）で読み、decode 後の byte 長が tree の申告 size と一致しなければ書く前に
+  拒否する。blob の作成も argv 上限（~1 MB）を超えるので `--input -` で送る。"
   [line]
   (let [base (gh-out "api" (str "repos/" slug "/git/ref/heads/main") "--jq" ".object.sha")
-        cur  (-> (gh-out "api" (str "repos/" slug "/contents/" ledger-path "?ref=" base) "--jq" ".content")
+        meta-out (gh-out "api" (str "repos/" slug "/contents/" ledger-path "?ref=" base)
+                         "--jq" "(.sha + \" \" + (.size|tostring))")
+        [fsha fsize-str] (str/split meta-out #"\s+")
+        fsize (js/parseInt fsize-str 10)
+        cur  (-> (gh-out "api" (str "repos/" slug "/git/blobs/" fsha) "--jq" ".content")
                  (str/replace #"\s" "")
-                 b64-decode)]
+                 b64-decode)
+        cur-bytes (.byteLength js/Buffer cur "utf8")]
+    (when (not= cur-bytes fsize)
+      (throw (js/Error. (str "REFUSING: decoded ledger is " cur-bytes
+                             " bytes but the tree says " fsize
+                             " — will not write a truncated ledger back"))))
     (if (str/includes? cur line)
       :already
       (let [next-txt (str (str/replace cur #"\n+$" "") "\n" line "\n")
-            blob (gh-out "api" (str "repos/" slug "/git/blobs")
-                         "-f" (str "content=" (b64-encode next-txt))
-                         "-f" "encoding=base64" "--jq" ".sha")
+            blob (gh-out {:input (js/JSON.stringify
+                                  #js {:content (b64-encode next-txt)
+                                       :encoding "base64"})}
+                         "api" "-X" "POST" (str "repos/" slug "/git/blobs")
+                         "--input" "-" "--jq" ".sha")
             tree (gh-out "api" (str "repos/" slug "/git/trees")
                          "-f" (str "base_tree=" base)
                          "-f" (str "tree[][path]=" ledger-path)
                          "-f" "tree[][mode]=100644" "-f" "tree[][type]=blob"
                          "-f" (str "tree[][sha]=" blob) "--jq" ".sha")
             commit (gh-out "api" (str "repos/" slug "/git/commits")
-                           "-f" (str "message=kaizen: land one ledger line from the loop that wrote it")
+                           "-f" (str "message=" message)
                            "-f" (str "tree=" tree)
                            "-f" (str "parents[]=" base) "--jq" ".sha")
             ;; CAS: base を指定した ref 更新。競合したら失敗する（force はしない）。
@@ -102,7 +132,9 @@
       (println "REFUSING: line file is empty — nothing to land")
       (js/process.exit 2))
     (if dry-run?
-      (do (println "would land 1 line into" (str slug ":" ledger-path))
+      (do (println "would land"
+                   (count (remove str/blank? (str/split-lines line)))
+                   "line(s) into" (str slug ":" ledger-path))
           (js/process.exit 0))
       (loop [attempt 1]
         (let [r (try (land-once line)
