@@ -1,0 +1,164 @@
+[{:db/id -1
+  :source/dataset "adr"
+  :adr/id "adr-2608220100-capability-grants-are-addressed-and-the-address-is-checked"
+  :adr/doc_type "adr"
+  :adr/title "identity は解決せず受け取る —— capability grant を addressed にし、その宛先を検査する"
+  :adr/status "accepted"
+  :adr/date "2026-08-22"
+  :adr/topic "identity"
+  :adr/authoritative_for "kotoba に identity を入れるときの形（受け取る / 解決しない）と、capability-semantics 経路の holder 束縛"
+  :adr/repos ["kotoba-lang/org-biscuitsec" "com-junkawasaki/root"]
+  :adr/related ["adr-2608120400-authority-kernel-principal-intent-decision-receipt"
+                "adr-2608200400-bots-get-a-did-and-authority-as-a-biscuit"
+                "adr-2608200400-did-primitive-identity-reexamination"
+                "adr-2608197300-hermes-did-identity-at-startup"
+                "ADR-2608159400"
+                "ADR-2608160200"
+                "ADR-2608136000"]
+  :adr/body "## 決定
+
+**kotoba に identity を入れる。ただし言語が identity を *解決* するのではなく、
+*受け取る* 形にする。**
+
+言語内に resolver を置くと identity の評価が effect になり、ADR-2608160200 の
+Execution CID memo 規則（effect set が空か完全 replay 可能なときだけ memo key に
+してよい）に抵触する。principal を **実行の入力**にすれば Execution CID に含まれ、
+決定性も memo 可能性も保たれる。Move の `signer` が取っている形で、VM しか構築
+できない値を entry point の引数として渡す。
+
+**identity を permission の決定に使わない。** 使うのは次の 3 つだけ:
+
+| 用途 | 場所 |
+|---|---|
+| designation（誰に権限を渡すか） | grant の宛先（biscuit の `[holder ...]`） |
+| accountability（誰の権限で何が起きたか） | receipt |
+| introduction（三者間 handoff・再接続） | OCapN netlayer / handoff certificate |
+
+呼び出し地点で「誰が呼んだか」を問うと confused deputy が戻る。問うのは
+「capability を提示したか」だけにする。
+
+## identity は 3 面あり、2 面は既に配線済みだった
+
+| 層 | 鍵 | 実装 | guest / decision に届くか |
+|---|---|---|---|
+| netlayer / vat | onion / TLS / Ed25519 | `kotoba.lang.captp-runtime` + `ocapn-handoff` | 届く |
+| 実行インスタンス | executor key | `kotoba.compiler.receipt` の `:executor` | 届く |
+| **principal（人 / bot / org）** | did:key | biscuit `:subject`、`:cap/holder` | **届いていなかった** |
+
+## 実測して見つけた欠陥（2026-08-22）
+
+`:cap/holder` は `lang/capability-semantics.edn` の `:identity-keys` に入っている。
+座席は在った。**しかし誰も座っていなかった。**
+
+| 場所 | 実際の挙動 |
+|---|---|
+| `biscuit.effective/authorize` | `:cap/holder (:cap/holder requested)` —— **呼び出し側の自己申告をそのまま capability に複写**。何とも比較しない |
+| `biscuit.kotoba/->delegated` | 読む fact は `[cap ...]` と `[before ...]` のみ。**`[holder ...]` を読まない** |
+| `biscuit.authority/->grant` | holder を読むが `(some ...)` = **最初の 1 件**。この repo 内でその値を読む箇所は 0 件 |
+| `authority/grant.cljc:109` | holder を持つ grant だけ束縛。nil なら bearer（これは正しい設計） |
+
+**decider が 2 つあった。** `authority/chain-authorize` は holder を見て、
+capability-semantics 経路は見ていない。ADR-2608200400 が『決定器は増やさない』と
+書いた当のところで、片方だけ質問を落としていた。
+
+`[holder ...]` を読まないことは中立ではない。**それは唯一「読まないと権限が広がる」
+fact** で、落とすと addressed token が bearer token に戻り、そのうえ
+`:cap/holder` が request から埋まるので、**主張する側と検査する側が同じ側**になる。
+
+## やったこと
+
+1. `->delegated` が `[holder <principal>]` を読む。
+2. `authorize` が `:holder`（**認証済み** principal。認証は既存の場所＝
+   `interop_profiles` の offline did:key / VC / UCAN、CACAO、passkey で済ませ、
+   その封じた結果を受け取る）を取り、`(:cap/holder requested)` は**入口で捨てる**。
+   - addressed な grant を addressee 以外が使う -> `:wrong-holder`
+   - addressed な grant を principal 無しで使う -> `:holder-required`
+   - unaddressed（bearer）は合法だが、`:policy/require-holder true` で拒否できる
+     -> `:unbound-grant`。`:policy/forbid-wildcard` と同じ形（lattice は許すが
+     deployment が断る）
+3. **有効な holder は最後の fact**（最初ではない）。`authority.grant/meet` が
+   『the holder is the child's: a delegation ends at whoever holds the leaf』と
+   書いており、最初を採ると**後続 block の再宛先付けが黙って無効になる** ——
+   親が token を持ち続け、委譲された子は何も得ない。`biscuit.authority/->grant`
+   も同じ規則に揃えた。
+4. receipt が **allowed / denied 両方**で `:receipt/holder` と
+   `:receipt/holder-binding` を持つ。`:unauthenticated`（principal が渡されなかった）
+   と `:bearer`（渡されたが grant が要求しなかった）は**別の値**にした ——
+   ADR-2608136000 の『飛ばした と 合格した が出力で区別できるか』。
+
+**decider は増やしていない。** `authority/grant.cljc` が既に持っている質問を、
+持っていなかった経路にも置いただけ。
+
+## 検査
+
+nbb 1.5.212 / node v22.22.2。baseline 71 tests / 172 assertions -> **77 / 202 / 0 failures**。
+
+**4 回の break/unbreak で、壊したものと報告された失敗が一致することを確認した**
+（ADR-2608136000 の警告どおり、壊し方を間違えた赤は成功した実演に見える）:
+
+| 壊し方 | 赤くなったもの |
+|---|---|
+| `:cap/holder` を requested から複写に戻す | 意図した 2 test |
+| `->delegated` の holder を last -> first | `a-delegation-ends-at-the-leaf` |
+| `->delegated` が holder fact を読まない | 3 test / 5 assertion |
+| `->grant` の holder を last -> first | `a-delegation-ends-at-whoever-holds-the-leaf` |
+
+測っていないもの（pass として数えない）: JVM `:test` alias と clj-kondo
+（この環境に clojure CLI が無い）、murakumo fleet 上での実行、実 Ed25519 での
+holder 束縛（本スイートの署名は決定論的スタンドイン）。
+詳細は `90-docs/evidence/260822-biscuit-holder-binding.edn`。
+
+## 着地の現在地（正直に）
+
+**`kotoba-lang/org-biscuitsec` には push できていない。** この remote session は
+`com-junkawasaki` だけが attach されており、`add_repo` の cross-tier add が
+拒否された（`cross-tier adds are not supported in v1`）。commit は patch として
+`90-docs/evidence/patches/260822-org-biscuitsec-holder-binding.patch` に置いた
+（base `039378d4b6fcebacc6fa54a1dfdbc8a12f2b3530`）。適用:
+
+```
+git -C orgs/kotoba-lang/org-biscuitsec am \\
+  90-docs/evidence/patches/260822-org-biscuitsec-holder-binding.patch
+```
+
+## 参考にした言語と、借りたもの
+
+| 言語 | 借りたもの |
+|---|---|
+| **Move** | `signer` —— runtime しか構築できない型を entry 引数で渡す。identity を解決せず受け取るのはこれ |
+| **E (Kernel-E)** | designation と permission の分離。呼び出し地点で誰かを問わない |
+| **Spritely Goblins / OCapN** | identity は node / instance / principal の 3 層で、node の identity は netlayer の仕事（= host boundary）|
+| **DAML** | `signatory` —— authority を値の存在条件にする。kotobase の datom 面への次の適用先 |
+| **biscuit（自前）** | attenuation が offline で、検証に秘密が要らない |
+
+**真似しないもの**: Solidity の `msg.sender` / `tx.origin`（ambient identity）、
+Cedar / RBAC（決定を再中央集権化し、decider が 3 つになる）。
+
+## まだやっていないこと（優先順）
+
+1. **`:principal` を guest grammar に入れる。** 1 ワードの opaque handle
+   （`:document` / vector と同じ形）にすれば native の admission gate を通る。
+   ゲストにできることは比較・`:cap/holder` への設置・受け渡しの 3 つだけとし、
+   **文字列化させない**（させると guest 内で ACL 文字列マッチが始まる）。
+   Execution CID に含める。
+2. **sealer / unsealer（brand pair）。** grep で 0 件。『identity が要る』case の
+   相当部分は『自分が以前作った値を自分だと分かる形で受け取り直したい』であり、
+   それは brand pair で解ける —— registry も鍵も要らず、完全に純粋。
+   **DID surface を足す前にこれを入れる。**
+3. **ゲスト側 attenuation。** bot が自分より狭い slice を他へ渡せない
+   （ADR-2608200400 が『次の決定であって漏れではない』と書いた穴）。
+4. **amu の run receipt v2 `:authority-decision` に principal を通す。** 現在
+   `:authority-decision` を供給するものが無く、実質 v1 しか出ていない。
+5. `lang/capability-semantics.edn` の `:receipt-requirements` に
+   `:receipt/holder` を昇格させるか（今回は追加キーに留め、言語側の floor を
+   動かしていない）。
+
+## この ADR 自身が、記録した class の欠陥で 1 度落ちた
+
+docstring を heredoc で書いた際、`\\\"` が Python 側で解決されてファイル上は
+**裸の引用符**になり、Clojure の docstring がそこで終わって
+`did:key:zAlice` がシンボルとして読まれた。**コンパイルは通り、テスト実行時に
+`did:key:zAlice is not ISeqable` で落ちた。** CLAUDE.md の『EDN 文書を heredoc で
+書いたら reader を通してから commit する』が、EDN だけでなく **Clojure の
+docstring にも同じ形で当たる**。"
+}]
