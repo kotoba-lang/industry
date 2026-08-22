@@ -1323,4 +1323,65 @@
      :file "seed.ts"
      :find "i < 24; i += 1"
      :replace "i < 2; i += 1"
-     :must-fail ["every-public-domain-the-readme-names-is-actually-seeded"]}]}]}
+     :must-fail ["every-public-domain-the-readme-names-is-actually-seeded"]}]}
+
+  {:repo "orgs/cloud-itonami/airshed"
+   :label "airshed actor descriptor —— manifest ↔ deploy ↔ lex/ の 3 面一致"
+   ;; deploy/app-aozora.edn は :deployment/requires に "did-match" と
+   ;; "capability-allowlist" を**自分で**挙げているのに、2026-08-22 までそれを
+   ;; 検査するものが無かった（cargo が 2026-05〜08 に踏んだ「descriptor が静かに
+   ;; 割れる」形と同じ入口）。規則は src/etzhayyim/airshed/contract.cljc の純粋
+   ;; 関数、fixture（contract_test）で落ちることを見せてから実ファイル
+   ;; （repo_test）に当てる。全て 2026-08-22 に実際に赤くなるところを見た。
+   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :green-marker "airshed actor contract: all green"
+   :mutations
+   [{:id :airshed/deploy-did-drifts
+     :why "manifest の @id と deploy の actor-did が別 DID に割れる形（cargo が 90b15e4→ec7015f で実際にやった改名半端の同型）。deploy 自身が requires に did-match を挙げているので、割れた瞬間にこの repo の宣言は嘘になる"
+     :file "deploy/app-aozora.edn"
+     :find ":deployment/actor-did \"did:web:airshed.etzhayyim.com\""
+     :replace ":deployment/actor-did \"did:web:etzhayyim.com:actor:airshed\""
+     :must-fail ["deploy-and-manifest-name-the-same-did"]}
+
+    {:id :airshed/step-calls-an-undeclared-capability
+     :why "deny-by-default の descriptor 面。step の fn が capability 宣言の外に出ても止まらないなら『宣言にない権限で動く actor』が作れる（cargo の undeclared-capability / custom escape-hatch と同じ理由）"
+     :file "actor-manifest.jsonld"
+     :find "{\"id\": \"appendAudit\", \"fn\": \"airshed.audit\","
+     :replace "{\"id\": \"appendAudit\", \"fn\": \"custom\","
+     :must-fail ["every-pipeline-step-calls-a-declared-capability"]}
+
+    {:id :airshed/allowlist-grows-beyond-the-manifest
+     :why "deploy 側の allowlist にだけ能力を足す形。manifest は変わらないので manifest だけ読むレビューは気づかず、配備側が宣言外の権限を配る"
+     :file "deploy/app-aozora.edn"
+     :find ":airshed.collaborate :airshed.engage :airshed.convene]"
+     :replace ":airshed.collaborate :airshed.engage :airshed.convene :airshed.actuate]"
+     :must-fail ["deploy-allowlist-equals-manifest-capabilities"]}
+
+    {:id :airshed/proposal-skips-human-approval
+     :why "RULE-AIRSHED-NO-AUTONOMOUS-ACTUATION の機械可読な面。requiresHumanApproval を false にする 1 文字級の編集で「提案のみ・実行は署名済み council decision」という README と governance rule の両方が嘘になる —— manifest は valid JSON のままなので、検査が無ければ何も落ちない"
+     :file "actor-manifest.jsonld"
+     :find "\"args\": {\"requiresHumanApproval\": true}"
+     :replace "\"args\": {\"requiresHumanApproval\": false}"
+     :must-fail ["a-proposal-cannot-skip-human-approval"]}
+
+    {:id :airshed/withdrawal-path-removed-from-the-lexicon
+     :why "RULE-AIRSHED-VOLUNTARY-PARTICIPATION（撤回可能な opt-in）。lexicon の enum からだけ withdrawn を落とすと、manifest の lifecycle は残るので manifest だけ見る側は気づかず、record 面では撤回が書けなくなる —— 片側だけ直すのが一番起こりやすい壊れ方"
+     :file "lex/engagement.edn"
+     :find "[\"draft\" \"consent-confirmed\" \"sent\" \"responded\" \"closed\" \"withdrawn\"]"
+     :replace "[\"draft\" \"consent-confirmed\" \"sent\" \"responded\" \"closed\"]"
+     :must-fail ["an-engagement-can-always-be-withdrawn"
+                 "manifest-lifecycle-matches-the-engagement-lexicon"]}
+
+    {:id :airshed/required-contract-ships-no-lexicon
+     :why "deploy の required-contracts の 1 件が typo で実在しない nsid になる形。EDN としては正しいので配備が実際に lexicon を引くまで分からない。全単射検査は逆向き（lexicon が在るのに required に無い = 黙って配備から落ちる）も同時に守る"
+     :file "deploy/app-aozora.edn"
+     :find "[\"com.etzhayyim.airshed.communitySession\""
+     :replace "[\"com.etzhayyim.airshed.communitySessions\""
+     :must-fail ["every-required-contract-ships-a-lexicon"]}
+
+    {:id :airshed/deny-by-default-rule-goes-blind
+     :why "**規則コード側を撃つ。** check-steps の :when に false を挟むと、実ファイルは緑のままなので repo_test は何も言わない —— fixture テストだけがこれを捕まえる。データを撃つ 6 件が守るのは descriptor、これが守るのは規則そのもの"
+     :file "src/etzhayyim/airshed/contract.cljc"
+     :find ":when (and f (not (contains? caps f)))]"
+     :replace ":when (and f false (not (contains? caps f)))]"
+     :must-fail ["a-step-that-calls-an-undeclared-capability-is-a-violation"]}]}]}
