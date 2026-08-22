@@ -410,13 +410,30 @@
    :axis/probe-extra-cp ["kotoba-lang/xml/src"]
    :axis/behavior "interop-materialx"}
 
-  {:axis/id :interop/alembic
+  ;; 2026-08-23: VDB と同じ理由で 1 軸を 2 つに割った。`.abc` は 2 層 ——
+  ;; 下が Ogawa（容器）、上が object model（objects / properties / samples /
+  ;; time sampling）。**容器の配置は上流ソースから逐語で取れた**ので実装した
+  ;; （alembic/lib/Alembic/Ogawa の OStream.cpp / IStreams.cpp / IGroup.cpp /
+  ;; IData.cpp / Foundation.h）。object model はまだ無い。
+  ;; **1 つの偽より 2 つの真。** 重みは 3 → 3+3 に増えるので、分割で score は
+  ;; 上がらない。
+  {:axis/id :interop/ogawa
    :axis/segment :interop :axis/weight 3
-   :axis/target "Alembic（映像パイプラインのキャッシュ標準）"
-   :axis/label "Alembic の読み書き"
-   :axis/repo "kotoba-lang/org-openusd"
+   :axis/target "Ogawa（Alembic `.abc` のバイナリ容器）"
+   :axis/label "Ogawa 容器の読み書き"
+   :axis/repo "kotoba-lang/io-alembic"
+   :axis/paths ["src/ogawa/core.cljc"]
+   :axis/markers ["read-archive" "write-archive" "group" "data" "tree-summary"]
+   :axis/behavior "interop-ogawa"}
+
+  {:axis/id :interop/alembic-objects
+   :axis/segment :interop :axis/weight 3
+   :axis/target "Alembic の object model（AbcGeom の PolyMesh / Xform / 時間サンプリング）"
+   :axis/label "Alembic オブジェクトモデル"
+   :axis/repo "kotoba-lang/io-alembic"
    :axis/paths ["src"]
-   :axis/markers ["read-abc" "write-abc" "alembic"]
+   ;; marker をこの名前にしてあるのは、書いた瞬間に軸が動くようにするため。
+   :axis/markers ["read-abc" "polymesh" "time-sampling"]
    :axis/behavior nil}
 
   ;; 2026-08-23: 1 軸を 2 つに割った。元の軸は「疎ボリュームグリッドの読み書き」で
