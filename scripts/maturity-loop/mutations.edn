@@ -285,7 +285,7 @@
     {:id :inga/emission-charged
      :why "emission が課金されること（無料だと fuel 台帳が実際の仕事量と食い違う）"
      :file "src/inga/state.cljc"
-     :find "                   :expansion-cost-fn\n                   (fn [s o] (reduce + 0 (map cost-fn (emitted-ops emit-fn s o))))"
+     :find "                   :expansion-cost-fn\n                   (fn [s o] (reduce + 0 (map cost-fn (emitted-ops ctx s o))))"
      :replace "                   :expansion-cost-fn (fn [_ _] 0)"
      :must-fail ["emission-is-charged-not-free"
                  "an-op-whose-emission-does-not-fit-is-not-applied-at-all"]}
@@ -293,8 +293,8 @@
     {:id :inga/emission-applied
      :why "投影が root に入ること（入らなければ非決定的な emission でも replica は割れない）"
      :file "src/inga/state.cljc"
-     :find "      (if-not emit-fn\n        state'\n        (update state' :db #(reduce apply-datom-op % (emit-fn o prev next))))"
-     :replace "      state'"
+     :find "          (if-not emit-fn\n            state'\n            (update state' :db #(reduce apply-datom-op % (emit-fn o prev next))))"
+     :replace "          state'"
      :must-fail ["emission-is-deterministic-or-replicas-split"]}
 
     {:id :inga/hydrate-returns-both-roots
