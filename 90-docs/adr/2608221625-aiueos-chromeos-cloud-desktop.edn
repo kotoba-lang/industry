@@ -37,7 +37,10 @@
                 "kotoba-lang/aiueos ADR-0041"
                 "kotoba-lang/aiueos ADR-0073"
                 "kotoba-lang/aiueos ADR-0076"
-                "kotoba-lang/aiueos ADR-0077"]
+                "kotoba-lang/aiueos ADR-0077"
+                "kotoba-lang/aiueos ADR-0079"
+                "kotoba-lang/aiueos ADR-0083"
+                "kotoba-lang/aiueos ADR-0084"]
   :adr/supersedes []
   :adr/authoritative_for
   ["aiueos を Chrome OS 型クラウドデスクトップの機械／OS 面として読むときの product contract"
@@ -54,7 +57,7 @@
 
 accepted にする理由: 新しい不可逆インフラ（新 west repo、新 design system、分散経路への D1 premise）は選ばない。選ぶのは既に accepted の決定の *合成* である。未着地の実装は gate の赤として残す。
 
-west pin の aiueos は `1af48744811baea37d44955947604edba2e76bd0`（root ADR-2608220200 が closing 時点で tip 一致と記録）。本 ADR の現在地はその revision の README / ADR-0013 / 0041 / 0073 / 0076 / 0077 / `docs/coverage.edn` / `resources/aiueos/cloud_live.edn` を読んだ結果である。手元の共有 checkout に aiueos tree は無かった。
+west pin の aiueos は `d0780608199724c3d26ad744ce6fd0441bd30a68`（2026-08-22、guest virtio-gpu 2D create/flush + P5 UNVERIFIED、aiueos ADR-0084）。本 ADR の現在地はその revision の README / ADR-0079 / 0083 / 0084 と、この Mac 上の gate 実行である。
 
 ## 決定
 
@@ -160,33 +163,29 @@ A または B と同じ bind。bind 時の mode が **management only**（状態
 
 画面 QR + 短いコードは便利な入口。backend は A と同じ `grant` enroll。完了条件も A と同じ。失敗: D だけを実装して A を「画面が無いから後回し」にする — 本 ADR はそれを拒否する。後からディスプレイを付けた機械は A/B で既に bind 済みなら **第二 OOBE を走らせない**。
 
-## 現在地（honest、2026-08-22）
+## 現在地（honest、2026-08-22 夜）
 
-完成していない。欠けているものを done と書かない。
+完成していない。P1–P4 の切片が緑でも Chrome OS 型デスクトップは 成立していない。
 
-### 実在する
+### 実在する（測定した）
 
-- QEMU/OVMF の boot 切片。firmware → compiler-emitted `BOOTX64.EFI` / `KERNEL.ELF` → ring-0 Kotoba。Desktop 行は README が **not yet**（virtio-gpu scanout を GOP aperture に対して 1 回読んだだけ。compositor も shell も無い）。
-- JVM/Chicory hosted profile（ADR-0011）。`aiueos.execute` は granted Wasm を走らせる。bare-metal の本番顔ではない。
-- grant 面は `kotoba-lang/grant`。
-- **hosted profile の cloud-live。** `clojure -M:cloud-live check` が 2026-08-22 に `kotobase.net` / `api.murakumo.cloud` / `infer.murakumo.cloud` へ TLS で届き、CID の bytes を読み、無い CID を拒否し、`murakumo-main` を解決し、credential 無しの completion を admit して exit 0（aiueos ADR-0073、root ADR-2608220200 は `--transport own` でも 5 レグ ADMITTED を再実行した）。これは **CLI gate** であってセッションシェルではない。
-- bare-metal の DHCPv4（ADR-0076 / 0041 step 1）。リースは記録され、**誰も消費していない**。driver は今もコンパイル時定数のアドレスから送る（root ADR-2608220200）。
-- TLS 1.3 client と HTTP/1.1 client はライブラリとして在り、**hosted profile で証明済み**（ADR-0077）。bare-metal の byte transport の下にはまだ無い。
+- QEMU/OVMF boot。firmware → `BOOTX64.EFI` / `KERNEL.ELF`。
+- **P1** `clojure -M:session smoke` — DADS SPA から kotobase CID と murakumo-main infer。
+- **P1b** `clojure -M:phone-bind smoke` — `-display none`、GPU 装置なし、ゲストキーボードなし。
+- **P2** `clojure -M:bare-metal cloud` — ゲスト TLS 1.3 + HTTPS GET + CID。CertVerify はまだ。
+- **P3** `clojure -M:session guest` — grant 付き notes。kotobase write は `:write-unauthorized`。
+- **P4** `clojure -M:session operator` — itonami.cloud inventory。CACAO write は 401 のまま。
+- **hosted compositor** `clojure -M:compositor smoke`（aiueos ADR-0079）— `window-session-state` + `#desktop` kami viewport + QMP virtio-gpu PCI。ウィンドウマネージャではない。
+- **guest virtio-gpu 2D** `clojure -M:compositor gpu`（aiueos ADR-0084、aiueos `d0780608199724c3d26ad744ce6fd0441bd30a68`）— KERNEL.ELF serial の CREATE result=ok と FLUSH result=ok。GET_DISPLAY_INFO や query-pci だけでは緑にしない。32×32 リソース。IME も decoration も無い。
 
-### 無い（本 ADR はこれを閉じない）
+### 無い / UNVERIFIED（本 ADR はこれを閉じない）
 
-- compositor / DADS SPA セッション / `apps/session` / 電話 `#setup`。
-- 電話 bind の E2E（P1b）。device agent が無いので 2800004900 の claim は `awaiting-proof` で止まる。
-- imager への減衰 enrollment grant 書き込み（P1c）。
-- BLE / DPP / `aiueos-setup` AP、LED / beep の生存合図。
-- bare-metal の DNS stub（0041 step 2）と usable TCP stream（step 3）。step 4/5 のライブラリは step 2/3 の上に乗って初めて bare-metal の意味を持つ。
-- itonami 配線。
-- WebGPU / kami を OS 面として出すこと。
-- 実機 qualification。すべての gate は QEMU/OVMF（README）。
-- credential 付き kotobase PUT（live は 401。block 面は Bearer、CACAO ではない — 0073 が 0041 row 6 を訂正した）。
-- credential 付き murakumo `/v1/messages`（401。completion は `infer.murakumo.cloud` の無認証面）。
-- ADR-0013 Phase 6（OS and desktop）。remaining: native Kotoba component runtime、compositor、browser shell as desktop UI、IME/a11y、permission broker、session restore。
-- `docs/coverage.edn` の M6 は **契約の versioning policy**（`:aiueos/*` EDN の patch/minor/major）であって、kernel / desktop の Phase 6 ではない。ADR-0013 が「Contract M6 does not imply kernel/hardware M6」と書いている。
+- **ウィンドウマネージャ。** 2D flush は scanout 経路であって WM ではない。IME は leftover。
+- **P5 実機。UNVERIFIED。** 下の P5 節。QEMU ≠ P5。
+- P1c 減衰 enrollment の本番 imager。BLE / DPP / 生存合図。
+- TLS CertVerify。CACAO 付き kotobase PUT。credential 付き murakumo `/v1/messages`。
+- ADR-0013 Phase 6 の native Kotoba compositor / guest session restore。
+- `docs/coverage.edn` の M6 は契約 versioning であって kernel Phase 6 ではない。
 
 ### ADR-0009 を実装済みと読まない
 
@@ -266,9 +265,18 @@ consumer 切片では optional。industrial cloud OS と呼ぶ前に必須。
 
 QEMU 専用ではない。物理マシンがそのイメージを boot し、P1 または P2 のシェルが残る。
 
-赤: USB boot の OVMF transport 等価性（ADR-0019）を実機と数える。README が今書く「Every gate above is QEMU/OVMF」を無視する。
+赤: USB boot の OVMF transport 等価性（ADR-0019）を実機と数える。README の QEMU/OVMF 限定を無視する。
 
 証拠: 実機の boot receipt。QEMU marker だけでは緑にしない。
+
+**2026-08-22 測定: UNVERIFIED。boot は発明していない。** 探したもの:
+
+- このホストは MacBook Air M4（Mac16,12、hostname 25MBAir）。QEMU の親であってゲスト boot receipt ではない。
+- `diskutil list` / `/Volumes`: 内蔵 APFS のみ + 外付け 1TB（EFI + APFS 260317 + Microsoft Basic Data INSTALLER）。INSTALLER は Ubuntu Server（casper、ubuntu-server-minimal.squashfs）。aiueos の ESP / KERNEL.ELF は無い。Ubuntu を flash/boot しない。
+- iOS Simulator disk images は対象外。
+- aiueos README と ADR-0019: USB OVMF を P5 に数えることを禁ずる。
+
+QEMU 上の 2D CREATE+FLUSH は P5 ではない。この UNVERIFIED は /goal を完了にしない。
 
 ## 非決定
 
