@@ -237,3 +237,228 @@
                                                 world/interaction-radius)
                                   (econ/unlockable state world)))]
         [:unlock (:zone/id z)]))))
+
+;; ============================================================================
+;; The KAMI frame — the real executor's contract
+;; ============================================================================
+;;
+;; `scene` above is the shop's own vocabulary: meshes by name, badges, a HUD
+;; model. It was written without the upstream consumer on the classpath and, as
+;; ADR-2608630000 warned, **it guessed the vocabulary wrong**. The live executor
+;; (`kami.webgpu`, ADR-2607120100) reads a much smaller map:
+;;
+;;   {:globals {:sky {:horizon [r g b] :sun-dir [x y z] :sun [r g b]}
+;;              :lighting {…} :eye [x y z] :target [x y z]}
+;;    :instances [{:pos [x y z] :color [r g b] :size [w h d] :yaw θ
+;;                 :geo :box|:sphere|:cylinder
+;;                 :metallic m :roughness r :emissive e}]}
+;;
+;; `kami-frame` is that map. It is the only thing in this game that the GPU
+;; ever sees, and it is checked against the real `kami.webgpu.ir` in
+;; `render_ir_test` rather than against a remembered shape.
+;;
+;; Units: the simulation is integer centimetres; the executor is unitless with
+;; y up. One metre = one world unit, so the scale factor lives here and only
+;; here.
+
+(def ^:private cm 0.01)
+
+(defn- p3
+  "Sim [x y] (cm, y away from the door) -> scene [x y z] (metres, y up)."
+  ([xy] (p3 xy 0))
+  ([[x y] height] [(* cm x) (* cm height) (* cm y)]))
+
+(defn- prim
+  "One instance from the primitive table, positioned on the floor."
+  [mesh tint xy height & [overrides]]
+  (let [{:keys [geo size roughness metallic emissive]} (get art/prims mesh)
+        [w h d] size]
+    (merge {:pos (p3 xy height)
+            :color (art/rgb tint)
+            :size [(* cm w) (* cm h) (* cm d)]
+            :geo geo
+            :yaw 0
+            :metallic (or metallic 0.0)
+            :roughness (or roughness 0.65)
+            :emissive (or emissive 0.0)}
+           overrides)))
+
+(defn- tint-of [mesh] (get art/palette mesh [1.0 0.0 1.0 1.0]))
+
+(defn bounds
+  "Axis-aligned extent of every fixture in the shop, in sim units.
+  Used for the floor slab and the camera, so a differently shaped shop frames
+  itself without anyone editing a constant."
+  [world]
+  (let [pts (keep (fn [id] (:fixture/pos (world/fixture world id))) (:fixture-order world))
+        xs (map first pts)
+        ys (map second pts)]
+    (if (seq pts)
+      {:min-x (apply min xs) :max-x (apply max xs)
+       :min-y (apply min ys) :max-y (apply max ys)}
+      {:min-x 0 :max-x world/tile :min-y 0 :max-y world/tile})))
+
+(def ^:private floor-margin 180)
+
+(defn- floor-instances
+  "One slab for the whole floor, then one band per zone tinted by whether the
+  department is open. A locked band is visibly a different floor rather than
+  simply missing, which is what tells a player there is more shop to buy."
+  [state world]
+  (let [{:keys [min-x max-x min-y max-y]} (bounds world)
+        w (+ (- max-x min-x) (* 2 floor-margin))
+        d (+ (- max-y min-y) (* 2 floor-margin))
+        cx (quot (+ min-x max-x) 2)
+        cy (quot (+ min-y max-y) 2)
+        entries (sort (map (fn [zid] (second (:zone/entry (world/zone world zid) [0 0])))
+                           (:zone-order world)))
+        gaps (map - (rest entries) entries)
+        band (if (seq gaps) (apply min gaps) 300)]
+    (into
+     ;; The plinth sits a clear 8 cm below the department bands. Coplanar
+     ;; tops z-fight, and at this scale that showed up as a staircase of
+     ;; speckle along every band edge rather than as an obvious flicker.
+     [{:pos (p3 [cx cy] -32) :color (art/rgb [0.34 0.36 0.42 1.0])
+       :size [(* cm w) (* cm 24) (* cm d)] :geo :box :yaw 0
+       :metallic 0.0 :roughness 0.95 :emissive 0.0}]
+     (mapv (fn [zid]
+             (let [z (world/zone world zid)
+                   open? (world/zone-unlocked? world (:unlocked state) zid)
+                   mesh (if open? :floor :floor-locked)
+                   [_ zy] (:zone/entry z [0 0])]
+               (prim mesh (tint-of mesh) [cx zy] 0
+                     {:size [(* cm w) (* cm 6) (* cm band)]})))
+           (:zone-order world)))))
+
+(defn- fixture-kami
+  [state world]
+  (vec
+   (for [fid (:fixture-order world)
+         :let [f (world/fixture world fid)
+               kind (:fixture/kind f)]
+         :when (contains? #{:rack :crate :checkout} kind)
+         :let [open? (world/zone-unlocked? world (:unlocked state) (:fixture/zone f))
+               pos (:fixture/pos f)]
+         inst (if (= :rack kind)
+                ;; A rack is a top surface on two posts: the garments have to
+                ;; sit on something, or a full rack reads as a pile on the floor.
+                [(prim :rack-post (tint-of :rack) [(- (first pos) 60) (second pos)] 0)
+                 (prim :rack-post (tint-of :rack) [(+ (first pos) 60) (second pos)] 0)
+                 (prim :rack (tint-of :rack) pos 90)]
+                [(prim kind (tint-of kind) pos 0)])]
+     (cond-> inst
+       (not open?) (assoc :color (art/rgb (tint-of :floor-locked)) :roughness 0.98)))))
+
+(def ^:private rack-top 114)
+
+(def ^:private shelf-step
+  "Garments on a rack lie flat and overlap; garments in your arms are a
+  swaying column. Same objects, different spacing — sharing `stack-step` put a
+  two-metre tower of tees on every full rack, which is taller than the staff."
+  9)
+
+(defn- shelf-kami
+  [state world]
+  (vec
+   (for [f (world/open-fixtures world (:unlocked state) :rack)
+         :let [fid (:fixture/id f)
+               item (:fixture/item f)
+               stock (get-in state [:stock fid] 0)]
+         i (range stock)]
+     (prim item (tint-of item) (:fixture/pos f) (+ rack-top (* shelf-step i))))))
+
+(defn- person-kami
+  "A body and a head. Two primitives read as a person from a tycoon camera;
+  one box does not, and the engine's skinned-mesh executor is a separate one
+  this game has no asset for (ADR-2607121800 Phase 3)."
+  [mesh tint agent]
+  (let [pos (:pos agent)
+        {:keys [size]} (get art/prims mesh)
+        body-h (second size)]
+    [(prim mesh tint pos 0)
+     (prim :head art/skin pos body-h)]))
+
+(defn- carried-kami
+  [agent]
+  (let [{:keys [item count]} (:carry agent)]
+    (vec
+     (for [i (range (or count 0))]
+       (prim item (tint-of item) (:pos agent) (+ 100 (* stack-step i)))))))
+
+(defn- people-kami
+  [state]
+  (-> []
+      (into (person-kami :player (tint-of :player) (:player state)))
+      (into (carried-kami (:player state)))
+      (into (mapcat (fn [m]
+                      (let [mesh (if (= :cashier (:role m)) :staff-cashier :staff-stocker)]
+                        (into (person-kami mesh (tint-of mesh) m) (carried-kami m))))
+                    (:staff state)))
+      (into (mapcat (fn [c]
+                      ;; A shopper running out of patience reddens. The
+                      ;; simulation already counts the two walkout causes
+                      ;; separately; this is the same fact, on screen.
+                      (let [ratio (/ (:patience c) (double sim/default-patience))
+                            [r g b] (art/rgb (tint-of :customer))
+                            k (max 0.0 (min 1.0 ratio))
+                            tint [(+ r (* (- 1.0 k) 0.26)) (* g (+ 0.45 (* 0.55 k)))
+                                  (* b (+ 0.45 (* 0.55 k))) 1.0]]
+                        (into (person-kami :customer tint c) (carried-kami c))))
+                    (:customers state)))))
+
+(defn- badge-kami
+  [state world]
+  (mapv (fn [b]
+          (case (:badge/kind b)
+            :max (prim :max-badge [1.0 0.86 0.30 1.0]
+                       (:fixture/pos (world/fixture world (:badge/fixture b)))
+                       (+ rack-top 130))
+            :unlock (prim :unlock-pad
+                          (if (:badge/affordable? b) [0.34 0.86 0.48 1.0] [0.86 0.72 0.28 1.0])
+                          (:zone/entry (world/zone world (:badge/zone b)) [0 0])
+                          8)))
+        (badges state world)))
+
+(defn camera
+  "Frame the whole shop from the door side.
+
+  A tycoon is read as a floor plan in perspective, so the camera holds the
+  shop rather than following the player. The distance is driven by the
+  footprint's *depth plus width*, not by the larger of the two: a phone is
+  portrait, so the horizontal field of view is the tight one and framing on
+  depth alone crops the shop off the side of the screen (measured — the first
+  browser shot lost the right-hand racks entirely)."
+  [world]
+  (let [{:keys [min-x max-x min-y max-y]} (bounds world)
+        cx (* cm (quot (+ min-x max-x) 2))
+        cz (* cm (quot (+ min-y max-y) 2))
+        w (* cm (- max-x min-x))
+        d (* cm (- max-y min-y))
+        ;; Fitted against the real frame, not guessed: on a 425x799 portrait
+        ;; viewport the executor's 60 degree vertical FOV is only ~34 degrees
+        ;; across, so the width term carries more weight than the depth term
+        ;; even though the shop is deeper than it is wide.
+        reach (+ (* 0.95 d) (* 1.10 w))]
+    {:eye [(+ cx (* 0.10 reach)) (* 0.86 reach) (+ cz (* 0.78 reach))]
+     :target [cx 0.0 (- cz (* 0.02 reach))]}))
+
+(defn kami-frame
+  "Shop state -> the render-IR `kami.webgpu/draw!` consumes.
+
+  This is the single seam. Nothing else in the game names a colour, a mesh or
+  a camera in the executor's vocabulary."
+  [state world]
+  (let [preset-id (:shop/preset (:shop world) :boutique-day)
+        preset (get art/presets preset-id (:boutique-day art/presets))
+        {:keys [eye target]} (camera world)]
+    {:globals {:sky {:horizon (art/rgb (:art/sky preset))
+                     :sun-dir [-0.38 -0.86 -0.34]
+                     :sun (art/rgb (:art/key-light preset))}
+               :lighting {:ambient [0.22 0.24 0.29] :ambient-sky 0.72 :rim 0.30}
+               :eye eye
+               :target target}
+     :instances (-> (floor-instances state world)
+                    (into (fixture-kami state world))
+                    (into (shelf-kami state world))
+                    (into (people-kami state))
+                    (into (badge-kami state world)))}))

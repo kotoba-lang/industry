@@ -1,0 +1,91 @@
+[{:db/id -1
+  :adr/id "2608212359"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/topic "network-isekai-boutique-stack-browser-render"
+  :adr/title "ADR-2608212359: Boutique Stack が実 KAMI executor でブラウザに描かれた —— render-IR の語彙は推測が外れており、視覚ゲートは3回とも空振りしていた"
+  :adr/status "accepted"
+  :adr/date "2026-08-21"
+  :adr/last-verified "2026-08-21"
+  :adr/last_verified "2026-08-21"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+
+  :adr/authoritative-for
+  ["Boutique Stack の描画 seam(render-ir/kami-frame)と、それが実 kami.webgpu に対して検証された状態の正本"
+   "kotoba-lang/* は匿名 git clone で到達できる(到達できないのは private な network-awai/network-isekai だけ)という訂正の正本"
+   "ブラウザ視覚ゲート(web/shoot.cljs)の在り処と、それが空振りしうる 3 つの経路の正本"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+
+  :adr/related
+  ["adr-2608630000-network-isekai-boutique-stack-shop-tycoon"
+   "adr-2608620000-network-isekai-kingdom-cascade-match3"
+   "adr-2607120100-kami-engine-cljs-direct-webgpu-rendering-standard"
+   "adr-2607121800-network-isekai-aaa-nintendo-quality-roadmap"
+   "adr-2608040300-engine-parity-ledger-unity-roblox-fortnite-steam"
+   "adr-2608040400-kami-render-orphaned-pipeline-layer"
+   "adr-2608037000-closing-game-engine-maturity-session"
+   "adr-2608072000-kotoba-shell-mobile-signing-packaging-in-app-bridge"]
+
+  :adr/body "# ADR-2608212359: Boutique Stack が実 KAMI executor でブラウザに描かれた\n\n**Status**: accepted / **Date**: 2026-08-21\n\n## 依頼\n\nオーナー指示: 「残りの実装と実際にプレイ画面を見せて」。直前の問い(スマホゲームの\nスクショを添付して「kami engine、isekai network で作れるようになっている?」)への回答が\n「ルール層は在る / 描画と mobile は未実行」だったので、その未実行分を実際に動かす。\n\n## 訂正 1 —— `kotoba-lang/*` は到達できる。到達できないのは private な 1 本だけ\n\nADR-2608620000 / 2608630000 はどちらも「上流 repo が session scope 外」を\nブロッカーに挙げ、`render_ir.cljc` を**実物に対してコンパイルせずに**出した。\n今回 `git ls-remote` で測ったところ:\n\n| repo | 匿名 HTTPS clone |\n|---|---|\n| `kotoba-lang/webgpu` `kami-engine` `shaders` `sprite2d` `host` ほか 20 本 | **通る** |\n| `network-awai/network-isekai` | 通らない(private) |\n\n`add_repo` は今も cross-tier add を拒否するし GitHub MCP も届かない —— **その 2 つが\n使えないことと、git が届かないことは別**だった。前回の記述は経路を 1 つしか試して\nいない。engine 側は west pin の commit を checkout して `orgs/kotoba-lang/<repo>` に\n置いた(west が使う正規パスなので `west update` で同じ場所に来る)。\n\n## 訂正 2 —— 推測した render-IR の語彙は実際に外れていた\n\nADR-2608630000 は自分で「実物に対してコンパイルしていない」と書き、外れたときに\n直す場所を 1 ファイルに閉じておいた。実際に外れていた:\n\n| | 書いてあったもの | 実際の executor |\n|---|---|---|\n| instance | `:instance/id` `:instance/mesh` `:instance/pos` `:instance/tint` | `:pos` `:color` `:size` `:yaw` `:geo` `:metallic` `:roughness` `:emissive` |\n| 色 | RGBA 4 要素 | **RGB 3 要素**(`pack-instance!` が `(color 0..2)` を読む) |\n| frame | `:scene/camera` `:render/meshes` `:render/instances` | `{:globals {:sky :lighting :eye :target} :instances [...]}` |\n| 形状 | `:mesh/file` の `.glb` | `:geo` が `ir/default-geometry` の box / sphere / cylinder を選ぶ |\n\n**閉じ込めが効いた**: 直したのは `render_ir.cljc` と `art.cljc` の 2 ファイルで、\nsim / world / economy / manager / catalog は 1 行も変えていない。balance gate の\ndigest `791045350` が不変であることがそれを機械で示している。\n\n## 決定\n\n### `render-ir/kami-frame` を唯一の seam にする\n\n既存の `render-ir/scene`(ゲーム自身の語彙、57 tests が固定している)は残し、\n**実 executor 向けのフレームを同じファイルの `kami-frame` として足した**。\nGPU が見るのはこれだけで、他のどのファイルも色・メッシュ・カメラを executor の\n語彙で名指ししない。\n\n### 形状表は「今日実際に描くもの」として書く\n\n`art/meshes` が名指しする `.glb` は 1 つも存在しない(「art が無い」は\nADR-2608630000 の既知ギャップ)。live executor は instanced primitive + PBR を描く\n経路で、fleet の top-down ゲームは全部そこを通っている。したがって\n`art/prims`(box / sphere / cylinder + PBR 係数、単位は sim と同じ cm)は\n**renderer のための placeholder ではなく、描画の実体**。`.glb` が来たら\n`:mesh/file` が到達可能になり、この表が置き換わる。\n\n人は cylinder + sphere の 2 primitive。tycoon のカメラからは 1 個の box は人に\n見えない。skinned mesh は別 executor(`kami.webgpu.mesh`)で、このゲームは資産を\n持たない —— ADR-2607121800 Phase 3 のまま。\n\n### seam のテストは実 namespace を require する\n\n`kami_frame_test` は `kami.webgpu.ir` を require し、`ir/valid?` / `ir/instance-size` /\n`ir/default-geometry` に対して検査する。**覚えている形のコピーに対して検査しても\n今回の外れは捕まらない。** 実際に捕まえた 2 件:\n\n1. パレットが RGBA で、`:color` に 4 要素が入っていた(shader 側では 4 番目が黙って\n   無視され、色が合わない形の間違いになる)。\n2. 満杯の rack に MAX バッジが重なるので「locked では 0、unlocked では 4」の 4 が\n   5 になった。バッジは emissive、商品はそうでない、という**意味のある区別**で\n   数え分けた。\n\n## 視覚ゲートは 3 回、別の理由で空振りした\n\nこれが今回いちばん時間を使った箇所で、3 つとも同じクラス —— **自分が読んでいる\nものが、読んでいると思っているものではない**。\n\n1. **`#js {}` のプロパティが `:advanced` で改名された。** ページが公開した API が\n   `undefined` になり、ハーネスの `(< instances 20)` は NaN 比較で false になり、\n   **何も描かれていなくても PASS した**。`goog.object/set` の文字列キーに変えた。\n2. **`page.evaluate` に `\"() => x\"` を渡していた。** Playwright は文字列を*式*として\n   評価するので、関数オブジェクトが返り、シリアライズできず `undefined`。IIFE か\n   素の式でなければならない。\n3. **`waitForFunction` も同じ。** `\"() => window.boutiqueStack\"` は初回ポーリングで\n   truthy な関数オブジェクトになるので、**待ち合わせが一切行われていなかった**。\n   ページが起動する前に測っていた。\n\nengine-parity 台帳の第 28 反復が「実 GPU gate の最初の版は assertion が空振りして\nいた(`->clj` が key を String で返すので `(:pixel result)` が常に nil)」と記録して\nいるのと同型で、**同じ罠に別の入口から 3 回入った**。ゲートは今、値が数値である\nことを先に要求する(`num?`)。\n\n## 実測\n\n| 対象 | 実測 |\n|---|---|\n| nbb suite(実 `kami.webgpu.ir` を classpath に載せて) | **65 tests / 385 assertions / 0 failures** |\n| balance gate | `1/1 shops playable`、digest **791045350**(描画変更の前後で不変) |\n| web build | `shadow-cljs release` **通過**、`:advanced` で **446 KB**、96 files |\n| backend | **`webgl2`** —— この Linux コンテナに WebGPU アダプタが無く、engine 自身の fallback が選ばれた(`No WebGPU adapter available`) |\n| 20 分シフト(24,000 tick)を実ブラウザで | ¥39,390 / **680 会計** / 25 離脱(棚 15・列 10) / 3 部門すべて開放 / staff 満員 / **103 instances** |\n| canvas | **642 色 / 平均輝度 69.4 / 黒 0.0%** —— 「3D が黒くなる」失敗ではない |\n| 画面 | `web/shots/boutique-stack.png`(20 分)・`-early.png`(6,000 tick、Tops のみ開放) |\n\n再現:\n\n```bash\ncd 60-apps/network-isekai/games/boutique-stack\nE=../../../../../orgs/kotoba-lang\nnpx nbb --classpath \"src:test:../common/src:$E/webgpu/src:$E/render/src\" run-tests.cljs\nnpx nbb --classpath \"src:../common/src\" shift.cljs --gate\ncd web && npm install && npx shadow-cljs release app\nnpx nbb serve.cljs --port 8177 &        # 127.0.0.1 でないと navigator.gpu が無い\nnpx nbb shoot.cljs --ticks 24000 --out shots/boutique-stack.png\n```\n\n## engine 側で見つけたこと(このセッションでは直していない)\n\n**WebGL 2.0 フォールバックは authored な `:sky` を捨てている。**\n`kotoba-lang/webgl` の `kami/webgl.cljc` の `render-mesh-scene!` は clear color を\n`(0.035 0.055 0.10)` でハードコードし、`:globals :sky :horizon` を読まない。\nシェーダも平坦な `u_color` 1 本で、PBR / cascade shadow / SSAO / IBL は無い。\n\nCLAUDE.md は WebGL 2.0 を「共通描画 subset の fallback」と定めているので**機能が\n薄いことは仕様**だが、**authored な値を黙って落とすのは subset の判断ではなく\n取りこぼし**。したがってスクリーンショットの暗い空はゲームの指定ではなく\nfallback の既定値。WebGPU 経路ならプリセットの明るい空になる(未検証)。\n別 repo で push 経路が無いので報告のみ。\n\n## ブラウザ側で踏んだ実バグ 2 件(どちらも修正済み)\n\n- **grid トラック内でスクロールする flex 行に `min-width: 0` が無く、行ではなく\n  *ページ*が広がった。** 440px のビューポートに 1042px の body が組まれ、\n  canvas のバッキングストア(そのリフロー前に要素から採った)が箱と一致しなくなり、\n  **店が斜めに歪んで見えた**。「クロップされている」ではなく「せん断されている」\n  という見え方だったのが手がかり。\n- **`window` の resize だけでは足りない。** 要素の箱は window が変わらなくても\n  変わる —— 下部のアクション行は最初の HUD 描画でボタンが入って初めて高さを持ち、\n  それだけでバッキングストアが箱より 7% 高いまま残った(= 店が縦に 7% 伸びる)。\n  `ResizeObserver` で要素を見る。executor は width/height を `init!` で 1 回だけ\n  捕らえるので、サイズが変わったら resize ではなく**再 init**する。\n- 台座とゾーン帯の上面が同一平面で z-fighting し、帯の縁に**階段状のスペックル**が\n  出ていた(点滅ではなく模様として出るので気づきにくい)。8cm 分離した。\n\n## 残っているギャップ(正直に)\n\n1. **WebGPU 経路は未検証。** このコンテナにアダプタが無い。engine-parity 台帳が\n   記すとおり実 GPU には `:channel \"chrome\"` の実機 Chrome が要り、ここには\n   Chromium しかない。**したがって PBR / IBL / cascade shadow / SSAO が\n   このゲームに効くことは、まだ画面で確認できていない。**\n2. **バッキングストアが 1x のまま。** ページの `devicePixelRatio` は 2 と報告される\n   のに backing == CSS px で、フレームが 2x のスクショへ拡大されて少し甘い。\n   原因未特定。追っていない(見た目の問題で、ゲートが測る対象ではない)。\n3. **skinned character も particle も無い。** 人は cylinder + sphere。\n   ADR-2607121800 Phase 3 と ADR-2608040400 の orphan particle は動いていない。\n4. **まだ `60-apps/` に staging されたまま。** `network-awai/network-isekai` が\n   private で、この session からは push できない。移設は次の最初の仕事。\n5. **mobile packaging は未実行**(Linux コンテナに Xcode / Android SDK が無い)。\n   **課金と広告の層は依然として存在しない**(StoreKit 0 件)。\n6. **`90-docs/maturity/engine-parity.datoms.edn` の `build-targets` 軸は陳腐化して\n   いる** —— 0.35 / 「mobile 出力が無い」は 2026-08-04 の測定で、`.ipa`/`.aab` を\n   実測した ADR-2608072000(08-07)より古い。自分で測っていないので値は動かさず、\n   ここに記録するだけにする。\n"
+
+  :adr/decisions
+  [{:decision/id :d1
+    :decision/what "実 executor 向けの frame を render_ir.cljc の kami-frame として足す。既存の scene は残す。GPU が見るのはこの 1 ファイルだけ。"
+    :decision/status :landed
+    :decision/evidence "kami_frame_test/the-frame-satisfies-the-executors-own-validator"}
+   {:decision/id :d2
+    :decision/what "art/prims を『今日実際に描くもの』として持つ。.glb は 1 つも存在しないので、primitive が実体であって placeholder ではない。"
+    :decision/status :landed
+    :decision/evidence "kami_frame_test/the-primitive-table-covers-every-mesh-the-scene-can-name"}
+   {:decision/id :d3
+    :decision/what "seam のテストは kami.webgpu.ir を require する。覚えている形のコピーに対して検査しない。"
+    :decision/status :landed
+    :decision/evidence "RGBA が :color に入っていたのと MAX バッジの重なりを、実際にこのテストが捕まえた"}
+   {:decision/id :d4
+    :decision/what "engine は west pin の commit を orgs/kotoba-lang/<repo> に checkout し、shadow-cljs の :source-paths がそこを指す。Maven/git 座標ではなく manifest が pin したものを使う。"
+    :decision/status :landed}
+   {:decision/id :d5
+    :decision/what "視覚ゲートは値が数値であることを先に要求する。undefined との数値比較は常に false になり、何も描かれていなくても PASS する。"
+    :decision/status :landed
+    :decision/evidence "shoot.cljs の num? ガード。修正前は instances=undefined で PASS していた"}
+   {:decision/id :d6
+    :decision/what "canvas のサイズ変更は resize ではなく再 init。executor は width/height を init! で 1 回だけ捕らえる。ResizeObserver で要素を見る。"
+    :decision/status :landed}]
+
+  :adr/gaps
+  [{:gap/id :webgpu-path-unverified
+    :gap/what "WebGPU 経路が画面で確認できていない。PBR / IBL / cascade shadow / SSAO がこのゲームに効くことは未実測。"
+    :gap/blocked-by "コンテナに WebGPU アダプタが無い。実機 GPU には :channel \"chrome\" が要る"
+    :gap/date "2026-08-21"}
+   {:gap/id :webgl-fallback-drops-sky
+    :gap/what "WebGL2 フォールバックが clear color をハードコードし、authored な :globals :sky :horizon を読まない(kotoba-lang/webgl の kami/webgl.cljc render-mesh-scene!)。機能の薄さは仕様だが、authored な値を落とすのは取りこぼし。"
+    :gap/blocked-by "別 repo で push 経路が無い"
+    :gap/date "2026-08-21"}
+   {:gap/id :backing-store-1x
+    :gap/what "devicePixelRatio が 2 と報告されるのにバッキングストアが CSS px のまま。フレームが拡大されて甘い。原因未特定。"
+    :gap/date "2026-08-21"}
+   {:gap/id :no-skinning-no-particles
+    :gap/what "人は cylinder + sphere。skinned mesh(ADR-2607121800 Phase 3)と particle(ADR-2608040400 の orphan)は動いていない。"
+    :gap/date "2026-08-21"}
+   {:gap/id :still-staged
+    :gap/what "network-awai/network-isekai が private で push できず、コードは 60-apps/ に staging されたまま。"
+    :gap/date "2026-08-21"}
+   {:gap/id :mobile-unbuilt
+    :gap/what "mobile packaging 未実行(Linux コンテナに Xcode / Android SDK が無い)。課金と広告の層は不在(StoreKit 0 件)。"
+    :gap/date "2026-08-21"}
+   {:gap/id :parity-build-targets-stale
+    :gap/what "engine-parity の build-targets 軸(0.35 / 「mobile 出力が無い」、2026-08-04 測定)が ADR-2608072000(08-07 に .ipa/.aab を実測)より古い。自分で測っていないので値は動かしていない。"
+    :gap/date "2026-08-21"}]
+
+  :adr/verification
+  {:nbb-suite "65 tests / 385 assertions / 0 failures (npx nbb --classpath src:test:../common/src:<webgpu>/src:<render>/src run-tests.cljs)"
+   :balance-gate "1/1 shops playable, digest 791045350 unchanged across the render change"
+   :web-build "npx shadow-cljs release app -> 446 KB advanced bundle, 96 files"
+   :browser "backend webgl2, tick 24003, 103 instances, money 39190, served 680, canvas 642 colours / mean 69.4 / dark 0.0%"
+   :shots ["60-apps/network-isekai/games/boutique-stack/web/shots/boutique-stack.png"
+           "60-apps/network-isekai/games/boutique-stack/web/shots/boutique-stack-early.png"]
+   :date "2026-08-21"}}]

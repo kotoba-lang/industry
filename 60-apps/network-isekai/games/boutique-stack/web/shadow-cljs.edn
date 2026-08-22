@@ -1,0 +1,48 @@
+;; Browser build for Boutique Stack.
+;;
+;; Source paths point at the west checkouts (`orgs/<org>/<repo>`) rather than
+;; at Maven/git coordinates: this game is staged inside the superproject
+;; (ADR-2608620000), so the engine it draws through is the one the manifest
+;; pins, and a `west update` moves both together.
+;;
+;; One build, one document, one mount — ADR-2608080100.
+{:source-paths
+ ["src"
+  "../src"
+  "../resources"
+  "../../common/src"
+  "../../../../../orgs/kotoba-lang/cartpole-math/src"
+  "../../../../../orgs/kotoba-lang/css/src"
+  "../../../../../orgs/kotoba-lang/dance/src"
+  "../../../../../orgs/kotoba-lang/expr/src"
+  "../../../../../orgs/kotoba-lang/fsm/src"
+  "../../../../../orgs/kotoba-lang/gpu/src"
+  "../../../../../orgs/kotoba-lang/host/src"
+  "../../../../../orgs/kotoba-lang/html/src"
+  "../../../../../orgs/kotoba-lang/jp-go-digital-design-system/src"
+  "../../../../../orgs/kotoba-lang/jp-go-digital-design-system/resources"
+  "../../../../../orgs/kotoba-lang/level/src"
+  "../../../../../orgs/kotoba-lang/netsync/src"
+  "../../../../../orgs/kotoba-lang/org-w3-webgpu/src"
+  "../../../../../orgs/kotoba-lang/physics/src"
+  "../../../../../orgs/kotoba-lang/physics/resources"
+  "../../../../../orgs/kotoba-lang/pipelines/src"
+  "../../../../../orgs/kotoba-lang/render/src"
+  "../../../../../orgs/kotoba-lang/render/resources"
+  "../../../../../orgs/kotoba-lang/render-shaders/src"
+  "../../../../../orgs/kotoba-lang/scene2d/src"
+  "../../../../../orgs/kotoba-lang/shaders/src"
+  "../../../../../orgs/kotoba-lang/sky/src"
+  "../../../../../orgs/kotoba-lang/sprite-gpu/src"
+  "../../../../../orgs/kotoba-lang/sprite2d/src"
+  "../../../../../orgs/kotoba-lang/webgl/src"
+  "../../../../../orgs/kotoba-lang/webgpu/src"
+  "../../../../../orgs/kotoba-lang/wgsl/src"]
+
+ :builds
+ {:app {:target :browser
+        :output-dir "public/js"
+        :asset-path "js"
+        :modules {:main {:init-fn isekai.games.boutique-stack.web/start!}}
+        :compiler-options {:optimizations :advanced
+                           :infer-externs :auto}}}}
