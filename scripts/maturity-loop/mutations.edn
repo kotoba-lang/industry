@@ -227,7 +227,133 @@
      :file "src/langgraph/checkpoint.cljc"
      :find "                      :checkpoint/status status}])\n         ckpt)"
      :replace "                      :checkpoint/status status}])\n         nil)"
-     :must-fail ["put!-returns-the-checkpoint-it-persisted"]}]}
+     :must-fail ["put!-returns-the-checkpoint-it-persisted"]}
+
+    ;; ── agent-loop の契約（2026-08-22 計測）──
+    ;; agent_loop.cljc は coding-agent host が毎 turn 回す reducer。test は happy path 1 本で、
+    ;; 当時の suite（48 test / 172 assertion, 緑）に下の 17 mutation を当てて **17 件とも緑のまま**
+    ;; だった。承認待ちの call を executor に渡す・deny した call を実行する、も含む。
+    ;; 17 件すべて agent_loop_contract_test.cljc の、それぞれ 1 つの deftest だけが捕まえる。
+    {:id :langgraph/approval-gate-executes-anyway
+     :why "承認待ちの call にも :tool/execute を出す。既存 test は effect 種別の集合しか見ないので、read-only が 1 本混じっていれば集合は同じ"
+     :file "src/langgraph/agent_loop.cljc"
+     :find "(for [call prepared :when (= :running (:call/status call))]\n                                     {:effect :tool/execute :call call})"
+     :replace "(for [call prepared]\n                                     {:effect :tool/execute :call call})"
+     :must-fail ["a-call-awaiting-approval-is-never-handed-to-the-executor"]}
+    {:id :langgraph/unknown-risk-runs-without-approval
+     :why ":tool/risk 無しを :read-only 扱いで即実行。既存 test の call は全部 risk を宣言しているので通る。fail-closed の要"
+     :file "src/langgraph/agent_loop.cljc"
+     :find "(not= :read-only (or (:tool/risk call) :unknown))"
+     :replace "(= :destructive (:tool/risk call))"
+     :must-fail ["a-call-with-no-declared-risk-fails-closed-to-approval"]}
+    {:id :langgraph/denied-call-still-executes
+     :why "人間が deny した call も実行する。既存 test に deny の場面が無い。単独 call では continue 側に抜けて mutation を踏まないので test は open call を 1 本残す"
+     :file "src/langgraph/agent_loop.cljc"
+     :find "                        approved? (conj {:effect :tool/execute :call call'}))"
+     :replace "                        true (conj {:effect :tool/execute :call call'}))"
+     :must-fail ["a-denied-call-is-not-executed-and-its-denial-reaches-the-model"]}
+    {:id :langgraph/tool-results-not-in-call-order
+     :why "ns docstring 唯一の明文の約束。既存 test は 2 call を call 順に完了させるうえ、8 件以下は array-map が挿入順を保つので sort を消しても通る —— 新 test は 10 call を逆順で完了させる"
+     :file "src/langgraph/agent_loop.cljc"
+     :find "  (->> (:tool-calls state) vals (sort-by :call/order)"
+     :replace "  (->> (:tool-calls state) vals"
+     :must-fail ["tool-results-are-returned-in-call-order-whatever-order-they-arrive"]}
+    {:id :langgraph/max-turns-never-enforced
+     :why "max-turns を検査しない。既存 test は max-turns 4 で 2 turn しか使わない"
+     :file "src/langgraph/agent_loop.cljc"
+     :find "    (if (>= next-turn (:budget/max-turns state))"
+     :replace "    (if false"
+     :must-fail ["max-turns-ends-the-task-as-a-budget-error"]}
+    {:id :langgraph/tool-call-budget-not-cumulative
+     :why "budget を turn 毎にリセットする。既存 test は 1 turn 内の超過だけを見る"
+     :file "src/langgraph/agent_loop.cljc"
+     :find "                                  :budget/tool-calls projected)"
+     :replace "                                  :budget/tool-calls (:budget/tool-calls state))"
+     :must-fail ["the-tool-call-budget-accumulates-across-turns"]}
+    {:id :langgraph/terminal-state-accepts-events
+     :why "終了後の event を受ける。phase 検査で別理由の reject にはなるので、test は理由 literal :terminal と state 不変を pin する"
+     :file "src/langgraph/agent_loop.cljc"
+     :find "    (terminal? state) (reject state ts :terminal)"
+     :replace "    false (reject state ts :terminal)"
+     :must-fail ["a-terminal-state-rejects-every-further-event-as-terminal"]}
+    {:id :langgraph/duplicate-call-ids-accepted
+     :why "同一 turn の call/id 重複を通す。結果の相関が壊れる"
+     :file "src/langgraph/agent_loop.cljc"
+     :find "          (not= (count ids) (count (set ids))) (reject state ts :duplicate-tool-call-id)"
+     :replace "          false (reject state ts :duplicate-tool-call-id)"
+     :must-fail ["duplicate-call-ids-in-one-turn-are-rejected"]}
+    {:id :langgraph/blank-call-id-accepted
+     :why "空白の call/id を通す。結果を相関できない"
+     :file "src/langgraph/agent_loop.cljc"
+     :find "  (and (string? id) (not (str/blank? id))"
+     :replace "  (and (string? id)"
+     :must-fail ["a-blank-call-id-is-rejected-as-invalid"]}
+    {:id :langgraph/interrupt-ignored
+     :why ":task/interrupted で phase を変えない。event だけ出るので既存 test では見えない"
+     :file "src/langgraph/agent_loop.cljc"
+     :find "    (let [state' (assoc state :loop/phase :interrupted)]"
+     :replace "    (let [state' state]"
+     :must-fail ["an-interrupt-moves-the-task-to-interrupted-and-checkpoints-it"]}
+    {:id :langgraph/model-result-accepted-while-awaiting-tools
+     :why "tool 待ちの最中の model 結果を受ける"
+     :file "src/langgraph/agent_loop.cljc"
+     :find "    (if-not (= :await-model (:loop/phase state))\n      (reject state ts :unexpected-model-result)"
+     :replace "    (if-not true\n      (reject state ts :unexpected-model-result)"
+     :must-fail ["a-model-result-while-awaiting-tools-is-rejected"]}
+    {:id :langgraph/approval-of-non-awaiting-call-accepted
+     :why "承認待ちでない call への approval を通し、実行済みの call をもう 1 度 execute する"
+     :file "src/langgraph/agent_loop.cljc"
+     :find "      (if-not (= :awaiting-approval (:call/status call))\n        (reject state ts :unexpected-approval)"
+     :replace "      (if-not call\n        (reject state ts :unexpected-approval)"
+     :must-fail ["approving-a-call-that-is-not-awaiting-approval-is-rejected"]}
+    {:id :langgraph/stale-tool-calls-carried-into-next-turn
+     :why "turn 完了後も前 turn の call 表を残す。checkpoint される state の形"
+     :file "src/langgraph/agent_loop.cljc"
+     :find "                          :items items :tool-calls {})]"
+     :replace "                          :items items)]"
+     :must-fail ["a-completed-turn-leaves-no-open-calls-behind"]}
+    {:id :langgraph/previous-response-id-dropped
+     :why "次 turn の :model/respond から previous-response-id が落ちる。Responses 系 host は会話を繋げられない"
+     :file "src/langgraph/agent_loop.cljc"
+     :find "                    :previous-response-id (:response/id state') :items items}]"
+     :replace "                    :items items}]"
+     :must-fail ["the-next-model-turn-is-chained-to-the-previous-response"]}
+    {:id :langgraph/failed-tool-recorded-as-succeeded
+     :why "ok? false を :succeeded と記録する。model が失敗を見られない"
+     :file "src/langgraph/agent_loop.cljc"
+     :find "              call' (assoc call :call/status (if ok? :succeeded :failed)"
+     :replace "              call' (assoc call :call/status :succeeded"
+     :must-fail ["a-failed-tool-is-recorded-as-failed-and-the-loop-goes-on"]}
+    {:id :langgraph/events-lose-thread-id
+     :why "event から :thread/id が落ちる。host は filing できない"
+     :file "src/langgraph/agent_loop.cljc"
+     :find "  (merge {:event/kind kind :thread/id (:thread/id state)"
+     :replace "  (merge {:event/kind kind"
+     :must-fail ["every-event-names-its-thread-and-turn"]}
+    {:id :langgraph/unknown-event-silently-accepted
+     :why "未知の event type を黙って受ける（reject event を出さない）"
+     :file "src/langgraph/agent_loop.cljc"
+     :find "    :else (reject state ts :unknown-event)))"
+     :replace "    :else {:state state :effects [] :events []}))"
+     :must-fail ["an-unknown-event-type-is-rejected-not-swallowed"]}
+
+    ;; ── nbb runner の網羅（2026-08-22 計測）──
+    ;; run-tests.cljs は『除外は 1 namespace だけ』と書きながら checkpoint-test を 2 日間
+    ;; 載せ忘れていた（nbb 36 test / JVM 48、どちらの出力もそれを言わない）。
+    ;; runner_coverage_test.cljc が test/ の一覧と runner の 2 つの list を突き合わせ、
+    ;; 除外の理由（:kg/claim/thread）が今も実在することまで assert する。
+    {:id :langgraph/runner-drops-a-namespace-from-run-tests
+     :why "runner の run-tests 呼び出しから namespace を 1 つ落とす。require に残っていれば load はされ、実行されない —— 出力は『N tests』の同じ形"
+     :file "run-tests.cljs"
+     :find "             'langgraph.checkpoint-test\n"
+     :replace ""
+     :must-fail ["every-test-namespace-is-in-the-runner-or-excluded-with-a-live-reason"]}
+    {:id :langgraph/exclusion-reason-expired
+     :why "除外の理由（cljs reader が読めない 2 スラッシュ keyword）を解消する。kg_checkpoint_test は属性名に依存しないので緑のまま —— 除外が失効したことを言うのは coverage test だけ"
+     :file "src/langgraph/kg_checkpoint.cljc"
+     :find ":kg/claim/thread"
+     :replace ":kg.claim/thread"
+     :must-fail ["every-test-namespace-is-in-the-runner-or-excluded-with-a-live-reason"]}]}
 
   {:repo "orgs/kotoba-lang/prolly-tree"
    :label "prolly-tree inclusion proof"
