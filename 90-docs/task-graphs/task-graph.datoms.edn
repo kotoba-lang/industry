@@ -649,6 +649,30 @@
   :task/status-at "2026-08-22"
   :task/status-note "2026-08-22 実測（ADR-2608220200 発見 4）: simeon に Routing.Type=dht + Gateway.ExposeRoutingAPI=true を設定し Kubo v0.41.0 daemon を起動。自前 IPNS 名 k51qzi5uqu5dklk9myzcglshccfgdro93kfkqoxtukriattjuvavchzmi1535x を publish し、**自前 router 経由で HTTP 200 / 365 byte の署名付き record として解決**（経路に DNS も US router も含まない）。delegated-ipfs.dev で同一 byte 数を確認し global DHT 実在を裏取り。**残る gap 3 つ**: (1) launchd 永続化に失敗（bootstrap: 5 I/O error）＝再起動を跨がない (2) NAT 配下で peers 9〜11・p2p-circuit 12 件＝到達性の修復が要る (3) 1 台のみ。この 3 つが片付くまで production の唯一経路にしない"}
 
+ {:db/id -34
+  :task/id "S0d-kubo-free-libp2p-node"
+  :task/workflow "sanction-survivable-architecture"
+  :task/title "Kubo / go-libp2p を使わない自前 libp2p ノード —— socket は landed、残りは Yamux 駆動と /ipfs/kad/1.0.0"
+  :task/kind "implementation"
+  :task/repo "kotoba-lang/io-libp2p-specs-transport"
+  :task/requires []
+  :task/external-gate false
+  :task/status :started
+  :task/status-at "2026-08-22"
+  :task/status-note "2026-08-22 実測（ADR-2608220300）: libp2p.provider.node を実装し、公開 libp2p peer 104.131.131.82:4001 に対して Noise_XX_25519_ChaChaPoly_SHA256 の handshake を **3/3 完了**（Kubo も go-libp2p も js-libp2p も不使用）。remote identity が RSA-2048（key-type 0 / 550 / 512 octets）として正しく読めており、protobuf schema は答えの正しさで裏取り済み。両方向を landing 前に確認: 実 peer=exit 0 / TLS サーバ=multistream :missing-newline exit 1 / 閉 port=ECONNREFUSED exit 1。着地 da8375b5aaef、west pin 前進済み。**残り 2 つ**: Yamux の駆動（.cljc は同 repo に在るが未駆動）と、その stream 上の /ipfs/kad/1.0.0。handshake が通ったので残りは配管であって暗号ではない"}
+
+ {:db/id -35
+  :task/id "S0e-fleet-ipv6-or-ipv4-reachability"
+  :task/workflow "sanction-survivable-architecture"
+  :task/title "fleet ノードの到達性を CPE 側で直す（IPv6 転送 もしくは IPv4 の 4001 port forward）"
+  :task/kind "infrastructure"
+  :task/repo "com-junkawasaki/root"
+  :task/requires []
+  :task/external-gate true
+  :task/status :blocked
+  :task/status-at "2026-08-22"
+  :task/status-note "2026-08-22 実測（ADR-2608220300）: simeon は RA で 2408: の global prefix と default route を貰っているが **IPv6 が全く通らない**（simeon→ipv6.google.com 100% loss。対照でこの機械→同 0% loss/16ms なので probe 側は生きている）。host firewall は pf・ALF とも無効なのでホスト側の遮断ではなく、**CPE が prefix を広告しながら転送していない**。ホストからできることは無く S0c と同じ外部ゲート。緩和は適用済み: use_tempaddr=0 を永続化、届かない /64 を Addresses.NoAnnounce に追加（届かないアドレスの公表は peer に無駄な dial を強いる分だけ有害）"}
+
  {:db/id -33
   :task/id "S0b-own-ipfs-gateway"
   :task/workflow "sanction-survivable-architecture"
