@@ -62,3 +62,45 @@
    :hud/danger "--hig-color-danger"
    :hud/hairline "--hig-hairline"
    :hud/font "--hig-font-sans"})
+
+(def prims
+  "What each mesh actually draws **today**.
+
+  `art/meshes` names a `.glb` per mesh, and none of those files exist — the
+  shop has no authored art yet. The live KAMI executor draws instanced
+  primitives (`kami.webgpu.ir/default-geometry`: box / sphere / cylinder) with
+  full PBR, and that is what every top-down game in this fleet renders through
+  right now. So the primitive is not a placeholder for the renderer's benefit:
+  it is the thing that draws. When a `.glb` lands, `:mesh/file` becomes
+  reachable and this table is what it replaces.
+
+  Sizes are in simulation units (1 unit = 1 cm), so they read against
+  `world/tile` = 100 without a second scale living somewhere else."
+  {:floor          {:geo :box      :size [300 6 300]   :roughness 0.92 :metallic 0.0}
+   :floor-locked   {:geo :box      :size [300 6 300]   :roughness 0.96 :metallic 0.0}
+   :rack           {:geo :box      :size [150 24 55]   :roughness 0.62 :metallic 0.05}
+   :rack-post      {:geo :cylinder :size [10 90 10]    :roughness 0.45 :metallic 0.55}
+   :crate          {:geo :box      :size [80 70 80]    :roughness 0.78 :metallic 0.0}
+   :checkout       {:geo :box      :size [140 95 70]   :roughness 0.35 :metallic 0.10}
+   :player         {:geo :cylinder :size [46 96 46]    :roughness 0.70 :metallic 0.0}
+   :staff-stocker  {:geo :cylinder :size [44 92 44]    :roughness 0.70 :metallic 0.0}
+   :staff-cashier  {:geo :cylinder :size [44 92 44]    :roughness 0.70 :metallic 0.0}
+   :customer       {:geo :cylinder :size [42 88 42]    :roughness 0.74 :metallic 0.0}
+   :head           {:geo :sphere   :size [40 40 40]    :roughness 0.66 :metallic 0.0}
+   :tee            {:geo :box      :size [58 16 40]    :roughness 0.85 :metallic 0.0}
+   :hoodie         {:geo :box      :size [60 18 42]    :roughness 0.88 :metallic 0.0}
+   :jacket         {:geo :box      :size [62 20 44]    :roughness 0.72 :metallic 0.0}
+   :coat           {:geo :box      :size [64 22 46]    :roughness 0.70 :metallic 0.0}
+   :sneaker        {:geo :box      :size [50 20 30]    :roughness 0.55 :metallic 0.05}
+   :boot           {:geo :box      :size [52 26 32]    :roughness 0.50 :metallic 0.05}
+   :max-badge      {:geo :box      :size [70 14 14]    :roughness 0.30 :metallic 0.0 :emissive 1.4}
+   :unlock-pad     {:geo :box      :size [220 3 220]   :roughness 0.40 :metallic 0.0 :emissive 0.7}})
+
+(def skin
+  "One neutral head tint. People are told apart by body colour, not face."
+  [0.86 0.72 0.60 1.0])
+
+(defn rgb
+  "Palette entries are authored RGBA; the instance ABI reads three floats."
+  [c]
+  (let [[r g b] (or c [1.0 0.0 1.0 1.0])] [r g b]))

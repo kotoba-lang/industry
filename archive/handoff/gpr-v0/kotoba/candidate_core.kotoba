@@ -1,0 +1,79 @@
+;; gpr.candidate-core — 埋設物候補について「報告するか」「掘ってよいか」を決める。
+;;
+;; ADR-2608750000 D4: 判断は .kotoba、DSP は .cljc。同じ判断を 2 実装が持つ
+;; mirror を作らない —— .cljc 側（gpr.detect）は特徴量までしか出さない。
+;;
+;; 入力はすべて i64 の固定小数（native の word 型に収まる形）:
+;;   r2-milli               当てはまりの良さ × 1000       (0.95 -> 950)
+;;   velocity-mm-per-ns     速度 [mm/ns]                  (0.1 m/ns -> 100)
+;;   aperture-mm            ピックが張る測線長 [mm]
+;;   amplitude-ratio-milli  最大包絡に対する比 × 1000
+;;   *-mm                   深さ [mm]
+;;
+;; ⚠ この core は **まだ一度もコンパイル・実行されていない**（未検証）。
+;;    scaffold した環境に clojure CLI が無く amu を回せなかった。
+;;    resources/candidate-decision-vectors.edn の表に対して
+;;    `amu compile` → KIR 実行で通すまで、この判断は「書いてある」だけである。
+
+(ns gpr.candidate-core)
+
+;; 報告判定の戻り値
+(def report-ok 0)              ;; 候補として報告してよい
+(def report-weak-fit 1)        ;; 双曲線の当てはまりが閾値未満
+(def report-implausible-v 2)   ;; 速度が地中の値域の外（フィットの失敗）
+(def report-too-few-picks 3)   ;; ピックが足りない
+(def report-narrow-aperture 4) ;; 測線が短く apex を挟めていない
+(def report-weak-amplitude 5)  ;; 反射が弱い
+
+;; 地中で観測される速度の値域 [mm/ns]。水 33 〜 空気 300。
+(def velocity-floor 33)
+(def velocity-ceiling 300)
+
+(defn report-decision
+  [r2-milli :i64
+   velocity-mm-per-ns :i64
+   n-picks :i64
+   aperture-mm :i64
+   amplitude-ratio-milli :i64
+   min-r2-milli :i64
+   min-picks :i64
+   min-aperture-mm :i64
+   min-amplitude-ratio-milli :i64] :i64
+  ;; 順序に意味がある: 測れなかった理由（ピック不足・非物理な速度）を先に返し、
+  ;; 「測ったが弱い」と区別できるようにする。両者が同じ値を返す検査は欠陥。
+  (if (< n-picks min-picks)
+    report-too-few-picks
+    (if (or (< velocity-mm-per-ns velocity-floor)
+            (> velocity-mm-per-ns velocity-ceiling))
+      report-implausible-v
+      (if (< r2-milli min-r2-milli)
+        report-weak-fit
+        (if (< aperture-mm min-aperture-mm)
+          report-narrow-aperture
+          (if (< amplitude-ratio-milli min-amplitude-ratio-milli)
+            report-weak-amplitude
+            report-ok))))))
+
+;; 掘削余裕の判定の戻り値
+(def clearance-clear 0)     ;; 計画深度は候補より十分浅い
+(def clearance-inquire 1)   ;; 余裕が足りない（照会・追加調査が要る）
+(def clearance-conflict 2)  ;; 計画深度が候補に届く
+
+(defn clearance-decision
+  [candidate-depth-mm :i64
+   depth-uncertainty-mm :i64
+   planned-depth-mm :i64
+   required-margin-mm :i64] :i64
+  ;; 候補の「ありうる最も浅い位置」を基準にする。推定値そのものを基準にすると、
+  ;; 誤差の半分だけ楽観する。
+  (let [shallowest (- candidate-depth-mm depth-uncertainty-mm)]
+    (if (>= planned-depth-mm shallowest)
+      clearance-conflict
+      (if (< (- shallowest planned-depth-mm) required-margin-mm)
+        clearance-inquire
+        clearance-clear))))
+
+;; ⚠ 法令上の義務（労働安全衛生規則 355 条の事前調査、道路占用、埋設物照会）は
+;;    ここでは判断しない。それは cloud-itonami の civil-engineering actor
+;;    （isic-4210 / 4220 / 4290 / 4312 / 4322）が permits データセットとともに
+;;    所有している（ADR-2608750000 D6）。この core が答えるのは幾何だけである。

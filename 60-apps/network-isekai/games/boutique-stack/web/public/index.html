@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>Boutique Stack</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%91%97%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="dds.css">
+<style>
+  /* App CSS is written against the --hig-* contract only. The bridge
+     (jp-go-dds.tokens/bridge-css, injected at boot) redefines all 71 of them
+     on top of DADS primitives, so nothing here re-derives a token. */
+  html, body { height: 100%; margin: 0; background: var(--hig-color-background); }
+  body {
+    font-family: var(--hig-font-sans);
+    color: var(--hig-color-on-surface);
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    height: 100dvh; height: 100vh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+             env(safe-area-inset-bottom) env(safe-area-inset-left);
+    overflow: hidden;
+  }
+  /* A scrolling flex row inside a grid track needs an explicit min-width:0,
+     or the track sizes to the row's full content and the *page* widens
+     instead of the row scrolling. Measured: the 440px phone laid out a
+     1042px body, and the canvas backing store (sized from the element before
+     that reflow) no longer matched its box — which is what made the shop look
+     sheared rather than merely cropped. */
+  #bs-top, #bs-bottom, #bs-stage, #bs-actions { min-width: 0; }
+  #bs-top {
+    display: flex; gap: var(--hig-spacing-3); align-items: center;
+    /* No wrap: the readouts are a single scannable row, and a wrapped row
+       pushed the clock off the edge of a 440px phone (measured). */
+    flex-wrap: nowrap; overflow-x: auto;
+    padding: var(--hig-spacing-3) var(--hig-spacing-4);
+    background: var(--hig-color-surface);
+    border-bottom: var(--hig-hairline) solid var(--hig-color-separator);
+  }
+  .bs-stat { display: flex; flex-direction: column; flex: 0 0 auto; }
+  .bs-stat dt {
+    font-size: var(--hig-text-caption2-font-size);
+    color: var(--hig-color-on-surface-variant);
+    letter-spacing: .04em;
+  }
+  .bs-stat dd {
+    margin: 0;
+    font-size: var(--hig-text-subheadline-font-size);
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+  }
+  #bs-money { color: var(--hig-color-success); }
+  #bs-lost { color: var(--hig-color-danger); }
+  #bs-stage { position: relative; min-height: 0; }
+  /* The canvas is the authoritative 3D surface — nothing is drawn over the
+     shop itself, only chrome around it. */
+  #bs-canvas { display: block; width: 100%; height: 100%; }
+  #bs-backend {
+    position: absolute; top: var(--hig-spacing-2); right: var(--hig-spacing-2);
+    font-size: var(--hig-text-caption2-font-size);
+    color: var(--hig-color-on-surface-variant);
+    background: var(--hig-color-surface);
+    border: var(--hig-hairline) solid var(--hig-color-separator);
+    border-radius: var(--hig-radius-xs);
+    padding: 2px var(--hig-spacing-2);
+  }
+  #bs-bottom {
+    padding: var(--hig-spacing-3) var(--hig-spacing-4);
+    background: var(--hig-color-surface);
+    border-top: var(--hig-hairline) solid var(--hig-color-separator);
+  }
+  #bs-actions {
+    display: flex; gap: var(--hig-spacing-2);
+    overflow-x: auto; padding-bottom: var(--hig-spacing-1);
+  }
+  #bs-actions .dads-button { flex: 0 0 auto; min-height: 44px; white-space: nowrap; }
+  /* An unaffordable action still has to be readable — it tells the player
+     what to save for. DADS outline at default opacity is too faint for that
+     job on a dark surface. */
+  #bs-actions .dads-button[disabled] { opacity: 1; color: var(--hig-color-on-surface-variant); }
+  #bs-auto { flex: 0 0 auto; margin-inline-start: auto; }
+  #bs-depts {
+    font-size: var(--hig-text-footnote-font-size);
+    color: var(--hig-color-on-surface-variant);
+    margin-top: var(--hig-spacing-2);
+  }
+</style>
+</head>
+<body>
+  <header id="bs-top">
+    <div class="bs-stat"><dt>所持金</dt><dd id="bs-money">¥0</dd></div>
+    <div class="bs-stat"><dt>抱えている</dt><dd id="bs-carry">0 / 0</dd></div>
+    <div class="bs-stat"><dt>会計済み</dt><dd id="bs-served">0</dd></div>
+    <div class="bs-stat"><dt>離脱</dt><dd id="bs-lost">0</dd></div>
+    <div class="bs-stat"><dt>経過</dt><dd id="bs-clock">0分0秒</dd></div>
+    <button id="bs-auto" class="dads-button" data-type="outline" data-size="sm" type="button">店長: 自動</button>
+  </header>
+  <main id="bs-stage">
+    <canvas id="bs-canvas"></canvas>
+    <div id="bs-backend">GPU 起動中…</div>
+  </main>
+  <footer id="bs-bottom">
+    <div id="bs-actions"></div>
+    <div id="bs-depts"></div>
+  </footer>
+  <script src="js/main.js"></script>
+</body>
+</html>

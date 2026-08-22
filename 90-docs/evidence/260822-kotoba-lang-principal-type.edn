@@ -1,0 +1,72 @@
+[{:db/id -1
+  :source/dataset "evidence"
+  :evidence/id "260822-kotoba-lang-principal-type"
+  :evidence/date "2026-08-22"
+  :evidence/adr "adr-2608220100-capability-grants-are-addressed-and-the-address-is-checked"
+  :evidence/claim ":principal が言語 core（kotoba.lang.type-system）の型契約に入り、(1) 効果を含意しない（identity は authority ではない）(2) 無から作れない（:principal/minted）が機械検査になった"
+  :evidence/repo "kotoba-lang/kotoba-lang"
+  :evidence/base-commit "5239f36e3473effe9718b252203e4229a57b4f0c"
+  :evidence/patch "90-docs/evidence/patches/260822-kotoba-lang-sealer-and-principal.patch"
+  :evidence/runtime "Clojure CLI + JVM"
+  :evidence/command "clojure -M:test -n kotoba.lang.principal-test / clojure -M:test / clojure -M:lint / clojure -M -m kotoba.lang.surface-matrix"
+  :evidence/result "principal-test 単体 5 tests / 26 assertions / 0 failures"
+  :evidence/regression
+  "本変更は sealer と違い**既存の共有 namespace とデータファイルを変更する**ので、
+  全スイートを測った。
+
+  sealer まで: 258 tests / 1399 assertions / 5 failures / 3 errors
+  principal 後: 263 tests / 1425 assertions / 5 failures / 3 errors
+  両方無し(基準): 249 tests / 1364 assertions / 5 failures / 3 errors
+
+  失敗 8 件は 3 回とも同一で、いずれもこの環境に clone していない兄弟 checkout
+  （../kotoba/...）を読みに行くもの。本変更由来の失敗は 0 件。
+
+  ⚠ ただし**一度だけ本変更由来の赤が出た**: surface-status.edn に invariant を
+  足した時点で `on-disk-matrix-matches-regenerated` が落ちた。
+  docs/lang/surface-matrix.md は surface-status.edn の射影で、生成物が stale に
+  なったことを gate が正しく捕まえた。`clojure -M -m kotoba.lang.surface-matrix`
+  で再生成して解消（差分 1 行）。**gate が働いた例として残す。**"
+  :evidence/lint "clojure -M:lint = errors 0 / warnings 22（sealer 修正後と同数。新規警告なし）"
+  :evidence/discrimination
+  "4 つの主張それぞれについて、壊し方と報告された失敗が一致することを確認した。
+
+  [A] validate-signature から mint 規則を外す
+      -> FAIL a-signature-cannot-mint-a-principal (7 assertions)
+
+  [B] mentions-principal? が再帰をやめる（wrapping で洗浄できてしまう）
+      -> FAIL a-signature-cannot-mint-a-principal (4)
+         FAIL passing-one-on-is-not-minting (2)
+
+  [C] :principal を primitive-types に入れる（literal を持ってしまう）
+      -> FAIL principal-is-a-type-but-has-no-literal (1)
+
+  [D] principal パラメータが effect を含意するようにする（identity を authority 扱い）
+      -> FAIL a-principal-is-not-authority (3)
+         FAIL passing-one-on-is-not-minting (4)
+
+  無改変に戻すと 4 回とも 0 failures。"
+  :evidence/not-measured
+  "測っていないものを pass として数えない（ADR-2608136000）。
+
+  - **backend は 1 つも実装していない。** surface-status.edn の当該 entry が
+    `:backends #{}` /
+    `:not-implemented #{:guest-grammar :kir :wasm32 :restricted-esm :native}`
+    と自己申告している。:principal 値を表現する backend は無く、
+    guest grammar に principal を束縛する構文も無い。
+  - したがって **.kotoba のソースに principal は書けない。** 入ったのは
+    型契約（signature validation）だけ。
+  - 「principal を :string に落とせない」は**検査していない** —— それは surface に
+    そういう操作が無いという事実であって、この namespace の規則ではない。
+  - 「runtime が渡すもので、プログラムが構築するものではない」も検査していない ——
+    grammar の性質。
+  - cljs / nbb 経路、murakumo fleet 上での実行、amu の kotoba.compiler.authority
+    との突き合わせ —— いずれも未実施。"
+  :evidence/landed
+  "kotoba-lang/kotoba-lang には push していない（cross-tier add 拒否）。適用:
+
+  git -C orgs/kotoba-lang/kotoba-lang am \\
+    90-docs/evidence/patches/260822-kotoba-lang-sealer-and-principal.patch
+
+  （このパッチは sealer と principal の 2 commit を含む。以前の
+  260822-kotoba-lang-sealer-brand-pairs.patch を置き換える）"
+}]
