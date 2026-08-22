@@ -198,6 +198,13 @@
   {:name "bonsai" :gate :jvm-test :cd true}
   {:name "langgraph" :gate :jvm-test :cd true}
   {:name "kagitaba" :gate :jvm-test :cd true}
+  ;; dougaka actor (cloud-itonami). Base deps resolve with git alone since
+  ;; 1a17b37 (langgraph pinned by sha; :dev keeps the sibling override), which
+  ;; is what let it in — measured 2026-08-23 from a sibling-less clone:
+  ;; `clojure -M:test` → Ran 38 tests containing 278 assertions. No ffmpeg in
+  ;; this suite. The engine (ai-gftd-dougaka) is NOT here: its deps.edn sits
+  ;; under clj/ and its suite runs ffmpeg, which no node cap declares.
+  {:name "ai-gftd-dougaka-actor" :gate :jvm-test :cd false}
   ;; user-test carried an untracked .github/workflows/ci.yml in the shared
   ;; checkout -- `clojure -M:test` + `-M:lint` on push. Actions are retired
   ;; repo-wide (ADR-2607300900) and disabled per repo, so that file was inert
