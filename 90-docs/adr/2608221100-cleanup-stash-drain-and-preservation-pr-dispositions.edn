@@ -38,7 +38,7 @@ hot-db → pattern-source の compiled SPARQL/Cypher 実行器切替を、fork �
 
 検証（両方向、nbb 1.5.212）: main 63a68399 = 154 tests / 578 assertions / 0 fail、branch = 155 / 581 / 0。clj-kondo は main と同数（変更ファイルの新規指摘 0）。
 
-**測定上の重要発見: ローカルの nbb 1.4.210 は pristine main ですら 197 test を落とす**（bundle 内 constructor が undefined に lastIndexOf を呼ぶ runtime バグ。classifier にスタック印字を仕込んで特定）。『ローカルで赤は fleet で赤ではない』の新しい実例。ローカル nbb の更新（`npm install -g nbb@latest`、現行 1.5.212 で green 確認済み）は owner 判断待ちで未実施。
+**測定上の重要発見: ローカルの nbb 1.4.210 は pristine main ですら 197 test を落とす**（bundle 内 constructor が undefined に lastIndexOf を呼ぶ runtime バグ。classifier にスタック印字を仕込んで特定）。『ローカルで赤は fleet で赤ではない』の新しい実例。**ローカル nbb は第 2 セッションで 1.5.212 に更新済み**（concept-lookup / edn-query 156k datoms で回帰確認）。
 
 ### 4. west skip 5 repo の治癒（全て pin で clean に）
 
@@ -47,9 +47,24 @@ hot-db → pattern-source の compiled SPARQL/Cypher 実行器切替を、fork �
 - yabai-actor: fsmonitor ノイズで実は clean
 - org-spirit-in-physics: submodule 時代の壊れた gitfile。`orgs/com-junkawasaki/org-spirit-in-physics.broken-gitdir-20260822` として保全し pin で再取得。**上流 history に無いのは 8 ファイルだけ**（旧 arXiv figure/tarball + 計算結果 JSON 2 件）
 
+### 5. 第 2 セッション — 224 イベントの reconcile は測定で二分された（2026-08-22 02Z〜03Z）
+
+`gftd/ledger.cljc`（never reordered、fold が意味を与える唯一の reader）と `gftd/canvas.cljc` の `apply-event`（`:react/observation` は case に無く **fold の no-op**）を読み、224 件を fold への影響で分けた:
+
+- **66 件の `:react/observation` → 台帳に着地済み**（merge `793d8c29961` 系、`ledger-land.cljs` の CAS append）。着地前に **fold 不変を両方向で証明**: 実 main の 9,912 イベントに対し `(= (fold {} main) (fold {} (into main obs66)))` = true、かつ add-item 158 件を足すと fold が変わること（判別器が判別することの証明）。seq は当時 max 9578 の **+1000 gap（10578〜10643）**で採番し loop との race を構造的に排除、元の衝突 seq は `:event/rescued-from-seq` に保存。着地後に live main で再検証: fold 不変 true、parse clean、**私の帯の seq 衝突 0**。
+- **158 件の `:canvas/add-item` → 駐車のまま**（`canvas-ledger-unlanded/2026-08-22-stash-rescue-events.edn` を 158 件に絞り、ヘッダに owner の選択肢 3 つ —— tail-append を受容 / history として保持 / fold 側を拡張 —— を記載）。どこに置いても 5 つの canvas block の item list が変わり advisor loop の観測が変わるので、データ判断。
+
+**副産物: `scripts/ledger-land.cljs` の台帳破壊バグを発見・修正**（merge `aedc7baf35f4`）。dry-run が 66 行を「1 line」と言った違和感を追った結果、旧実装は contents API で本文を読んでいたが **GitHub は 1 MB 超で `content` を空文字列・`encoding` を `none` で返す**（canvas-ledger 2.9 MB で実測）。旧コードはそれを空ファイルと区別できず、**次の書き込みで台帳全体を新しい行だけに置換する**ところだった（ADR-2608136000 の形）。kaiyu ledger（小）でしか使われておらず未発火だっただけ。修正: sha+size のみ contents API、本文は blobs API + maxBuffer 引き上げ、**decode byte 長 ≠ tree size なら書く前に拒否**、blob 作成は `--input -`（4 MB base64 は ARG_MAX 超）、`--message=` 引数化、dry-run は実行数表示。
+
+**seq-collision ratchet は 333→344 で赤だが、+11 は全て loop 同士の既知 append race（9335〜9477 帯、私の着地前から main に在った）**。私の 10578+ 帯は 0 件と origin/main 上で確認済み。
+
+### 6. append race の根治 — 調査のみ、未着手（第 3 セッション冒頭で closing）
+
+`gftd.ledger/append!` は `(inc (max seq-of-local-file))` で採番し、read と write の間に何も無い。呼び出し元は `gftd/cli.cljc` の 4 箇所（256 / 584 / 743 / 1076 行）のみ。`gftd/kotobase.cljc:74` は既に `bmc.event/<seq>-<digest>` に id を変えて projection 側の upsert 衝突を回避済みだが、**台帳側の採番は未修正**。verifier（`scripts/verify-ledger-seq-collision.cljs`）が root cause（ADR-2607254000 と同型: 同一 FS の排他 lock だけでは足りず、append 前に origin から sync が要る）を名指ししている。実装方針の候補: (a) `append!` 直前に origin/main の台帳 tail から max を取る（`ledger-land.cljs` の blobs 経路が再利用できる）(b) seq を `:event/at` + actor の content-hash に置換して採番自体を無くす —— (b) は `:event/seq` を読む fold / score / kotobase projection の全てに波及するので ADR が要る。**コードは 1 バイトも変えていない。**
+
 ## 温存したもの（次 agent へ）
 
-- **live loop の現行 WIP**: canvas-ledger の新規 append と maturity-loop の stash（close 時点で stash@{0} = fb0bebac、seq 9570+）。これは steady state であり退役対象ではない
+- **live loop の現行 WIP**: canvas-ledger の新規 append と maturity-loop の stash（close 時点で stash 2 本、いずれも maturity-loop の温存）。これは steady state であり退役対象ではない
 - owner の litigation 編集（`orgs/personal/litigation/` + 対応 ADR、superproject で dirty のまま）
 - `docs/design/tamaki-ui-concepts`（tamaki 系 WIP、untracked 6 ファイル）
 - `tamaki/community-coverage` branch（main の祖先・unique commit 0・tamaki workspace が checkout 中）
@@ -59,4 +74,4 @@ hot-db → pattern-source の compiled SPARQL/Cypher 実行器切替を、fork �
 
 ## resume point
 
-superproject 共有 checkout は close 時点で origin/main から十数 commit 遅れ + 並行セッションが index.lock を保持。**同期はどの live loop でも次周で行われるので手動介入不要。** kotobase-server の共有 checkout は新 pin の 1 commit 手前で clean 停車（次の west sync で追従）。次に手を付けるなら: ① canvas-ledger 224 イベントの時系列 reconcile（データ判断）② `nbb scripts/cleanup.cljs --unlanded` の wave-scratch 棚卸し ③ ローカル nbb の更新。"}]
+superproject 共有 checkout は close 時点で origin/main から十数 commit 遅れ + 並行セッションが index.lock を保持。**同期はどの live loop でも次周で行われるので手動介入不要。** kotobase-server の共有 checkout は新 pin の 1 commit 手前で clean 停車（次の west sync で追従）。次に手を付けるなら: ① **append race の根治**（§6 の方針 (a) が最小。最初のコマンド: `git show origin/main:70-tools/bmc/src/gftd/ledger.cljc` と `grep -n 'ledger/append!' 70-tools/bmc/src/gftd/cli.cljc`、検証は `nbb --classpath .:scripts/nbb_compat scripts/verify-ledger-seq-collision.cljs` が新規衝突 0 で緑になること）② 158 add-item イベントの処遇（owner 判断）③ `nbb scripts/cleanup.cljs --unlanded` の wave-scratch 棚卸し。"}]
