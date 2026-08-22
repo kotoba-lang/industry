@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 7818, "ai-gftd-chat-shell" 1},
+ {"magatama-sh1n5h1x" 7571, "ai-gftd-chat-shell" 1},
  :zone
- {:requests-7d 503924,
-  :pageviews-7d 6877,
-  :uniques-7d-sum 5623,
+ {:requests-7d 450671,
+  :pageviews-7d 4774,
+  :uniques-7d-sum 5308,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/", :requests 1173}
-   {:path "/favicon.ico", :requests 182}
-   {:path "/403.php", :requests 50}
+  [{:path "/.git/config", :requests 58}
    {:path "/wpxml.php", :requests 45}
-   {:path "/wp-content/x.php", :requests 43}
-   {:path "/wplogbak.php", :requests 35}
-   {:path "/wp-json/", :requests 33}
-   {:path "/css.php", :requests 33}],
-  :status-mix {:ok 3107, :client-error 1863, :server-error 13639},
+   {:path "/bs1.php", :requests 41}
+   {:path "/wp-admin/network/admin.php", :requests 41}
+   {:path "/ops.php", :requests 34}
+   {:path "/css.php", :requests 33}
+   {:path "/xingkong/index.php", :requests 32}
+   {:path "/wp-sing.php", :requests 31}],
+  :status-mix {:client-error 1734, :ok 1613, :server-error 13709},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -29,12 +29,12 @@
   :murakumo-paid-amount-minor 0,
   :charges-total 90,
   :last-charge-epoch 1604224274},
- :as-of "2026-08-21",
+ :as-of "2026-08-22",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 73},
+ {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 80},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 1173 · /favicon.ico 182 · /403.php 50 · /wpxml.php 45 · /wp-content/x.php 43 | 4xx(probe) 10% · 5xx 73%",
+ "上位 page (24h, 2xx/3xx): /.git/config 58 · /wpxml.php 45 · /bs1.php 41 · /wp-admin/network/admin.php 41 · /ops.php 34 | 4xx(probe) 10% · 5xx 80%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 503924 req/7d・5623 uniques(日次和)・うち4xx probe 10%(24h)、workers 7819 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 450671 req/7d・5308 uniques(日次和)・うち4xx probe 10%(24h)、workers 7572 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
