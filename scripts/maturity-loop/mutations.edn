@@ -1731,4 +1731,36 @@
      :find "    :sine (* ea (Math/pow (/ (* k Math/PI) L) 2) (Math/sin (/ (* k Math/PI x) L)))"
      :replace "    :sine (* 0.9 ea (Math/pow (/ (* k Math/PI) L) 2) (Math/sin (/ (* k Math/PI x) L)))"
      :must-fail ["manufactured-solution-recovers-second-order-accuracy"]}]}
+
+
+  {:repo "orgs/kotoba-lang/kami-engine-sculpt"
+   :label "スカルプト —— ブラシの減衰とマスクの保護"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :sculpt/mask-does-not-protect
+     :why "マスクは**塗った頂点をブラシから守る**もの。`(- 1 mask)` を落とすと、マスク 1.0 の頂点まで全力で動く —— 形は「それらしく」変形するので、マスクを塗った本人が気づくのは戻せなくなった後"
+     :file "src/kami/sculpt.cljc"
+     :find "                           amount (* strength falloff (- 1 mask))]"
+     :replace "                           amount (* strength falloff)]"
+     :must-fail ["masks-protect-sculpted-vertices"]}
+
+    {:id :sculpt/falloff-is-flat
+     :why "二次減衰 `(1 - d/r)^2` を定数 1 にすると、ブラシは円柱状に切り出す。**中心も縁も同じだけ動く**ので、隣り合う頂点の関係が壊れる"
+     :file "src/kami/sculpt.cljc"
+     :find "                     (let [falloff (let [x (- 1 (/ d radius))] (* x x))"
+     :replace "                     (let [falloff 1.0"
+     :must-fail ["brush-deforms-with-falloff-and-symmetry"]}]}
+
+  {:repo "orgs/kotoba-lang/kami-engine-animation"
+   :label "アニメーション —— 補間と範囲外の扱い"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :animation/hermite-becomes-linear
+     :why "Hermite / Bezier を線形補間に落としても**キーフレーム上の値は完全に一致する** —— 違うのはキーの間だけ。曲線を直線に変える退行は、キーだけ見るテストでは絶対に捕まらない"
+     :file "src/kami/animation.cljc"
+     :find "        :bezier (hermite a b p tangent-out tangent-in duration)"
+     :replace "        :bezier (+ a (* p (- b a)))"
+     :must-fail ["bezier-is-an-alias-of-hermite-and-nothing-said-so"]}]}
 ]}
