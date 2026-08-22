@@ -3229,6 +3229,20 @@
   ;; a fleet property -- that node's egress was 200 to maven and github at
   ;; that moment, and this fleet's egress is not uniform.
   {:name "grant" :gate :jvm-test :cd true}
+
+  ;; 2026-08-22: the TLS 1.3 client, landed today (root ADR-2608220100). It is
+  ;; the only cryptographic protocol implementation this workspace owns, and
+  ;; its suite reproduces 43 RFC 8448 vectors byte-exactly plus 40 named
+  ;; refusals -- exactly the kind of thing that must not depend on someone
+  ;; remembering to run it. `:test` and not the repo's own `:report` alias:
+  ;; `report` prints a scanned/executed evidence line and exits 3 when it
+  ;; cannot answer (a missing fixture), which is the RIGHT contract for an
+  ;; operator and the WRONG one here -- `:jvm-test` reads "Ran N tests ...
+  ;; 0 failures, 0 errors." and would see an exit code it has no rule for.
+  ;; The three-valued run stays the operator entry point; this is the
+  ;; continuous one. Deps are cognitect test-runner (maven) plus
+  ;; org-ietf-x509/org-ietf-asn1 (git, shipped by ship-git-deps!).
+  {:name "org-ietf-tls" :gate :jvm-test :cd true}
   ;; ────────────────────────────────────────────────────────────────────────
   ;; 2026-08-20: twenty SECOND gates, from a sweep of the sixty repos whose
   ;; only gate was :jvm-test. Each :jvm-test entry above stays exactly as it
