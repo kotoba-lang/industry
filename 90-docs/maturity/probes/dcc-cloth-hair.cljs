@@ -9,6 +9,20 @@
 ;;   (3) 平行移動・回転で残差が変わらない（距離拘束は原点を知らない）
 ;;   (4) 振り子が 2π√(L/g) で振れる —— この実装が一切寄与していない数
 ;;   (5) compliance が反復数に依存しない（XPBD の λ 累積が効いている証拠）
+;;
+;; ⚠ **所要時間を測ってから 2 箇所だけ削った（2026-08-24）。** 節ごとの実測
+;; （load 30 前後）:
+;;     残差掃引 1/4/16/64x40   32.4s   compliance 20と80x60   29.9s
+;;     球ドレープ 9x9 x120     19.6s   振り子 12000x20 反復    6.6s
+;;     自由布 20x50             3.6s   剛体不変 10x20 x2       1.1s
+;; 振り子は**拘束が 1 本しかないので 20 反復のうち 19 回が no-op** —— 2 反復・
+;; 8000 ステップで**周期がビット単位で同一**（2.0100000000000002、誤差 0.196%）に
+;; なり 6.6s → 0.76s。compliance は 80 反復を 40 にしても切り分けが変わらない
+;; （正しい実装 1.7e-16 vs λ 累積を外した実装 6.9e-3 —— 比 4e13）。
+;; **残差掃引と球ドレープは削らない。** 64 反復を 32 にすると最終残差が
+;; 0.0030 になって閾値 2.0e-3 を割り、閾値を緩めるしかなくなる —— それは
+;; 主張を弱めることであって、安くすることではない。**この probe が高いのは、
+;; 主張がその計算を要求するからである。**
 (try
   (let [abs* (fn [x] (js/Math.abs (double x)))
         g (cl/grid {:rows 8 :cols 8 :spacing 0.1 :pins #{[0 0] [0 7]}})
@@ -32,8 +46,8 @@
               :cloth/constraints [(cl/constraint 0 1 1.0)]}
         dt 0.0005
         xs (loop [c pend i 0 out []]
-             (if (= i 12000) out
-               (let [[_ n] (cl/step c {:dt dt :iterations 20})]
+             (if (= i 8000) out
+               (let [[_ n] (cl/step c {:dt dt :iterations 2})]
                  (recur n (inc i) (conj out (get-in n [:cloth/particles 1 :particle/position 0]))))))
         cross (vec (keep-indexed (fn [i [p q]] (when (and (neg? p) (pos? q)) (* dt i)))
                                  (map vector xs (rest xs))))
@@ -43,7 +57,7 @@
                           (nth (cl/centre-of-mass d) 1)))
         soft (fn [] (cl/grid {:rows 6 :cols 6 :spacing 0.1 :pins #{[0 0] [0 5]}
                               :compliance 1.0e-3 :shear-compliance 1.0e-3 :bend-compliance 1.0e-3}))
-        s20 (sag (soft) 20) s80 (sag (soft) 80)
+        s20 (sag (soft) 20) s80 (sag (soft) 40)
         sph {:collider/kind :sphere :collider/centre [0.4 0.5 0.4] :collider/radius 0.3}
         [_ draped] (cl/simulate (cl/grid {:rows 9 :cols 9 :spacing 0.1 :y 1.0})
                                 {:dt 0.008 :iterations 12 :colliders [sph]} 120)
