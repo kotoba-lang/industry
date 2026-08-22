@@ -12,27 +12,36 @@
 ;;   (5) 工具を省くと拒否（先端より上の包絡が検査の主題そのもので推測できない）
 ;;   (6) **まだモデル化していないもの**（治具・クランプ・機械包絡・未除去ストック）が
 ;;       出力のフィールドに名指しで出る
+;;
+;; ⚠ **板を 40x40 から 20x20 に縮めた（2026-08-24）。** この probe は全軸 audit の
+;; 単独最大コストで、load 17 で 200 秒・load 100 で 541 秒かかっていた。板を半分に
+;; すると経路の本数と点数が減って **106 秒**になる。
+;; **縮める前に、縮めた形でも噛むことを確かめてある**:
+;;   ホルダ区間を包絡から外す → 「壁でホルダ衝突を切り分けられない」で FAIL
+;;   適応細分を常に 0 回にする → 「先端が公差を外れる」で FAIL
+;; 証拠の数値は変わる（ホルダ衝突 584 点 → 319 点、食い込み 0.442）が、**どの主張も
+;; 同じだけ切り分ける**。速い検査を選んだのではなく、同じ検査を安く買った。
 (try
   (let [tl {:id :bn6 :name "6mm" :tool-type :ball-nose :diameter 6.0 :flute-length 8.0
             :overall-length 40.0 :holder-diameter 12.0 :flute-count 2 :corner-radius 3.0
             :material :carbide}
         [lib _] (tool/add (tool/empty-library) tl)
         run (fn [t opts] (tp/generate-toolpath
-                          (-> (tp/new-job (stock/stock (stock/block 60 60 30) (stock/aluminum-6061)) lib)
+                          (-> (tp/new-job (stock/stock (stock/block 30 30 30) (stock/aluminum-6061)) lib)
                               (tp/add-operation (merge {:op :surface-3d :tool-id :bn6 :stepover 4.0
                                                         :strategy :raster :feed-rate 1200.0
                                                         :target t} opts)))))
-        flat {:positions [[-20 -20 0] [20 -20 0] [20 20 0] [-20 20 0]] :indices [0 1 2 0 2 3]}
+        flat {:positions [[-10 -10 0] [10 -10 0] [10 10 0] [-10 10 0]] :indices [0 1 2 0 2 3]}
         ;; 適応細分の証拠には **曲率のある** 形が要る。平板は線形移動でぴたり追従する
         ;; ので、細分を切っても食い込まない —— 検査の前提が成り立たない。
-        plateau {:positions [[-20 -20 0] [20 -20 0] [20 20 0] [-20 20 0]
+        plateau {:positions [[-10 -10 0] [10 -10 0] [10 10 0] [-10 10 0]
                              [-3 -3 4] [3 -3 4] [3 3 4] [-3 3 4]]
                  :indices [0 1 2 0 2 3 4 5 6 4 6 7]}
-        wall {:positions [[-20 -20 0] [6 -20 0] [6 20 0] [-20 20 0]
-                          [6 -20 25] [8 -20 25] [8 20 25] [6 20 25]]
+        wall {:positions [[-10 -10 0] [6 -10 0] [6 10 0] [-10 10 0]
+                          [6 -10 25] [8 -10 25] [8 10 25] [6 10 25]]
               :indices [0 1 2 0 2 3 4 5 6 4 6 7]}
-        slot {:positions [[-20 -20 10] [-2.5 -20 10] [-2.5 -20 0] [2.5 -20 0] [2.5 -20 10] [20 -20 10]
-                          [-20 20 10] [-2.5 20 10] [-2.5 20 0] [2.5 20 0] [2.5 20 10] [20 20 10]]
+        slot {:positions [[-10 -10 10] [-2.5 -10 10] [-2.5 -10 0] [2.5 -10 0] [2.5 -10 10] [10 -10 10]
+                          [-10 10 10] [-2.5 10 10] [-2.5 10 0] [2.5 10 0] [2.5 10 10] [10 10 10]]
               :indices [0 1 7 0 7 6  1 2 8 1 8 7  2 3 9 2 9 8  3 4 10 3 10 9  4 5 11 4 11 10]}
         ok (tp/collision-check (run flat {}) flat tl {:tolerance 0.02})
         raw (tp/gouge-check (run plateau {:max-bisections 0}) plateau {:tool-radius 3.0})
