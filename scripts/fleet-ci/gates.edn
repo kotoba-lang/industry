@@ -411,6 +411,43 @@
    :script "gates/source-nul-bytes-check.cljs"
    :include-ext [".cljs" ".clj" ".cljc" ".edn" ".kotoba" ".md" ".yml"]
    :min-files 1500 :cd false}
+
+  ;; CI は murakumo fleet であって GitHub Actions ではない（ADR-2607300900、
+  ;; オーナー指示 2026-08-05「github は使わない、murakumo.cloud の cdci, workflow
+  ;; を使う」/ 2026-08-22「github actions はお金がかかるので murakumo cloud の
+  ;; actions で行う」）。この gate はその方針を **tree の側**で保つ —— repo root の
+  ;; `.github/workflows/*.yml` が、GitHub が自分の判断で runner を起こす唯一の
+  ;; 入口だから。設定（`actions/permissions`）は誰かが UI で戻せるが、tree は
+  ;; credential 無しのノードから見える。
+  ;;
+  ;; 検証ロジックは gate に持たせない。正本は
+  ;; `scripts/verify-no-github-workflows.cljs`（source-nul-bytes と同じ委譲形）。
+  ;;
+  ;; **緑の意味を広げないこと。** この gate が言うのは「この tree は GitHub に
+  ;; workflow を渡していない」だけで、「Actions が無効である」ではない。GitHub 側の
+  ;; 設定と Dependabot はノードから引けないので、verifier が出力に NOT-CHECKED として
+  ;; 明記する。そちらは operator 側の `scripts/github-actions-billable-audit.cljs`
+  ;; が持つ（credential を要する = ノードに置かない、の不変条件どおり）。
+  ;;
+  ;; 床は件数ではなく錨 `manifest/west.yml`。この repo が自分で持つ yaml は 5 本しか
+  ;; なく（残りは vendored な takeout / comfyui）、件数を床にすると vendored を整理
+  ;; した日に恒久的な exit 2 になる。錨は配送が生きているかだけを問う。
+  ;;
+  ;; **落ちることを確認済み**（2026-08-22、fleet と同じ形の tree =
+  ;; `git archive` + :include-ext filter、`.git` 無しの walk 経路）:
+  ;;   無改変 exit 0 / root に workflow を 1 本置くと exit 1 /
+  ;;   錨を落とすと exit 2 / verifier を filter から外すと exit 2。
+  ;;
+  ;; :include-ext に ".cljs" が要る（verifier 本体）。618 files / 8.8MB。
+  ;; :require-paths は、届かなかったときに「件数が足りない」ではなく
+  ;; **何が無いか**を最初の行に出すため。
+  {:name "root" :id "root-no-github-workflows" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/github-workflows-absent-check.cljs"
+   :include-ext [".yml" ".yaml" ".cljs"]
+   :min-files 400
+   :require-paths ["scripts/verify-no-github-workflows.cljs" "manifest/west.yml"]
+   :cd false}
   {:name "governor" :gate :jvm-test :cd true}
   {:name "taxlaw" :gate :jvm-test :cd true}
   ;; shohyo 諸表 (2026-08-18). Folds a trial balance into BS/PL and refuses
