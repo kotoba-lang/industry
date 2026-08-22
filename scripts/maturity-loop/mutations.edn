@@ -1570,7 +1570,7 @@
      :must-fail ["two-estimators-reach-the-same-integral"]}]}
 
   {:repo "orgs/kotoba-lang/io-alembic"
-   :label "Ogawa 容器と Alembic object 層 —— 静かに壊れる 2 つ"
+   :label "Ogawa 容器と Alembic object / property 層 —— 静かに壊れる 6 つ"
    :cmd ["clojure" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
@@ -1586,7 +1586,35 @@
      :file "src/alembic/objects.cljc"
      :find "(let [buf (subvec bs 0 (- (count bs) 32))"
      :replace "(let [buf bs"
-     :must-fail ["the-last-thirty-two-bytes-are-hashes"]}]}
+     :must-fail ["the-last-thirty-two-bytes-are-hashes"]}
+
+    {:id :alembic/size-hint-ignored
+     :why "size hint は property header 内の**全ての長さの幅**を決める。全部 uint32 で読むと短い header を踏み越え、余りのバイトから**存在しない property を作る**。名前も型も出てくるので、出力を見ても捏造だと分からない"
+     :file "src/alembic/properties.cljc"
+     :find "(def ^:private hint-width {0 1 1 2 2 4})"
+     :replace "(def ^:private hint-width {0 4 1 4 2 4})"
+     :must-fail ["every-size-hint-width-is-read"]}
+
+    {:id :alembic/implied-range-collapses
+     :why "0x0200 が無いときの暗黙域は 0x800 の有無で変わる（[0,0] か [1,n-1]）。両方 [0,0] に畳むと**全ての animation が定数として読める** —— sample 0 は正しいので「キャッシュが動いていない」ように見え、parse バグには見えない"
+     :file "src/alembic/properties.cljc"
+     :find "                            :else [1 (dec next-i) pos])"
+     :replace "                            :else [0 0 pos])"
+     :must-fail ["the-implied-changed-range-differs-from-the-constant-one"]}
+
+    {:id :alembic/sample-key-not-skipped
+     :why "sample block の先頭 16 バイトは鍵であって値ではない。飛ばさないと点列は**長さも型も合ったまま、全ての値がずれる**"
+     :file "src/alembic/properties.cljc"
+     :find "  \"Every sample data block starts with a 16-byte key. It is not data.\"\n  16)"
+     :replace "  \"x\"\n  0)"
+     :must-fail ["the-first-sixteen-bytes-are-a-key-not-values"]}
+
+    {:id :alembic/undecoded-pods-guessed
+     :why "string / wstring / float16 は復号を書き起こしていない。拒否をやめて数を返すと、**推測した数は正しい数と見分けが付かない** —— 呼び出し側には確かめる術が無い"
+     :file "src/alembic/properties.cljc"
+     :find "    (not (readable-pods pod))"
+     :replace "    (and false true)"
+     :must-fail ["it-refuses-rather-than-guessing"]}]}
 
   {:repo "orgs/kotoba-lang/voxel"
    :label "VDB 木と .nvdb 容器 —— tile と圧縮"
@@ -1733,6 +1761,32 @@
      :must-fail ["manufactured-solution-recovers-second-order-accuracy"]}]}
 
 
+  {:repo "orgs/kotoba-lang/ocio"
+   :label "色管理 —— 原色行列と色順応と伝達関数"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :ocio/adaptation-is-identity
+     :why "D60↔D65 の色順応を恒等にすると、**白がわずかに転ぶだけ**で全部の色が出る。ACES で作った素材を sRGB で見て「なんとなく青い」——それが数として出るのはここだけ"
+     :file "src/ocio/transform.cljc"
+     :find "        scale [[(/ dr sr) 0.0 0.0] [0.0 (/ dg sg) 0.0] [0.0 0.0 (/ db sb)]]]"
+     :replace "        scale [[1.0 0.0 0.0] [0.0 1.0 0.0] [0.0 0.0 1.0]]]"
+     :must-fail ["white-stays-white-across-white-points"]}
+
+    {:id :ocio/srgb-curve-becomes-pure-gamma
+     :why "sRGB の折れ線を純ガンマ 2.4 に置き換えると、**暗部だけがずれる**。中間調とハイライトは一致するので、並べて見ても分からない。公表点（0.5 → 0.2140…）と突き合わせて初めて出る"
+     :file "src/ocio/transform.cljc"
+     :find "  (if (<= v 0.04045) (/ v 12.92) (Math/pow (/ (+ v 0.055) 1.055) 2.4)))"
+     :replace "  (Math/pow v 2.4))"
+     :must-fail ["transfer-functions-hit-their-published-points"]}
+
+    {:id :ocio/unknown-space-accepted
+     :why "知らない色空間を拒否せず素通しすると、**変換しなかったことと変換したことが同じ出力になる**。パイプラインの途中で色空間名を打ち間違えても、絵は出る"
+     :file "src/ocio/transform.cljc"
+     :find "(defn known-spaces [] (set (keys colour-spaces)))"
+     :replace "(defn known-spaces [] (constantly true))"
+     :must-fail ["it-refuses-a-space-it-does-not-know"]}]}
+
   {:repo "orgs/kotoba-lang/kami-engine-sculpt"
    :label "スカルプト —— ブラシの減衰とマスクの保護"
    :cmd ["clojure" "-M:test"]
@@ -1750,7 +1804,42 @@
      :file "src/kami/sculpt.cljc"
      :find "                     (let [falloff (let [x (- 1 (/ d radius))] (* x x))"
      :replace "                     (let [falloff 1.0"
-     :must-fail ["brush-deforms-with-falloff-and-symmetry"]}]}
+     :must-fail ["brush-deforms-with-falloff-and-symmetry"]}
+
+    {:id :paint/texel-centre-becomes-corner
+     :why "テクセル中心を角にすると、ベイクした位置が**全テクセルで半テクセル分ずれる**。絵は「だいたい合っている」ので目では気づけない。しかも最初に書いたテストは期待値も texel-centre 経由で作っていたので両辺が同じだけずれて打ち消し、緑のままだった —— 期待値を解析的に書き直して初めて咬んだ"
+     :file "src/kami/paint.cljc"
+     :find "  [(/ (+ x 0.5) width) (/ (+ y 0.5) height)])"
+     :replace "  [(/ x width) (/ y height)])"
+     :must-fail ["the-uv-inverse-is-exact-not-approximate"]}
+
+    {:id :paint/layers-commute
+     :why "multiply を add にすると層の合成が可換になる。**順序が絵を変えないなら層ではない** —— 個々のストロークは正しく見えるので、絵を見て気づくことはない"
+     :file "src/kami/paint.cljc"
+     :find "   :multiply (fn [b a] (* b a))"
+     :replace "   :multiply (fn [b a] (+ b a))"
+     :must-fail ["layers-are-not-commutative"]}
+
+    {:id :paint/dilation-does-nothing
+     :why "滲ませを 0 回にすると、島の縁の外は背景のまま。双一次補間が縁で背景を混ぜ、**レンダリングして初めて黒い継ぎ目の線として出る** —— テクスチャを見ても分からない"
+     :file "src/kami/paint.cljc"
+     :find "    (loop [t tex known inside n pad]"
+     :replace "    (loop [t tex known inside n 0]"
+     :must-fail ["without-dilation-the-seam-samples-the-background"]}
+
+    {:id :paint/channels-not-isolated
+     :why "1 チャンネルに塗ったつもりが全チャンネルに入る。色を roughness にも書き込むと**絵は出て、光り方だけが説明のつかないものになる**"
+     :file "src/kami/paint.cljc"
+     :find "          [:ok (assoc-in material [:material/channels channel] result)])))))"
+     :replace "          [:ok (update material :material/channels (fn [cs] (zipmap (keys cs) (repeat result))))])))))"
+     :must-fail ["painting-one-pbr-channel-leaves-the-others-alone"]}
+
+    {:id :paint/pbr-range-unchecked
+     :why "roughness 1.5 や metallic -0.3 を通すと、レンダラでは「少し変な絵」として出るだけで、どこで入った値か遡れない"
+     :file "src/kami/paint.cljc"
+     :find "                  (when-let [bad (first (filter (fn [t] (some #(or (< % lo) (> % hi)) t))"
+     :replace "                  (when-let [bad (first (filter (fn [t] (some #(or (< % lo) (> % hi) false) []))"
+     :must-fail ["it-refuses-what-would-render-as-a-plausible-mistake"]}]}
 
   {:repo "orgs/kotoba-lang/kami-engine-animation"
    :label "アニメーション —— 補間と範囲外の扱い"

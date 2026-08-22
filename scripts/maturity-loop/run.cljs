@@ -171,18 +171,49 @@
 
 ;; ── suite ───────────────────────────────────────────────────────────────────
 
+(defn link-siblings!
+  "worktree の deps.edn が `:local/root \"../X\"` で指す兄弟 repo を、sandbox の
+  中に symlink で用意する。
+
+  **これが無いと、その repo は base すら緑にならない** —— 落ちているのは実装では
+  なく、隣が居ないことである。両者は `clojure -M:test` の出力では見分けが付かない
+  ので、**張れなかった名前は必ず報告する**（黙って進むと「変異が咬まなかった」
+  ではなく「suite が測れなかった」を、同じ顔で緑にする）。"
+  [root dir sandbox]
+  (let [f (path/join dir "deps.edn")]
+    (when (fs/existsSync f)
+      (doseq [m (re-seq #":local/root\s+\"\.\./([^\"]+)\"" (str (fs/readFileSync f "utf8")))]
+        (let [name (second m)
+              dst (path/join sandbox name)]
+          (when-not (fs/existsSync dst)
+            (if-let [srcdir (first (for [org (try (vec (fs/readdirSync (path/join root "orgs")))
+                                                  (catch :default _ []))
+                                         :let [p (path/join root "orgs" org name)]
+                                         :when (fs/existsSync p)]
+                                     p))]
+              (fs/symlinkSync srcdir dst "dir")
+              (progress! (str "   ⚠ 兄弟 `../" name "` が orgs/ に見つからない"
+                              " —— この suite の base は隣が居ないせいで落ちる")))))))))
+
 (defn- check-suite [{:keys [repo label mutations green-marker] :as suite} keep?]
   (let [sha (pinned-sha repo)
         src (path/join root repo)
-        dir (path/join (os/tmpdir) (str "maturity-" (path/basename repo) "-"
-                                        (subs (or sha "nopin") 0 8)))]
+        ;; worktree を **sandbox の中**に置く。裸で tmpdir に置くと、deps.edn の
+        ;; `:local/root "../yaml"` のような**兄弟参照が解決できない** —— 共有
+        ;; checkout では `orgs/kotoba-lang/yaml` が隣に在るが、tmpdir の隣には
+        ;; 無いので、その repo は base すら緑にならず suite ごと測れない。
+        ;; sandbox を 1 段挟めば、隣に symlink を張るだけで `../` が効く。
+        sandbox (path/join (os/tmpdir) (str "maturity-" (path/basename repo) "-"
+                                            (subs (or sha "nopin") 0 8)))
+        dir (path/join sandbox (path/basename repo))]
     (progress! (str "\n── " label "  [" repo "]"))
     (if-not sha
       (do (progress! (str "   SKIP: west.yml に `path: " repo "` の entry が無い"
                         " —— この repo は west 管理下に無いか、path が変わっている"))
           {:skipped 1})
       (do
-        (sh ["rm" "-rf" dir] root)
+        (sh ["rm" "-rf" sandbox] root)
+        (fs/mkdirSync sandbox #js {:recursive true})
         ;; pin は manifest のもので、ローカル checkout がそれを持っているとは
         ;; 限らない —— サーバ側マージ（`gh api .../merges`）で main が進んだ直後は
         ;; 特にそうで、実際にこの loop の初回実行がそれで 2 suite 落ちた。
@@ -201,6 +232,7 @@
                 (progress! "         pin が upstream に無いか、checkout が壊れている")
                 {:errors 1})
             (try
+              (link-siblings! root dir sandbox)
               (let [base (run-suite dir suite)]
                 (if-not (green?* (:out base) (:code base) green-marker)
                   (do (progress! (str "   FAIL: pin " (subs sha 0 8) " で suite が緑にならない"))
@@ -234,7 +266,8 @@
                 ;; checkout には何も残らない —— それがこの隔離の意味。
                 (if keep?
                   (println (str "   (worktree を残した: " dir ")"))
-                  (sh ["git" "worktree" "remove" "--force" dir] src))))))))))
+                  (do (sh ["git" "worktree" "remove" "--force" dir] src)
+                      (sh ["rm" "-rf" sandbox] root)))))))))))
 
 ;; ── main ────────────────────────────────────────────────────────────────────
 
