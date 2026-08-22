@@ -125,19 +125,27 @@
   "1 箇所だけ壊す。`:find` が無い／2 箇所以上あるのは **loop 自身のバグ** で、
   そのまま走らせると「壊せていないのに緑」を「噛まなかった」と誤報告する。"
   [dir {:keys [file find replace id]}]
-  (let [p (path/join dir file)
-        s (fs/readFileSync p "utf8")
-        n (occurrences s find)]
-    (cond
-      (zero? n)
-      {:ok? false :reason (str "anchor not found for " id " in " file)}
+  (let [p (path/join dir file)]
+    (if-not (fs/existsSync p)
+      ;; **pin の手前に在るファイルは「変異が咬まない」ではない。** 実測
+      ;; 2026-08-24: 新しい mutation を足した直後、west pin がまだ手前に居て
+      ;; ファイルが worktree に無く、`readFileSync` が投げて **32 suite 全部の
+      ;; 結果が失われた**（1 件の設定ずれが、残り 200 件の測定を道連れにする）。
+      ;; これは報告して次へ進む種類の食い違いであって、run を落とす理由ではない。
+      {:ok? false :reason (str "file not in the worktree for " id ": " file
+                               " —— west pin がこの変更の手前に居るか、path が違う")}
+      (let [s (fs/readFileSync p "utf8")
+            n (occurrences s find)]
+        (cond
+          (zero? n)
+          {:ok? false :reason (str "anchor not found for " id " in " file)}
 
-      (> n 1)
-      {:ok? false :reason (str "anchor is not unique for " id " (" n " occurrences)")}
+          (> n 1)
+          {:ok? false :reason (str "anchor is not unique for " id " (" n " occurrences)")}
 
-      :else
-      (do (fs/writeFileSync p (str/replace-first s find replace))
-          {:ok? true :original s :path p}))))
+          :else
+          (do (fs/writeFileSync p (str/replace-first s find replace))
+              {:ok? true :original s :path p}))))))
 
 (defn- run-suite [dir {:keys [cmd npm-install]}]
   (when npm-install
@@ -172,28 +180,40 @@
 ;; ── suite ───────────────────────────────────────────────────────────────────
 
 (defn link-siblings!
-  "worktree の deps.edn が `:local/root \"../X\"` で指す兄弟 repo を、sandbox の
+  "worktree の deps.edn が `:local/root \"../…\"` で指す兄弟 checkout を、sandbox の
   中に symlink で用意する。
 
   **これが無いと、その repo は base すら緑にならない** —— 落ちているのは実装では
   なく、隣が居ないことである。両者は `clojure -M:test` の出力では見分けが付かない
   ので、**張れなかった名前は必ず報告する**（黙って進むと「変異が咬まなかった」
-  ではなく「suite が測れなかった」を、同じ顔で緑にする）。"
+  ではなく「suite が測れなかった」を、同じ顔で緑にする）。
+
+  相対パスは 1 段とは限らない（`../yaml` も `../kotoba-lang/org-oasis-open-xmile`
+  も実在する）。実測 2026-08-24、単一セグメントだけを想定した最初の版は、
+  2 段の形で親ディレクトリの無い場所に symlink を張ろうとして ENOENT で落ちた。
+  **解決は共有 checkout の側で行い**（そこでは実際に解決できている）、その実体を
+  sandbox の同じ相対位置に張る。"
   [root dir sandbox]
   (let [f (path/join dir "deps.edn")]
     (when (fs/existsSync f)
-      (doseq [m (re-seq #":local/root\s+\"\.\./([^\"]+)\"" (str (fs/readFileSync f "utf8")))]
-        (let [name (second m)
-              dst (path/join sandbox name)]
+      (doseq [m (re-seq #":local/root\s+\"(\.\./[^\"]+)\"" (str (fs/readFileSync f "utf8")))]
+        (let [rel (second m)
+              ;; 共有 checkout から見た実体。ここでは `..` が本物の orgs/<org> を指す。
+              real (path/resolve (path/join root (path/basename (path/dirname dir))) "..")
+              src* (path/resolve dir rel)
+              dst (path/resolve dir rel)]
+          ;; dst は sandbox 内の同じ相対位置。実体は共有 checkout 側で解決する。
           (when-not (fs/existsSync dst)
-            (if-let [srcdir (first (for [org (try (vec (fs/readdirSync (path/join root "orgs")))
-                                                  (catch :default _ []))
-                                         :let [p (path/join root "orgs" org name)]
-                                         :when (fs/existsSync p)]
-                                     p))]
-              (fs/symlinkSync srcdir dst "dir")
-              (progress! (str "   ⚠ 兄弟 `../" name "` が orgs/ に見つからない"
-                              " —— この suite の base は隣が居ないせいで落ちる")))))))))
+            (let [found (first (for [org (try (vec (fs/readdirSync (path/join root "orgs")))
+                                              (catch :default _ []))
+                                     :let [p (path/join root "orgs" org (path/basename rel))]
+                                     :when (fs/existsSync p)]
+                                 p))]
+              (if found
+                (do (fs/mkdirSync (path/dirname dst) #js {:recursive true})
+                    (fs/symlinkSync found dst "dir"))
+                (progress! (str "   ⚠ 兄弟 `" rel "` が orgs/ に見つからない"
+                                " —— この suite の base は隣が居ないせいで落ちる"))))))))))
 
 (defn- check-suite [{:keys [repo label mutations green-marker] :as suite} keep?]
   (let [sha (pinned-sha repo)
@@ -233,21 +253,47 @@
                 {:errors 1})
             (try
               (link-siblings! root dir sandbox)
-              (let [base (run-suite dir suite)]
-                (if-not (green?* (:out base) (:code base) green-marker)
-                  (do (progress! (str "   FAIL: pin " (subs sha 0 8) " で suite が緑にならない"))
-                      (progress! (str "         " (last (remove str/blank? (str/split-lines (:out base))))))
+              ;; **走らせ方は mutation ごとに違ってよい。** 実測 2026-08-24:
+              ;; `#?(:clj int :cljs identity)` の変異は `clojure -M:test` で
+              ;; **0 failures**、`nbb test/run_portable.cljs` で **11 failures**
+              ;; だった —— JVM 側が弱いのではなく、cljs の分岐が JVM から
+              ;; 構造的に見えない。suite の cmd 1 本で回すと、この class は
+              ;; 全部「噛まない」として報告され、**検査の穴が実装の穴に見える**。
+              ;; base は cmd ごとに取る（別の走らせ方の緑を根拠にしない）。
+              (let [runs (fn [m] (merge suite (select-keys m [:cmd :green-marker])))
+                    bases (reduce (fn [acc m]
+                                    (let [c (:cmd (runs m))]
+                                      (if (contains? acc c)
+                                        acc
+                                        (assoc acc c (run-suite dir (runs m))))))
+                                  {(:cmd suite) (run-suite dir suite)}
+                                  mutations)
+                    red (first (for [[c b] bases
+                                     :let [gm (or (some #(when (= c (:cmd (runs %)))
+                                                           (:green-marker %))
+                                                        mutations)
+                                                  green-marker)]
+                                     :when (not (green?* (:out b) (:code b) gm))]
+                                 [c b]))]
+                (if red
+                  (do (progress! (str "   FAIL: pin " (subs sha 0 8) " で suite が緑にならない"
+                                      " (" (str/join " " (first red)) ")"))
+                      (progress! (str "         " (last (remove str/blank?
+                                                                (str/split-lines (:out (second red)))))))
                       {:errors 1})
                   (do
-                    (progress! (str "   base " (subs sha 0 8) ": 緑"))
+                    (progress! (str "   base " (subs sha 0 8) ": 緑"
+                                    (when (> (count bases) 1)
+                                      (str "（" (count bases) " 通りの走らせ方すべてで）"))))
                     (reduce
                      (fn [acc {:keys [id must-fail why] :as m}]
                        (let [applied (apply-mutation! dir m)]
                          (if-not (:ok? applied)
                            (do (progress! (str "   BUG  " id " — " (:reason applied)))
                                (update acc :errors inc))
-                           (let [r (run-suite dir suite)
-                                 v (bites? (:out r) (:code r) green-marker must-fail)]
+                           (let [r (run-suite dir (runs m))
+                                 v (bites? (:out r) (:code r)
+                                           (or (:green-marker m) green-marker) must-fail)]
                              (fs/writeFileSync (:path applied) (:original applied))
                              (if (:bit? v)
                                (do (progress! (str "   噛む " id))
