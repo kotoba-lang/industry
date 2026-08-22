@@ -1691,4 +1691,44 @@
   ;; 解決しない。**赤くなるところを見ていない mutation は載せない**という
   ;; このファイルの規約に従って、見送る。直すなら harness 側で sibling を
   ;; 一緒に切り出すか、ocio 側の依存座標を git 参照にする（2026-08-24）。
+
+
+  {:repo "orgs/kotoba-lang/org-iso-6983"
+   :label "CAM —— 工具が届く経路は 2 つある（低いから届く、太いから届く）"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :cam/holder-not-in-the-envelope
+     :why "工具が工作物に届く経路は**先端が低いから**と**シャンク・ホルダが太いから**の 2 つ。ホルダ区間を包絡から外すと、正しい形を切りながら治具を壊すプログラムが通る —— 先端の食い込みだけを見る検査では捕まらない"
+     :file "src/kotoba/cam/toolpath.cljc"
+     :find "      (> overall flute) (conj {:name :holder :radius hr :z-low flute :z-high overall}))))"
+     :replace "      false (conj {:name :holder :radius hr :z-low flute :z-high overall}))))"
+     :must-fail ["a-holder-collides-where-the-tip-is-perfectly-happy"]}
+
+    {:id :cam/no-adaptive-bisection
+     :why "適応細分を止めると生成した経路が自分の食い込み検査を通らなくなる。**曲率のある形でしか出ない** —— 平板は線形移動でぴたり追従するので、細分を切っても食い込まない"
+     :file "src/kotoba/cam/toolpath.cljc"
+     :find "        max-bisect (long (or max-bisections 12))"
+     :replace "        max-bisect 0"
+     :must-fail ["a-generated-pass-passes-its-own-gouge-check"]}]}
+
+
+  {:repo "orgs/kotoba-lang/kami-engine-cae-solver"
+   :label "CAE の検証 —— 製造解が 2 次収束すること"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :cae/mms-polynomial-forcing-wrong
+     :why "製造解法（MMS）は「解を先に決めて、それを厳密解にする source 項を逆算する」検証法。u = x(L−x)(x+L) に対する f = 6·EA·x を狂わせると **u はもう厳密解でなくなる**。線形要素はこの三次多項式に対して節点厳密なので、正しいときの誤差は丸め（1e-17〜1e-15）—— 狂わせると誤差が O(h²) に跳ね上がり、status が `:exact-to-round-off` から `:computed` に変わる。**`:must-fail` に名前を書く理由がここに出た**: 最初これを「2 次収束のテスト」に紐づけたが、あちらは `:sine` しか回さないので噛まなかった。別の理由で赤くなったものを「噛んだ」と誤読しないために、テスト名まで見る"
+     :file "src/cae/vv.cljc"
+     :find "    :polynomial (* 6.0 ea x)))"
+     :replace "    :polynomial (* 5.0 ea x)))"
+     :must-fail ["a-solver-that-is-exact-says-so-instead-of-reporting-a-number"]}
+
+    {:id :cae/mms-sine-forcing-wrong
+     :why "同じ狂わせ方を `:sine` 側に。こちらは丸め床の上に居るので、source 項を間違えると**収束次数そのもの**が 2 から外れる —— 誤差が大きくなるだけでなく、次数が変わるところが MMS の捕まえるもの"
+     :file "src/cae/vv.cljc"
+     :find "    :sine (* ea (Math/pow (/ (* k Math/PI) L) 2) (Math/sin (/ (* k Math/PI x) L)))"
+     :replace "    :sine (* 0.9 ea (Math/pow (/ (* k Math/PI) L) 2) (Math/sin (/ (* k Math/PI x) L)))"
+     :must-fail ["manufactured-solution-recovers-second-order-accuracy"]}]}
 ]}
