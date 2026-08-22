@@ -297,6 +297,55 @@ Proven both ways, in the real pipeline rather than in a unit test:
 | references a var that does not exist | `:additive` → PR → **merge** | **`:review`**, named, with the symbol |
 | references only vars that exist | `:additive` → merge | `:additive` → merge |
 
+### Every filter guarded `:additive` only; `:review` was committed unchecked
+
+SSoT: `:tracked-safety-gate` in the edn. Gate: `tracked-safety-gate!` in
+`scripts/cleanup-land.cljs`. Proof: `nbb scripts/cleanup-land.cljs --selftest-tracked-gate`.
+
+`plan-repo` classifies with `grouped (group-by #(classify-file dir %) untracked)` — the
+untracked set, and nothing else. `:tracked` reached `server-commit!` having passed through
+no filter at all. So the credential pattern, the secret-content scan, the 2 MB ceiling and
+the build-output exclusion were **all `:additive`-only**.
+
+What failed was the *route*, not the pattern: `junk-re` has carried `.cpcache` and
+`.shadow-cljs` since the day it was written. Measured 2026-08-21, both reached a PR through
+`:review`:
+
+| PR | what it was |
+|---|---|
+| `kotoba-lang/kotobase-worker-shell#3` | 103 files, all `.shadow-cljs/builds/test/dev/` compiler output, **+29,071 lines** |
+| `cloud-itonami/ai-gftd-dougaka#6` | `clj/.cpcache/*`, whose contents are one machine's absolute paths (`/Users/junkawasaki/.m2/…`) |
+
+**The same hole is in the credential side**: edit a tracked key file locally and it is
+committed and pushed. That makes this a safety fix, not a noise fix.
+
+The drop rule differs by class:
+
+- **credential / secret content** — dropped unconditionally. No exception to the floor.
+- **over 2 MB** — dropped.
+- **junk path** — dropped **only when absent from base**. If base has it, the repo tracks
+  that artifact deliberately (such repos exist), so discarding it silently is the more
+  dangerous move; it stays and a human reads it.
+
+When `base-map` cannot be fetched the junk question cannot be asked, so only credential and
+size apply and the gate prints `:applied :partial` — "could not measure" must not look like
+"measured and clean" (ADR-2608136000). Local working trees are never touched; what is
+dropped is already in that repo's `.git/stash-archive-<date>/tracked-modifications.patch`.
+
+Proven three ways, re-runnable by anyone:
+
+| case | kept | dropped |
+|---|---|---|
+| junk absent from base | 1 | `{:skip-junk-new 2, :skip-credential 1}`, `applied=true` |
+| junk present in base | 3 | `{:skip-credential 1}` |
+| base tree unavailable | 3 | `{:skip-credential 1}`, `applied=:partial` |
+
+Credential drops in all three.
+
+Never: treat `:review` as safe because it is not merged (it is still committed and pushed);
+drop junk without asking whether base tracks it; pass off a question you could not ask as a
+clean answer.
+
 ### A renamed-away path is absent from `main` for exactly the reason a new path is
 
 SSoT: `:residue-gate` in the edn. Gate: `scripts/rename_residue.cljs`, entry point
