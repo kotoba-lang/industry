@@ -1384,4 +1384,80 @@
      :file "src/etzhayyim/airshed/contract.cljc"
      :find ":when (and f (not (contains? caps f)))]"
      :replace ":when (and f false (not (contains? caps f)))]"
-     :must-fail ["a-step-that-calls-an-undeclared-capability-is-a-violation"]}]}]}
+     :must-fail ["a-step-that-calls-an-undeclared-capability-is-a-violation"]}]}
+
+  {:repo "orgs/cloud-itonami/yoro-supply"
+   :label "yoro-supply actor descriptor —— manifest ↔ cells ↔ lex ↔ deploy ↔ agent の 5 面一致 + 決定核"
+   ;; manifest.edn は :actor/cells と :actor/lex を宣言し、cells/*.edn は
+   ;; :cell/handler で py/agent.cljc の関数を名指しし、deploy/app-aozora.edn は
+   ;; cell 由来の capability-allowlist を配る。2026-08-22 までこの 5 面の一致を
+   ;; 検査するものが無かった（cargo / airshed と同じ「descriptor が静かに割れる」
+   ;; 入口）。規則は src/etzhayyim/yoro_supply/contract.cljc の純粋関数、fixture
+   ;; （contract_test）で落ちることを見せてから実ファイル（repo_test）に当てる。
+   ;; 決定核（G1 SBT gate / G7 tithe 10% / G7+G11 intent 停止）は py/agent.cljc を
+   ;; nbb で実 load して実挙動で固定。全て 2026-08-22 に実際に赤くなるところを見た。
+   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :green-marker "yoro-supply actor contract: all green"
+   :mutations
+   [{:id :yoro-supply/deploy-did-drifts
+     :why "deploy の actor-did と manifest.jsonld の id が別 DID に割れる形（cargo の改名半端・airshed と同型）。DID は gen-1/gen-3 を跨いで割れてはならない唯一の identity"
+     :file "deploy/app-aozora.edn"
+     :find ":deployment/actor-did \"did:web:etzhayyim.com:yoro-supply\""
+     :replace ":deployment/actor-did \"did:web:etzhayyim.com:actor:yoro-supply\""
+     :must-fail ["deploy-and-jsonld-name-the-same-did"]}
+
+    {:id :yoro-supply/allowlist-grows-beyond-the-cells
+     :why "deploy 側の allowlist にだけ能力を足す形。manifest は変わらないので manifest だけ読むレビューは気づかず、配備側が cell に対応しない権限を配る"
+     :file "deploy/app-aozora.edn"
+     :find ":yoro-supply.delivery-verify]"
+     :replace ":yoro-supply.delivery-verify :yoro-supply.actuate]"
+     :must-fail ["deploy-allowlist-equals-the-cell-set"]}
+
+    {:id :yoro-supply/handler-renamed-only-in-the-cell
+     :why "cell descriptor 側だけ handler を改名する形。EDN としては valid のまま、配備が実行時に初めて『関数が無い』で落ちる —— descriptor と code の縫い目が一番静かに割れる場所"
+     :file "cells/supplier_selection.edn"
+     :find ":cell/handler \"handle_supplier_selection\""
+     :replace ":cell/handler \"handle_supplier_pick\""
+     :must-fail ["every-cell-handler-exists-in-the-agent"]}
+
+    {:id :yoro-supply/state-graph-node-renamed-without-edges
+     :why ":nodes だけ rename して :edges を忘れる形 —— edge が ghost node を指し、新名 node は unreachable になる。graph は valid EDN のままなので検査が無ければ配備まで分からない"
+     :file "cells/shipment.edn"
+     :find "{:nodes [:confirm-ready :arrange-carrier :generate-docs :track-shipment :estimate-arrival]"
+     :replace "{:nodes [:confirm-ready :arrange-carrier :generate-docs :track :estimate-arrival]"
+     :must-fail ["every-cell-state-graph-is-well-formed"]}
+
+    {:id :yoro-supply/llm-endpoint-leaves-localhost
+     :why "G5 murakumo-only。endpoint を外部ホストに向ける 1 行の編集で『LLM access is Murakumo-only』という README・manifest 両方の宣言が嘘になる"
+     :file "cells/manufacture_track.edn"
+     :find ":endpoint \"127.0.0.1:4000\""
+     :replace ":endpoint \"api.example.com:443\""
+     :must-fail ["every-llm-cell-is-murakumo-only"]}
+
+    {:id :yoro-supply/tithe-shrinks
+     :why "G7 tithe 10%。TITHE_BPS を 1 桁削る編集は diff 上 2 文字で、settlement は valid な形のまま Public Fund への 10% が 1% になる"
+     :file "py/agent.cljc"
+     :find "(def TITHE_BPS 1000)"
+     :replace "(def TITHE_BPS 100)"
+     :must-fail ["settlement-splits-exactly-ten-percent-tithe"]}
+
+    {:id :yoro-supply/settlement-executes-without-signature
+     :why "G7+G11。署名なし settlement を executed に『改善』すると、member 署名 + operator gate を待つという README の宣言が嘘になる —— intent 停止は仕様であって未実装ではない"
+     :file "py/agent.cljc"
+     :find "\"state\" (if member-sig-ref \"executed\" \"intent\")"
+     :replace "\"state\" \"executed\""
+     :must-fail ["settlement-stops-at-intent-without-member-signature"]}
+
+    {:id :yoro-supply/sbt-gate-goes-blind
+     :why "G1 consent-bound。eligibility 判定を素通りにすると、SBT を持たない DID の発注が placed になる —— member = ordering principal という前提が壊れる"
+     :file "py/agent.cljc"
+     :find "(if (not (get elig \"eligible\"))"
+     :replace "(if false"
+     :must-fail ["a-stranger-without-sbt-cannot-place-an-order"]}
+
+    {:id :yoro-supply/rule-code-goes-blind
+     :why "**規則コード側を撃つ。** check-handlers の :when に false を挟むと、実ファイルは緑のままなので repo_test は何も言わない —— fixture テストだけがこれを捕まえる。データを撃つ 8 件が守るのは descriptor と決定核、これが守るのは規則そのもの"
+     :file "src/etzhayyim/yoro_supply/contract.cljc"
+     :find ":when (and f (not (contains? defn-names f)))]"
+     :replace ":when (and f false (not (contains? defn-names f)))]"
+     :must-fail ["a-cell-handler-missing-from-the-agent-is-a-violation"]}]}]}
