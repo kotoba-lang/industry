@@ -1605,4 +1605,67 @@
      :file "src/voxel/nvdb.cljc"
      :find "        (pos? codec)"
      :replace "        false"
-     :must-fail ["it-refuses-what-it-cannot-read"]}]}]}
+     :must-fail ["it-refuses-what-it-cannot-read"]}]}
+
+  {:repo "orgs/kotoba-lang/org-iso-10303"
+   :label "feature evaluator —— 拒否こそが実装"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :brep/fillet-returns-open-surfaces
+     :why "boolean が開いた曲面を返す組み合わせがあり、それは**体積が逆方向に間違った「立体」**である。閉包を検査せず返すと、閉包検査も三角形数も見分けられないまま出荷される"
+     :file "src/brep/feature.cljc"
+     ;; anchor は「閉包を確かめてから採用する」その 1 行。2026-08-23 の
+     ;; overshoot retry で `(if (pos? open-edges) …)` から
+     ;; `(when (empty? …) m)` に形が変わっている —— **mutation は実装の形に
+     ;; 追随する**必要があり、追随していない mutation は anchor not found として
+     ;; 報告される（それも harness の仕事のうち）
+     :find "(when (empty? (topo/boundary-edges (topo/topology m))) m)"
+     :replace "m"
+     :must-fail ["fillet-refuses-rather-than-returning-a-shape-nobody-asked-for"]}
+
+    {:id :brep/shell-accepts-concave
+     :why "面平面を内側に押して交差させるやり方は凸な body でのみ真のオフセット。凹の reflex 稜では 2 枚のオフセット面が材料の外で交わり、**残すべき壁を食った閉じたソリッド**が返る —— 閉包検査では捕まらない"
+     :file "src/brep/feature.cljc"
+     :find "          (not (convex-body? topo planes 1.0e-6))"
+     :replace "          false"
+     :must-fail ["shell-refuses-what-it-cannot-offset"]}]}
+
+  {:repo "orgs/kotoba-lang/kami-engine-modeling"
+   :label "板金と DXF —— シャーが切る数と、黙って落ちる entity"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :sheet-metal/deduction-loses-the-factor-two
+     :why "曲げ控除は 2·OSSB − BA。係数 2 を落とすと展開長が変わるが、**返るのはただの数**でシャーはそれを切る"
+     :file "src/kami/modeling/sheet_metal.cljc"
+     :find "(- (* 2.0 (outside-setback bend)) (bend-allowance bend))"
+     :replace "(- (outside-setback bend) (bend-allowance bend))"
+     :must-fail ["the-three-formulas-are-the-textbook-ones"]}
+
+    {:id :dxf/drops-unsupported-entities
+     :why "知らない entity 型を黙って捨てると、受け手は**自分の図面が subset になったこと**に気付けない"
+     :file "src/kami/modeling/drawing.cljc"
+     :find "(update-in acc [:dxf/unsupported kind] (fnil inc 0))"
+     :replace "acc"
+     :must-fail ["dxf-reads-back-and-reads-drawings-it-did-not-write"]}]}
+
+  {:repo "orgs/kotoba-lang/org-ansi-iges"
+   :label "IGES —— 区切り子はファイルの中で宣言されている"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :iges/assumes-default-delimiters
+     :why "Global の最初の 2 フィールドが区切り子を宣言する。`,` `;` と決め打ちした reader は、別の区切り子を選んだ系のファイルを**エラーを出さずに**間違った位置で分割する —— フィールドは分割されるので形は正しく、値だけが違う"
+     :file "src/iges/core.cljc"
+     :find "  (let [[pd rest1] (or (read-hollerith g) [nil nil])]"
+     :replace "  (let [[pd rest1] [nil nil]]"
+     :must-fail ["it-reads-a-file-it-did-not-write"]}]}
+
+  ;; ⚠ `orgs/kotoba-lang/ocio` の色順応 mutation はここに**入れていない**。
+  ;; あの repo の deps.edn は `:local/root "../yaml"` で兄弟 checkout を参照して
+  ;; おり、この harness は west pin から /tmp に worktree を切るので `../yaml` が
+  ;; 解決しない。**赤くなるところを見ていない mutation は載せない**という
+  ;; このファイルの規約に従って、見送る。直すなら harness 側で sibling を
+  ;; 一緒に切り出すか、ocio 側の依存座標を git 参照にする（2026-08-24）。
+]}
