@@ -188,6 +188,13 @@
         ;; 特にそうで、実際にこの loop の初回実行がそれで 2 suite 落ちた。
         ;; remote 名は west の慣習で `origin` とは限らないので --all で引く。
         (sh ["git" "fetch" "--all" "--quiet"] src)
+        ;; 消えた worktree の登録が残っていると `add` は
+        ;; 「missing but already registered」で落ちる。**その状態は普通に起きる**
+        ;; —— 前の実行が落ちた、別のセッションが /tmp を掃除した、`--keep-worktree`
+        ;; の残骸を手で消した。実測 2026-08-24、180 mutation の通し実行のうち
+        ;; 1 suite がこれだけの理由でエラーになった。prune は登録簿から
+        ;; **実体の無い entry を消すだけ**で、生きている worktree には触らない。
+        (sh ["git" "worktree" "prune"] src)
         (let [wt (sh ["git" "worktree" "add" "--detach" dir sha] src)]
           (if-not (zero? (:code wt))
             (do (println (str "   FAIL: worktree を作れない — " (str/trim (:out wt))))
