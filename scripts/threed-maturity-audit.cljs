@@ -31,6 +31,7 @@
   (:require [clojure.edn :as edn]
             [clojure.string :as str]
             ["fs" :as fs]
+            ["os" :as os]
             ["path" :as path]
             ["child_process" :as cp]))
 
@@ -254,6 +255,7 @@
         ;; 何も出さなかったので、実測 28 分無音のとき「遅い」のか「止まった」のかを
         ;; 区別できなかった —— 沈黙が進行中と同じ顔をする。所要秒数も一緒に出す
         ;; ので、どの probe が高いかが測らずに分かる。
+        load-before (first (.loadavg os))
         measured (vec (map-indexed
                        (fn [i axis]
                          (let [t0 (.now js/Date)
@@ -320,7 +322,19 @@
         (fs/writeFileSync out-file body)))
 
       ;; ── 報告 ──
-      (println (str "SCANNED\taxes=" (count measured) "\trepos=" resolved-repos
+      ;; 負荷を秒数の隣に置く。**このマシンは並行 agent で load が 17〜300 の間を
+    ;; 動く**ので、秒数だけを見て「速くなった/遅くなった」と読ませない。実測
+    ;; 2026-08-24: 同じ probe が load 17 で 200 秒、load 100 で 541 秒。
+    ;; ⚠ `scripts/maturity-loop/run.cljs`（mutation harness）と**同時に走らせない**
+    ;; こと —— あちらは repo の全 suite を繰り返し回すので、両方回すと双方の
+    ;; 秒数が意味を失う。あちらは resource-guard の build lock を通るが、
+    ;; この audit は通らない（64 本の probe を lock 越しに直列化すると、
+    ;; 長い mutation 実行中は永久に測れなくなる）。
+    (binding [*print-fn* *print-err-fn*]
+      (println (str "  load1 " (.toFixed load-before 1) " → "
+                    (.toFixed (first (.loadavg os)) 1)
+                    "（秒数はこの負荷での値。絶対値として引用しない）")))
+    (println (str "SCANNED\taxes=" (count measured) "\trepos=" resolved-repos
                     "\tfiles=" scanned-files))
       (println (str "STATUS\tworking=" (get by-status :working 0)
                     "\thollow=" (get by-status :hollow 0)
