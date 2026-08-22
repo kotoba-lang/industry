@@ -1763,4 +1763,29 @@
      :find "        :bezier (hermite a b p tangent-out tangent-in duration)"
      :replace "        :bezier (+ a (* p (- b a)))"
      :must-fail ["bezier-is-an-alias-of-hermite-and-nothing-said-so"]}]}
+
+
+  {:repo "orgs/kotoba-lang/org-iso-16739"
+   :label "IFC / IDS —— XML の入口を閉じておくこと"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :ifc/xxe-doctype-allowed
+     :why "`disallow-doctype-decl` を切ると **XXE（外部実体参照）が通る** —— 他人から受け取った IDS ファイルがローカルファイルを読み出せるようになる。**正常な IDS はどれも DOCTYPE を持たないので、切っても普通のテストは全部緑のまま通る**。セキュリティの硬化は、それを名指しで撃つテストが無ければ静かに外れる"
+     :file "src/ifc/ids/xml.clj"
+     :find "    (.setFeature factory \"http://apache.org/xml/features/disallow-doctype-decl\" true)"
+     :replace "    (.setFeature factory \"http://apache.org/xml/features/disallow-doctype-decl\" false)"
+     :must-fail ["rejects-doctype-and-external-entity-input"]}]}
+
+  {:repo "orgs/kotoba-lang/org-khronos-gltf"
+   :label "glTF —— 正規化整数アクセサの除数"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :gltf/normalized-divisor-off-by-one
+     :why "正規化 UNSIGNED_BYTE は 255 で割る（255 → ちょうど 1.0）。256 で割ると **最大値が 0.996 になり、1.0 に届かない** —— 色や UV が全体にわずかに暗く・小さくなるだけなので、目でも「だいたい合っている」画像でも気づけない。spec が決めている定数を、定数として守る"
+     :file "src/gltf.cljc"
+     :find "  {5120 127 5121 255 5122 32767 5123 65535})"
+     :replace "  {5120 127 5121 256 5122 32767 5123 65535})"
+     :must-fail ["decode-accessor-normalized-unsigned-byte"]}]}
 ]}
