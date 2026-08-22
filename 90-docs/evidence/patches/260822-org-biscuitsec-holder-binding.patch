@@ -1,0 +1,436 @@
+From cb6c33d257f74718bd72341c3b4f4de12ffa1cf5 Mon Sep 17 00:00:00 2001
+From: Jun Kawasaki <jun784@gmail.com>
+Date: Sat, 22 Aug 2026 01:17:13 +0000
+Subject: [PATCH] effective: the grant is addressed, and the address is checked
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+`requested ∩ delegated ∩ local-policy` decided what may be reached and never
+who by. The datum was not missing — `:cap/holder` is one of `:identity-keys`
+in the language's semantics — but the answer was copied out of the request:
+
+    :cap/holder (:cap/holder requested)
+
+A caller stating `:cap/holder "did:key:zWhoever"` had that string arrive
+intact in the capability handed to the handler, compared to nothing. The
+claim and the check were on the same side of the boundary.
+
+- `biscuit.kotoba/->delegated` now reads `[holder <principal>]`, the one fact
+  whose omission did not fail toward less authority: dropping it turned an
+  addressed token back into a bearer token.
+- `biscuit.effective/authorize` takes `:holder` — the authenticated principal,
+  the sealed output of an authentication that already happened — and drops
+  `(:cap/holder requested)` on entry rather than propagating it. An addressed
+  grant is usable only by its addressee (`:wrong-holder`, `:holder-required`);
+  an unaddressed one is a bearer grant that says so, and
+  `:policy/require-holder true` declines it, the same shape
+  `:policy/forbid-wildcard` already uses.
+- The effective holder is the LAST holder fact, not the first, in both this
+  fold and `biscuit.authority/->grant`. `authority.grant/meet` states the
+  rule: the holder is the child's, a delegation ends at whoever holds the
+  leaf. Taking the first made a later block's re-addressing a silent no-op —
+  the parent kept the token and the child got nothing.
+- Every receipt, allowed and denied alike, carries `:receipt/holder` and
+  `:receipt/holder-binding`, and `:unauthenticated` is a distinct value from
+  `:bearer`. Extra keys, not additions to `receipt-keys`:
+  `:receipt-requirements` is the floor the language sets, and a floor is not
+  a ceiling.
+
+No new decider. `authority/grant.cljc` already compares a holder when a grant
+names one; this puts the same question on the capability-semantics path,
+which had no holder check at all.
+
+Measured with nbb (the JVM `:test` alias needs a JDK toolchain not present in
+this environment): 77 tests / 202 assertions / 0 failures, from a 71/172
+baseline. Each change was shown to discriminate — reverting the request
+passthrough reddens 2 tests, reverting last-to-first reddens 2 here and 3 in
+the authority fold, and un-reading the holder fact reddens 5.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01H2BE7EX3cjLVRdv97GuwFu
+---
+ src/biscuit/authority.cljc       |  7 ++-
+ src/biscuit/effective.cljc       | 97 ++++++++++++++++++++++++++++----
+ src/biscuit/kotoba.cljc          | 34 ++++++++---
+ test/biscuit/authority_test.cljc | 20 +++++++
+ test/biscuit/effective_test.cljc | 91 +++++++++++++++++++++++++++++-
+ 5 files changed, 227 insertions(+), 22 deletions(-)
+
+diff --git a/src/biscuit/authority.cljc b/src/biscuit/authority.cljc
+index 1ae9b9a..d993295 100644
+--- a/src/biscuit/authority.cljc
++++ b/src/biscuit/authority.cljc
+@@ -43,7 +43,12 @@
+                         blocks)
+         all-facts (mapcat :block/facts blocks)
+         befores (keep (fn [[p v]] (when (= 'before p) v)) all-facts)
+-        holder (some (fn [[p v]] (when (= 'holder p) v)) all-facts)
++        ;; LAST, not first: `authority.grant/meet` states the rule — *the
++        ;; holder is the child's: a delegation ends at whoever holds the
++        ;; leaf.* Taking the first made a later block's re-addressing a
++        ;; silent no-op, so a delegation to a child appeared to happen and
++        ;; conferred nothing on the child while the parent kept the token.
++        holder (last (keep (fn [[p v]] (when (= 'holder p) v)) all-facts))
+         narrowed (reduce grant/meet (grant/grant base) per-block)]
+     (cond-> (assoc narrowed :grant/expires
+                    (reduce earlier (:grant/expires narrowed) befores))
+diff --git a/src/biscuit/effective.cljc b/src/biscuit/effective.cljc
+index 6b8f859..16773b4 100644
+--- a/src/biscuit/effective.cljc
++++ b/src/biscuit/effective.cljc
+@@ -24,6 +24,29 @@
+   guard that logs what it allowed and forgets what it refused cannot answer
+   the only question an incident asks.
+ 
++  ## The fourth term: the grant is addressed, and the address is checked
++
++  `requested ∩ delegated ∩ local-policy` decides *what* may be reached. It
++  never decided *by whom*, and the gap was not that the datum was absent —
++  `:cap/holder` is one of `:identity-keys` in the language's semantics — but
++  that the answer was copied out of the request. A caller stating
++  `:cap/holder \"did:key:zWhoever\"` had that string arrive intact in the
++  capability handed to the handler, and no step between compared it to
++  anything. **The claim and the check were on the same side of the boundary.**
++
++  So `authorize` now takes `:holder` — the *authenticated* principal, the
++  sealed output of whatever ran the authentication (CACAO, passkey, a
++  verified DID proof, a parent capability). It is never read from
++  `requested`, and `requested`'s own `:cap/holder` is now ignored entirely
++  rather than propagated. A grant that names a holder is usable only by that
++  holder; a grant that names none is a bearer grant and says so out loud.
++
++  Bearer is still legitimate — a public read capability has no addressee —
++  but it becomes a decision rather than a default: `:policy/require-holder
++  true` in the local policy refuses one, the same shape
++  `:policy/forbid-wildcard` already uses to keep a lattice-legal value out of
++  production.
++
+   ## No secret, anywhere
+ 
+   The whole decision needs the token, the root **public** key, the local
+@@ -38,9 +61,19 @@
+   it to the semantics file rather than to a docstring."
+   [:receipt/cap :receipt/at :receipt/call :receipt/outcome])
+ 
+-(defn- receipt [{:keys [now call cap outcome detail]}]
++(defn- receipt [{:keys [now call cap outcome detail holder binding]}]
++  ;; `:receipt/holder` and `:receipt/holder-binding` are present on EVERY
++  ;; path, allowed and denied alike, and `:unauthenticated` is a distinct
++  ;; value from `:bearer`. "No principal was supplied" and "a principal was
++  ;; supplied and the grant did not ask for one" are different facts about a
++  ;; call, and a receipt that renders them identically cannot answer the only
++  ;; question an incident asks. They are extra keys, not additions to
++  ;; `receipt-keys`: `:receipt-requirements` is the floor the language sets,
++  ;; and a floor is not a ceiling.
+   (cond-> {:receipt/at now :receipt/call call
+-           :receipt/cap cap :receipt/outcome outcome}
++           :receipt/cap cap :receipt/outcome outcome
++           :receipt/holder holder
++           :receipt/holder-binding (or binding :unauthenticated)}
+     detail (assoc :receipt/detail detail)))
+ 
+ (defn- wildcard? [x] (or (= :any x) (= "*" x) (= :* x)))
+@@ -50,20 +83,31 @@
+ 
+   `{:semantics <capability-semantics map> :token t :root-public-key pk
+     :verify-fn f :requested {:cap/kind k :cap/resource r} :local-policy p
+-    :now instant :call name}`
++    :now instant :call name :holder principal-or-nil}`
++
++  `:holder` is the **authenticated** principal — the sealed result of an
++  authentication that already happened, handed in by the edge that ran it.
++  It is not a claim the caller makes about itself, and it is deliberately
++  not read from `requested`: `(:cap/holder requested)` is now ignored.
+ 
+   -> `{:allowed? bool :reason kw :capability {…}|nil :receipt {…}}`
+ 
+   The capability is only present when allowed, and it is the **concrete
+   post-intersection** one (`:handler-receives`), never the token's claim."
+-  [{:keys [semantics token root-public-key verify-fn requested local-policy now call]}]
++  [{:keys [semantics token root-public-key verify-fn requested local-policy now call holder]}]
+   (let [rules (:rules semantics)
+         kinds (:kinds semantics)
+         {:cap/keys [kind resource]} requested
+-        deny (fn [reason & [detail]]
++        ;; The request's own `:cap/holder` never leaves this function. It is
++        ;; dropped rather than compared, because comparing it would suggest
++        ;; it carried information: a caller asserting who it is tells you
++        ;; nothing you did not already have to establish elsewhere.
++        requested (dissoc requested :cap/holder)
++        deny (fn [reason & [{:keys [detail binding]}]]
+                {:allowed? false :reason reason :capability nil
+                 :receipt (receipt {:now now :call call :cap requested
+-                                   :outcome :denied :detail (or detail reason)})})
++                                   :outcome :denied :detail (or detail reason)
++                                   :holder holder :binding binding})})
+         v (bt/verify token root-public-key verify-fn)]
+     (cond
+       (not (:ok? v))
+@@ -94,6 +138,12 @@
+           (let [live (filter (fn [g] (let [e (:grant/expires g)]
+                                        (or (nil? e) (neg? (compare now e)))))
+                              matching)
++                ;; Token-scoped, like `before`: every grant folded out of one
++                ;; token carries the same addressee, so any live grant answers.
++                addressed-to (some :grant/holder live)
++                binding (cond (nil? addressed-to) (if holder :bearer :unauthenticated)
++                              (= addressed-to holder) :bound
++                              :else :mismatch)
+                 delegated (into #{} (mapcat :grant/resources) live)
+                 allowed (into #{} (:policy/allow local-policy))
+                 ;; requested ∩ delegated ∩ local-policy, in that order and
+@@ -103,17 +153,40 @@
+                                                  (some wildcard? allowed))
+                                            s #{})))]
+             (cond
++              ;; The addressee is checked before the resource intersection so
++              ;; that a wrong holder is refused by its own name rather than
++              ;; disappearing into `:empty-intersection`. A denial that cannot
++              ;; say which term failed is a denial nobody can act on.
++              (and (some? addressed-to) (nil? holder))
++              (deny :holder-required {:binding :unauthenticated})
++
++              (= :mismatch binding)
++              (deny :wrong-holder {:binding :mismatch})
++
++              ;; Bearer stays legal, but production has to say so. Same shape
++              ;; as `:policy/forbid-wildcard`: the lattice permits it, the
++              ;; deployment declines it.
++              (and (:policy/require-holder local-policy) (nil? addressed-to))
++              (deny :unbound-grant {:binding binding})
++
+               (and (:policy/forbid-wildcard local-policy)
+                    (or (some wildcard? delegated) (wildcard? resource)))
+-              (deny :production-effective-wildcard)
++              (deny :production-effective-wildcard {:binding binding})
+ 
+               (and (= :deny (:empty-intersection rules)) (empty? effective))
+-              (deny :empty-intersection)
++              (deny :empty-intersection {:binding binding})
+ 
+               :else
+-              (let [cap {:cap/kind kind :cap/resource resource
+-                         :cap/holder (:cap/holder requested)
+-                         :cap/provenance :biscuit}]
++              ;; `:cap/holder` is the AUTHENTICATED principal or absent. It is
++              ;; never `(:cap/holder requested)` — that value was dropped on
++              ;; entry — and it is omitted rather than set to nil, because
++              ;; `kotoba.lang.capability-values` validates the key when the key
++              ;; is present and a nil there is a malformed capability, not an
++              ;; unaddressed one.
++              (let [cap (cond-> {:cap/kind kind :cap/resource resource
++                                 :cap/provenance :biscuit}
++                          holder (assoc :cap/holder holder))]
+                 {:allowed? true :reason :granted :capability cap
+                  :receipt (receipt {:now now :call call :cap cap
+-                                    :outcome :allowed})}))))))))
++                                    :outcome :allowed
++                                    :holder holder :binding binding})}))))))))
+diff --git a/src/biscuit/kotoba.cljc b/src/biscuit/kotoba.cljc
+index 80f3417..150cdf2 100644
+--- a/src/biscuit/kotoba.cljc
++++ b/src/biscuit/kotoba.cljc
+@@ -45,10 +45,26 @@
+   -> `{:grants [{:grant/kind :grant/resources :grant/expires :grant/id} …]
+        :grant/rejected [...]}`
+ 
+-  Facts read: `[cap <kind> <resource>]` and `[before <instant>]`. Everything
+-  else stays available to checks and policies and confers nothing — the same
+-  one-directional ignorance `biscuit.authority` documents, for the same
+-  reason: **an unread fact cannot widen a grant.**
++  Facts read: `[cap <kind> <resource>]`, `[before <instant>]` and
++  `[holder <principal>]`. Everything else stays available to checks and
++  policies and confers nothing — the same one-directional ignorance
++  `biscuit.authority` documents, for the same reason: **an unread fact
++  cannot widen a grant.**
++
++  ## The holder fact is read here because not reading it was not neutral
++
++  `holder` was the one fact whose omission did not fail toward less
++  authority. A token saying `[holder \"did:key:zAlice\"]` is a token its
++  issuer addressed; dropping the fact turned it back into a bearer token,
++  and `biscuit.effective` then filled `:cap/holder` from the **request** —
++  that is, from whatever the caller asserted about itself. The claim and
++  the check were on the same side.
++
++  The effective holder is the **last** holder fact in block order, not the
++  first. `authority.grant/meet` states the rule this follows: *the holder is
++  the child's: a delegation ends at whoever holds the leaf.* A chain whose
++  authority block is addressed to Alice and whose block 1 re-addresses it to
++  Bob is Alice delegating to Bob, and it is Bob who presents it.
+ 
+   Blocks fold in order and later blocks may only remove resources from a kind
+   they already have, never add a kind — `:scope-attenuation-only true` is not
+@@ -79,14 +95,16 @@
+                                                 [k (set/intersection rs later)]))
+                                             acc)))))
+                        {} per-block)
+-        befores (keep (fn [[p v]] (when (= 'before p) v))
+-                      (mapcat :block/facts blocks))
+-        expires (when (seq befores) (reduce (fn [a b] (if (neg? (compare a b)) a b)) befores))]
++        all-facts (mapcat :block/facts blocks)
++        befores (keep (fn [[p v]] (when (= 'before p) v)) all-facts)
++        expires (when (seq befores) (reduce (fn [a b] (if (neg? (compare a b)) a b)) befores))
++        holder (last (keep (fn [[p v]] (when (and (= 'holder p) (string? v)) v)) all-facts))]
+     {:grants (vec (for [[k rs] folded]
+                     (cond-> {:grant/kind k
+                              :grant/resources (vec (sort rs))
+                              :grant/id (str "biscuit:" (hash [k (sort rs)]))}
+-                      expires (assoc :grant/expires expires))))
++                      expires (assoc :grant/expires expires)
++                      holder (assoc :grant/holder holder))))
+      :grant/rejected @rejected}))
+ 
+ (defn missing-grant?
+diff --git a/test/biscuit/authority_test.cljc b/test/biscuit/authority_test.cljc
+index 3b5511f..a53f741 100644
+--- a/test/biscuit/authority_test.cljc
++++ b/test/biscuit/authority_test.cljc
+@@ -39,6 +39,26 @@
+     (testing "the block asked for something outside the base and got nothing extra"
+       (is (= ["kotoba://graph/acme/prices"] (scope/sorted (:grant/scopes g)))))))
+ 
++(deftest a-delegation-ends-at-whoever-holds-the-leaf
++  (testing "`authority.grant/meet` states the rule — the holder is the
++            child's. Reading the FIRST holder fact instead of the last made a
++            later block's re-addressing a silent no-op: the parent kept the
++            token and the child it was delegated to got nothing."
++    (let [t (-> (bt/authority {:facts '[[scope "kotoba://graph/acme/*"]
++                                        [holder "did:key:zAlice"]]
++                               :next-public-key (:public k1)
++                               :root-private-key (:private root) :sign-fn k/sign-fn})
++                (bt/append {:facts '[[scope "kotoba://graph/acme/*"]
++                                     [holder "did:key:zBob"]]
++                            :next-public-key (:public k1)
++                            :private-key (:private k1) :sign-fn k/sign-fn}))
++          g (ba/->grant t base)]
++      (is (= "did:key:zBob" (:grant/holder g)))
++      (is (true? (grant/authorized? g "kotoba://graph/acme/prices"
++                                    {:now "2026-08-18T00:00:00Z" :holder "did:key:zBob"})))
++      (is (false? (grant/authorized? g "kotoba://graph/acme/prices"
++                                     {:now "2026-08-18T00:00:00Z" :holder "did:key:zAlice"}))))))
++
+ (deftest a-later-block-cannot-extend-an-expiry
+   (let [t (-> (bt/authority {:facts '[[before "2026-09-01T00:00:00Z"]]
+                              :next-public-key (:public k1)
+diff --git a/test/biscuit/effective_test.cljc b/test/biscuit/effective_test.cljc
+index cfda1a5..f73ef78 100644
+--- a/test/biscuit/effective_test.cljc
++++ b/test/biscuit/effective_test.cljc
+@@ -34,15 +34,28 @@
+   (bt/authority {:facts facts :next-public-key (:public k1)
+                  :root-private-key (:private root) :sign-fn k/sign-fn}))
+ 
+-(defn- call [t requested & [{:keys [policy now]}]]
++(defn- call [t requested & [{:keys [policy now holder]}]]
+   (eff/authorize {:semantics semantics :token t
+                   :root-public-key (:public root) :verify-fn k/verify-fn
+                   :requested requested
+                   :local-policy (or policy {:policy/allow ["kotoba://graph/acme"]
+                                             :policy/forbid-wildcard true})
+                   :now (or now "2026-08-19T00:00:00Z")
++                  :holder holder
+                   :call "graph/read"}))
+ 
++(def k2 (k/keypair "two"))
++
++(defn- addressed-to
++  "An authority block delegating `graph-read` on acme, addressed to `who`."
++  [who]
++  (bt/authority {:facts [['cap "graph-read" "kotoba://graph/acme"]
++                         ['holder who]]
++                 :next-public-key (:public k1)
++                 :root-private-key (:private root) :sign-fn k/sign-fn}))
++
++(def acme {:cap/kind :graph-read :cap/resource "kotoba://graph/acme"})
++
+ (deftest the-whole-decision-needs-no-secret
+   (testing "the reason the centre is biscuit and not macaroon"
+     (let [t (token '[[cap "graph-read" "kotoba://graph/acme"]])
+@@ -113,6 +126,82 @@
+            (:reason (call t {:cap/kind :graph-read :cap/resource "kotoba://graph/acme"}
+                           {:policy {:policy/allow ["*"] :policy/forbid-wildcard true}}))))))
+ 
++;; ---------------------------------------------------------------------------
++;; The fourth term: the grant is addressed, and the address is checked.
++
++(deftest a-self-asserted-holder-never-reaches-the-capability
++  (testing "the defect this slice closes: before it, the string a caller put
++            in :cap/holder arrived intact in the capability handed to the
++            handler, having been compared to nothing"
++    (let [d (call (token '[[cap "graph-read" "kotoba://graph/acme"]])
++                  (assoc acme :cap/holder "did:key:zAttacker"))]
++      (is (true? (:allowed? d)) "a bearer grant still passes; that is not what changed")
++      (is (not (contains? (:capability d) :cap/holder))
++          "the request's own holder claim must not become the capability's holder")
++      (is (nil? (get-in d [:receipt :receipt/holder])))
++      (is (= :unauthenticated (get-in d [:receipt :receipt/holder-binding]))))))
++
++(deftest an-addressed-grant-is-usable-only-by-its-addressee
++  (let [t (addressed-to "did:key:zBob")]
++    (testing "the addressee"
++      (let [d (call t acme {:holder "did:key:zBob"})]
++        (is (true? (:allowed? d)))
++        (is (= "did:key:zBob" (get-in d [:capability :cap/holder])))
++        (is (= :bound (get-in d [:receipt :receipt/holder-binding])))))
++    (testing "anyone else — refused by its own name, not swallowed by the intersection"
++      (is (= :wrong-holder (:reason (call t acme {:holder "did:key:zEve"})))))
++    (testing "and nobody at all: an addressed grant is not a bearer grant"
++      (is (= :holder-required (:reason (call t acme)))))))
++
++(deftest a-delegation-ends-at-the-leaf
++  (testing "authority block addressed to Alice, block 1 re-addressing to Bob:
++            it is Bob who presents it. Taking the FIRST holder fact made the
++            delegation a silent no-op — the parent kept the token and the
++            child got nothing."
++    (let [t (-> (addressed-to "did:key:zAlice")
++                (bt/append {:facts [['cap "graph-read" "kotoba://graph/acme"]
++                                    ['holder "did:key:zBob"]]
++                            :next-public-key (:public k2)
++                            :private-key (:private k1) :sign-fn k/sign-fn}))]
++      (is (true? (:allowed? (call t acme {:holder "did:key:zBob"}))))
++      (is (= :wrong-holder (:reason (call t acme {:holder "did:key:zAlice"})))))))
++
++(deftest bearer-is-legal-but-a-deployment-can-decline-it
++  (let [t (token '[[cap "graph-read" "kotoba://graph/acme"]])
++        strict {:policy/allow ["kotoba://graph/acme"]
++                :policy/forbid-wildcard true
++                :policy/require-holder true}]
++    (testing "unaddressed, and the policy does not mind"
++      (is (true? (:allowed? (call t acme {:holder "did:key:zBob"}))))
++      (is (= :bearer (get-in (call t acme {:holder "did:key:zBob"})
++                             [:receipt :receipt/holder-binding]))))
++    (testing "unaddressed, and the policy does mind — same shape as forbid-wildcard"
++      (is (= :unbound-grant (:reason (call t acme {:policy strict :holder "did:key:zBob"})))))
++    (testing "an addressed grant satisfies the strict policy"
++      (is (true? (:allowed? (call (addressed-to "did:key:zBob") acme
++                                  {:policy strict :holder "did:key:zBob"})))))))
++
++(deftest every-receipt-names-the-holder-and-unauthenticated-is-not-bearer
++  (testing "'no principal was supplied' and 'a principal was supplied and the
++            grant did not ask for one' are different facts about a call"
++    (let [bearer (token '[[cap "graph-read" "kotoba://graph/acme"]])]
++      (doseq [[label d] [["allowed, bound" (call (addressed-to "did:key:zBob") acme
++                                                 {:holder "did:key:zBob"})]
++                         ["allowed, bearer" (call bearer acme {:holder "did:key:zBob"})]
++                         ["allowed, unauthenticated" (call bearer acme)]
++                         ["denied, wrong holder" (call (addressed-to "did:key:zBob") acme
++                                                      {:holder "did:key:zEve"})]
++                         ["denied, unknown kind" (call bearer {:cap/kind :kernel/format-disk
++                                                               :cap/resource "/dev/sda"}
++                                                        {:holder "did:key:zBob"})]]]
++        (testing label
++          (is (contains? (:receipt d) :receipt/holder) label)
++          (is (contains? (:receipt d) :receipt/holder-binding) label)))
++      (is (= :bearer (get-in (call bearer acme {:holder "did:key:zBob"})
++                             [:receipt :receipt/holder-binding])))
++      (is (= :unauthenticated (get-in (call bearer acme)
++                                      [:receipt :receipt/holder-binding]))))))
++
+ ;; ---------------------------------------------------------------------------
+ 
+ (def contract-rules
+-- 
+2.43.0
+
