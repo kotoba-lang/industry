@@ -1460,4 +1460,59 @@
      :file "src/etzhayyim/yoro_supply/contract.cljc"
      :find ":when (and f (not (contains? defn-names f)))]"
      :replace ":when (and f false (not (contains? defn-names f)))]"
-     :must-fail ["a-cell-handler-missing-from-the-agent-is-a-violation"]}]}]}
+     :must-fail ["a-cell-handler-missing-from-the-agent-is-a-violation"]}]}
+
+  {:repo "orgs/cloud-itonami/intel"
+   :label "intel repo contract —— E2E 境界 / DID シェル不在 / appview identity / migration 契約"
+   ;; kotoba/src/registry.ts は冒頭コメントで CUI (inferredCohort) の E2E 封緘を
+   ;; 宣言し（substrate は subject PII を plaintext で見ない・founder の
+   ;; E2E-migration set の canonical template）、2026-08-03 には DID シェル一式が
+   ;; 誤複製される実退行（撤去に 3 commit、1 つ目の revert は失敗したまま「撤去」を
+   ;; 名乗った）があったが、2026-08-22 までどちらを検査するものも無かった。
+   ;; 規則は src/etzhayyim/intel/contract.cljc の純粋関数、fixture（contract_test）で
+   ;; 落ちることを見せてから実ファイル（repo_test）に当てる。全て 2026-08-22 に
+   ;; 実際に赤くなるところを見た。
+   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :green-marker "intel contract: all green"
+   :mutations
+   [{:id :intel/cohort-write-goes-plaintext
+     :why "registry.ts の CUI 書き込みを plaintext write に変える 1 語の編集。subject PII が substrate に平文で書かれ始める —— registry.ts 冒頭の宣言『The substrate never sees subject PII in plaintext』が静かに嘘になる形"
+     :file "kotoba/src/registry.ts"
+     :find "await e.encryptedWrite<Record<string, unknown>>({"
+     :replace "await e.write({"
+     :must-fail ["the-cui-cohort-path-stays-e2e-encrypted"]}
+
+    {:id :intel/cohort-read-goes-plaintext
+     :why "読み出し側を plaintext に変える形。書き込み検査だけだと read 経路の「性能改善」（encryptedRead → read）が通る"
+     :file "kotoba/src/registry.ts"
+     :find "e.encryptedRead<InferredCohortBody>({ innerType: COHORT_INNER_TYPE, cursor, limit: PAGE_LIMIT })"
+     :replace "e.read<InferredCohortBody>({ collection: COHORT_INNER_TYPE, cursor, limit: PAGE_LIMIT })"
+     :must-fail ["the-cui-cohort-path-stays-e2e-encrypted"]}
+
+    {:id :intel/nanoid-drifts
+     :why "appview の etzhayyim.json だけ nanoid が変わる改名半端。kotodama.jsonld とディレクトリ名は古いままなので、配備面が別 component を指す —— CLAUDE.md の Known Limitations が記録する interfaces.package drift と同じ入口"
+     :file "appview/etzhayyim-wasm-intel-i7n73l0x/etzhayyim.json"
+     :find "\"nanoid\": \"i7n73l0x\""
+     :replace "\"nanoid\": \"i7n73l0y\""
+     :must-fail ["appview-manifests-agree-on-identity"]}
+
+    {:id :intel/kotodama-names-another-actor
+     :why "kotodama の @id が別 actor のホストを名乗る形。2026-08-03 の DID シェル複製は bare name 突合せが intel-actor のシェルをこの repo と誤ペアリングしたことから起きた —— identity の名指しが割れる同じ入口"
+     :file "appview/etzhayyim-wasm-intel-i7n73l0x/kotodama.jsonld"
+     :find "\"@id\": \"did:web:intel.etzhayyim.com\""
+     :replace "\"@id\": \"did:web:intel-actor.etzhayyim.com\""
+     :must-fail ["appview-manifests-agree-on-identity"]}
+
+    {:id :intel/readme-name-drifts
+     :why "README.edn の :name だけ変わり migration.edn の destination と割れる形。EDN としては valid のまま、この repo がどの repository の移行先かが 2 通りに読める"
+     :file "README.edn"
+     :find ":name \"com-etzhayyim-app-intel\""
+     :replace ":name \"com-etzhayyim-app-intel-legacy\""
+     :must-fail ["readme-and-migration-name-the-same-repository"]}
+
+    {:id :intel/did-shell-rule-goes-blind
+     :why "**規則コード側を撃つ。** check-did-shell の :when に false を挟むと、実ファイルは緑のままなので repo_test は何も言わない —— fixture テストだけがこれを捕まえる。データを撃つ 5 件が守るのはファイル面、これが守るのは規則そのもの"
+     :file "src/etzhayyim/intel/contract.cljc"
+     :find ":when (did-shell-file? p)"
+     :replace ":when (and false (did-shell-file? p))"
+     :must-fail ["a-did-shell-file-is-a-violation"]}]}]}
