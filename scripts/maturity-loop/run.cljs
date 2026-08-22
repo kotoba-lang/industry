@@ -40,6 +40,13 @@
 
 (def args (vec *command-line-args*))
 
+(defn- progress!
+  "進捗は stderr へ。Node の stdout はパイプ相手だとブロックバッファされるので、
+  ファイルに落とすと最後まで 1 行も見えない —— 実測 2026-08-24、67 分回して
+  出力ファイルは 0 行だった。stderr は同期に書かれる。"
+  [& xs]
+  (binding [*print-fn* *print-err-fn*] (println (apply str xs))))
+
 (defn- flag [name default]
   (let [i (.indexOf args name)]
     (if (neg? i) default (nth args (inc i) default))))
@@ -169,9 +176,9 @@
         src (path/join root repo)
         dir (path/join (os/tmpdir) (str "maturity-" (path/basename repo) "-"
                                         (subs (or sha "nopin") 0 8)))]
-    (println (str "\n── " label "  [" repo "]"))
+    (progress! (str "\n── " label "  [" repo "]"))
     (if-not sha
-      (do (println (str "   SKIP: west.yml に `path: " repo "` の entry が無い"
+      (do (progress! (str "   SKIP: west.yml に `path: " repo "` の entry が無い"
                         " —— この repo は west 管理下に無いか、path が変わっている"))
           {:skipped 1})
       (do
@@ -193,20 +200,20 @@
                       (println (str "         " (last (remove str/blank? (str/split-lines (:out base))))))
                       {:errors 1})
                   (do
-                    (println (str "   base " (subs sha 0 8) ": 緑"))
+                    (progress! (str "   base " (subs sha 0 8) ": 緑"))
                     (reduce
                      (fn [acc {:keys [id must-fail why] :as m}]
                        (let [applied (apply-mutation! dir m)]
                          (if-not (:ok? applied)
-                           (do (println (str "   BUG  " id " — " (:reason applied)))
+                           (do (progress! (str "   BUG  " id " — " (:reason applied)))
                                (update acc :errors inc))
                            (let [r (run-suite dir suite)
                                  v (bites? (:out r) (:code r) green-marker must-fail)]
                              (fs/writeFileSync (:path applied) (:original applied))
                              (if (:bit? v)
-                               (do (println (str "   噛む " id))
+                               (do (progress! (str "   噛む " id))
                                    (update acc :bit inc))
-                               (do (println (str "   噛まない " id " — " why))
+                               (do (progress! (str "   噛まない " id " — " why))
                                    (when (:still-green? v)
                                      (println "         suite は緑のまま（この不変条件は誰も守っていない）"))
                                    (when (seq (:missing-names v))
