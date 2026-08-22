@@ -1,7 +1,7 @@
 {:bottleneck "run Stripe checkout via /isco-1212/",
  :freeClaimUrl "/isco-1212/",
  :health-status 200,
- :asOf "2026-08-21T23:55:23.912Z",
+ :asOf "2026-08-22T00:57:51.943Z",
  :freeClaim "/isco-1212/",
  :zone-name "itonami.cloud",
  :productSurfaceHint
@@ -9,9 +9,9 @@
   :note
   "scores.productSurface should be 6340/6340 when free path is live"},
  :zone
- {:requests-7d 42354,
-  :pageviews-7d 444,
-  :uniques-7d-sum 689,
+ {:requests-7d 32239,
+  :pageviews-7d 361,
+  :uniques-7d-sum 578,
   :zone "itonami.cloud"},
  :agentRuns7d 40,
  :sources [:cloudflare :health :emitter :itonami-free-path],
@@ -41,7 +41,7 @@
  {:bottleneck
   "free path live — first paid Checkout at /isco-1212/ (hyp/itonami-smb-pay)",
   :freeClaimUrl "/isco-1212/",
-  :asOf "2026-08-21T23:55:24.633Z",
+  :asOf "2026-08-22T00:57:53.236Z",
   :freeClaim "/isco-1212/",
   :nextOwnerActions
   [{:freeClaimUrl "/isco-1212/",
@@ -141,19 +141,19 @@
  :paths
  {:ok
   [{:path "/auth/health", :requests 278}
-   {:path "/cloud-itonami-isic-4211/", :requests 65}
-   {:path "/cloud-itonami-isic-4520-carwash/", :requests 65}
-   {:path "/cloud-itonami-isic-9601-coinlaundry/", :requests 65}
-   {:path "/cloud-itonami-isic-6920/", :requests 64}
-   {:path "/cloud-itonami-isic-8121/", :requests 64}
-   {:path "/cloud-itonami-isic-7310/", :requests 64}
-   {:path "/cloud-itonami-isic-9601/", :requests 64}],
-  :status-mix {:server-error 3137, :client-error 1385, :ok 3604},
+   {:path "/cloud-itonami-isic-4211/", :requests 64}
+   {:path "/cloud-itonami-isic-4520-carwash/", :requests 64}
+   {:path "/cloud-itonami-isic-4210/", :requests 64}
+   {:path "/cloud-itonami-isic-9601-coinlaundry/", :requests 64}
+   {:path "/cloud-itonami-isic-6920/", :requests 63}
+   {:path "/cloud-itonami-isic-7310/", :requests 63}
+   {:path "/cloud-itonami-isic-9601/", :requests 63}],
+  :status-mix {:server-error 3087, :client-error 1384, :ok 3556},
   :window "24h"},
  :source "itonami-data-kv-list",
  :note
  "PII-free aggregates only. freePath is live without Stripe; paid stays 0 until checkout + webhook (hyp/itonami-smb-pay).",
- :as-of "2026-08-21",
+ :as-of "2026-08-22",
  :freePath
  {:freeClaimUrl "/isco-1212/",
   :externalTenants 5,
@@ -190,9 +190,9 @@
   :freePathApiAlias "/api/free-path"},
  :ok true,
  :traffic-quality
- {:window "24h", :probe-4xx-pct 17, :error-5xx-pct 39},
+ {:window "24h", :probe-4xx-pct 17, :error-5xx-pct 38},
  :top-paths
- "上位 page (24h, 2xx/3xx): /auth/health 278 · /cloud-itonami-isic-4211/ 65 · /cloud-itonami-isic-4520-carwash/ 65 · /cloud-itonami-isic-9601-coinlaundry/ 65 · /cloud-itonami-isic-6920/ 64 | 4xx(probe) 17% · 5xx 39%",
+ "上位 page (24h, 2xx/3xx): /auth/health 278 · /cloud-itonami-isic-4211/ 64 · /cloud-itonami-isic-4520-carwash/ 64 · /cloud-itonami-isic-4210/ 64 · /cloud-itonami-isic-9601-coinlaundry/ 64 | 4xx(probe) 17% · 5xx 38%",
  :freeClaimDocs "/docs/free-path.md",
  :funnel
  {:trials 5,
@@ -202,7 +202,7 @@
   :paid 0},
  :version "0.1.953",
  :signal
- "itonami.cloud 実測 42354 req/7d・689 uniques(日次和)・うち4xx probe 17%(24h)",
+ "itonami.cloud 実測 32239 req/7d・578 uniques(日次和)・うち4xx probe 17%(24h)",
  :tenants
  {:active 5,
   :external-paid 0,
