@@ -18,6 +18,7 @@
                 "ADR-2607093300"
                 "ADR-2607241100"
                 "adr-2608136000-five-questions-before-trusting-green"
+                "adr-2608220200-naming-plane-three-jobs-and-our-own-delegated-router"
                 "adr-2608211000-counting-the-absence-of-measurement-outside-code"]
   :adr/source-format "edn"
   :adr/title "ADR-2608220100: 制裁を生き延びる設計 —— 直列の US 依存を並列化する。欠けているのは部品ではなく通電である"
@@ -110,7 +111,8 @@ XMR はその外側、外部から価値を受け取る口として使う。法�
 # Consequences
 
 - 部品はほぼ全て揃っており、欠けているのは通電である。`aiueos` / `inga` / `ENGI` の 3 つは制裁下でも意味を持つ設計として既に正しく、そしてどれも live になっていない。
-- 段 0 の DNS だけが、部品が無く外部から調達する必要がある唯一の項目である。
+- **段 0 は 2026-08-22 に 3 分割した**（ADR-2608220200）。当初の S0 は「Tier 3 の blast radius を下げる ccTLD 二重委任」と「Tier 1/2 を DNS から**外す**作業」という別物を 1 つにまとめていた。現在は **S0a**（自前 delegated router、`:started` —— 自前 IPNS 名の publish と自前 router 経由の解決を実測済み）/ **S0b**（自前 gateway）/ **S0c**（ccTLD 二重委任）。
+- **外部調達が要るのは S0c だけで、S0a と S0b は手持ちだけで進む。** したがって「DNS を買うまで何も始まらない」は誤りだった。
 - ADR-2608039000（分散型経路に D1 を前提にしない）の適用範囲がここで広がる。同じ削除・再構築テストを D1 だけでなく **全ての US ベンダ**に当てる: それを今削除したときデータが失われるか、正しさが壊れるか。壊れるなら premise であり、遅くなるだけなら cache である。
 - 普通のアプリで Cloudflare / GitHub / B2 を使うことは引き続き問題ない。縛るのは、停止したときに事業が止まる経路だけである。
 
