@@ -588,6 +588,13 @@
    ;; `navigator.gpu` が無い」で止まっていたが、**この repo は既に 8 本の
    ;; Playwright テストを持っており**、実ブラウザで実 GPU（apple metal-3）に
    ;; 描いて画素を数えている。測れなかったのは能力ではなく、探し方だった。
+   ;;
+   ;; 2026-08-24 追記: その probe はスイートを**直接**回していたため、単体では
+   ;; 通るのに全軸 audit の中では 600 秒の上限に当たり UNMEASURABLE になった
+   ;; （load 100 と 308 の両方で再現）。軸の状態がマシンの混み具合で揺れるのは
+   ;; 判断に使えない。測定は `scripts/threed-gpu-receipt.cljs` が 1 回だけ行い、
+   ;; probe は**受領書を読む** —— ただし受領書の revision が webgpu の現 HEAD と
+   ;; 違えば PASS を出さない（古い測定で緑にしない）。
    :axis/behavior "realtime-gpu"}
 
   {:axis/id :render/skinned-gpu
