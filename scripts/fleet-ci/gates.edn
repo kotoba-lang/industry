@@ -3213,6 +3213,22 @@
   ;; this fleet is not uniform and the last section that wrote its measurement
   ;; down had it quoted back as a constant.
   {:name "aiueos" :gate :jvm-test :alias "test-fleet" :cd true}
+  ;; grant — the decision plane, split out of aiueos on 2026-08-21 (root
+  ;; ADR-2608219500). It gets its own gate rather than riding aiueos's,
+  ;; because that is the whole point of the split: aiueos's gate is a
+  ;; judgement about the pinned SHA of grant, not about grant's main, and a
+  ;; broken commit there would sit unchecked until someone advanced the pin.
+  ;;
+  ;; Cheaper to gate than the OS it came from: `:test` resolves two git deps
+  ;; (security, abi) plus the test runner, and no Wasm engine at all --
+  ;; aiueos.execute's Chicory stayed with the machine. No `:local/root`, so
+  ;; the alias resolves on a node that only has this repository's tree.
+  ;;
+  ;; Measured before landing, on levi, at main a8ed303: clone, `clojure
+  ;; -M:test`, 324 tests / 1056 assertions / 0 failures. Not recorded here as
+  ;; a fleet property -- that node's egress was 200 to maven and github at
+  ;; that moment, and this fleet's egress is not uniform.
+  {:name "grant" :gate :jvm-test :cd true}
   ;; ────────────────────────────────────────────────────────────────────────
   ;; 2026-08-20: twenty SECOND gates, from a sweep of the sixty repos whose
   ;; only gate was :jvm-test. Each :jvm-test entry above stays exactly as it
