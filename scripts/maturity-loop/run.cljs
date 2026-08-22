@@ -197,14 +197,14 @@
         (sh ["git" "worktree" "prune"] src)
         (let [wt (sh ["git" "worktree" "add" "--detach" dir sha] src)]
           (if-not (zero? (:code wt))
-            (do (println (str "   FAIL: worktree を作れない — " (str/trim (:out wt))))
-                (println "         pin が upstream に無いか、checkout が壊れている")
+            (do (progress! (str "   FAIL: worktree を作れない — " (str/trim (:out wt))))
+                (progress! "         pin が upstream に無いか、checkout が壊れている")
                 {:errors 1})
             (try
               (let [base (run-suite dir suite)]
                 (if-not (green?* (:out base) (:code base) green-marker)
-                  (do (println (str "   FAIL: pin " (subs sha 0 8) " で suite が緑にならない"))
-                      (println (str "         " (last (remove str/blank? (str/split-lines (:out base))))))
+                  (do (progress! (str "   FAIL: pin " (subs sha 0 8) " で suite が緑にならない"))
+                      (progress! (str "         " (last (remove str/blank? (str/split-lines (:out base))))))
                       {:errors 1})
                   (do
                     (progress! (str "   base " (subs sha 0 8) ": 緑"))
@@ -222,9 +222,9 @@
                                    (update acc :bit inc))
                                (do (progress! (str "   噛まない " id " — " why))
                                    (when (:still-green? v)
-                                     (println "         suite は緑のまま（この不変条件は誰も守っていない）"))
+                                     (progress! "         suite は緑のまま（この不変条件は誰も守っていない）"))
                                    (when (seq (:missing-names v))
-                                     (println (str "         赤くなるはずのテストが出ていない: "
+                                     (progress! (str "         赤くなるはずのテストが出ていない: "
                                                    (str/join ", " (:missing-names v)))))
                                    (update acc :blind inc)))))))
                      {:bit 0 :blind 0 :errors 0}
