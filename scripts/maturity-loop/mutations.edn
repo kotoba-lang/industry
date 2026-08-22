@@ -1662,6 +1662,29 @@
      :replace "  (let [[pd rest1] [nil nil]]"
      :must-fail ["it-reads-a-file-it-did-not-write"]}]}
 
+  {:repo "orgs/cloud-itonami/media-corpus"
+   :label "media-corpus bytes plane —— raw/ は annex pointer、backend は SHA256E"
+   ;; データ repo なので「実装」は .gitattributes の policy 行。テストは git の
+   ;; index/object だけを読むので annex の実体（B2）が無い worktree でも走る。
+   ;; 2026-08-22 に 4 通り（policy 退行 / backend 降格 / blob 混入 / 走査 0 件）
+   ;; とも赤くなるのを見た。ここに載せる 2 つは find/replace で表現できる形。
+   :cmd ["nbb" "test/annex_policy_test.cljs"]
+   :green-marker "ALL CHECKS PASS (annex policy)"
+   :mutations
+   [{:id :media-corpus/largefiles-policy-regression
+     :why "text2git の既定は「テキストは git に入れる」。この 1 行が消えると次の収集で JSON（1 ファイル 1 MB 超の Wikidata entity 含む）が git blob として履歴に入り、dataset を本体から分けた意味が消える —— datalad create の既定に「戻す」形の、実際に起こりうる退行"
+     :file ".gitattributes"
+     :find "raw/** annex.largefiles=anything"
+     :replace "raw/** annex.largefiles=nothing"
+     :must-fail ["gitattributes-raw-largefiles-policy"]}
+
+    {:id :media-corpus/backend-downgrade
+     :why "custody 検証（scripts/annex-custody-verify.cljs）は content hash に依存する。backend を MD5E に戻すと新規 add の pointer から SHA256 が消え、off-machine コピーの実在証明が黙って弱くなる —— この dataset は実際に MD5E から上げた経緯がある（.gitattributes の注記）"
+     :file ".gitattributes"
+     :find "* annex.backend=SHA256E"
+     :replace "* annex.backend=MD5E"
+     :must-fail ["gitattributes-backend-sha256e"]}]}
+
   ;; ⚠ `orgs/kotoba-lang/ocio` の色順応 mutation はここに**入れていない**。
   ;; あの repo の deps.edn は `:local/root "../yaml"` で兄弟 checkout を参照して
   ;; おり、この harness は west pin から /tmp に worktree を切るので `../yaml` が
