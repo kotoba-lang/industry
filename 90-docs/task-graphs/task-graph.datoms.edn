@@ -627,15 +627,38 @@
   :workflow/owner "Jun Kawasaki"}
 
  {:db/id -25
-  :task/id "S0-dns-dual-jurisdiction"
+  :task/id "S0c-dns-dual-jurisdiction"
   :task/workflow "sanction-survivable-architecture"
-  :task/title "ccTLD（.jp / JPRS）を取得し、非 US NS（deSEC もしくは自前）へ二重委任する。bootstrap peer と CID を client に焼き込み、URL から取りに行かない"
+  :task/title "ccTLD（.jp / JPRS）を取得し、非 US NS（deSEC もしくは自前）へ二重委任する —— Tier 3（未知の公衆）の blast radius を下げる施策"
   :task/kind "infrastructure"
   :task/repo "com-junkawasaki/root"
   :task/requires []
   :task/external-gate true
   :task/status :pending
-  :task/status-note "完了条件: Cloudflare を black-hole しても名前が引けること。5 段のうち唯一、部品が手元に無く外部調達が要る項目（レジストラと NS 事業者）"}
+  :task/status-note "ADR-2608220200 で S0 を 3 分割した際の第 3 片。旧 id は S0-dns-dual-jurisdiction。完了条件: Cloudflare を black-hole しても名前が引けること。**部品が手元に無く外部調達が要る唯一の task**。Tier 1/2 を DNS から外す作業（S0a / S0b）とは別物で、こちらを待つ必要はない"}
+
+ {:db/id -32
+  :task/id "S0a-own-delegated-router"
+  :task/workflow "sanction-survivable-architecture"
+  :task/title "自前 delegated routing router を fleet に常時稼働させ、kad.routing の既定 US router（delegated-ipfs.dev / cid.contact）への依存を外す"
+  :task/kind "infrastructure"
+  :task/repo "kotoba-lang/io-libp2p-specs-kad-dht"
+  :task/requires []
+  :task/external-gate false
+  :task/status :started
+  :task/status-at "2026-08-22"
+  :task/status-note "2026-08-22 実測（ADR-2608220200 発見 4）: simeon に Routing.Type=dht + Gateway.ExposeRoutingAPI=true を設定し Kubo v0.41.0 daemon を起動。自前 IPNS 名 k51qzi5uqu5dklk9myzcglshccfgdro93kfkqoxtukriattjuvavchzmi1535x を publish し、**自前 router 経由で HTTP 200 / 365 byte の署名付き record として解決**（経路に DNS も US router も含まない）。delegated-ipfs.dev で同一 byte 数を確認し global DHT 実在を裏取り。**残る gap 3 つ**: (1) launchd 永続化に失敗（bootstrap: 5 I/O error）＝再起動を跨がない (2) NAT 配下で peers 9〜11・p2p-circuit 12 件＝到達性の修復が要る (3) 1 台のみ。この 3 つが片付くまで production の唯一経路にしない"}
+
+ {:db/id -33
+  :task/id "S0b-own-ipfs-gateway"
+  :task/workflow "sanction-survivable-architecture"
+  :task/title "自前 IPFS HTTP Gateway を fleet に立て、公開 gateway（ipfs.io / dweb.link / cloudflare-ipfs.com）への依存を外す"
+  :task/kind "deployment"
+  :task/repo "kotoba-lang/tech-ipfs-specs-http-gateway"
+  :task/requires ["S0a-own-delegated-router"]
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "gateway 実装は pure .cljc で既にある（tech-ipfs-specs-http-gateway）。完了条件: 公開 gateway を 1 つも経由せずに CID が引けること"}
 
  {:db/id -26
   :task/id "S0-git-origin-self-hosted"
@@ -654,7 +677,7 @@
   :task/title "公開面を IPNS で常時ミラーし、CID 経路を通電させる"
   :task/kind "deployment"
   :task/repo "kotoba-lang/tech-ipfs-specs-ipns"
-  :task/requires ["S0-dns-dual-jurisdiction"]
+  :task/requires ["S0a-own-delegated-router" "S0b-own-ipfs-gateway"]
   :task/external-gate false
   :task/status :pending
   :task/status-note "完了条件: 実訪問が CID 経路を通った記録があること。実 IPNS record の publish 実績は既にある（fallback は常時通電の原則 2）"}
