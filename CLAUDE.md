@@ -1059,6 +1059,8 @@ nbb scripts/concept-lookup.cljs               # 語彙一覧
 |---|---|---|---|
 | `90-docs/concept/concept.datoms.edn` | **どの repo がどの概念を実装しているか** | `nbb scripts/gen-concept-index.cljs` | ADR-2608039980 |
 | `90-docs/surface/surface.datoms.edn` | **どのホストがどのパスを提供しているか** | `nbb scripts/gen-surface-index.cljs` | — |
+| `90-docs/compliance/scope.datoms.edn` | **どのワーカがどのデータストアに触り、誰に預けているか** | `nbb scripts/gen-compliance-scope.cljs` | ADR-2608231500 |
+| `90-docs/compliance/dependencies.datoms.edn` | **どの repo が何に依存し、それは本番に載るか** | `nbb scripts/gen-dependency-inventory.cljs` | ADR-2608231600 |
 
 どちらも生成物（手で編集しない）。語彙 `manifest/concept-vocabulary.edn` だけが手書き
 （「端末 と terminal と TTY は同じ」は repo の中身から導出できないため）。両方とも
@@ -1073,6 +1075,54 @@ nbb scripts/concept-lookup.cljs               # 語彙一覧
 `kobo`(工房) も機能を一文字も示さない**ので、名前からの経路も無かった。同じ日に
 `/signup` を 4 件重複させた事故（surface 索引の動機）と同じクラス —— 意思ではなく
 **見る場所が無い**。
+
+### compliance の 2 索引が答えるもの（2026-08-23 追加）
+
+surface 索引は「どのホストがどのパスを出すか」までで、**そのワーカがどのデータストアに
+触るかを持っていなかった**。監査（SOC 2 CC3.2/CC6.1、ISO/IEC 27001:2022 A.5.9）で
+問われるのはそこなので、compliance scope 索引が足す。`:scope/host` は
+`:surface/host` と、`:scope/repo` / `:dependency/repo` は `repo/path` と join できる。
+
+**どちらも fleet gate にできない**（west 管理の `orgs/` を読む。`root-permit-index` が
+それで落ち続けた形）。`manifest/orgs-detectors.edn` に `:compliance-scope-boundary` /
+`:dependency-vulnerabilities` として登録済み。
+
+⚠ **実測値をこの節に書かない。** 下記 3 つはどれも数で表せるが、書けばそれが定数として
+引用される（この CLAUDE.md 自身が fleet-ci の節でそう警告している）。数は ADR と索引の
+中に在るので、必要なら引く。ここに残すのは**引き方と、間違いの形**だけ。
+
+この 2 つを引かずに次の 3 つを結論しないこと:
+
+- **「この面は他と切り離せる」** —— 1 ワーカが複数の登録可能ドメインに応答している例が
+  実在する（1 config・1 binding 群・1 deploy credential）。**境界はドメインではなく
+  共有された制御環境の単位でしか切れない。** 現在数は
+  `grep 'cross-boundary=' 90-docs/compliance/scope.datoms.edn`（ADR-2608231500）。
+- **「脆弱性は無い」** —— version が範囲（`^1.2.3`）の依存を advisory DB に投げると
+  「該当なし」が返り、それは「脆弱性が無い」と同じ顔をする。範囲のままの依存は
+  **未測定であって clean ではない**。現在数は同索引の `:dependency/coverage` entity。
+- **「この脆弱性は緊急だ」** —— `:dependency/dev?` を見ずに数えない。2026-08-23 に
+  `undici@7.28.0` の 5 勧告を「本番 N repo」と誤報告した実例がある。lockfile は全件
+  `dev: true` で、deploy された Worker は workerd で走り undici を載せない。
+  npm は lockfile に既にその答えを持っていたのに、棚卸しがそれを捨てていた
+  （ADR-2608231700）。
+
+### 統制の写像と SBOM の生成器はどこにあるか
+
+- **SOC 2 TSC / ISO 27001 Annex A ↔ 手元の証拠** の写像は
+  `kotoba-lang/security` の `policy/control-crosswalk.edn` +
+  `src/kotoba/security/crosswalk.cljc`。`nbb --classpath src scripts/check-crosswalk.cljs`
+  が現在地を出す。**設計の証拠は運用の証拠にならない**という不変条件を計算器が持つ
+  （`type-ii-readiness` は運用 register を直接読むので、写像を埋めても Type II を
+  主張できない）。規格本文は複製していない —— 条項番号と自前の記述子と provenance URL
+  だけなので、`:control/descriptor` を規格の要求事項として引用しない。
+- **SBOM の生成器**は `cloud-itonami/cloud-itonami-isic-7120-cyberassurance` の
+  `cyberassurance.sbom`（CycloneDX 1.5、純関数）。⚠ **新しく作らない** ——
+  `kotoba-lang/app-sbom` が domain を、`kotoba-lang/security` の `docs/sbom-slsa.md` が
+  リリース成果物の仕様を、`kotoba-lang/amu` が SBOM を hash して署名に束ねる処理を
+  既に持っている。3 つとも「SBOM は在る」前提で、生成器だけが無かった。
+- **認証は取れるか**への答えは評価からは出ない。SOC 2 は CPA firm、ISO/IEC 27001 は
+  認定審査機関、ISMAP は登録監査機関が発行する。**評価の完全性は発行権限ではない**
+  （ADR-2608231800）。
 
 **索引に無いことは、存在しないことの証拠にならない。** concept 索引は README のある
 repo だけを見る（未索引の repo 数を `:concept/coverage` entity で申告し、
