@@ -127,6 +127,47 @@
                  :file rel})))
           (get m "packages"))))
 
+(defn- from-pnpm-lock
+  "pnpm-lock.yaml (v9) の `packages:` から確定版を取る。
+
+   なぜ足したか: このスキャナは `package-lock.json` しか読まず、**pnpm を使う
+   65 manifest を『version が範囲のまま = 未測定』として数えていた**（実測
+   2026-08-23）。lockfile が在るのに無いものとして数えるのは、
+   ADR-2608136000 が禁じている『測れなかったものを測った結果と同じ顔にする』
+   の裏返しで、こちらは *測れるものを測らずに未測定に入れて* いた。
+
+   形式は v9 で統一されている（実測: 30 ファイルすべて `lockfileVersion: '9.0'`）:
+
+     packages:
+       '@adobe/css-tools@4.4.4':
+         resolution: {...}
+
+   **name は最後の `@` で切る。** `@adobe/css-tools@4.4.4` の先頭 `@` で切ると
+   name が空になる —— OSV 照会で同じ間違いをして 1000 件の batch を落とした。
+
+   dev/production は v9 の `packages:` からは判らない（`importers:` を辿る必要が
+   ある）ので、**判らないものを production と主張しない**: `:dev? nil` を返し、
+   coverage 側で『scope 不明』として数える。"
+  [file rel]
+  (when-let [raw (read-safe file)]
+    (let [lines (str/split-lines raw)
+          start (first (keep-indexed (fn [i l] (when (= "packages:" (str/trim l)) i)) lines))]
+      (when start
+        (->> (drop (inc start) lines)
+             (take-while #(or (str/blank? %) (str/starts-with? % "  ")))
+             (keep (fn [l]
+                     (when-let [m (re-find #"^  '?([^':]+?)'?:\s*$" l)]
+                       (let [k (nth m 1)
+                             k (if-let [i (str/index-of k "(")] (subs k 0 i) k)
+                             i (.lastIndexOf k "@")]
+                         (when (pos? i)
+                           (let [nm (subs k 0 i) ver (subs k (inc i))]
+                             (when (and (seq nm) (re-matches #"[0-9][^\s]*" ver))
+                               {:purl (npm-purl nm ver) :ecosystem :npm
+                                :name nm :version ver :exact? true
+                                :dev? nil :file rel})))))))
+             vec)))))
+
 (defn- from-package-json [file rel]
   (when-let [m (read-json file)]
     (mapcat (fn [k]
@@ -142,7 +183,7 @@
 ;; ── 走査 ───────────────────────────────────────────────────────────────────
 
 (def ^:private manifest-names
-  #{"deps.edn" "package.json" "package-lock.json"})
+  #{"deps.edn" "package.json" "package-lock.json" "pnpm-lock.yaml"})
 
 (defn- manifests [repo-root]
   (letfn [(walk [d depth]
@@ -161,14 +202,19 @@
     (vec (walk repo-root 0))))
 
 (defn scan [repos]
-  (let [stats (atom {:repos 0 :manifests 0 :unreadable 0 :lock-preferred 0})
+  (let [stats (atom {:repos 0 :manifests 0 :unreadable 0 :lock-preferred 0 :pnpm-read 0})
         rows (atom [])]
     (doseq [repo repos]
       (swap! stats update :repos inc)
       (let [ms (manifests (path/join root repo))
             ;; 同じディレクトリに lock が在れば package.json は読まない。
             ;; 範囲と確定版が二重に入ると、同じ依存が 2 件に見える。
-            lock-dirs (set (map path/dirname (filter #(str/ends-with? % "package-lock.json") ms)))]
+            ;; lockfile を持つディレクトリでは package.json（範囲）を読まない。
+            ;; pnpm も同じ扱いにする —— 以前は package-lock.json だけを見ており、
+            ;; pnpm の repo は lockfile が在るのに未測定に数えられていた。
+            lock-dirs (set (map path/dirname
+                                (filter #(or (str/ends-with? % "package-lock.json")
+                                             (str/ends-with? % "pnpm-lock.yaml")) ms)))]
         (doseq [f ms
                 :let [rel (str/replace f (str root "/") "")
                       base (path/basename f)
@@ -178,6 +224,9 @@
                      (= base "deps.edn") (from-deps-edn f rel)
                      (= base "package-lock.json") (do (swap! stats update :lock-preferred inc)
                                                       (from-package-lock f rel))
+                     (= base "pnpm-lock.yaml") (do (swap! stats update :lock-preferred inc)
+                                                   (swap! stats update :pnpm-read inc)
+                                                   (from-pnpm-lock f rel))
                      (and (= base "package.json") (not (lock-dirs dir))) (from-package-json f rel)
                      :else [])]
             (when (and (nil? es) (not= base "package.json"))
@@ -201,7 +250,7 @@
                        :dependency/exact? (:exact? r)
                        ;; **本番に載るか、開発時だけか。** これが無いと、
                        ;; miniflare の中の undici が本番の依存と同じ緊急度で並ぶ。
-                       :dependency/dev? (boolean (:dev? r))
+                       :dependency/dev? (:dev? r)
                        :source/dataset "compliance-dependencies"
                        :source/file (:file r)}
                 (:version r) (assoc :dependency/version (:version r))
@@ -216,11 +265,15 @@
              :dependency/manifests-read (:manifests stats)
              :dependency/manifests-unreadable (:unreadable stats)
              :dependency/lockfiles-preferred (:lock-preferred stats)
+             :dependency/pnpm-lockfiles-read (:pnpm-read stats)
              :dependency/rows (count uniq)
              ;; **OSV に投げられるのは exact なものだけ。** 範囲のまま照会すると
              ;; 「該当なし」が返り、それは「脆弱性が無い」と同じ顔をする。
-             :dependency/production (count (remove :dev? uniq))
-             :dependency/development (count (filter :dev? uniq))
+             ;; `:dev? nil` は「判らなかった」であって production ではない。
+             ;; 3 つに分けて数える —— 2 値に畳むと pnpm 由来が本番として並ぶ。
+             :dependency/production (count (filter #(false? (:dev? %)) uniq))
+             :dependency/development (count (filter #(true? (:dev? %)) uniq))
+             :dependency/scope-unknown (count (filter #(nil? (:dev? %)) uniq))
              :dependency/queryable exact
              :dependency/not-queryable (- (count uniq) exact)}]
     (vec (concat ds [cov]))))
@@ -340,39 +393,56 @@
                                                            (str "pkg:npm/" nm "@" ver)
                                                            (str "pkg:maven/" (str/replace nm ":" "/") "@" ver))]
                                                 (let [rows (by-purl purl)
-                                                      prod (remove :dependency/dev? rows)]
+                                                      ;; **`(remove :dependency/dev? …)` と書かない。**
+                                                      ;; `:dev? nil` は「pnpm lockfile からは判らなかった」で
+                                                      ;; あって production ではない。not で畳むと判らなかった
+                                                      ;; ものが本番として並ぶ（実測 2026-08-23: pnpm 対応を
+                                                      ;; 入れた直後に undici が誤って PRODUCTION と出た）。
+                                                      prod (filter #(false? (:dependency/dev? %)) rows)
+                                                      unk (filter #(nil? (:dependency/dev? %)) rows)]
                                                   {:name nm :version ver :ids (:ids v)
                                                    :production? (boolean (seq prod))
+                                                   :scope-unknown? (boolean (and (empty? prod) (seq unk)))
                                                    :prod-repos (sort (distinct (map :dependency/repo prod)))
+                                                   :unk-repos (sort (distinct (map :dependency/repo unk)))
                                                    :repos (sort (distinct (map :dependency/repo rows)))}))))
                                        (sort-by :name))]
                          ;; **本番に載るものを先に出す。** dev 依存と同じ順に並べると
                          ;; 読む側が緊急度を取り違える（2026-08-23 に実際に取り違えた）。
                          (doseq [h (sort-by (juxt (complement :production?) :name) hits)]
-                           (println (str "  " (if (:production? h) "PRODUCTION" "dev-only  ")
+                           (println (str "  " (cond (:production? h) "PRODUCTION"
+                                                   (:scope-unknown? h) "scope不明  "
+                                                   :else "dev-only  ")
                                          "  " (:name h) "@" (:version h)
                                          "  " (str/join " " (:ids h))))
                            (println (str "      使用 " (count (:repos h)) " repo"
                                          (when (:production? h)
                                            (str " / うち本番 " (count (:prod-repos h)) ": "
-                                                (str/join ", " (:prod-repos h))))))
+                                                (str/join ", " (:prod-repos h))))
+                                         (when (:scope-unknown? h)
+                                           (str " / scope 不明 " (count (:unk-repos h)) " repo"
+                                                "（pnpm lockfile は dev/prod を言わない）"))))
                            ;; orgs-detector プロトコル。key は purl なので、版が上がれば
                            ;; finding は resolve し、別の版で再発すれば別の finding になる。
                            (when (some #{"--findings"} args)
                              (println (str "FINDING\t" (if (:production? h) "error" "warn")
                                            "\tvuln:pkg/" (:name h) "@" (:version h)
                                            "\t" (str/join " " (:ids h))
-                                           " — " (if (:production? h)
+                                           " — " (cond
+                                                   (:production? h)
                                                    (str "本番 " (count (:prod-repos h)) " repo: "
                                                         (str/join ", " (:prod-repos h)))
+                                                   (:scope-unknown? h)
+                                                   (str "scope 不明（pnpm）" (count (:unk-repos h)) " repo")
+                                                   :else
                                                    (str "開発時のみ、" (count (:repos h)) " repo"))))))
                          ;; 照会できなかった分も finding にする。沈黙した除外は
                          ;; 「脆弱性が無い」と同じ顔をする。
                          (when (and (some #{"--findings"} args)
                                     (pos? (:dependency/not-queryable cov)))
-                           (println (str "FINDING\twarn\tvuln-unqueryable:range-versions"
+                           (println (str "FINDING\twarn\tvuln-unqueryable:no-purl"
                                          "\t" (:dependency/not-queryable cov)
-                                         " 件が version 範囲のままで照会できない — lockfile が無い manifest がある")))
+                                         " 件に purl が無く照会できない（version が範囲、または :local/root の同一 tree 依存）")))
                          (when (and (some #{"--findings"} args) (seq skipped))
                            (println (str "FINDING\tinfo\tvuln-unqueryable:ecosystem"
                                          "\t" (reduce + (vals skipped))
@@ -395,7 +465,8 @@
                             " rows=" (:dependency/rows cov) "\n"
                             ";; 本番=" (:dependency/production cov)
                             " 開発時のみ=" (:dependency/development cov)
-                            " ← この 2 つを混ぜると triage を誤る\n"
+                            " scope不明=" (:dependency/scope-unknown cov)
+                            " ← この 3 つを混ぜると triage を誤る（不明を本番に数えない）\n"
                             ";; OSV に照会できる（version 確定）=" (:dependency/queryable cov)
                             " / できない（範囲のまま）=" (:dependency/not-queryable cov) "\n\n")
                 body (str header (pr-str datoms) "\n")]
