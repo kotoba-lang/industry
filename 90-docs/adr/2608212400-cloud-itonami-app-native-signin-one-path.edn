@@ -36,5 +36,38 @@ cloud-itonami-app の native macOS app（kotoba-shell-host の WKWebView）で�
 - itonami.cloud サイト面は legacy kotoba-ui のまま（日本語・HIG トークンで整合はする）。DADS 移行は別スライス。
 - did:key / did:webvh の器は既にある（:root-did-method :webvh、bot ごとの did:key + biscuit 委譲）。verify-itonami-did-webvh detector が inconclusive のままで、ここが『id を持って同期』の次の一手。
 - design-quality CLI は 0 バイト入力を 59.26 点として採点した（redirect + -L 無し curl の空ファイル）。『入力が無いとき何を返すか』クラス（ADR-2608136000）の実例で、空/極小入力の refuse（exit 2）を入れる余地がある。
-- jvm-new-surface-guard hook は cd <dir> && が先頭に無い compound command で target-dir を superproject に誤解決し、無関係な残骸ファイルで commit を 3 回ブロックした。回避は cd <dir> && で始めること。hook 側の target-dir 解決の改善余地。"
+- jvm-new-surface-guard hook は cd <dir> && が先頭に無い compound command で target-dir を superproject に誤解決し、無関係な残骸ファイルで commit を 3 回ブロックした。回避は cd <dir> && で始めること。hook 側の target-dir 解決の改善余地。
+
+## 2026-08-23 amendment — Bots の安定性・出力品質 SLO と score
+
+### 評価対象と観測窓
+
+対象は cloud-itonami-app の全 Bot とし、model/provider に関係なく同じ基準を適用する。scheduler が tick を発火できることと、Bot turn が有用な回答を期限内に返すことは別に測る。基準窓は直近 rolling 24h、補助窓は rolling 7d。24h の受理 turn が 100 未満なら合否は `insufficient-sample` とし、score は参考値に留める。
+
+2026-08-23 の live baseline: health OK、enabled workforce jobs 92、2 cadence 超の overdue 0。直近24hは turn 193、completed 107 (55.4%)、failed 84 (43.5%)、waiting approval 2、elapsed p50 317s / p90 1510s / max 8759s。失敗内訳は provider/timeout 55、tool-budget-exhausted 19、workspace/not-a-file 7、その他3。7d は turn 1135、completed 463 (40.8%)、failed 659 (58.1%)。30分超の stale `running` record は2件。これは scheduler health は良好だが execution layer は未安定、という baseline である。
+
+出力 baseline は直近24hの Bot output 223件。failure template 90件、successful-looking 133件、substantive 129件、successful-looking 中の safe no-op 93件 (69.9%)、substantive 中の evidence-bearing 109件 (84.5%)、unique-output ratio 52.9%。読み取り専用の3 sampleを実ファイル/Git履歴と照合し、成功回答の主張は一致した。直接 model API は murakumo-main / qwen3.8-27b-fastmtp-aggressive とも HTTP 200。一方、同一 workspace_read 課題では Qwen Bot 1件が約70秒で完了、murakumo-main Bot 2件が120秒 timeout、toolなし Bot probe は成功した。従って全体停止ではなく、context/tool loop・待ち行列・baseline latency が主要リスクである。
+
+### Score
+
+安定性 score `S` は100点満点: availability/scheduler 20、completion 30、latency 20、recovery/cleanup 15、observability 15。2026-08-23 baseline は 18 + 16.6 + 5 + 8 + 7 = 54.6、四捨五入して **55/100**。availability の18点は point-in-time health と overdue 0 は確認したが連続availability計測が無いため満点にしない。completion は `30 * completed / total = 30 * 107 / 193`。latency は all-turn p90 であり interactive 分離が未実装なので provisional。recovery は型付き失敗表示を評価する一方 stale-running 2件を減点。observability は error class を評価する一方、interactive send が turn-history に一貫して残らない点を減点する。
+
+成功時出力品質 score `Q` は100点満点: factual grounding 25、instruction adherence 20、specificity/actionability 20、clarity 15、structure 10、uncertainty/non-hallucination 10。baseline は 22 + 16 + 11 + 11 + 6 + 9 = **75/100**。failure も含む user-perceived effective quality は `E = completion-rate * Q = 0.554 * 75 = 41.6`、四捨五入して **42/100**。`Q` だけを製品品質として表示してはならず、常に `S/Q/E` を併記する。
+
+### 合格基準
+
+次の全条件を同じ rolling 24h 窓で満たした時だけ `PASS`。加重scoreが高くても個別gateの失敗を相殺しない。
+
+1. accepted turn 100件以上、completion rate 90%以上。
+2. interactive turn の end-to-end p90 が120秒以内。queue/provider/tool/compaction時間を分離記録する。
+3. provider timeout が全turnの2%未満。
+4. tool-budget-exhausted が全turnの1%未満。
+5. 30分超の stale-running record が0件。
+6. 同じ evidence digest に対する重複no-opをUIへ再投稿しない。状態変更が無い場合は内部receiptだけを保存する。
+7. 固定20課題以上（local folder/Git read、根拠抽出、変更提案、QA、handoffを含む）を同一版で実行し、factual grounding 95%以上、instruction adherence 90%以上、actionable answer 80%以上。成功回答だけでなくtimeout/errorも分母に含む end-to-end scoreを併記する。
+8. 上記を7日窓でも completion 90%以上、stale-running 0で再確認する。
+
+### 運用上の決定
+
+最優先は model単位の同時実行上限とbackpressure、interactive優先queue、workforce開始時刻のjitter、各tool loop前のcontext compaction、tool receipt上限、timeout時のidempotent retry最大1回。最大contextは利用可能容量であり、毎turnで埋める目標ではない。scoreは毎回、観測日時・母数・model別内訳・scopeを付けて更新し、未計測値を0やPASSとして扱わない。"
   :adr/related ["adr-2608136000" "ADR-2607173100" "ADR-2608080100" "ADR-2608180200"]}]
