@@ -185,6 +185,32 @@
               :configs-listed 451 :configs-parsed 450 :findings 10}
    :writes   :none}
 
+{:id       :dependency-vulnerabilities
+   :title    "known vulnerabilities in the dependencies the audited surfaces actually ship"
+   :why      "2026-08-23, ADR-2608231500: SOC 2 CC7.1 and ISO/IEC 27001:2022 A.8.8 ask
+              whether known vulnerabilities are found and acted on. The MODEL for
+              that has existed here for months -- `kotoba-lang/app-sbom` carries
+              1,823 lines plus a vitest suite over component/purl, OSV CVE ingest,
+              VulnMatch, severity-keyed SLA and blast radius -- but
+              `sbom.etzhayyim.com` does not resolve and nothing had ever put this
+              workspace's own dependencies into it. The first run measured 2,988
+              dependencies across the 21 in-scope repos and found four vulnerable
+              packages, one of them (undici 7.28.0, five advisories) shipping in
+              eight repos including cloud-itonami-app and the kotobase.net control
+              plane. This CANNOT be a fleet gate: it reads every in-scope checkout
+              under west-managed `orgs/`, and it needs egress to api.osv.dev, which
+              CLAUDE.md records as varying per node rather than being a constant."
+   :argv     ["nbb" "{{repo}}/scripts/gen-dependency-inventory.cljs" "--osv" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 86400000
+   :timeout-ms  900000
+   :measured {:as-of "2026-08-23" :runtime-s 40
+              :repos 21 :dependencies 2988 :queried 956
+              :skipped-range 55 :skipped-ecosystem 135 :vulnerable-packages 4}
+   :writes   :none}
+
 {:id       :verify-source-nul-bytes
    :title    "raw control bytes in source, which make grep answer as if a word is absent"
    :why      "2026-08-18/19: one NUL byte makes file(1) classify a source file as
