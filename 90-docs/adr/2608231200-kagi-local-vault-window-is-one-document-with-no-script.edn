@@ -116,7 +116,19 @@ Consequences
   including one that did NOT discriminate at first (the view-reachability
   check found fragments in the routing CSS, so a view dropped from the nav
   was still 'found'; it reads the <nav> element alone now).
-- Not done, and named rather than left implicit: no search or filter in the
-  item list, no item detail view, no kagitaba field rendering, no `kagi
-  fill` from the window, and no way to add or edit an item. All of those are
-  reveal-adjacent or write paths, and each deserves its own decision."}]
+- Search and item detail landed after the first cut (kagi aecf5c23). Search
+  is a GET over metadata only — no ciphertext is touched, so a query that
+  could only match a secret's contents finds nothing, and a filter matching
+  nothing is drawn differently from an empty vault. Opening one item is the
+  first thing in the window that decrypts, so it happens only when the reader
+  names one (`:detail` is not called while drawing a list, and a test fails
+  if it ever is), under its own ledger purpose `:ui-detail`. What comes back
+  is shape: `kagi.vault-read/strip-sensitive` drops concealed / totp /
+  credit-card / ssh-key values and keeps the fields, so the screen says a
+  password is SET rather than showing an empty cell. That work added
+  `kagi.vault-read/read-one`, which answers :ok / :raw / :denied / :absent as
+  four distinguishable things — `kagitaba-items` folds three of them into an
+  empty result, which is right for a list and wrong for opening one item.
+- Still not done, and named rather than left implicit: no `kagi fill` from
+  the window, and no way to add or edit an item. Both are write or
+  reveal-adjacent paths, and each deserves its own decision."}]
