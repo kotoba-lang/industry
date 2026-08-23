@@ -803,6 +803,63 @@
                           [p (mapv #(str (first (source-stem p)) "." %) exts)])
                         twins)}])))
 
+(defn- revert-residue-gate!
+  "Keep `:additive` from re-landing content the default branch DELETED.
+  -> [additive' reverted info] where `reverted` is demoted to :review.
+
+  ## The most dangerous reading of `not on main`
+
+  `:additive` means no path of this name exists on the default branch. A revert
+  produces exactly that state, and it produces it **on purpose**. Re-adding the
+  path does not add new work; it reverses somebody's decision.
+
+  Measured 2026-08-23, `kotoba-lang/kotoba`, found while surveying the west
+  update skip set. `cleanup: land untracked WIP (20 files)` merged as PR #487 at
+  10:07Z and was reverted the same day by `4903fba1`, which removed all 20 files
+  including `docs/ADR-codebase-actor-ipld.edn` and `src/kotoba/codebase_actor.clj`.
+  Because cleanup-land never deletes local copies -- correctly, that is the
+  safety floor -- both files were still sitting untracked in the shared checkout
+  afterwards. On the next `--apply` they are absent from main, carry no rename,
+  are not ignored, and have no source twin, so they plan as `:additive` -> PR ->
+  **merge**. `unresolved-refs-gate!` happens to catch the `.clj` (it requires
+  `kotoba.ipld-block-store`, which the revert also removed), but the `.edn` is a
+  document with no references and would sail straight through.
+
+  So the revert would have been undone by the tool that caused it, on its next
+  run, with a commit message calling the content new.
+
+  ## It demotes, it never drops
+
+  A path can legitimately be re-created after a deletion, and a human is the one
+  who can tell that from a reversal. Goes to :review with the deleting commit
+  named, so the reviewer starts from the evidence rather than from the diff.
+
+  ## Which ref, and what happens when there is none
+
+  The default branch when it resolves, HEAD otherwise -- residue-gate!'s
+  fallback and for its reason: a west checkout resolves `<remote>/<default>`
+  only about a third of the time. With neither, `:applied false` is printed
+  rather than passing everything (ADR-2608136000)."
+  [dir base additive]
+  (let [resolves? (fn [r] (some? (gitc dir "rev-parse" "--verify" "-q" r)))
+        ref (or (first (for [r (str/split-lines (or (gitc dir "remote") ""))
+                            :let [r (str/trim r)]
+                            :when (seq r)
+                            :let [cand (str r "/" base)]
+                            :when (resolves? cand)]
+                        cand))
+                (when (resolves? "HEAD") "HEAD"))]
+    (if (nil? ref)
+      [additive [] {:applied false :scanned 0}]
+      (let [judged (for [pth additive
+                         :let [line (str/trim (or (gitc dir "log" "--diff-filter=D" "-n" "1"
+                                                        "--format=%h%x09%s" ref "--" pth) ""))]]
+                     [pth (when (seq line) line)])
+            hits (->> judged (filter second) vec)]
+        [(->> judged (remove second) (mapv first))
+         (mapv first hits)
+         {:applied true :scanned (count additive) :findings (vec hits) :ref ref}]))))
+
 (defn- unresolved-refs-gate!
   "Keep `:additive` from landing code whose references do not resolve.
   -> [additive' unresolved] where `unresolved` is demoted to :review.
@@ -1267,7 +1324,10 @@
             ;; 「main に同名パスが無い」しか言っておらず、elf64.clj と
             ;; elf64.cljc は同名パスではない（source-twin-gate! の docstring）。
             [additive twins twinfo] (source-twin-gate! base-map additive)
-            tracked (vec (concat tracked demoted suspects unresolved twins))
+            ;; default branch が **削除した** パスを足し直さない。revert は
+            ;; 「main に無い」を意図的に作る（revert-residue-gate! の docstring）。
+            [additive reverted rvinfo] (revert-residue-gate! dir base additive)
+            tracked (vec (concat tracked demoted suspects unresolved twins reverted))
             ;; :review にも credential / junk / size の網をかける。
             ;; classify-file は untracked にしか当たっていない
             ;; （tracked-safety-gate! の docstring）。
@@ -1282,6 +1342,13 @@
                            (count unresolved) (:scanned uinfo)))
           (doseq [[p syms] (:findings uinfo)]
             (println (str "      " p "  " (str/join ", " syms)))))
+        (if (:applied rvinfo)
+          (when (seq reverted)
+            (println (format "  ⚠ default branch が削除済みのパス %d 件 → :review（scanned %d, ref %s）"
+                             (count reverted) (:scanned rvinfo) (:ref rvinfo)))
+            (doseq [[pth c] (:findings rvinfo)]
+              (println (str "      " pth "  ← 削除: " c))))
+          (println "  ⚠ revert-residue gate: 比較できる ref が無く未適用（:applied false）"))
         (if (:applied twinfo)
           (when (seq twins)
             (println (format "  ⚠ 同 namespace の別拡張子が base に在る %d 件 → :review（scanned %d）"
@@ -1308,12 +1375,22 @@
             [additive unresolved uinfo] (unresolved-refs-gate! dir base additive)
             ;; dry-run と同じ位置・同じ理由（source-twin-gate! の docstring）。
             [additive twins twinfo] (source-twin-gate! base-map additive)
+            ;; default branch が **削除した** パスを足し直さない。revert は
+            ;; 「main に無い」を意図的に作る（revert-residue-gate! の docstring）。
+            [additive reverted rvinfo] (revert-residue-gate! dir base additive)
             ;; base に存在するのに untracked と報告されたものは :additive ではない。
             ;; :review へ落として auto-merge の対象から外す（PR #444 の再発防止）。
-            tracked (vec (concat tracked tracked-differs demoted suspects unresolved twins))
+            tracked (vec (concat tracked tracked-differs demoted suspects unresolved twins reverted))
             ;; dry-run と同じ位置・同じ理由（tracked-safety-gate! の docstring）。
             [tracked ts-dropped ts-info] (tracked-safety-gate! dir base-map tracked)]
         (record-planned! dir additive tracked)
+        (if (:applied rvinfo)
+          (when (seq reverted)
+            (println (format "  ⚠ default branch が削除済みのパス %d 件 → :review（scanned %d, ref %s）"
+                             (count reverted) (:scanned rvinfo) (:ref rvinfo)))
+            (doseq [[pth c] (:findings rvinfo)]
+              (println (str "      " pth "  ← 削除: " c))))
+          (println "  ⚠ revert-residue gate: 比較できる ref が無く未適用（:applied false）"))
         (if (:applied twinfo)
           (when (seq twins)
             (println (format "  ⚠ 同 namespace の別拡張子が base に在る %d 件 → :review（scanned %d）"
@@ -1480,6 +1557,49 @@
 ;; (base-map, additive) の純関数なので、ファイルシステムも GitHub も要らない。
 ;; 大事なのは「落ちること」だけでなく「落ちないこと」も見せることで、
 ;; `foo.clj` + `foo.cljs`（.cljc 無し）は正当な platform split なので通す。
+
+;; `--selftest-revert-residue-gate` — 実 git repo を一時ディレクトリに建てて
+;; 両方向を実演する。history を読む gate なので合成の base-map では足りない。
+(when (argset "--selftest-revert-residue-gate")
+  (let [dir (str (.tmpdir node-os) "/cleanup-land-revert-selftest")
+        g (fn [& xs] (apply sh "git" "-C" dir xs))
+        w! (fn [rel content]
+             (let [f (io/file dir rel)]
+               (.mkdirSync node-fs (.getPath (.getParentFile f)) #js {:recursive true})
+               (.writeFileSync node-fs (.getPath f) content)))]
+    (try (.rmSync node-fs dir #js {:recursive true :force true}) (catch :default _ nil))
+    (.mkdirSync node-fs dir #js {:recursive true})
+    (sh "git" "init" "-q" "-b" "main" dir)
+    (g "config" "user.email" "selftest@example.invalid")
+    (g "config" "user.name" "selftest")
+    (w! "kept.txt" "never deleted\n")
+    (w! "reverted.txt" "landed then reverted\n")
+    (g "add" "-A") (g "-c" "commit.gpgsign=false" "commit" "-q" "-m" "land both")
+    ;; ここが revert に相当する: default branch から 1 本だけ消す
+    (g "rm" "-q" "reverted.txt")
+    (g "-c" "commit.gpgsign=false" "commit" "-q" "-m" "Revert \"land both\"")
+    ;; 消えたファイルを working tree に置き直す（cleanup-land はローカルを消さないので
+    ;; 実際にこの状態になる）
+    (w! "reverted.txt" "landed then reverted\n")
+    (w! "brand-new.txt" "genuinely new\n")
+    (let [[k1 d1 i1] (revert-residue-gate! dir "main" ["reverted.txt" "brand-new.txt"])
+          [k2 d2 i2] (revert-residue-gate! dir "main" ["brand-new.txt"])
+          [k3 d3 i3] (revert-residue-gate! (str dir "/does-not-exist") "main" ["x.txt"])
+          ok (and (= ["brand-new.txt"] k1) (= ["reverted.txt"] d1)
+                  (true? (:applied i1)) (= 2 (:scanned i1))
+                  (= ["brand-new.txt"] k2) (= [] d2) (= 1 (:scanned i2))
+                  (= ["x.txt"] k3) (= [] d3) (false? (:applied i3)))]
+      (println "revert-residue-gate! selftest")
+      (println (format "  (1) default branch が削除済み + 新規  -> kept=%s demoted=%s  %s"
+                       (pr-str k1) (pr-str d1) (pr-str (:findings i1))))
+      (println (format "  (2) 新規のみ                          -> kept=%s demoted=%s  ← 落としてはいけない側"
+                       (pr-str k2) (pr-str d2)))
+      (println (format "  (3) ref が引けない                     -> kept=%s applied=%s  ← 通すが「未適用」と申告"
+                       (pr-str k3) (:applied i3)))
+      (println (if ok "  SELFTEST PASS" "  SELFTEST FAIL"))
+      (try (.rmSync node-fs dir #js {:recursive true :force true}) (catch :default _ nil))
+      (js/process.exit (if ok 0 1)))))
+
 (when (argset "--selftest-source-twin-gate")
   (let [base {"src/a/elf64.cljc" "s1"      ; .clj を足すと shadow される
               "src/a/plat.cljs"  "s2"      ; .clj を足しても正当な split
