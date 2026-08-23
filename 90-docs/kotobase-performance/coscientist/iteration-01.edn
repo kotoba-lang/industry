@@ -1,94 +1,105 @@
-{:iteration 1
- :date "2026-08-18"
- :loop :kotobase/cost-coscientist
- :engine "90-docs/kotobase-performance/cost_coscientist.cljc"
- :ported-from "design-quality.coscientist (itself ported from isekai.ux.coscientist, ADR-0007)"
- :seed "The owner's criterion is cost against other graph databases. Every
-        priority list produced on 2026-08-17 was ordered by intuition."
+{:iteration/id "query-cost-coscientist-01"
+ :iteration/date "2026-08-23"
+ :iteration/seed "Generate -> Reflect -> Rank (Elo) -> Evolve -> Meta over kotobase's read path, in the shape design-quality.coscientist runs it for UI (root ADR-2606141500, isekai ADR-0007). The judge is scripts/audit_query_cost.cljs in kotoba-lang/kotobase-server: deterministic, no LLM, counts rather than milliseconds."
 
  :judge
- {:fn "cost-per-million"
-  :unit "USD per million served reads"
-  :prices {:source "developers.cloudflare.com, fetched 2026-08-17"
-           :usd-per-million-requests 0.30
-           :usd-per-million-cpu-ms 0.02
-           :usd-per-million-class-b 0.36}
-  :why-deterministic "The ranking is reproducible from measured quantities and
-                      published prices. Re-running it after a measurement
-                      changes reorders the roadmap by itself, rather than by
-                      anyone's recollection of which change felt biggest."}
+ {:script "kotobase-server scripts/audit_query_cost.cljs"
+  :unit :asks
+  :why-not-wall-clock "ADR-2608021000 settled this workspace on counts: this workstation runs many concurrent agent sessions and a millisecond here is a number about the host. Asks are a number about the design."
+  :floor "Each shape declares :floor-asks -- the index probes an ideal plan needs. For an n-clause conjunction that is n: read each clause's relation once, join in memory. Headroom is measured minus floor."
+  :fitness-correction
+  "The first fitness was :floor-quads, quads asked for, and it was WRONG. Quads asked is dominated by the per-request scan cache source-for installs, so the recursive rules looked like the whole problem (75 quads asked against a 3-row answer) while the cache was already absorbing them to 2 physical scans. Counting ASKS moved the entire headroom onto the joins, which is where it is. Recorded because a co-scientist loop is exactly as honest as its judge, and this one was briefly measuring the wrong thing."
+  :answer-guard "Every shape runs BOTH ways every run and the result SETS are compared. A row COUNT does not say the rows are the same rows, and a path that asks less by answering less is not cheaper. AGREE 9/9."}
 
- :baseline {:cost-per-million 70.06 :cpu-ms 1976 :class-b-ops 84 :bytes 11462579}
+ :baseline
+ {:graph "963 quads -- a 4-level class chain, 60 individuals, 300 people with :knows/:age/:city"
+  :measured
+  [{:shape :point                   :rows 1  :asks 1   :floor 1 :headroom 0}
+   {:shape :predicate-scan          :rows 60 :asks 1   :floor 1 :headroom 0}
+   {:shape :predicate-value         :rows 60 :asks 1   :floor 1 :headroom 0}
+   {:shape :two-clause-join         :rows 60 :asks 61  :floor 2 :headroom 59}
+   {:shape :three-clause-join       :rows 40 :asks 601 :floor 3 :headroom 598}
+   {:shape :subclass-closure        :rows 3  :asks 6   :floor 1 :headroom 5}
+   {:shape :type-closure            :rows 4  :asks 6   :floor 2 :headroom 4}
+   {:shape :closure-all-individuals :rows 60 :asks 6   :floor 2 :headroom 4}
+   {:shape :count-aggregate         :rows 1  :asks 1   :floor 1 :headroom 0}]
+  :total-headroom 670
+  :finding "98% of the headroom is two shapes. Both are joins, and both are index-nested-loop against a source this server had ALREADY fetched into memory -- N keyed scans of resident data where one broad scan would do."}
 
- :ranked
- [{:elo 1286 :id "h1-seed-materialisation"        :after 29.26 :saves 40.80 :share 0.582 :risk :low  :effort :L}
-  {:elo 1253 :id "h7-parse-only-addressable-values" :after 40.92 :saves 29.14 :share 0.416 :risk :low  :effort :M}
-  {:elo 1231 :id "h2-fold"                        :after 42.62 :saves 27.44 :share 0.392 :risk :low  :effort :S}
-  {:elo 1200 :id "h6-retract-inline-documents"    :after 46.74 :saves 23.32 :share 0.333 :risk :high :effort :S}
-  {:elo 1173 :id "h4-carv2-pack"                  :after 62.86 :saves  7.20 :share 0.103 :risk :high :effort :L}
-  {:elo 1145 :id "h3-engine-materialisation"      :after 69.94 :saves  0.12 :share 0.002 :risk :high :effort :L}
-  {:elo 1113 :id "h5-engine-pin"                  :after 70.06 :saves  0.00 :share 0.000 :risk :low  :effort :S}]
+ :generate
+ [{:id "qc-h1"
+   :title "Supply :clause-cardinality from the prefetched source"
+   :change "pattern-source/clause-cardinality counts each clause's broad relation against the in-memory source and hands it to datalog.core/q, which then chooses one broad scan plus an in-memory hash join over N keyed scans."
+   :grounding "The hash-join path has existed in datalog.core since 2026-08-02 (arrangement 7a0a2002, ADR-2608021000 6-4) and fires ONLY when the caller supplies :clause-cardinality. This server never did. The mechanism was not missing; the hint was."
+   :predicted-gain 657
+   :effort :S}
+  {:id "qc-h2"
+   :title "Order clauses by measured selectivity before joining"
+   :change "sort :where by counted cardinality ascending so the smallest relation drives"
+   :predicted-gain 0
+   :why-zero "qc-h1 already reaches the floor on both join shapes -- there is no ask left to remove. This would reduce the BINDINGS carried between clauses, which the current fitness does not measure. Deferred with the reason rather than shipped on a hunch."
+   :effort :M}
+  {:id "qc-h3"
+   :title "Collapse the fixpoint's repeated asks"
+   :change "the semi-naive loop re-asks the same pattern every round; hoist the scan out of the round"
+   :predicted-gain 13
+   :effort :M
+   :note "Physically already absorbed: 6 asks collapse to 2 distinct patterns through the per-request cache. The remaining cost is the ask, not the scan."}
+  {:id "qc-h4"
+   :title "Narrow the prefetch"
+   :change "prefetch each clause at its narrowest planned pattern rather than its widest"
+   :predicted-gain 0
+   :rejected-by-measurement "prefetched = 643 for the three-clause join, which is exactly 300 + 300 + 43, the sum of the three ranges. There is nothing to narrow. Also unsafe: the fixpoint probes with values not known at plan time (the same reason compiled-patterns widens a variable-length path)."
+   :effort :M}
+  {:id "qc-h5"
+   :title "Push the count aggregate down"
+   :change "compute COUNT during the join instead of materialising rows"
+   :predicted-gain 0
+   :rejected-by-measurement "measured 1 ask, at the floor. query-exec already pushes it."
+   :effort :S}
+  {:id "qc-h6"
+   :title "Memoise the source across requests by chain CID"
+   :change "a content-addressed source cache, the shape materialize-memo already uses"
+   :predicted-gain 0
+   :out-of-scope "This judge measures ONE query. A cross-request win needs a different judge and would be measured in block reads, not asks. Named so it is not re-derived."
+   :effort :M}
+  {:id "qc-h7"
+   :title "Use cardinality instead of query for fully-bound clauses"
+   :change "datalog.query/cardinality counts without building the set"
+   :predicted-gain 0
+   :out-of-scope "A memory win, not an ask win. Needs a memory judge."
+   :effort :S}]
 
- :the-result-the-ranking-could-not-produce
- {:finding "Neither top hypothesis is the answer. The pair is, and it is worth
-            far more than their sum."
-  :why "The served hydrate has two halves. A (514 ms, 84 gets) is hot-datoms:
-        fetching, decoding and merging blocks. B (1,430 ms) is building the
-        LocalStore map, parsing every value twice. h1 removes A and leaves B.
-        h7 removes B and leaves A. Each alone is floored by the other's
-        remainder."
-  :h1-alone 29.26 :h7-alone 40.92 :pair 0.76
-  :order "h7 first -- it is reversible, :M rather than :L, captures the larger
-          CPU half on its own, and unlike h1 does not depend on a read:write
-          ratio nothing has measured."
-  :note "A tournament scores one change at a time against one baseline, so it
-         is structurally unable to see this. Evolve is where it was recovered."}
+ :rank
+ {:method "Elo round-robin, K=32, base 1200, bout decided by predicted gain then effort -- the same convention design-quality.coscientist uses. The measured fitness is the judge; there is no LLM debate."
+  :order ["qc-h1" "qc-h3" "qc-h5" "qc-h7" "qc-h2" "qc-h4" "qc-h6"]
+  :note "Three of seven were REJECTED BY MEASUREMENT rather than by opinion (qc-h4, qc-h5, and the ask half of qc-h2). That is the point of having a judge: the loop spent its ranking on the one hypothesis with headroom behind it."}
 
- :what-the-loop-corrected-about-its-own-first-run
- [{:what "h1 credited with 98.4% of the cost"
-   :now "58.2%"
-   :why "The first run credited a seed MV with the whole hydrate. The
-         decomposition landed later that day showed it removes A only -- 23% of
-         the CPU. B survives ANY encoding, because the consumer is a
-         synchronous LocalStore over a plain Clojure map."}
-  {:what "h2 (fold) credited with 57.5%"
-   :now "39.2%"
-   :why "The first run used an offline harness row that measured a different
-         quantity. Fold reduces the novelty part of A, not B."}
-  {:what "h4 (CARv2 pack) credited with 38.6% and ranked third"
-   :now "10.3%"
-   :why "An arithmetic error in the input: it assumed novelty packs and
-         snapshot does not, when write-locality makes each novelty cell its own
-         commit and therefore its own pack. Only the 21 snapshot blocks
-         coalesce. The judge made this visible by producing a result that
-         contradicted the ADR the hypothesis cited."}
-  {:what "the baseline itself"
-   :now "$57.82 -> $70.06, and the Aura crossover 1.12M -> 0.93M queries/month"
-   :why "The corrected measurement made kotobase look WORSE, not better. This
-         is recorded because a loop that only ever improves its subject is
-         measuring its author's preferences."}]
+ :evolve
+ {:batch-id "query-cost-kaizen-1"
+  :members ["qc-h1"]
+  :why-only-one "qc-h3 is the only other non-zero, at 2% of the total and already absorbed physically by the cache. Shipping it in the same pass would put an unmeasurable change next to a measurable one in the same delta."}
 
- :what-the-judge-cannot-see
- ["CPU. The dominant input is a Node proxy for a quantity only the platform can
-   read. Paired `wrangler tail` showed one request reporting 36 ms of
-   in-isolate elapsed spending 4,046 ms of cpuTime (n=1). Nothing inside the
-   isolate can see cpuTime, so this cannot be closed from here, and every
-   dollar figure inherits the uncertainty. Do not quote these as prices."
-  "The read:write ratio, which decides whether h1 is a win at all."
-  "The read side at all: a five-minute tail of the whole Worker returned no
-   served queries. Today's value is the unit-economics crossover, not saved CPU
-   on traffic that is not there."
-  "Memory. A 4.9 MB seed decode against a 128 MB isolate is unmeasured, and a
-   hypothesis that fails on memory scores the same here as one that succeeds."
-  "Correctness. Every hypothesis is assumed to return the same answers; the
-   judge only prices them."
-  "Storage, deliberately excluded as constant across hypotheses -- including it
-   would shrink every difference by a constant and flatter whichever change is
-   being argued for."]
+ :shipped
+ {:hypothesis "qc-h1"
+  :where ["kotoba-lang/kotobase-server pattern-source/clause-cardinality"
+          "handler/do-q (datomic.q Datalog form)"
+          "handler/run-indexed-compiled-graph-query (graph.query)"]
+  :not-applied-to "sparql-protocol/do-sparql -- that surface does not hand its algebra to datalog.core at all. It materialises the named ranges into a quad seq and runs sparql.core's own BGP, which joins in memory already, so there is no keyed-scan-per-binding path to replace. Written into the source rather than left as an absence."
+  :measured-after
+  [{:shape :two-clause-join   :asks-before 61  :asks-after 2 :floor 2}
+   {:shape :three-clause-join :asks-before 601 :asks-after 3 :floor 3}]
+  :total-headroom-after 13
+  :closed "670 -> 13, 98%. Both join shapes land exactly on their floor."
+  :answers "AGREE 9/9 -- every shape compared as a SET, both ways, in the same run."
+  :discrimination "Making clause-cardinality return nils turns both join tests red. 174 tests / 649 assertions in kotobase-server, with the 7 pre-existing nbb-only failures in hosted-client-transactions-... unchanged."}
 
  :seed-for-next
- "Close the CPU uncertainty first; it is the input every ranking rests on and
-  the only one that cannot be read from inside the isolate. A `wrangler tail`
-  harness that pairs cpuTime against the counters /_diag/hydrate already
-  reports would make the judge's dominant term measured rather than proxied.
-  Until then this loop ranks reliably and prices unreliably."}
+ [{:what "The fixpoint's remaining 13 asks (qc-h3)."
+   :needs "A judge that separates asks from physical scans, since the cache already absorbs these. The audit reports both columns; nothing acts on the difference yet."}
+  {:what "Bindings carried between clauses (qc-h2)."
+   :needs "A fitness over intermediate result size. Asks cannot see it -- both join shapes are already at the floor and would score identically before and after."}
+  {:what "Cross-request source reuse (qc-h6)."
+   :needs "A judge over a REQUEST SEQUENCE, measured in block reads. The one-query judge here is structurally blind to it."}
+  {:what "Re-measure LDBC."
+   :needs "The interleaved harness in kotobase-peer. ADR-2608021000's ratios (IC09 12.8x, IC08 12.6x) predate this change and predate the index path; nothing here claims to have moved them, and the claim should be measured rather than inferred from the ask counts above."}]}
