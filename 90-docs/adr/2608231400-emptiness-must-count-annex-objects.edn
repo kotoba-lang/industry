@@ -1,0 +1,99 @@
+[{:db/id -1
+  :adr/id "adr-2608231400-emptiness-must-count-annex-objects"
+  :adr/title "撤去判定は annex object を数える。判定不能を空と同じ値で返さない"
+  :adr/status "accepted"
+  :adr/date "2026-08-23"
+  :adr/tags ["cleanup" "datalad" "git-annex" "silent-zero" "west"]
+  :adr/related ["adr-2608136000" "adr-2608124400"]
+  :adr/scope "このセッションで動かした範囲（すべて退避 → 保全確認 → 削除の順）:
+
+path-override leftover 197 → 3 件（約 16 GB 回収）。撤去できない 3 件は
+ai-gftd-apps-gftdcojp（自身の .claude/worktrees が使用中、内容は後継 main の ancestor で差 0）、
+compiler（別セッションの登録 worktree 11 本）、software.diaspora.nodeinfo（untracked 377 は
+退避済み、annex 25,966 は DataLad 経路の判断待ち）。
+
+west 登録 4,215 checkout: 実作業 branch 288 → 8（残りは全て生きた worktree が使用中）、
+dirty 346 → 2、untracked 0、stash 0。pin は 4,223 のうち 4,221 が upstream tip と一致。
+
+未着地作業の保全: 内容包含で測って 18,107 行 + leftover 側 98,000 行超。
+GitHub へ rescue branch として 261 本着地。push できなかった 4 本は GitHub 側が archived
+（read-only）で、bundle を作り `git bundle verify` を通してから削除した。"
+  :adr/consequences "1. 撤去判定は `nbb scripts/checkout-holds.cljs <path> ...` を通す。目視の 4 項目に戻さない。
+2. 「何も持たない」と言う前に annex を数える。`.git/annex/objects` の走査根が無いことと
+   0 件であることを区別する。
+3. `.git` を失った checkout に `git` を呼ぶと親を辿って superproject を答える。
+   rev-parse が成功したことを repo の生存の証拠にしない。
+4. DataLad データセットを `rm -rf` しない。object が read-only なので中途半端に壊れる。
+   撤去が要るなら `datalad remove` か、B2 の present を全数確認してから。
+5. 6 dataset の location log には実在しない clone の UUID が残っている。numcopies を
+   2 以上に上げる前に `git annex dead` を通すこと。"
+  :adr/body "撤去してよい checkout かの判定に、git-annex の content object を数える項目を足す。
+判定できない状態（.git が無い）を、判定できて空だった状態と別の値で返す。
+
+## 何が起きたか
+
+2026-08-23、path-override leftover（改名前のパスに残った checkout）197 件を整理した。
+「何も持たないもの」を branch / untracked / dirty / stash の 4 項目で判定し、
+0 のものを `rm -rf` で撤去した。157 件、続いて 27 件。
+
+27 件のうち **6 件は DataLad/git-annex データセットだった。** git-annex は content object を
+read-only にする設計なので `rm -rf` が Permission denied で止まり、`.git/annex/objects/` だけを
+残して **.git のメタデータと working tree を消した。** repo は破壊され、7.7 GB / 32,775 個の
+annex object が索引を失って孤立した。
+
+破壊直後の測定で `git -C <dir> rev-parse HEAD` が 6 件とも同じ sha を返した。**.git が無いので
+git が親ディレクトリを辿り、superproject の HEAD を答えていた。** 「HEAD が読める＝repo は
+生きている」と読めるが、事実は逆だった。
+
+## 被害（実測して確定させた）
+
+6 dataset の **key 全数 32,775 件が B2 に present** であることを、git-annex branch の
+location log を全数読んで確認した（標本ではない）。numcopies は 6 件とも既定 1 なので、
+B2 の 1 copy で要件は満たされる。**データ損失は無い。**
+
+後継 path（kotoba-lang/*）は 6 件とも `git annex init` すらされていなかった。つまり壊したのは
+「実データを持っていた唯一のローカル clone」だが、それは B2 の複製であって原本ではない。
+孤立した object は索引する repo が無いのでそのままでは使えず、key 一覧（識別子のみ）を
+退避して撤去した。再取得は後継 path で `git annex init` → `enableremote b2` → `annex get`。
+
+**残る不整合**: 壊れた clone の UUID が location log で copy を主張し続ける。numcopies=1 では
+実害が無いが、2 以上に上げると実在しない copy を数えて最後の実 copy の drop を許す。
+正しい修復は各 dataset で `git annex dead <uuid>`。6 つの共有データセットのメタデータ
+書き換えになるので実行していない。
+
+## 決定
+
+判定は `scripts/checkout-holds.cljs` に一本化する。5 項目
+（branches / untracked / dirty / stashes / **annex**）を数え、`.git` の不在は
+`no-git` / exit 2 で `empty`(0) とも `holds`(1) とも別の値で返す。SCANNED 行を必ず出す。
+
+実測で両方向を確認済み: clean→empty(0) / untracked 1 件→holds(1) /
+**annex object 1 件→holds(1)（旧判定はここで empty）** / 取り除く→empty(0) /
+.git 無し→no-git(2)。破壊した 6 件に当て直すと全件 holds を返す。
+
+## なぜ「成功した 157 件」がこの穴を隠したか
+
+157 件は偶然 DataLad を含まなかっただけで、**手順は最初から同じ穴を持っていた。**
+成功はこの種の欠陥を検出しない。ADR-2608136000（測れなかった検査が、測って問題が
+無かった検査と同じ値を返す）の一例で、そこに挙がっていない形 ——
+**検査項目そのものが足りない**場合も、同じく沈黙が緑として蓄積する。
+
+## 同じ日に見つかった同型の 3 件（いずれも修正済み）
+
+1. untracked 377 件を後継の *working tree* と比べて「後継に無い」と答えた。後継は
+   raw/ を 26,471 tracked していたが実体は 1 件しか materialize されていなかった（sparse）。
+2. 訊き直した先で remote 名が `origin` でなかったため main が解決できず、**分母 0 のまま
+   「377 件すべて未着地」**と出た。分母を印字する作りに直した。
+3. annex 判定の grep が `^/annex/` と `^\\.\\./\\.git/annex` を見ていたが実体は
+   `../../.git/annex/…`。両方外れて「通常の blob」と答えた。
+
+## 併せて直したもの
+
+`scripts/west-pin-put-batch.cljs` が pin 前進 19 件中 4 件を落としていた原因は west.yml では
+なくスクリプト側で、これも「検索の失敗」を「データについての事実」として報告する形だった。
+(a) 既定 branch を `main` 決め打ち（実際は Production / gh-pages / rescue/…）で、
+compare の 404（base ref が無い）が `not reachable from main` と印字されていた。
+(b) `- name: <entry>` の最初の一致で停止し、remotes と projects が同名を持てる
+（`kotoba-lang`）ため `no revision line at tip` と出ていた。両方向の対照実験で確認した。
+`path:` の存在を見る guard も書いたが一度も結果を変えなかったので落とした
+（発火させられない検査は検査ではない）。"}]
