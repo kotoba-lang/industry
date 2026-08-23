@@ -720,6 +720,89 @@
          {:scanned (count additive) :applied true}])
       [additive [] {:scanned 0 :applied false :reason :gitignore-blob-unreadable}])))
 
+(def ^:private clj-source-exts #{"clj" "cljs" "cljc"})
+
+(defn- source-stem
+  "path -> [stem ext] for Clojure sources, else nil."
+  [path]
+  (when-let [m (re-find #"^(.*)\.(clj|cljs|cljc)$" path)]
+    [(nth m 1) (nth m 2)]))
+
+(defn- shadowing-twin
+  "Does adding `ext` at `stem` shadow, or get shadowed by, something on base?
+
+  Clojure resolves a namespace by trying the platform extension BEFORE `.cljc`:
+  on the JVM `foo.clj` then `foo.cljc`, in ClojureScript `foo.cljs` then
+  `foo.cljc`. So a `.cljc` paired with `.clj` or `.cljs` means one of the two
+  files is loaded and the other is not, for that platform.
+
+  `foo.clj` + `foo.cljs` with no `.cljc` is NOT that -- it is the ordinary
+  platform-split pattern and must not be flagged."
+  [base-paths stem ext]
+  (let [others (->> (disj clj-source-exts ext)
+                    (filter #(contains? base-paths (str stem "." %)))
+                    sort vec)
+        hazard (if (= "cljc" ext)
+                 others                                   ; adding .cljc over .clj/.cljs
+                 (filterv #{"cljc"} others))]             ; adding .clj/.cljs over .cljc
+    (when (seq hazard) hazard)))
+
+(defn- source-twin-gate!
+  "Keep `:additive` from landing a source file that shadows one already on base.
+  -> [additive' twins info] where `twins` is demoted to :review.
+
+  ## The same wrong argument, in a new costume
+
+  `:additive` merges on one argument: no path of this name exists on the default
+  branch. `src/kotoba/native/elf64.clj` satisfies that perfectly while
+  `src/kotoba/native/elf64.cljc` sits on main -- **the paths differ, the
+  namespace does not.** This is the fourth time this file has had to record that
+  `not on main` does not mean `new work` (see residue-gate!, nested-repo-gate,
+  stale-ignore-gate).
+
+  Measured 2026-08-23 on the fleet's 22 open preservation PRs. Five were
+  classified merge-candidate by the disposition procedure in
+  manifest/cleanup-workflow.edn (overlap 0 with the default branch, 0 deleted
+  lines). Three of the five were not safe:
+
+  - `kotoba-lang/kotoba-native#56` adds `src/kotoba/native/elf64.clj` (804 lines)
+    while main carries `src/kotoba/native/elf64.cljc` (46,629 bytes). On the JVM
+    the 804-line file wins, so the deployed behaviour would come from a file a
+    reader opening the `.cljc` never sees. Overlap is 0 precisely BECAUSE the
+    extension differs.
+  - `kotoba-lang/bonsai#18` adds a `.bb` into a repo with none (CLAUDE.md forbids
+    new babashka entry points) -- policy, not shadowing, and out of this gate's
+    scope; reported so the next reader does not assume this gate covers it.
+  - `network-awai/app-aozora-engine#9` carries 0 files under a title claiming 1.
+
+  ## It demotes, it never drops
+
+  A twin can be deliberate mid-migration, so this goes to :review for a human,
+  on unresolved-refs-gate!'s precedent. Nothing in the working tree is touched.
+
+  ## When it cannot answer
+
+  With no `base-map` there is nothing to compare against, so the gate reports
+  `:applied false` rather than passing everything -- a run that could not look
+  must not read like a run that looked and found nothing (ADR-2608136000)."
+  [base-map additive]
+  (if (nil? base-map)
+    [additive [] {:applied false :scanned 0}]
+    (let [base-paths (set (keys base-map))
+          judged (map (fn [p]
+                        (if-let [[stem ext] (source-stem p)]
+                          [p (shadowing-twin base-paths stem ext)]
+                          [p nil]))
+                      additive)
+          twins (->> judged (filter second) vec)
+          kept (->> judged (remove second) (mapv first))]
+      [kept (mapv first twins)
+       {:applied true
+        :scanned (count (filter (comp some? source-stem) additive))
+        :findings (mapv (fn [[p exts]]
+                          [p (mapv #(str (first (source-stem p)) "." %) exts)])
+                        twins)}])))
+
 (defn- unresolved-refs-gate!
   "Keep `:additive` from landing code whose references do not resolve.
   -> [additive' unresolved] where `unresolved` is demoted to :review.
@@ -1180,7 +1263,11 @@
             ;; パス的に additive でも compile を壊す（unresolved-refs-gate! の
             ;; docstring / kotoba-kir b0472c3 の実例）。
             [additive unresolved uinfo] (unresolved-refs-gate! dir base additive)
-            tracked (vec (concat tracked demoted suspects unresolved))
+            ;; 同じ namespace を別拡張子で二重に持たせない。:additive は
+            ;; 「main に同名パスが無い」しか言っておらず、elf64.clj と
+            ;; elf64.cljc は同名パスではない（source-twin-gate! の docstring）。
+            [additive twins twinfo] (source-twin-gate! base-map additive)
+            tracked (vec (concat tracked demoted suspects unresolved twins))
             ;; :review にも credential / junk / size の網をかける。
             ;; classify-file は untracked にしか当たっていない
             ;; （tracked-safety-gate! の docstring）。
@@ -1195,6 +1282,13 @@
                            (count unresolved) (:scanned uinfo)))
           (doseq [[p syms] (:findings uinfo)]
             (println (str "      " p "  " (str/join ", " syms)))))
+        (if (:applied twinfo)
+          (when (seq twins)
+            (println (format "  ⚠ 同 namespace の別拡張子が base に在る %d 件 → :review（scanned %d）"
+                             (count twins) (:scanned twinfo)))
+            (doseq [[p others] (:findings twinfo)]
+              (println (str "      " p "  ← base: " (str/join ", " others)))))
+          (println "  ⚠ source-twin gate: base tree が引けず未適用（:applied false）"))
         (report-tracked-safety! ts-dropped ts-info)
         (record-planned! dir additive tracked)
         (when (seq additive) (println (format "  plan :additive  %d files → PR → merge" (count additive))))
@@ -1212,12 +1306,21 @@
             [additive suspects _] (residue-gate! dir base additive base-map)
             ;; 参照が解決しないコードも :additive から外す（上の dry-run と同じ理由）。
             [additive unresolved uinfo] (unresolved-refs-gate! dir base additive)
+            ;; dry-run と同じ位置・同じ理由（source-twin-gate! の docstring）。
+            [additive twins twinfo] (source-twin-gate! base-map additive)
             ;; base に存在するのに untracked と報告されたものは :additive ではない。
             ;; :review へ落として auto-merge の対象から外す（PR #444 の再発防止）。
-            tracked (vec (concat tracked tracked-differs demoted suspects unresolved))
+            tracked (vec (concat tracked tracked-differs demoted suspects unresolved twins))
             ;; dry-run と同じ位置・同じ理由（tracked-safety-gate! の docstring）。
             [tracked ts-dropped ts-info] (tracked-safety-gate! dir base-map tracked)]
         (record-planned! dir additive tracked)
+        (if (:applied twinfo)
+          (when (seq twins)
+            (println (format "  ⚠ 同 namespace の別拡張子が base に在る %d 件 → :review（scanned %d）"
+                             (count twins) (:scanned twinfo)))
+            (doseq [[p others] (:findings twinfo)]
+              (println (str "      " p "  ← base: " (str/join ", " others)))))
+          (println "  ⚠ source-twin gate: base tree が引けず未適用（:applied false）"))
         (report-tracked-safety! ts-dropped ts-info)
         (when (seq unresolved)
           (println (format "  ⚠ 参照が解決しない %d 件 → :review（scanned %d）"
@@ -1372,6 +1475,42 @@
 ;; 「落ちること」を確かめずに landed としない、という repo の規則（CLAUDE.md
 ;; 「gate は劇場になりうる」）を、この gate については誰でも再実行できる形にする。
 ;; 実ファイルを触るので一時ディレクトリに作って必ず消す。
+
+;; `--selftest-source-twin-gate` — 両方向を実演して終わる。source-twin-gate! は
+;; (base-map, additive) の純関数なので、ファイルシステムも GitHub も要らない。
+;; 大事なのは「落ちること」だけでなく「落ちないこと」も見せることで、
+;; `foo.clj` + `foo.cljs`（.cljc 無し）は正当な platform split なので通す。
+(when (argset "--selftest-source-twin-gate")
+  (let [base {"src/a/elf64.cljc" "s1"      ; .clj を足すと shadow される
+              "src/a/plat.cljs"  "s2"      ; .clj を足しても正当な split
+              "src/a/legacy.clj" "s3"}     ; .cljc を足すと shadow する
+        run (fn [add bm] (source-twin-gate! bm add))
+        [k1 d1 i1] (run ["src/a/elf64.clj"] base)
+        [k2 d2 _]  (run ["src/a/plat.clj"] base)
+        [k3 d3 _]  (run ["src/a/brand-new.clj"] base)
+        [k4 d4 _]  (run ["src/a/legacy.cljc"] base)
+        [k5 d5 i5] (run ["src/a/elf64.clj"] nil)
+        [k6 d6 i6] (run ["docs/README.md"] base)
+        ok (and (= [] k1) (= ["src/a/elf64.clj"] d1) (true? (:applied i1)) (= 1 (:scanned i1))
+                (= ["src/a/plat.clj"] k2) (= [] d2)
+                (= ["src/a/brand-new.clj"] k3) (= [] d3)
+                (= [] k4) (= ["src/a/legacy.cljc"] d4)
+                (= ["src/a/elf64.clj"] k5) (= [] d5) (false? (:applied i5))
+                (= ["docs/README.md"] k6) (= [] d6) (= 0 (:scanned i6)))]
+    (println "source-twin-gate! selftest")
+    (println (format "  (1) .clj over base .cljc      -> kept=%d demoted=%d %s"
+                     (count k1) (count d1) (pr-str (:findings i1))))
+    (println (format "  (2) .clj over base .cljs      -> kept=%d demoted=%d  ← 正当な platform split、通す"
+                     (count k2) (count d2)))
+    (println (format "  (3) 対応する base ファイル無し -> kept=%d demoted=%d" (count k3) (count d3)))
+    (println (format "  (4) .cljc over base .clj      -> kept=%d demoted=%d" (count k4) (count d4)))
+    (println (format "  (5) base tree が引けない       -> kept=%d demoted=%d applied=%s  ← 通すが「未適用」と申告"
+                     (count k5) (count d5) (:applied i5)))
+    (println (format "  (6) Clojure source ではない     -> kept=%d demoted=%d scanned=%d"
+                     (count k6) (count d6) (:scanned i6)))
+    (println (if ok "  SELFTEST PASS" "  SELFTEST FAIL"))
+    (js/process.exit (if ok 0 1))))
+
 (when (argset "--selftest-tracked-gate")
   (let [dir (str (.tmpdir node-os) "/cleanup-land-gate-selftest")
         w! (fn [rel content]
