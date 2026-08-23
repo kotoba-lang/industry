@@ -720,6 +720,171 @@
          {:scanned (count additive) :applied true}])
       [additive [] {:scanned 0 :applied false :reason :gitignore-blob-unreadable}])))
 
+(def ^:private clj-source-exts #{"clj" "cljs" "cljc"})
+
+(defn- source-stem
+  "path -> [stem ext] for Clojure sources, else nil."
+  [path]
+  (when-let [m (re-find #"^(.*)\.(clj|cljs|cljc)$" path)]
+    [(nth m 1) (nth m 2)]))
+
+(defn- shadowing-twin
+  "Does adding `ext` at `stem` shadow, or get shadowed by, something on base?
+
+  Clojure resolves a namespace by trying the platform extension BEFORE `.cljc`:
+  on the JVM `foo.clj` then `foo.cljc`, in ClojureScript `foo.cljs` then
+  `foo.cljc`. So a `.cljc` paired with `.clj` or `.cljs` means one of the two
+  files is loaded and the other is not, for that platform.
+
+  `foo.clj` + `foo.cljs` with no `.cljc` is NOT that -- it is the ordinary
+  platform-split pattern and must not be flagged."
+  [base-paths stem ext]
+  (let [others (->> (disj clj-source-exts ext)
+                    (filter #(contains? base-paths (str stem "." %)))
+                    sort vec)
+        hazard (if (= "cljc" ext)
+                 others                                   ; adding .cljc over .clj/.cljs
+                 (filterv #{"cljc"} others))]             ; adding .clj/.cljs over .cljc
+    (when (seq hazard) hazard)))
+
+(defn- source-twin-gate!
+  "Keep `:additive` from landing a source file that shadows one already on base.
+  -> [additive' twins info] where `twins` is demoted to :review.
+
+  ## The same wrong argument, in a new costume
+
+  `:additive` merges on one argument: no path of this name exists on the default
+  branch. `src/kotoba/native/elf64.clj` satisfies that perfectly while
+  `src/kotoba/native/elf64.cljc` sits on main -- **the paths differ, the
+  namespace does not.** This is the fourth time this file has had to record that
+  `not on main` does not mean `new work` (see residue-gate!, nested-repo-gate,
+  stale-ignore-gate).
+
+  Measured 2026-08-23 on the fleet's 22 open preservation PRs. Five were
+  classified merge-candidate by the disposition procedure in
+  manifest/cleanup-workflow.edn (overlap 0 with the default branch, 0 deleted
+  lines). Three of the five were not safe:
+
+  - `kotoba-lang/kotoba-native#56` adds `src/kotoba/native/elf64.clj` (804 lines)
+    while main carries `src/kotoba/native/elf64.cljc` (46,629 bytes). On the JVM
+    the 804-line file wins, so the deployed behaviour would come from a file a
+    reader opening the `.cljc` never sees. Overlap is 0 precisely BECAUSE the
+    extension differs.
+  - `kotoba-lang/bonsai#18` adds a `.bb` into a repo with none (CLAUDE.md forbids
+    new babashka entry points) -- policy, not shadowing, and out of this gate's
+    scope; reported so the next reader does not assume this gate covers it.
+  - `network-awai/app-aozora-engine#9` carries 0 files under a title claiming 1.
+
+  ## It demotes, it never drops
+
+  A twin can be deliberate mid-migration, so this goes to :review for a human,
+  on unresolved-refs-gate!'s precedent. Nothing in the working tree is touched.
+
+  ## When it cannot answer
+
+  With no `base-map` there is nothing to compare against, so the gate reports
+  `:applied false` rather than passing everything -- a run that could not look
+  must not read like a run that looked and found nothing (ADR-2608136000)."
+  [base-map additive]
+  (if (nil? base-map)
+    [additive [] {:applied false :scanned 0}]
+    (let [base-paths (set (keys base-map))
+          judged (map (fn [p]
+                        (if-let [[stem ext] (source-stem p)]
+                          [p (shadowing-twin base-paths stem ext)]
+                          [p nil]))
+                      additive)
+          twins (->> judged (filter second) vec)
+          kept (->> judged (remove second) (mapv first))]
+      [kept (mapv first twins)
+       {:applied true
+        :scanned (count (filter (comp some? source-stem) additive))
+        :findings (mapv (fn [[p exts]]
+                          [p (mapv #(str (first (source-stem p)) "." %) exts)])
+                        twins)}])))
+
+(defn- revert-residue-gate!
+  "Keep `:additive` from re-landing content the default branch DELETED.
+  -> [additive' reverted info] where `reverted` is demoted to :review.
+
+  ## The most dangerous reading of `not on main`
+
+  `:additive` means no path of this name exists on the default branch. A revert
+  produces exactly that state, and it produces it **on purpose**. Re-adding the
+  path does not add new work; it reverses somebody's decision.
+
+  Measured 2026-08-23, `kotoba-lang/kotoba`, found while surveying the west
+  update skip set. `cleanup: land untracked WIP (20 files)` merged as PR #487 at
+  10:07Z and was reverted the same day by `4903fba1`, which removed all 20 files
+  including `docs/ADR-codebase-actor-ipld.edn` and `src/kotoba/codebase_actor.clj`.
+  Because cleanup-land never deletes local copies -- correctly, that is the
+  safety floor -- both files were still sitting untracked in the shared checkout
+  afterwards. On the next `--apply` they are absent from main, carry no rename,
+  are not ignored, and have no source twin, so they plan as `:additive` -> PR ->
+  **merge**. `unresolved-refs-gate!` happens to catch the `.clj` (it requires
+  `kotoba.ipld-block-store`, which the revert also removed), but the `.edn` is a
+  document with no references and would sail straight through.
+
+  So the revert would have been undone by the tool that caused it, on its next
+  run, with a commit message calling the content new.
+
+  ## It demotes, it never drops
+
+  A path can legitimately be re-created after a deletion, and a human is the one
+  who can tell that from a reversal. Goes to :review with the deleting commit
+  named, so the reviewer starts from the evidence rather than from the diff.
+
+  ## Which ref, and what happens when there is none
+
+  The default branch when it resolves, HEAD otherwise -- residue-gate!'s
+  fallback and for its reason: a west checkout resolves `<remote>/<default>`
+  only about a third of the time. With neither, `:applied false` is printed
+  rather than passing everything (ADR-2608136000)."
+  [dir base additive]
+  (let [resolves? (fn [r] (some? (gitc dir "rev-parse" "--verify" "-q" r)))
+        ref (or (first (for [r (str/split-lines (or (gitc dir "remote") ""))
+                            :let [r (str/trim r)]
+                            :when (seq r)
+                            :let [cand (str r "/" base)]
+                            :when (resolves? cand)]
+                        cand))
+                (when (resolves? "HEAD") "HEAD"))]
+    (if (nil? ref)
+      [additive [] {:applied false :scanned 0}]
+      ;; 候補が多いときは history を 1 回だけ歩く。実測 2026-08-23
+       ;; (`kotoba-lang/kotoba`): 1 パスあたり `git log` を起動すると **279 ms**、
+       ;; 全 history を 1 回歩くと **3.4 秒**（削除パス 27,196 行）。損益分岐は
+       ;; **12 候補**。片方に決め打ちすると、候補 2 件の repo で 3.4 秒を払うか、
+       ;; 候補 1,000 件の repo で 4.6 分を払うかのどちらかになる。
+       ;; 閾値は測った値であって好みではない。
+      (let [batch? (> (count additive) 12)
+            deleted (when batch?
+                      ;; `git log` は新しい順なので、あるパスの **最初の** 出現が
+                      ;; 直近の削除 commit。後から来た古い削除で上書きしない。
+                      (let [out (or (gitc dir "log" "--diff-filter=D" "--name-only"
+                                          "--format=%x00%h%x09%s" ref) "")]
+                        (loop [ls (str/split-lines out) cur nil acc {}]
+                          (if-let [l (first ls)]
+                            (if (str/starts-with? l "\u0000")
+                              (recur (rest ls) (subs l 1) acc)
+                              (let [pth (str/trim l)]
+                                (recur (rest ls) cur
+                                       (if (and (seq pth) cur (not (contains? acc pth)))
+                                         (assoc acc pth cur) acc))))
+                            acc))))
+            judged (for [pth additive
+                         :let [line (if batch?
+                                      (get deleted pth)
+                                      (let [o (str/trim (or (gitc dir "log" "--diff-filter=D" "-n" "1"
+                                                                  "--format=%h%x09%s" ref "--" pth) ""))]
+                                        (when (seq o) o)))]]
+                     [pth line])
+            hits (->> judged (filter second) vec)]
+        [(->> judged (remove second) (mapv first))
+         (mapv first hits)
+         {:applied true :scanned (count additive) :findings (vec hits) :ref ref
+         :mode (if (> (count additive) 12) :one-history-walk :per-path)}]))))
+
 (defn- unresolved-refs-gate!
   "Keep `:additive` from landing code whose references do not resolve.
   -> [additive' unresolved] where `unresolved` is demoted to :review.
@@ -1180,7 +1345,14 @@
             ;; パス的に additive でも compile を壊す（unresolved-refs-gate! の
             ;; docstring / kotoba-kir b0472c3 の実例）。
             [additive unresolved uinfo] (unresolved-refs-gate! dir base additive)
-            tracked (vec (concat tracked demoted suspects unresolved))
+            ;; 同じ namespace を別拡張子で二重に持たせない。:additive は
+            ;; 「main に同名パスが無い」しか言っておらず、elf64.clj と
+            ;; elf64.cljc は同名パスではない（source-twin-gate! の docstring）。
+            [additive twins twinfo] (source-twin-gate! base-map additive)
+            ;; default branch が **削除した** パスを足し直さない。revert は
+            ;; 「main に無い」を意図的に作る（revert-residue-gate! の docstring）。
+            [additive reverted rvinfo] (revert-residue-gate! dir base additive)
+            tracked (vec (concat tracked demoted suspects unresolved twins reverted))
             ;; :review にも credential / junk / size の網をかける。
             ;; classify-file は untracked にしか当たっていない
             ;; （tracked-safety-gate! の docstring）。
@@ -1195,6 +1367,20 @@
                            (count unresolved) (:scanned uinfo)))
           (doseq [[p syms] (:findings uinfo)]
             (println (str "      " p "  " (str/join ", " syms)))))
+        (if (:applied rvinfo)
+          (when (seq reverted)
+            (println (format "  ⚠ default branch が削除済みのパス %d 件 → :review（scanned %d, ref %s）"
+                             (count reverted) (:scanned rvinfo) (:ref rvinfo)))
+            (doseq [[pth c] (:findings rvinfo)]
+              (println (str "      " pth "  ← 削除: " c))))
+          (println "  ⚠ revert-residue gate: 比較できる ref が無く未適用（:applied false）"))
+        (if (:applied twinfo)
+          (when (seq twins)
+            (println (format "  ⚠ 同 namespace の別拡張子が base に在る %d 件 → :review（scanned %d）"
+                             (count twins) (:scanned twinfo)))
+            (doseq [[p others] (:findings twinfo)]
+              (println (str "      " p "  ← base: " (str/join ", " others)))))
+          (println "  ⚠ source-twin gate: base tree が引けず未適用（:applied false）"))
         (report-tracked-safety! ts-dropped ts-info)
         (record-planned! dir additive tracked)
         (when (seq additive) (println (format "  plan :additive  %d files → PR → merge" (count additive))))
@@ -1212,12 +1398,31 @@
             [additive suspects _] (residue-gate! dir base additive base-map)
             ;; 参照が解決しないコードも :additive から外す（上の dry-run と同じ理由）。
             [additive unresolved uinfo] (unresolved-refs-gate! dir base additive)
+            ;; dry-run と同じ位置・同じ理由（source-twin-gate! の docstring）。
+            [additive twins twinfo] (source-twin-gate! base-map additive)
+            ;; default branch が **削除した** パスを足し直さない。revert は
+            ;; 「main に無い」を意図的に作る（revert-residue-gate! の docstring）。
+            [additive reverted rvinfo] (revert-residue-gate! dir base additive)
             ;; base に存在するのに untracked と報告されたものは :additive ではない。
             ;; :review へ落として auto-merge の対象から外す（PR #444 の再発防止）。
-            tracked (vec (concat tracked tracked-differs demoted suspects unresolved))
+            tracked (vec (concat tracked tracked-differs demoted suspects unresolved twins reverted))
             ;; dry-run と同じ位置・同じ理由（tracked-safety-gate! の docstring）。
             [tracked ts-dropped ts-info] (tracked-safety-gate! dir base-map tracked)]
         (record-planned! dir additive tracked)
+        (if (:applied rvinfo)
+          (when (seq reverted)
+            (println (format "  ⚠ default branch が削除済みのパス %d 件 → :review（scanned %d, ref %s）"
+                             (count reverted) (:scanned rvinfo) (:ref rvinfo)))
+            (doseq [[pth c] (:findings rvinfo)]
+              (println (str "      " pth "  ← 削除: " c))))
+          (println "  ⚠ revert-residue gate: 比較できる ref が無く未適用（:applied false）"))
+        (if (:applied twinfo)
+          (when (seq twins)
+            (println (format "  ⚠ 同 namespace の別拡張子が base に在る %d 件 → :review（scanned %d）"
+                             (count twins) (:scanned twinfo)))
+            (doseq [[p others] (:findings twinfo)]
+              (println (str "      " p "  ← base: " (str/join ", " others)))))
+          (println "  ⚠ source-twin gate: base tree が引けず未適用（:applied false）"))
         (report-tracked-safety! ts-dropped ts-info)
         (when (seq unresolved)
           (println (format "  ⚠ 参照が解決しない %d 件 → :review（scanned %d）"
@@ -1372,6 +1577,101 @@
 ;; 「落ちること」を確かめずに landed としない、という repo の規則（CLAUDE.md
 ;; 「gate は劇場になりうる」）を、この gate については誰でも再実行できる形にする。
 ;; 実ファイルを触るので一時ディレクトリに作って必ず消す。
+
+;; `--selftest-source-twin-gate` — 両方向を実演して終わる。source-twin-gate! は
+;; (base-map, additive) の純関数なので、ファイルシステムも GitHub も要らない。
+;; 大事なのは「落ちること」だけでなく「落ちないこと」も見せることで、
+;; `foo.clj` + `foo.cljs`（.cljc 無し）は正当な platform split なので通す。
+
+;; `--selftest-revert-residue-gate` — 実 git repo を一時ディレクトリに建てて
+;; 両方向を実演する。history を読む gate なので合成の base-map では足りない。
+(when (argset "--selftest-revert-residue-gate")
+  (let [dir (str (.tmpdir node-os) "/cleanup-land-revert-selftest")
+        g (fn [& xs] (apply sh "git" "-C" dir xs))
+        w! (fn [rel content]
+             (let [f (io/file dir rel)]
+               (.mkdirSync node-fs (.getPath (.getParentFile f)) #js {:recursive true})
+               (.writeFileSync node-fs (.getPath f) content)))]
+    (try (.rmSync node-fs dir #js {:recursive true :force true}) (catch :default _ nil))
+    (.mkdirSync node-fs dir #js {:recursive true})
+    (sh "git" "init" "-q" "-b" "main" dir)
+    (g "config" "user.email" "selftest@example.invalid")
+    (g "config" "user.name" "selftest")
+    (w! "kept.txt" "never deleted\n")
+    (w! "reverted.txt" "landed then reverted\n")
+    (g "add" "-A") (g "-c" "commit.gpgsign=false" "commit" "-q" "-m" "land both")
+    ;; ここが revert に相当する: default branch から 1 本だけ消す
+    (g "rm" "-q" "reverted.txt")
+    (g "-c" "commit.gpgsign=false" "commit" "-q" "-m" "Revert \"land both\"")
+    ;; 消えたファイルを working tree に置き直す（cleanup-land はローカルを消さないので
+    ;; 実際にこの状態になる）
+    (w! "reverted.txt" "landed then reverted\n")
+    (w! "brand-new.txt" "genuinely new\n")
+    ;; 13 件以上で batch 分岐（1 回の history 走査）に入る。**同じ入力で
+    ;; per-path と batch が同じ答えを出すこと**を確かめる —— 使われる分岐を
+    ;; 一度も通さない検査は、その分岐について何も言っていない。
+    (doseq [i (range 14)] (w! (str "filler-" i ".txt") "x\n"))
+    (let [many (into ["reverted.txt"] (map #(str "filler-" % ".txt") (range 14)))
+          [bk bd bi] (revert-residue-gate! dir "main" many)
+          [pk pd pi] (revert-residue-gate! dir "main" ["reverted.txt"])
+          [k1 d1 i1] (revert-residue-gate! dir "main" ["reverted.txt" "brand-new.txt"])
+          [k2 d2 i2] (revert-residue-gate! dir "main" ["brand-new.txt"])
+          [k3 d3 i3] (revert-residue-gate! (str dir "/does-not-exist") "main" ["x.txt"])
+          ok (and (= ["brand-new.txt"] k1) (= ["reverted.txt"] d1)
+                  (true? (:applied i1)) (= 2 (:scanned i1))
+                  (= ["brand-new.txt"] k2) (= [] d2) (= 1 (:scanned i2))
+                  (= ["x.txt"] k3) (= [] d3) (false? (:applied i3))
+                  ;; batch 分岐に入っていること、そして per-path と同じ答えであること
+                  (= :one-history-walk (:mode bi)) (= :per-path (:mode pi))
+                  (= ["reverted.txt"] bd) (= bd pd)
+                  (= (get-in bi [:findings 0 1]) (get-in pi [:findings 0 1])))]
+      (println "revert-residue-gate! selftest")
+      (println (format "  (1) default branch が削除済み + 新規  -> kept=%s demoted=%s  %s"
+                       (pr-str k1) (pr-str d1) (pr-str (:findings i1))))
+      (println (format "  (2) 新規のみ                          -> kept=%s demoted=%s  ← 落としてはいけない側"
+                       (pr-str k2) (pr-str d2)))
+      (println (format "  (3) ref が引けない                     -> kept=%s applied=%s  ← 通すが「未適用」と申告"
+                       (pr-str k3) (:applied i3)))
+      (println (str "  (4) 13 件以上 → batch 分岐        -> mode=" (name (:mode bi))
+                    " demoted=" (pr-str bd)))
+      (println (str "  (5) per-path と batch の一致       -> "
+                    (if (= (get-in bi [:findings 0 1]) (get-in pi [:findings 0 1]))
+                      "同じ削除 commit を返す" "不一致")))
+      (println (if ok "  SELFTEST PASS" "  SELFTEST FAIL"))
+      (try (.rmSync node-fs dir #js {:recursive true :force true}) (catch :default _ nil))
+      (js/process.exit (if ok 0 1)))))
+
+(when (argset "--selftest-source-twin-gate")
+  (let [base {"src/a/elf64.cljc" "s1"      ; .clj を足すと shadow される
+              "src/a/plat.cljs"  "s2"      ; .clj を足しても正当な split
+              "src/a/legacy.clj" "s3"}     ; .cljc を足すと shadow する
+        run (fn [add bm] (source-twin-gate! bm add))
+        [k1 d1 i1] (run ["src/a/elf64.clj"] base)
+        [k2 d2 _]  (run ["src/a/plat.clj"] base)
+        [k3 d3 _]  (run ["src/a/brand-new.clj"] base)
+        [k4 d4 _]  (run ["src/a/legacy.cljc"] base)
+        [k5 d5 i5] (run ["src/a/elf64.clj"] nil)
+        [k6 d6 i6] (run ["docs/README.md"] base)
+        ok (and (= [] k1) (= ["src/a/elf64.clj"] d1) (true? (:applied i1)) (= 1 (:scanned i1))
+                (= ["src/a/plat.clj"] k2) (= [] d2)
+                (= ["src/a/brand-new.clj"] k3) (= [] d3)
+                (= [] k4) (= ["src/a/legacy.cljc"] d4)
+                (= ["src/a/elf64.clj"] k5) (= [] d5) (false? (:applied i5))
+                (= ["docs/README.md"] k6) (= [] d6) (= 0 (:scanned i6)))]
+    (println "source-twin-gate! selftest")
+    (println (format "  (1) .clj over base .cljc      -> kept=%d demoted=%d %s"
+                     (count k1) (count d1) (pr-str (:findings i1))))
+    (println (format "  (2) .clj over base .cljs      -> kept=%d demoted=%d  ← 正当な platform split、通す"
+                     (count k2) (count d2)))
+    (println (format "  (3) 対応する base ファイル無し -> kept=%d demoted=%d" (count k3) (count d3)))
+    (println (format "  (4) .cljc over base .clj      -> kept=%d demoted=%d" (count k4) (count d4)))
+    (println (format "  (5) base tree が引けない       -> kept=%d demoted=%d applied=%s  ← 通すが「未適用」と申告"
+                     (count k5) (count d5) (:applied i5)))
+    (println (format "  (6) Clojure source ではない     -> kept=%d demoted=%d scanned=%d"
+                     (count k6) (count d6) (:scanned i6)))
+    (println (if ok "  SELFTEST PASS" "  SELFTEST FAIL"))
+    (js/process.exit (if ok 0 1))))
+
 (when (argset "--selftest-tracked-gate")
   (let [dir (str (.tmpdir node-os) "/cleanup-land-gate-selftest")
         w! (fn [rel content]
