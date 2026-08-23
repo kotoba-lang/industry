@@ -372,4 +372,22 @@ kotoba-lang/app-reviewer は提出アプリ自体の審査、kotoba-lang/kip は
 cloud-itonami/hakken(発見) は OEM 候補マッチングで無関係 —— 名前で引き当てない。
 ADR-2608170100。
 ⚠ 2026-08-17 時点で appview / 永続 store / fleet gate は無い（決定ランタイムのみ）。"}
+
+ :machine-virtualization
+ {:label "マシン仮想化 / VMM（他の OS を guest として動かす）"
+  :spellings ["vmm" "hypervisor" "virtual machine monitor" "tender" "hvt"
+              "kvm" "hvf" "hypervisor.framework" "virtualbox" "qemu"
+              "psci" "virtio-mmio" "guest kernel" "boot protocol" "devicetree"
+              "dtb" "fdt" "仮想化" "仮想機械" "ハイパーバイザ" "ゲスト OS"]
+  :note "**「vm」は 4 つの別物に付いている。** kotoba-lang/vmm = マシン仮想化の判断
+（arm64 Linux boot protocol・MMIO exit 分類・PSCI dispatch を .kotoba で持ち amu が
+KIR に落とす。guest は我々が書いていない OS）。aiueos の aiueos.hvt = その機構
+（/dev/kvm を java.lang.foreign で叩き guest RAM を map し vcpu を回す。ADR-0014）、
+aiueos.vm = QEMU の argv を組むだけ。kotoba-lang/kotoba-vm は **machine VM ではない**
+—— IPLD actor invocation kernel（FVM の形。committed message を実行する）。
+kototama は Wasm host。kotoba-mir / kotoba-gmir の virtual は仮想レジスタのこと。
+⚠ 2026-08-23 時点で **どの経路も他の OS を起動していない** —— hvt が動かすのは自前の
+Kotoba guest 5 本で、vmm の判断核を呼ぶ call site はまだ無い。type-1 hypervisor は
+ADR-0014 の firm non-goal。root ADR-2608239100。"}
+
 }
