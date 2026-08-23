@@ -148,6 +148,19 @@
 (def organism-re
   #"(?i)artificial[-\s]organism|organism autonomy|organism loop|organism 循環|人工生命|artificial organism")
 
+(defn project-roots
+  "\"\" plus every `<dir>/` whose deps.edn sits one level down. The nested
+  layout this workspace actually uses (python `lg/` beside clojure `clj/`)."
+  [files]
+  (into [""] (keep #(when-let [[_ d] (re-matches #"([^/]+)/deps\.edn" %)] (str d "/")) files)))
+
+(defn under-project-root?
+  "Predicate: is `f` under `<root><sub>` for some project root? `sub` is
+  \"src/\" / \"test/\" / \"tests/\"."
+  [files sub]
+  (let [prefixes (map #(str % sub) (project-roots files))]
+    (fn [f] (boolean (some #(str/starts-with? f %) prefixes)))))
+
 (defn- collect-evidence [rel-path]
   (let [root (ws-path rel-path)]
     (if-not (exists? root)
@@ -181,8 +194,16 @@
                            (boolean (:company/lei bp)))
          :service?     (has? #(re-matches #"wrangler\.(toml|json|jsonc)" (base %)))
          :corpus?      (has? #(str/ends-with? % ".datoms.edn"))
-         :src?         (has? #(str/starts-with? % "src/"))
-         :tests?       (has? #(or (str/starts-with? % "test/") (str/starts-with? % "tests/")))
+         ;; Source roots are the repo root AND every first-level directory that
+         ;; carries its own deps.edn (`clj/src`, `lg-clj/src` …). Measured
+         ;; 2026-08-23: cloud-itonami/ai-gftd-dougaka keeps its whole engine
+         ;; under clj/ and was classified "docs — no src" with 43 KB of source
+         ;; and 7 test files in plain sight; yukkuri / app-yukkuri have the
+         ;; same lg/ + clj/ layout. The nested root must declare itself with a
+         ;; deps.edn — a stray src/ under docs/ is not a project.
+         :src?         (has? (under-project-root? files "src/"))
+         :tests?       (has? (fn [f] (or ((under-project-root? files "test/") f)
+                                         ((under-project-root? files "tests/") f))))
          :deps?        (root-file? "deps.edn")
          :data?        (has? #(and (str/starts-with? % "data/")
                                    (or (str/ends-with? % ".edn") (str/ends-with? % ".json")
