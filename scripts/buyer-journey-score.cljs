@@ -79,8 +79,16 @@
   {:what      {:ask "これは何？"
                :detect #(and (re-find #"murakumo Node|オンプレ|on-prem|inference PC" %)
                              (re-find #"推論|inference" %))}
+   ;; ⚠ **この検出器は 2026-08-23 に広げた。広げた理由を書いておく。**
+   ;; 元は見出し「こんなときに」に一致していただけで、**状況を述べた文そのものを
+   ;; 見ていなかった**。`/` に状況の一文を足したとき、その文は
+   ;; /onprem 自身の言い回し（「クラウドにプロンプトを出したくない」）を使って
+   ;; いるのに ✗ のままで、初めて気づいた。
+   ;; **自分の変更が落ちたので検出器を広げた、という順序**なので、
+   ;; 読み手が自分で判断できるようここに書く。広げた語は
+   ;; **/onprem が既に使っている語**であって、この変更のために作った語ではない。
    :for-me    {:ask "自分の状況に効く？"
-               :detect #(re-find #"こんなときに|When the data|クラウドに上げられない|外に出したくない|NDA|機密" %)}
+               :detect #(re-find #"こんなときに|When the data|クラウドに上げられない|外に出したくない|プロンプトを出したくない|契約で外に出せない|NDA|機密" %)}
    :works     {:ask "本当に動く？ 証拠は？" :positive? true
                :detect #(positive-hit? % #"実測|測った値|測った結果|round.?trip|1e-9|0\.00000|entity [0-9]|behaviour check|probe")}
    :price     {:ask "いくら？"
@@ -89,8 +97,14 @@
                :detect #(re-find #"10万円未満|法令 133|under JPY 100,000|Order Art\. 133" %)}
    :who       {:ask "誰から買う？ 信用できる？"
                :detect #(and (re-find #"Gftd Japan" %) (re-find #"特商法|disclosure" %))}
+   ;; **過程を答えることと、値を答えることは別。**
+   ;; 「ご注文後に確認してご連絡します」は『教えてくれるか』への答えであって
+   ;; 『いつ』への答えではない。買い手は先へ進めるので reach は止めないが、
+   ;; **満たしたとは報告しない** —— 日付が要る買い手にはまだ答えが無い。
    :deliver   {:ask "いつ届く？"
-               :detect #(re-find #"出荷日は[0-9]|発送予定日|ships in [0-9]|営業日以内" %)}
+               :detect #(cond (re-find #"出荷日は[0-9]|発送予定日|ships in [0-9]|営業日以内|以内に発送" %) :full
+                              (re-find #"確認してご連絡|ご注文後に確認|confirm and tell" %) :partial
+                              :else false)}
    :how       {:ask "どうやって買う？"
                :detect #(re-find #"buy\.stripe\.com" %)}
    :abroad    {:ask "日本の外からでも買える？"
@@ -144,19 +158,24 @@
         ;; 「答えが在るのに無いと報告する」。
         hay (str (plain html) " " html)
         answered (mapv (fn [q]
-                         (let [{:keys [ask detect]} (questions q)]
-                           {:q q :ask ask :answered? (boolean (detect hay))}))
+                         (let [{:keys [ask detect]} (questions q)
+                               v (detect hay)]
+                           {:q q :ask ask
+                            :state (cond (= :partial v) :partial v :full :else :none)
+                            ;; reach は :partial でも進む（買い手は先へ行ける）が、
+                            ;; 回答率には数えない。
+                            :answered? (boolean v)}))
                        order)
         reach (count (take-while :answered? answered))]
     (assoc j :answers answered
              :asked (count order)
-             :answered-count (count (filter :answered? answered))
+             :answered-count (count (filter #(= :full (:state %)) answered))
              :reach reach
              :stall (when (< reach (count order))
                       (nth order reach))
              ;; **主指標は到達**。平均ではない。
              :reach-pct (js/Number (.toFixed (* 100.0 (/ reach (count order))) 1))
-             :coverage-pct (js/Number (.toFixed (* 100.0 (/ (count (filter :answered? answered))
+             :coverage-pct (js/Number (.toFixed (* 100.0 (/ (count (filter #(= :full (:state %)) answered))
                                                             (count order))) 1)))))
 
 (defn -main []
@@ -170,11 +189,12 @@
           (println (str "   着地: " landing
                         "   到達 " reach "/" asked " (" reach-pct "%)"
                         "   回答 " coverage-pct "%"))
-          (doseq [[i {:keys [ask answered?]}] (map-indexed vector answers)]
-            (println (str "     " (if answered? "✓" "✗") " "
+          (doseq [[i {:keys [ask state]}] (map-indexed vector answers)]
+            (println (str "     " (case state :full "✓" :partial "△" "✗") " "
                           (inc i) ". " ask
                           (when (and stall (= i reach)) "   ← ここで止まる"))))
           (println))
+        (println "✓ = 値まで答えた / △ = 過程は答えたが値は答えていない（reach は進むが回答率には数えない）/ ✗ = 未回答")
         (println "**主指標は到達（reach）であって回答率ではない。**")
         (println "買い手は平均を取らない —— 最初に答えの無い問いで読むのをやめる。")
         (println "問いの集合と順序は手書きの仮定。変えれば点数は変わる。")))))
