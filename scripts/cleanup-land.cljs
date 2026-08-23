@@ -851,14 +851,39 @@
                 (when (resolves? "HEAD") "HEAD"))]
     (if (nil? ref)
       [additive [] {:applied false :scanned 0}]
-      (let [judged (for [pth additive
-                         :let [line (str/trim (or (gitc dir "log" "--diff-filter=D" "-n" "1"
-                                                        "--format=%h%x09%s" ref "--" pth) ""))]]
-                     [pth (when (seq line) line)])
+      ;; 候補が多いときは history を 1 回だけ歩く。実測 2026-08-23
+       ;; (`kotoba-lang/kotoba`): 1 パスあたり `git log` を起動すると **279 ms**、
+       ;; 全 history を 1 回歩くと **3.4 秒**（削除パス 27,196 行）。損益分岐は
+       ;; **12 候補**。片方に決め打ちすると、候補 2 件の repo で 3.4 秒を払うか、
+       ;; 候補 1,000 件の repo で 4.6 分を払うかのどちらかになる。
+       ;; 閾値は測った値であって好みではない。
+      (let [batch? (> (count additive) 12)
+            deleted (when batch?
+                      ;; `git log` は新しい順なので、あるパスの **最初の** 出現が
+                      ;; 直近の削除 commit。後から来た古い削除で上書きしない。
+                      (let [out (or (gitc dir "log" "--diff-filter=D" "--name-only"
+                                          "--format=%x00%h%x09%s" ref) "")]
+                        (loop [ls (str/split-lines out) cur nil acc {}]
+                          (if-let [l (first ls)]
+                            (if (str/starts-with? l "\u0000")
+                              (recur (rest ls) (subs l 1) acc)
+                              (let [pth (str/trim l)]
+                                (recur (rest ls) cur
+                                       (if (and (seq pth) cur (not (contains? acc pth)))
+                                         (assoc acc pth cur) acc))))
+                            acc))))
+            judged (for [pth additive
+                         :let [line (if batch?
+                                      (get deleted pth)
+                                      (let [o (str/trim (or (gitc dir "log" "--diff-filter=D" "-n" "1"
+                                                                  "--format=%h%x09%s" ref "--" pth) ""))]
+                                        (when (seq o) o)))]]
+                     [pth line])
             hits (->> judged (filter second) vec)]
         [(->> judged (remove second) (mapv first))
          (mapv first hits)
-         {:applied true :scanned (count additive) :findings (vec hits) :ref ref}]))))
+         {:applied true :scanned (count additive) :findings (vec hits) :ref ref
+         :mode (if (> (count additive) 12) :one-history-walk :per-path)}]))))
 
 (defn- unresolved-refs-gate!
   "Keep `:additive` from landing code whose references do not resolve.
@@ -1582,13 +1607,24 @@
     ;; 実際にこの状態になる）
     (w! "reverted.txt" "landed then reverted\n")
     (w! "brand-new.txt" "genuinely new\n")
-    (let [[k1 d1 i1] (revert-residue-gate! dir "main" ["reverted.txt" "brand-new.txt"])
+    ;; 13 件以上で batch 分岐（1 回の history 走査）に入る。**同じ入力で
+    ;; per-path と batch が同じ答えを出すこと**を確かめる —— 使われる分岐を
+    ;; 一度も通さない検査は、その分岐について何も言っていない。
+    (doseq [i (range 14)] (w! (str "filler-" i ".txt") "x\n"))
+    (let [many (into ["reverted.txt"] (map #(str "filler-" % ".txt") (range 14)))
+          [bk bd bi] (revert-residue-gate! dir "main" many)
+          [pk pd pi] (revert-residue-gate! dir "main" ["reverted.txt"])
+          [k1 d1 i1] (revert-residue-gate! dir "main" ["reverted.txt" "brand-new.txt"])
           [k2 d2 i2] (revert-residue-gate! dir "main" ["brand-new.txt"])
           [k3 d3 i3] (revert-residue-gate! (str dir "/does-not-exist") "main" ["x.txt"])
           ok (and (= ["brand-new.txt"] k1) (= ["reverted.txt"] d1)
                   (true? (:applied i1)) (= 2 (:scanned i1))
                   (= ["brand-new.txt"] k2) (= [] d2) (= 1 (:scanned i2))
-                  (= ["x.txt"] k3) (= [] d3) (false? (:applied i3)))]
+                  (= ["x.txt"] k3) (= [] d3) (false? (:applied i3))
+                  ;; batch 分岐に入っていること、そして per-path と同じ答えであること
+                  (= :one-history-walk (:mode bi)) (= :per-path (:mode pi))
+                  (= ["reverted.txt"] bd) (= bd pd)
+                  (= (get-in bi [:findings 0 1]) (get-in pi [:findings 0 1])))]
       (println "revert-residue-gate! selftest")
       (println (format "  (1) default branch が削除済み + 新規  -> kept=%s demoted=%s  %s"
                        (pr-str k1) (pr-str d1) (pr-str (:findings i1))))
@@ -1596,6 +1632,11 @@
                        (pr-str k2) (pr-str d2)))
       (println (format "  (3) ref が引けない                     -> kept=%s applied=%s  ← 通すが「未適用」と申告"
                        (pr-str k3) (:applied i3)))
+      (println (str "  (4) 13 件以上 → batch 分岐        -> mode=" (name (:mode bi))
+                    " demoted=" (pr-str bd)))
+      (println (str "  (5) per-path と batch の一致       -> "
+                    (if (= (get-in bi [:findings 0 1]) (get-in pi [:findings 0 1]))
+                      "同じ削除 commit を返す" "不一致")))
       (println (if ok "  SELFTEST PASS" "  SELFTEST FAIL"))
       (try (.rmSync node-fs dir #js {:recursive true :force true}) (catch :default _ nil))
       (js/process.exit (if ok 0 1)))))
