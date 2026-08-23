@@ -30,17 +30,36 @@
 ;;   :local-root-broken       — deps.edn の :local/root が指す project が
 ;;                              未存在 or west 未登録（fresh checkout 破壊）
 ;;
+;;   :renamed-unverified      — true-orphan-git の候補だったが、**後継を訊けなかった**もの
+;;                              （2026-08-23 追加、ADR-2608230300）。:ask-failed（gh が
+;;                              答えなかった。rate limit / 認証 / 通信）と :no-remote
+;;                              （そもそも remote が無い）を :remote-unverified で区別する。
+;;                              **orphan ではない。登録も退役もこの行に対して行わない。**
+;;
 ;; 使い方:
 ;;   nbb scripts/west-orphan-audit.cljs              ; 人間可読サマリ
 ;;   nbb scripts/west-orphan-audit.cljs --all        ; 全件列挙
 ;;   nbb scripts/west-orphan-audit.cljs --blocking   ; :local-root-broken のみ
 ;;   nbb scripts/west-orphan-audit.cljs --edn        ; 機械可読 EDN
+;;   nbb scripts/west-orphan-audit.cljs --findings   ; detector protocol（gh を呼ばない）
+;;
+;; --findings は manifest/orgs-detectors.edn の :verify-west-registration-gap が使う。
+;; FINDING/SCANNED/CENSUS 行だけを出し、**gh を要する判定はしない**（レジストリの
+;; 『gh class は走らせない』——token を全並行セッションで共有するため）。したがって
+;; この mode は :true-orphan-git を finding にしない（gh 無しでは改名残骸と区別
+;; できず、実測 2026-08-23 では候補 43 件が 43 件とも改名残骸だった）。
 ;;
 ;; exit 0: blocking なし
 ;; exit 1: :local-root-broken か :relative-paths-broken が1件以上（どちらも
 ;;         **消費者の checkout が pin と一致している** hit だけを数える。古い木で
 ;;         読んだ宣言は :UNJUDGED で、exit 2 側）
 ;;         （登録漏れが consumer を壊している）
+;; exit 2: 判定できなかった辺がある、**または** GitHub に訊けなかった候補がある
+;;         （:ask-failed）。訊けなかった run が『true orphan 0 件』と答えるのを
+;;         禁じるため（ADR-2608136000）。:no-remote は再実行しても変わらないので
+;;         exit には入れない（恒久 exit 2 = 誰も行動できない常時赤）。
+;; exit 3: --findings で走査対象が 1 件も無い（orgs/ の無い木から回した）。
+;;         『見ていない』を『壊れた辺は無い』として返さないための床。
 ;;
 ;;   :relative-paths-broken   — deps.edn の :paths/:extra-paths に書かれた
 ;;                              "../…" が、実体の無い or west 未登録の project を
@@ -209,15 +228,42 @@
         (second (first urls)))))
 
 (defn canonical-slug
-  "GitHub の改名リダイレクトを辿った owner/name。引けなければ nil。
+  "GitHub の改名リダイレクトを辿った owner/name。
 
   `git remote get-url` が返すのは **改名される前の名前**でありうる（GitHub は
   リダイレクトするので fetch は成功し続け、ローカルは古い名前のままになる）。
-  full_name は改名後の実体を返すので、これが唯一の権威ある信号。"
+  full_name は改名後の実体を返すので、これが唯一の権威ある信号。
+
+  返り値は **三値**（2026-08-23 に nil 一値から変更、ADR-2608230300）:
+
+    {:status :answered  :slug \"org/name\"}  GitHub が答えた（改名先 or 同名）
+    {:status :answered  :slug nil}         404。その slug の repo は無い、と答えた
+    {:status :unverified :why \"…\"}         **訊けなかった**（rate limit / 認証 /
+                                            通信 / origin が github.com でない）
+
+  なぜ三値が要るか: 旧実装は `(when (zero? exit) …)` で、**404 も rate limit も
+  通信断も同じ nil** を返していた。呼び出し側はその nil を『改名ではない』と読む
+  ので、`gh` が答えられない間だけ **改名残骸が `:true-orphan-git`（register or
+  retire）として報告される**。実測 2026-08-23: この tree の候補 43 件は
+  **43 件とも**改名残骸で、そう分類できたのは gh が答えたからである。訊けない日には
+  同じ 43 件が『登録し直せ / 退役させろ』として出る —— 前者は規約違反、後者は実害。
+  この docstring は以前から『引けなかったものは残す』と書いていたが、**出力に
+  その区別が無かったので読み手には区別できなかった**（ADR-2608136000 の
+  『測れなかった検査が、測って問題が無かった検査と同じ値を返す』）。"
   [origin-url]
-  (when-let [slug (some-> (re-find #"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?$" origin-url) second)]
-    (let [{:keys [exit out]} (sh "gh" "api" (str "repos/" slug) "--jq" ".full_name")]
-      (when (zero? exit) (not-empty (str/trim out))))))
+  (if-let [slug (some-> (re-find #"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?$" origin-url) second)]
+    (let [{:keys [exit out err]} (sh "gh" "api" (str "repos/" slug) "--jq" ".full_name")]
+      (cond
+        (zero? exit)
+        {:status :answered :slug (not-empty (str/trim out))}
+        ;; 404 は「答え」である —— その slug の repo は無い、と GitHub が言った。
+        (re-find #"(?i)HTTP 404|Not Found" (str err))
+        {:status :answered :slug nil}
+        :else
+        {:status :unverified
+         :why (or (first (remove str/blank? (str/split-lines (str err))))
+                  (str "gh api repos/" slug " exit " exit " with no stderr"))}))
+    {:status :unverified :why (str "origin が github.com の URL ではない: " origin-url)}))
 
 (defn reclassify-renamed
   "`:true-orphan-git` のうち、remote が **west に登録済みの repo へリダイレクトする**
@@ -233,20 +279,46 @@
   後継 path に存在しない（twin=absent）。
 
   判定は 1 候補 1 往復。true-orphan-git は小さい集合なので許容できる。
-  引けなかったものは true-orphan-git に**残す**（『確かめられなかった』を
-  『改名ではない』に潰さない。ADR-2608136000）。"
+
+  **引けなかったものは `:true-orphan-git` に残さず `:renamed-unverified` に分ける**
+  （2026-08-23 変更、ADR-2608230300）。以前は『残す』と書いてそのとおり残していたが、
+  残された行は**印字上ほかの true orphan と 1 文字も違わなかった** —— 読み手にとって
+  『GitHub に訊いて後継が無かった』と『GitHub に訊けなかった』が同じ 1 行だった。
+  `:true-orphan-git` は以後『**確かめた上で**後継が無い』だけを意味する。
+  下流（west-triple-sync の `--scope orphans`）はこの集合しか登録候補にしない。
+
+  `:remote-unverified` の値で 2 種を区別する:
+    :ask-failed  gh に訊いたが答えが返らなかった（rate limit / 認証 / 通信）
+                 —— 一時的。再実行すれば答えが出る。exit 2 を引き起こす。
+    :no-remote   そもそも git remote が無い（訊きに行く先が無い）
+                 —— 構造的。再実行しても変わらないので exit 2 にはしない
+                 （恒久 exit 2 は『常に赤い detector』を作るだけで誰も行動できない）。"
   [acc west]
-  (let [{:keys [renamed orphan]}
+  (let [{:keys [renamed orphan unverified]}
         (reduce (fn [m {:keys [path origin] :as row}]
-                  (let [canon (when (seq origin) (canonical-slug origin))
+                  (let [res (if (str/blank? (str origin))
+                              {:status :unverified :kind :no-remote
+                               :why "git remote が無い —— 後継を訊きに行く先が無い"}
+                              (assoc (canonical-slug origin) :kind :ask-failed))
+                        canon (:slug res)
                         canon-path (when canon (str "orgs/" canon))]
-                    (if (and canon-path (contains? west canon-path))
+                    (cond
+                      (and canon-path (contains? west canon-path))
                       (update m :renamed conj (assoc row :redirects-to canon
                                                      :registered-at canon-path))
+
+                      (= :unverified (:status res))
+                      (update m :unverified conj
+                              (assoc row :remote-unverified (:kind res)
+                                     :unverified-why (:why res)))
+
+                      :else
                       (update m :orphan conj row))))
-                {:renamed [] :orphan []}
+                {:renamed [] :orphan [] :unverified []}
                 (:true-orphan-git acc))]
-    (assoc acc :true-orphan-git orphan :renamed-upstream renamed)))
+    (assoc acc :true-orphan-git orphan
+           :renamed-upstream renamed
+           :renamed-unverified unverified)))
 
 (defn tracked-in-superproject?
   "superproject の index に <rel> 配下の tracked file があるか。
@@ -375,6 +447,14 @@
                       :else                  (recur (inc i) in-str?)))))))
        (str/join "\n")))
 
+(def scan-census
+  "走査で実際に読んだ量。**findings 出力の evidence floor に使う。**
+
+  なぜ数えるか（ADR-2608136000 の問1『入力が無いとき何を返すか』）: 壊れた辺が
+  0 件であることと、deps.edn を 1 つも読めていないことは、この script の
+  返り値では同じ 0 になる。orgs/ の無い worktree から回せば必ず後者になる。"
+  (atom {:deps-files 0 :local-root-decls 0 :paths-files 0 :paths-decls 0}))
+
 (defn scan-local-root-deps
   "orgs/*/*/deps.edn の :local/root を走査し、未存在 or west 未登録を列挙。
 
@@ -390,9 +470,11 @@
             :when (exists? deps)
             ;; コメントを落としてから走査する。落とさないと、修正の経緯を書いた
             ;; コメントが依存として数えられる（strip-edn-comments の docstring 参照）。
-            :let [text (strip-edn-comments (or (read-text deps) ""))]
+            :let [text (strip-edn-comments (or (read-text deps) ""))
+                  _ (swap! scan-census update :deps-files inc)]
             :when (str/includes? text ":local/root")]
       (doseq [[_ target-rel] (re-seq #":local/root\s+\"([^\"]+)\"" text)]
+        (swap! scan-census update :local-root-decls inc)
         (let [abs (node-path.resolve repo target-rel)
               proj (project-of-abs abs)
               dir-exists? (exists? abs)
@@ -505,9 +587,11 @@
             :when (not (some #(str/includes? (str "/" f) %) paths-scan-debris))
             :let [text (strip-edn-comments (or (read-text f) ""))
                   dir (node-path.dirname f)
-                  self (project-of-abs dir)]]
+                  self (project-of-abs dir)
+                  _ (swap! scan-census update :paths-files inc)]]
       (doseq [[_ body] (re-seq #":(?:extra-)?paths\s*\[([^\]]*)\]" text)]
         (doseq [[_ rel] (re-seq #"\"(\.\./[^\"]*)\"" body)]
+          (swap! scan-census update :paths-decls inc)
           (let [abs (node-path.resolve dir rel)
                 proj (project-of-abs abs)]
             (when (and (str/starts-with? proj "orgs/") (not= proj self))
@@ -542,7 +626,56 @@
   (let [s (set argv)]
     {:all? (contains? s "--all")
      :blocking? (contains? s "--blocking")
-     :edn? (contains? s "--edn")}))
+     :edn? (contains? s "--edn")
+     :findings? (contains? s "--findings")}))
+
+(defn print-findings
+  "`manifest/orgs-detectors.edn` の `:findings :protocol` 形式で印字する。
+
+  FINDING<TAB>sev<TAB>key<TAB>detail / SCANNED<TAB>n<TAB>unit。
+
+  **報告するのは gh を呼ばない問いだけ** —— :local/root と :paths の壊れた辺
+  （= fresh checkout が解決できない登録漏れ。ADR-2607173200 が記録した crm の形）。
+  レジストリ自身が『gh を要るものは rate limit を全並行セッションで共有するので
+  ここでは走らせない』と書いているため、この mode は `reclassify-renamed` を
+  呼ばない。
+
+  だから `:true-orphan-git` は **findings にしない**。gh 抜きでは『改名残骸』と
+  『本当に未登録』を分けられず、実測 2026-08-23 では候補 43 件が **43 件とも**
+  改名残骸だった —— それを finding として出すのは、この audit が 2026-08-14 に
+  わざわざ潰した誤報を毎日復活させることになる。代わりに census 行として
+  『何件を判定していないか』を印字する（黙って落とさない）。"
+  [report]
+  (let [{:keys [local-root-broken relative-paths-broken unregistered counts]} report
+        census @scan-census
+        live (fn [rows] (filterv #(= :live (:class %)) rows))
+        stale (fn [rows] (filterv #(= :stale-tree (:class %)) rows))]
+    (println (str "SCANNED\t" (:local counts) "\tlocal orgs projects"))
+    (println (str "SCANNED\t" (:deps-files census) "\tproject deps.edn read for :local/root"))
+    (println (str "SCANNED\t" (:paths-files census) "\tdeps.edn read for relative :paths"))
+    (println (str "CENSUS\tlocal-root-decls=" (:local-root-decls census)
+                  " paths-decls=" (:paths-decls census)
+                  " west-paths=" (:west counts)
+                  " unadjudicated-true-orphan-candidates="
+                  (count (:true-orphan-git unregistered))
+                  " (gh を呼ばないので判定していない)"))
+    (doseq [row (live local-root-broken)]
+      (println (str "FINDING\tfail\tlocal-root:" (:project row)
+                    "\t" (:consumer-count row) " consumer(s) declare :local/root -> "
+                    (:project row) " (dir-exists=" (:dir-exists? row)
+                    " in-west=" (:in-west? row) "); e.g. " (first (:consumers row)))))
+    (doseq [row (live relative-paths-broken)]
+      (println (str "FINDING\tfail\trel-path:" (:project row)
+                    "\t" (:consumer-count row) " consumer(s) declare :paths \"" (:path row)
+                    "\" -> " (:project row) " (dir-exists=" (:dir-exists? row)
+                    " in-west=" (:in-west? row) "); e.g. " (first (:consumers row)))))
+    ;; 判定できなかった辺は finding にしない（消費者の checkout が pin と違う木に
+    ;; 居るので、そこで読んだ宣言は現在地ではない）。だが黙って落とすと clean と
+    ;; 区別できないので、数を印字して exit 2 側へ送る。
+    (let [n (+ (count (stale local-root-broken)) (count (stale relative-paths-broken)))]
+      (when (pos? n)
+        (println (str "UNJUDGED\t" n "\tconsumer checkout != declared pin"
+                      " (west update --fetch smart <name> の後に再測)"))))))
 
 (defn print-human [report opts]
   (let [{:keys [unregistered local-root-broken counts]} report]
@@ -561,7 +694,21 @@
                   "  (旧 path 残骸。orphan ではない)"))
     (println (str "  renamed-upstream: " (count (:renamed-upstream unregistered))
                   "  (remote が west 登録済み repo へリダイレクト = 改名残骸。**登録し直さない**)"))
-    (println (str "  true-orphan-git: " (count (:true-orphan-git unregistered))))
+    (println (str "  true-orphan-git: " (count (:true-orphan-git unregistered))
+                  "  (**確かめた上で**後継が無いもの。登録候補はここだけ)"))
+    (let [uv (:renamed-unverified unregistered)
+          af (count (filter #(= :ask-failed (:remote-unverified %)) uv))
+          nr (count (filter #(= :no-remote (:remote-unverified %)) uv))]
+      (println (str "  renamed-UNVERIFIED: " (count uv)
+                    "  (ask-failed=" af " no-remote=" nr
+                    ")  ← **後継を訊けなかった。orphan ではない**"))
+      (when (pos? (count uv))
+        (println "     この行は『登録し直す』にも『退役させる』にも使えない。")
+        (println "     ask-failed は gh が答えられなかっただけなので、まず再実行する。")
+        (when (:all? opts)
+          (doseq [row uv]
+            (println (str "     " (:path row) "  " (:remote-unverified row)
+                          "  " (:unverified-why row)))))))
     (println (str "  true-orphan-nongit: " (count (:true-orphan-nongit unregistered))))
     (let [by (group-by :class local-root-broken)]
       (println (str "  local-root-broken (blocking): " (count (:live by))))
@@ -673,8 +820,10 @@
         west (west-paths)
         overrides (path-overrides)
         local (local-org-projects)
-        unreg (-> (classify-unregistered local west overrides (west-rev->path))
-                  (reclassify-renamed west))
+        ;; --findings（detector mode）では gh を呼ばない。理由は print-findings の
+        ;; docstring と manifest/orgs-detectors.edn の『gh class は走らせない』。
+        unreg (cond-> (classify-unregistered local west overrides (west-rev->path))
+                (not (:findings? opts)) (reclassify-renamed west))
         path->rev (west-path->rev)
         ;; Classify the :local/root hits by the consumer's tree, exactly as the
         ;; :paths hits below already were. Until 2026-08-20 they were not, and
@@ -699,6 +848,11 @@
         paths-broken (scan-relative-paths west path->rev)
         live-paths-broken (filterv #(= :live (:class %)) paths-broken)
         unjudged-paths (filterv #(= :stale-tree (:class %)) paths-broken)
+        ;; 後継を **訊けなかった** 候補。:ask-failed は一時的（再実行で答えが出る）、
+        ;; :no-remote は構造的（訊きに行く先が無い）。exit を分けるために別々に数える。
+        unverified-rows (:renamed-unverified unreg)
+        ask-failed (filterv #(= :ask-failed (:remote-unverified %)) unverified-rows)
+        no-remote (filterv #(= :no-remote (:remote-unverified %)) unverified-rows)
         report {:counts {:local (count local)
                          :west (count west)
                          :unregistered (+ (count (:registered-elsewhere unreg))
@@ -712,10 +866,25 @@
                 :local-root-broken broken
                 :relative-paths-broken paths-broken
                 :blocking-count (+ (count live-broken) (count live-paths-broken))
-                :unjudged-count (+ (count unjudged-broken) (count unjudged-paths))}]
-    (if (:edn? opts)
-      (println (pr-str report))
-      (print-human report opts))
+                :unjudged-count (+ (count unjudged-broken) (count unjudged-paths))
+                ;; 「訊けなかった」を数として出す。0 でも印字する —— 出ていない数と
+                ;; 0 の数は別物で、前者は『この版はまだ測っていない』を意味する。
+                :remote-unverified {:ask-failed (count ask-failed)
+                                    :no-remote (count no-remote)}}]
+    (cond
+      (:findings? opts) (print-findings report)
+      (:edn? opts)      (println (pr-str report))
+      :else             (print-human report opts))
+    ;; ── 測れなかった run を clean と同じ値で返さない（ADR-2608136000 の問1/問2）──
+    ;; orgs/ の無い木（worktree・sparse checkout）から回すと、走査は 0 件で
+    ;; 完走し、壊れた辺 0 件 = exit 0 になる。それは『登録漏れは無い』ではなく
+    ;; 『見ていない』である。deps.edn を 1 つも読めていない run は答えを拒否する。
+    (when (and (:findings? opts)
+               (or (zero? (count local)) (zero? (:deps-files @scan-census))))
+      (println (str "CANNOT ANSWER\tlocal-orgs-projects=" (count local)
+                    " deps-files-read=" (:deps-files @scan-census)
+                    "\t走査対象が無い木で回している（orgs/ の在る checkout で回すこと）"))
+      (.exit js/process 3))
     ;; process.exit を先に呼ばないと nbb が常に 0 で落ちることがある
     ;; 0 / 1 / 2 を分ける。2 は「答えられなかった」専用（ADR-2608136000）——
     ;; 判定できなかった辺を clean と同じ 0 で返さない。
@@ -723,8 +892,40 @@
     ;; `broken`, so classifying the :local/root hits fixed the printed counts
     ;; and left the exit code -- the thing a hook or a gate actually reads --
     ;; still answering 1 for an edge the report itself now called UNJUDGED.
-    (.exit js/process (cond (pos? (+ (count live-broken) (count live-paths-broken))) 1
-                            (pos? (+ (count unjudged-broken) (count unjudged-paths))) 2
-                            :else 0))))
+    ;; :ask-failed も exit 2 側に入れる（2026-08-23）。GitHub に訊けなかった run は
+    ;; 『true orphan は 0 件でした』と答えてはいけない —— 訊けていれば 43 件が
+    ;; 改名残骸だと分かった tree で、訊けないまま 0 を返せば『掃除は済んでいる』と
+    ;; 読まれる。:no-remote は再実行しても変わらないので exit には入れない
+    ;; （恒久 exit 2 は誰も行動できない常時赤を作るだけ）。
+    ;; exit だけを読む消費者（scripts/closing-check.cljs は出力の末尾 6 行しか
+    ;; 見せない）に、2 の理由が届くようにする。理由の書いていない 2 は、
+    ;; 読み手にとって 1 と区別が付かない。
+    (let [blocking (+ (count live-broken) (count live-paths-broken))
+          unjudged (+ (count unjudged-broken) (count unjudged-paths))
+          asked-failed (count ask-failed)]
+      (when-not (:edn? opts)
+        (cond
+          (pos? blocking)
+          (println (str "\nEXIT 1: 消費者を壊している登録漏れが " blocking " 件。"))
+          (pos? unjudged)
+          (println (str "\nEXIT 2: 判定できなかった辺が " unjudged " 件（消費者の checkout が"
+                        " pin と不一致）。**登録漏れが無いとは言っていない。**"
+                        " west update --fetch smart <name> の後に再測すること。"))
+          (pos? asked-failed)
+          (println (str "\nEXIT 2: GitHub に後継を訊けなかった候補が " asked-failed " 件。"
+                        "**この run は『未登録は 0 件』とは答えていない。**"
+                        " gh が答えられる状態で再実行すること。"))
+          ;; --findings は gh を呼ばないので、ask-failed が 0 なのは
+          ;; 『訊いて全部答えが返った』ではなく『訊いていない』である。
+          ;; 同じ 0 に 2 つの意味を持たせない。
+          (:findings? opts)
+          (println (str "\nEXIT 0: 壊れた消費者辺なし。**未登録 repo そのものは判定していない**"
+                        "（gh を呼ばない mode。CENSUS 行の unadjudicated を見ること）。"))
+          :else
+          (println "\nEXIT 0: blocking な登録漏れなし（訊けなかった候補も 0 件）。")))
+      (.exit js/process (cond (pos? blocking) 1
+                              (pos? unjudged) 2
+                              (pos? asked-failed) 2
+                              :else 0)))))
 
 (apply -main *command-line-args*)

@@ -531,11 +531,27 @@ nbb scripts/west-orphan-audit.cljs --all
 | Class | Action |
 |---|---|
 | `:local-root-broken` | **Blocking** — register the missing project or retarget the dep. |
-| `:true-orphan-git` | Register or retire; report, never silent-delete. |
+| `:true-orphan-git` | Register or retire; report, never silent-delete. **Verified only** since 2026-08-23: GitHub was asked and named no successor. Bulk path: `west-triple-sync plan --scope orphans`. |
+| `:renamed-upstream` | Rename residue — the remote redirects to a repo west already carries. **Do not re-register.** |
+| `:renamed-unverified` | **Neither an orphan nor a decision.** GitHub could not be asked (`:ask-failed`) or there is no remote to ask (`:no-remote`). Never register, never retire. Re-run when `gh` can answer. |
 | `:path-override-leftover` | Do not re-register old path (new path is already in west). |
 | `:worktree-scratch` | Session debris; remove only after unpushed-WIP check. |
 | `:personal` | Out of west scope. |
 | `:true-orphan-nongit` | Report; register only if it becomes a real repo. |
+
+**訊けなかったことを「無い」と読まない（2026-08-23、ADR-2608230300）。** audit は
+`:true-orphan-git` の候補 1 件につき `gh api repos/<slug>` を 1 往復して改名先を引く。
+2026-08-23 の実測ではその候補 **43 件が 43 件とも改名残骸**で、そう分かったのは gh が
+答えたからである。gh が答えられない日（rate limit / 認証切れ / 通信）に、以前の実装は
+同じ 43 件を **`true-orphan-git`（register or retire）として印字**した —— 登録すれば規約
+違反、退役させれば実害。今は `:renamed-unverified` に分かれ、**exit 2**（答えられなかった）
+になる。`--blocking` の exit 0 を完了 gate に使う側は、2 を 0 と混ぜないこと。
+
+**登録漏れは 6 時間ごとに測られている。** `manifest/orgs-detectors.edn` の
+`:verify-west-registration-gap` が `west-orphan-audit --findings` を回し、壊れた
+consumer 辺を FINDING として出す（セッション開始時に表示される）。この detector は
+**gh を呼ばない**ので、`:true-orphan-git` は finding にせず CENSUS 行で件数だけ言う。
+以前この検査は **人が「cleanup」と打った時にしか走らなかった**。
 
 Incident reference (2026-07-12→17): `kotoba-lang/crm` pushed to GitHub; consumers
 `cloud-itonami-isic-5820` / `-6201` / `-6202` use `{:local/root "../../kotoba-lang/crm"}`;
@@ -544,6 +560,22 @@ crm missing from west and often from the local tree → fresh checkout breaks.
 **Repair / keep current (three planes):** see
 [`manifest/west-triple-sync-workflow.md`](west-triple-sync-workflow.md) and
 `nbb scripts/west-triple-sync.cljs` (ADR-2607173200).
+
+```bash
+nbb scripts/west-triple-sync.cljs plan  --scope blocking   # 壊れた :local/root 辺（既定）
+nbb scripts/west-triple-sync.cljs plan  --scope orphans    # 確かめた上で未登録の repo（2026-08-23 追加）
+nbb scripts/west-triple-sync.cljs apply --scope orphans    # repos.edn :extra-projects + --entry
+```
+
+`--scope orphans` が入るまで、**誰もまだ依存していない未登録 repo を一括で登録する経路は
+無かった**（`--names <path>` を 1 件ずつ手で渡すしかなかった）。plan が既定であることは
+変わらない。plan は判定していない候補があれば `renamed-UNVERIFIED=N` と警告する ——
+scope の沈黙を「未登録は無い」と読ませないため。
+
+**GitHub に push しただけでは終わっていない。** `scripts/cleanup-land.cljs` は GitHub 着地
+までしか行わず、west 登録は別の道具が持つ。そのため cleanup-land は最後に、**触った repo の
+うち west.yml に path を持たないもの**を名指しし、次に打つ `west-triple-sync` のコマンドを
+印字する（west.yml を読めなかった run は「0 件」ではなく「未測定」と言う）。
 
 ## Standard Cleanup
 

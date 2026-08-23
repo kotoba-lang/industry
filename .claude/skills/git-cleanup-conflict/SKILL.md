@@ -222,6 +222,10 @@ Check for the existing repo *before* creating one, or you mint duplicates.
   `:local/root` (or that belongs under `orgs/<org>/<repo>`) must also land in
   `manifest/repos.edn` `:extra-projects` + `nbb scripts/gen-west-manifest.cljs --entry
   <name>` (see skill `new-project-scaffold`). Incomplete = GH-only orphan.
+  **`cleanup-land.cljs` now says so in its own output**: its last section names every repo
+  it touched that has no `west.yml` path and prints the `west-triple-sync` command to run
+  next (2026-08-23). Before that the hand-off existed only in this prose, and landing to
+  GitHub and stopping was the main way a GH-only orphan got made.
 
 ## West orphan inventory (mandatory on cleanup / registration-gap reports)
 
@@ -234,7 +238,18 @@ is often **missing from the local tree**. Fresh checkout / CI cannot resolve the
 nbb scripts/west-orphan-audit.cljs              # summary + true-orphan-git sample
 nbb scripts/west-orphan-audit.cljs --blocking   # only :local/root broken edges
 nbb scripts/west-orphan-audit.cljs --all        # full lists
+nbb scripts/west-orphan-audit.cljs --findings   # detector protocol (gh-free); what the 6h tick runs
 ```
+
+**exit 0 / 1 / 2 / 3 は別の答えである。** 0 = blocking なし、1 = 壊れた辺がある、
+2 = **判定できなかった**（消費者の checkout が pin と不一致、または GitHub に訊けなかった）、
+3 = `--findings` で走査対象が 1 件も無い（`orgs/` の無い木から回した）。**2 を 0 と混ぜない** ——
+2026-08-23 以前は gh が答えられない日に改名残骸 43 件が `true-orphan-git` として出ており、
+その行に従えば登録し直す（規約違反）か退役させる（実害）ことになった（ADR-2608230300）。
+
+**これは 6 時間ごとに自動で測られている**（`manifest/orgs-detectors.edn` の
+`:verify-west-registration-gap`）。セッション開始時の detector 一覧に出るので、
+「cleanup」と打たれるまで登録漏れが積み上がることは無くなった。
 
 **Classify before you register or delete** (do not treat every unregistered dir as a
 new project):
@@ -242,7 +257,9 @@ new project):
 | Class | Meaning | Action |
 |---|---|---|
 | `:local-root-broken` | deps.edn points at missing or not-in-west project | **Blocking.** Register missing commons (clone → `:extra-projects` → `--entry`) or retarget deps to a west path / git dep. |
-| `:true-orphan-git` | local git under `orgs/` not in west | Register (if intentional fleet member) or retire/archive — report, don't silent-delete. |
+| `:true-orphan-git` | local git under `orgs/` not in west, **and GitHub named no successor** | Register (if intentional fleet member) or retire/archive — report, don't silent-delete. Bulk: `west-triple-sync plan --scope orphans`. |
+| `:renamed-upstream` | remote redirects to a repo west already carries | Rename residue. **Do not re-register the old path.** |
+| `:renamed-unverified` | the successor could not be looked up (`:ask-failed` / `:no-remote`) | **Neither orphan nor decision.** Never register, never retire. Re-run when `gh` can answer; the audit exits 2 for this. |
 | `:path-override-leftover` | old path after rename; new path is in west | Do **not** re-register the old name. Optional cleanup of leftover dir after content-containment. |
 | `:worktree-scratch` | `_wt-*`, `*-current`, `*-boundary`, `_intake` | Session debris — remove only after confirming no unpushed WIP. |
 | `:personal` | `orgs/personal/*` | Out of west scope. Never auto-register. |
@@ -258,11 +275,28 @@ When the goal is not only to *detect* orphans but to **align** the three planes,
 use the dedicated workflow (ADR-2607173200):
 
 ```bash
-nbb scripts/west-triple-sync.cljs plan --scope blocking   # dry-run
+nbb scripts/west-triple-sync.cljs plan --scope blocking   # dry-run（既定 scope）
+nbb scripts/west-triple-sync.cljs plan --scope orphans    # 確かめた上で未登録の repo を一括
 nbb scripts/west-triple-sync.cljs apply --scope blocking  # clone/register/ff/pin
+nbb scripts/west-triple-sync.cljs apply --scope orphans   # repos.edn :extra-projects + --entry
 nbb scripts/west-triple-sync.cljs apply --names crm
 nbb scripts/west-triple-sync.cljs verify --scope blocking
 ```
+
+**`--scope orphans` は 2026-08-23 に追加した。** それまで一括経路は `blocking`
+（誰かが `:local/root` で依存している辺）だけで、**誰もまだ依存していない未登録 repo は
+`--names <path>` を 1 件ずつ手で渡すしか無かった** —— この表は `:true-orphan-git` を
+「Register or retire」と書いているのに、register 側に一括の道具が無かった。
+母集団は `:true-orphan-git` **だけ**（personal / scratch / 改名残骸 / 訊けなかったものは
+入らない）。plan は判定していない候補を `renamed-UNVERIFIED=N` として必ず印字する ——
+scope の沈黙が「未登録は無い」に読まれないように。
+
+**plan は GitHub の答えを三値で扱う**（`:yes` / `:no` / `:unknown`）。`:unknown`
+（rate limit / 認証 / 通信）では clone も register も積まず、`report-unverified` として
+報告する。以前は 404 と同じ扱いで **`GitHub repo missing: … use new-project-scaffold to
+create`** と印字しており、その文言に従うと**既に在る repo をもう一度作る** ——
+この skill 自身が `Check for the existing repo before creating one, or you mint duplicates`
+と書いている、その取り違えを道具が生成していた。
 
 - SSoT: `manifest/west-triple-sync-workflow.edn` (+ readable `.md`)
 - Orchestrator: `scripts/west-triple-sync.cljs` (plan default; `--apply` via `apply` cmd)
@@ -292,9 +326,12 @@ nbb scripts/west-triple-sync.cljs verify --scope blocking
 5. Resolve any real merge conflicts by file class (`:resolve-conflicts` in the edn),
    regenerating `manifest/west.yml` rather than editing markers.
 6. For blocking orphans: finish registration (`new-project-scaffold` / `--entry`) or
-   retarget deps — do not leave GH-only + `:local/root` consumers.
+   retarget deps — do not leave GH-only + `:local/root` consumers. For verified
+   `:true-orphan-git` rows use the bulk path (`west-triple-sync plan --scope orphans`,
+   then `apply`) instead of `--names` one at a time. Never act on `:renamed-unverified`.
 7. Verify: conflict-marker search, `nbb scripts/gen-west-manifest.cljs --check`,
-   `nbb scripts/west-orphan-audit.cljs --blocking`, and any domain-specific script
+   `nbb scripts/west-orphan-audit.cljs --blocking` (**exit 2 は 0 ではない** — 判定
+   できなかった run を完了 gate として読まない), and any domain-specific script
    touched by the change.
 8. Create/merge PRs when mergeable; report external CI failures (billing/spending
    limits) as external to the code.
