@@ -1065,6 +1065,60 @@
    :timeout-ms 900000
    :writes :none}
 
+  {:id :verify-unbounded-query-paths
+   :title "query paths that can read the whole graph, and hand-written full-plane scans"
+   :why "`kotobase.server.datom-plan` has six rows and two bind no prefix -- `[_ _ o]`
+              and `[_ _ _]` both become `:eavt []`, the whole graph filtered in memory.
+              `kotobase.server.admission` refuses a query whose plan carries one, and
+              that refusal only holds where it is CALLED.
+              It was not called on the deployed SPARQL surface. `admission` landed
+              2026-08-23 gating `do-q` and `run-indexed-compiled-graph-query`; the
+              surface that actually answers `graph.sparql` is
+              `kotobase.server.sparql-protocol/do-sparql`, which calls `ps/source-for`
+              itself and went through neither. `SELECT * WHERE { ?s ?p ?o }` stayed
+              executable from the network for the length of one merge. THIS DETECTOR
+              IS WHAT FOUND IT, on its first run against real repositories, and the
+              finding cleared on the next run once the gate landed -- both directions,
+              on this workspace's own code rather than a fixture.
+              The cost being refused is measured: `kotobase.query.bridge/materialize`,
+              the other whole-database read, is linear in the documents while the query
+              over the result stays near 1ms across a 64x range
+              (90-docs/kotobase-performance/2026-08-23-bridge-materialize-scaling.edn)."
+   :measured "2026-08-23 on this machine: 37,256 source files under orgs/ in 12s.
+              Before the gate landed: 4 findings (2 ungated-source, 2 unbounded-scan).
+              After: 2, both the plan tables named in :accepted below.
+              A first, looser version matched the bare name `source-for` and reported
+              htmldom, a bitcoin node and a character creator -- none of which have ever
+              seen a datom. It now requires the `kotobase.server.pattern-source` REQUIRE
+              as well, which is why the noise floor is 0."
+   :argv ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+          "{{repo}}/scripts/verify-unbounded-query-paths.cljs"]
+   :cwd :root
+   :findings :protocol
+   :writes :none
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :timeout-ms 600000
+   :interval-ms 21600000
+   :accepted
+   {"unbounded-scan:orgs/kotoba-lang/kotobase-server/src/kotobase/server/datom_plan.cljc"
+    {:since "2026-08-23"
+     :why "This IS the planner. `{:index \"eavt\" :components []}` is the row the plan
+           table documents as `full scan, as asked`, and something has to name it --
+           the gate refuses the query before the plan is ever consulted, so the
+           existence of the row here is not the hazard. The hazard the rule is for is
+           a caller writing that map by hand somewhere else, going around both."
+     :clears-when "the plan stops being able to express an unbounded read at all,
+                   which would mean a store API that can bound a range read -- see the
+                   same follow-up `kotobase.query.bridge/materialize` records for
+                   `-list`."}
+    "unbounded-scan:orgs/kotoba-lang/kotobase-client/src/kotobase/datom_plan.cljc"
+    {:since "2026-08-23"
+     :why "The client's copy of the same table, deliberately separate (its own docstring
+           says why: forcing a graph-head runtime to upgrade an unrelated IPNS contract
+           merely to obtain an index plan would invalidate its existing signatures).
+           Same reasoning as the server copy."
+     :clears-when "same as the server copy, or the two plans merge."}}}
+
   {:id :verify-silent-js-callbacks
    :title "letfn siblings handed to a JS callback by name, which nbb never invokes"
    :why "Measured 2026-08-19 (ADR-2608190100): `(.catch fetch-and-retry)` in
