@@ -1062,11 +1062,12 @@ nbb scripts/concept-lookup.cljs               # 語彙一覧
 | `90-docs/compliance/scope.datoms.edn` | **どのワーカがどのデータストアに触り、誰に預けているか** | `nbb scripts/gen-compliance-scope.cljs` | ADR-2608231500 |
 | `90-docs/compliance/dependencies.datoms.edn` | **どの repo が何に依存し、それは本番に載るか** | `nbb scripts/gen-dependency-inventory.cljs` | ADR-2608231600 |
 
-どちらも生成物（手で編集しない）。語彙 `manifest/concept-vocabulary.edn` だけが手書き
-（「端末 と terminal と TTY は同じ」は repo の中身から導出できないため）。両方とも
+4 つとも生成物（手で編集しない）。語彙 `manifest/concept-vocabulary.edn` だけが手書き
+（「端末 と terminal と TTY は同じ」は repo の中身から導出できないため）。いずれも
 `manifest/edn-query.cljs` の datom 面に載っており（`:source/dataset "concept"` /
-`"surface"`）、`:concept/repo` / `:surface/repo` は `repo-taxonomy` の `:repo/path`
-と join できる。
+`"surface"` / `"compliance-scope"` / `"compliance-dependencies"`）、`:concept/repo` /
+`:surface/repo` / `:scope/repo` / `:dependency/repo` は `repo-taxonomy` の
+`:repo/path` と join できる。
 
 **なぜ要るか。** 2026-08-03、「kotoba-lang に terminal, console は設計実装されている?」に
 **「無い」と誤答した**。`kotoba-lang/kuro`（terminal model）と `kotoba-lang/kobo`
@@ -1081,7 +1082,8 @@ nbb scripts/concept-lookup.cljs               # 語彙一覧
 surface 索引は「どのホストがどのパスを出すか」までで、**そのワーカがどのデータストアに
 触るかを持っていなかった**。監査（SOC 2 CC3.2/CC6.1、ISO/IEC 27001:2022 A.5.9）で
 問われるのはそこなので、compliance scope 索引が足す。`:scope/host` は
-`:surface/host` と、`:scope/repo` / `:dependency/repo` は `repo/path` と join できる。
+`:surface/host` と、`:scope/repo` / `:dependency/repo` は `repo-taxonomy` の
+`:repo/path` と join できる。
 
 **どちらも fleet gate にできない**（west 管理の `orgs/` を読む。`root-permit-index` が
 それで落ち続けた形）。`manifest/orgs-detectors.edn` に `:compliance-scope-boundary` /
@@ -1101,10 +1103,12 @@ surface 索引は「どのホストがどのパスを出すか」までで、**�
   「該当なし」が返り、それは「脆弱性が無い」と同じ顔をする。範囲のままの依存は
   **未測定であって clean ではない**。現在数は同索引の `:dependency/coverage` entity。
 - **「この脆弱性は緊急だ」** —— `:dependency/dev?` を見ずに数えない。2026-08-23 に
-  `undici@7.28.0` の 5 勧告を「本番 N repo」と誤報告した実例がある。lockfile は全件
-  `dev: true` で、deploy された Worker は workerd で走り undici を載せない。
-  npm は lockfile に既にその答えを持っていたのに、棚卸しがそれを捨てていた
-  （ADR-2608231700）。
+  `undici@7.28.0` の 5 勧告を「本番 N repo」と誤報告した実例がある。deploy された
+  Worker は workerd で走り undici を載せないので、あれは miniflare 経由の開発時
+  依存だった。npm の lockfile はその答えを持っていたのに棚卸しが捨てていた
+  （ADR-2608231700）。⚠ **`:dev?` は 3 値である** —— pnpm の lockfile は dev/prod を
+  言わないので `nil`（判らなかった）を返す。`not` で畳むと、判らなかったものが本番
+  として並ぶ（ADR-2608232100）。
 
 ### 統制の写像と SBOM の生成器はどこにあるか
 
