@@ -191,7 +191,7 @@ in the actor` を明記。ADR-2607301200 が定めたとおり **判定層であ
 
 つまり **app は 7310 の存在を知っているが、呼んでいない。**
 
-### (4) cloud-itonami/yukkuri — 実際に動いていた経路(設計外)
+### (4) cloud-itonami/yukkuri — 実際に動いていた経路(設計外) 【2026-08-23 追記: 撤去済み】
 
 `lg/lg_yukkuri/graphs/manage_ads.py`(396 行、Python + LangGraph)。docstring が
 自ら理由を書いている:
@@ -213,6 +213,24 @@ in the actor` を明記。ADR-2607301200 が定めたとおり **判定層であ
 `260615-ads-api-tool-design.md` は Google Ads API の developer token 申請文書
 (`yukkuri-ads-ops`、audit / pause / budget の 3 機能、OS キーチェーン保管、
 日次上限 10,000 円)。
+
+**2026-08-23 追記 — この経路は撤去された。** commit `329e14e`(Replace lg/lg_yukkuri
+Python LangGraph pod with a clj/cljc runtime)で `lg/` の Python pod ごと削除され、
+後継の `clj/src/yukkuri/graphs/manage_ads.cljc`(280 行)は docstring で自ら
+*This namespace performs NO browser/HTTP/D1 IO* と宣言する純粋な planner である。
+移植されたのは plan builder・予算上限の算術(`budget-cap-jpy` 既定 10,000 円、
+env `YUKKURI_ADS_BUDGET_CAP_JPY`)・mode router・UI 操作列を**データとして**持つ部分
+だけで、**Ads UI を実際に駆動する部分は移植されていない**。したがって 2026-08-22 の
+実測時点で、外部媒体に campaign を作る/止める実行経路は workspace 内に存在しない。
+(1)(2)(3) の判定は変わらないが、**(4) を「今動いている経路」として読まないこと。**
+
+なお cljc 側の docstring は今も `lg/lg_yukkuri/browser_agent.py` を参照するが、
+そのファイルは repo に無い。`:adr/primary-sources` が挙げる `manage_ads.py` も
+同じ理由で現在のパスには存在しない(2026-07-30 時点の一次情報としては有効)。
+`campaign-name` は `yk-cyber-<lang>-pqc-<arm>-2606` 固定なので、実在した
+`yk-shiropico-ep01-en-infeed-260719` はこの builder からは出てこない
+(上の known-gap「誰が作成したかは断定していない」はそのまま残る)。
+現在地は skill `ads-operations` が持つ。
 
 ## API 登録の実態 — トークンは 2 つあり、片方はベーシック
 
