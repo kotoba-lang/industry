@@ -111,13 +111,25 @@
 ;; ── npm ────────────────────────────────────────────────────────────────────
 
 (defn- from-package-lock
-  "package-lock.json v2/v3 の `packages` は **確定版** を持つ。ここが最優先。"
+  "package-lock.json v2/v3 の `packages` は **確定版** を持つ。ここが最優先。
+
+   ⚠ **`node_modules/` を含む key だけを読む。** `packages` の key `\"\"` は
+   *そのプロジェクト自身* であり、workspace の member も同様に素の path を key に
+   持つ。初版は `(get v \"name\")` を無条件に採っていたので、プロジェクト自身が
+   依存として出ていた。実測 2026-08-23、全 tree 走査の『最優先』上位 2 件が
+   それだった:
+
+     orgs/cloud-itonami/cloud-itonami-isic-7210/svelte/   → `svelte@0.0.0`（勧告 8 件）
+     orgs/com-junkawasaki/webmaster/                      → `astro@0.0.1`（勧告 17 件）
+
+   どちらも npm の svelte / astro ではなく、**たまたまその名前のディレクトリ**で、
+   version 欄が無いので 0.0.0 になり、OSV の『N 未満が該当』範囲に全部当たっていた。
+   package の名前と version を、published package の名前と version と取り違えている。"
   [file rel]
   (when-let [m (read-json file)]
     (keep (fn [[k v]]
-            (let [nm (or (get v "name")
-                         (when (str/includes? k "node_modules/")
-                           (last (str/split k #"node_modules/"))))
+            (let [nm (when (str/includes? k "node_modules/")
+                       (or (get v "name") (last (str/split k #"node_modules/"))))
                   ver (get v "version")]
               (when (and nm ver (seq nm) (not (get v "link")))
                 ;; npm が既に計算した `dev` をそのまま運ぶ。ここを落とすと
@@ -126,6 +138,92 @@
                  :exact? true :dev? (boolean (or (get v "dev") (get v "devOptional")))
                  :file rel})))
           (get m "packages"))))
+
+(def ^:private source-exts
+  #{".ts" ".tsx" ".js" ".jsx" ".mjs" ".cjs" ".svelte" ".vue"
+    ".cljs" ".cljc" ".clj" ".kotoba"})
+
+(defn- source-files
+  "repo 配下の source を集める。node_modules と生成物は除く。"
+  [repo-root]
+  (letfn [(walk [d depth]
+            (when (<= depth 5)
+              (let [ents (try (fs/readdirSync d #js {:withFileTypes true}) (catch :default _ []))]
+                (mapcat (fn [e]
+                          (let [n (.-name e) q (path/join d n)]
+                            (cond
+                              (and (.isFile e) (some #(str/ends-with? n %) source-exts)) [q]
+                              (and (.isDirectory e)
+                                   (not (str/starts-with? n "."))
+                                   (not (#{"node_modules" "dist" "target" "build" "out" "public"} n)))
+                              (walk q (inc depth))
+                              :else nil)))
+                        ents))))]
+    (vec (walk repo-root 0))))
+
+(defn- imported-anywhere?
+  "この repo の source が `nm` を **直接** import しているか。
+
+   ## これが答えない問い
+
+   **推移依存の到達性には答えない。** 直接 import されていない推移依存でも、
+   親が使っていれば実行時には到達する。ここが答えるのは
+   『package.json が直接宣言しているのに、どのソースからも参照されていない』
+   という 1 つの形だけで、それ以外は `nil`（判定していない）を返す。
+
+   実測 2026-08-23 (`cloud-itonami/media`): `kysely` は `dependencies` に在り
+   HIGH 3 件を持つが、import しているファイルは **0 件**、脆弱 API の使用も 0 件、
+   さらに `media.itonami.cloud` は DNS が解決しない。到達性を測らずに
+   『HIGH×3・本番』だけを見れば 0.27→0.28 の major bump をかけるところだった。
+   正しい是正は使っていない依存を外すことだった。
+
+   照合は字句的で近似である —— 動的 `require(name)` や re-export 経由は拾えない。
+   したがって **false は『使っていない』の証明ではなく『直接参照が見当たらない』**
+   であり、finding にはそう書く。"
+  [repo-root nm]
+  (let [pat (re-pattern (str "(?:require\\(|from\\s+|import\\s+|\\[\")[\"']"
+                             (str/replace nm #"[.*+?^${}()|\[\]\\]" "\\$&")
+                             "(?:/[^\"']*)?[\"']"))]
+    (boolean (some (fn [f]
+                     (when-let [t (read-safe f)] (re-find pat t)))
+                   (source-files repo-root)))))
+
+(defn- declared-directly?
+  "この repo のどれかの package.json が `nm` を直接宣言しているか。
+
+   宣言されていない = 推移依存なので、`imported-anywhere?` の答えは意味を持たない
+   （親経由で到達しうる）。両者を分けるためにここで判定する。"
+  [repo-root nm]
+  (letfn [(walk [d depth]
+            (when (<= depth 3)
+              (let [ents (try (fs/readdirSync d #js {:withFileTypes true}) (catch :default _ []))]
+                (mapcat (fn [e]
+                          (let [n (.-name e) q (path/join d n)]
+                            (cond
+                              (and (.isFile e) (= n "package.json")) [q]
+                              (and (.isDirectory e) (not (str/starts-with? n "."))
+                                   (not (#{"node_modules" "dist" "target" "build"} n)))
+                              (walk q (inc depth))
+                              :else nil)))
+                        ents))))]
+    (boolean (some (fn [f]
+                     (when-let [m (read-json f)]
+                       (some #(contains? (get m %) nm)
+                             ["dependencies" "devDependencies" "optionalDependencies"])))
+                   (walk repo-root 0)))))
+
+(defn- reachability
+  "-> :unused-direct | :direct-and-imported | :transitive | :unknown
+
+   `:transitive` は **『到達しない』ではない** —— 親が使っていれば実行時に到達する。
+   判定できないことを、判定した結果と同じ顔にしない（ADR-2608136000）。"
+  [repo nm]
+  (let [root (path/join root repo)]
+    (if-not (fs/existsSync root)
+      :unknown
+      (if (declared-directly? root nm)
+        (if (imported-anywhere? root nm) :direct-and-imported :unused-direct)
+        :transitive))))
 
 (defn- from-pnpm-lock
   "pnpm-lock.yaml (v9) の `packages:` から確定版を取る。
@@ -349,7 +447,43 @@
                                   (filter #(seq (:ids %)))
                                   vec)})))))))
 
+;; `--selftest-reachability` — 一時ディレクトリに小さな repo を建てて 4 状態を実演する。
+;; 片方向しか出さない検査は、その判定が働いていることを示さない（CLAUDE.md
+;; 「gate は落ちることを確かめてから landed とする」の対偶）。
+(defn- selftest-reachability! []
+  (let [dir (path/join (.tmpdir (js/require "node:os")) "dep-reach-selftest")
+        w! (fn [rel content]
+             (let [f (path/join dir rel)]
+               (fs/mkdirSync (path/dirname f) #js {:recursive true})
+               (fs/writeFileSync f content)))]
+    (try (fs/rmSync dir #js {:recursive true :force true}) (catch :default _ nil))
+    (w! "package.json" (js/JSON.stringify
+                        (clj->js {"dependencies" {"used-pkg" "^1.0.0" "unused-pkg" "^2.0.0"}})))
+    (w! "src/app.ts" "import { thing } from \"used-pkg\";\nexport const x = thing;\n")
+    ;; 直接宣言されていない = 推移依存。import されていても :transitive のまま。
+    (w! "src/other.ts" "const y = require(\"transitive-pkg\");\n")
+    (let [rel (str/replace dir (str root "/") "")
+          ;; reachability は root 相対を取るので、絶対パスの場合はそのまま使う
+          probe (fn [nm]
+                  (if (declared-directly? dir nm)
+                    (if (imported-anywhere? dir nm) :direct-and-imported :unused-direct)
+                    :transitive))
+          r1 (probe "used-pkg") r2 (probe "unused-pkg") r3 (probe "transitive-pkg")
+          missing (reachability "orgs/does-not-exist-xyz" "anything")
+          ok (and (= :direct-and-imported r1) (= :unused-direct r2)
+                  (= :transitive r3) (= :unknown missing))]
+      (println "reachability selftest")
+      (println (str "  (1) 宣言あり + import あり -> " (name r1)))
+      (println (str "  (2) 宣言あり + import なし -> " (name r2) "  ← 是正は bump ではなく削除"))
+      (println (str "  (3) 宣言なし（推移依存）   -> " (name r3) "  ← 『到達しない』とは言わない"))
+      (println (str "  (4) checkout が無い         -> " (name missing) "  ← 測れていないと申告"))
+      (println (if ok "  SELFTEST PASS" "  SELFTEST FAIL"))
+      (try (fs/rmSync dir #js {:recursive true :force true}) (catch :default _ nil))
+      ok)))
+
 (defn -main [& args]
+  (when (some #{"--selftest-reachability"} args)
+    (js/process.exit (if (selftest-reachability!) 0 1)))
   (let [all? (some #{"--all"} args)
         osv? (some #{"--osv"} args)
         repos (if all?
@@ -403,6 +537,8 @@
                                                   {:name nm :version ver :ids (:ids v)
                                                    :production? (boolean (seq prod))
                                                    :scope-unknown? (boolean (and (empty? prod) (seq unk)))
+                                                   :reach (let [rs (sort (distinct (map :dependency/repo rows)))]
+                                                            (into {} (map (fn [r] [r (reachability r nm)]) rs)))
                                                    :prod-repos (sort (distinct (map :dependency/repo prod)))
                                                    :unk-repos (sort (distinct (map :dependency/repo unk)))
                                                    :repos (sort (distinct (map :dependency/repo rows)))}))))
@@ -422,6 +558,13 @@
                                          (when (:scope-unknown? h)
                                            (str " / scope 不明 " (count (:unk-repos h)) " repo"
                                                 "（pnpm lockfile は dev/prod を言わない）"))))
+                           (doseq [[r k] (sort-by key (:reach h))]
+                             (println (str "        到達性 " (name k) "  " r
+                                           (case k
+                                             :unused-direct "  ← 直接宣言だが import 0。是正は bump ではなく削除"
+                                             :transitive    "  ← 推移依存。親経由で到達しうる（未判定）"
+                                             :unknown       "  ← checkout が無く測れていない"
+                                             ""))))
                            ;; orgs-detector プロトコル。key は purl なので、版が上がれば
                            ;; finding は resolve し、別の版で再発すれば別の finding になる。
                            (when (some #{"--findings"} args)
@@ -435,7 +578,9 @@
                                                    (:scope-unknown? h)
                                                    (str "scope 不明（pnpm）" (count (:unk-repos h)) " repo")
                                                    :else
-                                                   (str "開発時のみ、" (count (:repos h)) " repo"))))))
+                                                   (str "開発時のみ、" (count (:repos h)) " repo"))
+                                           " / 到達性 "
+                                           (str/join "," (distinct (map (comp name val) (:reach h))))))))
                          ;; 照会できなかった分も finding にする。沈黙した除外は
                          ;; 「脆弱性が無い」と同じ顔をする。
                          (when (and (some #{"--findings"} args)
