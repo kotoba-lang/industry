@@ -58,7 +58,20 @@
             (= c \") (recur (inc i) (conj out c) (not in-str?) false)
             (and (not in-str?) (= c \/) (< (inc i) n) (= (nth s (inc i)) \/))
             (let [nl (or (str/index-of s "\n" i) n)] (recur nl out false false))
+            ;; ブロックコメント。`//` だけ落とす版は `/* */` を JSON に残す。
+            (and (not in-str?) (= c \/) (< (inc i) n) (= (nth s (inc i)) \*))
+            (let [e (or (str/index-of s "*/" (+ i 2)) n)] (recur (+ e 2) out false false))
             :else (recur (inc i) (conj out c) in-str? false)))))))
+
+(defn- drop-trailing-commas
+  "`,` の直後が `}` / `]` なら落とす。JSONC では合法、`JSON.parse` では不正。
+
+   これが無いあいだ、この索引は **`net-kotobase/engine`（backend.kotobase.net の
+   本番 worker）を静かに落としていた**。gen-compliance-scope は同じ穴を塞いだが、
+   同型と書かれていたこちらには移されないまま残っていた —— しかもこの索引は
+   parsed/listed を数えないので、落ちたことが出力のどこにも出なかった。"
+  [s]
+  (str/replace s #",(\s*[}\]])" "$1"))
 
 (defn- hosts-of
   "wrangler 設定 → このワーカが応答するホスト名。"
@@ -150,7 +163,7 @@
           cfg-file (wrangler-files rp)
           :let [raw (read-safe cfg-file)]
           :when raw
-          :let [cfg (try (js->clj (js/JSON.parse (strip-jsonc raw)))
+          :let [cfg (try (js->clj (js/JSON.parse (drop-trailing-commas (strip-jsonc raw))))
                          (catch :default _ nil))]
           :when cfg
           :let [hs (hosts-of cfg)
