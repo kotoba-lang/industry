@@ -390,4 +390,27 @@ kototama は Wasm host。kotoba-mir / kotoba-gmir の virtual は仮想レジス
 Kotoba guest 5 本で、vmm の判断核を呼ぶ call site はまだ無い。type-1 hypervisor は
 ADR-0014 の firm non-goal。root ADR-2608239100。"}
 
+ :analog-procedure-requirement
+ {:label "紙・押印・収入印紙・出頭に残る手続き要件（法的根拠 / 電子代替 / 提言 / 繋ぎ）"
+  :spellings ["印紙" "収入印紙" "revenue stamp" "印紙税" "書面" "押印" "対面" "出頭"
+              "電子政府" "e-gov" "egov" "電子申請" "電子納付" "デジタル手続法"
+              "パブコメ" "パブリックコメント" "意見公募" "public comment" "規制改革" "ホットライン"
+              "advocacy" "アドボカシー" "提言" "請願" "陳情"
+              "封入" "郵送" "送付" "使者" "messenger" "書留" "特定記録" "内容証明"
+              "登記" "法務局" "在留資格" "帰化" "公証" "定款認証" "訴状" "手数料"]
+  :query-spellings ["印紙" "収入印紙" "電子政府" "パブコメ" "意見公募" "封入" "郵送" "使者"]
+  :note "3 repo が 1 組（ADR-2608232400）。**kotoba-lang/shomen（書面）** = 判断: 何が analog
+か（書面・押印・収入印紙・出頭・原本添付・公証）／誰がそう言っているか（法律・政令・省令・運用）／
+電子の道はどこまで開いているか、を閉じた語彙で持ち、1 件から route / advocacy / interim を出す。
+**cloud-itonami/teigen（提言）** = 事業者自身の声で命令等・運用の見直しを求める governed actor
+（意見公募・規制改革ホットライン。請願は出さない）。**cloud-itonami/hikyaku（飛脚）** = 繋ぎ:
+収入印紙の購入・貼付・封入・追跡郵便を 1 step ごとに証拠を要求して回す使者 actor（代理ではない）。
+既存と混同しないこと —— cloud-itonami/moushibumi(申文) は**市民本人**のパブコメ・請願、
+cloud-itonami/toritsugi(取次) は手続きの案内、kotoba-lang/tetsuzuki は手続きの期限と審査、
+cloud-itonami/insatsu は印刷・郵送 routing（物理行為を持たない）、cloud-itonami/yuubin は
+Web ゆうびん投函の自動化（2026-04 断念）、cloud-itonami-iso3166-jpn-moj は法務省向け
+コンプライアンス事業 blueprint。
+⚠ 2026-08-23 時点: shomen の seed 10 件は全件 unverified-seed。teigen / hikyaku は R0
+（決定核と状態機械のみ。提出 host / workforce 配信 host / 台帳永続化は無い）。"}
+
 }
