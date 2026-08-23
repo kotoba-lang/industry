@@ -52,25 +52,53 @@
     {:blob blob :text text}))
 
 (defn revision-line-index
-  "Index of the `revision:` line belonging to `- name: <entry>`, scanning only
-   the few lines that follow so a repo whose name prefixes another cannot be hit."
+  "Index of the `revision:` line belonging to the PROJECT `- name: <entry>`.
+
+   Two things this must not do, both measured 2026-08-23:
+
+   1. Stop at the FIRST `- name: <entry>`. A remote and a project can share a
+      name -- `kotoba-lang` is both -- and the remote block has no `revision:`
+      within the scan window, so the original `first` returned nil and reported
+      `no revision line at tip` for an entry that is present and pinnable. That
+      verdict reads as a fact about west.yml; it was a fact about the search.
+      Hence `some` over every match. (A `path:`-presence guard was tried and
+      dropped: with `some` in place it never changed an outcome, and a check
+      that cannot be made to fire is not a check.)
+   2. Hit a repo whose name prefixes another -- hence the exact `str/trim`
+      compare and the bounded window."
   [lines entry]
-  (when-let [start (first (keep-indexed
-                           (fn [i l] (when (= (str/trim l) (str "- name: " entry)) i))
-                           lines))]
-    (first (keep (fn [j] (when (and (< j (count lines))
-                                    (str/starts-with? (str/trim (nth lines j)) "revision:"))
-                           j))
-                 (range (inc start) (min (count lines) (+ start 8)))))))
+  (let [starts (keep-indexed (fn [i l] (when (= (str/trim l) (str "- name: " entry)) i)) lines)]
+    (some (fn [start]
+            (first (keep (fn [j] (when (and (< j (count lines))
+                                            (str/starts-with? (str/trim (nth lines j)) "revision:"))
+                                   j))
+                         (range (inc start) (min (count lines) (+ start 8))))))
+          starts)))
+
+(defn default-branch
+  "The upstream default branch. NOT assumed to be `main`: measured 2026-08-23,
+   three of nineteen entries were dropped as `not reachable from main` when
+   their defaults were `Production`, `gh-pages` and a `rescue/...` holding pen.
+   The 404 that produced that verdict was the compare endpoint saying the base
+   ref does not exist -- not the pin saying it is unreachable. The single-entry
+   scripts/west-pin-put.cljs already resolved this; only the batch path did not."
+  [slug]
+  (let [b (str/trim (:out (sh (str "gh api repos/" slug " --jq .default_branch"))))]
+    (if (or (str/blank? b) (str/includes? b "\n")) nil b)))
 
 (defn verify [slug old-pin new-sha]
-  (let [reach (str/trim (:out (sh (str "gh api repos/" slug "/compare/main..." new-sha
-                                       " --jq .status"))))
+  (let [db (default-branch slug)
+        _ (when-not db (println (str "  ! " slug ": default branch unresolved")))
+        reach (if-not db
+                "UNRESOLVED"
+                (str/trim (:out (sh (str "gh api repos/" slug "/compare/"
+                                         db "..." new-sha " --jq .status")))))
         fwd (str/trim (:out (sh (str "gh api repos/" slug "/compare/" old-pin "..." new-sha
                                      " --jq '.status + \" \" + (.behind_by|tostring)'"))))]
     (cond
       (not (contains? #{"identical" "behind"} reach))
-      {:ok false :why (str "not reachable from main (status " reach ")")}
+      {:ok false :why (str "not reachable from default branch "
+                           (pr-str db) " (status " reach ")")}
       (not= fwd "ahead 0")
       {:ok false :why (str "not a clean forward move (" fwd ")")}
       :else {:ok true})))
