@@ -125,7 +125,31 @@
         ratio (if (zero? n) 0 (/ jp n))]
     (cond (> ratio 0.15) :ja
           (< ratio 0.02) :en
-          :else nil)))
+          ;; **混合は拒否しない。優勢な方で採点し、混合であることを併記する。**
+          ;; 実測 2026-08-23、拒否していたとき /models・/gpu・/blog の 3 面が
+          ;; UNMEASURABLE になった —— どれも「日本語の固有名詞が混じった英語面」で、
+          ;; **測れないのではなく、測り方を選べばよいだけだった。**
+          :else (if (> ratio 0.08) :ja :en))))
+
+(defn mixed? [t]
+  (let [n (count t)
+        jp (count (re-seq #"[\u3040-\u30ff\u4e00-\u9faf]" t))
+        r (if (zero? n) 0 (/ jp n))]
+    (and (>= r 0.02) (<= r 0.15))))
+
+(defn js-dependent
+  "server-render された本文に対して、**JS を実行しないと読めない面か**。
+
+   `#app` / `#root` の mount point が在り、かつ server 本文が薄ければ、
+   クローラと初回表示が見るのはその薄い分だけである。**これは体裁ではなく
+   到達性の問題**なので、コピーの点数と並べて出す。"
+  [html text]
+  (let [mount (boolean (re-find #"id=\"(app|root)\"" html))
+        scripts (count (re-seq #"<script" html))]
+    {:mount-point? mount
+     :script-tags scripts
+     :server-text-chars (count text)
+     :js-dependent? (and mount (< (count text) 600))}))
 
 (def register-cues
   "**Hume の 48 ラベルのうち、日本語の表層手がかりを定義できたものだけ。**
@@ -191,7 +215,13 @@
                         register-cues))]
     (if (or (nil? lx) (< (count t) min-chars))
       {:target label :chars (count t) :sentences n :lang lang
-       :unmeasurable (cond (< (count t) min-chars)
+       :render (js-dependent html t)
+       :unmeasurable (cond (and (< (count t) min-chars)
+                                (:js-dependent? (js-dependent html t)))
+                           (str "server 本文が " (count t) " 字（床 " min-chars "）で mount point あり"
+                                " —— **取得の失敗ではなく、内容が client 描画**。"
+                                "この面のコピーを測るには描画後の DOM が要る")
+                           (< (count t) min-chars)
                            (str "本文が " (count t) " 字（床 " min-chars "）—— 取得か抽出に失敗している")
                            :else
                            "言語を判定できない（日本語 15% 超でも英語 2% 未満でもない）")}
@@ -199,6 +229,8 @@
      :chars (count t)
      :sentences n
      :lang lang
+     :mixed? (mixed? t)
+     :render (js-dependent html t)
      :sales {:negation-sentences (count neg-sents)
              :negation-ratio-pct (r1 (pct (count neg-sents) n))
              :negation-hits (occurrences t negation)
@@ -225,9 +257,13 @@
 
 (defn- row [k v] (println (str "  " (.padEnd (str k) 30) v)))
 
-(defn report [{:keys [target chars sentences sales lp register lang unmeasurable]}]
+(defn report [{:keys [target chars sentences sales lp register lang unmeasurable] :as m}]
   (println (str "\n── " target))
-  (row "本文字数 / 文数 / 言語" (str chars " / " sentences " / " (or (some-> lang name) "?")))
+  (row "本文字数 / 文数 / 言語" (str chars " / " sentences " / " (or (some-> lang name) "?")
+                                    (when (:mixed? m) "（混合。優勢な方で採点）")))
+  (when (:js-dependent? (:render m))
+    (row "⚠ JS 依存" (str "server 本文 " (:server-text-chars (:render m)) " 字 + mount point あり"
+                           " —— クローラと初回表示が見るのはこれだけ")))
   (if unmeasurable
     (row "UNMEASURABLE" (str "**" unmeasurable "**"))
     (do
