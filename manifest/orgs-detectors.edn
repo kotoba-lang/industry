@@ -1490,4 +1490,51 @@
               Do not rewrite any check here as a shell grep: `grep` on this machine is
               ugrep, which reads `(` as a group opener, so `grep \"^(ns foo.bar\"` matches
               nothing and reports every namespace absent. The first draft of this
-              measurement concluded all four claims were missing for exactly that reason."}]}
+              measurement concluded all four claims were missing for exactly that reason."}
+
+  {:id       :verify-west-registration-gap
+   :title    "repos other checkouts depend on that west does not carry"
+   :why      "west 未登録の repo は、その repo を :local/root や :paths \"../…\" で参照して
+              いる checkout を fresh clone / CI 上で壊す。ADR-2607173200 の実例:
+              kotoba-lang/crm は GitHub に push 済み・west 未登録で、cloud-itonami-isic-5820
+              / -6201 / -6202 の deps.edn が指していた。手元では解決するので誰も気づかない。
+              この検査は 2026-08-23 まで **人が『cleanup』と打った時にしか走らなかった** ——
+              skill git-cleanup-conflict の minimum workflow の step 1 に入っているだけで、
+              打たれない限り登録漏れは何日でも積める。これを常設の測定にする。
+              報告するのは **消費者の checkout が pin と一致している辺だけ**（audit の
+              :live）。古い木で読んだ宣言は :stale-tree として exit 2 側に送られる ——
+              2026-08-20 に、195 commit 遅れた checkout が main で既に直っていた宣言を
+              報告し、その修正を書いて push するまで上流を読まなかった実例がある。
+              **gh は呼ばない**（レジストリの gh class 規約）。そのため :true-orphan-git
+              （誰もまだ依存していない未登録 repo）は finding にせず、CENSUS 行で
+              『判定していない候補が N 件』とだけ言う —— gh 無しでは改名残骸と区別できず、
+              実測 2026-08-23 では候補 43 件が 43 件とも改名残骸だった。そちらは
+              nbb scripts/west-orphan-audit.cljs --all（gh 有り）と
+              nbb scripts/west-triple-sync.cljs plan --scope orphans で人が見る。"
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/west-orphan-audit.cljs" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\tproject deps.edn read for :local/root"
+   :interval-ms 21600000                 ; 6h -- 登録漏れは人が repo を着地させた時に生まれる
+   :timeout-ms  600000                   ; 10m -- 実測 32s の 19x。この機械は load 100 まで振れる
+   :writes   :none
+   :measured "2026-08-23 on this machine, twice at load 25.8: 32.18s と 26.41s、出力同一、
+              exit 0。SCANNED 4433 local orgs projects / 3676 deps.edn (:local/root) /
+              3802 deps.edn (:paths)、CENSUS local-root-decls=3218 paths-decls=75
+              west-paths=4225 unadjudicated-true-orphan-candidates=43。
+              gh を 1 度も呼ばないことを PATH 上の spy で確認済み（呼び出しログ 0 行）。
+              landing 前に 4 方向を実際に出した（合成 tree、orgs/acme/{consumer,lib-registered,lib-orphan}）:
+                clean                                        -> exit 0、FINDING 0
+                consumer が未登録 project を :local/root で参照 -> exit 1、FINDING 2
+                                                                 （local-root: と rel-path: の両方）
+                consumer の checkout が pin と不一致            -> exit 2、UNJUDGED 2、FINDING 0
+                orgs/ の無い木（この repo の worktree）から実行  -> exit 3、SCANNED 0、CANNOT ANSWER
+              最後の 1 つがこの entry の床である。orgs/ を持たない木では走査が 0 件で
+              完走し、旧実装は『壊れた辺 0 件』= exit 0 を返した —— 『見ていない』が
+              『無い』として記録される形（ADR-2608136000 の問 1/問 2）。
+              現在の tree では finding 0 件で、それは blocking が実際に 0 だからである
+              （2026-08-23 の全件測定: local-root-broken 0 / relative-paths-broken 0）。
+              つまりこの detector は landing 時点で緑であり、**赤も実際に出せることを
+              合成 tree で先に見てから**登録した（『一度も緑にならない gate も、
+              一度も赤くならない gate も同じだけ無内容』）。"}]}

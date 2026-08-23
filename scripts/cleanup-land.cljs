@@ -1451,3 +1451,47 @@
 (when (pos? dropped)
   (println (format "⚠ --max で %d repo を処理していない。再実行して残りを処理すること。" dropped)))
 (println "※ ローカルの WIP は一切削除していない（archive + 着地のみ）。")
+
+;; ── west 登録の受け渡し（2026-08-23 追加、ADR-2608230300）──────────────────
+;;
+;; この script は **GitHub に着地させるところまで**しかやらない。west への登録は
+;; 別の道具（scripts/west-triple-sync.cljs）が持っている。skill git-cleanup-conflict
+;; は「Push to GitHub alone is not done … Incomplete = GH-only orphan」と書いて
+;; いるが、**その受け渡しは散文にしか無く、出力には現れなかった**。着地して満足
+;; して終わる経路が、GH-only orphan を作る主要な経路である（ADR-2607173200 の
+;; crm がまさにこの形: push 済み・west 未登録・consumer 3 件が壊れる）。
+;;
+;; ここでやるのは検出と次の 1 コマンドの提示だけで、登録はしない（登録は
+;; repos.edn と west.yml を書き換えるので、plan を見てから人/agent が回す）。
+(let [west-text (try (.readFileSync node-fs "manifest/west.yml" "utf8")
+                    (catch :default _ nil))
+      west-paths (when west-text
+                   (set (map second (re-seq #"(?m)^\s+path:\s+(\S+)" west-text))))
+      touched (map :dir acted)
+      unregistered (when west-paths
+                     (->> touched (remove #(contains? west-paths %)) sort vec))]
+  (println)
+  (cond
+    ;; west.yml を読めなかった run が「登録漏れ 0 件」と言わないこと。
+    (nil? west-paths)
+    (println "⚠ west 登録の確認: manifest/west.yml を読めなかった。未測定（0 件ではない）。")
+
+    (empty? touched)
+    (println "west 登録の確認: 着地対象 0 repo。確認対象なし。")
+
+    (empty? unregistered)
+    (println (format "west 登録の確認: 処理した %d repo はすべて west.yml に path を持つ。"
+                     (count touched)))
+
+    :else
+    (do
+      (println (format "⚠ west 未登録のまま着地した repo: %d / %d"
+                       (count unregistered) (count touched)))
+      (println "   GitHub に push しただけでは終わっていない —— fresh checkout と CI は")
+      (println "   この repo を解決できない（:local/root で参照している consumer は壊れる）。")
+      (doseq [d unregistered] (println (str "     " d)))
+      (println "   次の 1 手（plan が既定。apply で repos.edn + west.yml を書く）:")
+      (println (str "     nbb scripts/west-triple-sync.cljs plan --names "
+                    (str/join "," (map #(last (str/split % #"/")) unregistered))))
+      (println "   ⚠ この確認が見ているのは west.yml の path: だけ。repos.edn の")
+      (println "     :extra-projects に載っているかは見ていない（両方要る）。"))))

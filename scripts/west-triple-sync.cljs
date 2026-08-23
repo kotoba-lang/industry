@@ -7,7 +7,15 @@
 ;; wholesale gen-west-manifest commit / force-push / dirty overwrite はしない。
 ;;
 ;; 使い方:
-;;   nbb scripts/west-triple-sync.cljs plan  [--scope blocking|managed|names] [--names a,b]
+;;   nbb scripts/west-triple-sync.cljs plan  [--scope blocking|managed|orphans|names] [--names a,b]
+;;
+;;   scope:
+;;     blocking  消費者の :local/root が壊れている辺だけ（既定）
+;;     managed   local に在る west 登録済み project（ff / pin 前進）
+;;     orphans   audit が **確かめた上で** 未登録と分類した local git repo
+;;               （2026-08-23 追加。誰もまだ依存していない登録漏れの一括経路。
+;;                :personal / scratch / 改名残骸 / 訊けなかったものは入らない）
+;;     names     明示指定
 ;;   nbb scripts/west-triple-sync.cljs apply [--scope ...] [--names ...] [--no-pin-advance]
 ;;   nbb scripts/west-triple-sync.cljs verify [--scope ...] [--names ...]
 ;;
@@ -73,7 +81,7 @@
                opts)]
     (when-not (#{"plan" "apply" "verify"} cmd)
       (die! 2 (str "unknown command: " cmd " (plan|apply|verify)")))
-    (when-not (#{"blocking" "managed" "names"} (:scope opts))
+    (when-not (#{"blocking" "managed" "orphans" "names"} (:scope opts))
       (die! 2 (str "unknown scope: " (:scope opts))))
     (when (and (= (:scope opts) "names") (empty? (:names opts)))
       (die! 2 "--scope names requires --names a,b"))
@@ -229,9 +237,25 @@
        sort
        vec))
 
-(defn gh-repo-exists? [org name]
-  (let [{:keys [ok?]} (sh-ok "gh" "api" (str "repos/" org "/" name) "--jq" ".id")]
-    ok?))
+(defn gh-repo-state
+  "GitHub にその repo が在るかを **三値**で返す: :yes | :no | :unknown。
+
+  2026-08-23（ADR-2608230300）に `gh-repo-exists?` から置き換えた。旧実装は
+  `gh api` の exit だけを見ていたので、**404（無いと答えた）と rate limit /
+  認証切れ / 通信断（訊けなかった）が同じ false** になり、plan は後者を
+  『GitHub repo missing: use new-project-scaffold to create』として報告した。
+  この文言に従えば **既に在る repo をもう一度作る**ことになる —— skill 自身が
+  『Check for the existing repo before creating one, or you mint duplicates』と
+  書いている、その取り違えを道具側が生成していた。
+
+  :unknown は plan で **register / clone を積まない**。訊けなかったことを
+  『無い』とも『在る』とも扱わない（ADR-2608136000）。"
+  [org name]
+  (let [{:keys [ok? err]} (sh-ok "gh" "api" (str "repos/" org "/" name) "--jq" ".id")]
+    (cond
+      ok? :yes
+      (re-find #"(?i)HTTP 404|Not Found" (str err)) :no
+      :else :unknown)))
 
 (defn gh-default-branch [org name]
   (let [{:keys [ok? out]} (sh-ok "gh" "api" (str "repos/" org "/" name)
@@ -310,6 +334,34 @@
 (defn managed-from-names [names west-map]
   (mapv #(normalize-project % west-map) names))
 
+(defn managed-from-orphans
+  "`--scope orphans`: audit が **確かめた上で**未登録と分類した local git repo。
+
+  なぜ scope として要るか（2026-08-23、ADR-2608230300）: これまで一括経路は
+  `blocking`（誰かが :local/root で依存している辺）だけで、**誰もまだ依存して
+  いない未登録 repo は `--names <path>` を 1 件ずつ手で渡すしか無かった**。
+  skill git-cleanup-conflict は `:true-orphan-git` を『Register (if intentional
+  fleet member) or retire』と書いているのに、register 側に一括の道具が無い。
+  手で 1 件ずつ渡す道具は、件数が増えると使われなくなる。
+
+  安全側の設計:
+  - 母集団は `:true-orphan-git` **だけ**。`:personal` / `:worktree-scratch` /
+    `:path-override-leftover` / `:worktree-of-registered` / `:tracked-superproject`
+    / `:renamed-upstream` は audit が別クラスに分けており、ここには入らない。
+  - `:renamed-unverified`（後継を訊けなかった）も入らない。plan は代わりに
+    『判定していない候補が N 件ある』と報告する —— 黙って除くと、scope の沈黙が
+    『未登録は無い』に見える。
+  - plan が既定であることは変わらない。register は `apply` を明示したときだけ。"
+  [orphan-report]
+  (->> (get-in orphan-report [:unregistered :true-orphan-git])
+       (keep (fn [{:keys [path]}]
+               (let [parts (str/split (str path) #"/")]
+                 (when (and (= 3 (count parts)) (= "orgs" (first parts)))
+                   {:path path :org (nth parts 1) :name (nth parts 2)
+                    :reason :true-orphan-git}))))
+       (sort-by :path)
+       vec))
+
 (defn managed-from-local-west [west-map]
   (mapv (fn [path]
           (let [parts (str/split path #"/")]
@@ -321,6 +373,7 @@
   (case (:scope opts)
     "blocking" (managed-from-blocking orphan overrides)
     "managed" (managed-from-local-west west-map)
+    "orphans" (managed-from-orphans orphan)
     "names" (managed-from-names (:names opts) west-map)))
 
 ;; ---------- plan actions ----------
@@ -365,13 +418,23 @@
       (let [url (or (when dir? (origin-url path))
                     (remote-url-for org name remotes))
             [uorg uname] (or (parse-org-name-from-url url) [org name])
-            gh? (gh-repo-exists? uorg uname)
+            gh-state (gh-repo-state uorg uname)
+            gh? (= :yes gh-state)
             west-name (or (:name west) name)]
-        (when-not gh?
+        (when (= :no gh-state)
           (swap! reports conj {:op :report-skip
                                :path path
                                :note (str "GitHub repo missing: " uorg "/" uname
                                           " (use new-project-scaffold to create)")}))
+        ;; 訊けなかった。**『無い』と書かない** —— その文言は repo の重複作成に
+        ;; まっすぐ繋がる（gh-repo-state の docstring）。
+        (when (= :unknown gh-state)
+          (swap! reports conj {:op :report-unverified
+                               :path path
+                               :note (str "UNVERIFIED: GitHub に " uorg "/" uname
+                                          " を訊けなかった（rate limit / 認証 / 通信）。"
+                                          "この path に対する clone/register は積んでいない。"
+                                          "再実行して答えが出てから判断すること")}))
         (when (and gh? (not dir?))
           (swap! actions conj {:op :clone :path path
                                :url (or url (remote-url-for uorg uname remotes))
@@ -427,7 +490,10 @@
      :actions actions
      :reports reports
      :orphan-counts {:local-root-broken (count (:local-root-broken orphan))
-                     :true-orphan-git (count (get-in orphan [:unregistered :true-orphan-git]))}
+                     :true-orphan-git (count (get-in orphan [:unregistered :true-orphan-git]))
+                     ;; 判定していない候補。0 でも印字する —— この数を落とすと
+                     ;; 『登録候補は N 件』が『未登録は N 件しか無い』に読める。
+                     :renamed-unverified (count (get-in orphan [:unregistered :renamed-unverified]))}
      :no-pin-advance? (:no-pin-advance? opts)}))
 
 ;; ---------- apply ----------
@@ -602,7 +668,14 @@
                 " reports=" (count (:reports plan))))
   (println (str "orphan snapshot: "
                 "local-root-broken=" (get-in plan [:orphan-counts :local-root-broken])
-                " true-orphan-git=" (get-in plan [:orphan-counts :true-orphan-git])))
+                " true-orphan-git=" (get-in plan [:orphan-counts :true-orphan-git])
+                " renamed-UNVERIFIED=" (get-in plan [:orphan-counts :renamed-unverified])))
+  (when (pos? (or (get-in plan [:orphan-counts :renamed-unverified]) 0))
+    (println (str "  ⚠ UNVERIFIED "
+                  (get-in plan [:orphan-counts :renamed-unverified])
+                  " 件は GitHub に後継を訊けなかった候補で、どの scope にも入っていない。"))
+    (println "    『未登録はこれで全部』ではない。gh が答えられる状態で audit を再実行すること:")
+    (println "      nbb scripts/west-orphan-audit.cljs --all"))
   (println)
   (println "## managed")
   (doseq [p (:managed plan)]
