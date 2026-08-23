@@ -364,7 +364,14 @@
   (when-not (.existsSync node-fs (str dir "/.git"))
     (throw (js/Error. (str "archive!: " dir " に .git が無い。repo でない path に "
                            ".git を作らない（own-repo-root? を通してから呼ぶこと）"))))
-  (let [adir (str dir "/.git/stash-archive-" stamp)]
+  ;; `.git` がファイル（submodule 時代の gitdir ポインタ / linked worktree）のとき
+  ;; `<dir>/.git/...` への mkdir は ENOTDIR で落ちる。実体の gitdir を git に訊く。
+  ;; ここを直さずに enumeration だけ広げると、見えるようになった repo が archive で
+  ;; 落ちる —— 退避せずに着地させないための非交渉ルール（:retirement :archive）が
+  ;; 崩れるので、2 つは同じ変更で直す必要がある。
+  (let [gd   (or (some-> (gitc dir "rev-parse" "--absolute-git-dir") str/trim not-empty)
+                 (str dir "/.git"))
+        adir (str gd "/stash-archive-" stamp)]
     (.mkdirSync node-fs adir #js {:recursive true})
     (.writeFileSync node-fs (str adir "/untracked-files.txt") (str/join "\n" untracked))
     (when-let [patch (gitc dir "diff")]
@@ -1412,10 +1419,33 @@
       (println (if ok "  SELFTEST PASS" "  SELFTEST FAIL"))
       (js/process.exit (if ok 0 1)))))
 
+(def all-git-paths
+  ;; `-type d` を付けてはならない。**`.git` はファイルのこともある** —— submodule
+  ;; 時代の gitdir ポインタ（`gitdir: ../../../.git/modules/...`）と linked worktree が
+  ;; そう。実測 2026-08-22、`orgs/` の 5 checkout がこの形で、そのうち
+  ;; `orgs/kotoba-lang/kotoba` は untracked 22 + tracked 変更 10（codebase-actor /
+  ;; IPLD / semantic supply-chain の一式、7,494 行）を抱えていた。どの branch にも
+  ;; どの remote にも無く、共有 checkout で `git checkout` が走れば消える状態である。
+  ;;
+  ;; **`-type d` はそれを「repo が 0 件」として報告した。**「見に行けなかった」が
+  ;; 「見に行って何も無かった」と同じ出力になる、ADR-2608136000 の形そのもの。
+  ;; スタブ `.git` の防御は `own-repo-root?`（`rev-parse --show-toplevel` が dir 自身に
+  ;; 解決するか）が既に担っており、それは `.git` がファイルでも正しく働く —— つまり
+  ;; `-type d` は防御には寄与しておらず、見える範囲を狭めていただけだった。
+  (->> (sh "find" "orgs" "-maxdepth" "3" "-name" ".git")
+       :out str/trim str/split-lines
+       (remove str/blank?) sort
+       (map #(subs % 0 (- (count %) 5)))))
+
+(def gitdir-file-repos
+  ;; 証拠床: 「今回 `-type d` なら見えなかったはずの checkout」を数える。
+  ;; 0 件でも印字する（数えたことと、数えて 0 だったことを区別できるように）。
+  (->> all-git-paths
+       (filter (fn [d] (try (.isFile (.statSync node-fs (str d "/.git")))
+                            (catch :default _ false))))))
+
 (def repos
-  (->> (sh "find" "orgs" "-maxdepth" "3" "-name" ".git" "-type" "d")
-       :out str/trim str/split-lines sort
-       (map #(subs % 0 (- (count %) 5)))
+  (->> all-git-paths
        (remove annex?)
        (filter own-repo-root?)
        (filter (fn [d] (if only-names (some #(str/ends-with? d (str "/" %)) only-names) true)))))
@@ -1432,7 +1462,9 @@
 (def selected (if max-repos (take max-repos plans) plans))
 (def dropped (- (count plans) (count selected)))
 
-(println (format "\n対象 %d repo（--max により %d repo を打切り）" (count selected) dropped))
+(println (format "\n走査 %d checkout（うち .git がファイル = 旧 -type d では不可視だった分 %d）"
+                 (count all-git-paths) (count gitdir-file-repos)))
+(println (format "対象 %d repo（--max により %d repo を打切り）" (count selected) dropped))
 (def outcomes (mapv (fn [p] [p (land-repo! p)]) selected))
 (def archived-skipped (filterv #(= (second %) :archived-skip) outcomes))
 (def acted (mapv first (remove #(= (second %) :archived-skip) outcomes)))
