@@ -296,23 +296,44 @@
               :issuer/accreditation-date (get iss* "accreditationDate")
               :source/note "GLEIF's accreditation of the LOU named above, as an issuer of LEIs."})
 
-       (prov ra retrieved-at
-             {:fact/id "gleif-registration-authority"
-              :fact/kind :registration-authority
-              :company/lei lei
-              :authority/code (get ra* "code")
-              :authority/international-name (get ra* "internationalName")
-              :authority/organization-name (get ra* "internationalOrganizationName")
-              :authority/local-organization-name (get ra* "localOrganizationName")
-              :authority/website (get ra* "website")
-              :authority/country (get-in ra* ["jurisdictions" 0 "country"])
-              :authority/jurisdiction (get-in ra* ["jurisdictions" 0 "jurisdiction"])
-              :company/registered-as (get ent "registeredAs")
-              :source/note (if (= "RA999999" (get ra* "code"))
-                             (str "RA999999 is GLEIF's placeholder for \"no registration authority "
-                                  "available\": this record is not corroborated against a national "
-                                  "business register, which is why :company/registered-as is nil.")
-                             "Resolves :company/registration-authority-id to the national register that corroborated the record.")})
+       ;; A register can serve more than one jurisdiction, and GLEIF lists them
+       ;; all: RA000548 (the Swiss UID-Register) comes back as [Liechtenstein,
+       ;; Switzerland] in that order. Reading index 0 recorded "Liechtenstein"
+       ;; as the country of a Swiss company's register (measured 2026-08-23 on
+       ;; E0JAN6VLUDI1HITHT809), which is not what the registry says and is
+       ;; not what any reader of facts.edn would have known to doubt. So the
+       ;; list is recorded whole, as parallel string vectors in GLEIF's order;
+       ;; the entity's own jurisdiction is :company/jurisdiction on the LEI
+       ;; record, never inferred from here.
+       (let [juris (vec (get ra* "jurisdictions"))]
+         (prov ra retrieved-at
+               {:fact/id "gleif-registration-authority"
+                :fact/kind :registration-authority
+                :company/lei lei
+                :authority/code (get ra* "code")
+                :authority/international-name (get ra* "internationalName")
+                :authority/organization-name (get ra* "internationalOrganizationName")
+                :authority/local-organization-name (get ra* "localOrganizationName")
+                :authority/website (get ra* "website")
+                :authority/country-codes (mapv #(get % "countryCode") juris)
+                :authority/countries (mapv #(get % "country") juris)
+                :authority/jurisdictions (mapv #(get % "jurisdiction") juris)
+                :authority/jurisdiction-count (count juris)
+                :company/registered-as (get ent "registeredAs")
+                :source/note (cond
+                               (= "RA999999" (get ra* "code"))
+                               (str "RA999999 is GLEIF's placeholder for \"no registration authority "
+                                    "available\": this record is not corroborated against a national "
+                                    "business register, which is why :company/registered-as is nil.")
+
+                               (> (count juris) 1)
+                               (str "Resolves :company/registration-authority-id to the national register that corroborated the record. "
+                                    "GLEIF lists this register under " (count juris) " jurisdictions ("
+                                    (str/join ", " (map #(get % "countryCode") juris))
+                                    "), all recorded here in GLEIF's order; which one this entity belongs to is :company/jurisdiction on the LEI record, not a position in this list.")
+
+                               :else
+                               "Resolves :company/registration-authority-id to the national register that corroborated the record.")}))
 
        (prov elf retrieved-at
              {:fact/id "iso-20275-entity-legal-form"
@@ -396,8 +417,8 @@
    :securities/isin :securities/isin-count :securities/page-size :securities/page-count
    :issuer/name :issuer/marketing-name :issuer/website :issuer/accreditation-date
    :authority/code :authority/international-name :authority/organization-name
-   :authority/local-organization-name :authority/website :authority/country
-   :authority/jurisdiction
+   :authority/local-organization-name :authority/website :authority/country-codes
+   :authority/countries :authority/jurisdictions :authority/jurisdiction-count
    :elf/code :elf/local-name :elf/language :elf/country-code :elf/subdivision-code
    :elf/status :elf/date-created
    :relationship/kind :relationship/parent-lei :relationship/child-lei
