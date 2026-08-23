@@ -74,31 +74,36 @@
 ;; ── deps.edn ───────────────────────────────────────────────────────────────
 
 (defn- deps-entries
-  "deps.edn の :deps と各 alias の :extra-deps / :replace-deps を 1 本に。"
+  "deps.edn の :deps と各 alias の :extra-deps / :replace-deps を 1 本に。
+
+   **`:deps` は production、alias 側は development** として印を付けて返す。
+   両者を同じ列に混ぜると、test runner の脆弱性が本番の脆弱性と同じ緊急度で
+   並ぶ（2026-08-23 に実際にそう報告し、triage を誤った）。"
   [m]
-  (concat (:deps m)
-          (mapcat (fn [[_ a]] (concat (:extra-deps a) (:replace-deps a)))
+  (concat (map (fn [e] [e false]) (:deps m))
+          (mapcat (fn [[_ a]] (map (fn [e] [e true])
+                                   (concat (:extra-deps a) (:replace-deps a))))
                   (:aliases m))))
 
 (defn- from-deps-edn [file rel]
   (when-let [m (try (edn/read-string (read-safe file)) (catch :default _ nil))]
-    (keep (fn [[coord spec]]
+    (keep (fn [[[coord spec] dev?]]
             (cond
               (:mvn/version spec)
               {:purl (maven-purl coord (:mvn/version spec))
                :ecosystem :maven :name (str coord) :version (:mvn/version spec)
-               :exact? true :file rel}
+               :exact? true :dev? dev? :file rel}
 
               (:git/sha spec)
               (when-let [p (github-purl (:git/url spec) (:git/sha spec))]
                 {:purl p :ecosystem :github :name (str coord) :version (:git/sha spec)
-                 :exact? true :file rel})
+                 :exact? true :dev? dev? :file rel})
 
               ;; :local/root は同じ tree の中。第三者依存ではないので
               ;; 脆弱性照会の対象にしないが、**数からは落とさない**。
               (:local/root spec)
               {:purl nil :ecosystem :internal :name (str coord) :version nil
-               :exact? true :file rel}
+               :exact? true :dev? dev? :file rel}
 
               :else nil))
           (deps-entries m))))
@@ -115,8 +120,11 @@
                            (last (str/split k #"node_modules/"))))
                   ver (get v "version")]
               (when (and nm ver (seq nm) (not (get v "link")))
+                ;; npm が既に計算した `dev` をそのまま運ぶ。ここを落とすと
+                ;; miniflare 経由の dev 依存が本番依存と区別できなくなる。
                 {:purl (npm-purl nm ver) :ecosystem :npm :name nm :version ver
-                 :exact? true :file rel})))
+                 :exact? true :dev? (boolean (or (get v "dev") (get v "devOptional")))
+                 :file rel})))
           (get m "packages"))))
 
 (defn- from-package-json [file rel]
@@ -127,7 +135,7 @@
                         (let [exact? (boolean (re-matches #"\d+\.\d+\.\d+.*" spec))]
                           {:purl (when exact? (npm-purl nm spec))
                            :ecosystem :npm :name nm :version spec
-                           :exact? exact? :file rel})))
+                           :exact? exact? :dev? (= k "devDependencies") :file rel})))
                     (get m k)))
             ["dependencies" "devDependencies" "optionalDependencies"])))
 
@@ -180,7 +188,9 @@
 
 (defn ->datoms [{:keys [rows stats]} scoped?]
   (let [uniq (->> rows
-                  (group-by (juxt :repo :ecosystem :name :version))
+                  ;; 同じ package が production と development の両方に現れることが
+                  ;; ある。dev? を鍵に含めないと、片方が消えて triage が狂う。
+                  (group-by (juxt :repo :ecosystem :name :version :dev?))
                   (map (fn [[_ g]] (first g))))
         ds (map-indexed
             (fn [i r]
@@ -189,6 +199,9 @@
                        :dependency/ecosystem (:ecosystem r)
                        :dependency/name (:name r)
                        :dependency/exact? (:exact? r)
+                       ;; **本番に載るか、開発時だけか。** これが無いと、
+                       ;; miniflare の中の undici が本番の依存と同じ緊急度で並ぶ。
+                       :dependency/dev? (boolean (:dev? r))
                        :source/dataset "compliance-dependencies"
                        :source/file (:file r)}
                 (:version r) (assoc :dependency/version (:version r))
@@ -206,6 +219,8 @@
              :dependency/rows (count uniq)
              ;; **OSV に投げられるのは exact なものだけ。** 範囲のまま照会すると
              ;; 「該当なし」が返り、それは「脆弱性が無い」と同じ顔をする。
+             :dependency/production (count (remove :dev? uniq))
+             :dependency/development (count (filter :dev? uniq))
              :dependency/queryable exact
              :dependency/not-queryable (- (count uniq) exact)}]
     (vec (concat ds [cov]))))
@@ -324,20 +339,33 @@
                                                     purl (if (= "npm" eco)
                                                            (str "pkg:npm/" nm "@" ver)
                                                            (str "pkg:maven/" (str/replace nm ":" "/") "@" ver))]
-                                                {:name nm :version ver :ids (:ids v)
-                                                 :repos (sort (distinct (map :dependency/repo (by-purl purl))))})))
+                                                (let [rows (by-purl purl)
+                                                      prod (remove :dependency/dev? rows)]
+                                                  {:name nm :version ver :ids (:ids v)
+                                                   :production? (boolean (seq prod))
+                                                   :prod-repos (sort (distinct (map :dependency/repo prod)))
+                                                   :repos (sort (distinct (map :dependency/repo rows)))}))))
                                        (sort-by :name))]
-                         (doseq [h hits]
-                           (println (str "  " (:name h) "@" (:version h)
+                         ;; **本番に載るものを先に出す。** dev 依存と同じ順に並べると
+                         ;; 読む側が緊急度を取り違える（2026-08-23 に実際に取り違えた）。
+                         (doseq [h (sort-by (juxt (complement :production?) :name) hits)]
+                           (println (str "  " (if (:production? h) "PRODUCTION" "dev-only  ")
+                                         "  " (:name h) "@" (:version h)
                                          "  " (str/join " " (:ids h))))
-                           (println (str "      使用: " (str/join ", " (:repos h))))
+                           (println (str "      使用 " (count (:repos h)) " repo"
+                                         (when (:production? h)
+                                           (str " / うち本番 " (count (:prod-repos h)) ": "
+                                                (str/join ", " (:prod-repos h))))))
                            ;; orgs-detector プロトコル。key は purl なので、版が上がれば
                            ;; finding は resolve し、別の版で再発すれば別の finding になる。
                            (when (some #{"--findings"} args)
-                             (println (str "FINDING\terror\tvuln:pkg/" (:name h) "@" (:version h)
+                             (println (str "FINDING\t" (if (:production? h) "error" "warn")
+                                           "\tvuln:pkg/" (:name h) "@" (:version h)
                                            "\t" (str/join " " (:ids h))
-                                           " — " (count (:repos h)) " repo: "
-                                           (str/join ", " (:repos h))))))
+                                           " — " (if (:production? h)
+                                                   (str "本番 " (count (:prod-repos h)) " repo: "
+                                                        (str/join ", " (:prod-repos h)))
+                                                   (str "開発時のみ、" (count (:repos h)) " repo"))))))
                          ;; 照会できなかった分も finding にする。沈黙した除外は
                          ;; 「脆弱性が無い」と同じ顔をする。
                          (when (and (some #{"--findings"} args)
@@ -365,6 +393,9 @@
                             " repos=" (:dependency/repos-scanned cov)
                             " manifests=" (:dependency/manifests-read cov)
                             " rows=" (:dependency/rows cov) "\n"
+                            ";; 本番=" (:dependency/production cov)
+                            " 開発時のみ=" (:dependency/development cov)
+                            " ← この 2 つを混ぜると triage を誤る\n"
                             ";; OSV に照会できる（version 確定）=" (:dependency/queryable cov)
                             " / できない（範囲のまま）=" (:dependency/not-queryable cov) "\n\n")
                 body (str header (pr-str datoms) "\n")]
