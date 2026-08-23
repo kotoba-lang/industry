@@ -1685,6 +1685,17 @@ kotoba-lang の web / local app UI は **1 文書・1 バンドル・1 mount** �
   ことも確かめる（これが無いと single page にした利益が無い）。
 - **例外は SSR/OG が必要な公開ページ**（ADR-2606290000）。app と marketing
   surface を同じ規則で縛らない。分けるなら理由を書く。
+- **もう 1 つの例外は「生きた credential の隣にある local 面」**（ADR-2608231200、
+  2026-08-23）。`kagi ui` は **bundle を 1 本も出さず**、server-rendered な 1 文書 +
+  `default-src 'none'` で建っている —— vault を開いた session の隣のページに対して
+  「この script に何ができるか」への一番安い正しい答えは *script が無いこと*だから。
+  失うのは mount だけ（1 操作 = 1 描き直し。loopback で数ミリ秒）で、この規則が守ろうと
+  している不変条件——1 文書・1 shell・1 stylesheet・views をデータから生成——は全部残る。
+  **これを「SPA 化し忘れ」として直さない。** 公開 app には従来どおり SPA 規則が効く。
+  ⚠ 同 ADR の実測: **`Referrer-Policy: no-referrer` を付けたページは、自分自身への
+  same-origin form POST に `Origin: null` を送る。** Origin を検査する POST 面を持つ
+  ページでこれを付けると全 action が拒否され、しかも HTTP client は test が渡した
+  Origin を送るので**テストは緑のまま**。`same-origin` にする。
 - **router はまだ共有ライブラリに無い。** 2 app が同型の `route.cljc`（約 60 行、
   view 表 + `fragment->view` + `nav` を pure に持ち、listener だけ `#?(:cljs)`）を
   各自持っている。**抽出の trigger は 3 つ目の app** —— routing は markup でも CSS

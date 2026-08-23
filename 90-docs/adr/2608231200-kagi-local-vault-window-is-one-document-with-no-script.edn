@@ -1,0 +1,122 @@
+[{:db/id -1
+  :adr/id "adr-2608231200-kagi-local-vault-window-is-one-document-with-no-script"
+  :adr/title "kagi's local vault window is one server-rendered document with no script"
+  :adr/status "accepted"
+  :adr/date "2026-08-23"
+  :adr/last-verified "2026-08-23"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kagi-vault-surfaces"
+  :adr/authoritative-for
+  ["kagi ui: the local vault window"
+   "zero-JavaScript local surfaces next to live credentials"
+   "Referrer-Policy vs the Origin header a form POST gate needs"]
+  :adr/related
+  ["90-docs/adr/2606272330-kagi-clj-pqc-vault.edn"
+   "90-docs/adr/2607230100-kagi-v050-architecture-closure.edn"
+   "90-docs/adr/2608080100-kotoba-lang-ui-is-a-single-page-app.edn"
+   "90-docs/adr/2608136000-five-questions-before-believing-a-check.edn"
+   "90-docs/adr/2608201300-jvm-new-surface-scaffold-guard.edn"
+   "orgs/kotoba-lang/kagi/src/kagi/ui.cljc"
+   "orgs/kotoba-lang/kagi/src/kagi/ui/server.cljc"
+   "orgs/kotoba-lang/kagi/src/kagi/ui/actions.cljc"]
+  :adr/body "Context
+
+`kagi` is this workspace's 1Password replacement, and until now it was a CLI
+and nothing else. Everything a vault does it already did — the one thing a
+terminal is worse at than a window is a LIST. `kagi.vault-read` had already
+written down why that list is safe to draw: enumerating your own items is
+what a password manager's list screen is, and it stays safe because listing
+does not decrypt. ADR-2607230100 recorded \"GUI device grant/revoke\" as a
+follow-up that was never a closure blocker, so the gap was known and named.
+
+The repo-wide UI rules point in two directions here. ADR-2608080100 makes
+the single-page app the kotoba-lang default: one document, one bundle, one
+mount, views as data, fragment routing. The base design system is jp-go-dds
+(owner decision 2026-08-05). Both apply. But the bundle does not: this page
+is served to a browser sitting next to a process that is holding an open
+vault, and a ClojureScript bundle is a large amount of code that a reviewer
+of a credential surface would have to read, or trust.
+
+Decision
+
+`kagi ui` serves ONE server-rendered document from 127.0.0.1, on jp-go-dds,
+with no JavaScript at all, and `Content-Security-Policy: default-src 'none'`
+saying so. Views are data (`kagi.ui/views`); the nav, the routing CSS and
+the redirect targets are all generated from that vector, so a view cannot
+exist without being reachable. Addressing is by fragment, and the stylesheet
+resolves \"no fragment\" the same way a router resolves an unknown one:
+`body:not(:has(.kagi-view:target))` shows the default.
+
+This is a scoped exception to ADR-2608080100, and the scope is the reason:
+LOCAL surfaces that sit next to live credentials. What is given up is the
+mount — an action posts a form and the document is drawn again, which over a
+loopback socket is milliseconds. What is kept is every invariant that rule
+exists to protect: one document, one shell, one stylesheet, no second
+bundle to drift onto a second design system, no view that looks live and is
+dead. Public marketing surfaces and full applications stay on the SPA rule.
+
+Three properties hold the surface together.
+
+1. The plaintext never reaches the browser. Copy reveals through the same
+   `kagi.operation` graph as `kagi get` — so the AccessGovernor sees it and
+   the hash-chained ledger records it, with purpose `:ui-copy` — and the
+   value goes from the JVM to the clipboard. It is not written into the page
+   and does not cross the socket. The browser is the largest attack surface
+   on the machine and is never handed a secret.
+
+2. Three independent gates, each refusing by its own name. The socket is
+   127.0.0.1 (an absence of route, not a check). A session cookie, obtained
+   by exchanging a one-time `?token=` for an HttpOnly SameSite=Strict cookie
+   and an immediate redirect to a bare `/`, so the token is not left in the
+   address bar or the history. And the same token again in the body of every
+   POST: the cookie proves the browser is the operator's, the form token
+   proves the page is ours. Refusals answer `no-session` / `bad-origin` /
+   `bad-form-token`, because a guard that returns one 403 for three failures
+   can be broken in one of them and go on passing its own tests
+   (ADR-2608136000, question 6).
+
+3. The server holds no vault. `kagi.ui.server` is handed three functions
+   (`kagi.ui.actions`) and binds a socket; `kagi.cli` opens the vault once,
+   where unlock already knows how to prompt. Revocation asks before it acts:
+   the list control is a link that changes nothing, and only the second
+   control is a POST.
+
+Measured, and the reason this ADR exists rather than a comment
+
+The page first went out with `Referrer-Policy: no-referrer`. A browser
+served that header sends `Origin: null` on its OWN same-origin form POSTs —
+so every Copy and every Revoke came back `bad-origin`, while the whole test
+suite stayed green, because an HTTP client sends whatever Origin the test
+hands it. Found by clicking the button in a real browser; confirmed against
+an echo server (`no-referrer` -> `Origin: \"null\"`, `same-origin` -> the real
+origin); fixed to `same-origin`; pinned by a test that fails if it is ever
+tightened back.
+
+This is the exact shape ADR-2608136000 is about, in a place it had not been
+looked for: not a check that could not run, but a check driven differently
+by the test than by reality. Anyone else in this workspace who sets
+`no-referrer` on a page that has a form and an Origin check will hit it.
+
+Consequences
+
+- `kagi ui` exists: Items (metadata only), Devices (with revoke), Vault
+  (unlock envelope and identity). ADR-2607230100's GUI follow-up is closed
+  for revocation; device GRANT stays on the CLI, because it is a two-machine
+  ceremony with a fingerprint read aloud and a window on one of them does
+  not help.
+- kagi takes a runtime dependency on jp-go-digital-design-system. With no
+  bundle, the design system IS the front end.
+- New source is `.cljc` (ADR-2608201300). The JVM half is marked with a
+  reader conditional rather than by file extension: request parsing is
+  portable and unit-tested without a socket; the socket is not portable,
+  because it has to live in the process that holds the JDK's PQC primitives.
+- Verified: 222 tests / 811 assertions, 0 failures; clj-kondo 0 errors.
+  Every guard was checked by breaking it and watching its own test fail —
+  including one that did NOT discriminate at first (the view-reachability
+  check found fragments in the routing CSS, so a view dropped from the nav
+  was still 'found'; it reads the <nav> element alone now).
+- Not done, and named rather than left implicit: no search or filter in the
+  item list, no item detail view, no kagitaba field rendering, no `kagi
+  fill` from the window, and no way to add or edit an item. All of those are
+  reveal-adjacent or write paths, and each deserves its own decision."}]
