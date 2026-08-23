@@ -161,32 +161,44 @@
                         ents))))]
     (vec (walk repo-root 0))))
 
+(def ^:private config-exts
+  #{".config.js" ".config.mjs" ".config.cjs" ".config.ts" ".config.json"})
+
 (defn- imported-anywhere?
-  "この repo の source が `nm` を **直接** import しているか。
+  "この repo の source が `nm` を **直接** 参照しているか。
 
-   ## これが答えない問い
+   ## 判定を広く取る理由
 
-   **推移依存の到達性には答えない。** 直接 import されていない推移依存でも、
-   親が使っていれば実行時には到達する。ここが答えるのは
-   『package.json が直接宣言しているのに、どのソースからも参照されていない』
-   という 1 つの形だけで、それ以外は `nil`（判定していない）を返す。
+   誤りの向きが対称でない。**『到達しうる』の偽陽性は triage が 1 件増えるだけ**
+   だが、**『未使用』の偽陰性は「削除してよい」と言うので repo を壊す。**
+   だから曖昧なら参照ありに倒す。
 
-   実測 2026-08-23 (`cloud-itonami/media`): `kysely` は `dependencies` に在り
-   HIGH 3 件を持つが、import しているファイルは **0 件**、脆弱 API の使用も 0 件、
-   さらに `media.itonami.cloud` は DNS が解決しない。到達性を測らずに
-   『HIGH×3・本番』だけを見れば 0.27→0.28 の major bump をかけるところだった。
-   正しい是正は使っていない依存を外すことだった。
+   実測 2026-08-23、初版はここを狭く書いて **3 件すべてを誤判定した**:
 
-   照合は字句的で近似である —— 動的 `require(name)` や re-export 経由は拾えない。
-   したがって **false は『使っていない』の証明ではなく『直接参照が見当たらない』**
-   であり、finding にはそう書く。"
+     postcss              `postcss.config.mjs` 経由（import 文が無い）
+     xlsx                 `[\"xlsx$default\" :as XLSX]` — shadow-cljs の `$` 接尾辞
+     @hono/node-server    `[\"@hono/node-server\" :refer [serve]]` — cljs の vector 形
+
+   初版の正規表現は `require(` / `from ` / `import ` / `[\"` を前置に要求していた。
+   cljs の `[\"name\" :as x]` は `[` の直後が名前なので `[\"` + 引用符という前置条件に
+   当たらず、`$default` は名前の直後が `/` でないので当たらなかった。
+
+   いまは **引用符で囲まれた module 指定子として名前が現れるか**だけを見る
+   （`\"name\"` / `\"name/sub\"` / `\"name$default\"`）。コメントや docstring にも
+   当たりうるが、それは安全な向きの誤りである。
+
+   加えて `*.config.*` にファイル名として現れる場合も参照とみなす —— postcss /
+   tailwind / vite の plugin はコードから import されず設定に名前が書かれる。
+
+   したがって **false は『使っていない』の証明ではなく『参照が見当たらない』**。"
   [repo-root nm]
-  (let [pat (re-pattern (str "(?:require\\(|from\\s+|import\\s+|\\[\")[\"']"
-                             (str/replace nm #"[.*+?^${}()|\[\]\\]" "\\$&")
-                             "(?:/[^\"']*)?[\"']"))]
-    (boolean (some (fn [f]
-                     (when-let [t (read-safe f)] (re-find pat t)))
-                   (source-files repo-root)))))
+  (let [esc (str/replace nm #"[.*+?^${}()|\[\]\\]" "\\$&")
+        pat (re-pattern (str "[\"']" esc "(?:[/$][^\"']*)?[\"']"))
+        files (source-files repo-root)
+        configs (filter (fn [f] (some #(str/ends-with? f %) config-exts)) files)]
+    (boolean (or (some (fn [f] (when-let [t (read-safe f)] (re-find pat t))) files)
+                 ;; 設定ファイルは名前を裸で書くことがある（plugin 名など）
+                 (some (fn [f] (when-let [t (read-safe f)] (str/includes? t nm))) configs)))))
 
 (defn- declared-directly?
   "この repo のどれかの package.json が `nm` を直接宣言しているか。
@@ -457,9 +469,20 @@
                (fs/mkdirSync (path/dirname f) #js {:recursive true})
                (fs/writeFileSync f content)))]
     (try (fs/rmSync dir #js {:recursive true :force true}) (catch :default _ nil))
+    ;; 2026-08-23 に実際に外した 3 形式を必ず含める。初版はこの 3 つを
+    ;; すべて `unused-direct`（= 削除してよい）と誤判定し、どれも使われていた。
     (w! "package.json" (js/JSON.stringify
-                        (clj->js {"dependencies" {"used-pkg" "^1.0.0" "unused-pkg" "^2.0.0"}})))
+                        (clj->js {"dependencies" {"used-pkg" "^1.0.0" "unused-pkg" "^2.0.0"
+                                                  "cljs-vector-pkg" "^1.0.0"
+                                                  "shadow-suffix-pkg" "^1.0.0"
+                                                  "config-only-pkg" "^1.0.0"}})))
     (w! "src/app.ts" "import { thing } from \"used-pkg\";\nexport const x = thing;\n")
+    ;; cljs の vector import —— `[` の直後が名前で、初版の前置条件に当たらなかった
+    (w! "src/ns.cljs" "(ns a (:require [\"cljs-vector-pkg\" :refer [serve]]))\n")
+    ;; shadow-cljs の `$default` 接尾辞 —— 直後が `/` でないので当たらなかった
+    (w! "src/sc.cljs" "(ns b (:require [\"shadow-suffix-pkg$default\" :as X]))\n")
+    ;; 設定ファイル経由 —— import 文がそもそも無い
+    (w! "postcss.config.mjs" "export default { plugins: { \"config-only-pkg\": {} } };\n")
     ;; 直接宣言されていない = 推移依存。import されていても :transitive のまま。
     (w! "src/other.ts" "const y = require(\"transitive-pkg\");\n")
     (let [rel (str/replace dir (str root "/") "")
@@ -469,14 +492,20 @@
                     (if (imported-anywhere? dir nm) :direct-and-imported :unused-direct)
                     :transitive))
           r1 (probe "used-pkg") r2 (probe "unused-pkg") r3 (probe "transitive-pkg")
+          r4 (probe "cljs-vector-pkg") r5 (probe "shadow-suffix-pkg") r6 (probe "config-only-pkg")
           missing (reachability "orgs/does-not-exist-xyz" "anything")
           ok (and (= :direct-and-imported r1) (= :unused-direct r2)
-                  (= :transitive r3) (= :unknown missing))]
+                  (= :transitive r3) (= :unknown missing)
+                  (= :direct-and-imported r4) (= :direct-and-imported r5)
+                  (= :direct-and-imported r6))]
       (println "reachability selftest")
       (println (str "  (1) 宣言あり + import あり -> " (name r1)))
       (println (str "  (2) 宣言あり + import なし -> " (name r2) "  ← 是正は bump ではなく削除"))
       (println (str "  (3) 宣言なし（推移依存）   -> " (name r3) "  ← 『到達しない』とは言わない"))
       (println (str "  (4) checkout が無い         -> " (name missing) "  ← 測れていないと申告"))
+      (println (str "  (5) cljs [\"name\" :refer …]      -> " (name r4) "  ← 初版はここを外した"))
+      (println (str "  (6) shadow-cljs name$default     -> " (name r5) "  ← 初版はここを外した"))
+      (println (str "  (7) *.config.* に名前だけ         -> " (name r6) "  ← 初版はここを外した"))
       (println (if ok "  SELFTEST PASS" "  SELFTEST FAIL"))
       (try (fs/rmSync dir #js {:recursive true :force true}) (catch :default _ nil))
       ok)))
@@ -484,6 +513,16 @@
 (defn -main [& args]
   (when (some #{"--selftest-reachability"} args)
     (js/process.exit (if (selftest-reachability!) 0 1)))
+  ;; `--probe <repo-path> <package>` — 1 件の到達性をその場で引く。
+  ;; triage の実務で「この repo でこの package は本当に使われているか」を
+  ;; 全走査なしに確かめられる必要がある（全 tree 走査は 20 分超）。
+  (when-let [i (first (keep-indexed #(when (= "--probe" %2) %1) args))]
+    (let [repo (nth args (inc i) nil) pkg (nth args (+ i 2) nil)]
+      (if (and repo pkg)
+        (do (println (str repo "  " pkg "  -> " (name (reachability repo pkg))))
+            (js/process.exit 0))
+        (do (js/console.error "usage: --probe <repo-path> <package>")
+            (js/process.exit 2)))))
   (let [all? (some #{"--all"} args)
         osv? (some #{"--osv"} args)
         repos (if all?
