@@ -111,13 +111,25 @@
 ;; ── npm ────────────────────────────────────────────────────────────────────
 
 (defn- from-package-lock
-  "package-lock.json v2/v3 の `packages` は **確定版** を持つ。ここが最優先。"
+  "package-lock.json v2/v3 の `packages` は **確定版** を持つ。ここが最優先。
+
+   ⚠ **`node_modules/` を含む key だけを読む。** `packages` の key `\"\"` は
+   *そのプロジェクト自身* であり、workspace の member も同様に素の path を key に
+   持つ。初版は `(get v \"name\")` を無条件に採っていたので、プロジェクト自身が
+   依存として出ていた。実測 2026-08-23、全 tree 走査の『最優先』上位 2 件が
+   それだった:
+
+     orgs/cloud-itonami/cloud-itonami-isic-7210/svelte/   → `svelte@0.0.0`（勧告 8 件）
+     orgs/com-junkawasaki/webmaster/                      → `astro@0.0.1`（勧告 17 件）
+
+   どちらも npm の svelte / astro ではなく、**たまたまその名前のディレクトリ**で、
+   version 欄が無いので 0.0.0 になり、OSV の『N 未満が該当』範囲に全部当たっていた。
+   package の名前と version を、published package の名前と version と取り違えている。"
   [file rel]
   (when-let [m (read-json file)]
     (keep (fn [[k v]]
-            (let [nm (or (get v "name")
-                         (when (str/includes? k "node_modules/")
-                           (last (str/split k #"node_modules/"))))
+            (let [nm (when (str/includes? k "node_modules/")
+                       (or (get v "name") (last (str/split k #"node_modules/"))))
                   ver (get v "version")]
               (when (and nm ver (seq nm) (not (get v "link")))
                 ;; npm が既に計算した `dev` をそのまま運ぶ。ここを落とすと
