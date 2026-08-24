@@ -2283,6 +2283,25 @@
   ;; あって west pin を進める根拠ではない。
   {:name "kotoba-native" :id "kotoba-native-jvm-test" :gate :jvm-test :cap :jvm :cd false}
   {:name "kotoba-kir" :id "kotoba-kir-jvm-test" :gate :jvm-test :cap :jvm :cd false}
+  ;; kotoba.kir is `.cljc` and claims two runtimes; until 2026-08-24 every test
+  ;; in that repository was `.clj` and `:jvm-test` above was its only gate, so
+  ;; the `:cljs` branches had never been executed by anything. One of them was
+  ;; missing a guard the `:clj` branch had: a host stack overflow inside the
+  ;; constant oracle came out of `lower` as a raw `RangeError` instead of the
+  ;; `:fuel-exhausted` trap the JVM produces, for the same program.
+  ;;
+  ;; It surfaced from amu, not from here — `lazy-sequence` lowers on nbb
+  ;; 1.4.210 and raises on 1.5.212 — which is the shape this whole gate family
+  ;; exists for (root ADR-2608730000).
+  ;;
+  ;; :ship-git-deps because the suite loads kotoba-hir, security,
+  ;; io-multiformats and dag-cbor at the pinned shas. Verified on the gate's
+  ;; own resolved classpath and entry under the pinned nbb 1.4.210: 3 tests /
+  ;; 8 assertions / 0 failures, and the same on 1.5.212. Neutralising the new
+  ;; guard turns BOTH red.
+  {:name "kotoba-kir" :id "nbb-cross-runtime-kotoba-kir" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "kotoba-verifier" :id "kotoba-verifier-jvm-test" :gate :jvm-test :cap :jvm :cd false}
 
   ;; The two layers under those three. Added 2026-08-20 after porting code in
