@@ -1,0 +1,80 @@
+[{:db/id -1
+  :adr/id "adr-2608241600-status-murakumo-cloud-measured-status-page"
+  :adr/title "status.murakumo.cloud — measured status page (uptime statement, not assertion)"
+  :adr/status "accepted"
+  :adr/date "2026-08-24"
+  :adr/related "ADR-2607257000 ADR-2608039000 ADR-2608080100 ADR-2608231200"
+  :adr/body "## Decision
+
+status.claude.com のような status page を murakumo.cloud に建てる。ただし assert 型
+（『all systems operational』と書いてあるだけのページ）ではなく、`kotoba-lang/uptime`
+の statement 型 — 表示される全ての数値・文章・verdict は測定時に固定され、page は
+それを描画するだけで何も判断しない。
+
+実装は `network-awai/cloud-murakumo`（murakumo.cloud zone の所有 repo）に着地:
+
+- **prober** `scripts/status-probe.cljs`（nbb、operator マシン、launchd
+  `deploy/com.gftd.murakumo-status-probe.plist`、5 分毎）。Cloudflare の外から
+  `https://murakumo.cloud/` / `https://api.murakumo.cloud/health` /
+  `https://api.murakumo.cloud/infer/models/murakumo-main` を叩く。先例は
+  `cloud-itonami-isic-6311-identity/scripts/probe.cljs`（同型）。
+- **観測列**（正本、append-only）: `~/.gftd/murakumo-status/observations.edn`。
+  測定・イベント列なので append-only 例外クラス（ADR-2607257000）。
+- **statement**: 毎 tick `uptime.core/statement`（24h window、expected =
+  window/interval）+ `describe` + `slo-verdict`（0.999）を計算し、KV
+  （STATUS_KV、key `statement`）へ wrangler CLI（operator の既存 OAuth）で publish。
+  **prober は新しい secret を持たず、公開 ingest endpoint も作らない。**
+- **page** `murakumo-status` Worker（`wrangler.status.jsonc`、
+  `status_worker.cljs` + 純 view `status.cljc`、shadow-cljs `:status-worker`
+  build）。route `status.murakumo.cloud`（custom_domain）。KV を読んで
+  server-render。zero scripts、CSP `default-src 'none'`、Referrer-Policy
+  `same-origin`（no-referrer は Origin: null を作る — ADR-2608231200）。
+  design system は DADS（jp-go-dds、`page/->page` + `shadow.resource/inline`
+  で dds.css を bundle に焼く）。
+
+## page が拒否すること（uptime.core の 3 区別の描画側）
+
+- **Unobserved is not up**: statement が無い/読めない → 『No statement published』。
+  緑には構造的になれない（malformed doc は valid-doc? で :no-statement に落ちる）。
+- **stale は current ではない**: generated-at が 3 probe interval より古いと
+  『Prober silent』warning banner に切り替え、緑 banner を取り下げる — prober が
+  静かに死んだ瞬間が、page が最も良く見える瞬間であってはならない。
+- overall banner は per-target status から worst-first で導出。手置きの値は無い。
+
+## premise / projection（削除・再構築テスト）
+
+- STATUS_KV は **projection**: 消しても page が『no statement』に退行するだけで、
+  次 tick が観測列から再構築する。正しさは失われない（ADR-2608039000 と同じ基準）。
+- 観測列ファイルが正本。page はそれに対する公開 projection。
+
+## 独立性
+
+status page は本体 worker（murakumo-cloud）と **別 worker・共有 binding 無し** —
+報告対象に同乗した status page は、対象が落ちた時に何も言えない。残る結合は
+同一 Cloudflare account（受容。完全な外部化は statuspage ベンダ相当の別インフラが
+要り、現段階では過剰）と、prober が operator マシン 1 台であること（coverage が
+それを正直に申告する。fleet ノードへの多重化は follow-up）。
+
+## SPA 規則との関係
+
+server-rendered 1 文書・zero scripts は ADR-2608080100 の SSR/OG 公開ページ例外側。
+status page は『他が全部壊れている時に描画できる』『curl で読める』が要件なので
+bundle を持たない側が正しい（kagi ui / ADR-2608231200 と同型の判断）。
+
+## 検証（実測）
+
+- `npm run test:status`（nbb、4 tests / 15 assertions）: overall の worst-first、
+  stale 3-interval 境界（2 は許容・4 で撤回）、緑 banner が fresh+all-available
+  以外に出ないこと、incident detail（observed content）の HTML escape。
+  discriminate 確認済み: stale? を壊すと 3 FAIL / exit 1、戻すと 0 FAIL。
+- prober 実走: 3 target とも :up を観測、statement 生成、coverage 0.347%
+  （観測 1 本目）を正直に表示することを確認。
+- deps.edn の jp-go-dds pin を 32f542b → dc4602d（main tip、到達可能）へ前進
+  （旧 sha には page.cljc が無く API が存在しなかった。pin 既定 tip 規則 2026-08-20）。
+
+## 決めなかったこと / follow-up
+
+- 90 日 history 表示（現状 24h window のみ。観測列は append-only なので後から出せる）
+- prober の fleet ノード多重化（現状 operator 1 台、coverage が申告）
+- 観測列の rotation（~316k 行/年。当面問題にならない）
+- status.murakumo.cloud 自身を prober の target に足すこと"}]
