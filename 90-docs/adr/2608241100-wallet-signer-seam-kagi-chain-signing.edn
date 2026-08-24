@@ -111,6 +111,12 @@
      deps に wallet を追加（btc / eth-crypto は wallet 自身の pin 経由 —— crypto 機構の
      version truth を 1 本化）。新規 6 tests / 14 assertions、フルスイート 244 tests /
      888 assertions 緑。
+   - `cloud-itonami/cloud-itonami-app` merge `51579336a0bf3bebeae085b8c91f83688e20434d`:
+     **決定 6 実装済み** —— `connect-kagi-signer!` が外部 wallet と同一の one-use
+     SIWE challenge/verify 経路を歩き、link は :custody（既定 :external-wallet）と
+     :kagi の場合の BIP-44 :derivation-path を記録。custody は assignment と bot
+     container に伝播し、unassign で出生既定へ戻る。wallet pin を 34efd046 へ前進。
+     フルスイート 1849 tests / 11022 assertions 緑。
 
    ## 正直に言うべきこと
 
@@ -123,8 +129,11 @@
    - **staged 10 チェーンの実装順**は需要駆動。sol / trx / xrp は既存機構の組合せで安い
      （ed25519 は kagi が JDK で保有、SLIP-0010 が要る）。ada / dot / xmr は非標準
      暗号のためレビュー済み実装を呼ぶこと（自前実装禁止 —— ADR-2608039900 と同じ線）。
-   - **itonami の :custody :kagi 配線（決定 6）は未実装**。cloud-itonami-app の
-     wallet.clj は本 ADR 時点で無変更。
+   - **itonami の UI/API surface は未拡張**（決定 6 の domain 層は着地済み、上記）。
+     snapshot の要約フィールド（:custody / :sign-and-submit）は従来の
+     external-wallet 既定の記述のままで、web UI に kagi 接続の操作面はまだ無い ——
+     `connect-kagi-signer!` は CLI / bot 層から呼ぶ。transfer の署名・broadcast も
+     従来どおり外部 wallet（kagi 署名での送信は nonce 直列化と RPC 経路が先）。
    - **saifu.tx / sign / broadcast（Cosmos）も未実装のまま**（saifu 自身の計画どおり）。
      kagi.chain-signer は secp256k1 digest 署名なので、saifu.sign が SIGN_MODE_DIRECT の
      正準 sign-doc digest を作れば同じ seam に載る。
