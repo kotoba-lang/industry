@@ -7,16 +7,32 @@
 ;;
 ;; ## What it is about
 ;;
-;; Measured 2026-08-24 across three nbb versions, the same expression each time:
+;; Measured 2026-08-24 across three nbb versions:
 ;;
 ;;     ((fn [] (/ 1.0 -0.0)))    1.4.208 ##-Inf   1.4.210 ##-Inf   1.5.212 ##Inf
 ;;
-;; A `-0.0` LITERAL inside a function body reads back as +0.0 under SCI on
-;; nbb 1.5.212. The same literal at the top level, behind a top-level `def`,
-;; or COMPUTED with `(- 0.0)` or `(* -1.0 0.0)` keeps its sign on every
-;; version tested. It is a reader/analyzer regression between 1.4.210 and
-;; 1.5.212 -- not a permanent property of the runtime, and not something the
-;; JVM has ever got wrong.
+;; A `-0.0` literal loses its sign under SCI on nbb 1.5.212 when the analyzer
+;; treats it as an EXPRESSION inside a function body. 1.4.208 and 1.4.210 get
+;; every shape right, and the JVM always has: this is a regression between
+;; 1.4.210 and 1.5.212, not a property of the runtime.
+;;
+;; The first version of this file said "inside a function body", which was too
+;; broad and was wrong about two of its own nine findings. The measured split,
+;; all inside a `(fn [] ...)` on 1.5.212:
+;;
+;;   loses the sign   direct argument to a call, `let` binding value, returned
+;;                    bare, argument to `(list ...)`, `#()` body
+;;   keeps the sign   inside a `[...]` or `{...}` data literal, and anything
+;;                    COMPUTED -- `(- 0.0)`, `(* -1.0 0.0)`
+;;
+;; At the top level every shape keeps its sign.
+;;
+;; That split cannot be decided by scanning: `(let [z -0.0] ...)` has `[` as
+;; its innermost delimiter and still loses the sign, while `[1.0 -0.0]` has
+;; the same delimiter and does not. So this reports every code-position
+;; literal and does not pretend to know which ones are live -- see
+;; `runtime-verdict` below, which asks the nbb actually running instead of
+;; repeating a measurement.
 ;;
 ;; It had two live victims the day it was found, in two repositories that had
 ;; no idea they shared a bug:
@@ -63,7 +79,8 @@
 ;;      Distinct from 0 on purpose: a run that could not look must not report
 ;;      the same value as a run that looked and found nothing.
 
-(require '["node:fs" :as fs]
+(require '[nbb.core]
+         '["node:fs" :as fs]
          '["node:path" :as path]
          '["node:child_process" :as cp]
          '[clojure.string :as str])
@@ -145,6 +162,41 @@
                    (conj hits {:line line :depth depth}))
 
             :else (recur (inc i) line depth false false hits)))))))
+
+;; ---------------------------------------------------------------------------
+;; Ask THIS nbb, rather than repeating a measurement.
+;;
+;; CLAUDE.md's own rule about the fleet's egress: do not write the measured
+;; value down, write how to measure it -- whoever quotes it will drop the date.
+;; A detector whose whole subject is a version-dependent regression is the
+;; worst place to hard-code "1.5.212 is broken". If a later nbb fixes this,
+;; the run says so on its own.
+;; ---------------------------------------------------------------------------
+
+(defn- negative? [x] (neg? (/ 1.0 x)))
+
+(defn- runtime-verdict
+  "Which of the two shapes this nbb gets right, measured now.
+
+   `:expression` is a literal the analyzer evaluates inside a function body;
+   `:data-literal` is one sitting in a vector. Both must come back negative."
+  []
+  (let [expression ((fn [] (identity -0.0)))
+        data-literal ((fn [] (first [-0.0])))]
+    {;; `nbb.core/version` is the interpreter RUNNING this file. Shelling out
+     ;; to `nbb --version` reports whatever is first on PATH, which on this
+     ;; workstation is 1.4.208 while the probe just above may have run under a
+     ;; different interpreter entirely. That is not hypothetical: the first
+     ;; version of this function printed
+     ;;
+     ;;     RUNTIME nbb v1.4.208  expression-in-fn-body=LOSES-SIGN
+     ;;
+     ;; which is false about 1.4.208 and true about the nbb that ran it.
+     ;; A version that does not belong to the measurement beside it is the
+     ;; same defect this whole detector is about.
+     :version (str (nbb.core/version))
+     :expression-keeps-sign? (negative? expression)
+     :data-literal-keeps-sign? (negative? data-literal)}))
 
 ;; ---------------------------------------------------------------------------
 ;; Self-check. The first scanner written here called `subs` with one index,
@@ -231,6 +283,13 @@
   (println (str "SCANNED\t" scanned "\ttracked .cljc/.cljs across "
                 (count dirs) " checkout(s); self-check " checked "/"
                 (count self-check-cases) " cases"))
+  (let [{:keys [version expression-keeps-sign? data-literal-keeps-sign?]} (runtime-verdict)]
+    (println (str "RUNTIME\t" version
+                  "\texpression-in-fn-body=" (if expression-keeps-sign? "correct" "LOSES-SIGN")
+                  " data-literal-in-fn-body=" (if data-literal-keeps-sign? "correct" "LOSES-SIGN")
+                  (if (and expression-keeps-sign? data-literal-keeps-sign?)
+                    " -- this nbb reads every shape correctly, so the findings below are latent, not live"
+                    " -- findings below in an expression position are LIVE on this nbb"))))
   (when (pos? (count unreadable))
     (println (str "UNREADABLE\t" (count unreadable)
                   "\tfiles git listed but could not be read")))
@@ -248,9 +307,9 @@
            (str "negative-zero-literal:" (rel file) ":" line)
            (str "`-0.0` literal at depth " depth
                 (if (<= depth 1)
-                  " (top level -- correct today, and silently wrong the moment it is inlined into a function)"
-                  " (inside a called form -- reads as +0.0 on nbb 1.5.212)")
-                ". Write `(- 0.0)`."))))
+                  " (top level -- every nbb reads this correctly, and it stops being correct the moment someone inlines it into a function)"
+                  " (inside a form -- live or latent depending on whether the analyzer evaluates it as an expression; see the RUNTIME line)")
+                ". Write `(- 0.0)`, which is correct on every runtime and in every position."))))
       (println (str (count hits) " `-0.0` literal(s) in code position across "
                     (count (distinct (map :file hits))) " file(s)."))
       (js/process.exit 1))))
