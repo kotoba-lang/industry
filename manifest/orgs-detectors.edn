@@ -891,7 +891,43 @@
    :interval-ms 86400000                 ; 24h
    :timeout-ms  600000                   ; 10m -- 18x the worst measured runtime
    :writes   :none
-   :measured "2026-08-17 on this machine: 44s standalone (34s before it began reading
+      :corrected "2026-08-24: it was reading PROSE as code. `names-mentioned` ran over the
+              whole file, so a namespace explained in a `;;` comment or named in a
+              docstring or a `println` counted as required -- and `runner-loaded-not-run`
+              is exactly `mentioned AND NOT run`, so every one of its five findings was a
+              runner being blamed for the paragraph explaining why it leaves a namespace
+              out. `ongakuka/test/run_portable.cljs` never requires
+              `ongakuka.catalog-test` at all; it spends fourteen lines saying why it
+              cannot, and that was the evidence against it.
+
+              Comments are stripped for every question; STRINGS are stripped only for
+              `names-mentioned`. The two differ: what a runner RUNS can legitimately live
+              in a string (etzhayyim/root's akashi runner builds its `run-tests`
+              expression as one and hands it to a child process, and this file already
+              records that reading only the reader-macro form reported all five of its
+              genuinely-run namespaces as never run). What a runner REQUIRES cannot.
+
+              The one-hop BFS through aggregator namespaces read unstripped text too, and
+              had to be fixed separately -- the first pass looked correct on four repos
+              and left langgraph reporting, which is how that second site was found.
+
+              Effect: runner-loaded-not-run 5 -> 2, suite-uncovered 10 -> 13. The three
+              that moved are genuinely covered by no runner, which is the true statement
+              about them.
+
+              Both directions on real data, not synthetic: with the mention only in a
+              comment ongakuka reports suite-uncovered 1 / loaded-not-run 0; adding a real
+              `(require '[ongakuka.catalog-test])` to the runner without running it puts
+              it back to loaded-not-run 1.
+
+              The two that remain are worth knowing apart. `langgraph` is the best version
+              of this pattern in the workspace: `runner_coverage_test.cljc` holds an
+              `excluded` map giving the reason AND a `:still-contains` substring that must
+              still be present in the named source, so a stale exclusion fails the test.
+              It is named in code and therefore still reported -- teaching this detector to
+              recognise a declared, re-checked exclusion is the open item, not a fix to
+              langgraph. `net-kotobase/control-plane` is unexamined."
+:measured "2026-08-17 on this machine: 44s standalone (34s before it began reading
               package.json and deps.edn per project), 45s under the tick, over
               4,163 of 4,184 registered
               checkouts, 201 repos in scope (a ClojureScript runner AND at least one

@@ -163,12 +163,89 @@
 
 (def ns-token-re #"[a-zA-Z][a-zA-Z0-9._<>*+!?-]*")
 
+(declare strip-strings)
+
 (defn names-mentioned
-  "Every namespace-shaped token in `text`. Deliberately over-inclusive: it is
-   used only to answer 'is this namespace named here at all', where a false
-   positive makes the check quieter, never louder."
+  "Every namespace-shaped token in the CODE of `text` -- comments already gone
+   before this sees it, and strings removed here.
+
+   \"Deliberately over-inclusive\" is what this said until 2026-08-24, on the
+   reasoning that a false positive only makes the check quieter. That is true
+   for `suite-uncovered` and FALSE for `runner-loaded-not-run`, which is
+   exactly `mentioned AND NOT run` -- there, a name that appears only in prose
+   becomes a defect report against a runner that never mentioned it in code.
+   All five findings in that class were this: `ongakuka/test/run_portable.cljs`
+   never requires `ongakuka.catalog-test`, explains at length why it cannot,
+   and the explanation was what got counted.
+
+   Strings are stripped HERE and not in `code-only`, because the two questions
+   differ. What a runner RUNS can legitimately live in a string --
+   `etzhayyim/root`'s akashi runner builds its `run-tests` expression as one
+   and hands it to a child process. What a runner REQUIRES cannot: a namespace
+   named in a docstring or a `println` is prose about the code, not the code."
   [text]
-  (set (re-seq ns-token-re (or text ""))))
+  (set (re-seq ns-token-re (strip-strings (or text "")))))
+
+(defn- strip-strings
+  "`text` with string literals removed. Character literals are skipped first so
+   that a backslash-quote is not read as opening one."
+  [text]
+  (let [n (count text)]
+    (loop [i 0 in-string? false out []]
+      (if (>= i n)
+        (apply str out)
+        (let [c (subs text i (inc i))]
+          (cond
+            in-string?
+            (cond
+              (= c "\\") (recur (+ i 2) true out)
+              (= c "\"") (recur (inc i) false (conj out " "))
+              :else (recur (inc i) true out))
+
+            (= c "\\") (recur (+ i 2) false (conj out " "))
+            (= c "\"") (recur (inc i) true out)
+            :else (recur (inc i) false (conj out c))))))))
+
+(defn- code-only
+  "`text` with `;` line comments removed, strings left alone.
+
+   Every extraction below reads the file as text, and until 2026-08-24 it read
+   the COMMENTS too. That produced five findings, all false, in the
+   `runner-loaded-not-run` class -- a runner that explains in a comment why it
+   leaves a namespace out was reported as requiring it and forgetting to run
+   it. `ongakuka/test/run_portable.cljs` is the clearest: it never requires
+   `ongakuka.catalog-test` at all, it explains at length why it cannot, and
+   that explanation is what the detector counted.
+
+   Strings are deliberately KEPT. `etzhayyim/root`'s akashi runner builds its
+   `run-tests` expression AS A STRING and hands it to a child process -- the
+   comment on `quoted` below records that reading only the reader-macro form
+   reported all five of its genuinely-run namespaces as never run. Stripping
+   strings would put that back."
+  [text]
+  (let [n (count text)]
+    (loop [i 0 in-string? false out []]
+      (if (>= i n)
+        (apply str out)
+        (let [c (subs text i (inc i))]
+          (cond
+            in-string?
+            (if (= c "\\")
+              (recur (+ i 2) true (conj out c (subs text (inc i) (min n (+ i 2)))))
+              (recur (inc i) (not= c "\"") (conj out c)))
+
+            ;; A character literal: `\;` is not a comment, `\"` is not a string.
+            (= c "\\") (recur (+ i 2) false (conj out c (subs text (inc i) (min n (+ i 2)))))
+
+            (= c "\"") (recur (inc i) true (conj out c))
+
+            (= c ";")
+            (let [nl (.indexOf text "\n" i)]
+              (if (neg? nl)
+                (apply str out)
+                (recur nl false out)))
+
+            :else (recur (inc i) false (conj out c))))))))
 
 (defn run-targets
   "The namespaces a runner actually RUNS.
@@ -269,7 +346,12 @@
             rels (map #(.relative node-path abs %) files)
             by-rel (zipmap rels files)
             clj-family (filter #(re-find #"\.clj[sc]?$" %) rels)
-            texts (into {} (map (fn [r] [r (read-text (by-rel r))]) clj-family))
+            ;; Comment-stripped, at the ONE point every later question reads
+            ;; from. `ns-of`, `has-deftest?`, `runner?`, `run-targets` and
+            ;; `names-mentioned` all consume this map, and each of them was
+            ;; reading prose. See `code-only`.
+            texts (into {} (map (fn [r] [r (some-> (read-text (by-rel r)) code-only)])
+                                clj-family))
             ;; Classification is by CONTENT, not by filename. Measured
             ;; 2026-08-17 across the registered checkouts, `.cljc`/`.cljs`
             ;; files under a test directory come in at least six name shapes:
@@ -351,7 +433,16 @@
                               (let [seen' (into seen frontier)
                                     next-txt (keep (fn [[n rr]]
                                                      (when (and (frontier n) (not (seen n)))
-                                                       (read-text (by-rel rr))))
+                                                       ;; Comment-stripped like
+                                                       ;; `texts`: this hop
+                                                       ;; reads files that are
+                                                       ;; not runners, and a
+                                                       ;; namespace named in
+                                                       ;; their prose was
+                                                       ;; reaching the loaded
+                                                       ;; set through here.
+                                                       (some-> (read-text (by-rel rr))
+                                                               code-only)))
                                                    expected)
                                     grown (reduce into #{} (map names-mentioned next-txt))]
                                 ;; `set`, not the bare `remove` seq: the next
