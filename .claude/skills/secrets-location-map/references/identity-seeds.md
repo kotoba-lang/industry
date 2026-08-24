@@ -43,7 +43,24 @@
   - **投入先**: dispatch namespace `ai-gftd-repository-dispatch` の user Worker の
     `KOTOBASE_SECRET_KEY`。現時点で `cloud-itonami-isic-0111` のみ。
 
-## hyakka (wiki.kotobase.net) identity seed — 2026-08-15 に消えた
+## hyakka (wiki.kotobase.net) identity seed — 2026-08-15 に消え、2026-08-24 に v2 へ migration 済み
+
+- ✅ **2026-08-24: `hyakka-kotobase-seed` は新しい 32-byte seed で再作成済み**（この端末の
+  kagi、compartment `personal`、item 名は同じ）。**新 tenant DID =
+  `did:key:z6MkwF7M3TPYUvdNP5NtWfr6aA2xtr7dsETCwx26fnVamjQo`**。旧 seed の復元経路は
+  全て尽きた上での migration（vault.edn.bak は 7/19 で mint 7/31 より古い、kagi cloud
+  同期の最終 push は 7/25、APFS/TimeMachine snapshot 無し、fleet ノードに vault 無し、
+  vault ledger は item 名を持たない）。git の全 knowledge ledger（正本）を新 DID の
+  graph へ全量 re-publish して可視化を回復した — 情報損失はゼロ、失ったのは旧 graph の
+  identity 継続性のみ。
+- **旧 DID `did:key:z6MkuEj8M1GKrAqW8ZsenbickiLvpfzJFLpNpxgyggcm1DKv` の graph は
+  orphan**（append-only のまま残る。誰も書けない・resident の published.edn 追跡外）。
+- ⚠ **resident（別ホストで稼働中）はこの端末の kagi を読めない** — vault は 7/25 から
+  同期されておらず端末間で分岐している。resident の publish を復帰させるには、その
+  ホストの kagi に同じ item を登録するか `kagi push`/`pull` の同期判断が要る
+  （push は last-writer-wins なので相手 vault の内容確認が先）。
+
+### 旧記録（2026-08-15 の消失時点、経緯として保存）
 
 - ⚠ **`hyakka-kotobase-seed` は 2026-08-15 13:00 UTC 時点で kagi に存在しない**
   （`KAGI_HOME=$HOME/.kagi` で `no such item`）。**同じ乖離の 4 例目**
