@@ -84,6 +84,18 @@
 ;; one this detector also probes and expects to lower -- so a control that
 ;; stops lowering shows up as its own finding rather than silently disarming
 ;; the probes that lean on it.
+;;
+;; Two rules, both learned by breaking them:
+;;
+;;   ONE form, not two. The first `set-literal` entry read
+;;   `(if (contains? #{1 2} 1) 1 0)` against `(if (= 1 1) 1 0)`. That changes
+;;   the set literal AND `contains?`, so its rejection could belong to either,
+;;   and it was reported as drift in the set literal. A keyword set lowers.
+;;
+;;   The SAME value types on both sides. `#{1 2}` is rejected with
+;;   `expected keyword, got i64` before any operation on it is considered, so
+;;   a probe built on one measures the element type and calls the answer
+;;   something else.
 ;; ---------------------------------------------------------------------------
 
 (def corpus
@@ -91,8 +103,8 @@
     "(defn n [v :vector-i64] :i64 (count v)) (defn main [] :i64 (n [1 2]))"
     "(defn n [v :vector-i64] :i64 (nth v 0)) (defn main [] :i64 (n [1 2]))"]
    ["contains?"
-    "(defn f [m :map] :bool (contains? m :a)) (defn main [] :i64 (if (f {:a 1}) 1 0))"
-    "(defn f [m :map] :bool (= (get m :a 0) 1)) (defn main [] :i64 (if (f {:a 1}) 1 0))"]
+    "(defn main [] :i64 (let [s #{:a :b}] (if (contains? s :a) 1 0)))"
+    "(defn main [] :i64 (let [s #{:a :b}] (if (= 1 1) 1 0)))"]
    ["keys"
     "(defn f [m :map] :i64 (nth (keys m) 0)) (defn main [] :i64 (f {:a 1}))"
     "(defn f [m :map] :i64 (get m :a 0)) (defn main [] :i64 (f {:a 1}))"]
@@ -148,11 +160,17 @@
     "(defn main [] :i64 (as-> 1 v (+ v 1)))"
     "(defn main [] :i64 (let [v 1] (+ v 1)))"]
    ["disj"
-    "(defn f [s [:set :i64]] :bool (contains? (disj s 1) 1)) (defn main [] :i64 0)"
-    "(defn f [s [:set :i64]] :bool true) (defn main [] :i64 0)"]
+    "(defn main [] :i64 (let [s (disj #{:a :b} :a)] 1))"
+    "(defn main [] :i64 (let [s #{:a :b}] 1))"]
+   ;; The probe and its control differ in the SET LITERAL and nothing else.
+   ;; The first version of this entry read `(if (contains? #{1 2} 1) 1 0)`
+   ;; against `(if (= 1 1) 1 0)` -- two forms changed at once AND an element
+   ;; type the surface does not take -- and reported `set-literal` as drift.
+   ;; It is not: a keyword set lowers. `contains?` is what does not, and it
+   ;; has its own entry above.
    ["set-literal"
-    "(defn main [] :i64 (if (contains? #{1 2} 1) 1 0))"
-    "(defn main [] :i64 (if (= 1 1) 1 0))"]
+    "(defn main [] :i64 (let [s #{:a :b}] 1))"
+    "(defn main [] :i64 (let [s [:a :b]] 1))"]
    ["conj"
     "(defn f [v :vector-i64] :vector-i64 (conj v 2)) (defn main [] :i64 0)"
     "(defn f [v :vector-i64] :vector-i64 v) (defn main [] :i64 0)"]
