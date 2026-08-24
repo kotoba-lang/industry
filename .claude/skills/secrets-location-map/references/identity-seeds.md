@@ -51,7 +51,7 @@
   全て尽きた上での migration（vault.edn.bak は 7/19 で mint 7/31 より古い、kagi cloud
   同期の最終 push は 7/25、APFS/TimeMachine snapshot 無し、fleet ノードに vault 無し、
   vault ledger は item 名を持たない）。git の全 knowledge ledger（正本）を新 DID の
-  graph へ re-publish した（2026-08-24 時点 288/291 file。残 3 file と read は
+  graph へ re-publish した（2026-08-24 時点 290/291 file。残る jp-tetsuzuki seed 1 file と read は
   production backend の CPU 崖で保留 — graph が肥大し、fold の全経路が死んでいる:
   client fold は apex で Unauthorized、旧 engine の fold は folded:false の no-op、
   fold.cljs は退役 D1 で 410。可視化の unblock は engine main の silent-partial read
