@@ -51,8 +51,13 @@
   全て尽きた上での migration（vault.edn.bak は 7/19 で mint 7/31 より古い、kagi cloud
   同期の最終 push は 7/25、APFS/TimeMachine snapshot 無し、fleet ノードに vault 無し、
   vault ledger は item 名を持たない）。git の全 knowledge ledger（正本）を新 DID の
-  graph へ全量 re-publish して可視化を回復した — 情報損失はゼロ、失ったのは旧 graph の
-  identity 継続性のみ。
+  graph へ re-publish した（2026-08-24 時点 288/291 file。残 3 file と read は
+  production backend の CPU 崖で保留 — graph が肥大し、fold の全経路が死んでいる:
+  client fold は apex で Unauthorized、旧 engine の fold は folded:false の no-op、
+  fold.cljs は退役 D1 で 410。可視化の unblock は engine main の silent-partial read
+  退行の修正 → production deploy → bounded fold。ADR-2608170300 参照）。
+  情報損失はゼロ、失ったのは旧 graph の identity 継続性のみ。
+  publish 済み管理簿は `~/.gftd/hyakka-publish-published-v2.edn` に退避済み。
 - **旧 DID `did:key:z6MkuEj8M1GKrAqW8ZsenbickiLvpfzJFLpNpxgyggcm1DKv` の graph は
   orphan**（append-only のまま残る。誰も書けない・resident の published.edn 追跡外）。
 - ⚠ **resident（別ホストで稼働中）はこの端末の kagi を読めない** — vault は 7/25 から
