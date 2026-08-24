@@ -90,14 +90,29 @@
 ;; ── source-paths ────────────────────────────────────────────────────────────
 
 (defn- source-paths
-  "The :source-paths vector of a shadow-cljs.edn, as strings, or :unparsed."
+  "The :source-paths vector of a shadow-cljs.edn, as strings, or :unparsed.
+
+   Line comments inside the vector are stripped before extraction: this is a
+   regex over raw text, not a reader, and a path quoted inside `;;` prose is
+   not a declaration. Measured 2026-08-24: com-etzhayyim-app-explorer records
+   its FIXED bad path in a comment (`;; Was \"../../orgs/...\"`), and the
+   unstripped regex re-reported forever the exact bug the comment says was
+   fixed (a phantom `orgs/orgs/kotoba-lang` consumer). The strip requires
+   whitespace (or line start) before `;`, so a `;` inside a quoted path — none
+   exist in this fleet — would survive; worst case a truncated line yields an
+   unresolvable path, which surfaces as a warn rather than disappearing."
   [txt]
   (if-let [i (str/index-of txt ":source-paths")]
     (let [after (subs txt i)
           o (str/index-of after "[")
           c (str/index-of after "]")]
       (if (and o c (< o c))
-        (->> (re-seq #"\"([^\"]+)\"" (subs after o c)) (map second) vec)
+        (->> (str/split-lines (subs after o c))
+             (map #(str/replace % #"(^|\s);.*$" ""))
+             (str/join "\n")
+             (re-seq #"\"([^\"]+)\"")
+             (map second)
+             vec)
         :unparsed))
     nil))
 
