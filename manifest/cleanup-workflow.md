@@ -420,11 +420,25 @@ through live directories of that same rename-heavy repo: residue 0, suspect 0, w
 Never: treat "not on `main`" as proof a file is new; pass a skipped check off as a clean
 one; auto-exclude `:suspect` alongside `:residue`; delete anything from the working tree.
 
-### DO-NOT-MERGE PR は「駐車場」であって判定ではない
+### PR の題に指示を書かない。題は中身を述べ、状態は state が担う（2026-08-24、オーナー指示）
 
-`:review` / `:branches` として開かれた `DO-NOT-MERGE` PR は、開いた時点で**誰も中身を
-見ていない**。ラベルは事故を防ぐためのもので、判断の代わりではない。1 件ずつ
-disposition を付けて閉じるまでが cleanup。
+**`DO-NOT-MERGE` / `DO NOT MERGE` / `DO-NOT-AUTO-MERGE` を題に書いた PR を作らない。**
+これは 2026-08-24 のオーナー指示（「do not merge が pr に存在するのが不適切なので、
+削除なら削除、merge なら merge で cleanup して、また今後こういった do not merge のような
+分かりずらい status のものを作成しないように」）であり、`scripts/cleanup-land.cljs` の
+2 箇所の題を書き換えて実装済み（`grep -c DO-NOT-MERGE scripts/cleanup-land.cljs` = 0）。
+
+**題に書いた指示は強制力を持たない。** 実測 2026-08-24、`cloud-itonami/cloud-itonami-app`
+の姉妹 PR 2 本は同じ題「DO NOT MERGE — rescued the stranded …」で開かれ、**`#123` は
+2026-08-23 に merge された**。題は merge を止めず、履歴に嘘だけを残した。止めていたのは
+draft state の方である。したがって:
+
+- **題**は中身を述べる（`cleanup: rescue 3 uncommitted tracked change(s) from the shared checkout`）
+- **merge を止める**のは draft state（GitHub が機構として拒否する。読まれる必要がない）
+- **body** は「何を測れば決まるか」を書く（削除行数 / base の遅れ / main との overlap）
+
+**そして disposition は必ず付ける。** 開けたままにするのは第 3 の選択肢ではない。
+1 件ずつ merge か close まで持っていくのが cleanup。
 
 実測 2026-08-04: fleet に 98 件が滞留していた。同じラベルなのに中身は 3 つの全く違う
 ものだった — 一括処理してはならない理由そのもの:
@@ -508,10 +522,10 @@ disposition が `:close-*` の repo は、次のどれかまでやって初め�
 修正済み。修正後は既存の open な preservation PR があればその branch を再利用するので、
 repo あたり常に 1 本になる。
 
-**Never**: `DO-NOT-MERGE` を理由に中身を見ずに放置する（この節ができた理由）/ draft の
-まま放置して「GitHub が merge を防ぐから安全」で終わらせる（防いでいるのは事故だけで、
-判断は誰もしていない）/ archive せずに close する（`:retirement :archive` と同じ
-非交渉ルール）/ 同じラベルのものを 1 クラスタとして一括処理する。
+**Never**: 題に指示（`DO-NOT-MERGE` 等）を書いて判断の代わりにする / draft のまま放置して
+「GitHub が merge を防ぐから安全」で終わらせる（防いでいるのは事故だけで、判断は誰もして
+いない）/ archive せずに close する（`:retirement :archive` と同じ非交渉ルール）/ 同じ
+形のものを 1 クラスタとして一括処理する。
 
 Three kinds of "no remote", needing different handling: has commits (create + push);
 **no commits at all** (create empty repo, land via a parentless root commit through the API,

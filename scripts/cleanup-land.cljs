@@ -1483,19 +1483,26 @@
               (let [url (or (:url prior)
                             (existing-pr slug br)
                             (open-pr! slug base br
-                                      (str "DO-NOT-MERGE cleanup: preserve uncommitted tracked changes ("
-                                           files " files)")
-                                      (str "⚠️ **Draft on purpose — this must not be merged as-is.**\n\n"
-                                           "Opened as a draft so GitHub itself blocks the merge. On 2026-07-26/27, 17 PRs of\n"
-                                           "exactly this shape were merged by an automated pass because the body's warning was\n"
-                                           "advisory and the PR looked mergeable; ~913 lines were deleted from `" base "` before\n"
-                                           "the damage was found and 8 of them restored.\n\n"
-                                           "To use this: keep the additions, drop any deletions, or re-cut the branch from\n"
-                                           "current `" base "` so it only adds. Then mark it ready.\n\n"
-                                           "These rewrite files that already exist on `" base "`, and the working tree they\n"
-                                           "came from may be far behind it. Merging blind can silently roll `" base "` back.\n\n"
-                                           "Precedent: cloud-itonami's working tree was 1381 commits behind `main`; applying its\n"
-                                           "`legal/terms.md` would have reverted owner-approved public legal pages to a DRAFT.\n\n"
+                                      (str "cleanup: rescue " files
+                                           " uncommitted tracked change(s) from the shared checkout")
+                                      (str "Uncommitted changes to files that already exist on `" base "`, rescued\n"
+                                           "from the shared west checkout so they are on a branch rather than on no\n"
+                                           "branch at all. Opened as a draft: the state is the mechanism, so nothing\n"
+                                           "here relies on a title or a note being read.\n\n"
+                                           "**This pull request needs a disposition — merge it or close it.** Leaving it\n"
+                                           "open is not a third option; an undecided rescue PR is a parking space.\n\n"
+                                           "Measure three things before deciding:\n\n"
+                                           "1. **Deletions.** `0` deleted lines rewrites nothing and is normally safe.\n"
+                                           "   One or more means merging applies somebody else's unfinished edit.\n"
+                                           "2. **Base freshness.** How far behind `" base "` was the working tree these\n"
+                                           "   came from? A stale base makes a merge a silent rollback.\n"
+                                           "3. **Overlap.** Has `" base "` since moved the same files?\n"
+                                           "   `gh api repos/<repo>/compare/<base-sha>...<default> --jq '[.files[].filename]'`\n\n"
+                                           "Why the caution is not theoretical: on 2026-07-26/27, 17 pull requests of exactly\n"
+                                           "this shape were merged by an automated pass and ~913 lines were deleted from\n"
+                                           "`" base "`. Separately, cloud-itonami's working tree was 1381 commits behind\n"
+                                           "`main`; applying its `legal/terms.md` would have reverted owner-approved public\n"
+                                           "legal pages to a DRAFT.\n\n"
                                            "🤖 Generated with [Claude Code](https://claude.com/claude-code)")
                                       true))]
                 (println (format "  :review   %d files → %s （draft・merge しない）" files url)))
@@ -1551,14 +1558,21 @@
               (if-let [url (existing-pr slug b)]
                 (println (format "    %-46s PR 既存 %s" b url))
                 (if-let [url (open-pr! slug base b
-                                       (str "DO-NOT-MERGE cleanup: review un-landed branch " b)
-                                       (str "⚠️ **Draft on purpose — opened only to put this branch on a review path.**\n\n"
-                                            "`" b "` is pushed but not reachable from `" base "` and had no open PR.\n"
-                                            "Abandoned experiments, deliberate forks and force-pushed histories all look\n"
-                                            "alike from outside, so landing it is a human call.\n\n"
-                                            "Draft so GitHub blocks the merge rather than relying on this note being\n"
-                                            "read — on 2026-07-26/27 an automated pass merged 17 advisory-only PRs of the\n"
-                                            "sibling `:review` class and deleted ~913 lines from `" base "`.\n\n"
+                                       (str "cleanup: un-landed branch " b " (not reachable from " base ")")
+                                       (str "`" b "` is pushed but not reachable from `" base "`, and had no open pull\n"
+                                            "request. Opened as a draft so it is on a review path instead of rotting\n"
+                                            "unseen. The draft state is the mechanism; nothing here depends on a title\n"
+                                            "or a note being read.\n\n"
+                                            "**This pull request needs a disposition — merge it or close it.** Leaving it\n"
+                                            "open is not a third option.\n\n"
+                                            "Landing it is a judgement call because abandoned experiments, deliberate\n"
+                                            "forks and force-pushed histories are indistinguishable from outside. What\n"
+                                            "separates them is measurable:\n\n"
+                                            "- `gh api repos/<repo>/compare/" base "..." b " --jq '{status,ahead_by,behind_by}'`\n"
+                                            "- whether the added lines already exist on `" base "` (content containment)\n"
+                                            "- whether it still builds against current `" base "`, not against the base it\n"
+                                            "  was written on — a branch can be additive by path and still break the build\n\n"
+                                            "Closing is a fine answer, and it does not delete the branch.\n\n"
                                             "Opened by `scripts/cleanup-land.cljs` (skill `git-cleanup-conflict`).\n\n"
                                             "🤖 Generated with [Claude Code](https://claude.com/claude-code)")
                                        true)]
