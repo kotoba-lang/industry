@@ -2934,6 +2934,23 @@
   ;; as :jvm-test was my misconfiguration, not a missing capability.
   {:name "authority" :gate :nbb-test :classpath "src:test" :entry "test/run_portable.cljs"
    :cd true}
+  ;; render had no gate at all. Its ClojureScript runner named 4 of the 39
+  ;; `.cljc` test namespaces; running the other 35 for the first time
+  ;; (2026-08-24) found two silent defects the 253-test JVM suite could not
+  ;; see -- `gltf/base64-decode` returning `[]` for all input, and the KTX2
+  ;; test's own u64 builder writing the low dword into the high dword. Both
+  ;; are the `.cljc`-claims-two-runtimes class (root ADR-2608730000), and
+  ;; neither was reachable until something ran the suite here.
+  ;;
+  ;; No :ship-git-deps: the git deps in :test (kami-nv-compat, for the mesh
+  ;; tracer seam) are used only by the `.clj` tests, and the 39 `.cljc` ones
+  ;; read no files. Measured on the shipped shape -- `src:test` alone, 912K
+  ;; of tree, nothing else -- 219 tests / 3776 assertions / 0 failures.
+  ;;
+  ;; Discriminates: reverting either fix takes it to exit 1, naming the test
+  ;; that covers that fix.
+  {:name "render" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs"
+   :cd true}
   {:name "org-apache-parquet" :gate :jvm-test :cd true}
   {:name "org-apache-arrow" :gate :jvm-test :cd true}
   {:name "org-apache-avro" :gate :nbb-test :classpath "src:test" :entry "test/run.cljs"
