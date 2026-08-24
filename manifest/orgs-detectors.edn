@@ -1808,8 +1808,12 @@
               package.json script, and under nbb the exit code works. Those are printed
               as UNMEASURED, never as clean. The first pass at this detector did call
               them findings and produced 380 of them, none a defect."
-   :measured "2026-08-25 on this machine: 12s, exit 1, SCANNED 7725 test sources,
-              CLAIMS-SIGNAL 407, CHECKABLE 33, FINDINGS 32.
+   :measured "2026-08-25 on this machine: 12s, exit 0, SCANNED 7725 test sources,
+              CLAIMS-SIGNAL 407, CHECKABLE 33, FINDINGS 0 -- the whole population was
+              fixed the same day. It went 33 -> 32 -> 0, and the middle number is the
+              one that matters: 32 was measured after ONE repo had been converted by
+              hand, so this check has shown both of its answers against real code and
+              not only against a mutation.
 
               The underlying claim was measured dynamically in cloud-itonami-isic-6492
               before this detector was written, in both directions:
