@@ -2299,6 +2299,21 @@
   ;; own resolved classpath and entry under the pinned nbb 1.4.210: 3 tests /
   ;; 8 assertions / 0 failures, and the same on 1.5.212. Neutralising the new
   ;; guard turns BOTH red.
+  ;; kotoba-sema is `.cljc` and claims two runtimes; its only test was `.clj`
+  ;; and it had no gate at all, so the `:cljs` side had never run. What that
+  ;; hid: `desugar-case` checked constant uniqueness with `distinct`, which
+  ;; hashes above eight elements, and ClojureScript cannot hash the bigint a
+  ;; `.kotoba` integer literal is -- so `case` threw at the NINTH integer arm
+  ;; while the JVM took 64. Same class as the kotoba-kir entry below, and not
+  ;; a version regression: it failed identically on 1.4.208, 1.4.210 and
+  ;; 1.5.212, which is to say the pinned version would have caught it if
+  ;; anything had ever run this repository on ClojureScript.
+  ;;
+  ;; Verified on the pinned nbb 1.4.210 and on 1.5.212: 4 tests / 7 assertions
+  ;; / 0 failures, and BOTH go red when the fix is neutralised.
+  {:name "kotoba-sema" :id "nbb-cross-runtime-kotoba-sema" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "kotoba-kir" :id "nbb-cross-runtime-kotoba-kir" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
