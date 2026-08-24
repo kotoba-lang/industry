@@ -9,8 +9,8 @@
  :adr/body "# 2026-08-24 PR inbox sweep: 59 open PRs given a measured disposition
 
 オーナー指示は「review and merge」、続いて「cleanup」、最後に amu#607 の名指し。
-59 件すべてに disposition を付けた。**16 merged / 26 closed / 17 open**（うち
-2 件は archived repo で書き込み不能）。open 17 件は全件に測定付きのレビュー
+59 件すべてに disposition を付けた。**15 merged / 26 closed / 18 open**（うち
+2 件は archived repo で書き込み不能）。open 18 件は全件に測定付きのレビュー
 コメントを残してある。
 
 ## 中心的な発見: `:additive` はビルドについて何も言わない
@@ -127,7 +127,7 @@ component が link しない:
 
 ## 着地したもの
 
-merged 16: cloud-murakumo#87（**現 main が gate 未設定時に匿名・無制限で
+merged 15: cloud-murakumo#87（**現 main が gate 未設定時に匿名・無制限で
 推論を proxy していた実バグ**、negative control で `expected 503, actual 200`）/
 cloud-murakumo#73（x402 有料 infer-memory、conflict を両側 union で解決、
 463 tests 0 failures）/ amu#607 / kotoba-component#121 / cloud-itonami-app#123 /
