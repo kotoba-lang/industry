@@ -1833,4 +1833,47 @@
               A third measurement is why the detector also has a
               :compiled-without-main-cli-fn class: a compiled bundle whose namespace does
               not set *main-cli-fn* loads every namespace, runs no test, and exits 0 --
-              indistinguishable from a clean run in both the output and the exit code."}]}
+              indistinguishable from a clean run in both the output and the exit code."}
+
+  {:id       :verify-cljs-shift-width
+   :title    "bit shifts of 32 or more in code ClojureScript runs, where the count wraps"
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-cljs-shift-width.cljs" "--findings" "--root" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SHIFTS-READ\t[1-9][0-9]*"
+   :interval-ms 86400000                 ; 24h
+   :timeout-ms  600000                   ; 10m -- measured 2m11s over 28,581 files
+   :writes   :none
+   :why      "JavaScript takes shift counts modulo 32 and cljs bit-shift-left /
+              bit-shift-right / unsigned-bit-shift-right compile straight to them, so
+              `(bit-shift-left 1 32)` is 1 and `(unsigned-bit-shift-right x 32)` is the
+              low word. It does not throw; it returns a plausible number of the right
+              type. On the JVM the same expression is right, so a .cljc file is correct
+              in the suite that runs and wrong in the runtime nobody asked.
+
+              Found by hand three times in two days before this existed: cljs-i64/ashr
+              (divisor 2^shift, wrong for every shift >= 32), pe32plus/read-le (ELF
+              64-bit fields with the high four bytes folded into the low bits -- an
+              admission check that failed OPEN on the second runtime), and
+              object.pe32plus/little-endian (PE image-base at width 8, bytes 4..7
+              repeating 0..3). Two of the three sat in files whose own comments already
+              explained this exact hazard, in a different function."
+   :measured "2026-08-25 on this machine: 2m11s, exit 1, SCANNED 28581 .cljc/.cljs files,
+              SHIFTS-READ 1608, SHIFTS-COMPUTED 712, FINDINGS 23 across 14 files in
+              10 repositories.
+
+              Cross-checked against an independent Python implementation of the same
+              scan written first: identical 23-element finding set.
+
+              `#?(:clj ...)` branches are blanked IN PLACE rather than deleted, so a
+              reported line number is the one a reader opening the file sees. The first
+              version deleted them and a spot check landed five lines away, reading as a
+              false positive -- which is how the kotoba.map/mvt finding was nearly
+              discarded. It is a real defect in a `:cljs` branch: `f64-bits->double`
+              computes its high word as `(unsigned-bit-shift-right bits 32)`, which on
+              ClojureScript is `bits >>> 0`, so the high word equals the low word.
+
+              SHIFTS-COMPUTED is printed every run and is UNMEASURED, never clean: a
+              count like `(* 8 index)` cannot be classified by reading, and two of the
+              three motivating defects were exactly that shape."}]}
