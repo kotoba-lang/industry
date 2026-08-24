@@ -927,6 +927,35 @@
               It is named in code and therefore still reported -- teaching this detector to
               recognise a declared, re-checked exclusion is the open item, not a fix to
               langgraph. `net-kotobase/control-plane` is unexamined."
+   :declared-exclusions "2026-08-25: `runner-declared-exclusion` is a new, non-defect class.
+              A namespace named as a key of a `def` whose name says it holds exclusions --
+              `excluded`, `jvm-only` and the like -- IN the runner or in a file the runner
+              RUNS is reported as declared rather than as an omission.
+
+              Two repositories already did this and are the reason it exists:
+                kotoba-lang/langgraph  runner_coverage_test.cljc binds `excluded` to
+                                       {ns {:file .. :still-contains .. :because ..}} and
+                                       ASSERTS the substring is still present in the named
+                                       source, so an exclusion that stopped being true
+                                       fails the test. This is the shape worth copying.
+                kotoba-lang/aiueos     run-tests.cljs binds `jvm-only` to {ns reason} and
+                                       refuses when an entry names a namespace that does
+                                       not exist -- the floor that caught two stale entries
+                                       on 2026-08-24.
+
+              It recognises the DECLARATION, not the floor. A repository could bind
+              `excluded` and check nothing, and this would be quieter for it. That is why
+              the count is PRINTED in the summary rather than silently subtracted, and why
+              the finding text names langgraph's `:still-contains` as the stronger form.
+              What the declaration does buy: it is in code rather than prose, it lives in a
+              file that executes, and it is somewhere a floor CAN be attached.
+
+              Effect on the full sweep: runner-loaded-not-run 2 -> 1, plus one info. The
+              one that remains -- net-kotobase/control-plane, kotobase-api-gateway-cljs, 1
+              of 54 -- declares nothing, which is now the distinction the class draws.
+
+              Discriminated on real data: renaming langgraph's `excluded` var to
+              `off-the-runner` puts it straight back to runner-loaded-not-run 1."
 :measured "2026-08-17 on this machine: 44s standalone (34s before it began reading
               package.json and deps.edn per project), 45s under the tick, over
               4,163 of 4,184 registered
