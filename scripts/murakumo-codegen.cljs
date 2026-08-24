@@ -57,8 +57,9 @@
   (or (aget js/process.env "MURAKUMO_ALIAS_URL")
       "https://api.murakumo.cloud/infer/models/murakumo-main"))
 
-;; ③ の fallback。**endpoint だけ**。model 名は焼かない。
-(def fallback-endpoint "https://infer.murakumo.cloud/v1/chat/completions")
+;; 公開境界は api.murakumo.cloud のみ。registry の :endpoint は Worker
+;; が使う origin 情報であり、client が直接使ってはいけない。
+(def fallback-endpoint "https://api.murakumo.cloud/v1/chat/completions")
 
 (defn- resolve-target! []
   (let [env-ep (aget js/process.env "MURAKUMO_ENDPOINT")
@@ -72,7 +73,7 @@
           (.then #(.json %))
           (.then (fn [j]
                    (let [m (js->clj j :keywordize-keys true)]
-                     {:endpoint (or (:endpoint m) fallback-endpoint)
+                     {:endpoint fallback-endpoint
                       ;; alias 名を送る。worker 側が KV で解決するので、ここで
                       ;; `alias-for` の concrete id を送ると切替に追従しなくなる。
                       :model (or env-model "murakumo-main")

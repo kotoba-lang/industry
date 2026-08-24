@@ -67,8 +67,9 @@
 (def rpc-split "3,3,3,3,4,3,3,3,3,12")
 (def unit      "murakumo-ring.service")
 (def dropin    (str "/etc/systemd/system/" unit ".d/qwen38.conf"))
+(def api-key-file "/etc/murakumo/fleet-origin.keys")
 (def port      8090)
-(def public-ep "https://infer.murakumo.cloud/v1/chat/completions")
+(def public-ep "https://api.murakumo.cloud/v1/chat/completions")
 (def alias-url "https://api.murakumo.cloud/infer/models/murakumo-main")
 
 (defn- ssh! [script]
@@ -194,6 +195,7 @@
        (when distributed? (str "--tensor-split " rpc-split))
        "-ngl 999" (str "-c " ctx) (str "--parallel " parallel)
        "--host 0.0.0.0" (str "--port " port) "--jinja"
+       (str "--api-key-file " api-key-file)
        ;; **n-gram 投機デコードは既定で入れる。** 追加メモリ 0 で、出力は
        ;; 非投機と一致する（kbench 28/30・compile 3/3 が前後で不変、2026-08-15 実測）。
        ;; 効き方は「出力が文脈をどれだけなぞるか」に比例する:
