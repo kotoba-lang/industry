@@ -954,8 +954,26 @@
               one that remains -- net-kotobase/control-plane, kotobase-api-gateway-cljs, 1
               of 54 -- declares nothing, which is now the distinction the class draws.
 
-              Discriminated on real data: renaming langgraph's `excluded` var to
-              `off-the-runner` puts it straight back to runner-loaded-not-run 1."
+              2026-08-25: extraction widened to every namespace-shaped token inside the
+              form, not only `'`-prefixed ones. net-kotobase/control-plane writes
+              `(def excluded '{kotobase.site-page-test \"reason\" ...})` -- the MAP is
+              quoted, so no symbol inside carries a quote of its own, and reading only
+              `'ns` missed the whole registry. That repository is the third to use this
+              pattern and the strongest in a different way: a separate lint,
+              `scripts/check-test-registry.cljs`, parses BOTH `test-namespaces` and
+              `excluded` out of that one file and runs before the build, so the registry
+              and the suite cannot drift apart. Strings are stripped first, so a reason
+              that mentions a namespace cannot get in.
+
+              With that, `runner-loaded-not-run` is 0 across the workspace -- and the
+              whole arc is worth stating: the class began at 5 findings and not one was a
+              repository defect. Three were the detector reading comments and docstrings
+              as requires; two were deliberate, re-checked declarations it had no way to
+              recognise.
+
+              Discriminated on real data, both repositories: renaming langgraph's
+              `excluded` to `off-the-runner`, or control-plane's to `left-out`, puts each
+              straight back to runner-loaded-not-run 1."
 :measured "2026-08-17 on this machine: 44s standalone (34s before it began reading
               package.json and deps.edn per project), 45s under the tick, over
               4,163 of 4,184 registered

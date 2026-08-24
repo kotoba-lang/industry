@@ -255,7 +255,13 @@
                    (when (some #(str/includes? lower %) exclusion-vocabulary)
                      (let [i (str/index-of code whole)]
                        (when i (balanced-form code i)))))))
-         (mapcat #(map second (re-seq #"'([a-zA-Z][a-zA-Z0-9._<>*+!?-]*)" %)))
+         ;; Every namespace-shaped token inside the form, not only the
+         ;; `'`-prefixed ones. `net-kotobase/control-plane` writes
+         ;; `(def excluded '{kotobase.site-page-test "reason" ...})` -- the MAP
+         ;; is quoted, so no symbol inside it carries a quote of its own, and
+         ;; reading only `'ns` missed the whole registry. Strings are already
+         ;; stripped, so a reason that mentions a namespace cannot get in.
+         (mapcat #(re-seq ns-token-re %))
          set)))
 
 (defn- code-only
