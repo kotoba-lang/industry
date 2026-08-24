@@ -32,7 +32,10 @@
 ;; zero errors. A suite that runs zero tests fails: "no tests" must not read as
 ;; "nothing broken".
 ;;
-;; The nbb version is PINNED, and that is not tidiness. Measured 2026-08-06,
+;; The nbb version is PINNED, and that is not tidiness -- but a pin can go
+;; stale in a way that is worse than no pin, by reporting a defect as absent.
+;; See `nbb-version` below for the 2026-08-24 bump and what it was measured
+;; against. Measured 2026-08-06,
 ;; on the same source: nbb 1.4.210 runs `ipld.link`'s deftype fine, while
 ;; 1.4.208 dies with "Protocol not found: IEquiv" — a custom protocol in a
 ;; deftype does not work there at all. `npx nbb` inside this superproject
@@ -52,8 +55,30 @@
   (or (second (drop-while #(not= "--entry" %) args)) "run-tests.cljs"))
 
 (def nbb-version
-  "See the header. A custom protocol in a deftype needs at least this."
-  "1.4.210")
+  "See the header. A custom protocol in a deftype needs at least 1.4.210.
+
+   Moved 1.4.210 -> 1.5.212 on 2026-08-24, after measuring rather than
+   before. The old pin was chosen for a real reason and kept working, but it
+   had stopped being able to SEE a class of defect: a `-0.0` literal loses its
+   sign in an expression position under 1.5.212, and `kotoba.kir`'s constant
+   oracle exhausted the host stack where 1.4.210 had headroom. Two live
+   defects were found by hand this week that this gate, at its old pin,
+   reported as absent.
+
+   What the bump costs, measured across all 40 entries that use this script,
+   each run on both versions on one workstation:
+
+     38  identical pass on both
+      2  identical FAIL on both, same cause on each -- `aiueos` (its
+         `run-tests.cljs` excludes namespaces that no longer exist, and the
+         gate correctly refuses a stale exclusion) and `kotoba-parity-sigv4`
+         (a local `kotoba` shim pointing at a path that does not exist on
+         that machine)
+      0  changed verdict
+
+   So this bump is not expected to turn anything red. If it does on the fleet,
+   that is new information the old pin was hiding, which is the point."
+  "1.5.212")
 
 (defn- exists? [p]
   (try (.accessSync fs p) true (catch :default _ false)))
