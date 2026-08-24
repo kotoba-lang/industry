@@ -206,6 +206,58 @@
             (= c "\"") (recur (inc i) true out)
             :else (recur (inc i) false (conj out c))))))))
 
+(def ^:private exclusion-vocabulary
+  "Substrings that mark a `def` as holding deliberate exclusions."
+  ["exclud" "jvm-only" "jvm-onlys" "not-run" "skipped" "skip-"])
+
+(defn- balanced-form
+  "The substring of `text` starting at `i` (which must be an open paren) up to
+   its matching close. Strings are already gone when this is called, so a paren
+   inside one cannot unbalance it."
+  [text i]
+  (let [n (count text)]
+    (loop [j i depth 0]
+      (if (>= j n)
+        (subs text i)
+        (let [c (subs text j (inc j))]
+          (cond
+            (= c "(") (recur (inc j) (inc depth))
+            (= c ")") (if (= depth 1) (subs text i (inc j)) (recur (inc j) (dec depth)))
+            :else (recur (inc j) depth)))))))
+
+(defn- declared-exclusions
+  "Namespaces named as keys of a `def` whose name says it holds exclusions.
+
+   Two repositories already do this, and they are the reason the check exists:
+
+     kotoba-lang/langgraph  `runner_coverage_test.cljc` binds `excluded` to
+                            {ns {:file .. :still-contains .. :because ..}} and
+                            ASSERTS that the substring is still present in the
+                            named source -- so an exclusion that stopped being
+                            true fails the test.
+     kotoba-lang/aiueos     `run-tests.cljs` binds `jvm-only` to {ns reason} and
+                            refuses when an entry names a namespace that does
+                            not exist. That floor caught two stale entries on
+                            2026-08-24.
+
+   This recognises the DECLARATION, not the floor. A repository could bind
+   `excluded` and check nothing, and this would be quieter for it -- which is
+   why the count is printed rather than silently subtracted, and why
+   langgraph's `:still-contains` is the shape worth copying. What the
+   declaration does buy is that it lives in a file the runner runs: it is
+   loadable, it is in code rather than in a comment, and it is somewhere a
+   floor CAN be attached."
+  [text]
+  (let [code (strip-strings (or text ""))]
+    (->> (re-seq #"\(\s*def\s+(?:\^\S+\s+)*([^\s()\[\]{}]+)" code)
+         (keep (fn [[whole sym]]
+                 (let [lower (str/lower-case (str sym))]
+                   (when (some #(str/includes? lower %) exclusion-vocabulary)
+                     (let [i (str/index-of code whole)]
+                       (when i (balanced-form code i)))))))
+         (mapcat #(map second (re-seq #"'([a-zA-Z][a-zA-Z0-9._<>*+!?-]*)" %)))
+         set)))
+
 (defn- code-only
   "`text` with `;` line comments removed, strings left alone.
 
@@ -474,7 +526,18 @@
                  :all? all?
                  :current-ns-only? current-ns-only?
                  :loaded loaded
-                 :run-set run-set}))
+                 :run-set run-set
+                 ;; Computed here because `texts` is in scope here: the runner's
+                 ;; own text plus the text of every namespace it RUNS. langgraph
+                 ;; declares its exclusion in `runner_coverage_test.cljc`, which
+                 ;; the runner runs, so the declaration is somewhere that
+                 ;; executes rather than somewhere that merely exists.
+                 :declared-out
+                 (reduce into #{}
+                         (map declared-exclusions
+                              (cons t (keep (fn [[n path]]
+                                              (when (run-set n) (texts path)))
+                                            expected))))}))
          ;; Namespaces that need no runner to name them, or that a non-source
          ;; declaration names. Both are unioned into every project's run set.
          :self-running (set (keep (fn [[n p]] (when (self-running? (texts p)) n)) expected))
@@ -561,9 +624,16 @@
              run-set (into (reduce into #{} (map :run-set rs))
                            (into declared (filter self-running mine)))
              uncovered (sort (remove run-set mine))
+             ;; Exclusions this project DECLARES, in the runner itself or in a
+             ;; file the runner runs. See `declared-exclusions`: it recognises
+             ;; the declaration, not a floor, so the count is printed rather
+             ;; than quietly subtracted.
+             declared-out (reduce into #{} (map :declared-out rs))
              ;; required somewhere, run nowhere -- the half a require-only audit
              ;; would miss
-             loaded-not-run (sort (filter #(and (loaded %) (not (run-set %))) mine))
+             loaded-not-run-all (sort (filter #(and (loaded %) (not (run-set %))) mine))
+             declared-not-run (filterv declared-out loaded-not-run-all)
+             loaded-not-run (remove (set declared-not-run) loaded-not-run-all)
              not-loaded (sort (remove loaded mine))
              label (if (= "" project) "." project)
              where (str/join " " (sort (map :path rs)))]
@@ -581,6 +651,14 @@
                   :detail (str label ": " (count not-loaded) " of " (count mine)
                                " test namespace(s) named by no runner (" where "): "
                                (str/join " " (take 4 not-loaded)))})
+           (seq declared-not-run)
+           (conj {:sev "info" :kind :runner-declared-exclusion :repo repo :project label
+                  :detail (str label ": " (count declared-not-run)
+                               " excluded by a declaration in code, not by omission: "
+                               (str/join " " declared-not-run)
+                               " -- a declaration is weaker than a floor; langgraph's"
+                               " `:still-contains` re-checks that the reason is still true")})
+
            (seq loaded-not-run)
            (conj {:sev "fail" :kind :runner-loaded-not-run :repo repo :project label
                   :detail (str label ": " (count loaded-not-run) " of " (count mine)
@@ -602,8 +680,13 @@
         [[:suite-uncovered       "test namespaces no runner runs"]
          [:runner-loaded-not-run "required but never handed to run-tests"]
          [:runner-runs-nothing   "(run-tests) with no target"]
-         [:runner-unreadable     "runner file could not be read"]]]
-  (println (str "  " (subs (str (name k) "                       ") 0 24)
+         [:runner-unreadable     "runner file could not be read"]
+         ;; Not a defect. Printed because a number that is subtracted without
+         ;; being shown is a number nobody can argue with -- and this one is
+         ;; subtracted on the strength of a DECLARATION, which is weaker than
+         ;; a floor.
+         [:runner-declared-exclusion "excluded by a declaration in code (not a defect)"]]]
+  (println (str "  " (subs (str (name k) "                              ") 0 28)
                 (count (filter #(= k (:kind %)) all-findings)) "  " label)))
 (println)
 (println "  repos with a complete runner:"
