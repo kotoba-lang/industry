@@ -1638,4 +1638,58 @@
               the OTHER 1.4.210->1.5.212 regression found the same day (amu's ir/lower
               overflowing the SCI stack on a 243-byte fixture, ADR-2608242100), which
               is not a source shape. This closes one class; the version-divergence
-              question is still open."}]}
+              question is still open."}
+
+  {:id       :verify-grammar-lowering-drift
+   :title    "forms the grammar authority declares admitted, against what the compiler can lower"
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-grammar-lowering-drift.cljs" "--findings" "--root" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\tprobed forms"
+   :interval-ms 86400000                 ; 24h -- it moves when the grammar or the compiler does
+   :timeout-ms  600000                   ; 10m -- measured 35s at load 4.14, 17x
+   :writes   :none
+   :why      "kotoba-lang/kotoba-lang's lang/guest-grammar.edn is the authority for the
+              source surface, and root ADR-2607279200 Delivery #1 says in as many words
+              that what compiler/frontend.cljc accepts and what the authority admits are
+              different things whose drift is to be closed with a machine check. Measured
+              2026-08-24: eleven forms it declares for all three backends are rejected by
+              the compiler with `operation has no admitted lowering` --
+              conj contains? count disj dissoc keys peek set-literal str subs vals.
+
+              Cannot be a fleet gate: the authority lives in one repository and the
+              compiler in another, and the fleet ships one repo's tree. Same shape as
+              verify-wasm-toolchain-pin.
+
+              Every probe is PAIRED with a control -- the same program with the form under
+              test replaced by one known to lower. That is the whole design, because a
+              probe written wrong is rejected too and a naive detector calls that drift.
+              Not hypothetical: the hand pass that preceded this (ADR-2608243300 as first
+              written) reported nine, and the paired version shows it was wrong in BOTH
+              directions -- six of those nine had no control, and conj and peek were
+              dismissed as shape problems while being real. The corrected list is eleven,
+              and the ADR now says so.
+
+              Coverage is printed on every run and is the reason the number can be read at
+              all: 25 of 73 declared forms are probed. An unprobed form is UNMEASURED, not
+              clean."
+   :measured "2026-08-24 on this machine at load 4.14: 35s, exit 1,
+              SCANNED 25 probed forms of 73 declared, controls lowered 25/25,
+              11 drift / 1 rejected-with-a-reason (take) / 0 unverified.
+
+              Three floors, and each was reached during development rather than reasoned
+              about:
+                - No control lowered -> exit 2, `this harness is broken, not the compiler`.
+                  The first version passed the probe source as a trailing argument to
+                  `nbb -e`, which nbb reads as a script path, so every control failed. The
+                  floor refused to report 20 harness errors as 20 drifts.
+                - A control that does not lower -> that form is UNVERIFIED, never drift.
+                  Six map probes landed here first (the parameter type was
+                  `[:map :keyword :i64]` where `:map` is what a map literal satisfies), and
+                  that is how the shape error was found rather than published.
+                - Coverage printed every run.
+
+              Discriminated: replacing `count`'s control with a call to a nonexistent
+              operation moves it out of the drift list and into UNVERIFIED, naming the
+              reason -- 11 drift becomes 10 drift plus 1 unverified."}]}
