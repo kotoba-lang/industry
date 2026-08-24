@@ -1780,4 +1780,53 @@
 
               Discriminated: replacing `count`'s control with a call to a nonexistent
               operation moves it out of the drift list and into UNVERIFIED, naming the
-              reason -- 11 drift becomes 10 drift plus 1 unverified."}]}
+              reason -- 11 drift becomes 10 drift plus 1 unverified."}
+
+  {:id       :verify-cljs-runner-exit-signal
+   :title    "ClojureScript test runners whose failure signal cannot reach the caller"
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-cljs-runner-exit-signal.cljs" "--findings" "--root" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "CHECKABLE\t[1-9][0-9]*"
+   :interval-ms 86400000                 ; 24h -- moves only when a runner is edited
+   :timeout-ms  300000                   ; 5m -- measured 12s; it reads text, it runs nothing
+   :writes   :none
+   :why      "Two families of runner in this workspace call themselves the PRIMARY
+              automated quality gate for their actor, signal failure by setting
+              js/process.exitCode from :end-run-tests, and document their invocation as
+              `cljs.main --target node -m <the-runner-ns>`. Those two do not compose.
+              That form evaluates -main inside a node REPL environment; the process a
+              caller waits on is the driver, and it exits 0 whatever the tests did. The
+              exitCode never reaches it, and js/process.exit hangs the driver instead of
+              propagating. So the gate prints `1 failures` and returns success -- the
+              ADR-2608136000 shape at its purest, a check that could not report failure
+              returning the same value as one that passed.
+
+              Only files that BOTH set the exit code and document an invocation are
+              checkable from the file alone; the rest are invoked from a gate or a
+              package.json script, and under nbb the exit code works. Those are printed
+              as UNMEASURED, never as clean. The first pass at this detector did call
+              them findings and produced 380 of them, none a defect."
+   :measured "2026-08-25 on this machine: 12s, exit 1, SCANNED 7725 test sources,
+              CLAIMS-SIGNAL 407, CHECKABLE 33, FINDINGS 32.
+
+              The underlying claim was measured dynamically in cloud-itonami-isic-6492
+              before this detector was written, in both directions:
+                -m form,  one assertion broken   -> `1 failures`, exit 0
+                -m form,  unmodified             -> `0 failures`, exit 0
+                compiled, one assertion broken
+                          inside an async callback
+                          (lands after run-tests
+                          has already returned)  -> `1 failures`, exit 1
+                compiled, unmodified             -> `0 failures`, exit 0
+
+              Discriminated on a REAL fix rather than a mutation: isic-6492's runner was
+              converted to the compiled invocation and given *main-cli-fn*, and this
+              detector went 33 -> 32 with that repo the one that left. The same run
+              therefore carries both a positive and a negative instance.
+
+              A third measurement is why the detector also has a
+              :compiled-without-main-cli-fn class: a compiled bundle whose namespace does
+              not set *main-cli-fn* loads every namespace, runs no test, and exits 0 --
+              indistinguishable from a clean run in both the output and the exit code."}]}
