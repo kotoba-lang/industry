@@ -1719,9 +1719,14 @@
               source surface, and root ADR-2607279200 Delivery #1 says in as many words
               that what compiler/frontend.cljc accepts and what the authority admits are
               different things whose drift is to be closed with a machine check. Measured
-              2026-08-24: eleven forms it declares for all three backends are rejected by
-              the compiler with `operation has no admitted lowering` --
-              conj contains? count disj dissoc keys peek set-literal str subs vals.
+              Nine forms it declares for all three backends are rejected by the compiler
+              with `operation has no admitted lowering` --
+              conj contains? count dissoc keys peek str subs vals.
+              (2026-08-24 this entry said eleven, including `disj` and `set-literal`.
+              A keyword set lowers; the probe that said otherwise changed two forms at
+              once and used an element type the surface rejects first. `disj` fails with
+              `no admitted TYPE SIGNATURE`, a stated reason rather than a missing
+              lowering. See the corpus rules in the script.)
 
               Cannot be a fleet gate: the authority lives in one repository and the
               compiler in another, and the fleet ships one repo's tree. Same shape as
@@ -1741,7 +1746,7 @@
               clean."
    :measured "2026-08-24 on this machine at load 4.14: 35s, exit 1,
               SCANNED 25 probed forms of 73 declared, controls lowered 25/25,
-              11 drift / 1 rejected-with-a-reason (take) / 0 unverified.
+              9 drift / 2 rejected-with-a-reason (disj, take) / 0 unverified.
 
               Three floors, and each was reached during development rather than reasoned
               about:
