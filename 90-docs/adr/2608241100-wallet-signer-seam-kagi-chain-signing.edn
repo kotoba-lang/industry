@@ -117,34 +117,58 @@
      :kagi の場合の BIP-44 :derivation-path を記録。custody は assignment と bot
      container に伝播し、unassign で出生既定へ戻る。wallet pin を 34efd046 へ前進。
      フルスイート 1849 tests / 11022 assertions 緑。
+   - `kotoba-lang/wallet` merge `18394178cb40c7fbfe67904135486c166d699dc5`:
+     **TRX 実装**（アドレス = 0x41 ‖ last20(keccak256(pubkey)) の base58check。
+     検証済み 2 機構の合成を decode→keccak の機構間 cross-check で検査。tx は
+     raw-data protobuf 未実装を名指しして拒否）+ **UTXO tx 署名の seam 対応**
+     （btc-crypto は digest と DER を既に公開し署名機構も同一の RFC-6979 だった
+     ため btc-crypto 側変更ゼロ。P2PKH / BIP-143 P2WPKH を signer 経由で署名、
+     秘密鍵経路とバイト一致 parity。BCH は両経路とも受取専用のまま）。
+     40 tests / 103 assertions 緑。
+   - `kotoba-lang/saifu` merge `9320b53ec91d3d8390c431d8087cd7b53148102e`:
+     **saifu.tx + saifu.sign 実装** —— SIGN_MODE_DIRECT 正準化（protobuf.wire、
+     schema は EDN、proto3 既定値は省略）+ policy gate 必須の signer seam 署名
+     （:commit のみ署名、escalate/hold はデータで返す）。**oracle は cosmjs
+     実生成ベクタ**（再生成スクリプト同梱）: body / auth-info / sign-doc /
+     digest が byte 一致、RFC-6979 署名 64 byte も一致、bip32 が cosmjs の
+     Slip10 と、saifu.address が実導出と一致。23 tests / 117 assertions 緑。
+   - `cloud-itonami/cloud-itonami-app` merge `0d436b6d27ac4a818cc4ba6a2ed871c6fc1e4a46`:
+     **kagi 署名 transfer 送信**（wallet-send）。:custody :kagi の assignment の
+     提案を kagi-backed Signer で署名し raw tx として broadcast。
+     org-ethereum-jsonrpc は恒久 read-only 境界のため触らず、送信 capability は
+     app 側に 3 メソッドだけの明示 whitelist で置いた。nonce は per-address
+     monitor（プロセス内単一 writer）、:tx-hash はローカル計算して node の応答と
+     突合（嘘をつく node は拒否し状態を汚さない）。テストの oracle は再計算方式
+     （stub node が受け取った raw == 同じ Signer での再署名）。
+     フルスイート 1853 tests / 11038 assertions 緑。
 
    ## 正直に言うべきこと
 
    - **セキュリティクリティカルで、誰もレビューしていない**（saifu README と同じ警告）。
      意味のある額を扱わないこと。kagi vault に置く seed も検証用最小額に限る。
-   - **UTXO の tx 署名は signer seam を通らない**（btc-crypto.tx が sighash を内部計算し
-     外部署名を受けない）。seam 経由は :wallet.chain/signer-family-unsupported で
-     **拒否**する（沈黙で秘密鍵経路に落ちない）。btc-crypto.tx に digest/署名注入の
-     分離を足すのが follow-up。
-   - **staged 10 チェーンの実装順**は需要駆動。sol / trx / xrp は既存機構の組合せで安い
-     （ed25519 は kagi が JDK で保有、SLIP-0010 が要る）。ada / dot / xmr は非標準
+   - **staged は 9 チェーン**（trx は実装済みへ移動）。sol / xrp は既存機構の組合せで
+     安い（ed25519 は kagi が JDK で保有、SLIP-0010 が要る）。ada / dot / xmr は非標準
      暗号のためレビュー済み実装を呼ぶこと（自前実装禁止 —— ADR-2608039900 と同じ線）。
-   - **itonami の UI/API surface は未拡張**（決定 6 の domain 層は着地済み、上記）。
-     snapshot の要約フィールド（:custody / :sign-and-submit）は従来の
-     external-wallet 既定の記述のままで、web UI に kagi 接続の操作面はまだ無い ——
-     `connect-kagi-signer!` は CLI / bot 層から呼ぶ。transfer の署名・broadcast も
-     従来どおり外部 wallet（kagi 署名での送信は nonce 直列化と RPC 経路が先）。
-   - **saifu.tx / sign / broadcast（Cosmos）も未実装のまま**（saifu 自身の計画どおり）。
-     kagi.chain-signer は secp256k1 digest 署名なので、saifu.sign が SIGN_MODE_DIRECT の
-     正準 sign-doc digest を作れば同じ seam に載る。
-   - nonce / sequence の単一 writer はこの ADR では解いていない。同一 account を
-     複数プロセスから使う運用を始める前に kagi 側で直列化する。
+     TRON の tx raw-data protobuf も未実装のまま（アドレスのみ）。
+   - **itonami の UI/API surface は未拡張**。snapshot の要約フィールド
+     （:custody / :sign-and-submit）は従来の external-wallet 既定の記述のままで、
+     web UI に kagi 接続・kagi 送信の操作面はまだ無い ——
+     `connect-kagi-signer!` / `wallet-send/sign-and-submit!` は CLI / bot 層から呼ぶ。
+   - **saifu.broadcast（Cosmos）は未実装のまま**（tx / sign は着地済み、上記）。
+   - **nonce の単一 writer はプロセス内まで**（wallet-send の per-address monitor）。
+     同一 account を複数プロセスから使う運用を始める前に外部直列化が要る ——
+     この限界は wallet-send の docstring にも明記してある。
+   - **kagi 送信は plain value transfer のみ**（data 0x / gas 21000）。contract call は
+     Bot allowance wallet のスコープ外として意図的に持たない。
 
    ## 検証の再現
 
-   - wallet: `clojure -M:test`（worktree、36 tests / 90 assertions / 0 failures）
+   - wallet: `clojure -M:test`（40 tests / 103 assertions / 0 failures）
    - kagi: `clojure -M:test`（244 tests / 888 assertions / 0 failures、exit code は
-     リダイレクト後の検査コマンド自身から採取）"
+     リダイレクト後の検査コマンド自身から採取）
+   - saifu: `clojure -M:test`（23 tests / 117 assertions / 0 failures。cosmjs ベクタの
+     再生成は test/saifu/cosmjs_oracle.cljs — nbb + npm、CI では走らない）
+   - cloud-itonami-app: `clojure -M:test`（1853 tests / 11038 assertions / 0 failures）"
 
   :adr/alternatives
   "**新しい wallet repo を起こす**: wallet / saifu / kagi の 3 分担が既に在り、欠けて
