@@ -1230,10 +1230,10 @@
      :must-fail ["the-adr-exists-and-is-linked"]}]}
 
   {:repo "orgs/cloud-itonami/cloud-itonami-app"
-   :label "Cloud Itonami Bot handoff context isolation"
+   :label "Cloud Itonami Bot handoff isolation and paid-order fail-closed boundary"
    :cmd ["clojure" "-Sdeps" "{:paths [\"src\" \"resources\" \"test\"]}"
          "-M" "-e"
-         "(require 'clojure.test 'cloud.itonami.app.routines-test)(let [r (clojure.test/run-tests 'cloud.itonami.app.routines-test)] (shutdown-agents) (System/exit (+ (:fail r) (:error r))))"]
+         "(require 'clojure.test 'cloud.itonami.app.routines-test 'cloud.itonami.app.commerce-test)(let [r (clojure.test/run-tests 'cloud.itonami.app.routines-test 'cloud.itonami.app.commerce-test)] (shutdown-agents) (System/exit (+ (:fail r) (:error r))))"]
    :green-marker "0 failures, 0 errors"
    :mutations
    [{:id :cloud-itonami-app/handoff-target-context-isolated
@@ -1241,7 +1241,14 @@
      :file "src/cloud/itonami/app/bots.clj"
      :find "            (store-context! target-context-id target target-direction :handoff\n                            [target-message]"
      :replace "            (store-context! target-context-id target target-direction :handoff\n                            (conversation to-bot-id)"
-     :must-fail ["a-handoff-is-an-isolated-two-way-durable-conversation"]}]}
+     :must-fail ["a-handoff-is-an-isolated-two-way-durable-conversation"]}
+
+    {:id :cloud-itonami-app/unverified-payment-cannot-capture-inventory
+     :why "A facilitator rejection is the fail-closed boundary. Reversing it must prove that an unverified transaction cannot become paid or decrement inventory."
+     :file "src/cloud/itonami/app/commerce.clj"
+     :find "          (when-not (:isValid verdict)"
+     :replace "          (when (:isValid verdict)"
+     :must-fail ["unverified-payment-never-decrements-inventory"]}]}
 
   {:repo "orgs/cloud-itonami/mangaka-data"
    :label "mangaka-data corpus —— 文書どうしの参照と、言語版が共有する背骨"
