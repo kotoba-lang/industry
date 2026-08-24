@@ -1537,4 +1537,73 @@
               （2026-08-23 の全件測定: local-root-broken 0 / relative-paths-broken 0）。
               つまりこの detector は landing 時点で緑であり、**赤も実際に出せることを
               合成 tree で先に見てから**登録した（『一度も緑にならない gate も、
-              一度も赤くならない gate も同じだけ無内容』）。"}]}
+              一度も赤くならない gate も同じだけ無内容』）。"}
+
+  {:id       :verify-negative-zero-literals
+   :title    "-0.0 written as a literal, on the runtime where that stopped meaning -0.0"
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-negative-zero-literals.cljs" "--findings" "--root" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\ttracked .cljc/.cljs"
+   :interval-ms 86400000                 ; 24h -- a source shape, it moves when someone writes code
+   :timeout-ms  900000                   ; 15m -- measured 395s at load 5.17; 4,284 `git ls-files` calls dominate
+   :writes   :none
+   :why      "Measured 2026-08-24, the same expression on three nbb versions:
+              ((fn [] (/ 1.0 -0.0)))  ->  1.4.208 ##-Inf / 1.4.210 ##-Inf / 1.5.212 ##Inf.
+              A -0.0 LITERAL inside a function body reads back as +0.0 under SCI on
+              nbb 1.5.212. The same literal at the top level, behind a top-level def,
+              or computed with (- 0.0) keeps its sign on every version tested, and the
+              JVM has never got it wrong. So it is a regression between 1.4.210 and
+              1.5.212, and the workspace was blind to it in the worst possible way:
+              scripts/fleet-ci/gates/nbb-cross-runtime.cljs PINS 1.4.210 (correctly --
+              1.4.208 cannot load a deftype with a custom protocol), so the gate is
+              green on the version nobody installs and silent about the one they do.
+
+              It had two live victims the day it was found, in repositories that had no
+              idea they shared a bug -- kotoba-lang/io-ipld test/ipld/value_test.cljc
+              and kotoba-lang/kotobase-engine-contract
+              test/kotobase/engine/canonical_test.cljc. Both wrote #(f -0.0) to assert
+              a codec REJECTS negative zero; on current nbb the thunk passed +0.0, so
+              the assertion tested nothing it meant to. Both are fixed (io-ipld
+              42985bc, engine-contract adbdaae) and both are clean here now.
+
+              Cannot be a fleet gate: it reads every checkout under orgs/, and the
+              fleet ships one repo's tree (the shape root-permit-index stayed red on
+              for 300 runs).
+
+              Reports every code-position occurrence, not only the ones in function
+              bodies. A top-level (def z -0.0) reads correctly today and stops the
+              moment someone inlines it -- an edit that looks like a refactor, not a
+              value change -- and (- 0.0) costs nothing, so an exception would only be
+              something to forget. Findings name the paren depth so a reader can tell a
+              live defect from a latent one without opening the file."
+   :measured "2026-08-24 on this machine at load 5.17: 395s, exit 1,
+              SCANNED 28233 tracked .cljc/.cljs across 4284 checkouts, self-check 10/10.
+              9 code-position literals in 8 files (hakoniwa, actor-shiori,
+              com-etzhayyim-shiori, bim x2, kami-app-car-sim, org-ietf-jcs,
+              org-vrmc-vrm, rdf-canon). An earlier plain grep for the same string
+              returned 27 lines; the other 18 are docstrings and ;; comments, four of
+              them in io-ipld's own value.cljc explaining this very rule. That gap is
+              why this reads with reader state instead of a regex.
+
+              Both directions, on synthetic AND on real data:
+                self-check, 10 cases, run before it is allowed to say anything about
+                  the workspace -- bare literal in a call (1), top-level def (1),
+                  inside a ;; comment (0), inside a docstring (0), escaped quote in a
+                  string (0), character-literal semicolon then a real one (1), -0.05
+                  (0), x-0.0 (0), (- 0.0) (0), and -0. / -0.000 together (2).
+                real: --repo orgs/kotoba-lang/io-ipld at its fixed tip -> exit 0, OK.
+                  Reverting ONLY that one expression in the working tree -> exit 1,
+                  naming test/ipld/value_test.cljc:146 at depth 7. Restored, clean.
+
+              The self-check is not decoration. The first scanner written here called
+              subs with one index, which throws -- and a detector that dies before
+              printing SCANNED looks exactly like one that found nothing, to a caller
+              reading only the exit code.
+
+              What it does NOT see: .clj (JVM-only, where the literal is correct), and
+              the OTHER 1.4.210->1.5.212 regression found the same day (amu's ir/lower
+              overflowing the SCI stack on a 243-byte fixture, ADR-2608242100), which
+              is not a source shape. This closes one class; the version-divergence
+              question is still open."}]}
