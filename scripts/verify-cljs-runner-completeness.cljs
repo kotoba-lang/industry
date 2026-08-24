@@ -695,9 +695,16 @@
   (println (str "  " (subs (str (name k) "                              ") 0 28)
                 (count (filter #(= k (:kind %)) all-findings)) "  " label)))
 (println)
+;; A repo counts as complete when every test namespace is either RUN or
+;; DECLARED. `info` findings are declared exclusions, and holding them against
+;; completeness made the two numbers on this screen contradict each other:
+;; ongakuka read as 0 findings and `0 of 1 complete` at the same time.
 (println "  repos with a complete runner:"
-         (count (remove (fn [r] (some #(= (:repo r) (:repo %)) all-findings)) in-scope))
-         "of" (count in-scope) "with a ClojureScript runner")
+         (count (remove (fn [r] (some #(and (= (:repo r) (:repo %))
+                                            (not= "info" (:sev %)))
+                                      all-findings))
+                        in-scope))
+         "of" (count in-scope) "with a ClojureScript runner (run or declared)")
 (println "  repos with portable tests and NO ClojureScript runner:" (count no-runner)
          "-- counted, never a finding; see the header")
 
