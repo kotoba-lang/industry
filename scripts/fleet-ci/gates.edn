@@ -2160,6 +2160,40 @@
   ;; （`exit 0 — nbb: 6 tests, 14 passed, 0 failed, 0 errors`）。**dan は :jvm を
   ;; 持たない 3 ノードの 1 つ** —— clojure CLI の無いマシンで緑になったことが、
   ;; この gate の JDK-free 主張の実証そのもの。両方向を見せたので landed。
+  ;; Amu's JVM-free wasm32 regression suite (`test/nbb/run.cljs`, 30 fixtures
+  ;; through sema -> kir -> wasm). It existed and NOTHING ran it: measured
+  ;; 2026-08-24, `grep -rn "test/nbb/run.cljs" scripts/fleet-ci/` returned
+  ;; nothing, and it was red on current nbb the whole time.
+  ;;
+  ;; It could not be gated earlier for a real reason, which is worth keeping.
+  ;; `lazy-sequence.kotoba` exhausted the constant oracle's host stack on nbb
+  ;; 1.5.212 and folded on 1.4.210 — not because of that fixture, but because
+  ;; `kotoba.kir/eval-expr` recursed into the chosen `if` branch, so the
+  ;; closure `invoke` dispatcher (a linear `if` chain over every lambda in the
+  ;; module) cost one host frame per link. The oracle's reach depended on the
+  ;; SIZE OF THE MODULE. Fixed in kotoba-kir b9b2308 / kotoba-sema 58e1158,
+  ;; carried by amu 540b035. Adding the gate before that would have created a
+  ;; permanently red one.
+  ;;
+  ;; The gate script PINS nbb 1.5.212, and not the 1.4.210 that
+  ;; nbb-cross-runtime.cljs pins. Measured against amu at 0d00a71, the commit
+  ;; immediately before the fixes:
+  ;;
+  ;;   nbb 1.4.208   38 cases, 0 failed, exit 0
+  ;;   nbb 1.5.212   38 cases, 1 failed, exit 1 (lazy-sequence)
+  ;;
+  ;; The older pin cannot see this class of defect, which is how it stayed
+  ;; invisible. :cap :node because the script traps java/clojure/clj/javac on
+  ;; PATH — a green here is evidence no JVM was consulted.
+  {:name "amu" :id "amu-nbb-regression" :gate :nbb-script :cap :node
+   :script "gates/amu-nbb-regression-check.cljs"
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".kotoba"] :min-files 120
+   :require-paths ["test/nbb/run.cljs" "test/nbb/cases.cljs"
+                   "deps.edn" "deps-lock.edn"
+                   "src/kotoba/compiler/nbb/classpath.cljs"
+                   "test/nbb/fixtures/lazy-sequence.kotoba"]
+   :ship-git-deps true :cd false}
+
   {:name "amu" :id "amu-portable-surface" :gate :nbb-script :cap :node
    :script "gates/amu-portable-surface-check.cljs"
    :include-ext [".cljc" ".cljs" ".edn"] :min-files 120
