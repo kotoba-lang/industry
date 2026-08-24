@@ -6,7 +6,7 @@
   :adr/topic "hyakka-knowledge-wiki-on-kotobase"
   :adr/status "accepted"
   :adr/date "2026-07-31"
-  :adr/last-verified "2026-07-31"
+  :adr/last-verified "2026-08-24"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
 
@@ -43,14 +43,20 @@
    "network-awai/net-kotobase b8ffb5b (docs/adr/260718 に wiki.kotobase.net の委譲を記録)"
    "tenant DID did:key:z6MkuEj8M1GKrAqW8ZsenbickiLvpfzJFLpNpxgyggcm1DKv (seed は kagi `hyakka-kotobase-seed`, compartment personal)"
    "P1 join probe PASS (2026-07-31): two-hop rows=2 / control-claim rows=2"
+   "network-awai/app-hyakka d786aab (2026-08-24: 81 tests / 622 assertions 0-fail、Worker release build PASS)"
+   "live catalogue sha256:0f4eb289c9621cd4f30553b79ebe131874dcf7e058c6fb7e8aa899bef8efd114 (634 items / 4,665 claims / 488 sources)"
+   "jp-tetsuzuki live verification (2026-08-24): world/procedure/jp-sojo-teiki が一次資料・source hash・公式様式を伴って /api/v1/items/<id> から取得可能"
+   "superproject origin/main の app-hyakka pin = d786aab8146f76eacc2a8fdb45ab8652c6845633"
    "（P1 で追記）two-hop join probe の結果"]
 
   :adr/verify
   ["cd orgs/network-awai/app-hyakka && npm test"
+   "cd orgs/network-awai/app-hyakka && npm run build"
    "cd orgs/network-awai/app-hyakka && clojure -M:test   ; cljc portability"
    "cd orgs/network-awai/app-hyakka && HYAKKA_SEED=<kagi> npm run probe   ; P1 join gate"
    "cacao.conformance を wiki.kotobase.net の deploy に対して実行し 0-fail"
-   "curl -s https://wiki.kotobase.net/health | jq -e '.ok == true'"]
+   "curl -s https://wiki.kotobase.net/health | jq -e '.ok == true and .catalog-id == \"sha256:0f4eb289c9621cd4f30553b79ebe131874dcf7e058c6fb7e8aa899bef8efd114\"'"
+   "curl -s https://wiki.kotobase.net/api/v1/items/world%2Fprocedure%2Fjp-sojo-teiki | jq -e '.item.corpus == \"jp-tetsuzuki\" and (.facts | length > 0)'"]
 
   :adr/body
   "# Context
