@@ -1551,11 +1551,29 @@
    :writes   :none
    :why      "Measured 2026-08-24, the same expression on three nbb versions:
               ((fn [] (/ 1.0 -0.0)))  ->  1.4.208 ##-Inf / 1.4.210 ##-Inf / 1.5.212 ##Inf.
-              A -0.0 LITERAL inside a function body reads back as +0.0 under SCI on
-              nbb 1.5.212. The same literal at the top level, behind a top-level def,
-              or computed with (- 0.0) keeps its sign on every version tested, and the
-              JVM has never got it wrong. So it is a regression between 1.4.210 and
-              1.5.212, and the workspace was blind to it in the worst possible way:
+
+              A -0.0 literal loses its sign under SCI on nbb 1.5.212 when the analyzer
+              treats it as an EXPRESSION inside a function body. Characterised exactly
+              (this entry first said `inside a function body`, which was too broad and
+              was wrong about two of its own nine findings):
+
+                loses the sign  direct argument to a call, let binding value, returned
+                                bare, argument to (list ...), #() body
+                keeps the sign  inside a [...] or {...} data literal, and anything
+                                COMPUTED -- (- 0.0), (* -1.0 0.0)
+                top level       every shape keeps its sign
+
+              That split cannot be decided by scanning: (let [z -0.0] ...) has [ as its
+              innermost delimiter and loses the sign, while [1.0 -0.0] has the same
+              delimiter and does not. So the detector reports every code-position
+              literal and does NOT claim to know which are live -- it prints a RUNTIME
+              line measured by evaluating both shapes in the interpreter running it.
+              A later nbb that fixes this will say so on its own rather than have the
+              detector repeat a stale measurement.
+
+              1.4.208 and 1.4.210 get every shape right, and the JVM always has, so
+              this is a regression between 1.4.210 and 1.5.212. The workspace was blind
+              to it in the worst possible way:
               scripts/fleet-ci/gates/nbb-cross-runtime.cljs PINS 1.4.210 (correctly --
               1.4.208 cannot load a deftype with a custom protocol), so the gate is
               green on the version nobody installs and silent about the one they do.
@@ -1582,7 +1600,10 @@
               SCANNED 28233 tracked .cljc/.cljs across 4284 checkouts, self-check 10/10.
               9 code-position literals in 8 files (hakoniwa, actor-shiori,
               com-etzhayyim-shiori, bim x2, kami-app-car-sim, org-ietf-jcs,
-              org-vrmc-vrm, rdf-canon). An earlier plain grep for the same string
+              org-vrmc-vrm, rdf-canon). Two of those nine are NOT live on any nbb --
+              org-ietf-jcs is a top-level call argument and rdf-canon sits in a vector
+              literal -- which is how the over-broad first wording was caught: the
+              claim was checked against its own findings. An earlier plain grep
               returned 27 lines; the other 18 are docstrings and ;; comments, four of
               them in io-ipld's own value.cljc explaining this very rule. That gap is
               why this reads with reader state instead of a regex.
@@ -1596,6 +1617,17 @@
                 real: --repo orgs/kotoba-lang/io-ipld at its fixed tip -> exit 0, OK.
                   Reverting ONLY that one expression in the working tree -> exit 1,
                   naming test/ipld/value_test.cljc:146 at depth 7. Restored, clean.
+                  Run under 1.4.208, 1.4.210 and 1.5.212: same finding, and the RUNTIME
+                  line correctly says LOSES-SIGN for the third and correct for the
+                  other two.
+
+              The RUNTIME version comes from nbb.core/version, the interpreter running
+              the file, NOT from shelling out to `nbb --version`. The first version of
+              that function did shell out and printed
+                RUNTIME nbb v1.4.208  expression-in-fn-body=LOSES-SIGN
+              which is false about 1.4.208 and true about the nbb that ran it -- a
+              version that does not belong to the measurement beside it, which is the
+              same defect the detector exists to find.
 
               The self-check is not decoration. The first scanner written here called
               subs with one index, which throws -- and a detector that dies before
