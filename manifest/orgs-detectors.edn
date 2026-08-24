@@ -1859,9 +1859,20 @@
               object.pe32plus/little-endian (PE image-base at width 8, bytes 4..7
               repeating 0..3). Two of the three sat in files whose own comments already
               explained this exact hazard, in a different function."
-   :measured "2026-08-25 on this machine: 2m11s, exit 1, SCANNED 28581 .cljc/.cljs files,
-              SHIFTS-READ 1608, SHIFTS-COMPUTED 712, FINDINGS 23 across 14 files in
-              10 repositories.
+   :measured "2026-08-25 on this machine: 2m11s, exit 1, SCANNED 28584 .cljc/.cljs files,
+              SHIFTS-READ 1596, SHIFTS-COMPUTED 708, SHIFT-LEFT-31 2, FINDINGS 12.
+              It opened at 23 findings across 14 files in 10 repositories the same day
+              and has been coming down as they are fixed.
+
+              SHIFT-LEFT-31 is a SEPARATE, non-failing count, and the reason is a
+              measurement. A left shift by exactly 31 is negative on ClojureScript and
+              2^31 on the JVM -- a real divergence -- but it is usually deliberate: code
+              that builds a 32-bit word and masks it, writes it into a Uint32Array, or
+              runs it through its own `u32` helper is correct as written. Three sites
+              existed when the rule was added: one real (opus.celt's overflow guard
+              compared against a negative number, so the bits->pulses loop returned on
+              its first iteration and every band got zero pulses) and two deliberate.
+              One in three is not a finding rate, so it reports and never fails.
 
               Cross-checked against an independent Python implementation of the same
               scan written first: identical 23-element finding set.

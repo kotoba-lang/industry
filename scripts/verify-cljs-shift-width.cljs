@@ -11,9 +11,17 @@
 ;; `bit-shift-left` / `bit-shift-right` / `unsigned-bit-shift-right` compile
 ;; straight to them. So on ClojureScript:
 ;;
-;;   (bit-shift-left 1 32)  => 1        (not 4294967296)
-;;   (bit-shift-left 1 56)  => 16777216 (not 2^56)
+;;   (bit-shift-left 1 31)  => -2147483648 (not 2147483648 -- the SIGN BIT)
+;;   (bit-shift-left 1 32)  => 1           (not 4294967296)
+;;   (bit-shift-left 1 56)  => 16777216    (not 2^56)
 ;;   (unsigned-bit-shift-right x 32) => x >>> 0, the low word
+;;
+;; Note the first line. The boundary for `bit-shift-left` is 31, not 32: the
+;; result is an int32, so a shift that lands a set bit in position 31 makes the
+;; number NEGATIVE rather than wrapping. Measured 2026-08-25 while fixing
+;; `av1.bitreader/uvlc`, whose `2^leading_zeros - 1` term went negative at 31
+;; leading zeros -- a case the first version of this detector, which only
+;; looked for 32 and above, did not report.
 ;;
 ;; It does not throw. It returns a plausible number of the right type, which is
 ;; why this survives: on the JVM the same expression is right, so a `.cljc`
@@ -211,6 +219,7 @@
                     (str/ends-with? file ".cljc") blank-clj-branches
                     true blank-strings-and-comments)
           hits (atom [])
+          sign-bit (atom [])
           computed (atom 0)
           readable (atom 0)]
       (loop [from 0]
@@ -224,11 +233,36 @@
               (when (some? cnt)
                 (if-let [v (literal-value cnt)]
                   (do (swap! readable inc)
-                      (when (>= v 32)
-                        (swap! hits conj {:line (line-of blanked at) :shift v})))
+                      ;; `bit-shift-left` is wrong from 31 up: at 31 the result
+                      ;; is int32-negative rather than 2^31. The right shifts
+                      ;; are only wrong from 32, where the count wraps.
+                      (let [left? (str/includes? (first m) "bit-shift-left")]
+                        (cond
+                          (>= v 32)
+                          (swap! hits conj {:line (line-of blanked at) :shift v
+                                            :op (if left? "bit-shift-left" "shift-right")
+                                            :why "count taken mod 32"})
+                          ;; A left shift by exactly 31 puts a set bit in the
+                          ;; sign position, so on ClojureScript the result is
+                          ;; negative where the JVM's is 2^31. That IS a
+                          ;; divergence, but it is often deliberate: code that
+                          ;; builds a 32-bit word and then masks it, writes it
+                          ;; into a Uint32Array, or runs it through a `u32`
+                          ;; helper is correct as written. Measured 2026-08-25,
+                          ;; three sites: one real (opus.celt's overflow guard
+                          ;; compared against a negative number, so it never
+                          ;; fired) and two deliberate (xz.crc64 has its own
+                          ;; `u32`; a car-sim test writes into a Uint32Array).
+                          ;; One in three is not a finding rate. Reported and
+                          ;; counted, never failing the run.
+                          (and left? (= v 31))
+                          (swap! sign-bit conj
+                                 {:line (line-of blanked at)
+                                  :file file}))))
                   (swap! computed inc)))
               (recur (inc at))))))
-      {:file file :hits @hits :computed @computed :readable @readable})))
+      {:file file :hits @hits :sign-bit @sign-bit
+       :computed @computed :readable @readable})))
 
 (defn -main []
   (let [orgs (path/join root "orgs")
@@ -249,15 +283,16 @@
       (let [files (mapcat #(walk % 8) repos)
             results (keep scan-file files)
             findings (mapcat (fn [{:keys [file hits]}]
-                               (map (fn [{:keys [line shift]}]
+                               (map (fn [{:keys [line shift op why]}]
                                       {:id (str "shift-" shift ":"
                                                 (str/replace file (str root "/") "") ":" line)
                                        :file (str/replace file (str root "/") "")
-                                       :line line :shift shift})
+                                       :line line :shift shift :op op :why why})
                                     hits))
                              results)
             readable (reduce + (map :readable results))
-            computed (reduce + (map :computed results))]
+            computed (reduce + (map :computed results))
+            sign-bit (mapcat :sign-bit results)]
         (when (zero? (count results))
           (println "REFUSING: scanned 0 files. Refusing to report a pass.")
           (.exit js/process 2))
@@ -268,12 +303,19 @@
                       "\t(the count is an expression -- UNMEASURED here, not clean;"
                       " two of the three defects this detector was written for"
                       " were exactly this shape)"))
+        (println (str "SHIFT-LEFT-31\t" (count sign-bit)
+                      "\t(negative on ClojureScript, 2^31 on the JVM --"
+                      " often deliberate, so reported and never failing;"
+                      " measured 1 of 3 real)"))
+        (doseq [{:keys [file line]} (sort-by (juxt :file :line) sign-bit)]
+          (println (str "  SIGN-BIT  "
+                        (str/replace file (str root "/") "") ":" line)))
         (println (str "FINDINGS\t" (count findings)))
-        (doseq [{:keys [id file line shift]} (sort-by :id findings)]
+        (doseq [{:keys [id file line shift op why]} (sort-by :id findings)]
           (if findings-mode?
-            (println (str "FINDING\t" id "\tshift count " shift
-                          " is taken mod 32 on ClojureScript"))
-            (println (str "  " file ":" line "\tshift=" shift))))
+            (println (str "FINDING\t" id "\t" op " by " shift
+                          " on ClojureScript: " why))
+            (println (str "  " file ":" line "\tshift=" shift "\t" why))))
         (.exit js/process (if (seq findings) 1 0)))))
 
 (-main)
