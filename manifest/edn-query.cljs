@@ -868,6 +868,46 @@
     (warn-skipped! "cloud-itonami-lei tos.journal.edn" @skipped)
     out))
 
+(defn lei-facts-entities
+  "cloud-itonami-lei-<LEI>/facts.edn を読む。`scripts/lei-verify-facts.cljs` が
+   書く tx-data（entity map のベクタ）で、GLEIF の登記事実・ISIN・親子関係・
+   reporting exception が 1 entity ずつ、それぞれ :source/url と
+   :source/retrieved-at つきで入っている。
+
+   **この loader が無かった間、その事実は面から引けなかった。** facts.edn の
+   ヘッダは自分でそう申告している（「NOT on the shared query plane yet.
+   manifest/edn-query.cljs has loaders for blueprint.edn and tos.journal.edn
+   and none for this file」）。2026-08-25 に 183/185 repo が facts.edn を持った
+   ので、載せる価値がその申告を上回った。
+
+   :fact/id は **repo ローカル**で、`gleif-lei-record` は全 repo で同じ文字列。
+   LEI を足して初めて blueprint / tos / market-intel / property と結合できる
+   （tos loader が :tos/entity-id でやっているのと同じ理由）。repo を跨いで
+   1 件を名指しできるように :fact/qualified-id も足す。"
+  [next-tempid!]
+  (let [skipped (atom [])
+        out (doall
+             (mapcat
+              (fn [d]
+                (let [f (io/file d "facts.edn")]
+                  (if (.exists f)
+                    (let [ents (vector-of-maps-entities f)
+                          lei (lei-from-dir d)]
+                      ;; 読めたのに 0 件なら、別の規約か本物の破損。黙って落とさず報告する
+                      ;; （ファイルが無いのは skip ではない —— まだ生成していないだけ）。
+                      (when (empty? ents) (swap! skipped conj lei))
+                      (for [e ents]
+                        (assoc e
+                               :db/id (next-tempid!)
+                               :company/lei (or (:company/lei e) lei)
+                               :fact/qualified-id (str lei "/" (:fact/id e))
+                               :source/dataset (or (:source/dataset e) "cloud-itonami-lei-facts")
+                               :source/file (str f))))
+                    [])))
+              (lei-repo-dirs)))]
+    (warn-skipped! "cloud-itonami-lei facts.edn" @skipped)
+    out))
+
 ;; ---------- GLEIF LEI universe + 不動産 ownership（category J、ADR-2608012000） ----------
 ;;
 ;; kotoba-lang/property の `data/*.datoms.edn`（committed projection）を読む。
@@ -2261,6 +2301,7 @@
         company-tx (concat (company-facts-entities next-tempid!)
                             (lei-blueprint-entities next-tempid!)
                             (lei-tos-entities next-tempid!)
+                            (lei-facts-entities next-tempid!)
                             (gleif-lei-entities next-tempid!)
                             (houjin-bangou-entities next-tempid!)
                             (invoice-entities next-tempid!))
