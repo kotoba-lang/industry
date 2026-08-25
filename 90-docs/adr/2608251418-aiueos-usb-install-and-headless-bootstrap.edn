@@ -36,7 +36,7 @@
 
 Amu は checked KIR から AIUEOS の native artifact を生成し、Kotoba / kotoba-native は application と machine-code の authority を持つ。どちらも install target の選択、秘密の配布、ユーザー作成、ネットワーク初期化を所有しない。それらを compiler の責任に押し込まない。
 
-## 現在地（tranche 1..4 反映 2026-08-25、aiueos ADR-0097/0099/0101/0102 / contracts/install-v1.edn + ssh-v1.edn が component 側 matrix）
+## 現在地（tranche 1..5 反映 2026-08-25、aiueos ADR-0097/0099/0101/0102/0103 / contracts/install-v1.edn + ssh-v1.edn が component 側 matrix）
 
 | 面 | 現行 `main` | Ubuntu Server 相当との差 |
 |---|---|---|
@@ -127,7 +127,7 @@ Tailscale は R0 install の成功条件にしない。まず wired DHCP + local
 | I1 artifact | release image、installer bundle、intent、receipt の digest chain が閉じる | green（make-install-usb-image.py が閉じ、verify が image 単体から再導出） |
 | I2 destructive guard | partition / removable / system / nonempty / changed identity / wrong intent をすべて拒否する | green-offline（installer 18/18 + install-chain 18/18、各拒否は名指しの理由で pin。実 block device 上では未測定） |
 | I3 QEMU install | USB transport から空 disk へ install し、USB 無しで二回 boot する | **green（QEMU、2026-08-25、aiueos ADR-0099）**。smoke-qemu-install.cljs が 4 boot を一体で検査: USB-live install（intent admit + readback）→ USB 無しで NVMe から aiueos が 2 回 boot（各 39 marker）→ 再挿入 USB は existing-install で拒否し disk digest 不変。installed extent は release receipt digest と前後で一致 |
-| I4 headless | DHCP 後、外部 client が指定鍵で SSH、wrong key は拒否、二回目 boot でも成功 | **red**（login は未実装）。設計は ssh-v1.edn。**着地・実測済み**: (1) provisioning 半分（aiueos ADR-0101）= target 上で per-device ed25519 host key 生成 + authorized key 配置、RFC 8032 vector で pin・chain 22/22・install gate で確認。(2) **passive open + SSH identification 交換**（aiueos ADR-0102）= kernel が :22 の inbound TCP を accept し `SSH-2.0-aiueos_0.1` を交換、実 external client で 3/3 実測（smoke-qemu-ssh）。残る blocker: RX 深さ1 / entropy・sign 無し / 常駐 loop 無し、crypto brick は SHA-512 と Ed25519（kex/host-key/userauth） |
+| I4 headless | DHCP 後、外部 client が指定鍵で SSH、wrong key は拒否、二回目 boot でも成功 | **red**（login は未実装）。設計は ssh-v1.edn。**着地・実測済み**: (1) provisioning 半分（aiueos ADR-0101）= target 上で per-device ed25519 host key 生成 + authorized key 配置、RFC 8032 vector で pin・chain 22/22・install gate で確認。(2) **passive open + SSH identification 交換**（aiueos ADR-0102）= kernel が :22 の inbound TCP を accept し `SSH-2.0-aiueos_0.1` を交換、実 external client で 3/3 実測（smoke-qemu-ssh）。残る作業（aiueos ADR-0103 で narrowing 済み）: entropy API は着地・実測（aiueos_random_bytes、boot self-test で AIUEOS_RANDOM_OK）。crypto path は **ecdsa-sha2-nistp256** に変更 = userauth は既存の kernel ECDSA verify を再利用、新規 object は ECDSA P-256 RFC6979 **sign 1 本のみ**（既存 ecdsa-p256.kotoba の演算を再利用、SHA-512/Ed25519 不要）。残り: sign object + SSH transport（X25519+SHA-256+entropy は揃い） + host-key 署名 + aes128-gcm + userauth + 常駐 loop |
 | I5 repeat safety | 成功済み target を同じ USB が unattended erase しない | green（fake device + QEMU 全連鎖の両方で実測。boot4 の再挿入は exit 4 existing-install で拒否、disk byte-identical。実機では未測定） |
 | I6 physical probe | 対象 PC の NVMe / NIC / GPU / UEFI identity を read-only receipt にする | amber（hw-probe tooling を main へ移植済み。対象 PC では未実行） |
 | I7 physical install | 明示 target へ write/readback、USB 無し SSD boot、LAN SSH | red |
@@ -146,7 +146,8 @@ I7 の最初の qualification target は購入済み PC（ASRock B850M Pro RS Wi
 7. 対象 PC を read-only probe し、明示確認後に物理 install / readback / SSD boot を行う。
 8. ~~LAN SSH 成功後に optional Tailscale enrollment を追加する。~~（I8、I4 の後）
 5b. first-boot provisioning の静的半分（host key 生成 + authorized key 配置）を着地させる。（済 2026-08-25、aiueos ADR-0101）
-5c. TCP passive-open + SSH identification 交換を kernel に実装し実 client で実測。（済 2026-08-25、aiueos ADR-0102。sshd の login 本体 = kex/host-key/userauth は SHA-512 + Ed25519 の次 tranche）
+5c. TCP passive-open + SSH identification 交換を kernel に実装し実 client で実測。（済 2026-08-25、aiueos ADR-0102）
+5d. entropy API（aiueos_random_bytes）を着地・実測し、crypto path を ecdsa-sha2-nistp256 に確定（残る新規 crypto は ECDSA P-256 sign 1 本）。（済 2026-08-25、aiueos ADR-0103）
 9. 同じ contract を保ったまま Linux live mechanism 依存を native AIUEOS installer へ縮める。
 
 ## 非決定
