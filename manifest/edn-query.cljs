@@ -41,14 +41,40 @@
 ;; 十数 ms（実測 2026-07-30）。cwd が superproject root である必要があるのは、
 ;; 入力パスを git rev-parse --show-toplevel から解決しているため。
 
-(require '[scripts.nbb-compat :refer [slurp file-seq format]]
+(require '[scripts.nbb-compat :as nbb-compat :refer [file-seq format]]
          '[clojure.edn :as edn]
          '[clojure.java.io :as io]
          '[clojure.java.shell :as shell]
          '[clojure.string :as str]
-         '["datascript" :as ds-mod])
+         '["datascript" :as ds-mod]
+         '["fs" :as node-fs]
+         '["node:crypto" :as node-crypto])
 
 (def ds (.-default ds-mod))
+
+;; ---------- 何を読んだかを記録する（キャッシュの鮮度判定の材料） ----------
+;;
+;; キャッシュの鍵を「宣言した root を walk して hash」にはできない。この面が
+;; 読むのは `orgs/cloud-itonami` の下の 185 個の repo だが、その親には 1,852 個の
+;; repo が居て、walk すると数百万ファイルを stat することになる。
+;;
+;; だから **ビルドが実際に読んだファイル** を記録する。読む口は `slurp` 1 つに
+;; 集約されているので、ここを通れば漏れない —— 新しい loader を足しても、
+;; その loader が slurp を使う限り自動的に記録される。
+;;
+;; ファイルだけでは「ディレクトリに新しいファイルが増えた」を検出できないので、
+;; 読んだファイルの親と祖父ディレクトリの **エントリ名の digest** も併せて記録する
+;; （新しい lei repo が生えた場合は祖父の `orgs/cloud-itonami` 側で捕まる）。
+
+(def ^:private reads-seen (atom #{}))
+
+(defn slurp
+  "`scripts.nbb-compat/slurp` に読んだパスの記録を足したもの。名前を保つのは、
+   この面の 30 近い呼び出し側を書き換えないため。"
+  [path]
+  (swap! reads-seen conj (str path))
+  (nbb-compat/slurp path))
+
 
 (def root (str/trim (:out (shell/sh "git" "rev-parse" "--show-toplevel"))))
 
@@ -103,6 +129,12 @@
   [v]
   (cond
     (map? v) (pr-str v)
+    ;; 集合はここに来るまで素通しだった。map / vector と違い pr-str されないので
+    ;; CLJS の集合オブジェクトのまま JS 側へ渡り、datascript の serializable が
+    ;; `#object[Object #{...}]` と書いて **読み戻せない db** を作っていた
+    ;; （実測 2026-08-25: 約 100 万 datom 中 45 件がこれで、面のキャッシュ化を
+    ;; 阻んでいた唯一の原因）。map と同じく文字列にする。
+    (set? v) (pr-str v)
     (and (or (vector? v) (seq? v) (list? v)) (every? ->ds-scalar? v))
     (into-array (map ->ds-scalar v))
     (or (vector? v) (seq? v) (list? v)) (pr-str v)
@@ -2453,19 +2485,213 @@
     :description "Entity count per dataset in the plane, and the total."
     :input-schema {:type "object" :properties {}}}])
 
+;; ---------- 面のキャッシュと 30 秒予算 ----------
+;;
+;; 実測 2026-08-25、load 18〜23 のとき:
+;;
+;;   面の構築            298,795 ms   ← 所要時間のほぼ全部
+;;   join 1 本               267 ms
+;;   稀な属性を数える          7 ms
+;;
+;; join は全体の 0.09% で、遅かったのは「1 クエリ 1 プロセスで毎回 166,311
+;; entity を読み直していた」こと。キャッシュを挟むと最初の答えまで 7.6 秒
+;; (read 1.4 + JSON.parse 3.4 + from_serializable 2.3 + query 0.15)。
+;;
+;; **冷たい面に対しては答えを出さずに拒否する。** 5 分待たせると、待たされた側は
+;; 「重いクエリを書いてしまった」と誤解する —— 実際にはクエリは 1 秒もかかって
+;; いない。拒否すれば原因が名指しで出る。
+
+(def ^:private budget-ms 30000)
+
+(def ^:private cache-dir (io/file root ".projection-cache"))
+(def ^:private cache-json (io/file cache-dir "edn-query-plane.json"))
+(def ^:private cache-meta (io/file cache-dir "edn-query-plane.meta.edn"))
+(def ^:private views-file (io/file cache-dir "edn-query-views.edn"))
+(def ^:private views-spec (io/file root "manifest" "plane-views.edn"))
+
+(defn- sha256-hex [x]
+  (-> (node-crypto/createHash "sha256") (.update x) (.digest "hex")))
+
+(defn- stat-of [path]
+  (try (let [st (node-fs/statSync path)]
+         [(str path) (.-size st) (js/Math.round (.-mtimeMs st))])
+       (catch :default _ [(str path) -1 -1])))
+
+(defn- dir-digest [dir]
+  (try (sha256-hex (str/join " " (sort (js->clj (node-fs/readdirSync dir)))))
+       (catch :default _ "missing")))
+
+(defn- inputs-snapshot
+  "ビルドが読んだファイル (slurp が記録) と、その親・祖父ディレクトリのエントリ名
+   digest。ファイルだけでは『ディレクトリに新しいファイルが増えた』が見えない。
+
+   宣言した root を walk する方式は採れない —— この面が読むのは
+   orgs/cloud-itonami の下の 185 repo だが、その親には 1,852 repo が居るので
+   walk すると数百万ファイルを stat することになる。読んだものだけを記録する。"
+  []
+  (let [files (sort @reads-seen)
+        dirs (->> files
+                  (mapcat (fn [f]
+                            (let [parent (.getParent (io/file f))]
+                              [parent (some-> parent io/file .getParent)])))
+                  (remove nil?)
+                  distinct sort vec)]
+    {:files (mapv stat-of files)
+     :dirs (mapv (fn [d] [d (dir-digest d)]) dirs)}))
+
+(defn- snapshot-digest [{:keys [files dirs]}]
+  (sha256-hex (pr-str [(vec files) (vec dirs)])))
+
+(defn- current-digest
+  "meta が記録した *同じ* 集合を測り直す。ビルドせずに鮮度を判定できるのは
+   この記録があるからで、記録に無いものが増えた場合は dirs 側で捕まる。"
+  [{:keys [files dirs]}]
+  (snapshot-digest {:files (mapv (fn [[f _ _]] (stat-of f)) files)
+                    :dirs (mapv (fn [[d _]] [d (dir-digest d)]) dirs)}))
+
+(defn- read-meta []
+  (try (when (.exists cache-meta) (slurp-edn cache-meta))
+       (catch :default _ nil)))
+
+(defn- cache-state
+  "[:fresh|:stale|:absent meta]。**読めなかったことを fresh と区別する** ——
+   meta が壊れていれば :absent であって :fresh ではない。"
+  []
+  (let [m (read-meta)]
+    (cond
+      (or (nil? m) (not (.exists cache-json))) [:absent nil]
+      (= (:digest m) (current-digest m)) [:fresh m]
+      :else [:stale m])))
+
+(defn- write-cache! [db counts]
+  (when-not (.exists cache-dir)
+    (node-fs/mkdirSync (.getPath cache-dir) (clj->js {:recursive true})))
+  (let [snap (inputs-snapshot)
+        json (js/JSON.stringify (.serializable ds db))]
+    (node-fs/writeFileSync (.getPath cache-json) json)
+    (node-fs/writeFileSync (.getPath cache-meta)
+                           (pr-str (assoc snap
+                                          :digest (snapshot-digest snap)
+                                          :built-at (.toISOString (js/Date.))
+                                          :counts counts
+                                          :bytes (count json))))
+    {:bytes (count json) :files (count (:files snap)) :dirs (count (:dirs snap))}))
+
+(defn- load-cached-db []
+  (.from_serializable ds (js/JSON.parse (node-fs/readFileSync (.getPath cache-json) "utf8"))))
+
+(defn- allow-cold? []
+  (= "1" (.-EDN_QUERY_ALLOW_COLD (.-env js/process))))
+
+(defn- refuse-cold! [state]
+  (js/console.error
+   (str "edn-query: the plane is " (name state) " -- refusing to answer.\n"
+        "  Building it inline takes ~5 minutes, 10x this tool's 30s budget, and the\n"
+        "  query is not what is slow (a join measures ~0.3s once the plane is warm).\n"
+        "  Refresh the cache first:\n"
+        "    nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs refresh\n"
+        "  Or set EDN_QUERY_ALLOW_COLD=1 to build inline anyway."))
+  (scripts.nbb-compat/exit 4))
+
+(defn- plane-db! []
+  (let [[state m] (cache-state)]
+    (if (= :fresh state)
+      (let [t (js/Date.now)
+            db (load-cached-db)]
+        (js/console.error (str "edn-query: plane from cache in " (- (js/Date.now) t)
+                               "ms (built " (:built-at m) ")"))
+        {:db db :counts (:counts m) :source :cache})
+      (if (allow-cold?)
+        (let [t (js/Date.now)
+              built (build-conn)]
+          (js/console.error (str "edn-query: plane built in " (- (js/Date.now) t) "ms (cold)"))
+          {:db (.db ds (:conn built)) :counts (dissoc built :conn) :source :build})
+        (refuse-cold! state)))))
+
+(defn- timed-q
+  "クエリを実行し経過を stderr へ。30 秒超で exit 4 —— datascript は同期実行なので
+   途中では止められない。**これは事前抑止ではなく事後検出**であり、そう書いておく。
+   事前に効いているのは冷たい面を拒否する側。"
+  [db qs]
+  (let [t (js/Date.now)
+        r (.q ds qs db)
+        ms (- (js/Date.now) t)]
+    (js/console.error (str "edn-query: query " ms "ms"))
+    (when (> ms budget-ms)
+      (js/console.error (str "edn-query: that query took " ms "ms, over the " budget-ms
+                             "ms budget -- reporting it rather than passing it off as fine."))
+      (scripts.nbb-compat/exit 4))
+    r))
+
+(defn- run-refresh! []
+  (let [t0 (js/Date.now)
+        built (build-conn)
+        db (.db ds (:conn built))
+        t-build (- (js/Date.now) t0)
+        counts (dissoc built :conn)
+        written (write-cache! db counts)
+        views (when (.exists views-spec)
+                (into {} (map (fn [[k qs]]
+                                (let [t (js/Date.now)
+                                      rows (js->clj (.q ds qs db))]
+                                  (js/console.error (str "  view " k " " (- (js/Date.now) t)
+                                                         "ms rows=" (count rows)))
+                                  [k {:query qs :rows rows}]))
+                              (slurp-edn views-spec))))]
+    (when views
+      (node-fs/writeFileSync (.getPath views-file)
+                             (pr-str {:built-at (.toISOString (js/Date.)) :views views})))
+    (println (str "REFRESHED\tbuild_ms=" t-build
+                  " cache_bytes=" (:bytes written)
+                  " inputs_files=" (:files written)
+                  " inputs_dirs=" (:dirs written)
+                  " views=" (count (or views {}))))))
+
+(defn- run-view! [nm]
+  (if-not (.exists views-file)
+    (do (js/console.error "edn-query: no materialised views -- run refresh first")
+        (scripts.nbb-compat/exit 4))
+    (let [{:keys [views built-at]} (slurp-edn views-file)
+          v (or (get views (keyword nm)) (get views nm))]
+      (if v
+        (do (js/console.error (str "edn-query: view from " built-at))
+            (println (pr-str (:rows v))))
+        (do (js/console.error (str "edn-query: no such view: " nm
+                                   " (have: "
+                                   (str/join ", " (map #(if (keyword? %) (name %) (str %))
+                                                       (keys views)))
+                                   ")"))
+            (scripts.nbb-compat/exit 4))))))
+
 (def ^:private plane (atom nil))
 
 (defn- plane!
   "面を 1 回だけ組む。ロードは stderr に報告する（client 側で最初の呼び出しが
-   数十秒かかる理由が見えるように）。"
+   数十秒かかる理由が見えるように）。
+
+   キャッシュが新しければそれを使う —— mcp の最初の呼び出しが 5 分から 8 秒に
+   なる。古い/無い場合はここでは拒否せずに組む: mcp サーバは長命で、client は
+   既に接続してしまっているので、そこで exit 4 すると『答えられない server』に
+   なる。拒否が正しいのは 1 発で終わる CLI の側。"
   []
   (or @plane
       (let [t0 (js/Date.now)
-            _ (js/console.error "edn-query/mcp: loading the plane (first query only)…")
-            built (build-conn)]
-        (js/console.error (str "edn-query/mcp: plane ready in "
-                               (quot (- (js/Date.now) t0) 1000) "s"))
-        (reset! plane built))))
+            [state m] (cache-state)]
+        (if (= :fresh state)
+          ;; mcp の plane_stats は (vals (dissoc p :conn)) を足すので、
+          ;; 形を変えず counts を展開して返す
+          (let [built (assoc (:counts m) :conn (.conn_from_db ds (load-cached-db)))]
+            (js/console.error (str "edn-query/mcp: plane from cache in "
+                                   (- (js/Date.now) t0) "ms (built " (:built-at m) ")"))
+            (reset! plane built))
+          (do (js/console.error
+               (str "edn-query/mcp: cache is " (name state)
+                    " — building the plane (first query only, minutes). "
+                    "Run `edn-query.cljs refresh` to make this 8s."))
+              (let [built (build-conn)]
+                (js/console.error (str "edn-query/mcp: plane ready in "
+                                       (quot (- (js/Date.now) t0) 1000) "s"))
+                (reset! plane built)))))))
 
 (defn- q* [query]
   (js->clj (.q ds query (.db ds (:conn (plane!))))))
@@ -2596,52 +2822,44 @@
                    (recur)))))))
     (.on js/process.stdin "end" (fn [] (js/process.exit 0)))))
 
+
+(defn- counts-line [c]
+  (let [g (fn [k] (get c k 0))
+        total (reduce + 0 (map g [:adr-count :docs-count :manifest-count :foreign-adr-count
+                                  :biz-count :kj-count :rad-count :etzhayyim-80-data-count
+                                  :proc-registry-count :merged-kotoba-count :working-doc-count
+                                  :narrative-count :company-count :fleet-count :yabai-count
+                                  :tadori-count :patent-count :innen-count :awai-yakuwari-count
+                                  :tsukuru-candidates-count :tsukuru-registry-seed-count
+                                  :tsukuru-seed-count]))]
+    (str "adr=" (g :adr-count) " docs=" (g :docs-count) " manifest=" (g :manifest-count)
+         " foreign-adr=" (g :foreign-adr-count) " biz=" (g :biz-count) " kj=" (g :kj-count)
+         " rad=" (g :rad-count) " etzhayyim-80-data=" (g :etzhayyim-80-data-count)
+         " proc-registry=" (g :proc-registry-count) " merged-kotoba=" (g :merged-kotoba-count)
+         " working-doc=" (g :working-doc-count) " narrative=" (g :narrative-count)
+         " company=" (g :company-count) " fleet=" (g :fleet-count) " yabai=" (g :yabai-count)
+         " tadori=" (g :tadori-count) " patent=" (g :patent-count) " innen=" (g :innen-count)
+         " awai-yakuwari=" (g :awai-yakuwari-count)
+         " tsukuru-candidates=" (g :tsukuru-candidates-count)
+         " tsukuru-registry-seed=" (g :tsukuru-registry-seed-count)
+         " tsukuru-seed=" (g :tsukuru-seed-count)
+         " total=" total)))
+
 (defn- run-cli [mode queries]
-  (let [{:keys [conn adr-count docs-count manifest-count foreign-adr-count biz-count
-                kj-count rad-count
-                etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
-                narrative-count company-count fleet-count yabai-count tadori-count patent-count
-                innen-count awai-yakuwari-count gleif-tiers houjin-bangou-tiers
-                tsukuru-candidates-count tsukuru-registry-seed-count tsukuru-seed-count]}
-        (build-conn)
-        total (+ adr-count docs-count manifest-count foreign-adr-count biz-count
-                 kj-count rad-count
-                 etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
-                 narrative-count company-count fleet-count yabai-count tadori-count patent-count
-                 innen-count awai-yakuwari-count
-                 tsukuru-candidates-count tsukuru-registry-seed-count tsukuru-seed-count)]
-    (case mode
-      "count"
-      (println (format (str "adr=%s docs=%s manifest=%s foreign-adr=%s biz=%s kj=%s rad=%s "
-                             "etzhayyim-80-data=%s proc-registry=%s merged-kotoba=%s working-doc=%s "
-                             "narrative=%s company=%s fleet=%s yabai=%s tadori=%s patent=%s innen=%s "
-                             "awai-yakuwari=%s tsukuru-candidates=%s tsukuru-registry-seed=%s "
-                             "tsukuru-seed=%s total=%s gleif-tiers=%s houjin-bangou-tiers=%s")
-                        adr-count docs-count manifest-count foreign-adr-count biz-count
-                        kj-count rad-count
-                        etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
-                        narrative-count company-count fleet-count yabai-count tadori-count patent-count
-                        innen-count awai-yakuwari-count
-                        tsukuru-candidates-count tsukuru-registry-seed-count tsukuru-seed-count total
-                        (str/join "," gleif-tiers)
-                        (str/join "," houjin-bangou-tiers)))
+  (case mode
+    "refresh" (run-refresh!)
+    "view" (run-view! (first queries))
+    ("count" "q" "q*")
+    (let [{:keys [db counts]} (plane-db!)]
+      (case mode
+        "count" (println (counts-line counts))
+        "q" (println (pr-str (js->clj (timed-q db (first queries)))))
+        "q*" (println (pr-str (mapv (fn [x] (js->clj (timed-q db x))) queries)))))
 
-      "q"
-      (println (pr-str (js->clj (.q ds (first queries) (.db ds conn)))))
-
-      ;; q* — 面を 1 回だけ組んで N 本のクエリを順に流し、結果を同じ順の
-      ;; ベクタで 1 行に出す。面のロードが所要時間の全てなので、3 本の
-      ;; 独立したクエリを持つ検証スクリプトは 3 プロセス起動すると 3 倍かかる
-      ;; （scripts/verify-tsukuru-factory-plane.cljs が実測でそうなっていた）。
-      ;; 呼び出し側は「結果の本数 = 投げたクエリの本数」を検査できるので、
-      ;; 空出力を「結果 0 件」と誤読する経路も塞げる。
-      "q*"
-      (let [db (.db ds conn)]
-        (println (pr-str (mapv #(js->clj (.q ds % db)) queries))))
-
-      (do (println (str "usage: nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs "
-                        "[count | q '<datalog-query>' | q* '<q1>' '<q2>' ... | mcp]"))
-          (scripts.nbb-compat/exit 1)))))
+    (do (println (str "usage: nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs "
+                      "[refresh | count | q '<datalog-query>' | q* '<q1>' '<q2>' ... "
+                      "| view <name> | mcp]"))
+        (scripts.nbb-compat/exit 1))))
 
 (defn -main [& args]
   (let [[mode & queries] args]

@@ -137,7 +137,12 @@
   (println (str "  ... 面をロード中（1 回だけ / クエリ " (count queries) " 本）"))
   (let [t0 (js/Date.now)
         argv (concat ["nbb" "--classpath" ".:scripts/nbb_compat" query-script "q*"] queries)
-        {:keys [exit out err signal]} (apply shell/sh (concat argv [{:cwd root}]))
+        {:keys [exit out err signal]}
+        (apply shell/sh (concat argv [{:cwd root
+                                       ;; batch: a cold plane is normal here
+                                       :env (js/Object.assign
+                                             #js {} js/process.env
+                                             #js {:EDN_QUERY_ALLOW_COLD "1"})}]))
         secs (/ (- (js/Date.now) t0) 1000.0)
         ;; 失敗時にコマンドと両ストリームを必ず名指しする。旧版は err だけを
         ;; 見せており、err が空なら「edn-query が exit 1 — 」とダッシュの後に

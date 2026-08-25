@@ -28,7 +28,9 @@
   (let [r (.spawnSync cp "nbb"
                       (clj->js (concat ["--classpath" ".:scripts/nbb_compat"
                                         "manifest/edn-query.cljs" "q*"] queries))
-                      #js {:encoding "utf8" :maxBuffer (* 64 1024 1024)})]
+                      #js {:encoding "utf8" :maxBuffer (* 64 1024 1024)
+                           :env (js/Object.assign #js {} js/process.env
+                                                  #js {:EDN_QUERY_ALLOW_COLD "1"})})]
     (when (pos? (or (.-status r) 1))
       (println (str (.-stderr r)))
       (println "report-public-money-coverage: the query plane refused — cannot answer")
