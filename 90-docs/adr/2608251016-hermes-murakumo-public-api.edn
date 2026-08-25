@@ -51,6 +51,18 @@ public API。primary だけが gad 直結だった。その経路で ~27k token 
   これで 3 本の canvas-watch（itonami / murakumo / kotobase）が揃った。
   murakumo (`406c4ed94d10`) と kotobase (`84a50c9f3410`) は既に pin 済みだった。
 
+## Landing (closing, 2026-08-25)
+
+- PR https://github.com/com-junkawasaki/root/pull/2508 MERGED 2026-08-25T01:20:48Z
+- evidence commit `009bcd7c74849f6da3b46764e17bf578211a33f7`
+- merge commit `ebd663f3c6fe4ee538acdfa0fcfb38c3dc76787b`
+- session worktree `/tmp/root-close-hermes-murakumo-api` と branch
+  `agent/close-hermes-murakumo-api` は削除済み。
+- archive: `.git/stash-archive-2026-08-25/agent-close-hermes-murakumo-api.patch`
+
+shared checkout は dirty `90-docs/business/canvas-ledger.edn` と untracked `orgs/` があるため
+fast-forward していない。それはこのセッションの成果物ではない。
+
 ## Verification
 
 | いつ (JST) | 何 | 結果 |
@@ -61,6 +73,9 @@ public API。primary だけが gad 直結だった。その経路で ~27k token 
 | 10:01 | Cloud Itonami `127.0.0.1:1338/health` | 200 `cloud-itonami-app` |
 | 10:01 | この Mac → gad:8090 | 0 connections |
 | 10:08 | itonami-canvas-watch jobs.json | model=murakumo-main provider=custom, snapshot null |
+| 10:22 | first close `/ready` | slot probe timeout (`request-capacity.status=0`) — yaml は public API のまま。gad 直結に戻していない |
+| 11:05 | second close yaml line 3 | `base_url: https://api.murakumo.cloud/v1` |
+| 11:05 | second close `/ready` | ok=true, request-capacity configured=2 busy=1 available=1, fleet 11/11 |
 
 Hermes CLI の `hermes chat --safe-mode` は user config を無視して OpenRouter
 `z-ai/glm-5.2` に倒れる（402）。これは yaml の不具合ではない。`--provider custom` を付けた
