@@ -24,10 +24,24 @@ script はそれを Iceberg に載せるだけで、EDN も repo 構造も知ら
 
 ## 認証
 
-R2 Data Catalog は Cloudflare API token を Bearer で受ける。実測 2026-08-25:
-**wrangler の OAuth token がそのまま通る**（GET /v1/config が 200）ので、専用
-token を新たに発行していない。優先順は CF_CATALOG_TOKEN 環境変数 →
-~/Library/Preferences/.wrangler/config/default.toml の oauth_token。
+R2 Data Catalog は Cloudflare API token を Bearer で受ける。必要な権限は 2 つ:
+**R2 Data Catalog: Edit** と **Workers R2 Storage: Edit**。
+
+⚠ **catalog には面が 2 つあり、metadata が通ることを「使える」と読まない。**
+2026-08-25 の初版はここに「wrangler の OAuth token がそのまま通る（GET /v1/config
+が 200）」と書いていたが、**それは metadata 面しか測っていなかった**。同日の再測定で、
+OAuth token は list_namespaces / create_namespace まで通り **create_table で 401** に
+なる —— カタログ側が自分の bucket を list できず、こう返す:
+
+    List: Failed to list files in location. Please check the storage credentials
+      uri: https://<account>.r2.cloudflarestorage.com/<bucket>?list-type=2&...
+      response: 401  => S3Error { code: "Unauthorized" }
+
+`wrangler whoami` の scope 一覧に `r2` が無いことと整合する。**この script は
+OAuth token では表を作れない。**
+
+優先順は CF_CATALOG_TOKEN 環境変数 → macOS Keychain `service=gftd.cf` /
+`account=API_TOKEN`（2026-08-25 実測、この鍵で create_table と append が通る）。
 トークンは argv に載せない（ps 露出）。
 
 ## 測れなかったことを clean と書かない
@@ -45,7 +59,7 @@ import argparse
 import json
 import os
 import pathlib
-import re
+import subprocess
 import sys
 
 ACCOUNT_DEFAULT = "4da88288dc30d9ee257f319d3c33ecf0"
@@ -60,15 +74,32 @@ TABLES = [
 
 
 def load_token() -> str:
+    """CF_CATALOG_TOKEN -> Keychain gftd.cf/API_TOKEN。
+
+    wrangler の oauth_token へは**落とさない**。それは catalog の metadata 面しか
+    通らず、create_table が 401 で落ちる（docstring の「認証」を読むこと）。
+    通らない資格情報に静かにフォールバックすると、失敗が「書けなかった」ではなく
+    「認証は済んでいるのに謎の 401」に見える。
+    """
     tok = os.environ.get("CF_CATALOG_TOKEN")
-    if tok:
+    if tok and tok.strip():
         return tok.strip()
-    cfg = pathlib.Path.home() / "Library/Preferences/.wrangler/config/default.toml"
-    if cfg.exists():
-        m = re.search(r'^oauth_token\s*=\s*"([^"]+)"', cfg.read_text(), re.M)
-        if m:
-            return m.group(1)
-    print("no catalog token: set CF_CATALOG_TOKEN, or log in with wrangler", file=sys.stderr)
+    try:
+        out = subprocess.run(
+            ["security", "find-generic-password", "-s", "gftd.cf", "-a", "API_TOKEN", "-w"],
+            capture_output=True, text=True, timeout=30,
+        )
+        if out.returncode == 0 and out.stdout.strip():
+            return out.stdout.strip()
+    except Exception:
+        pass
+    print(
+        "no catalog token. Set CF_CATALOG_TOKEN, or store a Cloudflare API token with\n"
+        "  'R2 Data Catalog: Edit' + 'Workers R2 Storage: Edit' in Keychain\n"
+        "  service=gftd.cf account=API_TOKEN.\n"
+        "  (wrangler's OAuth session is NOT enough: it passes /v1/config and fails create_table.)",
+        file=sys.stderr,
+    )
     sys.exit(2)
 
 

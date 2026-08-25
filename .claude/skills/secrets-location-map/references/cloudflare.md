@@ -59,6 +59,15 @@
   - **`CLOUDFLARE_R2_ACCOUNT_TOKEN`** — R2 Account Token。**2026-08-25 時点で不在**（上記）。
   - **`CLOUDFLARE_R2_DATA_CATALOG_TOKEN`** — R2 Data Catalog (Iceberg) 用。
     必要な権限は 2 つ: **R2 Data Catalog: Edit** と **Workers R2 Storage: Edit**。
+    ✅ **2026-08-25 解消: この item は要らなかった。既存の Keychain
+    `gftd.cf` / `API_TOKEN` がこの 2 権限を持っている**（実測: 同じ鍵で
+    `create_table` + `append` + 読み戻しが通り、`cloud_itonami.gleif_lei_joined`
+    18,930 行と `gleif_lei_closure` 108,368 行を commit した）。
+    この節は `gftd.cf` を「DNS を読み書きできる資格情報」としか書いていなかったので、
+    R2 を触る用途では見落とされていた。**新しい token を発行する前にこれを試す。**
+    kagi 側の `CLOUDFLARE_R2_DATA_CATALOG_TOKEN` は引き続き `no such item`
+    （`~/.kagi` で実測、`CLOUDFLARE_R2_ACCESS_KEY` /
+    `CLOUDFLARE_API_TOKEN_AI_GFTD_CDN` も同じく不在）。
     実測 2026-08-25: wrangler の OAuth session は catalog の *metadata* 面には
     通る（`GET /v1/config` 200、`create_namespace` 成功）が、**storage 面で 401**
     になり `create_table` が落ちる（catalog 側が R2 を list できない）。
