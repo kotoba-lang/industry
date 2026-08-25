@@ -2563,6 +2563,108 @@
       (= (:digest m) (current-digest m)) [:fresh m]
       :else [:stale m])))
 
+(def ^:private shards-dir (io/file cache-dir "shards"))
+(def ^:private shards-index (io/file cache-dir "edn-query-shards.edn"))
+
+(defn- entity->dataset
+  "e -> dataset。:source/dataset を持たない entity はどの shard にも入らない ——
+   入れてしまうと『dataset を名指したクエリ』が名指していない entity を見ることに
+   なり、shard と全体で答えが変わる。名指せない entity は全体ロードでしか読めない、
+   という制約をそのまま残す方が正しい。"
+  [all-datoms]
+  (let [m (js/Map.)]
+    (doseq [d all-datoms]
+      (when (= "source/dataset" (.-a d))
+        (.set m (.-e d) (.-v d))))
+    m))
+
+(defn- write-shards!
+  "dataset ごとに datom を束ねて 1 ファイルずつ書く。全体 282 MB を毎回読むのは、
+   1 dataset しか要らないクエリにとって 97% が無駄。
+
+   1 pass で振り分ける（dataset ごとに全 datom を走査すると 75 倍になる）。"
+  [db]
+  (when-not (.exists shards-dir)
+    (node-fs/mkdirSync (.getPath shards-dir) (clj->js {:recursive true})))
+  (let [all (.datoms ds db ":eavt")
+        e->ds (entity->dataset all)
+        buckets (js/Map.)]
+    (doseq [d all]
+      (when-let [dsname (.get e->ds (.-e d))]
+        (when-not (.has buckets dsname) (.set buckets dsname (array)))
+        (.push (.get buckets dsname) d)))
+    (let [idx (doall
+               (for [dsname (js->clj (js/Array.from (.keys buckets)))]
+                 (let [datoms (.get buckets dsname)
+                       sdb (.init_db ds datoms (ds-schema))
+                       json (js/JSON.stringify (.serializable ds sdb))
+                       f (io/file shards-dir (str (str/replace (str dsname) #"[^A-Za-z0-9_.-]" "_")
+                                                  ".json"))]
+                   (node-fs/writeFileSync (.getPath f) json)
+                   [(str dsname) {:file (.getName f)
+                                  :datoms (.-length datoms)
+                                  :bytes (count json)}])))]
+      (node-fs/writeFileSync (.getPath shards-index)
+                             (pr-str {:built-at (.toISOString (js/Date.))
+                                      :shards (into {} idx)}))
+      {:shards (count idx)
+       :bytes (reduce + 0 (map (fn [[_ v]] (:bytes v)) idx))})))
+
+(defn- shardable
+  "クエリが触りうる dataset を静的に決められるか。
+
+   決められるのは **すべての entity 変数が `source/dataset` のリテラル節で
+   縛られているとき**だけ。そのときに限り、名指された shard だけを読んだ答えは
+   全体を読んだ答えと一致する（entity は必ずどれかの dataset に属するので、
+   名指されていない dataset の entity は解に現れ得ない）。
+
+   1 つでも縛られていない entity 変数があれば全体を読む —— **速さのために
+   答えを変えない**。:in / rules がある query も全体に落とす（束縛が実行時に
+   決まるので静的に言えない）。
+
+   戻り値: [:shards #{...}] か [:full <理由>]。"
+  [qs]
+  (try
+    (let [q (edn/read-string qs)]
+      (if-not (vector? q)
+        [:full "query is not a vector"]
+        (let [has-in? (some #{:in} q)
+              where (->> q (drop-while (complement #{:where})) rest
+                         (take-while (complement keyword?)))
+              clauses (filter vector? where)
+              evar? (fn [x] (and (symbol? x) (str/starts-with? (str x) "?")))
+              evars (set (keep (fn [c] (let [x (first c)] (when (evar? x) x))) clauses))
+              bound (into {} (keep (fn [c]
+                                     (when (and (>= (count c) 3)
+                                                (= "source/dataset" (nth c 1))
+                                                (string? (nth c 2))
+                                                (evar? (first c)))
+                                       [(first c) (nth c 2)]))
+                                   clauses))
+              unbound (remove bound evars)]
+          (cond
+            has-in? [:full ":in present — bindings are decided at run time"]
+            (empty? evars) [:full "no entity clause"]
+            (seq unbound) [:full (str "entity var(s) not pinned to a dataset: "
+                                      (str/join " " unbound))]
+            :else [:shards (set (vals bound))]))))
+    (catch :default e [:full (str "unparseable: " e)])))
+
+(defn- load-shards!
+  "名指された shard を読んで 1 つの db にまとめる。"
+  [datasets]
+  (let [idx (:shards (slurp-edn shards-index))
+        files (map (fn [d] [d (get idx d)]) datasets)]
+    (if (some (fn [[_ v]] (nil? v)) files)
+      nil
+      (let [datoms (array)]
+        (doseq [[_ {:keys [file]}] files]
+          (let [sdb (.from_serializable ds (js/JSON.parse
+                                            (node-fs/readFileSync
+                                             (.getPath (io/file shards-dir file)) "utf8")))]
+            (doseq [d (.datoms ds sdb ":eavt")] (.push datoms d))))
+        (.init_db ds datoms (ds-schema))))))
+
 (defn- write-cache! [db counts]
   (when-not (.exists cache-dir)
     (node-fs/mkdirSync (.getPath cache-dir) (clj->js {:recursive true})))
@@ -2630,6 +2732,7 @@
         t-build (- (js/Date.now) t0)
         counts (dissoc built :conn)
         written (write-cache! db counts)
+        sharded (write-shards! db)
         views (when (.exists views-spec)
                 (into {} (map (fn [[k qs]]
                                 (let [t (js/Date.now)
@@ -2645,6 +2748,8 @@
                   " cache_bytes=" (:bytes written)
                   " inputs_files=" (:files written)
                   " inputs_dirs=" (:dirs written)
+                  " shards=" (:shards sharded)
+                  " shard_bytes=" (:bytes sharded)
                   " views=" (count (or views {}))))))
 
 (defn- run-view! [nm]
@@ -2850,7 +2955,29 @@
     "refresh" (run-refresh!)
     "view" (run-view! (first queries))
     ("count" "q" "q*")
-    (let [{:keys [db counts]} (plane-db!)]
+    (let [{:keys [db counts]} (if (and (= mode "q")
+                                       (.exists shards-index)
+                                       ;; baseline を測るときに shard 経路へ落ちないようにする
+                                       ;; スイッチ。これが無いと「全体ロードを測った」と
+                                       ;; 言いながら shard を測ることになる
+                                       (not= "1" (.-EDN_QUERY_NO_SHARD (.-env js/process))))
+                                (let [[kind arg] (shardable (first queries))]
+                                  (if (= kind :shards)
+                                    (let [[state m] (cache-state)]
+                                      (if (= :fresh state)
+                                        (let [t (js/Date.now)
+                                              sdb (load-shards! arg)]
+                                          (if sdb
+                                            (do (js/console.error
+                                                 (str "edn-query: " (count arg) " shard(s) in "
+                                                      (- (js/Date.now) t) "ms — "
+                                                      (str/join " " (sort arg))))
+                                                {:db sdb :counts (:counts m)})
+                                            (plane-db!)))
+                                        (plane-db!)))
+                                    (do (js/console.error (str "edn-query: full plane — " arg))
+                                        (plane-db!))))
+                                (plane-db!))]
       (case mode
         "count" (println (counts-line counts))
         "q" (println (pr-str (js->clj (timed-q db (first queries)))))
