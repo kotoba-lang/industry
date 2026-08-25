@@ -36,7 +36,7 @@
 
 Amu は checked KIR から AIUEOS の native artifact を生成し、Kotoba / kotoba-native は application と machine-code の authority を持つ。どちらも install target の選択、秘密の配布、ユーザー作成、ネットワーク初期化を所有しない。それらを compiler の責任に押し込まない。
 
-## 現在地（tranche 1 反映 2026-08-25、aiueos ADR-0097 / contracts/install-v1.edn が component 側 matrix）
+## 現在地（tranche 1+2 反映 2026-08-25、aiueos ADR-0097/0099 / contracts/install-v1.edn が component 側 matrix）
 
 | 面 | 現行 `main` | Ubuntu Server 相当との差 |
 |---|---|---|
@@ -126,9 +126,9 @@ Tailscale は R0 install の成功条件にしない。まず wired DHCP + local
 | I0 contract | 本 ADR と component contract が同じ current-state matrix を持つ | green（contracts/install-v1.edn、2026-08-25） |
 | I1 artifact | release image、installer bundle、intent、receipt の digest chain が閉じる | green（make-install-usb-image.py が閉じ、verify が image 単体から再導出） |
 | I2 destructive guard | partition / removable / system / nonempty / changed identity / wrong intent をすべて拒否する | green-offline（installer 18/18 + install-chain 18/18、各拒否は名指しの理由で pin。実 block device 上では未測定） |
-| I3 QEMU install | USB transport から空 disk へ install し、USB 無しで二回 boot する | red。ただし install USB image 自体の USB-transport boot は緑（smoke-qemu-usb-boot、removable-media 経由・両 transport evidence 一致）。live installer 環境が USB に無いことが残りの穴 |
+| I3 QEMU install | USB transport から空 disk へ install し、USB 無しで二回 boot する | **green（QEMU、2026-08-25、aiueos ADR-0099）**。smoke-qemu-install.cljs が 4 boot を一体で検査: USB-live install（intent admit + readback）→ USB 無しで NVMe から aiueos が 2 回 boot（各 39 marker）→ 再挿入 USB は existing-install で拒否し disk digest 不変。installed extent は release receipt digest と前後で一致 |
 | I4 headless | DHCP 後、外部 client が指定鍵で SSH、wrong key は拒否、二回目 boot でも成功 | red（physical NIC driver も first-boot provisioning も sshd も無い） |
-| I5 repeat safety | 成功済み target を同じ USB が unattended erase しない | green-offline（target receipt + exit 4 rescue/inspect。inspection が空と誤申告しても receipt が止めることを実測。実機では未測定） |
+| I5 repeat safety | 成功済み target を同じ USB が unattended erase しない | green（fake device + QEMU 全連鎖の両方で実測。boot4 の再挿入は exit 4 existing-install で拒否、disk byte-identical。実機では未測定） |
 | I6 physical probe | 対象 PC の NVMe / NIC / GPU / UEFI identity を read-only receipt にする | amber（hw-probe tooling を main へ移植済み。対象 PC では未実行） |
 | I7 physical install | 明示 target へ write/readback、USB 無し SSD boot、LAN SSH | red |
 | I8 optional tailnet | LAN SSH 後に one-off enrollment し、再起動後に remote reach | red、I7 を塞がない |
@@ -139,7 +139,7 @@ I7 の最初の qualification target は購入済み PC（ASRock B850M Pro RS Wi
 
 1. ~~`usb-boot-v1.edn` と current README / ADR の network claim を同期する。~~（済 2026-08-25）
 2. ~~未統合 installer の guard / readback contract と tests を現行 AIUEOS に移植する。~~（済 2026-08-25、hw-probe 含む）
-3. QEMU の USB-live → empty-disk → USB-less reboot gate を作る。
+3. ~~QEMU の USB-live → empty-disk → USB-less reboot gate を作る。~~（済 2026-08-25、smoke-qemu-install.cljs。live 環境 = Debian kernel UKI + mechanism-only initramfs、決定は payload の nbb。9 個の実測済み失敗と修正は aiueos ADR-0099）
 4. ~~install intent と target receipt を導入し、repeat erase を拒否する。~~（済 2026-08-25、install-intent.cljs / install-to-disk.cljs / test-install-chain.cljs）
 5. first-boot wired DHCP、hostname、device claim、SSH key provisioning を閉じる。
 6. QEMU の外部 client から実 SSH handshake と reboot persistence を検査する。
