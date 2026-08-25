@@ -45,13 +45,25 @@
 
 - **Cloudflare の実キー（kagi、compartment `personal`、`KAGI_HOME=$HOME/.kagi`）**
   — 2026-08-05 にオーナーが提供、kagi へ保管（読み戻し・実 API 呼び出しまで検証済み）:
+  - ⚠ **2026-08-25 実測: 下記 5 件のうち `CLOUDFLARE_GLOBAL_API_KEY` と
+    `CLOUDFLARE_R2_ACCOUNT_TOKEN` は kagi に無い**（`~/.kagi` と repo 既定の
+    両 vault で `no such item`）。この節が「保管した・検証済み」と書いている
+    ことと実態が食い違っている。**記述を前提に計画を立てない**（この skill 自身の
+    注意 2 の 5 例目・6 例目）。R2 Data Catalog を触るには token 発行が要る。
   - **`CLOUDFLARE_GLOBAL_API_KEY`** — JSON（`email` / `global-api-key` / `account-id`）。
     **アカウント全体・全ゾーン、スコープを絞れない最強の資格情報。** 使うときは
     `X-Auth-Email` + `X-Auth-Key` ヘッダ（Bearer ではない）。DNS 編集はこれで通る。
   - **`CLOUDFLARE_API_TOKEN_AI_GFTD_CDN`** — bucket `ai-gftd-cdn` 用の API token。
   - **`CLOUDFLARE_R2_ACCESS_KEY`** — JSON（`access-key-id` / `secret-access-key` /
     `endpoint` / `bucket`）。S3 互換の R2 アクセス。
-  - **`CLOUDFLARE_R2_ACCOUNT_TOKEN`** — R2 Account Token。
+  - **`CLOUDFLARE_R2_ACCOUNT_TOKEN`** — R2 Account Token。**2026-08-25 時点で不在**（上記）。
+  - **`CLOUDFLARE_R2_DATA_CATALOG_TOKEN`** — R2 Data Catalog (Iceberg) 用。
+    必要な権限は 2 つ: **R2 Data Catalog: Edit** と **Workers R2 Storage: Edit**。
+    実測 2026-08-25: wrangler の OAuth session は catalog の *metadata* 面には
+    通る（`GET /v1/config` 200、`create_namespace` 成功）が、**storage 面で 401**
+    になり `create_table` が落ちる（catalog 側が R2 を list できない）。
+    **metadata が通ることを「使える」と読まない** —— 面が 2 つある。
+    使う側: `scripts/lei-datalake-sync.py` が `CF_CATALOG_TOKEN` として読む。
   - **`CLAUDE_API_KEY_GFTDCOJP`** — Anthropic API キー（Cloudflare とは無関係だが
     同時に提供されたのでここに置いた）。
   - ⚠ **これら 5 件は 2026-08-05 の会話ログに平文で露出している。ローテーション必須。**
