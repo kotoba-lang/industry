@@ -1,0 +1,120 @@
+[{:db/id -1
+  :rule/id :procurement/direct-first-v1
+  :rule/type :business-procurement
+  :rule/status :active
+  :rule/authority :owner-directive
+  :rule/effective-date "2026-08-25"
+  :rule/scope :repo-wide
+  :rule/title "Direct-first procurement and evidence-bounded intermediary exception"
+  :rule/default :prefer-direct-producer-operator-or-official-seller
+  :rule/objective
+  "Minimize risk-adjusted total procurement cost and unexplained intermediation rent while preserving lawful supply, support, compliance, and operational continuity."
+  :rule/decision-unit
+  [:procurement-route :product-configuration :quantity :jurisdiction :observation-time]
+  :rule/direct-route-definition
+  "A route whose contracting and invoicing entity is the producer, service operator, or official seller. Language, locale, email domain, and storefront branding alone do not prove directness."
+  :rule/total-cost-components
+  [:product-price
+   :tax
+   :freight
+   :customs
+   :inspection
+   :expected-defect-and-rma-cost
+   :expected-downtime-loss
+   :administration-cost
+   :inventory-and-capital-lockup]
+  :rule/derived-metrics
+  {:intermediary-premium
+   "intermediary risk-adjusted total cost - direct-route risk-adjusted total cost"
+   :verified-intermediary-value
+   "contracted or observed domestic replacement inventory + compliance evidence + SLA + credit + logistics + warranty value"
+   :unexplained-intermediation-rent
+   "intermediary premium - verified intermediary value"
+   :bypass-net-benefit
+   "unexplained intermediation rent - direct-route switching, import, support, and execution risk"}
+  :rule/hard-gates
+  [:lawful-import-and-resale
+   :product-and-configuration-match
+   :required-certification-evidence
+   :supplier-order-acceptance
+   :quantity-and-inventory-feasibility
+   :budget-and-payment-authority
+   :warranty-and-rma-understood]
+  :rule/scoring
+  {:risk-adjusted-total-cost 30
+   :supply-and-quantity-feasibility 15
+   :product-and-lot-consistency 10
+   :warranty-defect-and-rma 10
+   :lead-time-and-logistics 10
+   :moq-inventory-lockup-and-reversibility 10
+   :contract-invoice-and-evidence-quality 5
+   :negotiating-leverage-and-future-optionality 5
+   :evidence-confidence-and-recency 5}
+  :rule/intermediary-exception
+  {:default :reject
+   :allow-only-if
+   [:direct-route-unavailable
+    :direct-route-fails-a-hard-gate
+    :direct-route-cannot-supply-required-quantity
+    :verified-intermediary-value-exceeds-premium-and-added-risk]
+   :required-records
+   [:intermediary-identity
+    :contracting-entity
+    :premium
+    :verified-value
+    :evidence
+    :decision-time
+    :approver]}
+  :rule/contact-routing
+  {:principle :endpoint-and-authority-before-language
+   :prefer
+   [:official-global-b2b-endpoint
+    :producer-channel-or-sales-decision-maker
+    :explicit-direct-contracting-entity]
+   :language-use
+   "Use the recipient's working language, optionally bilingual, to improve precision and internal handling; never treat language alone as evidence of a direct route."
+   :must-not
+   [:conceal-destination
+    :conceal-resale-purpose
+    :evade-lawful-territorial-or-channel-restrictions
+    :misrepresent-order-volume-or-identity]}
+  :rule/evidence-policy
+  {:facts [:quote :invoice :contract :official-current-price :observed-fulfilment]
+   :not-facts [:assumed-support-value :language-implies-routing :intermediary-title-implies-service]
+   :unknown-treatment :lower-confidence-never-invent}
+  :rule/action-log-required
+  [:observed-price-and-source
+   :configuration-and-quantity
+   :contracting-and-invoicing-entity
+   :selected-route
+   :verified-value-or-exception
+   :decision-and-observation-time]
+  :rule/safety-boundary
+  "Direct-first does not waive compliance, warranty, customer protection, authorization, or truthful disclosure obligations."}
+
+ {:db/id -2
+  :decision/id :procurement/gmktec-2026-08-25
+  :decision/type :procurement-route
+  :decision/status :active-provisional
+  :decision/as-of "2026-08-25"
+  :decision/product-family :gmktec-mini-pc
+  :decision/intermediary :links-international
+  :decision/routes
+  [{:route :links-international
+    :role :japan-distributor
+    :observation "Quoted tax-exclusive prices for 32GB/256GB configurations remained above GMKtec JP tax-inclusive retail prices for higher-capacity configurations."
+    :verified-added-value :not-stated-in-quote}
+   {:route :gmktec-jp-official-store
+    :role :official-retail
+    :quantity-policy "Prefer for approximately 100 units only after order acceptance, inventory, invoice, same-lot, resale, and warranty gates are confirmed."
+    :status :preferred-current-route}
+   {:route :gmktec-global-b2b
+    :role :producer-or-official-global-sales
+    :quantity-policy "Evaluate for larger or negotiated corporate orders; OEM/ODM customization MOQ must not be conflated with standard branded corporate purchasing."
+    :status :deferred-no-current-quote-request}]
+  :decision/current-action
+  "No further GMKtec headquarters quote request now. Preserve the official-store route for an approximately 100-unit purchase and re-evaluate direct global B2B when scale or customization requires it."
+  :decision/language-policy
+  "Chinese or bilingual communication may improve precision with China-based staff, but endpoint, decision authority, and contracting entity determine route directness."
+  :decision/evidence-boundary
+  "The observed price premium is established; calling all of it unjustified extraction requires subtracting any later verified distributor service value."}]

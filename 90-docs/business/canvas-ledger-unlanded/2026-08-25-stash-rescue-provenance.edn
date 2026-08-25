@@ -1,0 +1,25 @@
+;; Provenance for the 2026-08-25 stash rescue (git-cleanup-conflict session) — which stash held which event.
+;; All 57 distinct events were :react/observation from advisor:auto, so ALL were RECONCILED into
+;; 90-docs/business/canvas-ledger.edn (tail append, fresh :event/seq 12683-12739 = then-max 11683 + 1000 gap,
+;; original :event/at preserved, :event/rescued-from-seq = the colliding seq each was born with).
+;; Landing was preceded by a fold-invariance proof: gftd.canvas/fold over the 10,025 main events ==
+;; fold with the 57 appended (observations are fold no-ops). Zero events parked (no :canvas/add-item this pass).
+;; Containment was measured with the seq-agnostic key (strip :seq / :rescued-from-seq, keep :at):
+;; 0 of 57 were already in main; 0 duplicates among the 57.
+{:rescued-at "2026-08-25"
+ :distinct-events 57
+ :source-stash-count 8
+ :source-working-tree-events 4
+ :archive ".git/stash-archive-2026-08-25/ (local, workstation 25MBAir; index.txt lists all SHAs)"
+ :reconciled {:react/observation 57 :to-seq-range [12683 12739]}
+ :parked {}
+ :stash-index
+ [{:stash-sha "472eff81e908d0b70a6791d5546916e2295655fb" :message "On main: closing 2026-08-25: preserve canvas-ledger + AGENTS.md before ff-only (do not drop)" :canvas-events 6 :note "also carried the 20-line AGENTS.md direct-first section + companion 90-docs/business/direct-procurement-rule.edn, landed in this same commit"}
+  {:stash-sha "1f132b9e0096872c4602145083b49e3c270ff023" :message "On main: canvas-ledger advisor:auto events seq11682-11687 (preserved before ff-only sync 2026-08-25)" :canvas-events 6}
+  {:stash-sha "fd7c99b2d60da9e244dbca7b5ff3110fee564b42" :message "On main: closing 2026-08-25: preserve dirty canvas-ledger before ff-only (do not drop)" :canvas-events 4}
+  {:stash-sha "a5d60fc472df56ed03f460ef99eb7386b7206133" :message "On main: kaiyu-kaizen ledger appends (byte-identical to origin/main, preserved by maturity session 2026-08-25)" :canvas-events 0 :note "kaiyu-kaizen.ledger.edn lines only, all already contained in origin/main"}
+  {:stash-sha "03486f6c57b07b0543028c98975a6df55cb625d6" :message "On main: canvas-ledger advisor:auto appends seq 11681-11692 (preserved by maturity-improve session 2026-08-25)" :canvas-events 12}
+  {:stash-sha "3fe2ccf7dabf0e97bf08b32c4bb9b409386a176c" :message "On main: advisor:auto ledger appends (seq 11680-11690 + kaiyu) preserved before ff-sync 2026-08-25" :canvas-events 12 :note "its 2 kaiyu-kaizen lines were already contained in origin/main"}
+  {:stash-sha "90d6c752c18f91ffb3f85ada9323cf84679b3d70" :message "On main: canvas-ledger WIP preserved by maturity-improve session 20260824T114557Z" :canvas-events 10}
+  {:stash-sha "91c3204dac295376cc373933f2e80624ba6027f0" :message "On main: maturity-loop 2026-08-24: preserve advisor:auto canvas-ledger appends (seq 11678-11680 local, collides with remote 11678)" :canvas-events 3 :note "its 1 kaiyu-kaizen line was already contained in origin/main"}]
+ :working-tree {:source "shared checkout 90-docs/business/canvas-ledger.edn dirty diff at cleanup time" :canvas-events 4 :original-seqs [11684 11687]}}
