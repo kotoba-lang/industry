@@ -1,0 +1,16 @@
+;; Provenance for the 2026-08-25 stash rescue, second pass (same git-cleanup-conflict session).
+;; While the first pass (2026-08-25-stash-rescue-provenance.edn) was landing, a concurrent session
+;; preserved one more advisor:auto stash at ff-sync time. Its 6 :react/observation events were all
+;; absent from main under the seq-agnostic key (strip :seq / :rescued-from-seq, keep :at), so all 6
+;; were RECONCILED into canvas-ledger.edn (tail append, fresh :event/seq 13739-13744 = then-max 12739
+;; + 1000 gap, original :event/at preserved, :event/rescued-from-seq = the colliding seq). Fold
+;; invariance proven over the 10,082 main events. Zero parked.
+{:rescued-at "2026-08-25"
+ :pass 2
+ :distinct-events 6
+ :source-stash-count 1
+ :archive ".git/stash-archive-2026-08-25/ (local, workstation 25MBAir; index.txt lists the SHA)"
+ :reconciled {:react/observation 6 :to-seq-range [13739 13744]}
+ :parked {}
+ :stash-index
+ [{:stash-sha "df5ee5a33198e8c1d4fc31976b0a47f512626624" :message "On main: canvas-ledger advisor:auto appends seq 11683-11688 (preserved for owner reconcile, 2026-08-25)" :canvas-events 6}]}
