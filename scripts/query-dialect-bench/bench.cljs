@@ -73,7 +73,10 @@
           res (.spawnSync child "nbb" (clj->js args)
                           #js {:cwd ROOT :encoding "utf8"
                                :maxBuffer (* 64 1024 1024)
-                               :timeout (* 20 60 1000)})
+                               :timeout (* 20 60 1000)
+                               ;; a benchmark measures the cold path on purpose
+                               :env (js/Object.assign #js {} js/process.env
+                                                      #js {:EDN_QUERY_ALLOW_COLD "1"})})
           out (or (.-stdout res) "")
           err (or (.-stderr res) "")]
       (cond

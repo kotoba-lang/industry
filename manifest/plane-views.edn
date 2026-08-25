@@ -1,0 +1,33 @@
+;; manifest/plane-views.edn — 事前計算しておくクエリ（materialised views）。
+;;
+;; `edn-query.cljs refresh` が面を組んだついでにこれらを実行し、結果を
+;; `.projection-cache/edn-query-views.edn` に書く。`edn-query.cljs view <name>` は
+;; **面を組まずにその EDN を読むだけ**なので、数十ミリ秒で答える。
+;;
+;; ここに置く基準は「よく訊かれる」かつ「答えが面の全体に依存する」こと。
+;; 一度きりの探索的クエリはここに書かない —— refresh のたびに走る費用がかかる。
+;;
+;; 追加したら refresh を 1 回回して、`view` が同じ答えを返すことを確かめる。
+;; view と生クエリが食い違ったら、それは cache が古いということ（`refresh` は
+;; 入力の digest を meta に書き、`q` はそれが合わないと**答えずに exit 4 する**）。
+
+{;; どの dataset に何 entity 載っているか。面の全体像を 1 行で見るための入口。
+ :dataset-entity-counts
+ "[:find ?dataset (count ?e) :where [?e \"source/dataset\" ?dataset]]"
+
+ ;; LEI カタログ: 法域ごとの社数。
+ :lei-by-jurisdiction
+ "[:find ?juris (count ?e) :where [?e \"source/dataset\" \"cloud-itonami-lei\"] [?e \"company/jurisdiction\" ?juris]]"
+
+ ;; LEI カタログ × GLEIF facts: 法人名・法域・ISIN。facts.edn を面に載せた
+ ;; （2026-08-25）ことで初めて書けるようになった join。
+ :lei-isin
+ "[:find ?name ?juris ?isin :where [?f \"source/dataset\" \"cloud-itonami-lei-facts\"] [?f \"company/lei\" ?lei] [?f \"securities/isin\" ?isin] [?b \"source/dataset\" \"cloud-itonami-lei\"] [?b \"company/lei\" ?lei] [?b \"company/legal-name\" ?name] [?b \"company/jurisdiction\" ?juris]]"
+
+ ;; LEI 登記の現況（ISSUED / LAPSED …）。法人の存続とは別の軸なので分けて数える。
+ :lei-registration-status
+ "[:find ?status (count ?e) :where [?e \"source/dataset\" \"cloud-itonami-lei-facts\"] [?e \"registration/status\" ?status]]"
+
+ ;; ADR の状態別件数。supersede 漏れを見るときの最初の 1 手。
+ :adr-status-counts
+ "[:find ?status (count ?e) :where [?e \"adr/status\" ?status]]"}
