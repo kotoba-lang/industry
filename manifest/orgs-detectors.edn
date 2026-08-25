@@ -1887,4 +1887,50 @@
 
               SHIFTS-COMPUTED is printed every run and is UNMEASURED, never clean: a
               count like `(* 8 index)` cannot be classified by reading, and two of the
-              three motivating defects were exactly that shape."}]}
+              three motivating defects were exactly that shape."}
+
+  {:id       :verify-cljs-inexact-integers
+   :title    "integer literals ClojureScript cannot represent, in code it executes"
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-cljs-inexact-integers.cljs" "--findings" "--root" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "LITERALS-EXAMINED\t[1-9][0-9]*"
+   :interval-ms 86400000                 ; 24h
+   :timeout-ms  600000                   ; 10m -- measured 2m over 28,586 files
+   :writes   :none
+   :why      "ClojureScript has no 64-bit integer; every number is an IEEE-754 double, so
+              a literal needing more than 53 bits of significand is rounded the moment it
+              is read. On the JVM the same literal is an exact long.
+
+              The recurring shape is a 64-bit PRNG transcribed into .cljc:
+              `(unchecked-add (unchecked-multiply state 6364136223846793005) ...)`.
+              Measured 2026-08-25 under nbb, one step from state 12345 gives
+              7.856670437842954e+22 -- a float, with no 64-bit wraparound anywhere; the
+              JVM gives -1206486762903477482. `unchecked-multiply` exists in cljs.core
+              and does not wrap.
+
+              This is a separate question from verify-cljs-shift-width, not a footnote on
+              it. That detector flags `(bit-shift-left 1 53)` inside these same PRNG
+              functions, and fixing that shift alone would make the files LOOK portable
+              while the multiply above it still never wrapped."
+   :measured "2026-08-25 on this machine: 2m, exit 1, SCANNED 28586 .cljc/.cljs files,
+              LITERALS-EXAMINED 132, FINDINGS 36 across 23 files.
+
+              Cross-checked against an independent Python implementation written first:
+              identical 36-element set, matching on file, line and literal.
+
+              The test is EXACT REPRESENTABILITY, not magnitude. A first version compared
+              against 2^53 and reported 1000000000000000000 and -9223372036854775808 --
+              both far past 2^53 and both exact (10^18 has a 42-bit significand; -2^63 is
+              a power of two) -- while 9223372036854775807, of the same size, is not. The
+              check now round-trips each literal through a double.
+
+              Discriminated on a fixture carrying all four cases plus one inside
+              `#?(:clj ...)`: only the inexact one is reported, and the :clj literal is
+              not even counted as examined.
+
+              One finding is deliberate: org-ietf-xdr's core_test.cljc writes 2^53 + 1
+              inside a :cljs-only deftest asserting that ClojureScript has already
+              rounded it and that encoding it must be refused. Named in the script so
+              nobody corrects a correct test."}]}
