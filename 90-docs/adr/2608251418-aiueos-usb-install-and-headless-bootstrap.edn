@@ -36,20 +36,20 @@
 
 Amu は checked KIR から AIUEOS の native artifact を生成し、Kotoba / kotoba-native は application と machine-code の authority を持つ。どちらも install target の選択、秘密の配布、ユーザー作成、ネットワーク初期化を所有しない。それらを compiler の責任に押し込まない。
 
-## 現在地
+## 現在地（tranche 1 反映 2026-08-25、aiueos ADR-0097 / contracts/install-v1.edn が component 側 matrix）
 
 | 面 | 現行 `main` | Ubuntu Server 相当との差 |
 |---|---|---|
 | release image | GPT disk と El Torito ISO を生成できる | install intent と first-boot 設定を束ねた配布物ではない |
 | USB flash | removable whole disk だけを明示確認後に書き、digest を readback する | USB から内蔵 SSD へ導入する installer ではない |
 | USB boot | 同じ image の disk / USB transport 等価性を QEMU/OVMF で検査する | 物理 PC の boot receipt がない |
-| internal install | `main` にはない。未統合 branch に第二空ディスク限定の Linux installer がある | boot disk、A/B、再実行拒否、first boot が閉じていない |
-| network | bare-metal cloud gate は QEMU で進んでいる一方、`usb-boot-v1.edn` の gap は network / NIC absent のまま | 契約の現在値を一致させ、実 NIC で DHCP を証明する必要がある |
+| internal install | 未統合 branch の guarded installer を main へ移植済み。install intent（named-disk admission）と target receipt + unattended 再消去拒否を nbb orchestration が所有し、fake device で両方向を実測 | USB live 環境からの導入、boot entry、A/B、first boot が閉じていない |
+| network | `usb-boot-v1.edn` の gap を分割更新済み（virtio net = present-qemu-proven / physical NIC = absent）。README / ADR-0019 も同期 | 実 NIC driver を書き、実機で DHCP を証明する必要がある |
 | identity / setup | grant / device の設計と hosted phone-bind proof がある | install image から実機の first-boot identity へ結ぶ receipt がない |
 | remote access | SSH / Tailscale の install contract がない | 鍵を置いたという静的検査でなく、別 host からの実 handshake が必要 |
 | recovery | release recovery ESP はある | 壊れた first-boot account / network を owner が復旧する経路ではない |
 
-`usb-boot-v1.edn` と現在の README / bare-metal ADR の network claim が一致していない状態も赤である。古い gap ledger を残したまま、別文書の green を現在値として足し算しない。実装 tranche は最初にこの契約を更新する。
+（2026-08-25 解消）`usb-boot-v1.edn`・README・ADR-0019 の network claim は tranche 1 で同期した。gap は削除ではなく分割で更新している — virtio が QEMU で証明済みであることと、physical NIC driver が無いことは別の主張であり、後者が I4 を塞いでいる。
 
 ## 決定
 
@@ -123,13 +123,13 @@ Tailscale は R0 install の成功条件にしない。まず wired DHCP + local
 
 | Gate | 緑 | 現在 |
 |---|---|---|
-| I0 contract | 本 ADR と component contract が同じ current-state matrix を持つ | root ADR のみ |
-| I1 artifact | release image、installer bundle、intent、receipt の digest chain が閉じる | release image のみ |
-| I2 destructive guard | partition / removable / system / nonempty / changed identity / wrong intent をすべて拒否する | 未統合 branch の第二空ディスク slice のみ |
-| I3 QEMU install | USB transport から空 disk へ install し、USB 無しで二回 boot する | red |
-| I4 headless | DHCP 後、外部 client が指定鍵で SSH、wrong key は拒否、二回目 boot でも成功 | red |
-| I5 repeat safety | 成功済み target を同じ USB が unattended erase しない | red |
-| I6 physical probe | 対象 PC の NVMe / NIC / GPU / UEFI identity を read-only receipt にする | probe tooling はあるが当該 install chain では未測定 |
+| I0 contract | 本 ADR と component contract が同じ current-state matrix を持つ | green（contracts/install-v1.edn、2026-08-25） |
+| I1 artifact | release image、installer bundle、intent、receipt の digest chain が閉じる | green（make-install-usb-image.py が閉じ、verify が image 単体から再導出） |
+| I2 destructive guard | partition / removable / system / nonempty / changed identity / wrong intent をすべて拒否する | green-offline（installer 18/18 + install-chain 18/18、各拒否は名指しの理由で pin。実 block device 上では未測定） |
+| I3 QEMU install | USB transport から空 disk へ install し、USB 無しで二回 boot する | red。ただし install USB image 自体の USB-transport boot は緑（smoke-qemu-usb-boot、removable-media 経由・両 transport evidence 一致）。live installer 環境が USB に無いことが残りの穴 |
+| I4 headless | DHCP 後、外部 client が指定鍵で SSH、wrong key は拒否、二回目 boot でも成功 | red（physical NIC driver も first-boot provisioning も sshd も無い） |
+| I5 repeat safety | 成功済み target を同じ USB が unattended erase しない | green-offline（target receipt + exit 4 rescue/inspect。inspection が空と誤申告しても receipt が止めることを実測。実機では未測定） |
+| I6 physical probe | 対象 PC の NVMe / NIC / GPU / UEFI identity を read-only receipt にする | amber（hw-probe tooling を main へ移植済み。対象 PC では未実行） |
 | I7 physical install | 明示 target へ write/readback、USB 無し SSD boot、LAN SSH | red |
 | I8 optional tailnet | LAN SSH 後に one-off enrollment し、再起動後に remote reach | red、I7 を塞がない |
 
@@ -137,10 +137,10 @@ I7 の最初の qualification target は購入済み PC（ASRock B850M Pro RS Wi
 
 ## 実装順
 
-1. `usb-boot-v1.edn` と current README / ADR の network claim を同期する。
-2. 未統合 installer の guard / readback contract と tests を現行 AIUEOS に移植する。
+1. ~~`usb-boot-v1.edn` と current README / ADR の network claim を同期する。~~（済 2026-08-25）
+2. ~~未統合 installer の guard / readback contract と tests を現行 AIUEOS に移植する。~~（済 2026-08-25、hw-probe 含む）
 3. QEMU の USB-live → empty-disk → USB-less reboot gate を作る。
-4. install intent と target receipt を導入し、repeat erase を拒否する。
+4. ~~install intent と target receipt を導入し、repeat erase を拒否する。~~（済 2026-08-25、install-intent.cljs / install-to-disk.cljs / test-install-chain.cljs）
 5. first-boot wired DHCP、hostname、device claim、SSH key provisioning を閉じる。
 6. QEMU の外部 client から実 SSH handshake と reboot persistence を検査する。
 7. 対象 PC を read-only probe し、明示確認後に物理 install / readback / SSD boot を行う。
