@@ -58,6 +58,10 @@
     `endpoint` / `bucket`）。S3 互換の R2 アクセス。
   - **`CLOUDFLARE_R2_ACCOUNT_TOKEN`** — R2 Account Token。**2026-08-25 時点で不在**（上記）。
   - **`CLOUDFLARE_R2_DATA_CATALOG_TOKEN`** — R2 Data Catalog (Iceberg) 用。
+    **2026-08-25 に発行して kagi に保管済み**（compartment `personal`）。同時に
+    `CLOUDFLARE_R2_ACCESS_KEY`（S3 互換の access-key-id / secret-access-key /
+    endpoint、JSON）も同じ発行で得たので保管した。
+    ⚠ **どちらもローテーション必要** —— 発行時の値が会話ログに平文で通っている。
     必要な権限は 2 つ: **R2 Data Catalog: Edit** と **Workers R2 Storage: Edit**。
     ✅ **2026-08-25 解消: この item は要らなかった。既存の Keychain
     `gftd.cf` / `API_TOKEN` がこの 2 権限を持っている**（実測: 同じ鍵で
@@ -73,6 +77,10 @@
     になり `create_table` が落ちる（catalog 側が R2 を list できない）。
     **metadata が通ることを「使える」と読まない** —— 面が 2 つある。
     使う側: `scripts/lei-datalake-sync.py` が `CF_CATALOG_TOKEN` として読む。
+    ⚠ **R2 SQL (`wrangler r2 sql query`) はこの token では 80013 Unauthorized**
+    （実測 2026-08-25）。同じ catalog の同じ表を DuckDB の iceberg extension は
+    読めるので、**表が無いのではなく R2 SQL が別の権限を要る**。片方の面が
+    拒否したことを「catalog が壊れている」と読まないこと。
   - **`CLAUDE_API_KEY_GFTDCOJP`** — Anthropic API キー（Cloudflare とは無関係だが
     同時に提供されたのでここに置いた）。
   - ⚠ **これら 5 件は 2026-08-05 の会話ログに平文で露出している。ローテーション必須。**
