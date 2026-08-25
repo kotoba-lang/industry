@@ -36,7 +36,7 @@
 
 Amu は checked KIR から AIUEOS の native artifact を生成し、Kotoba / kotoba-native は application と machine-code の authority を持つ。どちらも install target の選択、秘密の配布、ユーザー作成、ネットワーク初期化を所有しない。それらを compiler の責任に押し込まない。
 
-## 現在地（tranche 1..5 反映 2026-08-25、aiueos ADR-0097/0099/0101/0102/0103 / contracts/install-v1.edn + ssh-v1.edn が component 側 matrix）
+## 現在地（tranche 1..6 反映 2026-08-25、aiueos ADR-0097/0099/0101/0102/0103/0104 / contracts/install-v1.edn + ssh-v1.edn が component 側 matrix）
 
 | 面 | 現行 `main` | Ubuntu Server 相当との差 |
 |---|---|---|
@@ -148,6 +148,7 @@ I7 の最初の qualification target は購入済み PC（ASRock B850M Pro RS Wi
 5b. first-boot provisioning の静的半分（host key 生成 + authorized key 配置）を着地させる。（済 2026-08-25、aiueos ADR-0101）
 5c. TCP passive-open + SSH identification 交換を kernel に実装し実 client で実測。（済 2026-08-25、aiueos ADR-0102）
 5d. entropy API（aiueos_random_bytes）を着地・実測し、crypto path を ecdsa-sha2-nistp256 に確定（残る新規 crypto は ECDSA P-256 sign 1 本）。（済 2026-08-25、aiueos ADR-0103）
+5e. ECDSA P-256 RFC6979 sign object を実装、formula を RFC6979 A.2.5 vector で検証（ecdsa-sign-oracle）。**ただし kernel object としては未 compile** — この checkout の amu は ecdsa object の code region が 52KB で 32768 の kernel-object 上限を超え（shipped verify の再 compile すら不可、reproduce-toolchain-cannot-advance 条件）、KIR は memory を、wasm32 は kernel intrinsic を扱えず、測定経路が無い。source + oracle + blocker を着地（aiueos ADR-0104）。unblock 対象は object toolchain
 9. 同じ contract を保ったまま Linux live mechanism 依存を native AIUEOS installer へ縮める。
 
 ## 非決定
