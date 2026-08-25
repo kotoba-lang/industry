@@ -176,6 +176,48 @@
              :relationship/exception-reason (get a "reason")
              :source/note "Why no parent of this category is reported."}))))
 
+(defn declared-links
+  "The relationship links the main record itself declares. This is the
+   discriminator between the two meanings of a double 404 at a consolidation
+   level: a record that reports a parent OR an exception declares the level's
+   link here (measured 2026-08-25: Y87794H0US1R65VBXU25 declares direct-parent
+   while that endpoint answers 404, because the exception side answers 200),
+   and a record that carries no consolidation reporting at all declares
+   neither (549300KPBTIINY0VBM50, ACTIVE / ISSUED, no parent-level links)."
+  [record]
+  (set (keys (get-in record [:json "data" "relationships"]))))
+
+(defn absent-fact
+  "The measured third state at a consolidation level, added 2026-08-25 after
+   549300KPBTIINY0VBM50 (NORD ANGLIA EDUCATION, INC., ACTIVE / ISSUED)
+   answered 404 for BOTH the parent and the reporting exception at BOTH
+   levels. The either/or in this file's header was measured on four entities
+   in one family; this entity is outside it: GLEIF's own record declares no
+   link for the level in its relationships object, so the registry holds no
+   answer about this level -- which is a different fact from a reporting
+   exception, where the registry holds the answer 'none, and here is why'.
+
+   Emitted only when both endpoints answered 404 AND the level's link is
+   absent from the record's relationships, and cites the main record, whose
+   relationships object is the evidence. If GLEIF later publishes either
+   side, the emitted set changes and verification fails -- which is the
+   point."
+  [record parent-r exc-r retrieved-at lei id level]
+  (when (and (= 404 (:status parent-r)) (= 404 (:status exc-r))
+             (not (contains? (declared-links record) level)))
+    (prov record retrieved-at
+          {:fact/id id
+           :fact/kind :parent-reporting-absent
+           :company/lei lei
+           :relationship/level level
+           :source/note (str "GLEIF publishes neither a " level " nor a " level
+                             "-reporting-exception for this entity: both endpoints answer 404, "
+                             "and the cited record's own relationships object declares no "
+                             level " link. This is a measured absence of consolidation "
+                             "reporting at this level, not a reporting exception -- the "
+                             "registry holds no answer, rather than holding the answer "
+                             "'none'.")})))
+
 (defn build
   "The single definition of what facts.edn contains. --write emits it, the
    default mode rebuilds it from the live sources and diffs. Both modes go
@@ -356,6 +398,11 @@
        (exception-fact dpre retrieved-at lei "gleif-direct-parent-reporting-exception")
        (exception-fact upre retrieved-at lei "gleif-ultimate-parent-reporting-exception")
 
+       (absent-fact record dp dpre retrieved-at lei
+                    "gleif-direct-parent-reporting-absent" "direct-parent")
+       (absent-fact record up upre retrieved-at lei
+                    "gleif-ultimate-parent-reporting-absent" "ultimate-parent")
+
        ;; A measured zero. Without this entity, "GLEIF lists no direct children"
        ;; and "nobody asked GLEIF about children" would look identical in
        ;; facts.edn -- and a child appearing later would go unnoticed.
@@ -424,6 +471,7 @@
    :relationship/kind :relationship/parent-lei :relationship/child-lei
    :relationship/direct-child-count
    :relationship/exception-category :relationship/exception-reason
+   :relationship/level
    :source/dataset :source/url :source/http-status :source/retrieved-at
    :source/golden-copy-publish-date :source/note])
 
@@ -444,12 +492,16 @@
        ";; (d/transact conn (edn/read-string (slurp \"facts.edn\"))) like every other EDN\n"
        ";; corpus in this workspace. :company/lei is the join key.\n"
        ";;\n"
-       ";; Both consolidation levels are always represented, in one of two ways: a\n"
-       ";; :direct-parent / :ultimate-parent entity naming the parent, or a\n"
-       ";; :parent-reporting-exception entity saying why there is none. GLEIF publishes\n"
-       ";; exactly one of the pair per level and 404s the other, and the generator fails\n"
-       ";; rather than write this file if that stops being true -- so a level missing\n"
-       ";; from here was never a level nobody asked about.\n"
+       ";; Both consolidation levels are always represented, in one of three ways: a\n"
+       ";; :direct-parent / :ultimate-parent entity naming the parent, a\n"
+       ";; :parent-reporting-exception entity saying why there is none, or a\n"
+       ";; :parent-reporting-absent entity recording that GLEIF's record carries no\n"
+       ";; consolidation reporting at that level at all (its own relationships object\n"
+       ";; declares no such link, and both endpoints answer 404). When the record does\n"
+       ";; declare a level's link, GLEIF publishes exactly one of the pair and 404s the\n"
+       ";; other, and the generator fails rather than write this file if that stops\n"
+       ";; being true -- so a level missing from here was never a level nobody asked\n"
+       ";; about.\n"
        ";;\n"
        ";; The two counts here -- :securities/isin-count and\n"
        ";; :relationship/direct-child-count -- are read from meta.pagination.total of a\n"
@@ -481,16 +533,26 @@
    saying nothing whatsoever about this entity's parent, and without this check
    that emptiness reads exactly like a company that genuinely has none.
 
+   Except when the registry itself says the question has no answer. Measured
+   2026-08-25 on 549300KPBTIINY0VBM50 (ACTIVE / ISSUED): all four endpoints
+   answer 404 AND the main record's relationships object declares no
+   parent-level links at all -- the record carries no consolidation reporting.
+   That double 404 is a measured absence, recorded by `absent-fact`, not an
+   exclusivity break; the finding fires only when the record DECLARES the
+   level's link (`declared`) and the endpoints still both answer 404, because
+   then GLEIF is contradicting itself and silence would be this script's.
+
    Only 200 and 404 are conclusive here, and a level is judged only when BOTH
    of its endpoints gave one of those. A request that never got an HTTP answer
    is an unasked question, and a 5xx is a broken citation; both are already
    handled above, and answering them from here would report the wrong finding
    -- two 500s are not an entity with no parent."
-  [pairs]
+  [declared pairs]
   (for [[level parent exc] pairs
         :when (and (#{200 404} (:status parent)) (#{200 404} (:status exc)))
         :let [p? (present? parent) e? (present? exc)]
-        :when (= p? e?)]
+        :when (= p? e?)
+        :when (or p? (contains? declared level))]
     (str level ": " (if p?
                       (str "GLEIF answered 200 for BOTH the parent and the reporting "
                            "exception, which are supposed to be exclusive")
@@ -520,14 +582,19 @@
   (let [kinds (into #{} (map :fact/kind) entities)
         cats  (into #{} (comp (filter #(= :parent-reporting-exception (:fact/kind %)))
                               (map :relationship/exception-category))
-                    entities)]
+                    entities)
+        absents (into #{} (comp (filter #(= :parent-reporting-absent (:fact/kind %)))
+                                (map :relationship/level))
+                      entities)]
     (for [[level parent-kind exc-substr]
           [["direct-parent" :direct-parent "DIRECT_"]
            ["ultimate-parent" :ultimate-parent "ULTIMATE_"]]
           :when (not (or (contains? kinds parent-kind)
-                         (some #(and (string? %) (str/starts-with? % exc-substr)) cats)))]
-      (str level ": neither a :" (name parent-kind) " entity nor a "
-           ":parent-reporting-exception entity in a " exc-substr "* category was emitted"))))
+                         (some #(and (string? %) (str/starts-with? % exc-substr)) cats)
+                         (contains? absents level)))]
+      (str level ": neither a :" (name parent-kind) " entity, a "
+           ":parent-reporting-exception entity in a " exc-substr "* category, nor a "
+           ":parent-reporting-absent entity for this level was emitted"))))
 
 (defn compare-entities [recorded live]
   (let [by-id  (fn [xs] (into {} (map (juxt :fact/id identity) xs)))
@@ -608,19 +675,28 @@
 
                           (println (str "CHECKED\t" (count answered)))
                           (println (str "ENTITIES\t" (count recorded)))
-                          (doseq [r absent]
-                            (println (str (if (str/ends-with? (:url r) "-reporting-exception")
-                                            "NO-EXCEPTION\t" "NO-PARENT\t")
-                                          (:url r) "\t404 -- GLEIF publishes the other side of "
-                                          "this pair for this entity")))
+                          (let [declared (declared-links record)]
+                            (doseq [r absent]
+                              (let [level (if (str/includes? (:url r) "ultimate-parent")
+                                            "ultimate-parent" "direct-parent")]
+                                (println (str (if (str/ends-with? (:url r) "-reporting-exception")
+                                                "NO-EXCEPTION\t" "NO-PARENT\t")
+                                              (:url r) "\t404 -- "
+                                              (if (contains? declared level)
+                                                "GLEIF publishes the other side of this pair for this entity"
+                                                (str "GLEIF's record declares no " level
+                                                     " reporting at all; recorded as gleif-"
+                                                     level "-reporting-absent")))))))
 
                           (when (zero? (count answered))
                             (die! 3 "every request failed at the transport level"
                                   "-- cannot tell a dead citation from a dead network."
                                   "Refusing to report a pass."))
 
-                          (let [pf (parent-level-findings [["direct-parent" dp dpre]
-                                                           ["ultimate-parent" up upre]])]
+                          (let [pf (parent-level-findings
+                                    (declared-links record)
+                                    [["direct-parent" dp dpre]
+                                     ["ultimate-parent" up upre]])]
                             (when (seq pf)
                               (die! 1 (count pf) "consolidation level(s) where GLEIF's parent and"
                                     "reporting-exception endpoints are not exclusive:\n  "
