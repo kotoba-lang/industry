@@ -36,7 +36,7 @@
 
 Amu は checked KIR から AIUEOS の native artifact を生成し、Kotoba / kotoba-native は application と machine-code の authority を持つ。どちらも install target の選択、秘密の配布、ユーザー作成、ネットワーク初期化を所有しない。それらを compiler の責任に押し込まない。
 
-## 現在地（tranche 1+2 反映 2026-08-25、aiueos ADR-0097/0099 / contracts/install-v1.edn が component 側 matrix）
+## 現在地（tranche 1+2+3 反映 2026-08-25、aiueos ADR-0097/0099/0101 / contracts/install-v1.edn + ssh-v1.edn が component 側 matrix）
 
 | 面 | 現行 `main` | Ubuntu Server 相当との差 |
 |---|---|---|
@@ -127,7 +127,7 @@ Tailscale は R0 install の成功条件にしない。まず wired DHCP + local
 | I1 artifact | release image、installer bundle、intent、receipt の digest chain が閉じる | green（make-install-usb-image.py が閉じ、verify が image 単体から再導出） |
 | I2 destructive guard | partition / removable / system / nonempty / changed identity / wrong intent をすべて拒否する | green-offline（installer 18/18 + install-chain 18/18、各拒否は名指しの理由で pin。実 block device 上では未測定） |
 | I3 QEMU install | USB transport から空 disk へ install し、USB 無しで二回 boot する | **green（QEMU、2026-08-25、aiueos ADR-0099）**。smoke-qemu-install.cljs が 4 boot を一体で検査: USB-live install（intent admit + readback）→ USB 無しで NVMe から aiueos が 2 回 boot（各 39 marker）→ 再挿入 USB は existing-install で拒否し disk digest 不変。installed extent は release receipt digest と前後で一致 |
-| I4 headless | DHCP 後、外部 client が指定鍵で SSH、wrong key は拒否、二回目 boot でも成功 | red（physical NIC driver も first-boot provisioning も sshd も無い） |
+| I4 headless | DHCP 後、外部 client が指定鍵で SSH、wrong key は拒否、二回目 boot でも成功 | **red**（served handshake は未実装）。ただし SSH profile は設計済み（ssh-v1.edn、aiueos ADR-0101）で **provisioning 半分は着地・実測**: installer が target 上で per-device ed25519 host key を生成し intent の authorized key を配置。RFC 8032 vector で host key を pin、test-install-chain 22/22、QEMU install gate が live 経路で provision record を確認。残る blocker: TCP passive-open 無し / RX 深さ1 / entropy・sign primitive 無し / 常駐 loop 無し、crypto brick は SHA-512 と Ed25519 |
 | I5 repeat safety | 成功済み target を同じ USB が unattended erase しない | green（fake device + QEMU 全連鎖の両方で実測。boot4 の再挿入は exit 4 existing-install で拒否、disk byte-identical。実機では未測定） |
 | I6 physical probe | 対象 PC の NVMe / NIC / GPU / UEFI identity を read-only receipt にする | amber（hw-probe tooling を main へ移植済み。対象 PC では未実行） |
 | I7 physical install | 明示 target へ write/readback、USB 無し SSD boot、LAN SSH | red |
@@ -144,7 +144,8 @@ I7 の最初の qualification target は購入済み PC（ASRock B850M Pro RS Wi
 5. first-boot wired DHCP、hostname、device claim、SSH key provisioning を閉じる。
 6. QEMU の外部 client から実 SSH handshake と reboot persistence を検査する。
 7. 対象 PC を read-only probe し、明示確認後に物理 install / readback / SSD boot を行う。
-8. LAN SSH 成功後に optional Tailscale enrollment を追加する。
+8. ~~LAN SSH 成功後に optional Tailscale enrollment を追加する。~~（I8、I4 の後）
+5b. first-boot provisioning の静的半分（host key 生成 + authorized key 配置）を着地させる。（済 2026-08-25、aiueos ADR-0101。sshd 本体は blocker 解消の次 tranche）
 9. 同じ contract を保ったまま Linux live mechanism 依存を native AIUEOS installer へ縮める。
 
 ## 非決定
