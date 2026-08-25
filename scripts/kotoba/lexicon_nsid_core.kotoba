@@ -1,0 +1,73 @@
+;; NSID（AT Protocol の namespaced identifier）が妥当かどうかの**正本**。
+;; `kotoba/pure` プロファイル — capability ゼロ、effect ゼロ、コレクションゼロ。
+;;
+;; ## なぜここに置くか
+;;
+;; `scripts/audit-manifest-lexicon-drift` はこの判定を軸に動く: manifest が
+;; 宣言した NSID が妥当か、wire JSON の中の文字列が NSID なのか、
+;; ルート登録簿の要素が NSID なのか —— 監査の 3 箇所すべてがこの 1 つの述語を
+;; 呼ぶ。2026-08-25 まで、その述語は Python の正規表現
+;;
+;;   ^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*){2,}$
+;;
+;; として **監査スクリプトの中にだけ**在った。Python は
+;; CLAUDE.md の runtime 優先順位（kotoba wasm > clojurewasm > cljs > nbb）の
+;; どこにも無く、`.kotoba` に正本を移した上で nbb の監査本体がそれと一致する
+;; ことを検査する形にした。`manifest/org-id.kotoba` と
+;; `scripts/kotoba/fabric_actor_core.kotoba` と同じ分担 —— **食い違ったら
+;; この kernel が正しく、呼ぶ側を直す。**
+;;
+;; ## 正規表現を持たない言語で正規表現を表す
+;;
+;; Kotoba に正規表現は無い。上のパターンが言っているのは実際には
+;;
+;;   - `.` 区切りのセグメントが **3 つ以上**
+;;   - どのセグメントも空でない
+;;   - 先頭セグメントの 1 文字目は **小文字**（a-z）
+;;   - 以降のセグメントの 1 文字目は **英字**（大小どちらでも）
+;;   - それ以外の文字は 英数字 か ハイフン
+;;
+;; であり、1 パスの走査で表せる。走査で書くと、正規表現が黙って持っていた
+;; 「セグメントは空でない」が明示の分岐として現れる。
+;;
+;; bool ではなく `:i64` の 0/1 を返すのは `manifest/org-id.kotoba` に揃えた
+;; ため（同じ backend qualification で動く形）。
+
+(ns lexicon.nsid
+  (:export [nsid? scan alpha? body-char? lower? upper? digit?]))
+
+(defn dot [] :i64 46)
+(defn hyphen [] :i64 45)
+
+(defn lower? [c :i64] :i64 (if (>= c 97) (if (<= c 122) 1 0) 0))
+(defn upper? [c :i64] :i64 (if (>= c 65) (if (<= c 90) 1 0) 0))
+(defn digit? [c :i64] :i64 (if (>= c 48) (if (<= c 57) 1 0) 0))
+
+(defn alpha? [c :i64] :i64
+  (if (= (lower? c) 1) 1 (upper? c)))
+
+(defn body-char? [c :i64] :i64
+  (if (= (alpha? c) 1)
+    1
+    (if (= (digit? c) 1)
+      1
+      (if (= c (hyphen)) 1 0))))
+
+;; `seg` はいま何番目のセグメントか（0 始まり）、`pos` はそのセグメント内で
+;; 何文字読んだか。`pos` が 0 のときだけ「セグメントの 1 文字目」の規則が効く。
+(defn scan [s :string i :i64 seg :i64 pos :i64] :i64
+  (if (>= i (string-length s))
+    (if (= pos 0)
+      0
+      (if (>= seg 2) 1 0))
+    (let [c (string-code-point-at s i)]
+      (if (= c (dot))
+        (if (= pos 0) 0 (scan s (+ i 1) (+ seg 1) 0))
+        (if (= pos 0)
+          (if (= seg 0)
+            (if (= (lower? c) 1) (scan s (+ i 1) seg 1) 0)
+            (if (= (alpha? c) 1) (scan s (+ i 1) seg 1) 0))
+          (if (= (body-char? c) 1) (scan s (+ i 1) seg (+ pos 1)) 0))))))
+
+(defn nsid? [s :string] :i64
+  (if (= (string-length s) 0) 0 (scan s 0 0 0)))
