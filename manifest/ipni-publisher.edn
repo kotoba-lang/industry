@@ -1,0 +1,66 @@
+;; manifest/ipni-publisher.edn — the IPNI publisher identity for this workspace.
+;;
+;; ADR-2608160300 recorded that nothing can be announced without a
+;; /p2p/{peer-id}, and named this file as the artifact that unblocks the rest
+;; of the line. Owner instruction 2026-08-26 ("できるように整えていって") is the
+;; authorization; the two decisions it recorded are answered below.
+;;
+;; This file carries PUBLIC values only. The seed is in kagi, by name.
+{:ipni.publisher/peer-id "12D3KooWDscME2qEggsQYHg6d5d1Ms3Vq9duK6U15yQ64ksay2of"
+
+ ;; The same Ed25519 key seen through the IPNS naming plane. Recorded so the
+ ;; two derivations can be cross-checked without holding the seed: decoding
+ ;; this name yields the public key the peer-id is built from.
+ :ipni.publisher/ipns-name "k51qzi5uqu5dhontjj0tl8ezexhwh8aa265bj839qekj77b6o4fo10y3wzdeyu"
+
+ ;; Custody. Taken one item at a time by this identifier -- never enumerated.
+ :ipni.publisher/seed-kagi-item "kotobase-ipni-publisher"
+ :ipni.publisher/seed-kagi-compartment "net-kotobase"
+
+ ;; Decision 1 of ADR-2608160300: ONE key for the workspace, not one per
+ ;; surface. Twelve keys is a key set managed by enumeration whether anyone
+ ;; admits it or not, and the safety floor is explicit that credentials are
+ ;; taken one at a time by known identifier. Same reasoning as the appview
+ ;; catalog's one-name-not-four-hundred.
+ :ipni.publisher/scope :one-key-for-the-workspace
+
+ ;; Decision 2: IPNI is a PUBLISHING DISCIPLINE for every surface that puts a
+ ;; CID into the world, not a feature of pinning. Measured 2026-08-26: 435 of
+ ;; 510 kotoba.app.edn manifests carry a bundle CID, and none of them is a
+ ;; pin -- they are archive objects. Making IPNI a pinning feature would put
+ ;; the largest addressed corpus in the workspace permanently out of reach of
+ ;; the discovery plane.
+ :ipni.publisher/discipline :every-surface-that-publishes-cids
+
+ ;; Where the indexer GETs the advertisement chain. Anonymous by construction:
+ ;; cid.contact crawls without credentials, so a publisher behind auth can
+ ;; never be read (pinning.kotobase.net answers 401 and always will).
+ :ipni.publisher/publisher-origin "https://ipni.kotobase.net"
+
+ ;; Where the bytes are. NOT yet advertisable -- see :ipni.publisher/blockers.
+ :ipni.publisher/retrieval-candidates
+ [{:host "kotobase.net" :multiaddr "/dns4/kotobase.net/tcp/443/https" :status :blocked-on-raw-format}
+  {:host "ipfs.kotobase.net" :multiaddr "/dns4/ipfs.kotobase.net/tcp/443/https" :status :blocked-on-subdomain-redirect}]
+
+ ;; Measured 2026-08-26, before any advertisement was signed. An advertisement
+ ;; naming an address that cannot serve a verifiable block is worse than no
+ ;; advertisement: the indexer answers, the fetch fails, and the failure is
+ ;; attributed to IPFS rather than to us.
+ :ipni.publisher/blockers
+ [{:blocker :raw-format-ignored
+   :measured "2026-08-26"
+   :detail "GET /ipfs/{cid}?format=raw and Accept: application/vnd.ipld.raw both return the content-type the object was PUT with (text/html for isic-5110, application/octet-stream for the cloud.itonami.app bundle). transport-ipfs-gateway-http retrieval requires application/vnd.ipld.raw."
+   :owner "net-kotobase/ipfs"}
+  {:blocker :head-unsupported
+   :measured "2026-08-26"
+   :detail "HEAD /ipfs/{cid} answers 404 while GET of the same URL answers 200."
+   :owner "net-kotobase/ipfs"}
+  {:blocker :subdomain-gateway-unreachable
+   :measured "2026-08-26"
+   :detail "ipfs.kotobase.net/ipfs/{cid} 301s to {cid}.ipfs.kotobase.net, which times out -- no wildcard DNS or certificate. io-ipni-specs names this host as the retrieval multiaddr."
+   :owner "net-kotobase/ipfs"}]
+
+ :ipni.publisher/custody-verified
+ {:at "2026-08-26"
+  :how "written to kagi, read back, public key re-derived, peer-id compared -- storing without reading back is a custody claim that has never been tested"
+  :result :match}}
