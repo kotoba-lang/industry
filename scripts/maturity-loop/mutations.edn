@@ -2136,4 +2136,104 @@
      :file "src/kami/webgpu.cljs"
      :find "  {:alpha #js {:color #js {:srcFactor \"src-alpha\" :dstFactor \"one-minus-src-alpha\" :operation \"add\"}"
      :replace "  {:alfa #js {:color #js {:srcFactor \"src-alpha\" :dstFactor \"one-minus-src-alpha\" :operation \"add\"}"
-     :must-fail ["blend-vocabulary-matches-pipeline-table"]}]}]}
+     :must-fail ["blend-vocabulary-matches-pipeline-table"]}]}
+
+  {:repo "orgs/cloud-itonami/managon"
+   :label "managon —— 面どうしの identity 合意と、CLAUDE.md が CRITICAL と書いた開示規則"
+   ;; この repo は実在の法律事務所と実在の弁護士についての、非公式な AI 生成
+   ;; ページである。repo 自身の CLAUDE.md が visible な断り書き・出典表示・
+   ;; noindex,nofollow を **MUST** と書いていたが、それを強制するコードはどこにも
+   ;; 無く、規則は散文でしか存在していなかった —— 散文は配備を止めない。
+   ;;
+   ;; noindex は src/app.ts と svelte/src/app.html の**両面**に要求する。
+   ;; wrangler.jsonc の main が指すのは後者のビルド成果物で、kotodama.jsonld と
+   ;; CLAUDE.md は前者を entry と書いている（未解決の drift。test の docstring に
+   ;; 記録済み）。どちらが配備されても索引されないことだけは、向きが決まる前に
+   ;; 成り立たせておく。
+   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :green-marker "managon contract: all green"
+   :mutations
+   [{:id :managon/noindex-removed-from-worker-html
+     :why "実事務所の掲載と検索結果で競合しないための noindex は、CLAUDE.md が deliberate と明記した設定。消えても描画は成功するので、索引され始めて初めて分かる"
+     :file "src/app.ts"
+     :find "<meta name=\"robots\" content=\"noindex,nofollow\" />\n<title>"
+     :replace "<title>"
+     :must-fail ["disclosure-and-noindex-hold-on-every-html-surface"]}
+
+    {:id :managon/x-robots-tag-header-dropped
+     :why "meta を実行しない crawler には header 側でしか noindex が届かない。meta だけ残っていると『対策済み』に見える"
+     :file "src/app.ts"
+     :find "          \"x-robots-tag\": \"noindex, nofollow\",\n"
+     :replace ""
+     :must-fail ["disclosure-and-noindex-hold-on-every-html-surface"]}
+
+    {:id :managon/visible-disclosure-banner-emptied
+     :why "断り書きが画面から消えると、実在の弁護士についての AI 生成ページが事務所の公式サイトとして読まれる。DOM に要素は残るので、見た目の崩れでは気づけない"
+     :file "src/app.ts"
+     :find "<div class=\"disclosure\">${DISCLOSURE}</div>"
+     :replace "<div class=\"disclosure\"></div>"
+     :must-fail ["disclosure-and-noindex-hold-on-every-html-surface"]}
+
+    {:id :managon/meta-endpoint-loses-the-disclaimer
+     :why "CLAUDE.md の smoke は /_app/meta が disclaimer を返すと書く。API 経由の消費者には本文の banner が届かないので、ここが唯一の経路"
+     :file "src/app.ts"
+     :find "        disclaimer: DISCLOSURE,\n"
+     :replace ""
+     :must-fail ["disclosure-and-noindex-hold-on-every-html-surface"]}
+
+    {:id :managon/svelte-shell-becomes-indexable
+     :why "wrangler.jsonc の main が実際に指しているのはこちらのビルド成果物である。app.ts 側だけ noindex にしても、配備される面が索引される"
+     :file "svelte/src/app.html"
+     :find "    <meta name=\"robots\" content=\"noindex,nofollow\" />\n"
+     :replace ""
+     :must-fail ["disclosure-and-noindex-hold-on-every-html-surface"]}
+
+    {:id :managon/actor-did-drifts-from-identity-doc
+     :why "identity 文書と実際に応答する worker が別の DID を名乗ると、did:web を解決した相手と喋る相手が別人になる。どちらの面も相手を import しないので throw しない"
+     :file "src/app.ts"
+     :find "const ACTOR_DID = \"did:web:managon.etzhayyim.com\";"
+     :replace "const ACTOR_DID = \"did:web:manago.etzhayyim.com\";"
+     :must-fail ["actor-identity-agrees-across-worker-kotodama-and-wrangler"]}
+
+    {:id :managon/nanoid-drifts-in-wrangler
+     :why "nanoid は worker 名・route・identity 文書の 3 箇所を束ねる鍵。1 箇所だけ動くと fleet の逆引きが別 actor を指す"
+     :file "wrangler.jsonc"
+     :find "\"APP_NANOID\": \"m4n4g0n1\","
+     :replace "\"APP_NANOID\": \"m4n4g0n2\","
+     :must-fail ["actor-identity-agrees-across-worker-kotodama-and-wrangler"]}
+
+    {:id :managon/version-drifts-in-package-json
+     :why "version は package.json / wrangler vars / kotodama / worker fallback の 4 箇所にある。ずれると /_app/meta が嘘の版を返す"
+     :file "package.json"
+     :find "\"version\": \"0.1.0\","
+     :replace "\"version\": \"0.2.0\","
+     :must-fail ["declared-version-agrees-across-package-wrangler-and-kotodama"]}
+
+    {:id :managon/capability-dropped-from-wrangler
+     :why "discovery した能力と runtime が名乗る能力が食い違う。片方を消しても配備は成功する"
+     :file "wrangler.jsonc"
+     :find "\"APP_CAPABILITIES\": \"[\\\"law-firm-static-homepage\\\",\\\"english-translation\\\"]\","
+     :replace "\"APP_CAPABILITIES\": \"[\\\"law-firm-static-homepage\\\"]\","
+     :must-fail ["declared-capabilities-agree-between-kotodama-and-wrangler"]}
+
+    {:id :managon/display-name-drifts-in-wrangler
+     :why "一覧に出る名前と開いた先の名前が違うと、同じ actor だと分からない"
+     :file "wrangler.jsonc"
+     :find "\"APP_DISPLAY_NAME\": \"Minoru Law Office (English)\","
+     :replace "\"APP_DISPLAY_NAME\": \"Minoru Law Office\","
+     :must-fail ["display-name-and-description-agree-across-surfaces"]}
+
+    {:id :managon/fall-through-stops-being-404
+     :why "未定義の path が 200 を返すと、存在しない面が存在するように見える。CLAUDE.md が列挙した endpoint 以外は通さないのが既定"
+     :file "src/app.ts"
+     :find "return new Response(\"Not Found\", {\n      status: 404,"
+     :replace "return new Response(\"Not Found\", {\n      status: 200,"
+     :must-fail ["served-paths-are-exactly-the-documented-endpoints"]}
+
+    {:id :managon/source-attribution-url-drifts
+     :why "出典 URL が本文・/_app/meta・CLAUDE.md で食い違うと、どれが本当の出所か決まらない。実在の個人についての事実の裏付けが辿れなくなる"
+     :file "src/app.ts"
+     :find "sourceData: \"https://www.bengo4.com/mie/a_24204/l_137374/\","
+     :replace "sourceData: \"https://www.bengo4.com/mie/a_24204/l_999999/\","
+     :must-fail ["source-attribution-is-one-url-everywhere"
+                 "disclosure-and-noindex-hold-on-every-html-surface"]}]}]}
