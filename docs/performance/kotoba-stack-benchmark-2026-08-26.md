@@ -146,7 +146,7 @@ Evidence: `90-docs/performance/runs/2026-08-26-tender/tender.json`. Re-run:
 
 ```bash
 west update --fetch smart kototama   # if orgs/ missing in worktree
-node scripts/kotoba-tender-benchmark.mjs --runs 3 --date $(date +%Y-%m-%d)
+nbb scripts/kotoba-tender-benchmark.cljs --runs 3 --date $(date +%Y-%m-%d)
 ```
 
 | Path | Role | Performance posture |
