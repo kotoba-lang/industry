@@ -2256,12 +2256,27 @@ native に無いだけ。bare `:bool` パラメータは compiler ADR 0219 が�
 
 ### 移行の単位は決定核（decision core）— repo 全体を移そうとしない
 
-スカラ + 文字列 + record で表せる**判断**だけを `.kotoba` に切り出し、コレクションの
+スカラ + 文字列 + record で表せる**判断**を `.kotoba` に切り出し、コレクションの
 組み立てと effect は `.cljc` / `.clj` に残す。先例は `kotoba-lang/murakumo` の 33 本の
 `kotoba/*_core.kotoba` — **33/33 が native に載ったのは murakumo を移植したからではなく、
 決定核を切り出したから**（compiler ADR 0219 → 0220 → 0221 で 0/33 → 14/33 → 30/33 → 33/33）。
 `infer_join_core.kotoba` は冒頭で自分の境界を宣言している:
 `partition-work / enrollment map assembly stay cljc (vectors/maps).`
+
+⚠ **これは切り方であって、文字列禁止ではない**（ADR-2608261000）。
+『判断だけ』を『文字列を持たない』と読まない。判断が文字列の上に載るなら
+その文字列は核に入れる。線の CRLF・正規表現走査・ソケットを残す理由は
+mirror / 走査設計 / ambient authority であり、`:string` が無いからではない。
+`cond` は grammar が desugar する。入れ子 `if` を様式にしない。
+
+正しいスライス（手順の正本 ADR-2608261000、skill `kotoba-clj-to-kotoba`）:
+
+1. 書けない理由を `lang/surface-status.edn` の `:disposition` で分類する。
+2. `.cljc` を oracle のまま残し、`.kotoba` を require しない。
+3. set / map / nil / 線形式は cljc の adapter がスカラー（と必要な文字列）へ落とす。
+4. `.kotoba`（typed）と `.cljk`（`:clj-kotoba`、JVM target ではない）に同じ判断を書き、
+   `kotoba compile` で wasm と web を出す。untyped の `or` が i64 なら型注釈で表を保つ。
+5. parity は表の直積。意味を 1 枝だけひっくり返して赤になることを見る。
 
 - **parity test を必須にする。** 雛形は
   `murakumo/test/murakumo/infer_join_kotoba_parity_test.clj`

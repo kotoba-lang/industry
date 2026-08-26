@@ -1,0 +1,29 @@
+---
+description: clj→kotoba の決定核は切り方であって文字列禁止ではない。安全・未達・切り方を混ぜない。
+alwaysApply: true
+---
+
+# 決定核は切り方であって文字列禁止ではない
+
+clj / cljc から `.kotoba` / `.cljk` へ移すとき、書けない理由を一枚にしない。
+正本: ADR-2608650000（分類）、ADR-2608261000（手順）、skill `kotoba-clj-to-kotoba`。
+
+恒久の安全は 2 つだけ: `throw` → `[:result T E]` と、bool は数ではないこと。
+ソケットとホスト interop も安全（ambient authority を渡さない）。
+**文字列は禁止されていない。** `:string` / `string-concat` / `string=?` は言語にある。
+
+『判断だけ』は repo 全体を待たない切り方である。判断が文字列の上に載るなら
+その文字列は核に入れる。線の CRLF・正規表現走査・ソケットを残す理由は
+mirror / 走査設計 / 安全であり、Kotoba が文字列を持てないからではない。
+
+やってはいけない:
+
+- 『Kotoba は判断だけ／文字列を持たない』を安全設計として書く
+- amu 未成熟を、分類せず切り方の理由にする
+- `.cljc` から `.kotoba` を require する（require-graph）
+- `cond` が無いと思って入れ子 `if` を様式にする（grammar が desugar する）
+- reader を壊した赤を parity の成功実演に数える
+
+正しいスライス: oracle の `.cljc` を残す → adapter でスカラー（と必要な文字列）へ
+落とす → `.kotoba` と `.cljk` に同じ判断 → `kotoba compile` で wasm と web →
+表の直積の parity。

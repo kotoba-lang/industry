@@ -10,12 +10,12 @@
   ["`.kotoba` に書けない理由を「恒久の安全設計」と「backend 未達」に必ず分類する規約と、その分類の正本"
    "恒久として引き受ける制約は 2 つだけ（exceptions→Result / bool は型）という決定"
    "map・set・closure・異種ベクタ・再帰値・bare bool パラメータを native 追随前提の一時制約として扱う決定"
-   "cljc → .kotoba の移行単位を決定核（decision core）とし、コレクション組み立てを cljc に残す規約"
+   "cljc → .kotoba の移行単位は決定核（切り方）であり、文字列禁止ではない — 手順の正本は ADR-2608261000"
    "決定核に parity test を必須とする規約"
    "正規表現に依存する設計・`.cljc` のままの依存を持つ面を移行対象にしない規約"
    "kotoba-native の成熟度の 2026-08-08 時点の実測値と、その測り方"]
   :adr/supersedes []
-  :adr/related ["2607279200" "2607289500" "2607270100" "2608039700" "2608052000" "2607198300" "2607241100" "2607173000"]
+  :adr/related ["2607279200" "2607289500" "2607270100" "2608039700" "2608052000" "2607198300" "2607241100" "2607173000" "adr-2608261000-kotoba-migration-cut-is-not-a-string-ban"]
   :adr/repos ["com-junkawasaki/root"
               "cloud-itonami/cloud-itonami-app"
               "kotoba-lang/kotoba-lang"
@@ -114,8 +114,14 @@ bare `:bool` パラメータは compiler ADR 0219 が自ら
 ### 4. 移行の単位は決定核（decision core）
 
 **リポジトリ全体を `.kotoba` に移そうとしない。** スカラ + 文字列 + record で
-表せる判断だけを切り出し、コレクションの組み立てと effect は `.cljc` / `.clj` に
+表せる判断を切り出し、コレクションの組み立てと effect は `.cljc` / `.clj` に
 残す。
+
+⚠ **これは切り方であって、文字列禁止ではない。** 『判断だけ』を『文字列を
+持たない』と読まない。判断が文字列の上に載るならその文字列は核に入れる。
+線の形・正規表現による走査・ソケットを残す理由は、それぞれ mirror を作らない /
+走査設計は移さない / ambient authority を渡さない、であり、`:string` が無い
+からではない。正しい手順は ADR-2608261000。
 
 先例は `kotoba-lang/murakumo` の 33 本の `kotoba/*_core.kotoba`。
 `infer_join_core.kotoba`（87 行）は冒頭コメントで自分の境界を宣言している:
@@ -368,4 +374,10 @@ java -cp \"$(cat /tmp/cp.txt)\" clojure.main -e \\
               \\\"src/cloud/itonami/app/organism_worker.kotoba\\\"] \\
            t [:wasm32-kotoba-v1 :x86_64-kotoba-v1 :aarch64-kotoba-v1]] \\
      (println f t (some? (:kir (c/compile-source (slurp f) t {})))))\"
-```"}]
+```
+
+## 改訂履歴
+
+2026-08-26: 決定 4 を『切り方であって文字列禁止ではない』と明記し、手順を
+ADR-2608261000 へ委譲した。判断核から文字列を落とす読みはここで閉じる。
+"}]

@@ -1,0 +1,117 @@
+[{:db/id -1
+  :adr/id "adr-2608261000-kotoba-migration-cut-is-not-a-string-ban"
+  :adr/title "決定核は移行の切り方であって文字列禁止ではない — clj から .cljk / .kotoba への正しい移行"
+  :adr/status "accepted"
+  :adr/date "2026-08-26"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/related ["2608650000" "2607279200" "2608242100" "2608241900" "2607201300"]
+  :adr/repos ["com-junkawasaki/root" "kotoba-lang/org-ietf-smtp" "kotoba-lang/amu" "kotoba-lang/kotoba-lang"]
+  :adr/authoritative_for
+  ["clj / cljc → .cljk / .kotoba の正しい移行手順"
+   "決定核は切り方であって言語の天井ではないという決定"
+   "文字列を核に入れてよい条件と、線の形・走査・effect を残す条件"
+   "『判断だけ』『文字列を持たない』を安全設計・amu 未成熟と取り違えない分類"]
+  :adr/body
+  "2026-08-26、オーナーの問い: SMTP 核を判断だけにし文字列を持たせなかったのは
+kotoba の安全設計か、初期の移行時の制約か、amu が未成熟だからか。続けて
+『正しいかつ理想的な移行、実装方法に adr, md, rule を更新』。
+
+これは ADR-2608650000 が 2026-08-08 に分けた 2 種類（恒久の安全 / backend 未達）に、
+第三のものを足す。第三は言語でもコンパイラでもなく、**今のスライスの切り方**である。
+切り方を安全や未成熟と書くと、backend が追いついたあとも文字列の無い核を模倣する。
+
+## 分類（混ぜない）
+
+恒久の安全として引き受けるのは、今も 2 つだけである（ADR-2608650000 決定 2）。
+`throw` / `try` / `catch` を使わず `[:result T E]` を返すことと、bool は数ではないこと。
+加えてゲストが持ってはいけないものは ambient authority である
+（`no-interop` / `no-ambient-authority` / effect は capability）。ソケットと
+ホストオブジェクトはここに属する。
+
+`:max-parameters 5` は admission の床（t54）。引数が溢れたら畳む。言語から
+文字列を消す理由にはならない。
+
+正規表現演算は `:forbidden-heads` に無い。`not-yet-implemented` である。
+走査で構造を得る設計は、演算を待つのではなく宣言データに直してから移す
+（ADR-2608650000 決定 6）。
+
+map / set / `cond` は安全禁止ではない。`cond` は guest-grammar が nested `if` へ
+desugar する（L2、`:compiler :kotoba-wasm :kotoba-cljs`）。入れ子 `if` で書くのは
+初期の癖であって、様式にしない。
+
+amu が『判断以外を拒否した』事実は、2026-08-26 の SMTP スライスには無い。
+`kotoba compile --target wasm` と `--target web` は `.kotoba` と `.cljk` の両方で
+通った。足りなかったのは正規表現演算（stdlib）と、untyped の `or` が i64 になる
+既知の型付け（型注釈で回避）だけである。
+
+## 決定核は切り方である
+
+ADR-2608650000 決定 4 の『スカラ + 文字列 + record で表せる判断』は、核が
+持てるものの上限ではなく、**repo 全体を待たずに切る下限**である。文字列は
+禁止されていない。判断が文字列の上に載るなら、その文字列は核に入れる。
+
+切るもの（ゲストが JVM も Node も持たずに答える問）と、残すもの（線の形、
+走査、コレクション組み立て、effect）を先に名指しする。残す理由を『Kotoba は
+文字列を持てない』と書かない。
+
+残してよいものの例:
+
+- 線に出す CRLF / コマンド列。`string-concat` で書けるが、本番の送り手が
+  第二 formatter を使わないなら核にしない（静かな mirror）
+- 正規表現で応答行を map にする。演算未実装に加えて、走査設計のまま移さない
+- ソケット・ファイル・例外経路。安全不変条件
+- AUTH 名の set や資格情報の map。adapter がスカラーに落としてから核へ渡す
+
+入れてよいものの例:
+
+- 整数比較、bool の表、keyword の符号
+- 判断に必要な文字列（ホスト名は EHLO に書いてよいか、トークンは空か）
+- record（判断の入力が record なら、組み立ては cljc、フィールド上の判断は核）
+
+## 正しい移行（理想）
+
+1 スライス = 1 判断表。repo 全体を `.kotoba` に改名しない。
+
+1. **分類する。** 書けない理由を `lang/surface-status.edn` の `:disposition` で
+   引く。安全 / 意味の単純化 / 部分実装 / 未実装 / このスライスの切り方、のどれか。
+   分類を書かずに『Kotoba ではこう書く』と様式化しない。
+2. **oracle を残す。** `.cljc` / `.clj` が今の本番である。`.kotoba` を require しない
+   （require-graph）。核は同じ表の第二実装であり、突き合わせるものが parity である。
+3. **adapter を cljc に置く。** set / map / nil / 文字列の線形式から、核が取る
+   スカラー（と、判断に必要な文字列）へ落とす。`max-parameters` に収める。
+4. **`.kotoba` と `.cljk` を同じ判断で書く。** `.kotoba` は typed safe core、
+   `.cljk` は `:clj-kotoba`（JVM target ではない、ADR-2608242100）。本体が同じなのは
+   欠陥ではない。コメントで面を名指しする。untyped の `and` / `or` が i64 になるなら
+   型注釈を付けて表を保つ。入れ子 `if` に逃げて表を壊さない。
+5. **`kotoba compile` で wasm と web を出す。** 公開経路は CLI である。
+   `compile-source` は parity の内側。host に binary が無いときは skip し、
+   skip と pass を同じ顔にしない。
+6. **parity は表の直積を歩く。** 標本は、訪れていない行に同意する。壊し方は
+   意味を 1 枝だけひっくり返す。reader を壊した赤は成功した実演に数えない。
+7. **`ex-info` は切り出す機会に Result へ移す。** 移行の副産物にしない
+   （ADR-2608650000 決定 2）。
+
+## 実測（org-ietf-smtp、2026-08-26）
+
+切り出した判断は 3 つ: 応答は成功か、XOAUTH2 は 334 か、どの SASL か。
+線の形（command / response-line / base64）とソケットは `.cljc` に残した。
+`.cljk` と `.kotoba` の KIR digest は一致した。parity は SASL 全直積。
+`auth-none` と `auth-unsupported` を入れ替えると 60 行で落ちた
+（空の AUTH と GSSAPI のみは別コードでなければならない）。
+
+着地: kotoba-lang/org-ietf-smtp `fb312441622d`、west pin `990d5e791141`。
+
+最初の切り方が『文字列を持たない核』に見えたのは、SMTP の判断が整数と bool
+だったからである。それを言語の天井として文書化すると、次のスライスが
+判断に必要な文字列まで落とす。この ADR はその読みを閉じる。
+
+## 正本の置き場
+
+- 分類の正本は引き続き ADR-2608650000 と `lang/surface-status.edn`
+- 切り方と手順の正本はこの ADR
+- agent が毎回読む要約は CLAUDE.md / AGENTS.md の決定核節と
+  `.cursor/rules/always/kotoba-migration-cut.mdc`
+- 1 スライスの手順書は skill `kotoba-clj-to-kotoba`
+"}]
