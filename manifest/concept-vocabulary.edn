@@ -413,4 +413,16 @@ Web ゆうびん投函の自動化（2026-04 断念）、cloud-itonami-iso3166-j
 ⚠ 2026-08-23 時点: shomen の seed 10 件は全件 unverified-seed。teigen / hikyaku は R0
 （決定核と状態機械のみ。提出 host / workforce 配信 host / 台帳永続化は無い）。"}
 
+ :spatial-intelligence
+ {:label "公開空間情報 / live spatial intelligence（地球儀に載る観測）"
+  :spellings ["spatial intelligence" "geoint" "osint" "globe" "地球儀"
+              "衛星追跡" "satellite tracking" "tle" "sgp4" "adsb" "ads-b"
+              "flight tracking" "航空機追跡" "ais" "船舶追跡" "earthquake feed"
+              "天球" "tenkyu"]
+  :note "cloud-itonami/tenkyu（天球）が公開 feed を governed ingest して R2 Data
+Catalog の Iceberg 表に置き、cloud-itonami/app-tenkyu が WebGPU 地球儀で描く。
+どちらも名前が機能を示さないのでここに載せる。軌道伝播は kotoba-lang/sgp4
+（deep space は拒否する）、球面ジオメトリは kotoba-lang/geo。ADR-2608261800。
+上流サービスへの request はブラウザから 1 本も出ない —— 画像も海岸線も lake から。"}
+
 }
