@@ -103,6 +103,35 @@ commit して main に載せる。
 | **rebase 禁止・force-push 禁止** | CLAUDE.md |
 | **`manifest/west.yml` を触らない** | pin は中央で 1 commit にまとめる |
 
+## ⚠ `svelte/src/routes/**/+server.ts` は**バックエンド**である（実測 230 repo）
+
+**SvelteKit の `+server.ts` は frontend ではない。HTTP エンドポイントの実装。**
+route ツリーの中に在るので、`svelte/` を丸ごと消すと**本番のハンドラごと消える。**
+
+実測 2026-08-26、`cloud-itonami/app-warehouse` の agent が
+`svelte/src/routes/xrpc/[...path]/+server.ts` を見つけた —— その repo の README が
+**「実際にデプロイされるのはこのファイル」**と書いていた XRPC dispatcher で、
+wrangler の `main` が指していた SvelteKit build の実体がこれだった。agent は
+`src/xrpc-dispatcher.ts` へ**移して**から消した。同じ波の `app-scheduler` と
+`app-wvme` も同じ形に当たった。
+
+**これは例外ではない。`orgs/` 全体で `svelte/` 配下の `+server.ts` は 230 件在る。**
+
+**規則:**
+
+1. 消す前に `find <svelte-dir> -name '+server.ts'` を必ず引く。
+2. 在ったら**移す**（`<appview>/src/<意味のある名前>.ts`）。中身は byte 同一のまま、
+   provenance を書いたヘッダコメントだけ足す。
+3. **動かせるとは限らない。** SvelteKit 専用の import を持っていて、SvelteKit build が
+   消えた後は**そのままでは動かない**。ヘッダにそう書く —— 復活させるかは
+   未決の product 判断であって、移行の agent が決めることではない。
+4. `+page.server.ts` / `hooks.server.ts` / `svelte/src/routes/**/*.ts` のうち
+   `+page.svelte` でないものも同じ扱い。**`.svelte` でなければ frontend とは限らない。**
+
+既に移行を終えた 26 repo は全部確認済みで、**pre-migration tree に `+server.ts` を
+持っていたものは 0 件**（失ったものは無い）。危険は**これから**の、より大きい
+scaffold の側に在る。
+
 ## `svelte/` を消す前に、Svelte でないものが入っていないか見る
 
 **`svelte/static/` に、Svelte とは無関係の実物が置かれていることがある。**
