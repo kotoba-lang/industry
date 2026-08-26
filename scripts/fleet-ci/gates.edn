@@ -539,6 +539,30 @@
   ;; ClojureScript runner instead).
 {:name "psa" :gate :nbb-test :classpath "src:test" :entry "test/run_portable.cljs" :ship-git-deps true :cd true}
   {:name "worklaw" :gate :nbb-test :classpath "src:test" :entry "test/run_portable.cljs" :ship-git-deps true :cd true}
+  ;; watchlist-screen ships committed sanctions snapshots (OFAC SDN, UN
+  ;; Consolidated, JP MOF). Between 2026-07-19 and 2026-08-26 they sat 38 days
+  ;; old while `watchlist.model/default-stale-after-days` was 14 -- every
+  ;; screen correctly returned `:watchlist/stale? true` and nobody read the
+  ;; field. A value being computed correctly and someone noticing it are
+  ;; different things, and the second needs a place to go red.
+  ;;
+  ;; The 21-day limit is deliberately looser than the library's own 14: the
+  ;; library's number answers "can I trust this answer", this gate's answers
+  ;; "is the refresh mechanism running". Equal numbers would make one late run
+  ;; look the same as a broken schedule.
+  ;;
+  ;; :include-ext [".edn"] ships 7 files (3 entities, 3 manifests, deps.edn);
+  ;; :min-files 5 is the floor against a filtered-to-nothing tree, and the
+  ;; gate has its own --min 3 floor on manifests found.
+  ;;
+  ;; Verified in both directions against the tree `git archive | .edn only`
+  ;; produces -- green there, and red for each of its three stated reasons
+  ;; (a stale manifest, a manifest with no :manifest/fetched-at, an empty
+  ;; directory). NOT yet observed green on a node: the next tick is that.
+  {:name "watchlist-screen" :id "watchlist-snapshot-freshness" :org "kotoba-lang"
+   :gate :nbb-script :script "gates/snapshot-freshness-check.cljs"
+   :script-args ["--sub" "resources/watchlist/lists" "--max-age-days" "21" "--min" "3"]
+   :include-ext [".edn"] :min-files 5 :cd false}
   {:name "org-ietf-deflate" :gate :jvm-test :cd true}
   ;; org-w3-png had no gate at all until 2026-08-19, which is how `png.encode`
   ;; came to write every chunk type as four zero bytes under ClojureScript and

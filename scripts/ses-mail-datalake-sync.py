@@ -33,8 +33,8 @@ from typing import Any, Iterable
 import pyarrow as pa
 
 
-ACCOUNT_DEFAULT = "4da88288dc30d9ee257f319d3c33ecf0"
-BUCKET_DEFAULT = "cloud-itonami-datalake"
+from datalake_catalog import ACCOUNT_DEFAULT, BUCKET_DEFAULT, connect, ensure_namespace
+
 NAMESPACE = "cloud_itonami_private"
 
 STR = pa.string()
@@ -75,22 +75,6 @@ INPUT_KEYS = {
     "ses_opportunity": "opportunities",
     "ses_candidate": "candidates",
 }
-
-
-def load_token() -> str:
-    token = os.environ.get("CF_CATALOG_TOKEN")
-    if token and token.strip():
-        return token.strip()
-    result = subprocess.run(
-        ["security", "find-generic-password", "-s", "gftd.cf", "-a", "API_TOKEN", "-w"],
-        capture_output=True, text=True, timeout=30,
-    )
-    if result.returncode == 0 and result.stdout.strip():
-        return result.stdout.strip()
-    raise RuntimeError(
-        "catalog token unavailable: set CF_CATALOG_TOKEN or Keychain "
-        "service=gftd.cf account=API_TOKEN"
-    )
 
 
 def utc_now() -> str:
@@ -146,17 +130,6 @@ def dedupe_rows(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def arrow(rows: list[dict[str, Any]], schema: pa.Schema) -> pa.Table:
     return pa.Table.from_pylist(rows, schema=schema)
-
-
-def connect(account: str, bucket: str):
-    from pyiceberg.catalog.rest import RestCatalog
-
-    return RestCatalog(
-        name="cloud_itonami_datalake",
-        warehouse=f"{account}_{bucket}",
-        uri=f"https://catalog.cloudflarestorage.com/{account}/{bucket}",
-        token=load_token(),
-    )
 
 
 def load_or_create(catalog, table_name: str, schema: pa.Schema):
@@ -218,13 +191,7 @@ def main() -> int:
         return 0
 
     catalog = connect(args.account, args.bucket)
-    from pyiceberg.exceptions import NamespaceAlreadyExistsError
-
-    try:
-        catalog.create_namespace(NAMESPACE)
-        print(f"created namespace {NAMESPACE}")
-    except NamespaceAlreadyExistsError:
-        pass
+    ensure_namespace(catalog, NAMESPACE)
 
     failures = 0
     for name, incoming in batches.items():

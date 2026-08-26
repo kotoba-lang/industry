@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  com.gftd.watchlist-refresh — 制裁リスト snapshot を週 1 回取り直し、着地させ、
+  3 つの投影（git / R2 objects / Iceberg）を揃える。
+
+  なぜ常駐させるか: snapshot は 2026-07-19 から 2026-08-26 まで 38 日古いまま
+  だった。`scripts/refresh_lists.cljs` は在って動いていた —— 誰も回していな
+  かっただけである。screening は毎回正しく `:watchlist/stale? true` を返して
+  いたが、誰もその field を読んでいなかった。
+
+  この job は fleet gate `watchlist-snapshot-freshness`（21 日で赤）と対で
+  意味を持つ。gate だけなら直せない赤が残り、job だけなら止まっても誰も
+  気づかない。週 1 回なので、gate が赤くなるまでに 2 回失敗する猶予がある。
+
+  install:
+    cp scripts/com.gftd.watchlist-refresh.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.watchlist-refresh.plist
+
+  uninstall:
+    launchctl bootout gui/$(id -u)/com.gftd.watchlist-refresh
+
+  手で 1 回:
+    nbb scripts/watchlist-refresh-cycle.cljs --dry-run    # 取得・ratchet・両 suite まで
+    nbb scripts/watchlist-refresh-cycle.cljs              # 着地と publish まで
+
+  credential: git push は SSH remote（鍵は Keychain）、R2 は wrangler の OAuth
+  session、Iceberg は Keychain `gftd.cf` / `API_TOKEN`。
+  ⚠ **launchd から Keychain が読めないことがある**（ADR-2607178000）。その場合
+  iceberg の段だけが FAIL し、refresh / 検査 / 着地 / R2 は成功する —— driver は
+  段ごとに結果を出すので、log を見ればどこから再開すればよいか分かる。
+  **token をファイルに書き出して回避しない**（資格情報の平文コピーを増やす）。
+
+  日曜 05:23 local — 他の cron（01:17 / 02:41 / 04:17 / 04:30 / 06:00 / 06:17 /
+  07:43）を避ける。週 1 なのは上流の更新頻度に合わせたもので、OFAC は平日ほぼ
+  毎日更新されるが、この repo の staleness 閾値は 14 日なので週 1 で足りる。
+
+  ProcessType は Standard。Background にすると macOS の throttling で進まない
+  （fleet-ci tick / sweep の plist と同じ理由、実測済み）。
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.gftd.watchlist-refresh</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/nbb</string>
+    <string>/Users/junkawasaki/github/com-junkawasaki/scripts/watchlist-refresh-cycle.cljs</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/junkawasaki/github/com-junkawasaki</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key><integer>0</integer>
+    <key>Hour</key><integer>5</integer>
+    <key>Minute</key><integer>23</integer>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>ProcessType</key>
+  <string>Standard</string>
+
+  <key>StandardOutPath</key>
+  <string>/Users/junkawasaki/.gftd/watchlist-refresh.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/junkawasaki/.gftd/watchlist-refresh.log</string>
+</dict>
+</plist>
