@@ -287,6 +287,50 @@ throughput は上がらない。
 「ファイル名リストは網羅的ではない、目的で判断してよい」と明記した ——
 *指示に従わない自由を明示的に与えないと、次の agent は字面に従ってしまう。*
 
+## 「frontend だけ」と書いた scope が、2 つのものを取りこぼした（第 6・7 波）
+
+移行が 25 repo に達した時点で、**私のプロンプトの穴が 2 つ**出た。どちらも
+agent が正しく振る舞ったことで見えた。
+
+### `svelte/` の中に Svelte でないものが入っている
+
+私は「`svelte/` を丸ごと消せ」と書いた。`cloud-itonami/cad` の `svelte/static/` には
+**動作する prebuilt WASM の CAD viewer（約 266KB、上流 `kotoba-lang/kami-app-cad`
+の成果物）**が入っており、その repo 自身の ADR-0001 が「唯一動く viewer 面」と
+書いていた。**字面どおりなら壊していた。** agent は `static/` へ移してから消した。
+
+**規則**: 消す前に `svelte/` を列挙する。Svelte/Vite/tsconfig/tailwind のビルド系
+**以外**（wasm・画像・フォント・データ）は**移すもの**であって消すものではない。
+
+### deploy 設定が、消したパスを指したまま残る
+
+`wrangler.jsonc` の `main` と `assets.directory` が SvelteKit の出力を指している
+ことがある。3 agent が同じ状況に**3 通り**に答えた —— `main` を `src/app.ts` に
+付け替え / `main` を削って assets を向け直し / 触らず flag だけ。**3 つとも判断
+としては筋が通っていた**が、3 つ目で `cloud-itonami/app-society6` に**存在しない
+パスを指す config** が残った（修正済み `9c83207`。他 18 repo を掃いて同種はゼロ）。
+
+**判断の分かれ目は「その worker が `env.ASSETS.fetch` を呼ぶか」**。`app-docs` の
+worker は呼ぶので付け替えが正しく、`app-society6` のは呼ばないので同じ修正が誤り
+だった。**同じ操作が repo によって正誤を変えるので、条件を書かずに手順だけ渡すと
+必ず割れる。** skill に 1 通りに固定した。直後の `app-sheets` の agent がこの規則を
+独立に正しく適用した（worker を読んで `env.ASSETS.fetch` を確認してから付け替え）。
+
+⚠ **deploy は実行していない。** commit に **UNVERIFIED** と書いている。対象 host は
+NXDOMAIN のことが多い（`app-society6` の 2 host とも）——**live を壊す話ではないが、
+内部整合の壊れた config を残す理由にもならない。**
+
+### custody 判定は 5 形すべてで持ちこたえた
+
+`docs/verify-custody.cljs` / `docs/verify-docs-claims.cljs` /
+`docs/check-migration-identity.cljs` / `scripts/verify-docs-claims.cljs` /
+`docs/check-declared.cljs`。**中身で判定する規則は 5 形すべてで正しく動き、
+ファイル名リストなら 4 形を取りこぼしていた。**
+
+逆方向も効いている: `docs/check-declared.cljs` は DNS 名と依存解決を検査するが
+`svelte/` を pin しないので**止めない**。agent は実際に走らせて確認してから進めた。
+**checker が在ることと、その checker が `svelte/` を守っていることは別の事実。**
+
 ## 決めていないこと（正直に）
 
 - **移行の順序も期限も決めていない。** 1,379 ファイルは 1 セッションで動かせる量ではない。
