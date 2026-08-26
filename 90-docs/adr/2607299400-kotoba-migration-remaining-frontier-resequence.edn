@@ -19,7 +19,8 @@
   :adr/related
   ["adr-2607279200-kotoba-clojure-shaped-safety-elaboration-migration"
    "adr-2607289500-kotoba-refactor-agent-handoff-and-capability-repo-cid"
-   "adr-2607270100-kotoba-cloudflare-worker-and-ui-feasibility-spike"]
+   "adr-2607270100-kotoba-cloudflare-worker-and-ui-feasibility-spike"
+   "adr-2608650000-kotoba-cannot-write-has-two-kinds-decision-core-extraction"]
   :adr/body
   "# ADR-2607299400: Kotoba 移行の残りを実測で再測定し再順序化する
 
@@ -164,7 +165,7 @@ P7 kotoba repo 自身 — `src/` の 39 本の .clj を
    aiueos の decision-free C mechanism / judgement-in-kotoba と同じ基準を使う。
 ```
 
-並行可: P4 は P1–P3 と独立（capability トラック）。P6 は W4 待ちで着手不可。
+並行可: P4 は P1–P3 と独立（capability トラック）。P6 は当時 W4 待ちで着手不可と書いた。現行ではない。W4 は landed。P6 の残りは design-system の本移行（string-only SSR を最終 API にしない）であって、言語計画 W4 の未着手ではない。
 
 ### 5. `kotoba-lang/kotoba` 自身の現在地（実測）
 
@@ -4262,6 +4263,10 @@ C. expectation/golden migration (keep equal-family as `:i64`)
 - 新しい application DSL の導入（ADR-2607279200）
 - `kotoba-lang` 側 living plan の書き換え — 同 repo は毎時更新されており、
   本 ADR は superproject 側の断面固定に徹する
+
+## 改訂履歴
+
+2026-08-26: 『P6 は W4 待ちで着手不可』を当時の切り方へ戻した。W4 は landed。現行ではない。
 "
   :adr/consequences
   ["west pin 13 件を前進（825 commit 分）。verify-west-pins でサーバ側検証済み"
