@@ -70,15 +70,26 @@ ADR-2608171200 は 2026-08-17 時点で File Provider を未実装とし、Swift
   host + embedded File Provider extension の unsigned build が成功した。residency は
   `downloadLazily` / `inherited` / `downloadEagerlyAndKeepDownloaded` に対応する。
 - `cloud-itonami/cloud-itonami-app` main
-  `0e0d3171d99a755d585483df1eba61c678bedc9e`（PR #182）。focused suite は
+  `d25b9f40a21add30953f612ce3c0f4afdd52ac3b`（PR #182, #183）。focused suite は
   342 tests / 1370 assertions、失敗 0。HTTP の create → upload → materialize → mode 往復と、
-  remote JSON の unsigned byte 正規化を通した。
+  remote JSON の unsigned byte 正規化を通した。実データで encrypted envelope の 813 bytes を
+  Finder の file size として返す欠陥を見つけ、logical plaintext size を分離した follow-up は
+  1 test / 13 assertions、clj-kondo とも緑。
 - app bundle は Kotobase に CID
   `bafkreigce6ews2du2pb3hccoxgirrsdaxdmb4npgt7t72ux5qxmt3o5lpu` として publish し、
   PUT 201 / GET 200 / byte-identical を観測した。graph CID は
   `bafyreiahqbzxiou7j7y7pj74ctnxt4lcy2spp7xkxdevhhuudy5d43u5gy`、PUT 201 / GET 200。
-- superproject main `c0a4487b42d0f5f40e3e33532dd4873814ad070e` で 3 repo の pin と
-  checkout HEAD が一致した。
+- superproject main `2d8e5a3b0c94189abd5a6e42b4908eab5054c9ad` で Cloud app pin を
+  `d25b9f40...` へ server-verified fast-forward し、他 2 repo と合わせて 3 HEAD が一致した。
+- resident は immutable release `~/.cloud-itonami/releases/d25b9f40...` から起動し、`/health`
+  200。`Finder E2EE検証 2026-08-26/client-encrypted-check.txt` を作成し、67-byte upload と
+  materialize の SHA-256 が一致した。schedule/residency は一度 paused/online-only を観測後、
+  manual/pinned に戻した。保存 object は 813 bytes、package v1 / AES-256-GCM / X25519 /
+  HKDF-SHA256 / recipient wrap 1 / ciphertext chunk 1 で、既知の plaintext 文字列は存在しない。
+- ad-hoc signed host と embedded extension は `codesign --verify --deep --strict` を通り、extension
+  と domain 登録まで成功した。ただし File Provider daemon は `user-disabled` を返し、
+  `~/Library/CloudStorage` への projection はまだ無い。development provisioning は Xcode に保存済みの
+  account 再ログイン拒否と profile 不在で失敗したため、Finder 実体往復は OS の拡張許可後の gate。
 
 # 帰結と残る境界
 
