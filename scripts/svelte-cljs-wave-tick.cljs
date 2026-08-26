@@ -103,19 +103,39 @@
 (defn- custody-gated?
   "その repo が **machine-enforced な custody 契約**を持っていれば true。触らない。
 
-   実測 2026-08-26: `cloud-itonami/app-global` に投げた agent が正しく拒否した ——
-   あの repo の `docs/verify-custody.cljs` は「保管ファイル 24 / 87,245 バイト /
-   出所 tree hash」を検査して**今日 PASS する**。`svelte/` を消すと再構成 hash が
-   記録と恒久的に食い違い、直しようのない FAIL になる。文書の陳腐化ではなく
-   **契約違反**なので、移行するなら migration.edn と検査器を書き換える統治判断が
-   要る —— 移行バッチの agent が単独で決めることではない。
+   実測 2026-08-26: 投げた agent が 4 回**正しく拒否した**。それらの repo は
+   `migration.edn` で「N ファイル / M バイトを出所から verbatim に持ってきた」と
+   宣言し、検査器がそれを **sha256 で pin して今日 PASS している**。`svelte/` を
+   消すと 12/14 とか 9/19 とかの pin が外れ、**直しようのない FAIL** になる。
+   文書の陳腐化ではなく**契約違反**で、移行するなら migration.edn と検査器を
+   書き換える統治判断が要る —— バッチの agent が単独で決めることではない。
 
-   同じ形の repo が 6 件ある（app-global / app-maps / app-roukisho / app-saiban /
-   app-shomeisyashin / app-sre）。除外しないと loop が毎周これを選び、agent が
-   毎周正しく拒否して、token だけが減る。"
+   ⚠ **ファイル名で判定しない。** 最初 `docs/verify-custody.cljs` だけを見ていて
+   **3 つ取りこぼした**。実際に使われている名前と場所は少なくとも 4 通り:
+
+     docs/verify-custody.cljs           app-global, app-maps, app-roukisho, …
+     docs/verify-docs-claims.cljs       app-sos
+     docs/check-migration-identity.cljs gol-d-roger
+     scripts/verify-docs-claims.cljs    app-public-kafun-bokumetsu
+
+   だから**中身で判定する**: `docs/` か `scripts/` の `.cljs` が `migration.edn`
+   か `svelte/` に言及していれば custody 契約とみなす。
+
+   判別能は既知の陽性 9 件・陰性 9 件（実際に移行が通った repo）で検証済み ——
+   9/9 と 9/9。**両方向を見てから landed とした。**"
   [{:keys [repo]}]
-  (try (.existsSync fs (path.join root repo "docs" "verify-custody.cljs"))
-       (catch :default _ false)))
+  (try
+    (let [r (.spawnSync cp "sh"
+                        (clj->js
+                         ["-c"
+                          (str "find " (path.join root repo)
+                               " \\( -path '*/docs/*.cljs' -o -path '*/scripts/*.cljs' \\)"
+                               " -not -path '*/node_modules/*' 2>/dev/null"
+                               " | xargs grep -l -e 'migration\\.edn' -e 'svelte/' 2>/dev/null"
+                               " | head -1")])
+                        #js {:encoding "utf8" :timeout 30000})]
+      (not (str/blank? (str (aget r "stdout")))))
+    (catch :default _ false)))
 
 (defn- in-flight?
   "その repo に agent/cljs-migration branch が remote に在れば true（= 別の波が

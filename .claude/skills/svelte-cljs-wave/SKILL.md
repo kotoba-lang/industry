@@ -147,15 +147,28 @@ gh api "repos/<org>/<repo>/git/trees/main?recursive=1" \
 
 ## custody 契約を持つ repo は候補から外れる（tick が自動で除外する）
 
-実測 2026-08-26、`cloud-itonami/app-global` に投げた agent が**正しく拒否した**。
-あの repo の `docs/verify-custody.cljs` は「保管ファイル 24 / 87,245 バイト /
-出所 tree hash」を検査して**今日 PASS する**。`svelte/` を消すと再構成 hash が
-記録と恒久的に食い違い、**直しようのない FAIL** になる。文書の陳腐化ではなく
+実測 2026-08-26、投げた agent が **4 回正しく拒否した**。それらの repo は
+`migration.edn` で「N ファイル / M バイトを出所から verbatim に持ってきた」と宣言し、
+検査器がそれを **sha256 で pin して今日 PASS している**。`svelte/` を消すと
+12/14 や 9/19 の pin が外れ、**直しようのない FAIL** になる。文書の陳腐化ではなく
 **契約違反**で、移行するなら `migration.edn` と検査器を書き換える統治判断が要る。
 
-同じ形が 6 件（`app-global` `app-maps` `app-roukisho` `app-saiban`
-`app-shomeisyashin` `app-sre`）。tick が `docs/verify-custody.cljs` の有無で除外し、
+⚠ **ファイル名で判定しない。** 私が最初 `docs/verify-custody.cljs` だけを見て
+skill に書いたら、**3 つ取りこぼした**。実際の名前と場所は少なくとも 4 通り:
+
+    docs/verify-custody.cljs             app-global, app-maps, app-roukisho, …
+    docs/verify-docs-claims.cljs         app-sos
+    docs/check-migration-identity.cljs   gol-d-roger
+    scripts/verify-docs-claims.cljs      app-public-kafun-bokumetsu
+
+**中身で判定する。** `docs/` か `scripts/` の `.cljs` が `migration.edn` か
+`svelte/` に言及していれば custody 契約とみなす。tick はこの規則で除外し、
+既知の陽性 9 件・陰性 9 件（実際に移行が通った repo）で **9/9・9/9** を確認済み。
 `CUSTODY-SKIPPED` 行に**名前を出す**（黙って除くと移行が進んだように見える）。
+
+**agent への指示でもファイル名を固定しない。** 3 agent が「その名前は無いが、
+同じ目的の gate がこの名前で在る」と自分で気づいて止まった —— *指示の字面より
+その場で測った証拠を優先した*のが正しい。指示にはその判断を許す言葉を入れる。
 
 **これらを移行したくなったら、まず custody 契約をどうするかを人が決める。**
 波に混ぜない。
