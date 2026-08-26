@@ -42,7 +42,7 @@
 - [ ] **`kotoba.tender-comparison/v1`** — Chicory / Wasmtime / browser on same 3 guests
 - [ ] **`kotoba.os-microbench/v1`** — aiueos QEMU: boot-to-marker, syscall ping, ctx-switch (2 tasks)
 - [ ] **`perfgate.core/qualify` on every “we beat X” claim** (already used in amu for LLVM parity)
-- [ ] Fleet gate `root-kotoba-stack-performance` — fails if regression &gt; 5% vs pinned run
+- [x] Fleet gate `root-kotoba-stack-performance` — fails if pinned evidence is missing or datoms/json drift; live `--live` regression when amu checkout present
 
 ### Phase 1 — Compiler #1 on edit loop (4–8 weeks)
 

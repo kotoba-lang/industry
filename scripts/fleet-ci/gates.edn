@@ -1942,6 +1942,14 @@
    :gate :nbb-script :script "gates/kotobase-persistence-policy-check.cljs"
    :include-ext [".edn" ".cljs" ".md"] :min-files 1500 :cd false}
 
+  ;; Pinned quiet-host kotoba stack performance evidence (ADR-2608260800).
+  ;; Verifies performance.datoms.edn, judah-quiet JSON, host-meta load < 4,
+  ;; and datoms/json metric agreement. Does not re-run amu on fleet (orgs/ is
+  ;; not shipped); live regression is `scripts/verify-kotoba-stack-performance.cljs --live`.
+  {:name "root" :id "root-kotoba-stack-performance" :org "com-junkawasaki"
+   :gate :nbb-script :script "gates/kotoba-stack-performance-check.cljs"
+   :include-ext [".edn" ".cljs" ".json" ".md"] :min-files 10 :cd false}
+
   ;; net-kotobase の commit 済みバンドルが、その commit の source から作られたか
   ;; （ADR-2608110900）。**JDK を要求しない。**
   ;;

@@ -35,4 +35,15 @@ Authoritative ADR: `90-docs/adr/2608260800-kotoba-stack-performance-world-class.
 
 Machine index: `90-docs/performance/performance.datoms.edn`.
 
+## Fleet gate
+
+`root-kotoba-stack-performance` (murakumo fleet) checks that the pinned
+`2026-08-26-judah-quiet` JSON matches `performance.datoms.edn`. Local check:
+
+```bash
+nbb scripts/verify-kotoba-stack-performance.cljs --root .
+# With amu checkout and load < 4, also re-run benchmarks:
+nbb scripts/verify-kotoba-stack-performance.cljs --root . --live
+```
+
 Amu-local detail (methodology, kernel_wide caveats): `orgs/kotoba-lang/amu/docs/performance.md`.
