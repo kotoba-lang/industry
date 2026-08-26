@@ -353,7 +353,15 @@
      :file "src/langgraph/kg_checkpoint.cljc"
      :find ":kg/claim/thread"
      :replace ":kg.claim/thread"
-     :must-fail ["every-test-namespace-is-in-the-runner-or-excluded-with-a-live-reason"]}]}
+     :must-fail ["every-test-namespace-is-in-the-runner-or-excluded-with-a-live-reason"]}
+
+    ;; ── §5.1 companion（2026-08-26 計測）──
+    {:id :langgraph/done-tick-drops-carried-channel-state
+     :why "§5.1: :done thread で新 tick を始めるとき、latest の channel 値を捨てて initial-state だけに戻す"
+     :file "src/langgraph/graph.cljc"
+     :find "            base (if latest (merge base (:state latest)) base)"
+     :replace "            base base"
+     :must-fail ["channel-state-accumulates-across-ticks-on-a-done-thread"]}]}
 
   {:repo "orgs/kotoba-lang/prolly-tree"
    :label "prolly-tree inclusion proof"
