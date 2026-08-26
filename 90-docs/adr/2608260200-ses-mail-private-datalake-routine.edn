@@ -63,7 +63,7 @@ stable ID で吸収する。
   "com-junkawasaki/root working tree: scripts/ses-mail-datalake-sync.py、
 test/ses_mail_datalake_sync_test.py、Codex automation ses-datalake。"
   :adr/verification
-  "python3 test/ses_mail_datalake_sync_test.py: 4 tests OK。
+  "PYTHONPATH=scripts python3 test/ses_mail_datalake_sync_test.py: 6 tests OK。
 初回 commit: ses_mail 11 / ses_opportunity 3 / ses_candidate 8、missing 0。
 同一入力の再 commit: 行数 11 / 3 / 8 のまま、missing 0。
 原本追補: ses_mail_raw 11（本文 11 / payload hash 11）、ses_mail_attachment 0。

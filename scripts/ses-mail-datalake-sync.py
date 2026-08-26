@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""SES / 人材紹介メールの構造化 JSON を R2 Data Catalog に同期する。
+"""SES / 人材紹介メールの原本と構造化 JSON を R2 Data Catalog に同期する。
 
-メールボックスは正本で、この Iceberg 表は分析用 projection。本文、電話番号、署名欄、
-私用メールアドレスは保存しない。入力は Codex のメール connector が作る一時 JSON で、
-同じ record_id は後勝ちで upsert する。
+メールボックスは正本。原本表は connector が取得できたヘッダー、本文、添付、raw MIME を
+保持し、分類表は検索用 projection とする。同じ record_id は後勝ちで upsert する。
 
 Input:
   {
@@ -21,7 +20,9 @@ Run:
 from __future__ import annotations
 
 import argparse
+import base64
 import datetime as dt
+import hashlib
 import json
 import os
 import pathlib
@@ -40,6 +41,7 @@ NAMESPACE = "cloud_itonami_private"
 STR = pa.string()
 I64 = pa.int64()
 STRS = pa.list_(STR)
+BIN = pa.binary()
 
 SCHEMAS: dict[str, pa.Schema] = {
     "ses_mail": pa.schema([
@@ -68,12 +70,32 @@ SCHEMAS: dict[str, pa.Schema] = {
         ("skills", STRS), ("workstyle", STR), ("nationality", STR),
         ("notes", STR), ("source_url", STR), ("ingested_at", STR),
     ]),
+    "ses_mail_raw": pa.schema([
+        ("record_id", STR), ("source", STR), ("message_id", STR),
+        ("thread_id", STR), ("received_at", STR), ("sent_at", STR),
+        ("subject", STR), ("from_json", STR), ("to_json", STR),
+        ("cc_json", STR), ("bcc_json", STR), ("reply_to_json", STR),
+        ("internet_headers_json", STR), ("body_content_type", STR),
+        ("body_content", STR), ("body_preview", STR),
+        ("raw_rfc822", BIN), ("connector_payload_json", STR),
+        ("payload_sha256", STR), ("size_bytes", I64),
+        ("has_attachments", STR), ("source_url", STR), ("ingested_at", STR),
+    ]),
+    "ses_mail_attachment": pa.schema([
+        ("record_id", STR), ("source", STR), ("message_id", STR),
+        ("attachment_id", STR), ("filename", STR), ("content_type", STR),
+        ("content_disposition", STR), ("is_inline", STR), ("size_bytes", I64),
+        ("content_sha256", STR), ("content", BIN),
+        ("connector_metadata_json", STR), ("source_url", STR), ("ingested_at", STR),
+    ]),
 }
 
 INPUT_KEYS = {
     "ses_mail": "messages",
     "ses_opportunity": "opportunities",
     "ses_candidate": "candidates",
+    "ses_mail_raw": "raw_messages",
+    "ses_mail_attachment": "attachments",
 }
 
 
@@ -92,6 +114,13 @@ def _clean_scalar(value: Any, typ: pa.DataType) -> Any:
         if not isinstance(value, list):
             raise ValueError("list field must be a JSON array")
         return [str(item).strip() for item in value if str(item).strip()]
+    if pa.types.is_binary(typ):
+        if isinstance(value, bytes):
+            return value
+        try:
+            return base64.b64decode(str(value), validate=True)
+        except Exception as exc:
+            raise ValueError("binary field must be valid base64") from exc
     return str(value).strip()
 
 
@@ -126,6 +155,14 @@ def dedupe_rows(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     for row in rows:
         by_id[row["record_id"]] = row
     return [by_id[key] for key in sorted(by_id)]
+
+
+def add_content_hashes(table_name: str, rows: list[dict[str, Any]]) -> None:
+    for row in rows:
+        if table_name == "ses_mail_raw" and row.get("connector_payload_json") and not row.get("payload_sha256"):
+            row["payload_sha256"] = hashlib.sha256(row["connector_payload_json"].encode()).hexdigest()
+        if table_name == "ses_mail_attachment" and row.get("content") is not None and not row.get("content_sha256"):
+            row["content_sha256"] = hashlib.sha256(row["content"]).hexdigest()
 
 
 def arrow(rows: list[dict[str, Any]], schema: pa.Schema) -> pa.Table:
@@ -172,7 +209,8 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    payload = json.loads(pathlib.Path(args.input).read_text())
+    input_text = sys.stdin.read() if args.input == "-" else pathlib.Path(args.input).read_text()
+    payload = json.loads(input_text)
     if not isinstance(payload, dict):
         print("input top level must be an object", file=sys.stderr)
         return 2
@@ -180,6 +218,7 @@ def main() -> int:
     batches: dict[str, list[dict[str, Any]]] = {}
     for table_name, input_key in INPUT_KEYS.items():
         batches[table_name] = normalize_rows(payload.get(input_key, []), SCHEMAS[table_name], ingested_at)
+        add_content_hashes(table_name, batches[table_name])
         print(f"SCANNED\t{table_name}\t{len(batches[table_name])}")
     if not any(batches.values()):
         print("no rows: refusing to report a successful empty sync", file=sys.stderr)
