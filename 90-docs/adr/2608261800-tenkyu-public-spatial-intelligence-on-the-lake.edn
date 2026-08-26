@@ -177,7 +177,7 @@ canvas を透明として返し、`toDataURL` は `preserveDrawingBuffer` 無し
 
 ## 今やっていないこと
 
-- `tenkyu_fire` / `tenkyu_vessel` は UNMEASURED。FIRMS は無料キー、
+- `otent_fire` / `otent_vessel` は UNMEASURED。FIRMS は無料キー、
   AISStream は常駐 collector（**parser は実装・テスト済み**）
 - CCTV は入れていない。上流にはあるが、公開カメラの映像を lake に
   取り込むのは person-identifier 規則の判断が別に要る
@@ -190,11 +190,11 @@ canvas を透明として返し、`toDataURL` は `preserveDrawingBuffer` 無し
   落としていない** —— 見ていない遅さのためにデータを捨てると、地図から
   公園が消える
 - custom domain は `wrangler.jsonc` で意図的に**主張していない**。
-  live は `app-tenkyu.04-feasts-minded.workers.dev`
+  live は `app-otent.04-feasts-minded.workers.dev`
 
 ## 結果
 
-- deploy 済み・稼働中: https://app-tenkyu.04-feasts-minded.workers.dev
+- deploy 済み・稼働中: https://app-otent.04-feasts-minded.workers.dev
 - `npm test` 56 tests / 3,085 assertions（browser も GPU も不要）
 - browser 検査は WebGPU / WebGL2 の両方で green
 - 建物 19,016 件（100 tile、4 都市、失敗 0）

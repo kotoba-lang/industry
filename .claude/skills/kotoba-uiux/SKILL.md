@@ -74,6 +74,31 @@ migration had deleted, unstyled, for three days.
    crossing renders). Assert app state survives too; without that, the single page
    bought nothing.
 
+5. **Viewable is half the rule.** A UI is not finished when it compiles — it is
+   finished when there is one address a person can open and see it at. An app that
+   builds a bundle and ships no document has nothing to open; an app that ships two
+   has stopped being one page. Both are the same failure of *viewable as a single
+   page*, from opposite sides, and neither is visible in the source.
+
+**Check it — this is no longer prose only.** From the superproject root:
+
+```bash
+nbb scripts/verify-single-page-app.cljs --root . --findings
+```
+
+exit 0 clean · 1 findings · **2 refused** (it could not tell a registered checkout
+from a stale one, and says so rather than reporting clean). It reports
+`multi-document` for a repo with two script-loading documents and `no-document` for
+a `:target :browser` build with none; `404.html` is exempt, because a static host
+*needs* one and reporting it would punish following the rule. Registered as
+`:verify-single-page-app` in `manifest/orgs-detectors.edn`, where the SSR/OG
+marketing surfaces are carried as `:accepted` with a date and an exit condition.
+
+Its blind spot, stated rather than implied: `no-document` asks for shadow-cljs
+`:target :browser`, so an **`:esm` app that loses its only document is not caught** —
+`:esm` is also every library's target, and without the narrowing the class reported
+232 of 285 repos, nearly all correct by design. `multi-document` does cover `:esm`.
+
 **Exception**: pages that need SSR/OG for crawlers (ADR-2606290000). Don't bind an app
 and a marketing surface with one rule.
 

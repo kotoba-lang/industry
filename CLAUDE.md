@@ -1741,6 +1741,28 @@ kotoba-lang の web / local app UI は **1 文書・1 バンドル・1 mount** �
   待つ対象は**その view にしか無い要素**にする（両 view にある `main h1` を待つと
   crossing の描画前に返る。実測で踏んだ）。app 固有 state が crossing を越える
   ことも確かめる（これが無いと single page にした利益が無い）。
+- **「見られる」ことは規則の半分である**（2026-08-26、オーナー指示「uiux は
+  singlepage app として見れるようにしてね」）。UI は**コンパイルが通った時点では
+  終わっていない** —— 人が開ける address が 1 つあって、そこに見えて、初めて
+  終わりである。bundle を作って document を 1 枚も出さない app は開くものが無く、
+  2 枚出す app は 1 page であることをやめている。**同じ失敗の裏表**で、どちらも
+  ソースからは見えない（nav が router link でも素の href でもコードは同じに読める）。
+- **これは prose だけの規則ではなくなった。** superproject root で:
+
+  ```bash
+  nbb scripts/verify-single-page-app.cljs --root . --findings   # 0=clean 1=findings 2=REFUSED
+  ```
+
+  `multi-document`（script を読む document が 2 枚以上）と `no-document`
+  （shadow-cljs `:target :browser` なのに document が 0 枚）を報告する。
+  **`404.html` は違反ではない** —— 静的ホストでは規則が要求するものなので、
+  報告すれば規則を守った側を罰することになる。registry は
+  `manifest/orgs-detectors.edn` の `:verify-single-page-app` で、SSR/OG の
+  marketing surface は `:accepted`（日付・理由・解除条件つき）で持つ。
+  **既知の盲点**: `no-document` は `:target :browser` を要求するので、
+  **`:esm` の app が最後の document を失っても捕まえない**（`:esm` は library
+  全部の target でもあり、絞らずに測ると 285 中 232 が出て、その大半は設計どおり
+  正しい）。`multi-document` は `:esm` も見る。
 - **例外は SSR/OG が必要な公開ページ**（ADR-2606290000）。app と marketing
   surface を同じ規則で縛らない。分けるなら理由を書く。
 - **もう 1 つの例外は「生きた credential の隣にある local 面」**（ADR-2608231200、
