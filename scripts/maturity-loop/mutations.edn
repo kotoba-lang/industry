@@ -2474,4 +2474,260 @@
      :find "https://vh1cl3rk.etzhayyim.com/health"
      :replace "https://v3h1cl01.etzhayyim.com/health"
      :must-fail ["known-stale-docs-are-still-stale"]}]}
+
+  {:repo "orgs/cloud-itonami/voxelforge"
+   :label "voxelforge —— 9 面の合意と、配備される XRPC 面の信頼委譲"
+   ;; 2026-08-26 に 35 件すべて、名指しした test だけが赤くなるところを見た
+   ;; （巻き添えで落ちた test は 0 件）。suite は npm install 無しで走る ——
+   ;; kotoba/ の vitest は @etzhayyim/sdk を workspace:* で要求するが、この repo は
+   ;; もうその monorepo に居ないので、あの suite は此処では 1 度も走らない。
+   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :green-marker "voxelforge contract: all green"
+   :mutations
+   [{:id :voxelforge/actor-did-drifts-in-wrangler
+     :why "DID が 1 面だけ動くと、did:web を解決した相手と喋る相手が別人になる"
+     :file "wrangler.jsonc"
+     :find "\"VOXELFORGE_ACTOR_DID\": \"did:web:voxelforge.etzhayyim.com\""
+     :replace "\"VOXELFORGE_ACTOR_DID\": \"did:web:voxelforgex.etzhayyim.com\""
+     :must-fail ["actor-identity-agrees-across-surfaces"]}
+
+    {:id :voxelforge/route-host-drifts
+     :why "route の host が identity 文書から外れると、配備先と名乗り先が別になる"
+     :file "wrangler.jsonc"
+     :find "\"pattern\": \"voxelforge.etzhayyim.com/*\""
+     :replace "\"pattern\": \"voxelforge-edge.etzhayyim.com/*\""
+     :must-fail ["actor-identity-agrees-across-surfaces"]}
+
+    {:id :voxelforge/record-did-prefix-loses-the-actor-parent
+     :why "記録面の DID prefix が actor DID を親に持たなくなると、成果物の帰属が切れる"
+     :file "kotoba/src/types.ts"
+     :find "VOXELFORGE_DID_PREFIX = \"did:web:voxelforge.etzhayyim.com:\""
+     :replace "VOXELFORGE_DID_PREFIX = \"did:web:voxelforge.etzhayyim.com/\""
+     :must-fail ["actor-identity-agrees-across-surfaces"]}
+
+    {:id :voxelforge/worker-name-drifts
+     :why "worker 名が 1 面だけ動くと、配備先の逆引きが切れる"
+     :file "wrangler.jsonc"
+     :find "\"name\": \"etzhayyim-project-voxelforge\""
+     :replace "\"name\": \"voxelforge\""
+     :must-fail ["project-name-and-version-agree-across-surfaces"]}
+
+    {:id :voxelforge/version-drifts-in-package
+     :why "package.json だけ version が動くと、配備 var と成果物が別の版を名乗る"
+     :file "package.json"
+     :find "\"version\": \"0.1.0\""
+     :replace "\"version\": \"0.2.0\""
+     :must-fail ["project-name-and-version-agree-across-surfaces"]}
+
+    {:id :voxelforge/readme-name-drifts-from-the-declared-destination
+     :why "README が名乗る repo 名と移設先が食い違うと、どこに在るのかを 2 面が別々に答える"
+     :file "README.edn"
+     :find ":name \"com-etzhayyim-app-voxelforge\""
+     :replace ":name \"com-etzhayyim-app-voxelforge-legacy\""
+     :must-fail ["project-name-and-version-agree-across-surfaces"]}
+
+    {:id :voxelforge/migration-source-path-drifts
+     :why "抽出元 path が動くと、上流 monorepo への逆引きが 3 面でばらける"
+     :file "migration.edn"
+     :find ":path \"60-apps/etzhayyim-project-voxelforge\""
+     :replace ":path \"50-apps/etzhayyim-project-voxelforge\""
+     :must-fail ["extraction-source-path-agrees-across-three-surfaces"]}
+
+    {:id :voxelforge/pds-url-drifts-in-deploy-vars
+     :why "配備 var と identity 文書が別の PDS を指すと、名乗る依存先と喋る相手が別になる"
+     :file "wrangler.jsonc"
+     :find "\"PDS_URL\": \"https://atproto.etzhayyim.com\""
+     :replace "\"PDS_URL\": \"https://atproto-edge.etzhayyim.com\""
+     :must-fail ["backend-urls-agree-between-deploy-vars-and-identity-doc"]}
+
+    {:id :voxelforge/mcp-router-default-drifts-from-the-deploy-var
+     :why "配備される面の既定 router が var と食い違うと、var を消した日に別の上流へ流れる"
+     :file "svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "DEFAULT_MCP_ROUTER_URL = 'https://mcp.etzhayyim.com/xrpc/com.etzhayyim.mcp.message'"
+     :replace "DEFAULT_MCP_ROUTER_URL = 'https://mcp2.etzhayyim.com/xrpc/com.etzhayyim.mcp.message'"
+     :must-fail ["backend-urls-agree-between-deploy-vars-and-identity-doc"]}
+
+    {:id :voxelforge/bff-header-drifts-from-the-declared-framework
+     :why "上流へ名乗る framework が配備 var と食い違うと、router 側の由来判定がずれる"
+     :file "svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "'x-etzhayyim-bff', 'sveltekit-edge-bff'"
+     :replace "'x-etzhayyim-bff', 'sveltekit-bff'"
+     :must-fail ["backend-urls-agree-between-deploy-vars-and-identity-doc"]}
+
+    {:id :voxelforge/edge-route-prefix-drifts-from-the-nsid-template
+     :why "route の literal と NSID の組み立てがずれると、通った要求が別 NSID で転送される"
+     :file "src/app.ts"
+     :find "app.all(\"/xrpc/com.etzhayyim.voxelforge.:method\""
+     :replace "app.all(\"/xrpc/com.etzhayyim.apps.voxelforge.:method\""
+     :must-fail ["edge-lexicon-and-record-lexicon-are-both-pinned"
+                 "edge-confines-xrpc-to-the-voxelforge-lexicon"]}
+
+    {:id :voxelforge/record-collection-leaves-the-declared-prefix
+     :why "collection が nsidPrefixes の外へ出ると、identity 文書が所有を主張しない記録を書く"
+     :file "kotoba/src/types.ts"
+     :find "ARTIFACT_COLLECTION = \"com.etzhayyim.apps.voxelforge.artifact\""
+     :replace "ARTIFACT_COLLECTION = \"com.etzhayyim.voxelforge.artifact\""
+     :must-fail ["edge-lexicon-and-record-lexicon-are-both-pinned"]}
+
+    {:id :voxelforge/nsid-prefixes-drifts-in-the-identity-doc
+     :why "identity 文書の lexicon が動くと、記録面の collection が所有外になる"
+     :file "kotodama.jsonld"
+     :find "\"com.etzhayyim.apps.voxelforge\""
+     :replace "\"com.etzhayyim.apps.voxelforge3d\""
+     :must-fail ["edge-lexicon-and-record-lexicon-are-both-pinned"]}
+
+    {:id :voxelforge/meta-advertises-a-surface-outside-the-lexicon
+     :why "名乗る面が lexicon の外に出ると、dispatcher の prefix routing が空振りする"
+     :file "src/app.ts"
+     :find "\"/xrpc/com.etzhayyim.voxelforge.coverage\","
+     :replace "\"/xrpc/com.etzhayyim.admin.coverage\","
+     :must-fail ["advertised-surfaces-name-methods-under-the-edge-lexicon"]}
+
+    {:id :voxelforge/auth-bypass-gains-a-fourth-path
+     :why "auth を素通しする path が 1 本増えると、その面が無認証で外に出る"
+     :file "src/app.ts"
+     :find "if (path === \"/health\" || path === \"/_worker/health\" || path === \"/_app/meta\") {"
+     :replace "if (path === \"/health\" || path === \"/_worker/health\" || path === \"/_app/meta\" || path === \"/xrpc/com.etzhayyim.voxelforge.coverage\") {"
+     :must-fail ["edge-leaves-exactly-three-probe-paths-unauthenticated"]}
+
+    {:id :voxelforge/partial-claims-pass-auth
+     :why "did だけで通すと、org を持たない主体が org スコープの転送を起こせる"
+     :file "src/app.ts"
+     :find "if (!data?.did || !data?.orgDid) return null;"
+     :replace "if (!data?.did) return null;"
+     :must-fail ["edge-auth-fails-closed-on-every-unresolved-path"]}
+
+    {:id :voxelforge/missing-pds-binding-yields-an-anonymous-identity
+     :why "binding が無いときに合成 identity を返すと、認証面ごと消えても 200 が返る"
+     :file "src/app.ts"
+     :find "if (!env.PDS_SERVICE?.fetch) return null;"
+     :replace "if (!env.PDS_SERVICE?.fetch) return { did: \"anonymous\", orgDid: \"anonymous\" };"
+     :must-fail ["edge-auth-fails-closed-on-every-unresolved-path"]}
+
+    {:id :voxelforge/handler-stops-rechecking-auth
+     :why "middleware だけに頼ると、bypass 表が広がった日に handler が素通しする"
+     :file "src/app.ts"
+     :find "  const auth = c.var.auth;\n  if (!auth) {\n    return c.json({ error: \"AuthRequired\" }, 401);\n  }"
+     :replace "  const auth = c.var.auth as NonNullable<typeof c.var.auth>;"
+     :must-fail ["edge-confines-xrpc-to-the-voxelforge-lexicon"]}
+
+    {:id :voxelforge/nsid-method-can-come-from-the-query-string
+     :why "method が query から来ると、任意の NSID を dispatcher へ通せる"
+     :file "src/app.ts"
+     :find "const method = c.req.param(\"method\");"
+     :replace "const method = c.req.query(\"method\") ?? c.req.param(\"method\");"
+     :must-fail ["edge-does-not-let-query-params-decide-the-nsid"]}
+
+    {:id :voxelforge/hmac-signs-the-body-only
+     :why "署名対象から ts が落ちると、同じ body の再送が永久に有効になる"
+     :file "src/dispatcher.ts"
+     :find "`${ts}.${bodyText}`"
+     :replace "`${bodyText}`"
+     :must-fail ["dispatcher-signs-the-timestamp-and-body-with-hmac-sha256"]}
+
+    {:id :voxelforge/trust-hash-downgraded-to-sha1
+     :why "hash が弱くなると、上流の信頼判定が偽造できる"
+     :file "src/dispatcher.ts"
+     :find "{ name: \"HMAC\", hash: \"SHA-256\" }"
+     :replace "{ name: \"HMAC\", hash: \"SHA-1\" }"
+     :must-fail ["dispatcher-signs-the-timestamp-and-body-with-hmac-sha256"]}
+
+    {:id :voxelforge/actor-did-header-loses-delegation
+     :why "activeDid を落とすと、代理実行が本人の名前で上流に届く"
+     :file "src/dispatcher.ts"
+     :find "\"x-etzhayyim-actor-did\": auth.activeDid ?? auth.did,"
+     :replace "\"x-etzhayyim-actor-did\": auth.did,"
+     :must-fail ["dispatcher-prefers-the-delegated-actor-did"]}
+
+    {:id :voxelforge/response-header-allowlist-widens
+     :why "allowlist が広がると、上流の x-* が呼び出し元へ抜ける"
+     :file "src/dispatcher.ts"
+     :find "lk.startsWith(\"x-etzhayyim-\")"
+     :replace "lk.startsWith(\"x-\")"
+     :must-fail ["dispatcher-forwards-only-allowlisted-response-headers"]}
+
+    {:id :voxelforge/submit-timeout-inflated-tenfold
+     :why "submit の上限が伸びると、edge の要求が上流の停止に道連れになる"
+     :file "src/dispatcher.ts"
+     :find "const DISPATCH_TIMEOUT_MS = 60_000;"
+     :replace "const DISPATCH_TIMEOUT_MS = 600_000;"
+     :must-fail ["dispatcher-bounds-the-submit-and-separates-failure-modes"]}
+
+    {:id :voxelforge/timeout-and-unreachable-share-a-status
+     :why "504 と 502 が同じになると、上流の停止と落ちが呼び出し側から区別できない"
+     :file "src/dispatcher.ts"
+     :find "{ status: 504 },"
+     :replace "{ status: 502 },"
+     :must-fail ["dispatcher-bounds-the-submit-and-separates-failure-modes"]}
+
+    {:id :voxelforge/abort-timer-is-never-cleared
+     :why "timer を解除しないと、成功した要求ごとに abort が積み上がる"
+     :file "src/dispatcher.ts"
+     :find "clearTimeout(timer);"
+     :replace "void timer;"
+     :must-fail ["dispatcher-bounds-the-submit-and-separates-failure-modes"]}
+
+    {:id :voxelforge/meta-advertises-a-format-the-registry-rejects
+     :why "edge が名乗る format を記録面が拒否すると、生成は成功して登録だけが落ちる"
+     :file "src/app.ts"
+     :find "formats: [\"glb\", \"vox\", \"voxel_grid_json\", \"manifest_json\"],"
+     :replace "formats: [\"glb\", \"vox\", \"voxel_grid_json\", \"manifest_json\", \"stl\"],"
+     :must-fail ["advertised-formats-and-generators-match-the-record-validators"]}
+
+    {:id :voxelforge/registry-drops-a-generator-the-edge-advertises
+     :why "記録面が generator を落とすと、その経路で作った成果物だけ登録できない"
+     :file "kotoba/src/types.ts"
+     :find "const GENERATORS: readonly Generator[] = [\"trellis\", \"comfy3d\", \"cadquery\"];"
+     :replace "const GENERATORS: readonly Generator[] = [\"trellis\", \"cadquery\"];"
+     :must-fail ["advertised-formats-and-generators-match-the-record-validators"]}
+
+    {:id :voxelforge/voxel-dim-floor-rises-above-a-documented-example
+     :why "validator の下限が上がると、手順書に書いたとおり叩いて拒否される"
+     :file "kotoba/src/types.ts"
+     :find "n >= 8 && n <= 256"
+     :replace "n >= 64 && n <= 256"
+     :must-fail ["documented-smoke-arguments-are-accepted-by-the-record-validators"]}
+
+    {:id :voxelforge/deployed-main-drifts-to-the-thin-edge
+     :why "配備される entry が動くと、検査した面と配られる面が入れ替わる"
+     :file "wrangler.jsonc"
+     :find "\"main\": \"svelte/.svelte-kit/cloudflare/_worker.js\","
+     :replace "\"main\": \"src/app.ts\","
+     :must-fail ["deployed-entry-is-the-sveltekit-build-not-the-thin-edge"]}
+
+    {:id :voxelforge/deployed-route-drops-authorization
+     :why "authorization を削ると、委譲先の MCP router が誰とも判定できなくなる"
+     :file "svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "headers.delete('host');"
+     :replace "headers.delete('host'); headers.delete('authorization');"
+     :must-fail ["deployed-xrpc-route-delegates-auth-upstream-and-never-caches"]}
+
+    {:id :voxelforge/deployed-route-starts-caching
+     :why "XRPC 応答が cache されると、actor 状態が別の閲覧者へ漏れる"
+     :file "svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "headers.set('cache-control', 'no-store');"
+     :replace "headers.set('cache-control', 'public, max-age=60');"
+     :must-fail ["deployed-xrpc-route-delegates-auth-upstream-and-never-caches"]}
+
+    {:id :voxelforge/deployed-preflight-widens-to-get
+     :why "preflight が GET を許すと、cache 可能な経路で XRPC が引ける"
+     :file "svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "'access-control-allow-methods': 'POST,OPTIONS'"
+     :replace "'access-control-allow-methods': 'POST,GET,OPTIONS'"
+     :must-fail ["deployed-xrpc-route-delegates-auth-upstream-and-never-caches"]}
+
+    {:id :voxelforge/bpmn-dispatcher-url-var-appears
+     :why "既知の穴が塞がったら、例外表から外して契約へ移させる"
+     :file "wrangler.jsonc"
+     :find "    \"PDS_URL\": \"https://atproto.etzhayyim.com\","
+     :replace "    \"BPMN_DISPATCHER_URL\": \"https://dispatcher.etzhayyim.com\",\n    \"PDS_URL\": \"https://atproto.etzhayyim.com\","
+     :must-fail ["known-unset-deploy-vars-are-still-unset"]}
+
+    {:id :voxelforge/bpmn-deref-gains-a-fallback
+     :why "deref に fallback が付いたら、それは別の失敗の形。例外表と正規化の両方が動く"
+     :file "src/dispatcher.ts"
+     :find "env.BPMN_DISPATCHER_URL.replace"
+     :replace "(env.BPMN_DISPATCHER_URL ?? \"\").replace"
+     :must-fail ["known-unset-deploy-vars-are-still-unset"
+                 "dispatcher-normalizes-the-base-url-before-appending-the-nsid"]}]}
 ]}
