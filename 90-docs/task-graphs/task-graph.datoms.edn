@@ -77,7 +77,9 @@
   :task/repo "kotoba-lang/grammar"
   :task/requires []
   :task/external-gate false
-  :task/status-note "2026-08-26 発見。kotoba-lang/murakumo は public / 非 fork / 当日 push で default branch に .kotoba を 36 本持つが、repo:kotoba-lang/murakumo extension:kotoba は 0 を返す。API はエラーにならず小さい数を返すので「言語が使われていない」と区別できない。global raw も query の形で動いた (extension:kotoba=27、defn extension:kotoba=7) — 実在する corpus の件数はそうならない。tools/linguist-readiness.cljs は reachability control を持ち、この状態では exit 3 (UNVERIFIED) で拒否するようになった (kotoba-lang/grammar 5affe442)。残る仕事は、査読者が実際に見る web の code search UI で raw を測り直すこと。legacy search API の索引とは別物なので、そちらで見えているなら raw の現在地が変わる。owner-excluded=0 の側は索引ではなく採用の話なので、この測定では動かない"}
+  :task/status :completed
+  :task/status-at "2026-08-26T02:15:00.000Z"
+  :task/status-note "測定完了。2 つの検索面は索引も query 言語も共有していない — github.com/search は extension: を Unrecognized qualifier として拒否して 0 files を出し、path:*.kotoba には 58 files を返す。api.github.com は逆で、extension:kotoba に 27、path:*.kotoba に 0。査読者が使うのは web 側 (CONTRIBUTING が PR に検索結果へのリンクを求めるため) で、web に API は無い。REST 索引はこの org をほとんど覆っておらず、.kotoba を持つ repo 19 件のうち索引されていたのは 1 件 (com-junkawasaki/densha) だけ。linguist/PULL_REQUEST.md が extension: 形のリンクを貼っていたので、査読者が辿ると 58 件ある言語に対して 0 files が表示されるところだった。計測器と PR キットの両方を直した (kotoba-lang/grammar 372b8208)。確定値: raw 58 / owner-excluded 0 / 閾値 2000。raw が非ゼロなので索引は corpus を見えており、owner 側の repo を増やしても効く数字は動かない"}
 
  {:db/id -102
   :task/id "T-usage-tier-discussion"

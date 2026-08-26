@@ -34,32 +34,46 @@ ADR-2607266000 の責務分割で grammar authority を持つ repo が先に切�
 そこに着地していた。索引を引く規則が効いた場面だが、引いたのは west の repo-search
 であって task graph ではない。task graph 側は今回現在地に合わせた。
 
-## 3. readiness 計測器は測っていなかった
+## 3. readiness 計測器は、査読者と違う索引を、違う query 言語で測っていた
 
 tools/linguist-readiness.cljs は三値 exit を持ち、nil を 0 に潰さず、query 文字列を
 self-test する — 慎重に書かれている。それでも「測れなかった検査が、測って問題が
-無かった検査と同じ値を返す」形をしていた。self-test が確かめていたのは query の
-「文」が正しいことで、その答えが corpus から来たことではない。
+無かった検査と同じ値を返す」形をしていた。同じ日に 2 段階で分かった。
 
-実測 2026-08-26: kotoba-lang/murakumo は public / 非 fork / 当日 push で default
-branch に .kotoba を 36 本持つ。`repo:kotoba-lang/murakumo extension:kotoba` は
-0 を返す。search term を足しても 0。API はエラーにならず数を返すので、
-「索引が覆っていない」と「言語が使われていない」が同じ顔で出てくる。global raw も
-query の形で動いた (extension:kotoba=27、defn extension:kotoba=7) — 実在する
-corpus の件数は、ほぼ全ファイルに出る語で絞ったときに減ったりしない。
+第一段。REST の code search 索引が、この org を覆っていない。kotoba-lang/murakumo は
+public / 非 fork / 当日 push で default branch に .kotoba を 36 本持つが、その repo に
+scope したどんな query も 0 を返す。.kotoba を持つ repo を 19 件抽出して測ったところ、
+索引されていたのは 1 件だけだった (com-junkawasaki/densha)。API はエラーにならず
+小さい数を返すので、「索引が覆っていない」と「言語が使われていない」が同じ顔で出てくる。
 
-つまり README が引用していた「Measured 2026-08-24: raw 27, owner-excluded 0」の
-raw は corpus の測定ではなく、corpus を見られない索引の測定だった。修正
-(kotoba-lang/grammar 5affe442) は reachability control を足す: control repo の
-git tree から .kotoba を数え (ground truth)、同じ repo を search に訊く。tree が
-非ゼロで索引が 0 なら exit 3 (UNVERIFIED) で拒否し、不足 (exit 1) とは名乗らない。
-control は tree から導出するので、control repo が拡張子を失えば静かに効力を失う
-のではなく拒否する。--self-test は各拒否経路を実際に駆動して exit code を突き合わせる
-— この変更の前は、上記の拒否がすべて exit 1 を返していた。
+第二段、そしてこちらが致命的。査読者はその索引を使わないし、使えない。2 つの検索面は
+索引どころか query 言語すら共有していない (実測 2026-08-26):
+
+    query               github.com/search              api.github.com
+    extension:kotoba    Unrecognized qualifier.        27
+                        Try using the path qualifier
+                        -> 0 files
+    path:*.kotoba       58 files                       0
+
+CONTRIBUTING は PR に GitHub の検索結果へのリンクを求めており、それは web のほうで、
+web には API が無い。したがって REST を叩く script は査読の安い近似ではなく、
+査読の服を着た別の測定である。
+
+linguist/PULL_REQUEST.md は extension: 形のリンクを貼っていた。査読者がそれを辿ると、
+58 件ある言語に対して「Unrecognized qualifier」の下の「0 files」を見ることになる。
+これ単独で PR を沈める。
+
+修正 (kotoba-lang/grammar 372b8208、pin 前進済み): script は数を数えるのをやめ、
+query と閾値を持ち、人がページから読んだ数を評価する。数が渡されなければ exit 3。
+--self-test は 2 つの拒否と 2 つの判定をすべて実際に駆動して exit code を突き合わせる
+— 測っていないのに不足を報告する、という直前 2 版の欠陥が通らないようにする。
+
+実測 2026-08-26: raw 58 / owner-excluded 0 / 閾値 2000。
 
 ## 何が本当の gate か
 
-索引の話を除いても残るのは owner-excluded = 0 である。CONTRIBUTING は査読者が
+raw が 58 で非ゼロだということは、索引がこの corpus を見えているということである。
+つまり owner 側の repo を増やしても、効く数字は動かない。残るのは owner-excluded = 0 である。CONTRIBUTING は査読者が
 primary language owner のアカウントを -user: で除外してから評価すると明記しており、
 この org の外に .kotoba を書くアカウントは 1 つも無い。これは量ではなく所有の問題で、
 自分たちの repo をいくら増やしても動かない。
