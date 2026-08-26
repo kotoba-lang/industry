@@ -21,7 +21,8 @@ npm run benchmark-compile -- --runs 5 \
 ```
 
 Record host load before running (`sysctl -n vm.loadavg`). Contended hosts inflate
-every engine; compare ordering and bands, not the third decimal.
+every engine; compare ordering and bands, not the third decimal. **Official numbers**
+use murakumo fleet nodes with load &lt; 4 (see `runs/2026-08-26-judah-quiet/`).
 
 ## Documents
 

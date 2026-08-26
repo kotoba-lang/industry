@@ -20,9 +20,9 @@
 
 | # | Domain | Owner repo | Leader today (external) | Our baseline | Gap to #1 |
 |---|---|---|---|---|---|
-| A | Native codegen (integer) | amu | LLVM/Rust | **1.04× Rust** (narrow kernel) | wide kernel + calls + strings |
-| B | Wasm codegen + run | amu + kototama | Wasmtime / V8 | 5.25× Rust (same bench) | instance model + engine |
-| C | Compile latency | amu | rustc incremental / tsc | cold 2 s / hit 30 ms | cold startup |
+| A | Native codegen (integer) | amu | LLVM/Rust | **1.06× Rust** (judah quiet) | wide kernel + calls + strings |
+| B | Wasm codegen + run | amu + kototama | Wasmtime / V8 | 6.78× Rust (quiet) | instance model + engine |
+| C | Compile latency | amu | rustc incremental / tsc | cold **663 ms** / semantic edit **~38 ms** | cold &lt;500 ms; edit &lt;15 ms p95 |
 | D | Sandbox tender | kototama | Wasmtime / workerd | Chicory 3 s JVM cold | drop JVM from hot path |
 | E | OS primitives | aiueos | Linux / seL4 | UNMEASURED | entire benchmark plane |
 | F | Language + data | kotoba + kotobase | historical Rust kotoba | UNMEASURED | replay CLJC migration targets |
@@ -37,6 +37,7 @@
 - [x] Runtime comparison gate exists (`amu` `benchmark-runtime`)
 - [x] Compile baseline gate exists (`benchmark-compile`)
 - [x] Superproject evidence dir `90-docs/performance/runs/`
+- [x] **Quiet-host official run** on murakumo judah (`2026-08-26-judah-quiet/`)
 - [x] Human-readable summaries in `docs/performance/`
 - [ ] **`kotoba.tender-comparison/v1`** — Chicory / Wasmtime / browser on same 3 guests
 - [ ] **`kotoba.os-microbench/v1`** — aiueos QEMU: boot-to-marker, syscall ping, ctx-switch (2 tasks)
@@ -47,9 +48,9 @@
 
 | Gate | Target | Current |
 |---|---|---|
-| Worker wasm32 p95 | **&lt; 15 ms** | ~31 ms |
-| Worker aarch64 p95 | **&lt; 20 ms** | ~45 ms (policy-hit path) |
-| Cold small module | **&lt; 500 ms** | ~1,950 ms |
+| Worker wasm32 p95 | **&lt; 15 ms** | **~38 ms** semantic edit (quiet) |
+| Worker aarch64 p95 | **&lt; 20 ms** | **~23 ms** warm (quiet) |
+| Cold small module | **&lt; 500 ms** | **~663 ms** (quiet) |
 | `kernel_wide` vs LLVM AArch64 | **≤ 1.10×** on quiet host | 1.62× best post-allocator (see amu docs) |
 
 **Work:** native `bin/amu` default (skip nbb cold), expand register allocator to **call+branch** path (conservative stack slots today +33% at 24 live values).
