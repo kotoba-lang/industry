@@ -137,21 +137,47 @@
       (not (str/blank? (str (aget r "stdout")))))
     (catch :default _ false)))
 
-(defn- in-flight?
-  "その repo に agent/cljs-migration branch が remote に在れば true（= 別の波が
-   まだ持っている、または前の波が landing に失敗して残した）。触らない。
-   remote 名は west の慣習で org 名（`origin` ではない）。"
-  [{:keys [repo org]}]
+(defn- has-linked-worktree?
+  "その repo に linked worktree が在れば true（= 誰かが今まさに作業中）。
+
+   ⚠ **remote の branch だけを見ていては足りない。** 実測 2026-08-26: loop が
+   起きた瞬間、手で走らせていた 4 agent はまだ branch を push しておらず、
+   `IN-FLIGHT-SKIPPED 0` と出て **loop が同じ 4 repo を選んだ**。loop の agent は
+   別の path・別の branch 名（`/private/tmp/wave-sys-tms` / `agent/svelte-to-cljs`）
+   を使ったので git は衝突せず、**2 つの agent が同じ repo を二重に移行しかけた**。
+
+   agent は作業開始時に必ず linked worktree を作るので、**push より早く立つ印**が
+   これ。branch 名や path を決め打ちせず、linked worktree が 1 つでも在れば触らない。"
+  [{:keys [repo]}]
   (try
     (let [r (.spawnSync cp "git"
-                        (clj->js ["-C" (path.join root repo)
-                                  "ls-remote" "--heads" org "agent/cljs-migration"])
+                        (clj->js ["-C" (path.join root repo) "worktree" "list" "--porcelain"])
                         #js {:encoding "utf8" :timeout 30000})]
-      ;; 問い合わせに失敗したら「在るかもしれない」側に倒す（触らない）。
       (if (not= 0 (aget r "status"))
-        true
-        (not (str/blank? (str (aget r "stdout"))))))
+        true                                     ; 訊けなければ触らない側に倒す
+        (> (count (re-seq #"(?m)^worktree " (str (aget r "stdout")))) 1)))
     (catch :default _ true)))
+
+(defn- in-flight?
+  "別の波がその repo を持っていれば true。触らない。
+
+   2 つの印を見る —— **remote の branch**（push 済み、他マシンの波も見える）と
+   **linked worktree**（push 前、同じマシンの波だけ見える）。前者だけでは
+   agent の起動から push までの窓が空き、そこで loop と手動の波が衝突した。
+
+   remote 名は west の慣習で org 名（`origin` ではない）。"
+  [{:keys [repo org] :as c}]
+  (or (has-linked-worktree? c)
+      (try
+        (let [r (.spawnSync cp "git"
+                            (clj->js ["-C" (path.join root repo)
+                                      "ls-remote" "--heads" org "agent/cljs-migration"])
+                            #js {:encoding "utf8" :timeout 30000})]
+          ;; 問い合わせに失敗したら「在るかもしれない」側に倒す（触らない）。
+          (if (not= 0 (aget r "status"))
+            true
+            (not (str/blank? (str (aget r "stdout"))))))
+        (catch :default _ true))))
 
 (defn -main []
   (let [rels (scan!)]
