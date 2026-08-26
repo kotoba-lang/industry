@@ -1762,6 +1762,37 @@ kotoba-lang の web / local app UI は **1 文書・1 バンドル・1 mount** �
 から）は該当 repo ではそのまま有効。詳細は ADR-2607122200 と
 `orgs/kotoba-lang/kotoba-ui/docs/agent-guide.md`。
 
+### Svelte / React で UI を著述しない。既定は cljs + reagent + re-frame + jp-go-dds（repo-wide mandatory、2026-08-26、ADR-2608260900）
+
+**オーナー指示（2026-08-26）「svelte, react は全て cljs, reframe などに refactor」
+「jp-go-dds をデフォルトの デザインシステムに」。**
+
+- **新しい `.svelte` / `.tsx` / `.jsx` を書かない。** UI は `.cljc` / `.cljs` で書き、
+  状態は **reagent + re-frame**（`shitsuke.re-frame.core` / `shitsuke.reagent.core` の
+  host seam が既に在る。新しく作らない）、見た目は **`jp-go-dds`** に載せる。
+  既存の 1,379 ファイル（実測 2026-08-26）は移行対象で、順序と期限は未決定。
+- ⚠ **これは `react` / `react-dom` を package.json から剥がす指示ではない。**
+  reagent / re-frame は React を描画バックエンドに使うので、shadow-cljs の app が
+  `react` に依存しているのは**正常**であり移行後も残る。退役するのは
+  **著述面（ソースファイルの拡張子）**であって依存ではない。実測 2026-08-26:
+  `react` 依存 48 package のうち `manimani-experience-ui` と `kami-genko` は
+  `.tsx`/`.jsx` を 1 本も持たず、**既に適合済み**。依存だけを見て「React repo」と
+  数えない。
+- **数える時は `node_modules` と `.claude/worktrees/` の両方を除外する。** 除外前は
+  React が 754 件に見えたが、うち 386 件は使い捨て worktree 2 本に同じ 193 件が
+  複製されていたもの。除外を間違えた計測は、移行が進んだように見せる。
+- **設計言語は既に一致している。** `svelte-design-system`（55 component）は
+  `@digital-go-jp/design-tokens` に依存しており、DADS の token で描かれた Svelte 実装。
+  移行で変わるのは実装言語であって design language ではない。ただし
+  **`jp-go-dds` は 20 component**（実測 2026-08-26）で BottomSheet / Carousel /
+  DatePicker / Dialog / Drawer / Toast / Fab 等は対応が無い —— **「DADS で足りる」と
+  丸めない**。足りない分は jp-go-dds への上流拡張か `shitsuke.components` で組む。
+- **`/design-sync`（claude.ai/design 同期）はこの workspace で実行しない。** あの skill は
+  *React design systems* 専用で（`non-storybook/SKILL.md` の Scope 節）、ここには React の
+  design system が存在せず、**今後も作らないと決めた**。Svelte DS を custom element 経由で
+  bridge しても、design agent が吐く React はこの workspace が出荷する cljc に写らない。
+  **退役させると決めたスタックを、bridge を書いて固定化しない。**
+
 ## UI/UX 品質の数値化 — design-quality-score（2026-07-13、ADR-2607132300）
 
 **`uikit`/`appkit`/`kotoba-ui`/`liquid-glass-ui` の UI/UX 品質を数値で把握・比較したい
