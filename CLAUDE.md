@@ -2254,39 +2254,30 @@ native に無いだけ。bare `:bool` パラメータは compiler ADR 0219 が�
 **一時制約に沿って書いたコードは、その旨と撤去条件をモジュールのヘッダに書く。**
 書かなければ、後から読む者はそれを恒久の様式として模倣する。
 
-### 移行の単位は決定核（decision core）— repo 全体を移そうとしない
+### 移行の単位は kotoba/app の vertical slice である（ADR-2608261100）
 
-スカラ + 文字列 + record で表せる**判断**を `.kotoba` に切り出し、コレクションの
-組み立てと effect は `.cljc` / `.clj` に残す。先例は `kotoba-lang/murakumo` の 33 本の
-`kotoba/*_core.kotoba` — **33/33 が native に載ったのは murakumo を移植したからではなく、
-決定核を切り出したから**（compiler ADR 0219 → 0220 → 0221 で 0/33 → 14/33 → 30/33 → 33/33）。
-`infer_join_core.kotoba` は冒頭で自分の境界を宣言している:
-`partition-work / enrollment map assembly stay cljc (vectors/maps).`
+Kotoba は safe application language である（ADR-2607201300）。source は
+Clojure-shaped のまま、`kotoba/app` が第一候補。切り方は guest と host
+（ambient authority）であって、判断と残りではない。narrow-slice-only は
+2607201300 が削除済み。判断核を既定にすると、ADR-2607141900 と同じ誤りになる。
 
-⚠ **これは切り方であって、文字列禁止ではない**（ADR-2608261000）。
-『判断だけ』を『文字列を持たない』と読まない。判断が文字列の上に載るなら
-その文字列は核に入れる。線の CRLF・正規表現走査・ソケットを残す理由は
-mirror / 走査設計 / ambient authority であり、`:string` が無いからではない。
-`cond` は grammar が desugar する。入れ子 `if` を様式にしない。
+既定の移行は ADR-2607279200 決定 5 の 4 分類である。portable な product
+semantics を普通の Kotoba 値（map / 文字列 / record / document / `cond`）として
+移し、ソケット・credential・DOM 破壊は host に残す。vertical slice は
+capability が conformance を通った一本の製品経路（state → effect → event →
+governor → UI → checkpoint）。1 判断表ではない。1 commit を有界にするのは
+正しい。有界はスカラーを意味しない。参照は amu の `examples/todo-app.kotoba`
+（`init` / `view` / `step`）。kit の現状は
+`amu/resources/kotoba/lang/application-language.edn` をその場で読め。
 
-正しいスライス（手順の正本 ADR-2608261000、skill `kotoba-clj-to-kotoba`）:
+決定核の抽出は **named backend がその値を admit できないときの fallback**
+である。先例は murakumo の `kotoba/*_core.kotoba`（native が word 型のとき）。
+SMTP `protocol_core` も fallback であってテンプレートではない。使うときは
+ヘッダに欠落と撤去条件を書く。wasm / web に対して最初から潰さない。
 
-1. 書けない理由を `lang/surface-status.edn` の `:disposition` で分類する。
-2. `.cljc` を oracle のまま残し、`.kotoba` を require しない。
-3. set / map / nil / 線形式は cljc の adapter がスカラー（と必要な文字列）へ落とす。
-4. `.kotoba`（typed）と `.cljk`（`:clj-kotoba`、JVM target ではない）に同じ判断を書き、
-   `kotoba compile` で wasm と web を出す。untyped の `or` が i64 なら型注釈で表を保つ。
-5. parity は表の直積。意味を 1 枝だけひっくり返して赤になることを見る。
-
-- **parity test を必須にする。** 雛形は
-  `murakumo/test/murakumo/infer_join_kotoba_parity_test.clj`
-  （`compiler/compile-source` → `ir/execute` で `.kotoba` を回し既存実装と突き合わせる）。
-- **mirror を作らない。** 同じ判断を 2 実装が別々に持ち片方だけ直る状態にしない
-  （実測: `cloud-itonami-app` の `policy.cljc` は自分を
-  `The host-side mirror of policy.kotoba` と名乗っている）。
-- **正規表現でテキストを走査して構造を得る設計は、移行ではなく設計変更を先にやる**
-  （走査をやめて宣言データにする）。
-- **依存が `.cljc` のままの面は移行しない**（ADR-2607270100 を依存側から見た形）。
+文字列禁止ではない（ADR-2608261000）。`.cljc` oracle は slice の gate が揃うまで
+残し、`.kotoba` を require しない。mirror を作らない。正規表現走査は移す前に
+宣言データへ直す。依存が `.cljc` のままの面は移行しない。
 
 ### native の現在地の読み方
 
