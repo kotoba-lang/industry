@@ -1641,6 +1641,34 @@ programming model*」** と明記している。したがって:
    nbb 据え置き。`kotoba-lang/kotoba-script` は restricted-ESM emitter であって script runner
    ではない（名前で誤解しないこと）。
 
+## `.kotoba` で「書けない」は混ぜない — 決定核は切り方であって文字列禁止ではない（repo-wide mandatory、ADR-2608650000 / ADR-2608261000）
+
+`.kotoba` で何かが書けないと結論する前に、それが恒久の安全か、backend 未達か、
+**このスライスの切り方**かを分類する。正本は `lang/surface-status.edn` の
+`:disposition`。分類を書かなければ読み手は全部を恒久だと読み、backend が
+追いついたあとも自己制限を守り続ける。
+
+恒久として引き受けるのは 2 つだけ: `throw`/`try`/`catch` → `[:result T E]` と、
+bool は数ではないこと。ソケットとホスト interop は `no-ambient-authority` /
+`no-interop` で、これも安全である。**文字列は禁止されていない。**
+
+移行の単位は決定核である（repo 全体を移さない）。スカラ + 文字列 + record で
+表せる**判断**を切り出し、コレクション組み立てと effect は `.cljc` に残す。
+『判断だけ』を『文字列を持たない』と読まない。判断が文字列の上に載るなら
+その文字列は核に入れる。線の CRLF・正規表現走査・ソケットを残す理由は
+mirror / 走査設計 / ambient authority であり、`:string` が無いからではない。
+`cond` は grammar が desugar する。入れ子 `if` を様式にしない。amu が
+判断以外を拒否した、と書かない。
+
+正しいスライス（手順の正本 ADR-2608261000、skill `kotoba-clj-to-kotoba`）:
+
+1. 書けない理由を `:disposition` で分類する。
+2. `.cljc` を oracle のまま残し、`.kotoba` を require しない。
+3. set / map / nil / 線形式は cljc の adapter がスカラー（と必要な文字列）へ落とす。
+4. `.kotoba`（typed）と `.cljk`（`:clj-kotoba`、JVM target ではない）に同じ判断を書き、
+   `kotoba compile` で wasm と web を出す。untyped の `or` が i64 なら型注釈で表を保つ。
+5. parity は表の直積。意味を 1 枝だけひっくり返して赤になることを見る。
+
 ## design system（css / html / shitsuke / liquid-glass-ui / kotoba-ui）は `.kotoba` 移行対象（オーナー判断 2026-07-27、ADR-2607270100 §10）
 
 **この 5 リポジトリを「`.cljc` のまま維持する層」と扱わない。** `.kotoba` へ移行する方針が
