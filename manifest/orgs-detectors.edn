@@ -234,6 +234,37 @@
    :timeout-ms  1800000                  ; 30m -- ~6x the measured 5m runtime
    :writes   :none}
 
+  {:id       :verify-frontend-stack-retirement
+   :title    "Svelte/React/Next.js authoring surface growing back after it was retired"
+   :why      "2026-08-26, ADR-2608260900: the owner retired Svelte/React from the UI
+              authoring surface (cljs + reagent + re-frame + jp-go-dds instead). The
+              rule binds NEW files, so this is a ratchet against
+              manifest/frontend-stack-baseline.edn -- it reports repos that GREW, not
+              the 1,375 known-debt files, because 1,375 findings would bury the one
+              that matters. Three measured traps are encoded in it: (1) counting
+              without pruning .claude/worktrees double-counts -- React read as 754
+              when 386 were the same 193 files copied into two disposable worktrees;
+              (2) counting Next.js by a `next` dependency UNDERCOUNTS -- gftdcojp/hrse
+              has next.config.mjs and a src/app router but never declares next, so
+              this keys on config files instead; (3) vendored third-party sites under
+              contracts/lib/ and the m365-archive OneDrive dataset are not ours to
+              migrate and are excluded BY DECLARATION in the script, never silently.
+              This CANNOT be a fleet gate: a gate ships one repo's tree and the whole
+              measurement is over west-managed orgs/."
+   :argv     ["nbb" "--classpath" ".:scripts/nbb_compat"
+              "{{repo}}/scripts/verify-frontend-stack-retirement.cljs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 21600000                 ; 6h -- migration lands in waves, not minutes
+   :timeout-ms  600000                   ; 10m -- ~7x the measured 80s runtime
+   :measured "2026-08-26: 80s wall (find(1) 11.5s + nbb); 1,375 authored files across
+              226 repos; 7 live next.config.* after exclusions, 15 before. Verified in
+              all three directions before landing -- exit 2 with no baseline, exit 0
+              clean, and exit 1 naming orgs/kotoba-lang/app-docs (2 -> 3) when one
+              .svelte file was planted, then clean again once removed."
+   :writes   :none}
+
   {:id       :verify-bridge-guest-cannot-execute
    :title    "the claude-bridge guest keeping the tools it is documented not to have"
    :why      "ADR-2608200200, 2026-08-20: the bridge's own header and the commit that
