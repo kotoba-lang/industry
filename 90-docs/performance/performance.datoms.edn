@@ -5,7 +5,7 @@
   :performance/roadmap-path "docs/performance/world-class-roadmap.md"
   :performance/adr-id "adr-2608260800-kotoba-stack-performance-world-class"
   :performance/amu-commit "6889fa736750"
-  :performance/host "Apple M4 darwin arm64"
+  :performance/host "Apple M4 darwin arm64 (local)"
   :performance/loadavg "17.2 23.7 25.4"
   :performance/runtime-json "90-docs/performance/runs/2026-08-26/kotoba-runtime-20260826.json"
   :performance/compile-json "90-docs/performance/runs/2026-08-26/kotoba-compile-20260826.json"
@@ -14,4 +14,22 @@
   :performance/compile-cold-ms-wasm32 1949
   :performance/compile-loaded-ms-wasm32 394
   :performance/status "exploratory-contended-host"
+  :source/dataset "performance"}
+ {:performance/id "kotoba-stack-benchmark-2026-08-26-judah-quiet"
+  :performance/date "2026-08-26"
+  :performance/kind "measured-comparison"
+  :performance/summary-path "docs/performance/kotoba-stack-benchmark-2026-08-26.md"
+  :performance/roadmap-path "docs/performance/world-class-roadmap.md"
+  :performance/adr-id "adr-2608260800-kotoba-stack-performance-world-class"
+  :performance/amu-commit "6889fa736750"
+  :performance/host "judah murakumo fleet Apple M4"
+  :performance/loadavg "1.23 1.41 1.41"
+  :performance/runtime-json "90-docs/performance/runs/2026-08-26-judah-quiet/runtime.json"
+  :performance/compile-json "90-docs/performance/runs/2026-08-26-judah-quiet/compile.json"
+  :performance/amu-native-vs-rust 1.06
+  :performance/amu-wasm-vs-rust 6.78
+  :performance/compile-cold-ms-wasm32 663
+  :performance/compile-loaded-ms-wasm32 138
+  :performance/compile-semantic-edit-ms-wasm32 38
+  :performance/status "quiet-host-official"
   :source/dataset "performance"}]

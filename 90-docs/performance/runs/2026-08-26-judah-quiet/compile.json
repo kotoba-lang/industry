@@ -1,0 +1,815 @@
+{
+  "format": "kotoba.performance-baseline/v1",
+  "benchmark": "process-cold-compile",
+  "generatedAt": "2026-08-26T00:16:27.880Z",
+  "fixture": "/private/tmp/kotoba-perf-amu/examples/i64-semantics.kotoba",
+  "environment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v26.4.0",
+    "compilerCommit": null,
+    "compilerDirty": true
+  },
+  "targets": [
+    {
+      "target": "wasm32",
+      "runs": 5,
+      "processColdWall": {
+        "minimumMilliseconds": 660.128958,
+        "medianMilliseconds": 663.141583,
+        "p95Milliseconds": 663.728125,
+        "maximumMilliseconds": 663.728125
+      },
+      "loadedCompiler": {
+        "minimumMilliseconds": 136.826125,
+        "medianMilliseconds": 138.034833,
+        "p95Milliseconds": 140.36145800000003,
+        "maximumMilliseconds": 140.36145800000003
+      },
+      "entrypointAfterSharedSupport": {
+        "minimumMilliseconds": 523.246625,
+        "medianMilliseconds": 527.946958,
+        "p95Milliseconds": 528.545167,
+        "maximumMilliseconds": 528.545167
+      },
+      "processAndNamespaceStartup": {
+        "minimumMilliseconds": 521.380375,
+        "medianMilliseconds": 524.966833,
+        "p95Milliseconds": 526.2976249999999,
+        "maximumMilliseconds": 526.2976249999999
+      },
+      "artifactBytes": 529,
+      "provenanceBytes": 953,
+      "publicationBytes": 390,
+      "samples": [
+        {
+          "wallMilliseconds": 663.141583,
+          "compilerMilliseconds": 138.17475000000002,
+          "entrypointMilliseconds": 527.946958,
+          "startupMilliseconds": 524.966833,
+          "phases": [
+            {
+              "phase": "source-admit",
+              "milliseconds": 0.278583000000026
+            },
+            {
+              "phase": "source-read",
+              "milliseconds": 0.36008300000003146
+            },
+            {
+              "phase": "policy-read",
+              "milliseconds": 0.1571660000000179
+            },
+            {
+              "phase": "frontend",
+              "milliseconds": 74.85049999999995
+            },
+            {
+              "phase": "admission",
+              "milliseconds": 1.0152499999999236
+            },
+            {
+              "phase": "kir-lower",
+              "milliseconds": 22.950417000000016
+            },
+            {
+              "phase": "wasm-emit",
+              "milliseconds": 6.692125000000033
+            },
+            {
+              "phase": "provenance",
+              "milliseconds": 2.8547080000000733
+            },
+            {
+              "phase": "provenance-serialize",
+              "milliseconds": 0.35725000000002183
+            },
+            {
+              "phase": "output-set-write",
+              "milliseconds": 24.283457999999996
+            },
+            {
+              "phase": "command",
+              "milliseconds": 138.17475000000002
+            }
+          ],
+          "artifactBytes": 529,
+          "provenanceBytes": 953,
+          "publicationBytes": 390
+        },
+        {
+          "wallMilliseconds": 661.741833,
+          "compilerMilliseconds": 140.36145800000003,
+          "entrypointMilliseconds": 526.170209,
+          "startupMilliseconds": 521.380375,
+          "phases": [
+            {
+              "phase": "source-admit",
+              "milliseconds": 0.2795409999999947
+            },
+            {
+              "phase": "source-read",
+              "milliseconds": 0.35829200000000583
+            },
+            {
+              "phase": "policy-read",
+              "milliseconds": 0.15962500000000546
+            },
+            {
+              "phase": "frontend",
+              "milliseconds": 75.785708
+            },
+            {
+              "phase": "admission",
+              "milliseconds": 1.059582999999975
+            },
+            {
+              "phase": "kir-lower",
+              "milliseconds": 20.944208000000003
+            },
+            {
+              "phase": "wasm-emit",
+              "milliseconds": 8.642665999999963
+            },
+            {
+              "phase": "provenance",
+              "milliseconds": 3.1270000000000664
+            },
+            {
+              "phase": "provenance-serialize",
+              "milliseconds": 0.3665839999999889
+            },
+            {
+              "phase": "output-set-write",
+              "milliseconds": 25.247250000000008
+            },
+            {
+              "phase": "command",
+              "milliseconds": 140.36145800000003
+            }
+          ],
+          "artifactBytes": 529,
+          "provenanceBytes": 953,
+          "publicationBytes": 390
+        },
+        {
+          "wallMilliseconds": 660.128958,
+          "compilerMilliseconds": 136.826125,
+          "entrypointMilliseconds": 523.246625,
+          "startupMilliseconds": 523.302833,
+          "phases": [
+            {
+              "phase": "source-admit",
+              "milliseconds": 0.280791000000022
+            },
+            {
+              "phase": "source-read",
+              "milliseconds": 0.36087499999996453
+            },
+            {
+              "phase": "policy-read",
+              "milliseconds": 0.15791699999999764
+            },
+            {
+              "phase": "frontend",
+              "milliseconds": 75.36204099999998
+            },
+            {
+              "phase": "admission",
+              "milliseconds": 1.0124999999999318
+            },
+            {
+              "phase": "kir-lower",
+              "milliseconds": 21.455625000000055
+            },
+            {
+              "phase": "wasm-emit",
+              "milliseconds": 8.30295799999999
+            },
+            {
+              "phase": "provenance",
+              "milliseconds": 2.973833999999897
+            },
+            {
+              "phase": "provenance-serialize",
+              "milliseconds": 0.3670829999999796
+            },
+            {
+              "phase": "output-set-write",
+              "milliseconds": 22.286707999999976
+            },
+            {
+              "phase": "command",
+              "milliseconds": 136.826125
+            }
+          ],
+          "artifactBytes": 529,
+          "provenanceBytes": 953,
+          "publicationBytes": 390
+        },
+        {
+          "wallMilliseconds": 663.7005,
+          "compilerMilliseconds": 137.40287500000005,
+          "entrypointMilliseconds": 528.545167,
+          "startupMilliseconds": 526.2976249999999,
+          "phases": [
+            {
+              "phase": "source-admit",
+              "milliseconds": 0.2724169999999617
+            },
+            {
+              "phase": "source-read",
+              "milliseconds": 0.3462079999999901
+            },
+            {
+              "phase": "policy-read",
+              "milliseconds": 0.15158400000001393
+            },
+            {
+              "phase": "frontend",
+              "milliseconds": 75.25358300000005
+            },
+            {
+              "phase": "admission",
+              "milliseconds": 1.020040999999992
+            },
+            {
+              "phase": "kir-lower",
+              "milliseconds": 22.763874999999985
+            },
+            {
+              "phase": "wasm-emit",
+              "milliseconds": 6.657332999999994
+            },
+            {
+              "phase": "provenance",
+              "milliseconds": 2.8521670000000086
+            },
+            {
+              "phase": "provenance-serialize",
+              "milliseconds": 0.3536669999999731
+            },
+            {
+              "phase": "output-set-write",
+              "milliseconds": 23.327790999999934
+            },
+            {
+              "phase": "command",
+              "milliseconds": 137.40287500000005
+            }
+          ],
+          "artifactBytes": 529,
+          "provenanceBytes": 953,
+          "publicationBytes": 390
+        },
+        {
+          "wallMilliseconds": 663.728125,
+          "compilerMilliseconds": 138.034833,
+          "entrypointMilliseconds": 528.001791,
+          "startupMilliseconds": 525.6932919999999,
+          "phases": [
+            {
+              "phase": "source-admit",
+              "milliseconds": 0.27604100000002063
+            },
+            {
+              "phase": "source-read",
+              "milliseconds": 0.3679159999999797
+            },
+            {
+              "phase": "policy-read",
+              "milliseconds": 0.1491659999999797
+            },
+            {
+              "phase": "frontend",
+              "milliseconds": 75.51220900000004
+            },
+            {
+              "phase": "admission",
+              "milliseconds": 1.0284169999999904
+            },
+            {
+              "phase": "kir-lower",
+              "milliseconds": 22.310375000000022
+            },
+            {
+              "phase": "wasm-emit",
+              "milliseconds": 6.491125000000011
+            },
+            {
+              "phase": "provenance",
+              "milliseconds": 2.912166999999954
+            },
+            {
+              "phase": "provenance-serialize",
+              "milliseconds": 0.3692079999999578
+            },
+            {
+              "phase": "output-set-write",
+              "milliseconds": 24.31366700000001
+            },
+            {
+              "phase": "command",
+              "milliseconds": 138.034833
+            }
+          ],
+          "artifactBytes": 529,
+          "provenanceBytes": 953,
+          "publicationBytes": 390
+        }
+      ]
+    },
+    {
+      "target": "aarch64",
+      "runs": 5,
+      "processColdWall": {
+        "minimumMilliseconds": 879.213208,
+        "medianMilliseconds": 894.160167,
+        "p95Milliseconds": 897.097,
+        "maximumMilliseconds": 897.097
+      },
+      "loadedCompiler": {
+        "minimumMilliseconds": 231.224875,
+        "medianMilliseconds": 233.2841669999999,
+        "p95Milliseconds": 233.96245800000008,
+        "maximumMilliseconds": 233.96245800000008
+      },
+      "entrypointAfterSharedSupport": {
+        "minimumMilliseconds": 740.716667,
+        "medianMilliseconds": 755.472583,
+        "p95Milliseconds": 760.80475,
+        "maximumMilliseconds": 760.80475
+      },
+      "processAndNamespaceStartup": {
+        "minimumMilliseconds": 647.988333,
+        "medianMilliseconds": 660.4585000000001,
+        "p95Milliseconds": 664.715708,
+        "maximumMilliseconds": 664.715708
+      },
+      "artifactBytes": 3049,
+      "provenanceBytes": 953,
+      "publicationBytes": 393,
+      "samples": [
+        {
+          "wallMilliseconds": 894.160167,
+          "compilerMilliseconds": 233.70166699999993,
+          "entrypointMilliseconds": 755.472583,
+          "startupMilliseconds": 660.4585000000001,
+          "phases": [
+            {
+              "phase": "source-admit",
+              "milliseconds": 0.21529199999997672
+            },
+            {
+              "phase": "source-read",
+              "milliseconds": 0.31741599999998016
+            },
+            {
+              "phase": "policy-read",
+              "milliseconds": 0.14383299999997234
+            },
+            {
+              "phase": "frontend",
+              "milliseconds": 74.50754199999994
+            },
+            {
+              "phase": "admission",
+              "milliseconds": 0.9913750000000618
+            },
+            {
+              "phase": "kir-lower",
+              "milliseconds": 21.771417000000042
+            },
+            {
+              "phase": "native-emit",
+              "milliseconds": 70.74275
+            },
+            {
+              "phase": "artifact-seal",
+              "milliseconds": 2.3891250000000355
+            },
+            {
+              "phase": "native-verify",
+              "milliseconds": 33.33958299999995
+            },
+            {
+              "phase": "provenance",
+              "milliseconds": 1.4294999999999618
+            },
+            {
+              "phase": "artifact-serialize",
+              "milliseconds": 0.6149580000000014
+            },
+            {
+              "phase": "provenance-serialize",
+              "milliseconds": 0.060791999999992186
+            },
+            {
+              "phase": "output-set-write",
+              "milliseconds": 25.18100000000004
+            },
+            {
+              "phase": "command",
+              "milliseconds": 233.70166699999993
+            }
+          ],
+          "artifactBytes": 3049,
+          "provenanceBytes": 953,
+          "publicationBytes": 393
+        },
+        {
+          "wallMilliseconds": 879.213208,
+          "compilerMilliseconds": 231.224875,
+          "entrypointMilliseconds": 740.716667,
+          "startupMilliseconds": 647.988333,
+          "phases": [
+            {
+              "phase": "source-admit",
+              "milliseconds": 0.212833000000046
+            },
+            {
+              "phase": "source-read",
+              "milliseconds": 0.3137090000000171
+            },
+            {
+              "phase": "policy-read",
+              "milliseconds": 0.1439579999999978
+            },
+            {
+              "phase": "frontend",
+              "milliseconds": 74.073083
+            },
+            {
+              "phase": "admission",
+              "milliseconds": 2.801625000000058
+            },
+            {
+              "phase": "kir-lower",
+              "milliseconds": 21.907707999999957
+            },
+            {
+              "phase": "native-emit",
+              "milliseconds": 67.61370799999997
+            },
+            {
+              "phase": "artifact-seal",
+              "milliseconds": 2.3672500000000127
+            },
+            {
+              "phase": "native-verify",
+              "milliseconds": 34.33683399999995
+            },
+            {
+              "phase": "provenance",
+              "milliseconds": 1.4303750000000264
+            },
+            {
+              "phase": "artifact-serialize",
+              "milliseconds": 0.6289590000000089
+            },
+            {
+              "phase": "provenance-serialize",
+              "milliseconds": 0.06387500000005275
+            },
+            {
+              "phase": "output-set-write",
+              "milliseconds": 23.306999999999903
+            },
+            {
+              "phase": "command",
+              "milliseconds": 231.224875
+            }
+          ],
+          "artifactBytes": 3049,
+          "provenanceBytes": 953,
+          "publicationBytes": 393
+        },
+        {
+          "wallMilliseconds": 889.2075,
+          "compilerMilliseconds": 233.96245800000008,
+          "entrypointMilliseconds": 755.076708,
+          "startupMilliseconds": 655.2450419999999,
+          "phases": [
+            {
+              "phase": "source-admit",
+              "milliseconds": 0.21220800000003237
+            },
+            {
+              "phase": "source-read",
+              "milliseconds": 0.3142080000000078
+            },
+            {
+              "phase": "policy-read",
+              "milliseconds": 0.1563340000000153
+            },
+            {
+              "phase": "frontend",
+              "milliseconds": 75.28079100000002
+            },
+            {
+              "phase": "admission",
+              "milliseconds": 0.9867919999999231
+            },
+            {
+              "phase": "kir-lower",
+              "milliseconds": 21.931500000000028
+            },
+            {
+              "phase": "native-emit",
+              "milliseconds": 70.42979099999991
+            },
+            {
+              "phase": "artifact-seal",
+              "milliseconds": 2.471916999999962
+            },
+            {
+              "phase": "native-verify",
+              "milliseconds": 33.74708399999997
+            },
+            {
+              "phase": "provenance",
+              "milliseconds": 1.442083000000025
+            },
+            {
+              "phase": "artifact-serialize",
+              "milliseconds": 0.6280000000000427
+            },
+            {
+              "phase": "provenance-serialize",
+              "milliseconds": 0.06679099999996652
+            },
+            {
+              "phase": "output-set-write",
+              "milliseconds": 24.292832999999973
+            },
+            {
+              "phase": "command",
+              "milliseconds": 233.96245800000008
+            }
+          ],
+          "artifactBytes": 3049,
+          "provenanceBytes": 953,
+          "publicationBytes": 393
+        },
+        {
+          "wallMilliseconds": 897.097,
+          "compilerMilliseconds": 232.38129200000003,
+          "entrypointMilliseconds": 760.80475,
+          "startupMilliseconds": 664.715708,
+          "phases": [
+            {
+              "phase": "source-admit",
+              "milliseconds": 0.21191699999997127
+            },
+            {
+              "phase": "source-read",
+              "milliseconds": 0.3237499999999045
+            },
+            {
+              "phase": "policy-read",
+              "milliseconds": 0.1453750000000582
+            },
+            {
+              "phase": "frontend",
+              "milliseconds": 74.98645800000008
+            },
+            {
+              "phase": "admission",
+              "milliseconds": 0.9415000000000191
+            },
+            {
+              "phase": "kir-lower",
+              "milliseconds": 20.946042000000034
+            },
+            {
+              "phase": "native-emit",
+              "milliseconds": 70.092084
+            },
+            {
+              "phase": "artifact-seal",
+              "milliseconds": 2.379583999999909
+            },
+            {
+              "phase": "native-verify",
+              "milliseconds": 33.90029100000004
+            },
+            {
+              "phase": "provenance",
+              "milliseconds": 1.4578339999999343
+            },
+            {
+              "phase": "artifact-serialize",
+              "milliseconds": 0.6464579999999387
+            },
+            {
+              "phase": "provenance-serialize",
+              "milliseconds": 0.061208000000078755
+            },
+            {
+              "phase": "output-set-write",
+              "milliseconds": 24.30574999999999
+            },
+            {
+              "phase": "command",
+              "milliseconds": 232.38129200000003
+            }
+          ],
+          "artifactBytes": 3049,
+          "provenanceBytes": 953,
+          "publicationBytes": 393
+        },
+        {
+          "wallMilliseconds": 895.889292,
+          "compilerMilliseconds": 233.2841669999999,
+          "entrypointMilliseconds": 756.960917,
+          "startupMilliseconds": 662.605125,
+          "phases": [
+            {
+              "phase": "source-admit",
+              "milliseconds": 0.21558299999992414
+            },
+            {
+              "phase": "source-read",
+              "milliseconds": 0.3144160000000511
+            },
+            {
+              "phase": "policy-read",
+              "milliseconds": 0.14420899999993253
+            },
+            {
+              "phase": "frontend",
+              "milliseconds": 74.530667
+            },
+            {
+              "phase": "admission",
+              "milliseconds": 0.9661250000000337
+            },
+            {
+              "phase": "kir-lower",
+              "milliseconds": 21.048667000000023
+            },
+            {
+              "phase": "native-emit",
+              "milliseconds": 70.19749999999999
+            },
+            {
+              "phase": "artifact-seal",
+              "milliseconds": 2.416500000000042
+            },
+            {
+              "phase": "native-verify",
+              "milliseconds": 34.036666999999966
+            },
+            {
+              "phase": "provenance",
+              "milliseconds": 1.4379169999999704
+            },
+            {
+              "phase": "artifact-serialize",
+              "milliseconds": 0.6585419999998976
+            },
+            {
+              "phase": "provenance-serialize",
+              "milliseconds": 0.06579199999998764
+            },
+            {
+              "phase": "output-set-write",
+              "milliseconds": 25.205542000000037
+            },
+            {
+              "phase": "command",
+              "milliseconds": 233.2841669999999
+            }
+          ],
+          "artifactBytes": 3049,
+          "provenanceBytes": 953,
+          "publicationBytes": 393
+        }
+      ]
+    }
+  ],
+  "persistentWorkers": [
+    {
+      "target": "wasm32",
+      "runs": 5,
+      "startupMilliseconds": 518.81625,
+      "warmRoundTrip": {
+        "minimumMilliseconds": 21.693584,
+        "medianMilliseconds": 22.797875,
+        "p95Milliseconds": 23.927334,
+        "maximumMilliseconds": 23.927334
+      },
+      "loadedCompiler": {
+        "minimumMilliseconds": 21.46383400000002,
+        "medianMilliseconds": 22.62345899999991,
+        "p95Milliseconds": 23.697000000000003,
+        "maximumMilliseconds": 23.697000000000003
+      },
+      "policyChangeIncremental": {
+        "roundTripMilliseconds": 29.740417,
+        "compilerMilliseconds": 29.448624999999993,
+        "stageCache": {
+          "hir": "hit",
+          "kir": "hit"
+        }
+      },
+      "semanticEditIncremental": {
+        "roundTripMilliseconds": 37.76725,
+        "compilerMilliseconds": 37.49754200000007,
+        "stageCache": {
+          "hir": "miss",
+          "kir": "hit"
+        }
+      },
+      "artifactBytes": 529,
+      "samples": [
+        {
+          "roundTripMilliseconds": 21.693584,
+          "compilerMilliseconds": 21.46383400000002,
+          "artifactBytes": 529
+        },
+        {
+          "roundTripMilliseconds": 23.776584,
+          "compilerMilliseconds": 23.582167000000027,
+          "artifactBytes": 529
+        },
+        {
+          "roundTripMilliseconds": 22.796458,
+          "compilerMilliseconds": 22.62345899999991,
+          "artifactBytes": 529
+        },
+        {
+          "roundTripMilliseconds": 23.927334,
+          "compilerMilliseconds": 23.697000000000003,
+          "artifactBytes": 529
+        },
+        {
+          "roundTripMilliseconds": 22.797875,
+          "compilerMilliseconds": 22.589833,
+          "artifactBytes": 529
+        }
+      ]
+    },
+    {
+      "target": "aarch64",
+      "runs": 5,
+      "startupMilliseconds": 658.912583,
+      "warmRoundTrip": {
+        "minimumMilliseconds": 21.782875,
+        "medianMilliseconds": 22.744375,
+        "p95Milliseconds": 24.715959,
+        "maximumMilliseconds": 24.715959
+      },
+      "loadedCompiler": {
+        "minimumMilliseconds": 21.646082999999976,
+        "medianMilliseconds": 22.532666999999947,
+        "p95Milliseconds": 24.563875000000053,
+        "maximumMilliseconds": 24.563875000000053
+      },
+      "policyChangeIncremental": {
+        "roundTripMilliseconds": 67.845459,
+        "compilerMilliseconds": 67.57362499999999,
+        "stageCache": {
+          "hir": "hit",
+          "kir": "hit"
+        }
+      },
+      "semanticEditIncremental": {
+        "roundTripMilliseconds": 85.825459,
+        "compilerMilliseconds": 85.60112500000002,
+        "stageCache": {
+          "hir": "miss",
+          "kir": "hit"
+        }
+      },
+      "artifactBytes": 3049,
+      "samples": [
+        {
+          "roundTripMilliseconds": 22.744375,
+          "compilerMilliseconds": 22.532666999999947,
+          "artifactBytes": 3049
+        },
+        {
+          "roundTripMilliseconds": 21.782875,
+          "compilerMilliseconds": 21.646082999999976,
+          "artifactBytes": 3049
+        },
+        {
+          "roundTripMilliseconds": 21.807542,
+          "compilerMilliseconds": 21.68270899999993,
+          "artifactBytes": 3049
+        },
+        {
+          "roundTripMilliseconds": 22.791209,
+          "compilerMilliseconds": 22.65329200000008,
+          "artifactBytes": 3049
+        },
+        {
+          "roundTripMilliseconds": 24.715959,
+          "compilerMilliseconds": 24.563875000000053,
+          "artifactBytes": 3049
+        }
+      ]
+    }
+  ]
+}
