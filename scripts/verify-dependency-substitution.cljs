@@ -301,6 +301,22 @@
     (check "first-party-exists entries name a target"
            (every? :target (filter #(= :first-party-exists (:disposition %))
                                    (:dependency-substitution/dispositions ledger))))
+    ;; `:kind` says what the target actually IS. Twice now an entry has named
+    ;; a repository that exists and does something adjacent rather than the
+    ;; thing -- `@noble/ciphers` at a host-injected AEAD seam, `@noble/curves`
+    ;; at a key-encoding library with no sign or verify. Neither was visible
+    ;; to `substitution-target-missing`, because both targets exist.
+    ;;
+    ;; A required field cannot make anyone read the target. It can make the
+    ;; claim explicit enough that a wrong one is worth arguing with.
+    (check "first-party-exists entries say what the target IS"
+           (every? #{:implementation :capability-seam :partial}
+                   (map :kind (filter #(= :first-party-exists (:disposition %))
+                                      (:dependency-substitution/dispositions ledger)))))
+    (check "a :capability-seam or :partial target says why"
+           (every? #(or (:seam-because %) (:partial-because %))
+                   (filter #(#{:capability-seam :partial} (:kind %))
+                           (:dependency-substitution/dispositions ledger))))
     (if (seq @fails)
       (do (doseq [f @fails] (println "SELF-TEST FAIL" f))
           (js/process.exit 1))
