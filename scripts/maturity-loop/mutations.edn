@@ -2244,4 +2244,66 @@
      :find "sourceData: \"https://www.bengo4.com/mie/a_24204/l_137374/\","
      :replace "sourceData: \"https://www.bengo4.com/mie/a_24204/l_999999/\","
      :must-fail ["source-attribution-is-one-url-everywhere"
-                 "disclosure-and-noindex-hold-on-every-html-surface"]}]}]}
+                 "disclosure-and-noindex-hold-on-every-html-surface"]}]}
+
+  {:repo "orgs/cloud-itonami/ses"
+   :label "ses —— L3 dispatcher の面合意と CLAUDE.md CRITICAL 安全境界"
+   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :green-marker "ses contract: all green"
+   :mutations
+   [{:id :ses/hyperdrive-false-removed-from-meta
+     :why "hyperdrive: false が無いと DB binding があると誤解される"
+     :file "src/app.ts"
+     :find "    hyperdrive: false,\n"
+     :replace ""
+     :must-fail ["non-federable-and-no-hyperdrive-are-declared-in-meta"]}
+
+    {:id :ses/federable-false-removed-from-meta
+     :why "federable: false が無いと AT Repo へ漏れる前提で読まれる"
+     :file "src/app.ts"
+     :find "    federable: false,\n"
+     :replace ""
+     :must-fail ["non-federable-and-no-hyperdrive-are-declared-in-meta"]}
+
+    {:id :ses/nsid-prefix-changed
+     :why "NSID guard prefix が変わると他 actor の XRPC が通る"
+     :file "src/app.ts"
+     :find "  if (!nsid.startsWith(\"com.etzhayyim.apps.ses.\")) {"
+     :replace "  if (!nsid.startsWith(\"com.etzhayyim.apps.sesx.\")) {"
+     :must-fail ["nsid-guard-only-admits-ses-lexicon"]}
+
+    {:id :ses/jokyo-value-removed
+     :why "jokyoValues から状態が消えると LangGraph と meta が別語彙になる"
+     :file "src/app.ts"
+     :find "\"中途終了\""
+     :replace ""
+     :must-fail ["jokyo-state-machine-values-are-fixed"]}
+
+    {:id :ses/actor-did-drifts-from-identity-doc
+     :why "identity 文書と worker が別 DID を名乗る"
+     :file "src/app.ts"
+     :find "app.get(\"/\", (c) => c.json({ app: \"ses\", did: \"did:web:ses.etzhayyim.com\" }));"
+     :replace "app.get(\"/\", (c) => c.json({ app: \"ses\", did: \"did:web:sesx.etzhayyim.com\" }));"
+     :must-fail ["actor-identity-agrees-across-surfaces"]}
+
+    {:id :ses/nanoid-drifts-in-wrangler
+     :why "nanoid が 1 箇所だけ動くと fleet 逆引きがずれる"
+     :file "wrangler.jsonc"
+     :find "\"APP_NANOID\": \"s3s4nk3n\","
+     :replace "\"APP_NANOID\": \"s3s4nk3m\","
+     :must-fail ["actor-identity-agrees-across-surfaces"]}
+
+    {:id :ses/auth-401-removed
+     :why "Bearer 401 が無いと認証なしで ingest/update が通る"
+     :file "src/app.ts"
+     :find "Bearer token required"
+     :replace "Token optional"
+     :must-fail ["bearer-auth-is-required-off-public-paths"]}
+
+    {:id :ses/hyperdrive-added-to-wrangler
+     :why "HYPERDRIVE binding が wrangler に在ると edge が DB に直接触れる"
+     :file "wrangler.jsonc"
+     :find "  \"routes\": ["
+     :replace "  \"hyperdrive\": [{\"binding\": \"HYPERDRIVE\", \"id\": \"fake-id\"}],\n  \"routes\": ["
+     :must-fail ["worker-has-no-hyperdrive-binding"]}]}
+]}
