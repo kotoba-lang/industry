@@ -1,12 +1,24 @@
 [{:db/id -1
   :adr/id "adr-2608261800-tenkyu-public-spatial-intelligence-on-the-lake"
-  :adr/title "天球 tenkyu — public spatial intelligence read from R2 Data Catalog, not from the vendors"
+  :adr/title "お天道様 otent — public spatial intelligence read from R2 Data Catalog, not from the vendors"
   :adr/status "accepted"
   :adr/date "2026-08-26"
   :adr/deciders "owner (2026-08-26 指示), agent"
   :adr/related "adr-2608039000-blockchain-paths-must-not-presume-d1, adr-2608231500-compliance-scope-boundary, adr-2607102200-kami-render-stack-deps-authority-rename, adr-2608080100-single-page-app, adr-2608260900-svelte-react-refactor-to-cljs-reframe"
   :adr/body
-  "# 天球 tenkyu — 公開空間情報を、ベンダーではなく自分の lake から読む
+  "# お天道様 otent — 公開空間情報を、ベンダーではなく自分の lake から読む
+
+> **2026-08-26 に `tenkyu`(天球) から `otent`(お天道様) へ改名**（オーナー判断）。
+> 天球は「描かれる面」を指す。お天道様は**見ていること**を指す ——
+> 「お天道様は見ている」——  そちらがこの project の主題なので名前を寄せた。
+> 改名したもの: repo 2 本 / namespace 31 ファイル / Iceberg 表 3 つ（行数は
+> 保存: quake 150・aircraft 18,820・satellite 21）/ R2 の prefix 1,470 object /
+> Worker 名。旧 repo 名は GitHub の redirect で生きるが、west は新名のみを持つ。
+>
+> **この ADR の `:adr/id` と ファイル名は `tenkyu` のまま据え置く。** id は
+> 作成時に pin された discovery alias であって identity ではなく
+> （CLAUDE.md の命名節と同じ理屈）、動かせば `:adr/related` の参照先が壊れる。
+> 中身が現在地を語れば足りる。
 
 ## 発端
 
@@ -28,14 +40,13 @@ lake から」ではない。
 | repo | 面 | 何か |
 |---|---|---|
 | `kotoba-lang/sgp4` | subject（bare） | SGP4 軌道伝播と TLE parser、依存ゼロの `.cljc` |
-| `cloud-itonami/tenkyu` | metaphor（README 名乗り + vocabulary 登録） | 公開 feed の governed ingest。R2 Data Catalog の Iceberg 表へ append |
-| `cloud-itonami/app-tenkyu` | role（`app-` + subject） | WebGPU 地球儀の SPA。**lake だけを読む** |
+| `cloud-itonami/otent` | metaphor（README 名乗り + vocabulary 登録） | 公開 feed の governed ingest。R2 Data Catalog の Iceberg 表へ append |
+| `cloud-itonami/app-otent` | role（`app-` + subject） | WebGPU 地球儀の SPA。**lake だけを読む** |
 
 ### 2. データ面は Iceberg。**ブラウザは上流サービスに一切触らない**
 
 `cloud_itonami` namespace / `cloud-itonami-datalake` bucket。
-実測 2026-08-26 の着地: `tenkyu_quake` 66 行、`tenkyu_satellite` 21 行、
-`tenkyu_aircraft` 7,214 行。`tenkyu_fire` と `tenkyu_vessel` は
+実測 2026-08-26 の着地: `otent_quake`・`otent_satellite`・`otent_aircraft`。`otent_fire` と `otent_vessel` は
 **UNMEASURED**（前者は無料キー、後者は常駐 WebSocket collector が要る）。
 
 **表は projection であって正本ではない。** 全行が `payload_sha256` /
@@ -84,7 +95,7 @@ json は **cljs で exit 1・JVM は緑のまま** —— その非対称その�
 
 ## ブラウザでしか見つからなかった 4 件
 
-`app-tenkyu` の 23 検査（deploy 済み Worker に対して実行）が出した:
+`app-otent` の browser 検査（deploy 済み Worker に対して実行）が出した:
 
 1. **描画先の canvas が document に無かった。** React 18 の `createRoot`
    は hydration ではなく client render で、SSR の子を捨てる。`setTimeout 0`

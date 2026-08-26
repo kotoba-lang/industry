@@ -418,9 +418,12 @@ Web ゆうびん投函の自動化（2026-04 断念）、cloud-itonami-iso3166-j
   :spellings ["spatial intelligence" "geoint" "osint" "globe" "地球儀"
               "衛星追跡" "satellite tracking" "tle" "sgp4" "adsb" "ads-b"
               "flight tracking" "航空機追跡" "ais" "船舶追跡" "earthquake feed"
-              "天球" "tenkyu"]
-  :note "cloud-itonami/tenkyu（天球）が公開 feed を governed ingest して R2 Data
-Catalog の Iceberg 表に置き、cloud-itonami/app-tenkyu が WebGPU 地球儀で描く。
+              "天球" "tenkyu" "お天道様" "おてんとさま" "otent" "otentosama"]
+  :note "cloud-itonami/otent（お天道様）が公開 feed を governed ingest して R2 Data
+Catalog の Iceberg 表に置き、cloud-itonami/app-otent が WebGPU 地球儀で描く。
+**2026-08-26 に tenkyu(天球) から改名**（オーナー判断）—— 天球は「描かれる面」を
+指し、お天道様は「見ていること」を指す。後者がこの project の主題。旧名は
+GitHub の redirect で生きているが west は新名のみを持つ。
 どちらも名前が機能を示さないのでここに載せる。軌道伝播は kotoba-lang/sgp4
 （deep space は拒否する）、球面ジオメトリは kotoba-lang/geo。ADR-2608261800。
 上流サービスへの request はブラウザから 1 本も出ない —— 画像も海岸線も lake から。"}
