@@ -35,6 +35,7 @@
   ["adr-2607279200-kotoba-centered-migration-plan"
    "adr-2607300900-github-actions-retirement-murakumo-fleet"
    "adr-2608062400-money-loop-blocked-on-a-measured-price-and-an-observed-cac"
+   "adr-2608650000-kotoba-cannot-write-has-two-kinds-decision-core-extraction"
    "kotoba-lang/dsl-core docs/adr/0001-kotoba-source-authority.md"
    "kotoba-lang/css（.cljc を src に残したまま .kotoba を parity gate 下に置いた先例）"]
 
@@ -142,7 +143,7 @@ native backend（`kotoba.native.x86-64` / `aarch64`）が運ぶ値型（src の�
 
 `problem`/`problem-field` は `:document` を返し、`errors`/`warnings` は problem の**集合**を返す。集合型が 1 つも lower されない以上、`:record` で problem 1 件を表現し直しても `errors` は書けない。
 
-これは既知の言語側の限界と同じ根である —— CLAUDE.md「再帰的な値型は『まだ』無い」、移行計画 ADR-2607279200 の **W4「Define recursive logical values with explicit node/depth/byte budgets」**。`problem.kotoba` は W4 を待つ側の program である。
+これは当時 CLAUDE.md が「再帰的な値型は『まだ』無い」と書いていた切り方と同じ根に見えた（移行計画 ADR-2607279200 の W4）。現行ではない。W4 は compiler / kotoba-wasm / kotoba-cljs で landed している（ADR-2608650000）。無いのは native がその値を admit できないことであって、言語の天井ではない。`problem.kotoba` は native を待つ側の program である。
 
 ### 4. release 条件
 
@@ -160,8 +161,12 @@ native 経路が W4 待ちである以上、**W4 までの間、12+ repo と loo
 
 ### 6. 検出の欠如は別の gap として残る
 
-この破損を捕まえる仕組みはワークスペースに無い。dsl-core の CI は自 repo だけを見て、消費側には CI が無い。**「require が解決するか」を横断で見る gate**が要るが、本 ADR では設計しない（修理方法が決まると必要な形も変わるため）。"
+この破損を捕まえる仕組みはワークスペースに無い。dsl-core の CI は自 repo だけを見て、消費側には CI が無い。**「require が解決するか」を横断で見る gate**が要るが、本 ADR では設計しない（修理方法が決まると必要な形も変わるため）。
 
+## 改訂履歴
+
+2026-08-26: native が document/集合を運べないという 2026-08-07 の測定は残し、CLAUDE.md の『再帰的な値型はまだ無い』を言語の天井として読むのをやめた。当時の切り方。現行は ADR-2608650000（W4 landed、native は backend 未達）。
+"
   :adr/consequences
   "- **17 日間、緑の CI の裏で 12 repo が壊れていた事実が記録された。** ADR-2607300900 が『動いていない CI より無い CI の方がよい』と書いたのと同じ構図が、別の形で出た —— ここでは CI は動いていて緑で、**見る範囲が自 repo に閉じていた**。
 - **loop-system-dynamics の XMILE 経路 6 本が現在動かない。** これは test ではなく `src/` の実行経路である。ADR-2608062400 が『SD の道具立ては揃っている』と書いたのは `dynamics` の XMILE ライブラリについてであり正しいが、**それを使う orchestrator 側は今 load できない**。同 ADR の verification に書いた「6 本の XMILE モデルを確認した」はファイルを読んだという意味であって、実行したという意味ではない。
