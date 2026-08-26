@@ -870,6 +870,15 @@
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*\t"
    :interval-ms 86400000
+   :timeout-ms  600000                  ; 10m -- 10x the measured 61s, all filesystem reads
+   :writes   :none
+   :measured "2026-08-26: fields added by a later session. The entry landed without :timeout-ms
+              and :writes, and admission refuses the WHOLE home when any entry is
+              incomplete, so every detector here stopped running from 2026-08-26T05:57Z
+              until this was filled in -- roughly nine hours in which the session-start
+              report showed stale results and nothing said the home was down. Measured
+              here before filling in: exit 0, 61s wall. Writes nothing (no fs write call
+              in the script at all)."
    :adr      "adr-2608260200-kotoba-lang-external-dependency-substitution"}
 
   {:id       :verify-dependency-substitution
@@ -907,6 +916,12 @@
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*\t"
    :interval-ms 86400000                 ; 24h -- a dependency lands on human time
+   :timeout-ms  300000                  ; 5m -- 100x the measured 3s, which is a read of west.yml plus deps files
+   :writes   :none
+   :measured "2026-08-26: fields added by a later session, same admission outage as
+              :verify-char-int-coercion. Measured here: exit 0, 3s wall. The script has
+              one fs write, guarded by `--edn <path>`; the argv registered above does not
+              pass it, so under this home it writes nothing."
    :adr      "adr-2608260200-kotoba-lang-external-dependency-substitution"}
 
   {:id       :verify-jvm-dependency-surface
@@ -2039,4 +2054,72 @@
               One finding is deliberate: org-ietf-xdr's core_test.cljc writes 2^53 + 1
               inside a :cljs-only deftest asserting that ClojureScript has already
               rounded it and that encoding it must be refused. Named in the script so
-              nobody corrects a correct test."}]}
+              nobody corrects a correct test."}
+
+  {:id       :verify-single-page-app
+   :title    "UI that cannot be opened as one page"
+   :why      "2026-08-26, owner instruction: `uiux は singlepage app として見れる
+              ようにしてね. これは skill, rule に組み込んで`. The rule already existed --
+              ADR-2608080100 made single-page mandatory for kotoba-lang UI on
+              2026-08-08 -- and nothing checked it. That ADR was itself written after
+              two apps had shipped a second document for a secondary view: React, the
+              cljs core and the whole design system compiled and shipped twice (3.6 MB
+              across the pair, 2.1 MB as one page), and only one of the two app shells
+              followed the DADS migration. The other went on linking a stylesheet that
+              migration had deleted, unstyled, for three days. The measured failure was
+              invisible in source: an app with two documents reads exactly like an app
+              with one.
+              First run, 2026-08-26: 11 multi-document and 15 no-document over 285
+              repositories with a browser build config. Two of the eleven are the SSR/OG
+              marketing surfaces the ADR names as out of scope and are accepted below.
+              It cannot be a fleet gate: it reads orgs/, and a gate ships one repo's
+              tree, so on a node it would find an empty workspace and never go green
+              (ADR-2608124800)."
+   :argv     ["nbb" "{{repo}}/scripts/verify-single-page-app.cljs" "--root" "{{root}}" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 86400000
+   :timeout-ms  900000                  ; 15m -- 6x the measured ~2m30s, all filesystem reads
+   :writes   :none
+   :measured "2026-08-26 on this machine: exit 1, 26 findings,
+              `SCANNED 285 repositories with a browser build config, of 4231 registered
+              checkouts` / `multi-document=11 no-document=15 (of 56 with :target
+              :browser)`, ~2m30s wall.
+              Discriminated five ways on a three-repo fixture, each direction watched:
+              (a) one page each, and an :esm library with no page -- exit 0, zero
+              findings, so a component library is not reported for having no document;
+              (b) one repo grows a second script-loading document -- exit 1, exactly
+              that repo reported; (c) that document removed and a different repo's only
+              page deleted -- exit 1, no-document reported for that repo alone;
+              (d) a 404.html added -- exit 0, because the rule REQUIRES one on a static
+              host and reporting it would punish following the rule;
+              (e) west.yml removed -- exit 2 with REFUSED, not a pass, so a run that
+              could not tell a registered checkout from a stale one never reports clean.
+              The no-document class asks for shadow-cljs `:target :browser`
+              specifically. Measured without that narrowing it reported 232 of 285, and
+              nearly all were correct by design -- a codec, a component library, a node
+              target. A class that is 81% correct-by-design is noise, and noise is how a
+              detector stops being read.
+              Known blind spot, stated rather than implied: an `:esm` app that loses its
+              only document is NOT caught, because :esm is also the target of every
+              library. cloud-itonami/app-otent is such an app. multi-document catches
+              :esm apps; no-document does not."
+   :accepted {"multi-document:orgs/network-awai/cloud-murakumo"
+              {:since "2026-08-26"
+               :why "25 documents, but they are a marketing site and a blog --
+                     public/advertise.html, public/docs.html, public/blog/*. This is the
+                     SSR/OG exception ADR-2608080100 states in its own text: pages that
+                     need crawlable markup are not bound by the app rule, and binding an
+                     app and a marketing surface with one rule is the mistake the ADR
+                     warns against."
+               :clears-when "cloud-murakumo stops being a crawlable marketing surface,
+                             or its app half is split into its own repository."}
+              "multi-document:orgs/network-awai/cloud-itonami"
+              {:since "2026-08-26"
+               :why "18 documents: public/index.html plus industries, marketplace,
+                     kaisya and their /ja locale twins. Same SSR/OG exception -- these
+                     are indexed pages, and the locale split is a crawler-facing
+                     decision, not a routing one."
+               :clears-when "the itonami site stops needing crawlable per-locale
+                             markup, or its app surfaces move out of the site repo."}}}]}

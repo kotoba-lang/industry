@@ -214,6 +214,17 @@ tick が 2 件と出したが対象 appview には 1 件で、もう 1 件は**�
    **誰も静的ファイルを返さなくなる**。
 5. **`wrangler deploy` も `wrangler dev` も実行しない。** commit には
    **UNVERIFIED** と書く。deploy の検証は別の仕事。
+6. **`cljs/public` に置く document は 1 枚だけ**（＋ 静的ホストなら `404.html`）。
+   SvelteKit は route ごとに document を出すので、**その形のまま cljs へ移すと
+   移行が終わった瞬間に single-page 規則を破った app ができる**。画面の移動は
+   state の変更であって location の変更ではない（ADR-2608080100）。
+   view は表（data）で持ち、nav をそこから生成し、addressability は fragment
+   で与える。着地後の確認 —— exit 0 でなければ波は着地していない:
+
+   ```bash
+   nbb scripts/verify-single-page-app.cljs --root . --findings
+   ```
+
 
 ⚠ **なぜ 1 通りに固定するか。** 第 6 波で 3 agent が同じ状況に別々に答えた ——
 `app-docs` は `main` を `src/app.ts` に付け替え（その worker は実際に
