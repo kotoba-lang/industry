@@ -1,0 +1,725 @@
+{
+  "format": "kotoba.runtime-comparison/v1",
+  "benchmark": "unrolled-modular-mix-v1",
+  "contract": {
+    "n": 200,
+    "calls": 100000,
+    "warmupCalls": 10000,
+    "runs": 5,
+    "expectedResult": 1830338420,
+    "arithmetic": "8 identical quotient/remainder mix rounds stay within exact i64 and JavaScript safe integers",
+    "timing": "in-process steady state after explicit warmup; process wall and RSS are separate",
+    "wasmFuel": "Wasm warmup and measurement are split into fresh admitted instances of at most 400 calls; only call intervals are accumulated",
+    "nativeBoundary": "benchmark-only direct W^X invocation; no production supervisor or sandbox claim",
+    "optimization": "each compiler/JIT may optimize the same observable algorithm"
+  },
+  "environment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "cpu": "Apple M4",
+    "logicalCpus": 10,
+    "totalMemoryBytes": 34359738368,
+    "node": "v26.7.0",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "clojure": "{:version \"1.12.5.1654\"\n :config-files [\"/opt/homebrew/Cellar/clojure/1.12.5.1654/deps.edn\" \"/Users/junkawasaki/.clojure/deps.edn\" \"deps.edn\" ]\n :config-user \"/Users/junkawasaki/.clojure/deps.edn\"\n :config-project \"deps.edn\"\n :install-dir \"/opt/homebrew/Cellar/clojure/1.12.5.1654\"\n :config-dir \"/Users/junkawasaki/.clojure\"\n :cache-dir \".cpcache\"\n :force false\n :repro false\n :main-aliases \"\"\n :repl-aliases \"\"}",
+    "go": "go version go1.25.6 darwin/arm64",
+    "mojo": "Mojo 1.0.0 (ed45d567)",
+    "python": "Python 3.14.5",
+    "typescript": "Version 5.9.2",
+    "deno": "deno 2.4.5 (stable, release, aarch64-apple-darwin)\nv8 13.7.152.14-rusty\ntypescript 5.8.3",
+    "compilerCommit": "6889fa736750348863d2b98d69e688131a2ca515",
+    "compilerDirty": false
+  },
+  "buildMilliseconds": {
+    "amuWasm": 2044.485917,
+    "amuNative": 3464.501458,
+    "amuNativeExtract": 2869.493458,
+    "nativeBenchmarkRunner": 801.401375,
+    "rust": 8409.824042,
+    "clojurescript": 17310.248583,
+    "go": 6292.195542,
+    "mojo": 1673.195458,
+    "typescript": 1138.817667
+  },
+  "artifacts": {
+    "rust": {
+      "bytes": 358944
+    },
+    "clojureSource": {
+      "bytes": 1706
+    },
+    "clojurescript": {
+      "bytes": 98786
+    },
+    "amuWasm32": {
+      "bytes": 954
+    },
+    "amuNativeKexe": {
+      "bytes": 5864
+    },
+    "amuNativeCode": {
+      "bytes": 736
+    },
+    "amuNativeProvenance": {
+      "bytes": 953
+    },
+    "go": {
+      "bytes": 2421970
+    },
+    "mojo": {
+      "bytes": 65656
+    },
+    "typescript": {
+      "bytes": 1943
+    },
+    "pythonSource": {
+      "bytes": 1554
+    },
+    "typescriptSource": {
+      "bytes": 1955
+    }
+  },
+  "skippedEngines": {},
+  "engines": {
+    "rust": {
+      "runs": 5,
+      "steadyStateNanosecondsPerKernel": {
+        "minimum": 17.11084,
+        "median": 22.64209,
+        "p95": 28.78583,
+        "maximum": 28.78583
+      },
+      "processWallMilliseconds": {
+        "minimum": 9.730458,
+        "median": 13.356917,
+        "p95": 16.540667,
+        "maximum": 16.540667
+      },
+      "maxRssBytes": {
+        "minimum": 1507328,
+        "median": 1507328,
+        "p95": 1507328,
+        "maximum": 1507328
+      },
+      "samples": [
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 1711084,
+          "nanosecondsPerKernel": 17.11084,
+          "processWallMilliseconds": 16.540667,
+          "maxRssBytes": 1507328
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 2336334,
+          "nanosecondsPerKernel": 23.36334,
+          "processWallMilliseconds": 13.356917,
+          "maxRssBytes": 1507328
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 2878583,
+          "nanosecondsPerKernel": 28.78583,
+          "processWallMilliseconds": 14.206583,
+          "maxRssBytes": 1507328
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 2264209,
+          "nanosecondsPerKernel": 22.64209,
+          "processWallMilliseconds": 11.4595,
+          "maxRssBytes": 1507328
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 2001417,
+          "nanosecondsPerKernel": 20.01417,
+          "processWallMilliseconds": 9.730458,
+          "maxRssBytes": 1507328
+        }
+      ],
+      "slowdownVsRust": 1
+    },
+    "clojure": {
+      "runs": 5,
+      "steadyStateNanosecondsPerKernel": {
+        "minimum": 56.415,
+        "median": 76.03,
+        "p95": 111.34834,
+        "maximum": 111.34834
+      },
+      "processWallMilliseconds": {
+        "minimum": 1181.281792,
+        "median": 1346.583416,
+        "p95": 2987.871625,
+        "maximum": 2987.871625
+      },
+      "maxRssBytes": {
+        "minimum": 112902144,
+        "median": 127729664,
+        "p95": 130711552,
+        "maximum": 130711552
+      },
+      "samples": [
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 7341083,
+          "nanosecondsPerKernel": 73.41083,
+          "processWallMilliseconds": 2987.871625,
+          "maxRssBytes": 130711552
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 10159750,
+          "nanosecondsPerKernel": 101.5975,
+          "processWallMilliseconds": 1807.32875,
+          "maxRssBytes": 112902144
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 11134834,
+          "nanosecondsPerKernel": 111.34834,
+          "processWallMilliseconds": 1346.583416,
+          "maxRssBytes": 127729664
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 7603000,
+          "nanosecondsPerKernel": 76.03,
+          "processWallMilliseconds": 1181.281792,
+          "maxRssBytes": 128876544
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 5641500,
+          "nanosecondsPerKernel": 56.415,
+          "processWallMilliseconds": 1183.413166,
+          "maxRssBytes": 127467520
+        }
+      ],
+      "slowdownVsRust": 3.357905564371487
+    },
+    "clojurescript": {
+      "runs": 5,
+      "steadyStateNanosecondsPerKernel": {
+        "minimum": 423.68208,
+        "median": 461.74958,
+        "p95": 543.50875,
+        "maximum": 543.50875
+      },
+      "processWallMilliseconds": {
+        "minimum": 113.990291,
+        "median": 141.189792,
+        "p95": 194.010125,
+        "maximum": 194.010125
+      },
+      "maxRssBytes": {
+        "minimum": 54083584,
+        "median": 54263808,
+        "p95": 54575104,
+        "maximum": 54575104
+      },
+      "samples": [
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 42368208,
+          "nanosecondsPerKernel": 423.68208,
+          "processWallMilliseconds": 194.010125,
+          "maxRssBytes": 54575104
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 49185084,
+          "nanosecondsPerKernel": 491.85084,
+          "processWallMilliseconds": 144.995292,
+          "maxRssBytes": 54083584
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 54350875,
+          "nanosecondsPerKernel": 543.50875,
+          "processWallMilliseconds": 141.189792,
+          "maxRssBytes": 54181888
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 46174958,
+          "nanosecondsPerKernel": 461.74958,
+          "processWallMilliseconds": 113.990291,
+          "maxRssBytes": 54263808
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 45159000,
+          "nanosecondsPerKernel": 451.59,
+          "processWallMilliseconds": 116.990791,
+          "maxRssBytes": 54296576
+        }
+      ],
+      "slowdownVsRust": 20.39341686213596
+    },
+    "amu-wasm32": {
+      "runs": 5,
+      "steadyStateNanosecondsPerKernel": {
+        "minimum": 106.63954,
+        "median": 118.89913,
+        "p95": 151.40862,
+        "maximum": 151.40862
+      },
+      "processWallMilliseconds": {
+        "minimum": 92.412333,
+        "median": 111.765375,
+        "p95": 148.051333,
+        "maximum": 148.051333
+      },
+      "maxRssBytes": {
+        "minimum": 59097088,
+        "median": 59342848,
+        "p95": 59392000,
+        "maximum": 59392000
+      },
+      "samples": [
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 11889913,
+          "nanosecondsPerKernel": 118.89913,
+          "processWallMilliseconds": 111.765375,
+          "maxRssBytes": 59375616
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 14273080,
+          "nanosecondsPerKernel": 142.7308,
+          "processWallMilliseconds": 117.613375,
+          "maxRssBytes": 59195392
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 15140862,
+          "nanosecondsPerKernel": 151.40862,
+          "processWallMilliseconds": 148.051333,
+          "maxRssBytes": 59097088
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 11829620,
+          "nanosecondsPerKernel": 118.2962,
+          "processWallMilliseconds": 102.832417,
+          "maxRssBytes": 59342848
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 10663954,
+          "nanosecondsPerKernel": 106.63954,
+          "processWallMilliseconds": 92.412333,
+          "maxRssBytes": 59392000
+        }
+      ],
+      "slowdownVsRust": 5.25124359102892
+    },
+    "amu-native": {
+      "runs": 5,
+      "steadyStateNanosecondsPerKernel": {
+        "minimum": 15.08,
+        "median": 23.62,
+        "p95": 23.65,
+        "maximum": 23.65
+      },
+      "processWallMilliseconds": {
+        "minimum": 7.456333,
+        "median": 11.722333,
+        "p95": 17.929958,
+        "maximum": 17.929958
+      },
+      "maxRssBytes": {
+        "minimum": 1359872,
+        "median": 1359872,
+        "p95": 1359872,
+        "maximum": 1359872
+      },
+      "samples": [
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 2363000,
+          "nanosecondsPerKernel": 23.63,
+          "processWallMilliseconds": 11.722333,
+          "maxRssBytes": 1359872
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 2295000,
+          "nanosecondsPerKernel": 22.95,
+          "processWallMilliseconds": 17.929958,
+          "maxRssBytes": 1359872
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 2362000,
+          "nanosecondsPerKernel": 23.62,
+          "processWallMilliseconds": 13.041792,
+          "maxRssBytes": 1359872
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 2365000,
+          "nanosecondsPerKernel": 23.65,
+          "processWallMilliseconds": 11.497916,
+          "maxRssBytes": 1359872
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 1508000,
+          "nanosecondsPerKernel": 15.08,
+          "processWallMilliseconds": 7.456333,
+          "maxRssBytes": 1359872
+        }
+      ],
+      "slowdownVsRust": 1.043189917538531
+    },
+    "go": {
+      "runs": 5,
+      "steadyStateNanosecondsPerKernel": {
+        "minimum": 16.38583,
+        "median": 31.66875,
+        "p95": 33.30083,
+        "maximum": 33.30083
+      },
+      "processWallMilliseconds": {
+        "minimum": 9.734625,
+        "median": 15.0445,
+        "p95": 21.07275,
+        "maximum": 21.07275
+      },
+      "maxRssBytes": {
+        "minimum": 3964928,
+        "median": 4096000,
+        "p95": 4161536,
+        "maximum": 4161536
+      },
+      "samples": [
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 3310083,
+          "nanosecondsPerKernel": 33.10083,
+          "processWallMilliseconds": 14.587208,
+          "maxRssBytes": 4161536
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 2782459,
+          "nanosecondsPerKernel": 27.82459,
+          "processWallMilliseconds": 21.07275,
+          "maxRssBytes": 4096000
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 3166875,
+          "nanosecondsPerKernel": 31.66875,
+          "processWallMilliseconds": 15.0445,
+          "maxRssBytes": 4128768
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 3330083,
+          "nanosecondsPerKernel": 33.30083,
+          "processWallMilliseconds": 15.673917,
+          "maxRssBytes": 4079616
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 1638583,
+          "nanosecondsPerKernel": 16.38583,
+          "processWallMilliseconds": 9.734625,
+          "maxRssBytes": 3964928
+        }
+      ],
+      "slowdownVsRust": 1.39866726084032
+    },
+    "mojo": {
+      "runs": 5,
+      "steadyStateNanosecondsPerKernel": {
+        "minimum": 33.85,
+        "median": 43.42,
+        "p95": 51.69,
+        "maximum": 51.69
+      },
+      "processWallMilliseconds": {
+        "minimum": 21.34875,
+        "median": 26.907375,
+        "p95": 30.479583,
+        "maximum": 30.479583
+      },
+      "maxRssBytes": {
+        "minimum": 11616256,
+        "median": 11632640,
+        "p95": 11665408,
+        "maximum": 11665408
+      },
+      "samples": [
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 3385000,
+          "nanosecondsPerKernel": 33.85,
+          "processWallMilliseconds": 28.466792,
+          "maxRssBytes": 11665408
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 5169000,
+          "nanosecondsPerKernel": 51.69,
+          "processWallMilliseconds": 30.479583,
+          "maxRssBytes": 11616256
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 4342000,
+          "nanosecondsPerKernel": 43.42,
+          "processWallMilliseconds": 26.907375,
+          "maxRssBytes": 11616256
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 4359000,
+          "nanosecondsPerKernel": 43.59,
+          "processWallMilliseconds": 22.80525,
+          "maxRssBytes": 11632640
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 4235000,
+          "nanosecondsPerKernel": 42.35,
+          "processWallMilliseconds": 21.34875,
+          "maxRssBytes": 11665408
+        }
+      ],
+      "slowdownVsRust": 1.917667494475996
+    },
+    "python": {
+      "runs": 5,
+      "steadyStateNanosecondsPerKernel": {
+        "minimum": 1930.54916,
+        "median": 1957.22166,
+        "p95": 3042.28709,
+        "maximum": 3042.28709
+      },
+      "processWallMilliseconds": {
+        "minimum": 254.228417,
+        "median": 290.209042,
+        "p95": 424.635125,
+        "maximum": 424.635125
+      },
+      "maxRssBytes": {
+        "minimum": 15351808,
+        "median": 15433728,
+        "p95": 15482880,
+        "maximum": 15482880
+      },
+      "samples": [
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 195511334,
+          "nanosecondsPerKernel": 1955.11334,
+          "processWallMilliseconds": 314.615875,
+          "maxRssBytes": 15482880
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 304228709,
+          "nanosecondsPerKernel": 3042.28709,
+          "processWallMilliseconds": 424.635125,
+          "maxRssBytes": 15351808
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 209034833,
+          "nanosecondsPerKernel": 2090.34833,
+          "processWallMilliseconds": 290.209042,
+          "maxRssBytes": 15433728
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 193054916,
+          "nanosecondsPerKernel": 1930.54916,
+          "processWallMilliseconds": 254.228417,
+          "maxRssBytes": 15482880
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 195722166,
+          "nanosecondsPerKernel": 1957.22166,
+          "processWallMilliseconds": 260.910834,
+          "maxRssBytes": 15433728
+        }
+      ],
+      "slowdownVsRust": 86.44174013971325
+    },
+    "typescript-node": {
+      "runs": 5,
+      "steadyStateNanosecondsPerKernel": {
+        "minimum": 81.8425,
+        "median": 106.56208,
+        "p95": 184.19541,
+        "maximum": 184.19541
+      },
+      "processWallMilliseconds": {
+        "minimum": 79.009833,
+        "median": 86.504292,
+        "p95": 108.324875,
+        "maximum": 108.324875
+      },
+      "maxRssBytes": {
+        "minimum": 52559872,
+        "median": 52805632,
+        "p95": 52920320,
+        "maximum": 52920320
+      },
+      "samples": [
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 10656208,
+          "nanosecondsPerKernel": 106.56208,
+          "processWallMilliseconds": 86.504292,
+          "maxRssBytes": 52641792
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 18419541,
+          "nanosecondsPerKernel": 184.19541,
+          "processWallMilliseconds": 108.324875,
+          "maxRssBytes": 52559872
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 10767708,
+          "nanosecondsPerKernel": 107.67708,
+          "processWallMilliseconds": 95.67325,
+          "maxRssBytes": 52805632
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 8184250,
+          "nanosecondsPerKernel": 81.8425,
+          "processWallMilliseconds": 79.242667,
+          "maxRssBytes": 52920320
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 8794917,
+          "nanosecondsPerKernel": 87.94917,
+          "processWallMilliseconds": 79.009833,
+          "maxRssBytes": 52871168
+        }
+      ],
+      "slowdownVsRust": 4.706371187465468
+    },
+    "typescript-deno": {
+      "runs": 5,
+      "steadyStateNanosecondsPerKernel": {
+        "minimum": 46.11083,
+        "median": 69.7025,
+        "p95": 215.26958,
+        "maximum": 215.26958
+      },
+      "processWallMilliseconds": {
+        "minimum": 52.5905,
+        "median": 70.69825,
+        "p95": 285.009459,
+        "maximum": 285.009459
+      },
+      "maxRssBytes": {
+        "minimum": 58638336,
+        "median": 58736640,
+        "p95": 61243392,
+        "maximum": 61243392
+      },
+      "samples": [
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 21526958,
+          "nanosecondsPerKernel": 215.26958,
+          "processWallMilliseconds": 285.009459,
+          "maxRssBytes": 61243392
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 7483583,
+          "nanosecondsPerKernel": 74.83583,
+          "processWallMilliseconds": 76.5015,
+          "maxRssBytes": 58638336
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 6970250,
+          "nanosecondsPerKernel": 69.7025,
+          "processWallMilliseconds": 70.69825,
+          "maxRssBytes": 58736640
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 5182917,
+          "nanosecondsPerKernel": 51.82917,
+          "processWallMilliseconds": 54.039792,
+          "maxRssBytes": 58998784
+        },
+        {
+          "calls": 100000,
+          "warmupCalls": 10000,
+          "elapsedNanoseconds": 4611083,
+          "nanosecondsPerKernel": 46.11083,
+          "processWallMilliseconds": 52.5905,
+          "maxRssBytes": 58638336
+        }
+      ],
+      "slowdownVsRust": 3.0784481467921028
+    }
+  }
+}
