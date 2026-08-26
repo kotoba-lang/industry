@@ -115,6 +115,9 @@
    {:id :bad-recursive-absent
     :expect-kinds #{:recursive-values-still-absent}
     :text "再帰的な値型は「まだ」無い。今日は hiccup のような任意深度の入れ子を書けない。"}
+   {:id :bad-recursive-absent-plain
+    :expect-kinds #{:recursive-values-still-absent}
+    :text "ただし再帰的な値型は無い（本質的な制約）。"}
    {:id :good-recursive-landed
     :expect-kinds #{}
     :text "この節は 2026-08-08 に書き換えた。旧文は「今日は hiccup のような任意深度の入れ子を Kotoba の値として表現できない」と書いていたが、W4 は landed している。"}])
