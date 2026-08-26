@@ -127,6 +127,18 @@ wrangler の `main` が指していた SvelteKit build の実体がこれだっ�
    未決の product 判断であって、移行の agent が決めることではない。
 4. `+page.server.ts` / `hooks.server.ts` / `svelte/src/routes/**/*.ts` のうち
    `+page.svelte` でないものも同じ扱い。**`.svelte` でなければ frontend とは限らない。**
+5. **ヘッダの 1 行目を必ずこの文字列にする** —— 置き場所は agent ごとに割れてよいが、
+   **後から全部を見つけられること**だけは揃える:
+
+   ```
+   // SVELTEKIT-BACKEND-PRESERVED: moved out of svelte/ during the cljs migration; not wired.
+   ```
+
+   実測 2026-08-26、6 件が 4 通りの場所に置かれた（`src/xrpc-proxy.ts` /
+   `src/xrpc-dispatcher.ts` / `src/xrpc-mcp-router-proxy.ts` /
+   `backend-frozen/routes/xrpc/[...path]/+server.ts`）。どれも妥当な判断で、
+   最後のは元の route 構造を保つので復活させやすい。**場所を 1 つに強制するより、
+   `grep -r SVELTEKIT-BACKEND-PRESERVED orgs/` で全件挙がる方が価値がある。**
 
 既に移行を終えた 26 repo は全部確認済みで、**pre-migration tree に `+server.ts` を
 持っていたものは 0 件**（失ったものは無い）。危険は**これから**の、より大きい
