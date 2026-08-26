@@ -123,20 +123,68 @@ canvas を透明として返し、`toDataURL` は `preserveDrawingBuffer` 無し
   payload sha256 の完全一致（偽陰性なし）と、feed ごとの observed-at
   watermark（偽陰性あり、明記）
 
+## 建物ベクタ（2026-08-26 追記、第 2 波）
+
+初回は「キー不要の全球 MVT 供給元が無い」として建物押し出しを見送り、
+**オーナーが選んだ「画像 + ベクタ重ね（建物押し出し）」より狭く納品した**と
+明記した。その後 **OpenFreeMap**（キー不要・OSM 由来・ODbL 1.0）が
+`building` レイヤを `render_height` 付きで z14 に配信していることを実測し、
+埋めた。
+
+- **MVT の decode は ingest で 1 回だけ。** 730 KB の tile / 16 レイヤのうち
+  欲しいのは 3 つで、ブラウザに配ると全閲覧者が同じ答えに辿り着くために
+  払い続ける。R2 に載るのは平坦な座標配列（実測: 730 KB → 約 34 KB）
+- **範囲は 4 都市に限定し、manifest に tile block を書く。** z14 の建物は
+  全球 2.68 億 tile。renderer は manifest の範囲内しか要求せず、fly-to
+  ボタンも同じ manifest から**生成する** —— 取り込んだのに行に無い都市は
+  見えず、行にあるのに取り込んでいない都市は空の場所へ飛ばす
+- **地面も同じ tile から**（water / landcover / park）。z5 のラスタは
+  3 km 上空で 5 km/px なので、これが無いと都市が黒地に浮く
+- `kotoba-lang/geo` に **`globe-polygon-to-extrude-earcut`** を追加した ——
+  flat の extrude と globe の fill は在ったが globe の extrude だけが空で、
+  無ければ呼ぶ側が球面座標を library の外で再導出することになる
+
+### この波で見つかった、静かに機能を殺していた 2 つ
+
+1. **カメラの下限 1.05（318 km 上空）に対し、建物の要求閾値は 1.01。**
+   下限が閾値の完全に上にあり、**建物レイヤはどの端末でも永久に読み込まれ
+   得なかった**。地球儀は描画され、drag も zoom も動き、何も壊れて見えない。
+   2 つの namespace の 2 つの定数で、どちらも単体では妥当。
+   いまは `scene-test` が両者を突き合わせる
+2. **culling に地平線が入っていなかった。** tile 中心を固定閾値と比べる形は
+   「カメラが無限遠にあり地平線が 90 度」を仮定している。2.5 km 上空の
+   地平線は **1.6 度**で、可視 1 枚に対し **624 tile**（624 texture・624 mesh）
+   を常駐させていた。`acos(1/d)` を足して **7** になった。
+   その修正が z0 を再度壊した（tile 半径を π/2 で cap していたが、z0 tile の
+   角は中心から本当に π 離れている）—— 両方向とも test で固定した
+
+**誇張倍率 25 倍も測って捨てた。** 「40 m は地球半径の 6.3e-6 だから見えない」
+という理屈は、建物が**どこから見られるか**を無視していた。閾値以下でしか
+読まれず fly-to は 2.5 km 上空に着地するので、実寸で十分見える。25 倍では
+幅 20 m・高さ 1 km の針になり、Manhattan がカメラを越えて放射する白い筋の
+扇として描かれた —— これはバグに見えず、都市についての様式的判断に見える。
+
 ## 今やっていないこと
 
 - `tenkyu_fire` / `tenkyu_vessel` は UNMEASURED。FIRMS は無料キー、
   AISStream は常駐 collector（**parser は実装・テスト済み**）
 - CCTV は入れていない。上流にはあるが、公開カメラの映像を lake に
   取り込むのは person-identifier 規則の判断が別に要る
-- OSM の建物ベクタは入れていない。キー不要の全球 MVT 供給元が無く、
-  `kotoba.map.mvt` の decoder は在るので供給元を決めれば足りる
+- 建物は **4 都市（各 約 12 km 四方）だけ**。z14 の全球は 2.68 億 tile なので
+  全部は入れない。manifest が範囲を持ち、UI もそう書く
+- 建物 tile の decode は layer ごとに PBF を 1 周する（4 layer = 4 周）。
+  ingest 側の話なので描画には効かないが、100 tile で数分かかる
+- 地表 polygon に面積フィルタが無い。Manhattan 中心の 1 tile に `grass` が
+  512 枚あり、1 枚ごとに三角形分割の費用がかかる。**まだ測っていないので
+  落としていない** —— 見ていない遅さのためにデータを捨てると、地図から
+  公園が消える
 - custom domain は `wrangler.jsonc` で意図的に**主張していない**。
   live は `app-tenkyu.04-feasts-minded.workers.dev`
 
 ## 結果
 
 - deploy 済み・稼働中: https://app-tenkyu.04-feasts-minded.workers.dev
-- `npm test` 41 tests / 2,977 assertions（browser も GPU も不要）
-- browser 23 検査すべて green、WebGPU / WebGL2 の両方で
-- 上流 3 repo の pin 前進済み"}]
+- `npm test` 56 tests / 3,085 assertions（browser も GPU も不要）
+- browser 検査は WebGPU / WebGL2 の両方で green
+- 建物 19,016 件（100 tile、4 都市、失敗 0）
+- 上流 4 repo（geo ×2 / org-apache-avro / json）の pin 前進済み"}]
