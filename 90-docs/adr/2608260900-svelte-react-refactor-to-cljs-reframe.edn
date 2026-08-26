@@ -151,6 +151,61 @@ custom element 経由で React に bridge しても、design agent が吐くの�
 なお skill 自身が禁じているとおり、component を React で書き直して「同期」に見せかけない
 （*never a reimplementation*）。
 
+## 実際に landed した移行の型（2026-08-26、`gftdcojp/app-swe` で実証）
+
+第 1 波を subagent（Sonnet）に投げて最初に着地したのが `gftdcojp/app-swe`。
+`appview/<name>/svelte/`（Vite + Svelte + TS 一式）を `appview/<name>/cljs/` に
+置き換え、**残存 `.svelte` / `.ts` / `.tsx` / `.jsx` は 0**（GitHub の tree API で
+独立に確認）。build も実測: `shadow-cljs compile app` が 111 ファイル・0 warning、
+`compile test` + `node out/tests.js` が 4 test / 8 assertion / 0 failure。
+
+    appview/<name>/cljs/
+      deps.edn  shadow-cljs.edn  package.json  index.html  .gitignore
+      src/<ns>/app.cljs        ; re-frame reg-event-db/reg-sub + reagent view + main
+      test/<ns>/app_test.cljs  ; cljs.test
+
+⚠ **`reagent` / `re-frame` を `deps.edn` の top-level `:deps` に書かない。**
+このワークスペースの PreToolUse hook `jvm-new-surface-guard`（ADR-2608201300、
+「新しい top-level JVM runtime 依存を増やさない」）が**書き込みを拒否する**。
+`thheller/shadow-cljs` と同じく **`:cljs` alias の `:extra-deps`** に置く ——
+`shadow-cljs.edn` の `:deps {:aliases [:cljs :test]}` が build classpath に
+merge するので、出力は変わらない。
+
+    {:paths [\"src\"]
+     :deps {org.clojure/clojure {:mvn/version \"1.12.0\"}
+            org.clojure/clojurescript {:mvn/version \"1.11.132\"}
+            io.github.kotoba-lang/jp-go-digital-design-system
+            {:git/url \"https://github.com/kotoba-lang/jp-go-digital-design-system.git\"
+             :git/sha \"dc4602dc17bce8f6e9ba038e92b3e95fcc411b49\"}}
+     :aliases {:cljs {:extra-deps {thheller/shadow-cljs {:mvn/version \"2.28.20\"}
+                                   reagent/reagent {:mvn/version \"1.2.0\"}
+                                   re-frame/re-frame {:mvn/version \"1.4.3\"}}}
+               :test {:extra-paths [\"test\"]}}}
+
+他に実測で効いたもの: `:asset-path` は**相対**（これらのページは path prefix の
+下に出る）/ `:node-test` build に `:autorun true` / DADS の CSS は
+`jp_go_dds.page/->page` と同じ組み方で `index.html` に inline。
+
+**委譲の運用で分かったこと（並列度は lock で決まる）**: 6 agent を並列に出したが、
+`resource-guard` の build lock は**二本目を待たせず exit 2 で拒否する**ので、
+6 本が 1 本の lock を順番待ちすることになり、agent は retry loop に入って長く idle する。
+**並列度を上げても、同時に build できるのは 1 本。** 次の波は並列度を lock に
+合わせる（3〜4 本）か、build を持たない作業と混ぜる。
+
+⚠ **そしてここで私（coordinator）が測定を誤った。** idle している agent を見て
+`resource-guard.mjs status` を**1 回**引き、`build.active` が false なのを見て
+「lock は空いている、guard を迂回して foreground で回せ」と 2 agent に指示した。
+**それは間違いだった。** minpaku の agent が従わずに live で測り直し、
+`active:true, pid 98631`（`mig-app-tenki` が保持）と、`ps aux` に 6 セッションが
+同じ移行を回している証拠を出してきた。私のサンプルは**保持者の切れ目**に当たった
+だけだった。
+
+**競合している lock を 1 回サンプルした結果は、競合が無いことと区別できない。**
+ADR-2608136000 の「測れなかった検査が、測って問題が無かった検査と同じ値を返す」の
+そのままの形で、しかも今回は**検査ではなく指示**として下流に流れた。
+指示に従わず反証を出した agent の判断が正しく、指示を出した私が誤っていた。
+委譲先に「こうしろ」と渡す前に、その根拠が 1 サンプルでないことを確かめる。
+
 ## 決めていないこと（正直に）
 
 - **移行の順序も期限も決めていない。** 1,379 ファイルは 1 セッションで動かせる量ではない。
@@ -161,10 +216,35 @@ custom element 経由で React に bridge しても、design agent が吐くの�
 - Next.js に載っている appview（`hrse` 等）は routing / SSR / Clerk 認証まで含むので、
   view の載せ替えだけでは終わらない。個別に見積もる。
 
-## 検査
+## 検査（2026-08-26 に landed）
 
-まだ検査器を書いていない。書くなら「`.svelte` / `.tsx` / `.jsx` の総数が単調減少する」
-という ratchet 型が素直だが、CLAUDE.md の 6 問（2608136000）を通すこと ——
-とくに **入力が無いとき・実行できないときに pass を返さないこと**と、
-**`.claude/worktrees/` と `node_modules` を除外し忘れたときに静かに数が変わること**。
-除外を間違えた検査は、移行が進んだように見せる。"}]
+`scripts/verify-frontend-stack-retirement.cljs` + baseline
+`manifest/frontend-stack-baseline.edn`。detector registry の
+`:verify-frontend-stack-retirement` として 6 時間ごとに走る（fleet gate には
+できない —— gate は対象 repo の tree しか配らないのに、この測定は west 管理の
+`orgs/` 全体が対象）。
+
+**finding にするのは baseline から増えた repo だけ。** 既存の 1,375 件を毎回
+finding にすると、本当に見るべき 1 件がその中に埋まる。規則が縛るのは
+「新しく書かないこと」なので、検査もそこを見る。合計は evidence 行に出るので
+減っていることは毎回読める。
+
+exit は三値: **0** 増えていない / **1** 増えた repo がある / **2** 答えられなかった
+（baseline 不在・`find` 失敗・走査 0 件）。0 と 2 が別なのが要点で、
+**測れなかった実行が「異常なし」と同じ値を返してはならない**（ADR-2608136000）。
+
+**両方向を見てから landed とした**（CLAUDE.md「落ちない gate は劇場」）:
+baseline 無しで exit 2、baseline を書いて exit 0、`orgs/kotoba-lang/app-docs` に
+`.svelte` を 1 本置いて **exit 1 かつ finding がその repo を 2→3 と名指し**、
+取り除いて再び clean。**壊した対象と報告された対象が一致すること**まで確認した。
+
+実測で分かった 3 つの罠を検査自身が持っている:
+
+1. **`.claude/worktrees/` を prune しないと二重に数える**（React が 754 に見えた）。
+2. **Next.js を `next` 依存で数えると取りこぼす** —— `gftdcojp/hrse` は
+   `next.config.mjs` と `src/app` router を持つのに `next` を宣言していない。
+   だから**設定ファイル**で判定する。
+3. **除外は宣言する。** vendored な第三者サイト（`contracts/lib/` 配下）と
+   `m365-archive`（OneDrive 履歴の DataLad dataset）は移行対象ではないが、
+   黙って除くと移行が進んだように見える。実測: `next.config.*` は除外前 15 件・
+   除外後 **7 件**（live な Next.js app は 7 本）。"}]
