@@ -24,10 +24,15 @@
     (println msg))
   (js/process.exit code))
 
+(defn normalize-loadavg [raw]
+  (-> (str/trim (or raw ""))
+      (str/replace #"^[{\s]+" "")
+      (str/replace #"[}\s]+$" "")))
+
 (defn output-loadavg []
   (let [r (cp/spawnSync "sysctl" #js ["-n" "vm.loadavg"] #js {:encoding "utf8"})]
     (if (zero? (or (.-status r) 1))
-      (str/trim (or (.-stdout r) ""))
+      (normalize-loadavg (or (.-stdout r) ""))
       (let [r2 (cp/spawnSync "uptime" #js [] #js {:encoding "utf8"})]
         (when (zero? (or (.-status r2) 1))
           (str/trim (or (.-stdout r2) "")))))))

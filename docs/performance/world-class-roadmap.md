@@ -23,7 +23,7 @@
 | A | Native codegen (integer) | amu | LLVM/Rust | **1.06× Rust** (judah quiet) | wide kernel + calls + strings |
 | B | Wasm codegen + run | amu + kototama | Wasmtime / V8 | 6.78× Rust (quiet) | instance model + engine |
 | C | Compile latency | amu | rustc incremental / tsc | cold **663 ms** / semantic edit **~38 ms** | cold &lt;500 ms; edit &lt;15 ms p95 |
-| D | Sandbox tender | kototama | Wasmtime / workerd | Chicory ~165 µs steady vs Node ~106 ns (contended host) | drop JVM from hot path |
+| D | Sandbox tender | kototama | Wasmtime / workerd | Chicory ~36 µs steady vs Node ~70 ns (judah quiet) | drop JVM from hot path |
 | E | OS primitives | aiueos | Linux / seL4 | UNMEASURED | entire benchmark plane |
 | F | Language + data | kotoba + kotobase | historical Rust kotoba | UNMEASURED | replay CLJC migration targets |
 | G | End-to-end app | product repos | varies | UNMEASURED | define 3 representative apps |
@@ -39,7 +39,7 @@
 - [x] Superproject evidence dir `90-docs/performance/runs/`
 - [x] **Quiet-host official run** on murakumo judah (`2026-08-26-judah-quiet/`)
 - [x] Human-readable summaries in `docs/performance/`
-- [x] **`kotoba.tender-comparison/v1`** — Chicory / Wasmtime / Node WebAssembly on same 3 guests (`runs/2026-08-26-tender/`; quiet-host official pending)
+- [x] **`kotoba.tender-comparison/v1`** — Chicory / Wasmtime / Node WebAssembly on same 3 guests (`runs/2026-08-26-tender/` contended; **`runs/2026-08-26-judah-quiet-tender/` quiet-host official**)
 - [ ] **`kotoba.os-microbench/v1`** — aiueos QEMU: boot-to-marker, syscall ping, ctx-switch (2 tasks)
 - [ ] **`perfgate.core/qualify` on every “we beat X” claim** (already used in amu for LLVM parity)
 - [x] Fleet gate `root-kotoba-stack-performance` — fails if pinned evidence is missing or datoms/json drift; live `--live` regression when amu checkout present

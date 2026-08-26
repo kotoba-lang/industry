@@ -86,29 +86,48 @@
      :loaded (some-> t .-loadedCompiler .-medianMilliseconds)
      :semantic (some-> worker .-semanticEditIncremental .-roundTripMilliseconds)}))
 
+(defn verify-tender-entity! [entity]
+  (let [tender-path (:performance/tender-json entity)
+        tender (read-json tender-path)]
+    (when tender
+      (when-not (= "kotoba.tender-comparison/v1" (.-format tender))
+        (fail! (str "tender.json format drift: " (:performance/id entity))))
+      (let [h (.-headline tender)
+            node (.-nodeWebassemblyNanosecondsPerInvocationMedian h)
+            chicory (.-chicoryJvmSteadyNanosecondsPerInvocationMedian h)
+            slowdown (.-chicorySlowdownVsNodeSteady h)
+            cli (.-chicoryJvmSingleInvocationWallMsMedian h)]
+        (when-not (within? node (:performance/tender-node-ns-median entity) datoms-tolerance)
+          (fail! (str "tender-node-ns datoms/json mismatch: " (:performance/id entity))))
+        (when-not (within? chicory (:performance/tender-chicory-steady-ns-median entity) datoms-tolerance)
+          (fail! (str "tender-chicory-steady-ns datoms/json mismatch: " (:performance/id entity))))
+        (when-not (within? slowdown (:performance/tender-chicory-slowdown-vs-node entity) datoms-tolerance)
+          (fail! (str "tender-chicory-slowdown datoms/json mismatch: " (:performance/id entity))))
+        (when-not (within? cli (:performance/tender-chicory-cli-wall-ms-median entity) datoms-tolerance)
+          (fail! (str "tender-chicory-cli-wall datoms/json mismatch: " (:performance/id entity)))))
+      (when (= official-status (:performance/status entity))
+        (let [run-dir (path/dirname tender-path)
+              host-meta (read-json (path/join run-dir "host-meta.json"))]
+          (when host-meta
+            (when-not (= official-status (.-certification host-meta))
+              (fail! (str "tender host-meta certification is not " official-status
+                          ": " (:performance/id entity))))
+            (let [load1 (first-loadavg (.-loadavg host-meta))]
+              (when-not (and (number? load1) (< load1 4))
+                (fail! (str "tender host-meta loadavg[0] must be < 4 for "
+                            (:performance/id entity) ", got " load1))))))))))
+
 (defn verify-tender! [datoms]
-  (when-let [entity (some #(when (= "kotoba-tender-comparison-2026-08-26" (:performance/id %)) %) datoms)]
-    (let [tender-path (:performance/tender-json entity)
-          tender (read-json tender-path)]
-      (when tender
-        (when-not (= "kotoba.tender-comparison/v1" (.-format tender))
-          (fail! "tender.json format drift"))
-        (let [h (.-headline tender)
-              node (.-nodeWebassemblyNanosecondsPerInvocationMedian h)
-              chicory (.-chicoryJvmSteadyNanosecondsPerInvocationMedian h)
-              slowdown (.-chicorySlowdownVsNodeSteady h)
-              cli (.-chicoryJvmSingleInvocationWallMsMedian h)]
-          (when-not (within? node (:performance/tender-node-ns-median entity) datoms-tolerance)
-            (fail! (str "tender-node-ns datoms/json mismatch")))
-          (when-not (within? chicory (:performance/tender-chicory-steady-ns-median entity) datoms-tolerance)
-            (fail! (str "tender-chicory-steady-ns datoms/json mismatch")))
-          (when-not (within? slowdown (:performance/tender-chicory-slowdown-vs-node entity) datoms-tolerance)
-            (fail! (str "tender-chicory-slowdown datoms/json mismatch")))
-          (when-not (within? cli (:performance/tender-chicory-cli-wall-ms-median entity) datoms-tolerance)
-            (fail! (str "tender-chicory-cli-wall datoms/json mismatch"))))))))
+  (doseq [id ["kotoba-tender-comparison-2026-08-26"
+              "kotoba-tender-comparison-2026-08-26-judah-quiet"]]
+    (when-let [entity (some #(when (= id (:performance/id %)) %) datoms)]
+      (verify-tender-entity! entity))))
 
 (defn official-entity [datoms]
-  (some #(when (= official-status (:performance/status %)) %) datoms))
+  (some #(when (and (= official-status (:performance/status %))
+                    (= "measured-comparison" (:performance/kind %)))
+           %)
+        datoms))
 
 (defn verify-integrity! [entity]
   (if-not entity
@@ -229,7 +248,9 @@
   (doseq [p ["90-docs/performance/performance.datoms.edn"
              (path/join baseline-run-dir "runtime.json")
              (path/join baseline-run-dir "compile.json")
-             (path/join baseline-run-dir "host-meta.json")]]
+             (path/join baseline-run-dir "host-meta.json")
+             "90-docs/performance/runs/2026-08-26-judah-quiet-tender/tender.json"
+             "90-docs/performance/runs/2026-08-26-judah-quiet-tender/host-meta.json"]]
     (when-not (fs/existsSync (path/join root p))
       (die! 90 (str "required input missing: " p))))
   (let [datoms (read-edn-file "90-docs/performance/performance.datoms.edn")

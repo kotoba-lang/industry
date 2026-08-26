@@ -1,0 +1,604 @@
+{
+  "format": "kotoba.tender-comparison/v1",
+  "contract": {
+    "guests": [
+      "kotoba-compiled-fact",
+      "kotoba-compiled-peak-cells",
+      "amu-compiled-i64-main"
+    ],
+    "hosts": [
+      "node-webassembly",
+      "chicory-jvm",
+      "wasmtime-cli"
+    ],
+    "runs": 7,
+    "calls": 400,
+    "warmupCalls": 50,
+    "timing": {
+      "nodeWebassembly": "in-process WebAssembly.instantiate; reused instance; main() loop after warmup (≤500 invocations/instance for amu fuel budget)",
+      "chicoryJvmSingle": "subprocess clojure -M:cli run (includes JVM cold start + Chicory instantiate per sample)",
+      "chicoryJvmSteady": "single JVM; tender/open-session reused; main() loop after warmup",
+      "wasmtimeCli": "subprocess wasmtime run --invoke main per sample"
+    },
+    "safety": "host-free guests only (zero imports); fuel metering active on Chicory path"
+  },
+  "environment": {
+    "architecture": "arm64",
+    "clojure": "{:version \"1.12.5.1654\"\n :config-files [\"/opt/homebrew/Cellar/clojure/1.12.5.1654/deps.edn\" \"/Users/judah/.clojure/deps.edn\" \"deps.edn\" ]\n :config-user \"/Users/judah/.clojure/deps.edn\"\n :config-project \"deps.edn\"\n :install-dir \"/opt/homebrew/Cellar/clojure/1.12.5.1654\"\n :config-dir \"/Users/judah/.clojure\"\n :cache-dir \".cpcache\"\n :force false\n :repro false\n :main-aliases \"\"\n :repl-aliases \"\"}",
+    "wasmtime": "wasmtime 47.0.3 (5554cc1a6 2026-07-31)",
+    "totalMemoryBytes": 17179869184,
+    "kototamaRoot": "/Users/judah/.gitlibs/libs/io.github.kotoba-lang/kototama/40502c3cf4836c385a8399ce3e8d8e389f9a64dd",
+    "node": "v26.4.0",
+    "kototamaCommit": "40502c3cf4836c385a8399ce3e8d8e389f9a64dd",
+    "loadavg": "{ 1.87 2.21 2.54 }",
+    "capturedAt": "2026-08-26T02:23:12.805Z",
+    "logicalCpus": 10,
+    "cpu": "Apple M4",
+    "platform": "darwin"
+  },
+  "skippedHosts": {},
+  "guests": {
+    "kotoba-compiled-fact": {
+      "fixture": "test/kototama/fixtures/kotoba-compiled-fact.wasm",
+      "expectedResult": 120,
+      "importCount": 0,
+      "bytes": 92,
+      "hosts": {
+        "node-webassembly": {
+          "role": "browser-engine-parity (V8/Wasm in Node)",
+          "steadyStateNanosecondsPerInvocation": {
+            "minimum": 41.77,
+            "median": 69.79,
+            "p95": 356.6675,
+            "maximum": 356.6675
+          },
+          "samples": [
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 142667,
+              "result": 120,
+              "nanosecondsPerInvocation": 356.6675
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 44125,
+              "result": 120,
+              "nanosecondsPerInvocation": 110.3125
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 34875,
+              "result": 120,
+              "nanosecondsPerInvocation": 87.1875
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 27625,
+              "result": 120,
+              "nanosecondsPerInvocation": 69.0625
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 27916,
+              "result": 120,
+              "nanosecondsPerInvocation": 69.79
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 16708,
+              "result": 120,
+              "nanosecondsPerInvocation": 41.77
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 16833,
+              "result": 120,
+              "nanosecondsPerInvocation": 42.0825
+            }
+          ]
+        },
+        "chicory-jvm": {
+          "role": "kototama.tender R1 (JVM/Chicory)",
+          "singleInvocationWallMilliseconds": {
+            "minimum": 674.94925,
+            "median": 682.282792,
+            "p95": 1138.9545,
+            "maximum": 1138.9545
+          },
+          "steadyStateNanosecondsPerInvocation": {
+            "minimum": 33373.335,
+            "median": 35828.3325,
+            "p95": 45798.8525,
+            "maximum": 45798.8525
+          },
+          "samples": [
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 14030500,
+              "nanosecondsPerInvocation": 35076.25,
+              "result": 120
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 14331333,
+              "nanosecondsPerInvocation": 35828.3325,
+              "result": 120
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 13349334,
+              "nanosecondsPerInvocation": 33373.335,
+              "result": 120
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 15536292,
+              "nanosecondsPerInvocation": 38840.73,
+              "result": 120
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 13754208,
+              "nanosecondsPerInvocation": 34385.52,
+              "result": 120
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 18319541,
+              "nanosecondsPerInvocation": 45798.8525,
+              "result": 120
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 14672583,
+              "nanosecondsPerInvocation": 36681.4575,
+              "result": 120
+            }
+          ]
+        },
+        "wasmtime-cli": {
+          "role": "external Wasm engine (process-per-invocation)",
+          "singleInvocationWallMilliseconds": {
+            "minimum": 2.405792,
+            "median": 2.598042,
+            "p95": 47.248041,
+            "maximum": 47.248041
+          },
+          "note": "wasmtime run spawns a fresh process each sample; not comparable to in-process steady state",
+          "samples": [
+            {
+              "wallMilliseconds": 47.248041
+            },
+            {
+              "wallMilliseconds": 3.488708
+            },
+            {
+              "wallMilliseconds": 2.812834
+            },
+            {
+              "wallMilliseconds": 2.486083
+            },
+            {
+              "wallMilliseconds": 2.405792
+            },
+            {
+              "wallMilliseconds": 2.406583
+            },
+            {
+              "wallMilliseconds": 2.598042
+            }
+          ]
+        }
+      },
+      "ratios": {
+        "chicorySteadyVsNodeMedian": 513.3734417538328,
+        "chicorySingleVsWasmtimeMedian": 262.61422717569616
+      }
+    },
+    "kotoba-compiled-peak-cells": {
+      "fixture": "test/kototama/fixtures/kotoba-compiled-peak-cells.wasm",
+      "expectedResult": 240,
+      "importCount": 0,
+      "bytes": 330,
+      "hosts": {
+        "node-webassembly": {
+          "role": "browser-engine-parity (V8/Wasm in Node)",
+          "steadyStateNanosecondsPerInvocation": {
+            "minimum": 133.75,
+            "median": 151.3525,
+            "p95": 179.8975,
+            "maximum": 179.8975
+          },
+          "samples": [
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 71959,
+              "result": 240,
+              "nanosecondsPerInvocation": 179.8975
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 54458,
+              "result": 240,
+              "nanosecondsPerInvocation": 136.145
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 55500,
+              "result": 240,
+              "nanosecondsPerInvocation": 138.75
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 53500,
+              "result": 240,
+              "nanosecondsPerInvocation": 133.75
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 63750,
+              "result": 240,
+              "nanosecondsPerInvocation": 159.375
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 69459,
+              "result": 240,
+              "nanosecondsPerInvocation": 173.6475
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 60541,
+              "result": 240,
+              "nanosecondsPerInvocation": 151.3525
+            }
+          ]
+        },
+        "chicory-jvm": {
+          "role": "kototama.tender R1 (JVM/Chicory)",
+          "singleInvocationWallMilliseconds": {
+            "minimum": 678.370042,
+            "median": 683.366375,
+            "p95": 690.13525,
+            "maximum": 690.13525
+          },
+          "steadyStateNanosecondsPerInvocation": {
+            "minimum": 87452.5,
+            "median": 90682.915,
+            "p95": 95327.0825,
+            "maximum": 95327.0825
+          },
+          "samples": [
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 36202708,
+              "nanosecondsPerInvocation": 90506.77,
+              "result": 240
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 36494625,
+              "nanosecondsPerInvocation": 91236.5625,
+              "result": 240
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 34981000,
+              "nanosecondsPerInvocation": 87452.5,
+              "result": 240
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 38130833,
+              "nanosecondsPerInvocation": 95327.0825,
+              "result": 240
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 36273166,
+              "nanosecondsPerInvocation": 90682.915,
+              "result": 240
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 35371500,
+              "nanosecondsPerInvocation": 88428.75,
+              "result": 240
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 37983875,
+              "nanosecondsPerInvocation": 94959.6875,
+              "result": 240
+            }
+          ]
+        },
+        "wasmtime-cli": {
+          "role": "external Wasm engine (process-per-invocation)",
+          "singleInvocationWallMilliseconds": {
+            "minimum": 2.4965,
+            "median": 2.549375,
+            "p95": 5.029375,
+            "maximum": 5.029375
+          },
+          "note": "wasmtime run spawns a fresh process each sample; not comparable to in-process steady state",
+          "samples": [
+            {
+              "wallMilliseconds": 5.029375
+            },
+            {
+              "wallMilliseconds": 2.774875
+            },
+            {
+              "wallMilliseconds": 2.839375
+            },
+            {
+              "wallMilliseconds": 2.549375
+            },
+            {
+              "wallMilliseconds": 2.544125
+            },
+            {
+              "wallMilliseconds": 2.4965
+            },
+            {
+              "wallMilliseconds": 2.518875
+            }
+          ]
+        }
+      },
+      "ratios": {
+        "chicorySteadyVsNodeMedian": 599.1504269833666,
+        "chicorySingleVsWasmtimeMedian": 268.05251287080165
+      }
+    },
+    "amu-compiled-i64-main": {
+      "fixture": "test/kototama/fixtures/amu-compiled-i64-main.wasm",
+      "expectedResult": 42,
+      "importCount": 0,
+      "bytes": 292,
+      "hosts": {
+        "node-webassembly": {
+          "role": "browser-engine-parity (V8/Wasm in Node)",
+          "steadyStateNanosecondsPerInvocation": {
+            "minimum": 32.5,
+            "median": 45.52,
+            "p95": 52.395,
+            "maximum": 52.395
+          },
+          "samples": [
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 16000,
+              "result": 42,
+              "nanosecondsPerInvocation": 40
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 18750,
+              "result": 42,
+              "nanosecondsPerInvocation": 46.875
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 18458,
+              "result": 42,
+              "nanosecondsPerInvocation": 46.145
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 17458,
+              "result": 42,
+              "nanosecondsPerInvocation": 43.645
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 18208,
+              "result": 42,
+              "nanosecondsPerInvocation": 45.52
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 13000,
+              "result": 42,
+              "nanosecondsPerInvocation": 32.5
+            },
+            {
+              "format": "kotoba.tender-sample/v1",
+              "host": "node-webassembly",
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 20958,
+              "result": 42,
+              "nanosecondsPerInvocation": 52.395
+            }
+          ]
+        },
+        "chicory-jvm": {
+          "role": "kototama.tender R1 (JVM/Chicory)",
+          "singleInvocationWallMilliseconds": {
+            "minimum": 681.886542,
+            "median": 683.528583,
+            "p95": 692.29775,
+            "maximum": 692.29775
+          },
+          "steadyStateNanosecondsPerInvocation": {
+            "minimum": 22774.0625,
+            "median": 25413.5425,
+            "p95": 27010.8325,
+            "maximum": 27010.8325
+          },
+          "samples": [
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 10804333,
+              "nanosecondsPerInvocation": 27010.8325,
+              "result": 42
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 10165417,
+              "nanosecondsPerInvocation": 25413.5425,
+              "result": 42
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 10251209,
+              "nanosecondsPerInvocation": 25628.0225,
+              "result": 42
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 9550166,
+              "nanosecondsPerInvocation": 23875.415,
+              "result": 42
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 9109625,
+              "nanosecondsPerInvocation": 22774.0625,
+              "result": 42
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 10761083,
+              "nanosecondsPerInvocation": 26902.7075,
+              "result": 42
+            },
+            {
+              "calls": 400,
+              "warmupCalls": 50,
+              "elapsedNanoseconds": 9594083,
+              "nanosecondsPerInvocation": 23985.2075,
+              "result": 42
+            }
+          ]
+        },
+        "wasmtime-cli": {
+          "role": "external Wasm engine (process-per-invocation)",
+          "singleInvocationWallMilliseconds": {
+            "minimum": 2.323959,
+            "median": 2.525125,
+            "p95": 4.292792,
+            "maximum": 4.292792
+          },
+          "note": "wasmtime run spawns a fresh process each sample; not comparable to in-process steady state",
+          "samples": [
+            {
+              "wallMilliseconds": 4.292792
+            },
+            {
+              "wallMilliseconds": 2.866417
+            },
+            {
+              "wallMilliseconds": 2.757042
+            },
+            {
+              "wallMilliseconds": 2.525125
+            },
+            {
+              "wallMilliseconds": 2.323959
+            },
+            {
+              "wallMilliseconds": 2.47075
+            },
+            {
+              "wallMilliseconds": 2.509458
+            }
+          ]
+        }
+      },
+      "ratios": {
+        "chicorySteadyVsNodeMedian": 558.2939916520211,
+        "chicorySingleVsWasmtimeMedian": 270.69098876293253
+      }
+    }
+  },
+  "headline": {
+    "guest": "kotoba-compiled-fact",
+    "nodeWebassemblyNanosecondsPerInvocationMedian": 69.79,
+    "chicoryJvmSteadyNanosecondsPerInvocationMedian": 35828.3325,
+    "chicorySlowdownVsNodeSteady": 513.3734417538328,
+    "chicoryJvmSingleInvocationWallMsMedian": 682.282792
+  }
+}

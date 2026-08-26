@@ -15,6 +15,8 @@
            "90-docs/performance/runs/2026-08-26-judah-quiet/runtime.json"
            "90-docs/performance/runs/2026-08-26-judah-quiet/compile.json"
            "90-docs/performance/runs/2026-08-26-judah-quiet/host-meta.json"
+           "90-docs/performance/runs/2026-08-26-judah-quiet-tender/tender.json"
+           "90-docs/performance/runs/2026-08-26-judah-quiet-tender/host-meta.json"
            "docs/performance/kotoba-stack-benchmark-2026-08-26.md"
            "90-docs/adr/2608260800-kotoba-stack-performance-world-class.edn"]]
   (when-not (fs/existsSync (path/join root p))
