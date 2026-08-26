@@ -117,6 +117,15 @@
    ["str"
     "(defn f [a :string b :string] :string (str a b)) (defn main [] :i64 (string-byte-length (f \"a\" \"b\")))"
     "(defn f [a :string b :string] :string (string-concat a b)) (defn main [] :i64 (string-byte-length (f \"a\" \"b\")))"]
+   ;; `string=` is declared in :predicates and has no lowering in any
+   ;; position -- test, return, let-bound or literal-vs-literal. The builtin
+   ;; is spelled `string=?`, and `=` on strings is rejected with a message
+   ;; that names it. Found 2026-08-26 writing kotoba/smtp/protocol_response;
+   ;; the control is the spelling that does lower, so this entry reports the
+   ;; name and not the operation.
+   ["string="
+    "(defn f [a :string b :string] :bool (string= a b)) (defn main [] :i64 (if (f \"a\" \"a\") 1 0))"
+    "(defn f [a :string b :string] :bool (string=? a b)) (defn main [] :i64 (if (f \"a\" \"a\") 1 0))"]
    ["subs"
     "(defn f [a :string] :string (subs a 0 1)) (defn main [] :i64 (string-byte-length (f \"ab\")))"
     "(defn f [a :string] :string (string-substring a 0 1)) (defn main [] :i64 (string-byte-length (f \"ab\")))"]

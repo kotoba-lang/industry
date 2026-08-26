@@ -42,20 +42,34 @@ description: clj / cljc から .kotoba へ、kotoba/app の vertical slice を 1
    欠落と撤去条件を書く。wasm / web に対して最初から潰さない。
    `:max-parameters 5` は record / document に畳む理由であって、プログラムを
    述語群へ分解する理由ではない。
-5. **公開 compile は CLI。**
+5. **公開 compile は CLI。起動形は実測 2026-08-26 でこれ**（ADR-2608262000）。
 
 ```
-kotoba compile path/to/app.kotoba --target wasm -o app.wasm
-kotoba compile path/to/app.kotoba --target web  -o app.mjs
+kotoba -M compile /ABS/path/app.kotoba --target wasm32-browser --output app.wasm
+kotoba -M compile /ABS/path/app.kotoba --target js-browser    --output app.mjs
 ```
+
+   4 つとも間違えると別々の顔で落ちる: `-M` が無いと
+   `compiler commands require the -M execution boundary`（exit 2）、
+   target は `wasm` / `web` ではなく `wasm32-browser` / `js-browser`、
+   フラグは `-o` ではなく `--output`、そして **相対パスは
+   `:decode` / `input could not be read`** になる。
+   `orgs/kotoba-lang/amu/bin/kotoba` が動く実体。
 
 6. **parity。** 既存関数と突き合わせる。CLI は binary が無ければ skip し、
    skip と pass を同じ顔にしない。意味を 1 枝だけひっくり返して赤になることを
    見る。reader を壊した赤は数えない。`ex-info` はこの機会に Result へ移す。
+
+   **可用性は `which` で測らない。実行して exit code を読む。** 実測
+   2026-08-26、`~/.local/bin/kotoba` は消えた `/tmp` の実体を exec する
+   2 行の shim で、`which` は通り実行が 126 で落ち、skip されるはずの
+   3 test が **16 assertion の赤**になっていた（org-ietf-smtp）。
+   `(zero? (:exit (shell/sh bin "--help")))` なら両方向が出る。
 7. **着地。** feature branch を push し `gh api .../merges` で main へ。
    west pin は `nbb scripts/west-pin-put.cljs <entry> HEAD`。
 
 先例: amu `examples/todo-app.kotoba`（application）、
-`kotoba-lang/org-ietf-smtp` の `kotoba/smtp/protocol_commands`（コマンド文字列）。
+`kotoba-lang/org-ietf-smtp` の `kotoba/smtp/protocol_commands`（コマンド文字列）と
+`kotoba/smtp/protocol_response`（返信行の構造。走査を待たずに位置パースへ設計変更）。
 fallback: `kotoba-lang/murakumo` の `kotoba/*_core.kotoba`、
 `kotoba-lang/org-ietf-smtp` の `kotoba/smtp/protocol_core.{kotoba,cljk}`。
