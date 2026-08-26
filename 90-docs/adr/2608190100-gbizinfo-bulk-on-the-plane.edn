@@ -151,4 +151,32 @@ push main ok / push git-annex ok
 続けていた。token を Keychain に置いたので**次の日曜から本当に走る** —— 9,142 社 ×
 7 aspect = **63,924 リクエスト**、そして削除された `gbizinfo-joined.datoms.edn`
 （26,116 行）を作り直す。bulk と同じ token を使うので、throttle されれば
-こちらも止まる。**意図的にそう設計されたものなので触っていない。**"}]
+こちらも止まる。**意図的にそう設計されたものなので触っていない。**
+
+
+## 追記（2026-08-26）: トークンがこの workstation に無い —— JP リード収集は止まる
+
+**測った日: 2026-08-26。** ADR 起票時（2026-08-19）に Keychain / kagi へ置いた記録はあるが、
+**junkawasaki の Mac と到達可能な fleet ノード（judah / simeon / issachar）では
+`gbizinfo-api-token` が 0 byte**（`security find-generic-password` → item not found）。
+kagi `GBIZ_TOKEN` も item 不在。env `GBIZINFO_TOKEN` / `GBIZ_TOKEN` も未設定。
+
+agentmail `jk-wise-registry` と Telnyx 主 inbox を読んでも gBizINFO 申請メールは 0 件。
+Cursor / Claude の過去 transcript はトークン値が redact され復元不可。
+
+**同一セッションで完了した別経路（トークン不要）:**
+
+| corpus | 件数 | 場所 |
+|---|---|---|
+| 国税庁 法人番号 全件 | 5,816,535 | `~/.cache/houjin-bangou/houjin-bangou-corpus.edn` |
+| 適格請求書（法人）全件 | 2,577,460 | `~/.cache/invoice-kohyo/invoice-corpus.edn` |
+
+**JP 節税 ICP（murakumo `coverage.md`）は未更新** —— `collect_intent_pool.cljs` /
+`collect_contact_points.cljs` は起動時に exit 3。`/tmp/gbiz-bulk` は空ディレクトリのみ。
+
+### resume（次 agent）
+
+1. オーナーがトークンを Keychain `gbizinfo-api-token` に登録する。
+2. `orgs/kotoba-lang/property` で intent pool → contact points（`--limit 6000 --merge-into`）
+   → lead sheet export。
+3. `network-awai/cloud-murakumo` の `coverage.md` を 2026-08-26 付きで更新して main へ。"}]
