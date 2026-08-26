@@ -37,27 +37,43 @@
  ;; never be read (pinning.kotobase.net answers 401 and always will).
  :ipni.publisher/publisher-origin "https://ipni.kotobase.net"
 
- ;; Where the bytes are. NOT yet advertisable -- see :ipni.publisher/blockers.
+ ;; Where the bytes are. `kotobase.net` became advertisable on 2026-08-26:
+ ;; the path gateway now answers a block request with the block, and the
+ ;; bytes it returns were fetched and re-hashed to the CID that was asked
+ ;; for. A subdomain gateway is for website origin isolation, not for block
+ ;; retrieval, so ipfs.kotobase.net being broken does not block this.
  :ipni.publisher/retrieval-candidates
- [{:host "kotobase.net" :multiaddr "/dns4/kotobase.net/tcp/443/https" :status :blocked-on-raw-format}
-  {:host "ipfs.kotobase.net" :multiaddr "/dns4/ipfs.kotobase.net/tcp/443/https" :status :blocked-on-subdomain-redirect}]
+ [{:host "kotobase.net"
+   :multiaddr "/dns4/kotobase.net/tcp/443/https"
+   :status :ready
+   :verified
+   {:at "2026-08-26"
+    :worker-version "4ce297ca-035c-4f41-b887-39879b68ce95"
+    :how "GET /ipfs/{cid}?format=raw and Accept: application/vnd.ipld.raw both answered 200 application/vnd.ipld.raw; the returned bytes were re-hashed and reproduced the requested CID for a 4,778-byte and a 944,524-byte object; HEAD answered 200 where it used to answer 404"}}
+  {:host "ipfs.kotobase.net"
+   :multiaddr "/dns4/ipfs.kotobase.net/tcp/443/https"
+   :status :broken-but-not-on-the-ipni-path}]
 
- ;; Measured 2026-08-26, before any advertisement was signed. An advertisement
- ;; naming an address that cannot serve a verifiable block is worse than no
- ;; advertisement: the indexer answers, the fetch fails, and the failure is
- ;; attributed to IPFS rather than to us.
+ ;; Measured 2026-08-26. Two were fixed the same day; the third turned out
+ ;; not to be on this path at all. An advertisement naming an address that
+ ;; cannot serve a verifiable block is worse than no advertisement: the
+ ;; indexer answers, the fetch fails, and the failure is attributed to IPFS
+ ;; rather than to us. So these were measured before anything was signed.
  :ipni.publisher/blockers
  [{:blocker :raw-format-ignored
    :measured "2026-08-26"
-   :detail "GET /ipfs/{cid}?format=raw and Accept: application/vnd.ipld.raw both return the content-type the object was PUT with (text/html for isic-5110, application/octet-stream for the cloud.itonami.app bundle). transport-ipfs-gateway-http retrieval requires application/vnd.ipld.raw."
-   :owner "net-kotobase/ipfs"}
+   :status :fixed
+   :detail "GET /ipfs/{cid}?format=raw and Accept: application/vnd.ipld.raw returned the content-type the object was PUT with (text/html for isic-5110, application/octet-stream for the cloud.itonami.app bundle). Fixed in net-kotobase/control-plane 6886225e and deployed; both now answer application/vnd.ipld.raw."
+   :owner "net-kotobase/control-plane"}
   {:blocker :head-unsupported
    :measured "2026-08-26"
-   :detail "HEAD /ipfs/{cid} answers 404 while GET of the same URL answers 200."
-   :owner "net-kotobase/ipfs"}
+   :status :fixed
+   :detail "HEAD /ipfs/{cid} answered 404 while GET of the same URL answered 200, so a probing client concluded the object was absent. Same commit; HEAD now carries the status and headers of the GET with no body, and is not counted as a free serve."
+   :owner "net-kotobase/control-plane"}
   {:blocker :subdomain-gateway-unreachable
    :measured "2026-08-26"
-   :detail "ipfs.kotobase.net/ipfs/{cid} 301s to {cid}.ipfs.kotobase.net, which times out -- no wildcard DNS or certificate. io-ipni-specs names this host as the retrieval multiaddr."
+   :status :not-on-this-path
+   :detail "ipfs.kotobase.net/ipfs/{cid} 301s to {cid}.ipfs.kotobase.net, which answers 502 after ~28s -- TLS and DNS are fine (the certificate does carry *.ipfs.kotobase.net), the Worker simply cannot reach the archive store the control plane writes to. Block retrieval uses the path gateway, so this does not block advertising; it is a real defect of that host and is recorded here so it is not rediscovered."
    :owner "net-kotobase/ipfs"}]
 
  :ipni.publisher/custody-verified
