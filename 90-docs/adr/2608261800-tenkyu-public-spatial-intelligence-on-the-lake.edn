@@ -1,0 +1,142 @@
+[{:db/id -1
+  :adr/id "adr-2608261800-tenkyu-public-spatial-intelligence-on-the-lake"
+  :adr/title "天球 tenkyu — public spatial intelligence read from R2 Data Catalog, not from the vendors"
+  :adr/status "accepted"
+  :adr/date "2026-08-26"
+  :adr/deciders "owner (2026-08-26 指示), agent"
+  :adr/related "adr-2608039000-blockchain-paths-must-not-presume-d1, adr-2608231500-compliance-scope-boundary, adr-2607102200-kami-render-stack-deps-authority-rename, adr-2608080100-single-page-app, adr-2608260900-svelte-react-refactor-to-cljs-reframe"
+  :adr/body
+  "# 天球 tenkyu — 公開空間情報を、ベンダーではなく自分の lake から読む
+
+## 発端
+
+オーナー指示（2026-08-26）: spatialintelligence.ai の
+`gods-eye-view`（衛星・航空機・船舶・CCTV をブラウザの 3D 地球儀に載せる
+オープンソース）と同様のものを、**kotoba-lang org と cloud-itonami で、
+cljs / kotobase.net / R2 datacatalog ベースに実装して opensource に。
+またデータは全て kotobase, r2 datacatalog に保存したデータを使うように**。
+
+最後の一文が設計を決めている。上流はブラウザから CelesTrak・OpenSky・
+USGS・NASA・Google に直接取りに行き、地球儀は **Google Photorealistic
+3D Tiles**（従量課金・API キー必須）で描く。それは「データは全て自分の
+lake から」ではない。
+
+## 決定
+
+### 1. 3 repo に分ける（+ 上流 3 件の修正）
+
+| repo | 面 | 何か |
+|---|---|---|
+| `kotoba-lang/sgp4` | subject（bare） | SGP4 軌道伝播と TLE parser、依存ゼロの `.cljc` |
+| `cloud-itonami/tenkyu` | metaphor（README 名乗り + vocabulary 登録） | 公開 feed の governed ingest。R2 Data Catalog の Iceberg 表へ append |
+| `cloud-itonami/app-tenkyu` | role（`app-` + subject） | WebGPU 地球儀の SPA。**lake だけを読む** |
+
+### 2. データ面は Iceberg。**ブラウザは上流サービスに一切触らない**
+
+`cloud_itonami` namespace / `cloud-itonami-datalake` bucket。
+実測 2026-08-26 の着地: `tenkyu_quake` 66 行、`tenkyu_satellite` 21 行、
+`tenkyu_aircraft` 7,214 行。`tenkyu_fire` と `tenkyu_vessel` は
+**UNMEASURED**（前者は無料キー、後者は常駐 WebSocket collector が要る）。
+
+**表は projection であって正本ではない。** 全行が `payload_sha256` /
+`source_url` / `fetched_at` を持つので、表を全部落として payload から
+作り直せる。作り直せなくなった時点で premise になっているので、そうしない
+（ADR-2608039000 の削除・再構築テスト）。
+
+### 3. 地球儀の面も自前で持つ
+
+NASA GIBS Blue Marble のラスタ 1,365 タイル（z0–z5）と Natural Earth
+110m の海岸線・国境ベクタを R2 に一度取り込み、Worker 経由で配る。
+どちらもキー不要・public domain。**render 時に第三者へ出る request は
+1 本も無い。**
+
+代償は正直に書く: 画像は z5 の Blue Marble であって、都市の写実 3D
+ではない。得るものは、Google が落ちても動き、閲覧あたりの課金が無く、
+どの画素の出所も言えるページ。
+
+### 4. 衛星は「位置」ではなく「元期要素」を持つ
+
+lake に入るのは TLE で、位置は `kotoba-lang/sgp4` が**ブラウザで**、
+frame を描く瞬間に評価する。だから衛星表は 1 衛星 1 日 1 行で足り、
+航空機表の 1/1000 で済む。**deep space の要素集合は拒否**し、拒否数を
+画面に出す（近地球モデルに通した静止衛星は 1 日で数百 km ずれた位置を
+自信を持って返す）。
+
+### 5. レンダラは WebGPU 優先 / WebGL 2.0 fallback、Cesium も Three.js も使わない
+
+CLAUDE.md の 3D 規則どおり。ジオメトリは `kotoba-lang/geo` で、両 backend が
+同じ純 `.cljc` の scene を消費する —— **「fallback が同じ scene を描く」を
+検査可能にしているのはその境界だけ**。UI は cljs + reagent + re-frame +
+`jp-go-dds`、1 文書 1 bundle 1 mount。
+
+## 測って直したもの（上流 3 件）
+
+どれも例外を投げず、**静かに間違った値を返していた**:
+
+| repo | 欠陥 |
+|---|---|
+| `kotoba-lang/geo` | `globe-tile-patch` が Web Mercator タイル内の緯度を**線形補間**していた。ラスタタイルの画素行は Mercator y に線形で、緯度はその逆 Gudermann。**z0 で 24 度、z1 で 24 度、z3 で 0.57 度**の位置ずれ。壊れて見えず、投影の選択に見える |
+| `kotoba-lang/org-apache-avro` | varint を `Math.pow` で積んでいたので、Iceberg manifest の 64bit `snapshot_id` は**拒否を判断する前に既に壊れていた**。結果その record 全体を拒否し、隣にある `file_path` 文字列まで失う |
+| `kotoba-lang/json` | cljs で `(int \\a)` は 97 ではなく **0**（`bit-or \"a\" 0` = NaN|0）。`\\uXXXX` の hex 文字が全部 0 になり、`\\u65e5` が 攅 になる。`(int \\5)` は 5 なので**数字だけ動く**。core のテストは `.clj` で、cljs では一度も走っていなかった |
+
+3 件とも「壊れた状態を戻すと赤くなる」ことを実際に見てから landed。
+json は **cljs で exit 1・JVM は緑のまま** —— その非対称そのものが所見。
+
+## ブラウザでしか見つからなかった 4 件
+
+`app-tenkyu` の 23 検査（deploy 済み Worker に対して実行）が出した:
+
+1. **描画先の canvas が document に無かった。** React 18 の `createRoot`
+   は hydration ではなく client render で、SSR の子を捨てる。`setTimeout 0`
+   で始めた renderer は古い node を握ったまま、402x600 の buffer を保ち、
+   draw call を受け付け、**ページには居なかった**。frame counter は 700 を
+   超え、何も error にならない
+2. **1 つの canvas に renderer が 2 つ。** `mount!` と route listener が
+   同じ tick で `start-globe!` を呼び、guard が `:state`（promise 解決時に
+   しか入らない）に付いていた
+3. **地球儀が丸ごと culling されていた。** タイルの**中心**を固定閾値と
+   比べていた —— タイルの角半径を 0 とした同じ式。z0 は惑星全体を覆う
+   1 枚で中心が (0,0) なので、既定カメラ（20N 140E）が捨てた。要求タイル 0、
+   描画画素 0
+4. **存在しない CSS token 3 つ。** DADS を base にした app の下に
+   `shitsuke.hig` は居ないので `--hig-color-bg-elevated` は**何にも解決せず**、
+   overlay の背景だけが消えて文字が画像の上に載った
+
+**測り方も 2 回、逆向きに間違えた**: `createImageBitmap` は **WebGPU**
+canvas を透明として返し、`toDataURL` は `preserveDrawingBuffer` 無しの
+**WebGL** canvas を空白として返す。どちらも「何も描かれていない」と読める。
+
+## 運用で効いた設計
+
+- **snapshot id でキャッシュする。** Iceberg の snapshot id は表が変わった
+  ときにだけ、必ず変わる。hit は現在のデータであることが証明でき、miss は
+  commit 1 回につき 1 度。時間 TTL はどの瞬間もどちらかの向きに間違っている。
+  id は **manifest-list のファイル名**から取る —— `JSON.parse` は 64bit を
+  double に丸め、4043499409833639796 が …640000 になる。それは cache key
+- **UNMEASURED は 3 つ目の状態。** `tick` の exit code は 0/1/**2**。
+  読めなかった feed は「静かな惑星の観測」ではない。見ていない
+- **governor は実際に発火することを見た。** OpenSky の秒→ミリ秒変換を
+  外すと 7,224 行が `:timestamp-not-plausible` で保留。USGS の lat/lon を
+  入れ替えると 33 行中 24 行が範囲外 —— **残る 9 行は通った**ので、
+  batch 単位の保留率上限が別に要る
+- **重複排除は 2 段。** 衛星表が 21 の要素集合から 42 行になった。
+  payload sha256 の完全一致（偽陰性なし）と、feed ごとの observed-at
+  watermark（偽陰性あり、明記）
+
+## 今やっていないこと
+
+- `tenkyu_fire` / `tenkyu_vessel` は UNMEASURED。FIRMS は無料キー、
+  AISStream は常駐 collector（**parser は実装・テスト済み**）
+- CCTV は入れていない。上流にはあるが、公開カメラの映像を lake に
+  取り込むのは person-identifier 規則の判断が別に要る
+- OSM の建物ベクタは入れていない。キー不要の全球 MVT 供給元が無く、
+  `kotoba.map.mvt` の decoder は在るので供給元を決めれば足りる
+- custom domain は `wrangler.jsonc` で意図的に**主張していない**。
+  live は `app-tenkyu.04-feasts-minded.workers.dev`
+
+## 結果
+
+- deploy 済み・稼働中: https://app-tenkyu.04-feasts-minded.workers.dev
+- `npm test` 41 tests / 2,977 assertions（browser も GPU も不要）
+- browser 23 検査すべて green、WebGPU / WebGL2 の両方で
+- 上流 3 repo の pin 前進済み"}]
