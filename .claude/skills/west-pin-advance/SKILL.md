@@ -21,7 +21,8 @@ description: west manifest（manifest/west.yml）の pin を前進させる・re
 | やりたいこと | 使うもの |
 |---|---|
 | **local を pin に合わせる（差分だけ）** | `kagami sync --db manifest/fleet-db.edn`（kagami）。pin と一致する repo は **`:noop` で git を起動しない**、dirty は skip、pin SHA を名指しで fetch、`--jobs` で並列。⚠ **先に `kagami reconcile` を通すこと**（下記） |
-| **どの pin が remote より遅れているか** | `west update` は**答えない**（pin に合わせるだけ）。`gh api repos/<org>/<repo>/compare/<pin>...main` の `ahead_by` |
+| **どの pin が remote より遅れているか（1 件）** | `west update` は**答えない**（pin に合わせるだけ）。`gh api repos/<org>/<repo>/compare/<pin>...main` の `ahead_by` |
+| **どの pin が remote より遅れているか（fleet 全体）** | `nbb --classpath ".:scripts/nbb_compat" scripts/pin-tip-lag.cljs > pins.tsv`（GraphQL batch。stdout はそのまま `PINS=` に渡せる TSV）。**測れなかった batch は exit 2** で clean と区別する。向きは分類しないので、決めるのは `west-pin-put-batch.cljs` 側 |
 | **pin を前進させる** | `nbb scripts/advance-pins.cljs <org> <list-file> --execute`（entry の revision 行だけ書換）→ `nbb scripts/verify-west-pins.cljs` |
 | **GitHub / local / west.yml の三点ずれ** | `nbb scripts/west-triple-sync.cljs plan --scope managed`（既定 dry-run。`--scope blocking` は fresh-checkout を壊している分だけ） |
 | **ずれの定期検出** | `nbb scripts/fleet-sync-tick.cljs check`（検出のみ。書かない） |
