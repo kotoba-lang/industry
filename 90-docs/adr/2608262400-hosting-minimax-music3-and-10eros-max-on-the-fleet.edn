@@ -214,6 +214,44 @@ best-effort、torch が数十 GB 掴んでいる時の hard path は unit 再起
 4. **`ComfyUI-034` の名前はバージョンを含む。** ディレクトリ名・unit 名・venv の
    comfy_kitchen バージョンは**組**であり、動かすときは一緒に動かす。
 
+### 7. 3 つ目を建てたら recycler も 3 つを見る（2026-08-26 追記）
+
+deploy の直後、**`shinshi-video-actor` が毎 tick `vram-low` で skip していた。**
+VRAM は 51.5/51.5 GB で、queue が空のインスタンスが 43.9 GB を抱えていた。
+
+`comfyui-recycle.sh` は **`comfyui.service` だけ**を 2 時間ごとに再起動していた。
+それが唯一のインスタンスだった間は正しい。**`comfyui-h3` は最初から対象外で**、
+その unit のコメントが頼りにしていた「murakumo-generation が unit を再起動して
+譲る」経路は上の決定 6 のとおり `NoNewPrivileges` で**動いていなかった** ——
+つまり h3 の 43 GB 常駐は、3 つ目を建てる前から誰も回収していなかった。
+
+`/usr/local/bin/comfyui-recycle.cljs`（nbb。`.sh` は
+`comfyui-recycle.sh.retired-20260826` に退避）に置き換えた。shell 版にできな
+かったことが 2 つある: **instance ごとに busy を訊いて走っている job を残す**
+（3 つを盲目的に再起動すると 100 分のクリップが死ぬ）ことと、**instance ごとに
+何を決めたか言う**（何も回収しなかった run と、回収するものが無かった run を
+出力で区別する）こと。到達できない instance は「到達できない」と報告して
+**再起動しない** —— 答えないことは idle であることではない。
+
+4 分岐すべて実演済み: 閾値未満で放置 / 閾値超で再起動(exit 0) / busy で放置 /
+unreachable で放置。
+
+**実測: 3 インスタンスとも再起動して 47.7 GB が戻り、actor は skip をやめて
+生成・判定まで通した**（`held`、motion 0.441 —— 変更前の 0.453 と同じく governor が
+静止画クリップを差し止めた。挙動は変わっていない）。
+
+⚠ **回収は 034 単独の再起動では戻らなかった。** rocm-smi は /proc に居ない pid が
+43.9 GB を保持していると表示し続け、3 つ全部を再起動して初めて解放された。
+**この APU で「どの process が VRAM を持っているか」を rocm-smi の pid 表示から
+断定しない。**
+
+⚠ **未解決: 同じ窓で `record-error: TypeError: fetch failed` が 3 回出た**
+（kotobase への記録に失敗。判定自体は成立している）。ログ全体でこの 3 回だけで、
+どれも VRAM/RAM が枯渇していた時間帯に入る。**復旧後に gad から同じ
+`NODE_OPTIONS=--dns-result-order=ipv4first` の node fetch で kotobase.net に 200 が
+返ることは確認したが、actor 経路で `recorded:true` に戻ったことはまだ見ていない。**
+次の tick で確かめること —— 枯渇が原因という説明は、まだ measured ではない。
+
 ## Consequences
 
 - 1 つの APU に ComfyUI が 3 つ常駐する。idle は VRAM を持たないが、
