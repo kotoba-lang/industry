@@ -1,0 +1,170 @@
+[{:db/id -1
+  :adr/id "adr-2608260900-svelte-react-refactor-to-cljs-reframe"
+  :adr/title "Svelte / React は UI の著述面から退役させ、cljs + reagent + re-frame へ refactor し、design system の既定は jp-go-dds とする —— ただし shadow-cljs の react 依存は対象外"
+  :adr/status "accepted"
+  :adr/date "2026-08-26"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/related ["2607173000" "2607072000" "2607122200" "2608080100" "2607100030" "2607201300"]
+  :adr/body
+  "2026-08-26、オーナー指示「svelte, react は全て cljs, reframe などに refactor」。
+
+この workspace の UI を**著述する**面から Svelte と React を退役させ、
+ClojureScript + reagent + re-frame に寄せる。既存の runtime 優先順位
+（ADR-2607173000 / CLAUDE.md: kotoba wasm > clojurewasm > ClojureScript > nbb、
+JVM と bb は最後の手段）と、Rust を新規に書かない規則（ADR-2607072000）と、
+design system の base を jp-go-dds とする規則（2026-08-05）の、UI 著述面への延長。
+
+## 対象は「著述面」であって「依存」ではない —— ここを取り違えると本番が壊れる
+
+**`react` / `react-dom` を package.json から剥がす話ではない。** reagent と re-frame は
+React を描画バックエンドとして使うので、shadow-cljs の app が `react` に依存しているのは
+**正常**であり、移行後もそのまま残る。
+
+退役させるのは **`.svelte` / `.tsx` / `.jsx` というソースファイルで UI を書くこと**。
+
+実測 2026-08-26 でこの区別が要ることが確認できた: `react` 依存を持つ 48 package のうち、
+`manimani-experience-ui`（`.cljs` 1 本、react 18.2.0 依存）と `kami-genko`（`.cljc` 19 +
+`.cljs` 6、react 18.3.1 依存）は **`.tsx` / `.jsx` を 1 本も持たない** —— shadow-cljs が
+React を裏で使っているだけで、**既に適合済み**である。これらを「React repo」として
+数えたり、依存を剥がしにいったりしない。
+
+## 実測した規模（2026-08-26、node_modules と .claude/worktrees を除外）
+
+    Svelte  1,011 ファイル / 約 200 repo
+    React     368 ファイル /     14 repo
+    合計    1,379 ファイル
+
+Svelte の上位:
+
+    207  network-awai/app-aozora-svelte
+    107  kotoba-lang/svelte-design-system     （@etzhayyim/design-system、55 component）
+     73  etzhayyim/root
+     70  com-junkawasaki/org-spirit-in-physics
+     49  gftdcojp/ai-gftd-shinshi
+     34  gftdcojp/apps-gftdcojp
+
+React の上位:
+
+    89  gftdcojp/hrse                （Next.js appview）
+    81  gftdcojp/_intake
+    39  cloud-itonami/app-screener
+    31  gftdcojp/240301-olsp-dbguide-web
+    21  kotoba-lang/app-scap
+    17  com-junkawasaki/physics-model / inc-RQM / inc（各 17）
+
+⚠ **この数を定数として引用しない。** CLAUDE.md が fleet-ci の節で警告しているとおり、
+実測値を文書に書けばそれが定数として引用され続ける。ここに残すのは
+**測り方**であって、明日の値ではない:
+
+    find orgs -not -path '*/node_modules/*' -not -path '*/.claude/worktrees/*' \\
+      -type f -name '*.svelte' | wc -l
+
+⚠ **`.claude/worktrees/` を除外しないと二重に数える。** 除外前は React が 754 件に見えたが、
+うち 386 件は `etzhayyim/root/.claude/worktrees/` の使い捨て worktree 2 本に**同じ 193 件が
+複製されていた**もの。使い捨て worktree は移行対象ではない。
+
+## 移行先は既に在る —— 新しく作らない
+
+`kotoba-lang/shitsuke`（仕付け）が **portable な re-frame seam を既に持っている**:
+
+    shitsuke.re-frame        re-frame 形の小さな runtime（7 関数の portable subset、JVM/SSR/WASM 用）
+    shitsuke.re-frame.core   host seam: 本物の re-frame (cljs) ‖ mini runtime (clj)
+    shitsuke.reagent.core    host seam: 本物の reagent (cljs) ‖ hiccup/->html (clj)
+    shitsuke.hiccup          依存ゼロの hiccup → HTML 文字列 renderer（SSR 側の双子）
+    shitsuke.components      pure-hiccup UI primitive
+    shitsuke.hig             --hig-* semantic token 層
+
+つまり **1 セットの `.cljc` view が SSR と live browser の両方で描ける**という契約
+（dual-render contract、`kami-mangaka-reader-clj` で実証済み）が既に landed している。
+移行は「新しい仕組みを作る」のではなく **この seam に載せ替える**こと。
+
+SPA 規則（ADR-2608080100: 1 文書・1 バンドル・1 mount、view は data として持つ）も
+そのまま効く。
+
+## design system の既定は jp-go-dds（同日 2 番目のオーナー指示）
+
+2026-08-26、続けてオーナー指示「jp-go-dds をデフォルトの デザインシステムに」。
+2026-08-05 の規則（基本 design system は jp-go-dds）を**移行先として明示的に再確認**する。
+Svelte / React から移る先の design system は `svelte-design-system` でも legacy の
+kotoba-ui / liquid-glass-ui でもなく、**`kotoba-lang/jp-go-digital-design-system`**である。
+
+    (require [jp-go-dds.core :as dds]      ; button / select / table / chip-label / …
+             [jp-go-dds.page :as page]     ; ->page
+             [jp-go-dds.tokens :as tokens]) ; bridge-css — --hig-* 契約を DADS の上に
+
+`--hig-*` token 契約は `jp-go-dds.tokens/bridge-css` がそのまま運ぶので、契約で書かれた
+view / SVG / CSS は無改造で追従する（2026-08-05 の規則、2026-08-08 の実測 71 token）。
+
+### 移行が思ったより近い理由 —— 設計言語は既に DADS で一致している
+
+実測 2026-08-26: **`svelte-design-system` は既に `@digital-go-jp/design-tokens` と
+`@digital-go-jp/tailwind-theme-plugin` に依存している。** つまりあの 55 component は
+**DADS の設計言語で描かれた Svelte 実装**であって、別の design language ではない。
+移行で変わるのは**実装言語**であり、token・色・間隔・タイポグラフィは既に同じ出所を指す。
+
+これは移行を「デザインの作り直し」ではなく「同じ token の上での実装の載せ替え」にする。
+
+### ただし component の被覆には実測された差がある
+
+    jp-go-dds     20 component  (jp_go_dds/core.cljc)
+    svelte-ds     55 component
+
+`jp-go-dds` が今日持つのは accordion / button / card / checkbox / chip-label /
+container / divider / form-field / grid / heading / input-text / language-selector /
+notification-banner / radio / row / section / select / stack / table / textarea の 20。
+Svelte 側の BottomNav / BottomSheet / Carousel / DatePicker / Dialog / Drawer /
+Toast / Fab などは**対応が無い**。
+
+**この差を「DADS で足りる」と丸めない。** 足りない component は (1) `jp-go-dds` に
+上流拡張する (2) `shitsuke.components` の pure-hiccup primitive で組む (3) `dds-ext-*`
+（container / section / grid / stack / row / card の layout 補助）に倣って拡張する、
+のいずれか。**app CSS で layout を再導出しない**（2026-08-05 の規則）。
+
+参考: `deps.edn` で jp-go-dds を参照する checkout は実測 640 件（2026-08-26）。
+これは既にこの workspace の共通語であり、この決定はそれを追認するもの。
+
+## 帰結 —— claude.ai/design（/design-sync）には同期対象が無い
+
+同日、`/design-sync` を走らせようとして判明した。**Claude Design が消費するのは
+React の component library** である（skill の scope 節が明示: *Scope: React design
+systems. Both `_ds_bundle.js` and the previews render via React - a non-React DS has
+nothing for the claude.ai/design agent to build with.*）。
+
+この workspace を全走査した結果:
+
+- React の design system は**存在しない**。`react` 依存 48 package は**全て private な
+  application** で、library entry（exports / main / module）を持つものは 0 件。
+- packaged な design system は `svelte-design-system`（Svelte 5、55 component）1 本のみ。
+  `.storybook/` 設定と `.stories.*` は 0 件（devDeps に Storybook 9 addon は在る）。
+- base の DADS と legacy（kotoba-ui / liquid-glass-ui / uikit / appkit / shitsuke /
+  css / html / byoubu-ui / mokuroku-ui / kotoba-component）は全て `.cljc`。
+- west 全 4,237 project を名前でも検索した。唯一の近似 `com-radixx` は Radix UI ではなく
+  航空座席予約システムだった。
+
+**したがって `/design-sync` はこの workspace で実行しない。** 仮に Svelte DS を
+custom element 経由で React に bridge しても、design agent が吐くのは React であり、
+**この workspace が出荷するコード（cljc / hiccup）に写らない** —— skill の存在意義
+（designs map 1:1 onto code their engineers can ship）がそこで壊れる。**退役させると
+決めたスタックを、bridge を書いて固定化しない。**
+
+なお skill 自身が禁じているとおり、component を React で書き直して「同期」に見せかけない
+（*never a reimplementation*）。
+
+## 決めていないこと（正直に）
+
+- **移行の順序も期限も決めていない。** 1,379 ファイルは 1 セッションで動かせる量ではない。
+- **この ADR の時点で移行した repo は 0 件。** 決定と記録だけが landed した。
+- **component の名前どうしの対応表を作っていない。** 数（20 対 55）は測ったが、
+  「Svelte の Chip は DADS の chip-label か」を 1 件ずつ突き合わせてはいない。
+  数の差は被覆の差の**上界**であって、被覆そのものではない。
+- Next.js に載っている appview（`hrse` 等）は routing / SSR / Clerk 認証まで含むので、
+  view の載せ替えだけでは終わらない。個別に見積もる。
+
+## 検査
+
+まだ検査器を書いていない。書くなら「`.svelte` / `.tsx` / `.jsx` の総数が単調減少する」
+という ratchet 型が素直だが、CLAUDE.md の 6 問（2608136000）を通すこと ——
+とくに **入力が無いとき・実行できないときに pass を返さないこと**と、
+**`.claude/worktrees/` と `node_modules` を除外し忘れたときに静かに数が変わること**。
+除外を間違えた検査は、移行が進んだように見せる。"}]
