@@ -23,7 +23,8 @@
    "90-docs/adr/2606290000-all-workers-cljc-only-policy.edn"
    "90-docs/adr/2607252500-kotoba-wasm-component-first-execution-boundary.edn"
    "90-docs/adr/2607201300"
-   "90-docs/adr/2607122200"]
+   "90-docs/adr/2607122200"
+   "90-docs/adr/2608650000-kotoba-cannot-write-has-two-kinds-decision-core-extraction.edn"]
   :adr/evidence
   {:live-url "https://kotoba-worker-demo.04-feasts-minded.workers.dev"
    :repo "https://github.com/kotoba-lang/kotoba-worker-demo"
@@ -43,10 +44,11 @@
 > `orgs/kotoba-lang/kotoba-lang/docs/kotoba-centered-migration-plan.md`。食い違ったら
 > あちらが勝つ。特に次の 3 点は本 ADR 初版の書き方が計画と逆で、2026-07-27 に訂正した:
 >
-> 1. **再帰的な値型は「無い」ではなく「まだ無い」** — plan W4 が
->    「recursive logical values with explicit node/depth/byte budgets」を計画し、
->    「handles are not the application programming model」と明記している。flat node /
->    parent ポインタを Kotoba の書き方として一般化しない。
+> 1. **再帰的な値型は landed している**（W4。compiler / kotoba-wasm / kotoba-cljs。
+>    native に無いのは backend 未達であって言語の天井ではない、ADR-2608650000）。
+>    初版は「無い」、同日の訂正は plan を指して「まだ無い」と書いた。現行ではない。
+>    flat node / parent ポインタを Kotoba の書き方として一般化しない
+>    （handles は実装戦略）。
 > 2. **string-only SSR（形 A）は最終 API ではない** — Delivery #6 /plan L201 が
 >    明示的に禁じている。切り替えは W4 と両 renderer の qualification 後。
 > 3. **`cap-call` と数値 capability ID は通常 source の語彙ではない** — §2 が
@@ -338,4 +340,9 @@ walk するため、**宣言 8 件を超えると順序が未規定**になる�
 ## 付随所見（upstream 報告事項）
 
 `liquid-glass-ui` の slider は light 背景で track が事実上不可視（thumb のみ描画、dark では正常）。
-決定論的 HIG/WCAG audit は 100.00 を付けており、この欠落を検出できていない。"}]
+決定論的 HIG/WCAG audit は 100.00 を付けており、この欠落を検出できていない。
+
+## 改訂履歴
+
+2026-08-26: 冒頭の訂正『再帰的な値型はまだ無い』を当時の切り方へ戻した。W4 は landed。native 未達は ADR-2608650000。
+"}]
