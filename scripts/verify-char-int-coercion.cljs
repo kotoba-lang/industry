@@ -180,30 +180,76 @@
                           [] west-paths)
         r (.spawnSync cp "git" #js ["ls-files" "--" "*.cljc" "*.cljs"]
                       #js {:cwd root :maxBuffer 400000000 :encoding "utf8"})
+        ;; Skip this file. Its `positives` vector holds the pattern as data,
+        ;; and string-state alone does not settle it: a fixture is a string
+        ;; whose CONTENT is the form, so the form does start inside a string
+        ;; -- but so does a docstring quoting it, and only one of the two is
+        ;; worth suppressing by rule. A detector reporting its own test data
+        ;; is noise every run, so it is excluded by name rather than by
+        ;; inference.
+        self (.join path root "scripts" "verify-char-int-coercion.cljs")
         from-root (when (zero? (.-status r))
-                    (mapv #(.join path root %)
-                          (remove str/blank? (str/split-lines (str (.-stdout r))))))]
+                    (->> (str/split-lines (str (.-stdout r)))
+                         (remove str/blank?)
+                         (mapv #(.join path root %))
+                         (remove #(= % self))
+                         vec))]
     (when (and (seq west-paths) (some? from-root))
       (vec (concat from-root from-orgs)))))
 
+(defn- string-state
+  "Whether each character of `text` sits inside a string literal.
+
+  A line-based check cannot see this, and the omission has a specific
+  consequence: **every library that documents this trap gets reported for
+  documenting it.** `kotoba-lang/koe` and `person-isekai-hajime` both carry a
+  docstring quoting `(map int ...)` as the bug they were fixed for, and this
+  file's own self-test fixtures are string literals of the pattern. Four of
+  the first thirty-three findings were exactly that."
+  [text]
+  (loop [i 0 in? false out (transient []) esc? false]
+    (if (>= i (count text))
+      (persistent! out)
+      (let [c (subs text i (inc i))]
+        (cond
+          esc? (recur (inc i) in? (conj! out in?) false)
+          (= c "\\") (recur (inc i) in? (conj! out in?) true)
+          (= c "\"") (recur (inc i) (not in?) (conj! out in?) false)
+          :else (recur (inc i) in? (conj! out in?) false))))))
+
 (defn scan-text
   "Findings in one file's text. Pure, so the self-test exercises exactly the
-  code the scan runs."
+  code the scan runs.
+
+  A match is reported only when the form STARTS outside a string literal. For
+  `(map int \"literal\")` that start is the `(` -- the quote it then opens is
+  part of the match, not around it."
   [text]
-  (->> (str/split-lines (or text ""))
-       (map-indexed vector)
-       (mapcat (fn [[i line]]
-                 (when-not (re-find #"^\s*;" line)   ; a comment is not code
-                   (cond-> (vec (keep (fn [{:keys [id re what]}]
-                                         (when (re-find re line)
-                                           {:id id :line (inc i) :what what
-                                            :excerpt (str/trim (subs line 0 (min 100 (count line))))}))
-                                       patterns))
-                     (lambda-over-string-literal? line)
-                     (conj {:id :int-of-char-in-lambda :line (inc i)
-                            :what "(mapv #(… (int %) …) \"literal\") — the same coercion inside a lambda"
-                            :excerpt (str/trim (subs line 0 (min 100 (count line))))})))))
-       vec))
+  (let [in-string (string-state text)
+        lines (str/split-lines text)
+        offsets (vec (reductions + 0 (map #(inc (count %)) lines)))]
+    (->> lines
+         (map-indexed vector)
+         (mapcat
+          (fn [[i line]]
+            (when-not (re-find #"^\s*;" line)   ; a comment is not code
+              (let [base (nth offsets i 0)
+                    outside? (fn [at] (not (nth in-string (+ base (or at 0)) false)))]
+                (cond-> (vec (keep (fn [{:keys [id re what]}]
+                                     (let [m (re-find re line)]
+                                       (when m
+                                         (let [txt (if (string? m) m (first m))
+                                               at (str/index-of line txt)]
+                                           (when (outside? at)
+                                             {:id id :line (inc i) :what what
+                                              :excerpt (str/trim (subs line 0 (min 100 (count line))))})))))
+                                   patterns))
+                  (and (lambda-over-string-literal? line)
+                       (outside? (str/index-of line "(map")))
+                  (conj {:id :int-of-char-in-lambda :line (inc i)
+                         :what "(mapv #(... (int %) ...) \"literal\") -- the same coercion inside a lambda"
+                         :excerpt (str/trim (subs line 0 (min 100 (count line))))}))))))
+         vec)))
 
 ;; ── self test ────────────────────────────────────────────────────────────────
 
@@ -227,16 +273,33 @@
    "#?(:clj (vec (map #(bit-and (int %) 0xFF) (.getBytes (str s) \"UTF-8\")))"
    "#?(:clj (map #(bit-and (int %) 0xff) (.getBytes (str ch) \"UTF-8\"))"])
 
+(def ^:private string-negatives
+  "Texts whose only occurrence sits INSIDE a string -- a docstring quoting the
+  trap, or a fixture vector holding the pattern as data.
+
+  Each of these DOES match a pattern; that is the point. Before the check
+  tracked string state they were reported, which meant every library
+  documenting this bug was reported for documenting it: `kotoba-lang/koe` and
+  `person-isekai-hajime` both carry such a docstring, and both were fixed by
+  the very commit that added it."
+  ["(defn f\n  \"Not (map int \\\"abc\\\"), which is zeros here.\"\n  [x] x)"
+   "(defn g\n  \"Never (map int (str a b)).\"\n  [x] x)"
+   "(def fixtures [\"(mapv int (name kw))\"])"])
+
 (defn- self-test []
   (let [bad (atom [])]
     (doseq [s positives]
       (when (empty? (scan-text s)) (swap! bad conj (str "MISSED: " s))))
     (doseq [s negatives]
       (when (seq (scan-text s)) (swap! bad conj (str "FALSE POSITIVE: " s))))
+    (doseq [s string-negatives]
+      (when (seq (scan-text s))
+        (swap! bad conj (str "FALSE POSITIVE inside a string: " (pr-str s)))))
     (if (seq @bad)
       (do (doseq [b @bad] (println "SELF-TEST FAIL" b)) (js/process.exit 1))
       (do (println (str "self-test: " (count positives) " positives caught, "
-                        (count negatives) " negatives clean"))
+                        (+ (count negatives) (count string-negatives)) " negatives clean ("
+                        (count string-negatives) " of them inside a string)"))
           (js/process.exit 0)))))
 
 (when self-test? (self-test))
