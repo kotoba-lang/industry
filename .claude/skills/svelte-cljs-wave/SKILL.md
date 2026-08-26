@@ -95,12 +95,42 @@ commit して main に載せる。
 | **`package.json` に `"type": "module"` を書かない** | shadow-cljs の `:node-test` 出力は CommonJS（`__dirname`）。ESM 指定で `ReferenceError` になる。3 agent が踏んだ |
 | **build の sentinel / log を worktree の外に置かない** | 第 2 波で 3 agent が揃って `/private/tmp/claude-501/build-app.exit` という**共有パス**を使った。1 つの exit code を別の agent が自分の結果として読みうる。scratch は worktree の下か session 固有パスに置く |
 | **`:asset-path` は相対** | これらのページは path prefix の下に出る。絶対だと mount 先で壊れる |
-| **build は `resource-guard.mjs run build --` 経由、exit 2 は retry** | lock は二本目を**拒否**する。`exit 2` は失敗ではない。**迂回させない**（機械が飽和する） |
+| **build は前景の retry loop で回す。background 監視に入らせない** | 下記。第 1・2 波で計 6 agent がこれで停止した |
 | **backend の `.ts` を書き換えない** | `src/app.ts` / `src/engine.ts` は Cloudflare Worker の本番ロジック。第 1 波で 2 agent が正しく拒否した。**svelte/ ディレクトリだけ**が対象 |
 | **README / operator-quickstart / `kotodama.jsonld` の `staticDir` も直す** | 消した svelte build を説明したまま残すと、文書が能動的に嘘になる |
 | **build が通らなければ merge しない** | 壊れた移行は未移行より悪い |
 | **rebase 禁止・force-push 禁止** | CLAUDE.md |
 | **`manifest/west.yml` を触らない** | pin は中央で 1 commit にまとめる |
+
+## build は前景の retry loop で回す（agent を止めないための最重要事項）
+
+第 1 波・第 2 波で **6 agent すべてが同じ止まり方をした**: `resource-guard` の
+`exit 2` を受けて background の retry loop を起こし、その完了通知を待って idle し、
+**通知は来なかった**（background process は先に終了していた）。1 agent あたり
+180k〜250k token を使って何も着地しなかった。
+
+**background 監視・Monitor・sentinel ファイルを使わせない。** 次の 1 行が実測で
+毎回通った形（私が第 2 波の 3 repo を全部これで着地させた）:
+
+```bash
+for i in $(seq 1 9); do
+  node "$COM_JUNKAWASAKI_ROOT/scripts/resource-guard.mjs" run build -- npx shadow-cljs compile app > /tmp/x.log 2>&1
+  rc=$?; [ $rc -ne 2 ] && break
+  echo "attempt $i: lock held, waiting 45s"; sleep 45
+done
+echo "EXIT=$rc"; tail -5 /tmp/x.log
+```
+
+- **`exit 2` は「拒否された」であって失敗ではない。** lock が空くまで待って再試行。
+- **迂回させない。** 迂回すると飽和した機械に 7 本目の build が乗る。
+- **`$?` は最後のコマンドの終了値。** `... | tail` すると tail の 0 を読む。
+  **先にファイルへ落として exit を採り、それから読む**（CLAUDE.md の 6 問）。
+- **scratch ファイルは worktree の下か session 固有パスに置く。** 第 2 波で 3 agent が
+  揃って `/private/tmp/claude-501/build-app.exit` を使い、互いの exit code を読みうる
+  状態だった。
+- **lock は断続的に競合する。** 「今空いている」は次の瞬間の保証にならない ——
+  5 サンプル 20 秒すべて idle・shadow-cljs プロセス 0 を確認した直後に、無関係な
+  build に取られて exit 2 になった実測がある（2026-08-26）。
 
 着地は **feature branch → `gh api repos/<org>/<repo>/merges`**（サーバ側マージ）。
 PR を開きっぱなしにしない。worktree と branch は agent 自身に片付けさせる。
