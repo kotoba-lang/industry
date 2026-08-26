@@ -120,7 +120,13 @@
     :text "ただし再帰的な値型は無い（本質的な制約）。"}
    {:id :good-recursive-landed
     :expect-kinds #{}
-    :text "この節は 2026-08-08 に書き換えた。旧文は「今日は hiccup のような任意深度の入れ子を Kotoba の値として表現できない」と書いていたが、W4 は landed している。"}])
+    :text "この節は 2026-08-08 に書き換えた。旧文は「今日は hiccup のような任意深度の入れ子を Kotoba の値として表現できない」と書いていたが、W4 は landed している。"}
+   {:id :bad-w4-wait
+    :expect-kinds #{:w4-still-pending}
+    :text "problem.kotoba は W4 を待つ側の program である。切り替えは W4 と両 renderer の qualification 後。"}
+   {:id :good-w4-landed
+    :expect-kinds #{}
+    :text "当時は W4 待ちと書いた。現行ではない。W4 は landed。待ちは native を待つ backend 未達である。"}])
 
 (defn- run-self-test [cfg]
   (let [needles (:needles cfg)

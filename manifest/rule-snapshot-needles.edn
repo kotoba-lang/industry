@@ -47,4 +47,10 @@
    :pattern "再帰的な値型は.{0,20}まだ.{0,12}無い|再帰的な値型は無い|今日は hiccup のような任意深度"
    :demurrer "landed|旧文|書き換えた|当時|現行ではない"
    :fix "W4 は landed。native に無いだけ（backend 未達）。handles は実装戦略であって書き方ではない。"
+   :superseded-by "adr-2608650000"}
+  {:id :w4-still-pending
+   :class :measurement-baked-as-today
+   :pattern "W4 を待つ|W4 待ち|W4 までの間|切り替えは W4"
+   :demurrer "当時|landed|現行ではない|backend 未達|native を待つ"
+   :fix "W4 は landed。待ちが残るなら named backend の未達であって、言語計画の未着手ではない。"
    :superseded-by "adr-2608650000"}]}
