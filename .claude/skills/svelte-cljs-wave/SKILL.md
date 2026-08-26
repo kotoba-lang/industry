@@ -91,7 +91,9 @@ commit して main に載せる。
 | **remote 名は org 名**（`origin` ではない） | west checkout の慣習。`git push origin` は通らない |
 | **detached HEAD である** | west は SHA で pin するので branch 名が無い。`<org>/main` を明示させる |
 | **`reagent`/`re-frame` は `:cljs` alias に置く** | PreToolUse hook `jvm-new-surface-guard`（ADR-2608201300）が top-level の新規 JVM 依存を**拒否**する。第 1 波の 6 agent 全員が踏んだ |
+| **`package.json` に `react` と `react-dom` を入れる** | **reagent は npm の `react` / `react-dom` を解決する。** shadow-cljs だけ宣言すると app build が `The required namespace "react-dom" is not available, it was required by "reagent/dom.cljs"` で落ちる。第 2 波で `app-har` がこれで落ち、agent は**正直に失敗として報告した**（merge しなかった）。`devDependencies` に `^18.2.0` で足りる |
 | **`package.json` に `"type": "module"` を書かない** | shadow-cljs の `:node-test` 出力は CommonJS（`__dirname`）。ESM 指定で `ReferenceError` になる。3 agent が踏んだ |
+| **build の sentinel / log を worktree の外に置かない** | 第 2 波で 3 agent が揃って `/private/tmp/claude-501/build-app.exit` という**共有パス**を使った。1 つの exit code を別の agent が自分の結果として読みうる。scratch は worktree の下か session 固有パスに置く |
 | **`:asset-path` は相対** | これらのページは path prefix の下に出る。絶対だと mount 先で壊れる |
 | **build は `resource-guard.mjs run build --` 経由、exit 2 は retry** | lock は二本目を**拒否**する。`exit 2` は失敗ではない。**迂回させない**（機械が飽和する） |
 | **backend の `.ts` を書き換えない** | `src/app.ts` / `src/engine.ts` は Cloudflare Worker の本番ロジック。第 1 波で 2 agent が正しく拒否した。**svelte/ ディレクトリだけ**が対象 |
