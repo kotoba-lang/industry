@@ -143,7 +143,7 @@
    :note "By subpath: sha2 and hmac to org-nist-sha2, blake2 to org-ietf-blake2, hkdf to kotoba-lang/crypto, sha1 to kotoba-lang/hash. argon2 has no first-party equivalent -- see its own entry."}
   {:coordinate "@noble/curves" :ecosystem :npm :disposition :first-party-exists
    :target "kotoba-lang/org-ietf-ed25519"
-   :note "ed25519 is nearly all of the usage. secp256k1 is kotoba-lang/eth-crypto, which implements the point arithmetic and RFC 6979 in portable .cljc. bls12-381 has no first-party equivalent -- see its own entry."}
+   :note "By curve: ed25519 -- nearly all of the usage -- to org-ietf-ed25519; secp256k1 to kotoba-lang/eth-crypto, which implements the point arithmetic and RFC 6979 in portable .cljc; x25519 to kotoba-lang/org-ietf-x25519 as of 2026-08-26. bls12-381 has no first-party equivalent and its own entry says why."}
   {:coordinate "@noble/ciphers" :ecosystem :npm :disposition :first-party-exists
    :target "kotoba-lang/crypto" :note "AEAD shape; kotoba-lang/noise for the ChaCha20-Poly1305 handshake path."}
   {:coordinate "@noble/post-quantum" :ecosystem :npm :disposition :first-party-exists
@@ -256,8 +256,8 @@
    :note "TOML v1.0.0, the full grammar, reader only. No writer: table layout, key quoting and float formatting are policy questions a reader does not have to answer, and a round-trip suite against one's own writer looks like validation while checking nothing."}
   {:coordinate "hpke-js" :ecosystem :npm :disposition :gap-planned
    :proposed-name "org-ietf-hpke"
-   :prerequisite "a first-party X25519"
-   :note "RFC 9180, used by kotobase-server/security/keywrap.cljs. Measured 2026-08-26, the pieces are ALMOST there: HKDF is in kotoba-lang/crypto and ChaCha20-Poly1305 in kotoba-lang/noise, but DHKEM(X25519) needs an X25519 scalar multiplication and this workspace has none -- every hit for x25519 is a call site, not an implementation. X25519 is a Montgomery ladder, roughly 150 lines with RFC 7748 test vectors, and is the thing to build first. This is a sequence, not a size problem."}
+   :prerequisite "MET 2026-08-26 by kotoba-lang/org-ietf-x25519. What remains is HPKE itself: the labeled Extract/Expand of RFC 9180 section 4, DHKEM(X25519, HKDF-SHA256), the key schedule, and one AEAD. ChaCha20-Poly1305 is in kotoba-lang/noise; AES-GCM is not first-party and a base-mode HPKE does not need it."
+   :note "RFC 9180, used by kotobase-server/security/keywrap.cljs. The blocker named on 2026-08-26 -- that every hit for x25519 in this workspace was a call site rather than an implementation -- is gone."}
   {:coordinate "@endo/ocapn" :ecosystem :npm :disposition :gap-planned
    :proposed-name nil
    :prerequisite "an adapter in kotoba-lang/kotoba-lang, not a new repository"
