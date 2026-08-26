@@ -58,6 +58,15 @@
    "orgs/gftdcojp/m365-archive/"])
 
 (defn- vendored? [rel] (some #(str/starts-with? rel %) vendored-prefixes))
+(defn- stale-worktree?
+  "`orgs/<org>/.foo/...` —— repo 名が `.` で始まるものは west project ではなく、
+   orgs/ の中に置き去りにされた linked worktree。実測 2026-08-26:
+   `orgs/cloud-itonami/.wave5-3520` は `cloud-itonami-isic-3520` の worktree
+   （Aug 12 から放置）で、**同じ .svelte を 2 度数えさせ、親 repo を
+   in-flight にも見せていた**。撤去は git-cleanup-conflict の仕事なので、
+   ここでは数えないだけにする。"
+  [rel]
+  (str/starts-with? (str (nth (str/split rel #"/") 2 "")) "."))
 (defn- worktree? [rel] (str/includes? (str "/" rel) "/.claude/worktrees/"))
 
 (defn- scan!
@@ -80,6 +89,7 @@
         (let [rels (->> (str/split-lines (str (.readFileSync fs tmp "utf8")))
                         (remove str/blank?)
                         (remove worktree?)
+                        (remove stale-worktree?)
                         (remove vendored?)
                         vec)]
           (.unlinkSync fs tmp)
@@ -158,26 +168,51 @@
         (> (count (re-seq #"(?m)^worktree " (str (aget r "stdout")))) 1)))
     (catch :default _ true)))
 
-(defn- in-flight?
-  "別の波がその repo を持っていれば true。触らない。
+(defn- remote-name
+  "その checkout の remote 名。**仮定せず git に訊く。**
 
-   2 つの印を見る —— **remote の branch**（push 済み、他マシンの波も見える）と
-   **linked worktree**（push 前、同じマシンの波だけ見える）。前者だけでは
-   agent の起動から push までの窓が空き、そこで loop と手動の波が衝突した。
+   west の慣習では org 名だが、実測 2026-08-26 でそうでない checkout が在る ——
+   `cloud-itonami-isic-3510` ほか 4 repo の remote は `origin` で、org 名で
+   ls-remote すると `fatal: 'cloud-itonami' does not appear to be a git
+   repository` (rc=128) になる。in-flight? はそれを保守側に倒して in-flight と
+   数えていたので、**available な repo 5 本が in-flight として隠れ**、候補が
+   4 本出るはずの周に 1 本しか出なかった。名前が分からないのと、branch が
+   在るのは、別のことである（ADR-2608136000）。"
+  [{:keys [repo org]}]
+  (try
+    (let [r (.spawnSync cp "git" (clj->js ["-C" (path.join root repo) "remote"])
+                        #js {:encoding "utf8" :timeout 30000})
+          names (->> (str/split-lines (str (aget r "stdout"))) (remove str/blank?) set)]
+      (cond (contains? names org)    org
+            (contains? names "origin") "origin"
+            :else                    (first (sort names))))
+    (catch :default _ nil)))
 
-   remote 名は west の慣習で org 名（`origin` ではない）。"
-  [{:keys [repo org] :as c}]
-  (or (has-linked-worktree? c)
+(defn- in-flight
+  "別の波がその repo を持っていれば理由の keyword、持っていなければ nil。
+
+   2 つの印を見る —— **linked worktree**（push 前、同じマシンの波だけ見える）と
+   **remote の branch**（push 済み、他マシンの波も見える）。前者だけでは
+   push 済みで worktree を畳んだ波を見落とし、後者だけでは agent の起動から
+   push までの窓が空く（実測 2026-08-26、そこで loop と手動の波が衝突した）。
+
+   **訊けなかった場合は `:unmeasured` を返す。** 触らない点は in-flight と同じ
+   だが、報告では分ける —— 「別の波が持っている」と「こちらが測れなかった」を
+   同じ数字に畳むと、器の故障がプールの混雑に見える。"
+  [c]
+  (if (has-linked-worktree? c)
+    :worktree
+    (if-let [rem (remote-name c)]
       (try
         (let [r (.spawnSync cp "git"
-                            (clj->js ["-C" (path.join root repo)
-                                      "ls-remote" "--heads" org "agent/cljs-migration"])
+                            (clj->js ["-C" (path.join root (:repo c))
+                                      "ls-remote" "--heads" rem "agent/cljs-migration"])
                             #js {:encoding "utf8" :timeout 30000})]
-          ;; 問い合わせに失敗したら「在るかもしれない」側に倒す（触らない）。
-          (if (not= 0 (aget r "status"))
-            true
-            (not (str/blank? (str (aget r "stdout"))))))
-        (catch :default _ true))))
+          (cond (not= 0 (aget r "status"))        :unmeasured
+                (str/blank? (str (aget r "stdout"))) nil
+                :else                             :branch))
+        (catch :default _ :unmeasured))
+      :unmeasured)))
 
 (defn -main []
   (let [rels (scan!)]
@@ -216,10 +251,13 @@
           ;; in-flight 判定は 1 repo 1 network round trip なので、順位上位だけに当てる。
           ranked  (take (* 4 limit) open)
           skipped (atom [])
+          unmeasured (atom [])
           picked  (->> ranked
                        (remove (fn [c]
-                                 (when (in-flight? c)
-                                   (swap! skipped conj (:repo c)) true)))
+                                 (case (in-flight c)
+                                   nil         false
+                                   :unmeasured (do (swap! unmeasured conj (:repo c)) true)
+                                   (do (swap! skipped conj (:repo c)) true))))
                        (take limit)
                        vec)
           rec {:at (.toISOString (js/Date.))
@@ -229,6 +267,7 @@
                :limit limit
                :custody-skipped @custody
                :in-flight-skipped @skipped
+               :unmeasured-skipped @unmeasured
                :candidates picked}
           cands picked]
 
@@ -239,6 +278,9 @@
                     (when (seq @custody) (str "\t" (str/join " " @custody)))))
       (println (str "IN-FLIGHT-SKIPPED\t" (count @skipped)
                     (when (seq @skipped) (str "\t" (str/join " " @skipped)))))
+      ;; 「測れなかった」を in-flight に畳まない —— 器の故障が混雑に見える。
+      (println (str "UNMEASURED-SKIPPED\t" (count @unmeasured)
+                    (when (seq @unmeasured) (str "\t" (str/join " " @unmeasured)))))
       (println (str "CANDIDATES\t" (count cands)))
       (doseq [c cands]
         (println (str "  " (str/join "\t" [(:repo c) (str (:files c) "f")
