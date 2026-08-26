@@ -118,9 +118,22 @@ close されないが、閾値未達の PR は close される。閉じられた
 - 新しい task を 3 つ立てた: I-index-coverage (査読者が使う web 検索 UI で raw を
   測り直す) / T-usage-tier-discussion (200 tier を linguist に問う) /
   T-third-party-adoption (外部アカウントに .kotoba が生まれる導線)。
-- E-editor-extension は未着手のまま。workspace に contributes.grammars を持つ
-  package.json は 0 件 (2026-08-26 実測)。GitHub の表示は変わらないが、
-  今日 Kotoba と名乗れる唯一の面である。
+- E-editor-extension は着地した (kotoba-lang/grammar 8dd57c17、pin 605e6540)。
+  editors/vscode/ が同じ生成 grammar を運び、:forbidden-heads 31 個を
+  invalid.illegal.forbidden-head.kotoba に scope する — どのテーマもこれを
+  エラーとして描くので、swap! や eval が compiler に fail closed される前に
+  エディタ上で拒否される。GitHub の表示は変わらない (それを決めるのは
+  languages.yml)。checker は copy の drift に加えて、package.json の scopeName と
+  grammar の scopeName の一致を見る — ここがずれた拡張は install も activate も
+  でき、.kotoba を開けるのに何も色が付かず、VS Code は scope で grammar を引くので
+  エラーが出ない。5 通り実際に壊して、いずれも名乗った理由で拒否することを確認した。
+
+- 同じ変更で 2 つの誤りを直した。linguist/languages.yml.entry は grammar を
+  MIT と書いていたが実際は Apache-2.0 (どちらも Linguist の allowed list に
+  あるので障害ではないが、査読者は licence を見る)。usage query は NOT is:fork を
+  欠いていた — 閾値は「excluding forks」と書かれており、CONTRIBUTING 自身の例も
+  NOT is:fork path:*.boot である。今日はどちらでも 58 なので偶然一致していたが、
+  誰かが fork した瞬間に一致しなくなる。
 
 ## 改訂履歴
 

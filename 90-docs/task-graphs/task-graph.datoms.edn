@@ -57,7 +57,9 @@
   :task/repo "kotoba-lang/grammar"
   :task/requires ["G-grammar-repo"]
   :task/external-gate false
-  :task/status-note "未着手。workspace 内に contributes.grammars を持つ package.json は 0 件 (2026-08-26 実測)。syntaxes/kotoba.tmLanguage.json は既にあるので、拡張側は package.json + language contribution だけで足りる。GitHub の表示は変わらないが、エディタで Kotoba と名乗れる唯一の経路"}
+  :task/status :completed
+  :task/status-at "2026-08-26T03:00:00.000Z"
+  :task/status-note "kotoba-lang/grammar 8dd57c17 に着地 (pin 605e6540)。editors/vscode/ に package.json + language-configuration.json + 生成された grammar copy。VS Code は contributes.grammars[].path を拡張フォルダ内で解決するので copy が要るが、tools/gen-vscode-grammar.cljs --check が drift を拒否する (gen-embedded / gen-tmlanguage と同じ idiom)。copy 以外に 2 つ検査する: package.json の scopeName と grammar 内の scopeName の一致 (ここがずれると拡張は install も activate も .kotoba を開くこともできるのに何も色が付かず、VS Code は scope で grammar を引くのでエラーも出ない)、および宣言拡張子と linguist/languages.yml.entry の一致。実際に 1 つずつ壊して確認: stale copy=1 / scopeName typo=1 / extensions drift=1 / grammar 読めず=2 / 復元=0 で、いずれも名乗った理由で拒否した。出荷する grammar 自体も vscode-textmate (VS Code / linguist と同じエンジン) で kotoba-lang/murakumo の production source 3 本を tokenize し 100% scoped / 12 scope cases PASS。GitHub の表示は変わらない — languages.yml がそれを決めるため。Marketplace には出していない (vsce publisher identity はコードでなくアカウントの決定)"}
 
  {:db/id -5
   :task/id "B-linguist-upstream-pr"
