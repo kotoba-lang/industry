@@ -255,10 +255,9 @@
   {:coordinate "smol-toml" :ecosystem :npm :disposition :gap-closed
    :target "kotoba-lang/org-toml"
    :note "TOML v1.0.0, the full grammar, reader only. No writer: table layout, key quoting and float formatting are policy questions a reader does not have to answer, and a round-trip suite against one's own writer looks like validation while checking nothing."}
-  {:coordinate "hpke-js" :ecosystem :npm :disposition :gap-planned
-   :proposed-name "org-ietf-hpke"
-   :prerequisite "MET 2026-08-26. Both pieces exist now: kotoba-lang/org-ietf-x25519 for DHKEM and kotoba-lang/org-ietf-chacha20-poly1305 for the AEAD. What remains is HPKE itself -- the labeled Extract/Expand of RFC 9180 section 4, the key schedule and the context -- plus an HKDF taking an arbitrary salt. ⚠ kotoba-lang/crypto's hkdf is NOT that: it hardcodes a zero salt and its default digest is a JVM MessageDigest. Build the labeled KDF on org-nist-sha2's hmac-sha256, which is portable and real."
-   :note "RFC 9180, used by kotobase-server/security/keywrap.cljs. The blocker named on 2026-08-26 -- that every hit for x25519 in this workspace was a call site rather than an implementation -- is gone."}
+  {:coordinate "hpke-js" :ecosystem :npm :disposition :gap-closed
+   :target "kotoba-lang/org-ietf-hpke"
+   :note "RFC 9180 base mode with DHKEM(X25519, HKDF-SHA256), HKDF-SHA256 and ChaCha20Poly1305 -- the one suite this workspace can execute. Validated against the RFC's published DeriveKeyPair outputs and 231 differential assertions with BouncyCastle, including eight cases where BouncyCastle DECRYPTS what this sealed. The other suites need AES-GCM, the NIST curves or X448, each an implementation rather than a parameter; the PSK/Auth modes are the same key schedule with two more inputs and are not written because nothing consumes them."}
   {:coordinate "@endo/ocapn" :ecosystem :npm :disposition :gap-planned
    :proposed-name nil
    :prerequisite "an adapter in kotoba-lang/kotoba-lang, not a new repository"
