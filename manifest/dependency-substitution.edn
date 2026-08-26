@@ -1,0 +1,286 @@
+;; manifest/dependency-substitution.edn — every external dependency the
+;; kotoba-lang org still has, and what it is supposed to become.
+;;
+;; ## Why this file exists
+;;
+;; CLAUDE.md fixes the runtime order as `kotoba wasm` > `clojurewasm` >
+;; ClojureScript > nbb, demotes JVM and babashka to last resort, and
+;; `90-docs/migration/kotoba-wasm-runtime-cutover.edn` declares
+;; `:new-jvm-runtime-dependencies :forbidden`. Neither says what the CURRENT
+;; external surface is, so "is this dependency allowed?" had no answer that
+;; could be looked up -- only re-derived, differently each time.
+;;
+;; Measured 2026-08-26 across 2,129 of 2,143 west-registered kotoba-lang
+;; paths, the whole external surface is 26 distinct JVM runtime coordinates
+;; and 110 npm runtime packages. That is small enough to decide once, per
+;; coordinate, and then check.
+;;
+;; ## The finding that reshaped the work
+;;
+;; Most of it is already replaceable. The foundational stdlib
+;; (ADR-kotoba-lang-foundational-stdlib: coll/spec/json/wit/async/time/fs/
+;; http/io/test/fmt/lsp + scheduler/store/lint, plus net/crypto/tls/kv) and
+;; the origin-plane spec mirrors (org-nist-sha2, org-ietf-blake2,
+;; org-ietf-ed25519, org-ietf-cbor, io-multiformats, io-ipld-car,
+;; org-ietf-deflate, org-ietf-x509, org-ietf-asn1, org-postgresql-wire) cover
+;; the large majority by usage count. The work those entries name is REWIRING
+;; an import, not writing a library.
+;;
+;; So `:disposition` is the useful axis, not the coordinate:
+;;
+;;   :structural           the host language, its compiler, or a render
+;;                         backend. Not a library anyone here can write; the
+;;                         exit is the .kotoba migration, tracked elsewhere.
+;;   :first-party-exists   a first-party replacement is shipped and the work
+;;                         is to switch the import.
+;;   :gap-closed           there was no first-party equivalent and one was
+;;                         written. Names the repository.
+;;   :gap-open             there is no first-party equivalent and none has
+;;                         been written. Names what it would be called and
+;;                         why it has not been done.
+;;   :frozen-legacy        covered by an existing cutover contract with its
+;;                         own exit evidence. Do not re-litigate here.
+;;   :tooling              dev-time only; never resolved by shipped code.
+;;
+;; ## Two rules this file is the source of truth for
+;;
+;; 1. A coordinate that appears in a kotoba-lang checkout and NOT in this
+;;    file is a newly acquired external dependency. The cutover contract
+;;    forbids that for JVM runtime deps; for the others it is at minimum an
+;;    undiscussed one. `scripts/verify-dependency-substitution.cljs` reports
+;;    it.
+;; 2. `:target` is a claim that can be checked. It must name a repository
+;;    that exists, and the detector fails if it does not -- a substitution
+;;    ledger pointing at a library nobody wrote is worse than no ledger,
+;;    because it reads as though the work were already possible.
+;;
+;; ## What this file deliberately does not contain
+;;
+;; Usage counts. They were measured to decide the dispositions and they are
+;; in the ADR, but a count written here becomes a constant that gets quoted
+;; after it stops being true -- the failure mode CLAUDE.md documents about
+;; its own fleet-ci section. Re-measure with
+;; `scripts/verify-dependency-substitution.cljs --edn`.
+
+{:dependency-substitution/version 1
+ :dependency-substitution/adr "adr-2608260200-kotoba-lang-external-dependency-substitution"
+ :dependency-substitution/measured "2026-08-26"
+ :dependency-substitution/scope "orgs/kotoba-lang"
+
+ :dependency-substitution/dispositions
+ [;; ------------------------------------------------ structural: the host itself
+  {:coordinate "org.clojure/clojure" :ecosystem :maven :disposition :structural
+   :note "The language. The exit is the .kotoba migration (ADR-2607279200), not a library."}
+  {:coordinate "org.clojure/clojurescript" :ecosystem :maven :disposition :structural
+   :note "The compiler for the second-ranked runtime in CLAUDE.md's order. Not a dependency to remove."}
+  {:coordinate "thheller/shadow-cljs" :ecosystem :maven :disposition :structural
+   :note "Build tool. Produces JS but spawns a JVM to do it; the exit is amu's js target, not a rewrite."}
+  {:coordinate "com.github.clj-easy/graal-build-time" :ecosystem :maven :disposition :structural
+   :note "Native-image support for the kotoba CLI. Disappears with the JVM bootstrap, not before."}
+  {:coordinate "react" :ecosystem :npm :disposition :structural
+   :note "Reagent's render backend. CLAUDE.md ADR-2608260900 retires .tsx/.svelte AUTHORING, not this dependency; reagent apps keep it after migration."}
+  {:coordinate "react-dom" :ecosystem :npm :disposition :structural :note "As react."}
+  {:coordinate "nbb" :ecosystem :npm :disposition :structural
+   :note "The sanctioned script host (ADR-2607173000). Successor is kbb, which does not exist yet."}
+  {:coordinate "shadow-cljs" :ecosystem :npm :disposition :structural :note "As the maven coordinate."}
+
+  ;; ------------------------------------------------ frozen legacy: has a contract
+  {:coordinate "com.dylibso.chicory/runtime" :ecosystem :maven :disposition :frozen-legacy
+   :contract "90-docs/migration/kotoba-wasm-runtime-cutover.edn"
+   :note "Three sites, exactly the frozen inventory: aiueos, kotoba, kototama. New sites are forbidden by that contract; do not add a fourth here."}
+  {:coordinate "com.dylibso.chicory/wasm" :ecosystem :maven :disposition :frozen-legacy
+   :contract "90-docs/migration/kotoba-wasm-runtime-cutover.edn"}
+
+  ;; ------------------------------------------------ gap closed by this work
+  {:coordinate "ws" :ecosystem :npm :disposition :gap-closed
+   :target "kotoba-lang/org-ietf-websocket"
+   :note "RFC 6455 framing and handshake, portable .cljc, zero deps. Was npm-only, so the framing vanished on any JVM or kotoba-WASM target."}
+  {:coordinate "@msgpack/msgpack" :ecosystem :npm :disposition :gap-closed
+   :target "kotoba-lang/org-msgpack"
+   :note "Also replaces checkpointer's JVM-only hand-rolled codec, which had throwing ClojureScript stubs. The format was implemented once per runtime."}
+
+  ;; ------------------------------------------------ first-party exists: rewire
+  {:coordinate "org.clojure/data.json" :ecosystem :maven :disposition :first-party-exists
+   :target "kotoba-lang/json" :note "Layer 1 of the foundational stdlib. encode/decode, deterministic key order."}
+  {:coordinate "metosin/jsonista" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/json"}
+  {:coordinate "cheshire/cheshire" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/json"}
+  {:coordinate "zod" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/spec"}
+  {:coordinate "metosin/malli" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/spec"}
+  {:coordinate "org.clojure/tools.reader" :ecosystem :maven :disposition :first-party-exists
+   :target "kotoba-lang/reader" :note "kotoba-lang/edn covers the bounded-EDN half."}
+  {:coordinate "datascript/datascript" :ecosystem :maven :disposition :first-party-exists
+   :target "kotoba-lang/datalog" :note "With kotoba-lang/datom for the value layer; kotobase when durability is wanted."}
+  {:coordinate "datascript" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/datalog"}
+  {:coordinate "datalevin/datalevin" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/kotobase"}
+  {:coordinate "com.datomic/peer" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/kotobase"}
+  {:coordinate "com.datomic/local" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/kotobase"}
+  {:coordinate "org.neo4j/neo4j" :ecosystem :maven :disposition :first-party-exists
+   :target "kotoba-lang/kotobase" :note "Cypher itself is org-opencypher-cypher; the store is kotobase."}
+  {:coordinate "babashka/process" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/process"}
+  {:coordinate "http-kit/http-kit" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/http"}
+  {:coordinate "org.babashka/http-client" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/http"}
+  {:coordinate "clj-http/clj-http" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/http"}
+  {:coordinate "clj-commons/clj-yaml" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/yaml"}
+  {:coordinate "yaml" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/yaml"}
+  {:coordinate "@xmldom/xmldom" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/xml"}
+  {:coordinate "hiccup/hiccup" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/html"}
+  {:coordinate "org.clojure/core.async" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/async"}
+  {:coordinate "org.clojure/test.check" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/test"}
+  {:coordinate "org.clojure/data.csv" :ecosystem :maven :disposition :first-party-exists :target "kotoba-lang/org-ietf-csv"}
+  {:coordinate "fflate" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/org-ietf-deflate"}
+  {:coordinate "@ipld/dag-cbor" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/org-ietf-cbor"}
+  {:coordinate "@ipld/car" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/io-ipld-car"}
+  {:coordinate "multiformats" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/io-multiformats"}
+  {:coordinate "org.postgresql/postgresql" :ecosystem :maven :disposition :first-party-exists
+   :target "kotoba-lang/org-postgresql-wire" :note "provider-postgres is the adapter above it."}
+  {:coordinate "org.bouncycastle/bcprov-jdk18on" :ecosystem :maven :disposition :first-party-exists
+   :target "kotoba-lang/org-ietf-x509"
+   :note "Split by use: certificates to org-ietf-x509, DER to org-ietf-asn1, signatures to org-ietf-ed25519 or eth-crypto. Not a single swap."}
+  {:coordinate "org.bouncycastle/bcpkix-jdk18on" :ecosystem :maven :disposition :first-party-exists
+   :target "kotoba-lang/org-ietf-cms"}
+  {:coordinate "@noble/hashes" :ecosystem :npm :disposition :first-party-exists
+   :target "kotoba-lang/org-nist-sha2"
+   :note "By subpath: sha2 and hmac to org-nist-sha2, blake2 to org-ietf-blake2, hkdf to kotoba-lang/crypto, sha1 to kotoba-lang/hash. argon2 has no first-party equivalent -- see its own entry."}
+  {:coordinate "@noble/curves" :ecosystem :npm :disposition :first-party-exists
+   :target "kotoba-lang/org-ietf-ed25519"
+   :note "ed25519 is nearly all of the usage. secp256k1 is kotoba-lang/eth-crypto, which implements the point arithmetic and RFC 6979 in portable .cljc. bls12-381 has no first-party equivalent -- see its own entry."}
+  {:coordinate "@noble/ciphers" :ecosystem :npm :disposition :first-party-exists
+   :target "kotoba-lang/crypto" :note "AEAD shape; kotoba-lang/noise for the ChaCha20-Poly1305 handshake path."}
+  {:coordinate "@noble/post-quantum" :ecosystem :npm :disposition :first-party-exists
+   :target "kotoba-lang/kyber" :note "kotoba-lang/pqh is the crypto-agility seam above it."}
+  {:coordinate "three" :ecosystem :npm :disposition :first-party-exists
+   :target "kotoba-lang/kami-engine"
+   :note "Not merely available: CLAUDE.md's 3D rule forbids a second engine outright. org-threejs is a spec mirror, not a licence to depend on three."}
+  {:coordinate "@pixiv/three-vrm" :ecosystem :npm :disposition :first-party-exists
+   :target "kotoba-lang/org-vrmc-vrm"}
+  {:coordinate "re-frame/re-frame" :ecosystem :maven :disposition :first-party-exists
+   :target "kotoba-lang/shitsuke" :note "shitsuke.re-frame.core is the host seam; CLAUDE.md ADR-2608260900 makes re-frame the default state layer, so this is a seam, not a removal."}
+  {:coordinate "reagent/reagent" :ecosystem :maven :disposition :first-party-exists
+   :target "kotoba-lang/shitsuke" :note "As re-frame."}
+
+  ;; ------------------------------------------------ gap open: nothing to rewire to
+  {:coordinate "@noble/hashes/argon2" :ecosystem :npm :disposition :gap-open
+   :proposed-name "org-ietf-argon2"
+   :note "RFC 9106 Argon2id. kotoba-lang/pqh names the suite and injects an IKdf capability, stating the math is not in-language and is verified byte-identical against @noble/hashes. Tractable: Argon2 is BLAKE2b-based and org-ietf-blake2 already ships."}
+  {:coordinate "@noble/curves/bls12-381" :ecosystem :npm :disposition :gap-open
+   :proposed-name "org-ietf-bls-signatures"
+   :note "io-filecoin-signer's bls.cljc delegates to @noble/curves and says so: there is no pure-Java BLS12-381 in this workspace. A pairing-friendly curve is the largest single item on this list."}
+  {:coordinate "org.xerial/sqlite-jdbc" :ecosystem :maven :disposition :gap-open
+   :proposed-name "org-sqlite"
+   :note "kotobase-storage-sqlite and bitcoin-consensus. Worth questioning before building: kotobase-engine-lsm is the first-party engine, and the only thing a SQLite reader adds is compatibility with files other tools wrote."}
+  {:coordinate "tech.kwik/kwik" :ecosystem :maven :disposition :gap-open
+   :proposed-name "org-ietf-quic"
+   :note "murakumo. com-quic-http3 is NOT this -- it is a ~190-line CRUD scaffold over a schema, measured 2026-08-26, and naming it as the replacement would be false."}
+  {:coordinate "org.eclipse.milo/sdk-server" :ecosystem :maven :disposition :gap-open
+   :proposed-name "org-opcfoundation-opcua"
+   :note "dcs. com-opc-ua is a ~200-line CRUD scaffold, not a protocol stack."}
+  {:coordinate "org.eclipse.milo/sdk-client" :ecosystem :maven :disposition :gap-open
+   :proposed-name "org-opcfoundation-opcua"}
+  {:coordinate "com.digitalpetri.modbus/modbus-tcp" :ecosystem :maven :disposition :gap-open
+   :proposed-name "org-modbus"
+   :note "dcs. com-modbus-tcp is a ~182-line CRUD scaffold. The actual MBAP header plus PDU is small; this is the most tractable protocol gap on the list."}
+  {:coordinate "com.microsoft.playwright/playwright" :ecosystem :maven :disposition :gap-open
+   :proposed-name "org-chromedevtools-cdp"
+   :note "The workspace has browser, browser-use, browser-agent and devtools, but none of them speaks the CDP wire. What is missing is the protocol, not the orchestration."}
+  {:coordinate "playwright" :ecosystem :npm :disposition :gap-open :proposed-name "org-chromedevtools-cdp"}
+  {:coordinate "@crawlee/playwright" :ecosystem :npm :disposition :gap-open :proposed-name "org-chromedevtools-cdp"}
+  {:coordinate "com.google.javascript/closure-compiler-unshaded" :ecosystem :maven :disposition :gap-open
+   :proposed-name nil
+   :note "kotoba-script's optimizer for its restricted ESM output. Not a new repository: the exit is amu emitting what it wants directly, which is a compiler decision and not a library gap."}
+  {:coordinate "@bytecodealliance/jco" :ecosystem :npm :disposition :gap-open
+   :proposed-name nil
+   :note "kototama-component. Component-model tooling; kotoba-lang/kotoba-component owns the model, and the pinned wasm-tools/wac-cli binaries in its component-model-v1.edn are the same surface. One decision, not three."}
+  {:coordinate "com.microsoft.playwright/playwright-driver" :ecosystem :maven :disposition :gap-open
+   :proposed-name "org-chromedevtools-cdp"}
+
+
+  ;; ------------------------------------------------ families, by name prefix
+  ;; A prefix rule beats twenty-seven identical entries, and a family that
+  ;; grows does not silently fall out of the ledger. The longest matching
+  ;; prefix wins, so a specific coordinate can still override its family.
+  {:pattern "@radix-ui/" :disposition :first-party-exists :target "kotoba-lang/jp-go-digital-design-system"
+   :note "The repository is jp-go-digital-design-system; `jp-go-dds` is only the namespace prefix, and the ledger must name the repository west registers. Headless React primitives, all in one application. CLAUDE.md ADR-2608260900 retires .tsx authoring, so the destination is jp-go-dds components under reagent, not a Radix port."}
+  {:pattern "@digital-go-jp/" :disposition :first-party-exists :target "kotoba-lang/jp-go-digital-design-system"
+   :note "The upstream design tokens jp-go-dds is built from. Depending on them directly bypasses the token bridge, which is the seam --hig-* rides on."}
+  {:pattern "@tailwindcss/" :disposition :first-party-exists :target "kotoba-lang/jp-go-digital-design-system"}
+  {:pattern "@atproto/" :disposition :first-party-exists :target "kotoba-lang/org-bluesky-atproto"
+   :note "kotoba-lang/xrpc is the wire half, atproto-client the client half."}
+  {:pattern "@jitl/quickjs" :disposition :first-party-exists :target "kotoba-lang/quickjs"}
+  {:pattern "@huggingface/" :disposition :first-party-exists :target "kotoba-lang/org-huggingface-safetensors"}
+  {:pattern "@filoz/" :disposition :first-party-exists :target "kotoba-lang/io-filecoin"}
+  {:pattern "@internationalized/" :disposition :first-party-exists :target "kotoba-lang/time"}
+  {:pattern "@playwright/" :disposition :gap-open :proposed-name "org-chromedevtools-cdp"}
+  {:pattern "@storybook/" :disposition :tooling}
+  {:pattern "@testing-library/" :disposition :tooling}
+  {:pattern "@graphql-codegen/" :disposition :tooling}
+  {:pattern "@sveltejs/" :disposition :tooling
+   :note "Retired as an authoring surface by ADR-2608260900; still present until the 1,379 .svelte/.tsx files move."}
+  {:pattern "@cloudflare/" :disposition :tooling}
+  {:pattern "@types/" :disposition :tooling}
+  {:pattern "@tsconfig/" :disposition :tooling}
+  {:pattern "@vitest/" :disposition :tooling}
+  {:pattern "@webgpu/" :disposition :tooling :note "Type declarations. org-w3-webgpu is the contract."}
+  {:pattern "@biomejs/" :disposition :tooling}
+
+  ;; ------------------------------------------------ one application's React stack
+  {:coordinates ["next" "next-themes" "react-hook-form" "@hookform/resolvers"
+                 "react-day-picker" "react-resizable-panels" "embla-carousel-react"
+                 "cmdk" "vaul" "sonner" "input-otp" "lucide-react" "recharts"
+                 "class-variance-authority" "clsx" "tailwind-merge" "tailwindcss"
+                 "tailwindcss-animate" "autoprefixer" "postcss" "date-fns"]
+   :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/jp-go-digital-design-system"
+   :note "One repository (app-scap) carries nearly all of these. They are listed together because they share a single destination and a single decision: ADR-2608260900 retires .tsx as an authoring surface, so the exit is one migration, not twenty-one substitutions. Charting has no first-party equivalent yet; when recharts is migrated it needs one, and this entry should be split at that point rather than quietly widened."}
+
+  ;; ------------------------------------------------ remaining individual coordinates
+  {:coordinates ["graphql" "@apollo/client"] :ecosystem :npm
+   :disposition :first-party-exists :target "kotoba-lang/org-graphql-http"
+   :note "CLAUDE.md ADR-2608189300 makes GraphQL the routine read surface, so this is a seam to keep, not a dependency to delete."}
+  {:coordinates ["ethers" "viem"] :ecosystem :npm :disposition :first-party-exists
+   :target "kotoba-lang/eth-crypto"
+   :note "org-ethereum-jsonrpc for the RPC half, org-ethereum-abi for encoding. eth-crypto already implements the secp256k1 point arithmetic and RFC 6979 in portable .cljc."}
+  {:coordinate "hono" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/http"}
+  {:coordinate "node-cron" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/scheduler"}
+  {:coordinate "ink" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/kuro"
+   :note "Terminal UI. kuro is the terminal model and kobo the workbench (ADR-2606301000); neither name says so, which is why this line exists."}
+  {:coordinate "xml2js" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/xml"}
+  {:coordinate "xlsx" :ecosystem :npm :disposition :first-party-exists :target "kotoba-lang/ooxml"
+   :note "The npm package is SheetJS. Do not read this as kotoba-lang/xlsx, which is a different thing with the same name; the spreadsheet format lives in ooxml."}
+  {:coordinate "quickjs-emscripten-core" :ecosystem :npm :disposition :first-party-exists
+   :target "kotoba-lang/quickjs"}
+  {:coordinate "@google/model-viewer" :ecosystem :npm :disposition :first-party-exists
+   :target "kotoba-lang/kami-engine"
+   :note "As three: CLAUDE.md's 3D rule forbids a second engine, so this is not a preference."}
+  {:coordinate "@supabase/supabase-js" :ecosystem :npm :disposition :first-party-exists
+   :target "kotoba-lang/org-postgresql-wire"
+   :note "Supabase is Postgres plus a REST facade; the wire protocol is the part with a first-party implementation. The hosted service is a deployment choice, not a language dependency."}
+  {:coordinate "crawlee" :ecosystem :npm :disposition :gap-open :proposed-name "org-chromedevtools-cdp"}
+  {:coordinate "smol-toml" :ecosystem :npm :disposition :gap-open :proposed-name "org-toml"
+   :note "TOML has no first-party reader. Small, and it would also serve Cargo manifests and the pinned toolchain files."}
+  {:coordinate "hpke-js" :ecosystem :npm :disposition :gap-open :proposed-name "org-ietf-hpke"
+   :note "RFC 9180. kotobase-server uses it. Composable from what exists -- HKDF is in kotoba-lang/crypto, the AEAD in noise, the KEM in org-ietf-ed25519 -- so this is assembly rather than new cryptography."}
+  {:coordinate "@endo/ocapn" :ecosystem :npm :disposition :gap-open :proposed-name nil
+   :note "OCapN. CLAUDE.md ADR-2608160200 places UCAN, CACAO and OCapN as adapters over the core capability semantics in kotoba-lang/kotoba-lang, so the destination is an adapter there, not a new origin-plane repository."}
+  {:coordinate "curves" :ecosystem :npm :disposition :first-party-exists
+   :target "kotoba-lang/org-ietf-ed25519"
+   :note "murakumo declares `curves@^1.7.0`. The npm package `curves` is at 1.1.0 and unrelated, so that range cannot resolve at all -- this is a typo for @noble/curves that has never been installed. Fixing it means removing the line, not substituting it."}
+  {:coordinate "workflow" :ecosystem :npm :disposition :gap-open :proposed-name nil
+   :note "app-scap declares `workflow@latest`. The npm package of that name is unrelated to anything here; like the builtin-shadowing entries beside it, it is a line to delete rather than a dependency to replace."}
+
+  ;; ------------------------------------------------ tooling, by exact name
+  {:coordinates ["typescript" "tsx" "turbo" "typedoc" "vite" "vitest" "svelte"
+                 "svelte-check" "storybook" "bits-ui" "lucide-svelte" "jsdom"
+                 "http-server" "markuplint" "miniflare" "workerd" "wrangler" "tslib"]
+   :ecosystem :npm :disposition :tooling
+   :note "Never resolved by shipped code. wrangler, workerd and miniflare are the Cloudflare deploy and local-runtime surface, which is deployment, not language."}
+
+  ;; ------------------------------------------------ tooling: never in shipped code
+  {:coordinate "io.github.cognitect-labs/test-runner" :ecosystem :git :disposition :tooling
+   :note "The cutover contract allows historical .clj tests as an oracle until replaced. kotoba-lang/test is the in-language successor."}
+  {:coordinate "clj-kondo/clj-kondo" :ecosystem :maven :disposition :tooling
+   :note "Has a native binary and an npm package; it never needs to be a JVM dependency at all. kotoba-lang/lint is the in-language successor."}
+  {:coordinate "lambdaisland/kaocha" :ecosystem :maven :disposition :tooling :note "As test-runner."}
+  {:coordinate "cloverage/cloverage" :ecosystem :maven :disposition :tooling}
+  {:coordinate "io.github.clojure/tools.build" :ecosystem :git :disposition :tooling}
+  {:coordinate "org.clojure/tools.namespace" :ecosystem :maven :disposition :tooling}
+  {:coordinate "com.thheller/shadow-css" :ecosystem :maven :disposition :tooling}
+  {:coordinate "com.cognitect/transit-cljs" :ecosystem :maven :disposition :tooling}]}
