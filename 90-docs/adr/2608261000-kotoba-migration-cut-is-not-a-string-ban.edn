@@ -1,18 +1,17 @@
 [{:db/id -1
   :adr/id "adr-2608261000-kotoba-migration-cut-is-not-a-string-ban"
-  :adr/title "決定核は移行の切り方であって文字列禁止ではない — clj から .cljk / .kotoba への正しい移行"
+  :adr/title "決定核から文字列を落とす読みを閉じる — それは安全設計でも amu 拒否でもない"
   :adr/status "accepted"
   :adr/date "2026-08-26"
   :adr/deciders ["Jun Kawasaki"]
   :adr/supersedes ""
   :adr/superseded-by ""
-  :adr/related ["2608650000" "2607279200" "2608242100" "2608241900" "2607201300"]
+  :adr/related ["2608650000" "2607279200" "2608242100" "2608241900" "2607201300" "adr-2608261100-kotoba-app-vertical-slice-is-the-migration-unit"]
   :adr/repos ["com-junkawasaki/root" "kotoba-lang/org-ietf-smtp" "kotoba-lang/amu" "kotoba-lang/kotoba-lang"]
   :adr/authoritative_for
-  ["clj / cljc → .cljk / .kotoba の正しい移行手順"
-   "決定核は切り方であって言語の天井ではないという決定"
-   "文字列を核に入れてよい条件と、線の形・走査・effect を残す条件"
-   "『判断だけ』『文字列を持たない』を安全設計・amu 未成熟と取り違えない分類"]
+  ["文字列禁止の否定 — 判断核から文字列を落とす読みを閉じる"
+   "『判断だけ』『文字列を持たない』を安全設計・amu 未成熟と取り違えない分類"
+   "線の形・走査・effect を残す理由は mirror / 走査設計 / ambient authority であるという決定"]
   :adr/body
   "2026-08-26、オーナーの問い: SMTP 核を判断だけにし文字列を持たせなかったのは
 kotoba の安全設計か、初期の移行時の制約か、amu が未成熟だからか。続けて
@@ -46,52 +45,22 @@ amu が『判断以外を拒否した』事実は、2026-08-26 の SMTP スラ�
 通った。足りなかったのは正規表現演算（stdlib）と、untyped の `or` が i64 になる
 既知の型付け（型注釈で回避）だけである。
 
-## 決定核は切り方である
+## 決定核に文字列が無いことは天井ではない
 
-ADR-2608650000 決定 4 の『スカラ + 文字列 + record で表せる判断』は、核が
-持てるものの上限ではなく、**repo 全体を待たずに切る下限**である。文字列は
-禁止されていない。判断が文字列の上に載るなら、その文字列は核に入れる。
+ADR-2608650000 決定 4 が当時『スカラ + 文字列 + record で表せる判断』と
+書いたのは、核が持てるものの上限ではなく、repo 全体を待たずに切る下限
+だった。文字列は禁止されていない。判断が文字列の上に載るなら入れる。
+残す理由を『Kotoba は文字列を持てない』と書かない。移行単位そのものは
+ADR-2608261100。
 
-切るもの（ゲストが JVM も Node も持たずに答える問）と、残すもの（線の形、
-走査、コレクション組み立て、effect）を先に名指しする。残す理由を『Kotoba は
-文字列を持てない』と書かない。
+## この ADR が閉じる読み / 閉じない読み
 
-残してよいものの例:
+閉じる: 文字列禁止。SMTP 核に文字列が無かったのは、あの判断が整数と bool
+だったからである。それを言語の天井にしない。
 
-- 線に出す CRLF / コマンド列。`string-concat` で書けるが、本番の送り手が
-  第二 formatter を使わないなら核にしない（静かな mirror）
-- 正規表現で応答行を map にする。演算未実装に加えて、走査設計のまま移さない
-- ソケット・ファイル・例外経路。安全不変条件
-- AUTH 名の set や資格情報の map。adapter がスカラーに落としてから核へ渡す
-
-入れてよいものの例:
-
-- 整数比較、bool の表、keyword の符号
-- 判断に必要な文字列（ホスト名は EHLO に書いてよいか、トークンは空か）
-- record（判断の入力が record なら、組み立ては cljc、フィールド上の判断は核）
-
-## 正しい移行（理想）
-
-1 スライス = 1 判断表。repo 全体を `.kotoba` に改名しない。
-
-1. **分類する。** 書けない理由を `lang/surface-status.edn` の `:disposition` で
-   引く。安全 / 意味の単純化 / 部分実装 / 未実装 / このスライスの切り方、のどれか。
-   分類を書かずに『Kotoba ではこう書く』と様式化しない。
-2. **oracle を残す。** `.cljc` / `.clj` が今の本番である。`.kotoba` を require しない
-   （require-graph）。核は同じ表の第二実装であり、突き合わせるものが parity である。
-3. **adapter を cljc に置く。** set / map / nil / 文字列の線形式から、核が取る
-   スカラー（と、判断に必要な文字列）へ落とす。`max-parameters` に収める。
-4. **`.kotoba` と `.cljk` を同じ判断で書く。** `.kotoba` は typed safe core、
-   `.cljk` は `:clj-kotoba`（JVM target ではない、ADR-2608242100）。本体が同じなのは
-   欠陥ではない。コメントで面を名指しする。untyped の `and` / `or` が i64 になるなら
-   型注釈を付けて表を保つ。入れ子 `if` に逃げて表を壊さない。
-5. **`kotoba compile` で wasm と web を出す。** 公開経路は CLI である。
-   `compile-source` は parity の内側。host に binary が無いときは skip し、
-   skip と pass を同じ顔にしない。
-6. **parity は表の直積を歩く。** 標本は、訪れていない行に同意する。壊し方は
-   意味を 1 枝だけひっくり返す。reader を壊した赤は成功した実演に数えない。
-7. **`ex-info` は切り出す機会に Result へ移す。** 移行の副産物にしない
-   （ADR-2608650000 決定 2）。
+閉じない: 『正しい移行 = 1 判断表』。それは 2026-08-26 当日の SMTP fallback を
+理想と取り違えた。手順の正本は ADR-2608261100。判断核は named backend が
+値を admit できないときの fallback であり、既定ではない。
 
 ## 実測（org-ietf-smtp、2026-08-26）
 
@@ -109,9 +78,16 @@ ADR-2608650000 決定 4 の『スカラ + 文字列 + record で表せる判断�
 
 ## 正本の置き場
 
-- 分類の正本は引き続き ADR-2608650000 と `lang/surface-status.edn`
-- 切り方と手順の正本はこの ADR
-- agent が毎回読む要約は CLAUDE.md / AGENTS.md の決定核節と
+- 分類の正本は ADR-2608650000 と `lang/surface-status.edn`
+- 文字列禁止の否定はこの ADR
+- 移行単位と手順の正本は ADR-2608261100（言語の理想は ADR-2607201300 /
+  ADR-2607279200）
+- agent が毎回読む要約は CLAUDE.md / AGENTS.md と
   `.cursor/rules/always/kotoba-migration-cut.mdc`
-- 1 スライスの手順書は skill `kotoba-clj-to-kotoba`
+- 手順書は skill `kotoba-clj-to-kotoba`
+
+## 改訂履歴
+
+2026-08-26 同日: 『1 スライス = 1 判断表』を理想から外し、ADR-2608261100 へ
+委譲した。文字列禁止の否定は据え置き。
 "}]

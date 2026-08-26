@@ -2,7 +2,7 @@
   :adr/id "2608650000"
   :adr/doc_type "adr"
   :adr/topic "kotoba-cannot-write-has-two-kinds-decision-core"
-  :adr/title "kotoba で「書けない」は 2 種類ある — 恒久の安全設計と native backend の未達を分けて扱い、移行の単位を決定核（decision core）にする"
+  :adr/title "kotoba で「書けない」は 2 種類ある — 恒久の安全設計と backend 未達を分けて扱う。決定核は言語の移行単位ではない"
   :adr/status :accepted
   :adr/date "2026-08-08"
   :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
@@ -10,12 +10,12 @@
   ["`.kotoba` に書けない理由を「恒久の安全設計」と「backend 未達」に必ず分類する規約と、その分類の正本"
    "恒久として引き受ける制約は 2 つだけ（exceptions→Result / bool は型）という決定"
    "map・set・closure・異種ベクタ・再帰値・bare bool パラメータを native 追随前提の一時制約として扱う決定"
-   "cljc → .kotoba の移行単位は決定核（切り方）であり、文字列禁止ではない — 手順の正本は ADR-2608261000"
-   "決定核に parity test を必須とする規約"
+   "決定核は named backend が値を admit できないときの fallback であり、言語の移行単位ではない — 移行単位の正本は ADR-2608261100"
+   "fallback として切り出した核には parity test を必須とする規約"
    "正規表現に依存する設計・`.cljc` のままの依存を持つ面を移行対象にしない規約"
    "kotoba-native の成熟度の 2026-08-08 時点の実測値と、その測り方"]
   :adr/supersedes []
-  :adr/related ["2607279200" "2607289500" "2607270100" "2608039700" "2608052000" "2607198300" "2607241100" "2607173000" "adr-2608261000-kotoba-migration-cut-is-not-a-string-ban"]
+  :adr/related ["2607279200" "2607289500" "2607270100" "2608039700" "2608052000" "2607198300" "2607241100" "2607173000" "adr-2607201300-kotoba-safe-application-language-profile" "adr-2608261000-kotoba-migration-cut-is-not-a-string-ban" "adr-2608261100-kotoba-app-vertical-slice-is-the-migration-unit"]
   :adr/repos ["com-junkawasaki/root"
               "cloud-itonami/cloud-itonami-app"
               "kotoba-lang/kotoba-lang"
@@ -111,29 +111,30 @@ bare `:bool` パラメータは compiler ADR 0219 が自ら
 一時で、何が landed したら外せるのかを書く。書かなければ、後から読む者はそれを
 恒久の様式として模倣する。
 
-### 4. 移行の単位は決定核（decision core）
+### 4. 決定核は fallback であり、言語の移行単位ではない
 
-**リポジトリ全体を `.kotoba` に移そうとしない。** スカラ + 文字列 + record で
-表せる判断を切り出し、コレクションの組み立てと effect は `.cljc` / `.clj` に
-残す。
+**リポジトリ全体を `.kotoba` に機械改名しない**ことは生きている。ただし移行の
+単位は決定核ではない。単位は `kotoba/app` の vertical slice である
+（ADR-2607201300 / ADR-2607279200 決定 5 / ADR-2608261100）。
 
-⚠ **これは切り方であって、文字列禁止ではない。** 『判断だけ』を『文字列を
-持たない』と読まない。判断が文字列の上に載るならその文字列は核に入れる。
-線の形・正規表現による走査・ソケットを残す理由は、それぞれ mirror を作らない /
-走査設計は移さない / ambient authority を渡さない、であり、`:string` が無い
-からではない。正しい手順は ADR-2608261000。
-
-先例は `kotoba-lang/murakumo` の 33 本の `kotoba/*_core.kotoba`。
-`infer_join_core.kotoba`（87 行）は冒頭コメントで自分の境界を宣言している:
+決定核の抽出が正当なのは、**名指しした backend** がその値を admit できない
+ときだけである。先例は murakumo の 33 本の `kotoba/*_core.kotoba`。
+native が word 型だったので決定だけを切り出し、33/33 が載った
+（compiler ADR 0219 → 0220 → 0221）。`infer_join_core.kotoba` は冒頭で
+自分の境界を宣言している:
 
 > partition-work / enrollment map assembly stay cljc (vectors/maps).
 
-**33/33 が native に載ったのは murakumo を移植したからではなく、決定核を切り出した
-から**である（compiler ADR 0219 → 0220 → 0221 で 0/33 → 14/33 → 30/33 → 33/33）。
+wasm / web で application が書ける対象に、最初からこの形へ潰さない。
+amu の参照は `examples/todo-app.kotoba`（init / view / step、文字列、
+document、cond）。SMTP `protocol_core` は fallback の実測であり、テンプレート
+ではない。
 
-この方式は upstream への依頼を 1 つも必要としない。
+⚠ **文字列禁止でもない。** 『判断だけ』を『文字列を持たない』と読まない
+（ADR-2608261000）。fallback を使うときはヘッダに、どの backend のどの欠落が
+埋まったら外すかを書く。
 
-### 5. 決定核には parity test を必須にする
+### 5. fallback として切り出した核には parity test を必須にする
 
 `.kotoba` 側と既存実装が同じ入力で同じ答えを出すことを、実際に走らせて確かめる。
 雛形は `murakumo/test/murakumo/infer_join_kotoba_parity_test.clj`
@@ -380,4 +381,7 @@ java -cp \"$(cat /tmp/cp.txt)\" clojure.main -e \\
 
 2026-08-26: 決定 4 を『切り方であって文字列禁止ではない』と明記し、手順を
 ADR-2608261000 へ委譲した。判断核から文字列を落とす読みはここで閉じる。
+2026-08-26 同日: 決定 4 をさらに降格した。移行単位は kotoba/app の
+vertical slice（ADR-2608261100）。決定核は named backend が値を admit
+できないときの fallback である。
 "}]

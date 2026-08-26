@@ -1,54 +1,58 @@
 ---
 name: kotoba-clj-to-kotoba
-description: clj / cljc から .cljk と .kotoba へ、決定核を 1 スライスだけ正しく移す。判断核は切り方であって文字列禁止ではない。『clj から kotoba』『cljk』『decision core』『kotoba compile』で発火。
+description: clj / cljc から .kotoba へ、kotoba/app の vertical slice を 1 本移す。判断核は named backend が値を通せないときの fallback。『clj から kotoba』『cljk』『decision core』『todo-app』『kotoba compile』で発火。
 ---
 
-# clj → .cljk / .kotoba（1 スライス）
+# clj → .kotoba（vertical app slice）
 
-**正本は ADR-2608261000**（切り方と手順）。分類は ADR-2608650000 と
-`lang/surface-status.edn` の `:disposition`。この skill は 1 スライスの手順書。
+**正本は ADR-2608261100**（移行単位）。言語は ADR-2607201300 / ADR-2607279200。
+分類は ADR-2608650000 と `lang/surface-status.edn` の `:disposition`。
+文字列禁止の否定は ADR-2608261000。この skill は 1 slice の手順書。
+
+判断核は既定ではない。参照は amu の `examples/todo-app.kotoba`
+（`init` / `view` / `step`。文字列、`:document`、`cond`）。
 
 ## 混ぜない
 
 | 層 | 例 | 扱い |
 |---|---|---|
-| 恒久の安全 | `throw`、ホスト interop、ソケット、`:max-parameters 5` | 広げない |
+| 恒久の安全 | `throw`、ホスト interop、ソケット | 広げない |
 | 意味の単純化 | bool は数ではない | 広げない |
-| 部分実装 / 未達 | map の native、正規表現演算、untyped `or` が i64 | 待たずに切るか、型で回避 |
-| **このスライスの切り方** | 線の CRLF、走査パース、使われない第二 formatter | 核にしない。言語の天井と書かない |
+| 部分実装 / 未達 | native の word 型、正規表現演算 | その backend にだけ fallback。言語から削らない |
+| **guest / host** | 線の CRLF 送信、DOM 破壊、credential | 機構は host。product semantics はゲスト |
 
-**文字列は禁止されていない。** 判断が文字列の上に載るなら核に入れる。
-『判断だけ』を『文字列を持たない』と読まない。
+**文字列は禁止されていない。** 『判断だけ』を『文字列を持たない』と読まない。
+『1 スライス = 1 判断表』にしない。
 
 ## 手順
 
 対象は west 管理なら **origin/main から worktree**（共有 `orgs/` を直接編集しない）。
 
-1. **切る判断を名指しする。** ゲストが JVM も Node も持たずに答える問。効果と
-   線の形は残す。残す理由を disposition で書く。
-2. **`.cljc` を oracle のまま残す。** 核を require しない。set / map / nil /
-   線形式は adapter がスカラー（と必要な文字列）へ落とす。引数は 5 以下。
-3. **同じ判断を `.kotoba` と `.cljk` に書く。** `.kotoba` は typed safe core、
-   `.cljk` は `:clj-kotoba`（JVM target ではない）。本体が同じなのは欠陥ではない。
-   untyped の `and`/`or` が i64 になるなら型注釈を付けて表を保つ。
-   `cond` は grammar が desugar する。入れ子 `if` を様式にしない。
-   `ex-info` はこの機会に Result へ移す。
-4. **公開 compile は CLI。**
+1. **4 分類する**（ADR-2607279200 決定 5）。portable pure / portable effectful
+   app / host mechanism / operational script。書けない理由は `:disposition`。
+2. **product semantics を Clojure-shaped の `.kotoba` に書く。** map / 文字列 /
+   record / document / `cond`。契約は state + event → next-state + inert
+   effects。capability ID は通常書かない。`.cljk` は `:clj-kotoba`
+   （JVM target ではない）。
+3. **機構は host に残す。** ソケット、credential、DOM 破壊、SDK。
+   `.cljc` oracle は gate が揃うまで残し、`.kotoba` を require しない。
+4. **named backend が値を admit できないときだけ** 決定核へ畳む。ヘッダに
+   欠落と撤去条件を書く。wasm / web に対して最初から潰さない。
+   `:max-parameters 5` は record / document に畳む理由であって、プログラムを
+   述語群へ分解する理由ではない。
+5. **公開 compile は CLI。**
 
 ```
-kotoba compile path/to/core.kotoba --target wasm -o core.wasm
-kotoba compile path/to/core.cljk  --target wasm -o core.wasm
-kotoba compile path/to/core.kotoba --target web  -o core.mjs
+kotoba compile path/to/app.kotoba --target wasm -o app.wasm
+kotoba compile path/to/app.kotoba --target web  -o app.mjs
 ```
 
-5. **parity は表の直積。** `compiler/compile-source` → `ir/execute` を既存関数と
-   突き合わせる。CLI compile は binary が無ければ skip し、skip と pass を
-   同じ顔にしない。意味を 1 枝だけひっくり返して赤になることを見る。
-   reader を壊した赤は数えない。
-6. **着地。** feature branch を push し `gh api .../merges` で main へ。
-   west pin は `nbb scripts/west-pin-put.cljs <entry> HEAD`（共有 checkout で
-   west.yml を手編集しない）。
+6. **parity。** 既存関数と突き合わせる。CLI は binary が無ければ skip し、
+   skip と pass を同じ顔にしない。意味を 1 枝だけひっくり返して赤になることを
+   見る。reader を壊した赤は数えない。`ex-info` はこの機会に Result へ移す。
+7. **着地。** feature branch を push し `gh api .../merges` で main へ。
+   west pin は `nbb scripts/west-pin-put.cljs <entry> HEAD`。
 
-先例: `kotoba-lang/murakumo` の `kotoba/*_core.kotoba`、
-`kotoba-lang/org-ietf-smtp` の `kotoba/smtp/protocol_core.{kotoba,cljk}`
-（2026-08-26、KIR digest 一致、SASL 全直積の parity）。
+先例: amu `examples/todo-app.kotoba`（application）。
+fallback: `kotoba-lang/murakumo` の `kotoba/*_core.kotoba`、
+`kotoba-lang/org-ietf-smtp` の `kotoba/smtp/protocol_core.{kotoba,cljk}`。
