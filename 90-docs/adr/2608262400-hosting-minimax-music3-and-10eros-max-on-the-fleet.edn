@@ -93,7 +93,7 @@ instance を名乗る」へ。**未設定の named instance は `\"\"` に解決
 それを「offer していない」と読む）—— 別の instance へ fallback しない。MiniMax を
 頼んで黙って Wan が返る呼び出し元は、走っていない model が走ったと告げられる。
 
-### 6. 同一インスタンス内の model 切替でも解放する
+### 6. 同一インスタンス内の model 切替でも解放する —— ただし hard path で
 
 `comfy_yield_sibling` が解放するのは**他の**インスタンスで、これから投げる先の
 インスタンスは誰も解放していなかった。1 インスタンス 1 model family の間は
@@ -106,9 +106,33 @@ GPU 0 has a total capacity of 48.00 GiB of which 27.12 GiB is free` で落ちた
 同じ request を再起動直後のインスタンスに投げると 105 秒で通る —— **不足していたのは
 model ではなく residency** だと言えるのはこの対比があるから。
 
-`comfy_make_room(base, model)` は**載せ替えのときだけ**解放する。無条件に解放すると
-同じ model の反復が毎回数十 GB を読み直すことになり、それはこの 3 インスタンス構成が
-そもそも避けるために在るコストである。
+**最初の修正（POST /free）は効かなかった。** 同じ列が同じ形で再現した
+（`27.37 GiB is free ... 18.42 GiB is allocated by PyTorch`、148 MiB が置けない）。
+`comfy_free_models` は自分の docstring で既にそう言っていた —— queue flag であり
+best-effort、torch が数十 GB 掴んでいる時の hard path は unit 再起動である、と。
+**数十 GB が free と報告されながら 148 MiB が置けないのは不足ではない** ——
+このプロセスがもう詰め直せない unified memory の address space であり、
+そこから出る方法は新しいプロセスだけである。
+
+したがって target も sibling と同じ hard path（unit 再起動）を通す。**載せ替えの
+ときだけ**で、無条件に再起動すると同じ model の反復が毎回数十 GB を読み直す。
+
+**この経路が走るには tree の外で 2 つ真である必要があり、どちらも偽だった。**
+
+1. `/etc/sudoers.d/gad-comfy-yield` は `comfyui.service` と `comfyui-h3.service`
+   しか許可していなかった。`comfyui-034.service` を足した。
+2. **`murakumo-generation.service` が `NoNewPrivileges=true` で走っていた。**
+   sudo が昇格できないので `comfy_restart_unit` は yield せず
+   `CalledProcessError` を上げる。**これは新しい問題でも、このインスタンス固有の
+   問題でもない** —— `comfy_yield_sibling` は同じ helper を catch せずに呼ぶので、
+   **文書化された VRAM yield の hard path は deploy された unit の下で一度も
+   走ったことがない。** sibling が 8 GB 以上掴んでいる時にしか発火しないので
+   気付かれなかった。drop-in で `NoNewPrivileges=false` にした。sudo に許される
+   ことは変わらない —— sudoers の項目は固定 3 コマンドの `systemctl restart` だけ。
+
+3 つ揃えたあと、**2 回失敗していたのと同じ request**（music3 の 10 秒 WAV →
+同じインスタンスで 10eros-max）が 150 秒で完走した。225,296 bytes、512x512、
+39 frames、content hash 記録あり。失敗 2 回と成功 1 回は同じ request である。
 
 ## 実測（2026-08-26、gad / ROCm gfx1151 / ComfyUI v0.34.0）
 
@@ -182,7 +206,7 @@ model ではなく residency** だと言えるのはこの対比があるから�
 ## 参照
 
 - kotoba-lang/murakumo `90ef07c`（3 つ目のインスタンスと 2 model の配線）/
-  `b4c0c6b`（同一インスタンスの載せ替え解放）
+  `b4c0c6b`（載せ替え解放の最初の試み。POST /free は効かなかった）/ `21847a7`（hard path + sudoers + NoNewPrivileges）
 - network-awai/cloud-murakumo `7736978`（catalog spec）
 - ADR-2608036800（per-model `:status` と公開カタログ。未宣言は `:unverified` に落ちる）
 - ADR-2608100600（minimax-h3 を fleet video の既定にした判断と専用インスタンス）
