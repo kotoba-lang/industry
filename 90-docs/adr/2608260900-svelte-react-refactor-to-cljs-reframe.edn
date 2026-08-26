@@ -246,13 +246,46 @@ throughput は上がらない。
 なる。文書の陳腐化ではなく**契約違反**で、移行するなら `migration.edn` と検査器を
 書き換える統治判断が要る —— 移行バッチの agent が単独で決めることではない。
 
-同じ形が 6 件（`app-global` `app-maps` `app-roukisho` `app-saiban`
-`app-shomeisyashin` `app-sre`）。除外しなければ loop が毎周これを選び、agent が
-毎周正しく拒否して、token だけが減っていた。
+除外しなければ loop が毎周これを選び、agent が毎周正しく拒否して、token だけが減る。
 
-**この波で agent が指示に反して止めたのは 2 回目で、2 回とも agent が正しかった**
-（1 回目は lock の測定、2 回目はこれ）。**プロンプトに書いた範囲より、
-その場で測った証拠の方が強い。**
+#### ⚠ その検出器を私はファイル名で書き、3 つ取りこぼした
+
+上の 1 件を見て `docs/verify-custody.cljs` の有無で除外する検出器を書いた。
+第 3 波で 4 agent を出したら、**3 本が別々の名前の同じ gate を見つけて止まった**:
+
+    docs/verify-custody.cljs             app-global, app-maps, app-roukisho, …
+    docs/verify-docs-claims.cljs         app-sos
+    docs/check-migration-identity.cljs   gol-d-roger
+    scripts/verify-docs-claims.cljs      app-public-kafun-bokumetsu   ← docs/ ですらない
+
+3 本とも「その名前は無いが、同じ目的の gate がこの名前で在り、**今日 PASS して
+いる**」と自分で判断した。`gol-d-roger` の agent は「指示の字面を、同じ文が
+述べている目的に反して読むことになる」と書いてきた。**正しい。**
+
+検出を**中身**に変えた: `docs/` か `scripts/` の `.cljs` が `migration.edn` か
+`svelte/` に言及していれば custody 契約とみなす。**既知の陽性 9 件・陰性 9 件
+（実際に移行が通った repo）で 9/9・9/9** を確認してから landed した。
+除外は 4 → **10 件**になり、増えた 3 件（`drone` `image2vrm`
+`app-email-service-adapter`）はそれまで候補として静かに提示され続けていた。
+
+**規則の形が同じであることに名前を付けておく**: 一度観測した事例から
+**識別子（ファイル名）を検出条件にすると、同じ性質を別の名前で持つものを
+静かに取りこぼす。** 性質そのもの（何を pin して何を守っているか）で判定する。
+これは ADR-2608136000 の「測れなかった検査が、測って問題が無かった検査と
+同じ値を返す」の名前空間版で、**取りこぼした 3 件は「custody 無し」として
+候補に出ていた** —— 不在の証明ではなく、探し方が狭かっただけだった。
+
+#### 通算 6 回、agent が指示に従わず反証を出して、6 回とも agent が正しかった
+
+1. build lock を 1 サンプルで「空いている」と判定した私の指示（minpaku の agent が拒否）
+2. `app-global` の custody 契約（私のレシピに無い概念）
+3〜5. custody gate の別名 3 種（私の検出器が狭すぎた）
+6. sentinel 汚染を、共有ファイルの存在から**測らずに**断定した私の主張
+   （2 agent が worktree scope の log と自分の namespace 一致を示して訂正）
+
+**プロンプトに書いた字面より、その場で測った証拠の方が強い。** skill には
+「ファイル名リストは網羅的ではない、目的で判断してよい」と明記した ——
+*指示に従わない自由を明示的に与えないと、次の agent は字面に従ってしまう。*
 
 ## 決めていないこと（正直に）
 
