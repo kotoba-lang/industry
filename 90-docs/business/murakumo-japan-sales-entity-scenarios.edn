@@ -1,0 +1,217 @@
+{:decision-frame/schema "cloud.itonami.decision-frame.v1"
+ :decision-frame/id :murakumo/japan-sales-entity-2026-08-26
+ :decision-frame/as-of "2026-08-26"
+ :decision-frame/status :active-provisional
+ :scope
+ "Compare the Japanese corporation, US corporation without a Japan PE, and split hardware/IP operating models for GMKtec K16-based Murakumo sales in Japan. This is internal decision evidence, not tax advice or execution authority."
+ :decision-frame/scope
+ "Compare the Japanese corporation, US corporation without a Japan PE, and split hardware/IP operating models for GMKtec K16-based Murakumo sales in Japan. This is internal decision evidence, not tax advice or execution authority."
+
+ :facts
+ [{:id "k16-purchase-price"
+   :statement "The supplied working purchase price is JPY 99,000 per GMKtec K16."
+   :evidence ["owner input 2026-08-26"]}
+  {:id "computer-customs"
+   :statement "A mini PC classified in Japan Customs heading 8471 is normally customs-duty free; imported goods remain subject to consumption tax."
+   :evidence ["https://www.customs.go.jp/english/tariff/2023_02_21/data/print_e_84.htm"
+              "https://www.customs.go.jp/english/summary/tariff.htm"]}
+  {:id "foreign-domestic-sale-vat"
+   :statement "A foreign corporation selling goods located in a Japanese warehouse can owe Japanese consumption tax separately from import consumption tax."
+   :evidence ["https://www.nta.go.jp/about/organization/tokyo/buppann/pdf/01.pdf"]}
+  {:id "japan-national-corporate-rates"
+   :statement "For a qualifying small Japanese ordinary corporation, the national corporate tax rate is generally 15% on the first JPY 8 million of income and 23.2% above it; local taxes also apply."
+   :evidence ["https://www.nta.go.jp/taxes/shiraberu/taxanswer/hojin/5759.htm"]}
+  {:id "us-federal-rate"
+   :statement "A US C corporation computes federal income tax at 21% before applicable state taxes and credits."
+   :evidence ["https://www.irs.gov/instructions/i1120"]}
+  {:id "treaty-pe-rule"
+   :statement "Under the Japan-US treaty, business profits are generally taxable only in the residence state unless business is conducted through a permanent establishment in the other state; only PE-attributable profits may then be taxed there."
+   :evidence ["https://www.mof.go.jp/tax_policy/summary/international/tax_convention/USA_ST_en.pdf"]}
+  {:id "foreign-importer-administration"
+   :statement "A nonresident importer needs a resident Customs Procedure Agent, and a foreign consumption-tax taxpayer without a Japanese office needs a resident tax agent."
+   :evidence ["https://www.customs.go.jp/english/c-answer_e/sonota/9601_e.htm"
+              "https://www.nta.go.jp/taxes/shiraberu/taxanswer/shohi/6635.htm"]}
+  {:id "simplified-consumption-tax"
+   :statement "An eligible taxpayer with base-period taxable sales no more than JPY 50 million may elect simplified taxation; deemed purchase rates are 90% for wholesale and 80% for retail."
+   :evidence ["https://www.nta.go.jp/taxes/shiraberu/taxanswer/shohi/6505.htm"
+              "https://www.nta.go.jp/taxes/shiraberu/taxanswer/shohi/6517.htm"]}]
+
+ :entities
+ [{:id "gmktec-hk" :type "supplier"}
+  {:id "k16" :type "inventory-item"}
+  {:id "murakumo-hardware" :type "product-component"}
+  {:id "murakumo-cloud" :type "service-and-ip-component"}
+  {:id "japan-corp" :type "candidate-contracting-entity"}
+  {:id "us-corp" :type "candidate-contracting-entity"}
+  {:id "japan-customs" :type "customs-authority"}
+  {:id "japan-tax" :type "tax-authority"}
+  {:id "us-tax" :type "tax-authority"}
+  {:id "japan-customer" :type "customer"}
+  {:id "independent-3pl" :type "possible-logistics-provider"}]
+
+ :relations
+ [{:from "gmktec-hk" :predicate "supplies" :to "k16"
+   :evidence ["owner input 2026-08-26"]}
+  {:from "k16" :predicate "is-component-of" :to "murakumo-hardware"}
+  {:from "japan-corp" :predicate "candidate-importer-and-seller-of" :to "murakumo-hardware"}
+  {:from "us-corp" :predicate "candidate-importer-and-seller-of" :to "murakumo-hardware"}
+  {:from "japan-customs" :predicate "levies-import-consumption-tax-on" :to "k16"}
+  {:from "japan-tax" :predicate "taxes-domestic-sale-to" :to "japan-customer"}
+  {:from "us-tax" :predicate "taxes-worldwide-income-of" :to "us-corp"}
+  {:from "murakumo-cloud" :predicate "may-be-priced-separately-from" :to "murakumo-hardware"}
+  {:from "independent-3pl" :predicate "may-store-and-deliver-for" :to "us-corp"}]
+
+ :dynamics
+ {:mode "structural-sketch"
+  :reason "Inventory, import-tax recovery, sales cadence, after-tax retained earnings, and unresolved PE exposure accumulate over time. Demand cadence and operating costs are not yet observed well enough to justify a bound XMILE forecast."
+  :stocks ["cash tied in K16 inventory"
+           "recoverable import consumption tax"
+           "retained after-tax earnings"
+           "unresolved tax and PE positions"]
+  :flows ["supplier and freight cash outflow"
+          "import consumption tax prepayment"
+          "customer sales receipts"
+          "input-tax credit and output-tax payment"
+          "corporate income tax payment"
+          "tax, customs, transfer-pricing, and compliance administration spend"
+          "salary or dividend extraction"]}
+
+ :model-inputs
+ {:currency :JPY
+  :purchase-price-jpy 99000
+  :freight-and-insurance-per-unit-jpy 0
+  :customs-duty-rate 0.0
+  :consumption-tax-rate 0.10
+  :illustrative-sale-price-tax-inclusive-jpy 165000
+  :illustrative-annual-units 100
+  :illustrative-operating-cost-jpy 0
+  :us-federal-corporate-rate 0.21
+  :us-state-corporate-rate 0.0
+  :japan-effective-corporate-brackets
+  [{:up-to-jpy 4000000 :rate 0.2137}
+   {:up-to-jpy 8000000 :rate 0.2317}
+   {:rate 0.3358}]
+  :not-in-model
+  ["actual freight, insurance, customs brokerage, inspection, RMA, warranty, payment, and support costs"
+   "Japanese per-capita inhabitant levy"
+   "US state franchise tax and accounting fees"
+   "foreign tax credit limitations"
+   "corporate-income-tax effects of differences between actual input tax and deemed input tax under simplified consumption taxation"
+   "salary, dividend, and shareholder-level taxes"
+   "defense special corporate tax when the JPY 5 million corporate-tax deduction is exceeded"
+   "arm's-length hardware, cloud, service, or royalty allocation"]}
+
+ :sensitivity
+ {:sale-prices-tax-inclusive-jpy [149800 165000 198000]
+  :annual-units [10 100 500]
+  :consumption-tax-methods [:general :simplified-wholesale :simplified-retail]}
+
+ :score-weights
+ {:expected-value 0.25
+  :evidence-confidence 0.20
+  :reversibility 0.15
+  :authority-fit 0.15
+  :time-efficiency 0.10
+  :cost-efficiency 0.10
+  :dependency-independence 0.05}
+
+ :scenarios
+ [{:id "jp-direct"
+   :label "Japanese corporation imports from Hong Kong and sells in Japan"
+   :tax-model :japan-corporation
+   :assumptions
+   ["The Japanese corporation is the importer of record and preserves import permits and tax records."
+    "It registers for qualified invoices when B2B customers require them."
+    "K16 hardware and Murakumo service revenue are separately identified when their tax treatment or simplified-tax category differs."]
+   :outcomes
+   ["One Japanese customs, consumption-tax, customer-contract, warranty, and corporate-income-tax operating surface."
+    "No cross-border PE position is needed for the hardware distribution margin."
+    "The simplified-tax election may reduce consumption-tax payment when eligibility and classification are confirmed."]
+   :scores {:expected-value 0.82
+            :evidence-confidence 0.88
+            :reversibility 0.70
+            :authority-fit 0.90
+            :time-efficiency 0.86
+            :cost-efficiency 0.76
+            :dependency-independence 0.85}}
+  {:id "us-no-pe"
+   :label "US corporation imports and sells while asserting no Japan PE"
+   :tax-model :us-corporation-no-japan-pe
+   :assumptions
+   ["The US corporation has no Japanese fixed place, dependent contract agent, or non-auxiliary activity creating a PE."
+    "Japanese warehousing and delivery are performed by an independent provider within treaty limits."
+    "The US corporation appoints the required Japanese customs and tax agents and completes Japanese consumption-tax obligations."
+    "The US state corporate income-tax rate is zero in the illustrative model; this is not an observed fact."]
+   :outcomes
+   ["Potential 21% US federal corporate rate before state tax while profits remain in the corporation."
+    "Japanese consumption tax and import administration remain."
+    "PE, state nexus, shareholder extraction, and dual-country compliance can eliminate the apparent rate advantage."]
+   :scores {:expected-value 0.58
+            :evidence-confidence 0.45
+            :reversibility 0.55
+            :authority-fit 0.35
+            :time-efficiency 0.35
+            :cost-efficiency 0.60
+            :dependency-independence 0.30}}
+  {:id "split-hardware-ip"
+   :label "Japanese hardware distributor with separately governed US IP or cloud economics"
+   :tax-model :split-not-computed
+   :assumptions
+   ["The Japanese corporation imports, sells, invoices, and supports hardware."
+    "Any US charge for IP, cloud, or service is commercially real, separately evidenced, treaty-reviewed, and arm's-length."
+    "Related-party allocation is not used to move an arbitrary residual profit."]
+   :outcomes
+   ["Local hardware operations remain simple while a real US IP or cloud function can retain its supported economics."
+    "Transfer pricing, withholding classification, and treaty eligibility require professional review before execution."
+    "No numeric income-tax advantage is claimed until the intercompany allocation and actual functions are known."]
+   :scores {:expected-value 0.78
+            :evidence-confidence 0.58
+            :reversibility 0.58
+            :authority-fit 0.62
+            :time-efficiency 0.50
+            :cost-efficiency 0.65
+            :dependency-independence 0.45}}]
+
+ :selected "jp-direct"
+ :selection-rationale
+ "For a Japan-operated launch at the current evidence level, the Japanese corporation route has the strongest evidence, authority fit, and execution efficiency. The US no-PE route is a conditional scale option, not the default. The split route remains a later design option only if Murakumo IP/cloud functions and arm's-length pricing are real and documented."
+
+ :hard-gates
+ [{:id :gate/importer-of-record
+   :applies-to [:jp-direct :us-no-pe]
+   :required "Name the actual importer, customs declarant, owner of the goods, and holder of original import permits before the first shipment."
+   :status :open}
+  {:id :gate/consumption-tax
+   :applies-to [:jp-direct :us-no-pe]
+   :required "Confirm taxable-person, invoice-registration, general-versus-simplified method, filing period, and tax-agent status before pricing is published."
+   :status :open}
+  {:id :gate/japan-pe
+   :applies-to [:us-no-pe]
+   :required "Obtain a written Japan-US PE analysis covering the actual Japanese people, home or office, contract authority, warehouse, installation, repair, and support functions."
+   :status :open}
+  {:id :gate/us-state-and-extraction
+   :applies-to [:us-no-pe :split-hardware-ip]
+   :required "Model the actual US state nexus, franchise taxes, and Japanese-resident salary or dividend extraction before claiming savings."
+   :status :open}
+  {:id :gate/transfer-pricing
+   :applies-to [:split-hardware-ip]
+   :required "Document functions, assets, risks, agreement, withholding classification, treaty eligibility, and arm's-length price before intercompany charges."
+   :status :open}
+  {:id :gate/product-compliance
+   :applies-to [:jp-direct :us-no-pe :split-hardware-ip]
+   :required "Verify the exact K16 configuration, AC adapter electrical compliance, radio compliance, labeling, Japanese customer terms, warranty, and RMA responsibility before resale."
+   :status :open}]
+
+ :actions
+ [{:id :action/tax-model
+   :authority :internal-analysis-only
+   :effect "Run scripts/analyze-murakumo-japan-sales-scenarios.cljs against this file and preserve the input revision with any decision receipt."
+   :status :allowed}
+  {:id :action/procure
+   :authority :money-and-external-effect-gated
+   :effect "Place a supplier order."
+   :status :not-authorized-by-this-frame}
+  {:id :action/register-or-file
+   :authority :account-and-external-effect-gated
+   :effect "Register, file, elect, appoint an agent, or make a treaty claim."
+   :status :not-authorized-by-this-frame}]}
