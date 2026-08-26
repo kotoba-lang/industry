@@ -4,6 +4,8 @@
   :adr/status "accepted"
   :adr/date "2026-08-04"
   :adr/depends-on "ADR-2607299000（repository-rules の workspace authority）/ ADR-2607022800（appkit/uikit の既定 UI/UX）/ ADR-2607279200（kotoba source-surface authority）/ ADR-2607173000（script host は nbb）"
+  :adr/related ["adr-2608650000-kotoba-cannot-write-has-two-kinds-decision-core-extraction"
+                "adr-2607279200-kotoba-clojure-shaped-safety-elaboration-migration"]
 
   :adr/context
   "オーナーの問い（2026-08-03）: 『kotoba-lang org, aiueos に activity monitor,
@@ -192,10 +194,11 @@
       互換サーバ、新規9本は Kotoba app。`repository-rules.edn` に legacy
       non-conformant として名指しで記録したが、名前だけでは区別がつかない。
       将来どちらかを rename する判断が要る。network-awai の3本は未評価のまま。
-   3. **bounded `.kotoba` profile は再帰値を持てない**（ADR-2607279200 W4 待ち）。
-      ディレクトリ木は flat な item 集合 + `:item/parent` で表している。**これは
-      暫定であって Kotoba の application programming model ではない** ——
-      W4 の recursive logical value が入ったら置き換える。
+   3. **bounded `.kotoba` profile は再帰値を持てない**（ADR-2607279200 W4 待ち）
+      と、当時は書いた。現行ではない。W4 は compiler / kotoba-wasm / kotoba-cljs
+      で landed（ADR-2608650000）。native に無いのは backend 未達。ディレクトリ木を
+      flat な item 集合 + `:item/parent` で表しているのはその日の実装戦略であって、
+      Kotoba の application programming model ではない。
    4. **bounded profile を持つのは `mokuroku` と `app-files` の2本だけ。** 残り
       8 app は `.cljc` のみ。各 app 固有の不変条件（pid 再利用・EXIF fallback・
       disc 番号・ボリューム UUID 等）は `.cljc` テストで固定されているが、
@@ -203,7 +206,12 @@
    5. **Calculator / Clock / Weather は意図的に入れていない** —— 共有 kernel を
       選定理由にしている以上、kernel を使わない app を数合わせで足すと共通化の
       主張が嘘になる。必要になったら別 ADR で、kernel を使わないことを明記して
-      足す。"
+      足す。
+
+   ## 改訂履歴
+
+   2026-08-26: 『bounded `.kotoba` profile は再帰値を持てない（W4 待ち）』を当時の
+   切り方へ戻した。W4 は landed。現行ではない。native 未達は backend ギャップ。"
 
   :adr/verification
   "**実測（2026-08-04、すべて実行済み）。**
@@ -242,5 +250,6 @@
    2. 残り 8 app の bounded `.kotoba` profile（各 app 固有の不変条件を
       capability-free で証明する。`app-files` の confinement 証明が雛形）。
    3. `app-` prefix の二重意味の解消（rename 判断はオーナー案件）。
-   4. ADR-2607279200 W4（recursive logical value）着地後、`:item/parent` による
-      flat 表現を置き換える。"}]
+   4. `:item/parent` の flat 表現を、W4 が landed 済みの backend
+      （compiler / kotoba-wasm / kotoba-cljs）で recursive logical value に置き換える。
+      native を待つ必要はない（ADR-2608650000）。"}]
