@@ -51,8 +51,9 @@ kernel が持つのは 15 関数、すべて i64 と bool のスカラ:
 
 `.cljc` に残したもの: `funnel-specs` 表・段ベクタの走査・`get-in`・提案 map・
 canvas の重複除去・コレクションを要する文字列整形・metrics edn の形を知る
-橋渡し（`count->bp-input` / `benchmark->bp`）。CLAUDE.md の
-「移行の単位は決定核。repo 全体を移そうとしない」に従っている。
+橋渡し（`count->bp-input` / `benchmark->bp`）。当時の CLAUDE.md の
+「移行の単位は決定核。repo 全体を移そうとしない」に従った。現行の単位は
+ADR-2608261100。この funnel 核は native 向け fallback として読む。
 
 ## 単位を整数 basis point（10000 = 1.0）にした
 
@@ -230,4 +231,10 @@ qwen-agentworld-35b-a3b）で下書きを取った。実測 7.1–7.7 tok/s、2 
   この gate はまだ landed ではない。登録後の最初の receipt を見ること。
 - kernel は native に載らない（`typed-cap-call` も再帰値も使っていないので
   admission gate 自体は通りうるが、確認していない）。これは backend の話で
-  あって言語の天井ではない（ADR-2608650000）。"}]
+  あって言語の天井ではない（ADR-2608650000）。
+
+## 改訂履歴
+
+2026-08-26: 『移行の単位は決定核』への従いを当時の切り方として書き、
+現行を ADR-2608261100 へ付けた。
+"}]

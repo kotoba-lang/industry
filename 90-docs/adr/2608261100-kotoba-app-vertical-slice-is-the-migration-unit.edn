@@ -11,7 +11,8 @@
    "adr-2607279200-kotoba-clojure-shaped-safety-elaboration-migration"
    "2608650000"
    "adr-2608261000-kotoba-migration-cut-is-not-a-string-ban"
-   "adr-2607141900-cloud-itonami-cljc-actors-kotoba-incompatibility-narrow-slice-porting-policy"]
+   "adr-2607141900-cloud-itonami-cljc-actors-kotoba-incompatibility-narrow-slice-porting-policy"
+   "adr-2608261200-rule-kaizen-loop-implementation-snapshot-is-not-language"]
   :adr/repos ["com-junkawasaki/root" "kotoba-lang/amu" "kotoba-lang/kotoba-lang" "kotoba-lang/org-ietf-smtp" "kotoba-lang/murakumo"]
   :adr/authoritative_for
   ["clj / cljc → .kotoba の移行単位は kotoba/app の vertical slice であるという決定"
@@ -96,7 +97,10 @@ browser UI）。1 判断表ではない。1 commit を有界にするのは正�
 
 oracle の `.cljc` は、その slice の gate（source fidelity、semantic parity、
 safety、host parity、performance、release、rollout）が揃うまで消さない。
-`.kotoba` を `.cljc` から require しない（require-graph）。mirror を作らない。
+oracle は照合用の写しであり、意味の正本ではない。コマンド線・応答の意味・
+UI の view はゲストの product semantics である。『コマンド文字列は `.cljc`』
+は不適切（ある日の SMTP fallback を言語にした読み）。`.kotoba` を `.cljc`
+から require しない（require-graph）。mirror を作らない。
 公開 compile は `kotoba compile`。skip と pass を同じ顔にしない。
 
 ## 判断核は fallback である
@@ -119,11 +123,11 @@ wasm / web / `:js-kotoba-v1` に対して、最初から判断核へ潰さない
 
 ## 残すもの / 捨てるもの
 
-残す: 書けない理由の分類。文字列禁止の否定。`.cljc` oracle。require しない。
-parity。`ex-info` → Result。`.cljk` は `:clj-kotoba` であって JVM target
-ではない。`cond` は desugar する。
+残す: 書けない理由の分類。文字列禁止の否定。`.cljc` oracle（照合用。意味の
+正本ではない）。require しない。parity。`ex-info` → Result。`.cljk` は
+`:clj-kotoba` であって JVM target ではない。`cond` は desugar する。
 
 捨てる: 『正しい移行 = 1 判断表』。『Kotoba は判断だけ書く言語』。
-amu が判断以外を拒否した、という説明。native の欠落を wasm/web の様式に
-する mill。
+『コマンド文字列は `.cljc`』。amu が判断以外を拒否した、という説明。
+native の欠落を wasm/web の様式にする mill。
 "}]

@@ -48,9 +48,10 @@
 `murakumo` 35 / `kotoba-lang` 35 / `cloud-itonami` 26。
 （`orgs/kotoba-lang/compiler` の 128 は amu 改名前の凍結 checkout で、二重計上。）
 
-**比率 2.5% は失敗の指標ではない。** ADR-2608650000 が「移行の単位は決定核であって
-repo 全体ではない」と決めており、murakumo が 33/33 native に載ったのは移植したから
-ではなく判断だけを切り出したからである。
+**比率 2.5% は失敗の指標ではない。** repo 全体の比率は移行の進捗ではない。
+当時は ADR-2608650000 の『移行の単位は決定核』をそう読んでいた。現行の単位は
+ADR-2608261100（kotoba/app の vertical slice）。murakumo が 33/33 native に
+載ったのは、native が word 型のときに判断だけを切り出した fallback である。
 
 ## ADR-2608189400 の「4,189 本」は再現しなかった
 
@@ -187,4 +188,9 @@ adr-2608191100-maturity-pass-on-the-five-kotoba-refactor-resume-points に記録
   **80 / 22 / 127**、移行候補は 59 repo。
 - **#1 は clock-v1。** cap 7 は dataspace より 6 日早く native の
   `native-provider-contract?` に seal されており、不足は provider と実行証拠だけ。
+
+## 改訂履歴
+
+2026-08-26: 『移行の単位は決定核』を当時の切り方として書き、現行を
+ADR-2608261100 へ付けた。比率が失敗指標ではないという測定の読みは据え置き。
 "}]

@@ -15,10 +15,14 @@ HTTP + 自前 GGUF ランタイム）だが、そちらは Clojure で書かれ�
 
 **ollama 互換面の「決定」を `.kotoba` に移し、host には transport だけを残す。**
 
-移行の単位は repo でも namespace でもなく **決定核（decision core）**。先例は
-`kotoba-lang/murakumo` の 35 本の `kotoba/*_core.kotoba` で、そこで native
+当時の切り方は repo でも namespace でもなく **決定核（decision core）** と
+書いた（ADR-2608650000 決定 4、当時）。現行の移行単位は ADR-2608261100
+（kotoba/app の vertical slice）。判断核は named backend が値を admit
+できないときの fallback。この面で host が transport だけを持つ線は
+guest/host として正しく、3 core は native 向け fallback として読む。
+先例は `kotoba-lang/murakumo` の `kotoba/*_core.kotoba` で、native
 qualification が 0/33 → 33/33 に動いたのは murakumo を移植したからではなく、
-判断だけを切り出したから（compiler ADR 0219 → 0221）。ここでも同じ切り方をした。
+native が word 型のときに判断だけを切り出したから（compiler ADR 0219 → 0221）。
 
 | core | 何を決めるか |
 |---|---|
@@ -137,6 +141,7 @@ spawn（数十 ms）を払い、word-typed な planner は interpreter が約 2 
 
 ## 位置づけ
 
-ADR-2607279200（Kotoba 中心の移行）と ADR-2607270100 の「決定核を切り出す」に沿う。
+ADR-2607279200（Kotoba 中心の移行）に沿う。当時は ADR-2607270100 の
+「決定核を切り出す」を単位として読んだ。現行は ADR-2608261100。
 ADR-2607300900（CI の正本は murakumo fleet）は変えない —— この repo の gate は
 `clojure -M:test` として fleet-ci から呼べる形のままである。"}]

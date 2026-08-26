@@ -11,7 +11,7 @@
   :adr/authoritative_for
   ["文字列禁止の否定 — 判断核から文字列を落とす読みを閉じる"
    "『判断だけ』『文字列を持たない』を安全設計・amu 未成熟と取り違えない分類"
-   "線の形・走査・effect を残す理由は mirror / 走査設計 / ambient authority であるという決定"]
+   "線の形を .cljc に残したのは 2026-08-26 当日の SMTP fallback の記録であり、現行方針ではないという決定"]
   :adr/body
   "2026-08-26、オーナーの問い: SMTP 核を判断だけにし文字列を持たせなかったのは
 kotoba の安全設計か、初期の移行時の制約か、amu が未成熟だからか。続けて
@@ -65,12 +65,21 @@ ADR-2608261100。
 ## 実測（org-ietf-smtp、2026-08-26）
 
 切り出した判断は 3 つ: 応答は成功か、XOAUTH2 は 334 か、どの SASL か。
-線の形（command / response-line / base64）とソケットは `.cljc` に残した。
+当時は線の形（command / response-line / base64）とソケットを `.cljc` に残した。
+それはその日の SASL 整数 fallback の記録である。現行ではない。
+コマンドはゲストの product semantics であり、`.cljc` の同名関数は oracle
+であって意味の正本ではない。『コマンド文字列は `.cljc`』は不適切。
+同日の後続スライスで named builder（`ehlo-line` 等）は
+`kotoba/smtp/protocol_commands` へ移した（org-ietf-smtp `613dc922fb19`）。
+response-line の正規表現と base64 とソケットは、走査設計と ambient authority
+の理由で host に残っている。
+
 `.cljk` と `.kotoba` の KIR digest は一致した。parity は SASL 全直積。
 `auth-none` と `auth-unsupported` を入れ替えると 60 行で落ちた
 （空の AUTH と GSSAPI のみは別コードでなければならない）。
 
-着地: kotoba-lang/org-ietf-smtp `fb312441622d`、west pin `990d5e791141`。
+着地（核）: kotoba-lang/org-ietf-smtp `fb312441622d`、当時の west pin `990d5e791141`。
+着地（コマンド）: `613dc922fb19`。
 
 最初の切り方が『文字列を持たない核』に見えたのは、SMTP の判断が整数と bool
 だったからである。それを言語の天井として文書化すると、次のスライスが
@@ -90,4 +99,6 @@ ADR-2608261100。
 
 2026-08-26 同日: 『1 スライス = 1 判断表』を理想から外し、ADR-2608261100 へ
 委譲した。文字列禁止の否定は据え置き。
+2026-08-26 同日: 実測節の『線の形は .cljc に残した』を当日の記録へ戻し、
+『コマンド文字列は .cljc』を現行方針から外した。
 "}]

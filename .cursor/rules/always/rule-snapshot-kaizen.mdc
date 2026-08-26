@@ -1,0 +1,16 @@
+---
+description: 実装スナップショットを言語・規則にしない。規則そのものを疑う。
+alwaysApply: true
+---
+
+# 実装スナップショットを言語にしない
+
+standing な ADR / CLAUDE.md / AGENTS.md / always-rule / skill が、ある日の
+実装天井（emitter、backend、その日の切り方）を『こう書くもの』として残して
+いないか疑う。正本は ADR-2608261200。
+
+adr-inventory は status と pointer の棚卸しである。決定の中身が今も正しいか
+は見ない。中身は skill `rule-kaizen`（1 反復 = 1 finding）。
+
+needles は `manifest/rule-snapshot-needles.edn`（手書き。corpus から導かない）。
+新しいクラスを見つけたら needles に 1 本足してから直す。

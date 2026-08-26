@@ -1,0 +1,44 @@
+;; rule-kaizen の語彙。手書き。走査対象から導出しない（ADR-2608261200）。
+;; 新しいクラスを教えるときはここに 1 本足す。corpus を grep して足さない。
+;;
+;; :pattern は JS RegExp ソース。:demurrer はマッチ位置の前後 :window 文字。
+;; demurrer が当たれば現行方針ではない（降格・当時・捨てる）と読む。
+
+{:min-listed 500
+ :window 220
+ :surfaces
+ [{:id :standing
+   :git-args ["CLAUDE.md" "AGENTS.md" ".cursor/rules" ".claude/skills" ".agents/skills"]}
+  {:id :adr
+   :git-args ["90-docs/adr"]}]
+ :needles
+ [{:id :command-strings-are-cljc
+   :class :implementation-snapshot-as-language
+   :pattern "コマンド文字列は.{0,80}\\.cljc|Command strings?.{0,60}stay in \\.cljc|線の形.{0,120}\\.cljc に残"
+   :demurrer "降格|fallback|捨てる|不適切|閉じる|当時|歴史|oracle であって|現行は|現行の|現行ではない|現行方針|意味の正本|書き写さない|から外|当日の記録|切り方だった|様式にする|やってはいけない"
+   :fix "コマンドはゲストの product semantics。.cljc の同名関数は oracle であって意味の正本ではない。"
+   :superseded-by "adr-2608261100-kotoba-app-vertical-slice-is-the-migration-unit"}
+  {:id :migration-unit-is-decision-core
+   :class :implementation-snapshot-as-language
+   :pattern "移行の単位は.{0,80}決定核"
+   :demurrer "降格|fallback|捨てる|不適切|当時|現行は|現行の|現行ではない|ではないという|ここでは降格|ここで降格|から外|切り方だった|様式にする"
+   :fix "移行の単位は kotoba/app の vertical slice。判断核は named backend が値を admit できないときの fallback。"
+   :superseded-by "adr-2608261100-kotoba-app-vertical-slice-is-the-migration-unit"}
+  {:id :kotoba-is-judgement-only
+   :class :implementation-snapshot-as-language
+   :pattern "正しい移行 = 1 判断表|Kotoba は判断だけ"
+   :demurrer "捨てる|閉じる|不適切|誤り|理想から外|ではない|様式にする|やってはいけない"
+   :fix "Kotoba は safe application language。判断だけ書く様式は言語に無い。"
+   :superseded-by "adr-2608261100-kotoba-app-vertical-slice-is-the-migration-unit"}
+  {:id :baked-kit-counts
+   :class :measurement-baked-as-today
+   :pattern "全 8 capability kit"
+   :demurrer "書き写さない|その場で読む|値をここに|旧文|測定値を定数"
+   :fix "kit の qualification は kit ファイルをその場で読む。結果を standing に焼かない。"
+   :superseded-by "adr-2608650000"}
+  {:id :handles-are-the-model
+   :class :implementation-snapshot-as-language
+   :pattern "handles are the application programming model"
+   :demurrer "not the|ではない|否定"
+   :fix "handles は実装戦略であって application の書き方ではない。"
+   :superseded-by "adr-2607279200-kotoba-clojure-shaped-safety-elaboration-migration"}]}

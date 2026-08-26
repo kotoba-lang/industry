@@ -35,7 +35,9 @@ description: clj / cljc から .kotoba へ、kotoba/app の vertical slice を 1
    effects。capability ID は通常書かない。`.cljk` は `:clj-kotoba`
    （JVM target ではない）。
 3. **機構は host に残す。** ソケット、credential、DOM 破壊、SDK。
-   `.cljc` oracle は gate が揃うまで残し、`.kotoba` を require しない。
+   コマンド線・応答の意味はゲスト。`.cljc` に同じ builder があるのは
+   oracle（parity / require-graph）であって、そこに意味を置くためではない。
+   『コマンド文字列は `.cljc`』は不適切。`.kotoba` を require しない。
 4. **named backend が値を admit できないときだけ** 決定核へ畳む。ヘッダに
    欠落と撤去条件を書く。wasm / web に対して最初から潰さない。
    `:max-parameters 5` は record / document に畳む理由であって、プログラムを
@@ -53,6 +55,7 @@ kotoba compile path/to/app.kotoba --target web  -o app.mjs
 7. **着地。** feature branch を push し `gh api .../merges` で main へ。
    west pin は `nbb scripts/west-pin-put.cljs <entry> HEAD`。
 
-先例: amu `examples/todo-app.kotoba`（application）。
+先例: amu `examples/todo-app.kotoba`（application）、
+`kotoba-lang/org-ietf-smtp` の `kotoba/smtp/protocol_commands`（コマンド文字列）。
 fallback: `kotoba-lang/murakumo` の `kotoba/*_core.kotoba`、
 `kotoba-lang/org-ietf-smtp` の `kotoba/smtp/protocol_core.{kotoba,cljk}`。
