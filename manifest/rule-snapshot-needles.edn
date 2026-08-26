@@ -41,4 +41,10 @@
    :pattern "handles are the application programming model"
    :demurrer "not the|ではない|否定"
    :fix "handles は実装戦略であって application の書き方ではない。"
-   :superseded-by "adr-2607279200-kotoba-clojure-shaped-safety-elaboration-migration"}]}
+   :superseded-by "adr-2607279200-kotoba-clojure-shaped-safety-elaboration-migration"}
+  {:id :recursive-values-still-absent
+   :class :measurement-baked-as-today
+   :pattern "再帰的な値型は.{0,20}まだ.{0,12}無い|今日は hiccup のような任意深度"
+   :demurrer "landed|旧文|書き換えた|当時|現行ではない"
+   :fix "W4 は landed。native に無いだけ（backend 未達）。handles は実装戦略であって書き方ではない。"
+   :superseded-by "adr-2608650000"}]}

@@ -1610,23 +1610,27 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   export し、grant が `requiredCapabilities` と厳密一致しなければ
   `capability-grant-mismatch` で instantiate 自体が落ちる（実行時も fail closed）。
 
-### 再帰的な値型は「まだ」無い — flat/handle 設計を恒久前提にしない
+### 再帰的な値型は landed（W4）— flat/handle 設計を恒久前提にしない
 
-現在地: `docs/architecture.md`「not a recursive value」/ `docs/component-model-baseline.md`
-「General recursive Kotoba schemas are rejected by Component v1」。`[:set T]` は最大 32 要素。
-今日は hiccup のような任意深度の入れ子を Kotoba の値として表現できない。
+**この節は 2026-08-08 に書き換えた。** 旧文は「今日は hiccup のような任意深度の入れ子を
+Kotoba の値として表現できない」と書いていたが、W4 は 2026-07-27 に 6 スライスまで landed
+している（migration plan の W4 節が各スライスを記録）。第 5 スライス
+（`recursive_tree_value_test`）が **sealed schema-checked tree としての recursive
+logical value** を、第 1〜4 スライスが `:document` 値を入れている。
+**backend は `#{:compiler :kotoba-wasm :kotoba-cljs}`。native には無い。**
+それは backend 未達であって言語の天井ではない（ADR-2608650000）。
 
-**しかしこれは到達目標ではない。** migration plan の W4 は
-「Define **recursive logical values** with explicit node/depth/byte budgets」を計画しており、
-さらに **「Implementations may use arenas and handles, but *handles are not the application
-programming model*」** と明記している。したがって:
+migration plan は **「Implementations may use arenas and handles, but *handles are not the
+application programming model*」** と明記している。したがって:
 
 - **flat node 集合 / parent ポインタ / handle を「Kotoba ではこう書くもの」として文書化しない。**
-  それは実装戦略であって application の書き方ではない、と計画側が名指しで否定している。
-- 今日どうしても書く必要があるなら暫定として次の 2 形を使ってよいが、**暫定と明記する**:
-  **形 A** component を `:string` を返す純関数にし `string-concat` で合成（木は呼び出しグラフ
-  としてのみ存在、capability 不要）／**形 B** ui-v1 kit の `:declarative-flat-tree`。
-- 新しく永続的な API を設計するなら、W4 の recursive logical value を待つ方が正しい。
+  それは実装戦略であって application の書き方ではない。
+- **native 向けに word 型へ閉じて書く場合も同じ** — その制限は「native がまだ持っていない
+  から」であって様式ではない。モジュールのヘッダにそう書く。
+- 形 A（component を `:string` を返す純関数にし `string-concat` で合成）は、capability 不要で
+  native にも載る書き方として引き続き有効。ただし**string-only SSR を最終 API にしない**
+  （ADR-2607279200 Delivery #6）。
+- 新しく永続的な API を「W4 を待つ」理由で先送りしない。W4 は landed である。
 
 ### 今日の既知ブロッカー（回避策を知らずに時間を溶かさないこと）
 

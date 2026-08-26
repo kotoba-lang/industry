@@ -111,7 +111,13 @@
     :text "ADR-2608650000 のとおり移行の単位は決定核であって repo 全体ではない。"}
    {:id :baked-kit
     :expect-kinds #{:baked-kit-counts}
-    :text "全 8 capability kit（clock/http/llm）は wasm-aot pending。"}])
+    :text "全 8 capability kit（clock/http/llm）は wasm-aot pending。"}
+   {:id :bad-recursive-absent
+    :expect-kinds #{:recursive-values-still-absent}
+    :text "再帰的な値型は「まだ」無い。今日は hiccup のような任意深度の入れ子を書けない。"}
+   {:id :good-recursive-landed
+    :expect-kinds #{}
+    :text "この節は 2026-08-08 に書き換えた。旧文は「今日は hiccup のような任意深度の入れ子を Kotoba の値として表現できない」と書いていたが、W4 は landed している。"}])
 
 (defn- run-self-test [cfg]
   (let [needles (:needles cfg)
