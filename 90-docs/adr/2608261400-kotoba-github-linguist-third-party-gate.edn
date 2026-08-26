@@ -3,7 +3,9 @@
   :adr/title "GitHub が Kotoba と表示する条件は第三者採用であって実装ではない"
   :adr/status "accepted"
   :adr/date "2026-08-26"
-  :adr/related ["adr-2607266000" "2607202800-task-graph-edn-schema-kotoba-langgraph-integration"]
+  :adr/related ["adr-2607266000"
+                "2607202800-task-graph-edn-schema-kotoba-langgraph-integration"
+                "adr-2608261100-kotoba-app-vertical-slice-is-the-migration-unit"]
   :adr/body "GitHub が .kotoba を Clojure と表示するのは事故ではない。kotoba-lang/kotoba の
 .gitattributes に `*.kotoba linguist-language=Clojure` があり、task graph の
 A-gitattributes-alias として 2026-07-20 に意図して入れたものである。オーナーの
@@ -82,8 +84,10 @@ CONTRIBUTING は 2 段の閾値を持つ: 1 repo に複数出る拡張子 (.rb) 
 1 repo に 1 つしか出ない拡張子 (Makefile) は 200 files。実測 2026-08-26、.kotoba を
 持つ 1,257 repo のうち 1,183 (94.1%) がちょうど 1 本しか持たない。中央値 1、平均
 1.57 (135 / 103 / 88 / 78 本の外れ値が引き上げている)。これは Makefile の分布で
-あって .rb の分布ではなく、CLAUDE.md の「移行の単位は決定核」がそのまま形に出た
-ものである。認められれば gate は 10 分の 1 になる。
+あって .rb の分布ではなく、当時 CLAUDE.md が「移行の単位は決定核」と書いていた
+切り方がそのまま形に出たものである（現行は ADR-2608261100。判断核は named
+backend が値を admit できないときの fallback であって、移行の単位ではない）。
+認められれば gate は 10 分の 1 になる。
 
 これは PR ではなく discussion で問う。CONTRIBUTING 自身が「If you have a better
 approach, please open a new discussion」と招いており、閾値未達の discussion は
@@ -103,4 +107,8 @@ close されないが、閾値未達の PR は close される。閉じられた
 - E-editor-extension は未着手のまま。workspace に contributes.grammars を持つ
   package.json は 0 件 (2026-08-26 実測)。GitHub の表示は変わらないが、
   今日 Kotoba と名乗れる唯一の面である。
+
+## 改訂履歴
+
+2026-08-26 同日: 94.1% が 1 本という測定は残し、CLAUDE.md の『移行の単位は決定核』を当時の切り方へ戻した。現行は ADR-2608261100。
 "}]
