@@ -2730,4 +2730,334 @@
      :replace "(env.BPMN_DISPATCHER_URL ?? \"\").replace"
      :must-fail ["known-unset-deploy-vars-are-still-unset"
                  "dispatcher-normalizes-the-base-url-before-appending-the-nsid"]}]}
+  {:repo "orgs/cloud-itonami/yard-ops"
+   :label "yard-ops —— 9 面の合意と、配備される XRPC 面の信頼委譲"
+   ;; 2026-08-26 に 46 件すべて、名指しした test **だけ**が赤くなるところを見た
+   ;; （巻き添え 0 件 / 素通り 0 件 / 別名で赤 0 件）。suite は npm install 無しで
+   ;; 走る —— この repo に node_modules は 1 つも無く、`npm run typecheck` は tsc を
+   ;; 解決できずに落ちる。走れない検査は走って問題が無かった検査と同じ顔をする。
+   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :green-marker "yard-ops contract: all green"
+   :mutations
+   [{:id :yard-ops/actor-did-drifts-in-identity
+     :why "identity 文書の DID が 1 面だけ動くと、did:web を解決した相手と喋る相手が別人になる"
+     :file "kotodama.jsonld"
+     :find "\"@id\": \"did:web:yard-ops.etzhayyim.com\""
+     :replace "\"@id\": \"did:web:yardops.etzhayyim.com\""
+     :must-fail ["actor-identity-agrees-across-surfaces"]}
+
+    {:id :yard-ops/did-host-loses-its-route
+     :why "DID が名乗る host に配備が無くなると、解決できても届かない"
+     :file "wrangler.jsonc"
+     :find "\"pattern\": \"yard-ops.etzhayyim.com/*\""
+     :replace "\"pattern\": \"yard-ops-edge.etzhayyim.com/*\""
+     :must-fail ["actor-identity-agrees-across-surfaces"]}
+
+    {:id :yard-ops/route-zone-drifts
+     :why "route の zone が別ゾーンへ動くと、証明書と DNS の担い手が変わる"
+     :file "wrangler.jsonc"
+     :find "\"pattern\": \"y4rd0p5x.etzhayyim.com/*\",\n      \"zone_name\": \"etzhayyim.com\""
+     :replace "\"pattern\": \"y4rd0p5x.etzhayyim.com/*\",\n      \"zone_name\": \"etzhayyim.dev\""
+     :must-fail ["actor-identity-agrees-across-surfaces"]}
+
+    {:id :yard-ops/nanoid-var-drifts
+     :why "配備 var の nanoid だけ動くと、worker 名・route と逆引きが切れる"
+     :file "wrangler.jsonc"
+     :find "\"APP_NANOID\": \"y4rd0p5x\""
+     :replace "\"APP_NANOID\": \"y4rd0p5y\""
+     :must-fail ["nanoid-agrees-across-five-surfaces"]}
+
+    {:id :yard-ops/worker-name-loses-the-nanoid
+     :why "worker 名が nanoid 由来でなくなると、配備先から actor を引けなくなる"
+     :file "wrangler.jsonc"
+     :find "\"name\": \"kotodama-y4rd0p5x\""
+     :replace "\"name\": \"yard-ops\""
+     :must-fail ["nanoid-agrees-across-five-surfaces"]}
+
+    {:id :yard-ops/nanoid-route-drifts
+     :why "nanoid host の route が動くと、短縮 host での到達が消える"
+     :file "wrangler.jsonc"
+     :find "\"pattern\": \"y4rd0p5x.etzhayyim.com/*\""
+     :replace "\"pattern\": \"y4rd0p5z.etzhayyim.com/*\""
+     :must-fail ["nanoid-agrees-across-five-surfaces"]}
+
+    {:id :yard-ops/edge-nanoid-fallback-drifts
+     :why "var が消えた配備での既定 nanoid が別値になると、同じ worker が 2 つの id を名乗る"
+     :file "src/app.ts"
+     :find "env.APP_NANOID ?? \"y4rd0p5x\""
+     :replace "env.APP_NANOID ?? \"unknown\""
+     :must-fail ["nanoid-agrees-across-five-surfaces"]}
+
+    {:id :yard-ops/capability-dropped-from-deploy-var
+     :why "配備 var から能力が 1 つ落ちると、identity 文書が約束した口が消える"
+     :file "wrangler.jsonc"
+     :find "\"APP_CAPABILITIES\": \"[\\\"checkInTrailer\\\",\\\"assignDoor\\\",\\\"completeDockJob\\\",\\\"getDockSchedule\\\"]\""
+     :replace "\"APP_CAPABILITIES\": \"[\\\"checkInTrailer\\\",\\\"assignDoor\\\",\\\"completeDockJob\\\"]\""
+     :must-fail ["capabilities-agree-across-three-surfaces"]}
+
+    {:id :yard-ops/capability-order-drifts-in-identity
+     :why "順序が面ごとに違うと、位置で参照する側（UI の並び・BPMN の分岐）が静かにずれる"
+     :file "kotodama.jsonld"
+     :find "\"capabilities\": [\"checkInTrailer\", \"assignDoor\", \"completeDockJob\", \"getDockSchedule\"]"
+     :replace "\"capabilities\": [\"assignDoor\", \"checkInTrailer\", \"completeDockJob\", \"getDockSchedule\"]"
+     :must-fail ["capabilities-agree-across-three-surfaces"]}
+
+    {:id :yard-ops/edge-method-renamed
+     :why "health probe が名乗る method 名だけ変わると、probe を信じた側が無い口を呼ぶ"
+     :file "src/app.ts"
+     :find "\"assignDoor\", \"completeDockJob\""
+     :replace "\"assignDockDoor\", \"completeDockJob\""
+     :must-fail ["capabilities-agree-across-three-surfaces"]}
+
+    {:id :yard-ops/subscription-leaves-the-lexicon
+     :why "購読 collection が NSID prefix の外へ出ると、転送は通るのに購読が空振りする"
+     :file "kotodama.jsonld"
+     :find "\"collections\": [\"com.etzhayyim.apps.yardOps.operationalEvent\"]"
+     :replace "\"collections\": [\"com.etzhayyim.yardOps.operationalEvent\"]"
+     :must-fail ["lexicon-namespace-agrees-with-the-subscription"]}
+
+    {:id :yard-ops/nsid-prefix-stops-deriving-from-project
+     :why "lexicon の camel segment が project 名から外れると、改名時に片方だけ残る"
+     :file "src/app.ts"
+     :find "const NSID_PREFIX = \"com.etzhayyim.apps.yardOps.\";"
+     :replace "const NSID_PREFIX = \"com.etzhayyim.apps.yardops.\";"
+     :must-fail ["lexicon-namespace-agrees-with-the-subscription"]}
+
+    {:id :yard-ops/wrangler-main-points-at-the-thin-edge
+     :why "配備の入口が thin edge に切り替わると、信頼委譲・method 面・allowlist 不在という配備面の主張が全部ずれる"
+     :file "wrangler.jsonc"
+     :find "\"main\": \"svelte/.svelte-kit/cloudflare/_worker.js\""
+     :replace "\"main\": \"src/app.ts\""
+     :must-fail ["deployed-entrypoint-is-the-sveltekit-build-not-the-thin-edge"]}
+
+    {:id :yard-ops/bff-header-drifts-from-framework-var
+     :why "配備面が押す BFF 印と framework var が食い違うと、上流のログで経路を逆引きできない"
+     :file "svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "'x-etzhayyim-bff', 'sveltekit-edge-bff'"
+     :replace "'x-etzhayyim-bff', 'sveltekit-bff'"
+     :must-fail ["deployed-entrypoint-is-the-sveltekit-build-not-the-thin-edge"]}
+
+    {:id :yard-ops/deployed-face-gains-get
+     :why "配備面に GET が生えると thin edge との method 差が消える —— 表が古くなったまま緑になる形"
+     :file "svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "export const OPTIONS: RequestHandler"
+     :replace "export const GET: RequestHandler = async () => new Response(null, { status: 204 });\nexport const OPTIONS: RequestHandler"
+     :must-fail ["deployed-xrpc-face-delegates-trust-and-has-no-nsid-allowlist"]}
+
+    {:id :yard-ops/deployed-face-starts-dropping-authorization
+     :why "authorization を落とし始めたら、それは委譲ではなく検査になった（信頼モデルの変更）"
+     :file "svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "headers.delete('host');"
+     :replace "headers.delete('host'); headers.delete('authorization');"
+     :must-fail ["deployed-xrpc-face-delegates-trust-and-has-no-nsid-allowlist"]}
+
+    {:id :yard-ops/deployed-face-stops-forwarding-caller-headers
+     :why "呼び手の header を捨てると、上流での認証が根拠を失う"
+     :file "svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "const headers = new Headers(event.request.headers);"
+     :replace "const headers = new Headers();"
+     :must-fail ["deployed-xrpc-face-delegates-trust-and-has-no-nsid-allowlist"]}
+
+    {:id :yard-ops/mcp-default-drifts-from-var
+     :why "既定 router と配備 var が別を指すと、var が消えた配備だけ別の上流へ喋る"
+     :file "svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "const DEFAULT_MCP_ROUTER_URL = 'https://mcp.etzhayyim.com/xrpc/com.etzhayyim.mcp.message';"
+     :replace "const DEFAULT_MCP_ROUTER_URL = 'https://mcp.etzhayyim.com/xrpc/com.etzhayyim.mcp.send';"
+     :must-fail ["deployed-xrpc-face-delegates-trust-and-has-no-nsid-allowlist"]}
+
+    {:id :yard-ops/deployed-cors-narrows
+     :why "CORS を絞るのは正しい変更でありうるが、黙って起きてはいけない（今の面は任意 origin を許す）"
+     :file "svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "'access-control-allow-origin': '*'"
+     :replace "'access-control-allow-origin': 'https://etzhayyim.com'"
+     :must-fail ["deployed-xrpc-face-delegates-trust-and-has-no-nsid-allowlist"]}
+
+    {:id :yard-ops/deployed-loses-no-store
+     :why "no-store が外れると、認可済みの応答が中間に載りうる"
+     :file "svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "headers.set('cache-control', 'no-store'); "
+     :replace ""
+     :must-fail ["deployed-xrpc-face-delegates-trust-and-has-no-nsid-allowlist"]}
+
+    {:id :yard-ops/router-var-renamed-in-wrangler
+     :why "配備が別名で var を置くと、配備面は読めずに既定値へ落ちる（成功に見える失敗）"
+     :file "wrangler.jsonc"
+     :find "\"AGENTGATEWAY_MCP_ROUTER_URL\":"
+     :replace "\"MCP_ROUTER_URL\":"
+     :must-fail ["deployed-xrpc-face-delegates-trust-and-has-no-nsid-allowlist"]}
+
+    {:id :yard-ops/thin-edge-drops-the-prefix-guard
+     :why "prefix 検査を外すと、thin edge が任意の NSID を内部 dispatcher へ転送する"
+     :file "src/app.ts"
+     :find "if (nsid.startsWith(NSID_PREFIX) &&"
+     :replace "if (nsid &&"
+     :must-fail ["thin-edge-refuses-paths-outside-its-lexicon"]}
+
+    {:id :yard-ops/thin-edge-swaps-get-for-put
+     :why "受ける method 面が動くと、probe と実際に通る要求が食い違う"
+     :file "src/app.ts"
+     :find "req.method === \"GET\""
+     :replace "req.method === \"PUT\""
+     :must-fail ["thin-edge-refuses-paths-outside-its-lexicon"]}
+
+    {:id :yard-ops/thin-edge-stops-checking-invalid-json
+     :why "壊れた JSON の 400 を外すと、`{__invalidJson:true}` が本文として上流へ流れる"
+     :file "src/app.ts"
+     :find "      if (body.__invalidJson) return json({ error: \"InvalidJson\" }, 400);\n"
+     :replace ""
+     :must-fail ["thin-edge-refuses-paths-outside-its-lexicon"]}
+
+    {:id :yard-ops/query-overwrites-body
+     :why "query が body を上書きするようになると、POST 本文が URL から差し替えられる"
+     :file "src/app.ts"
+     :find "if (!(k in body)) body[k] = v;"
+     :replace "body[k] = v;"
+     :must-fail ["thin-edge-refuses-paths-outside-its-lexicon"]}
+
+    {:id :yard-ops/internal-secret-gains-a-dev-default
+     :why "既定値が空文字から別の literal に変わったら、fail-open の形が変わったので記録を更新する"
+     :file "src/app.ts"
+     :find "(env.DISPATCHER_INTERNAL_SECRET ?? \"\")"
+     :replace "(env.DISPATCHER_INTERNAL_SECRET ?? \"dev\")"
+     :must-fail ["thin-edge-sends-an-empty-internal-secret-when-unset"]}
+
+    {:id :yard-ops/internal-secret-header-renamed
+     :why "秘密を載せる header 名が動くと、上流が検査する header が空になる"
+     :file "src/app.ts"
+     :find "\"x-internal-secret\": secret"
+     :replace "\"x-etzhayyim-secret\": secret"
+     :must-fail ["thin-edge-sends-an-empty-internal-secret-when-unset"]}
+
+    {:id :yard-ops/dispatcher-url-gets-set-in-wrangler
+     :why "known-unset の var に値が入ったら、表の方が古い —— 黙って通さない"
+     :file "wrangler.jsonc"
+     :find "\"APP_FRAMEWORK\": \"sveltekit-edge-bff\","
+     :replace "\"APP_FRAMEWORK\": \"sveltekit-edge-bff\",\n    \"DISPATCHER_URL\": \"https://dispatcher.etzhayyim.com\","
+     :must-fail ["known-unset-deploy-vars-are-still-unset"]}
+
+    {:id :yard-ops/dispatcher-default-url-drifts
+     :why "var が無い経路の既定 dispatcher が動くと、未設定の配備だけ別の上流へ喋る"
+     :file "src/app.ts"
+     :find "env.DISPATCHER_URL ?? \"https://dispatcher.etzhayyim.com\""
+     :replace "env.DISPATCHER_URL ?? \"https://bpmn.etzhayyim.com\""
+     :must-fail ["known-unset-deploy-vars-are-still-unset"]}
+
+    {:id :yard-ops/health-loses-the-app-meta-path
+     :why "probe path が 1 本消えると、その path を叩いている監視だけが静かに 404 になる"
+     :file "src/app.ts"
+     :find "url.pathname === \"/_app/meta\""
+     :replace "url.pathname === \"/meta\""
+     :must-fail ["health-probe-answers-on-both-documented-paths"]}
+
+    {:id :yard-ops/execution-stops-naming-langserver
+     :why "execution 文字列が上流の段を落とすと、probe を読んだ人が経路を短く見積もる"
+     :file "src/app.ts"
+     :find "execution: \"edge-proxy+agentgateway-mcp+langserver\""
+     :replace "execution: \"edge-proxy+agentgateway-mcp\""
+     :must-fail ["health-probe-answers-on-both-documented-paths"]}
+
+    {:id :yard-ops/bpmn-path-drifts-from-project
+     :why "BPMN の path が project 名から外れると、契約の在処が引けなくなる"
+     :file "src/app.ts"
+     :find "bpmn: \"etzhayyim-root/00-contracts/bpmn/com/etzhayyim/yard-ops\""
+     :replace "bpmn: \"etzhayyim-root/00-contracts/bpmn/com/etzhayyim/yardops\""
+     :must-fail ["health-probe-answers-on-both-documented-paths"]}
+
+    {:id :yard-ops/svelte-package-name-drifts
+     :why "svelte package が親 package 名から導出されなくなると、2 つの package が別物に見える"
+     :file "svelte/package.json"
+     :find "\"name\": \"etzhayyim-project-yard-ops-svelte\""
+     :replace "\"name\": \"etzhayyim-yard-ops-svelte\""
+     :must-fail ["project-names-agree-across-surfaces"]}
+
+    {:id :yard-ops/migration-source-path-drifts
+     :why "抽出元 path が動くと、上流 monorepo への逆引きが landing page と 2 面でばらける"
+     :file "migration.edn"
+     :find ":path \"60-apps/etzhayyim-project-yard-ops\""
+     :replace ":path \"60-apps/yard-ops\""
+     :must-fail ["project-names-agree-across-surfaces"]}
+
+    {:id :yard-ops/readme-name-drifts-from-destination
+     :why "README が名乗る repo 名と移設先が食い違うと、どこに在るのかを 2 面が別々に答える"
+     :file "README.edn"
+     :find ":name \"com-etzhayyim-app-yard-ops\""
+     :replace ":name \"com-etzhayyim-app-yardops\""
+     :must-fail ["project-names-agree-across-surfaces"]}
+
+    {:id :yard-ops/landing-page-name-drifts
+     :why "配備される landing page が別の package を名乗ると、開いた人が別 app だと読む"
+     :file "svelte/src/routes/+page.svelte"
+     :find "\"name\": \"etzhayyim-project-yard-ops\""
+     :replace "\"name\": \"etzhayyim-project-yardops\""
+     :must-fail ["project-names-agree-across-surfaces"]}
+
+    {:id :yard-ops/display-name-drifts
+     :why "表示名が 1 面だけ動くと、UI と directory で別の名前が出る"
+     :file "wrangler.jsonc"
+     :find "\"APP_DISPLAY_NAME\": \"Yard Operations\""
+     :replace "\"APP_DISPLAY_NAME\": \"Yard Ops\""
+     :must-fail ["display-metadata-agrees-between-wrangler-and-identity"]}
+
+    {:id :yard-ops/ui-type-drifts
+     :why "UI 種別が食い違うと、shell が別の描画を選ぶ"
+     :file "kotodama.jsonld"
+     :find "\"uiType\": \"yoro\""
+     :replace "\"uiType\": \"kanban\""
+     :must-fail ["display-metadata-agrees-between-wrangler-and-identity"]}
+
+    {:id :yard-ops/performer-type-drifts
+     :why "performer 種別が食い違うと、governance の RACI の当て先が変わる"
+     :file "kotodama.jsonld"
+     :find "\"performerType\": \"service\""
+     :replace "\"performerType\": \"agent\""
+     :must-fail ["display-metadata-agrees-between-wrangler-and-identity"]}
+
+    {:id :yard-ops/description-shared-prefix-drifts
+     :why "2 面の説明が共有していた前半まで割れると、同じ app の説明だと読めなくなる"
+     :file "kotodama.jsonld"
+     :find "\"description\": \"yard-ops — gate-in / dock-door / gate-out coordination."
+     :replace "\"description\": \"yardops — gate-in / dock-door / gate-out coordination."
+     :must-fail ["display-metadata-agrees-between-wrangler-and-identity"]}
+
+    {:id :yard-ops/landing-page-summary-gets-fixed
+     :why "既知の空表示が直ったら赤くする —— 欠陥が黙って残るのと、記録が古いままなのを出力で区別する"
+     :file "svelte/src/routes/+page.svelte"
+     :find "\"routeCount\": 0"
+     :replace "\"routeCount\": 2"
+     :must-fail ["known-empty-landing-page-summary-is-still-empty"]}
+
+    {:id :yard-ops/migration-tracked-files-drifts
+     :why "provenance の件数が実体とずれたら、抽出の同一性は主張できない"
+     :file "migration.edn"
+     :find ":tracked-files 12"
+     :replace ":tracked-files 11"
+     :must-fail ["migration-file-set-still-matches-the-extraction"]}
+
+    {:id :yard-ops/migration-revision-loses-its-sha
+     :why "revision が可変な名前になると、抽出元を後から指せなくなる"
+     :file "migration.edn"
+     :find ":revision \"c9e7df4b327a3ee7b5ed25fb3480db45553c33ed\""
+     :replace ":revision \"HEAD\""
+     :must-fail ["migration-file-set-still-matches-the-extraction"]}
+
+    {:id :yard-ops/migration-bytes-drifts
+     :why "抽出物の合計バイトが記録とずれたら、記録の方を更新させる"
+     :file "migration.edn"
+     :find ":bytes 13299"
+     :replace ":bytes 13300"
+     :must-fail ["migration-byte-total-still-matches-the-extraction"]}
+
+    {:id :yard-ops/readme-declares-md-metadata
+     :why "正本が :md に変わったら名乗りが 2 箇所になりうる —— 宣言と実体を同時に見る"
+     :file "README.edn"
+     :find ":canonical-metadata :edn"
+     :replace ":canonical-metadata :md"
+     :must-fail ["repository-declares-itself-as-an-edn-first-app"]}
+
+    {:id :yard-ops/readme-kind-drifts
+     :why "kind が app でなくなると、fleet の分類と配備の実体が食い違う"
+     :file "README.edn"
+     :find ":kind :app"
+     :replace ":kind :lib"
+     :must-fail ["repository-declares-itself-as-an-edn-first-app"]}]}
 ]}
