@@ -262,7 +262,7 @@
    :note "OCapN. CLAUDE.md ADR-2608160200 places UCAN, CACAO and OCapN as adapters over the core capability semantics in kotoba-lang/kotoba-lang, so the destination is an adapter there, not a new origin-plane repository."}
   {:coordinate "curves" :ecosystem :npm :disposition :first-party-exists
    :target "kotoba-lang/org-ietf-ed25519"
-   :note "murakumo declares `curves@^1.7.0`. The npm package `curves` is at 1.1.0 and unrelated, so that range cannot resolve at all -- this is a typo for @noble/curves that has never been installed. Fixing it means removing the line, not substituting it."}
+   :note "RESOLVED 2026-08-26 (kotoba-lang/murakumo#332). murakumo's package.json declared `curves@^1.7.0`; the npm package `curves` is at 1.1.0 and unrelated, so `npm ci` failed with ETARGET on every clean checkout. The scope had been dropped from the name -- package-lock.json carried `@noble/curves` correctly the whole time, so manifest and lock also disagreed. The fix was restoring the scope, NOT deleting the line: witness-quorum declares the same `@noble/curves@^1.7.0` and murakumo reaches it transitively when witness_dial_attest.cljs runs. This entry is kept so a reappearance of the unscoped name is recognised rather than re-diagnosed."}
   {:coordinate "workflow" :ecosystem :npm :disposition :gap-open :proposed-name nil
    :note "app-scap declares `workflow@latest`. The npm package of that name is unrelated to anything here; like the builtin-shadowing entries beside it, it is a line to delete rather than a dependency to replace."}
 
