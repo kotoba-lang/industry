@@ -1,0 +1,106 @@
+[{:db/id -1
+  :adr/id "adr-2608261400-kotoba-github-linguist-third-party-gate"
+  :adr/title "GitHub が Kotoba と表示する条件は第三者採用であって実装ではない"
+  :adr/status "accepted"
+  :adr/date "2026-08-26"
+  :adr/related ["adr-2607266000" "2607202800-task-graph-edn-schema-kotoba-langgraph-integration"]
+  :adr/body "GitHub が .kotoba を Clojure と表示するのは事故ではない。kotoba-lang/kotoba の
+.gitattributes に `*.kotoba linguist-language=Clojure` があり、task graph の
+A-gitattributes-alias として 2026-07-20 に意図して入れたものである。オーナーの
+要望は「Kotoba と表示させたい」で、これに答えるにあたり 3 つのことが分かった。
+
+## 1. linguist-language=Kotoba は Kotoba にならない。バーから消える
+
+linguist の lib/linguist/lazy_blob.rb を読んで確認した。`language` は
+`Language.find_by_alias(lang)` の結果をそのまま返し、未知の名前でも通常検出へ
+フォールバックしない。属性を外しても同じで、.kotoba は languages.yml に無いので
+Extension strategy が空を返し、Classifier.call は空配列を渡すため
+(classify の `languages ||=` は空ベクタを truthy として素通しする) 何も返らない。
+どちらの経路でも .kotoba は言語バーから除外され、kotoba-lang/kotoba の表示言語は
+Shell (12,775 bytes) が筆頭になる。languages.yml に Kotoba も .kotoba も無いので、
+将来登録するときの名前・拡張子の衝突は無い。
+
+## 2. grammar は既にある。無いと結論しかけた
+
+「TextMate grammar は無い」と一度結論しかけたが、誤りだった。kotoba-lang/grammar が
+syntaxes/kotoba.tmLanguage.json (guest-grammar.edn からの生成、gen-tmlanguage.cljs
+--check が drift を拒否) と linguist 提出キット (PULL_REQUEST.md /
+languages.yml.entry / samples.edn) と readiness 計測器を既に持っている。
+task graph は G-grammar-repo を repo 名 kotoba-lang/kotoba-syntax の dispatched の
+まま持っていて、その repo は 404 だったので「未着手」に見えた。実際は
+ADR-2607266000 の責務分割で grammar authority を持つ repo が先に切り出されており、
+そこに着地していた。索引を引く規則が効いた場面だが、引いたのは west の repo-search
+であって task graph ではない。task graph 側は今回現在地に合わせた。
+
+## 3. readiness 計測器は測っていなかった
+
+tools/linguist-readiness.cljs は三値 exit を持ち、nil を 0 に潰さず、query 文字列を
+self-test する — 慎重に書かれている。それでも「測れなかった検査が、測って問題が
+無かった検査と同じ値を返す」形をしていた。self-test が確かめていたのは query の
+「文」が正しいことで、その答えが corpus から来たことではない。
+
+実測 2026-08-26: kotoba-lang/murakumo は public / 非 fork / 当日 push で default
+branch に .kotoba を 36 本持つ。`repo:kotoba-lang/murakumo extension:kotoba` は
+0 を返す。search term を足しても 0。API はエラーにならず数を返すので、
+「索引が覆っていない」と「言語が使われていない」が同じ顔で出てくる。global raw も
+query の形で動いた (extension:kotoba=27、defn extension:kotoba=7) — 実在する
+corpus の件数は、ほぼ全ファイルに出る語で絞ったときに減ったりしない。
+
+つまり README が引用していた「Measured 2026-08-24: raw 27, owner-excluded 0」の
+raw は corpus の測定ではなく、corpus を見られない索引の測定だった。修正
+(kotoba-lang/grammar 5affe442) は reachability control を足す: control repo の
+git tree から .kotoba を数え (ground truth)、同じ repo を search に訊く。tree が
+非ゼロで索引が 0 なら exit 3 (UNVERIFIED) で拒否し、不足 (exit 1) とは名乗らない。
+control は tree から導出するので、control repo が拡張子を失えば静かに効力を失う
+のではなく拒否する。--self-test は各拒否経路を実際に駆動して exit code を突き合わせる
+— この変更の前は、上記の拒否がすべて exit 1 を返していた。
+
+## 何が本当の gate か
+
+索引の話を除いても残るのは owner-excluded = 0 である。CONTRIBUTING は査読者が
+primary language owner のアカウントを -user: で除外してから評価すると明記しており、
+この org の外に .kotoba を書くアカウントは 1 つも無い。これは量ではなく所有の問題で、
+自分たちの repo をいくら増やしても動かない。
+
+オーナーの提案 (isekai.network で Kotoba を実装させて公開する、cloud-itonami で
+サイトを作って公開する) は、この一点で効かない — どちらも我々の org なので、
+公開しても -user: で除外される。効く形は「platform が publish する」ではなく
+「platform の利用者が、自分のアカウントの repo に publish する」導線を持つこと。
+export-to-your-own-GitHub、scaffolder が利用者の repo に決定核を 1 本書く、といった形。
+
+分散基準 (unique :user/:repo) と、後述の 200 tier が、どちらも「多数の repo に
+1 本ずつ」という形を同時に報いる。ただし I-index-coverage が示すとおり GitHub の
+索引は star 0 の低シグナル repo を覆っていない可能性があり、覆っていないなら
+「小さい repo を大量に作る」形は索引に載らない。導線を設計する前にそこを測る。
+
+アカウントを用意して数を作ることは、査読方法 (高比率ユーザの -user: 除外 + 無作為
+クリック) に対する gaming なので選択肢に入れない。
+
+## 閾値は 2000 でないかもしれない
+
+CONTRIBUTING は 2 段の閾値を持つ: 1 repo に複数出る拡張子 (.rb) は 2000 files、
+1 repo に 1 つしか出ない拡張子 (Makefile) は 200 files。実測 2026-08-26、.kotoba を
+持つ 1,257 repo のうち 1,183 (94.1%) がちょうど 1 本しか持たない。中央値 1、平均
+1.57 (135 / 103 / 88 / 78 本の外れ値が引き上げている)。これは Makefile の分布で
+あって .rb の分布ではなく、CLAUDE.md の「移行の単位は決定核」がそのまま形に出た
+ものである。認められれば gate は 10 分の 1 になる。
+
+これは PR ではなく discussion で問う。CONTRIBUTING 自身が「If you have a better
+approach, please open a new discussion」と招いており、閾値未達の discussion は
+close されないが、閾値未達の PR は close される。閉じられた PR を開け直すのは、
+遅れて出すより高い。
+
+## 決定
+
+- .gitattributes の Clojure エイリアスは維持する。外すと表示は Kotoba にならず、
+  ハイライトも失って Shell が筆頭になる — 現状より悪い。
+- 上流 PR (B) は staged のまま。requires に T-third-party-adoption を足した。
+  唯一の gate が第三者採用であることを依存関係として明示する。
+- readiness 計測器は索引が corpus を見られないとき拒否する (着地済み)。
+- 新しい task を 3 つ立てた: I-index-coverage (査読者が使う web 検索 UI で raw を
+  測り直す) / T-usage-tier-discussion (200 tier を linguist に問う) /
+  T-third-party-adoption (外部アカウントに .kotoba が生まれる導線)。
+- E-editor-extension は未着手のまま。workspace に contributes.grammars を持つ
+  package.json は 0 件 (2026-08-26 実測)。GitHub の表示は変わらないが、
+  今日 Kotoba と名乗れる唯一の面である。
+"}]

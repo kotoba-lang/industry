@@ -40,23 +40,24 @@
  {:db/id -3
   :task/id "G-grammar-repo"
   :task/workflow "kotoba-github-linguist-recognition"
-  :task/title "kotoba 専用の TextMate/tree-sitter grammar を独立リポジトリとして切り出す"
+  :task/title "kotoba 専用の TextMate grammar を独立リポジトリとして切り出す"
   :task/kind "new-repo-scaffold"
-  :task/repo "kotoba-lang/kotoba-syntax"
+  :task/repo "kotoba-lang/grammar"
   :task/requires []
   :task/external-gate false
-  :task/status :dispatched
-  :task/status-at "2026-07-21T04:42:13.062Z"
-  :task/status-note "posted WorkItem taskgraph:kotoba-github-linguist-recognition:G-grammar-repo (kind=business)"}
+  :task/status :completed
+  :task/status-at "2026-08-26T00:00:00.000Z"
+  :task/status-note "kotoba-lang/grammar に着地済み。repo 名は kotoba-syntax ではない — ADR-2607266000 の責務分割で grammar authority (resources/kotoba/lang/guest-grammar.edn) を持つ repo が既に切り出されており、TextMate は同じ catalog の projection として syntaxes/kotoba.tmLanguage.json に生成される (tools/gen-tmlanguage.cljs、--check が drift を拒否)。source.clojure の別名にしていないのは、:forbidden-heads の 31 head を invalid.illegal.forbidden-head.kotoba に scope して no-ambient-authority 不変条件をエディタ側に見せるため。linguist 提出キット (linguist/PULL_REQUEST.md, languages.yml.entry, samples.edn) も同 repo にある。2026-08-26 実測: clojure -M:test は 12 tests / 113 assertions / 0 failures、gen-embedded --check と gen-tmlanguage --check はいずれも exit 0"}
 
  {:db/id -4
   :task/id "E-editor-extension"
   :task/workflow "kotoba-github-linguist-recognition"
   :task/title "G の grammar を使う VS Code 拡張などエディタ向けシンタックスハイライトを整備する"
   :task/kind "editor-extension"
-  :task/repo "kotoba-lang/kotoba-syntax"
+  :task/repo "kotoba-lang/grammar"
   :task/requires ["G-grammar-repo"]
-  :task/external-gate false}
+  :task/external-gate false
+  :task/status-note "未着手。workspace 内に contributes.grammars を持つ package.json は 0 件 (2026-08-26 実測)。syntaxes/kotoba.tmLanguage.json は既にあるので、拡張側は package.json + language contribution だけで足りる。GitHub の表示は変わらないが、エディタで Kotoba と名乗れる唯一の経路"}
 
  {:db/id -5
   :task/id "B-linguist-upstream-pr"
@@ -64,9 +65,41 @@
   :task/title "github-linguist/linguist の languages.yml + grammars.yml + samples に Kotoba を登録する PR を送る"
   :task/kind "upstream-pr"
   :task/repo "github-linguist/linguist"
-  :task/requires ["G-grammar-repo"]
+  :task/requires ["G-grammar-repo" "T-third-party-adoption"]
   :task/external-gate true
-  :task/gate-reason "第三者OSSへの公開PR。かつ linguist は複数の独立リポジトでの実利用実績を要求するため、G単体の完了だけでは着手可能にならない（外生条件）。"}
+  :task/gate-reason "第三者OSSへの公開PR。linguist CONTRIBUTING は拡張子あたり直近1年で 2000 files (1 repo に 1 つしか出ない拡張子なら 200) のインデックスと、unique :user/:repo への分散を要求し、査読者は primary language owner のアカウントを -user: で除外してから評価する。G の完了では着手可能にならない。2026-08-26 実測: owner-excluded は 0 — この org の外に .kotoba を書くアカウントが無い。これが唯一の gate であり、量ではなく所有の問題なので、自分たちの repo を増やしても動かない。"}
+
+ {:db/id -101
+  :task/id "I-index-coverage"
+  :task/workflow "kotoba-github-linguist-recognition"
+  :task/title "GitHub code search がこの org の repo を索引していない件を、査読者が使う web 検索 UI で測り直す"
+  :task/kind "measurement"
+  :task/repo "kotoba-lang/grammar"
+  :task/requires []
+  :task/external-gate false
+  :task/status-note "2026-08-26 発見。kotoba-lang/murakumo は public / 非 fork / 当日 push で default branch に .kotoba を 36 本持つが、repo:kotoba-lang/murakumo extension:kotoba は 0 を返す。API はエラーにならず小さい数を返すので「言語が使われていない」と区別できない。global raw も query の形で動いた (extension:kotoba=27、defn extension:kotoba=7) — 実在する corpus の件数はそうならない。tools/linguist-readiness.cljs は reachability control を持ち、この状態では exit 3 (UNVERIFIED) で拒否するようになった (kotoba-lang/grammar 5affe442)。残る仕事は、査読者が実際に見る web の code search UI で raw を測り直すこと。legacy search API の索引とは別物なので、そちらで見えているなら raw の現在地が変わる。owner-excluded=0 の側は索引ではなく採用の話なので、この測定では動かない"}
+
+ {:db/id -102
+  :task/id "T-usage-tier-discussion"
+  :task/workflow "kotoba-github-linguist-recognition"
+  :task/title "linguist の discussion で .kotoba がどちらの閾値 tier かを問う (2000 か 200 か)"
+  :task/kind "upstream-discussion"
+  :task/repo "github-linguist/linguist"
+  :task/requires ["I-index-coverage"]
+  :task/external-gate true
+  :task/gate-reason "第三者OSSへの公開投稿。ただし PR ではなく discussion なので、閾値未達でも close されない — CONTRIBUTING 自身が「If you have a better approach, please open a new discussion」と招いている。"
+  :task/status-note "2026-08-26 実測: .kotoba を持つ 1,257 repo のうち 1,183 (94.1%) がちょうど 1 本しか持たない。中央値 1、平均 1.57 (135/103/88/78 本の外れ値が引き上げている)。これは CONTRIBUTING が 200 tier の説明に使う Makefile の分布であって .rb の分布ではない。決定核は repo あたり 1 つ、という移行方針 (CLAUDE.md 「移行の単位は決定核」) がそのまま形に出ている。認められれば gate は 10 分の 1 になる。認められなくても失うものが無いのが discussion を先に置く理由"}
+
+ {:db/id -103
+  :task/id "T-third-party-adoption"
+  :task/workflow "kotoba-github-linguist-recognition"
+  :task/title "自分たちが所有しないアカウントの repo に .kotoba が生まれる導線を作る"
+  :task/kind "adoption"
+  :task/repo "kotoba-lang/grammar"
+  :task/requires ["E-editor-extension"]
+  :task/external-gate true
+  :task/gate-reason "外部の人間が Kotoba を選ぶかどうかは、こちらの実装では決まらない。"
+  :task/status-note "唯一の gate。査読者は primary language owner を -user: で除外するので、isekai.network や cloud-itonami で「公開する」だけでは 1 件も増えない — それらは我々の org だから。数えられるのは、それらの利用者が自分のアカウントの repo に publish した .kotoba。したがって導線の形は「platform が export-to-your-own-GitHub を持つ」であって「platform が publish する」ではない。分散基準 (unique :user/:repo) と 200 tier の両方が、多数の repo に 1 本ずつ、という形を同時に報いる。ただし I-index-coverage が示すとおり、GitHub の索引は star 0 の低シグナル repo を覆っていない可能性があり、覆っていないなら「小さい repo を大量に作る」形は索引に載らない — 導線を設計する前にそこを測る。アカウントを用意して数を作るのは査読方法 (高比率ユーザの除外 + 無作為クリック) に対する gaming であり、選択肢に入れない"}
 
  ;; ── torihiki ⊖ Hyperliquid の gap 解消 ────────────────────────────────────
  ;;
