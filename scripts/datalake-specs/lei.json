@@ -1,0 +1,8 @@
+{
+  "_comment": "The table list scripts/datalake-sync.py used to hardcode. Data, not code, so the loader serves any exporter. scripts/lei-datalake-export.cljs writes these two JSON files; watchlist-datalake-export.cljs emits its own spec next to its data instead, which is the better shape -- an exporter and its spec cannot drift when one writes the other.",
+  "namespace": "cloud_itonami",
+  "tables": [
+    {"file": "lei_facts.json", "table": "lei_facts", "int_columns": ["value_index"]},
+    {"file": "lei_entity.json", "table": "lei_entity", "int_columns": []}
+  ]
+}
