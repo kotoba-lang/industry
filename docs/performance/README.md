@@ -18,6 +18,10 @@ npm run benchmark-runtime -- \
 
 npm run benchmark-compile -- --runs 5 \
   --output "$KOTOBA_ROOT/90-docs/performance/runs/$(date +%Y-%m-%d)/compile.json"
+
+# Tender comparison (needs kototama checkout)
+node scripts/kotoba-tender-benchmark.mjs --runs 3 --date $(date +%Y-%m-%d)
+# Worktree without orgs/: KOTOTAMA_ROOT=/path/to/kototama node scripts/kotoba-tender-benchmark.mjs ...
 ```
 
 Record host load before running (`sysctl -n vm.loadavg`). Contended hosts inflate
