@@ -27,7 +27,16 @@
 ;; 概念を 1 つに畳むとどれかが消える。**別概念として並べ、同じ綴りを両方に
 ;; 持たせる** —— `console` で引いた人には両方出るのが正しい。
 
-{:delegation
+{:malware-verdict
+ {:label "マルウェア判定と、その統治（ウイルス対策ソフトに相当するもの）"
+  :spellings ["aratame" "改め" "harai" "antivirus" "anti-virus" "ウイルス対策" "ウイルス対策ソフト"
+              "アンチウイルス" "マルウェア" "malware" "endpoint protection" "EPP" "EDR"
+              "XDR" "IOC" "indicator of compromise" "yara" "quarantine" "隔離"
+              "xprotect" "gatekeeper" "codesign" "notarization" "threat intelligence"
+              "検体" "signature database" "detection"]
+  :note "**判定と統治は cloud-itonami/aratame（改め）**（ADR-2608262300）—— 証拠から verdict を出し、その verdict に対して何をしてよいかを独立した governor が決める。検出エンジンは持たない。役割: aratame=判定+admission / cloud-itonami/threat-intelligence=IOC 台帳（IndicatorRecord・TLP・permille 信頼度）/ cloud-itonami/yabai=脅威グラフ（MalwareSample・C2・yara_rules を証拠として保持、評価はしない）/ kotoba-lang/macos-inventory=codesign・spctl・XProtect 版・Gatekeeper の読み取り専用プローブ / kotoba-lang/quarantine=delete opcode を持たない可逆隔離 / gftdcojp/misogi=端末ローカルの衛生コンソール（罪/穢れの 2 軸）/ kotoba-lang/com-virustotal=VT API 互換の clean-room（188 行、スキャンはしない）。⚠ **常駐監視も content inspection も無い**（EndpointSecurity client 無し、unpack/emulation/YARA 評価無し）。**Mac 上の実際のウイルス対策は XProtect** で、aratame doctor はその版を報告する。2026-08-26 に『cloud-itonami にウイルス対策は在るか』へ答えるのに 8 通りの grep が要り、概念索引はこの語を 1 つも持っていなかった —— それがこの entry の理由。"}
+
+ :delegation
  {:label "委譲 / capability token（減衰して他者へ渡す）"
   :spellings ["biscuit" "macaroon" "delegation" "attenuation" "capability token"
               "ucan" "cacao" "caveat" "委譲" "減衰" "権限委譲" "capability"

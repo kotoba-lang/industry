@@ -224,6 +224,35 @@
        " entries=" (count (:rows scanned)) "\n\n"
        (pr-str datoms) "\n"))
 
+(defn evidence-floor
+  "Why a generator refuses to write.
+
+  Measured 2026-08-26: this script was run in a worktree whose `orgs/` held no
+  checkouts. It scanned 4 repositories, indexed 0, and wrote an index saying so
+  — exit 0, and a diff that read as an ordinary update. An index built from
+  nothing is not an empty index; it is an unanswered question wearing the shape
+  of an answer, and the next `concept-lookup` would have reported every concept
+  in the workspace as absent.
+
+  So: nothing is written when nothing was indexed, and nothing is written when
+  the new index would drop most of an existing one. Rebuilding a genuinely
+  smaller index is still possible — delete the old file, or pass
+  --allow-shrink — but it cannot happen silently. Zero indexable repositories
+  is refused either way; there is no flag for it."
+  [scanned previous allow-shrink?]
+  (let [n (:indexable scanned)
+        prev-entries (count (re-seq #":concept/repo " (or previous "")))
+        new-entries (count (:rows scanned))]
+    (cond
+      (zero? n)
+      (str "concept index: 0 of " (:repos scanned)
+           " repositories were indexable. Nothing was measured.")
+
+      (and (not allow-shrink?)
+           (pos? prev-entries) (< new-entries (quot prev-entries 2)))
+      (str "concept index: " new-entries " entries would replace " prev-entries
+           " — more than half the index would disappear."))))
+
 (defn -main [& args]
   (let [args (vec args)
         scan-root (or (second (drop-while #(not= "--scan-root" %) args)) root)
@@ -234,10 +263,15 @@
         (println "concept index: up to date")
         (do (println "concept index: STALE — rerun nbb scripts/gen-concept-index.cljs")
             (set! (.-exitCode js/process) 1)))
-      (do (fs/mkdirSync (path/dirname out-file) #js {:recursive true})
+      (if-let [refusal (evidence-floor scanned (read-safe out-file)
+                                    (boolean (some #{"--allow-shrink"} args)))]
+        (do (println refusal)
+            (println "concept index: REFUSING to write. The previous index is left in place.")
+            (set! (.-exitCode js/process) 2))
+        (do (fs/mkdirSync (path/dirname out-file) #js {:recursive true})
           (fs/writeFileSync out-file out)
           (println (str "concept index: " (count (:rows scanned)) " entries over "
                         (:indexable scanned) "/" (:repos scanned) " repos → "
-                        (str/replace out-file (str root "/") "")))))))
+                        (str/replace out-file (str root "/") ""))))))))
 
 (apply -main *command-line-args*)
