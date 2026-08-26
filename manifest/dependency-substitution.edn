@@ -159,9 +159,9 @@
    :target "kotoba-lang/shitsuke" :note "As re-frame."}
 
   ;; ------------------------------------------------ gap open: nothing to rewire to
-  {:coordinate "@noble/hashes/argon2" :ecosystem :npm :disposition :gap-open
-   :proposed-name "org-ietf-argon2"
-   :note "RFC 9106 Argon2id. kotoba-lang/pqh names the suite and injects an IKdf capability, stating the math is not in-language and is verified byte-identical against @noble/hashes. Tractable: Argon2 is BLAKE2b-based and org-ietf-blake2 already ships."}
+  {:coordinate "@noble/hashes/argon2" :ecosystem :npm :disposition :gap-closed
+   :target "kotoba-lang/org-ietf-argon2"
+   :note "RFC 9106, all three variants, validated against the RFC vectors and 150 differential comparisons with BouncyCastle. ⚠ CORRECT, NOT FAST: measured 7.1 s on the JVM and 41 s under nbb at the OWASP minimum of 19 MiB, where a native provider takes under a tenth of a second. This does NOT retire pqh's IKdf capability on a login path -- it supplies the in-language reference that seam had no implementation of, and the provider a host with neither BouncyCastle nor @noble/hashes can fall back to. Read the repository README before substituting it anywhere interactive."}
   {:coordinate "@noble/curves/bls12-381" :ecosystem :npm :disposition :gap-open
    :proposed-name "org-ietf-bls-signatures"
    :note "io-filecoin-signer's bls.cljc delegates to @noble/curves and says so: there is no pure-Java BLS12-381 in this workspace. A pairing-friendly curve is the largest single item on this list."}
