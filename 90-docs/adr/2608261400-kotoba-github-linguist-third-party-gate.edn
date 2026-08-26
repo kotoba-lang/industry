@@ -138,4 +138,57 @@ close されないが、閾値未達の PR は close される。閉じられた
 ## 改訂履歴
 
 2026-08-26 同日: 94.1% が 1 本という測定は残し、CLAUDE.md の『移行の単位は決定核』を当時の切り方へ戻した。現行は ADR-2608261100。
+
+
+## 検証（このセッションで実際に走らせたもの）
+
+すべて log をファイルに落として exit を採った。パイプ越しの `$?` は使っていない
+（このセッション中に 2 度、通知の「exit code 0」が wrapper の値で、gate 本体は
+124 と 1 だった）。
+
+| 検査 | 結果 |
+|---|---|
+| `clojure -M:test`（kotoba-lang/grammar） | 12 tests / 113 assertions / 0 failures（3 回） |
+| `gen-embedded.cljs --check` | exit 0 |
+| `gen-tmlanguage.cljs --check` | exit 0 |
+| `gen-vscode-grammar.cljs --check` | exit 0 |
+| `linguist-readiness.cljs --self-test` | exit 0、12 ok |
+| `verify-tmlanguage.cljs`（vscode-textmate） | 3 source / 3,631 token / 100% scoped / 12 scope cases PASS |
+| `docs-edn-check.cljs --sub 90-docs/adr --min 1400 --strict-keys` | exit 0、2,480 文書 |
+| `verify-adr-identity.cljs` | exit 0 |
+| VS Code 拡張の負テスト 5 通り | stale=1 / scopeName typo=1 / extensions drift=1 / grammar 読めず=2 / 復元=0 |
+| JSON 3 本（package / language-configuration / grammar） | parse OK |
+
+**未実行と、その理由**: ツリー全体に対する `docs-edn-check`（`--sub` 無し）は
+回していない。1 度回して exit 1 になったが、内訳の大半は west 管理下の
+`orgs/*/deps.edn` を「symbol key」として落とす偽陽性で（`org.clojure/clojure` は
+deps.edn の正準形）、この検査は 90-docs 文書に対して較正されたものだった。
+fleet の設定も `--sub 90-docs/adr` である。ただしその実行が、90-docs/adr の外に
+**既存の壊れた EDN を 5 件**露出させた。今回のスコープ外なので直していない:
+`90-docs/gates/WEEK-11-EXECUTION-BOARD-INSTANCE-2026-08-19.edn`（Unmatched
+delimiter）/ `90-docs/gates/escalation-protocol-reference.edn`（同）/
+`90-docs/business/cloud-itonami-actor-substrate-ledger.edn`（symbol key `ZAF`、
+heredoc 破損の署名）/ `STRANGLER-FIG-MONTH1-DEPLOYMENT-SUMMARY.edn`（同、repo 直下）/
+`deploy/slo-dashboard-config.edn`（同）。**5 件とも現在の fleet 設定では誰も見て
+いない** —— gate の対象が `90-docs/adr` に限られているため。
+
+## 次の一手（resume point）
+
+1. **`T-usage-tier-discussion`** —— 一番安い。github-linguist に discussion を
+   立てて「.kotoba はどちらの tier か」を問う。根拠は実測済み（1,257 repo 中
+   1,183 が 1 本だけ = 94.1%、中央値 1）。PR ではないので閾値未達でも close
+   されない。認められれば gate が 2000 → 200 になる。
+2. **`T-third-party-adoption`** —— 唯一の実 gate。設計の入口は「platform が
+   publish する」ではなく「利用者が自分のアカウントの repo に publish する」
+   導線をどこに置くか。raw=58 が非ゼロなので、索引の問題ではなく所有の問題だと
+   確定している。
+3. 上の 5 件の壊れた EDN、または fleet gate の対象を `90-docs/adr` から
+   `90-docs` に広げるか（広げるなら 5 件を先に直す必要がある）。
+
+## 着地した commit（すべて default branch から到達可能、2026-08-26 確認）
+
+kotoba-lang/grammar: `5affe442`（reachability control）/ `372b8208`（査読者の面で
+測る + PR キット修正）/ `8dd57c17`（VS Code 拡張 + licence と NOT is:fork の修正）。
+superproject: `8d8e4946`（ADR + task graph）/ `ff38933a`（測定確定値）/
+`0cd30fe2`（E 着地）、pin 前進 `0ddc15eb` / `f2122ee4` / `605e6540`。
 "}]

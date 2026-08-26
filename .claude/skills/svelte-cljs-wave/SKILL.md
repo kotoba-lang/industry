@@ -98,9 +98,54 @@ commit して main に載せる。
 | **build は前景の retry loop で回す。background 監視に入らせない** | 下記。第 1・2 波で計 6 agent がこれで停止した |
 | **backend の `.ts` を書き換えない** | `src/app.ts` / `src/engine.ts` は Cloudflare Worker の本番ロジック。第 1 波で 2 agent が正しく拒否した。**svelte/ ディレクトリだけ**が対象 |
 | **README / operator-quickstart / `kotodama.jsonld` の `staticDir` も直す** | 消した svelte build を説明したまま残すと、文書が能動的に嘘になる |
+| **`wrangler.jsonc` / `wrangler.toml` が消したパスを指していたら直す**（下記の 1 通りに揃える） | 第 6 波で 3 agent が同じ問題に**3 通り**の答えを出した。scope を「frontend だけ」と書いた私の穴 |
 | **build が通らなければ merge しない** | 壊れた移行は未移行より悪い |
 | **rebase 禁止・force-push 禁止** | CLAUDE.md |
 | **`manifest/west.yml` を触らない** | pin は中央で 1 commit にまとめる |
+
+## `svelte/` を消す前に、Svelte でないものが入っていないか見る
+
+**`svelte/static/` に、Svelte とは無関係の実物が置かれていることがある。**
+実測 2026-08-26、`cloud-itonami/cad` の agent が `svelte/static/` に
+**動作する prebuilt WASM の CAD viewer（約 266KB、`kami_app_cad_bg.wasm` 一式）**を
+見つけた。上流 `kotoba-lang/kami-app-cad` の成果物で、Svelte の source ではない。
+しかもその repo 自身の ADR-0001 が「このリポジトリで唯一動く viewer 面」と書いていた。
+
+私の指示は「`svelte/` ディレクトリを丸ごと消せ」だったので、**字面どおりなら
+壊していた。** agent は `appview/<name>/static/` へ**移してから**消した。正しい。
+
+**`svelte/` の中を消す前に一度列挙する。** `.svelte` / `.ts` / vite・svelte・
+tailwind・tsconfig の設定・`node_modules` 以外のものが在ったら、それは
+**移すもの**であって消すものではない（wasm・画像・フォント・データ JSON など）。
+消してよいのは Svelte のビルド系一式だけ。
+
+## `wrangler` の deploy 設定は 1 通りに揃える
+
+`svelte/` を消すと、`wrangler.jsonc` の `main` と `assets.directory` が**存在しない
+パス**を指したまま残ることがある（SvelteKit の `_worker.js` と `client/`）。
+その状態の config は書かれたとおりには deploy できない。
+
+**規則（迷わないために 1 通りに固定する）:**
+
+1. `main` が消した SvelteKit の出力を指していたら **`main` を削る**。
+2. `assets.directory` を **`./cljs/public`** に向ける。
+3. `vars.APP_FRAMEWORK` が `sveltekit-*` なら `cljs-reagent-re-frame-jp-go-dds` に。
+4. **`main` を `src/app.ts` に付け替えない** —— ただし *その worker が
+   `env.ASSETS.fetch()` を呼んでいることを読んで確かめた場合だけ*は可。
+   呼んでいない worker を `main` に据えると、asset の前に worker が立って
+   **誰も静的ファイルを返さなくなる**。
+5. **`wrangler deploy` も `wrangler dev` も実行しない。** commit には
+   **UNVERIFIED** と書く。deploy の検証は別の仕事。
+
+⚠ **なぜ 1 通りに固定するか。** 第 6 波で 3 agent が同じ状況に別々に答えた ——
+`app-docs` は `main` を `src/app.ts` に付け替え（その worker は実際に
+`env.ASSETS.fetch` を持っていたので正しい）、`okaimono` は `main` を削って
+assets を向け直し（正しい・unverified と明記）、`app-society6` は
+**触らずに flag だけした**（結果、消えたパスを指す config が main に残った）。
+3 つとも判断としては筋が通っていて、**私が scope に書かなかったのが原因**。
+
+対象 host が NXDOMAIN のことが多い（`app-society6` の 2 host とも）。
+**live を壊す話ではないが、内部整合が壊れた config を残す理由にもならない。**
 
 ## build は前景の retry loop で回す（agent を止めないための最重要事項）
 
