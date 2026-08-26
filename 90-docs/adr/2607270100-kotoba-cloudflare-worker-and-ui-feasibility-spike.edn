@@ -175,7 +175,9 @@ limits: nodes 32 / queued-events 64）を定義する。
   string leaf 64 KiB で、**実測で 4,920 バイトの HTML 断片を `string-concat` の再帰で構築し
   ESM として実行できた**。SSR で実用サイズの文書を生成することは可能。
 
-**ただし再帰的な値型は無い**（これが設計システム移植の本質的な制約）:
+**ただし再帰的な値型は無い** と、当時（2026-07-27 の測定）は書いた。現行ではない。
+W4 は landed（この本文後半の slices。compiler / kotoba-wasm / kotoba-cljs。
+native に無いのは backend 未達、ADR-2608650000）。当時の根拠:
 
 - `docs/architecture.md`: 「bounded monomorphic foundation for later generic ADTs,
   **not a recursive value**」
@@ -183,9 +185,9 @@ limits: nodes 32 / queued-events 64）を定義する。
   Component v1**」
 - `[:set T]` は最大 32 要素（ui-v1 kit の nodes 32 上限と同根）
 
-つまり **hiccup（任意深度の入れ子ベクタ）を Kotoba の値として表現できない**。これは
-ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフラットな node 集合）
-を選んでいる理由でもある。
+当時は **hiccup（任意深度の入れ子ベクタ）を Kotoba の値として表現できない** と読めた。
+ui-v1 kit の `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフラットな node 集合）は
+その日の実装戦略であって、書き方ではない。
 
 ### 10. kotoba-ui / shitsuke / liquid-glass-ui を `.kotoba` 化する方針（オーナー判断 2026-07-27）
 
@@ -195,8 +197,8 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
 
 移植の形は**機械的な移植ではない**。これらは本質的に「データ → 文字列」の純関数群
 （token map → CSS 変数、hiccup → HTML、opts → component）であり、`->page` は文字列を返す。
-したがって **capability は一切不要で `kotoba/pure` プロファイルに収まる**。問題は型の方で、
-上記のとおり再帰的な値型が無いため、2 つの形のどちらかを取る:
+したがって **capability は一切不要で `kotoba/pure` プロファイルに収まる**。問題は当時の型の測定で、
+上記のとおり再帰値が無いと読めたため、2 つの形のどちらかを取った（現行の値の書き方ではない）:
 
 - **形 A（SSR、今日可能）**: 木を**値ではなく呼び出しグラフ**として持つ。各 component を
   `:string` を返す純関数にし、`string-concat` で合成する。hiccup を data として保持・変換する
@@ -345,4 +347,5 @@ walk するため、**宣言 8 件を超えると順序が未規定**になる�
 ## 改訂履歴
 
 2026-08-26: 冒頭の訂正『再帰的な値型はまだ無い』を当時の切り方へ戻した。W4 は landed。native 未達は ADR-2608650000。
+2026-08-26: §9 の『再帰的な値型は無い（本質的な制約）』も当時の測定へ戻した。needle が『まだ』を要求して見落としていた。
 "}]
