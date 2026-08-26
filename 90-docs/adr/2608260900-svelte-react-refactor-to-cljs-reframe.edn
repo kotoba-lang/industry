@@ -206,6 +206,54 @@ ADR-2608136000 の「測れなかった検査が、測って問題が無かっ�
 指示に従わず反証を出した agent の判断が正しく、指示を出した私が誤っていた。
 委譲先に「こうしろ」と渡す前に、その根拠が 1 サンプルでないことを確かめる。
 
+## 継続はローカル loop に載せた（2026-08-26、オーナー指示「local loop で効率的に」）
+
+姉妹 loop（industry-stack-wave / itonami-os-connect）と同型の 2 段構え:
+
+    scripts/svelte-cljs-wave-tick.cljs   候補を測る（決定論）。exit 0/2 の三値
+    scripts/svelte-cljs-wave-loop.cljs   候補があるときだけ claude を起こす
+    .claude/skills/svelte-cljs-wave/     手順の正本（loop には書かない）
+    com.gftd.svelte-cljs-wave.plist      LaunchAgent、3600s
+
+**モデルを起こさない条件を loop が持つ**: lock 中 / origin/main から分岐 /
+候補 0 本 / **tick が exit 2（測れなかった）**。最後のが要点で、
+測れなかった周にモデルを起こすと、無い仕事に token を使う。
+
+**並列度は 4。** 実測 2026-08-26: `resource-guard` の build lock は二本目を
+**exit 2 で拒否する**（待たせない）ので、6 本出しても同時に build できるのは 1 本で、
+残りは retry 待ちで長く idle した（各 agent 200k〜250k token）。並列度を上げても
+throughput は上がらない。
+
+### tick が除外するもの（全部 stdout に名前を出す）
+
+`node_modules` 等の他に 3 つ。**黙って除かない** —— 黙った除外は移行が
+進んだように見える。
+
+1. **1 repo に 3 本以上の `.svelte`** —— この機械的な波の対象外。大物
+   （`app-aozora-svelte` 34k 行、`svelte-design-system` 55 component）は
+   jp-go-dds への上流拡張という別の判断を要する。
+2. **remote に `agent/cljs-migration` branch が在る repo**（= 別の波が持っている、
+   または前の波が landing に失敗して残した）。問い合わせに失敗したら
+   **触らない側に倒す**（fail-closed）。
+3. **custody 契約を持つ repo** —— 次節。
+
+### custody 契約を持つ repo は移行対象ではない（agent の拒否が正しかった）
+
+第 2 波で `cloud-itonami/app-global` に投げた agent が**移行せずに止めて報告した**。
+根拠を確かめたところ正しかった: あの repo の `docs/verify-custody.cljs` は
+「保管ファイル 24 / 87,245 バイト / 出所 tree hash」を検査して**今日 PASS する**。
+`svelte/` を消すと再構成 hash が記録と恒久的に食い違い、**直しようのない FAIL** に
+なる。文書の陳腐化ではなく**契約違反**で、移行するなら `migration.edn` と検査器を
+書き換える統治判断が要る —— 移行バッチの agent が単独で決めることではない。
+
+同じ形が 6 件（`app-global` `app-maps` `app-roukisho` `app-saiban`
+`app-shomeisyashin` `app-sre`）。除外しなければ loop が毎周これを選び、agent が
+毎周正しく拒否して、token だけが減っていた。
+
+**この波で agent が指示に反して止めたのは 2 回目で、2 回とも agent が正しかった**
+（1 回目は lock の測定、2 回目はこれ）。**プロンプトに書いた範囲より、
+その場で測った証拠の方が強い。**
+
 ## 決めていないこと（正直に）
 
 - **移行の順序も期限も決めていない。** 1,379 ファイルは 1 セッションで動かせる量ではない。
