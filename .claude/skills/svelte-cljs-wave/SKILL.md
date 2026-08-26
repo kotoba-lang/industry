@@ -143,10 +143,29 @@ scaffold の側に在る。
 私の指示は「`svelte/` ディレクトリを丸ごと消せ」だったので、**字面どおりなら
 壊していた。** agent は `appview/<name>/static/` へ**移してから**消した。正しい。
 
-**`svelte/` の中を消す前に一度列挙する。** `.svelte` / `.ts` / vite・svelte・
-tailwind・tsconfig の設定・`node_modules` 以外のものが在ったら、それは
-**移すもの**であって消すものではない（wasm・画像・フォント・データ JSON など）。
-消してよいのは Svelte のビルド系一式だけ。
+**判定は拡張子ではなく「それは何か」で行う。** 実測 2026-08-26、`svelte/` の中から
+**3 種類**の別物が出た:
+
+| 種類 | 実例 | どうした |
+|---|---|---|
+| ビルド成果物 | `cad` の prebuilt WASM CAD viewer（266KB、上流 `kami-app-cad` の成果物） | `static/` へ移した |
+| **バックエンド** | `app-warehouse` / `app-scheduler` / `app-wvme` / `arbitrage` の `+server.ts` | `src/` へ移した（前節） |
+| **ドメインのデータ模块** | `hc` の `svelte/src/lib/legal/contracts.ts`（17.9KB）—— **その repo の CLAUDE.md が「§Contracts の正本」と名指ししていた** | `legal/contracts.ts` へ移した |
+
+⚠ **`.ts` だから消してよい、は成り立たない。** `hc` のそれは Svelte 構文を一切
+含まないただの TS データ模块で、どちらの frontend からも import されていなかった
+が、**repo の正本文書が権威として参照していた**。
+
+**列挙して、1 件ずつ「これは Svelte のビルドに必要か」を問う。** 必要なのは
+`*.svelte` / `main.ts` / `svelte.d.ts` / `app.html` / `vite.config.*` /
+`svelte.config.*` / `tsconfig.json` / `tailwind.config.*` / `postcss.config.*` /
+`package.json` / lockfile くらい。**それ以外は移す候補**で、消す前に
+「これを参照している文書やコードは無いか」を repo 内で grep する。
+
+⚠ **tick の `.svelte` 件数と、対象ツリーの件数は違うことがある。** `hc` は
+tick が 2 件と出したが対象 appview には 1 件で、もう 1 件は**別の appview
+（KYC）**のものだった。agent はそれに気づいて対象ツリーだけを扱った。
+**プロンプトに書いた件数と実物が食い違ったら、実物を信じる。**
 
 ## `wrangler` の deploy 設定は 1 通りに揃える
 
