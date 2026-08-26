@@ -70,7 +70,7 @@ ADR-2608171200 は 2026-08-17 時点で File Provider を未実装とし、Swift
   host + embedded File Provider extension の unsigned build が成功した。residency は
   `downloadLazily` / `inherited` / `downloadEagerlyAndKeepDownloaded` に対応する。
 - `cloud-itonami/cloud-itonami-app` main
-  `d25b9f40a21add30953f612ce3c0f4afdd52ac3b`（PR #182, #183）。focused suite は
+  `9c71bd26f1f46310bcfd40359e2495d4bec6b77d`（PR #182, #183, #184）。focused suite は
   342 tests / 1370 assertions、失敗 0。HTTP の create → upload → materialize → mode 往復と、
   remote JSON の unsigned byte 正規化を通した。実データで encrypted envelope の 813 bytes を
   Finder の file size として返す欠陥を見つけ、logical plaintext size を分離した follow-up は
@@ -79,9 +79,13 @@ ADR-2608171200 は 2026-08-17 時点で File Provider を未実装とし、Swift
   `bafkreigce6ews2du2pb3hccoxgirrsdaxdmb4npgt7t72ux5qxmt3o5lpu` として publish し、
   PUT 201 / GET 200 / byte-identical を観測した。graph CID は
   `bafyreiahqbzxiou7j7y7pj74ctnxt4lcy2spp7xkxdevhhuudy5d43u5gy`、PUT 201 / GET 200。
-- superproject main `2d8e5a3b0c94189abd5a6e42b4908eab5054c9ad` で Cloud app pin を
-  `d25b9f40...` へ server-verified fast-forward し、他 2 repo と合わせて 3 HEAD が一致した。
-- resident は immutable release `~/.cloud-itonami/releases/d25b9f40...` から起動し、`/health`
+- link wrap の live probe は one-time secret を `url-fragment` placement で返し、state と package
+  のどちらにも secret が無いことを確認した。wrap を 1→3 に増やしても ciphertext chunk は
+  byte-identical。テスト link 2 本を失効し、current link 0 と rotation-required を観測した。
+  UI は fragment grant を sessionStorage のみに置き、hash fragment 付き URL を表示する。
+- superproject main `8ba79fc05482285d9175489e2d0a71b18b20151f` で Cloud app pin を
+  `9c71bd2...` へ server-verified fast-forward し、他 2 repo と合わせて 3 HEAD が一致した。
+- resident は immutable release `~/.cloud-itonami/releases/9c71bd2...` から起動し、`/health`
   200。`Finder E2EE検証 2026-08-26/client-encrypted-check.txt` を作成し、67-byte upload と
   materialize の SHA-256 が一致した。schedule/residency は一度 paused/online-only を観測後、
   manual/pinned に戻した。保存 object は 813 bytes、package v1 / AES-256-GCM / X25519 /
