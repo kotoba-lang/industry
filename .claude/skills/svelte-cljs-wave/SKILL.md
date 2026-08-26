@@ -134,11 +134,29 @@ wrangler の `main` が指していた SvelteKit build の実体がこれだっ�
    // SVELTEKIT-BACKEND-PRESERVED: moved out of svelte/ during the cljs migration; not wired.
    ```
 
-   実測 2026-08-26、6 件が 4 通りの場所に置かれた（`src/xrpc-proxy.ts` /
-   `src/xrpc-dispatcher.ts` / `src/xrpc-mcp-router-proxy.ts` /
-   `backend-frozen/routes/xrpc/[...path]/+server.ts`）。どれも妥当な判断で、
-   最後のは元の route 構造を保つので復活させやすい。**場所を 1 つに強制するより、
+   実測 2026-08-26、7 件が**5 通り**の場所に置かれた。どれも妥当な判断で、
+   route 構造を保つ形は復活させやすい。**場所を 1 つに強制するより、
    `grep -r SVELTEKIT-BACKEND-PRESERVED orgs/` で全件挙がる方が価値がある。**
+
+   ⚠ **この marker 規則より前に landed した 7 件には marker が入っていない。**
+   つまり **`grep` の結果は 2026-08-26 のこの規則以降の分しか答えない。**
+   grep が 0 件でも「保存された backend は無い」ではない —— 下の 7 件は別に在る:
+
+   ```
+   cloud-itonami/app-scheduler/appview/scheduler-mcp-component/src/xrpc-agentgateway-proxy.ts
+   cloud-itonami/app-warehouse/src/xrpc-dispatcher.ts
+   cloud-itonami/arbitrage/worker/src/xrpc-proxy.ts
+   cloud-itonami/car-sim/appview/etzhayyim-wasm-car-sim-c4r51m00/src/xrpc-proxy.ts
+   cloud-itonami/collector/appview/etzhayyim-wasm-collector-c0ll3ct1/src/xrpc-mcp-router-proxy.ts
+   cloud-itonami/compintel/appview/compintel-cpti0001/salvage/svelte/src/routes/xrpc/[...path]/+server.ts
+   cloud-itonami/contentengine/appview/contentengine-cten0001/backend-frozen/routes/xrpc/[...path]/+server.ts
+   ```
+
+   **marker を後から 7 repo に注入する PR は出していない** —— 7 件の PR を
+   体裁のために起こすより、ここに名前を書いて grep の被覆を明示する方が安い。
+   ただし**「grep が全件を答える」と誤読させないことが条件**で、そのために
+   この注意書きが在る。1 件でも本文を触る用事ができたら、そのついでに
+   marker を足すこと。
 
 既に移行を終えた 26 repo は全部確認済みで、**pre-migration tree に `+server.ts` を
 持っていたものは 0 件**（失ったものは無い）。危険は**これから**の、より大きい
