@@ -131,15 +131,31 @@ Skipped on judah: Mojo, TypeScript (Node/Deno) — not on PATH.
 
 ## 3. kototama (runtime/tender)
 
-**Measured today (informal):** `clojure -M:cli run kotoba-compiled-fact.wasm` → **~3.4 s wall** (JVM cold + Chicory). Guest computes 5! = 120.
+**Measured `kotoba.tender-comparison/v1`** (2026-08-26, load **94** — exploratory contended host; quiet-host re-run pending on judah).
+
+| Host | `kotoba-compiled-fact` (5! = 120) | Notes |
+|---|---|---|
+| **Node WebAssembly** (V8) | **~106 ns/invocation** steady | in-process; 50 warmup + 400 timed calls |
+| **Chicory JVM** steady | **~165 µs/invocation** | **~1554×** slower than Node steady |
+| **Chicory JVM** CLI cold | **~7.3 s** wall | `clojure -M:cli run` (JVM + Chicory per sample) |
+| **wasmtime CLI** | **~40 ms** wall | process-per-invocation; not steady-state comparable |
+
+Guests: `kotoba-compiled-fact`, `kotoba-compiled-peak-cells`, `amu-compiled-i64-main` (host-free fixtures under `kototama/test/kototama/fixtures/`).
+
+Evidence: `90-docs/performance/runs/2026-08-26-tender/tender.json`. Re-run:
+
+```bash
+west update --fetch smart kototama   # if orgs/ missing in worktree
+node scripts/kotoba-tender-benchmark.mjs --runs 3 --date $(date +%Y-%m-%d)
+```
 
 | Path | Role | Performance posture |
 |---|---|---|
-| Browser `actor-host.js` | **First-class** R2 | No JVM; engine = browser Wasm |
+| Browser `actor-host.js` | **First-class** R2 | No JVM; engine = browser Wasm (~Node parity) |
 | `kototama.tender` (Chicory) | **Compat / CI** R1 | Per-instruction fuel — correctness over speed |
-| `kototama-component` (Wasmtime) | Component profile | Differential conformance, not QPS leaderboard |
+| `kototama-component` (Wasmtime) | Component profile | Differential conformance; CLI ~40 ms/invoke on fact guest |
 
-**Gap:** no `kotoba.tender-comparison/v1` yet (Chicory vs Wasmtime vs browser vs workerd on identical guests).
+**Next:** quiet-host official tender run on judah; workerd comparison (Phase 2).
 
 ---
 
