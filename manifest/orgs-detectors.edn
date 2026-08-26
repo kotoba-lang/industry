@@ -834,6 +834,43 @@
    ;; just been generated with this shape.
    }
 
+  {:id       :verify-dependency-substitution
+   :title    "every external dependency kotoba-lang has, against the destination the ledger assigns it"
+   :why      "`verify-jvm-dependency-surface` answers WHERE a JVM is still required -- a
+              census of hosts. This answers the next question: for each external
+              coordinate, WHAT is it supposed to become, and is that destination real.
+              Neither subsumes the other.
+              Measured 2026-08-26 across 2,131 present kotoba-lang checkouts, the whole
+              external surface is 191 distinct coordinates. Most of it is already
+              replaceable -- the foundational stdlib and the origin-plane mirrors cover
+              the large majority by usage -- so the work those entries name is rewiring
+              an import, not writing a library. Recording that is what stops the same
+              libraries being proposed again.
+              Two failure modes it exists to catch, both invisible by inspection:
+              (a) a coordinate resolved by shipped code that manifest/dependency-
+              substitution.edn does not name, which for JVM runtime deps the cutover
+              contract calls forbidden and for npm is at minimum undiscussed; and
+              (b) a :target the ledger names that west does not register -- a ledger
+              pointing at a library nobody wrote is worse than no ledger, because it
+              reads as though the migration were already possible.
+              It also reports Node builtins declared as npm dependencies. Those do not
+              resolve to the builtin: npm serves a real unrelated package for each name
+              (fs@0.0.1-security is npm's reclaimed-squat placeholder, tls@0.0.1 a stub,
+              crypto/net/path abandoned shims). Measured 2026-08-26, app-scap declared
+              six at `latest`, which means whatever is published at install time.
+              Both failure modes were shown to discriminate before landing: pointing a
+              :target at a repository nobody wrote turns it red, and removing a
+              coordinate the workspace actually uses turns it red.
+              Cannot be a fleet gate: it reads west-managed orgs/ checkouts and
+              manifest/west.yml together, and no single repo tree carries both."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-dependency-substitution.cljs" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 86400000                 ; 24h -- a dependency lands on human time
+   :adr      "adr-2608260200-kotoba-lang-external-dependency-substitution"}
+
   {:id       :verify-jvm-dependency-surface
    :title    "where a JVM is still required, across every west-registered checkout"
    :why      "CLAUDE.md demotes the JVM to last resort and

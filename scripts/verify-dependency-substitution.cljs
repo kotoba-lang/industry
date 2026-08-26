@@ -1,0 +1,376 @@
+#!/usr/bin/env nbb
+;; verify-dependency-substitution — every external dependency the kotoba-lang
+;; org still has, checked against the destination `manifest/dependency-
+;; substitution.edn` assigns it.
+;;
+;; ## What it is for
+;;
+;; `verify-jvm-dependency-surface` answers WHERE a JVM is still required.
+;; This one answers the next question: for each external coordinate, WHAT is
+;; it supposed to become, and is that destination real. The two are
+;; complementary and neither subsumes the other -- one is a census of hosts,
+;; this is a census of coordinates.
+;;
+;; Three findings, in descending severity:
+;;
+;;   unlisted-external-dependency
+;;     A coordinate resolved by shipped code that the ledger does not name.
+;;     For JVM runtime deps the cutover contract calls this forbidden
+;;     (`:new-jvm-runtime-dependencies :forbidden`); for npm it is at minimum
+;;     an undiscussed one. This is the finding the ledger exists to produce:
+;;     without it, a new dependency arrives silently.
+;;
+;;   substitution-target-missing
+;;     The ledger names a `:target` that is not a west-registered repository.
+;;     A ledger pointing at a library nobody wrote is worse than no ledger,
+;;     because it reads as though the migration were already possible. This
+;;     is checked against `manifest/west.yml`, not against `orgs/` on disk --
+;;     west registers 4,200 projects and checks out far fewer, so a
+;;     disk-based check would report absent repositories that exist.
+;;
+;;   builtin-shadowing-dependency
+;;     A `dependencies` entry whose name is a Node builtin. These do not
+;;     resolve to the builtin -- npm serves a real, unrelated package of that
+;;     name: `fs@0.0.1-security` is npm's reclaimed-squat placeholder,
+;;     `tls@0.0.1` is a stub, `crypto`, `net` and `path` are abandoned
+;;     userland shims. Declaring them adds a supply-chain edge that buys
+;;     nothing, and a range of `latest` means whatever is published at
+;;     install time. Measured 2026-08-26, `app-scap` declared six.
+;;
+;;   substitution-available
+;;     A coordinate whose replacement is shipped and which is still imported.
+;;     Actionable work, reported at :info because it is a plan, not a defect.
+;;
+;; ## What it refuses to do
+;;
+;; Report a pass it did not measure. If west.yml yields no kotoba-lang paths,
+;; or fewer than `min-repos` of them exist on disk, it prints `SCANNED\t0`
+;; and exits 2 -- neither 0 nor 1 -- because "I could not look" and "I looked
+;; and it was clean" must not be the same value (CLAUDE.md, ADR-2608136000).
+;;
+;; It also refuses to count unregistered checkouts. `orgs/` on this machine
+;; holds agent worktrees alongside registered projects, and every dependency
+;; in one is a copy of a dependency already counted under its registered
+;; path. Only paths west.yml names are walked.
+;;
+;; usage:
+;;   nbb scripts/verify-dependency-substitution.cljs
+;;   nbb scripts/verify-dependency-substitution.cljs --findings
+;;   nbb scripts/verify-dependency-substitution.cljs --edn out.edn
+;;   nbb scripts/verify-dependency-substitution.cljs --strict     ; exit 1 on unlisted
+;;   nbb scripts/verify-dependency-substitution.cljs --self-test
+
+(ns verify-dependency-substitution
+  (:require ["node:fs" :as fs]
+            ["node:path" :as path]
+            [clojure.edn :as edn]
+            [clojure.string :as str]))
+
+(def argv (vec *command-line-args*))
+(def flags (set argv))
+(def findings? (contains? flags "--findings"))
+(def strict? (contains? flags "--strict"))
+(def self-test? (contains? flags "--self-test"))
+
+(defn- flag [nm default]
+  (let [i (.indexOf argv nm)] (if (neg? i) default (nth argv (inc i) default))))
+
+(def root (.resolve path (flag "--root" ".")))
+(def min-repos (js/parseInt (flag "--min-repos" "500")))
+
+(defn- rd [f] (try (fs/readFileSync f "utf8") (catch :default _ nil)))
+(defn- ex? [f] (try (fs/existsSync f) (catch :default _ false)))
+
+;; ------------------------------------------------------------------ inputs
+
+(def west-text (rd (.join path root "manifest" "west.yml")))
+
+(def west-paths
+  (->> (str/split-lines (or west-text ""))
+       (keep #(second (re-find #"^\s+path:\s+(orgs/kotoba-lang/\S+)\s*$" %)))
+       distinct vec))
+
+(def west-repos
+  "Every `<org>/<name>` west registers, for checking `:target` claims. A
+  target may legitimately live outside kotoba-lang."
+  (->> (str/split-lines (or west-text ""))
+       (keep #(second (re-find #"^\s+path:\s+orgs/(\S+?)\s*$" %)))
+       set))
+
+(def ledger
+  (some-> (rd (.join path root "manifest" "dependency-substitution.edn"))
+          edn/read-string))
+
+(def by-coordinate
+  "Exact-coordinate lookup. An entry may name one `:coordinate` or several
+  under `:coordinates`, so a set that shares a destination -- one
+  application's whole React stack, say -- stays one paragraph instead of
+  twenty-five."
+  (into {}
+        (mapcat (fn [d]
+                  (for [c (or (:coordinates d) (some-> (:coordinate d) vector))]
+                    [c d])))
+        (:dependency-substitution/dispositions ledger)))
+
+(def by-pattern
+  "Entries that cover a family by name prefix. One `@radix-ui/` rule beats
+  twenty-seven identical entries, and a family that grows does not silently
+  fall out of the ledger."
+  (filterv :pattern (:dependency-substitution/dispositions ledger)))
+
+(defn select-pattern
+  "The longest `:pattern` in `patterns` that prefixes `coord`, or nil.
+
+  Longest wins so a specific rule can override a family one: `@radix-ui/`
+  can be a blanket entry while `@radix-ui/react-icons` says something
+  different, without the order of the file deciding which applies."
+  [patterns coord]
+  (->> patterns
+       (filter #(str/starts-with? coord (:pattern %)))
+       (sort-by #(- (count (:pattern %))))
+       first))
+
+(defn disposition-for
+  "The ledger entry governing `coord`: an exact coordinate first, then the
+  longest matching prefix."
+  [coord]
+  (or (get by-coordinate coord)
+      (select-pattern by-pattern coord)))
+
+;; --------------------------------------------------- dependency extraction
+
+(def node-builtins
+  "Names that resolve to a Node builtin when required, and to an unrelated
+  npm package when declared as a dependency."
+  #{"assert" "async_hooks" "buffer" "child_process" "cluster" "console"
+    "constants" "crypto" "dgram" "diagnostics_channel" "dns" "domain"
+    "events" "fs" "http" "http2" "https" "inspector" "module" "net" "os"
+    "path" "perf_hooks" "process" "punycode" "querystring" "readline" "repl"
+    "stream" "string_decoder" "sys" "timers" "tls" "trace_events" "tty"
+    "url" "util" "v8" "vm" "wasi" "worker_threads" "zlib"})
+
+(def first-party-npm-scopes
+  "npm scopes this workspace publishes. A package under one of them is a
+  workspace repository that happens to travel through the registry, not an
+  external dependency -- classifying it as external would report the
+  workspace's own libraries as debt."
+  ["@etzhayyim/" "@kotoba-lang/"])
+
+(defn- first-party?
+  "A workspace repository is not an external dependency. Matching is on the
+  git URL's org, not on the group id, because a coordinate like
+  `io.github.kotoba-lang/json` and a bare `:local/root` are the same claim."
+  [sym info]
+  (or (str/starts-with? (str sym) "io.github.kotoba-lang/")
+      (and (map? info) (contains? info :local/root))
+      (and (map? info) (string? (:git/url info))
+           (some? (re-find #"github\.com/(kotoba-lang|com-junkawasaki|cloud-itonami|net-kotobase|network-awai|etzhayyim|gftdcojp)/"
+                           (:git/url info))))))
+
+(defn- deps-edn-coordinates
+  "Coordinates from a `deps.edn`, tagged by whether shipped code resolves
+  them. The top-level `:deps` map is what a consumer gets; an alias is not."
+  [dir]
+  (let [f (.join path dir "deps.edn")]
+    (when (ex? f)
+      (when-let [m (try (edn/read-string (rd f)) (catch :default _ nil))]
+        (concat
+         (for [[sym info] (:deps m) :when (and sym (not (first-party? sym info)))]
+           {:coordinate (str sym) :ecosystem :maven :shipped? true})
+         (for [[_ av] (:aliases m)
+               [sym info] (merge (:extra-deps av) (:replace-deps av) (:deps av))
+               :when (and sym (not (first-party? sym info)))]
+           {:coordinate (str sym) :ecosystem :maven :shipped? false}))))))
+
+(defn- package-json-coordinates [dir]
+  (let [f (.join path dir "package.json")]
+    (when (ex? f)
+      (when-let [j (try (js->clj (js/JSON.parse (rd f))) (catch :default _ nil))]
+        (concat
+         (for [[n _] (get j "dependencies")
+               :when (not (some #(str/starts-with? n %) first-party-npm-scopes))]
+           {:coordinate n :ecosystem :npm :shipped? true})
+         (for [[n _] (get j "devDependencies")
+               :when (not (some #(str/starts-with? n %) first-party-npm-scopes))]
+           {:coordinate n :ecosystem :npm :shipped? false}))))))
+
+(defn collect
+  "Every external coordinate under `paths`, with the repositories that carry
+  it. Returns `{coordinate {:ecosystem kw :shipped #{repo} :tool #{repo}}}`."
+  [paths]
+  (reduce
+   (fn [acc p]
+     (let [dir (.join path root p)]
+       (if-not (ex? dir)
+         acc
+         (let [repo (subs p (count "orgs/kotoba-lang/"))]
+           (reduce (fn [a {:keys [coordinate ecosystem shipped?]}]
+                     (-> a
+                         (assoc-in [coordinate :ecosystem] ecosystem)
+                         (update-in [coordinate (if shipped? :shipped :tool)]
+                                    (fnil conj #{}) repo)))
+                   acc
+                   (concat (deps-edn-coordinates dir)
+                           (package-json-coordinates dir)))))))
+   {}
+   paths))
+
+;; ------------------------------------------------------------------ verdict
+
+(defn analyse [found]
+  (let [present (count (filter #(ex? (.join path root %)) west-paths))
+        ;; A coordinate the ledger does not name. Tool-only coordinates are
+        ;; reported too but at lower severity: a dev dependency is not
+        ;; shipped, and the cutover contract does not forbid it.
+        unlisted (for [[coord {:keys [ecosystem shipped tool]}] found
+                       ;; Builtins get their own, more specific finding.
+                       ;; Reporting them here as well counts one defect
+                       ;; twice, which makes the total useless as a measure
+                       ;; of how much is left.
+                       :when (and (nil? (disposition-for coord))
+                                  (not (and (= :npm ecosystem)
+                                            (contains? node-builtins coord))))]
+                   {:kind :unlisted-external-dependency
+                    :severity (if (seq shipped) :fail :warn)
+                    :coordinate coord :ecosystem ecosystem
+                    :repos (sort (or shipped tool))})
+        ;; A `:target` that is not a west-registered repository.
+        bad-targets (for [d (:dependency-substitution/dispositions ledger)
+                          :let [t (:target d)]
+                          :when (and t (not (contains? west-repos t)))]
+                      {:kind :substitution-target-missing
+                       :severity :fail
+                       :coordinate (:coordinate d) :target t})
+        ;; A dependency name that is a Node builtin.
+        shadowing (for [[coord {:keys [ecosystem shipped]}] found
+                        :when (and (= :npm ecosystem)
+                                   (contains? node-builtins coord)
+                                   (seq shipped))]
+                    {:kind :builtin-shadowing-dependency
+                     :severity :fail
+                     :coordinate coord :repos (sort shipped)})
+        ;; Replaceable today, still imported.
+        available (for [[coord {:keys [shipped]}] found
+                        :let [d (disposition-for coord)]
+                        :when (and d (seq shipped)
+                                   (#{:first-party-exists :gap-closed} (:disposition d)))]
+                    {:kind :substitution-available
+                     :severity :info
+                     :coordinate coord :target (:target d)
+                     :repos (sort shipped)})]
+    {:present present
+     :coordinates (count found)
+     :findings (concat bad-targets shadowing unlisted available)}))
+
+;; -------------------------------------------------------------------- self
+
+(defn- self-test []
+  (let [fails (atom [])
+        check (fn [name ok] (when-not ok (swap! fails conj name)))]
+    (check "first-party by group id" (first-party? 'io.github.kotoba-lang/json nil))
+    (check "first-party by git url"
+           (first-party? 'whatever {:git/url "https://github.com/kotoba-lang/spec.git"}))
+    (check "first-party by local root" (first-party? 'x {:local/root "../json"}))
+    (check "external is not first-party" (not (first-party? 'org.clojure/data.json {:mvn/version "1"})))
+    (check "node builtins recognised" (contains? node-builtins "fs"))
+    (check "a real package is not a builtin" (not (contains? node-builtins "react")))
+    (check "ledger parsed" (map? ledger))
+    (check "ledger has dispositions" (pos? (count by-coordinate)))
+    (check "every disposition is known"
+           (every? #{:structural :first-party-exists :gap-closed :gap-open
+                     :frozen-legacy :tooling}
+                   (map :disposition (:dependency-substitution/dispositions ledger))))
+    (check "every entry has a coordinate, coordinates, or a pattern"
+           (every? #(or (:coordinate %) (:coordinates %) (:pattern %))
+                   (:dependency-substitution/dispositions ledger)))
+    (check "no coordinate is governed by two entries"
+           (let [cs (mapcat #(or (:coordinates %) (some-> (:coordinate %) vector))
+                            (:dependency-substitution/dispositions ledger))]
+             (= (count cs) (count (set cs)))))
+    (let [ps [{:pattern "@a/" :disposition :tooling}
+              {:pattern "@a/b" :disposition :structural}]]
+      (check "longest pattern wins over a shorter one"
+             (= :structural (:disposition (select-pattern ps "@a/big"))))
+      (check "a shorter pattern still applies when no longer one matches"
+             (= :tooling (:disposition (select-pattern ps "@a/zzz"))))
+      (check "a non-matching coordinate selects nothing"
+             (nil? (select-pattern ps "@other/x"))))
+    (check "gap-closed entries name a target"
+           (every? :target (filter #(= :gap-closed (:disposition %))
+                                   (:dependency-substitution/dispositions ledger))))
+    (check "first-party-exists entries name a target"
+           (every? :target (filter #(= :first-party-exists (:disposition %))
+                                   (:dependency-substitution/dispositions ledger))))
+    (if (seq @fails)
+      (do (doseq [f @fails] (println "SELF-TEST FAIL" f))
+          (js/process.exit 1))
+      (do (println "self-test: all checks passed") (js/process.exit 0)))))
+
+;; -------------------------------------------------------------------- main
+
+(when self-test? (self-test))
+
+(when (nil? ledger)
+  (println "REFUSING: manifest/dependency-substitution.edn is unreadable")
+  (println "SCANNED\t0\trepos")
+  (js/process.exit 2))
+
+(when (empty? west-paths)
+  (println "REFUSING: manifest/west.yml yielded no kotoba-lang paths")
+  (println "SCANNED\t0\trepos")
+  (js/process.exit 2))
+
+(let [found (collect west-paths)
+      {:keys [present coordinates findings]} (analyse found)]
+
+  (when (< present min-repos)
+    (println (str "REFUSING: only " present " of " (count west-paths)
+                  " registered kotoba-lang paths are on disk (need " min-repos ")."))
+    (println "This is a checkout that cannot answer the question, not a clean one.")
+    (println "SCANNED\t0\trepos")
+    (js/process.exit 2))
+
+  (when-let [out (flag "--edn" nil)]
+    (fs/writeFileSync out (pr-str {:present present :found found :findings findings}))
+    (println "wrote" out))
+
+  (if findings?
+    (do (doseq [{:keys [kind severity coordinate target repos]} findings]
+          (println (str "FINDING\t" (name severity) "\t"
+                        (name kind) ":" coordinate "\t"
+                        (case kind
+                          :substitution-target-missing
+                          (str "ledger points at " target ", which west does not register")
+                          :unlisted-external-dependency
+                          (str "not in manifest/dependency-substitution.edn; used by "
+                               (str/join ", " (take 4 repos))
+                               (when (> (count repos) 4) (str " +" (- (count repos) 4))))
+                          :builtin-shadowing-dependency
+                          (str "declared in dependencies but is a Node builtin; npm serves an unrelated package of that name. In "
+                               (str/join ", " (take 4 repos)))
+                          :substitution-available
+                          (str "-> " target "; still imported by "
+                               (str/join ", " (take 4 repos))
+                               (when (> (count repos) 4) (str " +" (- (count repos) 4))))))))
+        (println (str "SCANNED\t" present "\trepos")))
+    (do
+      (println (str "verify-dependency-substitution  registered=" (count west-paths)
+                    " present=" present " distinct-coordinates=" coordinates))
+      (println)
+      (doseq [[kind label] [[:substitution-target-missing "ledger targets that do not exist"]
+                            [:builtin-shadowing-dependency "Node builtins declared as npm dependencies"]
+                            [:unlisted-external-dependency "external deps the ledger does not name"]
+                            [:substitution-available "replaceable today, still imported"]]]
+        (let [rows (filter #(= kind (:kind %)) findings)]
+          (println (str "  " label ": " (count rows)))
+          (doseq [{:keys [coordinate target repos severity]} (take 40 rows)]
+            (println (str "    [" (name severity) "] " coordinate
+                          (when target (str "  -> " target))
+                          (when (seq repos)
+                            (str "  (" (str/join ", " (take 3 repos))
+                                 (when (> (count repos) 3) (str " +" (- (count repos) 3))) ")")))))
+          (when (> (count rows) 40)
+            (println (str "    ... " (- (count rows) 40) " more not listed; use --edn")))))))
+
+  (when (and strict? (some #(= :fail (:severity %)) findings))
+    (js/process.exit 1)))
