@@ -1,0 +1,274 @@
+#!/usr/bin/env nbb
+;; verify-char-int-coercion — `int` applied to a character, in code
+;; ClojureScript runs, where that is not a code point.
+;;
+;; ## The defect
+;;
+;; On the JVM a character is a `java.lang.Character` and `(int \a)` is 97.
+;; Under ClojureScript there is no character type: `(seq "abc")` yields
+;; one-character STRINGS, and `int` of a string is 0. So
+;;
+;;     (mapv int "Password")
+;;
+;; is `[80 97 115 115 119 111 114 100]` on the JVM and `[0 0 0 0 0 0 0 0]`
+;; under ClojureScript. It does not throw. It returns a vector of the right
+;; length and the right type, full of zeros, and every distinct input maps to
+;; the same output.
+;;
+;; ## Why this needs a detector rather than a note
+;;
+;; Measured 2026-08-26, the idiom produced a wrong-and-plausible answer in
+;; THREE libraries in this workspace in one day, twice in code written after
+;; being bitten by it:
+;;
+;;   org-ietf-websocket   Sec-WebSocket-Accept became a digest of zeros
+;;   org-ietf-argon2      two different passwords hashed identically
+;;   org-modbus           the CRC catalogue check ran on nine zero bytes
+;;
+;; All three were caught only because those libraries run their suite on both
+;; runtimes. A repository with a JVM-only suite has nothing that can see it:
+;; the JVM path is correct, the tests are green, and the shipped
+;; ClojureScript is wrong.
+;;
+;; ## What it looks for
+;;
+;; High-confidence forms only, in `.cljc` and `.cljs` — the files
+;; ClojureScript compiles. `.clj` is never reported, because there the idiom
+;; is correct.
+;;
+;;   (map int "literal")      (mapv int "literal")
+;;   (map int (str …))        (mapv int (name …))
+;;   (mapv #(… (int %) …) "literal")
+;;
+;; A bare `(map int x)` over a variable is NOT reported. Deciding whether `x`
+;; holds a string needs type inference this does not have, and a detector
+;; that guesses trains people to ignore it.
+;;
+;; usage:
+;;   nbb scripts/verify-char-int-coercion.cljs [--findings] [--strict]
+;;   nbb scripts/verify-char-int-coercion.cljs --self-test
+
+(ns verify-char-int-coercion
+  (:require ["node:fs" :as fs]
+            ["node:path" :as path]
+            ["node:child_process" :as cp]
+            [clojure.string :as str]))
+
+(def argv (vec *command-line-args*))
+(def flags (set argv))
+(def findings? (contains? flags "--findings"))
+(def strict? (contains? flags "--strict"))
+(def self-test? (contains? flags "--self-test"))
+
+(defn- flag [nm default]
+  (let [i (.indexOf argv nm)] (if (neg? i) default (nth argv (inc i) default))))
+
+(def root (.resolve path (flag "--root" ".")))
+(def min-files (js/parseInt (flag "--min-files" "5000")))
+
+(def patterns
+  "Each names a form whose argument to `int` is a string on both runtimes, so
+  the divergence is certain rather than likely."
+  [{:id :map-int-literal
+    :re #"\((?:map|mapv)\s+int\s+\""
+    :what "(map int \"literal\") over a string literal's characters"}
+   {:id :map-int-str
+    :re #"\((?:map|mapv)\s+int\s+\((?:str|name|subs)\s"
+    :what "(map int (str …)) — the argument is a string by construction"}
+   ;; The lambda form is NOT a regex. `#(bit-and (int %) 0xFF)` followed by a
+   ;; string is the defect; `(.getBytes (str ch) "UTF-8")` inside the lambda's
+   ;; own argument is correct code that a regex reads identically, because
+   ;; both end in `) "`. Two real files in this workspace are the second
+   ;; shape, so the check counts parentheses instead -- see
+   ;; `lambda-over-string-literal?`.
+   ])
+
+(defn- close-paren
+  "Index just past the form opening at `i`, or nil if it does not close on
+  this line. String contents are skipped so a `(` inside one is not counted,
+  and `\\(` is a character literal rather than an opener."
+  [line i]
+  (loop [j i depth 0 in-str? false]
+    (cond
+      (>= j (count line)) nil
+      in-str? (let [c (nth line j)]
+                (cond (= c "\\") (recur (+ j 2) depth true)
+                      (= c "\"") (recur (inc j) depth false)
+                      :else (recur (inc j) depth true)))
+      :else
+      (let [c (nth line j)]
+        (cond
+          (= c "\\") (recur (+ j 2) depth false)          ; character literal
+          (= c "\"") (recur (inc j) depth true)
+          (= c "(") (recur (inc j) (inc depth) false)
+          (= c ")") (if (= depth 1) (inc j) (recur (inc j) (dec depth) false))
+          :else (recur (inc j) depth false))))))
+
+(defn lambda-over-string-literal?
+  "True when `line` contains `(map|mapv #(… (int %) …) \"literal\")` — the
+  anonymous-function spelling of the same coercion.
+
+  Counts parentheses rather than matching a pattern, because the two shapes a
+  regex confuses are
+
+      (mapv #(bit-and (int %) 0xFF) \"literal\")        ; the defect
+      (map #(bit-and (int %) 0xff) (.getBytes s \"UTF-8\"))  ; correct
+
+  and only the first has the string as the COLLECTION argument."
+  [line]
+  (let [ms (re-seq #"\((?:map|mapv)\s+#\(" line)]
+    (boolean
+     (when (seq ms)
+       (some (fn [start]
+               (let [lam (str/index-of line "#(" start)]
+                 (when lam
+                   (when-let [end (close-paren line (inc lam))]
+                     (let [rest' (str/triml (subs line end))]
+                       (and (str/starts-with? rest' "\"")
+                            (str/includes? (subs line lam end) "(int %"))))))) 
+             (loop [idx 0 acc []]
+               (if-let [i (str/index-of line "(map" idx)]
+                 (recur (inc i) (conj acc i))
+                 acc)))))))
+
+(defn- rd [f] (try (fs/readFileSync f "utf8") (catch :default _ nil)))
+
+(def west-paths
+  "Every path `manifest/west.yml` registers. Only these are walked.
+
+  `orgs/` on this machine also holds agent worktrees -- `.wt-*`,
+  `.tamaki-*` and friends -- and every file in one is a copy of a file
+  already counted under its registered path. Counting them would report the
+  same defect many times and make the number move whenever a loop happens to
+  be running."
+  (->> (str/split-lines (or (rd (.join path root "manifest" "west.yml")) ""))
+       (keep #(second (re-find #"^\s+path:\s+(orgs/\S+?)\s*$" %)))
+       distinct vec))
+
+(defn- source-files
+  "Every `.cljc`/`.cljs` under a registered path, plus the superproject's own.
+
+  A filesystem walk rather than `git ls-files` per repository: 4,200 git
+  invocations is minutes, and unlike the superproject -- which is a cone-mode
+  sparse checkout where a walk would silently miss files that exist on
+  `origin/main` -- each `orgs/` entry is an ordinary full checkout of its own
+  repository. The superproject's own sources ARE listed with git, for exactly
+  that cone reason."
+  []
+  (let [skip #{"node_modules" ".git" "target" ".cpcache" "out" "dist"
+               ".shadow-cljs" ".nbb" ".venv" "build"}
+        walk (fn walk [dir acc]
+               (let [entries (try (vec (fs/readdirSync dir #js {:withFileTypes true}))
+                                  (catch :default _ []))]
+                 (reduce (fn [acc e]
+                           (let [nm (.-name e)
+                                 full (.join path dir nm)]
+                             (cond
+                               (.isDirectory e)
+                               (if (or (contains? skip nm) (str/starts-with? nm "."))
+                                 acc
+                                 (walk full acc))
+                               (or (str/ends-with? nm ".cljc") (str/ends-with? nm ".cljs"))
+                               (conj acc full)
+                               :else acc)))
+                         acc entries)))
+        from-orgs (reduce (fn [acc p]
+                            (let [d (.join path root p)]
+                              (if (try (fs/existsSync d) (catch :default _ false))
+                                (walk d acc)
+                                acc)))
+                          [] west-paths)
+        r (.spawnSync cp "git" #js ["ls-files" "--" "*.cljc" "*.cljs"]
+                      #js {:cwd root :maxBuffer 400000000 :encoding "utf8"})
+        from-root (when (zero? (.-status r))
+                    (mapv #(.join path root %)
+                          (remove str/blank? (str/split-lines (str (.-stdout r))))))]
+    (when (and (seq west-paths) (some? from-root))
+      (vec (concat from-root from-orgs)))))
+
+(defn scan-text
+  "Findings in one file's text. Pure, so the self-test exercises exactly the
+  code the scan runs."
+  [text]
+  (->> (str/split-lines (or text ""))
+       (map-indexed vector)
+       (mapcat (fn [[i line]]
+                 (when-not (re-find #"^\s*;" line)   ; a comment is not code
+                   (cond-> (vec (keep (fn [{:keys [id re what]}]
+                                         (when (re-find re line)
+                                           {:id id :line (inc i) :what what
+                                            :excerpt (str/trim (subs line 0 (min 100 (count line))))}))
+                                       patterns))
+                     (lambda-over-string-literal? line)
+                     (conj {:id :int-of-char-in-lambda :line (inc i)
+                            :what "(mapv #(… (int %) …) \"literal\") — the same coercion inside a lambda"
+                            :excerpt (str/trim (subs line 0 (min 100 (count line))))})))))
+       vec))
+
+;; ── self test ────────────────────────────────────────────────────────────────
+
+(def ^:private positives
+  ["(def bs (mapv int \"123456789\"))"
+   "(crc/crc16 (map int \"abc\"))"
+   "(sha1 (map int (str key guid)))"
+   "(mapv int (name kw))"
+   "(mapv #(bit-and (int %) 0xFF) \"literal\")"])
+
+(def ^:private negatives
+  ["(mapv int [1 2 3])"
+   "(map int bytes)"
+   "(mapv #(bit-and (int %) 0xFF) (seq data))"
+   ";; (map int \"123456789\") in a comment"
+   "(map inc \"abc\")"
+   "(b/string->bytes \"123456789\")"
+   ;; The two shapes that a regex confused with the defect. Both are correct
+   ;; `#?(:clj …)` code from this workspace, and both were reported before the
+   ;; check started counting parentheses.
+   "#?(:clj (vec (map #(bit-and (int %) 0xFF) (.getBytes (str s) \"UTF-8\")))"
+   "#?(:clj (map #(bit-and (int %) 0xff) (.getBytes (str ch) \"UTF-8\"))"])
+
+(defn- self-test []
+  (let [bad (atom [])]
+    (doseq [s positives]
+      (when (empty? (scan-text s)) (swap! bad conj (str "MISSED: " s))))
+    (doseq [s negatives]
+      (when (seq (scan-text s)) (swap! bad conj (str "FALSE POSITIVE: " s))))
+    (if (seq @bad)
+      (do (doseq [b @bad] (println "SELF-TEST FAIL" b)) (js/process.exit 1))
+      (do (println (str "self-test: " (count positives) " positives caught, "
+                        (count negatives) " negatives clean"))
+          (js/process.exit 0)))))
+
+(when self-test? (self-test))
+
+;; ── scan ─────────────────────────────────────────────────────────────────────
+
+(let [files (source-files)]
+  (when (nil? files)
+    (println "REFUSING: west.yml yielded no paths, or `git ls-files` failed; this checkout cannot answer")
+    (println "SCANNED\t0\tfiles")
+    (js/process.exit 2))
+  (when (< (count files) min-files)
+    (println (str "REFUSING: only " (count files) " .cljc/.cljs files tracked (need "
+                  min-files "). A sparse or partial checkout reports absence, not cleanliness."))
+    (println "SCANNED\t0\tfiles")
+    (js/process.exit 2))
+
+  (let [hits (vec (mapcat (fn [f]
+                            (map #(assoc % :file f)
+                                 (scan-text (rd f))))
+                          files))]
+    (if findings?
+      (do (doseq [{:keys [file line id what excerpt]} hits]
+            (println (str "FINDING\tfail\t" (name id) ":" (str/replace file (str root "/") "") ":" line "\t"
+                          what " — " excerpt)))
+          (println (str "SCANNED\t" (count files) "\tfiles")))
+      (do (println (str "verify-char-int-coercion  tracked .cljc/.cljs=" (count files)
+                        "  findings=" (count hits)))
+          (doseq [{:keys [file line what excerpt]} (take 40 hits)]
+            (println (str "  " (str/replace file (str root "/") "") ":" line))
+            (println (str "      " excerpt))
+            (println (str "      " what)))
+          (when (> (count hits) 40)
+            (println (str "  … " (- (count hits) 40) " more")))))
+    (when (and strict? (seq hits)) (js/process.exit 1))))

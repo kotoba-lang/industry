@@ -834,6 +834,44 @@
    ;; just been generated with this shape.
    }
 
+  {:id       :verify-char-int-coercion
+   :title    "`int` applied to a character, in code ClojureScript runs, where that is not a code point"
+   :why      "On the JVM a character is a Character and `(int \\a)` is 97. Under
+              ClojureScript there is no character type: `(seq \"abc\")` yields
+              one-character STRINGS and `int` of a string is 0. So `(mapv int
+              \"Password\")` is the code points on one runtime and a vector of ZEROS on
+              the other. It does not throw. It returns a vector of the right length and
+              the right type, full of zeros, and every distinct input maps to the same
+              output.
+              Measured 2026-08-26, the idiom produced a wrong-and-plausible answer in
+              three libraries in this workspace in ONE DAY, twice in code written after
+              being bitten by it: Sec-WebSocket-Accept became a digest of zeros, two
+              different passwords hashed identically, and a CRC catalogue check ran on
+              nine zero bytes. All three were caught only because those libraries run
+              their suite on both runtimes; a repository with a JVM-only suite has
+              nothing that can see it.
+              First scan of the whole workspace found 30 more across 28,008 .cljc/.cljs
+              files, four of them in production source -- including a WAV header whose
+              RIFF/WAVE/data magic went out as zero bytes, in a function whose own
+              docstring says a wrong header yields `not an error but a transcript of
+              noise`, and a role-seed that summed to zero for every role in a
+              ClojureScript-only repository.
+              High-confidence forms only. A bare `(map int x)` over a variable is NOT
+              reported: deciding whether x holds a string needs type inference this does
+              not have, and a detector that guesses trains people to ignore it. The
+              lambda form counts parentheses rather than matching a pattern, because
+              `(map #(bit-and (int %) 0xff) (.getBytes s \"UTF-8\"))` is correct code
+              that a regex reads identically -- two real files here are that shape.
+              Cannot be a fleet gate: it reads west-managed orgs/ checkouts, and no
+              single repo tree carries them."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-char-int-coercion.cljs" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 86400000
+   :adr      "adr-2608260200-kotoba-lang-external-dependency-substitution"}
+
   {:id       :verify-dependency-substitution
    :title    "every external dependency kotoba-lang has, against the destination the ledger assigns it"
    :why      "`verify-jvm-dependency-surface` answers WHERE a JVM is still required -- a

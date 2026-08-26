@@ -162,36 +162,31 @@
   {:coordinate "@noble/hashes/argon2" :ecosystem :npm :disposition :gap-closed
    :target "kotoba-lang/org-ietf-argon2"
    :note "RFC 9106, all three variants, validated against the RFC vectors and 150 differential comparisons with BouncyCastle. ⚠ CORRECT, NOT FAST: measured 7.1 s on the JVM and 41 s under nbb at the OWASP minimum of 19 MiB, where a native provider takes under a tenth of a second. This does NOT retire pqh's IKdf capability on a login path -- it supplies the in-language reference that seam had no implementation of, and the provider a host with neither BouncyCastle nor @noble/hashes can fall back to. Read the repository README before substituting it anywhere interactive."}
-  {:coordinate "@noble/curves/bls12-381" :ecosystem :npm :disposition :gap-open
-   :proposed-name "org-ietf-bls-signatures"
-   :note "io-filecoin-signer's bls.cljc delegates to @noble/curves and says so: there is no pure-Java BLS12-381 in this workspace. A pairing-friendly curve is the largest single item on this list."}
-  {:coordinate "org.xerial/sqlite-jdbc" :ecosystem :maven :disposition :gap-open
-   :proposed-name "org-sqlite"
-   :note "kotobase-storage-sqlite and bitcoin-consensus. Worth questioning before building: kotobase-engine-lsm is the first-party engine, and the only thing a SQLite reader adds is compatibility with files other tools wrote."}
-  {:coordinate "tech.kwik/kwik" :ecosystem :maven :disposition :gap-open
-   :proposed-name "org-ietf-quic"
-   :note "murakumo. com-quic-http3 is NOT this -- it is a ~190-line CRUD scaffold over a schema, measured 2026-08-26, and naming it as the replacement would be false."}
-  {:coordinate "org.eclipse.milo/sdk-server" :ecosystem :maven :disposition :gap-open
-   :proposed-name "org-opcfoundation-opcua"
-   :note "dcs. com-opc-ua is a ~200-line CRUD scaffold, not a protocol stack."}
-  {:coordinate "org.eclipse.milo/sdk-client" :ecosystem :maven :disposition :gap-open
-   :proposed-name "org-opcfoundation-opcua"}
-  {:coordinate "com.digitalpetri.modbus/modbus-tcp" :ecosystem :maven :disposition :gap-open
-   :proposed-name "org-modbus"
-   :note "dcs. com-modbus-tcp is a ~182-line CRUD scaffold. The actual MBAP header plus PDU is small; this is the most tractable protocol gap on the list."}
-  {:coordinate "com.microsoft.playwright/playwright" :ecosystem :maven :disposition :gap-open
-   :proposed-name "org-chromedevtools-cdp"
-   :note "The workspace has browser, browser-use, browser-agent and devtools, but none of them speaks the CDP wire. What is missing is the protocol, not the orchestration."}
-  {:coordinate "playwright" :ecosystem :npm :disposition :gap-open :proposed-name "org-chromedevtools-cdp"}
-  {:coordinate "@crawlee/playwright" :ecosystem :npm :disposition :gap-open :proposed-name "org-chromedevtools-cdp"}
-  {:coordinate "com.google.javascript/closure-compiler-unshaded" :ecosystem :maven :disposition :gap-open
-   :proposed-name nil
-   :note "kotoba-script's optimizer for its restricted ESM output. Not a new repository: the exit is amu emitting what it wants directly, which is a compiler decision and not a library gap."}
-  {:coordinate "@bytecodealliance/jco" :ecosystem :npm :disposition :gap-open
-   :proposed-name nil
-   :note "kototama-component. Component-model tooling; kotoba-lang/kotoba-component owns the model, and the pinned wasm-tools/wac-cli binaries in its component-model-v1.edn are the same surface. One decision, not three."}
-  {:coordinate "com.microsoft.playwright/playwright-driver" :ecosystem :maven :disposition :gap-open
-   :proposed-name "org-chromedevtools-cdp"}
+  {:coordinate "@noble/curves/bls12-381" :ecosystem :npm :disposition :host-boundary
+   :note "DECIDED 2026-08-26: stays a host library for now, with the reason stated rather than the size hidden. A BLS12-381 pairing needs Fp, Fp2, Fp6 and Fp12 arithmetic, G1 and G2 curve operations, a Miller loop, a final exponentiation and hash-to-curve -- delicate cryptography where a subtle error is silent. io-filecoin-signer's bls.cljc already delegates to @noble/curves, which is audited, and says so in its docstring. Reopen with a real budget: io-filecoin-signer/testdata/gen_bls_vectors.clj means an oracle already exists, which is the expensive half."}
+  {:coordinate "org.xerial/sqlite-jdbc" :ecosystem :maven :disposition :host-boundary
+   :note "DECIDED 2026-08-26: stays a host library, and the proposed name was wrong. Both consumers need SQL with ACID transactions, not a file format: kotobase-storage-sqlite keeps CID blocks and linearizable refs in one database, and bitcoin-consensus validates a block against an immutable overlay on ONE SQL transaction that either commits whole or rolls back. A file-format reader would serve neither. The first-party answer for the kotobase case is kotobase-engine-lsm, which already exists -- that is a rewire, not a library gap. Reopen as `org-sqlite` only if something needs to READ files other tools wrote."}
+  {:coordinate "tech.kwik/kwik" :ecosystem :maven :disposition :host-boundary
+   :note "DECIDED 2026-08-26: stays a host library. QUIC is RFC 9000 plus 9001 plus 9002 -- packet protection, connection IDs, frames, loss recovery, congestion control, and a TLS 1.3 integration this workspace does not have either. murakumo reaches it through one JVM-only driver, murakumo/overlay/quic_driver.clj, so the coupling is already contained at a seam. Reopen when there is a first-party TLS 1.3 handshake to build on; until then a first-party QUIC would be a scaffold wearing a protocol's name. com-quic-http3 is a ~190-line CRUD scaffold and is not this."}
+  {:coordinate "org.eclipse.milo/sdk-server" :ecosystem :maven :disposition :host-boundary
+   :note "DECIDED 2026-08-26: stays a host library. dcs uses Milo as an OPC UA SERVER -- OpcUaServer, UaNodeManager, an address space -- which is Parts 3, 4, 5 and 6 of the specification, thousands of pages. dcs's own deps.edn already states the posture: the domain core is zero-dependency portable .cljc and the protocol-simulation layer is deliberately host-side over an independently authored implementation. Reopen if a consumer needs only the binary ENCODING rather than a server, which is a bounded subset. com-opc-ua is a ~200-line CRUD scaffold and is not this."}
+  {:coordinate "org.eclipse.milo/sdk-client" :ecosystem :maven :disposition :host-boundary
+   :note "As sdk-server. Test-scoped in dcs: an isolated live-client proof, deliberately outside :test because its netty version conflicts with the Modbus library's."}
+  {:coordinate "com.digitalpetri.modbus/modbus-tcp" :ecosystem :maven :disposition :gap-closed
+   :target "kotoba-lang/org-modbus"
+   :note "Thirteen function codes, all nine exception codes, MBAP, RTU and the ASCII mode. Framing tests are MODBUS Application Protocol V1.1b3 section 6 verbatim; the CRC is checked against the CRC RevEng catalogue value, against a second independent implementation over all 65,536 two-byte inputs, and against every single-bit error in a full frame. dcs.modbus can now be .cljc rather than JVM-only."}
+  {:coordinate "com.microsoft.playwright/playwright" :ecosystem :maven :disposition :host-boundary
+   :note "DECIDED 2026-08-26: stays a host library. The CDP wire is now buildable -- it is JSON-RPC over a WebSocket, and kotoba-lang/org-ietf-websocket supplies the framing -- but the wire is not what Playwright provides. It provides a managed browser, a driver protocol, auto-waiting, and the several thousand typed domain methods generated from a protocol definition this workspace does not vendor. A first-party CDP transport with no browser behind it would be a library nothing can use. Reopen if a consumer needs to speak CDP to a browser someone ELSE launched."}
+  {:coordinate "playwright" :ecosystem :npm :disposition :host-boundary
+   :note "As the maven coordinate."}
+  {:coordinate "@crawlee/playwright" :ecosystem :npm :disposition :host-boundary
+   :note "As playwright."}
+  {:coordinate "com.google.javascript/closure-compiler-unshaded" :ecosystem :maven :disposition :host-boundary
+   :note "DECIDED 2026-08-26: not a library gap at all. kotoba-script uses it to optimize its own restricted-ESM output, and the exit is amu emitting what it wants directly -- a compiler decision, tracked in the amu ADR series, not a repository anyone should create. Writing a JavaScript optimizer to avoid depending on one would be the largest item on this list in service of the least."}
+  {:coordinate "@bytecodealliance/jco" :ecosystem :npm :disposition :host-boundary
+   :note "DECIDED 2026-08-26: stays a host tool, together with the wasm-tools and wac-cli binaries kotoba-component pins in component-model-v1.edn. These are BUILD tools that produce Wasm components; nothing they emit reaches a shipped artifact as a dependency, and verify-wasm-toolchain-pin already checks that the pinned versions match what the fleet nodes hold. One decision, not three."}
+  {:coordinate "com.microsoft.playwright/playwright-driver" :ecosystem :maven :disposition :host-boundary
+   :note "As playwright."}
 
 
   ;; ------------------------------------------------ families, by name prefix
@@ -209,7 +204,8 @@
   {:pattern "@huggingface/" :disposition :first-party-exists :target "kotoba-lang/org-huggingface-safetensors"}
   {:pattern "@filoz/" :disposition :first-party-exists :target "kotoba-lang/io-filecoin"}
   {:pattern "@internationalized/" :disposition :first-party-exists :target "kotoba-lang/time"}
-  {:pattern "@playwright/" :disposition :gap-open :proposed-name "org-chromedevtools-cdp"}
+  {:pattern "@playwright/" :disposition :host-boundary
+   :note "As playwright; test-scoped everywhere it appears."}
   {:pattern "@storybook/" :disposition :tooling}
   {:pattern "@testing-library/" :disposition :tooling}
   {:pattern "@graphql-codegen/" :disposition :tooling}
@@ -253,18 +249,24 @@
   {:coordinate "@supabase/supabase-js" :ecosystem :npm :disposition :first-party-exists
    :target "kotoba-lang/org-postgresql-wire"
    :note "Supabase is Postgres plus a REST facade; the wire protocol is the part with a first-party implementation. The hosted service is a deployment choice, not a language dependency."}
-  {:coordinate "crawlee" :ecosystem :npm :disposition :gap-open :proposed-name "org-chromedevtools-cdp"}
-  {:coordinate "smol-toml" :ecosystem :npm :disposition :gap-open :proposed-name "org-toml"
-   :note "TOML has no first-party reader. Small, and it would also serve Cargo manifests and the pinned toolchain files."}
-  {:coordinate "hpke-js" :ecosystem :npm :disposition :gap-open :proposed-name "org-ietf-hpke"
-   :note "RFC 9180. kotobase-server uses it. Composable from what exists -- HKDF is in kotoba-lang/crypto, the AEAD in noise, the KEM in org-ietf-ed25519 -- so this is assembly rather than new cryptography."}
-  {:coordinate "@endo/ocapn" :ecosystem :npm :disposition :gap-open :proposed-name nil
-   :note "OCapN. CLAUDE.md ADR-2608160200 places UCAN, CACAO and OCapN as adapters over the core capability semantics in kotoba-lang/kotoba-lang, so the destination is an adapter there, not a new origin-plane repository."}
+  {:coordinate "crawlee" :ecosystem :npm :disposition :host-boundary
+   :note "As playwright, which it wraps. Crawlee is a crawling FRAMEWORK -- request queues, retries, session rotation, autoscaling -- over a managed browser. None of that is a wire protocol, and a first-party CDP transport would replace none of it."}
+  {:coordinate "smol-toml" :ecosystem :npm :disposition :gap-closed
+   :target "kotoba-lang/org-toml"
+   :note "TOML v1.0.0, the full grammar, reader only. No writer: table layout, key quoting and float formatting are policy questions a reader does not have to answer, and a round-trip suite against one's own writer looks like validation while checking nothing."}
+  {:coordinate "hpke-js" :ecosystem :npm :disposition :gap-planned
+   :proposed-name "org-ietf-hpke"
+   :prerequisite "a first-party X25519"
+   :note "RFC 9180, used by kotobase-server/security/keywrap.cljs. Measured 2026-08-26, the pieces are ALMOST there: HKDF is in kotoba-lang/crypto and ChaCha20-Poly1305 in kotoba-lang/noise, but DHKEM(X25519) needs an X25519 scalar multiplication and this workspace has none -- every hit for x25519 is a call site, not an implementation. X25519 is a Montgomery ladder, roughly 150 lines with RFC 7748 test vectors, and is the thing to build first. This is a sequence, not a size problem."}
+  {:coordinate "@endo/ocapn" :ecosystem :npm :disposition :gap-planned
+   :proposed-name nil
+   :prerequisite "an adapter in kotoba-lang/kotoba-lang, not a new repository"
+   :note "OCapN. ADR-2608160200 places UCAN, CACAO and OCapN as adapters over the core capability semantics in lang/capability-semantics.edn, so the destination is an adapter there. Creating an origin-plane repository for it would contradict that decision."}
   {:coordinate "curves" :ecosystem :npm :disposition :first-party-exists
    :target "kotoba-lang/org-ietf-ed25519"
    :note "RESOLVED 2026-08-26 (kotoba-lang/murakumo#332). murakumo's package.json declared `curves@^1.7.0`; the npm package `curves` is at 1.1.0 and unrelated, so `npm ci` failed with ETARGET on every clean checkout. The scope had been dropped from the name -- package-lock.json carried `@noble/curves` correctly the whole time, so manifest and lock also disagreed. The fix was restoring the scope, NOT deleting the line: witness-quorum declares the same `@noble/curves@^1.7.0` and murakumo reaches it transitively when witness_dial_attest.cljs runs. This entry is kept so a reappearance of the unscoped name is recognised rather than re-diagnosed."}
-  {:coordinate "workflow" :ecosystem :npm :disposition :gap-open :proposed-name nil
-   :note "app-scap declares `workflow@latest`. The npm package of that name is unrelated to anything here; like the builtin-shadowing entries beside it, it is a line to delete rather than a dependency to replace."}
+  {:coordinate "workflow" :ecosystem :npm :disposition :host-boundary
+   :note "RESOLVED 2026-08-26 by removal (kotoba-lang/app-scap#2). app-scap declared `workflow@latest`; the npm package of that name is unrelated to anything here and dragged in @vercel/*, @nestjs/*, @swc/*, @aws-sdk/* and @oclif/* -- most of the 385 packages that left when the six builtin-shadowing declarations were deleted. Kept in the ledger so a reappearance is recognised rather than re-diagnosed."}
 
   ;; ------------------------------------------------ tooling, by exact name
   {:coordinates ["typescript" "tsx" "turbo" "typedoc" "vite" "vitest" "svelte"
