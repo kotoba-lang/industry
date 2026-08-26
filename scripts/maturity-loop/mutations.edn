@@ -2306,4 +2306,172 @@
      :find "  \"routes\": ["
      :replace "  \"hyperdrive\": [{\"binding\": \"HYPERDRIVE\", \"id\": \"fake-id\"}],\n  \"routes\": ["
      :must-fail ["worker-has-no-hyperdrive-binding"]}]}
+
+  {:repo "orgs/cloud-itonami/vehicle"
+   :label "vehicle —— 薄い edge の面合意と、配備される XRPC 面の安全境界"
+   ;; 2026-08-26 に 23 件すべて、名指しした test 名で赤くなるところを見た。
+   ;; suite は npm install 無しで走る（fs 読みだけ）。
+   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :green-marker "vehicle contract: all green"
+   :mutations
+   [{:id :vehicle/nanoid-drifts-in-wrangler
+     :why "nanoid が 1 箇所だけ動くと fleet 逆引きが別 actor を指す"
+     :file "wrangler.jsonc"
+     :find "\"APP_NANOID\": \"v3h1cl01\""
+     :replace "\"APP_NANOID\": \"v3h1cl02\""
+     :must-fail ["actor-identity-agrees-across-surfaces"]}
+
+    {:id :vehicle/worker-name-drifts
+     :why "worker 名が nanoid から外れると配備先の逆引きが切れる"
+     :file "wrangler.jsonc"
+     :find "\"name\": \"kotodama-v3h1cl01\""
+     :replace "\"name\": \"kotodama-vehicle\""
+     :must-fail ["actor-identity-agrees-across-surfaces"]}
+
+    {:id :vehicle/route-host-drifts
+     :why "route の host が nanoid から外れると、identity 文書の指す先と配備先が別になる"
+     :file "wrangler.jsonc"
+     :find "\"pattern\": \"v3h1cl01.etzhayyim.com/*\""
+     :replace "\"pattern\": \"vehicle.etzhayyim.com/*\""
+     :must-fail ["actor-identity-agrees-across-surfaces"]}
+
+    {:id :vehicle/actor-did-drifts
+     :why "identity 文書と worker が別 DID を名乗ると、did:web を解決した相手と喋る相手が別人になる"
+     :file "src/app.ts"
+     :find "actor: \"did:web:vehicle.etzhayyim.com\""
+     :replace "actor: \"did:web:vehiclex.etzhayyim.com\""
+     :must-fail ["actor-identity-agrees-across-surfaces"]}
+
+    {:id :vehicle/capability-renamed-in-deploy-vars
+     :why "APP_CAPABILITIES と profile.capabilities がずれると、名乗る能力と配る能力が別になる"
+     :file "wrangler.jsonc"
+     :find "\\\"patent-linking\\\""
+     :replace "\\\"patent-linkingX\\\""
+     :must-fail ["capabilities-agree-between-deploy-vars-and-identity-doc"]}
+
+    {:id :vehicle/version-drifts-in-package
+     :why "package.json だけ version が動くと、配備 var と成果物が別の版を名乗る"
+     :file "package.json"
+     :find "\"version\": \"0.1.0\""
+     :replace "\"version\": \"0.2.0\""
+     :must-fail ["descriptor-fields-agree-across-surfaces"]}
+
+    {:id :vehicle/display-name-drifts
+     :why "表示名が 1 面だけ動くと、directory と actor 自身の名乗りが食い違う"
+     :file "wrangler.jsonc"
+     :find "\"APP_DISPLAY_NAME\": \"Vehicle Manufacturing Graph\""
+     :replace "\"APP_DISPLAY_NAME\": \"Vehicle Graph\""
+     :must-fail ["descriptor-fields-agree-across-surfaces"]}
+
+    {:id :vehicle/description-wording-drifts
+     :why "dash 正規化を通り抜ける『語の変更』が捕まること（正規化が検査を骨抜きにしていない）"
+     :file "wrangler.jsonc"
+     :find "Automotive manufacturing package, supply process"
+     :replace "Automotive manufacturing bundle, supply process"
+     :must-fail ["descriptor-fields-agree-across-surfaces"]}
+
+    {:id :vehicle/nsid-prefix-widened
+     :why "guard の prefix が広がると、他 actor の XRPC が dispatcher へ抜ける"
+     :file "src/app.ts"
+     :find "const NSID_PREFIX = \"com.etzhayyim.apps.vehicle.\";"
+     :replace "const NSID_PREFIX = \"com.etzhayyim.apps.\";"
+     :must-fail ["xrpc-guard-confines-the-thin-edge-to-the-vehicle-lexicon"]}
+
+    {:id :vehicle/nsid-guard-removed-from-branch
+     :why "定数は残したまま転送分岐から guard を外す —— 『定数が在る』だけの検査では捕まらない形"
+     :file "src/app.ts"
+     :find "if (nsid.startsWith(NSID_PREFIX) && (req.method === \"POST\" || req.method === \"GET\")) {"
+     :replace "if (nsid && (req.method === \"POST\" || req.method === \"GET\")) {"
+     :must-fail ["xrpc-guard-confines-the-thin-edge-to-the-vehicle-lexicon"]}
+
+    {:id :vehicle/extraction-floor-nsid-const-renamed
+     :why "抽出の床そのもの。定数名が変わったら空振りせず throw すること"
+     :file "src/app.ts"
+     :find "const NSID_PREFIX ="
+     :replace "const VEHICLE_NSID ="
+     :must-fail ["xrpc-guard-confines-the-thin-edge-to-the-vehicle-lexicon"]}
+
+    {:id :vehicle/trust-header-always-set
+     :why "secret 未束縛でも header を載せると、上流が空文字を信頼済みと読みうる"
+     :file "src/app.ts"
+     :find "if (trust) headers[\"x-internal-trust\"] = trust;"
+     :replace "headers[\"x-internal-trust\"] = trust;"
+     :must-fail ["thin-edge-omits-the-internal-trust-header-when-no-secret-is-bound"]}
+
+    {:id :vehicle/missing-secret-returns-undefined
+     :why "binding 不在時の戻りが空文字でなくなると、header 判定が静かに変わる"
+     :file "src/app.ts"
+     :find "if (!binding) return \"\";"
+     :replace "if (!binding) return undefined as unknown as string;"
+     :must-fail ["thin-edge-omits-the-internal-trust-header-when-no-secret-is-bound"]}
+
+    {:id :vehicle/invalid-json-forwarded
+     :why "壊れた JSON を素通しすると、上流が空 body を正当な要求と読む"
+     :file "src/app.ts"
+     :find "      if (body.__invalidJson) return json({ error: \"InvalidJson\" }, 400);\n"
+     :replace ""
+     :must-fail ["thin-edge-rejects-malformed-json-instead-of-forwarding-it"]}
+
+    {:id :vehicle/query-overwrites-body
+     :why "query が body を上書きできると、POST 済みの値を URL から差し替えられる"
+     :file "src/app.ts"
+     :find "if (!(k in body)) body[k] = v;"
+     :replace "body[k] = v;"
+     :must-fail ["query-params-never-overwrite-the-posted-body"]}
+
+    {:id :vehicle/dispatcher-base-changed
+     :why "既定の転送先が動くと、secret 付きの要求が別ホストへ出る"
+     :file "src/app.ts"
+     :find "env.DISPATCHER_URL ?? \"https://dispatcher.etzhayyim.com\""
+     :replace "env.DISPATCHER_URL ?? \"https://dispatcher.example.com\""
+     :must-fail ["dispatcher-base-url-is-pinned-and-slash-normalized"]}
+
+    {:id :vehicle/deployed-main-switched-to-thin-edge
+     :why "配備される entry が変わると、検査している面と走る面が別になる"
+     :file "wrangler.jsonc"
+     :find "\"main\": \"svelte/.svelte-kit/cloudflare/_worker.js\""
+     :replace "\"main\": \"src/app.ts\""
+     :must-fail ["deployed-entry-is-the-sveltekit-build-not-the-thin-edge"]}
+
+    {:id :vehicle/xrpc-response-becomes-cacheable
+     :why "XRPC 応答が cache されると、actor 状態が別の閲覧者へ漏れる"
+     :file "svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "headers.set('cache-control', 'no-store');"
+     :replace "headers.set('cache-control', 'max-age=60');"
+     :must-fail ["deployed-xrpc-route-does-not-cache-and-limits-preflight"]}
+
+    {:id :vehicle/preflight-widened
+     :why "preflight が広がると、想定していない method が cross-origin で通る"
+     :file "svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "'access-control-allow-methods': 'POST,OPTIONS'"
+     :replace "'access-control-allow-methods': 'POST,GET,OPTIONS'"
+     :must-fail ["deployed-xrpc-route-does-not-cache-and-limits-preflight"]}
+
+    {:id :vehicle/inbound-host-header-forwarded
+     :why "inbound の host を上流へ持ち越すと、router 側の vhost 判定が騙されうる"
+     :file "svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "headers.delete('host'); "
+     :replace ""
+     :must-fail ["deployed-xrpc-route-does-not-cache-and-limits-preflight"]}
+
+    {:id :vehicle/stale-nanoid-leaks-into-wrangler
+     :why "CLAUDE.md の古い識別子が配備 var へ漏れる"
+     :file "wrangler.jsonc"
+     :find "\"APP_SOURCE\": \"60-apps/etzhayyim-project-vehicle\""
+     :replace "\"APP_SOURCE\": \"60-apps/etzhayyim-project-vehicle-vh1cl3rk\""
+     :must-fail ["stale-doc-drift-has-not-spread-to-any-machine-read-surface"]}
+
+    {:id :vehicle/stale-nanoid-leaks-into-app-ts
+     :why "同じ漏れを thin edge 側で"
+     :file "src/app.ts"
+     :find "nanoid: env.APP_NANOID ?? \"v3h1cl01\""
+     :replace "nanoid: env.APP_NANOID ?? \"vh1cl3rk\""
+     :must-fail ["stale-doc-drift-has-not-spread-to-any-machine-read-surface"]}
+
+    {:id :vehicle/claude-md-quietly-fixed
+     :why "例外表が現実とずれたまま黙る形。CLAUDE.md が直ったら例外表を直させる"
+     :file "CLAUDE.md"
+     :find "https://vh1cl3rk.etzhayyim.com/health"
+     :replace "https://v3h1cl01.etzhayyim.com/health"
+     :must-fail ["known-stale-docs-are-still-stale"]}]}
 ]}
