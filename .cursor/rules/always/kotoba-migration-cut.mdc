@@ -25,6 +25,7 @@ Kotoba は safe application language である。切り方は guest と host
 やってはいけない:
 
 - 『正しい移行 = 1 判断表』『Kotoba は判断だけ書く』を様式にする
+- 『コマンド文字列は `.cljc`』を様式にする（コマンドはゲスト。`.cljc` は oracle）
 - amu 未成熟を、分類せず切り方の理由にする
 - `.cljc` から `.kotoba` を require する（require-graph）
 - `cond` が無いと思って入れ子 `if` を様式にする（grammar が desugar する）
@@ -32,5 +33,9 @@ Kotoba は safe application language である。切り方は guest と host
 - reader を壊した赤を parity の成功実演に数える
 
 正しいスライス: 書けない理由を `:disposition` で分類する → product semantics を
-Clojure-shaped の `.kotoba` へ、機構は host → oracle の `.cljc` は gate が揃うまで
-残す → named backend が通せないときだけ決定核へ畳む → `kotoba compile` と parity。
+Clojure-shaped の `.kotoba` へ、機構は host → `.cljc` の写しは oracle（意味の
+正本ではない） → named backend が通せないときだけ決定核へ畳む → `kotoba compile`
+と parity。
+
+実装のスナップショットを言語として残していないかは skill `rule-kaizen`
+（ADR-2608261200）。adr-inventory は status の棚卸しで、中身の正しさは見ない。

@@ -1247,6 +1247,10 @@ CertGovernor）。
     `superseded` にして後継 ADR を `:adr/superseded-by` で指すか、本文に「いつ・なぜ
     変えたか」を1〜2文残す。読み手が現在地を1回で読めることが目的であって、
     経緯の抹消が目的ではない。
+  - **実装スナップショットを言語にしない**: ある日の天井（emitter、backend、
+    その日の切り方）を『こう書くもの』として standing に残していないか疑う。
+    status の棚卸しは `adr-inventory`（中身の正しさは見ない）。中身の切り方が
+    まだ適切かは `rule-kaizen`（ADR-2608261200、1 反復 = 1 finding）。
   - **例外（従来どおり append-only を維持する）**: `90-docs/business/canvas-ledger.edn`・
     `90-docs/design-quality/design-quality-ledger.edn`・`manifest/fleet-db.ledger.edn`。
     これらは「文書」ではなく**測定・イベント列**（時系列そのものが値）または**署名付き
@@ -2276,8 +2280,10 @@ SMTP `protocol_core` も fallback であってテンプレートではない。�
 ヘッダに欠落と撤去条件を書く。wasm / web に対して最初から潰さない。
 
 文字列禁止ではない（ADR-2608261000）。`.cljc` oracle は slice の gate が揃うまで
-残し、`.kotoba` を require しない。mirror を作らない。正規表現走査は移す前に
-宣言データへ直す。依存が `.cljc` のままの面は移行しない。
+残し、`.kotoba` を require しない。oracle は照合用の写しであり、意味の正本ではない。
+コマンド文字列はゲストの product semantics である。『コマンド文字列は `.cljc`』は
+不適切（ある日の SMTP fallback を言語にした読み）。mirror を作らない。正規表現走査は
+移す前に宣言データへ直す。依存が `.cljc` のままの面は移行しない。
 
 ### native の現在地の読み方
 

@@ -901,6 +901,9 @@ CertGovernor）。
     `superseded` にして後継 ADR を `:adr/superseded-by` で指すか、本文に「いつ・なぜ
     変えたか」を1〜2文残す。読み手が現在地を1回で読めることが目的であって、
     経緯の抹消が目的ではない。
+  - **実装スナップショットを言語にしない**: ある日の天井を『こう書くもの』として
+    standing に残していないか疑う。status の棚卸しは `adr-inventory`。中身の
+    切り方がまだ適切かは `rule-kaizen`（ADR-2608261200、1 反復 = 1 finding）。
   - **例外（従来どおり append-only を維持する）**: `90-docs/business/canvas-ledger.edn`・
     `90-docs/design-quality/design-quality-ledger.edn`・`manifest/fleet-db.ledger.edn`。
     これらは「文書」ではなく**測定・イベント列**（時系列そのものが値）または**署名付き
@@ -1633,10 +1636,13 @@ programming model*」** と明記している。したがって:
    `{:allow #{[:cap/call <id>]}}` を渡せば CLI からそのままコンパイルできる。
    `--policy` 無しは空 policy（deny-by-default は不変）。`:schemas` は project mode では
    引き続き拒否（同名 schema の衝突規則が未決定）。
-2. **全 8 capability kit（clock/http/llm/log/state/storage/stream-object/ui）は
-   `:reference :implemented` だが `:wasm-aot`/`:native-aot`/`:jit` は `pending`**。
-3. **ingress（Request→Response）capability はどちらの面にも無い** — Cloudflare Worker の
-   エントリは cljs のままにする（ADR-2606290000 と整合）。
+2. **capability kit の qualification をここに書き写さない — kit ファイルが正本。**
+   引き方は CLAUDE.md の同節（reader で kit を読む）。**値をここに焼かない。**
+   旧文は「全 8 capability kit … wasm-aot pending」という測定値を定数として持ち、
+   引用された時点で実態と食い違っていた。残してよいのは引き方であって結果ではない。
+3. **ingress capability の有無も kit ファイルをその場で見る。** 旧文の
+   「どちらの面にも無い」は測定値だった。Worker のエントリを Kotoba に移す前に
+   `http-ingress-v1` / `stream-ingress-v1` を読む。
 4. **fs/process/exec capability も Kotoba script host（`kbb`）も無い** — build スクリプトは
    nbb 据え置き。`kotoba-lang/kotoba-script` は restricted-ESM emitter であって script runner
    ではない（名前で誤解しないこと）。
@@ -1667,6 +1673,7 @@ ADR-2607279200 決定 5: portable な product semantics を普通の Kotoba 値�
 1. 書けない理由を `:disposition` で分類する。
 2. product semantics を Clojure-shaped の `.kotoba` へ。機構は host。
 3. `.cljc` oracle は gate が揃うまで残し、`.kotoba` を require しない。
+   oracle は照合用であって意味の正本ではない。コマンドはゲスト。
 4. named backend が値を通せないときだけ決定核へ畳み、ヘッダに撤去条件を書く。
 5. `kotoba compile` で対象 backend を出し、parity を見る。skip と pass を
    同じ顔にしない。
