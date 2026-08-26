@@ -76,6 +76,38 @@
    :detail "ipfs.kotobase.net/ipfs/{cid} 301s to {cid}.ipfs.kotobase.net, which answers 502 after ~28s -- TLS and DNS are fine (the certificate does carry *.ipfs.kotobase.net), the Worker simply cannot reach the archive store the control plane writes to. Block retrieval uses the path gateway, so this does not block advertising; it is a real defect of that host and is recorded here so it is not rediscovered."
    :owner "net-kotobase/ipfs"}]
 
+ ;; Published 2026-08-26. Two advertisements: one CID to prove the path,
+ ;; then the corpus. The chain links back -- an indexer walks BACK from a
+ ;; head, so a second advertisement with no PreviousID orphans the first.
+ :ipni.publisher/chain
+ [{:advertisement "baguqeeraa7x2xflhz5tp6dj2hbg3j5febobxgoohwns325s6u2tapllyxdxq"
+   :entries "baguqeerau6pyxhbyx6poxmuh6c7zq7kmlhrdckloagcksygnpyu5zzf7j6yq"
+   :cids 1 :at "2026-08-26" :announce-status 204}
+  {:advertisement "baguqeeraa7fpey2eucubpel6wddilnoxbyydcyn7jefxibcfkvmh46vob37q"
+   :entries "baguqeeraztripjq7oqztkm47xkga67ydtm6vd4xyx647cycsful3n3nlsm7a"
+   :cids 435 :at "2026-08-26" :announce-status 204
+   :previous "baguqeeraa7x2xflhz5tp6dj2hbg3j5febobxgoohwns325s6u2tapllyxdxq"}]
+
+ ;; What is true now, measured rather than claimed. The round trip starts
+ ;; from a CID and nothing else: ask the public index who serves it, fetch
+ ;; from the address the index returns, re-hash, compare.
+ :ipni.publisher/round-trip
+ {:at "2026-08-26"
+  :index "https://delegated-ipfs.dev/routing/v1/providers/{cid}"
+  :result :ok
+  :sampled 4
+  :detail "The index returns this provider at /dns4/kotobase.net/tcp/443/https; the bytes fetched from there re-hash to the CID asked for. Before the announce the same query returned no provider."}
+
+ ;; ⚠ And what is NOT true, so nobody reads the line above as more than it
+ ;; says. Announcing to IPNI did not make kubo-based public gateways serve
+ ;; these CIDs, and it was never going to.
+ :ipni.publisher/public-gateways
+ {:at "2026-08-26"
+  :measured {"ipfs.io" 504 "trustless-gateway.link" 504 "w3s.link" 504
+             "dweb.link" :redirects-to-subdomain}
+  :why "Those gateways retrieve over Bitswap from libp2p peers. This operator advertises transport-ipfs-gateway-http (0x0920) and runs no libp2p peer, so a Bitswap-only client finds the provider record and still cannot fetch. Serving them needs the DHT-node transport kotoba-protocol records as the open item on the transport plane -- not another advertisement."
+  :consequence "A client that speaks trustless HTTP retrieval gets these blocks today. A client that speaks only Bitswap does not."}
+
  :ipni.publisher/custody-verified
  {:at "2026-08-26"
   :how "written to kagi, read back, public key re-derived, peer-id compared -- storing without reading back is a custody claim that has never been tested"
