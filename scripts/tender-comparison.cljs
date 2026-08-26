@@ -45,8 +45,11 @@
     (when (zero? (or (.-status r) 1))
       (str/trim (or (.-stdout r) "")))))
 
+(defn hrtime-bigint []
+  ((.-bigint js/process.hrtime)))
+
 (defn execute [command args & [{:keys [cwd env timeout]}]]
-  (let [started (.bigint (js/process.hrtime))
+  (let [started (hrtime-bigint)
         r (cp/spawnSync command (clj->js args)
                         #js {:cwd cwd
                              :encoding "utf8"
@@ -61,7 +64,7 @@
                    (or (.-stdout r) "") (or (.-stderr r) "")))))
     #js {:stdout (or (.-stdout r) "")
          :stderr (or (.-stderr r) "")
-         :wallMilliseconds (/ (- (.bigint (js/process.hrtime)) started) 1e6)}))
+         :wallMilliseconds (/ (js/Number (- (hrtime-bigint) started)) 1e6)}))
 
 (defn parse-json-sample [stdout expected]
   (let [lines (.split stdout #"\r?\n")
@@ -78,8 +81,11 @@
         (throw (js/Error. (str "result " (.-result sample) " != " expected))))
       sample)))
 
+(defn host-metric-median [fact host metric]
+  (.-median (aget (aget (.-hosts fact) host) metric)))
+
 (defn wasm-numeric-result [value]
-  (if (= "bigint" (js/typeof value)) (js/Number value) (js/Number value)))
+  (js/Number value))
 
 (defn node-steady-sample [wasm-path expected warmup calls]
   (let [wasm (fs/readFileSync wasm-path)]
@@ -87,8 +93,9 @@
         (.then
          (fn [result]
            (let [instance (.-instance result)
-                 main (aget (.-exports instance) "main")]
-             (when-not (fn? main) (throw (js/Error. "guest missing main export")))
+                 guest-main (aget (.-exports instance) "main")]
+             (when-not (instance? js/Function guest-main)
+               (throw (js/Error. "guest missing main export")))
              (let [total (+ warmup calls 1)]
                (when (> total 500)
                  (throw
@@ -96,25 +103,25 @@
                    (str "guest would exceed amu wasm32 instance invocation budget ("
                         total " > 500); lower --warmup/--calls"))))
                (dotimes [_ warmup]
-                 (let [v (wasm-numeric-result (main))]
+                 (let [v (wasm-numeric-result (guest-main))]
                    (when-not (= expected v)
                      (throw (js/Error. (str "warmup result " v " != " expected))))))
-               (let [started (.bigint (js/process.hrtime))
+               (let [started (hrtime-bigint)
                      result
                      (loop [i 0 acc 0]
                        (if (< i calls)
-                         (recur (inc i) (wasm-numeric-result (main)))
+                         (recur (inc i) (wasm-numeric-result (guest-main)))
                          acc))]
                  (when-not (= expected result)
                    (throw (js/Error. (str "result " result " != " expected))))
-                 (let [elapsed (- (.bigint (js/process.hrtime)) started)]
+                 (let [elapsed (js/Number (- (hrtime-bigint) started))]
                    #js {:format "kotoba.tender-sample/v1"
                         :host "node-webassembly"
                         :calls calls
                         :warmupCalls warmup
                         :elapsedNanoseconds elapsed
                         :result result
-                        :nanosecondsPerInvocation (/ elapsed calls)}))))))))
+                        :nanosecondsPerInvocation (/ elapsed calls)})))))))))
 
 (defn node-steady-runs [wasm-path expected warmup calls runs]
   (letfn [(step [run samples]
@@ -236,17 +243,17 @@
                        samples))]
                #js {:guest-id guest-id
                     :report (guest-report guest wasm-abs node-samples chicory-single chicory-steady
-                                          wasmtime-single)}))))))
+                                          wasmtime-single)})))))))
 
 (defn run-all-guests [opts]
   (letfn [(step [defs guests]
             (if (seq defs)
               (.then (run-guest (first defs) opts)
                      (fn [result]
-                       (aset guests (.-guest-id result) (.-report result))
+                       (aset guests (aget result "guest-id") (aget result "report"))
                        (step (rest defs) guests)))
               (js/Promise.resolve guests)))]
-    (step guest-defs #js [])))
+    (step guest-defs #js {})))
 
 (defn -main []
   (let [kototama-root (path/resolve (opt "--kototama" (path/join root "orgs/kotoba-lang/kototama")))
@@ -271,8 +278,8 @@
         (.then
          (fn [report-guests]
            (let [fact (aget report-guests "kotoba-compiled-fact")
-                 fact-node-median (.. fact -hosts -node-webassembly -steadyStateNanosecondsPerInvocation -median)
-                 fact-chicory-median (.. fact -hosts -chicory-jvm -steadyStateNanosecondsPerInvocation -median)
+                 fact-node-median (host-metric-median fact "node-webassembly" "steadyStateNanosecondsPerInvocation")
+                 fact-chicory-median (host-metric-median fact "chicory-jvm" "steadyStateNanosecondsPerInvocation")
                  host-ids (if wasmtime?
                             #js ["node-webassembly" "chicory-jvm" "wasmtime-cli"]
                             #js ["node-webassembly" "chicory-jvm"])
@@ -311,7 +318,7 @@
                            :chicoryJvmSteadyNanosecondsPerInvocationMedian fact-chicory-median
                            :chicorySlowdownVsNodeSteady (/ fact-chicory-median fact-node-median)
                            :chicoryJvmSingleInvocationWallMsMedian
-                           (.. fact -hosts -chicory-jvm -singleInvocationWallMilliseconds -median)}}
+                           (host-metric-median fact "chicory-jvm" "singleInvocationWallMilliseconds")}}
                  encoded (str (js/JSON.stringify report nil 2) "\n")]
              (when output-path
                (fs/writeFileSync (path/resolve output-path) encoded))

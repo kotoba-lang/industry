@@ -131,31 +131,33 @@ Skipped on judah: Mojo, TypeScript (Node/Deno) — not on PATH.
 
 ## 3. kototama (runtime/tender)
 
-**Measured `kotoba.tender-comparison/v1`** (2026-08-26, load **94** — exploratory contended host; quiet-host re-run pending on judah).
+**Measured `kotoba.tender-comparison/v1`** on **judah** (quiet-host official, load **1.87**, 7 runs × 400 calls).
 
 | Host | `kotoba-compiled-fact` (5! = 120) | Notes |
 |---|---|---|
-| **Node WebAssembly** (V8) | **~106 ns/invocation** steady | in-process; 50 warmup + 400 timed calls |
-| **Chicory JVM** steady | **~165 µs/invocation** | **~1554×** slower than Node steady |
-| **Chicory JVM** CLI cold | **~7.3 s** wall | `clojure -M:cli run` (JVM + Chicory per sample) |
-| **wasmtime CLI** | **~40 ms** wall | process-per-invocation; not steady-state comparable |
+| **Node WebAssembly** (V8) | **~70 ns/invocation** steady | in-process; 50 warmup + 400 timed calls |
+| **Chicory JVM** steady | **~35.8 µs/invocation** | **~513×** slower than Node steady |
+| **Chicory JVM** CLI cold | **~682 ms** wall | `clojure -M:cli run` (JVM + Chicory per sample) |
+| **wasmtime CLI** | see per-guest tables | process-per-invocation; not steady-state comparable |
+
+Exploratory contended-host run (load **94**, laptop): Node ~106 ns, Chicory steady ~165 µs (~1554×).
 
 Guests: `kotoba-compiled-fact`, `kotoba-compiled-peak-cells`, `amu-compiled-i64-main` (host-free fixtures under `kototama/test/kototama/fixtures/`).
 
-Evidence: `90-docs/performance/runs/2026-08-26-tender/tender.json`. Re-run:
+Evidence: `90-docs/performance/runs/2026-08-26-judah-quiet-tender/tender.json` (official), `90-docs/performance/runs/2026-08-26-tender/tender.json` (contended). Re-run:
 
 ```bash
 west update --fetch smart kototama   # if orgs/ missing in worktree
-nbb scripts/kotoba-tender-benchmark.cljs --runs 3 --date $(date +%Y-%m-%d)
+nbb scripts/kotoba-tender-benchmark.cljs --runs 7 --date 2026-08-26-judah-quiet
 ```
 
 | Path | Role | Performance posture |
 |---|---|---|
 | Browser `actor-host.js` | **First-class** R2 | No JVM; engine = browser Wasm (~Node parity) |
 | `kototama.tender` (Chicory) | **Compat / CI** R1 | Per-instruction fuel — correctness over speed |
-| `kototama-component` (Wasmtime) | Component profile | Differential conformance; CLI ~40 ms/invoke on fact guest |
+| `kototama-component` (Wasmtime) | Component profile | Differential conformance; CLI wall per guest in tender.json |
 
-**Next:** quiet-host official tender run on judah; workerd comparison (Phase 2).
+**Next:** workerd comparison (Phase 2); drop JVM from hot path in production browser path.
 
 ---
 
