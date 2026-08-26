@@ -278,7 +278,7 @@
     (check "ledger has dispositions" (pos? (count by-coordinate)))
     (check "every disposition is known"
            (every? #{:structural :first-party-exists :gap-closed :gap-open
-                     :frozen-legacy :tooling}
+                     :gap-planned :host-boundary :frozen-legacy :tooling}
                    (map :disposition (:dependency-substitution/dispositions ledger))))
     (check "every entry has a coordinate, coordinates, or a pattern"
            (every? #(or (:coordinate %) (:coordinates %) (:pattern %))
