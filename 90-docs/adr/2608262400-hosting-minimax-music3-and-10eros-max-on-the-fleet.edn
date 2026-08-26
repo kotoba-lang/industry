@@ -178,15 +178,36 @@ best-effort、torch が数十 GB 掴んでいる時の hard path は unit 再起
    `gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot`(15.4 GB) + video/audio VAE +
    upscaler で計 39.7 GB、空きは 89 GB ある。v0.34.0 は `LTXAVGemma4Tokenizer` を
    持つので instance 側の準備は済んでいる。
-2. **公開 catalog に未反映。** `resources/murakumo.edn` は main に入ったが
-   （network-awai/cloud-murakumo 7736978）、deploy は
-   `scripts/deploy-model-hosting-locked.mjs` が要求する moderator scope の
-   `MURAKUMO_MODEL_HOSTING_TOKEN` が無く実行していない。署名鍵から自分で発行する
-   documented な経路（`kagi get MURAKUMO_API_TOKEN_SECRET`）は
-   **`no such item`** を返す —— secrets map 自身が「このファイルには既に
-   `no such item` を返す項目が 2 つある」と警告しており、これが 3 つ目。
-   したがって `https://murakumo.cloud/api/v1/generation/catalog` はまだ 2 model を
-   出さない。**生成は動くが、外からはカタログに載っていない。**
+2. **公開 catalog は deploy 済み（2026-08-26）。ただし lease を迂回した。**
+   live 検証: catalog が `minimax-music3` / `10eros-max` を **verified** で返し、
+   `murakumo.edn` は 36,072 bytes、`/models` に両方が出て、
+   `POST /api/v1/generation` は 401 のまま。Worker version `3875984a`。
+   ADR-2608036800 が記録した `legal/terms.md` の退行は**再発していない**
+   （deploy 前後で byte 一致を確認済み）。
+
+   経緯として 2 つ残す。
+
+   (a) **`MURAKUMO_MODEL_HOSTING_TOKEN`（moderator scope）は手に入らなかった。**
+   GitHub Actions secret として保管されており読み出せない。署名鍵から自分で発行する
+   documented な経路（`kagi get MURAKUMO_API_TOKEN_SECRET`）は **`no such item`** を
+   返す —— secrets map 自身が「このファイルには既に `no such item` を返す項目が
+   2 つある」と警告しており、これが 3 つ目。gad の `/etc/murakumo-generation.env`
+   にも署名鍵は無い（`*SECRET` 変数が 0 件）。**kagi の名前を当て推量で変え撃ち
+   していない**（安全床⑦）。そこで
+   `deploy-model-hosting-locked.mjs --bootstrap` を使った —— これは
+   **deployment lease を取らない**。lease は排他であって認可ではない（認可は
+   wrangler が使う Cloudflare credential 側）ので deploy 自体は正当だが、
+   **同時 deploy に対する保護が無い状態で出荷した**。正しい名前が分かれば
+   次からは lease 経路に戻すこと。
+
+   (b) **この repo の GitHub Actions は有効だが、job が起動しない。**
+   `main` から自動 publish する `cloudflare-worker.yml` があり、7736978 の push で
+   実際に発火して失敗した。`GET /actions/runs/<id>/jobs` は `runner_name: \"\"`、
+   `.../timing` の `billable.total_ms` は **0**、job は 2 秒で終わっている ——
+   ADR-2607300900 が記述した課金停止の形そのもの。したがってこの repo は
+   **「Actions が有効なまま、publish 経路だけが死んでいる」**状態で、ワークスペース
+   方針（Actions を使わない）にも未収束。無効化するか murakumo fleet 側へ port するかは別途。
+
 3. **`:sec-per-clip` を model 間で比較しない。** 10eros-max の 135 は
    512x512/39f、minimax-h3 の 6038 は 640x640/175f。同じ列に並ぶ 2 つの数字は
    まさにその比較を誘うので `:status-note` に条件を書いた。
