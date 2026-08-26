@@ -79,6 +79,53 @@
       (str/replace "/" ".")
       (str/replace "_" "-")))
 
+(defn- declared-dependencies
+  "The artifact names in a shadow-cljs.edn `:dependencies` vector.
+
+  Read textually, like `:source-paths`, and for the same reason: this
+  script does not evaluate the config.
+
+  It exists because the workspace contains repos that ship namespaces named
+  after well-known maven artifacts -- `kotoba-lang/dom-gpu` provides a
+  `re-frame.core`. When one of those names is unresolved, the workspace
+  index finds the local file and this script concludes the build is wired
+  wrong. Measured 2026-08-26 on cloud-itonami/app-otent: reported as
+  `the build stops at The required namespace is not available, so nothing
+  in this repo runs`, about a Worker that had just built with 0 warnings
+  and was passing 31 of 31 browser checks against its deployed URL.
+
+  The header above already says an unresolved namespace outside the
+  workspace is probably a maven dependency and must not be failed on. This
+  is the same rule for the case where a same-named file happens to exist
+  inside the workspace too -- there the local file is a coincidence, not
+  the provider."
+  [txt]
+  (when-let [i (str/index-of txt ":dependencies")]
+    (let [after (subs txt i)
+          open (str/index-of after "[")
+          close (str/index-of after "]\n")]
+      (when (and open close (< open close))
+        (set (map second (re-seq #"\[\s*([a-zA-Z0-9._/-]+)\s+\"" (subs after open))))))))
+
+(defn- provided-by-dependency?
+  "Does a declared :dependencies coordinate plausibly provide this namespace?
+
+  `re-frame` provides `re-frame.core`; `reagent` provides `reagent.dom`.
+  Matched on the first segment, and on the artifact name with any group
+  prefix stripped, so `org.clojure/core.async` covers `clojure.core.async`
+  as well as `core.async.impl.protocols`."
+  [deps ns-sym]
+  (when (seq deps)
+    (let [n (str ns-sym)
+          head (first (str/split n #"\."))]
+      (boolean
+       (some (fn [coord]
+               (let [artifact (last (str/split coord #"/"))]
+                 (or (= artifact head)
+                     (str/starts-with? n (str artifact "."))
+                     (str/starts-with? n (str (str/replace coord "/" ".") ".")))))
+             deps)))))
+
 (defn- source-paths
   "The :source-paths vector of a shadow-cljs.edn, read textually.
 
@@ -259,7 +306,8 @@
   this build never reaches. shadow-cljs compiles a closure, not a directory."
   [repo-dir shadow-file]
   (let [txt (slurp* shadow-file)
-        paths (source-paths txt)]
+        paths (source-paths txt)
+        deps (declared-dependencies txt)]
     (if (nil? paths)
       {:repo (.relative path root repo-dir)
        ;; the comment-STRIPPED text: `:source-paths` mentioned only in a comment
@@ -288,6 +336,12 @@
                   (cond
                     (contains? seen n) (recur q seen unres)
                     (provided? n) (recur q seen unres)
+                    ;; A namespace a declared :dependencies coordinate
+                    ;; provides is provided, whether or not a same-named
+                    ;; file also exists somewhere in the workspace. See
+                    ;; `declared-dependencies` for the measurement that put
+                    ;; this here.
+                    (provided-by-dependency? deps n) (recur q seen unres)
                     (nil? (index n))
                     ;; Not on this build's source-paths. If the workspace has it,
                     ;; keep walking THROUGH it -- otherwise the tool reports one
