@@ -160,6 +160,37 @@
    :evidence "SCANNED\t[1-9][0-9]*"
    :timeout-ms 300000
    :interval-ms 43200000}
+{:id :verify-fleet-malware-protection
+   :title "the fleet's malware protection, measured rather than read off its settings"
+   :why "2026-08-26, ADR-2608262300: having built a verdict plane whose whole point
+              is that a scan which could not run must not return a clean scan's
+              value, the same ADR admitted it had never measured what actually
+              protects the fleet. Measured: all six reachable nodes had
+              ConfigDataInstall=1, Gatekeeper enabled, SIP enabled and zero
+              third-party agents -- every setting correct -- while their XProtect
+              data sat at 5333..5346 and their last successful background update
+              check was 87 to 167 days old. The operator workstation was at 5356,
+              checked the previous day. A detector that reads the settings reports
+              6/6 green; the settings are what is true, and they are not the
+              question. Cannot be a fleet gate twice over: it needs ssh keys, which
+              invariant 3 keeps off the nodes, and nodes.edn, which no shipped tree
+              carries. The forced scan that fixed it took ten seconds per node and
+              moved every one to 5356, so nothing was broken -- the scheduled scan
+              simply had not run in three months, and only a measurement says so."
+   :argv ["nbb" "{{repo}}/scripts/verify-fleet-malware-protection.cljs" "--findings" "--root" "{{root}}"]
+   :cwd :root
+   :findings :protocol
+   :writes :none
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :measured "2026-08-26: 25s wall for 10 hosts (6 answered in ~1.5s each, 4 timed
+              out at the 5s ConnectTimeout). Exit checked in all three directions:
+              1 with findings, 2 when no node answers (prints SCANNED 0, which
+              fails the evidence regex above and is recorded :inconclusive rather
+              than clean), 2 when nodes.edn cannot be read. Remediation lives in
+              the same script behind an explicit --remediate and is never in this
+              argv."
+   :timeout-ms 180000
+   :interval-ms 43200000}
 {:id       :compliance-scope-boundary
    :title    "certification scope drawn around domains, cut through by one Worker"
    :why      "2026-08-23, ADR-2608231500: asked whether SOC 2 could be obtained for
