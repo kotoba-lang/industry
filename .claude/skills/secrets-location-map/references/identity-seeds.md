@@ -67,6 +67,15 @@
     `did:key:z6MkwF7M3TPYUvdNP5NtWfr6aA2xtr7dsETCwx26fnVamjQo`** なので、
     復元した seed からこの DID が derive されることを
     `scripts/verify_identity.cljs` で確認してから publish を再開する。
+  - **projection がいつから止まっているかも測った**: この端末で publish 管理簿は
+    `~/.gftd/worktrees/app-hyakka-resident/.resident/published.edn` の 1 本だけで、
+    **最終更新 2026-08-15 12:00 / 収録 100 file**（最後に publish された ledger は
+    2026-08-15T02:41）。main の ledger は 2026-08-27 時点で **362 file** なので、
+    **datom 面は 12 日分・262 file 遅れている**。
+    さらに、下の 2026-08-24 の記録が「退避済み」と書いている
+    `~/.gftd/hyakka-publish-published-v2.edn` は**この端末に存在しない** ——
+    290/291 file の re-publish が実際に完了したかどうかは、ここからは
+    **UNVERIFIED**（別端末で行われた可能性は残る）。
   - 消失の原因は未特定。**2 度目である以上、次も起きるとみなす** —— seed を
     kagi だけに置く運用そのものが単一障害点で、`kagi push`（cloud 永続化）か
     別端末への `device grant` のどちらかを取るまでこの節は閉じない。
