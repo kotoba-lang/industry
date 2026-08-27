@@ -393,19 +393,95 @@ Discrimination measured by breaking one thing at a time:
   the private-message padding is not checked    1 red
   restored                                       0
 
+## The ratchet tree landed (2026-08-27)
+
+mls.node, mls.tree-hash and mls.tree-ops: the node encodings, the tree hash
+and the resolution, and the three proposals that change the tree's shape.
+With those, the add and update proposals and a Commit's UpdatePath -- which
+refused by name -- go through. 76 tests / 47,141 assertions on both runtimes,
+against three more of the working group's corpora.
+
+**A codec corpus is not a semantic corpus.** The messages corpus is 300
+entries of structs another implementation serialised with random field
+values; nothing in it is cryptographically valid and none of it is meant to
+be. Decoding those bytes and re-encoding to the same bytes is agreement about
+the wire format and nothing more -- which is exactly the question a wire
+format raises and exactly not the question a tree raises. tree-validation, 98
+real trees with every node's hash and resolution, is a separate corpus and a
+separate set of tests, and the two counts are not added together.
+
+Four findings:
+
+**The corpus can miss the step that makes an operation distinctive.** Add is
+the only one of the three shape-changing proposals that does NOT blank the
+direct path -- it records the new leaf as unmerged instead. The working
+group's tree-operations corpus has two Add cases and neither reaches that
+step: one extends into an all-blank subtree, the other's blank leaf has no
+non-blank ancestor. Measured, before writing anything else: an implementation
+that blanks the path on Add passes that corpus with nothing red. The states
+had to come from tree-validation, which holds 63 trees where the leftmost
+blank leaf does sit under a non-blank ancestor -- and even there, the
+MUST-be-sorted rule for unmerged_leaves has no state anywhere in the corpus
+that tells the two orderings apart. That one case is constructed and labelled
+as constructed. **A passing corpus is evidence about what the corpus reaches,
+and finding out what it reaches is a separate measurement.**
+
+**A range check needs its accepting side tested too.** Epochs now go through
+a uint64 reader that refuses anything outside the range both runtimes hold
+exactly. The byte offsets in that check were off by two, so it would have
+refused valid epochs -- and a test that only asserted the too-big direction
+would have passed. It was caught by asserting the boundary from below as
+well. This is the mirror of the rule already in this workspace's CLAUDE.md
+about negative tests that pass for the wrong reason: **an over-strict check
+and a correct one produce the same output on the input a refusal test uses.**
+
+**A parser that throws is worse than one that refuses, and the corpus found
+it immediately.** Lifetime.not_after is routinely 2^64-1, which is what
+implementations actually put there. Reading it into a JVM long raises an
+uncaught ArithmeticException; reading it into a JavaScript number silently
+drops the low bits. The same read was reachable from decode-private-message
+with twelve bytes of peer-supplied input. Lifetime now keeps its two fields as
+eight-byte vectors -- nothing compares them, because the lifetime check is not
+implemented, and a number that cannot be trusted is a worse foundation for
+that check than bytes that can.
+
+**The workspace's own prose was wrong again, in the same shape as before.**
+mls.suite's docstring said no MLS suite here can sign, because ed25519 was
+JVM-only and there was no ECDSA. Both had stopped being true earlier in this
+same programme. It has been corrected in place, with the correction left
+visible: five of seven suites sign, Ed448 is the gap. This is the second time
+in this programme that a confident sentence about another repository's
+capability outlived the capability question it answered -- the first was
+CLAUDE.md's JVM-only list. Prose about what another repository can do goes
+stale silently and goes stale with an authoritative tone.
+
+Discrimination measured by breaking one thing at a time:
+
+  the leaf hash input uses the node index          3095 red
+  LeafNodeTBS omits the group id and leaf index     721 red
+  Add blanks the direct path                        169 red
+  the ratchet_tree is not extended after decoding   102 red
+  it is extended to odd, not to a power of two      102 red
+  trailing blanks are kept when encoding             51 red
+  the resolution lists unmerged by leaf index        21 red
+  Update does not blank the path                      2 red
+  Remove does not truncate the tree                   2 red
+  unmerged_leaves is appended to, not sorted into     2 red
+  the uint64 range check reads only the first byte    1 red
+  restored                                            0
+
 ## What remains, in dependency order
 
-  1. MLS ratchet-tree nodes  LeafNode, KeyPackage, UpdatePath. The next
-                             real dependency for the same reason framing
-                             was: add and update proposals and a Commit's
-                             UpdatePath all carry them, and every
-                             remaining corpus is written in terms of a
-                             tree with real nodes in it.
-  2. MLS, after that         tree hashes, parent hashes, TreeKEM, Welcome.
+  1. MLS parent hashes       What makes a tree authenticated rather than
+                             merely agreed on: the tree hash says the group
+                             holds the same tree, the parent hash says each
+                             node's key was put there by someone entitled to.
+                             Everything it needs is now here.
+  2. MLS, after that         TreeKEM and Welcome.
   3. Ed448                   MLS suites 4 and 6 name it and nothing here
-                             implements it. The other five suites sign,
-                             so this is not a prerequisite for MLS -- it
-                             is two of seven suites.
+                             implements it. The other five suites sign, so
+                             this is not a prerequisite for MLS -- it is two
+                             of seven suites.
 
 ## What this does not claim
 
