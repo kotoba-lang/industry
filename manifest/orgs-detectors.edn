@@ -2153,4 +2153,40 @@
                      are indexed pages, and the locale split is a crawler-facing
                      decision, not a routing one."
                :clears-when "the itonami site stops needing crawlable per-locale
-                             markup, or its app surfaces move out of the site repo."}}}]}
+                             markup, or its app surfaces move out of the site repo."}}}
+  {:id       :verify-model-alias-admission
+   :title    "a model alias resolving to a name the app will not admit"
+   :why      "2026-08-27: cloud-itonami Bots ran at 37.3% completion for a day
+              (150 turns, 94 failed; 25 of the last 50 resident runs `model-mismatch`)
+              while the CLI, the server and the gateway all looked healthy -- because
+              they were. `murakumo-main` is an ALIAS, the fleet had repointed it, and
+              `cloud-itonami-app` still admitted only \"Qwen3.8-27B-Q4_K_M.gguf\". Every
+              turn generated fine over HTTP 200 and was then thrown away by
+              `assert-response-model!`. Nothing said so anywhere a person would look;
+              it surfaced only because someone asked whether the Bots were stable.
+              The alias has two slots that LABEL DIFFERENTLY -- five probes on
+              2026-08-27 06:05Z returned both `murakumo-main` and
+              `qwen3.8-27b-throughput-b70` -- which is why some turns completed rather
+              than none, and why one probe is worthless here: it reports clean half the
+              time while half of production is refused. The fix enumerated the measured
+              names, which is a floor and not a fix; the next redeploy that moves the
+              suffix reproduces the outage exactly. This detector is what makes that
+              cost one session-start line instead of a day."
+   :argv     ["nbb" "{{repo}}/scripts/verify-model-alias-admission.cljs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 21600000                 ; 6h -- it spends 5 inference calls per run
+   :timeout-ms  300000                   ; 5m -- measured 75s, and each probe caps at 90s
+   :writes   :none
+   :measured "2026-08-27 on this machine: 75s at load 20.71, exit 0,
+              `SCANNED\t1 alias\tmurakumo-main\tprobes=5\tserved=murakumo-main,qwen3.8-27b-throughput-b70`,
+              0 findings. Both directions were watched against the LIVE gateway, not
+              only in --self-test: `--accepted murakumo-main` (the set that was in
+              place during the outage) exits 1 and names
+              `qwen3.8-27b-throughput-b70` as refused, and the unmodified run exits 0.
+              It refuses rather than reporting clean when it cannot measure -- no
+              accepted set, no API key, or no probe naming a model all exit 2. That
+              path fired for real on its first live run, when a `js->clj` on the
+              Promise.all result made every status read nil against a gateway that had
+              answered fine."}]}
