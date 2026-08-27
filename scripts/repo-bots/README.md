@@ -103,8 +103,59 @@ fixture 作りが失敗していて（空の `test/` は git が追跡しない�
 no-op になった）**壊せていないのに緑を「噛まなかった」と読みかけた** —— 壊した
 ものと報告されたものが一致することを確かめること。
 
+## murakumo を繋ぐ側（提案は模型・判定は gate）
+
+```bash
+nbb scripts/repo-bots/propose.cljs --batch 8      # 波で草稿を作る（常駐用）
+nbb scripts/repo-bots/propose.cljs --bot <id>     # 1 体だけ
+nbb scripts/repo-bots/propose.cljs --dry-run      # 模型を呼ばず証拠の量だけ見る
+nbb scripts/repo-bots/propose.cljs --bot <id> --check-draft <file>   # gate だけ通す
+```
+
+    tick（決定論） → 証拠（決定論） → 模型が起草 → gate（決定論） → 草稿
+
+**測定に模型は入らない。** どの repo のどの床が割れているかは tick が決めてあり、
+模型がするのはその 1 件に対する文章の起草だけ。受理を決めるのは gate:
+
+1. 床を実際に越えるか（README なら 200 byte 以上）
+2. 挙げたパスが**実在するか** —— 1 つでも実在しなければ却下
+3. 挙げた URL のホストが証拠に在るか（`github.com/<org>/<name>` だけは許す）
+4. 雛形の痕跡（TODO / FIXME / placeholder / lorem）が無いか
+5. repo 名を名乗っているか
+
+却下された草稿も `.rejected.md` として残す。**何を却下したか読めないと、gate が
+効いているのか単に呼べていないのか区別できない。**
+
+**5 つとも、その理由だけで落ちることを実測した**（2026-08-27。受理された実物の
+草稿に対し、実在しないパスを 1 つ混ぜる / 証拠に無いホストの URL を足す / TODO を
+足す / 120 byte に切る、をそれぞれ当てて、**それぞれ自分の理由で**却下された）。
+
+### 模型に訊く前に止める 2 つの床
+
+- **証拠 400 byte 未満なら呼ばない。** 空の repo に「何が足りないか」を訊けば、
+  模型は流暢に捏造する。gate で落とせば済む話ではない —— 落ちると分かっている
+  呼び出しに fleet の時間を使い、receipt に却下が積み上がって本物の却下が埋もれる。
+  実測: 最初の波 8 件のうち **6 件がこれ**（`cloud-itonami/app-*` の空 scaffold）。
+- **未着地の草稿が 40 本を超えたら呼ばない**（`REPO_BOT_PENDING_CAP`）。書く側は
+  1 時間に 8 本、着地は 1 反復 1 件なので、上限が無ければ数百本の未読の草稿が
+  積み上がり「提案は出ている」という見た目だけが残る。上限に当たったとき
+  **詰まっているのは書く側ではない。**
+
+### モデル名を焼かない
+
+alias `murakumo-main` だけを送る（ADR-2607173100）。receipt には呼んだ時点の
+`alias-for` を記録するが、**次も同じ実体だとは仮定しない**。endpoint は
+`https://api.murakumo.cloud`（`MURAKUMO_API_BASE` で上書き可）。
+実測 2026-08-27: 認証不要、1 提案あたり 1,400〜1,900 token、20〜30 秒。
+
 ## 動かし続ける
 
-`scripts/com.gftd.repo-bots-tick.plist` を `~/Library/LaunchAgents/` に置いて
-`launchctl load`。既定は 1 時間ごとに 200 体なので、全 4,186 体を一周するのに
-おおよそ 21 時間かかる。
+3 つの LaunchAgent を `~/Library/LaunchAgents/` に置いて `launchctl load`:
+
+| plist | 間隔 | 何をするか |
+|---|---|---|
+| `com.gftd.repo-bots-tick` | 1h | 200 体を測る。全 4,186 体の一周におよそ 21 時間 |
+| `com.gftd.repo-bot-propose` | 1h | 8 本まで草稿を作る（滞留 40 本で自動停止） |
+| `com.gftd.repo-bot-drain` | 4h | 草稿を 1 件だけ着地させる（候補が無ければモデルを起こさない） |
+
+止めるときは `launchctl unload`。測る側だけ残して直す側を止める、もできる。

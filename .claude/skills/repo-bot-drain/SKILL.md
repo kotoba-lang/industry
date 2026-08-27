@@ -59,6 +59,26 @@ gh api repos/<org>/<name>/compare/<pin>...<head> --jq '{status, ahead_by, behind
 
 ### `:readme`（README.md が無い / 200 byte 未満）
 
+**まず、murakumo が書いた草稿が在るか見る。**
+
+```bash
+ls ~/.gftd/repo-bots/proposals/<org>__<name>.md          # 受理された草稿
+cat ~/.gftd/repo-bots/proposals/<org>__<name>.receipt.edn # 何が書いたか・token 数
+```
+
+草稿は `scripts/repo-bots/propose.cljs` が **決定論的に集めた証拠だけ**を渡して
+書かせ、**決定論的な gate**（実在しないパスを挙げていないか / 証拠に無いホストの
+URL が無いか / 雛形の痕跡が無いか / 床を越えているか / repo 名を名乗っているか）を
+通ったものだけが `.md` として残っている。却下された草稿は `.rejected.md` に在る。
+
+**草稿は下書きであって正解ではない。** 中身を読んで直す。直したら gate に通し直す:
+
+```bash
+nbb scripts/repo-bots/propose.cljs --bot <org>/<name> --check-draft <file>
+```
+
+草稿が無い場合（`INSUFFICIENT-EVIDENCE` で模型を呼ばなかった場合を含む）は自分で書く。
+
 **中身を読んでから書く。** 名前と ISIC 番号から推測した README は、この workspace が
 一番嫌う種類の嘘になる（ADR-2608039980 の「索引に無いことは不在の証拠にならない」の
 裏返しで、**中身を見ずに書いた索引は誤った答えを出す索引**になる）。
@@ -68,7 +88,10 @@ gh api repos/<org>/<name>/compare/<pin>...<head> --jq '{status, ahead_by, behind
   併せて `manifest/concept-vocabulary.edn` への登録が要るか確かめる
 - 最近接 repo との境界を 1 文書く（同一面・同一主題の重複を作らないため）
 - **空の repo に README だけ書かない。** 中身が無いなら、この finding は
-  `:readme` ではなく「その repo が空である」ことの報告。ADR に書いて次へ
+  `:readme` ではなく「その repo が空である」ことの報告。ADR に書いて次へ。
+  tick の `EMPTY-REPO` 行がこれを数えている（実測 2026-08-27: `:readme` 411 件の
+  うち **154 件は README もコードも無い**）。propose 側も証拠が 400 byte 未満なら
+  模型を呼ばず `INSUFFICIENT-EVIDENCE` を返す
 
 ### `:test-signal`（コードが在るのに test が無い）
 
