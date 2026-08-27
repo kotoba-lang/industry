@@ -41,8 +41,9 @@
        "  projects:\n"
        "    - name: a\n      remote: fixture\n      revision: " a-sha
        "\n      path: orgs/fixture/a\n      groups: [fixture]\n"
-       "    - name: b\n      remote: fixture\n      revision: " b-sha
-       "\n      path: orgs/fixture/b\n      groups: [fixture]\n\n"
+       "    - name: fixture-b\n      remote: fixture\n      repo-path: b\n      revision: " b-sha
+       "\n      path: orgs/fixture/b\n      groups: [fixture]\n"
+       "      submodules:\n        - path: vendor/example\n\n"
        "  self:\n    path: manifest\n    west-commands: west-commands.yml\n"))
 
 (defn revision [content name]
@@ -76,6 +77,13 @@
           (assert! (zero? (:exit checked))
                    "--check depended on arbitrary child HEAD"
                    checked))
+        (let [content (slurp west)]
+          (assert! (str/includes? content "    - name: fixture-b\n")
+                   "canonical check renamed an existing west project"
+                   {:content content})
+          (assert! (str/includes? content "      submodules:\n        - path: vendor/example\n")
+                   "canonical check dropped an explicit submodule list"
+                   {:content content}))
 
         ;; An explicit --entry remains the sole checkout-backed pin workflow.
         (let [advanced (run! fixture nbb "--classpath" root generator
@@ -85,9 +93,9 @@
           (assert! (= a-new (revision content "a"))
                    "--entry did not take the target checkout HEAD"
                    {:expected a-new :actual (revision content "a")})
-          (assert! (= b-old (revision content "b"))
+          (assert! (= b-old (revision content "fixture-b"))
                    "--entry changed an unrelated pin"
-                   {:expected b-old :actual (revision content "b")}))
+                   {:expected b-old :actual (revision content "fixture-b")}))
 
         ;; Moving the checkout backwards after the advance must neither regress
         ;; the pin nor create a canonical false stale.

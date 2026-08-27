@@ -76,6 +76,11 @@
             (swap! current assoc :path path))
           (when-let [rid (second (re-find #"^\s*rad-rid:\s*(\S+)" line))]
             (swap! current assoc :rad-rid rid))
+          (when (re-find #"^\s*submodules:\s*$" line)
+            (swap! current assoc :submodule-paths []))
+          (when-let [submodule-path (and (contains? @current :submodule-paths)
+                                         (second (re-find #"^\s{8}- path:\s*(\S+)" line)))]
+            (swap! current update :submodule-paths conj submodule-path))
           (when (re-find #"^\s*submodules:\s*true\s*$" line)
             (swap! current assoc :submodules true))
           (when-let [path (:path @current)]
@@ -148,7 +153,10 @@
 
 (defn project-entry [path dup-names working-entry-names]
   (let [existing (get existing-projects path)
-        wname   (west-name path dup-names)
+        ;; A committed west name is a public CLI identity. A stale candidate
+        ;; can temporarily alter basename duplication without this project
+        ;; moving, so deduplicate only names for genuinely new entries.
+        wname   (or (:name existing) (west-name path dup-names))
         ;; Full render / --check is a projection check, not an implicit pin
         ;; advance.  Reading every locally-present child HEAD made identical
         ;; superproject commits render differently in different clones and a
@@ -167,11 +175,14 @@
                   dl   [(:group dl)]
                   arch [(:group arch "archived")]
                   :else [(org-of path)])
+        existing-subs (:submodule-paths existing)
         recurse (or (contains? (:force-recurse-submodules cfg) path)
                     (nested? path)
-                    (:submodules existing))
+                    (:submodules existing)
+                    (seq existing-subs))
         excl    (get (:submodule-excludes cfg) path)
-        subs    (when (and recurse (seq excl)) (submodule-paths path excl))
+        subs    (or (when (and recurse (seq excl)) (submodule-paths path excl))
+                    existing-subs)
         base    (name-of path)]
     (when sha
       (str "    - name: " wname "\n"
