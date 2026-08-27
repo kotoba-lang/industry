@@ -163,6 +163,22 @@ catch that from inside a group. It is what an interop corpus is for, and it is
 the same shape as the two-sided-test finding above, one level up: a whole
 implementation agreeing with itself is not evidence either.
 
+**The MLS secret tree** -- RFC 9420 §9 and §6.3.2. 21 trees, 287 leaves, both
+ratchets, generations 0 and 15. 20,892 assertions on both runtimes.
+
+Two of its breaks are worth carrying. Siblings in the secret tree are told
+apart by the **context**, not the label: both children derive with the label
+tree, and what differs is left versus right. Swapping the roles of label and
+context makes siblings equal, so every member of the group would hold every
+other member's keys -- 2,240 red either way, and identical in the summary
+line to swapping left and right themselves.
+
+And generation 15 is why a corpus with two entries beats one with one. A
+ratchet is a hash chain, so an implementation that used the generation only as
+a context -- deriving generation 15 straight from the root -- agrees at
+generation 0 and diverges everywhere after. A corpus that published only
+generation 0 would have called it correct.
+
 ### A justification can be wrong in a way the code is not
 
 MLS-Exporter's label in the corpus is a 64-character string of hex digits. It
@@ -332,10 +348,10 @@ the consumers could only be built against a suite no deployed peer offers.
                              primitives' own corpora and say so.
                              DeriveKeyPair on the NIST curves also needs
                              rejection sampling, which X25519 does not.
-  2. MLS, the rest of it     tree-math, crypto-basics, signatures and the
-                             key schedule landed (below). Still to come,
-                             roughly in the order the corpus tests them:
-                             secret tree, transcript hashes, PSK secrets,
+  2. MLS, the rest of it     tree-math, crypto-basics, signatures, the key
+                             schedule and the secret tree landed (below).
+                             Still to come, roughly in the order the corpus
+                             tests them: transcript hashes, PSK secrets,
                              tree and parent hashes, TreeKEM, framing,
                              Welcome.
   3. Ed448                   MLS suites 4 and 6 name it and nothing here
