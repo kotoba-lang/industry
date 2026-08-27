@@ -165,6 +165,28 @@ METI 系以外の省庁ページは通る。
 gate 側で同じことをするのは「bot 検出の回避」であり安全床④に当たるので、**しない**。
 どちらに揃えるかはオーナーの判断であって gate の判断ではないので、ここに書いて残す。
 
+## 初回稼働（2026-08-27 23:40、実測）
+
+`itonami-coverage-scout` が予定どおり発火し、**1 回目で PR を出して merge まで通った。**
+
+| | |
+|---|---|
+| 実行 | 23:40:23 開始 → 00:45 完了（約 65 分）。incidents 0 |
+| branch | `bot/coverage-scout-20260827-2355`（23:55 作成） |
+| PR | **#2590**、00:40 作成 → **4a5e1c93** で merge |
+| 内容 | COFOG **022 民間防衛 → bousai.go.jp**、**082 文化サービス → bunka.go.jp** |
+
+**PR body を証拠として採らず、独立に検証してから merge した。** gate を自分で
+走らせ直すと両方の authority を再取得して **bot が報告したのと同じ byte 数**を返した
+（bousai 200/37412、bunka 200/38409、exit 0）。register は 3 map を読み、
+datascript に transact して **3 entity**（091 / 022 / 082）になることも確認した。
+
+**bot は規則どおりに振る舞った**: 測定された gap 表からしか選ばず（022 も 082 も
+COVERAGE SIGNAL に載っていた）、分類ページではなく**当局**を引き（内閣府防災・文化庁）、
+既存 entry を編集せず追記し、`main` に push しなかった。
+
+`itonami-ingest-scout` は 2026-08-28 11:40 が初回。
+
 ## Consequences
 
 - coverage register は**追記式ではない**（ADR-2607257000）。gap が閉じたら entry を
