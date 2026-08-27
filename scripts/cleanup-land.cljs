@@ -262,6 +262,67 @@
 (defn- annex? [dir]
   (or (.exists (io/file dir ".git" "annex")) (.exists (io/file dir ".datalad"))))
 
+(defn- send-outcome
+  "`git push` の結果を、**理由まで含めて**返す。
+
+  旧実装は結果を `{:keys [exit]}` だけで受け、**`:err` を捨てていた**。
+  ADR-2608136000 の 3 問目（受け取ったエラー本文を捨てていないか）そのもので、
+  実測 2026-08-27 の 6 件の `push 失敗` は **3 つの別の原因**が 1 文言に潰れていた:
+
+    non-fast-forward  branch が実際に diverge している（bonsai / nekko）
+                      → force は禁止。別名で保全するしかない
+    workflow-scope    `refusing to allow an OAuth App to create or update
+                      workflow ... without workflow scope`（torch / club-shinshi）
+                      → CLAUDE.md のとおり **HTTPS remote にだけ効く制約**で、
+                        同じ repo の SSH URL に送れば通る
+    transient         TLS handshake timeout 等。再試行で通る
+
+  最初の 2 つは対処が正反対（前者は絶対に送ってはいけない / 後者は送れる）なので、
+  同じ文言にしてはならない。戻り値は `[:ok <stderr>]` か `[:failed <kind> <reason>]`。"
+  [dir remote branch flags]
+  (let [{:keys [exit err]} (apply sh (concat ["git" "-C" dir "push"] flags [remote branch]))
+        e (str/trim (str err))]
+    (if (zero? exit)
+      [:ok e]
+      [:failed
+       (cond (re-find #"without .?workflow.? scope" e)            :workflow-scope
+             (re-find #"non-fast-forward|behind its remote" e)    :non-fast-forward
+             (re-find #"timeout|Could not resolve|Connection reset|TLS" e) :transient
+             :else :other)
+       (or (->> (str/split-lines e)
+                (filter #(re-find #"remote rejected|! \[rejected\]|^error:|^fatal:" %))
+                first (#(some-> % str/trim)) not-empty)
+           (first (remove str/blank? (str/split-lines e)))
+           "（stderr 空）")])))
+
+(defn- preserve-branch!
+  "branch を remote に保全する。成功判定は exit ではなく **ls-remote で実測する**。
+
+  実測 2026-08-27: 素朴な成否判定は `->` を含む拒否行にも一致してしまい、
+  **拒否された 3 件を成功として印字した**（同じ日に私自身がやった）。
+  唯一の証拠は remote 側の tip が local と一致することである。
+
+  `workflow-scope` で弾かれたときだけ、同じ repo の SSH URL へ送り直す
+  （CLAUDE.md: OAuth scope が効くのは HTTPS remote への push だけ。remote 設定は
+  書き換えない — 送り先を明示するだけ）。それ以外は**再試行しない** ——
+  non-fast-forward を通す道は force しかなく、それは禁止されている。"
+  [dir remote branch slug flags]
+  (let [local (some-> (gitc dir "rev-parse" branch) str/trim)
+        landed? (fn [r]
+                  (= local (some-> (gitc dir "ls-remote" "--heads" r (str "refs/heads/" branch))
+                                   str/trim (str/split #"\s+") first)))
+        [st kind reason] (send-outcome dir remote branch flags)]
+    (cond
+      (and (= st :ok) (landed? remote)) [:ok nil]
+      (= kind :workflow-scope)
+      (let [ssh (str "git@github.com:" slug ".git")
+            [st2 _ reason2] (send-outcome dir ssh branch flags)]
+        (if (and (= st2 :ok) (landed? ssh))
+          [:ok "SSH 経由（HTTPS は workflow scope で拒否）"]
+          [:failed (str "workflow-scope、SSH でも不可: " reason2)]))
+      (= st :ok) [:failed "exit 0 だが remote に tip が無い"]
+      :else [:failed (str (name kind) ": " reason)])))
+
 (def primary-remote
   "この repo の upstream remote 名。**`origin` 決め打ちにしてはいけない。**
 
@@ -280,8 +341,23 @@
   (memoize
    (fn [dir]
      (let [rs (->> (str/split-lines (or (gitc dir "remote") ""))
-                   (map str/trim) (remove str/blank?) vec)]
-       (cond (some #{"origin"} rs) "origin"
+                   (map str/trim) (remove str/blank?) vec)
+           github? (fn [r] (some-> (gitc dir "remote" "get-url" r)
+                                   (->> (re-find #"github\.com"))))
+           gh (filterv github? rs)]
+       ;; **GitHub を指す remote だけを候補にする。** git-annex の special remote
+       ;; （`b2` / `s3` …）は `git remote` に並ぶが git remote ではないので、
+       ;; ls-remote も push も通らない。名前だけで選ぶと、annex を使う repo で
+       ;; slug が nil に落ち、この docstring が警告しているとおり `(no-remote)`
+       ;; として **静かに全件スキップ**される。実測 2026-08-27:
+       ;; `kotoba-lang/newsfeed` の remote は `b2` と `kotoba-lang` の 2 つで、
+       ;; 旧実装は `origin` が無いので先頭の `b2` を選び、この repo に在った
+       ;; `rescue/west-detached-20260812`（この機械にしか無い branch）は
+       ;; 1 行も報告されないまま処理から落ちていた。
+       (cond (some #{"origin"} gh) "origin"
+             (seq gh)              (first gh)
+             ;; GitHub remote が1つも無いときだけ従来どおり（挙動を狭めない）
+             (some #{"origin"} rs) "origin"
              (seq rs)              (first rs))))))
 
 (defn- repo-slug
@@ -1562,12 +1638,18 @@
                         (some-> (gitc dir "rev-list" "--count" (str remote "/" b ".." b)) str/trim parse-long))]
             (cond
               (not has-remote?)
-              (let [{:keys [exit]} (sh "git" "-C" dir "push" "-u" remote b)]
-                (println (format "    %-46s %s" b (if (zero? exit) "pushed (新規)" "push 失敗"))))
+              (let [[st note] (preserve-branch! dir remote b slug ["-u"])]
+                (println (format "    %-46s %s" b
+                                 (if (= st :ok)
+                                   (str "pushed (新規)" (when note (str " — " note)))
+                                   (str "push 失敗 — " note)))))
 
               (and ahead (pos? ahead))
-              (let [{:keys [exit]} (sh "git" "-C" dir "push" remote b)]
-                (println (format "    %-46s %s" b (if (zero? exit) (str "pushed (+" ahead ")") "push 失敗"))))
+              (let [[st note] (preserve-branch! dir remote b slug [])]
+                (println (format "    %-46s %s" b
+                                 (if (= st :ok)
+                                   (str "pushed (+" ahead ")" (when note (str " — " note)))
+                                   (str "push 失敗 — " note)))))
 
               :else
               (if-let [url (existing-pr slug b)]
