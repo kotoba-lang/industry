@@ -257,6 +257,43 @@
     {:cleared (count (filter #(= :cleared (:event %)) recent))
      :broke (count (filter #(= :broke (:event %)) recent))}))
 
+(defn- roster-drift
+  "west.yml に在って名簿に無い repo の数。名簿は生成物なので west.yml が進むと
+  黙って古くなり、**新しく登録された repo には bot が居ないまま**になる。
+  それは『床を割っていない』と同じ顔をするので、tick 自身が言う。
+
+  archived / datalad は名簿から意図的に外してあるので、ここでも外す —— さもないと
+  常に 61 件のずれを報告し続け、**本物のずれが平常値に埋もれる**。
+
+  読めなければ nil（0 ではない）—— 測れなかったことを『ずれ無し』に畳まない。"
+  [registry]
+  (try
+    (let [lines (str/split-lines (.readFileSync fs (.join path top "manifest" "west.yml") "utf8"))
+          eligible
+          (loop [ls lines cur nil out #{}]
+            (if-let [line (first ls)]
+              (let [flush (fn [o]
+                            (if (and cur (:path cur)
+                                     (not (some #{"archived" "datalad"} (:groups cur))))
+                              (conj o (:path cur))
+                              o))]
+                (cond
+                  (re-find #"^    - name: \S+$" line) (recur (rest ls) {} (flush out))
+                  (and cur (re-find #"^      path: (\S+)$" line))
+                  (recur (rest ls) (assoc cur :path (second (re-find #"^      path: (\S+)$" line))) out)
+                  (and cur (re-find #"^      groups: \[(.*)\]$" line))
+                  (recur (rest ls)
+                         (assoc cur :groups (map str/trim (str/split (second (re-find #"^      groups: \[(.*)\]$" line)) #",")))
+                         out)
+                  :else (recur (rest ls) cur out)))
+              (if (and cur (:path cur)
+                       (not (some #{"archived" "datalad"} (:groups cur))))
+                (conj out (:path cur))
+                out)))
+          known (set (map :bot/repo registry))]
+      (count (remove known eligible)))
+    (catch :default _ nil)))
+
 (defn- report! [registry state]
   (let [bots (:bots state)
         ids (set (map :bot/id registry))
@@ -275,6 +312,12 @@
         unmeasured (- ticked measured)
         led (read-ledger)]
     (println (str "ROSTER\t" roster "\tbots"))
+    (let [d (roster-drift registry)]
+      (cond
+        (nil? d) (println "ROSTER-DRIFT\tUNMEASURED —— west.yml が読めない")
+        (pos? d) (println (str "ROSTER-DRIFT\t" d
+                              " 件が west.yml に在って名簿に無い"
+                              "\t再生成: nbb scripts/repo-bots/gen-registry.cljs"))))
     (println (str "TICKED\t" ticked "\t(never " never ")"
                   (when (pos? orphans) (str "\tORPHAN " orphans " —— 名簿から消えた repo の state 行"))))
     (println (str "MEASURED\t" measured "\tUNMEASURED\t" unmeasured))
