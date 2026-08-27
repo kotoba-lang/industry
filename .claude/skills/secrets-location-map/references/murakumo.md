@@ -2,6 +2,43 @@
 
 > **同名で別物が多い面。** どの Worker のどの gate かを必ず確認すること。
 
+## murakumo.cloud（Worker `murakumo-cloud`）mk1 第2検証鍵 (2026-08-27)
+
+- **`MURAKUMO_CLOUD_SITE_TOKEN_SECRET_2`（kagi vault、compartment `network-awai`）**
+  —— サイト Worker `murakumo-cloud`（= `murakumo.cloud`）の env
+  `MURAKUMO_TOKEN_SECRET_2` と同値。`/api/v1/*` の mk1 capability token を
+  検証する **optional な第2鍵**で、primary（`MURAKUMO_TOKEN_SECRET`）は
+  読み戻せないまま健在。**これは rotation ではなく追加なので、既発行の
+  トークンは 1 つも無効になっていない。**
+  取得: `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get MURAKUMO_CLOUD_SITE_TOKEN_SECRET_2`
+
+- **なぜ item 名に worker 名を入れたか。** このファイル冒頭の警告どおり
+  `MURAKUMO_TOKEN_SECRET` は **3 つの Worker が別々の値で持っている**
+  （`murakumo-cloud` / `local-murakumo` / `murakumo-generation-proxy`）。
+  ⚠ 実測 2026-08-27、**env 名で vault を引いて `no such item` を受け取り、
+  それを「トークンを発行できない」と読んだ**。実際には発行経路
+  （`clojure -M:token issue`）は最初から在り、足りなかったのは
+  「どの Worker の鍵か」を名前で区別することだけだった。この誤読で
+  deploy lease を 4 回諦めている。
+
+- **発行**（env は要らない。CLI が kagi から読む）:
+  ```
+  cd orgs/network-awai/cloud-murakumo
+  clojure -M:token issue --scope model-hosting-moderate --ttl 900
+  ```
+  `scripts/deploy-model-hosting-locked.mjs` は
+  `MURAKUMO_MODEL_HOSTING_TOKEN` が無ければ**自分でこれを叩く**。
+
+- ⚠ **subject は DID でなければならない。** `model-hosting-access/subject` は
+  `did:key:` / `did:web:` 以外を nil にするので、非 DID で発行したトークンは
+  **署名は正しいのに DID 判定のあるゲートを必ず落ちる**（403 の理由が
+  読み取れない形で）。CLI は既定を `did:web:murakumo.cloud` にし、DID を
+  要する scope に非 DID を渡したら**発行せずに落とす**。
+
+- live 検証（2026-08-27）: 発行したトークンで
+  `GET /api/v1/model-hosting/operations/deployment-lease` が **200**、
+  誤鍵で署名した対照は **403**。
+
 ## api.murakumo.cloud mk1 capability-token 署名鍵 (ADR-2608011400、2026-08-01)
 
 - **`MURAKUMO_API_TOKEN_SECRET`（kagi vault、compartment `network-awai`）** —
