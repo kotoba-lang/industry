@@ -1,0 +1,41 @@
+[{:adr/id "adr-2608271800-kotoba-external-trust-adapters"
+  :adr/title "Kotoba external trust adapters: EAS, Human Passport, and ERC-8004"
+  :adr/status "accepted"
+  :adr/date "2026-08-27"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/related ["adr-2608039950-ninsho-one-authority-many-apexes"]
+  :adr/body "# Kotoba external trust adapters: EAS, Human Passport, and ERC-8004
+
+## Context
+
+Kotoba already had portable subjects, evidence, attestations, causal identity epochs, and scoped trust claims. Sekisho already converted verified evidence into monotonic assurance tiers. It did not have current, protocol-specific verification for Human Passport or EAS. Etzhayyim contained a historical private-chain, monolithic `ERC-8004-shaped` contract, but the current draft ERC-8004 defines separate Identity, Reputation, and Validation registries. Treating the historical ABI as current conformance would be false.
+
+## Decision
+
+1. External protocols enter through `kotoba-lang/identity`, not through a new universal trust service. Host implementations own network access, pinned RPC, ABI decoding, and document retrieval. Pure adapters verify provenance and normalize portable records.
+2. EAS records require an explicit `eip155` coordinate, EAS and Schema Registry addresses, non-empty schema and attester allowlists, lifecycle checks, and a caller-supplied current time. On-chain existence alone never means Kotoba trusts the claim.
+3. Human Passport composes the EAS boundary and pins the current score schema, scorer ID, local minimum, policy CID, and subject binding. The adapter recomputes passing, keeps the source score only as evidence provenance, and emits a scoped `[:identity :sybil-resistance]` claim. Score attestations are treated as stale after 90 days even when EAS has no explicit expiration.
+4. Sekisho accepts the normalized `:evidence/humanity-verified` item as one way to reach `:attested`, only after contactability and a passkey root. It cannot satisfy `:identified`; document, liveness, and face-match requirements remain.
+5. Current draft ERC-8004 agents become `:agent` identity subjects. Registration is bound to the configured Identity Registry. Reputation and validation claims require non-empty client and validator allowlists and explicit thresholds. Below-threshold results are refusals, not trust claims. The `agent` execution-contract repo remains out of scope.
+6. `persist-trust-bundle!` validates and writes the subject, evidence, attestations, and causal trust claims in one ledger transaction.
+7. The historical Etzhayyim monolithic contract remains legacy evidence only. It is not advertised as current ERC-8004 compatible. Its public RPC returned Cloudflare tunnel error 1033 on 2026-08-27, so current live chain state is UNVERIFIED. No chain deployment or migration is claimed by this slice.
+
+## Trust boundaries
+
+- Human Passport is Sybil-resistance evidence, not legal identity, KYC, authorization, or a universal scalar score.
+- EAS is an attestation transport and registry, not an ambient authority.
+- ERC-8004 reputation is meaningful only relative to the selected client set; validation is meaningful only relative to the selected validator set and policy.
+- Every normalized record stays `:identity/non-adjudicating true`; final authorization remains with the relevant Kotoba authority.
+
+## Verification
+
+Identity contract tests cover untrusted schema/attester, revocation, expiration, future time, Human Passport scorer/threshold/90-day freshness, ERC-8004 registry binding, inactive registration, missing allowlists, threshold refusals, successful scoped claims, and atomic ledger persistence. Sekisho JVM and ClojureScript tests cover tier ordering, non-identification, and 90-day expiry.
+
+## References
+
+- https://docs.passport.human.tech/building-with-passport/stamps/introduction
+- https://docs.passport.human.tech/building-with-passport/stamps/smart-contracts/attestation-schema
+- https://docs.passport.human.tech/building-with-passport/stamps/smart-contracts/onchain-expirations
+- https://docs.attest.org/docs/core--concepts/attestations
+- https://eips.ethereum.org/EIPS/eip-8004"}]
