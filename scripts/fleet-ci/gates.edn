@@ -266,7 +266,7 @@
   ;; dependency the classpath names.
   {:name "io-ipld-car" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs"
    :ship-git-deps true :cd true}
-  ;; kotobase-query は既に 2 つ gate を持つ（下の :jvm-test と、:id 付きの
+  ;; ayatori（旧 kotobase-query）は既に 2 つ gate を持つ（下の :jvm-test と、:id 付きの
   ;; nbb-cross-runtime-query）。ADR-2608189300 の `kotobase.query.agent` を
   ;; gate する 3 つ目をここに足しかけたが撤去した:
   ;;   1. **覆いは元から在った** — :jvm-test は cognitect.test-runner で test/ を
@@ -648,7 +648,7 @@
   ;; Every one was run to completion on judah, from a fresh clone, with
   ;; `clojure -M:test` and its own deps resolved on the node:
   ;;
-  ;;   arrangement            46 tests /  207 assertions    kotobase-query        35 /   62
+  ;;   arrangement            46 tests /  207 assertions    ayatori               35 /   62
   ;;   datalog                91 /  163                     gremlin               23 /   37
   ;;   datom                   3 /    9                     org-graphql-http      23 /   39
   ;;   datom-source           23 /   74                     opencypher-cypher     75 /  174
@@ -695,7 +695,7 @@
   {:name "kotobase-projection" :gate :jvm-test :cd false}
   {:name "kotobase-protocols" :gate :nbb-test :classpath "src:test" :entry "bin/run_tests.cljs"
    :ship-git-deps true :cd false}
-  {:name "kotobase-query" :gate :jvm-test :cd false}
+  {:name "ayatori" :gate :jvm-test :cd false}
   {:name "org-apache-tinkerpop-gremlin" :gate :nbb-test :classpath "src:test" :entry "bin/run_tests.cljs"
    :ship-git-deps true :cd false}
   {:name "org-graphql-http" :gate :nbb-test :classpath "src:test" :entry "bin/run_tests.cljs"
@@ -843,7 +843,7 @@
   ;; counts differ by a JVM-only test file (an addition, not a flip):
   ;;
   ;;   chain               29 /  87   ==       org-apache-arrow   40/130 vs 35/111
-  ;;   kotobase-query      35 /  62   ==       org-apache-parquet 34/163 vs 31/152
+  ;;   ayatori             35 /  62   ==       org-apache-parquet 34/163 vs 31/152
   ;;   gremlin             23 /  37   ==
   ;;   org-graphql-http    23 /  39   ==       (both differ by `lake_e2e_test.clj`,
   ;;   opencypher-cypher   75 / 174   ==        which drives a real scan on the JVM)
@@ -882,7 +882,7 @@
   {:name "chain" :id "nbb-cross-runtime-chain" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
-  {:name "kotobase-query" :id "nbb-cross-runtime-query" :gate :nbb-script
+  {:name "ayatori" :id "nbb-cross-runtime-query" :gate :nbb-script
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
   {:name "org-apache-tinkerpop-gremlin" :id "nbb-cross-runtime-gremlin" :gate :nbb-script
