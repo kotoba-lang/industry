@@ -579,9 +579,25 @@
                                    (if age-days (str (.toFixed age-days 1) "d") "undated")
                                    " old (max " max-age-days "d); probing"))
             :else
-            (do (println (str "current\t" chosen "\tstill free, receipt "
-                              (.toFixed age-days 1) "d old"))
-                (.exit js/process 0)))))
+            ;; Current — but "the model is still free" and "the bots are on it"
+            ;; are different questions, and only the first one was ever asked
+            ;; here. Measured 2026-08-28: the scheduled refresh ran, reported
+            ;; `current`, exited 0, and left two agent jobs pointing at the
+            ;; fleet, because writing the jobs only ever happened on the
+            ;; install path. Reconciling costs no request and no probe.
+            (let [jobs (when write? (install-jobs! chosen))
+                  wrong (remove :ok jobs)
+                  cfg (when (fs/existsSync config-path)
+                        (second (re-find #"(?m)^  default: (\S+)$"
+                                         (fs/readFileSync config-path "utf8"))))]
+              (println (str "current\t" chosen "\tstill free, receipt "
+                            (.toFixed age-days 1) "d old"))
+              (doseq [j jobs]
+                (println (str "job\t" (:job j) "\t" (if (:ok j) "ok" (str "FAILED " (:out j))))))
+              (when (and cfg (not= cfg chosen))
+                (println (str "drift\t" config-path " says " cfg
+                              ", the receipt says " chosen)))
+              (.exit js/process (if (seq wrong) 1 0))))))
 
       (when (empty? cands)
         (die! 1 (str "No free model currently clears the floor.\n"

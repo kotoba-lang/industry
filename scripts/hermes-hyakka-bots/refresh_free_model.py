@@ -33,27 +33,59 @@ RESOLVER = os.environ.get(
 NBB = os.environ.get("HYAKKA_NBB", "/opt/homebrew/bin/nbb")
 JOBS_DB = os.environ.get(
     "HYAKKA_JOBS_DB", os.path.expanduser("~/.hermes/cron/jobs.json"))
-# Named, not id-pinned. Hermes job ids change when a job is recreated, and a
-# hard-coded id would then keep succeeding while updating nothing — the same
-# silent shape this whole directory is built against.
-BOT_NAMES = os.environ.get(
-    "HYAKKA_BOT_NAMES", "hyakka-source-scout,hyakka-ontology-scout").split(",")
+
+# Every agent-driven cron job, not a list of names.
+#
+# The first version named the two hyakka scouts. A day later the cron table
+# held five jobs: another session had added `itonami-ingest-scout` and
+# `itonami-coverage-scout`, built to the same pattern, and both went on running
+# on `murakumo-main` because nothing here knew they existed. Measured
+# 2026-08-28: one of them spent 57 minutes and 1,857,045 input tokens on the
+# fleet overnight, the night after the fleet stopped being the default.
+#
+# A name list does not fail when a sixth bot appears. It leaves it behind, and
+# looks identical to a run with nothing to do. So coverage is the default and a
+# deliberate pin is expressed by opting out.
+#
+# Jobs that run WITHOUT an agent carry no model at all and are skipped. This
+# job is one of them.
+OPT_OUT = {n.strip() for n in os.environ.get("HYAKKA_MODEL_OPT_OUT", "").split(",") if n.strip()}
 
 
 def bot_job_ids() -> str:
-    """Resolve the bots' current job ids by name, or refuse."""
+    """Every agent-driven job's id, minus the opt-outs. Says what it covers."""
     try:
         with open(JOBS_DB) as fh:
             jobs = json.load(fh).get("jobs", [])
     except Exception as exc:
         refuse(f"cannot read {JOBS_DB}: {exc}")
-    by_name = {j.get("name"): j.get("id") for j in jobs}
-    missing = [n for n in BOT_NAMES if not by_name.get(n)]
-    if missing:
-        refuse("no cron job named " + ", ".join(missing) +
-               f" in {JOBS_DB}. Installing a model into jobs that are not "
-               "there would report success and change nothing.")
-    return ",".join(by_name[n] for n in BOT_NAMES)
+    if not jobs:
+        refuse(f"{JOBS_DB} lists no cron jobs. Installing a model into an "
+               "empty table would report success and change nothing.")
+
+    targets, skipped = [], []
+    for j in jobs:
+        name = j.get("name") or j.get("id")
+        if j.get("no_agent"):
+            skipped.append(f"{name} (no-agent: runs a script, holds no model)")
+        elif name in OPT_OUT:
+            skipped.append(f"{name} (opted out)")
+        elif not j.get("id"):
+            refuse(f"a cron job named {name!r} has no id")
+        else:
+            targets.append(j)
+
+    # Printed every run. A refresh that quietly narrowed its own scope would
+    # look exactly like one that had nothing left to do.
+    print(f"COVERS\t{len(targets)} agent job(s)")
+    for j in targets:
+        print(f"  + {j.get('name')}\t{j.get('model')}\t{j.get('provider')}")
+    for line in skipped:
+        print(f"  - {line}")
+
+    if not targets:
+        refuse("no agent-driven cron job is left to point at a model.")
+    return ",".join(j["id"] for j in targets)
 
 
 def refuse(why: str) -> "typing.NoReturn":  # noqa: F821
