@@ -25,12 +25,12 @@ above the section describing the functions. Both files have been corrected.
 
 The rest was measured rather than assumed, and holds:
 
-  AES / AES-GCM     no portable implementation. Every AES in the tree is
-                    Node's crypto (kotobase's storage profile and erasure
-                    lifecycle). GitHub code search reports nothing, but that
-                    index does not cover this org -- controls for `hpke` and
-                    `x25519`, both known present, also return zero. The
-                    finding is from reading trees, not from that search.
+  AES / AES-GCM     was absent. Every AES in the tree was Node's crypto
+                    (kotobase's storage profile and erasure lifecycle).
+                    GitHub code search reported nothing, but that index does
+                    not cover this org -- controls for `hpke` and `x25519`,
+                    both known present, also return zero, so the finding came
+                    from reading trees. **Now kotoba-lang/org-nist-aes.**
   P-256/384/521     no portable implementation. btc-crypto has secp256k1
                     point arithmetic, but schnorr.cljc and core.cljc are
                     #?(:clj) only over java.math.BigInteger and the :cljs
@@ -59,26 +59,48 @@ in the auth kem_context turns 64 red and leaves base and PSK **green**;
 dropping auth-encap's second DH, the same 64. The localisation is the point
 -- it is what makes those numbers evidence about the added code.
 
+
 **HMAC-SHA-384**, for HKDF-SHA384. The substitution that matters is the key
 transformation: HMAC-SHA-384 and HMAC-SHA-512 share a 128-byte block, so
 using the wrong hash there changes nothing until a key exceeds 128 bytes.
 RFC 4231 case 6 is that key, and it is the single assertion the break turns
 red.
 
+**org-nist-aes** -- AES (FIPS 197, forward cipher only) and AES-GCM (SP
+800-38D), zero dependencies, seal/open mirroring chacha20.aead so an HPKE
+suite can be a parameter rather than a rewrite. Tested against the complete
+Wycheproof corpus: 316 cases, every group, no sampling, pinned by sha256 and
+re-extractable. 1,368 assertions on both runtimes, 1,667 with a javax.crypto
+oracle sweeping message, AAD and IV lengths the fixed corpus does not name.
+
+Two rows of its break table are worth carrying here. Incrementing the whole
+128-bit block instead of the low 32 bits turns **54** of 1,368 red -- the
+break is invisible to any message short enough not to carry. Comparing only
+the first tag byte turns **108** red and **only in the cases that are
+supposed to fail**: every correct decryption stays correct, so a suite
+without adversarial cases would have called it green.
+
+And one that is not hypothetical: it shipped on the first run with `Rcon[j]`
+written as `x^j` instead of `x^(j-1)`. The cipher was still a permutation,
+still round-tripped against itself, and agreed with nothing else in the
+world -- 866 assertions red. **Deriving a table protects against a mistyped
+constant, not against an off-by-one in the index that reads it**, which is a
+narrower guarantee than the derive-don't-transcribe habit implies.
+
 ## What remains, in dependency order
 
-AES-GCM is the keystone and not a matter of completeness. Every named
-consumer wants it: ECH configs in the wild advertise AES-128-GCM, and RFC
-9230 names X25519/HKDF-SHA256/AES-128-GCM as ODoH's mandatory suite. Until
-it exists, the consumers can only be built against a suite no deployed peer
-offers.
+AES-GCM was the keystone and it has landed, so the ordering below is no
+longer blocked at its root. Every named consumer wanted it: ECH configs in
+the wild advertise AES-128-GCM, and RFC 9230 names
+X25519/HKDF-SHA256/AES-128-GCM as ODoH's mandatory suite. Until it existed
+the consumers could only be built against a suite no deployed peer offers.
 
-  1. org-nist-aes            AES-128/192/256 + GCM. NIST SP 800-38D and
-                             CAVP vectors. Unblocks 2 of 3 AEADs.
-  2. hpke suite parameters   kdf_id and aead_id become values rather than
+  1. hpke suite parameters   DONE below the line: AES-GCM exists. kdf_id
+                             and aead_id become values rather than
                              constants. Validates against RFC 9180 A.1,
                              which is the same KEM with AES-128-GCM -- the
-                             extractor already reads it.
+                             extractor already reads that section. This is
+                             the next commit, and it is small.
   3. nist curves             P-256 first (A.3), then P-384/P-521. Needs
                              portable modular arithmetic over a 256-bit
                              prime and, unlike X25519, rejection sampling
