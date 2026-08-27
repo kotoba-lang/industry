@@ -134,6 +134,30 @@ The inner hello is padded by s6.1.3's scheme. Without it the ciphertext length
 tracks the inner SNI length -- the one thing ECH exists to hide -- so an
 unpadded client would advertise the length of the name it was hiding.
 
+**ECH is complete.** s6.1.6's rejection recovery landed too: the client
+finishes the handshake against the public_name, collects retry_configs from
+EncryptedExtensions, sends ech_required and returns an error rather than a
+connection -- because s6.1.7 says authenticating for the public name does not
+authenticate the origin. Measured against Cloudflare, which hands back a retry
+config with a different config_id from the one its DNS record publishes.
+
+ECH's HelloRetryRequest path stays unreachable rather than omitted: this
+client refuses HelloRetryRequest by name, so s7.2.1 cannot arise from it.
+
+### Documenting a trap is not removing it
+
+The public_name check of s6.1.7 was wrong twice, the same way both times. It
+takes a byte vector, and both wrong versions reached for characters: first a
+regex with one escape too many, so no name split and every valid name was
+rejected; then (map int over a string), which is code points on the JVM and
+zeros under ClojureScript. Then the test's own helper did the second one too.
+
+That second trap is documented in hpke.kdf/ascii, in this workspace, by us --
+and it was walked into three times in one afternoon by code written to be
+careful about it. The fix was not more care: the check compares bytes to byte
+constants now and never sees a character, which has neither failure available
+to it.
+
 ### Only the live handshake noticed
 
 The transcript starts with whichever ClientHello the server used, and that
@@ -229,19 +253,14 @@ the consumers could only be built against a suite no deployed peer offers.
                              primitives' own corpora and say so.
                              DeriveKeyPair on the NIST curves also needs
                              rejection sampling, which X25519 does not.
-  2. ECH s6.1.6 recovery     offering ECH landed (below) and live servers
-                             accept it. What remains is the rejection path:
-                             authenticate to the public_name, read
-                             retry_configs out of EncryptedExtensions, then
-                             abort with ech_required. Half of it would mean
-                             acting on retry configs the handshake had not
-                             yet authenticated, so it stops at :ech-rejected
-                             instead. ECH's HRR path is unreachable rather
-                             than omitted -- this client refuses
-                             HelloRetryRequest by name.
-  3. MLS (RFC 9420)          largest by far; an independent group key
-                             agreement sits on top. Unlike the other two it
-                             does have a published interop corpus.
+  2. MLS (RFC 9420)          the last consumer, and the largest by far: a
+                             group key agreement of its own sits on top.
+                             Unlike ECH and ODoH it has a published interop
+                             corpus, so the vectors question is already
+                             answered. Natural first slices are the ones
+                             that corpus covers standalone -- tree-math,
+                             then crypto-basics, which is where HPKE
+                             attaches.
 
 ## What this does not claim
 
