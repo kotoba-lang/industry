@@ -43,7 +43,35 @@
   - **投入先**: dispatch namespace `ai-gftd-repository-dispatch` の user Worker の
     `KOTOBASE_SECRET_KEY`。現時点で `cloud-itonami-isic-0111` のみ。
 
-## hyakka (wiki.kotobase.net) identity seed — 2026-08-15 に消え、2026-08-24 に v2 へ migration 済み
+## hyakka (wiki.kotobase.net) identity seed — 2026-08-15 に消え、2026-08-24 に v2 へ再作成、**2026-08-27 に再び `no such item`**
+
+- 🔴 **2026-08-27 04:5x UTC 実測: `hyakka-kotobase-seed` は live vault (`~/.kagi`) にも
+  repo-local vault にも存在しない**（両方で `no such item`）。**同じ item が消えるのは 2 度目**
+  で、この乖離クラス全体では 5 例目。
+  - **「読めなかった」ではなく「無い」であることは確かめた**（この区別を飛ばすと
+    復旧手順を誤る）: 同じ `KAGI_HOME=$HOME/.kagi` で `kagi whoami` は
+    `did:key:z6MkeaQ3TzXk8H7ZyEcrQyTM1iNEkJ2gmq1BdXsauaPGBTC1` を返し、
+    `unlock-status` は os-keychain wrap が 1 本ある状態を返す —— **vault は開いている**。
+    総当たり列挙はしていない（安全床⑦、`kagi ls` は叩いていない）。
+  - `~/.gftd/` にも seed ファイルは無い（あるのは `hyakka-archive/` だけ）。
+  - **実害**: `npm run publish`（ledger → kotobase `hyakka` ref の projection）が
+    起動できない。2026-08-27 に landed した kaiyaku corpus の 104 claim / 13 source は
+    **Git と Worker catalog には在るが、datom 面には入っていない**。
+    read 経路（`read_bisect` / `fold`）も同じ seed を要求するので、
+    **ref が今どこまで進んでいるかも測れない = UNVERIFIED**。
+  - **新しい seed を作って代替しないこと。** 別 seed = 別 DID = 別グラフで、
+    `:apex` は graph scope == issuer DID を要求する（下の 2026-08-15 の記録と同じ理由）。
+    復旧はオーナーによる再登録:
+    `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi add hyakka-kotobase-seed`
+    に v2 の 32 byte hex を流す。**v2 の tenant DID は
+    `did:key:z6MkwF7M3TPYUvdNP5NtWfr6aA2xtr7dsETCwx26fnVamjQo`** なので、
+    復元した seed からこの DID が derive されることを
+    `scripts/verify_identity.cljs` で確認してから publish を再開する。
+  - 消失の原因は未特定。**2 度目である以上、次も起きるとみなす** —— seed を
+    kagi だけに置く運用そのものが単一障害点で、`kagi push`（cloud 永続化）か
+    別端末への `device grant` のどちらかを取るまでこの節は閉じない。
+
+### 2026-08-24 の再作成（この時点では在った）
 
 - ✅ **2026-08-24: `hyakka-kotobase-seed` は新しい 32-byte seed で再作成済み**（この端末の
   kagi、compartment `personal`、item 名は同じ）。**新 tenant DID =
