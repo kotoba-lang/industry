@@ -13,9 +13,14 @@ and creating the jobs.
 | `hyakka-source-scout` | `20 9 * * *` | **articles** — new ingest sources, each of which becomes archived bytes, then sourced claims, then items |
 | `hyakka-ontology-scout` | `20 21 * * *` | **ontology** — new properties, but only ones the corpus already tried to state and could not |
 
-Both run on `murakumo-main` through `https://api.murakumo.cloud/v1`, the public
-alias, not a pinned model id (ADR-2607173100) and not the direct inference host
-(ADR-2608251016).
+Both run on a **free** OpenRouter model, chosen by measurement each week and
+installed by a third job. The fleet is the last entry in the fallback chain, not
+the primary (ADR-2608272100). Neither a model id nor a provider is written into
+the jobs by hand — `hermes cron edit` is driven by the resolver.
+
+| bot | schedule | grows |
+|---|---|---|
+| `hyakka-model-refresh` | `40 8 * * *` | nothing — it keeps the other two on a model that still exists |
 
 ## The shape, and why it is this shape
 
@@ -68,6 +73,67 @@ it could not judge. 2 is reached with `process.exit`, because setting
 `exitCode` and throwing reports 1 — the code this family uses for *measured,
 and found something*.
 
+## The model, and why nothing here names one
+
+`stealth/ox-alpha` was the most-used model on OpenRouter and served zero
+endpoints four days later. Writing a free model id into these jobs would be
+ADR-2608271450's pinned-`qwen3.6-35b-a3b` bug one tier down, and the free tier
+moves faster than the fleet ever did.
+
+So `resolve_free_model.cljs` asks OpenRouter which models are free right now,
+filters on a floor stated in `free-model-policy.edn` (context, tool support),
+and then **probes** the survivors rather than ranking them. Every proxy for
+capability lies: sorting the free tier by context descending on 2026-08-27 put
+a 2.6B model above a 550B one.
+
+The probe is the three things a hyakka bot actually does — emit a tool call
+with exact arguments, obey an exact-output instruction, write parseable EDN.
+Fail the first and the other two are not spent.
+
+```
+                    ┌ 3/3 → primary
+models API ─ floor ─┤ 3/3 → fallback_providers[…]     ┐ each a different
+(no key)            └ else → named in the receipt     ┘ provider
+                                                        then the fleet, last
+```
+
+**`busy` is not `cannot`.** Most of the free tier answers 429 on any given
+afternoon — nine of fifteen in one run here. A rate limit, a 403, a 5xx, and an
+upstream error delivered *inside a 200* are all recorded as unavailable and
+score nothing; only a model that answered gets a number. That distinction was
+wrong three times while this was written, and each time the receipt read as
+though the free tier had been measured and found wanting.
+
+`resolve_free_model_test.cljs` pins it, and requires the real namespace rather
+than copying the classifier — the first version copied it, and stayed green
+when the classifier was broken.
+
+```bash
+nbb --classpath scripts/hermes-hyakka-bots \
+    scripts/hermes-hyakka-bots/resolve_free_model_test.cljs   # 17 cases
+nbb scripts/hermes-hyakka-bots/resolve_free_model.cljs --list        # candidates, no key
+nbb scripts/hermes-hyakka-bots/resolve_free_model.cljs --check-config
+nbb scripts/hermes-hyakka-bots/resolve_free_model.cljs --if-stale --write --jobs a,b
+```
+
+`0` installed or already current · `1` nothing free passed, the fleet stays
+primary · `2` **REFUSED**, it could not find out. 1 and 2 must not collapse:
+*no free model works* is a measurement, *I could not look* is not.
+
+### Two things that will bite
+
+**The key never becomes a file.** It lives in the login Keychain under
+`gftd.openrouter` and reaches Hermes through `secrets.command`, the same shape
+`claude-zai` uses for `gftd.zai`. `providers.<n>.key_cmd` is the obvious fit
+and does not work: on hermes v0.20.5 the main turn succeeds and every
+auxiliary task then dies with `'CommandTokenSource' object has no attribute
+'strip'`. Context compression is an auxiliary task.
+
+**An OpenRouter key with no `auxiliary` block opens a billed lane.** Hermes's
+default auxiliary fallback is `google/gemini-3.6-flash`, which is paid, and it
+engages for background traffic as soon as a key is present. `free_only: true`
+is the ceiling, and the resolver writes it.
+
 ## Installing
 
 ```bash
@@ -86,8 +152,24 @@ $H cron create "20 9 * * *"  "$(cat ~/.hermes/scripts/source-scout.prompt.md)" \
 $H cron create "20 21 * * *" "$(cat ~/.hermes/scripts/ontology-scout.prompt.md)" \
    --name hyakka-ontology-scout --script hyakka_evidence.py --workdir "$W" \
    --model murakumo-main --provider custom --deliver local
+$H cron create "40 8 * * *" \
+   --name hyakka-model-refresh --script refresh_free_model.py --no-agent --deliver local
 $H gateway install     # without this, `cron list` shows the jobs and nothing fires
 ```
+
+The refresh job is `--no-agent` on purpose: the script *is* the job. The case it
+exists for is the one where the configured model has stopped answering, and a
+job that needed a model to fix the model would be dead exactly then.
+
+It resolves the two bots by **name**, not by job id. Hermes ids change when a
+job is recreated, and a pinned id would go on succeeding while updating
+nothing.
+
+`resolve_free_model.cljs` and `free-model-policy.edn` are copied to
+`~/.hermes/scripts/` alongside the shim — the resolver finds its policy beside
+itself, so the pair travels together. As with the prompts, this directory is
+the reviewable original and the installed copies can drift; re-copy after
+editing.
 
 The worktree must sit under `~/.gftd/worktrees/`, not in `/tmp`: app-hyakka's
 `deps.edn` carries the source path `../../kotoba-lang/kotobase-client/src`, and

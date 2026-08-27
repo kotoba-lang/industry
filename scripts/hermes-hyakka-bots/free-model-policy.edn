@@ -1,0 +1,92 @@
+;; What the hyakka growth bots need from a free model, stated as a floor
+;; rather than as a name.
+;;
+;; ADR-2608271450 recorded what a pinned model id costs here: `qwen3.6-35b-a3b`
+;; sat in the wiki's ingest config after the fleet stopped serving it, every
+;; extraction returned 401 for weeks, and each tick still exited 0. Free models
+;; on OpenRouter are strictly more volatile than that — `stealth/ox-alpha` was
+;; the most-used model on the platform and served zero endpoints four days
+;; later. So no model id is written here as the answer.
+;;
+;; `resolve_free_model.cljs` reads this, asks OpenRouter which models are free
+;; RIGHT NOW, and then *measures* the survivors instead of ranking them by a
+;; proxy. Context length is not capability: on 2026-08-27 sorting the free tier
+;; by context descending put a 2.6B model above a 550B one.
+
+{;; ---- hard filter, from the models API (no key needed) ------------------
+ :min-context 131072   ; the bots read a config, a registry, and receipts
+ :require-tools true   ; Hermes drives everything through tool calls
+
+ ;; Routers that pick a free model at random. `openrouter/free` advertises
+ ;; itself as exactly that, and a run that draws a 2.6B model cannot fetch a
+ ;; URL, write an EDN proposal and open a PR. Excluded by name because the
+ ;; models API does not otherwise mark them.
+ :exclude-ids #{"openrouter/free" "openrouter/auto"}
+
+ ;; ---- measured, not declared -------------------------------------------
+ ;; Probe the top `:probe-count` candidates (context desc) against the three
+ ;; things a hyakka bot actually has to do, and install the highest score.
+ ;; A candidate that fails the tool call is not probed further.
+ :probe-count 6
+
+ ;; ---- credential --------------------------------------------------------
+ ;; One place says where the key lives: the login Keychain, read the same way
+ ;; the `claude-zai` wrapper in ~/.zshrc reads `gftd.zai`. Rotation is a
+ ;; Keychain update and nothing else.
+ ;;
+ ;; Hermes is handed it through `secrets.command` (a KEY=VALUE helper run once
+ ;; per process) rather than `providers.<n>.key_cmd`. key_cmd is the more
+ ;; obvious fit and it is what was tried first — the main turn worked, and
+ ;; every auxiliary task then failed with
+ ;;   'CommandTokenSource' object has no attribute 'strip'
+ ;; on hermes v0.20.5. Auxiliary is not only the session title: context
+ ;; compression is an auxiliary task, and these bots run 35 minutes.
+ :provider-name "openrouter-free"
+ :key-env "OPENROUTER_API_KEY"
+ :key-read-cmd "security find-generic-password -s gftd.openrouter -w"
+
+ ;; ---- the floor under the floor ----------------------------------------
+ ;; Ours and unbilled. NOT "always up": measured 2026-08-27, the public chat
+ ;; API answered 200 at 18:50 and 400 {"error":"Unauthorized"} at 19:05, with
+ ;; or without an Authorization header, while `/infer/models/murakumo-main`
+ ;; went on reporting `status: serving, verdict: fresh` and `/ready` returned
+ ;; 503 (ADR-2608271900). So the resolver measures this at install time
+ ;; instead of asserting it, and every free model that also scored 3/3 is
+ ;; installed AHEAD of it — a chain of independent free providers first, the
+ ;; fleet last.
+ :fallback {:provider "custom"
+            :model "murakumo-main"
+            :base-url "https://api.murakumo.cloud/v1"}
+
+ ;; ---- how often to look again -------------------------------------------
+ ;; `--if-stale` is the daily shape: one keyless request to the model list,
+ ;; and probing happens only when the installed model has fallen off it or
+ ;; the receipt has aged past this. A daily full re-probe would spend ~25
+ ;; requests to re-learn the same answer, and would also change the bots'
+ ;; model underneath them for no reason.
+ :max-receipt-age-days 7
+
+ ;; ---- auxiliary traffic -------------------------------------------------
+ ;; Hermes runs side jobs — context compression, session titles — on their
+ ;; own chain, and its default OpenRouter fallback is `google/gemini-3.6-flash`,
+ ;; which is PAID. Handing Hermes an OpenRouter key without setting this opens
+ ;; a billed lane for background traffic on an account with no spend cap.
+ ;;
+ ;; Two guards, because one is a preference and the other is a ceiling:
+ ;;   :tasks     pin the side jobs to the fleet — free, ours, and already
+ ;;              proven to serve them (the murakumo sessions have
+ ;;              title_generation rows; the free provider had none)
+ ;;   :free-only refuse a non-":free" OpenRouter model even if that pin fails
+ ;; No per-task pins. Pinning compression and title generation at the fleet
+ ;; was tried and every session then emitted
+ ;;   ⚠ Auxiliary title generation failed: HTTP 400: {"error":"Unauthorized"}
+ ;; because the fleet was down — a pin cannot be more available than what it
+ ;; points at. Unpinned, side jobs ride the main provider and use the main
+ ;; fallback chain when it rate-limits, which is what actually recovered.
+ ;; :free-only stays as the ceiling: never a billed model for background work.
+ :auxiliary {:free-only true}
+
+ ;; Owner override. Entries here are TRIED FIRST, in order, and are still
+ ;; probed — this reorders the queue, it does not bypass the measurement.
+ ;; Leave empty unless you have a reason the probe cannot see.
+ :prefer []}
