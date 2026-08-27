@@ -144,6 +144,33 @@ config with a different config_id from the one its DNS record publishes.
 ECH's HelloRetryRequest path stays unreachable rather than omitted: this
 client refuses HelloRetryRequest by name, so s7.2.1 cannot arise from it.
 
+**MLS signs, on five of seven suites.** Ed25519 for 1 and 3, ECDSA over
+P-256/384/521 for 2, 5 and 7 -- the latter built into org-nist-ecc against
+1,530 Wycheproof verification cases, 930 of them invalid, rejected across
+sixteen distinct reasons. Ed448 (suites 4 and 6) refuses by name, and a test
+asserts that rather than skipping those suites.
+
+### The wrong answer came from our own documentation
+
+The previous revision of this ADR said this workspace had no portable
+signature, and made it a numbered prerequisite blocking all of MLS. It was
+false. org-ietf-ed25519's edwards.cljc and scalar.cljc have **zero** reader
+conditionals, and its ClojureScript smoke test asserts signatures
+byte-identical to the JVM's. It had been portable for some time.
+
+The claim was taken from CLAUDE.md, which listed that repository among the
+JVM-only libraries. That sentence was true when written and stopped being true
+without changing -- the same shape as org-nist-sha2's claim that SHA-384 and
+SHA-512 were absent, three headings above the section documenting them.
+
+This is the fifth absence claim in this program that turned out to be false,
+and the first where the wrong answer came from **reading this workspace's own
+prose instead of the repository**. The rule about searching before concluding
+absence is written against not looking; this was looking, in the wrong place,
+at something that looked authoritative. CLAUDE.md now says so at the point
+where the list is, and says to count reader conditionals instead of quoting
+it.
+
 ### Documenting a trap is not removing it
 
 The public_name check of s6.1.7 was wrong twice, the same way both times. It
@@ -280,15 +307,10 @@ the consumers could only be built against a suite no deployed peer offers.
                              tests them: key schedule, secret tree,
                              transcript hashes, PSK secrets, tree and
                              parent hashes, TreeKEM, framing, Welcome.
-  3. a portable signature    MLS names Ed25519, Ed448 or ECDSA in every
-                             suite and this workspace has none of them
-                             portably. org-ietf-ed25519 is :clj-only,
-                             org-nist-ecc says signatures are not there,
-                             and Ed448 does not exist here. Without one,
-                             MLS's authentication cannot be built at all --
-                             so this is not a polish item, it is a
-                             prerequisite that only became visible once the
-                             suites were written down.
+  3. Ed448                   MLS suites 4 and 6 name it and nothing here
+                             implements it. The other five suites sign
+                             (below), so this is no longer a prerequisite
+                             for MLS -- it is two of seven suites.
 
 ## What this does not claim
 
