@@ -99,8 +99,27 @@ floor を割る。どちらも静かにゼロへは縮められない。
 ### 5. これらの host では 403 は却下ではなく refusal である
 
 **gate を走らせて見つけた**（読んで気付いたのではない）。最初の版は
-`www.jpo.go.jp` の 403 を却下として報告した —— その数分前に、gate 自身の traffic で
-その host の WAF を踏んでいた。
+`www.jpo.go.jp` の 403 を却下として報告した。
+
+**訂正（2026-08-27 23:20 実測）**: この節は当初「その数分前に gate 自身の traffic で
+WAF を踏んだ」と書いていた。**それは推測であって測定ではなく、間違っていた。**
+同じ client（`fetch`）で User-Agent だけを変えて測ると:
+
+| host | `itonami-growth-gate/1` | browser UA |
+|---|---|---|
+| `www.enecho.meti.go.jp` | **403** | 200 |
+| `www.jpo.go.jp` | **403** | 200 |
+| `www.mext.go.jp` / `www.soumu.go.jp` / `www.mhlw.go.jp` / `www.moj.go.jp` | **200** | — |
+| `laws.e-gov.go.jp` API | **200** | — |
+
+つまり 403 は **UA で決まっており、rate では決まっていない**。gate は throttle されて
+いたのではなく、**最初の 1 request から名前で断られていた**。しかも断るのは
+**METI 系 host に限られる**（go.jp 一般ではない）。
+
+⚠ **curl で測ってはいけない。** in-repo verifier がその docstring で先に記録している
+とおり、一部の go.jp host は **TLS fingerprint** でも弾くので、curl は UA に関係なく
+403 を返し、「到達不能な当局」を測ったように見えて**自分の client を測っている**。
+上の表は gate と同じ `fetch` で採った。
 
 METI 系 4 host は**存在しないパスにも 403 を返し**、`www.meti.go.jp` は WAF challenge を
 **要求 URL のまま HTTP 202** で返す（この事実は meti の register 自身が測って記録して
@@ -132,10 +151,19 @@ ADR-2607011345 の topdir 誤認のため。
 | gate 却下（suite 欠落） | exit 1。`jpn-mic` は verifier を持つが mutation-check を持たないので通らない |
 
 **まだ見ていないもの**: `:sources` の**完全な exit 0**（受理 + repo 側 suite 緑）。
-この検証中に gate 自身の traffic で 特許庁 の WAF を踏み、以降 repo 側 verifier が
-REFUSED を返し続けた。同じ suite は同日それ以前に単独で緑を出している
-（pass=33 fail=0 refused=0 / caught=14 of 14）が、**それは gate を通した緑ではない**。
-host が回復してから 1 度確かめる必要がある。
+同じ suite は同日それ以前に単独で緑を出している（pass=33 fail=0 refused=0 /
+caught=14 of 14）が、**それは gate を通した緑ではない**。
+
+そして決定 5 の訂正により、これは**待てば解ける問題ではない**。gate は正直な UA を
+名乗り、METI 系 host はその名前を断る。よって **gate は METI 系 host の
+`:page-identity` / `:page-text` を永久に受理できない** —— `:e-gov-law-id` と
+METI 系以外の省庁ページは通る。
+
+**未決の判断**: in-repo verifier（`cloud-itonami-iso3166-jpn-meti`）は
+`Mozilla/5.0 ... Chrome/126 ...` を名乗っており、あの register の METI 系 6 ページは
+それで検証されている。これは**私が入れたものではなく tree に既に在った選択**である。
+gate 側で同じことをするのは「bot 検出の回避」であり安全床④に当たるので、**しない**。
+どちらに揃えるかはオーナーの判断であって gate の判断ではないので、ここに書いて残す。
 
 ## Consequences
 
