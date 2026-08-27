@@ -1,0 +1,91 @@
+[{:db/id -1
+  :adr/id "adr-2608273000-a-declared-interval-nothing-reads-back"
+  :adr/title "A declared interval that nothing reads back"
+  :adr/status "accepted"
+  :adr/date "2026-08-27"
+  :adr/repo "cloud-itonami/otent"
+  :adr/body "# The interval was a control, and the schedule was defeating it
+
+`otent` declares a `:min-interval-ms` per feed. That field has already been
+caught being decorative once in this repository (2026-08-26: it sat in the
+registry and nothing read it). On 2026-08-27 a coverage question was asked
+by hand, and the answer found the second-order version of the same defect:
+the field was being read, honoured to the millisecond, and **defeated one
+layer up**.
+
+## What was measured
+
+Over 173 cycles / 23.4 hours of the timer era, from the tick ledger:
+
+| | declared | measured (median) |
+|---|---|---|
+| cycle (plist `StartInterval`) | 300 s | 447 s |
+| usgs | 300 s | 448 s |
+| opensky | 600 s | 903 s |
+| celestrak | 21,600 s | 22,032 s |
+
+The mechanism: `bin/scheduled.cljs` ran `retain` inline after every tick,
+retention takes ~3.4 minutes, and launchd will not start a job that is
+still running. Every other 300-second fire was therefore dropped, and
+`due?` -- answering honestly about a clock it was handed too rarely --
+turned that into a 1.5x stretch on every feed's real poll rate.
+
+**Nothing was red at any point.** The tick exited as expected, the receipt
+ledger was complete, the tables were growing. The only symptom was a number
+nobody was computing.
+
+## Decision
+
+1. **`otent coverage`** (`src/otent/coverage.cljc`, pure) reads declared
+   cadence back from the ledger and reports drift past a 1.25x tolerance.
+   Exit 0 clean / 1 finding / 2 could-not-answer. A test asserts the
+   tolerance is below 1.49x -- the drift it was written for -- because a
+   tolerance chosen afterwards to make the current state pass is not a
+   tolerance.
+2. **Retention leaves the tick's critical path**, running hourly against
+   horizons whose shortest is a day. A skipped run logs `retain NOT-DUE`,
+   never `retain exit 0`.
+3. **The cycle times itself** and warns when it outlasts the timer's
+   period, naming the consequence.
+
+## The generalisable rule
+
+**A declared interval is a claim about the world, and something has to read
+it back.** `due?` checks whether the code MAY poll now; nothing was
+checking how often it DID. Those are different questions, and the gap
+between them is invisible to every green check.
+
+The same shape appears twice more in the same repository, both fixed here:
+
+- **An exemption whose clearing condition is prose will outlive its
+  reason.** `firms` was exempt from being unmeasured because
+  `$FIRMS_MAP_KEY` was not set, `:clears-when` read *the key is entered on
+  this machine*, and so it sat there being true. The key is free; nobody
+  had asked. It is now `the Keychain has firms.nasa/MAP_KEY`, which the
+  cycle evaluates every run -- a feed whose key it finds is no longer
+  exempt. First commit: 27,833 global fire detections, a whole kind moved
+  from never-observed to measured.
+- **A scope decision can hide in a URL and stop looking like a decision.**
+  The quake feed was `2.5_day.geojson` from day one. Every earthquake below
+  M2.5 was not missing from the table, it was outside what was ever asked
+  for -- which reads, from the table, exactly like a world with no small
+  earthquakes in it. `all_day.geojson`: 241 events against 29, smallest
+  M-0.4, same parser.
+
+## What is still not read back
+
+Cadence is now read back. **The shape of what a feed is asked for is
+not.** `otent coverage` would not have caught the `2.5_day` ceiling, and
+it would not catch a bounding box, a `limit`, or a category filter added
+to any other feed's `:default-params`. That gap is open and named here
+rather than discovered later.
+
+## Also measured, not fixed
+
+The `tenkyu` -> `otent` rename copied the basemap and building objects to
+the new prefix and never removed the old ones: **1,470 objects / 27.2 MB
+duplicated** under `tenkyu/`, byte-identical apart from a `_probe.txt`.
+The published manifests still named the retired prefix and were repointed;
+the duplicate objects were left in place, because deleting 1,470 objects is
+the owner's call and nothing reads them.
+"}]
