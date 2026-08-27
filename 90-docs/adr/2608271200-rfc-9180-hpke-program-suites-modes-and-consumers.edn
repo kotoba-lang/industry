@@ -109,6 +109,41 @@ with HKDF-SHA512, so the KEM derives with SHA-256 while the key schedule
 derives with SHA-512 in the same suite. A library reading one KDF for both is
 right about six appendices out of seven.
 
+**tls.ech in org-ietf-tls** -- draft-ietf-tls-esni-25, the ECH data plane:
+configurations, EncodedClientHelloInner and its reconstruction,
+ClientHelloOuterAAD, seal and open, and the acceptance confirmation. Client
+side and client-facing server side in one namespace, so the tests run both.
+1,472 assertions on the JVM, 922 of them on ClojureScript.
+
+Measured before starting, as this ADR asked: ECH is **not an RFC** -- the
+datatracker gives draft-ietf-tls-esni no RFC number at revision 25 -- and the
+text publishes no test vectors. So the evidence is live ECHConfigList values
+pulled from real HTTPS resource records, two-sided round-trip, and each of
+s5.1's four MUST-aborts asserted by its own reason.
+
+### A two-sided test cannot check a value both sides agree on
+
+The finding from ECH, and it generalises past ECH. Both halves live in one
+namespace, so a **symmetric** change to the HPKE info left every round-trip
+test green. Dropping the ECHConfig from the info -- which makes the context
+wrong against any real peer -- broke **nothing at all** until the value was
+pulled into its own function and pinned to the draft's text rather than to
+the other half of the code.
+
+That is a third member of the family this ADR already records. A corpus can
+be complete and not cover what you assume; a justification written next to a
+branch is not evidence about that branch; and a round-trip is not evidence
+about anything the two ends compute the same way.
+
+Two bugs surfaced on the way, both in shapes CLAUDE.md warns about.
+tls.result/error merges the caller's context map **over** its own
+:tls/alert and :tls/reason, so passing :tls/reason in the context silently
+replaced the stable keyword -- invisible to any test asserting that an error
+happened rather than which one. And a test's expected value used (map int
+over a string), which is code points on the JVM and a vector of zeros under
+ClojureScript: the trap hpke.kdf/ascii documents, walked into by a test
+written to check exactly that class of thing.
+
 **org-ietf-odoh** -- RFC 9230, HPKE's first consumer here. 229 assertions on
 both runtimes. The response is not a second encapsulation: the target exports
 an AEAD key from the same HPKE context, salted with the query plaintext, so
@@ -167,12 +202,13 @@ the consumers could only be built against a suite no deployed peer offers.
                              primitives' own corpora and say so.
                              DeriveKeyPair on the NIST curves also needs
                              rejection sampling, which X25519 does not.
-  2. TLS-ECH                 into org-ietf-tls, which is a TLS 1.3 client
-                             with no ECH today -- measured: no path in its
-                             tree matches ech/hpke, and extension.cljc does
-                             not carry one. Draft-tracked rather than an
-                             RFC, so the vectors question has to be asked
-                             again before starting.
+  2. ECH in tls.client       the data plane landed (below). What remains is
+                             offering it in a live handshake:
+                             HelloRetryRequest, the retry-config path of
+                             s6.1.6, and a second transcript. Landing that
+                             halfway would give a client that offers ECH
+                             and cannot tell whether it was accepted, which
+                             is worse than one that does not offer it.
   3. MLS (RFC 9420)          largest by far; an independent group key
                              agreement sits on top. Unlike the other two it
                              does have a published interop corpus.
