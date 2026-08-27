@@ -1,0 +1,104 @@
+[{
+   :db/id -1
+   :adr/id "adr-2608271200-rfc-9180-hpke-program-suites-modes-and-consumers"
+   :adr/title "RFC 9180 HPKE: four modes landed, AES-GCM is the keystone for the rest"
+   :adr/status "accepted"
+   :adr/date "2026-08-27"
+   :adr/body "# RFC 9180 HPKE — the whole surface, and what it costs
+
+Asked whether the wolfSSL article's HPKE was implemented here. It is:
+`kotoba-lang/org-ietf-hpke`, RFC 9180, portable .cljc. The article enumerates
+five KEMs, three KDFs, three AEADs and four modes; this had one of each KEM,
+KDF and AEAD, and one mode. The owner then asked for all four gaps: the
+remaining modes, the remaining suites, TLS-ECH, and ODoH/MLS.
+
+## The measurement that reordered the work
+
+The claim that stopped the other suites was written into org-ietf-hpke's own
+docstring: \"AES-GCM, P-256, P-384, P-521, X448, SHA-384 and SHA-512 are each
+an implementation this workspace does not have.\"
+
+Two of those were wrong. `sha2.sha512` has had SHA-384 and SHA-512 since the
+Ed25519 work, and `org-nist-sha2`'s README simultaneously documented them and
+listed them under \"Not implemented\" — the stale sentence sat three headings
+above the section describing the functions. Both files have been corrected.
+
+The rest was measured rather than assumed, and holds:
+
+  AES / AES-GCM     no portable implementation. Every AES in the tree is
+                    Node's crypto (kotobase's storage profile and erasure
+                    lifecycle). GitHub code search reports nothing, but that
+                    index does not cover this org -- controls for `hpke` and
+                    `x25519`, both known present, also return zero. The
+                    finding is from reading trees, not from that search.
+  P-256/384/521     no portable implementation. btc-crypto has secp256k1
+                    point arithmetic, but schnorr.cljc and core.cljc are
+                    #?(:clj) only over java.math.BigInteger and the :cljs
+                    branch throws. eth-crypto's secp256k1 is .cljs only.
+                    Neither is a short-Weierstrass curve with a = -3.
+  X448 / Curve448   nothing.
+  HMAC-SHA384       was missing. Added.
+
+## What is done
+
+**Four modes, anchored to the RFC rather than to an oracle.** RFC 9180
+Appendix A.2 is this library's suite exactly -- DHKEM(X25519, HKDF-SHA256),
+HKDF-SHA256, ChaCha20Poly1305 -- and publishes base, PSK, Auth and AuthPSK.
+The earlier argument for shipping base alone was that the others would be
+untested code paths; that was an argument about evidence, and the evidence
+was in the specification.
+
+A.2 is extracted by `scripts/extract_rfc9180.cljs` from a text pinned by
+sha256, not transcribed. The repo had already been bitten once: an earlier
+suite claimed A.2 vectors and carried A.1's ikmR, caught only by an
+assertion on pkRm. 404 assertions on both runtimes, 591 with the oracle.
+
+Discrimination, measured one break at a time: dropping the mode byte from
+key_schedule_context turns 245 red across all four modes; swapping pkRm/pkSm
+in the auth kem_context turns 64 red and leaves base and PSK **green**;
+dropping auth-encap's second DH, the same 64. The localisation is the point
+-- it is what makes those numbers evidence about the added code.
+
+**HMAC-SHA-384**, for HKDF-SHA384. The substitution that matters is the key
+transformation: HMAC-SHA-384 and HMAC-SHA-512 share a 128-byte block, so
+using the wrong hash there changes nothing until a key exceeds 128 bytes.
+RFC 4231 case 6 is that key, and it is the single assertion the break turns
+red.
+
+## What remains, in dependency order
+
+AES-GCM is the keystone and not a matter of completeness. Every named
+consumer wants it: ECH configs in the wild advertise AES-128-GCM, and RFC
+9230 names X25519/HKDF-SHA256/AES-128-GCM as ODoH's mandatory suite. Until
+it exists, the consumers can only be built against a suite no deployed peer
+offers.
+
+  1. org-nist-aes            AES-128/192/256 + GCM. NIST SP 800-38D and
+                             CAVP vectors. Unblocks 2 of 3 AEADs.
+  2. hpke suite parameters   kdf_id and aead_id become values rather than
+                             constants. Validates against RFC 9180 A.1,
+                             which is the same KEM with AES-128-GCM -- the
+                             extractor already reads it.
+  3. nist curves             P-256 first (A.3), then P-384/P-521. Needs
+                             portable modular arithmetic over a 256-bit
+                             prime and, unlike X25519, rejection sampling
+                             in DeriveKeyPair.
+  4. org-ietf-x448           RFC 7748 Curve448, and DHKEM(X448) (A.6).
+  5. TLS-ECH                 into org-ietf-tls, which is a TLS 1.3 client
+                             with no ECH today -- measured: no path in its
+                             tree matches ech/hpke, and extension.cljc does
+                             not carry one.
+  6. ODoH (RFC 9230)         HPKE plus a small message format. The cheapest
+                             consumer once AES-GCM lands.
+  7. MLS (RFC 9420)          largest by far; an independent group key
+                             agreement sits on top.
+
+## What this does not claim
+
+Nothing here is deployed. HPKE is a leaf library with no consumer in this
+workspace, which is the honest reading of \"implemented\": the primitive is
+real and the things RFC 9180 was written for are not built yet.
+
+The BouncyCastle oracle still covers base mode only. A second opinion on
+base mode is not a second opinion on auth mode, and the README says so
+rather than letting \"differential tested\" spread across all four."}]
