@@ -6,11 +6,16 @@
 ;;   nbb --classpath "orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/io-multiformats/src:\
 ;;   orgs/kotoba-lang/io-ipni-specs/src:orgs/kotoba-lang/org-ietf-ed25519/src" \
 ;;     scripts/ipni-advertise.cljs <content-cid>... [--execute]
+;;       [--ephemeral-detached]
 ;;
 ;; Dry run by default: it builds the blocks, signs, prints the CIDs, and
 ;; verifies its own signature -- but writes nothing and announces nothing.
 ;; `--execute` writes the two blocks and the head pointer to R2 and PUTs the
-;; announce to cid.contact.
+;; announce to cid.contact. `--ephemeral-detached` is for a reproducible live
+;; benchmark when the canonical signing key is unavailable: it creates a
+;; one-shot provider identity, writes/announces its ad, and deliberately leaves
+;; the canonical head untouched. Such an ad cannot be extended after the
+;; process exits, because its seed is never printed or retained.
 ;;
 ;; ⚠ An advertisement naming an address that cannot serve a verifiable block
 ;; is worse than no advertisement: the indexer answers, the fetch fails, and
@@ -20,6 +25,7 @@
 
 (ns ipni-advertise
   (:require ["child_process" :as cp]
+            ["node:crypto" :as crypto]
             ["fs" :as fs]
             [clojure.edn :as edn]
             [clojure.string :as str]
@@ -34,7 +40,8 @@
 
 (def manifest-path "manifest/ipni-publisher.edn")
 (def bucket "kotobase-graph-database-production")
-(def context-id "kotobase-appviews-v1")
+(def context-id
+  (or (aget (.-env js/process) "IPNI_CONTEXT_ID") "kotobase-appviews-v1"))
 (def indexer "https://cid.contact")
 
 (defn- die! [& msg]
@@ -156,9 +163,9 @@
 
 (let [argv (vec *command-line-args*)
       execute? (some #{"--execute"} argv)
+      detached? (some #{"--ephemeral-detached"} argv)
       content-cids (vec (remove #(str/starts-with? % "--") argv))
       m (edn/read-string (.readFileSync fs manifest-path "utf8"))
-      peer (:ipni.publisher/peer-id m)
       ready (first (filter #(= :ready (:status %)) (:ipni.publisher/retrieval-candidates m)))
       publisher-origin (:ipni.publisher/publisher-origin m)]
   (when (empty? content-cids)
@@ -166,9 +173,9 @@
   (when-not ready
     (die! "no retrieval candidate is :ready — advertising an address that cannot serve is worse than not advertising"))
   (let [addrs [(:multiaddr ready)]
-        publisher-addr (str "/dns4/" (str/replace publisher-origin #"^https://" "")
-                            "/tcp/443/https/p2p/" peer)
-        seed-hex (let [r (.spawnSync cp "orgs/kotoba-lang/kagi/bin/kagi"
+        seed-hex (if detached?
+                   (.toString (crypto/randomBytes 32) "hex")
+                   (let [r (.spawnSync cp "orgs/kotoba-lang/kagi/bin/kagi"
                                      (into-array ["get" (:ipni.publisher/seed-kagi-item m)
                                                   "-c" (:ipni.publisher/seed-kagi-compartment m)])
                                      #js {:encoding "utf8"
@@ -177,18 +184,21 @@
                                                  (aset "FLEET_ROOT" (.cwd js/process)))})]
                    (when-not (zero? (.-status r))
                      (die! "kagi:" (str/trim (str (.-stderr r)))))
-                   (str/trim (str (.-stdout r))))
+                   (str/trim (str (.-stdout r)))))
         seed (js/Buffer.from seed-hex "hex")
         _ (when-not (= 32 (.-length seed)) (die! "seed is not 32 bytes"))
         derived (mf/base58btc (->buf (concat [0x00 36 0x08 0x01 0x12 0x20]
                                              (vec (ed/pubkey-from-seed seed)))))
+        peer (if detached? derived (:ipni.publisher/peer-id m))
+        publisher-addr (str "/dns4/" (str/replace publisher-origin #"^https://" "")
+                            "/tcp/443/https/p2p/" peer)
         _ (when-not (= derived peer)
             (die! "the vault key does not derive the peer id in the manifest:" derived "vs" peer))
         metadata-bytes (vec (metadata/gateway-http-bytes))
         ;; An advertisement chain is a chain. An indexer that has already
         ;; ingested a head walks BACK from the new one, so a second
         ;; advertisement with no PreviousID orphans everything before it.
-        previous-id (r2-get-head)
+        previous-id (when-not detached? (r2-get-head))
         chunk (entry-chunk-node content-cids)
         chunk-block (dj/node->block chunk)
         signature (sign-advertisement {:peer peer :addrs addrs
@@ -203,6 +213,8 @@
                                 :signature signature})
         ad-block (dj/node->block ad)]
     (println "provider       " peer)
+    (println "publication    " (if detached? "ephemeral detached (head unchanged)" "canonical chain"))
+    (println "context        " context-id)
     (println "retrieval      " (first addrs))
     (println "publisher      " publisher-addr)
     (println "content CIDs   " (count content-cids))
@@ -222,7 +234,8 @@
         (println "\nwriting blocks…")
         (r2-put! (str "ipld/" (:cid chunk-block)) (:bytes chunk-block))
         (r2-put! (str "ipld/" (:cid ad-block)) (:bytes ad-block))
-        (r2-put! "ipni/head" (js/Buffer.from (:cid ad-block) "utf8"))
+        (when-not detached?
+          (r2-put! "ipni/head" (js/Buffer.from (:cid ad-block) "utf8")))
         (println "verifying over HTTPS before announcing…")
         (doseq [[label cid expected]
                 [["entry chunk" (:cid chunk-block) (:bytes chunk-block)]
@@ -231,10 +244,11 @@
             (when-not (.equals (js/Buffer.from got) (js/Buffer.from expected))
               (die! label "does not read back byte-identical from" publisher-origin))
             (println " " label "reads back identical," (.-length got) "bytes")))
-        (let [head (http-get-bytes (str publisher-origin "/ipni/v1/head"))]
-          (when-not (.equals (js/Buffer.from head) (js/Buffer.from (:bytes ad-block)))
-            (die! "head does not serve the advertisement we just wrote"))
-          (println "  head serves the advertisement"))
+        (when-not detached?
+          (let [head (http-get-bytes (str publisher-origin "/ipni/v1/head"))]
+            (when-not (.equals (js/Buffer.from head) (js/Buffer.from (:bytes ad-block)))
+              (die! "head does not serve the advertisement we just wrote"))
+            (println "  head serves the advertisement")))
         (println "\nannouncing to" indexer "…")
         (let [{:keys [body]} (announce! (:cid ad-block) publisher-addr)]
           (println body))))))
