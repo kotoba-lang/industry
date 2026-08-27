@@ -143,8 +143,18 @@
                  :performance/summary-path :performance/roadmap-path :performance/adr-id]]
         (when-not (get entity k) (fail! (str "datoms missing " (name k)))))
       (when runtime
-        (when-not (= "kotoba.runtime-comparison/v1" (.-format runtime))
-          (fail! "runtime.json format drift"))
+        (let [format (.-format runtime)]
+          (when-not (contains? #{"kotoba.runtime-comparison/v1"
+                                 "kotoba.runtime-comparison/v2"} format)
+            (fail! "runtime.json format drift"))
+          ;; v1 evidence predates explicit suites. A v2 root comparison must
+          ;; opt into competitive adapters and actually measure Rust; core
+          ;; evidence deliberately has no Rust-relative ratio.
+          (when (= "kotoba.runtime-comparison/v2" format)
+            (when-not (= "competitive" (.-suite runtime))
+              (fail! "runtime.json v2 must use the competitive suite"))
+            (when-not (= "measured" (some-> runtime .-normalization .-status))
+              (fail! "runtime.json v2 must measure its Rust normalization adapter"))))
         (let [rust (median-ns runtime "rust")
               amu-n (median-ns runtime "amu-native")
               amu-w (median-ns runtime "amu-wasm32")
@@ -206,7 +216,8 @@
                                 #js {:cwd amu :encoding "utf8" :stdio "pipe"
                                      :maxBuffer (* 32 1024 1024)}))
             rt (run "scripts/runtime-comparison.mjs"
-                    ["--runs" "3" "--calls" "100000" "--warmup" "10000" "--n" "200"
+                    ["--suite" "competitive"
+                     "--runs" "3" "--calls" "100000" "--warmup" "10000" "--n" "200"
                      "--output" runtime-out])
             _ (when-not (zero? (or (.-status rt) 1))
                 (print (str (or (.-stdout rt) "") (or (.-stderr rt) "")))

@@ -47,6 +47,7 @@ writeFileSync(join(outDir, "host-meta.json"), JSON.stringify(meta, null, 2));
 console.log("\n=== runtime comparison ===");
 sh("node", [
   "scripts/runtime-comparison.mjs",
+  "--suite", "competitive",
   "--runs", String(runs),
   "--calls", "100000",
   "--warmup", "10000",
