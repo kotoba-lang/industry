@@ -335,43 +335,77 @@ finding looked like \"the clamp test does not discriminate\" and was actually
 this (a red produced by breaking the wrong thing); this is the same error
 producing a green.
 
+## The MLS framing layer landed (2026-08-27)
+
+mls.proposal, mls.framing and mls.message: FramedContent, Sender,
+FramedContentAuthData, AuthenticatedContent, PublicMessage,
+PrivateMessage, MLSMessage, and the Proposal/Commit codecs framing cannot
+work without. Against the working group's message-protection corpus --
+seven suites, each with a proposal, a commit and an application message
+in both wire formats. 61 tests / 21,358 assertions on both runtimes.
+
+Both directions are exercised and they are labelled apart. Unprotecting
+what another implementation protected is the check that means something;
+protecting content and unprotecting it again is a round-trip, and a
+round-trip is only evidence that one implementation is self-consistent.
+
+Three guarantees sit underneath and a PublicMessage has two of them: the
+signature over FramedContentTBS says who wrote it, the membership tag
+over AuthenticatedContentTBM says the writer is in this group in this
+epoch, and encryption says nobody outside the group can read it. The tag
+is checked before the signature -- it is symmetric, so it rejects most
+garbage before any public-key work happens.
+
+Two findings worth keeping:
+
+**A parser needed a parser.** FramedContent embeds a Proposal or a Commit
+with no length prefix, so a reader that cannot say where a Commit ends
+cannot say where the signature after it begins. Only application content
+(an opaque<V>) is self-delimiting. This is why mls.proposal had to exist
+before framing could -- and why the transcript-hash layer, which landed
+first, had to reach the same content by recomputing the confirmation tag
+and matching it as a known suffix instead.
+
+**Refusing by name is not the same as not implementing.** add and update
+proposals, and a Commit's UpdatePath, carry KeyPackage and LeafNode --
+ratchet-tree encodings that do not exist yet. They return
+:unimplemented-proposal-type and :unimplemented-update-path rather than
+falling through the dispatch. This parser does not do that yet and that
+is not a proposal type are different things to tell a caller, and only
+the first one tells the caller to wait.
+
+Suites 4 and 6 sign with Ed448, which this workspace does not have. They
+are not skipped: their messages are decoded, their content codecs
+checked, and the signature step asserted to refuse by that name. A
+skipped suite and a passing suite look identical in a summary line.
+Application data may not travel as a PublicMessage (RFC 9420 6.1), and
+that refusal is placed before the signature step so it holds for those
+two suites as well -- a rule that depended on being able to sign would be
+no rule at all for the suites that cannot.
+
+Discrimination measured by breaking one thing at a time:
+
+  FramedContentTBS omits the GroupContext      31 red
+  the reuse guard is not applied               23 red
+  one ratchet for every content type           15 red
+  application data allowed in a PublicMessage   7 red
+  the membership tag is not checked             2 red
+  the private-message padding is not checked    1 red
+  restored                                       0
+
 ## What remains, in dependency order
 
-AES-GCM was the keystone and it has landed, so the ordering below is no
-longer blocked at its root. Every named consumer wanted it: ECH configs in
-the wild advertise AES-128-GCM, and RFC 9230 names
-X25519/HKDF-SHA256/AES-128-GCM as ODoH's mandatory suite. Until it existed
-the consumers could only be built against a suite no deployed peer offers.
-
-  1. (done) hpke suite params   AES-GCM exists. kdf_id
-                             and aead_id become values rather than
-                             constants. Validates against RFC 9180 A.1,
-                             which is the same KEM with AES-128-GCM -- the
-                             extractor already reads that section. This is
-                             the next commit, and it is small.
-  2. hpke KEM + KDF          DHKEM over the three NIST curves and X448,
-                             and HKDF-SHA384/512. What the RFC can anchor:
-                             A.3 (P-256, HKDF-SHA256, AES-128-GCM), A.4
-                             (P-256, **HKDF-SHA512**), A.5 (P-256,
-                             ChaCha20Poly1305), A.6 (**P-521**,
-                             HKDF-SHA512, AES-256-GCM), A.7 (X25519,
-                             export-only AEAD). There is **no appendix for
-                             P-384 or for X448**, so those two get the
-                             primitives' own corpora and say so.
-                             DeriveKeyPair on the NIST curves also needs
-                             rejection sampling, which X25519 does not.
-  2. the MLS framing layer   AuthenticatedContent, FramedContent, Proposal
-                             and Commit. This is the next real dependency
-                             rather than the next list item: every
-                             remaining corpus is written in terms of it,
-                             and the transcript hashes only avoided needing
-                             it by using the confirmation tag as a boundary
-                             marker.
-  3. MLS, after that         tree hashes, parent hashes, TreeKEM, Welcome.
+  1. MLS ratchet-tree nodes  LeafNode, KeyPackage, UpdatePath. The next
+                             real dependency for the same reason framing
+                             was: add and update proposals and a Commit's
+                             UpdatePath all carry them, and every
+                             remaining corpus is written in terms of a
+                             tree with real nodes in it.
+  2. MLS, after that         tree hashes, parent hashes, TreeKEM, Welcome.
   3. Ed448                   MLS suites 4 and 6 name it and nothing here
-                             implements it. The other five suites sign
-                             (below), so this is no longer a prerequisite
-                             for MLS -- it is two of seven suites.
+                             implements it. The other five suites sign,
+                             so this is not a prerequisite for MLS -- it
+                             is two of seven suites.
 
 ## What this does not claim
 
