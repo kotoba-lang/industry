@@ -116,4 +116,62 @@ duplicated under `tenkyu/`, byte-identical apart from a `_probe.txt`. The
 published manifests still named the retired prefix and were repointed; the
 duplicate objects were left in place, because deleting 1,470 objects is the
 owner's call and nothing reads them.
+
+## What the same day found underneath it
+
+Three more of the same shape, each closed:
+
+**Nothing had a timeout.** The first cycle after the retention change sat
+for eighteen minutes at 0% CPU, holding a dead OpenSky socket in
+`CLOSE_WAIT` and then two established Cloudflare connections. Node's
+`fetch` has no default timeout and nothing here set one. That is not a slow
+poll: launchd will not start a job while the previous one is running, so
+one stalled remote stops ingest entirely, and a cycle that never finishes
+writes no receipt -- so the ledger shows nothing, which is what a quiet
+period looks like. `otent.deadline` now bounds every call (60 s reads,
+180 s writes, including the kotobase publish through `make-client`'s
+`:fetch-fn`), and a call that runs out is UNMEASURED with `[timeout]`
+rather than `[unreachable]`: one says the feed answered nothing, the other
+says we stopped waiting and do not know what it would have said.
+
+**The suite was green over a file that did not parse.** A one-paren edit
+left `bin/otent.cljs` unparseable and `npm test` reported 70 tests, 740
+assertions, 0 failures. That file is required by nothing -- it is the entry
+point, it ends in `(-main)`, and requiring it from a test would run a tick
+against the live feeds. So the one file that touches the network, holds the
+commit logic and is what launchd executes was the one file no test could
+see. Each CLI is now run bare (usage line, exit 2, no socket, but a real
+load). `bin/scheduled.cljs` is still uncovered, and its docstring says so
+rather than letting the floor look complete.
+
+**The warning fired on the incident it was written for.** The new
+cycle-duration warning printed `cycle took 994 s ... launchd will skip
+fires` on that very stall -- in production, not in a test.
+
+## Open: the satellite table is ingested and not servable
+
+`GET /api/objects/satellite` has returned `503 error code: 1102` -- Worker
+CPU exceeded -- on every attempt, ~45-50 s in, and raising `limits.cpu_ms`
+to 120000 did not change it (the config was reverted rather than left in
+place claiming to do something it does not).
+
+Measured: `otent_satellite` is 21,085 rows in **5** Parquet files, 1.84 MB.
+`otent_fire` returns 27,833 rows from **one** 0.93 MB file without
+trouble. So the cost is bytes decoded, not rows returned, and the table has
+been unservable since the catalogue was widened from `GROUP=stations` (21
+objects) to `GROUP=active` on 2026-08-26 -- **ingest coverage went up and
+read coverage silently went to zero**, with a 503 as the only sign. It will
+worsen: the read window is seven days and each poll adds ~4,500 rows.
+
+Narrowing the window does not fix it. Element sets arrive across polls
+(21 + 7,493 + 4,684 + 4,412 + 4,475 to reach 21,085), so a short window
+would hold a fraction of the catalogue rather than a stale copy of it.
+
+The fix is a materialised current-catalogue object -- latest element set
+per object, written by the ingest side where CPU is free, served by the
+Worker without opening Parquet at all. **It is not done here**, because the
+obvious quick version reimplements `app-otent`'s fold in a second language
+in a second repository, and a second implementation of a fold drifts from
+the first silently. Doing it properly means one fold both sides call, and
+that is a design decision rather than an edit.
 "}]
