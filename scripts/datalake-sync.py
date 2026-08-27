@@ -106,6 +106,10 @@ def main() -> int:
     ap.add_argument("--account", default=ACCOUNT_DEFAULT)
     ap.add_argument("--bucket", default=BUCKET_DEFAULT)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--evolve-schema", action="store_true",
+                    help="入力に既存表より多い列があるとき、表の schema を広げてから "
+                         "書く（Iceberg の union_by_name）。**列が減る向きには効かない** "
+                         "-- それは refuse する（下記）")
     args = ap.parse_args()
 
     namespace, tables = load_spec(args.spec)
@@ -148,6 +152,41 @@ def main() -> int:
         except Exception:
             t = catalog.create_table(ident, schema=tbl.schema)
             print(f"{ident}: created")
+            t.overwrite(tbl)
+            back = catalog.load_table(ident).scan().to_arrow()
+            print(f"{ident}: committed  read-back-rows={back.num_rows}")
+            if back.num_rows != tbl.num_rows:
+                print(f"{ident}: MISMATCH wrote {tbl.num_rows} read back {back.num_rows}")
+                failed += 1
+            continue
+
+        # 列の増減は 2 つの別の話で、危険さが違う。
+        #
+        #   増えた   新しい列が足された。既存行はその列を null で持つ -- 正しい
+        #            （その行が書かれた時点でその値は存在しなかった）。
+        #   減った   入力がその列を表現できなかった。null 埋めすると
+        #            「値が無かった」として読めてしまう -- refuse する。
+        #
+        # 増えた側も既定では通さない: --evolve-schema を明示したときだけ広げる。
+        # 黙って広がる loader は、typo で足された列を本物の列として固定する。
+        existing = set(t.schema().column_names)
+        incoming = set(tbl.schema.names)
+        if incoming - existing:
+            if not args.evolve_schema:
+                print(f"{ident}: REFUSING -- input has columns the table does not: "
+                      f"{sorted(incoming - existing)}. Pass --evolve-schema if that is intended.")
+                failed += 1
+                continue
+            with t.update_schema() as us:
+                us.union_by_name(tbl.schema)
+            t = catalog.load_table(ident)
+            print(f"{ident}: schema widened by {sorted(incoming - existing)}")
+        if existing - incoming:
+            print(f"{ident}: REFUSING -- table has columns the input does not: "
+                  f"{sorted(existing - incoming)}. Null-filling them would record "
+                  "'no value' where the truth is 'not representable'.")
+            failed += 1
+            continue
 
         # 全量入れ替え。Iceberg は snapshot を残すので前回の中身は time-travel で読める。
         t.overwrite(tbl)
