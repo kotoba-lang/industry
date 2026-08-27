@@ -3167,4 +3167,156 @@
      :find "            :when (and (seq s) (not (s (str (:repo data)))))]"
      :replace "            :when false]"
      :must-fail ["a-shard-for-a-repo-the-summary-never-mentions-is-refused"]}]}
+
+  {:repo "orgs/cloud-itonami/cloud-itonami-contact-pii"
+   :label "contact-pii —— 個人データの custody が、静かに解けないこと"
+   ;; この repo は age 暗号化された PII レコードの DataLad dataset で、README が
+   ;; 「enforced in code, not by convention」と書いているのに、その enforcement は
+   ;; superproject 側の script にしか無かった。fixture テストは **content も age
+   ;; identity も 1 バイトも要求しない**ので fresh clone で走る —— 実 tree を測るのは
+   ;; bin/verify.cljs の方で、annex content が無いとき / --public-plane を渡されて
+   ;; いないときは pass ではなく exit 2 で拒否する。
+   ;;
+   ;; 各 fixture は :check の**キーワードそのもの**を pin している。`(seq violations)`
+   ;; だけを見る負テストは、別の理由で落ちた実行を「噛んだ」と数えるため（CLAUDE.md
+   ;; 「6 問」の 6 番）。
+   ;;
+   ;; ⚠ nbb の cljs.test runner は assertion が落ちても exit 0 を返す（この suite で
+   ;; 実測: 1 件わざと壊して runner は 1 failures を報告しつつ exit 0）。テスト側で
+   ;; counters から exit code を立てているので、:green-marker と exit は一致する。
+   :cmd ["nbb" "--classpath" "src:test" "test/contact_pii_verify_test.cljs"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :contact-pii/both-planes-not-compared
+     :why "org 面と person 面に同じ field が declare されると、消去要求が片面だけ履行される —— policy.edn 自身がそう書いている。両面の突き合わせを外すと、その重複が誰にも見えない"
+     :file "src/contact_pii_verify.cljs"
+     :find "        both  (sort (filter org-names person-names))]"
+     :replace "        both  []]"
+     :must-fail ["a-field-declared-in-both-planes-is-refused"]}
+
+    {:id :contact-pii/person-plane-location-unchecked
+     :why "person 面の :where が blueprint.edn（公開カタログ）を指したら、split は宣言の時点で消えている。実装が 1 行も変わらずに起きる退行"
+     :file "src/contact_pii_verify.cljs"
+     :find "      (when (some-> (:where person) (str/includes? \"blueprint.edn\"))"
+     :replace "      (when false"
+     :must-fail ["a-person-plane-pointed-at-the-public-file-is-refused"]}
+
+    {:id :contact-pii/hard-rule-can-be-deleted
+     :why "「person-level を公開面に書いてはならない」という 1 文がこの dataset の全部。消えても実行時の振る舞いは 1 つも変わらないので、検査だけが気付ける"
+     :file "src/contact_pii_verify.cljs"
+     :find "      (when (str/blank? (str (:hard-rule person)))"
+     :replace "      (when false"
+     :must-fail ["deleting-the-hard-rule-is-refused"]}
+
+    {:id :contact-pii/empty-person-plane-called-clean
+     :why "証拠の床。person 面の field が 0 件の policy は「違反 0 件」ではない —— schema と突き合わせるものが無いだけで、それを clean と読むと未測定が緑として溜まる"
+     :file "src/contact_pii_verify.cljs"
+     :find "      (when (empty? (:fields person))"
+     :replace "      (when false"
+     :must-fail ["an-empty-person-plane-is-refused"]}
+
+    {:id :contact-pii/policy-schema-drift-tolerated
+     :why "policy が person-level と呼ぶ field を schema が定義していないなら、policy はもう record の中身を述べていない。片方だけ編集する形の drift"
+     :file "src/contact_pii_verify.cljs"
+     :find "            :when (not (contains? person-schema f))]"
+     :replace "            :when false]"
+     :must-fail ["a-person-field-the-schema-never-defines-is-refused"]}
+
+    {:id :contact-pii/reverse-copy-tolerated
+     :why "hard rule は双方向。org-level の事実を private 面に複製すると、同じ事実が 2 面に載る。逆向きの検査を外す"
+     :file "src/contact_pii_verify.cljs"
+     :find "            :when (contains? org-fields k)]"
+     :replace "            :when false]"
+     :must-fail ["an-organisation-field-copied-into-the-private-schema-is-refused"]}
+
+    {:id :contact-pii/public-plane-scan-narrowed-to-container
+     :why "leak の実形は個々の :person/name であって :record/persons の丸ごとコピーだけではない。走査対象を container 1 つに絞ると、氏名 1 件の漏洩が素通りする"
+     :file "src/contact_pii_verify.cljs"
+     :find "  (let [fields (into #{:record/persons}\n                     (get-in policy [:policy/plane-split :person-level :fields]))]"
+     :replace "  (let [fields #{:record/persons}]"
+     :must-fail ["a-person-field-in-a-public-blueprint-is-refused"]}
+
+    {:id :contact-pii/annex-rule-only-checked-for-explicit-nothing
+     :why "git は rule が当たらない path に unspecified を返す。`= nothing` だけを違反とすると、**規則が消えた**場合（unspecified）が素通りする —— 実測でこの形を bin/verify.cljs に当てて赤くなるところを見た"
+     :file "src/contact_pii_verify.cljs"
+     :find "                     (not= \"anything\" val))]"
+     :replace "                     (= \"nothing\" val))]"
+     :must-fail ["a-record-git-does-not-annex-is-refused"]}
+
+    {:id :contact-pii/plaintext-files-may-be-annexed
+     :why "policy.edn 自身が annex されると、B2 credential を持たない監査者にとってこの dataset の規則が dangling symlink になる"
+     :file "src/contact_pii_verify.cljs"
+     :find "          :when (and (contains? plaintext-files p) (not= \"nothing\" val))]"
+     :replace "          :when false]"
+     :must-fail ["annexing-the-policy-file-itself-is-refused"]}
+
+    {:id :contact-pii/blob-mode-not-checked
+     :why "mode 100644 の record は git 履歴に焼かれた ciphertext。policy.edn の erasure 手順（drop すれば復元できない）がその瞬間に嘘になる。しかも worktree からは symlink と見分けが付かない"
+     :file "src/contact_pii_verify.cljs"
+     :find "                    (not= \"120000\" mode))]"
+     :replace "                    false)]"
+     :must-fail ["a-record-committed-as-a-plain-blob-is-refused"]}
+
+    {:id :contact-pii/no-annex-remote-tolerated
+     :why "drop 先が 1 つも無いなら、erasure 手順には機構が無い。空を「異常なし」と返す形"
+     :file "src/contact_pii_verify.cljs"
+     :find "  (if (empty? remotes)"
+     :replace "  (if false"
+     :must-fail ["a-dataset-with-nowhere-to-drop-from-is-refused"]}
+
+    {:id :contact-pii/lei-filename-tolerated
+     :why "README の custody 論拠そのもの —— 暗号化されていてもファイル名が LEI なら、どの企業の個人データを持っているかが repo access だけで分かる"
+     :file "src/contact_pii_verify.cljs"
+     :find "          :when (re-matches lei-re stem)]"
+     :replace "          :when false]"
+     :must-fail ["a-record-named-for-its-lei-is-refused"]}
+
+    {:id :contact-pii/unexpected-file-under-records-tolerated
+     :why "records/ 配下の非 .edn.age は schema も .gitattributes も述べていないもの。放置すると annex 規則の外側に何かが置かれる"
+     :file "src/contact_pii_verify.cljs"
+     :find "          :when (not (str/ends-with? n record-suffix))]"
+     :replace "          :when false]"
+     :must-fail ["a-file-under-records-that-is-not-a-record-is-refused"]}
+
+    {:id :contact-pii/plaintext-record-tolerated
+     :why "age magic を見なくなると、平文が annex されて B2 へ push される。この dataset が防いでいる唯一の不可逆な事故"
+     :file "src/contact_pii_verify.cljs"
+     :find "         :when (and present? (not (str/starts-with? (str head) age-magic)))]"
+     :replace "         :when false]"
+     :must-fail ["plaintext-under-records-is-refused"]}
+
+    {:id :contact-pii/absent-content-treated-as-plaintext
+     :why "逆向きの退行。content が無い record を『magic が無い』として違反にすると、fresh clone が全件 red になり、本物の平文と区別できなくなる。厳しすぎる方向も捕まえる"
+     :file "src/contact_pii_verify.cljs"
+     :find "         :when (and present? (not (str/starts-with? (str head) age-magic)))]"
+     :replace "         :when (not (str/starts-with? (str head) age-magic))]"
+     :must-fail ["absent-content-is-not-checked-as-clean"]}
+
+    {:id :contact-pii/empty-scan-called-clean
+     :why "証拠の床。record を 1 件も見ていない実行が、見て問題が無かった実行と同じ値を返す形"
+     :file "src/contact_pii_verify.cljs"
+     :find "  (if (zero? scanned-count)"
+     :replace "  (if false"
+     :must-fail ["scanning-no-records-is-refused-rather-than-called-clean"]}
+
+    {:id :contact-pii/retention-may-be-extended
+     :why "24 か月は policy の既定。短くするのは安全側、伸ばすのは owner 判断。上限検査を外すと、保持期間の延長が commit 1 本で通る"
+     :file "src/contact_pii_verify.cljs"
+     :find "      (> m retention-ceiling-months)"
+     :replace "      (> m 1000000)"
+     :must-fail ["extending-retention-by-edit-is-refused"]}
+
+    {:id :contact-pii/non-numeric-retention-tolerated
+     :why "`number?` 判定を外すと、手書き EDN で起きうる `:person-level-months \"24\"` が素通りする —— cljs で (pos? \"24\") は **true**、(> \"24\" 24) は false（実測）なので、下の 2 分岐はどちらも文字列を捕まえない。\n\n     ⚠ この mutation は最初 `(and (not (number? m)) (some? m))` と書いており、**噛まなかった**。nil も 0 も下の pos? 分岐が拾うので、当時のテスト 2 件は同じ keyword を受け取って緑のままだった。harness の報告は正しく、足りなかったのは検査ではなくテストの方だった（文字列の case を追加、eead9cb→7306219）"
+     :file "src/contact_pii_verify.cljs"
+     :find "      (not (number? m))"
+     :replace "      false"
+     :must-fail ["personal-data-with-no-stated-retention-is-refused"]}
+
+    {:id :contact-pii/redistribution-flag-defaults-open
+     :why "`false?` を `not true?` に緩めると、**キーが消えた** policy が「再配布不可」として通る。欠落を否定として読む形"
+     :file "src/contact_pii_verify.cljs"
+     :find "  (if (false? (get-in policy [:policy/redistribution :allowed]))"
+     :replace "  (if (not (true? (get-in policy [:policy/redistribution :allowed])))"
+     :must-fail ["flipping-the-redistribution-flag-is-refused"]}]}
 ]}
