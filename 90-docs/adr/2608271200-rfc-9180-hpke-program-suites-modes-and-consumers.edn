@@ -98,6 +98,24 @@ oracle.
 RFC's own vectors and the complete Wycheproof corpus (510 cases). 1,107
 assertions on both runtimes.
 
+**HPKE, fully parameterised** -- five KEMs, three KDFs, four AEADs including
+export-only, four modes, against all seven RFC 9180 appendices. Each test
+builds its suite from the identifiers the vectors themselves declare, so the
+registries are checked too. 2,423 assertions on both runtimes, 2,610 with the
+BouncyCastle oracle.
+
+Appendix A.4 is the one that earns its keep: DHKEM(P-256, HKDF-SHA256) paired
+with HKDF-SHA512, so the KEM derives with SHA-256 while the key schedule
+derives with SHA-512 in the same suite. A library reading one KDF for both is
+right about six appendices out of seven.
+
+**org-ietf-odoh** -- RFC 9230, HPKE's first consumer here. 229 assertions on
+both runtimes. The response is not a second encapsulation: the target exports
+an AEAD key from the same HPKE context, salted with the query plaintext, so
+the client must keep that plaintext and the response is bound to those exact
+query bytes. RFC 9230 publishes no vectors; the corpus is cloudflare/odoh-go's
+and the tests are named for what it is.
+
 ### Three findings from those two, worth more than the code
 
 **A corpus can be complete and still not cover the thing you assume it
@@ -132,7 +150,7 @@ the wild advertise AES-128-GCM, and RFC 9230 names
 X25519/HKDF-SHA256/AES-128-GCM as ODoH's mandatory suite. Until it existed
 the consumers could only be built against a suite no deployed peer offers.
 
-  1. hpke suite parameters   DONE below the line: AES-GCM exists. kdf_id
+  1. (done) hpke suite params   AES-GCM exists. kdf_id
                              and aead_id become values rather than
                              constants. Validates against RFC 9180 A.1,
                              which is the same KEM with AES-128-GCM -- the
@@ -149,14 +167,15 @@ the consumers could only be built against a suite no deployed peer offers.
                              primitives' own corpora and say so.
                              DeriveKeyPair on the NIST curves also needs
                              rejection sampling, which X25519 does not.
-  3. TLS-ECH                 into org-ietf-tls, which is a TLS 1.3 client
+  2. TLS-ECH                 into org-ietf-tls, which is a TLS 1.3 client
                              with no ECH today -- measured: no path in its
                              tree matches ech/hpke, and extension.cljc does
-                             not carry one.
-  4. ODoH (RFC 9230)         HPKE plus a small message format. The cheapest
-                             consumer.
-  5. MLS (RFC 9420)          largest by far; an independent group key
-                             agreement sits on top.
+                             not carry one. Draft-tracked rather than an
+                             RFC, so the vectors question has to be asked
+                             again before starting.
+  3. MLS (RFC 9420)          largest by far; an independent group key
+                             agreement sits on top. Unlike the other two it
+                             does have a published interop corpus.
 
 ## What this does not claim
 
