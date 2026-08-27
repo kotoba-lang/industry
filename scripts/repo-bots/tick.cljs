@@ -326,6 +326,16 @@
       (println "STANDING（床ごと。列挙しない）")
       (doseq [[f n oldest] (standing-summary bots)]
         (println (str "  " (name f) "\t" n " 体\t最古 " oldest "d"))))
+    ;; README が無く、コードも無い repo は「文書の欠落」ではなく **repo が空**。
+;;    直し方が別物（README を書くのではなく、中身を作るか退役させる）なので分けて数える。
+;;    実測 2026-08-27: 提案の最初の波 8 件のうち 6 件がこれだった。
+    (let [empty-repos (count (for [[_ r] bots
+                                   :when (get (:broken r) :readme)
+                                   :when (contains? (set (:na r)) :test-signal)]
+                               1))]
+      (when (pos? empty-repos)
+        (println (str "EMPTY-REPO\t" empty-repos
+                      " 体は README もコードも無い —— README の欠落ではなく repo が空"))))
     (when (pos? unmeasured)
       (println)
       (println "UNMEASURED の理由")
