@@ -177,8 +177,23 @@
 
   `.*-cache\\.json` は contracts/cache/solidity-files-cache.json（foundry の
   ビルドキャッシュ）向け。`cache` 単体を足すと正当な `cache/` ディレクトリまで
-  巻き込むので、ファイル名の形で絞る。"
-  #"(^|/)(node_modules|\.cpcache|\.shadow-cljs|cljs-runtime|\.fleet-run|\.wrangler|target|dist|build|out|\.DS_Store|.*\.log|.*-cache\.json)(/|$)")
+  巻き込むので、ファイル名の形で絞る。
+
+  `scratch` / `.probe` / `tmp` は 2026-08-27 に追加。ここまでの列挙は**ビルドの
+  副産物**だけを見ており、**人が手で置いた使い捨て**を見ていなかった。実測: この
+  日 `:additive`（= PR を作って **merge する**クラス）で着地した 5 repo のうち
+  2 つが診断用の投げ捨てスクリプトで、`cloud-itonami-isic-862` の
+  `.probe/probe.clj` と `cloud-itonami-isic-6310` の `scratch/probe.clj` が
+  **main に merge された**。どちらも ns を持たず top-level `require` で書かれた
+  REPL 用の走り書きで、両 repo とも**その 1 本以外にそのディレクトリ配下を
+  1 件も track していない**（= 意図して置いている artifact ディレクトリではない）。
+
+  ⚠ **原因を「scratch worktree から着地させたこと」と読んではいけない。** 同じ
+  日、同じ scratch worktree 由来で `etzhayyim/tamaki` の test と
+  `kotoba-lang/kakeibo` の accounting 実装（src+test）が正しく着地している。
+  効く信号は**取り込み元のディレクトリ**ではなく**着地する path そのもの**で、
+  取り込み元で弾いていれば本物 3 件を巻き添えにしていた。"
+  #"(^|/)(node_modules|\.cpcache|\.shadow-cljs|cljs-runtime|\.fleet-run|\.wrangler|target|dist|build|out|scratch|\.probe|tmp|\.DS_Store|.*\.log|.*-cache\.json)(/|$)")
 
 (def max-bytes (* 2 1024 1024))
 

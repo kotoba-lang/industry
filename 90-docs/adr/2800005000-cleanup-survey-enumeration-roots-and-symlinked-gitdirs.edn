@@ -116,11 +116,13 @@ editorialising な要約だけである。
 
 ## やらなかったこと
 
-- **fleet 規模の `:review` 着地（約 90 repo）**。対象の大半が `_wt*` / `.wave*` /
-  `.tamaki-*` の scratch worktree dir で、orphan audit が別途 116 件を
-  `worktree/scratch` に分類している。cleanup-land はその分類を参照しない ——
-  scratch dir から `:additive` を起こすのは rename residue と同じ誤った論証
-  （*main に無い* は *新しい仕事である* を意味しない）。backlog を減らさず増やす。
+- **fleet 規模の `:review` 着地（約 90 repo）**。draft PR を 90 本増やすと
+  backlog を減らさず増やす。`:preservation-pr-disposition` は 1 件ずつ
+  測って disposition を付けろと言っており、一括で開けることはそれに反する。
+
+  ⚠ **この節の初版は理由を間違えて書いていた**（2026-08-27 訂正）。
+  「対象の大半が scratch worktree dir だから危険」と書いたが、**測ったら違った** ——
+  下記のとおり効く信号は取り込み元のディレクトリではなく着地する path である。
 - **`.worktrees/` の撤去**。9 checkout は clean、1 つは Android launcher の
   PNG 再生成 51 件のみ（archive 済み）。5 repo は他セッションの in-flight な
   `agent/aiueos-rt-intrinsics` で、PR を開いて review 経路に載せるところまでが
@@ -134,5 +136,40 @@ editorialising な要約だけである。
    材料は `.git/stash-archive-20260827/unlanded-ledger-events-20260827/`。
 2. 開けた 5 PR の disposition（`kotoba-lang/amu#633` と `kotoba-native#61` は
    CONFLICTING、他 3 本は MERGEABLE）。
-3. cleanup-land 側に orphan audit の `worktree/scratch` 分類を渡す
-   —— scratch dir 由来の `:additive` を止める。"}]
+3. ~~cleanup-land 側に orphan audit の `worktree/scratch` 分類を渡す~~
+   —— **やらない。測ったら誤診だった**（2026-08-27）。
+
+## 訂正 —— `:additive` が junk を通した本当の理由（2026-08-27）
+
+この日 `:additive` で merge した 5 repo の中身を後から読んだところ、**2 つが
+投げ捨ての診断スクリプト**だった:
+
+| repo | 着地した path | 中身 |
+|---|---|---|
+| `cloud-itonami-isic-862` | `.probe/probe.clj` | ns を持たない top-level `require` の走り書き |
+| `cloud-itonami-isic-6310` | `scratch/probe.clj` | 同上 |
+
+両 repo とも**その 1 本以外にそのディレクトリ配下を 1 件も track していない**
+（30 blob 中 1、81 blob 中 1）ので、意図して置いている artifact ディレクトリでは
+ない。
+
+**しかし原因は『scratch worktree から取り込んだこと』ではない。** 同じ日・
+同じ scratch worktree 由来で、`etzhayyim/tamaki` の test と
+`kotoba-lang/kakeibo` の accounting 実装（src+test）が**正しく**着地している。
+取り込み元で弾く設計にしていれば、**本物 3 件を巻き添えにしていた**。
+
+効く信号は**着地する path そのもの**であり、これは既存の `junk-re` の担当領域
+だった —— その列挙が**ビルドの副産物**（`target` `dist` `cljs-runtime` …）
+だけを見ていて、**人が手で置いた使い捨て**（`scratch` `.probe` `tmp`）を
+見ていなかった。`junk-re` に 3 語を足して解消。
+
+両方向の実測（11 ケース、mismatch 0、**patch が変えたのはちょうど 2 件**）:
+着地済みの 2 本が `take → junk` に変わり、同じ worktree 由来の本物 3 件と
+false-positive 用の probe（`src/scratchpad_util.clj` / `src/tmpl/render.clj` /
+`docs/tmp-notes.md`）は**どれも不変**。既存 3 つの selftest も PASS。
+
+誤って着地した 2 ファイルは別途 revert する。
+
+**教訓**: 事故の相関（『scratch worktree だった』）を原因として記録しかけた。
+同じ母集団の中に**同じ相関を持つ正しい着地が 3 件**あったことを見れば、
+それが原因でないことは分かった。**次の一手を書くときも、その根拠を測る。**"}]
