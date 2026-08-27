@@ -2059,11 +2059,18 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
 - **`nbb`** — ClojureScript-on-Node の高速スクリプティング。静的サイト生成
   など軽量タスク向け（実例: `kototama/web/generate.cljs`）。
 - **JVM 単体と bb は最後の手段（app runtime として）。** 既存の JVM(`:clj`)
-  専用ライブラリ（`kotoba-lang/ed25519`・`kotoba-lang/cacao`・`kotoba-lang/
-  tech-ipfs-specs-ipns` 等）は、実装当時「唯一動く経路が JVM だった」という
-  正しい判断の結果なので、上位の選択肢が実在するようになった今も
-  リトロアクティブに書き直さない（移行する場合は対象を決めて ADR 化して
-  から着手する）。**script host としての bb は ADR-2607173000 で退役** —
+  専用ライブラリは、実装当時「唯一動く経路が JVM だった」という正しい判断の
+  結果なので、上位の選択肢が実在するようになった今もリトロアクティブに
+  書き直さない（移行する場合は対象を決めて ADR 化してから着手する）。
+  ⚠ **ただしこの一覧を「今どれが JVM 専用か」の答えとして引かない。**
+  ここは長く `kotoba-lang/ed25519`（現 `org-ietf-ed25519`）を例として挙げて
+  いたが、**2026-08-27 の実測でそれは誤りだった** —— `edwards.cljc` と
+  `scalar.cljc` は reader conditional が **0 個**、`sign.cljc` の 2 個は hex
+  整形だけで、`test/nbb_smoke.cljs` は cljs の署名が JVM と**バイト一致**する
+  ことを assert している。移行はとうに済んでいて、**それを書いた文だけが
+  古かった**。この誤った記述を根拠に「この workspace に portable な署名は
+  無い」と結論し、ADR に書き、次の作業の前提にしかけた（ADR-2608271200）。
+  **JVM 専用かどうかは repo の `#?(:clj` を数えて決める。ここを引かない。****script host としての bb は ADR-2607173000 で退役** —
   app を bb 前提で新規に書かないのはもちろん、運用スクリプトも nbb に寄せる。
 - `#?(:kototama ...)` / `#?(:clojurewasm ...)` という reader-conditional は
   **コードベース全体を検索してゼロ**——Clojure 標準は `:clj`/`:cljs`/
