@@ -179,6 +179,18 @@ a context -- deriving generation 15 straight from the root -- agrees at
 generation 0 and diverges everywhere after. A corpus that published only
 generation 0 would have called it correct.
 
+**PSK secrets and transcript hashes** -- RFC 9420 §8.4 and §8.2, the key
+schedule's two remaining inputs. 21,114 assertions on both runtimes, against
+77 PSK combinations and 7 transcript suites.
+
+One technique there is worth keeping. A Commit's AuthenticatedContent is the
+confirmed-hash input followed by an opaque confirmation tag, and **the
+boundary between them is not marked** -- finding it by parsing means parsing a
+whole Commit. It does not have to be parsed: the tag is recomputable, so its
+encoded form is a known suffix, and matching it finds the boundary and
+verifies the tag in one step. That is stronger than parsing would have been,
+and it let a layer land before the layer underneath it.
+
 ### A justification can be wrong in a way the code is not
 
 MLS-Exporter's label in the corpus is a 64-character string of hex digits. It
@@ -348,12 +360,14 @@ the consumers could only be built against a suite no deployed peer offers.
                              primitives' own corpora and say so.
                              DeriveKeyPair on the NIST curves also needs
                              rejection sampling, which X25519 does not.
-  2. MLS, the rest of it     tree-math, crypto-basics, signatures, the key
-                             schedule and the secret tree landed (below).
-                             Still to come, roughly in the order the corpus
-                             tests them: transcript hashes, PSK secrets,
-                             tree and parent hashes, TreeKEM, framing,
-                             Welcome.
+  2. the MLS framing layer   AuthenticatedContent, FramedContent, Proposal
+                             and Commit. This is the next real dependency
+                             rather than the next list item: every
+                             remaining corpus is written in terms of it,
+                             and the transcript hashes only avoided needing
+                             it by using the confirmation tag as a boundary
+                             marker.
+  3. MLS, after that         tree hashes, parent hashes, TreeKEM, Welcome.
   3. Ed448                   MLS suites 4 and 6 name it and nothing here
                              implements it. The other five suites sign
                              (below), so this is no longer a prerequisite
