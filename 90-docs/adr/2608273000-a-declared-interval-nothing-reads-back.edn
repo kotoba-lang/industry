@@ -34,7 +34,7 @@ turned that into a 1.5x stretch on every feed's real poll rate.
 ledger was complete, the tables were growing. The only symptom was a number
 nobody was computing.
 
-## Decision
+## Decisions
 
 1. **`otent coverage`** (`src/otent/coverage.cljc`, pure) reads declared
    cadence back from the ledger and reports drift past a 1.25x tolerance.
@@ -42,11 +42,20 @@ nobody was computing.
    tolerance is below 1.49x -- the drift it was written for -- because a
    tolerance chosen afterwards to make the current state pass is not a
    tolerance.
-2. **Retention leaves the tick's critical path**, running hourly against
+2. **`--window 3h`**, because the default median is over the whole ledger
+   and a 30-hour median carries the old number for most of a day. An
+   instrument built to measure a schedule that cannot show the schedule
+   being repaired is useless at the one moment it matters. The window is
+   printed in the header: *what is the cadence now* and *which window makes
+   this look fine* are different questions, and the reader must be able to
+   see which was asked.
+3. **Retention leaves the tick's critical path**, running hourly against
    horizons whose shortest is a day. A skipped run logs `retain NOT-DUE`,
    never `retain exit 0`.
-3. **The cycle times itself** and warns when it outlasts the timer's
+4. **The cycle times itself** and warns when it outlasts the timer's
    period, naming the consequence.
+5. **Every feed declares `:scope`** -- what its request excludes and what
+   could be asked for instead -- checked by a test. See below.
 
 ## The generalisable rule
 
@@ -55,37 +64,56 @@ it back.** `due?` checks whether the code MAY poll now; nothing was
 checking how often it DID. Those are different questions, and the gap
 between them is invisible to every green check.
 
-The same shape appears twice more in the same repository, both fixed here:
+The same shape appeared twice more in the same repository, both closed here:
 
 - **An exemption whose clearing condition is prose will outlive its
   reason.** `firms` was exempt from being unmeasured because
   `$FIRMS_MAP_KEY` was not set, `:clears-when` read *the key is entered on
   this machine*, and so it sat there being true. The key is free; nobody
   had asked. It is now `the Keychain has firms.nasa/MAP_KEY`, which the
-  cycle evaluates every run -- a feed whose key it finds is no longer
+  cycle evaluates on every run -- a feed whose key it finds is no longer
   exempt. First commit: 27,833 global fire detections, a whole kind moved
   from never-observed to measured.
 - **A scope decision can hide in a URL and stop looking like a decision.**
   The quake feed was `2.5_day.geojson` from day one. Every earthquake below
   M2.5 was not missing from the table, it was outside what was ever asked
-  for -- which reads, from the table, exactly like a world with no small
-  earthquakes in it. `all_day.geojson`: 241 events against 29, smallest
-  M-0.4, same parser.
+  for -- and a narrowed request and a quiet world produce identical rows,
+  so no table, receipt, governor or coverage report could tell them apart.
+  Now `all_day.geojson`: 241 events against 29, smallest M-0.4, same
+  parser.
 
-## What is still not read back
+## Closing the second gap rather than leaving it named
 
-Cadence is now read back. **The shape of what a feed is asked for is
-not.** `otent coverage` would not have caught the `2.5_day` ceiling, and
-it would not catch a bounding box, a `limit`, or a category filter added
-to any other feed's `:default-params`. That gap is open and named here
-rather than discovered later.
+The first version of this ADR said cadence was now read back but the shape
+of what a feed is asked for was not, and left that open. It is closed:
+every registry entry declares `:scope` in prose -- what the request
+excludes, and what could be asked for instead -- and a test refuses an
+entry without one.
+
+**This verifies nothing about whether a scope is right.** Nothing can, from
+here. It makes it impossible to narrow coverage without writing down that
+you did. `firms` is the case working as intended: it asks for VIIRS
+NOAA-20 and names `VIIRS_SNPP_NRT`, `VIIRS_NOAA21_NRT` and `MODIS_NRT` as
+available under the same key and not being asked for -- roughly a doubling
+of detections, sitting in the registry as an arguable line rather than in a
+path segment as a fact.
+
+## Coverage as of 2026-08-27
+
+| kind | rows | state |
+|---|---|---|
+| quake | 204 | live, all magnitudes |
+| satellite | 21,085 | live, `GROUP=active`; 799 deep-space cannot be propagated |
+| aircraft | 882,848 | live, bounded by OpenSky's receiver network |
+| fire | 27,833 | live from 2026-08-27 |
+| vessel | -- | **UNMEASURED**: AISStream is a WebSocket subscription and no resident collector exists. Structural, not a missing key. |
 
 ## Also measured, not fixed
 
 The `tenkyu` -> `otent` rename copied the basemap and building objects to
-the new prefix and never removed the old ones: **1,470 objects / 27.2 MB
-duplicated** under `tenkyu/`, byte-identical apart from a `_probe.txt`.
-The published manifests still named the retired prefix and were repointed;
-the duplicate objects were left in place, because deleting 1,470 objects is
-the owner's call and nothing reads them.
+the new prefix and never removed the old ones: **1,470 objects / 27.2 MB**
+duplicated under `tenkyu/`, byte-identical apart from a `_probe.txt`. The
+published manifests still named the retired prefix and were repointed; the
+duplicate objects were left in place, because deleting 1,470 objects is the
+owner's call and nothing reads them.
 "}]
