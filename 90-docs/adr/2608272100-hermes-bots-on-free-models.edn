@@ -158,4 +158,60 @@ top-level に置いたせいで、テストが対象を require した瞬間に 
 - 艦隊の 400 は ADR-2608271900 の未解決項目のまま。ここでは床を測って記録する
   ようにしただけで、直してはいない。
 - bot 本体（35 分、23 calls、PR を開く）は無料モデルでまだ一度も完走していない。
-  次の 9:20 の fire が最初の実測になる。"}]
+  次の 9:20 の fire が最初の実測になる。
+
+## Closing（2026-08-28）
+
+### 両方の bot が無料モデルで完走した
+
+| run | 結果 |
+|---|---|
+| `hyakka-source-scout` `e2100381` | **completed** 3分15秒・27 calls（murakumo 時代の同種 run は 35 分） |
+| `hyakka-ontology-scout` `a51ffc32` | **completed** 1 call・`source=builtin`（**scheduler が自分で発火**） |
+
+どちらも `session_model_usage` の行で確認した。警告の不在では判定していない。
+ontology 側は signal が空だったので何も提案せず worktree は clean —— 設計どおりの正解。
+
+source-scout は妥当な提案（ENA taxonomy / PubChem）を作りながら **PR を開けなかった**。
+prompt は「step 6 で gate、step 7 で config 編集」だが、bot は先に config を編集し、
+gate は live config を読むので自分の編集が `already configured` として返ってきた。
+綺麗な config に対して同じ提案は exit 0 で通る。app-hyakka PR #4 として着地させた
+（PubChem が CC-BY-NC 4.0 で、gate は fetch 可否と source-class しか見ずライセンスの
+意味は見ないため、merge せず人の判断に残した）。汚れた worktree を残すと
+`hyakka_evidence.py` の `git checkout --detach` が失敗して**次の run が REFUSED になる**。
+
+### refresh の horizon が 2 つの名前しか無かった
+
+翌日、cron table は 3 → 5 に増えていた。別セッションが同じ pattern で
+`itonami-ingest-scout` / `itonami-coverage-scout` を作っており、**どちらも
+`murakumo-main` のまま**だった。片方は一晩で **57 分・入力 186 万トークン**を艦隊で
+使った —— 艦隊が既定でなくなった翌晩に。
+
+名前のリストは 6 体目が現れても落ちない。黙って置き去りにし、**何もすることが無かった
+run と同じ顔をする**。既定を「agent 駆動の job すべて」に変え、意図的な pin は
+`HYAKKA_MODEL_OPT_OUT` で表明する形にした。毎回 `COVERS` ブロックを印字する。
+
+### そして広げた refresh が、走って何も変えなかった
+
+08:40 の定期実行は `current` を報告して exit 0 で終わり、2 つの job は艦隊を指したまま
+だった。**「そのモデルはまだ無料か」と「bot が実際にそれを指しているか」は別の問い**で、
+`--if-stale` は前者しか訊いていなかった。job への書き込みは install 経路にしか無かった。
+突き合わせは 1 リクエストも probe も要らないので、current 経路でも行い job ごとに 1 行
+出すようにした。
+
+**同じ「測っていない一致を、測った一致として報告する」形が、この ADR の中で 3 回
+出ている**（429 の分類、refresh の horizon、current 経路の無動作）。
+
+### 現在地
+
+4 つの agent job すべてが `cohere/north-mini-code:free` @ `openrouter-free`。
+1 本を意図的に `murakumo-main` へ戻して refresh をかけ、引き戻すことを確認済み。
+
+### 未了
+
+- `cloud-itonami-app` の Bot は 1 体も存在しない。作成は Passkey 必須の 61 ルート
+  （ADR-0006）で、`agent_session.clj` 自身が「ブラウザ以外に取得経路は無い」と書いて
+  いる。config・admission・実推論（`usage.cost 0`）は検証済みで、Bot が 1 体できた
+  瞬間から無料モデルで動く。
+- `auxiliary.free_only` が有料レーンを実際に拒むところは見ていない。設定しただけ。
+- ディレクトリ名は `scripts/hermes-hyakka-bots/` のままだが、もう hyakka 専用ではない。"}]
