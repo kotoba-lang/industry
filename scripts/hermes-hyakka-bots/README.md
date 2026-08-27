@@ -120,6 +120,13 @@ nbb scripts/hermes-hyakka-bots/resolve_free_model.cljs --if-stale --write --jobs
 primary · `2` **REFUSED**, it could not find out. 1 and 2 must not collapse:
 *no free model works* is a measurement, *I could not look* is not.
 
+**`--if-stale` reconciles even when nothing is stale.** *The model is still
+free* and *the bots are on it* are different questions, and for one day only
+the first was asked: the 08:40 run on 2026-08-28 reported `current`, exited 0,
+and left two jobs pointing at the fleet, because the jobs were only ever
+written on the install path. Pointing them costs no request and no probe, so
+the current path does it too and prints a line per job.
+
 ### Two things that will bite
 
 **The key never becomes a file.** It lives in the login Keychain under
@@ -161,9 +168,30 @@ The refresh job is `--no-agent` on purpose: the script *is* the job. The case it
 exists for is the one where the configured model has stopped answering, and a
 job that needed a model to fix the model would be dead exactly then.
 
-It resolves the two bots by **name**, not by job id. Hermes ids change when a
-job is recreated, and a pinned id would go on succeeding while updating
-nothing.
+It points **every agent-driven cron job** at the model it resolved — not a list
+of names, and not job ids. Ids change when a job is recreated; a name list is
+worse, because it does not fail when a bot it has never heard of appears.
+
+Measured 2026-08-28, the day after the switch: the table had grown from three
+jobs to five. Another session had added `itonami-ingest-scout` and
+`itonami-coverage-scout`, built to this same pattern against the cloud-itonami
+fleet, and both were still on `murakumo-main` — one of them spent 57 minutes
+and 1,857,045 input tokens there overnight. Nothing was broken and nothing
+reported anything; the refresh simply had a two-name horizon.
+
+So coverage is the default. A deliberate pin is expressed by opting out:
+
+```bash
+HYAKKA_MODEL_OPT_OUT=some-bot,another-bot   # names, comma-separated
+```
+
+Jobs that run **without** an agent carry no model and are skipped — this job is
+one of them. Every run prints a `COVERS` block naming what it targeted and what
+it skipped, because a refresh that quietly narrowed its own scope reads exactly
+like one with nothing left to do.
+
+⚠ The directory is still called `hermes-hyakka-bots`. It is no longer only
+about hyakka.
 
 `resolve_free_model.cljs` and `free-model-policy.edn` are copied to
 `~/.hermes/scripts/` alongside the shim — the resolver finds its policy beside
