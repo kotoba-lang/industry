@@ -559,7 +559,29 @@
   ;; UNLANDED 324 件のどこにも現れなかった。**「一覧に出ない」は「WIP が無い」では
   ;; ない**（ADR-2608136000: 測れなかった検査が、測って問題が無かった検査と同じ値を返す）。
   ;; 無効な `.git` を掴む危険は下の own-repo-root? が従来どおり弾く。
-  (let [repos (->> (sh "find" "orgs" "-maxdepth" "3" "-name" ".git" "(" "-type" "d" "-o" "-type" "f" ")")
+  ;; `.git` は **symlink** でもありうる。上の `-type d` → `(-type d -o -type f)`
+  ;; の修正は「ディレクトリとは限らない」までは直したが、`find` の `-type` は
+  ;; symlink を `l` として別に数えるので、**`.git` が symlink な checkout は
+  ;; どちらの枝にも当たらず、母集団から静かに落ち続けていた**。
+  ;; 実測 2026-08-27: この形が `orgs/` に 2 件（`gftdcojp/m365-archive` と
+  ;; `kotoba-lang/.toshokan-tamaki--toshokan-maturity-curator-grok-35`）、
+  ;; `.worktrees/` に 2 件。同じ形は `/private/tmp` の使い捨て worktree でも
+  ;; 見つかっており、この workspace では珍しい形ではない。
+  ;;
+  ;; 走査の **根** も盲点である。`-type d` の絞り込み（上記）を直しても、
+  ;; `find` に渡す根が `orgs` だけなら、そこに無い checkout は母集団に入らない。
+  ;; 実測 2026-08-27: superproject 直下の `.worktrees/` が子リポの worktree を
+  ;; 10 個抱えており、うち 6 branch・5 repo が default branch から diverged
+  ;; （push 済み・PR 無し = 誰の review 経路にも乗っていない）だった。survey は
+  ;; その日 UNLANDED を 350 件報告したが、**この 10 個はそのどれでもなく**、
+  ;; 出力に `.worktrees` の 4 文字が 1 度も現れなかった（cleanup-land.cljs も同じ）。
+  ;; CLAUDE.md は worktree を superproject の外に作れと言っているが、規約は
+  ;; 実在するディレクトリを消さない —— 測る側が根を 1 つしか見ないなら、
+  ;; 規約違反の置き場所は「違反として報告される」のではなく **見えなくなる**。
+  ;; own-repo-root? が無効な `.git` を従来どおり弾くので、根を増やす危険は無い。
+  (let [roots (->> ["orgs" ".worktrees"] (filter #(.exists (io/file %))) vec)
+        _ (println (format "走査の根: %s" (str/join " " roots)))
+        repos (->> (apply sh "find" (concat roots ["-maxdepth" "3" "-name" ".git" "(" "-type" "d" "-o" "-type" "f" "-o" "-type" "l" ")"]))
                    :out str/trim str/split-lines (remove str/blank?) sort
                    (map #(subs % 0 (- (count %) 5)))
                    (filter own-repo-root?)
