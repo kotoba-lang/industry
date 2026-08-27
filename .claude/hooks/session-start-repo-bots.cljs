@@ -86,8 +86,14 @@
                     "launchctl load " plist)]))
 
       :else
-      (let [bots (:bots state)
-            roster (count registry)
+      (let [all (:bots state)
+            ids (set (map :bot/id registry))
+            ;; 名簿の中だけで数える。state には名簿から消えた repo の行が残る
+            ;; （west entry の rename で実際に起きた）ので、生の件数を使うと
+            ;; 「名簿 4186 体 / 測定済み 4187」という**有り得ない行**が出る。
+            bots (into {} (filter #(contains? ids (key %)) all))
+            orphans (- (count all) (count bots))
+            roster (count ids)
             ticked (count bots)
             never (- roster ticked)
             unmeasured (count (filter #(= :unmeasured (:status (val %))) bots))
@@ -103,6 +109,7 @@
           (concat
            [(str "repo 常駐 bot: 名簿 " roster " 体 / 測定済み " ticked
                  (when (pos? never) (str "（**未踏 " never "**）"))
+                 (when (pos? orphans) (str " / 名簿から消えた state 行 " orphans))
                  (when age (str " / 最終測定 " (human age) "前")))]
            (when-not (exists? plist)
              [(str "  ⚠⚠ scheduler がありません —— " plist " が無い。"
