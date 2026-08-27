@@ -122,7 +122,7 @@
 
   `served` is the SET of names observed, not one name: the question is whether
   every slot behind the alias is admitted, and asking once cannot answer it."
-  [{:keys [accepted served alias-for]}]
+  [{:keys [accepted served alias-for declared]}]
   (let [refused (sort (remove #(contains? accepted %) served))]
     (cond-> []
       (seq refused)
@@ -139,24 +139,51 @@
              (str alias-model " reports alias-for=" (pr-str alias-for)
                   ", which the app will not admit. The registry has moved;"
                   " the served name usually follows. Admitted: "
-                  (str/join ", " (sort accepted)))]))))
+                  (str/join ", " (sort accepted)))])
+
+      ;; A pool nobody declared is a pool every client has to discover the
+      ;; expensive way. Measured 2026-08-27: local-murakumo PR #161 pooled the
+      ;; alias across two owned origins the same day, the registry record still
+      ;; read "Two production slots with 262144 tokens per slot" from before the
+      ;; pool, and cloud-itonami-app found out by refusing half its own answers.
+      ;; While this stands, an accepted set can only be maintained by hand.
+      (let [undeclared (sort (remove (set declared) served))]
+        (and (> (count served) 1) (seq undeclared)))
+      (conj [:warn "model-alias-pool-undeclared"
+             (str alias-model " answers to " (count served) " different names but the"
+                  " registry does not declare them: " (str/join ", " (sort served))
+                  (if (seq declared)
+                    (str " (declared: " (str/join ", " (sort declared)) ")")
+                    " (no served-model-names field)")
+                  ". Until the registry names its pool, every client's accepted set"
+                  " is hand-maintained and drifts on the next redeploy.")]))))
 
 (defn- self-test! []
   (let [cases [{:name "a name outside the set is a fail"
                 :in {:accepted #{"murakumo-main"} :served #{"qwen3.8-27b-throughput-b70"}
                      :alias-for "murakumo-main"}
                 :want #{"model-alias-served-not-admitted"}}
+               ;; Two names and nothing declaring them, so the pool warning is
+               ;; correct here too -- the fail is what must not be swallowed.
                {:name "one good slot does not excuse a bad one"
                 :in {:accepted #{"murakumo-main"} :served #{"murakumo-main" "qwen3.8-27b-throughput-b70"}
                      :alias-for "murakumo-main"}
-                :want #{"model-alias-served-not-admitted"}}
+                :want #{"model-alias-served-not-admitted" "model-alias-pool-undeclared"}}
                {:name "registry drift alone is a warn"
                 :in {:accepted #{"murakumo-main" "served-x"} :served #{"served-x"}
                      :alias-for "qwen3.8-27b"}
                 :want #{"model-alias-registry-not-admitted"}}
-               {:name "every observed slot admitted is clean"
+               {:name "two names the registry never declared is a warn"
                 :in {:accepted #{"murakumo-main" "served-x"} :served #{"murakumo-main" "served-x"}
-                     :alias-for "murakumo-main"}
+                     :alias-for "murakumo-main" :declared nil}
+                :want #{"model-alias-pool-undeclared"}}
+               {:name "a declared pool is not a finding"
+                :in {:accepted #{"murakumo-main" "served-x"} :served #{"murakumo-main" "served-x"}
+                     :alias-for "murakumo-main" :declared #{"murakumo-main" "served-x"}}
+                :want #{}}
+               {:name "one name needs no pool declaration"
+                :in {:accepted #{"murakumo-main"} :served #{"murakumo-main"}
+                     :alias-for "murakumo-main" :declared nil}
                 :want #{}}]
         bad (for [{:keys [name in want]} cases
                   :let [got (set (map second (judge in)))]
@@ -166,12 +193,14 @@
     (println (str "SELF-TEST\t" (- (count cases) (count bad)) "/" (count cases) " cases"))
     (if (seq bad) 1 0)))
 
-(defn- report! [accepted source served alias-for]
-  (let [findings (judge {:accepted accepted :served served :alias-for alias-for})]
+(defn- report! [accepted source served alias-for declared]
+  (let [findings (judge {:accepted accepted :served served
+                         :alias-for alias-for :declared declared})]
     (println (str "SCANNED\t1 alias\t" alias-model
                   "\tprobes=" probe-count
                   "\tserved=" (str/join "," (sort served))
                   "\talias-for=" (or alias-for "(unreadable)")
+                  "\tdeclared=" (if (seq declared) (str/join "," (sort declared)) "(none)")
                   "\tadmitted=" (count accepted)
                   "\tfrom=" source))
     (doseq [[sev k detail] findings]
@@ -207,9 +236,12 @@
                                  (keep #(json-get (:body %) "model"))
                                  set)
                      alias-for (when (= 200 (:status registry))
-                                 (json-get (:body registry) "alias-for"))]
+                                 (json-get (:body registry) "alias-for"))
+                     declared (when (= 200 (:status registry))
+                                (some-> (json-get (:body registry) "served-model-names")
+                                        js->clj set))]
                  (if (seq served)
-                   (report! accepted source served alias-for)
+                   (report! accepted source served alias-for declared)
                    (refuse! (str "no probe named a served model for " alias-model
                                  " in " probe-count " attempts (statuses "
                                  (str/join "," (map #(or (:status %) "-") chats))
