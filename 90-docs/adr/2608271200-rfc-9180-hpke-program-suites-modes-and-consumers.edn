@@ -150,6 +150,36 @@ P-256/384/521 for 2, 5 and 7 -- the latter built into org-nist-ecc against
 sixteen distinct reasons. Ed448 (suites 4 and 6) refuses by name, and a test
 asserts that rather than skipping those suites.
 
+**The MLS key schedule**, checked as a chain: 7 suites by 5 epochs, run
+forward from the initial init secret, never reading an epoch's init secret out
+of the fixture to feed the next. 17,340 assertions on both runtimes.
+
+RFC 9420's Figure 22 states its convention in prose above the diagram, and it
+is the one thing there that is easy to invert: Extract takes its salt from the
+top and its IKM from the left. Inverting it gives a key schedule that is
+entirely self-consistent -- every member running the same wrong code agrees
+with every other -- and shares nothing with anyone else. There is no way to
+catch that from inside a group. It is what an interop corpus is for, and it is
+the same shape as the two-sided-test finding above, one level up: a whole
+implementation agreeing with itself is not evidence either.
+
+### A justification can be wrong in a way the code is not
+
+MLS-Exporter's label in the corpus is a 64-character string of hex digits. It
+was read as hex, and on the strength of that reading the labelled-KDF helper
+was generalised to accept raw bytes as well as strings -- with a docstring
+explaining why the generalisation was necessary and citing the vectors.
+
+It is a label that happens to look like hex, passed as text. The generalisation
+ran fine; it was needed by nothing; and the docstring asserted a fact about the
+corpus that was false. The code was harmless and the prose was not, because the
+prose is what the next reader would have believed.
+
+That is the third member of a family this ADR keeps finding: a justification
+written next to a branch is not evidence about that branch; a round-trip is not
+evidence about what both ends compute the same way; and now, a generalisation
+is not evidence that the case it generalises for exists.
+
 ### The wrong answer came from our own documentation
 
 The previous revision of this ADR said this workspace had no portable
@@ -302,11 +332,12 @@ the consumers could only be built against a suite no deployed peer offers.
                              primitives' own corpora and say so.
                              DeriveKeyPair on the NIST curves also needs
                              rejection sampling, which X25519 does not.
-  2. MLS, the rest of it     tree-math and crypto-basics landed (below).
-                             Still to come, roughly in the order the corpus
-                             tests them: key schedule, secret tree,
-                             transcript hashes, PSK secrets, tree and
-                             parent hashes, TreeKEM, framing, Welcome.
+  2. MLS, the rest of it     tree-math, crypto-basics, signatures and the
+                             key schedule landed (below). Still to come,
+                             roughly in the order the corpus tests them:
+                             secret tree, transcript hashes, PSK secrets,
+                             tree and parent hashes, TreeKEM, framing,
+                             Welcome.
   3. Ed448                   MLS suites 4 and 6 name it and nothing here
                              implements it. The other five suites sign
                              (below), so this is no longer a prerequisite
