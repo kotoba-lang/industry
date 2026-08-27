@@ -3060,4 +3060,111 @@
      :find ":kind :app"
      :replace ":kind :lib"
      :must-fail ["repository-declares-itself-as-an-edn-first-app"]}]}
+
+  {:repo "orgs/cloud-itonami/cloud-itonami-gtm-data"
+   :label "gtm-data —— 634 テナント分の *未送信* outreach archive が、送信可能にならないこと"
+   ;; この repo は DataLad dataset で、中身は git-annex + B2 に在る。fixture テストは
+   ;; **content を 1 バイトも要求しない**ので fresh clone でも走る —— 実 archive を測る
+   ;; のは bin/verify.cljs の方で、content が無いときは pass ではなく exit 2 で拒否する。
+   ;;
+   ;; 各 fixture は :check の**キーワードそのもの**を pin している。`(seq violations)`
+   ;; だけを見る負テストは、別の理由で落ちた実行を「噛んだ」と数えるため（CLAUDE.md
+   ;; 「6 問」の 6 番）。2026-08-27 に 13 件すべて、名指しした test **だけ**が赤くなり、
+   ;; 無改変で緑になるところを見た（巻き添え 0 / 素通り 0）。
+   ;;
+   ;; ⚠ nbb の cljs.test runner は assertion が落ちても exit 0 を返す（実測）。テスト側で
+   ;; counters から exit code を立てているので、この suite の :green-marker と exit は一致する。
+   :cmd ["nbb" "--classpath" "src:test" "test/gtm_data_verify_test.cljs"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :gtm-data/external-send-not-proposed-becomes-a-blacklist
+     :why "`:external-send` は「外に出られる」効果の類。whitelist（:proposed 以外は全部だめ）を blacklist（:sent だけだめ）に「整理」すると、:done / :approved / :queued で承認された送信が全部素通りする。この archive が守っている唯一の性質がそれ"
+     :file "src/gtm_data_verify.cljs"
+     :find "                         (not= :proposed (:itonami.effect/status e)))]"
+     :replace "                         (= :sent (:itonami.effect/status e)))]"
+     :must-fail ["an-approved-external-send-is-refused"]}
+
+    {:id :gtm-data/done-exemption-never-fires
+     :why ":done を許すのは read-only な registry 書き込みだけ、という例外の縁。ここが効かなくなると例外が静かに広がる"
+     :file "src/gtm_data_verify.cljs"
+     :find "                         (not= :read-only (:itonami.effect/risk e)))]"
+     :replace "                         false)]"
+     :must-fail ["the-done-exemption-does-not-widen-past-read-only"]}
+
+    {:id :gtm-data/unknown-risk-accepted
+     :why "知らない risk 類は「安全な類」ではない。新しい effect kind が入ったとき、報告されずに通ると誰も気づかない"
+     :file "src/gtm_data_verify.cljs"
+     :find "              :when (not (known-risks (:itonami.effect/risk e)))]"
+     :replace "              :when false]"
+     :must-fail ["a-risk-class-nobody-reasoned-about-is-refused"]}
+
+    {:id :gtm-data/empty-store-reported-clean
+     :why "証拠の床。effect が 0 件の store を「違反 0 件」と同じ値で返すと、読めなかった実行が問題の無かった実行と区別できなくなる"
+     :file "src/gtm_data_verify.cljs"
+     :find "      [(v :store/no-effects \"fleet-sales-ads-store.edn\"\n          \"no effect entities found; refusing to report the store as clean\")]"
+     :replace "      []"
+     :must-fail ["an-empty-store-is-refused-rather-than-called-clean"]}
+
+    {:id :gtm-data/recipient-no-longer-checked
+     :why ":to が空であることが、この archive が「そのままでは送れない」ことの根拠。埋まったのを検出しなくなると、根拠が消えたことに誰も気づかない"
+     :file "src/gtm_data_verify.cljs"
+     :find "            :when (and (some? to) (not (str/blank? (str to))))]"
+     :replace "            :when false]"
+     :must-fail ["an-addressed-outreach-is-refused"]}
+
+    {:id :gtm-data/attribution-check-becomes-over-strict
+     :why "url か source の**どちらか**が在ればよい（実データの 25 件は source だけ）。and を or に「厳しく」すると、正しいデータ 25 件を違反と呼ぶ —— 緩む方向だけでなく、厳しすぎる方向の退行も捕まえる"
+     :file "src/gtm_data_verify.cljs"
+     :find "            :when (and (str/blank? (str (:url s)))\n                       (str/blank? (str (:source s))))]"
+     :replace "            :when (or (str/blank? (str (:url s)))\n                       (str/blank? (str (:source s))))]"
+     :must-fail ["a-prospect-with-no-trace-is-refused"]}
+
+    {:id :gtm-data/campaign-hold-not-checked
+     :why "2 本の広告 campaign は verified USDC deposit が無いため Governor に held された。ここが効かないと、deposit を捏造して go-live させた記録が通る"
+     :file "src/gtm_data_verify.cljs"
+     :find "            :when (and (map? an) (not= :held (:governor-result an)))]"
+     :replace "            :when (and (map? an) false)]"
+     :must-fail ["a-campaign-that-was-not-held-is-refused"]}
+
+    {:id :gtm-data/duplicate-repo-tolerated
+     :why "projection は 1 repo 1 entry。重複すると store / KV との突き合わせが静かにずれる"
+     :file "src/gtm_data_verify.cljs"
+     :find "      (for [[repo n] (frequencies (keep :repo entries)) :when (> n 1)]"
+     :replace "      (for [[repo n] (frequencies (keep :repo entries)) :when (> n 99)]"
+     :must-fail ["a-repo-appearing-twice-is-refused"]}
+
+    {:id :gtm-data/kv-key-shape-loosened
+     :why "`store:cloud-itonami/<repo>` は edge worker (workspace-store) との契約。prefix だけ見る正規表現に緩めると、org 違い・空 repo の key が通り、bulk put した先を誰も読めない"
+     :file "src/gtm_data_verify.cljs"
+     :find "  #\"^store:cloud-itonami/[a-z0-9][a-z0-9._-]*$\")"
+     :replace "  #\"^store:.*$\")"
+     :must-fail ["a-key-workspace-store-would-never-read-is-refused"]}
+
+    {:id :gtm-data/duplicate-kv-key-tolerated
+     :why "同じ key が 2 度あると bulk put は片方のテナントをもう片方で上書きする。put は成功して返る"
+     :file "src/gtm_data_verify.cljs"
+     :find "        (for [[k n] (frequencies ks) :when (> n 1)]"
+     :replace "        (for [[k n] (frequencies ks) :when (> n 99)]"
+     :must-fail ["a-duplicated-tenant-key-is-refused"]}
+
+    {:id :gtm-data/cross-check-skips-empty-side
+     :why "3 ファイルは同じ 634 テナントを述べる。片方が空のとき検査を飛ばすと、**部分再生成**（この dataset が既に 1 度やっている: iso3166 223 本中 81 本）が誰にも見えなくなる。各ファイルは単体では整合しているので、ここでしか出ない"
+     :file "src/gtm_data_verify.cljs"
+     :find "                     (when (or (seq missing) (seq extra))"
+     :replace "                     (when (and (seq other) (or (seq missing) (seq extra)))"
+     :must-fail ["a-partial-regeneration-is-refused"]}
+
+    {:id :gtm-data/shard-filename-not-compared
+     :why "shard のファイル名と :repo がずれると、per-repo の中身が別テナントのものとして読まれる"
+     :file "src/gtm_data_verify.cljs"
+     :find "            :when (not= stem (str (:repo data)))]"
+     :replace "            :when false]"
+     :must-fail ["a-shard-filed-under-the-wrong-name-is-refused"]}
+
+    {:id :gtm-data/orphan-shard-tolerated
+     :why "summary に無い repo の shard は、fleet 一覧から漏れたテナント。放置すると「634 件ある」という主張が静かに嘘になる"
+     :file "src/gtm_data_verify.cljs"
+     :find "            :when (and (seq s) (not (s (str (:repo data)))))]"
+     :replace "            :when false]"
+     :must-fail ["a-shard-for-a-repo-the-summary-never-mentions-is-refused"]}]}
 ]}
