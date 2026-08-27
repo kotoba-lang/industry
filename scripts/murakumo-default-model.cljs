@@ -178,11 +178,24 @@
                  (if (:error r)
                    (do (println "measure : FAILED —" (:error r))
                        (set! (.-exitCode js/process) 2))
-                   (println "measure :" (.toFixed (:tps r) 2) "tok/s decode")))))))
+                   (if (:tps r)
+                     (println "measure :" (.toFixed (:tps r) 2) "tok/s decode")
+                     ;; **timings が無い応答を 0 tok/s と読まない。** llama.cpp は
+                     ;; :timings を返すが vLLM は返さない。api.murakumo.cloud の
+                     ;; upstream は両方を含むので、どちらに当たったかで形が変わる。
+                     ;; 測れなかったので exit 2（判定できなかった）。
+                     (do (println "measure : UNMEASURED — response carried no :timings"
+                                  (str "(model " (:model r) ")"))
+                         (set! (.-exitCode js/process) 2)))))))))
 
 (defn- cmd-list! []
   (println (:out (ssh! (str "ls -d " model-root "/*/ | sed 's|.*/models/||;s|/$||'"))))
   (println "use:  set <name> [--distributed] [--parallel N] [--ctx N]"))
+
+(def public-alias
+  "The stable public alias every consumer sends (ADR-2607173100). The serve
+  line must answer to it, or model-identity checks reject a correct model."
+  "murakumo-main")
 
 (defn- exec-line [dir {:keys [distributed? parallel ctx gguf mmproj]}]
   (str/join " "
@@ -195,6 +208,15 @@
        (when distributed? (str "--tensor-split " rpc-split))
        "-ngl 999" (str "-c " ctx) (str "--parallel " parallel)
        "--host 0.0.0.0" (str "--port " port) "--jinja"
+       ;; **serve される名前を、consumer が送る名前に合わせる（罠 7）。**
+       ;; ADR-2607173100 は murakumo-main を「全 consumer が送る安定 alias」と
+       ;; 定めている。--alias を付けないと llama-server は自分を
+       ;; `Qwen3.8-27B-Q4_K_M.gguf` と名乗り、model 名を検査する caller は
+       ;; 正しく :model-mismatch で拒否する。2026-08-24 の切替がこれで、
+       ;; bot fleet の turn が落ち続けた（ADR-2608270230）。
+       ;; dir も併記して「安定名 + 実体」を両方引けるようにする。
+       ;; 具体 model id はここに焼かない（CLAUDE.md / ADR-2607173100）。
+       (str "--alias " public-alias "," dir)
        (str "--api-key-file " api-key-file)
        ;; **n-gram 投機デコードは既定で入れる。** 追加メモリ 0 で、出力は
        ;; 非投機と一致する（kbench 28/30・compile 3/3 が前後で不変、2026-08-15 実測）。
