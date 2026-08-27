@@ -20,6 +20,9 @@ Kotoba already had portable subjects, evidence, attestations, causal identity ep
 5. Current draft ERC-8004 agents become `:agent` identity subjects. Registration is bound to the configured Identity Registry. Reputation and validation claims require non-empty client and validator allowlists and explicit thresholds. Below-threshold results are refusals, not trust claims. The `agent` execution-contract repo remains out of scope.
 6. `persist-trust-bundle!` validates and writes the subject, evidence, attestations, and causal trust claims in one ledger transaction.
 7. The historical Etzhayyim monolithic contract remains legacy evidence only. It is not advertised as current ERC-8004 compatible. Its public RPC returned Cloudflare tunnel error 1033 on 2026-08-27, so current live chain state is UNVERIFIED. No chain deployment or migration is claimed by this slice.
+8. The reference JVM host performs read-only EAS and Human Passport access over an explicitly configured HTTPS RPC. It verifies `eth_chainId` before every contract read, caps JSON-RPC response size, rejects malformed ABI offsets and values, and normalizes Ethereum hex casing only for equality. It never writes to the chain.
+9. The live proof pins Optimism chain 10, EAS `0x4200000000000000000000000000000000000021`, Schema Registry `0x4200000000000000000000000000000000000020`, Human Passport schema `0xda0257756063c891659fed52fd36ef7557f7b45d66f59645fd3c3b263b747254`, and GitcoinAttester `0x843829986e895facd330486a61Ebee9E1f1adB1a`. On 2026-08-27 it decoded the official historical sample as scorer 335, score 922910, threshold 200000, and 29 stamps, then rejected it as expired. This proves live reading and fail-closed lifecycle behavior, not current validity of that wallet.
+10. The reference JVM host implements coordinate-driven ERC-8004 reads for Identity ownership, agent URI, verified agent wallet, Reputation summaries, Validation summaries, and bounded registration documents over HTTPS, an explicitly configured IPFS gateway, or base64 JSON data URIs. The draft expects per-chain singleton registries but supplies no canonical deployment addresses; Kotoba therefore does not guess a registry or claim a live ERC-8004 integration until an explicit deployment coordinate is governed.
 
 ## Trust boundaries
 
@@ -30,7 +33,7 @@ Kotoba already had portable subjects, evidence, attestations, causal identity ep
 
 ## Verification
 
-Identity contract tests cover untrusted schema/attester, revocation, expiration, future time, Human Passport scorer/threshold/90-day freshness, ERC-8004 registry binding, inactive registration, missing allowlists, threshold refusals, successful scoped claims, and atomic ledger persistence. Sekisho JVM and ClojureScript tests cover tier ordering, non-identification, and 90-day expiry.
+Identity contract tests cover untrusted schema/attester, revocation, expiration, future time, Human Passport scorer/threshold/90-day freshness, strict EAS/Human Passport ABI decoding, RPC chain mismatch, malformed offsets, ERC-8004 registry binding, inactive registration, missing allowlists, threshold refusals, successful scoped claims, and atomic ledger persistence. The Optimism proof additionally exercises the public chain without writing. Sekisho JVM and ClojureScript tests cover tier ordering, non-identification, and 90-day expiry.
 
 ## References
 
