@@ -1,0 +1,561 @@
+#!/usr/bin/env nbb
+;; scripts/itonami-verify-proposal.cljs — the gate the itonami growth bots must
+;; pass. It is the only thing in the loop that decides.
+;;
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/itonami-verify-proposal.cljs \
+;;       --proposal /tmp/itonami-proposal.edn [--root <superproject>] [--repo <path>]
+;;   ... --self-test        prove the gate rejects, before trusting that it accepts
+;;
+;;   0  every item accepted
+;;   1  some item rejected -- the reason is printed under it
+;;   2  REFUSED, it could not judge. Not a pass and not a rejection.
+;;
+;; 2 is reached with process.exit for the reason ADR-2608271450 decision 3
+;; records: setting exitCode and throwing reports 1 under nbb, and 1 already
+;; means "measured, and found something".
+;;
+;; ── WHY THE GATE RECOMPUTES EVERYTHING THE PROPOSAL CLAIMS
+;;
+;; A proposal is written by a model. Every number in it is a number the model
+;; produced, including the ones that look like measurements. So no field of a
+;; proposal is ever read as evidence of itself:
+;;
+;;   claims the URL is live      -> the gate fetches it, now
+;;   claims no repo exists       -> the gate reads manifest/west.yml
+;;   claims the code is official -> the gate reads the UN mirror
+;;   claims the suite passed     -> the gate runs the suite
+;;
+;; The proposal's job is to say WHAT to check. It never says whether it passed.
+;;
+;; ── THE TWO PROPOSAL KINDS
+;;
+;; :sources    entries destined for a repo's facts.edn (raises axis-ingest)
+;; :coverage   entries destined for the coverage register (raises coverage)
+;;
+;; They are checked by different rules because they are different claims. A
+;; source claims "this authority says this, and here is where"; a coverage entry
+;; claims "this class is standardised and this fleet has nothing for it". The
+;; first is settled by fetching, the second by reading two tables. A gate that
+;; ran one check for both would be establishing neither.
+;;
+;; ── THE ANTI-CHEAT, AND WHY IT IS A FLOOR AND NOT A CHECKSUM
+;;
+;; For :sources the real verification lives in the target repo -- scripts/
+;; verify-facts.cljs re-fetches every entry, and scripts/mutation-check.cljs
+;; breaks facts.edn fourteen ways and requires each break to be caught BY ITS
+;; OWN NAMED REASON. The cheap way past that is to weaken one of them in the
+;; same commit.
+;;
+;; Byte-comparing them against a sibling repo's copies would be wrong: the host
+;; declarations legitimately differ per ministry, so a correct adaptation and a
+;; sabotage look alike. So the gate takes the other side and demands evidence of
+;; discrimination: the mutation suite must report a floor of caught mutations
+;; with not-caught=0, and the verifier must show its self-tests ran. Weakening
+;; the verifier makes mutations stop being caught; weakening the suite drops it
+;; below the floor. Neither can be quietly reduced to zero, which is exactly the
+;; failure this workspace keeps finding (ADR-2608136000 question 1: what does
+;; this check return when there is nothing to check?).
+
+(ns itonami-verify-proposal
+  (:require [clojure.edn :as edn]
+            [clojure.string :as str]
+            [promesa.core :as pr]))
+
+(def fs (js/require "fs"))
+(def nodepath (js/require "path"))
+(def cp (js/require "child_process"))
+
+(def argv (vec (drop 2 (js->clj js/process.argv))))
+(defn- flag [n d]
+  (let [i (.indexOf (into-array argv) n)]
+    (if (and (>= i 0) (< (inc i) (count argv))) (nth argv (inc i)) d)))
+(def self-test? (boolean (some #{"--self-test"} argv)))
+(def root (or (flag "--root" nil)
+              (.-COM_JUNKAWASAKI_ROOT js/process.env)
+              (str (.-HOME js/process.env) "/github/com-junkawasaki")))
+
+;; Floors. Both are the values the proven JPN-METI suite reports; a suite that
+;; discriminates less than the one already in the tree is not admitted.
+(def mutation-floor 12)
+(def self-test-floor 5)
+
+(defn- refuse! [& msg]
+  (println "REFUSED — the gate could not judge this proposal.")
+  (doseq [m msg] (println (str "  " m)))
+  (js/process.exit 2))
+
+(defn- p [& xs] (nodepath.join root (str/join "/" xs)))
+(defn- slurp* [path] (when (fs.existsSync path) (fs.readFileSync path "utf8")))
+
+(defn- sh [cmd args & [opts]]
+  (try
+    (let [out (cp.execFileSync cmd (clj->js args)
+                               (clj->js (merge {:encoding "utf8"
+                                                :maxBuffer (* 64 1024 1024)
+                                                :stdio ["ignore" "pipe" "pipe"]} opts)))]
+      {:code 0 :out (str out) :err ""})
+    (catch :default e
+      {:code (or (.-status e) -1)
+       :out (str (or (.-stdout e) ""))
+       :err (str (or (.-stderr e) (.-message e) ""))})))
+
+;; ---------------------------------------------------------------------------
+;; fetch. Serial and paced on purpose: the ministry hosts these bots cite serve
+;; a bot challenge when asked too often, and a run that trips it establishes
+;; nothing about the proposal (see the JPN-METI register's own notes).
+;; ---------------------------------------------------------------------------
+
+(def pace-ms (js/parseInt (flag "--pace" "4000") 10))
+(defn- sleep [ms] (pr/create (fn [res] (js/setTimeout res ms))))
+
+(defn- fetch-once
+  "Returns {:ok? :status :final :bytes} or {:ok? false :error ...}. Never throws."
+  [url]
+  (-> (js/fetch url (clj->js {:redirect "follow"
+                              :headers {"user-agent" "itonami-growth-gate/1 (+cloud-itonami)"}}))
+      (.then (fn [res]
+               (-> (.text res)
+                   (.then (fn [body]
+                            {:ok? true
+                             :status (.-status res)
+                             :final (.-url res)
+                             :bytes (count body)
+                             :body body})))))
+      (.catch (fn [e] {:ok? false :error (str (or (.-message e) e))}))))
+
+(def waf-challenge-marks
+  ;; The AWS WAF interstitial these ministry hosts serve. It is a 2xx at the
+  ;; requested URL with an empty <title>, so nothing about the status line
+  ;; distinguishes it from the page.
+  ["awswaf" "challenge.js" "AwsWafIntegration" "captcha.js"])
+
+(defn- blocked?
+  "Is this response the authority declining to talk to an automated client,
+  rather than an answer about the URL?
+
+  MEASURED, not assumed. cloud-itonami-iso3166-jpn-meti's register records that
+  all four METI-family hosts answer **403** for a path that does not exist, and
+  separately that www.meti.go.jp serves a WAF challenge as a **202** at the
+  requested URL. So on these hosts:
+
+    403  is ambiguous  -- absent path, or blocked client
+    429  is blocking
+    5xx  is the host having a bad day
+    2xx + challenge body  is blocking wearing a pass
+
+  A gate that reads any of those as `the register is wrong` sends whoever reads
+  it to edit a register that was correct -- which is the defect running the
+  other way from the one this workspace usually finds, and the reason the
+  in-repo verifier reserves its own exit 2. So they are refusals here too.
+
+  404 and 410 stay rejections: those are the host answering clearly."
+  [{:keys [status body]}]
+  (cond
+    (some #(str/includes? (str body) %) waf-challenge-marks) :challenge-interposed
+    (= 403 status) :possibly-blocked
+    (= 429 status) :rate-limited
+    (and (number? status) (<= 500 status 599)) :server-error
+    :else nil))
+
+;; ---------------------------------------------------------------------------
+;; tables — read, never remembered
+;; ---------------------------------------------------------------------------
+
+(defn- west-names []
+  (let [t (slurp* (p "manifest/west.yml"))]
+    (when-not t (refuse! (str "manifest/west.yml not found under " root)))
+    (->> (re-seq #"(?m)^\s*-\s+name:\s+(\S+)\s*$" t) (map second) set)))
+
+(defn- isic-declares? [code]
+  (let [f (p "orgs/cloud-itonami/org-un-isic/data/classes" (str code ".json"))]
+    (when-not (fs.existsSync (p "orgs/cloud-itonami/org-un-isic/data/classes"))
+      (refuse! "the ISIC mirror is not checked out; the official table cannot be read"))
+    (fs.existsSync f)))
+
+(defn- cofog-groups []
+  (let [t (slurp* (p "orgs/cloud-itonami/org-un-cofog/worker/src/taxonomy.ts"))]
+    (when-not t (refuse! "the COFOG mirror is not checked out; the official table cannot be read"))
+    (let [gs (into #{} (map second (re-seq #"\{ code: \"(\d{3})\", nameEn:" t)))]
+      (when (empty? gs) (refuse! "the COFOG taxonomy parsed to zero groups — its shape changed"))
+      gs)))
+
+(defn- isic-covered? [names code]
+  (or (names (str "cloud-itonami-isic-" code))
+      (some #(re-find (re-pattern (str "^cloud-itonami-isic-" code "-")) %) names)
+      (names (str "cloud-itonami-isic-" (subs code 0 3)))
+      (some #(re-find (re-pattern (str "^cloud-itonami-isic-" (subs code 0 3) "-")) %) names)))
+
+(defn- cofog-covered? [names code]
+  (let [dotted (str (subs code 0 2) "." (subs code 2))]
+    (some #(str/starts-with? % (str "cloud-itonami-cofog-" dotted)) names)))
+
+;; ---------------------------------------------------------------------------
+;; :coverage entries
+;; ---------------------------------------------------------------------------
+
+(defn- check-coverage [entries]
+  (let [names (west-names)
+        cofog (cofog-groups)]
+    (pr/loop [todo (vec entries) done []]
+      (if (empty? todo)
+        (pr/resolved done)
+        (let [e (first todo)
+              id (or (:coverage/code e) "(no :coverage/code)")
+              kind (:coverage/kind e)
+              url (:coverage/authority-url e)
+              structural
+              (cond
+                (not (contains? #{:isic-class :cofog-group} kind))
+                [(str "unknown :coverage/kind " (pr-str kind)
+                      " — the gate judges :isic-class and :cofog-group and refuses to guess")]
+
+                (not (string? (:coverage/code e)))
+                ["missing :coverage/code"]
+
+                (and (= :isic-class kind) (not (re-matches #"\d{4}" (:coverage/code e))))
+                ["an :isic-class code is four digits"]
+
+                (and (= :cofog-group kind) (not (re-matches #"\d{3}" (:coverage/code e))))
+                ["a :cofog-group code is three digits (division*10 + group), e.g. 091"]
+
+                (and (= :isic-class kind) (not (isic-declares? (:coverage/code e))))
+                [(str "the ISIC mirror does not declare class " (:coverage/code e)
+                      " — a class the UN table does not carry is not a coverage gap")]
+
+                (and (= :cofog-group kind) (not (cofog (:coverage/code e))))
+                [(str "the COFOG taxonomy does not declare group " (:coverage/code e))]
+
+                (and (= :isic-class kind) (isic-covered? names (:coverage/code e)))
+                [(str "west already has a project covering ISIC " (:coverage/code e)
+                      " — recomputed from manifest/west.yml, the proposal's claim is ignored")]
+
+                (and (= :cofog-group kind) (cofog-covered? names (:coverage/code e)))
+                [(str "west already has a project covering COFOG " (:coverage/code e))]
+
+                (not (and (string? url) (str/starts-with? url "https://")))
+                ["missing :coverage/authority-url — a gap with no authority to cite is a note, not a register entry"]
+
+                :else nil)]
+          (if structural
+            (pr/recur (rest todo) (conj done {:id id :ok? false :why structural}))
+            (-> (fetch-once url)
+                (pr/then
+                 (fn [r]
+                   (cond
+                     (not (:ok? r))
+                     {:id id :ok? :refused
+                      :why [(str "could not reach " url ": " (:error r)
+                                 " — unreachable is not the same as wrong, so this is a refusal")]}
+                     (blocked? r)
+                     {:id id :ok? :refused
+                      :why [(str url " answered HTTP " (:status r)
+                                 " — read as " (name (blocked? r))
+                                 ", which says nothing about the URL. Re-run later.")]}
+                     (not (<= 200 (:status r) 299))
+                     {:id id :ok? false :why [(str url " answered HTTP " (:status r))]}
+                     (zero? (:bytes r))
+                     {:id id :ok? false :why [(str url " answered " (:status r) " with an empty body")]}
+                     :else
+                     {:id id :ok? true
+                      :note (str "authority " url " -> HTTP " (:status r) " / " (:bytes r) " bytes")})))
+                (pr/then (fn [res] (-> (sleep pace-ms)
+                                       (pr/then (fn [_] (pr/recur (rest todo) (conj done res)))))))))))))) 
+
+;; ---------------------------------------------------------------------------
+;; :sources entries — the register half
+;; ---------------------------------------------------------------------------
+
+(def egov-api "https://laws.e-gov.go.jp/api/2/laws?law_id=")
+
+(defn- check-law
+  "Resolve a law id through the e-Gov API and compare BOTH the title and the law
+  number. Status is never consulted: laws.e-gov.go.jp answers 200 for
+  /law/<anything>, so a URL that loads proves nothing about the id."
+  [e]
+  (let [id (:egov/law-id e)]
+    (-> (fetch-once (str egov-api id))
+        (pr/then
+         (fn [r]
+           (cond
+             (not (:ok? r)) {:ok? :refused :why [(str "e-Gov unreachable: " (:error r))]}
+             (not (<= 200 (:status r) 299)) {:ok? :refused :why [(str "e-Gov answered HTTP " (:status r))]}
+             :else
+             ;; total_count is the signal the proven in-repo verifier uses
+             ;; (cloud-itonami-iso3166-jpn-meti scripts/verify-facts.cljs, whose
+             ;; self-test pins a nonexistent id resolving to total_count 0).
+             ;; Read the same field rather than inferring absence from an empty
+             ;; vector: an id that does not exist and a response whose shape
+             ;; changed both give an empty vector, and only one of them is a
+             ;; finding.
+             (let [j (try (js->clj (js/JSON.parse (:body r))) (catch :default _ nil))
+                   total (get j "total_count")
+                   items (get j "laws")
+                   info (some-> items first (get "law_info"))
+                   rev  (some-> items first (get "revision_info"))
+                   title (some-> rev (get "law_title"))
+                   num   (some-> info (get "law_num"))]
+               (cond
+                 (nil? j) {:ok? :refused :why ["e-Gov returned a body that is not JSON"]}
+                 (nil? total) {:ok? :refused
+                               :why ["e-Gov returned JSON with no total_count — the API shape changed,"
+                                     "and an unrecognised shape must not be read as 'the law is absent'"]}
+                 (zero? total) {:ok? false :why [(str "e-Gov does not resolve law id " id
+                                                      " (total_count 0)")]}
+                 (empty? items) {:ok? :refused
+                                 :why [(str "e-Gov reported total_count " total
+                                            " but returned no law object")]}
+                 (and (:egov/law-title e) (not= title (:egov/law-title e)))
+                 {:ok? false :why [(str "law title drift: register says " (pr-str (:egov/law-title e))
+                                        ", e-Gov says " (pr-str title))]}
+                 (and (:egov/law-num e) (not= num (:egov/law-num e)))
+                 {:ok? false :why [(str "law number drift: register says " (pr-str (:egov/law-num e))
+                                        ", e-Gov says " (pr-str num))]}
+                 :else {:ok? true :note (str id " -> " title " / " num)}))))))))
+
+(defn- check-page [e]
+  (let [url (:source/url e)]
+    (-> (fetch-once url)
+        (pr/then
+         (fn [r]
+           (cond
+             (not (:ok? r)) {:ok? :refused :why [(str "unreachable: " (:error r))]}
+             (blocked? r)
+             {:ok? :refused
+              :why [(str "HTTP " (:status r) " read as " (name (blocked? r))
+                         " — on these hosts that is the authority declining to answer an"
+                         " automated client, not a verdict about this URL. Land nothing;"
+                         " re-run when it answers.")]}
+             (not (<= 200 (:status r) 299)) {:ok? false :why [(str "HTTP " (:status r))]}
+             (not= (:final r) url)
+             {:ok? false :why [(str "redirected to " (:final r)
+                                    " — cite the URL the authority actually serves")]}
+             (zero? (:bytes r)) {:ok? false :why ["empty body"]}
+             :else
+             (let [missing (remove #(str/includes? (:body r) %) (or (:page/must-contain e) []))]
+               (if (seq missing)
+                 {:ok? false :why [(str "page does not contain " (pr-str (vec missing)))]}
+                 {:ok? true :note (str "HTTP " (:status r) " / " (:bytes r) " bytes"
+                                       (when (seq (:page/must-contain e))
+                                         (str " / " (count (:page/must-contain e))
+                                              " string(s) present")))})))))))) 
+
+(defn- check-sources [entries]
+  (let [ids (map :source/id entries)
+        urls (keep #(or (:source/url %) (:egov/law-id %)) entries)
+        dup-id (->> ids frequencies (keep (fn [[k v]] (when (> v 1) k))) vec)
+        dup-url (->> urls frequencies (keep (fn [[k v]] (when (> v 1) k))) vec)]
+    (cond
+      (seq dup-id) (pr/resolved [{:id "(proposal)" :ok? false
+                                  :why [(str "duplicate :source/id " (pr-str dup-id))]}])
+      (seq dup-url) (pr/resolved [{:id "(proposal)" :ok? false
+                                   :why [(str "duplicate source " (pr-str dup-url))]}])
+      :else
+      (pr/loop [todo (vec entries) done []]
+        (if (empty? todo)
+          (pr/resolved done)
+          (let [e (first todo)
+                id (or (:source/id e) "(no :source/id)")
+                verify (:source/verify e)]
+            (cond
+              (not (string? (:source/id e)))
+              (pr/recur (rest todo) (conj done {:id id :ok? false :why ["missing :source/id"]}))
+
+              (not (contains? #{:e-gov-law-id :page-identity :page-text} verify))
+              (pr/recur (rest todo)
+                        (conj done {:id id :ok? false
+                                    :why [(str "unknown :source/verify " (pr-str verify)
+                                               " — each entry must name WHICH check establishes it")]}))
+
+              (and (= :page-text verify) (empty? (:page/must-contain e)))
+              (pr/recur (rest todo)
+                        (conj done {:id id :ok? false
+                                    :why [":page-text with no :page/must-contain checks nothing more than :page-identity"]}))
+
+              (and (= :e-gov-law-id verify) (not (:egov/law-id e)))
+              (pr/recur (rest todo)
+                        (conj done {:id id :ok? false :why [":e-gov-law-id with no :egov/law-id"]}))
+
+              :else
+              (-> (if (= :e-gov-law-id verify) (check-law e) (check-page e))
+                  (pr/then (fn [r] (assoc r :id id)))
+                  (pr/then (fn [r] (-> (sleep pace-ms)
+                                       (pr/then (fn [_] (pr/recur (rest todo) (conj done r))))))))))))))) 
+
+;; ---------------------------------------------------------------------------
+;; the in-repo suites — evidence that the repo's own checks still discriminate
+;; ---------------------------------------------------------------------------
+
+(defn- check-repo-suites [repo-path]
+  (let [abs (if (str/starts-with? repo-path "/") repo-path (p repo-path))
+        v (nodepath.join abs "scripts/verify-facts.cljs")
+        m (nodepath.join abs "scripts/mutation-check.cljs")]
+    (cond
+      (not (fs.existsSync abs))
+      {:ok? :refused :why [(str "--repo " abs " does not exist")]}
+
+      (not (fs.existsSync v))
+      {:ok? false
+       :why [(str "no scripts/verify-facts.cljs in " repo-path
+                  " — a register with no verifier is a list of strings. Copy the proven one"
+                  " from a sibling that has it and adapt its :host-behaviour entities.")]}
+
+      (not (fs.existsSync m))
+      {:ok? false
+       :why [(str "no scripts/mutation-check.cljs in " repo-path
+                  " — without it nothing establishes that the verifier objects when the"
+                  " register is wrong, and a verifier that cannot fail is not a check.")]}
+
+      :else
+      (let [mut (sh "nbb" ["scripts/mutation-check.cljs"] {:cwd abs})
+            caught (some-> (re-find #"caught=(\d+) inconclusive=(\d+) not-caught=(\d+) of (\d+)" (:out mut)) vec)]
+        (cond
+          (nil? caught)
+          {:ok? :refused
+           :why ["the mutation suite printed no caught=/not-caught= tally, so it cannot be read"
+                 (str "exit " (:code mut))]}
+
+          (not= "0" (nth caught 3))
+          {:ok? false :why [(str "the mutation suite left " (nth caught 3)
+                                 " mutation(s) NOT caught")]}
+
+          (< (js/parseInt (nth caught 4) 10) mutation-floor)
+          {:ok? false
+           :why [(str "the mutation suite declares only " (nth caught 4) " mutation(s); the floor is "
+                      mutation-floor ". A suite that discriminates less than the one already"
+                      " in this tree is not admitted — weakening it is the cheap way past this gate.")]}
+
+          (not= 0 (:code mut))
+          {:ok? false :why [(str "the mutation suite exited " (:code mut))]}
+
+          :else
+          (let [ver (sh "nbb" ["scripts/verify-facts.cljs"] {:cwd abs})
+                selftests (count (re-seq #"(?m)^SELF-TEST\t+ok\t" (:out ver)))
+                scanned (some-> (re-find #"SCANNED\t(\d+)\tof (\d+)" (:out ver)) vec)]
+            (cond
+              (= 2 (:code ver))
+              {:ok? :refused :why ["the repo's verifier REFUSED — it could not reach an authority"
+                                   "re-run when the host answers; a blocked run judges nothing"]}
+              (not= 0 (:code ver))
+              {:ok? false :why [(str "the repo's verifier exited " (:code ver))
+                                (str/join "\n" (take-last 12 (str/split-lines (:out ver))))]}
+              (< selftests self-test-floor)
+              {:ok? false
+               :why [(str "the verifier reported only " selftests " passing self-test(s); the floor is "
+                          self-test-floor ". Its self-tests are what establish that its checks"
+                          " discriminate, and a verifier that stopped running them is not evidence.")]}
+              (nil? scanned)
+              {:ok? :refused :why ["the verifier printed no SCANNED line — a truncated run reads like a clean one"]}
+              (zero? (js/parseInt (nth scanned 1) 10))
+              {:ok? false :why ["the verifier scanned 0 sources — an empty register is not a verified one"]}
+              :else
+              {:ok? true
+               :note (str "verifier exit 0, " selftests " self-test(s), SCANNED " (nth scanned 1)
+                          "/" (nth scanned 2) " · mutation suite caught " (nth caught 1)
+                          "/" (nth caught 4) ", not-caught 0")})))))))
+
+;; ---------------------------------------------------------------------------
+;; self-test — prove the gate rejects before trusting that it accepts
+;; ---------------------------------------------------------------------------
+
+(defn- run-self-test! []
+  (let [names (west-names)
+        cofog (cofog-groups)
+        cases
+        [["a COFOG group the taxonomy does not declare is rejected"
+          (not (cofog "999"))]
+         ["a COFOG group that already has a project is seen as covered"
+          (boolean (cofog-covered? names "032"))]
+         ["a COFOG group with no project is seen as uncovered"
+          (not (cofog-covered? names "091"))]
+         ["an ISIC class the mirror does not declare is rejected"
+          (not (isic-declares? "9999"))]
+         ["an ISIC class the mirror declares is accepted as declared"
+          (boolean (isic-declares? "0111"))]
+         ["an ISIC class with a project is seen as covered"
+          (boolean (isic-covered? names "0111"))]
+         ;; The blocked?/rejected split, without touching the network. These four
+         ;; are the whole reason this gate has an exit 2 for pages at all, and a
+         ;; classifier nobody exercised is the shape this workspace keeps finding.
+         ["a WAF challenge body is read as blocking even though it is a 2xx"
+          (= :challenge-interposed (blocked? {:status 202 :body "<script src=\"/awswaf/challenge.js\"></script>"}))]
+         ["403 on these hosts is read as possibly-blocked, not as a verdict"
+          (= :possibly-blocked (blocked? {:status 403 :body "<html>ページがありません</html>"}))]
+         ["429 is read as rate-limited"
+          (= :rate-limited (blocked? {:status 429 :body ""}))]
+         ["404 is NOT read as blocking — the host answered clearly"
+          (nil? (blocked? {:status 404 :body "<html>not found</html>"}))]
+         ["an ordinary 200 page is not read as blocking"
+          (nil? (blocked? {:status 200 :body "<html><title>法令・施策</title></html>"}))]]
+        bad (remove second cases)]
+    (doseq [[why ok] cases]
+      (println (str (if ok "SELF-TEST\tok\t" "SELF-TEST\tFAIL\t") why)))
+    (if (seq bad)
+      (do (println (str "REFUSED — " (count bad) " self-test(s) failed; the gate does not discriminate"))
+          (js/process.exit 2))
+      (do (println (str "OK\t" (count cases) " self-test(s)")) (js/process.exit 0)))))
+
+;; ---------------------------------------------------------------------------
+
+(defn -main []
+  (when self-test? (run-self-test!))
+  (let [path (flag "--proposal" nil)]
+    (when-not path (refuse! "no --proposal given"))
+    (when-not (fs.existsSync path) (refuse! (str "no proposal at " path)))
+    (let [text (slurp* path)
+          prop (try (edn/read-string text)
+                    (catch :default e (refuse! (str "the proposal cannot be read as EDN: " e))))
+          _ (when-not (map? prop) (refuse! "the proposal is not a map"))
+          sources (:sources prop)
+          coverage (:coverage prop)
+          repo (or (flag "--repo" nil) (:proposal/repo prop))]
+      (when (and (empty? sources) (empty? coverage))
+        (refuse! "the proposal declares neither :sources nor :coverage"
+                 "an empty proposal is not an accepted one"))
+      (when (and (seq sources) (seq coverage))
+        (refuse! "one proposal, one kind — :sources and :coverage are judged by different rules"))
+
+      (-> (if (seq sources) (check-sources sources) (check-coverage coverage))
+          (pr/then
+           (fn [results]
+             (doseq [r results]
+               (println (str (case (:ok? r) true "  ACCEPT\t" :refused "  REFUSED\t" "  REJECT\t")
+                             (:id r)
+                             (when (:note r) (str "\t" (:note r)))))
+               (doseq [w (:why r)] (println (str "      " w))))
+             (let [suite (when (and (seq sources) repo) (check-repo-suites repo))]
+               (when suite
+                 (println (str (case (:ok? suite) true "  ACCEPT\t" :refused "  REFUSED\t" "  REJECT\t")
+                               "in-repo suites"
+                               (when (:note suite) (str "\t" (:note suite)))))
+                 (doseq [w (:why suite)] (println (str "      " w))))
+               (when (and (seq sources) (not repo))
+                 (println "  REFUSED\tin-repo suites")
+                 (println "      no --repo given, so the register's own verifier and mutation suite")
+                 (println "      were never run. Fetching the URLs is not the same as verifying the")
+                 (println "      register, and this gate does not report the weaker check as the stronger one."))
+               (let [all (concat results (when suite [suite]))
+                     refused (filter #(= :refused (:ok? %)) all)
+                     rejected (filter #(false? (:ok? %)) all)
+                     accepted (filter #(true? (:ok? %)) all)
+                     no-repo? (and (seq sources) (not repo))]
+                 (println)
+                 (println (str "SCANNED\t" (count all) "\titem(s)"
+                               "\taccepted " (count accepted)
+                               "\trejected " (count rejected)
+                               "\trefused " (+ (count refused) (if no-repo? 1 0))))
+                 (cond
+                   (or (seq refused) no-repo?)
+                   (do (println "REFUSED — at least one item could not be judged. Land nothing.")
+                       (js/process.exit 2))
+                   (seq rejected)
+                   (do (println (str "REJECTED — " (count rejected) " item(s). Remove them and re-run."))
+                       (js/process.exit 1))
+                   (empty? accepted)
+                   (do (println "REFUSED — nothing was accepted and nothing was rejected.")
+                       (js/process.exit 2))
+                   :else
+                   (do (println (str "OK\t" (count accepted) " item(s) accepted"))
+                       (js/process.exit 0))))))) 
+          (pr/catch (fn [e] (refuse! (str "the gate threw: " e))))))))
+
+(-main)

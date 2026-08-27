@@ -1,0 +1,53 @@
+;; Uncovered classes, and the authority a service in that class would have to
+;; cite. NOT a generated file: appended one or two entries at a time by the
+;; itonami-coverage-scout bot, and every entry re-checked at entry time by
+;; scripts/itonami-verify-proposal.cljs.
+;;
+;; WHAT THIS FILE IS FOR, AND WHY IT IS NOT DERIVED
+;;
+;; The gap list itself IS derivable -- scripts/itonami-growth-evidence.cljs
+;; computes it every run from the UN mirrors and manifest/west.yml, and nothing
+;; here is allowed to disagree with that computation (the gate recomputes it and
+;; ignores whatever an entry claims). What is not derivable is the third column:
+;; which real authority a service in that function has to answer to. That is the
+;; thing an actor built for this class will need on its first day, it cannot be
+;; read off a classification table, and it is the only reason this file exists.
+;;
+;; So: the gap is measured, the authority is proposed and then fetched.
+;;
+;; ENTRIES ARE DELETED WHEN THE GAP CLOSES.
+;;
+;; Per ADR-2607257000 a document states the present, not its own history. When a
+;; project is registered for a class, its entry is removed -- the gate will
+;; reject re-adding it anyway, because it recomputes coverage from west.yml.
+;; `git log -p` holds what was here before.
+;;
+;; SHAPE — tx-data, like every other EDN corpus here:
+;;   (d/transact conn (edn/read-string (slurp "90-docs/coverage/itonami-coverage.datoms.edn")))
+;;
+;;   :coverage/kind          :cofog-group | :isic-class   (the gate judges only these two)
+;;   :coverage/code          "091" (3 digits, COFOG) | "2520" (4 digits, ISIC)
+;;   :coverage/name          the class name as the official table gives it
+;;   :coverage/authority-url the authority a service in this class must answer to.
+;;                           FETCHED by the gate at entry time. Not the
+;;                           classification page -- that proves the class exists,
+;;                           which was already measured.
+;;   :coverage/jurisdiction  which jurisdiction that authority is for
+;;   :coverage/verified-at   the day the gate fetched it
+;;   :source/dataset         "itonami-coverage" -- joins on manifest/edn-query.cljs
+;;
+;; :coverage/code joins to repo-taxonomy's :repo/path once a project exists, and
+;; to the scorecard's section fold via the first two digits.
+[
+{:db/id -1
+ :source/dataset "itonami-coverage"
+ :coverage/kind :cofog-group
+ :coverage/code "091"
+ :coverage/name "Pre-primary and primary education"
+ :coverage/division "09"
+ :coverage/division-name "Education"
+ :coverage/authority-url "https://www.mext.go.jp/a_menu/shotou/index.htm"
+ :coverage/jurisdiction "jpn"
+ :coverage/verified-at "2026-08-27"
+ :coverage/note "Seed entry, written by hand so the bot has a shape to extend rather than inventing one. Measured 2026-08-27: HTTP 200. COFOG division 09 has no actor at any group -- this is one of five divisions (01, 02 apart from a civil-defence relay, 08, 09, 10) where the fleet has nothing."}
+]
