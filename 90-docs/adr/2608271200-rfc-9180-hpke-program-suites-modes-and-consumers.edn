@@ -121,6 +121,33 @@ text publishes no test vectors. So the evidence is live ECHConfigList values
 pulled from real HTTPS resource records, two-sided round-trip, and each of
 s5.1's four MUST-aborts asserted by its own reason.
 
+**ECH offered from tls.client**, and **two live servers accept it**:
+crypto.cloudflare.com, and defo.ie -- a different operator publishing three
+configs in one list. Both decrypted a ClientHelloInner this client encrypted,
+used it, and signalled acceptance in ServerHello.random, which the client
+recomputed from its own inner transcript and matched. That is an independent
+implementation agreeing, and for ECH it is the only external evidence there
+is. The control: flipping one bit of the config public key gets :ech-rejected
+from both.
+
+The inner hello is padded by s6.1.3's scheme. Without it the ciphertext length
+tracks the inner SNI length -- the one thing ECH exists to hide -- so an
+unpadded client would advertise the length of the name it was hiding.
+
+### Only the live handshake noticed
+
+The transcript starts with whichever ClientHello the server used, and that
+decision was invisible to the entire unit suite. Forcing it to always pick the
+outer -- which gives a client that builds both hellos correctly, encrypts
+correctly, judges acceptance correctly, and then derives its keys from the
+wrong transcript -- left every test green.
+
+It is a named function with a test now. That is the third time this week the
+same remedy applied: org-nist-ecc's unreachable doubling branch, HPKE's
+unreachable rejection-sampling condition, and this. **A decision worth
+getting right is worth a name, because a decision buried in an expression is
+a decision no test can address.**
+
 ### A two-sided test cannot check a value both sides agree on
 
 The finding from ECH, and it generalises past ECH. Both halves live in one
@@ -202,13 +229,16 @@ the consumers could only be built against a suite no deployed peer offers.
                              primitives' own corpora and say so.
                              DeriveKeyPair on the NIST curves also needs
                              rejection sampling, which X25519 does not.
-  2. ECH in tls.client       the data plane landed (below). What remains is
-                             offering it in a live handshake:
-                             HelloRetryRequest, the retry-config path of
-                             s6.1.6, and a second transcript. Landing that
-                             halfway would give a client that offers ECH
-                             and cannot tell whether it was accepted, which
-                             is worse than one that does not offer it.
+  2. ECH s6.1.6 recovery     offering ECH landed (below) and live servers
+                             accept it. What remains is the rejection path:
+                             authenticate to the public_name, read
+                             retry_configs out of EncryptedExtensions, then
+                             abort with ech_required. Half of it would mean
+                             acting on retry configs the handshake had not
+                             yet authenticated, so it stops at :ech-rejected
+                             instead. ECH's HRR path is unreachable rather
+                             than omitted -- this client refuses
+                             HelloRetryRequest by name.
   3. MLS (RFC 9420)          largest by far; an independent group key
                              agreement sits on top. Unlike the other two it
                              does have a published interop corpus.
