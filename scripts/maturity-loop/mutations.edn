@@ -958,6 +958,58 @@
      :must-fail ["the-readme-names-both-dids-and-says-which-one-resolves"
                  "every-identity-claim-names-the-value-its-source-file-actually-holds"]}]}
 
+  {:repo "orgs/kotoba-lang/langchain"
+   :label "langchain —— 誰も見ていなかった chat history の契約"
+   ;; langchain.memory には test ファイルが 1 つも無かった（99 tests / 239
+   ;; assertions の suite が、この namespace を 1 行も通っていない）。
+   ;;
+   ;; この 5 件が同じ形をしているのは偶然ではない。memory の不変条件は
+   ;; **全部が scope join か順序**で、どちらも「thread が 1 本しか無い間は
+   ;; 正しく答え続ける」。テストが 1 スレッドしか作らなければ、5 件とも
+   ;; 壊したまま緑になる —— そして chat history が 1 スレッドなのは
+   ;; テストの中だけである。
+   ;;
+   ;; だから各テストは thread を 2 本生かしたまま、**両方**について主張する:
+   ;; 検査対象の 1 本と、動いてはならない 1 本。
+   ;; 2026-08-27 に 5 件すべて赤くなるところを見た。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :langchain/next-idx-ignores-thread
+     :why "index が「この会話の何ターン目か」を意味すること。?tid を外すと max は db 中の全 thread から取られるので、新しい会話が無関係な会話の続き番号から始まる。例外は出ない —— index は thread 内で一意のまま昇順のままなので、store は順番に答え続ける。壊れるのは意味だけで、それを読むのは paging と resume"
+     :file "src/langchain/memory.cljc"
+     :find ":find (max ?i) .\n                                 :in $ ?tid\n                                 :where [?t :thread/id ?tid]"
+     :replace ":find (max ?i) .\n                                 :in $ ?tid\n                                 :where [?t :thread/id _]"
+     :must-fail ["indices-restart-per-thread"]}
+
+    {:id :langchain/messages-unsorted
+     :why "q が返すのは集合で、順序を与えているのは sort-by だけ。小さな vector の集合は挿入順に反復することが多いので、append してすぐ読むテストでは sort を消しても緑になる。2 thread を交互に append して初めて、集合自身の順序がどちらの会話のターン順とも食い違う"
+     :file "src/langchain/memory.cljc"
+     :find "(->> rows (sort-by first) (mapv"
+     :replace "(->> rows (mapv"
+     :must-fail ["messages-come-back-in-turn-order"]}
+
+    {:id :langchain/messages-read-content-not-data
+     :why "message が丸ごと戻ること。:msg/content（検索用の文字列）を読むのは安く見えるし、普通の user 発話なら REPL で同じに print される —— assistant のターンから :tool-calls / :usage / :role が黙って落ちるだけ。落ちたことは、その履歴を replay するまで分からない"
+     :file "src/langchain/memory.cljc"
+     :find "[?m :msg/data ?data]"
+     :replace "[?m :msg/content ?data]"
+     :must-fail ["messages-round-trip-the-whole-message-not-just-its-text"]}
+
+    {:id :langchain/clear-ignores-thread
+     :why "この 5 件で唯一データを壊す向き。scope が効かなくなっても clear! は「それらしい件数」を返し、訊かれた thread はちゃんと空になる —— db 内の他の会話を全部道連れにしながら。だから両側から assert する（実測: 3 のはずの戻り値が 5 になり、bystander が [] になった）"
+     :file "src/langchain/memory.cljc"
+     :find ":find [?m ...]\n                      :in $ ?tid\n                      :where [?t :thread/id ?tid]"
+     :replace ":find [?m ...]\n                      :in $ ?tid\n                      :where [?t :thread/id _]"
+     :must-fail ["clear-empties-one-thread-and-only-that-thread"]}
+
+    {:id :langchain/append-returns-nil
+     :why "append! が割り当てた index を返すこと。index は append! の中で決まり呼び出し側からは他に観測できないので、自分でターンを数える呼び手は突き合わせる先を失う。型も arity も文句を言わない"
+     :file "src/langchain/memory.cljc"
+     :find ":msg/data (pr-str msg)}])\n          idx))"
+     :replace ":msg/data (pr-str msg)}])\n          nil))"
+     :must-fail ["append-returns-the-index-it-assigned"]}]}
+
   {:repo "orgs/kotoba-lang/langchain-store"
    :label "langchain-store —— 316 consumer が黙って依存している store seam の不変条件"
    ;; この repo の形は他の suite と違う。**テストが無かったのではなく、
