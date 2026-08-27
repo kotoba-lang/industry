@@ -15,6 +15,12 @@ description: repo ごとの常駐 bot（scripts/repo-bots/）が見つけた床�
 nbb scripts/repo-bots/tick.cljs --next     # 直す 1 件が EDN で出る
 ```
 
+**無人の loop（`com.gftd.repo-bot-drain`）は `--next-unattended` を使い、`:landed` を
+渡さない。** 他人の未 commit の作業は、失われうる唯一の床であると同時に、**誰も見て
+いないときに触ってよい対象ではない**（このマシンは並行 agent が走っている）。
+あなたが手で `/repo-bot-drain` を打ったなら人が見ているので、`--next` の答え
+（`:landed` を含む）で正しい。無人側は `:held-for-a-human` として件数を返す。
+
 `{:outcome :candidate :bot "<org>/<name>" :floor <床> :since <iso> :detail "…"}`
 
 - `:outcome :not-measured` — **候補 0 件ではない。** まだ誰も測っていない。
@@ -29,6 +35,7 @@ nbb scripts/repo-bots/tick.cljs --next     # 直す 1 件が EDN で出る
 ### `:landed`（未 commit / 未 push の作業がある）
 
 **最優先。他の床は放置しても情報が減らないが、未着地の作業は失われうる。**
+**ただし人が見ているときだけ。** 無人の周回はこの床を飛ばす（上記）。
 
 まず何が在るかを見る（`git -C orgs/<org>/<name> status` と `git log @{u}..HEAD`）。
 **判断せずに消さない。** 手順の正本は skill `git-cleanup-conflict`（`.claude/skills/`）で、

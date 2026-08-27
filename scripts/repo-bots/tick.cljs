@@ -359,9 +359,22 @@
 ;;   :test-signal  本物の仕事。最後
 (def floor-priority {:landed 0 :pinned 1 :readme 2 :test-signal 3})
 
-(defn- next-finding [state]
+;; 無人の loop に渡してはいけない床。
+;;
+;; :landed は**他人の未 commit の作業**である。優先順が一番上なのは正しい（失われ
+;; うるのはこれだけ）が、それは**人が見ている**ときの話で、無人の周回が真っ先に
+;; 手を付けてよい対象ではない。このマシンは並行 agent が走っており、CLAUDE.md が
+;; 共有 checkout の直接編集を禁じているのはまさにこの形の事故のため。
+;;
+;; --next は従来どおり :landed を先頭に出す（人が /repo-bot-drain を打つときの答え）。
+;; --next-unattended はそれを外す。**外したことを黙らない** —— 何件を外したかを
+;; 一緒に返す。
+(def ^:private unattended-excluded #{:landed})
+
+(defn- next-finding [state & {:keys [unattended?]}]
   (let [cands (for [[id row] (:bots state)
-                    [f {:keys [since detail]}] (:broken row)]
+                    [f {:keys [since detail]}] (:broken row)
+                    :when (not (and unattended? (unattended-excluded f)))]
                 {:bot id :floor f :since since :detail detail})]
     (->> cands
          ;; ⚠ 最初の版は `(.indexOf (clj->js floor-priority) (:floor c))` と書いて
@@ -461,15 +474,25 @@
         (js/process.exit 2))
     (let [prev (or (read-edn state-file) {:schema 1 :bots {}})]
       (cond
-        (flag "--next")
-        (let [n (next-finding prev)]
+        (or (flag "--next") (flag "--next-unattended"))
+        (let [unattended? (boolean (flag "--next-unattended"))
+              n (next-finding prev :unattended? unattended?)
+              held (when unattended?
+                     (count (for [[_ row] (:bots prev)
+                                  [f _] (:broken row)
+                                  :when (unattended-excluded f)] 1)))]
           ;; 候補が無いことと、測っていないことを区別する。state が空なら
           ;; 「finding 0 件」ではなく「まだ誰も測っていない」。
           (println (pr-str (cond
                              (empty? (:bots prev)) {:outcome :not-measured}
-                             (nil? n) {:outcome :no-candidates
-                                       :ticked (count (:bots prev))}
-                             :else (merge {:outcome :candidate} n))))
+                             (nil? n) (cond-> {:outcome :no-candidates
+                                                :ticked (count (:bots prev))}
+                                        (and held (pos? held))
+                                        (assoc :held-for-a-human held
+                                               :note "無人の周回では :landed を渡さない（他人の未 commit の作業）"))
+                             :else (cond-> (merge {:outcome :candidate} n)
+                                     (and held (pos? held))
+                                     (assoc :held-for-a-human held)))))
           (js/process.exit 0))
 
         (flag "--report")

@@ -116,6 +116,27 @@ keyword を indexOf すると同一性比較になって**常に -1** を返す�
 - STANDING は列挙しない（件数と最古の齢だけ）。もう言ったことを毎セッション
   言い直すのは、言っていないのと同じ（ADR-2608124800）。
 
+## 無人の周回は `:landed` を触らない（2026-08-27 追記）
+
+`:landed`（他人の未 commit の作業）は優先順の最上位で、それは正しい —— **失われ
+うるのはこの床だけ**だから。だがそれは*人が見ているとき*の話である。このマシンは
+並行 agent が走っており、CLAUDE.md が共有 checkout の直接編集を禁じているのは
+まさにこの形の事故のためなので、無人の loop には渡さない:
+
+    nbb scripts/repo-bots/tick.cljs --next              # 人が打つ。:landed を先頭に出す
+    nbb scripts/repo-bots/tick.cljs --next-unattended   # loop が打つ。:landed を外す
+
+**外したことを黙らない。** `--next-unattended` は `:held-for-a-human` として件数を
+返し、drain loop はそれをログと ledger に書く。**黙って除外する allowlist は、
+時間が経つと『そんな床は無い』と同じ意味になる。**
+
+この追記の直接のきっかけは、closing 時に launchd の実測を取ったこと:
+`repo-bots-tick` は runs=2（無人で 1 回発火済み）、`repo-bot-propose` は runs=1
+（kickstart のみ）、**`repo-bot-drain` は runs=0**。つまり drain の最初の無人実行は
+まだ起きておらず、そのときの標的が `network-awai/cloud-itonami` の未 commit 5 ファイル
+（別セッションの作業）だった。**一度も走っていない loop の最初の一手が、他人の
+working tree だった。**
+
 ## 未了（正直に）
 
 - ~~murakumo 推論はまだ繋いでいない。~~ **2026-08-27 に繋いだ（ADR-2608271700）。**

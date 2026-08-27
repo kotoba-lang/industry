@@ -65,7 +65,10 @@
     (let [{:keys [out]} (sh "nbb" ["scripts/repo-bots/tick.cljs" "--wave" "200"] {:timeout 900000})]
       (println (str/join "\n" (take-last 12 (str/split-lines (str out))))))
 
-    (let [{:keys [out]} (sh "nbb" ["scripts/repo-bots/tick.cljs" "--next"] {})
+    ;; 無人の周回なので --next-unattended。:landed（他人の未 commit の作業）は
+    ;; 人が見ているときだけ触る —— 失われうる唯一の床であることと、無人で触って
+    ;; よいことは別。件数は :held-for-a-human として返ってくるので黙らない。
+    (let [{:keys [out]} (sh "nbb" ["scripts/repo-bots/tick.cljs" "--next-unattended"] {})
           next (try (edn/read-string (str/trim (str out))) (catch :default _ nil))]
       (cond
         (nil? next)
@@ -79,12 +82,17 @@
             (append-ledger! {:at started :outcome :skipped :why :not-measured}))
 
         (= :no-candidates (:outcome next))
-        (do (log! "床割れ 0 件（測定済み" (:ticked next) "体）。無い仕事にモデルを起こさない")
+        (do (log! "無人で触ってよい床割れは 0 件（測定済み" (:ticked next) "体"
+                  (if-let [h (:held-for-a-human next)]
+                    (str "、:landed " h " 件は人待ち") "")
+                  "）。無い仕事にモデルを起こさない")
             (append-ledger! {:at started :outcome :skipped :why :no-candidates
-                             :ticked (:ticked next)}))
+                             :ticked (:ticked next)
+                             :held-for-a-human (:held-for-a-human next)}))
 
         dry-run?
-        (do (log! "--dry-run: 次の候補は" (:bot next) "/" (name (:floor next)) "—" (:detail next))
+        (do (log! "--dry-run: 次の候補は" (:bot next) "/" (name (:floor next)) "—" (:detail next)
+                  (if-let [h (:held-for-a-human next)] (str "（:landed " h " 件は人待ち）") ""))
             (append-ledger! {:at started :outcome :dry-run :next next}))
 
         :else
