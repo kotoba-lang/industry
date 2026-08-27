@@ -6,16 +6,40 @@
 ;; authorization; the two decisions it recorded are answered below.
 ;;
 ;; This file carries PUBLIC values only. The seed is in kagi, by name.
-{:ipni.publisher/peer-id "12D3KooWDscME2qEggsQYHg6d5d1Ms3Vq9duK6U15yQ64ksay2of"
+{:ipni.publisher/peer-id "12D3KooWGmq2x23J59LmqyBT5ik8pK9gEz7N3Y4vdJidezf7Usz3"
 
  ;; The same Ed25519 key seen through the IPNS naming plane. Recorded so the
  ;; two derivations can be cross-checked without holding the seed: decoding
  ;; this name yields the public key the peer-id is built from.
- :ipni.publisher/ipns-name "k51qzi5uqu5dhontjj0tl8ezexhwh8aa265bj839qekj77b6o4fo10y3wzdeyu"
+ :ipni.publisher/ipns-name "k51qzi5uqu5dirbsrgpb1iyrwbzlqgjoq006b7hda5nr2ah4cxez8atsxwc00c"
 
  ;; Custody. Taken one item at a time by this identifier -- never enumerated.
  :ipni.publisher/seed-kagi-item "kotobase-ipni-publisher"
  :ipni.publisher/seed-kagi-compartment "net-kotobase"
+ :ipni.publisher/seed-keychain-ref
+ "keychain://com.junkawasaki.kotobase.ipni/publisher-seed-v2"
+ :ipni.publisher/custody
+ {:primary :kagi
+  :secondary :apple-keychain
+  :cloud-sync {:at "2026-08-27"
+               :result :failed
+               :remote-seq-still 5
+               :reason :snapshot-transaction-http-500
+               :local-encrypted-vault-bytes 9213145}}
+
+ ;; Rotation record. The 2026-08-26 key was absent from both the 2026-08-27
+ ;; local vault and cloud snapshot seq 5, so retaining its public identifier
+ ;; would claim custody that no process could prove. The old advertisements
+ ;; remain immutable and crawlable; the new provider appends to their shared
+ ;; publisher DAG and signs every new advertisement with this identity.
+ :ipni.publisher/identity-rotation
+ {:at "2026-08-27"
+  :reason :prior-seed-unrecoverable
+  :previous-peer-id "12D3KooWDscME2qEggsQYHg6d5d1Ms3Vq9duK6U15yQ64ksay2of"
+  :previous-ipns-name "k51qzi5uqu5dhontjj0tl8ezexhwh8aa265bj839qekj77b6o4fo10y3wzdeyu"
+  :local-vault :absent
+  :cloud-vault {:seq 5 :result :absent}
+  :migration :append-cross-provider-chain}
 
  ;; Decision 1 of ADR-2608160300: ONE key for the workspace, not one per
  ;; surface. Twelve keys is a key set managed by enumeration whether anyone
@@ -86,17 +110,34 @@
   {:advertisement "baguqeeraa7fpey2eucubpel6wddilnoxbyydcyn7jefxibcfkvmh46vob37q"
    :entries "baguqeeraztripjq7oqztkm47xkga67ydtm6vd4xyx647cycsful3n3nlsm7a"
    :cids 435 :at "2026-08-26" :announce-status 204
-   :previous "baguqeeraa7x2xflhz5tp6dj2hbg3j5febobxgoohwns325s6u2tapllyxdxq"}]
+   :previous "baguqeeraa7x2xflhz5tp6dj2hbg3j5febobxgoohwns325s6u2tapllyxdxq"}
+  {:advertisement "baguqeeraxdv3l52lkykjlfsvoglog3hxtqfhbkseu74ee6wc2qsi32zatgrq"
+   :entries "baguqeerau5dbx77vpplagkq2ocfa25og3t25cg7n5zkeq4kkz7yyruicvrba"
+   :cids 1 :at "2026-08-27" :announce-status 204
+   :previous "baguqeeraa7fpey2eucubpel6wddilnoxbyydcyn7jefxibcfkvmh46vob37q"
+   :provider "12D3KooWGmq2x23J59LmqyBT5ik8pK9gEz7N3Y4vdJidezf7Usz3"
+   :context "ayatori-public-arrangement-v1"
+   :rotation true
+   :ingestion {:index "https://cid.contact"
+               :indexed true
+               :indexed-at "2026-08-27T08:13:07.771255Z"
+               :ads-scanned 1
+               :ads-processed 1
+               :entry-chunks 1
+               :multihashes 1}}]
 
  ;; What is true now, measured rather than claimed. The round trip starts
  ;; from a CID and nothing else: ask the public index who serves it, fetch
  ;; from the address the index returns, re-hash, compare.
  :ipni.publisher/round-trip
- {:at "2026-08-26"
-  :index "https://delegated-ipfs.dev/routing/v1/providers/{cid}"
+ {:at "2026-08-27"
+  :index "https://cid.contact/cid/{cid} and https://delegated-ipfs.dev/routing/v1/providers/{cid}"
   :result :ok
-  :sampled 4
-  :detail "The index returns this provider at /dns4/kotobase.net/tcp/443/https; the bytes fetched from there re-hash to the CID asked for. Before the announce the same query returned no provider."}
+  :sampled 1
+  :provider "12D3KooWGmq2x23J59LmqyBT5ik8pK9gEz7N3Y4vdJidezf7Usz3"
+  :snapshot "bafyreib662epgj5lnl2cisepwnq4z2hcqcm4eotvwwr72v76qrhvf45maq"
+  :retrieval-route "https://kotobase.net/ipld/{cid}"
+  :detail "Both uncached public lookup surfaces return the rotated provider at /dns4/kotobase.net/tcp/443/https. GET /ipld/{cid} returned bytes whose SHA-256 multihash reproduced the advertised Arrangement snapshot CID. The cid.contact /routing/v1 compatibility response remained a cached pre-rotation result (max-age 7200) at observation time and is not treated as failed ingestion."}
 
  ;; ⚠ And what is NOT true, so nobody reads the line above as more than it
  ;; says. Announcing to IPNI did not make kubo-based public gateways serve
@@ -109,6 +150,6 @@
   :consequence "A client that speaks trustless HTTP retrieval gets these blocks today. A client that speaks only Bitswap does not."}
 
  :ipni.publisher/custody-verified
- {:at "2026-08-26"
-  :how "written to kagi, read back, public key re-derived, peer-id compared -- storing without reading back is a custody claim that has never been tested"
+ {:at "2026-08-27"
+  :how "written to kagi and Apple Keychain, both read back equal, public key re-derived, peer-id and IPNS name compared -- storing without reading back is a custody claim that has never been tested"
   :result :match}}

@@ -38,7 +38,15 @@
             [multiformats.core :as mf]
             [multiformats.multiaddr :as ma]))
 
-(def manifest-path "manifest/ipni-publisher.edn")
+(def manifest-path
+  (or (aget (.-env js/process) "IPNI_MANIFEST_PATH")
+      "manifest/ipni-publisher.edn"))
+(def kagi-bin
+  (or (aget (.-env js/process) "IPNI_KAGI_BIN")
+      "orgs/kotoba-lang/kagi/bin/kagi"))
+(def ipfs-cwd
+  (or (aget (.-env js/process) "IPNI_IPFS_CWD")
+      "orgs/net-kotobase/ipfs"))
 (def bucket "kotobase-graph-database-production")
 (def context-id
   (or (aget (.-env js/process) "IPNI_CONTEXT_ID") "kotobase-appviews-v1"))
@@ -124,7 +132,7 @@
 (defn r2-get-head []
   (let [r (.spawnSync cp "npx" (into-array ["wrangler" "r2" "object" "get"
                                             (str bucket "/ipni/head") "--pipe" "--remote"])
-                      #js {:cwd "orgs/net-kotobase/ipfs" :encoding "utf8"})]
+                      #js {:cwd ipfs-cwd :encoding "utf8"})]
     (when (zero? (.-status r))
       (let [v (str/trim (str (.-stdout r)))]
         (when (str/starts-with? v "bagu") v)))))
@@ -135,7 +143,7 @@
     (let [r (.spawnSync cp "npx" (into-array ["wrangler" "r2" "object" "put"
                                               (str bucket "/" key)
                                               "--file" tmp "--remote"])
-                        #js {:cwd "orgs/net-kotobase/ipfs" :encoding "utf8"})]
+                        #js {:cwd ipfs-cwd :encoding "utf8"})]
       (.unlinkSync fs tmp)
       (when-not (zero? (.-status r))
         (die! "r2 put" key (str (.-stdout r)) (str (.-stderr r))))
@@ -175,7 +183,7 @@
   (let [addrs [(:multiaddr ready)]
         seed-hex (if detached?
                    (.toString (crypto/randomBytes 32) "hex")
-                   (let [r (.spawnSync cp "orgs/kotoba-lang/kagi/bin/kagi"
+                   (let [r (.spawnSync cp kagi-bin
                                      (into-array ["get" (:ipni.publisher/seed-kagi-item m)
                                                   "-c" (:ipni.publisher/seed-kagi-compartment m)])
                                      #js {:encoding "utf8"
