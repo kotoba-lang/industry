@@ -119,8 +119,8 @@ sentence would have stood unchallenged because nothing tested what it named.
 **A break that is not a break reads exactly like a missing test.** In
 org-ietf-x448, an attempted break masked bit 7 off before setting it --
 `(bit-or (bit-and x 0x7F) 0x80)`, which is the identity. Zero failures. The
-finding looked like "the clamp test does not discriminate" and was actually
-"the break was not one". CLAUDE.md already warns about the mirror image of
+finding looked like \"the clamp test does not discriminate\" and was actually
+\"the break was not one\". CLAUDE.md already warns about the mirror image of
 this (a red produced by breaking the wrong thing); this is the same error
 producing a green.
 
