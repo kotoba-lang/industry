@@ -22,7 +22,7 @@ Kotoba already had portable subjects, evidence, attestations, causal identity ep
 7. The historical Etzhayyim monolithic contract remains legacy evidence only. It is not advertised as current ERC-8004 compatible. Its public RPC returned Cloudflare tunnel error 1033 on 2026-08-27, so current live chain state is UNVERIFIED. No chain deployment or migration is claimed by this slice.
 8. The reference JVM host performs read-only EAS and Human Passport access over an explicitly configured HTTPS RPC. It verifies `eth_chainId` before every contract read, caps JSON-RPC response size, rejects malformed ABI offsets and values, and normalizes Ethereum hex casing only for equality. It never writes to the chain.
 9. The live proof pins Optimism chain 10, EAS `0x4200000000000000000000000000000000000021`, Schema Registry `0x4200000000000000000000000000000000000020`, Human Passport schema `0xda0257756063c891659fed52fd36ef7557f7b45d66f59645fd3c3b263b747254`, and GitcoinAttester `0x843829986e895facd330486a61Ebee9E1f1adB1a`. On 2026-08-27 it decoded the official historical sample as scorer 335, score 922910, threshold 200000, and 29 stamps, then rejected it as expired. This proves live reading and fail-closed lifecycle behavior, not current validity of that wallet.
-10. The reference JVM host implements coordinate-driven ERC-8004 reads for Identity ownership, agent URI, verified agent wallet, Reputation summaries, Validation summaries, and bounded registration documents over HTTPS, an explicitly configured IPFS gateway, or base64 JSON data URIs. The draft expects per-chain singleton registries but supplies no canonical deployment addresses; Kotoba therefore does not guess a registry or claim a live ERC-8004 integration until an explicit deployment coordinate is governed.
+10. The reference JVM host implements coordinate-driven ERC-8004 reads for Identity ownership, agent URI, verified agent wallet, Reputation summaries, Validation summaries, and bounded registration documents over HTTPS, an explicitly configured IPFS gateway, or base64 JSON data URIs. The official contracts repository now publishes Base mainnet Identity and Reputation deployments. Murakumo pins those addresses by content-addressed policy; Validation remains unbound until an official governed deployment is selected.
 11. JavaScript/edge hosts use the same EAS admission semantics through a bounded JSON-RPC reader. They verify chain ID before each call, decode attestation and schema contract responses themselves, and never accept caller-decoded chain records as provenance.
 12. Kotobase admits EAS only at authenticated `evidence.ingest`. An explicit `data:write` Authorization credential is required; a cookie-only session is insufficient. The accepted Optimism coordinate, schema, attester, and 90-day freshness policy are content-addressed as `urn:sha256:69f422026ab1efb38c7848a1e1bc5a0b2c52a4de6ecd774eef7b96cc0af6a6c1`. One dedicated per-tenant Durable Object transaction binds the hashed idempotency key to one evidence fingerprint. Its receipt is evidence-only and grants no capability.
 
@@ -62,10 +62,17 @@ as `urn:sha256:528431823be6f06bb184dcaaa712ab642c35e92795cd55a3f6859911aadbf877`
   receipt; same key and a different UID returns `409`. The live endpoint refuses
   unauthenticated requests with `401`. No positive production tenant write is
   claimed without an authenticated user and fresh passing attestation.
-- `murakumo.cloud` advertises the ERC-8004 adapter as `unbound`, with the future
-  action named `agent.execute`. Human Passport and EAS are not enforced for
-  agent execution. No registry address is guessed and no agent gains a model
-  slot from an external score.
+- `murakumo.cloud` actively serves `POST /api/v1/agent/execute`. It reads the
+  official Base mainnet Identity and Reputation registries, verifies the live
+  Reputation-to-Identity registry binding, bounds registration retrieval to
+  base64 JSON or the governed IPFS gateway, and requires the access-token
+  subject to equal the verified non-zero `agentWallet`. Policy
+  `urn:sha256:e35d20686db527eaa50c6c94f95a2c8d51a1f368d0bc44322a45341637910efd`
+  requires feedback count >= 1 and score >= 1 from the allowlisted Murakumo
+  treasury client. This is additional admission evidence: it grants no
+  capability and qualified requests still pass through the existing billing
+  and generation-upstream checks. Human Passport and EAS remain unenforced for
+  agent execution, and Validation remains unbound.
 
 All three production origins serve `/.well-known/kotoba-trust.json` and validate
 against the same schema. The profile is a discovery statement, not an
@@ -82,9 +89,11 @@ missing.
    authenticated tenant using a fresh passing attestation. The deployed `401`
    denial, active profile, policy bytes, Worker binding, and transactional tests
    prove the boundary and refusal path, not current user evidence.
-3. Murakumo `agent.execute` remains unbound until governance selects an ERC-8004
-   chain, registry addresses, client/validator allowlists, thresholds, and
-   revocation/expiry posture. No live ERC-8004 registry integration is claimed.
+3. The deployed Murakumo refusal path and mock-chain positive integration are
+   proven, but a production request from a currently registered and qualified
+   agent wallet has not yet completed generation. Validation is also still
+   unbound because this policy governs no official Validation registry address
+   or validator allowlist.
 4. The public discovery documents are HTTPS-served but are not independently
    content-signed. Consumers needing offline authenticity must pin bytes or wait
    for a governed signature envelope.
@@ -97,4 +106,5 @@ missing.
 - https://docs.passport.human.tech/building-with-passport/stamps/smart-contracts/attestation-schema
 - https://docs.passport.human.tech/building-with-passport/stamps/smart-contracts/onchain-expirations
 - https://docs.attest.org/docs/core--concepts/attestations
-- https://eips.ethereum.org/EIPS/eip-8004"}]
+- https://eips.ethereum.org/EIPS/eip-8004
+- https://github.com/erc-8004/erc-8004-contracts"}]
