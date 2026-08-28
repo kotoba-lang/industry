@@ -23,6 +23,8 @@ Kotoba already had portable subjects, evidence, attestations, causal identity ep
 8. The reference JVM host performs read-only EAS and Human Passport access over an explicitly configured HTTPS RPC. It verifies `eth_chainId` before every contract read, caps JSON-RPC response size, rejects malformed ABI offsets and values, and normalizes Ethereum hex casing only for equality. It never writes to the chain.
 9. The live proof pins Optimism chain 10, EAS `0x4200000000000000000000000000000000000021`, Schema Registry `0x4200000000000000000000000000000000000020`, Human Passport schema `0xda0257756063c891659fed52fd36ef7557f7b45d66f59645fd3c3b263b747254`, and GitcoinAttester `0x843829986e895facd330486a61Ebee9E1f1adB1a`. On 2026-08-27 it decoded the official historical sample as scorer 335, score 922910, threshold 200000, and 29 stamps, then rejected it as expired. This proves live reading and fail-closed lifecycle behavior, not current validity of that wallet.
 10. The reference JVM host implements coordinate-driven ERC-8004 reads for Identity ownership, agent URI, verified agent wallet, Reputation summaries, Validation summaries, and bounded registration documents over HTTPS, an explicitly configured IPFS gateway, or base64 JSON data URIs. The draft expects per-chain singleton registries but supplies no canonical deployment addresses; Kotoba therefore does not guess a registry or claim a live ERC-8004 integration until an explicit deployment coordinate is governed.
+11. JavaScript/edge hosts use the same EAS admission semantics through a bounded JSON-RPC reader. They verify chain ID before each call, decode attestation and schema contract responses themselves, and never accept caller-decoded chain records as provenance.
+12. Kotobase admits EAS only at authenticated `evidence.ingest`. An explicit `data:write` Authorization credential is required; a cookie-only session is insufficient. The accepted Optimism coordinate, schema, attester, and 90-day freshness policy are content-addressed as `urn:sha256:69f422026ab1efb38c7848a1e1bc5a0b2c52a4de6ecd774eef7b96cc0af6a6c1`. One dedicated per-tenant Durable Object transaction binds the hashed idempotency key to one evidence fingerprint. Its receipt is evidence-only and grants no capability.
 
 ## Trust boundaries
 
@@ -33,7 +35,7 @@ Kotoba already had portable subjects, evidence, attestations, causal identity ep
 
 ## Verification
 
-Identity contract tests cover untrusted schema/attester, revocation, expiration, future time, Human Passport scorer/threshold/90-day freshness, strict EAS/Human Passport ABI decoding, RPC chain mismatch, malformed offsets, ERC-8004 registry binding, inactive registration, missing allowlists, threshold refusals, successful scoped claims, and atomic ledger persistence. The Optimism proof additionally exercises the public chain without writing. Sekisho JVM and ClojureScript tests cover tier ordering, non-identification, and 90-day expiry.
+Identity contract tests cover untrusted schema/attester, revocation, expiration, future time, Human Passport scorer/threshold/90-day freshness, strict JVM and edge EAS/Human Passport ABI decoding, RPC chain mismatch, malformed offsets, governed-coordinate equality, ERC-8004 registry binding, inactive registration, missing allowlists, threshold refusals, successful scoped claims, and atomic ledger persistence. The Optimism proof additionally exercises the public chain without writing. Kotobase tests cover explicit Authorization, tenant binding, chain verification, same-key replay, conflicting-evidence `409`, storage absence, and the evidence-only receipt invariant. Sekisho JVM and ClojureScript tests cover tier ordering, non-identification, and 90-day expiry.
 
 ## Service integration addendum (2026-08-28)
 
@@ -53,10 +55,13 @@ as `urn:sha256:528431823be6f06bb184dcaaa712ab642c35e92795cd55a3f6859911aadbf877`
   only this fixed route to the resident origin; it carries the session cookie,
   exact Origin, CSRF token, and request ID unchanged, preserves every upstream
   refusal, and returns JSON 502 when the resident transport is unavailable.
-- `kotobase.net` advertises an EAS adapter as
-  `adapter-available-not-enforced`, with the future action named
-  `evidence.ingest`. It does not currently admit or authorize writes from an
-  external attestation.
+- `kotobase.net` actively serves authenticated `evidence.ingest`. The Worker
+  rereads the EAS attestation and schema on Optimism, applies the governed
+  schema/attester/lifecycle/freshness policy, and persists a tenant-scoped,
+  strongly idempotent receipt. Same key and same evidence returns the original
+  receipt; same key and a different UID returns `409`. The live endpoint refuses
+  unauthenticated requests with `401`. No positive production tenant write is
+  claimed without an authenticated user and fresh passing attestation.
 - `murakumo.cloud` advertises the ERC-8004 adapter as `unbound`, with the future
   action named `agent.execute`. Human Passport and EAS are not enforced for
   agent execution. No registry address is guessed and no agent gains a model
@@ -73,8 +78,10 @@ missing.
 1. A fresh, passing Human Passport attestation has not yet been exercised by an
    authenticated production user end to end; historical and synthetic evidence
    do not prove that positive path.
-2. Kotobase `evidence.ingest` remains a named future action. Its tenant policy,
-   replay/idempotency receipt, and durable ingestion path are not implemented.
+2. A positive Kotobase production receipt has not yet been written by an
+   authenticated tenant using a fresh passing attestation. The deployed `401`
+   denial, active profile, policy bytes, Worker binding, and transactional tests
+   prove the boundary and refusal path, not current user evidence.
 3. Murakumo `agent.execute` remains unbound until governance selects an ERC-8004
    chain, registry addresses, client/validator allowlists, thresholds, and
    revocation/expiry posture. No live ERC-8004 registry integration is claimed.
