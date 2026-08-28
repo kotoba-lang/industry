@@ -60,7 +60,7 @@
   (let [{:keys [exit signal out err]} (run args opts)]
     (when (pos? exit)
       (throw (js/Error. (str (str/join " " args) " (exit " exit
-                             (when signal (str " signal=" signal " — likely the 300s spawnSync timeout"))
+                             (when signal (str " signal=" signal " — likely the spawnSync :timeout"))
                              "): " err out))))
     out))
 
@@ -103,8 +103,15 @@
       (checked! ["git" "fetch" "cloud-itonami"] {})
       (checked! ["git" "merge" "--ff-only" "cloud-itonami/main"] {})
       (println (str "tick " (str/join " " argv)))
+      ;; resolve_tick.cljs self-limits to --max-duration-sec (default 600s)
+      ;; but the OUTER spawnSync timeout must stay comfortably above that,
+      ;; not at the 300s default (which would kill a legitimately-running
+      ;; tick before its own time budget even expires) — 800s covers the
+      ;; 600s work budget plus fixed overhead (nbb boot, cache-file scan)
+      ;; with real margin.
       (println (checked! (into ["nbb" "--classpath" "src" "scripts/resolve_tick.cljs" "--live"] argv)
-                         {:env (js/Object.assign #js {} js/process.env
+                         {:timeout 800000
+                          :env (js/Object.assign #js {} js/process.env
                                                  #js {"DNS_RESOLVER_OPERATOR_GATE" "open"})}))
       (let [status (:out (run ["git" "status" "--porcelain" "--" "data/ledger"] {}))]
         (if (str/blank? status)
