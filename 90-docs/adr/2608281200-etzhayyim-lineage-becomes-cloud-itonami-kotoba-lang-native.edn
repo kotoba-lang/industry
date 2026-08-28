@@ -282,4 +282,89 @@ app-shopping / todoke / supplychain / warifu / shiharai / omise)が先である�
 増えた状態で。パースが通ることは中身が正しいことの証拠ではない。書き込む
 前にキー数と本文の末尾を確認して気づいた。
 
+
+
+## Session closure(2026-08-28)—— 着地一覧と resume point
+
+8 PR が main に着地し、west pin 7 本が root main に反映済み。
+
+| # | repo | PR | pin |
+|---|---|---|---|
+| 1 | kotoba-lang/base-l2 | 1 | 6f741ec4b2df |
+| 2 | kotoba-lang/sdk | 1 | ce8ceb1649d2 |
+| 3 | kotoba-lang/pay | 2 | 87629621a61e |
+| 4 | cloud-itonami/warifu | 1 | bc31491d7f3a |
+| 5 | cloud-itonami/ec | 1 | 903819aaccc8 |
+| 6 | cloud-itonami/okaimono | 1 | 30bfb1b22243 |
+| 7 | network-awai/cloud-itonami | 540 | d01263e3ff6e |
+| 8 | com-junkawasaki/root | 2635 | (この ADR) |
+
+### 何が変わったか
+
+**substrate が portable になった。** base-l2 の `abi` / `paymaster` が `.cljc` へ。
+`.clj` 限定の根拠だった docstring は pin していた eth-crypto `eebb35b` には正しく、
+upstream `1253e01`(2026-07-26)以降は偽だった —— **塞がれた穴が境界を 2 ヶ月
+正当化していた**。ERC-4337 sponsored write が edge/portable runtime から
+締め出されていた唯一の `.clj` 境界がこれで外れた。
+
+**rail が実在するようになった。** `pay.rail.base-l2` が `PayRail` 6 method のうち
+`-pay!` だけを実装。残り 5 は `unprovisioned-rail` とバイト同一に HOLD し、
+テストが直接比較する。全部答える rail のほうが悪い —— HOLD は見えるが捏造した
+receipt は見えない。
+
+**warifu が R0 を出た。** `warifu.substrate.usdc` は 11 method のうち価値を動かす
+3 つだけを実 USDC に置き換える decorator。順序は chain-first(逆だと『支払った』と
+台帳が言うのに照合対象が無い)。解決できない payee と credit funding は拒否する。
+
+**TS closure が死んでいることが確定した。** cold store では sdk / ec / okaimono の
+いずれもインストールできない。root overrides は checkpointer の入れ子
+`npm install` に届かず、pin し直す先も無い —— checkpointer の package.json を
+触った次の commit がファイルごと削除している。3 repo の記録を訂正した。
+
+**actor DID の受け皿が立った。** `itonami.cloud/actor/{name}/did.json` が商流の核
+8 actor 分。`/actor/*` の SPA fall-through guard 付き(HTTP 200 の HTML は
+did:web resolver から見て『解決した』になる)。
+
+### 未検証・残件(優先順)
+
+1. **`ec` の tithe が唯一の未決事項。** 10% Public-Fund split を injectable policy に
+   するか、etzhayyim 側 wrapper へ移すか、据え置くか。`ec` が何であるかが変わるので
+   port の中で決めていない。`ec` ADR-0002 の Open 節が正本。
+2. **actor DID は本番未反映。** merge 後 ~30 分の時点で itonami.cloud はまだ古い
+   sites-registry を返し、`/actor/warifu/did.json` が `sites-publishing-rule` の 404。
+   deploy.yml は Actions 無効で走らないが、**同日の trust profile は本番で応答して
+   いる**ので別経路が生きている。確認は
+   `curl -s https://itonami.cloud/actor/warifu/did.json | jq .id`。
+3. **`ec` / `okaimono` の port 本体は未着手。** 接続先は確定している ——
+   `SettlementExecutor` と `PayRail/-pay!` は同型。`ec/kotoba` は 533 行。
+4. **参照の移行はまだ 1 件もしていない。** 510 repo / 36,840 座標は手つかず。
+   受け皿が本番で解決してから。
+5. **Actions が無効な repo が 2 つ**(`kotoba-lang/base-l2`、
+   `network-awai/cloud-itonami`)。この session が足した CI はそこでは走らない。
+6. **warifu に CI が無い**(Actions は有効)。
+
+### 次の agent の最初の一手
+
+```
+curl -s https://itonami.cloud/actor/warifu/did.json | head -c 200
+```
+
+`id` が返れば受け皿は生きている —— 残件 3 へ。`sites-publishing-rule` が返るなら
+まだ deploy されていない。
+
+### この session が踏んだ穴(繰り返さないために)
+
+- **`pnpm install` は cold check ではない。** warm store が prepare 済みの git 依存を
+  再生する。3 つの ADR / quickstart がこれで緑を記録していた。`--store-dir` を
+  空ディレクトリに向けるか CI runner で測る。
+- **パースが通ることは中身が正しいことの証拠ではない。** この ADR の訂正 1 の初稿は
+  curl 出力の生の引用符で body を切り、`clojure.edn/read-string` は成功したまま
+  残りを余分な map エントリとして吸収した(キー 14 → 20)。
+- **`$?` は pipe の最後の値。** `--check` を `| tail` に通して exit 0 を見て
+  『通った』と読みかけた。
+- **control が走ったことを確かめる。** 壊したつもりの python heredoc が構文エラーで
+  何も書き換えず、緑を『control 通過』と読みかけた。
+- **assertion が正しい理由で通っているか確かめる。** warifu の credit guard テストは
+  address 解決の失敗で throw していて、guard を消しても緑だった。
+
 "}]
