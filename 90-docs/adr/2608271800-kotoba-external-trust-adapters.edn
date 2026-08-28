@@ -67,18 +67,31 @@ as `urn:sha256:528431823be6f06bb184dcaaa712ab642c35e92795cd55a3f6859911aadbf877`
   Reputation-to-Identity registry binding, bounds registration retrieval to
   base64 JSON or the governed IPFS gateway, and requires the access-token
   subject to equal the verified non-zero `agentWallet`. Policy
-  `urn:sha256:e35d20686db527eaa50c6c94f95a2c8d51a1f368d0bc44322a45341637910efd`
+  `urn:sha256:16764a912de06ccb974ba9870c8c2dcd24c1bdd40cf2ccd1bb1dd079f02e0953`
   requires feedback count >= 1 and score >= 1 from the allowlisted Murakumo
   treasury client. This is additional admission evidence: it grants no
   capability and qualified requests still pass through the existing billing
   and generation-upstream checks. Human Passport and EAS remain unenforced for
-  agent execution, and Validation remains unbound.
+  agent execution. A keyed Base endpoint is tried first when configured,
+  followed by three bounded public fallbacks; the live capability surface
+  publishes only keyed presence and fallback count, never credential-bearing
+  URLs. Validation is explicitly
+  `deferred-upstream-no-official-deployment`: activation requires an official
+  Base coordinate, pinned runtime code and Identity binding, a validator and
+  expiry policy, and positive/expired/revoked/unavailable proofs.
 
 All three production origins serve `/.well-known/kotoba-trust.json` and validate
 against the same schema. The profile is a discovery statement, not an
 authorization credential; runtimes continue to fail closed when configuration,
 attestation lifecycle, subject binding, or governed registry coordinates are
 missing.
+
+The Murakumo policy is also published with a detached 2-of-2 Ed25519 envelope
+at the adjacent `.signature.json` URL. Verification over
+`kotoba-trust-policy-v1\\n<policy-id>` succeeded for both distinct public keys
+after live deployment. This closes offline content-authenticity of the bytes,
+but not independent human review: both governance keys remain under one
+operator's custody, which the envelope states explicitly.
 
 ## Explicit remaining gaps
 
@@ -89,15 +102,24 @@ missing.
    authenticated tenant using a fresh passing attestation. The deployed `401`
    denial, active profile, policy bytes, Worker binding, and transactional tests
    prove the boundary and refusal path, not current user evidence.
-3. The deployed Murakumo refusal path and mock-chain positive integration are
-   proven, but a production request from a currently registered and qualified
-   agent wallet has not yet completed generation. Validation is also still
-   unbound because this policy governs no official Validation registry address
-   or validator allowlist.
-4. The public discovery documents are HTTPS-served but are not independently
-   content-signed. Consumers needing offline authenticity must pin bytes or wait
-   for a governed signature envelope.
-5. Human Passport Individual Verifications via Sign Protocol are outside this
+3. Murakumo's positive application branch is covered through its existing
+   billing boundary, but no qualifying production subject exists. The public
+   event dataset through block 48,303,252 plus a direct Base scan through block
+   50,552,023 found zero Reputation feedback events from the governed treasury
+   client. Creating synthetic feedback or weakening the allowlist is not an
+   implementation fix and was not done.
+4. The official ERC-8004 deployment table still publishes no Base mainnet
+   Validation Registry coordinate. The policy now makes this an explicit
+   upstream activation gate rather than an ambiguous null, but it cannot be
+   activated truthfully until that external coordinate and governed validator
+   policy exist.
+5. RPC reads now have three public fallbacks, but no keyed/SLA Base provider is
+   provisioned. The targeted `murakumo-base-rpc-url` credential lookup returned
+   no item; no vault enumeration or guessed credential was attempted.
+6. The detached policy signatures are cryptographically distinct but share one
+   operator custody. Independent custodian or human review requires a second
+   external signer and is not claimed.
+7. Human Passport Individual Verifications via Sign Protocol are outside this
    slice; only the Onchain Passport EAS score path is accepted.
 
 ## References
