@@ -214,4 +214,26 @@ run と同じ顔をする**。既定を「agent 駆動の job すべて」に変
   いる。config・admission・実推論（`usage.cost 0`）は検証済みで、Bot が 1 体できた
   瞬間から無料モデルで動く。
 - `auxiliary.free_only` が有料レーンを実際に拒むところは見ていない。設定しただけ。
-- ディレクトリ名は `scripts/hermes-hyakka-bots/` のままだが、もう hyakka 専用ではない。"}]
+- ディレクトリ名は `scripts/hermes-hyakka-bots/` のままだが、もう hyakka 専用ではない。
+
+## Closing 2（2026-08-28）
+
+### refresh の horizon と cadence を直した
+
+翌日 cron table は 3 → 5 に増えており、別セッションが作った
+`itonami-ingest-scout` / `itonami-coverage-scout` が **`murakumo-main` のまま**だった。
+片方は一晩で 57 分・入力 186 万トークンを艦隊で使った。refresh を「agent 駆動の job
+すべて」に広げ（`HYAKKA_MODEL_OPT_OUT` で opt-out）、さらに `--if-stale` の current
+経路でも job を突き合わせるようにした —— 「そのモデルはまだ無料か」と「bot が実際に
+それを指しているか」は別の問いで、前者しか訊いていなかった。
+
+**cadence の提案は間違っていた。** 「hyakka 毎時 / itonami 6 時間」は
+`TERMINAL_CWD` write ロック（プロセスに 1 本、待ち上限 660 秒）を測らずに書いたもので、
+57 分保持する itonami の裏で毎時 hyakka が TimeoutError で死ぬ。衝突しない slot に
+組み直した: source 8/日・ontology 4/日・itonami 各 2/日、writer 衝突 0、
+無料枠 340 calls/day、ロック占有 18%。詳細は ADR-2608280200。
+
+### 現在地
+
+4 agent job すべてが無料モデル（`cohere/north-mini-code:free` @ `openrouter-free`）。
+1 本を意図的に `murakumo-main` へ戻して refresh をかけ、引き戻すことを確認済み。"}]
