@@ -20,6 +20,22 @@
 (def archive-dir (or (aget js/process.env "HYAKKA_ARCHIVE_DIR")
                      (str (.homedir os) "/.gftd/hyakka-archive")))
 (def lock-dir (str (.homedir os) "/.gftd/locks/hyakka-knowledge-ingest.lock"))
+;; The graph these ledgers belong to. `:apex` requires graph scope == issuer
+;; DID, so a seed that derives anything else does not fail — it writes to a
+;; DIFFERENT ref, silently forking the corpus.
+;;
+;; This constant exists because that nearly happened on 2026-08-28. Recovering
+;; a 64-hex `hyakka-kotobase-seed` from `~/.kagi/vault.edn.bak` and finding its
+;; DID recorded in ADR-2607311100 looked like proof the right seed was back.
+;; It was the v1 seed. The v1 graph was orphaned on 2026-08-24 when everything
+;; was re-published under v2, and the next tick would have written 296 ledgers
+;; into a graph nobody reads. The identity-seeds map says so four lines below
+;; the line that was read.
+;;
+;; A seed is not identified by being 64 hex characters, nor by deriving a DID
+;; that appears somewhere in the docs. It is identified by deriving THIS one.
+(def expected-tenant-did "did:key:z6MkwF7M3TPYUvdNP5NtWfr6aA2xtr7dsETCwx26fnVamjQo")
+
 (def b2-endpoint "https://s3.us-west-004.backblazeb2.com")
 (def public-health "https://wiki.kotobase.net/health")
 
@@ -280,6 +296,26 @@
                   (pr-str {:pending pending :expected expected :live live})))))
   (println "hyakka resident deploy retry policy validated"))
 
+(defn verify-tenant-did!
+  "Does this seed derive the graph we publish into? Returns nil if it does.
+
+  Delegates to app-hyakka's own `scripts/verify_identity.cljs`, which derives
+  through `kotobase.cid` — the authority the live plane uses — rather than
+  re-implementing base58btc here. A second implementation of a DID derivation
+  is precisely the thing that produces a plausible wrong answer.
+
+  The seed is passed in the environment and never appears in argv."
+  [env seed]
+  (let [e (js/Object.assign #js {} env)
+        _ (aset e "HYAKKA_SEED" seed)
+        r (run ["nbb" "--classpath" "../../kotoba-lang/kotobase-client/src"
+                "scripts/verify_identity.cljs" expected-tenant-did]
+               {:dir worktree :env e})]
+    (when-not (zero? (:exit r))
+      (str "seed derives a different tenant DID than " expected-tenant-did
+           " — publishing would fork the corpus into a graph nobody reads. "
+           (str/trim (str (:out r) " " (:err r)))))))
+
 (defn publish-kotobase!
   "Publish pending ledgers to the Kotobase datom plane. Returns why it could not.
 
@@ -292,7 +328,10 @@
   `hyakka-kotobase-seed` has been absent from kagi since 2026-08-15 and is
   recorded as owner action in ADR-2608271450 and the secrets map. What was NOT
   recorded is that it also held the public deploy hostage. It no longer does.
-  The ledgers stay pending — they already were — and the reason is returned."
+  The ledgers stay pending — they already were — and the reason is returned.
+
+  A seed that IS present is now checked against `expected-tenant-did` before a
+  single ledger moves. Absence is loud; the wrong seed was not."
   [env ledgers]
   (when (seq ledgers)
     (let [e (js/Object.assign #js {} env)
@@ -303,12 +342,17 @@
               (println "SKIP Kotobase publish —" (count ledgers)
                        "ledger(s) stay pending:" (str/trim (str why))))
             {:skipped (count ledgers) :why (str/trim (str why))})
-        (do (aset e "HYAKKA_SEED" (:ok seed))
-            (println "Kotobase publish pending ledgers in one resumable process")
-            (checked ["npm" "run" "publish" "--" "--knowledge" "true"
-                      "--batch" "100"]
-                     {:dir worktree :env e})
-            nil)))))
+        (if-let [wrong (verify-tenant-did! env (:ok seed))]
+          (do (binding [*out* *err*]
+                (println "SKIP Kotobase publish —" (count ledgers)
+                         "ledger(s) stay pending:" wrong))
+              {:skipped (count ledgers) :why wrong})
+          (do (aset e "HYAKKA_SEED" (:ok seed))
+              (println "Kotobase publish pending ledgers in one resumable process")
+              (checked ["npm" "run" "publish" "--" "--knowledge" "true"
+                        "--batch" "100"]
+                       {:dir worktree :env e})
+              nil))))))
 
 (defn deploy-public! [env]
   (println "verify tests before public deploy")

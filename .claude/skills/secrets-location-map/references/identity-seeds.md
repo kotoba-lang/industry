@@ -45,6 +45,34 @@
 
 ## hyakka (wiki.kotobase.net) identity seed — 2026-08-15 に消え、2026-08-24 に v2 へ再作成、**2026-08-27 に再び `no such item`**
 
+### 2026-08-28: v1 seed は `vault.edn.bak` から復旧できた。v2 は依然オーナーのみ
+
+- ✅ **旧 (v1) seed は失われていなかった。** `~/.kagi/vault.edn.bak`（08-15 12:06 =
+  03:06 UTC、消失の直前）から `hyakka-kotobase-seed` を取り出せ、
+  `did:key:z6MkuEj8…` を derive する。08-15 の調査が「復旧手段は尽きた」と結論した
+  のは、その時点の `.bak` が 7/19 だったため —— **その後の kagi 操作が .bak を
+  消失直前の vault で上書きしていた**。`hyakka-kotobase-seed-v1-orphan-recovered`
+  として保全した（compartment `personal`）。v1 graph は orphan のままだが、
+  読むことはできる状態に戻った。
+- 🔴 **v2 seed は復旧できない。** cloud vault（`kagi pull`、最終 push 7/25）に無く、
+  mint は 08-24。`vault.edn.bak` は v1 時代のもの。APFS local snapshot 0 件、
+  Time Machine の destination 未設定、`kagi recovery` の share も無し。
+  **オーナーによる再登録以外に経路が無い**（32 byte hex を stdin で）。
+- ⚠ **v1 を `hyakka-kotobase-seed` に戻してはいけない。** 2026-08-28 に一度そうして
+  しまい、次の resident tick（15 分後）が 296 ledger を orphan graph へ publish する
+  ところだった。publish は失敗しない —— `:apex` は issuer DID の graph に書くので、
+  **黙って別の ref へ分岐する**。
+  - 誤りの形: `.bak` から取れた seed が 64-hex で、その DID が ADR-2607311100 に
+    記録されていたことを「一致」と読んだ。**同じファイルの 4 行下が「旧 DID」と
+    書いている。** 1 行目で止めたのが原因。
+  - 現在 `hyakka-kotobase-seed` には非 64-hex の説明文字列を入れて塞いである
+    （kagi に削除コマンドが無いため）。v2 復元時はそのまま上書きすればよい。
+- 🛡 **構造的な防止を入れた。** `scripts/hyakka-knowledge-resident.cljs` が publish の
+  前に `scripts/verify_identity.cljs` で **derive した DID を
+  `did:key:z6MkwF7M3TPYUvdNP5NtWfr6aA2xtr7dsETCwx26fnVamjQo` と突き合わせる**。
+  不一致なら publish せず理由を出して SKIP（公開カタログの deploy は独立して続く）。
+  両方向で実測済み: v1 seed × v2 DID = 拒否 / v1 seed × v1 DID = 通過。
+
 - 🔴 **2026-08-27 04:5x UTC 実測: `hyakka-kotobase-seed` は live vault (`~/.kagi`) にも
   repo-local vault にも存在しない**（両方で `no such item`）。**同じ item が消えるのは 2 度目**
   で、この乖離クラス全体では 5 例目。
