@@ -35,6 +35,52 @@ Kotoba already had portable subjects, evidence, attestations, causal identity ep
 
 Identity contract tests cover untrusted schema/attester, revocation, expiration, future time, Human Passport scorer/threshold/90-day freshness, strict EAS/Human Passport ABI decoding, RPC chain mismatch, malformed offsets, ERC-8004 registry binding, inactive registration, missing allowlists, threshold refusals, successful scoped claims, and atomic ledger persistence. The Optimism proof additionally exercises the public chain without writing. Sekisho JVM and ClojureScript tests cover tier ordering, non-identification, and 90-day expiry.
 
+## Service integration addendum (2026-08-28)
+
+The adapters are exposed through one versioned discovery contract,
+`https://kotoba-lang.org/schemas/trust-profile/v1`. The schema and the active
+Itonami policy document are projected from `kotoba-lang/identity`; service repos
+do not invent a second trust vocabulary. The Itonami policy is content-addressed
+as `urn:sha256:528431823be6f06bb184dcaaa712ab642c35e92795cd55a3f6859911aadbf877`.
+
+- `itonami.cloud` is the only active enforcement slice. Authenticated human
+  sessions may call `POST /api/v1/trust/human-passport/verify`. The resident host
+  reads EAS on Optimism, binds the attestation recipient to the verified
+  Principal's Passkey Smart Account, applies scorer 335 / score 200000 / 90-day
+  freshness, and persists evidence plus its decision receipt atomically. The
+  effect is evidence-only and `grantsCapability` is false. Origin, CSRF, and
+  Passkey-session checks remain mandatory.
+- `kotobase.net` advertises an EAS adapter as
+  `adapter-available-not-enforced`, with the future action named
+  `evidence.ingest`. It does not currently admit or authorize writes from an
+  external attestation.
+- `murakumo.cloud` advertises the ERC-8004 adapter as `unbound`, with the future
+  action named `agent.execute`. Human Passport and EAS are not enforced for
+  agent execution. No registry address is guessed and no agent gains a model
+  slot from an external score.
+
+All three production origins serve `/.well-known/kotoba-trust.json` and validate
+against the same schema. The profile is a discovery statement, not an
+authorization credential; runtimes continue to fail closed when configuration,
+attestation lifecycle, subject binding, or governed registry coordinates are
+missing.
+
+## Explicit remaining gaps
+
+1. A fresh, passing Human Passport attestation has not yet been exercised by an
+   authenticated production user end to end; historical and synthetic evidence
+   do not prove that positive path.
+2. Kotobase `evidence.ingest` remains a named future action. Its tenant policy,
+   replay/idempotency receipt, and durable ingestion path are not implemented.
+3. Murakumo `agent.execute` remains unbound until governance selects an ERC-8004
+   chain, registry addresses, client/validator allowlists, thresholds, and
+   revocation/expiry posture. No live ERC-8004 registry integration is claimed.
+4. The public discovery documents are HTTPS-served but are not independently
+   content-signed. Consumers needing offline authenticity must pin bytes or wait
+   for a governed signature envelope.
+5. Human Passport Individual Verifications via Sign Protocol are outside this
+   slice; only the Onchain Passport EAS score path is accepted.
+
 ## References
 
 - https://docs.passport.human.tech/building-with-passport/stamps/introduction
