@@ -93,15 +93,27 @@ after live deployment. This closes offline content-authenticity of the bytes,
 but not independent human review: both governance keys remain under one
 operator's custody, which the envelope states explicitly.
 
+On 2026-08-28 the EAS index exposed a fresh attestation under the governed
+Human Passport schema. The reference reader then reread UID
+`0x0c57d8515a64b7ff3914a0a8dc435232967e9f540311037a4477c9b87ffd8f5c`
+from Optimism and accepted it against the exact Itonami policy: official
+attester, scorer 335, score 273090, attested and local threshold 200000, six
+stamps, unrevoked and within lifecycle. The same command still rejects the
+historical sample as expired. Both proofs were read-only. This closes the
+fresh-public-evidence gap but does not impersonate the recipient as an
+authenticated Itonami Principal or Kotobase tenant.
+
 ## Explicit remaining gaps
 
-1. A fresh, passing Human Passport attestation has not yet been exercised by an
-   authenticated production user end to end; historical and synthetic evidence
-   do not prove that positive path.
+1. Fresh passing Human Passport evidence is now proven from the public chain,
+   but its recipient has not authenticated as the matching production Itonami
+   Principal. The remaining gate is the user-bound session and persisted
+   evidence receipt, not schema decoding or freshness.
 2. A positive Kotobase production receipt has not yet been written by an
-   authenticated tenant using a fresh passing attestation. The deployed `401`
-   denial, active profile, policy bytes, Worker binding, and transactional tests
-   prove the boundary and refusal path, not current user evidence.
+   authenticated tenant. A fresh passing attestation is now available and the
+   shared verifier accepts it, while the deployed `401`, active profile, policy
+   bytes, Worker binding, and transactional tests prove the boundary and
+   refusal path. Tenant authorization and the external write remain distinct.
 3. Murakumo's positive application branch is covered through its existing
    billing boundary, but no qualifying production subject exists. The public
    event dataset through block 48,303,252 plus a direct Base scan through block
