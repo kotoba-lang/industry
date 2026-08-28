@@ -121,10 +121,11 @@ RuntimeError on .solve()」。`shomei` は「R0 design scaffold」。
    と fleet の Svelte→cljs 移行方針に一致する。TS SDK は既存 consumer の
    ためだけに凍結保持し、新規 actor は `.cljc` を使う。
 
-3. **DID は改名しない。rotate する。** did:webvh(cloud-itonami ADR-0046)
-   が唯一の経路。rotation する DID 文書が itonami.cloud 側で解決するように
-   なるまで、actor の `did:web:etzhayyim.com:actor:*` は**触らない**。
-   機械置換の禁止はこの ADR の hard invariant。
+3. **DID は機械置換しない。** actor の `did:web:etzhayyim.com:actor:*` は、
+   itonami.cloud 側に解決する文書が用意されるまで**触らない**。これはこの
+   ADR の hard invariant であり、下の訂正でも変わらない。
+
+   ただし**その先の機構は当初の記述が誤っていた** —— 下記「訂正 1」参照。
 
 4. **package 名の改名は、下流を数えてから 1 度だけ行う。** `@etzhayyim/*`
    → kotoba-lang scope の改名は import 文を壊す破壊的変更で、6 substrate
@@ -209,4 +210,76 @@ for d in */; do r=${d%/}; [ -d \"$r/.git\" ] || continue
   (cd $r && git grep -I -c -oE 'did:web:etzhayyim\\.com|com\\.etzhayyim\\.|@etzhayyim/|[a-z0-9-]*\\.etzhayyim\\.com' HEAD -- .)
 done
 ```
+
+
+## 訂正 1(2026-08-28、同日)—— 「rotate が唯一の経路」は鍵がある前提だった
+
+決定 3 は当初こう書いていた:
+
+> DID は改名しない。rotate する。did:webvh(cloud-itonami ADR-0046)が唯一の経路。
+
+**実測がこれを否定した。** etzhayyim の actor DID 文書を実際に取得すると、
+`verificationMethod` が空である:
+
+```
+GET https://etzhayyim.com/actor/warifu/did.json
+  id                 did:web:etzhayyim.com:actor:warifu
+  alsoKnownAs        []
+  verificationMethod []          <-- 空
+  service            [EtzhayyimAuthzResolver …]
+```
+
+`todoke` も `shomei` も同じ。これらは暗号学的 identity ではなく、service
+記述子(PDS endpoint、libp2p addr、_meta の ADR 参照)にすぎない。
+
+したがって **回すべき鍵が無い**。did:webvh の rotation plane は鍵を回し、
+失効させ、誰が変更を承認したかを記録するための機構で、鍵を持たない文書に
+対しては適用対象そのものが存在しない。cloud-itonami ADR-0046 が webvh を
+rotation plane と定めたのは正しいが、**この移行はその plane を必要としない。**
+
+### 正しい機構は alsoKnownAs
+
+DID Core の `alsoKnownAs` は「この subject は別の識別子でも知られている」を
+表すためのもので、まさにこの用途である。順序:
+
+1. itonami.cloud 側に `did:web:itonami.cloud:actor:<name>` を公開する。
+   service は etzhayyim 側の文書から引き継ぎ、`alsoKnownAs` に旧 DID を持たせる。
+2. etzhayyim 側の文書にも逆向きの `alsoKnownAs` を足す(両側を保有している
+   ので双方向に検証可能)。
+3. その上ではじめて repo 内の参照を移す。両方が解決し続ける。
+
+### hard invariant 自体は変わらない。理由が変わった
+
+「機械置換の禁止」は残る。鍵の連続性が切れるからではなく、**解決先の無い
+識別子ができるから**である。`sed` で `etzhayyim.com` を `itonami.cloud` に
+置換すれば、その瞬間に 1,790 箇所が 404 を指す。文書を先に公開するという
+順序は、訂正後も同じ。
+
+### ADR-0044 の規律はこちらにも及ぶ
+
+itonami.cloud の `.well-known/did.json` が `verificationMethod` を持たないのは
+ADR-0044 の決定である(持っていない鍵を document に書くのは custody の嘘)。
+actor 文書も同じ規律に従う —— 鍵を持たない actor の文書に verificationMethod を
+書いてはならない。etzhayyim 側が今そうなっているのは、同じ規律の結果である
+可能性が高い。
+
+### 残っている作業(この訂正では実装しない)
+
+受け皿そのもの —— itonami.cloud が `/actor/<name>/did.json` を返すこと。
+cloud-itonami は Cloudflare Pages Functions と `public/` の静的資産で構成され、
+`_middleware.js` が `/.well-known/*` を SPA に落とさない guard を持つ
+(ADR-0044、`test/well_known_guard_test.cljs`)。actor 文書も同じ扱いが要る。
+
+**どの actor に itonami.cloud の identity を与えるかは製品判断であり、この ADR は
+決めない。** 510 repo 全部ではないはずで、少なくとも商流の核(okaimono / ec /
+app-shopping / todoke / supplychain / warifu / shiharai / omise)が先である。
+
+### この訂正自体の作られ方について
+
+最初の草稿は、上の curl 出力を生の引用符つきで EDN 文字列に埋め、body を
+その位置で切った。**それでも `clojure.edn/read-string` は成功した** ——
+残りの本文が余分な map エントリとして吸収され、キーが 14 個から 20 個に
+増えた状態で。パースが通ることは中身が正しいことの証拠ではない。書き込む
+前にキー数と本文の末尾を確認して気づいた。
+
 "}]
