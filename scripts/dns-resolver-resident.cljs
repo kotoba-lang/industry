@@ -117,8 +117,19 @@
         (if (str/blank? status)
           (println "no new ledger files — nothing to commit")
           (do
-            (checked! ["git" "add" "data/ledger"] {})
-            (checked! ["git" "commit" "-m" (str "ingest: resident tick (" (str/join " " argv) ")")] {})
+            ;; data/ledger is git-annex (B2 special remote), not plain git —
+            ;; found live 2026-08-28: a tick that hit its full --n within
+            ;; budget wrote one 158MB ledger file, over GitHub's 100MB
+            ;; limit, and plain `git add`/push kept silently failing forever
+            ;; against the same stuck commit. `git annex add` (which
+            ;; `datalad save` drives) routes data/ledger/** to B2 per
+            ;; .gitattributes, so only a small pointer ever lands in git —
+            ;; resolve_tick.cljs's own max-domains-per-ledger-file cap is
+            ;; the root-cause fix; this is the transport-level backstop.
+            (checked! ["datalad" "save" "-d" "." "-m"
+                      (str "ingest: resident tick (" (str/join " " argv) ")")
+                      "--" "data/ledger"] {})
+            (checked! ["datalad" "push" "-d" "." "--to" "b2"] {})
             (checked! ["git" "push" "cloud-itonami" "resident/dns-resolver:main"] {})
             (println "pushed"))))
       (release-lock! lp)
