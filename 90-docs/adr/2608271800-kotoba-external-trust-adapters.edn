@@ -49,7 +49,10 @@ as `urn:sha256:528431823be6f06bb184dcaaa712ab642c35e92795cd55a3f6859911aadbf877`
   Principal's Passkey Smart Account, applies scorer 335 / score 200000 / 90-day
   freshness, and persists evidence plus its decision receipt atomically. The
   effect is evidence-only and `grantsCapability` is false. Origin, CSRF, and
-  Passkey-session checks remain mandatory.
+  Passkey-session checks remain mandatory. The apex Pages Function forwards
+  only this fixed route to the resident origin; it carries the session cookie,
+  exact Origin, CSRF token, and request ID unchanged, preserves every upstream
+  refusal, and returns JSON 502 when the resident transport is unavailable.
 - `kotobase.net` advertises an EAS adapter as
   `adapter-available-not-enforced`, with the future action named
   `evidence.ingest`. It does not currently admit or authorize writes from an
