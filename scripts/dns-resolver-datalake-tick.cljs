@@ -54,9 +54,18 @@
       (do (println (str "current\tlake matches the ledger (last synced " (:synced-at prev) ")"))
           (.exit js/process 0))
       (let [_ (fs/mkdirSync out-dir #js {:recursive true})
+            ;; export_and_sync.cljs now persists an accumulator across runs
+            ;; instead of re-parsing the whole ledger every tick (found
+            ;; live 2026-08-28: re-parsing ~1.6GB of accumulated EDN every
+            ;; run OOM'd on the default ~4GB heap) — this raised ceiling is
+            ;; a backstop for the accumulator itself (and any bootstrap/
+            ;; --force full-reparse) still growing large as the ledger
+            ;; scales toward world-scale coverage, not the fix itself.
             r (cp/spawnSync "nbb" #js ["--classpath" "src" "scripts/export_and_sync.cljs"
                                        "--root" root "--out-dir" out-dir]
-                            #js {:encoding "utf8" :cwd worktree})]
+                            #js {:encoding "utf8" :cwd worktree
+                                :env (js/Object.assign #js {} js/process.env
+                                                       #js {"NODE_OPTIONS" "--max-old-space-size=8192"})})]
         (print (or (.-stdout r) ""))
         (when (seq (.-stderr r)) (print (.-stderr r)))
         (when (pos? (or (.-status r) 1))
