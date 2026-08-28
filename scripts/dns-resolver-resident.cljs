@@ -19,19 +19,49 @@
 
 (def worktree (or (aget js/process.env "DNS_RESOLVER_WORKTREE")
                   (str (os/homedir) "/.gftd/worktrees/dns-resolver-resident")))
-(def lock-path (str (os/homedir) "/.gftd/locks/dns-resolver-" (or (aget js/process.env "TICK_SOURCE") "tick") ".lock"))
 
-(defn run [args opts]
+(defn lock-path-for
+  "One lock PER SOURCE, not one lock for the whole script — tranco (hourly)
+  and commoncrawl (every 15min) run on independent schedules and must not
+  serialize behind each other. Found live: without this, both jobs raced
+  for literally the same lock file and the more frequent one (commoncrawl)
+  lost every time to the slower one (tranco) still mid-fetch."
+  [source]
+  (str (os/homedir) "/.gftd/locks/dns-resolver-" (or source "tick") ".lock"))
+
+(defn source-arg
+  "Pull --source's value out of argv (defaults to \"tranco\", matching
+  resolve_tick.cljs's own default) — needed before argv is otherwise
+  parsed, just to know which lock file this run claims."
+  [argv]
+  (let [i (.indexOf (clj->js argv) "--source")]
+    (if (and (>= i 0) (< (inc i) (count argv))) (nth argv (inc i)) "tranco")))
+
+(defn run
+  "spawnSync with a hard wall-clock ceiling. Found live: the very first
+  launchd RunAtLoad execution hung past resolve_tick.cljs's OWN 120s
+  fetch-abort budget (ps showed 3m19s elapsed, 0.62s CPU time — genuinely
+  stuck waiting on I/O, not spinning) with no timeout error ever printed.
+  Root cause unconfirmed (possibly launchd's Background ProcessType
+  affecting network I/O timing in a way an in-process AbortController
+  didn't catch) — rather than chase it further, this makes the OUTER
+  process responsible for its own child never running forever, which is
+  the property that actually matters for a scheduled resident."
+  [args opts]
   (let [r (cp/spawnSync (first args) (clj->js (rest args))
                         (clj->js (merge {:encoding "utf8" :cwd worktree
+                                        :timeout 300000
                                         :maxBuffer (* 64 1024 1024)} opts)))]
     {:exit (if (nil? (.-status r)) 1 (.-status r))
+     :signal (.-signal r)
      :out (or (.-stdout r) "") :err (or (.-stderr r) "")}))
 
 (defn checked! [args opts]
-  (let [{:keys [exit out err]} (run args opts)]
+  (let [{:keys [exit signal out err]} (run args opts)]
     (when (pos? exit)
-      (throw (js/Error. (str (str/join " " args) " (exit " exit "): " err out))))
+      (throw (js/Error. (str (str/join " " args) " (exit " exit
+                             (when signal (str " signal=" signal " — likely the 300s spawnSync timeout"))
+                             "): " err out))))
     out))
 
 (defn alive?
@@ -44,48 +74,49 @@
     (try (.kill js/process pid 0) true
          (catch :default e (not= "ESRCH" (.-code e))))))
 
-(defn release-lock! [] (fs/rmSync lock-path #js {:force true}))
+(defn release-lock! [lp] (fs/rmSync lp #js {:force true}))
 
-(defn exit! [code]
+(defn exit! [lp code]
   ;; process.exit() does not unwind — a `finally` after this call would
   ;; never run (found live: the first failed test run left its lock
   ;; behind because .exit was called from inside a catch). Release the
   ;; lock explicitly at every exit point instead of trusting try/finally.
-  (release-lock!)
+  (release-lock! lp)
   (.exit js/process code))
 
-(defn claim-lock-or-die! []
-  (when (fs/existsSync lock-path)
-    (let [pid (js/parseInt (str/trim (fs/readFileSync lock-path "utf8")))]
+(defn claim-lock-or-die! [lp]
+  (when (fs/existsSync lp)
+    (let [pid (js/parseInt (str/trim (fs/readFileSync lp "utf8")))]
       (if (alive? pid)
-        (do (println (str "REFUSED: lock held by live pid " pid " at " lock-path))
+        (do (println (str "REFUSED: lock held by live pid " pid " at " lp))
             (.exit js/process 2)) ; nothing to release — this run never claimed it
         (do (println (str "reclaiming lock from dead pid " pid))
-            (release-lock!)))))
-  (fs/mkdirSync (path/dirname lock-path) #js {:recursive true})
-  (fs/writeFileSync lock-path (str (.-pid js/process))))
+            (release-lock! lp)))))
+  (fs/mkdirSync (path/dirname lp) #js {:recursive true})
+  (fs/writeFileSync lp (str (.-pid js/process))))
 
 (defn -main [& argv]
-  (claim-lock-or-die!)
-  (try
-    (println (str "sync " worktree))
-    (checked! ["git" "fetch" "cloud-itonami"] {})
-    (checked! ["git" "merge" "--ff-only" "cloud-itonami/main"] {})
-    (println (str "tick " (str/join " " argv)))
-    (println (checked! (into ["nbb" "--classpath" "src" "scripts/resolve_tick.cljs" "--live"] argv)
-                       {:env (js/Object.assign #js {} js/process.env
-                                               #js {"DNS_RESOLVER_OPERATOR_GATE" "open"})}))
-    (let [status (:out (run ["git" "status" "--porcelain" "--" "data/ledger"] {}))]
-      (if (str/blank? status)
-        (println "no new ledger files — nothing to commit")
-        (do
-          (checked! ["git" "add" "data/ledger"] {})
-          (checked! ["git" "commit" "-m" (str "ingest: resident tick (" (str/join " " argv) ")")] {})
-          (checked! ["git" "push" "cloud-itonami" "resident/dns-resolver:main"] {})
-          (println "pushed"))))
-    (release-lock!)
-    (catch :default e
-      (binding [*print-fn* *print-err-fn*] (println (str "FAIL " (.-message e))))
-      (exit! 1))))
+  (let [lp (lock-path-for (source-arg argv))]
+    (claim-lock-or-die! lp)
+    (try
+      (println (str "sync " worktree))
+      (checked! ["git" "fetch" "cloud-itonami"] {})
+      (checked! ["git" "merge" "--ff-only" "cloud-itonami/main"] {})
+      (println (str "tick " (str/join " " argv)))
+      (println (checked! (into ["nbb" "--classpath" "src" "scripts/resolve_tick.cljs" "--live"] argv)
+                         {:env (js/Object.assign #js {} js/process.env
+                                                 #js {"DNS_RESOLVER_OPERATOR_GATE" "open"})}))
+      (let [status (:out (run ["git" "status" "--porcelain" "--" "data/ledger"] {}))]
+        (if (str/blank? status)
+          (println "no new ledger files — nothing to commit")
+          (do
+            (checked! ["git" "add" "data/ledger"] {})
+            (checked! ["git" "commit" "-m" (str "ingest: resident tick (" (str/join " " argv) ")")] {})
+            (checked! ["git" "push" "cloud-itonami" "resident/dns-resolver:main"] {})
+            (println "pushed"))))
+      (release-lock! lp)
+      (catch :default e
+        (binding [*print-fn* *print-err-fn*] (println (str "FAIL " (.-message e))))
+        (exit! lp 1)))))
 
 (apply -main *command-line-args*)
