@@ -880,6 +880,37 @@ ${r}:scripts/x.cljs → pr/547:scripts/x.cljs   # ← 常にこう書く
 - 既存を見つけたら**それを使う**。「見つけたが自分で書き直す」は、既存が accepted
   ADR で否定されている場合を除き、選択肢に入らない。
 
+### IPFS/content-addressed storage で Kubo に安易に手を伸ばさない（repo-wide mandatory、2026-08-28）
+
+**IPFS の block 取得・bitswap 相当の P2P 配布が要る時、Kubo（go-ipfs）のような外部ネイティブ
+バイナリ daemon を既定の選択肢にしない。** Kubo は別プロセスの Go バイナリで、fleet ノードごとに
+プラットフォーム別ダウンロード・インストール・ライフサイクル管理が要り、上記「`.cljc`/
+`.kotoba` ランタイム優先順位」節が繰り返し禁じている「新規に外部ネイティブバイナリへ依存する」
+パターンそのものである。
+
+**`kotoba-lang/io-libp2p`（実体 repo 名 `kotoba-net`）に、pure Clojure/EDN (`.cljc`) による
+完全な libp2p 実装が既にある。** `src/kotoba/net/bitswap.cljc` に実際の bitswap 実装があり
+（`test/kotoba/net/bitswap_test.clj` でテスト済み）、TCP + multistream + Noise XX handshake +
+Yamux mux + Kademlia DHT + GossipSub + IPNS 周りも揃っている（`kotoba.net.node`/`dial`/
+`connection`/`mux`/`socket`/`serve`/`store`/`validate` 等の namespace）。**2026-08-04 に
+実際の public IPFS ピア（kubo/0.32.1、go-libp2p reference peer）とローカル Kubo 0.41 ノードに
+対して相互接続検証済み**（TCP+Noise+Yamux+identity、`/ipfs/kad/1.0.0` FIND_NODE、
+`/meshsub/1.1.0` GossipSub、全て実測）。pure `.cljc` なので nbb/JVM 上で in-process に動き、
+別プロセスの daemon もプラットフォーム別バイナリ配布も要らない。関連: `kotoba-lang/p2p`
+（別名 `kotoba-lang/net` としても参照される、同一系統）が同じ基盤の上に GraphSync
+（`/ipfs/graphsync/2.0.0`）を構築している。
+
+実測（2026-08-28）: kotobase の IPFS block provider を実装する際、複数の agent が
+「Kubo バイナリを fleet ノードへ curl 取得して一時実行する」経路や「npm の Helia
+（外部パッケージ）を検討する」経路にいきなり向かい、**この既存 native 実装の存在を
+見落としていた**。`nbb scripts/repo-search.cljs bitswap libp2p` で一発で見つかる
+——「無い」と結論する前に索引を引く節と同じ失敗の、IPFS 版。
+
+Kubo 自身（`kotobase.storage.ipfs-kubo` client）は Kubo が既に動いている環境との
+相互運用・比較対象として残してよいが、**新規に「fleet ノードで IPFS を動かす」経路を
+設計する時の第一候補は `io-libp2p` の native 実装**であり、Kubo バイナリの配布・
+インストールを前提にしない。
+
 ## 並行エージェント運用（worktree-per-agent / stash を積まない）
 
 複数セッション・エージェントが同時に走る前提の標準フロー。stash・branch・worktree の
