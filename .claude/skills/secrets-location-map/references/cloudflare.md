@@ -84,6 +84,14 @@
     （実測 2026-08-25）。同じ catalog の同じ表を DuckDB の iceberg extension は
     読めるので、**表が無いのではなく R2 SQL が別の権限を要る**。片方の面が
     拒否したことを「catalog が壊れている」と読まないこと。
+    **同じ Keychain `gftd.cf`/`API_TOKEN` が第二の bucket でも実測済み**
+    （2026-08-28）: `net-kotobase-datalake`（同アカウント、catalog
+    namespace `net_kotobase`）— `net-kotobase/commoncrawl-actor` が
+    committed page ごとに `net_kotobase.commoncrawl_page` へ 1 tick 1 batch
+    append する（`scripts/iceberg_append.py`、`otent` の同名スクリプトを
+    vendored）。**1 credential・1 account、bucket は用途/product ごとに分ける**
+    のがこの workspace の形（cloud-itonami の観測データ = `cloud-itonami-datalake`、
+    net-kotobase の crawl/search データ = `net-kotobase-datalake`）。
   - **`CLAUDE_API_KEY_GFTDCOJP`** — Anthropic API キー（Cloudflare とは無関係だが
     同時に提供されたのでここに置いた）。
   - ⚠ **これら 5 件は 2026-08-05 の会話ログに平文で露出している。ローテーション必須。**
