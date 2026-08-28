@@ -137,23 +137,61 @@
          (remove published)
          sort vec)))
 
-(defn upload-raw! [env receipt-path]
+;; Raw entries whose bytes are in neither the local archive nor B2. Reported
+;; at the end of the tick so the run is not mistaken for a clean one, without
+;; letting a single lost object abandon everything after it.
+(def lost-archives (atom []))
+
+;; Why the Kotobase datom plane was not written this tick, if it was not.
+(def kotobase-skip (atom nil))
+
+(defn upload-raw!
+  "Put a receipt's archived bytes in B2. Returns the entries it could not.
+
+  The local-existence check used to come FIRST, before asking B2 whether the
+  object was already there. Measured 2026-08-28: 69 of 734 raw entries had no
+  local file and 68 of them were already in B2 — the bytes had been uploaded
+  and the local copy pruned. Demanding a local copy to prove an upload that had
+  already happened turns ordinary housekeeping into a permanent stop.
+
+  The 69th is gone from both, and that one stopped this resident for 17 hours:
+  `fail!` threw, the caller's doseq abandoned the whole tick, and every later
+  receipt, ledger, projection and deploy went with it. One lost object must not
+  mean no pipeline. It is RETURNED instead — the run continues, and the caller
+  reports the loss rather than retrying it hourly forever.
+
+  A byte-length mismatch stays a hard failure. That is corruption, not absence."
+  [env receipt-path]
   (let [receipt (edn/read-string (.readFileSync fs (.join path worktree receipt-path) "utf8"))
-        bucket (aget env "B2_BUCKET")]
+        bucket (aget env "B2_BUCKET")
+        lost (atom [])]
     (doseq [{:keys [archive-relative-path object-key bytes sha256]} (:run/raw receipt)
-            :let [archive-path (.join path archive-dir archive-relative-path)]]
-      (when-not (.existsSync fs archive-path) (fail! (str "raw archive missing " sha256)))
-      (let [dst (str "s3://" bucket "/" object-key)
-            head (run ["aws" "s3api" "head-object" "--bucket" bucket "--key" object-key
-                       "--endpoint-url" b2-endpoint] {:env env})]
-        (when (pos? (:exit head))
-          (checked ["aws" "s3" "cp" archive-path dst "--endpoint-url" b2-endpoint
-                    "--only-show-errors"] {:env env}))
+            :let [archive-path (.join path archive-dir archive-relative-path)
+                  dst (str "s3://" bucket "/" object-key)
+                  head (run ["aws" "s3api" "head-object" "--bucket" bucket "--key" object-key
+                             "--endpoint-url" b2-endpoint] {:env env})
+                  in-b2? (zero? (:exit head))]]
+      (cond
+        ;; Already there. The local copy is housekeeping, not evidence.
+        in-b2? nil
+
+        (.existsSync fs archive-path)
+        (checked ["aws" "s3" "cp" archive-path dst "--endpoint-url" b2-endpoint
+                  "--only-show-errors"] {:env env})
+
+        :else
+        (do (swap! lost conj {:receipt receipt-path :sha256 sha256
+                              :object-key object-key :bytes bytes})
+            (println (str "LOST raw bytes in neither place: " sha256
+                          " (" bytes " bytes, " receipt-path ")"))))
+
+      (when (or in-b2? (.existsSync fs archive-path))
         (let [verified (checked ["aws" "s3api" "head-object" "--bucket" bucket "--key" object-key
                                 "--endpoint-url" b2-endpoint "--query" "ContentLength"
                                 "--output" "text"] {:env env})]
           (when-not (= (str bytes) (str/trim verified))
-            (fail! (str "B2 byte length mismatch for " sha256))))))))
+            (fail! (str "B2 byte length mismatch for " sha256))))))
+    @lost))
 
 (defn kotobase-seed [env]
   (let [e (js/Object.assign #js {} env)
@@ -242,15 +280,35 @@
                   (pr-str {:pending pending :expected expected :live live})))))
   (println "hyakka resident deploy retry policy validated"))
 
-(defn publish-kotobase! [env ledgers]
+(defn publish-kotobase!
+  "Publish pending ledgers to the Kotobase datom plane. Returns why it could not.
+
+  The Kotobase ref and the public catalogue are DIFFERENT SINKS with different
+  audiences: the ref is where cross-corpus Datalog joins live, the catalogue is
+  what wiki.kotobase.net serves. This used to throw when the seed was missing,
+  and the throw took the whole tick with it — so an absent credential for one
+  sink silently stopped the other one from ever deploying.
+
+  `hyakka-kotobase-seed` has been absent from kagi since 2026-08-15 and is
+  recorded as owner action in ADR-2608271450 and the secrets map. What was NOT
+  recorded is that it also held the public deploy hostage. It no longer does.
+  The ledgers stay pending — they already were — and the reason is returned."
+  [env ledgers]
   (when (seq ledgers)
     (let [e (js/Object.assign #js {} env)
-          seed (kotobase-seed env)]
-      (aset e "HYAKKA_SEED" seed)
-      (println "Kotobase publish pending ledgers in one resumable process")
-      (checked ["npm" "run" "publish" "--" "--knowledge" "true"
-                "--batch" "100"]
-               {:dir worktree :env e}))))
+          seed (try {:ok (kotobase-seed env)}
+                    (catch :default ex {:err (or (.-message ex) (str ex))}))]
+      (if-let [why (:err seed)]
+        (do (binding [*out* *err*]
+              (println "SKIP Kotobase publish —" (count ledgers)
+                       "ledger(s) stay pending:" (str/trim (str why))))
+            {:skipped (count ledgers) :why (str/trim (str why))})
+        (do (aset e "HYAKKA_SEED" (:ok seed))
+            (println "Kotobase publish pending ledgers in one resumable process")
+            (checked ["npm" "run" "publish" "--" "--knowledge" "true"
+                      "--batch" "100"]
+                     {:dir worktree :env e})
+            nil)))))
 
 (defn deploy-public! [env]
   (println "verify tests before public deploy")
@@ -284,8 +342,9 @@
               (do
                 (checked ["nbb" "--classpath" "src" "scripts/resident_ingest.cljs" "--once"]
                          {:dir worktree :env env})
-                (let [xs (changed-receipts)]
-                  (doseq [p xs] (upload-raw! env p))
+                (let [xs (changed-receipts)
+                      lost (vec (mapcat #(upload-raw! env %) xs))]
+                  (reset! lost-archives lost)
                   (publish-git! env)
                   xs)))]
         ;; A server-side merge advances main beyond the resident branch. Pull
@@ -297,14 +356,36 @@
               live (live-catalogue-id)
               deploy? (boolean (deploy-required? pending expected live))]
           (println "Kotobase pending ledgers=" (count pending))
-          (publish-kotobase! env pending)
+          (reset! kotobase-skip (publish-kotobase! env pending))
           (when (and deploy? (empty? pending))
             (println "public catalogue drift detected; redeploying"
                      "expected=" expected "live=" (or live "unavailable")))
           (when deploy? (deploy-public! env))
           (println "hyakka resident tick complete; receipts=" (count receipts)
                    "projected=" (count pending)
-                   "deployed=" deploy?))))
+                   "deployed=" deploy?
+                   "lost-archives=" (count @lost-archives)
+                   "kotobase-skipped=" (or (:skipped @kotobase-skip) 0))
+          ;; A tick that finished its work but could not back some bytes is
+          ;; neither a failure nor a clean run, and printing the count is not
+          ;; enough on its own: launchd records the exit status, and a 0 here
+          ;; would file "one archive is gone forever" next to "nothing to do".
+          (when-let [k @kotobase-skip]
+            (binding [*out* *err*]
+              (println "SKIPPED Kotobase publish:" (:why k)
+                       "—" (:skipped k) "ledger(s) still unpublished to the datom plane."
+                       "The public catalogue above is unaffected.")))
+          (when (seq @lost-archives)
+            (binding [*out* *err*]
+              (println "LOST" (count @lost-archives)
+                       "raw archive(s) exist in neither the local store nor B2;"
+                       "the receipts naming them cannot be backed and will not"
+                       "be retried into a stall:"))
+            (doseq [{:keys [sha256 receipt bytes]} @lost-archives]
+              (binding [*out* *err*]
+                (println " " sha256 (str "(" bytes " bytes)") receipt)))
+            (set! (.-exitCode js/process) 1))
+          (when @kotobase-skip (set! (.-exitCode js/process) 1)))))
     (finally (release-lock!))))
 
 (defn lock-selftest!
