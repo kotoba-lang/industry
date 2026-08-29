@@ -1,0 +1,32 @@
+#!/usr/bin/env nbb
+(ns fleet-ci.gates.kotoba-crypto-boundary-coverage
+  (:require ["node:child_process" :as cp]
+            ["node:fs" :as fs]
+            ["node:path" :as path]
+            [clojure.string :as str]))
+
+(def args (vec *command-line-args*))
+(def root (path/resolve (or (first (remove #(str/starts-with? % "--") args)) ".")))
+(def verifier (path/join root "scripts" "verify-cryptographic-boundaries.cljs"))
+(def inventory (path/join root "security" "cryptographic-boundaries.edn"))
+
+(defn- die! [code message]
+  (println (str "FLEET-CI: " message))
+  (js/process.exit code))
+
+(doseq [[file label] [[verifier "cryptographic boundary verifier"]
+                      [inventory "cryptographic boundary inventory"]]]
+  (when-not (fs/existsSync file)
+    (die! 90 (str label " missing after extract"))))
+
+(let [result (cp/spawnSync "npx"
+                           #js ["--yes" "nbb" verifier "--root" root "--self-test"]
+                           #js {:encoding "utf8" :cwd root :timeout 600000})
+      output (str (or (.-stdout result) "") (or (.-stderr result) ""))]
+  (print output)
+  (when-not (zero? (or (.-status result) 1))
+    (js/process.exit (or (.-status result) 1)))
+  (when-not (and (str/includes? output "cryptographic-boundaries: OK")
+                 (re-find #"[1-9][0-9]* cases OK" output))
+    (die! 93 "verifier returned without coverage and negative-test receipts"))
+  (println "FLEET-CI: Kotoba cryptographic boundary coverage OK"))
