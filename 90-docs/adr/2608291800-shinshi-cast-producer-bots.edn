@@ -1,0 +1,36 @@
+[{:db/id -1
+  :adr/id "adr-2608291800-shinshi-cast-producer-bots"
+  :adr/title "club-shinshi の actor ごとの itonami bots — cast bots（12 series 看板）+ producer bot（char-factory 経由で新 actor を mint）"
+  :adr/status "accepted"
+  :adr/date "2026-08-29"
+  :adr/related "adr-2608291500-hermes-bots-aozora-accounts-blocked-by-biscuit-cutover ADR-2607124500 ADR-2608180200"
+  :adr/body "## 決定（オーナー指示 2026-08-29）
+
+club-shinshi の actor（オリジナルキャラクター）ごとに bot を立て、画像・動画生成、会話、情報発信、shinshi.club と aozora.app への投稿をできるようにする。さらに producer bot を立て、新たな actor をプロデュース（カタログに追加）させる。
+
+## 形
+
+1. **実行面 = `scripts/shinshi-cast-bots/`**（hermes-bots-aozora と同型の nbb スクリプト群 + hermes cron shim）。
+   - roster は**毎回 D1 から導出**（ハードコードしない）: 12 original series それぞれの看板 = scene 数最多、同点は slug 昇順、ただし (a) RECORDLOG の modelProfile が同じ series 名を言うことを実測して IP キャラを弾く（tifa-final-fantasy が %-fantasy に一致した実測）、(b) first name の greedy 分散（slug 昇順だけだと 12 枠中 11 が akari-hoshino-* に潰れた実測）。
+   - `post.cljs`: murakumo-main（alias、無認証 chat completions）で in-character 作文、落ちたら profile 由来の決定論 fallback。shinshi.club へは vertex_repo_record への INSERT（char-posts.cljs と同経路、rkey cast-<epoch>）で、**書いた uri を読み返して検証**。aozora.app へは各キャラ自身の did:key（seed は Keychain custody、service aozora.app/actor-seed/<slug>.aozora.app）で試行。
+   - `produce.cljs`（producer bot）: キャラの authority は club-shinshi-app の char-factory（決定論工場）。工場の先頭 2000 index を回し、カタログ未登録の slug だけ N 人分の actress/profile INSERT + intro 投稿を D1 に着地、**行数を数え直して検証**。scene 画像とカタログ動画は既存パイプライン（char-images / catalog-video loop / shinshi-video-actor）が未充足キャラを拾う。
+   - `generate.cljs`: image = api.murakumo.cloud /v1/images/generations（mk1 要）→ /b/upload → scene 行登録。video = gad ComfyUI Wan2.2（scripts/shinshi-wan-i2v-once.py 再利用）→ 決定論品質 gate → publish-once 委譲。generation.murakumo.cloud は使わない（402/billing）。
+2. **workforce 面 = loop-yakuwari** に :club-shinshi/cast-member（desired 12）と :club-shinshi/producer を追加し、itonami CLI（cloud-itonami-app bots）から provision できる membership にする。activity は fleet.edn の global-wip が従来どおり縛る。
+3. **会話**は appview の companion 面（1:1 チャット）が既に持つ。この bots が足すのは定期の情報発信・生成・カタログ成長。
+
+## 現在地（2026-08-29 実測、正直に）
+
+- shinshi.club 側（D1 書き込み + 検証）は**動く**。
+- aozora.app は createAccount/createRecord/resolveHandle とも 401 で**全面 BLOCKED**（kotobase Biscuit-required cutover、ADR-2608291500 の実測のまま）。register/post は seed を鋳造して試行し、BLOCKED banner に生エラーを載せて exit 0。移行後は無変更で成功に転じる。
+- 前提修理: club-shinshi-app の tools/char-factory.cljs と char-posts.cljs は bb→nbb 変換の残骸（require を閉じない ')、Integer/parseInt、format、.mkdirs、spit/slurp）で **nbb で parse すら不能**だった。2de95b02 で修理し west pin 前進済み。壊れた工場を直すまで producer は REFUSED を返していた（沈黙ではなく）。
+
+## 却下した代替
+
+- 1,466 キャラ全員に常駐 bot: 稼働は fleet の global-wip 6 に縛られており、roster だけ膨らませても劇場になる。看板 12 + producer が catalog を育てる形にした。
+- bots.clj への生成ツール直結: cloud-itonami-app の Bot tool 面（ADR-2608180200 の authority 一本化）に新しい能力面を生やすのは別決定。実行面は署名可能な deterministic スクリプトに置き、Bot はそれを課される側にした。
+- Kubo / 新規インフラ: 不要。既存の D1 / R2 / ComfyUI / murakumo-main だけで立つ。
+
+## 撤去条件 / resume point
+
+- aozora 側は ADR-2608291500 の option A（aozora PDS の Biscuit 移行）が landed した時点で register.cljs → post.cljs を再実行するだけ。
+- cast の per-actor aozora ハンドルは <slug>.aozora.app。producer は shinshi-producer.aozora.app。"}]
