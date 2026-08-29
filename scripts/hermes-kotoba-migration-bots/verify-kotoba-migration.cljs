@@ -1,0 +1,185 @@
+#!/usr/bin/env nbb
+(ns verify-kotoba-migration
+  "The gate a clj/cljc -> .kotoba/.cljk migration proposal has to pass before
+  it becomes a PR.
+
+  Mirrors hyakka's verify_source_proposal.cljs and itonami's
+  itonami-verify-proposal.cljs: the model proposes, this decides, on evidence
+  it (re-)gathers itself. What it checks is different because the domain is —
+  there is no URL to fetch and no receipt corpus to corroborate against.
+  What stands in for that here is the thing the kotoba-clj-to-kotoba skill
+  already names as the real check: does the compiled artifact still do what
+  the Clojure it replaces did.
+
+  Three things, none optional:
+
+    1. the .kotoba/.cljk file COMPILES via the real compiler
+       (`kotoba -M compile ... --target js-browser`) — not `which kotoba`,
+       not a syntax eyeball. The skill's own warning: availability measured
+       by `which` passed while the binary itself was a dead shim exec'ing a
+       deleted /tmp path, and 3 tests that should have skipped ran red.
+    2. a NEW parity test exists (not already in the target repo's
+       origin/main at that path) that names itself as a parity test and
+       actually references the migrated namespace.
+    3. the target repo's own test command exits 0 AND its combined
+       stdout/stderr actually mentions the new test's namespace — an exit
+       code of 0 from a command that silently ran nothing proves nothing.
+
+  This is not full test-output parsing (clojure.test, cljs.test/shadow-cljs,
+  kaocha, nbb ad-hoc runners all format differently across kotoba-lang's
+  ~2,000 repos — no single regex covers them honestly). Where doubt exists
+  this refuses to grade it a pass rather than guess.
+
+  exit 0  every check passed — land it
+  exit 1  at least one check failed — printed, with the failing check named
+  exit 2  REFUSED: could not judge (proposal unreadable, target repo path
+          missing, amu binary missing) — not a verdict on the migration"
+  (:require [cljs.reader :as edn]
+            [clojure.string :as str]
+            ["node:fs" :as fs]
+            ["node:path" :as path]
+            ["node:os" :as os]
+            ["node:child_process" :as cp]))
+
+(def argv (vec (or *command-line-args* [])))
+(defn arg [flag default]
+  (let [i (.indexOf argv flag)]
+    (if (neg? i) default (get argv (inc i) default))))
+
+(def proposal-path (arg "--proposal" nil))
+(def repo-root (path/resolve (arg "--repo-root" ".")))
+;; The compiler lives in the superproject, not in the isolated per-run clone
+;; this gate is usually invoked against — pass it explicitly.
+(def amu-bin (arg "--amu-bin"
+                   (path/join (os/homedir) "github" "com-junkawasaki"
+                              "orgs" "kotoba-lang" "amu" "bin" "kotoba")))
+(def compile-timeout-ms (js/parseInt (arg "--compile-timeout-ms" "120000") 10))
+(def test-timeout-ms (js/parseInt (arg "--test-timeout-ms" "600000") 10))
+
+(def findings (atom []))
+(defn fail! [check why] (swap! findings conj {:check check :why why}))
+
+(defn refuse! [why]
+  (println "REFUSED — could not judge this migration proposal.")
+  (println why)
+  (.exit js/process 2))
+
+(when-not proposal-path (refuse! "no --proposal given"))
+(when-not (.existsSync fs proposal-path) (refuse! (str proposal-path " does not exist")))
+
+(def proposal
+  (try (edn/read-string (fs/readFileSync proposal-path "utf8"))
+       (catch :default e (refuse! (str "cannot read " proposal-path ": " (.-message e))))))
+
+(def required-keys #{:repo :source-path :kotoba-path :parity-test-path
+                      :parity-test-ns :test-command})
+(let [missing (remove #(contains? proposal %) required-keys)]
+  (when (seq missing)
+    (refuse! (str "proposal is missing required keys: " (str/join ", " missing)))))
+
+(when-not (.existsSync fs repo-root)
+  (refuse! (str "--repo-root " repo-root " does not exist")))
+(when-not (.existsSync fs amu-bin)
+  (refuse! (str amu-bin " does not exist — the compiler this gate needs to run "
+                "is not where it expects it. Pass --amu-bin.")))
+
+(defn rp [rel] (path/join repo-root rel))
+
+;; ---------------------------------------------------------------- 1. exist
+
+(when-not (.existsSync fs (rp (:source-path proposal)))
+  (fail! :source-exists (str (:source-path proposal) " not found under " repo-root)))
+(when-not (.existsSync fs (rp (:kotoba-path proposal)))
+  (fail! :kotoba-exists (str (:kotoba-path proposal) " not found under " repo-root)))
+(when-not (re-find #"\.(kotoba|cljk)$" (:kotoba-path proposal))
+  (fail! :kotoba-extension (str (:kotoba-path proposal) " does not end in .kotoba or .cljk")))
+
+;; ------------------------------------------------------------ 2. compiles
+
+(defn sh [cmd args opts]
+  (let [r (cp/spawnSync cmd (clj->js args)
+                        (clj->js (merge {:encoding "utf8" :maxBuffer (* 32 1024 1024)} opts)))]
+    {:status (if (some? (.-status r)) (.-status r) -1)
+     :stdout (or (.-stdout r) "")
+     :stderr (or (.-stderr r) "")
+     :error (.-error r)}))
+
+(when (empty? @findings) ; only spend the compile if the files at least exist
+  (let [out (path/join (os/tmpdir) (str "kotoba-migration-verify-" (.getTime (js/Date.)) ".mjs"))
+        r (sh amu-bin ["-M" "compile" (rp (:kotoba-path proposal))
+                       "--target" "js-browser" "--output" out]
+              {:timeout compile-timeout-ms})]
+    (if (zero? (:status r))
+      (println (str "compile\tjs-browser\tok\t" out))
+      (fail! :compiles-js-browser
+             (str "kotoba -M compile --target js-browser exited " (:status r)
+                  ":\n" (:stdout r) "\n" (:stderr r))))
+    ;; wasm32-browser is informational only — ADR-2608650000: an unavailable
+    ;; backend is an implementation gap, not grounds to reject the migration.
+    (let [wout (path/join (os/tmpdir) (str "kotoba-migration-verify-" (.getTime (js/Date.)) ".wasm"))
+          wr (sh amu-bin ["-M" "compile" (rp (:kotoba-path proposal))
+                          "--target" "wasm32-browser" "--output" wout]
+                 {:timeout compile-timeout-ms})]
+      (println (str "compile\twasm32-browser\t" (if (zero? (:status wr)) "ok" "gap (informational, not a rejection)"))))))
+
+;; ------------------------------------------------------- 3. parity test new
+
+(when-not (.existsSync fs (rp (:parity-test-path proposal)))
+  (fail! :parity-test-exists (str (:parity-test-path proposal) " not found under " repo-root)))
+
+(let [origin-check (sh "git" ["-C" repo-root "show"
+                              (str "origin/main:" (:parity-test-path proposal))]
+                       {})]
+  (when (zero? (:status origin-check))
+    (fail! :parity-test-is-new
+           (str (:parity-test-path proposal) " already exists in origin/main — "
+                "this proposal has to add a NEW parity test, not point at one that "
+                "predates the migration."))))
+
+(when (.existsSync fs (rp (:parity-test-path proposal)))
+  (let [content (.toString (fs/readFileSync (rp (:parity-test-path proposal))))]
+    (when-not (re-find #"(?i)parity" content)
+      (fail! :parity-test-self-documents
+             (str (:parity-test-path proposal) " does not contain the word "
+                  "\"parity\" anywhere — a test comparing the original and the "
+                  "migrated output should say so.")))
+    (when-not (str/includes? content (str (:parity-test-ns proposal)))
+      (fail! :parity-test-references-ns
+             (str (:parity-test-path proposal) " never mentions "
+                  (:parity-test-ns proposal) " — it can't be testing parity "
+                  "against a namespace it doesn't reference.")))))
+
+;; -------------------------------------------------------- 4. suite passes
+
+(when (empty? @findings)
+  (let [cmd-parts (str/split (:test-command proposal) #"\s+")
+        r (sh (first cmd-parts) (rest cmd-parts) {:cwd repo-root :timeout test-timeout-ms})]
+    (println (str "test-command\t" (:test-command proposal) "\texit=" (:status r)))
+    (cond
+      (not (zero? (:status r)))
+      (fail! :suite-passes (str "`" (:test-command proposal) "` exited " (:status r)
+                                 ":\n" (:stdout r) "\n" (:stderr r)))
+
+      (str/blank? (str (:stdout r) (:stderr r)))
+      (fail! :suite-ran-something (str "`" (:test-command proposal) "` exited 0 but "
+                                        "produced no output at all — that is what a "
+                                        "silently-no-op command looks like, not evidence "
+                                        "the new test ran."))
+
+      (not (str/includes? (str (:stdout r) (:stderr r)) (str (:parity-test-ns proposal))))
+      (fail! :suite-ran-the-new-test
+             (str "`" (:test-command proposal) "` exited 0 but its output never "
+                  "mentions " (:parity-test-ns proposal) " — the suite ran, but not "
+                  "provably the new parity test. Not a pass.")))))
+
+;; ------------------------------------------------------------------ verdict
+
+(if (empty? @findings)
+  (do (println)
+      (println "ACCEPTED — compile, new parity test, and full suite all check out.")
+      (.exit js/process 0))
+  (do (println)
+      (println (str "REJECTED — " (count @findings) " check(s) failed:"))
+      (doseq [f @findings]
+        (println (str "  " (name (:check f)) "\n    " (:why f))))
+      (.exit js/process 1)))

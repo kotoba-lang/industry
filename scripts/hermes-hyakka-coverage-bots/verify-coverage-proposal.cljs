@@ -1,0 +1,168 @@
+#!/usr/bin/env nbb
+(ns verify-coverage-proposal
+  "The gate a coverage-widening proposal has to pass before it becomes a PR.
+
+  Same shape as hyakka's other two gates (verify_source_proposal.cljs,
+  verify-kotoba-migration.cljs): the model proposes, this decides, on
+  evidence it re-gathers itself by actually running the connector with the
+  proposed change — not by reading the diff and judging it plausible.
+
+  Two proposal shapes, one per bot:
+
+    {:kind :raise-max-cves :source-id \"nvd-cve\" :new-max-cves N}
+      nvd.cljc's own comment names this the intended lever: \"the knob to
+      turn after watching the projection cost is :max-cves, not the ledger
+      format.\" The gate requires N to actually be higher than the current
+      config value (a proposal that lowers or repeats it raises nothing) and
+      bounded (<=50 per step — NVD's own resultsPerPage ceiling is 2000, but
+      a single proposal jumping there was never watched at any intermediate
+      size, which is exactly the \"raise gradually, watch the cost\" the
+      source code comment asks for).
+
+    {:kind :add-osm-bbox :id :name :bbox :max-results}
+      A NEW :overpass-osm source, not a bigger one — collect-overpass!'s own
+      docstring: \"widening area coverage is adding more small, reviewed
+      bboxes, not enlarging this one.\" The gate enforces both halves: the id
+      must not already exist in config, and the bbox area must stay under a
+      ceiling sized off the one proof-of-concept bbox already configured.
+
+  Both proposals are verified the same way: copy the real config, apply
+  exactly the proposed change, and run resident_ingest.cljs --only <id>
+  --no-llm against a throwaway --out directory. `entities= 0` or any
+  `WARN <id> ...` line is a rejection — a config change that cannot be
+  proven to fetch real, admitted data is not a coverage gain.
+
+  exit 0  ACCEPTED — the change fetched and admitted real data
+  exit 1  REJECTED — printed reason
+  exit 2  REFUSED — could not judge (missing files, bad proposal shape)"
+  (:require [cljs.reader :as edn]
+            [clojure.string :as str]
+            ["node:fs" :as fs]
+            ["node:path" :as path]
+            ["node:os" :as os]
+            ["node:child_process" :as cp]))
+
+(def argv (vec (or *command-line-args* [])))
+(defn arg [flag default]
+  (let [i (.indexOf argv flag)]
+    (if (neg? i) default (get argv (inc i) default))))
+
+(def proposal-path (arg "--proposal" nil))
+(def repo-root (path/resolve (arg "--repo-root" ".")))
+(def config-path (arg "--config" (path/join repo-root "config" "knowledge-ingest.edn")))
+(def nbb-bin (arg "--nbb" "/opt/homebrew/bin/nbb"))
+(def max-cves-step-ceiling 50)
+;; Roughly the proof-of-concept bbox's own footprint (0.006 x 0.007) with
+;; headroom, not an arbitrary round number — see collect-overpass!'s bbox.
+(def bbox-area-ceiling 0.001)
+
+(defn refuse! [why]
+  (println "REFUSED — could not judge this coverage proposal.")
+  (println why)
+  (.exit js/process 2))
+
+(def findings (atom []))
+(defn fail! [check why] (swap! findings conj {:check check :why why}))
+
+(when-not proposal-path (refuse! "no --proposal given"))
+(when-not (.existsSync fs proposal-path) (refuse! (str proposal-path " does not exist")))
+(def proposal
+  (try (edn/read-string (fs/readFileSync proposal-path "utf8"))
+       (catch :default e (refuse! (str "cannot read " proposal-path ": " (.-message e))))))
+(when-not (.existsSync fs config-path) (refuse! (str config-path " does not exist")))
+(def config
+  (try (edn/read-string (fs/readFileSync config-path "utf8"))
+       (catch :default e (refuse! (str "cannot read " config-path ": " (.-message e))))))
+
+(defn sh [cmd args opts]
+  (let [r (cp/spawnSync cmd (clj->js args)
+                        (clj->js (merge {:encoding "utf8" :maxBuffer (* 16 1024 1024)} opts)))]
+    {:status (if (some? (.-status r)) (.-status r) -1)
+     :stdout (or (.-stdout r) "") :stderr (or (.-stderr r) "")}))
+
+(defn source-by-id [id] (first (filter #(= id (:id %)) (:sources config))))
+
+(defn run-with-config!
+  "Write `new-config` to a temp file, run resident_ingest.cljs --only id
+  against it with a throwaway --out/--state, and return the parsed result."
+  [new-config id]
+  (let [tmp-config (path/join (os/tmpdir) (str "coverage-verify-config-" (.getTime (js/Date.)) ".edn"))
+        out-dir (path/join (os/tmpdir) (str "coverage-verify-out-" (.getTime (js/Date.))))]
+    (fs/writeFileSync tmp-config (pr-str new-config))
+    (fs/mkdirSync out-dir #js {:recursive true})
+    (let [r (sh nbb-bin ["--classpath" (path/join repo-root "src")
+                         (path/join repo-root "scripts" "resident_ingest.cljs")
+                         "--config" tmp-config "--only" id "--no-llm"
+                         "--out" out-dir "--state" (path/join out-dir "state.edn")]
+                {:cwd repo-root :timeout 60000 :env (js/Object.assign #js {} js/process.env
+                                                                       #js {"HYAKKA_SUPERPROJECT_ROOT" repo-root})})]
+      (merge r {:out-dir out-dir}))))
+
+(defn entities-and-warn [r]
+  (let [m (re-find #"entities=\s*(\d+)" (:stdout r))
+        warn (re-find (re-pattern (str "WARN\\s+\\S+\\s+.+")) (:stdout r))]
+    {:entities (when m (js/parseInt (second m) 10)) :warn warn}))
+
+(case (:kind proposal)
+  :raise-max-cves
+  (let [{:keys [source-id new-max-cves]} proposal
+        src (source-by-id source-id)]
+    (cond
+      (nil? src) (fail! :source-exists (str source-id " is not a configured source"))
+      (not (integer? new-max-cves)) (fail! :new-value-shape ":new-max-cves must be an integer")
+      (<= new-max-cves (or (:max-cves src) 0))
+      (fail! :must-raise (str "new-max-cves " new-max-cves " does not exceed the current "
+                              (:max-cves src) " — this raises nothing"))
+      (> (- new-max-cves (or (:max-cves src) 0)) max-cves-step-ceiling)
+      (fail! :step-bounded (str "jump of " (- new-max-cves (:max-cves src))
+                               " exceeds the per-proposal ceiling of " max-cves-step-ceiling
+                               " — raise gradually, watch the cost, per nvd.cljc's own comment")))
+    (when (empty? @findings)
+      (let [new-config (update config :sources
+                               (fn [srcs] (mapv #(if (= source-id (:id %))
+                                                   (assoc % :max-cves new-max-cves) %) srcs)))
+            r (run-with-config! new-config source-id)
+            {:keys [entities warn]} (entities-and-warn r)]
+        (println (str "run\t--only " source-id " --max-cves " new-max-cves
+                       "\texit=" (:status r) "\tentities=" entities))
+        (cond
+          (not (zero? (:status r))) (fail! :run-exits-0 (str "exited " (:status r) ": " (:stderr r)))
+          warn (fail! :no-warn (str "connector warned: " warn))
+          (or (nil? entities) (zero? entities)) (fail! :entities-positive "0 entities admitted at the new value")))))
+
+  :add-osm-bbox
+  (let [{:keys [id name bbox max-results]} proposal
+        {:keys [south west north east]} bbox
+        area (when (and south west north east) (* (- north south) (- east west)))]
+    (cond
+      (nil? id) (fail! :id-present "proposal has no :id")
+      (source-by-id id) (fail! :id-is-new (str id " is already a configured source"))
+      (not (and south west north east)) (fail! :bbox-shape ":bbox needs :south :west :north :east")
+      (not (< south north)) (fail! :bbox-shape ":south must be < :north")
+      (not (< west east)) (fail! :bbox-shape ":west must be < :east")
+      (> area bbox-area-ceiling)
+      (fail! :bbox-bounded (str "bbox area " area " exceeds the ceiling " bbox-area-ceiling
+                               " — widen by adding more small bboxes, not one big one"))
+      (or (nil? max-results) (> max-results 50))
+      (fail! :max-results-bounded ":max-results must be set and <=50"))
+    (when (empty? @findings)
+      (let [new-source {:id id :kind :overpass-osm :name name :bbox bbox :max-results max-results
+                        :interval-seconds 86400}
+            new-config (update config :sources conj new-source)
+            r (run-with-config! new-config id)
+            {:keys [entities warn]} (entities-and-warn r)]
+        (println (str "run\t--only " id "\texit=" (:status r) "\tentities=" entities))
+        (cond
+          (not (zero? (:status r))) (fail! :run-exits-0 (str "exited " (:status r) ": " (:stderr r)))
+          warn (fail! :no-warn (str "connector warned: " warn))
+          (or (nil? entities) (zero? entities)) (fail! :entities-positive "0 entities admitted for this bbox")))))
+
+  (refuse! (str "unknown :kind " (pr-str (:kind proposal))
+               " — must be :raise-max-cves or :add-osm-bbox")))
+
+(if (empty? @findings)
+  (do (println) (println "ACCEPTED — the proposed change fetched and admitted real data.")
+      (.exit js/process 0))
+  (do (println) (println (str "REJECTED — " (count @findings) " check(s) failed:"))
+      (doseq [f @findings] (println (str "  " (name (:check f)) "\n    " (:why f))))
+      (.exit js/process 1)))
