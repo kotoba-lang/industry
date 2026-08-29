@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.gftd.spotwork-match — スキマバイト（単発シフト）突合 bot の loop
+  (ADR-2608292100)
+
+  Install:
+    cp scripts/com.gftd.spotwork-match.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.spotwork-match.plist
+    launchctl kickstart -k gui/$(id -u)/com.gftd.spotwork-match
+
+  Unload:
+    launchctl bootout gui/$(id -u)/com.gftd.spotwork-match
+
+  Interval: 21600s (6h)。1 反復 = tick（決定論・数秒）+ 候補がある周だけ
+  claude -p /spotwork-match（最長 1h）。lock file（~/.gftd/spotwork-match.lock）が
+  重なりを防ぐ。候補が無い周・測れなかった周（:not-measured は :no-candidates とは
+  別の事実）はモデルを起こさない（loop 側で判定）。**床（オペレータ維持データの
+  未供給など）でもモデルを起こさない** —— bot に直せないものに予算を使わない。
+
+  ⚠ 姉妹 loop（isekai-game-dev / kami-lib-update）と違い classpath フラグを渡さない。
+  tick が `spotwork.*` を require し、そのパスは root の nbb.edn `:paths` が持って
+  いるので、ここで classpath を明示すると**それを上書きして tick が読めなくなる**。
+  loop 本体は clojure.edn / clojure.string しか使わないので、既定の解決で足りる。
+
+  （XML コメントにハイフン 2 つを書けないので、フラグ名は綴らずに書いてある。）
+
+  EnvironmentVariables に HOME / USER / LOGNAME / SHELL / PATH が無いと
+  `claude -p` が "Not logged in" で静かに失敗する（ADR-2608080500）。削らない。
+-->
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>COM_JUNKAWASAKI_ROOT</key>
+		<string>/Users/junkawasaki/github/com-junkawasaki</string>
+		<key>HOME</key>
+		<string>/Users/junkawasaki</string>
+		<key>LOGNAME</key>
+		<string>junkawasaki</string>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+		<key>SHELL</key>
+		<string>/bin/zsh</string>
+		<key>USER</key>
+		<string>junkawasaki</string>
+	</dict>
+	<key>Label</key>
+	<string>com.gftd.spotwork-match</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/opt/homebrew/bin/nbb</string>
+		<string>scripts/spotwork-match-loop.cljs</string>
+	</array>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardErrorPath</key>
+	<string>/Users/junkawasaki/.gftd/spotwork-match.stdout.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/junkawasaki/.gftd/spotwork-match.stdout.log</string>
+	<key>StartInterval</key>
+	<integer>21600</integer>
+	<key>WorkingDirectory</key>
+	<string>/Users/junkawasaki/github/com-junkawasaki</string>
+</dict>
+</plist>
