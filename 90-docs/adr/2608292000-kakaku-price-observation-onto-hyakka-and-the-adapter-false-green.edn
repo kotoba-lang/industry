@@ -13,7 +13,7 @@
   ["D1: kakaku の autorun adapter を文字列 key に揃え、seed-default を contracts/kotoba/seed.edn にする"
    "D2: heartbeat-persists に seed から導出した spread の assertion を足し、到達性 assertion を導出より前に置く"
    "D3: golden CID を be5e5aa2… に再 pin し、pin し直してよいのは出力を検めた後だけと注記する"
-   "D4: manifest/observatories.edn の kakaku は :known-broken 据え置き。manifest 側だけの --seed 修正は全ゼロ観測での false green を作る"
+   "D4: manifest/observatories.edn の kakaku は repo 側 fix の着地後に :produces-datoms へ上げる。fix 前に manifest だけ直すと全ゼロ観測で :produces-datoms が満たされ false green になる（fix は同日 main へ着地したので同時に上げた。--log は明示必須）"
    "D5: hyakka に載せるとき identity は claim graph の 1 ref、offer 時系列は同じ ref に入れない（ADR-2607311100 D7 の datom 予算）"
    "D6: source class は merchant 自身の一次情報に限る。他社の価格比較サイトからの取り込みは policy 上通らない"
    "D7: ref が 1 本しか join できないのは kotobase engine の Database record が ref-name をスカラーで持つためで、IPLD / IPNI の制約ではない"]
@@ -25,7 +25,9 @@
    "test-autorun 6 tests 29 assertions 0-fail、全 8 namespace 63 tests 313 assertions 0-fail"
    "破壊試験: adapter のみ revert で (pos? (count offers)) が (not (pos? 0)) で落ちる（名乗った理由で落ちる）"
    "clojure -M:test は 9 tests / 174 assertions しか実行しない（cognitect test-runner の .*-test$ pattern）"
-   "kotobase-engine src/kotobase/engine.clj: Database record の ref-name はスカラー、query の inputs は値であって db source ではない"]
+   "kotobase-engine src/kotobase/engine.clj: Database record の ref-name はスカラー、query の inputs は値であって db source ではない"
+   "cloud-itonami/kakaku PR #2 → main merge e7ad201（2026-08-29）。merge 後の main を独立 checkout して再実測: 3 offers / spread 700 / notable true / 26 datoms / chain OK、63 tests 313 assertions 0-fail、実行後の checkout clean"
+   "network-awai/app-hyakka は Claude GitHub App の repository selection に無く session を起こせない（github_repo_access_denied）。list_repos で network-awai から見えるのは loop-yakuwari のみ"]
   :adr/body
   "# ADR-2608292000: kakaku を wiki.kotobase.net に載せる前に、adapter の false green を潰す
 
@@ -157,12 +159,29 @@ test-runner の既定 pattern は `.*-test$` で、この repo の test namespac
 
 ## 着地状況
 
-- **repo 側の fix は push できていない。** この session は `com-junkawasaki` tier に
-  attach されており、`cloud-itonami/kakaku` へは anonymous read しか無い
-  （`add_repo` の push 要求は cross-tier で拒否）。patch は生成済みでオーナーに渡した。
-- **hyakka connector（第 2 段）は未着手。** `network-awai/app-hyakka` は private で
-  clone できず、`src/hyakka/ingest.cljc` の connector interface を読めない。
-  読まずに書けば動かないコードになるので書いていない。
+- **repo 側の fix は着地した**（2026-08-29）。`cloud-itonami/kakaku` PR #2 →
+  merge `e7ad201`。診断したセッションは `com-junkawasaki` tier に attach されていて
+  push できなかったので（`add_repo` の push 要求は cross-tier で拒否）、その repo を
+  初期 source にした別セッションを起こして着地させた。merge 後の main を独立に
+  checkout して再実測し、同じ golden CID `be5e5aa2…` が出ることを確認している
+  （2 コンテナ・2 セッションで独立に一致）。
+- **`manifest/observatories.edn` も同時に上げた** —— `:known-broken` →
+  `:produces-datoms`、`:args` に `--cycles 1 --log ${REPO}/data/kakaku.datoms.kotoba.edn`。
+  `--log` は省略できない: `log-default` は `seed-default` と同じ `*file*` 由来の理由で
+  `<repo>/kakaku/data/…` という入れ子に書き、`.gitignore` は
+  `data/kakaku.datoms.kotoba.edn` しか無視しないので checkout が汚れる。
+  `log-default` 自体は blast radius が別（`kotoba.clj` にあり他からも使われる）なので
+  この波では直していない。
+- **hyakka connector（第 2 段）は未着手で、理由は当初の想定と違った。** private で
+  clone できないことではなく、**`network-awai/app-hyakka` が Claude GitHub App の
+  repository selection に入っていない**（`github_repo_access_denied`）。実測: この
+  account から network-awai org で許可されているのは `loop-yakuwari` 1 本だけ。
+  org 設定で `app-hyakka` を追加すれば、そこを初期 source にしたセッションを起こせる。
+- **kakaku の seed を hyakka の claim にしてはならない。** `contracts/kotoba/seed.edn` は
+  冒頭に `G10: illustrative, NOT live retailer data` と書かれた例示データで、merchant の
+  ドメインが `a.example` / `b.example` / `c.example` である。ADR-2607311100 D3（出典必須）を
+  満たさない。往復の疎通確認に使いたくなるが、使ってよいのは unit test の fixture までで、
+  hyakka の第 1 tick は merchant 自身の一次情報を要する。
 
 ## 関連
 

@@ -47,6 +47,10 @@
     (catch :default e {:code nil :out "" :err (str e)})))
 
 (defn- append-ledger! [m]
+  ;; ~/.gftd が無い機械では最初の追記が失敗する。tick も同じ dir を作るが、
+  ;; diverged 経路は tick より前に書くのでここでも作る。
+  (try (.mkdirSync fs (.dirname (js/require "node:path") ledger-file) #js {:recursive true})
+       (catch :default _ nil))
   (try (.appendFileSync fs ledger-file (str (pr-str m) "\n"))
        (catch :default e (log! "ledger 追記に失敗:" (str e)))))
 
@@ -69,11 +73,17 @@
     (let [{:keys [code out]} (sh "nbb" ["--classpath" ".:scripts/nbb_compat"
                                         "scripts/ma-business-tick.cljs"] {})]
       (println out)
-      ;; tick は 0 か 2 しか返さない。**2 を 0 と同じに扱わない** ——
-      ;; そこが「測れなかった」と「測って問題が無かった」を分けている唯一の場所。
-      (when (= 2 code)
-        (log! "tick が答えられなかった（exit 2）。モデルを起こさない。")
-        (append-ledger! {:at started :outcome :skipped :why :tick-could-not-measure})
+      ;; tick は 0 か 2 しか返さない。**0 以外はすべて「進めない」** ——
+      ;; 2 を 0 と同じに扱わないのはもちろん、`nil`（nbb が PATH に無い等で
+      ;; 起動自体に失敗）も同じ側に置く。旧版は `(= 2 code)` だけを見ていたので、
+      ;; **tick が一度も走らなかった周に、前の周が書いた古い ledger の `:next` で
+      ;; モデルを起こしていた** —— 起動失敗が「測って問題が無かった」と同じ形で
+      ;; 通る経路で、この loop が防ごうとしている当のものだった。
+      (when (not= 0 code)
+        (log! (str "tick が答えを返さなかった（exit " code "）。モデルを起こさない。"))
+        (append-ledger! {:at started :outcome :skipped
+                         :why (if (= 2 code) :tick-could-not-measure :tick-did-not-run)
+                         :exit code})
         (js/process.exit 0)))
 
     (let [tick (last-tick)
