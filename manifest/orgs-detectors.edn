@@ -2216,19 +2216,34 @@
    :interval-ms 86400000                 ; 24h -- the registry is policy; it changes slowly
    :timeout-ms  300000                   ; 5m -- measured 3s, 100x headroom for a loaded box
    :writes   :none
-   :measured "2026-08-29 in the remote container (orgs/ absent, nbb 1.4.208): all four
-              directions were watched, not asserted. (1) Against a fabricated orgs/
-              tree holding all 13 declared repos it exits 0, `RESULT clean hard=0
-              info=1`. (2) Removing src/ from cloud-itonami-isic-6810 exits 1 and
-              reports exactly `repo-no-source/sumai/cloud-itonami-isic-6810` -- the
-              repo broken -- and NEXT flips from (none) to sumai. (3) Deleting the
-              :sha256 line from the census-service source exits 1 with
-              `source-incomplete/<id>` on exactly the SEVEN rows citing that source and
-              NOT on chuko-sha, which cites census-retail -- so the check keys on the
-              row's actual source rather than failing blanket. (4) With no
-              orgs/cloud-itonami it exits 2 REFUSED and says it refuses to report a
-              pass it did not measure, which is how it behaved on its first real run in
-              a container that has no west checkout. The runtime here is npm-installed
-              nbb 1.4.208 rather than a PATH nbb; on the workstation the registered
-              argv resolves normally."}
+   :measured "2026-08-29 in the remote container (orgs/ absent, nbb 1.4.208). Every
+              direction below was WATCHED against a mutated copy, not asserted. Baseline:
+              a fabricated orgs/ tree with all 13 declared repos and a non-empty src/ in
+              each exits 0. Then, one mutation at a time: deleting :market/source from
+              kekkon exits 1 naming `source-missing/kekkon` and still prints SCANNED and
+              RESULT (an earlier revision crashed here on a nil, exiting 1 with no
+              evidence line at all -- a run that could not measure wearing the exit code
+              of a run that found something); changing census-retail :unit to
+              :billion-jpy exits 1 with `ranking-unit-mismatch` and prints the table
+              headed unit=UNKNOWN (the earlier revision checked that :unit was PRESENT,
+              never that the sources AGREED, and left a row three orders of magnitude
+              mis-ranked with zero findings); typing :measurd on inshoku exits 1 with
+              `market-status-unknown/inshoku` (it previously dropped a 13-trillion-yen
+              vertical out of the ranking silently); repointing :registry/authority
+              :scheme at kotoba://awai/ exits 1 with nine `authority-off-scheme` rows,
+              8 verticals plus the capability (the check had hardcoded the prefix while
+              its message quoted the declared one); setting :choba's resource to an
+              https:// URL exits 1 (capabilities were never walked); emptying every
+              src/ exits 1 with `repo-no-source` (an empty directory used to satisfy the
+              check); and removing the isic-6810 checkout exits 0 with an INFO
+              `fleet-unmeasured/sumai/...` plus a `NOT-MEASURED fleet` line naming sumai,
+              with NEXT staying (none) -- a partial west checkout must not produce a
+              confident red or steer NEXT. With no orgs/cloud-itonami at all it exits 2
+              REFUSED after printing SCANNED, which is how it behaved on its first real
+              run here. Two questions it does not answer -- whether biscuit is live and
+              whether hyakka claims exist -- are printed every run as NOT-MEASURED lines
+              rather than left to look like passes. Runtime 3s; the 5m timeout is 100x
+              headroom for a loaded box. The runtime here is npm-installed nbb 1.4.208
+              rather than a PATH nbb; on the workstation the registered argv resolves
+              normally."}
 ]}
