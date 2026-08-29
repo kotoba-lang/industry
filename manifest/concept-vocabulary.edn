@@ -41,7 +41,7 @@
   :spellings ["biscuit" "macaroon" "delegation" "attenuation" "capability token"
               "ucan" "cacao" "caveat" "委譲" "減衰" "権限委譲" "capability"
               "offline attenuation" "bearer token"]
-  :note "**中心は kotoba-lang/org-biscuitsec（biscuit）**（ADR-2608180200）—— 公開鍵で鎖を作るので **検証に秘密が要らず edge で検証できる**。判定は常に kotoba-lang/authority の束 1 本で、biscuit も macaroon も CACAO も UCAN も wire（->grant で inert data に落ちてから決定に入る）。役割: biscuit=委譲 / cacao=人の同意・session 起点 / xyz-ucan=外部相互運用 / kotoba-lang/macaroon=root 秘密を持つ側だけが検証する狭い bearer / org-w3-vc=claim であって authority ではない。意味論の正本は kotoba の lang/capability-semantics.edn。⚠ wire 相互運用は未実装 —— biscuit protobuf も libmacaroons binary も書いておらず、外部実装が我々の token を読んだことは無い。まだどの経路も biscuit を使っていない（live は CACAO 自己発行）。"}
+  :note "**中心は kotoba-lang/org-biscuitsec（biscuit）**（ADR-2608180200）—— 公開鍵で鎖を作るので **検証に秘密が要らず edge で検証できる**。判定は常に kotoba-lang/authority の束 1 本で、biscuit も macaroon も CACAO も UCAN も wire（->grant で inert data に落ちてから決定に入る）。役割: biscuit=委譲 / cacao=人の同意・session 起点 / xyz-ucan=外部相互運用 / kotoba-lang/macaroon=root 秘密を持つ側だけが検証する狭い bearer / org-w3-vc=claim であって authority ではない。意味論の正本は kotoba の lang/capability-semantics.edn。⚠ wire 相互運用は未実装 —— biscuit protobuf も libmacaroons binary も書いておらず、外部実装が我々の token を読んだことは無い。**live 経路は在る**（ADR-2608291700、実測 2026-08-29）: 発行 `POST auth.kotobase.net/v1/biscuit/token`・archive `PUT /ipfs/{cid}`・datom 面（`KOTOBASE_BISCUIT_AUTH_MODE=required` で CACAO は 401）。**まだ載っていないのは 4 つの query 面**（sparql/cypher/graphql/gremlin は `Bearer, AWS SigV4, or an operator CACAO` と答え、Biscuit header を付けても応答がバイト同一）。現在地は書き写さず `90-docs/kotobase_auth_maturity/run.cljs` を回して測る。"}
 
  :table-root
  {:label "テーブルルート / table manifest（述語 → バイト範囲）"
