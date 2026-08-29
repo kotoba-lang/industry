@@ -124,18 +124,55 @@
         throw-first (count (re-seq #"\(defn-?\s+[^\s\[\]]+\s+(?:\^\S+\s+)?(?:\"(?:[^\"\\]|\\.)*\"\s+)?\[[^\]]*\]\s*\(throw[\s(]" src))]
     (and (pos? defns) (= defns throw-first))))
 
+(defn- strip-ns-form [source-text]
+  (str/replace (or source-text "") #"(?s)^.*?\(ns\s.*?\n\n" ""))
+
+(defn- decision-free-passthrough?
+  "Every defn is a pass-through into another namespace and the file decides
+   nothing of its own. Its product semantics live in the delegate, not here.
+
+   Found 2026-08-30 by production run: the wave surfaced exactly one candidate,
+   `mio/src/mio/methods/social.cljc` (13 lines, two defns, both delegating into
+   `etzhayyim.social.publication`, which has no .kotoba twin in the fleet).
+   Porting it cannot produce a migration -- either the delegate is still .cljc,
+   which the workspace rule forbids migrating against, or the port reproduces
+   the same pass-through: a zero-behaviour diff counted as a landed slice.
+
+   Measured 2026-08-30 across orgs/cloud-itonami: 658 files survive every other
+   predicate here and still match this one, and ALL TWENTY of the smallest
+   survivors are of this shape. `mission-b-candidates` sorts by ascending line
+   count, so the class occupies the entire front of the queue -- every wave
+   would draw its full slate from files that cannot land, and redraw them
+   forever.
+
+   Third instance of the class `operational-script-signal?` names ('small and
+   empty of decisions'), after `unactivated-scaffold?`. Verified both
+   directions against real files: matches `mio/methods/social.cljc`, the
+   13-line social_post adapters in amime / kaname / kenchi / kuni-umi /
+   actor-hoshimori, infra-utility-connect's four 12-line cells, and
+   cloud-itonami-app's `health.cljc` (whose own docstring reads \"decide
+   nothing\"); does not match hikari's `grid_edge` / `solar_pv_install`, nor
+   mio's own `reward.cljc` / `analyze.cljc`, which delegate but also decide."
+  [source-text]
+  (let [src (strip-ns-form source-text)
+        defns (count (re-seq #"\(defn-?\s" src))
+        ns-calls (count (re-seq #"\([a-zA-Z][a-zA-Z0-9_.\-]*/[a-zA-Z0-9_.\-!?*<>=+]+[\s)]" src))
+        decisions (count (re-seq #"\((?:if|if-not|if-let|when|when-not|when-let|cond|condp|case|and|or|not|=|not=|<|>|<=|>=|\+|-|\*|/|min|max|count|filter|remove|reduce|some|every\?)[\s)]" src))]
+    (and (pos? defns) (pos? ns-calls) (zero? decisions))))
+
 (defn- defn-count [source-text]
   (count (re-seq #"\(defn-?\s" (or source-text ""))))
 
 (defn- candidate-slice? [{:keys [line-count custody-gated? has-kotoba-twin? host-mechanism?
                                   operational-script? host-boundary? unactivated-scaffold?
-                                  defn-count]}]
+                                  decision-free-passthrough? defn-count]}]
   (and (not custody-gated?)
        (not has-kotoba-twin?)
        (not host-mechanism?)
        (not operational-script?)
        (not host-boundary?)
        (not unactivated-scaffold?)
+       (not decision-free-passthrough?)
        (pos? (or defn-count 0))
        (pos? line-count)
        (<= line-count 400)))
@@ -281,6 +318,7 @@
                                           op-sig? (operational-script-signal? f text)
                                           host-path? (host-boundary-path? f)
                                           scaffold? (unactivated-scaffold? text)
+                                          passthrough? (decision-free-passthrough? text)
                                           n-defn (defn-count text)]
                                       (when (candidate-slice? {:line-count line-count
                                                                :custody-gated? false
@@ -289,6 +327,7 @@
                                                                :operational-script? op-sig?
                                                                :host-boundary? host-path?
                                                                :unactivated-scaffold? scaffold?
+                                                               :decision-free-passthrough? passthrough?
                                                                :defn-count n-defn})
                                         {:repo (str fleet-dir "/" repo-name)
                                          :org "cloud-itonami"
