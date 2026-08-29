@@ -1,0 +1,25 @@
+;; fixture。労働時間 9 時間なのに休憩 45 分 —— 労基法 34 条は 8 時間超で 60 分。
+;; governor が :break/insufficient で止めることを、生きた経路でも見るための行。
+{:offer/id "of-fixture-0002-kitchen-long"
+ :offer/source :fixture
+ :offer/employer-did "did:web:example.invalid"
+ :offer/employer-label "（fixture）都内給食受託"
+ :offer/jurisdiction :jp
+ :offer/region "JP-13"
+ :offer/isco "9412"
+ :offer/date "2026-09-05"
+ :offer/start "08:00"
+ :offer/end "17:45"
+ :offer/tz "Asia/Tokyo"
+ :offer/break-minutes 45
+ :offer/hourly-wage 1250
+ :offer/currency "JPY"
+ :offer/overtime-premium-rate 1.25
+ :offer/night-premium-rate 1.25
+ :offer/agreement-36? true
+ :offer/headcount 3
+ :offer/fee {:fee/payer :employer :fee/rate 0.30}
+ :offer/wage-deductions []
+ :offer/penalty-predetermined? false
+ :offer/min-age 18
+ :offer/work-authorization-required? true}

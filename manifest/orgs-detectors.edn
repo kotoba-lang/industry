@@ -2189,4 +2189,61 @@
               accepted set, no API key, or no probe naming a model all exit 2. That
               path fired for real on its first live run, when a `js->clj` on the
               Promise.all result made every status read nil against a gateway that had
-              answered fine."}]}
+              answered fine."}
+  {:id       :recruit-vertical-registry
+   :title    "a market-size ranking that lost its sources, or a vertical whose floor broke"
+   :why      "2026-08-29: the owner asked for Recruit's SaaS/media portfolio to be
+              rebuilt on cloud-itonami largest-market-first. The ordering input is the
+              thing that rots. ADR-2607252200 already had to walk this back once for
+              isco-*: a market figure with no source, no basis and no reference year
+              reads exactly like a measured one, and a ranking built on it is a
+              fabricated global total presented as a measurement -- the specific
+              failure CLAUDE.md's system-dynamics rule names. This detector fails the
+              registry the moment a :measured row loses its url / retrieved-at /
+              sha256 / unit / reference-year / publisher, and reports mixed ranking
+              bases (the 2026-08-29 registry ranks seven rows on 経済センサス 売上高
+              and one, chuko-sha, on 年間商品販売額) as an INFO line rather than
+              letting the mix stay silent. It also names the next vertical to build,
+              which is what keeps the loop from re-deriving state each session."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/recruit-vertical-tick.cljs" "--findings" "--root" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   ;; The floor pins the UNIT (`vertical`) and the ratio form, not just a positive
+   ;; number -- a floor detects "measured nothing", never "measured the wrong set",
+   ;; so the unit has to be part of what it pins.
+   :evidence "SCANNED\t[1-9][0-9]*/[0-9]+\tvertical"
+   :interval-ms 86400000                 ; 24h -- the registry is policy; it changes slowly
+   :timeout-ms  300000                   ; 5m -- measured 3s, 100x headroom for a loaded box
+   :writes   :none
+   :measured "2026-08-29 in the remote container (orgs/ absent, nbb 1.4.208). Every
+              direction below was WATCHED against a mutated copy, not asserted. Baseline:
+              a fabricated orgs/ tree with all 13 declared repos and a non-empty src/ in
+              each exits 0. Then, one mutation at a time: deleting :market/source from
+              kekkon exits 1 naming `source-missing/kekkon` and still prints SCANNED and
+              RESULT (an earlier revision crashed here on a nil, exiting 1 with no
+              evidence line at all -- a run that could not measure wearing the exit code
+              of a run that found something); changing census-retail :unit to
+              :billion-jpy exits 1 with `ranking-unit-mismatch` and prints the table
+              headed unit=UNKNOWN (the earlier revision checked that :unit was PRESENT,
+              never that the sources AGREED, and left a row three orders of magnitude
+              mis-ranked with zero findings); typing :measurd on inshoku exits 1 with
+              `market-status-unknown/inshoku` (it previously dropped a 13-trillion-yen
+              vertical out of the ranking silently); repointing :registry/authority
+              :scheme at kotoba://awai/ exits 1 with nine `authority-off-scheme` rows,
+              8 verticals plus the capability (the check had hardcoded the prefix while
+              its message quoted the declared one); setting :choba's resource to an
+              https:// URL exits 1 (capabilities were never walked); emptying every
+              src/ exits 1 with `repo-no-source` (an empty directory used to satisfy the
+              check); and removing the isic-6810 checkout exits 0 with an INFO
+              `fleet-unmeasured/sumai/...` plus a `NOT-MEASURED fleet` line naming sumai,
+              with NEXT staying (none) -- a partial west checkout must not produce a
+              confident red or steer NEXT. With no orgs/cloud-itonami at all it exits 2
+              REFUSED after printing SCANNED, which is how it behaved on its first real
+              run here. Two questions it does not answer -- whether biscuit is live and
+              whether hyakka claims exist -- are printed every run as NOT-MEASURED lines
+              rather than left to look like passes. Runtime 3s; the 5m timeout is 100x
+              headroom for a loaded box. The runtime here is npm-installed nbb 1.4.208
+              rather than a PATH nbb; on the workstation the registered argv resolves
+              normally."}
+]}

@@ -325,6 +325,10 @@
        ;; 集計は二重にならないが、entity 自体は重複している。既存の集計値を
        ;; 動かさないためここでは触っていない（別途 ADR で扱う）。
        (remove #(str/ends-with? (str %) "corpus/corpus.datoms.edn"))
+       ;; arday-cofnas-affair も index-sources 側でロードする。ここで拾うと
+       ;; **同じ entity が 2 回**入り、entity 自身が `:source/dataset` を持つので
+       ;; training-corpus と同じく dataset 別の集計がちょうど 2 倍になる。
+       (remove #(str/ends-with? (str %) "knowledge/arday-cofnas-affair.datoms.edn"))
        (sort-by str)))
 
 (defn doc-entities-from-file [f]
@@ -1768,7 +1772,24 @@
    ;;    訴訟から離脱しており、検出可能性そのものが年によって動く。
    ;; ⚠ **LEI を 1 件も持たないので market-intel / cloud-itonami-lei と join できない。**
    ;;    推測した LEI が join 面を静かに壊すのを避けたため（`:coverage/no-lei-join`）。
-   ["lending-alignment" (io/file root "90-docs" "finance" "lending-alignment.datoms.edn")]])
+   ["lending-alignment" (io/file root "90-docs" "finance" "lending-alignment.datoms.edn")]
+   ;; arday-cofnas-affair — 2026-08 の Arday / Cofnas 事件の人物・発言カタログ
+   ;; （手書きの観測記録）。他の索引と違い**生成物ではない**ので `--check` に相当する
+   ;; 再生成検査が無い —— 更新は人（または agent）が直接書く。
+   ;;
+   ;; ⚠ **`:evidence/tier` を見ずに entity を数えないこと。** `:primary` は発言者自身の
+   ;;    公表物か、それを引いた報道を直接取得したもの、`:secondary` は報道 1 本、
+   ;;    `:tertiary` は Wikipedia の要約のみで**役職の記載に疑義があるものを含む**
+   ;;    （`:evidence/caveat` が付く）。tier を潰して数えると、裏取りしていない
+   ;;    肩書きが裏取り済みと同じ重みで面に載る。
+   ;; ⚠ `:coverage/known-gaps` を持つ entity が 1 件あり、取得できなかった経路
+   ;;    （原投稿・署名者名簿・403 の媒体）を申告する —— このカタログを引いて
+   ;;    出なかったことを「その発言が無かった」の証拠に使わせないため。
+   ;;
+   ;; join: 現状どの dataset とも join key を共有しない（人名は文字列で、LEI も
+   ;;       repo path も持たない）。孤島であることを承知の上で置いている。
+   ["arday-cofnas-affair"
+    (io/file root "90-docs" "knowledge" "arday-cofnas-affair.datoms.edn")]])
 
 (defn index-entities [next-tempid!]
   (let [skipped (atom [])

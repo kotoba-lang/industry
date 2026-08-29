@@ -351,12 +351,24 @@
   {:name "kakaku" :org "cloud-itonami"
    :domain "価格観測"
    :runtime :clojure :main "kakaku.methods.autorun"
-   :args []
+   ;; --log を明示しないと log-default が（seed-default と同じ *file* 由来の理由で）
+   ;; <repo>/kakaku/data/… という入れ子に書く。.gitignore は data/kakaku.datoms.kotoba.edn
+   ;; しか無視しないので、その入れ子は untracked として checkout を汚す（meyasu と同じ罠）。
+   :args ["--cycles" "1" "--log" "${REPO}/data/kakaku.datoms.kotoba.edn"]
    :produces "data/kakaku.datoms.kotoba.edn"
-   :expect :known-broken
-   :blocked-by "seed が repo に無い: kakaku/kotoba/seed.edn (FileNotFoundException)。
-                repo 側に seed を追加するか、-main が seed パスを引数で受ける必要がある"
-   :evidence "2026-08-08 実測"}
+   :output-gitignored true
+   :expect :produces-datoms
+   :evidence "2026-08-08 :known-broken として初出。2026-08-29 に欠陥 2 つを特定して
+              cloud-itonami/kakaku main へ着地（merge e7ad201、PR #2）。ADR-2608292000。
+              (1) seed パスが *file* 由来で classpath 相対の kakaku/kotoba/seed.edn になり解決しない
+              (2) より重い: build-state が keyword key を出すのに kakaku.methods.agent は入口も
+                  出口も文字列 key。全 handler が空入力ブランチに落ち、observation-datoms の
+                  (or … 0) が nil を吸うので、exit 0 / chain OK のまま観測が全部ゼロで永続化される
+              ⚠ (2) を直す前にこの entry を :produces-datoms へ上げてはならなかった —— 全ゼロの
+              観測が :produces-datoms を満たすので false green になる。上げてよくなったのは
+              fix が main に着地したから。
+              merge 後の main で実測: 3 offers / spread 700 / notable true / +26 datoms / chain OK、
+              全 8 test namespace 63 tests 313 assertions 0-fail、実行後の checkout は clean。"}
 
   {:name "hakoniwa" :org "cloud-itonami"
    :domain "前方シミュレーション（分布としての未来）"

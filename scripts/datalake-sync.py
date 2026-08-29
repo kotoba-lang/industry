@@ -35,6 +35,12 @@ watchlist / hyakka spec は 1 バイトも変えなくてよい）:
                       追加する -- 既存ファイルの書き直しは発生しない
                       （Iceberg のpartition evolution。過去分は旧spec のまま、
                       以降のcommitだけ新specで書かれる）。
+  "float_columns"     列名のリスト。`float64` 型で持つ（`int_columns` と同じ形の
+                      姉妹オプション）。**int で足りるなら int_columns を使う** ——
+                      float は等値比較が効かないので、識別子や件数を入れる列では
+                      ない。これが要るのは confidence や rate のように、値そのものが
+                      小数である列だけ。無指定なら従来どおり string になる（黙って
+                      0 や nan にはしない）。
   "timestamp_columns"  列名のリスト。ISO8601 文字列を `timestamp(us, UTC)` 型で
                       持つ（`int_columns` と同じ形の姉妹オプション）。**新規に
                       作る表にだけ効く** -- 既存表の列型を string → timestamp へ
@@ -84,10 +90,33 @@ LEI については同じ正本の別の投影として D1
 
 ## なぜ Python なのか（この workspace の script host は nbb）
 
-Iceberg の commit は Avro manifest / manifest-list / metadata.json / snapshot を
-書く作業で、nbb にその writer は無い。**境界は JSON** —— `*-datalake-export.cljs`
-が repo の EDN を JSON に落とし、この script はそれを Iceberg に載せるだけで、
-EDN も repo 構造も知らない。
+**境界は JSON** —— `*-datalake-export.cljs` が repo の EDN を JSON に落とし、
+この script はそれを Iceberg に載せるだけで、EDN も repo 構造も知らない。
+
+⚠ **この節は長く「nbb に Iceberg writer は無い」と書いていた。それは大雑把すぎて、
+実際より Python 側を広く正当化していた**（2026-08-29 に実測して訂正）。Iceberg の
+commit が要求するものを 1 つずつ見ると、欠けているのは 1 つだけ:
+
+| commit に要るもの | portable `.cljc` に在るか |
+|---|---|
+| data file (Parquet) | **在る** —— `kotoba-lang/org-apache-parquet` は reader **と writer**（`parquet/write.cljc`） |
+| metadata.json / snapshot | 在る（ただの JSON） |
+| REST catalog protocol | 在る（ただの HTTP） |
+| **manifest / manifest-list (Avro)** | **無い** —— `kotoba-lang/org-apache-avro` は **reader のみ**（`write`/`encode`/`emit` は 0 件、実測） |
+
+つまり Python が残っている理由は **Avro writer が無いこと、ただ 1 点**である。
+`org-apache-avro` に writer が入った日にこの script は nbb へ移せる ——
+「nbb には無理」ではなく「あと 1 リポジトリ」。
+
+**kotoba（`.kotoba`）は今日は対象外。** script host `kbb` は west に 0 件（未実装、
+CLAUDE.md の記述どおり）で、capability kit にも **fs / process / exec は無い**
+（在るのは clock / dataspace / http / http-ingress / llm / log / state / storage /
+stream-ingress / stream-object / ui。実測 2026-08-29）。運用 script の正本は
+引き続き nbb であり、kbb の存在を前提にしたコードは書かない。
+
+なお `kotoba-lang/tana`（棚）は columnar object 群の上に content-addressed な
+table plane を置くもので、**Iceberg とは別解**。この面を Iceberg のままにするか
+tana に寄せるかは、この loader の言語選択とは独立した設計判断。
 
 ## 認証
 
@@ -152,6 +181,7 @@ def load_spec(path: str):
             "file": t["file"],
             "table": t["table"],
             "int_columns": set(t.get("int_columns") or []),
+            "float_columns": set(t.get("float_columns") or []),
             "timestamp_columns": set(t.get("timestamp_columns") or []),
             "mode": mode,
             "partition_by": list(t.get("partition_by") or []),
@@ -160,7 +190,7 @@ def load_spec(path: str):
     return ns, out
 
 
-def to_arrow(rows, int_cols, timestamp_cols=frozenset()):
+def to_arrow(rows, int_cols, timestamp_cols=frozenset(), float_cols=frozenset()):
     import pyarrow as pa
 
     cols = sorted({k for r in rows for k in r.keys()})
@@ -169,6 +199,8 @@ def to_arrow(rows, int_cols, timestamp_cols=frozenset()):
         vals = [r.get(c) for r in rows]
         if c in int_cols:
             arrays.append(pa.array([None if v is None else int(v) for v in vals], pa.int32()))
+        elif c in float_cols:
+            arrays.append(pa.array([None if v is None else float(v) for v in vals], pa.float64()))
         elif c in timestamp_cols:
             parsed = []
             for v in vals:
@@ -253,7 +285,7 @@ def expire_old_snapshots(catalog, ident, retention_days):
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--spec", required=True,
-                    help="JSON: {namespace, tables:[{file,table,int_columns,timestamp_columns,mode,partition_by}]}")
+                    help="JSON: {namespace, tables:[{file,table,int_columns,float_columns,timestamp_columns,mode,partition_by}]}")
     ap.add_argument("--in-dir", default="/tmp")
     ap.add_argument("--account", default=ACCOUNT_DEFAULT)
     ap.add_argument("--bucket", default=BUCKET_DEFAULT)
@@ -305,7 +337,8 @@ def main() -> int:
         if not rows:
             print(f"SKIP {table}: 0 rows -- refusing to commit an empty snapshot")
             continue
-        loaded.append((spec, to_arrow(rows, spec["int_columns"], spec["timestamp_columns"])))
+        loaded.append((spec, to_arrow(rows, spec["int_columns"], spec["timestamp_columns"],
+                                      spec["float_columns"])))
 
     if not loaded:
         print("no table had rows -- refusing to report a pass")

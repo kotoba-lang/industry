@@ -275,12 +275,39 @@ CLAUDE.md と amu の `examples/todo-app.kotoba` が『Kotoba には整数→文
   | element | `textContent` / `getAttribute(n)` | `textContent` / `setAttribute(n,v)` / `addEventListener(type,fn)` |
   | `document` | `title` / `getElementById(id)` | `title` |
   | `console` | — | `log(…)` |
+  | global | — | `setTimeout(fn,ms)` / `fetch(url)` |
+
+  **`setTimeout` は `addEventListener` と同じ形で、同じ registry を共有する。**
+  どちらも「後で呼ぶ関数」をホストに渡す操作で、capability の無いゲストには時計も
+  呼び返しも無い。返るのは登録（遅延とハンドラ番号）で、発火は同じ第 2 の入口。
+  タイマ id として返すのはハンドラ番号である —— このエンジンが持つ identity が
+  それしか無いから。
 
   これで全部である。他は `undefined` で、page script はそれを検査できる ——
   ブラウザが持たない機能を検査するのと同じやり方で。
 
-  残る G4 の条件: `new Worker` / `fetch` / `setTimeout`。どれも同じ問いに帰着する ——
-  **返す値で言えるか、それとも呼び返しが要るか。**
+  **`fetch` も同じ形に載った。ここが本当の試金石だった** —— promise を返すからである。
+  返るのは pending request（`#req<n>` という id のノード。新しい値の型は要らなかった）で、
+  n が registry の枠。`.then(fn)` はその枠にハンドラを収め、同じ request を返すので
+  chain できる。ホストが request を実行し、**応答を添えてその枠を発火する**:
+
+  ```
+  eval-dom                              -> 5:fetch7:#window14:9:/api/data1:0
+                                           ( host が fetch する )
+  eval-dom-event-arg(…, 0, the-body)    -> 11:textContent3:out8:the body
+  ```
+
+  **effect model が存在する理由そのものの往復が、capability 無しで閉じた。**
+  ゲストは network に一度も触らず、応答はホストが手渡すデータである。
+
+  ⚠ **その応答の渡し方で、素直な方法が効かない。しかも理由が正しい。**
+  呼び出し「前」に caller の環境へ束縛してもだめで、**引数の無い宣言済み仮引数は
+  `undefined` に束縛される**（`function f(a) { return typeof a }; f()` が
+  `undefined` を答えるのはそのため）ので、外側の束縛を shadow する。だから
+  `bind-args` の「後」に束縛する。同じ理由でその入口は `call-fn` に委譲せず呼び出しを
+  展開して書いてある（`call-fn` は既に言語の上限である 5 引数）。
+
+  残る G4 の条件は `new Worker` だけになった。
 
 ## 次の一手（resume point）
 
@@ -307,7 +334,15 @@ effect-as-value で通り、quickjs-ng に対して両方向で測ってある�
   `:f64` の値は Kotoba を通るが演算に lowering が無く、`(+ x x)` は
   `expected i64, got f64` で拒否される。ソフト浮動小数点なら書ける
   （`bit-and`/`bit-or`/`bit-xor`/`quot` は在り、shift は無いので `*`/`quot` で代用）。
-- prototype / `instanceof`（`for...of` / `for...in` / `switch` は landed）
+- **prototype chain**（constructor と `instanceof` は landed —— `new Point(7).x` は
+  7、object を返す constructor はそれを返し、method 内の `this` は receiver。
+  無いのは `Point.prototype` であって、共有 method 表も継承も無い。object は
+  `%ctor`（JS の識別子では綴れない名前）に生成時の名前を憶えており、`instanceof` は
+  それを読む。`o['%ctor']` では届く —— bracket lookup は任意の文字列を取るので。
+  本物の穴で、小さい穴で、隠さずに書いてある）（旧記述: `instanceof` は landed —— 鎖が
+  無いので `catch` が実際に訊く問い（`e instanceof TypeError`）に、捕まえた error の
+  `name` で答える。知らない constructor には `false` を返す。これは拒否ではなく
+  本当の答えである: このエンジンに、その constructor の instance は存在しない）
 - **cell は解放されない**（README の Gaps に理由つきで記録済み）
 - **`browser.demo-smoke-test` はこのセッションの前からハングしていた**（実測 2026-08-29）。
   HEAD 版はその namespace に入ったあと 10 分以上何も出さず、kill した。1 回の delivery
@@ -315,6 +350,66 @@ effect-as-value で通り、quickjs-ng に対して両方向で測ってある�
   **これは私の変更が壊したものではない。** 直したのは「ハングが遅い成功と見分けられない」
   ことだけで、`with-deadline` が 120 秒で理由付きの失敗にする。**echo が届かない理由は
   未調査**であり、直したと書かない。
+
+  **排除できたもの**（2026-08-29 実測）: ①待ち時間の長さではない（500ms、および
+  1 回目の delivery 後にさらに 3 秒 —— どちらも placeholder のまま）②WebSocket
+  機構ではない（`quickjs-websocket-smoke-test` が同じ `websocket-fn`・同じ
+  delivery 形・同じ 500ms 境界で、同じ実行の中で通る）③handle の漏れではない
+  （失敗後に測って TCP handle は 0）。**残る差分**: このテストは既に 3 つの script
+  tag と実 Worker と実 fetch を走らせた session に `onmessage` を登録し、handler は
+  `document.title` ではなく `document.getElementById(...)` 越しに書く。どちらが効いて
+  いるかは判っていない。
+
+  **⚠ 機械を測ってからテストを疑うこと。** 実測 2026-08-29、このテストは「ハングして
+  いる」ように見えたが、その大半は**同じスイートが 4 本同時に走っていた**ことだった。
+  `scripts/resource-guard.mjs` が直列化するのは **build であって、その後に走る test
+  ではない**。guard を待つ retry loop は、前の実行が生きているうちに次を起動する。
+  4 本のうち listening server を握れたのは 1 本で、残る 3 本は **server を持てないまま
+  最初の `println` にも到達せず 0% CPU で止まっていた**。
+
+  これで症状は全部説明がつく —— 出力前の沈黙、0% CPU、TCP handle 0、そして
+  **届かない WebSocket echo**（自分の server が無いのだから echo する相手がいない）。
+
+  **私はこの 1 件で診断を 5 回外した**（idle → syscall block → promise の無限再帰 →
+  重い実処理 → 落ち着かない flow）。原因は毎回同じで、**たまたま捕まえた状態から
+  機構を推測し、それを一般化した**こと。しかも状態はコピーごとに違っていた。
+
+  **同じ形の測定ミスがもう 1 つ。安く再発するので名指ししておく**:
+  `pgrep -f <node target/node-tests.js> | head -1` は、node 本体より先に
+  **shell の wrapper**（`sh -c npm run compile:node-test && node ...`）に当たる。
+  「0% CPU だから idle」という観測のいくつかは **wrapper を見ていた**。実測では
+  wrapper が 0% のとき本体は 80% で回っていた。**測りたいプロセスを名指しすること。**
+
+  **道具について残る本物の知見** —— 答えを出したのは CPU profile だけで、取り方が肝
+  だった。`--cpu-prof` は**正常終了時にしか書かない**ので `timeout` に殺されると何も
+  残らず、プロセス内の timer も使えない（測ろうとしている当の状態が loop を飢えさせる）。
+  **inspector は別スレッドで動く**ので外から駆動できる。profile の答えは
+  self 時間の 86.7% が `cljs.core`、5.8% が `cssom.layout/node_style`、stack 深さ 126
+  —— **無限ループではなく重い実処理**であり、native sample の全サンプルが
+  `PromiseFulfillReactionJob` に見えたのは、各ステップを駆動する promise chain が
+  そこに立っていただけだった。
+
+  **`Promise.race` の deadline は同期的な重さも microtask の嵐も bound できない。**
+  timer は checkpoint が drain しない間は発火しない。これは計器の構造的な限界である。
+
+  **contention とは独立に残る、本物の弱さ**: `start-demo-server!` は serve できない
+  とき**黙って止まる**。自分の server を起こせないテストは、待つのではなくそう言う
+  べきである。**ここでは直していない。**
+
+  **競合を全部排除した 1 本だけの実行での実測（closing 時点）**: `browser.demo-smoke-test`
+  に入ってから **5 分半、CPU 48% で回り続け、最初の println にすら到達しない**。
+  完走までは走らせていない。したがって closing 時点で言えるのは
+  **「少なくとも非常に遅い」までで、「ハングする」とは測っていない**。
+  次に触る人はここから始めるとよい —— 完走まで走らせて時間を測るか、
+  `load-html!` の中で何にその時間が使われているかを inspector 経由の CPU profile で
+  見るか。前回の profile の答えは `cssom.layout` と `cljs.core` の map 操作だった。
+
+  **event loop を実際に掴んでいたものは 3 つ在り、3 番目は私の計器そのものだった**
+  （どれも本物の欠陥だが、**見かけ上のハングの原因ではなかった**） —— `Promise.race` は負けた側を
+  止めないので、`with-deadline` が張った 120 秒の timer が Node を生かし続けていた
+  （テスト 2 本で最大 240 秒、0% CPU、socket も無し —— 暴こうとしていたハングと
+  同じ顔）。settle 時に `clearTimeout` する。他の 2 層は、ゲストが開いた socket と、
+  **server が accept 済みの接続**（Node の `.close()` は既存接続を閉じない）。
   ⚠ 最初に書いた修正（delivery を poll し直す）は**前提が間違っていた** —— 1 回 8 秒
   かかるので 40 回試せば 320 秒で、deadline の内側に収まらない。しかも
   `Promise.race` は**負けた側を止めない**ので、engine を dispose した後も再帰が回り続けた。

@@ -1,0 +1,308 @@
+#!/usr/bin/env nbb
+;; scripts/recruit-vertical-tick.cljs — manifest/recruit-equivalent-verticals.edn を
+;; 現在地と突き合わせ、**次に建てる 1 本**を名指しする。ADR-2608290100。
+;;
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/recruit-vertical-tick.cljs [--findings] [--root <dir>]
+;;
+;; ## この tick が答える問い
+;;
+;;   1. registry の行は全部、出所つきで測られているか
+;;   2. 単位と基準は order を跨いで揃っているか（揃っていないなら順位は無意味）
+;;   3. その vertical の repo は実在するか。中身が在るか
+;;   4. biscuit の scope は宣言された scheme に乗っているか
+;;   5. hyakka の claim 主語が決まっているか
+;;   6. 次に建てるべき 1 本はどれか
+;;
+;; ## この tick が答え「ない」問い —— 出力に明示する
+;;
+;; biscuit が live か（org-biscuitsec を読む段が無い）／hyakka に claim が実際に
+;; 出ているか（app-hyakka の台帳を読む段が無い）。**飛ばしたことを黙らない** ——
+;; NOT-MEASURED 行として毎回出す。CLAUDE.md の 6 問の 4 番目（「飛ばした」と
+;; 「合格した」が出力で区別できるか）に対する答え。
+;;
+;; ## exit code —— 3 値。畳まない
+;;
+;;   0  測れて、床を割っているものが無い
+;;   1  測れて、findings が在る
+;;   2  REFUSED —— そもそも問えなかった
+;;
+;; ## 何も書かない
+;;
+;; :writes :none。測って言うだけ。
+
+(ns recruit-vertical-tick
+  (:require [clojure.edn :as edn]
+            [clojure.string :as str]
+            ["node:fs" :as fs]
+            ["node:path" :as path]))
+
+(def argv (vec *command-line-args*))
+(defn- flag? [n] (boolean (some #{n} argv)))
+(defn- opt [n] (let [i (.indexOf (clj->js argv) n)]
+                 (when (and (>= i 0) (< (inc i) (count argv))) (nth argv (inc i)))))
+
+(def root (or (opt "--root") (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT") "."))
+(def registry-path (path/join root "manifest" "recruit-equivalent-verticals.edn"))
+
+(def findings (atom []))
+(defn- finding! [sev k detail] (swap! findings conj [sev k detail]))
+
+(defn- exists? [p] (try (.existsSync fs p) (catch :default _ false)))
+(defn- slurp* [p] (try (.readFileSync fs p "utf8") (catch :default _ nil)))
+(defn- dir-entries [p] (try (vec (.readdirSync fs p)) (catch :default _ nil)))
+
+(defn- refuse! [why]
+  (println (str "REFUSED\t" why))
+  (println "This tick refuses to report a pass it did not measure.")
+  (.exit js/process 2))
+
+(def registry
+  (let [s (slurp* registry-path)]
+    (when-not s (refuse! (str "registry unreadable: " registry-path)))
+    (let [d (try (edn/read-string s)
+                 (catch :default e (refuse! (str "registry unparseable: " (.-message e)))))]
+      (when-not (map? d) (refuse! "registry is not a map"))
+      d)))
+
+(def verticals (vec (:registry/verticals registry)))
+(def capabilities (vec (:registry/capabilities registry)))
+(def sources (:registry/sources registry))
+
+(when (empty? verticals) (refuse! "registry declares no verticals"))
+
+;; ---------------------------------------------------------------------------
+;; 1. 出所の完全性。**通った行だけが順位に入る**
+;; ---------------------------------------------------------------------------
+;; 順位を組む前に弾いておくのは、出所の壊れた行を「順位表を印字する段」で触って
+;; nil 参照で落ちるのを構造的に避けるため。落ちると SCANNED も RESULT も出ない
+;; まま exit 1（findings が在るときの値）になり、**測れなかった実行が
+;; 測って問題が見つかった実行と同じ顔をする**。
+
+(def required-source-fields [:url :retrieved-at :sha256 :unit :reference-year :publisher])
+(def valid-statuses #{:measured :unmeasured :not-applicable})
+
+(defn- provenance-ok?
+  "その行を順位に入れてよいか。副作用として finding を積む。"
+  [v]
+  (let [id (name (:vertical/id v))
+        status (:market/status v)]
+    (cond
+      (nil? status)
+      (do (finding! "error" (str "market-status-missing/" id)
+                    "行が :market/status を宣言していない") false)
+
+      ;; **未知の status を黙って落とさない。** :measurd のような打ち間違いは
+      ;; 「順位から静かに消える」形で現れ、13 兆円の営みが 1 文字で消える。
+      (not (contains? valid-statuses status))
+      (do (finding! "error" (str "market-status-unknown/" id)
+                    (str ":market/status " (str status) " は未知。"
+                         "順位に入るのは :measured のみなので、打ち間違いは行を静かに消す"))
+          false)
+
+      (not= status :measured) false
+
+      :else
+      (let [src-key (:market/source v)
+            src (get sources src-key)]
+        (cond
+          (nil? (:market/value v))
+          (do (finding! "error" (str "measured-without-value/" id)
+                        ":measured なのに :market/value が無い") false)
+
+          (nil? src-key)
+          (do (finding! "error" (str "source-missing/" id)
+                        ":measured なのに :market/source が無い") false)
+
+          (nil? src)
+          (do (finding! "error" (str "source-unresolved/" id)
+                        (str ":market/source " (str src-key) " が :registry/sources に無い")) false)
+
+          :else
+          (let [missing (remove #(get src %) required-source-fields)
+                ok? (empty? missing)]
+            (when (seq missing)
+              (finding! "error" (str "source-incomplete/" id)
+                        (str "出所に " (str/join "," (map name missing)) " が無い")))
+            (when-not (:market/basis v)
+              (finding! "error" (str "basis-missing/" id) ":market/basis が無い"))
+            (when-not (:market/table v)
+              (finding! "warn" (str "table-missing/" id) "どの表から採ったかが無い。再現できない"))
+            (and ok? (some? (:market/basis v)))))))))
+
+(def rankable (filterv provenance-ok? verticals))
+
+;; ---------------------------------------------------------------------------
+;; 2. 単位 —— 揃っていなければ順位は数の比較ですらない
+;; ---------------------------------------------------------------------------
+;; :unit の在否だけを検査していた版は、census-retail を :billion-jpy に変えても
+;; 0 findings で、chuko-sha が 3 桁ぶん低い順位のまま居座った。**在ることと
+;; 揃っていることは別の主張。**
+
+(def ranking-unit
+  (let [units (into #{} (keep #(get-in sources [(:market/source %) :unit]) rankable))]
+    (cond
+      (empty? units) nil
+      (> (count units) 1)
+      (do (finding! "error" "ranking-unit-mismatch"
+                    (str "順位が " (count units) " 種類の単位にまたがる: "
+                         (str/join "," (map str units))
+                         "。大小比較が成立しないので、この順位は読んではいけない"))
+          nil)
+      :else (first units))))
+
+(defn- check-basis-mix! []
+  (let [bases (into #{} (keep :market/basis rankable))]
+    (when (> (count bases) 1)
+      (let [by-basis (reduce (fn [m v] (update m (:market/basis v) (fnil conj []) (name (:vertical/id v))))
+                             {} rankable)]
+        (finding! "info" "ranking-mixed-basis"
+                  (str "順位が " (count bases) " 種類の基準にまたがる: "
+                       (str/join " / " (map (fn [[b ids]] (str b "=" (str/join "," ids))) by-basis))
+                       "。これは欠陥ではなく、申告されるべき事実"))))))
+
+;; ---------------------------------------------------------------------------
+;; 3. authority / hyakka —— capability も検査対象に入れる
+;; ---------------------------------------------------------------------------
+;; capabilities を回していなかった版は、:choba の resource を
+;; https://evil.example/choba にしても 0 findings だった。
+
+(def scheme-prefix
+  ;; 宣言された :scheme から前置詞を導く。**ハードコードしない** —— メッセージが
+  ;; 宣言を引用しながら別の値で検査していると、scheme を変えた瞬間に全行が
+  ;; 違反になっても誰も報告しない。
+  (let [s (get-in registry [:registry/authority :scheme])]
+    (when (string? s)
+      (let [i (str/index-of s "{")]
+        (if i (subs s 0 i) s)))))
+
+(defn- check-authority! [entry id-key]
+  (let [id (name (get entry id-key))
+        res (:authority/resource entry)]
+    (cond
+      (nil? scheme-prefix)
+      (finding! "error" "authority-scheme-undeclared"
+                ":registry/authority :scheme が無い。何に照らして検査するか決まらない")
+      (nil? res)
+      (finding! "error" (str "authority-undeclared/" id) ":authority/resource が無い")
+      (not (str/starts-with? res scheme-prefix))
+      (finding! "error" (str "authority-off-scheme/" id)
+                (str res " が宣言された scheme（" scheme-prefix "…）に乗っていない")))))
+
+(defn- check-hyakka! [v]
+  (let [id (name (:vertical/id v))]
+    (when-not (:hyakka/subject v)
+      (finding! "error" (str "hyakka-subject-missing/" id)
+                ":hyakka/subject が無い。claim の主語が決まらない"))))
+
+;; ---------------------------------------------------------------------------
+;; 4. 現在地（orgs/ を読む）
+;; ---------------------------------------------------------------------------
+
+(def orgs-dir (path/join root "orgs" "cloud-itonami"))
+
+(defn- repo-state [repo-path]
+  (let [abs (path/join root repo-path)]
+    (if-not (exists? abs)
+      {:present? false}
+      ;; **空の src/ を「中身が在る」と読まない。** 空ディレクトリ 13 個で
+      ;; RESULT clean が出ていた。
+      (let [src (dir-entries (path/join abs "src"))]
+        {:present? true
+         :source?  (or (boolean (seq src)) (exists? (path/join abs "deps.edn")))}))))
+
+(def fleet-unmeasured (atom #{}))
+
+(defn- check-fleet! [v]
+  (let [id (name (:vertical/id v))
+        repos (vec (:vertical/repos v))]
+    (if (empty? repos)
+      (finding! "error" (str "no-repo/" id) "vertical が repo を 1 本も指していない")
+      (doseq [r repos]
+        (let [st (repo-state r)]
+          (cond
+            ;; checkout に無いのは「床が割れている」ではなく「この行は測れなかった」。
+            ;; west の部分 checkout で自信のある偽の赤を出し、NEXT をそこへ向けて
+            ;; いたのがこれ。info に落とし、NEXT の候補から外して別枠で数える。
+            (not (:present? st))
+            (do (swap! fleet-unmeasured conj id)
+                (finding! "info" (str "fleet-unmeasured/" id "/" (path/basename r))
+                          (str r " が checkout に無い。west pin は在るかもしれない —— "
+                               "この行の fleet 側は測れていない（床割れとは別）")))
+            (not (:source? st))
+            (finding! "warn" (str "repo-no-source/" id "/" (path/basename r))
+                      (str r " に中身のある src/ も deps.edn も無い"))))))))
+
+;; ---------------------------------------------------------------------------
+;; 実行
+;; ---------------------------------------------------------------------------
+
+(check-basis-mix!)
+(doseq [v verticals] (check-authority! v :vertical/id) (check-hyakka! v))
+(doseq [c capabilities] (check-authority! c :capability/id))
+
+(def orgs-present? (exists? orgs-dir))
+(when orgs-present? (doseq [v verticals] (check-fleet! v)))
+
+;; ---------------------------------------------------------------------------
+;; 順位
+;; ---------------------------------------------------------------------------
+
+(def skipped (filterv #(not (some #{%} rankable)) verticals))
+(def ranked (vec (reverse (sort-by :market/value rankable))))
+
+(println "== recruit-equivalent verticals ==")
+(println (str "registry: " registry-path))
+(println (str "rankable: " (count rankable) "  順位外(status/出所): " (count skipped)
+              "  capabilities(順位外): " (count capabilities)))
+(when-not ranking-unit
+  (println "⚠ 単位が揃っていないか不明。下の順位は大小比較として読めない"))
+(println "")
+(println (str "rank\tvertical\t市場規模(" (if ranking-unit (name ranking-unit) "unit=UNKNOWN") ")\t基準\t出所"))
+(doseq [[i v] (map-indexed vector ranked)]
+  (println (str (inc i) "\t" (name (:vertical/id v)) "\t" (:market/value v)
+                "\t" (:market/basis v) "\t" (name (:market/source v)))))
+(println "")
+
+;; 次の 1 本 = 床を割っている行のうち最も市場規模が大きいもの。2 本まとめない
+;; （ADR-2607189300）。fleet を測れなかっただけの行は候補にしない。
+(def broken-ids
+  (into #{} (keep (fn [[sev k _]]
+                    (when (not= sev "info")
+                      (let [seg (str/split k #"/")]
+                        (when (> (count seg) 1) (nth seg 1)))))
+                  @findings)))
+
+(def next-one (first (filter #(contains? broken-ids (name (:vertical/id %))) ranked)))
+
+(if next-one
+  (println (str "NEXT\t" (name (:vertical/id next-one))
+                "\t市場規模 " (:market/value next-one)
+                "\t" (str/join "," (:vertical/repos next-one))))
+  (println "NEXT\t(none)\t順位に入った行に床割れが無い"))
+
+;; **飛ばした問いを黙らない。**
+(println (str "NOT-MEASURED\tbiscuit-live\t"
+              "org-biscuitsec を読む段が無いので :authority/resource が実際に効いているかは測っていない"))
+(println (str "NOT-MEASURED\thyakka-claims\t"
+              "app-hyakka の台帳を読む段が無いので claim が出ているかは測っていない"))
+(when (seq @fleet-unmeasured)
+  (println (str "NOT-MEASURED\tfleet\t" (count @fleet-unmeasured)
+                " vertical の repo が checkout に無く fleet 側を測れていない: "
+                (str/join "," (sort (vec @fleet-unmeasured))))))
+(println "")
+
+(when (flag? "--findings")
+  (doseq [[sev k detail] @findings]
+    (println (str "FINDING\t" sev "\t" k "\t" detail))))
+
+;; evidence floor は単位（vertical）を含む。正の数だけでは「別の集合を数えた」を
+;; 検出できない。
+(println (str "SCANNED\t" (count verticals) "/" (count verticals) "\tvertical"))
+
+(when-not orgs-present?
+  (refuse! (str "orgs/cloud-itonami が無いので fleet 側を測れなかった: " orgs-dir)))
+
+(let [hard (count (remove #(= "info" (first %)) @findings))]
+  (println (str "RESULT\t" (if (zero? hard) "clean" "findings") "\thard=" hard
+                "\tinfo=" (- (count @findings) hard)))
+  (.exit js/process (if (zero? hard) 0 1)))

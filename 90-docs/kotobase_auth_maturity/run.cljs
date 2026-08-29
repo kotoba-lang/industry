@@ -1,0 +1,61 @@
+#!/usr/bin/env nbb
+;; Entry point for the kotobase auth/authz maturity measurement.
+;;
+;;   npx --yes nbb --classpath 90-docs 90-docs/kotobase_auth_maturity/run.cljs [--out FILE]
+;;   npx --yes nbb --classpath 90-docs 90-docs/kotobase_auth_maturity/run.cljs --probe stored.edn
+;;
+;; --probe scores a stored measurement without touching the network. That is
+;; what makes this judge testable: the same axes can be shown to go red and
+;; green against two hand-built probe maps, which is the only evidence that
+;; the scoring discriminates at all.
+;;
+;; Exit codes are three-valued on purpose:
+;;   0  every axis measured, no findings
+;;   1  every axis measured, findings present
+;;   2  at least one axis could not be measured -- REFUSING to report a score
+;;      as if it were complete. A check that could not run must not return
+;;      the value of a check that ran and found nothing wrong.
+(ns kotobase-auth-maturity.run
+  (:require [kotobase-auth-maturity.probe :as probe]
+            [kotobase-auth-maturity.audit :as audit]
+            [clojure.edn :as edn]
+            [clojure.string :as str]
+            [cljs.pprint :as pp]
+            ["fs" :as fs]))
+
+(defn- arg [args flag]
+  (second (drop-while #(not= flag %) args)))
+
+(defn -main [& args]
+  (let [stored (arg args "--probe")
+        p (if stored
+            (edn/read-string (str (fs/readFileSync stored "utf8")))
+            (probe/probe))
+        a (audit/audit p)
+        out (or (arg args "--out")
+                (when-not stored
+                  (str "90-docs/kotobase_auth_maturity/probe-"
+                       (subs (:probe/at p) 0 10) ".edn")))]
+    (println (str "kotobase auth/authz maturity — " (:probe/at p)))
+    (println (str "  overall        " (.toFixed (:overall a) 2) " / 100"
+                  "   (measured weight " (.toFixed (:measured-weight a) 2)
+                  " of " (.toFixed audit/total-weight 2) ")"))
+    (doseq [[pl v] (:by-plane a)]
+      (println (str "  " (str/join (repeat (max 0 (- 15 (count (name pl)))) " "))
+                    (name pl) "  " (if v (.toFixed v 2) "UNMEASURED"))))
+    (println)
+    (doseq [f (:findings a)]
+      (println (str "  [" (.toFixed (:headroom f) 3) "] " (name (:axis f))
+                    "\n        " (:finding f))))
+    (when (seq (:incomplete a))
+      (println (str "\n  UNMEASURED axes: " (str/join ", " (map name (:incomplete a))))))
+    (when out
+      (fs/writeFileSync out (with-out-str (pp/pprint {:probe p :audit a})))
+      (println (str "\n  wrote " out)))
+    (cond
+      (seq (:incomplete a)) (do (println "\n  REFUSING to report a complete score.") 2)
+      (seq (:findings a)) 1
+      :else 0)))
+
+(let [code (apply -main *command-line-args*)]
+  (set! (.-exitCode js/process) code))

@@ -1,0 +1,82 @@
+{:contract/id :murakumo/model-api-auth-v1
+ :contract/status :active
+ :contract/as-of "2026-08-29"
+ :contract/public-base-url "https://api.murakumo.cloud/v1"
+ :contract/default-model "murakumo-main"
+ :contract/source
+ {:worker "network-awai/local-murakumo"
+  :authn-worker "net-kotobase/control-plane/authn"
+  :identity-model "kotoba-lang/identity"
+  :webauthn "kotoba-lang/webauthn"
+  :capability-wire "kotoba-lang/org-chainagnostic-cacao"}
+ :contract/routes
+ [{:route "/v1/models"
+   :method :get
+   :authentication :anonymous
+   :authority :read-only-catalog}
+  {:route "/v1/chat/completions"
+   :method :post
+   :authentication #{:anonymous :passkey-session :murakumo-biscuit}
+   :anonymous-max-output-tokens 2048
+   :passkey-session-max-output-tokens 8192
+   :biscuit-max-output-tokens 32768
+   :biscuit-ttl-seconds 900
+   :biscuit-audience "https://api.murakumo.cloud"
+   :biscuit-requirements #{:signature :exact-model :inference-chat
+                           :output-ceiling :holder :account-did :expiry}
+   :authority :bounded-inference}
+  {:route "/v1/messages"
+   :method :post
+   :authentication :conditional-shared-token
+   :credentials #{:x-api-key :bearer}
+   :when-secret-unset :open
+   :authority :anthropic-compatible-inference}
+  {:route-pattern "/infer/{runs,spend,refund,models,plans,queue}"
+   :methods #{:post :put}
+   :authentication :capability-or-service
+   :credentials #{:cacao :service-bearer}
+   :cacao-requirements #{:valid-signature :current-time-window
+                         :issuer-equals-claimed-actor}}
+  {:route "/infer/transfer"
+   :method :post
+   :authentication :actor-capability-only
+   :credentials #{:cacao}
+   :service-bearer-accepted? false
+   :cacao-requirements #{:valid-signature :current-time-window
+                         :issuer-equals-sender :exact-transfer-resource
+                         :single-use-nonce}}]
+ :contract/current-identity
+ {:public-chat-passkey-verified? true
+  :passkey-rp "auth.murakumo.cloud"
+  :passkey-custody :server-custodied-passkey-gated
+  :inference-verification :cloudflare-service-binding
+  :public-chat-smart-contract-verified? false
+  :cacao-signature-suite :ed25519-did-key
+  :cacao-proves-passkey-ceremony? false
+  :erc4337-call-per-request? false
+  :erc1271-or-6492-call-per-request? false}
+ :contract/kotoba-model
+ {:principal :stable-chain-neutral-subject
+  :controller {:kind :passkey
+               :signature-suite :webauthn-p256
+               :status-requires-registration-evidence true}
+  :linked-account {:kind :smart-account
+                   :protocol :erc4337
+                   :verification #{:erc1271 :erc6492}
+                   :grants-capability-by-itself? false}
+  :deployment-status-for-murakumo-api :passkey-integrated-smart-account-pending}
+ :contract/target
+ {:flow [:webauthn-assertion
+         :verified-principal-controller
+         :optional-linked-smart-account-evidence
+         :short-lived-scoped-capability
+         :murakumo-admission]
+  :onchain-transaction-per-inference? false
+  :status :passkey-capability-deployed
+  :smart-account-status :owner-user-operation-and-chain-receipts-pending}
+ :contract/production-evidence
+ {:authn-worker-version "fd7bc41f-150a-4ffb-bca0-c5a63173b6ba"
+  :inference-worker-version "5e4d9ac6-52ce-4a67-8baf-297260b088b1"
+  :negative-paths #{:missing-session-401 :forged-biscuit-401}
+  :anonymous-generation :http-200-b70
+  :positive-passkey-user-ceremony :not-replayed-this-run}}

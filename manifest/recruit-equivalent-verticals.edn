@@ -1,0 +1,263 @@
+;; manifest/recruit-equivalent-verticals.edn
+;;
+;; リクルートが運営する SaaS / 情報サイトと同型の営みを、cloud-itonami の
+;; **既存の ISIC vertical repo** の上に設計・実装するための順序表。ADR-2608290100。
+;;
+;; ## 手で書く。生成物ではない
+;;
+;; ここに在るのは **政策**（どの営みを、どの順で、どの repo の上に建てるか）で
+;; あって観測ではない。`manifest/concept-vocabulary.edn` と同じ扱い —— repo の
+;; 中身から導出できないので手で書く。導出できる値（順位・被覆・現在地）は
+;; ここに持たず `scripts/recruit-vertical-tick.cljs` が毎回計算する。
+;;
+;; ## 順位は市場規模で決まる。その市場規模は 1 つの出所から採る
+;;
+;; ADR-2607252200 が isco-* に対して定めた規律をそのまま当てる:
+;;
+;;   - 出所・基準年・表番号・単位を **行ごとに** 持つ。持てない行は
+;;     `:market/status :unmeasured` で、**順位から外す**（0 で埋めない）。
+;;   - **基準（basis）が違う値を黙って 1 つの順位に混ぜない。** 混ざる行は
+;;     `:market/basis` が違うので、tick が別枠で数えて申告する。
+;;   - 同じ分類に落ちる行は **tie（同順）** として扱い、精度があるふりをしない。
+;;
+;; ⚠ **大分類（産業セクション）では順位を付けられない。** 実測 2026-08-29:
+;; カーセンサー相当を「卸売業，小売業」(480 兆円) で測ると全営みの 1 位になるが、
+;; それは卸売と小売の全部であって中古車の市場ではない。だから中分類・小分類の
+;; 表だけを使う。大分類の数字はこの表に載せない —— 載せれば誰かが使う。
+;;
+;; ## Air 系（Airレジ / Airペイ 等）をこの表に入れない理由
+;;
+;; リクルートの Air ビジネスツールズは**産業ではなく、上の営み全部に横断して
+;; 刺さる能力**（POS・決済・予約・シフト）である。ISIC の 1 class に対応しない
+;; ので市場規模を測る分母が無く、`:unmeasured` として入れると「測っていない
+;; だけでいずれ順位が付く」ように読める。cloud-itonami の語彙では capability
+;; であって vertical ではないので、`:capability/*` として別に宣言する。
+;;
+;; ## 出所（2 本とも同じ調査。基準は行ごとに `:market/basis` が言う）
+
+{:registry/id      "recruit-equivalent-verticals"
+ :registry/adr     "adr-2608290100-recruit-equivalent-verticals-on-cloud-itonami"
+ :registry/updated "2026-08-29"
+
+ ;; 出所の実体。行はここを `:market/source` で指す（値を行に複製しない）。
+ :registry/sources
+ {:census-service
+  {:publisher    "総務省統計局・経済産業省"
+   :survey       "令和3年経済センサス-活動調査"
+   :aggregation  "事業所に関する集計／産業別集計（サービス関連産業に関する集計）"
+   :document     "結果の概要"
+   :url          "https://www.meti.go.jp/statistics/tyo/census/r3result/pdf/r03_service_giy.pdf"
+   :retrieved-at "2026-08-29T10:19Z"
+   :sha256       "e945b33dd9832ac7b137d6aab281f58334f2ee60b604a03152eb784cc3eeced1"
+   :unit         :million-jpy
+   :reference-year 2020}
+
+  :census-retail
+  {:publisher    "総務省統計局・経済産業省"
+   :survey       "令和3年経済センサス-活動調査"
+   :aggregation  "産業別集計（卸売業，小売業に関する集計）法人"
+   :document     "結果の概要"
+   :url          "https://www.stat.go.jp/data/e-census/2021/kekka/pdf/oroshikouri_outline.pdf"
+   :retrieved-at "2026-08-29T10:20Z"
+   :sha256       "631ee5f410f20abb9b24cf1bb4b9f71a7e451d62f0341a7f8192226358b84628"
+   :unit         :million-jpy
+   :reference-year 2020}}
+
+ ;; 抽出が正しいことを、文書自身の本文と突き合わせて確かめた記録。
+ ;; CLAUDE.md「最低 2 つの出所を 1 件ずつ突き合わせる」に対する答え。
+ ;; 表から機械抽出した値と、同じ文書の散文が述べる値が一致したものだけを載せる。
+ :registry/parse-crosscheck
+ [{:table "表Ⅰ-1（産業横断的集計）" :label "卸売業，小売業"
+   :parsed 480167887 :prose "480兆1679億円" :agrees? true}
+  {:table "表Ⅰ-1（産業横断的集計）" :label "製造業"
+   :parsed 387060638 :prose "387兆606億円" :agrees? true}
+  {:table "表Ⅰ-1（産業横断的集計）" :label "医療，福祉"
+   :parsed 173336912 :prose "173兆3369億円" :agrees? true}]
+
+ ;; ---------------------------------------------------------------------------
+ ;; vertical: 産業に対応し、市場規模で順位が付くもの
+ ;; ---------------------------------------------------------------------------
+ :registry/verticals
+ [{:vertical/id       :sumai
+   :vertical/label    "住まい"
+   :vertical/recruit-analogue ["SUUMO" "SUUMOカウンター" "SUUMOジャーナル"]
+   :vertical/jsic     [{:code "68" :name "不動産取引業"}
+                       {:code "69" :name "不動産賃貸業・管理業"}]
+   :vertical/isic     ["6810" "6820"]
+   :vertical/repos    ["orgs/cloud-itonami/cloud-itonami-isic-6810"
+                       "orgs/cloud-itonami/cloud-itonami-isic-6820"]
+   :market/status     :measured
+   :market/value      39596033
+   :market/components [{:code "68" :value 16183927} {:code "69" :value 23412106}]
+   :market/basis      "売上高"
+   :market/source     :census-service
+   :market/table      "表Ⅰ-2 産業分類別売上高"
+   :authority/resource "kotoba://itonami/vertical/sumai"
+   :hyakka/subject    "itonami:vertical/sumai"}
+
+  {:vertical/id       :chuko-sha
+   :vertical/label    "中古車"
+   :vertical/recruit-analogue ["カーセンサー" "カーセンサーnet"]
+   :vertical/jsic     [{:code "591" :name "自動車小売業"}]
+   :vertical/isic     ["4510"]
+   :vertical/repos    ["orgs/cloud-itonami/cloud-itonami-isic-4510"]
+   :market/status     :measured
+   :market/value      16586900
+   :market/basis      "年間商品販売額"      ; ← service 表の「売上高」とは基準が違う
+   :market/source     :census-retail
+   :market/table      "第4表 小売業の産業小分類別年間商品販売額"
+   :market/caveat     "小売全体の 12.4%。新車・中古車・部品を含む『自動車小売業』であり、中古車だけの数字ではない。"
+   :authority/resource "kotoba://itonami/vertical/chuko-sha"
+   :hyakka/subject    "itonami:vertical/chuko-sha"}
+
+  {:vertical/id       :inshoku
+   :vertical/label    "飲食"
+   :vertical/recruit-analogue ["ホットペッパーグルメ" "レストランボード"]
+   :vertical/jsic     [{:code "76" :name "飲食店"}]
+   :vertical/isic     ["5610"]
+   :vertical/repos    ["orgs/cloud-itonami/cloud-itonami-isic-5610"]
+   :market/status     :measured
+   :market/value      13027204
+   :market/basis      "売上高"
+   :market/source     :census-service
+   :market/table      "表Ⅰ-2 産業分類別売上高"
+   :authority/resource "kotoba://itonami/vertical/inshoku"
+   :hyakka/subject    "itonami:vertical/inshoku"}
+
+  {:vertical/id       :shigoto
+   :vertical/label    "仕事"
+   :vertical/recruit-analogue ["Indeed" "リクナビ" "タウンワーク" "リクルートエージェント"
+                               "リクルートダイレクトスカウト" "リクルートスタッフィング"]
+   :vertical/jsic     [{:code "91" :name "職業紹介・労働者派遣業"}]
+   :vertical/isic     ["7810" "7820" "7830"]
+   :vertical/repos    ["orgs/cloud-itonami/cloud-itonami-isic-7810"
+                       "orgs/cloud-itonami/cloud-itonami-isic-7820"
+                       "orgs/cloud-itonami/cloud-itonami-isic-7830"]
+   :market/status     :measured
+   :market/value      7482002
+   :market/basis      "売上高"
+   :market/source     :census-service
+   :market/table      "表Ⅰ-2 産業分類別売上高"
+   :market/caveat     "職業紹介と労働者派遣の合計。求人メディアの広告収入はここではなく 73 広告業に落ちる。"
+   :authority/resource "kotoba://itonami/vertical/shigoto"
+   :hyakka/subject    "itonami:vertical/shigoto"}
+
+  {:vertical/id       :biyo
+   :vertical/label    "美容"
+   :vertical/recruit-analogue ["ホットペッパービューティー" "サロンボード"]
+   :vertical/jsic     [{:code "78" :name "洗濯・理容・美容・浴場業"}]
+   :vertical/isic     ["9602"]
+   :vertical/repos    ["orgs/cloud-itonami/cloud-itonami-isic-9602"]
+   :market/status     :measured
+   :market/value      4517543
+   :market/basis      "売上高"
+   :market/source     :census-service
+   :market/table      "表Ⅰ-2 産業分類別売上高"
+   :market/caveat     "洗濯業・浴場業を含む中分類。理容・美容だけの数字ではない。"
+   :authority/resource "kotoba://itonami/vertical/biyo"
+   :hyakka/subject    "itonami:vertical/biyo"}
+
+  {:vertical/id       :tabi
+   :vertical/label    "旅"
+   :vertical/recruit-analogue ["じゃらんnet" "じゃらんゴルフ"]
+   :vertical/jsic     [{:code "75" :name "宿泊業"}]
+   :vertical/isic     ["5510" "7911"]
+   :vertical/repos    ["orgs/cloud-itonami/cloud-itonami-isic-5510"
+                       "orgs/cloud-itonami/cloud-itonami-isic-7911"]
+   :market/status     :measured
+   :market/value      3833540
+   :market/basis      "売上高"
+   :market/source     :census-service
+   :market/table      "表Ⅰ-2 産業分類別売上高"
+   :market/caveat     "宿泊業のみ。旅行代理店(7911)の取扱額は別の分類で、この数字に含まれない。"
+   :authority/resource "kotoba://itonami/vertical/tabi"
+   :hyakka/subject    "itonami:vertical/tabi"}
+
+  {:vertical/id       :manabi
+   :vertical/label    "学び"
+   :vertical/recruit-analogue ["スタディサプリ" "スタディサプリ進路" "スタディサプリ for SCHOOL"]
+   :vertical/jsic     [{:code "82" :name "その他の教育，学習支援業"}]
+   :vertical/isic     ["8542" "8549"]
+   :vertical/repos    ["orgs/cloud-itonami/cloud-itonami-isic-8542"
+                       "orgs/cloud-itonami/cloud-itonami-isic-8549"]
+   :market/status     :measured
+   :market/value      3576880
+   :market/basis      "売上高"
+   :market/source     :census-service
+   :market/table      "表Ⅰ-2 産業分類別売上高"
+   :market/caveat     "81 学校教育はこの調査の集計対象外。学習塾・教養技能教授業などの民間部分だけ。"
+   :authority/resource "kotoba://itonami/vertical/manabi"
+   :hyakka/subject    "itonami:vertical/manabi"}
+
+  {:vertical/id       :kekkon
+   :vertical/label    "結婚"
+   :vertical/recruit-analogue ["ゼクシィ" "ゼクシィ縁結び" "ゼクシィ縁結びエージェント"]
+   :vertical/jsic     [{:code "79B" :name "結婚式場業"}]
+   :vertical/isic     ["9609"]
+   :vertical/repos    ["orgs/cloud-itonami/cloud-itonami-isic-9609"]
+   :market/status     :measured
+   :market/value      298491
+   :market/basis      "売上高"
+   :market/source     :census-service
+   :market/table      "表Ⅱ-1 「冠婚葬祭業」における産業小分類別事業所数、売上高"
+   :market/caveat     "結婚式場業のみ。婚活サービス・指輪・旅行など周辺市場を含まない。"
+   :authority/resource "kotoba://itonami/vertical/kekkon"
+   :hyakka/subject    "itonami:vertical/kekkon"}]
+
+ ;; ---------------------------------------------------------------------------
+ ;; capability: 産業ではなく、vertical に横断して刺さる能力。順位を付けない
+ ;; ---------------------------------------------------------------------------
+ :registry/capabilities
+ [{:capability/id     :choba
+   :capability/label  "帳場（POS・決済・予約・シフト）"
+   :capability/recruit-analogue ["Airレジ" "Airペイ" "Airリザーブ" "Airシフト"
+                                 "Airメイト" "Airワーク採用管理"]
+   :capability/serves [:inshoku :biyo :tabi :sumai :chuko-sha]
+   :market/status     :not-applicable
+   :market/why        "ISIC の 1 class に対応しない。分母が無いので順位を付けない（測っていないのではない）。"
+   :authority/resource "kotoba://itonami/capability/choba"}]
+
+ ;; ---------------------------------------------------------------------------
+ ;; biscuit — 委譲の wire。判定器は kotoba-lang/authority ただ 1 つ
+ ;; ---------------------------------------------------------------------------
+ ;;
+ ;; ⚠ **現在地: どの経路も biscuit を使っていない**（`manifest/concept-vocabulary.edn`
+ ;; の :delegation 項、ADR-2608180200）。live なのは CACAO 自己発行で、biscuit の
+ ;; wire 相互運用（protobuf）は書かれていない。だからこの節は **設計であって観測では
+ ;; ない**。
+ ;;
+ ;; ⚠ **tick はこれが live かを測らない。** org-biscuitsec を読む段を持たないので、
+ ;; 検査できるのは「`:authority/resource` が下の `:scheme` に乗っているか」だけ。
+ ;; live かどうかは毎回 `NOT-MEASURED biscuit-live` として出力に明示する ——
+ ;; **測っていないことを、測って問題が無かったことと同じ顔にしない**（CLAUDE.md の
+ ;; 6 問の 4 番目）。live 化の段で、その検査をここに足すこと。
+ :registry/authority
+ {:decider      "kotoba-lang/authority"
+  :decider-note "判定は 1 つ。biscuit も CACAO も UCAN も ->grant で inert data に落ちてから決定に入る（ADR-2608180200）。ここで 2 つ目の判定器を作らない。"
+  :wire         "kotoba-lang/org-biscuitsec"
+  :scheme       "kotoba://itonami/{vertical|capability}/<id>[/<op>]"
+  :root-key     {:where "biscuit.rootkey 署名回転ログ"
+                 :why   "検証に秘密が要らず edge で検証できる。webvh を root key の authority にしない（ADR-2608039000）。"}
+  :ops          [{:op :read    :who "誰でも" :attenuation "なし"}
+                 {:op :propose :who "vertical の bot" :attenuation "その vertical の resource に限定"}
+                 {:op :publish :who "governor を通った提案のみ" :attenuation "1 提案 1 token・使い切り"}]
+  :invariant    "bot が持つのは propose までで publish は持たない。governor を迂回できる token を発行しない。"}
+
+ ;; ---------------------------------------------------------------------------
+ ;; wiki.kotobase.net（hyakka）との同期
+ ;; ---------------------------------------------------------------------------
+ ;;
+ ;; 正本は network-awai/app-hyakka の knowledge/ledger/**/*.datoms.edn（append-only）。
+ ;; この registry は claim を**書かない** —— 何を claim として出すかの契約だけを持つ。
+ ;; 射影（5 表）は scripts/hyakka-datalake-export.cljs が既に持っている。
+ :registry/hyakka
+ {:ledger-root  "knowledge/ledger"
+  :repo         "orgs/network-awai/app-hyakka"
+  :properties   [{:property "itonami:market-size"    :from :market/value
+                  :qualifiers [:source-url :retrieved-at :source-sha256 :basis :reference-year]}
+                 {:property "itonami:jsic-class"     :from :vertical/jsic}
+                 {:property "itonami:isic-class"     :from :vertical/isic}
+                 {:property "itonami:recruit-analogue" :from :vertical/recruit-analogue}]
+  :extractor    "deterministic"
+  :extractor-note "この registry から出る claim は決定論的コネクタが書く。LLM 抽出と混ぜない —— hyakka の qualifiers は extractor 列でこの 2 つを分けており、ADR-2608271450 の事故（抽出が死んでいるのに wiki が育つ）はその列でしか見分けられない。"
+  :invariant    "claim には必ず出所 URL と retrieved-at と source-sha256 を付ける。付けられない値は claim にしない。"}}

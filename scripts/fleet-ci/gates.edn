@@ -3647,5 +3647,41 @@
    :org "kotoba-lang" :gate :nbb-script
    :script "gates/kotoba-crypto-boundary-coverage.cljs"
    :include-ext [".edn" ".cljs" ".md"] :min-files 50 :cd false}
+  ;; ---- the first credential-free step off the workstation ----------------
+  ;;
+  ;; root ADR-2608300100 decision 1: the hyakka resident's heavy steps are
+  ;; credential-free (ingest / catalog / test / build) while only publish and
+  ;; deploy need keys, so the load split runs along that boundary rather than
+  ;; moving the whole resident. This is that split's first step, and it was
+  ;; chosen because `scripts/generate_catalog.cljs` has ZERO third-party
+  ;; requires (node builtins only) and reads 18MB of committed ledgers — a
+  ;; :node cap is the whole requirement.
+  ;;
+  ;; What it proves: the catalogue wiki.kotobase.net serves is byte-identical
+  ;; to what its ledgers generate. Measured 2026-08-30 on the same
+  ;; :include-ext-filtered tree the fleet ships, all four directions:
+  ;;   unmodified                    -> exit 0
+  ;;   one ledger added, not rebuilt -> exit 1, "the INPUTS changed"
+  ;;   catalog body hand-edited      -> exit 1, "edited by hand"
+  ;;   --min above the real count    -> exit 1, evidence floor
+  ;; plus the refuse path (exit 2) observed live when the first draft read the
+  ;; wrong field: it declined to answer instead of reporting a green.
+  ;;
+  ;; ⚠ This gate REWRITES src/hyakka/catalog.cljc in the tree it runs on. That
+  ;; is correct on a node (a fresh tarball per run) and is why it must not be
+  ;; pointed at a working checkout.
+  ;;
+  ;; Floors are under the measured values (454 ledgers, 1008 shipped files) so
+  ;; a truncated ship or a half-run cannot report green. Both grow over time;
+  ;; the resident adds a ledger per tick.
+  ;;
+  ;; :cd false until it has a green receipt of its own, per this file's own
+  ;; standard.
+  {:name "app-hyakka" :id "hyakka-catalog-freshness" :org "network-awai"
+   :gate :nbb-script
+   :script "gates/hyakka-catalog-freshness-check.cljs"
+   :script-args ["--min" "400"]
+   :include-ext [".cljs" ".edn" ".cljc"]
+   :min-files 900 :cd false}
   ;; ────────────────────────────────────────────────────────────────────────
   ]}
