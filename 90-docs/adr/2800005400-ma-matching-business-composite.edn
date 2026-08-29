@@ -164,6 +164,39 @@ ADR-2608136000 が数えた「測れなかった検査が、測って問題が�
 第 1 反復の結果、`NEXT` は `stage-owner` → **`matching-runtime`** へ進んだ。
 次に bots が作るのは、この事業の本体である突き合わせの runtime である。
 
+## レビューで見つけて直した 5 件（2026-08-29、merge 前）
+
+自分の diff を敵対的に読み直したところ、**5 件とも「測れなかったものが緑になる」側**
+だった。この ADR が防ぐと言っている当のクラスを、その実装の中に作っていた。
+5 件とも**直す前に赤くなる場面を作って実測**してから直した。
+
+| # | 欠陥 | 旧挙動 | 現挙動 |
+|---|---|---|---|
+| 1 | 床の畳み方が :unmeasured を :ok に落としていた | 7 本中 6 本が測れず 1 本だけ通った周が **ok** | :broken > :unmeasured > :ok の 3 段で畳み、測れなかった repo を名指し |
+| 2 | 構成表の `:business/floors` を tick が読んでいなかった | 名簿は 5 床、出力は 4 床。`checkout` は誰も計算していない | 床の**順序も集合も構成表が決める**。実装の無い床は `:floor-not-implemented` として出す（黙って落とさない） |
+| 3 | dangling owner の照合に `:repo/role :none` を含めていた | 誤配置の記録として載せてある isic-6619 に stage を割り当てると**緑**（一度も測られないのに） | 測定対象の集合で照合し `:owner-not-a-constituent` |
+| 4 | os.edn の照合が引用符トークンを無差別に拾っていた | os.edn のどこかに同じ文字列が在るだけで宣言済み。2 文字の `ma` が特に危険 | `orgs/cloud-itonami/<name>` パス形か、`repo`/`path` を含む key の値だけ。外れたときに出るのは false red |
+| 5 | loop が tick の起動失敗を成功と同じに扱っていた | `(= 2 code)` だけを見ていたので、tick が一度も走らなかった周に**前周の古い ledger の `:next`** でモデルを起こしていた | `0` 以外はすべて skip。`:tick-could-not-measure` と `:tick-did-not-run` を分けて記録 |
+
+実測（それぞれ、その理由だけで動くことを確認した）:
+
+```
+N1a 全 repo を標準形に直す                    standard-form ok
+N1b そこから checkout を 1 本外す              standard-form unmeasured{6910}   ← 旧版は ok
+N2  stage を isic-6619（:role :none）に割当    stage-owner broken{:owner-not-a-constituent}
+N3  構成表に実装の無い床を 1 つ足す            revenue-signal unmeasured{:floor-not-implemented}
+N4a repo 名を repo 位置**以外**に置いた os.edn os-declared broken（7 本とも）  ← 旧版は全部 ok
+N4b :vertical/repo の値として置く               os-declared ok
+N4c orgs/cloud-itonami/<name> のパス形          os-declared ok
+N5  tick が起動できない + 古い ledger に :next  skipped{:tick-did-not-run :exit 1}  ← 旧版は起こしていた
+M5c working tree は宣言、origin/main は未宣言   broken のまま（regression 再確認）
+```
+
+⚠ **4 の照合は本物の os.edn に一度も当てていない。** `network-awai/cloud-itonami` は
+private でこの session から読めないため、当てたのは合成した os.edn だけである。
+実ファイルが `repo` / `path` を含まない key で宣言していれば **false red** が出る
+——見えて直せる側の失敗を選んだ、という判断であって、当てて確かめた結果ではない。
+
 ## Consequences
 
 - **事業が 1 つの対象として測れるようになった。** 2026-08-29 の実測値（fixture 上）は
