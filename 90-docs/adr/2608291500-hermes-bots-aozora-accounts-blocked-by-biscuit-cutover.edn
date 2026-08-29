@@ -1,0 +1,52 @@
+[{:db/id -1
+  :adr/id "adr-2608291500-hermes-bots-aozora-accounts-blocked-by-biscuit-cutover"
+  :adr/title "ADR-2608291500: Hermes bot ごとの aozora.app アカウント — 鋳造・登録・pulse を landed、投稿は kotobase Biscuit-required 切替で全面 BLOCKED（実測）"
+  :adr/status "accepted"
+  :adr/date "2026-08-29"
+  :adr/body "# ADR-2608291500: Hermes bots の aozora.app アカウント整備と、それを止めている kotobase の Biscuit 切替
+
+## オーナー指示（2026-08-29）
+
+「今の cloud-itonami, bots, itonami cli で オントロジーを wiki.kotobase.net に保存していく bots はある? また bots がそれぞれ aozora.app でもアカウントを web3, passkey smartcontract ベースで 自律的に情報の更新投稿もするように整えて.」
+
+前半の答えは **在る**: `scripts/hermes-hyakka-bots/` の `hyakka-ontology-scout`（毎 30 分、corpus が語れず拒否された property だけを ontology 提案にする）と `hyakka-source-scout` が wiki.kotobase.net (= `network-awai/app-hyakka`) を育てており、同型の `itonami-ingest-scout` / `itonami-coverage-scout` / `kotoba-migration-scout` / `vuln-coverage-scout` / `osm-coverage-scout` が動いている（roster は `~/.hermes/cron/jobs.json` が正、実測 2026-08-29 時点 9 job）。
+
+## 実装した（scripts/hermes-bots-aozora/）
+
+- `aozora_core.cljc` — handle 規則 `<job-name>.aozora.app`、Keychain service `aozora.app/actor-seed/<handle>`（fabric actor と同じ名前空間）、pulse 文、exit 契約（0=handled/BLOCKED-with-banner、1=local failure、2=REFUSED）。roster は jobs.json から毎回導出（two-name-horizon 対策。hermes-hyakka-bots README 2026-08-28 の実測）。
+- `register.cljs` — seed を **先に** Keychain へ（network 前）→ createSession 先行（yukkuri の account-bootstrap-order）→ 未登録なら createAccount → profile + 初投稿。**このPDSでは createSession は自己主権で、どの validly-signed did:key でも通る** — session-ok は登録の証明にならないので resolveHandle で 3 値判定（bound / unbound / unverifiable）。
+- `pulse.cljs` + `aozora_pulse.py` — 日次で bot ごとに jobs.json の実測値だけを投稿する決定論 receipt（モデル無し）。Hermes no-agent job `bots-aozora-pulse` として運用。
+- CACAO は `org-chainagnostic-cacao` の `cacao.core`（.cljc、nbb で動作確認済み）。npm 依存ゼロ、classpath は cacao/authority/org-ietf-ed25519/org-ietf-cbor の 4 src。
+
+**9 bot 全ての Ed25519 seed を鋳造し login Keychain に custody 済み**（2026-08-29）。did:key は register 実行 receipt にある（例: hyakka-ontology-scout = did:key:z6MkmCudvmUdKrwzACcBiqu5gfN7thB1LFbXx1F9F9tDJ8wR）。
+
+## しかし投稿・登録は 9/9 BLOCKED（実測 2026-08-29）
+
+`createRecord` / `createAccount` / `resolveHandle` すべて `transact 401 / datoms 401 {\"ok\":false,\"error\":\"Unauthorized\"}`。原因の連鎖を全て実測で辿った:
+
+1. `pds.aozora.app`（app-aozora-pds worker）は生きており createSession は 200。OPERATOR_SECRET も設定されている（wrangler secret list 実測）。
+2. PDS の datom 書き込み/読みは `kotobase.net /xrpc/ai.gftd.apps.kotobase.datomic.*` に行く。この面は worker `net-kotobase`（kotobase-api-gateway）が受け、`datoms.kotobase.net` = worker `kotobase-cf-wasm-staging`（engine、同一 Cloudflare account 4da88288）へ proxy する（zone custom-domain 実測）。
+3. gateway の viewer 解決（CACAO 検証）は**生きている** — 同じ operator CACAO で `/v1/audit` は 200 を返し tenant が解決される。checkout の `edge-cacao/verify-cacao-identity-chain` をローカル nbb で回しても受理（deploy 時点 commit の写しでも受理）。
+4. 落ちるのは datomic proxy の先。engine の live binding が（Cloudflare API 実測）:
+   - `KOTOBASE_BISCUIT_AUTH_MODE = required`
+   - `KOTOBASE_READ_OWNER_BINDING = strict`
+   - `KOTOBASE_READ_AUDIT_MODE = required`
+   つまり **通常 tenant data plane は Biscuit 必須**（net-kotobase/control-plane ADR-2608261300 + ADR-2608280230、2026-08-26〜28 に本番適用）。CACAO しか話さない caller は全滅する。**bot 固有ではない** — 新規ランダム did:key でも同じ 401（実測）。
+5. `orgs/network-awai/app-aozora-engine` に Biscuit 対応は 1 行も無い（grep + branch 一覧実測）。ADR-2608280230 の切替条件『first-party clients が全て Biscuit を使っていることを receipt で確認してから required へ』に対し、aozora PDS は未移行の first-party client であり、切替がこれを黙って落とした。8/14 の data-loss cutover（wrangler.jsonc の警告コメント）と同型の『切替はしたが依存を運ばなかった』。
+
+副次実測: aozora の operator seed は kagi item `aozora-d1-operator-secret`（compartment gftdcojp）にあり、そこから導出した did:key は PDS wrangler の `YORO_OPERATOR_DID` と一致する。runbook が言う item 名 `aozora OPERATOR_SECRET` は kagi に**無い**（stale）。
+
+## 復旧の選択肢（オーナー判断待ち）
+
+- **A. aozora PDS の Biscuit 移行（推奨・正道）**: authn (`auth.kotobase.net`) に aozora operator の tenant + service account を作り、`POST /v1/biscuit/token` で短命 Biscuit を取得して kotobase.client の datomic 呼び出しに `Authorization: Biscuit` を載せる。`KOTOBASE_READ_OWNER_BINDING=strict` のため、yoro-social-v2 と per-actor graph の owner marker がその tenant DID に bind されている必要もある（legacy claim は『db_name を保持し canonical-graph(viewer DID, db_name) が一致する』場合のみ）。app-aozora-engine + kotobase-client の実装作業。
+- **B. engine を `KOTOBASE_BISCUIT_AUTH_MODE=prefer` に戻す**: 即座に全 CACAO caller が復活するが、accepted な security cutover（ADR-2608280230）の巻き戻し。agent 判断ではやらない。
+- どちらでも、こちら側のスクリプトは**無変更で**動き出す（seed 済み・BLOCKED banner が自動的に posted に変わる）。
+
+## passkey / smartcontract の現在地（誇張しない）
+
+- passkey は aozora では**人間の儀式**（`auth.aozora.app` worker、live。WebAuthn 検証は kotoba-lang/webauthn。passkey は署名鍵ではなく session JWT を買う）。bot に適用できるのは passkey-PRF による seed wrap（ADR-2607022330、`pds/keylink.cljc` — client 側未実装の follow-up）。
+- smart contract は `kotoba-lang/base-l2`（ERC-4337 sponsored write + MST-root anchor、pure clj）と `cloud-itonami-app` の `smart_account.cljc`（Coinbase Smart Wallet v1.1 / WebAuthn P-256）が実在するが、**aozora auth への統合はゼロ**（grep + live 実測 2026-08-29）。bot アカウントの MST root を Base L2 に anchor するかは別の決定として起こす。
+
+## 関連
+
+ADR-2607031400（one blueprint = one actor）、ADR-2607161930（cloud-itonami distribution actors の先例）、ADR-2607032700（per-actor rollout）、ADR-2608150100（aozora D1 退役と data loss）、net-kotobase/control-plane ADR-2608261300 / ADR-2608280230（Biscuit primary / required 切替）。"}]
