@@ -60,10 +60,21 @@ D1 は appview（`orgs/network-awai/club-shinshi-app/appview/ai-gftd-wasm-shinsh
   比較する。実測: backfill 後 resolveHandle→did:key / describeRepo
   `handleIsCorrect:true` / listRecords 2 件 / AppView getAuthorFeed・getProfile
   とも handle 指定で 200。
-- **discover feed は依然 hang する**（2026-08-14 の kotobase.net cutover 以来
-  relay projection が運ばれていない。匿名でも Biscuit でも同じ = Biscuit 起因
-  ではない）。AppView 側はこれを**期限付き**にしたので、discovery graph に
-  fallback する route が巻き添えで hang することは無くなった。
+- **discover feed は依然返らない。原因はここに 2 回書いた「relay projection が
+  運ばれていない」ではなく、逆である**（2026-08-29 実測、ADR-2608170500 に
+  再測定を追記）。relay-bsky グラフは**読めないほど大きい** ——
+  kotobase が `504 UpstreamTimeout` を返し、`limit:3` でも同じなので query では
+  なくグラフの性質。そして全 relay ingest tick の第 1 手（`getResumePlan`）が
+  その読みなので、**取り込みは自分で自分を止めていて、グラフは増えていない**。
+  150 秒返らないのも hang ではなく、**25 秒の upstream timeout が 6 本直列**
+  （view → 全 DB scan、それぞれ `with-retry` が 504 を transient として 3 回）。
+  worker の cpuTime は 12ms —— CPU は一切使っていない。
+  **本当の修正は ADR-2608170500 が既に特定済み**（limit を scan の停止条件に
+  する。prolly-tree / kotobase-peer には landed、live worker
+  `kotobase-cf-wasm-staging` の peer pin が未前進）。AppView 側の緩和として、
+  discovery グラフの読みは期限付きで `UpstreamUnavailable` を返す ——
+  **空 feed は返さない**（読めないことと空であることは別の事実で、
+  空 feed を返すと読み手がそれを区別できなくなる）。
 - **画像 API は mk1 token（`MURAKUMO_API_KEY`）が要る**。無ければ UPSTREAM
   受領で止まり、投稿は既存 scene 画像を embed する。動画は
   `generation.murakumo.cloud` を使わない（402/billing — skill
