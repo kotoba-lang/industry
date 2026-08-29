@@ -77,6 +77,60 @@
   []
   (->long (call :support-cost-jpy [])))
 
+
+;; --- record arguments -------------------------------------------------------
+;; A record crosses the entry boundary as `[<resolved descriptor> field …]` in
+;; DECLARED order. The order is read out of the ARTIFACT rather than written down
+;; here a second time: a host copy of the field order is exactly the kind of
+;; duplicate that goes wrong silently when the guest's declaration changes.
+
+(defn schema
+  "The resolved `[:record name fields]` descriptor for `:d/report` and friends."
+  [ref-kw]
+  (or (get (:schemas triage-core) ref-kw)
+      (throw (ex-info "shipped core declares no such schema" {:ref ref-kw}))))
+
+(defn record
+  "Build a guest record argument from a field map, ordering the values by the
+  artifact's own declaration."
+  [ref-kw field-map]
+  (let [descriptor (schema ref-kw)
+        fields (nth descriptor 2)]
+    (into [descriptor]
+          (map (fn [[field _type]]
+                 (str (get field-map field ""))))
+          fields)))
+
+;; --- the member-authored filings -------------------------------------------
+;; Each one states, in the guest, that it is member-authored, needs the member's
+;; signature, cost ¥0 and is unsubmitted. Those four are not host options.
+
+(defn yen [n] (call :yen [(->long (or n 0))]))
+
+(defn damage-report
+  [{:keys [subject station kind occurred narrative loss-jpy]}]
+  (call :damage-report
+        [(record :d/report {:subject subject :station station :kind kind
+                            :occurred occurred :narrative narrative})
+         (->long (or loss-jpy 0))]))
+
+(defn incident-statement
+  "`timeline` is the member's own list of events, already one per line: what they
+  typed is tabulated by the host, the document around it is the guest's."
+  [{:keys [subject timeline discovery current]}]
+  (call :incident-statement [(str subject) (str timeline) (str discovery) (str current)]))
+
+(defn evidence-index [{:keys [subject rows n]}]
+  (call :evidence-index [(str subject) (str rows) (->long (or n 0))]))
+
+(defn damage-calculation [{:keys [subject lines total]}]
+  (call :damage-calculation [(str subject) (str lines) (->long (or total 0))]))
+
+(defn bank-freeze-request [{:keys [subject bank occurred counterparty loss-jpy]}]
+  (call :bank-freeze-request
+        [(str subject) (str bank) (str occurred) (str counterparty)
+         (->long (or loss-jpy 0))]))
+
 (defn recovery-plan
   "アカウント復旧手順書 — the member executes it; 助 never logs in for them."
   [service]

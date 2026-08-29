@@ -100,3 +100,46 @@
       (is (some? e))
       (is (re-find #"arg" (str (ex-message e)))
           (str "unexpected refusal reason: " (ex-message e))))))
+
+(deftest yen-groups-digits
+  (is (= "0" (o/yen 0)))
+  (is (= "999" (o/yen 999)))
+  (is (= "1,000" (o/yen 1000)))
+  (is (= "1,234,567" (o/yen 1234567)))
+  (is (= "-1,234" (o/yen -1234))))
+
+(deftest filings-carry-the-charter
+  (testing "every filing states member-authored / signed / free / unsubmitted —
+            these are guest text, so no host argument can drop them"
+    (doseq [[label doc]
+            [["被害届" (o/damage-report {:subject "" :station "" :kind "phishing"
+                                         :occurred "" :narrative "" :loss-jpy 0})]
+             ["被害状況報告書" (o/incident-statement {:subject "" :timeline "" :discovery "" :current ""})]
+             ["証拠目録" (o/evidence-index {:subject "" :rows "" :n 0})]
+             ["被害額算定書" (o/damage-calculation {:subject "" :lines "" :total 0})]
+             ["銀行組戻し" (o/bank-freeze-request {:subject "" :bank "" :occurred ""
+                                                   :counterparty "" :loss-jpy 0})]]]
+      (is (.contains ^String doc "本人作成・要署名・費用 ¥0・未提出") label))))
+
+(deftest blanks-become-fill-in-markers-not-empty-lines
+  (let [d (o/damage-report {:subject "" :station "" :kind "account-takeover"
+                            :occurred "" :narrative "" :loss-jpy 0})]
+    (is (.contains ^String d "（被害者氏名）"))
+    (is (.contains ^String d "（管轄）警察署長 殿"))
+    (is (.contains ^String d "（年月日時を記入）"))
+    (is (.contains ^String d "（事実を時系列で記入。別紙「被害状況報告書」参照）")
+        "a blank must read as a field to fill in, never as a document that says nothing")))
+
+(deftest guest-vocabulary-equals-the-ontology
+  (testing "the drift-lock tasuke's app/index.html carried as a grep over
+            `const SCAM_KINDS = [...]`, restated against the GUEST. Every kind the
+            ontology declares must classify, route to a free window, and warrant
+            documents — a kind the guest cannot answer for is a hole in routing."
+    (doseq [kind ["phishing" "unauthorized-transfer" "account-takeover" "support-scam"
+                  "romance-scam" "investment-scam" "ransomware" "impersonation"
+                  "fake-billing" "sns-fraud" "leak-extortion"]]
+      (is (= kind (o/classify "" kind)) (str kind " is a known kind"))
+      (is (seq (o/windows kind)) (str kind " routes to at least one free window"))
+      (is (<= 3 (count (o/actions kind))) (str kind " has a first-response checklist"))
+      (is (<= 4 (count (o/documents-for-kind kind 0))) (str kind " warrants the police core"))
+      (is (not= kind (o/ja-kind kind)) (str kind " has a Japanese name")))))

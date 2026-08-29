@@ -26,6 +26,13 @@
    :service   ""
    :account   ""
    :occurred  ""
+   :subject   ""
+   :station   ""
+   :bank      ""
+   :counterparty ""
+   :timeline  ""
+   :discovery ""
+   :current   ""
    :evidence  []
    :done      #{}})
 
@@ -84,6 +91,49 @@
 (rf/reg-sub
  :recovery-plan
  (fn [db _] (oracle/recovery-plan (:service db))))
+
+(defn- evidence-rows
+  "The 証拠目録's rows. The member's own items are TABULATED here and the document
+  around them is the guest's — that is the seam, stated so it is not mistaken for
+  the rules living in two places."
+  [items]
+  (->> items
+       (map-indexed (fn [i it]
+                      (str "  " (inc i) ". [" (:kind it) "] sha256="
+                           (subs (:sha256 it) 0 16) "… ref=" (:label it))))
+       (clojure.string/join "\n")))
+
+(rf/reg-sub
+ :filings
+ (fn [db _]
+   (let [loss (parse-yen (:loss db))
+         subject (:subject db)
+         kind (oracle/classify (:narrative db) (:explicit db))]
+     {"damage-report"
+      (oracle/damage-report {:subject subject :station (:station db) :kind kind
+                             :occurred (:occurred db) :narrative (:narrative db)
+                             :loss-jpy loss})
+      "incident-statement"
+      (oracle/incident-statement {:subject subject :timeline (:timeline db)
+                                  :discovery (:discovery db) :current (:current db)})
+      "evidence-index"
+      (oracle/evidence-index {:subject subject
+                              :rows (evidence-rows (:evidence db))
+                              :n (count (:evidence db))})
+      "damage-calculation"
+      (oracle/damage-calculation {:subject subject
+                                  :lines (if (pos? loss)
+                                           (str "  ・被害額: 金 " (oracle/yen loss) " 円")
+                                           "")
+                                  :total loss})
+      "bank-freeze-request"
+      (oracle/bank-freeze-request {:subject subject :bank (:bank db)
+                                   :occurred (:occurred db)
+                                   :counterparty (:counterparty db) :loss-jpy loss})
+      "recovery-plan" (oracle/recovery-plan (:service db))
+      "platform-request" (oracle/platform-request
+                          {:platform (:service db) :account-id (:account db)
+                           :occurred (:occurred db) :kind kind})})))
 
 (rf/reg-sub
  :platform-request

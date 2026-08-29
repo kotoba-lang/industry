@@ -27,7 +27,15 @@
   ;; Capability-free (kotoba/pure). No clock, no network, no storage.
   (:export [main known-kind? kind-of classify severity windows actions deadlines
             ja-kind documents-for-kind support-cost-jpy
-            recovery-plan platform-request]))
+            recovery-plan platform-request
+            yen damage-report incident-statement evidence-index
+            damage-calculation bank-freeze-request])
+  (:schemas {:d/report [:record :d/report
+                        [[:subject :string]
+                         [:station :string]
+                         [:kind :string]
+                         [:occurred :string]
+                         [:narrative :string]]]}))
 
 ;; --- the closed vocabulary -------------------------------------------------
 ;; Mirrors tasuke's ontology (schema/cybercrime-victim-support-ontology.kotoba.edn)
@@ -375,6 +383,128 @@
          (string-concat
           "                          利用者署名 ____________________\n\n"
           "※ 本依頼書は利用者本人が送付するものです（本人作成・要署名・下書き）。"))))))))
+
+
+;; --- 金額の表記 -------------------------------------------------------------
+;; `comma` in tasuke's report_gen.cljc, moved into the guest because a filing
+;; states an amount and the amount has to read the same everywhere it appears.
+;; Recursive rather than a format string: the guest has no printf.
+
+(defn group3 [s :string] :string
+  (let [n (string-length s)]
+    (if (<= n 3)
+      s
+      (string-concat (group3 (string-substring s 0 (- n 3)))
+                     (string-concat "," (string-substring s (- n 3) n))))))
+
+(defn yen [n :i64] :string
+  (if (< n 0)
+    (string-concat "-" (group3 (string-from-i64 (- 0 n))))
+    (group3 (string-from-i64 n))))
+
+;; --- the police core --------------------------------------------------------
+;; 被害届 / 被害状況報告書 / 証拠目録 / 被害額算定書 and the bank 組戻し.
+;;
+;; These were a JavaScript reimplementation inside tasuke's app/index.html,
+;; kept honest by a drift-lock that grepped `const SCAM_KINDS = [...]` out of the
+;; HTML. That is the shape ADR-2608112100 calls a checked replica: two
+;; implementations bound by a test, with the authority in neither. Here the text
+;; IS the authority, and both runtimes execute it.
+;;
+;; The seam: what a member TYPED (a timeline, a list of evidence rows, a
+;; breakdown) is tabulated by the host and arrives as one joined string. The
+;; document around it — every sentence a reader of the filing sees, and the four
+;; charter invariants it states — is decided here.
+;;
+;; 被害届 needs six values and the ABI caps a function at five parameters, so the
+;; strings fold into a record. The :i64 stays a TOP-LEVEL parameter: an :i64
+;; inside a record demands a js/BigInt on ClojureScript, and this app runs there.
+
+(defn header [subject :string title :string] :string
+  (string-concat
+   (string-concat title "\n\n")
+   (string-concat
+    (string-concat "申告者: " (if (string=? subject "") "（被害者氏名）" subject))
+    "（本人作成・要署名）\n作成日: （提出日を記入）\n")))
+
+(defn damage-report [x [:ref :d/report] loss :i64] :string
+  (let [station (if (string=? (record-get x :station) "")
+                  "（管轄）警察署長 殿"
+                  (record-get x :station))
+        narrative (if (string=? (record-get x :narrative) "")
+                    "（事実を時系列で記入。別紙「被害状況報告書」参照）"
+                    (record-get x :narrative))
+        occurred (if (string=? (record-get x :occurred) "")
+                   "（年月日時を記入）"
+                   (record-get x :occurred))]
+    (string-concat
+     (string-concat (header (record-get x :subject) "被 害 届（下書き）")
+                    (string-concat "\n宛先: " (string-concat station "\n\n")))
+     (string-concat
+      "下記のとおり被害を受けましたので届け出ます。\n\n"
+      (string-concat
+       (string-concat (string-concat "1. 被害の種類: サイバー犯罪（"
+                                     (string-concat (ja-kind (record-get x :kind)) "）\n"))
+                      (string-concat "2. 被害日時: " (string-concat occurred "\n")))
+       (string-concat
+        (string-concat (string-concat "3. 被害の概要:\n   " (string-concat narrative "\n"))
+                       (string-concat "4. 被害額: 金 " (string-concat (yen loss) " 円\n")))
+        (string-concat
+         "5. 証拠資料: 別紙「証拠目録」のとおり\n6. 相手方に関する情報: （判明している口座番号・URL・連絡先等を記入）\n\n"
+         (string-concat
+          "上記に相違ありません。\n\n                          申告者署名 ____________________ 印\n\n"
+          "※ これは被害者本人が提出するための下書きです（本人作成・要署名・費用 ¥0・未提出）。"))))))))
+
+(defn incident-statement [subject :string timeline :string discovery :string current :string] :string
+  (string-concat
+   (string-concat (header subject "被害状況報告書") "\n■ 経緯（時系列）\n")
+   (string-concat
+    (string-concat (if (string=? timeline "") "  （出来事を起きた順に記入）" timeline) "\n\n")
+    (string-concat
+     (string-concat "■ 気づいた契機\n  "
+                    (string-concat (if (string=? discovery "") "（どのように被害に気づいたか）" discovery) "\n\n"))
+     (string-concat
+      (string-concat "■ 現在の状況\n  "
+                     (string-concat (if (string=? current "") "（口座凍結依頼済／パスワード変更済 等）" current) "\n\n"))
+      "※ 本書面は被害者本人が事実を整理したものです（本人作成・要署名・費用 ¥0・未提出）。")))))
+
+(defn evidence-index [subject :string rows :string n :i64] :string
+  (string-concat
+   (string-concat (header subject "証 拠 目 録")
+                  "\n各証拠は暗号化して保管し、下記 sha256 により改変のないことを確認できます。\n\n")
+   (string-concat
+    (string-concat (if (string=? rows "") "  （証拠なし）" rows) "\n\n")
+    (string-concat
+     (string-concat "件数: " (string-concat (string-from-i64 n) " 件\n\n"))
+     "※ 原本（暗号化）は被害者本人が保持します。本書は本人作成・要署名・費用 ¥0・未提出。"))))
+
+(defn damage-calculation [subject :string lines :string total :i64] :string
+  (string-concat
+   (string-concat (header subject "被害額算定書") "\n■ 内訳\n")
+   (string-concat
+    (string-concat (if (string=? lines "") "  ・（項目を記入）" lines) "\n\n")
+    (string-concat
+     (string-concat "■ 合計: 金 " (string-concat (yen total) " 円\n\n"))
+     "※ 領収書・取引明細は証拠目録に対応します。本書は本人作成・要署名・費用 ¥0・未提出。"))))
+
+(defn bank-freeze-request [subject :string bank :string occurred :string counterparty :string loss :i64] :string
+  (let [to (if (string=? bank "") "（金融機関名）御中" bank)
+        at (if (string=? occurred "") "（記入）" occurred)
+        cp (if (string=? counterparty "") "（口座番号・名義）" counterparty)]
+    (string-concat
+     (string-concat (header subject "不正送金に関する組戻し・口座凍結のご依頼")
+                    (string-concat "\n宛先: " (string-concat to "\n\n")))
+     (string-concat
+      "私の口座から、身に覚えのない送金（不正送金）が行われました。つきましては、\n振り込め詐欺救済法に基づき、振込先口座の凍結および組戻し手続きをお願いいたします。\n\n"
+      (string-concat
+       (string-concat (string-concat "・被害日時: " (string-concat at "\n"))
+                      (string-concat "・送金額: 金 " (string-concat (yen loss) " 円\n")))
+       (string-concat
+        (string-concat (string-concat "・振込先（判明分）: " (string-concat cp "\n"))
+                       "・警察への被害届: （提出予定／受理番号を記入）\n\n")
+        (string-concat
+         "                          依頼人署名 ____________________ 印\n\n"
+         "※ 本依頼書は被害者本人が金融機関へ提出するものです（本人作成・要署名・費用 ¥0・未提出）。")))))))
 
 ;; --- G1 --------------------------------------------------------------------
 ;; 助's support is free. This is the only cost the guest can express: there is

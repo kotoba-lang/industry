@@ -138,25 +138,69 @@
    [:pre {:class "app-doc"} text]
    [:div {:class "app-inline"} [copy-control "コピー" text]]))
 
+(def doc-titles
+  "The document kinds the guest warrants, in the order it returns them."
+  {"damage-report"       "被害届（下書き）"
+   "incident-statement"  "被害状況報告書"
+   "evidence-index"      "証拠目録"
+   "damage-calculation"  "被害額算定書"
+   "bank-freeze-request" "銀行 組戻し・口座凍結依頼"
+   "platform-request"    "プラットフォーム凍結・復旧依頼"
+   "recovery-plan"       "アカウント復旧手順書"})
+
 (defn shorui []
-  (let [{:keys [documents ja-kind]} @(rf/subscribe [:triage])
-        plan @(rf/subscribe [:recovery-plan])
-        req  @(rf/subscribe [:platform-request])]
+  (let [{:keys [documents]} @(rf/subscribe [:triage])
+        filings @(rf/subscribe [:filings])]
     [:<>
      [banner]
      (dds/section
+      {:title "書類に入れる情報"}
+      [:p {:class "app-note"}
+       "空欄のままでも下書きは出ます（「（記入）」として残ります）。ここも保存されません。"]
+      (dds/grid
+       {:min "16rem"}
+       (dds/form-field
+        {:label "申告者氏名" :for "subject"}
+        (dds/input-text {:id "subject" :value (field :subject)
+                         :on-change #(put! :subject (.. % -target -value))}))
+       (dds/form-field
+        {:label "提出先の警察署" :for "station" :support "例）渋谷警察署長 殿"}
+        (dds/input-text {:id "station" :value (field :station)
+                         :on-change #(put! :station (.. % -target -value))}))
+       (dds/form-field
+        {:label "金融機関" :for "bank" :support "不正送金があった場合"}
+        (dds/input-text {:id "bank" :value (field :bank)
+                         :on-change #(put! :bank (.. % -target -value))}))
+       (dds/form-field
+        {:label "振込先（判明分）" :for "counterparty"}
+        (dds/input-text {:id "counterparty" :value (field :counterparty)
+                         :on-change #(put! :counterparty (.. % -target -value))})))
+      (dds/form-field
+       {:label "経緯（1 行に 1 つ、起きた順）" :for "timeline"}
+       (dds/textarea {:id "timeline" :rows 4 :value (field :timeline)
+                      :on-change #(put! :timeline (.. % -target -value))}))
+      (dds/grid
+       {:min "16rem"}
+       (dds/form-field
+        {:label "気づいた契機" :for "discovery"}
+        (dds/input-text {:id "discovery" :value (field :discovery)
+                         :on-change #(put! :discovery (.. % -target -value))}))
+       (dds/form-field
+        {:label "現在の状況" :for "current" :support "例）パスワード変更済"}
+        (dds/input-text {:id "current" :value (field :current)
+                         :on-change #(put! :current (.. % -target -value))}))))
+     (dds/section
       {:title "この被害で作る書面"}
       [:p {:class "app-note"}
-       "すべて本人が作成し、本人が署名して、本人が提出する下書きです。助 が警察やプラットフォームの名義で書くことはありません（G3）。費用は ¥0（G1）。"]
-      (into [:ul {:class "app-list"}] (for [d documents] [:li [:code d]])))
-     (when (some #{"recovery-plan"} documents)
-       (dds/section {:title "アカウント復旧手順書"} [document-block "本人が実行する手順" plan]))
-     (when (some #{"platform-request"} documents)
-       (dds/section {:title "プラットフォーム凍結・復旧依頼"} [document-block (str ja-kind "の申告") req]))
-     (dds/section
-      {:title "まだこの画面にない書面"}
-      [:p {:class "app-note"}
-       "被害届・被害状況報告書・証拠目録・被害額算定書・銀行組戻し依頼は、tasuke 本体（cloud-itonami/tasuke）の report-gen が持っています。この画面に載せるにはその生成器を guest に移す必要があり、まだやっていません。"])]))
+       "すべて本人が作成し、本人が署名して、本人が提出する下書きです。助 が警察やプラットフォームの名義で書くことはありません（G3）。費用は ¥0（G1）。どれを作るかも、本文も、guest が決めています。"]
+      (into [:ul {:class "app-list"}]
+            (for [d documents] [:li (get doc-titles d d) " " [:code d]])))
+     (into [:<>]
+           (for [d documents
+                 :let [text (get filings d)]
+                 :when text]
+             (dds/section {:title (get doc-titles d d)}
+                          [document-block (get doc-titles d d) text])))]))
 
 ;; --- 証拠 -------------------------------------------------------------------
 

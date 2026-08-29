@@ -104,6 +104,11 @@
                     "G2 — the document says 助 does not act as the member")
           _ (check! (str/includes? docs "本人作成・要署名")
                     "G3 — the document is member-authored and needs their signature")
+          n-docs (.evaluate page "document.querySelectorAll('.app-doc').length")
+          _ (check! (= 6 n-docs)
+                    (str "all six filings the guest warrants for a takeover are rendered (" n-docs ")"))
+          _ (check! (str/includes? docs "被 害 届")
+                    "the 被害届 the old app/index.html built in JavaScript now comes from the guest")
 
           ;; --- a negative control: the page must NOT show a kind it wasn't told
           _ (.click page "a[href='#soudan']")

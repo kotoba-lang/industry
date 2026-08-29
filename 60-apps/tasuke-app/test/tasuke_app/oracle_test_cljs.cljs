@@ -14,7 +14,8 @@
 
   Both are claims about THIS core, and a claim is not a measurement. That is
   what this file is for."
-  (:require [cljs.test :refer-macros [deftest is testing run-tests]]
+  (:require [clojure.string :as str]
+            [cljs.test :refer-macros [deftest is testing run-tests]]
             [tasuke-app.oracle :as o]))
 
 (def report
@@ -58,5 +59,38 @@
     (is (= "urgent" (:severity t)))
     (is (= 0 (:cost-jpy t)))
     (is (= 1 (count (:deadlines t))))))
+
+
+(deftest records-and-substring-cross-to-cljs
+  (testing "a record argument crosses the entry boundary — all-string fields only,
+            which is why the guest keeps its :i64 at the top level"
+    (let [doc (o/damage-report {:subject "川崎 純" :station "渋谷警察署長 殿"
+                                :kind "account-takeover" :occurred "2026-08-28 夜"
+                                :narrative "Xのアカウントを乗っ取られた" :loss-jpy 480000})]
+      (is (string? doc))
+      (is (str/includes? doc "アカウント乗っ取り"))
+      (is (str/includes? doc "本人作成・要署名・費用 ¥0・未提出"))))
+  (testing "string-substring survives on ClojureScript at this kir pin.
+            jp-go-dds records that an older `utf8-substring!` guarded with
+            `(integer? start)` breaks on a js/BigInt, and that its own pin pair is
+            not exposed. This app formats an integer into a string, so it IS the
+            exposed shape — measured here rather than assumed."
+    (is (= "1,234,567" (o/yen 1234567)))
+    (is (= "0" (o/yen 0)))
+    (is (= "999" (o/yen 999)))
+    (is (= "1,000" (o/yen 1000)))
+    (is (= "-1,234" (o/yen -1234)))))
+
+(deftest every-filing-states-the-charter-on-cljs
+  (doseq [[label doc]
+          [["被害届" (o/damage-report {:subject "" :station "" :kind "phishing"
+                                       :occurred "" :narrative "" :loss-jpy 0})]
+           ["被害状況報告書" (o/incident-statement {:subject "" :timeline "" :discovery "" :current ""})]
+           ["証拠目録" (o/evidence-index {:subject "" :rows "" :n 0})]
+           ["被害額算定書" (o/damage-calculation {:subject "" :lines "" :total 0})]
+           ["銀行組戻し" (o/bank-freeze-request {:subject "" :bank "" :occurred ""
+                                                 :counterparty "" :loss-jpy 0})]]]
+    (is (str/includes? doc "本人作成・要署名・費用 ¥0・未提出")
+        (str label " must state member-authored / signed / free / unsubmitted"))))
 
 (defn -main [& _] (run-tests))
