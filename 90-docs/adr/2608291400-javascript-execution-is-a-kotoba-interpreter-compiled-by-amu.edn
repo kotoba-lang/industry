@@ -58,7 +58,7 @@ emcc が WASM にしたもの』であって、C コンパイラが JS を読ん
 | 未実装 | 関数、オブジェクト、配列、`for`、`try`、クロージャ、プロトタイプ |
 | 自前テスト | 48 件が `:jvm-kir`（参照 KIR）と restricted ESM で緑 |
 | 差分テスト | **実 V8 と 57 件中 56 件が一致**、残り 1 件は理由つきで記録（i64 除算） |
-| wasm32-browser | 16 KB にコンパイルされるが**モジュールが instantiate しない** |
+| wasm32-browser | **16 KB、instantiate して 48/48 が中で通る**（下記の欠陥を直した後） |
 
 ## 測って初めて分かった天井（どれも文書に無かった）
 
@@ -79,17 +79,39 @@ emcc が WASM にしたもの』であって、C コンパイラが JS を読ん
   どちらかの上限が動いたら**外す**。ADR-2608650000 の分類でいう
   『backend の未達』であって『言語の恒久的な設計』ではない。
 
-## amu の欠陥 1 件（このリポジトリの目的そのものを塞いでいる）
+## wasm32 backend の欠陥 — 見つけて直した（2026-08-29）
 
-**`--target wasm32-browser` は `:ok true` を返しながら、instantiate できない
-モジュールを出す。** `WebAssembly.compile(): Compiling function #78 failed:
-function index #694 is out of bounds`。60 行の probe は同じ経路で正常に
-instantiate して動くので、原因は使い方ではなく規模か形である。
+**当初この ADR は『`--target wasm32-browser` は `:ok true` を返しながら
+instantiate できないモジュールを出す』と記録した。原因を特定して直した。**
 
-**コンパイラが緑を返して壊れた成果物を出す**というのは、CLAUDE.md が
-『測れなかった検査が、測って問題が無かった検査と同じ値を返す』と呼んでいる
-形の最も高くつく版である。これが直るまで、このエンジンが実際に走るのは
-参照 KIR と restricted ESM の 2 面だけ。
+`kotoba-lang/kotoba-wasm` の emitter が **call の operand を 1 バイトで
+書いていた**。Wasm の index operand は ULEB128 なので、127 を超える値を
+1 バイトで書くと切り捨てにはならない —— 上位ビットが LEB の**継続ビット**
+なので、デコーダは**次の命令バイトを飲み込み**、存在しない index を報告する。
+
+実測: 183 関数のモジュールで function 182（`0xB6`）への call が
+`function index #694 is out of bounds` になった。**694 = 54 + (5 << 7)**
+——`0xB6` の下位 7 ビットと、直後にあった `0x05` opcode である。
+
+**誰も気づかなかった理由は単純で、129 関数に達するまでどの index も
+2 バイト目を要さないから。** この JS エンジンが最初にそこを越えた。
+
+直し方: `encode-local-operands` は既に `::local-get/set/tee` に対して
+正しく ULEB を書いていたので、同じ pass に `::call` token を足し、
+**101 箇所の生の `[0x10 index]` を全部そこへ通した**（3 箇所は既に
+`[0x10] (uleb index)` と書かれていた）。新しい call site が同じ誤りを
+再導入できない形にした。
+
+gate: 200 関数を全部呼ぶモジュールを組み、`wasm-tools validate` と
+`wasmtime` で検査する test を追加。**両方向で確認済み** —— emitter を
+戻すと `func 200 failed to validate` で落ち、戻すと namespace 58 tests /
+292 assertions・suite 全体 111 / 503 が緑。
+
+**この class の教訓は『コンパイラが緑を返した』ことの方**である。
+`:ok true` と壊れた成果物が同時に出るのは、CLAUDE.md が『測れなかった検査が、
+測って問題が無かった検査と同じ値を返す』と呼ぶ形の、最も高くつく版である。
+emit は検査ではないが、**emit の成功が『動く成果物ができた』と読まれる**
+限り同じことが起きる。
 
 ## 併せて直した browser の成熟度（別件だが同じセッションの実測）
 
@@ -119,8 +141,8 @@ CLAUDE.md と amu の `examples/todo-app.kotoba` が『Kotoba には整数→文
 
 ## Exit gate
 
-- **G1**: amu の wasm32-browser が instantiate できるモジュールを出す。出せない間は
-  『Kotoba 製 JS エンジンが browser で動く』と主張しない。
+- ~~**G1**: amu の wasm32-browser が instantiate できるモジュールを出す。~~
+  **達成（2026-08-29、kotoba-wasm `a739f37`）。** 48/48 が wasm32 の中で通る。
 - **G2**: 関数・オブジェクト・配列が入り、差分 corpus が browser の実 smoke suite が
   使う JS を覆う。
 - **G3**: 同じ JS を QuickJS とこのエンジンに通して一致することを、browser の
@@ -132,7 +154,7 @@ CLAUDE.md と amu の `examples/todo-app.kotoba` が『Kotoba には整数→文
 
 - 実装: `kotoba-lang/org-ecma-international-262`（`src/ecma262.kotoba` 737 行、
   `test/differential.cljs`）
-- 修正: `kotoba-lang/dom-gpu` `475e2cb`
+- 修正: `kotoba-lang/dom-gpu` `475e2cb`、`kotoba-lang/kotoba-wasm` `a739f37`（ULEB call operand）
 - 関連 ADR: 2607198300（実行成果物の非依存）、2607072000（Rust を書かない）、
   2608650000（恒久の安全 vs backend の未達）、2607279200（Kotoba 中心の移行）、
   2608040100（origin 面 = 実ドメインの逆順）、2607051140（browser の分割）"}]
