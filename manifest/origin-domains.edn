@@ -100,6 +100,11 @@
   ;; now assert, so connector.validate/name-conformant? is checked against a
   ;; fact and not against the name it is checking.
   "kotoba-lang/com-github"          "github.com"
+  ;; ECMA-262 is published by Ecma International; tc39.es hosts the living
+  ;; draft, but the authority that issues the standard is what is recorded.
+  ;; DNS checked 2026-08-29: dig +short NS ecma-international.org returns
+  ;; three delegated cloudns.net nameservers.
+  "kotoba-lang/org-ecma-international-262" "ecma-international.org"
   "kotoba-lang/com-slack"           "slack.com"
   "kotoba-lang/com-notion"          "notion.com"
   "kotoba-lang/com-google-chat"     "google.com"

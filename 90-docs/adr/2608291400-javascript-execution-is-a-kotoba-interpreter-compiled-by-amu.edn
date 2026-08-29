@@ -1,0 +1,138 @@
+[{:db/id -1
+  :adr/id "adr-2608291400-javascript-execution-is-a-kotoba-interpreter-compiled-by-amu"
+  :adr/title "JavaScript の実行系は Kotoba で書いて amu でコンパイルする — amu は JS をコンパイルしない"
+  :adr/status "accepted"
+  :adr/date "2026-08-29"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/repos ["com-junkawasaki/root"
+              "kotoba-lang/org-ecma-international-262"
+              "kotoba-lang/browser"
+              "kotoba-lang/dom-gpu"
+              "kotoba-lang/amu"
+              "kotoba-lang/htmldom"]
+  :adr/body "## 問い
+
+`kotoba-lang/browser` の JavaScript 実行が QuickJS の WASM バイナリ
+（`quickjs-emscripten-core` + `@jitl/quickjs-singlefile-cjs-release-sync`）に
+依存している。ADR-2607198300 が『実行成果物が JVM/JS/Rust ホストに依存しない』と
+決め、ADR-2607072000 が『Rust が必要な実装は全て cljc』と決めた workspace で、
+第三者の C 製バイナリが production の実行経路に載っている。これをどう外すか。
+
+## amu は JS をコンパイルしない — 向きを取り違えない
+
+**amu は Kotoba のコンパイラであり、JS は入力にできない。** `bin/kotoba` の usage 行が
+入力を `<file.kotoba|file.cljk|file.cljc>` と定めており、amu の `src/` に現れる
+`javascript` は全て**出力**側の語（`:js-kotoba-v1`、`.mjs`、`:format :javascript/v1`）。
+JS フロントエンドは存在しない。
+
+したがって『amu で JS を動かす』は『amu が JS をコンパイルする』ではなく:
+
+    ページの script テキスト ──実行時の入力──> Kotoba で書いた JS インタプリタ
+                                              ──amu compile──> wasm32 ──> browser の host スロット
+
+**これは QuickJS と構造的に同じもの**である。QuickJS も『C で書かれた JS インタプリタを
+emcc が WASM にしたもの』であって、C コンパイラが JS を読んでいるわけではない。
+置き換わるのは C → Kotoba と emcc → amu の 2 つだけで、`browser.runtime` の
+`:runtime/eval` / `:runtime/call` / `:runtime/job-drain` という宿るスロットは動かない。
+
+**ターゲットは `wasm32-browser` であって `js` ではない。** JS で書かれた JS
+インタプリタは、動かすのに JS エンジンを要する（消そうとしているものを要する）。
+
+## 決定
+
+1. **JS 実行系の正本は `kotoba-lang/org-ecma-international-262`** — Kotoba で書き
+   amu でコンパイルする ECMA-262 部分集合インタプリタ。名前は origin 面
+   （ecma-international.org の逆順 + 主題 262、ADR-2608040100）。
+2. **QuickJS は消さない。差分オラクルとして残す。** 移行が終わるまで、同じ JS を
+   両方に通して一致を測るために必要である。消えるのは『production の実行経路が
+   QuickJS に依存している』という状態の方であって、QuickJS そのものではない。
+3. **エンジン自身が capability を要求しない。** `kotoba -M check` が
+   `:effects #{}` を報告する。DOM も fetch も storage も、browser 側の既存
+   capability 経路（`browser.compat.webapi`）が担い、インタプリタは値を返すだけ。
+
+## 実測した現在地（2026-08-29）
+
+| | |
+|---|---|
+| 言語 | 式、`var`/`let`/`const`、代入、`if`/`else`、`while`、ブロック、`typeof`、コメント、string/number/boolean/undefined/null |
+| 未実装 | 関数、オブジェクト、配列、`for`、`try`、クロージャ、プロトタイプ |
+| 自前テスト | 48 件が `:jvm-kir`（参照 KIR）と restricted ESM で緑 |
+| 差分テスト | **実 V8 と 57 件中 56 件が一致**、残り 1 件は理由つきで記録（i64 除算） |
+| wasm32-browser | 16 KB にコンパイルされるが**モジュールが instantiate しない** |
+
+## 測って初めて分かった天井（どれも文書に無かった）
+
+- **fuel の既定は instance 生涯で 512 演算**。パーサは最初の文に届く前に使い切る。
+  `--fuel` は省略可能なオプションではない。既定のままだと 48 件中 2 件しか通らない。
+- **typed ADT 値は実行時に 64 ノード / 深さ 12 で頭打ち**（`kotoba-kir` の
+  `adt-node-limit` / `adt-depth-limit`、CLI knob 無し、emit された
+  `assertTypedValue` が実行時に数える）。`[:option [:ref :js/node]]` を 4 本持つ
+  record は 1 ノードあたり約 8 ノードを消費するので、**AST は約 6 ノードで頭打ち** —
+  `(1 + 2) * 3` が既に超える。
+- **`[:vector [:ref R]]` は safe profile の外**。flat な arena も vector では作れない。
+  `[:map :string [:ref R]]` は通るが 31 entry まで。
+- **`pair` を戻り値として関数境界を越えると restricted ESM で trap する**
+  （`:jvm-kir` と `:wasm` では通る）。`record` は 3 backend とも通る。
+  境界を越える値は record にする。
+- 上記 2 つの帰結として、このエンジンは **AST を持たない直接評価器**であり、
+  **環境は文字列**である。これは様式ではなく測定された制約であって、
+  どちらかの上限が動いたら**外す**。ADR-2608650000 の分類でいう
+  『backend の未達』であって『言語の恒久的な設計』ではない。
+
+## amu の欠陥 1 件（このリポジトリの目的そのものを塞いでいる）
+
+**`--target wasm32-browser` は `:ok true` を返しながら、instantiate できない
+モジュールを出す。** `WebAssembly.compile(): Compiling function #78 failed:
+function index #694 is out of bounds`。60 行の probe は同じ経路で正常に
+instantiate して動くので、原因は使い方ではなく規模か形である。
+
+**コンパイラが緑を返して壊れた成果物を出す**というのは、CLAUDE.md が
+『測れなかった検査が、測って問題が無かった検査と同じ値を返す』と呼んでいる
+形の最も高くつく版である。これが直るまで、このエンジンが実際に走るのは
+参照 KIR と restricted ESM の 2 面だけ。
+
+## 併せて直した browser の成熟度（別件だが同じセッションの実測）
+
+- **`kotoba.wasm.abi` の 3 層がずれていた。** `:append-content`（CSS 生成内容）と
+  `:create-comment` が encode と apply には在って **admit に無く**、
+  `validate-batch` の default に落ちて **batch 全体を巻き込んで落としていた**。
+  修正 + 18 op 全部を 3 層に通す gate を追加（両方向で確認済み、dom-gpu `475e2cb`）。
+- **`wit/kotoba-dom.wit` は 18 op 中 9 op に host 関数を持たない。** 既存の
+  `wit-contract-test` は手書き 9 サンプルしか符号化しないので一度も問うたことが
+  なかった。gate に記録済み。
+- **`htmldom` が 2026-08-05 の `a4f6b94` から `<html>`/`<body>`/`<head>` を落として
+  いる**（Brave 実測に基づく正しい*フラグメント*解析規則）。browser のページロードは
+  文書解析なので `document.body` が常に null になり、2026-07 に書かれた 2 つの
+  smoke test が**24 日間赤のまま誰にも気づかれなかった** — cljs suite が CI に無く、
+  この checkout で一度も走っていなかったため。正しい直し方は htmldom に文書解析
+  モードを足すことだが、cssom conformance 855 case と browser 754 test に波及する。
+
+## 陳腐化していた記述（rule-kaizen）
+
+CLAUDE.md と amu の `examples/todo-app.kotoba` が『Kotoba には整数→文字列の
+組み込みが無い』と書き、その回避策（26 項目の上限、`9+` 表示）を設計に焼いていた。
+**`string-from-i64` は在る。** `string-code-point-at` / `string-contains?` /
+`string-join` / `string-replace-all` / `string-split-count` / `string-byte-length` /
+`string-fold-case` も在り、`lang/guest-grammar.edn` の `:predicates` が挙げる
+3 つ（`string-concat` `string-length` `string-substring`）より遥かに広い。
+文法ファイルは `string=` と書いているが実際の名前は `string=?` である。
+
+## Exit gate
+
+- **G1**: amu の wasm32-browser が instantiate できるモジュールを出す。出せない間は
+  『Kotoba 製 JS エンジンが browser で動く』と主張しない。
+- **G2**: 関数・オブジェクト・配列が入り、差分 corpus が browser の実 smoke suite が
+  使う JS を覆う。
+- **G3**: 同じ JS を QuickJS とこのエンジンに通して一致することを、browser の
+  `browser.runtime` 経路で測る。
+- **G4**: G3 が緑になって初めて、production の既定エンジンを差し替える。QuickJS は
+  オラクルとして残す。
+
+## 参照
+
+- 実装: `kotoba-lang/org-ecma-international-262`（`src/ecma262.kotoba` 737 行、
+  `test/differential.cljs`）
+- 修正: `kotoba-lang/dom-gpu` `475e2cb`
+- 関連 ADR: 2607198300（実行成果物の非依存）、2607072000（Rust を書かない）、
+  2608650000（恒久の安全 vs backend の未達）、2607279200（Kotoba 中心の移行）、
+  2608040100（origin 面 = 実ドメインの逆順）、2607051140（browser の分割）"}]
