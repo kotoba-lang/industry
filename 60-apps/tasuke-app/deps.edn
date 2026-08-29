@@ -1,0 +1,57 @@
+;; tasuke-app — 助 (tasuke) の被害後対応を、実際に開ける 1 枚のページにする app。
+;;
+;; 決定は `kotoba/triage_core.kotoba`（guest authority）が持ち、compile 済みの
+;; `resources/tasuke_app/oracle/triage-core.kir.edn` を KIR インタプリタが
+;; **ブラウザでも JVM でも同じ artifact から**実行する。UI は cljs + reagent +
+;; re-frame + jp-go-dds（ADR-2608260900 / 2608080100）。
+;;
+;; コンパイラ（amu）は :gen / :test だけに置く。消費側が要るのは KIR の実行で
+;; あって生成ではない（jp-go-dds/kotoba_oracle.clj と同じ切り方）。
+{:paths ["src" "resources"]
+
+ :deps {org.clojure/clojure {:mvn/version "1.12.0"}
+
+        ;; KIR インタプリタ。**runtime 依存であることがこの app の主張そのもの** ——
+        ;; `.kotoba` が「テストで突き合わせる複製」ではなく「走っているもの」になる。
+        ;; pin は amu 1e21a1f が宣言する kir と一致させる（emitter と interpreter が
+        ;; 食い違うと、書かれていない形を読むことになる）。
+        io.github.kotoba-lang/kotoba-kir
+        {:git/url "https://github.com/kotoba-lang/kotoba-kir.git"
+         :git/sha "6d08e3cffa09c003f8dbcdfaee964c4a1ea021ad"}
+
+        ;; jp-go-dds — このワークスペースの基本 design system（DADS）。
+        ;; `--hig-*` 契約は tokens/bridge-css が DADS primitive の上に再定義する。
+        io.github.kotoba-lang/jp-go-digital-design-system
+        {:git/url "https://github.com/kotoba-lang/jp-go-digital-design-system.git"
+         :git/sha "cc8f4849af5def7ea535fd6c0b8a623ccca645e9"}}
+
+ :aliases
+ {:cljs {:extra-deps {org.clojure/clojurescript {:mvn/version "1.11.132"}
+                      thheller/shadow-cljs      {:mvn/version "2.28.20"}
+                      reagent/reagent           {:mvn/version "1.2.0"}
+                      re-frame/re-frame         {:mvn/version "1.4.3"}}}
+
+  ;; KIR の再生成。コンパイラはここにしか無い。
+  :gen {:extra-paths ["gen"]
+        :extra-deps {io.github.kotoba-lang/amu
+                     {:git/url "https://github.com/kotoba-lang/amu.git"
+                      :git/sha "1e21a1f56613d7d4c7628af1945ebf1cf7862ff3"}}
+        :main-opts ["-m" "tasuke-app.kir-gen"]}
+
+  ;; 単一 document の生成。`:gen` と同じ path を使い、page も KIR も
+  ;; **同じ artifact** から出す（noscript の答えが guest 由来である理由）。
+  :gen-page {:extra-paths ["gen"]
+             :main-opts ["-m" "tasuke-app.page-gen"]}
+
+  ;; shadow-cljs に渡すのは **path だけ** の alias。:test には :main-opts が
+  ;; 付いており、shadow-cljs はそれを自分の引数として食って落ちる（実測）。
+  :cljs-test {:extra-paths ["test"]}
+
+  ;; JVM 側の gate。guest を直接実行して真理値表を突き合わせる。
+  :test {:extra-paths ["test" "gen"]
+         :extra-deps {io.github.cognitect-labs/test-runner
+                      {:git/tag "v0.5.1" :git/sha "dfb30dd"}
+                      io.github.kotoba-lang/amu
+                      {:git/url "https://github.com/kotoba-lang/amu.git"
+                       :git/sha "1e21a1f56613d7d4c7628af1945ebf1cf7862ff3"}}
+         :main-opts ["-m" "cognitect.test-runner"]}}}

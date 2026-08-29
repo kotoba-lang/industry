@@ -1,0 +1,28 @@
+(ns tasuke-app.kir-embed
+  "Compile-time embedding of the shipped KIR.
+
+  ClojureScript has no `io/resource`, so the artifact has to be in the bundle.
+  Reading it HERE, at compile time, from the same resource the JVM host reads at
+  runtime, is what keeps one artifact rather than two: a browser copy pasted into
+  a `.cljs` file would be a second source of the decisions, and the first time it
+  fell behind nothing would say so.
+
+  The data is emitted quoted. KIR carries symbols (an export's `:name` is one),
+  and an unquoted macro expansion would try to RESOLVE them."
+  (:require [clojure.edn :as edn]
+            [clojure.java.io :as io]))
+
+(def resource-path "tasuke_app/oracle/triage-core.kir.edn")
+
+(defn read-kir []
+  (if-let [url (io/resource resource-path)]
+    (edn/read-string (slurp url))
+    (throw (ex-info "shipped decision core is missing — run `clojure -M:gen`"
+                    {:path resource-path}))))
+
+(defmacro embedded-kir
+  "The shipped KIR, inlined at compile time. No fallback: a missing artifact
+  fails the build rather than silently shipping a page whose decisions came from
+  somewhere else."
+  []
+  (list 'quote (read-kir)))

@@ -1,0 +1,517 @@
+(ns triage-core
+  ;; 助 (tasuke) — the account-takeover / cybercrime first-response DECISIONS,
+  ;; as the guest authority. Everything exported here is a decision the victim
+  ;; acts on: which kind of crime this is, how urgent it is, which free public
+  ;; window answers it, what to do first, and which clock is already running.
+  ;;
+  ;; The host owns none of these. It reads the compiled KIR and executes it, in
+  ;; the browser and on the JVM alike, so both runtimes answer from the same
+  ;; artifact rather than from two implementations bound by a test
+  ;; (ADR-2608112100 is the precedent: a checked replica is not an authority).
+  ;;
+  ;; ## Why every boundary here is a string, a bool or a top-level :i64
+  ;;
+  ;; `kir/execute` coerces a TOP-LEVEL :i64 argument from a host integer, but an
+  ;; :i64 INSIDE a record goes through `value/bounded-typed-value!`, which on
+  ;; ClojureScript demands a js/BigInt and refuses a js/Number (measured on
+  ;; kotoba-lang/calendar 2026-08-12, recorded in jp-go-dds/kotoba_oracle.clj).
+  ;; A record with an :i64 field would therefore be green on the JVM and throw
+  ;; in every browser. This core is the first one written to CROSS that seam, so
+  ;; it takes the constraint as a design rule: no records at all, lists come back
+  ;; as newline-joined text, and the host splits them.
+  ;;
+  ;; Multi-value answers are newline-joined rather than :document, for the same
+  ;; reason: one shape that is known to survive both runtimes beats a richer one
+  ;; that has only ever been run on one.
+  ;;
+  ;; Capability-free (kotoba/pure). No clock, no network, no storage.
+  (:export [main known-kind? kind-of classify severity windows actions deadlines
+            ja-kind documents-for-kind support-cost-jpy
+            recovery-plan platform-request
+            yen damage-report incident-statement evidence-index
+            damage-calculation bank-freeze-request])
+  (:schemas {:d/report [:record :d/report
+                        [[:subject :string]
+                         [:station :string]
+                         [:kind :string]
+                         [:occurred :string]
+                         [:narrative :string]]]}))
+
+;; --- the closed vocabulary -------------------------------------------------
+;; Mirrors tasuke's ontology (schema/cybercrime-victim-support-ontology.kotoba.edn)
+;; and methods/triage.cljc SCAM-KINDS. A kind is for ROUTING, never a verdict (G4).
+
+(defn known-kind? [k :string] :bool
+  (or (string=? k "phishing")
+      (or (string=? k "unauthorized-transfer")
+          (or (string=? k "account-takeover")
+              (or (string=? k "support-scam")
+                  (or (string=? k "romance-scam")
+                      (or (string=? k "investment-scam")
+                          (or (string=? k "ransomware")
+                              (or (string=? k "impersonation")
+                                  (or (string=? k "fake-billing")
+                                      (or (string=? k "sns-fraud")
+                                          (string=? k "leak-extortion"))))))))))))
+
+;; --- classification --------------------------------------------------------
+;; Scan order IS the rule, not an implementation detail: 不正送金 outranks
+;; 乗っ取り because a takeover that already moved money is a money case first
+;; (the bank clock is the shortest one running). The order below is
+;; triage.cljc's KEYWORDS order, preserved exactly.
+;;
+;; Case folding happens HERE, not at the host boundary, so a host cannot get it
+;; wrong in one runtime and right in the other.
+;;
+;; ONE DELIBERATE DIVERGENCE from tasuke/methods/triage.cljc, asserted in the
+;; gate rather than left to be discovered: the takeover needle is the STEM
+;; "乗っ取", not "乗っ取り". The report this app was built from says
+;; 「乗っ取られたかもしれません」, which does not contain 「乗っ取り」 — the .cljc
+;; classifier misses it and falls through to the sns-fraud default. Measured
+;; 2026-08-29. The guest is the authority now, so the fix lives here and the
+;; parity test states the divergence instead of hiding it.
+
+(defn hit? [text :string needle :string] :bool
+  (string-contains? (string-fold-case text) (string-fold-case needle)))
+
+(defn transfer? [t :string] :bool
+  (or (hit? t "不正送金")
+      (or (hit? t "勝手に振込")
+          (or (hit? t "残高が減")
+              (or (hit? t "身に覚えのない出金")
+                  (or (hit? t "atm")
+                      (or (hit? t "振込")
+                          (or (hit? t "wire")
+                              (hit? t "unauthorized transfer")))))))))
+
+(defn takeover? [t :string] :bool
+  (or (hit? t "乗っ取")
+      (or (hit? t "ログインできない")
+          (or (hit? t "パスワード変更された")
+              (or (hit? t "パスワードが変更")
+                  (or (hit? t "メールアドレスが勝手に")
+                      (or (hit? t "二段階")
+                          (or (hit? t "takeover")
+                              (or (hit? t "hijack")
+                                  (hit? t "locked out"))))))))))
+
+(defn phishing? [t :string] :bool
+  (or (hit? t "フィッシング")
+      (or (hit? t "偽サイト")
+          (or (hit? t "偽メール")
+              (or (hit? t "sms")
+                  (or (hit? t "ショートメール")
+                      (or (hit? t "リンク")
+                          (hit? t "phish"))))))))
+
+(defn support-scam? [t :string] :bool
+  (or (hit? t "サポート詐欺")
+      (or (hit? t "警告画面")
+          (or (hit? t "ウイルスに感染")
+              (or (hit? t "電話してください")
+                  (or (hit? t "tech support")
+                      (or (hit? t "microsoft")
+                          (hit? t "遠隔操作"))))))))
+
+(defn romance? [t :string] :bool
+  (or (hit? t "ロマンス")
+      (or (hit? t "国際恋愛")
+          (or (hit? t "結婚")
+              (or (hit? t "投資を勧め")
+                  (hit? t "romance"))))))
+
+(defn investment? [t :string] :bool
+  (or (hit? t "投資詐欺")
+      (or (hit? t "必ず儲かる")
+          (or (hit? t "暗号資産")
+              (or (hit? t "fx")
+                  (or (hit? t "未公開株")
+                      (or (hit? t "investment")
+                          (hit? t "crypto"))))))))
+
+(defn ransomware? [t :string] :bool
+  (or (hit? t "ランサム")
+      (or (hit? t "暗号化された")
+          (or (hit? t "復号")
+              (or (hit? t "身代金")
+                  (or (hit? t "ransom")
+                      (hit? t "encrypted my")))))))
+
+(defn impersonation? [t :string] :bool
+  (or (hit? t "なりすまし")
+      (or (hit? t "偽アカウント")
+          (or (hit? t "偽プロフィール")
+              (or (hit? t "impersonat")
+                  (hit? t "fake account"))))))
+
+(defn fake-billing? [t :string] :bool
+  (or (hit? t "架空請求")
+      (or (hit? t "未払い")
+          (or (hit? t "請求メール")
+              (or (hit? t "電子マネー")
+                  (or (hit? t "ギフトカード")
+                      (hit? t "fake bill")))))))
+
+(defn leak-extortion? [t :string] :bool
+  (or (hit? t "流出")
+      (or (hit? t "晒す")
+          (or (hit? t "拡散する")
+              (or (hit? t "脅迫")
+                  (or (hit? t "sextortion")
+                      (or (hit? t "leak")
+                          (hit? t "extort"))))))))
+
+(defn kind-of [narrative :string] :string
+  ;; The default is sns-fraud rather than a refusal: an unclassified victim is
+  ;; still routed to a free public window. Refusing here would leave the person
+  ;; with nothing, which is the one outcome this actor exists to prevent.
+  (if (transfer? narrative) "unauthorized-transfer"
+      (if (takeover? narrative) "account-takeover"
+          (if (phishing? narrative) "phishing"
+              (if (support-scam? narrative) "support-scam"
+                  (if (romance? narrative) "romance-scam"
+                      (if (investment? narrative) "investment-scam"
+                          (if (ransomware? narrative) "ransomware"
+                              (if (impersonation? narrative) "impersonation"
+                                  (if (fake-billing? narrative) "fake-billing"
+                                      (if (leak-extortion? narrative) "leak-extortion"
+                                          "sns-fraud")))))))))))
+
+(defn classify [narrative :string explicit :string] :string
+  ;; An explicit kind from the member wins over the scanner — they know what
+  ;; happened to them and the scanner is a convenience, not an adjudicator.
+  (if (known-kind? explicit) explicit (kind-of narrative)))
+
+;; --- severity --------------------------------------------------------------
+;; Ordered most-severe first; the first match wins, mirroring triage.cljc's cond.
+
+(defn severity [kind :string loss :i64 ongoing :bool] :string
+  (if (and (string=? kind "unauthorized-transfer") (> loss 0))
+    "critical"
+    (if (or (string=? kind "ransomware")
+            (or (string=? kind "leak-extortion") ongoing))
+      (if (= loss 0) "urgent" "critical")
+      (if (or (>= loss 100000)
+              (or (string=? kind "account-takeover")
+                  (string=? kind "investment-scam")))
+        "urgent"
+        (if (or (> loss 0)
+                (or (string=? kind "phishing")
+                    (or (string=? kind "support-scam")
+                        (or (string=? kind "romance-scam")
+                            (string=? kind "fake-billing")))))
+          "elevated"
+          "info")))))
+
+;; --- free public windows (G5) ----------------------------------------------
+;; Codes resolve in tasuke's window registry. Newline-joined, in priority order.
+;; A paid referral is not representable here — that is the G5 invariant, and it
+;; holds by there being no branch that could produce one.
+
+(defn windows [kind :string] :string
+  (if (string=? kind "unauthorized-transfer") "bank-direct\nno-and-bank-fund-recovery\npolice-cyber-9110"
+      (if (string=? kind "account-takeover") "platform-abuse-desk\npolice-cyber-9110\njpcert"
+          (if (string=? kind "phishing") "antiphishing-council\nsafeline\npolice-cyber-9110"
+              (if (string=? kind "support-scam") "consumer-188\npolice-cyber-9110\njpcert"
+                  (if (string=? kind "romance-scam") "police-cyber-9110\nconsumer-188\nnccc"
+                      (if (string=? kind "investment-scam") "police-cyber-9110\nconsumer-188\nnccc"
+                          (if (string=? kind "ransomware") "jpcert\npolice-cyber-9110"
+                              (if (string=? kind "impersonation") "platform-abuse-desk\npolice-cyber-9110\nsafeline"
+                                  (if (string=? kind "fake-billing") "consumer-188\npolice-cyber-9110"
+                                      (if (string=? kind "leak-extortion") "police-cyber-9110\nsafeline\njpcert"
+                                          (if (string=? kind "sns-fraud") "platform-abuse-desk\nconsumer-188\npolice-cyber-9110"
+                                              "police-cyber-9110"))))))))))))
+
+;; --- the first-response checklist ------------------------------------------
+;; Evidence first, then containment, then report. The order is the advice: a
+;; victim who changes the password before capturing the screen loses the
+;; evidence that the account was ever taken.
+
+(defn actions-head [] :string
+  "まず証拠を保全する（スクリーンショット・URL・メール全文ヘッダ・取引履歴を保存し、加工しない）")
+
+(defn actions-tail [] :string
+  (string-concat "被害状況報告書（時系列）・証拠目録・被害額算定書を作成して届出に添える\n"
+                 "無料の公的窓口（警察 #9110 / 消費者ホットライン 188 / NCCC）に相談する"))
+
+(defn actions-mid [kind :string] :string
+  (if (string=? kind "unauthorized-transfer")
+    (string-concat "ただちに口座のある金融機関に電話し、不正送金の申告と口座凍結・組戻しを依頼する（振り込め詐欺救済法）\n"
+                   (string-concat "ネットバンキングのパスワードを変更し、追加の不正送金を止める\n"
+                                  "被害届の下書きを作成して最寄りの警察署／サイバー犯罪相談窓口（#9110）へ"))
+    (if (string=? kind "account-takeover")
+      (string-concat "別の安全な端末から該当サービスのパスワードをリセットし、攻撃者のセッションを失効させる\n"
+                     (string-concat "二段階認証を再設定し、登録メールアドレス・電話番号が書き換えられていないか確認する\n"
+                                    "アカウント復旧手順に沿って復旧し、プラットフォームの abuse 窓口へ凍結／復旧を依頼する"))
+      (if (string=? kind "phishing")
+        (string-concat "入力してしまった ID・パスワード・カード番号を直ちに変更・停止する\n"
+                       "フィッシング対策協議会／セーフラインへ URL を通報する")
+        (if (string=? kind "support-scam")
+          (string-concat "遠隔操作ソフトを入れた場合はネット接続を切ってからアンインストールし、パスワードを全変更する\n"
+                         "電子マネー・ギフトカードで支払った場合は番号と購入レシートを保全する")
+          (if (string=? kind "ransomware")
+            (string-concat "感染端末をネットワークから隔離する（電源は切らず LAN／Wi-Fi を遮断）\n"
+                           "身代金は支払わず JPCERT/CC へ相談し、復号ツールの有無を確認する")
+            (if (string=? kind "leak-extortion")
+              (string-concat "相手の要求に応じず、やり取りを保全する。送金も画像送付もしない\n"
+                             "拡散先があるならセーフラインと各プラットフォームへ削除を通報する")
+              "")))))))
+
+(defn actions [kind :string] :string
+  (let [mid (actions-mid kind)]
+    (if (string=? mid "")
+      (string-concat (actions-head) (string-concat "\n" (actions-tail)))
+      (string-concat (actions-head)
+                     (string-concat "\n" (string-concat mid (string-concat "\n" (actions-tail))))))))
+
+;; --- clocks already running ------------------------------------------------
+;; Informational, never legal advice (G4). Empty when this kind starts no clock
+;; the member can miss — an empty answer is an answer, not a missing one.
+
+(defn deadlines [kind :string] :string
+  (if (or (string=? kind "unauthorized-transfer")
+          (or (string=? kind "phishing")
+              (string=? kind "account-takeover")))
+    (if (string=? kind "unauthorized-transfer")
+      (string-concat "クレジットカードの不正利用は約款上おおむね60日以内の申告で補償対象になりやすい — 至急申告する\n"
+                     "預金口座の凍結は早いほど組戻しの成功率が上がる — 認知後ただちに銀行へ")
+      "クレジットカードの不正利用は約款上おおむね60日以内の申告で補償対象になりやすい — 至急申告する")
+    (if (or (string=? kind "fake-billing")
+            (or (string=? kind "support-scam")
+                (or (string=? kind "romance-scam")
+                    (string=? kind "investment-scam"))))
+      "通信販売の契約はクーリングオフの対象外のことが多い — ただし不実告知等は取消し得る（消費生活センター 188 で確認）"
+      "")))
+
+;; --- naming ----------------------------------------------------------------
+
+(defn ja-kind [kind :string] :string
+  (if (string=? kind "phishing") "フィッシング"
+      (if (string=? kind "unauthorized-transfer") "不正送金"
+          (if (string=? kind "account-takeover") "アカウント乗っ取り"
+              (if (string=? kind "support-scam") "サポート詐欺"
+                  (if (string=? kind "romance-scam") "ロマンス詐欺"
+                      (if (string=? kind "investment-scam") "投資詐欺"
+                          (if (string=? kind "ransomware") "ランサムウェア"
+                              (if (string=? kind "impersonation") "なりすまし"
+                                  (if (string=? kind "fake-billing") "架空請求"
+                                      (if (string=? kind "sns-fraud") "SNS型詐欺"
+                                          (if (string=? kind "leak-extortion") "情報流出・脅迫"
+                                              kind))))))))))))
+
+;; --- which member-authored documents this warrants -------------------------
+;; The police core always; a bank 組戻し when money moved; a platform request
+;; and a recovery plan when an account or an identity was taken. Mirrors
+;; packet/documents-for-kind, which is a decision, not plumbing.
+
+(defn wants-bank? [kind :string loss :i64] :bool
+  (or (string=? kind "unauthorized-transfer")
+      (and (> loss 0)
+           (or (string=? kind "investment-scam")
+               (or (string=? kind "fake-billing")
+                   (string=? kind "support-scam"))))))
+
+(defn wants-platform? [kind :string] :bool
+  (or (string=? kind "account-takeover")
+      (or (string=? kind "impersonation")
+          (or (string=? kind "sns-fraud")
+              (string=? kind "leak-extortion")))))
+
+(defn wants-recovery? [kind :string] :bool
+  (or (string=? kind "account-takeover")
+      (or (string=? kind "phishing")
+          (string=? kind "support-scam"))))
+
+(defn documents-for-kind [kind :string loss :i64] :string
+  (let [core "damage-report\nincident-statement\nevidence-index\ndamage-calculation"
+        with-bank (if (wants-bank? kind loss)
+                    (string-concat core "\nbank-freeze-request")
+                    core)
+        with-platform (if (wants-platform? kind)
+                        (string-concat with-bank "\nplatform-request")
+                        with-bank)]
+    (if (wants-recovery? kind)
+      (string-concat with-platform "\nrecovery-plan")
+      with-platform)))
+
+
+;; --- the two documents a taken-over account actually needs ------------------
+;; The member is the author on both (G3), signs both (G2/G7), pays nothing for
+;; either (G1), and neither is published (G9). Those four are not options a host
+;; can pass differently: they are written into the text here, in the guest, which
+;; is the only place they cannot be argued with.
+;;
+;; 助 never submits. A recovery plan is executed BY the member (:self-submit) and
+;; a platform request is sent BY the member. No branch here can produce a
+;; document authored as the police, as a platform, or as 助 itself.
+
+(defn recovery-plan [service :string] :string
+  (let [name (if (string=? service "") "（サービス名）" service)]
+    (string-concat
+     (string-concat "アカウント復旧手順書（" (string-concat name "）\n\n"))
+     (string-concat
+      "■ 手順（上から順に本人が実行）\n"
+      (string-concat
+       (string-concat "  1. 別の安全な端末・ネットワークから対象サービスのパスワードをリセットする\n"
+                      "  2. ログイン中の全セッションを失効させる（「すべてのデバイスからログアウト」）\n")
+       (string-concat
+        (string-concat "  3. 二段階認証を再設定し、認証アプリ／バックアップコードを更新する\n"
+                       "  4. 登録メールアドレス・電話番号・復旧用情報が改ざんされていないか確認し、元に戻す\n")
+        (string-concat
+         (string-concat "  5. 連携アプリ・API トークンを見直し、見覚えのない連携を解除する\n"
+                        "  6. 同じパスワードを使い回した他サービスもすべて変更する\n")
+         (string-concat
+          "  7. 復旧後、プラットフォームの abuse 窓口へ被害を報告し、再発防止設定を有効化する\n\n"
+          "※ 復旧操作は本人が行ってください。助 は手順を提供するだけで、代理ログインはしません。\n※ この支援は無料です（¥0）。"))))))))
+
+(defn platform-request [platform :string account-id :string occurred :string kind :string] :string
+  (let [to (if (string=? platform "") "（プラットフォーム）abuse 窓口" platform)
+        acct (if (string=? account-id "") "（ID／URL を記入）" account-id)
+        at (if (string=? occurred "") "（年月日時を記入）" occurred)]
+    (string-concat
+     (string-concat "アカウントに関する凍結・復旧のご依頼\n\n"
+                    (string-concat "宛先: " (string-concat to "\n\n")))
+     (string-concat
+      (string-concat "私の利用するアカウントが" (string-concat (ja-kind kind) "の被害に遭いました。\n"))
+      (string-concat
+       "利用規約の不正利用条項に基づき、凍結・復旧の対応をお願いいたします。\n\n"
+       (string-concat
+        (string-concat (string-concat "・対象アカウント: " (string-concat acct "\n"))
+                       (string-concat "・被害日時: " (string-concat at "\n")))
+        (string-concat
+         "・添付: 被害状況報告書・証拠目録\n\n"
+         (string-concat
+          "                          利用者署名 ____________________\n\n"
+          "※ 本依頼書は利用者本人が送付するものです（本人作成・要署名・下書き）。"))))))))
+
+
+;; --- 金額の表記 -------------------------------------------------------------
+;; `comma` in tasuke's report_gen.cljc, moved into the guest because a filing
+;; states an amount and the amount has to read the same everywhere it appears.
+;; Recursive rather than a format string: the guest has no printf.
+
+(defn group3 [s :string] :string
+  (let [n (string-length s)]
+    (if (<= n 3)
+      s
+      (string-concat (group3 (string-substring s 0 (- n 3)))
+                     (string-concat "," (string-substring s (- n 3) n))))))
+
+(defn yen [n :i64] :string
+  (if (< n 0)
+    (string-concat "-" (group3 (string-from-i64 (- 0 n))))
+    (group3 (string-from-i64 n))))
+
+;; --- the police core --------------------------------------------------------
+;; 被害届 / 被害状況報告書 / 証拠目録 / 被害額算定書 and the bank 組戻し.
+;;
+;; These were a JavaScript reimplementation inside tasuke's app/index.html,
+;; kept honest by a drift-lock that grepped `const SCAM_KINDS = [...]` out of the
+;; HTML. That is the shape ADR-2608112100 calls a checked replica: two
+;; implementations bound by a test, with the authority in neither. Here the text
+;; IS the authority, and both runtimes execute it.
+;;
+;; The seam: what a member TYPED (a timeline, a list of evidence rows, a
+;; breakdown) is tabulated by the host and arrives as one joined string. The
+;; document around it — every sentence a reader of the filing sees, and the four
+;; charter invariants it states — is decided here.
+;;
+;; 被害届 needs six values and the ABI caps a function at five parameters, so the
+;; strings fold into a record. The :i64 stays a TOP-LEVEL parameter: an :i64
+;; inside a record demands a js/BigInt on ClojureScript, and this app runs there.
+
+(defn header [subject :string title :string] :string
+  (string-concat
+   (string-concat title "\n\n")
+   (string-concat
+    (string-concat "申告者: " (if (string=? subject "") "（被害者氏名）" subject))
+    "（本人作成・要署名）\n作成日: （提出日を記入）\n")))
+
+(defn damage-report [x [:ref :d/report] loss :i64] :string
+  (let [station (if (string=? (record-get x :station) "")
+                  "（管轄）警察署長 殿"
+                  (record-get x :station))
+        narrative (if (string=? (record-get x :narrative) "")
+                    "（事実を時系列で記入。別紙「被害状況報告書」参照）"
+                    (record-get x :narrative))
+        occurred (if (string=? (record-get x :occurred) "")
+                   "（年月日時を記入）"
+                   (record-get x :occurred))]
+    (string-concat
+     (string-concat (header (record-get x :subject) "被 害 届（下書き）")
+                    (string-concat "\n宛先: " (string-concat station "\n\n")))
+     (string-concat
+      "下記のとおり被害を受けましたので届け出ます。\n\n"
+      (string-concat
+       (string-concat (string-concat "1. 被害の種類: サイバー犯罪（"
+                                     (string-concat (ja-kind (record-get x :kind)) "）\n"))
+                      (string-concat "2. 被害日時: " (string-concat occurred "\n")))
+       (string-concat
+        (string-concat (string-concat "3. 被害の概要:\n   " (string-concat narrative "\n"))
+                       (string-concat "4. 被害額: 金 " (string-concat (yen loss) " 円\n")))
+        (string-concat
+         "5. 証拠資料: 別紙「証拠目録」のとおり\n6. 相手方に関する情報: （判明している口座番号・URL・連絡先等を記入）\n\n"
+         (string-concat
+          "上記に相違ありません。\n\n                          申告者署名 ____________________ 印\n\n"
+          "※ これは被害者本人が提出するための下書きです（本人作成・要署名・費用 ¥0・未提出）。"))))))))
+
+(defn incident-statement [subject :string timeline :string discovery :string current :string] :string
+  (string-concat
+   (string-concat (header subject "被害状況報告書") "\n■ 経緯（時系列）\n")
+   (string-concat
+    (string-concat (if (string=? timeline "") "  （出来事を起きた順に記入）" timeline) "\n\n")
+    (string-concat
+     (string-concat "■ 気づいた契機\n  "
+                    (string-concat (if (string=? discovery "") "（どのように被害に気づいたか）" discovery) "\n\n"))
+     (string-concat
+      (string-concat "■ 現在の状況\n  "
+                     (string-concat (if (string=? current "") "（口座凍結依頼済／パスワード変更済 等）" current) "\n\n"))
+      "※ 本書面は被害者本人が事実を整理したものです（本人作成・要署名・費用 ¥0・未提出）。")))))
+
+(defn evidence-index [subject :string rows :string n :i64] :string
+  (string-concat
+   (string-concat (header subject "証 拠 目 録")
+                  "\n各証拠は暗号化して保管し、下記 sha256 により改変のないことを確認できます。\n\n")
+   (string-concat
+    (string-concat (if (string=? rows "") "  （証拠なし）" rows) "\n\n")
+    (string-concat
+     (string-concat "件数: " (string-concat (string-from-i64 n) " 件\n\n"))
+     "※ 原本（暗号化）は被害者本人が保持します。本書は本人作成・要署名・費用 ¥0・未提出。"))))
+
+(defn damage-calculation [subject :string lines :string total :i64] :string
+  (string-concat
+   (string-concat (header subject "被害額算定書") "\n■ 内訳\n")
+   (string-concat
+    (string-concat (if (string=? lines "") "  ・（項目を記入）" lines) "\n\n")
+    (string-concat
+     (string-concat "■ 合計: 金 " (string-concat (yen total) " 円\n\n"))
+     "※ 領収書・取引明細は証拠目録に対応します。本書は本人作成・要署名・費用 ¥0・未提出。"))))
+
+(defn bank-freeze-request [subject :string bank :string occurred :string counterparty :string loss :i64] :string
+  (let [to (if (string=? bank "") "（金融機関名）御中" bank)
+        at (if (string=? occurred "") "（記入）" occurred)
+        cp (if (string=? counterparty "") "（口座番号・名義）" counterparty)]
+    (string-concat
+     (string-concat (header subject "不正送金に関する組戻し・口座凍結のご依頼")
+                    (string-concat "\n宛先: " (string-concat to "\n\n")))
+     (string-concat
+      "私の口座から、身に覚えのない送金（不正送金）が行われました。つきましては、\n振り込め詐欺救済法に基づき、振込先口座の凍結および組戻し手続きをお願いいたします。\n\n"
+      (string-concat
+       (string-concat (string-concat "・被害日時: " (string-concat at "\n"))
+                      (string-concat "・送金額: 金 " (string-concat (yen loss) " 円\n")))
+       (string-concat
+        (string-concat (string-concat "・振込先（判明分）: " (string-concat cp "\n"))
+                       "・警察への被害届: （提出予定／受理番号を記入）\n\n")
+        (string-concat
+         "                          依頼人署名 ____________________ 印\n\n"
+         "※ 本依頼書は被害者本人が金融機関へ提出するものです（本人作成・要署名・費用 ¥0・未提出）。")))))))
+
+;; --- G1 --------------------------------------------------------------------
+;; 助's support is free. This is the only cost the guest can express: there is
+;; no parameter to make it anything else, so a host cannot introduce a fee by
+;; passing one.
+
+(defn support-cost-jpy [] :i64 0)
+
+(defn main [] :string
+  (severity (classify "Xのアカウントを乗っ取られたかもしれません" "") 0 true))

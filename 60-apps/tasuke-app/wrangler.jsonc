@@ -1,0 +1,18 @@
+// 静的アセットだけの Worker。script を持たないので、配るのは
+// `public/`（1 文書 + 1 bundle）そのもの。
+//
+// ルーティングは fragment（`#plan`）なので SPA rewrite は要らない ——
+// `not_found_handling` を single-page-application にすると、存在しない
+// パスまで 200 で index を返し、壊れたリンクが「動いているように見える」。
+// この app に他のパスは無い。
+//
+// ⚠ deploy には Cloudflare の credential が要る。ADR-2608290300 のとおり、
+// 2026-08-29 の session はそれを持っていないので **deploy されていない**。
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tasuke-first-response",
+  "compatibility_date": "2026-08-29",
+  "assets": {
+    "directory": "./public"
+  }
+}
