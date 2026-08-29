@@ -215,6 +215,7 @@
   {:name "org-ietf-ed25519" :gate :jvm-test :cd true}
   {:name "org-ietf-cbor" :gate :jvm-test :cd true}
   {:name "io-multiformats" :gate :jvm-test :cd true}
+ {:name "kami-engine-rotor" :gate :jvm-test :ship-git-deps true :cd true}
   ;; public-global is records only — no src, no JVM deps. Two gates because they
   ;; answer different questions: `test/run.cljs` settles what the bytes can
   ;; settle (parses, catalogue shape, the floor, and whether the README lists
