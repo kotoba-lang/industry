@@ -1,0 +1,106 @@
+[{:db/id -1
+  :adr/id "adr-2608291057-murakumo-model-api-authentication-boundary"
+  :adr/title "Murakumo model API authentication boundary: public chat, CACAO writes, and passkey smart-account target"
+  :adr/status "accepted"
+  :adr/date "2026-08-29"
+  :adr/topic "murakumo-model-api-authentication"
+  :adr/doc_type "adr"
+  :source/dataset "adr"
+  :adr/authoritative_for "api.murakumo.cloud model API authentication claims and the passkey smart-account migration boundary"
+  :adr/repos ["network-awai/local-murakumo"
+              "kotoba-lang/identity"
+              "kotoba-lang/webauthn"
+              "kotoba-lang/org-chainagnostic-cacao"]
+  :adr/related ["90-docs/surface/murakumo-model-api-auth.edn"
+                "90-docs/surface/murakumo-model-api-auth-rule.edn"
+                "90-docs/surface/murakumo-model-api-auth.md"]
+  :adr/body "## Context
+
+`api.murakumo.cloud` exposes an OpenAI-compatible model API and several
+control-plane write routes. The word authentication had been used for three
+different mechanisms: anonymous public inference, actor capabilities, and the
+Kotoba identity model. Treating them as one mechanism led to the unsupported
+claim that every model request was already authenticated by a passkey-backed
+smart contract.
+
+The implementation observed on 2026-08-29 is narrower:
+
+- `POST /v1/chat/completions` is intentionally anonymous and caps
+  `max_tokens` at 2048. It does not verify WebAuthn, CACAO, or a contract.
+- actor-authored writes such as `/infer/runs`, `/infer/spend`, model/plan
+  updates, queue writes, and CDCI operations require a matching, verified
+  CACAO or the explicitly configured service bearer, according to the route.
+- `/infer/transfer` is stricter: only a CACAO whose issuer matches the sender,
+  whose signed resource names the exact recipient and credit amount, and whose
+  nonce is consumed once can authorize the transfer. A service bearer cannot.
+- the CACAO verifier checks a CAIP-122/SIWE envelope signed by an Ed25519
+  `did:key`. It does not itself prove that a passkey was used to mint it.
+- Kotoba identity already models a WebAuthn P-256 passkey as a replaceable
+  controller and an ERC-4337 smart account as a linked account verified with
+  ERC-1271 and optionally ERC-6492. That is a portable identity contract, not
+  evidence that local-murakumo currently performs those verifications.
+
+## Decision
+
+Record the current and target states separately.
+
+### Current production contract
+
+1. The public model alias is `murakumo-main` at
+   `https://api.murakumo.cloud/v1`.
+2. Anonymous chat remains a bounded first-value path. Documentation must say
+   that its API key is optional today and that anonymous output is capped at
+   2048 tokens. It must not call this path passkey-authenticated or
+   smart-contract-authenticated.
+3. CACAO is the actor capability wire for privileged writes. The API verifies
+   issuer, signature, temporal validity, route-specific scope, and replay
+   constraints where required. A bearer is an operator/service credential,
+   never proof of the human or actor principal.
+4. A CACAO may be minted after a separate passkey ceremony, including the
+   server-custodied passkey-gated bridge implemented by the CACAO edge library.
+   The resulting request is accurately described as passkey-gated only when
+   that ceremony and key custody have current evidence. The API-side CACAO
+   check alone cannot establish it.
+5. No current model request invokes an ERC-4337 account, ERC-1271/6492
+   verifier, UserOperation, paymaster, or on-chain transaction. The current
+   model API therefore is not a smart-contract authentication system.
+
+### Target composition
+
+The preferred higher-assurance path is:
+
+`WebAuthn assertion -> verified Kotoba principal controller -> linked smart
+account evidence -> short-lived, audience- and action-scoped capability ->
+Murakumo admission`.
+
+The passkey authenticates a controller, the smart account is an optional
+linked account/recovery/execution surface, and CACAO or Biscuit carries the
+bounded authority. Identity, account, and authority are not interchangeable.
+Inference should not require an on-chain transaction per token or per request.
+
+Calling the target implemented requires all of the following evidence:
+
+- single-use WebAuthn registration and authentication challenges with RP,
+  origin, user-presence, user-verification, signature, and counter checks;
+- a verified principal document containing the passkey controller evidence;
+- for a smart-account claim, a configured CAIP-10 account, chain, ERC-4337
+  protocol, ERC-1271 plus optional ERC-6492 verification, and deployment/link
+  evidence;
+- a short-lived capability whose audience, model/action, budget, and expiry
+  are checked by Murakumo;
+- live API introspection and negative/positive data-plane tests proving the
+  selected route rejects missing, replayed, expired, wrong-audience, and
+  wrong-scope proofs.
+
+## Consequences
+
+- Clients can use the public chat API without fabricating an API key, while
+  privileged and paid operations keep their stronger authorization boundary.
+- Documentation can say Kotoba is ready to represent passkey controllers and
+  smart accounts without misreporting the deployed Murakumo verifier.
+- A later passkey/smart-account rollout is an explicit authentication change,
+  not a documentation-only rename. It needs code, deployment, and live proof.
+- The machine-readable contract and rule beside this ADR are the claim gate;
+  stale documentation must fail toward `unverified`, never toward
+  `implemented`.
+"}]

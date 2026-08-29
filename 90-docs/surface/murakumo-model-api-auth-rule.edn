@@ -1,0 +1,43 @@
+[{:db/id -1
+  :rule/id :murakumo/model-api-auth-claim-v1
+  :rule/type :authentication-claim-boundary
+  :rule/status :active
+  :rule/authority :adr-2608291057-murakumo-model-api-authentication-boundary
+  :rule/effective-date "2026-08-29"
+  :rule/scope #{:api.murakumo.cloud :murakumo-model-api :kotoba-identity-integration}
+  :rule/default :unverified
+  :rule/must
+  [:name-the-route
+   :separate-authentication-from-authorization
+   :separate-principal-controller-account-and-capability
+   :state-current-versus-target
+   :bind-live-claims-to-data-plane-evidence]
+  :rule/must-not
+  [:call-anonymous-chat-passkey-authenticated
+   :call-cacao-verification-webauthn-verification
+   :call-a-linked-smart-account-an-authority-grant
+   :call-an-identity-library-model-a-live-api-integration
+   :infer-smart-contract-auth-from-siwe-or-did-pkh
+   :infer-passkey-use-from-a-valid-cacao]
+  :rule/claim-gates
+  {:passkey-based
+   #{:single-use-challenge :rp-id :origin :p256-signature
+     :user-presence :user-verification :credential-counter
+     :principal-controller-evidence :live-positive-and-negative-test}
+   :smart-contract-based
+   #{:caip10-account :chain-id :erc4337-protocol
+     :erc1271-or-erc6492-verification :account-link-evidence
+     :live-positive-and-negative-test}
+   :capability-authorized
+   #{:signature :issuer :audience :scope :expiry :replay-policy}}
+  :rule/failure-language
+  {:missing-evidence :unverified
+   :model-only :specified-not-integrated
+   :code-only :implemented-not-deployed
+   :deployed-without-data-plane-proof :deployed-not-production-verified}
+  :rule/current-facts
+  {:public-chat :anonymous-bounded
+   :public-chat-max-output-tokens 2048
+   :privileged-write :cacao-or-service-bearer-by-route
+   :transfer :exact-single-use-cacao-only
+   :passkey-smart-account-integration :specified-not-integrated}}]
