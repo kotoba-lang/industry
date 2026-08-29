@@ -82,6 +82,11 @@
   [unit reason]
   (contains? (get issuance unit #{}) reason))
 
+;; 検査は `units` から導出する。単位名をベタ書きすると、**新しい単位を足したときに
+;; その単位だけ検査を素通りする** —— 「入力が増えたのに検査が黙って合格する」形になる。
+(def labour-units (->> units (filter (comp #{:labour} :sphere val)) (map key) set))
+(def all-flow-nodes (conj (set (keys units)) :fiat))
+
 ;; ── bot の損益（ADR D5）────────────────────────────────────────────
 
 (defn bot-margin
@@ -96,10 +101,11 @@
 ;; ── 検査 ───────────────────────────────────────────────────────────
 
 (def checks
-  [["労圏の2単位は fiat へ償還できない"
-    #(every? (fn [u] (and (not (allowed? u :fiat))
-                          (false? (:redeemable-to-fiat? (units u)))))
-             [:KUMO :YATA])]
+  [["労圏の単位は fiat へ償還できない（対象は units から導出する）"
+    #(and (seq labour-units)                       ; 空集合に every? は真を返す = 検査不能を合格にしない
+          (every? (fn [u] (and (not (allowed? u :fiat))
+                               (false? (:redeemable-to-fiat? (units u)))))
+                  labour-units))]
 
    ["KUMO ↔ YATA は双方向とも禁止（内部為替が無い）"
     #(and (not (allowed? :KUMO :YATA)) (not (allowed? :YATA :KUMO)))]
@@ -113,9 +119,10 @@
    ["外部で取引できる単位はちょうど1つ（投機面の隔離）"
     #(= 1 (count (filter (comp :externally-tradeable? val) units)))]
 
-   ["EN はどの単位とも交換できない"
-    #(every? (fn [u] (and (not (allowed? :EN u)) (not (allowed? u :EN))))
-             [:KUMO :YATA :BOT :fiat])]
+   ["EN はどの単位とも交換できない（対象は units から導出する）"
+    #(let [others (disj all-flow-nodes :EN)]
+       (and (seq others)
+            (every? (fn [u] (and (not (allowed? :EN u)) (not (allowed? u :EN)))) others)))]
 
    ["『bot が働いた』では BOT は発行されない（収入裏付け）"
     #(and (not (mints? :BOT :bot-did-work))
@@ -141,10 +148,20 @@
                        {:kumo-price 1 :yata-price 1}))]
 
    ["膜は全列挙 —— 表に無い流れは禁止として答える"
-    #(not (allowed? :KUMO :some-unlisted-sink))]])
+    #(not (allowed? :KUMO :some-unlisted-sink))]
+
+   ;; `allowed?` は既定 deny なので、`:allow? false` の行を消しても検査は全部緑のまま通る
+   ;; —— つまり「全列挙」は表を読むだけでは強制されていない。全順序対に明示の行を要求して、
+   ;; 新しい単位を足したら**全ての流れについて判断を書くことを強制する**。
+   ["膜表は全順序対を明示している（新しい単位は全流れの判断を強制される）"
+    #(let [pairs (for [a all-flow-nodes b all-flow-nodes :when (not= a b)] [a b])
+           missing (remove (fn [pr] (contains? membrane pr)) pairs)]
+       (when (seq missing)
+         (println "   missing membrane rows:" (pr-str (vec missing))))
+       (and (seq pairs) (empty? missing)))]])
 
 ;; evidence floor: 検査本数が 0 や想定より少ないまま「合格」を返さない
-(def expected-checks 13)
+(def expected-checks 14)
 
 (let [n (count checks)]
   (when (not= n expected-checks)
