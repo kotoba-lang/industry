@@ -1,0 +1,49 @@
+;; manifest/cua-bots.edn — CUA bot roster（policy file、手書き。生成物ではない）
+;;
+;; 画面操作の常駐 bot（CUA = computer-use agent）の名簿。実行機構は
+;; kotoba-lang/computer-use の selectable-backend layer（backend 10 種:
+;; :macos-local :window-scoped :agent-space :fleet-node :macos-vm
+;; :linux-container :cf-browser :cf-sandbox :saas-sandbox :host-object）で、
+;; **backend は bot ごとにこの名簿の 1 keyword で選ぶ。bot の昇格 =
+;; :bot/backend の 1 keyword を書き換えるだけ**（goal / 手順は変わらない）。
+;;
+;; 呼び出し規約（orgs/kotoba-lang/computer-use から）:
+;;   nbb bin/cua_bot_run.cljs --roster <このファイル> --bot <bot-id> \
+;;       --receipts-dir ~/.gftd/cua-bots/receipts/<bot-id> [--dry-run]
+;;   exit 0 = session done / 1 = failed / 2 = could-not-measure（3 値。混ぜない）
+;;
+;; entry の形:
+;;   {:bot/id "<[a-z0-9][a-z0-9-]{0,63}>"  ; 一意
+;;    :bot/goal <string>                    ; この bot の目的（session が解釈する）
+;;    :bot/backend <keyword>                ; 上の 10 種から 1 つ
+;;    :bot/target <map>                     ; backend が読む対象記述
+;;    :bot/interval-s <int>                 ; 周期（tick が due? を測る）
+;;    :bot/max-steps <int>                  ; 1 session の行動上限
+;;    :bot/allowed-actions #{...}           ; #{:pointer :key :type :script} の部分集合
+;;    :bot/budget-tokens <int>}             ; 1 session のモデル予算
+;;
+;; 検査は scripts/cua-bots-tick.cljs（形）と lib 側 --dry-run（backend 実在 +
+;; probe）。ADR: adr-2608291900-cua-bots-selectable-backend-residents。
+
+[{:bot/id "uiux-bots-page-qa"
+  :bot/goal "https://itonami.cloud/bots/ を開き、3 セクション（Grok runtime / workstation loops / hyakka）が live データで描画されていることを目視相当で確認し、異常（空セクション・エラー表示・古すぎる updated_at）を報告する"
+  :bot/backend :window-scoped
+  :bot/target {:app "Google Chrome"
+               :url "https://itonami.cloud/bots/"}
+  :bot/interval-s 21600
+  :bot/max-steps 8
+  :bot/allowed-actions #{:script}
+  :bot/budget-tokens 30000}
+
+ {:bot/id "isekai-touch-qa"
+  :bot/goal "https://isekai.network/gftd/jintori が応答し scene が touch stick を宣言していることを検証する。実 touch drag の駆動は、それができる backend に昇格したときに行う（:bot/backend の 1 keyword 書き換え）"
+  ;; いまは :host-object — repo が持つ決定論の touch gate をそのまま対象にする。
+  ;; task 名は network-isekai の scripts/tasks.edn の :jintori-touch（実在確認済み
+  ;; 2026-08-29。exit 2 = could not measure を自分で申告する gate）。
+  :bot/backend :host-object
+  :bot/target {:cwd "orgs/network-awai/network-isekai"
+               :cmd ["nbb" "scripts/run-task.cljs" "jintori-touch"]}
+  :bot/interval-s 21600
+  :bot/max-steps 4
+  :bot/allowed-actions #{}
+  :bot/budget-tokens 10000}]
