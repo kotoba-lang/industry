@@ -50,16 +50,29 @@
 passkey 根にすれば **失った共有秘密を再発行せずに operator 権限が戻り**、共有秘密そのものが無くなるので同じ失い方が再発しない。`/internal/grok-bots/authorize` が通れば Grok Bots 登録も復活する。
 
 ### 2.3 着地（2026-08-29 時点）
+- `net-kotobase/control-plane` `121de3e` — authn 側：passkey-rooted operator authority（`30509e8` 実装 + `95e92f6` capability 文書 + `aadd25d5` 実測 ADR）。action ごとの scope（`models` / `restore` / `grok-bots`）、attenuation は「正しく検証されるが到達不能」と自分で申告（`biscuit.wire` に append が無く `mint` が next-secret を返さない）。**本番の `MURAKUMO_OPERATOR_DIDS` は実在しない principal を指す placeholder** —— 誰も operator token を発行できない fail-closed 状態で、従来（service bearer のみ）と同一。オーナーが自分の accountDid を入れると有効になる
 - `net-kotobase/control-plane` `30509e8` — authn 側：passkey-rooted operator authority
 - `net-kotobase/control-plane` `95e92f6` — capability 文書がどの credential を出すかを名乗る（Biscuit は not_accepted と明示）
 - `network-awai/cloud-murakumo` `68d7d28` — passkey-gated mk1 発行（`GET /api/v1/auth/passkey/options` + `POST /api/v1/auth/passkey/token`）
 
 **検証経路の選択は測定に基づく**：`/rpc/verify-session` ではなく `/rpc/verify-inference` を使う。前者は生きている session なら何にでも valid を返すので、CACAO サインインを passkey と誤認する。後者だけが phishing 耐性（authn-method ∈ passkey 系、assurance high、MFA 未了でない）を実際に検査する。
 
+### 2.4 実測した end-to-end（mock ではない。署名する仮想オーセンティケータを使用）
+`kotobase-authn` は version `c81ea5bb` で本番デプロイ済み。3 つの custom domain すべてで `/health`・`GET /v1/session`・`POST /rpc/verify-inference`・`POST /rpc/verify-operator` が 200。
+
+- **operator 経路（producer 側のみ・通る）**: passkey 登録 → controller-link → murakumo.cloud session → `POST /v1/murakumo/operator-token` → 201、`mro_` 722 字、actions `[\"grok-bots\",\"models\"]`、TTL 900s → `/rpc/verify-operator` が `valid:true` と holder DID を返す。**拒否も測った**: 持っていない action / 中間エンコーディングの改竄（実際にトークンが変わったことを assert 済み）/ `/rpc/verify-inference` への持ち込み / allowlist 外の principal（403 `operator_not_authorized`）。**失効も測った**: DID を外すと未失効トークンが `valid:true`→`valid:false`、発行は 201→403
+- **推論経路（今まで mock でしか測られていなかったもの・通った）**: `mrb_` 発行 → live admission が `maxOutputTokens: 32768` → `/v1/chat/completions` に `max_tokens: 20000`（匿名上限 16384 超）で **200**。ceiling / model / 改竄はいずれも拒否、匿名経路は不変
+- **未測定として残るもの**: 16384 超の clamp 演算そのもの。両経路とも 200 を返し、差は 16384 を超える生成でしか現れないが、モデルが 292 token で停止し、再試行は Cloudflare 503（47 秒）になった。**上限値は admission 境界で測れているが、その上の算術は測れていない**
+
 ## 3. 未完（closing 時点で正直に）
 
-- **cloud-murakumo は merge 済みだがデプロイ未了**。判別根拠：本番 `/api/v1` の auth キーが SIWE/wallet の 6 個のままで、デプロイ前ベースラインと一致。新ルートを叩くと旧汎用ゲートの 401 が返る。**着地は有効化ではない**
-- **local-murakumo（api.murakumo.cloud）の消費者側が未着地**。したがって murakumo の operator route はまだ passkey Biscuit を受理せず、Grok Bots 登録も未復活
+- ~~cloud-murakumo デプロイ未了~~ **→ 完了**（version `38e0b0ec`）。独立確認：`/api/v1` の auth キーに passkey 5 件（`passkey-mint` / `passkey-options` / `passkey-scopes` / `passkey-ttl-seconds` / `passkey-relying-party`）が出現、未認証 mint が汎用 401 でなく `passkey-credential-required` を返す、homepage・models・SIWE は 200 を維持。**着地と有効化は別物**という判別（capability 文書のキーがデプロイ前ベースラインと一致するか）がここで効いた
+- **local-murakumo（api.murakumo.cloud）の消費者側が未着地**。実装は完成し全テスト緑（204 cljs / 1087 assertions、8 node:test、12 vitest）だが、**remote branch `network-awai/agent/passkey-operator-authority` = `caf90b7` に未マージで残っている**。⚠ **この branch を消さないこと** —— 消費側の成果物そのもの。したがって murakumo の operator route はまだ passkey Biscuit を受理せず（`POST /internal/grok-bots/authorize` は有効な `mro_` に対しても本番で 401）、**Grok Bots 登録も未復活**
+  - 着地できなかった理由：main が 2 度動き、conflict するのが**生成物**（`release/cljs/worker.js.gz` と `manifest.json`）で、これは片側を選んで解決してはならず merged tree から再生成する必要がある。再生成には `build` resource-guard 下の `shadow-cljs release` が要り、隣のセッションが約 50 分連続でロックを保持していた
+  - **次の agent が先に処理すべき第 2 の障害**：共有 checkout が main の `release/cljs/manifest.json` が記録する SHA から乖離している（`cloud-murakumo` が 8 commit 先行、`org-chainagnostic-cacao` が 2 先行、**`murakumo` は遅れ**）。共有 checkout のまま再生成すると未レビューの sibling drift を出荷し、かつ Kotoba oracle を退行させる。**private worktree で manifest の SHA に pin してから**再生成する
+- **`MURAKUMO_OPERATOR_DIDS` が placeholder**（`did:web:kotoba.cloud:tenant:u_NO-OPERATOR-CONFIGURED`）—— 消費側が着地しても、オーナーが `wrangler secret put MURAKUMO_OPERATOR_DIDS --name kotobase-authn`（値は `GET https://auth.murakumo.cloud/v1/session` の `accountDid`）を実行するまで誰も operator token を発行できない。意図的な fail-closed で、挙動は変更前（service bearer のみ）と同一
+- **`metrics-auth-ok?` の fail-open 修正も同じ未マージ branch の中**。ただし実測により **`MURAKUMO_METRICS_TOKEN` は本番で設定済み**（`wrangler secret list` に存在し、誤った bearer は 4 経路とも 401）なので、**塞いでも誰も 401 にならない**。判別は実バイナリで測った（修正前 bundle は未認証 POST がハンドラまで到達、修正後は 401）
+- **通常のデプロイ経路が壊れている**（cloud-murakumo）。`npm run deploy` が `could not mint a deployment-lease token` で失敗し、原因は kagi に `MURAKUMO_CLOUD_SITE_TOKEN_SECRET_2` が無いこと。vault の総当たり探索はせず（安全床⑦）、`assertDeployCurrentMain` を両側で保つ `deploy:bootstrap-model-hosting` で出した。復旧はオーナー操作。⚠ **`KAGI_HOME` 無しの `bin/kagi` は自分の repo の古い vault を読むので、「鍵が無い」と「違う金庫を見た」が同じ一行で返る**（secrets map に記録済み、root `4d7eb1e`）
 - `metrics-auth-ok?`（`worker.cljs:560`）の **fail-open が未修正** —— `MURAKUMO_METRICS_TOKEN` 未設定なら 4 経路が誰でも書ける。この repo で唯一の fail-open
 - Grok Bots 観測係 2 体（`isekai-game-production` / `kami-lib-maintainer`）は payload 準備済み・未登録
 - タッチ入力欠落があと 23 ゲーム（tick が列挙。bot が 6h に 1 件ずつ）
@@ -84,8 +97,14 @@ passkey 根にすれば **失った共有秘密を再発行せずに operator �
 
 ## 6. 次の agent への resume point
 
-1. **cloud-murakumo をデプロイする**（`deploy` scope の lock は空だった。競合は `build` のみ）。確認は `/api/v1` の auth キーに passkey ルートが出るか、未認証 `POST /api/v1/auth/passkey/token` が汎用 401 でなく名前つき拒否を返すか
-2. **local-murakumo の消費者側を着地させる** —— operator-scoped Biscuit を既存 bearer と**並べて**受理（`worker_entry.js` の JS gate と CLJS gate の両方）。無人経路は触らない
+1. **`agent/passkey-operator-authority`（`caf90b7`、network-awai/local-murakumo）を着地させる**（最優先。これが無いと passkey operator 経路は片側だけで、Grok Bots も戻らない）。手順は測定済みで、順序が重要：
+   (a) main から worktree を切って branch を merge —— **source は綺麗に merge でき、conflict するのは生成物 2 つだけ**
+   (b) sibling を main の `release/cljs/manifest.json` の SHA に **private worktree で** pin（最低 `murakumo` `4eb071a`、`org-chainagnostic-cacao` `2f74d25`、`cloud-murakumo` `bbf0899`）。**共有 checkout に対してビルドしない**
+   (c) `build` resource-guard 下で `shadow-cljs release worker ui` → `gzip -n` → `manifest.json` の digest を書き直し、`node scripts/package-release.mjs` が再現するまで合わせる
+   (d) `npm test` → `npx vitest run`（branch に入っている config 修正が無いと vitest はそもそも起動しない）
+   (e) server-side merge → `api.murakumo.cloud` を deploy
+   (f) `MURAKUMO_OPERATOR_DIDS` を一時的に設定して `scratchpad/e2e_operator_prod.sh` を回す。**probe に使うのは `/internal/grok-bots/authorize`**（副作用が無い）。⚠ **`PUT /infer/models/:id` を本番で probe しない** —— どの route でも消せない registry entry が残る
+2. **`MURAKUMO_OPERATOR_DIDS` にオーナーの accountDid を入れる**（1 の後。それまでは誰も発行できない）
 3. **`metrics-auth-ok?` を fail-closed に**。ただし先に本番で `MURAKUMO_METRICS_TOKEN` が設定済みかを測る（未設定なら hwmetrics reporter が 401 になる）
 4. **passkey→operator の end-to-end を実測**（仮想オーセンティケータで。mock で代替しない）
 5. `:linux-container` backend —— これが `:window-scoped` の自走不能を解き、fleet 並列を開く。docker/OrbStack はローカルに在るので必要なのは Xvfb イメージ
