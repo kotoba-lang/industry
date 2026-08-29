@@ -244,7 +244,44 @@
 
 (defn sync-main! [env]
   (checked ["git" "fetch" "origin" "main"] {:dir worktree :env env})
-  (checked ["git" "merge" "--ff-only" "origin/main"] {:dir worktree :env env}))
+  (let [ff (run ["git" "merge" "--ff-only" "origin/main"] {:dir worktree :env env})]
+    (when (pos? (:exit ff))
+      ;; Diverged, not merely behind: a previous tick committed and pushed but
+      ;; its server-side merge was refused (measured 2026-08-29: main moved
+      ;; under the tick, the generated catalogue conflicted, the merge 409'd,
+      ;; and every later tick failed this fast-forward the same way for hours
+      ;; — a silent permanent stall, since only launchd reads the exit code).
+      ;; When the stranded commits are already on the integration branch,
+      ;; retry the server-side merge once — main may have moved past the
+      ;; conflict — then fast-forward onto the result. A conflict that
+      ;; persists is named with the stuck commits and the runbook instead of
+      ;; being retried into the same wall every 15 minutes.
+      (let [ahead (str/trim (checked ["git" "rev-list" "--oneline" "origin/main..HEAD"]
+                                     {:dir worktree :env env}))
+            on-branch (zero? (:exit (run ["git" "merge-base" "--is-ancestor" "HEAD"
+                                          "refs/remotes/origin/resident/knowledge-ingest"]
+                                         {:dir worktree :env env})))]
+        (when-not on-branch
+          ;; Push first so the retry below always merges what this worktree
+          ;; actually holds; HEAD:resident/knowledge-ingest is the wrapper's
+          ;; own integration branch.
+          (run ["git" "push" "origin" "HEAD:resident/knowledge-ingest"]
+               {:dir worktree :env env}))
+        (let [merge-result (run ["gh" "api" "repos/network-awai/app-hyakka/merges"
+                                 "-f" "base=main" "-f" "head=resident/knowledge-ingest"
+                                 "-f" "commit_message=ingest: merge stranded resident tick"]
+                                {:dir worktree :env env})]
+          (when (and (pos? (:exit merge-result))
+                     (not (str/includes? (:err merge-result) "No commits between")))
+            (fail! (str "resident worktree diverged from origin/main and the server-side "
+                        "merge retry was refused (" (str/trim (:err merge-result)) "). "
+                        "Stranded local commits:\n" ahead "\n"
+                        "Runbook: merge origin/resident/knowledge-ingest onto origin/main in a "
+                        "clean worktree, resolving src/hyakka/catalog.cljc by `npm run catalog` "
+                        "regeneration (never by marker editing), land it server-side, then this "
+                        "worktree fast-forwards on the next tick.")))
+          (checked ["git" "fetch" "origin" "main"] {:dir worktree :env env})
+          (checked ["git" "merge" "--ff-only" "origin/main"] {:dir worktree :env env}))))))
 
 (defn catalogue-id []
   (let [source (.readFileSync fs (.join path worktree "src/hyakka/catalog.cljc") "utf8")
