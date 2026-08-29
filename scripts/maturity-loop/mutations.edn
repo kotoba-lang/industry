@@ -41,7 +41,77 @@
  :isolation :worktree
 
  :suites
- [{:repo "orgs/kotoba-lang/langgraph"
+ [{:repo "orgs/cloud-itonami/tsukuru-manufacturing-artifacts"
+   :label "tsukuru artifact catalog vs the dataset it describes"
+   ;; index/catalog.datoms.edn says of itself "This file is hand-maintained
+   ;; today", and until 2026-08-29 nothing read it. The mutations below are the
+   ;; ways it drifts: a byte count edited by hand, an object replaced without
+   ;; the catalog following, a row removed, coverage left overclaiming, a
+   ;; qualification quietly upgraded, an allowlist narrowed underneath it.
+   ;;
+   ;; All seven were replayed at pin afb6825e on 2026-08-29 before landing —
+   ;; each anchor unique, each bite naming the invariant it claims, base green
+   ;; before and after. The last is the refusal floor itself: an empty
+   ;; allowlist must exit **2**, not 1 and not 0, so "could not measure" never
+   ;; reads as the OK a clean run prints.
+   ;;
+   ;; NOT covered here: `raw-is-annexed-not-committed` fires on a plain blob
+   ;; committed under raw/, which no find/replace on a tracked text file can
+   ;; produce. It was verified by hand (git add -f raw/cae/leaked.edn -> exit 1,
+   ;; naming that invariant and nothing else) and stays unguarded by this loop.
+   :cmd ["nbb" "test/catalog_test.cljs"]
+   :green-marker "catalog-check: OK"
+   :mutations
+   [{:id :tsukuru/bytes-drift
+     :why "a hand-edited :artifact/bytes. The key carries the true size (-s1567), so the catalog can be checked against the object rather than against another hand-written number"
+     :file "index/catalog.datoms.edn"
+     :find ":artifact/bytes 1567"
+     :replace ":artifact/bytes 1568"
+     :must-fail ["catalog-bytes-matches-key"]}
+
+    {:id :tsukuru/object-replaced-catalog-not-followed
+     :why "the object is re-run and its key changes, but the row still names the old one — the shape this drifts in when somebody regenerates a solver output"
+     :file "index/catalog.datoms.edn"
+     :find ":artifact/annex-key \"SHA256E-s1567--59a21c81e6435755eae10bc5a1337bfca877943e6a9a5b216670185efed102ef.edn\""
+     :replace ":artifact/annex-key \"SHA256E-s1567--59a21c81e6435755eae10bc5a1337bfca877943e6a9a5b216670185efed102ee.edn\""
+     :must-fail ["catalog-key-matches-tree"]}
+
+    {:id :tsukuru/coverage-overclaims
+     :why "the coverage row exists so two rows are not read as tsukuru's manufacturing output. Drift here lies in the direction that misleads"
+     :file "index/catalog.datoms.edn"
+     :find ":artifact.coverage/objects 2"
+     :replace ":artifact.coverage/objects 3"
+     :must-fail ["coverage-count-matches-rows"]}
+
+    {:id :tsukuru/qualification-quietly-upgraded
+     :why "README: the :not-qualified marking is deliberate, 'rather than leaving a reader to assume otherwise from the presence of numbers'. Without this, a query reads a result as a qualification"
+     :file "index/catalog.datoms.edn"
+     :find ":artifact/qualification-claim :no-industrial-accuracy-claim\n  :artifact/dataset \"tsukuru-manufacturing-artifacts\"}\n\n {:db/id -2"
+     :replace ":artifact/qualification-claim :verified\n  :artifact/dataset \"tsukuru-manufacturing-artifacts\"}\n\n {:db/id -2"
+     :must-fail ["unqualified-carries-no-accuracy-claim"]}
+
+    {:id :tsukuru/object-loses-its-row
+     :why "an annexed object with no catalog row is invisible to every consumer that trusts this file instead of fetching — which is the whole point of the file. Coverage necessarily falls with it, so both are named"
+     :file "index/catalog.datoms.edn"
+     :find "{:db/id -2\n  :artifact/id \"cae-reference-cfd\"\n  :artifact/path \"raw/cae/cae-reference-cfd.edn\"\n  :artifact/annex-key \"SHA256E-s1564--aff2c27b2c8ada8617c52efbdb816833c74c2dd6b811a5be0d0dedaa8a295ed2.edn\"\n  :artifact/bytes 1564\n  :artifact/kind :cae-reference-output\n  :artifact/solver-kind :cfd\n  :artifact/producer \"kotoba-lang/kami-engine-cae-solver\"\n  :artifact/producer-sha \"42afc0c52d73d42db52f5a0fe733299db7fe144b\"\n  :artifact/qualification :not-qualified\n  :artifact/qualification-claim :no-industrial-accuracy-claim\n  :artifact/dataset \"tsukuru-manufacturing-artifacts\"}\n\n "
+     :replace ""
+     :must-fail ["tree-object-has-catalog-row" "coverage-count-matches-rows"]}
+
+    {:id :tsukuru/allowlist-narrowed-under-the-catalog
+     :why "scripts/verify-artifact-path-policy.cljs checks the TREE against the allowlist; nothing checked the CATALOG, which is what downstream reads. Narrowing the shape leaves both rows outside policy"
+     :file "index/policy.edn"
+     :find ":regex \"^raw/cae/"
+     :replace ":regex \"^raw/cae-disabled/"
+     :must-fail ["catalog-path-within-policy"]}
+
+    {:id :tsukuru/floor-empty-allowlist-must-refuse
+     :why "the floor itself. An unreadable input must not fall through the same seq as a clean one: exit 2 and REFUSED, never the OK a clean run prints"
+     :file "index/policy.edn"
+     :find ":policy/allowed-paths\n [{:shape \"raw/cae/<slug>.edn\""
+     :replace ":policy/allowed-paths []\n :policy/allowed-paths-disabled\n [{:shape \"raw/cae/<slug>.edn\""
+     :must-fail ["REFUSED"]}]}
+
+  {:repo "orgs/kotoba-lang/langgraph"
    :label "langgraph runtime claims, superstep semantics, thread custody"
    ;; 最初の 4 件は docs/operator-quickstart.md が host 作者に伝える 4 つの
    ;; 実行時の事実（API からは見えない）を守る。prose は黙って腐るので各主張に
