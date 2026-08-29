@@ -1,0 +1,195 @@
+[{:db/id -1
+  :adr/id "adr-2608760000-jvm-free-multi-route-http-service-host"
+  :adr/title "amu: a JVM-free, multi-route HTTP host for compiled Kotoba guests (kotoba/http-service)"
+  :adr/status "accepted"
+  :adr/body
+  "## Context
+
+The owner asked to remove the JVM dependency from `cloud-itonami/cloud-itonami-app`
+(a full JVM Clojure webapp) and run it via the `kotoba` CLI, authorizing new
+libraries in `kotoba-lang` where needed.
+
+Investigation (this session) found:
+
+- `kotoba-lang/amu`'s `runtime/wasi-service.mjs` is a real, working JVM-free
+  HTTP host: a Node `node:http` server that instantiates a compiled `.kotoba`
+  WASM module via WASI (`runtime/wasi-host.mjs`) and dispatches to it. It is
+  extremely narrow: exactly one route (`POST /v1/run`), a request schema
+  locked to `{entry, args, format}` with `args` bounded to 5 canonical i64
+  decimal strings. No arbitrary JSON body, no multiple routes, no sessions.
+- `kotoba-lang/mesh` (`HTTP mesh-route runtime for compiled Kotoba guests`) is
+  the closest prior art for the DESIGN PATTERN, not a solution to the JVM
+  problem: its `route.kotoba` decision core (compiled ahead of time, executed
+  on every request) is real and landed (ADR-2608120200), but its host
+  (`node.clj`) runs on JVM + Chicory. Reusing mesh's route.kotoba source
+  as-is was considered and rejected: it hard-codes murakumo's fixed
+  `/mesh/http/<route>` prefix scheme, a different product than a general
+  reusable multi-route table.
+- `kotoba-lang/kotobase-server`'s own README documents that this workspace's
+  flagship production server (kotobase.net) has NOT achieved a JVM/Rust-free
+  replacement either (ADR-2607072000 no-Rust policy, pinned Rust binary,
+  \"no cljc successor\" yet). The gap this ADR closes is real, and closing it
+  here does not imply kotobase.net or cloud-itonami-app are now JVM-free.
+- No existing repo already provides this (checked via
+  `nbb scripts/repo-search.cljs http serve route multi-route` and
+  `json codec document-json`; closest hits were `mesh` (JVM-hosted),
+  `capability-http-fetch`/`capability-http-post`/`capability-component-http`
+  (outbound-only atomic capability contracts, not a serving host), and
+  `kotoba-lang/json` (a `.cljc` JSON codec with no `.kotoba` port yet).
+
+Per this workspace's `.kotoba` runtime-priority rule (`kotoba wasm runtime >
+clojurewasm > ClojureScript > nbb`, JVM/bb demoted to last resort) and the
+'既定は restricted ESM' section of CLAUDE.md, a Node-hosted `:js-kotoba-v1`
+restricted-ESM module (`amu compile --target js`) is an explicitly sanctioned,
+already-proven way to run compiled Kotoba guests without a JVM at RUNTIME
+(the compiler itself still needs a JDK to produce the `.mjs` artifact --
+that is a build-time tool dependency, not a runtime one, and is explicitly
+out of scope for ADR-2607198300's 'no JVM at runtime' rule, same as gcc
+needing to run somewhere to build a native binary).
+
+Empirical finding this session: `--target js` (`:js-kotoba-v1`) turns out to
+be a BETTER fit for an HTTP host than the WASI/wasm32 path `wasi-service.mjs`
+already uses. A restricted-ESM instance exposes plain JS values directly
+(strings pass as plain JS strings, i64 as BigInt, keywords as `\":kw\"`
+strings, bool as plain bool -- confirmed by compiling and calling a probe
+module) and is fuel-metered per `instantiateKotoba()` call (confirmed via
+`amu/runtime/dom-driver.mjs`'s own documented behaviour: a shared instance
+dies of `fuel-exhausted` after ~8 calls). A guest call therefore either
+returns or traps -- it cannot spin the event loop forever -- so no
+`worker_threads.Worker` isolation is needed, unlike `wasi-service.mjs`.
+
+## Decision
+
+Add `runtime/http-service.mjs` to `kotoba-lang/amu`: a multi-route, JSON-body
+HTTP host for `:js-kotoba-v1` guests, following the SAME decision/mechanism
+split `kotoba-lang/mesh`'s `route.kotoba` established (ADR-2608120200), ported
+onto this JVM-free host rather than reusing mesh's fixed-prefix core:
+
+- `runtime/http/route-decide.kotoba`, compiled ahead of time to
+  `runtime/http/route-decide.mjs` and called on every request, decides:
+  which built-in kind a (method, path) pair is (`:health`, `:metrics`,
+  `:route`), what outcome a request produces given a HOST-SUPPLIED BOOLEAN
+  for 'is this route bound' and 'did the guest answer' (never the route
+  table itself -- mirrors mesh's ADR-2608112100 measured boundary: a core
+  handed one decision's worth of scalars delegates; a core handed a growing
+  collection does not), and what HTTP status an outcome gets.
+- `runtime/http-service.mjs` owns the route TABLE (grows with deployment),
+  Node socket/JSON mechanics, sealed sha256 digest verification of every
+  loaded guest module (refuses to import a module whose bytes don't hash to
+  the pinned digest), a hard refusal of any module declaring a non-empty
+  `requiredCapabilities` (this host grants zero capabilities to any guest --
+  every route handler and the decision core itself are `kotoba/pure`), and
+  bounded concurrency/body-size (65536 bytes, `stringLimits.valueBytes`'s own
+  measured ceiling on this target).
+- Body/response values cross the boundary as `:string` (not `:document`):
+  the host validates the request body and the guest's returned string are
+  each syntactically valid JSON (via `JSON.parse`, reject on failure) and
+  passes/returns the exact original bytes -- no restructuring. This is a
+  genuine generalization from `wasi-service.mjs`'s 5-bounded-i64-args scheme
+  to arbitrary-size JSON bodies, proven end to end with a `POST /echo` route
+  that round-trips an arbitrary JSON object byte-for-byte.
+
+Landed via https://github.com/kotoba-lang/amu/pull/680 (merge commit
+391124d81b447884850811da9d59141eacf05a33 on `kotoba-lang/amu` main). The
+`amu` west pin did not need advancing here: by the time this ADR landed, a
+separate routine had already moved the pin to a6ccf157111f, which
+`gh api repos/kotoba-lang/amu/compare/391124d8...a6ccf157111f` confirms is
+2 commits strictly ahead of (0 behind) this PR's merge commit -- i.e. this
+change is already included in the pinned checkout. Verified with
+`gh api repos/kotoba-lang/amu/compare/a6ccf157111f...main` -> `identical`,
+so the pin is also not stale against amu's current tip.
+
+## Verification (real, not simulated)
+
+`scripts/http-service-e2e.cljs` (the repeatable, real test): recompiles
+`route-decide.kotoba` fresh and fails loudly on any drift from the shipped
+`route-decide.mjs`'s `sourceDigest`; compiles two disposable fixtures fresh
+every run (a demo guest exporting `health`/`echo`, and a decision-core
+DOUBLE with deliberately different status mapping); starts a real
+`node:http` server; and fires real HTTP requests via `fetch` against it.
+18 assertions, all passing, including:
+
+- real end-to-end dispatch: `GET /health` -> 200 with a fixed JSON body,
+  `POST /echo` -> 200 round-tripping an arbitrary JSON object byte-for-byte,
+  `GET /nope` -> 404 with `not-found` (an unregistered route),
+  `POST /health` (wrong method) -> 404, malformed JSON body -> 400,
+  oversized body -> 413, `/healthz` and `/metrics` host built-ins unaffected
+  by the route table.
+- **delegation** (the test that actually distinguishes 'calls the compiled
+  core' from 'has its own hardcoded cond', mirroring mesh's own
+  `kotoba_oracle_test.clj` philosophy): swapping the decision core for the
+  double changes an unbound route's status from 404 to 410 -- proving the
+  host really asks the core, not a copy of its logic.
+- a module with a digest mismatch is refused at STARTUP, not silently served.
+- a module declaring a required capability (reused `examples/capability.kotoba`
+  + `examples/capability-policy.edn`, which compiles to `requiredCapabilities:
+  [7]` even on this target) is refused at startup -- this host really grants
+  nothing, it is not merely undocumented that it could.
+
+Separately, real `curl` requests were run against a standalone
+`node runtime/http-service.mjs` process (not just the in-process test
+harness) for `GET /health`, `POST /echo`, `GET /nope`, `GET /healthz` --
+transcript recorded in the landing PR. `ps` was checked before/during/after
+to confirm no `java` process is running while the server answers requests
+(java only ran during the earlier compile step).
+
+## Honest scope statement -- how far this is from 'cloud-itonami-app runs without a JVM'
+
+**Not close. This lands zero application routes.** `cloud-itonami-app`'s
+`server.clj` has a large route surface (auth, mail sync, drive sync, an LLM
+tool-calling loop, wallet/payments, WebAuthn ceremonies, OAuth redirects) --
+none of it was touched, ported, or even inventoried route-by-route this
+session. What exists now is a bare mechanism that can serve `N` routes
+whose handlers are pure `:string -> :string` Kotoba functions with no
+sessions, no cookies, no streaming, and no in-guest structural JSON parsing
+(the body crosses as a validated-syntactically-JSON string; a guest that
+wants to inspect individual fields must do its own string work today, or
+wait for `kotoba-lang/json`'s `.cljc` JSON codec to get a `.kotoba` port --
+that port does not exist yet and is not started by this ADR).
+
+Concretely unaddressed and each requiring separate, likely substantial,
+future ADRs before any real progress on `cloud-itonami-app`:
+
+- **WebAuthn ceremonies** -- not investigated at all this session. Almost
+  certainly needs a `.kotoba`-callable crypto capability (COSE/CBOR
+  attestation verification) this workspace does not yet have compiled to
+  any Kotoba target.
+- **OAuth redirects / session cookies** -- this host has zero cookie/session
+  primitives; sessions would need a new capability-gated store, not a pure
+  guest function.
+- **Mail sync / drive sync** -- these are outbound integrations
+  (`capability-http-fetch`/`capability-http-post` exist as atomic
+  authorities, but no guest-callable client library compiled to `.kotoba`
+  wires them up yet).
+- **LLM tool-calling loop** -- no `.kotoba` LLM client exists; this is a
+  meaningfully sized separate build.
+- **Wallet/payments** -- explicitly out of scope for any agent per this
+  workspace's safety floor (no autonomous fund movement).
+- **Structural JSON parsing inside a guest** -- named above; today a guest
+  can only pass through or emit fixed JSON text, not inspect arbitrary keys.
+
+## Proposed next slice (scoped, not started)
+
+A single real `cloud-itonami-app` read-only GET endpoint with NO auth, NO
+session, and a fixed response shape (e.g. a health/status endpoint that
+currently exists in `server.clj`) ported end-to-end onto this host, as the
+first proof that a real application route -- not a synthetic demo -- can run
+on `http-service.mjs`. That slice would also be the first real pressure test
+of the 'body crosses as a validated-JSON string, not a structured value'
+design choice, and should decide whether the `kotoba-lang/json` `.cljc` port
+to `.kotoba` needs to happen before or after it.
+
+## Consequences
+
+- `kotoba-lang/amu` gains a second, general-purpose HTTP host alongside the
+  narrow `wasi-service.mjs`; both remain (different guest compile targets,
+  different tradeoffs -- wasi-service.mjs's Worker-thread isolation may still
+  be preferable for guests that need a hard OS-level time cutoff rather than
+  a fuel budget).
+  - No new capability-authority repo was created (`capability-http-serve` /
+    `capability-net-listen` were considered per the naming-rules check in
+    `manifest/repository-rules.edn`'s `capability-` prefix declaration, which
+    requires `:execution :none` -- a contract-only repo -- and this host is
+    execution, not a contract). A future slice where GUESTS (not the host)
+    need direct listen/accept authority would be the trigger to add one;
+    today's guests are capability-free pure functions, so none was needed."}]
