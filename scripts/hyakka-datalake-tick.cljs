@@ -74,9 +74,30 @@
 (defn sh [args opts]
   (let [r (cp/spawnSync (first args) (clj->js (rest args))
                         (clj->js (merge {:encoding "utf8" :timeout 1800000
-                                         :maxBuffer (* 64 1024 1024)} opts)))]
-    {:exit (if (nil? (.-status r)) 1 (.-status r))
+                                         :maxBuffer (* 64 1024 1024)} opts)))
+        status (.-status r)
+        signal (.-signal r)
+        spawn-error (.-error r)]
+    ;; A null status means the child never exited on its own: it was killed by
+    ;; a signal (the :timeout above sends SIGTERM) or never started. Mapping
+    ;; that to 1 makes "we cut it off at 30 minutes" and "it failed" the same
+    ;; line in the log -- with empty stderr in both cases, because a killed
+    ;; process writes none. Found live 2026-08-29: hyakka-datalake logged
+    ;; `export failed (1):` with nothing after it, and the cause was this
+    ;; timeout firing under machine load, not the exporter.
+    {:exit (if (nil? status) 1 status)
+     :killed-by (when (nil? status) (or signal (some-> spawn-error .-message) "unknown"))
      :out (str (or (.-stdout r) "")) :err (str (or (.-stderr r) ""))}))
+
+(defn- failure-detail
+  "Why the child stopped, said in a way that distinguishes the two cases."
+  [{:keys [exit killed-by err]}]
+  (if killed-by
+    (str "killed by " killed-by " (not an exit code -- the timeout in `sh`, "
+         "or a failure to start). A killed process writes no stderr, so its "
+         "absence below is expected and is NOT evidence the child was silent "
+         "about a real error.\n" err)
+    (str "exit " exit "\n" err)))
 
 (defn -main []
   (let [{:keys [files sig]} (ledger-signature)
@@ -92,14 +113,14 @@
         (print (:out ex))
         (when (pos? (:exit ex))
           (die! (if (= 2 (:exit ex)) 2 1)
-                (str "export failed (" (:exit ex) "):\n" (:err ex))))
+                (str "export failed: " (failure-detail ex))))
         (let [ld (sh ["python3" (str root "/scripts/datalake-sync.py")
                       "--spec" (path/join out-dir "hyakka.spec.json")
                       "--in-dir" out-dir] {:cwd root})]
           (print (:out ld))
           (when (pos? (:exit ld))
             (die! (if (= 2 (:exit ld)) 2 1)
-                  (str "iceberg load failed (" (:exit ld) "):\n" (:err ld))))
+                  (str "load failed: " (failure-detail ld))))
           ;; Written only after the load reported success, so a crashed load
           ;; leaves the signature stale and the next tick retries rather than
           ;; recording a sync that did not happen.
