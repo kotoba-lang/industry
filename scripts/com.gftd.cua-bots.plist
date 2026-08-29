@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.gftd.cua-bots — CUA bot（selectable-backend 画面操作の常駐 bot）の loop
+  (ADR-2608291900)
+
+  Install:
+    cp scripts/com.gftd.cua-bots.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.cua-bots.plist
+    launchctl kickstart -k gui/$(id -u)/com.gftd.cua-bots
+
+  Unload:
+    launchctl bootout gui/$(id -u)/com.gftd.cua-bots
+
+  Interval: 3600s (1h)。tick が名簿（manifest/cua-bots.edn）の due を測り、
+  due な bot だけ kotoba-lang/computer-use の bin/cua_bot_run.cljs を回す。
+  **この loop は `claude -p` を呼ばない**（モデルの解釈は lib の session 内、
+  予算は名簿の :bot/budget-tokens）。skip-permissions フラグは存在しない。
+  lib が未着地の周は :not-measured として ledger に残る（failed でも done でもない）。
+  lock: ~/.gftd/cua-bots.lock / ledger: ~/.gftd/cua-bots/ledger.edn。
+
+  env block は姉妹 plist と同型の標準（nbb / git / gh を launchd の最小 env でも
+  同じ条件で動かすため）。
+-->
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>COM_JUNKAWASAKI_ROOT</key>
+		<string>/Users/junkawasaki/github/com-junkawasaki</string>
+		<key>HOME</key>
+		<string>/Users/junkawasaki</string>
+		<key>LOGNAME</key>
+		<string>junkawasaki</string>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+		<key>SHELL</key>
+		<string>/bin/zsh</string>
+		<key>USER</key>
+		<string>junkawasaki</string>
+	</dict>
+	<key>Label</key>
+	<string>com.gftd.cua-bots</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/opt/homebrew/bin/nbb</string>
+		<string>--classpath</string>
+		<string>.:scripts/nbb_compat</string>
+		<string>scripts/cua-bots-loop.cljs</string>
+	</array>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardErrorPath</key>
+	<string>/Users/junkawasaki/.gftd/cua-bots.stdout.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/junkawasaki/.gftd/cua-bots.stdout.log</string>
+	<key>StartInterval</key>
+	<integer>3600</integer>
+	<key>WorkingDirectory</key>
+	<string>/Users/junkawasaki/github/com-junkawasaki</string>
+</dict>
+</plist>
