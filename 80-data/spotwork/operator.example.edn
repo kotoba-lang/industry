@@ -1,0 +1,45 @@
+;; 80-data/spotwork/operator.example.edn — オペレータ維持データの**形の見本**。
+;;
+;; ⚠⚠ **ここに書いてある数値は見本であって、実際の告示額ではない。**
+;; そのまま `operator.edn` にコピーして運用に使わないこと。
+;;
+;; ## なぜ額が repo に無いのか
+;;
+;; 地域別最低賃金の**額は条文に無い**。最低賃金法 第4条が定めているのは効力
+;; （最低賃金額以上を支払う義務）だけで、額は毎年度、地域ごとに告示される。
+;; したがって額は「この repo が持つ事実」ではなく「運用者が維持するデータ」で、
+;; `spotwork.facts` は意図的にこれを持たない
+;;（`cloud-itonami-isic-7820` が同じ切り方をしている）。
+;;
+;; ## 供給されないとどうなるか
+;;
+;; `:wage/below-minimum` の判定が `:not-measured` になり、その求人の verdict は
+;; **`:hold`** になる。`:pass` には決してならない。「額を知らない」ことが
+;; 「額に問題が無い」として通ることは、この系では起こらない。
+;;
+;; ## 使い方
+;;
+;;   cp 80-data/spotwork/operator.example.edn 80-data/spotwork/operator.edn
+;;   # 今年度の告示額を厚生労働省 / 各都道府県労働局の一次資料から転記する
+;;
+;; `operator.edn` は .gitignore してよい（運用者ごとに違うため）。
+;; ここに置いてある場合は tick がそれを読む。
+
+{:operator/id "example-operator"
+ :operator/note "見本。実額ではない。転記元の一次資料 URL を :source に書くこと。"
+
+ ;; ISO 3166-2:JP のコード → 時間額。**要差し替え。**
+ :minimum-wage {"JP-13" 0
+                "JP-14" 0
+                "JP-27" 0}
+
+ ;; 転記の出所。空のままにしない —— 出所の無い額は根拠として引用できない。
+ :minimum-wage-source {:published-by nil
+                       :effective-from nil
+                       :url nil
+                       :url-status :not-recorded}
+
+ ;; 条文の e-Gov URL をオペレータが確認して入れる先。
+ ;; `spotwork.facts/with-basis-urls` がこの形を受ける。
+ ;; キーは [法令名 条番号]。**推測で埋めない。**
+ :basis-urls {}}
