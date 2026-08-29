@@ -28,6 +28,9 @@ nbb scripts/isekai-game-dev-tick.cljs     # 最終行に EDN で候補が出る
 
 - `:outcome :candidate :kind :registration-gap` — `:candidate` の 1 ゲームの
   `:missing`（game.edn / :content-rating / thumbnail.svg）を塞ぐ。**1 件だけ。**
+- `:outcome :candidate :kind :mobile-input-gap` — `:candidate` の 1 ゲームに
+  touch 入力経路を通す（下記のレシピ）。**1 件だけ**（`:all-mobile-input-gaps` に
+  他の該当が並んでいても、この周は candidate の 1 本）。
 - `:outcome :candidate :kind :new-game` — `:candidate` の 1 sample を
   **1 つの具体的な増分**だけ進める（下記）。完成させようとしない。
 - `:outcome :no-candidates` — 何もしない。無い仕事を作らない。
@@ -71,6 +74,40 @@ git -C orgs/network-awai/network-isekai worktree add -b agent/game-dev-$(date +%
   `"/<ns>/<game>"` の entry を、scene.edn / logic.cljc の実際の語彙を根拠
   （:evidence）にして書く。**中身を見ずに書かない。**
 
+## :mobile-input-gap の直し方
+
+tick の判定は「logic.cljc が `key-pressed?` を読み、`(axis …)` を一度も読まない」。
+kami.input（`orgs/kotoba-lang/host` の `src/kami/input.cljc`）の pointer 経路は
+**axes しか出さず actions は keyboard からしか発火しない**ので、この形の logic には
+touch が構造的に届かない（実例: gftd/jintori、オーナー報告 2026-08-29）。
+diff は最小に。**art direction は変えない。**
+
+1. **scene.edn の `:input` に stick を宣言する**:
+   `:sticks [{:x "MoveX" :y "MoveY" :dead 0.25}]`
+   動く実例は `public/games/gftd/at6-texan/scene.edn`（2 本 stick + `:zone`）。
+   1 本で足りるゲームは zone 無しの全面 1 本でよい。UI と干渉するなら
+   at6-texan に倣って `:zone` を絞る。
+   （MoveX/MoveY の :axes を持つ scene は kami.input の default stick でも axes が
+   出るが、宣言を書くのが catalog の作法 —— 意図が scene から読めるようにする。）
+2. **logic.cljc は key-pressed? を残して axis に fallback する**:
+   方向 = keyboard の action がどれか押されていればそれ、押されていなければ
+   `(axis "MoveX")` / `(axis "MoveY")` を読み、**±0.35 で -1/0/1 に量子化**して
+   **優勢な軸を採る**。⚠ **f32 比較だけで書く** —— guest DSL に f32→int 変換は
+   無く、catalog 標準の guest `axis` は f32 を返す（`0.35` との `<` / `>` 比較と
+   分岐で -1/0/1 を選ぶ。cast を書かない）。
+3. **HUD の操作ヒントに touch / drag を足す**（キーボードの記述は残す）。
+4. **検証**: そのゲームの既存 headless harness に **axis 入力の assertion を
+   1 本足して**回す（touch 経路が logic に届くことを、キー入力とは別に見る）。
+   full build は resource-guard 経由
+   （`node scripts/resource-guard.mjs run build -- <command>`、直接叩かない）。
+5. **deploy は明示 `--branch main`**。plain な worktree からの deploy は
+   **preview を作るだけで本番に載らない**（実測済み）。deploy 後、本番が
+   変更を配っていることを実際に見る（該当 JS / scene を curl して確認）。
+
+対象が 2 軸操作に写像できないゲーム（rhythm lane 系など）だった場合は、
+新しい UX を発明しない —— それは art direction。理由を ADR に書いて、
+`:all-mobile-input-gaps` の次のゲームをこの周の対象にする。
+
 ## 記録
 
 - 判断を伴ったら ADR を 1 本、`.edn` tx-data で書き、
@@ -91,7 +128,19 @@ git -C orgs/network-awai/network-isekai branch -D agent/game-dev-<date>
 ```
 
 rebase / force-push はしない。merge が 409 なら再試行、conflict なら
-origin/main から切り直して載せ直す。worktree と branch を消すまでが完了条件。
+origin/main から切り直して載せ直す。
+
+**着地したら west pin を前進させる（candidate の種類を問わず標準の 1 歩）。**
+子リポの main を直しても、pin が手前のままだと superproject と fleet gate は
+古い tip を見続ける（CLAUDE.md「直したら pin も前進させる」）:
+
+```bash
+cd "$COM_JUNKAWASAKI_ROOT"    # superproject root から
+nbb scripts/west-pin-put.cljs network-isekai <merged-sha>
+nbb scripts/verify-west-pins.cljs
+```
+
+worktree と branch を消すまでが完了条件。
 
 着地したら 1 行で報告する: どのゲームの / 何を / どの増分だけ進めたか /
 証拠（merge commit SHA）。**成否は次周の tick が測る** — 自分で「登録漏れは
