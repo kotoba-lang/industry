@@ -354,9 +354,25 @@
    :args []
    :produces "data/kakaku.datoms.kotoba.edn"
    :expect :known-broken
-   :blocked-by "seed が repo に無い: kakaku/kotoba/seed.edn (FileNotFoundException)。
-                repo 側に seed を追加するか、-main が seed パスを引数で受ける必要がある"
-   :evidence "2026-08-08 実測"}
+   ;; ⚠ ここを :produces-datoms に上げるのは repo 側の fix が着地してからにする。
+   ;;    --seed / --log を渡すだけの manifest 修正は exit 0 / 16 datoms / chain OK を
+   ;;    返すが、その観測は**全部ゼロ**である（下記 欠陥 2）。:produces-datoms は
+   ;;    それを満たしてしまうので、manifest だけ直すと false green になる。
+   :blocked-by "欠陥 2 つ。ADR-2608292000 に実測を記録した（2026-08-29、JVM 21 実行）。
+                (1) seed パスが解決しない: autorun.clj の seed-default が *file* 由来なので
+                    classpath 相対の kakaku/kotoba/seed.edn になる。実体は
+                    contracts/kotoba/seed.edn（test_autorun.clj は最初から正しい方を使う）。
+                    -main は既に --seed / --log を受けるので、args で回避もできる。
+                (2) より重い: build-state が keyword key を出すのに kakaku.methods.agent は
+                    入口も出口も文字列 key（(get state \"offers\" [])）。全 handler が
+                    空入力ブランチに落ち、observation-datoms の (or … 0) が nil を吸うので、
+                    exit 0 / chain OK のまま観測が全部 0 と none で永続化される。
+                    seed の実値は spread 700 / cheapest a_com / dearest b_com / notable true。
+                この退行は 2026-07-08 に test 側で assertion を緩めて吸収されていた
+                （spread の assertion が >= 0、golden CID がゼロ出力に再 pin）。
+                fix と破壊試験は済んでおり patch はオーナーが保持している。この session は
+                com-junkawasaki tier なので cloud-itonami へ push できず未着地。"
+   :evidence "2026-08-08 実測（初出）/ 2026-08-29 再現 + 根本原因特定（ADR-2608292000）"}
 
   {:name "hakoniwa" :org "cloud-itonami"
    :domain "前方シミュレーション（分布としての未来）"
