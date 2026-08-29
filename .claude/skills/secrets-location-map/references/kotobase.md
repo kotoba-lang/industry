@@ -62,3 +62,28 @@ content-addressed graph の名前空間ごと変わる — 障害ではなく**�
   不一致は 422 で弾く。読みは無認証の `GET /ipfs/<cid>`。**未設定だと 403（feature off）**。
   live 検証済み（2026-07-29、PUT 201 → GET 200、バイト一致）。
 - 消費側: `dougaka.archive`（production artifact の保管、ADR-2607299960）。
+
+## hyakka tenant + service account（Biscuit 移行対応、2026-08-29 provisioning、ADR-2608291500）
+
+datom 面が Biscuit 必須（ADR-2608281200）になり CACAO 自己発行 transact が 401 になった件の対応として、
+`auth.kotobase.net` に hyakka 用 tenant + editor service account を発行した。すべて kagi（compartment
+`personal`、`KAGI_HOME=$HOME/.kagi`）にあり、**値はここに書かない — その場で `kagi get` する**。
+
+| kagi item | 中身 | 用途 |
+|---|---|---|
+| `hyakka-authn-owner-seed` | 32-byte hex（Ed25519 seed） | tenant owner。この seed の CACAO で `/v1/cacao/session` を張り tenant/service-account を管理する。**custody-first で発行前に read-back 検証済み** |
+| `hyakka-authn-service-token` | service-account bootstrap secret（opaque Bearer） | `POST /v1/biscuit/token`（`tenantId` + `dbName=hyakka` + `permissions`）で短命 Biscuit と交換する。**この token 自体は datom 面に直接使わない** |
+| `hyakka-authn-tenant-id` | `t_1fb2227009234c0faf418b37`（**公開識別子、secret ではない**） | Biscuit 発行の `tenantId` |
+| `hyakka-authn-tenant-graph` | `bafyreig6tog2…`（公開 CID、`canonical-graph(tenantDid, dbName)` の決定的導出） | transact/put の ref `kotobase/db/<graph>/hyakka` |
+| `hyakka-authn-tenant-did` | `did:web:kotobase.net:tenant:t_1fb2227009234c0faf418b37`（公開） | Biscuit の holder / `x-kotobase-tenant-did` |
+
+- **service account の role は `editor`**（`data:read` + `data:write` + `audit:read`）。
+- **owner seed と service token を混同しない。** owner seed は「tenant を管理する権利」、service token は
+  「その graph に書く権利」。datom 面への書き込み経路は必ず service token → Biscuit → tenant graph。
+- **live 検証済み（2026-08-29）**: service token → `/v1/biscuit/token` 201 → `POST kotobase.net/api/transact`
+  に `Authorization: Biscuit` で **transact 200**（同じ graph へ 3 回の mint が同一 CID を返し決定的も確認）。
+- **consumer**: cloud 常駐 `itonami-grok-bots` の `HYAKKA_AUTHN_SERVICE_TOKEN`（Worker secret、
+  `HYAKKA_AUTHN_TENANT_ID` は var）。ローカル常駐（`com.network-awai.hyakka-knowledge-ingest`）は
+  同じ 3 item を env で読む経路へ移行予定（未完なら pending ledger は CACAO のまま 401）。
+- **`/ipld/*` の block PUT は依然 CACAO（`HYAKKA_SEED`）で Biscuit 不要** —— 401 していたのは transact だけ。
+  proof/record block は移行前から R2 に着地していた。
