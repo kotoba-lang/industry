@@ -50,6 +50,7 @@
 passkey 根にすれば **失った共有秘密を再発行せずに operator 権限が戻り**、共有秘密そのものが無くなるので同じ失い方が再発しない。`/internal/grok-bots/authorize` が通れば Grok Bots 登録も復活する。
 
 ### 2.3 着地（2026-08-29 時点）
+- `net-kotobase/control-plane` `121de3e` — authn 側：passkey-rooted operator authority（`30509e8` 実装 + `95e92f6` capability 文書 + `aadd25d5` 実測 ADR）。action ごとの scope（`models` / `restore` / `grok-bots`）、attenuation は「正しく検証されるが到達不能」と自分で申告（`biscuit.wire` に append が無く `mint` が next-secret を返さない）。**本番の `MURAKUMO_OPERATOR_DIDS` は実在しない principal を指す placeholder** —— 誰も operator token を発行できない fail-closed 状態で、従来（service bearer のみ）と同一。オーナーが自分の accountDid を入れると有効になる
 - `net-kotobase/control-plane` `30509e8` — authn 側：passkey-rooted operator authority
 - `net-kotobase/control-plane` `95e92f6` — capability 文書がどの credential を出すかを名乗る（Biscuit は not_accepted と明示）
 - `network-awai/cloud-murakumo` `68d7d28` — passkey-gated mk1 発行（`GET /api/v1/auth/passkey/options` + `POST /api/v1/auth/passkey/token`）
@@ -58,8 +59,10 @@ passkey 根にすれば **失った共有秘密を再発行せずに operator �
 
 ## 3. 未完（closing 時点で正直に）
 
-- **cloud-murakumo は merge 済みだがデプロイ未了**。判別根拠：本番 `/api/v1` の auth キーが SIWE/wallet の 6 個のままで、デプロイ前ベースラインと一致。新ルートを叩くと旧汎用ゲートの 401 が返る。**着地は有効化ではない**
-- **local-murakumo（api.murakumo.cloud）の消費者側が未着地**。したがって murakumo の operator route はまだ passkey Biscuit を受理せず、Grok Bots 登録も未復活
+- ~~cloud-murakumo デプロイ未了~~ **→ 完了**（version `38e0b0ec`）。独立確認：`/api/v1` の auth キーに passkey 5 件（`passkey-mint` / `passkey-options` / `passkey-scopes` / `passkey-ttl-seconds` / `passkey-relying-party`）が出現、未認証 mint が汎用 401 でなく `passkey-credential-required` を返す、homepage・models・SIWE は 200 を維持。**着地と有効化は別物**という判別（capability 文書のキーがデプロイ前ベースラインと一致するか）がここで効いた
+- **local-murakumo（api.murakumo.cloud）の消費者側が未着地**。したがって murakumo の operator route はまだ passkey Biscuit を受理せず、**Grok Bots 登録も未復活**。authn 側は live で実測済み（throwaway passkey で mint→検証→失効まで）だが、消費側が無いので end-to-end は未成立
+- **`MURAKUMO_OPERATOR_DIDS` が placeholder** —— 消費側が着地しても、オーナーが自分の accountDid をこの secret に入れるまで誰も operator token を発行できない（意図的な fail-closed）
+- **通常のデプロイ経路が壊れている**（cloud-murakumo）。`npm run deploy` が `could not mint a deployment-lease token` で失敗し、原因は kagi に `MURAKUMO_CLOUD_SITE_TOKEN_SECRET_2` が無いこと。vault の総当たり探索はせず（安全床⑦）、`assertDeployCurrentMain` を両側で保つ `deploy:bootstrap-model-hosting` で出した。復旧はオーナー操作。⚠ **`KAGI_HOME` 無しの `bin/kagi` は自分の repo の古い vault を読むので、「鍵が無い」と「違う金庫を見た」が同じ一行で返る**（secrets map に記録済み、root `4d7eb1e`）
 - `metrics-auth-ok?`（`worker.cljs:560`）の **fail-open が未修正** —— `MURAKUMO_METRICS_TOKEN` 未設定なら 4 経路が誰でも書ける。この repo で唯一の fail-open
 - Grok Bots 観測係 2 体（`isekai-game-production` / `kami-lib-maintainer`）は payload 準備済み・未登録
 - タッチ入力欠落があと 23 ゲーム（tick が列挙。bot が 6h に 1 件ずつ）
@@ -84,8 +87,8 @@ passkey 根にすれば **失った共有秘密を再発行せずに operator �
 
 ## 6. 次の agent への resume point
 
-1. **cloud-murakumo をデプロイする**（`deploy` scope の lock は空だった。競合は `build` のみ）。確認は `/api/v1` の auth キーに passkey ルートが出るか、未認証 `POST /api/v1/auth/passkey/token` が汎用 401 でなく名前つき拒否を返すか
-2. **local-murakumo の消費者側を着地させる** —— operator-scoped Biscuit を既存 bearer と**並べて**受理（`worker_entry.js` の JS gate と CLJS gate の両方）。無人経路は触らない
+1. **local-murakumo の消費者側を着地させる**（最優先。これが無いと passkey operator 経路は片側だけで、Grok Bots も戻らない） —— operator-scoped Biscuit を既存 bearer と**並べて**受理する。`worker_entry.js` の JS gate（`:259-267`）と CLJS gate の**両方**を通す必要がある。無人経路（ノード heartbeat / queue / slow-tier / cdci / hwmetrics / x402 ingest）は触らない
+2. **`MURAKUMO_OPERATOR_DIDS` にオーナーの accountDid を入れる**（1 の後。それまでは誰も発行できない）。そのうえで passkey→operator→murakumo route の end-to-end を**仮想オーセンティケータで実測**する（mock で代替しない）
 3. **`metrics-auth-ok?` を fail-closed に**。ただし先に本番で `MURAKUMO_METRICS_TOKEN` が設定済みかを測る（未設定なら hwmetrics reporter が 401 になる）
 4. **passkey→operator の end-to-end を実測**（仮想オーセンティケータで。mock で代替しない）
 5. `:linux-container` backend —— これが `:window-scoped` の自走不能を解き、fleet 並列を開く。docker/OrbStack はローカルに在るので必要なのは Xvfb イメージ
