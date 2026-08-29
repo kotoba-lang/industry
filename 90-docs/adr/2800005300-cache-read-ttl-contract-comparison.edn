@@ -85,6 +85,7 @@ TTL が切れた read は write/input 価格に化ける。ScheduleWakeup 20〜3
 
 - 2026-08-29(同日 2 回目): OpenRouter の routing とキャッシュ局所性、murakumo.cloud の cache read 設計を追加調査した(下記 2 節)。
 - 2026-08-29(同日 4 回目): 計器の 2 つの穴(streaming 未計測 / origin label が常に誤り)を塞いだ。下記『計器の穴を塞いだ』節。
+- 2026-08-29(closing): origin は end-to-end で確認、**streaming は未確認のまま**であることを記録し、下記『現在地』を予測から実測に直した。resume point を追加。
 - 2026-08-29(同日 3 回目): murakumo に cache 計器を実装して deploy し、live で測った。下記『murakumo の cache read 設計の現在地』の判定が **測定によって置き換わった** —— 『未設計に近い』は routing/会計については正しかったが、node 層については誤りで、cache は動いている。ただし byte-identical な要求にしか効かない。
 
 ## OpenRouter 等 aggregator の追加知見 — routing がキャッシュを割る
@@ -215,10 +216,27 @@ label を直すだけでは分解は得られず、**分解こそが目的**だ�
 実測時点で gad runs=198 の中身は「gad が捌いた run」ではなく「修正前の run」である。
 新旧を出力から区別する手段は無い —— 時間が解決する(ring が 200 run で一巡する)。
 
-### 現在地(2026-08-29 deploy 後の実測。標本であって定数ではない)
+### 現在地(2026-08-29 closing 時点の実測。標本であって定数ではない)
 
-runs-measured 200/200、全体 hit-rate 約 0.88、:by-mode は当時 sync のみ
-(streaming 計測は同じ deploy で入ったので、以後 stream バケットが立つ)。
+| 何を | 状態 |
+|---|---|
+| origin label (穴 2) | **end-to-end 確認済み**。by-origin が gad 125 / b70 75 に分かれ、ring が回るにつれ b70 が 53 から 75 へ増えた(= 誤 label の古い run が置き換わっている) |
+| streaming 計測 (穴 1) | **landed / deploy 済みだが未確認**。deploy から数時間、by-mode は sync 200 のみで **stream バケットが 1 度も立っていない** |
+
+⚠ **streaming を「直した」と読まない。** unit test は緑だが、穴 2 の 1 回目がまさに
+「unit test 緑・deploy 済み・実際には誤り」だった。同じ形をここで繰り返さないために、
+**stream バケットが実際に立つまでは未確認**とする。立たない理由は 2 つ考えられ、
+どちらかは未判別: (a) /v1/messages streaming のトラフィックが単に来ていない
+(b) 拾えていない。**判別しないまま (a) と決めつけない。**
+
+### resume point(次に座る人が最初にやること)
+
+1. GET /infer/cost の cache.by-mode を見る。stream バケットが立っていれば穴 1 は確認済みになる。
+2. 立っていなければ、認証付き(ANTHROPIC_PROXY_TOKEN)で /v1/messages streaming を 1 本通して
+   (a)/(b) を判別する。**無認証の /v1/chat/completions では判別できない** —— そちらは
+   verbatim passthrough で run を 1 件も記録しない別の穴なので、by-mode に何も現れない。
+3. 穴 1 が確認できたら、origin x mode の内訳を読んでから b70 の --cache-reuse を測る
+   (b70 は Cloudflare private binding 越し、gad は 2026-08-29 時点 health=000 で到達不能)。
 **この 0.88 と、上の「byte-identical にしか効かない」実測は矛盾していない** ——
 実トラフィックに同一 prefix の再送(健全性 probe / retry / cron)がどれだけ含まれるか
 次第で、両立する。**どちらか一方を fleet の実力として引用しない。**
