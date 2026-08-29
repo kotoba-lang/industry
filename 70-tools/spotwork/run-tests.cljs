@@ -1,0 +1,51 @@
+#!/usr/bin/env nbb
+;; 70-tools/spotwork テストランナー（nbb）。
+;;
+;;   nbb 70-tools/spotwork/run-tests.cljs
+;;
+;; classpath は root の nbb.edn が持つ（`70-tools/spotwork/src` と
+;; `70-tools/spotwork/test`）。
+;;
+;; ## 実行本数の床
+;;
+;; nbb の `clojure.test/run-tests` は **summary を返さない（nil）**。返り値を
+;; そのまま可否に使うと、1 本も走らなくても「失敗 0」として通る —— 「実行
+;; できなかった検査が、実行して問題が無かった検査と同じ値を返す」形
+;; （ADR-2608136000）。集計は `:end-run-tests` の report から受け取り、
+;; 走った assertion が `min-assertions` に満たなければ **exit 2**（0 でも 1 でも
+;; ない = 「答えられなかった」）で終わる。
+
+(require '[clojure.test :as t]
+         'spotwork.governor-test
+         'spotwork.match-test
+         'spotwork.proposal-test)
+
+(def min-assertions 100)
+
+(def summary (atom nil))
+
+(defmethod t/report [:cljs.test/default :end-run-tests] [m]
+  (reset! summary (select-keys m [:test :pass :fail :error])))
+
+(t/run-tests 'spotwork.governor-test 'spotwork.match-test 'spotwork.proposal-test)
+
+(let [{:keys [test pass fail error] :as s} @summary
+      assertions (+ (or pass 0) (or fail 0) (or error 0))]
+  (cond
+    (nil? s)
+    (do (println "REFUSING to report a pass: no summary was reported at all.")
+        (js/process.exit 2))
+
+    (pos? (+ (or fail 0) (or error 0)))
+    (do (println (str "FAIL — " fail " failures, " error " errors")) (js/process.exit 1))
+
+    (< assertions min-assertions)
+    (do (println (str "REFUSING to report a pass: only " assertions
+                      " assertions ran across " test " tests, floor is " min-assertions
+                      " — a namespace probably failed to load."))
+        (js/process.exit 2))
+
+    :else
+    (do (println (str "OK — " test " tests, " assertions " assertions"
+                      " (floor " min-assertions ")"))
+        (js/process.exit 0))))

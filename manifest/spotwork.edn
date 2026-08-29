@@ -1,0 +1,112 @@
+;; manifest/spotwork.edn — スキマバイト（単発シフト）突合の policy。
+;; **手書き。生成物ではない。** 実装は 70-tools/spotwork、常駐は
+;; scripts/spotwork-match-{tick,loop}.cljs、手順の正本は skill `spotwork-match`。
+;; 設計の正本は 90-docs/adr/2608292100-cloud-itonami-spotwork-matching-governed-bots.edn。
+;;
+;; ここが持つのは **policy（重み・phase・どこを読むか・何を非目標にするか）**だけで、
+;; 法令の根拠は `spotwork.facts`、判定は `spotwork.governor` が持つ。
+;; 法令の閾値をここに書き写さない —— 2 箇所に置けば必ず片方が古くなる。
+
+{:spotwork/version 1
+ :spotwork/updated "2026-08-29"
+
+ ;; ---------------------------------------------------------------- 入力
+ ;;
+ ;; ⚠ **いま入っているのは fixture であって実需要ではない。** スキマバイトの
+ ;; 単発シフトを公開 feed で配っている一次情報源は無く（`cloud-itonami/recruit`
+ ;; が集めている 6 つの公開 feed —— ESCO / O*NET / EURES / HelloWork / USAJOBS /
+ ;; Job Bank —— はどれも常用求人）、実需要は運用者が持ち込むしかない。
+ ;; **無い feed を在るものとして書かない。**
+ :spotwork/source
+ {:offers {:dir "80-data/spotwork/offers"
+           :status :fixtures-only
+           :why "単発シフトの公開 feed が存在しない。実需要はオペレータが持ち込む"}
+  :cohorts {:file "80-data/spotwork/cohorts.edn"
+            :status :fixtures-only
+            :upstream "cloud-itonami/talent（k-匿名 cohort 集計の公開読み）"}
+  :operator {:file "80-data/spotwork/operator.edn"
+             :example "80-data/spotwork/operator.example.edn"
+             :status :operator-supplied
+             :why "地域別最低賃金の額は条文に無い（毎年度の告示）。repo が持たない"}}
+
+ ;; 提案台帳。append-only、1 行 1 EDN。`;;` で始まる行と空行は読み飛ばす。
+ ;; 文書ではなく**イベント列**なので、CLAUDE.md の「現在値を上書きする」規則の
+ ;; 例外側（canvas-ledger.edn / design-quality-ledger.edn と同じ扱い）。
+ :spotwork/ledger {:file "80-data/spotwork/proposals.ledger.edn"
+                   :append-only? true}
+
+ ;; ---------------------------------------------------------------- policy
+
+ ;; 提案しかしない段階。phase 表と never-auto は governor が持つ。
+ :spotwork/phase :phase/advisory
+
+ ;; 突合の重み。合計 1.0。**これは policy であってデータではない**ので
+ ;; ここに置き、`spotwork.match/default-weights` は既定値として同じ値を持つ。
+ ;; 変えるときは両方を変え、なぜ変えたかを ADR に書く。
+ :spotwork/weights {:occupation 0.35
+                    :region 0.20
+                    :availability 0.25
+                    :reliability 0.10
+                    :supply 0.10}
+
+ ;; ---------------------------------------------------------------- bot
+ ;;
+ ;; ローカル Claude loop。tick が候補を測り、候補がある周だけモデルを起こす。
+ ;; `scripts/spotwork-match-loop.cljs` が在ることで itonami.cloud/bots/ の
+ ;; 名簿（scripts/loop-status-publish.cljs の union）に載る。
+ :spotwork/bot
+ {:bot/id "spotwork-match"
+  :bot/goal "単発シフトの求人 1 件を governed に審査して提案台帳へ着地させる。規則側に欠陥が見つかったときはそれを 1 件直す"
+  :bot/skill "spotwork-match"
+  :bot/tick "scripts/spotwork-match-tick.cljs"
+  :bot/loop "scripts/spotwork-match-loop.cljs"
+  :bot/ledger "~/.gftd/spotwork-match/ledger.edn"
+  :bot/interval-s 21600
+  ;; モデルを起こさない条件（loop が判定する）
+  :bot/skip-when #{:no-candidates      ; 無い仕事にモデルを起こさない
+                   :not-measured       ; 測れなかった周は直す対象が無い
+                   :diverged-checkout  ; 共有 checkout を壊さない
+                   :locked}}           ; 前周がまだ走っている
+
+ ;; ---------------------------------------------------------------- 境界
+ ;;
+ ;; 「同一面の同一主題は不可」（CLAUDE.md の 4 面規則）。この面が何を持ち、
+ ;; 何を持たないかを明示する。**ここに書いていない仕事を引き取らない。**
+ :spotwork/boundaries
+ {"cloud-itonami/cloud-itonami-isic-7810"
+  "職業紹介（常用）。年俸 × 手数料率で placement fee を検算する常勤前提のモデル。単発シフトの時間単位の判定は持たない"
+
+  "cloud-itonami/cloud-itonami-isic-7820"
+  "派遣。agency が雇用主のまま時限 assignment を dispatch する形。スキマバイトは直接雇用なので別"
+
+  "cloud-itonami/talent"
+  "働き手側の正本。ISCO-08 プロフィール、識別情報は E2E 暗号、公開読みは k-匿名 cohort のみ。**個人を出す口をここに作らない**"
+
+  "cloud-itonami/recruit"
+  "求人側の集約（公開 feed のみ、商用スクレイプ禁止）。常用求人。単発シフトは扱わない"
+
+  "kotoba-lang/shift"
+  "打刻・シフト・ロスター・充足率。**既に雇っている人**の勤怠。マッチング前の判定は持たない"
+
+  "70-tools/spotwork（ここ）"
+  "単発シフト 1 件に対する cohort-first の突合と、労働法・職安法・個人情報保護の governor 判定。提案までで、確定はしない"}
+
+ ;; ---------------------------------------------------------------- 非目標
+ :spotwork/non-goals
+ #{"個人を並べること（cohort までで止める。talent の k-匿名モデルを消費側が壊さない）"
+   "マッチの確定・就業の確定（governor の never-auto。人間のオペレータの操作）"
+   "賃金の支払・送金（即日払いを含め、この面は金銭を動かさない）"
+   "有料職業紹介事業の許可を代替すること（許可は運用者の法的義務）"
+   "実在の働き手・事業者のデータを fixture として置くこと"}
+
+ ;; ---------------------------------------------------------------- 現在地
+ ;;
+ ;; **測った日付と測り方だけを書く。数を書かない**（数は測り直せば出るし、
+ ;; ここに書けば日付を落として引用される —— CLAUDE.md が fleet-ci 節で
+ ;; 記録している失敗の形）。
+ :spotwork/status
+ {:measured-by "nbb 70-tools/spotwork/run-tests.cljs（exit 0/1/2 の 3 値）"
+  :measured-what "規則カタログの整合、宣言と検査の 1 対 1、各規則が自分の名前で拒否すること、確定系が自動化されないこと"
+  :live-demand :none
+  :live-surface :none
+  :operator-data :absent}}

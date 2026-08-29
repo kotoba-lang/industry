@@ -1,0 +1,27 @@
+;; fixture。実在の事業者ではない（did:web:example.invalid）。
+;; 申告が全部揃っていて、どの規則にも触れない求人。
+;; ただし地域別最低賃金額はオペレータ維持データなので、それが供給されるまで
+;; verdict は :pass ではなく :hold になる（それが正しい挙動）。
+{:offer/id "of-fixture-0001-hall-day"
+ :offer/source :fixture
+ :offer/employer-did "did:web:example.invalid"
+ :offer/employer-label "（fixture）都内カフェ"
+ :offer/jurisdiction :jp
+ :offer/region "JP-13"
+ :offer/isco "5246"
+ :offer/date "2026-09-05"
+ :offer/start "10:00"
+ :offer/end "19:00"
+ :offer/tz "Asia/Tokyo"
+ :offer/break-minutes 60
+ :offer/hourly-wage 1300
+ :offer/currency "JPY"
+ :offer/overtime-premium-rate 1.25
+ :offer/night-premium-rate 1.25
+ :offer/agreement-36? true
+ :offer/headcount 2
+ :offer/fee {:fee/payer :employer :fee/rate 0.30}
+ :offer/wage-deductions []
+ :offer/penalty-predetermined? false
+ :offer/min-age 18
+ :offer/work-authorization-required? true}
