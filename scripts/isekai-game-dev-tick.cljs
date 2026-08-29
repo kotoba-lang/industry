@@ -16,9 +16,13 @@
 ;;          {game.edn, content-ratings.edn の entry, thumbnail.svg} のどれかが無い。
 ;;          ただし deliberately-unlisted（オーナー判断で catalog 外のもの）は
 ;;          候補にせず :excluded として出力に見せる
-;;       2. new-game — public/benchmarks/catalog.edn の :samples で
+;;       2. mobile-input-gap — catalog game なのに touch 入力が logic に届かない
+;;          （logic.cljc が key-pressed? を読み、(axis …) を一度も読まない）。
+;;          出荷済みの欠陥（実例: gftd/jintori が phone で操作不能、オーナー報告
+;;          2026-08-29）なので planned より先
+;;       3. new-game — public/benchmarks/catalog.edn の :samples で
 ;;          :status が :planned / :next のもの
-;;       3. どちらも無ければ :no-candidates
+;;       4. どれも無ければ :no-candidates
 ;;
 ;; ## 出力と exit
 ;;
@@ -165,6 +169,54 @@
            ;; 出なくなるので、集合の陳腐化も出力から見える。
            :excluded (vec (filter #(deliberately-unlisted (:game %)) rows))})))))
 
+(def owner-reported-defects
+  "オーナーが名指しで報告した出荷済み欠陥。候補の並びで先頭に来る（検出は
+  下の走査と同じ —— ここに書いても走査に当たらなければ候補にならない。
+  直って走査から消えたら、この集合の entry は不活性になるので消してよい）。
+
+  - gftd/jintori — 2026-08-29 オーナー報告「phone で操作不能」"
+  #{"gftd/jintori"})
+
+(defn- mobile-input-gaps
+  "touch 入力が logic に届かない catalog game。
+
+  判定は決定論の 2 条件: logic.cljc が `key-pressed?` を読み、かつ
+  `(axis ` を一度も読まない。kami.input（orgs/kotoba-lang/host の
+  src/kami/input.cljc）の pointer 経路は **axes しか出さず、actions は
+  keyboard event からしか発火しない**ので、axis を読まない key-pressed?
+  だけの logic には touch 操作が構造的に届かない。
+
+  ⚠ 「scene に :sticks が無い」を条件にしない。kami.input は scene の
+  :axes に MoveX と MoveY が居れば **全面 1 本の default stick** を与える
+  （input.cljc の `sticks` / `default-stick`）ので、:sticks 無しでも
+  `(axis \"MoveX\")` を読む logic（実測: gftd/palisade, gftd/petit-forro）は
+  phone で動いている。そこを候補にすると、動いている game を『直し』に
+  モデルを起こすことになる。scene の :sticks 有無は fixer の参考として
+  行に載せるだけ。
+
+  content-ratings に依存しないので registration-gaps とは独立に測れる。
+  games dir が読めなければ nil（= 測れなかった。0 件ではない）。"
+  []
+  (let [games-dir (str repo-abs "/public/games")]
+    (when-let [nss (list-dirs games-dir)]
+      (->> (for [ns- nss
+                 g (or (list-dirs (str games-dir "/" ns-)) [])
+                 :let [id (str ns- "/" g)
+                       base (str games-dir "/" ns- "/" g)
+                       logic (read-file (str base "/logic.cljc"))
+                       scene (read-file (str base "/scene.edn"))]
+                 :when (and (exists? (str base "/game.edn"))
+                            (not (deliberately-unlisted id))
+                            logic
+                            (str/includes? logic "key-pressed?")
+                            (not (str/includes? logic "(axis ")))]
+             {:kind :mobile-input-gap :game id
+              :sticks-declared? (boolean (and scene (str/includes? scene ":sticks")))
+              :owner-reported? (contains? owner-reported-defects id)})
+           ;; オーナー報告の欠陥が先頭、あとはアルファベット順。
+           (sort-by (fn [m] [(if (:owner-reported? m) 0 1) (:game m)]))
+           vec))))
+
 (defn- planned-samples
   "catalog.edn の :samples で :status :planned / :next。読めなければ nil。"
   []
@@ -192,6 +244,7 @@
           reg (registration-gaps)
           gaps (:gaps reg)
           excluded (:excluded reg)
+          migs (mobile-input-gaps)
           planned (delay (planned-samples))]
       (cond
         ;; ratings が読めない = registration を測れない。planned だけで
@@ -204,6 +257,13 @@
         (seq gaps)
         (do (prn (cond-> {:outcome :candidate :kind :registration-gap
                           :candidate (first gaps) :all-gaps gaps
+                          :freshness fr}
+                   (seq excluded) (assoc :excluded excluded)))
+            (js/process.exit 0))
+
+        (seq migs)
+        (do (prn (cond-> {:outcome :candidate :kind :mobile-input-gap
+                          :candidate (first migs) :all-mobile-input-gaps migs
                           :freshness fr}
                    (seq excluded) (assoc :excluded excluded)))
             (js/process.exit 0))
