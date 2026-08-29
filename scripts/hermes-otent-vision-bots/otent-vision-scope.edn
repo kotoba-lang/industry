@@ -1,0 +1,45 @@
+{:system/id :otent-geospatial-vision
+ :mission "Turn licensed Earth and street-level imagery into bounded, reproducible geospatial observations and admitted Hyakka claims."
+ :targets {:ingest "cloud-itonami/otent"
+           :globe "cloud-itonami/app-otent"
+           :street-api "kotoba-lang/com-mapillary-graph-api"
+           :map-api "kotoba-lang/org-openstreetmap-overpass"
+           :wiki "network-awai/app-hyakka"}
+ :entity-types [:imagery-asset :capture :coverage-manifest :sensor :platform
+                :vision-model :model-run :image-detection :feature-observation
+                :change-observation :place :licence :refusal]
+ :required-imagery-fields [:source-id :source-url :asset-id :capture-time :ingested-at
+                           :footprint :crs :resolution-or-gsd :sensor :spectral-bands
+                           :licence :attribution :content-hash]
+ :required-analysis-fields [:model-id :model-version :model-artifact-hash :parameters
+                            :derived-from :run-at :label-taxonomy :confidence
+                            :geometry-or-centroid :spatial-uncertainty :temporal-uncertainty]
+ :source-policy
+ {:earth-allow [:nasa-public-domain :usgs-public-domain :esa-copernicus-licensed
+                :official-aerial-open-data :natural-earth-cc0]
+  :street-allow [:mapillary-api-under-current-terms :kartaview-open-data
+                 :authority-owned-open-street-imagery]
+  :derived-allow [:provider-published-detection :locally-reproducible-model-run]
+  :forbid [:search-result-image :scraped-map-tile :unknown-licence
+           :google-street-view-persistence-without-explicit-rights
+           :paywall-bypass :captcha-bypass :terms-bypass]}
+ :epistemic-boundaries
+ [:pixel-is-not-ground-truth
+  :provider-detection-is-an-observation-not-a-fact
+  :model-label-is-not-object-identity
+  :capture-time-is-not-ingest-time
+  :map-feature-is-not-current-without-observation-time
+  :absence-in-image-is-not-absence-in-world
+  :change-detection-is-not-cause
+  :coordinate-is-not-exact-beyond-stated-uncertainty
+  :missing-is-unmeasured
+  :coverage-is-bounded-not-global-by-default]
+ :privacy-boundaries [:no-face-identity :no-face-embedding :no-licence-plate-ocr
+                      :no-person-tracking :no-vehicle-tracking :no-reidentification
+                      :no-home-occupancy-inference :no-sensitive-site-targeting
+                      :no-biometric-or-protected-trait-inference]
+ :run-bounds {:sources-per-run 1 :areas-per-run 1 :models-per-run 1 :prs-per-run 1}
+ :safety-boundaries [:no-secret-in-url-or-log :no-unbounded-crawl
+                     :no-raw-image-republication-without-rights
+                     :no-ledger-hand-edit :no-shared-orgs-worktree-write
+                     :no-direct-main-push :no-force-push :no-merge :no-deploy]}
