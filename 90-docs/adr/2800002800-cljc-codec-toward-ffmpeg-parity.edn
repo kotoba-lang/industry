@@ -677,27 +677,34 @@ graph が 1 フレーム分の見積りで通る**）。
 
 「compiler だと jvm に依存しないようにできるのでは? aot, jit or rust runtime」への回答:
 
-- **AOT は実在する** —— `compiler/src/kotoba/compiler/backend/x86_64.cljc`（43 KB）/
-  `aarch64.cljc`（40 KB）が生の機械語を cljc から emit し、
-  `native_executor_test.clj`（859 行）が実プロセス実行を証明。ADR-2607198300 が
+- **AOT は実在する** —— 生の機械語を cljc から emit する backend が在り、
+  `native_executor_test.clj` が実プロセス実行を証明。ADR-2607198300 が
   「実行は最終的に JVM/Node/Rust を経由しない」を定めている。**JIT は不要**（AOT で
-  機械語まで落ちる）
+  機械語まで落ちる）。
+  ⚠ **2026-08-30 訂正 — repo 構成が変わった。** `compiler` は `kotoba-lang/amu` に改名され
+  （west には旧 `compiler` entry が古い pin の別 checkout として残る）、backend 本体は
+  `kotoba-lang/kotoba-native` の `src/kotoba/native/{x86_64,aarch64,machine_ir}.cljc` に
+  分かれた。上のパスでは読めない
 - **Rust は選択肢に入らない** —— ADR-2607072000 が kotoba-lang 全体に「Rust が必要な
   実装は全て cljc」を定め、根拠は kotoba 自身の約 38 万行 Rust crate 群の撤去実績。
   CLAUDE.md にもオーナー指示として明記
 - **障害は backend ではなく入口** —— native backend がコンパイルするのは `.kotoba` で
   codec は `.cljc`。「JVM 無しで codec を走らせる」= hot kernel の `.kotoba` 移植を
   意味し、そこが上記 W4 の値モデルに依存する
-- **具体的に何が足りないか（2026-07-30 追記、`compiler/docs/native-aot-baseline.md`
-  = compiler repo 自身の native track 用 running summary が authority）** ——
-  native の値の世界は **8 byte の機械語ワード 1 個**（rax/x0）＋ **heap arena の
-  `pair`（2 ワード固定セル。string は `pair(offset,length)` そのもの）**だけ。
-  record / variant（ADR 0062/0063）は **独立した実行時表現を持たない** ——
-  codegen 時に synthetic stack slot へ書き換えられ、**関数境界を越えない**
-  （引数にも戻り値にもならない）。f64 field は不可、case 数も「a handful」まで。
-  したがって **921,600 要素の画素面を保持できる型が無い** —— pair chain にすれば
-  16 byte/画素かつ O(n) access で、今の JVM persistent vector より確実に悪い。
-  つまり不足しているのは capability ではなく**値モデル**
+- ~~**具体的に何が足りないか** —— native の値の世界は 8 byte のワード 1 個 ＋ heap arena の
+  `pair` だけで、**921,600 要素の画素面を保持できる型が無い**。不足しているのは
+  capability ではなく値モデル~~ —— **2026-08-30 訂正。この段落は 2 重に誤っていた。**
+  ① 出典に挙げていた `native-aot-baseline.md` は ADR 0063 で更新が止まった doc で、
+  authority ではない（CLAUDE.md が名指しで引用を禁じている）。
+  ② **native はこの 2026-07-30 の 5 日後に vector を得た** —— ADR-2608049200
+  （accepted 2026-08-04）が `:vector-i64` / `:vector-f64` を host vector table への
+  1 語 handle として両 ISA に入れ、ADR-2608110200（accepted 2026-08-11）が
+  「native に collection が無いは端的に誤り」と記録した。新しい値表現も register
+  discipline も命令 encoding も要らなかった。
+  **今日の正しい制約は型の不在ではなく容量である**（kotoba-kir `kir/value.cljc:16`
+  `vector-item-limit` 16,384 / kotoba-verifier `verifier.cljc:1565-1566`
+  `:vector-capacity` 4,096・`:vector-item-capacity` 65,536）。
+  1 面 921,600 標本はこの 3 つのどれにも入らない —— 現在地は ADR-2608292300 §5
 - **W4 のゲートは実在し、待っているものが特定できた** ——
   `kotoba-lang/lang/performance-workloads.edn`。既存 2 case は **12 要素の collection**
   で、`:abi-decision` は tagged trie を検討する条件を

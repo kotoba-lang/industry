@@ -62,6 +62,13 @@ ADR-2608110100 は effect inference の traversal を host に残し、理由を
 **これは未実装ではなく拒否である。** ADR-2608650000 の分類でいえば
 `:intentional-security-constraint` 側であり、`:not-yet-implemented` ではない。
 
+⚠ **結果側だけは 2026-08-12 に片方向で開いた**（本 ADR の翌日、`kotoba-kir`
+`1bbdb09`）。`native-export-copy-result-type?`（`kir.cljc:389-392`、KEXE export copy
+ABI v1）が `:vector-i64` / `:vector-f64` を admit する。ただし唯一の呼び出し元
+（`kir.cljc:768-771`）が `(empty? params)` かつ非 entry を要求するので、copy ABI export は
+**0 引数**でなければならない。`:string-index` に wire 形は無く、**引数側は今も拒否される**
+—— 下の決定 1（export 境界を広げない）はそのまま有効である。
+
 ### 3. そもそも native 固有の制約ではなかった
 
 **どの backend にも「列」の parameter 型が無い**（実測）:
