@@ -89,4 +89,8 @@
  ;; Owner override. Entries here are TRIED FIRST, in order, and are still
  ;; probed — this reorders the queue, it does not bypass the measurement.
  ;; Leave empty unless you have a reason the probe cannot see.
- :prefer []}
+ ;;
+ ;; minimax/minimax-m3:free (2026-08-28 owner request): 1,048,576 context,
+ ;; tool-calling, scored 3/3 in the same day's receipt
+ ;; (~/.gftd/hermes-free-model/receipt.edn). Probed first; still has to pass.
+ :prefer ["minimax/minimax-m3:free"]}
