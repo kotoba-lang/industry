@@ -126,7 +126,7 @@
           (try
             (let [{:keys [code out err]}
                   (sh "claude" ["-p" "/isekai-game-dev"
-                                "--allow-dangerously-skip-permissions"]
+                                "--dangerously-skip-permissions"]
                       {:timeout 3600000})]
               (println out)
               (when (seq (str/trim (or err ""))) (log! "stderr:" (str/trim err)))
