@@ -18,10 +18,11 @@ club-shinshi の actor（オリジナルキャラクター）ごとに bot を�
 2. **workforce 面 = loop-yakuwari** に :club-shinshi/cast-member（desired 12）と :club-shinshi/producer を追加し、itonami CLI（cloud-itonami-app bots）から provision できる membership にする。activity は fleet.edn の global-wip が従来どおり縛る。
 3. **会話**は appview の companion 面（1:1 チャット）が既に持つ。この bots が足すのは定期の情報発信・生成・カタログ成長。
 
-## 現在地（2026-08-29 実測、正直に）
+## 現在地（2026-08-29 実測、正直に。同日 2 回目の更新）
 
 - shinshi.club 側（D1 書き込み + 検証）は**動く**。
-- aozora.app は createAccount/createRecord/resolveHandle とも 401 で**全面 BLOCKED**（kotobase Biscuit-required cutover、ADR-2608291500 の実測のまま）。register/post は seed を鋳造して試行し、BLOCKED banner に生エラーを載せて exit 0。移行後は無変更で成功に転じる。
+- **aozora.app も動く**。同日中に kotobase Biscuit 移行が landed（PDS 書き込み d9c2976 は並行セッション、AppView 読みの Biscuit 化 605d023 + discovery 匿名維持 7c5674d はこのセッション。ADR-2608291500 が正本）。再実測: register 13/13 registered、post は aozora=posted 12/12、getProfile / getAuthorFeed（DID 指定）が profile 付きで返る。予告どおり bots 側は無変更で成功に転じ、register には profile backfill（cutover 中に registered になった account の RecordNotFound を実測してから putRecord）だけを足した。
+- まだ開いている aozora 読み経路は handle 指定の read projection（並行 workstream）と discover feed（08-14 cutover 以来 relay projection 不在で hang、Biscuit 無関係）。bot 投稿には影響しない。
 - 前提修理: club-shinshi-app の tools/char-factory.cljs と char-posts.cljs は bb→nbb 変換の残骸（require を閉じない ')、Integer/parseInt、format、.mkdirs、spit/slurp）で **nbb で parse すら不能**だった。2de95b02 で修理し west pin 前進済み。壊れた工場を直すまで producer は REFUSED を返していた（沈黙ではなく）。
 
 ## 却下した代替
@@ -32,5 +33,5 @@ club-shinshi の actor（オリジナルキャラクター）ごとに bot を�
 
 ## 撤去条件 / resume point
 
-- aozora 側は ADR-2608291500 の option A（aozora PDS の Biscuit 移行）が landed した時点で register.cljs → post.cljs を再実行するだけ。
+- aozora の Biscuit 移行は landed 済み（このセクションの旧文「移行後に再実行するだけ」はそのとおり実行され、成立した）。
 - cast の per-actor aozora ハンドルは <slug>.aozora.app。producer は shinshi-producer.aozora.app。"}]
