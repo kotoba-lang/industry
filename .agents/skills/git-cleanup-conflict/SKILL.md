@@ -274,7 +274,9 @@ nbb scripts/west-triple-sync.cljs verify --scope blocking
    before touching anything — see the non-negotiable rule above.
 4. Landed/superseded → drop/delete. Unlanded → rescue to a pushed branch (never back
    into a stash) in a sparse worktree outside the superproject, per `:retirement
-   :rescue`. At fleet scale use **`nbb scripts/cleanup-land.cljs --apply`** instead of
+   :rescue`. Rootの作成入口は `nbb scripts/root-worktree.cljs create <task>
+   --include <path>`（ADR-2608291248）で、stale local mainとfull checkoutを避ける。
+   At fleet scale use **`nbb scripts/cleanup-land.cljs --apply`** instead of
    doing this by hand — it archives, then lands `:additive` and opens PRs for
    `:review`/`:branches` without merging them (see the section above).
 5. Resolve any real merge conflicts by file class (`:resolve-conflicts` in the edn),

@@ -1,0 +1,407 @@
+#!/usr/bin/env nbb
+;; root-worktree.cljs — west-managed root の軽量 worktree を安全に作る。
+;;
+;; 既定は full checkout ではない。origin/main から branch を作り、root の履歴/object
+;; database は linked worktree として共有し、working tree と index は必要な directory
+;; だけを cone-mode sparse checkout + sparse-index で展開する。
+;;
+;; west project は --west で名前を明示したものだけ取得する。引数なしの west update
+;; は、この script からは構造的に発生しない。
+;;
+;; usage:
+;;   nbb scripts/root-worktree.cljs create <task> [options]
+;;   nbb scripts/root-worktree.cljs inspect <path>
+;;   nbb scripts/root-worktree.cljs remove <path>
+;;   nbb scripts/root-worktree.cljs --self-test
+;;
+;; options:
+;;   --profile minimal|docs|policy|full   default: minimal
+;;   --include <directory>               repeatable; comma-separated values accepted
+;;   --west <project-name>               repeatable; comma-separated values accepted
+;;   --path <absolute-path>              must be outside the superproject
+;;   --base <ref>                        default: origin/main
+;;   --detach                            read-only/diagnostic worktree; no branch
+;;   --no-fetch                          do not refresh origin/main first
+;;   --dry-run                           print the exact plan without writing
+
+(require '[scripts.nbb-compat :as io]
+         '[clojure.string :as str])
+
+(def fs (js/require "node:fs"))
+(def os (js/require "node:os"))
+(def path (js/require "node:path"))
+
+(def profiles
+  {"minimal" ["manifest" "scripts" ".agents"]
+   "docs"    ["manifest" "scripts" ".agents" "90-docs/adr"]
+   "policy"  ["manifest" "scripts" ".agents" "90-docs/adr"
+              "90-docs/business" "contracts" "70-tools"]
+   "full"    []})
+
+(defn- script-args []
+  (if (seq *command-line-args*)
+    (vec *command-line-args*)
+    (let [argv (vec (js->clj (.-argv js/process)))
+          i (first (keep-indexed
+                    (fn [idx value]
+                      (when (str/ends-with? value "scripts/root-worktree.cljs") idx))
+                    argv))]
+      (if (some? i) (subvec argv (inc i)) []))))
+
+(defn- die! [message]
+  (binding [*print-fn* #(.error js/console %)]
+    (println (str "root-worktree: " message)))
+  (io/exit 2))
+
+(defn- run [cwd & argv]
+  (apply io/sh (concat argv [{:cwd cwd}])))
+
+(defn- run! [cwd & argv]
+  (let [result (apply run cwd argv)]
+    (when-not (zero? (:exit result))
+      (throw (ex-info (str (first argv) " failed: " (str/trim (:err result)))
+                      {:cwd cwd :argv (vec argv) :result result})))
+    (str/trim (:out result))))
+
+(defn- split-values [value]
+  (->> (str/split (or value "") #",")
+       (map str/trim)
+       (remove str/blank?)))
+
+(defn- parse-create [args]
+  (when (empty? args) (die! "create requires a task name"))
+  (loop [xs (rest args)
+         out {:task (first args)
+              :profile "minimal"
+              :includes []
+              :west []
+              :base "origin/main"
+              :detach false
+              :fetch true
+              :dry-run false}]
+    (if (empty? xs)
+      out
+      (let [[flag value & more] xs]
+        (case flag
+          "--profile" (if value
+                        (recur more (assoc out :profile value))
+                        (die! "--profile requires a value"))
+          "--include" (if value
+                        (recur more (update out :includes into (split-values value)))
+                        (die! "--include requires a directory"))
+          "--west" (if value
+                     (recur more (update out :west into (split-values value)))
+                     (die! "--west requires a project name"))
+          "--path" (if value
+                     (recur more (assoc out :path value))
+                     (die! "--path requires an absolute path"))
+          "--base" (if value
+                     (recur more (assoc out :base value))
+                     (die! "--base requires a ref"))
+          "--detach" (recur (rest xs) (assoc out :detach true))
+          "--no-fetch" (recur (rest xs) (assoc out :fetch false))
+          "--dry-run" (recur (rest xs) (assoc out :dry-run true))
+          (die! (str "unknown option: " flag)))))))
+
+(defn- safe-task? [task]
+  (boolean (re-matches #"[a-z0-9][a-z0-9._-]*" (or task ""))))
+
+(defn- safe-relative-dir? [value]
+  (and (seq value)
+       (not (.isAbsolute path value))
+       (not-any? #{".."} (str/split value #"/"))
+       (not (str/starts-with? value ".git"))))
+
+(defn- outside-root? [root target]
+  (let [r (.realpathSync fs (.resolve path root))
+        absolute-target (.resolve path target)
+        t (if (.existsSync fs absolute-target)
+            (.realpathSync fs absolute-target)
+            (.join path (.realpathSync fs (.dirname path absolute-target))
+                   (.basename path absolute-target)))
+        prefix (str r (.-sep path))]
+    (and (not= r t) (not (str/starts-with? t prefix)))))
+
+(defn- empty-directory? [target]
+  (or (not (.existsSync fs target))
+      (and (.isDirectory (.statSync fs target))
+           (zero? (count (.readdirSync fs target))))))
+
+(defn- west-projects [root]
+  (let [content (.readFileSync fs (.join path root "manifest" "west.yml") "utf8")]
+    (set (map second (re-seq #"(?m)^    - name: (\S+)$" content)))))
+
+(defn- normalize-gitdir-file!
+  "この workspace の hook が linked worktree の `.git` file を symlink に置換することが
+  ある。Git 自身の remove validation は symlink を拒むため、作成直後に標準の一行
+  gitdir pointer file へ戻す。参照先は symlink の realpath から取り、推測しない。"
+  [target]
+  (let [dotgit (.join path target ".git")]
+    (when (and (.existsSync fs dotgit) (.isSymbolicLink (.lstatSync fs dotgit)))
+      (let [gitdir (.realpathSync fs dotgit)]
+        (.unlinkSync fs dotgit)
+        (.writeFileSync fs dotgit (str "gitdir: " gitdir "\n"))
+        true))))
+
+(defn- quote-command [argv]
+  (str/join " " (map #(js/JSON.stringify (str %)) argv)))
+
+(defn- default-target [task]
+  (.join path (.tmpdir os)
+         (str "root-" task "-" (.toString (js/Date.now) 36))))
+
+(defn- create-plan [root opts]
+  (let [profile-paths (get profiles (:profile opts))
+        target (.resolve path (or (:path opts) (default-target (:task opts))))
+        sparse-paths (vec (distinct (concat profile-paths (:includes opts))))
+        branch (when-not (:detach opts) (str "codex/" (:task opts)))
+        add-args (vec (concat ["git" "worktree" "add" "--no-checkout"]
+                              (if (:detach opts) ["--detach"] ["-b" branch])
+                              [target (:base opts)]))]
+    {:root root
+     :target target
+     :branch branch
+     :profile (:profile opts)
+     :sparse-paths sparse-paths
+     :west (vec (distinct (:west opts)))
+     :fetch (:fetch opts)
+     :base (:base opts)
+     :add-command add-args
+     :sparse-command (when (not= "full" (:profile opts))
+                       (vec (concat ["git" "sparse-checkout" "set"
+                                     "--cone" "--sparse-index"] sparse-paths)))
+     :commands (cond-> []
+                 (:fetch opts) (conj ["git" "fetch" "origin" "main"])
+                 true (conj add-args)
+                 (not= "full" (:profile opts))
+                 (conj (vec (concat ["git" "sparse-checkout" "set"
+                                     "--cone" "--sparse-index"] sparse-paths))
+                       ["git" "checkout"])
+                 (seq (:west opts))
+                 (conj ["west" "init" "-l" "manifest"]
+                       (vec (concat ["west" "update" "--fetch" "smart"]
+                                    (distinct (:west opts))))))}))
+
+(defn- validate-create! [root opts]
+  (when-not (safe-task? (:task opts))
+    (die! "task must match [a-z0-9][a-z0-9._-]*"))
+  (when-not (contains? profiles (:profile opts))
+    (die! (str "unknown profile: " (:profile opts)
+               " (expected " (str/join ", " (sort (keys profiles))) ")")))
+  (doseq [directory (:includes opts)]
+    (when-not (safe-relative-dir? directory)
+      (die! (str "--include must be a safe root-relative directory: " directory))))
+  (when (and (= "full" (:profile opts)) (seq (:includes opts)))
+    (die! "--include cannot narrow the full profile; choose minimal/docs/policy instead"))
+  (when (and (:path opts) (not (.isAbsolute path (:path opts))))
+    (die! "--path must be absolute"))
+  (let [target (.resolve path (or (:path opts) (default-target (:task opts))))]
+    (when-not (.existsSync fs (.dirname path target))
+      (die! (str "target parent does not exist: " (.dirname path target))))
+    (when-not (outside-root? root target)
+      (die! (str "target must be outside the superproject: " target)))
+    (when-not (empty-directory? target)
+      (die! (str "target exists and is not empty: " target))))
+  (let [known (west-projects root)
+        unknown (remove known (:west opts))]
+    (when (seq unknown)
+      (die! (str "unknown west project(s): " (str/join ", " unknown))))))
+
+(defn- print-plan! [plan]
+  (println (str "root: " (:root plan)))
+  (println (str "target: " (:target plan)))
+  (println (str "base: " (:base plan)))
+  (println (str "branch: " (or (:branch plan) "(detached)")))
+  (println (str "profile: " (:profile plan)))
+  (println (str "sparse: " (if (seq (:sparse-paths plan))
+                              (str/join ", " (:sparse-paths plan))
+                              "(full checkout)")))
+  (println (str "west: " (if (seq (:west plan))
+                            (str/join ", " (:west plan))
+                            "(none)")))
+  (println "commands:")
+  (doseq [command (:commands plan)]
+    (println (str "  " (quote-command command)))))
+
+(defn- create! [root opts]
+  (validate-create! root opts)
+  (let [plan (create-plan root opts)]
+    (print-plan! plan)
+    (if (:dry-run opts)
+      (println "dry-run: no files or refs changed")
+      (try
+        (when (:fetch plan)
+          (run! root "git" "fetch" "origin" "main"))
+        (run! root "git" "rev-parse" "--verify" (str (:base plan) "^{commit}"))
+        (when-let [branch (:branch plan)]
+          (let [found (run root "git" "show-ref" "--verify" "--quiet"
+                           (str "refs/heads/" branch))]
+            (when (zero? (:exit found))
+              (throw (ex-info (str "branch already exists: " branch) {:branch branch})))))
+        (apply run! root (:add-command plan))
+        (when (normalize-gitdir-file! (:target plan))
+          (println "normalized .git symlink to a gitdir pointer file"))
+        (when-not (= "full" (:profile plan))
+          (apply run! (:target plan) (:sparse-command plan))
+          (run! (:target plan) "git" "checkout"))
+        (when (seq (:west plan))
+          (run! (:target plan) "west" "init" "-l" "manifest")
+          (apply run! (:target plan) "west" "update" "--fetch" "smart" (:west plan)))
+        ;; checkout / west hooks may replace it after the first normalization.
+        (when (normalize-gitdir-file! (:target plan))
+          (println "normalized final .git symlink to a gitdir pointer file"))
+        (println (str "created: " (:target plan)))
+        (println "next: make changes only inside this task worktree")
+        (catch :default error
+          (binding [*print-fn* #(.error js/console %)]
+            (println (str "creation stopped: " (.-message error)))
+            (println (str "partial worktree, if any, was preserved at: " (:target plan)))
+            (println "inspect it before running git worktree remove"))
+          (io/exit 1))))))
+
+(defn- inspect! [target]
+  (when-not target (die! "inspect requires a worktree path"))
+  (let [target (.resolve path target)
+        top (run! target "git" "rev-parse" "--show-toplevel")
+        branch (run! target "git" "branch" "--show-current")
+        sparse-result (run target "git" "config" "--bool" "core.sparseCheckout")
+        sparse-index-result (run target "git" "config" "--bool" "index.sparse")
+        sparse? (and (zero? (:exit sparse-result))
+                     (= "true" (str/trim (:out sparse-result))))
+        sparse-index? (and (zero? (:exit sparse-index-result))
+                           (= "true" (str/trim (:out sparse-index-result))))]
+    (println (str "worktree: " top))
+    (println (str "branch: " (if (str/blank? branch) "(detached)" branch)))
+    (println (str "sparse-checkout: " sparse?))
+    (println (str "sparse-index: " sparse-index?))
+    (println (str ".git shape: "
+                  (cond
+                    (.isSymbolicLink (.lstatSync fs (.join path target ".git"))) "symlink"
+                    (.isFile (.lstatSync fs (.join path target ".git"))) "pointer-file"
+                    :else "directory")))
+    (when sparse?
+      (println "sparse paths:")
+      (println (run! target "git" "sparse-checkout" "list")))
+    (when (.existsSync fs (.join path target ".west"))
+      (println (str "west topdir: " (run! target "west" "topdir"))))))
+
+(defn- nested-repos
+  "root sparse worktree の orgs/ に targeted west update が作った checkout を列挙する。
+  nested repo boundaryで止まり、その中のworktree等へは降りない。"
+  [target]
+  (let [start (.join path target "orgs")]
+    (letfn [(walk [directory depth]
+              (if (or (> depth 4) (not (.existsSync fs directory)))
+                []
+                (if (.existsSync fs (.join path directory ".git"))
+                  [directory]
+                  (mapcat (fn [name]
+                            (let [child (.join path directory name)]
+                              (if (.isDirectory (.lstatSync fs child))
+                                (walk child (inc depth))
+                                [])))
+                          (.readdirSync fs directory)))))]
+      (vec (walk start 0)))))
+
+(defn- nonblank-lines [text]
+  (remove str/blank? (str/split-lines (or text ""))))
+
+(defn- remove! [root target]
+  (when-not target (die! "remove requires a worktree path"))
+  (let [target (.resolve path target)]
+    (when-not (outside-root? root target)
+      (die! (str "refusing to remove the superproject or a nested path: " target)))
+    (when-not (.existsSync fs target)
+      (die! (str "worktree path does not exist: " target)))
+    (let [top (run! target "git" "rev-parse" "--show-toplevel")]
+      (when-not (= target (.resolve path top))
+        (die! (str "path is not a worktree root: " target))))
+    (let [root-dirty (run! target "git" "status" "--porcelain=v1")]
+      (when-not (str/blank? root-dirty)
+        (die! (str "root worktree has WIP; preserved and not removed:\n" root-dirty))))
+    (let [repos (nested-repos target)
+          root-with-ignored (run! target "git" "status" "--porcelain=v1" "--ignored=matching")
+          allowed (into (cond-> #{}
+                          (.existsSync fs (.join path target ".west")) (conj "!! .west/"))
+                        (map #(str "!! " (.relative path target %) "/") repos))
+          unexpected (remove allowed
+                             (filter #(str/starts-with? % "!! ")
+                                     (nonblank-lines root-with-ignored)))]
+      (when (seq unexpected)
+        (die! (str "root worktree has ignored content; archive/classify it before removal:\n"
+                   (str/join "\n" unexpected))))
+      (doseq [repo repos]
+        (let [dirty (run! repo "git" "status" "--porcelain=v1")
+              ignored (run! repo "git" "status" "--porcelain=v1" "--ignored=matching")
+              ignored-only (filter #(str/starts-with? % "!! ") (nonblank-lines ignored))]
+          (when-not (str/blank? dirty)
+            (die! (str "west child has WIP; preserved and not removed: " repo "\n" dirty)))
+          (when (seq ignored-only)
+            (die! (str "west child has ignored content; archive/classify it before removal: "
+                       repo "\n" (str/join "\n" ignored-only)))))))
+    ;; `git status` above may trigger the workspace's git-annex hook and recreate the
+    ;; symlink. Normalize only after the final inspection, with no target-side git call
+    ;; between this point and worktree remove.
+    (normalize-gitdir-file! target)
+    (let [branch (run! root "git" "-C" target "branch" "--show-current")]
+      ;; The previous command can recreate the symlink too; normalize one final time.
+      (normalize-gitdir-file! target)
+      (run! root "git" "worktree" "remove" target)
+      (println (str "removed clean worktree: " target))
+      (when-not (str/blank? branch)
+        (println (str "branch preserved: " branch
+                      " (retire it only through git-cleanup-conflict archive rules)"))))))
+
+(defn- assert! [condition message]
+  (when-not condition (throw (ex-info message {}))))
+
+(defn- self-test! []
+  (assert! (safe-task? "sparse-west-20260829") "valid task rejected")
+  (assert! (not (safe-task? "Bad/Task")) "unsafe task accepted")
+  (assert! (safe-relative-dir? "90-docs/adr") "valid include rejected")
+  (assert! (not (safe-relative-dir? "../outside")) "parent traversal accepted")
+  (assert! (not (safe-relative-dir? ".git/objects")) ".git include accepted")
+  (let [fixture (.mkdtempSync fs (.join path (.tmpdir os) "root-worktree-selftest-"))
+        root (.join path fixture "root")
+        external (.join path fixture "external")]
+    (try
+      (.mkdirSync fs root)
+      (assert! (outside-root? root external) "external target rejected")
+      (assert! (not (outside-root? root (.join path root "task")))
+               "nested target accepted")
+      (finally (.rmSync fs fixture #js {:recursive true :force true}))))
+  (let [parsed (parse-create ["demo" "--profile" "docs"
+                              "--include" "contracts,70-tools"
+                              "--west" "a,b" "--west" "c"
+                              "--detach" "--dry-run"])]
+    (assert! (= "docs" (:profile parsed)) "profile parse failed")
+    (assert! (= ["contracts" "70-tools"] (:includes parsed)) "include parse failed")
+    (assert! (= ["a" "b" "c"] (:west parsed)) "west parse failed")
+    (assert! (and (:detach parsed) (:dry-run parsed)) "boolean option parse failed"))
+  (let [fixture "manifest:\n  projects:\n    - name: a\n      remote: x\n    - name: b\n      remote: x\n"]
+    (assert! (= #{"a" "b"}
+                (set (map second (re-seq #"(?m)^    - name: (\S+)$" fixture))))
+             "west project parser failed"))
+  (println "root-worktree self-test passed: parsing, traversal guard, external-target guard"))
+
+(defn- usage! []
+  (println "usage:")
+  (println "  nbb scripts/root-worktree.cljs create <task> [options]")
+  (println "  nbb scripts/root-worktree.cljs inspect <path>")
+  (println "  nbb scripts/root-worktree.cljs remove <path>")
+  (println "  nbb scripts/root-worktree.cljs --self-test"))
+
+(defn -main [& args]
+  (let [args (vec args)]
+    (cond
+      (= ["--self-test"] args) (self-test!)
+      (= "create" (first args))
+      (let [root (run! (.cwd js/process) "git" "rev-parse" "--show-toplevel")]
+        (create! root (parse-create (rest args))))
+      (= "inspect" (first args)) (inspect! (second args))
+      (= "remove" (first args))
+      (let [root (run! (.cwd js/process) "git" "rev-parse" "--show-toplevel")]
+        (remove! root (second args)))
+      :else (usage!))))
+
+(apply -main (script-args))
