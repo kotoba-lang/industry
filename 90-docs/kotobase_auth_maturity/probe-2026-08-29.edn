@@ -4,9 +4,9 @@
   :authn/passkey-register-present true,
   :biscuit/surfaces-total 4,
   :authn/passkey-challenge-issued true,
-  :probe/at "2026-08-29T11:12:41.747Z",
+  :probe/at "2026-08-29T12:48:12.981Z",
   :authn/passkey-login-options 200,
-  :discovery/capabilities-names-credentials false,
+  :discovery/capabilities-names-credentials true,
   :authn/passkey-rp-id true,
   :authn/passkey-register-reason-named true,
   :biscuit/datom-plane-status 401,
@@ -26,8 +26,8 @@
   :biscuit/surface-refusal-text
   "unauthorized: this surface's reads require a credential (Bearer, AWS SigV4, or an operator CACAO)"},
  :audit
- {:overall 58.00000000000001,
-  :by-plane {:authentication 100, :authorization 36.36363636363637},
+ {:overall 64.00000000000001,
+  :by-plane {:authentication 100, :authorization 45.45454545454547},
   :axes
   [{:axis :passkey-login-live,
     :title "Passkey login issues a real WebAuthn challenge",
@@ -106,9 +106,8 @@
     :title "The capability document says which credential to present",
     :weight 0.06,
     :plane :authorization,
-    :score 0,
-    :finding
-    "/.well-known/kotobase-capabilities describes transports and limits but never names an accepted credential — discovery stops before the door",
+    :score 1,
+    :finding nil,
     :unknown? false}],
   :measured-weight 1,
   :findings
@@ -134,14 +133,6 @@
     :title "That refusal names Biscuit",
     :finding
     "the datom plane answers a bare \"Unauthorized\" — a CACAO speaker locked out by the cutover cannot learn why from the response",
-    :score 0,
-    :headroom 0.06}
-   {:axis :credentials-discoverable,
-    :plane :authorization,
-    :weight 0.06,
-    :title "The capability document says which credential to present",
-    :finding
-    "/.well-known/kotobase-capabilities describes transports and limits but never names an accepted credential — discovery stops before the door",
     :score 0, 
     :headroom 0.06}], 
   :incomplete []}}

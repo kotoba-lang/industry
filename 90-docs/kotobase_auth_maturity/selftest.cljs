@@ -17,6 +17,7 @@
 ;; workspace logged four separate instances of that shape on 2026-08-22 alone.
 (ns kotobase-auth-maturity.selftest
   (:require [kotobase-auth-maturity.audit :as audit]
+            [kotobase-auth-maturity.probe :as probe]
             [clojure.edn :as edn]
             [clojure.string :as str]
             ["fs" :as fs]))
@@ -74,6 +75,34 @@
                 (= 1 (count cleared))
                 (str "cleared " (str/join "," (map name cleared))
                      "; still open " (count after)))))
+
+    ;; 5. the discovery axis reads structure, not a word.
+    ;;
+    ;; Until 2026-08-29 this axis was `(names? body "credential")`. A capability
+    ;; document that listed Bearer / AWS4-HMAC-SHA256 / CACAO under
+    ;; `authentication.accepted` scored FALSE for not spelling one English word,
+    ;; and — the direction that matters more — prose saying "no credential is
+    ;; required" would have scored TRUE. These four cases pin both directions so
+    ;; the replacement cannot quietly regress to a substring search.
+    (let [answers (probe/capabilities-name-credentials?
+                   (js/JSON.stringify
+                    (clj->js {"authentication"
+                              {"required" true
+                               "accepted" [{"scheme" "Bearer"} {"scheme" "CACAO"}]}})))
+          silent (probe/capabilities-name-credentials?
+                  (js/JSON.stringify (clj->js {"surfaces" {"sparql" {}} "limits" {}})))
+          prose (probe/capabilities-name-credentials?
+                 (js/JSON.stringify (clj->js {"note" "no credential is required"})))
+          unread (probe/capabilities-name-credentials? nil)]
+      (check! "5a. a document listing accepted schemes answers true" (true? answers)
+              (str "got " (pr-str answers)))
+      (check! "5b. a document that never mentions authentication answers false"
+              (false? silent) (str "got " (pr-str silent)))
+      (check! "5c. prose containing the word but naming no scheme answers false"
+              (false? prose)
+              (str "got " (pr-str prose) " — the old substring check answered true here"))
+      (check! "5d. a body we could not read answers :unknown, not false"
+              (= :unknown unread) (str "got " (pr-str unread))))
 
     (let [failed (remove second @results)]
       (println (str "\n" (- (count @results) (count failed)) "/" (count @results) " checks passed"))
