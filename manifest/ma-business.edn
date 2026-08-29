@@ -1,0 +1,141 @@
+;; manifest/ma-business.edn — M&A マッチング事業の構成表（policy file、手書き。生成物ではない）
+;;
+;; ## なぜ root がこれを持つか
+;;
+;; itonami bots の作業単位は **repo 1 本**である（`scripts/repo-bots/` は west の
+;; repo ごとに bot を 1 体、`itonami-os-maturity-tick` は候補を 1 本ずつ出す）。
+;; ところが M&A マッチングは **1 本の repo に収まらない**: 案件の発掘・審査・
+;; マッチング・評価・PMI は、この fleet では別々の actor が持っている。
+;;
+;; どの repo にも「この 6 本で 1 つの事業だ」と書ける場所が無いので、bots からは
+;; **事業が見えない**。見えないものは進まない。だから構成表を superproject に置く。
+;; ここが cross-repo の合成を書ける唯一の場所である（子 repo は兄弟を知らない）。
+;;
+;; ## この表が「動いている」ことを意味しないこと
+;;
+;; `manifest/observatories.edn` 冒頭と `scripts/repo-bots/README.md` が記録した失敗と
+;; 同じ形を避ける —— **名簿には charter しか書かない。**
+;; 各 repo が実際にどうなっているかは `scripts/ma-business-tick.cljs` だけが答える。
+;; ここに書いた `:stage/owner` は「そこが持つべき」であって「そこが持っている」ではない。
+;;
+;; ## 実測（2026-08-29、shallow clone を直接読んだ）
+;;
+;; `cloud-itonami/ma` の README は 10 actor の表を持ち、ISIC 6619 を "M&A execution
+;; support"、ISIC 7020 を "PMI and transformation support" と割り当てている。
+;; **6619 の割り当ては誤り** —— 実在する `cloud-itonami-isic-6619` はカード決済処理
+;; （transaction intake / fraud screening / settlement / chargeback）であって M&A
+;; advisory ではない。`ma` の表は名前だけの対応で、実体を一度も見ていない。
+;; ここでは **実際に読んだ src の主題**を書く（:repo/subject）。
+;;
+;; 検査: nbb --classpath ".:scripts/nbb_compat" scripts/ma-business-tick.cljs
+;; ADR: adr-2608291400-ma-matching-business-composite
+
+{:business/id "ma-matching"
+ :business/name "M&A マッチング"
+ :business/adr "adr-2608291400-ma-matching-business-composite"
+
+ ;; 事業の 9 stage。出所は `cloud-itonami/ma` の `ui/app.js`（pin 29854b3 の
+ ;; ハードコード表）。**stage 定義はそこが正本**なので写しであることを明示する。
+ ;;
+ ;; :stage/owner は「その stage を持つべき repo」。nil = **まだ誰も持っていない**。
+ ;; nil を空欄として黙らせない —— tick はこれを :broken として名指しする。
+ :business/stage-source "orgs/cloud-itonami/ma/ui/app.js"
+ :business/stages
+ [{:stage/id :sales        :stage/label "Sales"        :stage/owner "cloud-itonami-isco-2412"}
+  ;; 2026-08-29 に README と src を読んで割り当てた（`ma` の actor 表は根拠にしない）。
+  ;; isco-1221 = Sales and Marketing Managers、:implemented、13 tests / 27 assertions。
+  {:stage/id :marketing    :stage/label "Marketing"    :stage/owner "cloud-itonami-isco-1221"}
+  {:stage/id :screening    :stage/label "Screening"    :stage/owner "cloud-itonami-isic-6612"}
+  ;; **この 1 行がこの事業の中心である。** M&A クラウドが売っているのは
+  ;; 「買い手と売り手の突き合わせ」そのもので、周辺の助言ではない。
+  ;; いま fleet の誰もこれを持っていない。
+  {:stage/id :matching     :stage/label "Matching"     :stage/owner "ma"}
+  {:stage/id :diligence    :stage/label "Diligence"    :stage/owner "cloud-itonami-isic-6612"}
+  {:stage/id :valuation    :stage/label "Valuation"    :stage/owner "cloud-itonami-isco-2412"}
+  {:stage/id :negotiation  :stage/label "Negotiation"  :stage/owner "cloud-itonami-isco-3324"}
+  ;; isic-6910 = 法務・会社設立 / registration agent。M&A の Closing のうち
+  ;; **登記・届出の側**を持つ。⚠ **資金決済（escrow / 送金）は持たない** ——
+  ;; その営みは fleet に owner が居ない。この床が測るのは所有であって被覆ではないので、
+  ;; 緑になっても Closing が全部担われたことにはならない。埋めるなら別の反復で。
+  {:stage/id :closing      :stage/label "Closing"      :stage/owner "cloud-itonami-isic-6910"}
+  {:stage/id :pmi          :stage/label "PMI"          :stage/owner "cloud-itonami-isic-7020"}]
+
+ ;; 構成 repo。:repo/subject は **README と src を実際に読んで書いた**主題で、
+ ;; `ma` の actor 表の主張ではない。
+ :business/constituents
+ [{:repo/name "ma"
+   :repo/role :orchestrator
+   :repo/subject "M&A 仲介の設計スケッチ（9 stage pipeline + 10 actor 名 + 静的 dashboard）"
+   :repo/runtime? false
+   :repo/note (str "自 repo の ADR 0001（accepted 2026-08-21）が『実装は 1 つも無い』"
+                   "と明記。README の 10 actor は ui/app.js のデータであって endpoint ではない。")
+   ;; **候補プールに構造的に入らない。** `itonami-os-maturity-tick` の
+   ;; candidate-family-re は `^cloud-itonami-(isic|isco|cofog|jsic|nace|naics|unspsc)-`
+   ;; なので、`ma` は標準形になっても自動では出てこない。改名はしない
+   ;; （ADR-2608040100: 既存 family の形が elision に優先する / 改名は discovery alias を
+   ;; 壊す）。代わりに **os.edn へ手で宣言する**ことを完了条件に含める。
+   :repo/auto-candidate? false}
+
+  {:repo/name "cloud-itonami-isco-2412"
+   :repo/role :adviser
+   :repo/subject "ISCO-08 2412 金融・投資アドバイザー（:implemented）"
+   :repo/runtime? true
+   ;; 実測 2026-08-29: src/finadvisory/ は actor.cljc / advisor.cljc / store.cljc /
+   ;; governor.cljc / render_html.clj。**phase.cljc と operation.cljc が無い**ので
+   ;; OS の標準形判定は :no-phase-op-sets で落ちる。実装済みだが OS からは回せない。
+   :repo/shape :two-file-actor}
+
+  {:repo/name "cloud-itonami-isco-3324"
+   :repo/role :broker
+   :repo/subject "ISCO-08 3324 貿易ブローカー（:implemented）"
+   :repo/runtime? true
+   :repo/shape :two-file-actor}
+
+  {:repo/name "cloud-itonami-isic-6612"
+   :repo/role :screening
+   :repo/subject "ISIC Rev.5 6612 証券・商品仲介"
+   :repo/runtime? true
+   :repo/shape :standard-form}
+
+  {:repo/name "cloud-itonami-isic-7020"
+   :repo/role :pmi
+   :repo/subject "ISIC Rev.5 7020 経営コンサルティング"
+   :repo/runtime? true
+   :repo/shape :standard-form}
+
+  {:repo/name "cloud-itonami-isco-1221"
+   :repo/role :marketing
+   :repo/subject "ISCO-08 1221 セールス・マーケティング管理者（:implemented）"
+   :repo/runtime? true
+   ;; 実測 2026-08-29: src/ は actor/advisor/store/governor の 2 ファイル形で
+   ;; phase.cljc と operation.cljc が無い。isco-2412 / 3324 と同じ形。
+   :repo/shape :two-file-actor}
+
+  {:repo/name "cloud-itonami-isic-6910"
+   :repo/role :closing
+   :repo/subject "ISIC Rev.5 6910 法務活動（会社設立 / registration agent）"
+   :repo/runtime? true
+   :repo/shape :standard-form}
+
+  {:repo/name "cloud-itonami-isic-6619"
+   :repo/role :none
+   ;; **`ma` の actor 表が誤って M&A advisory を割り当てている repo。**
+   ;; 構成には入れない。表に載せるのは、次に読む者が同じ誤読をしないため。
+   :repo/subject "ISIC Rev.5 6619 カード決済処理（M&A advisory ではない）"
+   :repo/runtime? true
+   :repo/shape :standard-form
+   :repo/misassigned-by "orgs/cloud-itonami/ma/README.md の actor 表"}]
+
+ ;; 事業として成立するのに要る床。tick がこの順で測り、最初に割れたものを
+ ;; 「次の 1 手」として名指しする。**順序が優先順位である。**
+ :business/floors
+ [{:floor/id :stage-owner
+   :floor/what "9 stage すべてに owner repo が居るか（:stage/owner nil を許さない）"}
+  {:floor/id :checkout
+   :floor/what "構成 repo の checkout が在り git repo であるか（無ければ :unmeasured）"}
+  {:floor/id :matching-runtime
+   :floor/what "Matching stage の owner に実際の runtime（src/）が在るか"}
+  {:floor/id :standard-form
+   :floor/what "構成 repo が OS 標準形（phase/operation/store/governor + 単一 ns）か"}
+  {:floor/id :os-declared
+   :floor/what "構成 repo が network-awai/cloud-itonami の os.edn に宣言されているか"}]}
