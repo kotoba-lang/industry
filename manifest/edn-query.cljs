@@ -1,6 +1,6 @@
 #!/usr/bin/env nbb
-;; manifest/edn-query.cljs — ADR ledger + RAD identity journal を実 DataScript
-;; (npm `datascript` パッケージ) にロードして query するツール。
+;; manifest/edn-query.cljs — ADR ledger + RAD identity journal を
+;; kotoba-lang/datalog にロードして query するツール（ADR-2608260200）。
 ;;
 ;; 対象:
 ;;   - 90-docs/adr/*.edn（manifest/edn-datomize.cljs で tx-data 化済み。
@@ -11,10 +11,9 @@
 ;;     「現在値」の entity map に圧縮してから読み込む — 履歴クエリは対象外、
 ;;     現在状態のみ）。orgs/etzhayyim/root が未 checkout の場合は黙ってスキップする。
 ;;
-;; 属性の型変換について: npm `datascript` パッケージは datascript.js 名前空間
-;; （JS 向けインターフェース）をそのまま公開しており、属性は keyword ではなく
+;; 属性の型変換について: このローダは属性を keyword ではなく
 ;; **裸の文字列**（例 "adr/id"、コロン無し）として扱う。:db/id だけ特別扱いで
-;; コロン付き文字列キー ":db/id"。このため元の edn の keyword 値もこのローダでは
+;; 整数 entity id。元の edn の keyword 値もこのローダでは
 ;; 文字列化する（"was keyword" という型情報は失われる — MVP の既知の制約。
 ;; 必要になったら別属性に :value/type "keyword" のようなマーカーを足す）。
 ;;
@@ -46,11 +45,9 @@
          '[clojure.java.io :as io]
          '[clojure.java.shell :as shell]
          '[clojure.string :as str]
-         '["datascript" :as ds-mod]
+         '[manifest.edn-query-datalog :as dlq]
          '["fs" :as node-fs]
          '["node:crypto" :as node-crypto])
-
-(def ds (.-default ds-mod))
 
 ;; ---------- 何を読んだかを記録する（キャッシュの鮮度判定の材料） ----------
 ;;
@@ -2286,43 +2283,32 @@
 
 (defn schema-path [] (io/file root "manifest" "schema.edn"))
 
+(defn card-many-attrs-set
+  "DataScript schema の cardinality-many 宣言を set に落とす（datalog ロード用）。"
+  []
+  (let [from-schema (if (.exists (schema-path))
+                      (into #{} (keep #(when (= (:db/cardinality %) :db.cardinality/many)
+                                          (kw->attr (:db/ident %)))
+                                    (slurp-edn (schema-path))))
+                      #{})]
+    (into dlq/*card-many-attrs*
+          (concat from-schema
+                  ["patent/applicant-norm"
+                   "yakuwari.policy/autonomous" "yakuwari.policy/voice-required"
+                   "yakuwari.policy/approval-required" "yakuwari.policy/blocked"
+                   "yakuwari.policy/unknown" "yakuwari/capability"
+                   "yakuwari/runners" "business/roles"
+                   "factory/capabilities" "factory/fulfillment-modes"]))))
+
 (defn ds-schema []
-  (let [attrs (if (.exists (schema-path)) (slurp-edn (schema-path)) [])
-        obj (js-obj)]
-    (doseq [attr attrs]
-      (when (= (:db/cardinality attr) :db.cardinality/many)
-        (aset obj (kw->attr (:db/ident attr)) (js-obj ":db/cardinality" ":db.cardinality/many"))))
-    (aset obj "rad/cid" (js-obj ":db/unique" ":db.unique/identity"))
-    ;; patent/applicant-norm is a vector of normalized names — join many-to-one
-    ;; against company/legal-name-norm (gap 2: applicant × LEI cross-corpus join).
-    (aset obj "patent/applicant-norm" (js-obj ":db/cardinality" ":db.cardinality/many"))
-    ;; awai-yakuwari (ADR-2607300800): a role holds several capabilities per
-    ;; decision, so these must be cardinality-many or datascript keeps only the
-    ;; last value and every "which roles need an approval" query silently
-    ;; under-reports. Declared here rather than in manifest/schema.edn because
-    ;; that file is generated and must not be hand-edited — same reason
-    ;; patent/applicant-norm sits here.
-    (doseq [a ["yakuwari.policy/autonomous" "yakuwari.policy/voice-required"
-               "yakuwari.policy/approval-required" "yakuwari.policy/blocked"
-               "yakuwari.policy/unknown" "yakuwari/capability"
-               "yakuwari/runners" "business/roles"]]
-      (aset obj a (js-obj ":db/cardinality" ":db.cardinality/many")))
-    ;; tsukuru factory registry (ADR-2800003200 Phase 1): 工場は複数の能力・複数の
-    ;; 受注形態を持つ。cardinality-many を宣言しないと datascript は JS array を
-    ;; 1 つの値として持ち、[?e "factory/capabilities" "cnc-controls"] が
-    ;; **黙って 0 件を返す**（能力で工場を引く、というこの dataset の主目的が
-    ;; 無言で壊れる）。schema.edn は生成物で手編集禁止なので、
-    ;; patent/applicant-norm・yakuwari/* と同じくここに置く。
-    (doseq [a ["factory/capabilities" "factory/fulfillment-modes"]]
-      (aset obj a (js-obj ":db/cardinality" ":db.cardinality/many")))
-    obj))
+  (card-many-attrs-set))
 
 ;; ---------- build + query ----------
 
 (defn build-conn []
-  (let [conn (.create_conn ds (ds-schema))
-        tempid (atom 0)
-        next-tempid! (fn [] (swap! tempid dec))
+  (binding [dlq/*card-many-attrs* (card-many-attrs-set)]
+    (let [tempid (atom 0)
+          next-tempid! (fn [] (swap! tempid dec))
         ;; ADR: multi-entity catalog も含め全 entity をロード
         adr-tx (mapcat (fn [f]
                          (map (fn [e] (assoc e :db/id (next-tempid!)))
@@ -2386,31 +2372,21 @@
         factory-tx (tsukuru-factory-entities next-tempid!)
         hayari-tx (hayari-entities next-tempid!)
         hayari-ent-tx (hayari-top-entities next-tempid!)
-        all-tx (into-array (map entity->js (concat adr-tx docs-tx manifest-tx foreign-adr-tx
-                                                     biz-tx canvas-tx kj-tx rad-tx
-                                                     journal-tx genome-tx datoms-tx
-                                                     hirameki-corpus-tx jinushi-tx
-                                                     proc-registry-tx merged-kotoba-tx
-                                                     working-doc-tx narrative-tx
-                                                     company-tx gbizinfo-tx kanpou-tx web-presence-tx
-                                                     gyousei-review-tx
-                                                     property-tx subsidy-tx relationship-tx fleet-tx
-                                                     yabai-tx tadori-tx patent-tx accounts-tx innen-tx
-                                                     awai-tx kakekomi-tx okugai-tx factory-tx
-                                                     hayari-tx hayari-ent-tx
-                                                     index-tx)))]
-    ;; 1 本の巨大 transact でなく 50k ずつ流す。実測（2026-08-07）: 20 万 entity を
-    ;; 1 本で流すとピーク 2.4 GB、50 万 entity を 50k ずつなら 3.4 GB —— 分割の方が
-    ;; entity あたりのピークが小さい。単一 transact は「全 entity の JS 表現」と
-    ;; 「db」を同時に生かすため、tier を 1 つ足しただけで既定 heap（4.2 GB）を
-    ;; 割りやすい。分割してもトランザクション境界の意味は変わらない（この面は
-    ;; 読み取り専用で、構築中に誰も query しない）。
-    (let [n (.-length all-tx)]
-      (loop [i 0]
-        (when (< i n)
-          (.transact ds conn (.slice all-tx i (min n (+ i 50000))))
-          (recur (+ i 50000)))))
-    {:conn conn
+        all-tx (vec (concat adr-tx docs-tx manifest-tx foreign-adr-tx
+                            biz-tx canvas-tx kj-tx rad-tx
+                            journal-tx genome-tx datoms-tx
+                            hirameki-corpus-tx jinushi-tx
+                            proc-registry-tx merged-kotoba-tx
+                            working-doc-tx narrative-tx
+                            company-tx gbizinfo-tx kanpou-tx web-presence-tx
+                            gyousei-review-tx
+                            property-tx subsidy-tx relationship-tx fleet-tx
+                            yabai-tx tadori-tx patent-tx accounts-tx innen-tx
+                            awai-tx kakekomi-tx okugai-tx factory-tx
+                            hayari-tx hayari-ent-tx
+                            index-tx))
+        db (dlq/build-db all-tx)]
+      {:db db
      :gleif-tiers (sort (gleif-tiers))
      :houjin-bangou-tiers (sort (houjin-bangou-tiers))
      :adr-count (count adr-tx)
@@ -2446,7 +2422,7 @@
      :tsukuru-candidates-count (count (filter #(= "tsukuru-candidates" (:source/dataset %)) factory-tx))
      :tsukuru-registry-seed-count (count (filter #(= "tsukuru-registry-seed" (:source/dataset %)) factory-tx))
      :tsukuru-seed-count (count (filter #(= "tsukuru-seed" (:source/dataset %)) factory-tx))
-     :index-count (count index-tx)}))
+     :index-count (count index-tx)})))
 
 ;; ---------- MCP mode（常駐して JSON-RPC で答える） ----------
 ;;
@@ -2525,7 +2501,7 @@
 (def ^:private budget-ms 30000)
 
 (def ^:private cache-dir (io/file root ".projection-cache"))
-(def ^:private cache-json (io/file cache-dir "edn-query-plane.json"))
+(def ^:private cache-edn (io/file cache-dir "edn-query-plane.edn"))
 (def ^:private cache-meta (io/file cache-dir "edn-query-plane.meta.edn"))
 (def ^:private views-file (io/file cache-dir "edn-query-views.edn"))
 (def ^:private views-spec (io/file root "manifest" "plane-views.edn"))
@@ -2580,56 +2556,37 @@
   []
   (let [m (read-meta)]
     (cond
-      (or (nil? m) (not (.exists cache-json))) [:absent nil]
+      (or (nil? m) (not (.exists cache-edn))) [:absent nil]
       (= (:digest m) (current-digest m)) [:fresh m]
       :else [:stale m])))
 
 (def ^:private shards-dir (io/file cache-dir "shards"))
 (def ^:private shards-index (io/file cache-dir "edn-query-shards.edn"))
 
-(defn- entity->dataset
-  "e -> dataset。:source/dataset を持たない entity はどの shard にも入らない ——
-   入れてしまうと『dataset を名指したクエリ』が名指していない entity を見ることに
-   なり、shard と全体で答えが変わる。名指せない entity は全体ロードでしか読めない、
-   という制約をそのまま残す方が正しい。"
-  [all-datoms]
-  (let [m (js/Map.)]
-    (doseq [d all-datoms]
-      (when (= "source/dataset" (.-a d))
-        (.set m (.-e d) (.-v d))))
-    m))
-
 (defn- write-shards!
-  "dataset ごとに datom を束ねて 1 ファイルずつ書く。全体 282 MB を毎回読むのは、
-   1 dataset しか要らないクエリにとって 97% が無駄。
-
-   1 pass で振り分ける（dataset ごとに全 datom を走査すると 75 倍になる）。"
   [db]
   (when-not (.exists shards-dir)
     (node-fs/mkdirSync (.getPath shards-dir) (clj->js {:recursive true})))
-  (let [all (.datoms ds db ":eavt")
-        e->ds (entity->dataset all)
-        buckets (js/Map.)]
-    (doseq [d all]
-      (when-let [dsname (.get e->ds (.-e d))]
-        (when-not (.has buckets dsname) (.set buckets dsname (array)))
-        (.push (.get buckets dsname) d)))
-    (let [idx (doall
-               (for [dsname (js->clj (js/Array.from (.keys buckets)))]
-                 (let [datoms (.get buckets dsname)
-                       sdb (.init_db ds datoms (ds-schema))
-                       json (js/JSON.stringify (.serializable ds sdb))
-                       f (io/file shards-dir (str (str/replace (str dsname) #"[^A-Za-z0-9_.-]" "_")
-                                                  ".json"))]
-                   (node-fs/writeFileSync (.getPath f) json)
-                   [(str dsname) {:file (.getName f)
-                                  :datoms (.-length datoms)
-                                  :bytes (count json)}])))]
-      (node-fs/writeFileSync (.getPath shards-index)
-                             (pr-str {:built-at (.toISOString (js/Date.))
-                                      :shards (into {} idx)}))
-      {:shards (count idx)
-       :bytes (reduce + 0 (map (fn [[_ v]] (:bytes v)) idx))})))
+  (let [datasets (into #{}
+                       (keep (fn [eid] (dlq/entity->dataset db eid))
+                             (keys (:eavt db))))
+        idx (doall
+             (for [dsname (sort datasets)
+                   :let [sdb (dlq/subset-db db #{dsname})
+                         content (dlq/serialize-db sdb)
+                         f (io/file shards-dir
+                                    (str (str/replace (str dsname) #"[^A-Za-z0-9_.-]" "_")
+                                         ".edn"))]]
+               (do
+                 (node-fs/writeFileSync (.getPath f) content)
+                 [(str dsname) {:file (.getName f)
+                                :datoms (dlq/datom-count sdb)
+                                :bytes (count content)}])))]
+    (node-fs/writeFileSync (.getPath shards-index)
+                           (pr-str {:built-at (.toISOString (js/Date.))
+                                    :shards (into {} idx)}))
+    {:shards (count idx)
+     :bytes (reduce + 0 (map (fn [[_ v]] (:bytes v)) idx))}))
 
 (defn- shardable
   "クエリが触りうる dataset を静的に決められるか。
@@ -2672,36 +2629,32 @@
     (catch :default e [:full (str "unparseable: " e)])))
 
 (defn- load-shards!
-  "名指された shard を読んで 1 つの db にまとめる。"
   [datasets]
   (let [idx (:shards (slurp-edn shards-index))
         files (map (fn [d] [d (get idx d)]) datasets)]
-    (if (some (fn [[_ v]] (nil? v)) files)
-      nil
-      (let [datoms (array)]
-        (doseq [[_ {:keys [file]}] files]
-          (let [sdb (.from_serializable ds (js/JSON.parse
-                                            (node-fs/readFileSync
-                                             (.getPath (io/file shards-dir file)) "utf8")))]
-            (doseq [d (.datoms ds sdb ":eavt")] (.push datoms d))))
-        (.init_db ds datoms (ds-schema))))))
+    (when-not (some (fn [[_ v]] (nil? v)) files)
+      (dlq/merge-dbs
+       (mapv (fn [[_ {:keys [file]}]]
+               (dlq/deserialize-db
+                (node-fs/readFileSync (.getPath (io/file shards-dir file)) "utf8")))
+             files)))))
 
 (defn- write-cache! [db counts]
   (when-not (.exists cache-dir)
     (node-fs/mkdirSync (.getPath cache-dir) (clj->js {:recursive true})))
   (let [snap (inputs-snapshot)
-        json (js/JSON.stringify (.serializable ds db))]
-    (node-fs/writeFileSync (.getPath cache-json) json)
+        edn (dlq/serialize-db db)]
+    (node-fs/writeFileSync (.getPath cache-edn) edn)
     (node-fs/writeFileSync (.getPath cache-meta)
                            (pr-str (assoc snap
                                           :digest (snapshot-digest snap)
                                           :built-at (.toISOString (js/Date.))
                                           :counts counts
-                                          :bytes (count json))))
-    {:bytes (count json) :files (count (:files snap)) :dirs (count (:dirs snap))}))
+                                          :bytes (count edn))))
+    {:bytes (count edn) :files (count (:files snap)) :dirs (count (:dirs snap))}))
 
 (defn- load-cached-db []
-  (.from_serializable ds (js/JSON.parse (node-fs/readFileSync (.getPath cache-json) "utf8"))))
+  (dlq/deserialize-db (node-fs/readFileSync (.getPath cache-edn) "utf8")))
 
 (defn- allow-cold? []
   (= "1" (.-EDN_QUERY_ALLOW_COLD (.-env js/process))))
@@ -2728,16 +2681,13 @@
         (let [t (js/Date.now)
               built (build-conn)]
           (js/console.error (str "edn-query: plane built in " (- (js/Date.now) t) "ms (cold)"))
-          {:db (.db ds (:conn built)) :counts (dissoc built :conn) :source :build})
+          {:db (:db built) :counts (dissoc built :db) :source :build})
         (refuse-cold! state)))))
 
 (defn- timed-q
-  "クエリを実行し経過を stderr へ。30 秒超で exit 4 —— datascript は同期実行なので
-   途中では止められない。**これは事前抑止ではなく事後検出**であり、そう書いておく。
-   事前に効いているのは冷たい面を拒否する側。"
   [db qs]
   (let [t (js/Date.now)
-        r (.q ds qs db)
+        r (dlq/q db qs)
         ms (- (js/Date.now) t)]
     (js/console.error (str "edn-query: query " ms "ms"))
     (when (> ms budget-ms)
@@ -2749,15 +2699,15 @@
 (defn- run-refresh! []
   (let [t0 (js/Date.now)
         built (build-conn)
-        db (.db ds (:conn built))
+        db (:db built)
         t-build (- (js/Date.now) t0)
-        counts (dissoc built :conn)
+        counts (dissoc built :db)
         written (write-cache! db counts)
         sharded (write-shards! db)
         views (when (.exists views-spec)
                 (into {} (map (fn [[k qs]]
                                 (let [t (js/Date.now)
-                                      rows (js->clj (.q ds qs db))]
+                                      rows (timed-q db qs)]
                                   (js/console.error (str "  view " k " " (- (js/Date.now) t)
                                                          "ms rows=" (count rows)))
                                   [k {:query qs :rows rows}]))
@@ -2804,9 +2754,7 @@
       (let [t0 (js/Date.now)
             [state m] (cache-state)]
         (if (= :fresh state)
-          ;; mcp の plane_stats は (vals (dissoc p :conn)) を足すので、
-          ;; 形を変えず counts を展開して返す
-          (let [built (assoc (:counts m) :conn (.conn_from_db ds (load-cached-db)))]
+          (let [built (assoc (:counts m) :db (load-cached-db))]
             (js/console.error (str "edn-query/mcp: plane from cache in "
                                    (- (js/Date.now) t0) "ms (built " (:built-at m) ")"))
             (reset! plane built))
@@ -2820,7 +2768,7 @@
                 (reset! plane built)))))))
 
 (defn- q* [query]
-  (js->clj (.q ds query (.db ds (:conn (plane!))))))
+  (timed-q (:db (plane!)) query))
 
 (defn- pairs->index
   "[[k v] …] -> {k v}。同じ k が複数あれば最初を採る。"
@@ -2852,8 +2800,8 @@
 
 (defn- counts-summary []
   (let [p (plane!)]
-    (-> (dissoc p :conn)
-        (assoc :total (reduce + (vals (dissoc p :conn)))))))
+    (-> (dissoc p :db)
+        (assoc :total (reduce + (vals (dissoc p :db)))))))
 
 (defn- mcp-invoke [tool-name args]
   (try
@@ -3001,8 +2949,8 @@
                                 (plane-db!))]
       (case mode
         "count" (println (counts-line counts))
-        "q" (println (pr-str (js->clj (timed-q db (first queries)))))
-        "q*" (println (pr-str (mapv (fn [x] (js->clj (timed-q db x))) queries)))))
+        "q" (println (pr-str (timed-q db (first queries))))
+        "q*" (println (pr-str (mapv (fn [x] (timed-q db x)) queries)))))
 
     (do (println (str "usage: nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs "
                       "[refresh | count | q '<datalog-query>' | q* '<q1>' '<q2>' ... "

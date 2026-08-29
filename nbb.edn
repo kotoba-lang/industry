@@ -9,4 +9,10 @@
 ;; `fleet-ci.placement` だと `fleet_ci/placement.cljs` を探してしまい、実際のディレクトリ
 ;; `scripts/fleet-ci/` と一致しないため。root scripts の慣習（`(ns closing-check)` 等）と同じ。
 {:paths ["." "scripts/nbb_compat" "scripts/fleet-ci" "70-tools/bmc/src" "70-tools/bmc/test"
-         "70-tools/spotwork/src" "70-tools/spotwork/test"]}
+         "70-tools/spotwork/src" "70-tools/spotwork/test"]
+ :deps {io.github.kotoba-lang/datalog
+        {:git/url "https://github.com/kotoba-lang/datalog.git"
+         :git/sha "d18513af533917539c56435de6fb1426738da31a"}
+        io.github.kotoba-lang/datom-source
+        {:git/url "https://github.com/kotoba-lang/datom-source.git"
+         :git/sha "19dc98ad5272da6648c27eada8e1ed76cac85d8d"}}}
