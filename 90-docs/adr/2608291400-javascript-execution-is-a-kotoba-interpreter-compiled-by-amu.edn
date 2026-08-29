@@ -113,36 +113,49 @@ gate: 200 関数を全部呼ぶモジュールを組み、`wasm-tools validate` 
 emit は検査ではないが、**emit の成功が『動く成果物ができた』と読まれる**
 限り同じことが起きる。
 
-## amu はこの修正をまだ取り込めない —— 原因は別 commit（三点測定、2026-08-29）
+## amu が取り込めなかった理由と、その解消（2026-08-29）
 
-修正は `kotoba-wasm` の main に入ったが、**amu の `deps.edn` pin は進めていない。**
-進めると amu の suite に 37 failures が出るためで、その原因を三点で測った:
+修正を amu の pin に載せると 37 failures が出た。原因を三点で測った:
 
 | amu の kotoba-wasm pin | 中身 | 結果 |
 |---|---|---|
-| `aac02618`（現行 pin） | 基準 | 1154 tests / 8526 assertions、**0 failures** |
+| `aac02618`（当時の pin） | 基準 | 1154 tests / 8526 assertions、**0 failures** |
 | `f6635d8` | + `c7d3514` のみ | 1154 / 8489、**37 failures** |
 | `a739f37` | + `c7d3514` + ULEB 修正 | 1154 / 8489、**37 failures（同一）** |
 
-**同じ test・同じ分布・同じ assertion 数**なので、**ULEB 修正は 1 件も足していない。**
-原因は `c7d3514`「replay the typed-Wasm implementation that only existed in a
-checkout」である。
+同じ test・同じ分布・同じ assertion 数なので、**ULEB 修正は 1 件も足していない。**
 
-落ちるのは backend parity 系（`dual-backend-pilot-suite-green` 22 /
-`every-pure-product-case-passes-profile-admission` 10 / ほか 5）で、落ちる kit は
-**`base64-kit` `vector-i64-kit` `vector-mut-kit` `vector-sum-kit`** ——
-**typed vector の経路**に集中している。症状は wasm32 側の結果が `nil`
-（KIR は値を返す）。
+**原因は `c7d3514`「replay the typed-Wasm implementation that only existed in
+a checkout」が emitter 側の半分だけを replay したこと。** bulk vector 構築の
+ために `kotoba:typed/vector-from-memory-i64` という新しい import を出すように
+なったが、`amu/runtime/browser-host.mjs` にその実装が来ていなかった。症状は
+`forbidden-import`。
 
-**したがって amu の pin が `aac02618` で止まっているのは怠慢ではなく、
-`c7d3514` との非互換が landed していないためである。** ULEB 修正を amu に
-届けるには、その非互換を先に解く必要がある —— それは別の欠陥であって、
-この ADR の範囲ではない。
+**直した（amu `514819906d80`）。** host 側 3 点:
 
-⚠ **単発の再現を CLI で試みたが判別材料にならなかった。** 3 バージョンとも
-同じ `:error :internal` を返す（conformance kit は JVM の `lc/run-case` 経由で
-走るので、nbb CLI 経路は別物）。**full suite の三点比較だけが決め手だった。**
-1 ケースだけを速く回す手立てが無いことが、この種の切り分けを高くしている。
+- allowlist に function と **`kotoba:typed/scratch` の memory import**
+- **instantiate ごとに** 2 ページ固定の `WebAssembly.Memory` を生成
+- `vector-from-memory-i64(descriptorId, offset, count)` の実装（item 予算は
+  `vector-conj-i64` と同一）
+
+**この path は host が memory を provide して import させる形なので profile の
+中に収まる。** `validateModule` は今も memory を *export* する module を拒む。
+
+⚠ **ここで一度、逆向きの誤った結論に飛びかけた** ——「browser profile は memory
+export を禁じるので host は guest memory を読めない、よってこの import は構造的に
+不可能」。実際は import で渡す設計だった。kotoba-wasm 側の gate を切る方向に
+進みかけて、**kotoba-wasm 自身の 10 test が『bulk path が在ること』を assert して
+落ちた**ので気づいた。**kotoba-wasm は 1 バイトも触っていない。**
+
+結果: **1154 tests / 8526 assertions、0 failures** —— 手つかずの baseline と
+**同じ assertion 数**。conformance の golden digest は再生成した（`c7d3514` が
+出力を正当に変えたため。golden test 自身が直し方を名乗る）。
+
+⚠ **単発の再現を CLI で試みたが判別材料にならなかった。** 3 バージョンとも同じ
+`:error :internal` を返す（conformance kit は JVM の `lc/run-case` 経由で走る）。
+決め手は full suite の三点比較で、**1 ケースだけを速く回す手立てが無いことが、
+この種の切り分けを高くしている。** 後で `clojure -M -e \"(load-file …)\"` が
+その速い経路だと分かり、そこから原因まで数分だった。
 
 ## 併せて直した browser の成熟度（別件だが同じセッションの実測）
 
