@@ -23,8 +23,9 @@
   :coverage/seed-outlet "BBC News (Yahoo! ニュース配信)"
   :coverage/seed-published "2026-08-21"
   :coverage/method "WebSearch + WebFetch。取得できた記事本文のみを根拠にした。SNS の原投稿には直接アクセスしていない — X の投稿はすべて報道が引用した形で採取している。"
-  :coverage/known-gaps "(1) Cofnas 本人の Substack 原文・X 原投稿は未取得（報道経由の孫引き）。(2) 両陣営の公開書簡の署名者リスト全文は未取得（ghent-letters.pages.dev は集計ページのみで氏名を出していない）。(3) Chronicle of Higher Education / Daily Nous / NBC News は 403 で取得できず。(4) 英政治家の肩書きは Wikipedia 由来で未検証（下記 :evidence/tier :tertiary）。"
+  :coverage/known-gaps "(1) Cofnas 本人の Substack 原文は未取得 —— ncofnas.com は本体が JS 描画で記事リンクが生 HTML に無く、archive API は proxy が 502 で塞いだ。X 原投稿も未取得で、引用はすべて VRT / Belga が引いた形。(2) 両陣営の署名者リストは 2026-08-29 に取得済み（gap 解消。擁護側は書簡本体から 955 件、支持側は ghent-letters が配布する CSV から 2,848 件）。(3) Chronicle of Higher Education / Daily Nous / NBC News は 403 で取得できず。(4) 英政治家の肩書きは Wikipedia 由来で未検証（下記 :evidence/tier :tertiary）。"
   :coverage/shape "1 人 1 entity。:person/category で politician / journalist / academic / civil-society / institution / organization に分類し、:person/side で告発側・擁護側を持つ。2026-08-29 の改訂前は tertiary 分が :roster/* という散文 blob 5 本に潰れており query できなかった —— 構造を直しただけで、裏取りの水準は :evidence/tier のまま変わっていない。"
+  :coverage/correction "2026-08-29 の訂正。初版は Cofnas 擁護書簡だけを 700 筆超と書き、ゲント大学支持側を未取得として空欄にしていた。実測すると支持側 2,848 筆に対し擁護側 955 筆で、約 3.0 倍の開きがある。初版の書き方は、擁護側が学界の主たる反応であるかのように読めた。／ ただし 2 つの数を並べて多寡を論じない。集め方が違う: 擁護側は ORCID 検証つき（100%）で国際・上位職階中心、支持側は Google Form で ORCID なし（34%）、ベルギー国内 1,091 名のうち Ghent University 自身が 439 名、大学院生・学部生も含む。片方は検証された研究者の署名、もう片方は当該大学を含む地元コミュニティの動員で、同じ単位ではない。"
   :coverage/caution "人が死亡している事案である。断定を避け、誰が何を言ったかの記録に留める。因果（誰のせいで死んだか）はこのカタログの主張しない範囲。"}
 
  ;; ---------------------------------------------------------------- 中心人物
@@ -251,7 +252,13 @@
   :letter/title "Letter opposing punishment of Nathan Cofnas"
   :letter/side "Cofnas 擁護"
   :letter/key-text "ゲント大学が Cofnas 博士を学問の自由の行使ゆえに罰することのないよう求める。／ 学問の自由の本質的な構成要素は、相手の地位や身分にかかわらず他の研究者の業績を精査できることであり、それには盗用や捏造といった学術不正の証拠を提示する自由が含まれる。／ 今回の懲戒手続きは、少なくとも部分的には学術不正を公表したことへの報復（retaliation）に見える。"
-  :letter/signatories "2026-08-24 時点で全世界から700筆超（当初報道は米国大学の教授200人超）。Duke, MIT, Northeastern, Texas A&M, UCLA など。ビジネススクール教員も23名含む（退職者を含む）。"
+  :letter/host-person "John Armstrong（King's College London の数学者。研究上の関心に高等教育の EDI への evidence-based approach を挙げている）"
+  :letter/signatories-measured 955
+  :letter/signatories-measured-at "2026-08-29"
+  :letter/signatories-orcid "955 / 955（100%）。署名時に ORCID 検証を要求する。"
+  :letter/signatory-examples "Michael Biggs（社会学, Oxford）、Abhishek Saha（数学, QMUL）、Michael Sharpe（名誉教授, Oxford）、Alex Byrne（哲学, MIT）、Joel Pust（哲学, Delaware）、Klaas Wynne FRSE（化学物理, Glasgow）、Martin Anthony・Peter Ramsay・David de Meza・Roham Alvandi（LSE）、Robert Black KC FRSE（スコットランド法名誉教授, Edinburgh）、Eric Kaufmann（Buckingham）、J. Michael Bailey（Northwestern）、Richard Haier（UC Irvine 名誉教授）"
+  :letter/signatory-profile "職階: full professor 270 / associate professor 91 / emeritus professor 50。国: US 203 / UK 137 / Belgium 26 / Spain 26（266 件は国が空）。上位所属は Oxford 14 / LSE 14 / UCL 11 / KCL 9 / Cambridge 9 と分散している。"
+  :letter/count-caveat "この数は増え続ける。報道は 08-24 時点で 700 筆超と書き、08-29 の実測は 955。日付なしで引用しない。"
   :letter/host "johnarmstrongmaths.com"
   :letter/source "https://www.insidehighered.com/news/quick-takes/2026/08/25/hundreds-academics-support-nathan-cofnas-open-letter ; https://poetsandquants.com/2026/08/25/nearly-2-dozen-b-school-profs-are-defending-a-suspended-race-realist-researcher/"
   :evidence/tier :secondary}
@@ -261,7 +268,10 @@
   :letter/title "Open letter supporting Ghent University's investigation"
   :letter/side "ゲント大学支持"
   :letter/key-text "ゲント大学が調査を開始した決定を支持する。この調査を内部告発への処罰として枠づける言説に抗する。／ 大学がレイシズム的な疑似科学に信用を与えようとする試みに利用されないよう求める。"
-  :letter/signatories "署名者数・氏名は集計ページに掲出されていない（未取得）。"
+  :letter/signatories-measured 2848
+  :letter/signatories-measured-at "2026-08-29"
+  :letter/signatories-orcid "996 / 2848（34%）。Google Form で集めており ORCID を要求していない。"
+  :letter/signatory-profile "国: Belgium 1091 / UK 487 / US 193 / Netherlands 157（491 件は空）。所属: Ghent University 439 / KU Leuven 129 / University of Antwerp 126 / UCLouvain 108 / VUB 75。職階: full professor 967 / doctoral researcher 488 / postdoctoral researcher 396 / student 185。"
   :letter/source "https://ghent-letters.pages.dev/"
   :statement/note "ghent-letters.pages.dev は両書簡の署名者を地理・所属・分野・職階で比較集計した第三者ページ。最終更新 2026-08-26。CSV 配布あり。"
   :evidence/tier :secondary}
@@ -549,4 +559,57 @@
   :person/role "ロンドン警視総監" :person/category "institution"
   :statement/text "記者 Jack Grove に関する苦情は、そもそも受理して進めるべきではなかった。"
   :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+
+ ;; ---------------------------------------------------------------------------
+ ;; 一次資料から取り直した分（2026-08-29）
+ ;;
+ ;; 逐語 evidence は `90-docs/knowledge/arday-cofnas-evidence.edn` に置き、
+ ;; `scripts/verify-arday-cofnas-evidence.cljs` が原文へ取りに行って照合する
+ ;; （17 check、うち 2 件は「一次資料に**無い**こと」を確かめる :absent）。
+ ;; ---------------------------------------------------------------------------
+
+ {:db/id -800 :source/dataset "arday-cofnas-affair" :person/name "John Armstrong"
+  :person/role "数学者" :person/affiliation "King's College London" :person/category "academic"
+  :person/side "手続き面での Cofnas 擁護"
+  :statement/text "Cofnas 擁護の公開書簡を自サイトでホストし、ORCID による署名者の資格検証を実装している。研究上の関心として、高等教育における EDI への evidence-based approach を自ら挙げている。"
+  :statement/source "https://johnarmstrongmaths.com/openletters/letter.php?campaign=cofnas"
+  :evidence/tier :primary}
+
+ {:db/id -801 :source/dataset "arday-cofnas-affair" :statement/who "Cofnas 擁護書簡の署名者一同"
+  :statement/venue "公開書簡（一次資料）" :statement/date "2026-08"
+  :statement/text "報道がほぼ引かなかった第 2 の論点: 我々は、大学が学問の自由への脅威を —— それが自校職員による苦痛の訴えであれ、外部からのボイコット予告であれ —— その脅威に狙われた当人を懲戒する根拠として扱っているように見えることを懸念する。"
+  :statement/verbatim-check "letter/threats"
+  :statement/source "https://johnarmstrongmaths.com/openletters/letter.php?campaign=cofnas"
+  :statement/note "書簡の要求は復職でも処分撤回でもなく、学問の自由の行使を理由に罰しないことに限定されている（check letter/ask）。"
+  :evidence/tier :primary}
+
+ {:db/id -802 :source/dataset "arday-cofnas-affair" :statement/who "Belga News Agency"
+  :statement/role "ベルギー国営通信" :statement/venue "配信記事" :statement/date "2026-08-20"
+  :statement/text "ゲント大学は人事記録と懲戒手続きの守秘のため詳細を明かさない。したがってどの発言が調査の引き金になったのかは不明である。"
+  :statement/verbatim-check "ghent/unclear-which"
+  :statement/source "https://www.belganewsagency.eu/press-releases/35637/"
+  :statement/note "⚠ 盗用を告発したから停職になった、という因果は一次資料の裏づけを持たない。大学が言っているのは最近の公の発言までで、どれかは特定されていない。BBC / Yahoo の見出し（盗用疑惑を告発した学者が停職に）はこの区別を落としている。"
+  :evidence/tier :primary}
+
+ {:db/id -803 :source/dataset "arday-cofnas-affair" :statement/who "VRT NWS"
+  :statement/role "ベルギー公共放送" :statement/venue "報道" :statement/date "2026-08-21"
+  :statement/text "Cofnas は 2024 年、レイシズムの申し立てを一因としてケンブリッジの Emmanuel College を去ることを余儀なくされた。ケンブリッジの調査は彼を差別・ハラスメントで有罪とせず、その見解は多くの人に不快と見なされるものの、法に触れず、表現の自由を守るための大学規程にも違反しないと結論した（Guardian 報）。"
+  :statement/verbatim-check "cofnas/emmanuel ; cambridge/cofnas-cleared"
+  :statement/source "https://www.vrt.be/vrtnws/en/2026/08/20/ugent-suspends-controversial-researcher-after-death-of-cambridge/"
+  :evidence/tier :primary}
+
+ {:db/id -804 :source/dataset "arday-cofnas-affair" :event/date "2026-03-12"
+  :event/what "ゲント大学の職員・学生 300 名が Cofnas の採用に異議を唱える。Arday の死（08-14）の 5 か月前、Cofnas の告発記事（07-21）の 4 か月前。"
+  :statement/verbatim-check "ghent/march-protest"
+  :statement/note "⚠ 停職を Arday 事件だけの帰結として読むと、この前史が消える。ゲント大学における Cofnas への反対は事件に先行しており、2026 年初頭の着任時点で既に抗議を招いていた。"
+  :statement/source "https://www.vrt.be/vrtnws/en/2026/08/20/ugent-suspends-controversial-researcher-after-death-of-cambridge/"
+  :evidence/tier :primary}
+
+ {:db/id -805 :source/dataset "arday-cofnas-affair" :statement/who "Jason Arday"
+  :statement/venue "辞任表明" :statement/date "2026-08-05"
+  :statement/text "辞任の理由として unrelenting public attention（やむことのない世間の注目）に言及した。"
+  :statement/verbatim-check "arday/resignation-words"
+  :statement/source "https://www.vrt.be/vrtnws/en/2026/08/20/ugent-suspends-controversial-researcher-after-death-of-cambridge/"
+  :statement/note "Good Law Project が掲載した全文（goodlawproject.org/an-update-from-jason-arday/）が一次資料だが、本カタログはまだ逐語照合をかけていない。"
+  :evidence/tier :secondary}
 ]

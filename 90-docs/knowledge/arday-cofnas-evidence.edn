@@ -1,0 +1,116 @@
+;; Arday / Cofnas 事件 — 逐語 evidence の manifest
+;;
+;; `90-docs/knowledge/arday-cofnas-affair.datoms.edn` のうち、**当事者自身の公表物、
+;; または当事者の声明を直接引用した報道**から採った主張を、原文への部分文字列一致で
+;; 検証できるようにしたもの。検証器は `scripts/verify-arday-cofnas-evidence.cljs`。
+;;
+;; 設計の要点:
+;;
+;; - **:verbatim は原文の言語で持つ**（英語）。翻訳を照合対象にすると、訳の揺れが
+;;   検証失敗として現れ、検証器が原文の変化を見なくなる。
+;; - **:expect :absent の行を必ず含める。** これは検索エンジンの要約が主張していたが
+;;   一次資料に無かった文言で、検証器が「見つからないこと」を確かめる。全部が
+;;   :present の manifest は、常に真になる assertion しか持たない（結果だけを見る
+;;   負テストと同じ欠陥）。
+;; - **:volatile true の文書に sha256 を pin しない。** 公開書簡は署名が増えるたびに
+;;   本文以外が変わるので、hash を pin すると「署名が 1 件増えた」が「原文が改竄された」
+;;   として毎回赤くなる。pin するのは archived な報道だけ。
+;;
+;; - **:source/sha256 は検証器自身に計算させる。** 初版はこの値を別のツール
+;;   （python の tag stripper）で作ったので、検証器の正規化と食い違い、3 source 中
+;;   2 つが初回から DRIFT した。pin を打つ側と照合する側で正規化が違えば、pin は
+;;   原文の変化ではなく道具の違いを測る。`--repin` で書き直す。
+;; - **DRIFT は exit 1 で落とす。** 印字するだけの signal は、誰も行動しないので
+;;   無いのと同じ。初版はまさにそれで、2 件の DRIFT を出しながら PASS と言っていた。
+;;
+;; 取得は 2026-08-29。UA は身元を名乗る形（hyakka-knowledge-ingest）。
+;; 実測: 同一分内の 2 回の取得で 3 source とも hash 一致（pin は安定に機能する）。
+
+{:manifest/subject "arday-cofnas-affair"
+ :manifest/captured-at "2026-08-29"
+ :manifest/user-agent "Mozilla/5.0 (hyakka-knowledge-ingest; +https://wiki.kotobase.net)"
+
+ :manifest/sources
+ [{:source/id "cofnas-letter"
+   :source/url "https://johnarmstrongmaths.com/openletters/letter.php?campaign=cofnas"
+   :source/kind :primary
+   :source/party "John Armstrong (King's College London) がホストする公開書簡そのもの"
+   :source/volatile true
+   :source/volatile-why "署名者リストを本文に含むため、署名が増えるたびに文書全体の hash が変わる。2026-08-29 の取得時点で 955 名（全員 ORCID 付き）。"
+   :source/captured-chars 63460}
+
+  {:source/id "vrt-nws"
+   :source/url "https://www.vrt.be/vrtnws/en/2026/08/20/ugent-suspends-controversial-researcher-after-death-of-cambridge/"
+   :source/kind :secondary
+   :source/party "VRT NWS（ベルギー公共放送）。ゲント大学の声明と Cofnas の X 投稿を直接引用している。"
+   :source/captured-chars 3626
+   :source/sha256 "857a3f8ac7fa4837"}
+
+  {:source/id "belga-35637"
+   :source/url "https://www.belganewsagency.eu/press-releases/35637/"
+   :source/kind :secondary
+   :source/party "Belga News Agency（ベルギー国営通信）。ゲント大学の確認を報じている。"
+   :source/captured-chars 5963
+   :source/sha256 "53cf8d91b4ffbe64"}]
+
+ :manifest/checks
+ [;; --- Cofnas 擁護書簡（一次資料。書簡そのもの） ---
+  {:check/id "letter/addressee" :check/source "cofnas-letter" :check/expect :present
+   :check/verbatim "Dear Professor Petra De Sutter"
+   :check/asserts "書簡はゲント大学長 Petra De Sutter 個人宛である。"}
+  {:check/id "letter/retaliation" :check/source "cofnas-letter" :check/expect :present
+   :check/verbatim "appear to constitute retaliation, at least in part, for publicizing academic misconduct"
+   :check/asserts "署名者は懲戒手続きを、学術不正の公表への報復と見ている。"}
+  {:check/id "letter/scrutiny" :check/source "cofnas-letter" :check/expect :present
+   :check/verbatim "An essential component of academic freedom is the ability to scrutinize the scholarship of other academics, regardless of their position or status"
+   :check/asserts "書簡の中心的な主張。地位にかかわらず他者の業績を精査できることが学問の自由の本質的構成要素である、とする。"}
+  {:check/id "letter/threats" :check/source "cofnas-letter" :check/expect :present
+   :check/verbatim "as grounds for disciplining the very individual targeted by those threats"
+   :check/asserts "第 2 の主張。大学が、脅威の標的になった当人を懲戒する根拠として、その脅威（自校職員の苦痛の訴えや外部のボイコット予告）を扱っている、という批判。報道要約はこの段落をほぼ落としている。"}
+  {:check/id "letter/ask" :check/source "cofnas-letter" :check/expect :present
+   :check/verbatim "we urge Ghent University to protect Dr Cofnas from being punished for exercising his academic freedom"
+   :check/asserts "書簡の要求。復職や処分撤回ではなく「罰しないこと」を求めている。"}
+
+  ;; --- ゲント大学の声明（VRT / Belga が直接引用） ---
+  {:check/id "ghent/precaution" :check/source "vrt-nws" :check/expect :present
+   :check/verbatim "the staff member has been suspended as a precautionary measure"
+   :check/asserts "停職は予防措置であって、懲戒処分そのものではない。"}
+  {:check/id "ghent/confidentiality" :check/source "vrt-nws" :check/expect :present
+   :check/verbatim "We cannot comment further on the specific details or the underlying arguments in order to safeguard confidentiality"
+   :check/asserts "大学は理由の詳細を公表していない。"}
+  {:check/id "ghent/unclear-which" :check/source "belga-35637" :check/expect :present
+   :check/verbatim "It is therefore unclear which specific statements prompted the investigation"
+   :check/asserts "**どの発言が調査の引き金になったかは公になっていない。** 「盗用告発を理由に停職された」という読み方は、一次資料の裏づけを持たない。"}
+  {:check/id "ghent/appropriate-followup" :check/source "belga-35637" :check/expect :present
+   :check/verbatim "appropriate follow-up"
+   :check/asserts "大学は停職の前日（08-19）に、Cofnas の発言へ適切に対応すると予告していた。"}
+
+  ;; --- Cofnas 自身の X 投稿（VRT が直接引用） ---
+  {:check/id "cofnas/x-post" :check/source "vrt-nws" :check/expect :present
+   :check/verbatim "I was just suspended by Ghent University. They will almost certainly fire me"
+   :check/asserts "停職を最初に公表したのは大学ではなく Cofnas 本人。"}
+  {:check/id "cofnas/x-rector" :check/source "vrt-nws" :check/expect :present
+   :check/verbatim "The decision was made by rector Petra De Sutter, a former leader of the Green Party"
+   :check/asserts "Cofnas は決定を学長個人と、その政治的経歴に帰している。"}
+
+  ;; --- 事件の前史（この 2 件は事件の読み方を変える） ---
+  {:check/id "cofnas/emmanuel" :check/source "vrt-nws" :check/expect :present
+   :check/verbatim "He was forced to leave Cambridge"
+   :check/asserts "Cofnas は 2024 年に、レイシズムの申し立てを一因として Emmanuel College を去っている。**Arday 事件は初めての衝突ではない。**"}
+  {:check/id "ghent/march-protest" :check/source "vrt-nws" :check/expect :present
+   :check/verbatim "questioned by 300 staff and students at Ghent University"
+   :check/asserts "**ゲント大学における Cofnas への反対は 2026-03 に始まっており、Arday 事件の 5 か月前である。** 停職を Arday 事件だけの帰結として読むと、この前史が消える。"}
+  {:check/id "cambridge/cofnas-cleared" :check/source "vrt-nws" :check/expect :present
+   :check/verbatim "did not breach the law and did not contravene university regulations designed to uphold free speech"
+   :check/asserts "ケンブリッジの調査は Cofnas を差別・ハラスメントで有罪としなかった。見解は多くの人に不快と見なされるが違法ではない、とした。"}
+  {:check/id "arday/resignation-words" :check/source "vrt-nws" :check/expect :present
+   :check/verbatim "unrelenting public attention"
+   :check/asserts "Arday が辞任表明で用いた語。"}
+
+  ;; --- 検索要約が主張したが一次資料に無かったもの（:absent が期待値） ---
+  {:check/id "unverified/hereditarian-contract" :check/source "vrt-nws" :check/expect :absent
+   :check/verbatim "hereditarian revolution"
+   :check/asserts "**検索エンジンの要約は「停職通知書が、Cofnas の race realism と hereditarian revolution の研究継続は雇用契約と根本的に矛盾すると述べた」と主張したが、VRT 本文にこの語は無い。** 取得できた一次・二次資料のどれにも無いので、カタログに載せていない。この行は、その除外が今も正しいことを検証器に毎回確かめさせるためにある。"}
+  {:check/id "unverified/hereditarian-belga" :check/source "belga-35637" :check/expect :absent
+   :check/verbatim "hereditarian revolution"
+   :check/asserts "同上（Belga 側でも不在）。"}]}
