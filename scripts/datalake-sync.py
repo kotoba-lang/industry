@@ -47,6 +47,14 @@ snapshot は毎回の commit 後に `--snapshot-retention-days`（既定 7）よ
 overwrite を毎時走らせる呼び出し元ほど snapshot が積み上がるので、個別の
 opt-in を要求せず既定で効かせる。`--no-expire-snapshots` で無効化できる。
 
+⚠ **古い loader に新しい spec を渡すと、`mode` は黙って無視され全量 overwrite に
+なる。** 実測 2026-08-29: catch-up 実行中に superproject の checkout を
+`git checkout --` で一時的に旧版へ戻してしまい、次の chunk が `mode: upsert` の
+つもりで **1,377 万行を消して 36 万行で置き換えた**（Iceberg の snapshot から
+rollback して復旧）。呼び出し側は `--require-incremental-support` を渡すこと ——
+旧 loader は argparse が `unrecognized arguments` で exit 2 にするので、
+**破壊的 overwrite ではなく失敗として現れる**。
+
 commit 後の read-back 検証（`row_count`）は Iceberg snapshot summary の
 `total-records` を読むだけで、`.scan().to_arrow()` によるテーブル全体の
 再ダウンロードはしない（測定: dns_resolution の 2300万行超で、この
@@ -258,11 +266,32 @@ def main() -> int:
                     help="commit 後、この日数より古い snapshot を expire する（既定 7）")
     ap.add_argument("--no-expire-snapshots", action="store_true",
                     help="snapshot expire を今回だけ止める")
+    # VERSION HANDSHAKE -- see the "stale loader" note in the module docstring.
+    # Callers whose spec relies on `mode` (append/upsert) MUST pass this. An
+    # older copy of this script has no such option, so argparse rejects it and
+    # exits 2 instead of silently ignoring `mode` and doing a full overwrite.
+    ap.add_argument("--require-incremental-support", action="store_true",
+                    help="この loader が mode(append/upsert) を解釈できることを"
+                         "呼び出し側が要求する。古い loader は argparse が"
+                         "unrecognized arguments で exit 2 にするので、"
+                         "**黙って overwrite に落ちる事故が構造的に起きない**")
     args = ap.parse_args()
     retention_days = None if args.no_expire_snapshots else args.snapshot_retention_days
 
     namespace, tables = load_spec(args.spec)
     print(f"SPEC\t{len(tables)}\ttables\tnamespace={namespace}")
+
+    # The other half of the handshake: a spec that asks for incremental
+    # behaviour from a caller that did not assert it understands the
+    # contract is a caller/loader mismatch, not a request to fall back to
+    # overwrite. Fail closed -- falling back is exactly the 13.4M-row
+    # deletion this guard exists to prevent.
+    incremental = sorted({t["table"] for t in tables if t["mode"] != "overwrite"})
+    if incremental and not args.require_incremental_support:
+        print(f"REFUSING: spec asks for non-overwrite mode on {incremental} but the caller "
+              "did not pass --require-incremental-support. Pass it (and make sure every "
+              "caller of this loader is the version that supports it).", file=sys.stderr)
+        return 2
 
     loaded = []
     for spec in tables:
