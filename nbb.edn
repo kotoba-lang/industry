@@ -8,4 +8,5 @@
 ;; ns 名が単一セグメント（`placement`）なのは、cljs が `-` を `_` に munge するので
 ;; `fleet-ci.placement` だと `fleet_ci/placement.cljs` を探してしまい、実際のディレクトリ
 ;; `scripts/fleet-ci/` と一致しないため。root scripts の慣習（`(ns closing-check)` 等）と同じ。
-{:paths ["." "scripts/nbb_compat" "scripts/fleet-ci" "70-tools/bmc/src" "70-tools/bmc/test"]}
+{:paths ["." "scripts/nbb_compat" "scripts/fleet-ci" "70-tools/bmc/src" "70-tools/bmc/test"
+         "70-tools/spotwork/src" "70-tools/spotwork/test"]}

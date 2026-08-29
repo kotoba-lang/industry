@@ -84,6 +84,7 @@ TTL が切れた read は write/input 価格に化ける。ScheduleWakeup 20〜3
 ## 改訂履歴
 
 - 2026-08-29(同日 2 回目): OpenRouter の routing とキャッシュ局所性、murakumo.cloud の cache read 設計を追加調査した(下記 2 節)。
+- 2026-08-29(同日 3 回目): murakumo に cache 計器を実装して deploy し、live で測った。下記『murakumo の cache read 設計の現在地』の判定が **測定によって置き換わった** —— 『未設計に近い』は routing/会計については正しかったが、node 層については誤りで、cache は動いている。ただし byte-identical な要求にしか効かない。
 
 ## OpenRouter 等 aggregator の追加知見 — routing がキャッシュを割る
 
@@ -98,6 +99,70 @@ prompt cache は **provider ローカル**(Anthropic は account 単位ですら
 3. **会計層**: usage に cached トークンの区別が無い(cost.cljc / gen_billing.cljc に該当フィールドなし)。cache hit 率は**未測定**(clean ではない)。
 
 **含意**: murakumo に cache read は「設計されている」とは言えない。効いているのは llama.cpp の既定動作 + local-murakumo の leader 固定だけで、gateway の round-robin と会計の欠落が穴。直すなら (a) gateway を会話/bot キー の sticky routing に変える、(b) llama-server の usage(timings.prompt_n の削減分)を cached として計上する、(c) hit 率を測ってから `--cache-reuse` 等を検討する、の順。本 ADR は現在地の記録であり、修正の実施は別途。
+
+## 実装と live 実測(2026-08-29、3 回目の改訂)
+
+計器を書いて deploy し、実際に測った。**「murakumo に cache read は設計されていない」
+という前節の判定は、node 層については誤りだった** —— 測っていなかったので
+分からなかっただけで、cache は動いている。ただし効く範囲が狭い。
+
+### landed(network-awai/local-murakumo `c1b3e1b`、api.murakumo.cloud に deploy 済み)
+
+- `cost/cached-prompt-tokens` — 3 つの出所を優先順に読む:
+  `timings.cache_n` > `usage.prompt_tokens_details.cached_tokens` > `prompt_tokens - prompt_n`。
+  **直接申告を導出より優先**する。fleet の origin は同質ではない(llama.cpp の b70/gad の
+  ほかに OpenAI 互換 origin が居る)ので 2 番目が要る。
+- **取れなければ nil。0 を捏造しない。** cache miss の実測 0 と、フィールド欠落を出力から
+  区別できることがこの計器の要点そのもの —— これが無ければ「測れなかった」が
+  「cache が効いていない」と同じ顔になる(ADR-2608136000 の 6 問の 1 問目)。
+- `cost/cache-summary` — 測れた run だけを分母にした hit 率。`:runs-measured` と
+  `:runs-total` を両方出すので、**小さい標本が fleet 全体の真実を騙れない**。
+  測れた run が 0 件なら nil(未測定であって hit 率 0% ではない)。
+- `/v1/messages` 応答の usage に `cache_read_input_tokens`(測れたときだけ)。
+  ⚠ Anthropic API と違い `input_tokens` は cached を**含んだ**総 prompt(llama.cpp usage の
+  素通し)。既存 consumer の課金計算を変えないための意図的な非互換。
+- 検証: 198 tests / 1039 assertions green、**壊すと落ちることを 2 方向で確認**(導出経路と
+  OpenAI 標準経路をそれぞれ壊して該当テストだけが落ちることを見た)。governed release
+  artifact も規定どおり refresh(`ui.js` は byte-identical に再生成され、変化が
+  `worker.js` だけに閉じていることが確認できた)。
+
+### live 実測 — cache は byte-identical にしか効かない
+
+api.murakumo.cloud → `qwen3.8-27b-throughput-b70`、連続 4 回:
+
+| 要求 | cache_n | prompt_n | prompt_ms |
+|---|---|---|---|
+| seed(新しい prefix) | 0 | 1230 | 1200 |
+| **byte-identical な再送** | **1226** | **4** | **171**(7 倍速) |
+| 同じ 1226-token prefix + 別の 4-token tail | **0** | 1230 | 1204 |
+| 同じ prefix + さらに別の tail | **0** | 1230 | 1193 |
+
+**含意**: 長い安定 prefix + 変化する tail という **agent loop の形そのものが、この origin では
+毎ターン全再評価**になる。この workspace の消費が cache read 98.5% で成立しているのは
+Anthropic 側の cache であって、murakumo 側ではない。
+
+**機構は未特定。** 候補は llama-server の `--cache-reuse`(既定 0。prefix が分岐した後の
+再利用を司る flag なので第一候補)、slot 選択(`--parallel 2` で分岐要求が空 slot に
+落ちている可能性)、chat template。**どれも測っていないので、原因として書かない。**
+次の一手は b70 で `--cache-reuse` を入れて上表を取り直すこと —— この repo からは b70 に
+到達できない(Cloudflare private binding。gad は tailnet に居るが当時 health=000)ため未実施。
+
+### deploy 後の初期値(標本が小さい。fleet の hit 率として引用しない)
+
+`GET /infer/cost` の `:cache` は deploy 直後に
+`{:runs-measured 5 :runs-total 200 :hit-rate 0.966}` を返した。**200 中 5 件しか測れて
+いない**(残りは計器より前に記録された run)ので、この 0.966 は fleet の hit 率ではない。
+ring が入れ替われば代表性が出る。**`:runs-measured` を見ずに `:hit-rate` を引用しない。**
+
+### routing / 会計の判定は変わらない
+
+- 会計の穴は**塞がった**(上記)。
+- routing: live 経路(`local-murakumo/readiness.cljc` の leader 固定)は 2026-08-29 に
+  修正済みで正しい。`cloud-murakumo/gateway.cljc` の round-robin は
+  **`.cljs` worker からの呼び出しが 1 件も無く、live traffic を運んでいない**(実測)。
+  したがって「直したばかりの anti-pattern を gateway が再生産している」という前節の
+  記述は、**live の害としては誇張**だった —— 将来 live 化するときに塞ぐべき seam であって、
+  今日壊れている経路ではない。sticky routing の実装は未着手(pure fn + test で足りる)。
 
 ## 出所
 

@@ -1,0 +1,63 @@
+;; 80-data/spotwork/cohorts.edn — 働き手側の k-匿名 cohort カタログ。
+;;
+;; ⚠ **これは fixture であって実在の働き手ではない。** 実運用では
+;; `cloud-itonami/talent`（自己主権の人材レジストリ）の公開読み（k-匿名 cohort
+;; 集計のみ）から取る。個人を指す行はここにも talent にも出てこない。
+;;
+;; `:cohort/size` が k（既定 5）未満の cohort は governor が
+;; `:cohort/below-k-anonymity` で止める —— 小さすぎる集団の集計は個人を指しうる。
+;;
+;; `:cohort/isco` は ISCO-08 の 4 桁 unit group。`cloud-itonami/talent` /
+;; `cloud-itonami/recruit` / `cloud-itonami/org-ilo-isco` と同じ語彙で、
+;; そのまま join できる。
+
+[{:cohort/id "ch-jp13-5246-day"
+  :cohort/label "東京・飲食カウンター接客・日中"
+  :cohort/isco "5246"
+  :cohort/region "JP-13"
+  :cohort/size 40
+  :cohort/availability [{:from "09:00" :to "22:00"}]
+  :cohort/no-show-rate 0.05
+  :cohort/work-authorization-verified? true
+  :cohort/source :fixture}
+
+ {:cohort/id "ch-jp13-5246-eve"
+  :cohort/label "東京・飲食カウンター接客・夕方以降"
+  :cohort/isco "5246"
+  :cohort/region "JP-13"
+  :cohort/size 23
+  :cohort/availability [{:from "16:00" :to "23:30"}]
+  :cohort/no-show-rate 0.09
+  :cohort/work-authorization-verified? true
+  :cohort/source :fixture}
+
+ {:cohort/id "ch-jp13-9412-day"
+  :cohort/label "東京・厨房補助・日中"
+  :cohort/isco "9412"
+  :cohort/region "JP-13"
+  :cohort/size 31
+  :cohort/availability [{:from "08:00" :to "18:00"}]
+  :cohort/no-show-rate 0.07
+  :cohort/work-authorization-verified? true
+  :cohort/source :fixture}
+
+ {:cohort/id "ch-jp14-5246-day"
+  :cohort/label "神奈川・飲食カウンター接客・日中"
+  :cohort/isco "5246"
+  :cohort/region "JP-14"
+  :cohort/size 18
+  :cohort/availability [{:from "09:00" :to "21:00"}]
+  :cohort/no-show-rate 0.06
+  :cohort/work-authorization-verified? true
+  :cohort/source :fixture}
+
+ ;; 無断欠勤率が未申告。**スコアが付かない**（0 点として最下位に並ぶのではなく、
+ ;; 順位表の外に出る）ことを、生きたデータでも確かめられるようにするための行。
+ {:cohort/id "ch-jp13-4110-day"
+  :cohort/label "東京・一般事務補助・日中（実績未申告）"
+  :cohort/isco "4110"
+  :cohort/region "JP-13"
+  :cohort/size 12
+  :cohort/availability [{:from "09:00" :to "18:00"}]
+  :cohort/work-authorization-verified? true
+  :cohort/source :fixture}]

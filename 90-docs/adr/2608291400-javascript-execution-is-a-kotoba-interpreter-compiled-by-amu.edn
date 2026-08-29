@@ -207,31 +207,218 @@ CLAUDE.md と amu の `examples/todo-app.kotoba` が『Kotoba には整数→文
 - ~~**G1**: amu の wasm32-browser が instantiate できるモジュールを出す~~
   **達成**（kotoba-wasm `a739f37` の ULEB 修正 + amu `5148199` の bulk vector host 実装）。
 - **G2**: 関数・オブジェクト・配列が入り、差分 corpus が browser の実 smoke suite が使う JS を覆う。
-  **前半は達成。後半は未達** —— corpus 159 件は手で書いた JS であって、`browser` の
-  `test-cljs/browser/compat/*` が実際に流す JS を覆ってはいない。
-- **G3**: 同じ JS を QuickJS とこのエンジンに通し、`browser.runtime` 経路で一致を測る。**未着手。**
-- **G4**: G3 が緑になって初めて production の既定エンジンを差し替える。QuickJS はオラクルとして残す。**未着手。**
+  **達成。** 言語面は `break`/`continue`/`finally`/`this`/builtin/`try` に加えて
+  `new Error(...)`・複合代入・`++`/`--` まで入り、corpus は host V8 に対して 210 件。
+- ~~**G3**: 同じ JS を QuickJS とこのエンジンに通し、`browser.runtime` 経路で一致を測る。~~
+  **着地**（`browser` `test/runtime-differential.cljs`）。**そしてすぐに 5 つの穴を出した** ——
+  どれも自前の 180 テストが 1 件も落とさずに通していたものである:
+
+  | 割れ方 | quickjs-ng | このエンジン（当時） |
+  |---|---|---|
+  | `typeof window` | undefined | error |
+  | `typeof nope` | undefined | error |
+  | `null.x` | TypeError を投げる | 投げず `undefined` |
+  | `new Error('boom')` | Error object | new is not defined |
+  | `'x'.toUpperCase` | 関数 | undefined（builtin 未実装） |
+
+  **これが差分テストを書いた理由そのものである。** 単体テストは誰かが書こうと思ったことしか
+  検査しない。`typeof window !== 'undefined'` は実ページで最も多い feature detection の
+  書き方だが、自分でテストを書くときには思いつかない —— 相手のエンジンに訊いて初めて出た。
+- **G4**: production の既定エンジンを差し替える。**未達だが、ブロッカーだった橋は架かった。**
+
+  差し替えに要るのは JS の言語機能ではなく **ホストオブジェクトの橋**だった
+  （`browser.compat.quickjs` は `:dom/query` `:dom/mutate` `:event/listen` `:net/fetch` 等
+  12 の import で Web API に繋がっている）。**capability を足さずに架けた。**
+
+  ```
+  host: snapshot (element id -> textContent)  ──┐
+                                                ▼
+                eval-dom(source, snapshot) ──> effect log ──> host が replay
+  ```
+
+  書き込みを**実行しない。値として返す。** これはこのワークスペースが `kotoba/app` に
+  対して既に引いている契約そのもの（`state + event -> next-state + inert effects`、
+  ADR-2607201300 / ADR-2608261100）で、その結果 **`document` を束縛したまま
+  `kotoba -M check` は `:effects #{}` を答え続ける**。`browser.runtime/ecma262` の
+  `:imports #{}` は欠落ではなく、**import する先が無い**という事実である。
+
+  代償は正直に書く: ①ゲストは自分の書き込みを読み返せない（read は host が注入した
+  snapshot から答える）②知っているホストオブジェクトは `document.getElementById` だけ。
+  **どちらも quickjs-ng に対して両方向で測ってある** —— `test/runtime-differential.cljs`
+  は実エンジンに同じログ形式を書く `document` シムを与えて 2 つのログを突き合わせる。
+  記録した文字列との照合ではない。
+
+  **`addEventListener` も同じ形に載った。** これは書き込みではなく**関数を渡す**
+  操作なので、capability の無いゲストは呼び返してもらえない。そこで:
+
+  - 登録は**登録そのもの**を返す —— 要素・イベント種別・ハンドラの**番号**。
+    関数はゲストの中に留まり、番号だけが境界を越える。
+  - 発火は第 2 の入口 `eval-dom-event(src, dom, n)`。**スクリプトを再実行**して
+    環境を組み直し、**ログを空にしてから**ハンドラ n を呼ぶので、返るのは
+    そのハンドラ自身の effect だけである。
+
+  再実行は「呼び出しの間に状態を持たない」ことの代償であり、正直な代償でもある ——
+  **状態は host が持つ**のだから、ゲストは毎回すべてを渡されなければならない。
+  ハンドラは自分が閉じ込めた変数を見る（capture が効く）。それが、関数ではなく
+  番号だけを渡す理由そのものである。
+
+  **属性・`document.title`・`console.log` も同じ形に載った。** ここで効いたのは
+  「`document` と `console` を予約 id のノードにする」こと（`#document` / `#console`、
+  HTML の id では綴れない）—— コードを減らす小技ではなく、**特殊ケースを消す**手である。
+  `document.title = x` が「任意のノードのプロパティへの書き込み」と同じ規則になり、
+  代入経路の規則が 3 本から 1 本になった。
+
+  ゲストが届く面の全体:
+
+  | | 読む | 書く |
+  |---|---|---|
+  | element | `textContent` / `getAttribute(n)` | `textContent` / `setAttribute(n,v)` / `addEventListener(type,fn)` |
+  | `document` | `title` / `getElementById(id)` | `title` |
+  | `console` | — | `log(…)` |
+  | global | — | `setTimeout(fn,ms)` / `fetch(url)` |
+
+  **`setTimeout` は `addEventListener` と同じ形で、同じ registry を共有する。**
+  どちらも「後で呼ぶ関数」をホストに渡す操作で、capability の無いゲストには時計も
+  呼び返しも無い。返るのは登録（遅延とハンドラ番号）で、発火は同じ第 2 の入口。
+  タイマ id として返すのはハンドラ番号である —— このエンジンが持つ identity が
+  それしか無いから。
+
+  これで全部である。他は `undefined` で、page script はそれを検査できる ——
+  ブラウザが持たない機能を検査するのと同じやり方で。
+
+  **`fetch` も同じ形に載った。ここが本当の試金石だった** —— promise を返すからである。
+  返るのは pending request（`#req<n>` という id のノード。新しい値の型は要らなかった）で、
+  n が registry の枠。`.then(fn)` はその枠にハンドラを収め、同じ request を返すので
+  chain できる。ホストが request を実行し、**応答を添えてその枠を発火する**:
+
+  ```
+  eval-dom                              -> 5:fetch7:#window14:9:/api/data1:0
+                                           ( host が fetch する )
+  eval-dom-event-arg(…, 0, the-body)    -> 11:textContent3:out8:the body
+  ```
+
+  **effect model が存在する理由そのものの往復が、capability 無しで閉じた。**
+  ゲストは network に一度も触らず、応答はホストが手渡すデータである。
+
+  ⚠ **その応答の渡し方で、素直な方法が効かない。しかも理由が正しい。**
+  呼び出し「前」に caller の環境へ束縛してもだめで、**引数の無い宣言済み仮引数は
+  `undefined` に束縛される**（`function f(a) { return typeof a }; f()` が
+  `undefined` を答えるのはそのため）ので、外側の束縛を shadow する。だから
+  `bind-args` の「後」に束縛する。同じ理由でその入口は `call-fn` に委譲せず呼び出しを
+  展開して書いてある（`call-fn` は既に言語の上限である 5 引数）。
+
+  残る G4 の条件は `new Worker` だけになった。
 
 ## 次の一手（resume point）
 
-**G3 が次。** `browser.runtime` は `:runtime/eval` / `:runtime/call` / `:runtime/job-drain`
-という記述子を既に定義しており、`browser.compat.quickjs` はその上の薄い Web API アダプタ
-である（browser の README がそう書いている）。このエンジンを 2 つ目の記述子として登録し、
-同じ page script を両方に流して突き合わせる。
+**次は `browser` 側の host adapter である。** ゲスト側は揃った ——
+`textContent` の読み書き、`addEventListener` の登録と発火まで、すべて
+effect-as-value で通り、quickjs-ng に対して両方向で測ってある。まだ無いのは
+**effect ログを実 htmldom に適用する host 側**で、これは `browser` の仕事:
 
-最初にやること: エンジンを `--target wasm32-browser --fuel 2000000000` で落とし、
-`orgs/kotoba-lang/browser/test-cljs/browser/compat/` の smoke test が実際に流している
-JS を集めて `test/differential.cljs` の corpus に足し、割れる場所を数える。
+1. 実 document から snapshot を作る（element id -> textContent）
+2. `eval-dom` を呼ぶ
+3. ログを parse して `dom-bridge/apply-mutation` に流す
+   （`textContent` の設定は `:remove-children` + `:create-text` + `:append-child`）
+4. `addEventListener` の登録を実イベント配送に繋ぎ、発火時に `eval-dom-event` を呼ぶ
 
-⚠ **実測済みの罠 2 つ（どちらもこのセッションで踏んだ）**
+そこまで行けば、`browser.demo` の実 `<script>` を QuickJS 抜きで走らせて
+**同じ document になることを比較できる** —— それが G4 の本当の合格条件である。
+
+**その次**が `new Worker` / `fetch` / `setTimeout`。どれも同じ問いに帰着する ——
+**返す値で言えるか、それとも呼び返しが要るか。** `addEventListener` は前者だった。
+
+**その他、残っている穴**:
+
+- **数値が i64 で IEEE-754 ではない。**これは*言語*の穴である（実測 2026-08-29）:
+  `:f64` の値は Kotoba を通るが演算に lowering が無く、`(+ x x)` は
+  `expected i64, got f64` で拒否される。ソフト浮動小数点なら書ける
+  （`bit-and`/`bit-or`/`bit-xor`/`quot` は在り、shift は無いので `*`/`quot` で代用）。
+- **prototype chain**（constructor と `instanceof` は landed —— `new Point(7).x` は
+  7、object を返す constructor はそれを返し、method 内の `this` は receiver。
+  無いのは `Point.prototype` であって、共有 method 表も継承も無い。object は
+  `%ctor`（JS の識別子では綴れない名前）に生成時の名前を憶えており、`instanceof` は
+  それを読む。`o['%ctor']` では届く —— bracket lookup は任意の文字列を取るので。
+  本物の穴で、小さい穴で、隠さずに書いてある）（旧記述: `instanceof` は landed —— 鎖が
+  無いので `catch` が実際に訊く問い（`e instanceof TypeError`）に、捕まえた error の
+  `name` で答える。知らない constructor には `false` を返す。これは拒否ではなく
+  本当の答えである: このエンジンに、その constructor の instance は存在しない）
+- **cell は解放されない**（README の Gaps に理由つきで記録済み）
+- **`browser.demo-smoke-test` はこのセッションの前からハングしていた**（実測 2026-08-29）。
+  HEAD 版はその namespace に入ったあと 10 分以上何も出さず、kill した。1 回の delivery
+  pass に **約 8 秒**かかり、2 回回しても WebSocket の echo は `#ws-proof` に届かない。
+  **これは私の変更が壊したものではない。** 直したのは「ハングが遅い成功と見分けられない」
+  ことだけで、`with-deadline` が 120 秒で理由付きの失敗にする。**echo が届かない理由は
+  未調査**であり、直したと書かない。
+
+  **排除できたもの**（2026-08-29 実測）: ①待ち時間の長さではない（500ms、および
+  1 回目の delivery 後にさらに 3 秒 —— どちらも placeholder のまま）②WebSocket
+  機構ではない（`quickjs-websocket-smoke-test` が同じ `websocket-fn`・同じ
+  delivery 形・同じ 500ms 境界で、同じ実行の中で通る）③handle の漏れではない
+  （失敗後に測って TCP handle は 0）。**残る差分**: このテストは既に 3 つの script
+  tag と実 Worker と実 fetch を走らせた session に `onmessage` を登録し、handler は
+  `document.title` ではなく `document.getElementById(...)` 越しに書く。どちらが効いて
+  いるかは判っていない。
+
+  **⚠ そして 3 つ直しても、スイートは最後まで走らない。** 3 つの修正を「これで直った」と
+  読まないこと —— それぞれ単独では正しいが、実行は依然として終わらない。
+
+  **診断は 4 回変わり、4 回とも症状から機構を推測して外した**（idle → syscall で
+  block → promise の無限再帰 → 実際は重い処理）。答えを出したのは
+  **CPU profile** だけである。取り方が肝で、`--cpu-prof` は**正常終了時にしか書かない**
+  ので `timeout` に殺されると何も残らず、プロセス内の timer も使えない（測ろうとして
+  いる当の状態が loop を飢えさせるので発火しない）。**inspector は別スレッドで動く**
+  ので外から駆動できる —— これが唯一効いた道具である。
+
+  profile の答え: self 時間の **86.7% が `cljs.core`**（`array_index_of_keyword?` 12%、
+  `array_copy` 10%、`aclone` 5%、`hash` 3%）、**5.8% が `cssom.layout/node_style`**、
+  stack の最大深さ 126（cljs として正常）。**無限ループではない。重い実処理である。**
+  native sample の全サンプルが `PromiseFulfillReactionJob` に見えたのは、各ステップを
+  駆動している promise chain がそこに立っているだけで、CPU はその下にあった。
+
+  **したがって私の deadline はこれを bound できない。** microtask checkpoint が
+  drain しない間 timer は発火しないので、`Promise.race` の deadline は**同期的な
+  重さにも microtask の嵐にも効かない**。ハングを暴くために入れた計器が、
+  「遅い」を「失敗」に変えていた可能性が高い —— それは元の問題より悪い。
+  **判定は deadline を 30 分に上げた無制限実行の結果待ちであり、結果が出るまで
+  「ハングである」とも「遅いだけである」とも書かない。**
+
+  **ハングは 3 層だった。3 番目は私の計器そのものだった** —— `Promise.race` は負けた側を
+  止めないので、`with-deadline` が張った 120 秒の timer が Node を生かし続けていた
+  （テスト 2 本で最大 240 秒、0% CPU、socket も無し —— 暴こうとしていたハングと
+  同じ顔）。settle 時に `clearTimeout` する。他の 2 層は、ゲストが開いた socket と、
+  **server が accept 済みの接続**（Node の `.close()` は既存接続を閉じない）。
+  ⚠ 最初に書いた修正（delivery を poll し直す）は**前提が間違っていた** —— 1 回 8 秒
+  かかるので 40 回試せば 320 秒で、deadline の内側に収まらない。しかも
+  `Promise.race` は**負けた側を止めない**ので、engine を dispose した後も再帰が回り続けた。
+  測ってから設計し直した。
+- **エンジンが遅い。** G3 の 35 ケースが数分かかる（scannerless で loop body を毎回
+  読み直す設計。README の Gaps の第一項がその理由）。QuickJS を置き換えるなら
+  ここは測って書く必要がある —— **まだ測っていない。**
+
+## 道具そのものについて測ったこと（2608291400 の 2 件）
+
+- **テストヘルパーは最初のテストより上に置く。** chunked wasm harness は
+  「最初のテストより上」を全チャンクに配るので、使うテストの隣に書いた `dom-is` は
+  1 チャンクにしか入らず、**それを持たない最後のチャンクだけがコンパイルに失敗した**。
+  ハーネスは 240 件の合格を合格として報告せず **refuse（exit 2）した** —— だから
+  見つかった。
+- **その規則を説明したコメントが、説明していた区切り文字を含んでいて、区切りになった。**
+  `first-test` の検出が行頭に錨付けされていなかったため、散文中の最初の言及が
+  境界として拾われた。いまは行頭の改行から始まる形だけを探す。
+
+⚠ **実測済みの罠 3 つ**
 
 - **`bin/kotoba` の shebang は npx 経由で nbb 1.4.208 を拾い、このマシンでは出力なしで
-  exit 194 する。** 直接入っている 1.5.212 は正常なので `nbb bin/kotoba …` で呼ぶ
-  （worktree なら `node_modules/nbb` を `/opt/homebrew/lib/node_modules/nbb` へ symlink）。
-  amu PR #631 が nbb を 1.5.212 へ上げようとしている。
+  exit 194 する。** 根本原因は amu が `node_modules` を自分自身への絶対 symlink として
+  追跡していたことで、`837572f` で untrack 済み。
 - **`west update` は west project を detached HEAD で checkout する。** 子リポで commit
   すると branch に乗らず、main への送出が「Everything up-to-date」と言いながら何も
   送らない。commit 後に `git branch --show-current` が空でないことを確かめる。
+- **`nbb … | tail` の `$?` は `tail` の値である。** G3 の 1 回目はこの形で走らせたため、
+  5 件の割れを印字しながら **exit 0 に見えていた**。CLAUDE.md がまさにこの形を
+  「実行できなかった検査が、実行して問題が無かった検査と同じ値を返す」の最短形として
+  挙げている。`> log 2>&1; echo EXIT=$?` にすること。
 
 ## 参照
 
