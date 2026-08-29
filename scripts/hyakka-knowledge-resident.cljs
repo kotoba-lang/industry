@@ -220,6 +220,30 @@
       (fail! "hyakka-kotobase-seed is not a 32-byte hex seed"))
     seed))
 
+(defn kagi-get-opt
+  "Read one kagi item, or nil if absent. `kagi get` exits non-zero and writes
+  `no such item` to stderr for a missing item, so absence is not an error here
+  — only a present-but-unreadable item would be, and that surfaces as an empty
+  value the caller treats as absent."
+  [env name]
+  (let [e (js/Object.assign #js {} env)
+        _ (aset e "KAGI_HOME" (str (.homedir os) "/.kagi"))
+        kagi (str root "/orgs/kotoba-lang/kagi/bin/kagi")
+        r (run [kagi "get" name] {:dir worktree :env e})]
+    (when (zero? (:exit r))
+      (let [v (str/trim (:out r))]
+        (when-not (str/blank? v) v)))))
+
+(defn authn-service-creds
+  "The tenant service-account credential for the Biscuit datom-plane path
+  (ADR-2608291500), or nil when not provisioned in this vault. The service
+  token is a secret; the tenant id is a public identifier. Both are required
+  for the Biscuit path; a partial pair is treated as absent."
+  [env]
+  (let [token (kagi-get-opt env "hyakka-authn-service-token")
+        tenant (kagi-get-opt env "hyakka-authn-tenant-id")]
+    (when (and token tenant) {:service-token token :tenant-id tenant})))
+
 (defn publish-git! [env]
   ;; The generated catalogue is committed with the ledger that produced it,
   ;; so repository main, the deployed Worker and its SHA-256 snapshot cannot
@@ -362,34 +386,52 @@
   and the throw took the whole tick with it — so an absent credential for one
   sink silently stopped the other one from ever deploying.
 
-  `hyakka-kotobase-seed` has been absent from kagi since 2026-08-15 and is
-  recorded as owner action in ADR-2608271450 and the secrets map. What was NOT
-  recorded is that it also held the public deploy hostage. It no longer does.
-  The ledgers stay pending — they already were — and the reason is returned.
+  Two credential paths, preferred in order (ADR-2608291500):
 
-  A seed that IS present is now checked against `expected-tenant-did` before a
-  single ledger moves. Absence is loud; the wrong seed was not."
+  1. Biscuit — a tenant service account (kagi `hyakka-authn-service-token` +
+     `hyakka-authn-tenant-id`). The datom plane went Biscuit-required
+     (net-kotobase ADR-2608280230) and 401s a self-issued CACAO, so this is
+     now the working path; `publish.cljs` exchanges the token for a
+     graph-scoped Biscuit and writes to the tenant graph. No seed is needed.
+  2. CACAO — the legacy `hyakka-kotobase-seed`, kept as a fallback. It has
+     been absent from kagi since 2026-08-15 (ADR-2608271450) and, even when
+     present, the plane now rejects it — so this path exists only so a vault
+     without the service account degrades to a spoken skip rather than a
+     crash that also stops the public deploy.
+
+  A missing credential is a spoken SKIP that leaves the ledgers pending and
+  never takes the tick (and its public deploy) down with it. A present CACAO
+  seed is still checked against `expected-tenant-did` before a ledger moves."
   [env ledgers]
   (when (seq ledgers)
-    (let [e (js/Object.assign #js {} env)
-          seed (try {:ok (kotobase-seed env)}
-                    (catch :default ex {:err (or (.-message ex) (str ex))}))]
-      (if-let [why (:err seed)]
-        (do (binding [*out* *err*]
-              (println "SKIP Kotobase publish —" (count ledgers)
-                       "ledger(s) stay pending:" (str/trim (str why))))
-            {:skipped (count ledgers) :why (str/trim (str why))})
-        (if-let [wrong (verify-tenant-did! env (:ok seed))]
-          (do (binding [*out* *err*]
-                (println "SKIP Kotobase publish —" (count ledgers)
-                         "ledger(s) stay pending:" wrong))
-              {:skipped (count ledgers) :why wrong})
-          (do (aset e "HYAKKA_SEED" (:ok seed))
-              (println "Kotobase publish pending ledgers in one resumable process")
-              (checked ["npm" "run" "publish" "--" "--knowledge" "true"
-                        "--batch" "100"]
-                       {:dir worktree :env e})
-              nil))))))
+    (let [e (js/Object.assign #js {} env)]
+      (if-let [{:keys [service-token tenant-id]} (authn-service-creds env)]
+        (do (aset e "HYAKKA_AUTHN_SERVICE_TOKEN" service-token)
+            (aset e "HYAKKA_AUTHN_TENANT_ID" tenant-id)
+            (println "Kotobase publish via tenant Biscuit (service account) —"
+                     (count ledgers) "pending ledger(s)")
+            (checked ["npm" "run" "publish" "--" "--knowledge" "true" "--batch" "100"]
+                     {:dir worktree :env e})
+            nil)
+        (let [seed (try {:ok (kotobase-seed env)}
+                        (catch :default ex {:err (or (.-message ex) (str ex))}))]
+          (if-let [why (:err seed)]
+            (do (binding [*out* *err*]
+                  (println "SKIP Kotobase publish —" (count ledgers)
+                           "ledger(s) stay pending (no service account, no seed):"
+                           (str/trim (str why))))
+                {:skipped (count ledgers) :why (str/trim (str why))})
+            (if-let [wrong (verify-tenant-did! env (:ok seed))]
+              (do (binding [*out* *err*]
+                    (println "SKIP Kotobase publish —" (count ledgers)
+                             "ledger(s) stay pending:" wrong))
+                  {:skipped (count ledgers) :why wrong})
+              (do (aset e "HYAKKA_SEED" (:ok seed))
+                  (println "Kotobase publish via legacy CACAO seed —"
+                           (count ledgers) "pending ledger(s)")
+                  (checked ["npm" "run" "publish" "--" "--knowledge" "true" "--batch" "100"]
+                           {:dir worktree :env e})
+                  nil))))))))
 
 (defn deploy-public! [env]
   (println "verify tests before public deploy")
