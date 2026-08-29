@@ -81,6 +81,24 @@ TTL が切れた read は write/input 価格に化ける。ScheduleWakeup 20〜3
 - loop の tick 間隔を新設・変更するときは、行き先モデルの TTL と突き合わせる。TTL より長い tick の loop を 3〜5 分 TTL の契約に置くと、cache read 前提のコスト見積りが崩れる。
 - 本測定は本機のみ。cloud routine / fleet 推論 / Codex / Cursor 分の計測は未実施（未測定であって少ないではない）。
 
+## 改訂履歴
+
+- 2026-08-29(同日 2 回目): OpenRouter の routing とキャッシュ局所性、murakumo.cloud の cache read 設計を追加調査した(下記 2 節)。
+
+## OpenRouter 等 aggregator の追加知見 — routing がキャッシュを割る
+
+prompt cache は **provider ローカル**(Anthropic は account 単位ですらある)で、provider を跨いで持ち越されない。OpenRouter の既定 routing は同一モデルでもリクエストごとに provider を切り替えうるが、**cache-aware / sticky routing は docs に存在しない**(2026-08-29 確認)。つまり既定のまま使うと cache read 前提の見積りは崩れる。対策は provider の pin: `provider: {order: [...], allow_fallbacks: false}` か `only`。これは可用性(fallback)とキャッシュ局所性のトレードオフであり、cache read 98.5% のワークロードでは pin が正しい側。加えて provider によっては cache 割引自体が消える(DeepSeek 経由で実測、read = input の 100%)。**aggregator を挟む場合は「割引率」「TTL」に加えて「routing がキャッシュを割らないか」が第 3 の検査項目になる。**
+
+## murakumo.cloud の cache read 設計の現在地(2026-08-29 実測)— 未設計に近い
+
+自前 fleet なので cache read は課金でなく**プリフィル時間の問題**として現れる(18k tok の再評価 ≈ 83 秒 vs cache hit 7〜13 秒、gad 実測)。3 層で見た:
+
+1. **ノード層(llama-server)**: 起動フラグに cache 関連なし(`deploy/llama-server.service` 実測)。llama.cpp 既定の slot 単位 exact-prefix 再利用だけが効いている。`--parallel 1〜2` なので、異なる会話が interleave すると互いの prefix cache を蹴り出す。`--cache-reuse`(チャンク再利用)や slot save/restore は未使用。
+2. **routing 層**: **二つの実装が逆を向いている。** `local-murakumo/readiness.cljc` は 2026-08-29 に leader 固定(B70 先頭)へ直し、その理由として「leader 交代が llama.cpp prefix cache を割り、常駐 bot の ~18k tok transcript が毎回ゼロから再評価された」と実測付きで記録している。一方 `cloud-murakumo/gateway.cljc` は **round-robin のまま**(44 行・62 行)で、直したばかりの anti-pattern を gateway 側が再生産している。
+3. **会計層**: usage に cached トークンの区別が無い(cost.cljc / gen_billing.cljc に該当フィールドなし)。cache hit 率は**未測定**(clean ではない)。
+
+**含意**: murakumo に cache read は「設計されている」とは言えない。効いているのは llama.cpp の既定動作 + local-murakumo の leader 固定だけで、gateway の round-robin と会計の欠落が穴。直すなら (a) gateway を会話/bot キー の sticky routing に変える、(b) llama-server の usage(timings.prompt_n の削減分)を cached として計上する、(c) hit 率を測ってから `--cache-reuse` 等を検討する、の順。本 ADR は現在地の記録であり、修正の実施は別途。
+
 ## 出所
 
 - OpenRouter models API（cache read 単価、2026-08-29 実測）/ OpenRouter prompt caching docs（TTL・自動/明示・pass-through）
