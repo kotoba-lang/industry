@@ -33,12 +33,25 @@
 (defn- read-edn [p]
   (try (edn/read-string (.readFileSync fs p "utf8")) (catch :default _ nil)))
 
+(defn- measured?
+  "NaN is a number to `number?`, and nil/nil in cljs IS NaN. Without this the
+   `unmeasured cannot win` rule below is bypassed by exactly the hypotheses it
+   exists to exclude."
+  [x] (and (number? x) (not (js/Number.isNaN x))))
+
+(defn- safe-div [a b]
+  (if (and (measured? a) (measured? b) (not (zero? b))) (/ a b) :UNMEASURED))
+
 ;; --- the evidence the judge is allowed to use -------------------------------
 
 (defn- evidence []
   (let [order (read-edn (.join path bench-dir "2026-08-29-compression-order.edn"))
         codec (read-edn (.join path bench-dir "2026-08-29-codec-choice-16k.edn"))
-        dict16 (read-edn (.join path bench-dir "2026-08-29-shared-dictionary-16k.edn"))
+        ;; Named by exact leaf size. The first sweep wrote "-16k" and the
+        ;; re-measured one wrote "-16384"; both files then sat side by side and
+        ;; this judge kept reading the stale one, reporting corrected numbers
+        ;; everywhere except in its own evidence.
+        dict16 (read-edn (.join path bench-dir "2026-08-29-shared-dictionary-16384.edn"))
         dict1 (read-edn (.join path bench-dir "2026-08-29-shared-dictionary-1024.edn"))
         leak (read-edn (.join path bench-dir "2026-08-29-length-leak-16k.edn"))]
     (when (some nil? [order codec dict16 dict1 leak])
@@ -62,9 +75,9 @@
                               [:by-scheme scheme :length-entropy-bits]))]
       {:datom-16k-baseline-sealed-bytes base
        ;; the two orders, as a fraction of what the plane stores today
-       :compress-then-encrypt-padme (/ (get-in arm [:compress-then-encrypt :padme]) base)
-       :compress-then-encrypt-none (/ (get-in arm [:compress-then-encrypt :none]) base)
-       :encrypt-then-compress (/ (:encrypt-then-compress-bytes arm) base)
+       :compress-then-encrypt-padme (safe-div (get-in arm [:compress-then-encrypt :padme]) base)
+       :compress-then-encrypt-none (safe-div (get-in arm [:compress-then-encrypt :none]) base)
+       :encrypt-then-compress (safe-div (:encrypt-then-compress-bytes arm) base)
        :identity 1.0
        :codec-rows (:rows codec)
        :dictionary-gain-pct-datom-16k (g dict16 :datom-catalogs)
@@ -187,7 +200,7 @@
         (mapv (fn [h]
                 (let [bk (:bytes-key h)
                       bytes-frac (get ev bk :UNMEASURED)
-                      measured? (number? bytes-frac)
+                      has-bytes? (measured? bytes-frac)
                       lb (:leak-bits-datom ev)
                       today (:today lb)
                       bits (get lb (:leak-scheme h) :UNMEASURED)
@@ -195,28 +208,28 @@
                       ;; leaks less than today scores above 1.0 on this axis
                       ;; before clamping -- that case is real and measured on
                       ;; the document plane, so the axis must be able to say it.
-                      added (if (and (number? bits) (number? today)) (- bits today) :UNMEASURED)
-                      leak-score (if (number? added) (max 0.0 (- 1.0 (/ (max added 0.0) 12.0))) 0.0)
+                      added (if (and (measured? bits) (measured? today)) (- bits today) :UNMEASURED)
+                      leak-score (if (measured? added) (max 0.0 (- 1.0 (/ (max added 0.0) 12.0))) 0.0)
                       kernel-score (- 1.0 (/ (min (count (:new-kernel-primitives h)) 4) 4.0))
                       reach-score (/ (count (:backends h)) 4.0)
                       ;; lower bytes is better, so invert into a gain
-                      bytes-score (if measured? (max 0.0 (- 1.0 bytes-frac)) 0.0)
+                      bytes-score (if has-bytes? (max 0.0 (- 1.0 bytes-frac)) 0.0)
                       total (+ (* (:bytes weights) bytes-score)
                                (* (:leak weights) leak-score)
                                (* (:kernel weights) kernel-score)
                                (* (:reach weights) reach-score))]
                   (assoc h
-                         :score {:bytes-fraction (if measured?
+                         :score {:bytes-fraction (if has-bytes?
                                                    (/ (js/Math.round (* 10000 bytes-frac)) 10000.0)
                                                    :UNMEASURED)
                                  :leak-bits-per-leaf bits
-                                 :leak-bits-above-today (if (number? added)
+                                 :leak-bits-above-today (if (measured? added)
                                                           (/ (js/Math.round (* 1000 added)) 1000.0)
                                                           :UNMEASURED)
                                  :bytes bytes-score :leak leak-score
                                  :kernel kernel-score :reach reach-score
                                  :total (/ (js/Math.round (* 10000 total)) 10000.0)}
-                         :admissible? (and measured? (number? added) (nil? (:blocked h))))))
+                         :admissible? (and has-bytes? (measured? added) (nil? (:blocked h))))))
               hyps)]
     (vec (sort-by (juxt (fn [h] (if (:admissible? h) 0 1))
                         (fn [h] (- (get-in h [:score :total]))))
@@ -230,8 +243,12 @@
         d16k (:dictionary-gain-pct-datom-16k ev)
         dadr (:dictionary-gain-pct-adr-16k ev)
         best-decompress (->> (:codec-rows ev)
-                             (filter #(number? (:decompress-mbps %)))
+                             (filter #(measured? (:decompress-mbps %)))
                              (sort-by :decompress-mbps >) first)]
+    (when-not best-decompress
+      (die EXIT-COULD-NOT-ANSWER
+           "no codec row carries a measured decompress throughput; refusing to"
+           "name a kernel read codec. Re-run aiuefs-codec-bench.cljs."))
     {:winner (:id winner)
      :mutations
      [{:from :measurement/length-leak

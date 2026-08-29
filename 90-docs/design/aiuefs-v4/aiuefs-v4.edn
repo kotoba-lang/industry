@@ -109,11 +109,26 @@
    :why-inside "codec in the clear would say whether the leaf compressed at all;
                 plaintext-length in the clear would hand back exactly the signal
                 padding exists to blunt."
-   :second-duty "plaintext-length is also the decompression bound. The reader
-                 knows the exact output size before inflating a byte and refuses
-                 anything that does not land on it, so a decompression bomb has
-                 no room to exist. One field closes a confidentiality hole and an
-                 availability hole, which is why it is not merely a convenience."}}
+   :second-duty "plaintext-length is also the decompression bound, and it is
+                 HANDED TO THE CODEC rather than checked afterwards. A length
+                 compared after the fact has already let the expansion be
+                 allocated, which is what a bomb wants; node refuses with
+                 ERR_BUFFER_TOO_LARGE before allocating. One field closes a
+                 confidentiality hole and an availability hole, which is why it
+                 is not merely a convenience."
+   :never-truncate "Output longer than the sealed length is REFUSED, never
+                    truncated to it. A prefix of the wrong plaintext is wrong
+                    data, and returning it would turn a detectable disagreement
+                    into silent corruption. The one exception is the identity
+                    codec, where the trailing bytes are the authenticated
+                    padding itself and slicing is the decode."}
+  :canonical-encoding-required
+  "A block must be the exact deterministic re-encoding of its own fields. The
+   AAD binds the header's VALUES, not its encoding, so without this check a
+   reordered key, an added key or trailing bytes all still authenticate -- and
+   the same plaintext would then open under unboundedly many CIDs, which is the
+   one invariant a content-addressed store cannot lose. Refusal:
+   :leaf/non-canonical."}
 
  ;; --- Compression ----------------------------------------------------------
  ;; Every number below was produced by a script in this repo against a corpus in
@@ -143,20 +158,51 @@
   :dictionary
   {:required false
    :default nil
-   :evidence "2026-08-29-shared-dictionary-{1024,4096,16k,65536}.edn, held-out split"
+   :evidence "2026-08-29-shared-dictionary-{1024,4096,16384,65536}.edn"
+   :method {:split :by-file
+            :split-why "Held-out FILES, not held-out leaf indices. Splitting by
+                        leaf index over the concatenated corpus leaves every
+                        held-out leaf byte-adjacent to training leaves of the
+                        same document, which is not a hold-out and reports a
+                        gain that will not survive an unseen file."
+            :dictionary-sources 64
+            :dictionary-why "An equal slice from each of 64 evenly sampled
+                             training leaves, so the fixed 32 KiB budget spans
+                             the same number of SOURCES at every leaf size.
+                             Keeping the tail of a concatenation instead made
+                             the dictionary span 32 whole leaves at 1 KiB and
+                             half of ONE leaf at 64 KiB, so the sweep moved leaf
+                             size and dictionary coverage together and could not
+                             say which one the curve was about."}
    :measured-gain-held-out-pct
-   {:datom {1024 33.8 4096 10.96 16384 3.24 65536 0.56}
-    :document {1024 22.81 4096 17.56 16384 10.67 65536 11.2}
-    :code {1024 17.61 4096 13.0 16384 8.35 65536 7.79}}
+   {:datom {1024 17.34 4096 10.4 16384 5.88 65536 2.93}
+    :document {1024 23.75 4096 19.05 16384 12.74 65536 10.48}
+    :code {1024 18.99 4096 14.69 16384 11.4 65536 10.95}}
+   :superseded-numbers
+   {:what "An earlier run of this bench reported datom 33.8 -> 0.56 across the
+           same sweep. Both ends were artefacts: the byte-adjacent split
+           inflated the small-leaf figure to roughly double, and the shrinking
+           dictionary depressed the large-leaf figure. The corrected figures are
+           the ones above."
+    :found-by "code review of this branch, 2026-08-29, before merge"}
    :reading
-   "The datom plane gain collapses with leaf size because a large datom leaf
-    already contains its own dictionary. The document plane keeps ~11% at every
-    size because ADRs share vocabulary that no single ADR contains. So a
-    dictionary is a property of the PLANE, not of the format; the format only
-    names which one was used, and a null link is the common case."
+   "The datom plane's gain falls off with leaf size about 2.5x faster than the
+    document plane's (5.9x decline versus 2.3x across the same sweep): a large
+    datom leaf increasingly contains its own dictionary, while ADRs keep sharing
+    vocabulary that no single ADR contains. So a dictionary is a property of the
+    PLANE, not of the format; the format only names which one was used, and a
+    null link remains the common case for the datom plane at production leaf
+    sizes. The document plane's ~10% at 64 KiB is large enough to be worth
+    carrying."
    :identity "the dictionary is an ordinary raw block named by its CID, so which
               dictionary verifies like everything else and versions like
-              everything else"}}
+              everything else"
+   :codec-restriction "Only deflate-raw accepts a preset dictionary here.
+                       Passing one to brotli or zstd is REFUSED
+                       (:leaf/dictionary-codec-mismatch) rather than dropped:
+                       a silently dropped dictionary leaves the header still
+                       binding the link, so the leaf gains nothing and is still
+                       unopenable without fetching that block."}}
 
  ;; --- Disclosure (the cost side, measured rather than asserted) -------------
  :disclosure
@@ -164,10 +210,10 @@
   :evidence "90-docs/design/aiuefs-v4/bench/results/2026-08-29-length-leak-16k.edn"
   :measured
   {:datom-plane {:today 0.704 :unpadded 9.762 :padme 5.508 :power-of-two 1.827}
-   :document-plane {:today 9.011 :unpadded 11.32 :padme 5.61 :power-of-two 1.697}}
+   :document-plane {:today 9.01 :unpadded 11.321 :padme 5.61 :power-of-two 1.697}}
   :findings
   ["On the document plane padme compression leaks LESS than the uncompressed
-    plane leaks today (5.61 vs 9.011 bits) while also being 2.3x smaller. There
+    plane leaks today (5.61 vs 9.01 bits) while also being 2.3x smaller. There
     is no trade to make there -- it is a strictly better point, and it is only
     visible because today's baseline was measured instead of assumed to be zero."
    "On the datom plane there IS a real trade: padme costs 4.8 bits per leaf over
@@ -194,8 +240,9 @@
                 introduces no key hierarchy, and says so rather than leaving the
                 omission to be discovered."
   :refusals
-  [:leaf/undecodable-header :leaf/unsupported-version :leaf/bad-nonce
-   :leaf/short-ciphertext :leaf/dictionary-unavailable :leaf/auth-failed
+  [:leaf/undecodable-header :leaf/non-canonical :leaf/unsupported-version
+   :leaf/bad-nonce :leaf/short-ciphertext :leaf/dictionary-unavailable
+   :leaf/dictionary-codec-mismatch :leaf/unknown-codec :leaf/auth-failed
    :leaf/inner-truncated :leaf/decompress-failed :leaf/length-mismatch]
   :refusal-discipline
   "Every refusal carries a literal reason keyword and the conformance suite pins
@@ -279,8 +326,19 @@
                 :evidence "this file and root ADR adr-2608291200 carry the same
                            matrix; both cite the same four bench EDN files"}
   :f1-format {:state :green
-              :evidence "scripts/aiuefs-codec.cljs selftest, 20/20, with three
-                         mutations each failing exactly the cases that name them"}
+              :evidence "scripts/aiuefs-codec.cljs selftest, 22/22, with six
+                         mutations each failing exactly the cases that name
+                         them: AAD removed, sealed length bound removed,
+                         dictionary-absent check removed, maxOutputLength
+                         removed, canonical-encoding check removed, and
+                         dictionary-codec guard removed"
+              :history "The first landing of this suite asserted the
+                        decompression-bound case as a DISJUNCTION -- refuse OR
+                        truncate to the sealed bound. The truncating branch
+                        passed, so the bound was never enforced and the reader
+                        returned ten bytes of the wrong plaintext as if they
+                        were the leaf. A disjunction lets the weaker branch
+                        satisfy the test."}
   :f2-compression-decision {:state :green
                             :evidence "four benches over four real corpora in this
                                        repo; both orders reported in the same row"}

@@ -67,21 +67,49 @@
 
 (def codec-names {0 :identity 1 :deflate-raw 2 :brotli 3 :zstd})
 
+;; Only deflate-raw takes a preset dictionary through node's zlib. Passing one
+;; to brotli or zstd here would be DROPPED SILENTLY while the header still bound
+;; the dictionary link -- the leaf would gain nothing and still be unopenable
+;; without fetching that block. So it is refused instead.
+(def ^:private dictionary-codecs #{1})
+
 (defn- compress-with [codec ^js buf dict]
+  (when (and dict (not (contains? dictionary-codecs codec)))
+    (throw (ex-info "leaf: this codec cannot take a preset dictionary"
+                    {:reason :leaf/dictionary-codec-mismatch :codec codec})))
   (case codec
     0 buf
     1 (.deflateRawSync zlib buf (if dict (js-obj "level" 6 "dictionary" dict) (js-obj "level" 6)))
     2 (.brotliCompressSync zlib buf)
     3 (.zstdCompressSync zlib buf)
-    (throw (ex-info "unknown codec" {:codec codec}))))
+    (throw (ex-info "unknown codec" {:reason :leaf/unknown-codec :codec codec}))))
 
-(defn- decompress-with [codec ^js buf dict]
-  (case codec
-    0 buf
-    1 (.inflateRawSync zlib buf (if dict (js-obj "dictionary" dict) (js-obj)))
-    2 (.brotliDecompressSync zlib buf)
-    3 (.zstdDecompressSync zlib buf)
-    (throw (ex-info "unknown codec" {:codec codec}))))
+(defn- decompress-with
+  "`max-output` is a HARD bound handed to the codec, not a length checked after
+   the fact. Checking afterwards means the expansion has already been
+   materialised, which is exactly what a decompression bomb wants; node refuses
+   with ERR_BUFFER_TOO_LARGE before allocating."
+  [codec ^js buf dict max-output]
+  (when (and dict (not (contains? dictionary-codecs codec)))
+    (throw (ex-info "leaf: this codec cannot take a preset dictionary"
+                    {:reason :leaf/dictionary-codec-mismatch :codec codec})))
+  (let [cap (max 1 max-output)]
+    (case codec
+      ;; identity carries no stream terminator, so the authenticated zero
+      ;; padding is still attached here and taking the first `max-output`
+      ;; bytes is the decode, not a truncation of a codec's output. The
+      ;; dangerous case -- a codec producing MORE than the sealed length --
+      ;; cannot arise for identity, because there is no codec.
+      0 (if (< (.-length buf) max-output)
+          (throw (ex-info "leaf: identity body is shorter than the sealed length"
+                          {:reason :leaf/length-mismatch}))
+          (.subarray buf 0 max-output))
+      1 (.inflateRawSync zlib buf (if dict
+                                    (js-obj "dictionary" dict "maxOutputLength" cap)
+                                    (js-obj "maxOutputLength" cap)))
+      2 (.brotliDecompressSync zlib buf (js-obj "maxOutputLength" cap))
+      3 (.zstdDecompressSync zlib buf (js-obj "maxOutputLength" cap))
+      (throw (ex-info "unknown codec" {:reason :leaf/unknown-codec :codec codec})))))
 
 ;; --- padding ----------------------------------------------------------------
 
@@ -253,6 +281,17 @@
                                                  {:reason :leaf/undecodable-header
                                                   :cause (ex-message e)}))))
         v (get h "v") p (get h "p") d (get h "d") iv (get h "iv") ct (get h "ct")]
+    ;; CANONICAL OR NOTHING. The AAD binds the header's VALUES, not its
+    ;; encoding, so without this a reordered key, an added key, or trailing
+    ;; bytes all still authenticate -- and the same plaintext would then open
+    ;; under unboundedly many CIDs, which is the one invariant a
+    ;; content-addressed store cannot lose. Re-encode and compare bytes.
+    (when-not (and v p iv ct
+                   (.equals (cbor-map (conj (header-entries p d iv)
+                                            ["ct" (cbor-bytes ct)]))
+                            block))
+      (throw (ex-info "leaf: block is not the canonical encoding of its own fields"
+                      {:reason :leaf/non-canonical})))
     (when-not (= leaf-version v)
       (throw (ex-info "leaf: version" {:reason :leaf/unsupported-version :v v})))
     (when-not (and iv (= nonce-bytes (.-length iv)))
@@ -276,13 +315,18 @@
       (let [codec (.readUInt8 padded 0)
             plain-len (.readUInt32LE padded 1)
             body (.subarray padded 5)
-            ;; The bound is read from inside the seal, so it cannot be inflated
-            ;; by whoever supplied the block.
-            out (try (decompress-with codec body dictionary)
-                     (catch :default _
+            ;; The bound is read from inside the seal, so whoever supplied the
+            ;; block cannot inflate it. It is handed to the codec so the
+            ;; expansion is never materialised, and the result is NOT truncated
+            ;; to it: a prefix of the wrong plaintext is wrong data, and
+            ;; returning it would turn a detectable disagreement into silent
+            ;; corruption.
+            out (try (decompress-with codec body dictionary plain-len)
+                     (catch :default e
                        (throw (ex-info "leaf: decompression failed"
-                                       {:reason :leaf/decompress-failed :codec codec}))))
-            out (if (> (.-length out) plain-len) (.subarray out 0 plain-len) out)]
+                                       {:reason (or (:reason (ex-data e))
+                                                    :leaf/decompress-failed)
+                                        :codec codec}))))]
         (when-not (= plain-len (.-length out))
           (throw (ex-info "leaf: length does not match the sealed bound"
                           {:reason :leaf/length-mismatch
@@ -401,16 +445,34 @@
           _ (.setAAD c a)
           ct (js/Buffer.concat #js [(.update c inner) (.final c) (.getAuthTag c)])
           block (cbor-map (conj (header-entries padding-none nil iv) ["ct" (cbor-bytes ct)]))]
+      ;; This case originally accepted EITHER a refusal OR a truncation to the
+      ;; sealed bound. The truncating branch passed, so the bound was never
+      ;; enforced and the reader returned ten bytes of the wrong plaintext as
+      ;; if they were the leaf. A disjunction lets the weaker branch satisfy
+      ;; the test; only the refusal is asserted now.
       (check "refuse/decompression-bound"
-             ;; It must NOT return 200000 bytes. Either it refuses on the
-             ;; length check, or it truncates to the sealed bound -- both are
-             ;; bounded; silently returning the full expansion is not.
-             (let [r (try (.-length (open-leaf {:block block :key key}))
-                          (catch :default e (:reason (ex-data e))))]
-               (or (= r 10) (= r :leaf/length-mismatch)))
+             (= :leaf/decompress-failed (reason-of #(open-leaf {:block block :key key})))
              {}))
 
-    ;; 11. padme never shrinks and is bounded
+    ;; 11. a non-canonical re-encoding of an otherwise valid leaf is refused,
+    ;;     even though its AAD still authenticates.
+    (let [{:keys [bytes]} (seal-leaf {:plaintext text :key key})
+          appended (js/Buffer.concat #js [bytes (js/Buffer.from #js [0x00])])]
+      (check "refuse/trailing-bytes"
+             (= :leaf/non-canonical (reason-of #(open-leaf {:block appended :key key})))
+             {}))
+
+    ;; 12. a dictionary handed to a codec that cannot use it is refused at seal
+    ;;     time rather than silently dropped.
+    (let [dict (js/Buffer.from (str/join (repeat 200 "vocabulary ")) "utf8")
+          dcid (cid-v1 cid-codec-raw dict)]
+      (check "refuse/dictionary-codec-mismatch"
+             (= :leaf/dictionary-codec-mismatch
+                (reason-of #(seal-leaf {:plaintext text :key key :codec codec-brotli
+                                        :dictionary dict :dictionary-cid dcid})))
+             {}))
+
+    ;; 13. padme never shrinks and is bounded
     (check "padme/monotone-and-bounded"
            (every? (fn [L] (let [p (padme L)] (and (>= p L) (<= p (* 1.13 (max L 1))))))
                    (concat (range 1 2000) [4096 16384 65536 131072 1048576]))

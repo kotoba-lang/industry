@@ -65,18 +65,31 @@
                                 (conj out (.subarray b off (min (.-length b) (+ off leaf-bytes))))))))))
                files)))
 
+(def dictionary-sources 64)
+
 (defn- build-dictionary
-  "A zlib preset dictionary is a raw window: the CODEC MATCHES AGAINST ITS TAIL
-   FIRST, so the most valuable material goes last. Deterministic given the same
-   training leaves: sample evenly, concatenate, keep the final `dict-bytes`."
+  "Take an equal slice from each of `dictionary-sources` evenly sampled training
+   leaves, so the fixed `dict-bytes` budget spans the SAME NUMBER OF SOURCES at
+   every leaf size.
+
+   The first version concatenated a sample and kept the final `dict-bytes`.
+   That silently changed what the dictionary WAS as the sweep moved: at 1 KiB
+   leaves the 32 KiB tail covered 32 whole leaves, at 64 KiB it covered half of
+   ONE. The resulting `gain collapses with leaf size` curve therefore measured
+   leaf size and dictionary coverage at once, and could not say which moved."
   [train]
   (if (empty? train)
     nil
-    (let [step (max 1 (quot (count train) 64))
-          sample (vec (take-nth step train))
-          joined (js/Buffer.concat (clj->js sample))
-          n (.-length joined)]
-      (if (<= n dict-bytes) joined (.subarray joined (- n dict-bytes) n)))))
+    (let [n (min dictionary-sources (count train))
+          step (max 1 (quot (count train) n))
+          per (max 1 (quot dict-bytes n))
+          slices (->> (take-nth step train)
+                      (take n)
+                      (mapv #(.subarray % 0 (min per (.-length %)))))
+          joined (js/Buffer.concat (clj->js slices))]
+      (if (<= (.-length joined) dict-bytes)
+        joined
+        (.subarray joined 0 dict-bytes)))))
 
 (defn- sha256-hex [^js b] (-> (.createHash crypto "sha256") (.update b) (.digest "hex")))
 
@@ -88,16 +101,23 @@
         results
         (vec
          (for [{:keys [id dir suffixes]} corpora]
+           ;; The split is by FILE. Splitting by leaf index over the
+           ;; concatenated corpus leaves every held-out leaf byte-adjacent to
+           ;; training leaves from the same document, which is not a hold-out
+           ;; and reports a gain that will not survive an unseen file.
            (let [files (files-under dir suffixes 2048)
+                 indexed-files (map-indexed vector files)
+                 held-files (mapv second (filter (fn [[i _]] (zero? (mod i holdout-every))) indexed-files))
+                 train-files (mapv second (remove (fn [[i _]] (zero? (mod i holdout-every))) indexed-files))
                  ls (leaves-of files)
-                 indexed (map-indexed vector ls)
-                 held (mapv second (filter (fn [[i _]] (zero? (mod i holdout-every))) indexed))
-                 train (mapv second (remove (fn [[i _]] (zero? (mod i holdout-every))) indexed))
+                 held (leaves-of held-files)
+                 train (leaves-of train-files)
                  dict (build-dictionary train)
                  held-bytes (reduce + 0 (map #(.-length %) held))]
              (println (str "SCANNED\t" (name id) "\tfiles\t" (count files)
-                           "\tleaves\t" (count ls)
-                           "\theld-out\t" (count held) "\ttrain\t" (count train)))
+                           "\theld-out-files\t" (count held-files)
+                           "\ttrain-files\t" (count train-files)
+                           "\theld-out-leaves\t" (count held) "\ttrain-leaves\t" (count train)))
              (if (or (empty? held) (nil? dict))
                {:corpus id :state :UNMEASURED
                 :reason "no held-out leaves or no dictionary could be built"}
@@ -117,9 +137,13 @@
                  {:corpus id
                   :state :measured
                   :files (count files)
+                  :split :by-file
+                  :held-out-files (count held-files)
+                  :train-files (count train-files)
                   :leaves-total (count ls)
                   :leaves-held-out (count held)
                   :leaves-trained-on (count train)
+                  :dictionary-sources dictionary-sources
                   :held-out-plaintext-bytes held-bytes
                   :dictionary-bytes (.-length dict)
                   :dictionary-sha256 (sha256-hex dict)
@@ -141,6 +165,8 @@
                    :node (.-version js/process)
                    :leaf-bytes leaf-bytes
                    :holdout-every holdout-every
+                   :split :by-file
+                   :dictionary-construction "equal slice from each of 64 evenly sampled training leaves, so source count is constant across the leaf-size sweep"
                    :dictionary-budget-bytes dict-bytes
                    :codec "deflate-raw level 6, zlib preset dictionary"
                    :load1-at-measurement (first (js->clj (.loadavg os)))
