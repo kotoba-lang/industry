@@ -113,12 +113,54 @@ wiki item として複製しない。
 
 - hyakka の claim graph はこの ADR の影響を直接受けない（bulk data を持たない）。
   将来 join したくなったら、その時に別 ADR で境界を引く。
-- `cloud-itonami-dns-resolver` の初回 live tick で実データが Iceberg に着地することを
-  もって「実装済み」とする（設計だけでは完了扱いにしない、CLAUDE.md の一般規律どおり）。
+- `cloud-itonami-dns-resolver` は**実装済み・稼働中**（2026-08-28〜29 実測）。
+  Tranco（毎時）+ Common Crawl（13分毎）の resident tick が
+  `orgs/cloud-itonami/cloud-itonami-dns-resolver` main へ commit を積み続けている。
+  R2 Data Catalog（`cloud_itonami.dns_resolution`）へは launchd 常駐
+  `com.cloud-itonami.dns-resolver-datalake`（毎時）が同期する。
 - `cloud-itonami-zone-ingest` は CZDS 承認というオーナー側の外部アクションが完了する
-  までの間、README に「G7 ゲート閉・CZDS credential 待ち」と明記した状態を維持する。
+  までの間、README に「G7 ゲート閉・CZDS credential 待ち」と明記した状態を維持する
+  （**未着手** — repo 自体まだ作成していない。設計のみ）。
 - 「全世界のドメイン」を今後引用する時は、この ADR の実際のスコープ
   （CT logs + Tranco Top-1M + 将来のCZDS）を指すのであって、文字通りの全数ではない
   ——引用する側がこの区別を落とさないよう、hyakka 側にも registry.cljc の coverage
   ノートと同様の「主張しない」記述を、resolver-actor 側の README にも置く。
+
+## 既知の未解決ギャップ（2026-08-29 実測、隠さず記録）
+
+**R2 Data Catalog 同期は「毎回テーブル全体をメモリに保持して overwrite する」設計で、
+台帳が伸びるほど確実に壁に当たる。** 恒久修正は別セッションに送る判断をした
+（`datalake-sync.py` は共有 loader — LEI/watchlist/hyakka も使う — で、片手間の
+tail-end 変更にしない）。
+
+- **経緯**: 初回のフルテーブル再パース（毎tick、台帳全体を再読み込み）が OOM。
+  永続 accumulator（増分読み込み）に直したら plain object の V8 dictionary-mode
+  劣化に当たり（1.5時間進まず）、Map に直したら `JSON.stringify` の V8 文字列長上限に
+  当たり（140万行）、batched write に直したら次の run の `readFileSync` が同じ壁に
+  当たり、`node:readline` streaming に直したら heap OOM（110/171ファイル、408万行）
+  に当たり、heap を上げたら（8GB）checkpoint の in-place truncate が**前回の
+  正しい checkpoint を破壊する**バグに当たり（atomic rename で修正）——ここまでで
+  6,481,356 行の初回ブートストラップと増分 sync を実データで完走・Iceberg
+  read-back 一致まで確認した（commit a1c83f5）。
+  その後 12,085,691 行まで伸びた時点で再度 heap OOM。lock が無く並行実行を
+  防いでいなかった疑いもあり、lock 追加 + heap 16GB に上げた（commit d01e62f）。
+- **今の壁**: accumulator が大きくなるほど `node:readline` での読み込み自体が
+  遅くなる（実測: 671万行→121万行の増分読み込みだけで 1 時間超）。heap を上げるのは
+  症状を先送りするだけで、**世界規模（数億行）には原理的に届かない**。
+- **正しい修正**: `datalake-sync.py` に `--append`（Iceberg の `t.append()` または
+  upsert）を足し、この Node script が**毎回テーブル全体をメモリに載せる**構造を
+  やめて、**新規ファイル分の差分だけ**を都度 Iceberg に積む形にする。dedup（同じ
+  `:resolution/id` の再確認）の扱いは overwrite 版と意味が変わる（append-only の
+  観測ログになるか、Iceberg 側の upsert 機能を使うか）ので、**設計判断が要る** ——
+  片手間で決めない。
+- **今すぐ実行可能な一時対応**（このギャップを消しはしないが延命する）:
+  heap をさらに上げる、または accumulator を id のハッシュ prefix でシャーディング
+  して 1 run あたりのメモリを頭打ちにする。どちらも恒久修正ではないと明記した上で
+  使う。
+- **次に取り組む時の入口**: `orgs/cloud-itonami/cloud-itonami-dns-resolver/scripts/
+  export_and_sync.cljs` の docstring（「FOUR THINGS THAT LOOKED LIKE FIXES AND
+  WEREN'T」— 5番目がこのギャップ）と `scripts/dns-resolver-datalake-tick.cljs` の
+  inline コメントに経緯を残してある。`scripts/datalake-sync.py` は
+  `t.overwrite(tbl)` のみで `--append` 相当は無い（実測 2026-08-28、docstring の
+  古い記述「`--replace` は別 writer が持つ」は誤りで既に訂正済み）。
 "}]
