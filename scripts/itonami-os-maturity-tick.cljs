@@ -285,14 +285,60 @@
   適合している件数を別枠で報告する（人が判断できるように）。"
   #"^cloud-itonami-(isic|isco|cofog|jsic|nace|naics|unspsc)-")
 
+(def ^:private recruit-registry-path
+  (str root "/manifest/recruit-equivalent-verticals.edn"))
+
+(defn- recruit-priority
+  "`manifest/recruit-equivalent-verticals.edn`（ADR-2608290100）を repo → 順位に畳む。
+
+  あの registry は「934 本の vertical のうちどれを、**どの順で**建てるか」を出所つきで
+  決めたものだが、それを読む者が居なかった —— この tick は候補を M_own 降順で並べる
+  だけなので、市場規模の順位は登録された時点から一度も候補の順序に効いていない。
+
+  **`:market/status :measured` の行だけを順位に使う。** 未測定の行に順位を与えると、
+  『測れなかった』が『下位』として並び、出力から区別できなくなる（registry 自身が
+  順位外として持っている区別を、ここで畳んではいけない）。
+
+  入力が無い / 読めないときに**空の順位表を返さない** —— それは「registry に 1 本も
+  載っていない」と同じ値で、順位付けを黙って失う。`:status` で区別して呼び出し側に
+  報告させる（CLAUDE.md の 6 問の 1・4 番目）。"
+  []
+  (let [txt (try (str (.readFileSync fs recruit-registry-path "utf8"))
+                 (catch :default _ nil))
+        reg (when txt (try (edn/read-string txt) (catch :default _ ::unparsable)))]
+    (cond
+      (nil? txt) {:status :absent :rank {}}
+      (= ::unparsable reg) {:status :unparsable :rank {}}
+      :else
+      (let [all (vec (:registry/verticals reg))
+            ranked (->> all
+                        (filter #(= :measured (:market/status %)))
+                        (sort-by #(- (or (:market/value %) 0))))]
+        {:status (if (seq ranked) :measured :no-ranked-rows)
+         :ranked (count ranked)
+         :unranked (- (count all) (count ranked))
+         :rank (into {}
+                     (for [[i v] (map-indexed vector ranked)
+                           p (:vertical/repos v)]
+                       [(last (str/split (str p) #"/"))
+                        {:rank (inc i)
+                         :vertical (:vertical/id v)
+                         :market-value (:market/value v)}]))}))))
+
 (defn- candidates
   "宣言されていない**分類ファミリ**の repo のうち、標準形に適合しているものを
-  M_own 順で。
+  順位順で。
+
+  順位は 2 段: **① recruit registry が出所つきで測った市場規模の順位、② M_own 降順**。
+  registry に載っていない repo は ① を持たないので、従来どおり ② だけで並ぶ ——
+  つまりこの変更は**registry に載った 8 vertical を前に出すだけ**で、それ以外の
+  候補の相対順序を動かさない。
 
   **順位は毎周計算し直す。** 固定リストにすると、繋いだ repo が残り続けたり、
   新しく標準形になった repo が永久に出てこなくなる。"
   [declared-repos in-flight-branches]
   (let [scores (own-scores)
+        prio (recruit-priority)
         all-dirs (->> (try (vec (.readdirSync fs isic-dir)) (catch :default _ []))
                       (filter #(str/starts-with? % "cloud-itonami-"))
                       (remove declared-repos))
@@ -313,8 +359,12 @@
         rows (->> repos
                   (map conformance)
                   (filter :conformant?)
-                  (map (fn [r] (assoc r :own (get scores (str "orgs/cloud-itonami/" (:repo r))))))
-                  (sort-by #(- (or (:own %) 0))))
+                  (map (fn [r] (assoc r
+                                      :own (get scores (str "orgs/cloud-itonami/" (:repo r)))
+                                      :recruit (get (:rank prio) (:repo r)))))
+                  ;; ① registry 順位（無い repo は末尾）② M_own 降順
+                  (sort-by (juxt #(or (:rank (:recruit %)) 999999)
+                                 #(- (or (:own %) 0)))))
         ;; **提案する分だけ nbb で実際に require してみる。** 形が揃っていても
         ;; 面を作る nbb で load できなければ繋がらない（isic-6910 の js-mod が
         ;; その実例）。222 本全部を probe すると tick が遅くなるので、
@@ -351,7 +401,10 @@
      :outside-families {:conformant (count outside)
                         :sample (vec (take 3 outside))}
      :in-flight-skipped in-flight-skipped
-     :top (mapv #(select-keys % [:repo :ns :own :ops]) (:top probed))}))
+     ;; **順位付けの入力そのものを報告する。** `:absent` / `:unparsable` を
+     ;; `{}` に畳むと「registry に載っていない」と同じ顔になる。
+     :recruit-priority (dissoc prio :rank)
+     :top (mapv #(select-keys % [:repo :ns :own :ops :recruit]) (:top probed))}))
 
 
 ;; ── 2b) 標準形か（shim だけで繋がるか）────────────────────────────────────
@@ -589,7 +642,8 @@
                :api-gate gate
                ;; **まだ宣言されていない産業の候補**（ADR-2608070000）。
                ;; loop はここを読んで次の 1 本を選ぶ。探索を毎周やり直さない。
-               :candidate-pool (select-keys pool [:scanned :conformant :near-miss :outside-families])
+               :candidate-pool (select-keys pool [:scanned :conformant :near-miss :outside-families
+                                                 :recruit-priority])
                :candidates (:top pool)
                :offline? offline?}]
 
@@ -630,10 +684,28 @@
     (when (seq (:nbb-rejected pool))
       (log! "  nbb で load できず候補から外した:"
             (str/join ", " (map #(str (:repo %) "(" (name (:why %)) ")") (:nbb-rejected pool)))))
+    (let [rp (:recruit-priority pool)]
+      (case (:status rp)
+        :measured
+        (log! (str "  順位の第 1 キー: recruit registry（ADR-2608290100）の市場規模 "
+                   (:ranked rp) " vertical。順位外(未測定) " (:unranked rp)
+                   " —— 順位外は下位ではなく、順位を持たない"))
+        :no-ranked-rows
+        (log! "  ⚠ recruit registry は読めたが :market/status :measured の行が 0 —— 市場規模による順位付けは効いていない")
+        :absent
+        (log! (str "  ⚠ recruit registry が無い（" recruit-registry-path
+                   "）。市場規模の順位は**適用されていない**。M_own だけで並んでいる"))
+        :unparsable
+        (log! (str "  ⚠ recruit registry が EDN として読めない（" recruit-registry-path
+                   "）。市場規模の順位は**適用されていない**"))
+        (log! "  ⚠ recruit registry の状態が不明")))
     (doseq [c (:top pool)]
       (log! (str "  · " (:repo c) "  ns=" (:ns c)
                  "  M_own=" (if (:own c) (.toFixed (:own c) 4) "未測定")
-                 "  ops=" (count (:ops c)))))
+                 "  ops=" (count (:ops c))
+                 (if-let [r (:recruit c)]
+                   (str "  recruit#" (:rank r) "(" (name (:vertical r)) ")")
+                   ""))))
     (log! "公開面:" (pr-str surfaces))
     (log! "API gate（未認証 POST で 401 が正）:" gate
           (if (= 401 gate) "" "  ⚠ 401 ではない"))
