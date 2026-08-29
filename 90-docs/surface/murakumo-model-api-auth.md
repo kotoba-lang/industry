@@ -1,75 +1,78 @@
 # Murakumo model API authentication
 
-As of 2026-08-29, the model API is OpenAI-compatible but is not uniformly
-passkey- or smart-contract-authenticated.
+As of 2026-08-29, `api.murakumo.cloud` accepts both bounded anonymous chat and
+passkey-gated inference. Smart Account ownership is still a separate,
+unverified on-chain link; it is not required per inference and must not be
+inferred from a valid passkey session or Biscuit.
 
-## Current route contract
-
-| Route | Current authentication | What it proves |
-|---|---|---|
-| `GET /v1/models` | anonymous | catalog read only |
-| `POST /v1/chat/completions` | anonymous, `max_tokens <= 2048` | bounded public inference; no caller identity |
-| `POST /v1/messages` | `x-api-key` or Bearer when the proxy secret is configured; open when unset | possession of a shared proxy token |
-| privileged `/infer/*` writes | verified CACAO or service Bearer, depending on route | actor capability or operator service authority |
-| `POST /infer/transfer` | exact, single-use CACAO only | the issuer authorized this recipient and credit amount |
-
-The recommended client configuration remains:
+## Client settings
 
 ```text
 Base URL: https://api.murakumo.cloud/v1
 Model: murakumo-main
-API key: optional for the current public chat route
+Anonymous API key: optional (SDK placeholder is accepted but proves nothing)
+Authenticated API key: mrb_<short-lived Biscuit>, issued for 15 minutes
 Timeout: 120 seconds or longer
 ```
 
-An OpenAI SDK that requires a non-empty key may use a local placeholder such
-as `unused`; the Worker does not interpret it as an identity. Do not store a
-real credential merely to satisfy the SDK.
+Anonymous `POST /v1/chat/completions` remains capped at 2048 output tokens.
+A high-assurance passkey session scoped to `murakumo.cloud` may call the same
+route directly and is capped at 8192. For CLI/OpenAI SDK use, the signed-in
+browser exchanges that session at:
 
-## Passkey, smart account, and capability are different layers
+```http
+POST https://auth.murakumo.cloud/v1/murakumo/token
+Origin: https://auth.murakumo.cloud
+Content-Type: application/json
 
-Kotoba's identity model can represent a WebAuthn P-256 passkey as a controller
-of a stable principal. It can also link that controller to an ERC-4337 smart
-account whose signatures are checked with ERC-1271 and, when needed, ERC-6492.
-Neither link grants API authority by itself.
-
-Murakumo's current privileged request wire is CACAO: a short-lived,
-scope-carrying CAIP-122/SIWE envelope signed by an Ed25519 `did:key`. Verifying
-that envelope proves control of that DID and its included capability. It does
-not prove that a WebAuthn ceremony occurred. A separate passkey service may
-gate and mint the CACAO, but that custody and ceremony must be stated and
-verified separately.
-
-No current model request calls an ERC-4337 account, ERC-1271/6492 verifier,
-UserOperation, paymaster, or on-chain transaction. Therefore the accurate
-current statement is:
-
-> Kotoba defines a passkey-controller and smart-account identity model;
-> Murakumo currently exposes bounded anonymous chat and CACAO/service-token
-> authorization. Passkey-to-smart-account admission is specified but not yet
-> integrated into the model API.
-
-## Target higher-assurance flow
-
-```text
-WebAuthn assertion
-  -> verified Kotoba principal controller
-  -> optional linked smart-account evidence
-  -> short-lived audience/action/budget-scoped capability
-  -> Murakumo admission
+{"model":"murakumo-main","maxOutputTokens":8192}
 ```
 
-The target does not require an on-chain transaction for every inference.
-Passkeys authenticate controllers; smart accounts provide a linked execution
-or recovery surface; CACAO or Biscuit carries bounded authority to the API.
+The response's `token` is supplied as `Authorization: Bearer mrb_…`. The
+credential is a Biscuit v3 grant bound to `https://api.murakumo.cloud`, the
+exact model, `inference:chat`, an output-token ceiling, holder/account DIDs,
+and a 15-minute expiry. Issuance is capped at 32768 output tokens.
 
-The target may be called production-ready only after WebAuthn ceremony checks,
-principal evidence, smart-account verification, capability scope/replay
-checks, and live positive and negative API tests all exist.
+## What the passkey path proves
 
-## Sources of truth
+`auth.murakumo.cloud` is its own WebAuthn RP. It verifies the single-use
+challenge, RP ID, origin, P-256 signature, user verification, and credential
+counter, then stores a `Domain=murakumo.cloud` session. The inference Worker
+forwards only the cookie or `mrb_` bearer to `kotobase-authn` through a
+Cloudflare service binding. The Biscuit root seed and passkey custody key never
+enter `local-murakumo`; it receives only a bounded admission result.
 
-- ADR: `90-docs/adr/2608291057-murakumo-model-api-authentication-boundary.edn`
-- machine contract: `90-docs/surface/murakumo-model-api-auth.edn`
-- claim rule: `90-docs/surface/murakumo-model-api-auth-rule.edn`
-- deployed implementation: `network-awai/local-murakumo`
+This implementation is passkey-gated, not non-custodial Smart Account
+authentication. A passkey cannot directly sign the Ed25519 Biscuit root or a
+CACAO. The service mints the short-lived capability after the ceremony using
+server-held keys. A linked ERC-4337 account becomes verified only after an
+existing owner signs the owner-update UserOperation and target-chain receipts
+are recorded. That on-chain step is not currently complete.
+
+## Route contract
+
+| Route | Authentication | Authority |
+|---|---|---|
+| `GET /v1/models` | anonymous | catalog read |
+| `POST /v1/chat/completions` | anonymous, passkey cookie, or `mrb_` bearer | 2048 anonymous; 8192 cookie; token-specific ceiling up to 32768 |
+| `POST /v1/messages` | conditional shared token | Anthropic-compatible inference |
+| privileged `/infer/*` writes | verified CACAO or service bearer, by route | actor capability or operator authority |
+| `POST /infer/transfer` | exact single-use CACAO only | recipient and credit amount |
+
+## Production evidence
+
+- Authn Worker version: `fd7bc41f-150a-4ffb-bca0-c5a63173b6ba`.
+- Inference Worker version: `5e4d9ac6-52ce-4a67-8baf-297260b088b1`.
+- `GET https://auth.murakumo.cloud/health` returned the
+  `murakumo.cloud` apex and `auth.murakumo.cloud` RP.
+- Token issuance without a passkey session returned 401
+  `passkey_session_required`.
+- A forged `mrb_` bearer returned 401 at the public inference route.
+- Anonymous real inference returned 200 from
+  `qwen3.8-27b-throughput-b70` with one generated choice.
+- The positive passkey ceremony requires a real user/device assertion; it is
+  implemented and cryptographically tested, but was not replayed by an agent
+  as a production user in this deployment run.
+
+Sources of truth: the sibling ADR, machine contract, claim rule,
+`net-kotobase/control-plane/authn`, and `network-awai/local-murakumo`.

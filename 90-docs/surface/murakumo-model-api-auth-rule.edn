@@ -38,6 +38,14 @@
   :rule/current-facts
   {:public-chat :anonymous-bounded
    :public-chat-max-output-tokens 2048
+   :passkey-session-chat :deployed
+   :passkey-session-max-output-tokens 8192
+   :murakumo-biscuit {:ttl-seconds 900
+                      :max-output-tokens 32768
+                      :audience "https://api.murakumo.cloud"
+                      :verification :authn-service-binding}
    :privileged-write :cacao-or-service-bearer-by-route
    :transfer :exact-single-use-cacao-only
-   :passkey-smart-account-integration :specified-not-integrated}}]
+   :passkey-integration :deployed
+   :positive-production-passkey-ceremony :unverified-this-run
+   :smart-account-integration :owner-user-operation-and-chain-receipts-pending}}]
