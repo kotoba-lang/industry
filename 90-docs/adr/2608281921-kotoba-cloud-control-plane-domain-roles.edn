@@ -18,8 +18,16 @@
                           :poll-interval-seconds 2
                           :poll-budget-per-five-minutes 600
                           :retry-after :bounded-and-honored}
-   :cli-distribution {:e2e :merged-main-source
-                      :packaged-release :not-published}
+   :cli-distribution {:e2e :live-public-package
+                      :packaged-release {:status :published
+                                         :version "0.7.3"
+                                         :tag "v0.7.3"
+                                         :platforms [:darwin-arm64
+                                                     :darwin-amd64
+                                                     :linux-amd64]
+                                         :installer :verified-public-latest
+                                         :homebrew :verified-public-tap
+                                         :npm :not-published}}
    :controller-handoff {:targets [:kotobase :murakumo :itonami]
                         :ttl-seconds 120
                         :single-use true
@@ -28,6 +36,7 @@
   :adr/evidence
   {:merged {:control-plane "23050c60dd1554f4134176e021c19298549bd6e9"
             :kotoba-cli "fe80925f64050b39e4d23b2274fd7b9506acbea2"
+            :kotoba-cli-package "314f7812e6bba40f940924e784f4646a3c45f5eb"
             :app-kotoba-cloud "5b91db568e6ab0aa8f9fef56d34f63b4499d3c13"
             :cloud-murakumo "bbf0899d92dffa6f29881962887603c86504ec30"
             :app-auth "5a7848fd07913d7bacaa44a4ad86e3699cb928f9"
@@ -42,8 +51,23 @@
               :kotoba-cloud "a1ee8149-4177-4363-b7d1-1b2a3362bfdd"
               :murakumo-cloud "ed28c23d-596d-4fc7-a9cb-71317f68d2a0"
               :itonami-cloud "78bdbf24.cloud-itonami.pages.dev"}
+   :cli-release {:url "https://github.com/kotoba-lang/kotoba/releases/tag/v0.7.3"
+                 :release-commit "d9c3c8d5eca2e7632a8a665fea0522f55dd46683"
+                 :release-tree "4f1408f6c19200c97014e26484f1a94a31eaffc9"
+                 :source-formula-commit "314f7812e6bba40f940924e784f4646a3c45f5eb"
+                 :tap-commit "15730b88201db08f9c2e943173c094dc83cc9dbc"
+                 :signer "did:key:z6MkgtjFR4xwQtb4ZqGg5N8NCpT8fNd4HfjznLamf9oZhmRs"
+                 :archive-sha256
+                 {:darwin-arm64 "5ba2cdf04278e603cc89d7e7e581879664a2adcadbc66d65ae62beaa91ab4cd4"
+                  :darwin-amd64 "3fc5ffbb76458ae0c833500ca71e4bf8e0837d4a229ecc402882cf3596a63f1f"
+                  :linux-amd64 "6b14c81619cf019feed5ca8a295fb27db34883bbaca4a547e98a3db398e2e058"}
+                 :signed-envelopes :verified-all-platforms
+                 :latest-download :verified-v0.7.3
+                 :homebrew-install :verified-v0.7.3}
    :tests {:public-http "18/18"
-           :kotoba-cli "672 tests / 9411 assertions"
+           :kotoba-cli "686 tests / 9478 assertions"
+           :kotoba-native-package "3 platforms; native smoke and isolated id show"
+           :kotoba-homebrew "public tap install and complete formula test"
            :auth-core "61 tests / 396 assertions"
            :auth-worker "target-bound and single-use controller handoff; exact auth/apex CSP origins; Cloudflare dry-run"
            :kotobase-gateway "513 tests / 2495 assertions; worker shell suite; bundle manifest 124 inputs"
