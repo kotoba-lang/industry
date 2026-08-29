@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.gftd.loop-status-publish — com.gftd.* loop 群の現在地を itonami.cloud の
+  公開 status page（itonami.cloud/bots/、API /api/bots-status）へ発行する
+  (ADR-2608291600 改訂履歴)
+
+  Install:
+    cp scripts/com.gftd.loop-status-publish.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.loop-status-publish.plist
+    launchctl kickstart -k gui/$(id -u)/com.gftd.loop-status-publish
+
+  Unload:
+    launchctl bootout gui/$(id -u)/com.gftd.loop-status-publish
+
+  Interval: 1800s (30min)。**この loop はモデルを一切呼ばない**（純粋な publisher。
+  skill 無し、claude 起動無し）。bearer token は ~/.gftd/bots-status-token
+  （値はどこにも書かない — パス参照のみ）。token が無い周は exit 2
+  （:not-measured）で、発行成功とは別の顔をする。
+
+  claude を呼ばないので HOME/USER/... の env block は "Not logged in" 対策では
+  なく、git / curl / nbb が同じ条件で動くための姉妹 plist と同型の標準 block。
+-->
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>COM_JUNKAWASAKI_ROOT</key>
+		<string>/Users/junkawasaki/github/com-junkawasaki</string>
+		<key>HOME</key>
+		<string>/Users/junkawasaki</string>
+		<key>LOGNAME</key>
+		<string>junkawasaki</string>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+		<key>SHELL</key>
+		<string>/bin/zsh</string>
+		<key>USER</key>
+		<string>junkawasaki</string>
+	</dict>
+	<key>Label</key>
+	<string>com.gftd.loop-status-publish</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/opt/homebrew/bin/nbb</string>
+		<string>--classpath</string>
+		<string>.:scripts/nbb_compat</string>
+		<string>scripts/loop-status-publish.cljs</string>
+	</array>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardErrorPath</key>
+	<string>/Users/junkawasaki/.gftd/loop-status-publish.stdout.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/junkawasaki/.gftd/loop-status-publish.stdout.log</string>
+	<key>StartInterval</key>
+	<integer>1800</integer>
+	<key>WorkingDirectory</key>
+	<string>/Users/junkawasaki/github/com-junkawasaki</string>
+</dict>
+</plist>
