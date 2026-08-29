@@ -6,8 +6,8 @@ ROOT = Path(__file__).resolve().parent
 PROMPTS = {
     "kotoba-design.prompt.md": ["one existing `kotoba-lang` library", "Never push main", "unmeasured"],
     "itonami-design.prompt.md": ["one existing `cloud-itonami` actor", "Never push main", "human approval"],
-    "equipment-schema.prompt.md": ["signed claim/commit DAG", "dealer-owned first-party inventory", "query/readback"],
-    "equipment-source.prompt.md": ["at most two", "fetched in this run", "live query/readback"],
+    "equipment-schema.prompt.md": ["signed claim/commit DAG", "dealer-owned first-party inventory", "query/readback", "intentionally not a file in app-hyakka"],
+    "equipment-source.prompt.md": ["at most two", "fetched in this run", "live query/readback", "Do not require the superproject's"],
 }
 
 failures = []
