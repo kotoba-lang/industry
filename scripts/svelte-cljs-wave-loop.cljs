@@ -137,7 +137,7 @@
                   ;; 1 波 = 4 並列 + pin 前進 + 再測定。実測で 1 repo 20〜30 分、
                   ;; build lock 待ちが乗るので 90 分上限（姉妹 wave と同型）。
                   (sh "claude" ["-p" "/svelte-cljs-wave"
-                                "--allow-dangerously-skip-permissions"]
+                                "--dangerously-skip-permissions"]
                       {:timeout 5400000})]
               (println out)
               (when (seq (str/trim (or err ""))) (log! "stderr:" (str/trim err)))

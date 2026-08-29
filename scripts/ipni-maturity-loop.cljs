@@ -175,7 +175,7 @@
                                             ". Read 90-docs/ipni_maturity/iteration-01.edn "
                                             "and ADR-2608160300 first, then do exactly this "
                                             "one thing and land it.")
-                                  "--allow-dangerously-skip-permissions"]
+                                  "--dangerously-skip-permissions"]
                         {:timeout 5400000})]
                 (println out)
                 (when (seq (str/trim (or err ""))) (log! "stderr:" (str/trim err)))

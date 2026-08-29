@@ -137,7 +137,7 @@
             (let [{:keys [code out err]}
                   ;; wave は 24 並列で長い。90 分上限（姉妹 maturity と同型）
                   (sh "claude" ["-p" "/industry-stack-wave"
-                                "--allow-dangerously-skip-permissions"]
+                                "--dangerously-skip-permissions"]
                       {:timeout 5400000})]
               (println out)
               (when (seq (str/trim (or err ""))) (log! "stderr:" (str/trim err)))
