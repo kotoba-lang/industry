@@ -192,4 +192,72 @@ to `.kotoba` needs to happen before or after it.
     requires `:execution :none` -- a contract-only repo -- and this host is
     execution, not a contract). A future slice where GUESTS (not the host)
     need direct listen/accept authority would be the trigger to add one;
-    today's guests are capability-free pure functions, so none was needed."}]
+    today's guests are capability-free pure functions, so none was needed.
+
+## Addendum (2026-08-29) -- the named next slice: one real route + admission-decision parity
+
+Landed via https://github.com/kotoba-lang/amu/pull/683 (merge commit
+8a5152fa8a93e129e9ae097cd9f0fe9822ae9edc on `kotoba-lang/amu` main; west pin
+advanced to that commit the same session). `cloud-itonami-app` was NOT
+modified -- its source was only read (byte-for-byte, unmodified) and its
+already-shipped production code path was only run, never edited.
+
+### What was built
+
+- `examples/cloud-itonami-health-route.kotoba`: a new `kotoba/pure` response
+  guest carrying the REAL `cloud.itonami.app.health.v1` JSON shape read from
+  `cloud-itonami-app`'s `server.clj` (`process-liveness?` branch, confirmed
+  by curling a live `cloud-itonami-app` process on `127.0.0.1:1338` the same
+  session and cross-reading `server.clj` directly). `ok`, `service`, and
+  `schema` are the real, fixed constants. `store` and `drive-store` on a real
+  server are `(config/store-fingerprint)` and
+  `(name (documents/selected-store-kind))` -- this process's own data
+  directory fingerprint and selected drive backend, which a standalone demo
+  host has neither of. Rather than fabricate a plausible-looking value for
+  either, both fields literally say `\"representative-...\"` and the file's
+  own header spells out exactly what is real vs. representative.
+- `scripts/cloud-itonami-health-route-e2e.cljs` +
+  `test/http/cloud_itonami_health_test.mjs`: wires `GET /health` onto a real
+  `http-service.mjs` instance (reusing the existing, UNMODIFIED
+  `runtime/http/route-decide.mjs` shared decide core -- the same one the
+  original synthetic demo used) and fires real HTTP requests over a real
+  socket. 6/6 assertions pass: 200 + correct shape on `GET /health`, 404 on
+  `POST /health` (wrong method) and `GET /nope`, 200 on the host's own
+  `/healthz` (unaffected by the route table).
+- `scripts/cloud-itonami-health-parity.cljs`: the slice's actual point.
+  Compiles `cloud-itonami-app`'s existing, UNMODIFIED
+  `src/cloud/itonami/app/health_core.kotoba` (read from a checkout named by
+  `--app-dir`/`CLOUD_ITONAMI_APP_DIR`) to this repo's `:js-kotoba-v1` target
+  with the same `amu compile` used everywhere else in this ADR, then checks
+  its `health-route?` export against the REAL production oracle path --
+  `cloud.itonami.app.health/health-route?`, run UNMODIFIED via `clojure -M`
+  inside that checkout, which itself calls `kotoba.kir/execute` against the
+  shipped `resources/cloud/itonami/app/oracle/health.kir.edn` -- across 21
+  `(method, path)` cases: the one positive (`GET /health`) plus 20 negatives
+  (wrong method incl. case, wrong path incl. case/trailing-slash/whitespace/
+  query-string/path-traversal-string, unrelated paths, all-empty). **21/21
+  agree.** The mismatch-detection path itself was verified to actually fire,
+  not just report a clean PASS by construction: one run with the JS side's
+  `(method, path)` arguments deliberately swapped correctly reported 1/21
+  MISMATCH on exactly the case that swap would break (`GET /health`), 20/21
+  AGREE elsewhere.
+
+### What this does, and does not, establish
+
+The `GET /health` route now served by `http-service.mjs` is gated by THAT
+host's own shared `route-decide.kotoba` (table lookup), not by
+`health_core.kotoba`. The parity result is a narrower, more precise claim,
+stated deliberately narrowly: IF a host wired `health_core.kotoba`'s own
+`health-route?` as its admission gate the way `cloud-itonami-app`'s real
+production server does today (via the JVM/KIR-interpreter oracle), an
+`amu`-compiled `:js-kotoba-v1` version of the exact same source would answer
+identically on every input tried. That is real evidence the admission
+DECISION survives the runtime swap (JVM/KIR-interpreter -> Node/restricted-
+ESM) for this one route -- it is not evidence that `cloud-itonami-app` is
+closer to running without a JVM. The gap named in the base ADR's honest
+scope statement is unchanged: no session, no auth, no cookies, no streaming,
+no structural JSON parsing in-guest, and every other route in `server.clj`
+(auth, mail/drive sync, the LLM tool-calling loop, WebAuthn, OAuth,
+wallet/payments) is untouched. One route's admission-decision parity is not
+a served, production-equivalent `/health` endpoint replacing the JVM one,
+let alone progress on the rest of the application."}]
