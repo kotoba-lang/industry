@@ -15,7 +15,8 @@
             [jp-go-dds.core :as dds]
             [jp-go-dds.page :as page]
             [jp-go-dds.tokens :as tokens]
-            [tasuke-app.oracle :as oracle])
+            [tasuke-app.oracle :as oracle]
+            [tasuke-app.windows :as windows])
   (:gen-class))
 
 (def app-css
@@ -86,7 +87,10 @@
       [:p (str "この端末では入力を受け付けられませんが、"
                (oracle/ja-kind kind) "の初動はこれです。")]
       (into [:ol] (for [a actions] [:li a]))
-      [:p "無料の窓口: " (str/join " → " windows)]
+      ;; NAMES, not codes. This block is read by exactly the person who has no
+      ;; JavaScript to look a code up with; `platform-abuse-desk → jpcert` tells
+      ;; them nothing. Measured 2026-08-29.
+      (into [:ul] (for [w windows] [:li (windows/describe w)]))
       [:p "警察 サイバー犯罪相談窓口 #9110 / 消費者ホットライン 188"])]))
 
 (defn document []

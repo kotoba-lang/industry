@@ -10,7 +10,8 @@
             [jp-go-dds.core :as dds]
             [re-frame.core :as rf]
             [reagent.core :as r]
-            [tasuke-app.route :as route]))
+            [tasuke-app.route :as route]
+            [tasuke-app.windows :as windows]))
 
 (def severity-chip
   {"critical" ["red" "危険 — いま動く"]
@@ -66,11 +67,17 @@
                     :on-change #(put! :narrative (.. % -target -value))}))
     (dds/grid
      {:min "16rem"}
-     (dds/form-field
-      {:label "金銭被害の額" :for "loss" :support "例）48万 / 480000 / なし"}
-      (dds/input-text {:id "loss" :value (field :loss)
-                       :inputMode "text"
-                       :on-change #(put! :loss (.. % -target -value))}))
+     (let [{:keys [ok?]} @(rf/subscribe [:loss])]
+       (dds/form-field
+        {:label "金銭被害の額" :for "loss"
+         :support (if ok?
+                    "例）48万 / 48万5千 / 480,000 / なし"
+                    "読み取れませんでした。数字か「48万5千」のように書いてください（このままだと 0 円として書面に出ます）")
+         :status (when-not ok? "読み取れません")}
+        (dds/input-text {:id "loss" :value (field :loss)
+                         :inputMode "text"
+                         :aria-invalid (when-not ok? "true")
+                         :on-change #(put! :loss (.. % -target -value))})))
      (dds/form-field
       {:label "サービス名" :for "service" :support "例）X（旧Twitter）/ ○○銀行"}
       (dds/input-text {:id "service" :value (field :service)
@@ -103,8 +110,8 @@
 ;; --- 初動 -------------------------------------------------------------------
 
 (defn plan []
-  (let [{:keys [actions deadlines windows severity]} @(rf/subscribe [:triage])
-        done @(rf/subscribe [:done])]
+  (let [{:keys [actions deadlines windows kind]} @(rf/subscribe [:triage])
+        done @(rf/subscribe [:done kind])]
     [:<>
      [banner]
      (when (seq deadlines)
@@ -122,11 +129,12 @@
                 [:span {:class "dads-checkbox__checkbox"}
                  [:input {:class "dads-checkbox__input" :type "checkbox"
                           :checked (contains? done i)
-                          :on-change #(rf/dispatch [:action/toggle i])}]]
+                          :on-change #(rf/dispatch [:action/toggle kind i])}]]
                 [:span {:class "dads-checkbox__label"} step]]])))
      (dds/section
       {:title "この被害に対応する無料の窓口"}
-      (into [:ul {:class "app-list"}] (for [w windows] [:li [:code w]]))
+      (into [:ul {:class "app-list"}]
+            (for [w windows] [:li (windows/describe w) " " [:code w]]))
       [:p {:class "app-note"}
        "窓口の連絡先は「窓口」画面。助 は有料の紹介をしません（G5）。"])]))
 
@@ -212,11 +220,15 @@
                     (apply str))))))
 
 (defn shoko []
-  (let [items @(rf/subscribe [:evidence])
-        label (r/atom "")
+  ;; The two r/atoms are constructor state, which is what form-2 is for. The
+  ;; SUBSCRIPTION is not: deref'd out here it is read once and the table never
+  ;; repaints — added evidence would not appear and 削除 would do nothing
+  ;; visible. Measured 2026-08-29.
+  (let [label (r/atom "")
         kind  (r/atom "screenshot")]
     (fn []
-      [:<>
+      (let [items @(rf/subscribe [:evidence])]
+       [:<>
        (dds/section
         {:title "証拠を固める"}
         [:p {:class "app-note"}
@@ -264,23 +276,12 @@
                     [:td [:button {:class "dads-button" :data-type "text" :data-size "sm"
                                    :type "button"
                                    :on-click #(rf/dispatch [:evidence/drop i])} "削除"]]]))]
-          [:p {:class "app-note"} "まだ 1 件もありません。"]))])))
+          [:p {:class "app-note"} "まだ 1 件もありません。"]))]))))
 
 ;; --- 窓口 -------------------------------------------------------------------
 ;; The codes come from the guest; the contact details are facts about the
 ;; outside world, kept here as a plain table and dated. If one is wrong, it is
 ;; wrong as data, not as a rule.
-
-(def window-directory
-  {"police-cyber-9110"          ["警察 サイバー犯罪相談窓口" "#9110（各都道府県警）" "https://www.npa.go.jp/bureau/cyber/soudan.html"]
-   "platform-abuse-desk"        ["各プラットフォームの abuse / ヘルプ窓口" "サービス内の「不正利用の報告」" ""]
-   "jpcert"                     ["JPCERT/CC" "インシデント報告" "https://www.jpcert.or.jp/form/"]
-   "consumer-188"               ["消費者ホットライン" "188（いやや）" "https://www.kokusen.go.jp/"]
-   "nccc"                       ["国民生活センター" "" "https://www.kokusen.go.jp/"]
-   "antiphishing-council"       ["フィッシング対策協議会" "報告受付" "https://www.antiphishing.jp/registration.html"]
-   "safeline"                   ["セーフライン" "違法・有害情報の通報" "https://www.safe-line.jp/"]
-   "bank-direct"                ["取引金融機関" "各行の緊急連絡先（24時間）" ""]
-   "no-and-bank-fund-recovery"  ["振り込め詐欺救済法に基づく手続き" "振込先の金融機関へ" ""]})
 
 (defn madoguchi []
   (let [{:keys [windows]} @(rf/subscribe [:triage])]
@@ -289,14 +290,14 @@
       {:title "この被害に対応する窓口（優先順）"}
       (into [:ol {:class "app-list"}]
             (for [w windows
-                  :let [[name contact url] (get window-directory w [w "" ""])]]
+                  :let [[name contact url] (get windows/directory w [w "" ""])]]
               [:li [:strong name] (when (seq contact) (str " — " contact))
                (when (seq url) [:span " " [:a {:href url :target "_blank" :rel "noreferrer"} url]])]))
       [:p {:class "app-note"} "いずれも無料の公的／公益窓口です。有料の紹介はしません（G5）。連絡先は 2026-08-29 時点の記載。"])
      (dds/section
       {:title "すべての窓口"}
       (into [:ul {:class "app-list"}]
-            (for [[code [name contact url]] (sort window-directory)]
+            (for [[code [name contact url]] (sort windows/directory)]
               [:li [:code code] " " name (when (seq contact) (str " — " contact))])))]))
 
 ;; --- shell ------------------------------------------------------------------
