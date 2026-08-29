@@ -142,5 +142,77 @@ usage の grep + decentralization self-claim の確認、Mission B: 小さい自
   別物』（ADR-2608039000 自身の言明）のとおり、規則違反が無いことの証拠であって
   tick 器の欠陥ではない — tick はこの sweep を毎波継続し、新しい repo が
   cloud-itonami に増えた時に再判定する。
-- 2026-08-29: repo scaffold + 初回 wave 実行。詳細は本 body を後続の commit で
-  更新する（着地した PR / commit SHA / west pin を記録）。"}]
+- 2026-08-29: repo scaffold 着地。`cloud-itonami/loop-fleet-refactor-wave`
+  作成（初期 commit `8166cd3`、`README.md` + `deps.edn` + `src/loop_fleet_refactor_wave/
+  mission_{a,b}.cljc` + test、34 assertion pass）。west 登録
+  （`manifest/repos.edn` `:extra-projects` + `manifest/west.yml` entry、
+  `com-junkawasaki/root` merge commit `36aa0bcc3c336e8bb16c3f5e73ca6265f5dd9906`）。
+  ADR 本体・tick script v1 も同じ commit で着地。
+- 2026-08-29 実測（初回 tick を実 fleet に対して実行）: `orgs/cloud-itonami/`
+  は 1,853 repo・14,361 対象ファイル。Mission A raw 0（上記の通り）。Mission B
+  raw 9,686 —— ただし tick v1 の `candidate-slice?` は size/custody/twin/
+  host-signal しか見ておらず、**最小順ソートで上位 4 件が 4 行の
+  `run_tests.clj`（`require` + `run-tests` + `System/exit`、判断ゼロ）**になった。
+  Mission B の実候補（`cloud-itonami-app` の `store_core.cljc` 121 行、純粋な
+  state-transition 関数）はこの順位では出ない——**tick 器自体の欠陥**であり、
+  `operational-script-signal?`（runner basename + run-tests 呼び出し検出）と
+  `defn-count`（≥1 defn 要求）を `loop-fleet-refactor-wave` の `mission_b.cljc`
+  （merge commit `7d4d356bdb52225b297d5f3a05bd759b6f876cf7`）と
+  `scripts/fleet-refactor-wave-tick.cljs`（両方とも `com-junkawasaki/root`
+  merge commit `36860e87d59692484cf92172ec48e8d0a70d9ca4`）に同時に足して修正した。
+  west pin も追従（`loop-fleet-refactor-wave` を `7d4d356` へ、commit
+  `a008f914b8c51936a95a7d752561f71705288054`）。修正後の再実行では
+  `run_tests.clj` 系は消えたが、**新たな既知の穴**が 1 つ残っている:
+  `host-mechanism-signal?` の正規表現が `babashka.http-client` を認識せず、
+  `tadori/src/tadori/host/http.clj`（実際は network authority を持つ host
+  adapter）を誤って通した。この穴は次波の follow-up として残す（黙って直った
+  ことにしない）。
+- 2026-08-29: skill (`fleet-refactor-wave`)・loop 起動 script
+  (`fleet-refactor-wave-loop.cljs`)・launchd plist
+  (`com.gftd.fleet-refactor-wave.plist`) を着地
+  （`com-junkawasaki/root` commit `36860e87d59692484cf92172ec48e8d0a70d9ca4`、
+  上記 tick 修正と同じ commit）。plist は既存 launchd job label と衝突しない
+  ことを `launchctl list` で確認の上インストール・`launchctl bootstrap` 済み
+  （`launchctl list` に `com.gftd.fleet-refactor-wave` として登録確認済み）。
+  interval 3600s、`RunAtLoad` false のため次の自然発火は最大 1 時間後。
+- 2026-08-29: 初回の実 Mission B 波、着地・検証済み。`cloud-itonami/
+  cloud-itonami-app` の `src/cloud/itonami/app/store_core.cljc`（121 行、純粋な
+  state-transition 関数群）を対象に fresh agent（fork ではない）を1体投入し、
+  scratch clone + `agent/kotoba-migration` branch + サーバ側 merge の手順で
+  着地させた。**merge commit `895795f043ed2787f390f9489905995803ac2823`
+  （`gh api repos/cloud-itonami/cloud-itonami-app/commits/895795f...` で
+  独立に存在・main 到達を確認済み、branch も削除確認済み）。** west pin も
+  追従（`cloud-itonami-app` を `895795f` へ、commit
+  `c670cf9491eabbb4e1682f005be336a4ce4b385f`）。
+
+  **移した部分**: `src/cloud/itonami/app/store_core.kotoba`（新規）が
+  `retention-drop-count`（window-eviction の算術 `max(0, size - cap)`、
+  `append-message`/`record-response` の trim が共通で使っていたもの）を
+  export。同 repo に既存の `fleet_core.cljc`/`fleet_core.kotoba`
+  oracle-bridge パターンをそのまま踏襲。4 target（wasm32-kotoba-v1 /
+  js-kotoba-v1 / x86_64-kotoba-v1 / aarch64-kotoba-v1）とも compile 確認。
+  独立確認: `kotoba_oracle.cljc` の `cores` map に `:store-core` キーが
+  追加され、値が `store_core.kotoba` のパスを指していることを `gh api` で
+  直接確認済み。
+
+  **host 側に残した部分**: `new-id`（`random-uuid` を使う——randomness は
+  capability 経由でしか正当に扱えず、この wave のスコープ外）と `:sessions`
+  （実行時文字列キーの map。legacy map literal は keyword key のみ、typed
+  `[:map K V]` は 1 entry 1 型のみ、`:document` は 256 node/depth 8 の上限
+  ——実測した backend gap として両ファイルのヘッダに明記、ADR-2608650000 の
+  「一時制約」分類）。
+
+  **検証**（agent 報告を `gh api` で独立に裏取り済み。diff の対象ファイルは
+  `resources/.../store-core.kir.edn` / `kotoba_oracle.cljc` /
+  `store_core.cljc` / `store_core.kotoba` / `oracle_cases.cljc` /
+  `store_core_kotoba_parity_test.clj` / `test_runner.clj` の 7 本のみ、
+  report と一致）。agent 側の申告: full JVM suite 2053 tests / 12078
+  assertions / 0 failures（rebase 後の 1 回の一時的 flake — `store-core` を
+  require しない無関係な worker-queue test — を隔離テストと 2 回目の
+  full run で切り分け済み）、`bin/test-oracle-cljs` 218/218（ClojureScript
+  実行）、`.kir.edn` 15 本の byte-for-byte no-drift 再生成確認。
+
+  **tick 器の既知の穴（この波では未修正、次波の follow-up として明記）**:
+  `host-mechanism-signal?` の正規表現が `babashka.http-client` を認識せず、
+  `tadori/src/tadori/host/http.clj`（network authority を持つ host adapter）
+  を誤って候補として通した。"}]
