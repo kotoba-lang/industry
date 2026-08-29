@@ -237,4 +237,38 @@
  :coverage/jurisdiction "jpn"
  :coverage/verified-at "2026-08-29"
  :coverage/note "COFOG 05.4 (Protection of biodiversity and landscape) in Japan is owned by the Ministry of the Environment's nature conservation function, whose English nature hub at env.go.jp/en/nature/ publishes the protected-area and species-policy framework biodiversity services cite. Gate-fetched 2026-08-29: HTTP 200 / 47369 bytes. COFOG division 05 (Environmental protection) had 051 already covered; 054 is the first entry for the biodiversity subset of the division."}
+{:db/id -1
+ :source/dataset "itonami-coverage"
+ :coverage/kind :cofog-group
+ :coverage/code "105"
+ :coverage/name "Unemployment"
+ :coverage/division "10"
+ :coverage/division-name "Social protection"
+ :coverage/authority-url "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/koyou/index.html"
+ :coverage/jurisdiction "jpn"
+ :coverage/verified-at "2026-08-29"
+ :coverage/note "Unemployment (COFOG 10.5) in Japan is owned by the Ministry of Health, Labour and Welfare, whose employment policy page at mhlw.go.jp is the public authority the unemployment-insurance function answers to. Gate-fetched 2026-08-29: HTTP 200 / 59204 bytes. Division 10 (social protection) already names 101/102/103/104; 105 is the employment-cash-benefit subset. Candidates 04.1 (meti.go.jp) and 02.1 (mod.go.jp) were tried first this run and answered 403 across the board — same host CDN policy class as MHLW's /english/ subtree — so they were dropped rather than recorded unfetched."}
+
+{:db/id -1
+ :source/dataset "itonami-coverage"
+ :coverage/kind :cofog-group
+ :coverage/code "073"
+ :coverage/name "Hospital services"
+ :coverage/division "07"
+ :coverage/division-name "Health"
+ :coverage/authority-url "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kenkou_iryou/iryou/index.html"
+ :coverage/jurisdiction "jpn"
+ :coverage/verified-at "2026-08-30"
+ :coverage/note "Hospital services (COFOG 07.3) in Japan are owned by the Ministry of Health, Labour and Welfare, whose medical policy hub (medical care) at mhlw.go.jp is the public authority the hospital function answers to. Gate-fetched 2026-08-30: HTTP 200 / 64217 bytes. Division 07 had 071 already covered; 073 is the inpatient/hospital-services subset of the health division. Candidate 10.2 (Old age) was dropped this run - it already has a nenkin.go.jp entry in this file."}
+{:db/id -1
+ :source/dataset "itonami-coverage"
+ :coverage/kind :cofog-group
+ :coverage/code "093"
+ :coverage/name "Post-secondary non-tertiary education"
+ :coverage/division "09"
+ :coverage/division-name "Education"
+ :coverage/authority-url "https://www.mext.go.jp/a_menu/01_d.htm"
+ :coverage/jurisdiction "jpn"
+ :coverage/verified-at "2026-08-30"
+ :coverage/note "Post-secondary non-tertiary education (COFOG 09.3) in Japan is owned by MEXT, whose universities/graduate-schools and specialized-education page at mext.go.jp covers the senmon-gakkou/post-secondary tier. The a_menu/koutou hub meta-refreshes to a_menu/01_d.htm; both fetched 2026-08-30, the target answering HTTP 200 / 11714 bytes. Division 09 (Education) already names 091/092/094; 093 is the post-secondary-non-tertiary link."}
 ]
