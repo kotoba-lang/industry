@@ -219,3 +219,11 @@
              (get-in (finding no-hours :hours/over-daily-cap-without-36) [:detail :why])))
       (is (= :offer/break-undeclared
              (get-in (finding no-break :hours/over-daily-cap-without-36) [:detail :why]))))))
+
+(deftest break-longer-than-the-shift-is-not-a-pass
+  (testing "労働時間が負になる矛盾した申告を『休憩は足りている』として通さない"
+    (let [r (review (assoc fx/lawful-offer :offer/break-minutes 600))]  ; 拘束 540 分
+      (is (= :hold (:verdict r)))
+      (is (= :not-measured (status-of r :break/insufficient)))
+      (is (= :offer/break-exceeds-span
+             (get-in (finding r :break/insufficient) [:detail :why]))))))

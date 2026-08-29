@@ -89,3 +89,14 @@
          (:proposal/offer-fingerprint
           (build (assoc fx/lawful-offer :offer/id "of-renamed") [fx/cohort-a])))
       "id は内容ではない"))
+
+(deftest fingerprint-sees-non-ascii-changes
+  (testing "コードユニットを 1 バイトに切り詰めると あ(U+3042) と B(U+0042) が衝突する"
+    (let [a (build (assoc fx/lawful-offer :offer/employer-label "あ") [fx/cohort-a])
+          b (build (assoc fx/lawful-offer :offer/employer-label "B") [fx/cohort-a])]
+      (is (not= (:proposal/offer-fingerprint a) (:proposal/offer-fingerprint b))
+          "指紋が動かないことは tick にとって『再審査は要らない』と同義")))
+  (testing "日本語だけが違う 2 件も区別する"
+    (let [a (build (assoc fx/lawful-offer :offer/employer-label "都内カフェ") [fx/cohort-a])
+          b (build (assoc fx/lawful-offer :offer/employer-label "都内バー") [fx/cohort-a])]
+      (is (not= (:proposal/offer-fingerprint a) (:proposal/offer-fingerprint b))))))

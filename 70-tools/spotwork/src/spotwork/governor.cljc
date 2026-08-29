@@ -148,6 +148,11 @@
     (cond
       (nil? span) (unmeasured :offer/hours-unreadable)
       (not (number? brk)) (unmeasured :offer/break-undeclared)
+      ;; 休憩が拘束時間を超えている申告は矛盾していて、労働時間が負になる。
+      ;; **これを pass にしない** —— 負の労働時間は required 0 を満たすので、
+      ;; 何も足さないと「休憩は足りている」として通る（この系が防ごうとして
+      ;; いる形そのもの）。
+      (> brk span) (unmeasured :offer/break-exceeds-span)
       :else
       (let [work (- span brk)
             required (cond (> work 480) 60 (> work 360) 45 :else 0)]

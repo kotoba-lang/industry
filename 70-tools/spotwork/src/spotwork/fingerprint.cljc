@@ -29,19 +29,33 @@
   #?(:clj (let [u (bit-and (long h) 0xFFFFFFFF)] (Long/toHexString u))
      :cljs (.toString (unsigned-bit-shift-right h 0) 16)))
 
+(defn- code-unit
+  "i 文字目の UTF-16 コードユニット（0..65535）。JVM の `.charAt` も JS の
+  `.charCodeAt` も UTF-16 単位を返すので、両者は同じ値になる。"
+  [s i]
+  #?(:clj (int (.charAt ^String s i))
+     :cljs (.charCodeAt s i)))
+
 (defn of
-  "任意の値 → `\"fnv1a32-xxxxxxxx\"`。"
+  "任意の値 → `\"fnv1a32-xxxxxxxx\"`。
+
+  ⚠ **コードユニットを 1 バイトに切り詰めない。** 以前はここで `0xFF` を取って
+  いたが、それだと `あ`（U+3042）と `B`（U+0042）が同じ値になり、**日本語を
+  含む求人（`:offer/employer-label` など）が書き換わったのに指紋が動かない**
+  経路ができる。指紋が動かないことは tick にとって『再審査は要らない』と
+  同義なので、これは静かに検査を飛ばすバグだった。上位バイトと下位バイトを
+  順に混ぜる（UTF-16 単位なので JVM と cljs で同じ値になる）。"
   [x]
   (let [s (canonical-str x)
         n (count s)]
     (loop [i 0 h (unchecked-int 2166136261)]
       (if (>= i n)
         (str "fnv1a32-" (hex32 h))
-        (recur (inc i)
-               (mul32 (bit-xor h (bit-and #?(:clj (int (.charAt ^String s i))
-                                             :cljs (.charCodeAt s i))
-                                          0xFF))
-                      16777619))))))
+        (let [cu (code-unit s i)
+              h (mul32 (bit-xor h (bit-and cu 0xFF)) 16777619)
+              h (mul32 (bit-xor h (bit-and (unsigned-bit-shift-right cu 8) 0xFF))
+                       16777619)]
+          (recur (inc i) h))))))
 
 (defn of-offer
   "求人の**内容**の指紋。`:offer/id` は内容ではないので外す —— id が同じまま
