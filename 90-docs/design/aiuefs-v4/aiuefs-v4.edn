@@ -1,0 +1,301 @@
+;; aiuefs-v4 -- what AIUEOS stores, as checkable data.
+;;
+;; One sentence: THERE IS NO SECOND STORE. The bytes AIUEOS installs, the bytes
+;; ayatori pulls from a public IPNI provider, and the bytes kotobase serves are
+;; the same blocks with the same CIDs, packed the same way, sealed the same way,
+;; and queried by the same engine. aiuefs-v4 is the local face of that one
+;; plane, not a filesystem that happens to sit near it.
+;;
+;; This file and the root ADR adr-2608291200 must say the same thing (gate F0),
+;; the same rule install-v1.edn keeps with adr-2608251418.
+{:format :aiueos.aiuefs-contract/v4
+ :supersedes :aiuefs-v3
+ :profile :bare-metal-uefi
+ :architecture :x86_64
+
+ ;; --- What v3 is, so the change is legible ---------------------------------
+ ;; Measured on kotoba-lang/aiueos c2203a1 (= the root west pin), 2026-08-29.
+ :v3-current-state
+ {:writable-state-bytes 16          ; struct aiuefs_mutable_object.object[16]
+  :app-catalog-capacity 4
+  :app-max-bytes 12288
+  :authentication :rsa2048-pkcs1-v1_5-sha256
+  :kernel-authenticity false        ; boot-v1.edn says so itself: digest, no signature
+  :block-io "one 512-byte sector per virtio request, queue depth 1, sti/hlt until complete"
+  :compression :none
+  :cid :none
+  :reachable-by-ayatori false
+  :note "v3 is a correct proof of mechanism. Nothing here calls it broken; it
+         is bounded in ways ADR-2608153500 already recorded as needing to move
+         before an inference runtime can land."}
+
+ ;; --- The layering, unchanged from the workspace's physical plane ----------
+ ;; ADR-2608160100 fixed this; v4 adopts it rather than inventing beside it.
+ :layers
+ {:l0a-block {:owner "the block itself" :identity :cid-v1-sha256
+              :new-in-v4 :kotoba.leaf/v1}
+  :l0b-pack  {:owner "kotoba-lang/io-ipld-car" :format :carv2
+              :policy :one-commit-one-pack
+              :requires [:range-read]}
+  :l0c-object {:owner "kotobase-storage" :profile :packed-blocks
+               :media #{:local-nvme :b2 :r2 :s3 :http-gateway}}
+  :l1-datom  {:owner "kotoba-lang/arrangement + kotoba-lang/datalog"
+              :indexes ["spo" "pso" "pos" "ocp"]
+              :structure "kotoba-lang/prolly-tree, content-defined boundaries"}
+  :l2-query  {:owner "kotoba-lang/ayatori" :dialect :kotobase
+              :note "not a premise; ADR-2608039970. Datalog is one surface over L1."}}
+
+ ;; --- The filesystem -------------------------------------------------------
+ ;; A filesystem is a naming plane plus a durability plane. v4 takes the naming
+ ;; plane from IPLD and the durability plane from the journal v3 already has.
+ ;; It adds no third plane, which is the whole reason ext4/erofs/squashfs and
+ ;; UnixFS were both ranked and both rejected: each introduces a second name
+ ;; for the same bytes, and only one of the two names verifies.
+ :filesystem
+ {:naming :cid-only
+  :directory "an IPLD map block; a path is a sequence of link traversals, not a
+              string the store understands"
+  :mutability "one signed root CID per volume; everything below it is immutable"
+  :on-disk
+  {:lba0 {:struct "aiuefs_superblock_v4"
+          :magic "AIUEFS4 "
+          :binds [:version :pack-first-lba :pack-length-bytes
+                  :root-cid-36 :root-signature-64 :signer-key-id
+                  :dictionary-cid-36-or-zero]}
+   :lba1-2 {:journal :unchanged-from-v3
+            :note "the v3 journal mechanism is kept verbatim: two slots,
+                   highest-valid-sequence, redo-before-append, readback. It is
+                   the one part of v3 that already does its job."}
+   :lba3 {:mutable-object :unchanged-from-v3
+          :role "now holds only the local head pointer; content moved into the pack"}
+   :pack-extent {:format :carv2
+                 :addressing "(pack offset, frame length) from the CARv2 index"}}
+  :deletion-test
+  {:question "erase this disk; does a re-enrolled machine come back?"
+   :answer :yes
+   :because "the root CID is a network-resolvable name (ADR-0041: storage
+             authority is remote and content-addressed). The local pack is a
+             cache with a signed head, which is what ADR-2608039000 requires of
+             anything on a distributed path."}}
+
+ ;; --- The file format ------------------------------------------------------
+ :file-format
+ {:id :kotoba.leaf/v1
+  :reference-implementation "scripts/aiuefs-codec.cljs"
+  :conformance-vectors "90-docs/design/aiuefs-v4/conformance-vectors.edn"
+  :block-encoding :dag-cbor
+  :outer-fields
+  [{:key "v" :type :uint :why "format version"}
+   {:key "p" :type :uint
+    :why "padding scheme. Plaintext ON PURPOSE: it describes a leak the
+          ciphertext's own length already exposes, so concealing it buys
+          nothing, and a reader must be able to reason about disclosure
+          without holding the key."}
+   {:key "d" :type [:link :or :null]
+    :why "the dictionary block. Plaintext ON PURPOSE, and this is the
+          load-bearing choice: a dictionary that is not a visible edge of the
+          DAG can be garbage collected, after which every leaf that used it is
+          undecodable and nothing in the graph explains why. Dictionary
+          identity is a per-plane constant and discloses nothing about this
+          leaf."}
+   {:key "iv" :type :bytes :length 12}
+   {:key "ct" :type :bytes :why "AES-256-GCM output, tag appended"}]
+  :aad "the deterministic CBOR encoding of the outer map without the ct key
+        (RFC 8949 4.2.1). A rewritten padding claim or a substituted dictionary
+        link fails the tag rather than decoding -- both directions proved by
+        mutation in scripts/aiuefs-codec.cljs."
+  :inner-after-decrypt
+  {:layout "u8 codec || u32le plaintext-length || compressed || zero padding"
+   :why-inside "codec in the clear would say whether the leaf compressed at all;
+                plaintext-length in the clear would hand back exactly the signal
+                padding exists to blunt."
+   :second-duty "plaintext-length is also the decompression bound. The reader
+                 knows the exact output size before inflating a byte and refuses
+                 anything that does not land on it, so a decompression bomb has
+                 no room to exist. One field closes a confidentiality hole and an
+                 availability hole, which is why it is not merely a convenience."}}
+
+ ;; --- Compression ----------------------------------------------------------
+ ;; Every number below was produced by a script in this repo against a corpus in
+ ;; this repo. None is quoted from elsewhere.
+ :compression
+ {:position :before-the-aead
+  :evidence "90-docs/design/aiuefs-v4/bench/results/2026-08-29-compression-order.edn"
+  :measured
+  {:encrypt-then-compress "1.0001-1.0104 -- bytes GROW. Reproduces ADR-2608160100
+                           1.003 and confirms that decision for its own subject."
+   :compress-then-encrypt "0.098-0.47 depending on plane and leaf size"
+   :datom-plane-16k 0.139 :datom-plane-128k 0.098
+   :document-plane-64k 0.371 :code-plane-64k 0.286 :app-plane-64k 0.213}
+  :why-the-earlier-conclusion-was-not-wrong
+  "ADR-2608160100 measured the pack, which holds sealed leaves, and correctly
+   said do not compress it. That sentence was then available to be read as
+   compression does not pay here, which is false by a factor of ten. The two
+   readings differ by which side of the AEAD you stand on, and nothing in the
+   record separated them."
+  :kernel-read-codec :deflate-raw
+  :kernel-read-codec-why
+  "fastest measured decompress (449 MB/s at 16 KiB versus brotli 289) for 1.1
+   points of ratio, and the only codec a bounded kernel-side inflate must carry.
+   Producers may use brotli or zstd; the codec id travels inside the seal, so a
+   reader that meets one it cannot decode refuses by name instead of guessing."
+  :evidence-codec "90-docs/design/aiuefs-v4/bench/results/2026-08-29-codec-choice-16k.edn"
+  :dictionary
+  {:required false
+   :default nil
+   :evidence "2026-08-29-shared-dictionary-{1024,4096,16k,65536}.edn, held-out split"
+   :measured-gain-held-out-pct
+   {:datom {1024 33.8 4096 10.96 16384 3.24 65536 0.56}
+    :document {1024 22.81 4096 17.56 16384 10.67 65536 11.2}
+    :code {1024 17.61 4096 13.0 16384 8.35 65536 7.79}}
+   :reading
+   "The datom plane gain collapses with leaf size because a large datom leaf
+    already contains its own dictionary. The document plane keeps ~11% at every
+    size because ADRs share vocabulary that no single ADR contains. So a
+    dictionary is a property of the PLANE, not of the format; the format only
+    names which one was used, and a null link is the common case."
+   :identity "the dictionary is an ordinary raw block named by its CID, so which
+              dictionary verifies like everything else and versions like
+              everything else"}}
+
+ ;; --- Disclosure (the cost side, measured rather than asserted) -------------
+ :disclosure
+ {:metric "Shannon entropy of the sealed-length distribution, bits per leaf"
+  :evidence "90-docs/design/aiuefs-v4/bench/results/2026-08-29-length-leak-16k.edn"
+  :measured
+  {:datom-plane {:today 0.704 :unpadded 9.762 :padme 5.508 :power-of-two 1.827}
+   :document-plane {:today 9.011 :unpadded 11.32 :padme 5.61 :power-of-two 1.697}}
+  :findings
+  ["On the document plane padme compression leaks LESS than the uncompressed
+    plane leaks today (5.61 vs 9.011 bits) while also being 2.3x smaller. There
+    is no trade to make there -- it is a strictly better point, and it is only
+    visible because today's baseline was measured instead of assumed to be zero."
+   "On the datom plane there IS a real trade: padme costs 4.8 bits per leaf over
+    today for a 7.2x byte saving; power-of-two costs 1.1 bits for a 4.9x saving."
+   "Therefore the padding scheme is a per-plane policy, and p is a field."]
+  :default :padme
+  :default-why "bounded overhead near 12% (measured 2% on the datom plane at
+                16 KiB), and it is the point that is strictly better than today
+                on at least one plane. A plane with an adversary who can choose
+                plaintexts should declare :power-of-two and pay the bytes."
+  :not-claimed "This is a length-distribution measurement over a fixed corpus. It
+                is not a proof against an adaptive chosen-plaintext adversary,
+                and it does not model an attacker who observes many leaves of one
+                entity."}
+
+ ;; --- Decryption -----------------------------------------------------------
+ :decryption
+ {:aead :aes-256-gcm
+  :order :decrypt-then-decompress
+  :order-why "the reverse would run a decoder over unauthenticated bytes -- the
+              largest attack surface in the read path pointed at the one
+              component that parses attacker-shaped input."
+  :key-custody "unchanged: the arrangement encrypt-fn/blind-fn seam. v4
+                introduces no key hierarchy, and says so rather than leaving the
+                omission to be discovered."
+  :refusals
+  [:leaf/undecodable-header :leaf/unsupported-version :leaf/bad-nonce
+   :leaf/short-ciphertext :leaf/dictionary-unavailable :leaf/auth-failed
+   :leaf/inner-truncated :leaf/decompress-failed :leaf/length-mismatch]
+  :refusal-discipline
+  "Every refusal carries a literal reason keyword and the conformance suite pins
+   the literal, not merely that something threw. Verified by mutation: removing
+   the AAD fails exactly refuse/rewritten-padding-claim and
+   refuse/substituted-dictionary-link; removing the length bound fails exactly
+   refuse/decompression-bound and the padded round-trip; removing the dictionary
+   check fails exactly refuse/dictionary-unavailable."
+  :searchable-encryption-unchanged
+  "Keys stay blinded per arrangement.core; compression touches the VALUE side
+   only. Blinded keys are already high-entropy, so compressing them would gain
+   nothing and would leak through the same length channel with none of the
+   benefit."}
+
+ ;; --- Communication --------------------------------------------------------
+ :communication
+ {:discovery {:protocol :ipni :owner "kotoba-lang/io-ipni-specs"
+              :client "ayatori.discovery"
+              :caution "IPNI indexes MULTIHASHES. A provider answer for a
+                        multihash is not a statement about a codec, and the
+                        ayatori bench pins the case where a dag-cbor CID sharing
+                        a raw block digest must fail closed. v4 inherits that; it
+                        does not re-decide it."}
+  :retrieval {:client "ayatori.remote" :verification :rehash-every-block
+              :transport [:trustless-gateway-http :libp2p-bitswap]
+              :libp2p "kotoba-lang/io-libp2p (kotoba.net.bitswap) -- pure .cljc,
+                       interop-verified against go-libp2p peers 2026-08-04. Do not
+                       reach for Kubo (root CLAUDE.md, 2026-08-28)."}
+  :aiueos-uplink {:tls "the kernel own TLS 1.3 + ECDSA P-256 path (aiueos ADR-0087,
+                        ADR-0114/0115 K16 direct HTTPS)"
+                  :note "already measured against a real endpoint; v4 adds no new
+                         transport, it adds a reason to use the one that exists."}
+  :ota "fetch the blocks the local pack cannot prove it already has. prolly-tree
+        already supports structural replication of exactly the missing subtree, so
+        an update is a diff of CIDs, not an image swap."
+  :not-claimed "No round-trip count was measured by this iteration. ADR-2608160100
+                names round trips as the success metric for the pack layer, and the
+                honest state of that claim is UNMEASURED, not green."}
+
+ ;; --- Verification, and the hole it closes ---------------------------------
+ :verification
+ {:v3 {:app-catalog :rsa2048 :app :rsa2048 :kernel :sha256-digest-only
+       :kernel-authenticity false}
+  :v4 {:everything :one-signed-root-cid
+       :signature :ecdsa-p256-sha256
+       :signature-why "the kernel already has BOTH verify and sign for this curve,
+                       landed and boot-tested (aiueos ADR-0105, ADR-0108).
+                       RSA-2048 leaves the kernel entirely."
+       :kernel-authenticity true
+       :how "the kernel is a block in the pack. It is named by the root CID, and
+             the root CID is signed. The digest-without-a-signature hole in
+             boot-v1.edn closes as a consequence of the naming change rather than
+             as a separate feature."}}
+
+ ;; --- What this costs on the AIUEOS side, stated before it is spent --------
+ :required-kernel-work
+ [{:item :multi-sector-block-io
+   :today "one 512-byte sector per virtio request, queue depth 1"
+   :needed "a 16 KiB leaf is 32 sequential round trips today; the descriptor
+            chain must carry a multi-sector extent"
+   :kind :decision-free-c-mechanism}
+  {:item :carv2-index-reader
+   :needed "offset math over the pack index"
+   :kind :decision-free-c-mechanism
+   :decision-half "CID verification stays a Kotoba object (ADR-2607241100): the C
+                   finds the bytes, the Kotoba decides whether to admit them"}
+  {:item :bounded-inflate
+   :needed "deflate-raw decode only; no encoder in the kernel"
+   :kind :decision-free-c-mechanism
+   :safety "bounded by the sealed plaintext-length, which the C cannot read until
+            the Kotoba side has authenticated the leaf"}
+  {:item :aes-256-gcm
+   :today "aes128-gcm exists in the SSH record layer (aiueos ADR-0108)"
+   :needed "the 256-bit key schedule"
+   :kind :decision-free-c-mechanism}]
+
+ ;; --- Gates ----------------------------------------------------------------
+ ;; Same shape as install-v1.edn. A green piece is never summed into a green whole.
+ :gates
+ {:f0-contract {:state :green
+                :evidence "this file and root ADR adr-2608291200 carry the same
+                           matrix; both cite the same four bench EDN files"}
+  :f1-format {:state :green
+              :evidence "scripts/aiuefs-codec.cljs selftest, 20/20, with three
+                         mutations each failing exactly the cases that name them"}
+  :f2-compression-decision {:state :green
+                            :evidence "four benches over four real corpora in this
+                                       repo; both orders reported in the same row"}
+  :f3-disclosure {:state :green-measured
+                  :note "length-distribution entropy over a fixed corpus. NOT a
+                         proof against an adaptive chosen-plaintext adversary."}
+  :f4-second-implementation {:state :red
+                             :note "the conformance vectors exist; no Kotoba-side
+                                    implementation reproduces them yet. Until one
+                                    does, this is a specification with one
+                                    implementation, which is not a format."}
+  :f5-kernel-block-io {:state :red :note "still one sector per request"}
+  :f6-round-trips {:state :UNMEASURED
+                   :note "the pack layer own success metric. Named here so its
+                          absence is legible; see the next-iteration seed."}
+  :f7-physical {:state :red
+                :note "AIUEOS install gate I7 is red for reasons that predate this
+                       design; v4 does not change that and does not depend on it"}}}
