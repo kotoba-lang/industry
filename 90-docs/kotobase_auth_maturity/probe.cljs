@@ -65,6 +65,34 @@
   [body word]
   (if (nil? body) :unknown (boolean (str/includes? (str/lower-case body) (str/lower-case word)))))
 
+(defn capabilities-name-credentials?
+  "Does the capability document say which credential to present?
+
+  Structure, not a word. This axis used to be `(names? body \"credential\")`,
+  and on 2026-08-29 a document that listed every accepted scheme under
+  `authentication.accepted` -- Bearer, AWS4-HMAC-SHA256, CACAO, plus Biscuit
+  under `not_accepted` -- still scored false, because it happened not to spell
+  the English word. A substring search over a JSON body cannot tell a document
+  that answers the question from one that merely mentions the topic, and it
+  gets BOTH directions wrong: prose saying `no credential is required` would
+  have scored true.
+
+  So: parse it, and require a non-empty `authentication.accepted` whose entries
+  carry a `scheme`. Unparseable or absent body stays `:unknown` -- a document we
+  could not read is not a document that failed."
+  [body]
+  (if (nil? body)
+    :unknown
+    (try
+      (let [d (js->clj (js/JSON.parse body))
+            accepted (get-in d ["authentication" "accepted"])]
+        (boolean (and (sequential? accepted)
+                      (seq accepted)
+                      (every? #(and (map? %) (string? (get % "scheme"))
+                                    (seq (get % "scheme")))
+                              accepted))))
+      (catch :default _ :unknown))))
+
 (defn- present?
   "An endpoint is present when it answers anything except 404/405/:unknown.
 
@@ -157,4 +185,4 @@
 
      ;; --- discovery: can a stranger learn which credential to present? ---
      :discovery/capabilities-status (:status caps)
-     :discovery/capabilities-names-credentials (names? (:body caps) "credential")}))
+     :discovery/capabilities-names-credentials (capabilities-name-credentials? (:body caps))}))
