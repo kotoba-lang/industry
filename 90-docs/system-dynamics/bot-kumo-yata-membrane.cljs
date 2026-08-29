@@ -1,0 +1,188 @@
+#!/usr/bin/env nbb
+;; 90-docs/system-dynamics/bot-kumo-yata-membrane.cljs
+;;
+;; ADR-2608291009 の再現スクリプト。BOT / KUMO / YATA の膜表と発行規則を
+;; データとして持ち、ADR の散文が主張している不変条件を実際に検査する。
+;;
+;; なぜ在るか: ADR-2607995000 の膜表は「ここに無い流れは禁止」という全列挙型
+;; だったが、散文のままだったので、後から足された流れが表と食い違っても
+;; 誰も気づけなかった。表を data にしておけば、新しい流れを足すときに
+;; この検査が先に落ちる。
+;;
+;; 実行:  nbb 90-docs/system-dynamics/bot-kumo-yata-membrane.cljs
+;; exit:  0 = 全不変条件が成立 / 1 = 違反あり / 2 = 検査自体が実行できなかった
+;;
+;; ⚠ この script は「設計が一貫しているか」だけを答える。
+;;   BOT が発行されているか・KUMO に production の呼び出し元が在るか・
+;;   YATA の掲示価格が測られたかは **答えない**（どれも 2026-08-29 時点で No / 未測定）。
+
+(require '[clojure.string :as str])
+
+;; ── 単位の型（ADR D1）──────────────────────────────────────────────
+;; 3 単位は 3 つの通貨ではなく 3 つの別の型である。
+
+(def units
+  {:KUMO {:sphere :labour   :kind :resource-meter
+          :backing :measured-compute-supply
+          :redeemable-to-fiat? false :externally-tradeable? false
+          :scale [:memory-time :mtokens :video-seconds :audio-seconds :assets]}
+   :YATA {:sphere :labour   :kind :resource-meter
+          :backing :proven-storage-duration
+          :redeemable-to-fiat? false :externally-tradeable? false
+          :scale [:gb-months :egress-gb]}
+   :BOT  {:sphere :junbi    :kind :tradeable-token
+          :backing :externally-settled-revenue
+          :redeemable-to-fiat? false ; 発行体は買い戻さない。売れるのは外部市場のみ
+          :externally-tradeable? true
+          :scale [:count]}
+   :EN   {:sphere :relation :kind :mutual-credit
+          :backing :none-non-issued
+          :redeemable-to-fiat? false :externally-tradeable? false
+          :scale [:non-priced]}})
+
+;; ── 膜（ADR D3）── 全列挙。ここに無い流れは禁止。────────────────────
+;; [from to] -> {:allow? bool :why "..."}
+
+(def membrane
+  {[:fiat :KUMO]  {:allow? true  :why "一方向 mint、5% treasury"}
+   [:fiat :YATA]  {:allow? true  :why "新規。ADR-2608048000 が名指しした穴"}
+   [:KUMO :fiat]  {:allow? false :why "前払い使用権であって請求権ではない"}
+   [:YATA :fiat]  {:allow? false :why "同上"}
+   [:KUMO :YATA]  {:allow? false :why "内部為替を作らない。演算と保管の掲示価格は独立に動く"}
+   [:YATA :KUMO]  {:allow? false :why "同上"}
+   [:BOT :KUMO]   {:allow? true  :why "ADR-2607299900 の TOKEN→credits を展開"}
+   [:BOT :YATA]   {:allow? true  :why "同上"}
+   [:KUMO :BOT]   {:allow? false :why "通せば労圏の単位が交換可能資産への請求権になる"}
+   [:YATA :BOT]   {:allow? false :why "同上"}
+   [:BOT :fiat]   {:allow? true  :why "外部市場。投機面をここ1箇所に隔離する"}
+   [:fiat :BOT]   {:allow? true  :why "外部市場"}
+   [:EN :KUMO]    {:allow? false :why "労働の計量と関係性の会計は混ぜない"}
+   [:KUMO :EN]    {:allow? false :why "同上"}
+   [:EN :YATA]    {:allow? false :why "同上"}
+   [:YATA :EN]    {:allow? false :why "同上"}
+   [:EN :BOT]     {:allow? false :why "EN は永久に非価格"}
+   [:BOT :EN]     {:allow? false :why "同上"}
+   [:EN :fiat]    {:allow? false :why "同上"}
+   [:fiat :EN]    {:allow? false :why "同上"}})
+
+(defn allowed?
+  "膜は全列挙。表に無い流れは **禁止** であって『未定義』ではない。"
+  [from to]
+  (boolean (:allow? (get membrane [from to]))))
+
+;; ── 発行（ADR D4）──────────────────────────────────────────────────
+
+(def issuance
+  {:KUMO #{:settled-run :settled-witness-duty}
+   :YATA #{:settled-storage-duration}      ; 耐久性チャレンジに通った GB-month
+   :BOT  #{:externally-settled-revenue :finalized-witness-duty}})
+
+(defn mints?
+  "その事由でその単位が発行されるか。`:bot-did-work` はどこにも無い —— それが D4 の要点。"
+  [unit reason]
+  (contains? (get issuance unit #{}) reason))
+
+;; 検査は `units` から導出する。単位名をベタ書きすると、**新しい単位を足したときに
+;; その単位だけ検査を素通りする** —— 「入力が増えたのに検査が黙って合格する」形になる。
+(def labour-units (->> units (filter (comp #{:labour} :sphere val)) (map key) set))
+(def all-flow-nodes (conj (set (keys units)) :fiat))
+
+;; ── bot の損益（ADR D5）────────────────────────────────────────────
+
+(defn bot-margin
+  "revenue_BOT − (burn_KUMO × 掲示KUMO価格 + burn_YATA × 掲示YATA価格)。
+   費用は **掲示価格** で評価する（原価ではない）—— 測りたいのは機会費用。
+   価格が未登録なら nil を返す。**0 を返さない**（未測定を無料と読ませない）。"
+  [{:keys [revenue-bot burn-kumo burn-yata]} {:keys [kumo-price yata-price]}]
+  (when (and (number? kumo-price) (number? yata-price)
+             (number? revenue-bot) (number? burn-kumo) (number? burn-yata))
+    (- revenue-bot (+ (* burn-kumo kumo-price) (* burn-yata yata-price)))))
+
+;; ── 検査 ───────────────────────────────────────────────────────────
+
+(def checks
+  [["労圏の単位は fiat へ償還できない（対象は units から導出する）"
+    #(and (seq labour-units)                       ; 空集合に every? は真を返す = 検査不能を合格にしない
+          (every? (fn [u] (and (not (allowed? u :fiat))
+                               (false? (:redeemable-to-fiat? (units u)))))
+                  labour-units))]
+
+   ["KUMO ↔ YATA は双方向とも禁止（内部為替が無い）"
+    #(and (not (allowed? :KUMO :YATA)) (not (allowed? :YATA :KUMO)))]
+
+   ["労圏 → BOT は双方向とも禁止（労圏が請求権にならない）"
+    #(and (not (allowed? :KUMO :BOT)) (not (allowed? :YATA :BOT)))]
+
+   ["BOT → 労圏 は一方向で通る"
+    #(and (allowed? :BOT :KUMO) (allowed? :BOT :YATA))]
+
+   ["外部で取引できる単位はちょうど1つ（投機面の隔離）"
+    #(= 1 (count (filter (comp :externally-tradeable? val) units)))]
+
+   ["EN はどの単位とも交換できない（対象は units から導出する）"
+    #(let [others (disj all-flow-nodes :EN)]
+       (and (seq others)
+            (every? (fn [u] (and (not (allowed? :EN u)) (not (allowed? u :EN)))) others)))]
+
+   ["『bot が働いた』では BOT は発行されない（収入裏付け）"
+    #(and (not (mints? :BOT :bot-did-work))
+          (mints? :BOT :externally-settled-revenue))]
+
+   ["どの単位も pre-mine の発行事由を持たない"
+    #(not-any? (fn [rs] (contains? rs :pre-mine)) (vals issuance))]
+
+   ["YATA は『置いた』ではなく『置き続けた証明』で発行される"
+    #(and (mints? :YATA :settled-storage-duration)
+          (not (mints? :YATA :bytes-accepted)))]
+
+   ["掲示価格が未登録なら損益は nil（0 ではない）"
+    #(nil? (bot-margin {:revenue-bot 100 :burn-kumo 5 :burn-yata 5}
+                       {:kumo-price 2 :yata-price nil}))]
+
+   ["損益は掲示価格で計算される"
+    #(= 70 (bot-margin {:revenue-bot 100 :burn-kumo 10 :burn-yata 5}
+                       {:kumo-price 2 :yata-price 2}))]
+
+   ["値札の無い bot は必ず赤字になる（revenue 0、burn > 0）"
+    #(neg? (bot-margin {:revenue-bot 0 :burn-kumo 1 :burn-yata 1}
+                       {:kumo-price 1 :yata-price 1}))]
+
+   ["膜は全列挙 —— 表に無い流れは禁止として答える"
+    #(not (allowed? :KUMO :some-unlisted-sink))]
+
+   ;; `allowed?` は既定 deny なので、`:allow? false` の行を消しても検査は全部緑のまま通る
+   ;; —— つまり「全列挙」は表を読むだけでは強制されていない。全順序対に明示の行を要求して、
+   ;; 新しい単位を足したら**全ての流れについて判断を書くことを強制する**。
+   ["膜表は全順序対を明示している（新しい単位は全流れの判断を強制される）"
+    #(let [pairs (for [a all-flow-nodes b all-flow-nodes :when (not= a b)] [a b])
+           missing (remove (fn [pr] (contains? membrane pr)) pairs)]
+       (when (seq missing)
+         (println "   missing membrane rows:" (pr-str (vec missing))))
+       (and (seq pairs) (empty? missing)))]])
+
+;; evidence floor: 検査本数が 0 や想定より少ないまま「合格」を返さない
+(def expected-checks 14)
+
+(let [n (count checks)]
+  (when (not= n expected-checks)
+    (println (str "REFUSED — 検査本数が " expected-checks " ではなく " n
+                  "。検査を足したら expected-checks も動かすこと"))
+    (js/process.exit 2)))
+
+(let [results (map (fn [[label f]]
+                     (let [ok (try (boolean (f)) (catch :default e {:err (str e)}))]
+                       [label ok]))
+                   checks)
+      errs    (filter (fn [[_ r]] (map? r)) results)
+      fails   (filter (fn [[_ r]] (false? r)) results)]
+  (doseq [[label r] results]
+    (println (cond (map? r) (str "ERROR " label " — " (:err r))
+                   r        (str "ok    " label)
+                   :else    (str "FAIL  " label))))
+  (println)
+  (println (str "checks=" (count results)
+                " ok=" (count (filter (fn [[_ r]] (true? r)) results))
+                " fail=" (count fails)
+                " error=" (count errs)))
+  (println "⚠ この緑が言うのは『設計が一貫している』だけ。BOT は未発行、KUMO は production 呼び出し元 0、YATA の掲示価格は未測定。")
+  (js/process.exit (cond (seq errs) 2 (seq fails) 1 :else 0)))

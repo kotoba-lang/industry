@@ -1,0 +1,25 @@
+;; fixture。求職者に手数料を負わせ、キャンセル料を賃金から引き、深夜割増が無い。
+;; スキマバイトで実際に問題になる 3 つを 1 件に束ねた否定対照。
+{:offer/id "of-fixture-0003-night-fee"
+ :offer/source :fixture
+ :offer/employer-did "did:web:example.invalid"
+ :offer/employer-label "（fixture）都内深夜物流"
+ :offer/jurisdiction :jp
+ :offer/region "JP-13"
+ :offer/isco "9333"
+ :offer/date "2026-09-06"
+ :offer/start "21:00"
+ :offer/end "02:00"
+ :offer/tz "Asia/Tokyo"
+ :offer/break-minutes 30
+ :offer/hourly-wage 1210
+ :offer/currency "JPY"
+ :offer/overtime-premium-rate 1.25
+ :offer/night-premium-rate 1.0
+ :offer/agreement-36? true
+ :offer/headcount 4
+ :offer/fee {:fee/payer :jobseeker :fee/rate 0.10}
+ :offer/wage-deductions [{:kind :cancellation-fee :amount 3000}]
+ :offer/penalty-predetermined? true
+ :offer/min-age 18
+ :offer/work-authorization-required? true}

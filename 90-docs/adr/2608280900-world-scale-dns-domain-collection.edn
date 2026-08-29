@@ -126,41 +126,61 @@ wiki item として複製しない。
   ——引用する側がこの区別を落とさないよう、hyakka 側にも registry.cljc の coverage
   ノートと同様の「主張しない」記述を、resolver-actor 側の README にも置く。
 
-## 既知の未解決ギャップ（2026-08-29 実測、隠さず記録）
+## R2 Data Catalog 同期のスケーラビリティ（2026-08-29 解消。経緯を残す）
 
-**R2 Data Catalog 同期は「毎回テーブル全体をメモリに保持して overwrite する」設計で、
-台帳が伸びるほど確実に壁に当たる。** 恒久修正は別セッションに送る判断をした
-（`datalake-sync.py` は共有 loader — LEI/watchlist/hyakka も使う — で、片手間の
-tail-end 変更にしない）。
+**旧状態**: 同期は毎回テーブル全体をメモリに載せて `t.overwrite()` していたため、
+コストが「変わった量」ではなく「テーブル全体の大きさ」に比例した。台帳が伸びれば
+確実に壁に当たる設計で、実際に何度も当たった。
 
-- **経緯**: 初回のフルテーブル再パース（毎tick、台帳全体を再読み込み）が OOM。
-  永続 accumulator（増分読み込み）に直したら plain object の V8 dictionary-mode
-  劣化に当たり（1.5時間進まず）、Map に直したら `JSON.stringify` の V8 文字列長上限に
-  当たり（140万行）、batched write に直したら次の run の `readFileSync` が同じ壁に
-  当たり、`node:readline` streaming に直したら heap OOM（110/171ファイル、408万行）
-  に当たり、heap を上げたら（8GB）checkpoint の in-place truncate が**前回の
-  正しい checkpoint を破壊する**バグに当たり（atomic rename で修正）——ここまでで
-  6,481,356 行の初回ブートストラップと増分 sync を実データで完走・Iceberg
-  read-back 一致まで確認した（commit a1c83f5）。
-  その後 12,085,691 行まで伸びた時点で再度 heap OOM。lock が無く並行実行を
-  防いでいなかった疑いもあり、lock 追加 + heap 16GB に上げた（commit d01e62f）。
-- **今の壁**: accumulator が大きくなるほど `node:readline` での読み込み自体が
-  遅くなる（実測: 671万行→121万行の増分読み込みだけで 1 時間超）。heap を上げるのは
-  症状を先送りするだけで、**世界規模（数億行）には原理的に届かない**。
-- **正しい修正**: `datalake-sync.py` に `--append`（Iceberg の `t.append()` または
-  upsert）を足し、この Node script が**毎回テーブル全体をメモリに載せる**構造を
-  やめて、**新規ファイル分の差分だけ**を都度 Iceberg に積む形にする。dedup（同じ
-  `:resolution/id` の再確認）の扱いは overwrite 版と意味が変わる（append-only の
-  観測ログになるか、Iceberg 側の upsert 機能を使うか）ので、**設計判断が要る** ——
-  片手間で決めない。
-- **今すぐ実行可能な一時対応**（このギャップを消しはしないが延命する）:
-  heap をさらに上げる、または accumulator を id のハッシュ prefix でシャーディング
-  して 1 run あたりのメモリを頭打ちにする。どちらも恒久修正ではないと明記した上で
-  使う。
-- **次に取り組む時の入口**: `orgs/cloud-itonami/cloud-itonami-dns-resolver/scripts/
-  export_and_sync.cljs` の docstring（「FOUR THINGS THAT LOOKED LIKE FIXES AND
-  WEREN'T」— 5番目がこのギャップ）と `scripts/dns-resolver-datalake-tick.cljs` の
-  inline コメントに経緯を残してある。`scripts/datalake-sync.py` は
-  `t.overwrite(tbl)` のみで `--append` 相当は無い（実測 2026-08-28、docstring の
-  古い記述「`--replace` は別 writer が持つ」は誤りで既に訂正済み）。
+**現在**: 差分だけを `mode: upsert` で送る。恒久修正は完了している。
+
+### 何を直したか
+
+- **`scripts/datalake-sync.py`**（共有 loader。LEI/watchlist/hyakka も使う）
+  - `mode: upsert | append` + `join_columns` —— 差分だけを送る。upsert は冪等なので
+    再送しても重複しない（実測: 同じ差分の再送で `updated=0 inserted=0`）
+  - `partition_by` —— Iceberg の partition evolution。既存ファイルは旧 spec のまま
+    読めるので非破壊
+  - `timestamp_columns` —— string ではなく `timestamp(us, UTC)`。**新規テーブルのみ**
+    （既存列の string→timestamptz は pyiceberg が正しく拒否する。retrofit には
+    テーブル再作成が要るので暗黙にはやらない）
+  - **snapshot の自動 expire**（`--snapshot-retention-days`、既定 7、全 caller に適用）。
+    実測: hyakka_claim は毎時同期 1 日で snapshot 57 個
+  - commit 後の検証は snapshot summary の `total-records` を読む。全件 re-scan を
+    やめた（2300万行では**検証自体が commit より重かった**）
+- **`export_and_sync.cljs`** —— Iceberg にまだ無い行を `pending-delta-shards/` で
+  追跡し、それだけを chunk 化して送る。chunk ごとに checkpoint するので中断しても再開できる
+- **`catchup_sync.cljs`**（新規）—— 一回限りの大量 backlog 専用。shard を 4 個ずつ
+  streaming で読んで送る（RSS 約 40MB〜500MB。以前は 10〜16GB）。時間単位 job と
+  同じ lock を取るので catalog の main branch で競合しない
+
+### 途中で踏んだもの（同じ轍を踏まないため）
+
+- **V8 の `Map` は 2^24 = 16,777,216 entry が上限**。実測でちょうど 16,604,474 行で
+  `Map maximum size exceeded`。**heap を上げても直らない**（構造的上限であって
+  メモリ量の問題ではない）。accumulator を 256 shard に分割して解決
+- **復旧のつもりの seed が OOM を作った** —— pending-delta を accumulator の全コピーで
+  seed したら、通常の fold 実行が 2300万行×2 を同時に保持することになった。
+  「新規 fold が無いなら accumulator を読まない」「fold 後に明示的に解放する」で解消
+- **⚠ 古い loader に新しい spec を渡すと `mode` は黙って無視され全量 overwrite になる。**
+  実測: catch-up 実行中に superproject checkout を別作業の一環で一瞬 pre-upsert 版へ
+  戻してしまい、次の chunk（361,588 行）が **13,778,525 行を消してテーブルを置き換えた**。
+  Iceberg の snapshot から rollback して復旧（full scan で行数を実測確認）。
+  投影なので正本は失われていないが、再同期に数時間かかるところだった。
+  ログに兆候は出ていた —— 正常な upsert は `committed (upsert) ... updated=N inserted=M`、
+  事故時は素の `committed`。
+  **対策（fail closed）**: caller は `--require-incremental-support` を渡す。古い loader は
+  argparse が `unrecognized arguments` で exit 2 にする。さらに loader 側も、
+  非 overwrite の `mode` を要求する spec にこのフラグが無ければ拒否する。
+  **4 方向すべてを実測**（新+flag=通る / 新-flag=拒否 / **git から取り出した旧 loader**+flag=拒否 /
+  mode 無しの既存 spec=影響なし）。CLAUDE.md が名指ししている形そのもの ——
+  **できなかった操作が、できた操作と同じ顔をして返る**。
+
+### 残っている宿題
+
+- `resolved_at` は string 列のまま（上記のとおり retrofit にはテーブル再作成が要る）。
+  日付範囲クエリの pruning を効かせたくなった時点で判断する
+- **`export_and_sync.cljs` と同型の「毎回全件再パース」構造が
+  `scripts/hyakka-datalake-export.cljs` にも残っている。** 台帳が 9.7MB と桁違いに
+  小さいので今は問題になっていないが、同じ壁に向かってはいる（今回は触っていない）
 "}]
