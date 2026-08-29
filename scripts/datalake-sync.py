@@ -102,11 +102,14 @@ commit が要求するものを 1 つずつ見ると、欠けているのは 1 �
 | data file (Parquet) | **在る** —— `kotoba-lang/org-apache-parquet` は reader **と writer**（`parquet/write.cljc`） |
 | metadata.json / snapshot | 在る（ただの JSON） |
 | REST catalog protocol | 在る（ただの HTTP） |
-| **manifest / manifest-list (Avro)** | **無い** —— `kotoba-lang/org-apache-avro` は **reader のみ**（`write`/`encode`/`emit` は 0 件、実測） |
+| **manifest / manifest-list (Avro)** | **在る**（2026-08-29〜） —— `kotoba-lang/org-apache-avro` に writer を実装した（`avro.file/write`。fastavro が読めることを実測、`test/fixtures/verify_written.py`） |
 
-つまり Python が残っている理由は **Avro writer が無いこと、ただ 1 点**である。
-`org-apache-avro` に writer が入った日にこの script は nbb へ移せる ——
-「nbb には無理」ではなく「あと 1 リポジトリ」。
+**つまり 4 つとも揃っており、この script を nbb へ移せない技術的理由はもう無い。**
+2026-08-29 より前はここに「Avro writer が無い」と書いてあり、それが唯一の理由だった。
+移植そのものはまだやっていない —— **これは「移植は不要」ではなく「未着手」である。**
+着手するときの形は今と同じで、境界の JSON はそのまま、`pyiceberg` がやっている
+manifest/metadata/snapshot の組み立てを `avro.file/write` + `org-apache-parquet` +
+素の HTTP で書き直すことになる。
 
 **kotoba（`.kotoba`）は今日は対象外。** script host `kbb` は west に 0 件（未実装、
 CLAUDE.md の記述どおり）で、capability kit にも **fs / process / exec は無い**
