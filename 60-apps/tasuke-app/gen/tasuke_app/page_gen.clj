@@ -1,0 +1,137 @@
+(ns tasuke-app.page-gen
+  "Writes `public/index.html` — the ONE document (ADR-2608080100).
+
+      clojure -M:gen-page
+
+  The shell, the stylesheet and the `<noscript>` answer are rendered here, at
+  build time, by the same `jp-go-dds` the browser bundle uses and the same guest
+  the page runs. The noscript block is not a second implementation: it is the
+  guest's answer for the commonest case, taken at build time, so a victim with
+  JavaScript off still gets the first three things to do and a free window to
+  call."
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
+            [html.core :as html]
+            [jp-go-dds.core :as dds]
+            [jp-go-dds.page :as page]
+            [jp-go-dds.tokens :as tokens]
+            [tasuke-app.oracle :as oracle])
+  (:gen-class))
+
+(def app-css
+  "Small and unlayered. Every value is a `--hig-*` token that
+  `tokens/bridge-css` resolves onto DADS primitives — no raw hex, no px font
+  size, no second palette. What is here is the shell DADS does not ship (an app
+  header, a nav row, a verdict strip, a document block)."
+  "
+.app-header { padding: var(--hig-spacing-6) 0 var(--hig-spacing-3); }
+.app-tagline { color: var(--hig-color-secondary-label);
+               font-size: var(--hig-text-subheadline-font-size);
+               line-height: var(--hig-text-subheadline-line-height); margin: 0 0 var(--hig-spacing-4); }
+.app-nav { display: flex; flex-wrap: wrap; gap: var(--hig-spacing-2); }
+.app-hint { color: var(--hig-color-tertiary-label);
+            font-size: var(--hig-text-footnote-font-size); margin: var(--hig-spacing-2) 0 0; }
+.app-lede { font-size: var(--hig-text-callout-font-size);
+            line-height: var(--hig-text-callout-line-height);
+            color: var(--hig-color-secondary-label); margin: 0 0 var(--hig-spacing-4); }
+.app-note { color: var(--hig-color-secondary-label);
+            font-size: var(--hig-text-footnote-font-size);
+            line-height: var(--hig-text-footnote-line-height); }
+.app-verdict { display: flex; flex-wrap: wrap; align-items: center; gap: var(--hig-spacing-3);
+               padding: var(--hig-spacing-4); margin: var(--hig-spacing-4) 0;
+               border-radius: var(--hig-radius-md);
+               background: var(--hig-color-secondary-system-grouped-background);
+               border: var(--hig-hairline) solid var(--hig-color-separator); }
+.app-verdict__kind { font-size: var(--hig-text-headline-font-size);
+                     line-height: var(--hig-text-headline-line-height); font-weight: 700; }
+.app-verdict__free { margin-left: auto; color: var(--hig-color-secondary-label);
+                     font-size: var(--hig-text-footnote-font-size); }
+.app-inline { display: flex; flex-wrap: wrap; gap: var(--hig-spacing-3);
+              align-items: center; margin-top: var(--hig-spacing-4); }
+.app-list { padding-left: var(--hig-spacing-6); }
+.app-list li { margin-bottom: var(--hig-spacing-2); }
+.app-steps { padding-left: var(--hig-spacing-5); }
+.app-steps li { margin-bottom: var(--hig-spacing-3); }
+.app-steps__done { color: var(--hig-color-tertiary-label); text-decoration: line-through; }
+.app-doc { white-space: pre-wrap; font-family: var(--hig-font-mono);
+           font-size: var(--hig-text-footnote-font-size);
+           line-height: var(--hig-text-body-line-height);
+           background: var(--hig-color-tertiary-system-background);
+           border: var(--hig-hairline) solid var(--hig-color-separator);
+           border-radius: var(--hig-radius-sm); padding: var(--hig-spacing-4);
+           overflow-x: auto; }
+.app-hash { font-family: var(--hig-font-mono); }
+.app-table { width: 100%; }
+.app-file { font-size: var(--hig-text-footnote-font-size); }
+.app-footer { margin: var(--hig-spacing-8) 0 var(--hig-spacing-6);
+              padding-top: var(--hig-spacing-4);
+              border-top: var(--hig-hairline) solid var(--hig-color-separator);
+              color: var(--hig-color-tertiary-label);
+              font-size: var(--hig-text-caption1-font-size);
+              line-height: var(--hig-text-caption1-line-height); }
+")
+
+(def demo-narrative
+  "The commonest case this page exists for, used only to render the noscript
+  answer. The live page asks the member instead."
+  "Xのアカウントを乗っ取られたかもしれません。メールアドレスが勝手に変更されたとの通知メール。")
+
+(defn noscript []
+  (let [kind (oracle/classify demo-narrative)
+        actions (oracle/actions kind)
+        windows (oracle/windows kind)]
+    [:noscript
+     (dds/section
+      {:title "JavaScript が無効のときの最短の答え"}
+      [:p (str "この端末では入力を受け付けられませんが、"
+               (oracle/ja-kind kind) "の初動はこれです。")]
+      (into [:ol] (for [a actions] [:li a]))
+      [:p "無料の窓口: " (str/join " → " windows)]
+      [:p "警察 サイバー犯罪相談窓口 #9110 / 消費者ホットライン 188"])]))
+
+(defn document []
+  (page/->page
+   {:title "助 — 乗っ取り・サイバー被害の初動"
+    :description "アカウント乗っ取り・不正送金など、サイバー被害に遭った後の初動・窓口・書面を無料で組み立てます。代理ログインも代理提出もしません。"
+    :lang "ja"
+    :css (slurp (io/resource "jp_go_dds/dds.css"))
+    :app-css (str tokens/skin-css "\n" app-css)
+    :head [[:script {:src "js/tasuke-app.js" :defer true}]]}
+   [:div {:id "app"}]
+   (noscript)))
+
+(defn artifact-document
+  "The same page, packaged for a host that supplies the document skeleton
+  (`<!doctype>`, `<head>`, `<body>`) and serves it under a Content-Security-Policy
+  that admits no external script. So: content only, and the bundle INLINED.
+
+  This is not a second document for the app — `public/index.html` remains the one
+  document (ADR-2608080100). It is the one document re-wrapped for one host, built
+  from the same CSS, the same guest and the same bundle, by this same generator, so
+  it cannot drift into a second version of the page.
+
+  The host paints its own ground in the viewer's theme, so `body` takes an explicit
+  background here: DADS is a light design system with no upstream dark palette, and
+  this page commits to light rather than inventing one."
+  []
+  (str "<title>助 乗っ取り初動キット</title>\n"
+       "<style>\n" (slurp (io/resource "jp_go_dds/dds.css")) "\n"
+       dds/ext-css "\n" tokens/skin-css "\n" app-css "\n"
+       "body { background: var(--color-neutral-white, #fff); color: var(--hig-color-label); "
+       "font-family: var(--hig-font-text); margin: 0; }\n"
+       "</style>\n"
+       "<div id=\"app\"></div>\n"
+       (html/->html (noscript)) "\n"
+       "<script>\n" (slurp (io/file "public/js/tasuke-app.js")) "\n</script>\n"))
+
+(defn -main [& _]
+  (let [out (io/file "public/index.html")
+        art (io/file "out/artifact.html")]
+    (io/make-parents out)
+    (spit out (document))
+    (println (.getPath out) (.length out) "bytes")
+    (when (.exists (io/file "public/js/tasuke-app.js"))
+      (io/make-parents art)
+      (spit art (artifact-document))
+      (println (.getPath art) (.length art) "bytes"))
+    (shutdown-agents)))

@@ -1,0 +1,20 @@
+;; tasuke-app — 1 document, 1 bundle, 1 mount (ADR-2608080100)。
+;;
+;; :app          — public/index.html が読む唯一の bundle。
+;; :oracle-test  — 同じ KIR artifact を **ClojureScript 側でも**実行して、
+;;                 JVM の真理値表と同じ答えが返ることを実測する node test。
+;;                 jp-go-dds の oracle が「JVM が緑でも cljs の証拠にならない」と
+;;                 名指しした 2 つの非対称（record 内 :i64 が BigInt を要求する /
+;;                 utf8-substring! の integer? guard）が、この core の形で本当に
+;;                 起きないことを確かめるのはこの build だけ。
+{:deps   {:aliases [:cljs :cljs-test]}
+ :builds {:app         {:target     :browser
+                        :output-dir "public/js"
+                        ;; RELATIVE。このページは path prefix の下に置かれうる
+                        ;; （artifact / Pages / itonami.cloud の org host）ので、
+                        ;; 絶対パスにすると mount point ごとに嘘になる。
+                        :asset-path "js"
+                        :modules    {:tasuke-app {:init-fn tasuke-app.core/main}}}
+          :oracle-test {:target    :node-test
+                        :output-to "out/oracle-tests.js"
+                        :ns-regexp "^tasuke-app\\..*-test-cljs$"}}}

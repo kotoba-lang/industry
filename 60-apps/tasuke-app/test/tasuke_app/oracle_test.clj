@@ -1,0 +1,102 @@
+(ns tasuke-app.oracle-test
+  "The gate over the shipped decision core.
+
+  Two things are checked, and they are different claims:
+
+    1. the SHIPPED artifact answers the truth table (that is what the page runs);
+    2. the artifact is what `kotoba/triage_core.kotoba` compiles to TODAY (that
+       is what stops the source and the shipped decisions drifting apart).
+
+  Without (2) a stale artifact passes (1) forever."
+  (:require [clojure.test :refer [deftest is testing]]
+            [tasuke-app.kir-gen :as gen]
+            [tasuke-app.oracle :as o]))
+
+(def report
+  "The wording of the report this app was built from, verbatim."
+  "（悲報）Xのアカウントを乗っ取られたかもしれません。メールアドレスが勝手に変更されたとの通知メール。")
+
+(deftest artifact-is-current
+  (testing "the shipped KIR is what the source compiles to now"
+    (is (= (gen/compile-kir) o/triage-core)
+        "artifact drifted from kotoba/triage_core.kotoba — run `clojure -M:gen`")))
+
+(deftest classifies-the-report
+  (testing "the takeover stem catches 乗っ取られた, which 乗っ取り does not"
+    (is (= "account-takeover" (o/classify report)))
+    (is (= "account-takeover" (o/classify "乗っ取られた"))
+        "DELIBERATE DIVERGENCE from tasuke triage.cljc, which needs 乗っ取り and
+         falls through to the sns-fraud default on this wording")
+    (is (= "sns-fraud" (o/classify "よくわからない DM が来た"))
+        "an unclassified victim is still routed, never refused"))
+  (testing "money outranks the account: the bank clock is the shortest one"
+    (is (= "unauthorized-transfer"
+           (o/classify "乗っ取られて勝手に振込されていた"))))
+  (testing "an explicit kind from the member wins over the scan"
+    (is (= "ransomware" (o/classify report "ransomware")))
+    (is (= "account-takeover" (o/classify report "not-a-kind"))
+        "an unknown explicit kind is ignored, not propagated")))
+
+(deftest severity-table
+  (is (= "urgent"   (o/severity "account-takeover" 0 false)))
+  (is (= "critical" (o/severity "unauthorized-transfer" 1 false)))
+  (is (= "info"     (o/severity "unauthorized-transfer" 0 false))
+      "INHERITED CONTRADICTION, asserted rather than quietly fixed: a 不正送金
+       whose amount is not yet known scores the LOWEST severity, while
+       `deadlines` returns two running clocks for the same kind. tasuke's
+       methods/triage.cljc scores it the same way; changing it here would make
+       this app disagree with the actor without saying so. The view answers it
+       by showing the clocks whatever the severity. Upstream finding, recorded
+       in the ADR.")
+  (is (= "critical" (o/severity "ransomware" 1 false)))
+  (is (= "urgent"   (o/severity "ransomware" 0 false)))
+  (is (= "elevated" (o/severity "phishing" 0 false)))
+  (is (= "info"     (o/severity "sns-fraud" 0 false)))
+  (is (= "urgent"   (o/severity "sns-fraud" 0 true))
+      "an ongoing attack is urgent whatever the kind"))
+
+(deftest routing-and-documents
+  (is (= ["platform-abuse-desk" "police-cyber-9110" "jpcert"]
+         (o/windows "account-takeover")))
+  (is (= ["bank-direct" "no-and-bank-fund-recovery" "police-cyber-9110"]
+         (o/windows "unauthorized-transfer")))
+  (is (= ["police-cyber-9110"] (o/windows "not-a-kind"))
+      "an unknown kind still routes somewhere free")
+  (is (= ["damage-report" "incident-statement" "evidence-index" "damage-calculation"
+          "platform-request" "recovery-plan"]
+         (o/documents-for-kind "account-takeover" 0)))
+  (is (some #{"bank-freeze-request"} (o/documents-for-kind "unauthorized-transfer" 0)))
+  (is (not (some #{"bank-freeze-request"} (o/documents-for-kind "fake-billing" 0)))
+      "no money moved -> no 組戻し to ask for")
+  (is (some #{"bank-freeze-request"} (o/documents-for-kind "fake-billing" 1))))
+
+(deftest actions-lead-with-evidence
+  (let [steps (o/actions "account-takeover")]
+    (is (= 6 (count steps)))
+    (is (.startsWith ^String (first steps) "まず証拠を保全する")
+        "a victim who resets the password first loses the proof it was ever taken")
+    (is (some #(.contains ^String % "二段階認証") steps))))
+
+(deftest deadlines-are-empty-or-real
+  (is (= 2 (count (o/deadlines "unauthorized-transfer"))))
+  (is (= 1 (count (o/deadlines "account-takeover"))))
+  (is (= [] (o/deadlines "ransomware"))
+      "empty is an answer; it must not read as a missing one"))
+
+(deftest g1-cost-is-not-a-parameter
+  (is (= 0 (o/support-cost-jpy)))
+  (is (= 0 (:cost-jpy (o/triage {:narrative report :loss-jpy 900000 :ongoing? true})))
+      "no argument can make 助 cost money"))
+
+(deftest refuses-for-the-reason-it-names
+  (testing "a non-export is refused as a non-export, not by accident"
+    (let [e (try (o/call :hit? ["a" "b"]) nil (catch clojure.lang.ExceptionInfo e e))]
+      (is (some? e) "an unexported guest function must not be callable")
+      (is (= "function is not exported" (ex-message e))
+          "pin the reason: a different failure passing here would prove nothing")))
+  (testing "a wrong argument count is refused"
+    (let [e (try (o/call :severity ["account-takeover"]) nil
+                 (catch clojure.lang.ExceptionInfo e e))]
+      (is (some? e))
+      (is (re-find #"arg" (str (ex-message e)))
+          (str "unexpected refusal reason: " (ex-message e))))))

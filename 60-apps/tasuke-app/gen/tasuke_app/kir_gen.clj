@@ -1,0 +1,35 @@
+(ns tasuke-app.kir-gen
+  "Regenerate the shipped KIR from `kotoba/triage_core.kotoba`.
+
+      clojure -M:gen
+
+  What this writes IS what the browser loads. Nothing here transforms the
+  compiler's output, so the artifact under test and the artifact that ships
+  cannot drift apart."
+  (:require [clojure.java.io :as io]
+            [clojure.pprint :as pp]
+            [kotoba.compiler.core :as compiler])
+  (:gen-class))
+
+(def target
+  "`:js-kotoba-v1` — the app's own runtime is ClojureScript, so the artifact is
+  produced for the target it is executed under. KIR itself is target-independent
+  for a core of scalars and strings, but one target has to be named and naming
+  it once is what keeps regeneration reproducible."
+  :js-kotoba-v1)
+
+(def source "kotoba/triage_core.kotoba")
+(def artifact "resources/tasuke_app/oracle/triage-core.kir.edn")
+
+(defn compile-kir []
+  (let [result (compiler/compile-source (slurp (io/file source)) target)]
+    (or (:kir result)
+        (throw (ex-info "compile-source returned no :kir"
+                        {:source source :keys (keys result) :result result})))))
+
+(defn -main [& _]
+  (let [out (io/file artifact)]
+    (io/make-parents out)
+    (spit out (with-out-str (pp/pprint (compile-kir))))
+    (println (.getPath out) (.length out) "bytes")
+    (shutdown-agents)))

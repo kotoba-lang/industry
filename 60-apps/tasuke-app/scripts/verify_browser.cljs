@@ -1,0 +1,137 @@
+(ns verify-browser
+  "Opens the built page in a real browser and measures the two things that are
+  invisible in the source.
+
+      npx nbb scripts/verify_browser.cljs
+
+  1. **The guest's decisions reach the screen.** The verdict a victim reads has
+     to be the one `kotoba/triage_core.kotoba` returns. A bundle that compiles
+     proves nothing about that.
+
+  2. **Crossing a view does not load a document** (ADR-2608080100). The nav is
+     real `href`s, so routing and navigating look IDENTICAL in the source. The
+     test leaves a value on `window`, crosses, and checks it survived — and waits
+     on an element that exists ONLY in the target view, because waiting on
+     something both views have returns before the crossing has rendered.
+     It also checks app STATE survives the crossing; without that, being a single
+     page bought nothing."
+  (:require ["playwright$default" :as pw]
+            ["http" :as http]
+            ["fs" :as fs]
+            ["path" :as path]
+            [clojure.string :as str]
+            [promesa.core :as p]))
+
+(def port 8931)
+(def root "public")
+
+(def mime {".html" "text/html; charset=utf-8" ".js" "text/javascript; charset=utf-8"
+           ".css" "text/css; charset=utf-8" ".map" "application/json"})
+
+(defn serve! []
+  (p/create
+   (fn [resolve _]
+     (let [srv (.createServer
+                http
+                (fn [req res]
+                  (let [url (first (str/split (.-url req) #"\?"))
+                        rel (if (= url "/") "index.html" (subs url 1))
+                        f (path/join root rel)]
+                    (if (fs/existsSync f)
+                      (do (.setHeader res "content-type"
+                                      (get mime (path/extname f) "application/octet-stream"))
+                          (.end res (fs/readFileSync f)))
+                      (do (set! (.-statusCode res) 404) (.end res "not found"))))))]
+       (.listen srv port #(resolve srv))))))
+
+(defn fail! [msg]
+  (println "FAIL:" msg)
+  (js/process.exit 1))
+
+(defn check! [ok? msg]
+  (println (if ok? "  ok  " "  FAIL") msg)
+  (when-not ok? (js/process.exit 1)))
+
+(defn -main [& _]
+  (p/let [srv (serve!)
+          ;; The container ships chromium 1194; whatever playwright version npm
+          ;; resolved may pin a different build, and "playwright install" is not
+          ;; available here. Point at the installed binary instead of downloading.
+          exe (let [c "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"]
+                (when-not (fs/existsSync c)
+                  (fail! (str "no chromium at " c)))
+                c)
+          browser (.launch (.-chromium pw) #js {:args #js ["--no-sandbox"]
+                                                :executablePath exe})
+          page (.newPage browser)
+          _ (.goto page (str "http://127.0.0.1:" port "/"))
+          _ (.waitForSelector page "#app .app-verdict")
+
+          ;; --- 1. the guest's answer reaches the screen ---------------------
+          _ (.fill page "#narrative"
+                   "Xのアカウントを乗っ取られたかもしれません。メールアドレスが勝手に変更されたとの通知メール。")
+          _ (.fill page "#account" "@example")
+          _ (.fill page "#service" "X")
+          _ (.waitForFunction page
+                              "document.querySelector('.app-verdict__kind') &&
+                               document.querySelector('.app-verdict__kind').textContent.includes('アカウント乗っ取り')")
+          verdict (.textContent page ".app-verdict")
+          _ (check! (str/includes? verdict "アカウント乗っ取り") "verdict names the kind the guest returned")
+          _ (check! (str/includes? verdict "緊急") "severity urgent reaches the screen")
+          _ (check! (str/includes? verdict "¥0") "G1 — the page states the cost the guest fixes at 0")
+
+          chip-bg (.evaluate page "getComputedStyle(document.querySelector('.dads-chip-label')).backgroundColor")
+          _ (check! (not (contains? #{"rgba(0, 0, 0, 0)" "transparent"} chip-bg))
+                    (str "the severity chip is filled, not unstyled text (" chip-bg ")"))
+
+          ;; --- 2. crossing a view must not load a document ------------------
+          _ (.evaluate page "window.__probe = 'alive'")
+          mounted-before (.evaluate page "window.tasukeMountedAt")
+          _ (.click page "a[href='#shorui']")
+          ;; an element that exists ONLY in 書面
+          _ (.waitForSelector page ".app-doc")
+          probe (.evaluate page "window.__probe")
+          mounted-after (.evaluate page "window.tasukeMountedAt")
+          _ (check! (= "alive" probe) "window survived the crossing (routed, did not navigate)")
+          _ (check! (= mounted-before mounted-after) "the app did not remount")
+
+          ;; --- app state survives the crossing ------------------------------
+          doc (.textContent page ".app-doc")
+          docs (.evaluate page "Array.from(document.querySelectorAll('.app-doc')).map(e=>e.textContent).join('\\n')")
+          _ (check! (str/includes? docs "@example")
+                    "the account typed in 相談 is in the 書面 the guest generated")
+          _ (check! (str/includes? docs "代理ログインはしません")
+                    "G2 — the document says 助 does not act as the member")
+          _ (check! (str/includes? docs "本人作成・要署名")
+                    "G3 — the document is member-authored and needs their signature")
+
+          ;; --- a negative control: the page must NOT show a kind it wasn't told
+          _ (.click page "a[href='#soudan']")
+          _ (.waitForSelector page "#narrative")
+          _ (.fill page "#narrative" "ランサムウェアに感染して暗号化された")
+          _ (.waitForFunction page
+                              "document.querySelector('.app-verdict__kind').textContent.includes('ランサムウェア')")
+          v2 (.textContent page ".app-verdict__kind")
+          _ (check! (str/includes? v2 "ランサムウェア")
+                    "a different narrative gives a different answer (the view is not a fixed string)")
+
+          ;; back to the takeover before the 書面 screenshot: for ransomware the
+          ;; guest warrants neither a recovery plan nor a platform request, so
+          ;; there is no `.app-doc` to wait for. That is the app being right.
+          _ (.fill page "#narrative" "Xのアカウントを乗っ取られたかもしれません。メールアドレスが勝手に変更された。")
+          _ (.click page "a[href='#shorui']")
+          _ (.waitForSelector page ".app-doc")
+          _ (.screenshot page #js {:path "out/tasuke-shorui.png" :fullPage true})
+          _ (.click page "a[href='#plan']")
+          _ (.waitForSelector page ".app-steps")
+          _ (.click page "a[href='#soudan']")
+          _ (.fill page "#narrative" "Xのアカウントを乗っ取られたかもしれません")
+          _ (.click page "a[href='#plan']")
+          _ (.waitForSelector page ".app-steps")
+          _ (.screenshot page #js {:path "out/tasuke-plan.png" :fullPage true})
+          _ (.close browser)
+          _ (.close srv)]
+    (println "\nOK — browser checks passed")
+    (js/process.exit 0)))
+
+(-main)
