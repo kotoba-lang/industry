@@ -98,9 +98,15 @@ passkey 根にすれば **失った共有秘密を再発行せずに operator �
 ## 6. 次の agent への resume point
 
 1. **`agent/passkey-operator-authority`（`caf90b7`、network-awai/local-murakumo）を着地させる**（最優先。これが無いと passkey operator 経路は片側だけで、Grok Bots も戻らない）。手順は測定済みで、順序が重要：
-   (a) main から worktree を切って branch を merge —— **source は綺麗に merge でき、conflict するのは生成物 2 つだけ**
-   (b) sibling を main の `release/cljs/manifest.json` の SHA に **private worktree で** pin（最低 `murakumo` `4eb071a`、`org-chainagnostic-cacao` `2f74d25`、`cloud-murakumo` `bbf0899`）。**共有 checkout に対してビルドしない**
-   (c) `build` resource-guard 下で `shadow-cljs release worker ui` → `gzip -n` → `manifest.json` の digest を書き直し、`node scripts/package-release.mjs` が再現するまで合わせる
+   (a) main から worktree を切って branch を merge —— **source は綺麗に merge でき、conflict するのは生成物 2 つだけ**（実行して確認済み。`src/worker_entry.js` と `src/local_murakumo/worker.cljs` は auto-merge、`src/operator_auth.js` は新規追加なので衝突しない）。生成物は `git checkout --ours` で一旦 main 側を staging し、(c) で上書きする
+   ⚠ **west の checkout は remote を `origin` ではなく org 名で持つ** —— `git fetch origin` は `'origin' does not appear to be a git repository` で落ちる。`git fetch network-awai` と書く
+   (b) sibling を main の `release/cljs/manifest.json` の SHA に **private worktree で** pin。**共有 checkout に対してビルドしない**。
+   **layout が本物と同じ形でないと解決しない** —— `deps.edn` は `../../kotoba-lang/<repo>` と `../cloud-murakumo/src` を参照するので、worktree は `<x>/network-awai/local-murakumo` に置き、siblings を `<x>/kotoba-lang/` と `<x>/network-awai/` に並べる。**on-disk に要るのは 7 本**（manifest の 13 依存のうち残りは推移解決）:
+   `cloud-murakumo` `bbf0899` / `kotobase-peer` `67e0512` / `html` `e379492` / `css` `8b04f65` / `treasury` `e860f9d` / `org-chainagnostic-cacao` `2f74d25` / `murakumo` `4eb071a`
+   (c) `build` resource-guard 下で `shadow-cljs release worker ui` → `gzip -n` → `manifest.json` の digest を書き直し、`node scripts/package-release.mjs` が再現するまで合わせる（clojure 1.12 / JDK 21 は導入済み。`shadow-cljs` は npm/alias 依存から外されており、この refresh のときだけ `-Sdeps` で明示的に引く）。
+   **再生成が本当に必要であることは実測済み** —— main は merge-base `008608e` 以降に digest 入力のソースを 4 本変えている（`worker.cljs` / `routes.cljc` / `edge_queue.cljc` / `merkle_store.cljs`）ので、main 側の成果物も branch 側の成果物も使えない。
+   ⚠ **resource-guard の exit 2 はロックであってテスト失敗ではない。** 3 セッションが `build` を取り合っていた（実測 2026-08-29 夜: cypher / app-hyakka / mirror）。`> file` で落として exit を採る（pipe すると最後のコマンドの値になる）。
+   ⚠ **別セッションが同じ `src/local_murakumo/worker.cljs` を `agent/openrouter-external-models` で編集中だった。** 先に着地されたら main が動くので (c) をやり直す —— ソースの merge は綺麗なので手戻りは再ビルドだけ
    (d) `npm test` → `npx vitest run`（branch に入っている config 修正が無いと vitest はそもそも起動しない）
    (e) server-side merge → `api.murakumo.cloud` を deploy
    (f) `MURAKUMO_OPERATOR_DIDS` を一時的に設定して `scratchpad/e2e_operator_prod.sh` を回す。**probe に使うのは `/internal/grok-bots/authorize`**（副作用が無い）。⚠ **`PUT /infer/models/:id` を本番で probe しない** —— どの route でも消せない registry entry が残る
