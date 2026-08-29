@@ -275,12 +275,39 @@ CLAUDE.md と amu の `examples/todo-app.kotoba` が『Kotoba には整数→文
   | element | `textContent` / `getAttribute(n)` | `textContent` / `setAttribute(n,v)` / `addEventListener(type,fn)` |
   | `document` | `title` / `getElementById(id)` | `title` |
   | `console` | — | `log(…)` |
+  | global | — | `setTimeout(fn,ms)` / `fetch(url)` |
+
+  **`setTimeout` は `addEventListener` と同じ形で、同じ registry を共有する。**
+  どちらも「後で呼ぶ関数」をホストに渡す操作で、capability の無いゲストには時計も
+  呼び返しも無い。返るのは登録（遅延とハンドラ番号）で、発火は同じ第 2 の入口。
+  タイマ id として返すのはハンドラ番号である —— このエンジンが持つ identity が
+  それしか無いから。
 
   これで全部である。他は `undefined` で、page script はそれを検査できる ——
   ブラウザが持たない機能を検査するのと同じやり方で。
 
-  残る G4 の条件: `new Worker` / `fetch` / `setTimeout`。どれも同じ問いに帰着する ——
-  **返す値で言えるか、それとも呼び返しが要るか。**
+  **`fetch` も同じ形に載った。ここが本当の試金石だった** —— promise を返すからである。
+  返るのは pending request（`#req<n>` という id のノード。新しい値の型は要らなかった）で、
+  n が registry の枠。`.then(fn)` はその枠にハンドラを収め、同じ request を返すので
+  chain できる。ホストが request を実行し、**応答を添えてその枠を発火する**:
+
+  ```
+  eval-dom                              -> 5:fetch7:#window14:9:/api/data1:0
+                                           ( host が fetch する )
+  eval-dom-event-arg(…, 0, the-body)    -> 11:textContent3:out8:the body
+  ```
+
+  **effect model が存在する理由そのものの往復が、capability 無しで閉じた。**
+  ゲストは network に一度も触らず、応答はホストが手渡すデータである。
+
+  ⚠ **その応答の渡し方で、素直な方法が効かない。しかも理由が正しい。**
+  呼び出し「前」に caller の環境へ束縛してもだめで、**引数の無い宣言済み仮引数は
+  `undefined` に束縛される**（`function f(a) { return typeof a }; f()` が
+  `undefined` を答えるのはそのため）ので、外側の束縛を shadow する。だから
+  `bind-args` の「後」に束縛する。同じ理由でその入口は `call-fn` に委譲せず呼び出しを
+  展開して書いてある（`call-fn` は既に言語の上限である 5 引数）。
+
+  残る G4 の条件は `new Worker` だけになった。
 
 ## 次の一手（resume point）
 
@@ -307,7 +334,10 @@ effect-as-value で通り、quickjs-ng に対して両方向で測ってある�
   `:f64` の値は Kotoba を通るが演算に lowering が無く、`(+ x x)` は
   `expected i64, got f64` で拒否される。ソフト浮動小数点なら書ける
   （`bit-and`/`bit-or`/`bit-xor`/`quot` は在り、shift は無いので `*`/`quot` で代用）。
-- prototype / `instanceof`（`for...of` / `for...in` / `switch` は landed）
+- **ユーザ定義の constructor と prototype chain**（`instanceof` は landed —— 鎖が
+  無いので `catch` が実際に訊く問い（`e instanceof TypeError`）に、捕まえた error の
+  `name` で答える。知らない constructor には `false` を返す。これは拒否ではなく
+  本当の答えである: このエンジンに、その constructor の instance は存在しない）
 - **cell は解放されない**（README の Gaps に理由つきで記録済み）
 - **`browser.demo-smoke-test` はこのセッションの前からハングしていた**（実測 2026-08-29）。
   HEAD 版はその namespace に入ったあと 10 分以上何も出さず、kill した。1 回の delivery
@@ -315,6 +345,25 @@ effect-as-value で通り、quickjs-ng に対して両方向で測ってある�
   **これは私の変更が壊したものではない。** 直したのは「ハングが遅い成功と見分けられない」
   ことだけで、`with-deadline` が 120 秒で理由付きの失敗にする。**echo が届かない理由は
   未調査**であり、直したと書かない。
+
+  **排除できたもの**（2026-08-29 実測）: ①待ち時間の長さではない（500ms、および
+  1 回目の delivery 後にさらに 3 秒 —— どちらも placeholder のまま）②WebSocket
+  機構ではない（`quickjs-websocket-smoke-test` が同じ `websocket-fn`・同じ
+  delivery 形・同じ 500ms 境界で、同じ実行の中で通る）③handle の漏れではない
+  （失敗後に測って TCP handle は 0）。**残る差分**: このテストは既に 3 つの script
+  tag と実 Worker と実 fetch を走らせた session に `onmessage` を登録し、handler は
+  `document.title` ではなく `document.getElementById(...)` 越しに書く。どちらが効いて
+  いるかは判っていない。
+
+  **⚠ そして 3 つ直しても、スイートは最後まで走らない。** 0% CPU・TCP handle 0 で
+  `Ran N tests` に到達しない。**何が残っているかは判っていない。** 3 つの修正を
+  「これで直った」と読まないこと —— それぞれ単独では正しいが、実行は依然として止まる。
+
+  **ハングは 3 層だった。3 番目は私の計器そのものだった** —— `Promise.race` は負けた側を
+  止めないので、`with-deadline` が張った 120 秒の timer が Node を生かし続けていた
+  （テスト 2 本で最大 240 秒、0% CPU、socket も無し —— 暴こうとしていたハングと
+  同じ顔）。settle 時に `clearTimeout` する。他の 2 層は、ゲストが開いた socket と、
+  **server が accept 済みの接続**（Node の `.close()` は既存接続を閉じない）。
   ⚠ 最初に書いた修正（delivery を poll し直す）は**前提が間違っていた** —— 1 回 8 秒
   かかるので 40 回試せば 320 秒で、deadline の内側に収まらない。しかも
   `Promise.race` は**負けた側を止めない**ので、engine を dispose した後も再帰が回り続けた。
