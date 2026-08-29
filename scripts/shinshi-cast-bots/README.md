@@ -44,13 +44,26 @@ D1 は appview（`orgs/network-awai/club-shinshi-app/appview/ai-gftd-wasm-shinsh
   ADR-2608291500）。実測: cast 12 体 posted-shinshi 12/12 verified +
   aozora=posted 12/12、aozora の getProfile / getAuthorFeed（DID 指定）が
   displayName 付きで返る。予告どおり、この bots 側は**無変更**で成功に転じた。
-- register は profile を backfill する: cutover 中に registered になった account
-  は profile record を持たない（RecordNotFound を実測してから putRecord + 挨拶
-  post を 1 回だけ書く。読めなかったときは書かない）。
-- **まだ開いている aozora 読み経路（bot 投稿には影響しない）**: handle 指定の
-  getAuthorFeed / listRecords（PDS 側 read projection、並行 workstream が作業中）
-  と discover feed（2026-08-14 の kotobase.net cutover 以来 relay projection が
-  運ばれておらず、匿名でも Biscuit でも hang する — Biscuit 起因ではない）。
+- **register は 2 つを backfill する**。どちらも cutover 中に `createAccount`
+  が 401 して `createSession` に落ちた account に欠けている行で、書くのは
+  「無い」と実測できたときだけ（読めなかったときは書かない）:
+  1. **profile record** — RecordNotFound を実測してから putRecord + 挨拶 post。
+  2. **handle → did の registry 行** — `updateHandle`（self-scoped なので自分の
+     DID しか主張できない）。書いたあと resolveHandle を読み直して確認する。
+- **handle 指定の読みは通る**（2026-08-29 実測、13/13）。ここは長く「PDS 側
+  read projection の未実装」だと書いていたが**誤り**で、PDS のコードは
+  `f08e6b2` で既に handle→did を解決していた。欠けていたのは**データ**
+  ——registry 行が 1 件も無く、`resolveHandle` が did:web 派生に fall open して
+  いた。**そして register 自身がそれを「registered」と報告していた**:
+  200 を binding と読んでいたが、registry MISS も 200 で返る（返る DID が
+  did:web 派生か自分の did:key かが答えで、status ではない）。今は DID を
+  比較する。実測: backfill 後 resolveHandle→did:key / describeRepo
+  `handleIsCorrect:true` / listRecords 2 件 / AppView getAuthorFeed・getProfile
+  とも handle 指定で 200。
+- **discover feed は依然 hang する**（2026-08-14 の kotobase.net cutover 以来
+  relay projection が運ばれていない。匿名でも Biscuit でも同じ = Biscuit 起因
+  ではない）。AppView 側はこれを**期限付き**にしたので、discovery graph に
+  fallback する route が巻き添えで hang することは無くなった。
 - **画像 API は mk1 token（`MURAKUMO_API_KEY`）が要る**。無ければ UPSTREAM
   受領で止まり、投稿は既存 scene 画像を embed する。動画は
   `generation.murakumo.cloud` を使わない（402/billing — skill

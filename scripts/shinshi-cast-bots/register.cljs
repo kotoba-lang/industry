@@ -9,7 +9,15 @@
    Order per bot (yukkuri's account-bootstrap-order):
      1. ensure an Ed25519 seed in the Keychain BEFORE any network call;
      2. createSession first; only when that fails, createAccount;
-     3. on a fresh account, putRecord the profile + one registration post.
+     3. bind handle -> did in the PDS registry if it is not already bound
+        to this did (updateHandle, self-scoped), verified by re-reading;
+     4. putRecord the profile + one registration post if absent.
+
+   Steps 3 and 4 are backfills, not just fresh-account setup: a bot that
+   registered while the Biscuit cutover 401'd createAccount owns neither
+   row, and the account it does own is reachable only by DID until they
+   are written. Both are idempotent — a bound handle and a present profile
+   are read first and left alone.
 
    Run from the superproject root:
      R=$PWD K=$PWD/orgs/kotoba-lang
@@ -65,16 +73,68 @@
                           {:status (.-status resp) :body v
                            :ok (and (< (.-status resp) 400) (not (get v "error")))})))))))
 
-(defn resolve-handle [handle]
+(defn resolve-handle
+  "-> Promise<did-string | :unverifiable>.
+
+   Returns the DID the PDS resolves the handle to, NOT whether the call
+   succeeded. A 200 is not a binding: on a registry MISS the PDS derives
+   `did:web:<handle>` and answers 200 with it, because an unkeyed actor's
+   identity IS that derivation (aozora.pds.repo/resolve-handle documents the
+   fallback). A did:key bot is bound only when the resolved DID is its OWN
+   did:key, so the comparison — not the status — is the measurement.
+
+   Measured 2026-08-29: this returned :bound for all 13 cast bots while the
+   registry held no row for any of them, so every handle-keyed read
+   (listRecords / describeRepo / getAuthorFeed) answered empty against a
+   did:web that owns nothing."
+  [handle]
   (-> (js/fetch (str core/pds "/xrpc/com.atproto.identity.resolveHandle?handle="
                      (js/encodeURIComponent handle)))
       (.then (fn [resp]
                (.then (.text resp)
                       (fn [text]
-                        (cond (= 200 (.-status resp)) :bound
-                              (str/includes? text "AccountNotFound") :unbound
-                              :else :unverifiable)))))
+                        (let [v (try (js->clj (js/JSON.parse text))
+                                     (catch :default _ {}))]
+                          (or (get v "did") :unverifiable))))))
       (.catch (fn [_] :unverifiable))))
+
+(defn- handle-state
+  "Compare a resolved DID against the DID the session authenticated as."
+  [resolved did]
+  (cond (= resolved :unverifiable) "session-ok-handle-unverifiable"
+        (= resolved did)           "registered"
+        :else                      "session-ok-handle-unbound"))
+
+(defn- ensure-handle!
+  "Bind handle -> did in the PDS handle registry when it is not already bound
+   to THIS did. createAccount writes that row; a bot that fell back to
+   createSession while the Biscuit cutover 401'd createAccount has none, so
+   its handle resolves to did:web:<handle> and names an empty repo.
+
+   updateHandle is self-scoped (the router injects :_auth-did from the
+   session), so a bot can only ever claim its own DID — there is no way for
+   this backfill to bind someone else's handle.
+
+   Re-reads after the write and reports what the registry ACTUALLY answers,
+   so a write that returned 200 but did not land is not reported as bound.
+   -> Promise<state-string>."
+  [handle did token]
+  (-> (resolve-handle handle)
+      (.then
+       (fn [resolved]
+         (if (= resolved did)
+           (js/Promise.resolve "registered")
+           (-> (xrpc "com.atproto.identity.updateHandle" {:handle handle} token)
+               (.then
+                (fn [{:keys [ok status body]}]
+                  (if-not ok
+                    (js/Promise.resolve
+                     (str "handle-bind-failed " status " " (get body "error")))
+                    (-> (resolve-handle handle)
+                        (.then (fn [after]
+                                 (if (= after did)
+                                   "registered+handle-bound"
+                                   (str "handle-bind-unverified(" after ")"))))))))))))))
 
 (defn- profile-missing?
   "-> Promise<bool>. Only a definite RecordNotFound counts as missing — an
@@ -126,16 +186,12 @@
          (fn [{:keys [ok body] :as sess}]
            (if ok
              (let [did (get body "did") token (get body "accessJwt")]
-               (-> (resolve-handle handle)
+               (-> (ensure-handle! handle did token)
                    (.then (fn [hstate]
                             (.then (ensure-profile! bot did token)
                                    (fn [suffix]
                                      {:name name :handle handle :did did
-                                      :state (str (case hstate
-                                                    :bound "registered"
-                                                    :unbound "session-ok-handle-unbound"
-                                                    "session-ok-handle-unverifiable")
-                                                  suffix)}))))))
+                                      :state (str hstate suffix)}))))))
              (-> (xrpc "com.atproto.server.createAccount" {:handle handle :cacao (mint seed)} nil)
                  (.then
                   (fn [{:keys [ok body status]}]
@@ -157,10 +213,17 @@
                                                      :text post
                                                      :createdAt now}} token)))
                             (.then (fn [{:keys [ok body status]}]
-                                     (cond-> {:name name :handle handle :did did :state "registered"}
-                                       ok (assoc :post-uri (get body "uri"))
-                                       (not ok) (assoc :state "registered-post-failed"
-                                                       :error (str status " " (get body "error")))))))))))))))
+                                     ;; createAccount is documented to bind the
+                                     ;; handle, but the binding is read back
+                                     ;; rather than assumed — that assumption is
+                                     ;; what hid 13 unbound handles.
+                                     (.then (ensure-handle! handle did token)
+                                            (fn [hstate]
+                                              (cond-> {:name name :handle handle :did did
+                                                       :state hstate}
+                                                ok (assoc :post-uri (get body "uri"))
+                                                (not ok) (assoc :state (str hstate "+post-failed")
+                                                                :error (str status " " (get body "error")))))))))))))))))
         (.catch (fn [e] {:name name :handle handle :state "LOCAL-FAILURE"
                          :error (.-message e)})))))
 
