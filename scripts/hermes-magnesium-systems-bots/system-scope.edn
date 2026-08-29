@@ -1,0 +1,84 @@
+{:system/id :magnesium-hydrogen-pemfc-electric-drive
+ :mission "Develop a replaceable Mg/MgH2 hydrogen cartridge, controlled hydrogen reactor, PEM fuel-cell, DC bus, buffer battery, ESC, and motor system without consuming the load-bearing magnesium structure."
+ :architecture [:replaceable-mg-or-mgh2-cartridge
+                :controlled-hydrogen-reactor
+                :pem-fuel-cell
+                :dc-dc-and-dc-bus
+                :buffer-battery
+                :esc
+                :electric-motor]
+ :design-domains [:parametric-3d-model
+                  :materials-and-units
+                  :structural-cae
+                  :thermal-cae
+                  :fluid-pressure-and-leak-cae
+                  :electrochemical-model
+                  :motor-and-powertrain-model
+                  :vibration-fatigue-and-safety]
+ :kotoba-targets ["kotoba-lang/kami-engine-vehicle-designer"
+                  "kotoba-lang/kami-engine-echem"
+                  "kotoba-lang/kami-engine-motor"
+                  "kotoba-lang/kami-engine-cae-solver"
+                  "kotoba-lang/kami-engine-cad"
+                  "kotoba-lang/fea"
+                  "kotoba-lang/kami-flow"]
+ :itonami-targets ["cloud-itonami/cloud-itonami-isic-2432"
+                   "cloud-itonami/cloud-itonami-isic-2823"
+                   "cloud-itonami/cloud-itonami-isic-2720"
+                   "cloud-itonami/hydrogen-electrolysis"
+                   "cloud-itonami/igata"
+                   "cloud-itonami/cad"]
+ :manufacturing-cells [:magnesium-hpdc
+                       :cartridge-dry-inert-handling
+                       :hydrogen-reactor-fabrication
+                       :pem-stack-assembly-and-test
+                       :electronics-smt-and-test
+                       :system-assembly-and-eol
+                       :mes-traceability]
+ :first-generation-boundary {:outsource [:mgh2-synthesis :mea-manufacturing]
+                             :retain-in-house [:cartridge-integration
+                                               :reactor-control
+                                               :powertrain-integration
+                                               :eol-validation]}
+ :wiki-target "network-awai/app-hyakka"
+ :wiki-equipment-classes [:magnesium-hpdc-machine
+                          :melting-and-dosing-furnace
+                          :vacuum-and-spray-system
+                          :trim-press-and-cnc
+                          :xray-ct-and-cmm
+                          :inert-powder-handling-and-pressing
+                          :helium-leak-and-pressure-test
+                          :pem-stack-assembly-and-test
+                          :smt-and-power-electronics-test
+                          :motor-thrust-vibration-and-thermal-test
+                          :mes-and-traceability]
+ ;; Discovery seeds from the supplied concept, not accepted claims. A bot must
+ ;; fetch the owner's current page or API before recording any fact.
+ :wiki-manufacturer-discovery-seeds ["Buehler" "Toshiba Machine" "UBE" "Toyo"
+                                     "Bosch Rexroth" "Parker" "Moog" "Siemens"
+                                     "Beckhoff" "Mitsubishi Electric" "Yaskawa"]
+ :wiki-entity-types [:equipment-manufacturer :equipment-model :seller :equipment-offer]
+ :wiki-required-fields [:manufacturer
+                        :model
+                        :equipment-class
+                        :condition
+                        :price
+                        :currency
+                        :availability
+                        :location
+                        :observed-at
+                        :source-url
+                        :seller]
+ :wiki-source-policy {:allow [:manufacturer-first-party
+                              :dealer-first-party-inventory]
+                      :forbid [:price-aggregator
+                               :marketplace-user-listing
+                               :third-party-wiki-prose
+                               :user-generated]}
+ :safety-boundaries [:no-load-bearing-consumable-magnesium
+                     :no-unsupported-material-or-performance-constants
+                     :no-autonomous-hazardous-machine-operation
+                     :no-autonomous-purchase-or-financial-commitment
+                     :no-shared-orgs-worktree-write
+                     :no-direct-main-push
+                     :no-force-push]}
