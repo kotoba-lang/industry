@@ -24,6 +24,7 @@
   :coverage/seed-published "2026-08-21"
   :coverage/method "WebSearch + WebFetch。取得できた記事本文のみを根拠にした。SNS の原投稿には直接アクセスしていない — X の投稿はすべて報道が引用した形で採取している。"
   :coverage/known-gaps "(1) Cofnas 本人の Substack 原文・X 原投稿は未取得（報道経由の孫引き）。(2) 両陣営の公開書簡の署名者リスト全文は未取得（ghent-letters.pages.dev は集計ページのみで氏名を出していない）。(3) Chronicle of Higher Education / Daily Nous / NBC News は 403 で取得できず。(4) 英政治家の肩書きは Wikipedia 由来で未検証（下記 :evidence/tier :tertiary）。"
+  :coverage/shape "1 人 1 entity。:person/category で politician / journalist / academic / civil-society / institution / organization に分類し、:person/side で告発側・擁護側を持つ。2026-08-29 の改訂前は tertiary 分が :roster/* という散文 blob 5 本に潰れており query できなかった —— 構造を直しただけで、裏取りの水準は :evidence/tier のまま変わっていない。"
   :coverage/caution "人が死亡している事案である。断定を避け、誰が何を言ったかの記録に留める。因果（誰のせいで死んだか）はこのカタログの主張しない範囲。"}
 
  ;; ---------------------------------------------------------------- 中心人物
@@ -331,16 +332,221 @@
   :statement/note "これら4本はいずれも 403 等で本文を取得できていない。見出しと検索結果の要約のみ。個別の発言者名を引用していないのはそのため。"
   :evidence/tier :tertiary}
 
- ;; ------------------------------- Wikipedia 由来の未検証リスト（役職に注意）
- {:db/id -700
-  :source/dataset "arday-cofnas-affair"
-  :roster/kind "wikipedia-derived-unverified"
-  :roster/warning "以下は Wikipedia の Jason Arday 項目の要約から採取した。役職の記載に明白な疑義があるもの（例: Andy Burnham を Prime Minister としている）を含むため、個別に一次確認するまで肩書きごと引用しないこと。"
-  :roster/politicians "Andy Burnham（死を「あらゆる意味での悲劇」と述べたとされる。肩書き記載に疑義あり）、Lucy Powell（教育相とされる。深く衝撃を受け悲しんでいる)、Sadiq Khan（ロンドン市長。容認できない公的な追い立て・執拗な公開の辱め）、Kemi Badenoch（保守党党首。彼の死を報道の口封じに使うべきでない）、Jacob Rees-Mogg（ケンブリッジは DEI の Kool-Aid を飲んだ）、Chris Smith（ケンブリッジ総長。レイシズム的な狂騒であったが、盗用の申し立て自体は厳密な調査に値する）、Afzal Khan（労働党議員。IPSO への超党派書簡を主導、53名署名）、Zack Polanski / John McDonnell / Clive Lewis（Good Law Project 書簡に署名）"
-  :roster/journalists "Lanre Bakare（Guardian、8/1 調査報道。掲載は正しかったと擁護）、Gordon Rayner（Telegraph、7/24）、Emma Yeomans（The Times、8/6）、Jason Okundaye（Guardian。ケンブリッジは彼を学者ではなくマスコットとして扱った）、Charles Moore（Telegraph）、Graeme Wood / Tyler Austin Harper（The Atlantic）、Nesrine Malik、Afua Hirsch、Celia Walden、Gareth Corfield"
-  :roster/academics "Robert Dingwall、Hilary Cremin、Bhaskar Vira、Roger Mosey、Suchitra Sebastian、Nicholas Guyatt（独立調査を求める約100名の書簡を共同組織）、Paul Gilroy、Alan Lester"
-  :roster/civil-society "Simon Woolley（Homerton College 学寮長、Arday の恩師。報道の扱いへの調査を要求）、Patrick Vernon（遺族への募金、20万ポンド超）、Runnymede Trust、Stand Up to Racism（ロンドン中心部で数千人規模の追悼集会）、Colin Salmon、Misan Harriman、Shola Mos-Shogbamimu、National Union of Journalists"
-  :roster/institutions-reviewing "Jesus College Cambridge、University of Glasgow、Durham University、Queen's University Belfast、Birkbeck（在籍記録なしと表明）、Nelson Mandela University（客員教授ではなく臨時の非常勤と表明）、Palgrave Macmillan（刊行中止）、Routledge、WaterAid、Mind、IPSO"
-  :roster/source "https://en.wikipedia.org/wiki/Jason_Arday"
-  :evidence/tier :tertiary}
+ ;; ---------------------------------------------------------------------------
+ ;; Wikipedia 由来の人物（1 人 1 entity）
+ ;;
+ ;; 2026-08-29 の改訂で、:roster/politicians 等の散文 blob 5 本をここに展開した。
+ ;; blob のままでは query できず、「オントロジーになっていない」の最たる箇所だった。
+ ;; 出典は依然 Wikipedia の Jason Arday 項目の要約 1 本のみなので tier は :tertiary
+ ;; のまま据え置く —— 構造を直したことは、裏取りをしたことではない。
+ ;;
+ ;; ⚠ :evidence/caveat が付いた entity の役職は未検証。肩書きごと引用しないこと。
+ ;; ---------------------------------------------------------------------------
+
+ {:db/id -700 :source/dataset "arday-cofnas-affair" :person/name "Andy Burnham"
+  :person/role "政治家"
+  :person/category "politician"
+  :statement/text "彼の死はあらゆる意味での悲劇である。内省の時が必要だ。"
+  :evidence/caveat "Wikipedia の要約は Prime Minister としているが、これは私の知識と食い違う。役職は未検証。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -701 :source/dataset "arday-cofnas-affair" :person/name "Lucy Powell"
+  :person/role "教育相とされる" :person/category "politician"
+  :statement/text "深く衝撃を受け、悲しんでいる。遺族の悲嘆が尊重されるべきだ。"
+  :evidence/caveat "役職未検証" :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -702 :source/dataset "arday-cofnas-affair" :person/name "Sadiq Khan"
+  :person/role "ロンドン市長" :person/category "politician" :person/side "擁護側"
+  :statement/text "Arday は容認できない公的な追い立て、そして執拗な公開の辱めの被害者だった。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -703 :source/dataset "arday-cofnas-affair" :person/name "Kemi Badenoch"
+  :person/role "保守党党首" :person/category "politician"
+  :statement/text "Arday の死を、報道を口封じするために使うべきではない。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -704 :source/dataset "arday-cofnas-affair" :person/name "Jacob Rees-Mogg"
+  :person/role "元保守党政治家" :person/category "politician"
+  :statement/text "この件はケンブリッジが DEI の Kool-Aid を飲んだことを示している。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -705 :source/dataset "arday-cofnas-affair" :person/name "Chris Smith"
+  :person/role "ケンブリッジ大学総長" :person/category "politician"
+  :statement/text "空気はレイシズム的な狂騒になった。しかし盗用の申し立て自体は厳密な調査に値する。"
+  :statement/note "擁護と告発の双方に触れている数少ない発言。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -706 :source/dataset "arday-cofnas-affair" :person/name "Afzal Khan"
+  :person/role "労働党議員" :person/category "politician" :person/side "擁護側"
+  :statement/text "メディアの精査に関する調査を求める超党派書簡を IPSO 宛に主導した（53 名の議員・貴族が署名）。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -707 :source/dataset "arday-cofnas-affair" :person/name "Zack Polanski"
+  :person/category "politician" :person/side "擁護側" :statement/text "Good Law Project の公開書簡に署名。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -708 :source/dataset "arday-cofnas-affair" :person/name "John McDonnell"
+  :person/category "politician" :person/side "擁護側" :statement/text "Good Law Project の公開書簡に署名。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -709 :source/dataset "arday-cofnas-affair" :person/name "Clive Lewis"
+  :person/category "politician" :person/side "擁護側" :statement/text "Good Law Project の公開書簡に署名。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+
+ {:db/id -720 :source/dataset "arday-cofnas-affair" :person/name "Lanre Bakare"
+  :person/role "記者" :person/affiliation "The Guardian" :person/category "journalist"
+  :statement/date "2026-08-01"
+  :statement/text "経歴上の不一致を含む調査報道を執筆。のちに、Guardian が報じたのは正しかったと擁護した。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -721 :source/dataset "arday-cofnas-affair" :person/name "Gordon Rayner"
+  :person/role "記者" :person/affiliation "The Daily Telegraph" :person/category "journalist"
+  :statement/date "2026-07-24" :statement/text "盗用疑惑を最初に報じた新聞記事を執筆。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -722 :source/dataset "arday-cofnas-affair" :person/name "Emma Yeomans"
+  :person/role "記者" :person/affiliation "The Times" :person/category "journalist"
+  :statement/date "2026-08-06" :statement/text "研究の捏造を示す証拠を報じた。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -723 :source/dataset "arday-cofnas-affair" :person/name "Jason Okundaye"
+  :person/role "記者" :person/affiliation "The Guardian" :person/category "journalist"
+  :statement/text "ケンブリッジは彼を学者としてではなくマスコットとして扱った。この件は文化戦争と woke 批判に利用された。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -724 :source/dataset "arday-cofnas-affair" :person/name "Charles Moore"
+  :person/role "記者" :person/affiliation "The Daily Telegraph" :person/category "journalist"
+  :statement/text "当初に申し立てを退けたケンブリッジ自身に責任がある。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -725 :source/dataset "arday-cofnas-affair" :person/name "Graeme Wood"
+  :person/role "記者" :person/affiliation "The Atlantic" :person/category "journalist"
+  :statement/text "報道の精査は、語られた虚偽の突飛さに見合った比例的なものだった。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -726 :source/dataset "arday-cofnas-affair" :person/name "Tyler Austin Harper"
+  :person/role "記者" :person/affiliation "The Atlantic" :person/category "journalist"
+  :statement/text "人種をめぐる対立する説明のいずれにも、真実の要素が含まれている。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -727 :source/dataset "arday-cofnas-affair" :person/name "Nesrine Malik"
+  :person/role "記者・著述家" :person/category "journalist" :person/side "擁護側"
+  :statement/text "これが我々黒人全員に関わることだと感じずにいるのは難しい。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -728 :source/dataset "arday-cofnas-affair" :person/name "Afua Hirsch"
+  :person/role "記者・著述家" :person/category "journalist"
+  :statement/text "黒人社会学者たちは Arday の研究について私的に懸念を述べていた、と書いた。"
+  :statement/note "擁護側の陣営から出た、擁護一辺倒ではない証言。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -729 :source/dataset "arday-cofnas-affair" :person/name "Celia Walden"
+  :person/role "記者" :person/category "journalist"
+  :statement/text "BBC が Arday の番組出演を否定したと報じた。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -730 :source/dataset "arday-cofnas-affair" :person/name "Gareth Corfield"
+  :person/role "記者" :person/affiliation "The Daily Telegraph" :person/category "journalist"
+  :statement/text "Arday が Seven Up! に出演していたことは不可能である、と述べた。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -731 :source/dataset "arday-cofnas-affair" :person/name "Matt Walsh"
+  :person/role "分析者" :person/category "journalist"
+  :statement/text "2026-07-25 から 08-20 の間に Arday に関する新聞記事 242 本を確認した。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -732 :source/dataset "arday-cofnas-affair" :person/name "National Union of Journalists"
+  :person/category "organization"
+  :statement/text "黒人記者を含む記者への攻撃を非難した。同時に、報道の一部の側面には正当な懸念があるとも認めた。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+
+ {:db/id -740 :source/dataset "arday-cofnas-affair" :person/name "Robert Dingwall"
+  :person/role "社会学者・名誉教授" :person/category "academic"
+  :statement/text "公平な調査を推奨した。EDI をめぐる問題では偏って見えずに論評すること自体が難しいと述べた。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -741 :source/dataset "arday-cofnas-affair" :person/name "Hilary Cremin"
+  :person/role "教育学部長" :person/affiliation "University of Cambridge" :person/category "academic"
+  :statement/date "2023" :statement/text "採用時: あなたは自分の research において世界で最良の人物だ。"
+  :statement/note "2023-06 には、懸念を受けて Arday が論文を撤回することに同意したと回答しつつ、全面的な支持を表明していた（Retraction Watch）。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -742 :source/dataset "arday-cofnas-affair" :person/name "Bhaskar Vira"
+  :person/role "pro-vice-chancellor" :person/affiliation "University of Cambridge" :person/category "academic"
+  :statement/text "人種・不平等・教育に関する卓越した研究者である。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -743 :source/dataset "arday-cofnas-affair" :person/name "Roger Mosey"
+  :person/role "Selwyn College 前学寮長" :person/affiliation "University of Cambridge" :person/category "academic"
+  :statement/text "自閉症と識字をめぐる経歴ゆえに、説得力のある候補者だった。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -744 :source/dataset "arday-cofnas-affair" :person/name "Suchitra Sebastian"
+  :person/role "物理学者" :person/affiliation "University of Cambridge" :person/category "academic"
+  :statement/text "採用経緯への独立調査を求める約 100 名の署名者の 1 人。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -745 :source/dataset "arday-cofnas-affair" :person/name "Nicholas Guyatt"
+  :person/role "歴史学者" :person/affiliation "University of Cambridge" :person/category "academic"
+  :statement/text "調査を求める書簡を共同で組織した。Channel 4 に対し、この採用は例外的な事例だったと強調した。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -746 :source/dataset "arday-cofnas-affair" :person/name "Paul Gilroy"
+  :person/role "社会学者" :person/affiliation "University College London" :person/category "academic"
+  :statement/text "この騒動が人文系の予算削減を覆い隠すことを懸念する。無条件の擁護者たちも批判した。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -747 :source/dataset "arday-cofnas-affair" :person/name "Alan Lester"
+  :person/role "歴史地理学者" :person/affiliation "University of Sussex" :person/category "academic"
+  :statement/text "この騒動は極右のレイシストに、彼らが露骨に振るうであろう武器を与えた。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+
+ {:db/id -760 :source/dataset "arday-cofnas-affair" :person/name "Simon Woolley"
+  :person/role "Homerton College 学寮長、Arday の恩師" :person/category "civil-society" :person/side "擁護側"
+  :statement/text "メディアが申し立てをどう扱ったかについて調査を求めた。Good Law Project の書簡にも署名。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -761 :source/dataset "arday-cofnas-affair" :person/name "Patrick Vernon"
+  :person/role "政治活動家" :person/category "civil-society" :person/side "擁護側"
+  :statement/text "遺族のための募金を立ち上げ、20 万ポンド超を集めた。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -762 :source/dataset "arday-cofnas-affair" :person/name "Runnymede Trust"
+  :person/category "organization" :person/side "擁護側"
+  :statement/text "Arday への人種化された、超攻撃的なメディアの精査を批判した。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -763 :source/dataset "arday-cofnas-affair" :person/name "Stand Up to Racism"
+  :person/category "organization" :person/side "擁護側"
+  :statement/text "ロンドン中心部で追悼集会を組織した（数千人規模）。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -764 :source/dataset "arday-cofnas-affair" :person/name "Colin Salmon"
+  :person/role "俳優" :person/category "civil-society" :person/side "擁護側"
+  :statement/text "Good Law Project の公開書簡に署名。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -765 :source/dataset "arday-cofnas-affair" :person/name "Misan Harriman"
+  :person/role "写真家" :person/category "civil-society" :person/side "擁護側"
+  :statement/text "Good Law Project の公開書簡に署名。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -766 :source/dataset "arday-cofnas-affair" :person/name "Shola Mos-Shogbamimu"
+  :person/role "弁護士" :person/category "civil-society" :person/side "擁護側"
+  :statement/text "Good Law Project の公開書簡に署名。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -767 :source/dataset "arday-cofnas-affair" :person/name "Sonita Alleyne"
+  :person/role "Jesus College 学寮長" :person/affiliation "University of Cambridge" :person/category "civil-society"
+  :statement/text "Good Law Project の書簡に署名したが、のちに名前を撤回した。"
+  :statement/note "署名後に離脱した 3 人（Kebede / Alleyne / Uchegbu）は、擁護側の結束が時間とともに崩れたことを示す。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -768 :source/dataset "arday-cofnas-affair" :person/name "Ijeoma Uchegbu"
+  :person/role "薬学研究者" :person/category "civil-society"
+  :statement/text "Good Law Project の書簡に当初署名したが、のちに距離を置いた。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+
+ {:db/id -780 :source/dataset "arday-cofnas-affair" :person/name "Jesus College, Cambridge"
+  :person/category "institution" :institution/action "2026-08-05 以降、調査を開始した。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -781 :source/dataset "arday-cofnas-affair" :person/name "University of Glasgow"
+  :person/category "institution" :institution/action "2022 年の採用判断の見直しを発表。あわせて客員教授職の主張を否定した。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -782 :source/dataset "arday-cofnas-affair" :person/name "Durham University"
+  :person/category "institution" :institution/action "採用の見直しを発表。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -783 :source/dataset "arday-cofnas-affair" :person/name "Queen's University Belfast"
+  :person/category "institution" :institution/action "職員との 2021 年共著論文の調査を開始。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -784 :source/dataset "arday-cofnas-affair" :person/name "Birkbeck, University of London"
+  :person/category "institution" :institution/action "Arday が在籍した記録は無いと表明。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -785 :source/dataset "arday-cofnas-affair" :person/name "Nelson Mandela University"
+  :person/category "institution" :institution/action "客員教授ではなく臨時の非常勤（adjunct）であったと表明。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -786 :source/dataset "arday-cofnas-affair" :person/name "Palgrave Macmillan"
+  :person/category "institution" :institution/action "Arday の企画した書籍の刊行を取りやめたと表明。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -787 :source/dataset "arday-cofnas-affair" :person/name "Routledge"
+  :person/category "institution" :institution/action "Arday の書籍を 2030 年に刊行する意向を確認した。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -788 :source/dataset "arday-cofnas-affair" :person/name "WaterAid"
+  :person/category "institution" :institution/action "海外へボランティアを派遣してはいないと Telegraph に回答。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -789 :source/dataset "arday-cofnas-affair" :person/name "Mind"
+  :person/category "institution" :institution/action "Arday の研究に資金提供していないと否定。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -790 :source/dataset "arday-cofnas-affair" :person/name "IPSO"
+  :person/category "institution"
+  :institution/action "2026-08-18 までに 188,000 件の苦情を受けたと表明。人間による検証が必要だと強調した。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
+ {:db/id -791 :source/dataset "arday-cofnas-affair" :person/name "Mark Rowley"
+  :person/role "ロンドン警視総監" :person/category "institution"
+  :statement/text "記者 Jack Grove に関する苦情は、そもそも受理して進めるべきではなかった。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday" :evidence/tier :tertiary}
 ]
