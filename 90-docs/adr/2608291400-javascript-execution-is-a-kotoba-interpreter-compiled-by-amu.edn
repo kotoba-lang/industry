@@ -50,15 +50,34 @@ emcc が WASM にしたもの』であって、C コンパイラが JS を読ん
    `:effects #{}` を報告する。DOM も fetch も storage も、browser 側の既存
    capability 経路（`browser.compat.webapi`）が担い、インタプリタは値を返すだけ。
 
-## 実測した現在地（2026-08-29）
+## 実測した現在地（2026-08-29 セッション終了時）
 
 | | |
 |---|---|
-| 言語 | 式、`var`/`let`/`const`、代入、`if`/`else`、`while`、ブロック、`typeof`、コメント、string/number/boolean/undefined/null |
-| 未実装 | 関数、オブジェクト、配列、`for`、`try`、クロージャ、プロトタイプ |
-| 自前テスト | 48 件が `:jvm-kir`（参照 KIR）と restricted ESM で緑 |
-| 差分テスト | **実 V8 と 57 件中 56 件が一致**、残り 1 件は理由つきで記録（i64 除算） |
-| wasm32-browser | **16 KB、instantiate して 48/48 が中で通る**（下記の欠陥を直した後） |
+| 言語 | 式・変数（`var`/`let`/`const`）・代入・`if`/`else`・`while`・**`for`**・ブロック・**関数**（宣言/式/再帰/相互再帰/巻き上げ/**参照捕捉クロージャ**）・**配列**・**オブジェクト**・**メンバ参照と代入**・**メソッド呼び出し**・**`this`**・**組み込みメソッド 10 個**・**`try`/`catch`/`throw`**・`typeof`・コメント |
+| 未実装 | `finally`、`Error` オブジェクト、プロトタイプ、破壊的配列メソッド、`for...in`/`of`、セル解放 |
+| 自前テスト | **143/143**。restricted ESM 成果物と **wasm32 の中**の両方で |
+| 差分テスト | **実 V8 と 159 件中 156 件一致**（`test/differential.cljs`） |
+| wasm32-browser | **38 KB、instantiate して中で 143/143 が通る** |
+| ソース | `src/ecma262.kotoba` 約 1,700 行、capability ゼロ（`-M check` が `:effects #{}`） |
+
+**記録済み乖離は 3 件、全部に理由がある**:
+
+1. `7 / 2` —— JS の数値は IEEE-754 double、このエンジンは i64 なので切り捨て
+2. 内部エラー（ReferenceError / TypeError / SyntaxError）が catch で**メッセージ文字列**として届く
+   —— `Error` オブジェクトのコンストラクタが無いため。**投げた値は型を保つ**ので、割れるのは内部エラーだけ
+3. 素の呼び出しの `typeof this` —— 実エンジンは sloppy mode でグローバルオブジェクトを入れる。
+   このエンジンにグローバルオブジェクトは無い
+
+**捕捉は参照である**（当初は値渡しで、それが 4 件目の乖離だった）。環境を 1 本の文字列の中で
+2 領域に割った —— `<bindings-length>:<bindings><cells>`。**束縛**が名前→セル id、
+**セル**がセル id→値。関数値は束縛だけを捕らえ、セルは実行中のプログラムと共に呼び出しへ
+入り、呼び出しから出る。`var`/引数は新しいセルを確保（シャドウ）、代入は見つけたセルを
+書き換える。**環境は元から全体を流れていたので、この分割は配管を増やさなかった** ——
+7 つ目のレコードフィールドなら全構築箇所に触ることになった。
+
+⚠ **セルは解放されない。** id は確保時の領域長なので再利用できず、領域は増え続ける。
+64 KiB の文字列上限に長時間実行なら到達する（ページスクリプトなら届かない）。
 
 ## 測って初めて分かった天井（どれも文書に無かった）
 
@@ -183,21 +202,41 @@ CLAUDE.md と amu の `examples/todo-app.kotoba` が『Kotoba には整数→文
 3 つ（`string-concat` `string-length` `string-substring`）より遥かに広い。
 文法ファイルは `string=` と書いているが実際の名前は `string=?` である。
 
-## Exit gate
+## Exit gate（現在地）
 
-- ~~**G1**: amu の wasm32-browser が instantiate できるモジュールを出す。~~
-  **達成（2026-08-29、kotoba-wasm `a739f37`）。** 48/48 が wasm32 の中で通る。
-- **G2**: 関数・オブジェクト・配列が入り、差分 corpus が browser の実 smoke suite が
-  使う JS を覆う。
-- **G3**: 同じ JS を QuickJS とこのエンジンに通して一致することを、browser の
-  `browser.runtime` 経路で測る。
-- **G4**: G3 が緑になって初めて、production の既定エンジンを差し替える。QuickJS は
-  オラクルとして残す。
+- ~~**G1**: amu の wasm32-browser が instantiate できるモジュールを出す~~
+  **達成**（kotoba-wasm `a739f37` の ULEB 修正 + amu `5148199` の bulk vector host 実装）。
+- **G2**: 関数・オブジェクト・配列が入り、差分 corpus が browser の実 smoke suite が使う JS を覆う。
+  **前半は達成。後半は未達** —— corpus 159 件は手で書いた JS であって、`browser` の
+  `test-cljs/browser/compat/*` が実際に流す JS を覆ってはいない。
+- **G3**: 同じ JS を QuickJS とこのエンジンに通し、`browser.runtime` 経路で一致を測る。**未着手。**
+- **G4**: G3 が緑になって初めて production の既定エンジンを差し替える。QuickJS はオラクルとして残す。**未着手。**
+
+## 次の一手（resume point）
+
+**G3 が次。** `browser.runtime` は `:runtime/eval` / `:runtime/call` / `:runtime/job-drain`
+という記述子を既に定義しており、`browser.compat.quickjs` はその上の薄い Web API アダプタ
+である（browser の README がそう書いている）。このエンジンを 2 つ目の記述子として登録し、
+同じ page script を両方に流して突き合わせる。
+
+最初にやること: エンジンを `--target wasm32-browser --fuel 2000000000` で落とし、
+`orgs/kotoba-lang/browser/test-cljs/browser/compat/` の smoke test が実際に流している
+JS を集めて `test/differential.cljs` の corpus に足し、割れる場所を数える。
+
+⚠ **実測済みの罠 2 つ（どちらもこのセッションで踏んだ）**
+
+- **`bin/kotoba` の shebang は npx 経由で nbb 1.4.208 を拾い、このマシンでは出力なしで
+  exit 194 する。** 直接入っている 1.5.212 は正常なので `nbb bin/kotoba …` で呼ぶ
+  （worktree なら `node_modules/nbb` を `/opt/homebrew/lib/node_modules/nbb` へ symlink）。
+  amu PR #631 が nbb を 1.5.212 へ上げようとしている。
+- **`west update` は west project を detached HEAD で checkout する。** 子リポで commit
+  すると branch に乗らず、main への送出が「Everything up-to-date」と言いながら何も
+  送らない。commit 後に `git branch --show-current` が空でないことを確かめる。
 
 ## 参照
 
-- 実装: `kotoba-lang/org-ecma-international-262`（`src/ecma262.kotoba` 737 行、
-  `test/differential.cljs`）
+- 実装: `kotoba-lang/org-ecma-international-262` `14a79ed`（`src/ecma262.kotoba` 約 1,700 行、
+  `test/differential.cljs` 159 ケース）
 - 修正: `kotoba-lang/dom-gpu` `475e2cb`、`kotoba-lang/kotoba-wasm` `a739f37`（ULEB call operand）
 - 関連 ADR: 2607198300（実行成果物の非依存）、2607072000（Rust を書かない）、
   2608650000（恒久の安全 vs backend の未達）、2607279200（Kotoba 中心の移行）、
