@@ -49,7 +49,7 @@
 > kotobase-protocols-worker へ、Cypher は 2026-08-05 に net-kotobase/cypher へ deploy
 > された。実測 2026-08-29: sparql / cypher / gremlin / graphql.kotobase.net はいずれも
 > 401 www-authenticate: Bearer を返す（＝稼働していて認証を要求している）。
-> datomic.kotobase.net は 24 パスを無認証で公開し、/api/q は 401。
+> datomic.kotobase.net は 23 パスを無認証で公開し、/api/q は 401。
 >
 > **id は identity なので変えない**（ADR-2607289500）。下の「実測1」「実測2」は
 > 2026-08-03 時点の測定としてそのまま残す —— 当時は正しかった。
