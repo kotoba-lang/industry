@@ -12,6 +12,27 @@
   トークンは 1 つも無効になっていない。**
   取得: `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get MURAKUMO_CLOUD_SITE_TOKEN_SECRET_2`
 
+- ⚠ **2026-08-29 実測: この item は live vault に存在しない。**
+  `KAGI_HOME=$HOME/.kagi` を正しく付けた上で
+  **`no such item: MURAKUMO_CLOUD_SITE_TOKEN_SECRET_2`**（exit 1、stdout 0 byte）。
+  上の記述は復旧時の参照として残す。索引冒頭の注意 2「ここに書いてあることは
+  実在の証明ではない」がまた当たった形で、このファイルだけで 4 節目になる。
+  - ⚠ **同じ日に 1 度、`KAGI_HOME` を付け忘れて引き、同じ `no such item` を
+    受け取っている。** `bin/kagi` は自身の repo root へ `cd` するので、付け忘れは
+    **旧 vault**（`orgs/kotoba-lang/kagi/.kagi/vault.edn`）を読む —— つまり
+    **「鍵が無い」と「別の金庫を見た」が同じ 1 行で返る。** 索引冒頭の注意 1 は
+    このためにある。不在を結論する前に、必ず付け直して 2 回測ること。
+  - **影響は発行経路だけ。** `scripts/deploy-model-hosting-locked.mjs` が
+    deployment-lease token を `clojure -M:token issue` で鋳造できず、通常の
+    `npm run deploy` が `could not mint a deployment-lease token` で落ちる。
+    2026-08-29 の本番 deploy は `npm run deploy:bootstrap-model-hosting`
+    （lease を取らない。main 同期ガード `assertDeployCurrentMain` は upload 前後
+    とも生きている）で通した。**検証は無傷** —— primary `MURAKUMO_TOKEN_SECRET`
+    は Worker 側で健在で、発行済み mk1 は 1 つも無効になっていない。
+  - 復旧はオーナー操作（現行値を documented 名で kagi に入れる）。
+    **vault を総当たりで探さないこと**（安全床⑦。`kagi ls` の全件取得は
+    無関係な credential の metadata を露出させる）。
+
 - **なぜ item 名に worker 名を入れたか。** このファイル冒頭の警告どおり
   `MURAKUMO_TOKEN_SECRET` は **3 つの Worker が別々の値で持っている**
   （`murakumo-cloud` / `local-murakumo` / `murakumo-generation-proxy`）。

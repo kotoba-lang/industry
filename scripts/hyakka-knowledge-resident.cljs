@@ -225,6 +225,24 @@
 ;; Why the Kotobase datom plane was not written this tick, if it was not.
 (def kotobase-skip (atom nil))
 
+(def kotobase-failure
+  "The error from a datom-plane publish that FAILED, as opposed to one that was
+  skipped for a missing credential.
+
+  These are the same event for the public catalogue and were not treated the
+  same. `publish-kotobase!` returns a map when it cannot run and THROWS when it
+  runs and fails, and only the first case let the tick continue — so a missing
+  credential was survivable while a transport error, a compile abort or a
+  rejected batch took the public deploy down with it.
+
+  Measured 2026-08-29: the publish step died after 807 s when shadow-cljs
+  aborted par-compile under load ~400. The books merged to main hours earlier
+  were in the committed catalogue and never reached the Worker, because the
+  step that deploys it is three lines below the one that threw. ADR-2607311100
+  already says these are different sinks with different audiences; that has to
+  hold for a failure and not only for an absence."
+  (atom nil))
+
 (defn upload-raw!
   "Put a receipt's archived bytes in B2. Returns the entries it could not.
 
@@ -515,6 +533,63 @@
       (println (str/trim version-line)))
     (println "live catalogue verified" actual)))
 
+(defn publish-then-deploy!
+  "Publish to the datom plane, then deploy the public catalogue EITHER WAY.
+
+  The two are different sinks with different audiences (ADR-2607311100): the
+  ref is where cross-corpus Datalog joins live, the catalogue is what
+  wiki.kotobase.net serves. `publish-kotobase!` already refuses to take the
+  tick down when a credential is missing — it returns a map. But when it RUNS
+  and fails it throws, and a throw three lines above the deploy skipped the
+  deploy. Absence was survivable; failure was not, for no reason anyone chose.
+
+  Measured 2026-08-29: the publish died after 807 s (shadow-cljs aborted
+  par-compile at load ~400). A connector merged to main hours earlier was in
+  the committed catalogue and never reached the Worker.
+
+  The pending ledgers stay pending on either path, so the next tick retries
+  exactly as it does after a skip. The tick still ends non-zero — the failure
+  is reported, not swallowed.
+
+  Takes the two steps as thunks so the ordering can be exercised without
+  publishing or deploying anything (`HYAKKA_DEPLOY_ISOLATION_SELFTEST=1`)."
+  [publish! deploy! deploy?]
+  (let [outcome (try {:ok (publish!)} (catch :default e {:failed e}))]
+    (reset! kotobase-skip (:ok outcome))
+    (reset! kotobase-failure (:failed outcome))
+    (when deploy? (deploy!))
+    outcome))
+
+(defn deploy-isolation-selftest!
+  "Show that a FAILING publish still deploys, and that a succeeding one does
+  too — and that `deploy? false` deploys neither. Both directions, because a
+  version that always deployed would pass the first check alone."
+  []
+  (let [deployed (atom 0)
+        fail! (fn [] (throw (js/Error. "simulated publish failure")))
+        ok! (fn [] {:skipped 0})
+        deploy! (fn [] (swap! deployed inc))
+        check (fn [label expected actual]
+                (if (= expected actual)
+                  (println "  ok  " label)
+                  (do (println "  FAIL" label
+                               (str "expected " (pr-str expected) " got " (pr-str actual)))
+                      (set! (.-exitCode js/process) 1))))]
+    (reset! deployed 0)
+    (let [r (publish-then-deploy! fail! deploy! true)]
+      (check "a failing publish still deploys" 1 @deployed)
+      (check "  and the failure is recorded" true (some? (:failed r)))
+      (check "  and is visible in the atom" true (some? @kotobase-failure)))
+    (reset! deployed 0) (reset! kotobase-failure nil) (reset! kotobase-skip nil)
+    (let [r (publish-then-deploy! ok! deploy! true)]
+      (check "a succeeding publish deploys" 1 @deployed)
+      (check "  and records no failure" nil (:failed r)))
+    (reset! deployed 0) (reset! kotobase-failure nil) (reset! kotobase-skip nil)
+    (publish-then-deploy! fail! deploy! false)
+    (check "deploy? false deploys nothing, even after a failure" 0 @deployed)
+    (reset! kotobase-failure nil) (reset! kotobase-skip nil)
+    (println "deploy-isolation selftest done")))
+
 (defn main []
   (acquire-lock!)
   (try
@@ -545,14 +620,15 @@
               live (live-catalogue-id)
               deploy? (boolean (deploy-required? pending expected live))]
           (println "Kotobase pending ledgers=" (count pending))
-          (reset! kotobase-skip
-                  (timed! (str "publish-kotobase (" (count pending) " ledgers)")
-                          #(publish-kotobase! env pending)))
           (when (and deploy? (empty? pending))
             (println "public catalogue drift detected; redeploying"
                      "expected=" expected "live=" (or live "unavailable")))
-          (when deploy? (timed! "deploy-public (test + build + wrangler)"
-                                #(deploy-public! env)))
+          (publish-then-deploy!
+           #(timed! (str "publish-kotobase (" (count pending) " ledgers)")
+                    (fn [] (publish-kotobase! env pending)))
+           #(timed! "deploy-public (test + build + wrangler)"
+                    (fn [] (deploy-public! env)))
+           deploy?)
           (println "hyakka resident tick complete; receipts=" (count receipts)
                    "projected=" (count pending)
                    "deployed=" deploy?
@@ -562,6 +638,12 @@
           ;; neither a failure nor a clean run, and printing the count is not
           ;; enough on its own: launchd records the exit status, and a 0 here
           ;; would file "one archive is gone forever" next to "nothing to do".
+          (when-let [e @kotobase-failure]
+            (binding [*out* *err*]
+              (println "FAILED Kotobase publish:" (or (.-message e) (str e)))
+              (println "  " (count pending) "ledger(s) stay pending and the next tick"
+                       "retries them. The public catalogue above is unaffected —"
+                       "it is a different sink.")))
           (when-let [k @kotobase-skip]
             (binding [*out* *err*]
               (println "SKIPPED Kotobase publish:" (:why k)
@@ -577,7 +659,8 @@
               (binding [*out* *err*]
                 (println " " sha256 (str "(" bytes " bytes)") receipt)))
             (set! (.-exitCode js/process) 1))
-          (when @kotobase-skip (set! (.-exitCode js/process) 1)))))
+          (when (or @kotobase-skip @kotobase-failure)
+            (set! (.-exitCode js/process) 1)))))
     (finally
       ;; Before the lock, and outside the success path: a tick that died in
       ;; step 4 of 7 is exactly the tick whose step timings someone needs.
@@ -594,6 +677,11 @@
   (release-lock!)
   (println "released"))
 
+(if (= "1" (aget js/process.env "HYAKKA_DEPLOY_ISOLATION_SELFTEST"))
+  (try (deploy-isolation-selftest!)
+       (catch :default e
+         (binding [*out* *err*] (println "FAIL" (or (.-message e) (str e))))
+         (set! (.-exitCode js/process) 1)))
 (if (= "1" (aget js/process.env "HYAKKA_LOCK_SELFTEST"))
   (try (lock-selftest!)
        (catch :default e
@@ -605,4 +693,4 @@
     (main)
     (catch :default e
       (binding [*out* *err*] (println "FAIL" (or (.-message e) (str e))))
-      (set! (.-exitCode js/process) 1)))))
+      (set! (.-exitCode js/process) 1))))))
