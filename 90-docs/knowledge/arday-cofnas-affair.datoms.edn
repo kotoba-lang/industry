@@ -1,0 +1,346 @@
+;; Arday / Cofnas 事件 — 関連人物と公開発言の収集カタログ
+;;
+;; 起点: https://news.yahoo.co.jp/articles/4870b312b8752db72b2a920511792405d05f22e2
+;;       (BBC News 配信 / 2026-08-21 13:24 /
+;;        見出し「英ケンブリッジ大教授の盗用疑惑を告発した学者、ベルギーの大学で停職に」)
+;;
+;; multi-entity catalog。manifest/edn-query.cljs の datom 面に載る
+;; (:source/dataset "arday-cofnas-affair")。
+;;
+;; ⚠ 検証水準は entity ごとに :evidence/tier で申告する。
+;;    :primary   — 一次資料 or 発言者自身の投稿を引いた報道を直接取得した
+;;    :secondary — 報道 1 本を直接取得した
+;;    :tertiary  — Wikipedia 経由の要約のみ。役職・肩書きの誤りを含みうる
+;;    tertiary を「確認済み」として引用しないこと。
+
+[
+ ;; ---------------------------------------------------------------- coverage
+ {:db/id -1
+  :source/dataset "arday-cofnas-affair"
+  :coverage/kind "provenance"
+  :coverage/collected-at "2026-08-29"
+  :coverage/seed-url "https://news.yahoo.co.jp/articles/4870b312b8752db72b2a920511792405d05f22e2"
+  :coverage/seed-outlet "BBC News (Yahoo! ニュース配信)"
+  :coverage/seed-published "2026-08-21"
+  :coverage/method "WebSearch + WebFetch。取得できた記事本文のみを根拠にした。SNS の原投稿には直接アクセスしていない — X の投稿はすべて報道が引用した形で採取している。"
+  :coverage/known-gaps "(1) Cofnas 本人の Substack 原文・X 原投稿は未取得（報道経由の孫引き）。(2) 両陣営の公開書簡の署名者リスト全文は未取得（ghent-letters.pages.dev は集計ページのみで氏名を出していない）。(3) Chronicle of Higher Education / Daily Nous / NBC News は 403 で取得できず。(4) 英政治家の肩書きは Wikipedia 由来で未検証（下記 :evidence/tier :tertiary）。"
+  :coverage/caution "人が死亡している事案である。断定を避け、誰が何を言ったかの記録に留める。因果（誰のせいで死んだか）はこのカタログの主張しない範囲。"}
+
+ ;; ---------------------------------------------------------------- 中心人物
+ {:db/id -10
+  :source/dataset "arday-cofnas-affair"
+  :person/name "Jason Arday"
+  :person/name-ja "ジェイソン・アーデイ"
+  :person/role "社会学者（教育社会学）。ケンブリッジ大学の史上最年少の黒人教授として2023年に着任、2026-08-05 辞任。2026-08-14 死亡、41歳。"
+  :person/affiliation "University of Cambridge（元）/ Jesus College / 以前 Glasgow, Durham"
+  :person/side "被告発側"
+  :evidence/tier :secondary}
+
+ {:db/id -11
+  :source/dataset "arday-cofnas-affair"
+  :person/name "Nathan Cofnas"
+  :person/name-ja "ネイサン・コフナス"
+  :person/role "哲学者。自称 race realist。2026-07-21 に Substack で Arday の博士論文の盗用を告発。2026-08-19 ゲント大学が予備懲戒調査として停職処分。"
+  :person/affiliation "Ghent University, Department of Philosophy and Moral Sciences（博士研究員）"
+  :person/side "告発側"
+  :evidence/tier :primary}
+
+ ;; ------------------------------------------------------- 発言・投稿（告発側）
+ {:db/id -100
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Nathan Cofnas"
+  :statement/venue "Substack"
+  :statement/date "2026-07-21"
+  :statement/text "Arday の2015年博士論文を Copyleaks にかけたところ、Paula Zwozdiak-Myers の2009年博士論文と広範に一致した。多くの段落が最小限の編集で持ち込まれており、元原稿の校正ミスまでそのまま残っている箇所がある（Many passages are lifted with minimal editing, sometimes retaining copy-editing mistakes from the original source）。"
+  :statement/source "https://retractionwatch.com/2026/07/27/cambridge-jason-arday-plagiarism-allegations-times-higher-education-exclusive/"
+  :statement/note "この投稿が事件の起点。Cofnas はケンブリッジ内部の情報提供者から連絡を受けたと書いている。調査は独立に行ったとしている。"
+  :evidence/tier :secondary}
+
+ {:db/id -101
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Nathan Cofnas"
+  :statement/venue "X (旧 Twitter)"
+  :statement/date "2026-08-19"
+  :statement/text "ゲント大学に停職処分を受けた。ほぼ確実に解雇されるだろう。決定を下したのは学長の Petra De Sutter で、緑の党の元党首である（They will almost certainly fire me. The decision was made by rector Petra De Sutter, a former leader of the Green Party.）。"
+  :statement/source "https://www.timeshighereducation.com/news/university-suspends-academic-who-accused-jason-arday-plagiarism"
+  :statement/corroboration "Inside Higher Ed / Times Higher Education / Al Jazeera の3本が同一文言を引用している。"
+  :evidence/tier :primary}
+
+ {:db/id -102
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Nathan Cofnas"
+  :statement/venue "インタビュー (kursiv.media)"
+  :statement/date "2026-08-25"
+  :statement/text "自分は、悲劇的な結末につながる一連の出来事を引き起こす行為をしたのは事実だ（I did take an action which set off a series of events that led to a tragic outcome）。責任がないと言えば、起きたことの重大さを分かっていないように聞こえる。／ Jason Arday 個人にはまったく関心がなかった。悪意もなかった。彼には教授のままで最高の人生を送っていてほしかった（I had zero interest about Jason Arday. I had no ill will for him; I wanted him to stay a professor and live his best life）。Arday は（DEI 批判の中では）付随的な存在にすぎない。／ メールを開くたびに殺害予告が大量に届く（I am flooded with death threats, just countless, every time I open my email）。／ そういう人物を批判することは許されていなければならない。たとえ相手が悪く受け取り、傷ついたとしても。"
+  :statement/source "https://uz.kursiv.media/en/2026-08-25/i-wanted-him-to-live-his-best-life-defiant-nathan-cofnas-on-jason-ardays-death/"
+  :evidence/tier :secondary}
+
+ {:db/id -103
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "David Sanders"
+  :statement/role "生化学者"
+  :statement/affiliation "Purdue University"
+  :statement/venue "Times Higher Education の63ページ調査資料へのレビュー"
+  :statement/date "2025-09 頃"
+  :statement/text "広範な盗用があることに疑いの余地はない（There is no question that there is extensive plagiarism）。"
+  :statement/source "https://retractionwatch.com/2026/07/27/cambridge-jason-arday-plagiarism-allegations-times-higher-education-exclusive/"
+  :evidence/tier :secondary}
+
+ {:db/id -104
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "David (Dave) Harris"
+  :statement/role "名誉教授"
+  :statement/affiliation "Plymouth Marjon University"
+  :statement/venue "Arday への直接メール、のち Telegraph への発言"
+  :statement/date "2023-05 / 2026-07"
+  :statement/text "2018年の論文と Anjum Memon（疫学者）の著作との間に不可解な一致がある、と本人に指摘。Arday はこれをいじめ・ハラスメントだとして退け、警察に通報した（Devon and Cornwall 警察は立件せず）。のち Telegraph に対し「重大な盗用（serious plagiarism）」と述べた。"
+  :statement/source "https://retractionwatch.com/2026/07/27/cambridge-jason-arday-plagiarism-allegations-times-higher-education-exclusive/"
+  :evidence/tier :secondary}
+
+ {:db/id -105
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Martyn Hammersley"
+  :statement/role "社会学者・名誉教授"
+  :statement/affiliation "The Open University"
+  :statement/venue "ケンブリッジ大学執行部への書簡"
+  :statement/date "2023-05"
+  :statement/text "単一の出典からの実質的な盗用がある（substantial plagiarism from one source）。"
+  :statement/source "https://retractionwatch.com/2026/07/27/cambridge-jason-arday-plagiarism-allegations-times-higher-education-exclusive/"
+  :evidence/tier :secondary}
+
+ {:db/id -106
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Jack Grove"
+  :statement/role "記者"
+  :statement/affiliation "Times Higher Education"
+  :statement/venue "Retraction Watch への説明"
+  :statement/date "2026-07"
+  :statement/text "2025年9月に記事を用意し Arday に反論の機会を与えたが、Carter-Ruck からの法的警告書を受けて掲載を見送った。訴訟になれば媒体が何か月も拘束されえた。"
+  :statement/source "https://retractionwatch.com/2026/07/27/cambridge-jason-arday-plagiarism-allegations-times-higher-education-exclusive/"
+  :evidence/tier :secondary}
+
+ {:db/id -107
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Ian Pace"
+  :statement/role "音楽学者"
+  :statement/venue "Arday の単著への書評"
+  :statement/text "知的に薄く、方法論的に擁護不能で、本文としても問題がある（intellectually threadbare, methodologically indefensible and textually compromised）。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday"
+  :evidence/tier :tertiary}
+
+ ;; ------------------------------------------------------- 発言（擁護・批判側）
+ {:db/id -200
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Jolyon Maugham KC"
+  :statement/role "弁護士、Good Law Project 創設者"
+  :statement/venue "Good Law Project の公開書簡、および自身のニュースレター whatthelawdoes"
+  :statement/date "2026-07-26 以降"
+  :statement/text "公開書簡: 我々署名者は、Jason Arday 教授の学術的誠実性への持続的で悪意ある攻撃に憤慨している。盗用の申し立ては完全に虚偽であり、2つの大学に付託されたが、調査はいかなる不正の証拠も見出さなかった。関連する学術誌も申し立ての根拠を認めなかった。／ 自身の弁明: Good Law Project は Arday 本人ではなく、あるシニアな黒人研究者から書簡掲載を依頼された（2026-07-25）。掲載を正当と考えたのは、ケンブリッジ大学自身が Arday は調査で潔白が証明されたと強い声明を出していたからである。我々はこれ以上の広い意味で彼を代理してはいない。盗用の申し立てが根拠あるものだと今は考えるか、との問いには — 一言で言えば、いいえ。"
+  :statement/source "https://goodlawproject.org/the-guardian-and-professor-jason-arday/ ; https://www.whatthelawdoes.com/p/good-law-project-and-dr-jason-arday"
+  :statement/note "書簡は10,000筆超、別途の公的調査要求の請願は90,000筆超と報じられている（数値は Wikipedia 経由、未検証）。ケンブリッジの黒人学生・研究者の署名者名は報復を恐れて非公開とされた。"
+  :evidence/tier :secondary}
+
+ {:db/id -201
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Sneha Krishnan"
+  :statement/role "研究者"
+  :statement/affiliation "University of Oxford"
+  :statement/venue "公開投稿（Al Jazeera が引用）"
+  :statement/date "2026-08"
+  :statement/text "Arday へのハラスメントと死は個別の逸脱ではない。反黒人レイシズムに浸された制度による制度的殺人というべき事例である（Arday's harassment and death are not idiosyncrasies: they are very much a case of institutional murder by a system infused with anti-Black racism）。"
+  :statement/source "https://www.aljazeera.com/news/2026/8/20/university-suspends-us-academic-leading-jason-arday-plagiarism-accusations"
+  :evidence/tier :secondary}
+
+ {:db/id -202
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Kehinde Andrews"
+  :statement/role "ブラック・スタディーズ研究者"
+  :statement/venue "報道へのコメント / Good Law Project 書簡署名"
+  :statement/text "Arday は誤りを犯したが盗用の罪を犯したわけではない。これは右派による組織的で意図的な中傷キャンペーンである（a dedicated, co-ordinated smear campaign from the right）。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday"
+  :evidence/tier :tertiary}
+
+ {:db/id -203
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Priyamvada Gopal"
+  :statement/role "教授"
+  :statement/affiliation "University of Cambridge"
+  :statement/venue "Guardian / Channel 4"
+  :statement/text "ケンブリッジにとって Arday の採用は、業績よりもメディア上の可視性が魅力だった。大学はグロテスクなレイシズムを解き放った責任を負う。彼の採用は例外的な事例（an anomaly）だった。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday"
+  :evidence/tier :tertiary}
+
+ {:db/id -204
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Kathleen Stock"
+  :statement/role "哲学者"
+  :statement/venue "BBC News"
+  :statement/text "ケンブリッジの採用は、良い報道を切実に求めていた大学の動機によるものだ。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday"
+  :evidence/tier :tertiary}
+
+ {:db/id -205
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Simon Baron-Cohen"
+  :statement/role "教授、Arday の友人"
+  :statement/affiliation "University of Cambridge"
+  :statement/text "Arday の精神状態が悪化していくのを見ていた。彼はもう続けられないと感じていた。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday"
+  :evidence/tier :tertiary}
+
+ {:db/id -206
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Arday の遺族"
+  :statement/venue "死去後の家族声明"
+  :statement/date "2026-08"
+  :statement/text "Jason は3年にわたり持続的な虐待のキャンペーンにさらされた。彼は穏やかな人物で、常に人の最善の面を見ようとしていた。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday"
+  :evidence/tier :tertiary}
+
+ {:db/id -207
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Jo Grady"
+  :statement/role "書記長"
+  :statement/affiliation "University and College Union (UCU)"
+  :statement/text "Arday が受けたハラスメントの水準とレイシズムを非難する。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday"
+  :evidence/tier :tertiary}
+
+ {:db/id -208
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Daniel Kebede"
+  :statement/role "教職員組合指導者"
+  :statement/text "当初 Good Law Project の書簡に署名したが、のち距離を置いた。公開かつ残酷な引きずり下ろしがレイシズムの連鎖を解き放ったと批判している。"
+  :statement/source "https://en.wikipedia.org/wiki/Jason_Arday"
+  :statement/note "Sonita Alleyne（Jesus College 学寮長）と Ijeoma Uchegbu も署名後に名前を撤回した、と Wikipedia は記す。未検証。"
+  :evidence/tier :tertiary}
+
+ ;; --------------------------------------------------------------- 大学・機関
+ {:db/id -300
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Ghent University"
+  :statement/role "学長 Petra De Sutter / 副学長 Herwig Reynaert 名の声明"
+  :statement/date "2026-08-19"
+  :statement/text "予備懲戒調査を開始した。この手続きの一環として、正式な懲戒機関に付託するに足る根拠があるかを評価している。予備調査が続く間、予防措置として当該職員を停職とした。／ 我々は学問の自由と開かれた学術的議論を、たとえ見解が論争的であっても重視する。しかしその自由は無制限ではない（However, that freedom is not unlimited）。／ そのため、本件に関してゲント大学の博士研究員が最近行った複数の公の発言を非常に深刻に受け止めている。／ 当該人物は手続き上正しく適正に実施された選考を経て、最も適格な候補者として選ばれたものである。"
+  :statement/source "https://www.insidehighered.com/news/faculty/2026/08/21/university-suspends-academic-who-accused-arday-plagiarism"
+  :statement/note "起点となった BBC / Yahoo 記事が引用しているのはこの声明。停職理由として挙げられているのは盗用告発そのものではなく「最近の公の発言」であり、Al Jazeera は差別を理由とする調査だと報じている。"
+  :evidence/tier :primary}
+
+ {:db/id -301
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "University of Cambridge"
+  :statement/venue "広報声明（時系列で立場が変化）"
+  :statement/text "当初: Arday は卑劣なキャンペーンの被害者であり、調査により盗用の申し立ては晴らされている。／ 2026-08-05: 学歴と名誉職に関する新情報を受けて調査を開始すると発表（同日 Arday 辞任）。／ 死去後: 大学は広範なメンタルヘルス支援と保安措置を提供していたと弁明。"
+  :statement/source "https://retractionwatch.com/2026/07/27/cambridge-jason-arday-plagiarism-allegations-times-higher-education-exclusive/ ; https://en.wikipedia.org/wiki/Jason_Arday"
+  :evidence/tier :secondary}
+
+ {:db/id -302
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Liverpool John Moores University"
+  :statement/venue "不正調査パネルの結論"
+  :statement/date "2025"
+  :statement/text "博士論文における盗用は意図的な不正行為ではなく、誠実かつ合理的な誤り（honest and reasonable error）によるものと結論した。"
+  :statement/source "https://www.whatthelawdoes.com/p/good-law-project-and-dr-jason-arday"
+  :statement/note "擁護側が「調査で潔白」と述べる根拠がこれ。告発側はこの結論自体を争っている。"
+  :evidence/tier :secondary}
+
+ ;; --------------------------------------------------------- 対抗する公開書簡
+ {:db/id -400
+  :source/dataset "arday-cofnas-affair"
+  :letter/title "Letter opposing punishment of Nathan Cofnas"
+  :letter/side "Cofnas 擁護"
+  :letter/key-text "ゲント大学が Cofnas 博士を学問の自由の行使ゆえに罰することのないよう求める。／ 学問の自由の本質的な構成要素は、相手の地位や身分にかかわらず他の研究者の業績を精査できることであり、それには盗用や捏造といった学術不正の証拠を提示する自由が含まれる。／ 今回の懲戒手続きは、少なくとも部分的には学術不正を公表したことへの報復（retaliation）に見える。"
+  :letter/signatories "2026-08-24 時点で全世界から700筆超（当初報道は米国大学の教授200人超）。Duke, MIT, Northeastern, Texas A&M, UCLA など。ビジネススクール教員も23名含む（退職者を含む）。"
+  :letter/host "johnarmstrongmaths.com"
+  :letter/source "https://www.insidehighered.com/news/quick-takes/2026/08/25/hundreds-academics-support-nathan-cofnas-open-letter ; https://poetsandquants.com/2026/08/25/nearly-2-dozen-b-school-profs-are-defending-a-suspended-race-realist-researcher/"
+  :evidence/tier :secondary}
+
+ {:db/id -401
+  :source/dataset "arday-cofnas-affair"
+  :letter/title "Open letter supporting Ghent University's investigation"
+  :letter/side "ゲント大学支持"
+  :letter/key-text "ゲント大学が調査を開始した決定を支持する。この調査を内部告発への処罰として枠づける言説に抗する。／ 大学がレイシズム的な疑似科学に信用を与えようとする試みに利用されないよう求める。"
+  :letter/signatories "署名者数・氏名は集計ページに掲出されていない（未取得）。"
+  :letter/source "https://ghent-letters.pages.dev/"
+  :statement/note "ghent-letters.pages.dev は両書簡の署名者を地理・所属・分野・職階で比較集計した第三者ページ。最終更新 2026-08-26。CSV 配布あり。"
+  :evidence/tier :secondary}
+
+ ;; ------------------------------------------------------------------ 時系列
+ {:db/id -500 :source/dataset "arday-cofnas-affair" :event/date "2023-05"
+  :event/what "David Harris が Arday に類似を指摘。Arday はハラスメントとして警察に通報（不立件）。Martyn Hammersley がケンブリッジ執行部に書簡。"
+  :evidence/tier :secondary}
+ {:db/id -501 :source/dataset "arday-cofnas-affair" :event/date "2025-09"
+  :event/what "Times Higher Education（Jack Grove 記者）が63ページの調査資料をもとに記事を準備。Carter-Ruck の法的警告で掲載中止。"
+  :evidence/tier :secondary}
+ {:db/id -502 :source/dataset "arday-cofnas-affair" :event/date "2025"
+  :event/what "Liverpool John Moores University のパネルが「誠実かつ合理的な誤り」と結論。"
+  :evidence/tier :secondary}
+ {:db/id -503 :source/dataset "arday-cofnas-affair" :event/date "2026-07-21"
+  :event/what "Nathan Cofnas が Substack で告発。Copyleaks による照合結果を提示。"
+  :evidence/tier :secondary}
+ {:db/id -504 :source/dataset "arday-cofnas-affair" :event/date "2026-07-24"
+  :event/what "Daily Telegraph（Gordon Rayner）が盗用疑惑を報道。"
+  :evidence/tier :tertiary}
+ {:db/id -505 :source/dataset "arday-cofnas-affair" :event/date "2026-07-26"
+  :event/what "Good Law Project が Arday 擁護の公開書簡を掲載。"
+  :evidence/tier :secondary}
+ {:db/id -506 :source/dataset "arday-cofnas-affair" :event/date "2026-07-27"
+  :event/what "Retraction Watch が THE の記事差し止め経緯を独自報道。"
+  :evidence/tier :primary}
+ {:db/id -507 :source/dataset "arday-cofnas-affair" :event/date "2026-08-01"
+  :event/what "Guardian（Lanre Bakare）が経歴上の不一致を含む調査報道を掲載。"
+  :evidence/tier :tertiary}
+ {:db/id -508 :source/dataset "arday-cofnas-affair" :event/date "2026-08-05"
+  :event/what "ケンブリッジ大学が調査開始を発表。同日 Arday が辞任（辞任表明は Good Law Project が公開）。"
+  :evidence/tier :secondary}
+ {:db/id -509 :source/dataset "arday-cofnas-affair" :event/date "2026-08-14"
+  :event/what "Arday がロンドン南西部で死亡しているのが発見される。41歳。死因は公表されていない。"
+  :evidence/tier :secondary}
+ {:db/id -510 :source/dataset "arday-cofnas-affair" :event/date "2026-08-19"
+  :event/what "ゲント大学が Cofnas を予防的に停職。Cofnas が X で公表。"
+  :evidence/tier :primary}
+ {:db/id -511 :source/dataset "arday-cofnas-affair" :event/date "2026-08-21"
+  :event/what "BBC News が停職を報道（本カタログの起点となった Yahoo 配信記事）。The Conversation が Roger J. Kreuz（University of Memphis）の論考を掲載。"
+  :evidence/tier :primary}
+ {:db/id -512 :source/dataset "arday-cofnas-affair" :event/date "2026-08-24 / 08-25"
+  :event/what "Cofnas 擁護の公開書簡が700筆超に。対抗書簡も立ち上がる。Chronicle of Higher Education が米国の研究者の分裂を報道。"
+  :evidence/tier :secondary}
+ {:db/id -513 :source/dataset "arday-cofnas-affair" :event/date "2026-08-26"
+  :event/what "検死審問（inquest）開始。検死官は unnatural death としての調査を示唆（Wikipedia 由来、未検証）。"
+  :evidence/tier :tertiary}
+
+ ;; -------------------------------------------------------------- 論評（第三者）
+ {:db/id -600
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "Roger J. Kreuz"
+  :statement/role "Associate Dean / Feinstone Interdisciplinary Research Professor"
+  :statement/affiliation "University of Memphis"
+  :statement/venue "The Conversation"
+  :statement/date "2026-08-21"
+  :statement/text "盗用の告発は文化戦争の武器になった。中世からルネサンス、近代初期にかけては imitatio の倫理が支配的で、独創性の価値は今ほど高くなかった。現代では独創性が道徳的美徳として扱われるため、盗用の申し立ては特に破壊的になる。左右の党派はいずれも、イデオロギー上の敵を貶めるために盗用の申し立てを日常的に用いている。"
+  :statement/related "Claudine Gay（ハーバード大学長辞任）、Christopher Rufo、Rand Paul、Neil Gorsuch の事例を並置している。"
+  :statement/source "https://theconversation.com/jason-arday-and-the-new-politics-of-plagiarism-290020"
+  :evidence/tier :primary}
+
+ {:db/id -601
+  :source/dataset "arday-cofnas-affair"
+  :statement/who "未取得の論争軸"
+  :statement/venue "Chronicle of Higher Education / Daily Nous / Quillette / Substack (lipton)"
+  :statement/text "米国の研究者コミュニティは「Cofnas を擁護すべきか」で割れている。Quillette は Cofnas と Arday の扱いをケンブリッジのダブルスタンダードとして論じ、lipton.substack.com は Arday の死は悲劇だが Cofnas を責めるなと論じている。Daily Nous は哲学者コミュニティの反応を集約している。"
+  :statement/source "https://www.chronicle.com/article/should-jason-ardays-accuser-be-defended-american-scholars-disagree ; https://dailynous.com/2026/08/24/cofnas-suspended-by-ghent-university/ ; https://quillette.com/2026/08/14/institutional-failures-in-the-garden-of-great-intellects-cofnas-arday-cambridge/ ; https://lipton.substack.com/p/jason-ardays-death-is-a-tragedy-but"
+  :statement/note "これら4本はいずれも 403 等で本文を取得できていない。見出しと検索結果の要約のみ。個別の発言者名を引用していないのはそのため。"
+  :evidence/tier :tertiary}
+
+ ;; ------------------------------- Wikipedia 由来の未検証リスト（役職に注意）
+ {:db/id -700
+  :source/dataset "arday-cofnas-affair"
+  :roster/kind "wikipedia-derived-unverified"
+  :roster/warning "以下は Wikipedia の Jason Arday 項目の要約から採取した。役職の記載に明白な疑義があるもの（例: Andy Burnham を Prime Minister としている）を含むため、個別に一次確認するまで肩書きごと引用しないこと。"
+  :roster/politicians "Andy Burnham（死を「あらゆる意味での悲劇」と述べたとされる。肩書き記載に疑義あり）、Lucy Powell（教育相とされる。深く衝撃を受け悲しんでいる)、Sadiq Khan（ロンドン市長。容認できない公的な追い立て・執拗な公開の辱め）、Kemi Badenoch（保守党党首。彼の死を報道の口封じに使うべきでない）、Jacob Rees-Mogg（ケンブリッジは DEI の Kool-Aid を飲んだ）、Chris Smith（ケンブリッジ総長。レイシズム的な狂騒であったが、盗用の申し立て自体は厳密な調査に値する）、Afzal Khan（労働党議員。IPSO への超党派書簡を主導、53名署名）、Zack Polanski / John McDonnell / Clive Lewis（Good Law Project 書簡に署名）"
+  :roster/journalists "Lanre Bakare（Guardian、8/1 調査報道。掲載は正しかったと擁護）、Gordon Rayner（Telegraph、7/24）、Emma Yeomans（The Times、8/6）、Jason Okundaye（Guardian。ケンブリッジは彼を学者ではなくマスコットとして扱った）、Charles Moore（Telegraph）、Graeme Wood / Tyler Austin Harper（The Atlantic）、Nesrine Malik、Afua Hirsch、Celia Walden、Gareth Corfield"
+  :roster/academics "Robert Dingwall、Hilary Cremin、Bhaskar Vira、Roger Mosey、Suchitra Sebastian、Nicholas Guyatt（独立調査を求める約100名の書簡を共同組織）、Paul Gilroy、Alan Lester"
+  :roster/civil-society "Simon Woolley（Homerton College 学寮長、Arday の恩師。報道の扱いへの調査を要求）、Patrick Vernon（遺族への募金、20万ポンド超）、Runnymede Trust、Stand Up to Racism（ロンドン中心部で数千人規模の追悼集会）、Colin Salmon、Misan Harriman、Shola Mos-Shogbamimu、National Union of Journalists"
+  :roster/institutions-reviewing "Jesus College Cambridge、University of Glasgow、Durham University、Queen's University Belfast、Birkbeck（在籍記録なしと表明）、Nelson Mandela University（客員教授ではなく臨時の非常勤と表明）、Palgrave Macmillan（刊行中止）、Routledge、WaterAid、Mind、IPSO"
+  :roster/source "https://en.wikipedia.org/wiki/Jason_Arday"
+  :evidence/tier :tertiary}
+]
