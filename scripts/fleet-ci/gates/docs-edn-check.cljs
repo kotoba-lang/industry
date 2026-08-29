@@ -12,7 +12,8 @@
 ;; 展開ミス（ADR-2607178000 addendum の --strip-components 事故と同型）で
 ;; 空ディレクトリを検査して「0 件 = 全部有効」と報告する事故を防ぐ。
 (ns fleet-ci.gates.docs-edn-check
-  (:require ["node:fs" :as fs]
+  (:require ["node:child_process" :as child-process]
+            ["node:fs" :as fs]
             ["node:path" :as path]
             [cljs.reader :as reader]
             [clojure.string :as str]))
@@ -72,9 +73,34 @@
     (sequential? v) (mapcat bad-keys v)
     :else nil))
 
-(def skip-dirs #{"node_modules" ".git" "archive" "dist" "target" ".shadow-cljs"})
+(def skip-dirs #{"node_modules" ".git" "archive" "dist" "target" ".shadow-cljs"
+                 ;; Session scratch: git worktrees other agents cut under the
+                 ;; superproject. They are UNTRACKED, so the fleet is never
+                 ;; sent them -- walking them makes a local run red for files
+                 ;; the gate will never see on a node, which is the same
+                 ;; measurement error as the sparse-cone one in CLAUDE.md with
+                 ;; its sign flipped. Measured 2026-08-29: every one of this
+                 ;; gate's local failures came from one such worktree.
+                 ".worktrees"})
 
-(defn edn-files [dir]
+;; Ask git what is in the tree, and only fall back to walking the filesystem
+;; when git cannot answer (an extracted tree with no .git, which is exactly
+;; what the fleet ships). The two disagree in both directions: git alone
+;; misses the extracted tree, the walk alone picks up untracked scratch.
+(defn tracked-edn-files [dir]
+  (try
+    (let [out (.execFileSync child-process "git"
+                             #js ["-C" dir "ls-files" "--cached" "--others"
+                                  "--exclude-standard" "-z" "--" "*.edn"]
+                             #js {:encoding "utf8" :maxBuffer (* 64 1024 1024)})]
+      (->> (str/split out #"\u0000")
+           (remove str/blank?)
+           (remove (fn [f] (some #(str/starts-with? f (str % "/")) skip-dirs)))
+           (mapv #(path/join dir %))
+           seq))
+    (catch :default _ nil)))
+
+(defn walked-edn-files [dir]
   (let [out (atom [])]
     ((fn walk [d]
        (doseq [e (fs/readdirSync d #js {:withFileTypes true})]
@@ -84,6 +110,9 @@
              (str/ends-with? n ".edn") (swap! out conj p)))))
      dir)
     @out))
+
+(defn edn-files [dir]
+  (or (tracked-edn-files dir) (walked-edn-files dir)))
 
 (when-not (fs/existsSync root)
   (println "FLEET-CI: root does not exist:" root
