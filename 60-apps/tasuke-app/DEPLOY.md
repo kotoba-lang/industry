@@ -24,9 +24,29 @@ npm install && npx shadow-cljs release app && clojure -M:gen-page
 npx wrangler deploy            # tasuke-first-response.<account>.workers.dev
 ```
 
-その後 `manifest/` の surface 索引を再生成し（`nbb scripts/gen-surface-index.cljs`）、
-**host が索引に載って初めて「開ける場所がある」と言える** —— この app が生まれた
-そもそもの発端は、tasuke の host が索引に 1 件も無かったことだった。
+または `npm run deploy`（build → page → wrangler deploy）。
+
+### ⚠ workers.dev だけで出すと、発端の gap は閉じない
+
+`scripts/gen-surface-index.cljs` を読んで実測した 2 点:
+
+1. **索引が walk するのは `orgs/<org>/<repo>` だけ。** root の `60-apps/` は
+   走査対象外なので、この設定は **tasuke へ移送するまで索引に載らない**。
+2. **`hosts-of` は `routes[].pattern` と `route` しか読まない。** つまり
+   `*.workers.dev` に出しただけでは host が 0 件のままで、索引は今までどおり
+   「tasuke に開ける場所は無い」と答え続ける。
+
+この app が生まれた発端がまさにそれ（surface 索引に tasuke の host が 1 件も
+無かった）なので、**閉じるには custom domain を決めて `routes` に書く**必要がある。
+ドメインの決定はオーナーのものなので、placeholder は置いていない —— 置けば索引は
+serve していない host を載せることになり、それは索引を嘘にする。
+
+deploy して host が決まったら:
+
+```bash
+# wrangler.jsonc に routes を足してから
+nbb scripts/gen-surface-index.cljs      # superproject root で
+```
 
 ⚠ 本番 deploy の前に `git merge --ff-only origin/main` を通すこと。deploy には
 fast-forward 検査が無く、最後に実行した人が勝つ（root CLAUDE.md の実インシデント）。

@@ -7,7 +7,8 @@
     "test:jvm": "clojure -M:test",
     "test:cljs": "shadow-cljs compile oracle-test && node out/oracle-tests.js",
     "build": "shadow-cljs release app",
-    "dev": "shadow-cljs watch app"
+    "dev": "shadow-cljs watch app",
+    "deploy": "shadow-cljs release app && clojure -M:gen-page && wrangler deploy"
   },
   "devDependencies": {
     "nbb": "^1.5.212",
