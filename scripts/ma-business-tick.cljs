@@ -145,7 +145,15 @@
         {:repos nil :why :origin-main-unreadable}
         ;; 宣言の形は os.edn 側の都合なので構造を仮定しない。**repo 名の出現**だけを
         ;; 見る（`cloud-itonami-<family>-<code>` と、構成表に載る素の名前）。
-        {:repos (set (map second (re-seq #"\"(?:orgs/cloud-itonami/)?([a-z0-9][a-z0-9.-]*)\"" out)))
+        ;; **repo を指す位置に在る名前だけを拾う。** 素の引用符トークンを全部
+        ;; 拾うと、os.edn のどこかに偶然同じ文字列が在るだけで宣言済みになる
+        ;; ——2 文字の `ma` が特に危ない。宣言の構造は os.edn 側の都合なので
+        ;; 固定しないが、`orgs/cloud-itonami/<name>` というパス形か、名前に
+        ;; `repo` / `path` を含む key の直後の値、のどちらかであることは要求する。
+        ;; 外した場合に出るのは **false red**（見えて直せる）であって
+        ;; false green ではない。
+        {:repos (into (set (map second (re-seq #"\"orgs/cloud-itonami/([a-z0-9][a-z0-9.-]*)\"" out)))
+                      (map second (re-seq #"[:/a-z0-9-]*(?:repo|path)[a-z0-9-]*\s+\"(?:orgs/cloud-itonami/)?([a-z0-9][a-z0-9.-]*)\"" out)))
          :raw-bytes (count out)}))))
 
 ;; ── 構成 repo 1 本を測る ────────────────────────────────────────────────────
@@ -189,8 +197,11 @@
   os-declared も一度も測られない —— 『埋めたので進んだ』という見た目だけが残る。
   この床が測るのは **所有であって被覆ではない**（その stage の仕事をその repo が
   どこまで実際にやるかは、ここでは測っていない）。"
-  [reg]
-  (let [names (set (map :repo/name (:business/constituents reg)))
+  [reg measured]
+  ;; **測定対象（`measured`）の名前で照合する。** 構成表の全 entry で照合すると、
+  ;; `:repo/role :none` の entry（誤配置の記録として載せてあるだけの repo）に
+  ;; stage を割り当てても床が緑になり、その repo は一度も測られない。
+  (let [names (set (map :repo measured))
         unowned (->> (:business/stages reg) (filter #(nil? (:stage/owner %))) (mapv :stage/id))
         dangling (->> (:business/stages reg)
                       (keep :stage/owner)
@@ -242,19 +253,41 @@
           measured (mapv #(measure-repo % declared) cs)
           scanned (count measured)
           measurable (count (remove #(= :unmeasured (:verdict (:checkout %))) measured))
-          floors [[:stage-owner (stage-owner-floor reg)]
-                  [:matching-runtime (matching-runtime-floor reg measured)]
-                  [:standard-form
-                   (let [bad (filterv #(= :broken (:verdict (:standard-form %))) measured)]
-                     (if (seq bad)
-                       {:verdict :broken :repos (mapv (juxt :repo #(:why (:standard-form %))) bad)}
-                       (if (zero? measurable) {:verdict :unmeasured :why :no-checkouts} {:verdict :ok})))]
-                  [:os-declared
-                   (let [bad (filterv #(= :broken (:verdict (:os-declared %))) measured)]
-                     (cond
-                       (nil? declared) {:verdict :unmeasured :why decl-why}
-                       (seq bad) {:verdict :broken :repos (mapv :repo bad)}
-                       :else {:verdict :ok}))]]
+          ;; **床は per-repo の判定を畳んで作る。畳み方は 1 つだけ**（roll-up）:
+          ;; 1 本でも :broken なら :broken、無くて 1 本でも :unmeasured なら
+          ;; **:unmeasured**、全部 :ok なら :ok。
+          ;;
+          ;; 真ん中の段が要る。旧版は「:broken が無ければ :ok」と畳んでいたので、
+          ;; **7 本中 6 本が測れず 1 本だけ通った周が :ok になっていた** ——
+          ;; ADR-2608136000 の「測れなかった検査が、測って問題が無かった検査と
+          ;; 同じ値を返す」そのもので、自分の PR の中に作っていた。
+          roll-up (fn [k detail-fn]
+                    (let [bad (filterv #(= :broken (:verdict (k %))) measured)
+                          unk (filterv #(= :unmeasured (:verdict (k %))) measured)]
+                      (cond
+                        (seq bad) {:verdict :broken :repos (mapv detail-fn bad)}
+                        (seq unk) {:verdict :unmeasured
+                                   :repos (mapv (juxt :repo #(:why (k %))) unk)}
+                        (empty? measured) {:verdict :unmeasured :why :no-constituents}
+                        :else {:verdict :ok})))
+          compute (fn [id]
+                    (case id
+                      :stage-owner (stage-owner-floor reg measured)
+                      :checkout (roll-up :checkout (juxt :repo #(:why (:checkout %))))
+                      :matching-runtime (matching-runtime-floor reg measured)
+                      :standard-form (roll-up :standard-form
+                                              (juxt :repo #(:why (:standard-form %))))
+                      :os-declared (if (nil? declared)
+                                     {:verdict :unmeasured :why decl-why}
+                                     (roll-up :os-declared
+                                              (juxt :repo #(:why (:os-declared %)))))
+                      ;; **構成表が名前を挙げた床を、実装が無いからと黙って落とさない。**
+                      ;; 落とすと『名簿には 5 つ、出力には 4 つ』が誰にも気付かれない。
+                      {:verdict :unmeasured :why :floor-not-implemented}))
+          ;; **順序は構成表が決める。** ここに literal で書くと、構成表の
+          ;; 「順序が優先順位である」という宣言が嘘になる。
+          floor-ids (mapv :floor/id (:business/floors reg))
+          floors (mapv (fn [id] [id (compute id)]) floor-ids)
           nxt (next-move floors)]
 
       (log! "== M&A マッチング事業 tick ==" (str "(" (:business/id reg) ")"))
