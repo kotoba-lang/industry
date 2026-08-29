@@ -1,0 +1,532 @@
+#!/usr/bin/env nbb
+;; Reference implementation of `kotoba.leaf.v1` -- the sealed leaf envelope
+;; that aiuefs-v4 stores and that ayatori reads, plus its conformance suite.
+;;
+;;   nbb scripts/aiuefs-codec.cljs selftest
+;;   nbb scripts/aiuefs-codec.cljs vectors --out <file.edn>
+;;
+;; WHY AN ENVELOPE AND NOT A FLAG.
+;;
+;; The storage plane already seals every leaf (arrangement.core: blinded key,
+;; AEAD value). Compression therefore has exactly two possible positions, and
+;; the measurement in bench/results/2026-08-29-compression-order.edn says they
+;; are not close: after the AEAD the bytes GROW (1.0001-1.0104, reproducing
+;; ADR-2608160100's 1.003), before it they fall to 0.098-0.47. So compression
+;; goes inside the sealed leaf -- which means the leaf needs a header, which
+;; means it needs to be a value with an identity, which is what this file is.
+;;
+;; THREE FIELDS EARN THEIR PLACE, AND WHERE EACH ONE LIVES IS THE DESIGN.
+;;
+;;   "d" dictionary link -- OUTSIDE the ciphertext, as a real IPLD Link.
+;;       Not for secrecy but for reachability: a dictionary that is not a
+;;       visible edge of the DAG can be garbage-collected, and every leaf that
+;;       needed it becomes undecodable with nothing in the graph to say why.
+;;       Dictionary identity is a per-plane constant; it says nothing about
+;;       this leaf's content. Measured gain, on held-out leaves the dictionary
+;;       never saw: 33.8% at 1 KiB leaves, 0.56% at 64 KiB (datom plane) --
+;;       so this field is usually null, and that is a result, not an omission.
+;;
+;;   codec + plaintext length -- INSIDE the ciphertext. Both would otherwise
+;;       leak. `n` in the clear would hand back precisely the length signal
+;;       that padding exists to blunt, and `codec` in the clear says whether
+;;       the leaf was compressible at all. Neither is needed before decryption:
+;;       AEAD first, then decode.
+;;
+;;   "p" padding scheme -- OUTSIDE, plaintext. It describes the leak that the
+;;       ciphertext's own length already exposes, so hiding it buys nothing,
+;;       and a reader must be able to reason about disclosure without holding
+;;       the key.
+;;
+;; PLAINTEXT LENGTH CLOSES TWO HOLES WITH ONE FIELD. Sealed, it is also the
+;; decompression bound: the reader knows the exact output size before it
+;; inflates a single byte and refuses anything that does not land on it. A
+;; decompression bomb needs a reader that discovers the size as it goes; this
+;; one never does.
+;;
+;; All header fields are AEAD associated data, so a substituted dictionary
+;; link or a rewritten padding claim fails the tag rather than decoding.
+
+(require '[clojure.string :as str])
+
+(def zlib (js/require "node:zlib"))
+(def crypto (js/require "node:crypto"))
+(def fs (js/require "node:fs"))
+(def path (js/require "node:path"))
+
+;; --- codecs -----------------------------------------------------------------
+;; The wire numbers are the format; the names are not. deflate-raw is the read
+;; path's choice (measured 449 MB/s decompress at 16 KiB versus brotli's 289,
+;; for 1.1 points of ratio) and the only one a bounded kernel-side inflate has
+;; to implement. The others are admitted so a producer that is not the kernel
+;; can trade differently without a format change.
+
+(def codec-identity 0)
+(def codec-deflate-raw 1)
+(def codec-brotli 2)
+(def codec-zstd 3)
+
+(def codec-names {0 :identity 1 :deflate-raw 2 :brotli 3 :zstd})
+
+;; Only deflate-raw takes a preset dictionary through node's zlib. Passing one
+;; to brotli or zstd here would be DROPPED SILENTLY while the header still bound
+;; the dictionary link -- the leaf would gain nothing and still be unopenable
+;; without fetching that block. So it is refused instead.
+(def ^:private dictionary-codecs #{1})
+
+(defn- compress-with [codec ^js buf dict]
+  (when (and dict (not (contains? dictionary-codecs codec)))
+    (throw (ex-info "leaf: this codec cannot take a preset dictionary"
+                    {:reason :leaf/dictionary-codec-mismatch :codec codec})))
+  (case codec
+    0 buf
+    1 (.deflateRawSync zlib buf (if dict (js-obj "level" 6 "dictionary" dict) (js-obj "level" 6)))
+    2 (.brotliCompressSync zlib buf)
+    3 (.zstdCompressSync zlib buf)
+    (throw (ex-info "unknown codec" {:reason :leaf/unknown-codec :codec codec}))))
+
+(defn- decompress-with
+  "`max-output` is a HARD bound handed to the codec, not a length checked after
+   the fact. Checking afterwards means the expansion has already been
+   materialised, which is exactly what a decompression bomb wants; node refuses
+   with ERR_BUFFER_TOO_LARGE before allocating."
+  [codec ^js buf dict max-output]
+  (when (and dict (not (contains? dictionary-codecs codec)))
+    (throw (ex-info "leaf: this codec cannot take a preset dictionary"
+                    {:reason :leaf/dictionary-codec-mismatch :codec codec})))
+  (let [cap (max 1 max-output)]
+    (case codec
+      ;; identity carries no stream terminator, so the authenticated zero
+      ;; padding is still attached here and taking the first `max-output`
+      ;; bytes is the decode, not a truncation of a codec's output. The
+      ;; dangerous case -- a codec producing MORE than the sealed length --
+      ;; cannot arise for identity, because there is no codec.
+      0 (if (< (.-length buf) max-output)
+          (throw (ex-info "leaf: identity body is shorter than the sealed length"
+                          {:reason :leaf/length-mismatch}))
+          (.subarray buf 0 max-output))
+      1 (.inflateRawSync zlib buf (if dict
+                                    (js-obj "dictionary" dict "maxOutputLength" cap)
+                                    (js-obj "maxOutputLength" cap)))
+      2 (.brotliDecompressSync zlib buf (js-obj "maxOutputLength" cap))
+      3 (.zstdDecompressSync zlib buf (js-obj "maxOutputLength" cap))
+      (throw (ex-info "unknown codec" {:reason :leaf/unknown-codec :codec codec})))))
+
+;; --- padding ----------------------------------------------------------------
+
+(def padding-none 0)
+(def padding-padme 1)
+
+(defn- ilog2 [n] (loop [n n i -1] (if (zero? n) i (recur (bit-shift-right n 1) (inc i)))))
+
+(defn padme
+  "Nikitin et al. 2019. Rounds a length up so that the number of distinct
+   observable lengths grows logarithmically, at a bounded overhead."
+  [L]
+  (if (< L 2)
+    L
+    (let [e (ilog2 L) s (inc (ilog2 (max e 1))) z (- e s)]
+      (if (<= z 0) L (let [m (bit-shift-left 1 z)] (* m (quot (+ L m -1) m)))))))
+
+(defn- pad-to [scheme L] (case scheme 0 L 1 (padme L) (throw (ex-info "unknown padding" {:p scheme}))))
+
+;; --- deterministic CBOR (the subset this envelope needs) ---------------------
+;; RFC 8949 4.2.1 core deterministic encoding: shortest-form heads, and map
+;; keys sorted by their encoded bytes. Written out rather than pulled in
+;; because the AAD must be byte-exact and a general encoder's option flags are
+;; a place for that to drift silently.
+
+(defn- cbor-head [^long major ^long n]
+  (let [mt (bit-shift-left major 5)]
+    (cond
+      (< n 24) (js/Buffer.from #js [(+ mt n)])
+      (< n 0x100) (js/Buffer.from #js [(+ mt 24) n])
+      (< n 0x10000) (let [b (js/Buffer.alloc 3)]
+                      (.writeUInt8 b (+ mt 25) 0) (.writeUInt16BE b n 1) b)
+      (< n 0x100000000) (let [b (js/Buffer.alloc 5)]
+                          (.writeUInt8 b (+ mt 26) 0) (.writeUInt32BE b n 1) b)
+      :else (throw (ex-info "cbor: length out of range for this subset" {:n n})))))
+
+(defn- cbor-uint [n] (cbor-head 0 n))
+(defn- cbor-bytes [^js b] (js/Buffer.concat #js [(cbor-head 2 (.-length b)) b]))
+(defn- cbor-text [s] (let [b (js/Buffer.from s "utf8")]
+                       (js/Buffer.concat #js [(cbor-head 3 (.-length b)) b])))
+(def ^:private cbor-null (js/Buffer.from #js [0xf6]))
+
+(defn- cbor-link
+  "An IPLD Link: CBOR tag 42 over a byte string whose first byte is the
+   multibase identity prefix 0x00, per the DAG-CBOR spec."
+  [^js cid-bytes]
+  (js/Buffer.concat #js [(cbor-head 6 42)
+                         (cbor-bytes (js/Buffer.concat
+                                      #js [(js/Buffer.from #js [0x00]) cid-bytes]))]))
+
+(defn- cbor-map
+  "Entries are [text-key encoded-value]. Sorted by encoded key bytes."
+  [entries]
+  (let [encoded (mapv (fn [[k v]] [(cbor-text k) v]) entries)
+        sorted (sort (fn [[a _] [b _]] (.compare js/Buffer a b)) encoded)]
+    (js/Buffer.concat
+     (clj->js (into [(cbor-head 5 (count sorted))]
+                    (mapcat (fn [[k v]] [k v]) sorted))))))
+
+;; --- CID --------------------------------------------------------------------
+
+(def cid-codec-raw 0x55)
+(def cid-codec-dag-cbor 0x71)
+
+(defn cid-v1
+  "CIDv1 = 0x01 || codec || 0x12 0x20 || sha256(bytes). Both codecs used here
+   are single-byte varints, so no varint encoder is needed; a wider codec would
+   need one and this asserts rather than truncating."
+  [codec ^js bytes]
+  (when (>= codec 0x80) (throw (ex-info "cid: multi-byte codec varint not supported here" {:codec codec})))
+  (let [digest (-> (.createHash crypto "sha256") (.update bytes) (.digest))]
+    (js/Buffer.concat #js [(js/Buffer.from #js [0x01 codec 0x12 0x20]) digest])))
+
+;; --- the envelope -----------------------------------------------------------
+
+(def leaf-version 1)
+(def nonce-bytes 12)
+
+(defn- header-entries [padding dict-cid iv]
+  [["v" (cbor-uint leaf-version)]
+   ["p" (cbor-uint padding)]
+   ["d" (if dict-cid (cbor-link dict-cid) cbor-null)]
+   ["iv" (cbor-bytes iv)]])
+
+(defn- aad
+  "The associated data is the deterministic encoding of the header WITHOUT the
+   ciphertext. Changing any header field after sealing invalidates the tag."
+  [padding dict-cid iv]
+  (cbor-map (header-entries padding dict-cid iv)))
+
+(defn seal-leaf
+  "plaintext -> {:bytes <dag-cbor block> :cid <CIDv1>}.
+
+   inner := u8 codec || u32le plaintext-length || compressed || zero padding"
+  [{:keys [plaintext key codec padding dictionary dictionary-cid iv]
+    :or {codec codec-deflate-raw padding padding-padme}}]
+  (when-not (= 32 (.-length key)) (throw (ex-info "leaf: key must be 32 bytes" {})))
+  (when (and dictionary (not dictionary-cid))
+    (throw (ex-info "leaf: a dictionary must be named by its CID, or the DAG cannot reach it" {})))
+  (let [iv (or iv (.randomBytes crypto nonce-bytes))
+        body (compress-with codec plaintext dictionary)
+        head (js/Buffer.alloc 5)
+        _ (.writeUInt8 head codec 0)
+        _ (.writeUInt32LE head (.-length plaintext) 1)
+        inner (js/Buffer.concat #js [head body])
+        target (pad-to padding (.-length inner))
+        padded (if (> target (.-length inner))
+                 (js/Buffer.concat #js [inner (js/Buffer.alloc (- target (.-length inner)))])
+                 inner)
+        a (aad padding dictionary-cid iv)
+        c (.createCipheriv crypto "aes-256-gcm" key iv)
+        _ (.setAAD c a)
+        ct (js/Buffer.concat #js [(.update c padded) (.final c) (.getAuthTag c)])
+        block (cbor-map (conj (header-entries padding dictionary-cid iv)
+                              ["ct" (cbor-bytes ct)]))]
+    {:bytes block
+     :cid (cid-v1 cid-codec-dag-cbor block)
+     :codec codec
+     :padding padding
+     :plaintext-bytes (.-length plaintext)
+     :sealed-bytes (.-length block)}))
+
+;; A decoder for exactly the map this encoder writes. It is intentionally
+;; strict: an unexpected major type is a refusal, not a best guess.
+(defn- decode-header [^js block]
+  (let [pos (atom 0)
+        u8 (fn [] (let [v (.readUInt8 block @pos)] (swap! pos inc) v))
+        head (fn []
+               (let [b (u8) major (bit-shift-right b 5) ai (bit-and b 0x1f)]
+                 [major (cond (< ai 24) ai
+                              (= ai 24) (u8)
+                              (= ai 25) (let [v (.readUInt16BE block @pos)] (swap! pos + 2) v)
+                              (= ai 26) (let [v (.readUInt32BE block @pos)] (swap! pos + 4) v)
+                              :else (throw (ex-info "leaf: unsupported cbor head" {:ai ai})))
+                  ai]))
+        take-n (fn [n] (let [s (.subarray block @pos (+ @pos n))] (swap! pos + n) s))]
+    (let [[mt n _] (head)]
+      (when-not (= 5 mt) (throw (ex-info "leaf: block is not a cbor map" {:major mt})))
+      (loop [i 0 acc {}]
+        (if (= i n)
+          acc
+          (let [[kmt klen _] (head)
+                _ (when-not (= 3 kmt) (throw (ex-info "leaf: map key is not text" {:major kmt})))
+                k (.toString (take-n klen) "utf8")
+                b (.readUInt8 block @pos)
+                v (cond
+                    (= b 0xf6) (do (swap! pos inc) nil)
+                    :else (let [[vmt vlen _] (head)]
+                            (case vmt
+                              0 vlen
+                              2 (take-n vlen)
+                              6 (if (= 42 vlen)
+                                  (let [[bmt blen _] (head)
+                                        raw (take-n blen)]
+                                    (when-not (= 2 bmt)
+                                      (throw (ex-info "leaf: link is not a byte string" {})))
+                                    (.subarray raw 1))
+                                  (throw (ex-info "leaf: unexpected cbor tag" {:tag vlen})))
+                              (throw (ex-info "leaf: unexpected cbor major type" {:major vmt})))))]
+            (recur (inc i) (assoc acc k v))))))))
+
+(defn open-leaf
+  "block bytes -> plaintext, or a refusal with a NAMED reason. Every refusal
+   here has a literal reason keyword, because a test that only asserts `it
+   threw` counts an unrelated failure as a success."
+  [{:keys [block key dictionary]}]
+  (let [h (try (decode-header block)
+               (catch :default e (throw (ex-info "leaf: undecodable header"
+                                                 {:reason :leaf/undecodable-header
+                                                  :cause (ex-message e)}))))
+        v (get h "v") p (get h "p") d (get h "d") iv (get h "iv") ct (get h "ct")]
+    ;; CANONICAL OR NOTHING. The AAD binds the header's VALUES, not its
+    ;; encoding, so without this a reordered key, an added key, or trailing
+    ;; bytes all still authenticate -- and the same plaintext would then open
+    ;; under unboundedly many CIDs, which is the one invariant a
+    ;; content-addressed store cannot lose. Re-encode and compare bytes.
+    (when-not (and v p iv ct
+                   (.equals (cbor-map (conj (header-entries p d iv)
+                                            ["ct" (cbor-bytes ct)]))
+                            block))
+      (throw (ex-info "leaf: block is not the canonical encoding of its own fields"
+                      {:reason :leaf/non-canonical})))
+    (when-not (= leaf-version v)
+      (throw (ex-info "leaf: version" {:reason :leaf/unsupported-version :v v})))
+    (when-not (and iv (= nonce-bytes (.-length iv)))
+      (throw (ex-info "leaf: nonce" {:reason :leaf/bad-nonce})))
+    (when (or (nil? ct) (< (.-length ct) 17))
+      (throw (ex-info "leaf: ciphertext" {:reason :leaf/short-ciphertext})))
+    (when (and d (nil? dictionary))
+      (throw (ex-info "leaf: dictionary named but not supplied"
+                      {:reason :leaf/dictionary-unavailable})))
+    (let [body (.subarray ct 0 (- (.-length ct) 16))
+          tag (.subarray ct (- (.-length ct) 16))
+          dec (.createDecipheriv crypto "aes-256-gcm" key iv)
+          _ (.setAAD dec (aad p d iv))
+          _ (.setAuthTag dec tag)
+          padded (try (js/Buffer.concat #js [(.update dec body) (.final dec)])
+                      (catch :default _
+                        (throw (ex-info "leaf: authentication failed"
+                                        {:reason :leaf/auth-failed}))))]
+      (when (< (.-length padded) 5)
+        (throw (ex-info "leaf: inner too short" {:reason :leaf/inner-truncated})))
+      (let [codec (.readUInt8 padded 0)
+            plain-len (.readUInt32LE padded 1)
+            body (.subarray padded 5)
+            ;; The bound is read from inside the seal, so whoever supplied the
+            ;; block cannot inflate it. It is handed to the codec so the
+            ;; expansion is never materialised, and the result is NOT truncated
+            ;; to it: a prefix of the wrong plaintext is wrong data, and
+            ;; returning it would turn a detectable disagreement into silent
+            ;; corruption.
+            out (try (decompress-with codec body dictionary plain-len)
+                     (catch :default e
+                       (throw (ex-info "leaf: decompression failed"
+                                       {:reason (or (:reason (ex-data e))
+                                                    :leaf/decompress-failed)
+                                        :codec codec}))))]
+        (when-not (= plain-len (.-length out))
+          (throw (ex-info "leaf: length does not match the sealed bound"
+                          {:reason :leaf/length-mismatch
+                           :declared plain-len :actual (.-length out)})))
+        out))))
+
+;; --- conformance ------------------------------------------------------------
+;; Every negative case pins the REASON, not merely that something threw. A test
+;; that accepts any failure counts a run that broke for another cause as a
+;; discrimination it never made.
+
+(defn- reason-of [f]
+  (try (f) :no-refusal
+       (catch :default e (or (:reason (ex-data e)) :threw-without-reason))))
+
+(defn- selftest []
+  (let [key (.alloc js/Buffer 32 7)
+        other-key (.alloc js/Buffer 32 9)
+        text (js/Buffer.from (str/join "\n" (repeat 400 "[{:adr/id \"adr-x\" :adr/status \"accepted\"}]")) "utf8")
+        small (js/Buffer.from "aiueos" "utf8")
+        results (atom [])
+        check (fn [name pass? detail] (swap! results conj {:case name :pass? pass? :detail detail}))]
+
+    ;; 1. round trip, every codec, with and without padding
+    (doseq [codec [codec-identity codec-deflate-raw codec-brotli codec-zstd]
+            padding [padding-none padding-padme]]
+      (let [{:keys [bytes]} (seal-leaf {:plaintext text :key key :codec codec :padding padding})
+            back (open-leaf {:block bytes :key key})]
+        (check (str "roundtrip/" (name (codec-names codec)) "/pad" padding)
+               (.equals back text) {:sealed (.-length bytes)})))
+
+    ;; 2. an empty and a tiny plaintext still round-trip
+    (doseq [[label pt] [["empty" (js/Buffer.alloc 0)] ["tiny" small]]]
+      (let [{:keys [bytes]} (seal-leaf {:plaintext pt :key key})]
+        (check (str "roundtrip/" label) (.equals (open-leaf {:block bytes :key key}) pt) {})))
+
+    ;; 3. the CID is a function of the bytes, and sealing is deterministic given
+    ;;    a fixed nonce -- otherwise the same content commits to two CIDs.
+    (let [iv (.alloc js/Buffer nonce-bytes 3)
+          a (seal-leaf {:plaintext text :key key :iv iv})
+          b (seal-leaf {:plaintext text :key key :iv iv})]
+      (check "determinism/same-nonce-same-cid"
+             (and (.equals (:bytes a) (:bytes b)) (.equals (:cid a) (:cid b)))
+             {:cid (.toString (:cid a) "hex")}))
+
+    ;; 4. a fresh nonce must NOT produce the same bytes: nonce reuse under GCM
+    ;;    is catastrophic, so the default has to be random.
+    (let [a (seal-leaf {:plaintext text :key key})
+          b (seal-leaf {:plaintext text :key key})]
+      (check "determinism/default-nonce-is-fresh" (not (.equals (:bytes a) (:bytes b))) {}))
+
+    ;; 5. wrong key is refused, by name
+    (let [{:keys [bytes]} (seal-leaf {:plaintext text :key key})]
+      (check "refuse/wrong-key"
+             (= :leaf/auth-failed (reason-of #(open-leaf {:block bytes :key other-key})))
+             {}))
+
+    ;; 6. a flipped ciphertext byte is refused, by name
+    (let [{:keys [bytes]} (seal-leaf {:plaintext text :key key})
+          tampered (js/Buffer.from bytes)]
+      (aset tampered (- (.-length tampered) 20) (bit-xor 1 (aget tampered (- (.-length tampered) 20))))
+      (check "refuse/flipped-ciphertext"
+             (= :leaf/auth-failed (reason-of #(open-leaf {:block tampered :key key})))
+             {}))
+
+    ;; 7. THE HEADER IS AUTHENTICATED. Rewriting the padding claim -- a
+    ;;    plaintext field a naive envelope would leave unbound -- must fail the
+    ;;    tag, not decode. This is the case that decides whether AAD is real.
+    (let [{:keys [bytes]} (seal-leaf {:plaintext text :key key :padding padding-padme})
+          idx (loop [i 0] (cond (>= i (- (.-length bytes) 2)) nil
+                                (and (= 0x61 (aget bytes i)) (= 0x70 (aget bytes (inc i)))) (+ i 2)
+                                :else (recur (inc i))))
+          tampered (when idx (let [b (js/Buffer.from bytes)] (aset b idx padding-none) b))]
+      (check "refuse/rewritten-padding-claim"
+             (and idx (= :leaf/auth-failed (reason-of #(open-leaf {:block tampered :key key}))))
+             {:patched-at idx}))
+
+    ;; 8. a dictionary leaf refuses by name when the dictionary is absent --
+    ;;    it does not silently decode to garbage.
+    (let [dict (js/Buffer.from (str/join (repeat 500 "adr/status accepted ")) "utf8")
+          dcid (cid-v1 cid-codec-raw dict)
+          {:keys [bytes]} (seal-leaf {:plaintext text :key key :codec codec-deflate-raw
+                                      :dictionary dict :dictionary-cid dcid})]
+      (check "refuse/dictionary-unavailable"
+             (= :leaf/dictionary-unavailable (reason-of #(open-leaf {:block bytes :key key})))
+             {})
+      (check "roundtrip/with-dictionary"
+             (.equals (open-leaf {:block bytes :key key :dictionary dict}) text)
+             {:dictionary-cid (.toString dcid "hex")})
+      ;; 9. substituting a DIFFERENT dictionary link is refused by the tag,
+      ;;    even though the substitute is a perfectly valid block.
+      (let [other (js/Buffer.from "a different dictionary entirely" "utf8")
+            ocid (cid-v1 cid-codec-raw other)
+            patched (js/Buffer.from bytes)
+            at (.indexOf patched (.subarray dcid 0 8))]
+        (when (>= at 0) (.copy (.subarray ocid 0 8) patched at))
+        (check "refuse/substituted-dictionary-link"
+               (and (>= at 0)
+                    (contains? #{:leaf/auth-failed :leaf/dictionary-unavailable}
+                               (reason-of #(open-leaf {:block patched :key key :dictionary other}))))
+               {:patched-at at})))
+
+    ;; 10. THE DECOMPRESSION BOUND. A leaf whose sealed length claim is smaller
+    ;;     than what the codec actually produces must be refused. Constructed by
+    ;;     sealing a doctored inner with the real key: this is the bomb an
+    ;;     attacker who holds the key could still not land.
+    (let [big (js/Buffer.alloc 200000 32)
+          body (compress-with codec-deflate-raw big nil)
+          head (js/Buffer.alloc 5)
+          _ (.writeUInt8 head codec-deflate-raw 0)
+          _ (.writeUInt32LE head 10 1)          ; lies: claims 10 bytes
+          inner (js/Buffer.concat #js [head body])
+          iv (.randomBytes crypto nonce-bytes)
+          a (aad padding-none nil iv)
+          c (.createCipheriv crypto "aes-256-gcm" key iv)
+          _ (.setAAD c a)
+          ct (js/Buffer.concat #js [(.update c inner) (.final c) (.getAuthTag c)])
+          block (cbor-map (conj (header-entries padding-none nil iv) ["ct" (cbor-bytes ct)]))]
+      ;; This case originally accepted EITHER a refusal OR a truncation to the
+      ;; sealed bound. The truncating branch passed, so the bound was never
+      ;; enforced and the reader returned ten bytes of the wrong plaintext as
+      ;; if they were the leaf. A disjunction lets the weaker branch satisfy
+      ;; the test; only the refusal is asserted now.
+      (check "refuse/decompression-bound"
+             (= :leaf/decompress-failed (reason-of #(open-leaf {:block block :key key})))
+             {}))
+
+    ;; 11. a non-canonical re-encoding of an otherwise valid leaf is refused,
+    ;;     even though its AAD still authenticates.
+    (let [{:keys [bytes]} (seal-leaf {:plaintext text :key key})
+          appended (js/Buffer.concat #js [bytes (js/Buffer.from #js [0x00])])]
+      (check "refuse/trailing-bytes"
+             (= :leaf/non-canonical (reason-of #(open-leaf {:block appended :key key})))
+             {}))
+
+    ;; 12. a dictionary handed to a codec that cannot use it is refused at seal
+    ;;     time rather than silently dropped.
+    (let [dict (js/Buffer.from (str/join (repeat 200 "vocabulary ")) "utf8")
+          dcid (cid-v1 cid-codec-raw dict)]
+      (check "refuse/dictionary-codec-mismatch"
+             (= :leaf/dictionary-codec-mismatch
+                (reason-of #(seal-leaf {:plaintext text :key key :codec codec-brotli
+                                        :dictionary dict :dictionary-cid dcid})))
+             {}))
+
+    ;; 13. padme never shrinks and is bounded
+    (check "padme/monotone-and-bounded"
+           (every? (fn [L] (let [p (padme L)] (and (>= p L) (<= p (* 1.13 (max L 1))))))
+                   (concat (range 1 2000) [4096 16384 65536 131072 1048576]))
+           {})
+
+    (let [rs @results
+          passed (count (filter :pass? rs))
+          total (count rs)]
+      (doseq [{:keys [case pass? detail]} rs]
+        (println (str (if pass? "ok  " "FAIL") "\t" case
+                      (when (seq detail) (str "\t" (pr-str detail))))))
+      (println)
+      (println (str "CASES\t" passed "/" total))
+      (when (zero? total)
+        (binding [*out* *err*] (println "aiuefs-codec: zero cases ran; refusing to report a pass"))
+        (.exit js/process 2))
+      (.exit js/process (if (= passed total) 0 1)))))
+
+;; --- conformance vectors ----------------------------------------------------
+;; Fixed key, fixed nonce, fixed plaintext -> fixed CID. A second implementation
+;; (the kernel's, in Kotoba) is conformant when it reproduces these.
+
+(defn- vectors [out]
+  (let [key (.alloc js/Buffer 32 7)
+        iv (.alloc js/Buffer nonce-bytes 3)
+        cases (for [[label pt] [["empty" (js/Buffer.alloc 0)]
+                                ["ascii" (js/Buffer.from "aiueos" "utf8")]
+                                ["repetitive" (js/Buffer.from (str/join (repeat 1000 "ab")) "utf8")]]
+                    codec [codec-identity codec-deflate-raw]
+                    padding [padding-none padding-padme]]
+                (let [{:keys [bytes cid sealed-bytes]}
+                      (seal-leaf {:plaintext pt :key key :iv iv :codec codec :padding padding})]
+                  {:case (str label "/" (name (codec-names codec)) "/pad" padding)
+                   :plaintext-hex (.toString pt "hex")
+                   :codec codec :padding padding
+                   :key-hex (.toString key "hex") :iv-hex (.toString iv "hex")
+                   :block-hex (.toString bytes "hex")
+                   :block-cid-hex (.toString cid "hex")
+                   :sealed-bytes sealed-bytes}))
+        payload {:format :kotoba.leaf/v1
+                 :generated-at (.toISOString (js/Date.))
+                 :aead "aes-256-gcm"
+                 :note "AAD is the deterministic CBOR of the header without \"ct\"."
+                 :vectors (vec cases)}]
+    (when out
+      (.mkdirSync fs (.dirname path out) #js {:recursive true})
+      (.writeFileSync fs out (with-out-str (pr payload))))
+    (println (str "VECTORS\t" (count cases) (when out (str "\t-> " out))))))
+
+(let [cmd (first *command-line-args*)
+      args (vec *command-line-args*)
+      out (let [i (.indexOf (to-array args) "--out")] (when (>= i 0) (nth args (inc i) nil)))]
+  (case cmd
+    "selftest" (selftest)
+    "vectors" (vectors out)
+    (do (println "usage: aiuefs-codec.cljs selftest | vectors --out <file.edn>")
+        (.exit js/process 2))))
