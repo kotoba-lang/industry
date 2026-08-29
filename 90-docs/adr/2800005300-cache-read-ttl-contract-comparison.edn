@@ -1,0 +1,90 @@
+[{:db/id -1
+  :adr/id "adr-2800005300-cache-read-ttl-contract-comparison"
+  :adr/title "agent loop の LLM 契約は cache read 会計と TTL で選ぶ — Kimi/Qwen/Z.ai/OpenRouter 実測比較と現行 Claude Max 構成の追認"
+  :adr/date "2026-08-29"
+  :adr/status "accepted"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/repos ["com-junkawasaki/root"]
+  :adr/body "## Context — この workspace のトークン消費は cache read が 98.5%
+
+2026-08-29 に実測した（このワークステーションの ~/.claude/projects セッションログ 795 ファイル、直近 30 日、239,159 assistant メッセージの usage を全数集計）:
+
+| 種別 | 30日 | 構成比 |
+|---|---|---|
+| cache read | 841 億 tok | 98.5% |
+| cache write | 10.9 億 tok | 1.3% |
+| output | 1.9 億 tok | 0.2% |
+| 非キャッシュ input | 173 万 tok | ~0% |
+| 合計 | 854 億 tok/月 | |
+
+git 履歴側の裏付け: superproject 30 日 19,945 commits + 子リポ 4,287 checkout の無作為 500 サンプル実測から外挿で月 ~46,000 commits（LLM 起因 commit 1 件 ≈ 200 万 tok）。この 854 億は本機の Claude Code 分のみで、cloud routine / murakumo fleet 推論 / Codex / Cursor を含まない下界。現行契約は Claude Max ×3 + Cursor ×1 + GPT Pro ×1（月 $700〜1,400 程度）で、Fable 5 API 生値換算 $107k/月 相当を吸収している。
+
+このミックスでは、モデルの定価 (input/output) はほぼ無意味で、**(1) cache read 単価・割引率、(2) TTL（キャッシュ寿命）、(3) 定額プランの枠消費が cache read をどう数えるか**の 3 点が実効コストを決める。
+
+## 調査結果（2026-08-29 実測。価格・仕様は動くので、引用時は再測定すること）
+
+### (1) API の cache read 単価（OpenRouter models API 実測）
+
+| モデル | input $/M | output $/M | cache read $/M | read/input | cache write |
+|---|---|---|---|---|---|
+| Claude Fable 5 | 10.00 | 50.00 | 1.000 | 10% | 1.25x（5m）/ 2x（1h） |
+| Claude Opus 5 | 5.00 | 25.00 | 0.500 | 10% | 同上 |
+| Claude Sonnet 5 | 2.00 | 10.00 | 0.200 | 10% | 同上 |
+| GPT-5.1 | 1.25 | 10.00 | 0.125 | 10% | 無料（自動） |
+| GPT-5.2 | 1.75 | 14.00 | 0.175 | 10% | 無料（自動） |
+| GPT-5.2-pro | 21.00 | 168.00 | **割引なし** | 100% | — |
+| Kimi K3 | 3.00 | 15.00 | 0.300 | 10% | 無料（自動、min 256 tok） |
+| Kimi K2.7-code | 0.95 | 4.00 | 0.190 | 20% | 無料（自動） |
+| Qwen3.8-Max | 2.00 | 6.00 | 0.250 | 12.5% | 1.25x（明示 cache_control） |
+| GLM-5.3 | 1.40 | 4.40 | 0.260 | 19% | 無料（自動） |
+| GLM-5.3-flash | 0.075 | 0.25 | 0.015 | 20% | 無料（自動） |
+| DeepSeek v3.1（OpenRouter 経由） | 0.55 | 1.65 | **割引なし** | 100% | — |
+
+実測ミックス（cr 98.5% / cw 1.3% / out 0.2%）での blended 単価と月 854 億 tok の換算: GLM-5.3-flash $0.016/M（$1.4k/月）< GPT-5.1 $0.16/M（$13.8k）< Kimi K2.7-code $0.21/M（$17.8k）< Sonnet 5 $0.25/M（$21.5k）< GLM-5.3 $0.28/M（$24.2k）< Qwen3.8-Max $0.29/M（$24.9k）< Kimi K3 $0.37/M（$31.4k）< Opus 5 $0.63/M（$53.6k）< Fable 5 $1.26/M（$107.3k）。定価 input が安い GLM-5.3 より GPT-5.1 が blended で安い — cache read 割引率（10% vs 19%）が定価差を逆転させる。
+
+### (2) TTL — cache read 単価が「適用されるか」を決める
+
+| 提供元 | TTL | 制御 |
+|---|---|---|
+| Anthropic | 5 分（既定）/ **1 時間**（明示） | cache_control で明示。1h は write 2x |
+| OpenAI | 自動、**最短 30 分** | 制御なし（負荷次第で退避） |
+| Gemini | 5 分固定（更新されない） | 明示 |
+| Kimi/Moonshot・Z.ai/GLM・DeepSeek・Groq・Grok | **3〜5 分**、platform 管理 | 自動・制御なし |
+
+TTL が切れた read は write/input 価格に化ける。ScheduleWakeup 20〜30 分間隔の slow loop や再開セッションでは、3〜5 分 TTL 勢の cache read 単価は**実際にはほぼ適用されない**（Kimi K2.7 で全ミスなら $0.95/M → $81k/月 相当まで悪化）。1 ターン数秒〜数分の interactive coding では 3〜5 分でも保つ。**slow loop に耐える TTL を持つのは Anthropic（1h 明示）だけ**で、OpenAI 30 分が次点。
+
+### (3) 定額プランの枠消費会計 — ここが最大の差別化点
+
+| 契約 | 月額 | cache read の枠消費 | 出所の確度 |
+|---|---|---|---|
+| Claude Max | $100〜200/acct | コスト加重（read = input の 10% 相当） | 実測（本 workspace が現に月 854 億 tok を Max ×3 で吸収） |
+| Kimi 会員（Andante 49 / Moderato 99 / Allegretto 199 / Allegro 699 元） | ~$7〜98 | **cached tokens は枠に数えない**（uncached input + output のみ計上） | 非公式ガイド記載。契約前に公式で要検証 |
+| GLM Coding Plan（Lite $18 / Pro $72 / Max $160、5h + 週次 credit 窓） | $18〜160 | credit 式 (input×6.9 + cached×1.7 + output×24)/10k → cached は input の **~25% 加重**。オフピーク（SGT 平日 14-18 時以外）50% 引き | 複数ガイド一致 |
+| Qwen Coding Plan（Pro $50。Lite は 2026-03 新規停止） | $50 | 会計非公開。コミュニティ実測でキャッシュヒット率が低く枠消費が速いとの報告複数 | 弱い |
+| OpenRouter | 定額なし（従量 + credit 手数料 ~5.5%） | 上流の cache 価格を素通し。**provider によっては cache 割引が消える**（DeepSeek 経由で実測、割引なし表示） | OpenRouter docs + models API 実測 |
+
+試算: 実測ミックスを GLM Coding Plan credit 式に入れると月 ~1,550 万 credits 必要 = Max プラン（週 14 万）の **~26 契約分** — GLM 定額はこの量を吸収できない。Kimi は cached 不算入が真なら枠消費は uncached in + out の月 ~13 億 tok だけで、会計上は最も agent-loop 向き — ただし TTL 3〜5 分なので slow loop では cached にならず結局計上される点に注意（会計の強さと TTL の弱さが打ち消し合う）。
+
+## Decision
+
+1. **主契約は Claude Max（複数アカウント）を維持する。** 決め手は単価でも会計でもなく **1h TTL**。この workspace の loop は 20〜30 分 tick が主体で、これに耐えるキャッシュを持つ契約が他にない。実測でも Max ×3 が月 854 億 tok を現に吸収している。
+2. **バルク・低品質許容の処理（分類・要約・大量バッチ）の従量オフロード先は GLM-5.3-flash（OpenRouter 経由）を第一候補にする。** blended $0.016/M は 2 位に 10 倍差。ただし TTL 3〜5 分なので、オフロードするのは「1 回で読み切る」バッチ形の仕事に限る（loop を移さない）。
+3. **品質が要る従量オフロードは blended で選ぶ**（GPT-5.1 > Kimi K2.7-code > Sonnet 5 の順、定価 input で選ばない）。cache 割引が消える経路（OpenRouter の一部 provider、GPT-5.2-pro）は避ける。
+4. **Kimi 会員は「interactive 専用の増枠」としてなら検討に値する**（cached 不算入が公式に確認できた場合のみ）。slow loop には移さない。
+5. **Qwen Coding Plan は採らない**（会計非公開 + キャッシュヒット率への否定的報告 + Lite 新規停止）。
+6. **契約・単価の数値は本 ADR の日付の測定値であり、定数として他文書へ転記しない**（CLAUDE.md の「実測値を規則に書かない」則に従う。引用する側は再測定する）。
+
+## Consequences
+
+- 月次の実効レート監視は「blended $/M at 実測ミックス」で行う。定価表での比較は禁止（GPT-5.1 と GLM-5.3 の逆転が示すとおり誤る）。
+- loop の tick 間隔を新設・変更するときは、行き先モデルの TTL と突き合わせる。TTL より長い tick の loop を 3〜5 分 TTL の契約に置くと、cache read 前提のコスト見積りが崩れる。
+- 本測定は本機のみ。cloud routine / fleet 推論 / Codex / Cursor 分の計測は未実施（未測定であって少ないではない）。
+
+## 出所
+
+- OpenRouter models API（cache read 単価、2026-08-29 実測）/ OpenRouter prompt caching docs（TTL・自動/明示・pass-through）
+- Kimi: kimi.ai resources（K3/K2.7 価格）、kimi-ai.chat guide（cached 不算入の記述）、Moonshot context-caching guide（自動・min 256 tok）
+- Z.ai: docs.z.ai devpack、GLM Coding Plan 各ガイド（credit 式・multiplier・オフピーク）
+- Qwen: Alibaba Model Studio（Qwen3.8-Max GA 価格）、コミュニティ報告（キャッシュヒット率）
+- ローカル実測: ~/.claude/projects 全数集計 + git log / rev-list サンプリング（本 ADR Context 節）"}]
