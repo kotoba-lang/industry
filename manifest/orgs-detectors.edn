@@ -2246,4 +2246,45 @@
               headroom for a loaded box. The runtime here is npm-installed nbb 1.4.208
               rather than a PATH nbb; on the workstation the registered argv resolves
               normally."}
+{:id :itonami-actor-pnl
+   :title "the P&L input for cloud-itonami actors, and the reason it does not close"
+   :why "2026-08-29, ADR-2608291009 (BOT / KUMO / YATA) defines what `a bot that
+              works and earns` means and names step 4: run that margin over the
+              governed actors. Run as written it returns a zero for every actor,
+              because both sides are structurally zero -- KUMO is never called
+              from production (ADR-2608026100 records the engine as complete and
+              unfired) and one cloud-itonami repo carries an x402 SKU. A zero
+              margin for `earned nothing and burned nothing` prints identically
+              to one for `broke even`, which is the defect class CLAUDE.md keeps
+              naming. This makes margin three-valued so the open cost side is
+              visible as an open cost side. It also reports the population,
+              because the population is wrong: :repo/has-actor-edn? is set by a
+              basename match anywhere in the tree, and ten of its forty-one hits
+              are schema/actor.edn -- Datomic attribute vectors. Measured while
+              writing it, twice: the first classifier called all twelve vectors
+              schemas and was wrong about aburi, whose manifest is tx-data with
+              :actor/did, caught by reading bodies rather than header comments;
+              and the first catalog guard admitted x402.nexus's service index,
+              which answers 200 to any unknown path with no :items, so a fetch
+              of the wrong URL read as `nobody sells anything` -- the finding
+              this detector exists to make. Cannot be a fleet gate: it reads
+              orgs/cloud-itonami and manifest/itonami-maturity-evidence.edn, and
+              no single shipped tree holds the actors."
+   :argv ["nbb" "{{repo}}/scripts/itonami-actor-pnl.cljs" "--findings" "--root" "{{root}}"]
+   :cwd :root
+   :findings :protocol
+   :writes :none
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :timeout-ms 180000
+   :interval-ms 86400000
+   :measured "2026-08-29: 41 scanned, 31 admitted, 10 schema-not-actor, 0 with a
+              SKU, 0 margins computable. Wall clock 6s including the catalog
+              fetch, so the 180s timeout is 30x headroom. Daily rather than
+              hourly because every input moves on the scale of a landed ADR, not
+              a commit. Discrimination checked in both directions before
+              landing: a receipts fixture covering all 31 exits 0, the same
+              fixture with three actors pushed below zero exits 1 naming three,
+              and the unmeasured state exits 2. Three refusals fire for their
+              own reasons -- no orgs tree, a receipts path that does not exist,
+              and a catalog that responds without carrying :items."}
 ]}
