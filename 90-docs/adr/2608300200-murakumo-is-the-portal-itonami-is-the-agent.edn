@@ -29,6 +29,7 @@
    "adr-2608291057-murakumo-model-api-authentication-boundary"]
   :adr/evidence
   ["live 2026-08-30: GET https://murakumo.cloud/ 200、h1 は『AI を、所有できるインターネットへ。』、strap は WEB3-NATIVE AI COMPUTE / x402 · USDC · Base / DID · CIDv1"
+   "live 2026-08-30 —— **今日の production は黙って差し替えている**: POST https://api.murakumo.cloud/v1/chat/completions に model=anthropic/claude-sonnet-4.6 を送ると HTTP 200 が返り、応答の model は murakumo-main、system_fingerprint は b9334-192d8ae8b（llama.cpp）。Claude を頼んで Qwen が答えており、呼び出し元にはその事実がどこにも出ない"
    "live 2026-08-30: GET https://api.murakumo.cloud/v1/models 200 —— 6 件すべて owned_by=murakumo の bare id（murakumo-main, murakumo-edge, qwen3.8-27b-*）。publisher-namespaced id は 0 件"
    "live 2026-08-30: GET https://api.murakumo.cloud/infer/models/murakumo-main → alias-for=qwen3.8-27b, status=serving, context=262144"
    "live 2026-08-30: GET https://itonami.cloud/ 200、lead は『model inference is delegated to Murakumo』、4 層は Kotoba=safe execution / Kotobase=durable state / Murakumo=AI inference / cloud-itonami=governed operations"
@@ -121,6 +122,15 @@ base URL を 1 つ変えるだけで model 文字列をそのまま使える。*
 **どちらも fleet model へ fallback しない。** `anthropic/claude-*` に Qwen で答えるのは
 呼び出し元が頼んだものの黙った差し替えであり、下流の誰にも見えない。CLAUDE.md の
 『測れなかった検査が、測って問題が無かった検査と同じ値を返す』の model 版である。
+
+**これは仮想の危険ではない —— 今日の production がまさにそれをしている。** 2026-08-30、
+live の `POST /v1/chat/completions` に `model=anthropic/claude-sonnet-4.6` を送ると
+**HTTP 200** が返り、応答の `model` は `murakumo-main`、`system_fingerprint` は
+`b9334-…`（llama.cpp）である。`resolve-endpoint` の `:else` が未知の id を
+default endpoint に落とすので、**Claude を頼んだ呼び出し元に Qwen が答え、
+その事実は応答のどこにも出ない**（`model` フィールドを読み比べない限り）。
+この変更が 402/503 を返すようにするのは、機能を塞ぐためではなく、
+**既に起きている嘘を止めるため**である。
 
 ### 5. web3 first —— card は代替であって前提ではない
 
