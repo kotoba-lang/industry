@@ -13,7 +13,12 @@
 
   `.cljc` on purpose: routing is testable without a browser, and only the
   listener is behind a reader conditional."
-  #?(:cljs (:require [re-frame.core :as rf])))
+  ;; `clojure.string` was used fully qualified and never required. On
+  ;; ClojureScript the build pulled it in anyway (another namespace requires it),
+  ;; so it worked — and a JVM `require` of this namespace, which the docstring
+  ;; above promises, would have failed. Measured 2026-08-29.
+  (:require [clojure.string :as str]
+            #?@(:cljs [[re-frame.core :as rf]])))
 
 (def views
   "Order is the nav order. `:id` is the fragment."
@@ -31,7 +36,7 @@
   "`\"#plan\"` → `:plan`. An unknown or empty fragment is the first view, never a
   blank screen — a victim who lands on a bad link still gets the intake form."
   [fragment]
-  (let [s (-> (str fragment) (clojure.string/replace #"^#" ""))
+  (let [s (-> (str fragment) (str/replace #"^#" ""))
         k (keyword s)]
     (if (contains? known k) k default-view)))
 

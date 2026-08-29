@@ -93,6 +93,11 @@
           probe (.evaluate page "window.__probe")
           mounted-after (.evaluate page "window.tasukeMountedAt")
           _ (check! (= "alive" probe) "window survived the crossing (routed, did not navigate)")
+          ;; `(= nil nil)` would pass, and nil is exactly what a removed
+          ;; `tasukeMountedAt` gives — the check would go green precisely when the
+          ;; thing it guards disappeared. Require a real value first.
+          _ (check! (number? mounted-before)
+                    (str "the mount marker exists to compare (" mounted-before ")"))
           _ (check! (= mounted-before mounted-after) "the app did not remount")
 
           ;; --- app state survives the crossing ------------------------------
@@ -134,6 +139,31 @@
           _ (.click page "a[href='#plan']")
           _ (.waitForSelector page ".app-steps")
           _ (.screenshot page #js {:path "out/tasuke-plan.png" :fullPage true})
+
+          ;; --- 証拠: the file never leaves, only its hash is kept -------------
+          ;; No gate covered this view, and a subscription deref'd in the form-2
+          ;; CONSTRUCTOR made the table render once and never repaint (measured
+          ;; 2026-08-29). A view that silently ignores what a victim adds is worse
+          ;; than one that is missing.
+          _ (.click page "a[href='#shoko']")
+          _ (.waitForSelector page "#ev-label")
+          _ (.fill page "#ev-label" "変更通知メールのスクショ")
+          _ (.setInputFiles page "input[type=file]"
+                            #js {:name "notice.txt" :mimeType "text/plain"
+                                 :buffer (js/Buffer.from "tasuke evidence fixture")})
+          _ (.waitForSelector page ".app-table tbody tr")
+          row (.textContent page ".app-table tbody tr")
+          _ (check! (str/includes? row "変更通知メールのスクショ")
+                    "the added evidence appears (the table is live, not a snapshot)")
+          ;; sha256("tasuke evidence fixture") = f6e35971c8fce0d8… — computed in the
+          ;; browser, and the bytes are dropped. Pinned to the CONTENT hash so the
+          ;; check cannot pass on a hash of the filename instead.
+          _ (check! (str/includes? row "f6e35971c8fce0d8")
+                    (str "the row carries the sha256 of the CONTENT (" row ")"))
+          n-rows (.evaluate page "document.querySelectorAll('.app-table tbody tr').length")
+          _ (.click page ".app-table tbody tr button")
+          _ (.waitForFunction page "document.querySelectorAll('.app-table tbody tr').length === 0")
+          _ (check! (= 1 n-rows) "削除 repaints the table (it went 1 → 0)")
           _ (.close browser)
           _ (.close srv)]
     (println "\nOK — browser checks passed")

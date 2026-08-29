@@ -69,8 +69,8 @@ host の行数ではない）の適用であり、同時に jp-go-dds の `kotob
 
 | 非対称（jp-go-dds が 2026-08-12 に実測） | この core |
 |---|---|
-| record 内の `:i64` は cljs で `js/BigInt` を要求し `js/Number` を拒否する | **record を宣言しない**。`:i64` は top-level 引数のみ |
-| `utf8-substring!` の `integer?` guard が BigInt で壊れる | 整数を文字列へ整形しない |
+| record 内の `:i64` は cljs で `js/BigInt` を要求し `js/Number` を拒否する | record は 1 つだけ（被害届の 6 値が ABI の 5 引数上限を超える）で全フィールド `:string`。`:i64` は top-level 引数のみ |
+| `utf8-substring!` の `integer?` guard が BigInt で壊れる | `yen` が整数を文字列へ整形する —— 露出する形そのもので、この pin 対では通ることを cljs gate で実測した |
 
 多値は `:document` ではなく改行区切り文字列。**両 runtime で通ると分かっている
 形を、片方でしか走らせていない豊かな形より優先する。**
@@ -101,9 +101,9 @@ cross-tier add を拒否）。そのため `60-apps/tasuke-app/` に staging す
 
 | 検査 | 結果 |
 |---|---|
-| `clojure -M:test`（JVM、出荷 artifact + 生成一致） | 8 tests / 34 assertions 緑 |
+| `clojure -M:test`（JVM、出荷 artifact + 生成一致） | 15 tests / 186 assertions 緑 |
 | `npm run test:cljs`（node、同じ artifact を cljs で実行） | 5 tests / 21 assertions 緑 |
-| `npx nbb scripts/verify_browser.cljs`（実 Chromium） | 10 項目緑 |
+| `npx nbb scripts/verify_browser.cljs`（実 Chromium） | 16 項目緑 |
 | bundle / document | 564 KB / 83 KB、document は 1 枚 |
 
 両方向を出した: JVM gate は誤った severity の assertion を実際に落とし、cljs gate は
@@ -124,6 +124,31 @@ pin している。
    画面は severity に関わらず時計を出す。
 3. **`.cljc` が cljs でコンパイルできない**（上記 Context）。ブラウザ・nbb で
    tasuke の domain を使う経路は、現状どれも存在しない。
+
+## レビューで見つかった 7 件（2026-08-29、着地前に修正）
+
+`/code-review` が PR #2727 に対して出した指摘。7 件とも実在し、すべて直した。
+**そのうち 4 件は「動いているように見えて黙って壊れている」形**である:
+
+1. **`shoko` が form-2 の constructor で subscription を deref していた** ——
+   証拠テーブルが一度きりの値を描き、追加も削除も反映されない。この view には
+   gate が無かった。ブラウザ gate に、実ファイルを投入して sha256 が **内容の**
+   ハッシュであることまで確かめる検査を足した。
+2. **`parse-yen` が「48万5千円」を 485 と読んでいた** —— 3 桁違いの金額が、
+   本人が署名する被害届と被害額算定書に印字される。読めない入力は
+   **`:ok? false` として報告し、推測しない**形に変えた（`tasuke-app.input`、可搬）。
+3. **`<noscript>` が窓口を生のコード**（`platform-abuse-desk → jpcert`）で出して
+   いた —— JavaScript の無い読み手にはコードを引く手段が無い。窓口表を
+   `tasuke-app.windows`（`.cljc`）に出し、生成器と view が同じものを読む。
+4. **`:done` が kind をまたいで持ち越されていた** —— 分類が変わると、別の
+   チェックリストが「やった」線で消された状態で出る。kind で鍵を付けた。
+5. `route.cljc` / `state.cljs` が `clojure.string` を require せず使っていた ——
+   cljs では他 ns 経由で通るが、docstring が約束する JVM require は落ちる。
+6. ブラウザ gate の `(= mounted-before mounted-after)` は、marker が消えたとき
+   `nil = nil` で**通る** —— 守ろうとしている当のものが消えたときに緑になる。
+   先に `number?` を確かめる形にした。
+7. README / この ADR の記述が commit 2 に追いついていなかった（書面 5 種は既に
+   guest にある、record は 1 つ宣言している、整数→文字列は実際に踏んでいる）。
 
 ## Consequences
 

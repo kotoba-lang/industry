@@ -26,8 +26,8 @@ jp-go-dds の `kotoba_oracle.clj` は、**JVM でだけ** guest に委譲し、C
 
 | 非対称 | この core の避け方 |
 |---|---|
-| record 内の `:i64` は cljs で `js/BigInt` を要求する | **record を 1 つも宣言しない**。`:i64` は top-level 引数だけ（`kir/execute` が coerce する） |
-| `utf8-substring!` の `integer?` guard が BigInt で壊れる | 整数を文字列に整形しない |
+| record 内の `:i64` は cljs で `js/BigInt` を要求する | record は 1 つだけ（被害届の 6 値が ABI の 5 引数上限を超えるため）で、**全フィールドが `:string`**。`:i64` は必ず top-level 引数（`kir/execute` が coerce する） |
+| `utf8-substring!` の `integer?` guard が BigInt で壊れる | この core は `yen` で **整数を文字列に整形する** —— つまり露出する形そのもの。この pin 対（amu 1e21a1f / kir 6d08e3c）では通ることを cljs gate で**実測**した（jp-go-dds は「露出していない」としか書けていなかった） |
 
 多値は `:document` ではなく改行区切りの文字列で返し、host が split する。
 **両方の runtime で通ることが分かっている形を選ぶ**（豊かだが片方でしか走らせて
@@ -52,6 +52,9 @@ npx nbb scripts/verify_browser.cljs   # 実ブラウザで 10 項目
 | `npx nbb scripts/verify_browser.cljs` | guest の答えが画面に出る / view を跨いでも document を読み込まない / 跨いでも state が残る / chip が本当に塗られている |
 | 負のコントロール | 未 export の関数呼び出しが `"function is not exported"` **その理由で**拒否される（理由の literal を pin する） |
 
+書面は 7 種とも guest が本文を持つ（被害届 / 被害状況報告書 / 証拠目録 / 被害額算定書 /
+銀行組戻し依頼 / プラットフォーム凍結復旧依頼 / アカウント復旧手順書）。
+
 いずれも壊して赤くなることを確認済み（2026-08-29）。
 
 ## この画面がしないこと
@@ -65,8 +68,6 @@ npx nbb scripts/verify_browser.cljs   # 実ブラウザで 10 項目
 
 ## まだ無いもの（正直に）
 
-- 被害届・被害状況報告書・証拠目録・被害額算定書・銀行組戻し依頼の**本文生成**。
-  tasuke 本体の `methods/report_gen.cljc` が持っており、guest へ移していない。
 - **live な公開先**。この session に Cloudflare の credential が無く deploy して
   いない。`public/` は静的ファイルなので、置けばそのまま動く。
 - **本来の置き場所への着地**。この app は `cloud-itonami/tasuke` に属する。この

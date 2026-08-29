@@ -10,7 +10,10 @@
   Without (2) a stale artifact passes (1) forever."
   (:require [clojure.test :refer [deftest is testing]]
             [tasuke-app.kir-gen :as gen]
-            [tasuke-app.oracle :as o]))
+            [tasuke-app.input :as input]
+            [tasuke-app.oracle :as o]
+            [tasuke-app.route :as route]
+            [tasuke-app.windows :as windows]))
 
 (def report
   "The wording of the report this app was built from, verbatim."
@@ -143,3 +146,43 @@
       (is (<= 3 (count (o/actions kind))) (str kind " has a first-response checklist"))
       (is (<= 4 (count (o/documents-for-kind kind 0))) (str kind " warrants the police core"))
       (is (not= kind (o/ja-kind kind)) (str kind " has a Japanese name")))))
+
+(deftest yen-input-is-read-or-refused
+  (testing "the shapes a member actually types"
+    (is (= {:jpy 480000 :ok? true} (dissoc (input/parse-yen "480000") :empty?)))
+    (is (= {:jpy 480000 :ok? true} (input/parse-yen "480,000円")))
+    (is (= {:jpy 480000 :ok? true} (input/parse-yen "48万")))
+    (is (= {:jpy 485000 :ok? true} (input/parse-yen "48万5千"))
+        "MEASURED: the first version read this as 485 — three orders of magnitude
+         under, printed into a filing the member signs")
+    (is (= {:jpy 485000 :ok? true} (input/parse-yen "48万5千円")))
+    (is (= {:jpy 120000000 :ok? true} (input/parse-yen "1億2000万")))
+    (is (= {:jpy 15000 :ok? true} (input/parse-yen "1.5万")))
+    (is (= {:jpy 480000 :ok? true} (input/parse-yen "４８００００")) "全角"))
+  (testing "nothing is nothing, and it is not an error"
+    (is (:ok? (input/parse-yen "")))
+    (is (= 0 (:jpy (input/parse-yen ""))))
+    (is (= {:jpy 0 :ok? true} (input/parse-yen "なし"))))
+  (testing "unreadable text is REPORTED, never guessed at"
+    (doseq [bad ["たぶん48くらい" "?" "48万くらい？" "百万"]]
+      (is (= {:jpy 0 :ok? false} (input/parse-yen bad))
+          (str bad " must not be silently turned into a number")))))
+
+(deftest window-codes-all-describe
+  (testing "every code the guest can return has an entry a victim can act on"
+    (doseq [kind ["phishing" "unauthorized-transfer" "account-takeover" "support-scam"
+                  "romance-scam" "investment-scam" "ransomware" "impersonation"
+                  "fake-billing" "sns-fraud" "leak-extortion"]
+            code (o/windows kind)]
+      (is (contains? windows/directory code)
+          (str code " is routed to but not described — a code is not a window"))
+      (is (not= code (windows/describe code))))))
+
+(deftest route-is-testable-off-the-browser
+  (testing "the namespace loads on the JVM, which its docstring promises"
+    (is (= :soudan (route/fragment->view "#soudan")))
+    (is (= :plan (route/fragment->view "#plan")))
+    (is (= :soudan (route/fragment->view "#nope")) "an unknown fragment is the first view")
+    (is (= :soudan (route/fragment->view "")) "so is none")
+    (is (= "#shorui" (route/view->fragment :shorui)))
+    (is (= (count route/views) (count (set (map :id route/views)))) "view ids are unique")))

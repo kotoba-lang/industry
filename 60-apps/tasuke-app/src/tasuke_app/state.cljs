@@ -13,7 +13,9 @@
   Evidence is the same rule taken one step further: the file's bytes are hashed in
   the browser and then dropped. What the db holds is a label, a kind and a sha256
   — never the content."
-  (:require [re-frame.core :as rf]
+  (:require [clojure.string :as str]
+            [re-frame.core :as rf]
+            [tasuke-app.input :as input]
             [tasuke-app.oracle :as oracle]
             [tasuke-app.route :as route]))
 
@@ -34,7 +36,7 @@
    :discovery ""
    :current   ""
    :evidence  []
-   :done      #{}})
+   :done      {}})
 
 (rf/reg-event-db :app/init (fn [_ _] initial))
 (rf/reg-event-db :route/set (fn [db [_ id]] (assoc db :route id)))
@@ -45,8 +47,14 @@
 
 (rf/reg-event-db
  :action/toggle
- (fn [db [_ step]]
-   (update db :done #(if (contains? % step) (disj % step) (conj % step)))))
+ ;; Keyed BY KIND. The checklist is positional, and the positions mean different
+ ;; steps for different kinds — a set of bare indices carried across a
+ ;; reclassification renders a different checklist with unperformed steps struck
+ ;; through, which is the one thing a first-response list must never do.
+ (fn [db [_ kind step]]
+   (update-in db [:done kind]
+              #(let [s (or % #{})]
+                 (if (contains? s step) (disj s step) (conj s step))))))
 
 (rf/reg-event-db
  :evidence/add
@@ -58,34 +66,19 @@
 
 ;; --- derived: everything below is the guest's answer, not this app's ---------
 
-(defn- parse-yen
-  "「48万」「480,000円」「なし」→ yen. Kept on the host because it is text
-  normalization, not a decision — the same boundary the guest draws for case
-  folding it does NOT draw here."
-  [s]
-  (let [t (-> (str s) (clojure.string/replace "," "") (clojure.string/replace "円" "")
-              (clojure.string/trim))]
-    (cond
-      (clojure.string/blank? t) 0
-      (contains? #{"なし" "無し" "ない"} t) 0
-      :else (if-let [m (re-matches #"(\d+(?:\.\d+)?)万(\d+)?" t)]
-              (long (+ (* (js/parseFloat (nth m 1)) 10000)
-                       (if (nth m 2) (js/parseInt (nth m 2)) 0)))
-              (let [n (js/parseInt (clojure.string/replace t #"[^0-9]" ""))]
-                (if (js/isNaN n) 0 n))))))
-
 (rf/reg-sub :route (fn [db _] (:route db)))
 (rf/reg-sub :field (fn [db [_ k]] (get db k)))
 (rf/reg-sub :evidence (fn [db _] (:evidence db)))
-(rf/reg-sub :done (fn [db _] (:done db)))
-(rf/reg-sub :loss-jpy (fn [db _] (parse-yen (:loss db))))
+(rf/reg-sub :done (fn [db [_ kind]] (get (:done db) kind #{})))
+(rf/reg-sub :loss (fn [db _] (input/parse-yen (:loss db))))
+(rf/reg-sub :loss-jpy (fn [db _] (:jpy (input/parse-yen (:loss db)))))
 
 (rf/reg-sub
  :triage
  (fn [db _]
    (oracle/triage {:narrative (:narrative db)
                    :explicit  (:explicit db)
-                   :loss-jpy  (parse-yen (:loss db))
+                   :loss-jpy  (:jpy (input/parse-yen (:loss db)))
                    :ongoing?  (:ongoing? db)})))
 
 (rf/reg-sub
@@ -101,12 +94,12 @@
        (map-indexed (fn [i it]
                       (str "  " (inc i) ". [" (:kind it) "] sha256="
                            (subs (:sha256 it) 0 16) "… ref=" (:label it))))
-       (clojure.string/join "\n")))
+       (str/join "\n")))
 
 (rf/reg-sub
  :filings
  (fn [db _]
-   (let [loss (parse-yen (:loss db))
+   (let [loss (:jpy (input/parse-yen (:loss db)))
          subject (:subject db)
          kind (oracle/classify (:narrative db) (:explicit db))]
      {"damage-report"
