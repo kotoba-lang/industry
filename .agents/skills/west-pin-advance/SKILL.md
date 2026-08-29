@@ -154,14 +154,15 @@ superproject のサブディレクトリなので上方向の探索が superproj
 topdir が固定される。実測検証: ADR-2607011300。
 
 ```bash
-# ✅ 正: superproject の外に worktree を作り、topdir を固定
-git worktree add -b <agent-branch> /tmp/root-<agent-name> origin/main
-cd /tmp/root-<agent-name>
-west init -l manifest                       # ← この worktree 専用の .west/ を生成
-west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独立 checkout
+# ✅ 正: helper が current origin/main + external sparse worktree + targeted west を固定
+nbb scripts/root-worktree.cljs create <task> --west <必要なrepo名>
+# 複数なら --west a,b または --west a --west b。引数ゼロ update は生成されない。
 # ❌ 誤: .Codex/worktrees/<name> 配下の worktree で west を動かす
 #        （superproject 本体を topdir と誤認し、本体の orgs/ を書き換える）
 ```
+
+full root checkout は `--profile full` を明示した場合だけ。root側の追加directoryは
+`--include <path>`、ADRを含む標準viewは`--profile docs`。詳細はADR-2608291248。
 
 注意:
 - これでも防げないのは **上流の force-push 系**（`origin/main` の force-rewrite /

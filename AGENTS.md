@@ -688,10 +688,12 @@ push 直前まで行われなかった。**警告を読むことと同期する�
   `west update` / 読み取りだけ。本体に未コミット編集が転がっていると、並行セッションの
   main 同期のたびに「他人の WIP を stash 温存」が発火して stash が堆積する。
 - **作業は 1 task = 1 branch = 1 worktree（superproject の外、sibling path）。**
-  `git worktree add -b <branch> /tmp/root-<name> origin/main`。superproject の
-  full checkout は重い（2分超）ので、触るパスが少ない作業は `--no-checkout` +
-  `git sparse-checkout set --no-cone <paths>` で部分 checkout にする。worktree 内で
-  west を使う場合は前節のとおり `west init -l manifest` で topdir を固定する。
+  既定入口は `nbb scripts/root-worktree.cljs create <task>`（ADR-2608291248）。
+  `origin/main` fetch → `--no-checkout` → cone sparse checkout + sparse-index を行い、
+  root 23万件を毎回展開しない。ADR/政策は `--profile docs|policy`、追加 directory は
+  `--include <path>`。west child が必要なら `--west <name>` を明示し、対象だけを
+  `west update --fetch smart` する。full root は `--profile full` を**明示した場合だけ**。
+  worktree 内の `west init -l manifest` と superproject 外配置で topdir を固定する。
 - **WIP の退避は stash でなく session branch への commit。** commit は名前・履歴・
   所有者が付き branch 単位で棚卸しできるが、stash は無名の共有スタックで誰のものか
   追えなくなる。stash を使ってよいのは「共有 checkout で見つけた他人の未コミット WIP を

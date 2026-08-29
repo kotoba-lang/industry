@@ -67,11 +67,25 @@ nbb scripts/b2-creds.cljs --json        # プログラム用（west_annex.cljs �
 
 ```bash
 west init -l manifest                                   # 初回（非破壊）
-west list -f '{name}' | grep -v '^manifest$' | xargs west update --fetch smart
+west update --fetch smart <name> [<name> ...]           # 必要な project だけ
 west list ; west status
 nbb scripts/gen-west-manifest.cljs                         # pin 前進後に再生成（手書き禁止）
 nbb scripts/gen-west-manifest.cljs --check                 # CI: 乖離で exit 1
 ```
+
+### task worktree（root 全23万fileを毎回展開しない）
+
+```bash
+nbb scripts/root-worktree.cljs create <task>                         # minimal sparse root
+nbb scripts/root-worktree.cljs create <task> --profile docs          # ADRを含む
+nbb scripts/root-worktree.cljs create <task> --west <project-name>   # childを1件だけ取得
+nbb scripts/root-worktree.cljs inspect /private/tmp/root-<task>-...  # shape確認
+nbb scripts/root-worktree.cljs remove /private/tmp/root-<task>-...   # clean/ignored childを検査して除去
+```
+
+既定は外部worktree + sparse-indexで、full checkoutは`--profile full`を明示した時だけ。
+`--west`が無ければwest update自体を実行せず、指定があればその名前だけを渡すため、
+引数ゼロで全projectを歩く経路は無い。設計の正本はADR-2608291248。
 
 ### actor manifest / Lexicon boundary audit
 

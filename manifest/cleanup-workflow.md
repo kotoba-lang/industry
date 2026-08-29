@@ -698,8 +698,8 @@ accumulation); this section is the recovery path. Verified in practice 2026-07-0
    sparse worktree outside the superproject (full checkout is slow):
 
    ```bash
-   git worktree add --no-checkout -b stash-rescue-<date> /tmp/root-stash-rescue origin/main
-   cd /tmp/root-stash-rescue && git sparse-checkout set --no-cone <paths> && git checkout
+   nbb scripts/root-worktree.cljs create stash-rescue-<date> --include <directory>
+   cd <helper-printed-exact-path>
    git apply -3 --include='<path>' <archive>/<sha>.patch   # 3-way, per rescued file
    git commit && git push origin stash-rescue-<date>        # push; merge is owner's call
    ```
