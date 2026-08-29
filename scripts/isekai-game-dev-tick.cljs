@@ -13,7 +13,9 @@
 ;;       :fresh に畳まない（ADR-2608136000 の形）。
 ;;   (b) 候補。優先順:
 ;;       1. registration-gap — public/games/<ns>/<g>/ に居るのに
-;;          {game.edn, content-ratings.edn の entry, thumbnail.svg} のどれかが無い
+;;          {game.edn, content-ratings.edn の entry, thumbnail.svg} のどれかが無い。
+;;          ただし deliberately-unlisted（オーナー判断で catalog 外のもの）は
+;;          候補にせず :excluded として出力に見せる
 ;;       2. new-game — public/benchmarks/catalog.edn の :samples で
 ;;          :status が :planned / :next のもの
 ;;       3. どちらも無ければ :no-candidates
@@ -120,9 +122,26 @@
          sort vec)
     (catch :default _ nil)))
 
+(def deliberately-unlisted
+  "public/games/ に居るが、**オーナー判断で catalog に載せていない**もの。
+  登録漏れ（bot が塞ぐ対象）ではないので registration-gap から除外する。
+  黙って消さない —— tick の出力に :excluded として毎回出す。
+
+  - gftd/castlevania — Canvas 2D の standalone prototype。listed games が共有する
+    3D kami.webgpu render-IR pipeline を通らないため、意図して game discovery の
+    外に置かれている（根拠: network-isekai の shadow-cljs.edn の :castlevania
+    build 冒頭コメント、~L48「NOT part of :app, NOT listed in game discovery」）
+  - gftd/sekaiju — 2D 横スクロール MMO client（network-isekai ADR-0071）。
+    castlevania と同じ形（独自 module / Canvas 2D / no WebGPU）で、意図して
+    catalog の外（同じく shadow-cljs.edn の :sekaiju build コメントが明記）
+
+  ここに足すときは、除外の根拠が**上流 repo に書かれている**ことを確かめてから。"
+  #{"gftd/castlevania" "gftd/sekaiju"})
+
 (defn- registration-gaps
   "public/games/<ns>/<g>/ に居るのに登録が欠けているゲーム。
-  content-ratings が読めなかったら nil（= 測れなかった。0 件ではない）。"
+  content-ratings が読めなかったら nil（= 測れなかった。0 件ではない）。
+  deliberately-unlisted は候補にしないが、:excluded として持ち帰る。"
   []
   (let [games-dir (str repo-abs "/public/games")
         ratings (read-edn-file (str repo-abs "/resources/content-ratings.edn"))
@@ -130,16 +149,21 @@
     (if (nil? rated)
       nil
       (when-let [nss (list-dirs games-dir)]
-        (vec
-         (for [ns- nss
-               g (or (list-dirs (str games-dir "/" ns-)) [])
-               :let [base (str games-dir "/" ns- "/" g)
-                     missing (cond-> []
-                               (not (exists? (str base "/game.edn"))) (conj :game.edn)
-                               (not (contains? rated (str "/" ns- "/" g))) (conj :content-rating)
-                               (not (exists? (str base "/thumbnail.svg"))) (conj :thumbnail.svg))]
-               :when (seq missing)]
-           {:kind :registration-gap :game (str ns- "/" g) :missing missing}))))))
+        (let [rows (for [ns- nss
+                         g (or (list-dirs (str games-dir "/" ns-)) [])
+                         :let [base (str games-dir "/" ns- "/" g)
+                               id (str ns- "/" g)
+                               missing (cond-> []
+                                         (not (exists? (str base "/game.edn"))) (conj :game.edn)
+                                         (not (contains? rated (str "/" id))) (conj :content-rating)
+                                         (not (exists? (str base "/thumbnail.svg"))) (conj :thumbnail.svg))]
+                         :when (seq missing)]
+                     {:kind :registration-gap :game id :missing missing})]
+          {:gaps (vec (remove #(deliberately-unlisted (:game %)) rows))
+           ;; 除外は沈黙させない: 除外したものと、それが何を欠いているかを見せる。
+           ;; 除外集合に居るのに欠けが 0 のもの（= いつか登録された）はここに
+           ;; 出なくなるので、集合の陳腐化も出力から見える。
+           :excluded (vec (filter #(deliberately-unlisted (:game %)) rows))})))))
 
 (defn- planned-samples
   "catalog.edn の :samples で :status :planned / :next。読めなければ nil。"
@@ -165,36 +189,42 @@
 
     :else
     (let [fr (freshness)
-          gaps (registration-gaps)
+          reg (registration-gaps)
+          gaps (:gaps reg)
+          excluded (:excluded reg)
           planned (delay (planned-samples))]
       (cond
         ;; ratings が読めない = registration を測れない。planned だけで
         ;; 「候補あり/なし」を言うと、測れなかった面が clean の顔をする。
-        (nil? gaps)
+        (nil? reg)
         (do (prn {:outcome :not-measured :why :content-ratings-unreadable
                   :freshness fr})
             (js/process.exit 2))
 
         (seq gaps)
-        (do (prn {:outcome :candidate :kind :registration-gap
-                  :candidate (first gaps) :all-gaps gaps
-                  :freshness fr})
+        (do (prn (cond-> {:outcome :candidate :kind :registration-gap
+                          :candidate (first gaps) :all-gaps gaps
+                          :freshness fr}
+                   (seq excluded) (assoc :excluded excluded)))
             (js/process.exit 0))
 
         (nil? @planned)
-        (do (prn {:outcome :not-measured :why :benchmarks-catalog-unreadable
-                  :freshness fr})
+        (do (prn (cond-> {:outcome :not-measured :why :benchmarks-catalog-unreadable
+                          :freshness fr}
+                   (seq excluded) (assoc :excluded excluded)))
             (js/process.exit 2))
 
         (seq @planned)
-        (do (prn {:outcome :candidate :kind :new-game
-                  :candidate (first @planned) :all-planned @planned
-                  :freshness fr})
+        (do (prn (cond-> {:outcome :candidate :kind :new-game
+                          :candidate (first @planned) :all-planned @planned
+                          :freshness fr}
+                   (seq excluded) (assoc :excluded excluded)))
             (js/process.exit 0))
 
         :else
-        (do (prn {:outcome :no-candidates :freshness fr
-                  :note "registration gap 0 件、planned sample 0 件"})
+        (do (prn (cond-> {:outcome :no-candidates :freshness fr
+                          :note "registration gap 0 件、planned sample 0 件"}
+                   (seq excluded) (assoc :excluded excluded)))
             (js/process.exit 0))))))
 
 (-main)
