@@ -84,6 +84,7 @@ TTL が切れた read は write/input 価格に化ける。ScheduleWakeup 20〜3
 ## 改訂履歴
 
 - 2026-08-29(同日 2 回目): OpenRouter の routing とキャッシュ局所性、murakumo.cloud の cache read 設計を追加調査した(下記 2 節)。
+- 2026-08-29(同日 4 回目): 計器の 2 つの穴(streaming 未計測 / origin label が常に誤り)を塞いだ。下記『計器の穴を塞いだ』節。
 - 2026-08-29(同日 3 回目): murakumo に cache 計器を実装して deploy し、live で測った。下記『murakumo の cache read 設計の現在地』の判定が **測定によって置き換わった** —— 『未設計に近い』は routing/会計については正しかったが、node 層については誤りで、cache は動いている。ただし byte-identical な要求にしか効かない。
 
 ## OpenRouter 等 aggregator の追加知見 — routing がキャッシュを割る
@@ -163,6 +164,65 @@ ring が入れ替われば代表性が出る。**`:runs-measured` を見ずに `
   したがって「直したばかりの anti-pattern を gateway が再生産している」という前節の
   記述は、**live の害としては誇張**だった —— 将来 live 化するときに塞ぐべき seam であって、
   今日壊れている経路ではない。sticky routing の実装は未着手(pure fn + test で足りる)。
+
+## 計器の穴を塞いだ(2026-08-29、4 回目の改訂)
+
+3 回目で入れた計器には 2 つの穴があり、どちらも **「測れていない」が「問題なし」と
+同じ顔をする**形だった。両方 landed / deploy 済み(f35d020, 008608e)。
+
+### 穴 1 — streaming が一切測れていなかった
+
+cost/stream-run は tokens と elapsed しか受け取らず、prompt/cached を持たなかった。
+つまり GET /infer/cost の hit 率は **非 streaming だけの標本**で、しかもそれが標本だと
+出力から分からなかった。llama.cpp は streaming でも最終チャンクに timings を載せる
+(実測: finish_reason チャンク。**delta は空 map であって nil ではない**ので、usage 専用の
+枝には落ちない。usage はさらに別チャンク)。stream state machine が cond のどの枝でも
+timings/usage を控えるようにし、非 streaming と同じ cached-prompt-tokens の優先順で測る。
+
+**まだ塞がっていない**: /v1/chat/completions の streaming は verbatim passthrough で
+**run を 1 件も記録しない**(cache だけでなく cost も未計測)。SSE 本文に触らない設計なので、
+tee するには live streaming 経路を変える必要がある。:by-mode にも現れない ——
+記録が無いものは分母にすら入らない。
+
+### 穴 2 — origin label が常に誤りで、直したつもりの 1 回目も誤りだった
+
+head-node は env の静的値(既定 \"gad\")を返すだけで、実際にどの origin が応答したかを
+見ていなかった。b70 が捌いた run も \"gad\" と記録され、origin ごとの hit 率が出せなかった。
+
+**1 回目の修正(f35d020)は効かなかった。** resolve-endpoint が返すのは *候補* であって、
+実際に応答した origin ではない —— main pool はその先の fetch-inference で failover する
+(既定候補は gad、実際に捌くのは b70 が常態)。候補で label すると修正前と**まったく同じ
+誤答**を返す。しかも by-origin が {\"gad\" 200} という「それらしい」形で出るので、
+**出力を見ても間違いだと分からない**。この ADR が扱っている失敗の型そのものが、
+その修正の中で再発した。
+
+2 回目(008608e)で fetch-inference に任意の on-origin callback を足し(既定 nil =
+従来どおり)、候補が実際に応答した枝で呼ぶ。deploy 後の実測で by-origin が
+b70 runs=2 hit=0.9959 を報告し、初めて修正が確認できた。
+
+**教訓: unit test はこの区別を持てない。** 候補と served の違いは live の failover でしか
+現れないので、テストは緑のまま誤った label を通す。**この種の修正は deploy 後の
+end-to-end 観測でしか検証できない。**
+
+### cache-summary に :by-origin / :by-mode を足した
+
+label を直すだけでは分解は得られず、**分解こそが目的**だった。全体を 1 つの率に畳むと、
+ある origin の 0% が別の origin の 100% に薄められて見えなくなる。:by-mode は
+「その率が sync だけの標本ではないか」を出力から判定可能にする。
+
+⚠ **ring が入れ替わるまで by-origin の gad バケットは信用しない。** 200 run の ring には
+修正前の run(静的 label で記録された、真の origin が不明なもの)が混ざっており、
+実測時点で gad runs=198 の中身は「gad が捌いた run」ではなく「修正前の run」である。
+新旧を出力から区別する手段は無い —— 時間が解決する(ring が 200 run で一巡する)。
+
+### 現在地(2026-08-29 deploy 後の実測。標本であって定数ではない)
+
+runs-measured 200/200、全体 hit-rate 約 0.88、:by-mode は当時 sync のみ
+(streaming 計測は同じ deploy で入ったので、以後 stream バケットが立つ)。
+**この 0.88 と、上の「byte-identical にしか効かない」実測は矛盾していない** ——
+実トラフィックに同一 prefix の再送(健全性 probe / retry / cron)がどれだけ含まれるか
+次第で、両立する。**どちらか一方を fleet の実力として引用しない。**
+分解が入ったので、次はこの内訳(origin x mode)を読んでから --cache-reuse を測る。
 
 ## 出所
 
