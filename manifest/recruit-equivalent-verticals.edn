@@ -224,8 +224,13 @@
  ;; ⚠ **現在地: どの経路も biscuit を使っていない**（`manifest/concept-vocabulary.edn`
  ;; の :delegation 項、ADR-2608180200）。live なのは CACAO 自己発行で、biscuit の
  ;; wire 相互運用（protobuf）は書かれていない。だからこの節は **設計であって観測では
- ;; ない** —— `:authority/status` は行ごとに tick が測り、実装が無い間は
- ;; `:declared-not-live` と報告する。「宣言した」を「効いている」と読ませない。
+ ;; ない**。
+ ;;
+ ;; ⚠ **tick はこれが live かを測らない。** org-biscuitsec を読む段を持たないので、
+ ;; 検査できるのは「`:authority/resource` が下の `:scheme` に乗っているか」だけ。
+ ;; live かどうかは毎回 `NOT-MEASURED biscuit-live` として出力に明示する ——
+ ;; **測っていないことを、測って問題が無かったことと同じ顔にしない**（CLAUDE.md の
+ ;; 6 問の 4 番目）。live 化の段で、その検査をここに足すこと。
  :registry/authority
  {:decider      "kotoba-lang/authority"
   :decider-note "判定は 1 つ。biscuit も CACAO も UCAN も ->grant で inert data に落ちてから決定に入る（ADR-2608180200）。ここで 2 つ目の判定器を作らない。"
