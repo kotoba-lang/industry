@@ -76,22 +76,66 @@
                               :else :unverifiable)))))
       (.catch (fn [_] :unverifiable))))
 
+(defn- profile-missing?
+  "-> Promise<bool>. Only a definite RecordNotFound counts as missing — an
+   unreachable PDS must not trigger a re-write."
+  [did]
+  (-> (js/fetch (str core/pds "/xrpc/com.atproto.repo.getRecord?repo="
+                     (js/encodeURIComponent did)
+                     "&collection=app.bsky.actor.profile&rkey=self"))
+      (.then (fn [resp]
+               (.then (.text resp)
+                      (fn [text] (str/includes? text "RecordNotFound")))))
+      (.catch (fn [_] false))))
+
+(defn- ensure-profile!
+  "On the createSession path the account already exists, but a bot first
+   registered while the Biscuit cutover 401'd createAccount has no profile
+   record (measured 2026-08-29: RecordNotFound for every cast bot). Write
+   profile + registration post exactly once. -> Promise<suffix-string>."
+  [{:keys [display description post]} did token]
+  (-> (profile-missing? did)
+      (.then
+       (fn [missing?]
+         (if-not missing?
+           ""
+           (-> (xrpc "com.atproto.repo.putRecord"
+                     {:repo did :collection "app.bsky.actor.profile" :rkey "self"
+                      :record {:$type "app.bsky.actor.profile"
+                               :displayName display
+                               :description description}} token)
+               (.then (fn [{:keys [ok status body]}]
+                        (if-not ok
+                          (js/Promise.resolve
+                           (str "+profile-failed " status " " (get body "error")))
+                          (-> (xrpc "com.atproto.repo.createRecord"
+                                    {:repo did :collection "app.bsky.feed.post"
+                                     :record {:$type "app.bsky.feed.post"
+                                              :text post
+                                              :createdAt (core/whole-second-iso)}} token)
+                              (.then (fn [{:keys [ok]}]
+                                       (if ok "+profiled" "+profiled-post-failed")))))))))))))
+
 (defn register-bot!
   "bot: {:name <slug-or-producer> :display <name> :description <text> :post <text>}"
-  [{:keys [name display description post]}]
+  [{:keys [name display description post] :as bot}]
   (let [handle (core/handle name)
         seed (ensure-seed! handle)]
     (-> (xrpc "com.atproto.server.createSession" {:cacao (mint seed)} nil)
         (.then
          (fn [{:keys [ok body] :as sess}]
            (if ok
-             (-> (resolve-handle handle)
-                 (.then (fn [hstate]
-                          {:name name :handle handle :did (get body "did")
-                           :state (case hstate
-                                    :bound "registered"
-                                    :unbound "session-ok-handle-unbound"
-                                    "session-ok-handle-unverifiable")})))
+             (let [did (get body "did") token (get body "accessJwt")]
+               (-> (resolve-handle handle)
+                   (.then (fn [hstate]
+                            (.then (ensure-profile! bot did token)
+                                   (fn [suffix]
+                                     {:name name :handle handle :did did
+                                      :state (str (case hstate
+                                                    :bound "registered"
+                                                    :unbound "session-ok-handle-unbound"
+                                                    "session-ok-handle-unverifiable")
+                                                  suffix)}))))))
              (-> (xrpc "com.atproto.server.createAccount" {:handle handle :cacao (mint seed)} nil)
                  (.then
                   (fn [{:keys [ok body status]}]

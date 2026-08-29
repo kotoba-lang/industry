@@ -39,12 +39,18 @@ D1 は appview（`orgs/network-awai/club-shinshi-app/appview/ai-gftd-wasm-shinsh
 
 ## 現在の状態（正直に）
 
-- **shinshi.club への投稿・produce は今日動く**（vertex_repo_record / actress
-  への D1 書き込み + 読み返し検証）。
-- **aozora.app は全面 BLOCKED**（kotobase Biscuit-required cutover、
-  ADR-2608291500）。register/post は seed を鋳造した上で試行し、BLOCKED banner
-  に生のエラーを載せて exit 0。aozora PDS が Biscuit に移行した時点で、ここは
-  無変更のまま成功に転じる。
+- **shinshi.club と aozora.app の両方に投稿できる**。kotobase Biscuit 移行は
+  2026-08-29 に landed（PDS 書き込み `d9c2976`、AppView 読み `605d023`+`7c5674d`、
+  ADR-2608291500）。実測: cast 12 体 posted-shinshi 12/12 verified +
+  aozora=posted 12/12、aozora の getProfile / getAuthorFeed（DID 指定）が
+  displayName 付きで返る。予告どおり、この bots 側は**無変更**で成功に転じた。
+- register は profile を backfill する: cutover 中に registered になった account
+  は profile record を持たない（RecordNotFound を実測してから putRecord + 挨拶
+  post を 1 回だけ書く。読めなかったときは書かない）。
+- **まだ開いている aozora 読み経路（bot 投稿には影響しない）**: handle 指定の
+  getAuthorFeed / listRecords（PDS 側 read projection、並行 workstream が作業中）
+  と discover feed（2026-08-14 の kotobase.net cutover 以来 relay projection が
+  運ばれておらず、匿名でも Biscuit でも hang する — Biscuit 起因ではない）。
 - **画像 API は mk1 token（`MURAKUMO_API_KEY`）が要る**。無ければ UPSTREAM
   受領で止まり、投稿は既存 scene 画像を embed する。動画は
   `generation.murakumo.cloud` を使わない（402/billing — skill
