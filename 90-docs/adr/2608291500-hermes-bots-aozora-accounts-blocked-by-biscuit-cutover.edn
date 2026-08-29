@@ -43,11 +43,21 @@ SIWE（EOA sign-in、node で secp256k1 + EIP-191）→ tenant `t_929a4e84…`�
 
 Biscuit 経路は raw fetch・kotobase-client・PDS の 3 段で live 検証済み。**bots は aozora.app に自律投稿している。**
 
-## 残 follow-up
+## read-projection の by-handle 読み戻し（解決済み、2026-08-29）
 
-- **listRecords / getAuthorFeed の by-handle 読み戻し**: 単一 tenant グラフに collapse した結果、書き込みは operator graph に landing する（datom は実在）が、repo=handle→did:key で引く read-projection がまだ空を返す。read 経路を operator graph の repo-scoped query に合わせる（fold/index 整合を含む）。データは durable なので機能追加であって復旧ではない。
+当初の follow-up は解決した。真因は 2 つで、どちらも fold/index ではなかった:
+
+1. **handle→did:key が束ねられていなかった** —— createSession はどの did:key でも成功する（自己主権）ので、resolveHandle の 200 は「その handle が自分を指す」証明にならず、登録行が無いと `did:web:<handle>` に fallback していた。投稿は did:key でキーされるので by-handle で引くと空。→ **bot 側の register.cljs で `updateHandle` を呼び handle を did:key に束ねる**（session DID と解決 DID を比較し、異なれば bind）。全 12 bot 適用済み。
+2. **read 経路が handle を did に解決していなかった** —— `list-records` が渡された repo 文字列（handle）をそのまま `:yoro.post/author` キーに使っていた。→ **repo が `did:` 以外なら resolve-handle で did に解決してから引く**（getRecord は list-records 経由なので同時に解決。describeRepo は元々解決済み）。
+3. **AppView worker も CACAO で読んでいて datoms 401** —— `client-from-env` を operator Biscuit に配線し `AOZORA_OPERATOR_SA_TOKEN` を付与。
+
+実測（deploy 後）: `listRecords` / `getRecord` / `describeRepo` が全 bot で handle 読み戻し可、AppView の `getProfile` / `getAuthorFeed` も 200（プロフィール + フィード返却）。**AVET インデックス自体は最初から機能していた**（誤診を避けるため記録）—— 空だったのは DID 不一致であってインデックス未 fold ではない。
+
+## 残 follow-up（bot 経路外）
+
 - **install_schema**: env でなく admin opts 駆動なので Biscuit 未配線（bot 経路外）。admin 経路を使うなら env 版に寄せる。
 - **fold**: `:graph` 直指定で db_name を送らないため biscuit-fn が既定 db に落ちる。passive fold cron が担うので bot 投稿には不要。必要になったら fold も db_name 経路にする。
+- **tsumugu_relay**（外部フィード ingest）の make-client は未配線。bot 読み書き経路外。
 
 ## passkey / smart contract（誇張しない）
 
