@@ -1,0 +1,45 @@
+{:system/id :world-legal-knowledge
+ :mission "Continuously expand a provenance-preserving worldwide public legal knowledge graph without claiming complete global coverage."
+ :wiki-target "network-awai/app-hyakka"
+ :coverage-unit [:jurisdiction :authority :source :document-class :language]
+ :corpora {:legislation [:bill :law :regulation :amendment :official-gazette-record]
+           :cases [:court :case :docket-event :opinion :order :judgment :appeal]
+           :profession [:lawyer :bar-admission :disciplinary-status :judge :judicial-office :appointment]
+           :news [:legal-news-report :official-press-release]}
+ :required-common-fields [:jurisdiction :issuing-authority :source-url :source-language
+                          :original-title :observed-at :content-hash :source-class]
+ :required-legislation-fields [:document-type :official-identifier :status :introduced-at
+                               :enacted-at :effective-at :version :amends :repeals]
+ :required-case-fields [:court :case-number :docket-number :filed-at :decision-at
+                        :procedural-posture :disposition :appeal-status :party-role]
+ :required-profession-fields [:person-name :professional-role :jurisdiction :public-register-id
+                              :organization :office-status :term-start :term-end]
+ :required-news-fields [:publisher :headline :published-at :updated-at :byline
+                        :reporting-language :about-legal-record]
+ :source-policy
+ {:legislation-allow [:official-legislature :official-gazette :official-legislation-registry]
+  :cases-allow [:official-court :official-docket :official-judiciary :official-prosecutor]
+  :profession-allow [:official-bar-or-regulator :official-judiciary :official-appointment-record]
+  :news-allow [:publisher-owned-news-page :publisher-owned-feed :official-institution-release]
+  :forbid [:search-snippet :generated-summary :third-party-wiki-prose :people-search-broker
+           :home-address :personal-email :private-phone :unverified-social-post
+           :paywall-bypass :captcha-bypass]}
+ :epistemic-boundaries
+ [:bill-is-not-law
+  :allegation-or-charge-is-not-guilt
+  :lower-court-ruling-is-not-final-when-appeal-is-pending
+  :news-report-is-a-report-not-a-judicial-holding
+  :machine-translation-is-not-authoritative-text
+  :missing-is-unmeasured
+  :worldwide-is-a-coverage-goal-not-a-completeness-claim]
+ :run-bounds {:schema-prs 1 :sources-per-run 2 :jurisdictions-per-run 2 :prs-per-run 1}
+ :safety-boundaries [:public-professional-data-only
+                     :no-legal-advice
+                     :no-personal-risk-scoring
+                     :no-autonomous-contact
+                     :no-ledger-hand-edit
+                     :no-shared-orgs-worktree-write
+                     :no-direct-main-push
+                     :no-force-push
+                     :no-merge
+                     :no-deploy]}
