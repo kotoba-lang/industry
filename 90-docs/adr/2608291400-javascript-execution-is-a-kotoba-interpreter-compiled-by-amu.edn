@@ -360,30 +360,44 @@ effect-as-value で通り、quickjs-ng に対して両方向で測ってある�
   `document.title` ではなく `document.getElementById(...)` 越しに書く。どちらが効いて
   いるかは判っていない。
 
-  **⚠ そして 3 つ直しても、スイートは最後まで走らない。** 3 つの修正を「これで直った」と
-  読まないこと —— それぞれ単独では正しいが、実行は依然として終わらない。
+  **⚠ 機械を測ってからテストを疑うこと。** 実測 2026-08-29、このテストは「ハングして
+  いる」ように見えたが、その大半は**同じスイートが 4 本同時に走っていた**ことだった。
+  `scripts/resource-guard.mjs` が直列化するのは **build であって、その後に走る test
+  ではない**。guard を待つ retry loop は、前の実行が生きているうちに次を起動する。
+  4 本のうち listening server を握れたのは 1 本で、残る 3 本は **server を持てないまま
+  最初の `println` にも到達せず 0% CPU で止まっていた**。
 
-  **診断は 4 回変わり、4 回とも症状から機構を推測して外した**（idle → syscall で
-  block → promise の無限再帰 → 実際は重い処理）。答えを出したのは
-  **CPU profile** だけである。取り方が肝で、`--cpu-prof` は**正常終了時にしか書かない**
-  ので `timeout` に殺されると何も残らず、プロセス内の timer も使えない（測ろうとして
-  いる当の状態が loop を飢えさせるので発火しない）。**inspector は別スレッドで動く**
-  ので外から駆動できる —— これが唯一効いた道具である。
+  これで症状は全部説明がつく —— 出力前の沈黙、0% CPU、TCP handle 0、そして
+  **届かない WebSocket echo**（自分の server が無いのだから echo する相手がいない）。
 
-  profile の答え: self 時間の **86.7% が `cljs.core`**（`array_index_of_keyword?` 12%、
-  `array_copy` 10%、`aclone` 5%、`hash` 3%）、**5.8% が `cssom.layout/node_style`**、
-  stack の最大深さ 126（cljs として正常）。**無限ループではない。重い実処理である。**
-  native sample の全サンプルが `PromiseFulfillReactionJob` に見えたのは、各ステップを
-  駆動している promise chain がそこに立っているだけで、CPU はその下にあった。
+  **私はこの 1 件で診断を 5 回外した**（idle → syscall block → promise の無限再帰 →
+  重い実処理 → 落ち着かない flow）。原因は毎回同じで、**たまたま捕まえた状態から
+  機構を推測し、それを一般化した**こと。しかも状態はコピーごとに違っていた。
 
-  **したがって私の deadline はこれを bound できない。** microtask checkpoint が
-  drain しない間 timer は発火しないので、`Promise.race` の deadline は**同期的な
-  重さにも microtask の嵐にも効かない**。ハングを暴くために入れた計器が、
-  「遅い」を「失敗」に変えていた可能性が高い —— それは元の問題より悪い。
-  **判定は deadline を 30 分に上げた無制限実行の結果待ちであり、結果が出るまで
-  「ハングである」とも「遅いだけである」とも書かない。**
+  **同じ形の測定ミスがもう 1 つ。安く再発するので名指ししておく**:
+  `pgrep -f <node target/node-tests.js> | head -1` は、node 本体より先に
+  **shell の wrapper**（`sh -c npm run compile:node-test && node ...`）に当たる。
+  「0% CPU だから idle」という観測のいくつかは **wrapper を見ていた**。実測では
+  wrapper が 0% のとき本体は 80% で回っていた。**測りたいプロセスを名指しすること。**
 
-  **ハングは 3 層だった。3 番目は私の計器そのものだった** —— `Promise.race` は負けた側を
+  **道具について残る本物の知見** —— 答えを出したのは CPU profile だけで、取り方が肝
+  だった。`--cpu-prof` は**正常終了時にしか書かない**ので `timeout` に殺されると何も
+  残らず、プロセス内の timer も使えない（測ろうとしている当の状態が loop を飢えさせる）。
+  **inspector は別スレッドで動く**ので外から駆動できる。profile の答えは
+  self 時間の 86.7% が `cljs.core`、5.8% が `cssom.layout/node_style`、stack 深さ 126
+  —— **無限ループではなく重い実処理**であり、native sample の全サンプルが
+  `PromiseFulfillReactionJob` に見えたのは、各ステップを駆動する promise chain が
+  そこに立っていただけだった。
+
+  **`Promise.race` の deadline は同期的な重さも microtask の嵐も bound できない。**
+  timer は checkpoint が drain しない間は発火しない。これは計器の構造的な限界である。
+
+  **contention とは独立に残る、本物の弱さ**: `start-demo-server!` は serve できない
+  とき**黙って止まる**。自分の server を起こせないテストは、待つのではなくそう言う
+  べきである。**ここでは直していない。**
+
+  **event loop を実際に掴んでいたものは 3 つ在り、3 番目は私の計器そのものだった**
+  （どれも本物の欠陥だが、**見かけ上のハングの原因ではなかった**） —— `Promise.race` は負けた側を
   止めないので、`with-deadline` が張った 120 秒の timer が Node を生かし続けていた
   （テスト 2 本で最大 240 秒、0% CPU、socket も無し —— 暴こうとしていたハングと
   同じ顔）。settle 時に `clearTimeout` する。他の 2 層は、ゲストが開いた socket と、
