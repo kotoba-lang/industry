@@ -1,0 +1,49 @@
+{:system/id :world-research-ecosystem
+ :mission "Continuously build a provenance-preserving ontology of worldwide research, scholarly societies, events, funding, sponsorship, venues, and measured influence."
+ :wiki-target "network-awai/app-hyakka"
+ :itonami-candidates ["cloud-itonami/app-public-fund"
+                      "cloud-itonami/app-crowdfunding"
+                      "cloud-itonami/app-analytics"
+                      "cloud-itonami/mitooshi"
+                      "kotoba-lang/app-kenkyusha"]
+ :coverage-unit [:discipline :jurisdiction :language :source :year :identifier-class]
+ :entity-types [:research-work :research-project :study :dataset :software
+                :researcher :institution :scholarly-society
+                :event-series :event-edition :venue :place
+                :funder :funding-award :sponsor :sponsorship
+                :impact-observation :correction :retraction]
+ :identifiers [:doi :orcid :ror :issn :isbn :grant-id :registry-id :official-event-id]
+ :required-common-fields [:source-url :source-class :source-language :observed-at
+                          :content-hash :issuing-organization :original-title]
+ :source-policy
+ {:research-allow [:doi-registration-agency :publisher-first-party :institutional-repository
+                   :official-study-registry :official-dataset-repository]
+  :events-allow [:society-first-party :conference-organizer-first-party :venue-first-party]
+  :funding-allow [:official-funder-registry :recipient-first-party-award-disclosure
+                  :conference-organizer-sponsor-page :sponsor-first-party-disclosure]
+  :impact-allow [:citation-registry :official-policy-document :official-patent-record
+                 :standards-body-first-party :guideline-publisher-first-party
+                 :publisher-correction-or-retraction]
+  :forbid [:search-snippet :generated-summary :third-party-wiki-prose :scraped-profile
+           :paywall-bypass :captcha-bypass :inferred-sponsorship :inferred-causality]}
+ :epistemic-boundaries
+ [:publication-is-not-validation
+  :preprint-is-not-peer-reviewed-article
+  :conference-acceptance-is-not-journal-peer-review
+  :funding-is-not-endorsement
+  :sponsorship-is-not-authorship-or-scientific-control
+  :citation-is-not-positive-support
+  :correlation-is-not-causation
+  :metric-is-a-versioned-observation-not-timeless-impact
+  :venue-is-event-edition-specific
+  :missing-is-unmeasured
+  :worldwide-is-a-coverage-goal-not-a-completeness-claim]
+ :impact-dimensions [:scholarly-citation :replication :correction :retraction
+                     :policy-citation :patent-citation :standard-adoption
+                     :clinical-guideline-citation :dataset-or-software-reuse]
+ :run-bounds {:sources-per-run 2 :disciplines-per-run 2 :jurisdictions-per-run 2 :prs-per-run 1}
+ :safety-boundaries [:public-professional-data-only :no-researcher-ranking
+                     :no-causal-claim-without-design :no-legal-or-medical-advice
+                     :no-autonomous-contact :no-financial-commitment
+                     :no-ledger-hand-edit :no-shared-orgs-worktree-write
+                     :no-direct-main-push :no-force-push :no-merge :no-deploy]}
