@@ -2087,6 +2087,62 @@
               rounded it and that encoding it must be refused. Named in the script so
               nobody corrects a correct test."}
 
+  {:id       :verify-protocol-lib-substance
+   :title    "libraries that name a protocol and contain no wire code"
+   :why      "2026-08-29. A survey asked which critical-infrastructure protocols this
+              workspace was missing. Counting by repo name said almost none were: there
+              is a repo for Modbus, OPC UA, ISO 8583, BGP, NMEA 2000, Fedwire. Reading
+              them said otherwise. `com-modbus-tcp` is 182 lines of `entity-specs` +
+              `routes` serving `POST /v1/requests` with zero bit or byte operations --
+              it does not implement Modbus. `org-modbus`, 558 lines with 77 bitwise
+              operations and a CRC checked two ways, does. Both look identical to every
+              index this workspace owns: repo name, west manifest, concept index, and
+              the maturity scorer, which reads bytes and scaffold markers and gives
+              `com-modbus-tcp` `scaffold-marker-hits 0`.
+              The measured shape of the problem: 1000 repos under orgs/kotoba-lang with
+              a src/<name>/main.cljc of that form share only 231 distinct entity-name
+              signatures. `com-nmea2000-marine` carries an EV-charging schema
+              (ChargeSession/Connector/Trip) copied from an OCPP template; 47 payment
+              repos including `com-fedwire` and `com-zengin-system` carry Stripe's
+              object model (PaymentIntent/Payout/Refund). Fedwire is not
+              PaymentIntent-shaped.
+              This is the failure class CLAUDE.md names -- a check that could not
+              measure returning the value of a check that measured and found nothing --
+              applied to libraries rather than to gates. It cannot be a fleet gate: it
+              reads orgs/, and a gate ships one repo's tree (ADR-2608124800).
+              NOTE ON THE CLAIM SIGNAL: the phrase it keys on (`deep system protocol`)
+              is itself template boilerplate, so a repo like `com-morningstar` asserts
+              it implements a protocol only because the generator said so. The finding
+              is still sound -- the repo does assert it and contains no wire code -- but
+              the assertion is generated, not considered."
+   :argv     ["nbb" "{{repo}}/scripts/verify-protocol-lib-substance.cljs" "--root" "{{root}}" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 86400000
+   :timeout-ms  900000                  ; 15m -- ~10x the measured ~63s, all filesystem reads
+   :writes   :none
+   :measured "2026-08-29 on this machine: exit 1, 302 findings, ~63s wall.
+              `SCANNED 4230 registered orgs/ checkouts present on disk and readable, of
+              4255 registered under orgs/ (25 not checked out -> UNVERIFIED, not
+              scanned)` / `not-facade-shape=3206 facade-no-protocol-claim=722
+              facade-claims-protocol=302 (clean=0 thin=0 no-wire-code=302)`.
+              3206+722+302 = 4230 = SCANNED, so the buckets account for every repo it
+              looked at, and the 25 it could not read are reported UNVERIFIED rather
+              than folded into clean.
+              Discrimination re-run by the orchestrator rather than taken from the
+              subagent's report, ten probes, both directions watched: FLAGGED --
+              com-modbus-tcp, com-opc-ua, com-iso-8583, com-nmea2000-marine,
+              com-fedwire. NOT flagged -- org-modbus, org-ietf-tls, io-libp2p (real wire
+              implementations, and no org-/io-/tech-/dev- repo is flagged at all), and
+              com-stripe, com-adyen (facade-shaped with zero bit operations, but their
+              README says `platform`, never `protocol`: a REST wrapper for a genuine
+              REST platform is what correct looks like there).
+              Known limit: no repo in this corpus is facade-shaped AND claims a protocol
+              AND has real wire code, so the `do not flag an adequate implementation`
+              branch is proven only indirectly, via org-modbus's different shape and
+              com-stripe's different claim, not via an in-corpus boundary case."}
+
   {:id       :verify-single-page-app
    :title    "UI that cannot be opened as one page"
    :why      "2026-08-26, owner instruction: `uiux は singlepage app として見れる
