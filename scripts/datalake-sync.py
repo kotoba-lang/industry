@@ -90,10 +90,33 @@ LEI については同じ正本の別の投影として D1
 
 ## なぜ Python なのか（この workspace の script host は nbb）
 
-Iceberg の commit は Avro manifest / manifest-list / metadata.json / snapshot を
-書く作業で、nbb にその writer は無い。**境界は JSON** —— `*-datalake-export.cljs`
-が repo の EDN を JSON に落とし、この script はそれを Iceberg に載せるだけで、
-EDN も repo 構造も知らない。
+**境界は JSON** —— `*-datalake-export.cljs` が repo の EDN を JSON に落とし、
+この script はそれを Iceberg に載せるだけで、EDN も repo 構造も知らない。
+
+⚠ **この節は長く「nbb に Iceberg writer は無い」と書いていた。それは大雑把すぎて、
+実際より Python 側を広く正当化していた**（2026-08-29 に実測して訂正）。Iceberg の
+commit が要求するものを 1 つずつ見ると、欠けているのは 1 つだけ:
+
+| commit に要るもの | portable `.cljc` に在るか |
+|---|---|
+| data file (Parquet) | **在る** —— `kotoba-lang/org-apache-parquet` は reader **と writer**（`parquet/write.cljc`） |
+| metadata.json / snapshot | 在る（ただの JSON） |
+| REST catalog protocol | 在る（ただの HTTP） |
+| **manifest / manifest-list (Avro)** | **無い** —— `kotoba-lang/org-apache-avro` は **reader のみ**（`write`/`encode`/`emit` は 0 件、実測） |
+
+つまり Python が残っている理由は **Avro writer が無いこと、ただ 1 点**である。
+`org-apache-avro` に writer が入った日にこの script は nbb へ移せる ——
+「nbb には無理」ではなく「あと 1 リポジトリ」。
+
+**kotoba（`.kotoba`）は今日は対象外。** script host `kbb` は west に 0 件（未実装、
+CLAUDE.md の記述どおり）で、capability kit にも **fs / process / exec は無い**
+（在るのは clock / dataspace / http / http-ingress / llm / log / state / storage /
+stream-ingress / stream-object / ui。実測 2026-08-29）。運用 script の正本は
+引き続き nbb であり、kbb の存在を前提にしたコードは書かない。
+
+なお `kotoba-lang/tana`（棚）は columnar object 群の上に content-addressed な
+table plane を置くもので、**Iceberg とは別解**。この面を Iceberg のままにするか
+tana に寄せるかは、この loader の言語選択とは独立した設計判断。
 
 ## 認証
 
