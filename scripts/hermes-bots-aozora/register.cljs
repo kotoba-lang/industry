@@ -82,20 +82,40 @@
                            :ok (and (< (.-status resp) 400) (not (get v "error")))})))))))
 
 (defn resolve-handle
-  "→ Promise<:bound | :unbound | :unverifiable>. On this PDS a createSession
-   for ANY validly-signed did:key succeeds (the DID is the account), so a good
-   session proves nothing about the handle registry — only resolveHandle does,
-   and it is exactly the surface the current upstream outage takes down."
+  "→ Promise<did-string | :unverifiable>. resolveHandle returns 200 EVEN for an
+   unbound handle — it falls back to `did:web:<handle>` on a registry miss — so a
+   200 is not proof the handle points at this bot's did:key. Return the actual
+   DID string so the caller can compare it against the session DID; only an exact
+   match means the handle is bound to us and listRecords/getAuthorFeed will find
+   our posts (which are keyed by :yoro.post/author = our did:key)."
   [handle]
   (-> (js/fetch (str core/pds "/xrpc/com.atproto.identity.resolveHandle?handle="
                      (js/encodeURIComponent handle)))
       (.then (fn [resp]
                (.then (.text resp)
                       (fn [text]
-                        (cond (= 200 (.-status resp)) :bound
-                              (str/includes? text "AccountNotFound") :unbound
-                              :else :unverifiable)))))
+                        (if (= 200 (.-status resp))
+                          (get (try (js->clj (js/JSON.parse text)) (catch :default _ {})) "did")
+                          :unverifiable)))))
       (.catch (fn [_] :unverifiable))))
+
+(defn bind-handle!
+  "Bind `handle` -> this bot's did:key via com.atproto.identity.updateHandle
+   (self-scoped: a session can only claim its own DID). Also writes the actor
+   profile so describeRepo/getProfile show the bot. Idempotent."
+  [job-name handle token did]
+  (-> (xrpc "com.atproto.identity.updateHandle" {:handle handle} token)
+      (.then (fn [uh]
+               (if-not (:ok uh)
+                 {:name job-name :handle handle :did did :state "LOCAL-FAILURE"
+                  :error (str "updateHandle " (:status uh) " " (get-in uh [:body "error"]))}
+                 (-> (xrpc "com.atproto.repo.putRecord"
+                           {:repo did :collection "app.bsky.actor.profile" :rkey "self"
+                            :record {:$type "app.bsky.actor.profile"
+                                     :displayName (core/display-name job-name)
+                                     :description (core/description job-name)}} token)
+                     (.then (fn [_] {:name job-name :handle handle :did did
+                                     :state "registered"}))))))))
 
 (defn register-bot! [job-name]
   (let [handle (core/handle job-name)
@@ -104,13 +124,15 @@
         (.then
          (fn [{:keys [ok body] :as sess}]
            (if ok
-             (-> (resolve-handle handle)
-                 (.then (fn [hstate]
-                          {:name job-name :handle handle :did (get body "did")
-                           :state (case hstate
-                                    :bound "registered"
-                                    :unbound "session-ok-handle-unbound"
-                                    "session-ok-handle-unverifiable")})))
+             (let [did (get body "did") token (get body "accessJwt")]
+               (-> (resolve-handle handle)
+                   (.then (fn [resolved]
+                            (if (= resolved did)
+                              ;; handle already bound to our did:key.
+                              {:name job-name :handle handle :did did :state "registered"}
+                              ;; unbound (or bound elsewhere / did:web fallback):
+                              ;; claim it for our did:key so reads resolve to us.
+                              (bind-handle! job-name handle token did))))))
              (-> (xrpc "com.atproto.server.createAccount" {:handle handle :cacao (mint seed)} nil)
                  (.then
                   (fn [{:keys [ok body status]}]
