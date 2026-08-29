@@ -67,7 +67,7 @@ and Py Kotodama WASM）なので、com-morningstar が protocol を名乗るの�
   音声            org-ietf-sip (RFC 3261), org-ietf-rtp (RFC 3550)
   医療・カード    org-hl7-v2 (ER7 + MLLP), org-iso-8583
 
-合計 9,717 src 行 / 668 bit 演算 / 500 test / 20,497 assertion / 0 failure。
+合計 11,114 src 行 / 730 bit 演算 / 525 test / 22,669 assertion / 0 failure。\n（この 4 数は最初 9,717 / 668 / 500 / 20,497 と書いた。作業中に暗算で出した値で、4 つとも誤り。全 15 repo を clone し直して測り直した値がこれである。register commit e262172 の message には誤った方が残っている —— history は書き換えない。）
 全 suite を orchestrator が自分で走らせ、exit code は pipe を通さずファイルに落として
 採った（cmd | tail は tail の exit を返す）。
 
