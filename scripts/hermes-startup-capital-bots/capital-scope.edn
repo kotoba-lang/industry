@@ -1,0 +1,47 @@
+{:system/id :world-startup-capital-ecosystem
+ :mission "Continuously build a provenance-preserving ontology of worldwide startups, venture firms, funds, GPs, LPs, public professional fund-manager roles, financing rounds, and portfolio relationships."
+ :wiki-target "network-awai/app-hyakka"
+ :itonami-candidates ["cloud-itonami/app-public-fund"
+                      "cloud-itonami/app-crowdfunding"
+                      "cloud-itonami/app-analytics"
+                      "cloud-itonami/mitooshi"]
+ :coverage-unit [:jurisdiction :source :language :year :industry :stage :identifier-class]
+ :entity-types [:company :startup-observation :brand :legal-entity
+                :venture-firm :management-company :investment-fund :fund-vehicle
+                :general-partner :limited-partner :professional-role :fund-manager
+                :financing-round :fund-close :commitment :investment
+                :portfolio-relationship :exit :acquisition :ipo :liquidation
+                :jurisdiction :regulator :filing]
+ :identifiers [:lei :company-registration-number :cik :crd :iard :official-registry-id]
+ :required-common-fields [:source-url :source-class :source-language :observed-at
+                          :content-hash :issuing-entity :jurisdiction :asserted-at]
+ :source-policy
+ {:allow [:official-company-registry :official-regulator :official-securities-filing
+          :official-stock-exchange-filing :company-first-party :fund-first-party
+          :manager-first-party :institutional-lp-first-party :official-board-record]
+  :discovery-only [:licensed-commercial-aggregator :news-report]
+  :forbid [:search-snippet :generated-summary :scraped-directory :social-post
+           :broker-list :paywall-bypass :captcha-bypass :inferred-lp
+           :inferred-ownership :inferred-personal-wealth]}
+ :epistemic-boundaries
+ [:brand-is-not-legal-entity
+  :venture-firm-is-not-fund-vehicle
+  :gp-is-not-management-company-without-source
+  :lp-commitment-is-not-current-nav-or-ownership
+  :announced-target-is-not-closed-fund-size
+  :announced-round-is-not-cash-received
+  :lead-investor-is-not-board-control
+  :portfolio-page-is-an-observed-claim-not-a-current-holding
+  :news-report-is-not-an-issuer-or-regulator-filing
+  :estimated-valuation-is-not-verified-valuation
+  :startup-is-a-time-bounded-observation-not-a-permanent-class
+  :missing-is-unmeasured
+  :worldwide-is-a-coverage-goal-not-a-completeness-claim]
+ :privacy-boundaries [:public-professional-data-only :no-personal-contact-data
+                      :no-home-address :no-personal-wealth :no-family-data
+                      :no-sensitive-trait-inference :no-reputation-ranking]
+ :run-bounds {:sources-per-run 2 :jurisdictions-per-run 2 :prs-per-run 1}
+ :safety-boundaries [:no-investment-advice :no-autonomous-trade-or-allocation
+                     :no-outreach-or-solicitation :no-financial-commitment
+                     :no-ledger-hand-edit :no-shared-orgs-worktree-write
+                     :no-direct-main-push :no-force-push :no-merge :no-deploy]}
