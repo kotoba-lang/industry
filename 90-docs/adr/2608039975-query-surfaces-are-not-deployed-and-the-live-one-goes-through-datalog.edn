@@ -1,13 +1,13 @@
 [{:db/id -1
   :adr/id "adr-2608039975-query-surfaces-are-not-deployed-and-the-live-one-goes-through-datalog"
-  :adr/title "ADR-2608039975: kotobase-query の IVM 接続は今やらない / SPARQL の 2 実装問題は 2026-08-04 に protocol 実装への差し替えで決着"
+  :adr/title "ADR-2608039975: kotobase-query の IVM 接続は今やらない / SPARQL の 2 実装問題は 2026-08-04 に protocol 実装への差し替えで決着（※ 2026-08-30 訂正: id と旧タイトルが言う not-deployed はもはや偽。4 面は deploy 済み）"
   :adr/status "accepted"
   :adr/doc_type "adr"
   :adr/doc-type "adr"
   :adr/source-format "edn"
   :adr/date "2026-08-03"
-  :adr/last-verified "2026-08-04"
-  :adr/last_verified "2026-08-04"
+  :adr/last-verified "2026-08-30"
+  :adr/last_verified "2026-08-30"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "query-surfaces-not-deployed-live-path-goes-through-datalog"
@@ -44,6 +44,22 @@
   :adr/body
   "# ADR-2608039975: IVM 接続は今やらない —— 前提が実測で崩れた
 
+> **2026-08-30 訂正 —— この ADR の id とファイル名が言う query-surfaces-are-not-deployed は、
+> もはや偽である。** SPARQL / Gremlin / GraphQL は 2026-07-30 に
+> kotobase-protocols-worker へ、Cypher は 2026-08-05 に net-kotobase/cypher へ deploy
+> された。実測 2026-08-29: sparql / cypher / gremlin / graphql.kotobase.net はいずれも
+> 401 www-authenticate: Bearer を返す（＝稼働していて認証を要求している）。
+> datomic.kotobase.net は 24 パスを無認証で公開し、/api/q は 401。
+>
+> **id は identity なので変えない**（ADR-2607289500）。下の「実測1」「実測2」は
+> 2026-08-03 時点の測定としてそのまま残す —— 当時は正しかった。
+>
+> **D1（IVM 接続は今やらない）は引き続き有効。** trigger は「materialize scan が
+> 実測でレイテンシ予算を超えたとき」であり、deploy されたことは trigger ではない。
+> 2026-08-30 に bridge の供給元が kotobase-query から ayatori に移ったが
+> （ADR-2608300200）、ayatori.query は同一 bridge への alias namespace なので、
+> 走る scan は同じもので trigger 条件は動いていない。
+
 **Status**: accepted
 **Date**: 2026-08-03
 **Deciders**: Jun Kawasaki
@@ -56,7 +72,7 @@ ADR-2608039970 の follow-up 5 として「`kotobase-query` の `materialize` �
 
 `kotobase-query` を require しているのは 6 つの surface repo（`datomic-client-shim` / `org-postgresql-wire` / `org-opencypher-cypher` / `org-w3-sparql-protocol` / `org-graphql-http` / `org-apache-tinkerpop-gremlin`）とそれぞれのテストだけで、**deploy shell が1つも無い**。`kotobase-protocols-worker`（`s3`/`ipfs`/`git`/`atproto`/`pinning`/`issues` を実際に配信している worker）には bridge への参照がゼロで、`db-for` / `query-memo` / `query-version` も出てこない —— ADR-2607310900 の memo すら、まだ誰も配線していない。
 
-**6 surface はライブラリとして green なだけで、live ではない。**
+**6 surface はライブラリとして green なだけで、live ではない。**（2026-08-03 時点。2026-08-30 現在は 4 面が deploy 済み —— 冒頭の訂正を見よ）
 
 ### 実測2 —— live な SPARQL は別実装で、しかも Datalog 経由
 
