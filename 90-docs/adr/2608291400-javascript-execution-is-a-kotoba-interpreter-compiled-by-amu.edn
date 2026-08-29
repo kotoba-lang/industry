@@ -334,7 +334,12 @@ effect-as-value で通り、quickjs-ng に対して両方向で測ってある�
   `:f64` の値は Kotoba を通るが演算に lowering が無く、`(+ x x)` は
   `expected i64, got f64` で拒否される。ソフト浮動小数点なら書ける
   （`bit-and`/`bit-or`/`bit-xor`/`quot` は在り、shift は無いので `*`/`quot` で代用）。
-- **ユーザ定義の constructor と prototype chain**（`instanceof` は landed —— 鎖が
+- **prototype chain**（constructor と `instanceof` は landed —— `new Point(7).x` は
+  7、object を返す constructor はそれを返し、method 内の `this` は receiver。
+  無いのは `Point.prototype` であって、共有 method 表も継承も無い。object は
+  `%ctor`（JS の識別子では綴れない名前）に生成時の名前を憶えており、`instanceof` は
+  それを読む。`o['%ctor']` では届く —— bracket lookup は任意の文字列を取るので。
+  本物の穴で、小さい穴で、隠さずに書いてある）（旧記述: `instanceof` は landed —— 鎖が
   無いので `catch` が実際に訊く問い（`e instanceof TypeError`）に、捕まえた error の
   `name` で答える。知らない constructor には `false` を返す。これは拒否ではなく
   本当の答えである: このエンジンに、その constructor の instance は存在しない）
@@ -355,9 +360,28 @@ effect-as-value で通り、quickjs-ng に対して両方向で測ってある�
   `document.title` ではなく `document.getElementById(...)` 越しに書く。どちらが効いて
   いるかは判っていない。
 
-  **⚠ そして 3 つ直しても、スイートは最後まで走らない。** 0% CPU・TCP handle 0 で
-  `Ran N tests` に到達しない。**何が残っているかは判っていない。** 3 つの修正を
-  「これで直った」と読まないこと —— それぞれ単独では正しいが、実行は依然として止まる。
+  **⚠ そして 3 つ直しても、スイートは最後まで走らない。** 3 つの修正を「これで直った」と
+  読まないこと —— それぞれ単独では正しいが、実行は依然として終わらない。
+
+  **診断は 4 回変わり、4 回とも症状から機構を推測して外した**（idle → syscall で
+  block → promise の無限再帰 → 実際は重い処理）。答えを出したのは
+  **CPU profile** だけである。取り方が肝で、`--cpu-prof` は**正常終了時にしか書かない**
+  ので `timeout` に殺されると何も残らず、プロセス内の timer も使えない（測ろうとして
+  いる当の状態が loop を飢えさせるので発火しない）。**inspector は別スレッドで動く**
+  ので外から駆動できる —— これが唯一効いた道具である。
+
+  profile の答え: self 時間の **86.7% が `cljs.core`**（`array_index_of_keyword?` 12%、
+  `array_copy` 10%、`aclone` 5%、`hash` 3%）、**5.8% が `cssom.layout/node_style`**、
+  stack の最大深さ 126（cljs として正常）。**無限ループではない。重い実処理である。**
+  native sample の全サンプルが `PromiseFulfillReactionJob` に見えたのは、各ステップを
+  駆動している promise chain がそこに立っているだけで、CPU はその下にあった。
+
+  **したがって私の deadline はこれを bound できない。** microtask checkpoint が
+  drain しない間 timer は発火しないので、`Promise.race` の deadline は**同期的な
+  重さにも microtask の嵐にも効かない**。ハングを暴くために入れた計器が、
+  「遅い」を「失敗」に変えていた可能性が高い —— それは元の問題より悪い。
+  **判定は deadline を 30 分に上げた無制限実行の結果待ちであり、結果が出るまで
+  「ハングである」とも「遅いだけである」とも書かない。**
 
   **ハングは 3 層だった。3 番目は私の計器そのものだった** —— `Promise.race` は負けた側を
   止めないので、`with-deadline` が張った 120 秒の timer が Node を生かし続けていた
