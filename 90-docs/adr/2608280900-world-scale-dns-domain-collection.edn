@@ -176,34 +176,23 @@ wiki item として複製しない。
   mode 無しの既存 spec=影響なし）。CLAUDE.md が名指ししている形そのもの ——
   **できなかった操作が、できた操作と同じ顔をして返る**。
 
-### 現在地と再開点（2026-08-29 22:59 実測）
+### catch-up は完走した（2026-08-30 実測）
 
-**Iceberg テーブルはまだ accumulator に追いついていない。追いつけていない理由は
-コードではなくマシン負荷である。**
+**テーブルは accumulator と完全に一致した。**
 
 | | 値 |
 |---|---|
-| `cloud_itonami.dns_resolution` | 13,873,407 行 / snapshot 96 |
-| accumulator-shards（正本側の投影元） | 24,384,882 行 |
-| catch-up 進捗 | next-shard 32 / 256 |
-| load average | 294（この間 4〜336 を往復した） |
+| `cloud_itonami.dns_resolution` | **24,384,882 行** |
+| accumulator-shards | **24,384,882 行**（一致） |
+| shard 進捗 | 256/256、progress ファイルは削除済み |
+| commit 種別 | 全て `committed (upsert)` |
 
-catch-up プロセスは**生きていて、極端に遅いだけ**（python 子プロセスが 1 時間で
-6% CPU）。1 バッチごとに catchup-progress.json へ checkpoint し、mode は upsert
-なので**中断しても再送は安全**（冪等）。
+出発点は 10,122,230 行だったので、+1,426 万行。途中 load 400〜500 で何時間も
+飢餓状態になったが、1 バッチごとの checkpoint と upsert の冪等性で、**遅くはなっても
+壊れも巻き戻りもしなかった**。lock は解放済みで、毎時 job は次の tick から通常運転
+（新しい ledger ファイルだけを fold → その差分だけ upsert）に戻る。
 
-再開・確認は:
-
-```bash
-# 生きているか
-pgrep -f catchup_sync ; cat ~/.gftd/dns-resolver-lake/catchup-progress.json   # -> next-shard
-# 死んでいたら（lock を掴んだまま死んだ場合は次の起動が dead pid を回収する）
-cd ~/.gftd/worktrees/dns-resolver-resident
-nice -n 10 env NODE_OPTIONS=--max-old-space-size=2048 nbb --classpath src scripts/catchup_sync.cljs --root /Users/junkawasaki/github/com-junkawasaki --out-dir ~/.gftd/dns-resolver-lake --shards-per-batch 8
-```
-
-⚠ **ログで健全性を見るときは `committed (upsert)` を見る。** 素の `committed` は
-overwrite 経路で、それが出ていたら上の「古い loader」事故が再発している。
+⚠ ログの健全性は `committed (upsert)` で見る。素の `committed` は overwrite 経路。
 
 ### Avro / Iceberg を自前で持った（2026-08-29）
 
@@ -220,8 +209,17 @@ Python 依存は、**理由が 1 つに絞れたので潰した**:
 
 ### 残っている宿題
 
-- `resolved_at` は string 列のまま（上記のとおり retrofit にはテーブル再作成が要る）。
-  日付範囲クエリの pruning を効かせたくなった時点で判断する
+- **`resolved_at` の timestamptz 化は「やらない」を推奨に変えた**（2026-08-30 実測）。
+  当初は「pruning のためにいずれやる」と書いたが、測ったら前提が違った:
+  **`source_date` の identity partition が既に効いている**（`spec: [1000: source_date:
+  identity(7)]`）ので、日付範囲の絞り込みという主目的はもう満たされている。
+  timestamptz が追加で効くのは日内の時刻での絞り込みで、それはファイル単位の
+  min/max 統計に依存するが、**この writer は統計を書かない**（狭める方向に誤った
+  bound は答えから行を消すため、意図的に null のまま）。つまり**今の構成では
+  timestamptz の利得はほぼゼロ**。
+  一方コストは、24,384,882 行のテーブルの作り直し + snapshot 172 個の履歴喪失 +
+  数時間の再同期という**破壊的で不可逆な操作**。統計を書くようになった時に、
+  その時の実測で再評価する。
 - **`export_and_sync.cljs` と同型の「毎回全件再パース」構造が
   `scripts/hyakka-datalake-export.cljs` にも残っている。** 台帳が 9.7MB と桁違いに
   小さいので今は問題になっていないが、同じ壁に向かってはいる（今回は触っていない）
