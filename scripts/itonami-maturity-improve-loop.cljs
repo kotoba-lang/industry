@@ -107,7 +107,7 @@
           (do (log! "--dry-run: 計測値が stale。次の 1 手は測り直し")
               (append-ledger! {:at started :outcome :dry-run :why :stale-measurement}))
           (let [{:keys [code out]} (sh "claude" ["-p" "/itonami-maturity-improve"
-                                                 "--allow-dangerously-skip-permissions"]
+                                                 "--dangerously-skip-permissions"]
                                        {:timeout 5400000})]
             (println out)
             (append-ledger! {:at started :finished (.toISOString (js/Date.))
@@ -129,7 +129,7 @@
         :else
         (let [{:keys [code out err]}
               (sh "claude" ["-p" "/itonami-maturity-improve"
-                            "--allow-dangerously-skip-permissions"]
+                            "--dangerously-skip-permissions"]
                   {:timeout 5400000})]
           (println out)
           (when (seq (str/trim (or err ""))) (log! "stderr:" (str/trim err)))

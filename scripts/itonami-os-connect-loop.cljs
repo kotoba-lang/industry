@@ -135,7 +135,7 @@
         ;;    （2 箇所に手順があると必ず片方が古くなる）。
         (let [{:keys [code out err]}
               (sh "claude" ["-p" "/itonami-os-connect"
-                            "--allow-dangerously-skip-permissions"]
+                            "--dangerously-skip-permissions"]
                   {:timeout 3600000})]
           (println out)
           (when (seq (str/trim (or err ""))) (log! "stderr:" (str/trim err)))
