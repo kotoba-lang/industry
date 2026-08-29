@@ -56,6 +56,70 @@
                   (str/trim (str err (when (and (seq err) (seq out)) "\n") out)))))
     out))
 
+;; ---- per-step measurement -------------------------------------------------
+;;
+;; Two defects, one fix. (1) A tick is a sequence of expensive steps and the
+;; log recorded only the whole; a 2h tick could not be attributed to a step, so
+;; "which work should move to the fleet" (root ADR-2608300100 decision 1) had
+;; no measurement behind it. (2) `run` uses spawnSync, which CAPTURES child
+;; stdout instead of streaming it — so a step in progress prints nothing at all
+;; and an operator cannot tell slow from hung. Measured 2026-08-29: a publish
+;; step was silent for 93 minutes while it was in fact draining normally.
+;;
+;; The load average is recorded BESIDE each duration, because on this
+;; workstation (many concurrent agents) a duration without the load it was
+;; measured under is not a fact about the step — the same catalog build has
+;; been observed at minutes and at tens of minutes. CLAUDE.md's rule.
+(def step-timings (atom []))
+
+(defn- load1
+  "Current 1-minute load average, or nil when it cannot be read. Never throws:
+  this is decoration on a measurement, and must not be able to fail a tick."
+  []
+  (try
+    (let [out (:out (run ["sysctl" "-n" "vm.loadavg"] {}))]
+      (some-> (re-find #"[\d.]+" (str out)) js/parseFloat))
+    (catch :default _ nil)))
+
+(defn timed!
+  "Run `f`, recording and printing its wall time and the load it ran under.
+
+  Prints a line BEFORE the step as well: a step that is running must be
+  distinguishable from a step that has hung, and with captured child output
+  the start marker is the only evidence available while it runs."
+  [label f]
+  (let [started (js/Date.now)
+        load-at-start (load1)]
+    (println (str "▶ " label " (load " (or load-at-start "?") ")"))
+    (try
+      (let [result (f)
+            elapsed-ms (- (js/Date.now) started)]
+        (swap! step-timings conj {:step label :ms elapsed-ms :load load-at-start})
+        (println (str "✓ " label " " (.toFixed (/ elapsed-ms 1000) 1) "s"
+                      " (load " (or load-at-start "?") ")"))
+        result)
+      (catch :default e
+        ;; A failed step is still a measured step. Dropping its duration is how
+        ;; "the tick died somewhere" loses the one number that says where.
+        (let [elapsed-ms (- (js/Date.now) started)]
+          (swap! step-timings conj {:step label :ms elapsed-ms
+                                    :load load-at-start :failed? true})
+          (println (str "✗ " label " " (.toFixed (/ elapsed-ms 1000) 1) "s"
+                        " (load " (or load-at-start "?") ") — failed")))
+        (throw e)))))
+
+(defn print-step-timings!
+  "One line per step, slowest first. Printed even when the tick failed, so the
+  question `where did the time go` is answerable from the log alone."
+  []
+  (when (seq @step-timings)
+    (let [total (reduce + (map :ms @step-timings))]
+      (println (str "step timings (total " (.toFixed (/ total 1000) 1) "s):"))
+      (doseq [{:keys [step ms load failed?]} (sort-by :ms > @step-timings)]
+        (println (str "  " (.padStart (.toFixed (/ ms 1000) 1) 8) "s"
+                      "  load " (.padStart (str (or load "?")) 6)
+                      "  " step (when failed? " [FAILED]")))))))
+
 (def lock-owner-file (str lock-dir "/owner.edn"))
 
 (defn- alive?
@@ -458,32 +522,37 @@
       (fail! (str "resident worktree missing: " worktree)))
     (let [catch-up-only? (= "1" (aget js/process.env "HYAKKA_CATCH_UP_ONLY"))
           env (if catch-up-only? (process-env) (resolve-b2-env))]
-      (sync-main! env)
+      (timed! "sync-main (pre)" #(sync-main! env))
       (let [receipts
             (if catch-up-only?
               []
               (do
-                (checked ["nbb" "--classpath" "src" "scripts/resident_ingest.cljs" "--once"]
-                         {:dir worktree :env env})
+                (timed! "ingest"
+                        #(checked ["nbb" "--classpath" "src" "scripts/resident_ingest.cljs" "--once"]
+                                  {:dir worktree :env env}))
                 (let [xs (changed-receipts)
-                      lost (vec (mapcat #(upload-raw! env %) xs))]
+                      lost (timed! "upload-raw (B2)"
+                                   #(vec (mapcat (fn [r] (upload-raw! env r)) xs)))]
                   (reset! lost-archives lost)
-                  (publish-git! env)
+                  (timed! "publish-git (catalog + commit + merge)" #(publish-git! env))
                   xs)))]
         ;; A server-side merge advances main beyond the resident branch. Pull
         ;; that exact merge tree before projection and deploy; last-writer-wins
         ;; deploys from a stale checkout previously reverted this zone.
-        (sync-main! env)
+        (timed! "sync-main (post)" #(sync-main! env))
         (let [pending (unpublished-ledgers)
               expected (catalogue-id)
               live (live-catalogue-id)
               deploy? (boolean (deploy-required? pending expected live))]
           (println "Kotobase pending ledgers=" (count pending))
-          (reset! kotobase-skip (publish-kotobase! env pending))
+          (reset! kotobase-skip
+                  (timed! (str "publish-kotobase (" (count pending) " ledgers)")
+                          #(publish-kotobase! env pending)))
           (when (and deploy? (empty? pending))
             (println "public catalogue drift detected; redeploying"
                      "expected=" expected "live=" (or live "unavailable")))
-          (when deploy? (deploy-public! env))
+          (when deploy? (timed! "deploy-public (test + build + wrangler)"
+                                #(deploy-public! env)))
           (println "hyakka resident tick complete; receipts=" (count receipts)
                    "projected=" (count pending)
                    "deployed=" deploy?
@@ -509,7 +578,11 @@
                 (println " " sha256 (str "(" bytes " bytes)") receipt)))
             (set! (.-exitCode js/process) 1))
           (when @kotobase-skip (set! (.-exitCode js/process) 1)))))
-    (finally (release-lock!))))
+    (finally
+      ;; Before the lock, and outside the success path: a tick that died in
+      ;; step 4 of 7 is exactly the tick whose step timings someone needs.
+      (print-step-timings!)
+      (release-lock!))))
 
 (defn lock-selftest!
   "Exercise the real acquire/release pair and nothing else, so the reclaim
