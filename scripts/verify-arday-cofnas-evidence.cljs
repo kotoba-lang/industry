@@ -98,8 +98,10 @@
                                     [(:source/id s) (assoc r :spec s)]))
                                 sources))]
       (let [by-id (into {} fetched)
-            failed-fetch (remove #(:ok (val %)) by-id)]
-        (def drifted (atom []))
+            failed-fetch (remove #(:ok (val %)) by-id)
+            ;; drift は doseq の中から積むので atom で持つ。`def` にすると実行時に
+            ;; トップレベル var を作り、同一プロセスで 2 度呼ぶと前回の値が残る。
+            drifted (atom [])]
         (doseq [[id r] by-id]
           (if (:ok r)
             (let [t (:text r)
