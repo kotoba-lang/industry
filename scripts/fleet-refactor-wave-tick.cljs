@@ -74,7 +74,7 @@
 
 (defn- host-mechanism-signal? [source-text]
   (boolean
-   (re-find #"(?i)(clj-http|hato\.client|java\.net\.Socket|fs/readFileSync|fs/writeFileSync|process/exec|System/getenv|System/exit|clojure\.java\.io|\.execFileSync|\.spawnSync)"
+   (re-find #"(?i)(clj-http|hato\.client|babashka\.http-client|babashka\.process|babashka\.fs|java\.net\.Socket|fs/readFileSync|fs/writeFileSync|process/exec|System/getenv|System/exit|clojure\.java\.io|\.execFileSync|\.spawnSync|\bslurp\b|\bspit\b)"
             (or source-text ""))))
 
 (defn- operational-script-signal?
@@ -88,15 +88,54 @@
   (or (boolean (re-find #"(?i)(run[_-]?tests?|test[_-]?runner|runner)\.(clj|cljc)$" (or path "")))
       (boolean (re-find #"clojure\.test/run-tests|cljs\.test/run-tests" (or source-text "")))))
 
+(defn- host-boundary-path?
+  "path が host/ ディレクトリ・ns セグメントに在るか。ADR-2607279200 の 4 分類で
+   `kotoba/host` は ambient authority を**保つ**側なので、repo 自身が host/ に
+   置いたファイルは「これは mechanism だ」と宣言している。
+
+   実測 2026-08-29: `tadori/src/tadori/host/http.clj`（7 行・defn 1 個・docstring
+   に \"Network authority terminates here.\"）を host-mechanism-signal? が
+   取り逃した —— `babashka.http-client` を alias `http` で使っており source 側の
+   列挙に無かったため。**client library の列挙は原理的に完成しない**ので、path を
+   見る方が堅い。"
+  [path]
+  (boolean (re-find #"(?:^|/)host/|\.host\." (or path ""))))
+
+(defn- unactivated-scaffold?
+  "全ての `defn` の body の**先頭**が無条件 `throw` か = 未 activate の R0 scaffold。
+   移す product semantics が無い —— 移植すると定数 `[:result _ E]` を返す
+   `.kotoba` になり、**挙動ゼロの diff が「移行済み」として数えられる**。
+
+   実測 2026-08-29: `hikari/cells/*/state_machine.cljc` 3 本
+   （`(defn solve [_state] (throw (ex-info \"R0 scaffold ... not activated\" ...)))`）
+   が候補 4 枠のうち 3 つを占めた。この形は fleet 全体で tick の line-count 範囲に
+   111 件あり、**正当に着地できないので pool から消えず、毎周同じものが再提案される**
+   （loop が進まず空回りする）。
+
+   operational-script-signal? が記録しているのと同じ欠陥クラス（'small and empty of
+   decisions'）に別経路で到達したもの。判定は意図的に狭く、**throw が body の
+   先頭形でなければならない** —— `when-not`/`cond` の中の防御的 throw は match
+   しない。2026-08-29 に実ファイルで**両方向**確認済み: 上記 3 本は match し、
+   防御的 throw を計 3 個持つ実装済み decision core である `grid_edge` と
+   `solar_pv_install` は match しない。"
+  [source-text]
+  (let [src (or source-text "")
+        defns (count (re-seq #"\(defn-?\s" src))
+        throw-first (count (re-seq #"\(defn-?\s+[^\s\[\]]+\s+(?:\^\S+\s+)?(?:\"(?:[^\"\\]|\\.)*\"\s+)?\[[^\]]*\]\s*\(throw[\s(]" src))]
+    (and (pos? defns) (= defns throw-first))))
+
 (defn- defn-count [source-text]
   (count (re-seq #"\(defn-?\s" (or source-text ""))))
 
 (defn- candidate-slice? [{:keys [line-count custody-gated? has-kotoba-twin? host-mechanism?
-                                  operational-script? defn-count]}]
+                                  operational-script? host-boundary? unactivated-scaffold?
+                                  defn-count]}]
   (and (not custody-gated?)
        (not has-kotoba-twin?)
        (not host-mechanism?)
        (not operational-script?)
+       (not host-boundary?)
+       (not unactivated-scaffold?)
        (pos? (or defn-count 0))
        (pos? line-count)
        (<= line-count 400)))
@@ -240,12 +279,16 @@
                                           has-twin? (kotoba-twin-exists? f kotoba-files)
                                           host-sig? (host-mechanism-signal? text)
                                           op-sig? (operational-script-signal? f text)
+                                          host-path? (host-boundary-path? f)
+                                          scaffold? (unactivated-scaffold? text)
                                           n-defn (defn-count text)]
                                       (when (candidate-slice? {:line-count line-count
                                                                :custody-gated? false
                                                                :has-kotoba-twin? has-twin?
                                                                :host-mechanism? host-sig?
                                                                :operational-script? op-sig?
+                                                               :host-boundary? host-path?
+                                                               :unactivated-scaffold? scaffold?
                                                                :defn-count n-defn})
                                         {:repo (str fleet-dir "/" repo-name)
                                          :org "cloud-itonami"
