@@ -30,7 +30,9 @@
    "2026-08-30: portal UI slice A landed — storefront + static site sources in cloud-murakumo-app (6a157621); operator wires :local/root dep + :site alias (e1038169); west pins on superproject main (d60bec1)"
    "2026-08-30: portal UI slice B landed — SPA (`ui/*`), i18n, studio, playground core (spec/scheduler/runtime/schema/gen/ledger) + 88 locale EDNs moved to cloud-murakumo-app (2a93d0fe); operator consumes via :local/root, prep copies i18n to public/, shadow :app build stays operator (63e0099e); west pins superproject main (f33627b8)"
    "2026-08-30: slice B verification — app clojure -M:test 34 tests / 24052 assertions 0 failures; operator clojure -M:test 471 tests / 2466 assertions 0 failures; node test/onprem_page_test.mjs passed"
-   "2026-08-30: public HTML copy-lock tests stay in operator (clojure -M:site); app keeps storefront + insight + ui-identity + studio + i18n unit tests"
+   "2026-08-30: portal UI slice C landed — viewer identity (`viewer.cljc`), mobile admission (`mobile.cljc`), browser join sources (`mobile_worker.cljs`, `mobile_sw.cljs`), join page (`resources/join/*`) moved to cloud-murakumo-app (b849101f); operator consumes via :local/root, prep copies join assets, shadow :mobile/:mobile-sw builds stay operator (2485320f)"
+   "2026-08-30: slice C verification — app clojure -M:test 47 tests / 24111 assertions 0 failures; operator clojure -M:test 458 tests / 2407 assertions 0 failures"
+   "2026-08-30: public HTML copy-lock tests stay in operator (clojure -M:site); app keeps storefront + insight + ui-identity + studio + i18n + viewer + mobile unit tests"
    "live: api.murakumo.cloud served from inference API worker; murakumo.cloud served from operator deploy"]
   :adr/body
   "# murakumo 3-repo split — API / app / operator
@@ -80,7 +82,10 @@ ADR-2608300200 で murakumo = portal（Nous Portal）、itonami = agent（Hermes
    `cloud-murakumo-app` へ。operator は `shadow-cljs` `:app` build と `public/js/` 配信を維持し、
    `:local/root` で app namespace を classpath に載せる。`npm run prep` は app の `resources/i18n/` を
    `public/i18n/` へコピー。
-4. **follow-up slice C**: `viewer.cljc`、mobile join flows。
+4. **landed slice C（2026-08-30）**: consumer identity（`viewer.cljc`）と mobile join flows
+   （`mobile.cljc`、`mobile_worker.cljs`、`mobile_sw.cljs`、`resources/join/*`）を `cloud-murakumo-app`
+   へ。operator は `devices*` HTTP adapters と shadow `:mobile` / `:mobile-sw` build を維持し、
+   `npm run prep` で join 静的資産を `public/join/` へコピー。
 5. **非目標**: API を `cloud-murakumo` に統合しない。内部 namespace `local_murakumo.*` の
    一括 rename は別スライス（wire / deploy 名が先）。
 
