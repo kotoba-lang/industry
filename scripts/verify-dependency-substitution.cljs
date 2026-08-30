@@ -249,18 +249,29 @@
                     {:kind :builtin-shadowing-dependency
                      :severity :fail
                      :coordinate coord :repos (sort shipped)})
-        ;; Replaceable today, still imported.
+        ;; Replaceable today via naive import swap, still imported.
         available (for [[coord {:keys [shipped]}] found
                         :let [d (disposition-for coord)]
                         :when (and d (seq shipped)
-                                   (#{:first-party-exists :gap-closed} (:disposition d)))]
+                                   (#{:first-party-exists :gap-closed} (:disposition d))
+                                   (not= :host-provider (:kind d)))]
                     {:kind :substitution-available
                      :severity :info
                      :coordinate coord :target (:target d)
-                     :repos (sort shipped)})]
+                     :repos (sort shipped)})
+        ;; First-party exists but must substitute through host provider + kotoba oracle.
+        via-host (for [[coord {:keys [shipped]}] found
+                       :let [d (disposition-for coord)]
+                       :when (and d (seq shipped)
+                                  (= :first-party-exists (:disposition d))
+                                  (= :host-provider (:kind d)))]
+                   {:kind :substitution-via-host
+                    :severity :info
+                    :coordinate coord :target (:target d)
+                    :repos (sort shipped)})]
     {:present present
      :coordinates (count found)
-     :findings (concat bad-targets shadowing unlisted available)}))
+     :findings (concat bad-targets shadowing unlisted available via-host)}))
 
 ;; -------------------------------------------------------------------- self
 
@@ -310,12 +321,16 @@
     ;; A required field cannot make anyone read the target. It can make the
     ;; claim explicit enough that a wrong one is worth arguing with.
     (check "first-party-exists entries say what the target IS"
-           (every? #{:implementation :capability-seam :partial}
+           (every? #{:implementation :capability-seam :partial :host-provider}
                    (map :kind (filter #(= :first-party-exists (:disposition %))
                                       (:dependency-substitution/dispositions ledger)))))
     (check "a :capability-seam or :partial target says why"
            (every? #(or (:seam-because %) (:partial-because %))
                    (filter #(#{:capability-seam :partial} (:kind %))
+                           (:dependency-substitution/dispositions ledger))))
+    (check ":host-provider entries say why and name an amu oracle path"
+           (every? #(and (:host-because %) (:amu-oracle %))
+                   (filter #(= :host-provider (:kind %))
                            (:dependency-substitution/dispositions ledger))))
     (if (seq @fails)
       (do (doseq [f @fails] (println "SELF-TEST FAIL" f))
@@ -367,6 +382,10 @@
                           :substitution-available
                           (str "-> " target "; still imported by "
                                (str/join ", " (take 4 repos))
+                               (when (> (count repos) 4) (str " +" (- (count repos) 4))))
+                          :substitution-via-host
+                          (str "-> " target " via host-provider + kotoba oracle; still imported by "
+                               (str/join ", " (take 4 repos))
                                (when (> (count repos) 4) (str " +" (- (count repos) 4))))))))
         (println (str "SCANNED\t" present "\trepos")))
     (do
@@ -376,6 +395,7 @@
       (doseq [[kind label] [[:substitution-target-missing "ledger targets that do not exist"]
                             [:builtin-shadowing-dependency "Node builtins declared as npm dependencies"]
                             [:unlisted-external-dependency "external deps the ledger does not name"]
+                            [:substitution-via-host "host-provider + kotoba oracle, still imported"]
                             [:substitution-available "replaceable today, still imported"]]]
         (let [rows (filter #(= kind (:kind %)) findings)]
           (println (str "  " label ": " (count rows)))

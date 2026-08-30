@@ -83,27 +83,33 @@
     (catch :default _ nil)))
 
 (defn- parse-findings [out]
-  (->> (str/split-lines (or out ""))
-       (keep (fn [line]
-               (when-let [m (re-find
-                             #"FINDING\tinfo\tsubstitution-available:([^\t]+)\t-> ([^;]+); still imported by (.+)"
-                             line)]
-                 (let [[_ coord target repos-s] m
-                       repos (->> (str/split repos-s #",\s*")
-                                  (map str/trim)
-                                  (remove str/blank?)
-                                  (remove #(str/starts-with? % "+"))
-                                  vec)]
-                   {:coordinate coord
-                    :target (str/trim target)
-                    :repos repos}))))
-       (reduce (fn [m {:keys [coordinate target repos]}]
-                 (update m coordinate
-                         (fnil (fn [old]
-                                 (merge old {:target target
-                                             :repos (vec (distinct (concat (:repos old) repos)))}))
-                               {:target target :repos repos})))
-               {})))
+  (letfn [(parse-line [line pattern mode]
+            (when-let [m (re-find pattern line)]
+              (let [[_ coord target repos-s] m
+                    repos (->> (str/split repos-s #",\s*")
+                               (map str/trim)
+                               (remove str/blank?)
+                               (remove #(str/starts-with? % "+"))
+                               vec)]
+                {:coordinate coord
+                 :target (str/trim target)
+                 :repos repos
+                 :mode mode})))]
+    (->> (str/split-lines (or out ""))
+         (keep (fn [line]
+                 (or (parse-line line
+                                 #"FINDING\tinfo\tsubstitution-via-host:([^\t]+)\t-> ([^;]+) via host-provider \+ kotoba oracle; still imported by (.+)"
+                                 :via-host)
+                     (parse-line line
+                                 #"FINDING\tinfo\tsubstitution-available:([^\t]+)\t-> ([^;]+); still imported by (.+)"
+                                 :rewire))))
+         (reduce (fn [m {:keys [coordinate target repos mode]}]
+                   (update m coordinate
+                           (fnil (fn [old]
+                                   (merge old {:target target :mode mode
+                                               :repos (vec (distinct (concat (:repos old) repos)))}))
+                                 {:target target :repos repos :mode mode})))
+                 {}))))
 
 (defn- repo-path [name]
   (str "orgs/kotoba-lang/" name))
@@ -151,6 +157,7 @@
   (let [prio-idx (into {} (map-indexed (fn [i c] [c i]) coordinate-priority))
         ranked (sort-by (fn [[coord info]]
                           [(if (deferred? coord) 1 0)
+                           (if (= :via-host (:mode info)) 0 1)
                            (get prio-idx coord 999)
                            (count (:repos info))
                            coord])
@@ -224,7 +231,7 @@
                :candidates picked}]
 
       (println (str "SCANNED\t" scanned "\trepos"))
-      (println (str "POOL\t" pool "\tsubstitution-available coordinates"))
+      (println (str "POOL\t" pool "\tsubstitution coordinates (via-host + available)"))
       (when coordinate
         (println (str "WAVE-COORDINATE\t" coordinate "\t->\t" target)))
       (println (str "MISSING-CHECKOUT\t" (count (or skipped-missing []))
