@@ -2355,16 +2355,33 @@ governor → UI → checkpoint）。1 判断表ではない。1 commit を有界
 （`init` / `view` / `step`）。kit の現状は
 `amu/resources/kotoba/lang/application-language.edn` をその場で読め。
 
-決定核の抽出は **named backend がその値を admit できないときの fallback**
-である。先例は murakumo の `kotoba/*_core.kotoba`（native が word 型のとき）。
-SMTP `protocol_core` も fallback であってテンプレートではない。使うときは
-ヘッダに欠落と撤去条件を書く。wasm / web に対して最初から潰さない。
+**2026-08-30 の Q9 whole-component 決定は、決定核 fallback を移行単位として
+認めない。** backend が component 全体を admit できない場合、その移行は
+`:blocked` である。predicate、decision core、caller が前計算した scalar shadow は
+compiler research / historical fixture にはできるが、移行進捗、consumer cutover、
+旧 source 削除の証拠にはならない。
 
 文字列禁止ではない（ADR-2608261000）。`.cljc` oracle は slice の gate が揃うまで
 残し、`.kotoba` を require しない。oracle は照合用の写しであり、意味の正本ではない。
 コマンド文字列はゲストの product semantics である。『コマンド文字列は `.cljc`』は
 不適切（ある日の SMTP fallback を言語にした読み）。mirror を作らない。正規表現走査は
 移す前に宣言データへ直す。依存が `.cljc` のままの面は移行しない。
+
+Q9 の移行単位は namespace / deployable component の全 public surface と transitive
+source closure。機構だけを capability provider import に残す。各 target は verified
+native `kotoba check` / `kotoba compile` / `kotoba rad build` と、
+`amu check --jvm-free` / `amu compile --jvm-free` の両方を通す。acceptance では
+`java` / `javac` / `clojure` / `clj` を deny/trace し、未対応 target、lock failure、
+JVM-free project linker 未達は fallback せず block する。
+
+oracle parity は nbb/CLJS、native、Wasm、または content-addressed golden vector で
+全 public surface を照合する。JVM oracle は historical/non-gating。両 build の
+payload CID、definition CID、exports/imports、effects、resource bounds が一致するまで
+consumer cutover しない。機械正本は
+`orgs/kotoba-lang/kotoba-lang/lang/q9-migration.edn`、Kototama 採用記録は
+`orgs/kotoba-lang/kototama/qualification/q9-whole-component-build.edn`。既存の
+JVM/Chicory tender と Clojure compiler path は compat/diagnostic であり、Q9 を
+green にできない。
 
 ### native の現在地の読み方
 
@@ -2430,8 +2447,10 @@ byte 一致 parity gate（KIR インタプリタを同一 JVM で回す / compil
 コンパイラ（cljc）が AOT コンパイルを、独立して直接実行可能なネイティブ artifact
 まで最後まで面倒を見ることを意味する。** 配布される実行成果物が JVM/Chicory ホスト・
 JS エンジン（Node/browser）ホスト・新規 Rust 実行エンジンのいずれにも依存しては
-ならない。コンパイラ**ツール自体**が JVM 上で動くこと（gcc がどこかで動く必要が
-あるのと同じビルド時の話）は問わない——問題なのは実行成果物のランタイム依存。
+ならない。さらに **Q9 source migration は build/acceptance も JVM-free** である。
+verified native Kotoba CLI と Amu `--jvm-free` を使い、compiler、test、oracle の
+どこにも JVM を必須化しない。ADR-2607198300 の「compiler tool の JVM は問わない」は
+一般的な historical build の記述としてのみ残り、Q9 には適用しない。
 
 - **kototama 自身の maturity ladder（`orgs/kotoba-lang/kototama/docs/maturity.md`）
   には JVM/JS 以外の層が無いことを直接確認済み**: R0 contract → **R1 JVM/Chicory
