@@ -2318,14 +2318,25 @@ target に落ちたときだけで、**それは amu の経路ではない**。
 
 **したがって「native に無い」は、それ自体では言語の設計判断の証拠にならない。**
 
-### 恒久として引き受けるのは 2 つだけ
+### 恒久として引き受けるのは 2 つだけ（2026-08-30 精密化: 恒久は性質であって記法ではない）
 
 | 制約 | 出典 |
 |---|---|
-| `throw` / `try` / `catch` を使わず `[:result T E]` を返す | `:invariants :explicit-errors` = `:intentional-security-constraint`。**native の話ではなく wasm/cljs でも禁止** |
+| **untracked control effect の禁止** — ambient `throw` / `try` / `catch` を使わず `[:result T E]` を返す。**native の話ではなく wasm/cljs でも拒否**。typed abort/exception ability（effect row に現れ checked unwind を伴う、Unison の Exception と同型）は前提条件 landed 後に ADR 経由で widening 可 | `:invariants :explicit-errors`。改訂は ADR-2608650000 + adr-2608301500 |
 | bool は数ではなく型 | `:invariants :bool-is-a-type-not-a-number` = `:intentional-semantic-simplification` |
 
 `ex-info` → Result は後戻りしない設計変更なので、移行の副産物にせず正面からやる。
+
+**記法制限には shielding axis が付いた（adr-2608301500、2026-08-30 オーナー指示）。**
+禁止が守る性質を 5 軸（`:code-identity` / `:dispatch-bypass` / `:authority` /
+`:control-effect-tracking` / `:resource-bounds`）で名指しし、**definition CID
+（Unison 的 identity）と grant 交差 dispatch（biscuit 的 authority）で防げる害には
+記法禁止を恒久としない**。`:authority` 軸（atom / swap! / reset! / volatile! / ref /
+dosync）は `:state` ability への desugar という widening path を持つ — ただし前提条件
+（backend qualification・cap handle 格納の schema 拒否・conformance vectors）が
+landed するまでは fail-closed に拒否のまま。eval / interop / defmacro は CID と
+静的検査可能性そのものが要求するので恒久（機構が成熟しても解禁されない）。
+正本は `kotoba-lang/kotoba-lang` `lang/surface-status.edn` の `:shielding-axis`。
 
 ### それ以外は native 追随を前提とした一時制約として書く
 

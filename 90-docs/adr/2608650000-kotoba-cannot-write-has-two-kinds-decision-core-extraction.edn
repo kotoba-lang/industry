@@ -8,7 +8,7 @@
   :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
   :adr/authoritative_for
   ["`.kotoba` に書けない理由を「恒久の安全設計」と「backend 未達」に必ず分類する規約と、その分類の正本"
-   "恒久として引き受ける制約は 2 つだけ（exceptions→Result / bool は型）という決定"
+   "恒久として引き受ける制約は 2 つだけ（exceptions→Result / bool は型）という決定（2026-08-30 改訂: exceptions 側の恒久は untracked control effect の禁止として精密化、typed abort ability への widening path あり — adr-2608301500）"
    "map・set・closure・異種ベクタ・再帰値・bare bool パラメータを native 追随前提の一時制約として扱う決定"
    "決定核は named backend が値を admit できないときの fallback であり、言語の移行単位ではない — 移行単位の正本は ADR-2608261100"
    "fallback として切り出した核には parity test を必須とする規約"
@@ -84,6 +84,19 @@ exception paths`。effect を隠す経路を作らないための不変条件で
 追いついていないのではない。**これは native の話ではなく、wasm/cljs でも同じく
 禁止**である。移行のときに `ex-info` を Result へ移すのは後戻りしない変更なので、
 決定核を切り出す機会に正面からやる。
+
+**改訂（2026-08-30、オーナー指示 / adr-2608301500-guest-syntax-restrictions-classified-by-shielding-mechanism）**:
+恒久の中身を精密化する。恒久なのは『untracked な control effect の禁止』で
+あって、非局所脱出そのものの永久追放ではない。ambient な throw/try/catch は
+引き続き全 backend で拒否し、[:result T E] が現行の必須 surface である。
+ただし Unison の Exception ability と同型の typed abort/exception ability
+（effect row に現れ、checked lexical unwind と positive/negative conformance
+vectors を伴う）は、前提条件が landed した後に ADR 経由で widening 可能と
+する。bool 恒久は変更なし。禁止全体の分類（shielding axis: code-identity /
+dispatch-bypass / authority / control-effect-tracking / resource-bounds、
+biscuit 的 grant dispatch で防げる害には記法禁止を恒久としない）の正本は
+上記 ADR と kotoba-lang/kotoba-lang lang/surface-status.edn の
+:shielding-axis / :widening-path。
 
 ### 3. それ以外は native 追随を前提とした一時制約として書く
 
