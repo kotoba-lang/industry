@@ -74,6 +74,12 @@
    ["a clean reply yields the message"
     {:status 200 :text "{\"choices\":[{\"message\":{\"content\":\"x\"}}]}"} true]])
 
+(def config-cases
+  [["response cache is enabled"
+    #"(?m)^openrouter:\n  response_cache: true$"]
+   ["response cache TTL stays bounded to five minutes"
+    #"(?m)^  response_cache_ttl: 300$"]])
+
 (defn -main []
   (let [fails (atom 0)]
     (doseq [[nm resp want why] cases]
@@ -86,7 +92,13 @@
         (when (not= got want) (swap! fails inc))
         (println (if (= got want) "ok  " "FAIL") nm "-> message-of"
                  (if got "returned a message" "returned nil"))))
-    (println (str "RAN\t" (+ (count cases) (count message-cases)) " cases, " @fails " failed"))
+    (let [rendered (r/render-config "example/model:free" [] false)]
+      (doseq [[nm pattern] config-cases]
+        (let [got (boolean (re-find pattern rendered))]
+          (when-not got (swap! fails inc))
+          (println (if got "ok  " "FAIL") nm))))
+    (println (str "RAN\t" (+ (count cases) (count message-cases) (count config-cases))
+                  " cases, " @fails " failed"))
     (when (pos? @fails) (.exit js/process 1))))
 
 (-main)

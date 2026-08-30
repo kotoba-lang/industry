@@ -116,6 +116,12 @@ nbb scripts/hermes-hyakka-bots/resolve_free_model.cljs --check-config
 nbb scripts/hermes-hyakka-bots/resolve_free_model.cljs --if-stale --write --jobs a,b
 ```
 
+The generated Hermes configuration enables OpenRouter response caching with a
+300-second TTL. This is separate from provider prompt caching: only byte-for-byte
+identical successful requests are replayed, while changing bot/tool context gets
+a different cache key. Hermes disables response caching when retrying an empty
+completion, so an unusable cached response is not replayed indefinitely.
+
 `0` installed or already current · `1` nothing free passed, the fleet stays
 primary · `2` **REFUSED**, it could not find out. 1 and 2 must not collapse:
 *no free model works* is a measurement, *I could not look* is not.
