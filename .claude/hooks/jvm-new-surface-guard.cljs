@@ -32,11 +32,6 @@
       (when (zero? exit) out))
     (catch :default _ nil)))
 
-(defn- target-dir [cmd]
-  (or (second (re-find #"\bgit\s+-C\s+(\S+)" cmd))
-      (second (re-find #"^\s*cd\s+(\S+)\s*&&" cmd))
-      "."))
-
 (defn- file-exists? [p]
   (try (.existsSync fs p) (catch :default _ false)))
 
@@ -86,32 +81,75 @@
         (when after
           (check-deps-change! before after))))))
 
-(defn- changed-paths [top]
-  (->> [(sh top "diff" "--name-only")
-        (sh top "diff" "--cached" "--name-only")
-        (sh top "ls-files" "-o" "--exclude-standard")]
-       (keep identity)
-       (mapcat str/split-lines)
+(defn- lines [s]
+  (->> (str/split-lines (or s ""))
        (map str/trim)
-       (remove str/blank?)
+       (remove str/blank?)))
+
+(defn- nested-repo?
+  "Is `path` inside a git repository of its own, below `top`?
+
+  The west superproject checks out ~4,000 child repositories under `orgs/`,
+  and they are not ignored. A file in one of them is never part of a commit
+  to `top`, so measuring it here answers about a tree nobody is committing."
+  [top path]
+  (loop [d (node-path/dirname path)]
+    (cond
+      (contains? #{"" "." "/"} d) false
+      (file-exists? (node-path/join top d ".git")) true
+      :else (recur (node-path/dirname d)))))
+
+(defn- commit-paths
+  "What this commit will actually contain.
+
+  Staged paths, plus tracked-but-unstaged ones only when `-a` was passed.
+  Untracked files are excluded: `git commit` does not add them, and the
+  previous `ls-files -o` swept in every child repository under `orgs/`,
+  each of whose `deps.edn` then had no HEAD version to compare against — so
+  every coordinate in it read as newly added. That is how this guard came to
+  refuse a commit touching three prose files (measured 2026-08-30)."
+  [top cmd]
+  (->> (cond-> [(sh top "diff" "--cached" "--name-only")]
+         (pol/commit-includes-unstaged? cmd) (conj (sh top "diff" "--name-only")))
+       (mapcat lines)
        distinct))
+
+(defn- push-paths
+  "What this push carries that the upstream has not seen. Empty (and so a
+  no-op) when there is no upstream to compare against — a push whose commits
+  were each checked at commit time."
+  [top]
+  (lines (sh top "diff" "--name-only" "@{upstream}..HEAD")))
 
 (defn- head-text [top path]
   (sh top "show" (str "HEAD:" path)))
 
-(defn- handle-commit! [cmd]
-  (let [top (some-> (sh (target-dir cmd) "rev-parse" "--show-toplevel") str/trim)]
-    (when (str/blank? top) (allow!))
-    (doseq [path (changed-paths top)]
-      (let [abs (node-path/join top path)
-            on-disk? (file-exists? abs)
-            at-head? (boolean (head-text top path))]
-        (cond
-          (and (pol/production-clj-path? path) on-disk? (not at-head?))
-          (deny! (pol/deny-reason-clj path))
+(defn- handle-git! [cmd push?]
+  (let [dir (pol/target-dir cmd)]
+    ;; nil = the command changes directory somewhere this cannot resolve
+    ;; ($VAR, glob, ~). Reading that as "." would measure the superproject
+    ;; instead, which is wrong in both directions: a clean tree there hides a
+    ;; real new dependency in the repo being committed to, and a busy one
+    ;; denies a commit that adds nothing. Say so instead of guessing.
+    (when (nil? dir)
+      (deny! (str "jvm-new-surface-guard cannot tell which repository this "
+                  "targets: the `cd` destination is not a literal path "
+                  "(a variable, glob or ~). Re-run with `git -C <literal path> "
+                  "…`, or a literal `cd`, so the guard measures the tree you "
+                  "are committing to. Set JVM_NEW_SURFACE_ALLOW=1 to skip.")))
+    (let [top (some-> (sh dir "rev-parse" "--show-toplevel") str/trim)]
+      (when (str/blank? top) (allow!))
+      (doseq [path (if push? (push-paths top) (commit-paths top cmd))
+              :when (not (nested-repo? top path))]
+        (let [abs (node-path/join top path)
+              on-disk? (file-exists? abs)
+              at-head? (boolean (head-text top path))]
+          (cond
+            (and (pol/production-clj-path? path) on-disk? (not at-head?))
+            (deny! (pol/deny-reason-clj path))
 
-          (and (deps-edn-path? path) on-disk?)
-          (check-deps-change! (head-text top path) (read-utf8 abs)))))))
+            (and (deps-edn-path? path) on-disk?)
+            (check-deps-change! (head-text top path) (read-utf8 abs))))))))
 
 (try
   (when (= "1" (or (aget js/process.env "JVM_NEW_SURFACE_ALLOW") ""))
@@ -126,8 +164,8 @@
       (re-find #"^(Edit|StrReplace)$" tool) (handle-edit! ti)
       (= "Bash" tool)
       (let [cmd (or (:command ti) "")]
-        (when (re-find #"\bgit\b(?:\s+-C\s+\S+)?\s+(?:commit|push)\b" cmd)
-          (handle-commit! cmd)))
+        (when-let [verb (second (re-find #"\bgit\b(?:\s+-C\s+\S+)?\s+(commit|push)\b" cmd))]
+          (handle-git! cmd (= "push" verb))))
       :else nil)
     (allow!))
   (catch :default _
