@@ -1,0 +1,134 @@
+#!/usr/bin/env nbb
+;; register_fabric_actors.cljs — fabric actor（`*-organism.aozora.app`）の
+;; 初回登録（handle 取得・profile・名乗り post・Keychain へ seed 保存）。
+;;
+;; 2026-08-30 に JVM (.clj) から nbb (.cljs) へ refactor（publish 版と同じ理由:
+;; superproject root の deps.edn で `clojure` が落ちる障害クラスの除去 +
+;; cacao 鋳造を cljs 実装に寄せる）。名乗り・handle・Keychain service 名・
+;; 終了状態は **この script が持たない** —— 正本は
+;; `scripts/kotoba/fabric_actor_core.kotoba`、参照実装は
+;; `gftd.fabric-actor-core`（ADR-2608155000）。ここに残るのは HTTP・CACAO
+;; 鋳造・Keychain 書き込み・receipt の JSON 書き出しという effect だけ。
+;;
+;; 実行:
+;;   nbb --classpath "scripts:orgs/kotoba-lang/org-chainagnostic-cacao/src:orgs/kotoba-lang/authority/src:orgs/kotoba-lang/org-ietf-ed25519/src:orgs/kotoba-lang/org-ietf-cbor/src" \
+;;     scripts/register_fabric_actors.cljs [product ...]
+(ns register-fabric-actors
+  (:require [clojure.string :as str]
+            [cacao.core :as cacao]
+            [gftd.fabric-actor-core :as core]
+            ["node:child_process" :as cp]
+            ["node:crypto" :as node-crypto]
+            ["node:fs" :as fs]
+            ["node:path" :as path]))
+
+(def root (or (aget (.-env js/process) "FABRIC_ROOT") "."))
+(def receipt-path (path/join root "80-data/system/artificial-organism-actors.json"))
+(def user (or (aget (.-env js/process) "USER") "fabric-operator"))
+
+(defn- now-iso [] (.toISOString (js/Date.)))
+
+(defn post! [nsid body token]
+  (-> (js/fetch (str core/pds "/xrpc/" nsid)
+                (clj->js {:method "POST"
+                          :headers (cond-> {"content-type" "application/json"}
+                                     token (assoc "authorization" (str "Bearer " token)))
+                          :body (js/JSON.stringify (clj->js body))}))
+      (.then (fn [resp]
+               (.then (.text resp)
+                      (fn [text]
+                        (let [value (try (js->clj (js/JSON.parse text) :keywordize-keys true)
+                                         (catch :default _ {}))]
+                          (when (or (>= (.-status resp) 400) (:error value))
+                            (throw (ex-info (str nsid " rejected")
+                                            {:status (.-status resp)
+                                             :error (:error value)
+                                             :message (:message value)})))
+                          value)))))))
+
+(defn seed []
+  (js/Uint8Array.from (node-crypto/randomBytes 32)))
+
+(defn b64 [bytes]
+  (.toString (js/Buffer.from bytes) "base64"))
+
+(defn cacao-for [seed]
+  (let [now (js/Date.)]
+    (:cacao-b64 (cacao/mint {:seed seed :aud "did:web:pds.aozora.app"
+                             :iat (now-iso)
+                             :exp (.toISOString (js/Date. (+ (.getTime now) 300000)))
+                             :nonce (str (random-uuid))
+                             :resources ["atproto://account/session"]
+                             :domain "pds.aozora.app"}))))
+
+(defn keychain! [handle seed]
+  (let [r (cp/spawnSync "security"
+                        (clj->js ["add-generic-password" "-U" "-a" user
+                                  "-s" (core/seed-service handle) "-w" (b64 seed)])
+                        #js {:encoding "utf8"})]
+    (when-not (zero? (.-status r))
+      (throw (ex-info "keychain write failed" {:handle handle :stderr (.-stderr r)})))))
+
+(defn register! [product]
+  (let [handle (core/handle product)
+        seed (seed)
+        cacao (cacao-for seed)]
+    (-> (post! "com.atproto.server.createAccount" {:handle handle :cacao cacao} nil)
+        (.then (fn [session]
+                 (let [did (:did session)
+                       token (:accessJwt session)
+                       now (now-iso)]
+                   (keychain! handle seed)
+                   (-> (post! "com.atproto.repo.putRecord"
+                              {:repo did :collection "app.bsky.actor.profile" :rkey "self"
+                               :record {:$type "app.bsky.actor.profile"
+                                        :displayName (core/display-name product)
+                                        :description (core/description product)}}
+                              token)
+                       (.then (fn [_]
+                                (post! "com.atproto.repo.createRecord"
+                                       {:repo did :collection "app.bsky.feed.post"
+                                        :record {:$type "app.bsky.feed.post"
+                                                 :text (core/registration-text product)
+                                                 :createdAt now}}
+                                       token)))
+                       (.then (fn [post]
+                                {:product product :handle handle :did did
+                                 :state "registered"
+                                 :postUri (:uri post) :postCid (:cid post)})))))))))
+
+(defn -main [& _]
+  (let [selected (if (seq *command-line-args*) (vec *command-line-args*) core/products)]
+    (-> (reduce (fn [p product]
+                  (.then p (fn [acc]
+                             (.then (.catch (register! product)
+                                            (fn [e] {:product product :state "failed"
+                                                     :error (or (:error (ex-data e)) (.-message e))
+                                                     :message (:message (ex-data e))}))
+                                    #(conj acc %)))))
+                (js/Promise.resolve []) selected)
+        (.then (fn [fresh]
+                 (let [old (try (:results (js->clj (js/JSON.parse (fs/readFileSync receipt-path "utf8"))
+                                                   :keywordize-keys true))
+                                (catch :default _ []))
+                       replaced (set selected)
+                       results (vec (concat (remove #(contains? replaced (:product %)) old) fresh))
+                       receipt {:schema 1 :generatedAt (now-iso) :pds core/pds :results results}
+                       ;; 終了状態は fresh（今回試した分）で決める。receipt に残っている
+                       ;; 過去の結果まで見ると、直っていない別 product のせいで今回の
+                       ;; run が永遠に赤くなる。0 件 = exit 2（試していない ≠ 全部成功）。
+                       code (core/exit-code (count fresh)
+                                            (count (filter #(= "failed" (:state %)) fresh)))]
+                   (fs/writeFileSync receipt-path
+                                     (str (js/JSON.stringify (clj->js receipt) nil 2) "\n"))
+                   (println (js/JSON.stringify (clj->js receipt)))
+                   (.exit js/process code))))
+        (.catch (fn [e]
+                  (binding [*out* *err*]
+                    (println (str "register-fabric-actors: " (.-message e))))
+                  (.exit js/process 1))))))
+
+;; script 実行のときだけ走る（require では走らない — PDS への登録を誤発火させない）。
+(when (some #(str/ends-with? (str %) "register_fabric_actors.cljs")
+            (js->clj js/process.argv))
+  (-main))
