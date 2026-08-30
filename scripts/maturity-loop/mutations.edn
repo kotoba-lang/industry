@@ -3531,4 +3531,87 @@
      :find "   :object-types\n   [{:id :tender\n     :name \"Procurement Tender / Opportunity\"\n     :attributes {:status :keyword}\n     :key [:status]}]})"
      :replace "   :object-types\n   []})"
      :must-fail ["registries-are-not-empty-test"]}]}
+
+  {:repo "orgs/kotoba-lang/mailer"
+   :label "mailer provider-request boundary"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   ;; mailer turns an approved mail/send effect into a provider request. Nothing
+   ;; downstream re-derives the request, so a field lost here is lost silently:
+   ;; the host executes a well-formed instruction and reports success. Until
+   ;; 2026-08-30 the suite covered the :resend and :smtp shapes and little else,
+   ;; and writing the missing cases found two such losses (a body part made
+   ;; invisible by its charset spelling, a display name read under only one of
+   ;; the two keys `mail.message` accepts).
+   ;;
+   ;; All eight below were applied one at a time at pin 72d1fb89 on 2026-08-30,
+   ;; each anchor unique in the file, each reddening the tests named and no
+   ;; others beyond those listed, with the unmutated tree green before and after.
+   ;;
+   ;; Two of these exist because the first version of the test they name did NOT
+   ;; bite. `effect-type-unchecked` used to leave a NullPointerException escaping
+   ;; from deep inside `mail.message` -- red, but for a reason the test does not
+   ;; name -- so the assertion now reads the ex-data, and `caught` catches
+   ;; Throwable rather than only ex-info. `receipt-status-hardcoded` used to
+   ;; survive outright: the only status any test reported was :accepted, which is
+   ;; also the default, so dropping the provider's status was unobservable.
+   :mutations
+   [{:id :mailer/media-type-case
+     :why "content-type の大小文字を media type の同一性に含める。`TEXT/PLAIN; charset=utf-8` の part が見えなくなる —— RFC 2045 は同じ型だと言っている"
+     :file "src/mailer/core.cljc"
+     :find "          str/trim\n          str/lower-case\n          not-empty)"
+     :replace "          str/trim\n          not-empty)"
+     :must-fail ["matches-body-parts-by-media-type-not-header-string"]}
+
+    {:id :mailer/media-type-trim
+     :why "content-type 前後の空白を型の同一性に含める。同上、header の書き方の揺れで part が消える"
+     :file "src/mailer/core.cljc"
+     :find "          (str/split #\";\")\n          first\n          str/trim\n"
+     :replace "          (str/split #\";\")\n          first\n"
+     :must-fail ["matches-body-parts-by-media-type-not-header-string"]}
+
+    {:id :mailer/no-body-refusal
+     :why "送れる part が1つも無い message への拒否を外す。`mail.message` は part が在れば valid と言うので、:text も :html も持たない request が**普通に組み上がる** —— 空のメールを送れという整った指示になり、失敗は宛先で初めて現れる。これがこの repo における『測れなかったものが、測って問題が無かったものと同じ顔をする』形"
+     :file "src/mailer/core.cljc"
+     :find "    (when-not (or text html)\n      (throw (ex-info \"mail message has no text/plain or text/html part to send\"\n                      {:mail/subject (:mail/subject m)\n                       :mail.part/content-types (mapv :mail.part/content-type parts)})))\n"
+     :replace ""
+     :must-fail ["refuses-a-message-with-no-sendable-part"]}
+
+    {:id :mailer/display-name-plain-key
+     :why "表示名を namespaced な key だけから読む。`mail.message/normalize-address` は `:email` 綴りを受け付けて他の key を素通しするので、`{:email _ :name _}` と書かれた宛先は名前を黙って失う"
+     :file "src/mailer/core.cljc"
+     :find "(or (:mail.address/name a) (:name a))"
+     :replace "(:mail.address/name a)"
+     :must-fail ["keeps-the-display-name-in-both-spellings"]}
+
+    {:id :mailer/ses-capabilities-copied
+     :why "ses の request が resend の capability を宣言する。3 branch はほぼ同型なので copy-paste で実際に起きる形。host は config ではなく request から権限を配るので、宣言のずれは過大な権限になる"
+     :file "src/mailer/core.cljc"
+     :find "       :mailer.request/capabilities (provider-capabilities :ses)"
+     :replace "       :mailer.request/capabilities (provider-capabilities :resend)"
+     :must-fail ["every-request-declares-its-providers-capabilities"]}
+
+    {:id :mailer/provider-table-drift
+     :why "supported-providers にだけ provider を足す（capability 表には足さない）。config の required-capabilities が nil になり、policy engine はそれを『何も要らない』と読む。表を2つ持つ限り必ず起きるずれ"
+     :file "src/mailer/core.cljc"
+     :find "(def supported-providers #{:resend :smtp :ses})"
+     :replace "(def supported-providers #{:resend :smtp :ses :postmark})"
+     :must-fail ["every-supported-provider-has-a-capability-set"
+                 "provider-config-refuses-unknown-provider"
+                 "every-request-declares-its-providers-capabilities"
+                 "refuses-a-message-with-no-sendable-part"]}
+
+    {:id :mailer/effect-type-unchecked
+     :why "effect 種別の門を外す。message が nil になるので `mail.message` の奥で NPE が出て、どのみち赤くはなる —— だから『何か throw された』だけを見るテストはこの mutation を**噛んだことにして生き延びる**。ex-data を読んで初めて、名乗っている理由で拒否したことになる"
+     :file "src/mailer/core.cljc"
+     :find "    (when-not (= :mail/send (:mail.effect/type effect))\n      (throw (ex-info \"mailer request requires mail/send effect\" {:effect effect})))\n"
+     :replace ""
+     :must-fail ["rejects-non-mail-effect"]}
+
+    {:id :mailer/receipt-status-hardcoded
+     :why "provider が返した status を捨てて :accepted に固定する。既定値も :accepted なので、**queue された送信も拒否された送信も受理として記録される**。status を1種類しか通さないテストからは見えない"
+     :file "src/mailer/core.cljc"
+     :find "                    :status (:status provider-result)}"
+     :replace "                    :status :accepted}"
+     :must-fail ["receipt-reports-the-status-the-provider-gave"]}]}
 ]}
