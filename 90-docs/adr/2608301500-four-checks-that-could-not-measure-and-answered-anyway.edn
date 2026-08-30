@@ -1,0 +1,146 @@
+[{:db/id -1
+  :adr/id "adr-2608301500-four-checks-that-could-not-measure-and-answered-anyway"
+  :adr/title "Four checks that could not measure, and answered anyway (cleanup session 2026-08-30)"
+  :adr/status "accepted"
+  :adr/date "2026-08-30"
+  :adr/supersedes ""
+  :adr/related "adr-2608136000-six-questions-before-writing-a-check, adr-2608230300-asking-failed-is-not-an-absent-successor, adr-2607211600-full-history-default"
+  :adr/body
+  "## What this session did
+
+A `git cleanup conflict` pass over the superproject and its 4,316 child checkouts.
+Everything below is landed on a default branch unless it says otherwise.
+
+### Landed
+
+| where | what |
+|---|---|
+| root `1e0291eff6ae` | rescued a stranded fleet-ci receipt + fixed the observatory evidence drop |
+| root `da9812a13bdb` | COFOG 072 + 033 coverage entries rescued from six dead scout branches |
+| root `2b5e7dab6a51` | hourly observatory run carrying the first evidence row |
+| `cloud-itonami/animeka#7` | 1 untracked file |
+| `cloud-itonami/eigyo-list#1` | 24 city receipt EDNs + 2 journal entries |
+| `cloud-itonami/eigyo-list#2` | the append-only journal delta (disposition recorded on the PR) |
+| `net-kotobase/control-plane#578` | 1 untracked file |
+
+Retired: 21 merged remote branches, 10 local, all archived first to
+`.git/stash-archive-20260830/` (348K) with an `index.txt`. Preserved by publishing,
+never merged: 5 branches that existed only on this machine.
+
+## The finding
+
+Four separate checks this session could not make the measurement they claimed, and
+each returned the value that means `fine`. This is exactly the class ADR-2608136000
+names, so the point of this ADR is not the class but that it recurred four times in
+one day across four unrelated tools.
+
+### 1. An observatory mitigation that never once fired
+
+`scripts/observatory-run.cljs` has returned `:signal` / `:load1-before` /
+`:load1-after` / `:timeout-ms` from `run-one` since 2026-08-13, in a commit whose own
+message is `observatory: record the load, because three timeouts today were my own
+parallelism`. `datom` was ready to write all four. The record assembled between the
+two never carried them, so `git log -S killed-by-signal` over
+`90-docs/observatory/observatory.datoms.edn` returns no commit in the file's history.
+
+It cost precisely what that commit predicted. At `2026-08-30T01:35:08.532Z` six
+observatories (watari, mitooshi, com-etzhayyim-mikurabe, com-etzhayyim-kawaraban,
+hirameki, hayari) were written `:known-broken` / `meets-expectation false` after
+603-663s against the registry's 600000ms timeout, at one timestamp, on one machine.
+One saturated batch, killed. In the ledger it is indistinguishable from six actors
+that regressed. Those rows were not landed. The fix carries the four fields; the next
+tick produced the first row in the file's history to have any of them: `meyasu`,
+`load1-before 400.96`.
+
+The lesson is narrower than 'add the field'. The field WAS added. What was missing is
+that nothing ever asserted the field arrived, so a mitigation sat inert for 17 days
+looking exactly like a mitigation that works.
+
+### 2. `west-triple-sync plan --names` reads directory names, not remotes
+
+Asked to plan registration for six paths that `cleanup-land` reported as
+west-unregistered, the plan proposed three `:register` actions and three
+`report-skip`s reading `GitHub repo missing: network-awai/local-murakumo-fastmtp (use
+new-project-scaffold to create)`.
+
+All six already resolve to repos west carries:
+
+| path | remote resolves to | already in west as |
+|---|---|---|
+| `orgs/etzhayyim/com-etzhayyim-kizashi` | `etzhayyim/actor-kizashi` | `orgs/etzhayyim/actor-kizashi` |
+| `orgs/etzhayyim/com-etzhayyim-ossekai` | `etzhayyim/actor-ossekai` | `orgs/etzhayyim/actor-ossekai` |
+| `orgs/network-awai-worktrees/cloud-itonami-slogan` | `network-awai/cloud-itonami` | `orgs/network-awai/cloud-itonami` |
+| `orgs/network-awai/local-murakumo-fastmtp` | `network-awai/local-murakumo` | `orgs/network-awai/local-murakumo` |
+| `orgs/network-awai/local-murakumo-runpod5090` | `network-awai/local-murakumo` | `orgs/network-awai/local-murakumo` |
+| `orgs/network-awai/network-isekai-playtest` | `network-awai/network-isekai` | `orgs/network-awai/network-isekai` |
+
+Every successor is checked out locally. The first two are `:renamed-upstream`, which
+the cleanup runbook's own table marks `Do not re-register`. Applying the plan would
+have registered two dead names, added an entry whose `:org` is
+`network-awai-worktrees` (a local worktree directory, not a GitHub org), and followed
+that `use new-project-scaffold to create` sentence into creating three repos that
+exist. That sentence is the trap ADR-2608230300 documents by name.
+
+`west-orphan-audit` resolves the git remote and reports `true-orphan-git=0` /
+`renamed-UNVERIFIED=0`, exit 0, on the same tree. **Where the two disagree, the audit
+is right.** Nothing was registered; `manifest/` was not written.
+
+### 3. The primary-remote fallback picks the annex special remote
+
+72% of `orgs/` checkouts have no `origin`. A fallback of `git remote | head -1` picks
+`b2` — the Backblaze annex special remote — wherever it exists, because it sorts
+first. Measured against `b2`, `gftdcojp/m365-archive`'s `agent/multi-mailbox-ingest`
+read ABSENT-on-remote when it was already on `github/`, and a branch archive came out
+`0 commits, 0B` because `$REM/main` did not resolve. Both are the silent shape: a
+push that was already done reads as un-pushed work, and an archive that measured
+nothing reads as an empty branch. Prefer `origin`, then a remote whose URL contains
+`github.com`, and never a bare `head -1`.
+
+### 4. `$?` after a pipe, and a waiter that waited on itself
+
+Two shell-level instances, both already warned about in CLAUDE.md and both committed
+anyway:
+
+- `timeout 110 nbb ... > log; echo EXIT=$?` correctly reported `EXIT=124`. The same
+  measurement piped to `tail` would have reported 0. Long checks go to a file first.
+- `until ! pgrep -f 'cleanup-land.cljs'; do sleep; done` never exits, because the
+  waiter's own command line contains that string. Four waiters hung on themselves
+  before this was noticed; the fix is to capture the real PID and use `kill -0`.
+
+## Adjacent, and unrelated to the class
+
+**A revert caught before it shipped.** `network-awai/cloud-murakumo` held
+`public/go.html` at +33/-224. That checkout is one commit behind, and the commit it
+lacks (`c63bfd2`, PR #148) touches that same file: the public operator and contact
+disclosure. Not landed, no PR opened, archived with the measurement under
+`.git/stash-archive-20260830/child-repos/`.
+
+**A branch that could not be preserved under its own name.**
+`kotoba-lang/kotoba` `agent/guest-authoring-maturity-l2` is diverged 117 local-only /
+2 remote-only. Pushed as `agent/guest-authoring-maturity-l2-local-20260830`; the
+original ref is untouched. Force-push stays forbidden, so resolving the divergence is
+the owning session's call.
+
+**The west-pin guard denies the whole Bash call.** It is a PreToolUse hook, not a git
+hook, so a `fetch && merge --ff-only && push` chain never runs its own sync — the
+command is rejected before its first word and the checkout stays as stale as it was.
+`WEST_PIN_VERIFY_SKIP=1` as a command prefix cannot reach it for the same reason. The
+pin it flagged was never anything the branches did: each branch's `manifest/west.yml`
+was byte-identical to its own merge-base. Sync as a separate call, then push.
+
+## Resume point
+
+- Nothing is half-finished. Superproject clean, 0 stashes, 0 open PRs in every repo
+  touched, west orphan audit exit 0.
+- The dynamic confirmation of finding 1 is ongoing: every full observatory tick from
+  now should carry `:observatory/load1-before` and `:timeout-ms`, and
+  `:killed-by-signal` whenever `spawnSync` reports one. If a future tick writes
+  `:known-broken` with those fields nil, the carrier regressed again.
+- Not done, deliberately: ~23 pushed-but-un-PR'd branches across 12 child repos, plus
+  a 34-branch farm on `network-awai/app-hyakka`. The owner chose preserve-only for
+  this pass. The runbook gates PR-opening behind `--branches`, which is opt-in.
+- Not done: the two `etzhayyim` leftover directories. The correct move is retiring the
+  stale checkouts, not registering them.
+- `90-docs/observatory/observatory.datoms.edn` will be dirty again within the hour.
+  That is the hourly routine regenerating it, not leftover work; it lands by cleanup
+  pass, not by the routine."}]
