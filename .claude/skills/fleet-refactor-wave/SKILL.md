@@ -28,8 +28,30 @@ tick が **exit 2** なら測れていない。**その周は何もしない。*
 なく、ADR-2608039000 の規則違反が今のところ無いという legitimate な測定結果。
 0 本が続くこと自体を異常として扱わない）。
 
-`--mission a` / `--mission b` で片方だけに絞れる（既定は `both`）。**Mission A
-候補が続けて 0 本なら Mission B を優先する**（タスクの指示どおり）。
+`--mission a` / `--mission b` で片方だけに絞れる（既定は `both`）。
+
+> ⚠ **Mission B は 2026-08-30 以降 authority が禁じている。手で再開しない。**
+> tick が `MISSION-B-BLOCKED` を出すのは、機械正本
+> `kotoba-lang/kotoba-lang` の `lang/q9-migration.edn`（origin/main）が
+> 2 つの独立した理由で禁じているから:
+>
+> 1. `:scope :decision-only-extraction-forbidden true` —— この tick の Mission B
+>    が探すのは decision core（ADR-2608290100 Decision §3 が自分でそう書いている）で、
+>    authority が名指しで禁じた形そのもの。`:legacy-decision-cores` は
+>    `:status :historical-evidence-only` / `:expansion false`。
+> 2. `:current-decision :authorized-waves #{:wave-0 :wave-1}` —— `orgs/cloud-itonami/`
+>    は `:wave-4`（`:status :not-authorized`）。authorized な 2 tranche は
+>    `orgs/kotoba-lang/*` のみで、cloud-itonami の言及は 0 件。
+>
+> 解除は tick を書き換えることではなく、**authority 側が変わること**。authority が
+> 許可に転じれば gate は自動で通る（両方向を実測済み）。Mission B を再開したい場合の
+> 正しい経路は、Q9 の `:whole-component-build-contract`（`kotoba check` /
+> `amu check --jvm-free` の両建て + `:component-closure` 全 public surface）を
+> 満たす移行単位に tick のヒューリスティクスを作り直すことで、この gate を外すことではない。
+
+**したがって当面、この loop が実際に進められるのは Mission A だけ**であり、その
+候補は 0 本が続いている（ADR-2608039000 の規則違反が今のところ無いという legitimate な
+測定結果）。両方が 0 本の周は、何もしないのが正しい出力。
 
 tick は各候補の `:repo` `:org` `:name` `:mission`（`:a`/`:b`）、Mission B なら
 さらに `:file`（対象 `.clj`/`.cljc` の相対パス）`:lines` を出す。**それをそのまま
