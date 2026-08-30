@@ -3441,4 +3441,94 @@
      :find "  (if (false? (get-in policy [:policy/redistribution :allowed]))"
      :replace "  (if (not (true? (get-in policy [:policy/redistribution :allowed])))"
      :must-fail ["flipping-the-redistribution-flag-is-refused"]}]}
+
+  {:repo "orgs/kotoba-lang/ontology"
+   :label "ontology/connector registries: the tables, not the four lookups over them"
+   ;; この repo の suite は 2026-08-30 まで、全 assertion が :tender と :jp.kkj を
+   ;; 手で名指ししていた。**自分が書いた行に対して lookup が動くこと**は証明できるが、
+   ;; 行そのものが誤っていることには気づけない。加えて 0-/1-arity しか呼んでいな
+   ;; かったので、`by-id` が渡された registry を無視して seed 済みの var を読むよう
+   ;; 書き換えても suite は緑のままだった —— その arity こそがこの library の
+   ;; 拡張点（blueprint が自前の object-type を渡す口）である。
+   ;;
+   ;; 9 件とも pin 7a9872cc で実際に赤くなるのを見てから載せた。さらに**変更前の
+   ;; tree にも同じ mutation を当てて測った**: 3 件が旧 suite を緑のまま通り抜け
+   ;; （by-id が registry を無視する 2 件と、:key が :attributes から外れる 1 件）、
+   ;; 別の 2 件は変更前に存在しなかった guard を対象にしている。残る 4 件は旧 suite
+   ;; でも捕まったが、同じ性質を**表の側から**述べたものとして残す。
+   ;;
+   ;; ここで守りたい失敗は構造的に静かである。connector の :object-type を綴り
+   ;; 間違えても、その id は解決し、tag は綴り間違いをそのまま押し、
+   ;; tagged-conforms? はその source が出す**あらゆる fact に対して false** を返す
+   ;; ——呼び出し側から見ると「本当に conform しない fact」と区別がつかない。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [;; ── 旧 suite を緑のまま通り抜けた 3 件 ────────────────────────────────
+    {:id :ontology/by-id-ignores-its-registry
+     :why "`by-id` が引数の registry ではなく seed 済みの var を読む。1-arity を一度も呼んでいない suite には見えない、ごく普通の refactor 事故 —— そして caller が自前の object-type を渡す経路が丸ごと死ぬ"
+     :file "src/kotoba/ontology.cljc"
+     :find "([reg] (into {} (map (juxt :id identity) (object-types reg)))))"
+     :replace "([reg] (into {} (map (juxt :id identity) (object-types registry)))))"
+     :must-fail ["caller-supplied-registry-is-the-one-read-test"]}
+
+    {:id :ontology/connector-by-id-ignores-its-registry
+     :why "connector 側の同じ事故。`tag` の `:reg` kwarg が黙って無効になり、blueprint が登録した connector ではなく fleet の seed が使われる"
+     :file "src/kotoba/ontology/connector.cljc"
+     :find "([reg] (into {} (map (juxt :id identity) (connectors reg)))))"
+     :replace "([reg] (into {} (map (juxt :id identity) (connectors registry)))))"
+     :must-fail ["caller-supplied-connector-registry-is-the-one-read-test"]}
+
+    {:id :ontology/object-type-key-drift
+     :why ":key が :attributes に無い属性を名指しする。:key を読むコードは 1 行も無いので、この drift は実行時に何も起こさない —— conforms? は key 属性を 1 つも持たない fact に対して true を返し続け、別々の instance が識別不能なまま両方 conform する"
+     :file "src/kotoba/ontology.cljc"
+     :find "     :key [:status]}]})"
+     :replace "     :key [:tender-id]}]})"
+     :must-fail ["object-type-key-is-drawn-from-its-attributes-test"]}
+
+    ;; ── 変更前には存在しなかった guard（docstring だけが主張していた）──────
+    {:id :ontology/tag-stamps-nil-object-type
+     :why "registry に在るが :object-type を持たない connector（:status :planned で id だけ予約した行）を tag が弾かず {:ontology/type nil, :ontology/source :jp.planned} を返す。source を名乗りながら型を主張しない fact は provenance ではない —— これは tag の docstring が『それを防ぐために存在する』と書いていた当の形で、2026-08-30 まで実際に起きた"
+     :file "src/kotoba/ontology/connector.cljc"
+     :find "    (when-not object-type\n      (throw (ex-info (str \"connector declares no object-type: \" connector-id)\n                      {:reason :connector-without-object-type\n                       :connector-id connector-id :connector connector})))\n"
+     :replace ""
+     :must-fail ["tag-refusal-reasons-are-distinct-test"]}
+
+    {:id :ontology/tag-launders-provenance
+     :why "既に :ontology/source を持つ fact への再 tag が、出所を黙って上書きする。jp.kkj 由来の fact が jp.geps を名乗って出ていく —— well-formed で conform もするのに、この registry が記録するために存在する唯一の事実について嘘をついている"
+     :file "src/kotoba/ontology/connector.cljc"
+     :find "    (when (and prior-source (not= prior-source connector-id))\n      (throw (ex-info (str \"fact already tagged by a different connector: \" prior-source)\n                      {:reason :provenance-overwrite\n                       :connector-id connector-id :prior-source prior-source})))\n"
+     :replace ""
+     :must-fail ["tag-refusal-reasons-are-distinct-test"
+                 "tag-is-idempotent-for-the-same-connector-test"]}
+
+    ;; ── 旧 suite でも捕まった 4 件（表の側から同じ性質を述べ直したもの）────
+    {:id :ontology/connector-object-type-typo
+     :why "seed 済み connector の :object-type を綴り間違える。この suite が存在する理由そのもの —— id は解決し、tag は成功し、tagged-conforms? はその source の全 fact に対して静かに false を返し続ける"
+     :file "src/kotoba/ontology/connector.cljc"
+     :find "    {:id :jp.geps\n     :name \"GEPS 落札実績オープンデータ\"\n     :object-type :tender"
+     :replace "    {:id :jp.geps\n     :name \"GEPS 落札実績オープンデータ\"\n     :object-type :tendr"
+     :must-fail ["every-connector-declares-a-resolvable-object-type-test"
+                 "seeded-connectors-round-trip-through-tag-test"]}
+
+    {:id :ontology/conforms-collapses-unknown-type-to-false
+     :why "未知の object-type に対する nil を false に畳む（`boolean` で包む、いかにも書かれそうな『整理』）。呼び出し側は『そんな型は無い』と『この fact は conform しない』を区別できなくなる —— 壊れた pipeline が clean な rejection と同じ顔になる形"
+     :file "src/kotoba/ontology.cljc"
+     :find "   (when-let [type (get-type reg id)]\n     (every? #(contains? fact %) (keys (:attributes type))))))"
+     :replace "   (boolean\n    (when-let [type (get-type reg id)]\n      (every? #(contains? fact %) (keys (:attributes type)))))))"
+     :must-fail ["unknown-type-is-nil-not-false-test"]}
+
+    {:id :ontology/tagged-conforms-ignores-source
+     :why "tagged-conforms? から source 一致の検査を外す。別の connector が押した fact が、任意の connector の名前で検証を通る"
+     :file "src/kotoba/ontology/connector.cljc"
+     :find "           (= connector-id (:ontology/source fact))\n"
+     :replace ""
+     :must-fail ["tagged-conforms?-test"]}
+
+    {:id :ontology/empty-object-type-table
+     :why "object-type の表を空にする。evidence floor —— registry_test の性質は全部 doseq なので、空の表に対しては**全部 vacuously true** になる。『検査できなかった』が『検査して問題なかった』と同じ緑を返す形の、この repo における最短経路。\n\n     ⚠ 最初は `(when false)` を差し込んで空にしようとして **reader を壊した**。赤くはなったが :must-fail の名前は出ず、harness は正しく RED-WRONG-REASON と報告した。壊したものと報告されたものを一致させるため、表そのものを `[]` に置き換える形に直した"
+     :file "src/kotoba/ontology.cljc"
+     :find "   :object-types\n   [{:id :tender\n     :name \"Procurement Tender / Opportunity\"\n     :attributes {:status :keyword}\n     :key [:status]}]})"
+     :replace "   :object-types\n   []})"
+     :must-fail ["registries-are-not-empty-test"]}]}
 ]}
