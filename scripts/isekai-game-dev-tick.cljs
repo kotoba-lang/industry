@@ -19,7 +19,13 @@
 ;;       2. mobile-input-gap — catalog game なのに touch 入力が logic に届かない
 ;;          （logic.cljc が key-pressed? を読み、(axis …) を一度も読まない）。
 ;;          出荷済みの欠陥（実例: gftd/jintori が phone で操作不能、オーナー報告
-;;          2026-08-29）なので planned より先
+;;          2026-08-29）なので planned より先。
+;;          **ただし走査に当たることと直せることは別**（ADR-0084 DECISION 1）。
+;;          軸を 1 つも宣言しない game は kami.input が stick を 1 本も出さず、
+;;          tap→action 経路も無いので、この recipe が構造的に届かない。候補に
+;;          せず :touch-unreachable として毎回出す（黙って消さない）。scene が
+;;          読めず届くか測れなかったものは :touch-reachability-unmeasured ——
+;;          「軸が無い」と「読めなかった」を同じ値にしない
 ;;       3. new-game — public/benchmarks/catalog.edn の :samples で
 ;;          :status が :planned / :next のもの
 ;;       4. どれも無ければ :no-candidates
@@ -169,6 +175,60 @@
            ;; 出なくなるので、集合の陳腐化も出力から見える。
            :excluded (vec (filter #(deliberately-unlisted (:game %)) rows))})))))
 
+(defn- touch-reachability
+  "この game に touch を届かせられるか —— **scene が宣言した内容から**決める。
+
+  kami.input（orgs/kotoba-lang/host の src/kami/input.cljc）の `sticks` を写したもの。
+  あちらは stick を 1 本も返さない条件を持っており（実測 2026-08-31、同ファイル
+  50-58 行）、その条件に当たる game は pointer から axes が 1 度も出ないので、
+  guest 側を何行書いても thumb は届かない:
+
+    (cond (false? (:stick imap)) []
+          (seq (:sticks imap))   [...]          ; 明示宣言 → 出る
+          :else (if (or (some? (:stick imap))   ; 明示 opt-in → 出る
+                        (and (contains? (:axes imap) \"MoveX\")
+                             (contains? (:axes imap) \"MoveY\")))
+                  [s] []))                      ; 両軸そろって初めて default stick
+
+  返す verdict:
+
+    :both        MoveX/MoveY とも宣言済み → default stick が既に出ている。
+                 直すのは guest 側だけ（goriketsu / building-site /
+                 care-coordination の形、ADR-0084 DECISION 2）
+    :declared    :sticks か :stick で明示宣言済み → stick は出ている
+    :incomplete  片軸だけ → stick が 1 本も出ていない。もう片方の軸を足せば届く
+                 （drive の形、ADR-0083）
+    :none        軸が 1 つも無い → **stick recipe が構造的に届かない**。
+                 actions だけの game で、`on-action` は keydown/keyup からしか
+                 呼ばれない（同ファイル 178/184 行。pointer 経路 pd/pm/pu は
+                 `on-axes` / `on-pointer` しか呼ばない）。tap から action を出す
+                 経路が kami.input に無いので、**この game を候補にすると
+                 直しようのないものを直せと言うことになる**（ADR-0084 DECISION 1）
+    :unmeasured  scene.edn が読めない / EDN として parse できない / map でない。
+                 **:none に畳まない** —— 測れなかった scene と、測って軸が無かった
+                 scene を同じ値で返すと、後者の理由で前者が候補から落ちる
+                 （ADR-2608136000 の 1 問目・4 問目）"
+  [scene-txt]
+  (let [parsed (try (edn/read-string scene-txt) (catch :default _ ::parse-error))]
+    (cond
+      (nil? scene-txt)         {:reachable :unmeasured :why :scene-unreadable}
+      (= ::parse-error parsed) {:reachable :unmeasured :why :scene-parse-error}
+      (not (map? parsed))      {:reachable :unmeasured :why :scene-not-a-map}
+      :else
+      (let [imap (:input parsed)
+            axes (:axes imap)
+            axes (when (map? axes) axes)]
+        (cond
+          (false? (:stick imap))   {:reachable :none :why :stick-opted-out}
+          (seq (:sticks imap))     {:reachable :declared}
+          (some? (:stick imap))    {:reachable :declared}
+          (and (contains? axes "MoveX")
+               (contains? axes "MoveY")) {:reachable :both}
+          (or (contains? axes "MoveX")
+              (contains? axes "MoveY")) {:reachable :incomplete
+                                         :declared-axes (vec (sort (keys axes)))}
+          :else {:reachable :none :why :no-axes-declared})))))
+
 (def owner-reported-defects
   "オーナーが名指しで報告した出荷済み欠陥。候補の並びで先頭に来る（検出は
   下の走査と同じ —— ここに書いても走査に当たらなければ候補にならない。
@@ -177,46 +237,64 @@
   - gftd/jintori — 2026-08-29 オーナー報告「phone で操作不能」"
   #{"gftd/jintori"})
 
-(defn- mobile-input-gaps
-  "touch 入力が logic に届かない catalog game。
+(defn- mobile-input-rows
+  "touch 入力が logic に届かない catalog game を、**届かせられるかで分けて**返す。
 
-  判定は決定論の 2 条件: logic.cljc が `key-pressed?` を読み、かつ
-  `(axis ` を一度も読まない。kami.input（orgs/kotoba-lang/host の
-  src/kami/input.cljc）の pointer 経路は **axes しか出さず、actions は
-  keyboard event からしか発火しない**ので、axis を読まない key-pressed?
-  だけの logic には touch 操作が構造的に届かない。
+  走査の 2 条件は決定論: logic.cljc が `key-pressed?` を読み、かつ `(axis ` を
+  一度も読まない。kami.input の pointer 経路は **axes しか出さず、actions は
+  keyboard event からしか発火しない**ので、axis を読まない key-pressed? だけの
+  logic には touch 操作が構造的に届かない。
 
-  ⚠ 「scene に :sticks が無い」を条件にしない。kami.input は scene の
-  :axes に MoveX と MoveY が居れば **全面 1 本の default stick** を与える
-  （input.cljc の `sticks` / `default-stick`）ので、:sticks 無しでも
-  `(axis \"MoveX\")` を読む logic（実測: gftd/palisade, gftd/petit-forro）は
-  phone で動いている。そこを候補にすると、動いている game を『直し』に
-  モデルを起こすことになる。scene の :sticks 有無は fixer の参考として
-  行に載せるだけ。
+  ⚠ 「scene に :sticks が無い」を条件にしない。kami.input は scene の :axes に
+  MoveX と MoveY が居れば **全面 1 本の default stick** を与えるので、:sticks
+  無しでも `(axis \"MoveX\")` を読む logic（実測: gftd/palisade, gftd/petit-forro）
+  は phone で動いている。そこを候補にすると、動いている game を『直し』に
+  モデルを起こすことになる。scene の :sticks 有無は fixer の参考として行に載せる。
+
+  ⚠ **走査に当たることと、直せることは別**（ADR-0084 DECISION 1、2026-08-30
+  accepted）。軸を 1 つも宣言していない game は stick が 1 本も出ないので、
+  この recipe が届かない —— それでも走査には当たるので、2026-08-31 まで
+  この関数は 11 件の直しようのない game を候補の**先頭**（アルファベット順で
+  gftd/ghosthacker-* が itonami/* より前）に置き続けていた。実測: ADR-0084 /
+  0085 / 0086 の 3 反復とも、この 11 件を手で読み飛ばしてから仕事を始めている。
+  `touch-reachability` で分け、届かないものは候補にせず :touch-unreachable
+  として毎回出す（**黙って消さない** —— 消すと『touch で遊べない game は無い』
+  という別の嘘になる。閉じるには kami.input 側に tap→action 経路が要る）。
 
   content-ratings に依存しないので registration-gaps とは独立に測れる。
   games dir が読めなければ nil（= 測れなかった。0 件ではない）。"
   []
   (let [games-dir (str repo-abs "/public/games")]
     (when-let [nss (list-dirs games-dir)]
-      (->> (for [ns- nss
-                 g (or (list-dirs (str games-dir "/" ns-)) [])
-                 :let [id (str ns- "/" g)
-                       base (str games-dir "/" ns- "/" g)
-                       logic (read-file (str base "/logic.cljc"))
-                       scene (read-file (str base "/scene.edn"))]
-                 :when (and (exists? (str base "/game.edn"))
-                            (not (deliberately-unlisted id))
-                            logic
-                            (str/includes? logic "key-pressed?")
-                            (not (str/includes? logic "(axis ")))]
-             {:kind :mobile-input-gap :game id
-              :sticks-declared? (boolean (and scene (str/includes? scene ":sticks")))
-              :owner-reported? (contains? owner-reported-defects id)})
-           ;; オーナー報告の欠陥が先頭、あとはアルファベット順。
-           (sort-by (fn [m] [(if (:owner-reported? m) 0 1) (:game m)]))
-           vec))))
-
+      (let [rows (->> (for [ns- nss
+                            g (or (list-dirs (str games-dir "/" ns-)) [])
+                            :let [id (str ns- "/" g)
+                                  base (str games-dir "/" ns- "/" g)
+                                  logic (read-file (str base "/logic.cljc"))
+                                  scene (read-file (str base "/scene.edn"))]
+                            :when (and (exists? (str base "/game.edn"))
+                                       (not (deliberately-unlisted id))
+                                       logic
+                                       (str/includes? logic "key-pressed?")
+                                       (not (str/includes? logic "(axis ")))]
+                        (merge {:kind :mobile-input-gap :game id
+                                :sticks-declared? (boolean (and scene (str/includes? scene ":sticks")))
+                                :owner-reported? (contains? owner-reported-defects id)}
+                               (touch-reachability scene)))
+                      ;; オーナー報告の欠陥が先頭、あとはアルファベット順。
+                      (sort-by (fn [m] [(if (:owner-reported? m) 0 1) (:game m)]))
+                      vec)
+            by (group-by :reachable rows)]
+        ;; 直せる行は 1 つの並びに戻してから返す —— group-by の順に concat すると
+        ;; owner 報告の先頭性が group の中でしか効かなくなる。
+        {:gaps        (->> (concat (:both by) (:declared by) (:incomplete by))
+                           (sort-by (fn [m] [(if (:owner-reported? m) 0 1)
+                                             ({:both 0 :declared 1 :incomplete 2} (:reachable m) 3)
+                                             (:game m)]))
+                           vec)
+         :unreachable (vec (map #(assoc % :kind :touch-unreachable) (:none by)))
+         :unmeasured  (vec (map #(assoc % :kind :touch-reachability-unmeasured)
+                                (:unmeasured by)))}))))
 (defn- planned-samples
   "catalog.edn の :samples で :status :planned / :next。読めなければ nil。"
   []
@@ -244,7 +322,23 @@
           reg (registration-gaps)
           gaps (:gaps reg)
           excluded (:excluded reg)
-          migs (mobile-input-gaps)
+          mig (mobile-input-rows)
+          migs (:gaps mig)
+          ;; 走査には当たるが stick recipe が届かない game。候補にはしないが
+          ;; **毎回出す** —— 消すと『touch で遊べない game は無い』という嘘になる。
+          unreachable (:unreachable mig)
+          ;; scene が読めず届くかどうかを測れなかった game。:none とは別の事実。
+          unmeasured-touch (:unmeasured mig)
+          ;; 出力の共通尾部。候補の種類によらず、上の 2 つを落とさない。
+          tail (fn [m] (cond-> m
+                         (seq excluded) (assoc :excluded excluded)
+                         (seq unreachable)
+                         (assoc :touch-unreachable
+                                {:n (count unreachable)
+                                 :why "kami.input に tap->action 経路が無く、軸を宣言しない game には stick が 1 本も出ない（ADR-0084 DECISION 1）。閉じるには host 側の変更が要る"
+                                 :games (mapv :game unreachable)})
+                         (seq unmeasured-touch)
+                         (assoc :touch-reachability-unmeasured unmeasured-touch)))
           planned (delay (planned-samples))]
       (cond
         ;; ratings が読めない = registration を測れない。planned だけで
@@ -255,36 +349,31 @@
             (js/process.exit 2))
 
         (seq gaps)
-        (do (prn (cond-> {:outcome :candidate :kind :registration-gap
-                          :candidate (first gaps) :all-gaps gaps
-                          :freshness fr}
-                   (seq excluded) (assoc :excluded excluded)))
+        (do (prn (tail {:outcome :candidate :kind :registration-gap
+                        :candidate (first gaps) :all-gaps gaps
+                        :freshness fr}))
             (js/process.exit 0))
 
         (seq migs)
-        (do (prn (cond-> {:outcome :candidate :kind :mobile-input-gap
-                          :candidate (first migs) :all-mobile-input-gaps migs
-                          :freshness fr}
-                   (seq excluded) (assoc :excluded excluded)))
+        (do (prn (tail {:outcome :candidate :kind :mobile-input-gap
+                        :candidate (first migs) :all-mobile-input-gaps migs
+                        :freshness fr}))
             (js/process.exit 0))
 
         (nil? @planned)
-        (do (prn (cond-> {:outcome :not-measured :why :benchmarks-catalog-unreadable
-                          :freshness fr}
-                   (seq excluded) (assoc :excluded excluded)))
+        (do (prn (tail {:outcome :not-measured :why :benchmarks-catalog-unreadable
+                        :freshness fr}))
             (js/process.exit 2))
 
         (seq @planned)
-        (do (prn (cond-> {:outcome :candidate :kind :new-game
-                          :candidate (first @planned) :all-planned @planned
-                          :freshness fr}
-                   (seq excluded) (assoc :excluded excluded)))
+        (do (prn (tail {:outcome :candidate :kind :new-game
+                        :candidate (first @planned) :all-planned @planned
+                        :freshness fr}))
             (js/process.exit 0))
 
         :else
-        (do (prn (cond-> {:outcome :no-candidates :freshness fr
-                          :note "registration gap 0 件、planned sample 0 件"}
-                   (seq excluded) (assoc :excluded excluded)))
+        (do (prn (tail {:outcome :no-candidates :freshness fr
+                        :note "registration gap 0 件、touch が届く mobile-input gap 0 件、planned sample 0 件"}))
             (js/process.exit 0))))))
 
 (-main)
