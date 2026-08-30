@@ -29,4 +29,17 @@
      "nbb scripts/dependency-substitution-wave-tick.cljs --limit 4"
      "clojure -M:test in org-ietf-chacha20-poly1305 (parity test)"
      "clojure -M:test in org-nist-sha2 hash.subpath-dispatch-kotoba-parity-test"
-     "npm test in noise with reference provider on classpath"]})}]
+     "npm test in noise with reference provider on classpath"]
+
+    :landed-2026-08-30
+    {:com-junkawasaki/root
+     ["c6b8871dc22 depsub tick: defer GCM-SIV and skip reference-complete repos"
+      "dbbfd04359c west pin org-nist-sha2 cb67e53"
+      "5f53339a488 fix: cond parity in dependency-substitution-wave-tick"]
+     :kotoba-lang/org-nist-sha2
+     ["cb67e53e590e kotoba/hash/subpath_dispatch oracle + KIR parity (2 tests, 19 assertions)"]
+     :tick-evidence
+     "WAVE @noble/ciphers: DEFERRED-SKIPPED kotobase-server; REFERENCE-COMPLETE-SKIPPED kagi+noise; CANDIDATES 0"}
+
+    :resume-point
+    "Next wave coordinate @noble/hashes — add reference providers in io-storj-node, org-chainagnostic-cacao, and the +1 consumer from verify --findings. Optionally teach tick to advance when all open repos for a coordinate are deferred+reference-complete (today @noble/ciphers stays selected with CANDIDATES 0)."})}]
