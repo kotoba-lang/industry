@@ -10,7 +10,7 @@
 ;;
 ;; ## 何を測るか（全部ローカル。network を引かない）
 ;;
-;;   :checkout     checkout が在って git repo である
+;;   :checkout     checkout が在って、git がそれを**自分の** repo として受理する
 ;;   :pinned       local HEAD が west pin と一致する
 ;;   :landed       未 commit の変更が無く、upstream より前に出た commit も無い
 ;;   :readme       README.md が在って 200 byte 以上ある
@@ -23,6 +23,9 @@
 ;; 見つけた形そのものなので、**測れなかったことを ok に畳まない**:
 ;;
 ;;   - checkout が無い bot は「違反 0 件」ではなく **:unmeasured**
+;;   - `.git` は在るが git が受理しない checkout も **:unmeasured**。ここを ok に
+;;     畳むと git は親を辿り、後続の床が **superproject の状態**をその bot の
+;;     測定値として記録する（実測 2026-08-30。詳細は `floor-checkout`）
 ;;   - upstream を解決できない branch の :landed も **:unmeasured**（ok ではない）
 ;;   - 上流 default branch との遅れ（pin 鮮度）は network が要るのでここでは測らない。
 ;;     測っていないものを、測ったように見せない
@@ -125,13 +128,48 @@
 (defn- exists? [p] (try (.existsSync fs p) (catch :default _ false)))
 (defn- size-of [p] (try (.-size (.statSync fs p)) (catch :default _ 0)))
 
+(defn- real-path
+  "realpath。解決できなければ与えられた値をそのまま返す（比較を落とさない）。"
+  [p]
+  (try (str (.realpathSync fs p)) (catch :default _ (str p))))
+
 ;; ---------------------------------------------------------------- floors
 
-(defn- floor-checkout [abs]
+(defn- floor-checkout
+  "checkout が在って、**git がそれを自分の repo として受理する**こと。
+
+  `.git` が在ることは、git がそれを repo として受理することを意味しない。受理
+  しなければ git は黙って**親を辿り superproject を答える** — その答えは成功と
+  同じ形（exit 0 + それらしい出力）で返るので、後続の床が superproject の状態を
+  この bot の測定値として記録する。
+
+  実測 2026-08-30、`com-junkawasaki/org-spirit-in-physics-comics`: DataLad
+  dataset の `.git` が `objects/` と `config` を失っていた。パスとしての `.git`
+  は在るので旧実装はここを `:ok` で通し、`--next` は
+
+    {:floor :landed :detail \"未 commit 1 ファイル\"}
+
+  を出した。その 1 ファイルは superproject の
+  `90-docs/observatory/observatory.datoms.edn` で、この repo のものではない。
+  `floor-pinned` も同じ経路で superproject の HEAD を読んでいた。**壊れた
+  checkout が、測れなかったのではなく別の repo の値を答えていた。**
+
+  ADR-2608136000 の 2 問目（そもそも実行できないとき何を返すか）そのものだが、
+  返っていたのは pass ではなく**他人の測定値**なので、出力から嘘だと分からない。"
+  [abs]
   (cond
     (not (exists? abs))               [:unmeasured "checkout が無い"]
     (not (exists? (str abs "/.git")))  [:unmeasured "git repo ではない"]
-    :else                              [:ok nil]))
+    :else
+    (let [{:keys [ok? out err]} (git abs "rev-parse" "--show-toplevel")]
+      (cond
+        (not ok?)
+        [:unmeasured (str "git が checkout を開けない: " err)]
+        ;; git が答えた toplevel がこの checkout でないなら、以降の git は全部
+        ;; 別の repo について答える。ok に畳まず :unmeasured で止める。
+        (not= (real-path out) (real-path abs))
+        [:unmeasured (str ".git が壊れている — git は親の repo を答える: " out)]
+        :else [:ok nil]))))
 
 (defn- floor-pinned [abs pin]
   (let [{:keys [ok? out err]} (git abs "rev-parse" "HEAD")]
