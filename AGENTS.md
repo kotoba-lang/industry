@@ -1670,19 +1670,32 @@ ADR-2607279200 決定 5: portable な product semantics を普通の Kotoba 値�
 移し、機構は host に残す。vertical slice は一本の製品経路。参照は amu の
 `examples/todo-app.kotoba`（`init` / `view` / `step`）。
 
-決定核は named backend が値を admit できないときの **fallback** である
-（murakumo native、SMTP `protocol_core`）。wasm / web に対して最初から潰さない。
-`cond` は grammar が desugar する。amu が判断以外を拒否した、と書かない。
+**2026-08-30 の Q9 whole-component 決定は、決定核 fallback を移行単位として
+認めない。** backend が component 全体を admit できない場合、その移行は
+`:blocked` である。predicate、decision core、caller が前計算した scalar shadow は
+compiler research / historical fixture にはできるが、移行進捗、consumer cutover、
+旧 source 削除の証拠にはならない。
 
 正しいスライス（手順の正本 ADR-2608261100、skill `kotoba-clj-to-kotoba`）:
 
 1. 書けない理由を `:disposition` で分類する。
-2. product semantics を Clojure-shaped の `.kotoba` へ。機構は host。
-3. `.cljc` oracle は gate が揃うまで残し、`.kotoba` を require しない。
-   oracle は照合用であって意味の正本ではない。コマンドはゲスト。
-4. named backend が値を通せないときだけ決定核へ畳み、ヘッダに撤去条件を書く。
-5. `kotoba compile` で対象 backend を出し、parity を見る。skip と pass を
-   同じ顔にしない。
+2. namespace / deployable component の全 public surface と transitive source closure を
+   Clojure-shaped Kotoba (`.kotoba` / `.cljk`) へ移す。機構は capability provider import。
+3. 各 target を verified native `kotoba check` / `kotoba compile` /
+   `kotoba rad build` と、`amu check --jvm-free` /
+   `amu compile --jvm-free` の両方で build する。
+4. acceptance では `java` / `javac` / `clojure` / `clj` を deny/trace する。
+   未対応 target、lock failure、JVM-free project linker 未達は fallback せず block。
+5. `.cljc` oracle は nbb/CLJS、native、Wasm、または content-addressed golden vector で
+   全 public surface を照合する。JVM oracle は historical/non-gating。
+6. 両 build の payload CID、definition CID、exports/imports、effects、resource bounds が
+   一致するまで consumer cutover しない。skip と pass を同じ顔にしない。
+
+機械正本は `orgs/kotoba-lang/kotoba-lang/lang/q9-migration.edn`、言語 ADR は
+`docs/adr/ADR-q9-whole-component-build-migration.md`、Kototama 採用記録は
+`orgs/kotoba-lang/kototama/qualification/q9-whole-component-build.edn`。既存の
+JVM/Chicory tender と Clojure compiler path は compat/diagnostic であり、Q9 の
+build、test、parity、soak を green にできない。
 
 ## design system（css / html / shitsuke / liquid-glass-ui / kotoba-ui）は `.kotoba` 移行対象（オーナー判断 2026-07-27、ADR-2607270100 §10）
 
@@ -1718,8 +1731,10 @@ byte 一致 parity gate（KIR インタプリタを同一 JVM で回す / compil
 コンパイラ（cljc）が AOT コンパイルを、独立して直接実行可能なネイティブ artifact
 まで最後まで面倒を見ることを意味する。** 配布される実行成果物が JVM/Chicory ホスト・
 JS エンジン（Node/browser）ホスト・新規 Rust 実行エンジンのいずれにも依存しては
-ならない。コンパイラ**ツール自体**が JVM 上で動くこと（gcc がどこかで動く必要が
-あるのと同じビルド時の話）は問わない——問題なのは実行成果物のランタイム依存。
+ならない。さらに **Q9 source migration は build/acceptance も JVM-free** である。
+verified native Kotoba CLI と Amu `--jvm-free` を使い、compiler、test、oracle の
+どこにも JVM を必須化しない。ADR-2607198300 の「compiler tool の JVM は問わない」は
+一般的な historical build の記述としてのみ残り、Q9 には適用しない。
 
 - **kototama 自身の maturity ladder（`orgs/kotoba-lang/kototama/docs/maturity.md`）
   には JVM/JS 以外の層が無いことを直接確認済み**: R0 contract → **R1 JVM/Chicory

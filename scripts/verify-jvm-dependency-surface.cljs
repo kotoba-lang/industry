@@ -28,16 +28,17 @@
 ;; the exit:
 ;;
 ;;   :jvm-source    `.clj` under the repo's own source tree. The JVM is not a
-;;                  tool here, it is the runtime. Exit = port to `.cljc`/`.cljs`
-;;                  (portable) or to `.kotoba` (decision core).
+;;                  tool here, it is the runtime. Q9 exit = port the whole
+;;                  namespace/deployable component to `.kotoba`/`.cljk`;
+;;                  a decision-core extraction is not migration completion.
 ;;   :jvm-runtime-deps  maven coordinates in the TOP-LEVEL `:deps` map. Shipped
 ;;                  code resolves them. Exit = a cljs/npm equivalent, or drop.
 ;;   :jvm-build     shadow-cljs / ClojureScript compiler / tools.build in an
 ;;                  alias. Produces JS but spawns a JVM to do it.
-;;   :jvm-test      cognitect test-runner / kaocha in an alias. CLAUDE.md's
-;;                  cutover contract already allows these as
-;;                  `:historical-clj-tests :allowed-as-oracle-until-replaced`,
-;;                  so they are reported at :info and never as a failure.
+;;   :jvm-test      cognitect test-runner / kaocha in an alias. The workspace
+;;                  inventory reports historical use at :info, but Q9 cannot
+;;                  use it as acceptance evidence; replace it with nbb/CLJS,
+;;                  native, Wasm, or content-addressed golden vectors.
 ;;   :jvm-lint      clj-kondo only. The cheapest exit in the whole set.
 ;;   :jvm-chicory   Chicory, the JVM Wasm runtime. The cutover contract names
 ;;                  `:new-chicory-call-sites :forbidden`, so any site outside
@@ -179,11 +180,10 @@
   require a `*.render-html` namespace at all, and of those 514 repos exactly 3
   have their entrypoint required by other code.
 
-  ADR-2607198300 is explicit that a JVM at BUILD time is not the gap -- the gap
-  is a JVM in the shipped artifact's runtime. Counting these as `:jvm-source`
-  put 514 repos into a bucket labelled `the JVM is the runtime` when the JVM is
-  the tool. That is a 67% overcount of the thing anyone would act on, which is
-  why this is its own kind rather than a comment."
+  This broad inventory keeps build-time JVM use distinct from a shipped JVM
+  runtime so the two debts remain measurable. Q9 migration is stricter: its
+  build and acceptance must use native Kotoba plus Amu `--jvm-free`, so this
+  class remains debt even though it is not `:jvm-source`."
   [text]
   (boolean (and text (re-find #"(?m)^\(defn -main" text))))
 
@@ -370,9 +370,8 @@
 ;; ClojureScript or Kotoba as it stands. The counted-only classes are the ones
 ;; where a per-repo key would carry no decision:
 ;;
-;;   :jvm-test / :jvm-test-oracle  the cutover contract allows them outright
-;;                                 (`:historical-clj-tests
-;;                                 :allowed-as-oracle-until-replaced`)
+;;   :jvm-test / :jvm-test-oracle  broad historical inventory only; Q9 cannot
+;;                                 count either as acceptance evidence
 ;;   :jvm-lint                     a clj-kondo alias, 3,023 repos, identical
 ;;                                 in all of them
 ;;   :jvm-runtime-clojure-only     `org.clojure/clojure` and nothing else in
@@ -416,8 +415,8 @@
     (pos? (or clj-build-entry 0))
     (conj {:sev "info" :kind :clj-build-entrypoint :repo repo
            :detail (str clj-build-entry " .clj file(s), every one a -main run at"
-                        " build time -- ADR-2607198300 does not count a build-time"
-                        " JVM as a runtime dependency")})
+                        " build time -- distinct from runtime JVM debt, but not"
+                        " admissible in Q9 build/acceptance")})
     (pos? (or clj-mesh 0))
     (conj {:sev "info" :kind :clj-mesh-guest :repo repo
            :detail (str clj-mesh " .clj file(s) calling host capabilities"
@@ -430,7 +429,7 @@
            :detail (str clj-unloadable " .clj file(s) whose ns does not match the path")})
     (pos? clj-test)
     (conj {:sev "info" :kind :jvm-test-oracle :repo repo
-           :detail (str clj-test " .clj test file(s) [allowed-as-oracle-until-replaced]")})
+           :detail (str clj-test " .clj test file(s) [historical inventory; not Q9 acceptance]")})
     (seq test-tool)
     (conj {:sev "info" :kind :jvm-test :repo repo
            :detail (str "JVM test runner: " (str/join " " (sort test-tool)))})
@@ -459,7 +458,7 @@
       [:clj-mesh-guest   "`.clj` that is a KOTOBA Mesh guest, not JVM at all"]
          [:clj-script       "`.clj` with no ns -- a JVM entry point, not library code"]
          [:clj-unloadable   "`.clj` whose ns does not match its path; nothing loads it"]
-         [:jvm-test-oracle  ".clj tests (allowed as oracle)"]
+         [:jvm-test-oracle  ".clj tests (historical; not Q9 acceptance)"]
          [:jvm-test         "JVM test runner in an alias"]
          [:jvm-lint         "clj-kondo via maven"]]]
   (let [n (str (tally k))
