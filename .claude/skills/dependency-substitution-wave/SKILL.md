@@ -69,14 +69,27 @@ nbb --classpath ".:scripts/nbb_compat" scripts/verify-dependency-substitution.cl
 
 ## coordinate 別の rewire 指針（ledger を読んだうえで）
 
-### `@noble/ciphers`
+### `@noble/ciphers` — **rewire しない（2026-08-30、`:host-boundary` へ変更済み）**
 
-ledger の `:target` は `kotoba-lang/org-ietf-chacha20-poly1305`。**実測 2026-08-30**:
-repo が import しているのは Noble の `gcm` / `gcmsiv`（AES-GCM / GCM-SIV）が多い。
-→ **`kotoba-lang/org-nist-aes`** の `aes.gcm` / `aes.gcm-siv` に寄せる。
-ChaCha20-Poly1305 だけが要る箇所は `org-ietf-chacha20-poly1305`。
-`package.json` から `@noble/ciphers` を落とし、shadow / cljs テストを通す。
-先例: `kotobase-server`, `net-kotobase/control-plane`（superproject 外なら該当 repo の main を参照）。
+**この coordinate は pool から外した。tick が出さなくなっているはずで、出たら ledger を読む。**
+理由は「実装が無い」ではない —— `org-ietf-chacha20-poly1305` も `org-nist-aes` も実在し、
+portable `.cljc` で RFC ベクタを通る。**落ちるのは速度で、しかもテストに映らない**
+（pure 実装は正しいので rewire は緑のまま 3 桁の regression を landed させる）。
+
+実測（nbb = 両 call site が実際に使う runtime。どちらも shadow-cljs を持たない。load 34–37）:
+
+| | pure `.cljc` | `@noble` |
+|---|---|---|
+| ChaCha20-Poly1305 seal 96 B / 1 KiB | 3.25 ms / 52.4 ms | 0.0065 ms / 0.012 ms |
+| AES-256-GCM seal 96 B / 8 KiB | 48.9 ms / 2144 ms | 0.046 ms / 0.560 ms |
+
+- `noise/provider/noble.cljs` は**この発見を既に済ませている** —— sibling primitive の
+  27 ms `@noble/curves` DH を逃げるためだけに `provider/node.cljs` が在り、docstring に表がある。
+- ⚠ **`aes.gcm-siv` は存在しない。** `org-nist-aes` は `aes.core` と `aes.gcm` だけ。
+  GCM-SIV は RFC 8452（GHASH でなく POLYVAL + nonce ごとの派生鍵）なので、
+  `gcmsiv` を `aes.gcm` に置き換えると **wire format が壊れ、nonce 誤用耐性が黙って消える。**
+- 再開は **coordinate 単位ではなく call site 単位で**。cold path は今も価値がある
+  （`kotobase-server` の HMAC → `org-nist-sha2` はそれ）。
 
 ### `@noble/hashes`
 
