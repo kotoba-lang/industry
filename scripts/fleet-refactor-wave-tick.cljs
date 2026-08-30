@@ -43,7 +43,8 @@
 ;;      pool（repo 数）が 0。0 と 2 を区別する意味がそこにある（ADR-2608136000）。
 
 (ns fleet-refactor-wave-tick
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [clojure.edn :as edn]))
 
 ;; ─────────────── Mission A 判定（…mission_a.cljc の写し） ──────────────────
 
@@ -275,6 +276,84 @@
               :else :branch))
       :unmeasured)))
 
+;; ───────────────── Q9 authority（Mission B の入場判定）─────────────────
+;;
+;; Mission B が提案してよいかは、この tick が決めることではない。機械正本は
+;; `kotoba-lang/kotoba-lang` の `lang/q9-migration.edn`（CLAUDE.md「Q9 の移行単位」
+;; 節が名指しで authority と呼んでいるファイル）。
+;;
+;; **なぜ後から足したか。** 2026-08-30 12:02/12:16 に authority が v3 になり
+;; (a) `:scope :decision-only-extraction-forbidden true` (b) `:current-decision
+;; :authorized-waves #{:wave-0 :wave-1}`（cloud-itonami は wave-4）が入った。
+;; この tick の Mission B ヒューリスティクスは ADR-2608290100 Decision §3 が
+;; 書いているとおり「小さい自己完結 decision core の発見」で、(a) が名指しで
+;; 禁じている形そのもの。同日 06:30/06:32 に 2 本の decision core が landed
+;; しており（isic-3812 / kotoba-erp）、それらは authority の
+;; `:legacy-decision-cores {:status :historical-evidence-only :expansion false}`
+;; に当たる。
+;;
+;; gate が無ければこの tick は**毎時 forbidden な仕事を 4 本提案し続ける**。
+;; SKILL.md は候補をそのまま fresh agent に配れと書いてあるので、提案は実行に
+;; なる。これは ADR-2608136000 の 2 問目（「そもそも実行できないとき何を返すか。
+;; pass と同じ値なら欠陥」）の Mission B 版 —— 「許可されているか測っていない」が
+;; 「測って許可されていた」と同じ出力（候補 4 本）になっていた。
+;;
+;; authority が**読めなかったときは候補を出さない**（exit 2）。読めない = 許可
+;; されているかを測っていない、であって許可ではない。
+
+(def ^:private q9-authority-rel "lang/q9-migration.edn")
+(def ^:private q9-authority-repo "orgs/kotoba-lang/kotoba-lang")
+(def ^:private fleet-org "cloud-itonami")
+
+(defn- q9-authority
+  "kotoba-lang の **origin/main** から authority を読む。checkout は pin の分だけ
+   遅れるので checkout のファイルを読まない（CLAUDE.md「結論を出す前に origin/main
+   を読む」。実測 2026-08-30: checkout は 4 commit 遅れており、そこには v3 の
+   禁止条項が 1 つも無かった）。
+
+   返り値 {:ok <edn>} / {:unmeasured <reason>}。"
+  []
+  (let [{:keys [code out err]}
+        (sh "git" ["-C" q9-authority-repo "show" (str "origin/main:" q9-authority-rel)] {})]
+    (cond
+      (not= 0 (or code -1))
+      {:unmeasured (str q9-authority-repo " の origin/main から " q9-authority-rel
+                        " を読めない: " (str/trim (str err)))}
+      (str/blank? out)
+      {:unmeasured (str q9-authority-rel " が空")}
+      :else
+      (try
+        (let [m (edn/read-string out)]
+          (if (map? m)
+            {:ok m}
+            {:unmeasured (str q9-authority-rel " が map ではない")}))
+        (catch :default e
+          {:unmeasured (str q9-authority-rel " を読めない (EDN): " (str e))})))))
+
+(defn- mission-b-block-reasons
+  "authority が Mission B を禁じている理由を**全部**返す（空 = 許可）。
+   cond で最初の 1 つだけを返さないのは、片方が解除されたときに残りが残ることを
+   出力から読めるようにするため。"
+  [auth]
+  (let [scope (:scope auth)
+        waves (:waves auth)
+        org-wave (some (fn [[k v]]
+                         (when (str/includes? (str (:name v)) fleet-org) k))
+                       waves)
+        authorized (or (get-in auth [:current-decision :authorized-waves]) #{})]
+    (cond-> []
+      (:decision-only-extraction-forbidden scope)
+      (conj (str ":scope :decision-only-extraction-forbidden true — この tick の "
+                 "Mission B は decision core を探す（ADR-2608290100 Decision §3）"))
+
+      (nil? org-wave)
+      (conj (str "authority の :waves に " fleet-org " を名指す wave が無い"))
+
+      (and (some? org-wave) (not (contains? authorized org-wave)))
+      (conj (str org-wave " (" (:name (get waves org-wave)) ") が :authorized-waves "
+                 (pr-str authorized) " に無い — :status "
+                 (pr-str (:status (get waves org-wave))))))))
+
 ;; ───────────────────────── candidate assembly ─────────────────────────
 
 (defn- mission-a-candidates
@@ -357,7 +436,20 @@
         (js/process.exit 2))
 
       (let [want-a (contains? #{"a" "both"} mission-filter)
-            want-b (contains? #{"b" "both"} mission-filter)
+            want-b-asked (contains? #{"b" "both"} mission-filter)
+            ;; Mission B は authority に訊いてから測る。禁じられている形を
+            ;; 毎周測り直しても行動できる出力にはならないので、走査ごと省く。
+            auth (when want-b-asked (q9-authority))
+            b-blocked (when (:ok auth) (mission-b-block-reasons (:ok auth)))]
+        (when (:unmeasured auth)
+          (println (str "REFUSING\tQ9 authority を読めない —— Mission B が許可されて"
+                        "いるかを測っていない。候補は出さない"))
+          (println (str "REASON\t" (:unmeasured auth)))
+          (println (str "SCANNED\t" (count rels) "\tfiles under " fleet-dir))
+          (println (str "POOL\t" pool "\trepos"))
+          (js/process.exit 2))
+
+        (let [want-b (and want-b-asked (empty? b-blocked))
             a-cands (if want-a (mission-a-candidates by-repo) [])
             b-cands (if want-b (mission-b-candidates by-repo) [])
             all-raw (->> (concat a-cands b-cands)
@@ -381,7 +473,8 @@
                  :pool pool
                  :files (count rels)
                  :mission-a-raw (count a-cands)
-                 :mission-b-raw (count b-cands)
+                 :mission-b-raw (if want-b (count b-cands) :not-measured)
+                 :mission-b-blocked (vec (or b-blocked []))
                  :limit limit
                  :in-flight-skipped @skipped
                  :unmeasured-skipped @unmeasured
@@ -390,7 +483,12 @@
         (println (str "SCANNED\t" (count rels) "\tfiles under " fleet-dir))
         (println (str "POOL\t" pool "\trepos"))
         (println (str "MISSION-A-RAW\t" (count a-cands)))
-        (println (str "MISSION-B-RAW\t" (count b-cands)))
+        (if want-b
+          (println (str "MISSION-B-RAW\t" (count b-cands)))
+          (println (str "MISSION-B-RAW\tnot-measured"
+                        (when-not want-b-asked "\t(--mission a)"))))
+        (doseq [r (or b-blocked [])]
+          (println (str "MISSION-B-BLOCKED\t" r)))
         (println (str "IN-FLIGHT-SKIPPED\t" (count @skipped)
                       (when (seq @skipped) (str "\t" (str/join " " @skipped)))))
         (println (str "UNMEASURED-SKIPPED\t" (count @unmeasured)
@@ -401,6 +499,6 @@
                         (when (:file c) (str "\t" (:file c) "\t" (:lines c) "L")))))
         (try (.appendFileSync fs ledger-file (str (pr-str rec) "\n"))
              (catch :default e (println "ledger 追記失敗:" (str e))))
-        (js/process.exit 0)))))
+        (js/process.exit 0))))))
 
 (-main)
