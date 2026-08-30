@@ -1,0 +1,29 @@
+[{:db/id -1
+  :adr/id "adr-2608301100-amu-crypto-dependency-substitution"
+  :adr/title "Crypto dependency substitution via host-provider + Kotoba oracle"
+  :adr/status "accepted"
+  :adr/date "2026-08-30"
+  :adr/related ["adr-2608260200-kotoba-lang-external-dependency-substitution"
+                "adr-2608301000-loop-dependency-substitution-wave-scaffold"]
+  :adr/body
+  (pr-str
+   {:context
+    "2026-08-30 wave 1 measured @noble/ciphers and classified it :host-boundary because portable org-ietf-chacha20-poly1305 and org-nist-aes pass RFC vectors but are 500–4000× slower under nbb on hot paths. That removed the coordinate from dependency-substitution-wave entirely — but the user expectation was amu-based substitution (kotoba oracle + explicit providers), not 'do nothing' or naive package.json deletion."
+
+    :decision
+    ["Introduce :kind :host-provider on :first-party-exists ledger entries for crypto npm coordinates where portable .cljc exists but hot paths need native-speed injection."
+     "verify-dependency-substitution emits substitution-via-host (not substitution-available) for these entries."
+     "dependency-substitution-wave-tick parses via-host findings and prefers them over naive rewire."
+     "Substitution ladder per coordinate: portable .cljc reference → Kotoba scalar oracle (amu compile + parity test, SMTP precedent) → reference/correctness provider in consumer repos → production provider (noble/node/wasm) until measured safe to drop npm."
+     "Deleting @noble/ciphers or @noble/hashes from package.json while still calling provider/noble is forbidden — tests stay green while landing speed regression."]
+
+    :consequences
+    ["@noble/ciphers and @noble/hashes return to the wave pool as substitution-via-host."
+     "First slice landed: org-ietf-chacha20-poly1305 kotoba/chacha20/aead_params + noise.provider.reference for AEAD."
+     "Future: org-nist-sha2 / org-ietf-blake2 kotoba oracles for @noble/hashes subpaths; wasm crypto capability kit remains separate work."]
+
+    :verification
+    ["nbb scripts/verify-dependency-substitution.cljs --self-test"
+     "nbb scripts/dependency-substitution-wave-tick.cljs --limit 4"
+     "clojure -M:test in org-ietf-chacha20-poly1305 (parity test)"
+     "npm test in noise with reference provider on classpath"]})}]

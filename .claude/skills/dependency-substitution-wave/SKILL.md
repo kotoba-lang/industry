@@ -69,35 +69,44 @@ nbb --classpath ".:scripts/nbb_compat" scripts/verify-dependency-substitution.cl
 
 ## coordinate 別の rewire 指針（ledger を読んだうえで）
 
-### `@noble/ciphers` — **rewire しない（2026-08-30、`:host-boundary` へ変更済み）**
+tick が `substitution-via-host` を出したら **`:kind :host-provider`** 波である。
+**`package.json` から `@noble/*` を消すだけは禁止** —— 速度 regression が緑のまま通る。
 
-**この coordinate は pool から外した。tick が出さなくなっているはずで、出たら ledger を読む。**
-理由は「実装が無い」ではない —— `org-ietf-chacha20-poly1305` も `org-nist-aes` も実在し、
-portable `.cljc` で RFC ベクタを通る。**落ちるのは速度で、しかもテストに映らない**
-（pure 実装は正しいので rewire は緑のまま 3 桁の regression を landed させる）。
+### host-provider 波の ladder（ADR-2608301100）
 
-実測（nbb = 両 call site が実際に使う runtime。どちらも shadow-cljs を持たない。load 34–37）:
+1. **`.cljc` 正本** — 既に在る portable 実装（RFC ベクタ済み）。
+2. **Kotoba oracle** — ledger の `:amu-oracle` パスに scalar 判断核を足す
+   （SMTP `protocol_core.kotoba` と同型）。`orgs/kotoba-lang/amu/bin/kotoba -M compile`
+   で wasm32-kotoba-v1 にコンパイルし、`*_kotoba_parity_test.clj` で `.cljc` と突き合わせる。
+3. **reference provider** — 消費側 repo に `provider/reference.cljs`（または JVM 同等）を足し、
+   AEAD/ハッシュを first-party へ向ける。**本番 hot path は noble/node のまま**。
+4. **本番切替** — call site ごとに測定してから。compiled-cljs / wasm kit が qualification したら
+   noble 依存を外す。
 
-| | pure `.cljc` | `@noble` |
-|---|---|---|
-| ChaCha20-Poly1305 seal 96 B / 1 KiB | 3.25 ms / 52.4 ms | 0.0065 ms / 0.012 ms |
-| AES-256-GCM seal 96 B / 8 KiB | 48.9 ms / 2144 ms | 0.046 ms / 0.560 ms |
+### `@noble/ciphers` — **via-host（削除しない）**
 
-- `noise/provider/noble.cljs` は**この発見を既に済ませている** —— sibling primitive の
-  27 ms `@noble/curves` DH を逃げるためだけに `provider/node.cljs` が在り、docstring に表がある。
-- ⚠ **`aes.gcm-siv` は存在しない。** `org-nist-aes` は `aes.core` と `aes.gcm` だけ。
-  GCM-SIV は RFC 8452（GHASH でなく POLYVAL + nonce ごとの派生鍵）なので、
-  `gcmsiv` を `aes.gcm` に置き換えると **wire format が壊れ、nonce 誤用耐性が黙って消える。**
-- 再開は **coordinate 単位ではなく call site 単位で**。cold path は今も価値がある
-  （`kotobase-server` の HMAC → `org-nist-sha2` はそれ）。
+`:target` `kotoba-lang/org-ietf-chacha20-poly1305`。`:amu-oracle` `kotoba/chacha20/aead_params`。
 
-### `@noble/hashes`
+| 段 | やること |
+|---|---|
+| target repo | `kotoba/chacha20/aead_params.{kotoba,cljk}` + parity test |
+| consumer (noise 等) | `noise.provider.reference` — AEAD は `chacha20.aead`、DH/hash は noble のまま |
+| 禁止 | `package.json` から `@noble/ciphers` を消して noble provider を残す |
 
-`:target` `kotoba-lang/org-nist-sha2`。ledger の `:note` どおり subpath で振り分け:
-sha2/hmac → org-nist-sha2、blake2 → org-ietf-blake2、hkdf → crypto、sha1 → hash。
-argon2 は別 entry（org-ietf-argon2、遅いので login path に安易に載せない）。
+実測（nbb、load 34–37）: ChaCha seal 3.25 ms vs 0.0065 ms @ 96 B（pure vs @noble）。
 
-### `hpke-js`
+- `noise/provider/node.cljs` は DH の hot path 用（既存）。
+- ⚠ **GCM-SIV は first-party 無し** — `gcmsiv` → `aes.gcm` 置換は wire 破壊。
+
+### `@noble/hashes` — **via-host（削除しない）**
+
+`:target` `kotoba-lang/org-nist-sha2`。subpath 振り分けは ledger `:note` どおり。
+**noise の BLAKE2s は handshake hot path** — pure `noise.blake2s` へ安易に差し替えない。
+oracle は target repo（org-nist-sha2 / org-ietf-blake2）に kotoba 判断核を足す波で別途。
+
+### `substitution-available`（従来の naive rewire）
+
+#### `hpke-js`
 
 → `kotoba-lang/org-ietf-hpke`。
 
@@ -129,5 +138,6 @@ argon2 は別 entry（org-ietf-argon2、遅いので login path に安易に載�
 
 ## 測定
 
-成功は「自己申告」ではなく **次周の `substitution-available:<coordinate>` 件数減**
-または当該 repo がリストから消えること。
+成功は「自己申告」ではなく **次周の `substitution-via-host:<coordinate>` / `substitution-available:<coordinate>` 件数減**
+または当該 repo がリストから消えること。host-provider 波では **npm 行が残っていても**
+oracle + reference provider が入っていれば進捗と数える。
