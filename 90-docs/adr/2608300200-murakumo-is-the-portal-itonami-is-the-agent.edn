@@ -242,6 +242,94 @@ env（3 つとも optional、未設定は 503 であって fallback ではない
    external model が live になるまで『300+ models』とは書けない。順序は
    実装 → deploy → copy であって逆ではない。
 
+## Landing (closing, 2026-08-30)
+
+**deploy 済み。** `local-murakumo` Version `b5532d28-b111-48a2-ae1c-b15453560e17`、
+`api.murakumo.cloud` / `app.itonami.cloud`。
+
+| repo | main の commit | pin |
+|---|---|---|
+| `com-junkawasaki/root` | `3ea7502` / `9c6bbf9` / `99f9eaa` | — |
+| `network-awai/local-murakumo` | `02549a5` | `134afdb` |
+| `kotoba-lang/langchain` | `a46c87c` | `fb05d4b` |
+| `cloud-itonami/mangaka` | `72f13e5` | `3f57c46` |
+| `network-awai/local-manimani` | `73bd195` | `4144166` |
+
+**live で確かめた前後**（同じリクエスト、deploy を挟んで）:
+
+| | before | after |
+|---|---|---|
+| `model=anthropic/claude-sonnet-4.6` | **HTTP 200**、応答 `model: murakumo-main`（Qwen が Claude として答えていた） | **HTTP 503** `external_models_unavailable` |
+| `model=murakumo-main` | 200 | 200（`content: 'pong'`、退行なし） |
+| `/health` | ok | ok |
+
+**検証**: external-models 26 test / 134 assertion、langchain.model 7 test / 22 assertion、
+既存 device-p256 2 test / 13 assertion（merge 後も緑）。負の対照 4 本 ——
+`:anonymous` を paying set に足す / `:inert` を paying にする / x402 を blanket に戻す /
+未価格を通す —— いずれもその性質を名指す test だけが赤くなり、exit code も動いた。
+⚠ **全 suite は baseline から赤い**（`@noble/hashes/sha2.js` 未インストール）ので
+証拠に使っていない。使ったのは対象 ns の直接実行と負の対照。
+
+**governed artifact**: `shadow-cljs release worker ui` を外部 west workspace で実行し、
+`scripts/package-release.mjs` が deploy ファイルを再現することを確認。sibling pin 3 件
+（murakumo / org-chainagnostic-cacao / cloud-murakumo）が動いていたが、**local-murakumo の
+require closure に 1 ファイルも入らないことを実測してから**取り込んだ（closure は
+`cacao.edge.verify` / `cloud-murakumo.{token,trust}` / `murakumo.infer.{credits,prices,windows}` /
+`murakumo.kotoba.oracle` の推移閉包 6 ファイル）。途中で main が K16 device receipt を
+landing させたため、**artifact を作り直してから** merge した —— 先に作った artifact を
+出していれば、source には残っているその変更を bundle の中だけで巻き戻していた。
+
+## 未解決 —— 次に誰かが拾うところ
+
+1. **external model はまだ 1 つも売られていない。** `MURAKUMO_OPENROUTER_API_KEY` と
+   `MURAKUMO_EXTERNAL_PRICES` の両方が未設定で、どちらも owner の領域
+   （前者は credential、後者は値付け）。両方入れるまで 503 のまま。**これは
+   未完成ではなく設計どおりの fail-closed。**
+2. **x402 の穴（上記 決定 5 の ⚠）。** cloud-murakumo が shared token で proxy するので
+   settled な支払いが `:shared-token` として届き、prepaid の上限が効かない。
+   価格を付けるより先にここを塞ぐ。
+3. **KUMO / FVM は着手していない。** owner 指示「KUMO Token も fvm 相当で」は
+   ADR-2608291009 D1/D3（KUMO は非取引の労圏単位、取引可能なのは BOT）と
+   ADR-2608057000（Filecoin は信頼性を理由に anchor 先として却下）の両方と衝突する。
+   **どちらも owner 自身の決定なので、解釈を勝手に選ばずに質問として残した。**
+   2026-08-30 の会話で owner から「en, engi の取引不可というのは今は適切なの、
+   holochain はどうしている?」という先行する問いが出た。**答えは既にこの workspace の
+   ADR の中にある**（ADR-2607259800 決定 1）:
+
+   > Holochain がその実例である。EN は HoloFuel と同じ設計を独立に導出したもので、
+   > Holochain は $20.4M を2018年に調達しながら 2026年時点で HoloFuel 本体が未ローンチ。
+   > **設計が同じなら成長曲線も同じになる。**
+
+   外部を実測して、この自己予測は当たっている: HOT→HoloFuel の 1:1 交換は
+   **2018 ICO から 8 年たった 2026-07 時点でまだ開いていない**（Holo Ltd 自身は換金を
+   運営せず「licensed third-party」に委ねると明記）。HoloFuel は reputation/capacity で
+   上下限を切った相互信用で「hosting のための通貨であって holding のためではない」。
+   Sardex は euro と相互に交換不可・利子 0・域内限定のまま機能しており、
+   **非交換性は制約ではなく機構**である（obligation-clearing と併用で域内純債務 ~50% 減）。
+
+   **したがって「非取引は今も適切か」への答えは『適切だが、それは効いている制約ではない』。**
+   実測（2026-08-30）: EN の実口座 **0**、bond した外部 witness **0**、実転送は
+   operator が作った使い捨て鍵どうしの **2〜3 件**、`example-journal.edn` は自ら
+   `SYNTHETIC CORPUS … Do not cite balances here as measurements` と書いている。
+   `engi-node` は live だが `peer-count 0` の devnet。交換可能にしてもこの数字は動かない
+   —— 動かすのは受容密度で、それは ADR-2607259800 が自分で score 3.00 を付けた
+   follow-up `broker-actor-for-credit-imbalance`（WIR/Sardex の主要な死因＝
+   **恒常的な純債権者が使い道を持てない**への対処）が担当する未着手項目である。
+
+   ⚠ **その調査で見つかった実際の欠陥（この ADR の範囲外だが記録する）**: 信用限度の
+   モデルが 2 つに割れている。`cloud-itonami/credits` は**独立保証人の中央値**で決め、
+   保証が無ければ既定 0（負残高不可＝fail-closed）。一方 `kotoba-lang/engi` は
+   genesis に**自己申告**した `:engi/credit-limit` を使う —— **信用の出所が無い**。
+   HoloFuel は reputation/capacity で縛る。相互信用で限度の裏付けが自己申告なのは、
+   net-zero 規律ではなく段階を踏んだ無制限発行になる。どちらを正本にするか未決。
+4. **artifact refresh の手順はスクリプト化してあるが landing していない**
+   （session scratchpad の `refresh-manifest.mjs`）。`release/cljs/README.md` の手順を
+   1 コマンドにし、動いた sibling pin を差分表示する。**landing するなら nbb で書き直す**
+   （このワークスペースは新規 `.mjs` を禁じている）。
+5. **`langchain.model` の既定変更で 6 つの example がまだ `:api-key` を `:url` 無しで
+   渡している**（computer-use ×2 / godaddy-dns / langgraph ×2、および同 repo の 1 件は修正済み）。
+   production ではないが、読まれるコードなので `anthropic-direct-url` を足す。
+
 ## Consequences
 
 - murakumo は自前の OSS model を publish する研究所であり続けながら、closed model の
