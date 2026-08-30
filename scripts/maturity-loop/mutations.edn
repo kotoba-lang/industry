@@ -4137,4 +4137,193 @@
      :find "(t/run-tests 'oil_trading.murakumo-test\n             'oil_trading.manifest-test)"
      :replace "(t/run-tests 'oil_trading.manifest-test)"
      :must-fail ["REFUSED"]}]}
+
+  {:repo "orgs/cloud-itonami/oil-upstream"
+   :label "oil-upstream planner: the gate, the record key, and the manifest it is a bijection with"
+   ;; src/oil_upstream/murakumo.cljc is .cljc and had never been executed on
+   ;; any runtime -- the repo had no test/, no deps.edn, no nbb.edn. Every
+   ;; claim about its gate was true only by inspection. `actor-manifest.test.ts`
+   ;; has sat here since 2026-05 with no package.json and no vitest to run it,
+   ;; the same way the identical file did in the sibling `oil-trading` and
+   ;; `cargo` repos. Its assertions are re-expressed in cljs here
+   ;; (ADR-2608260900 retires .ts as an authoring surface).
+   ;;
+   ;; All 20 were replayed by hand at this tree on 2026-08-31 before landing,
+   ;; one at a time with the file restored between runs: every anchor unique,
+   ;; every bite naming exactly the tests that claim it, base green before the
+   ;; battery and after it.
+   ;;
+   ;; What this repo supports that oil-trading's suite could not: the cell
+   ;; catalogue is checked as a BIJECTION against the manifest's obligations --
+   ;; 5 xrpc endpoints + 5 advertised subscriptions + 2 requiredCollections +
+   ;; 4 requiredLoops = 16 = (count cell-specs), the four sources disjoint.
+   ;; The one-directional coverage checks cannot see a cell nobody asked for;
+   ;; `an-orphan-cell-is-added-without-a-manifest-obligation` is the mutation
+   ;; that only the bijection catches.
+   ;;
+   ;; Two mutations were written and are NOT registered: deleting either of
+   ;; `gate-value`'s trailing `(when (set? attestations) ...)` clauses, and
+   ;; deleting both. All three runs stayed green. Those clauses are
+   ;; unreachable -- `get` answers for sets, so a keyword set resolves in
+   ;; clause 1 and a string set in clause 2. The registered pair aims at those
+   ;; first two instead, where the floor actually lives. Dead code reads
+   ;; exactly like a blind suite from outside, which is the whole reason the
+   ;; battery is replayed by hand.
+   ;;
+   ;; Three tests are named hazard-* and pin DEFECTS, not guarantees: the rkey
+   ;; collision, the caller-overwritable record body, and the DID document that
+   ;; does not claim the DID this actor stamps -- the same three the sibling
+   ;; oil-trading and business-person repos carry, from the same migration
+   ;; commit f072718. Their mutations are therefore *fixes*: they go red when
+   ;; somebody repairs the defect, which is the moment the test and the
+   ;; mutation should both go.
+   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :green-marker "oil-upstream: all green"
+   :mutations
+   [{:id :oilup/a-baseline-gate-is-dropped
+     :why "dropping a gate from common-gates shrinks BOTH the required set and the expected set, so every doseq and every set equality in the suite follows it down and stays green while the gate widens. Only the literal count and name list catch it"
+     :file "src/oil_upstream/murakumo.cljc"
+     :find "   :no-probing-baseline\n"
+     :replace ""
+     :must-fail ["the-planner-still-has-something-to-plan"]}
+
+    {:id :oilup/an-attested-gate-is-normalised-to-true
+     :why "an attestation recorded as false must not be read as attested. The floor is gate-value's `or`, not missing-gates' `boolean` -- the `or` chain has already turned an explicit false into nil by the time missing-gates sees it, so mutating `boolean` to `some?` there would be vacuous"
+     :file "src/oil_upstream/murakumo.cljc"
+     :find "  (or (get attestations gate)\n      (get attestations (name gate))"
+     :replace "  (or (when (some? (get attestations gate)) true)\n      (get attestations (name gate))"
+     :must-fail ["false-attestation-does-not-satisfy-a-gate"]}
+
+    {:id :oilup/a-blocked-plan-still-emits-its-effects
+     :why "the one property this actor has: no :mst/put-record leaves the boundary unless every gate is attested. Returning the planned effects alongside :status :blocked is the plausible regression -- it reads like a debugging convenience and every downstream reader that dispatches on :effects rather than :status starts writing"
+     :file "src/oil_upstream/murakumo.cljc"
+     :find "         {:status :blocked\n          :effects []}"
+     :replace "         {:status :blocked\n          :effects (mapv (fn [{:keys [collection record rkey]}]\n                           (put-record-effect collection rkey record))\n                         (records-for spec input))}"
+     :must-fail ["blocked-plan-emits-no-effects"]}
+
+    {:id :oilup/string-keyed-attestations-stop-resolving
+     :why "callers hand attestations over as JSON, so string keys and string sets are the wire shape, not a convenience. Dropping the (name gate) lookup makes every such caller silently unattested -- the actor refuses to write and looks correct while doing it"
+     :file "src/oil_upstream/murakumo.cljc"
+     :find "\n      (get attestations (name gate))"
+     :replace ""
+     :must-fail ["gate-value-reads-all-four-attestation-shapes"
+                 "a-plan-is-ready-when-attestations-arrive-as-a-set-of-strings"]}
+
+    {:id :oilup/keyword-keyed-attestations-stop-resolving
+     :why "the mirror of the above, and the clause that resolves a keyword set. Both of gate-value's reachable branches are pinned, because the two that follow them are dead"
+     :file "src/oil_upstream/murakumo.cljc"
+     :find "  (or (get attestations gate)\n"
+     :replace "  (or\n"
+     :must-fail ["gate-value-reads-all-four-attestation-shapes"]}
+
+    {:id :oilup/the-string-rkey-fallback-is-dropped
+     :why "`(get record* \"rkey\")` looks redundant next to `(:rkey record*)` and is the obvious thing to delete while tidying. It is the branch that JSON-shaped records land on, and losing it moves them to the request id -- so every record in one request collides on one key and put-record overwrites all but the last"
+     :file "src/oil_upstream/murakumo.cljc"
+     :find "\n                                 (get record* \"rkey\")"
+     :replace ""
+     :must-fail ["rkey-is-derived-in-a-fixed-order-of-preference"]}
+
+    {:id :oilup/a-path-separator-survives-into-the-rkey
+     :why "widening the safe set by one character is how sanitisers are relaxed -- someone wants hierarchical keys. A slash in an rkey escapes the collection it was addressed to"
+     :file "src/oil_upstream/murakumo.cljc"
+     :find "(str/replace #\"[^A-Za-z0-9._~-]\" \"-\")"
+     :replace "(str/replace #\"[^A-Za-z0-9._~/-]\" \"-\")"
+     :must-fail ["safe-rkey-replaces-every-character-outside-the-safe-set"]}
+
+    {:id :oilup/rkey-collapse-repaired
+     :why "hazard tripwire. safe-rkey turns every unsafe character into a single dash and asks str/blank? afterwards, so equal-length non-ASCII identifiers share an rkey and put-record overwrites. Collapsing runs is one plausible repair; either way the hazard test must notice and both it and this mutation should then be deleted"
+     :file "src/oil_upstream/murakumo.cljc"
+     :find "(str/replace #\"[^A-Za-z0-9._~-]\" \"-\"))]\n    (if"
+     :replace "(str/replace #\"[^A-Za-z0-9._~-]+\" \"-\"))]\n    (if"
+     :must-fail ["hazard-safe-rkey-collapses-distinct-identifiers-onto-one-key"]}
+
+    {:id :oilup/record-merge-order-protects-the-stamp
+     :why "hazard tripwire, and the actual repair: merging the caller's record BEFORE base makes :actorDid, :$type, :scaffold and :constitutionalStatus unspoofable in the record body. When this lands for real, delete the hazard test and this mutation"
+     :file "src/oil_upstream/murakumo.cljc"
+     :find "(merge {:$type coll}\n                            base\n                            (or (get input-records coll)\n                                (get input-records idx)\n                                {}))"
+     :replace "(merge {:$type coll}\n                            (or (get input-records coll)\n                                (get input-records idx)\n                                {})\n                            base)"
+     :must-fail ["hazard-a-caller-supplied-record-overwrites-the-actor-stamp-in-the-body"]}
+
+    {:id :oilup/the-planner-stamps-a-different-did
+     :why "actor-did is the identity every effect is attributed under and the only thing tying this code to the manifest. Nothing in the repo cross-checked the two before this suite, so a drift here was invisible"
+     :file "src/oil_upstream/murakumo.cljc"
+     :find "  \"did:web:oil-upstream.etzhayyim.com\")"
+     :replace "  \"did:web:oil-upstream.example.com\")"
+     :must-fail ["manifest-and-cljc-boundary-name-the-same-actor"]}
+
+    {:id :oilup/a-cell-is-renamed-away-from-its-endpoint
+     :why "the manifest names endpoints in dotted NSID form and cell-specs in dashed legacy form; the only thing connecting them is that substitution. Renaming one side leaves an endpoint the actor serves with no cell that can answer it, and the manifest keeps advertising it"
+     :file "src/oil_upstream/murakumo.cljc"
+     :find ":getfield {:legacy-cell \"com-etzhayyim-apps-oilUpstream-registry-getField\""
+     :replace ":getfield {:legacy-cell \"com-etzhayyim-apps-oilUpstream-registry-getFieldV2\""
+     :must-fail ["every-xrpc-endpoint-has-a-cell-that-can-serve-it"
+                 "the-cell-catalogue-is-exactly-what-the-manifest-obliges"]}
+
+    {:id :oilup/an-orphan-cell-is-added-without-a-manifest-obligation
+     :why "the direction the one-directional coverage checks are blind to, and the reason the bijection exists: cells get added during migration and the manifest lags. A cell nobody asked for is reachable through all-cell-plans, writes to a collection under this actor's namespace, and no coverage check that walks the manifest can see it"
+     :file "src/oil_upstream/murakumo.cljc"
+     :find "  :koji {:legacy-cell \"koji\""
+     :replace "  :orphan {:legacy-cell \"com-etzhayyim-apps-oilUpstream-orphan\"\n     :phase :event\n     :murakumo-node \"reuben\"\n     :collections [(collection \"orphan\")]\n     :required-gates common-gates\n     :trigger \"manifest cell orphan\"\n     :ceiling \"Manifest-driven migration scaffold; explicit execution stays in runtime methods\"}\n  :koji {:legacy-cell \"koji\""
+     :must-fail ["the-cell-catalogue-is-exactly-what-the-manifest-obliges"
+                 "the-planner-still-has-something-to-plan"]}
+
+    {:id :oilup/the-manifest-advertises-an-endpoint-with-no-cell
+     :why "the same drift from the other side, which is the direction it actually happens: an endpoint is versioned in the manifest and the planner is not updated with it"
+     :file "actor-manifest.jsonld"
+     :find "\"nsid\": \"com.etzhayyim.apps.oilUpstream.registry.listFields\""
+     :replace "\"nsid\": \"com.etzhayyim.apps.oilUpstream.registry.listFieldsV2\""
+     :must-fail ["every-xrpc-endpoint-has-a-cell-that-can-serve-it"
+                 "the-documented-xrpc-endpoints-are-still-the-ones-declared"
+                 "the-cell-catalogue-is-exactly-what-the-manifest-obliges"]}
+
+    {:id :oilup/a-subscription-arrives-with-no-cell-to-handle-it
+     :why "the top-level triggers block is what a relay reads to decide what to deliver, so a collection listed there with no cell is a silent drop rather than an error. oilRefining.refinery arrives from a repo this one does not control"
+     :file "actor-manifest.jsonld"
+     :find "\"com.etzhayyim.apps.oilRefining.refinery\""
+     :replace "\"com.etzhayyim.apps.oilRefining.crude\""
+     :must-fail ["every-subscribed-collection-has-a-cell-that-can-handle-it"
+                 "the-cell-catalogue-is-exactly-what-the-manifest-obliges"]}
+
+    {:id :oilup/a-pipeline-is-triggered-by-a-collection-nobody-advertises
+     :why "this manifest has two subscription surfaces that are allowed to differ in size -- the top-level block advertises five, the pipeline list runs steps for one. A pipeline keyed to a collection outside the advertised set never fires, and nothing about it looks wrong. The replacement here is a collection that DOES have a cell, so the coverage check stays green and only the subset check moves"
+     :file "actor-manifest.jsonld"
+     :find "\"com.etzhayyim.apps.oilMidstream.flow\"\n        ],\n        \"type\": \"subscribeRepos\""
+     :replace "\"com.etzhayyim.apps.standard.shinkaEvolution\"\n        ],\n        \"type\": \"subscribeRepos\""
+     :must-fail ["the-pipeline-subscriptions-are-a-subset-of-the-advertised-ones"]}
+
+    {:id :oilup/a-required-loop-loses-the-cell-that-runs-it
+     :why "requiredLoops is an obligation the standard rule places on this actor, and a loop with no cell simply never runs -- there is no error, the loop is just absent. Nothing in the repo connected the two before this suite"
+     :file "actor-manifest.jsonld"
+     :find "\n    \"koji\",\n"
+     :replace "\n    \"koji-v2\",\n"
+     :must-fail ["every-required-loop-and-collection-has-a-cell"
+                 "the-cell-catalogue-is-exactly-what-the-manifest-obliges"]}
+
+    {:id :oilup/custom-escape-hatch-allowed
+     :why "a step whose fn is outside the declared capability vocabulary runs with authority the manifest never granted. `custom` is the specific escape hatch the retired vitest file was written to refuse, so losing it would undo the one check that file was carried over for"
+     :file "actor-manifest.jsonld"
+     :find "\"fn\": \"derive:social\""
+     :replace "\"fn\": \"custom\""
+     :must-fail ["no-pipeline-step-escapes-into-a-custom-function"]}
+
+    {:id :oilup/a-step-reaches-for-a-capability-the-actor-never-declared
+     :why "the vitest file only checked steps against the global vocabulary, so a step could use any known capability whether or not THIS actor declared it. graph.vectorSearch is in the vocabulary and not in this manifest's capabilities list -- the check that catches it is the per-actor one, and only that one moves here"
+     :file "actor-manifest.jsonld"
+     :find "\"fn\": \"graph.write\""
+     :replace "\"fn\": \"graph.vectorSearch\""
+     :must-fail ["every-pipeline-step-fn-is-a-capability-the-manifest-declared"]}
+
+    {:id :oilup/served-did-document-is-reconciled
+     :why "hazard tripwire. .well-known/did.json identifies itself as did:web:etzhayyim.com:actor:oil-upstream while the planner and the manifest both stamp did:web:oil-upstream.etzhayyim.com, and alsoKnownAs bridges neither. Which side moves is an ownership decision; this fires whichever side moves first"
+     :file ".well-known/did.json"
+     :find "\"id\" : \"did:web:etzhayyim.com:actor:oil-upstream\","
+     :replace "\"id\" : \"did:web:oil-upstream.etzhayyim.com\","
+     :must-fail ["hazard-the-served-did-document-does-not-claim-the-did-this-actor-stamps"]}
+
+    {:id :oilup/the-evidence-floor-itself
+     :why "the floor under the suite, guarded like anything else. Dropping a namespace from the runner leaves a run that prints `0 failures, 0 errors` and would otherwise be read as a pass -- the exact shape ADR-2608136000 is about. It must exit 2, not 0 and not 1, and it must not print the marker. `must-fail` names the REFUSED line rather than a test, because the point is that no test ran"
+     :file "run_tests.cljs"
+     :find "(t/run-tests 'oil_upstream.murakumo-test\n             'oil_upstream.manifest-test)"
+     :replace "(t/run-tests 'oil_upstream.manifest-test)"
+     :must-fail ["REFUSED"]}]}
 ]}
