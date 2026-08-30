@@ -4326,4 +4326,97 @@
      :find "(t/run-tests 'oil_upstream.murakumo-test\n             'oil_upstream.manifest-test)"
      :replace "(t/run-tests 'oil_upstream.manifest-test)"
      :must-fail ["REFUSED"]}]}
+  {:repo "orgs/cloud-itonami/gov-municipality"
+   :label "gov-municipality permitting actor: the gate, the clock, and the six files that describe one actor"
+   ;; Until 2026-08-31 this repo's suite was green exactly one way: `run_tests.sh`
+   ;; built a mktemp symlink farm to reconcile namespaces with paths that did not
+   ;; match them, and drove four namespaces through `bb` -- a retired script host
+   ;; here (ADR-2607173000), reached through a .sh file, which is not an authoring
+   ;; surface either. `methods/agent.cljc` was .cljc in extension only: it read
+   ;; `System/currentTimeMillis` and referred to `clojure.string/split` without
+   ;; requiring it, so Babashka's preload was the only thing holding it up.
+   ;; `src/gov_municipality/murakumo.cljc` -- the fail-closed gate -- was in none
+   ;; of the four namespaces and had never been executed on any runtime.
+   ;;
+   ;; All ten below were replayed by hand at 9c5827be on 2026-08-31, one at a
+   ;; time with the file restored between runs, before any of them was written
+   ;; here. Every anchor was checked to occur exactly once; base green before and
+   ;; after; no mutation printed the green marker. The runner's three exit codes
+   ;; were each shown to discriminate rather than assumed: breaking
+   ;; `missing-gates` gives exit 1 with 28 failures and no marker, dropping a
+   ;; namespace from `run-tests` gives exit 2 while printing "0 failures,
+   ;; 0 errors", and the unmodified tree gives exit 0 with the marker. The last
+   ;; is registered below, so the floor is guarded the same way the code is.
+   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :green-marker "gov-municipality: all green"
+   :mutations
+   [{:id :gov/gate-check-removed
+     :why "the invariant the boundary exists for. With nothing removed from :required-gates, `missing-gates` returns empty for every input and every cell plans as :ready -- an actor that writes to the MST without a single attestation. This is the shape the drift takes if the gate is ever 'simplified'"
+     :file "src/gov_municipality/murakumo.cljc"
+     :find "(remove #(boolean (gate-value attestations %)))"
+     :replace "(remove (fn [_] true))"
+     :must-fail ["blocked-plan-emits-no-effects"]}
+
+    {:id :gov/presence-counts-as-attestation
+     :why "a gate recorded as `false` is a refusal, not a signature. `contains?` is the plausible-looking edit -- it reads as 'the attestation is present' -- and it turns every explicit `false` into a pass. Nothing else in the suite distinguishes an absent gate from one that was actively denied"
+     :file "src/gov_municipality/murakumo.cljc"
+     :find "  (or (get attestations gate)"
+     :replace "  (or (and (map? attestations) (contains? attestations gate))"
+     :must-fail ["falsey-attestation-is-a-refusal-not-a-signature"]}
+
+    {:id :gov/path-separator-survives-into-rkey
+     :why "`safe-rkey` decides what a record is called in the MST. Widening the safe alphabet by one character lets a slash through, and an rkey containing a path separator is not a key -- it is a path. The DIDs this actor derives rkeys from are full of colons and dots, so the alphabet is load-bearing"
+     :file "src/gov_municipality/murakumo.cljc"
+     :find "(str/replace #\"[^A-Za-z0-9._~-]\" \"-\")"
+     :replace "(str/replace #\"[^A-Za-z0-9._~/-]\" \"-\")"
+     :must-fail ["safe-rkey-strips-did-web-and-unsafe-characters"]}
+
+    {:id :gov/clock-goes-back-to-jvm-only
+     :why "the exact regression this commit removed. `System/currentTimeMillis` in a .cljc file is invisible on the JVM -- it is the runtime it works on -- so only a run that is not the JVM can see it. nbb refuses at analysis, so :must-fail names the refusal rather than a test: the namespace never loads, and 'the suite went red' would otherwise count any unrelated breakage as this one"
+     :file "src/gov_municipality/methods/agent.cljc"
+     :find "#?(:clj (System/currentTimeMillis)\n     :cljs (.now js/Date))"
+     :replace "(System/currentTimeMillis)"
+     :must-fail ["Unable to resolve symbol: System/currentTimeMillis"]}
+
+    {:id :gov/clojure-string-require-dropped
+     :why "the other half of that regression. The file referred to `clojure.string/split` for months without requiring the namespace and nobody noticed, because Babashka preloads it. Dropping the require again is silent on bb and refused by nbb at the first `str/` call"
+     :file "src/gov_municipality/methods/agent.cljc"
+     :find "  (:require [clojure.string :as str]))"
+     :replace "  )"
+     :must-fail ["Unable to resolve symbol: str/starts-with?"]}
+
+    {:id :gov/app-manifest-src-drifts
+     :why "kotoba.app.edn names the three files `kotoba app deploy` compiles. It fell behind the tree during this very commit -- the cells moved and the manifest did not follow -- and the test caught it. This is that drift, replayed"
+     :file "kotoba.app.edn"
+     :find "\"src/gov_municipality/cells/final_sign_off/state_machine.cljc\""
+     :replace "\"cells/final_sign_off/state_machine.cljc\""
+     :must-fail ["kotoba-app-src-paths-exist"]}
+
+    {:id :gov/cell-cites-an-undeclared-gate
+     :why "a cell sidecar claiming to enforce a gate the actor does not declare. The gate ids are the actor's constitutional surface (manifest.edn :actor/gates); a cell citing G21 is either a typo or a gate somebody removed from the manifest without following it into the cells"
+     :file "cells/permit_submission.edn"
+     :find ":cell/gates [\"G1\" \"G15\" \"G16\" \"G19\" \"G20\"]"
+     :replace ":cell/gates [\"G1\" \"G15\" \"G16\" \"G19\" \"G21\"]"
+     :must-fail ["cells-only-cite-gates-the-manifest-declares"]}
+
+    {:id :gov/lex-record-leaves-the-shared-root
+     :why "the four lexicon records must agree on one root, whatever it is. This repo already spells its lexicon root three different ways across prose, cljc and lex/*.edn -- that divergence is pinned by a separate test. What must not happen on top of it is the lex files themselves splitting"
+     :file "lex/inspectionSchedule.edn"
+     :find ":lex/id \"com.etzhayyim.govmunicipality.inspectionSchedule\""
+     :replace ":lex/id \"com.etzhayyim.gov.inspectionSchedule\""
+     :must-fail ["lex-records-share-one-root-and-end-with-their-declared-name"]}
+
+    {:id :gov/manifest-cell-loses-its-sidecar
+     :why "manifest.edn and cells/*.edn are two lists of the same cells. Renaming one entry leaves a declared cell with no sidecar and a sidecar no manifest entry -- checked in both directions, because only one direction catches a rename"
+     :file "manifest.edn"
+     :find "{:cell/id \"ledger\"                :cell/kind :datalog   :cell/runtime :kotoba}"
+     :replace "{:cell/id \"audit\"                 :cell/kind :datalog   :cell/runtime :kotoba}"
+     :must-fail ["every-manifest-cell-has-a-sidecar-and-every-sidecar-a-manifest-entry"]}
+
+    {:id :gov/namespace-dropped-from-the-runner
+     :why "the floor, guarded like the code. A namespace quietly dropped from `run-tests` prints '0 failures, 0 errors' -- the same words a full green run prints -- so without the floor a suite that stopped measuring the boundary reads as a suite that found nothing wrong. It must exit 2, not 0 and not 1, and must not print the marker. :must-fail names the REFUSED line rather than a test, because the point is that the tests did not run"
+     :file "run_tests.cljs"
+     :find "             'gov_municipality.murakumo-test\n             'gov_municipality.manifest-test)"
+     :replace "             'gov_municipality.manifest-test)"
+     :must-fail ["REFUSED"]}]}
 ]}
