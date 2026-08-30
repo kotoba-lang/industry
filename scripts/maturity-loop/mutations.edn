@@ -3731,4 +3731,106 @@
      :find ":incident {:legacy-cell \"com-etzhayyim-apps-dataCenterOps-incident\"\n     :phase :event\n     :murakumo-node \"reuben\"\n     :collections [(collection \"incident\")]\n     :required-gates common-gates"
      :replace ":incident {:legacy-cell \"com-etzhayyim-apps-dataCenterOps-incident\"\n     :phase :event\n     :murakumo-node \"reuben\"\n     :collections [(collection \"incident\")]\n     :required-gates (rest common-gates)"
      :must-fail ["every-cell-declares-the-common-gates-and-one-collection"]}]}
+
+  {:repo "orgs/cloud-itonami/app-public-domain-colorization"
+   :label "lg-pd-color — portability, the error envelope, and the BPMN rights gate"
+   ;; This port declared `bb` as the only way to run its tests, in a `bb.edn`
+   ;; naming the pre-rename `com-junkawasaki/langgraph-clj`. `bb` is the script
+   ;; host ADR-2607173000 retired, so the only runtime that had ever executed
+   ;; these `.cljc` namespaces was the JVM one -- and they were not portable at
+   ;; all: `graphs/task.cljc` caught `Exception` and called `.getMessage`, so
+   ;; under nbb the namespace could not be READ. Nothing reported it, because
+   ;; nothing ran it. `run_tests.cljs` now runs both runtimes and prints the
+   ;; marker only when both are green, which is what the first mutation exists
+   ;; to keep true.
+   ;;
+   ;; Three kinds of thing are shot at here, because this suite guards three:
+   ;;   1. the code            (lg-clj/src/lg_pd_color/**)
+   ;;   2. the process data    (bpmn/colorize-public-domain-work.bpmn)
+   ;;   3. the two runtime configs (lg-clj/nbb.edn vs lg-clj/deps.edn)
+   ;; A suite that only reddens on (1) is a test of itself, not of the pipeline
+   ;; -- the rights gate lives entirely in (2), in one XML attribute per gate.
+   ;;
+   ;; All eleven were applied one at a time at pin 25cd2fce on 2026-08-30, with
+   ;; the tree restored between runs; each reddened the tests naming it, and the
+   ;; unmutated control was green before the battery and after it.
+   :cmd ["nbb" "run_tests.cljs"]
+   :green-marker "lg-pd-color: both runtimes green (nbb + JVM)"
+   :mutations
+   [{:id :pdcolor/portable-not-jvm-only
+     :why "the `.cljc` really runs on both runtimes. Reverting to JVM interop does not fail a test -- it stops nbb from READING the namespace, which is why the defect survived from the extraction until 2026-08-30. The marker names a diagnostic string rather than a test name for exactly that reason: there is no test result to name when the load itself dies"
+     :file "lg-clj/src/lg_pd_color/graphs/task.cljc"
+     :find "(catch #?(:clj Exception :cljs :default) e\n          {:error (clip (error-message e) 300)})"
+     :replace "(catch Exception e\n          {:error (clip (.getMessage e) 300)})"
+     :must-fail ["Unable to resolve symbol: Exception"]}
+
+    {:id :pdcolor/error-message-unclipped
+     :why "the 300-char clip the node docstring claims. An unbounded handler message otherwise lands verbatim in an HTTP body -- ffmpeg stderr is not small"
+     :file "lg-clj/src/lg_pd_color/graphs/task.cljc"
+     :find "(clip (error-message e) 300)"
+     :replace "(error-message e)"
+     :must-fail ["error-message-is-clipped-to-300-chars"]}
+
+    {:id :pdcolor/boundary-handler-goes-quiet
+     :why "an unbound native handler fails loud. Returning {} instead makes a deploy that forgot to inject a handler report 200 with an empty output -- a restoration step that did nothing, recorded as done"
+     :file "lg-clj/src/lg_pd_color/graphs/task.cljc"
+     :find "  (fn [_kwargs]\n    (throw (ex-info (str \"native worker handler not configured: \" name\n                         \" (inject via lg-pd-color.graphs.task/*handlers*)\")\n                    {:handler name}))))"
+     :replace "  (fn [_kwargs] {}))"
+     :must-fail ["every-task-graph-fails-loud-when-its-handler-is-unbound"]}
+
+    {:id :pdcolor/unmapped-nsid-echoed-whole
+     :why "the caller-supplied NSID is clipped before it goes into an error body. The clip is the only bound on what an unmapped caller can push back through this surface"
+     :file "lg-clj/src/lg_pd_color/server.cljc"
+     :find "(str \"NSID not mapped: \" (clip nsid 120))"
+     :replace "(str \"NSID not mapped: \" nsid)"
+     :must-fail ["an-unmapped-nsid-is-not-echoed-back-unbounded"]}
+
+    {:id :pdcolor/assistant-id-default-dropped
+     :why "server.py's documented default. A client that omits assistant_id must get liveness, not a 404 -- the 404 reads as `this deployment is broken`"
+     :file "lg-clj/src/lg_pd_color/server.cljc"
+     :find "(or (:assistant_id body) \"health\")"
+     :replace "(:assistant_id body)"
+     :must-fail ["runs-without-an-assistant-id-is-health"]}
+
+    {:id :pdcolor/graph-renamed-without-the-bpmn
+     :why "a graph renamed here without the BPMN following. The dispatch surface stays perfectly consistent with itself; the process keeps dispatching a Zeebe task type nobody serves, and the run does not fail -- it stalls in the broker"
+     :file "lg-clj/src/lg_pd_color/graphs/task.cljc"
+     :find "\"videoEnhanceQuality\""
+     :replace "\"videoUpscale\""
+     :must-fail ["every-pdcolor-task-type-is-served-by-a-graph-or-named-as-someone-elses"]}
+
+    {:id :pdcolor/rights-gate-falls-through
+     :why "PROCESS DATA. The rights gate's safety property is not that its condition is right, it is that a run answering NOTHING refuses. Point Gate_AutoRights' default at the human-approval branch and an unclassified work walks forward instead of blocking. One XML attribute; no test read it before"
+     :file "bpmn/colorize-public-domain-work.bpmn"
+     :find "<bpmn:exclusiveGateway id=\"Gate_AutoRights\" name=\"Rights class publishable?\" default=\"Flow_Rights_Blocked\">"
+     :replace "<bpmn:exclusiveGateway id=\"Gate_AutoRights\" name=\"Rights class publishable?\" default=\"Flow_Rights_Human\">"
+     :must-fail ["a-gate-nobody-answers-refuses"]}
+
+    {:id :pdcolor/publish-bypasses-the-rights-gate
+     :why "PROCESS DATA. A flow rerouted around a gate leaves every gate's own attributes correct -- the gate is still there, still fail-closed, and no longer on the path to Task_Publish. Only reachability sees it"
+     :file "bpmn/colorize-public-domain-work.bpmn"
+     :find "<bpmn:sequenceFlow id=\"Flow_SaveRun_Gate\" sourceRef=\"Task_SaveRun\" targetRef=\"Gate_AutoRights\"/>"
+     :replace "<bpmn:sequenceFlow id=\"Flow_SaveRun_Gate\" sourceRef=\"Task_SaveRun\" targetRef=\"Task_HumanRightsApproval\"/>"
+     :must-fail ["publish-is-behind-every-rights-and-qc-gate"]}
+
+    {:id :pdcolor/blocked-run-rejoins-the-pipeline
+     :why "PROCESS DATA. A blocked run must terminate. Sending the blocked audit back into the colorization chain gives a work that failed rights screening a path to publication, while every gate still refuses correctly on its own"
+     :file "bpmn/colorize-public-domain-work.bpmn"
+     :find "<bpmn:sequenceFlow id=\"Flow_EndBlocked\" sourceRef=\"Task_AuditBlocked\" targetRef=\"End_Blocked\"/>"
+     :replace "<bpmn:sequenceFlow id=\"Flow_EndBlocked\" sourceRef=\"Task_AuditBlocked\" targetRef=\"Task_SegmentShots\"/>"
+     :must-fail ["refusal-ends-the-process"]}
+
+    {:id :pdcolor/runtimes-pin-different-langgraphs
+     :why "RUNTIME CONFIG. nbb reads nbb.edn and the JVM reads deps.edn, so `both runtimes green` can quietly become `two runtimes, two libraries`. The replacement is a real adjacent langgraph commit, so the drift is what is caught rather than an unresolvable coordinate"
+     :file "lg-clj/nbb.edn"
+     :find "5fdc6e7d71d95bc78db4fa1a20c325c79940f984"
+     :replace "bf75c16ac647d688e6a5dcef3bf2428e994256a0"
+     :must-fail ["nbb-and-the-jvm-test-the-same-langgraph"]}
+
+    {:id :pdcolor/camel-join-lowercases-the-rest
+     :why "this one shoots the TEST, not the code. The BPMN-to-graph derivation is the test's own helper; `str/capitalize` lower-cases the rest, so segmentShots becomes Segmentshots and the mapping silently matches nothing. A `no unserved task types` assertion over an empty mapping would still be green"
+     :file "lg-clj/test/lg_pd_color/contract_test.cljc"
+     :find "(str (str/upper-case (subs s 0 1)) (subs s 1))"
+     :replace "(str/capitalize s)"
+     :must-fail ["the-derivation-is-not-vacuous"]}]}
 ]}
