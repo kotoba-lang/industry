@@ -2465,6 +2465,23 @@ byte 一致 parity gate（KIR インタプリタを同一 JVM で回す / compil
 順序が未規定**（Clojure map が hash-map に切り替わるため。実測済み）で、移植版は
 `typed-map-entry-at` のキー昇順で決定的。
 
+### `document-bool` に i64 を渡すと、`amu check` は通り**実行時に**落ちる（2026-08-31 実測）
+
+上の「`or` は bool でなく i64」は css 移植の知見だが、**`document-bool` 経由で表面化すると
+症状が変わる**。実測（`org-ietf-ers` の chain slice、amu 88ae83e）:
+
+- `and` / `or` に型注釈が無いと i64 になる。**keyword 同士の `=` も同じ**。
+- それを `(document-bool …)` に渡しても `amu check` は **`:ok true` を返す**。
+- 落ちるのは **export を実行した瞬間**で、`value is not a boolean`（`:phase :value`、
+  `kotoba.kir.value/bounded-typed-value!`）。
+
+**型の誤りが check を素通りして、値の構築時に初めて出る。** `cond` や `if` の*テスト位置*
+では強制されるので、そこだけ見ていると気付かない。**document 構築に到達する bool は
+全部 `if` に畳む**（`(if (= t :no) true false)` まで含めて）。
+
+同日のもう 1 つの実測: **`new` は local 名にできない**。`:forbidden-heads`（interop）に
+在るので `(let [new …] …)` は shadowing 警告ではなく `invalid local binding` になる。
+
 **移行順序は依存順に厳守する**: `css` → `html` → `shitsuke` → `liquid-glass-ui` → `kotoba-ui`。
 逆順・同時並行は依存を壊す。移行が完了するまでは skill `kotoba-uiux` の既存ルール
 （app は `kotoba-ui.core` のみ require、raw hex 禁止、layout は shell から）がそのまま有効で、
