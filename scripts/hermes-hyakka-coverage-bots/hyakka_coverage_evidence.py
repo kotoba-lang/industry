@@ -24,8 +24,39 @@ import sys
 
 READ_ROOT = os.environ.get("HYAKKA_COVERAGE_READ_ROOT",
                            os.path.expanduser("~/github/com-junkawasaki"))
-WORK_ROOT = os.environ.get("HYAKKA_COVERAGE_BOT_WORKTREE",
-                           os.path.expanduser("~/.gftd/worktrees/hyakka-coverage-bot"))
+# Which worktree this run owns, in falling order of explicitness:
+#
+#   1. HYAKKA_COVERAGE_BOT_WORKTREE — an operator saying it outright
+#   2. the job's own cwd, when it is a git worktree — Hermes runs a cron
+#      script with `cwd = job.workdir` (cron/scheduler.py, `_script_cwd`),
+#      so a per-job `--workdir` is the only per-job signal this script can
+#      see. There is no job id or job name in the environment; that was
+#      checked before writing this.
+#   3. the legacy shared default
+#
+# (2) exists because ONE script serves TWO jobs. The docstring above argues
+# that sharing a worktree across bot families cost ~11 hours, and then both
+# vuln-coverage-scout and osm-coverage-scout landed on the same default —
+# the same shape, one level down. They fire 12h apart so it has not bitten
+# yet; that is a timetable, not an isolation guarantee.
+#
+# A cwd that is NOT a worktree is ignored rather than trusted. Before
+# per-job workdirs were set, that cwd was the shared superproject checkout,
+# where several Claude sessions work concurrently — syncing THAT to
+# origin/main is the accident this whole file exists to avoid.
+def _work_root() -> str:
+    explicit = os.environ.get("HYAKKA_COVERAGE_BOT_WORKTREE")
+    if explicit:
+        return os.path.expanduser(explicit)
+    cwd = os.getcwd()
+    read_root = os.path.abspath(os.path.expanduser(
+        os.environ.get("HYAKKA_COVERAGE_READ_ROOT", "~/github/com-junkawasaki")))
+    if os.path.exists(os.path.join(cwd, ".git")) and cwd != read_root:
+        return cwd
+    return os.path.expanduser("~/.gftd/worktrees/hyakka-coverage-bot")
+
+
+WORK_ROOT = _work_root()
 NBB = os.environ.get("HYAKKA_COVERAGE_NBB", "/opt/homebrew/bin/nbb")
 
 
