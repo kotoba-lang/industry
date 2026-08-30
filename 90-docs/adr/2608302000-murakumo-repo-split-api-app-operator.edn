@@ -26,6 +26,8 @@
   :adr/evidence
   ["2026-08-30: GitHub rename network-awai/local-murakumo → network-awai/cloud-murakumo-api"
    "2026-08-30: new repo network-awai/cloud-murakumo-app scaffolded (tenant-neutral portal app, cloud-itonami-app pattern)"
+   "2026-08-30: portal UI slice A landed — storefront + static site sources in cloud-murakumo-app (6a157621); operator wires :local/root dep + :site alias (e1038169); west pins on superproject main (d60bec1)"
+   "2026-08-30: public HTML copy-lock tests stay in operator (clojure -M:site); app keeps storefront + insight unit tests only"
    "live: api.murakumo.cloud served from inference API worker; murakumo.cloud served from operator deploy"]
   :adr/body
   "# murakumo 3-repo split — API / app / operator
@@ -66,11 +68,14 @@ ADR-2608300200 で murakumo = portal（Nous Portal）、itonami = agent（Hermes
 
 ### 移行の切り方（段階）
 
-1. **今回（landed）**: GitHub rename、`west` path override、新 repo `cloud-murakumo-app` scaffold、
+1. **landed（2026-08-30）**: GitHub rename、`west` path override、新 repo `cloud-murakumo-app` scaffold、
    README / ADR / manifest 正本。
-2. **follow-up**: `cloud-murakumo` から storefront / site 純 UI を `cloud-murakumo-app` へ
-   物理移動し、operator の `deps.edn` を `:local/root` または git dep で接続。
-3. **非目標**: API を `cloud-murakumo` に統合しない。内部 namespace `local_murakumo.*` の
+2. **landed slice A（2026-08-30）**: storefront + `cloud-murakumo.site.*` 静的ページ（`generate` /
+   `models` を除く）+ 関連 resources / unit tests を `cloud-murakumo-app` へ移動。operator は
+   `:local/root` dep と `:site` alias（app を classpath に載せて `clojure -M:site`）で接続。
+3. **follow-up slice B**: SPA（`ui/core.cljs`、`shadow` `:app` build）を app へ。
+4. **follow-up slice C**: `viewer.cljc`、mobile join flows。
+5. **非目標**: API を `cloud-murakumo` に統合しない。内部 namespace `local_murakumo.*` の
    一括 rename は別スライス（wire / deploy 名が先）。
 
 ## Consequences
