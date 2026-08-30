@@ -458,6 +458,26 @@
    :min-files 400
    :require-paths ["scripts/verify-no-github-workflows.cljs" "manifest/west.yml"]
    :cd false}
+  ;; Human authentication policy is authority-scoped, not a repository-wide
+  ;; keyword ban. External OAuth/OIDC/SAML/Email/SMS mirrors and protocol
+  ;; libraries may exist; only declared first-party session / credential /
+  ;; recovery issuers are constrained. The gate refuses a verdict when its
+  ;; policy, ADR, SECURITY.md, AGENTS.md, or west inventory was filtered out.
+  ;;
+  ;; Red/green discrimination is recorded in ADR-2608302125: unchanged tree
+  ;; exits 0; adding :password to one active-methods set exits 1; removing the
+  ;; machine policy from the shipped tree exits 2.
+  {:name "root" :id "root-human-auth-no-downgrade" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/human-auth-no-downgrade-check.cljs"
+   :include-ext [".md" ".edn" ".yml" ".cljs"]
+   :min-files 1500
+   :require-paths ["SECURITY.md"
+                   "AGENTS.md"
+                   "manifest/west.yml"
+                   "manifest/human-authentication-policy.edn"
+                   "90-docs/adr/2608302125-human-authentication-is-passkey-only-and-never-downgrades.edn"]
+   :cd false}
   {:name "governor" :gate :jvm-test :cd true}
   {:name "taxlaw" :gate :jvm-test :cd true}
   ;; shohyo 諸表 (2026-08-18). Folds a trial balance into BS/PL and refuses

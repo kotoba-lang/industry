@@ -189,6 +189,34 @@ skill `new-project-scaffold` を参照。
     従来どおり必ず**事前確認**する（force-push / 履歴書き換えの詳細は下記 Git operations
     節。公開リポ化と他者ブランチへの push はここが正本の禁止列挙）。
 
+## 人間認証は Passkey-only、弱い経路へ戻さない（repo-wide mandatory、2026-08-30、ADR-2608302125）
+
+first-party project が human session、identity bootstrap、credential registration /
+replacement、account recovery のいずれかを発行する場合、root `SECURITY.md` と
+`manifest/human-authentication-policy.edn` を必ず適用する。
+
+- active な人間認証は WebAuthn Passkey のみ。Email、password、SMS/voice、OAuth /
+  OIDC / SAML / social / enterprise SSO、support/operator/admin override を login、
+  bootstrap、step-up、credential registration、recovery の authority にしない。
+- approved authenticator が無い時は fail closed。feature flag、tenant setting、provider
+  secret、legacy record、incident 対応から弱い fallback を復活させない。
+- recovery は session を直接発行せず、one-time offline secret + 48 時間以上の
+  server-enforced delay + fresh Passkey による credential replacement とする。
+  operator は freeze できるが identity を grant できず、delay を短縮できない。
+- closed legacy route は 404/410 で ceremony・redirect・token/session/credential issuance
+  を始めない。source / built artifact / live route の negative test に plausible legacy
+  secret を含める。
+- 新しい human-auth surface は deploy 前に machine inventory へ登録する。
+  `:migration-gap` / `:unverified` を `:conformant` と読まず、1 件でも残る間は
+  workspace-wide Passkey-only を claim しない。
+- 外部仕様 mirror、protocol library、test fixture、強認証後の notification/connectivity
+  は、それだけで human authentication authority ではない。文字列の存在ではなく、
+  human session / credential / recovery を発行する authority を境界にする。
+
+project の nested `SECURITY.md` は root policy を強化・具体化できるが、弱めてはならない。
+競合は security finding として扱い、便利さを理由に局所例外を作らない。federation が必要なら
+別 hostname・RP/trust boundary・session namespace・threat model・ADR を持つ別 product にする。
+
 ## CI/CD は murakumo fleet。GitHub Actions を使わない（repo-wide mandatory、2026-08-05、ADR-2607300900）
 
 **オーナー指示（2026-08-05）「github は使わない、murakumo.cloud の cdci, workflow を使う」。**

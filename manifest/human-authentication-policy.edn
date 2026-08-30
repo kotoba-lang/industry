@@ -1,0 +1,89 @@
+{:policy/id "human-authentication-no-downgrade/v1"
+ :policy/adr "2608302125"
+ :policy/security-document "SECURITY.md"
+ :policy/scope :first-party-human-authentication-surfaces
+ :policy/last-reviewed "2026-08-30"
+
+ :human-auth/approved-active-methods #{:webauthn-passkey}
+ :human-auth/prohibited-authority
+ #{:email-link
+   :email-otp
+   :email-address
+   :password
+   :sms-otp
+   :voice-otp
+   :telephone-ownership
+   :oauth
+   :oidc
+   :saml
+   :social-sso
+   :enterprise-sso
+   :security-question
+   :device-fingerprint
+   :support-judgment
+   :operator-reset
+   :administrator-override}
+
+ :recovery/replaces-credential-not-session? true
+ :recovery/offline-one-time-secret? true
+ :recovery/store-verifier-only? true
+ :recovery/server-enforced-delay-hours-min 48
+ :recovery/owner-cancellable-during-delay? true
+ :recovery/revoke-superseded-authority? true
+ :recovery/operator-bypass? false
+
+ :legacy/closed-route-statuses #{404 410}
+ :legacy/runtime-reactivation-prohibited? true
+ :legacy/source-built-live-negative-tests-required? true
+ :legacy/plausible-secret-fixture-required? true
+
+ :inventory/allowed-statuses #{:conformant :migration-gap :unverified}
+ :inventory/workspace-passkey-only-claim? false
+ :inventory/exclusions
+ #{:external-specification-mirror
+   :protocol-library
+   :test-fixture
+   :post-auth-notification
+   :post-auth-connectivity}
+
+ :inventory/surfaces
+ [{:project "app-auth"
+   :path "orgs/cloud-itonami/app-auth"
+   :role :authority
+   :active-methods #{:webauthn-passkey}
+   :status :conformant
+   :security-policy "SECURITY.md"
+   :evidence "built Worker negative tests and deployed auth.itonami.cloud route probes"}
+
+  {:project "cloud-itonami"
+   :path "orgs/network-awai/cloud-itonami"
+   :role :combined-authority-and-service
+   :active-methods #{:webauthn-passkey}
+   :legacy-code #{:email-link :password}
+   :status :migration-gap
+   :security-policy "SECURITY.md"
+   :evidence "legacy Email and initial-password code remains pending closure and negative verification"}
+
+  {:project "cloud-itonami-app"
+   :path "orgs/cloud-itonami/cloud-itonami-app"
+   :role :client
+   :active-methods #{:webauthn-passkey}
+   :status :unverified
+   :security-policy "SECURITY.md"
+   :evidence "policy alignment does not by itself prove current built and live route closure"}
+
+  {:project "authn"
+   :path "orgs/net-kotobase/authn"
+   :role :authority
+   :active-methods #{:webauthn-passkey}
+   :status :unverified
+   :security-policy "SECURITY.md"
+   :evidence "auth.kotobase.net requires current source, artifact, and live negative verification"}
+
+  {:project "app-kotoba-cloud"
+   :path "orgs/kotoba-lang/app-kotoba-cloud"
+   :role :client-and-public-surface
+   :active-methods #{:webauthn-passkey}
+   :status :unverified
+   :security-policy "SECURITY.md"
+   :evidence "auth.kotoba.cloud requires current source, artifact, and live negative verification"}]}
