@@ -2418,11 +2418,29 @@ green にできない。
 **この節に測定値を書き足さないこと** —— 直近 3 回の陳腐化はすべて「日付付きで値を書いた」
 ことが原因で、引用する側は日付を落とす。
 
-可搬 stdlib は `kotoba-lang/lang/stdlib/core.kotoba`（`compile --prelude` で明示取り込み）。
-`select-keys` `merge` `update` `group-by` `every?` `some` `concat` `comp2` `partial1` 等は
-**在る**。無いのは `get-in` `sort-by` `juxt` `mapv` `keep` `remove` `for` と `str/*` 全般。
+可搬 stdlib は `kotoba-lang/lang/stdlib/core.kotoba`。`select-keys` `merge` `update`
+`group-by` `every?` `some` `concat` `comp2` `partial1` 等は**在る**。無いのは `get-in`
+`sort-by` `juxt` `mapv` `keep` `remove` `for` と `str/*` 全般、そして**バイト走査**
+（`skip-spaces` / `digit?` / 大小無視比較のような、行指向プロトコルが必ず要るもの）。
 **「stdlib に無い」と言う前にこのファイルを引く**（索引を引いてから「無い」と言う規則が、
 repo だけでなく言語の stdlib にも当たる）。
+
+⚠ **`compile --prelude` で取り込めると書いてあったのは誤り**（2026-08-30 に訂正）。
+`--prelude` を読むのは **CLJS backend だけ**で、`kotoba.compiler.nbb.*` の entry point は
+どれもパースしない。実測（amu `2cb7d3f`、JDK 無し）: stdlib 専用の名前（`comp2` /
+`stdlib-binary-closure-anchor`）を単一ファイルで呼ぶと `:subset-reject`、**`--prelude` を
+付けても一字一句同じ拒否**。`grep -c prelude` は wasm_cli / x86_64_cli / aarch64_cli とも 0。
+つまり**フラグは黙って無視され、他の経路では緑を返していた**。amu#709 で exit 64 に
+fail-closed 化した。
+
+**したがって単一ファイルの guest は stdlib を引けない。** 共有する経路は project route
+（`--source-path` / `--module-lock`）だけで、それは CLI では JVM 経由になる（`bin/amu` の
+`nbbNativeEligible` が project mode を弾く）。**Q9 は JVM build 依存を禁じているので、
+JVM-free を保つ単一ファイル guest は、必要な小さなヘルパを自前で持つしかない。**
+これは規律の失敗ではなく道具の穴である —— 実測 2026-08-30、`org-ietf-smtp` /
+`org-ietf-pop3` / `org-ietf-imap` の 3 repo が同じバイト走査（空白送り・数字判定・
+大小無視比較）を**別々の名前で 3 回**書いている。重複を「まとめろ」と指示する前に、
+`compile --module-lock` が非 JS target を受けるか、nbb 側に linker が来るかを確かめること。
 
 ## design system（css / html / shitsuke / liquid-glass-ui / kotoba-ui）は `.kotoba` 移行対象（オーナー判断 2026-07-27、ADR-2607270100 §10）
 
