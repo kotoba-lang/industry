@@ -29,6 +29,8 @@
    "adr-2608291057-murakumo-model-api-authentication-boundary"]
   :adr/evidence
   ["live 2026-08-30: GET https://murakumo.cloud/ 200、h1 は『AI を、所有できるインターネットへ。』、strap は WEB3-NATIVE AI COMPUTE / x402 · USDC · Base / DID · CIDv1"
+   "live 2026-08-30: Base の treasury `0xA00366…D4E` は **contract が deploy 済み**（`eth_getCode` が Safe proxy の bytecode を返す）で、USDC を **10.21** 保持している。`x402_offer.cljc` の docstring にある『Base に contract が無いので送られた USDC は使えない』は**古い**"
+   "cloud-murakumo/src/cloud_murakumo/x402_offer.cljc の `bundle-output-tokens` = 25,000 は 1,000,000 ÷ 40 で、40 credits/Mtok-out は **murakumo-main の掲示価格**（murakumo/resources/prices.edn）。つまり x402 の $0.01 が買う量は fleet 自前モデルの価格から導かれている"
    "live 2026-08-30 —— **今日の production は黙って差し替えている**: POST https://api.murakumo.cloud/v1/chat/completions に model=anthropic/claude-sonnet-4.6 を送ると HTTP 200 が返り、応答の model は murakumo-main、system_fingerprint は b9334-192d8ae8b（llama.cpp）。Claude を頼んで Qwen が答えており、呼び出し元にはその事実がどこにも出ない"
    "live 2026-08-30: GET https://api.murakumo.cloud/v1/models 200 —— 6 件すべて owned_by=murakumo の bare id（murakumo-main, murakumo-edge, qwen3.8-27b-*）。publisher-namespaced id は 0 件"
    "live 2026-08-30: GET https://api.murakumo.cloud/infer/models/murakumo-main → alias-for=qwen3.8-27b, status=serving, context=262144"
@@ -131,6 +133,47 @@ default endpoint に落とすので、**Claude を頼んだ呼び出し元に Qw
 その事実は応答のどこにも出ない**（`model` フィールドを読み比べない限り）。
 この変更が 402/503 を返すようにするのは、機能を塞ぐためではなく、
 **既に起きている嘘を止めるため**である。
+
+### 5. relay する model は、価格を付けるまで売らない（2026-08-30 追記）
+
+オーナー指示「x402 課金をちゃんと統合して」を実装して分かったこと。
+
+`x402_offer.cljc` は x402 の 1 リクエストを **25,000 出力トークン**で打ち切る。その数は
+`1,000,000 ÷ 40` で、40 credits/Mtok-out は **murakumo-main の掲示価格**である。
+docstring 自身が「超えた分は原価割れになる」と上限の理由を書いている。
+
+**この導出は、モデルが murakumo-main でなくなった瞬間に黙って成り立たなくなる。**
+上流で桁違いの単価が付く frontier model に同じ $0.01 を当てると、同じ 25,000 トークンが
+operator の上流アカウントに他人の価格で請求される。
+
+したがって:
+
+- **`:x402-settled` を `paying-identities` に入れない。** あの集合は『後から請求できて
+  失効させられる principal』であり、settled な x402 は **定額前払い**で、何を買えたかは
+  どのモデルに使ったかで決まる。`prepaid-allowance` がそれを計算する
+  （$15/Mtok-out のモデルなら $0.01 = **666** トークンであって 25,000 ではない）。
+  端数は **切り捨て** —— 切り上げは operator が差額を払うことになる。
+- **価格は prepaid だけでなく全 rail で必須。** x402 だけを縛りたくなるが、
+  `/v1/chat/completions` にも `/v1/messages` にも**リクエスト単位の課金は 1 つも
+  走っていない** —— 身元のある呼び出し元は*身元がある*だけで*課金されていない*。
+  価格の無い relay モデルは operator から要求者への**上限の無い移転**で、
+  要求者が誰かはその上限を決めない。価格を付けることが operator の『これを売る』
+  という意思表示なので、未価格は **503**（呼び出し元が何を払っても解決しない）。
+- したがって実際のスイッチは `MURAKUMO_EXTERNAL_PRICES` であって API キーではない。
+  **キーだけでは何も売られない。**
+
+⚠ **未解決の穴を明記する。** cloud-murakumo の x402 gate は
+`murakumo.cloud/x402/v1/chat/completions` に居て、決済後に shared token で
+api.murakumo.cloud へ proxy する。**したがって settled な x402 呼び出しは
+local-murakumo には `:shared-token` として届き、prepaid の上限は適用されない。**
+モデルに価格を付けた時点で、$0.01 の支払いが公開上限 16,384 トークンを引ける。
+塞ぐには cloud-murakumo が (a) namespaced model を prepaid rail で拒否するか
+(b) 決済額を転送する必要がある。**それまでは、x402 proxy が live な状態で
+external model に価格を付けると、flat bundle の値段で売ることになる。**
+
+`chat-completions-route` は prepaid の上限を**わざと参照していない** —— その分岐は
+この Worker に届かないので、nil しか返せない呼び出しを書けば『効いていない検査』を
+1 つ増やすことになる（ADR-2608136000 の 4 問目）。コメントで穴を名指しするに留めた。
 
 ### 5. web3 first —— card は代替であって前提ではない
 
