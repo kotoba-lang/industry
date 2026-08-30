@@ -1310,6 +1310,26 @@
    :script "gates/adr-identity-check.cljs" :script-args ["--min" "1400"]
    :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
 
+  ;; itonami-coverage.datoms.edn は `[ {…} {…} ]` という **1 個の** top-level form
+  ;; でなければならない。2026-08-30、2 つの scout commit が閉じ括弧 `]` の**後ろ**に
+  ;; entity を追記し、`edn/read-string` は最初の form だけを返して成功したので、
+  ;; **4 entity がどの consumer からも見えないまま**ファイルは「読める」ままだった。
+  ;; うち 2 つは既に中に在る code の再追加で、それが `grep` にだけ重複として映った。
+  ;;
+  ;; 2026-08-21 の PR #2689「remove duplicate itonami coverage entries」が同じ形を
+  ;; 一度掃除している。**掃除だけして検査を置かなかったので再発した。**
+  ;; scout の prompt は "the gate will reject re-adding a class that now has a
+  ;; project" と書いているが、そう書いた時点でこのファイルを見る gate は無かった。
+  ;;
+  ;; gate は entity 数を 2 通りに数えて突き合わせる（text 中の列 0 の `{:db/id` と
+  ;; reader が返した数）。片方だけでは「読めた」と「全部読めた」が区別できない。
+  ;; :min-files 1 は絞り込みが壊れて空 tree を「違反 0 件 = 合格」にしないための床で、
+  ;; gate 側も入力が無ければ exit 2（0 でも 1 でもない = 答えられなかった）で終わる。
+  {:id "root-itonami-coverage"
+   :name "root" :org "com-junkawasaki" :gate :nbb-script
+   :script "gates/itonami-coverage-check.cljs"
+   :include-ext [".edn" ".cljs"] :min-files 1 :cd false}
+
   ;; The orgs-detector registry admits, checked HERE instead of six hours later
   ;; on a machine nobody is watching. That tick refuses EVERY detector when one
   ;; entry lacks a mandatory field, and when it does, its state file simply

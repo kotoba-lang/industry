@@ -45,6 +45,18 @@ in the file shows the shape.
 - Never remove or edit an existing entry. Entries are deleted when their gap
   closes, and the gate will reject re-adding a class that now has a project —
   so a gap that closed needs no action from you.
+- **Append INSIDE the vector, before the final `]`, never at the end of the
+  file.** The whole file is one `[ {…} {…} ]` form. A map written after the
+  closing bracket is a second top-level form, and `clojure.edn/read-string`
+  returns only the first — so the entry parses, the file looks fine, and no
+  consumer ever sees it. Measured 2026-08-30: two runs appended past the `]` and
+  four entries went invisible, two of which were re-adds of codes already in the
+  file. `scripts/fleet-ci/gates/itonami-coverage-check.cljs` now counts entities
+  two ways and fails on the mismatch.
+- **Read the codes already in the file and skip any you would re-add.** A second
+  entry for a code that is already present is a duplicate even when you reword
+  `:coverage/note` — the note is not the identity, `:coverage/code` is. PR #2689
+  cleaned this class up once already; it came back because nothing checked.
 - Never edit `manifest/west.yml`, `manifest/repos.edn`, or anything under
   `orgs/` — the superproject's `orgs/` is a shared checkout other sessions work
   in, and west.yml is generated.
