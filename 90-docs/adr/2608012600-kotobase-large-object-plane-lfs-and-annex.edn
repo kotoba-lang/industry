@@ -40,7 +40,7 @@
   :adr/body
   "# ADR-2608012600: 大容量オブジェクト面は1つ、protocol adapter は2つ
 
-**Status**: accepted（G0 着地。**G1 は provider 半分のみ着地** — 2026-08-04、下記「現在地」。grant endpoint と server-side verify は未着手で、**live の `PUT /ipfs/:cid` は 4 MiB のまま**。現に動いている経路は directory store と B2 S3 special remote のままで、この ADR はそれを止めない）
+**Status**: accepted（G0 着地。**D4 の grant endpoint は着地・deploy 済み** — 2026-08-30 実測: `POST /objects/v1/grant/{upload,download,remove}` と `POST /objects/v1/settle` が live で routing され、未認証で 401 / 403 の fail-closed を返す。presigned URL なので GB 級が Worker を通らない。**server-side verify は未着手**（`handle-settle` は `:digest-verified? false` を渡し `:client-attested` / `:stored` で止まる — サーバは bytes を hash していないので、していないと言う）。`PUT /ipfs/:cid` の 4 MiB は残るが、これは grant 面の**隣に意図的に残した in-path 経路の性質**であって未完了項目ではない。annex 側で現に動いている経路は directory store と B2 S3 special remote のまま。⚠ **この行は 2026-08-04 の測定値のまま 2026-08-30 まで「grant endpoint 未着手」と読まれ、ADR-2608301039 初版の実装順序を誤らせた** — status 行は測定日の値であって現在地ではない。現在地はコードに訊く）
 **Date**: 2026-08-01
 
 ## Context — 今どこにいるか（実コードで確認した現在地）
