@@ -3833,4 +3833,160 @@
      :find "(str (str/upper-case (subs s 0 1)) (subs s 1))"
      :replace "(str/capitalize s)"
      :must-fail ["the-derivation-is-not-vacuous"]}]}
+
+  {:repo "orgs/cloud-itonami/business-person"
+   :label "business-person planner: the gate, the envelope, the record key, and the manifest it must match"
+   ;; src/business_person/murakumo.cljc is .cljc and had never been executed on
+   ;; any runtime — the repo had no tests, no deps.edn, no nbb.edn. Every claim
+   ;; about its gate was true only by inspection.
+   ;;
+   ;; All 18 were replayed by hand at pin 3edd2b8f on 2026-08-30 before landing,
+   ;; one at a time with the tree restored between runs: every anchor unique,
+   ;; every bite naming exactly the test that claims it and nothing else, base
+   ;; green before the battery and after it.
+   ;;
+   ;; The first mutation written for `an-attestation-recorded-as-false-...` did
+   ;; NOT bite. It aimed at `missing-gates`, whose `boolean` is redundant —
+   ;; `gate-value`'s `or` chain has already turned an explicit false into nil,
+   ;; so `boolean` and `some?` are equivalent there. The suite stayed green,
+   ;; which is exactly what a vacuous test looks like from outside. The
+   ;; registered mutation aims at `gate-value`, where the floor actually lives.
+   ;;
+   ;; Three tests are named hazard-* and pin DEFECTS, not guarantees: the rkey
+   ;; collision, the caller-overwritable record body, and the DID document that
+   ;; does not claim the DID this actor stamps. Their mutations are therefore
+   ;; *fixes* — they go red when somebody repairs the defect, which is the
+   ;; moment the test and the mutation should both be deleted.
+   :cmd ["nbb" "test/run.cljs"]
+   :green-marker "business-person: all green"
+   :mutations
+   [{:id :bp/an-attested-gate-is-normalised-to-true
+     :why "an attestation recorded as false must not be read as attested. The floor is gate-value's `or`, not missing-gates' `boolean` — this normalises the lookup to a bare true and the false answer becomes a yes"
+     :file "src/business_person/murakumo.cljc"
+     :find "  (or (get attestations gate)\n      (get attestations (name gate))"
+     :replace "  (or (when (some? (get attestations gate)) true)\n      (get attestations (name gate))"
+     :must-fail ["an-attestation-recorded-as-false-does-not-count-as-attested"]}
+
+    {:id :bp/a-baseline-gate-is-dropped
+     :why "dropping a gate from common-gates shrinks BOTH the required set and the expected set, so every set-equality assertion follows it down. Only the evidence floor on the count catches this"
+     :file "src/business_person/murakumo.cljc"
+     :find "[:council-charter-attestation\n   :no-platform-held-key-baseline\n   :no-probing-baseline\n"
+     :replace "[:council-charter-attestation\n   :no-platform-held-key-baseline\n"
+     :must-fail ["the-planner-still-has-something-to-plan"]}
+
+    {:id :bp/one-cell-quietly-requires-fewer-gates
+     :why "the gate weakened for one cell out of twelve, which the fleet-wide count cannot see"
+     :file "src/business_person/murakumo.cljc"
+     :find "  :koji {:legacy-cell \"koji\"\n     :phase :event\n     :murakumo-node \"reuben\"\n     :collections [(collection \"koji\")]\n     :required-gates common-gates"
+     :replace "  :koji {:legacy-cell \"koji\"\n     :phase :event\n     :murakumo-node \"reuben\"\n     :collections [(collection \"koji\")]\n     :required-gates (vec (rest common-gates))"
+     :must-fail ["every-cell-requires-every-common-gate"]}
+
+    {:id :bp/blocked-plan-still-carries-records
+     :why "a refusal that still hands back a planned :records body is a refusal a caller can walk around by not reading :status"
+     :file "src/business_person/murakumo.cljc"
+     :find "         {:status :blocked\n          :effects []}"
+     :replace "         {:status :blocked\n          :effects []\n          :records (vec (records-for spec input))}"
+     :must-fail ["a-blocked-plan-carries-no-records-and-no-effects"]}
+
+    {:id :bp/unknown-cell-returns-nil-instead-of-refusing
+     :why "returning nil for an unknown cell key makes a typo indistinguishable from a cell that planned nothing — and the nil spec then plans :ready with no gates at all"
+     :file "src/business_person/murakumo.cljc"
+     :find "    (when-not spec\n      (throw (ex-info \"unknown cell\" {:cell cell-key})))"
+     :replace "    (when-not spec\n      nil)"
+     :must-fail ["an-unknown-cell-is-refused-rather-than-planned"]}
+
+    {:id :bp/effect-envelope-takes-the-actor-from-the-record
+     :why "the envelope's :actor is the one field a caller must not be able to reach. Sourcing it from the record body hands the actor's identity to its input"
+     :file "src/business_person/murakumo.cljc"
+     :find "{:op :mst/put-record\n   :actor actor-did"
+     :replace "{:op :mst/put-record\n   :actor (or (:actorDid record) actor-did)"
+     :must-fail ["a-caller-cannot-redirect-an-effect-envelope"]}
+
+    {:id :bp/record-body-loses-the-actor-stamp
+     :why "a record with no actorDid is a record nobody can attribute"
+     :file "src/business_person/murakumo.cljc"
+     :find "        base {:actorDid actor-did\n              :computedAt computed-at"
+     :replace "        base {:computedAt computed-at"
+     :must-fail ["a-planned-record-carries-the-cells-own-provenance"]}
+
+    {:id :bp/all-cell-plans-covers-only-the-first-cell
+     :why "a planner that silently covers one cell of twelve reports success for eleven it never looked at"
+     :file "src/business_person/murakumo.cljc"
+     :find "        (keys cell-specs)))"
+     :replace "        (take 1 (keys cell-specs))))"
+     :must-fail ["all-cell-plans-covers-every-cell-and-each-plan-names-its-own-cell"]}
+
+    {:id :bp/rkey-lets-a-path-separator-through
+     :why "a slash in a record key is not a degraded key, it is a different AT-URI path"
+     :file "src/business_person/murakumo.cljc"
+     :find "(str/replace #\"[^A-Za-z0-9._~-]\" \"-\"))]"
+     :replace "(str/replace #\"[^A-Za-z0-9._~/-]\" \"-\"))]"
+     :must-fail ["safe-rkey-emits-only-atproto-legal-record-key-characters"]}
+
+    {:id :bp/rkey-blank-fallback-removed
+     :why "without the fallback an empty identifier yields an empty rkey, which is a malformed path rather than an anonymous record. Named twice because an empty string also fails the legality regex"
+     :file "src/business_person/murakumo.cljc"
+     :find "    (if (str/blank? clean) \"unknown\" clean)))"
+     :replace "    clean))"
+     :must-fail ["safe-rkey-never-emits-an-empty-record-key"
+                 "safe-rkey-emits-only-atproto-legal-record-key-characters"]}
+
+    {:id :bp/did-web-strip-is-unanchored
+     :why "the strip is anchored because did:web: appearing later in an identifier is data, not a prefix. Unanchored, it deletes from the middle"
+     :file "src/business_person/murakumo.cljc"
+     :find "(str/replace #\"^did:web:\" \"\")"
+     :replace "(str/replace #\"did:web:\" \"\")"
+     :must-fail ["safe-rkey-strips-the-did-web-prefix-only-at-the-start"]}
+
+    {:id :bp/a-cell-writes-to-a-hand-edited-nsid
+     :why "an NSID written out by hand instead of derived from the cell key does not fail here — the record lands in a collection nobody reads"
+     :file "src/business_person/murakumo.cljc"
+     :find ":collections [(collection \"person\")]"
+     :replace ":collections [(collection \"persons\")]"
+     :must-fail ["every-cell-writes-to-the-nsid-derived-from-its-own-key"]}
+
+    {:id :bp/a-cell-is-renamed-without-the-manifest
+     :why "the manifest subscribes to twelve things and the planner plans twelve things; rename one side and the actor stops covering a collection it is subscribed to. That does not fail here, it stalls in the broker"
+     :file "src/business_person/murakumo.cljc"
+     :find ":officerrole {:legacy-cell \"com-etzhayyim-apps-businessPerson-officerRole\""
+     :replace ":officerrole {:legacy-cell \"com-etzhayyim-apps-businessPerson-officerRoles\""
+     :must-fail ["the-twelve-cells-are-exactly-the-manifests-collections-and-loops"
+                 "the-cell-key-is-derived-from-its-legacy-cell-name"]}
+
+    {:id :bp/manifest-loses-a-subscribed-collection
+     :why "the other direction: the manifest drops a collection the planner still serves"
+     :file "actor-manifest.jsonld"
+     :find ",\n        \"com.etzhayyim.apps.businessPerson.collectionJob\""
+     :replace ""
+     :must-fail ["the-manifest-still-declares-something-to-check"
+                 "the-twelve-cells-are-exactly-the-manifests-collections-and-loops"]}
+
+    {:id :bp/manifest-actor-did-drifts-from-the-code
+     :why "the DID stamped on every record and the DID the manifest declares are the same string in two files, with nothing holding them together"
+     :file "actor-manifest.jsonld"
+     :find "\"@id\": \"did:web:business-person.etzhayyim.com\","
+     :replace "\"@id\": \"did:web:business-person.etzhayyim.example\","
+     :must-fail ["code-and-manifest-name-the-same-actor-did"]}
+
+    ;; ── the three hazard tripwires. These mutations are FIXES. ──────────────
+    {:id :bp/rkey-collapse-changes-shape
+     :why "hazard tripwire. safe-rkey collapses every non-[A-Za-z0-9._~-] character to a single dash and checks str/blank? afterwards, so equal-length non-ASCII identifiers share an rkey and put-record overwrites. Collapsing runs instead is one plausible repair; either way the hazard test must notice"
+     :file "src/business_person/murakumo.cljc"
+     :find "(str/replace #\"[^A-Za-z0-9._~-]\" \"-\"))]\n    (if"
+     :replace "(str/replace #\"[^A-Za-z0-9._~-]+\" \"-\"))]\n    (if"
+     :must-fail ["hazard-safe-rkey-collapses-distinct-identifiers-onto-one-key"]}
+
+    {:id :bp/record-merge-order-protects-the-stamp
+     :why "hazard tripwire, and the actual repair: merging the caller's record BEFORE base makes :actorDid, :$type, :scaffold and :constitutionalStatus unspoofable in the record body. When this lands for real, delete the hazard test and this mutation"
+     :file "src/business_person/murakumo.cljc"
+     :find "(merge {:$type coll}\n                            base\n                            (or (get input-records coll)\n                                (get input-records idx)\n                                {}))"
+     :replace "(merge {:$type coll}\n                            (or (get input-records coll)\n                                (get input-records idx)\n                                {})\n                            base)"
+     :must-fail ["hazard-a-caller-supplied-record-overwrites-the-actor-stamp-in-the-body"]}
+
+    {:id :bp/served-did-document-is-reconciled
+     :why "hazard tripwire. .well-known/did.json identifies itself as did:web:etzhayyim.com:actor:business-person while the planner stamps did:web:business-person.etzhayyim.com and the document does not list it in alsoKnownAs. Which side moves is an ownership decision; this fires whichever side moves first"
+     :file ".well-known/did.json"
+     :find "\"id\" : \"did:web:etzhayyim.com:actor:business-person\","
+     :replace "\"id\" : \"did:web:business-person.etzhayyim.com\","
+     :must-fail ["hazard-the-served-did-document-does-not-claim-the-did-this-actor-stamps"]}]}
 ]}
