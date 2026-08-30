@@ -1,0 +1,107 @@
+#!/usr/bin/env nbb
+;; hyakka-notability-audit — decision-free audit of the wiki's entity sources.
+;;
+;; Kotoba-family implementation, on the kotoba seam: request construction and
+;; URL parsing come from `kotoba.lang.http` (pure, .cljc, compile-free), body
+;; decoding from `kotoba.lang.json`, and the ONLY host-specific code is the
+;; Node fetch transport below — which is exactly where kotoba.lang.http's
+;; IHttp protocol says transport belongs (host-injected; capability-http-fetch
+;; is still :contract-only, so nbb bots carry their own thin adapter).
+;;
+;; Runs with --no-agent (the .sh wrapper is the cron job): stdout is delivered
+;; verbatim. It reports:
+;;   1. source counts and distinct Wikidata QIDs (duplicate :id/:url/QID are
+;;      the classic failure once bots add sources — made visible here);
+;;   2. live sitelink counts for up to 20 configured QIDs, so drift toward
+;;      under-covered entities shows up in the delivery.
+;;
+;; Exit 0 unless the config cannot be read (REFUSED-shaped line). Network
+;; failure degrades the sitelink sample to a skip line, never to an error.
+(ns hyakka-notability-audit
+  (:require [clojure.string :as str]
+            ["node:fs" :as fs]
+            [kotoba.lang.http :as http]
+            [kotoba.lang.json :as json]))
+
+(def user-agent "hyakka-notability-audit/0.1 (+https://wiki.kotobase.net)")
+(def timeout-ms 30000)
+
+;; ---------- Node host transport (the IHttp seam, nbb/Node edition) ----------
+
+(defn fetch-json!
+  "Perform a kotoba.lang.http request map with the Node host transport.
+  Returns a promise of decoded body. GET only, which is all this audit needs."
+  [req]
+  (-> (js/fetch (:http/url req)
+                #js {:method "GET"
+                     :headers #js {"User-Agent" user-agent}
+                     :signal (js/AbortSignal.timeout timeout-ms)})
+      (.then #(.text %))
+      (.then #(json/decode %))))
+
+(defn query-url
+  "kotoba.lang.http gives parse-url but no query encoder (minimal by design),
+  so the audit builds its own query string, then validates with parse-url."
+  [base params]
+  (let [enc js/encodeURIComponent
+        q (str/join "&" (map (fn [[k v]] (str (enc k) "=" (enc v))) params))
+        url (str base "?" q)]
+    ;; parse-url throws on a malformed url — let that be the audit's config
+    ;; sanity check rather than a fetch failing late with a confusing error.
+    (http/parse-url url)
+    url))
+
+;; ---------- the audit (no decisions, only reports) ----------
+
+(defn qids-from-config [text]
+  (->> (re-seq #":url \"([^\"]+)\"" text)
+       (map second)
+       (filter #(str/includes? % "Special:EntityData/"))
+       (mapcat #(re-seq #"Q\d+" %))
+       vec))
+
+(defn report! []
+  (let [config-path (or (first *command-line-args*)
+                        "config/knowledge-ingest.edn")]
+    (when-not (fs/existsSync config-path)
+      (println (str "REFUSED — no config readable at " config-path))
+      (js/process.exit 0))
+    (let [text (fs/readFileSync config-path "utf8")
+          ids (map second (re-seq #":id \"([^\"]+)\"" text))
+          urls (map second (re-seq #":url \"([^\"]+)\"" text))
+          qids (qids-from-config text)
+          dup-qids (->> qids (group-by identity)
+                        (filter #(> (count (second %)) 1))
+                        (map first) sort)
+          sample (vec (take 20 (sort (distinct qids))))]
+      (println (str "sources-total\t" (count ids)))
+      (println (str "sources-duplicate-ids\t" (- (count ids) (count (distinct ids)))))
+      (println (str "sources-duplicate-urls\t" (- (count urls) (count (distinct urls)))))
+      (println (str "wikidata-entity-sources\t"
+                    (count (filter #(str/includes? % "Special:EntityData/") urls))))
+      (println (str "wikidata-distinct-qids\t" (count (distinct qids))))
+      (when (seq dup-qids)
+        (println (str "wikidata-duplicate-qids\t" (str/join "," dup-qids))))
+      (if (seq sample)
+        (-> (fetch-json!
+             (http/request :get
+                           (query-url "https://www.wikidata.org/w/api.php"
+                                      {"action" "query"
+                                       "titles" (str/join "|" sample)
+                                       "prop" "pageprops"
+                                       "format" "json"})))
+            (.then (fn [data]
+                     (let [pages (-> (get-in data ["query" "pages"])
+                                     js->clj vals)]
+                       (doseq [p pages]
+                         (when-some [links (get-in p ["pageprops" "wb-sitelinks"])]
+                           ;; Value is a STRING here ("301"), not an int. Key is
+                           ;; "wb-sitelinks", not "wikibase_sitelinks" (measured).
+                           (println (str "sitelinks\t" (get p "title") "\t" links))))
+                       (println (str "sitelinks-sampled\t" (count pages))))))
+            (.catch (fn [e]
+                      (println (str "sitelinks-sampled\t0\tskip\t"
+                                    (or (.-message e) (str e)))))))
+        (println "sitelinks-sampled\t0\tno-wikidata-sources")))))
+
+(report!)
