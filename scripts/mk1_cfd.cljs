@@ -1,0 +1,151 @@
+#!/usr/bin/env nbb
+;; mk1_cfd.cljs — 叢雲 MK-1 筐体の内部流を、検証済み D3Q19 LBM
+;; (kotoba-lang/kami-engine-cfd の `kami-cfd.duct`)で解き、結果を
+;; `90-docs/hardware/mk1-cfd.edn` に落とす。
+;;
+;; 2026-08-30: JVM 版 (mk1_cfd.clj) を nbb へ移植。`kami-cfd.duct` は portable
+;; .cljc なのでそのままロードできる（旧版のコメントにあった「nbb では分オーダー」
+;; は SCI が速くなった今日では validate-poiseuille 1 回 62 秒で収まる。ただし
+;; 本ケース (約 3.4 万セル × 最大 3 万 step) は実測数時間級 — 下の MK1_CFD_SMOKE
+;; を参照。数値本体を amu wasm32 に降すのは別作業（kami-cfd.duct 自体の
+;; amu 適合は別途確認が要る）で、この移植は JVM 依存の除去が目的）。
+;;
+;; **MK1_CFD_SMOKE=1 で小さな検証ケースだけを回す**（64x8x32 ≈ 1.6 万セルの
+;; ドライラン。フルケースは環境変数 MK1_CFD_FULL=1）。
+(ns mk1-cfd
+  (:require [kami-cfd.duct :as duct]
+            [clojure.edn :as edn]
+            [clojure.string :as str]
+            [cljs.pprint :refer [pprint]]
+            [scripts.nbb-compat :refer [format slurp spit]]
+            ["node:fs" :as fs]
+            ["node:path" :as path]))
+
+;; superproject root は引数で受ける(既定 ".")。
+(def ^:dynamic *root* ".")
+(defn- assembly-path [] (str *root* "/90-docs/hardware/mk1-assembly.edn"))
+(defn- out-path [] (str *root* "/90-docs/hardware/mk1-cfd.edn"))
+
+;; 旧版と同一のパラメータ（経緯は旧版コメント / git 履歴参照）。
+(def ^:private cell-mm 6.0)
+(def ^:private max-steps 30000)
+(def ^:private check-every 100)
+(def ^:private rel-tol 1.0e-4)
+(def ^:private u-lat 0.05)
+(def ^:private nu-lat 0.02)
+(def ^:private u-phys-ms 3.0)
+
+(defn- mm->cell [mm] (long (Math/floor (/ (double mm) cell-mm))))
+
+(defn- load-placement []
+  (let [d (edn/read-string (slurp (assembly-path)))
+        {:keys [inner-mm wall-mm]} (:mk1/enclosure d)
+        w (double wall-mm)]
+    {:inner inner-mm
+     :wall w
+     :boxes (mapv (fn [{:keys [part aabb-mm]}]
+                    (let [[mn mx] aabb-mm]
+                      {:part part
+                       ;; 筐体内寸座標へ移す(壁厚を引く)
+                       :lo (mapv #(mm->cell (- (double %) w)) mn)
+                       :hi (mapv #(mm->cell (- (double %) w)) mx)}))
+                  (:mk1/placement d))
+     :heat-w (:heat-w (:mk1/sim d))}))
+
+(defn -main [& args]
+  (binding [*root* (or (first args) ".")]
+   (let [{:keys [inner wall boxes heat-w]} (load-placement)
+         smoke? (some? (aget (.-env js/process) "MK1_CFD_SMOKE"))
+         ;; smoke: ドライラン用に薄いドメイン。
+         [ix iy iz] (if smoke?
+                      [64 8 32]
+                      (mapv #(mm->cell %) inner))
+         _ (println (str "domain " ix " x " iy " x " iz " cells (" cell-mm " mm/cell) = " (* ix iy iz) " cells"))
+         solid-boxes (mapv (fn [{:keys [lo hi]}] [lo hi]) boxes)
+         dom (duct/domain ix iy iz (duct/boxes->solid-fn solid-boxes))
+         _ (println (str "solid cells " (:solid-count dom)
+                      " (" (* 100.0 (/ (double (:solid-count dom)) (* ix iy iz))) "% of domain)"))
+         gpu (first (filter #(= "gpu-b70" (:part %)) boxes))
+         gx0 (nth (:lo gpu) 0) gx1 (nth (:hi gpu) 0)
+         gy0 (nth (:lo gpu) 1) gy1 (min (nth (:hi gpu) 1) (dec iy))
+         lbm0 (duct/duct-new
+               dom {:nu nu-lat :u0 u-lat
+                    ;; 背面 GPU スロット = blower。inward normal は +z なので
+                    ;; 外向き(吸い出し)は負の u。
+                    :patches [(duct/patch :z-min :inlet
+                                          (fn [x y] (and (>= x gx0) (<= x gx1)
+                                                         (>= y gy0) (<= y gy1)))
+                                          (- u-lat))
+                              ;; 前面 passive メッシュ = 大気開放
+                              (duct/patch :z-max :outlet
+                                          (fn [x _] (< x gx0)) nil)]})
+         _ (println (str "running until steady (max " max-steps ", check every " check-every ")..." (if smoke? " [SMOKE]" "")))
+         t0 (.now js/Date)
+         conv (duct/run-until-steady lbm0 {:rel-tol rel-tol :max-steps (if smoke? 200 max-steps)
+                                           :check-every check-every})
+         lbm (:lbm conv)
+         secs (/ (- (.now js/Date) t0) 1000.0)
+         fin (duct/patch-flux lbm :inlet)
+         fout (duct/patch-flux lbm :outlet)
+         stag (duct/stagnant-fraction lbm 0.10)
+         {:keys [q-m3s cfm]} (duct/lattice->cfm (Math/abs (double fin)) cell-mm u-lat u-phys-ms)
+         dt (duct/bulk-delta-t (double heat-w) q-m3s)
+         val (duct/validate-poiseuille)
+         result
+         {:solver "kami-cfd.duct (kotoba-lang/kami-engine-cfd)"
+          :lattice "D3Q19 BGK + Smagorinsky LES"
+          :runner "scripts/mk1_cfd.cljs (nbb)"
+          :domain-cells [ix iy iz]
+          :cell-mm cell-mm
+          :steps (:steps conv)
+          :convergence (:status conv)
+          :residual (:residual conv)
+          :residual-tol (:tol conv)
+          :rel-tol rel-tol
+          :solid-fraction (/ (Math/round (* 1000.0 (/ (double (:solid-count dom)) (* ix iy iz)))) 1000.0)
+          :inlet-flux-lattice fin
+          :outlet-flux-lattice fout
+          :q-m3s q-m3s
+          :cfm cfm
+          :stagnant-fraction stag
+          :heat-w heat-w
+          :bulk-delta-t-k dt
+          :u-phys-ms u-phys-ms
+          :validation-case "force-driven plane Poiseuille vs closed form"
+          :validation-l2 (:l2-rel val)
+          :validation-tol (:tol val)
+          :validation-pass (:pass? val)
+          :wall-clock-s secs
+          :mass-balance-residual (if (zero? fin) nil (Math/abs (/ (+ fin fout) fin)))
+          :caveats
+          ["部材は AABB の箱近似。ヒートシンクのフィン形状・コネクタの凹凸は無い。"
+           "格子収束確認(cell-mm を半分にして結論が変わらないこと)は未実施。"
+           "convergence が :max-steps なら流れ場はまだ変化中で、流束は暫定値。"
+           "入口風速 3.0 m/s は B70 blower の assumption。実機で風速計を当てて置き換える。"
+           "エネルギー方程式なし → 素子ジャンクション温度は出ない。bulk-delta-t-k は排気空気の上昇。"
+           "ケーブルは solid として入れていない(mk1-cad.cljs の 6c で別に経路判定)。"
+           "nbb (SCI) は JVM より遅い。フルケースの実行には実測で数時間を見ること。"]
+          :generated-by "scripts/mk1_cfd.cljs"}]
+     (println (str "inlet flux " fin " / outlet flux " fout " (lattice)"))
+     (println (str "-> " q-m3s " m3/s = " cfm " CFM"))
+     (println (str "stagnant fraction " stag))
+     (println (str "bulk dT " dt " K for " heat-w " W"))
+     (println (str "convergence " (name (:status conv)) " after " (:steps conv)
+                      " steps (residual " (:residual conv) ", tol " (:tol conv)
+                      " = " rel-tol " x u0)"))
+     (println (str "mass balance: |inlet+outlet| / |inlet| = "
+                      (if (zero? fin) "Infinity" (Math/abs (/ (+ fin fout) fin)))
+                      " (0 = perfect)"))
+     (println (str "poiseuille validation L2=" (:l2-rel val) " pass=" (:pass? val)))
+     (println (str "wall clock " secs " s"))
+     (fs/mkdirSync (path/dirname (out-path)) #js {:recursive true})
+     (spit (out-path)
+           (str ";; 生成物 — 手編集しない。再生成: MK1_CFD_SMOKE=1 nbb scripts/mk1_cfd.cljs <root> (smoke) / MK1_CFD_FULL=1 でフル\n"
+                ";; 検証: force-driven plane Poiseuille を閉形解と突き合わせ済み\n"
+                (with-out-str (cljs.pprint/pprint result))))
+     (println "wrote" (out-path)))))
+
+(let [argv (js->clj js/process.argv)
+      idx (first (keep-indexed (fn [i a] (when (str/ends-with? (str a) "mk1_cfd.cljs") i)) argv))]
+  (when idx
+    (apply -main (drop (inc idx) argv))))
