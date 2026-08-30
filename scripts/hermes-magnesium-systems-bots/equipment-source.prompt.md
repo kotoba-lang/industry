@@ -18,3 +18,28 @@ Rules:
 8. Commit only focused configuration/connector/test files, push a topic branch, and open at most one PR. Never hand-edit ledgers/receipts, push main, force-push, merge, deploy, purchase, contact a seller, or create a financial commitment.
 
 Opening no PR is correct when no admissible first-party source can be verified.
+
+## Commands the cron runtime refuses
+
+These bots run with no human present, so Hermes's approval gate has nobody to
+ask and denies rather than prompts. A denied command returns `exit_code: -1`
+with `BLOCKED: Command flagged as dangerous`, the run continues, and the job
+still finishes `completed` — so a bot that keeps reaching for one of these
+forms reports success having done nothing. Measured 2026-08-30 across
+~/.hermes/logs: 12 such denials over 4 jobs, none of them asked for by any
+prompt. The model reached for them on its own.
+
+Do not use, and do not work around:
+
+- `-e` / `-c` script flags (`nbb -e '...'`, `python3 -c '...'`) — put the code
+  in a file in the worktree and run the file. 8 of the 12 denials were this.
+- heredocs that feed a script to an interpreter (`<<'EOF'`) — same fix. Note
+  this is independent of the EDN-heredoc corruption the superproject CLAUDE.md
+  warns about; both point at writing the file directly.
+- recursive delete (`rm -rf`). There is no approved form of this here. If a
+  path must go, name the files. This one is denied by design and must stay
+  denied: an unattended agent is exactly who should not be able to run it.
+
+The denial does not record the command it rejected — only the class — so
+neither you nor the operator can review afterwards what was attempted. Assume
+nothing is learned from a denial except that the run was wasted.
