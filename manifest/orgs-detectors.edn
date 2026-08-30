@@ -2087,6 +2087,70 @@
               rounded it and that encoding it must be refused. Named in the script so
               nobody corrects a correct test."}
 
+  {:id       :verify-cljc-runtime-parity
+   :title    "portable .cljc that manipulates bytes and has never been run on ClojureScript"
+   :why      "2026-08-30. Over two days this workspace shipped 26 protocol codecs and hit
+              the SAME bug class eight times: `.cljc` byte code that passes on the JVM and
+              is silently wrong under ClojureScript. org-opcfoundation-ua's decode-int32
+              leaned on JS bit-or sign-extension; org-iso-8583's `(int c)` on a character
+              is a code point on JVM and a numeric-string parse in cljs, so a non-digit
+              became 0 and \"02A0\" passed as a valid MTI; org-ietf-diameter's
+              bytes->uint32 went NEGATIVE for any Application-Id above 0x7fffffff;
+              org-can-cia-canopen, org-ethercat and com-profibus-profinet each had the
+              identical u32 sign bug; org-lora-alliance-lorawan lost precision on 64-bit
+              DevEUI magnitudes; and org-amqp encoded the \"AMQP\" magic bytes as ZEROS in
+              PRODUCTION code.
+              Every one was caught only because the suite was run on both runtimes. Every
+              one was green on the JVM.
+              org-modbus's README names this trap explicitly, and the second wave walked
+              into it anyway -- which is the same shape as this workspace's standing
+              finding that a docstring is not read by the execution producing the wrong
+              answer. Prose did not prevent it. That is why this is a detector.
+              WHAT IT MEASURES: not the bug (a pattern rule for it is mostly false
+              positives -- `(int x)` on a number is fine). It measures the structural
+              precondition: a repo whose source is `.cljc` is CLAIMING it runs on both
+              runtimes; does it ever actually run on cljs? Signal A is error only when the
+              repo also does bit/byte work, because that is the population the eight
+              incidents came from. The rest is reported :info -- the portability claim is
+              still unverified there, but those repos cannot carry this bug class, and
+              burying 318 repos that can inside 2180 that mostly cannot is how a detector
+              gets ignored.
+              Signal B (risky constructs) is :warn and explicitly NOT presented as defects
+              -- measured false-positive rate about 1 in 3 on a hand-read sample, mostly
+              reader-conditional-guarded `mapv int` pairs the regex only half sees.
+              It cannot be a fleet gate: it reads orgs/, and a gate ships one repo's tree
+              (ADR-2608124800)."
+   :argv     ["nbb" "{{repo}}/scripts/verify-cljc-runtime-parity.cljs" "--root" "{{root}}" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 86400000
+   :timeout-ms  900000                  ; 15m -- ~24x the measured ~37s, all filesystem reads
+   :writes   :none
+   :measured "2026-08-30 by the orchestrator, re-run rather than taken from the building
+              subagent's report: exit 1, ~37s wall.
+              `SCANNED 4258 registered orgs/ checkouts present on disk and readable, of
+              4290 registered under orgs/ (32 not checked out -> UNVERIFIED, not scanned)`.
+              portable-claiming(.cljc)=3517; signal-a no-cljs-verification-path=2180, OF
+              WHICH DOING BYTE WORK=318 (the error set) and 1862 :info; signal-b
+              repos-with-hits=159, total-hits=352; unread-cljc-files=0.
+              Discrimination checked in both directions against the JSON output, not the
+              --findings text: the text output caps at 400 error lines sorted
+              alphabetically, so it never reaches orgs/kotoba-lang/* and absence from it
+              proves nothing -- I made exactly that mistake once while verifying this.
+              Eight controls that DO have a cljs runner are absent from
+              signal-a-error-repos: org-modbus, org-dnp3, org-amqp,
+              org-lora-alliance-lorawan, org-can-cia-canopen, org-ethercat,
+              com-profibus-profinet, org-ietf-diameter. org-ietf-srtp IS present, and its
+              own README says the ClojureScript path was not cross-verified.
+              Known limits, stated by the author: the walk covers src/ test/ tests/
+              scripts/ script/ plus root package.json/nbb.edn/shadow-cljs.edn, so a runner
+              in a nonstandard directory is missed and its repo is flagged undeservedly;
+              the presence test is an OR of heuristics reverse-engineered from six naming
+              conventions actually found here, and proves a runner EXISTS, never that it
+              is executed; signal-b's bit-composition rule is a line-window regex, not a
+              parser, and both misses and over-triggers."}
+
   {:id       :verify-protocol-lib-substance
    :title    "libraries that name a protocol and contain no wire code"
    :why      "2026-08-29. A survey asked which critical-infrastructure protocols this
