@@ -2189,18 +2189,38 @@ application programming model*」** と明記している。したがって:
   native にも載る書き方として引き続き有効。ただし**string-only SSR を最終 API にしない**
   （ADR-2607279200 Delivery #6）。
 
-### ブラウザ / JS で動かす口は 3 つあり、既定は restricted ESM（2026-08-18 実測）
+### ブラウザ / Worker で動かす口は 3 つあり、既定は wasm32-browser（2026-08-30 改訂）
 
-**`.kotoba` をブラウザや Node で動かすとき、既定は `--target js`（`:js-kotoba-v1`）
-または `--target js-browser`（`:js-browser-kotoba-v1`）の restricted ESM。**
-`kotobaArtifact` と `instantiateKotoba(grants)` を export する `.mjs` が 1 枚出て、
-そのまま `import` できる。
+**amu は native compiler であって JVM に依存しない**（オーナー指摘 2026-08-30）。
+`.kotoba` をブラウザや Worker で動かすときの既定は **`--target wasm32-browser`** で、
+`bin/amu` はこれを **nbb で実行する —— JVM を起こさない**。
 
-| target | 出力 | host | 使いどころ |
-|---|---|---|---|
-| `js` / `js-browser` | restricted ESM `.mjs` | `amu/runtime/dom-driver.mjs` + `browser-host.mjs` | **既定。** ブラウザアプリ・多ファイル project |
-| `wasm32-browser` | `.wasm` | `amu/runtime/browser-host.mjs`（`kotoba:typed/cap-call`） | capability kit の `:wasm-aot` 面 |
-| `cljs-browser-kotoba-v1` | `.cljs` **ソーステキスト** | 無い（自分で require して `main` を呼ぶ） | cljs toolchain に載せたいとき |
+⚠ **この節は 2026-08-30 まで逆を書いていた。** 「既定は `--target js` の restricted ESM」
+と指名した上で、同じ節の下の方で「コンパイルは js / cljs とも JVM 経路」と自分で書いて
+いた —— **JVM を起こす経路を既定に指名していた**。JVM が現れるのは native/wasm 以外の
+target に落ちたときだけで、**それは amu の経路ではない**。
+
+実測 2026-08-30、`bin/amu` @ `kotoba-lang/main` `0df9d99` —— **nbb（JVM なし）で走るのは**
+`check` / `extract-native` / `verify-output-set` / `sign-output-set` と、
+`worker` | `compile` の `--target` ∈ {未指定, `wasm32`, `wasm32-browser`, `wasm32-wasi`,
+`x86_64*`, `aarch64*`}。**それ以外は `spawn("clojure", …)` に落ちる。**
+（読むのは `orgs/kotoba-lang/amu` の checkout ではなく `kotoba-lang/main` —— 2026-08-30
+時点で checkout は pin のまま **139 commit 遅れ**ており、その古い tree を読んで
+「amu も部分的に JVM」と誤読した。）
+
+| target | 出力 | host | 実行 | 使いどころ |
+|---|---|---|---|---|
+| `wasm32-browser` | `.wasm` | `amu/runtime/browser-host.mjs`（`kotoba:typed/cap-call`） | **nbb（JVM なし）** | **既定。** ブラウザ / Worker |
+| `js` / `js-browser` | restricted ESM `.mjs` | `amu/runtime/dom-driver.mjs` + `browser-host.mjs` | **clojure（JVM）** | 既存資産の互換のみ。**新規で選ばない** |
+| `cljs-browser-kotoba-v1` | `.cljs` **ソーステキスト** | 無い（自分で require して `main` を呼ぶ） | **clojure（JVM）** | cljs toolchain に載せる必要があるときだけ |
+
+- **JVM を起こさないことは好みではなく容量の問題である。** 実測 2026-08-30、この 1 台
+  （10 コア）で **load average 513**、java 14 本 / node 99 本 / Claude セッション 8 本。
+  走っていた java を親プロセスで辿ると **`scripts/resource-guard.mjs` の下に居たのは 1 本だけ**で、
+  残りは `clojure -M` / `-A:test` / `-Sdeps` / launchd 常駐だった。guard が壊れているのではなく、
+  **guard の対象が「build コマンド名の列挙」（shadow-cljs / vite / next / cargo / wash）なので、
+  実際に CPU を食っている JVM の test / gate / loop が全部その列挙の外にある**。
+  列挙を足すより、**JVM を起こさない経路を既定にする方が効く。**
 
 - **UI は `init` / `view` / `step` の 3 つの純関数 export**（`state + event -> next-state`）。
   参照実装は `amu/examples/todo-app.kotoba`、host は `amu/runtime/dom-driver.mjs`。
@@ -2218,8 +2238,9 @@ application programming model*」** と明記している。したがって:
   生涯で使い切りなので dom-driver は **1 インタラクション = 1 新規 instance** にしている
   —— 共有すると描画途中で `fuel-exhausted` になる。**整数→文字列の builtin が無い**
   （todo-app が ID を 26 文字のアルファベットから取っているのはそのため）。
-- **コンパイルは `js` / `cljs` とも JVM 経路**（`bin/amu` が nbb ネイティブ経路に振るのは
-  wasm / native だけ）。1 ファイルで分単位かかるので、loop や hook に組み込む前に測る。
+- **`js` / `cljs` target を選ぶと `clojure` が起きる。** それが JVM の入口であって、
+  amu 自体の性質ではない。1 ファイルで分単位かかるので、どうしても使う場合でも
+  loop や hook に組み込む前に測る。**新規はこの 2 target を選ばない。**
 - 実ブラウザでの確認は `amu/tests/browser/`（`app.html` + `browser.spec.mjs`、Playwright で
   trusted event を送る）。Node の mock DOM で足りるなら `createMockDom` が
   `browser-host.mjs` に在る。
