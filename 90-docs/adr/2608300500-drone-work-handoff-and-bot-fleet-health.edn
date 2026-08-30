@@ -104,4 +104,55 @@ Next, in order:
 
 Known inaccuracies that survive: no rotor-to-rotor interference, no ground
 effect, no gust margin, no cooling, and a motor fit that averages over KV 100-400
-with an 18.6% worst residual."}]
+with an 18.6% worst residual.
+
+## Closing audit, 2026-08-30
+
+Every repo touched this session is three-point aligned — local HEAD equals the
+remote default branch equals the west pin, working tree clean:
+
+| repo | commit |
+|---|---|
+| kotoba-lang/kami-engine-rotor | `fd8ea44` |
+| kotoba-lang/kami-engine-pack | `ed2ff2d` |
+| kotoba-lang/kami-engine-multirotor | `152cc59` |
+| kotoba-lang/kami-engine-motor | `1dccf82` |
+| kotoba-lang/celler | `35a42a7` |
+| etzhayyim/root | `afb3e79` |
+
+Superproject `com-junkawasaki/root` at `12c2a9a` and 0 ahead / 0 behind
+`origin/main`. No open PRs in any of the seven repositories touched. No `agent/*`
+branches of this session remain, local or remote. No worktrees of this session
+remain.
+
+**One stash retired.** `stash@{0}` — \"west.yml: kami-engine-pack entry (preserved
+by ayatori-wiring session)\" — turned out to be this session's own work, stashed
+by a concurrent session to get past it. Content-containment checked before
+dropping: the stashed pack pin `0b28ee23` is an ancestor of main's `ed2ff2d`
+(ahead=1, behind=0) and the stashed rotor pin `fd8ea447` is byte-identical to
+main's. Archived to `.git/stash-archive-20260830/` first regardless, per the
+retirement rule that confidence is not a reason to skip the archive.
+
+Untouched on purpose: `90-docs/observatory/observatory.datoms.edn` (another
+session's uncommitted work) and the worktree
+`scratchpad/root-closing [agent/adr-write-path-ceiling]`, which belongs to a
+different session.
+
+### What was verified, and what was not
+
+| | |
+|---|---|
+| ran green | kami-engine-rotor 20 tests / 69 assertions; kami-engine-pack 13 / 57; kami-engine-multirotor 14 / 65; kami-engine-motor 17 / 56 (bldc + the pre-existing solver suite). Both the `:dev` local-sibling path and the plain `:test` git-dep path the fleet gate takes. clj-kondo 0 errors 0 warnings on all four |
+| verified discriminating | twelve deliberate breaks across the four repos, each reddening the tests that name it, each restored to green |
+| **NOT run** | **every fleet gate.** Three `:jvm-test` gates are registered and none has executed on the fleet. By this workspace's own rule none of them is landed |
+| **NOT run** | celler's TypeScript suite — `npm install` timed out at 180 s (exit 124) fetching the `@etzhayyim/sdk` git dependencies. The identity rewrite is textual-consistency checked only |
+| not measured | whether the calibrated motor fit holds below 216 W or above 3180 W; the solver reports `:extrapolated?` there rather than guessing |
+
+### First command for whoever picks this up
+
+```
+nbb scripts/fleet-ci/tick.cljs        # get one of the three gates to run
+```
+
+Until one is green, the correct summary of this session's test evidence is
+\"green on this workstation\", not \"green\"."}]
