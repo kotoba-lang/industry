@@ -20,8 +20,36 @@ import os
 import subprocess
 import sys
 
-WORKTREE = os.environ.get("HYAKKA_BOT_WORKTREE",
-                          os.path.expanduser("~/.gftd/worktrees/hyakka-growth-bot"))
+# Which worktree this run owns, in falling order of explicitness:
+#
+#   1. HYAKKA_BOT_WORKTREE — an operator saying it outright
+#   2. the job's own cwd, when it is a git worktree. Hermes runs a cron
+#      script with `cwd = job.workdir` (cron/scheduler.py, `_script_cwd`),
+#      and passes no job id or job name in the environment — checked before
+#      writing this — so a per-job `--workdir` is the only per-job signal
+#      this script can see.
+#   3. the legacy shared default, unchanged
+#
+# (2) exists because ONE script serves SEVERAL jobs, and a per-script
+# default therefore hands them all the same tree. Measured 2026-08-30:
+# four jobs shared this tree (hyakka-source-scout, which fires 8x a day, hyakka-ontology-scout, mg-equipment-schema, mg-equipment-source), and source-scout's 05:30 fire sat 15 minutes before mg-equipment-source's 05:45 while p90 run length was 21 minutes. An interrupted run leaves an uncommitted diff behind and every
+# later fire in that tree fails the same `git checkout` refusal — the
+# failure that blocked hyakka-source-scout for ~11 hours.
+#
+# A cwd that is NOT a worktree is ignored rather than trusted: before
+# per-job workdirs were set that cwd was the shared superproject checkout,
+# where several Claude sessions work at once.
+def _work_root() -> str:
+    explicit = os.environ.get("HYAKKA_BOT_WORKTREE")
+    if explicit:
+        return os.path.expanduser(explicit)
+    cwd = os.getcwd()
+    if os.path.exists(os.path.join(cwd, ".git")) and cwd != os.path.abspath(
+            os.path.expanduser("~/github/com-junkawasaki")):
+        return cwd
+    return os.path.expanduser("~/.gftd/worktrees/hyakka-growth-bot")
+
+WORKTREE = _work_root()
 NBB = os.environ.get("HYAKKA_NBB", "/opt/homebrew/bin/nbb")
 DAYS = os.environ.get("HYAKKA_EVIDENCE_DAYS", "14")
 
