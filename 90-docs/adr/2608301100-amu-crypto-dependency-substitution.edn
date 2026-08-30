@@ -20,10 +20,13 @@
     :consequences
     ["@noble/ciphers and @noble/hashes return to the wave pool as substitution-via-host."
      "First slice landed: org-ietf-chacha20-poly1305 kotoba/chacha20/aead_params + noise.provider.reference for AEAD."
-     "Future: org-nist-sha2 / org-ietf-blake2 kotoba oracles for @noble/hashes subpaths; wasm crypto capability kit remains separate work."]
+     "Second slice landed 2026-08-30: org-nist-sha2 kotoba/hash/subpath_dispatch (KIR parity) + noise.hash.reference and kagi.digest.reference for SHA-256."
+     "kotobase-server GCM-SIV stays deferred (no aes.gcm substitute). tick skips reference-complete repos and deferred repos."
+     "Future: org-ietf-blake2 kotoba oracles for remaining @noble/hashes subpaths; wasm crypto capability kit remains separate work."]
 
     :verification
     ["nbb scripts/verify-dependency-substitution.cljs --self-test"
      "nbb scripts/dependency-substitution-wave-tick.cljs --limit 4"
      "clojure -M:test in org-ietf-chacha20-poly1305 (parity test)"
+     "clojure -M:test in org-nist-sha2 hash.subpath-dispatch-kotoba-parity-test"
      "npm test in noise with reference provider on classpath"]})}]
