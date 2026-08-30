@@ -106,9 +106,11 @@ itonami bots import grok   [--base <url>] [--business <slug>]
 suite 2117 tests / 12569 assertions / 1 failure（`every-authority-ships-disabled`。
 #236 由来で `origin/main` 自身が赤く、この変更のものではない）。
 
-resident は release `b16db3e` で走っているので、`itonami bots import` は
-**新しい build を転がすまで CLI に現れない**（`bots import` は CLI 側の
-hand-written command なので、CLI が新しい tree から起動されれば server の
-build と無関係に動く —— つまり `~/.cloud-itonami/app` を pin に合わせれば
-provision を待たずに使える）。
+resident は release `509f557`（= この merge）で走っており、CLI shim も同じ release を
+指しているので、`itonami bots import hermes` / `... grok` は**そのまま使える**。
+入れ替えで踏んだ罠（`kickstart` が plist を読まない / CLI の headless server が
+port を奪って env を欠く）は ADR-2608301800 の着地節に記録した。
+
+**hermes 側は実測済み**（`available 1 / importable 0 / not-importable 1`、理由 script）。
+**grok 側の認証済み `/bots` は依然として未測定** —— bearer が無い。
 "}]
