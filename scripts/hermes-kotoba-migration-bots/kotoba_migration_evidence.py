@@ -48,6 +48,9 @@ READ_ROOT = os.environ.get("KOTOBA_MIGRATION_READ_ROOT",
 RUN_PARENT = os.environ.get("KOTOBA_MIGRATION_RUN_PARENT",
                             os.path.expanduser("~/.gftd/worktrees/kotoba-migration-bot"))
 NBB = os.environ.get("KOTOBA_MIGRATION_NBB", "/opt/homebrew/bin/nbb")
+GATE = os.environ.get(
+    "KOTOBA_MIGRATION_GATE",
+    os.path.expanduser("~/.hermes/scripts/verify-kotoba-migration.cljs"))
 
 
 def refuse(why: str) -> None:
@@ -63,6 +66,8 @@ def main() -> None:
     if not os.path.isdir(os.path.join(READ_ROOT, "orgs", "kotoba-lang")):
         refuse(f"{READ_ROOT} has no populated orgs/kotoba-lang/ — there is "
                f"nothing to scan for candidates.")
+    if not os.path.isfile(GATE):
+        refuse(f"installed migration gate is missing: {GATE}")
 
     os.makedirs(RUN_PARENT, exist_ok=True)
 
@@ -84,8 +89,8 @@ def main() -> None:
     print(f"read-root\t{READ_ROOT}\t(read only — never edit inside this tree)")
     print(f"run-parent\t{RUN_PARENT}\t(clone the chosen repo into a FRESH "
           f"timestamped subdirectory here — never reuse a directory across runs)")
-    print(f"amu-bin\t{os.path.join(READ_ROOT, 'orgs', 'kotoba-lang', 'amu', 'bin', 'kotoba')}")
-    print(f"gate\t{os.path.join(READ_ROOT, 'scripts', 'hermes-kotoba-migration-bots', 'verify-kotoba-migration.cljs')}")
+    print(f"amu-bin\t{os.path.join(READ_ROOT, 'orgs', 'kotoba-lang', 'amu', 'bin', 'amu')}")
+    print(f"gate\t{GATE}")
     print(proc.stdout)
 
 

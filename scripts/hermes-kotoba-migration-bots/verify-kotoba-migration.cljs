@@ -14,7 +14,7 @@
   Three things, none optional:
 
     1. the .kotoba/.cljk file COMPILES via the real compiler
-       (`kotoba -M compile ... --target js-browser`) — not `which kotoba`,
+       (`amu compile ... --target js-browser`) — not `which kotoba`,
        not a syntax eyeball. The skill's own warning: availability measured
        by `which` passed while the binary itself was a dead shim exec'ing a
        deleted /tmp path, and 3 tests that should have skipped ran red.
@@ -52,7 +52,7 @@
 ;; this gate is usually invoked against — pass it explicitly.
 (def amu-bin (arg "--amu-bin"
                    (path/join (os/homedir) "github" "com-junkawasaki"
-                              "orgs" "kotoba-lang" "amu" "bin" "kotoba")))
+                              "orgs" "kotoba-lang" "amu" "bin" "amu")))
 (def compile-timeout-ms (js/parseInt (arg "--compile-timeout-ms" "120000") 10))
 (def test-timeout-ms (js/parseInt (arg "--test-timeout-ms" "600000") 10))
 
@@ -106,18 +106,18 @@
 
 (when (empty? @findings) ; only spend the compile if the files at least exist
   (let [out (path/join (os/tmpdir) (str "kotoba-migration-verify-" (.getTime (js/Date.)) ".mjs"))
-        r (sh amu-bin ["-M" "compile" (rp (:kotoba-path proposal))
+        r (sh amu-bin ["compile" (rp (:kotoba-path proposal))
                        "--target" "js-browser" "--output" out]
               {:timeout compile-timeout-ms})]
     (if (zero? (:status r))
       (println (str "compile\tjs-browser\tok\t" out))
       (fail! :compiles-js-browser
-             (str "kotoba -M compile --target js-browser exited " (:status r)
+             (str "amu compile --target js-browser exited " (:status r)
                   ":\n" (:stdout r) "\n" (:stderr r))))
     ;; wasm32-browser is informational only — ADR-2608650000: an unavailable
     ;; backend is an implementation gap, not grounds to reject the migration.
     (let [wout (path/join (os/tmpdir) (str "kotoba-migration-verify-" (.getTime (js/Date.)) ".wasm"))
-          wr (sh amu-bin ["-M" "compile" (rp (:kotoba-path proposal))
+          wr (sh amu-bin ["compile" (rp (:kotoba-path proposal))
                           "--target" "wasm32-browser" "--output" wout]
                  {:timeout compile-timeout-ms})]
       (println (str "compile\twasm32-browser\t" (if (zero? (:status wr)) "ok" "gap (informational, not a rejection)"))))))
