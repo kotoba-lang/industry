@@ -68,7 +68,7 @@ skill and ADR-2608261100. One slice per run. Small and landed beats large and st
    with `:decode`/`input could not be read` — this is a known trap, not a maybe):
 
    ```
-   <amu-bin> -M compile /ABS/PATH/to/file.kotoba --target js-browser --output /tmp/check.mjs
+   <amu-bin> compile /ABS/PATH/to/file.kotoba --target js-browser --output /tmp/check.mjs
    ```
 
    If this fails, fix the `.kotoba` file and try again. Do not write a parity test

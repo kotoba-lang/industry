@@ -1,4 +1,4 @@
-# `hermes-kotoba-migration-bots` — one scheduled bot that moves clj/cljc to .kotoba/.cljk
+# `hermes-kotoba-migration-bots` — governed JVM → Kotoba migration fleet
 
 The versioned copy of the Hermes cron bot that advances the `kotoba-clj-to-kotoba`
 migration (ADR-2608261100, ADR-2607279200) one vertical slice at a time. Hermes lives
@@ -9,7 +9,20 @@ job.
 
 | bot | schedule | does |
 |---|---|---|
-| `kotoba-migration-scout` | `15 5 * * *` | picks one `.clj`/`.cljc` file across `orgs/kotoba-lang/*` with no `.kotoba`/`.cljk` counterpart yet, migrates it, and opens a PR only if compile + a new parity test + the target repo's own suite all pass |
+| `kotoba-migration-scout` | `15 5 * * *` | moves one product-semantics slice from `.clj`/`.cljc` to `.kotoba`/`.cljk`; never migrates host mechanisms |
+| `kotoba-cli-build-scout` | `52 1 * * *` | takes one repo measured as `:jvm-build`, adds a reversible `kotoba compile` / JVM-free `amu compile` route, and retains the JVM oracle |
+| `kotoba-cli-build-verifier` | `52 3 * * *` | independently re-runs compile, oracle, parity, suite, JVM-process, rollback, and diff checks on open build-scout PRs; never edits or merges |
+
+These are roles, not duplicate workers. The semantic scout and build scout have
+different candidate sets and different seen ledgers. The verifier consumes only PRs
+whose title starts `[bot][kotoba-cli-build]`, so two bots never claim the same unit of
+work. Schedules avoid the fleet's recurring `05/10/15/20/25/30/35/40/45/50` minute
+bands and leave two hours between build and verification.
+
+The detector excludes the frozen bootstrap quartet (`kotoba`, `amu`, `kototama`,
+`aiueos`): removing their JVM bootstraps is an architectural tranche, not an
+autonomous per-repo build PR. Build proposals may add an existing repo-native task or
+an NBB `.cljs` command, but never a new shell/Python/MJS operational script.
 
 ```
 kotoba_migration_evidence.py ──► one candidate ──► the bot migrates ──► verify-kotoba-migration.cljs ──► PR
@@ -107,7 +120,7 @@ works as intended.
 Four things, in this order, each independently verified to reject its own failure case
 before this was written up as landed:
 
-1. **compiles** — `<amu-bin> -M compile <kotoba-path> --target js-browser --output
+1. **compiles** — `<amu-bin> compile <kotoba-path> --target js-browser --output
    <tmp>` must exit 0. `--target wasm32-browser` is also run but is informational only
    (ADR-2608650000: an unavailable native/wasm backend is an implementation gap, not
    grounds to reject a migration that's otherwise correct).
@@ -128,16 +141,10 @@ verdict on the migration.
 
 ## Model
 
-This job rides the same `hyakka-model-refresh` coverage as every other agent-driven
-job in the cron table (see `hermes-hyakka-bots/README.md`, "coverage is the default").
-No model is pinned here on purpose — the free-model resolver's own argument against
-hand-pinned model ids (ADR-2608271450, ADR-2608272100) applies exactly as much to this
-bot as to the wiki ones, and Hermes has no per-job env-var mechanism this script could
-use to opt out cleanly without editing the gateway's own launchd plist (`EnvironmentVariables`
-in `~/Library/LaunchAgents/ai.hermes.gateway.plist`) and restarting a live process for
-one job's sake. If migration quality on the resolved free model turns out to be poor in
-practice, pinning via that plist (or asking for a per-job env mechanism upstream) is the
-next step — not silently working around the coverage default.
+All three jobs are explicitly pinned to `z-ai/glm-5.3-flash` through
+`openrouter-free`, with low reasoning effort. The model/provider are job metadata;
+credentials remain in the Hermes/1Password secret path and never appear in these
+versioned files or prompts.
 
 ## Installing
 
@@ -146,13 +153,34 @@ cp scripts/hermes-kotoba-migration-bots/kotoba_migration_evidence.py \
    ~/.hermes/scripts/
 cp scripts/hermes-kotoba-migration-bots/kotoba-migration-scout.prompt.md \
    ~/.hermes/scripts/kotoba-migration-scout.prompt.md
+cp scripts/hermes-kotoba-migration-bots/verify-kotoba-migration.cljs \
+   ~/.hermes/scripts/
+cp scripts/hermes-kotoba-migration-bots/kotoba_cli_build_evidence.py \
+   ~/.hermes/scripts/
+cp scripts/hermes-kotoba-migration-bots/kotoba-cli-build-scout.prompt.md \
+   ~/.hermes/scripts/
+cp scripts/hermes-kotoba-migration-bots/kotoba_cli_build_verifier_evidence.py \
+   ~/.hermes/scripts/
+cp scripts/hermes-kotoba-migration-bots/kotoba-cli-build-verifier.prompt.md \
+   ~/.hermes/scripts/
 
 mkdir -p ~/.gftd/worktrees/kotoba-migration-bot
 
 H=~/.hermes/hermes-agent/venv/bin/hermes
 $H cron create "15 5 * * *" "$(cat ~/.hermes/scripts/kotoba-migration-scout.prompt.md)" \
    --name kotoba-migration-scout --script kotoba_migration_evidence.py \
-   --deliver local
+   --deliver local --model z-ai/glm-5.3-flash --provider openrouter-free \
+   --reasoning-effort low
+
+$H cron create "52 1 * * *" "$(cat ~/.hermes/scripts/kotoba-cli-build-scout.prompt.md)" \
+   --name kotoba-cli-build-scout --script kotoba_cli_build_evidence.py \
+   --deliver local --model z-ai/glm-5.3-flash --provider openrouter-free \
+   --reasoning-effort low
+
+$H cron create "52 3 * * *" "$(cat ~/.hermes/scripts/kotoba-cli-build-verifier.prompt.md)" \
+   --name kotoba-cli-build-verifier --script kotoba_cli_build_verifier_evidence.py \
+   --deliver local --model z-ai/glm-5.3-flash --provider openrouter-free \
+   --reasoning-effort low
 ```
 
 No `--workdir` is set — unlike the other two bots, there is no single fixed directory
