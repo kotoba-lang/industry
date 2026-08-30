@@ -3614,4 +3614,121 @@
      :find "                    :status (:status provider-result)}"
      :replace "                    :status :accepted}"
      :must-fail ["receipt-reports-the-status-the-provider-gave"]}]}
+
+  {:repo "orgs/cloud-itonami/data-center-ops"
+   :label "data-center-ops actor gate and the payload it must not drop"
+   :cmd ["nbb" "test/data_center_ops/murakumo_test.cljs"]
+   :green-marker "0 failures, 0 errors"
+   ;; murakumo.cljc is the only executable code in that repo and it is a gate:
+   ;; it turns a request into :mst/put-record effects and nothing downstream
+   ;; re-derives them. Until 2026-08-30 it had no tests at all, and writing them
+   ;; found two silent losses -- `records` given as a vector fell through to {}
+   ;; while the plan stayed :ready, and the caller's record was merged over the
+   ;; actor's own fields, so it could name a different actorDid or claim a
+   ;; different $type than the collection it was filed under.
+   ;;
+   ;; Runs on nbb, no JVM: the source is .cljc with zero reader conditionals,
+   ;; so one runtime executes all of it and there is no second branch here that
+   ;; could rot unseen.
+   ;;
+   ;; All twelve below were applied one at a time at pin e269e978 on 2026-08-30,
+   ;; each anchor unique in the file, each reddening the tests named and **no
+   ;; others** (the replay compared the full set of red test names against
+   ;; :must-fail, not just its presence), with the unmutated tree green before
+   ;; the battery and after it.
+   ;;
+   ;; `refusal-reason-renamed` is here for the rule that a negative test must
+   ;; refuse for the reason it names: it leaves the throw in place and only
+   ;; changes the keyword, so a test that merely observed "something was thrown"
+   ;; would survive it. It does not.
+   :mutations
+   [{:id :dco/gate-stops-checking
+     :why "the gate stops asking -- the shape a check takes when somebody neuters the filter. Nothing may be emitted before every constitutional gate attests; this is the invariant the whole actor pattern rests on"
+     :file "src/data_center_ops/murakumo.cljc"
+     :find "(remove #(boolean (gate-value attestations %)))"
+     :replace "(remove (constantly true))"
+     :must-fail ["no-attestations-blocks-and-emits-nothing"
+                 "absent-attestations-block-rather-than-default-open"
+                 "partial-attestation-blocks-and-names-only-the-missing-gates"
+                 "explicit-false-is-not-an-attestation"
+                 "no-cell-can-be-planned-without-attestations"
+                 "gates-are-checked-before-the-payload"]}
+
+    {:id :dco/presence-read-as-attestation
+     :why "read the gate as present rather than as attesting -- a plausible refactor that makes a gate answered `false` count as attested, and drops the string-keyed spelling callers use"
+     :file "src/data_center_ops/murakumo.cljc"
+     :find "(remove #(boolean (gate-value attestations %)))"
+     :replace "(remove #(contains? attestations %))"
+     :must-fail ["explicit-false-is-not-an-attestation"
+                 "attestations-are-read-from-every-shape-the-callers-use"]}
+
+    {:id :dco/sequential-records-dropped
+     :why "restores the original silent loss: `records` written as a vector falls through to {} while the plan stays :ready, so the host is handed a well-formed instruction to write a record with no payload in it and reports success"
+     :file "src/data_center_ops/murakumo.cljc"
+     :find "(sequential? records) (vec records)"
+     :replace "(sequential? records) {}"
+     :must-fail ["payload-survives-every-accepted-records-shape"]}
+
+    {:id :dco/unusable-shape-guard-disabled
+     :why "disables the refusal so an unusable shape is dropped again instead of raised. Dropping and refusing look identical downstream -- both produce a successful put-record -- which is why the drop went unnoticed for as long as it did"
+     :file "src/data_center_ops/murakumo.cljc"
+     :find "(some? records)       (throw (ex-info"
+     :replace "(some? nil)           (throw (ex-info"
+     :must-fail ["unusable-records-shape-is-refused-not-silently-dropped"]}
+
+    {:id :dco/refusal-reason-renamed
+     :why "leaves the throw and renames only the reason. A test that asserted merely that something was thrown would survive this; pinning the literal is what makes the assertion about this refusal rather than about any failure"
+     :file "src/data_center_ops/murakumo.cljc"
+     :find ":reason :records/unusable-shape"
+     :replace ":reason :records/bad"
+     :must-fail ["unusable-records-shape-is-refused-not-silently-dropped"]}
+
+    {:id :dco/provenance-forgeable-again
+     :why "restores the original merge order, in which the caller's record overrode the actor's own fields. A record could then name a different actorDid, or claim a $type other than the collection it is filed under -- which is what an ATProto consumer dispatches on -- and the store has no way to detect it afterwards"
+     :file "src/data_center_ops/murakumo.cljc"
+     :find "(merge defaults\n                            (assert-provenance! asserted supplied)\n                            asserted)"
+     :replace "(merge defaults\n                            asserted\n                            supplied)"
+     :must-fail ["caller-cannot-forge-actor-provenance"]}
+
+    {:id :dco/refusal-does-not-name-the-field
+     :why "the refusal stops saying which field was forged. An operator reading only the message cannot tell whether the actorDid or the scaffold flag was the one that moved"
+     :file "src/data_center_ops/murakumo.cljc"
+     :find ":field k"
+     :replace ":field :some-field"
+     :must-fail ["caller-cannot-forge-actor-provenance"]}
+
+    {:id :dco/actor-did-drifts-from-manifest
+     :why "the DID the records are signed with drifts from the one actor-manifest.jsonld advertises. Both files already disagree with .well-known/did.json, so this pair is the one that still holds and the only guard against it widening"
+     :file "src/data_center_ops/murakumo.cljc"
+     :find "\"did:web:data-center-ops.etzhayyim.com\")"
+     :replace "\"did:web:data-center-ops.example.com\")"
+     :must-fail ["actor-did-agrees-with-the-published-manifest"]}
+
+    {:id :dco/record-type-stops-matching-collection
+     :why "$type stops naming the collection the record is written into. Both values are plausible strings and the effect still looks well-formed, so nothing but this assertion distinguishes them"
+     :file "src/data_center_ops/murakumo.cljc"
+     :find ":$type coll\n                       :actorDid actor-did"
+     :replace ":$type (:legacy-cell spec)\n                       :actorDid actor-did"
+     :must-fail ["record-type-matches-the-collection-it-is-written-into"]}
+
+    {:id :dco/empty-record-key-allowed
+     :why "an empty record key reaches the store. An empty rkey addresses the collection itself rather than a record in it, and the fallback exists precisely to keep that from happening"
+     :file "src/data_center_ops/murakumo.cljc"
+     :find "(if (str/blank? clean) \"unknown\" clean)"
+     :replace "clean"
+     :must-fail ["an-empty-record-key-becomes-unknown-rather-than-empty"]}
+
+    {:id :dco/cells-share-one-collection
+     :why "every cell writes into one shared collection, so the 25 cells overwrite each other's records. The effects still look correct one at a time -- only comparing them reveals it"
+     :file "src/data_center_ops/murakumo.cljc"
+     :find "(str \"com.etzhayyim.data-center-ops.\" name))"
+     :replace "(str \"com.etzhayyim.data-center-ops.cell\"))"
+     :must-fail ["each-cell-writes-its-own-collection"]}
+
+    {:id :dco/a-cell-quietly-exempted-from-a-gate
+     :why "one cell is given a shorter gate list than the rest. It still blocks with no attestations, so the gate tests stay green; only the declaration check sees that :incident now requires less of itself than its 24 siblings do"
+     :file "src/data_center_ops/murakumo.cljc"
+     :find ":incident {:legacy-cell \"com-etzhayyim-apps-dataCenterOps-incident\"\n     :phase :event\n     :murakumo-node \"reuben\"\n     :collections [(collection \"incident\")]\n     :required-gates common-gates"
+     :replace ":incident {:legacy-cell \"com-etzhayyim-apps-dataCenterOps-incident\"\n     :phase :event\n     :murakumo-node \"reuben\"\n     :collections [(collection \"incident\")]\n     :required-gates (rest common-gates)"
+     :must-fail ["every-cell-declares-the-common-gates-and-one-collection"]}]}
 ]}
