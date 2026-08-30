@@ -413,6 +413,15 @@
              (println (str "      " (str/trim (or (last (take 3 (reverse (remove str/blank? (str/split-lines (str (:err r) "\n" (:out r))))))) "")))))
            (assoc base
                   :observed observed :ok ok? :exit (:exit r) :ms ms
+                  ;; run-one 由来の証拠を落とさない。datom は :signal / :load1-* /
+                  ;; :timeout-ms を書く用意があるのに、ここが運んでいなかったので
+                  ;; **一度も値が出たことが無い**（2026-08-13 に足した緩和が、
+                  ;; 2026-08-30 の同型の事故で 6 本を evidence 無しの
+                  ;; :known-broken にした。実測: 履歴上どの行にも
+                  ;; killed-by-signal が無い）。
+                  :signal (:signal r)
+                  :load1-before (:load1-before r) :load1-after (:load1-after r)
+                  :timeout-ms (:timeout-ms r)
                   :bytes-before (:bytes before 0) :bytes-after (:bytes after 0)
                   :units (:units after 0)
                   :chain-ok (chain-ok? (str (:out r) (:err r)))
