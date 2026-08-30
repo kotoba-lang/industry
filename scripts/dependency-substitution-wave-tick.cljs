@@ -246,6 +246,7 @@
                                   (reference-complete? c)
                                   (do (swap! ref-complete conj (:repo c)) true)
 
+                                  :else
                                   (case (in-flight c)
                                     nil false
                                     :unmeasured (do (swap! unmeasured conj (:repo c)) true)
