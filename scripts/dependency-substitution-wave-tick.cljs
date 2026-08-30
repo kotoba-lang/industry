@@ -65,8 +65,32 @@
    "vaul"
    "cmdk"])
 
+;; GCM-SIV has no first-party equivalent — do not substitute aes.gcm (ADR-2608301100).
+(def coordinate-deferred-repos
+  {"@noble/ciphers" #{"kotobase-server"}})
+
+;; Ladder step 3 landed: reference provider + parity test on disk (still imports npm).
+(def reference-complete
+  {"@noble/ciphers"
+   {"noise" ["src/noise/provider/reference.cljs"
+             "test/noise/provider/reference_aead_test.cljs"]
+    "kagi" ["src/kagi/crypto/reference.cljs"
+            "test/kagi/crypto/reference_aead_test.cljs"]}
+   "@noble/hashes"
+   {"noise" ["src/noise/hash/reference.cljs"
+             "test/noise/provider/reference_hash_test.cljs"]
+    "kagi" ["src/kagi/digest/reference.cljs"
+            "test/kagi/digest/reference_test.cljs"]}})
+
 (defn- deferred? [coord]
   (some #(str/starts-with? coord %) defer-patterns))
+
+(defn- coordinate-deferred? [{:keys [coordinate name]}]
+  (contains? (get coordinate-deferred-repos coordinate #{}) name))
+
+(defn- reference-complete? [{:keys [coordinate name repo]}]
+  (when-let [paths (get-in reference-complete [coordinate name])]
+    (every? #(.existsSync fs (path.join root repo %)) paths)))
 
 (defn- run-findings!
   "verify-dependency-substitution --findings を subprocess で走らせ、stdout を返す。
@@ -210,13 +234,22 @@
                                  (remove #(on-disk? (repo-path %)))
                                  vec))
           skipped (atom [])
+          ref-complete (atom [])
+          deferred (atom [])
           unmeasured (atom [])
           picked (->> ranked
                       (remove (fn [c]
-                                (case (in-flight c)
-                                  nil false
-                                  :unmeasured (do (swap! unmeasured conj (:repo c)) true)
-                                  (do (swap! skipped conj (:repo c)) true))))
+                                (cond
+                                  (coordinate-deferred? c)
+                                  (do (swap! deferred conj (:repo c)) true)
+
+                                  (reference-complete? c)
+                                  (do (swap! ref-complete conj (:repo c)) true)
+
+                                  (case (in-flight c)
+                                    nil false
+                                    :unmeasured (do (swap! unmeasured conj (:repo c)) true)
+                                    (do (swap! skipped conj (:repo c)) true)))))
                       (take limit)
                       vec)
           rec {:at (.toISOString (js/Date.))
@@ -226,6 +259,8 @@
                :target target
                :limit limit
                :missing-checkout (or skipped-missing [])
+               :deferred-skipped @deferred
+               :reference-complete-skipped @ref-complete
                :in-flight-skipped @skipped
                :unmeasured-skipped @unmeasured
                :candidates picked}]
@@ -237,6 +272,10 @@
       (println (str "MISSING-CHECKOUT\t" (count (or skipped-missing []))
                     (when (seq skipped-missing)
                       (str "\t" (str/join " " skipped-missing)))))
+      (println (str "DEFERRED-SKIPPED\t" (count @deferred)
+                    (when (seq @deferred) (str "\t" (str/join " " @deferred)))))
+      (println (str "REFERENCE-COMPLETE-SKIPPED\t" (count @ref-complete)
+                    (when (seq @ref-complete) (str "\t" (str/join " " @ref-complete)))))
       (println (str "IN-FLIGHT-SKIPPED\t" (count @skipped)
                     (when (seq @skipped) (str "\t" (str/join " " @skipped)))))
       (println (str "UNMEASURED-SKIPPED\t" (count @unmeasured)
