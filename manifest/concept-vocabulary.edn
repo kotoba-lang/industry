@@ -437,4 +437,16 @@ GitHub の redirect で生きているが west は新名のみを持つ。
 （deep space は拒否する）、球面ジオメトリは kotoba-lang/geo。ADR-2608261800。
 上流サービスへの request はブラウザから 1 本も出ない —— 画像も海岸線も lake から。"}
 
+ :mikake
+ {:label "旅行メタサーチ / travel metasearch（見掛け = 比較表）"
+  :spellings ["travel metasearch" "fare comparison" "price comparison"
+              "航空券比較" "ホテル比較" "旅行比較" "mikake" "見掛け" "みかけ"]
+  :note "network-awai/app-tabi-mikake。**mikake は metaphor 名**（見掛け = 価格を
+並べて見る比較表そのもの）なのでここに載せる。Skyscanner 相当を「検索 + 比較 +
+外部予約への送客」に限定した面で、自社予約・決済・第三者広告は持たない
+（ADR-2608301849）。収益は affiliate/CPC 送客が主軸で、壊れた attribution は
+収益損失なので tabi-mikake.offers/affiliate-healthy? が機械で判定する。
+正本の価格観測は app-hyakka の claim graph に置き、R2 Data Catalog の Iceberg
+表（tabi_offers、observed-at の day パーティション）は匿名化した分析面のみ。"}
+
 }
