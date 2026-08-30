@@ -8,6 +8,7 @@
   :adr/date "2026-08-30"
   :adr/last-verified "2026-08-30"
   :adr/last_verified "2026-08-30"
+  :adr/last-updated "2026-08-30"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "murakumo-repo-boundaries"
@@ -27,7 +28,9 @@
   ["2026-08-30: GitHub rename network-awai/local-murakumo → network-awai/cloud-murakumo-api"
    "2026-08-30: new repo network-awai/cloud-murakumo-app scaffolded (tenant-neutral portal app, cloud-itonami-app pattern)"
    "2026-08-30: portal UI slice A landed — storefront + static site sources in cloud-murakumo-app (6a157621); operator wires :local/root dep + :site alias (e1038169); west pins on superproject main (d60bec1)"
-   "2026-08-30: public HTML copy-lock tests stay in operator (clojure -M:site); app keeps storefront + insight unit tests only"
+   "2026-08-30: portal UI slice B landed — SPA (`ui/*`), i18n, studio, playground core (spec/scheduler/runtime/schema/gen/ledger) + 88 locale EDNs moved to cloud-murakumo-app (2a93d0fe); operator consumes via :local/root, prep copies i18n to public/, shadow :app build stays operator (63e0099e); west pins superproject main (f33627b8)"
+   "2026-08-30: slice B verification — app clojure -M:test 34 tests / 24052 assertions 0 failures; operator clojure -M:test 471 tests / 2466 assertions 0 failures; node test/onprem_page_test.mjs passed"
+   "2026-08-30: public HTML copy-lock tests stay in operator (clojure -M:site); app keeps storefront + insight + ui-identity + studio + i18n unit tests"
    "live: api.murakumo.cloud served from inference API worker; murakumo.cloud served from operator deploy"]
   :adr/body
   "# murakumo 3-repo split — API / app / operator
@@ -73,7 +76,10 @@ ADR-2608300200 で murakumo = portal（Nous Portal）、itonami = agent（Hermes
 2. **landed slice A（2026-08-30）**: storefront + `cloud-murakumo.site.*` 静的ページ（`generate` /
    `models` を除く）+ 関連 resources / unit tests を `cloud-murakumo-app` へ移動。operator は
    `:local/root` dep と `:site` alias（app を classpath に載せて `clojure -M:site`）で接続。
-3. **follow-up slice B**: SPA（`ui/core.cljs`、`shadow` `:app` build）を app へ。
+3. **landed slice B（2026-08-30）**: SPA sources（`ui/*`、`i18n`、`studio`、playground closure）を
+   `cloud-murakumo-app` へ。operator は `shadow-cljs` `:app` build と `public/js/` 配信を維持し、
+   `:local/root` で app namespace を classpath に載せる。`npm run prep` は app の `resources/i18n/` を
+   `public/i18n/` へコピー。
 4. **follow-up slice C**: `viewer.cljc`、mobile join flows。
 5. **非目標**: API を `cloud-murakumo` に統合しない。内部 namespace `local_murakumo.*` の
    一括 rename は別スライス（wire / deploy 名が先）。
