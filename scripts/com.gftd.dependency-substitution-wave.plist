@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.gftd.dependency-substitution-wave — kotoba-lang 外部依存 substitution 波
+  (ADR-2608301000)
+
+  Install:
+    cp scripts/com.gftd.dependency-substitution-wave.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.dependency-substitution-wave.plist
+    launchctl kickstart -k gui/$(id -u)/com.gftd.dependency-substitution-wave
+
+  Unload:
+    launchctl bootout gui/$(id -u)/com.gftd.dependency-substitution-wave
+
+  Interval: 21600s (6h). 1 波 = 1 coordinate × 最大 4 repo + pin 前進 + 再測定。
+  lock file が重なりを防ぐ。候補 0 / 測れなかった周はモデルを起こさない。
+-->
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>COM_JUNKAWASAKI_ROOT</key>
+		<string>/Users/junkawasaki/github/com-junkawasaki</string>
+		<key>HOME</key>
+		<string>/Users/junkawasaki</string>
+		<key>LOGNAME</key>
+		<string>junkawasaki</string>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+		<key>SHELL</key>
+		<string>/bin/zsh</string>
+		<key>USER</key>
+		<string>junkawasaki</string>
+	</dict>
+	<key>Label</key>
+	<string>com.gftd.dependency-substitution-wave</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/opt/homebrew/bin/nbb</string>
+		<string>--classpath</string>
+		<string>.:scripts/nbb_compat</string>
+		<string>scripts/dependency-substitution-wave-loop.cljs</string>
+	</array>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardErrorPath</key>
+	<string>/Users/junkawasaki/.gftd/dependency-substitution-wave.stdout.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/junkawasaki/.gftd/dependency-substitution-wave.stdout.log</string>
+	<key>StartInterval</key>
+	<integer>21600</integer>
+	<key>WorkingDirectory</key>
+	<string>/Users/junkawasaki/github/com-junkawasaki</string>
+</dict>
+</plist>
