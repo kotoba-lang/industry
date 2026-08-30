@@ -45,6 +45,46 @@
  :key-env "OPENROUTER_API_KEY"
  :key-read-cmd "security find-generic-password -s gftd.openrouter -w"
 
+ ;; ---- how long to wait for one non-streaming call -----------------------
+ ;; Hermes arms a stale watchdog on every non-streaming call and kills the
+ ;; socket when it fires (`run_agent.py` `_compute_non_stream_stale_timeout`).
+ ;; Left implicit it derives 90s, widening to 150s past 50k estimated tokens
+ ;; and 240s past 100k — and an implicit budget is additionally capped at half
+ ;; the remaining run budget, so it can only ever come DOWN.
+ ;;
+ ;; Measured 2026-08-30 against ~/.hermes/cron/usage_audit.jsonl: of the 21
+ ;; recorded cron errors, 19 are this watchdog firing, and every one of them
+ ;; reports an elapsed time equal to one of those three thresholds. The
+ ;; scaling is working; the calls are simply longer than it allows. Per-run
+ ;; prompt totals ran median 857k / p90 5.1M tokens, and run durations median
+ ;; 185s / p90 21min. The bots read a repo and think for 35 minutes; a
+ ;; four-minute ceiling on a single large-context turn is below what the work
+ ;; costs.
+ ;;
+ ;; Set here (not as HERMES_API_CALL_STALE_TIMEOUT) so it lands as
+ ;; `providers.<n>.stale_timeout_seconds`, which `_stale_timeout_is_explicit`
+ ;; treats as user configuration: it becomes the FLOOR the context scaling
+ ;; raises from, and it is exempt from the run-budget halving.
+ ;;
+ ;; 600 rather than the 1800 the upstream example suggests for slow
+ ;; large-context turns: a genuinely hung provider still has to be given up
+ ;; on inside the 35-minute run, or the watchdog stops being a watchdog.
+ :stale-timeout-seconds 600
+
+ ;; ---- response cache ----------------------------------------------------
+ ;; Distinct from provider-side prompt caching: this reuses a whole prior
+ ;; answer for an identical request. Kept short because a bot's request
+ ;; embeds repository and tool state that changes under it, while an exact
+ ;; retry inside the window — which is what the fallback chain produces when
+ ;; the watchdog fires — should not be paid for twice.
+ ;;
+ ;; Stated here because it was previously hand-written into config.yaml under
+ ;; a top-level `openrouter:` key this resolver did not own. That made the
+ ;; resolver REFUSE (exit 2) on every run from that day on, so the daily
+ ;; `--if-stale` model re-check silently stopped happening — measured
+ ;; 2026-08-30. Owning the key is what lets the resolver run again.
+ :response-cache {:enabled true :ttl-seconds 300}
+
  ;; ---- the floor under the floor ----------------------------------------
  ;; Ours and unbilled. NOT "always up": measured 2026-08-27, the public chat
  ;; API answered 200 at 18:50 and 400 {"error":"Unauthorized"} at 19:05, with
@@ -93,4 +133,43 @@
  ;; minimax/minimax-m3:free (2026-08-28 owner request): 1,048,576 context,
  ;; tool-calling, scored 3/3 in the same day's receipt
  ;; (~/.gftd/hermes-free-model/receipt.edn). Probed first; still has to pass.
- :prefer ["minimax/minimax-m3:free"]}
+ :prefer ["minimax/minimax-m3:free"]
+
+ ;; ---- owner override: the primary is BILLED (2026-08-30) ----------------
+ ;; This file's premise — bots run on free models — was the owner's, and so
+ ;; is this reversal. It is recorded here rather than argued, but the reason
+ ;; it was asked for is a measurement, so the measurement is written down.
+ ;;
+ ;; ~/.hermes/cron/usage_audit.jsonl, 136 cron calls over 2026-08-28..30:
+ ;;
+ ;;   z-ai/glm-5.3-flash            56 ok   7 fail   11%   median 224s
+ ;;   minimax/minimax-m3:free       46 ok  16 fail   26%   median 188s
+ ;;   cohere/north-mini-code:free   11 ok   0 fail    0%   median  24s
+ ;;
+ ;; The free model this policy chose fails at more than twice the rate of the
+ ;; billed one, on the bots' own workload, over days rather than one probe.
+ ;; Both numbers are from the SAME days and the same jobs, so the comparison
+ ;; is not confounded by which bots were running.
+ ;;
+ ;; Do not read north-mini-code's 0/11 as the best of the three. It is the
+ ;; second entry in :fallback-providers, so it is only ever reached after the
+ ;; primary has already failed — the 11 calls it served are the short, late
+ ;; turns of a retry, not a bot's 35-minute run from the start. Its median of
+ ;; 24s against the others' ~200s is the tell. It stays a fallback.
+ ;;
+ ;; Cost, measured the same day from OpenRouter's /key endpoint: $0.14/day,
+ ;; $3.38 lifetime. The account has NO spend cap (`limit: null`), which is
+ ;; the hazard the :auxiliary note below was written about — a cap belongs on
+ ;; the key regardless of which model is primary.
+ ;;
+ ;; :auxiliary :free-only stays true. Side jobs are background traffic and
+ ;; nothing measured here says they should be billed too.
+ ;;
+ ;; What the resolver still does with this set: it checks every run that the
+ ;; id is still on OpenRouter's model list, and exits 1 saying so when it is
+ ;; not. That is the one guard ADR-2608271450 asked for — a pinned id that
+ ;; has stopped existing must not present as a healthy tick.
+ :primary {:model "z-ai/glm-5.3-flash"
+           :billed true
+           :measured-at "2026-08-30"
+           :evidence "~/.hermes/cron/usage_audit.jsonl"}}

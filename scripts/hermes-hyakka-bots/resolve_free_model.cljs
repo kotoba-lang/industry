@@ -91,7 +91,8 @@
 ;; Keys this script owns in ~/.hermes/config.yaml. Anything else at the top
 ;; level means somebody configured Hermes by hand and a wholesale rewrite
 ;; would silently drop it, so we refuse instead of clobbering.
-(def managed-config-keys #{"model" "fallback_providers" "providers" "secrets" "auxiliary"})
+(def managed-config-keys #{"model" "fallback_providers" "providers" "secrets" "auxiliary"
+                            "openrouter"})
 
 (defn die!
   "Exit immediately with `code`. Setting `exitCode` and throwing reports 1
@@ -130,6 +131,22 @@
 (def provider-name (or (:provider-name policy) "openrouter-free"))
 (def key-env (or (:key-env policy) "OPENROUTER_API_KEY"))
 (def key-read-cmd (:key-read-cmd policy))
+;; nil leaves the provider block exactly as it was, so an absent policy key
+;; hands the watchdog back to Hermes's implicit derivation rather than to 0.
+(def stale-timeout-seconds (:stale-timeout-seconds policy))
+;; nil emits no `openrouter:` block at all, which is Hermes's own default
+;; (no response cache) rather than a cache with an unstated TTL.
+(def response-cache (:response-cache policy))
+;; Owner override, admitted 2026-08-30. Not a preference — `:prefer` reorders
+;; the probe queue and `:primary` replaces it, because the model the owner
+;; chose is BILLED and so can never appear in `cands` (`candidate?` requires
+;; zero-priced). See :primary in free-model-policy.edn for the measurement.
+;;
+;; This reintroduces exactly the hazard ADR-2608271450 is about — a model id
+;; written down as the answer — so the one thing the resolver still owes is
+;; to check that the id is real every run, and to say so out loud when it
+;; stops being real instead of letting every tick 401 and exit 0.
+(def primary (:primary policy))
 
 (defn check-policy! []
   (when-let [e @policy-error] (refuse! e))
@@ -175,6 +192,15 @@
   (let [pr (:pricing m)
         n #(js/parseFloat (or % "1"))]
     (and (zero? (n (:prompt pr))) (zero? (n (:completion pr))))))
+
+(defn zero-priced-id?
+  "Whether an id names a free model, by OpenRouter's own `:free` suffix.
+
+  Deliberately textual rather than a pricing lookup: this is asked while
+  rendering config, where the models list is not in hand, and it has to
+  agree with Hermes's `free_only` check — which is also a suffix test."
+  [id]
+  (str/ends-with? (str id) ":free"))
 
 (defn text-out? [m]
   (let [outs (set (get-in m [:architecture :output_modalities] []))]
@@ -433,6 +459,15 @@
        "    base_url: " or-base "\n"
        "    api_mode: chat_completions\n"
        "    key_env: " key-env "\n"
+       (when stale-timeout-seconds
+         (str "    # Floor for the non-streaming stale watchdog. Implicit, it is 90s,\n"
+              "    # widening to 150s past 50k estimated tokens and 240s past 100k, and\n"
+              "    # an implicit budget is also capped at half the remaining run budget\n"
+              "    # — so it can only come down. Measured 2026-08-30: 19 of the 21\n"
+              "    # recorded cron errors are this watchdog firing at exactly those\n"
+              "    # three values. Set here, it is explicit: the scaling raises from it\n"
+              "    # and the run-budget halving does not apply. See free-model-policy.edn.\n"
+              "    stale_timeout_seconds: " stale-timeout-seconds "\n"))
        "\n"
        "model:\n"
        "  provider: " provider-name "\n"
@@ -453,7 +488,26 @@
               "# free_only is the ceiling: never a billed model for background work.\n"
               "auxiliary:\n"
               "  free_only: " (if (:free-only auxiliary) "true" "false") "\n"
-              "  openrouter_model: " model-id "\n"
+              ;; NOT model-id. When the primary is billed, writing it here
+              ;; would pin context compression and title generation to the
+              ;; billed model on the same line that declares free_only —
+              ;; the config would state a ceiling and breach it. Side jobs
+              ;; take the first free runner-up instead, and when there is
+              ;; none the key is omitted so free_only alone decides.
+              (let [aux-model (if (zero-priced-id? model-id)
+                                model-id
+                                (first runners-up))]
+                (if aux-model
+                  (str "  openrouter_model: " aux-model "\n")
+                  "  # no free model on record for side jobs; free_only decides alone\n"))
+              "\n"))
+       (when (map? response-cache)
+         (str "# OpenRouter response caching is separate from provider prompt caching.\n"
+              "# Keep the TTL short: bot requests may include changing repository and\n"
+              "# tool state, while an exact retry within the window should be reusable.\n"
+              "openrouter:\n"
+              "  response_cache: " (if (:enabled response-cache) "true" "false") "\n"
+              "  response_cache_ttl: " (:ttl-seconds response-cache) "\n"
               "\n"))
        "# Walked in order when the model above rate-limits or goes away.\n"
        "# Most of the free tier answers 429 on any given afternoon, so the\n"
@@ -497,6 +551,19 @@
             :out (str/trim (str (or (.-stdout r) "") (or (.-stderr r) "")))}))))
 
 ;; ---------------------------------------------------------------- receipt
+
+(defn free-runners-up
+  "The free models that last scored 3/3, read back from the receipt.
+
+  A billed `:primary` still wants free models under it: the chain is walked
+  when the primary rate-limits or goes away, and the whole point of measuring
+  them was so that the fallback is a model known to do this work rather than
+  the next id in a list. Empty when there is no receipt yet — an empty chain
+  is honest, and `render-config` still writes the fleet entry beneath it."
+  []
+  (or (try (:free-fallbacks (edn/read-string (fs/readFileSync receipt-path "utf8")))
+           (catch :default _ nil))
+      []))
 
 (defn prior-passes
   "3/3 verdicts from the last receipt, for models still on the free list.
@@ -557,6 +624,39 @@
       (js/console.error (str "SCANNED\t" (count all) " models, " (count cands)
                              " free and over the floor (ctx>=" min-context
                              (when require-tools? ", tools") ")"))
+      ;; A `:primary` in the policy short-circuits the probe entirely. The
+      ;; measurement that justifies it is in the policy, not here, and it is
+      ;; not a measurement this script can make: it compares a BILLED model
+      ;; against the free tier on the bots' own failure record, which lives
+      ;; in ~/.hermes/cron/usage_audit.jsonl and covers days rather than one
+      ;; probe. What is checked here is the only thing that goes stale on its
+      ;; own — whether the id still exists.
+      ;;
+      ;; `all`, not `cands`: `candidate?` requires zero-priced, so a billed
+      ;; primary is never in `cands` and looking for it there would report
+      ;; every healthy day as a disappearance.
+      (when primary
+        (let [pid (:model primary)
+              m (some #(when (= pid (:id %)) %) all)]
+          (when-not m
+            (die! 1 (str "The pinned primary " pid " is no longer on OpenRouter's model list.\n"
+                         "This is the failure ADR-2608271450 records, caught early: leave it\n"
+                         "in place and every cron tick 401s while still exiting 0.\n\n"
+                         "Nothing was changed. Either pick a successor and update :primary in\n"
+                         (str policy-path) ", or drop :primary to hand the choice back to\n"
+                         "the probe.")))
+          (let [jobs (when write? (install-jobs! pid))
+                wrong (remove :ok jobs)
+                cfg-written (when write? (install-config! pid (free-runners-up) false))]
+            (println (str "primary\t" pid "\tlisted, ctx=" (:context_length m)
+                          ", prompt=$" (get-in m [:pricing :prompt])))
+            (when cfg-written (println (str "config\t" cfg-written)))
+            (doseq [j jobs]
+              (println (str "job\t" (:job j) "\t" (if (:ok j) "ok" (str "FAILED " (:out j))))))
+            (when-not write?
+              (println "dry-run\tpass --write to install"))
+            (.exit js/process (if (seq wrong) 1 0)))))
+
       ;; --if-stale: the cheap daily question. One keyless request has already
       ;; been spent above; if the installed model is still on the list and the
       ;; receipt is young, stop here rather than spending ~25 more to re-learn
