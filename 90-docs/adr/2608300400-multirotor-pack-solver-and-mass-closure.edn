@@ -74,9 +74,13 @@ ceiling and reported that as `:mass-spiral-runaway`. That conflates two findings
 that need different fixes:
 
 ```
-10 kg payload / 12 min  ->  CLOSES at 39.5 kg   :mtow-limit    a real aircraft, wrong class
-14 kg payload / 12 min  ->  DIVERGES            :mass-closure  no aircraft, any class
+12 kg payload / 12 min  ->  CLOSES at 26.9 kg   :mtow-limit    a real aircraft, wrong class
+1.5 kg payload / 60 min ->  DIVERGES            :mass-closure  no aircraft, any class
 ```
+
+(These two examples were 10 kg/12 min and 14 kg/12 min when this ADR was
+written. Both now CLOSE — see the amendment at the end. The distinction they
+illustrate is unchanged; the aircraft that illustrate it are not.)
 
 Before the fix the first was reported as the second — telling an engineer to
 abandon a design that merely needed a different class. `close-mass` now ignores
@@ -150,11 +154,8 @@ advanced; tests re-run green against the newer tips.
 
 ## What is still absent
 
-- **No small-motor calibration.** `kami-engine-motor` returns 105 g for a
-  0.44 N.m motor, extrapolating a traction-motor air-gap shear model two orders
-  of magnitude down in size. Real BLDC motors in this class weigh more, so every
-  MTOW above is optimistic by the motor error. This is the largest known
-  inaccuracy in the chain.
+- ~~**No small-motor calibration.**~~ **DONE, and the claim this ADR made about
+  it was WRONG IN DIRECTION.** See the amendment at the end.
 - **No design actor.** There is no LLM proposer sealed behind this governor, the
   way kami-engine-vehicle-designer seals one behind PhysicsGovernor. The closure
   is the governor; nothing proposes to it yet.
@@ -166,4 +167,48 @@ advanced; tests re-run green against the newer tips.
 - **The fleet gates have never run.** Three `:jvm-test` gates are registered
   (`kami-engine-rotor`, `-pack`, `-multirotor`) and none has been green on the
   fleet yet, so by this workspace's own rule none is landed.
-"}]
+
+
+## Amendment, 2026-08-30 — the motor claim was backwards, and fixing it moved the envelope
+
+This ADR asserted that `kami-engine-motor` under-estimates small motors and that
+\"every MTOW above is optimistic by the motor error\". **That was asserted from no
+data.** Measured the same day against T-MOTOR's own published figures for five
+motors (MN2806 / MN4006 / MN5208 / MN8012 / MN8017, 46-453 g, 216-3180 W), the
+traction-motor shear model is **40-53% HEAVY** at drone scale, not light:
+
+```
+shaft 343 W  ->  traction model 115 g   calibrated  82 g   (+40%)
+shaft 800 W  ->  traction model 267 g   calibrated 175 g   (+53%)
+```
+
+`motor.bldc` (`:rom-bldc`, in kami-engine-motor) now fits
+`mass_g = a * P_W^b` over that table — a = 0.374, b = 0.898, R2 0.979 in log
+space, worst residual 18.6%. The fit is computed from the table at call time, so
+the constants cannot drift away from their data; the solver reports
+`:extrapolated?` outside 216-3180 W and carries `:worst-residual` rather than
+inventing confidence. KV is not in the fit (mass tracks torque, and these
+datasheets do not state rpm at max power), which is part of that residual.
+
+`multirotor.closure` now calls it. The consequences are not cosmetic:
+
+| | before | after |
+|---|---|---|
+| baseline MTOW (1.5 kg / 20 min) | 5.301 kg | **4.926 kg** |
+| motors (4) | 458 g | **306 g** |
+| rotor diameter | 429 mm | **413 mm** |
+| hover, electrical | 600 W | **558 W** |
+| endurance boundary at 1.5 kg | ~25 min | **~36 min** |
+| 14 kg / 12 min | reported DIVERGES | **closes at 31.6 kg** |
+| 1.5 kg / 30 min | reported DIVERGES | **closes at 8.66 kg** |
+
+So the aircraft got lighter and **the feasible envelope grew** — designs this ADR
+published as non-existent do exist. Two of its own examples were among them.
+
+The general lesson is the one this workspace already writes down and this ADR
+still managed to break: **a confident claim about the direction of an error, made
+without measuring, is not a caveat — it is a wrong result with a humble tone.**
+A refusal is only as good as the sizing beneath it.
+
+Still absent after this amendment: the design actor, the manufacturing and
+compliance surface, rotor-to-rotor effects, and any green fleet gate."}]
