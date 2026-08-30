@@ -53,6 +53,57 @@
          ;; legacy script names that agents already touch.
          (not (re-find #"(^|/)(\.claude|scripts|tools|bin)/" p)))))
 
+(defn- unquote-arg
+  "Strip one layer of matching shell quotes. `\"/a b\"` -> `/a b`."
+  [s]
+  (let [s (str/trim (str s))
+        n (count s)]
+    (if (and (>= n 2)
+             (or (and (str/starts-with? s "\"") (str/ends-with? s "\""))
+                 (and (str/starts-with? s "'") (str/ends-with? s "'"))))
+      (subs s 1 (dec n))
+      s)))
+
+(defn- literal-path?
+  "False when the shell would produce something other than these bytes:
+  an unexpanded variable, command substitution, a glob, or `~`."
+  [p]
+  (not (re-find #"[$`*?~]|\$\{" (str p))))
+
+(defn target-dir
+  "Which git repository does `cmd` act on?
+
+  `git -C <dir>` wins. Otherwise the LAST `cd` that runs before the git
+  command, separated by `&&`, `;` or a newline, with the path bare,
+  \"double\" or 'single' quoted.
+
+  Returns `\".\"` when the command never changes directory, and **nil when it
+  does but the destination is not literal** (`$VAR`, a glob, `~`). nil means
+  `I could not tell`, and callers must not read it as `\".\"`: this guard
+  answers a question about one repository, and answering it about a different
+  one is wrong in both directions — a clean tree hides a real violation, and
+  a busy tree denies a commit that adds nothing.
+
+  Measured 2026-08-30: the previous regex accepted only `^cd <bare> &&`, so
+  `cd /a/b` on its own line, and `cd \"$SP/x\" &&`, both silently fell back to
+  `\".\"` — the west superproject — and denied commits in child repos for
+  dependencies belonging to neither."
+  [cmd]
+  (let [cmd (str cmd)]
+    (if-let [c (second (re-find #"\bgit\s+-C\s+(\"[^\"]*\"|'[^']*'|\S+)" cmd))]
+      (unquote-arg c)
+      (let [cds (->> (re-seq #"(?:^|&&|;|\n)\s*cd\s+(\"[^\"]*\"|'[^']*'|[^\s;&|]+)" cmd)
+                     (map second))]
+        (if (empty? cds)
+          "."
+          (let [dir (unquote-arg (last cds))]
+            (when (literal-path? dir) dir)))))))
+
+(defn commit-includes-unstaged?
+  "`git commit -a` also commits tracked files that were never staged."
+  [cmd]
+  (boolean (re-find #"\bcommit\b[^\n]*?(?:\s-[a-zA-Z]*a|\s--all\b)" (str cmd))))
+
 (defn- coord-org [sym v]
   (or (second (re-find #"github\.com[:/]([^/]+)/" (str (:git/url v ""))))
       (second (re-find #"^(?:io|com|net)\.github\.([^/]+)/" (str sym)))))
@@ -158,6 +209,25 @@
                :aliases {:lint {:replace-deps {clj-kondo/clj-kondo {:mvn/version \"2024.01.01\"}}}}}"
         {:keys [added]} (new-runtime-third-party nil after)]
     (assert! "alias lint not top-level" (empty? added)))
+  ;; target-dir — the parsing that decides WHICH repo is measured.
+  (assert! "no cd -> ." (= "." (target-dir "git commit -m x")))
+  (assert! "cd && bare" (= "/a/b" (target-dir "cd /a/b && git commit -m x")))
+  (assert! "cd on its own line"
+           (= "/a/b" (target-dir "cd /a/b\ngit add -A\ngit commit -m x")))
+  (assert! "cd double-quoted" (= "/a b" (target-dir "cd \"/a b\" && git commit")))
+  (assert! "cd single-quoted" (= "/a b" (target-dir "cd '/a b' && git commit")))
+  (assert! "semicolon separated" (= "/a/b" (target-dir "cd /a/b ; git commit")))
+  (assert! "last cd wins" (= "/second" (target-dir "cd /first && cd /second && git commit")))
+  (assert! "git -C beats cd" (= "/c" (target-dir "cd /a && git -C /c commit")))
+  (assert! "git -C quoted" (= "/c d" (target-dir "git -C \"/c d\" commit")))
+  (assert! "unexpanded var -> nil" (nil? (target-dir "cd \"$SP/x\" && git commit")))
+  (assert! "braced var -> nil" (nil? (target-dir "cd ${SP}/x && git commit")))
+  (assert! "tilde -> nil" (nil? (target-dir "cd ~/x && git commit")))
+  (assert! "glob -> nil" (nil? (target-dir "cd /a/*/b && git commit")))
+  (assert! "commit -a" (commit-includes-unstaged? "git commit -am x"))
+  (assert! "commit --all" (commit-includes-unstaged? "git commit --all -m x"))
+  (assert! "plain commit" (not (commit-includes-unstaged? "git commit -m x")))
+  (assert! "-m is not -a" (not (commit-includes-unstaged? "git commit -m 'add all files'")))
   (println "self-test passed"))
 
 (defn -main [& args]

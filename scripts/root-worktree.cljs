@@ -132,9 +132,25 @@
     (set (map second (re-seq #"(?m)^    - name: (\S+)$" content)))))
 
 (defn- normalize-gitdir-file!
-  "この workspace の hook が linked worktree の `.git` file を symlink に置換することが
-  ある。Git 自身の remove validation は symlink を拒むため、作成直後に標準の一行
-  gitdir pointer file へ戻す。参照先は symlink の realpath から取り、推測しない。"
+  "**git-annex** が linked worktree の `.git` file を symlink に置換する。Git 自身の
+  remove validation は symlink を拒むため、作成直後に標準の一行 gitdir pointer file
+  へ戻す。参照先は symlink の realpath から取り、推測しない。
+
+  犯人が特定できたので記録する（実測 2026-08-30）。superproject は annex repo
+  （`annex.uuid` / `annex.version 10` / `.git/annex` が在り、`.git/hooks/post-checkout`
+  は git-annex のもの）で、annex は worktree 内で annex symlink が解決するよう
+  `.git` を symlink に変換しようとする。現場で出る警告がそう言っている:
+
+    warning: unable to convert .git file to symlink that will work with
+    git-annex: createSymbolicLink '../../annex' to './.git/annex'
+
+  **だから superproject の linked worktree でだけ起きる。** 対照として
+  `orgs/kotoba-lang/kotoba-annex` には annex 設定が無く、そこでは一度も起きない
+  （同日、両方で worktree を作って確認した）。
+
+  ⚠ **生の `git worktree add` で superproject の worktree を作ると、これを踏む。**
+  後で `git worktree remove` が `'.git' is not a .git file` で拒否し、branch も
+  「worktree に使われている」ため削除できなくなる。この関数を通る `create` を使うこと。"
   [target]
   (let [dotgit (.join path target ".git")]
     (when (and (.existsSync fs dotgit) (.isSymbolicLink (.lstatSync fs dotgit)))
