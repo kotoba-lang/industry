@@ -118,6 +118,42 @@
 (defn- local-uuid [dir]
   (str/trim (:out (sh "git" "config" "annex.uuid" {:cwd dir}))))
 
+(defn remote-providers
+  "UUID → **provider**, from the git-annex branch's `remote.log`.
+
+   A provider is *who would have to fail for the copy to be gone*. For an S3
+   remote that is the `host=` it signs against; for an `external` remote its
+   `externaltype=`; otherwise the remote `type=`.
+
+   **This is deliberately not the remote name.** Two remotes called `b2` and
+   `b2-backup` pointing at the same `s3.us-west-004.backblazeb2.com` are one
+   provider. `numcopies=2` satisfied that way survives a deleted bucket and a
+   leaked key — which is real — but not that provider having a bad day, and
+   counting names would report two and imply otherwise.
+
+   Reads only the non-secret fields. `remote.log` also carries `cipher=` and
+   `s3creds=`; those are never parsed and never reported, because a custody
+   report is written to disk with --report."
+  [dir]
+  (let [{:keys [out exit]} (sh "git" "show" "git-annex:remote.log" {:cwd dir})]
+    (if-not (zero? (or exit 1))
+      {}
+      (into {}
+            (keep (fn [line]
+                    (let [toks (str/split (str/trim line) #"\s+")
+                          uuid (first toks)
+                          kv (into {} (keep (fn [t]
+                                              (let [i (.indexOf t "=")]
+                                                (when (pos? i)
+                                                  [(subs t 0 i) (subs t (inc i))])))
+                                            (rest toks)))]
+                      (when (and uuid (re-matches #"[0-9a-f-]{36}" uuid))
+                        [uuid (or (get kv "host")
+                                  (get kv "externaltype")
+                                  (get kv "type")
+                                  "unknown")]))))
+            (remove str/blank? (str/split-lines (or out "")))))))
+
 (defn whereis
   "Parses `git annex whereis --json` (one JSON object per line).
 
@@ -144,6 +180,7 @@
                      (when-let [f (get m "file")]
                        {:file f
                         :copies (count trusted)
+                        :uuids (set (keep #(get % "uuid") trusted))
                         :untrusted (count untrusted)
                         :on (set (map #(get % "description") trusted))
                         :where (mapv #(get % "description") (concat trusted untrusted))}))
@@ -249,6 +286,12 @@
           {:name name :status :skipped :reason "not a git-annex repo (no annex.uuid)"}
           (let [entries (whereis dir)
                 total (count entries)
+                uuid->provider (remote-providers dir)
+                ;; どのプロバイダが落ちたら、この dataset のコピーが消えるか。
+                providers (->> entries
+                               (mapcat :uuids)
+                               (keep #(get uuid->provider %))
+                               set)
                 creds (creds-health dir)
                 broken-creds (filterv #(not (:usable? %)) creds)
                 at-risk (filter #(and (zero? (:copies %)) (zero? (:untrusted %))) entries)
@@ -297,6 +340,9 @@
                              (seq broken-creds))
                        :fail :ok)
              :annexed total
+             ;; 「off-machine コピーが 2 本」と「独立したプロバイダが 2 社」は
+             ;; 別の主張である。前者だけを報告すると、後者だと読まれる。
+             :providers (vec (sort providers))
              :broken-creds broken-creds
              :at-risk (mapv :file at-risk)
              :only-untrusted (mapv :file only-untrusted)
@@ -318,6 +364,13 @@
       sample-n (let [n (js/parseInt (or (arg argv "--sample") "1") 10)]
                  (if (js/isNaN n) 1 n))
       report-path (arg argv "--report")
+      ;; 既定では**報告するだけ**。ここを既定で fail にすると、今の構成
+      ;; （同一プロバイダの 2 bucket）が一斉に赤くなり、しかもそれは
+      ;; 「壊れている」ではなく「プロバイダ障害には耐えない」という別の主張である。
+      ;; 2 社目を足した側が、足したことを機械に守らせるためのスイッチ。
+      require-providers (let [v (arg argv "--require-providers")]
+                          (when v (let [n (js/parseInt v 10)]
+                                    (when-not (js/isNaN n) n))))
       declared (projects)
       on-disk (annexed-checkouts-on-disk)
       ;; 印の無い annex dataset も対象にする（印は宣言、disk は観測）。
@@ -359,8 +412,42 @@
                       " good-passed=" good-passed?))
         (when-not (and empty-flagged? good-passed? (= 2 (count health)))
           (fail "self-test 失敗: creds-health が空の credential を検出できていません。"))
-        (println "self-test ok")
-        (exit 0))))
+        (println "self-test ok"))
+      ;; provider 判定も同じ流儀で、**実際の git object** に対して確かめる。
+      ;; remote.log を合成して git-annex branch に置き、`remote-providers` が
+      ;; 「remote 名」ではなく「落ちたらコピーが消える先」を返すことを見る。
+      (let [dir (str (or (.-TMPDIR (.-env js/process)) "/tmp") "/annex-provider-selftest")
+            log (str "11111111-1111-1111-1111-111111111111 bucket=one host=s3.us-west-004.backblazeb2.com name=b2 type=S3 timestamp=1s\n"
+                     "22222222-2222-2222-2222-222222222222 bucket=two host=s3.us-west-004.backblazeb2.com name=b2-backup type=S3 timestamp=2s\n"
+                     "33333333-3333-3333-3333-333333333333 bucket=three host=gateway.storjshare.io name=storj type=S3 timestamp=3s\n"
+                     "44444444-4444-4444-4444-444444444444 externaltype=ipfs name=ipfs type=external timestamp=4s\n")]
+        (sh "rm" "-rf" dir {})
+        (.mkdirSync fs dir #js {:recursive true})
+        (sh "git" "init" "-q" dir {})
+        (.writeFileSync fs (str dir "/remote.log") log)
+        (let [blob (str/trim (:out (sh "git" "hash-object" "-w" "remote.log" {:cwd dir})))
+              tree (str/trim (:out (sh "git" "mktree" {:cwd dir :input (str "100644 blob " blob "\tremote.log\n")})))
+              commit (str/trim (:out (sh "git" "commit-tree" tree "-m" "annex" {:cwd dir})))]
+          (sh "git" "update-ref" "refs/heads/git-annex" commit {:cwd dir})
+          (let [m (remote-providers dir)
+                distinct-providers (set (vals m))]
+            (sh "rm" "-rf" dir {})
+            (println (str "self-test: remotes-in-log=" (count m)
+                          " distinct-providers=" (count distinct-providers)))
+            ;; 4 remote あるが、**独立したプロバイダは 3**。b2 と b2-backup は
+            ;; 同じ host なので 1 つに畳まれなければならない —— ここが畳まれないなら
+            ;; この検査は remote 名を数えているだけで、何も保証していない。
+            (when-not (and (= 4 (count m))
+                           (= 3 (count distinct-providers))
+                           (= (get m "11111111-1111-1111-1111-111111111111")
+                              (get m "22222222-2222-2222-2222-222222222222"))
+                           (= "gateway.storjshare.io"
+                              (get m "33333333-3333-3333-3333-333333333333"))
+                           (= "ipfs" (get m "44444444-4444-4444-4444-444444444444")))
+              (fail (str "self-test 失敗: remote-providers が provider を畳めていません: "
+                         (pr-str m))))
+            (println "self-test ok (providers)"))))
+      (exit 0)))
   (when (some #{"--list-projects"} argv)
     (doseq [{:keys [name path]} targets] (println (str name " " path)))
     (exit 0))
@@ -395,6 +482,9 @@
         :unverified (println (str "  - " (:name r) ": UNVERIFIED — " (:annexed r)
                                   " annexed; " (:reason r)))
         :ok (println (str "  - " (:name r) ": OK — " (:annexed r) " annexed, all with off-machine copies"
+                          "; providers=" (count (:providers r))
+                          (when (seq (:providers r))
+                            (str " (" (str/join ", " (:providers r)) ")"))
                           (when (seq (:sampled r))
                             (str "; verified from " (:remote r) ": " (str/join ", " (:sampled r))))))
         :fail (do
@@ -430,9 +520,30 @@
                                 file))
                   (doseq [l (take 3 (remove str/blank? (str/split-lines (str error))))]
                     (println (str "        " l)))))))
-    (when report-path
-      (spit report-path (str (pr-str {:annex-custody/results results}) "\n"))
-      (println (str "report -> " report-path)))
-    (if (seq failed)
-      (do (println "annex-custody-verify: FAIL") (exit 1))
-      (println "annex-custody-verify: OK"))))
+    ;; **「off-machine コピーが N 本」と「独立したプロバイダが N 社」は別の主張。**
+    ;; 前者だけを印字すると後者だと読まれる。同一プロバイダの 2 bucket は
+    ;; bucket の削除と鍵 1 本の侵害には耐えるが、そのプロバイダの障害には耐えない。
+    (let [want (or require-providers 2)
+          thin (filter #(and (= :ok (:status %))
+                             (pos? (:annexed %))
+                             (< (count (:providers %)) want))
+                       results)]
+      (when (seq thin)
+        (println (str "annex-custody-verify: "
+                      (if require-providers "PROVIDER INDEPENDENCE FAIL" "NOTE")
+                      " — " (count thin) " project(s) hold every copy at fewer than "
+                      want " independent provider(s):"))
+        (doseq [r thin]
+          (println (str "  - " (:name r) ": providers=" (count (:providers r))
+                        " (" (str/join ", " (:providers r)) ")")))
+        (println (str "      2 本目は別プロバイダの S3 互換で足せる（新規コード不要）: "
+                      "ANNEX_ENDPOINT=<host> ANNEX_BUCKET=<bucket> ANNEX_KEY_ID=… "
+                      "ANNEX_APP_KEY=… scripts/datalad-b2-init.cljs <dir> <remote-name>")))
+      (when report-path
+        (spit report-path (str (pr-str {:annex-custody/results results}) "\n"))
+        (println (str "report -> " report-path)))
+      (cond
+        (seq failed) (do (println "annex-custody-verify: FAIL") (exit 1))
+        (and require-providers (seq thin))
+        (do (println "annex-custody-verify: FAIL (provider independence)") (exit 1))
+        :else (println "annex-custody-verify: OK")))))

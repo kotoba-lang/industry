@@ -52,6 +52,27 @@ description: How to handle large binaries (model weights, wasm, video, image dat
   2 回実行して 2 本目を足すのが正しい（同一プロバイダでも bucket 削除と鍵 1 本の
   侵害には耐える。**プロバイダ障害には耐えない**ので、そう書く）。
 
+- **「コピーが 2 本」と「プロバイダが 2 社」は別の主張で、いまは機械が区別する。**
+  `annex-custody-verify` は git-annex branch の `remote.log` から各 remote の
+  **provider**（S3 なら `host=`、external なら `externaltype=`）を引き、
+  copy 数とは別に provider 数を印字する。`b2` と `b2-backup` が同じ host を指して
+  いれば **1 社**に畳まれる —— remote 名を数えれば 2 に見えるが、そのプロバイダが
+  落ちれば両方消えるので、それは 2 ではない。
+
+  ```bash
+  nbb --classpath ".:scripts/nbb_compat" scripts/annex-custody-verify.cljs --sample 0
+  #   … providers=1 (s3.us-west-004.backblazeb2.com)  ← 既定は報告のみ
+  nbb … scripts/annex-custody-verify.cljs --require-providers 2   # 満たさなければ exit 1
+  ```
+
+  **既定を fail にしていない**のは、今の構成（同一プロバイダの 2 bucket）は
+  壊れているのではなく「プロバイダ障害には耐えない」という別の状態だから。
+  2 社目を足した側が `--require-providers 2` を CI に入れて、足したことを機械に
+  守らせる。2 本目は**別プロバイダの S3 互換**なら新規コード 0 行で足せる
+  （`ANNEX_ENDPOINT` / `ANNEX_BUCKET` / `ANNEX_KEY_ID` / `ANNEX_APP_KEY` を渡して
+  `datalad-b2-init.cljs` をもう一度）。Storj の Gateway-MT は署名付き S3 なので
+  `type=S3` のまま入る（`kotoba-lang/io-storj` 参照）。
+
 - **共有 bucket を使うときは `B2_FILEPREFIX` を必ず渡す。** legislation 4 件と
   tsukuru-manufacturing-artifacts はいずれも `gftdcojp-m365-annex` を prefix で
   分けて共有している（tsukuru はさらに 2 本目として `ai-gftd-datasets` にも
