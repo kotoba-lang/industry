@@ -42,7 +42,11 @@
    "deploy 2026-08-31: kotobase-protocols-worker version 44e201d8-1c85-405e-af59-118a7737a7f6, control-plane adc2b753 — sparql/gremlin/graphql が Biscuit を読む (201 tests, 0 failures)"
    "control 実行 (rung 除去): 落ちたのは acceptance test 1 本のみ。refusal test 6 本と header-changes-answer test は緑のまま"
    "deploy 2026-08-31 その2: net-kotobase gateway version 19c9271e, control-plane 5e3b2976 — xrpc 401 が presented/details を名乗る (536 tests, 0 failures)"
-   "再測定 2026-08-31 08:11Z: overall 40.00, kotobase.net 100.00 (4/4 plane)"]
+   "再測定 2026-08-31 08:11Z: overall 40.00, kotobase.net 100.00 (4/4 plane)"
+   "deploy 2026-08-31 その3: itonami-app-auth version 188053db, app-auth 795edbf4 — /v1/biscuit/token を kotobase-authn へ転送 (worker smoke 全 pass, 新規 13 check)"
+   "転送が本物である証拠: 同じ偽 bearer に対し auth.itonami.cloud と auth.kotobase.net が同一の 401 not authorized を返す"
+   "app-aozora-auth の wrangler secret list は空。PDS_JWT_SECRET は app-aozora-pds のみが持つ"
+   "再測定 2026-08-31 09:48Z: overall 45.83, itonami.cloud 65.00"]
   :adr/body
   "# ADR-2608311600: 6 apex に対する 1 つの認証・権限設計
 
@@ -225,10 +229,68 @@ Biscuit を読んで authn へ転送していた（`^Biscuit [A-Za-z0-9_-]{80,81
 
 datom 面 / IPLD / IPNI の設計判定は **ADR-2608311800**。
 
+## 6.7 配線（2026-08-31）— §5 の 2 と 5 が着地、3 は 1 つの秘密で止まっている
+
+**overall 45.83。itonami.cloud 45.00 → 65.00。**
+
+### §5-2 着地: `auth.itonami.cloud/v1/biscuit/token`（version `188053db`）
+
+**mint ではなく転送。** root seed は `kotobase-authn` だけが持つ（ADR-2608261300）ので、
+service binding で転送し、拒否も含めて答えをそのまま返す。**2 つ目の issuer を作らない。**
+
+実測で転送が本物であることを確認: 同じ偽 bearer に対して `auth.itonami.cloud` と
+`auth.kotobase.net` が**同一の `{error: not authorized}` 401** を返す ——
+ローカルの stub ではなく issuer の principal 検査まで到達している。credential 無しは
+issuer 自身の **403 same-origin**（以前は 404）。
+
+**Cookie は転送しない。** authn の session cookie は `gftd_session` で自分の apex に
+scope されており、こちらの session は itonami のもの。**一方の apex の session 名を
+他方の名前空間で解釈させるのは、この設計全体が避けている confused deputy の形。**
+戻りの `set-cookie` も落とす。どちらも smoke test が assert する（コメントの主張ではない）。
+
+**隠さずに書く**: itonami の passkey session だけでは今日 mint できない。service account
+と bearer 保持者はできる（authn の handler が *a live human session or service-account
+bootstrap secret* を受け、CSRF guard が Authorization 提示者を免除する）。**principal の
+接続は ADR-0082 の controller の問いで、proxy では解けない** —— WebAuthn credential は
+RP-scoped なので、転送で他 apex の ceremony が有効になることはない。
+
+### §5-3 は **1 つの秘密**で止まっている（aozora）
+
+`app-aozora-auth` は **secret を 1 つも持たずに deploy されている**（`wrangler secret
+list` → `[]`）。必要な `PDS_JWT_SECRET` は `app-aozora-pds` が持ち、**設計上読めない**。
+リポジトリ自身が場所と手順を書いている（`auth/README.md`、vault item
+`aozora PDS_JWT_SECRET`）。
+
+**新しい値を生成して解決しない。** 同 README が「rotation は両 Worker で同時に」と
+書いており、片側だけ違う値にすると in-flight session が静かに壊れる ——
+**503 より悪い**。`op read` は 1 件狙い撃ちで試して無音で失敗した（CLAUDE.md が記録する
+interactive unlock timeout）。**繰り返し叩けば owner に unlock prompt を連発するので、
+1 回で止めた。**
+
+⚠ **path を共有契約に寄せる／秘密の gate を緩める、のどちらもしなかった。**
+どちらも `controller-live` / `one-authority` を緑にするが、**sign-in は壊れたまま**に
+なる —— 計器だけが動いて製品が動かない、この ADR が禁じている形そのもの。
+
+**解除条件**: `auth/` で `npx wrangler secret put PDS_JWT_SECRET`（pds と同じ値）。owner 操作。
+
+### 配線の途中で踏んだ欠陥 2 件（どちらも「静かに何もしなかった」形）
+
+1. **`:require` の挿入が黙って失敗した。** assert を付けない文字列置換を、**main より
+   9 commit 遅れた checkout** から読んだ内容に対して当てた。anchor が存在せず置換は
+   0 件、そして **`shadow-cljs release worker` は exit 0 で成功した** ——
+   `No such namespace: issuer` を警告しながら、存在しない global への呼び出し
+   `issuer.Ac(b,a)` を出力して。**本番の最初のリクエストで ReferenceError になる。**
+2. **その guard として入れた `:warnings-as-errors true` が効かなかった。**
+   トップレベルと build map の両方で試し、**両方とも欠陥を再投入して確かめた** ——
+   build は同じ 2 警告で exit 0 のまま。**commit していない。落ちることを示せない
+   guard は、誰も持っていない保護として読まれる。**
+
+捕まえたのは `test/worker_smoke.cljs`（**built artifact** を走らせて
+`issuer is not defined` で abort）。危険は次に人が立つ場所、`shadow-cljs.edn` に記録した。
+
 ## 7. やっていないこと（正直に）
 
-- **§5 の 3〜5 は着地していない。** 3 は aozora の passkey を共有契約へ、
-  4 は x402 / isekai に principal を接続、5 は `pds.aozora.app` の 200 →401。
+- **§5-3 は owner の 1 操作待ち**（上記）。**§5-4 は未着手**（x402 / isekai に principal）。
 - **probe は credential を持たない。** 測れるのは「拒否がどう名乗るか」までで、
   **正当な Biscuit が実際に通ることは測っていない。**
 - **`plane-reads-capability` は正しい Biscuit で測っていない。** 構文だけの
