@@ -296,7 +296,19 @@
                                     [kind m] (if f (classify-manifest f) [:absent nil])
                                     nm (:repo/name e)]]
                           {:repo nm :path (:repo/path e) :file f :kind kind :manifest m
-                           :skus (get skus nm) :book (read-pricing-book dir)})
+                           ;; **カタログの seller 名は repo 名とは限らない。**
+                           ;; 実測 2026-08-31: `cloud-itonami/actor-hanmoto` は
+                           ;; seller `hanmoto` として live で払える状態なのに、
+                           ;; repo 名で引いていたので `no-sku` と読まれていた。
+                           ;; 宣言（`:actor/x402-seller`）を優先し、無ければ
+                           ;; repo 名に落ちる —— そして**落ちたことを数える**。
+                           :seller (or (:actor/x402-seller m)
+                                       (get m "actor/x402-seller") nm)
+                           :seller-declared? (boolean (or (:actor/x402-seller m)
+                                                          (get m "actor/x402-seller")))
+                           :skus (get skus (or (:actor/x402-seller m)
+                                               (get m "actor/x402-seller") nm))
+                           :book (read-pricing-book dir)})
                    actors (filter #(= :actor (:kind %)) rows)
                    schemas (filter #(= :schema (:kind %)) rows)
                    broken (filter #(#{:unparseable :absent} (:kind %)) rows)]
@@ -310,6 +322,10 @@
                              "\ton-disk actor.edn dirs=" (count on-disk)
                              "\tin evidence=" (count flagged)
                              (when (pos? unseen) (str "\tUNSEEN=" unseen))))
+               (println (str "SELLER-NAMES\tdeclared="
+                             (count (filter :seller-declared? rows))
+                             " of " (count rows)
+                             "\t(undeclared fall back to the repo name, which can miss silently)"))
                (println (str "SCANNED\t" (count rows)))
                (println (str "ADMITTED\t" (count actors)))
                (println (str "SCHEMA-NOT-ACTOR\t" (count schemas)))
@@ -398,6 +414,13 @@
                                   (str/join ", " unseen-names)
                                   ". Re-run scripts/itonami-maturity-scan.cljs. Evidence: "
                                   ev-path)))
+                 (when (seq (remove :seller-declared? actors))
+                   (finding! "warn" "seller-name-undeclared"
+                             (str (count (remove :seller-declared? actors)) " of " (count actors)
+                                  " actors do not declare :actor/x402-seller, so the catalog is"
+                                  " joined on the repo name. A seller whose name differs from its"
+                                  " repo reads as no-sku while being live and payable -- measured"
+                                  " on actor-hanmoto (seller \"hanmoto\") on 2026-08-31.")))
                  (when (seq broken)
                    (finding! "warn" "actor-manifest-unparseable"
                              (str (count broken) " actor.edn could not be read or parsed: "
