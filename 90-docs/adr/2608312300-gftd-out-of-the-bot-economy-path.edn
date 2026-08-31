@@ -32,7 +32,8 @@
   :adr/related
   ["90-docs/adr/2607242100-cloud-itonami-awai-network-operator-change.edn（Stripe merchant of record が Gftd Japan のままという既知 gap）"
    "90-docs/adr/2607320500-legal-structure-three-roles-no-foundation-no-custody.edn（法人は 2 つ。Gftd Japan は収納代行・インフラ vendor であって Service operator ではない）"
-   "90-docs/adr/2608026100-murakumo-credits-as-unit-of-account-opaque-backend.edn（hold/capture/release の欠落を最初に名指しした ADR）"]
+   "90-docs/adr/2608026100-murakumo-credits-as-unit-of-account-opaque-backend.edn（hold/capture/release の欠落を最初に名指しした ADR）"
+   "**既存の gftd 除去トラック** —— superproject の PR #2826（codex/remove-gftd-bots-pin-clean、merged）と kotoba-lang/murakumo の codex/remove-gftd-runtime-wave2-20260827（main の 1 commit 先、tools/qa のみ）。**本 ADR はそれらと競合する波ではなく、方向の決定とガードレールである。** 実際に文字列や runtime を外す作業はそのトラックで行い、D2 の『触ってはならないもの』を必ず先に読むこと"]
 
   :adr/measured
   ["ADR-2608291009 が受け皿として挙げる 10 repo に gftdcojp org の repo は 1 つも無い。統合経路は repo の単位では既に gftd を含まない"
@@ -147,7 +148,8 @@ fold が価値を失わず、発明もしない**。差額はその場で口座�
    "not-done-deliberately: YATA 用 bucket の作成。step 1 の原価が未測定のまま bucket だけ作っても、掲示価格を決められない"]
 
   :adr/known-gaps
-  ["**`balances` が JSON 形の feed を畳めない（既存欠陥、今回の発見）。** 文字列キーの事象は `balances-step` の cond をすべて外れて `:else` に落ち、**settle 済み run として読み替えられる**。実測: (balances [{run/shares {alice 500.0}} {run/spend {alice 120.0}}]) → {head 0.0, :treasury 0.0}。残高も spend も消え、代わりに head と treasury の行が生える。同じ feed を `refundable` は正しく読む。つまり **ledger の検査が読めた feed が、ledger の fold では別物になる**。murakumo の test に `ledger-checks-read-json-feeds-but-the-fold-does-not` として現在の契約を固定した。直すのは `balances` の意味を変える別の変更"
+  ["**本 ADR を書く前に、既存の gftd 除去トラックを引かなかった。** 起草後に worktree 一覧で codex/remove-gftd-runtime-wave2-20260827 に気づき、そこから PR #2826 に辿った。CLAUDE.md の『無いと結論する前に索引を引く』は repo にも作業トラックにも当たる —— 方向を決める ADR を書く前に、同じ方向で既に走っているものを引くべきだった。内容は競合しないが、参照が無ければ次に読む者が重複して波を立てる"
+   "**`balances` が JSON 形の feed を畳めない（既存欠陥、今回の発見）。** 文字列キーの事象は `balances-step` の cond をすべて外れて `:else` に落ち、**settle 済み run として読み替えられる**。実測: (balances [{run/shares {alice 500.0}} {run/spend {alice 120.0}}]) → {head 0.0, :treasury 0.0}。残高も spend も消え、代わりに head と treasury の行が生える。同じ feed を `refundable` は正しく読む。つまり **ledger の検査が読めた feed が、ledger の fold では別物になる**。murakumo の test に `ledger-checks-read-json-feeds-but-the-fold-does-not` として現在の契約を固定した。直すのは `balances` の意味を変える別の変更"
    "**murakumo の `-M:test` がこの環境で起動しない。** `babashka/http-client` が classpath に無く、`kotoba.lang.http.host.babashka` のロードで落ちる。**私の branch でも無改変の main でも同じ**なので既存の環境 gap だが、結果として step 2 の検証は当該 namespace を直接ロードして行った（33 tests / 163 assertions）。repo 全体の suite は今日この機械では緑にできない"
    "YATA の原価が未測定（D4 step 1）。B2 の請求は web console にしか無く、agent は読めない。usage（GB 数）は scoped key で測れるが、それは請求ではない"
    "Stripe merchant of record が Gftd Japan のまま（D3-2）。BOT 経済の収入経路がここを通る限り、『外部が決済した収入』の着地点が gftd 側にある"
