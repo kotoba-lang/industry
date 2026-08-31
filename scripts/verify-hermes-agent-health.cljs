@@ -117,6 +117,27 @@
         (.toString buf "utf8"))
       (finally (fs/closeSync fd)))))
 
+(defn- oldest-ms
+  "Epoch ms of the earliest timestamped line in `text`, or nil.
+
+  This is what makes the window claim checkable. Without it a clean scan of a
+  log that only reaches back 55 minutes prints the same thing as a clean scan
+  of a log that reaches back 48 hours -- CLAUDE.md's question 4, applied to
+  this file's own output."
+  [text]
+  (reduce (fn [acc line] (if-let [t (line-ms line)] (if acc (min acc t) t) acc))
+          nil (str/split-lines text)))
+
+(defn- merge-scans
+  "Combine per-file class maps: counts add, and the newest sample wins."
+  [a b]
+  (reduce (fn [acc [k v]]
+            (let [cur (get acc k)]
+              (assoc acc k (if (and cur (>= (:last cur) (:last v)))
+                             (update cur :n + (:n v))
+                             (assoc v :n (+ (:n v) (:n cur 0)))))))
+          a b))
+
 (defn- scan-log
   "{class-key -> {:n :last :sample}} for lines inside the window."
   [text cutoff-ms]
@@ -175,9 +196,18 @@
                   :when (try (.isDirectory (fs/statSync d)) (catch :default _ false))]
               [n d])))))
 
+(def ^:private log-names
+  ;; hermes rotates errors.log at ~2 MB. Reading only the live file made this
+  ;; detector claim a 48h window over whatever survived rotation -- measured
+  ;; 2026-08-31: 96.3% of errors.log was one repeating warning and the oldest
+  ;; surviving line was 55 minutes old. Rotation is not a reason to shrink the
+  ;; window silently.
+  ["errors.log" "errors.log.1" "errors.log.2"])
+
 (defn- scan-profile [[name dir] cutoff-ms]
   (let [auth-p (path/join dir "auth.json")
-        log-p (path/join dir "logs" "errors.log")
+        log-ps (filterv fs/existsSync
+                        (mapv #(path/join dir "logs" %) log-names))
         out {:name name :read 0}
         out (if (fs/existsSync auth-p)
               (try (-> out
@@ -188,10 +218,17 @@
                    (catch :default e
                      (assoc out :error (str "auth.json: " (.-message e)))))
               out)]
-    (if (fs/existsSync log-p)
-      (try (-> out
-               (update :read inc)
-               (assoc :log (scan-log (read-tail log-p) cutoff-ms)))
+    (if (seq log-ps)
+      (try (reduce (fn [acc lp]
+                     (let [text (read-tail lp)]
+                       (-> acc
+                           (update :read inc)
+                           (update :log merge-scans (scan-log text cutoff-ms))
+                           (update :oldest (fn [o] (let [t (oldest-ms text)]
+                                                     (cond (nil? t) o
+                                                           (nil? o) t
+                                                           :else (min o t))))))))
+                   (assoc out :log {} :rotated? (> (count log-ps) 1)) log-ps)
            (catch :default e
              (assoc out :error (str "errors.log: " (.-message e)))))
       out)))
@@ -235,6 +272,14 @@
       (do (println "self-test OK — discriminates in both directions, for its own stated reason") 0)
       (do (println "self-test FAILED — a check that cannot fail is theatre") 1))))
 
+(defn- fmt1 [x] (.toFixed x 1))
+
+(defn- covered-h
+  "Hours of log this profile's files actually reach back, or nil when it has
+   no timestamped log at all."
+  [r]
+  (when-let [o (:oldest r)] (/ (- (.now js/Date) o) 3600000)))
+
 (defn- -main []
   (if self-test?
     (set! (.-exitCode js/process) (self-test!))
@@ -257,12 +302,45 @@
                          :when hit]
                      {:key (str "hermes-" key ":" (:name r))
                       :sev sev
-                      :detail (str (:n hit) "x in the last " window-hours "h — " say
-                                   " | " (:sample hit))}))]
+                      ;; Say the span this profile's logs actually reach back,
+                      ;; not the nominal window. They are the same only when
+                      ;; rotation has not eaten the difference.
+                      :detail (str (:n hit) "x in the last "
+                                   (let [cov (covered-h r)]
+                                     (if (and cov (< cov (* 0.95 window-hours)))
+                                       (str (fmt1 cov) "h of log that survives"
+                                            " (window is " window-hours "h; the rest"
+                                            " has rotated away)")
+                                       (str window-hours "h")))
+                                   " — " say " | " (:sample hit))}))]
           ;; Evidence floor. A profile whose files could not be read is not a
           ;; profile with nothing wrong, and the two used to print the same 0.
           (println (str "SCANNED\t" read-n "\tfile(s) across " (count ps) " profile(s)"
                         (when (seq broken) (str "\tUNREADABLE\t" (count broken)))))
+          ;; Coverage is evidence, not a finding: rotation is normal, and a
+          ;; class that could never return to green is the silence this file
+          ;; exists to break. But a clean scan over 55 minutes must not read
+          ;; as a clean scan over 48 hours.
+          ;; A young log and a rotated-away log both cover less than the
+          ;; window, and only one of them is a problem. The fleet MINIMUM
+          ;; conflates them: one profile whose log was created a minute ago
+          ;; drags it to 0.0h and hides that everyone else is fine.
+          (let [with-logs (filterv covered-h rs)
+                short (filterv #(< (covered-h %) (* 0.95 window-hours)) with-logs)
+                truncated (filterv :rotated? short)]
+            (println (str "LOGSPAN\tfull=" (- (count with-logs) (count short))
+                          "/" (count with-logs) " profile(s) cover " window-hours "h"
+                          (when (seq truncated)
+                            (str "\tTRUNCATED\t"
+                                 (str/join ", "
+                                   (for [r (take 3 (sort-by covered-h truncated))]
+                                     (str (:name r) "=" (fmt1 (covered-h r)) "h")))
+                                 " — rotation ate the rest; absence of a finding"
+                                 " there is not evidence over the full window"))
+                          (when (and (seq short) (empty? truncated))
+                            (str "\tYOUNG\t" (count short)
+                                 " profile(s) simply have less history than the"
+                                 " window; nothing has rotated away")))))
           (doseq [b broken]
             (binding [*print-fn* *print-err-fn*]
               (println (str "  unreadable: " (:name b) " — " (:error b)))))
