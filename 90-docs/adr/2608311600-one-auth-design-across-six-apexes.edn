@@ -48,7 +48,11 @@
    "app-aozora-auth の wrangler secret list は空。PDS_JWT_SECRET は app-aozora-pds のみが持つ"
    "再測定 2026-08-31 09:48Z: overall 45.83, itonami.cloud 65.00"
    "verify-credential-consumers: 4,329 repo 横断で /rpc/verify-operator の外部 consumer は 0、verify-inference は 8、verify-session は 6"
-   "cloud-murakumo-api branch agent/operator-biscuit-consumer c990fb6 — 277 tests/1432 assertions 0 failures、governed artifact refresh 待ちで未 merge"]
+   "cloud-murakumo-api branch agent/operator-biscuit-consumer c990fb6 — 277 tests/1432 assertions 0 failures、governed artifact refresh 待ちで未 merge"
+   "deploy 2026-08-31: app-aozora-auth 9883c91a (44 tests/143 assertions) と nexus-x402 7679d61e (89 tests/383 assertions)、いずれも control で判別を確認"
+   "auth.aozora.app / auth.kotoba.cloud / auth.itonami.cloud が同一 credential に同一の 401 not authorized を返す"
+   "再測定 2026-08-31 11:57Z: overall 52.50、x402.nexus 35.00、aozora.app 35.00"
+   "kotobase.biscuit-grant は net-kotobase/control-plane の shared/src に 1 ファイルだけ存在する — deployable の中に閉じた唯一の verifier"]
   :adr/body
   "# ADR-2608311600: 6 apex に対する 1 つの認証・権限設計
 
@@ -339,11 +343,73 @@ endpoint の一覧は issuer の source から**読む**（手書きの表は、
    **この欠陥は finding を隠す方向に壊れていた**ので、控えの合成ツリーには
    「数えてはいけない issuer 内の言及」を必ず含める。
 
+## 6.10 aozora と x402（2026-08-31）— overall 52.50
+
+**aozora.app 15.00 → 35.00 / x402.nexus 15.00 → 35.00。**
+
+### aozora: 秘密が要る修理と、要らない修理は別だった
+
+`app-aozora-auth` version `9883c91a`。**`/v1/biscuit/token` を kotobase-authn へ転送。**
+壊れていたのは 2 つで、**片方だけが秘密を必要としていた** —— ceremony は
+`PDS_JWT_SECRET` 待ちのまま（意図的に据え置き。新しい値を生成すると PDS 側の
+in-flight session が静かに壊れる）だが、**capability の発行は秘密を 1 つも要らなかった。**
+
+実測: **3 apex が同じ credential に同一の答えを返す。**
+
+```
+auth.aozora.app    {error: not authorized} 401
+auth.kotoba.cloud  {error: not authorized} 401
+auth.itonami.cloud {error: not authorized} 401
+```
+
+**Cookie は転送しない / 戻りの set-cookie は落とす。** control（cookie を転送集合に
+足す）で `the-cookie-is-not-forwarded-to-the-issuer` **だけ**が落ちることを確認済み。
+
+### x402: 拒否が提示されたものを名乗る
+
+`nexus-x402` version `7679d61e`。`{error: unauthorized}` 1 種類だった応答が、
+**none / bearer / biscuit / cacao / unknown-scheme** を区別する。**なぜ落ちたかは
+言わない** —— 共有 admin 秘密が 1 本の面で `wrong token` と `not configured` を
+分ければ、未認証の呼び手にこの deployment を教えることになる。
+
+**Biscuit は「まだ受け付けない」と明言する。** 沈黙は拒否されたトークンと同じ顔をする。
+
+### §5-4 が配線だけでは終わらない構造的な理由
+
+**x402 に mint だけ足すことは、しなかった。** それは自分で
+**未消費 credential**（§6.8 の欠陥）を作る手である。受け取りが先。
+
+受け取りには verifier が要る。そして fleet 唯一の実装 —— **自分の docstring が
+*one implementation, two deployables* と書いている `kotobase.biscuit-grant`** ——
+は **`net-kotobase/control-plane` という deployable の中**にあり、
+`shared/src/kotobase/` に**ただ 1 ファイル**として置かれている。
+
+**3 つ目の consumer は、他プロダクトの repo に source 依存するか、2 つ目の verifier を
+書くかしかない。誰もどちらもしていない。**
+
+**これが観測されたパターンの説明である**: itonami と aozora は issuer へ**転送**し、
+murakumo と x402 は**何も受け取らない** —— 設計ではなく **packaging** がそうさせている。
+解くには verifier を library repo へ出す必要があり、それは repo の決定であって配線ではない。
+
+### 今回踏んだ計測側の欠陥 2 件
+
+1. **zsh の単語分割で `-H` が渡っていなかった。** `${h:+-H $h}` の形（引数を変数で組む書き方）は zsh で 1 語になる
+   （CLAUDE.md が `west update $NAMES` で記録しているのと同じ罠）。**動いている deploy を
+   壊れていると報告する 1 歩手前だった** —— header を 1 つずつ独立の引数で渡して測り直した。
+2. **x402 の新しい build script はこのマシンで動かない。** 別セッションが同日 main に
+   入れた `npx --yes shadow-cljs release worker` が `release@latest` を install しようとして
+   失敗する —— CLAUDE.md が 2026-08-10 に実測記録している `npx --yes <pkg> <flag>` の欠陥。
+   shadow-cljs は devDependency に在るので `--no-install` なら通る。**他セッションの
+   進行中の変更なので直していない。報告に留める。**
+
 ## 7. やっていないこと（正直に）
 
 - **§5-3 は owner の 1 操作待ち**（`wrangler secret put PDS_JWT_SECRET`）。
 - **murakumo は governed artifact の refresh 待ち**（branch は保全済み、merge していない）。
-- **§5-4 は未着手**（x402 / isekai に principal）。
+- **isekai.network は 0.00 のまま。** 自己発行 did:key を controller として principal に
+  結ぶ**設計判断**が要る（proxy では解けない）。
+- **x402 が Biscuit を受け取れるようにするには `biscuit-grant` を library repo へ出す**
+  必要がある —— repo の決定。
 - **probe は credential を持たない。** 測れるのは「拒否がどう名乗るか」までで、
   **正当な Biscuit が実際に通ることは測っていない。**
 - **`plane-reads-capability` は正しい Biscuit で測っていない。** 構文だけの
