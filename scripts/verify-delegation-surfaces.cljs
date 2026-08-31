@@ -117,12 +117,31 @@
 
   Not the literal `kotoba://`. `authority`'s README counts eight schemes and
   one of them is `kotoba-rad://<rid>/push/<ref>`, which does not contain
-  `kotoba://` as a substring -- so a literal match cannot see it at all."
-  "kotoba[-a-z]*://")
+  `kotoba://` as a substring -- so a literal match cannot see it at all.
+
+  ## And it must NAME something
+
+  A trailing character after `://` is required, because an authority string
+  names a resource. `authority.scope/parse` refuses a scheme with an empty
+  path outright, so a bare `kotoba://` is not a scope at all and testing for
+  it is not a covering decision -- it is scheme detection.
+
+  Measured 2026-09-01: this detector's only production-path `warn` was
+  `kotoba-lang/bonsai`'s `remote_helper.clj`, which asks
+  `(str/starts-with? url \"kotoba://\")` beside the same test for
+  `\"https://\"` and `\"http://\"` to decide whether a GIT REMOTE is on the
+  network. There is no grant and no resource there; the scheme merely shares
+  a name with the capability one. With that the only finding, the detector
+  could never report clean, and a check that cannot go green is as
+  uninformative as one that cannot go red.
+
+  `[^/\"]` rather than `[a-z]`: `kotoba://*` is a real scope -- the whole
+  apex -- and a letter class would have stopped matching it."
+  "kotoba[-a-z]*://[^/\"]")
 
 (def line-ere
   "Rule A: a prefix test applied to something NAMED like an authority."
-  "starts-with\\?.*(resource|scope|capabilit|cap-|grant|kotoba[-a-z]*://)")
+  (str "starts-with\\?.*(resource|scope|capabilit|cap-|grant|" scheme-ere ")"))
 
 (def file-ere
   "Rule B: a file that defines its own covering relation.
@@ -198,7 +217,11 @@
    {:rule :file :text "(defn covers-the-window? [a b] (str/starts-with? a b))"
     :match? false :why "a similarly-named function that is not a covering relation"}
    {:rule :line :text "(str/starts-with? scope \"kotoba-rad://r/push/\")"
-    :match? true  :why "the kotoba-rad:// scheme, which a literal kotoba:// cannot see"}])
+    :match? true  :why "the kotoba-rad:// scheme, which a literal kotoba:// cannot see"}
+   {:rule :line :text "(or (str/starts-with? url \"kotoba://\") (str/starts-with? url \"https://\"))"
+    :match? false :why "scheme detection for a git remote -- a bare kotoba:// names no resource, and authority.scope/parse refuses it (bonsai/remote_helper.clj, measured 2026-09-01)"}
+   {:rule :line :text "(str/starts-with? scope \"kotoba://*\")"
+    :match? true  :why "the apex wildcard IS a scope, so the trailing-character rule must not exclude it"}])
 
 (defn- sh! [& args]
   (let [{:keys [exit err] :as r} (apply sh args)]
