@@ -1,0 +1,110 @@
+[{:db/id -1
+  :adr/id "adr-2608319600-itonami-is-a-hermes-profile-and-the-claude-oauth-patch-is-upstream"
+  :adr/title "itonami is a hermes profile, and the Claude OAuth patch it would have carried is already upstream"
+  :adr/status "accepted"
+  :adr/date "2026-08-31"
+  :adr/context
+  "Asked to design an `itonami-claude-auth` plugin for the itonami CLI, mirroring
+   `kristianvast/hermes-claude-auth` (Claude Code OAuth bypass for hermes-agent).
+
+   Two measurements answered it instead.
+
+   MEASUREMENT 1 — there is no itonami CLI.
+
+     $ cat ~/.local/bin/itonami
+     #!/bin/sh
+     exec ~/.hermes/hermes-agent/venv/bin/hermes -p itonami \"$@\"
+
+   itonami is one of 25 hermes profiles sharing one binary, one venv, one
+   site-packages. hermes-claude-auth installs a `.pth` that monkey-patches
+   `build_anthropic_kwargs` at interpreter startup, so a second copy under a
+   second name would be a second `.pth` racing the first on the same
+   interpreter. What is per-profile is `config.yaml`, `.env` and skills.
+   `auth.json` and `credential_pool` live at $HERMES_HOME root and are shared.
+
+   MEASUREMENT 2 — the patch is upstream in hermes-agent 0.20.6.
+
+   With `~/.hermes/patches/` absent and no `.pth` installed, a one-shot call
+   reached Anthropic and answered:
+
+     $ itonami chat --provider anthropic -m claude-sonnet-4-6 -q 'Reply with exactly: OK' -Q
+     OK
+
+   agent.log for that turn:
+     Lazy-installing anthropic==0.87.0 for feature 'provider.anthropic'
+     provider=anthropic ... at https://api.anthropic.com
+     API call #1: model=claude-sonnet-4-6 provider=anthropic in=15814 out=4 latency=4.1s
+
+   The lazy install shows this was the first real Anthropic call on this
+   machine, so no earlier state could have served it."
+
+  :adr/decision
+  "1. Do not create the repo. There is nothing for it to hold.
+
+   2. Do not name anything `itonami-claude-auth`. Two independent reasons, and
+      each would stand alone:
+      (a) org elision (ADR-2608040170) — `cloud-itonami/itonami-claude-auth`
+          says itonami twice.
+      (b) the plane is wrong about the world — `plugin-` names the agent HOST
+          it adapts (`manifest/repository-rules.edn`, ADR-2608318100, landed
+          the same day). The host is hermes. itonami is a profile of that host,
+          not a host. Had a repo been warranted, the name was
+          `kotoba-lang/plugin-hermes-claude-auth`, or a surface on the existing
+          `kotoba-lang/plugin-hermes`.
+
+   3. Do not flip the itonami profile default to anthropic. Its default is
+      `openrouter-free / z-ai/glm-5.3-flash`, which is a deliberate free-model
+      floor (`scripts/hermes-hyakka-bots/free-model-policy.edn`) driving cron
+      jobs. Claude on that profile is available per invocation via
+      `--provider anthropic`; making it the default is a cost decision with an
+      owner, and this is not it."
+
+  :adr/evidence
+  "Chain establishing that the successful call used the Claude Code OAuth
+   token and nothing else:
+
+   - `read_claude_code_credentials()` in the hermes venv returns
+     source=macos_keychain, token kind sk-ant-oat (OAuth, not sk-ant-api),
+     refresh token present, valid_now=true. Read by known identifier
+     (Claude Code-credentials), not by enumeration.
+   - No ANTHROPIC_API_KEY in the session env, in `~/.hermes/.env`, in
+     `~/.hermes/profiles/itonami/.env`, or in either config.yaml. The one
+     secret the command helper injects is OPENROUTER_API_KEY from Keychain
+     `gftd.openrouter`.
+   - `hermes auth status anthropic` reports `logged out`;
+     auth.json credential_pool holds only openrouter and copilot;
+     active_provider is nil.
+   - So the only anthropic credential present on the machine was the Claude
+     Code OAuth token.
+
+   Why hermes no longer needs the patch — `agent/anthropic_adapter.py`:
+     - `build_anthropic_kwargs(..., is_oauth: bool = False)` docstring:
+       'When is_oauth is True, applies Claude Code compatibility transforms:
+       system prompt prefix, tool name prefixing, and prompt sanitization.'
+     - `oauth-2025-04-20` is in the beta header list at line 480.
+   These are the transforms hermes-claude-auth existed to inject. hermes now
+   ships them first-party, so the third-party patch is obsolete here."
+
+  :adr/consequences
+  "Nothing is built and nothing is configured. The capability already exists
+   and is reachable today with `itonami --provider anthropic -m <model>`.
+
+   The load-bearing output of this ADR is negative: the next agent asked for
+   `itonami-claude-auth` should read this instead of cloning a patch that
+   would collide with hermes 0.20.6's own OAuth path.
+
+   Two things would reopen it, and both are measurable rather than assumed:
+   - a hermes update that removes the `is_oauth` transforms or the
+     `oauth-2025-04-20` beta (re-run the one-shot smoke test; a 4xx from
+     api.anthropic.com is the signal, not a fallback answering);
+   - a decision to make Claude the itonami default, which is a change to the
+     free-model policy and belongs to whoever owns that floor.
+
+   Untested: whether the auto-discovery gate `is_provider_explicitly_configured`
+   admits the Claude Code credentials without an explicit `--provider` flag.
+   The smoke test passed the flag, so that path is UNVERIFIED rather than known
+   to work."
+
+  :adr/related ["adr-2608318100-plugin-prefix-agent-host-plugin-adapter"
+                "adr-2608040100-repo-name-four-planes"
+                "adr-2608040170-identity-is-org-slash-name"]}]
