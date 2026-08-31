@@ -224,7 +224,22 @@
 (def ^:private copied-ns-re
   #"copied\s+from[\s;]+`([A-Za-z0-9_.-]+)`'?\s*`([A-Za-z0-9_.-]+)`")
 
-(def ^:private pin-re #"pinned at\s+(?:commit\s+)?([0-9a-f]{7,40})")
+(def ^:private pin-re
+  "`[\\s;]` and not `\\s`, because the sha is often on the NEXT comment line and
+  `\\s` does not cross the `;;` that opens it. Measured 2026-08-31: three
+  vendored copies wrote `pinned at` at the end of a line —
+  nexus-x402's and adserver's `treasury/core.cljc`, and nexus-x402's
+  `pay/facilitator.cljc` — and every one of them was reported as *no pin
+  declared (CURRENT axis only)*. They had each named the commit they were
+  taken from; nothing read it.
+
+  That is this script's own failure mode, from its own docstring: a copy that
+  does not match its own pin is a defect, and a pin nobody parsed cannot
+  produce that verdict — it produces the quieter one that reads as the file's
+  omission rather than the checker's blindness. The other four spellings
+  already used `[\\s;]` and the header comment says so; this one was left
+  behind."
+  #"pinned at[\s;]+(?:commit[\s;]+)?([0-9a-f]{7,40})")
 
 ;; A sixth spelling, and the largest population: a copy that names no repo and
 ;; no commit, only a NAMESPACE it promises to track.
