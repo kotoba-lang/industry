@@ -4392,3 +4392,12 @@ orgs/personal/research/genomics/high-iq-japanese-gwas/.venv-audit/
 # If the series itself becomes load-bearing, it needs durable retention
 # (B2/annex) rather than git -- see ADR-2608197800.
 /90-docs/observation/atproto-engagement.datoms.edn
+
+# Credential-adjacent local config. The shared superproject checkout carries a
+# root-level credentials.edn (created 2026-08-31 by a session that needed it);
+# it must stay untracked: committing credentials is the one mistake git cannot
+# take back (secret scanning + force-push history rewrite). See the repo's
+# safety floor: credential handling goes through dedicated tooling, never
+# through a form field or a commit. If a tracked home for this file is ever
+# needed it must be an encrypted/annex path, not plain git.
+/credentials.edn
