@@ -53,7 +53,12 @@ for (const path of tracked) {
 // only stayed quiet because every stale path failed the existsSync skip below.
 // The invariant that matters is unchanged — a public custom domain is never
 // owned out of `orgs/kotoba-lang/` (enforced against tracked files above too).
-const PUBLIC_OWNER_ORGS = ["orgs/gftdcojp/", "orgs/network-awai/", "orgs/net-kotobase/"];
+// `orgs/cloud-itonami/` joined 2026-08-31: app.itonami.cloud moved off the
+// murakumo inference Worker (which held it as a second custom domain and so
+// kept every dispatch-namespace mount dark) onto the router written for it,
+// cloud-itonami-app/services/itonami-fleet-dispatch. The org hosts the itonami
+// fleet, so it is a hosting org in the sense this list means.
+const PUBLIC_OWNER_ORGS = ["orgs/gftdcojp/", "orgs/network-awai/", "orgs/net-kotobase/", "orgs/cloud-itonami/"];
 
 const fullWorkspace = tracked.length > 0;
 const skipped = [];
