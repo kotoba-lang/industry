@@ -4419,4 +4419,80 @@
      :find "             'gov_municipality.murakumo-test\n             'gov_municipality.manifest-test)"
      :replace "             'gov_municipality.manifest-test)"
      :must-fail ["REFUSED"]}]}
+
+  {:repo "orgs/kotoba-lang/playwright"
+   :label "playwright marshalling seams and eval-page's three-way dispatch"
+   ;; Until 2026-08-31 the only test that could run here without a browser was
+   ;; `(is (boolean? (pw/available?)))` -- true whichever way available? answers,
+   ;; and true as well if it had been a constant. The suite was green and measured
+   ;; nothing. The eight below were each replayed at pin b377e887 before landing:
+   ;; anchor unique, base green before and after, suite red naming that test.
+   ;;
+   ;; Two of them are the CLAUDE.md floor rather than ordinary correctness --
+   ;; :error-swallowed and :bridge-failure-returns-nil turn a failure into nil,
+   ;; which is exactly what a successful eval of an expression with no value
+   ;; returns. A browser error and a harness that was never installed would then
+   ;; be indistinguishable from a page that answered.
+   ;;
+   ;; NOT covered here: everything reached through a real browser. `clojure -M:test`
+   ;; (the smoke suite) needs an installed chromium and is red on any machine
+   ;; without one, so it is not the suite this loop runs.
+   :cmd ["clojure" "-M:kotoba-test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :playwright/clj-conversion-stops-recursing
+     :why "the shape this actually regresses in -- somebody reads the reduce as a plain walk and drops the recursive call. Clojure's = considers a java.util.HashMap equal to a Clojure map, so an =-only test stays green here; the test asserts map?/vector? on a map nested inside a list, which is what discriminates"
+     :file "src/playwright_clj/core.clj"
+     :find "(assoc! m (key e) (->clj (val e)))"
+     :replace "(assoc! m (key e) (val e))"
+     :must-fail ["->clj-recurses-into-nested-java-collections"]}
+
+    {:id :playwright/cdp-key-keeps-its-colon
+     :why "`name` -> `str` on CDP parameter keys. CDP ignores unknown parameters silently, so the virtual authenticator comes up with defaults and the passkey ceremony fails far from the cause"
+     :file "src/playwright_clj/core.clj"
+     :find "(doseq [[k v] x] (.add o (name k) (clj->gson v))) o)"
+     :replace "(doseq [[k v] x] (.add o (str k) (clj->gson v))) o)"
+     :must-fail ["cdp-keyword-keys-lose-the-colon"]}
+
+    {:id :playwright/cdp-value-keeps-its-colon
+     :why "the same slip on the value side, which is how it actually shipped -- keys used `name`, values fell through to `str`, so {:transport :internal} sent \":internal\". Removing the branch restores the bug this test was written from"
+     :file "src/playwright_clj/core.clj"
+     :find "    (keyword? x) (com.google.gson.JsonPrimitive. ^String (name x))\n"
+     :replace ""
+     :must-fail ["cdp-keyword-values-lose-the-colon"]}
+
+    {:id :playwright/cdp-booleans-become-strings
+     :why "a redundant-looking branch removed in a tidy-up. true then falls to `str` and CDP receives the string \"true\", which is not a boolean anywhere in the protocol"
+     :file "src/playwright_clj/core.clj"
+     :find "    (boolean? x) (com.google.gson.JsonPrimitive. ^Boolean (boolean x))\n"
+     :replace ""
+     :must-fail ["cdp-booleans-stay-json-booleans"]}
+
+    {:id :playwright/error-swallowed
+     :why "FLOOR. An ok:false response degraded to (:result parsed) -- nil. Every failed browser eval then returns exactly what a successful eval of a valueless expression returns, and the caller cannot tell that the browser reported an error at all"
+     :file "src/kami/playwright.clj"
+     :find "          parsed (throw (ex-info (str \"browser eval error: \" (:error parsed)) {}))"
+     :replace "          parsed (:result parsed)"
+     :must-fail ["eval-page-throws-when-the-browser-reports-an-error"]}
+
+    {:id :playwright/bridge-failure-returns-nil
+     :why "FLOOR, the other half. Unparseable stdout means the bridge never ran -- no Playwright package, no node module, a crash. Returning nil makes 'the harness is absent' indistinguishable from 'the page answered nothing'"
+     :file "src/kami/playwright.clj"
+     :find "          :else  (throw (ex-info (str \"playwright bridge failed (exit \" exit \")\") {:err err :out out}))"
+     :replace "          :else  nil"
+     :must-fail ["eval-page-throws-when-the-bridge-never-ran"]}
+
+    {:id :playwright/available-stops-answering
+     :why "available? is a guard callers wrap browser-dependent work in; if it propagates instead of answering, every consumer that asked whether it could proceed dies at the question"
+     :file "src/kami/playwright.clj"
+     :find "       (catch Exception _ false)))"
+     :replace "       (catch Exception e (throw e))))"
+     :must-fail ["available?-returns-false-rather-than-throwing-when-the-bridge-is-broken"]}
+
+    {:id :playwright/facade-drifts-from-the-ssot
+     :why "ADR-2607102200 addendum 8 makes kami.playwright the SSoT and kotoba.playwright a re-export. A facade that stops being the same var is a second implementation, and the old boolean? test passed on exactly this"
+     :file "src/kotoba/playwright.clj"
+     :find "(def available? impl/available?)"
+     :replace "(def available? (constantly true))"
+     :must-fail ["facade-re-exports-the-same-fns"]}]}
 ]}
