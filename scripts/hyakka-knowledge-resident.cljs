@@ -451,7 +451,7 @@
   [env seed]
   (let [e (js/Object.assign #js {} env)
         _ (aset e "HYAKKA_SEED" seed)
-        r (run ["nbb" "--classpath" "../../kotoba-lang/kotobase-client/src"
+        r (run ["nbb" "--classpath" "../../kotoba-lang/kotobase-client/src:../../kotoba-lang/org-nist-sha2/src"
                 "scripts/verify_identity.cljs" expected-tenant-did]
                {:dir worktree :env e})]
     (when-not (zero? (:exit r))
