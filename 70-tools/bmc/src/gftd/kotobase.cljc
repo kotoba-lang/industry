@@ -57,9 +57,13 @@
                           :cljs (.charCodeAt s i)))
                     4294967296))))))
 
-(defn- seq-counts
+(defn seq-counts
   "{seq → how many events carry it}, so a colliding seq can be told from a
-  unique one without re-reading the file."
+  unique one without re-reading the file.
+
+  Public because the count has to be taken over the CORPUS and the projection
+  runs on a batch — the caller that holds the whole ledger is the only one that
+  can compute this correctly. See events->tx-data."
   [events]
   (reduce (fn [m e] (if-let [s (:event/seq e)] (update m s (fnil inc 0)) m)) {} events))
 
@@ -110,15 +114,36 @@
 (defn events->tx-data
   "Vector of stamped events → tx_edn entity-map vector.
 
-  Counts seq values across the WHOLE batch first: whether an id is ambiguous is
-  a property of the corpus, not of one event, so event->entity cannot see it
-  alone."
-  [events]
-  (let [counts (seq-counts events)]
-    (mapv #(event->entity % counts) events)))
+  Whether an id is ambiguous is a property of the CORPUS, not of one event and
+  not of the batch being written. Pass `counts` (from seq-counts over the whole
+  ledger) whenever `events` is a slice — which is the normal case, because
+  gftd.cli/dual-write-kotobase! projects exactly what ledger/append! just
+  stamped.
 
-(defn events->tx-edn [events]
-  (pr-str (events->tx-data events)))
+  The 1-arity counts over `events` itself. That is correct only when `events` IS
+  the corpus. Given a slice it cannot see a seq that collides with an event
+  projected on an earlier run, hands out the bare \"bmc.event/<seq>\" that the
+  earlier event is already stored under, and cardinality-one upsert replaces it.
+
+  The invariant both arities must keep: an event gets the same :db/id whether it
+  is projected alone or alongside the corpus."
+  ([events] (events->tx-data events (seq-counts events)))
+  ([events counts] (mapv #(event->entity % counts) events)))
+
+(defn events->tx-edn
+  ([events] (pr-str (events->tx-data events)))
+  ([events counts] (pr-str (events->tx-data events counts))))
+
+(defn slice-payload
+  "What the CLI hands the dual-write helper: the batch, plus the seq counts the
+  batch cannot compute for itself.
+
+  Only the seqs present in the batch are carried — that is all event->entity
+  looks up, and the whole map is ~10k entries on the live ledger."
+  [corpus batch]
+  {:bmc/events (vec batch)
+   :bmc/seq-counts (select-keys (seq-counts corpus)
+                                (into #{} (keep :event/seq) batch))})
 
 (defn transact-url
   ([endpoint] (transact-url endpoint "transact"))

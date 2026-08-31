@@ -58,25 +58,37 @@
                     argv))
       (throw (js/Error. "usage: nbb ... kotobase-dual-write.cljs <events.edn|->"))))
 
-(defn read-events [arg]
+(defn read-payload
+  "-> {:events [...] :counts {seq → n}}
+
+  The payload carries seq counts taken over the WHOLE ledger, because the events
+  in it are a slice: whether a seq is ambiguous cannot be decided from the slice
+  (gftd.kotobase/events->tx-data says why). `nil` counts means the caller did not
+  send any, and the projection falls back to counting the slice — the old
+  behaviour, kept so an older CLI writing a bare vector still works."
+  [arg]
   (let [raw (if (= arg "-")
               (fs/readFileSync 0 "utf8")
               (fs/readFileSync arg "utf8"))
         v (edn/read-string raw)]
     (cond
-      (vector? v) v
-      (map? v) [v]
+      (vector? v) {:events v :counts nil}
+      (and (map? v) (contains? v :bmc/events))
+      {:events (:bmc/events v) :counts (:bmc/seq-counts v)}
+      (map? v) {:events [v] :counts nil}
       :else (throw (js/Error. (str "events file must be EDN vector/map, got "
                                    (type v)))))))
 
 (defn -main []
   (let [arg (events-arg)
-        events (read-events arg)
+        {:keys [events counts]} (read-payload arg)
         sk (load-or-create-identity!)
         c (client/make-client {:endpoint endpoint
                                :operator-did kbase/default-operator-did
                                :secret-key sk})
-        tx-edn (kbase/events->tx-edn events)]
+        tx-edn (if counts
+                 (kbase/events->tx-edn events counts)
+                 (kbase/events->tx-edn events))]
     (js/console.error "kotobase dual-write: did=" (:did c)
                       "db=" db-name
                       "events=" (count events)

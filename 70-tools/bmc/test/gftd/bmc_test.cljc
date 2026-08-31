@@ -652,6 +652,51 @@
     (is (= (kbase/digest {:a 1 :b "x"}) (kbase/digest {:b "x" :a 1})))
     (is (not= (kbase/digest {:a 1}) (kbase/digest {:a 2})))))
 
+(deftest kotobase-collision-is-a-corpus-property-not-a-batch-one
+  ;; The within-batch case above is handled. The projection does not RUN on a
+  ;; batch that contains the whole corpus: gftd.cli/dual-write-kotobase! is
+  ;; handed exactly what ledger/append! just stamped -- one to three events --
+  ;; and writes only those to the temp file the helper reads. So seq-counts sees
+  ;; a slice, and a new event whose seq already belongs to a projected historical
+  ;; event looks unique inside its own batch. It then takes the bare
+  ;; "bmc.event/<seq>", which is the id the historical event is already stored
+  ;; under, and cardinality-one upsert REPLACES it.
+  ;;
+  ;; The invariant that actually matters is therefore not "ids are unique within
+  ;; the batch" but: projecting an event as part of a batch must give the SAME id
+  ;; as projecting it as part of the corpus.
+  (let [older {:event/seq 7 :event/type :react/observation :event/actor "advisor:gate"
+               :event/at "t1" :event/value "already projected last week"}
+        newer {:event/seq 7 :event/type :react/observation :event/actor "advisor:auto"
+               :event/at "t2" :event/value "appended by a second loop"}
+        corpus [older newer]
+        batch  [newer]                       ; what append! returns and the helper receives
+        corpus-ids (kbase/events->tx-data corpus)
+        id-in-corpus (:db/id (second corpus-ids))
+        counts (kbase/seq-counts corpus)
+        id-in-batch (:db/id (first (kbase/events->tx-data batch counts)))]
+    (is (= id-in-corpus id-in-batch)
+        "an event must get the same :db/id whether projected alone or with the corpus")
+    (is (str/starts-with? id-in-batch "bmc.event/7-")
+        "seq 7 is ambiguous in the corpus, so the batch may not hand out the bare id")
+    (testing "and the bare id stays bare when the corpus really has one event on it"
+      (let [solo {:event/seq 9 :event/type :canvas/note :event/actor "a" :event/at "t"}]
+        (is (= "bmc.event/9"
+               (:db/id (first (kbase/events->tx-data [solo] (kbase/seq-counts [solo]))))))))
+    (testing "the payload the CLI writes carries exactly the counts the slice needs"
+      (let [p (kbase/slice-payload corpus batch)]
+        (is (= [newer] (:bmc/events p)))
+        (is (= {7 2} (:bmc/seq-counts p))
+            "the count is the corpus's 2, not the slice's 1")
+        (is (= id-in-corpus
+               (:db/id (first (kbase/events->tx-data (:bmc/events p)
+                                                     (:bmc/seq-counts p)))))
+            "round-tripping through the payload must reproduce the corpus id"))
+      (testing "and it carries only the seqs in the batch, not the whole ledger"
+        (let [big (concat corpus (for [n (range 100 200)]
+                                   {:event/seq n :event/type :x :event/actor "a" :event/at "t"}))]
+          (is (= #{7} (set (keys (:bmc/seq-counts (kbase/slice-payload big batch)))))))))))
+
 (deftest compose-advisors-concat
   (let [a (fn [_] [{:proposal/action :canvas/add-item :event/value "a"}])
         b (fn [_] [{:proposal/action :canvas/add-item :event/value "b"}])
