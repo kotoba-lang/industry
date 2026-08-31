@@ -516,6 +516,92 @@
            (murakumo/extract-content
             {"choices" [{"message" {"content" "```edn\n[{:x 1}]\n```"}}]})))))
 
+(deftest murakumo-model-resolution
+  ;; ADR-2607173100: models are changed by repointing one KV entry, so no
+  ;; concrete checkpoint id may be baked into a default. root#2844 measured
+  ;; the accident this prevents: the advisor's `default-model` constant
+  ;; named a checkpoint the fleet had stopped serving, every tick failed
+  ;; the call, fell through to gate-only, and printed as "proposals: 0" --
+  ;; the loop looked idle instead of broken.
+  ;;
+  ;; Measured 2026-08-31, live endpoint:
+  ;;   GET /infer/models/murakumo-main -> {"alias-for":"qwen3.8-27b",
+  ;;                                       "status":"serving", ...}
+  ;; These tests pin THAT shape, so the next model swap (alias repointed,
+  ;; alias-for becomes qwen4-… or whatever) breaks the fixture loudly
+  ;; instead of silently rotting a default again.
+  (let [alias-body (str "{\"id\":\"murakumo-main\","
+                        "\"alias-for\":\"qwen3.8-27b\","
+                        "\"status\":\"serving\","
+                        "\"format\":\"alias\"}")
+        withdrawn-body (str "{\"id\":\"murakumo-main\","
+                            "\"alias-for\":\"qwen3.8-27b\","
+                            "\"status\":\"withdrawn\"}")
+        models-body (str "{\"object\":\"list\",\"data\":"
+                         "[{\"id\":\"murakumo-main\"},{\"id\":\"murakumo-edge\"}]}")]
+    (testing "explicit :model opt wins over everything"
+      (let [calls (atom [])]
+        (is (= "explicit/checkpoint"
+               (murakumo/resolve-model
+                (fn [url] (swap! calls conj url) {:status 200 :body alias-body})
+                {:model "explicit/checkpoint" :env-get (constantly nil)})))
+        (is (empty? @calls) "no network call when a model is given")))
+    (testing "BMC_MURAKUMO_MODEL env beats the alias lookup"
+      (is (= "env-model"
+             (murakumo/resolve-model
+              (fn [_] (throw (ex-info "must not be called" {})))
+              {:env-get (fn [k] (when (= "BMC_MURAKUMO_MODEL" k)
+                                  "env-model"))}))))
+    (testing "serving alias resolves to alias-for (measured: qwen3.8-27b)"
+      (is (= "qwen3.8-27b"
+             (murakumo/resolve-model
+              (fn [url] (is (str/includes? url "murakumo-main"))
+                        {:status 200 :body alias-body})
+              {:env-get (constantly nil)}))))
+    (testing "a withdrawn/stale alias falls through to the endpoint"
+      (is (= "murakumo-main"
+             (murakumo/resolve-model
+              (fn [url] (if (str/includes? url "/infer/models/")
+                          {:status 200 :body withdrawn-body}
+                          {:status 200 :body models-body}))
+              {:env-get (constantly nil)}))))
+    (testing "endpoint-only fallback takes the first /v1/models id"
+      (is (= "murakumo-main"
+             (murakumo/resolve-model
+              (fn [_] {:status 200 :body models-body})
+              {:env-get (constantly nil)}))))
+    (testing "every lookup failing resolves to nil -> the alias itself is sent"
+      (is (nil? (murakumo/resolve-model
+                 (fn [_] {:status 0 :body ""})
+                 {:env-get (constantly nil)})))))
+  (testing "make-complete sends the RESOLVED model, not the alias constant"
+    (let [bodies (atom [])
+          complete (murakumo/make-complete
+                    (fn [{:keys [body]}]
+                      (swap! bodies conj (murakumo/parse-json-body body))
+                      {:status 200
+                       :body "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}"})
+                    (fn [_] {:status 200
+                             :body "{\"id\":\"murakumo-main\",\"alias-for\":\"qwen3.8-27b\",\"status\":\"serving\"}"})
+                    {})]
+      (is (= "ok" (complete "hi")))
+      ;; parse-json-body keys are strings (js->clj without keywordize on
+      ;; cljs; clojure.data.json/read-str likewise) — look up "model".
+      (is (= "qwen3.8-27b" (get (first @bodies) "model"))
+          "the request body names the checkpoint the fleet actually serves")))
+  (testing "make-complete without http-get! carries the alias (server-side deref)"
+    (let [bodies (atom [])
+          complete (murakumo/make-complete
+                    (fn [{:keys [body]}]
+                      (swap! bodies conj (murakumo/parse-json-body body))
+                      {:status 200
+                       :body "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}"})
+                    {})]
+      (complete "hi")
+      (is (= "murakumo-main" (get (first @bodies) "model")))
+      (is (string? murakumo/default-model)
+          "the starting point of resolution stays a def, not an inline literal"))))
+
 (deftest kotobase-event-projection
   (let [evs [{:event/seq 42 :event/type :canvas/add-item :event/actor "advisor:auto"
               :event/at "t" :canvas/id :cloud-itonami.problem :event/value "v"
