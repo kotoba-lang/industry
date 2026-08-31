@@ -102,3 +102,102 @@
                ["B2 実勢" 6.95] ["Storj（ADR-2607299200 引用）" 7.00]
                ["kura 自身の導出顧客価格" 3.75]]]
   (println (str "  " (.padEnd n 34) "$" (r2f p))))
+
+;; ══════════════════════════════════════════════════════════════════════
+;; 案 (ii) 再販 —— オーナー判断 2026-08-31。掲示 = 原価 x 2.0 は捨てる。
+;; ADR-2608313100。ここから下は (ii) の下での掲示価格と routing の導出。
+;; ══════════════════════════════════════════════════════════════════════
+(defn- r2 [x] (/ (js/Math.round (* x 100)) 100.0))
+(def b2-store (/ (v :b2/storage-usd-per-tb-month) 1000.0))
+(def b2-egress (v :b2/egress-usd-per-gb))
+(def b2-free-ratio 3.0)
+(def b2-class-a 0.0)
+(def r2-store (v :r2/storage-usd-per-gb-month))
+(def r2-class-a-per-m (v :r2/class-a-usd-per-million))
+
+;; 実測レート（2026-08-31 取得）
+
+(println "── 1. backend の交点（egress 比 r = 月間 egress / 保存量）──────")
+;; B2: b2-store + b2-egress*(r-3)  vs  R2: r2-store
+(let [r* (+ b2-free-ratio (/ (- r2-store b2-store) b2-egress))]
+  (println (str "  B2 総額 = " b2-store " + " b2-egress "*(r-" b2-free-ratio ")"
+                "   R2 総額 = " r2-store))
+  (println (str "  交点 r* = " (r2f r*) " —— これを超えると R2 が安い"))
+  (def crossover r*))
+
+(defn cost-b2 [r] (+ b2-store (* b2-egress (max 0.0 (- r b2-free-ratio)))))
+(defn cost-r2 [_] r2-store)
+(defn cost-best [r] (min (cost-b2 r) (cost-r2 r)))
+
+(println)
+(println "── 2. 最適 routing での原価上限 ──────────────────────────")
+(println (str "  r=0 → $" (r2f (cost-best 0.0)) "  r=3 → $" (r2f (cost-best 3.0))
+              "  r=" (r2f crossover) " → $" (r2f (cost-best crossover))
+              "  r=10 → $" (r2f (cost-best 10.0))))
+(println (str "  **上限 = $" (r2f (cost-best 100.0)) "/GB月**（R2 に逃がせるので egress では青天井にならない）"))
+
+(println)
+(println "── 3. 掲示価格の候補（x2.0 は捨てる。整数 credits・TB月 建て）──")
+;; 1 credit = $0.01。GB月 だと B2 原価 0.00695 が 1 credit 未満で表せない
+(println (str "  ⚠ GB月 建てでは整数 credits にできない: B2 原価 " b2-store
+              " $/GB月 = " (r2f (* 100 b2-store)) " credits < 1"))
+(println "  → 目盛りは 1 YATA = 1 GB月 のまま、**掲示は TB月 建て**にする")
+(doseq [p [700 750 800 900 1000]]
+  (let [usd (/ p 100.0)]
+    (println (str "  " p " credits/TB月 = $" (r2f usd)
+                  "  B2 原価比 x" (r2f (/ usd (* b2-store 1000)))
+                  (when (= p 800) "   ← 候補")))))
+
+(println)
+(println "── 4. 候補 800 cr/TB月 + egress 1 cr/GB（3x 無料は素通し）の損益 ──")
+(let [ps 8.0 pe 0.01]
+  (doseq [r [0.0 1.0 3.0 crossover 5.0 10.0 50.0]]
+    (let [rev (+ ps (* pe (max 0.0 (- r b2-free-ratio)) 1000.0))
+          cost (* (cost-best r) 1000.0)
+          be (if (<= (cost-b2 r) (cost-r2 r)) "B2" "R2")]
+      (println (str "  r=" (.padEnd (str (r2f r)) 8)
+                    "収入 $" (.padEnd (str (r2 rev)) 9)
+                    "原価 $" (.padEnd (str (r2 cost)) 8)
+                    "粗利 $" (.padEnd (str (r2 (- rev cost))) 9)
+                    "→ " be)))))
+
+(println)
+(println "── 5. 書き込み操作（(ii) では必須。B2 と R2 で非対称）──────")
+(doseq [kb [16.0 128.0]]
+  (let [blocks (/ (* 1024.0 1024.0) kb)]
+    (println (str "  block " (int kb) " KB: 1 GB 書込 = " (int blocks) " ops"
+                  "  R2 $" (r2f (* (/ blocks 1e6) r2-class-a-per-m))
+                  "  B2 $" (r2f (* (/ blocks 1e6) b2-class-a)) " (無料)"))))
+(println "  → **B2 は API 呼び出しが無料、R2 は egress が無料。無料の次元が互いに逆。**")
+(println "     書込が多く読出が少ない → B2、読出が多い → R2。routing がそのまま margin になる")
+
+(println)
+(println "── 6. B2 単独が床になるか（あらゆる profile で赤字にならないか）──")
+(let [ps 8.0 pe 0.01]
+  (println "  収入 = 8.00 + 10*max(0,r-3) $/TB月、B2 原価 = 6.95 + 10*max(0,r-3)")
+  (doseq [r [0.0 3.0 10.0 100.0 1000.0]]
+    (let [rev (+ ps (* 10.0 (max 0.0 (- r 3.0))))
+          c-b2 (+ 6.95 (* 10.0 (max 0.0 (- r 3.0))))]
+      (println (str "    r=" (.padEnd (str r) 8) "収入 $" (.padEnd (str (r2 rev)) 10)
+                    "B2 原価 $" (.padEnd (str (r2 c-b2)) 10)
+                    "粗利 $" (r2 (- rev c-b2))))))
+  (println "  → **B2 の粗利は egress 比に依らず一定の $1.05/TB月。** 赤字になる r は存在しない")
+  (println "     （egress の掲示単価を B2 の原価と同額にしてあるので、差が storage 分だけ残る）"))
+
+(println)
+(println "── 7. 書込の多い顧客（保存 1 TB、書込 1 TB/月、16 KB block）────")
+(let [blocks-per-gb (/ (* 1024.0 1024.0) 16.0)
+      ops-per-tb (* 1024.0 blocks-per-gb)
+      r2-write-tb (* (/ ops-per-tb 1e6) 4.50)]
+  (println (str "  1 TB/月 の書込 = " (int ops-per-tb) " class-A ops = R2 で $" (r2 r2-write-tb)))
+  (doseq [r [1.0 10.0]]
+    (let [rev (+ 8.0 (* 10.0 (max 0.0 (- r 3.0))))
+          c-b2 (+ 6.95 (* 10.0 (max 0.0 (- r 3.0))))
+          c-r2 (+ 15.0 r2-write-tb)]
+      (println (str "  r=" (.padEnd (str r) 6)
+                    "収入 $" (.padEnd (str (r2 rev)) 9)
+                    "B2 $" (.padEnd (str (r2 c-b2)) 9) "(書込無料、粗利 $" (r2 (- rev c-b2)) ")"
+                    "   R2 $" (r2 c-r2) " ← 置いたら壊滅"))))
+  (println (str "  → **書込の多いテナントを R2 に置かない**が routing の不変条件。"))
+  (println (str "     破ると保存 1 TB・書込 1 TB/月 で原価 $" (r2 (+ 15.0 r2-write-tb))
+                " 対 収入 $8。掲示価格では吸収できない")))
