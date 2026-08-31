@@ -6,12 +6,29 @@
 ;; authorization; the two decisions it recorded are answered below.
 ;;
 ;; This file carries PUBLIC values only. The seed is in kagi, by name.
-{:ipni.publisher/peer-id "12D3KooWGmq2x23J59LmqyBT5ik8pK9gEz7N3Y4vdJidezf7Usz3"
+{;; The identity that SIGNS the live head. Read off the wire, not asserted:
+ ;; GET https://ipni.kotobase.net/ipni/v1/head -> {"pubkey":{"/":{"bytes": …}}},
+ ;; identity-multihash that protobuf key, base58btc it. Measured 2026-08-31.
+ ;;
+ ;; This field was stale by two rotations until then. It named the 2026-08-27
+ ;; key while the head had been signed by another since 2026-08-30, and a
+ ;; fourth identity was never recorded at all -- see :identity-history. The
+ ;; file that exists to say which key publishes did not know which key was
+ ;; publishing, and nothing compared the two. `scripts/verify-ipni-publisher-record.cljs`
+ ;; now does.
+ :ipni.publisher/peer-id "12D3KooWGxKwrwhqzVDKynC6PzP3vSWC5F3JjjmaqWyTE91YBt7X"
 
  ;; The same Ed25519 key seen through the IPNS naming plane. Recorded so the
  ;; two derivations can be cross-checked without holding the seed: decoding
  ;; this name yields the public key the peer-id is built from.
- :ipni.publisher/ipns-name "k51qzi5uqu5dirbsrgpb1iyrwbzlqgjoq006b7hda5nr2ah4cxez8atsxwc00c"
+ ;;
+ ;; Derivation (verified 2026-08-31 by reproducing the PREVIOUS recorded pair
+ ;; from its own peer-id before applying it to this one -- a derivation that
+ ;; cannot reproduce a known-good pair may not be used to write a new one):
+ ;;   multihash = 0x00 <len> <protobuf pubkey>       (identity)
+ ;;   peer-id   = base58btc(multihash)
+ ;;   ipns-name = "k" + base36(0x01 0x72 <multihash>) (CIDv1, libp2p-key)
+ :ipni.publisher/ipns-name "k51qzi5uqu5ditqo6wh890it27iac9968e2q9jhijcqhnmfok6bmbiceqvodra"
 
  ;; Custody. Taken one item at a time by this identifier -- never enumerated.
  :ipni.publisher/seed-kagi-item "kotobase-ipni-publisher"
@@ -27,19 +44,56 @@
                :reason :snapshot-transaction-http-500
                :local-encrypted-vault-bytes 9213145}}
 
- ;; Rotation record. The 2026-08-26 key was absent from both the 2026-08-27
- ;; local vault and cloud snapshot seq 5, so retaining its public identifier
- ;; would claim custody that no process could prove. The old advertisements
- ;; remain immutable and crawlable; the new provider appends to their shared
- ;; publisher DAG and signs every new advertisement with this identity.
- :ipni.publisher/identity-rotation
- {:at "2026-08-27"
-  :reason :prior-seed-unrecoverable
-  :previous-peer-id "12D3KooWDscME2qEggsQYHg6d5d1Ms3Vq9duK6U15yQ64ksay2of"
-  :previous-ipns-name "k51qzi5uqu5dhontjj0tl8ezexhwh8aa265bj839qekj77b6o4fo10y3wzdeyu"
-  :local-vault :absent
-  :cloud-vault {:seq 5 :result :absent}
-  :migration :append-cross-provider-chain}
+ ;; Identity history, as the indexer sees it -- a LIST, not a single
+ ;; :previous. It was a single rotation record and rotation happened again
+ ;; twice; a field shaped `current + previous` cannot hold a third, so the
+ ;; third and fourth were simply not written down.
+ ;;
+ ;; Measured 2026-08-31 from GET https://cid.contact/providers, filtered to
+ ;; rows whose Publisher.Addrs contain ipni.kotobase.net. Every row has
+ ;; Publisher.ID == AddrInfo.ID, which is the cost: each rotation minted a
+ ;; new PROVIDER identity too, and a retrieval client resolves content to a
+ ;; provider. The three older provider identities are the ones whose seeds
+ ;; this file records as unrecoverable.
+ :ipni.publisher/identity-history
+ [{:peer-id "12D3KooWDscME2qEggsQYHg6d5d1Ms3Vq9duK6U15yQ64ksay2of"
+   :ipns-name "k51qzi5uqu5dhontjj0tl8ezexhwh8aa265bj839qekj77b6o4fo10y3wzdeyu"
+   :last-advertisement "2026-08-26T07:26:14Z"
+   :provider-multiaddr "/dns4/kotobase.net/tcp/443/https"
+   :custody :unrecoverable
+   :recorded-at "2026-08-27"}
+  {:peer-id "12D3KooWHu8JYZpEkaewiMsR2FSGYwMqsVXthdnzFyh9TQdxsRTk"
+   :last-advertisement "2026-08-27T07:44:42Z"
+   :provider-multiaddr "/dns4/kotobase.net/tcp/443/https"
+   :custody :unverified
+   :recorded-at "2026-08-31"
+   :note "never recorded until the 2026-08-31 audit; no rotation entry was written for it"}
+  {:peer-id "12D3KooWGmq2x23J59LmqyBT5ik8pK9gEz7N3Y4vdJidezf7Usz3"
+   :ipns-name "k51qzi5uqu5dirbsrgpb1iyrwbzlqgjoq006b7hda5nr2ah4cxez8atsxwc00c"
+   :last-advertisement "2026-08-27T08:13:07Z"
+   :provider-multiaddr "/dns4/kotobase.net/tcp/443/https"
+   :custody :unverified
+   :recorded-at "2026-08-27"
+   :note "this file's :ipni.publisher/peer-id until 2026-08-31"}
+  {:peer-id "12D3KooWGxKwrwhqzVDKynC6PzP3vSWC5F3JjjmaqWyTE91YBt7X"
+   :ipns-name "k51qzi5uqu5ditqo6wh890it27iac9968e2q9jhijcqhnmfok6bmbiceqvodra"
+   :last-advertisement "2026-08-30T13:38:50Z"
+   :provider-multiaddr "/dns4/ipfs.kotobase.net/tcp/443/https"
+   :custody :unverified
+   :recorded-at "2026-08-31"
+   :current? true
+   :note "signs the live head. The FIRST identity to advertise ipfs.kotobase.net rather than kotobase.net -- and the measurement below says that is the address that works."}]
+
+ ;; Custody of the CURRENT identity is UNVERIFIED, and saying so is the point.
+ ;; This file names a kagi item; nobody has checked that the key now signing
+ ;; heads is the key under that name. Verifying it means taking that one item
+ ;; by its known identifier (never enumerating the vault) and deriving the
+ ;; peer-id from its seed. Until someone does, `:seed-kagi-item` records where
+ ;; a key is SUPPOSED to be, which is not the same as where this key is.
+ :ipni.publisher/current-custody
+ {:status :unverified
+  :as-of "2026-08-31"
+  :verifies-it "derive the peer-id from the seed stored at :seed-kagi-item and compare it to :ipni.publisher/peer-id"}
 
  ;; Decision 1 of ADR-2608160300: ONE key for the workspace, not one per
  ;; surface. Twelve keys is a key set managed by enumeration whether anyone
@@ -66,17 +120,30 @@
  ;; bytes it returns were fetched and re-hashed to the CID that was asked
  ;; for. A subdomain gateway is for website origin isolation, not for block
  ;; retrieval, so ipfs.kotobase.net being broken does not block this.
+ ;; ⚠ Re-measured 2026-08-31 and the two rows had swapped. The entry that
+ ;; said :ready 404s the objects the live chain announces, and the entry that
+ ;; said :broken serves them and re-hashes correctly. The 2026-08-26
+ ;; measurement is not disputed -- it verified two OTHER objects -- but a
+ ;; status recorded once is a claim about that day, and the advertisements
+ ;; kept moving. This is exactly the hazard :ipni.publisher/blockers states
+ ;; below in its own words: an advertisement naming an address that cannot
+ ;; serve a verifiable block is worse than no advertisement.
  :ipni.publisher/retrieval-candidates
- [{:host "kotobase.net"
-   :multiaddr "/dns4/kotobase.net/tcp/443/https"
-   :status :ready
-   :verified
-   {:at "2026-08-26"
-    :worker-version "4ce297ca-035c-4f41-b887-39879b68ce95"
-    :how "GET /ipfs/{cid}?format=raw and Accept: application/vnd.ipld.raw both answered 200 application/vnd.ipld.raw; the returned bytes were re-hashed and reproduced the requested CID for a 4,778-byte and a 944,524-byte object; HEAD answered 200 where it used to answer 404"}}
-  {:host "ipfs.kotobase.net"
+ [{:host "ipfs.kotobase.net"
    :multiaddr "/dns4/ipfs.kotobase.net/tcp/443/https"
-   :status :broken-but-not-on-the-ipni-path}]
+   :status :ready
+   :advertised-by "12D3KooWGxKwrwhqzVDKynC6PzP3vSWC5F3JjjmaqWyTE91YBt7X (current)"
+   :verified
+   {:at "2026-08-31"
+    :how "GET /ipfs/{cid}?format=raw with Accept: application/vnd.ipld.raw 301s to the subdomain gateway and answers 200; the returned bytes were re-hashed and reproduced the requested CID for all three CIDs reachable from the live head advertisement (442, 46 and 442 bytes). The redirect is not a fault: following it yields verifiable bytes."}}
+  {:host "kotobase.net"
+   :multiaddr "/dns4/kotobase.net/tcp/443/https"
+   :status :does-not-serve-the-advertised-objects
+   :advertised-by "the three older identities in :identity-history"
+   :measured
+   {:at "2026-08-31"
+    :how "the same three CIDs answered 404 with a 10-byte body. The 2026-08-26 :ready verification used two different objects and is not contradicted; what changed is which objects are advertised."}
+   :consequence "three of the four publisher identities point retrieval at this host for objects it does not have"}]
 
  ;; Measured 2026-08-26. Two were fixed the same day; the third turned out
  ;; not to be on this path at all. An advertisement naming an address that
