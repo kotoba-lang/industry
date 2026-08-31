@@ -252,7 +252,29 @@
     (when-not (fs/existsSync ev-path) (refuse! (str "no evidence file at " ev-path)))
     (let [evidence (try (edn/read-string (slurp* ev-path))
                         (catch :default e (refuse! (str "evidence unreadable: " (.-message e)))))
-          flagged (filter #(and (:repo/path %) (:repo/has-actor-edn? %)) evidence)]
+          flagged (filter #(and (:repo/path %) (:repo/has-actor-edn? %)) evidence)
+          ;; **母集団は tree ではなく、一度スキャンして保存した file から来る。**
+          ;; 昨日 scan した evidence に対して今日 actor を足すと、この検出器は
+          ;; その actor を `no-offer` に数えるのではなく **一度も見ない** ——
+          ;; そして出力にはそれが書かれていなかった。
+          ;;
+          ;; 実測 2026-08-31: cloud-itonami/actor-hanmoto を作った直後、
+          ;; metering detector（tree を直接歩く）は 1 件増え、この script は
+          ;; 31 のまま動かなかった。同じ問いに 2 つの数が出て、片方は
+          ;; 「無い」ではなく「見えない」だった。
+          ev-mtime (try (.-mtime (fs/statSync ev-path)) (catch :default _ nil))
+          ;; **数の差ではなく集合の差で取る。** evidence の `:repo/has-actor-edn?` は
+          ;; tree 内のどこに actor.edn があっても真になる（この script 自身が
+          ;; contamination として報告している性質）ので、repo 直下だけを数えた値と
+          ;; は比較できない。最初この 2 つを引き算して 32 - 41 = 0 を出し、
+          ;; **見えていない actor が居るのに UNSEEN 0 と報告しかけた。**
+          on-disk (let [base (p/join root "orgs" "cloud-itonami")]
+                    (if-not (fs/existsSync base) []
+                      (vec (filter #(fs/existsSync (p/join base % "actor.edn"))
+                                   (fs/readdirSync base)))))
+          known (set (map #(last (str/split (str (:repo/path %)) #"/")) flagged))
+          unseen-names (vec (remove known on-disk))
+          unseen (count unseen-names)]
       (when (zero? (count flagged)) (refuse! "evidence flagged zero actor repos"))
       (-> (if offline? (js/Promise.resolve nil) (fetch-catalog))
           (.then
@@ -280,6 +302,14 @@
                    broken (filter #(#{:unparseable :absent} (:kind %)) rows)]
                (when (zero? (count actors)) (refuse! "no admissible actor manifest found"))
                ;; evidence floor, before any verdict
+               ;; **何を読んだかを先に言う。** 母集団が cache から来ることと、
+               ;; その cache がいつのものかを、数の前に置く。
+               (println (str "EVIDENCE\t" ev-path "\t"
+                             (if ev-mtime (.toISOString ev-mtime) "mtime unknown")))
+               (println (str "POPULATION\tfrom evidence, not from the tree"
+                             "\ton-disk actor.edn dirs=" (count on-disk)
+                             "\tin evidence=" (count flagged)
+                             (when (pos? unseen) (str "\tUNSEEN=" unseen))))
                (println (str "SCANNED\t" (count rows)))
                (println (str "ADMITTED\t" (count actors)))
                (println (str "SCHEMA-NOT-ACTOR\t" (count schemas)))
@@ -358,6 +388,16 @@
                                   (:reason (kumo-burn nil))
                                   " ADR-2608291009 step 4 cannot run until a receipt"
                                   " store exists; pass --receipts <edn> once one does.")))
+                 ;; 見えていない actor を、`no-offer` の中に黙って混ぜない ——
+                 ;; 混ぜたら『値札が無い』と『測っていない』が同じ行になる。
+                 (when (pos? unseen)
+                   (finding! "warn" "evidence-behind-the-tree"
+                             (str unseen " repo(s) hold an actor.edn on disk that this"
+                                  " evidence file does not know about, so they are NOT"
+                                  " in any count above -- not even in no-offer: "
+                                  (str/join ", " unseen-names)
+                                  ". Re-run scripts/itonami-maturity-scan.cljs. Evidence: "
+                                  ev-path)))
                  (when (seq broken)
                    (finding! "warn" "actor-manifest-unparseable"
                              (str (count broken) " actor.edn could not be read or parsed: "
