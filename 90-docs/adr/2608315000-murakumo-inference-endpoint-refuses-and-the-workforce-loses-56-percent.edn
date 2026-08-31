@@ -38,7 +38,12 @@ Cloud Itonami の resident workforce が、**修正後の 50 run 窓で 56% を
 |---|---|
 | short prompt / max_tokens 64 | 4/4 通過（3.8–5.7s） |
 | short prompt / max_tokens 16384 | 4/4 通過（3.3–9.0s） |
-| **long prompt 4,620 B / max_tokens 16384** | **3/3 通過（52.8–82.6s）** |
+| **long prompt 4,620 B / max_tokens 16384** | **5/5 通過（52.8–144.0s、中央値 79.4s）** |
+
+⚠ この行は最初 `3/3（52.8–82.6s）` と書いた。probe が 5 回のうち 3 回まで
+しか出力していない時点の**部分結果を完了として報告した**もの。完走後の値が上で、
+**最大値は 82.6s ではなく 144.0s** だった。結論の向きは変わらないが、
+app 側の request timeout との関係を見るときはこの 144s の方を使うこと。
 
 `/v1/models` は 200 で 8 model を広告し、`bots task` を手で投げれば通る。
 **payload の形では壊れない。**
@@ -79,7 +84,9 @@ mac-mini fleet 側。**cloud-itonami-app の config では直らない** —— 
    signature で弾かれただけで、User-Agent を付けたら 8/8 通った
 2. **`nohup &` の子が tool 呼び出し終了で殺され**、条件が 2 度未実行のまま終わった。
    出力に条件が無いことを「その条件が失敗した」と読めば 3 度目の誤報だった
-3. **snapshot だけを読んで journal を無視**し、「07:00Z 以降 0 run」と読みかけた。
+3. **部分結果を完了として報告した** —— long prompt の probe を `3/3` と書いたが
+   5 回中 3 回までしか出ていなかった。完走は `5/5`、最大 144.0s
+4. **snapshot だけを読んで journal を無視**し、「07:00Z 以降 0 run」と読みかけた。
    snapshot は 07:00:23 書込、journal には 07:01–07:04 の run が在る。
    結局ファイル解析は不要で、**アプリ自身（`bots workforce`）が正本**だった
 
