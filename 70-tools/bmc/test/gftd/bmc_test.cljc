@@ -49,6 +49,48 @@
     (is (= 3 (ledger/next-seq evs)))
     (is (= [5 6] (map :event/seq (ledger/stamp [{:event/seq 4}] "t" [{} {}]))))))
 
+(deftest ledger-seq-survives-the-file-being-reverted
+  ;; The collision was documented as two writers racing between a read and a
+  ;; write. The committed canvas-ledger says otherwise: across its 362 colliding
+  ;; seq values the SMALLEST gap between the two events is 32 seconds, the median
+  ;; about an hour, the largest 3.1 days (measured 2026-08-31). Nothing that slow
+  ;; is a race, and a lock around the append would have fixed none of it.
+  ;;
+  ;; What actually happens: a main sync reverts the ledger to origin/main,
+  ;; dropping lines that were never landed. The next append counts only the file,
+  ;; so it re-issues the numbers those dropped events already used -- and when
+  ;; git merges the two copies, two events sit on one seq.
+  ;;
+  ;; The floor is what a reverted file cannot take away.
+  (testing "without a floor, a revert re-issues the number (the bug, stated)"
+    (let [on-main [{:event/seq 1} {:event/seq 2} {:event/seq 3}]
+          loop-a (ledger/stamp on-main "t1" [{:event/value "A"}])
+          ;; ... revert to origin/main; loop-a's line is gone ...
+          loop-b (ledger/stamp on-main "t2" [{:event/value "B"}])]
+      (is (= 4 (:event/seq (first loop-a))))
+      (is (= 4 (:event/seq (first loop-b)))
+          "this is the defect: two different events, one number")))
+  (testing "with the floor, the reverted file cannot lower the next seq"
+    (let [on-main [{:event/seq 1} {:event/seq 2} {:event/seq 3}]
+          loop-a (ledger/stamp on-main "t1" [{:event/value "A"}])
+          hwm (ledger/high-water loop-a)
+          loop-b (ledger/stamp on-main "t2" [{:event/value "B"}] hwm)]
+      (is (= 4 (:event/seq (first loop-a))))
+      (is (= 5 (:event/seq (first loop-b)))
+          "loop B must not reuse the number loop A already issued")))
+  (testing "the floor never pulls a seq backwards when the file is ahead of it"
+    (is (= 11 (ledger/next-seq [{:event/seq 10}] 3))))
+  (testing "an unreadable or missing mark degrades to the old behaviour, not to a wrong number"
+    (is (= 0 (ledger/parse-hwm nil)))
+    (is (= 0 (ledger/parse-hwm "")))
+    (is (= 0 (ledger/parse-hwm "not-a-number")))
+    (is (= 0 (ledger/parse-hwm "-5")))
+    (is (= 42 (ledger/parse-hwm "42\n"))))
+  (testing "the mark lives outside the tree, or a checkout could revert it too"
+    (let [p (ledger/hwm-file "/home/u" "/repo/90-docs/business/canvas-ledger.edn")]
+      (is (str/starts-with? p "/home/u/.gftd/"))
+      (is (not (str/includes? p "/repo/"))))))
+
 (deftest governor-invariants
   (let [idx (canvas/index base)
         {:keys [approved rejected]}
