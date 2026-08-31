@@ -32,24 +32,35 @@
 (def apexes
   [{:apex "itonami.cloud"
     :auth "https://auth.itonami.cloud"
-    :plane {:url "https://itonami.cloud/api/authority" :method "GET"}}
+    :planes [{:url "https://itonami.cloud/api/authority" :method "GET"}]}
    {:apex "murakumo.cloud"
     :auth "https://auth.murakumo.cloud"
-    :plane {:url "https://api.murakumo.cloud/v1/cdci/jobs" :method "GET"}}
+    :planes [{:url "https://api.murakumo.cloud/v1/cdci/jobs" :method "GET"}]}
+   ;; Four planes, because this apex HAS four and measuring one of them was
+   ;; under-measuring from the start. Discovered 2026-08-31: the three query
+   ;; surfaces were wired to read a Biscuit and this probe reported no change,
+   ;; because the one endpoint it asked was the datom plane -- a different
+   ;; Worker. An axis that samples one surface answers about that surface and
+   ;; is quoted as answering about the apex. Adding planes can only lower a
+   ;; score, never raise one: `plane-reads-capability` is true only when EVERY
+   ;; listed plane reads the header.
    {:apex "kotobase.net"
     :auth "https://auth.kotobase.net"
-    :plane {:url "https://kotobase.net/xrpc/ai.gftd.apps.kotobase.datomic.q"
-            :method "POST" :data "{\"query\":\"[:find ?e]\"}"}}
+    :planes [{:url "https://kotobase.net/xrpc/ai.gftd.apps.kotobase.datomic.q"
+              :method "POST" :data "{\"query\":\"[:find ?e]\"}"}
+             {:url "https://sparql.kotobase.net/sparql" :method "POST" :data "{}"}
+             {:url "https://gremlin.kotobase.net/gremlin" :method "POST" :data "{}"}
+             {:url "https://graphql.kotobase.net/graphql" :method "POST" :data "{}"}]}
    {:apex "x402.nexus"
     :auth "https://auth.x402.nexus"
-    :plane {:url "https://x402.nexus/admin/settlements/__probe__" :method "GET"}}
+    :planes [{:url "https://x402.nexus/admin/settlements/__probe__" :method "GET"}]}
    {:apex "isekai.network"
     :auth "https://auth.isekai.network"
-    :plane {:url "https://isekai.network/api/fork" :method "POST" :data "{}"}}
+    :planes [{:url "https://isekai.network/api/fork" :method "POST" :data "{}"}]}
    {:apex "aozora.app"
     :auth "https://auth.aozora.app"
-    :plane {:url "https://pds.aozora.app/xrpc/com.atproto.server.getSession"
-            :method "GET"}}])
+    :planes [{:url "https://pds.aozora.app/xrpc/com.atproto.server.getSession"
+              :method "GET"}]}])
 
 ;; The shared contract, and the shapes a second implementation has actually
 ;; used. `one-authority` is true only when the FIRST one answered.
@@ -141,7 +152,21 @@
     (< status 400) false
     :else (names-any? body ["unauthorized" "credential" "authorization"])))
 
-(defn- probe-apex [{:keys [apex auth plane]}]
+(defn- probe-plane
+  "Measure one plane twice: bare, and with a syntactically-shaped Biscuit."
+  [plane]
+  (let [bare (curl (assoc plane :headers ["content-type: application/json"]))
+        with (curl (assoc plane :headers ["content-type: application/json"
+                                          "Authorization: Biscuit EnwAAA"]))]
+    {:url (:url plane)
+     :bare bare
+     :with with
+     :reads (cond
+              (or (= :unknown (:status bare)) (= :unknown (:status with))) :unknown
+              :else (not= [(:status bare) (normalise (:body bare))]
+                          [(:status with) (normalise (:body with))]))}))
+
+(defn- probe-apex [{:keys [apex auth planes]}]
   (let [shared (curl {:url (str auth shared-passkey-path) :method "POST" :data "{}"
                       :headers ["content-type: application/json"]})
         shared-live (challenge? shared)
@@ -162,9 +187,11 @@
                    (boolean (some (fn [[_ r]] (true? (challenge? r))) alts)))
         mint (curl {:url (str auth "/v1/biscuit/token") :method "POST" :data "{}"
                     :headers ["content-type: application/json"]})
-        bare (curl (assoc plane :headers ["content-type: application/json"]))
-        with (curl (assoc plane :headers ["content-type: application/json"
-                                          "Authorization: Biscuit EnwAAA"]))
+        measured (mapv probe-plane planes)
+        ;; The first plane is the one the credential-shape axes are read from:
+        ;; the others say whether the apex is consistent, not what it demands.
+        bare (:bare (first measured))
+        with (:with (first measured))
         refuses (refusal? (:status bare) (:body bare))]
     {:apex apex
 
@@ -178,6 +205,10 @@
      :raw/plane-status (:status bare)
      :raw/plane-body (:body bare)
      :raw/plane-body-with-biscuit (:body with)
+     :raw/planes (mapv (fn [m] {:url (:url m) :status (:status (:bare m)) :reads (:reads m)})
+                       measured)
+     :raw/planes-reading (str (count (filter #(true? (:reads %)) measured))
+                              "/" (count measured))
 
      ;; --- the five invariants, as scorable axes ---
      :controller-live (cond
@@ -200,11 +231,11 @@
                             ;; present AND guarded: an unguarded mint is not
                             ;; a capability issuer, it is a token faucet.
                             :else (= 403 (:status mint)))
+     ;; EVERY listed plane, not the first one. An apex whose query surfaces
+     ;; read the header while its datom plane does not has not finished.
      :plane-reads-capability (cond
-                               (or (= :unknown (:status bare))
-                                   (= :unknown (:status with))) :unknown
-                               :else (not= [(:status bare) (normalise (:body bare))]
-                                           [(:status with) (normalise (:body with))]))
+                               (some #(= :unknown (:reads %)) measured) :unknown
+                               :else (every? #(true? (:reads %)) measured))
      :refusal-names-credential (cond
                                  (= :unknown refuses) :unknown
                                  (false? refuses) false
