@@ -132,15 +132,50 @@ Measured after that, all JVM-free: the kernel compiles to an 8,394-byte
 `wasm32-browser-kotoba-v1` module, instantiates on `runtime/browser-host.mjs`,
 and returns the same `document-sha256` for S as the reference interpreter.
 
-**That parity claim covers S's identity and nothing else.** Exercising the
-dataspace capability on wasm needs a provider written against the browser
-host's own value representation, and there is not one. So conformance still
-runs only on the interpreter, and the kernel is NOT yet known to admit
-identically on both backends. The parity check discriminates -- pointed at a
-module built from a renamed entity type it fails with both digests printed --
-but a check asserting only `is a sha256` would have passed, and that is nearly
+The parity check covers S's identity only, and it discriminates -- pointed at
+a module built from a renamed entity type it fails with both digests printed.
+A check asserting only `is a sha256` would have passed, and that is nearly
 what it was: its first run compared against an interpreter that had thrown,
-and so reported a failure for the wrong reason.
+and reported a failure for the wrong reason.
+
+**Admission itself now runs on the module too**, against a real dataspace --
+the same `provider.dataspace` the interpreter run uses, with a bridge either
+side of it. The bridge is small because the host's document form IS the KIR
+document form; a keyword is the text :is-a wrapped in quotes on one side and the keyword
+`:is-a` on the other.
+
+Two things had to change, and both are measured properties of the host rather
+than preferences.
+
+**A call cannot arrive from outside.** `browser-host.mjs` admits a compound
+argument only if the host itself minted it -- `assertValue` rejects anything
+else as `forged compound typed value rejected` -- and the constructors it
+exposes (`instance.typedValues`) are `vectorI64`, `vectorF64`, `stringIndex`,
+`disjointSetI64`, `document`, `bytes`. No record, no variant. So the kernel
+carries `call-declare` / `call-relate` / `call-related` / `call-census`, which
+take scalars and assemble the call value inside the guest. The other direction
+is open: a provider's result goes through `admitHostResult`, which mints from
+plain frozen arrays.
+
+That makes the earlier phrasing wrong. `oak-call` is no longer `the only
+door`; there are five entries. **The property that was ever load-bearing is
+that admission is reached in exactly one place**, and it still is -- each
+entry assembles a call and hands it to `oak-call`. Conformance now asserts the
+export set AND that no `do-*` / `all-*` / `type-of` is in it, so a future
+export that reaches the dataspace unadmitted fails a check rather than
+widening the surface quietly.
+
+**One call spends one instance.** Fuel is spent over an instance's life, not
+per call, so a run that reuses an instance traps `unreachable` partway through
+-- measured after four checks. The dataspace outlives the instances because
+the provider is the host's, which is the shape `amu/runtime/dom-driver.mjs`
+already uses for the same reason.
+
+Eleven checks pass on wasm. The suite discriminates on that backend as on the
+other: the domain check made vacuous fails only the domain check, showing the
+call falling through to the range check; query results discarded fails six.
+The capacity and evidence mutations were run against the interpreter only --
+the capacity one needs 34 instances on wasm, which is slow rather than hard.
 
 ## Evidence
 
