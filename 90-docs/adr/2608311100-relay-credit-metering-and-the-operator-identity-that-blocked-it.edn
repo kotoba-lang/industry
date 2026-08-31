@@ -59,8 +59,15 @@ The fallback was rebuilt to leave that pool: `qwen/qwen3.8-flash` ->
 `z-ai/glm-5.3-flash` (Z.ai, 1.31M ctx, cheaper) -> the local bridge, last.
 Re-measured 10 runs: 9 qwen, 1 glm, 0 bridge.
 
-The local bridge is also broken independently — it answers
-`No such tool available` for every tool. That is why it must not be first.
+The local bridge was also broken independently — it answered
+`No such tool available` for every tool, which is why it was put last.
+FIXED 2026-08-31 (adr-2608311900): the guest reached for the caller's tools
+even though the empty --tools flag leaves it holding none, and on a bad run
+wrote the CLI's refusal into `content` with `tool_calls` empty — so the caller
+was told its own tools were broken. The bridge now names that error in its
+directive and salvages the rejected attempt into `tool_calls`, with a test
+that fails when the salvage is removed. Ordering it last is still right for
+other reasons (it is the slowest lane), but no longer for this one.
 
 ## The credit rail — what landed and what it cost
 
