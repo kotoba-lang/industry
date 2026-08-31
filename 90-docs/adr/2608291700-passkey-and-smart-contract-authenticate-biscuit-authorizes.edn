@@ -103,12 +103,28 @@ gremlin  names-biscuit=1  header-changes-answer=YES
   コンパイルできなかった**（`multiformats/core` が要求する `sha2.core` が
   source path に無い）。cypher を serve する library が、しばらく誰にも
   ビルドし直されていなかった。
-- 同 repo の `node out/node-tests.js` は**完走しない**。ns ヘッダを出して
-  `kotobase-store-test` の後で止まり、`shell-test` に到達せず `Ran N tests` を
-  出さないまま 900 秒で切られる。`biscuit_test.cljs` を外しても同じなので、
-  Biscuit の段より前からある。**完走しないスイートは、通った変更と壊れた変更に
-  同じ沈黙を返す**ので、判定を切り出す `:biscuit-test` build を足した。
-  広いほうの hang は open。
+- ~~同 repo の `node out/node-tests.js` は完走しない~~ **これは誤りだった。**
+  完走する —— このワークステーションで**約 9 分**かかり、`55 tests / 215
+  assertions` を報告する。900 秒で 3 回切って、その沈黙を hang と読んだ。
+  **プロセスが CPU を焼いているかを一度も見ていなかった。** `node
+  out/node-tests.js` の行を直接サンプルすると CPU 時間は 8s → 28s → 75s → 89s
+  と積み上がっており、deadlock ではなく遅いテストだった。
+
+  誤読は 2 つの測定ミスから来ており、どちらも同じ形 —— **対象ではなくラッパーに
+  当てていた**: `pgrep -f 'node out/node-tests.js'` はその文字列を含む shell 自身に
+  当たるので「まだ走っている」が常に真になり、`ps | grep | head -1` は
+  `timeout 600 node …` を掴んで 0.0% CPU を返した。
+
+  この誤読の上で行動した結果、**スイートを一度も完走させないまま Biscuit の段を
+  merge・deploy し、`an-anonymous-gremlin-websocket-handshake-is-rejected` を
+  赤くしたまま出荷した**（`www-authenticate` が意図どおり `Biscuit, Bearer` に
+  変わったのに、期待値が `Bearer` のままだった）。production は壊れていない ——
+  4 面の live 実測は正しい —— が、それは運であって手順ではない。**完走させて
+  いれば 9 分で判った。** 修正は `fa4f599`、修正後 0 failures / exit 0。
+
+  `:biscuit-test` build は残すが、**全体スイートの代用ではない**。本当に要るのは
+  protocols-worker が自分の重いテストに与えている扱い（多コミット系を既定の
+  `-test$` から別 build へ出す）で、それは未着手。
 
 ## 2.1 旧・現在地 —— 実測、2026-08-29
 
