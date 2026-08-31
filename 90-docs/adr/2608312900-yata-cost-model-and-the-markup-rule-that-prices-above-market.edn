@@ -4,7 +4,9 @@
   :adr/source-format "edn"
   :adr/topic "yata-cost-model"
   :adr/title "ADR-2608312900: YATA の原価を計算した —— 数字は出たが、『掲示 = 原価 x 2.0』をクラウド原価に当てると市場の 3〜4 倍になる。そして書き込み操作は掲示価格に一切入っていない"
-  :adr/status "accepted"
+  :adr/status "superseded"
+  :adr/superseded_by ["adr-2608313700-yata-one-design-account-is-derived-not-issued"]
+  :adr/superseded_note "原価の測定はこの ADR が最初に行ったが、価格・粒度・口座まで含めた設計 1 本に畳んだ。本文は git が持つ。"
   :adr/date "2026-08-31"
   :adr/last_verified "2026-08-31"
   :adr/deciders ["Jun Kawasaki"]

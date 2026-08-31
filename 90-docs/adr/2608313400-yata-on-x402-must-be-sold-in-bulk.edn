@@ -4,7 +4,9 @@
   :adr/source-format "edn"
   :adr/topic "yata-on-x402-sku-shape"
   :adr/title "ADR-2608313400: YATA を x402 に載せるのに『価格つきの PUT を足す』はできない —— 4 MiB を 5 年保管しても $0.0018 で、read 1 回より安い。売るならまとめてで、書き込みの門は CACAO のまま残す"
-  :adr/status "accepted"
+  :adr/status "superseded"
+  :adr/superseded_by ["adr-2608313700-yata-one-design-account-is-derived-not-issued"]
+  :adr/superseded_note "まとめ売りの算数はここで出たが、残していた identity の問いが導出で解けたので設計 1 本に畳んだ。本文は git が持つ。"
   :adr/date "2026-08-31"
   :adr/last_verified "2026-08-31"
   :adr/deciders ["Jun Kawasaki"]
