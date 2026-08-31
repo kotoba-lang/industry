@@ -1,0 +1,182 @@
+[{:db/id -1
+  :adr/id "adr-2608311600-one-auth-design-across-six-apexes"
+  :adr/title "ADR-2608311600: 6 apex に対する 1 つの認証・権限設計 — 実測 36.67/100、同じ finding が 6 面全部に在る"
+  :adr/status "accepted"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-31"
+  :adr/last-verified "2026-08-31"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "cross-apex-auth-integration"
+  :adr/repos ["orgs/cloud-itonami/app-auth"
+              "orgs/cloud-itonami/cloud-itonami-app"
+              "orgs/network-awai/cloud-murakumo"
+              "orgs/net-kotobase/control-plane"
+              "orgs/network-awai/nexus-x402"
+              "orgs/network-awai/network-isekai"
+              "orgs/network-awai/app-aozora-engine"]
+  :adr/authoritative-for
+  ["ADR-2608039950 (identity 面) と ADR-2608291700 (capability 面) を 1 つの設計として述べること"
+   "その設計への適合を 6 apex 横断で測る 5 不変条件と、その計器 (90-docs/auth_plane_integration)"
+   "2026-08-31 時点の 6 apex 適合度と、その測り方"
+   "RP ID を 1 つに寄せない (passkey は RP-scoped のまま) という決定"]
+  :adr/related
+  ["2608039950"
+   "adr-2608291700-passkey-and-smart-contract-authenticate-biscuit-authorizes"
+   "adr-2608180200-biscuit-as-delegation-center"
+   "adr-2608155000-authority-capability-lattice"
+   "2608120100"
+   "2608110100"]
+  :adr/evidence
+  ["90-docs/auth_plane_integration/probe-2026-08-31.edn — overall 36.67, 6 apexes, 22 findings, 0 unmeasured"
+   "selftest.cljs — 6/6 checks, exit 0"
+   "auth.itonami.cloud /v1/passkey/login/options -> 200 challenge, rpId=itonami.cloud"
+   "auth.murakumo.cloud -> 200 rpId=auth.murakumo.cloud / auth.kotobase.net -> 200 rpId=auth.kotobase.net / auth.kotoba.cloud -> 200 rpId=auth.kotoba.cloud"
+   "auth.itonami.cloud /v1/biscuit/token -> 404 (mint 不在)。murakumo/kotobase/kotoba.cloud -> 403 same-origin"
+   "auth.aozora.app /api/passkey/login/begin -> 503 AuthNotConfigured PDS_JWT_SECRET unset。/v1/passkey/login/options -> 404"
+   "auth.x402.nexus / auth.isekai.network -> curl exit 6 (NXDOMAIN)"
+   "6 apex とも Authorization: Biscuit を付けた応答が付けないものと正規化後バイト同一"
+   "pds.aozora.app /xrpc/com.atproto.server.getSession -> HTTP 200 body AuthMissing"
+   "cloud-itonami-app services/app-edge/wrangler.jsonc に routes 記述なし"]
+  :adr/body
+  "# ADR-2608311600: 6 apex に対する 1 つの認証・権限設計
+
+**Status**: accepted / **Date**: 2026-08-31
+**Deciders**: Jun Kawasaki（オーナー指示「では設計統合」）
+
+## 1. なぜ「統合」なのか — 新しい決定ではない
+
+設計は既に 2 本ある。
+
+- **ADR-2608039950**（2026-08-03）— authority は 1 つ、apex は多数。新しい identity を作らない
+- **ADR-2608291700**（2026-08-29）— passkey と smart contract が認証し、Biscuit が権限を持つ
+
+前者は **identity の面**を、後者は **capability の面**を決めた。**両者を並べて 1 つとして
+述べた文書は無く、両者が同時に成り立っているかを測る計器も無かった。**
+
+だから統合とは新しい設計を書くことではない。**2 本の accepted な決定を 1 つの検査可能な
+形にまとめ、6 つの apex 全部に当てて測ること**である。
+
+## 2. 統合された設計 — 3 つの面と 1 つの決定器
+
+| 面 | 何を持つか | 正本 |
+|---|---|---|
+| **principal** | 人 1 人 = 1 つの安定 principal（`did:web:kotobase.net:tenant:<user>`） | ADR-2608039950 決定 1 |
+| **controller** | passkey（RP-scoped）/ SIWE + ERC-4337 smart account / did:key。**複数持てる。どれも principal ではない** | ADR-0082（cloud-itonami-app）、ADR-2608039950 |
+| **capability** | Biscuit v3。scheme は `<apex>://can/<action>` | ADR-2608180200 / 2608261300 / 2608280230 |
+| **決定器** | `kotoba-lang/authority` の `covers?` / `meet` **1 本** | ADR-2608155000 |
+
+CACAO は session の起点と署名済み artifact に残り、**delegation からは降りたまま**。
+email OTP / SSO は補助経路として残す（基盤から降ろすが消さない）。
+
+### 決定: RP ID を 1 つに寄せない
+
+実測で **4 つの RP** が在る（`itonami.cloud` / `auth.murakumo.cloud` / `auth.kotobase.net` /
+`auth.kotoba.cloud`）。**これは違反ではない。** passkey は RP-scoped であることが phishing
+境界そのもので、domain-free にすればその境界を失う（ADR-0082）。**跨ぐのは principal で
+あって credential ではない。**
+
+違反は RP が 4 つあることではなく、**それらが同じ principal に結ばれていないこと**である。
+
+### 5 つの不変条件（検査されるのはこれ）
+
+| # | 不変条件 | 重み |
+|---|---|---|
+| 1 | `controller-live` — その apex で passkey ceremony が実際に取れる | 0.25 |
+| 2 | `one-authority` — その ceremony は共有 authn の契約であって 2 つ目の実装ではない | 0.20 |
+| 3 | `capability-issuance` — その apex が Biscuit を mint でき、cross-origin を弾く | 0.20 |
+| 4 | `plane-reads-capability` — data plane が Biscuit header を読む | 0.20 |
+| 5 | `refusal-names-credential` / `auth-failure-status` — 拒否が credential class を名乗り、401/403 を使う | 0.10 / 0.05 |
+
+## 3. 現在地 — 実測 2026-08-31
+
+```
+overall        36.67 / 100   (6 apexes, 22 findings, 0 unmeasured)
+
+  kotobase.net     80.00
+  murakumo.cloud   80.00
+  itonami.cloud    45.00
+  x402.nexus       15.00
+  aozora.app        0.00
+  isekai.network    0.00
+```
+
+**同じ 1 つの finding が 6 apex 全部に在る。** `plane-reads-capability` —— **どの apex の
+data plane も `Authorization: Biscuit` を読んでいない。** header を付けた応答が付けない
+ものと（timestamp を正規化した後）バイト同一である。ADR-2608291700 が kotobase の
+4 つの query 面について記録したことは、**6 apex 全体の性質だった。**
+
+## 4. 測って初めて分かったこと — 3 件、どれも tree の記述と食い違う
+
+1. **aozora.app の passkey は 503 で止まっている。** `/api/passkey/login/begin` が
+   `AuthNotConfigured: PDS_JWT_SECRET unset` を返す。コードは完成しており ADR-2608120100 も
+   accepted だが、**live では ceremony が 1 度も完了できない。** しかも path が共有契約と
+   違う（`/api/passkey/login/begin` vs `/v1/passkey/login/options`）—— **2 つ目の実装**で
+   ある。コードが在ることと ceremony が取れることは別の事実で、前者を読んでも後者は分から
+   ない（auth-duplication-census が 2026-08-03 に記録したのと同じ形）。
+2. **itonami.cloud は Biscuit を mint できない。** `/v1/biscuit/token` が 404。passkey の面は
+   6 apex で最も進んでいる（rpId = `itonami.cloud`、ERC-4337 smart account まで実装・test
+   済み）のに、**capability の面だけが繋がっていない。**
+3. **cloud-itonami-app の edge は route を持たない。** `services/app-edge/wrangler.jsonc` に
+   routes の記述が無く、`app.itonami.cloud` は fleet dispatch、`itonami.cloud/api/*` は
+   landing worker が全部拾う。**passkey から smart account までの実装は公開面に出ていない。**
+
+## 5. 順序（この順でしかやらない）
+
+1. **`plane-reads-capability` を 6 面に配線する。** 共有 verifier は
+   `shared/kotobase/biscuit_grant.cljc` に既に在る（ADR-2608262600 D4）。
+   **2 つ目の verifier を書かない。** 安い順: kotobase 4 query 面 → murakumo `/v1/cdci/*`
+   → aozora pds → x402 admin。
+2. **itonami に `/v1/biscuit/token` を出す。** passkey が最も進んだ apex が capability を
+   持てないのは、統合の最短の穴。
+3. **aozora の passkey を共有契約に寄せる。** `PDS_JWT_SECRET` を入れて 503 を解くのは 1 手
+   だが、**それは 2 つ目の実装を生かす手**である。先に `auth.aozora.app` を共有 authn worker
+   の route にできるかを見る（ADR-2608039950 決定 3 が言う custom domain 1 行）。
+4. **x402.nexus と isekai.network に principal を接続する。** どちらも今日は設計の外に居る。
+   x402 の `Bearer ADMIN_TOKEN` は murakumo の共有秘密と同じ形（**誰も名乗らない**）。
+   isekai の self-minted did:key は controller として**正しい形**なので、捨てずに principal に結ぶ。
+5. **auth 失敗が 200 を返す面を直す。** `pds.aozora.app` は `AuthMissing` を **HTTP 200** で
+   返す。status で分岐する client は成功として扱う。
+
+**1 と 5 はコード、2 と 3 は配線、4 はオーナー判断。**
+
+## 6. 計器
+
+```
+nbb --classpath 90-docs 90-docs/auth_plane_integration/run.cljs
+nbb --classpath 90-docs 90-docs/auth_plane_integration/selftest.cljs
+```
+
+exit は 3 値: **0 = 全軸測れて finding 無し / 1 = 全軸測れて finding あり /
+2 = 測れなかった軸がある（完全なスコアの報告を拒否する）**。
+
+selftest は 6/6 green で、次を実演する: 今日の面は空虚に緑ではない（22 finding）/
+緑が到達可能（100.00）/ 赤が到達可能（0.00）/ **1 軸を直すと finding が 1 つだけ、
+名指しした 1 つだけ消える** / 測れなかった軸は nil であって 0 ではない /
+**HTTP 200 の本文は refusal ではない**。
+
+最後の 1 つは、この計器自身が 2026-08-31 に踏んだ欠陥を pin したもの。`itonami.cloud` の
+**認証されていない 200 landing JSON** が `authority` という語を含むために
+`refusal-names-credential` を true にしていた —— **拒否していない応答を、拒否が理由を
+名乗った証拠として数えていた。**
+
+**この計器は 90-docs/kotobase_auth_maturity と別物である。** あちらは 1 つの apex の面が
+どれだけ成熟しているかを深く測る。こちらは **apex 同士が一致しているか**を測る。
+片方で 100、もう片方で 0 は両立する（自前の立派な認証面を持ち、誰とも共有していない apex）。
+
+**⚠ この ADR に実測値を書き足さないこと。** §3 の表は 2026-08-31 の値であり、引用する側は
+日付を落とす。現在地は probe を回して得る。
+
+## 7. やっていないこと（正直に）
+
+- **§5 は 1 つも着地していない。** この ADR と計器だけが今日の成果物。
+- **probe は credential を持たない。** 測れるのは「拒否がどう名乗るか」までで、
+  **正当な Biscuit が実際に通ることは測っていない。**
+- **`plane-reads-capability` は正しい Biscuit で測っていない。** 構文だけの
+  `Biscuit EnwAAA` を付けて答えが変わるかを見る。読んでいる面なら 401 の理由が変わるので
+  **false は強い証拠**だが、**true になったときそれが正しく読んでいる証拠にはならない。**
+- **fleet gate にしていない。** 外向き HTTPS を要求し、ノードの egress は一様ではない。
+  常駐させるなら operator ホスト 1 台に置く。
+- **itonami の checkout は最後に fetch した main より 57 commit 遅れている。**
+  §4 の 3 番目（app-edge に route が無い）は、その遅れた tree に対する観測である。"}]

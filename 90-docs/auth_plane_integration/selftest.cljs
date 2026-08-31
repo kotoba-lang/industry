@@ -1,0 +1,91 @@
+#!/usr/bin/env nbb
+;; Does the judge discriminate, or is it green because nothing looked?
+;;
+;;   nbb --classpath 90-docs 90-docs/auth_plane_integration/selftest.cljs [probe.edn]
+;;
+;; Six checks. The fourth is the one that matters: a negative test that only
+;; asserts "it went red" counts a run that failed for an unrelated reason as
+;; a discrimination. So fixing exactly one axis must remove exactly ONE
+;; finding, and the named one.
+(ns auth-plane-integration.selftest
+  (:require [auth-plane-integration.audit :as audit]
+            [auth-plane-integration.probe :as probe]
+            [clojure.edn :as edn]
+            [clojure.string :as str]
+            ["fs" :as fs]))
+
+(def ^:private results (atom []))
+
+(defn- check [name ok? detail]
+  (swap! results conj {:name name :ok (boolean ok?) :detail detail})
+  (println (str (if ok? "  ok   " "  FAIL ") name "  —  " detail)))
+
+(def all-axes (mapv :axis audit/axes))
+
+(defn- apex-with [name v]
+  (into {:apex name} (for [a all-axes] [a v])))
+
+(defn -main [& args]
+  (let [stored (or (first args) "90-docs/auth_plane_integration/probe-2026-08-31.edn")
+        live (let [d (edn/read-string (str (fs/readFileSync stored "utf8")))]
+               (or (:probe d) d))
+        live-a (audit/audit live)
+
+        green {:probe/at "green" :apexes [(apex-with "a" true) (apex-with "b" true)]}
+        red {:probe/at "red" :apexes [(apex-with "a" false) (apex-with "b" false)]}
+        ;; red, except apex "a" now satisfies exactly one axis
+        one-fixed {:probe/at "one" :apexes [(assoc (apex-with "a" false) :one-authority true)
+                                            (apex-with "b" false)]}
+        unk {:probe/at "unk" :apexes [(assoc (apex-with "a" true) :capability-issuance :unknown)]}
+
+        ga (audit/audit green) ra (audit/audit red)
+        oa (audit/audit one-fixed) ua (audit/audit unk)]
+
+    (println (str "auth-plane-integration selftest — judge over " stored "\n"))
+
+    (check "today is not vacuously green"
+           (seq (:findings live-a))
+           (str (count (:findings live-a)) " findings across "
+                (count (:by-apex live-a)) " apexes"))
+
+    (check "green is reachable"
+           (and (= 0 (count (:findings ga)))
+                (< (js/Math.abs (- 100.0 (:overall ga))) 1e-9))
+           (str "all-true probe scores " (.toFixed (:overall ga) 2)))
+
+    (check "red is reachable"
+           (and (= (* 2 (count all-axes)) (count (:findings ra)))
+                (< (js/Math.abs (:overall ra)) 1e-9))
+           (str "all-false probe scores " (.toFixed (:overall ra) 2)
+                " with " (count (:findings ra)) " findings"))
+
+    (let [gone (clojure.set/difference
+                (set (map (juxt :apex :axis) (:findings ra)))
+                (set (map (juxt :apex :axis) (:findings oa))))]
+      (check "fixing one axis removes exactly that one finding"
+             (= gone #{["a" :one-authority]})
+             (str "removed " (pr-str gone))))
+
+    (check "an unmeasured axis is not a zero"
+           (and (nil? (:score (first (:by-apex ua))))
+                (seq (:incomplete ua))
+                (nil? (:overall ua)))
+           "apex score is nil and the overall refuses, rather than scoring 0")
+
+    ;; The literal case this probe got wrong on 2026-08-31: an unauthenticated
+    ;; 200 landing document containing the word "authority" was read as a
+    ;; refusal that names a credential. Pinned so a rewrite cannot lose it.
+    (check "a 200 body is never a refusal"
+           (and (false? (probe/refusal? 200 "{\"ok\":true,\"authority\":\"/api/authority\"}"))
+                (true? (probe/refusal? 401 "{\"error\":\"Unauthorized\"}"))
+                (= :unknown (probe/refusal? :unknown nil)))
+           "200+\"authority\" false, 401 true, :unknown passes through")
+
+    (let [failed (remove :ok @results)]
+      (println (str "\n  " (- (count @results) (count failed)) "/" (count @results) " checks"))
+      (if (seq failed)
+        (do (println (str "  failed: " (str/join ", " (map :name failed)))) 1)
+        0))))
+
+(let [code (apply -main *command-line-args*)]
+  (set! (.-exitCode js/process) code))
