@@ -50,18 +50,48 @@
   [events]
   (reduce max 0 (keep :event/seq events)))
 
+(defn ledger-key
+  "The LOGICAL identity of a ledger: its path relative to the repository root.
+
+  Keying the mark on the absolute path was wrong, and wrong in the direction
+  that matters. Measured 2026-08-31, hours after the floor landed: two mark
+  files existed for one ledger --
+
+    …com-junkawasaki_90-docs_business_canvas-ledger.edn.seq          13968
+    …T_itonami-qwen36-1788174887288_90-docs_business_canvas…seq      13966
+
+  The second is `com.gftd.itonami-qwen36-tick`, which by design builds a
+  sibling worktree per run (`(str (.tmpdir os) \"/itonami-qwen36-\" ts)`) so it
+  never touches the shared checkout, and deletes it afterwards. Every tick
+  therefore got a NEW absolute path, a NEW key, and a floor of zero -- the
+  writer the floor most needed to constrain was the one it did not constrain,
+  and each run leaked one more orphan mark file.
+
+  Relative to the repository root both spellings are
+  `90-docs/business/canvas-ledger.edn`, so they share one floor."
+  [git-root ledger-path]
+  (let [p (str ledger-path)
+        root (when (seq (str git-root)) (str/replace (str git-root) #"/+$" ""))]
+    (if (and root (str/starts-with? p (str root "/")))
+      (subs p (inc (count root)))
+      ;; no root to relativise against: fall back to the last two segments,
+      ;; which still collapses two checkouts of the same ledger onto one key
+      (let [segs (remove str/blank? (str/split p #"/"))]
+        (str/join "/" (take-last 2 segs))))))
+
 (defn hwm-file
-  "Where the high-water mark for `ledger-path` lives.
+  "Where the high-water mark for a ledger lives.
 
   Deliberately NOT beside the ledger and not inside the repository: the whole
   point is to survive `git checkout` reverting the ledger, and anything tracked
   or ignorable inside the tree can be reverted or cleaned with it. `~/.gftd` is
   where this workspace already keeps machine-local loop state."
-  [home ledger-path]
-  (str home "/.gftd/ledger-hwm/"
-       (-> (str ledger-path)
-           (str/replace #"[^A-Za-z0-9._-]" "_"))
-       ".seq"))
+  ([home ledger-path] (hwm-file home nil ledger-path))
+  ([home git-root ledger-path]
+   (str home "/.gftd/ledger-hwm/"
+        (-> (ledger-key git-root ledger-path)
+            (str/replace #"[^A-Za-z0-9._-]" "_"))
+        ".seq")))
 
 (defn parse-hwm
   "Stored high-water mark → int. Anything unreadable is 0, which is exactly the
@@ -79,12 +109,23 @@
        (let [f (java.io.File. ^String path)]
          (if (.exists f) (parse-events (slurp f)) [])))
 
+     (defn- git-root-of [path]
+       ;; the repository root the ledger belongs to; nil when git cannot say,
+       ;; in which case ledger-key falls back to the last two path segments
+       (try
+         (let [d (.getParent (java.io.File. ^String path))
+               p (.. (ProcessBuilder. ["git" "-C" (str d) "rev-parse" "--show-toplevel"])
+                     (redirectErrorStream true) start)
+               out (slurp (.getInputStream p))]
+           (when (zero? (.waitFor p)) (clojure.string/trim out)))
+         (catch Exception _ nil)))
+
      (defn- read-hwm [path]
-       (let [f (java.io.File. ^String (hwm-file (System/getProperty "user.home") path))]
+       (let [f (java.io.File. ^String (hwm-file (System/getProperty "user.home") (git-root-of path) path))]
          (if (.exists f) (parse-hwm (slurp f)) 0)))
 
      (defn- write-hwm! [path n]
-       (let [f (java.io.File. ^String (hwm-file (System/getProperty "user.home") path))]
+       (let [f (java.io.File. ^String (hwm-file (System/getProperty "user.home") (git-root-of path) path))]
          (when-let [p (.getParentFile f)] (.mkdirs p))
          (spit f (str n))))
 
@@ -114,8 +155,17 @@
        (let [f (nc/file path)]
          (if (.exists f) (parse-events (nc/slurp f)) [])))
 
+     (defn- git-root-of [path]
+       (try
+         (let [cp (js/require "node:child_process")
+               d (.dirname (js/require "node:path") path)
+               r (.spawnSync cp "git" (clj->js ["-C" d "rev-parse" "--show-toplevel"])
+                             #js {:encoding "utf8"})]
+           (when (zero? (or (.-status r) 1)) (str/trim (str (.-stdout r)))))
+         (catch :default _ nil)))
+
      (defn- hwm-path* [path]
-       (hwm-file (.homedir (js/require "node:os")) path))
+       (hwm-file (.homedir (js/require "node:os")) (git-root-of path) path))
 
      (defn- read-hwm [path]
        (let [f (nc/file (hwm-path* path))]
