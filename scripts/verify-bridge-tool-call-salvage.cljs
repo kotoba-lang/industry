@@ -169,6 +169,10 @@
                             :required ["path"]}}}])
 
 (defn- ask [port scenario]
+  (if (= :health scenario)
+    (-> (js/fetch (str "http://127.0.0.1:" port "/health"))
+        (.then (fn [r] (.then (.json r) (fn [j] {:status (.-status r)
+                                                 :body (js->clj j :keywordize-keys true)})))))
   (-> (js/fetch (str "http://127.0.0.1:" port "/v1/chat/completions")
         #js {:method "POST"
              :headers #js {"Content-Type" "application/json"}
@@ -180,7 +184,7 @@
                                :tools tools
                                :max_tokens 512}))})
       (.then (fn [r] (.then (.json r) (fn [j] {:status (.-status r)
-                                               :body (js->clj j :keywordize-keys true)}))))))
+                                               :body (js->clj j :keywordize-keys true)})))))))
 
 (defn- calls [resp]
   (get-in resp [:body :choices 0 :message :tool_calls]))
@@ -244,7 +248,27 @@
         (not (str/includes? (str (get-in r [:body :error :message]))
                             "relayed this bridge's own"))
         (str "502 for some other reason: " (pr-str (:body r)))
-        :else nil))]])
+        :else nil))]
+
+   ;; Last on purpose: it reads counters the four above moved. Order is
+   ;; guaranteed because the cases run sequentially.
+   ["counters — the reach for tools it does not hold is countable, not just tailable"
+    :health
+    (fn [r]
+      (let [st (get-in r [:body :tool_runs])]
+        (cond
+          (nil? st) "/health does not report tool_runs at all"
+          ;; 4 tool-bearing requests: 3 answered, 1 refused. A refused run that
+          ;; went uncounted would hide the refusal floor entirely.
+          (not= 4 (:runs st)) (str "expected runs=4, got " (pr-str st))
+          ;; salvage and recovered each reached for `terminal`; healthy reached
+          ;; for nothing; unrecoverable reached for `Bash`, which the caller
+          ;; never declared and which therefore must NOT count as a reach for
+          ;; a caller tool.
+          (not= 2 (:with-attempts st)) (str "expected with-attempts=2, got " (pr-str st))
+          (not= 1 (:salvaged st)) (str "expected salvaged=1, got " (pr-str st))
+          :else nil)))]
+])
 
 (defn- run []
   (let [tmp (fs/mkdtempSync (path/join (os/tmpdir) "bridge-salvage-"))
