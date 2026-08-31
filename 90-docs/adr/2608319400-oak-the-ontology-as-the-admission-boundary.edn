@@ -199,6 +199,50 @@ the way a check that ran and passed exits. Fixed before landing.
 The runner exits 2 -- neither 0 nor 1 -- and names the missing repositories
 when a sibling checkout is absent.
 
+## Where this stands (2026-08-31)
+
+Everything below is on a default branch. Nothing is waiting on a review.
+
+| repo | commit | what |
+|---|---|---|
+| kotoba-lang/oak | 6f209ddf | the kernel, both suites, README |
+| kotoba-lang/kotoba-kir | ff7a3ae2 | document indexing, document-sha256, uleb, the npm-free route |
+| kotoba-lang/kotoba-wasm | 34557de9 | the capability import key, and the repo`s first cljs runner |
+| kotoba-lang/amu | fb22f754 | the pin advance, via PR 715 |
+| com-junkawasaki/root | this file, and the west entry for oak | |
+
+Verification, from a fresh clone of the published pin, all JVM-free:
+
+- `nbb bin/conformance.cljs` -- 20 checks, 0 failures, on the reference
+  interpreter
+- `nbb bin/wasm-conformance.cljs` -- 11 checks, 0 failures, on the compiled
+  module against a real dataspace
+- kotoba-kir`s own cljs suite -- 37 tests, 90 assertions, 0 failures
+- kotoba-wasm`s new cljs suite -- 2 tests, 0 failures
+- amu PR 715 -- both required checks green; `test (ubuntu-latest)` is 1,189
+  tests / 8,727 assertions
+
+## What is left, in the order it is worth doing
+
+1. **The capacity and fuel ceilings are checked on the interpreter only.**
+   Running them on wasm is slow rather than hard -- the capacity one needs 34
+   instances, because fuel is spent per instance. Resume at
+   `test/wasm-conformance.cljs`, whose `steps` helper already sequences one
+   instance per call.
+2. **The judge loop is not implemented and S is hand-written.** That is the
+   dynamic half of the paper. Nothing here depends on it; a kernel is
+   retargeted by editing `schema-doc`.
+3. **A second consumer would justify moving the host bridge out of the test.**
+   `host->kir-doc` / `kir->host-doc` / `kir->host-result` are general over the
+   dataspace kit, not over oak, and probably belong beside
+   `provider.dataspace` rather than in a suite. One consumer is not yet a
+   library.
+4. **The i64-is-a-BigInt class keeps recurring.** amu ADR-0286 is one
+   instance, this ADR records two more, and a fifth landed the same day in
+   kotoba-wasm from another session. The only detector that works is running
+   the ClojureScript path; both repositories now have a runner, and widening
+   what those runners cover is what shrinks the class.
+
 ## Consequences
 
 - New UI/agent work that needs a governed graph has a worked example of the
