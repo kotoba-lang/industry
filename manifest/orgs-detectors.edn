@@ -2407,4 +2407,51 @@
               and the unmeasured state exits 2. Three refusals fire for their
               own reasons -- no orgs tree, a receipts path that does not exist,
               and a catalog that responds without carrying :items."}
+
+{:id :verify-hermes-agent-health
+   :title    "the resident agent fleet's credentials, which died two days before anyone was told"
+   :why      "2026-08-31: the OpenRouter key in ~/.hermes/auth.json's credential pool
+              answered 401 `User not found.` on 2026-08-29 21:13 -- a revoked key,
+              not an empty balance. The pool wrote last_status=exhausted with
+              last_error_reset_at=null, which never retries and never clears, and
+              nothing said so for 37 hours across 22 profiles. What the operator
+              eventually saw named two innocent things: `Context length exceeded
+              (510,398 tokens). Cannot compress further.` and Cloudflare 1101 on
+              api.murakumo.cloud. Neither was true. conversation_loop.py:6030
+              prints that sentence when compression makes NO PROGRESS at any size
+              -- the same line appears in this machine's own logs at 8,214 tokens
+              -- and it made no progress because the auxiliary compressor was
+              401ing with everything else. Falling past the dead primary to the
+              last fallback then handed 327k to a 262,144 ceiling behind a single
+              shared llama.cpp queue, which is where the 1101 came from. The
+              primary's real window is 1,310,720; it always fitted. One dead
+              credential, two errors that both blamed something downstream, two
+              days. Cannot be a fleet gate: its whole input is ~/.hermes on the
+              operator workstation, which exists in no repo tree and on no node.
+              It reads no secret -- the fingerprint comparison that actually
+              proved the diagnosis by hand needs a Keychain read, and launchd
+              cannot answer an unlock prompt (ADR-2607178000), so that half stays
+              in the hand-run set rather than becoming a permanent :inconclusive."
+   :argv ["nbb" "{{repo}}/scripts/verify-hermes-agent-health.cljs" "--findings"]
+   :cwd :root
+   :findings :protocol
+   :writes :none
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :timeout-ms 120000
+   :interval-ms 21600000
+   :measured "2026-08-31: 902ms wall for 26 files across 23 profiles at load
+              average 28, so the 120s timeout is 130x headroom; 6h because a
+              credential dies between one turn and the next, not between one
+              landed ADR and the next. All three exits checked before landing.
+              0: --self-test, six assertions. 1: the live install, 6 findings.
+              2: a missing --home, which refuses rather than reporting a healthy
+              fleet from an absent one. The self-test earned its place on the
+              first run -- it failed, because `get` on a raw JS object returns
+              nil, so pool-findings reported every dead credential as healthy.
+              That is the exact bug this detector exists to catch, written into
+              the detector itself, and only the both-directions test saw it.
+              Log classes carry a 48h window on purpose: without one the first
+              401 ever logged is a finding forever, and a detector that cannot
+              return to green is the silence it was built to break. Pool state
+              carries no window -- `exhausted` is a fact about now."}
 ]}
