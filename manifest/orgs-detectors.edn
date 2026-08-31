@@ -296,7 +296,77 @@
               belongs in a measured field that gets re-measured and not in a
               claim."}
 
-{:id       :verify-source-nul-bytes
+{:id       :verify-shadow-cljs-provider-paths
+   :title    "builds that put a library on their source path but not that library's own dependency"
+   :why      "2026-08-31: net-kotobase/control-plane's protocols-worker and
+              network-awai/app-aozora-engine BOTH stopped at `The required namespace
+              \"sha2.core\" is not available, it was required by \"kotobase/cid.cljs\"` --
+              neither could be rebuilt from its own main, and both deploy live
+              Workers. One library grew a dependency and its consumers' source paths
+              did not follow. Nothing noticed because a build nobody ran is
+              indistinguishable from a build that works. A sweep found the same shape
+              in 8 more builds. This is deliberately not a fleet gate: it reads
+              `orgs/` and it runs `git show <default>/main:<path>` per repo, and a
+              gate ships one repo's tree with no siblings and no remotes."
+   :argv     ["nbb" "{{repo}}/scripts/verify-shadow-cljs-provider-paths.cljs"
+              "--findings" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 43200000                 ; 12h -- source paths change slowly
+   :timeout-ms  1800000                  ; 30m -- ~3x the measured 9m over 235 builds
+   :writes   :none
+   :measured "Landed 2026-08-31 with all three exit codes shown against a synthetic
+              tree rather than asserted: a build missing the provider -> exit 1 and one
+              FINDING naming the file and the namespace; the same tree with only the
+              correct build -> exit 0 `clean`; a repo whose default branch cannot be
+              resolved -> exit 2 and REFUSING, not clean. First live run: SCANNED 195
+              of 235, 10 broken, 40 unreadable, so exit 2 -- the tree is NOT reported
+              clean while 40 builds were never opened. It reads the DEFAULT BRANCH and
+              not the working tree on purpose: a west checkout sits at its pin, and
+              the first draft of this sweep read working trees and reported a repair
+              that had already landed."}
+
+  {:id       :verify-ipni-publisher-record
+   :title    "the IPNI publisher record, against the identity that is actually publishing"
+   :why      "2026-08-31, ADR-2608311800: manifest/ipni-publisher.edn named the
+              2026-08-27 key while the live head had been signed by another since
+              2026-08-30, and a fourth identity had never been written down at all --
+              the file that exists to say which key publishes did not know which key
+              was publishing. Its two retrieval candidates had also swapped: the host
+              marked :ready 404'd all three CIDs reachable from the live head, and the
+              host marked :broken served them and re-hashed correctly. Three of the
+              four publisher identities still point retrieval at the 404ing host, and
+              since every indexed row has Publisher.ID == AddrInfo.ID, each rotation
+              minted a new PROVIDER identity too -- the file's own words are that an
+              advertisement naming an address that cannot serve a verifiable block is
+              worse than no advertisement. Nothing compared the record to the wire, so
+              the record could only ever be as fresh as the last person who looked.
+              CANNOT be a fleet gate twice over: it reads a superproject manifest AND
+              it requires outbound HTTPS to cid.contact, and node egress is not
+              uniform (measured 2026-08-13, 8 nodes 200 / zebulun 000)."
+   :argv     ["nbb" "{{repo}}/scripts/verify-ipni-publisher-record.cljs" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 21600000                 ; 6h -- rotation is rare but a stale record
+                                         ; is invisible, so do not let it run daily
+   :timeout-ms  600000                   ; 10m -- measured ~40s, mostly cid.contact
+   :writes   :none
+   :measured "Landed 2026-08-31 with both directions shown rather than asserted.
+              Clean run: exit 0, SCANNED 6, six checks ok, zero FINDING lines. Three
+              controls, each naming the check it should: putting the stale peer-id
+              back failed record-names-the-live-signer AND
+              the-current-entry-is-the-declared-one; dropping the newest identity from
+              :identity-history failed history-accounts-for-every-indexed-identity and
+              named the missing id; claiming kotobase.net is :ready failed
+              ready-candidate-serves-kotobase.net while the other candidate stayed ok.
+              --selftest proves the peer-id and IPNS derivations reproduce a pair the
+              manifest already held, and the CID constant was computed independently
+              in python rather than by the code under test -- a derivation that cannot
+              reproduce a known-good pair may not be used to judge a new one."}
+
+  {:id       :verify-source-nul-bytes
    :title    "raw control bytes in source, which make grep answer as if a word is absent"
    :why      "2026-08-18/19: one NUL byte makes file(1) classify a source file as
               `data`, and grep then SKIPS it silently -- `grep -c MessageDigest
