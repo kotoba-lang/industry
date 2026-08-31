@@ -6,6 +6,27 @@
 ;;
 ;; ## 何を発行するか
 ;;
+;; 2 つの population を **1 通の document** に載せる（ADR-2608318000 /
+;; cloud-itonami ADR-0053）:
+;;
+;;   `loops`      launchd の com.gftd.* Claude loop（従来どおり）
+;;   `residents`  Hermes の cron 常駐（~/.hermes/cron/jobs.json）
+;;
+;; **1 通なのは KV の key が 1 つだからである。** `/api/bots-status` は
+;; `current` を丸ごと上書きするので、publisher を 2 本にすると片方が
+;; もう片方を静かに消す —— しかもどちらも 204 を受け取る。
+;;
+;; residents は **workdir も prompt も載せない**（前者は operator の home
+;; 配下の絶対パス、後者は agent の指示そのもの）。載せるのは name /
+;; schedule / last_run / next_run / last_status / failure_streak /
+;; enabled / paused / model / provider / script（ファイル名のみ）/
+;; has_error（**本文ではなく有無**）。
+;;
+;; 読めなかったときは `residents.why` に理由を入れて **空配列を送らない
+;; ようにする** —— 空の jobs は「常駐は 1 体も居ない」と読め、それは
+;; 失敗が生んではならない答え。page 側は why が在れば section 全体を
+;; unmeasured にする。
+;;
 ;; loop の列挙は **union**（片方に居ないものを黙って落とさない）:
 ;;   (a) ledger を持つ loop — 対応する scripts/<name>-loop.cljs
 ;;       （repo-bot-drain は scripts/repo-bots/drain-loop.cljs）が存在するもの
@@ -31,14 +52,17 @@
 ;; ## 出力と exit
 ;;
 ;;   --dry-run       document(JSON) を印字して PUT しない。exit 0
+;;   --self-test     residents の読み取りを両方向で確かめる。exit 0/1
 ;;   token が無い    {:outcome :not-measured :why :token-missing}、exit 2
 ;;                   —— 発行できなかったことを成功に見せない
 ;;   PUT が 204 以外 {:outcome :publish-failed :status … :body …}、exit 1
 ;;                   —— **応答 body を捨てない**（原因はたいてい body に書いてある）
-;;   PUT が 204      {:outcome :published :loops N}、exit 0
+;;   PUT が 204      {:outcome :published :loops N :residents N|:unmeasured}、
+;;                   exit 0 —— residents が読めなかった run を「発行できた」
+;;                   だけで済ませない（数と理由を両方出す）
 ;;
 ;; usage:
-;;   nbb --classpath ".:scripts/nbb_compat" scripts/loop-status-publish.cljs [--dry-run]
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/loop-status-publish.cljs [--dry-run|--self-test]
 
 (ns loop-status-publish
   (:require [clojure.edn :as edn]
@@ -56,6 +80,7 @@
 (def token-file (str gftd "/bots-status-token"))
 (def endpoint "https://itonami.cloud/api/bots-status")
 (def dry-run? (boolean (some #{"--dry-run"} *command-line-args*)))
+(def self-test? (boolean (some #{"--self-test"} *command-line-args*)))
 
 (defn- exists? [p] (try (.existsSync fs p) (catch :default _ false)))
 (defn- read-file [p] (try (.readFileSync fs p "utf8") (catch :default _ nil)))
@@ -145,13 +170,81 @@
             :else nil)
      :ledger_lines (:lines led 0)}))
 
+;; ---------------------------------------------------------- hermes residents
+
+(def hermes-home
+  (or (aget (.-env js/process) "HERMES_HOME") (str home "/.hermes")))
+
+(defn- read-hermes-jobs
+  "<home>/cron/jobs.json → {:jobs [job…]} か {:why \"…\"}。
+
+  **読めなかった理由を捨てない。** 5 つの失敗はどれも「常駐が 0 体」と
+  同じ形で返せてしまうので、それぞれ別の名前で返す。値は Hermes が持つ
+  JS object のまま扱う（`get` は生の JS object に nil を返す —— この
+  workspace が verify-hermes-agent-health で一度踏んだ形）。
+
+  home を引数に取るのは self-test がこの関数**そのもの**を回すため。
+  分類器を写して回すテストは、分類器が壊れても緑のままになる。"
+  ([] (read-hermes-jobs hermes-home))
+  ([hermes-home]
+   (let [f (str hermes-home "/cron/jobs.json")]
+    (cond
+      (not (exists? hermes-home)) {:why "hermes-home-absent"}
+      (not (exists? f)) {:why "jobs-file-absent"}
+      :else
+      (let [txt (read-file f)]
+        (if (nil? txt)
+          {:why "jobs-file-unreadable"}
+          (let [parsed (try (js/JSON.parse txt) (catch :default _ ::bad))]
+            (cond
+              (= ::bad parsed) {:why "jobs-file-invalid-json"}
+              (nil? parsed) {:why "jobs-file-invalid-json"}
+              :else
+              (let [arr (aget parsed "jobs")]
+                (if-not (array? arr)
+                  {:why "jobs-file-shape-unexpected"}
+                  {:jobs (vec arr)}))))))))))
+
+(defn- resident-row
+  "1 job → 発行する facts だけ。**workdir と prompt は写さない。**"
+  [job]
+  (let [g #(let [v (aget job %)] (when-not (undefined? v) v))]
+    {:name (g "name")
+     :enabled (boolean (g "enabled"))
+     :paused (some? (g "paused_at"))
+     :schedule (or (g "schedule_display")
+                   (some-> (g "schedule") (aget "expr")))
+     :last_run (g "last_run_at")
+     :next_run (g "next_run_at")
+     :last_status (g "last_status")
+     ;; **本文は載せない。** hermes の last_error は失敗した script の
+     ;; stdout をそのまま抱えており（実測: at:// URI と投稿本文が入って
+     ;; いた）、それを公開ページに転記するのは任意のプロセス出力を公開
+     ;; することになる。「失敗していて、記録が在る」までが公開してよい
+     ;; 事実で、中身は operator が手元で読む。
+     :has_error (some? (g "last_error"))
+     :failure_streak (g "failure_streak")
+     :agent (not (true? (g "no_agent")))
+     ;; script は path ではなくファイル名（~/.hermes/scripts 配下の名前）
+     :script (g "script")
+     :model (g "model")
+     :provider (g "provider")}))
+
+(defn- residents []
+  (let [{:keys [jobs why]} (read-hermes-jobs)]
+    {:runtime "hermes"
+     :observed_at (.toISOString (js/Date.))
+     :why why
+     :jobs (if why [] (mapv resident-row jobs))}))
+
 (defn- document []
   (let [installed (plist-names)
         names (sort (into (ledger-names) installed))]
     {:schema "cloud.itonami.bots-status.v1"
      :updated_at (.toISOString (js/Date.))
      :source (.hostname os)
-     :loops (mapv #(row % installed) names)}))
+     :loops (mapv #(row % installed) names)
+     :residents (residents)}))
 
 ;; ---------------------------------------------------------------- publish
 
@@ -179,7 +272,64 @@
           {:status nil :body (str/trim (str out "\n" err))}))
       (finally (try (.unlinkSync fs hdr) (catch :default _ nil))))))
 
+;; ---------------------------------------------------------------- self-test
+;;
+;; Both directions, or it is theatre. The reader must produce jobs from a
+;; well-formed file AND a named reason from each way it can fail — a reader
+;; that returns `{:jobs []}` on every error reports "no residents" for a
+;; broken read, which is the one answer this whole block exists to prevent.
+
+(defn- self-test! []
+  (let [tmp (str gftd "/.loop-status-self-test")
+        write! (fn [body]
+                 (.mkdirSync fs (str tmp "/cron") #js {:recursive true})
+                 (.writeFileSync fs (str tmp "/cron/jobs.json") body))]
+    (try
+      (write! (js/JSON.stringify
+               (clj->js {:jobs [{:name "a-scout" :enabled true
+                                 :schedule_display "0 3 * * *"
+                                 :last_run_at "2026-08-30T03:00:00Z"
+                                 :next_run_at "2026-08-31T03:00:00Z"
+                                 :last_status "ok" :failure_streak 0
+                                 :model "m" :provider "p" :script "e.py"
+                                 :workdir "/Users/someone/.gftd/worktrees/x"
+                                 :last_error "Script exited with code 1\nstdout: boom"
+                                 :prompt "SECRET INSTRUCTIONS"}]})))
+      (let [good (read-hermes-jobs tmp)
+            row (resident-row (first (:jobs good)))
+            emitted (pr-str row)
+            _ (write! "{not json")
+            broken (read-hermes-jobs tmp)
+            _ (write! "{\"jobs\": \"not-an-array\"}")
+            shaped (read-hermes-jobs tmp)
+            _ (.rmSync fs (str tmp "/cron/jobs.json") #js {:force true})
+            missing (read-hermes-jobs tmp)
+            absent (read-hermes-jobs (str tmp "-no-such-home"))
+            checks
+            [["a well-formed file yields jobs"     (= 1 (count (:jobs good)))]
+             ["…and no why"                        (nil? (:why good))]
+             ["invalid JSON is named, not empty"   (= "jobs-file-invalid-json" (:why broken))]
+             ["a wrong shape is named, not empty"  (= "jobs-file-shape-unexpected" (:why shaped))]
+             ["an absent file is named, not empty" (= "jobs-file-absent" (:why missing))]
+             ["an absent home is named separately" (= "hermes-home-absent" (:why absent))]
+             ["a failed read carries no jobs key"  (nil? (:jobs broken))]
+             ["the row keeps the name"             (= "a-scout" (:name row))]
+             ["the row drops workdir"              (not (str/includes? emitted "/Users/"))]
+             ["the row drops the prompt"           (not (str/includes? emitted "SECRET"))]
+             ["the row drops the error body"       (not (str/includes? emitted "boom"))]
+             ["…but keeps that there was one"      (true? (:has_error row))]]]
+        (doseq [[label ok?] checks]
+          (println (if ok? "  ok  " "  FAIL") label))
+        (if (every? second checks)
+          (do (println "self-test OK — a failed read is named, never an empty resident list") 0)
+          (do (println "self-test FAILED — a check that cannot fail is theatre") 1)))
+      (finally
+        (try (.rmSync fs tmp #js {:recursive true :force true})
+             (catch :default _ nil))))))
+
 (defn -main []
+  (when self-test?
+    (js/process.exit (self-test!)))
   (let [doc (document)
         json (js/JSON.stringify (clj->js doc) nil 1)]
     (cond
@@ -199,7 +349,11 @@
               (js/process.exit 2))
           (let [{:keys [status body]} (put! token json)]
             (if (= 204 status)
-              (do (prn {:outcome :published :loops (count (:loops doc))})
+              (do (prn {:outcome :published
+                        :loops (count (:loops doc))
+                        :residents (if-let [w (:why (:residents doc))]
+                                     [:unmeasured w]
+                                     (count (:jobs (:residents doc))))})
                   (js/process.exit 0))
               ;; 応答 body を捨てない（CLAUDE.md 6 問の 3 番目）。
               (do (prn {:outcome :publish-failed :status status
