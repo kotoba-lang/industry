@@ -18,6 +18,18 @@
     account-scoped token では権限不足になる。**verify の失敗を「鍵が死んでいる」と
     読まないこと** — 判定は実際に使う endpoint（`/zones/{id}/dns_records`）で行う。
     2026-08-14 にこれで 5 分溶かした。
+  - ⚠ **2026-08-31 実測: この session からは `gftd.cf` が引けない。**
+    `security find-generic-password -s gftd.cf -a API_TOKEN -w` も
+    `-s gftd.cf -w` も NOT FOUND。旧記述は消さずに残す（下記）——
+    2026-08-05「存在しない」→ 2026-08-14「PRESENT」→ 2026-08-31「引けない」と
+    3 回振れており、**この item の在否をこの索引から読まないこと**。
+    その日に引けるかどうかを、使う直前に自分で確かめる。
+    2026-08-31 に Cloudflare を触った実作業（Workers の custom domain 付け替え、
+    dispatch namespace への deploy）は **wrangler の OAuth session** で通した
+    （`wrangler whoami` → account `cloud-kotoba` = 4da88288…、scope に
+    `workers_scripts (write)` / `workers_routes (write)` があり、
+    `PUT /accounts/{acc}/workers/domains` まで通る）。DNS ではなく Workers を
+    触るならこちらが現役の経路。
   - ⚠ **2026-08-05 版のこの節は「`gftd.cf` は実測で存在しない」と書いていたが誤り。**
     2026-08-14 に `security find-generic-password -s gftd.cf` は PRESENT を返す。
     当時 `-a API_TOKEN` を付けずに引いたか、別ユーザ context で引いた可能性が高い。
