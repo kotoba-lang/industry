@@ -29,7 +29,13 @@
    "2026-08-31: api.murakumo.cloud に deploy 済み（version 3a5d06ff）。live の /v1/models で murakumo-main のみ is_ready true、残る 5 hosted は 4 理由すべてを列挙して withheld、relay 2 件は無改変を確認"
    "2026-08-31: provenance 7 key が live JSON に全部残っていることを確認（clj->js 衝突の回帰確認）"
    "2026-08-31: 別セッションが c485b76 で readiness.cljc を governed artifact 無しで landed させており main が deploy 不能だった。artifact を refresh して 4925a3d で復旧、npm test 270/1400 green"
-   "2026-08-31 未完: murakumo.cloud サイトの再デプロイが kagi の OS-Keychain unlock 待ちで止まっており、/legal/privacy.md は旧版（Last updated 2026-08-30）のまま。正本 (cloud-murakumo-app 1c08443) と配信コピー (cloud-murakumo 24d11cd) は main に landed。--bootstrap（lease 無し deploy）は使わなかった"]
+   "2026-08-31 未完: murakumo.cloud サイトの再デプロイが kagi の OS-Keychain unlock 待ちで止まっており、/legal/privacy.md は旧版（Last updated 2026-08-30）のまま。正本 (cloud-murakumo-app 1c08443) と配信コピー (cloud-murakumo 24d11cd) は main に landed。--bootstrap（lease 無し deploy）は使わなかった"
+   "2026-08-31 PR 棚卸し: 開いていた 8 本を merge 2 / close 4 / reland 2 で処理。superseded 3 本（api#181/#182/#183）は content containment で『main が既に持っている、または後から逆に決めている』ことを示した —— #182 を merge すると hosted-model-ids が 4→2 に縮み、#181 は context を 65536→32768 に、#183 は pool 順の Xavier を last から second に戻す"
+   "2026-08-31 cloud-murakumo#126 reland: site 半分を cloud-murakumo-app d8001cc、worker 半分を cloud-murakumo c65b0c0 へ分割着地（08-31 の分割で site source が別 repo に移っていた）。501→401 の break で site_worker_speech_test が『actual: 401, expected: 501』と名指しで赤、復元で緑"
+   "2026-08-31 break の測り方を 1 度誤った: speech-path? を切っても resolve-route が :kind :speech を同じ handler へ dispatch するため観測が変わらず、『テストが判別しない』ように見えた。壊し方が無効だっただけで、両方が通る handle-speech! を壊して測り直した"
+   "2026-08-31 test/llms_public_api_test.mjs が 08-31 の分割以来 dead だった（旧パスの site/docs.cljc を読んで ENOENT）。その手前で throw するので llms.txt が docs から乖離しないことを守る assertion が全部到達不能。パスを直し、削って赤・戻して緑を確認"
+   "2026-08-31 api#190 の blocker を解消: debit-credits? が mk1 の scope を読むようにした（cloud-murakumo-api 785da4b、deploy version ff3eaa81）。identity-from-authorize が :sub/:scope を捨てていたため課金判定が operator の bot と支払う他人を構造的に区別できなかった。scope-allows? は使わない（\"all\" が免除を得てしまう）・scope 欠落は課金・免除は mk1 限定。break 3 方向すべて名指しで赤、271 tests / 1412 assertions 緑、OPERATOR_RELAY_IN_BUNDLE=1"
+   "2026-08-31 未完: murakumo.cloud サイトの再デプロイは kagi の OS-Keychain unlock 待ちのまま。着地済みの音声 501 contract と privacy §6a は、その 1 回の deploy で同時に公開される"]
   :adr/body
   "murakumo.cloud を OpenRouter の hosting provider として登録する前に、先方が課している
 4 つの要件のうち機械で答えられるものを実装した。申請自体はまだ出していない
