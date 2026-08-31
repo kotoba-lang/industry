@@ -85,11 +85,35 @@ workforce のものと別（別の population・別のホスト。片方の漏�
 
 台帳の口座名は did:key 文字列なので、bot の did がそのまま口座名になる。
 
-### D3. 支出権限は deny-by-default の名簿。cap は rail ごとの単位で置く
+### D3. 支出権限は deny-by-default。正本は **署名された Biscuit**（2026-08-31 改訂）
 
-`manifest/bot-allowances.edn` に無い bot は policy が nil になり、
-`pay.x402-buyer/plan` が `:buyer/no-policy` で拒否する —— **socket を開く前に**。
-沈黙を自由と読まない。
+**当初この決定は「名簿ファイル」だった。オーナー指摘（「biscuit をベースに cacao は
+成立している?」）を受けて改めた。**
+
+`manifest/bot-allowances.edn` が「払ってよいか・いくらまでか」を決めていたが、あれは
+**署名の無い EDN で、読むのは payer だけ**である。この workspace 自身の分業に照らすと
+それは delegation であり、delegation は Biscuit で運び `kotoba-lang/authority` が決める:
+
+- ADR-2608291700 —— 「CACAO は session の起点として残り **delegation からは降りている**」
+- ADR-2608312900（hyakka）—— 「**支払いは authorization ではない。** x402 が決済し、
+  biscuit が『その支払いが何を買ったか』を運び、authority が決める」
+
+したがって **ファイルは issuance policy（何を付与すると決めたか）に降り**、bot が持つのは
+`scripts/x402_bot_pass.cljs` が発行する pass、payer が信じるのはその中の**検証済み grant**。
+`cap credits-spend kotoba://credits/<seller>` + `before` + `holder` +
+`limit` facts。**名簿に載っていることは必要条件であって十分条件ではない** ——
+pass を持たない bot は socket を開く前に `:pass/absent` で拒否される（live 実測）。
+
+**fold は 2 つとも narrowing 専用。** `cap` は library が畳む（後の block は狭められるが
+広げられない）。`limit` は payer が**最小勝ち**で畳む —— 広げられる attenuation は
+attenuation ではない。**上限の記載が無い pass は拒否**する（沈黙を「上限なし」と読むのが、
+fact を 1 つ落とした token を無制限の支出に変える経路）。
+
+⚠ **これは「強制」ではない。** pass を読むのは今も payer だけで、上限が縛るのは
+行儀の良い買い手である。token が今日買っているのは、**checkout を編集して広げられない**
+こと・**鍵を 1 つも持たない holder が offline で狭められる**こと・**root 公開鍵さえあれば
+誰でも検証できる**ことで、どれもファイルには一度も無かった性質。seller 側の強制は
+台帳が pass を受け取る決定（murakumo 側）が要る。
 
 cap は `{[network asset] n}` で置く。`:credits/per-call 1` は 1 credit であって
 1 micro-USDC ではなく、**両者は同じ challenge の同じ field に同じ文字列で届く**。
@@ -209,6 +233,7 @@ facilitator が鍵を持たないこと、USDC rail の価格と宛先。"
    "west pin a5a4c45c（pay / nexus-x402 / control-plane の 2 巡目）/ 8f30641f（3 巡目）"
    "**整理パス（2026-08-31 同日）**: kotoba-lang/pay d9e9f5ce（discovery が host の能力を必須引数で受ける。79 tests / 379 assertions）/ network-awai/nexus-x402 712a97cf（announce = admit 集合。84 tests / 372 assertions、Worker の /.well-known/x402 を実際に叩く test。**最初の版は定数どうしを比べていて、配線を戻しても緑のままだった**）/ com-junkawasaki/root 40c7d254（vendored pin の regex が `;;` を跨げず 5 件の pin 宣言が読まれていなかった: 44→39 no-pin。同 commit で bot 名簿の checker）"
    "deploy: nexus-x402 version 4996cd9a（announce 修正後）"
+   "**allowance が capability になった（2026-08-31 夜、オーナー指摘「biscuit をベースに cacao は成立している?」から）**: com-junkawasaki/root 08caedc5 —— `scripts/x402_bot_pass.cljs`（発行）+ payer が検証済み grant から policy を導出。14 tests / 35 assertions（payer）+ 5 / 17（実 writer・verifier・fold を通した round trip）。sabotage 3 種とも赤: 最大勝ちの limit / 未検証 pass の通過 / 上限不在を無制限と読む"
    "**authorization 境界（2026-08-31 夕方）**: kotoba-lang/org-chainagnostic-cacao 2327183e（core が署名し edge が検証する組を初めて突き合わせた cross smoke、10 checks。JVM 56 tests / 211 assertions）/ network-awai/cloud-murakumo-api（旧名 local-murakumo）abdb7d9e（実 CACAO → 実 verifier → 実 decision、11 assertions、sabotage 3 種）/ com-junkawasaki/root d7ae1d3f。west pin 9094ab06 + 723e6b59"
    "kotoba-lang/pay 7db004a2（buyer が credits を読み、2 rail を金額順に並べない。19 tests / 67 assertions、負の control 3 本）"
    "network-awai/nexus-x402 bdc88235（/apply が credits を運ぶ。60 tests / 266 assertions、負の control 3 本）"
