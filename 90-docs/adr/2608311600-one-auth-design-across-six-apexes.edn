@@ -52,6 +52,9 @@
    "deploy 2026-08-31: app-aozora-auth 9883c91a (44 tests/143 assertions) と nexus-x402 7679d61e (89 tests/383 assertions)、いずれも control で判別を確認"
    "auth.aozora.app / auth.kotoba.cloud / auth.itonami.cloud が同一 credential に同一の 401 not authorized を返す"
    "再測定 2026-08-31 11:57Z: overall 52.50、x402.nexus 35.00、aozora.app 35.00"
+   "deploy 2026-08-31: nexus-x402 953f290b — admin が kotoba://can/data:write の Biscuit を公開鍵で検証 (97 tests/404 assertions、control で acceptance が落ちることを確認)"
+   "vendoring 6 ファイルは commit 前に宣言 pin と byte 比較。最初の試行は 6 中 2 が pin-dishonest だった"
+   "再測定 2026-08-31 12:43Z（軸追加で分母 1.10 に変更、前後は別スケール）: overall 50.76、x402.nexus 40.91"
    "kotobase.biscuit-grant は net-kotobase/control-plane の shared/src に 1 ファイルだけ存在する — deployable の中に閉じた唯一の verifier"]
   :adr/body
   "# ADR-2608311600: 6 apex に対する 1 つの認証・権限設計
@@ -402,14 +405,58 @@ murakumo と x402 は**何も受け取らない** —— 設計ではなく **pa
    shadow-cljs は devDependency に在るので `--no-install` なら通る。**他セッションの
    進行中の変更なので直していない。報告に留める。**
 
+## 6.11 x402 が Biscuit を受け取る（2026-08-31）— そして計器が見ていなかったもの
+
+`nexus-x402` version `953f290b`。**admin 面が `kotoba://can/data:write` を持つ Biscuit を
+受理する。検証はここで、公開鍵で行う** —— この Worker は mint できない credential を
+検査でき、盗む価値のあるものを持たない。共有 `ADMIN_TOKEN` は**外していない**
+（外すのは rotation で、コピーを持つ無人の呼び手は頼んでいない）。
+
+新しい scope は作らず `data:write` を再利用した —— gateway が archive PUT で同じ選択を
+した理由がそのまま当てはまる: 発明すれば既存 role が「role が既にできると言っていること」
+をできなくなり、しかも **issuer 側の変更が先に要る**。
+
+### 前提だった構造的欠陥は、別セッションが解いていた
+
+§6.10 で「`biscuit-grant` が deployable の中に閉じている」と書いた当日、**別セッションが
+それを `kotoba-lang/grant` へ移していた**（`b2340fdd`「the reader moves to the decision
+plane」）。私は org-biscuitsec へ移す作業を始めていて、**途中で気づいて破棄した。**
+
+x402 はこの repo の規約どおり **vendoring** で取り込む（nexus の CI は west workspace 無しで
+この repo だけを checkout するため）。6 ファイル・約 1,500 行、`clojure.string` 以外の依存なし。
+
+⚠ **最初の vendoring は 6 中 2 が pin-dishonest だった。** west pin に居る working tree から
+コピーして、ヘッダには upstream head を宣言していた。`verify-vendored-copies.cljs` が
+**「stale より悪い」**と呼ぶ形（ヘッダが唯一の provenance なのに、それが嘘）。
+全部 `git show <pin>:<path>` から取り直し、**commit 前に 6 本とも byte 比較した。**
+
+### 計器が、設計の中心的主張を見ていなかった
+
+**x402 が Biscuit を検証し始めても、スコアは 1 ポイントも動かなかった。**
+軸は issuance と拒否の形しか見ておらず、**受け取り側について何も測っていなかった。**
+
+`refusal-advertises-capability`（0.10）を足した。**名前は見えるものに合わせている** ——
+credential を持たない probe は受理を観測できず、観測できるのは**その面が capability を
+受け取ると言っているか**だけ。同じ file の前の軸を、まさにこの誤りで改名したばかりである。
+
+⚠ **軸を足すと分母が変わる。** 52.50 → 50.76 は退行ではなく**別の物差し**。
+**前後の数値を trend として並べないこと。**
+
+```
+kotobase.net 100.00 / murakumo.cloud 72.73 / itonami.cloud 59.09
+x402.nexus 40.91 / aozora.app 31.82 / isekai.network 0.00   (overall 50.76)
+```
+
 ## 7. やっていないこと（正直に）
 
 - **§5-3 は owner の 1 操作待ち**（`wrangler secret put PDS_JWT_SECRET`）。
 - **murakumo は governed artifact の refresh 待ち**（branch は保全済み、merge していない）。
 - **isekai.network は 0.00 のまま。** 自己発行 did:key を controller として principal に
   結ぶ**設計判断**が要る（proxy では解けない）。
-- **x402 が Biscuit を受け取れるようにするには `biscuit-grant` を library repo へ出す**
-  必要がある —— repo の決定。
+- **x402 に mint はまだ無い**（受理はできる）。今なら未消費 credential にならないので
+  足せるが、未着手。
+- **murakumo と itonami と aozora は capability を advertise していない** ——
+  受理していないので、それが正直な状態。
 - **probe は credential を持たない。** 測れるのは「拒否がどう名乗るか」までで、
   **正当な Biscuit が実際に通ることは測っていない。**
 - **`plane-reads-capability` は正しい Biscuit で測っていない。** 構文だけの
