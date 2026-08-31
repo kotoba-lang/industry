@@ -46,7 +46,11 @@
 
 restart は `kickstart -k` では**足りない** —— process は再起動するが launchd は plist を読み直さないので、新しい release を指しているのに古い release で上がってくる（実測。1 回目はそうなった）。`bootout` → `bootstrap` が要る。
 
-④metrics/*.edn 12 件は dirty のまま。08-31 の再収集だが nexus-x402 が `{}`（main は 2362）で、これは測定ゼロではなく**収集失敗**。失敗を data として着地させないために残した。
+④**解決済み（PR #2861）。そしてこの ADR の記述は小さすぎた。** 初版は「nexus-x402 が `{}`」と 1 product の話として書いたが、実際は **全 product のCloudflare 数値がすべて消えていた** —— net-kotobase 261,870 req/7d → 消失、cloud-murakumo 859,821 → 消失、worker invocation 6 本（2,362〜186,385）→ 消失。そして **12 ファイルすべてが `:sources [:cloudflare :health :emitter]` を名乗ったまま**だった。BMC advisor loop はこのファイルを読む。
+
+原因: `cf-graphql` は `:throw false` で post するので、失効した token は `errors` を積み `data` を持たない 200 形の body で返る。`zone-traffic` と `worker-invocations` はどちらも `(get-in r [:data …])` を読んで nil を得て、それを空コレクションに畳んだ —— **本当に idle な zone が返す値と同一**。`cf-classify`（純関数）で区別し、`:sources` から `:cloudflare` を外し `:cloudflare-unmeasured` を記録するようにした。`zone-top-paths` は元から nil を返していたので触っていない。
+
+⚠ **token 自体が消えている**: `security find-generic-password -s gftd.cf` は **exit 44 / item could not be found**（拒否ではなく不在）。復旧するまで `-main` はthrow する —— これは静かな空ファイルより正しい挙動。**復旧はオーナー作業。**失敗した 12 ファイルは archive の上で破棄し、main の実数値に戻した。
 
 ⑤true-orphan-git 3 件（cloud-itonami/dougaka・dougaka-actor・dougaka-vector）は登録も退役もしていない。
 
