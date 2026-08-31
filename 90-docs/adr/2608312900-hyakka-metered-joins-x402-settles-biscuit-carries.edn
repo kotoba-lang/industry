@@ -1,0 +1,178 @@
+[{:db/id -1
+  :adr/id "adr-2608312900-hyakka-metered-joins-x402-settles-biscuit-carries"
+  :adr/title "wiki.kotobase.net の公開データに x402 の課金経路を通す —— 決めるのは支払いではなく biscuit + authority"
+  :adr/status "accepted"
+  :adr/date "2026-08-31"
+  :adr/doc_type "adr"
+  :adr/topic "hyakka-metered-joins-x402-biscuit-authority"
+  :adr/last_verified "2026-08-31"
+  :adr/related ["adr-2608180200-biscuit-as-delegation-center"
+                "adr-2607093100-x402-monetization-gateway-integration"
+                "90-docs/adr/2608136000"
+                "orgs/network-awai/app-hyakka/docs/adr/0011-metered-joins-x402-settles-biscuit-carries.md"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/authoritative_for
+  ["wiki.kotobase.net は POST /x402/query 1 本だけを課金する。無料だった route は 1 本も有料にしない —— claim は CC0-1.0 で公開射影は 1 request で落ちるので、既に無料の bytes に値段を付けない。課金の単位は walk（block read のコストが答えの大きさに比例する部分）である"
+   "支払いは authorization ではない。x402 が決済し、biscuit が『その支払いが何を買ったか』を運び、kotoba-lang/authority が決める。ADR-2608180200 の :delegated 項に wire を入れたものであって、決定器は増やさない"
+   "biscuit.kotoba/->delegated の block fold は resource 文字列の set/intersection なので、wildcard を含む grant の attenuation が空集合に畳まれる。narrowing は authority.grant/meet に行わせる（block 1 つにつき chain link 1 つ）"
+   "x402.nexus に origin 付き seller rule を登録しない。gateway が spend-gate! を通してから X-PAYMENT ごと proxy するので、facilitator の /settle を使う origin では二重に予算を消費し、買い手が払ったのに 402 が返る"
+   "pass の bound は expiry（15 分）であって revocation list ではない。buyer ごとの state を持たない"]
+  :adr/consequences "{:secret \"HYAKKA_BISCUIT_ROOT_SK を Worker secret として stdin 経由で put。vault に写しは取っていない —— custody 鍵ではなく 15 分 pass の署名鍵で、失っても影響は 1 窓分\", :price-single-home \"価格は hyakka.dataverse/offers の 1 箇所。/.well-known/x402 も 402 challenge もそこを読む（ADR-2608039990 の再発防止）\", :follow-up-1 \"biscuit.kotoba/->delegated の文字列 fold を upstream に報告する\", :follow-up-2 \"nexus の proxy 認証（rule の :auth-header / :auth-secret-env）を配線してから x402.nexus catalog に載せる\", :tests \"390 tests / 5 failures 前、428 / 5 後。増えた 38 は全部通り、既存 5 failure は equipment corpus が残した ontology の穴で前後同一\"}"
+  :adr/body "# ADR-2608312900: wiki.kotobase.net の公開データに x402 の課金経路を通す —— ただし決めるのは支払いではなく biscuit + authority
+
+**Status**: accepted / **Date**: 2026-08-31
+**Related**: ADR-2608180200（delegation の中心を biscuit にする）/
+ADR-2607093100（x402 を pay レールの標準ワイヤに）/
+ADR-2608136000（測れなかった検査が、測って問題が無かった検査と同じ値を返す）/
+ADR-2608039990（価格の写しが二重化した事故）/
+`orgs/network-awai/app-hyakka/docs/adr/0011`
+
+## 問いと、測った現在地
+
+問い: 「wiki.kotobase.net の公開データを query するのに x402 で課金決済を求める設計は
+統合されているか」。
+
+実測（2026-08-31）: **統合されていなかった。** `orgs/network-awai/app-hyakka` に
+`x402` の出現は 0 件、worker の route はすべて無認証・CORS 開放。x402.nexus の
+live `/catalog`（16 item / 6 seller）にも hyakka / wiki の entry は無い。
+
+課金されていたのは**隣の面**である。`kotobase.net` の gateway が
+`POST /x402/xrpc/<read-method>` を $0.002、`GET /x402/ipfs/<cid>` を $0.001 で売って
+おり、live で 402 challenge を返す（実測）。ここが混同の元。
+
+## 決定
+
+wiki.kotobase.net に**課金経路を 1 本だけ**足す: `POST /x402/query`（最大 3 hop の
+join、双方向）。**無料だった route は 1 本も有料にしない。**
+
+そして **支払いは authorization ではない。** 支払いは biscuit を鋳造し、
+`kotoba-lang/authority` がそれで足りるかを決める。
+
+    支払いも pass も無い      402（価格を返す）
+    pass あり                verify -> authorize -> walk（支払い不要）
+    支払いあり                settle -> pass 鋳造 -> walk
+
+## なぜ「データ」ではなく「walk」に課金するか
+
+claim は CC0-1.0 で、公開射影の全体は `/snapshots/<sha256>.json` に 1 request で
+落ちる。**既に無料で配っている bytes に値段を付けるのは劇場**であり、
+`LICENSE-DATA.md` が逆側から同じことを言っている。
+
+無料面にできないのは **walk** である。`/api/v1/corpus/linked-by` は逆辺を
+ちょうど 1 本しか答えない —— 連結も順方向も無い。だから「制裁指定を受けた主体が
+落札した公共調達」のような問いは、索引を leaf 単位でエッジ越しに引き抜いて自分で
+組み立てるしかない。これは実際に block read を食い、コストが答えの大きさに比例する。
+**課金の単位はそこ。**
+
+## delegation は biscuit が運ぶ —— 開いていた 1 項
+
+既存の有料 read 面は authority を**リテラルの代入**で決めていた。
+`net-kotobase` の `/x402/xrpc/` は settle 済み query を tenant `x402-anon`・
+`authorization` nil で proxy する（`worker.cljc`）。支払いが CACAO を**置き換える**。
+動くが、次の 3 つを表現できない:
+
+- 払い手が全員同じ principal になるので、**誰が何を買ったかが authority 検査から見えない**
+- 買い手は**狭められる物を何も持たない**ので、subagent に自分より狭い read を渡せない
+- **1 settlement = 1 request** なので、分析的な walk は問いごとに on-chain 決済する
+
+ADR-2608180200 はこの穴を名指ししている: `capability-semantics.edn` の
+`:requested-intersect-delegated-intersect-local-policy` 4 項のうち 3 項には所有者が
+居て、**`delegated` にだけ wire が無かった**。この landing はその wire をこの面に
+入れたものであり、**決定器は増やしていない**（`hyakka.pass` は自前の covering
+relation を 1 つも持たない。`authority` は source path で消費する）。
+
+## 配線して見つけたもの 1 —— wildcard の attenuation が空集合に畳まれる
+
+**`biscuit.kotoba/->delegated` は block 間の narrowing を resource 文字列の
+`set/intersection` で行う。** 後続 block が先行 block の literal の部分集合を名乗る
+場合は正しく、docstring もそう書いている。**wildcard が入った瞬間に壊れる**:
+
+    block 0   cap graph-read kotoba://graph/hyakka/*
+    block 1   cap graph-read kotoba://graph/hyakka/koukyou-chotatsu
+
+この 2 文字列の交差は**空集合**。つまり「全面 pass を 1 dataset に絞る」という
+**biscuit を選んだ理由そのものの操作**が、何にも届かない token を作る。
+`hyakka.pass-test/attenuation-only-narrows` が初回実行で落ちて判明した（テストは残す）。
+
+欲しかった演算は既に在る —— `authority.grant/meet` は scope を antichain として
+meet するので `*` ∧ `chotatsu` = `chotatsu`、`chotatsu` ∧ `*` = `chotatsu`。
+narrowing は効き、widening は表現できない。よって `hyakka.pass/->chain` は
+**block 1 つにつき link 1 つ**を作って `authority.chain` に畳ませる。
+`->delegated` は自分にしかできないこと（fact を読む・kind 集合を閉じる・reject を
+報告する）を、束は自分にしかできないこと（covering を決める）をする。
+**これは library の回避策ではなく、ADR-2608180200 が書いている合成そのもの。**
+文字列 fold は upstream に報告する価値がある。
+
+## 配線して見つけたもの 2 —— facilitator の gateway に登録すると二重決済になる
+
+**x402.nexus に `origin` 付きの seller rule を登録してはならない**（今回は登録して
+いない）。`handle-gateway` は `spend-gate!` を通してから `X-PAYMENT` を**そのまま
+付けて** origin へ proxy する。`pay.facilitator/spend-verdict` は単発フラグではなく
+**予算**なので、50000 micros ちょうどの支払いは gateway 側で使い切られ、こちらの
+gate が `/settle` を呼ぶと `:payment-exhausted` で 402 になる。
+**買い手は払い、nexus は settlement を記録し、resource は出ない。**
+
+murakumo の `/x402/*` が二重にならないのは、origin 側が facilitator の `/settle` では
+なく**自分で on-chain 検証している**から。こちらは chain RPC credential を持たない
+設計なのでその手は使えない。
+
+したがって現在の discovery は **x402 標準の
+`https://wiki.kotobase.net/.well-known/x402`**（live）と `/api/v1/datasets`。
+nexus catalog への掲載は**未了**であり、それは忘れたのではなく、
+**壊れた door を公開ディレクトリに載せないという判断**である。安全に載せる道は
+1 つ実在する: rule の `:auth-header` + `:auth-secret-env`（nexus が proxy 時に
+自分の secret を注入する既存機構）で「nexus 経由である」ことを認証し、その場合だけ
+origin 側は settle せず pass を鋳造する。nexus 側の secret 設定と deploy が要るので
+別 landing にする。
+
+## pass の bound は expiry。revocation list を新設しない
+
+ADR-2608180200 が実測して決めたとおり biscuit は失効を持たない。よって pass は
+**15 分**で、漏れた pass は取り消すのではなく期限切れになる。
+その代わり **buyer ごとの state を 1 バイトも持たない**（counter も KV も replay 台帳も
+無い）。1 回の支払いが 1 つの窓を買い、窓の中では何度でも walk できる。
+`biscuit.wire/revocation-ids` は公開リストが実在する日のための seam として残す。
+
+**pass は bearer token であり、そう書いてある。** payer は `holder` fact に provenance
+として載るが、`hyakka.pass/authorize` はその holder を `authority.chain` に**渡さない**
+—— HTTP request は提示者が payer であることを証明しないので、未認証の提示者に対する
+holder 検査は「不一致なら `:wrong-holder`、盗んだ token なら `:granted`」という
+**片方向にしか discriminate しない assertion** になる。買い手が実際に持っている
+binding は attenuation である。
+
+## 拒否は区別する（ADR-2608136000）
+
+| 何が起きたか | 答え |
+|---|---|
+| pass も支払いも無い | 402 + 価格 |
+| pass が期限切れ / scope 外 | **402** —— 新しい支払いで直る |
+| token が root 違い・壊れている・何も grant しない | **403** —— 金では直らない |
+| deployment に root key が無い | `:pass/unverified`。**grant と同じ値を返さない** |
+| facilitator に届かない | 503。「あなたの支払いが失敗した」とは言わない |
+| 支払い後に索引が読めない | 502 + `paid: true`。空の rows にしない |
+
+## 実測（live、2026-08-31）
+
+- `GET /api/v1/datasets` → 200 / 15 corpus（counts は射影から数える。宣言しない）
+- `GET /.well-known/x402` → root **public** key を公開（買い手が自分で pass を検証できる）
+- `POST /x402/query`（無支払い）→ **402** + `maxAmountRequired 50000`
+- `POST /x402/query`（hops 空）→ **400**。価格を出す前に断る —— 走れない request に
+  支払いを求めるのは、何もしないことに金を取ること
+- `POST /x402/query`（他人の root の token）→ **403** `pass/malformed`
+- 既存の無料 route（`/`・`/health`・`/api/v1/`・`/api/v1/items`・`/api/v1/corpus`）→ 全部 200
+
+test: 変更前 390 tests / 5 failures、変更後 428 / 5。**増えた 38 は全部通り、
+既存の 5 failure（equipment corpus が残した ontology の穴）は前後で同一。**
+
+## Consequences
+
+- `HYAKKA_BISCUIT_ROOT_SK` が新しい Worker secret（stdin 経由で put、argv にもファイルにも
+  出していない）。**vault に写しを取っていない** —— これは custody 鍵ではなく 15 分の
+  read pass に署名する鍵で、失っても影響は 1 窓分、再生成すれば公開鍵は自動で publish
+  され直す。この判断は wrangler.jsonc に書いてある。
+- 価格は `hyakka.dataverse/offers` の 1 箇所にしかない。`/.well-known/x402` も
+  402 challenge もそこを読む（ADR-2608039990 の再発防止）。
+- **follow-up 1**: `biscuit.kotoba/->delegated` の文字列 fold を upstream に報告する。
+- **follow-up 2**: nexus の proxy 認証（`:auth-header`）を配線してから catalog に載せる。
+"}]
