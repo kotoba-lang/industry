@@ -57,7 +57,15 @@ restart は `kickstart -k` では**足りない** —— process は再起動す
 ⑧未測定: shallow checkout 86 件（session 開始時の値、再測定していない）/ orgs detector の standing findings（compliance-scope 8・dependency-vulnerabilities 6・malware-protection 4・source-nul-bytes 新規 3）/ 最後の pin 前進以降の drift。"
 
   :adr/resume-point
-  "次の 1 手は `gftd.ledger/append!` の writer 修正（seq を採る前に origin から同期する。ADR-2607254000 が別台帳で同じ結論）。これが新規衝突を止める唯一の場所で、#2855 は下流の被害だけを止めている。検査は `nbb scripts/verify-ledger-seq-collision.cljs`（exit 0 = baseline 以下）。既存 362 件の修復は別問題で、`bmc.event/<seq>-<digest>` 側が既に読めるので急がない。app を現行コードに載せるなら release を pin で切り、同時に plist の 4 要素目を削る。fleet の :review 495 ファイルは slug 衝突 24 組をどちらの写しで採るか決めるまで着地させない。⚠ dual-write helper は**どの checkout から走らせても、そこに新しい Ed25519 identity を黙って作る**（gitignored）。worktree を捨てる前に `.bmc-kotobase-identity.hex` の有無を見ること。"
+  "**ledger の系列は 3 段とも閉じた** —— projection の曖昧性解消（既存）、corpus 単位の counts（#2855）、writer の floor（#2857）。残る 362 件は履歴であって進行中の欠陥ではなく、`bmc.event/<seq>-<digest>` 側から読めるので急がない。
+
+⚠ **#2857 はまだ本番で走っていない。** 実測（closing 時点）: `~/.gftd/ledger-hwm/` は空で、live loop はこの修正が載ってから 1 度も append していない。最初の append が mark を作る。**次にこの ADR を読む者への最初の確認事項はここ** —— `ls ~/.gftd/ledger-hwm/` が空でなくなり、中身が canvas-ledger の max seq に一致すること。空のままなら loop 側が古いコードを読んでいる。
+
+残りの優先順（測って並べたもの、大きい順）: ①fleet の :review 495 ファイル / slug 衝突 24 組 —— どちらの写しを採るかはオーナー判断で、道具は判断を拒否する。②metrics/*.edn 12 件（nexus-x402 が `{}` = 収集失敗。clean な `gftd collect` を回すか捨てるか）。③true-orphan-git 3 件（dougaka / dougaka-actor / dougaka-vector）を登録か退役か。④`pin-tip-lag.cljs` の retry 不足（この機械の負荷では常用で exit 2 になる）。⑤常駐 loop が共有 checkout に残す stale index.lock（このセッションで 8 回除去した。所有者不在）。⑥repo-bots 名簿 4,247 体に対し state ファイルが無い（一度も tick していない）。
+
+未測定のまま: shallow checkout 86 件 / orgs detector の standing findings / 最後の pin 前進以降の drift。**「測っていない」を「問題なし」と書かないこと。**
+
+⚠ この作業で分かった、道具が見ていない場所: **release directory**（`~/.cloud-itonami/releases/<sha>/`）。cleanup.cljs は `orgs/` しか歩かないので、本番で走っている 293 行の未コミット変更を誰も見ていなかった。checkout・west pin・repo main に次ぐ**第 4 の面**として扱うこと。"
 
   :adr/related ["adr-2607173100-murakumo-main-alias"
                 "adr-2607254000-ledger-append-sync-before-seq"
