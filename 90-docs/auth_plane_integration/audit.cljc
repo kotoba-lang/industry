@@ -33,7 +33,22 @@
    {:axis :refusal-names-credential :weight 0.10
     :claim "a refusal names the credential class it wanted"}
    {:axis :auth-failure-status      :weight 0.05
-    :claim "an authentication failure carries 401/403, not 200"}])
+    :claim "an authentication failure carries 401/403, not 200"}
+   ;; Added 2026-08-31. The design's central claim is that Biscuit is what
+   ;; authorizes, and NO axis measured anything about it at the accepting end:
+   ;; x402.nexus began verifying Biscuits with a public root and its score did
+   ;; not move. A scoreboard that cannot see the thing it exists to measure is
+   ;; worse than a low number.
+   ;;
+   ;; NAMED for what it can see. Without a credential this cannot observe
+   ;; acceptance -- only whether the surface SAYS a capability is accepted. The
+   ;; previous axis in this file was renamed for exactly this mistake, so:
+   ;; advertises, not accepts.
+   ;;
+   ;; ⚠ Adding an axis changes the denominator. Scores before and after are on
+   ;; different scales and must not be compared as a trend.
+   {:axis :refusal-advertises-capability :weight 0.10
+    :claim "the refusal tells a stranger that a capability credential is accepted here"}])
 
 (def total-weight (reduce + (map :weight axes)))
 

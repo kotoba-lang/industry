@@ -1,16 +1,17 @@
 {:probe
- {:probe/at "2026-08-31T11:57:20.226Z",
+ {:probe/at "2026-08-31T12:43:06.065Z",
   :probe/method "live HTTP, no credential held by the prober",
   :probe/design
   ["adr-2608039950-ninsho-one-authority-many-apexes"
    "adr-2608291700-passkey-and-smart-contract-authenticate-biscuit-authorizes"],
   :apexes
   [{:raw/plane-body-with-biscuit
-    "{\"ok\":true,\"version\":\"0.1.953\",\"freeClaim\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"freePathDocs\":\"/docs/free-path.md\",\"freePath\":{\"freeClaim\":\"/isco-1212/\",\"freeClaimUrl\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"freePathDocs\":\"/docs/free-path.md\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\",\"ok\":true,\"docs\":\"/docs/free-path.md\"},\"surface\":\"org-index\",\"org\":\"authority\",\"note\":\"Tenant data is scoped to org/repo pairs. There is no org-wide public tenant list (PII-safe design).\",\"pattern\":{\"metrics\":\"/api/authority/{repo}/metrics\",\"example\":\"/api/authority/example-repo/metrics\",\"freeClaim\":\"/isco-1212/\",\"fleetMetrics\":\"/api/fleet/metrics\",\"freeClaimUrl\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"freePathDocs\":\"/docs/free-path.md\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\"},\"bottleneck\":\"run Stripe checkout via /isco-1212/\",\"nextOwnerActions\":[{\"id\":\"first-paid-checkout\",\"ui\":\"/isco-1212/\",\"agent\":\"/isco-1212/agent.json\",\"docs\":\"/docs/go-live.md\",\"preflight\":\"/docs/checkout-preflight.md\",\"freeClaim\":\"/isco-1212/\",\"freeClaimUrl\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"freePathDocs\":\"/docs/free-path.md\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\",\"gate\":\"hyp/itonami-smb-pay\",\"note\":\"Org \\\"authority\\\" has no list endpoint. Pick a repo path /api/authority/{repo}/metrics or claim via /isco-1212/.\",\"verify\":\"curl -sS -A 'owner/1' https://itonami.cloud/api/fleet/metrics | jq '.tenants.externalPaid'\"}],\"links\":{\"freepath\":\"/api/freepath\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\",\"metrics\":\"/api/metrics\",\"fleet\":\"/api/fleet\",\"fleetMetrics\":\"/api/fleet/metrics\",\"billing\":\"/api/billing/status\",\"status\":\"/api/status\",\"maturity\":\"/api/maturity\",\"agentRuns\":\"/api/agent-runs\",\"openapi\":\"/openapi-free-path.json\",\"freeClaim\":\"/isco-1212/\",\"freeClaimUrl\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"checkoutPreflight\":\"/docs/checkout-preflight.md\",\"goLiveDocs\":\"/docs/go-live.md\",\"wedgePages\":\"/docs/wedge-pages.md\",\"distributionDrafts\":\"/docs/distribution-drafts.md\",\"freePathDocs\":\"/docs/free-path.md\",\"badge\":\"/api/badge\",\"stripe\":\"/api/stripe\",\"webauthn\":\"/api/webauthn\",\"nudge\":\"/api/nudge\",\"orgIndex\":\"/api/org\",\"tenantMetricsPattern\":\"/api/{org}/{repo}/metrics\",\"productMetrics\":\"/api/metrics\"},\"asOf\":\"2026-08-31T11:57:22.200Z\",\"freeClaimUrl\":\"/isco-1212/\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\"}",
+    "{\"ok\":true,\"version\":\"0.1.953\",\"freeClaim\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"freePathDocs\":\"/docs/free-path.md\",\"freePath\":{\"freeClaim\":\"/isco-1212/\",\"freeClaimUrl\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"freePathDocs\":\"/docs/free-path.md\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\",\"ok\":true,\"docs\":\"/docs/free-path.md\"},\"surface\":\"org-index\",\"org\":\"authority\",\"note\":\"Tenant data is scoped to org/repo pairs. There is no org-wide public tenant list (PII-safe design).\",\"pattern\":{\"metrics\":\"/api/authority/{repo}/metrics\",\"example\":\"/api/authority/example-repo/metrics\",\"freeClaim\":\"/isco-1212/\",\"fleetMetrics\":\"/api/fleet/metrics\",\"freeClaimUrl\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"freePathDocs\":\"/docs/free-path.md\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\"},\"bottleneck\":\"run Stripe checkout via /isco-1212/\",\"nextOwnerActions\":[{\"id\":\"first-paid-checkout\",\"ui\":\"/isco-1212/\",\"agent\":\"/isco-1212/agent.json\",\"docs\":\"/docs/go-live.md\",\"preflight\":\"/docs/checkout-preflight.md\",\"freeClaim\":\"/isco-1212/\",\"freeClaimUrl\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"freePathDocs\":\"/docs/free-path.md\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\",\"gate\":\"hyp/itonami-smb-pay\",\"note\":\"Org \\\"authority\\\" has no list endpoint. Pick a repo path /api/authority/{repo}/metrics or claim via /isco-1212/.\",\"verify\":\"curl -sS -A 'owner/1' https://itonami.cloud/api/fleet/metrics | jq '.tenants.externalPaid'\"}],\"links\":{\"freepath\":\"/api/freepath\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\",\"metrics\":\"/api/metrics\",\"fleet\":\"/api/fleet\",\"fleetMetrics\":\"/api/fleet/metrics\",\"billing\":\"/api/billing/status\",\"status\":\"/api/status\",\"maturity\":\"/api/maturity\",\"agentRuns\":\"/api/agent-runs\",\"openapi\":\"/openapi-free-path.json\",\"freeClaim\":\"/isco-1212/\",\"freeClaimUrl\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"checkoutPreflight\":\"/docs/checkout-preflight.md\",\"goLiveDocs\":\"/docs/go-live.md\",\"wedgePages\":\"/docs/wedge-pages.md\",\"distributionDrafts\":\"/docs/distribution-drafts.md\",\"freePathDocs\":\"/docs/free-path.md\",\"badge\":\"/api/badge\",\"stripe\":\"/api/stripe\",\"webauthn\":\"/api/webauthn\",\"nudge\":\"/api/nudge\",\"orgIndex\":\"/api/org\",\"tenantMetricsPattern\":\"/api/{org}/{repo}/metrics\",\"productMetrics\":\"/api/metrics\"},\"asOf\":\"2026-08-31T12:43:07.127Z\",\"freeClaimUrl\":\"/isco-1212/\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\"}",
     :raw/planes-reading "0/1",
     :one-authority true,
+    :refusal-advertises-capability false,
     :raw/plane-body
-    "{\"ok\":true,\"version\":\"0.1.953\",\"freeClaim\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"freePathDocs\":\"/docs/free-path.md\",\"freePath\":{\"freeClaim\":\"/isco-1212/\",\"freeClaimUrl\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"freePathDocs\":\"/docs/free-path.md\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\",\"ok\":true,\"docs\":\"/docs/free-path.md\"},\"surface\":\"org-index\",\"org\":\"authority\",\"note\":\"Tenant data is scoped to org/repo pairs. There is no org-wide public tenant list (PII-safe design).\",\"pattern\":{\"metrics\":\"/api/authority/{repo}/metrics\",\"example\":\"/api/authority/example-repo/metrics\",\"freeClaim\":\"/isco-1212/\",\"fleetMetrics\":\"/api/fleet/metrics\",\"freeClaimUrl\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"freePathDocs\":\"/docs/free-path.md\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\"},\"bottleneck\":\"run Stripe checkout via /isco-1212/\",\"nextOwnerActions\":[{\"id\":\"first-paid-checkout\",\"ui\":\"/isco-1212/\",\"agent\":\"/isco-1212/agent.json\",\"docs\":\"/docs/go-live.md\",\"preflight\":\"/docs/checkout-preflight.md\",\"freeClaim\":\"/isco-1212/\",\"freeClaimUrl\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"freePathDocs\":\"/docs/free-path.md\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\",\"gate\":\"hyp/itonami-smb-pay\",\"note\":\"Org \\\"authority\\\" has no list endpoint. Pick a repo path /api/authority/{repo}/metrics or claim via /isco-1212/.\",\"verify\":\"curl -sS -A 'owner/1' https://itonami.cloud/api/fleet/metrics | jq '.tenants.externalPaid'\"}],\"links\":{\"freepath\":\"/api/freepath\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\",\"metrics\":\"/api/metrics\",\"fleet\":\"/api/fleet\",\"fleetMetrics\":\"/api/fleet/metrics\",\"billing\":\"/api/billing/status\",\"status\":\"/api/status\",\"maturity\":\"/api/maturity\",\"agentRuns\":\"/api/agent-runs\",\"openapi\":\"/openapi-free-path.json\",\"freeClaim\":\"/isco-1212/\",\"freeClaimUrl\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"checkoutPreflight\":\"/docs/checkout-preflight.md\",\"goLiveDocs\":\"/docs/go-live.md\",\"wedgePages\":\"/docs/wedge-pages.md\",\"distributionDrafts\":\"/docs/distribution-drafts.md\",\"freePathDocs\":\"/docs/free-path.md\",\"badge\":\"/api/badge\",\"stripe\":\"/api/stripe\",\"webauthn\":\"/api/webauthn\",\"nudge\":\"/api/nudge\",\"orgIndex\":\"/api/org\",\"tenantMetricsPattern\":\"/api/{org}/{repo}/metrics\",\"productMetrics\":\"/api/metrics\"},\"asOf\":\"2026-08-31T11:57:21.708Z\",\"freeClaimUrl\":\"/isco-1212/\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\"}",
+    "{\"ok\":true,\"version\":\"0.1.953\",\"freeClaim\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"freePathDocs\":\"/docs/free-path.md\",\"freePath\":{\"freeClaim\":\"/isco-1212/\",\"freeClaimUrl\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"freePathDocs\":\"/docs/free-path.md\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\",\"ok\":true,\"docs\":\"/docs/free-path.md\"},\"surface\":\"org-index\",\"org\":\"authority\",\"note\":\"Tenant data is scoped to org/repo pairs. There is no org-wide public tenant list (PII-safe design).\",\"pattern\":{\"metrics\":\"/api/authority/{repo}/metrics\",\"example\":\"/api/authority/example-repo/metrics\",\"freeClaim\":\"/isco-1212/\",\"fleetMetrics\":\"/api/fleet/metrics\",\"freeClaimUrl\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"freePathDocs\":\"/docs/free-path.md\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\"},\"bottleneck\":\"run Stripe checkout via /isco-1212/\",\"nextOwnerActions\":[{\"id\":\"first-paid-checkout\",\"ui\":\"/isco-1212/\",\"agent\":\"/isco-1212/agent.json\",\"docs\":\"/docs/go-live.md\",\"preflight\":\"/docs/checkout-preflight.md\",\"freeClaim\":\"/isco-1212/\",\"freeClaimUrl\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"freePathDocs\":\"/docs/free-path.md\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\",\"gate\":\"hyp/itonami-smb-pay\",\"note\":\"Org \\\"authority\\\" has no list endpoint. Pick a repo path /api/authority/{repo}/metrics or claim via /isco-1212/.\",\"verify\":\"curl -sS -A 'owner/1' https://itonami.cloud/api/fleet/metrics | jq '.tenants.externalPaid'\"}],\"links\":{\"freepath\":\"/api/freepath\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\",\"metrics\":\"/api/metrics\",\"fleet\":\"/api/fleet\",\"fleetMetrics\":\"/api/fleet/metrics\",\"billing\":\"/api/billing/status\",\"status\":\"/api/status\",\"maturity\":\"/api/maturity\",\"agentRuns\":\"/api/agent-runs\",\"openapi\":\"/openapi-free-path.json\",\"freeClaim\":\"/isco-1212/\",\"freeClaimUrl\":\"/isco-1212/\",\"freeClaimAgent\":\"/isco-1212/agent.json\",\"freeClaimUi\":\"/isco-1212/\",\"freeClaimDocs\":\"/docs/free-path.md\",\"checkoutPreflight\":\"/docs/checkout-preflight.md\",\"goLiveDocs\":\"/docs/go-live.md\",\"wedgePages\":\"/docs/wedge-pages.md\",\"distributionDrafts\":\"/docs/distribution-drafts.md\",\"freePathDocs\":\"/docs/free-path.md\",\"badge\":\"/api/badge\",\"stripe\":\"/api/stripe\",\"webauthn\":\"/api/webauthn\",\"nudge\":\"/api/nudge\",\"orgIndex\":\"/api/org\",\"tenantMetricsPattern\":\"/api/{org}/{repo}/metrics\",\"productMetrics\":\"/api/metrics\"},\"asOf\":\"2026-08-31T12:43:06.981Z\",\"freeClaimUrl\":\"/isco-1212/\",\"freePathApi\":\"/api/freepath\",\"freePathApiAlias\":\"/api/free-path\"}",
     :raw/auth-host-absent? false,
     :raw/shared-passkey-rp-id "itonami.cloud",
     :raw/mint-status 403,
@@ -31,6 +32,7 @@
     "{\"error\":\"/v1/cdci/jobs requires either a matching CACAO (Authorization: CACAO <base64>; legacy body :cacao is also accepted, and :iss must equal the claimed :who/:did) or a valid MURAKUMO_SERVICE_TOKEN bearer\"}",
     :raw/planes-reading "0/1",
     :one-authority true,
+    :refusal-advertises-capability false,
     :raw/plane-body
     "{\"error\":\"/v1/cdci/jobs requires either a matching CACAO (Authorization: CACAO <base64>; legacy body :cacao is also accepted, and :iss must equal the claimed :who/:did) or a valid MURAKUMO_SERVICE_TOKEN bearer\"}",
     :raw/auth-host-absent? false,
@@ -53,6 +55,7 @@
     "{\"ok\":false,\"error\":\"Unauthorized\",\"presented\":\"biscuit\",\"details\":\"the presented Biscuit was not accepted (bad signature, expired, revoked, or out of scope)\"}",
     :raw/planes-reading "4/4",
     :one-authority true,
+    :refusal-advertises-capability true,
     :raw/plane-body
     "{\"ok\":false,\"error\":\"Unauthorized\",\"presented\":\"none\",\"details\":\"no credential was presented; this surface accepts an issued Biscuit (Authorization: Biscuit <token>), a session cookie, a service token, or an operator CACAO\"}",
     :raw/auth-host-absent? false,
@@ -81,11 +84,12 @@
     :raw/shared-passkey-status 200,
     :raw/alternate-passkey nil}
    {:raw/plane-body-with-biscuit
-    "{\"error\":\"unauthorized\",\"accepts\":\"Bearer <ADMIN_TOKEN>\",\"presented\":\"biscuit\",\"details\":\"an issued Biscuit is not accepted at this surface yet; present the admin bearer token\"}",
+    "{\"error\":\"unauthorized\",\"accepts\":\"Bearer <ADMIN_TOKEN>, or an issued Biscuit carrying kotoba://can/data:write\",\"presented\":\"biscuit\",\"details\":\"the presented Biscuit was not accepted (malformed, bad signature, expired, or missing kotoba://can/data:write)\"}",
     :raw/planes-reading "1/1",
     :one-authority false,
+    :refusal-advertises-capability true,
     :raw/plane-body
-    "{\"error\":\"unauthorized\",\"accepts\":\"Bearer <ADMIN_TOKEN>\",\"presented\":\"none\",\"details\":\"no credential was presented\"}",
+    "{\"error\":\"unauthorized\",\"accepts\":\"Bearer <ADMIN_TOKEN>, or an issued Biscuit carrying kotoba://can/data:write\",\"presented\":\"none\",\"details\":\"no credential was presented\"}",
     :raw/auth-host-absent? true,
     :raw/shared-passkey-rp-id nil,
     :raw/mint-status :unknown,
@@ -107,6 +111,7 @@
    {:raw/plane-body-with-biscuit "{\"error\":\"bad ref\"}",
     :raw/planes-reading "0/1",
     :one-authority false,
+    :refusal-advertises-capability false,
     :raw/plane-body "{\"error\":\"bad ref\"}",
     :raw/auth-host-absent? true,
     :raw/shared-passkey-rp-id nil,
@@ -130,6 +135,7 @@
     "{\"error\":\"AuthMissing\",\"message\":\"valid session required\"}",
     :raw/planes-reading "0/1",
     :one-authority false,
+    :refusal-advertises-capability false,
     :raw/plane-body
     "{\"error\":\"AuthMissing\",\"message\":\"valid session required\"}",
     :raw/auth-host-absent? false,
@@ -184,9 +190,38 @@
       :axis :auth-failure-status,
       :headroom 0.05,
       :finding
-      "isekai.network: an authentication failure carries 401/403, not 200 -- no"}]}
+      "isekai.network: an authentication failure carries 401/403, not 200 -- no"}
+     {:apex "isekai.network",
+      :axis :refusal-advertises-capability,
+      :headroom 0.1,
+      :finding
+      "isekai.network: the refusal tells a stranger that a capability credential is accepted here -- no"}]}
+   {:apex "aozora.app",
+    :score 31.818181818181817,
+    :incomplete [],
+    :findings
+    [{:apex "aozora.app",
+      :axis :controller-live,
+      :headroom 0.25,
+      :finding
+      "aozora.app: a passkey ceremony is obtainable at this apex -- no"}
+     {:apex "aozora.app",
+      :axis :one-authority,
+      :headroom 0.2,
+      :finding
+      "aozora.app: that ceremony is the shared authn contract, not a second implementation -- no"}
+     {:apex "aozora.app",
+      :axis :refusal-distinguishes-credential,
+      :headroom 0.2,
+      :finding
+      "aozora.app: a refused credential is distinguishable from none presented -- no"}
+     {:apex "aozora.app",
+      :axis :refusal-advertises-capability,
+      :headroom 0.1,
+      :finding
+      "aozora.app: the refusal tells a stranger that a capability credential is accepted here -- no"}]}
    {:apex "x402.nexus",
-    :score 35,
+    :score 40.909090909090914,
     :incomplete [],
     :findings
     [{:apex "x402.nexus",
@@ -204,27 +239,8 @@
       :headroom 0.2,
       :finding
       "x402.nexus: the apex can mint a Biscuit, and guards the mint against cross-origin -- no"}]}
-   {:apex "aozora.app",
-    :score 35,
-    :incomplete [],
-    :findings
-    [{:apex "aozora.app",
-      :axis :controller-live,
-      :headroom 0.25,
-      :finding
-      "aozora.app: a passkey ceremony is obtainable at this apex -- no"}
-     {:apex "aozora.app",
-      :axis :one-authority,
-      :headroom 0.2,
-      :finding
-      "aozora.app: that ceremony is the shared authn contract, not a second implementation -- no"}
-     {:apex "aozora.app",
-      :axis :refusal-distinguishes-credential,
-      :headroom 0.2,
-      :finding
-      "aozora.app: a refused credential is distinguishable from none presented -- no"}]}
    {:apex "itonami.cloud",
-    :score 65,
+    :score 59.09090909090908,
     :incomplete [],
     :findings
     [{:apex "itonami.cloud",
@@ -241,19 +257,29 @@
       :axis :auth-failure-status,
       :headroom 0.05,
       :finding
-      "itonami.cloud: an authentication failure carries 401/403, not 200 -- no"}]}
+      "itonami.cloud: an authentication failure carries 401/403, not 200 -- no"}
+     {:apex "itonami.cloud",
+      :axis :refusal-advertises-capability,
+      :headroom 0.1,
+      :finding
+      "itonami.cloud: the refusal tells a stranger that a capability credential is accepted here -- no"}]}
    {:apex "murakumo.cloud",
-    :score 80,
+    :score 72.72727272727273,
     :incomplete [],
     :findings
     [{:apex "murakumo.cloud",
       :axis :refusal-distinguishes-credential,
       :headroom 0.2,
       :finding
-      "murakumo.cloud: a refused credential is distinguishable from none presented -- no"}]}
+      "murakumo.cloud: a refused credential is distinguishable from none presented -- no"}
+     {:apex "murakumo.cloud",
+      :axis :refusal-advertises-capability,
+      :headroom 0.1,
+      :finding
+      "murakumo.cloud: the refusal tells a stranger that a capability credential is accepted here -- no"}]}
    {:apex "kotobase.net", :score 100, :incomplete [], :findings []}],
   :incomplete [],
-  :overall 52.5,
+  :overall 50.75757575757576,
   :findings
   [{:apex "x402.nexus",
     :axis :controller-live,
@@ -320,11 +346,31 @@
     :headroom 0.1,
     :finding
     "itonami.cloud: a refusal names the credential class it wanted -- no"}
+   {:apex "itonami.cloud",
+    :axis :refusal-advertises-capability,
+    :headroom 0.1,
+    :finding
+    "itonami.cloud: the refusal tells a stranger that a capability credential is accepted here -- no"}
+   {:apex "murakumo.cloud",
+    :axis :refusal-advertises-capability,
+    :headroom 0.1,
+    :finding
+    "murakumo.cloud: the refusal tells a stranger that a capability credential is accepted here -- no"}
    {:apex "isekai.network",
     :axis :refusal-names-credential,
     :headroom 0.1,
     :finding
     "isekai.network: a refusal names the credential class it wanted -- no"}
+   {:apex "isekai.network",
+    :axis :refusal-advertises-capability,
+    :headroom 0.1,
+    :finding
+    "isekai.network: the refusal tells a stranger that a capability credential is accepted here -- no"}
+   {:apex "aozora.app",
+    :axis :refusal-advertises-capability,
+    :headroom 0.1,
+    :finding
+    "aozora.app: the refusal tells a stranger that a capability credential is accepted here -- no"}
    {:apex "itonami.cloud",
     :axis :auth-failure-status,
     :headroom 0.05,

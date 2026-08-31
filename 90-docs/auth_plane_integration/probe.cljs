@@ -83,6 +83,14 @@
 (def auth-words ["biscuit" "bearer" "cacao" "credential" "authorization"
                  "unauthorized" "auth" "token" "sigv4"])
 
+(defn- curl-raw
+  "Run a command, returning stdout, or nil when it could not run."
+  [cmd]
+  (try (str (cp/execSync cmd #js {:encoding "utf8"
+                                  :stdio #js ["pipe" "pipe" "pipe"]
+                                  :timeout 40000}))
+       (catch :default _ nil)))
+
 (defn- curl
   "One request. Returns {:status :body :curl-exit}.
 
@@ -111,6 +119,20 @@
                    :unknown)
          :body (when si (str/trim (subs head 0 si)))
          :curl-exit exit}))))
+
+(defn- response-headers
+  "The response head as text, or nil. A surface may answer `which credential`
+  in `www-authenticate` rather than in the body, and reading only the body
+  would report a correct surface as silent.
+
+  Fetched with `-D - -o /dev/null` rather than by adding `-i` to the main
+  request: the head carries a Date and a request id, and folding those into the
+  body would make every plane look like it changes its answer."
+  [{:keys [url method data]}]
+  (let [m (if method (str "-X " method " ") "")
+        d (if data (str "--data-binary " (pr-str data) " ") "")]
+    (curl-raw (str "curl -sS --max-time 20 -D - -o /dev/null "
+                   m d "-H " (pr-str "content-type: application/json") " " (pr-str url)))))
 
 (defn- absent?
   "Did the request establish that there is no such host?"
@@ -174,6 +196,7 @@
     {:url (:url plane)
      :bare bare
      :with with
+     :head (response-headers plane)
      :reads (cond
               (or (= :unknown (:status bare)) (= :unknown (:status with))) :unknown
               :else (not= [(:status bare) (normalise (:body bare))]
@@ -260,6 +283,18 @@
      :refusal-distinguishes-credential (cond
                                (some #(= :unknown (:reads %)) measured) :unknown
                                :else (every? #(true? (:reads %)) measured))
+     ;; Does the refusal name a CAPABILITY credential (Biscuit), as opposed to
+     ;; only bearer/session/CACAO? Read from the body and from
+     ;; `www-authenticate`, because both are places a surface answers this.
+     :refusal-advertises-capability
+     (cond
+       (= :unknown refuses) :unknown
+       (false? refuses) false
+       :else (let [body (names-any? (:body bare) ["biscuit"])
+                   header (names-any? (:head (first measured)) ["biscuit"])]
+               (cond (and (= :unknown body) (= :unknown header)) :unknown
+                     :else (boolean (or (true? body) (true? header))))))
+
      :refusal-names-credential (cond
                                  (= :unknown refuses) :unknown
                                  (false? refuses) false
