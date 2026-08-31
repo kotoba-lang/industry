@@ -706,7 +706,12 @@
            (let [root (:root ps)
                  tmp (str "/tmp/bmc-kotobase-events-" (js/Date.now) ".edn")
                  helper (str root "/70-tools/bmc/bin/kotobase-dual-write.cljs")
+                 ;; sha2.core lives in the sibling org-nist-sha2 checkout —
+                 ;; kotobase.cid requires it, and without this path the helper
+                 ;; dies with "Could not find namespace: sha2.core" before it
+                 ;; ever posts (measured 2026-08-31).
                  cp (str root "/orgs/kotoba-lang/kotobase-client/src:"
+                         root "/orgs/kotoba-lang/org-nist-sha2/src:"
                          root "/70-tools/bmc/src:"
                          root "/scripts/nbb_compat:"
                          root)

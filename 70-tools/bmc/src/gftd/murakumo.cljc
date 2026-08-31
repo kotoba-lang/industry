@@ -8,7 +8,22 @@
             #?(:clj [clojure.data.json :as json])))
 
 (def default-url "https://api.murakumo.cloud/v1/chat/completions")
-(def default-model "qwen3.6-35b-a3b")
+(def default-model
+  "The ALIAS, never a checkpoint id (ADR-2607173100).
+
+  This read `\"qwen3.6-35b-a3b\"` until 2026-08-31, and by then the fleet had
+  stopped serving it — measured, that id answers HTTP 522 from the origin while
+  `murakumo-main` completes normally. Every auto-advisor tick had been failing
+  the call and falling through to gate-only, which prints as `proposals: 0`
+  rather than as an error, so the loop looked idle instead of broken.
+
+  Naming the *next* checkpoint would buy the same bug again on the next swap.
+  The alias is one KV entry the operator repoints, and its dereference is the
+  only thing that survives a model change. Measured the same day:
+  `qwen3.8-27b-fastmtp-aggressive` — the concrete id first proposed as the
+  replacement — is itself served out of `qwen3.8-27b-throughput-b70`, so it
+  does not even name the model that answers it."
+  "murakumo-main")
 (def default-max-tokens 400)
 (def user-agent "gftd-bmc/0.1 (portfolio business react loop)")
 
