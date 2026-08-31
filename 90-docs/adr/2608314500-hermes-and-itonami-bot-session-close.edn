@@ -112,7 +112,7 @@ A→B の差分は **+3 tests / +9 assertions** で、私の 3 テストと asse
 pin する形（宣言部の 1,980 が現れ、prompt 全体の長さは現れない）に直して B' を撃ち
 直した。**この欠陥は closing の検証手順そのものが見つけた。**
 
-## この日、同じ形の誤りを 7 回踏んだ
+## この日、同じ形の誤りを 9 回踏んだ
 
 **私の測り方が、対象の性質として報告されかけた。**
 
@@ -123,6 +123,9 @@ pin する形（宣言部の 1,980 が現れ、prompt 全体の長さは現れ�
 5. job 数から「11 件は輸入可能」と推論 → 実測は 0 件
 6. 拒否されたことだけを assert する負テスト → 別の理由の拒否を弁別と数えていた
 7. `next-run-at` の古さを「詰まり」と診断 → 143 job の最小値という仕様だった
+8. 「http-error の大半は履歴」を 2 回述べた → 実測すると 0 件が履歴だった
+9. その測定のパーサがレコード境界を誤り、次のレコードの値を読んだ → 「38 run」は
+   でたらめ。境界で区切り直して 52 run
 
 1–3 と 5 は報告前に捕まえた。4 は報告直後に自分で見つけて撤回した。
 **6 は closing の「落ちることを確かめる」手順が見つけた** —— それが無ければ
@@ -149,9 +152,46 @@ window が前進し `running` が立つ —— **tick は動いている**。修
 `no-op` に寄っており、これは `adjust-workforce-cadence!` の docstring が
 「やることが無かった Bot は枠を譲る」と書いている設計上の正常終了である。
 
-`provider/http-error 28` も大半は**修正前の履歴**だった —— window は 08-30
-20:38 からの 50 run 分で、provider が無効だった期間を丸ごと含む。いま 1 体に
-task を投げると **12 秒で応答する**。6 分間に増えた http-error は 1 件。
+~~`provider/http-error 28` も大半は修正前の履歴だった~~ **これは誤り。訂正 5 を参照** ——
+実測すると **1 件も履歴ではなかった。**
+
+## 訂正 5 —— 「大半は履歴」は 2 回言った推論で、実測は 0 件だった
+
+`provider/http-error` を「window が provider 無効期間を含むから大半は履歴」と
+**2 回**述べた。**期間からの推論であって測定ではなかった。**
+
+state を run 単位で数え直した（レコードを run id のキーで区切り、
+`:job/created-at` が provider を有効化した 05:23Z 以降のものだけを取る）:
+
+    修正後の 52 run
+      provider/http-error   29   (56%)
+      no-op                 13
+      completed              8
+      running                1
+      provider/denied        1
+
+**29 件は 1 件残らず修正後のものだった。** report の 50 run 窓は既に post-fix で
+埋まっており、私が根拠にした古い `since` は前のサンプル時点の値だった。手動 task が
+2 回成功したのも代表ではない —— 52 分の 8 が completed なので成功も起きる。
+
+エラー本文は 1 種類に集中している（`:agent.run/error-message`）:
+
+    \"model provider request failed — HTTP 502 murakumo fleet unreachable:
+     Error: connection_refused\"
+
+⚠ **この測定自体も 1 度書き損じた。** 最初のパーサは
+`:job/resident-workforce? true` から前方 4,000 字を見て `:job/created-at` を拾う
+形で、実際には**次のレコードの値**を読み、「38 run」というでたらめを出した。
+EDN の map はキー順が保証されないので `created-at` は marker より前にある。
+レコード境界で区切り直して数え直した。
+
+## 誰の管轄か
+
+502 は **cloud-itonami app の設定ではない。** provider の有効化は効いており
+（無効時は 1 件も走れなかった）、tick も動いている（1 時間で 52 run）。落ちて
+いるのは `api.murakumo.cloud` が fleet に到達する経路で、面としては
+`network-awai/cloud-murakumo-api` と mac-mini fleet 側にある。
+`/v1/models` は 200 を返し単発 task は通るので、**間欠か特定経路のみ**の可能性が高い。
 
 ## artifact も同じ理由で 2 行間違えていた
 
@@ -165,5 +205,7 @@ task を投げると **12 秒で応答する**。6 分間に増えた http-error
 1. **今夜 01:40** の `itonami-coverage-scout` —— **hermes 側の** scheduler 経由の
    完走を一度も観測していない。最初の観測点。（itonami 側の tick は上で観測済み）
 2. `itonami-canvas-watch` を戻すかはオーナー判断（理由が記録されていない）。
-3. 修正後の run が `completed` を出すか。いま観測できているのは `no-op` まで。
+3. **murakumo fleet の 502。** 修正後 52 run の 56% がこれで落ちる
+   （`connection_refused`）。cloud-itonami の管轄外で、次に入るなら
+   `network-awai/cloud-murakumo-api` と fleet 側の面。
 "}]
