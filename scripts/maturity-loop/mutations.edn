@@ -4964,4 +4964,89 @@
      :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
      :green-marker "logistics: all green"
      :must-fail ["REFUSED"]}]}
+    {:repo "orgs/cloud-itonami/app-tenki"
+     :label "app-tenki appview wiring —— ビルド設定・配信文書・マウント先を繋ぐ文字列"
+     ;; パッケージ内の cljs.test suite は `tenki.app` **1 名前空間の中**を検査する。
+     ;; ビルド設定と、配信される文書と、そこへマウントするコードを繋いでいる文字列は
+     ;; 2 つのファイルに重複して書かれていて、誰も突き合わせていない。
+     ;;
+     ;; どの継ぎ目も壊れ方が同じである: 片側を変えると `shadow-cljs compile app` は通り、
+     ;; `node out/tests.js` も `0 failures, 0 errors` を出し、**画面には何も出ない**。
+     ;; CLAUDE.md が名指ししている形——測れなかった検査が、測って問題が無かった検査と
+     ;; 同じ値を返す——の UI 版で、しかもこの repo は既に一度それを踏んでいる
+     ;; （旧 Svelte 版の `test/tenki.test.ts` は `expect(true).toBe(true)` だった）。
+     ;;
+     ;; 9 件とも pin 80b2ea97 で landing 前に赤くなるところを実測した。7 件は exit 1 で
+     ;; 自分の不変条件名を出し、後ろ 2 件は **exit 2**（REFUSED）を出す。0 でも 1 でも
+     ;; ない値でなければ、「入力が読めなかった」が「読んで問題が無かった」と同じ顔をする。
+     ;;
+     ;; ここに無いもの: `:wiring/exactly-one-document` の mutation。これは
+     ;; **文書をもう 1 枚足す**ことでしか壊せず、この harness は find/replace しか
+     ;; 持たない。手では確認してある（2 枚目の html を置くと exit 1 + その名前）。
+     ;; 同じ理由で `test/` を空にする refusal も入っていない。
+     :cmd ["nbb" "test/appview_wiring_test.cljs"]
+     :green-marker "appview-wiring: OK"
+     :mutations
+     [{:id :wiring/asset-path-goes-absolute
+       :why "docs/operator-quickstart.md は asset-path を相対にしてあるのは意図だと記録している——これらのページは path prefix 配下で配信されるので、絶対 \"/js\" はルート直下でだけ動いて他で 404 する。ローカルでは常に動くので、この退行はレビューを生き延びる"
+       :file "appview/tenki-weather-component/cljs/shadow-cljs.edn"
+       :find ":asset-path \"js\""
+       :replace ":asset-path \"/js\""
+       :must-fail [":wiring/asset-path-must-be-relative"]}
+
+      {:id :wiring/module-is-renamed
+       :why "module key を変えると shadow-cljs は素直に public/js/<新名>.js を出すが、文書は js/app.js を要求し続ける。compile は緑、テストも緑、ブラウザだけが 404 する"
+       :file "appview/tenki-weather-component/cljs/shadow-cljs.edn"
+       :find ":modules {:app {:init-fn"
+       :replace ":modules {:main {:init-fn"
+       :must-fail [":wiring/bundle-src-mismatch"]}
+
+      {:id :wiring/output-dir-moves-out-from-under-the-document
+       :why "出力先を移すと、文書からの相対解決が外れる。どちらのファイルも単体では正しいままなので、突き合わせないと分からない"
+       :file "appview/tenki-weather-component/cljs/shadow-cljs.edn"
+       :find ":output-dir \"public/js\""
+       :replace ":output-dir \"dist/js\""
+       :must-fail [":wiring/output-dir-not-under-document"]}
+
+      {:id :wiring/init-fn-points-at-a-namespace-with-no-source
+       :why ":init-fn が実在しない ns を指す形。shadow-cljs のビルドは落ちるが、ビルドを回さない経路（この gate 自身を含む）は committed なファイルだけで先に気付けた方がよい"
+       :file "appview/tenki-weather-component/cljs/shadow-cljs.edn"
+       :find ":init-fn tenki.app/main"
+       :replace ":init-fn tenki.core/main"
+       :must-fail [":wiring/init-fn-namespace-has-no-source-file"]}
+
+      {:id :wiring/mount-id-is-renamed-on-one-side
+       :why "React の慣習に合わせて id を root にする、のような普通の変更。render が null に描くので画面は loading… のまま止まるが、build も cljs.test suite も DOM に触らないので両方緑のままになる"
+       :file "appview/tenki-weather-component/cljs/src/tenki/app.cljs"
+       :find "getElementById \"app\""
+       :replace "getElementById \"root\""
+       :must-fail [":wiring/mount-id-absent-from-document"]}
+
+      {:id :wiring/npm-test-runs-a-previous-build
+       :why "**この suite で一番重い 1 件。** :output-to を変えると `npm test` は新しいファイルをコンパイルしてから out/ に残っている**前のビルドの成果物**を走らせる。緑になるが、それは変更前のコードに対する緑である。CLAUDE.md の『測れなかった検査が測って問題が無かった検査と同じ値を返す』そのもの"
+       :file "appview/tenki-weather-component/cljs/shadow-cljs.edn"
+       :find ":output-to \"out/tests.js\""
+       :replace ":output-to \"out/test.js\""
+       :must-fail [":wiring/npm-test-does-not-run-shadow-test-output"]}
+
+      {:id :wiring/ns-regexp-stops-matching-the-tests
+       :why ":ns-regexp はどの名前空間を test bundle に**コンパイルするか**を決める。合わないファイルは失敗するテストではなく、テストですらない——suite はいつもの Ran N tests / 0 failures を出し、そのファイルは一度も実行されない"
+       :file "appview/tenki-weather-component/cljs/shadow-cljs.edn"
+       :find ":ns-regexp \"-test$\""
+       :replace ":ns-regexp \"-spec$\""
+       :must-fail [":wiring/test-ns-not-matched-by-ns-regexp"]}
+
+      {:id :wiring/shadow-config-silently-closes-early
+       :why "**refusal の床。exit 2 でなければならない。** `edn/read-string` は最初の form だけ読んで残りを捨てるので、早く閉じて後ろにゴミが続く設定ファイルが clean として通る。CLAUDE.md が heredoc の \\\" について記述しているのと同じ形で、実際に 2026-08 の 4 文書がこれで壊れている。read-edn は text を vector で包んで全部を消費させ、form 数が 1 でなければ測定を拒否する"
+       :file "appview/tenki-weather-component/cljs/shadow-cljs.edn"
+       :find ":ns-regexp \"-test$\"}}}"
+       :replace ":ns-regexp \"-test$\"}}}\n{:stray :form}"
+       :must-fail ["REFUSED" "expected exactly 1 EDN form"]}
+
+      {:id :wiring/ns-regexp-key-disappears
+       :why "**refusal の床。exit 2 でなければならない。** :ns-regexp が無ければ、どの名前空間が走るのかを答えられない。答えられないことを『不一致 0 件』として緑で返すと、この検査は自分が測っていないものについて合格を出すことになる"
+       :file "appview/tenki-weather-component/cljs/shadow-cljs.edn"
+       :find ":ns-regexp \"-test$\""
+       :replace ":nsregexp \"-test$\""
+       :must-fail ["REFUSED" "no :ns-regexp"]}]}
 ]}
