@@ -1,0 +1,142 @@
+#!/usr/bin/env nbb
+;; ads-adult-preflight — the resident check behind the `murakumo-adult-traffic`
+;; CUA bot (manifest/cua-bots.edn).
+;;
+;; It answers ONE question: if an ExoClick campaign for murakumo.cloud's image
+;; and video generation were placed today, would it actually serve?
+;;
+;; That question has a measured history. The only third-party ad result this
+;; workspace has ever recorded is ExoClick at USD 0 / 0 impressions, and
+;; ADR-2608096000 records the cause: not price, not policy -- our own creative
+;; hosting was returning 522, so nothing could fill. The campaign was live and
+;; buying nothing, and no one noticed until the spend report came back empty.
+;; A bot that checks the account and not the creative would have reported that
+;; run healthy. So the creative reachability check is FIRST here, and its
+;; failure is a hard block rather than a warning.
+;;
+;; Three-value exit, per manifest/cua-bots.edn:
+;;   0 = ready to place      1 = blocked (a named blocker)      2 = could not measure
+;;
+;; Exit 2 is not a softer 1. "The network was unreachable" and "the creative is
+;; down" must not arrive as the same value, because the first is a fact about
+;; this run and the second is a fact about the campaign.
+
+(ns ads-adult-preflight
+  (:require [clojure.string :as str]))
+
+(def creative-endpoints
+  "Everything a served impression has to reach. The landing page is here from
+   the start; creative image/video URLs join this vector as they are produced,
+   which is the one edit this file should need per campaign."
+  [{:label "landing page"        :url "https://murakumo.cloud/"}
+   {:label "advertiser intake"   :url "https://murakumo.cloud/advertise"}])
+
+(def policy-phrases
+  "Sentences advertising.platform's exoclick-ads entry was transcribed FROM.
+   If one disappears, the entry is stale and its :read-on is a lie -- the
+   catalog's own rule is that a stale read is a re-read task, not a reason to
+   guess. Checking the phrases rather than a page hash keeps this robust to
+   markup churn while still failing when the POLICY moves."
+  ["Deepfake" "Undressing" "Cryptocurrency" "Swedish" "extreme violence"])
+
+(def policy-url "https://www.exoclick.com/guidelines/")
+
+(defn- fetch
+  "Returns {:status n :body s} or {:error msg}. A transport failure is never
+   folded into a status code -- the caller has to be able to tell them apart."
+  [url]
+  (-> (js/fetch url #js {:redirect "follow"})
+      (.then (fn [r] (-> (.text r) (.then (fn [b] {:status (.-status r) :body b})))))
+      (.catch (fn [e] {:error (or (.-message e) (str e))}))))
+
+(defn- check-creatives []
+  (-> (js/Promise.all (clj->js (map #(fetch (:url %)) creative-endpoints)))
+      (.then (fn [rs]
+               (let [rs (js->clj rs :keywordize-fn keyword)]
+                 (mapv (fn [ep r]
+                         (let [r (into {} (map (fn [[k v]] [(keyword k) v]) r))]
+                           (merge ep
+                                  (cond
+                                    (:error r)              {:verdict :unmeasured :note (:error r)}
+                                    (= 200 (:status r))     {:verdict :ok :note (str "HTTP 200, "
+                                                                                     (count (:body r)) " bytes")}
+                                    :else                   {:verdict :down
+                                                             :note (str "HTTP " (:status r)
+                                                                        (when (#{502 503 522 524} (:status r))
+                                                                          " -- this is the 2026-08 failure shape"))}))))
+                       creative-endpoints rs))))))
+
+(defn- check-policy-freshness []
+  (-> (fetch policy-url)
+      (.then (fn [r]
+               (cond
+                 (:error r)          {:verdict :unmeasured :note (:error r)}
+                 (not= 200 (:status r)) {:verdict :unmeasured :note (str "HTTP " (:status r))}
+                 :else
+                 (let [body (:body r)
+                       missing (remove #(str/includes? (str/lower-case body) (str/lower-case %))
+                                       policy-phrases)]
+                   (if (seq missing)
+                     {:verdict :stale
+                      :note (str "phrases no longer on the page: " (str/join ", " missing)
+                                 " -- re-read " policy-url " and re-transcribe the entry")}
+                     {:verdict :ok
+                      :note (str (count policy-phrases) "/" (count policy-phrases)
+                                 " transcribed phrases still present")}))))))) 
+
+(def standing-blockers
+  "Blockers that are TRUE UNTIL SOMEONE DOES SOMETHING OFF-MACHINE, restated on
+   every run so a green creative check can never read as 'ready to place'.
+   Each names what would clear it."
+  [{:id :no-exoclick-account
+    :note "no ExoClick advertiser account or credentials in this workspace"
+    :clears-when "a human completes signup and identity/payment verification (safety floor 1 and 2 -- no agent may stand in for this)"}
+   {:id :no-buy-adapter
+    :note "advertising.placer supports google-ads and youtube-ads only; exoclick-ads returns :unsupported"
+    :clears-when "an ExoClick adapter is written against api.exoclick.com -- ADR-2608139200 puts this AFTER the policy transcription, which is now done"}])
+
+(defn- line [sym label note] (println (str " " sym " " label (when note (str " -- " note)))))
+
+(defn -main [& args]
+  (let [json? (some #{"--json"} args)]
+    (-> (js/Promise.all #js [(check-creatives) (check-policy-freshness)])
+        (.then
+         (fn [[creatives policy]]
+           (let [creatives (vec creatives)
+                 down      (filter #(= :down (:verdict %)) creatives)
+                 unmeasured (concat (filter #(= :unmeasured (:verdict %)) creatives)
+                                    (when (= :unmeasured (:verdict policy)) [policy]))
+                 checked   (count creatives)]
+             (if json?
+               (println (js/JSON.stringify (clj->js {:creatives creatives :policy policy
+                                                     :standing-blockers standing-blockers})
+                                           nil 2))
+               (do
+                 (println "murakumo.cloud x ExoClick -- placement preflight\n")
+                 (println (str "CREATIVE REACHABILITY  (SCANNED\t" checked ")"))
+                 (doseq [c creatives]
+                   (line (case (:verdict c) :ok "OK  " :down "DOWN" "?   ")
+                         (str (:label c) " " (:url c)) (:note c)))
+                 (println "\nPOLICY TRANSCRIPTION FRESHNESS")
+                 (line (case (:verdict policy) :ok "OK  " :stale "STALE" "?   ")
+                       "advertising.platform exoclick-ads :read-on 2026-08-31" (:note policy))
+                 (println "\nSTANDING BLOCKERS (not measurable from here -- they are facts about the world)")
+                 (doseq [b standing-blockers]
+                   (line "BLOCK" (name (:id b)) (str (:note b) "\n        clears when: " (:clears-when b))))))
+             ;; Evidence floor: zero endpoints checked is not a clean run.
+             (let [code (cond
+                          (zero? checked)                      2
+                          (seq unmeasured)                     2
+                          (seq down)                           1
+                          (= :stale (:verdict policy))         1
+                          (seq standing-blockers)              1
+                          :else                                0)]
+               (when-not json?
+                 (println (str "\nEXIT " code " -- "
+                               (case code
+                                 0 "ready to place"
+                                 1 "blocked, see above"
+                                 2 "COULD NOT MEASURE; this is not a pass"))))
+               (js/process.exit code))))))))
+
+(-main)

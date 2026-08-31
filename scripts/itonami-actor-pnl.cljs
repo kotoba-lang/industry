@@ -176,10 +176,72 @@
 (defn yata-burn [repo]
   (if-let [v (get-in receipts [repo :yata])]
     {:value v :reason nil}
-    {:value nil :reason "YATA has no posted price: cost inputs unmeasured (ADR-2608291009 D6)"}))
+    ;; 訂正 2026-08-31: YATA の掲示価格は決まった（800 credits/TB月、ADR-2608313700）。
+    ;; 開いているのは価格ではなく **計器** —— GB月 を actor 単位で数える経路が無い。
+    ;; 古い理由を残すと、解けた問題を解けていないことにしてしまう。
+    {:value nil :reason "no storage meter: YATA is posted at 800 credits/TB-month (ADR-2608313700) but nothing counts GB-months per actor"}))
 
 (defn settled-revenue [repo]
   (get-in receipts [repo :revenue]))
+
+
+;; --- the offer ladder ------------------------------------------------------
+;;
+;; `no-sku` was one bucket doing two jobs. An actor that has written a price
+;; book and is holding it back because its own gates are unmet is not in the
+;; same state as an actor that has never named what it sells, and collapsing
+;; them prints the same 31 either way -- the shape this script's own docstring
+;; is about.
+;;
+;; The shape is not invented here. `cloud-itonami-isic-6311-identity/pricing.edn`
+;; already carries it (ADR-2608110200): the price book is DATA in one file,
+;; `:pricing/gates` are what must be true before charging anyone, and
+;; `:plan/status` says whether a plan is offered or merely argued with. That
+;; repo is 1 of 1,965. Reading it here is what makes the other 1,964 a funnel
+;; with a place to put the answer rather than a single flat number.
+
+(defn read-pricing-book
+  "`pricing.edn` at the repo root, or nil. Unreadable is NOT nil -- a file that
+   exists and will not parse is a finding, not an absence."
+  [dir]
+  (let [f (p/join dir "pricing.edn")]
+    (when (fs/existsSync f)
+      (try (edn/read-string (slurp* f))
+           (catch :default e {:pricing/unreadable (.-message e)})))))
+
+(defn unmet-gates
+  "Gates the book itself declares are not met. `:gate/met` must be literally
+   true -- a missing flag is unmet, because a gate nobody answered is not a
+   gate that passed."
+  [book]
+  (remove #(true? (:gate/met %)) (:pricing/gates book)))
+
+(defn offered-plans
+  "Plans whose status is something other than :proposed. A book of proposals is
+   a book nobody may be billed from, which is what that repo says about itself."
+  [book]
+  (remove #(= :proposed (:plan/status %)) (:pricing/plans book)))
+
+(defn offer-stage
+  "Where this actor stands between existing and being payable.
+
+     :in-catalog  a facilitator lists a SKU for it -- it can actually be paid
+     :sellable    price book present, no unmet gate, at least one plan offered
+     :proposed    price book present, but gated or all plans still proposals
+     :unreadable  a pricing.edn that will not parse
+     :no-offer    nothing names what this actor sells
+
+   The order matters: being in the catalog is the only stage where revenue can
+   be non-zero, and the three below it are degrees of not-yet, not degrees of
+   failure."
+  [{:keys [skus book]}]
+  (cond
+    (seq skus)                        :in-catalog
+    (:pricing/unreadable book)        :unreadable
+    (nil? book)                       :no-offer
+    (and (empty? (unmet-gates book))
+         (seq (offered-plans book)))  :sellable
+    :else                             :proposed))
 
 ;; --- run --------------------------------------------------------------------
 
@@ -212,7 +274,7 @@
                                     [kind m] (if f (classify-manifest f) [:absent nil])
                                     nm (:repo/name e)]]
                           {:repo nm :path (:repo/path e) :file f :kind kind :manifest m
-                           :skus (get skus nm)})
+                           :skus (get skus nm) :book (read-pricing-book dir)})
                    actors (filter #(= :actor (:kind %)) rows)
                    schemas (filter #(= :schema (:kind %)) rows)
                    broken (filter #(#{:unparseable :absent} (:kind %)) rows)]
@@ -227,9 +289,25 @@
                                                   (count (distinct (map :seller (:items catalog)))) " sellers"))))
                (println)
                (let [priced (filter #(seq (:skus %)) actors)
-                     unpriced (remove #(seq (:skus %)) actors)]
+                     unpriced (remove #(seq (:skus %)) actors)
+                     stage (group-by offer-stage actors)
+                     n #(count (get stage % []))]
                  (println (str "actors with a SKU:      " (count priced)))
                  (println (str "actors with no SKU:     " (count unpriced)))
+                 (println)
+                 ;; The ladder, not the flat number. Each rung has a different
+                 ;; next action, which is the whole reason for splitting them.
+                 (println "OFFER LADDER (ADR-2608110200 の price book を読んで分類)")
+                 (println (str "  in-catalog   " (n :in-catalog)
+                               "\t払われる経路が在る（収入が 0 でない唯一の段）"))
+                 (println (str "  sellable     " (n :sellable)
+                               "\t価格表が在り gate も通っている。catalog へ /apply するだけ"))
+                 (println (str "  proposed     " (n :proposed)
+                               "\t価格表は在るが gate 未達 or 全 plan が :proposed"))
+                 (println (str "  unreadable   " (n :unreadable)
+                               "\tpricing.edn が在るが読めない"))
+                 (println (str "  no-offer     " (n :no-offer)
+                               "\t何を売るのか、どこにも書かれていない"))
                  (let [open-cost (remove #(and (:value (kumo-burn (:repo %)))
                                                (:value (yata-burn (:repo %)))
                                                (settled-revenue (:repo %)))
@@ -250,12 +328,29 @@
                                   " in the tree). :repo/has-actor-edn? overstates the governed"
                                   " population by " (count schemas) ". Examples: "
                                   (str/join ", " (map :path (take 3 schemas))))))
-                 (when (seq unpriced)
-                   (finding! "warn" "actors-without-sku"
-                             (str (count unpriced) " of " (count actors)
-                                  " admitted actors have no catalog entry, so revenue is"
-                                  " measured at 0: they have no way to be paid."
-                                  " Catalog: " catalog-url)))
+                 ;; 2 つの finding に割る。`no-offer` の次の一手は「何を売るか決める」で、
+                 ;; `proposed` / `sellable` の次の一手は「gate を通す」「/apply する」。
+                 ;; 1 つの finding にまとめると、次の一手が違うものが同じ行になる。
+                 (when (seq (get stage :no-offer))
+                   (finding! "warn" "actors-without-an-offer"
+                             (str (n :no-offer) " of " (count actors)
+                                  " admitted actors declare no price book at all"
+                                  " (no pricing.edn). Revenue is measured at 0 because"
+                                  " nothing names what they sell. The shape to copy is"
+                                  " cloud-itonami-isic-6311-identity/pricing.edn"
+                                  " (ADR-2608110200): price as data in one file,"
+                                  " :pricing/gates for what must be true before charging.")))
+                 (when (seq (concat (get stage :proposed) (get stage :sellable)))
+                   (finding! "warn" "offers-declared-but-not-payable"
+                             (str (+ (n :proposed) (n :sellable)) " actor(s) have a price book"
+                                  " but no catalog entry: " (n :sellable) " have met their own"
+                                  " gates and only need /apply at " catalog-url ", "
+                                  (n :proposed) " are still gated or all-proposed."
+                                  " These are NOT the same state as having no offer.")))
+                 (when (seq (get stage :unreadable))
+                   (finding! "fail" "pricing-book-unreadable"
+                             (str (n :unreadable) " pricing.edn present but unparseable: "
+                                  (str/join ", " (map :path (take 3 (get stage :unreadable)))))))
                  (when (seq open-cost)
                    (finding! "fail" "cost-side-open"
                              (str "margin is uncomputable for " (count open-cost) " of "
