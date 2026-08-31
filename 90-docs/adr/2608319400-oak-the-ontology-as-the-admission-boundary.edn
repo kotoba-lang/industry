@@ -91,10 +91,56 @@ fails 10 assertions without it and its out-of-range control passes either way.
 document reached `MessageDigest` on the JVM and `(throw ...)` on cljs, while
 every other document operation was portable. The thrown message said the
 operation `requires the JVM/Node host path` -- and nbb IS Node -- which is why
-the gap read as a deliberate restriction rather than a missing branch. Now
-routed through `multiformats.core/sha256`, already a direct dependency. The
+the gap read as a deliberate restriction rather than a missing branch. The
 test vector is pinned to `shasum -a 256` over the canonical bytes, so neither
 host's own digest is the oracle for the other.
+
+**2b. The first version of that fix was itself a regression, and this is the
+part worth keeping.** It routed through `multiformats.core/sha256` on the
+reasoning that io-multiformats is already a direct dependency. On `:cljs` that
+namespace requires the npm package `@noble/hashes/sha2.js`, so
+`kotoba.kir.value` -- which every value-carrying module loads -- gained an npm
+dependency. It was not seen because the reasoning was checked against the
+io-multiformats CHECKOUT on hand, which predates that require.
+
+**Being a direct dependency says nothing about what the RESOLVED version of it
+pulls in**, and the resolved version is the one in the consumer's lock. Now
+`sha2.core`, which is the portable implementation multiformats itself reached
+for, one link closer, with no host packages at all. The digest is unchanged.
+
+What caught it was amu's own `--jvm-free` resolver, which fails closed:
+advancing amu's pin turned `amu check --jvm-free` into `Cannot find module
+'@noble/hashes/sha2.js'` while the same command on the unadvanced pin passed.
+That control is the check to run before landing a change to a T0 namespace,
+and it was not run.
+
+## The wasm path, measured
+
+`amu check --jvm-free` passed on the kernel from the first day and
+`amu compile --jvm-free --target wasm32-browser` did not: an i64 reached a
+host operation that cannot take a BigInt in two more places -- `uleb` in
+kotoba-kir and the capability import key in kotoba-wasm -- and the CLI reports
+any host exception as an internal compiler error. Both are fixed, and
+kotoba-wasm grew its own ClojureScript runner in the process, for the same
+reason kotoba-kir did: every test in it was `.clj`.
+
+Advancing amu's own pins to those fixes is what makes the documented CLI
+command work; it is a pure fast-forward (kir +13, wasm +2) and goes through a
+pull request, because amu's main is protected.
+
+Measured after that, all JVM-free: the kernel compiles to an 8,394-byte
+`wasm32-browser-kotoba-v1` module, instantiates on `runtime/browser-host.mjs`,
+and returns the same `document-sha256` for S as the reference interpreter.
+
+**That parity claim covers S's identity and nothing else.** Exercising the
+dataspace capability on wasm needs a provider written against the browser
+host's own value representation, and there is not one. So conformance still
+runs only on the interpreter, and the kernel is NOT yet known to admit
+identically on both backends. The parity check discriminates -- pointed at a
+module built from a renamed entity type it fails with both digests printed --
+but a check asserting only `is a sha256` would have passed, and that is nearly
+what it was: its first run compared against an interpreter that had thrown,
+and so reported a failure for the wrong reason.
 
 ## Evidence
 
