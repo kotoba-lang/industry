@@ -536,6 +536,70 @@
      :replace "  (if (store? root)\n    root\n    #?(:clj (filesystem root)\n       :cljs root)))"
      :must-fail []}]}
 
+  {:repo "orgs/kotoba-lang/retail"
+   :label "retail の輸出形式と EAN-13 チェックサム"
+   ;; 2026-08-31 に pin 95d5439 で 7 件すべて手で当て、赤くなるところを実際に見た。
+   ;; anchor はどれも対象ファイルに 1 回だけ、base は mutation 前後とも緑
+   ;; （12 tests / 37 assertions -> 15 / 51）。
+   ;;
+   ;; ここで回すのは JVM suite だけである。cljs 側の主張（README と ns docstring が
+   ;; 売っている .cljc 可搬性）は test/nbb_smoke.cljs が測るが、それは別の runner なので
+   ;; **この suite が緑でも cljs は未測定**。social-publication のように 1 本で両方を
+   ;; 回す形へ寄せるのが次の一手。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :retail/currency-raw
+     :why "currency が json-str を通ること —— receipts->json でここだけが生 interpolate されており、`US\"D` が JSON 文字列を早期に閉じていた（Python の strict json が実際に拒否した）。同じ関数の receipt_id も、inventory->json の sku/location も escape 済みなので、抜けていたのはこの 1 本だけ"
+     :file "src/kotoba/retail/export.cljc"
+     :find "\"\\\"currency\\\":\\\"\" (json-str (or (:receipt/currency r) \"USD\")) \"\\\",\""
+     :replace "\"\\\"currency\\\":\\\"\" (or (:receipt/currency r) \"USD\") \"\\\",\""
+     :must-fail ["json-export-escapes-currency-like-every-other-string-field"]}
+
+    {:id :retail/validate-branch-order
+     :why "validate-ean13 の分岐順序。digits-only は非文字列に nil を返し (count nil) は 0 なので、:wrong-length を先に置くと :not-a-string の枝が飲み込まれる —— 呼び手から見て「渡し方が違う」と「バーコードが違う」の区別が消える"
+     :file "src/kotoba/retail.cljc"
+     :find "      (not (string? s))        {:retail/valid? false :retail/error :not-a-string}\n      (not (= 13 (count d)))   {:retail/valid? false :retail/error :wrong-length}"
+     :replace "      (not (= 13 (count d)))   {:retail/valid? false :retail/error :wrong-length}\n      (not (string? s))        {:retail/valid? false :retail/error :not-a-string}"
+     :must-fail ["validate-ean13-names-every-branch-it-can-return"]}
+
+    {:id :retail/normalized-dropped
+     :why ":retail/normalized が成功結果に載ること —— 呼び手が区切り記号を落とした形を保存するための唯一の出口で、黙って消えても valid? true は真のまま"
+     :file "src/kotoba/retail.cljc"
+     :find "{:retail/valid? true :retail/normalized d}"
+     :replace "{:retail/valid? true}"
+     :must-fail ["validate-ean13-names-every-branch-it-can-return"
+                 "ean13-normalizes-separators-on-purpose"]}
+
+    {:id :retail/no-separator-strip
+     :why "digits-only が区切り記号を落とすこと。これは意図された契約（:retail/normalized がその出口）だが、締め付けても他は何も赤くならないので、今日動いているスキャナ入力が黙って壊れる"
+     :file "src/kotoba/retail.cljc"
+     :find "(when (string? s) (str/replace s #\"\\D\" \"\"))"
+     :replace "(when (string? s) s)"
+     :must-fail ["ean13-normalizes-separators-on-purpose"]}
+
+    {:id :retail/ean-weight-flip
+     :why "EAN-13 の mod-10 重み付けが 1,3,1,3… で位置 0 から始まること。even/odd を入れ替えると GS1 のチェックサムではなくなる"
+     :file "src/kotoba/retail.cljc"
+     :find "(* dg (if (even? i) 1 3))"
+     :replace "(* dg (if (odd? i) 1 3))"
+     :must-fail ["ean13-test"
+                 "validate-ean13-test"]}
+
+    {:id :retail/c0-escapes-dropped
+     :why "RFC 8259 §7 の C0 全域（U+0000–U+001F）が escape されること。範囲を空にすると生の制御バイトがそのまま JSON に出る"
+     :file "src/kotoba/retail/export.cljc"
+     :find "(into {\\\" \"\\\\\\\"\" \\\\ \"\\\\\\\\\"}\n        (for [i (range 0x20)]"
+     :replace "(into {\\\" \"\\\\\\\"\" \\\\ \"\\\\\\\\\"}\n        (for [i (range 0x0)]"
+     :must-fail ["json-export-escapes-every-c0-control-character"]}
+
+    {:id :retail/csv-cr-dropped
+     :why "RFC 4180 の quoting が裸の \\r も含むこと。\\r 単独も行終端なので、quote しないと読み戻しで 1 行が 2 行に割れる"
+     :file "src/kotoba/retail/export.cljc"
+     :find "(if (re-find #\"[\\\",\\n\\r]\" s)"
+     :replace "(if (re-find #\"[\\\",\\n]\" s)"
+     :must-fail ["csv-export-quotes-a-bare-carriage-return"]}]}
+
   {:repo "orgs/kotoba-lang/social-publication"
    :label "social-publication の 4 不変条件"
    ;; `run_tests.cljs` は同じ suite を nbb と JVM の両方で走らせ、**両方**緑の
