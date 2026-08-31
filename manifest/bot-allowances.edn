@@ -1,0 +1,49 @@
+;; manifest/bot-allowances.edn — what each itonami bot may spend, and on which rail.
+;;
+;; DENY BY DEFAULT. A bot that is not named here has no allowance, and
+;; `scripts/x402_bot_pay.cljs` refuses before it opens a socket. A bot that has
+;; not been told what it may spend has not been authorised to spend anything,
+;; and the most dangerous default here is the one that reads silence as
+;; freedom (kotoba-lang/pay `x402-buyer`: "no policy is not permission").
+;;
+;; WHY CREDITS AND NOT USDC. The only rail an unattended process can settle
+;; without holding money is murakumo credits: labour-issued, transferable
+;; between holders, NON-redeemable for fiat/USDC/EN by design (ADR-2607995000
+;; §1). A bot paying in credits is spending an allowance inside this economy,
+;; not moving funds. The USDC rail stays available to a HUMAN or an operator
+;; who chooses it; no bot is granted it here, and a bot cannot grant itself one
+;; because this file is the policy and the bot does not write it.
+;;
+;; UNITS ARE PER RAIL. `:credits/per-call` is credits, not micro-USDC. The two
+;; arrive as the same string in the same field of the same 402 challenge, so
+;; the cap is keyed by rail on the way into the buyer policy.
+;;
+;; A COMMITTED ALLOWANCE IS NOT A FUNDED ONE. Naming a bot here permits a
+;; spend; it does not create a balance. An unfunded bot is refused by the
+;; ledger with `insufficient-credits`, which is the correct answer and a
+;; different one from "not allowed".
+
+{:allowance/version 1
+
+ ;; The credits ledger of record. Balances are read from `<ledger>/infer/credits`
+ ;; and transfers are appended by the FACILITATOR, not by the bot: the bot mints
+ ;; a CACAO naming one (recipient, amount) and hands it over, which is the
+ ;; difference between paying someone and giving them your account.
+ :allowance/ledger "https://api.murakumo.cloud"
+
+ ;; Sellers a bot may pay at all, by their credits account name. A name and not
+ ;; an address: credits have no chain.
+ :allowance/sellers #{"murakumo" "kotobase"}
+
+ ;; The rail every allowance below is denominated in, in preference order.
+ ;; `pay.x402-buyer` refuses to CHOOSE between rails whose amounts are not
+ ;; comparable, so this is what makes a two-offer challenge decidable.
+ :allowance/rails [["murakumo" "CREDITS"]]
+
+ :allowance/bots
+ {"repo-bot-drain"     {:credits/per-call 1 :credits/per-day 20}
+  "docs-edn-repair"    {:credits/per-call 1 :credits/per-day 10}
+  "adr-inventory"      {:credits/per-call 1 :credits/per-day 10}
+  "rule-kaizen"        {:credits/per-call 1 :credits/per-day 10}
+  "itonami-ingest-scout"   {:credits/per-call 1 :credits/per-day 30}
+  "itonami-coverage-scout" {:credits/per-call 1 :credits/per-day 30}}}
