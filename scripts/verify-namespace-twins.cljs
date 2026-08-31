@@ -1,0 +1,114 @@
+#!/usr/bin/env nbb
+;; One namespace, two files, one of them dead.
+;;
+;;   nbb scripts/verify-namespace-twins.cljs [--findings]
+;;
+;; Clojure resolves `.clj` before `.cljc` on the JVM and `.cljs` before `.cljc`
+;; on ClojureScript. So a namespace that exists as both has one file that wins
+;; on that platform and one that is never loaded there. Sometimes that is the
+;; point -- a platform-specific implementation beside a portable one. Usually
+;; it is an accident, and the accident is silent: edits to the shadowed file
+;; compile, pass review, and change nothing.
+;;
+;; kotoba-native's `kotoba.native.elf64` is why this exists. Its two files are
+;; a deliberate twin (that repo's ADR-0036 says so, and says the JVM file must
+;; not be the weaker of the pair), and nothing measured the claim. They drifted
+;; to 74 entries against 69, and because the JVM file is the one that runs,
+;; three aiueos kernel objects stopped building -- reported as an "internal
+;; compiler error", which it was not.
+;;
+;; THE SIBLING AXIS. `scripts/verify-namespace-collisions.cljs` (ADR-2608120600)
+;; asks the same question one level out: two REPOSITORIES publishing the same
+;; namespace, where the classpath decides which wins. Same family -- something
+;; silently wins and the loser's edits do nothing -- different resolver. That
+;; ADR's warning transfers directly: a content difference between the two files
+;; is NOT by itself a signal. Most divergence there was scaffolding that is
+;; supposed to differ.
+;;
+;; WHERE YOU LOOK DECIDES THE ANSWER. Scanning only `src/` finds four pairs
+;; across this workspace. Scanning the repositories finds twenty-seven. The
+;; first number is not wrong about `src/`; it is wrong as an answer to "how
+;; many are there", and nothing in its output says which question it answered.
+;; This walks whole repositories and says how many it walked.
+(ns verify-namespace-twins
+  (:require [clojure.string :as str]
+            ["fs" :as fs]
+            ["path" :as path]))
+
+(def ^:private skip-dirs
+  ;; `.claude/worktrees` holds transient copies of other repositories: a pair
+  ;; found inside one is the same pair already counted at its real home.
+  #{"node_modules" ".git" "target" ".cpcache" ".shadow-cljs" "dist" "build"
+    ".nbb" ".gitlibs" "worktrees"})
+
+(def ^:private intentional
+  "Pairs that are supposed to exist, with the reason. A pair not listed here is
+  not necessarily a defect -- it is unexamined."
+  {"kotoba-lang/kotoba-lang lang/conformance/namespace_priority/src/demo/util"
+   "the conformance fixture whose SUBJECT is namespace priority"
+   "kotoba-lang/kotoba-lang lang/conformance/entry_extensions/main"
+   "the conformance fixture whose SUBJECT is entry-file extension priority"
+   "kotoba-lang/kotoba-lang-security-hardening lang/conformance/namespace_priority/src/demo/util"
+   "the same fixture in the hardening fork"
+   "kotoba-lang/kotoba-lang-security-hardening lang/conformance/entry_extensions/main"
+   "the same fixture in the hardening fork"
+   "kotoba-lang/kotoba-native src/kotoba/native/elf64"
+   "a declared twin (kotoba-native ADR-0036), kept identical by elf64-twin-parity-test"
+   "kotoba-lang/kotobase-engine-prolly src/kotobase/engine/prolly/provider"
+   "a JVM coordinator and a ClojureScript/R2 coordinator -- different implementations on purpose"})
+
+(defn- walk [dir out]
+  (doseq [entry (try (fs/readdirSync dir #js {:withFileTypes true}) (catch :default _ []))]
+    (let [name (.-name entry) full (path/join dir name)]
+      (cond
+        (.isDirectory entry) (when-not (contains? skip-dirs name) (walk full out))
+        (.isFile entry)
+        (when-let [ext (first (filter #(str/ends-with? name %) [".cljc" ".cljs" ".clj"]))]
+          (let [ns-path (subs full 0 (- (count full) (count ext)))]
+            (vswap! out update ns-path (fnil conj #{}) ext)))))))
+
+(defn -main [& args]
+  (let [findings? (some #{"--findings"} args)
+        orgs "orgs"
+        repos (vec (for [org (sort (try (fs/readdirSync orgs) (catch :default _ [])))
+                         :let [op (path/join orgs org)]
+                         :when (try (.isDirectory (fs/statSync op)) (catch :default _ false))
+                         repo (sort (try (fs/readdirSync op) (catch :default _ [])))
+                         :let [rp (path/join op repo)]
+                         :when (try (.isDirectory (fs/statSync rp)) (catch :default _ false))]
+                     rp))]
+    ;; Evidence floor: a sweep that walked nothing has not found nothing.
+    (when (empty? repos)
+      (println "REFUSING TO REPORT A RESULT: no repositories under orgs/ were walked")
+      (set! (.-exitCode js/process) 2)
+      (throw (ex-info "no repositories" {})))
+    (let [pairs (volatile! [])]
+      (doseq [rp repos]
+        (let [out (volatile! {})]
+          (walk rp out)
+          (doseq [[ns-path exts] @out
+                  :when (and (contains? exts ".cljc")
+                             (or (contains? exts ".clj") (contains? exts ".cljs")))]
+            (let [rel (subs ns-path (inc (count rp)))
+                  key (str (subs rp (inc (count orgs))) " " rel)
+                  shadow (if (contains? exts ".clj") ".clj" ".cljs")
+                  same? (try (= (str (fs/readFileSync (str ns-path shadow)))
+                                (str (fs/readFileSync (str ns-path ".cljc"))))
+                             (catch :default _ false))]
+              (vswap! pairs conj {:key key :exts (vec (sort exts))
+                                  :shadows shadow :identical? same?
+                                  :intentional (get intentional key)})))))
+      (let [all (sort-by :key @pairs)
+            unexamined (remove :intentional all)]
+        (println (str "REPOSITORIES\t" (count repos)))
+        (println (str "TWIN-NAMESPACES\t" (count all)
+                      "\tDECLARED-INTENTIONAL\t" (- (count all) (count unexamined))
+                      "\tUNEXAMINED\t" (count unexamined)))
+        (when findings?
+          (doseq [p unexamined]
+            (println (str "  " (:key p) "  " (str/join "+" (:exts p))
+                          "  " (:shadows p) " shadows the .cljc"
+                          (if (:identical? p) "  (byte-identical)" "  (THEY DIFFER)")))))
+        (set! (.-exitCode js/process) (if (seq unexamined) 1 0))))))
+
+(apply -main *command-line-args*)
