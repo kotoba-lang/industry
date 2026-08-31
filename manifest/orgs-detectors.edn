@@ -271,14 +271,30 @@
               detectors answering one question with different populations is one of
               them being quietly narrower, so both are admitted and the split is
               reported."
-   :run      "nbb scripts/verify-actor-metering.cljs [--root <path>] [--findings]"
-   :exits    {0 "no actor lacks a metering namespace"
-              1 "findings: actors with no meter"
-              2 "REFUSED -- no orgs tree, or no admissible actor manifest"}
-   :measured {:scanned 31 :meter-shaped 0 :partial 0 :no-meter-ns 31
-              :conventions {:bare 24 :ns-prefixed 6 :nested 1}
-              :as-of "2026-08-31"}
-   :writes   :none}
+   :argv ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+          "{{repo}}/scripts/verify-actor-metering.cljs" "--findings" "--root" "{{root}}"]
+   :cwd :root
+   :findings :protocol
+   :writes   :none
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :timeout-ms 120000
+   :interval-ms 86400000
+   :measured "Landed 2026-08-31 in a documentation shape -- :run / :exits /
+              :measured-as-a-map -- which admission refuses, because none of
+              :argv :cwd :findings :evidence :timeout-ms :interval-ms was
+              present. The whole registry was therefore exit 2 and the tick ran
+              NOTHING, for every detector, not just this one. Rewritten into the
+              runnable shape by measuring rather than guessing: run 2026-08-31,
+              9.8s wall, exit 1, `SCANNED 32 actors` and 31 FINDING lines, and
+              CONVENTIONS reported {:ns-prefixed 7 :bare 24 :nested 1}. The
+              timeout is 12x that wall; daily because an actor gains a metering
+              namespace on the scale of a landed ADR, not a commit. The prose
+              :why above is the author's and is unchanged.
+              Note the scanned count is 32 and the conventions are 7/24/1, where
+              the entry as written said 31 and 6/24/1 -- the population moved
+              between their run and this one, which is exactly why the number
+              belongs in a measured field that gets re-measured and not in a
+              claim."}
 
 {:id       :verify-source-nul-bytes
    :title    "raw control bytes in source, which make grep answer as if a word is absent"
@@ -2526,4 +2542,47 @@
               break was visible. ps is retried once: one read in four came back
               empty at load 46, and a transient there flips every finding
               between fail and warn -- two failures still print UNREADABLE."}
+
+{:id :verify-declared-serving
+   :title    "a model catalog saying `serving` about an endpoint that does not answer"
+   :why      "2026-08-31: api.murakumo.cloud served `murakumo-main` as
+              `status: serving`, `status-evidence.verdict: fresh`, `age_days: 6`
+              -- while its own declared endpoint infer.murakumo.cloud/health
+              answered 404 and every request to that model was failing. Six is
+              less than the seven-day window, so the read path was working
+              exactly as designed and still could not say so.
+              ADR-2608270230 recorded the same shape lasting eleven days: a head
+              exited status 0 on 2026-08-16, Restart=on-failure never fired, and
+              the registry kept answering `serving` the whole time.
+              local-murakumo.model-status already considered probing on read and
+              rejected it in its own docstring, for a good reason -- it would
+              make the registry unanswerable exactly when the fleet is down --
+              and said instead that comparing a declaration against an actual
+              probe `belongs to a detector that can fail, not to a read`. This
+              is that detector; what was missing was not the reasoning but the
+              second half of it. Cannot be a fleet gate: it reads a live public
+              gateway and probes hosts over the network, neither of which exists
+              in a shipped tree. Flags only records whose OWN status is
+              `serving`; an `unverified` record is already telling the truth and
+              flagging it would punish the honest state."
+   :argv ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+          "{{repo}}/scripts/verify-declared-serving.cljs" "--findings"]
+   :cwd :root
+   :findings :protocol
+   :writes :none
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :timeout-ms 120000
+   :interval-ms 21600000
+   :measured "2026-08-31: 11.7s wall for 6 catalog records and 1 endpoint probe,
+              so the 120s timeout is 10x headroom; 6h because a head dies between
+              one turn and the next, not between one landed ADR and the next.
+              All three exits checked before landing. 0: --self-test, eight
+              assertions including that a 404 is NOT an answer -- the live case
+              was a host that resolves and terminates TLS with nothing behind it,
+              so any-response-is-alive would have passed it. 1: the live catalog,
+              one finding, naming murakumo-main. 2: a catalog URL that 404s,
+              which refuses rather than reporting a truthful registry from one
+              that did not answer. A record with no endpoint is a separate warn
+              rather than a pass, because a claim nothing can check is not a
+              claim that passed."}
 ]}

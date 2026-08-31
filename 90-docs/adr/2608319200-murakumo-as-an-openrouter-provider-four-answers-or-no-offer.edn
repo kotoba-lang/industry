@@ -25,7 +25,11 @@
    "2026-08-31: provider-catalog の 3 方向 break test（datacenter 既定化 / stale 理由の畳み込み / capacity を飽和点に）が全部その理由で落ちることを実測"
    "2026-08-31: verify-inference-data-policy.cljs の 4 方向 break test（ring / TTL / :messages / ソース欠損）が exit 1/1/1/2 で分かれることを実測"
    "2026-08-31: clj->js が namespaced keyword を潰して datacenter provenance を消していたことを preview で発見し、回帰テストを追加"
-   "2026-08-31: npm test 268 tests / 1391 assertions 0 failures、npm run build と wrangler deploy --dry-run 成功"]
+   "2026-08-31: npm test 268 tests / 1391 assertions 0 failures、npm run build と wrangler deploy --dry-run 成功"
+   "2026-08-31: api.murakumo.cloud に deploy 済み（version 3a5d06ff）。live の /v1/models で murakumo-main のみ is_ready true、残る 5 hosted は 4 理由すべてを列挙して withheld、relay 2 件は無改変を確認"
+   "2026-08-31: provenance 7 key が live JSON に全部残っていることを確認（clj->js 衝突の回帰確認）"
+   "2026-08-31: 別セッションが c485b76 で readiness.cljc を governed artifact 無しで landed させており main が deploy 不能だった。artifact を refresh して 4925a3d で復旧、npm test 270/1400 green"
+   "2026-08-31 未完: murakumo.cloud サイトの再デプロイが kagi の OS-Keychain unlock 待ちで止まっており、/legal/privacy.md は旧版（Last updated 2026-08-30）のまま。正本 (cloud-murakumo-app 1c08443) と配信コピー (cloud-murakumo 24d11cd) は main に landed。--bootstrap（lease 無し deploy）は使わなかった"]
   :adr/body
   "murakumo.cloud を OpenRouter の hosting provider として登録する前に、先方が課している
 4 つの要件のうち機械で答えられるものを実装した。申請自体はまだ出していない
