@@ -64,7 +64,13 @@
 ;; in posted-price credits, folded from signed receipts. Nothing writes this file
 ;; today; the flag is the seam that makes step 4 runnable the day something does,
 ;; and the reason this detector has a reachable green.
-(def receipts-path (opt "--receipts" nil))
+(def receipts-path
+  "Written by scripts/itonami-receipts-export.cljs. Defaults to the file that
+  script produces, so the two halves meet without a flag -- but stays nil when
+  it does not exist, because a cost side reporting zero is worse than one
+  reporting why it is open."
+  (let [d (opt "--receipts" (p/join root "manifest/itonami-receipts.edn"))]
+    (when (fs/existsSync d) d)))
 
 (defn slurp* [f] (try (.readFileSync fs f "utf8") (catch :default _ nil)))
 
@@ -157,9 +163,22 @@
 
 ;; --- cost side --------------------------------------------------------------
 ;;
-;; KUMO burn is folded from signed receipts (murakumo.infer.credits/receipt).
-;; There is no receipt store on this host and none is reachable from a repo
-;; scan, so the cost side reports why it is open rather than reporting zero.
+;; KUMO burn is folded from the murakumo run ledger by
+;; scripts/itonami-receipts-export.cljs.
+;;
+;; ⚠ This comment used to say there was no receipt store. Measured 2026-08-31,
+;; that was false: `api.murakumo.cloud/infer/runs` answers 200 with 772 rows,
+;; 119 of them spend entries, and the ledger is live in production. The claim
+;; had outlived its own truth and was being quoted as a reason by every actor
+;; in the output.
+;;
+;; What is actually open is the JOIN, and it is a sharper finding than the
+;; plumbing was. Also measured that day: five accounts have spent credits
+;; (dougaka 1666, two did:key customers, shinshi 40.8, isekai-pages 5) and the
+;; overlap with the 32 actors here is ZERO -- by DID, by repo name, by seller
+;; name. The things spending metered credits are not actors and the actors are
+;; not spending metered credits. An actor claims its spend account by declaring
+;; `:actor/murakumo-account`, and none does yet.
 
 (def receipts
   (when receipts-path
@@ -171,7 +190,7 @@
 (defn kumo-burn [repo]
   (if-let [v (get-in receipts [repo :kumo])]
     {:value v :reason nil}
-    {:value nil :reason "no receipt store: murakumo.infer.credits is not called from production (ADR-2608026100)"}))
+    {:value nil :reason "the run ledger is live (772 rows, 119 spends) but no actor declares :actor/murakumo-account -- measured 2026-08-31, zero overlap between the 5 spending accounts and this population"}))
 
 (defn yata-burn [repo]
   (if-let [v (get-in receipts [repo :yata])]
