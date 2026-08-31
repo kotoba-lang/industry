@@ -138,24 +138,39 @@ pin より前に居るのが正常で、HEAD こそ実態である。
 |---|---|---|
 | `Could not find namespace: kotoba.artifact.core` | 閉包を 1 つも書いていなかった | 2026-08-08 |
 | `Could not find namespace: kotoba.compiler.frontend` | compiler → **`kotoba-sema`**（#545 "Consume semantic analysis from kotoba-sema"。ns 名は不変で repo だけ動いた） | 2026-08-09 |
+| `Could not find namespace: sha2.core` | **閉包の引き方が 1 段しか辿っていなかった**。`sha2.core` を持つ `org-nist-sha2` は amu の *直接* 依存ではなく、`security` 等を経由した先に居る | 2026-08-31 |
 
-どちらも**落ちたのではなく走らなかった**ので、「スコア算術はカーネルと一致している」が
+どれも**落ちたのではなく走らなかった**ので、「スコア算術はカーネルと一致している」が
 誰にも検査されないまま計測が landed し続けた（落ちるより悪い。検査されていないことが
-緑と区別できない）。だから閉包は**そのつど `amu/deps.edn` から引く**:
+緑と区別できない）。
+
+⚠ **3 件目は「列を書くな」を守っていても起きる。** 閉包を毎回 `amu/deps.edn` から
+引いていても、**1 段だけ引けば 1 段目の外は見えない**。依存は推移的なので、
+**閉包の計算も推移的でなければならない**。だから閉包は shell に書かず、
+**`scripts/itonami-maturity-parity-classpath.cljs` に訊く**:
 
 ```bash
-R=$HOME/github/com-junkawasaki
-CP=".:scripts/nbb_compat:$R/orgs/kotoba-lang/amu/src:$R/orgs/kotoba-lang/amu/resources"
-for r in $(grep -oE 'io\.github\.kotoba-lang/[a-z0-9-]+' "$R/orgs/kotoba-lang/amu/deps.edn" \
-           | sed 's|.*/||' | sort -u); do
-  if [ -d "$R/orgs/kotoba-lang/$r/src" ]; then CP="$CP:$R/orgs/kotoba-lang/$r/src"
-  else echo "MISSING checkout: $r"; fi          # ← west update --fetch smart <name> で取る
-  [ -d "$R/orgs/kotoba-lang/$r/resources" ] && CP="$CP:$R/orgs/kotoba-lang/$r/resources"
-done
+CP=$(nbb --classpath ".:scripts/nbb_compat" \
+      scripts/itonami-maturity-parity-classpath.cljs --root "$HOME/github/com-junkawasaki") || true
 nbb --classpath "$CP" scripts/itonami-maturity-kernel-parity.cljs \
   --evidence manifest/itonami-maturity-evidence.edn \
   --datoms 90-docs/system-dynamics/itonami-maturity.datoms.edn
 ```
+
+deriver の exit は 3 値（`0` 全部 checkout 済み / `1` classpath は出たが未 checkout の
+repo が在る（stderr に repo 名と `west update` の行）/ `2` **REFUSED** —— 起点の
+`amu/deps.edn` が読めず、stdout に**何も出さない**）。`|| true` が要るのは `1` が
+advisory だから。**`2` のときに CP が空文字のまま gate を回さない。**
+
+⚠ **この recipe を shell に戻さない。** 同じ日に shell 版が 2 回別の理由で壊れた ——
+1 段しか辿らない閉包と、**zsh が `for r in $CLOSURE` を単語分割しないので classpath が
+2 エントリに潰れる**（CLAUDE.md の `west update $NAMES` と同じ罠）。どちらも
+**classpath が静かに間違うだけで、症状は「gate が起動しない」= exit 1** だった。
+
+⚠ **起動しなかったときの exit も 1 である。** 本物の `FAIL` と同じ値なので、
+**exit だけを見て「不一致があった」と読まない**。`Could not find namespace:` が
+出ていないことを毎回確かめる（下の「緑を採用する前に落とす」と対で効く ——
+落とす側が名前解決で落ちていたら、それは discriminate の実演になっていない）。
 
 **`MISSING checkout:` が出たら先にそれを取る。** 閉包の repo は west に登録されていても
 checkout されていないことがある（実測 2026-08-09: `kotoba-sema` が未 checkout で、
