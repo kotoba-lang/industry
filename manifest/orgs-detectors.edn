@@ -242,6 +242,44 @@
               :skipped-range 55 :skipped-ecosystem 135 :vulnerable-packages 4}
    :writes   :none}
 
+{:id       :verify-actor-metering
+   :title    "governed actors that meter nothing, which is upstream of having no price"
+   :why      "2026-08-31, ADR-2608314000: the offer ladder put all 31 governed actors
+              in no-offer, and the reason a price book cannot be written for them is
+              upstream of the price. `pricing/problems` refuses an invoice that
+              quotes a dimension nobody counts, and ADR-2608110200 says why the
+              order matters -- a price can be chosen later, a month that was not
+              measured can never be measured afterwards. So the question is whether
+              an actor records dimensioned usage at all, and that had been answered
+              only by a substring search: 9 of 31 repos contain the word `usage` or
+              `meter` somewhere in src, which is not evidence, because a comment
+              matches too. This counts the shape instead, taken from authn.usage --
+              the one meter in this workspace that actually supports a price book --
+              which carries a period, a de-duplicating key, and an aggregate.
+              Measured 31 of 31 with no metering namespace at all, so the 9 was
+              indeed the wrong question.
+
+              It reports meter-SHAPED, never metered. Whether a meter runs, or
+              recorded last month, is not visible in a repository, and the reference
+              itself says de-duplication is the part that cannot be reconstructed
+              from a log afterwards. Collapsing those two words would let a
+              namespace that has never executed be counted as measurement.
+
+              Two conventions for actor.edn exist -- 24 bare `:did`, 6 ns-prefixed
+              `:actor/did`, 1 nested -- and the first version of this detector read
+              only the second, admitting 6 where itonami-actor-pnl admits 31. Two
+              detectors answering one question with different populations is one of
+              them being quietly narrower, so both are admitted and the split is
+              reported."
+   :run      "nbb scripts/verify-actor-metering.cljs [--root <path>] [--findings]"
+   :exits    {0 "no actor lacks a metering namespace"
+              1 "findings: actors with no meter"
+              2 "REFUSED -- no orgs tree, or no admissible actor manifest"}
+   :measured {:scanned 31 :meter-shaped 0 :partial 0 :no-meter-ns 31
+              :conventions {:bare 24 :ns-prefixed 6 :nested 1}
+              :as-of "2026-08-31"}
+   :writes   :none}
+
 {:id       :verify-source-nul-bytes
    :title    "raw control bytes in source, which make grep answer as if a word is absent"
    :why      "2026-08-18/19: one NUL byte makes file(1) classify a source file as
