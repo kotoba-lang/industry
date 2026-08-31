@@ -54,7 +54,9 @@ restart は `kickstart -k` では**足りない** —— process は再起動す
 
 ⑤true-orphan-git 3 件（cloud-itonami/dougaka・dougaka-actor・dougaka-vector）は登録も退役もしていない。
 
-⑥`pin-tip-lag.cljs` は batch あたり 1 回しか retry しないため、この機械の負荷では常用で exit 2 になる。道具は正直（clean と報告しない）だが retry 不足。
+⑥**解決済み（PR #2860）。** partial failure —— GitHub は部分失敗を **200-with-errors** で返し、読めた repo は stdout に載り残りは null になる。それは parse できるので batch は :ok と数えられ、**null は一度も再質問されずに UNRESOLVED になっていた**（実測: FAILED_BATCHES 0 なのに UNRESOLVED 240/4252、その 240 を 1 度訊き直すと全件解決した）。今は最大 3 round 再質問する。拒否は弱めていない —— それでも解決しないものは UNRESOLVED のままで exit 2。
+
+⚠ **依然として誰も走らせていない。** orgs-detector には登録できない —— 登録済み 54 detector は **1 つも gh を呼んでいない**（レジストリの gh class 規約、実測で確認）。GraphQL 前提のこの検査はその class に入らない。継続測定したいなら launchd job だが、**pin を無人で前進させるのは policy 判断**であって道具の問題ではない —— 上流が壊れた tip をそのまま fleet の pin に採用することになる。
 
 ⑦pin drift は連続的で、最初の前進から約 40 分で 6 件が新たに遅れた。手動 pull では保たない。
 
