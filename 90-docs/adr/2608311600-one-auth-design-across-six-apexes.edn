@@ -46,7 +46,9 @@
    "deploy 2026-08-31 その3: itonami-app-auth version 188053db, app-auth 795edbf4 — /v1/biscuit/token を kotobase-authn へ転送 (worker smoke 全 pass, 新規 13 check)"
    "転送が本物である証拠: 同じ偽 bearer に対し auth.itonami.cloud と auth.kotobase.net が同一の 401 not authorized を返す"
    "app-aozora-auth の wrangler secret list は空。PDS_JWT_SECRET は app-aozora-pds のみが持つ"
-   "再測定 2026-08-31 09:48Z: overall 45.83, itonami.cloud 65.00"]
+   "再測定 2026-08-31 09:48Z: overall 45.83, itonami.cloud 65.00"
+   "verify-credential-consumers: 4,329 repo 横断で /rpc/verify-operator の外部 consumer は 0、verify-inference は 8、verify-session は 6"
+   "cloud-murakumo-api branch agent/operator-biscuit-consumer c990fb6 — 277 tests/1432 assertions 0 failures、governed artifact refresh 待ちで未 merge"]
   :adr/body
   "# ADR-2608311600: 6 apex に対する 1 つの認証・権限設計
 
@@ -288,9 +290,60 @@ interactive unlock timeout）。**繰り返し叩けば owner に unlock prompt 
 捕まえたのは `test/worker_smoke.cljs`（**built artifact** を走らせて
 `issuer is not defined` で abort）。危険は次に人が立つ場所、`shadow-cljs.edn` に記録した。
 
+## 6.8 murakumo — 書いたが出荷していない（2026-08-31）
+
+**ADR-2608291200 は半分しか着地していなかった。** authn は operator credential
+（`mro_`、`murakumo://can/operator:<action>`、15 分、caller ごと）を mint し、検証 RPC
+`/rpc/verify-operator` まで持ち、`api.murakumo.cloud` には `AUTHN_SERVICE` binding も
+在る。**それを呼ぶコードが 1 つも無かった。**
+
+実測: **checkout 済み 4,329 repo を横断して、issuer 自身の repo の外に呼び手ゼロ。**
+credential は発行され、検証でき、期限が切れ、**何も authorize していなかった** ——
+その間、置き換えるはずだった共有秘密が `/v1/kotobase/database-restore` の唯一の鍵の
+まま（1 本の文字列、全 operator プロセスが保持、`=` で比較、監査で誰も名乗らず、
+2026-08-29 以降**誰も読めない**）。
+
+**どちらの半分も間違っていない。繋がっているかを誰も問わなかった** ——
+そして**存在しない consumer はどこにもエラーを出さない。**
+
+配線は書き、テストも通した（277 tests / 1432 assertions、新規 5 件含む、0 failures）。
+**branch `agent/operator-biscuit-consumer`（`c990fb6`）に保全し、merge していない。**
+
+**出荷しない理由**: この repo の `npm run build` は**コンパイルしない**。hash 固定の
+committed artifact を展開して source digest を assert するので、**source を 1 文字
+変えると `release/cljs/manifest.json` を refresh するまで全員のビルドが壊れる。**
+`shadow-cljs.edn` 自身が refresh 条件を *in a clean west workspace*、13 の sibling
+pin つきと書いている。実測: 共有 checkout は `release/cljs/ui.js.gz` が**未コミットで
+dirty**、artifact の最終 refresh は 68 分前 —— **別セッションがまさにその artifact を
+触っている。** 検証していない workspace から refresh すれば、**コンパイルした対象と
+違う依存 pin を記録する governance record** ができる。
+
+⚠ **前ターンの「ZERO callers」は `cloud-murakumo-api` 1 repo だけを見た主張だった。**
+fleet 全体で測り直して結論は変わらなかったが、**測った範囲は変わった** ——
+下記の計器がそれを毎回測る。
+
+## 6.9 計器 3 本目 — `verify-credential-consumers`
+
+**issuer が晒す検証 endpoint のうち、workspace の誰も呼んでいないものを報告する。**
+endpoint の一覧は issuer の source から**読む**（手書きの表は、新しい credential class
+が増えた日にそれを隠す方向に古びる）。
+
+**この検出器自身が 2 回壊れていた。両方とも直してある。**
+
+1. 3 endpoint それぞれで全 tree を歩き、**9 分で終わらなかった。** コストは walk なので
+   1 回だけ歩いて bucket する。
+2. **issuer の source ファイルだけを除外していた。** そのせいで
+   `/rpc/verify-operator` に consumer が 3 件あるように見えた —— **自分の ADR、自分の
+   README、自分のコンパイル済み bundle。** そして `clean` と報告した。
+   **consumer とは他人のこと**なので issuer repo 全体を除外する。
+   **この欠陥は finding を隠す方向に壊れていた**ので、控えの合成ツリーには
+   「数えてはいけない issuer 内の言及」を必ず含める。
+
 ## 7. やっていないこと（正直に）
 
-- **§5-3 は owner の 1 操作待ち**（上記）。**§5-4 は未着手**（x402 / isekai に principal）。
+- **§5-3 は owner の 1 操作待ち**（`wrangler secret put PDS_JWT_SECRET`）。
+- **murakumo は governed artifact の refresh 待ち**（branch は保全済み、merge していない）。
+- **§5-4 は未着手**（x402 / isekai に principal）。
 - **probe は credential を持たない。** 測れるのは「拒否がどう名乗るか」までで、
   **正当な Biscuit が実際に通ることは測っていない。**
 - **`plane-reads-capability` は正しい Biscuit で測っていない。** 構文だけの
