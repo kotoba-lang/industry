@@ -30,7 +30,8 @@
    "adr-2608200400-bots-get-a-did-and-authority-as-a-biscuit（identity → authority の順序。wallet はその次として明示的に後回しにされていた）"
    "adr-2608291009-bot-kumo-yata-three-unit-economy（BOT/KUMO/YATA。本 ADR は KUMO(=credits) の消費側の配線であって、単位の設計を変えない）"
    "adr-2607093100-x402-monetization-gateway-integration"
-   "adr-2608136000（測れなかった検査が、測って問題が無かった検査と同じ値を返す）"]
+   "adr-2608136000（測れなかった検査が、測って問題が無かった検査と同じ値を返す）"
+   "adr-2608314100-the-two-routes-that-move-value-are-gated-the-one-that-makes-it-is-not（この ADR の『残高は operator 鍵の 1 手』を訂正する）"]
 
   :adr/measured
   ["live 2026-08-31 実測: x402.nexus /.well-known/x402 は credits rail を authorization 仕様つきで announce している。しかし /catalog の 20 品目は 1 件も credits 価格を持たず、murakumo の 402 challenge の accepts は USDC/transaction の 1 件だけだった。**announce されていて、誰も offer していない rail**"
@@ -181,8 +182,13 @@ X-PAYMENT を付けて再送し、支出を append-only に記録する。**人�
    mint が instant を正規化。conformance の意図的な不正ベクタは `:instants :raw`
    で作り続けられる）+ root d7ae1d3f（payer が秒精度で mint する）。
 2. **bot の口座に残高が無い。** 名簿に載せることは permit であって funding ではない。
-   資金供給は operator の credits 口座から bot へ transfer する操作で、**operator の
-   鍵を要する**。これは owner の 1 手であって agent の 1 手ではない。
+
+   ⚠ **『operator 鍵の 1 手』と書いていたのは不正確だった**（2026-08-31 夜に訂正）。
+   資金を付ける経路は 3 つあり、**うち 1 つは無認証で誰でも引ける** ——
+   `POST /itonami/trial` は did を送るだけで 200 credits を mint する。
+   だから足りないのは鍵ではなく**引かないという判断**で、その理由（自社 bot が
+   外部向け promo を引くと裏付けの無い発行になり、台帳の independent acceptor 判定を
+   汚す）と現在地の実測は ADR-2608314100 に置いた。
    未funded の bot は台帳から `insufficient-credits` を受ける —— これは正しい答えであり、
    `:allowance/unlisted`（許されていない）とは別の答えである。
 3. **`exact` scheme は誰も掲示していない。** gasless な EIP-3009 は検証側に実装済みだが、
