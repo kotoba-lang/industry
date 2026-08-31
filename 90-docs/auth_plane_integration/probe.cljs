@@ -270,6 +270,22 @@
                         (true? shared-live) true
                         (= :unknown shared-live) (if (true? alt-live) true :unknown)
                         :else (boolean alt-live))
+     ;; WebAuthn requires the RP ID to be a registrable suffix of the origin,
+     ;; so an apex may name itself or a name under itself -- and must not name
+     ;; anybody else's. An apex handing out a challenge scoped to another
+     ;; apex's rpId would be giving its visitors a credential for somebody
+     ;; else's door.
+     ;;
+     ;; The probe had been RECORDING this value since its first version and
+     ;; scoring nothing with it. `audit/coverage` is what noticed.
+     :controller-is-rp-scoped
+     (let [rp (rp-id (:body shared))]
+       (cond
+         (absent? shared) false
+         (and (nil? rp) (= :unknown (:status shared))) :unknown
+         (nil? rp) false
+         :else (boolean (or (= rp apex) (str/ends-with? rp (str "." apex))))))
+
      :one-authority (cond
                       (absent? shared) false
                       (true? shared-live) true

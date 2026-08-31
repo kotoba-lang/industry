@@ -58,6 +58,8 @@
    "deploy 2026-08-31: nexus-x402 c2354717 — /v1/biscuit/token を kotobase-authn へ転送 (101 tests/412 assertions)"
    "再測定 2026-08-31 13:10Z: overall 53.79、x402.nexus 59.09。6 apex 中 5 が同じ issuer で mint する"
    "isekai.network は Cloudflare Pages + .mjs Functions、identity はブラウザ自己発行 did:key — 配線ではなく判断が要る"
+   "audit/coverage は初回実行で controllers-are-rp-scoped の軸欠落を検出。probe は rpId を初版から記録していたが採点していなかった"
+   "再測定 2026-08-31 14:01Z（分母 1.20）: overall 53.47。rp-scoped は itonami/murakumo/kotobase が true"
    "kotobase.biscuit-grant は net-kotobase/control-plane の shared/src に 1 ファイルだけ存在する — deployable の中に閉じた唯一の verifier"]
   :adr/body
   "# ADR-2608311600: 6 apex に対する 1 つの認証・権限設計
@@ -491,6 +493,35 @@ client-side である。auth ホストも session も無い。
    既存 Functions は全部 `.mjs` なので、規約どうしが正面衝突する。**
 
 3 点ともオーナー判断であり、勝手に決めない。
+
+## 6.13 不変条件を軸から独立に宣言する（2026-08-31）
+
+**今日の計器の欠陥は 3 つとも、測られる側ではなく測る側にあった。** 根は 1 つで、
+**軸を「probe で測りやすいもの」から作った**こと。設計の主張は散文の中にしか無く、
+軸と突き合わせるものが存在しなかった。
+
+`audit/invariants` を足した —— **設計が何を主張するかを、観測可能性と無関係に**書く。
+軸は `:invariant` を宣言し、`coverage` が 3 つに分ける:
+
+- **covered** — 軸がある
+- **unobservable** — 軸を持てない理由が宣言してある（例: `one-decider` は
+  「どの実装が決めたか」が応答に出ない。**省かずに宣言する** —— 省いたことが、
+  受け取り側を半日見えなくした当のもの）
+- **SILENT** — 軸も理由も無い。**これが欠陥**で、run は exit 2 で拒否する
+
+逆向きも見る: **どの不変条件にも属さない軸（ORPHAN）も拒否**する。
+誰も頼んでいない測定は、誰も行動できない測定である。
+
+**coverage は初回実行で本物の穴を 1 つ出した。** `controllers-are-rp-scoped`
+（ADR-0082）に軸が無く、しかも**観測可能**だった —— ceremony は自分の `rpId` を返す。
+probe は**初版からその値を記録していて、何も採点していなかった。**
+`controller-is-rp-scoped` を足した（rpId がその apex の名前か: 他 apex の rpId を配る面は、
+訪問者に**他人の扉の credential** を渡している）。
+
+**coverage は毎回、スコアより先に印字する。** 不完全な軸の集合から出た数より、
+軸が届く範囲と届かない範囲の一覧の方が価値がある。後ろに置けば誰も読まない。
+
+⚠ 軸が増えて分母は 1.20。**53.79 → 53.47 は別スケール**であり退行ではない。
 
 ## 7. やっていないこと（正直に）
 
