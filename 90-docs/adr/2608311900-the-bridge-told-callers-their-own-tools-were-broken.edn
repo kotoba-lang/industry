@@ -183,6 +183,45 @@ cron を数えるとき `started_at > <unix秒>` で絞ったが、この列は 
 直して測り直したのが上の表。ADR-2608301700 が同じ日に 4 回記録した
 「照合器が別のものを掴んでいるのに、その結果を測定として報告した」形の再発。
 
+## 同じ誤帰属の連鎖が、もう 1 本 log の中で動いていた（2026-08-31 追記）
+
+log を読み直して見つけた: bridge が model `murakumo-main` を 3 回受け取り、
+Claude CLI が `unrecognized_model` で 404 を返し、bridge がそれを **502
+upstream_error** にしていた。
+
+出所は codinator の `auxiliary.compression.model: murakumo-main`
+（`base_url` は murakumo）。primary が落ちると auxiliary 呼び出しは
+fallback の claude-bridge へ行くが、**model 名は primary のものを持ったまま**
+なので、CLI にとっては存在しないモデルになる。
+
+502 は「一時障害」なので hermes は 3 回再試行する —— 決して成功しない要求に対して。
+そして compression が死ぬと、detector の docstring が書いているとおり
+**次のエラーは長さのせいにする**。この ADR の冒頭の事件と同じ誤帰属の連鎖が、
+規模を小さくして同時に走っていた。実際 `verify-hermes-agent-health` が残していた
+warn `hermes-compression-dead:codinator` の本文は
+`502 - claude reported an error subtype=success terminal_reason=api_erro…` で、
+bridge log の `murakumo-main` 404 3 本と同じ形をしている。
+
+**決定**: CLI が `unrecognized_model` を報告したら **400 invalid_request_error**
+にし、本文に「この bridge が serve するモデル」を並べる。理由は 429 のときと同じ
+——**再試行で直らないものを再試行させない**。型も直した（`case` で 400 →
+`invalid_request_error`。OpenAI client はこの型で分岐する）。
+`unrecognized_model` は result event ではなく **stderr** に載るので、
+`upstream-status` は stderr も受け取る。
+
+検査は 6 ケース目。400 マッピングだけを外すと**このケースだけ**が
+「still 502 upstream_error — hermes reads that as transient」で落ちる。
+
+⚠ 最初この fixture は caller に `claude-sonnet-5`（serve 済み）を要求させながら
+stub には別モデルの拒否を演じさせていたので、bridge のエラー本文が
+**serve しているモデルを「serve していない」と言う**形になった。fixture を現実に
+合わせ（caller が `murakumo-main` を要求する）、本文が拒否されたモデル名と
+serve 一覧の両方を含むことを assert している。
+
+**hermes 側の config は触っていない** —— 25 profile の auxiliary が primary の
+model 名を持ったまま fallback する設計は hermes 側の話で、ここで直すのは
+「その要求が来たときに正直で再試行不能な答えを返す」ことだけ。
+
 ## 直していないもの
 
 - **`approval.pending` の busy poll**: 11:08–11:19 の 11 分で 1,573 行、全部同じ

@@ -379,6 +379,11 @@
                              (pr-str (subs txt 0 (min 300 (count txt)))))}
       :else r)))
 
+;; The CLI's marker for "that is not one of my models". It rides on stderr,
+;; not on the result event, so a status mapping that reads only `parsed`
+;; cannot see it.
+(def ^:private unknown-model-marker "unrecognized_model")
+
 (defn- upstream-status
   "The HTTP status this failure should surface as, or nil for the 502 default.
 
@@ -389,15 +394,28 @@
   as 429, an OpenAI-compatible client raises RateLimitError instead, which is a
   different exception the caller can actually route on.
 
-  Only 429 is translated. Everything else stays 502: 5xx and transport faults
-  really are ours to retry, and a 4xx about the CLI's own state would be a lie
-  if we blamed it on the caller's request."
-  [parsed]
+  Two are translated: 429 (a rate limit is not a server fault) and an
+  unrecognized model (the caller named something this bridge does not serve).
+  Everything else stays 502: 5xx and transport faults really are ours to
+  retry, and a 4xx about the CLI's own state would be a lie if we blamed it on
+  the caller's request. The model case is not that -- it IS the request."
+  [parsed err]
   (let [raw (:api_error_status parsed)
         n (cond (number? raw) raw
                 (string? raw) (js/parseInt raw 10)
                 :else nil)]
-    (when (= 429 n) 429)))
+    (cond
+      (= 429 n) 429
+      ;; A model this bridge does not serve is the CALLER's request being
+      ;; wrong, and no amount of retrying fixes it. Measured 2026-08-31:
+      ;; codinator's auxiliary compressor failed over to this bridge still
+      ;; carrying `murakumo-main` (its PRIMARY provider's model). The CLI
+      ;; answered 404 unrecognized_model, we returned 502 `upstream_error`,
+      ;; hermes read that as transient and retried -- and when compression
+      ;; stops working the NEXT error blames context length instead. That is
+      ;; the same misattribution chain this bridge already cost two days on.
+      (str/includes? (str err) unknown-model-marker) 400
+      :else nil)))
 
 (defn spawn-claude
   "One CLI run. `content` is a vector of Anthropic blocks (text and images);
@@ -473,7 +491,8 @@
                                         :attempted (count attempts)))]
           (cond
             (nil? parsed)
-            (finish {:error (str "claude exited " code
+            (finish {:attempted (count attempts)
+                     :error (str "claude exited " code
                                  " with no result event in " (count lines)
                                  " line(s) of output: "
                                  (subs raw 0 (min 400 (count raw)))
@@ -493,8 +512,18 @@
             ;; Report what the CLI actually said. Reading only `result` gave
             ;; "(no message)" on every real failure and made 10 errors
             ;; undiagnosable -- the reason was in the fields we dropped.
-            (finish {:status (upstream-status parsed)
-                     :error (str "claude reported an error"
+            (finish {:attempted (count attempts)
+                     :status (upstream-status parsed @err)
+                     :error (str (if (str/includes? (str @err) unknown-model-marker)
+                                   (str "this bridge does not serve model "
+                                        (pr-str model) " -- it serves "
+                                        (str/join ", " served-models)
+                                        ". A caller that failed over to this "
+                                        "bridge while still carrying its "
+                                        "primary provider's model name will "
+                                        "land here; retrying cannot fix it. ")
+                                   "")
+                                 "claude reported an error"
                                  (when-let [st (:subtype parsed)] (str " subtype=" st))
                                  (when-let [tr (:terminal_reason parsed)] (str " terminal_reason=" tr))
                                  (when-let [as (:api_error_status parsed)] (str " api_error_status=" (pr-str as)))
@@ -644,8 +673,12 @@
                       (let [status (or (:status result) 502)]
                         (send-json res status
                           {:error {:message (:error result)
-                                   :type (if (= 429 status)
-                                           "rate_limit_error"
+                                   ;; the type is what OpenAI clients route
+                                   ;; on; calling a bad request an upstream
+                                   ;; fault is what made hermes retry it
+                                   :type (case status
+                                           429 "rate_limit_error"
+                                           400 "invalid_request_error"
                                            "upstream_error")}})))
                   (do (when (:attempted result) (record-tool-run! result))
                       (log "<-" model (str ms "ms")
