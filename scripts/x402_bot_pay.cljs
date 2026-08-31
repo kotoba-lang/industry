@@ -214,6 +214,13 @@
 
 ;; ── the network half ─────────────────────────────────────────────────────
 
+(defn json-encode
+  "The host's JSON serializer. `pay` does not serialize JSON — `encode-header`
+  takes an already-serialized string — and passing it the map produced base64
+  of a print form, which the facilitator could not parse and which it reported
+  as no payment at all (measured 2026-08-31, fixed on both sides)."
+  [x] (js/JSON.stringify (clj->js x)))
+
 (defn- now-iso [] (.toISOString (js/Date.)))
 
 (defn- plus-seconds [secs]
@@ -331,7 +338,7 @@
                      (let [minted (transfer-cacao bot-id {:to (:pay-to chosen) :amount amount})
                            payment (buyer/credits-payment chosen {:payer acct
                                                                   :cacao (:cacao-b64 minted)})
-                           header (buyer/payment-header payment)]
+                           header (buyer/payment-header payment json-encode)]
                        (if (nil? header)
                          (do (append-ledger! (assoc row :phase :abandoned
                                                     :at (now-iso)
