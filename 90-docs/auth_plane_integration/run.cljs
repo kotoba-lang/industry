@@ -35,11 +35,26 @@
                 (when-not stored
                   (str "90-docs/auth_plane_integration/probe-"
                        (subs (:probe/at p) 0 10) ".edn")))]
+    ;; The coverage block prints on EVERY run, before the scores. A number
+    ;; assembled from an incomplete set of axes is worth less than the list of
+    ;; what the axes do and do not reach, and putting it after the scores would
+    ;; make it the thing nobody reads.
+    (println (audit/format-coverage))
+    (println)
     (println (audit/format-report p a))
     (when out
       (fs/writeFileSync out (with-out-str (pp/pprint {:probe p :audit a})))
       (println (str "\n  wrote " out)))
     (cond
+      ;; An invariant the design asserts and nothing measures is not a low
+      ;; score, it is an unmeasured claim, and it refuses the same way an
+      ;; unmeasured axis does.
+      (seq (:silent (audit/coverage)))
+      (do (println "\n  REFUSING: an invariant has no axis and no declared reason.") 2)
+
+      (seq (audit/orphan-axes))
+      (do (println "\n  REFUSING: an axis serves no declared invariant.") 2)
+
       (seq (:incomplete a)) 2
       (seq (:findings a)) 1
       :else 0)))
