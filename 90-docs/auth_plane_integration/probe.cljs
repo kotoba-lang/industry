@@ -203,7 +203,10 @@
                           [(:status with) (normalise (:body with))]))}))
 
 (defn- probe-apex [{:keys [apex auth planes]}]
-  (let [shared (curl {:url (str auth shared-passkey-path) :method "POST" :data "{}"
+  ;; The apex's own origin, for surfaces that mount the shared contract there
+  ;; rather than on an auth subdomain.
+  (let [apex-origin (str "https://" apex)
+        shared (curl {:url (str auth shared-passkey-path) :method "POST" :data "{}"
                       :headers ["content-type: application/json"]})
         shared-live (challenge? shared)
         alts (when-not (true? shared-live)
@@ -221,8 +224,23 @@
                                      alts)))
         alt-live (when alts
                    (boolean (some (fn [[_ r]] (true? (challenge? r))) alts)))
-        mint (curl {:url (str auth "/v1/biscuit/token") :method "POST" :data "{}"
-                    :headers ["content-type: application/json"]})
+        ;; The mint is looked for at BOTH plausible places: the apex's auth
+        ;; host and the apex itself. Measured 2026-08-31: x402.nexus began
+        ;; forwarding /v1/biscuit/token on its own apex -- it has no auth
+        ;; subdomain -- and this axis stayed false, because the probe had
+        ;; quietly assumed one shape of deployment. An axis that only looks
+        ;; where most apexes happen to put a thing reports its own assumption.
+        mint-at (fn [base]
+                  (curl {:url (str base "/v1/biscuit/token") :method "POST" :data "{}"
+                         :headers ["content-type: application/json"]}))
+        mint-auth (mint-at auth)
+        mint (if (and (not= 403 (:status mint-auth))
+                      (not (nil? apex-origin)))
+               ;; only fall back when the auth host did not already answer as a
+               ;; guarded mint, so an apex with both is scored on the stronger
+               (let [alt (mint-at apex-origin)]
+                 (if (= 403 (:status alt)) alt mint-auth))
+               mint-auth)
         measured (mapv probe-plane planes)
         ;; The first plane is the one the credential-shape axes are read from:
         ;; the others say whether the apex is consistent, not what it demands.
