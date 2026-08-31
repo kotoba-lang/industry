@@ -327,6 +327,43 @@
               the first draft of this sweep read working trees and reported a repair
               that had already landed."}
 
+  {:id       :verify-shared-library-consumption
+   :title    "how each build reaches its shared library, and whether it can reach it at all"
+   :why      "2026-08-31, root ADR-2608311600: kotobase.biscuit-grant -- the fleet's one
+              Biscuit verifier -- moved out of net-kotobase/control-plane into
+              kotoba-lang/grant. The API gateway followed via a pinned git dep. The
+              protocols worker did not: its shadow-cljs source path still pointed at the
+              emptied ../shared/src, its source still required the namespace, and MAIN
+              COULD NOT COMPILE IT -- while the deployed artifact went on serving
+              sparql, gremlin and graphql. A source path carries no pin and raises no
+              error until somebody builds, so the gap between `deployed` and `buildable`
+              stayed invisible. Three routes exist and only one is silent: a vendored
+              copy is pinned and diffable, a git dep is pinned and fails loudly, a
+              source path is neither. CANNOT be a fleet gate: it reads every repo and
+              runs git against each one, and a gate ships a single tree."
+   :argv     ["nbb" "{{repo}}/scripts/verify-shared-library-consumption.cljs"
+              "--findings" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 43200000                 ; 12h
+   :timeout-ms  1200000                  ; 20m -- measured ~3m
+   :writes   :none
+   :measured "Landed 2026-08-31 after being wrong twice, both fixed rather than
+              described. It first classified from WORKING TREES, so a west checkout at
+              its pin made a correctly-vendored build read as `dangling` -- wrong in the
+              direction that manufactures findings, measured on nexus-x402 the day its
+              copy landed. It then folded exit status into an `:ok` meaning `0 or 1`,
+              which is right for grep and wrong for git: `rev-parse --verify` failures
+              read as successes, every repo resolved to the first remote in the list,
+              and the correctly-pinned API gateway was reported as unable to compile.
+              Classification now reads the default branch and reports exit status
+              instead of interpreting it; rows carry how far the local checkout is
+              behind, so a stale tree is legible rather than mistaken for a defect.
+              First correct run: gateway pinned-dep, nexus-x402 vendored,
+              protocols-worker DANGLING (真 -- fixed in control-plane 2a959b76),
+              kotobase-worker-shell source-path and unpinned."}
+
   {:id       :verify-credential-consumers
    :title    "a credential class that is minted, verifiable, and accepted by nobody"
    :why      "2026-08-31, ADR-2608311600: ADR-2608291200 minted a per-caller operator
