@@ -59,6 +59,8 @@
 (ns x402-bot-pay
   (:require [clojure.edn :as edn]
             [nbb.core :as nbb]
+            [biscuit.wire :as wire]
+            [biscuit.kotoba :as bk]
             [clojure.string :as str]
             [cacao.core :as cacao]
             [ed25519.core :as ed]
@@ -72,7 +74,13 @@
 
 ;; ── where things live ────────────────────────────────────────────────────
 
-(def allowances-file "manifest/bot-allowances.edn")
+(def allowances-file
+  "The ISSUANCE policy — what the operator has decided to grant. It is no
+  longer what the payer trusts: that is the signed pass
+  (`scripts/x402_bot_pass.cljs`), read by `read-pass` and folded by
+  `biscuit.kotoba/->delegated`. This file is read here only to mint one and to
+  answer `spent`/`policy` questions about what WOULD be granted."
+  "manifest/bot-allowances.edn")
 
 (defn gftd-dir [] (path/join (os/homedir) ".gftd"))
 (defn seed-file [] (path/join (gftd-dir) "itonami-bot-payer.seed"))
@@ -128,23 +136,140 @@
   ([] (read-allowances allowances-file))
   ([f] (try (edn/read-string (fs/readFileSync f "utf8")) (catch :default _ nil))))
 
-(defn policy-for
-  "The `pay.x402-buyer` policy for one bot, or nil when it has no allowance.
+(def ^:private seller-prefix "kotoba://credits/")
 
-  nil is load-bearing: `buyer/plan` refuses a nil policy with
-  `:buyer/no-policy`, so an unlisted bot cannot pay even if every later check
-  were wrong. The caps are keyed by rail because `:credits/per-call` counts
-  credits and the USDC offer in the same challenge counts micro-dollars."
-  [registry bot-id]
-  (when-let [a (get-in registry [:allowance/bots bot-id])]
-    (let [rails (vec (:allowance/rails registry))
-          per-call (:credits/per-call a)]
+(defn resource->seller
+  "The seller a granted resource names, or nil. A resource of another shape
+  confers no seller rather than being trimmed into one — `kotoba://graph/x`
+  is not a credits account and must not become one by string surgery."
+  [r]
+  (when (and (string? r) (str/starts-with? r seller-prefix))
+    (let [s (subs r (count seller-prefix))]
+      (when (re-matches #"[a-z0-9][a-z0-9._-]{0,62}" s) s))))
+
+(defn spend-limits
+  "The `limit` facts of a verified token, folded MINIMUM-wins.
+
+  `biscuit.kotoba/->delegated` reads `cap` and `before` and nothing else, so
+  these confer no authority on their own — which is exactly why they are safe
+  to carry. What they need is a fold, and the fold has to be one-directional
+  for the same reason block folding is: a later block may LOWER a cap and must
+  never raise one. Attenuation that can widen is not attenuation.
+
+  A limit nobody set is nil, not infinity — the caller decides what an absent
+  cap means, and here it means the offer is refused rather than uncapped."
+  [token-model]
+  (reduce (fn [acc [p n v]]
+            (if (and (= 'limit p) (string? n) (number? v))
+              (update acc (keyword n) (fn [prev] (if prev (min prev v) v)))
+              acc))
+          {}
+          (mapcat :block/facts (:biscuit/blocks token-model))))
+
+(defn pass-policy
+  "A VERIFIED pass -> the `pay.x402-buyer` policy it confers, or nil.
+
+  This is where the allowance stopped being a file. `manifest/bot-allowances.edn`
+  is now the ISSUANCE policy — what the operator decided to grant — and what
+  the payer trusts is the grant inside a signed token, folded by
+  `biscuit.kotoba/->delegated` and never by this namespace. There is one
+  covering decision in this workspace and it is `kotoba-lang/authority`'s;
+  writing a second one here is what that library exists to prevent.
+
+  nil when the token confers no `credits-spend` grant. `buyer/plan` refuses a
+  nil policy with `:buyer/no-policy`, so the deny-by-default floor is the same
+  one it was when the file was the authority — it is now merely a floor
+  somebody can verify.
+
+  It refuses an UNVERIFIED pass here rather than only at the call site. The
+  function that turns a credential into authority is the one that must not do
+  it for a credential nobody checked — a guard that lives only in the caller is
+  one refactor away from a second caller without it, and the test for it passed
+  against this function for the wrong reason until the guard moved here.
+
+  ⚠ This binds a WELL-BEHAVED buyer. The pass is read here, by the payer, and
+  no seller checks it yet; a bot that skipped this function is stopped by its
+  balance and nothing else. What the token buys today is that the allowance
+  cannot be widened by editing a checkout, can be narrowed offline by a holder
+  with none of our keys, and can be verified by anyone holding the root public
+  key. Seller-side enforcement is murakumo's decision, not this file's."
+  [{:keys [grants limits] :pass/keys [verified?]} rails]
+  (let [grants (when verified? grants)          ; an unverified credential confers nothing
+        resources (into #{} (mapcat :grant/resources)
+                        (filter #(= :credits-spend (:grant/kind %)) grants))
+        sellers (into #{} (keep resource->seller) resources)
+        per-call (:per-call limits)]
+    (when (and (seq sellers) per-call)
       {:schemes #{"credits"}
        :networks (set (map first rails))
        :assets (set (map second rails))
-       :pay-tos (set (:allowance/sellers registry))
+       :pay-tos sellers
        :caps (into {} (map (fn [r] [r per-call])) rails)
-       :prefer rails})))
+       :prefer (vec rails)})))
+
+
+
+(defn root-public-hex
+  "The spend authority's PUBLIC key, hex, or nil.
+
+  Only the public half, and from its own file: a verifier that could read the
+  signing seed would be able to mint what it is checking. `x402_bot_pass.cljs`
+  writes this beside the seed; nil here means this host was never given the
+  authority to check against, which is `:pass/unverifiable` — neither a grant
+  nor a denial."
+  []
+  (let [f (path/join (gftd-dir) "bot-spend-authority.pub")]
+    (when (fs/existsSync f)
+      (some-> (fs/readFileSync f "utf8") str/trim not-empty))))
+
+(defn read-pass
+  "The bot's spend pass, decoded, verified, and folded.
+
+  -> `{:pass/verified? bool :pass/reason kw :grants [...] :limits {...}
+       :holder did}`
+
+  Decode and verify are separate calls in `biscuit.wire`, and its docstring
+  warns that converting without verifying decodes an attacker's facts. They
+  are joined here, once, so there is no route by which an unverified model
+  reaches `->delegated`.
+
+  A missing pass, an unreadable one and a host with no root public key are
+  three different answers. Only one of them means the bot was refused."
+  [bot-id]
+  (let [f (path/join (gftd-dir) "x402-bot-pass" (str bot-id ".token"))]
+    (cond
+      (not (fs/existsSync f)) {:pass/verified? false :pass/reason :pass/absent
+                               :detail (str "no pass at " f)}
+      :else
+      (let [b64 (str/trim (fs/readFileSync f "utf8"))
+            pub (root-public-hex)]
+        (cond
+          (nil? pub) {:pass/verified? false :pass/reason :pass/unverifiable
+                      :detail "no bot-spend-authority.pub on this host"}
+          :else
+          (try
+            (let [padded (-> b64 (str/replace "-" "+") (str/replace "_" "/"))
+                  bytes (vec (js/Buffer.from padded "base64"))
+                  token (wire/decode-token bytes)
+                  pub-bytes (vec (js/Buffer.from pub "hex"))
+                  v (wire/verify token pub-bytes
+                                 (fn [key payload sig]
+                                   (try (ed/verify (js/Uint8Array.from (clj->js key))
+                                                   (js/Uint8Array.from (clj->js payload))
+                                                   (js/Uint8Array.from (clj->js sig)))
+                                        (catch :default _ false))))
+                  model (wire/token->model token)]
+              (if-not (:ok? v)
+                {:pass/verified? false :pass/reason :pass/bad-signature :detail (:reason v)}
+                (let [d (bk/->delegated model #{:credits-spend})]
+                  {:pass/verified? true
+                   :grants (:grants d)
+                   :rejected (:grant/rejected d)
+                   :holder (:grant/holder d)
+                   :limits (spend-limits model)})))
+            (catch :default e
+              {:pass/verified? false :pass/reason :pass/malformed
+               :detail (str e)})))))))
 
 (defn- day-of [iso] (some-> iso (subs 0 10)))
 
@@ -165,24 +290,35 @@
 (defn allowance-verdict
   "May this bot commit `amount` more credits today? Pure.
 
-  Distinguishes an unreadable registry from an unlisted bot from an exhausted
-  one. All three refuse; a caller that cannot tell them apart cannot tell a
-  broken deployment from a working one enforcing its limits."
-  [registry rows bot-id day amount]
-  (let [a (get-in registry [:allowance/bots bot-id])
-        per-call (:credits/per-call a)
-        per-day (:credits/per-day a)
+  `limits` comes from the SIGNED pass (`spend-limits`), not from a file. Both
+  halves of an allowance now live in the same credential: WHICH sellers, in the
+  `cap` facts the library folds, and HOW MUCH, in the `limit` facts this
+  namespace folds minimum-wins. Half a policy in a token and half in a
+  checkout would be an allowance nobody could state.
+
+  An ABSENT limit refuses, which is the opposite of the usual convention and
+  is deliberate: a pass that says nothing about how much authorises nothing,
+  and reading silence as `no cap` is how a token with a dropped fact becomes
+  unlimited spending.
+
+  The refusals stay distinct — a caller that cannot tell an unpassed bot from
+  an exhausted one cannot tell a broken deployment from a working one
+  enforcing its limits."
+  [limits rows bot-id day amount]
+  (let [per-call (:per-call limits)
+        per-day (:per-day limits)
         already (spent-on rows bot-id day)]
     (cond
-      (nil? registry) {:ok? false :reason :allowance/unreadable}
-      (nil? a) {:ok? false :reason :allowance/unlisted}
+      (nil? limits) {:ok? false :reason :allowance/no-pass}
       (not (and (number? amount) (pos? amount))) {:ok? false :reason :allowance/bad-amount}
-      (and per-call (> amount per-call)) {:ok? false :reason :allowance/over-per-call
-                                          :limit per-call :amount amount}
-      (and per-day (> (+ already amount) per-day))
+      (nil? per-call) {:ok? false :reason :allowance/no-per-call-limit}
+      (> amount per-call) {:ok? false :reason :allowance/over-per-call
+                           :limit per-call :amount amount}
+      (nil? per-day) {:ok? false :reason :allowance/no-per-day-limit}
+      (> (+ already amount) per-day)
       {:ok? false :reason :allowance/daily-exhausted
        :limit per-day :spent already :amount amount}
-      :else {:ok? true :spent already :remaining (when per-day (- per-day already amount))})))
+      :else {:ok? true :spent already :remaining (- per-day already amount)})))
 
 ;; ── the local spend ledger ───────────────────────────────────────────────
 
@@ -302,10 +438,16 @@
   (when (and (= 402 status) (map? body)) body))
 
 (defn plan-for
-  "-> {:challenge c :plan p} for a request that came back 402, or a refusal."
-  [registry bot-id response]
+  "-> {:challenge c :plan p} for a request that came back 402, or a refusal.
+
+  The policy comes from the VERIFIED pass. An unverified one yields no policy
+  at all rather than a narrow one, so `buyer/plan` refuses with
+  `:buyer/no-policy` — the same floor as before, now standing on something
+  somebody can check."
+  [pass registry bot-id response]
   (if-let [ch (challenge-of response)]
-    {:challenge ch :plan (buyer/plan ch (policy-for registry bot-id))}
+    {:challenge ch
+     :plan (buyer/plan ch (pass-policy pass (:allowance/rails registry)))}
     {:refuse :buyer/not-a-challenge :status (:status response)}))
 
 (defn pay!
@@ -317,23 +459,26 @@
   [{:keys [bot-id url method body registry dry-run?]}]
   (let [registry (or registry (read-allowances))
         ledger (:allowance/ledger registry)
-        acct (account bot-id)]
+        acct (account bot-id)
+        pass (read-pass bot-id)]
     (-> (fetch-json url {:method method :body body})
         (.then
          (fn [first-response]
-           (let [{:keys [challenge plan refuse]} (plan-for registry bot-id first-response)]
+           (let [{:keys [challenge plan refuse]} (plan-for pass registry bot-id first-response)]
              (cond
                refuse (js/Promise.resolve {:stage :no-challenge :refuse refuse
                                            :status (:status first-response)
                                            :body (:body first-response)})
                (:refuse plan) (js/Promise.resolve {:stage :planned :refuse (:refuse plan)
                                                    :rejected (:rejected plan)
+                                                   :pass (select-keys pass [:pass/verified? :pass/reason])
                                                    :challenge challenge})
                :else
                (let [chosen (:pay plan)
                      amount (:amount chosen)
                      day (day-of (now-iso))
-                     verdict (allowance-verdict registry (read-ledger) bot-id day amount)]
+                     verdict (allowance-verdict (when (:pass/verified? pass) (:limits pass))
+                                                (read-ledger) bot-id day amount)]
                  (cond
                    (not (:ok? verdict))
                    (js/Promise.resolve {:stage :allowance :refuse (:reason verdict)
@@ -387,7 +532,12 @@
         method (or (flag argv "--method") (if body "POST" "GET"))]
     (case cmd
       "account" (out {:bot bot-id :account (account bot-id)})
-      "policy"  (out {:bot bot-id :policy (policy-for registry bot-id)})
+      "policy"  (let [pass (read-pass bot-id)]
+                  (out {:bot bot-id
+                        :pass (select-keys pass [:pass/verified? :pass/reason :holder :limits])
+                        :policy (when (:pass/verified? pass)
+                                  (pass-policy pass (:allowance/rails registry)))}))
+      "pass"    (out (read-pass bot-id))
       "spent"   (out {:bot bot-id :day (day-of (now-iso))
                       :spent (spent-on (read-ledger) bot-id (day-of (now-iso)))})
       "balance" (-> (balance! (:allowance/ledger registry) (account bot-id))
@@ -398,7 +548,7 @@
       "pay"     (-> (pay! {:bot-id bot-id :url url :method method :body body
                            :registry registry})
                     (.then out))
-      (do (println "usage: x402_bot_pay.cljs <account|policy|spent|balance|probe|pay> <bot-id> [url] [--body json]")
+      (do (println "usage: x402_bot_pay.cljs <account|policy|pass|spent|balance|probe|pay> <bot-id> [url] [--body json]")
           (js/process.exit 2)))))
 
 ;; Only when this file is the one that was invoked. Requiring it — which the

@@ -1,10 +1,24 @@
 ;; manifest/bot-allowances.edn — what each itonami bot may spend, and on which rail.
 ;;
-;; DENY BY DEFAULT. A bot that is not named here has no allowance, and
-;; `scripts/x402_bot_pay.cljs` refuses before it opens a socket. A bot that has
-;; not been told what it may spend has not been authorised to spend anything,
-;; and the most dangerous default here is the one that reads silence as
-;; freedom (kotoba-lang/pay `x402-buyer`: "no policy is not permission").
+;; THIS FILE IS THE ISSUANCE POLICY, NOT THE AUTHORITY.
+;;
+;; It says what the operator has decided to GRANT. What a bot carries is a
+;; Biscuit minted from it by `scripts/x402_bot_pass.cljs`, and what the payer
+;; trusts is the verified grant inside that token — folded by
+;; `biscuit.kotoba/->delegated`, decided by `kotoba-lang/authority`.
+;;
+;; Until 2026-08-31 this file WAS the authority: an unsigned EDN that only the
+;; payer read. Under this workspace's own division that is a delegation, and
+;; delegation is a Biscuit (ADR-2608291700: "CACAO は session の起点として残り
+;; delegation からは降りている"; ADR-2608312900-hyakka: "支払いは authorization
+;; ではない。x402 が決済し、biscuit が『その支払いが何を買ったか』を運び、
+;; authority が決める"). Being named here is now necessary and NOT sufficient:
+;; a bot with no pass is refused with `:pass/absent` before a socket opens.
+;;
+;; DENY BY DEFAULT is unchanged. A bot that has not been told what it may spend
+;; has not been authorised to spend anything, and the most dangerous default
+;; here is the one that reads silence as freedom (kotoba-lang/pay
+;; `x402-buyer`: "no policy is not permission").
 ;;
 ;; WHY CREDITS AND NOT USDC. The only rail an unattended process can settle
 ;; without holding money is murakumo credits: labour-issued, transferable
@@ -18,8 +32,11 @@
 ;; arrive as the same string in the same field of the same 402 challenge, so
 ;; the cap is keyed by rail on the way into the buyer policy.
 ;;
-;; A COMMITTED ALLOWANCE IS NOT A FUNDED ONE. Naming a bot here permits a
-;; spend; it does not create a balance. An unfunded bot is refused by the
+;; A COMMITTED ALLOWANCE IS NOT A FUNDED ONE, AND AN ISSUED PASS IS NOT AN
+;; ENFORCED ONE. Naming a bot here permits a spend; it does not create a
+;; balance, and today the payer is still the only party that reads the pass —
+;; seller-side enforcement needs the ledger to accept it, which is murakumo's
+;; decision. An unfunded bot is refused by the
 ;; ledger with `insufficient-credits`, which is the correct answer and a
 ;; different one from "not allowed".
 
