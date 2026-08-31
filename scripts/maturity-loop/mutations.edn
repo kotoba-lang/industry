@@ -1142,7 +1142,50 @@
      :file "src/langchain/memory.cljc"
      :find ":msg/data (pr-str msg)}])\n          idx))"
      :replace ":msg/data (pr-str msg)}])\n          nil))"
-     :must-fail ["append-returns-the-index-it-assigned"]}]}
+     :must-fail ["append-returns-the-index-it-assigned"]}
+
+    ;; ── docs/catalog.edn（上流出典の台帳）─────────────────────────
+    ;;
+    ;; 台帳の値打ちは「各行が本当に fetch されたこと」だけにある。行を
+    ;; 1 つ足すのは無料なので、discipline を検査するものが無ければ
+    ;; これは URL を並べる場所になる —— それは axis-ingest の水増しの
+    ;; 定義そのもの。だから 4 件とも「台帳が嘘をつく向き」に壊す。
+    ;;
+    ;; 2026-09-01 に 4 件とも赤くなるところを見た（両ランタイムで）。
+    {:id :langchain/catalog-records-a-failed-fetch
+     :why "取れなかった出典が、取れて問題が無かった出典と同じ顔で並ばないこと。:http さえ書いてあれば行は『測ったように』読める —— 値を見なければ 404 も 200 も同じ 1 行"
+     :file "docs/catalog.edn"
+     :find ":url \"https://atproto.com/specs/xrpc\"\n   :http 200"
+     :replace ":url \"https://atproto.com/specs/xrpc\"\n   :http 404"
+     :must-fail ["every-source-carries-its-measurement"]}
+
+    {:id :langchain/catalog-mirrors-a-file-we-do-not-have
+     :why ":mirrors が実在する path を指すこと。存在しないファイルを指す引用は誰の provenance でもないが、EDN としては完全に正しく読める"
+     :file "docs/catalog.edn"
+     :find ":mirrors [\"README.md\" \"docs/adr/0001-architecture.md\"]"
+     :replace ":mirrors [\"README.md.gone\" \"docs/adr/0001-architecture.md\"]"
+     :must-fail ["mirrors-point-at-files-this-repo-has"]}
+
+    {:id :langchain/catalog-lists-one-source-twice
+     :why "同じ URL を 2 行に分けても各行は個別に真のままで、件数だけが倍になること。この台帳を書いたとき実際に踏んだ形 —— 上流の per-concept ページ 9 本が 1 ページへ redirect していたので、歴史的アドレスのまま並べれば 9 引用に見えた"
+     :file "docs/catalog.edn"
+     :find ":url \"https://atproto.com/specs/xrpc\""
+     :replace ":url \"https://docs.datomic.com/\""
+     :must-fail ["urls-are-distinct"]}
+
+    {:id :langchain/catalog-drops-a-port-from-the-index
+     :why "port である namespace が 1 つ残らず台帳に出ること。これが無いと台帳は repo の成長に対して黙って腐る —— 新しい移植先が行を持たないまま増え、既存の行は全部正しいので誰も気づかない"
+     :file "docs/catalog.edn"
+     :find "\"src/langchain/json.cljc\" \"src/langchain/parser.cljc\" \"deps.edn\""
+     :replace "\"src/langchain/parser.cljc\" \"deps.edn\""
+     :must-fail ["every-namespace-that-mirrors-something-is-cited"]}
+
+    {:id :langchain/request-body-drops-the-default-model
+     :why "request-body が :model 無しのとき既定へ手を伸ばすこと。chain-test はここを literal で assert していて、a46c87c が既定を murakumo-main へ動かしたとき **更新され忘れたのがその写し**で、main は赤いまま tip に居た。literal の pin は model-test に 1 箇所だけ置き、chain-test は seam を持つ形に直してある —— その seam が本当に噛むことを、既定を落とす向きで示す"
+     :file "src/langchain/model.cljc"
+     :find "body {:model (or model default-model)"
+     :replace "body {:model model"
+     :must-fail ["anthropic-wire-format"]}]}
 
   {:repo "orgs/kotoba-lang/langchain-store"
    :label "langchain-store —— 316 consumer が黙って依存している store seam の不変条件"
