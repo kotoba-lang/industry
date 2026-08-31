@@ -40,7 +40,9 @@
    "pds.aozora.app /xrpc/com.atproto.server.getSession -> HTTP 200 body AuthMissing"
    "cloud-itonami-app services/app-edge/wrangler.jsonc に routes 記述なし"
    "deploy 2026-08-31: kotobase-protocols-worker version 44e201d8-1c85-405e-af59-118a7737a7f6, control-plane adc2b753 — sparql/gremlin/graphql が Biscuit を読む (201 tests, 0 failures)"
-   "control 実行 (rung 除去): 落ちたのは acceptance test 1 本のみ。refusal test 6 本と header-changes-answer test は緑のまま"]
+   "control 実行 (rung 除去): 落ちたのは acceptance test 1 本のみ。refusal test 6 本と header-changes-answer test は緑のまま"
+   "deploy 2026-08-31 その2: net-kotobase gateway version 19c9271e, control-plane 5e3b2976 — xrpc 401 が presented/details を名乗る (536 tests, 0 failures)"
+   "再測定 2026-08-31 08:11Z: overall 40.00, kotobase.net 100.00 (4/4 plane)"]
   :adr/body
   "# ADR-2608311600: 6 apex に対する 1 つの認証・権限設計
 
@@ -197,9 +199,36 @@ malformed-token` のように**理由を名乗る**。第 2 の verifier は書�
    credential を正しく読んで通す証拠にはならない。** 6 つの refusal test も
    溶接された扉に対して全部緑だった。**判別しているのは acceptance だけ。**
 
+## 6.6 着地記録 その 2（2026-08-31）
+
+**§5 の 1 が kotobase の 4 面すべてで完了し、2 も着地。kotobase.net は 100.00。**
+overall 36.67 → **40.00**。最初に完全適合した apex。
+
+- `net-kotobase` gateway version `19c9271e-d1a6-43d9-8b7d-1dccb080ec35`
+  （control-plane `5e3b2976`）—— xrpc の 401 が **提示なし / 形式不正 /
+  形式は正しいが拒否**の 3 つを区別する。536 tests, 2604 assertions, 0 failures。
+- **なぜ well-formed な credential が落ちたかは言わない。** その理由は authn にあり、
+  gateway を 2 つ目の policy engine にしない。未認証の呼び手に `expired` と
+  `not yours` を区別して見せるのは別種の漏洩である。
+
+### axis を改名した —— `refusal-distinguishes-credential`
+
+**`plane-reads-capability` は測れないことを名乗っていた。** gateway は最初から
+Biscuit を読んで authn へ転送していた（`^Biscuit [A-Za-z0-9_-]{80,8192}$`）。
+測れていたのは**拒否が提示された credential を提示なしと区別するか**である。
+**機構の名前を付けた axis は、その機構についての証拠として引用される。**
+
+同時に、probe が送っていた `Biscuit EnwAAA` は **6 文字**で、gateway も murakumo も
+80 文字以上を要求していた —— **考慮される大きさに届かない入力は判別できず、
+しかも finding に見える向きに壊れる。** 200 文字に直した（直しても datom 面の
+結果は変わらず、欠陥は本物だった）。
+
+datom 面 / IPLD / IPNI の設計判定は **ADR-2608311800**。
+
 ## 7. やっていないこと（正直に）
 
-- **§5 の 2〜5 は着地していない。** 1 も datom 面が残っている。
+- **§5 の 3〜5 は着地していない。** 3 は aozora の passkey を共有契約へ、
+  4 は x402 / isekai に principal を接続、5 は `pds.aozora.app` の 200 →401。
 - **probe は credential を持たない。** 測れるのは「拒否がどう名乗るか」までで、
   **正当な Biscuit が実際に通ることは測っていない。**
 - **`plane-reads-capability` は正しい Biscuit で測っていない。** 構文だけの

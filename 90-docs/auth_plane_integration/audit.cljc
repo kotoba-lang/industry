@@ -28,8 +28,8 @@
     :claim "that ceremony is the shared authn contract, not a second implementation"}
    {:axis :capability-issuance      :weight 0.20
     :claim "the apex can mint a Biscuit, and guards the mint against cross-origin"}
-   {:axis :plane-reads-capability   :weight 0.20
-    :claim "presenting a Biscuit changes what the data plane answers"}
+   {:axis :refusal-distinguishes-credential :weight 0.20
+    :claim "a refused credential is distinguishable from none presented"}
    {:axis :refusal-names-credential :weight 0.10
     :claim "a refusal names the credential class it wanted"}
    {:axis :auth-failure-status      :weight 0.05
