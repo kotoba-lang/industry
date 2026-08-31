@@ -35,7 +35,9 @@
    "**`pricing.edn` を持つ repo は `orgs/cloud-itonami` 全体で 1 件**（`cloud-itonami-isic-6311-identity`）。そしてその repo は **`actor.edn` を持たない** —— 統治された 31 体との交わりは空"
    "負のコントロール: admitted actor（aburi）に既存の price book を置くと no-offer 31→30 / proposed 0→1 に動き、外すと戻る。ladder は discriminate する"
    "参照 price book の形: `:pricing/version` `:pricing/currency` `:pricing/authority` `:pricing/plans`（`:plan/status` `:plan/monthly-base` `:plan/included` `:plan/overage` `:plan/hard-cap`）`:pricing/gates`（`:gate/id` `:gate/met` `:gate/note`）`:pricing/disclosures`。全 plan が `:status :proposed`、6 gate 中 3 が未達"
-   "`actor.edn` を持つ 31 repo のうち、src に `usage|meter` の**文字列**を含むのは 9。**これは meter の証拠ではない**（コメントでも当たる）ので、計測の有無は未測定"]
+   "`actor.edn` を持つ 31 repo のうち、src に `usage|meter` の**文字列**を含むのは 9。**これは meter の証拠ではない**（コメントでも当たる）"
+   "**（2026-08-31 追測）計器の形を数えた: 31 中 31 が `no-meter-ns`。** meter-shaped 0 / partial 0。`no-offer` 31 の上流は『何も計測していない』で確定した。負のコントロール: 参照計器を 1 体に置くと no-meter-ns 31→30 / meter-shaped 0→1 に動き、外すと戻る"
+   "**（2026-08-31 追測）`actor.edn` には様式が 2 つある** —— bare `:did` 24 / ns-prefixed `:actor/did` 6 / nested `:actor` 1。検出器の初版は後者だけを読み 31 中 6 しか admit しなかった"]
 
   :adr/problem
   "オーナー指示（2026-08-31）「事業としても成長するように itonami bots に profile を作って」。
@@ -128,7 +130,7 @@ governed actor の母集団に対して定義されているので、**そのま
    "not-done-deliberately: `actor.edn` と `pricing.edn` の母集団を揃えること。どちらに寄せるかは事業の判断"]
 
   :adr/known-gaps
-  ["**actor が何かを計測しているかが未測定。** `usage|meter` の文字列一致 9/31 は証拠ではない。『次元を持つ使用イベントを発行しているか』を見る検出器が要る —— それが `no-offer` 31 の上流"
+  ["**（解消 2026-08-31）actor が何かを計測しているか。** `scripts/verify-actor-metering.cljs` が測った: **31 中 31 が計器の ns を持たない**（meter-shaped 0 / partial 0）。`usage|meter` の文字列一致 9 件は予想どおり証拠ではなかった —— コメントにも当たっていた。**結果は `meter-shaped` であって `metered` ではない** —— 走っているか / 先月を記録したかは repo から見えない"
    "**統治と商いの母集団が素**（D3）。どちらに寄せるか（governed actor に price book を持たせるか、priced repo に governor を持たせるか）は決めていない"
    "ladder は `orgs/cloud-itonami` 配下しか見ない。`network-awai` の actor（murakumo / kotobase 等）は catalog 側に居るが、この ladder の母集団ではない"
    "`sellable` 段は今日 0 なので、**一度も出たことがない段が 2 つある**（sellable / in-catalog）。ladder が両方向を見せたのは no-offer ↔ proposed の 1 対だけ"
@@ -136,7 +138,7 @@ governed actor の母集団に対して定義されているので、**そのま
 
   :adr/open-decisions
   ["`actor.edn` と `pricing.edn` の母集団を揃えるか、揃えるならどちらへ寄せるか"
-   "計測の検出器を書くか（`no-offer` の上流を測る）"]
+   "**（済 2026-08-31）計測の検出器**は `scripts/verify-actor-metering.cljs` として landed し `manifest/orgs-detectors.edn` に登録済み。次の問いは『31 体のどれに計器を入れるか』"]
 
   :adr/body
   "# ADR-2608314000: profile は price book で、それは既に在った
@@ -192,6 +194,26 @@ ladder にした。初回は **no-offer 31 / 他すべて 0**。
 
 **そして計測の有無は、今日まだ測っていない。** `src` に `usage|meter` の文字列を含むのは
 31 中 9 だが、**文字列一致は meter の証拠ではない。**
+
+## 上流を測った（2026-08-31 追記）
+
+known-gap に置いた『計測の有無は未測定』を測った。**31 中 31 が計器の ns を持たない。**
+
+判定は発明していない —— 参照実装 `authn.usage` が持つ 3 要素を探す:
+期間（`month-of` / `scope`）、**重複排除できるキー**（`mau-key` / `count-key`）、集計（`report`）。
+その docstring が理由を言っている ——『**価格は後から決められる。計測されなかった月は
+後から計測できない。**重複排除は、後からログから復元できない部分である』。
+
+`usage|meter` の文字列一致 9 件は、予想どおり証拠ではなかった。
+
+**結果は `meter-shaped` であって `metered` ではない。** 走っているか、先月を実際に
+記録したかは repo から見えない。**その 2 つを同じ語で呼ばない。**
+
+### 検出器を書いていて、自分の母集団が狭かった
+
+初版は `:actor/` 接頭辞だけを見て **31 中 6 しか admit しなかった**。
+`itonami-actor-pnl` は 31 を admit するので、**同じ問いに 2 つの検出器が別々の数を
+返す**状態を作りかけた。そういうときは、たいてい片方が黙って狭い。
 
 ## 自分でも踏んだ
 
