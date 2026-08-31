@@ -68,6 +68,30 @@
 ;; execute them would make this an agent, and an agent behind a completions
 ;; endpoint runs commands the caller never sanctioned.
 
+;; ## The guest reaches for the caller's tools anyway (2026-08-31)
+;;
+;; `--tools ""` leaves the guest with exactly one tool, StructuredOutput. Told
+;; that the CALLER has `terminal` and `read_file`, the guest emits a `tool_use`
+;; for `terminal` regardless, and the CLI answers
+;;
+;;     <tool_use_error>Error: No such tool available: terminal</tool_use_error>
+;;
+;; On a good run it recovers and puts the call in `tool_calls` (measured: 4
+;; turns, 2 of them wasted). On a bad run it gives up and writes that error
+;; into `content` with `tool_calls` EMPTY — so the CALLER, whose tools are
+;; fine, is told its tools are broken. Measured 2026-08-31 against the live
+;; bridge: "Both `terminal` and `read_file` returned \"No such tool available\"
+;; errors ... This looks like a tool-access issue on the bridge side." Hermes
+;; bots relayed that to their operator for two days as a fleet-wide tool
+;; outage; nothing was wrong with hermes.
+;;
+;; Two floors, because the prompt one alone is a request the model may decline:
+;;   directive   name the error and say it is this bridge's plumbing (below)
+;;   salvage     the rejected attempt IS the decision. `attempted-caller-calls`
+;;               recovers it when the reply named no tool, and a reply that is
+;;               ABOUT the plumbing with nothing to recover becomes an error
+;;               rather than a lie the caller would act on.
+
 (ns claude-bridge
   (:require ["node:http" :as http]
             ["node:child_process" :as cp]
@@ -91,8 +115,10 @@
 (defn log [& xs]
   ;; Timestamp every line. A log without one cannot answer "is it failing now
   ;; or did it fail an hour ago" -- which is the only question anyone asks it.
+  ;; nil args are dropped so an optional field (salvaged=, below) can be
+  ;; passed unconditionally without leaving a double space behind.
   (.error js/console (str (.toISOString (js/Date.)) " [claude-bridge] "
-                          (str/join " " xs))))
+                          (str/join " " (remove nil? xs)))))
 
 ;; ── request shaping ──────────────────────────────────────────────────────
 ;; OpenAI content is either a string or a list of typed blocks. We keep BOTH
@@ -244,7 +270,13 @@
        "object matching its parameters. "
        (if (= :required choice)
          "You MUST name at least one tool this turn."
-         "When you can answer directly, leave `tool_calls` empty — do not invent a call to fill it.")))
+         "When you can answer directly, leave `tool_calls` empty — do not invent a call to fill it.")
+       "\n\nDo NOT try to invoke these tools yourself. You hold none of them, so "
+       "the attempt comes back as `No such tool available: <name>`. That error "
+       "is about this bridge's plumbing — it does not mean the tool is missing, "
+       "broken, or unavailable to the caller. Never repeat it to the caller and "
+       "never describe the caller's tools as failing. Put the call in "
+       "`tool_calls` instead."))
 
 ;; The no-tools case keeps its original directive: callers routinely ask for
 ;; shell commands, and without being told, the guest emits a tool_use, burns
@@ -291,6 +323,61 @@
                                 (when (seq (str (:name c)))
                                   {:name (:name c) :arguments (or (:arguments c) {})}))
                               (:tool_calls obj)))})))
+
+(def ^:private no-such-tool "No such tool available")
+
+(defn- attempted-caller-calls
+  "Caller-tool invocations the guest ATTEMPTED directly, in order, deduped.
+
+  The guest holds no tools, so a `tool_use` naming one of the caller's comes
+  back `<tool_use_error>Error: No such tool available: <name></tool_use_error>`.
+  The attempt is still the decision the model made about which tool to run --
+  recovering it turns a lost turn into the right answer.
+
+  Only names the CALLER declared are recovered. A `Bash` the guest reached for
+  is not a call the caller can execute, and handing it over would smuggle in
+  exactly the agent behaviour `--tools \"\"` exists to prevent."
+  [events spec-names]
+  (let [names (set spec-names)
+        argstr #(js/JSON.stringify (clj->js (or % {})))]
+    (->> events
+         (filter #(= "assistant" (:type %)))
+         (mapcat (fn [e] (let [c (get-in e [:message :content])]
+                           (if (sequential? c) c []))))
+         (filter #(and (= "tool_use" (:type %)) (contains? names (:name %))))
+         (map (fn [b] {:name (:name b) :arguments (or (:input b) {})}))
+         (reduce (fn [acc c]
+                   (if (some #(and (= (:name %) (:name c))
+                                   (= (argstr (:arguments %)) (argstr (:arguments c))))
+                             acc)
+                     acc
+                     (conj acc c)))
+                 [])
+         vec)))
+
+(defn- salvage-tool-calls
+  "Fill an empty `tool_calls` from the guest's rejected direct attempts.
+
+  Deliberately narrow: it fires ONLY when the reply named no tool AND the
+  answer is either empty or about the bridge's own plumbing. A guest that
+  attempted a tool, was refused, and then answered the question properly is
+  left alone -- forcing a call it had abandoned would be its own regression."
+  [r attempts]
+  (let [txt (str (:text r))
+        plumbing? (str/includes? txt no-such-tool)
+        no-text? (str/blank? txt)]
+    (cond
+      (:error r) r
+      (seq (:tool-calls r)) r
+      (not (or plumbing? no-text?)) r
+      (seq attempts) (assoc r :tool-calls attempts
+                              :text (if plumbing? "" txt)
+                              :salvaged (count attempts))
+      plumbing? {:error (str "the guest relayed this bridge's own '" no-such-tool
+                             "' to the caller and named no tool to run -- the "
+                             "caller's tools are fine. result="
+                             (pr-str (subs txt 0 (min 300 (count txt)))))}
+      :else r)))
 
 (defn- upstream-status
   "The HTTP status this failure should surface as, or nil for the 502 default.
@@ -372,7 +459,13 @@
               events (keep (fn [l] (try (js->clj (js/JSON.parse l) :keywordize-keys true)
                                         (catch :default _ nil)))
                            lines)
-              parsed (last (filter #(= "result" (:type %)) events))]
+              parsed (last (filter #(= "result" (:type %)) events))
+              ;; The guest reaches for the caller's tools even though it holds
+              ;; none; those rejected attempts are recoverable. See the header.
+              attempts (if tools?
+                         (attempted-caller-calls events (map :name specs))
+                         [])
+              structured (fn [p] (salvage-tool-calls (parse-structured p) attempts))]
           (cond
             (nil? parsed)
             (finish {:error (str "claude exited " code
@@ -387,7 +480,7 @@
             (and (:is_error parsed)
                  (= "error_max_turns" (:subtype parsed))
                  (seq (str (:result parsed))))
-            (finish (assoc (if tools? (parse-structured parsed)
+            (finish (assoc (if tools? (structured parsed)
                                {:text (:result parsed)})
                            :usage (:usage parsed)))
 
@@ -405,7 +498,7 @@
                                  " | raw=" (subs raw 0 (min 600 (count raw))))})
 
             :else
-            (let [r (if tools? (parse-structured parsed)
+            (let [r (if tools? (structured parsed)
                         {:text (or (:result parsed) "")})]
               (finish (if (:error r) r (assoc r :usage (:usage parsed)))))))))
     (doto (.-stdin child) (.write (stream-json-line content)) (.end))))
@@ -533,7 +626,9 @@
                                            "upstream_error")}})))
                   (do (log "<-" model (str ms "ms")
                            (str (count (str (:text result))) "B")
-                           (str "calls=" (count (:tool-calls result))))
+                           (str "calls=" (count (:tool-calls result)))
+                           (when-let [n (:salvaged result)]
+                             (str "salvaged=" n)))
                       (if stream?
                         (send-stream res id model result)
                         (send-completion res id model result))))))))))))
