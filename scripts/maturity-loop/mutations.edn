@@ -41,7 +41,114 @@
  :isolation :worktree
 
  :suites
- [{:repo "orgs/cloud-itonami/tsukuru-manufacturing-artifacts"
+ [{:repo "orgs/cloud-itonami/org-un-isic"
+   :label "org-un-isic ingest catalog —— 出所の pin と、それが何であるかの測定"
+   ;; catalog.edn は 2 つの別々の腐り方をする。
+   ;;
+   ;;   pin の側は、committed なファイルが再生成されて digest が追随しない形。
+   ;;   catalog を信じた consumer は、矛盾するはずだった bytes に触らない。
+   ;;
+   ;;   測定の側はもっと速く腐る。428 クラスのうち 381 が UN の ISIC Rev.4 と
+   ;;   一致し、残り 47 はこれこれ、と書いてある。data/classes のタイトルを
+   ;;   1 つ編集すればその数字は全部古くなるが、ファイルは自信のある過去形で
+   ;;   主張し続ける。参照表 2 つは意図的に commit されていないので offline で
+   ;;   verdict を導き直すことはできない —— できるのは、**測った対象が動いたら
+   ;;   verdict を無効にする**ことで、それが :titles-digest である。
+   ;;
+   ;; そして正確さではなく誠実さの側の不変条件が 1 つ。出所が不明な表は不明と
+   ;; 言い続けなければならない。unpinned な表の隣にもっともらしい URL を書くのは
+   ;; data/PROVENANCE.edn がまさに記録している誤りで、その記録の言葉では
+   ;; 「disputed な表に authoritative に見える pin を与えるのは、それが埋める
+   ;; ように見える穴より悪い」。
+   ;;
+   ;; 10 件とも pin 431ef166 で landing 前に実際に赤くなるところを見た。
+   ;; anchor は一意、噛んだ invariant は名前まで一致、無改変で exit 0。
+   ;; さらに拒否床 6 件（入力が読めない / dataset が空 / :sources が空 /
+   ;; EDN が 1 form でない）が **exit 2** を返すことも確認した —— 0 でも 1 でも
+   ;; ない値でなければ、「測れなかった」が「測って問題が無かった」と同じ顔をする。
+   ;;
+   ;; その拒否床が test 自身の穴を 1 つ見つけている: `read-string` は最初の
+   ;; form だけ読んで残りを捨てるので、map が早く閉じて後ろにゴミが続く EDN が
+   ;; **clean として通っていた**。CLAUDE.md が heredoc の `\"` について記述して
+   ;; いるのと同じ形。read-edn は text を vector で包んで全部を消費させる。
+   ;;
+   ;; ここに無いもの: 5 つのアドレスが今も 200 を返すかは検査しない。それは
+   ;; この repo についての主張ではないので、落ちても意味が読めない。記録した日に
+   ;; 取得して確かめてある。
+   :cmd ["nbb" "test/catalog_test.cljs"]
+   :green-marker "catalog-check: OK"
+   :mutations
+   [{:id :isic/titles-digest-stale
+     :why "data/classes のタイトルが 1 つ変われば :what-data-classes-is の 381/20/27 は全部古い。参照表が repo に無いので verdict は導き直せない —— 測った対象が動いたことを検出するのが :titles-digest の全仕事"
+     :file "data/classes/0111.json"
+     :find "\"nameEn\": \"Growing of cereals"
+     :replace "\"nameEn\": \"GROWING of cereals"
+     :must-fail ["catalog-titles-digest-matches-tree"]}
+
+    {:id :isic/class-count-drift
+     :why "手で書かれた件数。dataset の実ファイル数と突き合わせられるので、もう一つの手書き数字と比べる必要が無い"
+     :file "catalog.edn"
+     :find ":files 428"
+     :replace ":files 427"
+     :must-fail ["catalog-class-count-matches-tree"]}
+
+    {:id :isic/verdicts-stop-partitioning
+     :why "3 つの verdict が dataset を分割していなければ、結論は主張しているより少ない範囲しか覆っていない。どのクラスも必ずどれか 1 つに入る"
+     :file "catalog.edn"
+     :find ":title-matches-isic-exactly 381"
+     :replace ":title-matches-isic-exactly 380"
+     :must-fail ["catalog-verdicts-partition-the-dataset"]}
+
+    {:id :isic/finding-names-a-vanished-code
+     :why "dataset を去ったクラスについての finding。修理対象の 47 件は下流が読む actionable な一覧なので、実在しないコードが混じると repair が空振りする"
+     :file "catalog.edn"
+     :find "\"6619\" \"8410\" \"9101\"]"
+     :replace "\"6619\" \"8410\" \"9999\"]"
+     :must-fail ["catalog-finding-codes-exist-in-tree"]}
+
+    {:id :isic/finding-count-drifts-from-its-list
+     :why "要約の数字と、その数字が要約している一覧が別々に編集される形。片方だけ直すのが自然な壊れ方"
+     :file "catalog.edn"
+     :find ":title-matches-nace-not-isic 20"
+     :replace ":title-matches-nace-not-isic 21"
+     :must-fail ["catalog-finding-count-matches-list" "catalog-verdicts-partition-the-dataset"]}
+
+    {:id :isic/same-address-cited-twice
+     :why "provenance catalog を実際より豊かに見せる最も安い方法。ingest の指標は URL の出現回数を数えるので、これを塞がないと catalog は水増しの道具になる"
+     :file "catalog.edn"
+     :find ":ramon-retired true"
+     :replace ":also \"https://ec.europa.eu/eurostat/web/nace\"\n   :ramon-retired true"
+     :must-fail ["catalog-cites-each-address-once"]}
+
+    {:id :isic/mirrored-digest-stops-matching-bytes
+     :why "committed なファイルが再生成されて digest が追随しない形。catalog を信じた consumer は矛盾する bytes に触らない"
+     :file "catalog.edn"
+     :find ":sha256 \"fc408f57bd3a4f33c35a4f384ec0010283dd72774892c8d48ae1330a8caeb57f\""
+     :replace ":sha256 \"fc408f57bd3a4f33c35a4f384ec0010283dd72774892c8d48ae1330a8caeb57e\""
+     :must-fail ["catalog-mirrored-digest-matches-committed-bytes" "catalog-agrees-with-rev5-upstream-record"]}
+
+    {:id :isic/rev5-record-drifts-from-catalog
+     :why "同じ pin を 2 つのファイルが持つと、片方だけ更新される機会が 2 つできる。逆向き —— upstream.edn 側を動かしても catalog が気づく"
+     :file "data/rev5/upstream.edn"
+     :find " :sha256 \"fc408f57"
+     :replace " :sha256 \"aa408f57"
+     :must-fail ["catalog-agrees-with-rev5-upstream-record"]}
+
+    {:id :isic/unpinned-table-given-a-plausible-address
+     :why "この repo が丸ごと戒めになっている誤りそのもの。digest 無しでもっともらしい URL を書けば、出所不明の表が出所を持っているように読める"
+     :file "catalog.edn"
+     :find ":source-url :unknown :sha256 :unknown :fetched-at :unknown"
+     :replace ":source-url \"https://unstats.un.org/unsd/publication/seriesm/seriesm_4rev4e.pdf\" :sha256 :unknown :fetched-at :unknown"
+     :must-fail ["catalog-unpinned-table-declares-unknown-provenance" "catalog-addresses-are-declared-sources"]}
+
+    {:id :isic/fetched-source-loses-its-digest
+     :why "取得したと書いてある source から digest が消える形。:pending は「これから測る」に見えるが、比較の再現性はその時点で失われている"
+     :file "catalog.edn"
+     :find ":sha256 \"9f8598cd9460a3ced11743b881f01eb1259d711664e1526a9d0c24e577fb80df\""
+     :replace ":sha256 :pending"
+     :must-fail ["catalog-fetched-source-carries-a-digest"]}]}
+
+  {:repo "orgs/cloud-itonami/tsukuru-manufacturing-artifacts"
    :label "tsukuru artifact catalog vs the dataset it describes"
    ;; index/catalog.datoms.edn says of itself "This file is hand-maintained
    ;; today", and until 2026-08-29 nothing read it. The mutations below are the
