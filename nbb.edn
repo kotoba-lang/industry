@@ -8,11 +8,22 @@
 ;; ns 名が単一セグメント（`placement`）なのは、cljs が `-` を `_` に munge するので
 ;; `fleet-ci.placement` だと `fleet_ci/placement.cljs` を探してしまい、実際のディレクトリ
 ;; `scripts/fleet-ci/` と一致しないため。root scripts の慣習（`(ns closing-check)` 等）と同じ。
+;;
+;; ⚠ **ここに `:deps` を書かないこと（2026-08-31、fleet-ci 赤の実測）。**
+;; nbb は cwd の nbb.edn / deps.edn に `:deps` があると、その解決のために
+;; `bb --config <cache>/deps.edn --deps-root <cwd> uberjar` を起動する。これには
+;; **JDK と（初回は）外向きネットワークが要る**。murakumo fleet のノードは JDK 無し
+;; （`/usr/bin/java` は「Unable to locate a Java Runtime」の stub）で外向き HTTPS も無い
+;; ので、**child は依存解決の時点でクラッシュし、gate は中身を実行する前に赤になる**。
+;; 実測 2026-08-30: 983f4bde4d6 でここに datalog の `:deps` が足された直後から、root の
+;; `:nbb-script` gates（fabric-actor-core / funnel-core / gate-core / score-core /
+;; org-id-derivation ほか）が全ノードで「could not run …」で連続赤。operator laptop
+;; （JDK あり）では緑になるため、手実行の緑は環境差の幻影になる。
+;;
+;; sibling repo のソースが必要なときは、**west checkout のパスを明示 classpath に足す**:
+;;   nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" ...
+;; 例: 90-docs/pricing-intelligence/query.cljs の使い方は同ファイルの冒頭コメント参照。
+;; この形なら依存解決は起きず、ノード（tarball 配布に orgs/ が無い場合でも
+;; ship-git-deps! が ~/.gitlibs に置いた tree）で完結する。
 {:paths ["." "scripts/nbb_compat" "scripts/fleet-ci" "70-tools/bmc/src" "70-tools/bmc/test"
-         "70-tools/spotwork/src" "70-tools/spotwork/test"]
- :deps {io.github.kotoba-lang/datalog
-        {:git/url "https://github.com/kotoba-lang/datalog.git"
-         :git/sha "d18513af533917539c56435de6fb1426738da31a"}
-        io.github.kotoba-lang/datom-source
-        {:git/url "https://github.com/kotoba-lang/datom-source.git"
-         :git/sha "19dc98ad5272da6648c27eada8e1ed76cac85d8d"}}}
+         "70-tools/spotwork/src" "70-tools/spotwork/test"]}
