@@ -30,10 +30,15 @@
 ⑧pin 鮮度: 1 回目の走査は **exit 2 / UNRESOLVED 240 of 4252**。240 件を個別に問い直すと全件解決したので、原因は改名でも archive でもなく**負荷下の transient GraphQL 失敗**。2 回目は 4252/4252・UNRESOLVED 0 で完全に答えた。"
 
   :adr/landed
-  "PR #2849 hyakka sha2 classpath（merged）/ PR #2850 ell-edutek annex ポインタ 28 件（merged）/ canvas-ledger 26+2 イベントを ledger-land で直接 main へ / west pin 13 件を 2 commit（c5004f97・e88d89c2）で tip へ前進し、16 repo が checkout==pin==tip になったことを検証 / branch 7 本と worktree 5 つを archive の上で退役、merged remote branch 2 本を削除（どちらも behind_by=0 を確認してから）。"
+  "PR #2849 hyakka sha2 classpath（merged）/ PR #2850 ell-edutek annex ポインタ 28 件（merged）/ canvas-ledger 26+2 イベントを ledger-land で直接 main へ / west pin 13 件を 2 commit（c5004f97・e88d89c2）で tip へ前進し、16 repo が checkout==pin==tip になったことを検証 / branch 7 本と worktree 5 つを archive の上で退役、merged remote branch 2 本を削除（どちらも behind_by=0 を確認してから） / **PR #2855**（merge commit 1f2fcd5a）: projection の counts を batch 単位から corpus 単位へ。この ADR の初版が ① で書いた原因記述は誤りで、その訂正も #2855 に含む。"
 
   :adr/not-done
-  "①**canvas-ledger の seq 衝突が最大の未修正**。gate は exit 1（362 vs baseline 333）、387 イベントが自分の id を持たない。原因は `gftd.ledger/append!` がローカルファイルから max を読み、読みと書きの間で誰もファイルを保持しないこと。今データが失われていないのは bmc-dual-write が 08-19 から失敗しているからで、**projection を直した瞬間に発火する**（:db/id が bmc.event/<seq> で cardinality-one upsert = 2 件目が 1 件目を置換する）。
+  "①**canvas-ledger の seq 衝突は半分だけ直った。この ADR の初版はここを誤って書いていた。**
+初版は「projection を直した瞬間に発火する」と書いたが、**projection は既に直っていた** —— `event->entity` は衝突した seq を `bmc.event/<seq>-<digest>` に分ける実装を持っていた。初版はそれを読まず、`verify-ledger-seq-collision.cljs` の header コメント（projection 修正より前に書かれたもの）を測定値として引用した。**コメントを測定の代わりに使った**という、この ADR 自身が別の項で戒めている形。
+
+実際に残っていた欠陥はもっと狭い: **その分岐は batch しか見ていなかった。** `dual-write-kotobase!` は `append!` が今 stamp した 1〜3 件だけを helper に渡すので、`seq-counts` は slice 上で数えており、**既に projection 済みの歴史的イベントと seq が衝突する新イベントは自分の batch の中では一意に見える** —— bare な `bmc.event/<seq>` を取り、cardinality-one upsert がその歴史的イベントを置換する。PR #2855 で修正（counts を corpus 単位で渡す。不変条件は『あるイベントの :db/id は単独で projection しても corpus と一緒に projection しても同じ』）。両方向で証明: 2-arity を slice 数えに戻すと当該テストだけが 3 失敗、戻すと 363 assertion が全通過。
+
+**まだ直っていないのは writer 側**。`gftd.ledger/append!` は依然 `(inc (max ...))` を、読みと書きの間でファイルを保持せずに stamp する。gate は exit 1 のまま（362 vs baseline 333、387 イベントが自分の id を持たない）で、これは #2855 では動かない —— #2855 は衝突が**イベントを食う**のを止めただけで、既存 362 件の修復も新規発生の停止もしていない。なお dual-write の失敗は namespace load から **401 Unauthorized** に変わっており、書き込み開始まで auth 修正 1 つの距離にある。
 
 ②cloud-itonami app の常駐 server は west checkout ではなく `~/.cloud-itonami/releases/81a29545…` から走っており、pin より **28 commit 古い**。checkout を同期しても窓の中身は変わらない。release を切るのは credential を持つ常駐サービスへの deploy なので、依頼の範囲外として実施していない。
 
@@ -50,7 +55,7 @@
 ⑧未測定: shallow checkout 86 件（session 開始時の値、再測定していない）/ orgs detector の standing findings（compliance-scope 8・dependency-vulnerabilities 6・malware-protection 4・source-nul-bytes 新規 3）/ 最後の pin 前進以降の drift。"
 
   :adr/resume-point
-  "次の 1 手は `gftd.ledger/append!` の修正（seq を採る前に origin から同期する。ADR-2607254000 が別台帳で同じ結論を出している）。検査は `nbb scripts/verify-ledger-seq-collision.cljs`（exit 0 = baseline 以下）。app を現行コードに載せるなら release を `a70f7ca` で切り、同時に plist の 4 要素目を削る。fleet の :review 495 ファイルは slug 衝突 24 組をどちらの写しで採るか決めるまで着地させない。"
+  "次の 1 手は `gftd.ledger/append!` の writer 修正（seq を採る前に origin から同期する。ADR-2607254000 が別台帳で同じ結論）。これが新規衝突を止める唯一の場所で、#2855 は下流の被害だけを止めている。検査は `nbb scripts/verify-ledger-seq-collision.cljs`（exit 0 = baseline 以下）。既存 362 件の修復は別問題で、`bmc.event/<seq>-<digest>` 側が既に読めるので急がない。app を現行コードに載せるなら release を pin で切り、同時に plist の 4 要素目を削る。fleet の :review 495 ファイルは slug 衝突 24 組をどちらの写しで採るか決めるまで着地させない。⚠ dual-write helper は**どの checkout から走らせても、そこに新しい Ed25519 identity を黙って作る**（gitignored）。worktree を捨てる前に `.bmc-kotobase-identity.hex` の有無を見ること。"
 
   :adr/related ["adr-2607173100-murakumo-main-alias"
                 "adr-2607254000-ledger-append-sync-before-seq"
