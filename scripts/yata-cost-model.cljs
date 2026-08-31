@@ -201,3 +201,28 @@
   (println (str "  → **書込の多いテナントを R2 に置かない**が routing の不変条件。"))
   (println (str "     破ると保存 1 TB・書込 1 TB/月 で原価 $" (r2 (+ 15.0 r2-write-tb))
                 " 対 収入 $8。掲示価格では吸収できない")))
+
+;; ══════════════════════════════════════════════════════════════════════
+;; step 3（YATA を x402 に載せる）の SKU の粒度 —— ADR-2608313400
+;; 保管は時間あたり、x402 は要求あたり。**1 回払いで何を買うのか**を決めない
+;; 限り載らない。決めるための算数がこれ。
+;; ══════════════════════════════════════════════════════════════════════
+(def posted-usd-per-tb-month 8.0)                        ; ADR-2608313100
+(def posted-usd-per-gb-month (/ posted-usd-per-tb-month 1024.0))
+
+(println)
+(println "══ step 3: 1 回払いで保管を売ると、取引額が決済より小さくなる ══")
+(println (str "  掲示 $" posted-usd-per-tb-month "/TB月 = $"
+              (/ (js/Math.round (* posted-usd-per-gb-month 1e8)) 1e8) "/GB月"))
+(doseq [mib [4.0 1.0]]
+  (doseq [months [1 12 60]]
+    (let [usd (* (/ mib 1024.0) posted-usd-per-gb-month months)]
+      (println (str "  " mib " MiB x " months " か月 = $"
+                    (/ (js/Math.round (* usd 1e8)) 1e8))))))
+(println "  比較: 現行 SKU は /x402/ipfs $0.001・/x402/xrpc $0.002、Base の gas も $0.001 オーダー")
+(println "  → **4 MiB を 5 年保管しても $0.0018。read 1 回より安い。**")
+(println)
+(println "══ 意味のある取引額にするには、まとめて売るしかない ══════════")
+(doseq [usd [0.01 1.0 8.0]]
+  (println (str "  $" usd " = " (r2f (/ usd posted-usd-per-gb-month)) " GB月 = "
+                (r2f (/ (/ usd posted-usd-per-gb-month) 1024.0)) " TB月")))
