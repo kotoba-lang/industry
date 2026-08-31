@@ -41,7 +41,11 @@
    "murakumo 口座（seller の受け先）は台帳にまだ存在しない。credits_admission/admit-transfer は宛先の事前存在を要求しないので、最初の支払いが口座を作る"
    "既存の買い手ツールは 2 本とも人手前提と自分で書いている: nexus-x402/examples/infer-memory-buyer.mjs『Private keys never enter this script. Transfer the required USDC to payTo on Base』/ cloud-murakumo-llms-codex/scripts/x402_dogfood.cljs『This tool NEVER holds a key, signs, or moves funds』"
    "USDC rail の live scheme は transaction（先に自分で送金 → txHash を提示）。1 request = 1 on-chain tx で、$0.001 の read に gas がかかる。exact（EIP-3009、gasless）は pay.x402/payload-errors の検証側に実装済みだが、live の seller は 1 件も掲示していない"
-   "着地後の実測: bot は live challenge を読み、:buyer/scheme-not-allowed で拒否し、拒否した offer（transaction/base/10000）を名指しした。口座残高は {:reachable? true :known? false :credits 0}"]
+   "着地後の実測（credits offer が出る前）: bot は live challenge を読み、:buyer/scheme-not-allowed で拒否し、拒否した offer（transaction/base/10000）を名指しした。口座残高は {:reachable? true :known? false :credits 0}"
+
+   "**deploy 後の実測（2026-08-31、両レール）**: murakumo の challenge accepts が 2 件（transaction/base/10000 と credits/murakumo/1）、kotobase も 2 件（transaction/base/1000 と credits/murakumo/0.1）。bot は両方で credits を選び、支払いを送り、**credits payment not settled: insufficient-credits** を受けた —— envelope は decode され、credits gate に routing され、残高だけが無い"
+
+   "**配線しながら見つけた欠陥 3 つ（どれも『払ったのに払っていないことにされる』形）**: ① pay/payment-header が payment の **map** を base64 していた（encode-header は直列化済み文字列を取る）。facilitator の decode が throw して nil を返し、**nil は『ヘッダ無し』と同じ枝**なので、正しく scope した CACAO を持つ buyer が『X-PAYMENT header is required』と言われた ② nexus の decode-payment がその nil を返していたので、壊れたヘッダと無いヘッダが区別できなかった（今は 400 malformed X-PAYMENT）③ buyer の parse-amount が整数しか読まず、kotobase の 0.1 credit を :buyer/unreadable-amount にしていた。**storage rail はその 1 点だけで到達不能だった**"]
 
   :adr/problem
   "オーナー指示（2026-08-31）「do it」——『itonami CLI bot がそれぞれ wallet を持ち、
@@ -128,8 +132,10 @@ X-PAYMENT を付けて再送し、支出を append-only に記録する。**人�
 **まだ通っていないこと（正直に）**:
 
 1. **正の経路は production で 1 度も通っていない。** ADR-2608150100 が同じ文で
-   『未実証』と書いた状態がまだ続いている。今日直したのは、その経路に**到達できる
-   ようにした**ところまで。
+   『未実証』と書いた状態がまだ続いている。今日届いたのは
+   **`insufficient-credits`** まで —— envelope は decode され、credits gate へ
+   routing され、残高だけが無い。**CACAO 検証が通ったことは主張しない**
+   （残高検査は台帳の transfer より手前にある）。
 2. **bot の口座に残高が無い。** 名簿に載せることは permit であって funding ではない。
    資金供給は operator の credits 口座から bot へ transfer する操作で、**operator の
    鍵を要する**。これは owner の 1 手であって agent の 1 手ではない。
@@ -148,7 +154,13 @@ X-PAYMENT を付けて再送し、支出を append-only に記録する。**人�
 facilitator が鍵を持たないこと、USDC rail の価格と宛先。"
 
   :adr/evidence
-  ["kotoba-lang/pay 7db004a2（buyer が credits を読み、2 rail を金額順に並べない。19 tests / 67 assertions、負の control 3 本）"
+  ["**live 2026-08-31 deploy 後**: murakumo.cloud/.well-known/x402 と kotobase.net/.well-known/x402 がどちらも credits を宣言し、POST /apply で registry に入り、両 seller の 402 challenge が accepts 2 件を返す"
+   "kotoba-lang/pay bc4feaf1（payment-header が host の JSON serializer を必須引数に取る）/ 6cd37647（ledger rail の小数を読む。77 tests / 371 assertions）"
+   "network-awai/nexus-x402 1aa75e5e（decode できないヘッダを 400 malformed X-PAYMENT にする。82 tests / 362 assertions、Worker の fetch handler を実際に駆動する suite）"
+   "net-kotobase/control-plane fd37bf4d（読み取りを 0.1 / 0.2 credit で価格付け。9 tests / 64 assertions）。deploy: net-kotobase version 453cd026"
+   "deploy: murakumo-cloud version 3d030efe（lease token の kagi item MURAKUMO_CLOUD_SITE_TOKEN_SECRET_2 が存在せず、script が明示する --bootstrap で deploy した。lease は concurrency guard であって authorization ではない。**この item が無いこと自体が既存の gap**）"
+   "west pin a5a4c45c（pay / nexus-x402 / control-plane の 2 巡目）"
+   "kotoba-lang/pay 7db004a2（buyer が credits を読み、2 rail を金額順に並べない。19 tests / 67 assertions、負の control 3 本）"
    "network-awai/nexus-x402 bdc88235（/apply が credits を運ぶ。60 tests / 266 assertions、負の control 3 本）"
    "network-awai/cloud-murakumo aa277402（document が credits を宣言する。18 tests / 93 assertions、負の control 2 本）"
    "com-junkawasaki/root: scripts/x402_bot_pay.cljs + scripts/x402_bot_pay_test.cljs + manifest/bot-allowances.edn（11 tests / 27 assertions、負の control 4 本）"
