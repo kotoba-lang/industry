@@ -264,4 +264,36 @@ blob** と照合し、一致するものだけ（= 純粋な staleness、15 件�
 | `x402.nexus/gateway/kotobase/…`（無支払い） | **402**。flag を持たない seller は 1 つも挙動が変わっていない |
 | wiki の無料 route 8 本 | 全部 **200** |
 
-`nexus-x402` version `cd105023` / `app-hyakka` version `442c1160`。"}]
+`nexus-x402` version `cd105023` / `app-hyakka` version `442c1160`。
+
+### 支払って歩いた —— この面が「はい」と言ったのはこれが初めて（2026-08-31、live）
+
+それまでこの面が live で見せていたのは 402 / 403 / 400 だけで、**granted → 実際に rows を返す**方向は stub index に対する test でしか証明されていなかった。オーナーが $0.05 を送金し、on-chain から特定して実測した。
+
+**決済**: Base block 50687650、USDC **50000 micros**、`0xe255d685…` → payTo、99 confirmations。tx は `eth_getLogs`（keyless Base RPC）で window 内に 1 件だけ在ることを確認して同定した。
+
+| 何を | 結果 |
+|---|---|
+| `X-PAYMENT`（transaction scheme）付きで 2 hop の walk | **200**。`settlement.success: true`、rows 7、`index-requests 12`、各 row が `path`（company → game → platform）を持つ |
+| 返ってきた pass | biscuit v3、546 文字、`resource: kotoba://graph/hyakka/*`、`expires` は 15 分後、`holder` は payer address |
+| **その pass だけで 2 本目の walk**（無支払い） | **200**、rows 1。`settlement` は返らない = 決済していない |
+| **同じ tx を replay** | **402** `payment not spendable: payment-exhausted`。1 支払い = 1 pass が予算として効いている |
+
+**そして減衰**。`org-biscuitsec` に `wire/append-block` が無く、multi-block は全部手組みの model だったので、「holder が narrow できる」は**形式の主張**でしかなかった。書き手を実装して、live の pass を **wiki が一度も見たことのない鍵**で（token 自身が運ぶ proof secret を使って）1 ブロック足した:
+
+| 何を | 結果 |
+|---|---|
+| narrowed pass + 自分の dataset (`game-kouryaku`) | **200**、rows 4、`depth: 2`、`resource: …/game-kouryaku` |
+| **同じ** narrowed pass + 別 dataset (`isic`) | **402**（scope 外） |
+| **元の広い pass** + その同じ `isic` | **200**、rows 4 |
+
+3 行目が control。これが無ければ 2 行目の 402 は「query が壊れていた」でも同じ顔をする。
+
+### 同時に見つけた、まだ直っていない食い違い
+
+**paid walk が歩く索引の母集団と、`/api/v1/datasets` が広告する母集団が違う。** walk は IPFS の content-addressed 索引（147,908 item）を歩くが、その索引は **game-kouryaku / wikidata の corpus だけ**で、equipment・chotatsu 等は bundled snapshot（2,761 item）側にしか無い。実測: `linked-by prop/manufacturer` → `equipment/manufacturer/Mitutoyo` は **subjects 0**。
+
+catalogue は 15 dataset すべてに `metered-access: \"/x402/query\"` と書いているので、**買い手は歩けない dataset に対して pass を買える**。402 も 403 も出ず、空の答えが返る —— このリポジトリ自身が何度も名指ししている「測れなかったことが、測って何も無かったことと同じ顔をする」形である。
+
+直し方は 2 つあり、どちらも小さくない: 索引を全 corpus に広げるか、`:metered-access` を索引に載っている dataset にだけ書いて残りは無料面だけを名乗るか。**今日は測っただけで直していない。**
+"}]
