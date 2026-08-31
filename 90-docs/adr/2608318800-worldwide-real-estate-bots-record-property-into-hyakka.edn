@@ -110,24 +110,30 @@ passes. Neither direction was assumed.
 - `verify_bundle.py` passes: 6 prompts, 6 isolated evidence scopes, 11 scope
   boundaries.
 
-## Known, and not caused by this work
+## The model, measured twice on the day it landed
 
-The bots are on `murakumo-main`, not on a free OpenRouter model. The
-`hyakka-model-refresh` job REFUSED at install time because ~/.hermes/config.yaml
-now carries top-level keys the resolver does not own (`_config_version`,
-`agent`, `plugins`), written by a Hermes config-format migration. It left every
-bot's model exactly as it was, which is the correct behaviour and the reason
-the refusal is visible at all.
+At install the bots were left on `murakumo-main`, because
+`hyakka-model-refresh` REFUSED: a Hermes config-format migration had added
+top-level keys the resolver does not own (`_config_version`, `agent`,
+`plugins`), and it left every bot's model exactly as it was — the correct
+behaviour, and the reason the refusal was visible at all. `murakumo-main` was
+probed rather than assumed (HTTP 200, alias-for `qwen3.8-27b`, status
+`serving`), so the fallback would have carried them.
 
-`murakumo-main` was probed rather than assumed: HTTP 200, alias-for
-`qwen3.8-27b`, status `serving`. So these bots run today on the documented last
-entry of the fallback chain.
+By closing the same day, another session's `carry-forward` fix for that
+refusal had been installed into `~/.hermes/scripts/resolve_free_model.cljs`
+and the refresh had run. Measured from `~/.hermes/cron/jobs.json`: all six
+jobs are on `z-ai/glm-5.3-flash` / `openrouter-free`. Nobody named them —
+the refresh covers every agent-driven job by default, which is exactly why a
+name list is worse than none: it does not fail when a bot it has never heard
+of appears.
 
-An uncommitted `carry-forward` fix for exactly this refusal exists in another
-session's working tree in the shared checkout, so it was not touched here. When
-it lands, the refresh picks these six up without being told their names —
-coverage is the default, and a name list is worse than none because it does not
-fail when a bot it has never heard of appears.
+Two things are worth keeping from that sequence. The refusal was a
+measurement and was reported as one, so the ADR did not have to be wrong to
+be current. And the fix is installed but is still not committed to `main`,
+so the reviewable original under `scripts/hermes-hyakka-bots/` and the copy
+Hermes actually runs have drifted — the hazard that directory's README names
+about itself.
 
 ## Consequences
 
