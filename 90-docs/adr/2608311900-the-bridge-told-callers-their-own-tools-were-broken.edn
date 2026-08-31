@@ -222,17 +222,85 @@ serve 一覧の両方を含むことを assert している。
 model 名を持ったまま fallback する設計は hermes 側の話で、ここで直すのは
 「その要求が来たときに正直で再試行不能な答えを返す」ことだけ。
 
+## live の証拠が出そろった（2026-08-31 追記）
+
+**salvage は実際に発火した。** fleet 全体に health ping を投げた際の bridge log:
+
+    <- claude-sonnet-5 ...ms ...B calls=1 attempts=1 salvaged=1
+
+`/health` の累計は `runs=29 with-attempts=13 salvaged=1`。**45% の run が今も
+caller の道具に直接手を伸ばしており**、そのうち 1 本は自力で立ち直れず、床が拾った。
+上の「12 run で試行 7・salvage 0」に「だから床は要らない」と読める余地はもう無い。
+
+**400 も発火した。** 同じ窓に `-> murakumo-main 1 block(s) tools=1` が来て
+`<- ERROR ... this bridge does not serve model \"murakumo-main\" -- it serves …`
+で即座に返った。**`tools=1` の auxiliary 呼び出し**であり、codinator の
+compression と同じ形。以前ならここで 502 が返り、hermes が 3 回叩いていた。
+
+## fleet ping — 24/24 が応答した（2026-08-31）
+
+各 profile に「今ツールを呼べるか。呼べるなら 1 つ実行して答えよ」を投げた。
+
+    24 profile 中 24 が応答（exit 0）
+    22 が実際に tool を実行したと報告（date / echo / web_search の実結果つき）
+     2 が「呼べない」と回答
+
+⚠ **最初の測定は嘘だった。** 並列 5・上限 180s で回したところ 13 本が exit 124 に
+なり、危うく「13 bot が無応答」と報告するところだった。**それは私の timeout で
+あって bot の障害ではない** —— 並列 3・上限 420s で回し直すと 15 本すべてが
+31〜243s で正常応答した。負荷の高いマシンで測った timeout を、対象の性質として
+報告しない。
+
+**「呼べない」と答えた 2 本は、自己申告を鵜呑みにせず測った。**
+
+- `bridgetestclone` —— hermes が **tools=0 で問い合わせている**（ping 窓で
+  tools=0 はこの 1 本だけ）。しかも走ったのは claude-bridge ではなく
+  **cursor-bridge (9181) の `cursor-grok-4.6-high`**。bridge の欠陥ではない。
+- `itonami-sales` —— 「この profile は設計上 tool 無しで動く」と答えたが、
+  **config に toolsets 制限は無い**。bridge log の対応行は
+  `calls=0 attempts=1`（応答 179B ≒ 保存された 182B）。つまり**道具に手を伸ばし、
+  拒否され、自分の言葉で言い訳を書いた** —— 拒否文の literal を含まないので
+  salvage の条件（空 or 配管の話）に当たらなかった。**bot の自己説明は測定ではない。**
+
+## detector 自身が、見えていない窓を見たと言っていた
+
+`verify-hermes-agent-health` は `errors.log` **1 本だけ**を読み、`48h` と印字して
+いた。実際に読めていたのは rotation を生き延びた分だけである。
+
+同じ日、desktop クライアントが **存在しない session へ永久にポーリング**していて
+（`948207dd` に加えて新しく `5bced081` も。**どちらも state.db に無く、
+`gateway_routing` は空**なので、stale id はクライアントのメモリにしかない）、
+errors.log の **96.3%** がその 1 行、生き残っていた最古の行は **55 分前**だった。
+
+rotate 済みの `errors.log.1` / `.2` も読むようにして両方向を比べた:
+
+    live のみ:      LOGSPAN full=24/26   `<root>` の compression 所見が無い
+    rotate 込み:    LOGSPAN full=25/26   その所見が戻る
+
+**洪水は実際に所見を 1 件消していた。** さらに `LOGSPAN` を常に印字し、
+rotation で欠けた profile（TRUNCATED）と、単に履歴が短いだけの profile（YOUNG）を
+分けて報告する —— **fleet の最小値を取ると、1 分前にできた log 1 本が全体を
+0.0h に引きずり、他が健全であることを隠す。**
+
 ## 直していないもの
 
 - **`approval.pending` の busy poll**: 11:08–11:19 の 11 分で 1,573 行、全部同じ
   reaped session (`948207dd`) に対する `session-scoped RPC rejected`。upstream
   hermes の desktop client 側の polling で、errors.log を実質使えなくしている。
   この repo のコードではない。
-- **salvage が発火した live の実例はまだ無い。** 12 run で試行 7・salvage 0 ——
-  つまり「試行してから諦める」側にまだ当たっていない。stub では両方向を出して
-  いるので床の正しさは示せているが、live の発火例は `/health` の `salvaged` が
-  0 から動いた時点で得られる。**それまで「salvage は要らなかった」と読まない**
-  —— 要らなかったのではなく、当たっていないだけである。
+- **salvage は「自分の言葉で諦めた」run を拾えない。** 条件が「返答が空 or
+  拒否文の literal を含む」なので、`itonami-sales` のように model が自分の言葉で
+  言い訳を書くと素通りする。実測 29 run 中 `calls=0 attempts=1` が 4 本あり、
+  そのうち何本がこの形かは分けられていない。条件を「試行があれば常に」まで
+  広げると、拒否された後に**普通に答えた** run（`recovered`）を壊すので広げて
+  いない。分けるにはテキスト以外の手がかりが要る。
+- **approval.pending の永久ポーリングは止めていない。** 停める手は Hermes
+  desktop の再起動だけだが（launchd の job は `not running` で、動いている
+  pid 25535 は PPID 1 の別インスタンスなので `kickstart` は効かない）、
+  **その時点で operator の session が稼働中だった**（数秒おきに terminal を
+  実行して各 profile の cron を点検していた）。log ノイズを直すために稼働中の
+  turn を中断するのは割に合わない。detector 側は rotate 済みを読むようにして
+  実害を消したので、再起動は operator の都合のよいときでよい。
 - **`bridgetestclone` は tools=0 で問い合わせている**（ping 24 本中この 1 本だけ）。
   bridge は宣言が無いので正しく「道具は無い」と答え、bot も正しくそう報告した。
   つまり bridge の欠陥ではなく、その test clone 固有の profile 設定。姉妹の
