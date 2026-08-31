@@ -1,0 +1,68 @@
+{:system/id :world-real-estate-investment-and-purchase
+ :mission "Continuously build a provenance-preserving worldwide ontology of real property, land rights, recorded transactions, official valuations, encumbrances, listed and unlisted real-estate investment vehicles, and the jurisdiction-specific procedure, tax and restriction of buying property."
+ :wiki-target "network-awai/app-hyakka"
+ :hyakka-corpus "fudosan"
+ :itonami-candidates ["cloud-itonami/real-estate"
+                      "cloud-itonami/mortgage-registry"
+                      "cloud-itonami/cloud-itonami-isic-6810"
+                      "cloud-itonami/cloud-itonami-isic-6820"
+                      "cloud-itonami/cloud-itonami-isco-3334"]
+ :coverage-unit [:jurisdiction :registry :source :language :year :property-class :tenure :identifier-class]
+ :entity-types [:parcel :building :dwelling-unit :property-address
+                :land-right :tenure :freehold :leasehold :condominium-right
+                :title-record :land-registry :cadastre :registrar
+                :recorded-transaction :price-paid-observation :listing-observation
+                :official-valuation :assessed-value :price-index
+                :encumbrance :mortgage-record :lien :easement
+                :real-estate-fund :reit :fund-vehicle :management-company
+                :portfolio-disclosure :property-holding-observation
+                :purchase-procedure-step :required-document :notarial-act
+                :transfer-tax :stamp-duty :registration-fee :recurring-property-tax
+                :foreign-ownership-restriction :zoning-designation :planning-permission
+                :brokerage-licence :jurisdiction :regulator :filing]
+ :identifiers [:cadastral-parcel-id :title-number :land-registry-id :unique-property-reference
+                :lei :company-registration-number :cik :official-registry-id]
+ :required-common-fields [:source-url :source-class :source-language :observed-at
+                          :content-hash :issuing-entity :jurisdiction :asserted-at
+                          :currency-when-monetary :area-unit-when-dimensional]
+ :source-policy
+ {:allow [:official-land-registry :official-cadastre :official-statistics-agency
+          :official-tax-authority :official-regulator :official-securities-filing
+          :official-stock-exchange-filing :official-municipal-planning-authority
+          :official-central-bank :fund-first-party :manager-first-party]
+  :discovery-only [:licensed-commercial-aggregator :news-report :brokerage-portal]
+  :forbid [:search-snippet :generated-summary :scraped-directory :social-post
+           :broker-list-as-fact :paywall-bypass :captcha-bypass
+           :inferred-ownership :inferred-valuation :automated-valuation-as-fact
+           :personal-wealth-inference :individual-owner-identification]}
+ :epistemic-boundaries
+ [:listing-asking-price-is-not-a-transaction-price
+  :recorded-transaction-price-is-not-current-market-value
+  :official-or-assessed-valuation-is-not-market-price
+  :price-index-is-not-a-property-level-price
+  :registered-title-is-not-beneficial-ownership
+  :mortgage-record-is-not-current-debt-outstanding
+  :portfolio-disclosure-is-an-observed-claim-not-a-current-holding
+  :planning-permission-is-not-a-completed-building
+  :zoning-designation-is-not-permission-to-build
+  :announced-acquisition-is-not-a-completed-transfer
+  :estimated-or-automated-valuation-is-not-a-verified-valuation
+  :rental-yield-is-derived-not-observed
+  :area-figures-differ-by-measurement-standard-and-are-not-interchangeable
+  :currency-amounts-are-nominal-at-their-own-date-not-comparable-without-a-stated-basis
+  :a-parcel-is-not-a-building-and-a-building-is-not-a-dwelling-unit
+  :missing-is-unmeasured
+  :worldwide-is-a-coverage-goal-not-a-completeness-claim]
+ :privacy-boundaries [:legal-entities-and-public-professional-roles-only
+                      :no-natural-person-owner-identification
+                      :no-personal-residential-address-linkage
+                      :no-occupancy-or-household-data
+                      :no-personal-contact-data :no-personal-wealth
+                      :no-mortgage-borrower-identification
+                      :no-sensitive-trait-inference :no-neighbourhood-desirability-ranking]
+ :run-bounds {:sources-per-run 2 :jurisdictions-per-run 2 :prs-per-run 1}
+ :safety-boundaries [:no-investment-advice :no-property-valuation-service
+                     :no-autonomous-purchase-bid-offer-or-trade
+                     :no-outreach-or-solicitation :no-financial-commitment
+                     :no-ledger-hand-edit :no-shared-orgs-worktree-write
+                     :no-direct-main-push :no-force-push :no-merge :no-deploy]}
