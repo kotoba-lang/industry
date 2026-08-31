@@ -129,4 +129,54 @@ iOS platform が入っていない（`xcodebuild: error: … iOS 26.5 is not ins
 - `cloud-itonami/cloud-itonami-app` PR #245 → main `a70f7ca`（`docs/adr/0087`、`mobile/`、
   `app.mobile.kotoba.edn`、edge CORS）
 - edge Worker 再 deploy（version `b26cb27a-96db-4df3-8c5f-b8f3dbf6f08a`、workers.dev のみ）
+
+
+## 残っている gap（優先順）
+
+1. **iOS が一度もコンパイルされていない。** この machine の Xcode 26.6 に iOS platform が
+   無い。`xcodebuild -downloadPlatform iOS`(≈10 GiB) を実行できる空きがあるときに、
+   `app build --target ios --execute` を通す。scaffold は既に通っている（xcodegen 込み）。
+2. **実アップロード未実施**（App Store Connect / Play track）。`app package` は署名が
+   構成されていなければ拒否するので、まず `:apple/team-id` と keystore を manifest / 環境に
+   与えるところから。ワークスペース全体では別経路（Capacitor + fastlane）で ASC 到達実績が
+   あるので「不可能」と読まないこと（ADR-2608081200）。
+3. **端末に載っているのは slice 1 だけ。** chat / mail / drive / calendar / 書き込み面は
+   ADR-2608081500 の slice 2〜5。**モバイル側の追加作業は要らない** —— edge に載れば載る。
+4. **Android 実機/エミュレータでの起動確認は未実施**（この machine に AVD も system-image も
+   無い）。bridge 自体は shell 側で実機検証済み（ADR-2608072000）だが、この APK は
+   「ビルドできた」までで「起動して描画した」ではない。
+5. **共有 checkout の追随**: `orgs/cloud-itonami/cloud-itonami-app` は 15f425c のまま
+   （pin は a70f7ca）。superproject の共有 checkout が 97 commit 遅れ・216 ファイル
+   未コミット・index.lock 保持中（別セッション作業中）だったため、west を回していない。
+
+## 次に着手するときの起点
+
+```bash
+# 1. バンドルを建てて検査する（dist/ は build 出力、index.html だけ committed）
+cd orgs/cloud-itonami/cloud-itonami-app/mobile
+npm install && npm run build          # index:check → dds.css → shadow-cljs release
+clojure -M:test                       # 7 tests / 24 assertions
+python3 -m http.server 8099 --bind 127.0.0.1 --directory dist &
+npx nbb scripts/verify-browser.cljs   # 11/11、実ブラウザ 390x844
+
+# 2. edge 側
+cd ../services/app-edge
+npm run test                                     # fleet-core parity 14/14
+npx nbb test/worker_routes_smoke.cljs https://cloud-itonami-app-edge.04-feasts-minded.workers.dev
+
+# 3. native
+cd ../..
+rm -rf target/kotoba-shell/app        # scaffold は出力を掃除しない
+orgs/kotoba-lang/shell/bin/kotoba-shell app scaffold --target ios --target android \\
+  --manifest app.mobile.kotoba.edn --policy mobile/shell-policy.edn \\
+  --output-dir target/kotoba-shell/app
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \\
+  orgs/kotoba-lang/shell/bin/kotoba-shell app build --target android --execute \\
+  --manifest app.mobile.kotoba.edn --policy mobile/shell-policy.edn \\
+  --output-dir target/kotoba-shell/app
+```
+
+⚠ gradle の transform cache が壊れて `aar-metadata.properties (No such file or directory)` で
+落ちることがある。該当 transform ディレクトリを消しただけでは直らず、**`gradle --stop` で
+daemon を落としてから**もう一度回すと通る（実測 2026-08-31）。
 "}]
