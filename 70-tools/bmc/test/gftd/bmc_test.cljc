@@ -89,7 +89,29 @@
   (testing "the mark lives outside the tree, or a checkout could revert it too"
     (let [p (ledger/hwm-file "/home/u" "/repo/90-docs/business/canvas-ledger.edn")]
       (is (str/starts-with? p "/home/u/.gftd/"))
-      (is (not (str/includes? p "/repo/"))))))
+      (is (not (str/includes? p "/repo/")))))
+  (testing "one ledger is one floor, however many checkouts reach it"
+    ;; Measured 2026-08-31, hours after the floor landed: TWO marks existed for
+    ;; the canvas ledger, because com.gftd.itonami-qwen36-tick builds a fresh
+    ;; sibling worktree per run and deletes it. Keyed on the absolute path,
+    ;; every tick got a new key and therefore a floor of zero -- the writer the
+    ;; floor most needed to constrain was the one it did not.
+    (let [shared "/Users/j/github/com-junkawasaki/90-docs/business/canvas-ledger.edn"
+          tick   "/var/folders/T/itonami-qwen36-1788174887288/90-docs/business/canvas-ledger.edn"]
+      (is (= (ledger/ledger-key "/Users/j/github/com-junkawasaki" shared)
+             (ledger/ledger-key "/var/folders/T/itonami-qwen36-1788174887288" tick))
+          "the same ledger in two checkouts must resolve to one key")
+      (is (= "90-docs/business/canvas-ledger.edn"
+             (ledger/ledger-key "/Users/j/github/com-junkawasaki" shared)))
+      (is (= (ledger/hwm-file "/home/u" "/Users/j/github/com-junkawasaki" shared)
+             (ledger/hwm-file "/home/u" "/var/folders/T/itonami-qwen36-1788174887288" tick))
+          "so both write the same mark file")))
+  (testing "different ledgers still get different floors"
+    (is (not= (ledger/ledger-key "/r" "/r/90-docs/business/canvas-ledger.edn")
+              (ledger/ledger-key "/r" "/r/90-docs/design-quality/design-quality-ledger.edn"))))
+  (testing "with no root to relativise against it still collapses two checkouts"
+    (is (= (ledger/ledger-key nil "/a/b/business/canvas-ledger.edn")
+           (ledger/ledger-key nil "/completely/other/business/canvas-ledger.edn")))))
 
 (deftest governor-invariants
   (let [idx (canvas/index base)
