@@ -4495,4 +4495,259 @@
      :find "(def available? impl/available?)"
      :replace "(def available? (constantly true))"
      :must-fail ["facade-re-exports-the-same-fns"]}]}
+
+  {:repo "orgs/kotoba-lang/logistics"
+   :label "logistics: the tracking contract, the two export surfaces, and the console that must stay read-only"
+   ;; Before this, the suite was 11 tests / 27 assertions, and every export test
+   ;; was a `re-find` over the emitted text. A substring match cannot see a row
+   ;; that stopped having as many fields as its header, a quote that was opened
+   ;; and never closed, or a control character that makes the document
+   ;; unreadable to every conforming parser -- it only reports that some bytes
+   ;; it already knew about are somewhere in the output. So the export tests now
+   ;; decode, with `kotoba.logistics.readback`: an RFC 4180 reader and an RFC
+   ;; 8259 reader written from the grammars and pinned, fixture by fixture,
+   ;; against Python's `csv` and `json` modules. The oracle has its own tests,
+   ;; because a decoder written from the encoder agrees with it by construction.
+   ;;
+   ;; All 29 were replayed by hand at pin 599c8ee on 2026-08-31 before landing,
+   ;; one at a time with the file restored between runs and the tree confirmed
+   ;; clean afterwards: every anchor unique, every bite naming the test that
+   ;; claims the invariant, base green before the battery and after it.
+   ;;
+   ;; Two of the 29 run under nbb rather than the JVM, and neither is visible to
+   ;; `clojure -M:test`. `kotoba.logistics` says of itself that it is portable
+   ;; across JVM / ClojureScript / SCI / GraalVM and nothing had ever run it
+   ;; anywhere but the JVM; `json-hex4` carries a comment saying it avoids
+   ;; Integer interop "that would only work on :clj" and nothing checked that
+   ;; either. This is the shape run.cljs already records: a `#?(:clj int :cljs
+   ;; identity)` mutation scored 0 failures under `clojure -M:test` and 11 under
+   ;; nbb. `kotoba.logistics.ui` is not in the nbb run -- it needs html/css as
+   ;; git deps, and a runner that cannot start reports what a runner that found
+   ;; nothing wrong reports.
+   ;;
+   ;; The nbb runner's three exit codes were each shown to discriminate rather
+   ;; than assumed: dropping a namespace from its list gives exit 2 while still
+   ;; printing "0 failures, 0 errors" and no marker; breaking an invariant gives
+   ;; exit 1 with the failing test named; the unmodified tree gives 0 with the
+   ;; marker. The first version of the floor was set from the JVM totals by
+   ;; mistake and refused its own green run, which is the floor working.
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :logistics/tracking-matched-as-a-substring
+     :why "`re-matches` anchors and `re-find` does not, and they are one word apart in the same form. With `re-find`, a mis-keyed number with the carrier's punctuation still attached passes, and so does a 60-character paste -- each contains a run of eight or more upper alphanumerics somewhere inside it. The old suite only tried well-formed and too-short inputs, so nothing stood between the two spellings"
+     :file "src/kotoba/logistics.cljc"
+     :find "(boolean (re-matches #\"[A-Z0-9]{8,35}\" t))"
+     :replace "(boolean (re-find #\"[A-Z0-9]{8,35}\" t))"
+     :must-fail ["a-tracking-number-must-match-as-a-whole-not-as-a-substring"]}
+
+    {:id :logistics/tracking-ceiling-removed
+     :why "the upper bound of the declared 8..35 interval. The old suite tested 5 and 16 characters, so both ends could move in either direction unobserved -- and a validator with no ceiling accepts a whole pasted email as a tracking number"
+     :file "src/kotoba/logistics.cljc"
+     :find "re-matches #\"[A-Z0-9]{8,35}\" t"
+     :replace "re-matches #\"[A-Z0-9]{8,}\" t"
+     :must-fail ["the-accepted-tracking-length-is-a-closed-interval"]}
+
+    {:id :logistics/tracking-floor-lowered
+     :why "the lower bound of the same interval. A floor of 1 accepts every stray keystroke in the tracking column as a valid number, and the settlement file then reports it as validated"
+     :file "src/kotoba/logistics.cljc"
+     :find "re-matches #\"[A-Z0-9]{8,35}\" t"
+     :replace "re-matches #\"[A-Z0-9]{1,35}\" t"
+     :must-fail ["the-accepted-tracking-length-is-a-closed-interval"]}
+
+    {:id :logistics/normalize-drops-case-folding
+     :why "normalization is case folding AND separator stripping; dropping either half leaves a function that still returns a plausible string for every input. A lower-case tracking number then fails validation while the operator's screen shows it exactly as the carrier printed it"
+     :file "src/kotoba/logistics.cljc"
+     :find "(str/upper-case (str/replace s #\"[ \\-]\" \"\"))"
+     :replace "(str/replace s #\"[ \\-]\" \"\")"
+     :must-fail ["normalization-folds-case-and-strips-the-two-separators-carriers-print"]}
+
+    {:id :logistics/normalize-keeps-hyphens
+     :why "the other half. Carriers print both separators; keeping hyphens means `1Z-999-AA1-0123` is rejected as malformed rather than normalized, which reads as a carrier problem rather than a code one"
+     :file "src/kotoba/logistics.cljc"
+     :find "#\"[ \\-]\""
+     :replace "#\"[ ]\""
+     :must-fail ["normalization-folds-case-and-strips-the-two-separators-carriers-print"]}
+
+    {:id :logistics/status-set-loses-exception
+     :why "the constructor answers nil for a status it does not know, which is the same answer it gives for a genuinely bad one. Narrowing the set therefore does not raise anything -- the exception shipment simply stops existing, and every downstream count is quietly right about a smaller world"
+     :file "src/kotoba/logistics.cljc"
+     :find "#{:booked :picked-up :in-transit :delivered :exception}"
+     :replace "#{:booked :picked-up :in-transit :delivered}"
+     :must-fail ["shipment-accepts-every-declared-status"]}
+
+    {:id :logistics/mode-set-loses-sea
+     :why "same shape for route legs. A sea leg becomes nil, the route still has a length, and the consignment CSV still reports a leg count -- one short"
+     :file "src/kotoba/logistics.cljc"
+     :find "#{:road :rail :air :sea}"
+     :replace "#{:road :rail :air}"
+     :must-fail ["leg-accepts-every-declared-mode"]}
+
+    {:id :logistics/validate-forgets-the-normalized-form
+     :why "a valid result must carry the normalized number. Dropping it leaves `:logistics/valid? true` with a nil normalized form, so both exporters publish an empty normalized column for a number they have just called valid -- and the caller that reads the map without checking the flag gets nil instead of a half-normalized string"
+     :file "src/kotoba/logistics.cljc"
+     :find "{:logistics/valid? true :logistics/normalized (normalize-tracking s)}"
+     :replace "{:logistics/valid? true}"
+     :must-fail ["a-validation-result-carries-an-error-or-a-normalized-form-never-both"]}
+
+    {:id :logistics/validate-accepts-a-non-string
+     :why "`tracking-valid?` and `validate-tracking` answer the same question through different code, and different callers ask different ones -- the console asks one, the exporters ask the other. A change that reaches only one of them splits the operator's screen from the operator's file, and neither looks wrong on its own"
+     :file "src/kotoba/logistics.cljc"
+     :find "(not (string? s))         {:logistics/valid? false :logistics/error :not-a-string}"
+     :replace "(not (string? s))         {:logistics/valid? true :logistics/error :not-a-string}"
+     :must-fail ["the-two-tracking-entry-points-reach-the-same-verdict"]}
+
+    {:id :logistics/consignment-invents-its-own-status
+     :why "a consignment reports the shipment's status rather than having one. A default here shows an exception shipment as booked on the consignment line of the same console, and the two lines disagree without either being obviously wrong"
+     :file "src/kotoba/logistics.cljc"
+     :find ":cons/status     (:shipment/status shipment-record)"
+     :replace ":cons/status     :booked"
+     :must-fail ["a-consignment-takes-its-status-from-the-shipment-it-carries"]}
+
+    {:id :logistics/delivered-predicate-also-answers-for-in-transit
+     :why "the two predicates partition the statuses they name. Widening one so it answers for a neighbour is the plausible edit -- somebody wants `delivered?` to mean 'no longer our problem' -- and every existing assertion about a delivered shipment still holds"
+     :file "src/kotoba/logistics.cljc"
+     :find "(defn delivered? [s] (= :delivered (:shipment/status s)))"
+     :replace "(defn delivered? [s] (contains? #{:delivered :in-transit} (:shipment/status s)))"
+     :must-fail ["the-status-predicates-answer-only-for-their-own-status"]}
+
+    {:id :logistics/a-route-becomes-a-set
+     :why "order is the route. A set has the right leg count, so the console's Legs column and the consignment CSV both stay correct while Tokyo->Nagoya->Osaka silently becomes an unordered bag of legs"
+     :file "src/kotoba/logistics.cljc"
+     :find ":cons/route      legs"
+     :replace ":cons/route      (set legs)"
+     :must-fail ["a-route-keeps-its-legs-in-the-order-they-were-given"]}
+
+    {:id :export/csv-stops-quoting-a-bare-cr
+     :why "RFC 4180 needs CR quoted as much as LF, and every standard reader treats a lone CR as a record boundary -- Python's splits the row into two. This is the regression the file's own comment says was there before; the mutation is a revert to it"
+     :file "src/kotoba/logistics/export.cljc"
+     :find "#\"[\\\",\\n\\r]\""
+     :replace "#\"[\\\",\\n]\""
+     :must-fail ["every-csv-column-survives-a-round-trip-through-an-rfc4180-reader"]}
+
+    {:id :export/csv-stops-quoting-the-separator
+     :why "a warehouse called `Store B, Annex` then becomes two fields. The row still parses, so a reader that only checks for expected substrings finds everything it was looking for -- the failure is only visible to something that counts the fields the reader produced"
+     :file "src/kotoba/logistics/export.cljc"
+     :find "#\"[\\\",\\n\\r]\""
+     :replace "#\"[\\\"\\n\\r]\""
+     :must-fail ["every-csv-export-row-has-as-many-fields-as-its-header"]}
+
+    {:id :export/csv-stops-doubling-an-embedded-quote
+     :why "RFC 4180 section 2.7: a quote inside a quoted field is written twice. Nothing covered this before -- the field is still wrapped in quotes, so the document looks right, and a carrier called `Carrier \\\"Fast\\\" Ltd` ends the field early and shifts every column after it"
+     :file "src/kotoba/logistics/export.cljc"
+     :find "(str \"\\\"\" (str/replace s \"\\\"\" \"\\\"\\\"\") \"\\\"\")"
+     :replace "(str \"\\\"\" s \"\\\"\")"
+     :must-fail ["every-csv-column-survives-a-round-trip-through-an-rfc4180-reader"]}
+
+    {:id :export/csv-header-gains-a-column-the-rows-do-not
+     :why "adding a column to the header and forgetting the row is the ordinary way a CSV export breaks. Every field keeps its own value and every substring assertion keeps passing; only the arity against the header moves"
+     :file "src/kotoba/logistics/export.cljc"
+     :find "[\"shipment_id\" \"origin\" \"destination\" \"carrier\" \"tracking\" \"status\"]"
+     :replace "[\"shipment_id\" \"origin\" \"destination\" \"carrier\" \"tracking\" \"weight\" \"status\"]"
+     :must-fail ["every-csv-export-row-has-as-many-fields-as-its-header"]}
+
+    {:id :export/csv-column-is-renamed
+     :why "downstream settlement importers key on these strings, and the contract is not written down anywhere else. `legs` to `leg_count` is an improvement to read and a breaking change to consume"
+     :file "src/kotoba/logistics/export.cljc"
+     :find "\"consignment_id\" \"shipment\" \"legs\" \"declared_value\" \"status\""
+     :replace "\"consignment_id\" \"shipment\" \"leg_count\" \"declared_value\" \"status\""
+     :must-fail ["csv-headers-are-the-published-column-names"]}
+
+    {:id :export/consignment-legs-column-carries-the-route
+     :why "the column is a count. Putting the route there produces a printed collection full of commas -- which `csv-cell` then quotes correctly, so the row still parses with the right arity and only the value is wrong"
+     :file "src/kotoba/logistics/export.cljc"
+     :find "(count (:cons/route c))"
+     :replace "(:cons/route c)"
+     :must-fail ["the-consignment-legs-column-is-a-count-not-the-route"]}
+
+    {:id :export/json-stops-escaping-the-top-of-the-c0-range
+     :why "RFC 8259 section 7 requires all of U+0000-U+001F escaped. Narrowing the range leaves the common escapes (tab, LF, CR) working, so the export still looks right for every value anyone tests by hand -- and a field carrying U+001F produces a document Python's json module refuses to read"
+     :file "src/kotoba/logistics/export.cljc"
+     :find "(for [i (range 0x20)]"
+     :replace "(for [i (range 0x0a)]"
+     :must-fail ["the-json-export-is-readable-for-every-c0-control-character"]}
+
+    {:id :export/json-hex-digits-come-out-reversed
+     :why "the shift order in `json-hex4`. Reversed, U+0001 is written as \\u1000 -- still four hex digits, still valid JSON, still parses. The value is simply a different character, which no structural check on the document would notice"
+     :file "src/kotoba/logistics/export.cljc"
+     :find "(for [shift [12 8 4 0]]"
+     :replace "(for [shift [0 4 8 12]]"
+     :must-fail ["the-json-export-is-readable-for-every-c0-control-character"]}
+
+    {:id :export/json-stops-escaping-at-all
+     :why "the floor under every JSON field. Removing `str/escape` leaves `json-string-escapes` and `json-hex4` in the file, fully written and never called, which is how this kind of change survives review"
+     :file "src/kotoba/logistics/export.cljc"
+     :find "(str/escape (str (if (nil? v) \"\" v)) json-string-escapes)"
+     :replace "(str (if (nil? v) \"\" v))"
+     :must-fail ["every-json-member-survives-a-round-trip-through-an-rfc8259-reader"]}
+
+    {:id :export/json-tracking-verdict-is-always-true
+     :why "the CSV and the JSON are two renderings of one call to `validate-tracking`, and each spells the verdict differently -- \"yes\"/\"no\" against true/false. Nothing made them stay in agreement, so a change to one is invisible to a test that reads the other"
+     :file "src/kotoba/logistics/export.cljc"
+     :find "\"\\\"valid\\\":\" (if (:logistics/valid? r) \"true\" \"false\") \",\""
+     :replace "\"\\\"valid\\\":\" \"true\" \",\""
+     :must-fail ["the-csv-and-json-tracking-exports-decide-the-same-way"]}
+
+    {:id :ui/tracking-column-uses-raw-hiccup
+     :why "`html.core` escapes text; `[:hiccup/raw ...]` does not, and the stylesheet already goes through it in the same file, so a second use reads as ordinary. The page still renders and the column still shows the right text -- the console has just become an injection surface for anyone who can name a carrier"
+     :file "src/kotoba/logistics/ui.cljc"
+     :find "[:td (str t)]"
+     :replace "[:td [:hiccup/raw (str t)]]"
+     :must-fail ["no-operator-supplied-value-reaches-the-document-unescaped"]}
+
+    {:id :ui/carrier-column-uses-raw-hiccup
+     :why "the same edit one column over, registered separately because the test walks every column an operator-supplied string can reach and a test that only covered the first one would look identical from outside"
+     :file "src/kotoba/logistics/ui.cljc"
+     :find "[:td (:shipment/carrier s)]"
+     :replace "[:td [:hiccup/raw (str (:shipment/carrier s))]]"
+     :must-fail ["no-operator-supplied-value-reaches-the-document-unescaped"]}
+
+    {:id :ui/console-gains-a-dispatch-button
+     :why "the console observes; the governor decides. A control arrives looking like an improvement, and the old test named only `<form` and `<button` -- an `<input`, an `onclick`, or a `<dialog` would have walked straight past it"
+     :file "src/kotoba/logistics/ui.cljc"
+     :find "[:span.badge \"read-only · governor-gated\"]"
+     :replace "[:button \"Dispatch\"]"
+     :must-fail ["the-console-renders-no-write-surface-at-all"]}
+
+    {:id :ui/a-status-loses-its-badge
+     :why "three statuses get a colour and the rest fall through to muted. The fall-through is what breaks quietly: an exception shipment still renders, still says \"exception\", and is no longer red"
+     :file "src/kotoba/logistics/ui.cljc"
+     :find "(= :exception (:shipment/status s)) [:span.err \"exception\"]"
+     :replace "(= :cancelled (:shipment/status s)) [:span.err \"exception\"]"
+     :must-fail ["every-shipment-status-is-shown-with-its-own-badge"]}
+
+    {:id :ui/an-empty-section-still-renders
+     :why "a section with no records must not claim one. An always-rendered `Tracking validation` heading over an empty table tells an operator that nothing needs checking, which is the same thing it would say if the data never arrived"
+     :file "src/kotoba/logistics/ui.cljc"
+     :find "(when (seq trackings)"
+     :replace "(when true"
+     :must-fail ["a-section-appears-only-when-it-has-records"]}
+
+    ;; ── the two the JVM run cannot see ──────────────────────────────────────
+    {:id :export/json-hex-cljs-branch-drops-a-digit
+     :why "a reader conditional whose :cljs branch is wrong. `clojure -M:test` takes the :clj branch and reports 0 failures for all thirty-two control characters; under nbb the top half of the C0 range comes out as \\u000X instead of \\u001X. This is the exact shape run.cljs already records for `#?(:clj int :cljs identity)` -- 0 failures on the JVM, 11 under nbb -- and the reason this repo now has a second runner at all"
+     :file "src/kotoba/logistics/export.cljc"
+     :find "(apply str (for [shift [12 8 4 0]] (nth json-hex-digits (bit-and (bit-shift-right n shift) 0xf))))"
+     :replace "#?(:clj (apply str (for [shift [12 8 4 0]] (nth json-hex-digits (bit-and (bit-shift-right n shift) 0xf)))) :cljs (str \"000\" (nth json-hex-digits (bit-and n 0xf))))"
+     :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+     :green-marker "logistics: all green"
+     :must-fail ["the-json-export-is-readable-for-every-c0-control-character"]}
+
+    {:id :export/json-hex-reaches-for-jvm-interop
+     :why "`json-hex4`'s docstring says it uses bit ops and a lookup table specifically to avoid \"Long/Integer interop that would only work on :clj\". Nothing checked that claim, and the JVM run structurally cannot -- it is the runtime the interop works on. nbb refuses at analysis, so the :must-fail names the refusal itself rather than a test: the namespace never loads, and 'the suite went red' would otherwise count any unrelated breakage as this one"
+     :file "src/kotoba/logistics/export.cljc"
+     :find "(apply str (for [shift [12 8 4 0]] (nth json-hex-digits (bit-and (bit-shift-right n shift) 0xf))))"
+     :replace "(let [h (Integer/toHexString n)] (str (subs \"0000\" 0 (- 4 (count h))) h))"
+     :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+     :green-marker "logistics: all green"
+     :must-fail ["Unable to resolve symbol: Integer/toHexString"]}
+
+    {:id :logistics/a-namespace-is-dropped-from-the-portable-runner
+     :why "the floor under the portable runner, guarded like the code. A namespace quietly dropped from `run-tests` prints '0 failures, 0 errors' -- the same words a full green run prints -- so without the floor a suite that stopped measuring a third of itself reads as a suite that found nothing wrong. It must exit 2, not 0 and not 1, and must not print the marker. `must-fail` names the REFUSED line rather than a test, because the point is that the tests did not run"
+     :file "run_tests.cljs"
+     :find "(t/run-tests 'kotoba.logistics-test\n             'kotoba.logistics.export-test\n             'kotoba.logistics.readback-test)"
+     :replace "(t/run-tests 'kotoba.logistics-test\n             'kotoba.logistics.export-test)"
+     :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+     :green-marker "logistics: all green"
+     :must-fail ["REFUSED"]}]}
 ]}
