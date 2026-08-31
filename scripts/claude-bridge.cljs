@@ -465,7 +465,12 @@
               attempts (if tools?
                          (attempted-caller-calls events (map :name specs))
                          [])
-              structured (fn [p] (salvage-tool-calls (parse-structured p) attempts))]
+              ;; :attempted rides along on EVERY tools? result, including 0.
+              ;; Without a denominator "salvage never fired" is unreadable: it
+              ;; means either the directive is working or the salvage is dead
+              ;; code, and those need opposite responses.
+              structured (fn [p] (assoc (salvage-tool-calls (parse-structured p) attempts)
+                                        :attempted (count attempts)))]
           (cond
             (nil? parsed)
             (finish {:error (str "claude exited " code
@@ -502,6 +507,21 @@
                         {:text (or (:result parsed) "")})]
               (finish (if (:error r) r (assoc r :usage (:usage parsed)))))))))
     (doto (.-stdin child) (.write (stream-json-line content)) (.end))))
+
+;; ── how often the guest reaches for tools it does not hold ───────────────
+;; Log lines answer "did it happen just now"; nothing answered "how often".
+;; That gap is why the guest attempting caller tools went unnoticed for two
+;; days -- every failed run looked, from outside, exactly like a run with
+;; nothing to call. These are process-lifetime counts over tool-bearing
+;; requests only, exposed on /health.
+(def tool-stats (atom {:runs 0 :with-attempts 0 :salvaged 0}))
+
+(defn record-tool-run! [result]
+  (swap! tool-stats
+         (fn [m] (-> m
+                     (update :runs inc)
+                     (cond-> (pos? (or (:attempted result) 0)) (update :with-attempts inc))
+                     (cond-> (:salvaged result) (update :salvaged inc))))))
 
 ;; ── admission: this machine already runs hot; don't fan out ──────────────
 (def inflight (atom 0))
@@ -617,18 +637,22 @@
               (run-next!)
               (let [ms (- (.now js/Date) t0)]
                 (if (:error result)
-                  (do (log "<- ERROR" model (str ms "ms") (:error result))
+                  ;; A refused run is still a run. Counting only the successes
+                  ;; would make the refusal floor look like it never fires.
+                  (do (when (:attempted result) (record-tool-run! result))
+                      (log "<- ERROR" model (str ms "ms") (:error result))
                       (let [status (or (:status result) 502)]
                         (send-json res status
                           {:error {:message (:error result)
                                    :type (if (= 429 status)
                                            "rate_limit_error"
                                            "upstream_error")}})))
-                  (do (log "<-" model (str ms "ms")
+                  (do (when (:attempted result) (record-tool-run! result))
+                      (log "<-" model (str ms "ms")
                            (str (count (str (:text result))) "B")
                            (str "calls=" (count (:tool-calls result)))
-                           (when-let [n (:salvaged result)]
-                             (str "salvaged=" n)))
+                           (when-let [n (:attempted result)] (str "attempts=" n))
+                           (when-let [n (:salvaged result)] (str "salvaged=" n)))
                       (if stream?
                         (send-stream res id model result)
                         (send-completion res id model result))))))))))))
@@ -647,7 +671,8 @@
         (cond
           (and (= method "GET") (contains? #{"/health" "/"} url))
           (send-json res 200 {:status "ok" :backend claude-bin
-                              :inflight @inflight :queued (count @queued)})
+                              :inflight @inflight :queued (count @queued)
+                              :tool_runs @tool-stats})
 
           (and (= method "GET") (str/ends-with? url "/models"))
           (send-json res 200
