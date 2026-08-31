@@ -410,9 +410,23 @@
               (first (str/split lib-path #"/"))
               (last (str/split source #"/")))]
     (distinct
-     [(if (str/starts-with? lib-path "src/") lib-path (str "src/" lib-path))
-      (str "src/" lib "/" lib-path)
-      lib-path])))
+     (remove nil?
+       [(if (str/starts-with? lib-path "src/") lib-path (str "src/" lib-path))
+        (str "src/" lib "/" lib-path)
+        lib-path
+        ;; A fourth spelling, and the one that hid the most: the header writes
+        ;; the path as it looks from the *superproject* -- `(authority/src/
+        ;; authority/scope.cljc)` -- so the repo name is already the first
+        ;; segment. Prefixing `src/` then asks for `src/authority/src/...`,
+        ;; which is nowhere, so the copy came out UNRESOLVED. It was still
+        ;; reported by name, so nothing vanished quietly; but UNRESOLVED means
+        ;; the drift axis was never evaluated, and the six copies sitting in
+        ;; that state were the authority and credential ones -- scope, grant,
+        ;; biscuit wire, biscuit_grant, protobuf wire. The covering relation
+        ;; that decides what a paid pass may read had a vendored duplicate
+        ;; nobody was diffing. Strip the repo segment and try again.
+        (when (str/starts-with? lib-path (str lib "/"))
+          (subs lib-path (inc (count lib))))]))))
 
 (defn- resolve-upstream
   "{:path :body} for the first candidate git can actually show at `rev`."
