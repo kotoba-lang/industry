@@ -57,6 +57,8 @@
    "vendored の Circle 実装は EIP3009.sol を持ち、FiatTokenV2 / FiatTokenV2_2 / FiatTokenUtil が transferWithAuthorization を実装している"
    "nexus-x402 の pay/x402.cljc は scheme=exact の payload を EIP-3009 authorization として構成し、assetTransferMethod に eip3009 を入れる。asset の既定は usdc-base 定数で固定されている"
    "junbi/chain.clj の token-registry は :jpyc の :address を nil にしており、read-balance は nil のとき例外を投げる。一方 core.cljc の既定 basket weights は usdc 0.40 / jpyc 0.40 / eurc 0.20 —— 重みの 40% が on-chain で読めない"
+   "GCC は Ethereum mainnet の 0x799d24a6FFBb758C6E2Ed8f981822A17Eaa5F30B に実在する。name=Gftd Computing Credits / symbol=GCC / decimals=6 / totalSupply=10,000,006.711595 / version()=2。EIP-1967 と zeppelinos の proxy slot がどちらも 0 なので直接デプロイであり upgradeable ではない。supplyCap() は revert する（GCCStablecoin.sol ではない）。owner / masterMinter / blacklister はいずれも junbi Safe 0xA003…D4E"
+   "同 GCC は authorizationState と nonces に応答する —— EIP-3009 と EIP-2612 を持つ。junbi Safe の保有は 10,000,000.000000 GCC で供給の 99.99993%。Uniswap v3 mainnet factory の getPool(GCC, USDC, fee) は 500 / 3000 / 10000 のいずれも 0 を返し、プールは存在しない。Base 上の同アドレスは code 0 バイト"
    "murakumo.cloud/legal/terms.md の 52 行目が MCC を現在形で a transferable utility token と記述している。MCC はどのチェーンにも存在しない"]
 
   :adr/problem
@@ -129,6 +131,10 @@ sink (a) は「x402 を BOT で払うと USDC より割引、受領した BOT �
 
 実測したとおり `GCCStablecoin.sol` は EIP-3009 も EIP-2612 も持たない（18 関数、いずれも該当なし）。一方 vendored 済みの Circle 実装は `EIP3009.sol` を持ち `FiatTokenV2_2` がそれを継承している。
 
+**そしてこの導出は、既に一度実行されていた。** mainnet の GCC（0x799d24a6…）は `version()` が 2 を返し `supplyCap()` が revert する —— **`GCCStablecoin.sol` からではなく Circle FiatToken V2 から deploy されている**。`authorizationState` と `nonces` に応答するので EIP-3009 と EIP-2612 の両方を持つ。
+
+つまり D4 は新しい選択ではなく、**既に取られた選択を、その理由と一緒に書き直したもの**である。前版の設計文書は理由を監査コストと書いていたが、実際に効いているのは EIP-3009 である。
+
 したがって:
 
 - **BOT = FiatTokenV2_2 の実装 + FiatTokenProxy**。Safe を owner / pauser / blacklister / masterMinter に置く
@@ -173,7 +179,8 @@ sink (a) は「x402 を BOT で払うと USDC より割引、受領した BOT �
   :adr/implementation
   ["landed: 本 ADR（90-docs/adr/2608311800-bot-token-issues-on-base.edn）"
    "landed: orgs/cloud-itonami/app-credits の TOKEN_DESIGN_ETHEREUM.md を TOKEN_DESIGN_BASE.md へ rename し、D6 の 5 点を書き換え"
-   "landed: west pin を app-credits について前進"
+   "landed: orgs/cloud-itonami/app-credits の merge commit 8d7ef7760adf（TOKEN_DESIGN_BASE.md への rename と書き換え、CLAUDE.md と operator-quickstart.md の参照修正）。verify-docs-claims.cljs は前後とも exit 0、tracked file は 81 のまま"
+   "landed: west pin を app-credits について前進（superproject commit 0d2b69e980c7、e2651b82→8d7ef776、ahead=2 behind=0 をサーバ側で検証）"
    "not-done-deliberately: contract の作成・デプロイ・配布・上場。CLAUDE.md の安全床②（資金の売買・送金・変換・trade をしない）に該当し、かつ発行体の法的構成が未確定（ADR-2607320500 §6）"
    "not-done-deliberately: nexus-x402 の asset 固定の解除（D5 の 1 と 2）。BOT が存在しない段階で本番決済面の requirement 形状を変えると、settlements 0 の原因切り分けが 1 つ増える。settlements が 1 になってから触る"
    "not-done-deliberately: kotobase-anchor-fevm の evm_version pin。本 ADR の scope 外の別 repo であり、Base の決定とは独立に直すべき欠陥として known-gaps に名指しする"]
@@ -181,6 +188,8 @@ sink (a) は「x402 を BOT で払うと USDC より割引、受領した BOT �
   :adr/known-gaps
   ["kotobase-anchor-fevm の foundry.toml が evm_version を持たない。実効値は forge 既定の prague で、Filecoin Calibration profile を配りながら Calibration で通るかは未測定（evidence ディレクトリが無く、docs に deploy 済みアドレスが 0 件）。D3 の原則に反しているが、本 ADR は Base の決定であり、この修正は別 PR にする"
    "gh search code が positive control でも 0 件を返したので、bUSD の不在は GitHub 側では未測定である。checkout 済みツリーと west 名前索引の範囲でしか主張していない"
+   "mainnet の GCC をどう扱うかが未決である。供給 10,000,006.711595 のうち 10,000,000 を junbi Safe が保有し、Uniswap プールは 1 つも無い —— deploy 済み・mint 済み・未上場という状態。upgradeable ではないので Base へ移すことはできず、扱いは (a) 放置 (b) 退役 (c) BOT の前身として位置づけ直す のいずれか。本 ADR は決めない"
+   "本 ADR の初版は GCC の deploy 先を private geth と anvil だけと書いていた。誤りである。原因は foundry の broadcast/ ディレクトリを根拠にしたこと —— あれは forge script が実行した deploy しか記録しないので、別経路で出した mainnet の GCC は 1 行も現れない。**deploy の有無をリポジトリの成果物から結論しない。チェーンに訊く。**"
    "BOT の供給量・初期配布・emission カーブは本 ADR に無い。ADR-2608291009 が収入裏付け発行（外部決済収入と finalize された witness duty のみが mint する）を決めているので、固定初期供給という形自体が採れない可能性がある。掲示価格の決め方（同 ADR D6 の 4 手順）が先"
    "decimals 18 という選択は、KUMO / YATA の掲示価格がまだ 1 つも測られていない状態で決めている。価格が決まったときに 18 では粗すぎる／細かすぎるという判断が出たら、proxy 越しでも decimals は変えられないので再デプロイになる"
    "sink (b) witness bond / (c) governance stake 加重 / (d) bot enrolment bond は本 ADR で contract 面に落としていない。(b) は ADR-2607994000 の bond の建値差し替えなので最も小さい"
@@ -237,6 +246,27 @@ bUSD は見つからなかった。近い 2 つ（HAKARI と kawase-yui）はど
 同じセッションの前段で token 形のものを 4 つ挙げたが、**BOT が抜けていた。** 原因は ADR をファイル名パターン（token|erc20|evm|fevm|chain|credit）で絞ったことで、`2608291009-bot-kumo-yata-three-unit-economy.edn` はそのどれにも当たらない。2 日前に landed した、まさに問われていた設計を、名前の形だけで落とした。
 
 `:adr/title` を横断で引けば当たっていた（実際、次に引いたときは 1 発で出た）。**ファイル名は索引ではない。**
+
+## 途中で自分の主張が 1 つ壊れたこと
+
+本 ADR の初版は「GCC の public chain への deploy は 0」と書いた。**誤りだった。**
+
+app-credits の CLAUDE.md にアドレスが書いてあったので引いたところ、
+**GCC は Ethereum mainnet に生きていた** —— 供給 10,000,006.711595、うち
+10,000,000 を junbi Safe が保有し、Uniswap v3 のプールは 3 つの標準 fee tier の
+どれにも存在しない。deploy 済みで、mint 済みで、上場されていない。
+
+原因は根拠の選び方である。foundry の `broadcast/` ディレクトリを読んで
+chainId 260425 と 1337 しか無いことを確認したが、**あれは forge script が
+実行した deploy しか記録しない。** 別経路で出したものは 1 行も現れない。
+
+**deploy の有無をリポジトリの成果物から結論しない。チェーンに訊く。**
+
+この訂正は D4 を弱めない。むしろ裏付ける —— mainnet の GCC は
+`version()` が 2 を返し `supplyCap()` が revert するので、
+`GCCStablecoin.sol` ではなく **Circle FiatToken V2 から deploy されている**。
+EIP-3009 も EIP-2612 も持っている。**同じ導出が既に一度実行されていて、
+その理由が文書に書かれていなかった**だけである。
 
 ## この ADR が変えないもの
 
