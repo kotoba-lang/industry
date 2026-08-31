@@ -449,4 +449,25 @@ GitHub の redirect で生きているが west は新名のみを持つ。
 正本の価格観測は app-hyakka の claim graph に置き、R2 Data Catalog の Iceberg
 表（tabi_offers、observed-at の day パーティション）は匿名化した分析面のみ。"}
 
+
+ :hanmoto
+ {:label "発行者レジストリ / publisher registry（版元 = 世に出した側）"
+  :spellings ["publisher registry" "publisher census" "publishing hosts"
+              "fediverse instances" "instance directory" "blog hosts"
+              "発行者" "版元" "hanmoto" "はんもと" "媒体一覧" "掲示板一覧"]
+  :note "cloud-itonami/actor-hanmoto。**hanmoto は metaphor 名**（版元 = 作品を
+世に出した側）なのでここに載せる —— 名前は『発行者の名簿』を一文字も示さない。
+27,307 の発行ホストを software / protocol / 出所 / 規模つきで持つ
+（blog 13,319 / social 10,012 / media 1,730 / forum 306、未分類 6.0% は
+いちばん近い箱に入れず unknown のまま報告する）。ADR-2608314900。
+
+**隣の actor-kawaraban（瓦版）と混同しない** —— kawaraban は『何が言われたか』
+（見出し・byline・link）、hanmoto は『誰が言えるか』（発行しているホスト）。
+見出しは瓦版のもの、それを配ったホストはここのもの。
+
+**account を 1 行も持たない。** 上流 corpus は 174,592 行持つが、発行者の
+register は組織の register である（CLAUDE.md repo-wide mandatory）。計器も
+同じ線を守り、caller（払った鍵から導出した did:pkh）を月・顧客ごとの salt で
+hash してから記録する。"}
+
 }
