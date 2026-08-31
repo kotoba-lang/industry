@@ -2696,4 +2696,34 @@
               that did not answer. A record with no endpoint is a separate warn
               rather than a pass, because a claim nothing can check is not a
               claim that passed."}
+
+  {:id       :verify-ship-builds-first
+   :title    "ship paths that can send out an artifact nobody built"
+   :why      "2026-08-31, twice in one day and both times to the person fixing it.
+              In the morning a stale bundle went out over a settlement fix and put
+              an inflated public revenue figure back. In the evening a build exited
+              127 -- its compiler was not on PATH -- the ship ran as a separate
+              command, and only the second exit code was read, sending out a bundle
+              three and a half hours old. The ship guard checks the CHECKOUT's git
+              state, not the artifact's, so a checkout perfectly in step with main
+              can send out bytes that disagree with its own source while the guard
+              stays green. Two independent properties keep a ship path honest: it
+              builds first (so a failed build stops the ship), and that build goes
+              through resource-guard (so it takes its turn -- a build has held that
+              lock twelve minutes here while another session's retries were all
+              refused). Measured across the tree: 58 ship scripts, 17 can ship
+              unbuilt, 39 build outside the guard, 2 do both. Not a fleet gate: it
+              reads `orgs/`, so a node shipped only one repo's tree would report
+              clean forever."
+   :script   "scripts/verify-ship-builds-first.cljs"
+   :args     ["--findings"]
+   :exit     {0 "every ship script builds first, under the guard"
+              1 "findings"
+              2 "could not measure -- no orgs tree, or no ship script found at all"}
+   :fixed-by "Give the repo `build` and ship scripts of the shape actor-hanmoto and
+              nexus-x402 now use: the build under
+              `${COM_JUNKAWASAKI_ROOT:-../../..}/scripts/resource-guard.mjs run
+              build`, and the ship chaining `npm run build && …` so a failed build
+              stops it. This measures the sanctioned path only -- neither incident
+              went through a script, and no script can stop a CLI run by hand."}
 ]}
