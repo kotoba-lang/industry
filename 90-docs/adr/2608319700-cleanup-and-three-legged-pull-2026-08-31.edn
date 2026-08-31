@@ -59,7 +59,9 @@ restart は `kickstart -k` では**足りない** —— process は再起動す
   :adr/resume-point
   "**ledger の系列は 3 段とも閉じた** —— projection の曖昧性解消（既存）、corpus 単位の counts（#2855）、writer の floor（#2857）。残る 362 件は履歴であって進行中の欠陥ではなく、`bmc.event/<seq>-<digest>` 側から読めるので急がない。
 
-⚠ **#2857 はまだ本番で走っていない。** 実測（closing 時点）: `~/.gftd/ledger-hwm/` は空で、live loop はこの修正が載ってから 1 度も append していない。最初の append が mark を作る。**次にこの ADR を読む者への最初の確認事項はここ** —— `ls ~/.gftd/ledger-hwm/` が空でなくなり、中身が canvas-ledger の max seq に一致すること。空のままなら loop 側が古いコードを読んでいる。
+✅ **#2857 は本番で走っていることを確認した（2026-08-31 19:46）。** `~/.gftd/ledger-hwm/…canvas-ledger.edn.seq` が作られ、値 **13965** はローカル台帳の max seq と一致する。同じ周で書かれた 2 件（13964 / 13965）は origin/main の max 13963 を**追い越して**採番されており、revert 後に番号を再発行する旧挙動なら 13964 は既存イベントと衝突していた。着地後も colliding-seq は 362 のままで増えていない。
+
+つまり ledger の 3 段（projection の曖昧性解消 / corpus 単位の counts #2855 / writer の floor #2857）は**すべて landed かつ本番で観測済み**。残る 362 件は履歴であって進行中の欠陥ではない。
 
 残りの優先順（測って並べたもの、大きい順）: ①fleet の :review 495 ファイル / slug 衝突 24 組 —— どちらの写しを採るかはオーナー判断で、道具は判断を拒否する。②metrics/*.edn 12 件（nexus-x402 が `{}` = 収集失敗。clean な `gftd collect` を回すか捨てるか）。③true-orphan-git 3 件（dougaka / dougaka-actor / dougaka-vector）を登録か退役か。④`pin-tip-lag.cljs` の retry 不足（この機械の負荷では常用で exit 2 になる）。⑤常駐 loop が共有 checkout に残す stale index.lock（このセッションで 8 回除去した。所有者不在）。⑥repo-bots 名簿 4,247 体に対し state ファイルが無い（一度も tick していない）。
 
