@@ -112,9 +112,34 @@ CLAUDE.md の「測れなかった検査が、測って問題が無かった検�
 | 応答 | 長時間 | 4.3s |
 | bridge log | `calls=0` | `calls=1` |
 
-after の run では salvage は発火していない（`salvaged=` が出ていない）——
-directive だけで guest が直接呼び出しをやめた。salvage はそれが効かなかった run
-のための床として残る。
+## directive は直接呼び出しを止めていない —— 測ったら 12 回中 7 回（2026-08-31 追記）
+
+上の after 1 本を見て「directive だけで guest が直接呼び出しをやめた」と最初に
+書いた。**誤りだった。** その時点では試行回数を数える手段が無く、
+`salvaged=` が出ていないことを「試行が無かった」と読んだ —— 発火しなかった床と、
+そもそも要らなかった床が、出力で区別できていなかった。
+
+数えられるようにしてから同じ形の 12 リクエストを流した結果:
+
+    runs=12  with-attempts=7  salvaged=0
+
+**58% の run で guest はいまだに caller の道具を直接呼びに行っている。** 今回は
+12 本とも自力で立ち直った（`calls=1`）ので salvage は 1 度も要らなかったが、
+**旧来の失敗の前提条件は過半の run で今も成立している。** salvage は dead code
+ではなく、コイン投げの下に敷いた網である。
+
+数え方: `:attempted` を tools 付き結果**全部**に（0 も含めて）載せ、log に
+`attempts=N` として出し、process 生涯の `{:runs :with-attempts :salvaged}` を
+`/health` の `tool_runs` に出す。分母が無いと「salvage が発火しない」は
+*directive が効いている* とも *salvage が死んでいる* とも読めて、両者は正反対の
+対応を要求する。refuse された run も数える —— 成功だけ数えると 502 の床が
+一度も働いていないように見える。
+
+検査は 5 ケース目で counter を assert する（`runs=4 / with-attempts=2 /
+salvaged=1`）。`Bash` の試行が with-attempts に入らないこと（caller が宣言して
+いない名前は「caller の道具に手を伸ばした」ではない）と、refuse された run が
+runs に入ることを、この 1 ケースが同時に固定する。refuse の計上だけを外すと
+このケースだけが `expected runs=4, got {:runs 3 …}` で落ちる。
 
 ## 同時に直したもの — 恒久的に exhausted だった credential
 
@@ -158,13 +183,58 @@ cron を数えるとき `started_at > <unix秒>` で絞ったが、この列は 
 直して測り直したのが上の表。ADR-2608301700 が同じ日に 4 回記録した
 「照合器が別のものを掴んでいるのに、その結果を測定として報告した」形の再発。
 
+## 同じ誤帰属の連鎖が、もう 1 本 log の中で動いていた（2026-08-31 追記）
+
+log を読み直して見つけた: bridge が model `murakumo-main` を 3 回受け取り、
+Claude CLI が `unrecognized_model` で 404 を返し、bridge がそれを **502
+upstream_error** にしていた。
+
+出所は codinator の `auxiliary.compression.model: murakumo-main`
+（`base_url` は murakumo）。primary が落ちると auxiliary 呼び出しは
+fallback の claude-bridge へ行くが、**model 名は primary のものを持ったまま**
+なので、CLI にとっては存在しないモデルになる。
+
+502 は「一時障害」なので hermes は 3 回再試行する —— 決して成功しない要求に対して。
+そして compression が死ぬと、detector の docstring が書いているとおり
+**次のエラーは長さのせいにする**。この ADR の冒頭の事件と同じ誤帰属の連鎖が、
+規模を小さくして同時に走っていた。実際 `verify-hermes-agent-health` が残していた
+warn `hermes-compression-dead:codinator` の本文は
+`502 - claude reported an error subtype=success terminal_reason=api_erro…` で、
+bridge log の `murakumo-main` 404 3 本と同じ形をしている。
+
+**決定**: CLI が `unrecognized_model` を報告したら **400 invalid_request_error**
+にし、本文に「この bridge が serve するモデル」を並べる。理由は 429 のときと同じ
+——**再試行で直らないものを再試行させない**。型も直した（`case` で 400 →
+`invalid_request_error`。OpenAI client はこの型で分岐する）。
+`unrecognized_model` は result event ではなく **stderr** に載るので、
+`upstream-status` は stderr も受け取る。
+
+検査は 6 ケース目。400 マッピングだけを外すと**このケースだけ**が
+「still 502 upstream_error — hermes reads that as transient」で落ちる。
+
+⚠ 最初この fixture は caller に `claude-sonnet-5`（serve 済み）を要求させながら
+stub には別モデルの拒否を演じさせていたので、bridge のエラー本文が
+**serve しているモデルを「serve していない」と言う**形になった。fixture を現実に
+合わせ（caller が `murakumo-main` を要求する）、本文が拒否されたモデル名と
+serve 一覧の両方を含むことを assert している。
+
+**hermes 側の config は触っていない** —— 25 profile の auxiliary が primary の
+model 名を持ったまま fallback する設計は hermes 側の話で、ここで直すのは
+「その要求が来たときに正直で再試行不能な答えを返す」ことだけ。
+
 ## 直していないもの
 
 - **`approval.pending` の busy poll**: 11:08–11:19 の 11 分で 1,573 行、全部同じ
   reaped session (`948207dd`) に対する `session-scoped RPC rejected`。upstream
   hermes の desktop client 側の polling で、errors.log を実質使えなくしている。
   この repo のコードではない。
-- **salvage が発火した live の実例はまだ無い**（restart 後の run は directive
-  だけで通った）。stub では両方向を出しているが、実 guest が諦める run に当たった
-  ときに `salvaged=` が log に出ることを次に確認すること。
+- **salvage が発火した live の実例はまだ無い。** 12 run で試行 7・salvage 0 ——
+  つまり「試行してから諦める」側にまだ当たっていない。stub では両方向を出して
+  いるので床の正しさは示せているが、live の発火例は `/health` の `salvaged` が
+  0 から動いた時点で得られる。**それまで「salvage は要らなかった」と読まない**
+  —— 要らなかったのではなく、当たっていないだけである。
+- **`bridgetestclone` は tools=0 で問い合わせている**（ping 24 本中この 1 本だけ）。
+  bridge は宣言が無いので正しく「道具は無い」と答え、bot も正しくそう報告した。
+  つまり bridge の欠陥ではなく、その test clone 固有の profile 設定。姉妹の
+  `bridgetestfresh` は同じ ping で実際に tool を実行して返している。
 "}]

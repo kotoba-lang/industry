@@ -113,6 +113,18 @@
          (attempt \"tu1\" \"terminal\" {:command \"ls\"})
          (result {:content \"The capital of France is Paris.\" :tool_calls []}))
 
+   ;; the CLI does not know the model: a caller failed over to this bridge
+   ;; still carrying its PRIMARY provider's model name. The marker rides on
+   ;; STDERR, which is why a status mapping reading only the result event
+   ;; could not see it.
+   \"unknown-model\"
+   #(do (.write (.-stderr js/process)
+                \"[claude-code:unrecognized_model] model=murakumo-main\")
+        (str (init)
+             (line {:type \"result\" :subtype \"success\" :is_error true
+                    :terminal_reason \"api_error\" :api_error_status 404
+                    :result \"There is an issue with the selected model (murakumo-main).\"})))
+
    ;; nothing recoverable -- the attempt named a tool the CALLER never
    ;; declared -- and the reply is about the plumbing. Must not be relayed.
    \"unrecoverable\"
@@ -169,18 +181,28 @@
                             :required ["path"]}}}])
 
 (defn- ask [port scenario]
+  (if (= :health scenario)
+    (-> (js/fetch (str "http://127.0.0.1:" port "/health"))
+        (.then (fn [r] (.then (.json r) (fn [j] {:status (.-status r)
+                                                 :body (js->clj j :keywordize-keys true)})))))
   (-> (js/fetch (str "http://127.0.0.1:" port "/v1/chat/completions")
         #js {:method "POST"
              :headers #js {"Content-Type" "application/json"}
              :body (js/JSON.stringify
-                     (clj->js {:model "claude-sonnet-5"
+                     ;; the unknown-model case must REQUEST the unserved model:
+                     ;; a fixture where the caller asks for a served model and
+                     ;; the CLI rejects a different one makes the bridge's own
+                     ;; error text read as a lie about a model it does serve.
+                     (clj->js {:model (if (= "unknown-model" scenario)
+                                        "murakumo-main"
+                                        "claude-sonnet-5")
                                :messages [{:role "user"
                                            :content (str "SCENARIO:" scenario
                                                          " list the files")}]
                                :tools tools
                                :max_tokens 512}))})
       (.then (fn [r] (.then (.json r) (fn [j] {:status (.-status r)
-                                               :body (js->clj j :keywordize-keys true)}))))))
+                                               :body (js->clj j :keywordize-keys true)})))))))
 
 (defn- calls [resp]
   (get-in resp [:body :choices 0 :message :tool_calls]))
@@ -244,7 +266,48 @@
         (not (str/includes? (str (get-in r [:body :error :message]))
                             "relayed this bridge's own"))
         (str "502 for some other reason: " (pr-str (:body r)))
-        :else nil))]])
+        :else nil))]
+
+   ["unknown-model — a model this bridge does not serve is 400, not a retryable 502"
+    "unknown-model"
+    (fn [r]
+      (let [msg (str (get-in r [:body :error :message]))
+            typ (str (get-in r [:body :error :type]))]
+        (cond
+          (= 502 (:status r))
+          (str "still 502 upstream_error -- hermes reads that as transient and "
+               "retries a request that can never succeed: " (subs msg 0 (min 200 (count msg))))
+          (not= 400 (:status r)) (str "expected 400, got " (:status r))
+          (not= "invalid_request_error" typ)
+          (str "type is " (pr-str typ) " -- OpenAI clients route on this, and "
+               "calling a bad request an upstream fault is what caused the retries")
+          (not (str/includes? msg "murakumo-main"))
+          (str "the message does not name the model that was refused: " msg)
+          (not (str/includes? msg "claude-sonnet-5"))
+          (str "the message does not say what this bridge DOES serve: " msg)
+          :else nil)))]
+
+   ;; Last on purpose: it reads counters the five above moved. Order is
+   ;; guaranteed because the cases run sequentially.
+   ["counters — the reach for tools it does not hold is countable, not just tailable"
+    :health
+    (fn [r]
+      (let [st (get-in r [:body :tool_runs])]
+        (cond
+          (nil? st) "/health does not report tool_runs at all"
+          ;; 5 tool-bearing requests that reached a verdict: 3 answered, 1
+          ;; refused by the salvage floor, 1 rejected as an unserved model. A
+          ;; verdict that went uncounted would hide a whole failure class from
+          ;; the denominator.
+          (not= 5 (:runs st)) (str "expected runs=5, got " (pr-str st))
+          ;; salvage and recovered each reached for `terminal`; healthy reached
+          ;; for nothing; unrecoverable reached for `Bash`, which the caller
+          ;; never declared and which therefore must NOT count as a reach for
+          ;; a caller tool.
+          (not= 2 (:with-attempts st)) (str "expected with-attempts=2, got " (pr-str st))
+          (not= 1 (:salvaged st)) (str "expected salvaged=1, got " (pr-str st))
+          :else nil)))]
+])
 
 (defn- run []
   (let [tmp (fs/mkdtempSync (path/join (os/tmpdir) "bridge-salvage-"))
