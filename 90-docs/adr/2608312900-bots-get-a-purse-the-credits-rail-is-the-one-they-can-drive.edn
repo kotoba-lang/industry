@@ -145,10 +145,37 @@ X-PAYMENT を付けて再送し、支出を append-only に記録する。**人�
    掲示するには authorization を on-chain に submit する **gas を持った relayer** が要り、
    facilitator は『鍵を持たない』という不変条件を持っている。**この 2 つは両立しない。**
    どちらを動かすかは owner の決定で、本 ADR は動かさない。
+
+   ⚠ **ただし facilitator は 2026-08-31 まで `exact` を announce していた。**
+   `/.well-known/x402` の `:schemes に transaction と exact の 2 つ` は
+   `pay.facilitator/discovery` の literal で、deployment を一度も見ていない。
+   同じ literal が `:networks に base だけ` として **base-sepolia を隠していた** ——
+   `apply` は admit し `treasury` は検証できるのに、document を読んだ seller は
+   『価値を動かさずに証明するのは無理』と結論する。**多く名乗るのと少なく名乗るのは
+   同じ欠陥の符号違い**で、builder の literal は見たことのない deployment について
+   正しくも間違ってもいられない。今は host が両方を渡す（`:schemes` / `:networks` /
+   `:testnets` は必須で、欠けたら throw）。live 実測 2026-08-31 deploy 後:
+   schemes は transaction の 1 件、networks は base と base-sepolia、testnets は base-sepolia。
+
+   **testnet の現在地**: facilitator 側は通る（admit・検証・announce の 3 つが一致）。
+   足りないのは ①testnet 価格を掲示する seller ②bot の EVM 鍵（今は Ed25519 の
+   did:key だけ。`base-sepolia` に pin した鍵は「bot に金を持たせる」ことにならないが、
+   D1 の不変条件を testnet 限定で緩める判断になるので owner の一言が要る）
+   ③faucet の 1 手（sign-in / CAPTCHA が挟まるので agent は通らない）。
 4. **fleet gate に載せていない。** payer の test は 6 repo にまたがる classpath を要し、
    `ship-git-deps!` が運ぶのは git 依存だけなので、ノードに入力が揃わない。
    `root-permit-index` が 300 回落ち続けたのと同じ形になるので、**落ちない gate を
    landing させるより、gate が無いと書く方を選ぶ。**
+
+   代わりに `scripts/verify_bot_allowances.cljs` が名簿側を検査する（root 単体で完結
+   するので入力が揃う）。**支出できる bot の名簿は 2 方向へずれ、どちらも「網羅」に見える**
+   —— 誰も答えない id（死んだ policy）と、載っていない実在の bot（黙って払えなくなり、
+   ずっと後に『bot が止まった』として現れる）。各 entry は `:runs-as/*` で自分の
+   裏付けを名乗り、Hermes の job は tree から訊けないので **UNVERIFIED（ok ではない）**。
+   exit は 3 値（0 clean / 1 findings / 2 REFUSED＝registry が読めなかった）。
+   ⚠ 最初の版は sparse worktree から走らせると **実在する skill 3 件を MISSING と報告した** ——
+   入力が見えない検査は、見えなかったものを fail させるのではなく「見えなかった」と
+   言わねばならない。偽の MISSING の方が出荷しやすい（勤勉に見えるので）。
 
 **変えていないもの**: KUMO/YATA/BOT の単位設計（ADR-2608291009）、credits の非償還性、
 facilitator が鍵を持たないこと、USDC rail の価格と宛先。"
@@ -159,7 +186,9 @@ facilitator が鍵を持たないこと、USDC rail の価格と宛先。"
    "network-awai/nexus-x402 1aa75e5e（decode できないヘッダを 400 malformed X-PAYMENT にする。82 tests / 362 assertions、Worker の fetch handler を実際に駆動する suite）"
    "net-kotobase/control-plane fd37bf4d（読み取りを 0.1 / 0.2 credit で価格付け。9 tests / 64 assertions）。deploy: net-kotobase version 453cd026"
    "deploy: murakumo-cloud version 3d030efe（lease token の kagi item MURAKUMO_CLOUD_SITE_TOKEN_SECRET_2 が存在せず、script が明示する --bootstrap で deploy した。lease は concurrency guard であって authorization ではない。**この item が無いこと自体が既存の gap**）"
-   "west pin a5a4c45c（pay / nexus-x402 / control-plane の 2 巡目）"
+   "west pin a5a4c45c（pay / nexus-x402 / control-plane の 2 巡目）/ 8f30641f（3 巡目）"
+   "**整理パス（2026-08-31 同日）**: kotoba-lang/pay d9e9f5ce（discovery が host の能力を必須引数で受ける。79 tests / 379 assertions）/ network-awai/nexus-x402 712a97cf（announce = admit 集合。84 tests / 372 assertions、Worker の /.well-known/x402 を実際に叩く test。**最初の版は定数どうしを比べていて、配線を戻しても緑のままだった**）/ com-junkawasaki/root 40c7d254（vendored pin の regex が `;;` を跨げず 5 件の pin 宣言が読まれていなかった: 44→39 no-pin。同 commit で bot 名簿の checker）"
+   "deploy: nexus-x402 version 4996cd9a（announce 修正後）"
    "kotoba-lang/pay 7db004a2（buyer が credits を読み、2 rail を金額順に並べない。19 tests / 67 assertions、負の control 3 本）"
    "network-awai/nexus-x402 bdc88235（/apply が credits を運ぶ。60 tests / 266 assertions、負の control 3 本）"
    "network-awai/cloud-murakumo aa277402（document が credits を宣言する。18 tests / 93 assertions、負の control 2 本）"
