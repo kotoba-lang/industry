@@ -327,6 +327,47 @@
               the first draft of this sweep read working trees and reported a repair
               that had already landed."}
 
+  {:id       :verify-credential-consumers
+   :title    "a credential class that is minted, verifiable, and accepted by nobody"
+   :why      "2026-08-31, ADR-2608311600: ADR-2608291200 minted a per-caller operator
+              credential for api.murakumo.cloud (`mro_`, 15 minutes, scoped to named
+              actions) and measured the whole passkey chain live against real services
+              with a signing virtual authenticator. The consumer was never written.
+              Measured across 4,329 checked-out repos: `/rpc/verify-operator` has ZERO
+              callers outside the issuer's own repository, so the credential exists,
+              verifies, expires and authorises nothing -- while the shared secret it was
+              built to replace stayed the only key to /v1/kotobase/database-restore
+              (one string, held by every operator process, compared with `=`, naming
+              nobody in an audit, and unreadable by any human since 2026-08-29).
+              Neither half was wrong; nothing asked whether they were connected, and a
+              consumer that does not exist raises no error anywhere. CANNOT be a fleet
+              gate: it must read the issuer in one repo and search every other repo,
+              and a gate ships one repo's tree."
+   :argv     ["nbb" "{{repo}}/scripts/verify-credential-consumers.cljs"
+              "--findings" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 43200000                 ; 12h -- credential classes are added rarely,
+                                         ; and the walk is expensive
+   :timeout-ms  1800000                  ; 30m -- ~5x the measured 5m24s
+   :writes   :none
+   :measured "Landed 2026-08-31 with all three exit codes shown against a synthetic
+              tree: one endpoint consumed and one not -> exit 1 and exactly one FINDING
+              naming the unconsumed one; adding the missing consumer -> exit 0 `clean`;
+              removing the issuer -> exit 2 REFUSED, because an unread issuer must not
+              be reported as an unconsumed credential.
+              Two defects were found in this detector while writing it and both are
+              fixed rather than described. It first ran three separate `grep -r` walks
+              over 4,000 repos and did not finish in nine minutes; the cost is the walk,
+              so it now walks once and buckets. It then excluded only the issuer's
+              SOURCE FILE, which made /rpc/verify-operator look like it had three
+              consumers -- its own ADR, its own README and its own compiled bundle --
+              and reported `clean`. A consumer is somebody else, so the issuer's whole
+              repository is excluded. That defect failed in the direction that hides
+              the finding, which is why the synthetic tree above includes an
+              issuer-local mention that must not count."}
+
   {:id       :verify-ipni-publisher-record
    :title    "the IPNI publisher record, against the identity that is actually publishing"
    :why      "2026-08-31, ADR-2608311800: manifest/ipni-publisher.edn named the
