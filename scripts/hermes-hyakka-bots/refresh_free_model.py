@@ -31,8 +31,22 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 RESOLVER = os.environ.get(
     "HYAKKA_RESOLVER", os.path.join(HERE, "resolve_free_model.cljs"))
 NBB = os.environ.get("HYAKKA_NBB", "/opt/homebrew/bin/nbb")
+# The cron table this job must read is the one its own scheduler runs. When
+# the gateway runs a profile, the script subprocess inherits HERMES_HOME
+# pointing at the profile directory, while expanduser("~/.hermes/...") names
+# the ROOT install's table — measured 2026-08-31: the wrapper then listed the
+# root table's 37 agent jobs and handed their ids to a `hermes cron edit`
+# that resolved against the profile table, so every reconciliation failed
+# not-found while looking like coverage. HERMES_HOME wins when present; the
+# expanduser default is only for a bare root install.
+_HERMES_HOME = os.environ.get("HERMES_HOME") or os.path.expanduser("~/.hermes")
 JOBS_DB = os.environ.get(
-    "HYAKKA_JOBS_DB", os.path.expanduser("~/.hermes/cron/jobs.json"))
+    "HYAKKA_JOBS_DB", os.path.join(_HERMES_HOME, "cron", "jobs.json"))
+# Same reasoning for the config the resolver may rewrite whole: it must be
+# the config of the home whose jobs it just edited, not whichever config
+# $HOME happens to name.
+HERMES_CONFIG = os.environ.get(
+    "HYAKKA_HERMES_CONFIG", os.path.join(_HERMES_HOME, "config.yaml"))
 
 # Every agent-driven cron job, not a list of names.
 #
@@ -100,7 +114,8 @@ def main() -> None:
     jobs = bot_job_ids()
 
     proc = subprocess.run(
-        [NBB, RESOLVER, "--if-stale", "--write", "--jobs", jobs],
+        [NBB, RESOLVER, "--if-stale", "--write", "--jobs", jobs,
+         "--config", HERMES_CONFIG],
         capture_output=True, text=True, timeout=1800)
 
     # stderr carries the SCANNED line and the per-candidate probe trace; it is
