@@ -5,6 +5,10 @@ Everything above this line is a measurement taken minutes ago. It is the only
 thing you know about the fleet. If it begins with REFUSED, say so plainly and
 stop — do not propose anything.
 
+## Objective
+
+Raise `axis-ingest` on one repo in the cloud-itonami fleet each run, by giving that repo a regulatory source register in which every citation was fetched during the same run. The register is the deliverable; an unverified citation is not one.
+
 ## Your one job this run
 
 Raise `axis-ingest` on ONE repo, by giving it a regulatory source register whose
