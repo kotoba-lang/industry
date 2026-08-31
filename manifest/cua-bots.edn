@@ -35,6 +35,23 @@
   :bot/allowed-actions #{:script}
   :bot/budget-tokens 30000}
 
+ {:bot/id "murakumo-adult-traffic"
+  :bot/goal "murakumo.cloud の画像・動画生成を ExoClick（アダルト面）へ出稿する準備が、今日その状態にあるかを測る。creative の到達性 → 転記済みポリシーの鮮度 → 残る blocker の順に報告する"
+  ;; :host-object — 測るのは HTTP とファイルであって画面ではない。画面操作の
+  ;; backend に昇格させる理由が今は無い（ExoClick は API を持つ）。
+  ;;
+  ;; creative 到達性を先頭に置くのは様式ではない。この workspace が記録している
+  ;; 唯一の第三者広告実績は ExoClick の USD 0 / imp 0 で、原因は価格でも審査でも
+  ;; なく自前の画像配信が 522 だったこと（ADR-2608096000）。アカウント側だけを
+  ;; 見る bot は、あの run を「正常」と報告する。
+  :bot/backend :host-object
+  :bot/target {:cwd "."
+               :cmd ["nbb" "scripts/ads-adult-preflight.cljs"]}
+  :bot/interval-s 86400
+  :bot/max-steps 4
+  :bot/allowed-actions #{}
+  :bot/budget-tokens 12000}
+
  {:bot/id "isekai-touch-qa"
   :bot/goal "https://isekai.network/gftd/jintori が応答し scene が touch stick を宣言していることを検証する。実 touch drag の駆動は、それができる backend に昇格したときに行う（:bot/backend の 1 keyword 書き換え）"
   ;; いまは :host-object — repo が持つ決定論の touch gate をそのまま対象にする。
