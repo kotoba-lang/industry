@@ -126,6 +126,26 @@
                     acc (:spend r)))
           {} runs))
 
+(defn- declared-accounts
+  "The workspace's account -> repo map, from manifest/murakumo-accounts.edn.
+
+  A repo does not have to be an actor to spend. `dougaka` has no `actor.edn`
+  and should not grow one to record a billing fact, so the mapping lives in the
+  manifest and this reads both: an actor may still declare
+  `:actor/murakumo-account` itself."
+  []
+  (let [f (p/join root "manifest/murakumo-accounts.edn")]
+    (if-not (fs/existsSync f)
+      {}
+      ;; Keyed by repo NAME, because that is what `itonami-actor-pnl` joins on.
+      ;; The manifest records the full path, which is unambiguous for a reader;
+      ;; emitting the path here would produce a receipts file whose keys match
+      ;; nothing, and a cost side that reads as absent rather than as wrong.
+      (try (into {} (map (fn [a] [(:account a) (last (str/split (str (:repo a)) #"/"))]))
+                 (:accounts (edn/read-string (slurp* f))))
+           (catch :default e
+             (refuse! (str "manifest/murakumo-accounts.edn unreadable: " (.-message e))))))))
+
 (defn -main []
   (if offline?
     (refuse! "--offline: the ledgers are the whole input; there is nothing to fold")
@@ -136,7 +156,10 @@
                  _ (when (empty? rows) (refuse! (str "run ledger empty or unreadable: " runs-url)))
                  spend (spend-by-account rows)
                  as (vec (actors))
-                 claimed-acct (into {} (keep (fn [a] (when (:account a) [(:account a) (:repo a)])) as))
+                 ;; Two sources, one map. An actor may claim its own account;
+                 ;; a repo that is not an actor is claimed by the manifest.
+                 claimed-acct (merge (declared-accounts)
+                                     (into {} (keep (fn [a] (when (:account a) [(:account a) (:repo a)])) as)))
                  claimed-sell (into {} (keep (fn [a] (when (:seller a) [(:seller a) (:repo a)])) as))
                  attributed (reduce (fn [m [acct cr]]
                                       (if-let [repo (get claimed-acct acct)]
@@ -157,6 +180,15 @@
                                   (:duplicates settle) " duplicate)"))))
              (println (str "ATTRIBUTED\t" (count attributed) " of " (count spend)
                            " spending accounts"))
+             ;; A spender need not be an actor. `itonami-actor-pnl` walks the
+             ;; actor population, so a cost attributed to a repo outside it is
+             ;; real and still will not appear there -- said here rather than
+             ;; left for someone to notice the number never showing up.
+             (let [actor-names (set (map :repo as))
+                   outside (remove actor-names (keys attributed))]
+               (when (seq outside)
+                 (println (str "OUTSIDE-THE-LADDER\t" (str/join ", " outside)
+                               "\t(attributed, but not in the actor population)"))))
              (when (seq unattributed)
                (println "UNATTRIBUTED\tcredits spent by accounts no actor claims:")
                (doseq [[a cr] (sort-by (comp - val) (vec unattributed))]

@@ -1,0 +1,49 @@
+;; manifest/murakumo-accounts.edn — which repository spends under which
+;; murakumo credits account.
+;;
+;; ## Why this is a workspace fact and not a repo's own
+;;
+;; `scripts/itonami-receipts-export.cljs` folds the murakumo run ledger to give
+;; each repo its measured cost. It joins on the spend account, and the ledger
+;; keys spending by the JWT `sub` of whoever called `/infer/spend` -- a subject
+;; that is issued out of band. Measured twice on 2026-08-31, from the spender
+;; side as well as the repo side: nothing in the tree says which repo holds
+;; which subject. The production issuer configuration is not here, and the only
+;; occurrence of one of these names beside a `sub` is in a test.
+;;
+;; So the mapping cannot be derived. It has to be declared by someone who
+;; knows, and it belongs here rather than in each repo's `actor.edn` because
+;; **the spenders are not all actors**. `dougaka` has no `actor.edn` and should
+;; not grow one merely to record a billing fact -- an actor.edn is a claim
+;; about governance, and this is a claim about a bill.
+;;
+;; ## The rule this file exists to keep
+;;
+;; An account nobody claims here is reported UNATTRIBUTED with its credits, and
+;; those credits are folded into nobody's cost. Guessing would be worse than
+;; the gap: attributing 1,666 credits to the wrong repo produces a margin
+;; number that is precise and false.
+
+{:schema 1
+
+ :accounts
+ [{:account "dougaka"
+   :repo "orgs/cloud-itonami/dougaka"
+   :declared-by "Jun Kawasaki"
+   :declared "2026-08-31"
+   :note "Owner decision. The repo is registered twice in west -- `dougaka` and
+          the older `ai-gftd-dougaka`, both at the same revision -- and the
+          short name is the one the naming rules prefer. It runs (a
+          wrangler.jsonc at its root) and it is the largest spender in the
+          ledger, which is what made it the first buyer worth wiring."}]
+
+ ;; Spending accounts seen in the ledger with no declaration yet. Listed so
+ ;; the gap is a name rather than a silence; the exporter reports them from the
+ ;; ledger regardless, and this is only the reading list.
+ :undeclared
+ [{:account "shinshi" :seen "2026-08-31" :credits 40.8}
+  {:account "isekai-pages" :seen "2026-08-31" :credits 5}
+  {:account "did:key:z6MkCustomer2" :seen "2026-08-31" :credits 50
+   :note "A did:key rather than a name -- possibly an external customer rather
+          than one of ours, which would mean it never gets a repo."}
+  {:account "did:key:z6MkVaOUdZOGhInJXDZWPt7OaijGrBB88tjv" :seen "2026-08-31" :credits 50}]}
