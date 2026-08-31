@@ -15,7 +15,8 @@
                 "adr-2608312800-the-hermes-turn-loop-in-kotoba-and-the-itonami-bots-that-were-never-installed"
                 "adr-2608313200-bot-fleet-memory-jvm-cpython-and-amu-native"
                 "adr-2608313500-itonami-and-hermes-on-one-model-order-glm-flash-first"
-                "adr-2608301900-bots-import-ends-at-a-role-proposal"]
+                "adr-2608301900-bots-import-ends-at-a-role-proposal"
+                "adr-2608315000-murakumo-inference-endpoint-refuses-and-the-workforce-loses-56-percent"]
   :adr/body "## この文書は何か
 
 2026-08-31 の 1 セッションの gap ledger と resume point。**live に加えた変更が
@@ -205,7 +206,10 @@ EDN の map はキー順が保証されないので `created-at` は marker よ�
 1. **今夜 01:40** の `itonami-coverage-scout` —— **hermes 側の** scheduler 経由の
    完走を一度も観測していない。最初の観測点。（itonami 側の tick は上で観測済み）
 2. `itonami-canvas-watch` を戻すかはオーナー判断（理由が記録されていない）。
-3. **murakumo fleet の 502。** 修正後 52 run の 56% がこれで落ちる
-   （`connection_refused`）。cloud-itonami の管轄外で、次に入るなら
-   `network-awai/cloud-murakumo-api` と fleet 側の面。
+3. ~~murakumo fleet の 502 の所在~~ **特定済み。ADR-2608315000 に分離した。**
+   `local-murakumo` の推論口 `127.0.0.1:8090` が connection_refused、
+   fleet は online 9 / expected 11（offline: issachar, naphtali）、hosted model は
+   両方 `generation-ok=false`。**次に入るならその 8090 のプロセスと 2 ノード。**
+   payload では壊れないことは実測済み（app と同型の 4,620 B / 16384 out が 5/5、
+   52.8–144.0s）。
 "}]
