@@ -2464,5 +2464,28 @@
               rotation ate the rest. A young log and a rotated-away log both
               fall short of the window and only one is a problem, so they are
               reported separately; the fleet MINIMUM conflated them and read
-              0.0h because one profile's log was a minute old."}
+              0.0h because one profile's log was a minute old.
+              2026-08-31 addendum 2, from its first real run: the window lets a
+              FIXED credential clear a finding but not a RESTARTED gateway, and
+              a restart is how this is actually fixed -- the env loader marks a
+              home applied after its first fetch attempt, success OR error, so
+              one transient failure poisons a KeepAlive process for its whole
+              life. Measured: three profiles held findings whose newest lines
+              were 10:27, 19:24 and 11:23 while every running gateway had
+              started at 12:22 or later; all three were about processes that no
+              longer existed and nothing said so. Findings are now correlated
+              with the profile's live gateway from `ps` alone (no env read, no
+              secret): newer process -> warn, older -> keep, and NOT FOUND ->
+              KEEP, because downgrading on a failed lookup turns 'I could not
+              find it' into 'it is gone'. Two bugs in that correlation were
+              found by running it and both answered confidently rather than
+              erroring -- a shell command quoting this file counted as a
+              gateway, and `--profile <n>` processes were filed under <root>
+              because only the path form was read. Both are pinned, and the
+              first fixtures for both stayed GREEN with the rule inverted
+              (the stray named an existing profile; the flag-form line had no
+              path to disagree with), so the fixtures were reshaped until the
+              break was visible. ps is retried once: one read in four came back
+              empty at load 46, and a transient there flips every finding
+              between fail and warn -- two failures still print UNREADABLE."}
 ]}
