@@ -40,10 +40,33 @@
  ;; comparable, so this is what makes a two-offer challenge decidable.
  :allowance/rails [["murakumo" "CREDITS"]]
 
+ ;; Every id says WHERE it is anchored, so the name can be checked against
+ ;; something rather than taken on trust. `scripts/verify-bot-allowances.cljs`
+ ;; resolves each one and REFUSES to report a clean registry when it could not
+ ;; ask — an id nothing answers to is dead policy, and a real bot missing from
+ ;; this file silently cannot pay.
+ ;;
+ ;;   :runs-as/launchd  — a plist in ~/Library/LaunchAgents (this host)
+ ;;   :runs-as/skill    — a skill in .claude/skills (invoked by a loop or by hand)
+ ;;   :runs-as/hermes   — a Hermes cron job; its jobs live in Hermes's own
+ ;;                       SQLite, so this one cannot be checked from the tree
+ ;;                       and is reported UNVERIFIED rather than ok
  :allowance/bots
- {"repo-bot-drain"     {:credits/per-call 1 :credits/per-day 20}
-  "docs-edn-repair"    {:credits/per-call 1 :credits/per-day 10}
-  "adr-inventory"      {:credits/per-call 1 :credits/per-day 10}
-  "rule-kaizen"        {:credits/per-call 1 :credits/per-day 10}
-  "itonami-ingest-scout"   {:credits/per-call 1 :credits/per-day 30}
-  "itonami-coverage-scout" {:credits/per-call 1 :credits/per-day 30}}}
+ {"repo-bot-drain"
+  {:credits/per-call 1 :credits/per-day 20
+   :runs-as/launchd "com.gftd.repo-bot-drain" :runs-as/skill "repo-bot-drain"}
+
+  "docs-edn-repair"
+  {:credits/per-call 1 :credits/per-day 10 :runs-as/skill "docs-edn-repair"}
+
+  "adr-inventory"
+  {:credits/per-call 1 :credits/per-day 10 :runs-as/skill "adr-inventory"}
+
+  "rule-kaizen"
+  {:credits/per-call 1 :credits/per-day 10 :runs-as/skill "rule-kaizen"}
+
+  "itonami-ingest-scout"
+  {:credits/per-call 1 :credits/per-day 30 :runs-as/hermes "itonami-ingest-scout"}
+
+  "itonami-coverage-scout"
+  {:credits/per-call 1 :credits/per-day 30 :runs-as/hermes "itonami-coverage-scout"}}}
