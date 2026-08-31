@@ -38,7 +38,9 @@
    "auth.x402.nexus / auth.isekai.network -> curl exit 6 (NXDOMAIN)"
    "6 apex とも Authorization: Biscuit を付けた応答が付けないものと正規化後バイト同一"
    "pds.aozora.app /xrpc/com.atproto.server.getSession -> HTTP 200 body AuthMissing"
-   "cloud-itonami-app services/app-edge/wrangler.jsonc に routes 記述なし"]
+   "cloud-itonami-app services/app-edge/wrangler.jsonc に routes 記述なし"
+   "deploy 2026-08-31: kotobase-protocols-worker version 44e201d8-1c85-405e-af59-118a7737a7f6, control-plane adc2b753 — sparql/gremlin/graphql が Biscuit を読む (201 tests, 0 failures)"
+   "control 実行 (rung 除去): 落ちたのは acceptance test 1 本のみ。refusal test 6 本と header-changes-answer test は緑のまま"]
   :adr/body
   "# ADR-2608311600: 6 apex に対する 1 つの認証・権限設計
 
@@ -168,14 +170,41 @@ selftest は 6/6 green で、次を実演する: 今日の面は空虚に緑で�
 **⚠ この ADR に実測値を書き足さないこと。** §3 の表は 2026-08-31 の値であり、引用する側は
 日付を落とす。現在地は probe を回して得る。
 
+## 6.5 着地記録（2026-08-31）
+
+**§5 の 1 は kotobase の query 3 面で着地・本番稼働。** `kotobase-protocols-worker`
+version `44e201d8-1c85-405e-af59-118a7737a7f6`、control-plane `adc2b753`。
+`sparql` / `gremlin` / `graphql` が `Authorization: Biscuit` を読むようになり、
+`www-authenticate` が `Biscuit, Bearer` に、拒否は `presented Biscuit rejected:
+malformed-token` のように**理由を名乗る**。第 2 の verifier は書いていない
+（`kotobase.biscuit-grant` に委譲）。201 tests / 1121 assertions、0 failures。
+
+**残るのは datom 面**（`kotobase.net/xrpc/…datomic.q`、別 Worker）。probe の
+`:raw/planes-reading` が `3/4` と記録する。axis は 4 面すべてが読むまで false の
+ままで、これは正しい —— **一部の面だけが読む apex は、まだ終わっていない。**
+
+### 着地の途中で分かった 2 つのこと
+
+1. **計器が apex ごとに plane を 1 本しか測っていなかった。** deploy 後に probe を
+   回して「変わらない」と出たが、**原因は変更ではなく計器**で、kotobase について
+   訊いていた 1 本は datom 面（別 Worker）だった。**1 面を測った答えが apex の答えと
+   して引用される。** 現在は listed plane 全部を測り、全部が読むまで true にしない。
+   plane を足すことはスコアを下げることはあっても上げることはない。
+2. **§7 の懸念が実演で確認された。** rung を外した control 実行で、**落ちたのは
+   acceptance test 1 本だけ**だった —— 「header を付けると答えが変わる」テストは
+   **rung が無くても緑のまま**（401 の本文を組む側が独立に理由を書くため）。
+   つまり probe の `plane-reads-capability` が true になっても、**それは surface が
+   credential を正しく読んで通す証拠にはならない。** 6 つの refusal test も
+   溶接された扉に対して全部緑だった。**判別しているのは acceptance だけ。**
+
 ## 7. やっていないこと（正直に）
 
-- **§5 は 1 つも着地していない。** この ADR と計器だけが今日の成果物。
+- **§5 の 2〜5 は着地していない。** 1 も datom 面が残っている。
 - **probe は credential を持たない。** 測れるのは「拒否がどう名乗るか」までで、
   **正当な Biscuit が実際に通ることは測っていない。**
 - **`plane-reads-capability` は正しい Biscuit で測っていない。** 構文だけの
-  `Biscuit EnwAAA` を付けて答えが変わるかを見る。読んでいる面なら 401 の理由が変わるので
-  **false は強い証拠**だが、**true になったときそれが正しく読んでいる証拠にはならない。**
+  `Biscuit EnwAAA` を付けて答えが変わるかを見る。**false は強い証拠**だが、
+  **true は正しく読んでいる証拠にならない** —— §6.5 の 2 で実演済み。
 - **fleet gate にしていない。** 外向き HTTPS を要求し、ノードの egress は一様ではない。
   常駐させるなら operator ホスト 1 台に置く。
 - **itonami の checkout は最後に fetch した main より 57 commit 遅れている。**
