@@ -150,6 +150,30 @@
      :must [:define-agent-procedure :declare-inputs :declare-outputs]
      :must-not [:require-resident-runner :own-ci-state]
      :examples ["skill-ux-kaizen"]}
+    ;; ── agent-host plugins (2026-08-31, ADR-2608318100) ────────────
+    ;; action- adapts this workspace's work to GitHub's runner. plugin-
+    ;; adapts it to an agent host (Hermes today) that loads code and calls
+    ;; it as tools. Same shape, different runner, so the same must-nots
+    ;; apply: the adapter carries no domain contract and no second copy of
+    ;; a decision that already has one owner. The host dictates the
+    ;; language, which is exactly why the decision must not live in it --
+    ;; a reimplementation there is a second decider, and two answers that
+    ;; agree until they do not (ADR-2608197300 sections 3 and 5).
+    {:prefix "plugin-"
+     :role :agent-host-plugin-adapter
+     ;; Loaded when the host starts a turn; holds no loop of its own.
+     :execution :on-demand
+     :must [:expose-a-host-plugin-manifest
+            :delegate-every-decision-to-its-owner
+            :distinguish-could-not-answer-from-answered-no
+            :ship-a-probe-that-verifies-an-install]
+     :must-not [:own-domain-contract
+                :reimplement-a-decider-in-the-host-language
+                :require-resident-runner]
+     :examples ["plugin-hermes"]
+     ;; The first instance of this shape predates the prefix and lives in
+     ;; the superproject rather than a repo: scripts/hermes-dashboard-auth-did.
+     :prior-art ["com-junkawasaki/root scripts/hermes-dashboard-auth-did"]}
     {:prefix "action-"
      :role :github-action-adapter
      ;; Fires on a workflow event.
