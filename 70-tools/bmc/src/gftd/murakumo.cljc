@@ -3,29 +3,95 @@
    (ADR-2607180400). Pure builders + response parsers; I/O is injected.
 
    Default endpoint: https://api.murakumo.cloud/v1/chat/completions
-   (public try-it path; enable_thinking off so content is not empty)."
+   (public try-it path; enable_thinking off so content is not empty).
+
+   Model resolution (ADR-2607173100, repo-wide mandatory): concrete model
+   ids are never baked into defaults — they die when the fleet repoints
+   one KV entry. Resolution order:
+
+     1. explicit `:model` opt, else BMC_MURAKUMO_MODEL env
+     2. `murakumo-main` alias → GET /infer/models/murakumo-main, serve
+        `alias-for` when the entry is :serving
+     3. endpoint-only fallback → GET /v1/models, take the first id
+
+   The failure this replaces: `default-model` was a bare checkpoint id,
+   the fleet stopped serving it, and every advisor tick failed the call
+   and fell through to gate-only — printing as `proposals: 0` rather than
+   as an error, so the loop looked idle for as long as nobody read the
+   ledger closely (root#2844, measured 2026-08-31)."
   (:require [clojure.string :as str]
             #?(:clj [clojure.data.json :as json])))
 
 (def default-url "https://api.murakumo.cloud/v1/chat/completions")
-(def default-model
-  "The ALIAS, never a checkpoint id (ADR-2607173100).
 
-  This read `\"qwen3.6-35b-a3b\"` until 2026-08-31, and by then the fleet had
-  stopped serving it — measured, that id answers HTTP 522 from the origin while
-  `murakumo-main` completes normally. Every auto-advisor tick had been failing
-  the call and falling through to gate-only, which prints as `proposals: 0`
-  rather than as an error, so the loop looked idle instead of broken.
+(def alias-url "https://api.murakumo.cloud/infer/models/murakumo-main")
+(def models-url "https://api.murakumo.cloud/v1/models")
 
-  Naming the *next* checkpoint would buy the same bug again on the next swap.
-  The alias is one KV entry the operator repoints, and its dereference is the
-  only thing that survives a model change. Measured the same day:
-  `qwen3.8-27b-fastmtp-aggressive` — the concrete id first proposed as the
-  replacement — is itself served out of `qwen3.8-27b-throughput-b70`, so it
-  does not even name the model that answers it."
-  "murakumo-main")
+;; The STARTING point of resolution, not the answer: `resolve-model` treats
+;; this as the `murakumo-main` alias and dereferences it. Naming a concrete
+;; checkpoint here would reintroduce exactly the root#2844 failure the
+;; resolution exists to prevent.
+(def default-model "murakumo-main")
+
 (def default-max-tokens 400)
 (def user-agent "gftd-bmc/0.1 (portfolio business react loop)")
+
+(defn parse-json-body
+  "Parse JSON body string → cljs/clj map. nil on failure."
+  [body]
+  (try
+    #?(:clj  (json/read-str (str body))
+       :cljs (js->clj (js/JSON.parse (str body)) :keywordize-keys false))
+    (catch #?(:clj Exception :cljs :default) _ nil)))
+
+(defn- serving?
+  "An alias entry answers only while its status is serving — a stale or
+  withdrawn alias must fall through, not be trusted."
+  [entry]
+  (= "serving" (or (get entry "status") (:status entry))))
+
+(defn alias-target
+  "Extract `alias-for` from a decoded /infer/models/murakumo-main body.
+  nil unless the entry is present, serving, and names a target."
+  [parsed]
+  (when (serving? parsed)
+    (or (get parsed "alias-for") (:alias-for parsed))))
+
+(defn first-model-id
+  "First id out of a decoded /v1/models body (endpoint-only fallback)."
+  [parsed]
+  (when-let [data (or (get parsed "data") (:data parsed))]
+    (when (sequential? data)
+      (when-let [m (first data)]
+        (or (get m "id") (:id m))))))
+
+(defn resolve-model
+  "ADR-2607173100 resolution order:
+
+     1. explicit `model` opt (caller argument — beats everything)
+     2. BMC_MURAKUMO_MODEL env (env-get injected for tests)
+     3. murakumo-main alias: GET alias-url, serve alias-for while :serving
+     4. endpoint-only fallback: GET models-url, take the first id
+
+  Returns a string, or nil when nothing could be resolved. nil is the
+  caller's cue to build the request with the ALIAS itself (`default-model`)
+  rather than a guessed checkpoint id: the OpenAI-compatible endpoint
+  dereferences `murakumo-main` server-side, so sending the alias is always
+  safe and never bakes an id.
+
+  `http-get!` is (fn [url] → {:status n :body s}); injected so resolution
+  is testable. It may return the same shape `http-post!` does."
+  [http-get! {:keys [model env-get]}]
+  (or model
+      (let [env-model (when env-get (env-get "BMC_MURAKUMO_MODEL"))]
+        (or (when (seq env-model) env-model)
+            (let [res (try (http-get! alias-url) (catch #?(:clj Exception :cljs :default) _ nil))
+                  parsed (and res (:body res) (parse-json-body (:body res)))]
+              (or (alias-target parsed)
+                  (let [res (try (http-get! models-url)
+                                 (catch #?(:clj Exception :cljs :default) _ nil))]
+                    (when (and res (:body res))
+                      (first-model-id (parse-json-body (:body res)))))))))))
 
 (defn build-body
   "OpenAI chat.completions request body map for a single prompt."
@@ -65,14 +131,6 @@
     (let [c (str/trim (str content))]
       (strip-fences (if (seq c) c (str/trim (str reasoning)))))))
 
-(defn parse-json-body
-  "Parse JSON body string → cljs/clj map. nil on failure."
-  [body]
-  (try
-    #?(:clj  (json/read-str (str body))
-       :cljs (js->clj (js/JSON.parse (str body)) :keywordize-keys false))
-    (catch #?(:clj Exception :cljs :default) _ nil)))
-
 (defn complete-from-http-result
   "Map {:status n :body s} → content string or nil.
    Non-2xx / empty content → nil (caller falls back to gate-only)."
@@ -85,24 +143,32 @@
 (defn make-complete
   "Return (fn [prompt] → string-or-nil).
    `http-post!` is (fn [{:keys [url headers body]}] → {:status :body}).
+   `http-get!` (optional) is (fn [url] → {:status :body}) and powers the
+   ADR-2607173100 model resolution; without it the request carries the
+   `murakumo-main` alias itself, which the endpoint resolves server-side.
    Fail-soft: network/HTTP/parse errors yield nil so the ReAct tick can fall
    back to the deterministic gate-aware advisor."
-  [http-post! {:keys [url model max-tokens] :as opts}]
-  (let [url (or url default-url)]
-    (fn [prompt]
-      (try
-        (let [body #?(:clj  (json/write-str (build-body prompt opts))
-                      :cljs (js/JSON.stringify
-                             (clj->js (build-body prompt opts))))
-              res (http-post! {:url url
-                               :headers {"Content-Type" "application/json"
-                                         "User-Agent" user-agent}
-                               :body body})]
-          (complete-from-http-result res))
-        (catch #?(:clj Exception :cljs :default) e
-          (println "murakumo complete failed:"
-                   #?(:clj (.getMessage e) :cljs (or (.-message e) (str e))))
-          nil)))))
+  ([http-post! opts] (make-complete http-post! nil opts))
+  ([http-post! http-get! {:keys [url model env-get] :as opts}]
+   (let [url (or url default-url)
+         ;; Resolution happens once per complete-maker, not per call: one
+         ;; tick dereferences the alias once and then issues its calls.
+         resolved (or model (resolve-model http-get! opts) default-model)]
+     (fn [prompt]
+       (try
+         (let [opts' (assoc opts :model resolved)
+               body #?(:clj  (json/write-str (build-body prompt opts'))
+                       :cljs (js/JSON.stringify
+                              (clj->js (build-body prompt opts'))))
+               res (http-post! {:url url
+                                :headers {"Content-Type" "application/json"
+                                          "User-Agent" user-agent}
+                                :body body})]
+           (complete-from-http-result res))
+         (catch #?(:clj Exception :cljs :default) e
+           (println "murakumo complete failed:"
+                    #?(:clj (.getMessage e) :cljs (or (.-message e) (str e))))
+           nil))))))
 
 (defn compose-gate+llm
   "Advisor that always runs gate-aware (deterministic progression), then
