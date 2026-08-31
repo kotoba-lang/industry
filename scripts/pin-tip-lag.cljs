@@ -54,6 +54,20 @@
 ;; fleet with lagging pins. A run that surveys nothing at all also exits 2
 ;; rather than reporting an empty, passing fleet.
 ;;
+;; That retry only ever covered a batch failing WHOLE. GitHub answers a partial
+;; failure as 200-with-errors: the repositories it could read are on stdout and
+;; the rest are null. That parses, so the batch counted as :ok and its nulls
+;; were reported UNRESOLVED without being asked a second time. Measured
+;; 2026-08-31: a run reported FAILED_BATCHES 0 with UNRESOLVED 240 of 4252, and
+;; re-asking for exactly those 240 once resolved every one -- they were neither
+;; archived nor renamed, just a transient partial failure the tool could not
+;; retry. So the nulls are now re-asked too (resolve-batch, up to 3 rounds).
+;; This does not weaken the refusal: what still will not resolve is still
+;; UNRESOLVED and still exits 2. It stops `could not measure` being the routine
+;; answer, which is what teaches a reader to skip the survey.
+;;
+;; `--self-test` proves both directions offline, with no network and no fleet.
+;;
 ;; exit 0: every surveyable pin is at its tip
 ;; exit 1: at least one pin differs from its tip (rows on stdout)
 ;; exit 2: the survey could not answer -- do not read this as either of the above
@@ -173,6 +187,79 @@
             (err-println "  retry" (inc n) "for batch" idx)
             (recur (inc n)))))))
 
+(defn- fill-tips
+  "items -> items with :tip filled from one GraphQL round. Unresolvable ones
+  come back without :tip."
+  [items idx]
+  (let [{:keys [ok err]} (gql-batch-retry items idx)]
+    (if err
+      {:err err}
+      {:items (vec (map-indexed
+                     (fn [j it]
+                       (assoc it :tip (get-in (:data ok)
+                                              [(keyword (str "r" j)) :defaultBranchRef :target :oid])))
+                     items))})))
+
+(defn resolve-batch
+  "Resolve every item's tip, re-asking for the ones that came back empty.
+
+  gql-batch-retry only retries when the WHOLE batch fails. GitHub's GraphQL
+  answers a partial failure as 200-with-errors: the repositories it could read
+  are on stdout and the rest are null. That parses, so the batch counts as :ok
+  and its nulls were reported as UNRESOLVED without ever being asked again.
+
+  Measured 2026-08-31 on this fleet: a run reported FAILED_BATCHES 0 with
+  UNRESOLVED 240 of 4252 -- and re-asking for exactly those 240, once, resolved
+  all of them. They were not archived, renamed or missing; they were a transient
+  partial failure that the tool was structurally unable to retry. A survey whose
+  routine answer is `could not measure` teaches its reader to skip it, which is
+  worse than the drift it exists to find."
+  ([items idx] (resolve-batch items idx fill-tips true))
+  ([items idx fill sleep?]
+   (let [first-round (fill items idx)]
+     (if (:err first-round)
+       first-round
+       (loop [acc (:items first-round) round 1]
+         (let [missing (vec (remove :tip acc))]
+           (if (or (empty? missing) (> round 3))
+             {:items acc}
+             (do (err-println "  re-asking for" (count missing)
+                              "null repositor(ies) in batch" idx "- round" round)
+                 (when sleep? (try (.execSync cp "sleep 3") (catch :default _ nil)))
+                 (let [again (fill missing (str idx "-r" round))]
+                   (if (:err again)
+                     {:items acc}          ;; keep what we have; the caller counts the rest
+                     (let [fixed (into {} (for [it (:items again) :when (:tip it)]
+                                            [(:name it) (:tip it)]))]
+                       (recur (mapv #(if (and (nil? (:tip %)) (fixed (:name %)))
+                                       (assoc % :tip (fixed (:name %)))
+                                       %)
+                                    acc)
+                              (inc round)))))))))))))
+
+(when (some #{"--self-test"} argv)
+  (let [mk (fn [n] {:name n :remote "o" :revision "dead"})
+        three [(mk "a") (mk "b") (mk "c")]
+        ;; round 1 returns nulls for b and c, later rounds answer everything:
+        ;; a transient partial failure, which is what 200-with-errors is
+        calls (atom 0)
+        flaky (fn [items _idx]
+                (swap! calls inc)
+                {:items (mapv #(assoc % :tip (if (and (= 1 @calls) (not= "a" (:name %)))
+                                               nil "tip")) items)})
+        recovered (resolve-batch three "t" flaky false)
+        ;; and one that never answers: must stay unresolved, not loop forever
+        never (fn [items _idx] {:items (mapv #(assoc % :tip nil) items)})
+        stuck (resolve-batch three "t" never false)
+        ok? (fn [label pred] (println (if pred "PASS" "FAIL") label) pred)
+        r1 (ok? "a transient null is re-asked and recovered"
+                (every? :tip (:items recovered)))
+        r2 (ok? "and it took more than one round to get there" (> @calls 1))
+        r3 (ok? "a permanent null stays unresolved rather than being invented"
+                (every? (complement :tip) (:items stuck)))
+        r4 (ok? "and the re-ask loop terminates" (= 3 (count (:items stuck))))]
+    (js/process.exit (if (and r1 r2 r3 r4) 0 1))))
+
 (def total-batches (js/Math.ceil (/ (count candidates) batch-size)))
 
 (loop [i 0 differing 0 unresolved 0 failed 0]
@@ -187,16 +274,13 @@
                              (pos? differing)                     1
                              :else                                0)))
     (let [items (subvec candidates i (min (count candidates) (+ i batch-size)))
-          {:keys [ok err]} (gql-batch-retry items (quot i batch-size))]
+          outcome (resolve-batch items (quot i batch-size))
+          err (:err outcome)]
       (err-println "batch" (inc (quot i batch-size)) "of" total-batches
                    (if err (str "FAILED: " (subs (str err) 0 (min 160 (count (str err))))) ""))
       (if err
         (recur (+ i batch-size) differing (+ unresolved (count items)) (inc failed))
-        (let [data (:data ok)
-              res  (map-indexed
-                     (fn [j it]
-                       (assoc it :tip (get-in data [(keyword (str "r" j)) :defaultBranchRef :target :oid])))
-                     items)
+        (let [res  (:items outcome)
               hits (filter #(and (:tip %) (not= (:tip %) (:revision %))) res)]
           ;; streamed, not accumulated: an eleven-minute run that is killed at
           ;; minute nine should still have told you what it found by minute nine
