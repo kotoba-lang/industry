@@ -67,6 +67,19 @@
 (def shared-passkey-path "/v1/passkey/login/options")
 (def alternate-passkey-paths ["/api/passkey/login/begin" "/passkey/login/options"])
 
+(def shaped-biscuit
+  "A token of the shape a real one has, not a placeholder.
+
+  This probe first used `Biscuit EnwAAA` -- six characters. Measured
+  2026-08-31: both the kotobase gateway and murakumo require
+  `[A-Za-z0-9_-]{80,8192}` before they will even forward a token, so a
+  six-character value was discarded as *no credential* and produced exactly
+  the anonymous answer. The axis below then reported `does not read the
+  header` about surfaces that read it fine. **An input too small to be
+  considered cannot discriminate**, and it fails in the direction that looks
+  like a finding."
+  (str "Biscuit " (apply str (repeat 200 "A"))))
+
 (def auth-words ["biscuit" "bearer" "cacao" "credential" "authorization"
                  "unauthorized" "auth" "token" "sigv4"])
 
@@ -157,7 +170,7 @@
   [plane]
   (let [bare (curl (assoc plane :headers ["content-type: application/json"]))
         with (curl (assoc plane :headers ["content-type: application/json"
-                                          "Authorization: Biscuit EnwAAA"]))]
+                                          (str "Authorization: " shaped-biscuit)]))]
     {:url (:url plane)
      :bare bare
      :with with
@@ -232,8 +245,19 @@
                             ;; a capability issuer, it is a token faucet.
                             :else (= 403 (:status mint)))
      ;; EVERY listed plane, not the first one. An apex whose query surfaces
-     ;; read the header while its datom plane does not has not finished.
-     :plane-reads-capability (cond
+     ;; distinguish a presented credential while its datom plane does not has
+     ;; not finished.
+     ;;
+     ;; NAME: this axis was called `plane-reads-capability` until 2026-08-31,
+     ;; when reading the gateway proved it forwards the header and the answer
+     ;; is identical anyway. It never measured whether a surface READS a
+     ;; credential -- it measures whether its REFUSAL distinguishes a
+     ;; presented one from none, which is the property an operator can act on
+     ;; and the one the graph database already names (`biscuit-scheme?` there
+     ;; is deliberately broader than its wire matcher, so a malformed token
+     ;; stays a rejection). An axis named for a mechanism it cannot see gets
+     ;; quoted as evidence about that mechanism.
+     :refusal-distinguishes-credential (cond
                                (some #(= :unknown (:reads %)) measured) :unknown
                                :else (every? #(true? (:reads %)) measured))
      :refusal-names-credential (cond
