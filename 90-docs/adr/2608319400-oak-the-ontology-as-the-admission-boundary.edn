@@ -1,0 +1,132 @@
+[{:db/id -1
+  :adr/id "adr-2608319400-oak-the-ontology-as-the-admission-boundary"
+  :adr/title "OaK: the ontology as the admission boundary for an agent's calls"
+  :adr/status "accepted"
+  :adr/date "2026-08-31"
+  :adr/related ["adr-2607201300-kotoba-safe-application-language"
+                "adr-2607279200-kotoba-centered-migration-plan"
+                "adr-2608261100-kotoba-app-vertical-slice-migration-unit"]
+  :adr/body
+  "## Context
+
+The owner pointed at OaK -- Ontology-as-a-Kernel, from `Toward Effective and
+Reliable LLM Agents via Dynamic Ontology` (Zhang, Sun, Yang, Cui, Guo, Hu;
+arXiv:2608.22974) -- and asked for it to be implemented on amu and Kotoba.
+
+**The paper was not read.** The specification implemented is the description
+the owner supplied: the kernel is `K = (S, F)`, a task-oriented ontology
+schema plus the executable reasoning functions permitted over it, and the
+agent computes through `F` rather than over the store. Treat the
+correspondence as a reading of the idea, not as fidelity to its algorithms.
+The dynamic half -- building `S` and `F` from training data and refining them
+against a judge -- is NOT implemented; `S` is hand-written and fixed.
+
+## Decision
+
+`kotoba-lang/oak`. One `.kotoba` guest, one exported entry (`oak-call`), the
+graph behind `:dataspace/transact`.
+
+The framing lands on this stack almost without translation, because Kotoba
+already refuses ambient authority. Three properties OaK argues for are not
+things this implementation adds; they are things it cannot avoid:
+
+- the agent computes only through `F` -- `F` is not exported, `oak-call` is
+- the agent cannot reach the store -- the graph is behind capability id 24,
+  and a guest that does not hold it cannot name a pattern
+- a refusal is a result, not a crash -- no ambient `throw`, so every refusal
+  is `[:rejected code detail]`
+
+`S` is an ordinary document, so it has a `document-sha256` identity, and every
+result carries it. A result is attributable to the schema that admitted it.
+An entity's TYPE is not a field of the schema and not an argument of the call
+-- it is an assertion in the graph, put there by an earlier admitted
+`:declare`, so checking a domain constraint is itself a graph query.
+
+`dataspace-v1` was chosen for the graph plane because it is the only
+capability kit qualified on `:reference`, `:wasm-aot`, `:native-aot` AND
+`:jit` (measured 2026-08-31; read the kit file, not this sentence).
+
+## Two ceilings, and only one of them is the kernel's
+
+A query result is one document and a document container holds
+`document-container-item-limit` (32) items, so a 33rd fact would be one the
+kernel could never report. The kernel refuses it on the WRITE side with
+`:oak/graph-at-capacity`. It has to be the write side: the provider does not
+answer 'too many', it traps while encoding its reply, and a Kotoba guest has
+no `catch`.
+
+Reading is bounded AGAIN by the host's fuel, and that ceiling is not ours.
+Measured 2026-08-31 on the reference interpreter at default fuel: a census
+answers at 24 declared entities and traps `:fuel-exhausted` at 28 -- so on
+that host fuel runs out before the document does. The conformance suite
+therefore does not name a size. It probes for the running host's own ceiling
+and asserts the invariant on both sides: below it a read answers; above it
+what comes out is a Kotoba trap naming `:fuel-exhausted`, never a wrong answer
+and never a host error object. The same self-calibrating shape
+`kir_host_stack_trap_test` uses, and for the same reason.
+
+## Two upstream defects this uncovered, both fixed and merged
+
+Neither was reachable from a `.clj` test, and the fleet gate for kotoba-kir is
+`:jvm-test`, so nothing had executed the `:cljs` branches.
+
+**1. Every indexed document operation was broken on ClojureScript.** An i64 is
+a Long on the JVM and a BigInt on cljs, and `nth` / `assoc` / `subvec` / `inc`
+all reject a BigInt. Each operation handed the host collection the i64 it had
+just range-checked, so:
+
+    (document-vector-at [10 20 30] 0)   ;; host TypeError escaped
+    (document-vector-at [10 20 30] 9)   ;; clean none
+
+The IN-RANGE read -- the one every real program does -- was the one that
+threw, and the out-of-range read answered cleanly. **The broken path was the
+quieter of the two**, and a test that only checked that a bad index yields
+`none` would have stayed green while no document could be read at all.
+Measured: all six of `document-vector-at`, `document-list-at`,
+`document-map-entry-at`, `document-vector-assoc`, `document-vector-drop`,
+`document-vector-remove`. Fixed by `container-host-index`; the regression test
+fails 10 assertions without it and its out-of-range control passes either way.
+
+**2. `document-sha256` was JVM-only.** The W4 exit-gate identity for a logical
+document reached `MessageDigest` on the JVM and `(throw ...)` on cljs, while
+every other document operation was portable. The thrown message said the
+operation `requires the JVM/Node host path` -- and nbb IS Node -- which is why
+the gap read as a deliberate restriction rather than a missing branch. Now
+routed through `multiformats.core/sha256`, already a direct dependency. The
+test vector is pinned to `shasum -a 256` over the canonical bytes, so neither
+host's own digest is the oracle for the other.
+
+## Evidence
+
+19 conformance checks, run JVM-free under nbb (analyze -> lower -> instantiate
+-> invoke, all `.cljc`). Green is cheap, so each was measured by breaking the
+kernel one edit at a time and confirming that what went red was what the check
+is named after:
+
+- domain check made vacuous -> ONLY the domain check failed, showing the call
+  falling through to the range check
+- capacity guard removed -> the two capacity checks, reporting the provider's
+  own `document-edn-read vector item limit exceeded`
+- evidence digest replaced by a constant -> the digest check
+- query results discarded -> six checks
+
+That third mutation found a defect in the suite itself: the capacity block was
+letting the provider's trap escape as an uncaught host error, so the run
+STOPPED rather than reporting a failure. A check that cannot run must not exit
+the way a check that ran and passed exits. Fixed before landing.
+
+The runner exits 2 -- neither 0 nor 1 -- and names the missing repositories
+when a sibling checkout is absent.
+
+## Consequences
+
+- New UI/agent work that needs a governed graph has a worked example of the
+  admission pattern that does not require reading the compiler.
+- The two kotoba-kir fixes make the whole document plane usable under nbb,
+  which is the JVM-free path Q9 requires. This was blocking more than oak.
+- What is NOT here: no judge loop, no schema learned from data, no
+  multi-schema kernel, no retraction. `S` is edited by hand and the kernel is
+  recompiled.
+- The naming plane is `subject` (bare name). `oak` is a metaphor name, so the
+  README names itself in its first paragraph and distinguishes itself from
+  OAK, the Ontology Access Kit, which is a different project."}]

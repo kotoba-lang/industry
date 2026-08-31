@@ -71,6 +71,13 @@
               "実行時リンク" "runtime link"]
   :note "kotoba-lang/kototama が T3 の存在。成果物を宿し、aiueos が貸した named provider にだけ結ぶ。Solo5 の tender は役割語であって製品名ではない。宿は kototama-native（旧 tender-native、ns kototama.native.executor）/ kototama-component（旧 tender-component）/ wasm-webcomponent（browser）。kotodama は別 runtime（ADR-2607050900）。索引: ADR-2608139980。"}
 
+ :ontology-kernel
+ {:label "OaK（ontology-as-a-kernel: 入場を決める schema）"
+  :spellings ["oak" "ontology-as-a-kernel" "ontology kernel" "オントロジー"
+              "オントロジーカーネル" "schema admission" "domain range"
+              "agent admission" "K=(S,F)"]
+  :note "kotoba-lang/oak が K=(S,F) —— S は entity type と domain/range を持つ document、F は S に照らして admit された呼び出しだけが届く関数表。agent は oak-call に型付き値を渡すだけで dataspace capability を持たない。名前は隠喩なので README 冒頭で名乗る。INCATools の OAK（Ontology Access Kit）とは別物。kotoba-lang/ontology は object-type + provenance の登録簿で、こちらは呼び出しの権限境界 —— 層ではなく別の問い。索引: ADR-2608319400。"}
+
  :kotoba-vm
  {:label "kotoba-vm（IPLD actor invocation kernel）"
   :spellings ["kotoba-vm" "fvm" "filecoin vm" "filecoin virtual machine"
