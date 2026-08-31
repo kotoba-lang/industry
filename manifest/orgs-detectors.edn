@@ -2453,5 +2453,16 @@
               Log classes carry a 48h window on purpose: without one the first
               401 ever logged is a finding forever, and a detector that cannot
               return to green is the silence it was built to break. Pool state
-              carries no window -- `exhausted` is a fact about now."}
+              carries no window -- `exhausted` is a fact about now.
+              2026-08-31 addendum: it read only the LIVE errors.log, so the 48h
+              window was really whatever survived rotation. Measured that day,
+              with a desktop client flooding the log at ~140 lines/min, the
+              root profile's oldest surviving line was 55 minutes old and one
+              real finding had already been evicted -- reading errors.log.1
+              and .2 brought it back. It now also prints LOGSPAN: how many
+              profiles actually cover the window, and names the ones where
+              rotation ate the rest. A young log and a rotated-away log both
+              fall short of the window and only one is a problem, so they are
+              reported separately; the fleet MINIMUM conflated them and read
+              0.0h because one profile's log was a minute old."}
 ]}
