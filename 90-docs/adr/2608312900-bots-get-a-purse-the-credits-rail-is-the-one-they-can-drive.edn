@@ -132,10 +132,30 @@ X-PAYMENT を付けて再送し、支出を append-only に記録する。**人�
 **まだ通っていないこと（正直に）**:
 
 1. **正の経路は production で 1 度も通っていない。** ADR-2608150100 が同じ文で
-   『未実証』と書いた状態がまだ続いている。今日届いたのは
+   『未実証』と書いた状態がまだ続いている。live で届くのは
    **`insufficient-credits`** まで —— envelope は decode され、credits gate へ
-   routing され、残高だけが無い。**CACAO 検証が通ったことは主張しない**
-   （残高検査は台帳の transfer より手前にある）。
+   routing され、残高だけが無い。
+
+   ⚠ **残高検査が transfer より手前にあるので、live の probe は authorization に
+   ついて何も言えない。** 資金をいくら入れても見えない層なので、そこは test で
+   証明した（2026-08-31 夕方）: **bot が実際に mint した CACAO が、Worker が動かす
+   verifier を通り、その 1 件だけを authorize する** ——
+   `network-awai/local-murakumo` の `cacao_transfer_e2e_test`（11 assertion、
+   sabotage 3 種とも赤）。宛先の付け替え・金額の引き上げ・他人の口座からの引き落としは
+   3 つとも拒否される。
+
+   **この test が無ければ、bot の支払いは 1 件も通らなかった。** 配線した状態で
+   実際に測ったところ、`cacao.core/mint`（actor が署名する側）と
+   `cacao.edge.verify`（Worker が検証する側）が **2 箇所ずれていた**:
+   ① `statement` を署名側だけが含めていて、検証側の再構成が読まない ——
+   **正しく scope した署名が「署名が不正」として落ちる**（鍵違いと区別が付かない）
+   ② ミリ秒付き instant を core の verify は文字列比較で通し、edge は
+   `invalid CACAO iat` で拒否する。**私の payer は両方を同時に踏んでいた。**
+   原因は構造的で、既存の smoke が **edge↔edge** しか回しておらず、production の
+   組（core が署名し edge が検証する）を誰も突き合わせていなかったこと。
+   修正: `org-chainagnostic-cacao` 2327183e（edge が statement を再構成し、
+   mint が instant を正規化。conformance の意図的な不正ベクタは `:instants :raw`
+   で作り続けられる）+ root d7ae1d3f（payer が秒精度で mint する）。
 2. **bot の口座に残高が無い。** 名簿に載せることは permit であって funding ではない。
    資金供給は operator の credits 口座から bot へ transfer する操作で、**operator の
    鍵を要する**。これは owner の 1 手であって agent の 1 手ではない。
@@ -189,6 +209,7 @@ facilitator が鍵を持たないこと、USDC rail の価格と宛先。"
    "west pin a5a4c45c（pay / nexus-x402 / control-plane の 2 巡目）/ 8f30641f（3 巡目）"
    "**整理パス（2026-08-31 同日）**: kotoba-lang/pay d9e9f5ce（discovery が host の能力を必須引数で受ける。79 tests / 379 assertions）/ network-awai/nexus-x402 712a97cf（announce = admit 集合。84 tests / 372 assertions、Worker の /.well-known/x402 を実際に叩く test。**最初の版は定数どうしを比べていて、配線を戻しても緑のままだった**）/ com-junkawasaki/root 40c7d254（vendored pin の regex が `;;` を跨げず 5 件の pin 宣言が読まれていなかった: 44→39 no-pin。同 commit で bot 名簿の checker）"
    "deploy: nexus-x402 version 4996cd9a（announce 修正後）"
+   "**authorization 境界（2026-08-31 夕方）**: kotoba-lang/org-chainagnostic-cacao 2327183e（core が署名し edge が検証する組を初めて突き合わせた cross smoke、10 checks。JVM 56 tests / 211 assertions）/ network-awai/cloud-murakumo-api（旧名 local-murakumo）abdb7d9e（実 CACAO → 実 verifier → 実 decision、11 assertions、sabotage 3 種）/ com-junkawasaki/root d7ae1d3f。west pin 9094ab06 + 723e6b59"
    "kotoba-lang/pay 7db004a2（buyer が credits を読み、2 rail を金額順に並べない。19 tests / 67 assertions、負の control 3 本）"
    "network-awai/nexus-x402 bdc88235（/apply が credits を運ぶ。60 tests / 266 assertions、負の control 3 本）"
    "network-awai/cloud-murakumo aa277402（document が credits を宣言する。18 tests / 93 assertions、負の control 2 本）"
