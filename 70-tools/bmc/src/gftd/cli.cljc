@@ -715,7 +715,16 @@
                          root "/70-tools/bmc/src:"
                          root "/scripts/nbb_compat:"
                          root)
-                 _ (nc/spit tmp (pr-str (vec events)))
+                 ;; The helper is handed a SLICE — exactly what append! stamped.
+                 ;; Whether a seq is ambiguous is a property of the whole ledger,
+                 ;; so send the counts with it; without them a new event sharing
+                 ;; a seq with an already-projected one takes the bare
+                 ;; "bmc.event/<seq>" and cardinality-one upsert replaces that
+                 ;; earlier event. Only the seqs in this batch are sent: that is
+                 ;; all event->entity looks up, and the full map is ~10k entries.
+                 _ (nc/spit tmp (pr-str (kbase/slice-payload
+                                         (ledger/read-events (:ledger ps))
+                                         events)))
                  node-path (str root "/orgs/kotoba-lang/kotobase-client/node_modules"
                                 (when-let [p (nc/getenv "NODE_PATH")] (str ":" p)))
                  ;; nbb-compat/sh merges options into spawnSync; set env so
