@@ -88,9 +88,12 @@
 ;; Overridable so the unreachable-API refusal can actually be exercised.
 (def or-base (arg "--api" "https://openrouter.ai/api/v1"))
 
-;; Keys this script owns in ~/.hermes/config.yaml. Anything else at the top
-;; level means somebody configured Hermes by hand and a wholesale rewrite
-;; would silently drop it, so we refuse instead of clobbering.
+;; Keys this script owns in ~/.hermes/config.yaml — the ones it renders from
+;; scratch on every rewrite. Anything else at the top level is somebody else's
+;; (Hermes writes `_config_version`, `agent` and `plugins` during a
+;; config-format migration), and `carry-forward` copies those blocks through
+;; the rewrite verbatim. This used to be a refusal; see `carry-forward` for
+;; why a refusal was the wrong remedy for a hazard it named correctly.
 (def managed-config-keys #{"model" "fallback_providers" "providers" "secrets" "auxiliary"
                             "openrouter"})
 
@@ -137,6 +140,39 @@
 ;; nil emits no `openrouter:` block at all, which is Hermes's own default
 ;; (no response cache) rather than a cache with an unstated TTL.
 (def response-cache (:response-cache policy))
+
+;; Who OpenRouter credits for these calls. nil emits no header block, which
+;; leaves Hermes's own attribution in place — and Hermes names ITSELF there
+;; (`HTTP-Referer: https://hermes-agent.nousresearch.com`, `X-Title: Hermes
+;; Agent`, `_OR_HEADERS_BASE` in agent/auxiliary_client.py), so an absent
+;; policy key is not a neutral default. See :attribution in the policy.
+(def attribution (:attribution policy))
+
+(defn attribution-headers
+  "The header pairs OpenRouter reads for app attribution, or nil.
+
+  Three names for two facts. `HTTP-Referer` and `X-OpenRouter-Title` are what
+  OpenRouter documents; `X-Title` is documented as also accepted and is the
+  one Hermes's built-in default already occupies. Writing only the new name
+  would leave `X-Title: Hermes Agent` on the wire beside it, and which of two
+  conflicting titles OpenRouter believes is not a thing to assume — so the
+  legacy name is overridden rather than left."
+  []
+  (when (map? attribution)
+    (let [{:keys [referer title]} attribution]
+      (seq (cond-> []
+             (not (str/blank? referer)) (conj ["HTTP-Referer" referer])
+             (not (str/blank? title))   (conj ["X-OpenRouter-Title" title]
+                                              ["X-Title" title]))))))
+
+(defn render-headers
+  "An `extra_headers:` YAML block at `indent`, or nil when there is nothing
+  to say. Values are quoted: a bare `https://...` is a mapping key away from
+  being read as one by YAML."
+  [indent]
+  (when-let [hs (attribution-headers)]
+    (str indent "extra_headers:\n"
+         (apply str (for [[k v] hs] (str indent "  " k ": " (pr-str v) "\n"))))))
 ;; Owner override, admitted 2026-08-30. Not a preference — `:prefer` reorders
 ;; the probe queue and `:primary` replaces it, because the model the owner
 ;; chose is BILLED and so can never appear in `cands` (`candidate?` requires
@@ -430,10 +466,154 @@
        (keep #(second (re-find #"^([A-Za-z_][A-Za-z0-9_-]*):" %)))
        set))
 
+(defn top-level-blocks
+  "`yaml` split into [key text] pairs, one per top-level `key:` line. A block
+  runs from its key line to the line before the next top-level key. Leading
+  comments therefore attach to the block ABOVE them, which is safe here
+  because owned blocks are re-rendered from scratch — only the text of
+  unowned blocks is ever reused."
+  [yaml]
+  (let [lines (vec (str/split-lines yaml))
+        starts (vec (keep-indexed
+                      (fn [i l]
+                        (when-let [k (second (re-find #"^([A-Za-z_][A-Za-z0-9_-]*):" l))]
+                          [i k]))
+                      lines))]
+    (vec (for [[n [i k]] (map-indexed vector starts)
+               :let [end (if-let [nxt (get starts (inc n))] (first nxt) (count lines))]]
+           [k (str/replace (str/join "\n" (subvec lines i end)) #"\s+$" "")]))))
+
+(defn carried-keys
+  "Top-level keys present in `yaml` that this script does not own."
+  [yaml]
+  (sort (remove managed-config-keys (map first (top-level-blocks yaml)))))
+
+(defn carry-forward
+  "The verbatim text of every top-level block this script does not own, so a
+  wholesale rewrite PRESERVES it instead of dropping it.
+
+  This used to be a refusal, and the refusal was correct about the hazard and
+  wrong about the remedy. Measured 2026-08-31: the v0.20.5 -> v0.20.6 config
+  migration made Hermes itself write `_config_version`, `agent` and `plugins`
+  into ~/.hermes/config.yaml, and from that moment every run exited 2 with
+  `carries top-level keys this script does not own`. The daily model re-check
+  stopped, which is exactly the silence ADR-2608271450 exists to prevent —
+  and it would recur on every future Hermes config migration, because the set
+  of keys Hermes owns is not ours to enumerate ahead of time.
+
+  Nothing is dropped and nothing is interpreted: the block is copied out and
+  appended after the managed sections. The keys are printed by the caller, so
+  carrying is visible rather than silent."
+  [yaml]
+  (let [blocks (remove #(managed-config-keys (first %)) (top-level-blocks yaml))]
+    (when (seq blocks)
+      (str "\n"
+           "# ── Carried forward verbatim (not written by this script) ─────────\n"
+           "# Top-level keys this script does not own — Hermes writes these\n"
+           "# during a config-format migration. Copied through the rewrite\n"
+           "# unchanged and never interpreted here.\n"
+           (str/join "\n\n" (map second blocks))
+           "\n"))))
+
+
+;; ---------------------------------------------------- per-profile configs
+;;
+;; A Hermes profile gets its OWN config.yaml and that file REPLACES this one
+;; — `get_config_path()` is `get_hermes_home() / "config.yaml"` and a profile
+;; moves HERMES_HOME to `~/.hermes/profiles/<n>/`. Nothing is layered over
+;; the default config, so a setting written only there reaches exactly the
+;; runs that name no profile.
+;;
+;; Measured 2026-08-31: 23 profiles existed, and every one of them still
+;; resolved `HTTP-Referer: https://hermes-agent.nousresearch.com`. This
+;; script had been treating ~/.hermes/config.yaml as "the one config all the
+;; bots share" — which it is not, and the mistake is invisible from the
+;; default profile, where everything reads correct.
+;;
+;; New profiles copy this config at creation (`profiles.py`: `source =
+;; get_hermes_home() / "config.yaml"`), so they inherit whatever is here.
+;; Only the ones that already exist have to be reached.
+
+(defn- indent-of [l] (count (take-while #{" "} (map str l))))
+
+(defn- find-line [lines pred]
+  (first (keep-indexed (fn [i l] (when (pred l) i)) lines)))
+
+(defn- section-end
+  "One past the last line of the section headed at `i` — the first later
+  line indented no deeper than the header."
+  [lines i]
+  (let [hi (indent-of (nth lines i))]
+    (or (first (for [j (range (inc i) (count lines))
+                     :let [l (nth lines j)]
+                     :when (and (not (str/blank? l)) (<= (indent-of l) hi))]
+                 j))
+        (count lines))))
+
+(defn- drop-subblock
+  "Drop `key:` at exactly `indent` and every line below it that is deeper."
+  [lines indent k]
+  (let [hit (str (apply str (repeat indent " ")) k ":")]
+    (loop [in (seq lines) out []]
+      (if-let [l (first in)]
+        (if (= l hit)
+          (recur (seq (drop-while #(and (not (str/blank? %)) (> (indent-of %) indent))
+                                  (rest in)))
+                 out)
+          (recur (next in) (conj out l)))
+        out))))
+
+(defn- upsert-headers
+  "Replace the `extra_headers` block inside the section headed by the exact
+  line `header` with `text`, appended at that section's end. Stripping first
+  is what makes a second run a refresh rather than a duplicate key — and YAML
+  takes the LAST of two duplicate keys, so a version that only appended would
+  keep working while silently ignoring every earlier edit."
+  [lines header text]
+  (if-let [i (find-line lines #(= % header))]
+    (let [e (section-end lines i)
+          body (drop-subblock (subvec lines (inc i) e) (+ (indent-of header) 2) "extra_headers")]
+      (vec (concat (subvec lines 0 (inc i)) body
+                   (str/split-lines text)
+                   (subvec lines e))))
+    lines))
+
+(defn patch-attribution
+  "Put the attribution headers into a config this script did not render.
+
+  Surgical rather than wholesale on purpose: a profile carries its own
+  answers (`pr-cleanup` runs a different model), so re-rendering the file
+  would replace real per-profile differences with this script's defaults.
+  Returns `yaml` unchanged when the policy states no attribution, and when
+  the file has neither section to put it in."
+  [yaml]
+  (if-let [text-4 (render-headers "    ")]
+    (-> (vec (str/split-lines yaml))
+        (upsert-headers (str "  " provider-name ":") text-4)
+        (upsert-headers "model:" (render-headers "  "))
+        (->> (str/join "\n"))
+        (str "\n"))
+    yaml))
+
+(defn install-profile-configs!
+  "Apply `patch-attribution` to every existing profile config. Reports one
+  entry per profile, including the unchanged ones — `already right` and
+  `never looked` must not read the same."
+  [profiles-dir]
+  (when (fs/existsSync profiles-dir)
+    (vec (for [n (sort (vec (fs/readdirSync profiles-dir)))
+               :let [f (path/join profiles-dir n "config.yaml")]
+               :when (fs/existsSync f)
+               :let [before (fs/readFileSync f "utf8")
+                     after (patch-attribution before)]]
+           (do (when (not= before after) (fs/writeFileSync f after))
+               {:profile n :changed (not= before after)})))))
+
 (defn render-config [model-id runners-up fallback-reachable]
   (str "# Managed by scripts/hermes-hyakka-bots/resolve_free_model.cljs.\n"
-       "# Do not hand-edit: this file is rewritten whole, and the resolver\n"
-       "# refuses to touch it if it finds a top-level key it does not own.\n"
+       "# Do not hand-edit the sections below: this file is rewritten whole.\n"
+       "# Top-level keys the resolver does not own (Hermes writes some during\n"
+       "# a config-format migration) are carried forward verbatim at the end.\n"
        "#\n"
        "# The model below was chosen by measurement, not by name — see\n"
        "# free-model-policy.edn and the receipt at\n"
@@ -468,10 +648,33 @@
               "    # three values. Set here, it is explicit: the scaling raises from it\n"
               "    # and the run-budget halving does not apply. See free-model-policy.edn.\n"
               "    stale_timeout_seconds: " stale-timeout-seconds "\n"))
+       (when-let [h (render-headers "    ")]
+         (str "    # Who OpenRouter credits these calls to — its app leaderboard\n"
+              "    # and this account's activity read them off the request. Hermes\n"
+              "    # ships its own values here and names ITSELF, so this is an\n"
+              "    # override, not a blank being filled. See :attribution in\n"
+              "    # free-model-policy.edn for why three names carry two facts.\n"
+              "    #\n"
+              "    # Matched by base_url, so the fallback entry into the same\n"
+              "    # endpoint below inherits it. Applied last of all header\n"
+              "    # sources on the main client, and it survives a credential\n"
+              "    # swap (`apply_custom_provider_extra_headers_to_client_kwargs`).\n"
+              h))
        "\n"
        "model:\n"
        "  provider: " provider-name "\n"
        "  default: " model-id "\n"
+       (when-let [h (render-headers "  ")]
+         (str "  # The same headers again, one level up, because the block above\n"
+              "  # does not reach every client Hermes builds. Auxiliary calls —\n"
+              "  # context compression, session titles — construct their own\n"
+              "  # OpenAI client and merge `model.extra_headers` (aliased from\n"
+              "  # `model.default_headers`), never the per-provider block. Set\n"
+              "  # only above, side-job traffic would still be credited to\n"
+              "  # Hermes. This one is not route-scoped, so the fleet fallback\n"
+              "  # sees it too; it is inert to an endpoint that reads no such\n"
+              "  # header, and carries nothing secret.\n"
+              h))
        "\n"
        (when (map? auxiliary)
          (str "# Side jobs — context compression, session titles. Hermes's own\n"
@@ -527,16 +730,25 @@
        "    base_url: " (:base-url fallback) "\n"))
 
 (defn install-config! [model-id runners-up fallback-reachable]
-  (when (fs/existsSync config-path)
-    (let [extra (remove managed-config-keys (top-level-keys (fs/readFileSync config-path "utf8")))]
-      (when (seq extra)
-        (refuse! (str config-path " carries top-level keys this script does not own: "
-                      (str/join ", " (sort extra))
-                      "\nRewriting it whole would drop them. Move them into the managed\n"
-                      "set in resolve_free_model.cljs, or install by hand.")))))
-  (fs/mkdirSync (path/dirname config-path) #js {:recursive true})
-  (fs/writeFileSync config-path (render-config model-id runners-up fallback-reachable))
-  (str "wrote " config-path))
+  (let [prior   (when (fs/existsSync config-path) (fs/readFileSync config-path "utf8"))
+        carried (when prior (carry-forward prior))
+        keys'   (when prior (carried-keys prior))]
+    (fs/mkdirSync (path/dirname config-path) #js {:recursive true})
+    (fs/writeFileSync config-path
+                      (str (render-config model-id runners-up fallback-reachable) carried))
+    (let [profs (install-profile-configs! (path/join (path/dirname config-path) "profiles"))
+          moved (filter :changed profs)]
+      (str "wrote " config-path
+           (when (seq keys')
+             (str " (carried forward: " (str/join ", " keys') ")"))
+           ;; Said out loud even when it is zero. A profile config that this
+           ;; script never opened and one it opened and found already right
+           ;; are different facts, and only one of them means the profiles
+           ;; are covered.
+           (when profs
+             (str "; profiles " (count profs) " seen, " (count moved) " patched"
+                  (when (seq moved)
+                    (str ": " (str/join ", " (map :profile moved))))))))))
 
 (defn install-jobs!
   "The cron jobs carry their own model/provider, which override config.yaml.
@@ -602,13 +814,11 @@
     (println (str "config\t" config-path))
     (println (str "owned\t" (str/join ", " (sort managed-config-keys))))
     (if (fs/existsSync config-path)
-      (let [ks (top-level-keys (fs/readFileSync config-path "utf8"))
-            extra (remove managed-config-keys ks)]
+      (let [yaml (fs/readFileSync config-path "utf8")
+            ks   (top-level-keys yaml)
+            extra (carried-keys yaml)]
         (println (str "present\t" (str/join ", " (sort ks))))
-        (when (seq extra)
-          (refuse! (str config-path " carries top-level keys this script does not own: "
-                        (str/join ", " (sort extra))
-                        "\nRewriting it whole would drop them.")))
+        (println (str "carried\t" (if (seq extra) (str/join ", " extra) "(none)")))
         (println "verdict\tsafe to rewrite"))
       (println "verdict\tno config yet; one will be created"))
     (.exit js/process 0))

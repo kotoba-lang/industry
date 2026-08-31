@@ -78,7 +78,124 @@
   [["response cache is enabled"
     #"(?m)^openrouter:\n  response_cache: true$"]
    ["response cache TTL stays bounded to five minutes"
-    #"(?m)^  response_cache_ttl: 300$"]])
+    #"(?m)^  response_cache_ttl: 300$"]
+   ;; ── attribution ──────────────────────────────────────────────────
+   ;; Hermes ships its own values for these and names itself in them, so an
+   ;; unrendered block is not a blank — it is upstream's name on this
+   ;; account's spend. Both placements are pinned because they reach
+   ;; different clients: the provider block covers the main turn, and only
+   ;; `model.extra_headers` reaches the auxiliary lane.
+   ["the provider block carries the referer"
+    #"(?m)^    HTTP-Referer: \"https://itonami.cloud\"$"]
+   ["the provider block carries the documented title header"
+    #"(?m)^    X-OpenRouter-Title: \"Itonami By KotobaLabs\"$"]
+   ["the legacy title header is overridden too, not left to Hermes"
+    #"(?m)^    X-Title: \"Itonami By KotobaLabs\"$"]
+   ["the model block repeats them, so side jobs are attributed too"
+    #"(?m)^model:\n(?:  .*\n|  #.*\n)*  extra_headers:\n    HTTP-Referer: \"https://itonami\.cloud\"$"]])
+
+;; ── carry-forward ────────────────────────────────────────────────────
+;; The rewrite is whole-file, so anything not rendered is gone unless it is
+;; carried. Measured 2026-08-31: the Hermes v0.20.5 -> v0.20.6 config
+;; migration added `_config_version`, `agent` and `plugins`, and the resolver
+;; exited 2 on every run from that moment. Both directions are pinned here —
+;; a config with only owned keys must carry NOTHING, or "carried it" and
+;; "there was nothing to carry" would return the same value.
+
+(def owned-only-config
+  (str "secrets:\n  command:\n    enabled: true\n"
+       "\nproviders:\n  openrouter-free:\n    api_mode: chat_completions\n"
+       "\nmodel:\n  provider: openrouter-free\n  default: x/y:free\n"))
+
+(def migrated-config
+  (str owned-only-config
+       "\nplugins:\n  enabled: []\n"
+       "_config_version: 39\n"
+       "agent: {}\n"))
+
+(defn- carry-cases []
+  ;; `carried` is coerced with `str` on purpose: when carry-forward regresses
+  ;; to nil, `re-find` against nil THROWS, and a crashed suite is a weaker
+  ;; demonstration than a red one — it proves the code broke, not that these
+  ;; assertions can tell. Coerced, a regression prints FAIL for each case.
+  (let [nothing (r/carry-forward owned-only-config)
+        carried (str (r/carry-forward migrated-config))
+        keys'   (r/carried-keys migrated-config)]
+    [["a config of only owned keys carries nothing"
+      (nil? nothing)
+      "if this returns text, the negative control is dead and every 'carried'
+       assertion below passes for the wrong reason"]
+     ["the three keys Hermes added are named"
+      (= ["_config_version" "agent" "plugins"] (vec keys'))
+      "the report has to say what it moved, or carrying is silent"]
+     ["`plugins` keeps its nested value, not just its key"
+      (boolean (re-find #"(?m)^plugins:\n  enabled: \[\]$" carried))
+      "a block splitter that stops at the key line would drop the body and
+       still look like it worked"]
+     ["`_config_version` survives with its value"
+      (boolean (re-find #"(?m)^_config_version: 39$" carried))
+      "a leading underscore has to survive the key regex"]
+     ["`agent` survives"
+      (boolean (re-find #"(?m)^agent: \{\}$" carried))
+      ""]
+     ["no owned key is duplicated into the carried tail"
+      (not (re-find #"(?m)^(secrets|providers|model):" carried))
+      "carrying an owned block too would emit the key twice and YAML would
+       take the LAST one — the rewrite would silently lose its own answer"]
+     ["what install writes still contains the rendered model"
+      (boolean (re-find #"(?m)^  default: example/model:free$"
+                        (str (r/render-config "example/model:free" [] false) carried)))
+      "composition check: the tail must not truncate the rendered body"]]))
+
+
+;; ── per-profile configs ──────────────────────────────────────────────
+;; A profile's config.yaml REPLACES the default one rather than layering
+;; over it, so a setting written only to ~/.hermes/config.yaml reaches
+;; exactly the runs that name no profile. Measured 2026-08-31: 23 profiles,
+;; all still resolving Hermes's own attribution. The patch is surgical
+;; because profiles differ from each other — `pr-cleanup` runs a different
+;; model — and re-rendering would overwrite that difference with a default.
+
+(def profile-config
+  ;; Shaped like the real thing: Hermes dumps these with comments stripped
+  ;; and no blank lines, and this one carries a per-profile model on purpose.
+  (str "secrets:\n  command:\n    enabled: true\n"
+       "providers:\n  openrouter-free:\n    base_url: https://openrouter.ai/api/v1\n"
+       "    stale_timeout_seconds: 600\n"
+       "model:\n  provider: openrouter-free\n  default: upstage/solar-pro4:free\n"
+       "auxiliary:\n  free_only: true\n"))
+
+(defn- profile-cases []
+  (let [once  (r/patch-attribution profile-config)
+        twice (r/patch-attribution once)
+        stale (r/patch-attribution
+                (str/replace once "Itonami By KotobaLabs" "Someone Else"))]
+    [["the provider section gains the headers"
+      (boolean (re-find #"(?m)^    X-OpenRouter-Title: \"Itonami By KotobaLabs\"$" once))
+      ""]
+     ["the model section gains them too"
+      (boolean (re-find #"(?m)^  extra_headers:\n    HTTP-Referer: \"https://itonami\.cloud\"$" once))
+      "only this one reaches the auxiliary client"]
+     ["the profile's own model is untouched"
+      (boolean (re-find #"(?m)^  default: upstage/solar-pro4:free$" once))
+      "the whole reason this is a patch and not a re-render"]
+     ["nothing else in the file moved"
+      (every? #(str/includes? once %)
+              ["secrets:" "    enabled: true" "    stale_timeout_seconds: 600"
+               "auxiliary:" "  free_only: true"])
+      "a section-end that overshoots would swallow the next block"]
+     ["a second run changes nothing"
+      (= once twice)
+      "YAML takes the LAST of two duplicate keys, so an append-only version
+       would keep looking right while ignoring every later edit"]
+     ["a stale value is replaced, not appended beside"
+      (and (not (str/includes? stale "Someone Else"))
+           (= 2 (count (re-seq #"(?m)^\s+X-OpenRouter-Title:" stale))))
+      "this is the case the strip-first exists for"]
+     ["a config with neither section is returned untouched"
+      (= "unrelated: true\n" (r/patch-attribution "unrelated: true\n"))
+      "negative control: if the patcher writes into anything it is handed,
+       'patched 23 profiles' stops being evidence of anything"]]))
 
 (defn -main []
   (let [fails (atom 0)]
@@ -97,8 +214,14 @@
         (let [got (boolean (re-find pattern rendered))]
           (when-not got (swap! fails inc))
           (println (if got "ok  " "FAIL") nm))))
-    (println (str "RAN\t" (+ (count cases) (count message-cases) (count config-cases))
-                  " cases, " @fails " failed"))
+    (let [cc (concat (carry-cases) (profile-cases))]
+      (doseq [[nm got why] cc]
+        (when-not got (swap! fails inc))
+        (println (if got "ok  " "FAIL") nm
+                 (if (str/blank? why) "" (str "— " (str/replace why #"\s+" " ")))))
+      (println (str "RAN\t" (+ (count cases) (count message-cases) (count config-cases)
+                               (count cc))
+                    " cases, " @fails " failed")))
     (when (pos? @fails) (.exit js/process 1))))
 
 (-main)
