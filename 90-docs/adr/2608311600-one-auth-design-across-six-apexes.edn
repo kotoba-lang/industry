@@ -55,6 +55,9 @@
    "deploy 2026-08-31: nexus-x402 953f290b — admin が kotoba://can/data:write の Biscuit を公開鍵で検証 (97 tests/404 assertions、control で acceptance が落ちることを確認)"
    "vendoring 6 ファイルは commit 前に宣言 pin と byte 比較。最初の試行は 6 中 2 が pin-dishonest だった"
    "再測定 2026-08-31 12:43Z（軸追加で分母 1.10 に変更、前後は別スケール）: overall 50.76、x402.nexus 40.91"
+   "deploy 2026-08-31: nexus-x402 c2354717 — /v1/biscuit/token を kotobase-authn へ転送 (101 tests/412 assertions)"
+   "再測定 2026-08-31 13:10Z: overall 53.79、x402.nexus 59.09。6 apex 中 5 が同じ issuer で mint する"
+   "isekai.network は Cloudflare Pages + .mjs Functions、identity はブラウザ自己発行 did:key — 配線ではなく判断が要る"
    "kotobase.biscuit-grant は net-kotobase/control-plane の shared/src に 1 ファイルだけ存在する — deployable の中に閉じた唯一の verifier"]
   :adr/body
   "# ADR-2608311600: 6 apex に対する 1 つの認証・権限設計
@@ -447,14 +450,55 @@ kotobase.net 100.00 / murakumo.cloud 72.73 / itonami.cloud 59.09
 x402.nexus 40.91 / aozora.app 31.82 / isekai.network 0.00   (overall 50.76)
 ```
 
+## 6.12 x402 が発行もする（2026-08-31）— overall 53.79、6 apex 中 5 が同じ issuer
+
+`nexus-x402` version `c2354717`。`POST /v1/biscuit/token` を kotobase-authn へ転送。
+**受理できるようになった後に足した。順序が要点である** —— consumer の無い mint は、
+存在し、検証でき、期限が切れ、**何も authorize しない credential** である
+（§6.8 で api.murakumo.cloud に見つけたもの）。**先に発行していれば、それを知りながら
+作ったことになる。**
+
+この apex は今、**できる場所でそれぞれの半分をやっている**: 検証は**ここ**で公開根拠で
+（秘密が要らない）、発行は**転送**で（root seed は kotobase-authn だけが持つ）。
+
+```
+kotobase.net 100.00 / murakumo.cloud 72.73 / itonami.cloud 59.09
+x402.nexus 59.09 / aozora.app 31.82 / isekai.network 0.00   (overall 53.79)
+```
+
+### 計器がまた自分の仮定を報告していた
+
+**mint を足してもスコアは動かなかった。** probe は mint を `auth.<apex>` にしか
+探しておらず、x402 は auth サブドメインを持たず apex 自身に置いたからである。
+**多くの apex がたまたま置く場所だけを見る軸は、自分の仮定を報告する。**
+両方を見るようにした（一律。auth host が既に guarded mint を返すならそちらを採る）。
+
+これで**今日 3 度目**である —— 軸が機構の名前を名乗っていた / 受け取り側を測っていなかった /
+配置の一形態しか見ていなかった。**計器の欠陥はどれも、測られる側ではなく測る側にあった。**
+
+### isekai.network が 0.00 である理由（実測）
+
+**放置ではない。** `isekai.network` は **Cloudflare Pages**（静的 + `functions/` の
+Pages Functions、すべて `.mjs`/`.js`）で、identity は README のとおり
+**ブラウザが自己発行する did:key（Ed25519、非抽出、IndexedDB）** —— *設計として*
+client-side である。auth ホストも session も無い。
+
+したがってここは**配線ではなく判断**が要る:
+
+1. isekai に server-side の authority 面を持たせるか（Pages Functions なら可能）
+2. 自己発行 did:key を principal の controller として結ぶか（ADR-0082 の controller 問題）
+3. 新規コードは `.mjs` になる —— CLAUDE.md は新規 `.mjs` を禁じている。**この repo の
+   既存 Functions は全部 `.mjs` なので、規約どうしが正面衝突する。**
+
+3 点ともオーナー判断であり、勝手に決めない。
+
 ## 7. やっていないこと（正直に）
 
 - **§5-3 は owner の 1 操作待ち**（`wrangler secret put PDS_JWT_SECRET`）。
 - **murakumo は governed artifact の refresh 待ち**（branch は保全済み、merge していない）。
 - **isekai.network は 0.00 のまま。** 自己発行 did:key を controller として principal に
   結ぶ**設計判断**が要る（proxy では解けない）。
-- **x402 に mint はまだ無い**（受理はできる）。今なら未消費 credential にならないので
-  足せるが、未着手。
+- **isekai.network は 3 つのオーナー判断待ち**（§6.12）。
 - **murakumo と itonami と aozora は capability を advertise していない** ——
   受理していないので、それが正直な状態。
 - **probe は credential を持たない。** 測れるのは「拒否がどう名乗るか」までで、
