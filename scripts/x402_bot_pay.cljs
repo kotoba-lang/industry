@@ -221,10 +221,26 @@
   as no payment at all (measured 2026-08-31, fixed on both sides)."
   [x] (js/JSON.stringify (clj->js x)))
 
-(defn- now-iso [] (.toISOString (js/Date.)))
+(defn- utc-second
+  "`YYYY-MM-DDTHH:MM:SSZ` — the ONLY shape `cacao.edge.verify` parses, and the
+  verifier a Cloudflare Worker runs.
+
+  `.toISOString` emits milliseconds. `cacao.core/verify` compares instants as
+  strings and tolerates them, so such a CACAO looks fine to a JVM/Node test and
+  is refused at the edge with `invalid CACAO iat` — a message about the
+  timestamp, on a token whose signature and scope are both correct. Measured
+  2026-08-31: every CACAO this payer minted carried one, so every payment it
+  made would have been refused. `cacao.core/mint` now normalizes too
+  (kotoba-lang/org-chainagnostic-cacao 2327183e); this stays because the value
+  is also what the local ledger row records, and two places that disagree about
+  when a spend happened is its own defect."
+  [^js d]
+  (str (.replace (.toISOString d) #"\.\d{3}Z$" "Z")))
+
+(defn- now-iso [] (utc-second (js/Date.)))
 
 (defn- plus-seconds [secs]
-  (.toISOString (js/Date. (+ (.getTime (js/Date.)) (* 1000 secs)))))
+  (utc-second (js/Date. (+ (.getTime (js/Date.)) (* 1000 secs)))))
 
 (defn- fetch-json
   "-> {:status n :body <parsed or string> :headers h}. Never throws on a
