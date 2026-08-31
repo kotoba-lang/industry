@@ -110,13 +110,41 @@
          (.padStart (str (inc (.getMonth d))) 2 "0") "-"
          (.padStart (str (.getDate d)) 2 "0"))))
 
-(defn cf-graphql [token query]
-  (-> (curl/post "https://api.cloudflare.com/client/v4/graphql"
-                 {:headers {"Authorization" (str "Bearer " token)
-                            "Content-Type" "application/json"}
-                  :body (json/generate-string {:query query})
-                  :throw false})
-      :body (json/parse-string true)))
+(defn cf-classify
+  "Parsed Cloudflare GraphQL body -> the body, or {::failed reason}.
+
+  Pure, so the distinction that matters can be tested without a token."
+  [body]
+  (cond
+    (seq (:errors body)) {::failed (str/join "; " (keep :message (:errors body)))}
+    (nil? (:data body))  {::failed "response carried neither data nor errors"}
+    :else body))
+
+(defn cf-graphql
+  "Cloudflare's GraphQL, with the failure kept instead of dropped.
+
+  `:throw false` means an expired or revoked token comes back as a 200-shaped
+  body carrying `errors` and no `data`. Every caller then read
+  `(get-in r [:data …])`, got nil, and folded it into an empty collection --
+  which is the same value a genuinely idle worker produces. Measured
+  2026-08-31: all twelve product metrics regenerated with every Cloudflare
+  number gone (net-kotobase 261870 req/7d -> absent, cloud-murakumo 859821 ->
+  absent, six workers' invocation counts -> absent) while each file still
+  declared `:sources [:cloudflare …]`. The collection failed and the failure
+  was written as a measurement."
+  [token query]
+  (cf-classify
+   (-> (curl/post "https://api.cloudflare.com/client/v4/graphql"
+                  {:headers {"Authorization" (str "Bearer " token)
+                             "Content-Type" "application/json"}
+                   :body (json/generate-string {:query query})
+                   :throw false})
+       :body (json/parse-string true))))
+
+(defn cf-failed
+  "The reason a Cloudflare call could not be measured, or nil."
+  [x]
+  (when (map? x) (::failed x)))
 
 (defn zone-traffic
   "→ {zoneTag {:requests-7d n :pageviews-7d n :uniques-7d-sum n}}"
@@ -126,13 +154,15 @@
                " { zoneTag httpRequests1dGroups(limit: 10, filter: {date_gt: \"" (date-days-ago 7) "\"})"
                " { sum { requests pageViews } uniq { uniques } } } } }")
         r (cf-graphql token q)]
-    (into {}
-          (for [z (get-in r [:data :viewer :zones])]
-            [(:zoneTag z)
-             (let [gs (:httpRequests1dGroups z)]
-               {:requests-7d (reduce + (map #(get-in % [:sum :requests] 0) gs))
-                :pageviews-7d (reduce + (map #(get-in % [:sum :pageViews] 0) gs))
-                :uniques-7d-sum (reduce + (map #(get-in % [:uniq :uniques] 0) gs))})]))))
+    (if-let [why (cf-failed r)]
+      {::failed why}
+      (into {}
+            (for [z (get-in r [:data :viewer :zones])]
+              [(:zoneTag z)
+               (let [gs (:httpRequests1dGroups z)]
+                 {:requests-7d (reduce + (map #(get-in % [:sum :requests] 0) gs))
+                  :pageviews-7d (reduce + (map #(get-in % [:sum :pageViews] 0) gs))
+                  :uniques-7d-sum (reduce + (map #(get-in % [:uniq :uniques] 0) gs))})])))))
 
 (defn worker-invocations
   "→ {scriptName requests-7d}"
@@ -141,9 +171,11 @@
                " { workersInvocationsAdaptive(limit: 500, filter: {date_gt: \"" (date-days-ago 7) "\"})"
                " { sum { requests errors } dimensions { scriptName } } } } }")
         r (cf-graphql token q)]
-    (reduce (fn [m g] (update m (get-in g [:dimensions :scriptName]) (fnil + 0)
-                              (get-in g [:sum :requests] 0)))
-            {} (get-in r [:data :viewer :accounts 0 :workersInvocationsAdaptive]))))
+    (if-let [why (cf-failed r)]
+      {::failed why}
+      (reduce (fn [m g] (update m (get-in g [:dimensions :scriptName]) (fnil + 0)
+                                (get-in g [:sum :requests] 0)))
+              {} (get-in r [:data :viewer :accounts 0 :workersInvocationsAdaptive])))))
 
 (defn zone-top-paths
   "実際に user がどのpageにアクセスしているか (直近24h)。edgeResponseStatus で
@@ -457,20 +489,32 @@
         zt (zone-traffic tok)
         wi (worker-invocations tok)
         stripe (when sk (stripe-summary sk))
+        ;; A failed Cloudflare call must not be written as an empty measurement:
+        ;; :sources may only claim :cloudflare for the numbers it actually got,
+        ;; and the reason it got none has to survive into the file.
+        cf-why (or (cf-failed zt) (cf-failed wi))
         as-of (date-days-ago 0)]
+    (when cf-why
+      (println "WARNING cloudflare unmeasured:" cf-why
+               "— :sources will not claim :cloudflare for these products"))
     (fs/create-dirs out-dir)
     (doseq [[p {:keys [zone zone-name workers health] :as cfg}] products]
       (let [m (cond-> {:as-of as-of
-                       :sources (vec (remove nil? [:cloudflare (when (and (:stripe cfg) stripe) :stripe)
+                       :sources (vec (remove nil? [(when-not cf-why :cloudflare)
+                                                   (when (and (:stripe cfg) stripe) :stripe)
                                                    (when health :health)]))}
-                zone (assoc :zone (assoc (get zt zone) :zone zone-name) :zone-name zone-name)
-                zone (as-> m' (let [tp (zone-top-paths tok zone p)]
-                                (cond-> m'
-                                  tp (assoc :paths (assoc tp :window "24h")
-                                            :top-paths (top-paths-summary tp))
-                                  (traffic-quality tp) (assoc :traffic-quality (traffic-quality tp)))))
-                (seq workers) (assoc :workers-invocations-7d
-                                     (into {} (filter (fn [[k _]] (contains? workers k)) wi)))
+                cf-why (assoc :cloudflare-unmeasured cf-why)
+                (and zone (not cf-why))
+                (assoc :zone (assoc (get zt zone) :zone zone-name) :zone-name zone-name)
+                (and zone (not cf-why))
+                (as-> m' (let [tp (zone-top-paths tok zone p)]
+                           (cond-> m'
+                             tp (assoc :paths (assoc tp :window "24h")
+                                       :top-paths (top-paths-summary tp))
+                             (traffic-quality tp) (assoc :traffic-quality (traffic-quality tp)))))
+                (and (seq workers) (not cf-why))
+                (assoc :workers-invocations-7d
+                       (into {} (filter (fn [[k _]] (contains? workers k)) wi)))
                 (and (:stripe cfg) stripe) (assoc :stripe stripe)
                 health (assoc :health-status (http-status health)))
             m (merge-emitter m p)
@@ -506,4 +550,29 @@
         (spit (str out-dir "/" (name p) ".edn") (with-out-str (pprint/pprint m)))
         (println "wrote" (name p) "-" (:signal m))))))
 
-(-main)
+;; `nbb 70-tools/bmc/collect.cljs --self-test` — no token, no network.
+;; Guards the one distinction this collector kept getting wrong: a Cloudflare
+;; call that FAILED must not look like a Cloudflare call that returned zero.
+(if (some #{"--self-test"} (vec *command-line-args*))
+  (let [ok? (fn [label pred] (println (if pred "PASS" "FAIL") label) pred)
+        errs   (cf-classify {:errors [{:message "Authentication error"}] :data nil})
+        blank  (cf-classify {:foo 1})
+        good   (cf-classify {:data {:viewer {:zones []}}})
+        rs [(ok? "a body carrying errors is a failure, not empty data"
+                 (= "Authentication error" (cf-failed errs)))
+            (ok? "a body with neither data nor errors is also a failure"
+                 (some? (cf-failed blank)))
+            (ok? "a real body passes through untouched"
+                 (and (nil? (cf-failed good)) (= good {:data {:viewer {:zones []}}})))
+            (ok? "an empty-but-successful result stays empty, not failed"
+                 (nil? (cf-failed (cf-classify {:data {:viewer {:accounts []}}}))))
+            ;; the consequence the files showed: :sources claimed :cloudflare
+            ;; while carrying no Cloudflare number
+            (ok? ":sources omits :cloudflare when the call failed"
+                 (= [:health]
+                    (vec (remove nil? [(when-not (cf-failed errs) :cloudflare) nil :health]))))
+            (ok? "and still claims it when the call worked"
+                 (= [:cloudflare :health]
+                    (vec (remove nil? [(when-not (cf-failed good) :cloudflare) nil :health]))))]]
+    (js/process.exit (if (every? true? rs) 0 1)))
+  (-main))
