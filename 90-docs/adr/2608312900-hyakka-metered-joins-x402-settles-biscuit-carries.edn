@@ -18,7 +18,7 @@
    "biscuit.kotoba/->delegated の block fold は resource 文字列の set/intersection なので、wildcard を含む grant の attenuation が空集合に畳まれる。narrowing は authority.grant/meet に行わせる（block 1 つにつき chain link 1 つ）"
    "x402.nexus に origin 付き seller rule を登録しない。gateway が spend-gate! を通してから X-PAYMENT ごと proxy するので、facilitator の /settle を使う origin では二重に予算を消費し、買い手が払ったのに 402 が返る"
    "pass の bound は expiry（15 分）であって revocation list ではない。buyer ごとの state を持たない"]
-  :adr/consequences "{:secret \"HYAKKA_BISCUIT_ROOT_SK を Worker secret として stdin 経由で put。vault に写しは取っていない —— custody 鍵ではなく 15 分 pass の署名鍵で、失っても影響は 1 窓分\", :price-single-home \"価格は hyakka.dataverse/offers の 1 箇所。/.well-known/x402 も 402 challenge もそこを読む（ADR-2608039990 の再発防止）\", :follow-up-1 \"biscuit.kotoba/->delegated の文字列 fold を upstream に報告する\", :follow-up-2 \"nexus の proxy 認証（rule の :auth-header / :auth-secret-env）を配線してから x402.nexus catalog に載せる\", :tests \"390 tests / 5 failures 前、428 / 5 後。増えた 38 は全部通り、既存 5 failure は equipment corpus が残した ontology の穴で前後同一\"}"
+  :adr/consequences "{:secret \"HYAKKA_BISCUIT_ROOT_SK を Worker secret として stdin 経由で put。vault に写しは取っていない —— custody 鍵ではなく 15 分 pass の署名鍵で、失っても影響は 1 窓分\", :price-single-home \"価格は hyakka.dataverse/offers の 1 箇所。/.well-known/x402 も 402 challenge もそこを読む（ADR-2608039990 の再発防止）\", :follow-up-1 \"DONE 2026-08-31 —— 報告ではなく修正した。org-biscuitsec c06cb2f9: ->delegated は authority.scope/meet-sets で narrow し、lattice が読めない opaque な resource だけ identity で narrow する。同じ library の biscuit.authority/->grant は最初から grant/meet で畳んでいたので、2 つ目の答えを消したのであって 3 つ目を足したのではない。両者が一致することを test で pin した\", :follow-up-2 \"DONE 2026-08-31 —— proxy 認証ではなく settler を 1 つにした。nexus-x402 93802cb: resource が settlesViaFacilitator: true を宣言すると gateway は gate せず素通しし、origin だけが /settle を呼ぶ。path から推論せず宣言にしたのは、murakumo の /x402/* が見た目は同じで今のまま正しいから —— 違うのは誰が /settle を呼ぶかであって prefix の形ではない\", :tests \"390 tests / 5 failures 前、428 / 5 後。増えた 38 は全部通り、既存 5 failure は equipment corpus が残した ontology の穴で前後同一\"}"
   :adr/body "# ADR-2608312900: wiki.kotobase.net の公開データに x402 の課金経路を通す —— ただし決めるのは支払いではなく biscuit + authority
 
 **Status**: accepted / **Date**: 2026-08-31
@@ -175,4 +175,93 @@ test: 変更前 390 tests / 5 failures、変更後 428 / 5。**増えた 38 は�
   402 challenge もそこを読む（ADR-2608039990 の再発防止）。
 - **follow-up 1**: `biscuit.kotoba/->delegated` の文字列 fold を upstream に報告する。
 - **follow-up 2**: nexus の proxy 認証（`:auth-header`）を配線してから catalog に載せる。
-"}]
+
+
+## 追記（2026-08-31、同日）—— follow-up 2 件とも着地。両方とも「合成の欠陥」で、片方は library の中にもう 1 つの答えが在ったこと
+
+### follow-up 1 —— biscuit の fold は upstream で直した（`org-biscuitsec` `c06cb2f9`）
+
+`biscuit.kotoba/->delegated` は `authority.scope/meet-sets` で narrow するようになった。
+lattice が読めない resource（`[cap \"infer\" \"murakumo-main\"]` のような model alias。
+opaque な名前には identity しか関係が無い）だけ文字列の一致で narrow する。parse が
+集合を分割するので 2 つの規則が同じ要素に当たることは無く、**片側でしか parse できない
+名前はどこにも関係しないので落ちる** —— どの枝も narrow の方向で、widen できる枝は無い。
+
+**直した理由より、直せると分かった理由の方が鋭い。** 同じ library の 10 行隣にある
+`biscuit.authority/->grant` は**最初から `authority.grant/meet` で畳んでいた**。つまり
+この library は「2 つの block が共同で何を conferするか」に**答えを 2 つ**持っていて、
+片方だけが束だった —— `authority` がまさに防ぐために在る重複であり、`biscuit.authority`
+自身の docstring が「biscuit を足すことは *does this cover that* への新しい答えを足しては
+ならない」と書いている、その当のもの。**3 つ目を足したのではなく、2 つ目を消した。**
+
+pin した invariant は挙動ではなく**この一致**である: `->delegated` と `->grant` が
+wildcard / 逆 wildcard / identity / 素の兄弟の 4 ケースで同じに narrow することを assert する。
+
+ついでに 1 つ直した: **narrow の結果が空になった kind は、resource が空の grant として
+持ち回るのをやめて落とす。** どちらも何も confer しないが、`missing-grant?` が本当のことを
+言えるのは後者だけで、`:missing-grant :deny` は「何も委譲しない token」全部に普通の経路で
+届くはずのものだった。81 tests/202 assertions → 84/211、両方 0 failure。
+
+**app-hyakka 側の per-block 合成は残す。** 今はどちらの経路も同じ答えを出すが、
+残す方は**どの部品が決めたかを声に出して言う**（`:authority/attempts` が block ごとの
+over-claim を記録する）。
+
+### follow-up 2 —— facilitator 側に「支払い 1 回につき settler 1 つ」を入れた（`nexus-x402` `93802cb`）
+
+resource が自分の `/.well-known/x402` に **`settlesViaFacilitator: true`** を宣言できる
+ようになった。その seller に対して gateway は **gate せず素通し**する —— spend も
+reserve せず、無支払いの枝では**origin 自身の 402** がそのまま返る（価格をこちらで
+言い直さない。2 つ目の写しが ADR-2608039990 の事故そのもの）。
+
+**path から推論せず宣言にした。** murakumo の `/x402/*` は見た目が同じで、しかも
+**今のままで正しい** —— あちらは自分で on-chain 検証するので facilitator 側の予算を
+消費しない。違うのは *誰が `/settle` を呼ぶか*であって、prefix の形ではない。
+
+`true` という boolean 以外では有効にならない（truthy な文字列が gate を素通しに
+変えてはならない）。無い = 無いのであって false ではないので、**この flag 以前に
+登録された seller は 1 つも挙動が変わらない**。`origin` を持たない rule は素通しに
+できない（`(str nil path)` は相対 URL で `fetch` が throw し、登録エラーであるべきものが
+有料 route の 500 として出る）。67 tests/297 assertions → 68/305、0 failure。
+
+app-hyakka の `/.well-known/x402` は **`accepts` と `resources` の 2 つの形**を同じ
+`dataverse/offers` から描く。前者は支払う client が話す形、後者は
+`nexus.apply/rules-from-document` が読んで listing を作る形。**価格を別々に教えられた
+facilitator**が、まさに ADR-2608039990 の事故だった。
+
+### 乖離を直す途中で作った傷 —— `reset --mixed` は worktree を stale なまま置き去りにする
+
+superproject の local main が **1 ahead / 60 behind** で乖離していた（local の 1 commit は
+別セッションのもので、追加 17 行すべてが `origin/main` に byte 一致 = **landed**）。
+`--ff-only` は通らず、`reset --hard` は他セッションの dirty な working tree を壊すので、
+`git reset --mixed origin/main` を選んだ。
+
+**これで index だけが 61 commit 進み、working tree は古いまま残った。** 結果、その
+61 commit が触った 15 ファイルが「main を巻き戻す変更」として `git status` に現れ、
+**staleness と実編集が同じ顔で並んだ** —— そのまま commit すれば他人の仕事を消していた。
+
+直し方は「どちらであるかを測る」こと: 各ファイルの working tree の blob を**旧 HEAD の
+blob** と照合し、一致するものだけ（= 純粋な staleness、15 件）と、そもそも disk に無い
+もの（= 新規追加を取り損ねている、4 件）を HEAD から復元した。一致しない 6 件は他
+セッションの実編集なので触っていない。untracked 20 件と stash 1 件も同様。
+
+**教訓は 2 つ。** ①`reset --mixed <far-ahead-ref>` の後の `git status` は、
+「自分が変えたもの」ではなく「**自分が追いついていないもの**」を含む。この 2 つは
+出力から区別できない。②commit を落とす前に archive する規則は、`branch -D` や
+`stash drop` だけでなく **HEAD を動かす操作全部**に効く（`.git/stash-archive-2026-08-31/`
+に patch + `index.txt` で退避済み）。
+
+
+### 実測（live、2026-08-31、両方 deploy 後）
+
+| 測ったもの | 結果 |
+|---|---|
+| `wiki.kotobase.net/.well-known/x402` | `seller: hyakka` / `resources[0] = POST /x402/query $0.05 base` / `settlesViaFacilitator: true`、`accepts[0].maxAmountRequired = 50000`（同じ宣言から描いている） |
+| `POST x402.nexus/apply {origin}` | `{ok: true, action: \"register\", seller: \"hyakka\"}` —— 送ったのは origin 1 つだけで、価格も payTo も**こちらが serve した文書から読まれた** |
+| `x402.nexus/catalog` | 19 item / 7 seller → **20 / 8**。hyakka の行に `direct` と `settles-via-facilitator: true` が付く |
+| `POST x402.nexus/gateway/hyakka/x402/query`（無支払い） | **402**、`description` が **origin 自身の文言** —— facilitator は価格を言い直していない |
+| 同（`hops: []`） | **400** + origin のエラー文。gateway の 404 でも 402 でもない = 素通しが効いている |
+| `POST wiki.kotobase.net/x402/query`（無支払い / 壊れた pass） | **402 / 403**（direct door は不変） |
+| `x402.nexus/gateway/kotobase/…`（無支払い） | **402**。flag を持たない seller は 1 つも挙動が変わっていない |
+| wiki の無料 route 8 本 | 全部 **200** |
+
+`nexus-x402` version `cd105023` / `app-hyakka` version `442c1160`。"}]
