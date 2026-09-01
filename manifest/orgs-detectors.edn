@@ -467,6 +467,55 @@
    :timeout-ms  1800000                  ; 30m -- ~6x the measured 5m runtime
    :writes   :none}
 
+  {:id       :verify-flattened-edn-prose
+   :title    "EDN 文字列の中の散文が行構造を失っている（parse は通るので誰も気づかない）"
+   :why      "2026-09-01: ADR-2608311750 の :adr/body が 1 回の書き込みで 1061 行から
+              39 行に潰れた。原因は手書きの EDN unescaper —— `\\X -> X` は `\\\\` と
+              `\\\"` には正しく、`\\n` に対しては改行を文字 n にする。ファイル上の
+              1061 個の `\\n` エスケープが全部 `n` になり、本文が 1 行になった。
+              **それでも EDN として妥当**なので docs-edn-check --strict-keys は緑の
+              まま（parse も key 位置も無傷）、reader は値を返し、文書は破壊されて
+              いる。発見は偶然で、別 agent の通りすがりの指摘だった。ADR-2608136000
+              の『測れなかった検査が、測って問題が無かった検査と同じ値を返す』の
+              一種。原因を『shell の補間』と推測した最初の記録は誤りで、b95fcba で
+              訂正済み —— 使われていたのは引用ヒアドキュメント（補間なし）であり、
+              補間を禁じる規則ではこの穴は塞がらない。
+              CANNOT be a fleet gate for orgs/: 対象の 17 repo は west 管理で、
+              gate が配る 1 repo の tree には存在しない。superproject 側の
+              90-docs も同じ 1 回の走査で見るので分割していない。"
+   :argv     ["nbb" "--classpath" ".:scripts/nbb_compat"
+              "{{repo}}/scripts/verify-flattened-edn-prose.cljs" "--findings" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 21600000                 ; 6h -- ADR の書き込みは波で来る。
+                                         ; 半日待つと『偶然見つかる』に戻る
+   :timeout-ms  600000                   ; 10m -- 実測 70s の ~8.5x
+   :measured "2026-09-01: 70s wall、散文本文 5,398 本（superproject の 90-docs +
+              orgs/ 17 repo）、findings 0、読めない EDN 11 本は未測定として申告。
+              閾値 3 つはすべて実測で落とした —— 行密度 2.0/1k（破損 0.83 対
+              同サイズ帯の正常の最小 3.59）、指紋の絶対床 3、指紋密度 3.0/1k
+              （破損 5.53 対 散文 4,623 本の最大 1.448）。
+              **片方ずつでは効かない**ことを実際に測って確認している: 見出しが
+              行頭に無い = 2484 本中 1361 本を誤検出 / 行密度だけ = 小さい本文で
+              正しい本文 2 本が破損本文より低密度 / 旧本文が新本文の接頭辞か =
+              この workspace が明示的に許可するその場書き換えで発火（実測: 別
+              agent の `未測定` -> `測定済み`）/ 指紋を絶対数で見る = 536KB の
+              無傷な索引 etzhayyim/root/.../README.edn が誤検出。
+              両方向を fixture で実演: 2c19126f（破損）で exit 1、182f3df（復元）
+              と 51752fca（その場書き換え）で exit 0。指紋 regex を潰した mutant は
+              exit 2（答えられなかった）を返し、0（clean）を返さない。
+              **真陽性の実例は 1 件しかない。** 閾値は 1 つの実例と 4,623 の陰性から
+              引いたものであり、別種の潰れ方（`\\t` を食う / CRLF 化 / JSON 往復）は
+              見ない。行頭トークンを持たない素の段落だけの本文が潰れても黙る。"
+   :fixed-by "本文を手で escape しない。`scripts/adr-body.cljs get|append|set` を
+              通す —— reader で読み `pr-str` で書き、**書いた直後に読み直して
+              照合し**、一致しなければ元のバイトに戻して exit 1 で終わる。
+              この予防の方が本検出器より価値が高い（検出は最短でも 6h 遅れる）。
+              既に潰れてしまった本文は `git log -p <file>` で最後の健全な版を
+              取り、その本文 + 以後の各追記を `adr-body.cljs set` で組み直す。"
+   :writes   :none}
+
   {:id       :verify-frontend-stack-retirement
    :title    "Svelte/React/Next.js authoring surface growing back after it was retired"
    :why      "2026-08-26, ADR-2608260900: the owner retired Svelte/React from the UI
