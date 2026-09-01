@@ -2691,7 +2691,52 @@
               empty at load 46, and a transient there flips every finding
               between fail and warn -- two failures still print UNREADABLE."}
 
-{:id :verify-advertised-surfaces
+{:id :verify-x402-offer-domain
+   :title    "a live x402 offer whose EIP-712 domain is not the token's own"
+   :why      "`extra` in a 402 offer is the domain a buyer signs under. If it
+              differs from what the token declares, the signature recovers a
+              DIFFERENT address and the payment is rejected as a bad signature,
+              which points at the buyer rather than at the offer that told it
+              what to sign.
+              This has happened twice on x402.nexus in one day. Introduced
+              2026-09-01: both requirement builders emitted `USD Coin`
+              unconditionally, so every base-sepolia listing named a domain its
+              own token does not use. Fixed, deployed, verified. Then it came
+              back the same day -- a later deploy shipped a build without the
+              fix, main said `USDC` and the live offers said `USD Coin`, and
+              nothing noticed until a client SDK was run against the live
+              service and printed the domain it had been handed.
+              Nothing else catches it. The offer is well formed and every field
+              is individually plausible. The scheme in production use is
+              `transaction`, which does not read `extra` at all, so nothing
+              fails until the first `exact` payment. verify-advertised-surfaces
+              checks that a path ANSWERS, not that what it answers is true.
+              The comparison is against the counterparty: the token's own
+              name() is read from the chain, never from a table kept here,
+              because a table would drift exactly the way the offer did.
+              Cannot be a fleet gate: it reads a live catalog and calls
+              contracts over the network."
+   :argv ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+          "{{repo}}/scripts/verify-x402-offer-domain.cljs" "--findings"]
+   :cwd :root
+   :findings :protocol
+   :writes :none
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :timeout-ms 120000
+   :interval-ms 21600000
+   :measured "2026-09-01: 2 networks, a few seconds; 6h because any deploy can
+              reintroduce it and the last one did.
+              Discriminates: verified against a local mock serving the same
+              catalog three ways. The token's real name exits 0; the mainnet
+              name on a testnet token exits 1 with a finding naming both
+              values; an offer with no domain exits 1.
+              Its own first version scanned one network of two and exited 0 --
+              the base listings are POST-only and answer a GET with 404 rather
+              than a 402, so probing everything with GET measured half the
+              estate and reported clean. It now uses the catalog's own method
+              and refuses when fewer networks were measured than found."}
+
+  {:id :verify-advertised-surfaces
    :title    "a discovery document advertising an endpoint the host does not serve"
    :why      "2026-09-01, three times in one session on x402.nexus. (1) Four
               endpoints were reported as already live because each answered
