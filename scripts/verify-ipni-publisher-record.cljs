@@ -26,7 +26,12 @@
             ["child_process" :as cp]
             ["crypto" :as crypto]))
 
-(def manifest-path "manifest/ipni-publisher.edn")
+(def manifest-path
+  ;; Overridable so the negative direction can be shown on a doctored copy
+  ;; rather than asserted. A check nobody has watched fail is a check nobody
+  ;; knows the failure mode of.
+  (or (aget (.-env js/process) "IPNI_MANIFEST_PATH")
+      "manifest/ipni-publisher.edn"))
 (def head-url "https://ipni.kotobase.net/ipni/v1/head")
 (def providers-url "https://cid.contact/providers")
 (def publisher-host "ipni.kotobase.net")
@@ -71,6 +76,36 @@
         (if (empty? bs)
           (str out (nth b32-alphabet (bit-and (bit-shift-left acc (- 5 bits)) 31)))
           (recur (rest bs) (+ (* acc 256) (first bs)) (+ bits 8) out))))))
+
+(defn- base32-decode
+  "The multibase 'b' body back to bytes. Encoding without decoding is how a
+  CID becomes something only a human can read: the indexer indexes
+  MULTIHASHES, and getting from one to the other is this direction."
+  [s]
+  (loop [cs (seq s) acc 0 bits 0 out []]
+    (if (empty? cs)
+      out                                 ; trailing <8 bits are padding, dropped
+      (let [i (str/index-of b32-alphabet (first cs))
+            acc (+ (* acc 32) i) bits (+ bits 5)]
+        (if (>= bits 8)
+          (recur (rest cs) (bit-and acc (dec (bit-shift-left 1 (- bits 8)))) (- bits 8)
+                 (conj out (bit-and (bit-shift-right acc (- bits 8)) 255)))
+          (recur (rest cs) acc bits out))))))
+
+(defn cid->multihash-b58
+  "The base58btc multihash inside a base32 CIDv1 -- the key cid.contact's
+  uncached lookup surface is addressed by.
+
+  Skips the version byte and the codec varint: entries carry multihashes,
+  not CIDs, so `raw` and `dag-cbor` CIDs of the same bytes share one key."
+  [cid]
+  (when (str/starts-with? cid "b")
+    (let [b (base32-decode (subs cid 1))]
+      (when (= 0x01 (first b))
+        (loop [i 1]
+          (if (>= (nth b i) 0x80)
+            (recur (inc i))
+            (base-n (vec (drop (inc i) b)) b58-alphabet)))))))
 
 (defn identity-multihash
   "0x00 <len> <protobuf pubkey> — the identity multihash a libp2p peer id is."
@@ -125,6 +160,46 @@
                         :last (get p "LastAdvertisementTime")}))))
            vec)
       (catch :default _ nil))))
+
+(defn multihash-providers
+  "Who cid.contact says is providing `b58`, on the surface that is NOT cached.
+
+  /cid/{cid} and /routing/v1/providers/{cid} both sit behind CloudFront, and
+  a cached miss and a real absence are the same bytes -- which is how a
+  removal was once read as still-present for three minutes. /multihash/
+  carries no age header and reflected a new advertisement in 15s.
+
+  nil means the question could not be asked. [] means it was asked and the
+  index holds nothing for that multihash -- a different fact from a removal,
+  and the caller must not conflate them."
+  [b58]
+  ;; 404 is an ANSWER -- "indexed nothing for this multihash" -- and must not
+  ;; arrive looking like an unreachable network, or the floor check below can
+  ;; never fire for the reason it names. So the status is read, not inferred
+  ;; from whether a body parsed.
+  (let [url (str "https://cid.contact/multihash/" b58)
+        out (try (str (cp/execSync
+                       (str "curl -sSL --max-time 25 -w '\\n%{http_code}' " (pr-str url))
+                       #js {:encoding "utf8" :stdio #js ["pipe" "pipe" "pipe"]}))
+                 (catch :default _ nil))
+        [body status] (when out
+                        (let [i (str/last-index-of out "\n")]
+                          [(subs out 0 i) (str/trim (subs out (inc i)))]))]
+    (cond
+      (nil? out) nil                      ; could not ask
+      (= "404" status) []                 ; asked; the index holds nothing
+      (not= "200" status) nil
+      :else
+      (try
+        (->> (get (js->clj (js/JSON.parse body)) "MultihashResults")
+           (mapcat #(get % "ProviderResults"))
+           (map (fn [p]
+                  {:id (get-in p ["Provider" "ID"])
+                   :addrs (vec (get-in p ["Provider" "Addrs"]))
+                   :context (try (str (js/Buffer.from (get p "ContextID") "base64"))
+                                 (catch :default _ nil))}))
+             vec)
+        (catch :default _ nil)))))
 
 (defn linked-cids
   "CIDv1 dag-cbor/raw links embedded in a block — enough to find something the
@@ -188,7 +263,24 @@
     (check! :cid-of-known-bytes
             (= "bafyreibmvkn2wghwulquddzzwi2qysbleoz5eaqyr3ghjcszb47vhep2ve"
                (cid-of-dag-cbor (js/Buffer.from "kotobase" "utf8")))
-            (str "CIDv1 dag-cbor of the 8 bytes 'kotobase', computed independently in python: " (subs (cid-of-dag-cbor (js/Buffer.from "kotobase" "utf8")) 0 20) "…"))))
+            (str "CIDv1 dag-cbor of the 8 bytes 'kotobase', computed independently in python: " (subs (cid-of-dag-cbor (js/Buffer.from "kotobase" "utf8")) 0 20) "…"))
+    ;; The lookup key is derived, not copied out of the manifest -- a
+    ;; derivation checked against the file it is about proves only that two
+    ;; copies agree. Anchor it on bytes instead: sha256 of the three bytes
+    ;; "Any" is the digest inside the witness CID, and `shasum -a 256` says
+    ;; 2b505597daa736f13c2910c260e8deb1af3b20ffe375eb5e01a003e92f541db9.
+    (let [digest (.toString (.digest (.update (crypto/createHash "sha256")
+                                              (js/Buffer.from "Any" "utf8")))
+                            "hex")
+          witness "bafkreiblkbkzpwvhg3ytykiqyjqorxvrv45sb77doxvv4anaapus6va5xe"]
+      (check! :witness-digest-is-sha256-of-its-content
+              (= "2b505597daa736f13c2910c260e8deb1af3b20ffe375eb5e01a003e92f541db9" digest)
+              "sha256 of the 3 bytes 'Any'")
+      (check! :multihash-key-round-trips
+              (= "QmRFjHhG3SkR1RnjwXZ7zz1zS5NpDsv6JCn5V4EkEzP8dv"
+                 (cid->multihash-b58 witness))
+              (str "base32 CIDv1 → base58btc multihash: "
+                   (str (cid->multihash-b58 witness)))))))
 
 (defn -main [& args]
   (reset! findings? (boolean (some #{"--findings"} args)))
@@ -199,15 +291,20 @@
           declared (:ipni.publisher/peer-id m)
           history (:ipni.publisher/identity-history m)
           candidates (:ipni.publisher/retrieval-candidates m)
+          life (:ipni.publisher/lifecycle-proof m)
+          known-ids (set (map :peer-id history))
           pk (head-pubkey)
           pubs (indexer-publishers)]
       (println "ipni publisher record vs the wire\n")
       ;; Evidence floor: the registry matches SCANNED\t[1-9][0-9]* before it will
       ;; believe an exit code. A record with no history entries and no candidates
       ;; has nothing to disagree with and must not read as agreement.
-      (println (str "SCANNED\t" (+ (count history) (count candidates))
+      (println (str "SCANNED\t" (+ (count history) (count candidates)
+                                  (if life 2 0))
                     "\t(" (count history) " history entries, "
-                    (count candidates) " retrieval candidates)\n"))
+                    (count candidates) " retrieval candidates, "
+                    (if life "1 lifecycle proof over 2 multihashes" "no lifecycle proof")
+                    ")\n"))
       (when (zero? (+ (count history) (count candidates)))
         (swap! unmeasured conj :nothing-to-check))
 
@@ -255,6 +352,49 @@
                                        " returned bytes that re-hash to "
                                        " did NOT return bytes matching ")
                            head-cid))))))
+
+      ;; ── the lifecycle proof ────────────────────────────────────────────
+      ;; ADR-2608160300's success criterion ends with the advertisement going
+      ;; away again. Two controls first: an absence read off an instrument
+      ;; that cannot see presences is not evidence of anything.
+      (when life
+        (let [control (multihash-providers (get-in life [:control :multihash]))
+              witness (multihash-providers (get-in life [:witness :multihash]))
+              ours (fn [rs] (filter #(known-ids (:id %)) rs))
+              control-ok (cond (nil? control) :unmeasured
+                               :else (boolean (seq (ours control))))
+              floor-ok (cond (nil? witness) :unmeasured
+                             :else (boolean (seq witness)))]
+
+          (check! :lifecycle-control-still-advertised control-ok
+                  (cond (= :unmeasured control-ok) "cid.contact could not be read"
+                        control-ok (str "this publisher is still returned for "
+                                        (get-in life [:control :multihash]) " — the matcher can see us")
+                        :else (str "no recorded identity is returned for the control multihash; "
+                                   "an absence at the witness proves nothing while this is false")))
+
+          (check! :lifecycle-witness-still-indexed floor-ok
+                  (cond (= :unmeasured floor-ok) "cid.contact could not be read"
+                        floor-ok (str (count witness) " provider(s) hold the witness multihash — "
+                                      "the index has not forgotten it")
+                        :else "the index returns nobody at all for the witness; a forgotten multihash is not a removal"))
+
+          ;; Only meaningful once BOTH controls hold, so it inherits their
+          ;; verdict rather than reporting a pass they did not license.
+          (check! :lifecycle-removal-took-effect
+                  (cond (or (= :unmeasured control-ok) (= :unmeasured floor-ok)) :unmeasured
+                        (not (and control-ok floor-ok)) :unmeasured
+                        :else (empty? (ours witness)))
+                  (cond (or (= :unmeasured control-ok) (= :unmeasured floor-ok))
+                        "not asked: a control was unmeasured"
+                        (not (and control-ok floor-ok))
+                        "not asked: a control failed, so absence here is uninterpretable"
+                        (empty? (ours witness))
+                        (str "gone from " (get-in life [:witness :multihash])
+                             "; the remaining " (count witness) " are third parties")
+                        :else (str "still listed: "
+                                   (str/join ", " (map :id (ours witness)))
+                                   " — :lifecycle-proof says :ok and the wire disagrees")))))
 
       (println)
       (cond
