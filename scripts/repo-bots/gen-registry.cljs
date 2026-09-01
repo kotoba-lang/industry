@@ -44,17 +44,47 @@
 (def argv (vec (drop 2 js/process.argv)))
 (defn- flag [n] (some #{n} argv))
 
+(def cp (js/require "node:child_process"))
+
 (def top (or (.-CLAUDE_PROJECT_DIR (.-env js/process)) (.cwd js/process)))
-(def west-file (.join path top "manifest" "west.yml"))
 (def out-file (.join path top "manifest" "repo-bots.edn"))
 
+(defn- west-yaml
+  "west.yml の本文を **origin/main から** 読む。working tree の写しは読まない。
+
+  ここが `:pinned` 床の入力で、床の意味は「checkout が west pin と一致するか」。
+  その pin の正本は superproject の origin/main であって、手元の checkout では
+  ない —— CLAUDE.md / ADR-2608136800 が『checkout・west pin・repo の main は
+  3 つの別物。結論を出す前に origin/main を読む』と定めているとおり。
+
+  **実測 2026-09-01 の事故**: 手元の superproject が origin/main から 401 commit
+  遅れていた日、working tree の west.yml と origin/main の west.yml で **55 本の
+  pin が食い違っていた**。名簿はその古い写しから生成され、tick は
+  `HEAD c2d9fe1 ≠ pin cbb2b72` という *実在しない* 違反を報告し続けた。
+  さらに悪いことに、その報告に素直に従って `west update` を回すと checkout は
+  古い pin へ **後退する**。誤検出が、退行を指示していた。
+
+  読めなかったときは **exit 2**（0 でも 1 でもない = 「答えられなかった」）で
+  終わる。古い写しへ黙って落ちない —— 落ちた先が、まさにこのバグである。"
+  []
+  (let [r (.spawnSync cp "git" #js ["-C" top "show" "origin/main:manifest/west.yml"]
+                      #js {:encoding "utf8" :maxBuffer (* 64 1024 1024)})]
+    (if (and (zero? (.-status r)) (not (str/blank? (.-stdout r))))
+      (.-stdout r)
+      (do (println (str "REFUSED\torigin/main:manifest/west.yml を読めなかった — "
+                        (str/trim (str (.-stderr r)))))
+          (println "  名簿は pin の正本から生成する。手元の west.yml へは落とさない")
+          (println "  (古い写しからの生成は、実在しない :pinned 違反と、checkout の退行指示を作る)")
+          (println "  直す: git -C <superproject> fetch origin")
+          (.exit js/process 2)))))
+
 (defn- projects
-  "west.yml の project を {:name :path :remote :revision :groups} で返す。
+  "origin/main の west.yml の project を {:name :path :remote :revision :groups} で返す。
 
   YAML パーサを持ち込まないのは repo-search.cljs と同じ理由 —— この形は完全に
   規則的で、道具立て無しで動くことに価値がある。"
   []
-  (let [lines (str/split-lines (.readFileSync fs west-file "utf8"))]
+  (let [lines (str/split-lines (west-yaml))]
     (loop [ls lines cur nil out []]
       (if-let [line (first ls)]
         (let [push (fn [o] (cond-> o cur (conj cur)))]
