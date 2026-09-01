@@ -15,7 +15,12 @@ regenerable class has already been selected.
 
 1. Run `scripts/mac_disk_cleanup.zsh audit`. Avoid a whole-home recursive scan: this workspace has thousands of Git/DataLad trees and broad traversal is slow.
 2. Report the current free space, exact candidate classes and measured sizes, reversibility, and exclusions before deletion.
-3. Run `scripts/mac_disk_cleanup.zsh apply` for package/build/browser caches. When pressure remains severe and the user asked for cleanup, run `apply-extended` for inactive browser/meeting-app model caches too; those may need downloading again.
+3. Run `scripts/mac_disk_cleanup.zsh apply` for bounded package/build/browser
+   caches. Maven and Gradle dependency caches are audit-only because a running
+   JVM may already have resolved files beneath them; deleting the directory can
+   invalidate its classpath mid-process. When pressure remains severe and the
+   user asked for cleanup, run `apply-extended` for inactive browser/meeting-app
+   model caches too; those may need downloading again.
 4. Re-run `audit` after the active tools have had time to recreate required caches. Report the stable before/after free space. A command completing—or a transient increase before immediate redownload—is not evidence of durable reclaimed space; `df` is.
 5. If less than roughly 10 GiB remains, inspect only the largest targeted areas next. Report large non-regenerable areas rather than deleting them.
 
@@ -38,6 +43,10 @@ Do not inspect process command lines: they can expose API keys. To decide whethe
 - APFS snapshots: distinguish update snapshots from Time Machine snapshots. Never remove OS update snapshots ad hoc.
 - Permission-denied cache entries: leave them. Do not escalate merely to erase protected cache residue.
 - Homebrew: `brew cleanup -s --prune=all` may remove obsolete kegs/downloads, but its many "most recent version not installed" warnings are not reclaimed-space evidence.
-- Codex runtime dependencies: the current session can immediately recreate roughly gigabytes. Measure and report them, but do not delete them from inside an active Codex session.
+- Active runtime dependencies: Maven (`~/.m2/repository`), Gradle
+  (`~/.gradle/caches`), and Codex runtime dependencies can be referenced by
+  already-running processes. Measure and report them, but do not delete them
+  from the unattended `apply` / `apply-extended` modes or from inside an active
+  Codex session.
 
 The helper is intentionally dry-run by default and validates that every deletion target is beneath the current `/Users/<name>` home before invoking `rm`.
