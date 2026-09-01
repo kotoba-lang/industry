@@ -5664,4 +5664,119 @@
      :find "\"Case\": \"case\","
      :replace "\"Case\": \"ticket\","
      :must-fail ["the-substrate-schema-declares-every-object-the-cleanroom-api-maps"]}]}
-]}
+
+  {:repo "orgs/cloud-itonami/communicator"
+   :label "communicator —— 文書とコードが互いについて述べている主張"
+   ;; `kotoba/` の vitest 8 件は MockEtzhayyim に対する registry の挙動を見ている。
+   ;; この suite が見ているのは別のもので、**ファイル間の約束**である:
+   ;;
+   ;;   types.ts は自分の union を「mirror communicator.proto, sans UNSPECIFIED」と
+   ;;   書いているが、それはコメントである。proto に値を足しても union から落としても
+   ;;   TypeScript は何も言わない —— 別のファイルだからで、8 件は写し損ねた値に
+   ;;   一度も触れない。
+   ;;
+   ;;   `readonly RiskLevel[]` から "blocked" を消しても型は通る（部分集合は妥当な
+   ;;   `readonly RiskLevel[]`）。しかし `isRisk` はその配列を見るので、消した瞬間から
+   ;;   合法な値が実行時に拒否される。TypeScript が構造的に捕まえられない形。
+   ;;
+   ;;   依存の 3 つ組は README / PROJECT.jsonld / proto の 3 箇所で、構成要素の一覧は
+   ;;   README / appview/README / PROJECT.jsonld の 3 箇所で、独立に述べられている。
+   ;;
+   ;;   quickstart の「Tests 8 passed」は書いた日の測定で、テストを 1 本足した瞬間に
+   ;;   静かに嘘になる。
+   ;;
+   ;; ⚠ この suite の最初の版は「その型の guard が registry.ts のどこかで呼ばれて
+   ;; いるか」を見ていた。`isProvider` は 2 箇所から呼ばれているので、
+   ;; recordStageEvent から provider 検査を丸ごと外しても**緑のままだった**。
+   ;; :communicator/stage-event-provider-check-removed はその退行を撃つために在る ——
+   ;; 名乗っている理由で拒否したことがあるか、という問いに型ごとの版は答えられない。
+   ;;
+   ;; migration.edn の 4 つの測定値は出所（etzhayyim/root）にしか答えが無いので、
+   ;; 出所が手元に無いときは SKIPPED と印字して合格に数えない。使い捨て worktree で
+   ;; 走るこの loop では 2 件が skip になり、緑マーカーはその旨を添えて出る。
+   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :green-marker "communicator contracts: all green"
+   :mutations
+   [{:id :communicator/proto-gains-an-enum-value
+     :why "wire contract に値が増えたのに union が追随しない形。proto を触った側は TypeScript から何の合図も受け取らない"
+     :file "proto/v1/communicator.proto"
+     :find "  RISK_LEVEL_BLOCKED = 4;"
+     :replace "  RISK_LEVEL_BLOCKED = 4;\n  RISK_LEVEL_SEVERE = 5;"
+     :must-fail ["every-proto-enum-has-a-matching-typescript-union"]}
+
+    {:id :communicator/union-drops-a-proto-value
+     :why "逆向き。union から値が落ちると、その値を持つ record は型検査で弾かれるようになるが、proto を読んで実装した相手にはそれが見えない"
+     :file "kotoba/src/types.ts"
+     :find "\"low\" | \"medium\" | \"high\" | \"blocked\""
+     :replace "\"low\" | \"medium\" | \"high\""
+     :must-fail ["every-proto-enum-has-a-matching-typescript-union"]}
+
+    {:id :communicator/runtime-array-loses-a-member
+     :why "**TypeScript が構造的に捕まえられない**形。部分集合は `readonly RiskLevel[]` として妥当なので型は通り、isRisk が合法な値を実行時に拒否しはじめる"
+     :file "kotoba/src/types.ts"
+     :find "export const RISK_LEVELS: readonly RiskLevel[] = [\"low\", \"medium\", \"high\", \"blocked\"];"
+     :replace "export const RISK_LEVELS: readonly RiskLevel[] = [\"low\", \"medium\", \"high\"];"
+     :must-fail ["runtime-arrays-are-exhaustive-over-their-unions"]}
+
+    {:id :communicator/stage-event-provider-check-removed
+     :why "検査を 1 箇所だけ外す形。isProvider はもう 1 箇所から呼ばれているので、**型ごとに見る検査はこれを緑で通す**。この mutation はその弱さを撃つために在る（実測 2026-09-01、最初の版が実際に通した）"
+     :file "kotoba/src/registry.ts"
+     :find "  if (!isProvider(input.selectedProvider)) return { status: \"rejected\", error: \"invalidProvider\" };"
+     :replace "  // provider check removed"
+     :must-fail ["closed-enums-accepted-by-writes-are-checked-at-runtime"]}
+
+    {:id :communicator/party-role-literals-removed
+     :why "guard を持たず inline 比較で守られている閉じた enum。guard の有無だけを見る検査はこれを見落とす"
+     :file "kotoba/src/registry.ts"
+     :find "  if (input.role !== \"sender\" && input.role !== \"recipient\") return { status: \"rejected\", error: \"invalidRole\" };"
+     :replace "  // role check removed"
+     :must-fail ["closed-enums-accepted-by-writes-are-checked-at-runtime"]}
+
+    {:id :communicator/depends-on-drifts
+     :why "3 文書が独立に述べている依存の 1 つがずれる形。JSON-LD としては正しいままなので、突き合わせるまで分からない"
+     :file "PROJECT.jsonld"
+     :find "etzhayyim-project-mailer/id/Project/etzhayyim-project-mailer"
+     :replace "etzhayyim-project-postman/id/Project/etzhayyim-project-postman"
+     :must-fail ["the-three-dependencies-agree-across-readme-jsonld-and-proto"]}
+
+    {:id :communicator/component-renamed-in-one-document-only
+     :why "構成要素を 3 文書のうち 1 つでだけ改名する形。README と jsonld は元の名前のまま残る"
+     :file "appview/README.md"
+     :find "1. `communicator-agent-component`"
+     :replace "1. `communicator-planner-component`"
+     :must-fail ["performers-are-exactly-the-components-that-are-not-marked-planned"]}
+
+    {:id :communicator/planned-marker-dropped
+     :why "「まだ無い」の印だけが消える形。実装は増えていないのに文書は在るように読める —— PROJECT.jsonld の performer が 3 のままなので突き合わせで出る"
+     :file "README.md"
+     :find "4. `policy-check-component` (planned)"
+     :replace "4. `policy-check-component`"
+     :must-fail ["performers-are-exactly-the-components-that-are-not-marked-planned"]}
+
+    {:id :communicator/a-test-is-added-without-updating-the-quickstart
+     :why "quickstart が「Tests 8 passed」と測って書いた数字が、テストを 1 本足しただけで静かに古くなる形。これが一番起きやすい"
+     :file "kotoba/test/communicator.test.ts"
+     :find "  describe(\"coverage rollup\", () => {"
+     :replace "  it(\"newly added case\", async () => { expect(1).toBe(1); });\n  describe(\"coverage rollup\", () => {"
+     :must-fail ["quickstart-test-count-matches-the-suite-it-describes"]}
+
+    {:id :communicator/readme-points-at-a-file-that-is-not-here
+     :why "文書が実在しないパスを指す形。この repo が実際にそうなっていた —— README は `wasm/README.md` を指していたが、出所の tree にもそれは無かった"
+     :file "README.md"
+     :find "See: `appview/README.md`"
+     :replace "See: `wasm/README.md`"
+     :must-fail ["every-repo-relative-path-named-by-a-document-exists"]}
+
+    {:id :communicator/collection-nsid-moves-to-another-app
+     :why "NSID の名前空間が別 app に移る形。文字列なので誰も止めず、record は別 app の collection に書かれる"
+     :file "kotoba/src/types.ts"
+     :find "export const STAGE_EVENT_COLLECTION = \"com.etzhayyim.apps.communicator.conversationStageEvent\";"
+     :replace "export const STAGE_EVENT_COLLECTION = \"com.etzhayyim.apps.mailer.conversationStageEvent\";"
+     :must-fail ["collection-constants-are-namespaced-under-this-app"]}
+
+    {:id :communicator/quickstart-table-row-renamed
+     :why "quickstart の記録家族の表が定数からずれる形。表は読み手が最初に見るものなので、ずれたまま残ると入口が嘘になる"
+     :file "docs/operator-quickstart.md"
+     :find "| `conversationParty` |"
+     :replace "| `conversationPeer` |"
+     :must-fail ["quickstart-record-family-table-matches-the-constants"]}]}]}
