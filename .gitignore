@@ -4417,3 +4417,12 @@ orgs/personal/research/genomics/high-iq-japanese-gwas/.venv-audit/
 /kotoba-cli-build-verify/
 /orgs/network-awai-worktrees/
 /scripts/hermes-startup-capital-bots/quarantine/
+
+# Same class, appearing at a new root each time. `runs/kotoba-cli-verify-<ts>/`
+# (23 MB, 701 files) was created by an ad-hoc verification run *during* the
+# 2026-09-01 cleanup pass that added the block above — which is the evidence
+# that enumerating observed paths is whack-a-mole, not a fix. Kept root-anchored
+# on purpose: 47 files under `90-docs/business/revenue-agent-loop/runs/` and
+# `90-docs/performance/runs/` are tracked, and a bare `runs/` would hide every
+# one of them.
+/runs/
