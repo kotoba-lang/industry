@@ -296,4 +296,41 @@ blob** と照合し、一致するものだけ（= 純粋な staleness、15 件�
 catalogue は 15 dataset すべてに `metered-access: \"/x402/query\"` と書いているので、**買い手は歩けない dataset に対して pass を買える**。402 も 403 も出ず、空の答えが返る —— このリポジトリ自身が何度も名指ししている「測れなかったことが、測って何も無かったことと同じ顔をする」形である。
 
 直し方は 2 つあり、どちらも小さくない: 索引を全 corpus に広げるか、`:metered-access` を索引に載っている dataset にだけ書いて残りは無料面だけを名乗るか。**今日は測っただけで直していない。**
-"}]
+
+
+## 2026-09-01 — 買い手が読むフラグが、全行で true だった
+
+live を測ってから直した。/.well-known/x402 は 1 corpus を売ると言い、
+/api/v1/datasets は 18 行すべてに walkable: true と答える。**単体ではどちらも
+正しい** —— catalogue の `walkable` は「どれかの経路が歩ける」という意味で、
+実際どの corpus もどれかの経路で歩けるので一様であり、経路を名指しするのは
+`walk` の側で、そちらは割れる。
+
+欠陥はその間の一文だった。offer の説明が「Every corpus at /api/v1/datasets
+carries a `walkable` flag; the rest are served free and are not sold here」と
+書いており、買い手を**一様なフィールドへ案内していた**。全行で同じ値を返す
+フィールドは、引用された当の問いに答えられない。いまは `walk` を名指しし、
+`walkable` は読むべきものではないと明記する。
+
+discovery 文書自身も、広い語で狭い意味を publish していた —— 全行が
+walkable: true の catalogue の隣に、top-level walkable: [game-kouryaku]。
+**1 つの名前の下に、2 つの別の問いへの 2 つの答え**が、しかも支払い前に agent が
+読む唯一の文書の中に置かれていて、広い方が常に yes と言う。`metered` に改めた。
+
+test は先に落とし、**主張の前提（`:walkable` は 1 値・`:walk` は 2 値）は修正前に
+通る**ので、前提は仮定ではなく測定である。528 test / 23,945 assertion green、
+network-awai/app-hyakka@b46419e8 で main。
+
+**⚠ live には未反映。** deploy は credential で止まっている: この machine に
+wrangler の OAuth session が無く（`wrangler whoami` = not authenticated、
+`~/.wrangler/config` も不在）、secrets-location-map が Workers の現役経路として
+名指ししているのはその session である。Keychain の gftd.cf / API_TOKEN は
+**引けた**（同 skill の 2026-08-31 の記述「この session からは引けない」は今日は
+当たらない）が、GET /accounts/{acc}/workers/scripts/app-hyakka が **401** を
+返すので Workers scope を持たない。**総当たりで他の item を探すことはしない**
+（安全床⑦）。解除は owner の `npx wrangler login` 1 回。
+
+したがって現在地は **merged ≠ deployed**。上の 2026-08-31 節が記録した
+「catalogue が索引に無い dataset にも metered-access を書いていた」問題は
+既に直っている（walkable-datasets と free-walk-datasets は素で交わらない）が、
+**今日の文言修正は main にあって live に無い。**"}]
