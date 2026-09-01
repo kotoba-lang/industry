@@ -1,0 +1,184 @@
+[{:db/id -1
+  :adr/id "adr-2800005600-gpu-supplier-selection-is-decided-by-rights"
+  :adr/title "GPU 供給元の選定はライツで決まる —— 6 社の規約を読むと、わいせつ条項の無い第三者は 1 社も無く、著作権法 30 条の 4 の利益は provider の IP 無侵害保証で打ち消される"
+  :adr/status "accepted"
+  :adr/date "2026-09-01"
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/repos ["com-junkawasaki/root"
+              "network-awai/cloud-murakumo-api"
+              "network-awai/cloud-murakumo"]
+  :adr/related ["adr-2608319200-murakumo-as-an-openrouter-provider-four-answers-or-no-offer"
+                "adr-2608318700-adult-traffic-placement-transcribe-before-buy"
+                "adr-2607246000-adult-content-payment-processor-banking-jurisdiction-research"
+                "2800004500"
+                "adr-2608136000-six-questions-before-trusting-green"]
+  :adr/body
+  "## Context
+
+オーナーの問い（2026-09-01）は 2 段だった。最初は『ライツ的に、学習も生成も
+問題ないのは?』で、model のライセンスで答えたところ『model じゃなくて gpu
+provider 側で調査して』と差し戻された。
+
+先行 ADR は供給元を**価格・容量・レイテンシ**で測っている（2800004500 が
+自前ホストと従量 API の分岐、adr-2608026300 が調達価格、
+adr-2608039800 が latency、adr-2608026200 が credits plan）。
+**規約と権利で測ったものは 1 本も無い。** 本 ADR はその軸だけを埋める。
+
+対象は murakumo が成人向けを許容する推論面を持つ場合の供給元選定である。
+アダルト面『への出稿』は adr-2608318700、決済・銀行・法域は
+adr-2607246000 が既に扱っており、本 ADR はどちらとも重ならない。
+
+## 訂正 —— RunPod を compute-neutral と報告したのは誤りだった
+
+同日セッションの前半で、RunPod の AUP を『compute-neutral（GPU を売っているので
+あってコンテンツ市場ではない）』と報告した。**誤り。**
+二次情報（SEO ブログ）を読んで規約本体を読んでいなかった。
+
+実際の RunPod Terms of Service は、Your Content が obscene / lewd / lascivious /
+filthy でないことを顧客に保証させ、さらに otherwise objectionable という
+catch-all を持つ。**Together の obscene / pornography より広い。**
+
+CLAUDE.md が名指しする欠陥クラスの変種である —— 一覧 1 本の不在を『無い』と
+読まない、の要約版。**要約が原典と同じ顔で返ってきた。**
+provider の規約は必ず一次文書を読む。
+
+## 実測 —— 4 軸（2026-09-01、各社の公開規約を実読）
+
+軸は 4 つ。どれも『学習』と『生成』の両方に効く。
+
+1. 出力・モデル・データの所有権が顧客に残るか
+2. provider が顧客データを自社モデルの学習に使わないと明言しているか
+3. 処理を行う地理的リージョンを契約で固定できるか（= 著作権法 30 条の 4 を
+   主張できるか）
+4. わいせつ・成人向けコンテンツの禁止条項があるか
+
+| provider | 1 所有権 | 2 no-train | 3 リージョン指定 | 4 わいせつ条項 |
+|---|---|---|---|---|
+| Modal | 明示（§1.8 顧客が全権利を保持） | **明示（§5.5.4 顧客データで AI モデルを学習しない）** | **明示（§1.9 顧客が指定した地理的リージョンでのみ処理させられる）** | 有（§1.4.c indecent or obscene） |
+| RunPod | 明示（顧客が所有権を保持） | 部分（aggregated and anonymized 形でサービス改善に利用） | 無（AP-JP-1 福島リージョンは実在し in-country residency を謳うが、ToS 本体に residency 条項が無い） | 有（**最も広い**。上記 catch-all 付き） |
+| Vast.ai | **無（ToS が所有権に沈黙）** | 不明 | **無（ホスト所在地は非開示・選択不可）** | 有（obscene。成人向け単独の条項は無い） |
+| Together | 未読 | 未読 | 未読 | 有（obscene または pornography に当たる素材の送信を strictly prohibited。**serverless と dedicated GPU cluster を区別しない**） |
+| Fireworks | 明示（§7 顧客が Content を保有） | 明示（§3.6 Zero Data Retention） | 未読 | 有（**最も厳しい**。§3.3(v) が Input に nudity or other sexually suggestive content を含めないことを保証させる） |
+| Baseten | 未読 | 未読 | 未読 | 有（**最も狭い**。§5.2 Customer Content 保証に obscene / pornographic / unlawful。モデル出力については沈黙し、CSAM 条項は無い） |
+
+未読の欄は、わいせつ条項で落ちた時点で読むのを止めたためである。
+**未読は『条項が無い』ではない。** 非成人用途で再検討するなら読む必要がある。
+
+## 発見 1 —— わいせつ条項の無い第三者 GPU provider は 6 社中 0
+
+探し方の問題ではなく市場の構造である。厳しさの順は
+Fireworks（sexually suggestive）> RunPod（lewd / lascivious / filthy +
+otherwise objectionable）> Together（obscene / pornography）>
+Modal（indecent or obscene）> Vast（obscene）> Baseten（Customer Content のみ）。
+
+**成人向けを serve する用途で、ライツ的に問題ない第三者 provider は存在しない。**
+
+付随して Fireworks には §2.2(i) があり、Service を競合製品の開発・ベンチマーク・
+競合分析に使うことを禁じている。cloud-murakumo の README は自らを OpenRouter /
+fal / Modal / RunPod の代替と位置づけているので、**Fireworks を supply adapter に
+することはこの条項に正面から違反する。**
+
+## 発見 2 —— 30 条の 4 の利益は、provider の IP 無侵害保証で打ち消される
+
+RunPod と Vast.ai はどちらも、顧客のコンテンツが第三者の権利を侵害しないことの
+**保証**を顧客に要求する。
+
+日本の著作権法 30 条の 4 は非享受目的の情報解析に許諾を不要とする（2026 年時点で
+同法の改正は無く、2025 年の AI 推進法は別建て）。しかし **30 条の 4 は権利制限
+規定であって権利許諾ではない。** したがって出所の権利がクリアでないデータで
+学習する場合、provider が求める保証を文字通りには満たせない。
+
+> 30 条の 4 で得た自由は、provider の契約で消える。
+
+この非対称は自社コーパスで学習する計画を支持する。権利を保有しているデータだけが、
+**その保証を真実として与えられる。**
+
+## 発見 3 —— リージョンを契約で固定できるのは Modal だけ
+
+30 条の 4 は日本国内の行為に適用されるので、どこで学習するかを契約で約束させ
+られるかがライツ問題になる。
+
+- Modal は §1.9 で顧客がリージョンを指定できると明文化している
+- RunPod は AP-JP-1（福島）リージョンが実在し in-country data residency を
+  謳うが、**それはマーケティング文言であって ToS 本体の約束ではない**
+- Vast.ai はホスト所在地が非開示かつ選択不可。**30 条の 4 を主張できず、
+  どの国の刑法が当たるかも決まらない**
+
+## Decision
+
+**D1. 成人向けの学習および生成は、自社所有ノード（日本）でのみ行う。**
+第三者 ToS のわいせつ条項に触れない唯一の形であり、同時に 30 条の 4 が効く。
+現在の所有在庫は Mac mini 10 台（2800004500 の実測で 1 台 16 GiB、合計
+160 GiB unified memory）と Intel Arc Pro B70 ノードと Jetson AGX Xavier で、
+いずれも日本にある。
+
+**D2. 非成人の学習で第三者を使うなら Modal を第一候補にする。**
+no-train とリージョン指定の両方を明文で持つ唯一の provider。
+
+**D3. Vast.ai は使わない。** 所在地が決まらない以上、学習側でも生成側でも
+ライツを主張できない。価格が最安であることはこの欠落を埋めない。
+
+**D4. RunPod は非成人のバーストにのみ使う。AP-JP-1 があっても JP を名乗る
+根拠にしない。** ToS に residency 条項が無いため、リージョンの主張は
+外部に対して裏付けられない。
+
+**D5. モデルは Apache 2.0 または MIT に限る。** 実測（2026-09-01）:
+Qwen3.6-27B は Apache 2.0、GLM-5.2 と DeepSeek-V4 は MIT、Mistral Small 4 は
+Apache 2.0。**Gemma 4 も Apache 2.0** であり、Gemma Terms of Use は明示的に
+Gemma 4 を除外している（Gemma Prohibited Use Policy が sexual chatbots を
+名指しで禁じているのは、その ToU への incorporation by reference 経由なので、
+Gemma 4 には流れてこない）。ただし Google 自身の PUP ページは Gemma 4 に
+言及しており提示上の曖昧さが残るので、中核には前 4 者を置く。
+Llama 4 は AUP（sexual solicitation / CSAM / 性暴力を禁止。成人全般の包括禁止は
+無い）と帰属表示と 7 億 MAU 条項を持つため中核にしない。Kimi K3 は Moonshot 独自
+ライセンスで**未読**。
+
+## ADR-2608319200 との関係 —— 独立な 2 経路が同じ配置を指した
+
+adr-2608319200 は decision 1 で、第三者クラウド origin（RunPod pod）は region が
+環境変数で決まるので JP を名乗れず、datacenter 未宣言により offer に載らない、と
+**能力と申告の側から**決めていた。
+
+本 ADR は**権利の側から**同じ結論に達した（D4）。
+
+2 つの独立した理由が同じ配置を指しているので、**この配置は片方の理由が変わっても
+崩れない。** 逆に言えば、RunPod が ToS に residency 条項を足したとしても、
+わいせつ条項が残る限り成人面には使えない。
+
+なお同 ADR が宣言値 1,800 output tokens/分・並列 4 を**実測 N=4 の 2,133
+tokens/分より下に**置いたのは意図的な決定であり、飽和点で約束したレートは
+他の負荷で外れ、外れたレートが 5xx になり aggregator の採点対象になるためである。
+**この数字を『容量不足だから上げる』対象として扱わない。**
+
+## Consequences
+
+(+) 供給元の比較表に、価格・容量・レイテンシに続く 4 本目の軸が入った。
+    以後 provider を足すときは 4 軸を埋めてから採否を決められる。
+
+(+) 自社所有フリートの位置づけが変わった。Web3 の主張やコスト論ではなく、
+    **この事業で唯一ライツがクリーンな基盤**という理由が付いた。
+
+(+) 学習データの出所に関する要求が、法（30 条の 4）ではなく契約（IP 無侵害
+    保証）から導かれることが分かった。自社コーパス優先の根拠が 1 つ増えた。
+
+(-) 成人面の供給は自社ハードの調達量で頭打ちになる。第三者にバーストできない
+    ので、需要が伸びたときの弾力性は購入速度で決まる。
+
+(-) **未測定**: さくらインターネット高火力など国内 GPU クラウドの約款は
+    読めていない（公開ページが PDF 群で本文を取得できなかった）。国内には
+    アダルト可ホスティングという確立した区分が存在するが、**共用サーバと VPS の
+    区分であって GPU では該当が見つかっていない。** 自社ハード + 国内
+    コロケーションが現実的な拡張形だが、これも約款は未読である。
+
+(-) Together / Baseten の所有権・no-train・リージョン条項は未読。
+    わいせつ条項で落ちた時点で読むのを止めた。非成人用途で再検討するなら読む。
+
+(?) 本 ADR は公開規約と条文の読解であって法的助言ではない。とくに
+    30 条の 4 の但し書き（著作権者の利益を不当に害する場合）と、刑法 175 条に
+    おけるテキストと画像の線引きは、事業化前に counsel に当てる価値がある。
+
+(?) 出力側の権利は本 ADR では解けない。30 条の 4 が守るのは学習であって出力では
+    なく、生成・利用フェーズには人間が作成した場合と同じ侵害基準が適用される。
+    Apache 2.0 も MIT も出力について何も述べない。ここは admission 側の設計問題
+    であり、CSAM 遮断と同じ層（amu の capability policy）が受け持つべきである。"}]
