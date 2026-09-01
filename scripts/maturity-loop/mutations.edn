@@ -5366,4 +5366,125 @@
      :find "(def struct* k/struct*)"
      :replace "(def struct* k/binding*)"
      :must-fail ["the-facade-re-exports-the-whole-surface" "struct-and-shader-assembly"]}]}
+
+  {:repo "orgs/cloud-itonami/app-yukkuri"
+   :label "app-yukkuri lg-clj —— .cljc が名乗っている可搬性を、実際に両方の runtime で確かめる"
+   ;; 21 兄弟目。この repo の src は全部 `.cljc` だが、2026-09-01 まで**それを
+   ;; 読んだ runtime は 1 つしかなかった** —— `bb test` で、babashka は JVM。
+   ;; つまり reader conditional の ClojureScript 側は一度も評価されておらず、
+   ;; `lg-yukkuri.audit` は cljs では **load すらできなかった**（`json/generate-string`
+   ;; が `#?(:clj ...)` の require の外で使われていた）。
+   ;;
+   ;; 壊れ方は 2 種類あって、後者の方が悪い:
+   ;;
+   ;;   load できない  audit / llm / compose / generate-visual / synthesize-voice
+   ;;                  （cheshire・SecureRandom・byte-array・pmap・Base64）
+   ;;   静かに違う値   `llm/parse-json-object` と `render-video/json-parse` が
+   ;;                  `#?(:clj ... :default nil)` で、**ClojureScript では
+   ;;                  どんな入力に対しても nil を返していた**。nil は
+   ;;                  「JSON オブジェクトが無かった」の値でもあるので、
+   ;;                  scriptwriter と critic は整形式の応答すべてに対して
+   ;;                  fail-closed し、それをモデルのせいとして報告する。
+   ;;                  `render-video/json-gen` の `:default` は `(str m)` で、
+   ;;                  `meta_json` という名前の列に EDN を書いていた。
+   ;;
+   ;; いま suite は JVM と nbb の両方で走り、**両方で 44 tests / 141 assertions**
+   ;; と一致する。下の 11 件は 2026-09-01 に実際に赤くなるところを見たもので、
+   ;; うち **5 件は当日まで緑のまま生き残っていた**（`json-parse` を nil に、
+   ;; `camel->snake` の index guard を外す、Murakumo の host allowlist に
+   ;; api.openai.com を足す、`->int` の fallback を別の数に、`random-hex` を
+   ;; 定数に）。その 5 件のために書いたテストが `:must-fail` に出てくる。
+   ;;
+   ;; Murakumo の 1 件は 6 問目そのもの。`assert-murakumo` は scheme と host を
+   ;; `and` で繋ぐので、`https://api.openai.com/v1` は **host allowlist が何を
+   ;; 言おうと** scheme で拒否される。https だけを testing していた assertion は
+   ;; 「拒否された」を真のまま**空振りで**通り、allowlist の穴を見なかった。
+   ;; `run-tests.cljs` runs BOTH runtimes and fails unless they agree on the
+   ;; test and assertion counts. That is not thoroughness for its own sake:
+   ;; three of the mutations below (`:lenient-json-parse-back-to-default-nil`,
+   ;; `:rkey-generator-repeats`, `:fan-out-drops-all-but-the-first`) edit only
+   ;; a `:cljs` branch, so a JVM-only command runs BYTE-IDENTICAL code and
+   ;; reports them as unguarded. The harness would then say "this invariant is
+   ;; not tested" when the truth is "this run never looked" -- the two are
+   ;; indistinguishable from the outside, which is the failure this whole suite
+   ;; exists to catch.
+   :cmd ["nbb" "run-tests.cljs"]
+   :green-marker "both runtimes agree"
+   :mutations
+   [{:id :yukkuri/lenient-json-parse-back-to-default-nil
+     :why "**この repo で最も高くついていた形。** `parse-json-object` の両方の parse を `#?(:clj ... :default nil)` に戻す。JVM では何も変わらないので `clojure -M:test` は緑のまま、ClojureScript では全 LLM 応答が『JSON が無かった』になる。返り値が『解析できなかった』と『解析したが空だった』で同じ"
+     :file "lg-clj/src/lg_yukkuri/llm.cljc"
+     :find "  (try (json/parse-string s true)\n       (catch #?(:clj Exception :cljs :default) _ nil)))"
+     :replace "  #?(:clj (try (json/parse-string s true) (catch Exception _ nil)) :default nil))"
+     :must-fail ["generate-script-happy-path-stubbed" "review-video-pass-publishes"]}
+
+    {:id :yukkuri/timeline-generator-emits-edn
+     :why "`json-gen` の `:default` に戻す形。`meta_json` / `timeline_json` という名前の列に Clojure の map を `str` したものが入る。どの呼び出し側も文字列を受け取るので通り、renderer が読むまで分からない"
+     :file "lg-clj/src/lg_yukkuri/graphs/render_video.cljc"
+     :find "(defn- json-gen [m] (json/generate-string m))"
+     :replace "(defn- json-gen [m] (str m))"
+     :must-fail ["render-video-timeline-round-trips-asset-meta"]}
+
+    {:id :yukkuri/timeline-parser-returns-nil
+     :why "`json-parse` を nil にする形。**2026-09-01 まで緑だった** —— happy path は renderer が返す `render_blob_key` を assert していて、renderer に渡る timeline を誰も読んでいなかったので、asset の meta が丸ごと消えても気づかない"
+     :file "lg-clj/src/lg_yukkuri/graphs/render_video.cljc"
+     :find "(defn- json-parse [s] (json/parse-string s true))"
+     :replace "(defn- json-parse [s] nil)"
+     :must-fail ["render-video-timeline-round-trips-asset-meta"]}
+
+    {:id :yukkuri/camel-to-snake-loses-its-index-guard
+     :why "`_camel_to_snake` の『先頭は飛ばす』を落とす形。**2026-09-01 まで緑だった** —— 既存の case が全部小文字始まりで、大文字始まりのキーだけが `:_video_id` になる。graph 側は nil を読むだけで例外も出ない"
+     :file "lg-clj/src/lg_yukkuri/server.cljc"
+     :find "(if (and (pos? i) (not= c lc))"
+     :replace "(if (not= c lc)"
+     :must-fail ["camel-to-snake-does-not-prefix-the-first-character"]}
+
+    {:id :yukkuri/murakumo-host-allowlist-widened
+     :why "**6 問目。** ADR-2605215000 の allowlist に api.openai.com を足す。**2026-09-01 まで緑だった** —— 唯一の off-fleet case が `https://` で、scheme 検査が先に発火するため、assertion は『拒否された』を真のまま空振りで通っていた。自分が名乗っている理由で拒否したことが一度も無い"
+     :file "lg-clj/src/lg_yukkuri/llm.cljc"
+     :find "#{\"127.0.0.1:4000\" \"localhost:4000\""
+     :replace "#{\"api.openai.com\" \"127.0.0.1:4000\" \"localhost:4000\""
+     :must-fail ["murakumo-guard"]}
+
+    {:id :yukkuri/int-coercion-falls-back-to-a-different-number
+     :why "`->int` の fallback を宣言された既定値から動かす形。**2026-09-01 まで緑だった** —— `as-int` が『throw しない』ことは testing されていたが、**どの値に落ちるか**は誰も見ていなかったので、limit 50 が 999 になっても緑"
+     :file "lg-clj/src/lg_yukkuri/compat.cljc"
+     :find "    (string? v)  (or (parse-long (str/trim v)) d)"
+     :replace "    (string? v)  (or (parse-long (str/trim v)) 999)"
+     :must-fail ["list-videos-falls-back-to-the-declared-default-for-a-bad-limit"]}
+
+    {:id :yukkuri/rkey-generator-repeats
+     :why "`random-hex` を定数にする形。**2026-09-01 まで緑だった** —— store は rkey での upsert なので、衝突しても insert は全部正常に返り、graph は成功を報告し、前のレコードが黙って消える。fm の `:rkey-truncated` と同じ形が別の repo で出た"
+     :file "lg-clj/src/lg_yukkuri/compat.cljc"
+     :find "     :cljs (let [bs (js/Uint8Array. n)]\n             (js/crypto.getRandomValues bs)\n             (apply str (map #(.padStart (.toString % 16) 2 \"0\") (array-seq bs))))))"
+     :replace "     :cljs (apply str (repeat n \"ab\"))))"
+     :must-fail ["generated-rkeys-are-unique-so-no-record-overwrites-another"]}
+
+    {:id :yukkuri/api-key-check-inverted
+     :why "`check-api-key` の比較を反転させる形。正しい鍵だけが 401 になる —— 運用では『鍵を設定したのに通らない』として鍵の側を疑う"
+     :file "lg-clj/src/lg_yukkuri/server.cljc"
+     :find "(if (and (seq api-key) (not= x-api-key api-key))"
+     :replace "(if (and (seq api-key) (= x-api-key api-key))"
+     :must-fail ["api-key-guard"]}
+
+    {:id :yukkuri/compose-accepts-a-blank-topic
+     :why "空 topic の検査を外す形。空の話題で video 行が queued として書かれ、pipeline の先まで進んでから中身が無いことが分かる"
+     :file "lg-clj/src/lg_yukkuri/graphs/compose.cljc"
+     :find "(str/blank? topic) {:error \"topic is required\"}"
+     :replace "(and false (str/blank? topic)) {:error \"topic is required\"}"
+     :must-fail ["compose-requires-topic"]}
+
+    {:id :yukkuri/fan-out-drops-all-but-the-first
+     :why "`compat/fan-out` の cljs 側が先頭 1 件しか処理しない形。asyncio.gather の置き換えなので、scene / line が 1 つだけ生成されて残りは静かに落ちる。件数はどこにも報告されない"
+     :file "lg-clj/src/lg_yukkuri/compat.cljc"
+     :find "     :cljs (mapv f xs)))"
+     :replace "     :cljs (mapv f (take 1 xs))))"
+     :must-fail ["generate-visual-happy-path-stubbed" "synthesize-voice-happy-path-stubbed"]}
+
+    {:id :yukkuri/nsid-map-loses-an-entry
+     :why "NSID 表から 1 本落とす形。/xrpc のその NSID だけが 404 になり、他の 9 本は動き続けるので health check では見えない"
+     :file "lg-clj/src/lg_yukkuri/server.cljc"
+     :find "   \"com.etzhayyim.apps.yukkuri.reviewVideo\"     \"review_video\"})"
+     :replace "   })"
+     :must-fail ["nsid-map-completeness"]}]}
 ]}
