@@ -244,15 +244,25 @@
   (let [base (if (re-find #"^https?://" host) host (str "https://" host))]
     (-> (js/Promise.all
          #js [(fetch-text (str base "/llms.txt") timeout-ms)
-              (fetch-text (str base "/openapi.json") timeout-ms)])
+              (fetch-text (str base "/openapi.json") timeout-ms)
+              ;; robots.txt too, for its `Sitemap:` line. A sitemap is a
+              ;; promise made specifically TO crawlers, and leaving it out
+              ;; meant this detector reported x402.nexus clean while
+              ;; robots.txt pointed at a /sitemap.xml answering 500.
+              ;; Measured live 2026-09-01.
+              (fetch-text (str base "/robots.txt") timeout-ms)])
         (.then
          (fn [^js rs]
            (let [llms (aget rs 0) oapi (aget rs 1)
+                 robots (aget rs 2)
                  docs (cond-> []
                         (and llms (= 200 (:status llms)) (document? :llms (:body llms)))
                         (conj (:body llms))
                         (and oapi (= 200 (:status oapi)) (document? :openapi (:body oapi)))
-                        (conj (:body oapi)))]
+                        (conj (:body oapi))
+                        (and robots (= 200 (:status robots))
+                             (re-find #"(?im)^\s*sitemap\s*:" (str (:body robots))))
+                        (conj (:body robots)))]
              (if (empty? docs)
                (js/Promise.resolve
                 {:host host :refused "no discovery document answered with a document"})
