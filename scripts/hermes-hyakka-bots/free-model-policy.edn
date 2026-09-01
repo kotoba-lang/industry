@@ -45,6 +45,27 @@
  :key-env "OPENROUTER_API_KEY"
  :key-read-cmd "security find-generic-password -s gftd.openrouter -w"
 
+ ;; ---- attribution -------------------------------------------------------
+ ;; Owner instruction 2026-08-31: OpenRouter traffic from these bots is
+ ;; attributed to Itonami, not to the agent that happens to be driving it.
+ ;;
+ ;; OpenRouter reads the app's identity off two request headers and shows it
+ ;; on the app leaderboard and in the account's activity: `HTTP-Referer` (the
+ ;; link) and `X-OpenRouter-Title` (the display name; `X-Title` is documented
+ ;; as also accepted). Hermes sets BOTH itself and names itself in them —
+ ;; `HTTP-Referer: https://hermes-agent.nousresearch.com`, `X-Title: Hermes
+ ;; Agent`, in `_OR_HEADERS_BASE` (agent/auxiliary_client.py). So this is not
+ ;; filling in a blank: without an override, every call this workspace pays
+ ;; for is credited upstream.
+ ;;
+ ;; The resolver writes all three names — the two documented ones plus the
+ ;; legacy `X-Title` — because Hermes's default occupies `X-Title`
+ ;; specifically. Setting only the new name would leave a stale `Hermes
+ ;; Agent` on the wire next to it, and which one OpenRouter prefers when both
+ ;; arrive is not ours to assume.
+ :attribution {:referer "https://itonami.cloud"
+               :title "Itonami By KotobaLabs"}
+
  ;; ---- how long to wait for one non-streaming call -----------------------
  ;; Hermes arms a stale watchdog on every non-streaming call and kills the
  ;; socket when it fires (`run_agent.py` `_compute_non_stream_stale_timeout`).

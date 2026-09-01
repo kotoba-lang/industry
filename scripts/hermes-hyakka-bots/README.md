@@ -116,6 +116,34 @@ nbb scripts/hermes-hyakka-bots/resolve_free_model.cljs --check-config
 nbb scripts/hermes-hyakka-bots/resolve_free_model.cljs --if-stale --write --jobs a,b
 ```
 
+## Whose name is on the bill
+
+OpenRouter identifies the calling app from two request headers — `HTTP-Referer`
+(the link) and `X-OpenRouter-Title` (the display name; `X-Title` is documented
+as also accepted) — and shows that identity on its app leaderboard and in the
+account's activity.
+
+Hermes fills both in **with its own name** (`_OR_HEADERS_BASE` in
+`agent/auxiliary_client.py`: `https://hermes-agent.nousresearch.com` /
+`Hermes Agent`). So there is no neutral default here: unset, every call this
+account pays for is credited upstream. `:attribution` in the policy names the
+app instead, and the resolver renders it into two places, because they reach
+different clients:
+
+| written to | reaches |
+|---|---|
+| `providers.<n>.extra_headers` | the main turn — matched by `base_url`, applied last, survives a credential swap |
+| `model.extra_headers` | auxiliary calls (context compression, session titles), which build their own client and merge only this one |
+
+All three header names are written, including the legacy `X-Title`, because
+that is the one Hermes's default occupies — setting only the new name would
+leave `X-Title: Hermes Agent` on the wire beside it, and which of two
+conflicting titles OpenRouter believes is not a thing to assume. Resolved
+against Hermes's own code on 2026-08-31, the wire carries
+`HTTP-Referer: https://itonami.cloud` and both title headers reading
+`Itonami By KotobaLabs`. `X-OpenRouter-Categories` is left as Hermes sets it;
+it is a marketplace category, not an identity.
+
 The generated Hermes configuration enables OpenRouter response caching with a
 300-second TTL. This is separate from provider prompt caching: only byte-for-byte
 identical successful requests are replayed, while changing bot/tool context gets
