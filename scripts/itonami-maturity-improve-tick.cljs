@@ -287,14 +287,40 @@
    `vin` and read as contention that was not there. `worktree list` is
    authoritative and finds linked worktrees wherever they live.
 
+   **Counts only registrations git has NOT marked `prunable`.** A prunable entry
+   is one whose working tree is gone -- git resolved the gitdir file and found
+   nothing at the other end -- so there is no edit in it to collide with and no
+   WIP in it to protect. Counting them says `another session holds this` for a
+   session that has already exited, which is the shape this repository's rules
+   name as mandatory to avoid: a check that could not find contention returning
+   the same value as a check that found some.
+
+   Measured 2026-09-01/02, and this is why the fix is not cosmetic: the tick
+   named orgs/cloud-itonami/lawyer as its top choice and refused it on
+   /private/tmp/gftd-deps-g1Qe91/lawyer, which git itself reports as
+   `prunable gitdir file points to non-existent location` and which holds zero
+   files and no .git. lawyer is clean and three-point aligned, so nothing would
+   ever clear that entry -- it dropped the same repository every round, the way
+   archived repositories threw away three consecutive first choices before the
+   sweep excluded them. Four ticks in a row had ONE candidate and it was this one.
+
+   `locked` entries still count: those are live worktrees a session parked
+   deliberately, which is contention.
+
    Returns nil when it looks free, or a reason string."
   [path]
   (let [d (str root "/" path)
         wt (sh "git" ["-C" d "worktree" "list" "--porcelain"])
         br (sh "git" ["-C" d "branch" "--list" "agent/*"])
+        ;; porcelain emits one blank-line-separated record per worktree; the
+        ;; `prunable` line is optional and only present on dead registrations.
+        ;; Parse records, not lines -- a line-wise filter cannot see which
+        ;; `worktree` line the `prunable` marker belongs to.
         n-wt (if (zero? (:code wt))
-               (count (filter #(str/starts-with? % "worktree ")
-                              (str/split-lines (:out wt))))
+               (->> (str/split (:out wt) #"\n\s*\n")
+                    (filter #(re-find #"(?m)^worktree " %))
+                    (remove #(re-find #"(?m)^prunable\b" %))
+                    count)
                0)
         branches (if (zero? (:code br))
                    (remove str/blank? (map str/trim (str/split-lines (:out br))))
