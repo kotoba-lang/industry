@@ -84,16 +84,34 @@
    :current? true
    :note "signs the live head. The FIRST identity to advertise ipfs.kotobase.net rather than kotobase.net -- and the measurement below says that is the address that works."}]
 
- ;; Custody of the CURRENT identity is UNVERIFIED, and saying so is the point.
- ;; This file names a kagi item; nobody has checked that the key now signing
- ;; heads is the key under that name. Verifying it means taking that one item
- ;; by its known identifier (never enumerating the vault) and deriving the
- ;; peer-id from its seed. Until someone does, `:seed-kagi-item` records where
- ;; a key is SUPPOSED to be, which is not the same as where this key is.
+ ;; Measured 2026-09-01, by doing exactly what the previous entry said would
+ ;; verify it. The answer is no. Both recorded custody locations hold the SAME
+ ;; seed, and it is not the key that signs the live head:
+ ;;
+ ;;   kagi kotobase-ipni-publisher (net-kotobase)  -> 12D3KooWGmq2x23J…Usz3
+ ;;   keychain publisher-seed-v2                   -> 12D3KooWGmq2x23J…Usz3  (same pubkey)
+ ;;   the key signing GET /ipni/v1/head            -> 12D3KooWGxKwrwhq…Bt7X
+ ;;
+ ;; The held seed derives the THIRD entry in :identity-history -- the identity
+ ;; this file named until the 2026-08-31 audit. The rotation that produced the
+ ;; current identity never wrote its seed to either location.
+ ;;
+ ;; Where the current key actually is: `IPNI_ED25519_SEED_B64URL`, a Cloudflare
+ ;; Worker secret on `net-kotobase-private-ipni-drain`. Worker secrets are
+ ;; write-only, so the identity that publishes the corpus CANNOT be signed for
+ ;; by any operator holding only these two vaults. That is not a lost key; it
+ ;; is a key with exactly one holder, and the holder is a deploy target.
+ ;;
+ ;; :custody-verified below says :match, and it was true of the key it tested
+ ;; on 2026-08-27. It is not a statement about the key publishing now.
  :ipni.publisher/current-custody
- {:status :unverified
-  :as-of "2026-08-31"
-  :verifies-it "derive the peer-id from the seed stored at :seed-kagi-item and compare it to :ipni.publisher/peer-id"}
+ {:status :mismatch
+  :as-of "2026-09-01"
+  :held-identity "12D3KooWGmq2x23J59LmqyBT5ik8pK9gEz7N3Y4vdJidezf7Usz3"
+  :head-signing-identity "12D3KooWGxKwrwhqzVDKynC6PzP3vSWC5F3JjjmaqWyTE91YBt7X"
+  :how "took each item once by its known identifier (never enumerated), derived the Ed25519 public key from the seed, built the identity multihash and base58btc peer-id, and compared against the pubkey read off GET /ipni/v1/head"
+  :current-key-location "cloudflare worker secret IPNI_ED25519_SEED_B64URL on net-kotobase-private-ipni-drain (write-only)"
+  :consequence "an operator can publish only as the held identity; the corpus chain can be extended only by the drain worker"}
 
  ;; Decision 1 of ADR-2608160300: ONE key for the workspace, not one per
  ;; surface. Twelve keys is a key set managed by enumeration whether anyone
@@ -191,13 +209,78 @@
                :ads-scanned 1
                :ads-processed 1
                :entry-chunks 1
-               :multihashes 1}}]
+               :multihashes 1}}
+  ;; The ADR's success criterion, run as one lifecycle on one CID. Published
+  ;; under the HELD identity (see :current-custody) and with --detached-head,
+  ;; so R2 `ipni/head` -- the drain worker's compare-and-set state for the
+  ;; current identity's chain -- was not touched. This publisher already had
+  ;; its own registered chain at cid.contact, so PreviousID continues it.
+  {:advertisement "baguqeerau3ttnv5lhzos4fnztujrqmxbfvdu76lpyen4d27rukxmszn42fzq"
+   :entries "baguqeeraeqfrj3qymknr3mjqewyis4rmc5rnnpo7yqf4rombf7pnb4ndw5iq"
+   :cids 1 :at "2026-09-01" :announce-status 204
+   :previous "baguqeeraxdv3l52lkykjlfsvoglog3hxtqfhbkseu74ee6wc2qsi32zatgrq"
+   :provider "12D3KooWGmq2x23J59LmqyBT5ik8pK9gEz7N3Y4vdJidezf7Usz3"
+   :context "ipni-lifecycle-proof-2026-09-01"
+   :is-rm false
+   :detached-head true
+   :ingestion {:index "https://cid.contact"
+               :indexed true
+               :indexed-at "2026-09-01T05:29:21Z"
+               :multihashes 1}}
+  {:advertisement "baguqeera45tvhtc4sn6qyuj4wzib3ndqtleeutr4nzgtjgho2p7dosq4hkoa"
+   :entries "baguqeeraeqfrj3qymknr3mjqewyis4rmc5rnnpo7yqf4rombf7pnb4ndw5iq"
+   :cids 1 :at "2026-09-01" :announce-status 204
+   :previous "baguqeerau3ttnv5lhzos4fnztujrqmxbfvdu76lpyen4d27rukxmszn42fzq"
+   :provider "12D3KooWGmq2x23J59LmqyBT5ik8pK9gEz7N3Y4vdJidezf7Usz3"
+   :context "ipni-lifecycle-proof-2026-09-01"
+   :is-rm true
+   :detached-head true
+   :ingestion {:index "https://cid.contact"
+               :synced true
+               :synced-at "2026-09-01T05:34:27Z"
+               :entry-removed false
+               :note "accepted and became the publisher's LastAdvertisement. It named the real entry chunk rather than NoEntries; storetheindex ignores Entries on a removal, so this was a valid context removal, not a malformed one."}}
+  ;; Re-issued in the canonical form: Entries = NoEntries, no chunk. Same
+  ;; ContextID, so it retracts the same thing the one above does.
+  {:advertisement "baguqeeraxzjrrxgnrigmav4mkdfisxcmvselylwvfczyuxvncf2w6yg3qo4q"
+   :entries "bafkreehdwdcefgh4dqkjv67uzcmw7oje"
+   :cids 0 :at "2026-09-01" :announce-status 204
+   :previous "baguqeera45tvhtc4sn6qyuj4wzib3ndqtleeutr4nzgtjgho2p7dosq4hkoa"
+   :provider "12D3KooWGmq2x23J59LmqyBT5ik8pK9gEz7N3Y4vdJidezf7Usz3"
+   :context "ipni-lifecycle-proof-2026-09-01"
+   :is-rm true
+   :detached-head true
+   :ingestion {:index "https://cid.contact"
+               :synced true
+               :synced-at "2026-09-01T05:45:13Z"}}]
+
+ ;; Which cid.contact surface answers freshly. This is not trivia: the first
+ ;; three minutes of watching the provide advertisement land were spent
+ ;; reading a CloudFront response cached BEFORE the announce, which reports
+ ;; "not indexed" in exactly the same shape as "indexed and absent".
+ ;;
+ ;;   /cid/{cid}                     CloudFront. age 554-573s observed.
+ ;;                                  A query-string nonce does NOT bust it.
+ ;;   /routing/v1/providers/{cid}    cache-control max-age=7200.
+ ;;   /multihash/{base58 multihash}  no age header; reflected a new
+ ;;                                  advertisement within 15s.
+ ;;
+ ;; So :round-trip's description of /cid/{cid} as an uncached lookup surface
+ ;; is wrong. Measure liveness on /multihash/, and read `age:` before
+ ;; believing any of them.
+ :ipni.publisher/lookup-surfaces
+ {:measured-at "2026-09-01"
+  :fresh ["https://cid.contact/multihash/{base58btc-multihash}"]
+  :cached ["https://cid.contact/cid/{cid}"
+           "https://cid.contact/routing/v1/providers/{cid}"]
+  :rule "read the age header; a cached miss and a real absence are the same bytes"}
 
  ;; What is true now, measured rather than claimed. The round trip starts
  ;; from a CID and nothing else: ask the public index who serves it, fetch
  ;; from the address the index returns, re-hash, compare.
  :ipni.publisher/round-trip
  {:at "2026-08-27"
+  ;; ⚠ `/cid/{cid}` is NOT an uncached surface. See :lookup-surfaces.
   :index "https://cid.contact/cid/{cid} and https://delegated-ipfs.dev/routing/v1/providers/{cid}"
   :result :ok
   :sampled 1

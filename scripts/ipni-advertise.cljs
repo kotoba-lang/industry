@@ -6,7 +6,17 @@
 ;;   nbb --classpath "orgs/kotoba-lang/io-ipld/src:orgs/kotoba-lang/io-multiformats/src:\
 ;;   orgs/kotoba-lang/io-ipni-specs/src:orgs/kotoba-lang/org-ietf-ed25519/src" \
 ;;     scripts/ipni-advertise.cljs <content-cid>... [--execute]
-;;       [--ephemeral-detached]
+;;       [--is-rm] [--previous <ad-cid>] [--detached-head] [--ephemeral-detached]
+;;
+;; `--is-rm` publishes a REMOVAL. It carries the same ContextID and the same
+;; entry chunk as the advertisement it retracts, which is the retraction the
+;; indexer honours whether it removes by context id or by entries -- so it
+;; does not depend on reproducing go-libipni's `NoEntries` constant, a value
+;; this workspace has no authoritative copy of.
+;;
+;; `--previous` names the advertisement to chain onto, for a publisher whose
+;; tip is not the one `ipni/head` points at. `--detached-head` publishes
+;; without touching that pointer.
 ;;
 ;; Dry run by default: it builds the blocks, signs, prints the CIDs, and
 ;; verifies its own signature -- but writes nothing and announces nothing.
@@ -52,6 +62,27 @@
   (or (aget (.-env js/process) "IPNI_CONTEXT_ID") "kotobase-appviews-v1"))
 (def indexer "https://cid.contact")
 
+(def no-entries-cid
+  "The `NoEntries` sentinel a removal advertisement names in place of an
+  entry chunk, marking it a removal BY CONTEXT ID.
+
+  Derived, not remembered. go-libipni `ingest/schema/schema.go` builds it as
+
+      multihash.Sum(nil, multihash.SHA2_256, 16)   -> cid.NewCidV1(cid.Raw, m)
+
+  i.e. sha256 of the EMPTY byte slice truncated to 16 bytes, as CIDv1 raw:
+
+      sha256(\"\")  = e3b0c442 98fc1c14 9afbf4c8 996fb924 27ae41e4 …
+      first 16    = e3b0c44298fc1c149afbf4c8996fb924
+      cid bytes   = 01 55 12 10 <those 16>
+
+  Recovering it from memory failed three times here -- each attempt hashed
+  the ASCII string \"nil\" instead of nil, and one produced a plausible-looking
+  string with the right prefix and an invented tail. If this ever needs
+  checking again, recompute it from the construction above; do not trust the
+  literal."
+  "bafkreehdwdcefgh4dqkjv67uzcmw7oje")
+
 (defn- die! [& msg]
   (apply println "REFUSING —" msg)
   (set! (.-exitCode js/process) 1)
@@ -89,25 +120,25 @@
   {"Entries" (mapv #(->buf (cid->multihash %)) content-cids)})
 
 (defn advertisement-node
-  [{:keys [peer addrs entries-cid metadata-bytes previous-id signature]}]
+  [{:keys [peer addrs entries-cid metadata-bytes previous-id signature is-rm]}]
   (cond-> {"Provider" peer
            "Addresses" (vec addrs)
            "Entries" (link/link entries-cid)
            "ContextID" (->buf (octets context-id))
            "Metadata" (->buf metadata-bytes)
-           "IsRm" false
+           "IsRm" (boolean is-rm)
            "Signature" (->buf signature)}
     previous-id (assoc "PreviousID" (link/link previous-id))))
 
 (defn sign-advertisement
-  [{:keys [peer addrs entries-cid metadata-bytes previous-id seed]}]
+  [{:keys [peer addrs entries-cid metadata-bytes previous-id seed is-rm]}]
   (let [payload-bytes (sign/signature-payload
                        {:previous-id previous-id
                         :entries entries-cid
                         :provider peer
                         :addresses addrs
                         :metadata metadata-bytes
-                        :is-rm false}
+                        :is-rm (boolean is-rm)}
                        {:cid-bytes-fn cid->bytes})]
     (when (:error payload-bytes) (die! "signature payload:" (pr-str payload-bytes)))
     (let [payload (vec (mf/multihash-sha256 (->buf payload-bytes)))
@@ -156,6 +187,37 @@
     (when-not (zero? (.-status r)) (die! "GET failed" url))
     (.-stdout r)))
 
+(defn resolve-head-ad
+  "The advertisement CID the published head points at.
+
+  R2 `ipni/head` holds a POINTER, and what it points at changed shape. The
+  `ipni-drain` worker writes a SIGNED HEAD block `{head, pubkey, sig}` and
+  stores that block's CID; this script used to store the advertisement CID
+  itself. Both are dag-json, so both render as `bagu…` and a reader that
+  only checks the prefix cannot tell them apart -- which is how a signed
+  head becomes a PreviousID. An indexer walking back from such a chain
+  fetches an envelope where an advertisement should be and stops.
+
+  So the pointer is dereferenced and the block is asked what it is, rather
+  than inferred from how its CID is spelled."
+  [publisher-origin pointer]
+  (when pointer
+    (let [txt (.toString (http-get-bytes (str publisher-origin "/ipni/v1/ad/" pointer)) "utf8")
+          body (try (js/JSON.parse txt) (catch :default _ nil))]
+      (cond
+        (nil? body)
+        (die! "the published head block is not readable JSON:" pointer)
+
+        ;; Legacy: the pointer IS the advertisement.
+        (some? (aget body "Provider")) pointer
+
+        ;; Current: a signed head wrapping the advertisement link.
+        (some? (aget body "head")) (aget (aget body "head") "/")
+
+        :else
+        (die! "the published head block is neither an advertisement nor a"
+              "signed head:" pointer)))))
+
 (defn announce! [ad-cid publisher-addr]
   (let [addr-b64 (.toString (->buf (ma/->octets publisher-addr)) "base64")
         body (js/JSON.stringify (clj->js {"Cid" {"/" ad-cid} "Addrs" [addr-b64]}))
@@ -169,19 +231,52 @@
 
 ;; ── main ────────────────────────────────────────────────────────────────────
 
+(def valued-flags
+  "Flags that consume the following argv element, so it is not mistaken for
+  a content CID."
+  #{"--previous"})
+
+(defn- flag-value [argv name]
+  (second (drop-while #(not= name %) argv)))
+
 (let [argv (vec *command-line-args*)
-      execute? (some #{"--execute"} argv)
-      detached? (some #{"--ephemeral-detached"} argv)
-      content-cids (vec (remove #(str/starts-with? % "--") argv))
+      execute? (boolean (some #{"--execute"} argv))
+      ephemeral? (boolean (some #{"--ephemeral-detached"} argv))
+      is-rm? (boolean (some #{"--is-rm"} argv))
+      ;; An ephemeral run is detached by construction; --detached-head says
+      ;; the same thing for a run that uses a key we actually hold.
+      detached-head? (boolean (or ephemeral? (some #{"--detached-head"} argv)))
+      previous-flag (flag-value argv "--previous")
+      content-cids (loop [a (seq argv) out []]
+                     (cond
+                       (nil? a) out
+                       (contains? valued-flags (first a)) (recur (nnext a) out)
+                       (str/starts-with? (first a) "--") (recur (next a) out)
+                       :else (recur (next a) (conj out (first a)))))
       m (edn/read-string (.readFileSync fs manifest-path "utf8"))
       ready (first (filter #(= :ready (:status %)) (:ipni.publisher/retrieval-candidates m)))
       publisher-origin (:ipni.publisher/publisher-origin m)]
-  (when (empty? content-cids)
+  ;; A removal names a ContextID, not content: `ipni.ad/advertisement` treats
+  ;; empty entries as an error EXCEPT when :is-rm, which is the library's
+  ;; reading of the spec. Requiring a content CID here would have forced the
+  ;; caller to name entries a removal must not carry.
+  (when (and (empty? content-cids) (not is-rm?))
     (die! "no content CID given"))
   (when-not ready
     (die! "no retrieval candidate is :ready — advertising an address that cannot serve is worse than not advertising"))
+  ;; Checked BEFORE anything is written. The canonical `ipni/head` is now a
+  ;; signed head block written by `ipni-drain`; this tool only knows how to
+  ;; store the bare advertisement CID. Writing that would regress the format
+  ;; and lose the head signature, and it would break the drain worker's
+  ;; compare-and-set on the same key. Refusing beats a silent regression.
+  (when (and execute? (not detached-head?))
+    (die! "the canonical ipni/head is a SIGNED head block written by ipni-drain,"
+          "and this tool can only write the legacy bare-CID form — publishing"
+          "would regress the format and break that worker's compare-and-set."
+          "Publish with --detached-head (and --previous <ad-cid> to stay on"
+          "an existing chain)."))
   (let [addrs [(:multiaddr ready)]
-        seed-hex (if detached?
+        seed-hex (if ephemeral?
                    (.toString (crypto/randomBytes 32) "hex")
                    (let [r (.spawnSync cp kagi-bin
                                      (into-array ["get" (:ipni.publisher/seed-kagi-item m)
@@ -197,62 +292,93 @@
         _ (when-not (= 32 (.-length seed)) (die! "seed is not 32 bytes"))
         derived (mf/base58btc (->buf (concat [0x00 36 0x08 0x01 0x12 0x20]
                                              (vec (ed/pubkey-from-seed seed)))))
-        peer (if detached? derived (:ipni.publisher/peer-id m))
+        ;; Publish as the identity the key we HOLD derives -- not as the
+        ;; identity a field claims. That field was stale through two
+        ;; rotations, and comparing the seed against it can only ever fail
+        ;; closed or pass by luck. What must be true is that the derived
+        ;; identity is one this manifest records; an unrecorded key is an
+        ;; unaccountable publisher.
+        known-identities (into #{}
+                               (remove nil?)
+                               (cons (:ipni.publisher/peer-id m)
+                                     (map :peer-id (:ipni.publisher/identity-history m))))
+        peer (cond
+               ephemeral? derived
+               (contains? known-identities derived) derived
+               :else (die! "the key in the vault derives" derived
+                           "— an identity this manifest does not record."
+                           "Recording it is a decision, not a fix to make here."))
         publisher-addr (str "/dns4/" (str/replace publisher-origin #"^https://" "")
                             "/tcp/443/https/p2p/" peer)
-        _ (when-not (= derived peer)
-            (die! "the vault key does not derive the peer id in the manifest:" derived "vs" peer))
+        _ (when (and (not ephemeral?) (not= peer (:ipni.publisher/peer-id m)))
+            (println "⚠ the vault key derives" peer)
+            (println "  which is a RECORDED identity but NOT"
+                     (:ipni.publisher/peer-id m))
+            (println "  the one signing the live head. Publishing under the key we hold."))
         metadata-bytes (vec (metadata/gateway-http-bytes))
         ;; An advertisement chain is a chain. An indexer that has already
         ;; ingested a head walks BACK from the new one, so a second
         ;; advertisement with no PreviousID orphans everything before it.
-        previous-id (when-not detached? (r2-get-head))
-        chunk (entry-chunk-node content-cids)
-        chunk-block (dj/node->block chunk)
+        previous-id (cond
+                      previous-flag previous-flag
+                      detached-head? nil
+                      :else (resolve-head-ad publisher-origin (r2-get-head)))
+        chunk-block (when-not is-rm? (dj/node->block (entry-chunk-node content-cids)))
+        entries-cid (if is-rm? no-entries-cid (:cid chunk-block))
         signature (sign-advertisement {:peer peer :addrs addrs
-                                       :entries-cid (:cid chunk-block)
+                                       :entries-cid entries-cid
                                        :metadata-bytes metadata-bytes
                                        :previous-id previous-id
+                                       :is-rm is-rm?
                                        :seed seed})
         ad (advertisement-node {:peer peer :addrs addrs
-                                :entries-cid (:cid chunk-block)
+                                :entries-cid entries-cid
                                 :metadata-bytes metadata-bytes
                                 :previous-id previous-id
+                                :is-rm is-rm?
                                 :signature signature})
         ad-block (dj/node->block ad)]
     (println "provider       " peer)
-    (println "publication    " (if detached? "ephemeral detached (head unchanged)" "canonical chain"))
+    (println "operation      " (if is-rm? "REMOVE (IsRm true)" "provide (IsRm false)"))
+    (println "publication    " (cond ephemeral? "ephemeral detached (head unchanged)"
+                                     detached-head? "detached (head unchanged)"
+                                     :else "canonical chain"))
     (println "context        " context-id)
     (println "retrieval      " (first addrs))
     (println "publisher      " publisher-addr)
     (println "content CIDs   " (count content-cids))
     (println "previous head  " (or previous-id "none — this is the first advertisement"))
-    (println "entry chunk    " (:cid chunk-block) (str "(" (.-length (:bytes chunk-block)) " bytes)"))
+    (println "entries        " (if is-rm?
+                                 (str no-entries-cid " (NoEntries — removal by context id)")
+                                 (str (:cid chunk-block) " (" (.-length (:bytes chunk-block)) " bytes)")))
     (println "advertisement  " (:cid ad-block) (str "(" (.-length (:bytes ad-block)) " bytes)"))
     (println "signature      " (count signature) "bytes, verified locally")
     (if-not execute?
       (do
         ;; Print what would be written. A CID is not reviewable; the bytes are.
-        (println "\n--- entry chunk ---")
-        (println (.toString (js/Buffer.from (:bytes chunk-block)) "utf8"))
+        (when chunk-block
+          (println "\n--- entry chunk ---")
+          (println (.toString (js/Buffer.from (:bytes chunk-block)) "utf8")))
         (println "\n--- advertisement ---")
         (println (.toString (js/Buffer.from (:bytes ad-block)) "utf8"))
         (println "\ndry run — nothing written, nothing announced. Pass --execute."))
       (do
         (println "\nwriting blocks…")
-        (r2-put! (str "ipld/" (:cid chunk-block)) (:bytes chunk-block))
+        (when chunk-block
+          (r2-put! (str "ipld/" (:cid chunk-block)) (:bytes chunk-block)))
         (r2-put! (str "ipld/" (:cid ad-block)) (:bytes ad-block))
-        (when-not detached?
+        (when-not detached-head?
           (r2-put! "ipni/head" (js/Buffer.from (:cid ad-block) "utf8")))
         (println "verifying over HTTPS before announcing…")
         (doseq [[label cid expected]
-                [["entry chunk" (:cid chunk-block) (:bytes chunk-block)]
-                 ["advertisement" (:cid ad-block) (:bytes ad-block)]]]
+                (cond-> [["advertisement" (:cid ad-block) (:bytes ad-block)]]
+                  chunk-block
+                  (conj ["entry chunk" (:cid chunk-block) (:bytes chunk-block)]))]
           (let [got (http-get-bytes (str publisher-origin "/ipni/v1/ad/" cid))]
             (when-not (.equals (js/Buffer.from got) (js/Buffer.from expected))
               (die! label "does not read back byte-identical from" publisher-origin))
             (println " " label "reads back identical," (.-length got) "bytes")))
-        (when-not detached?
+        (when-not detached-head?
           (let [head (http-get-bytes (str publisher-origin "/ipni/v1/head"))]
             (when-not (.equals (js/Buffer.from head) (js/Buffer.from (:bytes ad-block)))
               (die! "head does not serve the advertisement we just wrote"))
