@@ -1,7 +1,7 @@
 {:contract/id "awai-murakumo-basho-hokusai-routing"
- :contract/version 2
+ :contract/version 3
  :contract/as-of "2026-09-01"
- :contract/status :frontdoors-merged-basho-live-fail-closed-hokusai-deploy-blocked
+ :contract/status :frontdoors-live-fail-closed
  :contract/active? true
  :contract/advertise-models? false
  :ownership {:model-developer "awai.network"
@@ -95,7 +95,11 @@
   :hokusai {:repo "orgs/network-awai/cloud-murakumo"
             :pull-request 159
             :merge-commit "683cb6ed6eded3114be0b797eb259316e6f77e6b"
-            :production-state :deploy-blocked-missing-lease-signing-secret}
+            :generated-artifact-pull-request 160
+            :deployed-main-commit "af0b6cb1d489e4babfe3a158af3e176f18c6136f"
+            :cloudflare-version "1b398be7-53e0-4683-9d75-009394080ed6"
+            :deployment-mode :owner-approved-lease-free-bootstrap
+            :production-state :live-auth-enforced-fail-closed}
   :awai-network {:repo "orgs/network-awai/network-awai-apex"
                  :pull-request 1
                  :merge-commit "174492d8186d62ae728c0f4f630a4af94fcf2310"
@@ -109,7 +113,10 @@
                                   :code "self_model_backend_unavailable"}}
   :hokusai {:focused-tests {:tests 31 :assertions 250 :failures 0 :errors 0}
             :release-build :passed
-            :production-deploy :blocked}
+            :production-deploy :passed
+            :model-page-http-status 200
+            :unauthenticated-submit-http-status 401
+            :unauthenticated-poll-http-status 401}
   :awai-network {:tests {:tests 36 :assertions 128 :failures 0 :errors 0}
                  :release-build :passed
                  :health-http-status 200
@@ -119,6 +126,6 @@
   :basho-front-door-live true
   :basho-generation-live false
   :hokusai-front-door-merged true
-  :hokusai-front-door-live false
+  :hokusai-front-door-live true
   :openrouter-model-registration false
   :note "API boundaries are merged and fail closed. No Basho or Hokusai product checkpoint/backend is live or advertised."}}
