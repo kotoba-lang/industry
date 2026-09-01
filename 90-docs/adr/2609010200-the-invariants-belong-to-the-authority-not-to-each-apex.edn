@@ -118,9 +118,24 @@
      2  itonami's delegation layer, CACAO to Biscuit. Its own docstring says
         the Drive attests rather than alice proving she chose to. A delegation
         the person did not sign is the platform granting on their behalf.
-     3  the mrb_ presentation divergence. An agent carrying capability across
-        surfaces should not need per-surface presentation knowledge; that
-        knowledge is the agent's labour.
+     3  [STRUCK 2026-09-01] the mrb_ presentation divergence was listed here
+        as agent labour. Measured the next day, it is not. An agent does not
+        carry one capability across surfaces: it holds one per surface and
+        presents whatever it was handed, so it needs no knowledge of shape.
+        Presenting one apex's token at another fails on audience and root key
+        regardless — kotobase answers malformed-token to an mrb_ token — and
+        that failure is the cross-apex boundary this ADR wants, not a cost.
+
+        The divergence is also narrower than stated: authn's verify-inference
+        says in its own docstring that both the mrb_ form and the raw body are
+        accepted internally, so it lives only in edge gates, where the prefix
+        earns its place by rejecting garbage without a round trip.
+
+        The party that needed to know the shape was the PROBE, because it
+        fabricates tokens instead of holding one. That is already recorded as
+        an instrument finding in adr-2608319900. Conflating an instrument's
+        difficulty with an agent's labour is how a work list grows an item
+        nobody needed, and this ADR asserted it without checking.
      4  auth hostnames for apexes with no principals. Last: it adds enrolment
         surface without adding anyone who can be freed.
 
