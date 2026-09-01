@@ -2458,19 +2458,29 @@ fail-closed 化した。
 （`--source-path` / `--module-lock`）である。
 
 ⚠ **この節は 2026-08-30 に「project route は CLI では JVM 経由になる」と書いていた。
-`--source-path` については 2026-08-31 に解消済み**（amu#717）。`kotoba.compiler.nbb.project-files`
-が閉じたグラフを node:fs で解決し、portable な `project/link-source` に渡す:
+2026-09-01 に project mode は全部 Node へ移り、`bin/amu` の `jvmOnlyProjectMode` は
+関数ごと消えた。** `--source-path` は 2026-08-31（amu#717、`kotoba.compiler.nbb.project-files`）、
+`--module-lock` は 2026-09-01（amu#728、`kotoba.compiler.nbb.module-lock`、ADR 0289）。
+どちらも同じ portable な `project/link-source` に渡す:
 
 ```bash
-amu compile main.cljk --source-path <dir> --target wasm32 --jvm-free   # exit 0
+amu compile main.cljk --source-path <dir> --target wasm32 --jvm-free            # exit 0
+amu module-lock main.cljk --source-path <dir> --blocks <dir> --jvm-free         # exit 0
+amu compile --module-lock lock.edn --blocks <dir> --target wasm32 --jvm-free    # exit 0
 ```
 
-実測（`clojure` を PATH から外し `JAVA_HOME=/nonexistent`）: 2 module の project が
-通り、生成 wasm が `run(5) = 11` を返す（= もう一方の module のコードが走っている）。
+実測（`clojure` と `java` を PATH から外し `JAVA_HOME=/nonexistent`）: 2 module の
+project が通り、生成 wasm が `run(5) = 11` を返す（= もう一方の module のコードが
+走っている）。
 
-- **`--module-lock` はまだ JVM のまま。** resolver に Node 版が無く、path resolver で
-  lock 付きの build に答えると pin が黙って外れるので、`exit 64` で fail-closed。
-  **再現可能な build を要求する経路は今も JVM を通る。**
+- **再現可能な build も、もう JVM を通らない。** lock を**作る**側（`amu module-lock`）も
+  同じ日に移した —— 消費だけ移すと JDK が全 pinned build の 1 段上流に移るだけで、
+  Q9 の反論は答えたことにならない。lock の全 refusal（未 pin の依存 / CID に hash
+  しない block / block store の不在 …）は message ごと保存されており、path fallback は
+  無い。実測: JVM 経路と突き合わせて **lock.edn・block CID・`.wasm` はバイト一致**。
+  **provenance だけは 1 フィールド（`:build-metadata-sha256`）違う** —— これは
+  `--source-path` でも同じに出る path-resolver 移植由来の既存差で、route を跨いで
+  provenance を照合する consumer は 2 つを同一視できない。
 - したがって「JVM-free を保つには単一ファイルにするしかない」はもう成り立たない。
   実測 2026-08-30 に見つかった重複 —— `org-ietf-smtp` / `org-ietf-pop3` /
   `org-ietf-imap` の 3 repo が同じバイト走査（空白送り・数字判定・大小無視比較）を
