@@ -7,8 +7,10 @@
 set -u
 WORKTREE="${HYAKKA_BOT_WORKTREE:-$HOME/.gftd/worktrees/hyakka-wikidata-class-bot}"
 NBB="${HYAKKA_NBB:-/opt/homebrew/bin/nbb}"
-KOTOBA=/Users/junkawasaki/github/com-junkawasaki/orgs/kotoba-lang
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Derived, not hardcoded: this file lives at <root>/scripts/hermes-hyakka-bots/,
+# so the west checkouts are two levels up. HYAKKA_KOTOBA overrides it.
+KOTOBA="${HYAKKA_KOTOBA:-$(cd "$SCRIPT_DIR/../.." && pwd)/orgs/kotoba-lang}"
 
 cd "$WORKTREE" 2>/dev/null || {
   echo "REFUSED — no worktree at $WORKTREE"
