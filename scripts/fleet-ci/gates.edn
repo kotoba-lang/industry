@@ -1304,6 +1304,34 @@
    :script-args ["--sub" "90-docs" "--min" "6" "--strict-keys"]
    :include-ext [".edn"] :min-files 30 :cd false}
 
+  ;; cloud-itonami-app の実際のテストスイート。**この repo は 209 個の test ファイルと
+  ;; 2,189 個の test を持ちながら、fleet gate は隣の docs-edn 1 本だけだった** ——
+  ;; つまり「読めるか」は測られていて「動くか」は一度も測られていない。実測
+  ;; 2026-09-01、その未測定の下で 5 つの検査が main で赤いまま滞留していた
+  ;; （authority が endpoint 付きで出荷 / bundle lock と文書の CID 不一致で
+  ;; graph/publish! が throw / script が作る id を要求する過剰な規則）。
+  ;;
+  ;; 走ることは **fleet が配る形そのもので** 確認済み（推測ではない）:
+  ;; `git archive origin/main | tar -x` した tree —— `.git` も `orgs/` も無い ——
+  ;; で `clojure -M:test` が 2,189 tests / 12,993 assertions を走らせ、worktree で
+  ;; 走らせたときと **同一の結果**（13 failures, 0 errors）を返した。つまり
+  ;; `.git` にも sibling にも依存していない。:test alias の :local/root は :dev
+  ;; だけに閉じている（"Release and CI never use this"）。
+  ;; ノード側も実測: judah / levi とも maven=200 github=200 / java 26。
+  ;;
+  ;; ⚠ **landing 時点で赤い。緑にする条件は 1 つだけ**: human_work_http_test の
+  ;; 13 failures。`/api/workspace/human-work/...` は src/ に一度も存在したことが
+  ;; なく（`git log -S` で 0 件）、test ファイルは 2026-09-01 16:40 の
+  ;; `946760e cleanup: land untracked WIP (11 files)` で main に入った ——
+  ;; 実装より先に書かれた test であって回帰ではない。その面を作るか file を
+  ;; 退役させるかは製品判断で、それが済めばこの gate は緑になる。
+  ;;
+  ;; :cd false —— 赤い gate に pin を進めさせない。緑の receipt が出るまでこのまま。
+  ;; 1 tick あたり約 30 分のノード時間を使うので、上の 1 件が長引くなら
+  ;; この entry を外す方が安い。
+  {:name "cloud-itonami-app" :id "itonami-app-jvm-test" :org "cloud-itonami"
+   :gate :jvm-test :cap :jvm :cd false}
+
   ;; superproject の ADR identity gate。**:id が必要**（:name は org / tip 解決に
   ;; 使う repo 名のままにする必要があるので、識別子を分ける）。
   ;;
