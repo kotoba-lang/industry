@@ -5,7 +5,7 @@
   :adr/doc-type "adr"
   :adr/source-format "edn"
   :adr/date "2026-08-31"
-  :adr/last-verified "2026-08-31"
+  :adr/last-verified "2026-09-01"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "cross-apex-auth-integration"
@@ -522,6 +522,62 @@ probe は**初版からその値を記録していて、何も採点していな
 軸が届く範囲と届かない範囲の一覧の方が価値がある。後ろに置けば誰も読まない。
 
 ⚠ 軸が増えて分母は 1.20。**53.79 → 53.47 は別スケール**であり退行ではない。
+
+## 6.14 closing — 2026-09-01 01:50Z の現在地と再開点
+
+**overall 53.47 / 100**（分母 1.20。8/31 の数値と直接は比べない —— 途中で軸を 2 本足した）。
+
+```
+kotobase.net 100.00 / murakumo.cloud 75.00 / itonami.cloud 62.50
+x402.nexus 54.17 / aozora.app 29.17 / isekai.network 0.00
+```
+
+### 本番に載ったもの（実測で確認済み）
+
+| Worker | version | 何が変わったか |
+|---|---|---|
+| `kotobase-protocols-worker` | `44e201d8` | sparql/gremlin/graphql が Biscuit を読む |
+| `net-kotobase`（gateway） | `19c9271e` | xrpc 401 が 提示なし/形式不正/拒否 を区別 |
+| `app-aozora-pds` | `7bdc34b7` | 認証失敗が 200 から 401 へ |
+| `itonami-app-auth` | `188053db` | `/v1/biscuit/token` を issuer へ転送 |
+| `app-aozora-auth` | `9883c91a` | 同上 |
+| `nexus-x402` | `c2354717` | Biscuit を公開鍵で**受理**し、mint は転送 |
+
+### ⚠ main に在るが本番に出ていないもの
+
+**`cloud-murakumo-api` `e2e944d7`** —— operator Biscuit の consumer と governed artifact
+refresh は main に着地し検証も通ったが、**出荷していない**。
+
+**Cloudflare の OAuth token が `2026-08-31T22:01:50Z` に期限切れ**で、wrangler 3 バージョン
+（4.103 / 4.107 / 4.123）すべてが `not authenticated` を返す。`refresh_token` は config に
+在るが自動更新が効いていない。**このマシンからの出荷は全 Worker で止まっている。**
+
+再開は owner の `wrangler login`（ブラウザ対話）のあと、その repo の `npm run deploy`。
+
+### 残る blocker（すべて owner の判断か鍵）
+
+1. **出荷全般** — OAuth 期限切れ（上記）
+2. **aozora の ceremony** — `auth/` で `PDS_JWT_SECRET` を pds と同じ値で設定する。
+   **新しい値を生成すると pds の in-flight session が静かに壊れる。**
+3. **isekai.network** — 6.12 の 3 判断（server-side authority を持たせるか /
+   自己発行 did:key を controller にするか / 新規 `.mjs` の規約衝突）
+
+### 計器（着地済み、`manifest/orgs-detectors.edn` に登録、計 56）
+
+| detector | 何を比べるか |
+|---|---|
+| `verify-ipni-publisher-record` | 記録 と live head の署名者・cid.contact・実配信 |
+| `verify-shadow-cljs-provider-paths` | source-path に載せた lib と その lib 自身の依存 |
+| `verify-credential-consumers` | issuer が晒す検証 endpoint と それを呼ぶ者 |
+| `verify-shared-library-consumption` | 各 build が共有ライブラリに**届くか**、どの経路で |
+
+再測定は `90-docs/auth_plane_integration/run.cljs`（exit 0/1/2）と同 `selftest.cljs`（6/6）。
+
+### 次の一手（出荷を要さない）
+
+`verify-shadow-cljs-provider-paths` が報告した**ビルド不能 8 件のうち直したのは 3 件**
+（control-plane protocols-worker / aozora / murakumo）。**残り 5 件**は出荷を伴わずに
+直せる。同 script を `--findings orgs` で回せば現在地が出る。
 
 ## 7. やっていないこと（正直に）
 
