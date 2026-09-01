@@ -462,7 +462,28 @@
               never fire for the reason it names. It now reads the status. --selftest
               anchors the lookup-key derivation on BYTES, not on the manifest it
               judges: sha256 of the 3 bytes 'Any' is the witness digest, and
-              (drop (inc i)) -> (drop i) yields a visibly different key."}
+              (drop (inc i)) -> (drop i) yields a visibly different key.
+
+              2026-09-02: three checks added for :ipni.publisher/discovery-witness --
+              the sample 90-docs/ipni_maturity/probe.cljs scores its heaviest axis
+              (:discoverable-as-provider, weight 0.20) on. The probe used to carry that
+              sample as a literal, and the literal was the CID the lifecycle proof
+              RETRACTS, so the axis read 0 for eighteen hours while the hypothesis it
+              stands for was green and passing the checks above -- and the loop kept
+              ranking already-finished work first. A probe that carries its own sample
+              is a probe whose sample nobody re-measures, so the sample moved into the
+              record and is measured here every six hours. Clean run: exit 0, SCANNED
+              9, twelve checks ok. Three directions shown on doctored copies via
+              IPNI_MANIFEST_PATH: sample repointed at the retracted witness fails BOTH
+              discovery-witness-is-not-the-lifecycle-witness and
+              discovery-witness-still-advertised, each naming its own reason; sample
+              repointed at a multihash the index does not associate with us fails only
+              -still-advertised while -is-not-the-lifecycle-witness stays ok, so the two
+              are independent; deleting the key fails discovery-witness-is-recorded.
+              That last one exists because the audit averages over MEASURED axes only:
+              an unrecorded sample makes the axis :unknown, and dropping a red axis
+              RAISES the mean. Deleting the sample must not be a quiet way to score
+              higher."}
 
   {:id       :verify-source-nul-bytes
    :title    "raw control bytes in source, which make grep answer as if a word is absent"

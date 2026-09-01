@@ -17,6 +17,7 @@
   and it is not there'; :unknown says 'could not measure', and the audit
   refuses to score it rather than counting silence as failure."
   (:require [clojure.string :as str]
+            [clojure.edn :as edn]
             [cljs.pprint :as pp]
             ["fs" :as fs]
             ["child_process" :as cp]))
@@ -25,7 +26,14 @@
 (def gateway-host "https://ipfs.kotobase.net")
 (def indexer "https://cid.contact")
 
-;; A CID the gateway is known to serve, used as the retrieval witness.
+;; A CID the gateway is known to serve, used as the RETRIEVAL witness only.
+;;
+;; It is also the CID the 2026-09-01 lifecycle proof retracted, so it will
+;; never again resolve to this publisher -- by design. Scoring
+;; :discoverable-as-provider on it is what pinned that axis at 0 while
+;; ipni-h1, the hypothesis the axis stands for, was green and passing its own
+;; detector. The discovery sample is read from the publisher record instead;
+;; see `discovery-witness` below.
 (def ^:private re-call-site
   "A require or use of the ipni namespaces. Matches the alias form the
   library is actually consumed through."
@@ -142,6 +150,77 @@
         {:hits (count hit-files) :repos (vec (distinct hit-repos))
          :manifests-read (count files) :repos-listed (count paths)}))))
 
+(defn- manifest-path
+  "Overridable so the negative directions can be SHOWN on a doctored copy
+  rather than asserted -- the same seam, and the same env var, that
+  scripts/verify-ipni-publisher-record.cljs uses. A check nobody has watched
+  fail is a check nobody knows the failure mode of."
+  [root]
+  (or (aget (.-env js/process) "IPNI_MANIFEST_PATH")
+      (str root "/manifest/ipni-publisher.edn")))
+
+(defn- publisher-record
+  "manifest/ipni-publisher.edn as data, or nil if absent or unreadable.
+
+  nil becomes :unknown at the call site, never 0. A probe that could not read
+  the record has not discovered that nobody can find us."
+  [root]
+  (let [f (manifest-path root)]
+    (when (fs/existsSync f)
+      (try (edn/read-string (str (fs/readFileSync f "utf8")))
+           (catch :default _ nil)))))
+
+(defn- multihash-providers
+  "Provider peer ids cid.contact returns for a base58btc multihash.
+
+  nil  -- the question could not be asked.
+  []   -- it was asked, and the index holds nothing for that multihash.
+
+  Different facts, and the caller must not merge them. 404 is an ANSWER, so
+  the status is read rather than inferred from whether a body parsed;
+  otherwise `the index knows nothing` arrives wearing the same face as `the
+  network was down`, which is the one substitution this rubric exists to
+  refuse.
+
+  Reads /multihash/, not /routing/v1/providers/. All three cid.contact
+  surfaces sit behind CloudFront -- measured 2026-09-02, /multihash/ answered
+  `age: 234` and a query-string nonce did not bust it -- but /routing/v1/ was
+  measured serving `age: 1518` against `max-age=7200` while /multihash/
+  reflected a new advertisement in 15s. The axis asks what the index says
+  now, so it reads the shortest-lived of the three."
+  [b58]
+  (let [out (sh (str "curl -sSL --max-time 25 -w " (pr-str "\\n%{http_code}") " "
+                     (pr-str (str indexer "/multihash/" b58))))
+        [body status] (when (and out (str/index-of out "\n"))
+                        (let [i (str/last-index-of out "\n")]
+                          [(subs out 0 i) (str/trim (subs out (inc i)))]))]
+    (cond
+      (nil? out) nil
+      (nil? status) nil
+      (= "404" status) []
+      (not= "200" status) nil
+      :else (try
+              (->> (get (js->clj (js/JSON.parse body)) "MultihashResults")
+                   (mapcat #(get % "ProviderResults"))
+                   (mapv #(get-in % ["Provider" "ID"])))
+              (catch :default _ nil)))))
+
+(defn- recorded-identities
+  "Every peer id this publisher is recorded as having published under.
+
+  The axis asks whether the public index returns US. `us` is a set of four
+  keys, not one: the corpus was advertised under identities that have since
+  rotated, and cid.contact still answers for them. Matching only the current
+  key would report `not discoverable` for content that is discoverable.
+
+  The previous matcher was `(str/includes? body \"kotobase\")`, which passes on
+  any response whose text contains that substring -- a third party running a
+  host with kotobase in the name would satisfy it, and no arrangement of
+  peer ids could fail it."
+  [rec]
+  (into (set (keep :peer-id (:ipni.publisher/identity-history rec)))
+        (keep identity [(:ipni.publisher/peer-id rec)])))
+
 (defn- publisher-identity
   "Whether a publisher identity has been DECIDED, measured as the presence of
   `manifest/ipni-publisher.edn` naming a peer id.
@@ -153,7 +232,7 @@
   the hypothesis table instead would have made the wake path unreachable
   forever, which is the shape of a gate that is never green."
   [root]
-  (let [f (str root "/manifest/ipni-publisher.edn")]
+  (let [f (manifest-path root)]
     (if-not (fs/existsSync f)
       0
       (let [txt (str (fs/readFileSync f "utf8"))]
@@ -169,6 +248,16 @@
         pinning-head    (http-status "https://pinning.kotobase.net/ipni/v1/head")
         gateway-serves  (http-status-following (str gateway-host "/ipfs/" witness-cid))
         providers-body  (http-body (str indexer "/routing/v1/providers/" witness-cid))
+        ;; discovery: a CID we DO advertise, matched against the keys we
+        ;; publish under. Sample and keys both come from the publisher
+        ;; record, which verify-ipni-publisher-record.cljs re-measures
+        ;; against the wire every six hours -- so the sample this axis
+        ;; rests on is itself checked, rather than asserted here.
+        rec             (publisher-record root)
+        disc            (:ipni.publisher/discovery-witness rec)
+        known-ids       (recorded-identities rec)
+        disc-answered   (when (:multihash disc) (multihash-providers (:multihash disc)))
+        disc-ours       (when disc-answered (filterv known-ids disc-answered))
         ;; repo-side facts
         dep-result      (dep-declaration-count root)
         consumer-repos  (if (map? dep-result) (:repos dep-result) [])
@@ -199,9 +288,18 @@
                               (str/includes? providers-body "Providers") 1
                               :else 0)
      :indexer/lists-kotobase (cond
-                               (nil? providers-body) :unknown
-                               (str/includes? providers-body "kotobase") 1
+                               (nil? rec) :unknown          ; no record to read
+                               (nil? disc) :unknown         ; record names no sample
+                               (empty? known-ids) :unknown  ; record names no identity
+                               (nil? disc-answered) :unknown ; cid.contact unreachable
+                               (seq disc-ours) 1
                                :else 0)
+     ;; Printed so the axis can be audited without re-running it: which
+     ;; multihash was asked, who answered, and which of those are ours.
+     :indexer/discovery-sample {:multihash (:multihash disc)
+                                :asked (count known-ids)
+                                :answered (if (nil? disc-answered) :unknown (count disc-answered))
+                                :ours (if (nil? disc-ours) :unknown (vec disc-ours))}
      :read/cid-contact-router (cond
                                 (nil? routers-src) :unknown
                                 (str/includes? routers-src "cid.contact") 1
