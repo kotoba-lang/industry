@@ -5895,4 +5895,84 @@
      :file "cljs/public/index.html"
      :find "<div id=\"app\">"
      :replace "<div id=\"root\">"
-     :must-fail ["shell-mount-point-matches-the-one-the-app-renders-into"]}]}]}
+     :must-fail ["shell-mount-point-matches-the-one-the-app-renders-into"]}]}
+
+  {:repo "orgs/cloud-itonami/lawyer"
+   :label "lawyer —— 4 つのファイルが別々の言語で述べている 1 つの XRPC 契約"
+   ;; `lexicons/lawyer/` は README 自身が "NSID contract SSoT" と呼んでいる。その
+   ;; 契約の一部を、他の 4 つが別の言語で言い直している:
+   ;;
+   ;;   - 配備される route（`+server.ts`。wrangler が指すのは SvelteKit の出力）
+   ;;   - 4 つの view。NSID を **文字列リテラル**として名指しする
+   ;;   - `worker/src/app.ts` の /health が広告する command 一覧
+   ;;   - README の XRPC 表。NSID と **その type** を繰り返している
+   ;;
+   ;; TypeScript はこの 4 つを結べない。NSID は文字列、type は JSON、handler は
+   ;; export された記号なので、`tsc --noEmit` も `svelte-check` も 4 者が食い違った
+   ;; まま緑を返す（実測: 147 files 0 errors のまま、下の 1 つ目が成立していた）。
+   ;;
+   ;; ⚠ この suite が在る理由は、テストの初回実行が**実際に食い違いを 1 つ見つけた**
+   ;; ことである。lexicon 3 本が `query` を宣言し、それを呼ぶ 3 つの view は XRPC の
+   ;; 束縛どおり `fetch(url)`（= GET）を投げていたのに、route は POST と OPTIONS しか
+   ;; export していなかった。SvelteKit は route のコードに入る前に 405 を返し、view は
+   ;; その失敗を `catch { …DEMO… }` で受けるので、**dashboard と matter 一覧と grant
+   ;; 一覧が捏造データを描画し、画面にはそう書いていなかった**。配備面の半分が届かない
+   ;; まま、動いているソフトウェアに見えていた。
+   ;;
+   ;; :lawyer/route-loses-its-get-handler はその退行そのものを撃つ。
+   ;; :lawyer/cors-forgets-the-method-it-just-gained は対で要る —— preflight が GET を
+   ;; 広告しなければ、browser は route に届く前に cross-origin の呼び出しを拒否する。
+   ;;
+   ;; ここに無いもの: MCP router が実際に応答するかは検査しない。それはこの repo に
+   ;; ついての主張ではないので、落ちても意味が読めない。
+   :cmd ["nbb" "test/xrpc_contract_test.cljs"]
+   :green-marker "lawyer contracts: all green"
+   :mutations
+   [{:id :lawyer/route-loses-its-get-handler
+     :why "見つかった欠陥そのもの。export を 1 語外すだけで query 3 本が 405 になるが、view は catch で demo に落ちるので画面は『動いて』見える。tsc も svelte-check も何も言わない"
+     :file "worker/svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "export const GET: RequestHandler"
+     :replace "const GET: RequestHandler"
+     :must-fail ["every-declared-method-type-is-reachable"]}
+
+    {:id :lawyer/cors-forgets-the-method-it-just-gained
+     :why "route は GET を持っているのに preflight が広告しない形。同一 origin では動くので手元では気付かず、cross-origin の呼び出しだけが browser 側で拒否される"
+     :file "worker/svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "'access-control-allow-methods': 'GET,POST,OPTIONS',"
+     :replace "'access-control-allow-methods': 'POST,OPTIONS',"
+     :must-fail ["cors-advertises-every-exported-method"]}
+
+    {:id :lawyer/lexicon-id-drifts-from-its-filename
+     :why "この directory を glob する consumer は path から id を導く。file を動かさずに id だけ変えると、両者を突き合わせていない全員にとって別の NSID になる"
+     :file "lexicons/lawyer/acceptGrant.json"
+     :find "\"id\": \"ai.gftd.apps.lawyer.acceptGrant\","
+     :replace "\"id\": \"ai.gftd.apps.lawyer.acceptGrantV2\","
+     :must-fail ["lexicon-id-matches-filename"]}
+
+    {:id :lawyer/lexicon-changes-type-without-the-readme
+     :why "type は呼び方そのもの（query→GET / procedure→POST）。SSoT 側だけ変えると、README を読んで実装した呼び手は正しく書いたまま 405 を受ける"
+     :file "lexicons/lawyer/getDashboard.json"
+     :find "\"type\": \"query\","
+     :replace "\"type\": \"procedure\","
+     :must-fail ["readme-table-matches-lexicons"]}
+
+    {:id :lawyer/readme-table-drops-a-row
+     :why "逆向き。lexicon は在るのに表から落ちる形で、表しか読まない人にとってその NSID は存在しない"
+     :file "README.md"
+     :find "| `logWorkNote` | procedure | Encrypted work note + time entry |\n"
+     :replace ""
+     :must-fail ["readme-table-matches-lexicons"]}
+
+    {:id :lawyer/a-view-calls-an-nsid-nobody-declares
+     :why "改名の途中で止まった形。文字列リテラルなので TypeScript は無言、失敗は実行時の 502 で、view はそれも catch して demo を描く"
+     :file "worker/svelte/src/routes/matters/+page.svelte"
+     :find "ai.gftd.apps.lawyer.listAssignedMatters"
+     :replace "ai.gftd.apps.lawyer.listMatters"
+     :must-fail ["every-referenced-nsid-is-declared"]}
+
+    {:id :lawyer/health-advertises-a-command-nobody-declares
+     :why "/health を polling する相手に対する宣言。手で書かれた配列なので、lexicon を足さずに 1 行足せば通ってしまう"
+     :file "worker/src/app.ts"
+     :find "          \"ai.gftd.apps.lawyer.logWorkNote\",\n"
+     :replace "          \"ai.gftd.apps.lawyer.logWorkNote\",\n          \"ai.gftd.apps.lawyer.closeMatter\",\n"
+     :must-fail ["advertised-commands-are-declared"]}]}]}
