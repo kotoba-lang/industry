@@ -345,4 +345,88 @@
  :coverage/jurisdiction "jpn"
  :coverage/verified-at "2026-08-31"
  :coverage/note "R&D environmental protection (COFOG 05.5) in Japan is owned by the Ministry of the Environment (MOEJ), whose env.go.jp portal funds and publishes environmental research programs, the Environmental Research and Technology Development Fund and NIES oversight any environmental-R&D actor answers to. Gate-fetched 2026-08-31: HTTP 200 / 56974 bytes. Division 05 already had 052, 053, 054; 055 is the research-funding side."}
+
+{:db/id -1
+ :coverage/name "Public debt transactions"
+ :coverage/verified-at "2026-09-01"
+ :coverage/division-name "General public services"
+ :coverage/note "Public debt transactions (COFOG 01.4) in Japan are owned by the Ministry of Finance, whose Japanese Government Bonds policy page at mof.go.jp is the debt-management authority sovereign-debt and bond-data services answer to. Gate-fetched 2026-09-01: HTTP 200 / 21900 bytes. Division 01 already had 011 (Cabinet Office) and 012 (JICA); 014 is the debt-management side."
+ :source/dataset "itonami-coverage"
+ :coverage/authority-url "https://www.mof.go.jp/english/policy/jgbs/"
+ :coverage/kind :cofog-group
+ :coverage/division "01"
+ :coverage/jurisdiction "jpn"
+ :coverage/code "014"}
+
+{:db/id -1
+ :coverage/name "Military defence"
+ :coverage/verified-at "2026-09-01"
+ :coverage/division-name "Defence"
+ :coverage/note "Military defence (COFOG 02.1) in the United Kingdom is owned by the Ministry of Defence, whose gov.uk hub publishes defence policy, the armed forces command structure and the procurement/estate programs any defence actor answers to. Gate-fetched 2026-09-01: HTTP 200 / 162498 bytes. Division 02 had 022 (civil defence); 021 is the military side."
+ :source/dataset "itonami-coverage"
+ :coverage/authority-url "https://www.gov.uk/government/organisations/ministry-of-defence"
+ :coverage/kind :cofog-group
+ :coverage/division "02"
+ :coverage/jurisdiction "gbr"
+ :coverage/code "021"}
+
+{:db/id -1
+ :coverage/name "Fuel and energy"
+ :coverage/verified-at "2026-09-01"
+ :coverage/division-name "Economic affairs"
+ :coverage/note "Fuel and energy (COFOG 04.3) in the United States is owned by the Department of Energy, whose energy.gov portal publishes national energy policy, grid and nuclear programs and the applied-energy funding any energy actor answers to. Gate-fetched 2026-09-01: HTTP 200 / 131877 bytes. Division 04 already had 042 (agriculture); 043 is the energy side."
+ :source/dataset "itonami-coverage"
+ :coverage/authority-url "https://www.energy.gov"
+ :coverage/kind :cofog-group
+ :coverage/division "04"
+ :coverage/jurisdiction "usa"
+ :coverage/code "043"}
+
+{:db/id -1
+ :coverage/name "Communication"
+ :coverage/verified-at "2026-08-31"
+ :coverage/division-name "Economic affairs"
+ :coverage/note "Communication (COFOG 04.6) in Japan is owned by the Ministry of Internal Affairs and Communications (soumu.go.jp), whose ICT/communications policy hub publishes telecom, internet, and broadcast infrastructure policy any communications actor answers to. Gate-fetched 2026-08-31: HTTP 200 / 45523 bytes. Division 04 (Economic affairs) already had 042 and 045; 046 is the infrastructure/communications side. This run also tried soumu s-news/01tsushin and menu_02/ict02 paths (both 404) before landing on the policy hub."
+ :source/dataset "itonami-coverage"
+ :coverage/authority-url "https://www.soumu.go.jp/menu_seisaku/ictseisaku/index.html"
+ :coverage/kind :cofog-group
+ :coverage/division "04"
+ :coverage/jurisdiction "jpn"
+ :coverage/code "046"}
+
+{:db/id -1
+ :coverage/name "R&D Health"
+ :coverage/verified-at "2026-09-01"
+ :coverage/division-name "Health"
+ :coverage/note "R&D health (COFOG 07.5) in Japan is funded and coordinated by AMED (Japan Agency for Medical Research and Development), whose amed.go.jp portal publishes the medical R&D programs, grant calls and project results any health-research actor answers to. Gate-fetched 2026-09-01: HTTP 200 / 27939 bytes. Division 07 already had 071 (medical products), 072 (outpatient), 073 (hospital); 075 is the research-funding side."
+ :source/dataset "itonami-coverage"
+ :coverage/authority-url "https://www.amed.go.jp/"
+ :coverage/kind :cofog-group
+ :coverage/division "07"
+ :coverage/jurisdiction "jpn"
+ :coverage/code "075"}
+
+{:db/id -1
+ :coverage/name "Religious and other community services"
+ :coverage/verified-at "2026-08-31"
+ :coverage/division-name "Recreation, culture and religion"
+ :coverage/note "Religious and other community services (COFOG 08.4) in Japan are administered by the Agency for Cultural Affairs religious-corporations function, whose shukyohojin (religious corporations) page at bunka.go.jp publishes certification and oversight of religious corporations and the Shukyo Nenkan statistics any religious/community actor answers to. Gate-fetched 2026-08-31: HTTP 200 / 25080 bytes. Division 08 already had 081/082/083; 084 is the religious-and-community side."
+ :source/dataset "itonami-coverage"
+ :coverage/authority-url "https://www.bunka.go.jp/seisaku/shukyohojin/index.html"
+ :coverage/kind :cofog-group
+ :coverage/division "08"
+ :coverage/jurisdiction "jpn"
+ :coverage/code "084"}
+
+{:db/id -1
+ :coverage/name "R&D Education"
+ :coverage/verified-at "2026-08-31"
+ :coverage/division-name "Education"
+ :coverage/note "COFOG 09.7 in Japan: the Japan Society for the Promotion of Science (日本学術振興会) under MEXT funds academic research (Grants-in-Aid for Scientific Research), publishes grant statistics and open-science policy; an education-R&D actor answers to JSPS/MEXT. Fetched 2026-08-31: HTTP 200 / 87024 bytes."
+ :source/dataset "itonami-coverage"
+ :coverage/authority-url "https://www.jsps.go.jp/"
+ :coverage/kind :cofog-group
+ :coverage/division "09"
+ :coverage/jurisdiction "jpn"
+ :coverage/code "097"}
 ]
