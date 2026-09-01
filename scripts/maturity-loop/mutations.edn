@@ -5223,6 +5223,9 @@
    ;;
    ;; ここに無いもの: 102 という数が今も正しいかは検査しない。それは 2026-02-22 の
    ;; 上流の性質であってこの repo についての主張ではないので、落ちても意味が読めない。
+   ;;
+   ;; harness 実測（2026-09-01、pin a0b52b6d、`run.cljs --only app-society6`）:
+   ;;   base a0b52b6d: 緑 / 噛む=9 噛まない=0 エラー=0 skip=0
    :cmd ["nbb" "test/cofog_artifact_test.cljs"]
    :green-marker "cofog-artifact-check: OK"
    :mutations
