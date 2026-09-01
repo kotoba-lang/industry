@@ -4,7 +4,7 @@
   :adr/source-format "edn"
   :adr/authoritative true
   :adr/title "faucet は CAPTCHA ではなく passkey で門を作り、トークンだけでなく grant を発行する"
-  :adr/status "proposed"
+  :adr/status "accepted"
   :adr/date "2026-09-01"
   :adr/last_verified "2026-09-01"
   :adr/deciders ["Jun Kawasaki"]
@@ -86,4 +86,56 @@ mode of every bug in it is that testnet tokens move.
 The allowance numbers, whether the drip is ETH and USDC or ETH only with USDC
 minted, and whether a second draw tops up the same session address or issues a
 new one. Those need the first draw to exist before they can be chosen on
-evidence rather than guessed."}]
+evidence rather than guessed.
+
+## Accepted 2026-09-01, with the on-chain half corrected
+
+Owner direction: the self faucet should drop the CAPTCHA, be agent-first, and
+ask for WebAuthn / passkey / smart-contract authentication instead. Accepted.
+
+### Most of the gate already exists and is running
+
+webauthn.adapters.edge verifies registration and assertion against WebCrypto,
+and cloud-itonami/app-auth already uses it in production at
+auth.itonami.cloud. The faucet does not implement ceremony crypto; it is a
+relying party of what is live. org-w3-webauthn holds the ceremony data as EDN
+with crypto injected, and org-nist-ecc has a P-256 verify that returns a
+reason rather than a boolean, for hosts without WebCrypto.
+
+### The smart-contract half is NOT available, and a session note said it was
+
+The note said RIP-7212's P-256 precompile was verified working on Base. It is
+not. Measured 2026-09-01 with the spec's exact layout -- address 0x100, 160
+bytes of hash, r, s, x, y, 32 bytes of 1 on success and no output on failure
+-- and with signatures verified valid locally before sending: Base, Base
+Sepolia, Optimism, Arbitrum, Scroll and Ethereum all return nothing.
+
+Separating absent from rejecting took work, because both are empty. The call
+shape was validated first against precompiles that must exist: identity at
+0x04 echoes its input and sha256 at 0x02 matches a locally computed digest.
+With the shape proven, empty for a locally valid signature means absent.
+
+A contract at 0xc2b78104907F722DABAc4C69f826a522B2754De4 exists on both Base
+and Base Sepolia with 3537 bytes of code, and returned 0 for six independent
+locally valid signatures, low-s normalised and not. Whether that is a
+different contract or a different interface is UNVERIFIED; it is not evidence
+that on-chain verification works.
+
+scripts/p256-onchain-probe.cljs is the measurement, kept so the answer is
+re-checkable rather than remembered. It exits 2 when it cannot validate its
+own call shape, because an absence measured through a call that does not work
+is not an absence.
+
+### So the gate is a passkey, and the contract is the grant
+
+Verification stays off-chain, in the relying party. What the passkey signs is
+the spend grant of ADR-2609010100: scope, limit, expiry, revocable. The
+facilitator enforces that grant on every settlement, so the agent's authority
+is bounded by something a person authorised with a gesture, and bounded
+without any contract needing to check a P-256 signature.
+
+That is the trust boundary honestly stated: a holder of the passkey authorises
+a grant, this relying party checks the assertion, and the facilitator refuses
+anything outside the grant. Moving the check on-chain would remove the relying
+party from the trusted set, and remains the goal -- blocked on P-256
+verification that this workspace has now measured rather than assumed."}]
