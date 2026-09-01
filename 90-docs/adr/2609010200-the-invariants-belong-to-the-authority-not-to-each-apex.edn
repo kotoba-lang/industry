@@ -52,7 +52,29 @@
    product's own first sentence."
 
   :adr/decision
-  "Split the invariants by what they are properties OF.
+  "Split the invariants by what they are properties OF. THREE categories, not
+   two — the first version proposed two and listed as a refutation that a
+   surface where a person is expected per request would need a third. That
+   refutation fired within a day, from the product's own landing page, so the
+   third is written in rather than left as a hypothetical.
+
+     CONSENT surfaces — a person's presence is the FEATURE, not the cost:
+
+   itonami.cloud shows one on its first screen. A bot has done the work and
+   stopped: x402 payment, 24.00 USDC, no transfer has occurred, approval
+   required. Beside it the page states the principle — bots keep consequential
+   authority explicit. The identity panel names the other: Kotoba Stable
+   Principal is not connected to Itonami on this browser, Itonami keeps its own
+   first-party session, Passkey and cookie are never copied between services,
+   Connect this Principal.
+
+   So freeing people from labour does not mean removing every human act. It
+   means bots do the work and a person decides what is consequential — money
+   moving, and one identity being joined to another. A ceremony on a consent
+   surface is not overhead to minimise; it is the thing being bought. The
+   argument is therefore sharper than the first version rather than weaker:
+   minimise ROUTINE presence, preserve CONSEQUENTIAL presence, and never
+   confuse an invariant that serves the second for one that inflicts the first.
 
      AUTHORITY invariants — measured ONCE, against the shared authn:
        a ceremony is live; it is one implementation rather than a second;
@@ -87,6 +109,12 @@
 
      1  itonami's holder-to-membership binding. Not a blocker to tick off: it
         is the seam where one human act becomes an agent's standing authority.
+        Partly named by the product already: Connect this Principal joins a
+        Kotoba Stable Principal to an Itonami session. That is a PERSON's
+        continuity though, and a Biscuit presents an AGENT's holder. The open
+        half is whether an agent's holder is bound through the person who
+        connected it or separately. Do not read the existing kotoba-link path
+        as having answered this.
      2  itonami's delegation layer, CACAO to Biscuit. Its own docstring says
         the Drive attests rather than alice proving she chose to. A delegation
         the person did not sign is the platform granting on their behalf.
@@ -114,9 +142,12 @@
      that is authority-plane work with a real gap behind it, not an absent
      question.
 
-     If a surface can be shown where a person IS expected to be present per
-     request — a console, an approval step — then per-apex ceremony is right
-     for that surface and the split needs a third category rather than two.
+     [FIRED 2026-09-01] A surface where a person is expected per request was
+     shown by the product itself, one day after this was written: the x402
+     approval step and the Connect this Principal ceremony on itonami.cloud.
+     The split is three categories now and the consent one is above. Still open
+     is which surfaces belong in it — an approval step and an identity link are
+     two; whether an operator console is a third is not settled here.
 
      If offline attenuation turns out not to be reachable in practice — if
      every path ends up calling home anyway — then the labour argument
