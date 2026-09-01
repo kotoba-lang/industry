@@ -81,6 +81,58 @@ rather than assumed.
 Measured 2026-09-01: 9 advertised paths on x402.nexus and 40 on
 itonami.cloud, both clean after the fixes.
 
+## Running it across the estate
+
+Ten of the 425 non-wildcard hosts in the surface index answer /llms.txt.
+Folding www and alias names leaves five documents, plus itonami.cloud which
+is not in that index. 81 advertised paths across those six.
+
+Three standing findings, each confirmed by hand:
+
+- atproto.etzhayyim.com/.well-known/did.json and
+  /.well-known/oauth-authorization-server answer Cloudflare 1033 -- a
+  hostname proxied by Cloudflare with nothing behind it. etzhayyim.com's own
+  llms.txt promises that host, and no repo in the surface index claims it.
+- mcp.etzhayyim.com/xrpc/com.etzhayyim.mcp.message does not resolve in DNS at
+  all, although orgs/kotoba-lang/app-agentgateway declares that host.
+
+And one host reported UNMEASURED rather than red. yoro.etzhayyim.com
+redirects every path to aozora.app, which returns the same 2455 bytes for
+/search and for a path nobody routed. That is what a single-page app does,
+and this workspace requires single-page apps, so a served path and an
+unserved one genuinely cannot be told apart there from outside. Calling it a
+defect would be a standing red nobody should clear; calling it clean would
+be the lie this detector exists to prevent. The UNMEASURED lines print with
+or without --findings.
+
+## Six of its own bugs, in the order they were found
+
+Every red this detector produced before it had controls was its own:
+
+1. GET-probing endpoints a document named POST.
+2. A placeholder truncated to its prefix: `/gateway/<seller>/<path>` became
+   `/gateway/`.
+3. Fragment links, which fetch the same document by definition.
+4. Globs -- `/api/*` is a shape, not an address.
+5. Reading an HTML index served at /openapi.json as if it were a discovery
+   document, then reporting that index's own links as broken promises. It
+   committed the failure mode it was written to detect.
+6. A registrable-domain helper threaded with ->> instead of ->, which put the
+   string into str/split's regex position so every host returned the same
+   value, every host compared equal, and the same-site filter accepted
+   everything including foreign domains. Two self-test cases asserting that a
+   foreign domain is dropped are what caught it; without them this would have
+   shipped as a widening that looks exactly like a working filter.
+
+A seventh was caught by the harness rather than by a test: after the
+same-site change, the local discriminating host (127.0.0.1:8791) compared
+`0.1:8791` against `0.1`, every endpoint was dropped as off-site, and the one
+run that makes this detector go red silently stopped making it go red. The
+detector still exited 2, so it did not report clean -- but the reason had
+changed and nothing said so.
+
+All seven are self-test cases. 24 of them.
+
 ## What this does not change
 
 The binding constraint is still demand, not surface. The catalog holds 25

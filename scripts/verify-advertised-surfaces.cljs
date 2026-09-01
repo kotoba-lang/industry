@@ -38,6 +38,28 @@
 ;; A 404 is not a finding by itself -- a host that says "no" is telling the
 ;; truth. It is a finding only when a document advertised that path.
 ;;
+;; ## Three more, found by running it across the estate
+;;
+;; Measured 2026-09-01 against the five hosts in this workspace that publish a
+;; discovery document (10 of 425 surface-index hosts answer /llms.txt; folding
+;; www and alias names leaves five documents). All three findings from that
+;; run were this detector's own faults, and the first is the one it exists to
+;; catch:
+;;
+;; - It treated ANY 200 from /openapi.json as a discovery document. Two hosts
+;;   answer that path with their HTML index page, so the detector read the
+;;   index, extracted the index's own links, and reported `/404` as an
+;;   advertised path that answers like an unadvertised one. It committed the
+;;   failure mode it was written to detect. A document is now checked: the
+;;   OpenAPI one must parse as JSON and carry an `openapi` key; llms.txt must
+;;   not be HTML.
+;; - `/api/*` is a glob. Same class as `<seller>`: a shape, not an address.
+;; - A document may name hosts other than the one serving it. etzhayyim.com's
+;;   llms.txt lists only yoro. and atproto. subdomains, so the detector
+;;   extracted nothing and refused. Those are still that document's promises.
+;;   Endpoints under the same registrable domain are now probed, each host
+;;   with its own control.
+;;
 ;; Cannot be a fleet gate: it reads live public documents and probes hosts
 ;; over the network, neither of which exists in a shipped tree.
 
@@ -50,64 +72,130 @@
 (def ^:private findings? (flag? "--findings"))
 
 (def ^:private default-hosts
-  ;; Hosts whose discovery documents this workspace publishes. A host belongs
-  ;; here once it serves /llms.txt or /openapi.json; probing a host that
-  ;; publishes neither would measure nothing and report clean.
-  ["x402.nexus"])
+  "Hosts in this workspace that actually publish a discovery document.
+
+  Measured 2026-09-01 by requesting /llms.txt from all 425 non-wildcard hosts
+  in 90-docs/surface/surface.datoms.edn: ten answered, and folding www and
+  alias names (kotobase.gftd.ai, smtp.kotobase.net) leaves these five plus
+  itonami.cloud, which publishes one but is not in that index. A host belongs
+  here once it publishes a document; probing one that publishes none would
+  measure nothing and report clean."
+  ["x402.nexus" "kotobase.net" "kotoba-lang.org" "murakumo.cloud"
+   "etzhayyim.com" "itonami.cloud"])
 
 ;; ---------------------------------------------------------------- extraction
 
 (def ^:private method-re #"(?i)\b(GET|POST|PUT|PATCH|DELETE|ANY)\b[^A-Za-z0-9]{0,4}$")
 
-(defn advertised-paths
-  "Same-host endpoints a discovery document names, as {:path :method}.
+(defn registrable
+  "The last two labels of a host.
 
-  Three details, each of which produced a false finding when it was missing:
+  An approximation. It is right for every host this workspace serves
+  (etzhayyim.com, kotoba-lang.org, kotobase.net, murakumo.cloud, x402.nexus,
+  itonami.cloud) and wrong for multi-label suffixes such as co.jp. Used only
+  to decide whether a document's link is that document's own promise, so a
+  wrong answer widens or narrows the probe rather than corrupting a verdict."
+  [host]
+  ;; `->`, not `->>`. Threading last puts the string into str/split's REGEX
+  ;; position, so every host returned the same value, every host compared
+  ;; equal, and the same-site filter accepted everything including foreign
+  ;; domains. The two self-test cases that assert a foreign domain is dropped
+  ;; are what caught it; without them this would have shipped as a widening
+  ;; that looks exactly like a working filter. Measured 2026-09-01.
+  (-> (-> host
+           (str/replace #"^https?://" "")
+           (str/replace #"/.*$" "")
+           ;; The port is not part of the name. Without this the local
+           ;; discriminating harness (127.0.0.1:8791) compared `0.1:8791`
+           ;; against `0.1`, every endpoint was dropped as off-site, and the
+           ;; one test that makes this detector go red silently stopped
+           ;; making it go red. Measured 2026-09-01, immediately after the
+           ;; same-site change landed.
+           (str/replace #":\d+$" ""))
+      (str/split #"\.")
+      (->> (take-last 2) (str/join "."))))
+
+(defn document?
+  "Whether a body is the document that was asked for, rather than whatever the
+  host serves to everything.
+
+  This is the detector's own version of the bug it detects. It used to accept
+  any 200, so two hosts answering /openapi.json with their HTML index had that
+  index read as a discovery document and its links reported as broken
+  promises. Measured 2026-09-01 on kotobase.net and murakumo.cloud."
+  [kind body]
+  (let [t (str/triml (str body))]
+    (case kind
+      :llms (and (not (str/blank? t))
+                 (not (str/starts-with? (str/lower-case t) "<!doctype"))
+                 (not (str/starts-with? t "<")))
+      :openapi (boolean (try (let [j (js/JSON.parse t)]
+                               (and j (some? (aget j "openapi")) (some? (aget j "paths"))))
+                             (catch :default _ false))))))
+
+(defn relative-methods
+  "path -> method, from mentions that name a method and a path without a host.
+
+  A document often states the method once in prose (`POST /v1/responses`) and
+  then shows a curl example whose URL carries no method token in front of it.
+  Reading only the token before the URL probed GET, got 404, and reported a
+  live endpoint as absent. Measured 2026-09-01: api.murakumo.cloud/v1/responses
+  answers 404 to GET and 400 to POST, and murakumo.cloud's own llms.txt says
+  POST on an earlier line."
+  [body]
+  (->> (re-seq #"(?i)\b(GET|POST|PUT|PATCH|DELETE)\b\s+`?(/[A-Za-z0-9._~/{}-]*)" body)
+       (map (fn [[_ m pth]] [(str/replace pth #"[.,;:`]+$" "") (str/upper-case m)]))
+       (remove #(= "GET" (second %)))
+       (into {})))
+
+(defn advertised-endpoints
+  "Endpoints a discovery document names, as {:host :path :method}.
+
+  Four details, each of which produced a false finding when it was missing:
 
   - The method is read from the token in front of the URL. A document saying
     `POST /verify` promises nothing about GET, and probing GET reported a
-    served endpoint as absent. Measured 2026-09-01: three of four findings in
-    the detector's first live run were this.
-  - A URL followed immediately by `<` or `{` is a shape, not an address. The
-    regex stops at the placeholder and leaves a truncated prefix behind, so
-    `/gateway/<seller>/<path>` became `/gateway/`, which no host serves. The
-    character after the match decides.
-  - Only this host's URLs count. Another host's outage is not this document's
-    broken promise."
+    served endpoint as absent.
+  - A URL followed immediately by `<` or `{`, or containing `*`, is a shape,
+    not an address. `/gateway/<seller>/<path>` truncates to `/gateway/`, and
+    `/api/*` is a glob; neither is something a host serves.
+  - A fragment names a place inside a document, not a second document.
+  - A document may name other hosts under the same registrable domain, and
+    those are still its promises. etzhayyim.com's llms.txt names only
+    yoro. and atproto. subdomains; reading only same-host URLs extracted
+    nothing at all and the detector refused rather than measuring."
   [host body]
-  (let [h (str/replace host #"^https?://" "")
-        re (re-pattern (str "https?://" (str/replace h "." "\\.") "([^\\s\"'`)\\]<>{},]*)"))]
-    (->> (loop [idx 0 acc []]
-           (if-let [m (.exec (js/RegExp. (.-source re) "g")
-                             (subs body idx))]
-             (let [at (+ idx (.-index m))
+  (let [site (registrable host)
+        rel (relative-methods body)
+        re (js/RegExp. "(https?)://([A-Za-z0-9.-]+(?::[0-9]+)?)([^\\s\"'`)\\]<>{},]*)" "g")]
+    (->> (loop [acc []]
+           (if-let [m (.exec re body)]
+             (let [scheme (aget m 1)
+                   h (aget m 2)
+                   path (aget m 3)
                    whole (aget m 0)
-                   after (get body (+ at (count whole)))
-                   path (aget m 1)
-                   before (subs body (max 0 (- at 12)) at)]
-               (recur (+ at (count whole))
-                      (if (or (#{"<" "{"} (str after))
-                              (str/blank? path)
-                              (= path "/"))
-                        acc
-                        (conj acc {:path (str/replace (if (str/starts-with? path "/") path (str "/" path))
-                                                      #"[.,;:]+$" "")
-                                   :method (if-let [mm (re-find method-re before)]
-                                             (let [x (str/upper-case (second mm))]
-                                               (if (= x "ANY") "GET" x))
-                                             "GET")}))))
+                   after (get body (+ (.-index m) (count whole)))
+                   before (subs body (max 0 (- (.-index m) 12)) (.-index m))]
+               (recur
+                (if (or (not= site (registrable h))
+                        (#{"<" "{"} (str after))
+                        (str/blank? path)
+                        (= path "/"))
+                  acc
+                  (conj acc {:scheme scheme
+                             :host h
+                             :path (str/replace path #"[.,;:]+$" "")
+                             :method (let [pth (str/replace path #"[.,;:]+$" "")]
+                                       (if-let [mm (re-find method-re before)]
+                                         (let [x (str/upper-case (second mm))]
+                                           (if (= x "ANY") "GET" x))
+                                         (get rel pth "GET")))}))))
              acc))
-         (remove #(re-find #"&lt;|&gt;|&#" (:path %)))
-         ;; A fragment names a place inside a document, not a second document.
-         ;; Probing `/#go-live` fetches `/` and then reports that it answered
-         ;; what `/` answers, which is true and means nothing. Measured
-         ;; 2026-09-01 on itonami.cloud: both findings in that run were this.
+         (remove #(re-find #"&lt;|&gt;|&#|\*" (:path %)))
          (remove #(str/includes? (:path %) "#"))
-         (group-by :path)
-         ;; One probe per path. A path named with both GET and POST is probed
-         ;; with the non-GET method, which is the one a GET would misreport.
+         (group-by (juxt :host :path))
          (map (fn [[_ vs]] (or (first (remove #(= "GET" (:method %)) vs)) (first vs))))
-         (sort-by :path)
+         (sort-by (juxt :host :path))
          vec)))
 
 (defn verdict
@@ -148,38 +236,52 @@
         (.catch (fn [_] nil))
         (.finally #(js/clearTimeout t))))))
 
-(defn- probe-host [host timeout-ms]
-  (let [;; A full base URL is accepted so the discriminating run can point at a
-        ;; local server. Without it this detector could only ever be exercised
-        ;; against hosts it must not break on purpose.
-        base (if (re-find #"^https?://" host) host (str "https://" host))
-        nonce (str "/__control-" (.toString (js/Math.random) 36) "-not-a-route")]
+(defn- control-for [scheme host timeout-ms]
+  (fetch-text (str scheme "://" host "/__control-"
+                   (.toString (js/Math.random) 36) "-not-a-route") timeout-ms))
+
+(defn- probe-site [host timeout-ms]
+  (let [base (if (re-find #"^https?://" host) host (str "https://" host))]
     (-> (js/Promise.all
-         #js [(fetch-text (str base nonce) timeout-ms)
-              (fetch-text (str base "/llms.txt") timeout-ms)
+         #js [(fetch-text (str base "/llms.txt") timeout-ms)
               (fetch-text (str base "/openapi.json") timeout-ms)])
         (.then
          (fn [^js rs]
-           (let [control (aget rs 0)
-                 docs (remove nil? [(aget rs 1) (aget rs 2)])]
-             (cond
-               (nil? control) {:host host :refused "the control path could not be fetched"}
-               (empty? docs) {:host host :refused "no discovery document answered"}
-               :else
+           (let [llms (aget rs 0) oapi (aget rs 1)
+                 docs (cond-> []
+                        (and llms (= 200 (:status llms)) (document? :llms (:body llms)))
+                        (conj (:body llms))
+                        (and oapi (= 200 (:status oapi)) (document? :openapi (:body oapi)))
+                        (conj (:body oapi)))]
+             (if (empty? docs)
+               (js/Promise.resolve
+                {:host host :refused "no discovery document answered with a document"})
                (let [eps (->> docs
-                              (mapcat #(advertised-paths host (:body %)))
-                              (group-by :path)
+                              (mapcat #(advertised-endpoints host %))
+                              (group-by (juxt :host :path))
                               (map (fn [[_ vs]] (or (first (remove #(= "GET" (:method %)) vs))
                                                     (first vs))))
-                              (sort-by :path) vec)]
-                 (-> (js/Promise.all
-                      (clj->js (map #(fetch-text (str base (:path %)) timeout-ms (:method %)) eps)))
-                     (.then (fn [^js rs2]
-                              {:host host
-                               :control control
-                               :results (mapv (fn [e r] (assoc e :verdict (verdict control r)
-                                                               :status (:status r)))
-                                              eps (js->clj rs2))})))))))))))
+                              (sort-by (juxt :host :path)) vec)
+                     hs (distinct (map (juxt :scheme :host) eps))]
+                 (if (empty? eps)
+                   (js/Promise.resolve
+                    {:host host :refused "the document names no endpoint under this site"})
+                   ;; A control per host. A document may promise paths on a
+                   ;; sibling subdomain, and that sibling has its own idea of
+                   ;; what to say to a path nobody advertised.
+                   (-> (js/Promise.all (clj->js (map (fn [[sc h]] (control-for sc h timeout-ms)) hs)))
+                       (.then (fn [^js cs]
+                                (let [ctl (zipmap hs (js->clj cs :keywordize-keys true))]
+                                  (-> (js/Promise.all
+                                       (clj->js (map #(fetch-text (str (:scheme %) "://" (:host %) (:path %))
+                                                                  timeout-ms (:method %)) eps)))
+                                      (.then (fn [^js rs2]
+                                               {:host host
+                                                :controls ctl
+                                                :results (mapv (fn [e r]
+                                                                 (assoc e :verdict (verdict (get ctl [(:scheme e) (:host e)]) r)
+                                                                        :status (:status r)))
+                                                               eps (js->clj rs2 :keywordize-keys true))}))))))))))))))))
 
 ;; ----------------------------------------------------------------- self-test
 
@@ -190,20 +292,43 @@
                [(verdict ctl {:status 404 :body "nope"}) :absent "an advertised path answering 404 is absent"]
                [(verdict ctl {:status 522 :body "error code: 522"}) :server-error "522 is the host failing, not serving"]
                [(verdict ctl nil) :unreachable "no response is not a pass"]
-               [(mapv :path (advertised-paths "x402.nexus" "see [c](https://x402.nexus/catalog) and `https://x402.nexus/mcp`"))
+               [(mapv :path (advertised-endpoints "x402.nexus" "see [c](https://x402.nexus/catalog) and `https://x402.nexus/mcp`"))
                 ["/catalog" "/mcp"] "markdown and backticked URLs are both read"]
-               [(mapv :path (advertised-paths "x402.nexus" "ANY https://x402.nexus/gateway/&lt;seller&gt;/x"))
+               [(mapv :path (advertised-endpoints "x402.nexus" "ANY https://x402.nexus/gateway/&lt;seller&gt;/x"))
                 [] "an escaped placeholder is a shape, not an address"]
-               [(mapv :path (advertised-paths "x402.nexus" "ANY https://x402.nexus/gateway/<seller>/<path>"))
+               [(mapv :path (advertised-endpoints "x402.nexus" "ANY https://x402.nexus/gateway/<seller>/<path>"))
                 [] "a raw placeholder truncates the URL; the prefix is not an address"]
-               [(mapv (juxt :method :path) (advertised-paths "x402.nexus" "- `POST https://x402.nexus/verify` thin API"))
+               [(mapv (juxt :method :path) (advertised-endpoints "x402.nexus" "- `POST https://x402.nexus/verify` thin API"))
                 [["POST" "/verify"]] "the method in front of the URL is the method to probe"]
                [(mapv (juxt :method :path)
-                      (advertised-paths "x402.nexus" "GET https://x402.nexus/verify and POST https://x402.nexus/verify"))
+                      (advertised-endpoints "x402.nexus" "GET https://x402.nexus/verify and POST https://x402.nexus/verify"))
                 [["POST" "/verify"]] "a path named with two methods is probed with the one a GET would misreport"]
-               [(mapv :path (advertised-paths "x402.nexus" "https://other.example/catalog"))
+               [(mapv :path (advertised-endpoints "x402.nexus" "https://other.example/catalog"))
                 [] "another host's paths are not this host's promise"]
-               [(mapv :path (advertised-paths "itonami.cloud" "[go](https://itonami.cloud/#go-live)"))
+               [(registrable "http://127.0.0.1:8791") (registrable "127.0.0.1")
+                "a port is not part of the name; the local harness must stay on-site"]
+               [(mapv (juxt :host :path) (advertised-endpoints "http://127.0.0.1:8791" "[a](http://127.0.0.1:8791/served)"))
+                [["127.0.0.1:8791" "/served"]] "a host with a port is extracted whole"]
+               [(mapv (juxt :method :path)
+                      (advertised-endpoints "api.murakumo.cloud"
+                        "- request: `POST /v1/responses`\ncurl https://api.murakumo.cloud/v1/responses \\"))
+                [["POST" "/v1/responses"]]
+                "a method stated in prose applies to the same path in a curl example that has none"]
+               [(relative-methods "see GET /a and POST /b") {"/b" "POST"}
+                "only a non-GET mention is worth remembering; GET is the default anyway"]
+               [(mapv :path (advertised-endpoints "kotobase.net" "`https://kotobase.net/api/*` is the alias"))
+                [] "a glob is a shape, not an address"]
+               [(mapv (juxt :host :path)
+                      (advertised-endpoints "etzhayyim.com" "- https://yoro.etzhayyim.com/search"))
+                [["yoro.etzhayyim.com" "/search"]] "a sibling subdomain named by the document is that document's promise"]
+               [(mapv :path (advertised-endpoints "etzhayyim.com" "- https://yoro.example.com/search"))
+                [] "a different registrable domain is not"]
+               [(document? :llms "<!DOCTYPE html><html>") false "an HTML index answering /llms.txt is not that document"]
+               [(document? :llms "# Title\n- [a](https://x/y)") true "markdown is"]
+               [(document? :openapi "<!doctype html>") false "an HTML index answering /openapi.json is not that document"]
+               [(document? :openapi "{\"openapi\":\"3.1.0\",\"paths\":{}}") true "an OpenAPI document is"]
+               [(document? :openapi "{\"hello\":1}") false "valid JSON without openapi/paths is not"]
+               [(mapv :path (advertised-endpoints "itonami.cloud" "[go](https://itonami.cloud/#go-live)"))
                 [] "a fragment is a place inside a document, not an address"]]
         fails (remove (fn [[got want _]] (= got want)) cases)]
     (doseq [[got want why] fails] (println "FAIL" why "\n  got " (pr-str got) "\n  want" (pr-str want)))
@@ -212,15 +337,52 @@
 
 ;; ---------------------------------------------------------------------- main
 
+(defn- catch-all?
+  "Whether a host answers an unadvertised path with a document of its own.
+
+  A single-page app does this by design: the workspace requires SPAs, and an
+  SPA serves the same shell for `/search` and for a path nobody routed, with
+  the client deciding what to render. A worker that forgot its 404 does it by
+  accident. From outside they are the same response, so per-path findings on
+  such a host are noise -- x402.nexus's own index-for-everything bug produced
+  four of them and one statement would have said it.
+
+  So this is reported once per host, and the paths it explains are not
+  reported individually. What the detector can still say about that host is
+  that it cannot distinguish a served path from an unserved one there."
+  [control]
+  (and control (= 200 (:status control)) (not (str/blank? (:body control)))))
+
 (defn- report [hosts]
   (let [refused (filter :refused hosts)
         measured (remove :refused hosts)
-        results (mapcat (fn [h] (map #(assoc % :host (:host h)) (:results h))) measured)
-        bads (filter #(bad? (:verdict %)) results)]
+        ;; NOT (assoc % :host (:host h)). A document may promise paths on a
+        ;; sibling subdomain, and stamping the queried site's name over the
+        ;; endpoint's own reported the wrong host as failing -- three
+        ;; yoro.etzhayyim.com paths were printed as etzhayyim.com paths.
+        ;; Measured 2026-09-01.
+        results (mapcat :results measured)
+        controls (reduce merge {} (map :controls measured))
+        catch-alls (->> results
+                        (filter #(= :same-as-control (:verdict %)))
+                        (filter #(catch-all? (get controls [(:scheme %) (:host %)])))
+                        (map (juxt :scheme :host))
+                        distinct set)
+        bads (->> results
+                  (filter #(bad? (:verdict %)))
+                  (remove #(and (= :same-as-control (:verdict %))
+                                (catch-alls [(:scheme %) (:host %)]))))]
     (println (str "SCANNED\t" (count results) "\tadvertised path(s) across "
                   (count measured) " host(s)"))
     (doseq [r refused]
       (println (str "REFUSED\t" (:host r) "\t" (:refused r))))
+    (doseq [[_ h] (sort-by second catch-alls)]
+      (println (str "UNMEASURED\t" h "\t"
+                    (count (filter #(and (= :same-as-control (:verdict %))
+                                         (= h (:host %))) results))
+                    " path(s): this host answers an unadvertised path with 200 and a"
+                    " body of its own, so a served path and an unserved one cannot be"
+                    " told apart from outside")))
     (when findings?
       (doseq [b (sort-by (juxt :host :path) bads)]
         (println (str "FINDING\t" (:method b) " " (:host b) (:path b) "\t" (name (:verdict b))
@@ -234,6 +396,15 @@
       (seq refused) 2
       (zero? (count results)) 2
       (seq bads) 1
+      ;; A catch-all host is NOT a red. A single-page app serves the same
+      ;; shell for every client-routed path by design -- this workspace
+      ;; requires SPAs -- so demanding it be fixed would be a standing red
+      ;; nobody should clear. Measured 2026-09-01: yoro.etzhayyim.com
+      ;; redirects every path to aozora.app, which returns the same 2455
+      ;; bytes for /search and for a path nobody routed. The honest report is
+      ;; that those paths are unmeasured, which the UNMEASURED lines say
+      ;; whether or not --findings was passed, so a clean exit cannot be read
+      ;; as "every promise was checked".
       :else 0)))
 
 (defn- main []
@@ -242,7 +413,7 @@
     :else
     (let [hosts (if-let [h (opt "--host")] [h] default-hosts)
           timeout-ms (js/parseInt (or (opt "--timeout-ms") "8000"))]
-      (-> (js/Promise.all (clj->js (map #(probe-host % timeout-ms) hosts)))
+      (-> (js/Promise.all (clj->js (map #(probe-site % timeout-ms) hosts)))
           (.then (fn [^js rs] (report (js->clj rs :keywordize-keys true))))))))
 
 (-> (main)
