@@ -5779,4 +5779,120 @@
      :file "docs/operator-quickstart.md"
      :find "| `conversationParty` |"
      :replace "| `conversationPeer` |"
-     :must-fail ["quickstart-record-family-table-matches-the-constants"]}]}]}
+     :must-fail ["quickstart-record-family-table-matches-the-constants"]}]}
+  {:repo "orgs/cloud-itonami/graph-sos-intel"
+   :label "graph-sos-intel の status page —— それが説明している 4 つのファイルとの一致"
+   ;; この repo が edge で動かすものは静的 asset だけである（`wrangler.jsonc` に
+   ;; `main` が無いので、Worker script は 1 本も deploy 経路に居ない）。そして
+   ;; その asset が描くのは **この Worker 自身の説明** —— route、runtime binding、
+   ;; XRPC handler が前に居るかどうか、自分の source の在り処。4 つとも隣の
+   ;; ファイルについての主張である。
+   ;;
+   ;; 主張は `cljs/src/graph_sos_intel/app.cljs` の `default-db` に literal として
+   ;; 置かれていて、既存の suite（`cljs/test/graph_sos_intel/app_test.cljs`）は
+   ;; **同じ literal をもう一度書いて突き合わせている**。だから wrangler に binding を
+   ;; 1 つ足せば page は嘘をつき始めるが、suite は緑のままである —— 実装を書き写した
+   ;; テストは何も discriminate しない。
+   ;;
+   ;; これは仮定の話ではない。この `default-db` の出所である Svelte の const は
+   ;; `routeCount: 0` / `routes: []` / `vars: []` を、1 route と 9 vars を宣言する
+   ;; `wrangler.jsonc` の隣で主張し続けていたし、`relativePath` は**この repo が
+   ;; 切り出される前の monorepo の中のパス**を指していた。移行が値を直したが、
+   ;; 次にずれたときに気づくものは何も残らなかった。
+   ;;
+   ;; `test/declared_surface_test.cljs` は値ではなく**関係**を検査する。最後の 2 つ
+   ;; （shell が bundle に届くか / mount 先が一致するか）は assets-only な Worker
+   ;; 固有の静かな壊れ方で、shadow-cljs の module を改名すると page は読み込まれ、
+   ;; style も当たり、**"loading…" のまま永久に止まる** —— script tag の 404 は
+   ;; 誰にも報告されず、対象のコードは正しくコンパイルされるので cljs の unit test は
+   ;; 全部緑のままである。
+   ;;
+   ;; ここに無いもの: `:app/title` が `APP_DISPLAY_NAME` と一致するかは検査しない。
+   ;; **一致していない**（page は "Ai etzhayyim Project Graph Sos Intel"、config は
+   ;; "Graph SoS Intel"）が、どちらが正しいかは製品の判断であって drift ではない。
+   ;; 今日成り立たない関係を assert すると、その検査は landing 時点で赤く、
+   ;; 次に読む者に「これは無視してよい」と教えることになる。
+   ;;
+   ;; harness 実測（2026-09-01、pin f659af12、mutation を 1 つずつ当てて復元）:
+   ;;   base f659af12: 緑 / 噛む=10 噛まない=0
+   ;; さらに拒否床 7 件が **exit 2** を返すことも確認した（wrangler.jsonc 不在 /
+   ;; vars 空 / routes 空 / `default-db` 改名 / `default-db` 消失 / shadow module が
+   ;; 2 本 / getElementById 呼び出しの書き換え）。空の vars と空の routes は
+   ;; **両辺が空になることで下の等式を全部満たす**ので、等式に到達する前に拒否する。
+   ;; 「測れなかった」が「測って問題が無かった」と同じ値を返してはならない。
+   ;;
+   ;; 改名の床は、コードを読んで見つけたのではなく mutation を回して見つけた ——
+   ;; `.indexOf "(def default-db"` は前方一致なので、改名された `default-db-v2` が
+   ;; page の状態として読まれ、検査は OK を返していた。
+   :cmd ["nbb" "test/declared_surface_test.cljs"]
+   :green-marker "declared-surface-check: OK"
+   :mutations
+   [{:id :graph-sos-intel/binding-added
+     :why "deploy に binding を 1 つ足す形。wrangler.jsonc を編集する理由は普通そこにあり、その編集は ClojureScript のファイルに一切届かない"
+     :file "wrangler.jsonc"
+     :find "\"APP_UI_TYPE\": \"appview\","
+     :replace "\"APP_UI_TYPE\": \"appview\",\n    \"APP_NEW_BINDING\": \"x\","
+     :must-fail ["vars-match-wrangler-var-keys"]}
+
+    {:id :graph-sos-intel/binding-removed
+     :why "逆向き。binding を落としても page は載せ続けるので、画面は存在しない設定を宣伝する"
+     :file "wrangler.jsonc"
+     :find "    \"APP_EMBED_URL\": \"https://gs0s1nt7.etzhayyim.com/?embed=1\",\n"
+     :replace ""
+     :must-fail ["vars-match-wrangler-var-keys"]}
+
+    {:id :graph-sos-intel/route-hostname-moves
+     :why "hostname が動く形。route は 1 本しかないので count は変わらず、count だけを見る検査はこれを通す"
+     :file "wrangler.jsonc"
+     :find "\"pattern\": \"gs0s1nt7.etzhayyim.com/*\""
+     :replace "\"pattern\": \"graph-sos-intel.etzhayyim.com/*\""
+     :must-fail ["routes-match-wrangler-patterns"]}
+
+    {:id :graph-sos-intel/worker-script-revived
+     :why ":app/xrpc? が false である理由はちょうど 1 つ —— この config に main が無いこと。BFF を復活させる編集は反対側（wrangler）から来るので、ClojureScript を開かないまま page の『not configured』が嘘になる"
+     :file "wrangler.jsonc"
+     :find "\"name\": \"kotodama-gs0s1nt7\","
+     :replace "\"main\": \"src/app.ts\",\n  \"name\": \"kotodama-gs0s1nt7\","
+     :must-fail ["xrpc-flag-matches-whether-a-worker-script-is-deployed"]}
+
+    {:id :graph-sos-intel/route-count-drifts-from-its-list
+     :why "同じ map の中で数と一覧が別々に編集される形。Svelte の const が routeCount 0 と routes [] を同時に持っていたのと同じ場所"
+     :file "cljs/src/graph_sos_intel/app.cljs"
+     :find ":app/route-count 1"
+     :replace ":app/route-count 2"
+     :must-fail ["route-count-matches-the-route-list"]}
+
+    {:id :graph-sos-intel/source-path-reverts-to-the-svelte-one
+     :why "page が事実として表示する自分の source path が、実在しないものを指す形。移行が見つけたときまさにこうなっていた（切り出し前の monorepo のパス）"
+     :file "cljs/src/graph_sos_intel/app.cljs"
+     :find ":app/relative-path \"cljs/src/graph_sos_intel/app.cljs\""
+     :replace ":app/relative-path \"svelte/src/routes/+page.svelte\""
+     :must-fail ["relative-path-names-a-file-that-exists"]}
+
+    {:id :graph-sos-intel/npm-package-renamed
+     :why "package.json の name が動く形。page は project 名を 2 箇所で名乗っており、どちらも npm 側の改名を見ていない"
+     :file "package.json"
+     :find "\"name\": \"@etzhayyim/etzhayyim-project-graph-sos-intel\","
+     :replace "\"name\": \"@etzhayyim/graph-sos-intel\","
+     :must-fail ["app-name-matches-package-json"]}
+
+    {:id :graph-sos-intel/shadow-module-renamed
+     :why "この repo で一番静かな壊れ方。module 名は出力ファイル名なので、改名すると shell の script tag が 404 する —— compile は通り、cljs の unit test も全部緑で、画面だけが『loading…』のまま止まる"
+     :file "cljs/shadow-cljs.edn"
+     :find ":modules {:app {:init-fn graph-sos-intel.app/main}}"
+     :replace ":modules {:main {:init-fn graph-sos-intel.app/main}}"
+     :must-fail ["shell-loads-the-bundle-shadow-cljs-emits"]}
+
+    {:id :graph-sos-intel/asset-path-moves
+     :why "同じ 404 を別の側から起こす形。:asset-path は shell の相対パスの前半で、shell は手で書かれているので追随しない"
+     :file "cljs/shadow-cljs.edn"
+     :find ":asset-path \"js\""
+     :replace ":asset-path \"assets/js\""
+     :must-fail ["shell-loads-the-bundle-shadow-cljs-emits"]}
+
+    {:id :graph-sos-intel/shell-mount-renamed
+     :why "bundle は読み込まれ、実行され、render 先が無い形。例外にならず、shell の placeholder が残るだけなので、成功と区別が付かない"
+     :file "cljs/public/index.html"
+     :find "<div id=\"app\">"
+     :replace "<div id=\"root\">"
+     :must-fail ["shell-mount-point-matches-the-one-the-app-renders-into"]}]}]}
