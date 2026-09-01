@@ -1795,6 +1795,27 @@
      :replace "\"etzhayyim:seedScript\": \"seed-v2.ts\""
      :must-fail ["the-project-file-points-at-a-seed-script-that-exists"]}
 
+    {:id :fm/readme-collection-count-drifts-from-the-seed
+     :why "**件数だけがずれる形。** collection の名前は README と seed で一致したままなので、名前を突き合わせる 2 つの検査は緑のまま通る。README を読んだ人には 28 件と書いてあり、それは実測として印字されている —— 数字は散文と違って『だいたい合っている』が無いので、1 件のずれがそのまま嘘になる"
+     :file "README.md"
+     :find "`com.etzhayyim.apps.fund.manager` — 28 件"
+     :replace "`com.etzhayyim.apps.fund.manager` — 29 件"
+     :must-fail ["the-counts-the-readme-prints-are-the-counts-the-seed-writes"]}
+
+    {:id :fm/readme-total-drifts-from-the-bullets
+     :why "本文の『計 165 レコード』だけがずれる形。箇条書きの件数は全部正しいので、collection ごとの突き合わせでは出ない。README の中の 2 つの主張が食い違っている状態で、どちらが正しいかは seed に訊くまで分からない"
+     :file "README.md"
+     :find "計 165 レコード。"
+     :replace "計 164 レコード。"
+     :must-fail ["the-counts-the-readme-prints-are-the-counts-the-seed-writes"]}
+
+    {:id :fm/readme-count-notation-broken-so-nothing-is-read
+     :why "**沈黙対策そのものを撃つ。** 1 行だけ『— N 件』の表記を崩すと、その行は **読み飛ばされる** —— 件数の不一致としてではなく、集合が 1 つ小さくなるだけとして現れる。床が無ければ残り 5 件を突き合わせて緑になり、**落ちた 1 件は誰も数えない**。床が『5 件しか読めなかった（床 6）』として拒否することを確かめている"
+     :file "README.md"
+     :find "`com.etzhayyim.apps.fund.metric` — 28 件"
+     :replace "`com.etzhayyim.apps.fund.metric` (28)"
+     :must-fail ["the-counts-the-readme-prints-are-the-counts-the-seed-writes"]}
+
     {:id :fm/synthetic-volume-cut-so-collections-go-thin
      :why "**この suite の沈黙対策そのものを撃つ。** synthetic の本数を削ると全 collection が薄くなる。重複も孤児参照も『0 件』になるので、床が無ければ全検査が中身を見ないまま緑になる。件数の床がそれを捕まえることを確かめている"
      :file "seed.ts"
