@@ -1,1 +1,79 @@
-[{:doc/body "# OpenRouter provider application — awai.network / murakumo.cloud\n\n**Status:** draft only; not submitted\n\n**As of:** 2026-09-01\n\n**Submit owner:** Jun Kawasaki\n\n**Hard hold:** fine-tuned artifacts, production endpoints, data policy, pricing, and measurements are not yet complete\n\n## Short application answer\n\nmurakumo.cloud is applying to become an OpenRouter inference provider for Japanese-first models developed by awai.network. We are fine-tuning upstream open-weight models on a proprietary, rights-reviewed Japanese dataset and will serve the resulting checkpoints through OpenAI-compatible endpoints. Our initial hosting vendors are Baseten and Together; murakumo.cloud remains the provider responsible for routing, authentication, metering, reliability, and data policy.\n\nThe first planned model is `awai-network/basho`, based on `Qwen/Qwen3.8-Flash-Next`. Basho is in development and is not yet available for production traffic. A prior Baseten deployment named `basho-fp8-test` used a different small Qwen3.5 FP8 checkpoint solely to verify the serving path; it must not be represented as the Basho model.\n\nThe second planned model is `awai-network/hokusai`, based on `MiniMaxAI/MiniMax-H3`. Hokusai is an asynchronous video-generation model with native audiovisual output, not a chat-completions LLM. It will use the OpenRouter video job contract: submit, poll or webhook, and download content. OpenRouter already lists the upstream `minimax/h3` as a video model; Hokusai will be submitted only after the distinct fine-tuned checkpoint and Japanese evaluation are verified.\n\n## Organization and responsibility\n\n| Field | Answer |\n|---|---|\n| Model developer / publisher | awai.network |\n| Inference provider | murakumo.cloud |\n| Infrastructure vendors | Baseten and Together |\n| Target audience | Japanese developers and applications requiring Japanese-first behavior |\n| Provider website | https://murakumo.cloud |\n| Model developer website | https://awai.network |\n| Contact | OWNER-FILL: provider onboarding email and responsible person |\n| Legal entity | OWNER-FILL: exact contracting and invoicing entity |\n| Terms / privacy / acceptable use | OWNER-FILL: public URLs |\n\n## Models proposed\n\n| Requested model ID | Display name | Planned base | Current state | Submission state |\n|---|---|---|---|---|\n| `awai-network/basho` | Basho | `Qwen/Qwen3.8-Flash-Next` | fine-tune and production endpoint not yet verified | draft |\n| `awai-network/hokusai` | Hokusai | `MiniMaxAI/MiniMax-H3` | Japanese-first audiovisual video fine-tune; artifact and hosted endpoint not yet verified | draft |\n\nFor every submitted model we will disclose the upstream model and license, fine-tuning method, dataset provenance categories, supported parameters/modalities, context length, cutoff date, safety limitations, and eval results. We will not claim that an upstream checkpoint renamed at deployment time is an original model.\n\n## Technical integration\n\nmurakumo.cloud will expose:\n\n- `awai-network/basho`: OpenAI-compatible `POST /chat/completions` with streaming and non-streaming responses.\n- Correct Basho prompt and completion usage in both streaming and non-streaming modes.\n- `awai-network/hokusai`: asynchronous `POST /videos`, job status polling, optional signed webhook, and content download.\n- Hokusai capabilities for duration, resolution, aspect ratio, reference assets, and `generate_audio`, restricted to values actually supported by every advertised endpoint.\n- A provider `/models` endpoint containing only models ready for OpenRouter traffic.\n- Per-model USD pricing (tokens for Basho; output seconds/variants for Hokusai), capacity, supported parameters, and readiness state.\n- Authentication, bounded timeouts, rate limits, stable error mapping, and health monitoring.\n\nHosting will use Baseten and Together after the same immutable checkpoint is validated on both. Primary/fallback order is OWNER-FILL after measurement; it is not yet selected. Vendor endpoints remain private behind murakumo.cloud.\n\n- Baseten: Basho and Hokusai can use custom deployments with `min_replica=0`. Hokusai uses the asynchronous request queue/webhook path.\n- Together Basho: standard custom-model dedicated endpoint. It is stopped when idle during validation; ordinary dedicated endpoints are not claimed as true serverless.\n- Together Hokusai: Dedicated Container Inference with Sprocket/Queue API and `min_replicas=0`. Access requires Together sales enablement.\n- Hugging Face is currently only a private artifact-repository candidate and is not claimed as a live OpenRouter-serving provider.\n\nThe inactive, fail-closed deployment contract is recorded in `90-docs/deployment/awai-murakumo-basho-hokusai-routing.edn`. Missing endpoint, credential, health, capacity, or matching artifact-revision evidence prevents routing and prevents the model from appearing in `/models`.\n\n## Data policy\n\nOWNER-FILL all fields before submission:\n\n- Are prompts or outputs logged?\n- Retention duration and deletion process.\n- Whether request data is ever used for training (recommended answer only if operationally true: no).\n- Whether zero-data-retention routing is supported.\n- Regions where request data is processed.\n- Subprocessors and their data-handling settings for Baseten and Together.\n- Abuse monitoring and legally required disclosure process.\n\n## Pricing, capacity, and reliability\n\nAll values are currently **unmeasured** and must not be invented.\n\n| Field | Basho | Hokusai |\n|---|---:|---:|\n| Input USD / 1M tokens | 未測定 | N/A |\n| Output USD / 1M tokens | 未測定 | N/A |\n| Output USD / second and variants | N/A | 未測定 |\n| Context length | 未測定 | N/A |\n| Capacity | 未測定 TPM | 未測定 concurrent jobs / video seconds |\n| Median / p95 first response | 未測定 TTFT | 未測定 queue wait |\n| Median / p95 throughput | 未測定 tokens/s | 未測定 generation wall time / output second |\n| Measured uptime / success | 未測定 | 未測定 |\n| Tool calling | 未検証 | N/A |\n| Structured output / JSON | 未検証 | job JSONのみ |\n| Vision/reference input | 未検証 | 未検証 |\n| Native generated audio | N/A | 未検証 |\n\nOpenRouter documents normal routing priority at 95%+ uptime. The application stays draft until a representative measurement window meets that threshold or OpenRouter agrees to a staged launch with `is_ready` disabled.\n\n## Evidence already available\n\n- A Baseten direct endpoint accepted the served name `basho`; that smoke used `RedHatAI/Qwen3.5-9B-FP8-dynamic`, not the Basho base.\n- Current compute readback: Baseten is inactive with 0 active replicas, $0.68 current-period usage, and $0.71 remaining credits; Together has no custom models or dedicated endpoints; Hugging Face awai-network has 0 dedicated endpoints.\n- Baseten keeps min replicas 0 / max 1 and its scale-down delay was reduced from 900 seconds to 0. Together's standard compatible-base list does not include Qwen3.8 Flash/Next or GLM 5.3 Flash, and arbitrary Dedicated Containers require sales enablement.\n- OpenRouter BYOK connection tests succeeded for Baseten and Together against the existing catalog model `z-ai/glm-5.3-flash`.\n- A direct OpenRouter request for unregistered `awai-network/basho` failed with HTTP 400 `invalid model ID`, confirming that provider/catalog onboarding is required.\n- A private Hugging Face repository `awai-network/basho` exists but does not yet contain a verified fine-tuned checkpoint or live endpoint.\n- OpenRouter currently lists upstream `minimax/h3` as a video-generation model and exposes an asynchronous `/api/v1/videos` API.\n- murakumo already has a generation job façade, polling/artifact pipeline, a MiniMax-H3 ComfyUI graph, and an OpenAI `/v1/videos` backend adapter. Vendor-specific Hokusai endpoints and the OpenRouter-facing compatibility route remain unverified.\n\n## Submission checklist\n\n- [ ] Produce Basho fine-tuned checkpoint and immutable revision/content ID.\n- [ ] Produce Hokusai fine-tuned checkpoint and immutable revision/content ID.\n- [ ] Confirm upstream-license obligations and proprietary-dataset rights.\n- [ ] Publish a model card with Japanese eval and safety evidence.\n- [ ] Deploy the identical Basho artifact to Baseten and Together and test direct inference.\n- [ ] Implement and verify murakumo.cloud Basho `/chat/completions`, streaming usage, and `/models`.\n- [ ] Implement and verify murakumo.cloud Hokusai `/videos` submit/poll/content/webhook contract.\n- [ ] Obtain Together Dedicated Container Inference access for Hokusai, or keep Together Hokusai unadvertised.\n- [ ] Measure price, context length, capacity, TTFT, throughput, errors, and uptime.\n- [ ] Fill contact, legal entity, public policy URLs, and complete data-policy answers.\n- [ ] Decide production primary/fallback from measurements.\n- [ ] Obtain owner review immediately before sending the OpenRouter application.\n\n## Do not claim\n\n- Do not claim Basho or Hokusai is trained, deployed, listed, or live until separately verified.\n- Do not present `basho-fp8-test` as the Basho checkpoint.\n- Do not describe BYOK success as custom-model registration.\n- Do not say Hugging Face is an OpenRouter provider in this setup.\n- Do not send Hokusai through `/chat/completions`; it is an asynchronous audiovisual video model.\n", :doc/title "OpenRouter provider application — awai.network / murakumo.cloud", :doc/as-of "2026-09-01", :source/dataset "business", :doc/owner "Jun Kawasaki", :doc/related ["adr-2609011842-awai-japanese-models-openrouter-provider-application"], :db/id -1, :doc/note "Converted verbatim from the .md this document was drafted as, so that it lands under the 90-docs EDN-only rule (ADR-2607171600). :doc/body is the markdown source unchanged.", :doc/status :draft, :doc/id "business-openrouter-awai-murakumo-provider-application"}]
+[{:db/id -1
+  :doc/id "business-openrouter-awai-murakumo-provider-application"
+  :doc/title "OpenRouter provider application — awai.network / murakumo.cloud"
+  :doc/as-of "2026-09-01"
+  :doc/status :draft
+  :doc/owner "Jun Kawasaki"
+  :doc/related ["adr-2609011842-awai-japanese-models-openrouter-provider-application"]
+  :source/dataset "business"
+  :doc/body
+  "# OpenRouter provider application — awai.network / murakumo.cloud
+
+**Status:** draft only; not submitted
+
+**Hard hold:** fine-tuned artifacts, production inference backends, data policy, pricing, capacity, and reliability measurements are incomplete.
+
+## Application summary
+
+murakumo.cloud is applying to become an OpenRouter inference provider for Japanese-first models developed by awai.network. We fine-tune upstream open-weight models on a proprietary, rights-reviewed Japanese dataset. murakumo.cloud owns the public API boundary, authentication, routing, metering, reliability, and data policy. Baseten is the initial hosting primary; Together is a later fallback after access and identical-artifact verification.
+
+The requested models are:
+
+| Model ID | Display name | Planned base | Modality | Current state |
+|---|---|---|---|---|
+| `awai-network/basho` | Basho | `Qwen/Qwen3.8-Flash-Next` | streaming chat | artifact not trained; public route live but fail-closed |
+| `awai-network/hokusai` | Hokusai | `MiniMaxAI/MiniMax-H3` | asynchronous audiovisual video | artifact not trained; adapter merged, production deploy blocked |
+
+We will not describe a renamed upstream checkpoint as an original model. The prior Baseten deployment `basho-fp8-test` used `RedHatAI/Qwen3.5-9B-FP8-dynamic` only for infrastructure smoke testing and is not Basho.
+
+## Organization
+
+| Field | Answer |
+|---|---|
+| Model developer / publisher | awai.network |
+| Inference provider | murakumo.cloud |
+| Infrastructure vendors | Baseten primary; Together gated fallback |
+| Provider website | https://murakumo.cloud |
+| Developer website | https://awai.network |
+| Contact and legal entity | OWNER-FILL before submission |
+| Terms, privacy, acceptable use | OWNER-FILL public URLs before submission |
+
+## Public API contract
+
+- Basho: OpenAI-compatible `POST /v1/chat/completions`, streaming and non-streaming, with prompt/completion token usage.
+- Hokusai: `POST /api/v1/videos`, job polling, optional signed webhook, and content download. Advertised duration, resolution, aspect ratio, references, and `generate_audio` are limited to verified capabilities.
+- `/v1/models` advertises only ready models.
+- Any missing endpoint, credential, health, capacity, price, or exact artifact-revision evidence fails closed.
+- Vendor URLs and credentials remain private behind murakumo.cloud.
+
+## Hosting decision
+
+Baseten is the validation primary because this account supports custom deployments and `min_replica=0` scale-to-zero. Together's normal custom-model list does not currently cover the planned bases, while arbitrary Dedicated Container Inference requires sales enablement. Together remains a fallback candidate only after it serves the same immutable artifact and passes the same capability, health, capacity, and accounting checks. Primary order is remeasured before general availability.
+
+Scale-to-zero is acceptable for review only if the cold-start path, timeout budget, capacity, and representative availability are demonstrated. An always-warm GPU is not claimed or required by this draft.
+
+## Current production evidence
+
+- Basho gateway: cloud-murakumo-api PR #194 merged at `3e91b9f507006493c71135d50be3ffcc4c52391e`; Cloudflare version `a9066a0a-c55a-4ebb-a690-d9de1eda7dde` is live on api.murakumo.cloud. A live unready request returns HTTP 503 `self_model_backend_unavailable`, and Basho is excluded from `/v1/models`.
+- Hokusai adapter: cloud-murakumo PR #159 merged at `683cb6ed6eded3114be0b797eb259316e6f77e6b`. Production deployment is blocked by the missing deployment-lease signing secret; lease-free bootstrap has not been used.
+- awai.network: network-awai-apex PR #1 merged at `174492d8186d62ae728c0f4f630a4af94fcf2310`; Cloudflare version `45d9a3bb-bff4-4a72-b06f-08b9aa629564` is live. Health and a real `murakumo-main` chat generation passed. Basho/Hokusai cutover variables are intentionally unset until readiness passes.
+- OpenRouter BYOK tests against the existing catalog model `z-ai/glm-5.3-flash` succeeded for Baseten and Together, but BYOK did not register `awai-network/basho`. Calling that unregistered OpenRouter model ID returned HTTP 400 `invalid model ID`.
+
+## Pricing, capacity, and data policy
+
+All commercial and performance values remain **未測定**. Before submission, provide Basho input/output USD per 1M tokens, context length, TTFT, tokens/s, TPM, errors and uptime; provide Hokusai USD per output second/variant, queue wait, generation time, concurrent jobs, success rate, artifact retention and uptime.
+
+OWNER-FILL prompt/output logging, retention, deletion, training reuse, ZDR, processing regions, vendor subprocessors, and abuse/legal disclosure policy. Do not state `no training` or ZDR unless operational controls prove it.
+
+## Submission gate
+
+- [ ] Produce immutable Basho and Hokusai fine-tuned checkpoints and private artifact readback.
+- [ ] Review upstream licenses and proprietary-dataset rights.
+- [ ] Publish model cards, Japanese evals, safety evals, and supported-capability matrices.
+- [ ] Deploy Baseten backends and pass direct positive/negative inference tests.
+- [ ] Obtain Together access and validate the identical artifacts, or keep Together unadvertised.
+- [ ] Pass murakumo.cloud streaming usage and video submit/poll/content/webhook tests.
+- [ ] Publish prices, capacity, data policy, and representative uptime evidence.
+- [ ] Fill owner/legal/policy fields and obtain owner review immediately before submission.
+
+Do not claim either model is trained, generating, OpenRouter-listed, or generally available until those states are separately verified."}]

@@ -38,8 +38,9 @@
    "Baseten docs: custom deployment は min_replica 0 で scale-to-zero、長時間処理は async request queue と webhook を利用可能"
    "Together docs: standard custom model upload は text generation / embedding と dedicated endpoint が対象。Dedicated Container Inference は video workload、Queue API、min_replicas 0 を扱えるが sales enablement が必要"
    "cloud-murakumo source readback 2026-09-01: /api/v1/generation job facade、MiniMax-H3 ComfyUI graph、async artifact pipeline、OpenAI /v1/videos backend adapter が既に存在"
-   "2026-09-01 local implementation: cloud-murakumo-api に awai-network/basho の明示 provider routing、revision/readiness/price/advertisement fail-closed gate を追加し、focused tests 38 tests / 198 assertions / 0 failures"
-   "2026-09-01 local implementation: cloud-murakumo に awai-network/hokusai の OpenRouter-compatible async video adapter と backend served-name/revision gate を追加し、focused tests 3 tests / 11 assertions / 0 failures。両 repo とも unmerged / undeployed で production credentials/endpoints は未配線"]
+   "2026-09-01 production: cloud-murakumo-api PR #194 は main へ merge 済み（3e91b9f507006493c71135d50be3ffcc4c52391e）。Cloudflare version a9066a0a-c55a-4ebb-a690-d9de1eda7dde を api.murakumo.cloud に deploy。awai-network/basho は backend 未準備のため /v1/models へ未掲載、live request は HTTP 503 self_model_backend_unavailable で fail-closed"
+   "2026-09-01 merged: cloud-murakumo PR #159 は main へ merge 済み（683cb6ed6eded3114be0b797eb259316e6f77e6b）。awai-network/hokusai の OpenRouter-compatible async video adapter は merged。production deploy は deployment lease signing secret 不在で停止し、lease-free bootstrap は未実行"
+   "2026-09-01 production: network-awai-apex PR #1 は main へ merge 済み（174492d8186d62ae728c0f4f630a4af94fcf2310）。Cloudflare version 45d9a3bb-bff4-4a72-b06f-08b9aa629564 を awai.network に deployし、murakumo-main の実生成を確認。Basho/Hokusai cutover 設定は readiness 未達のため未設定"]
   :adr/body
   "# awai.network の日本語独自モデルを murakumo.cloud provider として OpenRouter に申請する
 
@@ -65,7 +66,7 @@ awai.network は日本語に最適化した独自モデルを開発し、murakum
 
 4. **Hokusai.** planned base は `MiniMaxAI/MiniMax-H3`。`awai-network/hokusai` は chat model ではなく、native audio を含む asynchronous video generation model として申請する。OpenRouter 自身が `minimax/h3` を video model として掲載しているため modality mismatch はない。public contract は `POST /api/v1/videos` → job id / polling URL → status → content download とし、対応する reference inputs、duration、resolution、aspect ratio、`generate_audio` を capability として宣言する。
 
-5. **hosting.** Baseten と Together は vendor であり、OpenRouter 上の provider 表示は murakumo.cloud とする。Basho は同一 checkpoint を両社に置き、TTFT、tokens/s、稼働率、失敗率、実効 $/Mtok を測る。Hokusai は video-second、queue wait、生成時間、成功率、artifact readback、実効 $/second を測る。未測定の primary / fallback 順序を記録しない。Hugging Face private repository は artifact registry 候補であり、現時点では OpenRouter provider endpoint と見なさない。
+5. **hosting.** 検証時の primary は Baseten、Together は access と同一 artifact の検証後に fallback とする。Baseten は現アカウントで custom deployment と scale-to-zero が利用できる一方、Together は対象 base の通常 custom upload と arbitrary Dedicated Container が現時点で利用できないためである。Basho は同一 checkpoint を両社に置き、TTFT、tokens/s、稼働率、失敗率、実効 $/Mtok を測る。Hokusai は video-second、queue wait、生成時間、成功率、artifact readback、実効 $/second を測る。GA 前に再測定して順序を確定する。Hugging Face private repository は artifact registry 候補であり、現時点では OpenRouter provider endpoint と見なさない。
 
 6. **serverless / scale-to-zero.** 検証段階の既定は idle GPU cost 0 とする。
    - Baseten Basho: custom engine、`min_replica=0`。cold start を明示する。
@@ -101,7 +102,7 @@ awai.network は日本語に最適化した独自モデルを開発し、murakum
 
 ## Deployment contract
 
-Model routes, vendor endpoint settings, secret names, scale-to-zero behavior, and fail-closed readiness gates are recorded in `90-docs/deployment/awai-murakumo-basho-hokusai-routing.edn`. The contract is inactive and must not advertise either model until every readiness gate is evidenced.
+Model routes, vendor endpoint settings, secret names, scale-to-zero behavior, and fail-closed readiness gates are recorded in `90-docs/deployment/awai-murakumo-basho-hokusai-routing.edn`. The front doors are active where deployed, but neither model may be advertised or routed to paid inference until every readiness gate is evidenced.
 
 ## Application artifact
 
