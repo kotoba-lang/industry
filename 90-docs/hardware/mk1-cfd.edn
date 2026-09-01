@@ -1,0 +1,36 @@
+;; 生成物 — 手編集しない。再生成: MK1_CFD_SMOKE=1 nbb scripts/mk1_cfd.cljs <root> (smoke) / MK1_CFD_FULL=1 でフル
+;; 検証: force-driven plane Poiseuille を閉形解と突き合わせ済み
+{:mass-balance-residual 0.9954078973246797,
+ :stagnant-fraction 0.9849537921026502,
+ :rel-tol 0.0001,
+ :cell-mm 6,
+ :validation-case "force-driven plane Poiseuille vs closed form",
+ :residual 0.0014679926275300318,
+ :validation-pass true,
+ :bulk-delta-t-k 41.05965653468692,
+ :heat-w 332,
+ :steps 200,
+ :caveats
+ ["部材は AABB の箱近似。ヒートシンクのフィン形状・コネクタの凹凸は無い。"
+  "格子収束確認(cell-mm を半分にして結論が変わらないこと)は未実施。"
+  "convergence が :max-steps なら流れ場はまだ変化中で、流束は暫定値。"
+  "入口風速 3.0 m/s は B70 blower の assumption。実機で風速計を当てて置き換える。"
+  "エネルギー方程式なし → 素子ジャンクション温度は出ない。bulk-delta-t-k は排気空気の上昇。"
+  "ケーブルは solid として入れていない(mk1-cad.cljs の 6c で別に経路判定)。"
+  "nbb (SCI) は JVM より遅い。フルケースの実行には実測で数時間を見ること。"],
+ :validation-tol 0.02,
+ :domain-cells [64 8 32],
+ :outlet-flux-lattice 0.014694728561024772,
+ :solid-fraction 0.201,
+ :lattice "D3Q19 BGK + Smagorinsky LES",
+ :convergence :max-steps,
+ :validation-l2 0.014445593462895185,
+ :q-m3s 0.006911999999999994,
+ :residual-tol 0.000005,
+ :cfm 14.645698559999987,
+ :wall-clock-s 212.095,
+ :runner "scripts/mk1_cfd.cljs (nbb)",
+ :inlet-flux-lattice -3.199999999999997,
+ :generated-by "scripts/mk1_cfd.cljs",
+ :u-phys-ms 3, 
+ :solver "kami-cfd.duct (kotoba-lang/kami-engine-cfd)"}
