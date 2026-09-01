@@ -101,7 +101,14 @@
 
           {:change (str "address: " finding) :effort :M :shippable? false
            :blocked-by "no hypothesis registered for this axis"})]
-    {:id (str "ipni-h" (inc idx))
+    ;; Keyed by AXIS, not by position in the sorted findings. The id used to
+    ;; be (str "ipni-h" (inc idx)), which renamed every hypothesis whenever
+    ;; the ranking moved: `ipni-h1` meant :discoverable-as-provider on
+    ;; 2026-08-20 and :entries-hamt on 2026-09-02. A loop message naming
+    ;; `ipni-h1` therefore pointed at different work depending on when it was
+    ;; read -- and on 2026-09-02 it sent a session to redo a hypothesis that
+    ;; had already been proved, because the id had survived the thing it named.
+    {:id (str "ipni-h-" (name axis))
      :axis axis :title title :finding finding
      :change change :effort effort
      :predicted-gain headroom :worst-score worst-score
@@ -162,7 +169,20 @@
      ;; anything a stranger can see -- the same defect as an unmeasured
      ;; metric, wearing the opposite mask. Say so in the output rather than
      ;; reporting a gain.
-     :batch-observable? (boolean (some :observable? (:hypotheses evolved)))
+     ;; Three-valued on purpose. `nil` = there was no batch to judge, which
+     ;; must not print as "every member is unobservable": (some ...) over an
+     ;; empty collection is falsey, so an EMPTY batch used to emit the loop's
+     ;; strongest warning together with a gain of +0.00. Nothing being left to
+     ;; do and everything left being invisible are opposite states.
+     ;; Startable, but not in the batch: `evolve` batches :low risk and defers
+     ;; :blocked, so :medium-effort work is in NEITHER list. It is still
+     ;; startable and still on the roadmap, so an empty batch must not be
+     ;; reported as an empty backlog.
+     :startable-outside-batch
+     (let [batched (set (map :id (:hypotheses evolved)))]
+       (mapv :id (remove #(or (:blocked-by %) (batched (:id %))) ranked)))
+     :batch-observable? (when (seq (:hypotheses evolved))
+                          (boolean (some :observable? (:hypotheses evolved))))
      :unobservable-gain (reduce + (map :gain-points
                                        (remove :observable? (:hypotheses evolved))))}))
 
@@ -177,7 +197,7 @@
 (defn iteration-md
   [n {:keys [overall findings incomplete measured-weight]} meta probe]
   (let [{:keys [roadmap batch reachable-without-unblocking
-                batch-observable? unobservable-gain]} meta]
+                batch-observable? unobservable-gain startable-outside-batch]} meta]
     (str
      "# IPNI maturity — Co-Scientist iteration " (if (< n 10) (str "0" n) n) "\n\n"
      "> Judge: `ipni-maturity.audit` over `ipni-maturity.probe` — measured HTTP\n"
@@ -202,9 +222,27 @@
                                        " | " (if (:observable? h) "yes" "no")
                                        " | +" (pct (:gain-points h)) " |")) roadmap))
      "\n\n## Meta\n\n"
-     (if batch-observable?
+     (cond
+       (nil? batch-observable?)
+       (str "**The batch is empty.** Reachable without unblocking: **"
+            (pct reachable-without-unblocking) " / 100** — which is where the score already is.\n\n"
+            (if (seq startable-outside-batch)
+              (str "That is not an empty backlog. `evolve` batches only `:low`-risk work and defers\n"
+                   "only `:blocked` work, so `:medium`-effort hypotheses land in neither list while\n"
+                   "staying startable and on the roadmap: **"
+                   (str/join ", " (map #(str "`" % "`") startable-outside-batch))
+                   "**.\n\n")
+              "Nothing startable remains on the roadmap either.\n\n")
+            "An empty batch is also not a batch of invisible work, and this section used to\n"
+            "print the second when it meant the first: `(some :observable? [])` is falsey, so\n"
+            "having nothing batched rendered as the loop's strongest warning next to a gain\n"
+            "of +0.00.\n")
+
+       batch-observable?
        (str "Batch `" (:batch-id batch) "` = " (str/join ", " (:members batch))
             ". Reachable without unblocking: **" (pct reachable-without-unblocking) " / 100**.\n")
+
+       :else
        (str "**Every member of the startable batch is unobservable from outside.**\n\n"
             "Shipping all of it moves the score **+" (pct unobservable-gain)
             "** (to " (pct reachable-without-unblocking) " / 100) without changing anything a\n"
@@ -235,6 +273,14 @@
         md-out (loop [a argv] (cond (empty? a) nil
                                     (= "--md" (first a)) (second a)
                                     :else (recur (rest a))))
+        ;; The iteration number comes from the output filename, not a literal.
+        ;; It was hardcoded to 1, so iteration 02 would have been written with
+        ;; iteration 01's :doc/id -- a collision in the datom plane, and the
+        ;; kind CLAUDE.md names explicitly (two documents, one id, and the
+        ;; second silently answers for the first).
+        n (or (some-> md-out (->> (re-find #"iteration-(\d+)")) second
+                      (js/parseInt 10))
+              1)
         {:keys [before meta]} (run probe)
         _ (when md-out
             ;; EDN, not .md: 90-docs's source of truth is EDN documents
@@ -243,13 +289,15 @@
             (fs/writeFileSync
              md-out
              (pr-str [{:db/id -1
-                       :doc/id (str "doc-ipni-maturity-iteration-01")
-                       :doc/title "IPNI maturity — Co-Scientist iteration 01"
+                       :doc/id (str "doc-ipni-maturity-iteration-"
+                                    (when (< n 10) "0") n)
+                       :doc/title (str "IPNI maturity — Co-Scientist iteration "
+                                       (when (< n 10) "0") n)
                        :doc/path md-out
                        :source/dataset "ipni-maturity"
                        :doc/measured-at (:measured-at probe)
                        :doc/score (:overall before)
-                       :doc/body (iteration-md 1 before meta probe)}]))
+                       :doc/body (iteration-md n before meta probe)}]))
             (println "wrote" md-out))]
     (println "IPNI maturity:" (pct (:overall before)) "/ 100"
              (str "(" (pct (* 100.0 (/ (:measured-weight before) audit/total-weight)))
@@ -269,7 +317,15 @@
     (println)
     (println "batch" (:batch-id (:batch meta)) "=" (str/join ", " (:members (:batch meta))))
     (println "reachable without unblocking:" (pct (:reachable-without-unblocking meta)) "/ 100")
-    (when-not (:batch-observable? meta)
+    (when (nil? (:batch-observable? meta))
+      (println)
+      (let [out (:startable-outside-batch meta)]
+        (if (seq out)
+          (do (println "META: the batch is empty — nothing left is :low risk.")
+              (println (str "  Still startable, at :medium effort, on the roadmap: "
+                            (str/join ", " out) ".")))
+          (println "META: the batch is empty and nothing startable remains on the roadmap."))))
+    (when (false? (:batch-observable? meta))
       (println)
       (println "META: every member of this batch is UNOBSERVABLE from outside.")
       (println (str "  Shipping the whole batch moves the score +"

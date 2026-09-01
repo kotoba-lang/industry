@@ -292,6 +292,7 @@
           history (:ipni.publisher/identity-history m)
           candidates (:ipni.publisher/retrieval-candidates m)
           life (:ipni.publisher/lifecycle-proof m)
+          disc (:ipni.publisher/discovery-witness m)
           known-ids (set (map :peer-id history))
           pk (head-pubkey)
           pubs (indexer-publishers)]
@@ -300,10 +301,11 @@
       ;; believe an exit code. A record with no history entries and no candidates
       ;; has nothing to disagree with and must not read as agreement.
       (println (str "SCANNED\t" (+ (count history) (count candidates)
-                                  (if life 2 0))
+                                  (if life 2 0) (if disc 1 0))
                     "\t(" (count history) " history entries, "
                     (count candidates) " retrieval candidates, "
                     (if life "1 lifecycle proof over 2 multihashes" "no lifecycle proof")
+                    (if disc ", 1 discovery witness" "")
                     ")\n"))
       (when (zero? (+ (count history) (count candidates)))
         (swap! unmeasured conj :nothing-to-check))
@@ -395,6 +397,55 @@
                         :else (str "still listed: "
                                    (str/join ", " (map :id (ours witness)))
                                    " — :lifecycle-proof says :ok and the wire disagrees")))))
+
+      ;; ── the discovery witness ──────────────────────────────────────────
+      ;; 90-docs/ipni_maturity/probe.cljs scores :discoverable-as-provider
+      ;; (weight 0.20, the heaviest axis) on the CID named here. A probe that
+      ;; carried its own sample is a probe whose sample nobody re-measured;
+      ;; that is exactly how the axis came to be scored on the CID the
+      ;; lifecycle proof RETRACTS, and how it then reported 0 for eighteen
+      ;; hours while ipni-h1 was green and passing the checks above.
+      ;;
+      ;; So the sample is recorded, and measured here for its own reason.
+      ;; Both directions matter: a sample that stopped resolving to us, and a
+      ;; sample that is the retracted witness again.
+      ;; Recorded at all? Deleting the key would make the heaviest axis
+      ;; :unknown, and the audit scores over MEASURED axes only -- so dropping
+      ;; a red axis RAISES the mean. That must not be a silent move.
+      (check! :discovery-witness-is-recorded
+              (boolean (:multihash disc))
+              (if (:multihash disc)
+                (str "the probe's sample is named in the record: " (:multihash disc))
+                (str "no :ipni.publisher/discovery-witness — probe.cljs scores its "
+                     "heaviest axis :unknown, which drops it from the mean instead of "
+                     "counting it")))
+
+      (when disc
+        (let [answered (multihash-providers (:multihash disc))
+              ours (when answered (filter #(known-ids (:id %)) answered))]
+
+          (check! :discovery-witness-is-not-the-lifecycle-witness
+                  (if-not life :unmeasured
+                          (not= (:multihash disc) (get-in life [:witness :multihash])))
+                  (cond (not life) "no lifecycle proof recorded to compare against"
+                        (= (:multihash disc) (get-in life [:witness :multihash]))
+                        (str "the discovery sample IS the retracted witness ("
+                             (:multihash disc) ") — the heaviest axis can never be green")
+                        :else "the two samples are different multihashes, as they must be"))
+
+          (check! :discovery-witness-still-advertised
+                  (cond (nil? answered) :unmeasured
+                        :else (boolean (seq ours)))
+                  (cond (nil? answered) "cid.contact could not be read"
+                        (seq ours)
+                        (str (count ours) " of this publisher's recorded identities answer for "
+                             (:multihash disc) " — the probe's sample is real")
+                        (empty? answered)
+                        (str "the index holds nothing at all for " (:multihash disc)
+                             " — the probe is scoring its heaviest axis on a multihash nobody indexes")
+                        :else
+                        (str (count answered) " provider(s) answer for " (:multihash disc)
+                             " and none is ours — the probe's sample no longer belongs to us")))))
 
       (println)
       (cond

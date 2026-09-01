@@ -269,11 +269,56 @@
  ;; is wrong. Measure liveness on /multihash/, and read `age:` before
  ;; believing any of them.
  :ipni.publisher/lookup-surfaces
- {:measured-at "2026-09-01"
-  :fresh ["https://cid.contact/multihash/{base58btc-multihash}"]
+ {:measured-at "2026-09-01T18:36:30Z"
+  ;; Re-measured 2026-09-02. The earlier entry called /multihash/ :fresh on the
+  ;; strength of one response that carried no age header -- but that was a MISS,
+  ;; taken seconds after an announce. Asked again cold it is
+  ;; `x-cache: Hit from cloudfront, age: 234`, and a query-string nonce does not
+  ;; bust it (age went 213 -> 234 across two requests with different nonces, so
+  ;; the query string is not in the cache key). All three surfaces are cached.
+  ;;
+  ;; What survives is the ORDER, which is what the reads actually rely on:
+  ;; /multihash/ reflected a new advertisement in 15s while /cid/ and
+  ;; /routing/v1/ were still serving `age: 1518` against `max-age=7200`.
+  ;; It is the shortest-lived surface, not an uncached one.
+  :least-stale ["https://cid.contact/multihash/{base58btc-multihash}"]
   :cached ["https://cid.contact/cid/{cid}"
-           "https://cid.contact/routing/v1/providers/{cid}"]
-  :rule "read the age header; a cached miss and a real absence are the same bytes"}
+           "https://cid.contact/routing/v1/providers/{cid}"
+           "https://cid.contact/multihash/{base58btc-multihash}"]
+  :rule "read the age header; a cached miss and a real absence are the same bytes"
+  :consequence "a PRESENCE read through cache is still a presence someone published. An ABSENCE is not safe to read this way, which is why the removal check carries two controls rather than trusting one 200."}
+
+ ;; ── The sample the maturity probe scores :discoverable-as-provider on ──
+ ;;
+ ;; Recorded here rather than written into 90-docs/ipni_maturity/probe.cljs,
+ ;; because a probe carrying its own sample is a probe whose sample nobody
+ ;; re-measures. scripts/verify-ipni-publisher-record.cljs checks this one
+ ;; against the wire every six hours for its own reason: if the CID named here
+ ;; stops resolving to a recorded identity the detector goes red, and the axis
+ ;; it feeds reports :unknown rather than 0.
+ ;;
+ ;; Why it is not the lifecycle witness. Until 2026-09-02 the probe measured
+ ;; this axis against :lifecycle-proof :witness -- the CID the lifecycle proof
+ ;; deliberately RETRACTS. The two cannot both be satisfied: the proof needs
+ ;; that advertisement gone, the axis needs one present. So the axis read 0
+ ;; from 2026-09-01T05:45Z onward, the score sat at 80.99, and ipni-h1 stayed
+ ;; the top-ranked hypothesis -- for work that had already been finished and
+ ;; was passing its own detector. Two roles need two CIDs.
+ :ipni.publisher/discovery-witness
+ {:cid "bafyreib662epgj5lnl2cisepwnq4z2hcqcm4eotvwwr72v76qrhvf45maq"
+  :multihash "QmSaS2KXyjqoR3JzkEsEgeZh1ZLsA9hMkN7RbsWWMWoiXu"
+  :why "a CID of the durably advertised corpus: advertised, and never retracted"
+  :invariant "never equal to :lifecycle-proof :witness :multihash"
+  :measured-at "2026-09-01T18:36:30Z"
+  :surface "https://cid.contact/multihash/{base58btc-multihash}"
+  :providers [{:peer-id "12D3KooWHu8JYZpEkaewiMsR2FSGYwMqsVXthdnzFyh9TQdxsRTk"
+               :context "kotobase-appviews-v1"
+               :addr "/dns4/kotobase.net/tcp/443/https"}
+              {:peer-id "12D3KooWGmq2x23J59LmqyBT5ik8pK9gEz7N3Y4vdJidezf7Usz3"
+               :context "ayatori-public-arrangement-v1"
+               :addr "/dns4/ipfs.kotobase.net/tcp/443/https"}]
+  :matched-on :recorded-peer-id
+  :not-matched-on "a substring of the response body. The axis used to accept any body containing kotobase, which matches an address a third party happens to carry and says nothing about which key signed the advertisement."}
 
  ;; ── ADR-2608160300's own success criterion, run end to end on one CID ──
  ;;
@@ -370,7 +415,14 @@
    :axis :discoverable-as-provider
    :measured "2026-09-01T12:24:39Z"
    :score 80.99
-   :effect "the axis is red because the removal succeeded"}
+   :effect "the axis is red because the removal succeeded"
+   :status :resolved
+   :resolved-at "2026-09-02"
+   :resolved-by "the axis now reads :ipni.publisher/discovery-witness -- a CID this publisher advertises -- instead of the CID this proof retracts. Two roles, two CIDs."
+   :score-after 97.52
+   :caveat "the score moved because the measurement was corrected, not because anything new was published. No advertisement was made on 2026-09-02. The wire is in exactly the state the 2026-09-01 run left it in."
+   :why-it-was-not-fixed-here-first
+   "Swapping the sample raises the score of the change that swaps it, which is the one edit nobody can check. So it was deferred to a separate iteration, and landed with: a sample read from this record rather than written into the probe, three new detector checks that measure that sample against the wire every six hours, a matcher keyed on recorded peer ids instead of the substring kotobase, and five demonstrated directions -- present, retracted, unknown-to-the-index, unrecorded, and no-identities."}
 
   :not-proven
   ["The removal was honoured by cid.contact. Other indexers were not asked."
