@@ -132,9 +132,78 @@ red when the fallback is reintroduced.
 Verified live: all 9 base-sepolia listings across the 3 sellers now name the
 pool, in the documents AND in the runtime 402 challenges.
 
+## It was never once bought, and that is how the last bugs were found
+
+Measured at closing: `/admin/settlements` reported ZERO settlements for every
+seller, on every chain, ever. The facilitator had been advertising a catalogue
+for months and no purchase had completed through it. Nothing said so, because
+nothing asked.
+
+Buying one thing found three defects, each of which passed every check that did
+not involve money changing hands:
+
+  1. murakumo verified against the WRONG CHAIN. `rpcs` ignored the chain
+     entirely and always returned Base mainnet endpoints, so a base-sepolia
+     payment was checked where its transaction does not exist. A buyer with
+     five confirmations was told `verification_unavailable`. The offer named
+     the right chain, token and payTo; only the endpoint list was wrong, and
+     nothing that reads an offer can see that.
+
+  2. The GATEWAY settled testnet payments against the mainnet rule.
+     `match-rule` returns the first match when a resource is priced on two
+     chains, and that is mainnet -- different payTo, different asset.
+     `pay.facilitator/rule-for-payment` already existed and does it correctly;
+     it simply was not the function the gateway called. This predates the
+     testnet work entirely: hanmoto has carried base-sepolia listings alongside
+     base all along, so the gateway has never been able to settle a testnet
+     payment for a seller that also sells on mainnet.
+
+  3. Re-registering hanmoto through `/apply` DROPPED its origin-token wiring.
+     `apply` rebuilds rules from the seller's own document, which cannot carry
+     `auth-header` / `auth-secret-env`, so the fields an admin PUT had set were
+     replaced with nothing. Self-inflicted, during this work, and restored by
+     re-PUTting all six rules.
+
+The first successful purchase: 0.001 USDC on base-sepolia -> HTTP 200 with
+hanmoto's real publisher counts. The pool went 20.000 -> 19.912 while the buyer
+kept 0.088, which is the recycling working: everything spent came back.
+
+## The published prose was the last surface still lying
+
+llms.txt -- the file an agent reads before deciding how to pay -- still said the
+gate was a WebAuthn assertion, verification unwired and the pool unfunded, hours
+after all three stopped being true. The page and the JSON had moved to
+`nexus.faucet/status`; three hardcoded sentences had not. A description that
+UNDERSTATES is still wrong: an agent reading it was told not to bother.
+
+`nexus.directory/faucet-line` now derives one sentence from the measured status,
+and a pool that cannot be read says `unmeasured` rather than guessing. murakumo
+and kotobase llms.txt now state the two fields that differ between the chains
+and point at the faucet.
+
 ## What is still owed
 
-USDC. Circle's faucet is the only source of Base Sepolia USDC and it is
-captcha-gated, which an agent must not defeat. Until someone draws it into
-0xD030410BABA777b1e7FacABf679295641203628A, the faucet pours gas and says
-UNFUNDED for the other half -- which is the honest report, not a failure."}]
+The pool is funded: 20 USDC and 0.198 ETH, ~199 draws. Two of the three
+draws Circle's faucet issued landed on the wrong chain first (Arc Testnet and
+Ethereum Sepolia are the first two entries in its dropdown; Base Sepolia is
+seventh), and the Ethereum Sepolia one was recovered with CCTP burn-and-mint --
+`nexus.cctp` and `scripts/faucet_topup.cljs` are the programmatic paths for
+both problems now. 20 USDC remains on Arc, safe and unused.
+
+Still open:
+
+  - murakumo's payment now VERIFIES and then fails at `reservation_unavailable`.
+    Its spend-gate calls kotobase.net/api/payment-reserve; the endpoint is alive
+    (401 unauthenticated, correctly) and KOTOBASE_BEARER_TOKEN is set, so it is
+    a token-scope or database problem in that subsystem. It is shared with
+    mainnet, so it is not testnet-specific -- but that it predates this work is
+    UNPROVEN, not established.
+
+  - `/admin/settlements/hanmoto` still reports zero after a successful purchase.
+    The settlement index is not recording. An observability gap rather than a
+    payment failure, but it means the facilitator's books stay blank while money
+    moves.
+
+  - kotoba.cloud sells nothing over x402 and so has no testnet rail to document.
+    Listing it means first deciding what it sells and at what price, which is a
+    product decision and not this one."}]
