@@ -6090,4 +6090,160 @@
      :file "appview/wvme-mcp-component/src/app.ts"
      :find "const ACTOR_DID = \"did:web:wvme.etzhayyim.com\";"
      :replace "const ACTOR_DID: string = \"did:web:wvme.etzhayyim.com\";"
-     :must-fail ["the-worker-source-still-declares-the-values-this-suite-reads-from-it"]}]}]}
+     :must-fail ["the-worker-source-still-declares-the-values-this-suite-reads-from-it"]}]}
+
+  {:repo "orgs/cloud-itonami/okaimono"
+   :label "okaimono の自己記述 —— 9 ファイルに手で写された identity と配線"
+   ;; この repo にはテストが 2 本あったが、どちらも **1 つのサブパッケージの
+   ;; 中しか見ていなかった**。しかも片方は今日 1 本も走らない:
+   ;;
+   ;;   kotoba/test/okaimono.test.ts        32 本の本物のテスト。ただし
+   ;;                                        2026-08-28 以降 install できない
+   ;;                                        （TypeScript 依存閉包が死んでいる。
+   ;;                                        README と operator-quickstart §1 が
+   ;;                                        測定付きで記録している）
+   ;;   appview/…/cljs/test/…/app_test.cljs default-db を default-db と比べる
+   ;;                                        4 本。JVM の shadow-cljs build が要る
+   ;;
+   ;; つまり **install も network も JVM も無しに実行できる検査が 1 つも無かった。**
+   ;;
+   ;; 撃つ先が 6 種類あるのは、この suite が 6 種類のものを守っているから:
+   ;;   1. deploy 設定（wrangler.jsonc —— nanoid・routes・assets・vars）
+   ;;   2. descriptor（kotodama.jsonld —— @id・nanoid・routes・profile）
+   ;;   3. 静的バンドルの配線（shadow-cljs.edn ↔ index.html ↔ app.cljs）
+   ;;   4. cljs test build の選択（:ns-regexp が ns を拾わないと 0 テストで緑）
+   ;;   5. docs が公開している測定値（README / operator-quickstart の件数）
+   ;;   6. 移行のときに付けた名前（README.edn ↔ migration.edn）
+   ;;
+   ;; ⚠ **kotoba の vitest 32 本はここに登録していない。** そもそも install が
+   ;; 通らないので、走らせること自体ができない。app-wvme と同じ理由（run-suite の
+   ;; :npm-install が repo ルートを撃つ）でもあるが、ここではそれ以前の問題。
+   ;;
+   ;; 17 件すべて 2026-09-02 に pin 031ab2d1 で実際に赤くなるところを見た。
+   ;; anchor は一意、噛んだ assertion は行番号まで一致（同じ test を名指しする
+   ;; 2 件は別々の行で落ちる）、無改変で exit 0。
+   ;;
+   ;; evidence floor は **それが存在する理由の場面**で確かめた —— 比較の
+   ;; 両側で key を改名すると `nil = nil` が緑のまま残り、floor だけが赤くなる。
+   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :green-marker "okaimono self-description: all green"
+   :npm-install false
+   :mutations
+   [{:id :okaimono/the-worker-vars-keep-a-stale-nanoid
+     :why "nanoid は kotodama・Worker 名・vars・公開ルート・埋め込み URL の 5 箇所に手で書かれている。1 箇所だけ直す、がこの形の repo で最も起きる drift"
+     :file "appview/okaimono-shopping-mcp-component/wrangler.jsonc"
+     :find "\"APP_NANOID\": \"ok4imn1o\""
+     :replace "\"APP_NANOID\": \"ok4imn10\""
+     :must-fail ["the-nanoid-is-the-same-string-in-every-place-that-spells-it"]}
+
+    {:id :okaimono/the-worker-is-renamed-without-the-descriptor
+     :why "Cloudflare 上の Worker 名は kotodama-<nanoid>。ここだけ人が読みやすい名前に変えると、descriptor から Worker を引く経路が切れる"
+     :file "appview/okaimono-shopping-mcp-component/wrangler.jsonc"
+     :find "\"name\": \"kotodama-ok4imn1o\""
+     :replace "\"name\": \"kotodama-okaimono\""
+     :must-fail ["the-nanoid-is-the-same-string-in-every-place-that-spells-it"]}
+
+    {:id :okaimono/the-embed-url-points-at-another-host
+     :why "APP_EMBED_URL は他の appview が iframe に入れる先。routes に無い host を指しても、この repo の中では誰も困らない"
+     :file "appview/okaimono-shopping-mcp-component/wrangler.jsonc"
+     :find "https://ok4imn1o.etzhayyim.com/?embed=1"
+     :replace "https://okaimono.etzhayyim.com/?embed=1"
+     :must-fail ["the-nanoid-is-the-same-string-in-every-place-that-spells-it"]}
+
+    {:id :okaimono/the-did-host-loses-its-route
+     :why "did:web:<host> は https://<host>/.well-known/did.json に解決する。その host が routes から落ちると、DID を解決した相手はここへ届かない —— did document を書く前に route が要る"
+     :file "appview/okaimono-shopping-mcp-component/kotodama.jsonld"
+     :find "\"host\": \"okaimono.etzhayyim.com\""
+     :replace "\"host\": \"shop.okaimono.etzhayyim.com\""
+     :must-fail ["the-did-host-is-a-host-this-worker-answers-for"]}
+
+    {:id :okaimono/the-display-name-is-changed-in-only-one-of-the-two
+     :why "descriptor は did:web を解決した相手が読み、vars は Worker 自身が実行時に読む。片方だけ直すと、外から見た名前と中から名乗る名前が割れる"
+     :file "appview/okaimono-shopping-mcp-component/wrangler.jsonc"
+     :find "\"APP_DISPLAY_NAME\": \"Okaimono D2C Store\""
+     :replace "\"APP_DISPLAY_NAME\": \"Okaimono Store\""
+     :must-fail ["the-descriptor-and-the-worker-vars-agree-field-by-field"]}
+
+    {:id :okaimono/the-worker-advertises-a-capability-nobody-granted
+     :why "この 2 つは今日**等しくない**（descriptor だけが unispsc 2 件を持つ）ので、等価は pin できない。危険な向き —— Worker が descriptor に無い能力を名乗る —— だけを見る"
+     :file "appview/okaimono-shopping-mcp-component/wrangler.jsonc"
+     :find "[\\\"e-commerce\\\",\\\"product-catalog\\\"]"
+     :replace "[\\\"e-commerce\\\",\\\"product-catalog\\\",\\\"arbitrage\\\"]"
+     :must-fail ["the-worker-never-claims-a-capability-the-descriptor-does-not-grant"]}
+
+    {:id :okaimono/a-server-entry-comes-back-pointing-at-the-removed-svelte-tree
+     :why "**実際に起きていた形**。この wrangler.jsonc の直前の版は、削除済みの svelte/.svelte-kit/cloudflare/_worker.js を main に指したまま残っていた。設定が名指しする経路が消えたことを、誰も見ていなかった"
+     :file "appview/okaimono-shopping-mcp-component/wrangler.jsonc"
+     :find "  \"compatibility_date\":"
+     :replace "  \"main\": \"./svelte/.svelte-kit/cloudflare/_worker.js\",\n  \"compatibility_date\":"
+     :must-fail ["every-repo-path-the-deploy-config-names-exists"]}
+
+    {:id :okaimono/the-asset-path-drifts-from-the-script-tag
+     :why "shadow-cljs が書く場所・document が読む場所・Cloudflare が配る場所は別々に書かれている。1 つずらすと **build は緑のまま document が空になる**"
+     :file "appview/okaimono-shopping-mcp-component/cljs/shadow-cljs.edn"
+     :find ":asset-path \"js\""
+     :replace ":asset-path \"assets\""
+     :must-fail ["the-static-bundle-is-wired-end-to-end"]}
+
+    {:id :okaimono/the-init-fn-loses-its-export
+     :why ":advanced では ^:export の無い var 名が潰れるので、:init-fn が呼ばれなくなる。compile は成功し、document は白いまま"
+     :file "appview/okaimono-shopping-mcp-component/cljs/src/okaimono/app.cljs"
+     :find "(defn ^:export main []"
+     :replace "(defn main []"
+     :must-fail ["the-static-bundle-is-wired-end-to-end"]}
+
+    {:id :okaimono/the-test-namespace-is-renamed-out-of-the-ns-regexp
+     :why "`:ns-regexp` に一致する ns が 0 個でも shadow-cljs compile test は成功し、node out/tests.js は `Ran 0 tests` と言って **exit 0** で終わる。『測っていない』が『測って問題が無かった』と同じ顔になる形（CLAUDE.md の 6 問の 1 番目）"
+     :file "appview/okaimono-shopping-mcp-component/cljs/test/okaimono/app_test.cljs"
+     :find "(ns okaimono.app-test"
+     :replace "(ns okaimono.app-spec"
+     :must-fail ["the-cljs-test-build-still-selects-the-test-namespace"]}
+
+    {:id :okaimono/a-vitest-case-is-skipped-and-the-docs-keep-saying-32
+     :why "**この repo は既にこの形で一度腐っている** —— quickstart 自身が『MIGRATION-TODO.md still claims \"14/14\". That number is stale』と記録している。docs 側の数も code 側の数もファイルから読むので、片側だけ直しても揃わない"
+     :file "kotoba/test/okaimono.test.ts"
+     :find "    it(\"rejects negative\", () => {"
+     :replace "    it.skip(\"rejects negative\", () => {"
+     :must-fail ["the-test-counts-the-docs-publish-are-the-counts-the-code-has"]}
+
+    {:id :okaimono/the-quickstart-cljs-assertion-count-goes-stale
+     :why "同じ腐り方の docs 側。測定値として貼られた出力は、貼った瞬間から code と独立に動く"
+     :file "docs/operator-quickstart.md"
+     :find "Ran 4 tests containing 6 assertions."
+     :replace "Ran 4 tests containing 8 assertions."
+     :must-fail ["the-test-counts-the-docs-publish-are-the-counts-the-code-has"]}
+
+    {:id :okaimono/the-readme-layout-table-points-at-a-moved-file
+     :why "Layout 表は『ここに在る』という主張。散文は削除済みの svelte/ や存在しない wasm/ を意図的に名指しするので、表の 1 列目だけを見る"
+     :file "README.md"
+     :find "| `proto/v1/shopping.proto` |"
+     :replace "| `proto/v2/shopping.proto` |"
+     :must-fail ["every-path-the-readme-points-at-exists"]}
+
+    {:id :okaimono/the-readme-entry-link-rots
+     :why "README の唯一のリポジトリ相対リンクが入口（operator-quickstart）を指す。入口が 404 になっても README は自信を持って読める"
+     :file "README.md"
+     :find "](docs/operator-quickstart.md)"
+     :replace "](docs/operator-quickstart.md.md)"
+     :must-fail ["every-path-the-readme-points-at-exists"]}
+
+    {:id :okaimono/the-migration-name-is-changed-in-only-one-of-the-two
+     :why "この repo は 4 つの名前を持ちどれも一致しない（quickstart の Repository identity is inconsistent 節）。その中で com-etzhayyim-app-okaimono を使っているのは README.edn と migration.edn の 2 つだけなので、その 2 つが揃っていることだけを守る"
+     :file "README.edn"
+     :find ":name \"com-etzhayyim-app-okaimono\""
+     :replace ":name \"com-etzhayyim-okaimono\""
+     :must-fail ["the-two-files-that-use-the-migration-name-still-agree"]}
+
+    {:id :okaimono/the-router-url-loses-its-path
+     :why "**この suite 自身の誠実さ**。wrangler.jsonc は行頭 // コメントと、文字列の中の https:// の両方を持つ。素朴な剥がしは後者を切り詰めるか JSON を壊す。host の後の path が残っていることを独立に見る"
+     :file "appview/okaimono-shopping-mcp-component/wrangler.jsonc"
+     :find "https://mcp.etzhayyim.com/xrpc/com.etzhayyim.mcp.message"
+     :replace "https://mcp.etzhayyim.com"
+     :must-fail ["the-jsonc-reader-does-not-eat-the-urls-inside-the-strings"]}
+
+    {:id :okaimono/the-descriptor-loses-the-key-this-suite-reads
+     :why "**evidence floor**。抽出が nil を返すと、比較は nil = nil で緑になりうる。実測: 比較の両側で key を改名すると nanoid の等値検査は緑のまま残り、floor だけが赤くなる"
+     :file "appview/okaimono-shopping-mcp-component/kotodama.jsonld"
+     :find "\"nanoid\": \"ok4imn1o\""
+     :replace "\"nanoidV2\": \"ok4imn1o\""
+     :must-fail ["the-files-this-suite-reads-still-declare-what-it-reads-from-them"]}]}]}
