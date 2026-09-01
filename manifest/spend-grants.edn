@@ -43,17 +43,31 @@
    :limit {:funded-usd "5.00"        ; the ceiling arithmetic enforces
            :per-call-usd "0.05"}     ; the ceiling the token carries
 
-   :networks ["base"]
-   :assets ["0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"]
+   ;; base-sepolia, deliberately. A rail whose only demonstration costs real
+   ;; money is demonstrated once and assumed thereafter, and the first thing an
+   ;; autonomous buyer does should be rehearsed where a mistake costs nothing.
+   ;; hanmoto lists every resource on both networks at the same price, and this
+   ;; allowlist is what makes this buyer take the testnet one and never the
+   ;; other -- the choosing is `pay.x402-buyer/plan`'s, not a special case.
+   :networks ["base-sepolia"]
+   ;; Sepolia USDC, from treasury/chains. NOT the mainnet address: an asset
+   ;; allowlist naming the wrong chain's token refuses every offer, and it
+   ;; refuses them for a reason that reads like the seller is at fault.
+   :assets ["0x036CbD53842c5426634e7929541eC2318f3dCF7e"]
    :schemes ["exact" "transaction"]
 
    :expires "2026-10-01T00:00:00Z"
    :declared "2026-09-01"
    :declared-by "Jun Kawasaki"
-   :state :awaiting-funding
+   :state :awaiting-testnet-funding
    :note "Owner decision 2026-08-31: dougaka is the first buyer -- it runs, and
-          it is the largest spender in the murakumo ledger. The session key was
-          generated straight into the keychain; the address holds zero and
-          funding it is the operator's step, not an agent's. Until it is
-          funded this grant is a declaration and nothing can spend under it,
-          which is the correct resting state."}]}
+          it is the largest spender in the murakumo ledger. Moved to
+          base-sepolia on 2026-09-01 at the owner's direction, so the first
+          autonomous purchase is rehearsed where a mistake costs nothing.
+
+          The session key was generated straight into the keychain; the address
+          holds zero on both networks and funding is the operator's step. On a
+          testnet that is not because value moves -- it does not -- but because
+          every faucet gates on a login or a CAPTCHA, and an agent must do
+          neither. Until it is funded this grant is a declaration and nothing
+          can spend under it, which is the correct resting state."}]}
