@@ -101,22 +101,34 @@ Xavier は 2.6 tok/s / 37-44 秒で、速い peer の前に出すと退行する
 修正（Xavier を末尾固定）と回帰テストを入れて 8 並列は 200×8・最大 3.71 秒に戻った。
 詳細と再発防止は adr-2800005800。
 
-## closing 時点の実測（2026-09-01 19:4x）
+## closing 時点の実測 —— 2 回測って別の答えが出た
 
-```
-api chat            200 だが 118 秒
- /ready              ok:true  degraded [fleet-incomplete primary-unavailable]
-pool-available      {gad 0, b70 1, xavier 1}
-request-capacity    {configured 2, busy 2, available 0}  ← gad は満杯を正しく報告
-このマシンの load    113.79
-compute-market      chat の quote は返る
-itonami.cloud       200 / app・auth とも 200
-```
+同じ面を 20 分あけて 2 回測った。**1 回目だけを見て報告していたら、本番が壊れて
+いると書いていた。**
+
+| | 19:4x | 20:0x |
+|---|---|---|
+| api chat | 200 / **118 秒** | 200 / **3.46 秒** |
+| /ready degraded | fleet-incomplete, **primary-unavailable** | fleet-incomplete のみ |
+| gad の slots | busy 2 / **available 0** | busy 0 / **available 2** |
+| このマシンの load | **113.79** | 111.43（1 分平均。5 分平均は 87.63） |
+
+`fleet-incomplete` は両方で出続けている（fleet の一部が未配線）。消えたのは
+`primary-unavailable` の方で、これは gad の枠が空いたということ。
 
 **118 秒は変更の欠陥ではなくホストの飽和である。** 3.71 秒を測ったときの load は
-約 35 だった。このセッションで回した JVM ビルド（shadow-cljs の release を 5 回以上）
-も寄与している。`/ready` が `primary-unavailable` を出しているのは、まさにこの
-状態を報告するために在る。
+約 35 で、このセッションで回した JVM ビルド（shadow-cljs の release を 5 回以上）が
+飽和に寄与している。`/ready` が `primary-unavailable` を出したのは、まさにこの
+状態を報告するために足した機能が働いた結果であって、故障の報告ではない。
+
+**したがって closing 時点の本番は健全である**（chat 3.46 秒、gad に空き 2）。
+ただし `fleet-incomplete` は残っており、それは未解決 2 の modality 欠落と同じ話。
+
+⚠ **引き継ぐ側へ: 負荷 100 超のこのマシンで測った推論の所要時間は、本番の性能では
+ない。** load を値の隣に書かない測定は、この 118 秒と 3.46 秒を区別できない。
+
+その他の面（両回とも同じ）: compute-market は `chat` の quote を返す。
+itonami.cloud は 200、app・auth とも 200。
 
 ## 未解決 —— 優先順
 
