@@ -5136,4 +5136,57 @@
        :find "    kotoba.labor.portable-test])"
        :replace "    kotoba.labor.export-test])"
        :must-fail ["REFUSED"]}]}
+
+  {:repo "orgs/cloud-itonami/resource-provider"
+   :label "resource-provider 平文と封緘の境界 —— 依存を 1 つも入れずに実物を動かす"
+   :cmd ["nbb" "test/resource_provider_test.cljs"]
+   :green-marker "resource-provider-check: OK"
+   :mutations
+   [{:id :resource-provider/rkey-collapses-separators-again
+    :why "この repo が広告している外部キーを、静かに嘘にする退行そのもの。rkeyOf が [^a-z0-9] の連続を \"-\" に潰していた頃、\"gpu.west\" \"gpu_west\" \"gpu-west\" \"gpu~west\" は同じ record key \"listing-gpu-west\" に落ちながら、それぞれ違う DID を持っていた。2 番目に登録した provider は alreadyExists と言われて **1 番目の DID と URI** を渡され、recordStat の FK 検査は \"gpu.west\" の登録を根拠に \"gpu_west\" を通した"
+    :file "kotoba/src/types.ts"
+    :find "export function rkeyOf(prefix: string, id: string): string {\n  return `${prefix}-${id.toLowerCase()}`;\n}"
+    :replace "export function rkeyOf(prefix: string, id: string): string {\n  return `${prefix}-${id.toLowerCase().replace(/[^a-z0-9]+/g, \"-\")}`;\n}"
+    :must-fail ["record-key-derivation-is-injective"
+                "record-key-and-did-agree-on-identity"
+                "foreign-key-rejects-a-listing-that-was-never-registered"]}
+
+   {:id :resource-provider/provider-pii-written-in-plaintext
+    :why "この repo が存在する理由そのものの退行 —— 封じるべき PII を平文で書く。**vitest 側の read-cap テストはこの変異を通してしまう**（quickstart が自分でそう書いている: 平文書き込みだと scanProfiles が encryptedRead で何も見つけないので、outsider は「アクセス制御されているから」ではなく「データが無いから」0 を見る）。この suite は同じ瞬間に owner が読めることを対にして確かめ、さらに平文 substrate を geo と device fingerprint で直接検索するので、3 通りの別々の理由で赤くなる"
+    :file "kotoba/src/registry.ts"
+    :find "  const receipt = await e.encryptedWrite<Record<string, unknown>>({\n    innerType: PROVIDER_PROFILE_INNER_TYPE,\n    record: body as unknown as Record<string, unknown>,\n    recipients: input.recipients ?? [],\n    rkey: rkeyOf(\"profile\", input.profileId),\n  });"
+    :replace "  const receipt = await e.write({\n    collection: PROVIDER_PROFILE_INNER_TYPE,\n    record: body as unknown as Record<string, unknown>,\n    rkey: rkeyOf(\"profile\", input.profileId),\n  });"
+    :must-fail ["boundary-plaintext-writes-only-the-public-catalog"
+                "boundary-every-sealed-type-goes-through-encryptedWrite"
+                "boundary-plaintext-never-contains-geo"
+                "boundary-plaintext-never-contains-device-fingerprint"
+                "read-cap-owner-still-sees-the-record-the-outsider-cannot"]}
+
+   {:id :resource-provider/listing-id-validation-dropped
+    :why "rkeyOf は injective になったが、そのぶん**呼ぶ側が検証しなければ表現できない id がそのまま record key になる**。この guard を外すと registerListing は空白入りの id を受け、AT Protocol の record key に使えない文字列と、空白を含む DID を作る"
+    :file "kotoba/src/registry.ts"
+    :find "  if (!isSafeId(input.listingId)) return { status: \"rejected\", error: \"invalidListingId\" };\n  if (!isResourceType(input.resourceType)) return { status: \"rejected\", error: \"invalidResourceType\" };\n  if (!isUint(input.capacity))"
+    :replace "  if (!isResourceType(input.resourceType)) return { status: \"rejected\", error: \"invalidResourceType\" };\n  if (!isUint(input.capacity))"
+    :must-fail ["unrepresentable-listing-id-is-rejected"]}
+
+   {:id :resource-provider/money-regex-admits-exponent-notation
+    :why "金額は decimal STRING で持つ（AT-Lexicon は float を持たない）という不変条件の退行。指数表記を通すと \"1e3\" が金額として台帳に載り、読み手ごとに 1000 とも \"1e3\" とも解釈されうる"
+    :file "kotoba/src/types.ts"
+    :find "  return typeof s === \"string\" && /^-?\\d+(\\.\\d+)?$/.test(s);"
+    :replace "  return typeof s === \"string\" && /^-?\\d+(\\.\\d+)?([eE]-?\\d+)?$/.test(s);"
+    :must-fail ["isDecimalString-\"1e3\""]}
+
+   {:id :resource-provider/percent-upper-bound-off-by-one
+    :why "qualityScore は整数 0-100 という宣言の境界を 1 だけ広げる。境界の off-by-one は検査が境界値を持っていなければ永久に見えない"
+    :file "kotoba/src/types.ts"
+    :find "  return typeof n === \"number\" && Number.isInteger(n) && n >= 0 && n <= 100;"
+    :replace "  return typeof n === \"number\" && Number.isInteger(n) && n >= 0 && n <= 101;"
+    :must-fail ["isPct-101"]}
+
+   {:id :resource-provider/new-collection-declared-without-a-side
+    :why "collection を足して境界表に載せ忘れる、という一番起きやすい形。平文と封緘のどちらでもない collection は、書いた人が思っているどちらかであって、読む人には分からない"
+    :file "kotoba/src/types.ts"
+    :find "export const RESOURCE_PROVIDER_DID_PREFIX"
+    :replace "export const PAYOUT_REQUEST_COLLECTION = \"com.etzhayyim.apps.resourceProvider.payoutRequest\";\nexport const RESOURCE_PROVIDER_DID_PREFIX"
+    :must-fail ["every-declared-collection-is-on-one-side-of-the-boundary"]}]}
 ]}
