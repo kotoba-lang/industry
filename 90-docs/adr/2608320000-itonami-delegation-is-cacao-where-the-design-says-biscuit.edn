@@ -63,6 +63,51 @@
    cbfa277) and the apex is segment 0 of a parsed scope rather than a prefix
    constant."
 
+  :adr/measured-2026-09-01
+  "Both open items turned out narrower than this ADR states, and one of its
+   claims is wrong. Read this section before the ordering above.
+
+   ITONAMI ALREADY CARRIES BOT AUTHORITY AS A BISCUIT.
+   `cloud.itonami.app.bot-authority` exists and its opening line is that a
+   Bot's authority is carried as a biscuit and decided by `authority` — one
+   decider, verifiable holding only the root public key, no secret. The app
+   already depends on org-biscuitsec and authority. So the claim above that
+   itonami's delegation layer is CACOO where the design says Biscuit is true
+   only of `cloud.itonami.app.capability`, which shares DOCUMENTS. Bot
+   capability, the thing an unattended agent spends, is already Biscuit.
+
+   THE MISSING HALF IS THE HOLDER'S KEY, AND IT IS DELIBERATE.
+   That namespace says so under a heading called What is NOT here: attenuation
+   by the Bot itself. `biscuit.token/append` needs the private key the previous
+   block named, and no Bot holds one — bot-identity gives a Bot a name,
+   deliberately not a signing key. So the fleet can issue a Bot's authority and
+   anyone can verify it, and a Bot cannot hand a narrower slice to something
+   else. Their words: that is the next decision, not an oversight.
+
+   TWO HALVES IN TWO REPOSITORIES, NEITHER AWARE OF THE OTHER.
+   On 2026-09-01 `kotoba-lang/grant` gained the first measurement that the
+   READER honours a narrowing: a holder appends a block offline, the issuer is
+   never consulted, the narrowed token keeps what it kept and has lost what it
+   gave up, and appending cannot widen. That is exactly the property
+   bot-authority cannot yet exercise, because its holders have no key. One
+   repository proved the door opens; the other cannot reach the handle.
+
+   THE BINDING THIS ADR CALLED MISSING IS MOSTLY PRESENT.
+   A local User carries an Ed25519 did:key as the IDENTITY axis — assigned at
+   creation, unchanged by adding or revoking a Passkey, distinct from the
+   Passkey COSE did:key which names the credential. That is the right anchor
+   for a holder, and it matches the invariant another session declared the same
+   day: what crosses apexes is the principal, never the credential. What is
+   genuinely absent is only the reverse lookup, DID to membership, at the MCP
+   admission point — `membership-for` takes a user-id and nothing resolves a
+   holder DID to one.
+
+   SO THE OPEN DECISION IS NOT THE ONE THIS ADR NAMED. It is whether a Bot
+   holds a signing key. Without one, an unattended agent can spend authority
+   the fleet issued but cannot narrow it before handing it on, which is the
+   half of the 2026-09-01 direction — one human act, then bounded autonomous
+   spend — that the fleet cannot yet deliver."
+
   :adr/consequences
   "The six-apex score for itonami.cloud will not move by wiring a header. Two of
    its four findings are about a plane that is public by design, and the other
