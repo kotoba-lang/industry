@@ -22,7 +22,7 @@ The requested models are:
 | Model ID | Display name | Planned base | Modality | Current state |
 |---|---|---|---|---|
 | `awai-network/basho` | Basho | `Qwen/Qwen3.8-Flash-Next` | streaming chat | artifact not trained; public route live but fail-closed |
-| `awai-network/hokusai` | Hokusai | `MiniMaxAI/MiniMax-H3` | asynchronous audiovisual video | artifact not trained; adapter merged, production deploy blocked |
+| `awai-network/hokusai` | Hokusai | `MiniMaxAI/MiniMax-H3` | asynchronous audiovisual video | artifact not trained; public route live but fail-closed |
 
 We will not describe a renamed upstream checkpoint as an original model. The prior Baseten deployment `basho-fp8-test` used `RedHatAI/Qwen3.5-9B-FP8-dynamic` only for infrastructure smoke testing and is not Basho.
 
@@ -55,7 +55,7 @@ Scale-to-zero is acceptable for review only if the cold-start path, timeout budg
 ## Current production evidence
 
 - Basho gateway: cloud-murakumo-api PR #194 merged at `3e91b9f507006493c71135d50be3ffcc4c52391e`; Cloudflare version `a9066a0a-c55a-4ebb-a690-d9de1eda7dde` is live on api.murakumo.cloud. A live unready request returns HTTP 503 `self_model_backend_unavailable`, and Basho is excluded from `/v1/models`.
-- Hokusai adapter: cloud-murakumo PR #159 merged at `683cb6ed6eded3114be0b797eb259316e6f77e6b`. Production deployment is blocked by the missing deployment-lease signing secret; lease-free bootstrap has not been used.
+- Hokusai adapter: cloud-murakumo PR #159 merged at `683cb6ed6eded3114be0b797eb259316e6f77e6b`; generated artifact PR #160 merged at `af0b6cb1d489e4babfe3a158af3e176f18c6136f`. After explicit owner approval, lease-free bootstrap deployed Cloudflare version `1b398be7-53e0-4683-9d75-009394080ed6`. The model page is live, and unauthenticated submit/poll requests return HTTP 401. The fine-tuned backend remains unconfigured and Hokusai remains pending.
 - awai.network: network-awai-apex PR #1 merged at `174492d8186d62ae728c0f4f630a4af94fcf2310`; Cloudflare version `45d9a3bb-bff4-4a72-b06f-08b9aa629564` is live. Health and a real `murakumo-main` chat generation passed. Basho/Hokusai cutover variables are intentionally unset until readiness passes.
 - OpenRouter BYOK tests against the existing catalog model `z-ai/glm-5.3-flash` succeeded for Baseten and Together, but BYOK did not register `awai-network/basho`. Calling that unregistered OpenRouter model ID returned HTTP 400 `invalid model ID`.
 
