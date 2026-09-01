@@ -5975,4 +5975,119 @@
      :file "worker/src/app.ts"
      :find "          \"ai.gftd.apps.lawyer.logWorkNote\",\n"
      :replace "          \"ai.gftd.apps.lawyer.logWorkNote\",\n          \"ai.gftd.apps.lawyer.closeMatter\",\n"
-     :must-fail ["advertised-commands-are-declared"]}]}]}
+     :must-fail ["advertised-commands-are-declared"]}]}
+
+  {:repo "orgs/cloud-itonami/app-wvme"
+   :label "app-wvme の自己記述 —— 7 ファイルに手で写された identity"
+   ;; この repo は 2026-09-01 まで、**2 本のテストがあってどちらも drift を
+   ;; 報告できなかった**。`test/wvme.test.ts` は `expect(true).toBe(true)` で
+   ;; （README がそれを既知の欠陥 4 として記録していた）、
+   ;; `cljs/test/wvme/app_test.cljs` は default-db を default-db と比べている。
+   ;; 後者の docstring は「wrangler.jsonc に対して
+   ;; scripts/verify-appview-page-summary.cljs が検査する不変条件」と書くが、
+   ;; **その script は superproject に在ってこの repo には無い**。
+   ;;
+   ;; DID・nanoid・公開ルート 2 本・8 つの XRPC メソッド・var 名は 7 ファイルに
+   ;; 手で写されている。撃つ先が 4 種類あるのは、この suite が 4 種類のものを
+   ;; 守っているから:
+   ;;   1. Worker のソース定数（src/app.ts）
+   ;;   2. デプロイ設定（wrangler.jsonc）
+   ;;   3. descriptor（kotodama.jsonld / PROJECT.jsonld / README.edn）
+   ;;   4. SPA が手で写した定数（cljs/src/wvme/app.cljs）
+   ;;
+   ;; ⚠ **Worker の vitest（16 本）はここに登録していない。** run-suite の
+   ;; `:npm-install` は repo ルートで `npm install` を撃つが、この repo の
+   ;; package.json は 3 階層下（appview/wvme-mcp-component/）に在るので届かない。
+   ;; そちらの discriminate は 2026-09-02 に手で確認した —— src/app.ts を
+   ;; 9 通りに壊して 9 通りとも、名指しした test が赤くなる。**登録されて
+   ;; いない = 時間をまたいで守られていない**ので、root に package.json を
+   ;; 置くか harness が subdir を受け取れるようになったら登録する。
+   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :green-marker "app-wvme self-description: all green"
+   :npm-install false
+   ;; 12 件すべて 2026-09-02 に pin 0c498733 で実際に赤くなるところを見た。
+   :mutations
+   [{:id :app-wvme/a-method-is-renamed-in-only-one-of-the-four-lists
+     :why "8 メソッドは src/app.ts・APP_CAPABILITIES・kotodama・README の 4 箇所に別々に書かれている。1 箇所だけ直す、がこの形の repo で最も起きる drift（隣の cargo では pipeline が 8→10 に増えたのを走らない vitest が 2 年半見逃した）"
+     :file "appview/wvme-mcp-component/wrangler.jsonc"
+     :find "\\\"listScans\\\""
+     :replace "\\\"listScan\\\""
+     :must-fail ["the-eight-methods-are-the-same-list-in-all-four-files"]}
+
+    {:id :app-wvme/the-readme-method-list-loses-one
+     :why "人間が読む側の一覧が黙って短くなる形。README は機械可読ではないので、ここを見るものが他に無い"
+     :file "README.md"
+     :find "getVulnerability / createRemediation / listRemediations / getScanReport"
+     :replace "getVulnerability / createRemediation / listRemediations"
+     :must-fail ["the-eight-methods-are-the-same-list-in-all-four-files"]}
+
+    {:id :app-wvme/the-descriptor-is-renamed-to-another-actor
+     :why "Worker が /health で名乗る DID と、did:web を解決した相手が読む descriptor の @id が割れる。どちらも単体では正しく見え、突き合わせた時だけ矛盾する"
+     :file "appview/wvme-mcp-component/kotodama.jsonld"
+     :find "\"@id\": \"did:web:wvme.etzhayyim.com\""
+     :replace "\"@id\": \"did:web:wvme-next.etzhayyim.com\""
+     :must-fail ["the-worker-answers-with-the-did-kotodama-declares"]}
+
+    {:id :app-wvme/the-worker-keeps-an-older-nanoid-as-its-fallback
+     :why "`env.APP_NANOID ?? \"…\"` の右辺は **env が無い経路でだけ**使われる。ここが古いと、その経路の /health だけが別の id を名乗り、本番では見えない"
+     :file "appview/wvme-mcp-component/src/app.ts"
+     :find "env.APP_NANOID ?? \"vyie6ivw\""
+     :replace "env.APP_NANOID ?? \"vyie6iv0\""
+     :must-fail ["the-nanoid-is-the-same-string-in-every-place-that-spells-it"]}
+
+    {:id :app-wvme/a-public-route-is-renamed-under-the-spa
+     :why "did:web:<host> は https://<host>/.well-known/did.json に解決する。その host が routes から消えると、DID を解決した相手はこの Worker に到達しない —— did document を書く前に route が要る"
+     :file "appview/wvme-mcp-component/wrangler.jsonc"
+     :find "\"pattern\": \"wvme.etzhayyim.com/*\""
+     :replace "\"pattern\": \"wvme-legacy.etzhayyim.com/*\""
+     :must-fail ["the-did-host-is-a-route-this-worker-actually-serves"
+                 "the-spa-landing-page-shows-the-routes-wrangler-actually-declares"]}
+
+    {:id :app-wvme/the-spa-route-list-goes-stale
+     :why "landing page が描く『公開ルート』は wrangler から手で写した定数。cljs 側の既存テストはそれを自分自身と比べているので、写し元が動いても緑のまま"
+     :file "appview/wvme-mcp-component/cljs/src/wvme/app.cljs"
+     :find ":app/routes [\"vyie6ivw.etzhayyim.com/*\" \"wvme.etzhayyim.com/*\"]"
+     :replace ":app/routes [\"vyie6ivw.etzhayyim.com/*\" \"wvme-old.etzhayyim.com/*\"]"
+     :must-fail ["the-spa-landing-page-shows-the-routes-wrangler-actually-declares"]}
+
+    {:id :app-wvme/the-vars-panel-shows-a-value-instead-of-a-name
+     :why "この panel の存在理由は『var の名前だけを出し、値は出さない』こと。名前の代わりに値を貼るのは 1 文字の編集で、見た目では区別が付かない"
+     :file "appview/wvme-mcp-component/cljs/src/wvme/app.cljs"
+     :find "\"APP_DISPLAY_NAME\" \"APP_FRAMEWORK\""
+     :replace "\"WVME\" \"APP_FRAMEWORK\""
+     :must-fail ["the-spa-shows-every-var-name-wrangler-declares-and-no-value"]}
+
+    {:id :app-wvme/the-self-describing-path-is-not-updated-after-a-move
+     :why "`:app/relative-path` は自分の場所を名乗る。移動のたびに手で更新されてきた（059e0f4 で 1 度、svelte→cljs でもう 1 度）。実在を確かめるので、次の移動で忘れたら赤くなる"
+     :file "appview/wvme-mcp-component/cljs/src/wvme/app.cljs"
+     :find ":app/relative-path \"appview/wvme-mcp-component/cljs/src/wvme/app.cljs\""
+     :replace ":app/relative-path \"appview/wvme-mcp-component/svelte/src/routes/+page.svelte\""
+     :must-fail ["the-spa-names-its-own-source-path-and-that-file-exists"]}
+
+    {:id :app-wvme/the-nsid-namespace-splits-from-the-subscriptions
+     :why "Worker が proxy する名前空間と、kotodama が subscribe すると宣言した collection が割れる。宣言した record 型を自分で中継できない状態になるが、どちらのファイルも単体では整合している"
+     :file "appview/wvme-mcp-component/src/app.ts"
+     :find "const NSID_PREFIX = \"com.etzhayyim.apps.wvme.\";"
+     :replace "const NSID_PREFIX = \"com.etzhayyim.apps.wvme.v2.\";"
+     :must-fail ["the-worker-only-proxies-its-own-nsid-namespace"]}
+
+    {:id :app-wvme/the-project-jsonld-keeps-an-older-url
+     :why "schema.org の @id / url は外部が読む面。DID の host と割れても、この repo の中では誰も困らないので気づかれない"
+     :file "PROJECT.jsonld"
+     :find "\"url\": \"https://wvme.etzhayyim.com\""
+     :replace "\"url\": \"https://wvme.etzhayyim.ai\""
+     :must-fail ["the-project-jsonld-points-at-the-same-host-as-the-did"]}
+
+    {:id :app-wvme/the-canonical-metadata-forgets-the-repo-name
+     :why "README.edn は :canonical-metadata :edn を名乗っている。機械が読む正本が repo 名を間違えると、その正本性そのものが嘘になる"
+     :file "README.edn"
+     :find ":name \"app-wvme\""
+     :replace ":name \"wvme\""
+     :must-fail ["the-machine-readable-name-is-this-repository"]}
+
+    {:id :app-wvme/a-type-annotation-makes-the-extraction-silent
+     :why "**この suite 自身の誠実さ**。TS を parse せず正規表現で定数を取っているので、型注釈を足すだけで抽出が nil になり、nil = nil が緑になりうる。evidence floor（読めなかったことを、読んで一致したことと同じ値にしない）がここで効く"
+     :file "appview/wvme-mcp-component/src/app.ts"
+     :find "const ACTOR_DID = \"did:web:wvme.etzhayyim.com\";"
+     :replace "const ACTOR_DID: string = \"did:web:wvme.etzhayyim.com\";"
+     :must-fail ["the-worker-source-still-declares-the-values-this-suite-reads-from-it"]}]}]}
