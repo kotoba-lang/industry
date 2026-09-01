@@ -1,0 +1,89 @@
+;; manifest/bot-allowances.edn — what each itonami bot may spend, and on which rail.
+;;
+;; THIS FILE IS THE ISSUANCE POLICY, NOT THE AUTHORITY.
+;;
+;; It says what the operator has decided to GRANT. What a bot carries is a
+;; Biscuit minted from it by `scripts/x402_bot_pass.cljs`, and what the payer
+;; trusts is the verified grant inside that token — folded by
+;; `biscuit.kotoba/->delegated`, decided by `kotoba-lang/authority`.
+;;
+;; Until 2026-08-31 this file WAS the authority: an unsigned EDN that only the
+;; payer read. Under this workspace's own division that is a delegation, and
+;; delegation is a Biscuit (ADR-2608291700: "CACAO は session の起点として残り
+;; delegation からは降りている"; ADR-2608312900-hyakka: "支払いは authorization
+;; ではない。x402 が決済し、biscuit が『その支払いが何を買ったか』を運び、
+;; authority が決める"). Being named here is now necessary and NOT sufficient:
+;; a bot with no pass is refused with `:pass/absent` before a socket opens.
+;;
+;; DENY BY DEFAULT is unchanged. A bot that has not been told what it may spend
+;; has not been authorised to spend anything, and the most dangerous default
+;; here is the one that reads silence as freedom (kotoba-lang/pay
+;; `x402-buyer`: "no policy is not permission").
+;;
+;; WHY CREDITS AND NOT USDC. The only rail an unattended process can settle
+;; without holding money is murakumo credits: labour-issued, transferable
+;; between holders, NON-redeemable for fiat/USDC/EN by design (ADR-2607995000
+;; §1). A bot paying in credits is spending an allowance inside this economy,
+;; not moving funds. The USDC rail stays available to a HUMAN or an operator
+;; who chooses it; no bot is granted it here, and a bot cannot grant itself one
+;; because this file is the policy and the bot does not write it.
+;;
+;; UNITS ARE PER RAIL. `:credits/per-call` is credits, not micro-USDC. The two
+;; arrive as the same string in the same field of the same 402 challenge, so
+;; the cap is keyed by rail on the way into the buyer policy.
+;;
+;; A COMMITTED ALLOWANCE IS NOT A FUNDED ONE, AND AN ISSUED PASS IS NOT AN
+;; ENFORCED ONE. Naming a bot here permits a spend; it does not create a
+;; balance, and today the payer is still the only party that reads the pass —
+;; seller-side enforcement needs the ledger to accept it, which is murakumo's
+;; decision. An unfunded bot is refused by the
+;; ledger with `insufficient-credits`, which is the correct answer and a
+;; different one from "not allowed".
+
+{:allowance/version 1
+
+ ;; The credits ledger of record. Balances are read from `<ledger>/infer/credits`
+ ;; and transfers are appended by the FACILITATOR, not by the bot: the bot mints
+ ;; a CACAO naming one (recipient, amount) and hands it over, which is the
+ ;; difference between paying someone and giving them your account.
+ :allowance/ledger "https://api.murakumo.cloud"
+
+ ;; Sellers a bot may pay at all, by their credits account name. A name and not
+ ;; an address: credits have no chain.
+ :allowance/sellers #{"murakumo" "kotobase"}
+
+ ;; The rail every allowance below is denominated in, in preference order.
+ ;; `pay.x402-buyer` refuses to CHOOSE between rails whose amounts are not
+ ;; comparable, so this is what makes a two-offer challenge decidable.
+ :allowance/rails [["murakumo" "CREDITS"]]
+
+ ;; Every id says WHERE it is anchored, so the name can be checked against
+ ;; something rather than taken on trust. `scripts/verify-bot-allowances.cljs`
+ ;; resolves each one and REFUSES to report a clean registry when it could not
+ ;; ask — an id nothing answers to is dead policy, and a real bot missing from
+ ;; this file silently cannot pay.
+ ;;
+ ;;   :runs-as/launchd  — a plist in ~/Library/LaunchAgents (this host)
+ ;;   :runs-as/skill    — a skill in .claude/skills (invoked by a loop or by hand)
+ ;;   :runs-as/hermes   — a Hermes cron job; its jobs live in Hermes's own
+ ;;                       SQLite, so this one cannot be checked from the tree
+ ;;                       and is reported UNVERIFIED rather than ok
+ :allowance/bots
+ {"repo-bot-drain"
+  {:credits/per-call 1 :credits/per-day 20
+   :runs-as/launchd "com.gftd.repo-bot-drain" :runs-as/skill "repo-bot-drain"}
+
+  "docs-edn-repair"
+  {:credits/per-call 1 :credits/per-day 10 :runs-as/skill "docs-edn-repair"}
+
+  "adr-inventory"
+  {:credits/per-call 1 :credits/per-day 10 :runs-as/skill "adr-inventory"}
+
+  "rule-kaizen"
+  {:credits/per-call 1 :credits/per-day 10 :runs-as/skill "rule-kaizen"}
+
+  "itonami-ingest-scout"
+  {:credits/per-call 1 :credits/per-day 30 :runs-as/hermes "itonami-ingest-scout"}
+
+  "itonami-coverage-scout"
+  {:credits/per-call 1 :credits/per-day 30 :runs-as/hermes "itonami-coverage-scout"}}}

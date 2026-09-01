@@ -49,6 +49,70 @@
     (is (= 3 (ledger/next-seq evs)))
     (is (= [5 6] (map :event/seq (ledger/stamp [{:event/seq 4}] "t" [{} {}]))))))
 
+(deftest ledger-seq-survives-the-file-being-reverted
+  ;; The collision was documented as two writers racing between a read and a
+  ;; write. The committed canvas-ledger says otherwise: across its 362 colliding
+  ;; seq values the SMALLEST gap between the two events is 32 seconds, the median
+  ;; about an hour, the largest 3.1 days (measured 2026-08-31). Nothing that slow
+  ;; is a race, and a lock around the append would have fixed none of it.
+  ;;
+  ;; What actually happens: a main sync reverts the ledger to origin/main,
+  ;; dropping lines that were never landed. The next append counts only the file,
+  ;; so it re-issues the numbers those dropped events already used -- and when
+  ;; git merges the two copies, two events sit on one seq.
+  ;;
+  ;; The floor is what a reverted file cannot take away.
+  (testing "without a floor, a revert re-issues the number (the bug, stated)"
+    (let [on-main [{:event/seq 1} {:event/seq 2} {:event/seq 3}]
+          loop-a (ledger/stamp on-main "t1" [{:event/value "A"}])
+          ;; ... revert to origin/main; loop-a's line is gone ...
+          loop-b (ledger/stamp on-main "t2" [{:event/value "B"}])]
+      (is (= 4 (:event/seq (first loop-a))))
+      (is (= 4 (:event/seq (first loop-b)))
+          "this is the defect: two different events, one number")))
+  (testing "with the floor, the reverted file cannot lower the next seq"
+    (let [on-main [{:event/seq 1} {:event/seq 2} {:event/seq 3}]
+          loop-a (ledger/stamp on-main "t1" [{:event/value "A"}])
+          hwm (ledger/high-water loop-a)
+          loop-b (ledger/stamp on-main "t2" [{:event/value "B"}] hwm)]
+      (is (= 4 (:event/seq (first loop-a))))
+      (is (= 5 (:event/seq (first loop-b)))
+          "loop B must not reuse the number loop A already issued")))
+  (testing "the floor never pulls a seq backwards when the file is ahead of it"
+    (is (= 11 (ledger/next-seq [{:event/seq 10}] 3))))
+  (testing "an unreadable or missing mark degrades to the old behaviour, not to a wrong number"
+    (is (= 0 (ledger/parse-hwm nil)))
+    (is (= 0 (ledger/parse-hwm "")))
+    (is (= 0 (ledger/parse-hwm "not-a-number")))
+    (is (= 0 (ledger/parse-hwm "-5")))
+    (is (= 42 (ledger/parse-hwm "42\n"))))
+  (testing "the mark lives outside the tree, or a checkout could revert it too"
+    (let [p (ledger/hwm-file "/home/u" "/repo/90-docs/business/canvas-ledger.edn")]
+      (is (str/starts-with? p "/home/u/.gftd/"))
+      (is (not (str/includes? p "/repo/")))))
+  (testing "one ledger is one floor, however many checkouts reach it"
+    ;; Measured 2026-08-31, hours after the floor landed: TWO marks existed for
+    ;; the canvas ledger, because com.gftd.itonami-qwen36-tick builds a fresh
+    ;; sibling worktree per run and deletes it. Keyed on the absolute path,
+    ;; every tick got a new key and therefore a floor of zero -- the writer the
+    ;; floor most needed to constrain was the one it did not.
+    (let [shared "/Users/j/github/com-junkawasaki/90-docs/business/canvas-ledger.edn"
+          tick   "/var/folders/T/itonami-qwen36-1788174887288/90-docs/business/canvas-ledger.edn"]
+      (is (= (ledger/ledger-key "/Users/j/github/com-junkawasaki" shared)
+             (ledger/ledger-key "/var/folders/T/itonami-qwen36-1788174887288" tick))
+          "the same ledger in two checkouts must resolve to one key")
+      (is (= "90-docs/business/canvas-ledger.edn"
+             (ledger/ledger-key "/Users/j/github/com-junkawasaki" shared)))
+      (is (= (ledger/hwm-file "/home/u" "/Users/j/github/com-junkawasaki" shared)
+             (ledger/hwm-file "/home/u" "/var/folders/T/itonami-qwen36-1788174887288" tick))
+          "so both write the same mark file")))
+  (testing "different ledgers still get different floors"
+    (is (not= (ledger/ledger-key "/r" "/r/90-docs/business/canvas-ledger.edn")
+              (ledger/ledger-key "/r" "/r/90-docs/design-quality/design-quality-ledger.edn"))))
+  (testing "with no root to relativise against it still collapses two checkouts"
+    (is (= (ledger/ledger-key nil "/a/b/business/canvas-ledger.edn")
+           (ledger/ledger-key nil "/completely/other/business/canvas-ledger.edn")))))
+
 (deftest governor-invariants
   (let [idx (canvas/index base)
         {:keys [approved rejected]}
@@ -651,6 +715,51 @@
     (is (= "{:a 1,:b \"x\"}" (kbase/canonical {:b "x" :a 1})))
     (is (= (kbase/digest {:a 1 :b "x"}) (kbase/digest {:b "x" :a 1})))
     (is (not= (kbase/digest {:a 1}) (kbase/digest {:a 2})))))
+
+(deftest kotobase-collision-is-a-corpus-property-not-a-batch-one
+  ;; The within-batch case above is handled. The projection does not RUN on a
+  ;; batch that contains the whole corpus: gftd.cli/dual-write-kotobase! is
+  ;; handed exactly what ledger/append! just stamped -- one to three events --
+  ;; and writes only those to the temp file the helper reads. So seq-counts sees
+  ;; a slice, and a new event whose seq already belongs to a projected historical
+  ;; event looks unique inside its own batch. It then takes the bare
+  ;; "bmc.event/<seq>", which is the id the historical event is already stored
+  ;; under, and cardinality-one upsert REPLACES it.
+  ;;
+  ;; The invariant that actually matters is therefore not "ids are unique within
+  ;; the batch" but: projecting an event as part of a batch must give the SAME id
+  ;; as projecting it as part of the corpus.
+  (let [older {:event/seq 7 :event/type :react/observation :event/actor "advisor:gate"
+               :event/at "t1" :event/value "already projected last week"}
+        newer {:event/seq 7 :event/type :react/observation :event/actor "advisor:auto"
+               :event/at "t2" :event/value "appended by a second loop"}
+        corpus [older newer]
+        batch  [newer]                       ; what append! returns and the helper receives
+        corpus-ids (kbase/events->tx-data corpus)
+        id-in-corpus (:db/id (second corpus-ids))
+        counts (kbase/seq-counts corpus)
+        id-in-batch (:db/id (first (kbase/events->tx-data batch counts)))]
+    (is (= id-in-corpus id-in-batch)
+        "an event must get the same :db/id whether projected alone or with the corpus")
+    (is (str/starts-with? id-in-batch "bmc.event/7-")
+        "seq 7 is ambiguous in the corpus, so the batch may not hand out the bare id")
+    (testing "and the bare id stays bare when the corpus really has one event on it"
+      (let [solo {:event/seq 9 :event/type :canvas/note :event/actor "a" :event/at "t"}]
+        (is (= "bmc.event/9"
+               (:db/id (first (kbase/events->tx-data [solo] (kbase/seq-counts [solo]))))))))
+    (testing "the payload the CLI writes carries exactly the counts the slice needs"
+      (let [p (kbase/slice-payload corpus batch)]
+        (is (= [newer] (:bmc/events p)))
+        (is (= {7 2} (:bmc/seq-counts p))
+            "the count is the corpus's 2, not the slice's 1")
+        (is (= id-in-corpus
+               (:db/id (first (kbase/events->tx-data (:bmc/events p)
+                                                     (:bmc/seq-counts p)))))
+            "round-tripping through the payload must reproduce the corpus id"))
+      (testing "and it carries only the seqs in the batch, not the whole ledger"
+        (let [big (concat corpus (for [n (range 100 200)]
+                                   {:event/seq n :event/type :x :event/actor "a" :event/at "t"}))]
+          (is (= #{7} (set (keys (:bmc/seq-counts (kbase/slice-payload big batch)))))))))))
 
 (deftest compose-advisors-concat
   (let [a (fn [_] [{:proposal/action :canvas/add-item :event/value "a"}])

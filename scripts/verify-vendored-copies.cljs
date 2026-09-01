@@ -224,7 +224,22 @@
 (def ^:private copied-ns-re
   #"copied\s+from[\s;]+`([A-Za-z0-9_.-]+)`'?\s*`([A-Za-z0-9_.-]+)`")
 
-(def ^:private pin-re #"pinned at\s+(?:commit\s+)?([0-9a-f]{7,40})")
+(def ^:private pin-re
+  "`[\\s;]` and not `\\s`, because the sha is often on the NEXT comment line and
+  `\\s` does not cross the `;;` that opens it. Measured 2026-08-31: three
+  vendored copies wrote `pinned at` at the end of a line —
+  nexus-x402's and adserver's `treasury/core.cljc`, and nexus-x402's
+  `pay/facilitator.cljc` — and every one of them was reported as *no pin
+  declared (CURRENT axis only)*. They had each named the commit they were
+  taken from; nothing read it.
+
+  That is this script's own failure mode, from its own docstring: a copy that
+  does not match its own pin is a defect, and a pin nobody parsed cannot
+  produce that verdict — it produces the quieter one that reads as the file's
+  omission rather than the checker's blindness. The other four spellings
+  already used `[\\s;]` and the header comment says so; this one was left
+  behind."
+  #"pinned at[\s;]+(?:commit[\s;]+)?([0-9a-f]{7,40})")
 
 ;; A sixth spelling, and the largest population: a copy that names no repo and
 ;; no commit, only a NAMESPACE it promises to track.
@@ -395,9 +410,23 @@
               (first (str/split lib-path #"/"))
               (last (str/split source #"/")))]
     (distinct
-     [(if (str/starts-with? lib-path "src/") lib-path (str "src/" lib-path))
-      (str "src/" lib "/" lib-path)
-      lib-path])))
+     (remove nil?
+       [(if (str/starts-with? lib-path "src/") lib-path (str "src/" lib-path))
+        (str "src/" lib "/" lib-path)
+        lib-path
+        ;; A fourth spelling, and the one that hid the most: the header writes
+        ;; the path as it looks from the *superproject* -- `(authority/src/
+        ;; authority/scope.cljc)` -- so the repo name is already the first
+        ;; segment. Prefixing `src/` then asks for `src/authority/src/...`,
+        ;; which is nowhere, so the copy came out UNRESOLVED. It was still
+        ;; reported by name, so nothing vanished quietly; but UNRESOLVED means
+        ;; the drift axis was never evaluated, and the six copies sitting in
+        ;; that state were the authority and credential ones -- scope, grant,
+        ;; biscuit wire, biscuit_grant, protobuf wire. The covering relation
+        ;; that decides what a paid pass may read had a vendored duplicate
+        ;; nobody was diffing. Strip the repo segment and try again.
+        (when (str/starts-with? lib-path (str lib "/"))
+          (subs lib-path (inc (count lib))))]))))
 
 (defn- resolve-upstream
   "{:path :body} for the first candidate git can actually show at `rev`."

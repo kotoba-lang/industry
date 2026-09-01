@@ -1,0 +1,134 @@
+[{:db/id -1
+  :adr/id "adr-2609010200-the-invariants-belong-to-the-authority-not-to-each-apex"
+  :adr/title "Proposed: the auth invariants belong to the authority, measured once, and to each credentialed surface — not to each apex"
+  :adr/status "proposed"
+  :adr/date "2026-09-01"
+
+  :adr/context
+  "PROPOSED, NOT SETTLED. This is where a day of measurement points, written so
+   that it can be argued with. The refutations are listed in their own section
+   and each of them is cheap to run; if one comes back the other way, this ADR
+   is wrong and should be superseded rather than amended.
+
+   ADR-2608311600 scores six apexes against five invariants each and reports
+   36.67/100. Three attempts to close its findings ended with the apex being
+   sound and the axis asking a question that apex does not have
+   (adr-2608319900, adr-2608320000, adr-2609010100). One is an anecdote. Three
+   is a shape.
+
+   The shape: applying five invariants to each apex measures each apex as a
+   miniature of the whole design — its own ceremony, its own issuance, its own
+   credentialed plane. That is the second identity per product which
+   ADR-2608039950 forbids by name. The instrument's form contradicts the design
+   it measures, and the authn Worker's own configuration already says apexes are
+   not peers: AUTHN_PRIMARY_APEX is kotoba.cloud, and the comment beside it says
+   anonymous first registration exists only on Kotoba's identity plane while
+   other RPs must first prove a linked Stable Principal.
+
+   Two premises are doing the work below. The first is measured; the second is
+   the owner's, and was NOT found in this tree.
+
+   MEASURED — a Biscuit is verified with no secret. `kotobase.biscuit-grant`
+   says so itself: it must be able to decide without any secret, and that is the
+   whole reason the credential is a Biscuit and not a shared string. The four
+   kotobase query surfaces wired on 2026-08-31 hold the root as a var, not a
+   secret. Attenuation is the holder's and happens offline: append a block, hand
+   it to an agent, the issuer is never consulted and the agent cannot widen it
+   back.
+
+   STATED BY THE OWNER, not found in the tree — that itonami.cloud exists to
+   free humanity from labour. Searched for it in 90-docs, manifest and the
+   cloud-itonami README and did not find that phrasing. It is taken here as
+   given because the owner gave it, and it is flagged because an argument built
+   on a premise nobody wrote down should say so."
+
+  :adr/decision
+  "Split the invariants by what they are properties OF.
+
+     AUTHORITY invariants — measured ONCE, against the shared authn:
+       a ceremony is live; it is one implementation rather than a second;
+       it mints the one capability format; first registration has one plane;
+       other RPs link a Stable Principal rather than mint their own.
+
+     SURFACE invariants — measured per CREDENTIALED SURFACE, not per apex:
+       the plane reads a presented credential; a refusal names the credential
+       class; an authentication failure carries 401 or 403.
+
+     A surface that requires no credential is not in the denominator. Not
+     exempt — absent. It has no question to answer.
+
+   Two reasons, and the second is the load-bearing one.
+
+   IT MATCHES THE DESIGN. `plane-reads-capability` is the one axis that survived
+   contact with reality this week: it was a true defect on four kotobase
+   surfaces and is fixed there, it is a false negative on murakumo, and at
+   itonami it points at a plane that is public by design. The other four assume
+   a person is present at that apex.
+
+   IT MATCHES THE PURPOSE, if the purpose is the one stated. Measuring the
+   authority once IS one enrolment per person; measuring surfaces many times IS
+   many agents with nobody present. The uniform form pushes the other way: six
+   apexes, six RPs, six ceremonies, a person signing in six times. An invariant
+   that multiplies acts of human presence is pointed away from a goal of
+   removing human labour.
+
+   The same premise reorders the open work, and it comes out close to the
+   inverse of the probe's headroom order. That inversion is the strongest
+   evidence for the split.
+
+     1  itonami's holder-to-membership binding. Not a blocker to tick off: it
+        is the seam where one human act becomes an agent's standing authority.
+     2  itonami's delegation layer, CACAO to Biscuit. Its own docstring says
+        the Drive attests rather than alice proving she chose to. A delegation
+        the person did not sign is the platform granting on their behalf.
+     3  the mrb_ presentation divergence. An agent carrying capability across
+        surfaces should not need per-surface presentation knowledge; that
+        knowledge is the agent's labour.
+     4  auth hostnames for apexes with no principals. Last: it adds enrolment
+        surface without adding anyone who can be freed.
+
+   The probe puts controller-live (0.25) first. Under the stated purpose it is
+   last."
+
+  :adr/consequences
+  "WHAT WOULD REFUTE THIS. Each is cheap, and any one of them ends it.
+
+     If the intent is that all six apexes become products with their own RP and
+     their own issuance, the uniform scoring is correct, three apexes really are
+     at zero, and this ADR is simply wrong. One sentence from the owner settles
+     it and no measurement can.
+
+     If x402.nexus has or will have end-user principals rather than operators
+     only, its controller-live finding is real and item 4 moves up.
+
+     If aozora's atproto identities are meant to link to the Stable Principal,
+     that is authority-plane work with a real gap behind it, not an absent
+     question.
+
+     If a surface can be shown where a person IS expected to be present per
+     request — a console, an approval step — then per-apex ceremony is right
+     for that surface and the split needs a third category rather than two.
+
+     If offline attenuation turns out not to be reachable in practice — if
+     every path ends up calling home anyway — then the labour argument
+     collapses, because introspection per request is a central premise wearing
+     an OAuth hat and no amount of splitting invariants changes that.
+
+   WHAT IT COSTS. Re-splitting moves the denominator. The score will rise with
+   nothing built, and a later reader will misread that as progress exactly the
+   way 36.67 invites being misread as one third built. Any re-scoring must carry
+   the old number beside it and say plainly that what changed is the question.
+
+   And the direction itself has a price. Authority that works while nobody
+   watches means a leaked token is good until it expires. Short expiry, budget
+   ceilings and a revocation list get MORE important, not less, precisely
+   because the person is not there. The widening landed in grant cbfa277 —
+   permits? honouring a wildcard it used to discard — is correct and is also a
+   widening, which is why the cross-apex boundary was pinned in the same
+   commit."
+
+  :adr/related ["adr-2608311600-one-auth-design-across-six-apexes"
+                "adr-2608039950-ninsho-one-authority-many-apexes"
+                "adr-2608319900-credential-shape-is-per-apex-and-the-probe-reads-one-shape"
+                "adr-2608320000-itonami-delegation-is-cacao-where-the-design-says-biscuit"
+                "adr-2609010100-the-six-apexes-are-not-six-products-of-the-same-shape"]}]

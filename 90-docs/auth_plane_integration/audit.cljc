@@ -18,24 +18,114 @@
   found nothing wrong."
   (:require [clojure.string :as str]))
 
-;; Weights sum to 1.00 per apex. The ordering is the causal one: you cannot
+(def invariants
+  "What the DESIGN asserts, written independently of what a probe can see.
+
+  This list existed only inside prose until 2026-08-31, and its absence had a
+  measurable cost: the axes below were invented from what was easy to probe,
+  so for most of a day there was no axis at the accepting end at all and
+  nothing said so. A scoreboard assembled from what is convenient reports its
+  own convenience.
+
+  So: state the invariant first, then say how it is covered. An invariant with
+  neither an axis nor a declared reason it cannot have one is a SILENT hole,
+  and `coverage` refuses to report a complete result while one exists. That is
+  the whole point -- unmeasured must not look like measured, and here the
+  unmeasured thing is a claim the design makes about itself."
+  [{:invariant :one-principal-many-controllers
+    :claim "an apex does not mint a second identity authority; it links to the one"
+    :source "ADR-2608039950 decision 1"}
+   {:invariant :controllers-are-rp-scoped
+    :claim "a credential stays scoped to the RP it was created for; what crosses apexes is the principal, never the credential"
+    :source "ADR-0082 (cloud-itonami-app)"}
+   {:invariant :one-capability-format
+    :claim "authority travels as a Biscuit; CACAO stays at session origin and signed artifacts"
+    :source "ADR-2608180200 / ADR-2608261300"}
+   {:invariant :one-decider
+    :claim "covers? and meet have a single implementation (kotoba-lang/authority); a wire format is not a second policy engine"
+    :source "ADR-2608155000"
+    ;; Nothing a credential-less prober can see. Two apexes could each run
+    ;; their own copy of the lattice and answer identically to every request
+    ;; this instrument is able to make. Declared rather than omitted, because
+    ;; omitting it is what made the accepting end invisible for a day.
+    :unobservable "which implementation decided is not visible in any response; it needs source reading, which verify-credential-consumers does for the issuer side"}
+   {:invariant :refusals-are-legible
+    :claim "a rejected credential is distinguishable from an absent one, names what is accepted, and carries an auth status"
+    :source "ADR-2608311600 §6.5"}])
+
+;; Weights sum to 1.10 per apex. The ordering is the causal one: you cannot
 ;; read a capability you cannot mint, and you cannot mint one without a
 ;; ceremony that actually completes.
 (def axes
   [{:axis :controller-live          :weight 0.25
+    :invariant :one-principal-many-controllers
     :claim "a passkey ceremony is obtainable at this apex"}
    {:axis :one-authority            :weight 0.20
+    :invariant :one-principal-many-controllers
     :claim "that ceremony is the shared authn contract, not a second implementation"}
    {:axis :capability-issuance      :weight 0.20
+    :invariant :one-capability-format
     :claim "the apex can mint a Biscuit, and guards the mint against cross-origin"}
-   {:axis :plane-reads-capability   :weight 0.20
-    :claim "presenting a Biscuit changes what the data plane answers"}
+   {:axis :refusal-distinguishes-credential :weight 0.20
+    :invariant :refusals-are-legible
+    :claim "a refused credential is distinguishable from none presented"}
    {:axis :refusal-names-credential :weight 0.10
+    :invariant :refusals-are-legible
     :claim "a refusal names the credential class it wanted"}
    {:axis :auth-failure-status      :weight 0.05
-    :claim "an authentication failure carries 401/403, not 200"}])
+    :invariant :refusals-are-legible
+    :claim "an authentication failure carries 401/403, not 200"}
+   ;; Added 2026-08-31. The design's central claim is that Biscuit is what
+   ;; authorizes, and NO axis measured anything about it at the accepting end:
+   ;; x402.nexus began verifying Biscuits with a public root and its score did
+   ;; not move. A scoreboard that cannot see the thing it exists to measure is
+   ;; worse than a low number.
+   ;;
+   ;; NAMED for what it can see. Without a credential this cannot observe
+   ;; acceptance -- only whether the surface SAYS a capability is accepted. The
+   ;; previous axis in this file was renamed for exactly this mistake, so:
+   ;; advertises, not accepts.
+   ;;
+   ;; ⚠ Adding an axis changes the denominator. Scores before and after are on
+   ;; different scales and must not be compared as a trend.
+   {:axis :refusal-advertises-capability :weight 0.10
+    :invariant :one-capability-format
+    :claim "the refusal tells a stranger that a capability credential is accepted here"}
+   ;; Added because `coverage` said so on its first run:
+   ;; :controllers-are-rp-scoped had no axis and no declared reason it could
+   ;; not have one -- and it is plainly observable, since the ceremony hands
+   ;; back its own rpId. The probe had been RECORDING that value since the
+   ;; first version and scoring nothing with it.
+   ;;
+   ;; What it asserts: the rpId an apex issues is a name that apex controls.
+   ;; An apex whose challenge carried another apex's rpId would be handing its
+   ;; visitors a credential scoped to somebody else.
+   {:axis :controller-is-rp-scoped :weight 0.10
+    :invariant :controllers-are-rp-scoped
+    :claim "the rpId this apex issues is a name this apex controls"}])
 
 (def total-weight (reduce + (map :weight axes)))
+
+(defn coverage
+  "Which invariants have an axis, which declared they cannot, and which are
+  SILENT. The third list is the defect; the first two are the report."
+  []
+  (let [by-inv (group-by :invariant axes)]
+    (reduce (fn [acc {:keys [invariant unobservable] :as inv}]
+              (let [axs (mapv :axis (get by-inv invariant))]
+                (cond
+                  (seq axs) (update acc :covered conj (assoc inv :axes axs))
+                  unobservable (update acc :declared-unobservable conj inv)
+                  :else (update acc :silent conj inv))))
+            {:covered [] :declared-unobservable [] :silent []}
+            invariants)))
+
+(defn orphan-axes
+  "Axes that serve no declared invariant. The mirror of a silent invariant:
+  a measurement nobody asked for is a measurement nobody can act on."
+  []
+  (let [declared (set (map :invariant invariants))]
+    (vec (remove #(contains? declared (:invariant %)) axes))))
 
 (defn- axis-value
   "Read one axis out of one apex's probe map. Returns true, false or :unknown."
@@ -73,6 +163,28 @@
      :overall (when (empty? incomplete)
                 (/ (reduce + scores) (double (max 1 (count scores)))))
      :findings (vec (sort-by (comp - :headroom) (mapcat :findings rs)))}))
+
+(defn format-coverage
+  "Printed EVERY run, not only when something is wrong. An invariant that is
+  legitimately unobservable has to stay visible, or the next person adds an
+  axis for it, or worse, assumes one exists."
+  []
+  (let [{:keys [covered declared-unobservable silent]} (coverage)
+        orphans (orphan-axes)]
+    (str/join
+     "\n"
+     (concat
+      ["  invariants"]
+      (for [c covered]
+        (str "    covered      " (name (:invariant c))
+             "  <- " (str/join ", " (map name (:axes c)))))
+      (for [u declared-unobservable]
+        (str "    unobservable " (name (:invariant u)) "  — " (:unobservable u)))
+      (for [x silent]
+        (str "    SILENT       " (name (:invariant x))
+             "  — no axis and no declared reason it cannot have one"))
+      (for [o orphans]
+        (str "    ORPHAN AXIS  " (name (:axis o)) "  — serves no declared invariant"))))))
 
 (defn format-report [p a]
   (str/join

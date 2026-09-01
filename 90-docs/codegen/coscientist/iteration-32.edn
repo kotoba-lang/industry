@@ -1,0 +1,116 @@
+[{:db/id -1
+  :doc/id "codegen-coscientist-iteration-32"
+  :doc/doc_type "coscientist-iteration"
+  :doc/path "90-docs/codegen/coscientist/iteration-32.edn"
+  :doc/date "2026-08-31"
+  :source/dataset "codegen-coscientist"
+  :coscientist/domain "licensed rematch of kernel_deep versus LLVM at moved pins, both arms built and timed on one quiet host"
+  :coscientist/iteration 32
+  :coscientist/subject "judah Apple M4, runner rebuilt from amu main kexe-benchmark.c (isa hoisted), kernel_deep, amu f403ed29 / kotoba-native db7b7119 (mir transitive) vs rustc 1.98.0 -C opt-level=3 -C codegen-units=1, both compiled on judah"
+  :coscientist/action "one-shot oracle then 12 discarded rotations and 25 scored, arms ABBA; n=200, 100k calls, 10k warmup, fuel 1048576; perfgate.core/qualify candidate=amu baseline=llvm metric :wall-ns lower-is-better, default policy unrelaxed; no seal. The amu arm had to be built through the JVM route because the nbb route fails on this input. Do not rematch kernel_wide. Do not overwrite 04-31. Do not ship rust into amu. Do not ship a timed bench export."
+  :coscientist/measured "judah loadavg 2.28 start and end. Oracle 2552249090 on every one of 50 scored samples. amu 964 B leaf: min 8.94, mean 8.9732, rel stdev 0.0045. LLVM: min 8.71, mean 8.7680, rel stdev 0.0084. min ratio 1.0264x; mean improvement -2.34%. perfgate refused :improvement-below-threshold (requires +5%); gap 0.2052 ns exceeds summed stdev 0.1140, so the arms are separated and the difference is real in LLVM's favour. :llvm-beaten remains false. No claim artifact. Separately measured: amu compile --target aarch64-macos fails with :kotoba/internal-error on the nbb route for this input at both f403ed29 and 27d69898, on two machines, while the same source compiles to wasm32 and the JVM route compiles it to a 6986 B kexe; --jvm-free fails identically."
+  :coscientist/refuted "that iteration 31's 1.094x is the standing ratio for kernel_deep. At moved pins with both arms built on the quiet host it is 1.0264x. Also refuted: that the published default route can build this fixture -- it cannot, and neither can --jvm-free."
+  :coscientist/carries-forward "iteration-14: leaf kernel_wide vs LLVM inside noise, perfgate refused; do not rematch that. iteration-29: production :call-live vs :all-vregs sealed (claim 1010495960). iteration-30: production count-loop vs shape-matched LLVM refused. iteration-31: superseded as the standing kernel_deep ratio, not overwritten. This file does not overwrite 04-31. Do not rematch kernel_deep until a pin changes the extracted bytes. :cfg-liveness remains false. :llvm-beaten remains false. RESOLVED the same day: the nbb native route could not compile kernel_deep OR kernel_wide. Root cause was a fourth instance of ADR-0286's class -- a64-cache-leaf-constants keyed its occurrences map by the raw i64, and a ClojureScript i64 is a BigInt primitive goog.getUid cannot hash; under eight entries the map is an array map and never hashes, so small leaves passed. Fixed with the existing const-key helper in kotoba-native b77496b8, pinned into amu by PR 722, issue 721 closed. Verified: the unpatched backend still fails on the same command, the emitted kexe is byte-identical to the JVM front's, the JVM front's own output is byte-identical across the change, all 13 runtime-comparison fixtures build on the nbb front (2 fixed, 11 unchanged), 224 tests and 2708 assertions green. The next rematch does not need hand-routing through the JVM. The timing above is unaffected: the artifact it measured is the same ca77e371 kexe the fixed route now emits."
+  :doc/body "# Codegen co-scientist, iteration 32
+
+The rematch iteration 31 licensed: it said \"do not rematch `kernel_deep`
+until a pin changes the extracted bytes.\" The pins moved a lot -- amu +306,
+kotoba-native +122, kotoba-mir +55 -- and the extracted leaf went 1068 B to
+964 B. So the bytes changed and this is that rematch.
+
+Do not overwrite 04-31. Do not rematch `kernel_wide` (iteration 14).
+Do not ship rust sources into amu. Do not ship a timed bench export.
+
+## One thing is better than iteration 31
+
+Iteration 31 had to compile the LLVM arm on a loaded workstation because
+judah had no rustc, and timed on judah. Judah has rustc now. **Both arms
+were built and timed on the same quiet host.** That removes a cross-machine
+compile from the comparison.
+
+## What blocked it first, and is the more important finding
+
+`amu compile kernel_deep.kotoba --target aarch64-macos` **fails with
+`:kotoba/internal-error` on the nbb route**, which is the default route for
+native targets and the only JVM-free one.
+
+It is not a regression and not the environment. Discriminated four ways:
+
+| input | route | result |
+|---|---|---|
+| `tiny.kotoba` -> aarch64-macos | nbb | ok |
+| `kernel_deep.kotoba` -> wasm32 | nbb | ok |
+| `kernel_deep.kotoba` -> aarch64-macos | nbb | **internal compiler error** |
+| `kernel_deep.kotoba` -> aarch64-macos | JVM (`clojure -M:run`) | ok, 6986 B kexe, 964 B extracted |
+
+Reproduced at amu `f403ed29` (main) and at `27d69898` (iteration 31's own
+pin), on judah and on the workstation. `--jvm-free` fails identically, so
+the route Q9 depends on cannot build this program at all. The frontend is
+fine -- the same source compiles to wasm32 -- so this is the AArch64 native
+lowering on one route only.
+
+Two implementations of one command disagree on one input. The timing below
+therefore ran on the **JVM-built** artifact, as iteration 31's must have.
+
+## What was timed
+
+| arm | build | bytes | sha256 |
+|---|---|---:|---|
+| amu | JVM route, then `extract-native --symbol kernel`, offset 0 | **964** | `e47f8e6c5709bfa11ee0e4c635c9cab282b2f272c0b7154a198397c078a22f42` |
+| llvm | `rustc 1.98.0 --edition 2021 -C opt-level=3 -C codegen-units=1 --crate-type=cdylib` | 16792 | `e86a208de01129879c3b10b4325eea53d67e3c298af01207ec328f0d629ec2d0` |
+
+Runner rebuilt on judah from `bench/runtime-comparison/kexe-benchmark.c` at
+amu main (the isa is already hoisted there, so this is the iteration-29
+runner). Iteration 31 reused a `/tmp` binary; `/tmp` had been cleared, so
+this one was rebuilt rather than reused.
+
+## Oracle
+
+One-shot, 1 call and 1 warmup, both arms: **2552249090**, the same value
+iteration 31 recorded, and it held on every one of the 50 scored samples.
+STOP was not taken.
+
+## Times
+
+12 discarded frequency-warmup rotations, then 25 scored rotations, arms
+rotated ABBA. n=200, 100k calls, 10k warmup, fuel 1048576.
+judah loadavg 2.28 at start and 2.28 at end.
+
+| arm | min | mean | median | p95 | max | rel stdev |
+|---|---:|---:|---:|---:|---:|---:|
+| amu | 8.94 | 8.9732 | 8.97 | 9.07 | 9.11 | 0.0045 |
+| llvm | 8.71 | 8.7680 | 8.74 | 8.95 | 8.95 | 0.0084 |
+
+**min ratio amu/llvm 1.0264.** Mean improvement -2.34%.
+
+perfgate refused: `:improvement-below-threshold` (requires +5%). The gap of
+0.2052 ns exceeds the summed standard deviation of 0.1140, so the arms ARE
+separated -- the difference is real and it is in LLVM's favour.
+`:llvm-beaten` remains **false**. No claim artifact.
+
+amu's relative standard deviation (0.0045) is roughly half LLVM's (0.0084).
+Steadier, still behind.
+
+## What this does and does not establish
+
+Established, on this kernel, this host, these pins: amu is 1.0264x LLVM at
+the minimum and 2.34% behind at the mean, separated from noise.
+
+**Not established: that amu got 8.5% faster.** The amu arm moved 9.77 ->
+8.94 ns since iteration 31, but three things changed at once -- the pins,
+the rustc version (1.97.1 -> 1.98.0), and the LLVM arm's build host (a
+loaded Air -> judah). The LLVM arm moved too, 8.928 -> 8.71. The ratio is
+the quantity this run measured; a cross-iteration delta on either arm alone
+mixes changes and is not claimed.
+
+## Next
+
+The bar is not parity. perfgate's default policy needs **+5%** to seal a
+\"faster\" claim, so amu must be 5% faster than LLVM here, not 2.6% behind.
+The remaining 0.205 ns/call is the thing to rank.
+
+Do not rematch `kernel_deep` until a pin changes the extracted bytes again.
+The nbb native-route failure is the blocker to fix first: while it stands,
+the default and JVM-free routes cannot build the fixture this loop ranks,
+and every future rematch has to be hand-routed through the JVM.
+"}]

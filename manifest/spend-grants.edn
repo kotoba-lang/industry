@@ -1,0 +1,73 @@
+;; manifest/spend-grants.edn — what each autonomous buyer may spend.
+;;
+;; ## One declaration, two enforcements
+;;
+;; A spend limit gets enforced in two places that cannot see each other: a
+;; biscuit narrows it off-chain, and (later) a contract enforces it on-chain.
+;; Written separately they drift, and a drifted pair has no honest reading --
+;; the smaller one is what actually holds, and nobody knows which that is.
+;;
+;; So both are DERIVED from here. `scripts/mint-spend-grant.cljs` builds the
+;; token; nothing hand-writes a cap.
+;;
+;; ## The first limit needs no code
+;;
+;; `:funded-usd` is the real ceiling, and arithmetic enforces it: an account
+;; holding five dollars cannot spend six. It needs no contract, no audit, and
+;; no review, and it is live the moment somebody funds the address.
+;;
+;; `:per-call-usd` is what the token says, and it is smaller. It exists so a
+;; single bad call cannot drain the balance in one go -- the balance bounds the
+;; blast radius over time, the token bounds it per request.
+;;
+;; A contract earns its place when the limit must be finer than *how much is in
+;; the account* -- per day, per seller, per period. Until then, deploying one
+;; would add the only irreversible thing in this design to hold funds it does
+;; not yet need to hold.
+;;
+;; ## The key is not here
+;;
+;; `:key` records WHERE the private key lives, never the key. It was generated
+;; into that location and no copy was written to disk.
+
+{:schema 1
+
+ :grants
+ [{:buyer "dougaka"
+   :repo "orgs/cloud-itonami/dougaka"
+   :spends-under "dougaka"          ; the murakumo account in manifest/murakumo-accounts.edn
+
+   :session-address "0x38C2229589e2097486b4a3390f557E84cB69F30c"
+   :key {:kind :macos-keychain :service "dougaka-x402-session-key" :account "dougaka"}
+
+   :limit {:funded-usd "5.00"        ; the ceiling arithmetic enforces
+           :per-call-usd "0.05"}     ; the ceiling the token carries
+
+   ;; base-sepolia, deliberately. A rail whose only demonstration costs real
+   ;; money is demonstrated once and assumed thereafter, and the first thing an
+   ;; autonomous buyer does should be rehearsed where a mistake costs nothing.
+   ;; hanmoto lists every resource on both networks at the same price, and this
+   ;; allowlist is what makes this buyer take the testnet one and never the
+   ;; other -- the choosing is `pay.x402-buyer/plan`'s, not a special case.
+   :networks ["base-sepolia"]
+   ;; Sepolia USDC, from treasury/chains. NOT the mainnet address: an asset
+   ;; allowlist naming the wrong chain's token refuses every offer, and it
+   ;; refuses them for a reason that reads like the seller is at fault.
+   :assets ["0x036CbD53842c5426634e7929541eC2318f3dCF7e"]
+   :schemes ["exact" "transaction"]
+
+   :expires "2026-10-01T00:00:00Z"
+   :declared "2026-09-01"
+   :declared-by "Jun Kawasaki"
+   :state :awaiting-testnet-funding
+   :note "Owner decision 2026-08-31: dougaka is the first buyer -- it runs, and
+          it is the largest spender in the murakumo ledger. Moved to
+          base-sepolia on 2026-09-01 at the owner's direction, so the first
+          autonomous purchase is rehearsed where a mistake costs nothing.
+
+          The session key was generated straight into the keychain; the address
+          holds zero on both networks and funding is the operator's step. On a
+          testnet that is not because value moves -- it does not -- but because
+          every faucet gates on a login or a CAPTCHA, and an agent must do
+          neither. Until it is funded this grant is a declaration and nothing
+          can spend under it, which is the correct resting state."}]}

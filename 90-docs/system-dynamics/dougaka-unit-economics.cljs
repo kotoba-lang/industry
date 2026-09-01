@@ -1,0 +1,232 @@
+#!/usr/bin/env nbb
+;; dougaka の単位経済を XMILE で回す —— 入力は全部、測った値だけ。
+;;
+;;   nbb --classpath "orgs/kotoba-lang/org-oasis-open-xmile/src" \
+;;       90-docs/system-dynamics/dougaka-unit-economics.cljs
+;;
+;; ## 何を答えるか
+;;
+;; ADR-2608291009 D5 は bot の損益を `revenue − (burn_KUMO × 掲示価格 + …)` と
+;; 定義した。dougaka はその式が初めて片側だけ閉じた actor である —— **費用は
+;; 実測できて、収入は測って 0**（catalog に SKU が無い）。
+;;
+;; だからこのモデルが出すのは margin ではなく **break-even price**: 測れた費用
+;; だけから導ける「いくらで売れば 0 になるか」と、それが実測した他社価格の
+;; どこに落ちるか。margin は価格が付いた日に計算できるようになる。
+;;
+;; ## 入力の出所（すべて 2026-09-01 実測。推定値は 1 つも無い）
+;;
+;; **dougaka 自身** —— GET https://api.murakumo.cloud/infer/runs の 124 spend:
+;;
+;;     model              events  credits  units
+;;     minimax-h3             71     1456  video-seconds 182
+;;     wan2.2-ti2v-5b          2       40  video-seconds 4
+;;     cosyvoice2             38       76  ktext 38
+;;     trellis                 5      225  assets 5
+;;     animagine-xl-4.0        5       30  images 5
+;;     ace-step                2       26  audio-seconds 240
+;;     minimax-music3          1        5  audio-seconds 20
+;;                                 -----
+;;                                  1858 credits over 186 video-seconds
+;;
+;; 1,858 credits ÷ 186 秒 = **9.99 credits/秒**。credits-per-usd は 100
+;; (ADR-2607030030) なので **$0.0999/秒**。これは完成尺あたりの**全部込み**
+;; —— 音声・音楽・3D・静止画・編集素材を含む。生成モデル単体の値ではない。
+;;
+;; **他社** —— 公開価格ページから抽出（下の competitors に source を持たせた）。
+;; どれも **raw generation の秒単価**であって完成動画の価格ではない。だから
+;; 「dougaka の $0.0999 が Wan 2.5 の $0.05 より高い」は**同じものの比較では
+;; ない** —— その差に何が入っているかを一緒に読むこと。同じ土俵で比べられる
+;; 行は `:comparable :generation-only` を持つ 2 つ（dougaka の minimax-h3 実効
+;; 単価と wan2.2 実効単価）だけである。
+
+(require '[xmile.model :as m]
+         '[xmile.execute :as x])
+
+;; ── 実測入力 ────────────────────────────────────────────────────────────────
+
+(def ledger-url
+  (or (second (drop-while #(not= "--ledger" %) (vec (drop 2 (.-argv js/process)))))
+      "https://api.murakumo.cloud/infer/runs"))
+
+(def account "dougaka")
+(def credits-per-usd 100)   ; ADR-2607030030
+
+;; ⚠ 数字をこのファイルに焼かない。
+;;
+;; 最初の版は 1,858 credits / 186 秒 を定数で持っていた。同じ日の数時間後に
+;; feed は 2,338 credits / 246 秒 になっていて、**モデルは書いた瞬間から古い**
+;; ことが分かった。CLAUDE.md が『実測して定数で持つな』と繰り返している形が、
+;; 単位経済のモデルでも同じように出る。だから読む。
+
+(def runs-file
+  "`--runs-file <path>` reads the feed from disk instead of the network.
+
+   It exists so the refusals below can be exercised against a feed whose SHAPE
+   is wrong — one carrying spend but no video-seconds — which is a different
+   failure from a feed that could not be fetched and must not print as one. A
+   guard with no way to be triggered is a guard nobody has seen work."
+  (second (drop-while #(not= "--runs-file" %) (vec (drop 2 (.-argv js/process))))))
+
+(defn fetch-runs []
+  (if runs-file
+    (js/Promise.resolve
+     (try (js->clj (js/JSON.parse (.readFileSync (js/require "fs") runs-file "utf8"))
+                   :keywordize-keys true)
+          (catch :default _ nil)))
+    (-> (js/fetch ledger-url)
+        (.then (fn [r] (if (.-ok r) (.json r) (throw (js/Error. (str "HTTP " (.-status r)))))))
+        (.then (fn [j] (js->clj j :keywordize-keys true)))
+        (.catch (fn [_] nil)))))
+
+(defn- spend-of [r]
+  (let [v (or (:run/spend r) (get r "run/spend") (:spend r) (get r "spend"))]
+    (when (map? v) v)))
+
+(defn- for-of [r]
+  (or (:run/spend-for r) (get r "run/spend-for") (:spend-for r) (get r "spend-for") {}))
+
+(defn burn
+  "この account の spend を model 別・単位別に畳む。`nil` in, `nil` out ——
+   読めなかった feed を空の集計に畳むと、1 度も使っていない actor と
+   同じ 0 を出す。"
+  [runs]
+  (when runs
+    (let [rows (filter #(get (spend-of %) (keyword account)) runs)]
+      (reduce (fn [acc r]
+                (let [c (get (spend-of r) (keyword account))
+                      f (for-of r)
+                      m (or (:model f) (get f "model") "?")
+                      us (or (:units f) (get f "units") {})]
+                  (-> acc
+                      (update :credits + c)
+                      (update :events inc)
+                      (update-in [:by-model m :credits] (fnil + 0) c)
+                      (update-in [:by-model m :events] (fnil inc 0))
+                      (update :units (fn [u] (reduce (fn [a [k v]] (update a (name k) (fnil + 0) v)) u us)))
+                      (update-in [:by-model m :units]
+                                 (fn [u] (reduce (fn [a [k v]] (update a (name k) (fnil + 0) v)) (or u {}) us))))))
+              {:credits 0 :events 0 :units {} :by-model {}}
+              rows))))
+
+(defn generation-only-credits
+  "video-seconds を単位に持つ model だけの credits と秒。他社の
+   `:generation-only` と同じ土俵に置ける唯一の切り出し。"
+  [b]
+  (reduce (fn [acc [_ v]]
+            (if-let [s (get-in v [:units "video-seconds"])]
+              (-> acc (update :credits + (:credits v)) (update :seconds + s))
+              acc))
+          {:credits 0 :seconds 0} (:by-model b)))
+
+(def competitors
+  "他社の公開価格。**推定は 1 行も入れない** —— 読めなかったものは載せない。
+   `:comparable` は、その数字が dougaka の何と比べられるかを言う。"
+  [{:vendor "fal.ai" :product "Wan 2.5"              :usd-per-video-second 0.05
+    :comparable :generation-only :source "https://fal.ai/pricing" :read-on "2026-09-01"}
+   {:vendor "fal.ai" :product "Kling 2.5 Turbo Pro"  :usd-per-video-second 0.07
+    :comparable :generation-only :source "https://fal.ai/pricing" :read-on "2026-09-01"}
+   {:vendor "Replicate" :product "wavespeedai/wan-2" :usd-per-video-second 0.09
+    :comparable :generation-only :source "https://replicate.com/pricing" :read-on "2026-09-01"}
+   {:vendor "Replicate" :product "top published tier" :usd-per-video-second 0.25
+    :comparable :generation-only :source "https://replicate.com/pricing" :read-on "2026-09-01"}])
+
+(def unmeasured
+  "測れなかったもの。**空欄ではなく、名前を付けて残す。**
+   これがあるので margin は 3 値になる（黒字 / 赤字 / 未測定）。"
+  [{:what :finished-short-price
+    :why "完成した縦型ショート（45〜90秒）1 本の市場価格。制作会社の料金表は
+          公開されていないか見積もり制で、引用できる数字が取れなかった。
+          revenue を推定で埋めるとこのモデル全体が推定になる"}
+   {:what :dougaka-revenue
+    :why "catalog に dougaka の SKU が無い（scripts/itonami-actor-pnl.cljs:
+          actors with a SKU = 0）。収入は未測定ではなく **測って 0**"}
+   {:what :yata-burn
+    :why "保管は 800 credits/TB月 で掲示済み（ADR-2608313700）だが、
+          actor ごとに GB月 を数える計器が無い"}])
+
+
+;; ── XMILE モデル ────────────────────────────────────────────────────────────
+;;
+;; stock は 1 つ（credits 残高）。flow は 2 つ（burn と revenue）。dt=1 が
+;; 「1 秒の完成尺を作る」1 ステップ。price を動かして残高の傾きが反転する点が
+;; break-even —— 割り算でも出るが、**モデルにしておくと稼働率・歩留まり・保管の
+;; flow を足す場所が決まる**（今日はどれも未測定なので足さない。足す場所が在る
+;; ことと、埋めたつもりになることは別）。
+
+(defn model-at-price
+  [price-usd burn-per-second opening-credits seconds]
+  (-> (m/model "dougaka-unit-economics")
+      (m/set-sim-specs (m/sim-specs 0 seconds {:xmile/dt 1 :xmile/method :euler}))
+      (m/add-variable (m/stock "Credits" (str opening-credits)
+                               {:xmile/inflows #{"Revenue"} :xmile/outflows #{"Burn"}}))
+      (m/add-variable (m/flow "Burn" (str burn-per-second)))
+      (m/add-variable (m/flow "Revenue" (str (* price-usd credits-per-usd))))
+      (m/add-variable (m/aux "MarginPerSecond" "Revenue - Burn"))))
+
+(defn final-credits [price-usd burn-per-second opening seconds]
+  (last (get-in (x/run (model-at-price price-usd burn-per-second opening seconds))
+                [:xmile/series "Credits"])))
+
+;; ── 報告 ────────────────────────────────────────────────────────────────────
+
+(defn- r4 [x] (/ (js/Math.round (* 10000 x)) 10000))
+
+(defn report [b]
+  (if (nil? b)
+    (do (println "REFUSED\tthe run ledger at" (or runs-file ledger-url) "could not be read.")
+        (println "This is not a zero-cost actor; it is an unmeasured one.")
+        (js/process.exit 2))
+    (let [secs (get-in b [:units "video-seconds"] 0)]
+      (if-not (pos? secs)
+        (do (println "REFUSED\tthe feed carries no video-seconds for" account
+                     "— a cost per second cannot be divided out of it.")
+            (js/process.exit 2))
+        (let [cps (/ (:credits b) secs)
+              usd (/ cps credits-per-usd)
+              g (generation-only-credits b)
+              g-usd (/ (/ (:credits g) (:seconds g)) credits-per-usd)]
+          (println "DOUGAKA UNIT ECONOMICS")
+          (println (str "  read " ledger-url " at " (.toISOString (js/Date.))))
+          (println)
+          (println "実測した費用（feed から畳んだ。このファイルに数字は焼いていない）")
+          (println (str "  " (:events b) " spend events, " (:credits b) " credits, "
+                        secs " 完成秒"))
+          (doseq [[m v] (sort-by (comp - :credits val) (:by-model b))]
+            (println (str "    " (.padEnd m 20) " " (.padStart (str (:credits v)) 6)
+                          " credits  " (pr-str (:units v)))))
+          (println (str "  all-in           " (r4 cps) " credits/秒 = $" (r4 usd) "/秒"))
+          (println (str "  generation-only  $" (r4 g-usd) "/秒  ("
+                        (:credits g) " credits / " (:seconds g) " 秒)"))
+          (println)
+          (println "他社（すべて raw generation の秒単価。完成動画の価格ではない）")
+          (doseq [c (sort-by :usd-per-video-second competitors)]
+            (println (str "  $" (:usd-per-video-second c) "/秒  " (:vendor c) " "
+                          (:product c) "   " (:source c) " (" (:read-on c) ")")))
+          (println)
+          (println "同じ土俵の比較（:generation-only どうし）")
+          (doseq [c (sort-by :usd-per-video-second competitors)]
+            (let [delta (- g-usd (:usd-per-video-second c))]
+              (println (str "  vs " (:vendor c) " " (:product c) ": dougaka は $"
+                            (r4 (js/Math.abs delta)) "/秒 "
+                            (if (pos? delta) "高い" "安い")
+                            " (" (r4 (* 100 (/ delta (:usd-per-video-second c)))) "%)"))))
+          (println)
+          (println "break-even —— XMILE を回して残高の傾きが 0 になる価格")
+          (let [opening 1000 n 60]
+            (doseq [p (sort (distinct [0.05 0.07 0.09 (r4 usd) 0.15 0.25]))]
+              (let [end (final-credits p cps opening n)
+                    slope (/ (- end opening) n)]
+                (println (str "  $" p "/秒 → " n " 秒後 " (js/Math.round end)
+                              " credits（1 秒あたり " (r4 slope) " credits）"
+                              (cond (> slope 0.001) "  黒字"
+                                    (< slope -0.001) "  赤字"
+                                    :else "  break-even")))))
+            (println (str "  break-even は $" (r4 usd) "/秒 —— 費用がそのまま下限価格である")))
+          (println)
+          (println "MARGIN\tUNMEASURED —— 収入側が測って 0 なので率が定義できない")
+          (doseq [u unmeasured]
+            (println (str "  " (name (:what u)) ": "
+                          (first (clojure.string/split-lines (:why u)))))))))))
+
+(-> (fetch-runs) (.then burn) (.then report))

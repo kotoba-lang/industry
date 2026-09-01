@@ -91,10 +91,91 @@ fails 10 assertions without it and its out-of-range control passes either way.
 document reached `MessageDigest` on the JVM and `(throw ...)` on cljs, while
 every other document operation was portable. The thrown message said the
 operation `requires the JVM/Node host path` -- and nbb IS Node -- which is why
-the gap read as a deliberate restriction rather than a missing branch. Now
-routed through `multiformats.core/sha256`, already a direct dependency. The
+the gap read as a deliberate restriction rather than a missing branch. The
 test vector is pinned to `shasum -a 256` over the canonical bytes, so neither
 host's own digest is the oracle for the other.
+
+**2b. The first version of that fix was itself a regression, and this is the
+part worth keeping.** It routed through `multiformats.core/sha256` on the
+reasoning that io-multiformats is already a direct dependency. On `:cljs` that
+namespace requires the npm package `@noble/hashes/sha2.js`, so
+`kotoba.kir.value` -- which every value-carrying module loads -- gained an npm
+dependency. It was not seen because the reasoning was checked against the
+io-multiformats CHECKOUT on hand, which predates that require.
+
+**Being a direct dependency says nothing about what the RESOLVED version of it
+pulls in**, and the resolved version is the one in the consumer's lock. Now
+`sha2.core`, which is the portable implementation multiformats itself reached
+for, one link closer, with no host packages at all. The digest is unchanged.
+
+What caught it was amu's own `--jvm-free` resolver, which fails closed:
+advancing amu's pin turned `amu check --jvm-free` into `Cannot find module
+'@noble/hashes/sha2.js'` while the same command on the unadvanced pin passed.
+That control is the check to run before landing a change to a T0 namespace,
+and it was not run.
+
+## The wasm path, measured
+
+`amu check --jvm-free` passed on the kernel from the first day and
+`amu compile --jvm-free --target wasm32-browser` did not: an i64 reached a
+host operation that cannot take a BigInt in two more places -- `uleb` in
+kotoba-kir and the capability import key in kotoba-wasm -- and the CLI reports
+any host exception as an internal compiler error. Both are fixed, and
+kotoba-wasm grew its own ClojureScript runner in the process, for the same
+reason kotoba-kir did: every test in it was `.clj`.
+
+Advancing amu's own pins to those fixes is what makes the documented CLI
+command work; it is a pure fast-forward (kir +13, wasm +2) and goes through a
+pull request, because amu's main is protected.
+
+Measured after that, all JVM-free: the kernel compiles to an 8,394-byte
+`wasm32-browser-kotoba-v1` module, instantiates on `runtime/browser-host.mjs`,
+and returns the same `document-sha256` for S as the reference interpreter.
+
+The parity check covers S's identity only, and it discriminates -- pointed at
+a module built from a renamed entity type it fails with both digests printed.
+A check asserting only `is a sha256` would have passed, and that is nearly
+what it was: its first run compared against an interpreter that had thrown,
+and reported a failure for the wrong reason.
+
+**Admission itself now runs on the module too**, against a real dataspace --
+the same `provider.dataspace` the interpreter run uses, with a bridge either
+side of it. The bridge is small because the host's document form IS the KIR
+document form; a keyword is the text :is-a wrapped in quotes on one side and the keyword
+`:is-a` on the other.
+
+Two things had to change, and both are measured properties of the host rather
+than preferences.
+
+**A call cannot arrive from outside.** `browser-host.mjs` admits a compound
+argument only if the host itself minted it -- `assertValue` rejects anything
+else as `forged compound typed value rejected` -- and the constructors it
+exposes (`instance.typedValues`) are `vectorI64`, `vectorF64`, `stringIndex`,
+`disjointSetI64`, `document`, `bytes`. No record, no variant. So the kernel
+carries `call-declare` / `call-relate` / `call-related` / `call-census`, which
+take scalars and assemble the call value inside the guest. The other direction
+is open: a provider's result goes through `admitHostResult`, which mints from
+plain frozen arrays.
+
+That makes the earlier phrasing wrong. `oak-call` is no longer `the only
+door`; there are five entries. **The property that was ever load-bearing is
+that admission is reached in exactly one place**, and it still is -- each
+entry assembles a call and hands it to `oak-call`. Conformance now asserts the
+export set AND that no `do-*` / `all-*` / `type-of` is in it, so a future
+export that reaches the dataspace unadmitted fails a check rather than
+widening the surface quietly.
+
+**One call spends one instance.** Fuel is spent over an instance's life, not
+per call, so a run that reuses an instance traps `unreachable` partway through
+-- measured after four checks. The dataspace outlives the instances because
+the provider is the host's, which is the shape `amu/runtime/dom-driver.mjs`
+already uses for the same reason.
+
+Eleven checks pass on wasm. The suite discriminates on that backend as on the
+other: the domain check made vacuous fails only the domain check, showing the
+call falling through to the range check; query results discarded fails six.
+The capacity and evidence mutations were run against the interpreter only --
+the capacity one needs 34 instances on wasm, which is slow rather than hard.
 
 ## Evidence
 
@@ -117,6 +198,50 @@ the way a check that ran and passed exits. Fixed before landing.
 
 The runner exits 2 -- neither 0 nor 1 -- and names the missing repositories
 when a sibling checkout is absent.
+
+## Where this stands (2026-08-31)
+
+Everything below is on a default branch. Nothing is waiting on a review.
+
+| repo | commit | what |
+|---|---|---|
+| kotoba-lang/oak | 6f209ddf | the kernel, both suites, README |
+| kotoba-lang/kotoba-kir | ff7a3ae2 | document indexing, document-sha256, uleb, the npm-free route |
+| kotoba-lang/kotoba-wasm | 34557de9 | the capability import key, and the repo`s first cljs runner |
+| kotoba-lang/amu | fb22f754 | the pin advance, via PR 715 |
+| com-junkawasaki/root | this file, and the west entry for oak | |
+
+Verification, from a fresh clone of the published pin, all JVM-free:
+
+- `nbb bin/conformance.cljs` -- 20 checks, 0 failures, on the reference
+  interpreter
+- `nbb bin/wasm-conformance.cljs` -- 11 checks, 0 failures, on the compiled
+  module against a real dataspace
+- kotoba-kir`s own cljs suite -- 37 tests, 90 assertions, 0 failures
+- kotoba-wasm`s new cljs suite -- 2 tests, 0 failures
+- amu PR 715 -- both required checks green; `test (ubuntu-latest)` is 1,189
+  tests / 8,727 assertions
+
+## What is left, in the order it is worth doing
+
+1. **The capacity and fuel ceilings are checked on the interpreter only.**
+   Running them on wasm is slow rather than hard -- the capacity one needs 34
+   instances, because fuel is spent per instance. Resume at
+   `test/wasm-conformance.cljs`, whose `steps` helper already sequences one
+   instance per call.
+2. **The judge loop is not implemented and S is hand-written.** That is the
+   dynamic half of the paper. Nothing here depends on it; a kernel is
+   retargeted by editing `schema-doc`.
+3. **A second consumer would justify moving the host bridge out of the test.**
+   `host->kir-doc` / `kir->host-doc` / `kir->host-result` are general over the
+   dataspace kit, not over oak, and probably belong beside
+   `provider.dataspace` rather than in a suite. One consumer is not yet a
+   library.
+4. **The i64-is-a-BigInt class keeps recurring.** amu ADR-0286 is one
+   instance, this ADR records two more, and a fifth landed the same day in
+   kotoba-wasm from another session. The only detector that works is running
+   the ClojureScript path; both repositories now have a runner, and widening
+   what those runners cover is what shrinks the class.
 
 ## Consequences
 

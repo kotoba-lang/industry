@@ -1,6 +1,6 @@
 [{:db/id -1
   :adr/id "adr-2608291700-passkey-and-smart-contract-authenticate-biscuit-authorizes"
-  :adr/title "ADR-2608291700: passkey と smart contract が認証し、Biscuit が権限を持つ — 実測 58.00/100、認証 100 / 権限 36.36"
+  :adr/title "ADR-2608291700: passkey と smart contract が認証し、Biscuit が権限を持つ — 実測 100.00/100、認証 100 / 権限 100（2026-08-31 に閉じた）"
   :adr/status "accepted"
   :adr/doc-type "adr"
   :adr/doc_type "adr"
@@ -62,7 +62,71 @@
 passkey も wallet も持たない既存 principal が締め出される。基盤とは
 「新しい principal に既定で与えるもの」であって「唯一許すもの」ではない。
 
-## 2. 現在地 —— 実測、2026-08-29
+## 2. 現在地 —— 実測、2026-08-31（同日 3 回測っている）
+
+```
+2026-08-29  overall 58.00   authentication 100.00   authorization  36.36
+2026-08-31  overall 64.00   authentication 100.00   authorization  45.45   (06:04Z)
+2026-08-31  overall 100.00  authentication 100.00   authorization 100.00   (09:38Z)
+```
+
+**§3 の順序 1〜3 が閉じた。** 最後の 09:38Z の実測は `unknown axes []` /
+`incomplete []` / `measured-weight 1.00` —— 11 軸すべてが live HTTP で測られ、
+**測れなかった軸を pass として数えていない**。
+
+閉じた順に:
+
+- **3（capability 文書）** —— 08-29 と 08-31 06:04Z の間に landed。
+- **2（datom 面が理由を名乗る）** —— `net-kotobase/control-plane` `5e3b2976`。
+- **1（4 面が Biscuit を受理する）** —— 2 段階で閉じた。protocols-worker が
+  `a8c4e158`（16:31 JST）で sparql / graphql / gremlin を配線し、**cypher だけ
+  残った**。cypher.kotobase.net はその Worker の route ではなく、
+  ADR-2608051000 で切り出された `net-kotobase/cypher` で、`kotoba-lang/kotobase-worker-shell`
+  が持つ **同じ namespace の古い写し**の上に建っていた。shell `8cd9edc` +
+  cypher `9720de23` で 4 面目が閉じた。
+
+deploy 後の実測:
+
+```
+sparql   names-biscuit=1  header-changes-answer=YES
+cypher   names-biscuit=1  header-changes-answer=YES
+graphql  names-biscuit=1  header-changes-answer=YES
+gremlin  names-biscuit=1  header-changes-answer=YES
+```
+
+**「1 repo = 1 capability」の分割は、変更の到達範囲も分割する。** protocols-worker
+を直した人は 4 面全部を直したつもりで、3 面しか直っていなかった。差は測って初めて出た。
+
+### この作業で見つかった、この ADR では直していない 2 件
+
+- `kotoba-lang/kotobase-worker-shell` の main は**現在の manifest pin で
+  コンパイルできなかった**（`multiformats/core` が要求する `sha2.core` が
+  source path に無い）。cypher を serve する library が、しばらく誰にも
+  ビルドし直されていなかった。
+- ~~同 repo の `node out/node-tests.js` は完走しない~~ **これは誤りだった。**
+  完走する —— このワークステーションで**約 9 分**かかり、`55 tests / 215
+  assertions` を報告する。900 秒で 3 回切って、その沈黙を hang と読んだ。
+  **プロセスが CPU を焼いているかを一度も見ていなかった。** `node
+  out/node-tests.js` の行を直接サンプルすると CPU 時間は 8s → 28s → 75s → 89s
+  と積み上がっており、deadlock ではなく遅いテストだった。
+
+  誤読は 2 つの測定ミスから来ており、どちらも同じ形 —— **対象ではなくラッパーに
+  当てていた**: `pgrep -f 'node out/node-tests.js'` はその文字列を含む shell 自身に
+  当たるので「まだ走っている」が常に真になり、`ps | grep | head -1` は
+  `timeout 600 node …` を掴んで 0.0% CPU を返した。
+
+  この誤読の上で行動した結果、**スイートを一度も完走させないまま Biscuit の段を
+  merge・deploy し、`an-anonymous-gremlin-websocket-handshake-is-rejected` を
+  赤くしたまま出荷した**（`www-authenticate` が意図どおり `Biscuit, Bearer` に
+  変わったのに、期待値が `Bearer` のままだった）。production は壊れていない ——
+  4 面の live 実測は正しい —— が、それは運であって手順ではない。**完走させて
+  いれば 9 分で判った。** 修正は `fa4f599`、修正後 0 failures / exit 0。
+
+  `:biscuit-test` build は残すが、**全体スイートの代用ではない**。本当に要るのは
+  protocols-worker が自分の重いテストに与えている扱い（多コミット系を既定の
+  `-test$` から別 build へ出す）で、それは未着手。
+
+## 2.1 旧・現在地 —— 実測、2026-08-29
 
 推測ではなく `90-docs/kotobase_auth_maturity/` の probe が live を叩いた値。
 

@@ -41,7 +41,114 @@
  :isolation :worktree
 
  :suites
- [{:repo "orgs/cloud-itonami/tsukuru-manufacturing-artifacts"
+ [{:repo "orgs/cloud-itonami/org-un-isic"
+   :label "org-un-isic ingest catalog —— 出所の pin と、それが何であるかの測定"
+   ;; catalog.edn は 2 つの別々の腐り方をする。
+   ;;
+   ;;   pin の側は、committed なファイルが再生成されて digest が追随しない形。
+   ;;   catalog を信じた consumer は、矛盾するはずだった bytes に触らない。
+   ;;
+   ;;   測定の側はもっと速く腐る。428 クラスのうち 381 が UN の ISIC Rev.4 と
+   ;;   一致し、残り 47 はこれこれ、と書いてある。data/classes のタイトルを
+   ;;   1 つ編集すればその数字は全部古くなるが、ファイルは自信のある過去形で
+   ;;   主張し続ける。参照表 2 つは意図的に commit されていないので offline で
+   ;;   verdict を導き直すことはできない —— できるのは、**測った対象が動いたら
+   ;;   verdict を無効にする**ことで、それが :titles-digest である。
+   ;;
+   ;; そして正確さではなく誠実さの側の不変条件が 1 つ。出所が不明な表は不明と
+   ;; 言い続けなければならない。unpinned な表の隣にもっともらしい URL を書くのは
+   ;; data/PROVENANCE.edn がまさに記録している誤りで、その記録の言葉では
+   ;; 「disputed な表に authoritative に見える pin を与えるのは、それが埋める
+   ;; ように見える穴より悪い」。
+   ;;
+   ;; 10 件とも pin 431ef166 で landing 前に実際に赤くなるところを見た。
+   ;; anchor は一意、噛んだ invariant は名前まで一致、無改変で exit 0。
+   ;; さらに拒否床 6 件（入力が読めない / dataset が空 / :sources が空 /
+   ;; EDN が 1 form でない）が **exit 2** を返すことも確認した —— 0 でも 1 でも
+   ;; ない値でなければ、「測れなかった」が「測って問題が無かった」と同じ顔をする。
+   ;;
+   ;; その拒否床が test 自身の穴を 1 つ見つけている: `read-string` は最初の
+   ;; form だけ読んで残りを捨てるので、map が早く閉じて後ろにゴミが続く EDN が
+   ;; **clean として通っていた**。CLAUDE.md が heredoc の `\"` について記述して
+   ;; いるのと同じ形。read-edn は text を vector で包んで全部を消費させる。
+   ;;
+   ;; ここに無いもの: 5 つのアドレスが今も 200 を返すかは検査しない。それは
+   ;; この repo についての主張ではないので、落ちても意味が読めない。記録した日に
+   ;; 取得して確かめてある。
+   :cmd ["nbb" "test/catalog_test.cljs"]
+   :green-marker "catalog-check: OK"
+   :mutations
+   [{:id :isic/titles-digest-stale
+     :why "data/classes のタイトルが 1 つ変われば :what-data-classes-is の 381/20/27 は全部古い。参照表が repo に無いので verdict は導き直せない —— 測った対象が動いたことを検出するのが :titles-digest の全仕事"
+     :file "data/classes/0111.json"
+     :find "\"nameEn\": \"Growing of cereals"
+     :replace "\"nameEn\": \"GROWING of cereals"
+     :must-fail ["catalog-titles-digest-matches-tree"]}
+
+    {:id :isic/class-count-drift
+     :why "手で書かれた件数。dataset の実ファイル数と突き合わせられるので、もう一つの手書き数字と比べる必要が無い"
+     :file "catalog.edn"
+     :find ":files 428"
+     :replace ":files 427"
+     :must-fail ["catalog-class-count-matches-tree"]}
+
+    {:id :isic/verdicts-stop-partitioning
+     :why "3 つの verdict が dataset を分割していなければ、結論は主張しているより少ない範囲しか覆っていない。どのクラスも必ずどれか 1 つに入る"
+     :file "catalog.edn"
+     :find ":title-matches-isic-exactly 381"
+     :replace ":title-matches-isic-exactly 380"
+     :must-fail ["catalog-verdicts-partition-the-dataset"]}
+
+    {:id :isic/finding-names-a-vanished-code
+     :why "dataset を去ったクラスについての finding。修理対象の 47 件は下流が読む actionable な一覧なので、実在しないコードが混じると repair が空振りする"
+     :file "catalog.edn"
+     :find "\"6619\" \"8410\" \"9101\"]"
+     :replace "\"6619\" \"8410\" \"9999\"]"
+     :must-fail ["catalog-finding-codes-exist-in-tree"]}
+
+    {:id :isic/finding-count-drifts-from-its-list
+     :why "要約の数字と、その数字が要約している一覧が別々に編集される形。片方だけ直すのが自然な壊れ方"
+     :file "catalog.edn"
+     :find ":title-matches-nace-not-isic 20"
+     :replace ":title-matches-nace-not-isic 21"
+     :must-fail ["catalog-finding-count-matches-list" "catalog-verdicts-partition-the-dataset"]}
+
+    {:id :isic/same-address-cited-twice
+     :why "provenance catalog を実際より豊かに見せる最も安い方法。ingest の指標は URL の出現回数を数えるので、これを塞がないと catalog は水増しの道具になる"
+     :file "catalog.edn"
+     :find ":ramon-retired true"
+     :replace ":also \"https://ec.europa.eu/eurostat/web/nace\"\n   :ramon-retired true"
+     :must-fail ["catalog-cites-each-address-once"]}
+
+    {:id :isic/mirrored-digest-stops-matching-bytes
+     :why "committed なファイルが再生成されて digest が追随しない形。catalog を信じた consumer は矛盾する bytes に触らない"
+     :file "catalog.edn"
+     :find ":sha256 \"fc408f57bd3a4f33c35a4f384ec0010283dd72774892c8d48ae1330a8caeb57f\""
+     :replace ":sha256 \"fc408f57bd3a4f33c35a4f384ec0010283dd72774892c8d48ae1330a8caeb57e\""
+     :must-fail ["catalog-mirrored-digest-matches-committed-bytes" "catalog-agrees-with-rev5-upstream-record"]}
+
+    {:id :isic/rev5-record-drifts-from-catalog
+     :why "同じ pin を 2 つのファイルが持つと、片方だけ更新される機会が 2 つできる。逆向き —— upstream.edn 側を動かしても catalog が気づく"
+     :file "data/rev5/upstream.edn"
+     :find " :sha256 \"fc408f57"
+     :replace " :sha256 \"aa408f57"
+     :must-fail ["catalog-agrees-with-rev5-upstream-record"]}
+
+    {:id :isic/unpinned-table-given-a-plausible-address
+     :why "この repo が丸ごと戒めになっている誤りそのもの。digest 無しでもっともらしい URL を書けば、出所不明の表が出所を持っているように読める"
+     :file "catalog.edn"
+     :find ":source-url :unknown :sha256 :unknown :fetched-at :unknown"
+     :replace ":source-url \"https://unstats.un.org/unsd/publication/seriesm/seriesm_4rev4e.pdf\" :sha256 :unknown :fetched-at :unknown"
+     :must-fail ["catalog-unpinned-table-declares-unknown-provenance" "catalog-addresses-are-declared-sources"]}
+
+    {:id :isic/fetched-source-loses-its-digest
+     :why "取得したと書いてある source から digest が消える形。:pending は「これから測る」に見えるが、比較の再現性はその時点で失われている"
+     :file "catalog.edn"
+     :find ":sha256 \"9f8598cd9460a3ced11743b881f01eb1259d711664e1526a9d0c24e577fb80df\""
+     :replace ":sha256 :pending"
+     :must-fail ["catalog-fetched-source-carries-a-digest"]}]}
+
+  {:repo "orgs/cloud-itonami/tsukuru-manufacturing-artifacts"
    :label "tsukuru artifact catalog vs the dataset it describes"
    ;; index/catalog.datoms.edn says of itself "This file is hand-maintained
    ;; today", and until 2026-08-29 nothing read it. The mutations below are the
@@ -1142,7 +1249,50 @@
      :file "src/langchain/memory.cljc"
      :find ":msg/data (pr-str msg)}])\n          idx))"
      :replace ":msg/data (pr-str msg)}])\n          nil))"
-     :must-fail ["append-returns-the-index-it-assigned"]}]}
+     :must-fail ["append-returns-the-index-it-assigned"]}
+
+    ;; ── docs/catalog.edn（上流出典の台帳）─────────────────────────
+    ;;
+    ;; 台帳の値打ちは「各行が本当に fetch されたこと」だけにある。行を
+    ;; 1 つ足すのは無料なので、discipline を検査するものが無ければ
+    ;; これは URL を並べる場所になる —— それは axis-ingest の水増しの
+    ;; 定義そのもの。だから 4 件とも「台帳が嘘をつく向き」に壊す。
+    ;;
+    ;; 2026-09-01 に 4 件とも赤くなるところを見た（両ランタイムで）。
+    {:id :langchain/catalog-records-a-failed-fetch
+     :why "取れなかった出典が、取れて問題が無かった出典と同じ顔で並ばないこと。:http さえ書いてあれば行は『測ったように』読める —— 値を見なければ 404 も 200 も同じ 1 行"
+     :file "docs/catalog.edn"
+     :find ":url \"https://atproto.com/specs/xrpc\"\n   :http 200"
+     :replace ":url \"https://atproto.com/specs/xrpc\"\n   :http 404"
+     :must-fail ["every-source-carries-its-measurement"]}
+
+    {:id :langchain/catalog-mirrors-a-file-we-do-not-have
+     :why ":mirrors が実在する path を指すこと。存在しないファイルを指す引用は誰の provenance でもないが、EDN としては完全に正しく読める"
+     :file "docs/catalog.edn"
+     :find ":mirrors [\"README.md\" \"docs/adr/0001-architecture.md\"]"
+     :replace ":mirrors [\"README.md.gone\" \"docs/adr/0001-architecture.md\"]"
+     :must-fail ["mirrors-point-at-files-this-repo-has"]}
+
+    {:id :langchain/catalog-lists-one-source-twice
+     :why "同じ URL を 2 行に分けても各行は個別に真のままで、件数だけが倍になること。この台帳を書いたとき実際に踏んだ形 —— 上流の per-concept ページ 9 本が 1 ページへ redirect していたので、歴史的アドレスのまま並べれば 9 引用に見えた"
+     :file "docs/catalog.edn"
+     :find ":url \"https://atproto.com/specs/xrpc\""
+     :replace ":url \"https://docs.datomic.com/\""
+     :must-fail ["urls-are-distinct"]}
+
+    {:id :langchain/catalog-drops-a-port-from-the-index
+     :why "port である namespace が 1 つ残らず台帳に出ること。これが無いと台帳は repo の成長に対して黙って腐る —— 新しい移植先が行を持たないまま増え、既存の行は全部正しいので誰も気づかない"
+     :file "docs/catalog.edn"
+     :find "\"src/langchain/json.cljc\" \"src/langchain/parser.cljc\" \"deps.edn\""
+     :replace "\"src/langchain/parser.cljc\" \"deps.edn\""
+     :must-fail ["every-namespace-that-mirrors-something-is-cited"]}
+
+    {:id :langchain/request-body-drops-the-default-model
+     :why "request-body が :model 無しのとき既定へ手を伸ばすこと。chain-test はここを literal で assert していて、a46c87c が既定を murakumo-main へ動かしたとき **更新され忘れたのがその写し**で、main は赤いまま tip に居た。literal の pin は model-test に 1 箇所だけ置き、chain-test は seam を持つ形に直してある —— その seam が本当に噛むことを、既定を落とす向きで示す"
+     :file "src/langchain/model.cljc"
+     :find "body {:model (or model default-model)"
+     :replace "body {:model model"
+     :must-fail ["anthropic-wire-format"]}]}
 
   {:repo "orgs/kotoba-lang/langchain-store"
    :label "langchain-store —— 316 consumer が黙って依存している store seam の不変条件"
@@ -4814,4 +4964,229 @@
      :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
      :green-marker "logistics: all green"
      :must-fail ["REFUSED"]}]}
+    {:repo "orgs/cloud-itonami/app-tenki"
+     :label "app-tenki appview wiring —— ビルド設定・配信文書・マウント先を繋ぐ文字列"
+     ;; パッケージ内の cljs.test suite は `tenki.app` **1 名前空間の中**を検査する。
+     ;; ビルド設定と、配信される文書と、そこへマウントするコードを繋いでいる文字列は
+     ;; 2 つのファイルに重複して書かれていて、誰も突き合わせていない。
+     ;;
+     ;; どの継ぎ目も壊れ方が同じである: 片側を変えると `shadow-cljs compile app` は通り、
+     ;; `node out/tests.js` も `0 failures, 0 errors` を出し、**画面には何も出ない**。
+     ;; CLAUDE.md が名指ししている形——測れなかった検査が、測って問題が無かった検査と
+     ;; 同じ値を返す——の UI 版で、しかもこの repo は既に一度それを踏んでいる
+     ;; （旧 Svelte 版の `test/tenki.test.ts` は `expect(true).toBe(true)` だった）。
+     ;;
+     ;; 9 件とも pin 80b2ea97 で landing 前に赤くなるところを実測した。7 件は exit 1 で
+     ;; 自分の不変条件名を出し、後ろ 2 件は **exit 2**（REFUSED）を出す。0 でも 1 でも
+     ;; ない値でなければ、「入力が読めなかった」が「読んで問題が無かった」と同じ顔をする。
+     ;;
+     ;; ここに無いもの: `:wiring/exactly-one-document` の mutation。これは
+     ;; **文書をもう 1 枚足す**ことでしか壊せず、この harness は find/replace しか
+     ;; 持たない。手では確認してある（2 枚目の html を置くと exit 1 + その名前）。
+     ;; 同じ理由で `test/` を空にする refusal も入っていない。
+     :cmd ["nbb" "test/appview_wiring_test.cljs"]
+     :green-marker "appview-wiring: OK"
+     :mutations
+     [{:id :wiring/asset-path-goes-absolute
+       :why "docs/operator-quickstart.md は asset-path を相対にしてあるのは意図だと記録している——これらのページは path prefix 配下で配信されるので、絶対 \"/js\" はルート直下でだけ動いて他で 404 する。ローカルでは常に動くので、この退行はレビューを生き延びる"
+       :file "appview/tenki-weather-component/cljs/shadow-cljs.edn"
+       :find ":asset-path \"js\""
+       :replace ":asset-path \"/js\""
+       :must-fail [":wiring/asset-path-must-be-relative"]}
+
+      {:id :wiring/module-is-renamed
+       :why "module key を変えると shadow-cljs は素直に public/js/<新名>.js を出すが、文書は js/app.js を要求し続ける。compile は緑、テストも緑、ブラウザだけが 404 する"
+       :file "appview/tenki-weather-component/cljs/shadow-cljs.edn"
+       :find ":modules {:app {:init-fn"
+       :replace ":modules {:main {:init-fn"
+       :must-fail [":wiring/bundle-src-mismatch"]}
+
+      {:id :wiring/output-dir-moves-out-from-under-the-document
+       :why "出力先を移すと、文書からの相対解決が外れる。どちらのファイルも単体では正しいままなので、突き合わせないと分からない"
+       :file "appview/tenki-weather-component/cljs/shadow-cljs.edn"
+       :find ":output-dir \"public/js\""
+       :replace ":output-dir \"dist/js\""
+       :must-fail [":wiring/output-dir-not-under-document"]}
+
+      {:id :wiring/init-fn-points-at-a-namespace-with-no-source
+       :why ":init-fn が実在しない ns を指す形。shadow-cljs のビルドは落ちるが、ビルドを回さない経路（この gate 自身を含む）は committed なファイルだけで先に気付けた方がよい"
+       :file "appview/tenki-weather-component/cljs/shadow-cljs.edn"
+       :find ":init-fn tenki.app/main"
+       :replace ":init-fn tenki.core/main"
+       :must-fail [":wiring/init-fn-namespace-has-no-source-file"]}
+
+      {:id :wiring/mount-id-is-renamed-on-one-side
+       :why "React の慣習に合わせて id を root にする、のような普通の変更。render が null に描くので画面は loading… のまま止まるが、build も cljs.test suite も DOM に触らないので両方緑のままになる"
+       :file "appview/tenki-weather-component/cljs/src/tenki/app.cljs"
+       :find "getElementById \"app\""
+       :replace "getElementById \"root\""
+       :must-fail [":wiring/mount-id-absent-from-document"]}
+
+      {:id :wiring/npm-test-runs-a-previous-build
+       :why "**この suite で一番重い 1 件。** :output-to を変えると `npm test` は新しいファイルをコンパイルしてから out/ に残っている**前のビルドの成果物**を走らせる。緑になるが、それは変更前のコードに対する緑である。CLAUDE.md の『測れなかった検査が測って問題が無かった検査と同じ値を返す』そのもの"
+       :file "appview/tenki-weather-component/cljs/shadow-cljs.edn"
+       :find ":output-to \"out/tests.js\""
+       :replace ":output-to \"out/test.js\""
+       :must-fail [":wiring/npm-test-does-not-run-shadow-test-output"]}
+
+      {:id :wiring/ns-regexp-stops-matching-the-tests
+       :why ":ns-regexp はどの名前空間を test bundle に**コンパイルするか**を決める。合わないファイルは失敗するテストではなく、テストですらない——suite はいつもの Ran N tests / 0 failures を出し、そのファイルは一度も実行されない"
+       :file "appview/tenki-weather-component/cljs/shadow-cljs.edn"
+       :find ":ns-regexp \"-test$\""
+       :replace ":ns-regexp \"-spec$\""
+       :must-fail [":wiring/test-ns-not-matched-by-ns-regexp"]}
+
+      {:id :wiring/shadow-config-silently-closes-early
+       :why "**refusal の床。exit 2 でなければならない。** `edn/read-string` は最初の form だけ読んで残りを捨てるので、早く閉じて後ろにゴミが続く設定ファイルが clean として通る。CLAUDE.md が heredoc の \\\" について記述しているのと同じ形で、実際に 2026-08 の 4 文書がこれで壊れている。read-edn は text を vector で包んで全部を消費させ、form 数が 1 でなければ測定を拒否する"
+       :file "appview/tenki-weather-component/cljs/shadow-cljs.edn"
+       :find ":ns-regexp \"-test$\"}}}"
+       :replace ":ns-regexp \"-test$\"}}}\n{:stray :form}"
+       :must-fail ["REFUSED" "expected exactly 1 EDN form"]}
+
+      {:id :wiring/ns-regexp-key-disappears
+       :why "**refusal の床。exit 2 でなければならない。** :ns-regexp が無ければ、どの名前空間が走るのかを答えられない。答えられないことを『不一致 0 件』として緑で返すと、この検査は自分が測っていないものについて合格を出すことになる"
+       :file "appview/tenki-weather-component/cljs/shadow-cljs.edn"
+       :find ":ns-regexp \"-test$\""
+       :replace ":nsregexp \"-test$\""
+       :must-fail ["REFUSED" "no :ns-regexp"]}]}
+
+     {:repo "orgs/kotoba-lang/labor"
+      :label "labor 賃金と輸出 —— 二つ目の host で走らせて初めて見える差"
+      ;; この repo は .cljc が JVM / ClojureScript / SCI / GraalVM に可搬だと
+      ;; 名乗りながら、deps.edn には runner が 1 本（JVM）しか無かった。だから
+      ;; ClojureScript は assertion を 1 つも実行していない —— 主張は落ちて
+      ;; いたのではなく**測られていなかった**。測られていない主張と、測って
+      ;; 満たされている主張は、どちらも何も出力しないので同じ顔をする。
+      ;;
+      ;; 二つ目の host で同じファイルを走らせた最初の実行が差を出した。
+      ;; `(+ 8 nil)` は JVM で NullPointerException、ClojureScript で 8。
+      ;;
+      ;; だから mutation の一部は **:cmd を nbb 側に差し替えて**登録している。
+      ;; :labor/guard-kept-on-jvm-dropped-on-cljs は `clojure -M:test` では
+      ;; **緑のまま**で、portable runner だけが赤くなる —— host が 1 つしか
+      ;; 無い suite が構造的に見られないものが在ることの、実演。
+      :cmd ["clojure" "-M:test"]
+      :green-marker "0 failures, 0 errors."
+      :mutations
+      [
+      {:id :labor/total-hours-stops-checking-hours
+       :why "この repo で二つ目の host を足した理由そのもの。`(+ 8 nil)` は JVM で NullPointerException、ClojureScript で 8 になる —— 同じ勤務表が、片方では落ち、片方では労働者が記録した時間より小さい数を静かに返す。8 はエラー値ではないので wages-for を通って payroll の gross になり、短いシフトと区別できないまま支払われる"
+       :file "src/kotoba/labor.cljc"
+       :find "  (reduce (fn [acc e]
+            (+ acc (amount (:ts/hours e) {:labor/field :ts/hours :ts/entry e})))
+          0
+          entries))"
+       :replace "  (reduce + (map :ts/hours entries)))"
+       :must-fail ["total-hours-refuses-an-entry-with-no-hours" "total-hours-refuses-a-non-numeric-hours-value"]}
+
+      {:id :labor/guard-kept-on-jvm-dropped-on-cljs
+       :why "**この suite で一番大事な 1 本。`clojure -M:test` はこの変異に対して緑のまま終わる** —— reader conditional の :cljs 分岐は JVM から構造的に見えないので、host が 1 つしか無かった頃の suite はこの退行を永久に報告できなかった。二つ目の host だけが赤くなることを確かめるためにここに在る（maturity-loop の README が `#?(:clj int :cljs identity)` として記録しているのと同じ class）"
+       :file "src/kotoba/labor.cljc"
+       :cmd ["nbb" "--classpath" "src:test" "test/run_portable.cljs"]
+       :green-marker "portable-check: OK"
+       :find "            (+ acc (amount (:ts/hours e) {:labor/field :ts/hours :ts/entry e})))"
+       :replace "            (+ acc #?(:clj (amount (:ts/hours e) {:labor/field :ts/hours :ts/entry e})
+                      :cljs (:ts/hours e))))"
+       :must-fail ["total-hours-refuses-an-entry-with-no-hours" "total-hours-refuses-a-non-numeric-hours-value"]}
+
+      {:id :labor/payroll-stops-checking-gross
+       :why "gross が欠けた payroll は、ClojureScript では net 0 の**整った記録**になった —— 何も支払われていない労働者が、well-formed な行として台帳に載る。JVM では例外なので、host によって『壊れる』と『静かに嘘をつく』が入れ替わる"
+       :file "src/kotoba/labor.cljc"
+       :find "  (let [gross (amount gross {:labor/field :payroll/gross :payroll/id id})"
+       :replace "  (let [gross gross"
+       :must-fail ["payroll-refuses-a-missing-gross"]}
+
+      {:id :labor/contracts-json-currency-unescaped
+       :why "同じ object の contract_id / worker / role は escaper を通り、currency だけ通っていなかった。`:currency` は labor/contract の普通の引数なので公開経路から到達する。Python の json module で確認済み: 引用符 1 つで JSON 文字列が早く閉じ、文書全体が parse できなくなる"
+       :file "src/kotoba/labor/export.cljc"
+       :find "\"\\\"currency\\\":\\\"\" (json-str (or (:contract/currency c) \"USD\")) \"\\\"}\")))"
+       :replace "\"\\\"currency\\\":\\\"\" (or (:contract/currency c) \"USD\") \"\\\"}\")))"
+       :must-fail ["contracts-json-escapes-the-currency-field"]}
+
+      {:id :labor/json-num-accepts-a-non-number
+       :why "`number?` を `some?` に緩めるのは、この検査を弱める最も自然な書き方。金額は quote 無しで埋め込まれるので、数でない値は**文字列層の外に出る** —— rate が `15,\"approved\":true` のとき、間違った rate ではなく object の**二つ目のキー**が生まれる。escape では塞げない（そのフィールドは quote されていない）"
+       :file "src/kotoba/labor/export.cljc"
+       :find "  [v ctx]
+  (if (number? v)
+    (str v)"
+       :replace "  [v ctx]
+  (if (some? v)
+    (str v)"
+       :must-fail ["contracts-json-refuses-a-non-numeric-rate" "payrolls-json-refuses-a-non-numeric-amount"]}
+
+      {:id :labor/payrolls-json-loses-the-currency-key
+       :why "record は currency を持ち payrolls->csv は列に出すのに、JSON だけが落としていた形。同じ payroll が、JSON の読み手には**単位の無い金額 3 つ**、CSV の読み手には単位付きの金額に見える"
+       :file "src/kotoba/labor/export.cljc"
+       :find "\"\\\"currency\\\":\\\"\" (json-str (or (:payroll/currency p) \"USD\")) \"\\\"}\")))"
+       :replace "\"\\\"currency_omitted\\\":\\\"\" (json-str (or (:payroll/currency p) \"USD\")) \"\\\"}\")))"
+       :must-fail ["payroll-json-carries-every-column-the-csv-carries"]}
+
+      {:id :labor/csv-gains-a-column-json-does-not
+       :why "不変条件を『currency が出ること』ではなく『CSV の各列が JSON にも在ること』として書いた理由。**次に片方だけへ足される列**を捕まえられるかを、逆向きから確かめる"
+       :file "src/kotoba/labor/export.cljc"
+       :find "(csv-row [\"payroll_id\" \"worker\" \"period\" \"gross\" \"deductions\" \"net\" \"currency\"])"
+       :replace "(csv-row [\"payroll_id\" \"worker\" \"period\" \"gross\" \"deductions\" \"net\" \"currency\" \"employer\"])"
+       :must-fail ["payroll-json-carries-every-column-the-csv-carries"]}
+
+      {:id :labor/portable-runner-quietly-covers-less
+       :why "**refusal の床。exit 2 でなければならない。** 名前空間の一覧は静的に書くしかない（require はコンパイル時に解決される）ので、それは tree についての主張になる。この runner を書いている最中に実際に起きた: 一覧が kotoba.labor.portable-test を編集で失い、それでも `3/3 namespaces / portable-check: OK` と印字して 7 つ少ないテストで緑を返した。いまは一覧を disk と突き合わせ、答えられないなら 0 でも 1 でもない値で終わる"
+       :file "test/run_portable.cljs"
+       :cmd ["nbb" "--classpath" "src:test" "test/run_portable.cljs"]
+       :green-marker "portable-check: OK"
+       :find "    kotoba.labor.portable-test])"
+       :replace "    kotoba.labor.export-test])"
+       :must-fail ["REFUSED"]}]}
+
+  {:repo "orgs/cloud-itonami/resource-provider"
+   :label "resource-provider 平文と封緘の境界 —— 依存を 1 つも入れずに実物を動かす"
+   :cmd ["nbb" "test/resource_provider_test.cljs"]
+   :green-marker "resource-provider-check: OK"
+   :mutations
+   [{:id :resource-provider/rkey-collapses-separators-again
+    :why "この repo が広告している外部キーを、静かに嘘にする退行そのもの。rkeyOf が [^a-z0-9] の連続を \"-\" に潰していた頃、\"gpu.west\" \"gpu_west\" \"gpu-west\" \"gpu~west\" は同じ record key \"listing-gpu-west\" に落ちながら、それぞれ違う DID を持っていた。2 番目に登録した provider は alreadyExists と言われて **1 番目の DID と URI** を渡され、recordStat の FK 検査は \"gpu.west\" の登録を根拠に \"gpu_west\" を通した"
+    :file "kotoba/src/types.ts"
+    :find "export function rkeyOf(prefix: string, id: string): string {\n  return `${prefix}-${id.toLowerCase()}`;\n}"
+    :replace "export function rkeyOf(prefix: string, id: string): string {\n  return `${prefix}-${id.toLowerCase().replace(/[^a-z0-9]+/g, \"-\")}`;\n}"
+    :must-fail ["record-key-derivation-is-injective"
+                "record-key-and-did-agree-on-identity"
+                "foreign-key-rejects-a-listing-that-was-never-registered"]}
+
+   {:id :resource-provider/provider-pii-written-in-plaintext
+    :why "この repo が存在する理由そのものの退行 —— 封じるべき PII を平文で書く。**vitest 側の read-cap テストはこの変異を通してしまう**（quickstart が自分でそう書いている: 平文書き込みだと scanProfiles が encryptedRead で何も見つけないので、outsider は「アクセス制御されているから」ではなく「データが無いから」0 を見る）。この suite は同じ瞬間に owner が読めることを対にして確かめ、さらに平文 substrate を geo と device fingerprint で直接検索するので、3 通りの別々の理由で赤くなる"
+    :file "kotoba/src/registry.ts"
+    :find "  const receipt = await e.encryptedWrite<Record<string, unknown>>({\n    innerType: PROVIDER_PROFILE_INNER_TYPE,\n    record: body as unknown as Record<string, unknown>,\n    recipients: input.recipients ?? [],\n    rkey: rkeyOf(\"profile\", input.profileId),\n  });"
+    :replace "  const receipt = await e.write({\n    collection: PROVIDER_PROFILE_INNER_TYPE,\n    record: body as unknown as Record<string, unknown>,\n    rkey: rkeyOf(\"profile\", input.profileId),\n  });"
+    :must-fail ["boundary-plaintext-writes-only-the-public-catalog"
+                "boundary-every-sealed-type-goes-through-encryptedWrite"
+                "boundary-plaintext-never-contains-geo"
+                "boundary-plaintext-never-contains-device-fingerprint"
+                "read-cap-owner-still-sees-the-record-the-outsider-cannot"]}
+
+   {:id :resource-provider/listing-id-validation-dropped
+    :why "rkeyOf は injective になったが、そのぶん**呼ぶ側が検証しなければ表現できない id がそのまま record key になる**。この guard を外すと registerListing は空白入りの id を受け、AT Protocol の record key に使えない文字列と、空白を含む DID を作る"
+    :file "kotoba/src/registry.ts"
+    :find "  if (!isSafeId(input.listingId)) return { status: \"rejected\", error: \"invalidListingId\" };\n  if (!isResourceType(input.resourceType)) return { status: \"rejected\", error: \"invalidResourceType\" };\n  if (!isUint(input.capacity))"
+    :replace "  if (!isResourceType(input.resourceType)) return { status: \"rejected\", error: \"invalidResourceType\" };\n  if (!isUint(input.capacity))"
+    :must-fail ["unrepresentable-listing-id-is-rejected"]}
+
+   {:id :resource-provider/money-regex-admits-exponent-notation
+    :why "金額は decimal STRING で持つ（AT-Lexicon は float を持たない）という不変条件の退行。指数表記を通すと \"1e3\" が金額として台帳に載り、読み手ごとに 1000 とも \"1e3\" とも解釈されうる"
+    :file "kotoba/src/types.ts"
+    :find "  return typeof s === \"string\" && /^-?\\d+(\\.\\d+)?$/.test(s);"
+    :replace "  return typeof s === \"string\" && /^-?\\d+(\\.\\d+)?([eE]-?\\d+)?$/.test(s);"
+    :must-fail ["isDecimalString-\"1e3\""]}
+
+   {:id :resource-provider/percent-upper-bound-off-by-one
+    :why "qualityScore は整数 0-100 という宣言の境界を 1 だけ広げる。境界の off-by-one は検査が境界値を持っていなければ永久に見えない"
+    :file "kotoba/src/types.ts"
+    :find "  return typeof n === \"number\" && Number.isInteger(n) && n >= 0 && n <= 100;"
+    :replace "  return typeof n === \"number\" && Number.isInteger(n) && n >= 0 && n <= 101;"
+    :must-fail ["isPct-101"]}
+
+   {:id :resource-provider/new-collection-declared-without-a-side
+    :why "collection を足して境界表に載せ忘れる、という一番起きやすい形。平文と封緘のどちらでもない collection は、書いた人が思っているどちらかであって、読む人には分からない"
+    :file "kotoba/src/types.ts"
+    :find "export const RESOURCE_PROVIDER_DID_PREFIX"
+    :replace "export const PAYOUT_REQUEST_COLLECTION = \"com.etzhayyim.apps.resourceProvider.payoutRequest\";\nexport const RESOURCE_PROVIDER_DID_PREFIX"
+    :must-fail ["every-declared-collection-is-on-one-side-of-the-boundary"]}]}
 ]}

@@ -7,6 +7,10 @@ description: Audit and safely reclaim regenerable disk space on the user's macOS
 
 Recover useful space without treating source, history, user data, or active work as disposable.
 
+For disk-wide mapping or individual review of a path outside this skill's fixed
+allowlist, use `disk-space-audit` first. This skill starts only after a
+regenerable class has already been selected.
+
 ## Workflow
 
 1. Run `scripts/mac_disk_cleanup.zsh audit`. Avoid a whole-home recursive scan: this workspace has thousands of Git/DataLad trees and broad traversal is slow.

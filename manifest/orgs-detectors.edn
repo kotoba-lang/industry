@@ -296,7 +296,155 @@
               belongs in a measured field that gets re-measured and not in a
               claim."}
 
-{:id       :verify-source-nul-bytes
+{:id       :verify-shadow-cljs-provider-paths
+   :title    "builds that put a library on their source path but not that library's own dependency"
+   :why      "2026-08-31: net-kotobase/control-plane's protocols-worker and
+              network-awai/app-aozora-engine BOTH stopped at `The required namespace
+              \"sha2.core\" is not available, it was required by \"kotobase/cid.cljs\"` --
+              neither could be rebuilt from its own main, and both deploy live
+              Workers. One library grew a dependency and its consumers' source paths
+              did not follow. Nothing noticed because a build nobody ran is
+              indistinguishable from a build that works. A sweep found the same shape
+              in 8 more builds. This is deliberately not a fleet gate: it reads
+              `orgs/` and it runs `git show <default>/main:<path>` per repo, and a
+              gate ships one repo's tree with no siblings and no remotes."
+   :argv     ["nbb" "{{repo}}/scripts/verify-shadow-cljs-provider-paths.cljs"
+              "--findings" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 43200000                 ; 12h -- source paths change slowly
+   :timeout-ms  1800000                  ; 30m -- ~3x the measured 9m over 235 builds
+   :writes   :none
+   :measured "Landed 2026-08-31 with all three exit codes shown against a synthetic
+              tree rather than asserted: a build missing the provider -> exit 1 and one
+              FINDING naming the file and the namespace; the same tree with only the
+              correct build -> exit 0 `clean`; a repo whose default branch cannot be
+              resolved -> exit 2 and REFUSING, not clean. First live run: SCANNED 195
+              of 235, 10 broken, 40 unreadable, so exit 2 -- the tree is NOT reported
+              clean while 40 builds were never opened. It reads the DEFAULT BRANCH and
+              not the working tree on purpose: a west checkout sits at its pin, and
+              the first draft of this sweep read working trees and reported a repair
+              that had already landed."}
+
+  {:id       :verify-shared-library-consumption
+   :title    "how each build reaches its shared library, and whether it can reach it at all"
+   :why      "2026-08-31, root ADR-2608311600: kotobase.biscuit-grant -- the fleet's one
+              Biscuit verifier -- moved out of net-kotobase/control-plane into
+              kotoba-lang/grant. The API gateway followed via a pinned git dep. The
+              protocols worker did not: its shadow-cljs source path still pointed at the
+              emptied ../shared/src, its source still required the namespace, and MAIN
+              COULD NOT COMPILE IT -- while the deployed artifact went on serving
+              sparql, gremlin and graphql. A source path carries no pin and raises no
+              error until somebody builds, so the gap between `deployed` and `buildable`
+              stayed invisible. Three routes exist and only one is silent: a vendored
+              copy is pinned and diffable, a git dep is pinned and fails loudly, a
+              source path is neither. CANNOT be a fleet gate: it reads every repo and
+              runs git against each one, and a gate ships a single tree."
+   :argv     ["nbb" "{{repo}}/scripts/verify-shared-library-consumption.cljs"
+              "--findings" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 43200000                 ; 12h
+   :timeout-ms  1200000                  ; 20m -- measured ~3m
+   :writes   :none
+   :measured "Landed 2026-08-31 after being wrong twice, both fixed rather than
+              described. It first classified from WORKING TREES, so a west checkout at
+              its pin made a correctly-vendored build read as `dangling` -- wrong in the
+              direction that manufactures findings, measured on nexus-x402 the day its
+              copy landed. It then folded exit status into an `:ok` meaning `0 or 1`,
+              which is right for grep and wrong for git: `rev-parse --verify` failures
+              read as successes, every repo resolved to the first remote in the list,
+              and the correctly-pinned API gateway was reported as unable to compile.
+              Classification now reads the default branch and reports exit status
+              instead of interpreting it; rows carry how far the local checkout is
+              behind, so a stale tree is legible rather than mistaken for a defect.
+              First correct run: gateway pinned-dep, nexus-x402 vendored,
+              protocols-worker DANGLING (真 -- fixed in control-plane 2a959b76),
+              kotobase-worker-shell source-path and unpinned."}
+
+  {:id       :verify-credential-consumers
+   :title    "a credential class that is minted, verifiable, and accepted by nobody"
+   :why      "2026-08-31, ADR-2608311600: ADR-2608291200 minted a per-caller operator
+              credential for api.murakumo.cloud (`mro_`, 15 minutes, scoped to named
+              actions) and measured the whole passkey chain live against real services
+              with a signing virtual authenticator. The consumer was never written.
+              Measured across 4,329 checked-out repos: `/rpc/verify-operator` has ZERO
+              callers outside the issuer's own repository, so the credential exists,
+              verifies, expires and authorises nothing -- while the shared secret it was
+              built to replace stayed the only key to /v1/kotobase/database-restore
+              (one string, held by every operator process, compared with `=`, naming
+              nobody in an audit, and unreadable by any human since 2026-08-29).
+              Neither half was wrong; nothing asked whether they were connected, and a
+              consumer that does not exist raises no error anywhere. CANNOT be a fleet
+              gate: it must read the issuer in one repo and search every other repo,
+              and a gate ships one repo's tree."
+   :argv     ["nbb" "{{repo}}/scripts/verify-credential-consumers.cljs"
+              "--findings" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 43200000                 ; 12h -- credential classes are added rarely,
+                                         ; and the walk is expensive
+   :timeout-ms  1800000                  ; 30m -- ~5x the measured 5m24s
+   :writes   :none
+   :measured "Landed 2026-08-31 with all three exit codes shown against a synthetic
+              tree: one endpoint consumed and one not -> exit 1 and exactly one FINDING
+              naming the unconsumed one; adding the missing consumer -> exit 0 `clean`;
+              removing the issuer -> exit 2 REFUSED, because an unread issuer must not
+              be reported as an unconsumed credential.
+              Two defects were found in this detector while writing it and both are
+              fixed rather than described. It first ran three separate `grep -r` walks
+              over 4,000 repos and did not finish in nine minutes; the cost is the walk,
+              so it now walks once and buckets. It then excluded only the issuer's
+              SOURCE FILE, which made /rpc/verify-operator look like it had three
+              consumers -- its own ADR, its own README and its own compiled bundle --
+              and reported `clean`. A consumer is somebody else, so the issuer's whole
+              repository is excluded. That defect failed in the direction that hides
+              the finding, which is why the synthetic tree above includes an
+              issuer-local mention that must not count."}
+
+  {:id       :verify-ipni-publisher-record
+   :title    "the IPNI publisher record, against the identity that is actually publishing"
+   :why      "2026-08-31, ADR-2608311800: manifest/ipni-publisher.edn named the
+              2026-08-27 key while the live head had been signed by another since
+              2026-08-30, and a fourth identity had never been written down at all --
+              the file that exists to say which key publishes did not know which key
+              was publishing. Its two retrieval candidates had also swapped: the host
+              marked :ready 404'd all three CIDs reachable from the live head, and the
+              host marked :broken served them and re-hashed correctly. Three of the
+              four publisher identities still point retrieval at the 404ing host, and
+              since every indexed row has Publisher.ID == AddrInfo.ID, each rotation
+              minted a new PROVIDER identity too -- the file's own words are that an
+              advertisement naming an address that cannot serve a verifiable block is
+              worse than no advertisement. Nothing compared the record to the wire, so
+              the record could only ever be as fresh as the last person who looked.
+              CANNOT be a fleet gate twice over: it reads a superproject manifest AND
+              it requires outbound HTTPS to cid.contact, and node egress is not
+              uniform (measured 2026-08-13, 8 nodes 200 / zebulun 000)."
+   :argv     ["nbb" "{{repo}}/scripts/verify-ipni-publisher-record.cljs" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 21600000                 ; 6h -- rotation is rare but a stale record
+                                         ; is invisible, so do not let it run daily
+   :timeout-ms  600000                   ; 10m -- measured ~40s, mostly cid.contact
+   :writes   :none
+   :measured "Landed 2026-08-31 with both directions shown rather than asserted.
+              Clean run: exit 0, SCANNED 6, six checks ok, zero FINDING lines. Three
+              controls, each naming the check it should: putting the stale peer-id
+              back failed record-names-the-live-signer AND
+              the-current-entry-is-the-declared-one; dropping the newest identity from
+              :identity-history failed history-accounts-for-every-indexed-identity and
+              named the missing id; claiming kotobase.net is :ready failed
+              ready-candidate-serves-kotobase.net while the other candidate stayed ok.
+              --selftest proves the peer-id and IPNS derivations reproduce a pair the
+              manifest already held, and the CID constant was computed independently
+              in python rather than by the code under test -- a derivation that cannot
+              reproduce a known-good pair may not be used to judge a new one."}
+
+  {:id       :verify-source-nul-bytes
    :title    "raw control bytes in source, which make grep answer as if a word is absent"
    :why      "2026-08-18/19: one NUL byte makes file(1) classify a source file as
               `data`, and grep then SKIPS it silently -- `grep -c MessageDigest
@@ -2585,4 +2733,34 @@
               that did not answer. A record with no endpoint is a separate warn
               rather than a pass, because a claim nothing can check is not a
               claim that passed."}
+
+  {:id       :verify-ship-builds-first
+   :title    "ship paths that can send out an artifact nobody built"
+   :why      "2026-08-31, twice in one day and both times to the person fixing it.
+              In the morning a stale bundle went out over a settlement fix and put
+              an inflated public revenue figure back. In the evening a build exited
+              127 -- its compiler was not on PATH -- the ship ran as a separate
+              command, and only the second exit code was read, sending out a bundle
+              three and a half hours old. The ship guard checks the CHECKOUT's git
+              state, not the artifact's, so a checkout perfectly in step with main
+              can send out bytes that disagree with its own source while the guard
+              stays green. Two independent properties keep a ship path honest: it
+              builds first (so a failed build stops the ship), and that build goes
+              through resource-guard (so it takes its turn -- a build has held that
+              lock twelve minutes here while another session's retries were all
+              refused). Measured across the tree: 58 ship scripts, 17 can ship
+              unbuilt, 39 build outside the guard, 2 do both. Not a fleet gate: it
+              reads `orgs/`, so a node shipped only one repo's tree would report
+              clean forever."
+   :script   "scripts/verify-ship-builds-first.cljs"
+   :args     ["--findings"]
+   :exit     {0 "every ship script builds first, under the guard"
+              1 "findings"
+              2 "could not measure -- no orgs tree, or no ship script found at all"}
+   :fixed-by "Give the repo `build` and ship scripts of the shape actor-hanmoto and
+              nexus-x402 now use: the build under
+              `${COM_JUNKAWASAKI_ROOT:-../../..}/scripts/resource-guard.mjs run
+              build`, and the ship chaining `npm run build && …` so a failed build
+              stops it. This measures the sanctioned path only -- neither incident
+              went through a script, and no script can stop a CLI run by hand."}
 ]}

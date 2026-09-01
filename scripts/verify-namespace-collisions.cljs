@@ -1,4 +1,8 @@
 #!/usr/bin/env nbb
+;; The sibling axis is `scripts/verify-namespace-twins.cljs`
+;; (ADR-2608319602): ONE repository publishing one namespace as both
+;; `.cljc` and `.clj`/`.cljs`, where the loader's extension priority --
+;; not the classpath -- decides which file is dead.
 ;; Report Clojure namespaces that more than one checked-out repo ships.
 ;;
 ;;   nbb scripts/verify-namespace-collisions.cljs            ; divergent only

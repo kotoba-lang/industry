@@ -1,0 +1,90 @@
+#!/usr/bin/env nbb
+;; manifest/spend-grants.edn -> the facts a token carries, and the policy the
+;; buyer folds out of them.
+;;
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/spend-grant-facts.cljs [--buyer dougaka]
+;;
+;; ## Why this is a separate step from minting
+;;
+;; A spend limit is enforced twice, off-chain by a biscuit and (later) on-chain
+;; by a contract, and the two cannot see each other. Written separately they
+;; drift, and a drifted pair has no honest reading: the smaller holds and
+;; nobody knows which it is.
+;;
+;; This is the single derivation both sides come from. It is pure -- a
+;; declaration in, facts out -- so it runs today, before any root key exists,
+;; and its output can be checked against the declaration by eye.
+;;
+;; Minting needs a signer and the signer is the passkey, which is step 2. What
+;; this proves in the meantime is that the numbers a token WOULD carry are the
+;; numbers somebody declared, rather than numbers somebody typed twice.
+;;
+;; ## The conversion is where a cap gets silently multiplied
+;;
+;; USDC has six decimals. `0.05` means 50000 base units, and a cap written in
+;; the wrong unit is off by a factor of a million in whichever direction hurts.
+;; So the declaration holds dollars, one function converts, and no other file
+;; is allowed to hold a base-unit number.
+(ns spend-grant-facts
+  (:require ["fs" :as fs]
+            ["path" :as p]
+            [clojure.edn :as edn]
+            [clojure.string :as str]))
+
+(def argv (vec (drop 2 (js->clj (.-argv js/process)))))
+(defn- opt [f d] (let [i (.indexOf argv f)] (if (neg? i) d (nth argv (inc i) d))))
+(def root (opt "--root" "."))
+(def only (opt "--buyer" nil))
+
+(defn- refuse! [m]
+  (.write (.-stderr js/process) (str "REFUSING: " m "\n"))
+  (.exit js/process 2))
+
+(def usdc-decimals 6)
+
+(defn usd->base-units
+  "Dollars as a STRING -> integer base units. Refuses anything it cannot read
+  exactly, because a cap that silently became zero is a cap that permits
+  nothing and a cap that silently became a million is one that permits
+  everything."
+  [s]
+  (let [t (str/trim (str s))]
+    (when-not (re-matches #"\d+(\.\d{1,6})?" t)
+      (refuse! (str "not a dollar amount this can convert exactly: " (pr-str s))))
+    (let [[whole frac] (str/split t #"\.")
+          frac (str/join (take usdc-decimals (concat (or frac "") (repeat "0"))))]
+      (js/parseInt (str whole frac) 10))))
+
+(defn grant->facts
+  "One grant -> the fact vectors a token carries. The predicate names are
+  `pay.x402-buyer/policy-vocabulary`'s, so the buyer folds these back into the
+  policy it plans with -- one vocabulary, both directions."
+  [{:keys [limit networks assets schemes]}]
+  (into [['max-amount (usd->base-units (:per-call-usd limit))]]
+        (concat (map (fn [n] ['network n]) networks)
+                (map (fn [a] ['asset a]) assets)
+                (map (fn [s] ['scheme s]) schemes))))
+
+(defn -main []
+  (let [f (p/join root "manifest/spend-grants.edn")]
+    (when-not (fs/existsSync f) (refuse! (str "no declaration at " f)))
+    (let [d (try (edn/read-string (fs/readFileSync f "utf8"))
+                 (catch :default e (refuse! (str "unreadable: " (.-message e)))))
+          gs (cond->> (:grants d) only (filter #(= only (:buyer %))))]
+      (when (empty? gs) (refuse! (str "no grant" (when only (str " for " only)))))
+      (doseq [g gs]
+        (println (str "BUYER\t" (:buyer g) "\t" (name (:state g))))
+        (println (str "ADDRESS\t" (:session-address g)))
+        (println (str "CEILINGS\tfunded $" (get-in g [:limit :funded-usd])
+                      " (arithmetic)\tper-call $" (get-in g [:limit :per-call-usd])
+                      " (the token)"))
+        (println (str "EXPIRES\t" (:expires g)))
+        (println "FACTS")
+        (doseq [fact (grant->facts g)]
+          (println (str "  " (pr-str fact))))
+        (when (= :awaiting-funding (:state g))
+          (println (str "\nNOT SPENDABLE. The address holds nothing until somebody funds it,"
+                        "\nand funding is the operator's step. This is the correct resting"
+                        "\nstate for a declaration whose signer does not exist yet.")))))))
+
+(-main)

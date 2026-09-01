@@ -2,6 +2,14 @@
   "The P&L input for cloud-itonami actors, and the three ways it is not
   computable today.
 
+  ⚠ `a bot that works and earns` does NOT mean a bot is paid for working.
+  ADR-2608291009 D4 is explicit and calls it the strongest invariant in that
+  design: **「bot が働いた」ことでは BOT は発行されない。「bot の働きに誰かが
+  払った」ことで発行される** — 1,958 bots doing 1,956 kinds of unpaid work mint
+  nothing. Supply answers external demand or it does not move. So this file
+  measures; it never proposes an issuance, and a reader arriving here looking
+  for a way to pay bots for their work should stop at this paragraph.
+
   ADR-2608291009 (BOT / KUMO / YATA) defines what `a bot that works and earns`
   means, per window:
 
@@ -24,6 +32,18 @@
 
   So margin is three-valued here. `:unmeasured` is not zero, and it carries the
   reason it could not be closed.
+
+  ## The join, as a quantity (2026-09-01)
+
+  The cost side used to read a receipts file nothing wrote, and the reason it
+  was open lived in a comment: *five accounts have spent credits and the overlap
+  with the actors here is ZERO*. A sentence in a comment does not move when
+  somebody fixes it. This now folds the live run feed and prints
+  `KUMO BURN <attributed> / <unattributed>` with the accounts nobody claims
+  named, so the gap is a number that shrinks by one declaration at a time.
+
+  Three answers, not two: an unreadable feed prints UNMEASURED and says so,
+  because a cost side reporting zero is worse than one reporting why it is open.
 
   It also reports the population, because the population is wrong. The maturity
   scan sets `:repo/has-actor-edn?` with a basename match anywhere in the tree
@@ -187,10 +207,46 @@
       (try (edn/read-string (slurp* receipts-path))
            (catch :default e (refuse! (str "receipts unreadable: " (.-message e))))))))
 
-(defn kumo-burn [repo]
-  (if-let [v (get-in receipts [repo :kumo])]
-    {:value v :reason nil}
-    {:value nil :reason "the run ledger is live (772 rows, 119 spends) but no actor declares :actor/murakumo-account -- measured 2026-08-31, zero overlap between the 5 spending accounts and this population"}))
+(def ledger-url (opt "--ledger" "https://api.murakumo.cloud/infer/runs"))
+
+(defn fetch-ledger
+  "The live run feed, or nil. Public and unauthenticated to read, which is what
+   makes the cost side computable without a credential."
+  []
+  (-> (js/fetch ledger-url)
+      (.then (fn [r] (if (.-ok r) (.json r) (throw (js/Error. (str "HTTP " (.-status r)))))))
+      (.then (fn [j] (js->clj j :keywordize-keys true)))
+      (.catch (fn [_] nil))))
+
+(defn spend-by-account
+  "account -> credits spent, folded from the run feed. `nil` in, `nil` out: a
+   feed that could not be read must not fold to an empty map, because an empty
+   map and a fleet that has never spent print the same zero."
+  [runs]
+  (when runs
+    (reduce (fn [acc r]
+              (let [s (or (:run/spend r) (get r "run/spend") (:spend r) (get r "spend"))]
+                (if (map? s)
+                  (reduce (fn [a [k v]] (update a (name k) (fnil + 0.0) v)) acc s)
+                  acc)))
+            {} runs)))
+
+(defn kumo-burn
+  "Credits this repo's actor burned, or why that is not answerable.
+
+   Two different opens, and they had been printing as one. `no-account` is an
+   actor that never said which account it spends from — the join is missing and
+   the fix is one line in its manifest. `no-ledger` is a feed this run could not
+   read — nothing is missing except the measurement, and reporting it as the
+   first would send someone to edit a manifest that is already correct."
+  ([repo] (kumo-burn repo nil nil))
+  ([repo account spend]
+   (cond
+     (get-in receipts [repo :kumo]) {:value (get-in receipts [repo :kumo]) :reason nil}
+     (nil? spend) {:value nil :reason (str "run ledger unreadable at " ledger-url
+                                           " -- the cost side is unmeasured, not zero")}
+     (nil? account) {:value nil :reason "this actor declares no :actor/murakumo-account, so its spend cannot be told from anyone else's"}
+     :else {:value (get spend account 0.0) :reason nil})))
 
 (defn yata-burn [repo]
   (if-let [v (get-in receipts [repo :yata])]
@@ -295,9 +351,11 @@
           unseen-names (vec (remove known on-disk))
           unseen (count unseen-names)]
       (when (zero? (count flagged)) (refuse! "evidence flagged zero actor repos"))
-      (-> (if offline? (js/Promise.resolve nil) (fetch-catalog))
+      (-> (js/Promise.all
+           #js [(if offline? (js/Promise.resolve nil) (fetch-catalog))
+                (if offline? (js/Promise.resolve nil) (fetch-ledger))])
           (.then
-           (fn [catalog]
+           (fn [[catalog ledger]]
              ;; A 200 that carries no items is not an empty catalog, it is a
              ;; page that is not the catalog -- x402.nexus answers 200 with a
              ;; service index for any unknown path. Admitting it would make
@@ -325,6 +383,13 @@
                                        (get m "actor/x402-seller") nm)
                            :seller-declared? (boolean (or (:actor/x402-seller m)
                                                           (get m "actor/x402-seller")))
+                           ;; The cost-side join, declared the same way the
+                           ;; revenue-side one is. An actor that does not name
+                           ;; its spend account cannot have its burn told from
+                           ;; anyone else's — and the remainder is counted below
+                           ;; rather than left as a sentence in a comment.
+                           :account (or (:actor/murakumo-account m)
+                                        (get m "actor/murakumo-account"))
                            :skus (get skus (or (:actor/x402-seller m)
                                                (get m "actor/x402-seller") nm))
                            :book (read-pricing-book dir)})
@@ -373,14 +438,31 @@
                                "\tpricing.edn が在るが読めない"))
                  (println (str "  no-offer     " (n :no-offer)
                                "\t何を売るのか、どこにも書かれていない"))
-                 (let [open-cost (remove #(and (:value (kumo-burn (:repo %)))
+                 (let [spend (spend-by-account ledger)
+                       claimed (into {} (keep (fn [a] (when (:account a) [(:account a) (:repo a)])) actors))
+                       attributed (reduce + 0.0 (keep (fn [[acct v]] (when (claimed acct) v)) spend))
+                       unattributed (reduce + 0.0 (keep (fn [[acct v]] (when-not (claimed acct) v)) spend))
+                       open-cost (remove #(and (:value (kumo-burn (:repo %) (:account %) spend))
                                                (:value (yata-burn (:repo %)))
                                                (settled-revenue (:repo %)))
                                          actors)]
+                 ;; The join, as a quantity. It was a sentence in a docstring,
+                 ;; and a sentence does not move when someone fixes it.
+                 (println)
+                 (if (nil? spend)
+                   (println (str "KUMO BURN\tUNMEASURED — the run ledger at " ledger-url
+                                 " could not be read. This is not zero."))
+                   (do (println (str "KUMO BURN\t" (js/Math.round attributed) " credits attributed to an actor, "
+                                     (js/Math.round unattributed) " unattributed"))
+                       (when (pos? unattributed)
+                         (println (str "  " (count (remove #(claimed (key %)) spend))
+                                       " account(s) spend credits that no actor claims: "
+                                       (str/join ", " (map key (remove #(claimed (key %)) spend)))))
+                         (println (str "  an actor claims one by declaring :actor/murakumo-account")))))
                  (println (str "margin computable:      " (- (count actors) (count open-cost))
                                (when (seq open-cost)
                                  (str "  (open for " (count open-cost) ": "
-                                      (:reason (kumo-burn nil)) ")"))))
+                                      (:reason (kumo-burn nil nil spend)) ")"))))
                  (println)
                  ;; Three findings, not forty-one rows. Each is aggregate because
                  ;; each has one fix; a per-repo row here would report the same
@@ -420,7 +502,7 @@
                    (finding! "fail" "cost-side-open"
                              (str "margin is uncomputable for " (count open-cost) " of "
                                   (count actors) " admitted actors. "
-                                  (:reason (kumo-burn nil))
+                                  (:reason (kumo-burn nil nil spend))
                                   " ADR-2608291009 step 4 cannot run until a receipt"
                                   " store exists; pass --receipts <edn> once one does.")))
                  ;; 見えていない actor を、`no-offer` の中に黙って混ぜない ——
@@ -448,7 +530,7 @@
                  ;; not a pass, and must not share an exit code with one that is.
                  (println)
                  (let [margins (for [r actors]
-                                 (let [k (kumo-burn (:repo r)) y (yata-burn (:repo r))]
+                                 (let [k (kumo-burn (:repo r) (:account r) spend) y (yata-burn (:repo r))]
                                    (if-let [rev (and (:value k) (:value y) (settled-revenue (:repo r)))]
                                      {:repo (:repo r) :margin (- rev (:value k) (:value y))}
                                      {:repo (:repo r) :margin nil})))
