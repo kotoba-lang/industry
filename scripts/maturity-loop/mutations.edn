@@ -5189,4 +5189,109 @@
     :find "export const RESOURCE_PROVIDER_DID_PREFIX"
     :replace "export const PAYOUT_REQUEST_COLLECTION = \"com.etzhayyim.apps.resourceProvider.payoutRequest\";\nexport const RESOURCE_PROVIDER_DID_PREFIX"
     :must-fail ["every-declared-collection-is-on-one-side-of-the-boundary"]}]}
-]}
+
+  {:repo "orgs/cloud-itonami/app-society6"
+   :label "app-society6 の凍結 COFOG artifact —— rollup と components と、それを引用する散文"
+   ;; appview/society6-ui-s6c9m2q1/static/data/ の 2 ファイルは**再生成できない**。
+   ;; 生成器 generate_cofog_directory_summary.sh は入力を旧 etzhayyim-root monorepo の
+   ;; layout から解決するので、この repo では `find: ... No such file or directory` で
+   ;; exit 1 になる（quickstart が実測を引用している）。つまりこの 2 つが変わる唯一の
+   ;; 経路は手編集で、**JSON として妥当なまま数字だけが動いた編集は、この repo の
+   ;; 他のどの検査にも映らない** —— `npm run typecheck` の tsconfig は kotoba/src しか
+   ;; include せず、kotoba/ の vitest はこの 2 ファイルを一度も読まない。
+   ;;
+   ;; 3 番目の不変条件（rkey の単射性）だけは artifact の話ではなく registry の話である。
+   ;; kotoba/src/registry.ts は cofogService の record を `cofogRkey(code)` で読み書きする
+   ;; ので、大小・区切りだけが違う 2 つのコードは**同じ 1 件**を指す —— registerCofog は
+   ;; 先の 1 件を見つけて `alreadyExists` を返し、後の service は黙って保存されない。
+   ;; いま 97 の distinct code が 97 の distinct key を持つのはデータの性質であって、
+   ;; 変わりうるのはデータの側である。
+   ;;
+   ;; 4 番目は散文の側。README.md と quickstart はどちらも件数と日付を本文で引用する。
+   ;; ⚠ **この検査は fenced code block を剥がしてから当てる。** 剥がす前は、
+   ;; quickstart に貼った「失敗時の出力」そのものが `"101 directories"` を含むために
+   ;; **101 に壊した artifact に対して散文検査が通っていた**（実測: 4 件出るはずの
+   ;; 違反が 3 件だった）。検査が自分の実演に defeat される形で、これは推測ではなく
+   ;; 測って見つけた。
+   ;;
+   ;; 9 件とも pin a0b52b6d で landing 前に実際に赤くなるところを見た。壊した対象と
+   ;; 報告された invariant は毎回一致し、無改変で exit 0。さらに拒否床 5 件
+   ;; （summary 不在 / summary が JSON でない / directories が空 / README 不在 /
+   ;; components が空配列）が **exit 2** を返すことも確認した —— 空の artifact は
+   ;; 下の等式を全部満たす（0 = 0 = 0）ので、これを 0 でも 1 でもない値で返さなければ
+   ;; 「測れなかった」が「測って問題が無かった」と同じ顔になる。
+   ;;
+   ;; ここに無いもの: 102 という数が今も正しいかは検査しない。それは 2026-02-22 の
+   ;; 上流の性質であってこの repo についての主張ではないので、落ちても意味が読めない。
+   :cmd ["nbb" "test/cofog_artifact_test.cljs"]
+   :green-marker "cofog-artifact-check: OK"
+   :mutations
+   [{:id :society6/summary-total-drifts-from-its-list
+     :why "rollup の totals と、それが要約している一覧が別々に編集される形。片方だけ直すのが自然な壊れ方で、散文が引用している数字もそこで古くなる"
+     :file "appview/society6-ui-s6c9m2q1/static/data/cofog-directory-summary.json"
+     :find "\"directories\": 102,"
+     :replace "\"directories\": 101,"
+     :must-fail ["summary-total-directories-matches-the-list"
+                 "group-counts-sum-to-total-directories"
+                 "prose-quotes-the-directory-count-in-the-artifact"]}
+
+    {:id :society6/group-row-count-drifts
+     :why "per-group の表は totals とは別の行として編集される。group 単位の数字が自分の directories と合わなくなるのは、totals が合っていても起きる"
+     :file "appview/society6-ui-s6c9m2q1/static/data/cofog-directory-summary.json"
+     :find "\"group\": \"04\",\n      \"count\": 25,"
+     :replace "\"group\": \"04\",\n      \"count\": 24,"
+     :must-fail ["group-row-count-matches-its-directories"
+                 "group-counts-sum-to-total-directories"]}
+
+    {:id :society6/group-row-with-svelte-drifts
+     :why "同じ表の別の列。1 列だけ直して隣を忘れる形で、count が合っているので totals 側からは見えない"
+     :file "appview/society6-ui-s6c9m2q1/static/data/cofog-directory-summary.json"
+     :find "\"group\": \"07\",\n      \"count\": 14,\n      \"withSvelte\": 14,"
+     :replace "\"group\": \"07\",\n      \"count\": 14,\n      \"withSvelte\": 13,"
+     :must-fail ["group-row-with-svelte-matches-its-directories"
+                 "group-with-svelte-sums-to-total"]}
+
+    {:id :society6/directory-leaves-the-portal-silently
+     :why "directory を portal から外したが components 側を直していない形。portal が render するのは components の方なので、外したはずのものが出続ける"
+     :file "appview/society6-ui-s6c9m2q1/static/data/cofog-directory-summary.json"
+     :find "\"name\": \"cofog-0111-executive-component\",\n      \"code\": \"0111-executive\",\n      \"group\": \"01\",\n      \"hasSvelte\": true,\n      \"inPortal\": true"
+     :replace "\"name\": \"cofog-0111-executive-component\",\n      \"code\": \"0111-executive\",\n      \"group\": \"01\",\n      \"hasSvelte\": true,\n      \"inPortal\": false"
+     :must-fail ["components-are-exactly-the-in-portal-directories"
+                 "summary-total-in-portal-matches-the-list"
+                 "summary-portal-split-covers-every-directory"]}
+
+    {:id :society6/component-renamed-without-its-directory
+     :why "同じ集合を 2 ファイルが名指ししているので、片方だけ更新される機会が 2 つある。逆向き —— summary 側を動かしても components が気づく"
+     :file "appview/society6-ui-s6c9m2q1/static/data/cofog-components.json"
+     :find "\"component\": \"cofog-0112-foreign-component\""
+     :replace "\"component\": \"cofog-0112-foreign-renamed\""
+     :must-fail ["components-are-exactly-the-in-portal-directories"]}
+
+    {:id :society6/directory-bucketed-under-the-wrong-group
+     :why "group は rollup が集計する鍵。code と食い違うと、その directory は属さない group の下で数えられる"
+     :file "appview/society6-ui-s6c9m2q1/static/data/cofog-directory-summary.json"
+     :find "\"code\": \"0113-general\",\n      \"group\": \"01\""
+     :replace "\"code\": \"0113-general\",\n      \"group\": \"02\""
+     :must-fail ["directory-group-is-a-prefix-of-its-code"
+                 "group-row-count-matches-its-directories"]}
+
+    {:id :society6/two-codes-collapse-to-one-registry-key
+     :why "この repo で一番静かな壊れ方。registry.ts は cofogService を cofogRkey(code) で読み書きするので、区切りだけが違う 2 コードは同じ 1 件を指す —— 2 件目の registerCofog は alreadyExists を返して保存されない。artifact 側は 2 行のままなので、どこにも失敗が現れない"
+     :file "appview/society6-ui-s6c9m2q1/static/data/cofog-components.json"
+     :find "\"code\": \"0111\","
+     :replace "\"code\": \"01.1\","
+     :must-fail ["cofog-rkey-is-injective-over-the-codes-in-the-artifacts"]}
+
+    {:id :society6/component-loses-its-title
+     :why "portal が表示に使う欄が空になる形。JSON としては妥当なので、読み込みは成功して画面だけが空になる"
+     :file "appview/society6-ui-s6c9m2q1/static/data/cofog-components.json"
+     :find "\"title\": \"Executive\","
+     :replace "\"title\": \"\","
+     :must-fail ["components-carry-code-name-and-title"]}
+
+    {:id :society6/prose-count-drifts-from-the-artifact
+     :why "逆向き —— artifact ではなく散文の側が動く形。README は凍結スナップショットの規模を本文で断言しており、その数字は隣のファイルとは別に編集される"
+     :file "README.md"
+     :find "（102 directories）"
+     :replace "（120 directories）"
+     :must-fail ["prose-quotes-the-directory-count-in-the-artifact"]}]}]}
