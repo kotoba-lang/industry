@@ -4401,3 +4401,19 @@ orgs/personal/research/genomics/high-iq-japanese-gwas/.venv-audit/
 # through a form field or a commit. If a tracked home for this file is ever
 # needed it must be an encrypted/annex path, not plain git.
 /credentials.edn
+
+# Transient build/verify run output and scratch checkouts that accumulate in the
+# shared superproject checkout. Measured 2026-09-01: 196 MB across 5,703 files,
+# none of it ignored, all of it untracked — which means every `cleanup-land`
+# pass saw it as `:additive` landing candidates ("no path of this name exists on
+# main"). That argument is exactly the one the residue / nested-repo / stale-ignore
+# gates exist to refute: absent from main is not the same as new work. Two of
+# these are timestamped copies of whole repos written by build verification, and
+# one holds nested git checkouts that are not registered worktrees of this repo
+# (both were confirmed clean with 0 unpushed commits before being hidden here).
+# Regenerate by re-running the verification; nothing here is a source of truth.
+/verify-runs/
+/orgs/verify-runs/
+/kotoba-cli-build-verify/
+/orgs/network-awai-worktrees/
+/scripts/hermes-startup-capital-bots/quarantine/
