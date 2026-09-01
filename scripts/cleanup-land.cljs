@@ -1856,10 +1856,18 @@
                             (catch :default _ false))))))
 
 (def repos
+  ;; `--names` は `own-repo-root?` より **前** に当てる。順序を逆にすると、1 repo に
+  ;; 絞ったつもりの run が 4,296 回の `git rev-parse --show-toplevel` を spawn してから
+  ;; 絞り込む —— 実測 2026-09-01（load 690 のこの機械）、`--names animeka` が evidence
+  ;; 行（下の「走査 N checkout」）に到達する前に数分かかり、その間の出力は header 3 行
+  ;; だけだった。**「走査中」と「対象 0 repo」が出力から区別できない**という、この
+  ;; script 自身が gitdir-file-blindspot で警告している形である。3 つの述語はどれも
+  ;; 純粋（`annex?` は statSync、`own-repo-root?` は rev-parse + realpath 比較、名前
+  ;; 照合は文字列)なので、並べ替えても結果集合は変わらない —— 変わるのは費用だけ。
   (->> all-git-paths
+       (filter (fn [d] (if only-names (some #(str/ends-with? d (str "/" %)) only-names) true)))
        (remove annex?)
-       (filter own-repo-root?)
-       (filter (fn [d] (if only-names (some #(str/ends-with? d (str "/" %)) only-names) true)))))
+       (filter own-repo-root?)))
 
 (def plans
   (->> repos (map plan-repo)
