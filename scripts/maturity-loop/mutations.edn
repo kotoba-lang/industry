@@ -5508,4 +5508,160 @@
      :find "   \"com.etzhayyim.apps.yukkuri.reviewVideo\"     \"review_video\"})"
      :replace "   })"
      :must-fail ["nsid-map-completeness"]}]}
+
+  {:repo "orgs/cloud-itonami/app-open-saas"
+   :label "app-open-saas —— 文書と実装が互いについて言っていること"
+   ;; この repo は既に vitest を 14 + 14 件持っていて、各 appview のドメイン層を
+   ;; 単体でよく見ている。見ていなかったのは別の種類の主張である —— **複数の
+   ;; ファイルが同じことについて別々に語り、どれが破れても何も throw しない**:
+   ;;
+   ;;   appview/README.md           ── API 一覧と serving host を案内する
+   ;;   appview/*/src/app.ts        ── TypeScript 側の登録経路
+   ;;   appview/*/*.py              ── **同じ appview のもう一方の実装**（FastAPI）
+   ;;   appview/*/kotodama.jsonld   ── デプロイ宣言（host / route prefix / runtimeType）
+   ;;   docs/operator-quickstart.md ── 実測として数字を印字している
+   ;;   salesforce-schema.kotoba.edn ── py が書く基板の属性
+   ;;
+   ;; landing 前に 5 つの食い違いが実在した。いずれも 2026-09-01 に実測:
+   ;; README が登録の無い `/api/open-saas/demo-tenants` を案内していた
+   ;; （console の `app.all("/api/*")` が 404 JSON を返すので**サーバは健康なまま**）、
+   ;; README の host だけが他 3 つの宣言とずれていた、基板スキーマが raw な
+   ;; `:contact/email` を宣言する一方で `createLead` は `sha256:` を強制していた
+   ;; （**両者は同じ DID に書く**）、py の mapper がクライアントの任意のキーを
+   ;; そのまま基板に書いていた、そして **py は一度も Python として構文が通って
+   ;; いなかった**（EDN のキーワードが Python のリストに貼られていた）。
+   ;;
+   ;; テストは実物を走らせる —— `src/*-domain.ts` は外部依存を持たない純 TypeScript
+   ;; なので Node 26 の型ストリップでそのまま import でき、写しを置かずに済む。
+   ;; 写しを置くと写しの方だけが正しいまま実物が腐る。
+   ;;
+   ;; exit は 3 値（0 緑 / 1 不変条件が破れた / 2 証拠を集められなかった）。
+   ;; 2 は landing 前に 5 経路（ファイル欠落・印字ブロックが読めない・README の
+   ;; 契約見出しが消えた・モジュールが import できない・スキーマが空）で実測した。
+   :cmd ["nbb" "--classpath" "test" "run_tests.cljs"]
+   :green-marker "app-open-saas contracts: all green"
+   ;; 16 件とも pin bc02c670 で実際に赤くなるところを見た。anchor は一意、噛んだ
+   ;; invariant は名前まで一致、無改変で exit 0。**14 の deftest はすべて
+   ;; いずれかの mutation に名指しされている**（名指しの無いテストを残さない）。
+   ;;
+   ;; その sweep が検査自身の穴を 1 つ見つけている: `/`-is-served の検査は当初
+   ;; 「**どれか 1 つの** appview が静的 catch-all を持てばよい」と書いており、
+   ;; console の `app.all("*")` を潰しても sfcrm の分で緑のままだった。経路を
+   ;; appview に帰属させない検査は、片側が壊れたことを判別できない。
+   ;;
+   ;; ここに無いもの: py を実際に起動する検査。`fastapi` / `pydantic` / `kotodama`
+   ;; の依存宣言がこの repo に無いので、再現可能に起動できない。検査が主張するのは
+   ;; 「宣言された runtime が Python として読める」までで、それ以上を主張しない。
+   :mutations
+   [{:id :open-saas/readme-documents-a-route-that-does-not-exist
+     :why "README が実在しない `/api/...` を案内する形。console は `app.all(\"/api/*\")` で 404 JSON を返すので **サーバは正常に応答し続ける** —— 読んだ人だけが動かない。landing 前に実在した欠陥そのもの"
+     :file "appview/README.md"
+     :find "- `GET /api/open-saas/tenants`: tenant 一覧（snapshot）"
+     :replace "- `GET /api/open-saas/demo-tenants`: tenant 一覧（snapshot）"
+     :must-fail ["every-api-path-the-appview-readme-documents-is-registered-by-an-app"]}
+
+    {:id :open-saas/route-renamed-in-the-app-but-not-the-readme
+     :why "**逆向き。** 実装側で経路を改名して README を直し忘れる形。上の mutation と同じ検査を反対の側から撃つ —— 片側からしか撃たない検査は、もう片側が動いたときに黙る"
+     :file "appview/open-saas-console-os4a5s1/src/app.ts"
+     :find "app.get(\"/api/open-saas/plans\""
+     :replace "app.get(\"/api/open-saas/pricing\""
+     :must-fail ["every-api-path-the-appview-readme-documents-is-registered-by-an-app"]}
+
+    {:id :open-saas/static-fallback-narrowed-so-slash-is-unserved
+     :why "console の静的 catch-all を絞って `/` が誰にも応答されなくなる形。**この mutation が検査自身の穴を見つけた** —— 最初の版は『どれか 1 つの appview が fallback を持てばよい』と書いており、sfcrm の分で緑のままだった"
+     :file "appview/open-saas-console-os4a5s1/src/app.ts"
+     :find "app.all(\"*\", async (c) => {"
+     :replace "app.all(\"/ui/*\", async (c) => {"
+     :must-fail ["every-non-api-path-the-readme-documents-is-served-by-something"]}
+
+    {:id :open-saas/readme-host-drifts-from-the-deployment-manifest
+     :why "README の serving host だけが manifest からずれる形。読んだ人は存在しないアドレスを叩く。landing 前に実在した（manifest の @id / routes[].host / py の GRAPH_ID の 3 つが一致し、README だけが違った）"
+     :file "appview/README.md"
+     :find "- Route: `https://salesforce-opensaas.etzhayyim.com/`"
+     :replace "- Route: `https://salesforce.opensaas.etzhayyim.com/`"
+     :must-fail ["the-appview-readme-and-the-kotodama-manifest-name-the-same-host"]}
+
+    {:id :open-saas/substrate-schema-takes-a-raw-email-again
+     :why "基板スキーマが生の email を宣言する形。TS 側の `createLead` は `sha256:` を強制し続けるので、**同じ DID に対して片側だけが PII split を守る**。この repo の看板の主張（ADR-0018）が半分になる。landing 前に実在した"
+     :file "appview/salesforce-crm-sfcrm9x3/salesforce-schema.kotoba.edn"
+     :find "{:db/ident :contact/email_hash "
+     :replace "{:db/ident :contact/email "
+     :must-fail ["the-crm-substrate-schema-stores-no-raw-contact-channel"]}
+
+    {:id :open-saas/cleanroom-allowlist-admits-an-undeclared-attribute
+     :why "py の allowlist に、スキーマが宣言していない属性を 1 つ足す形。**退行ではなく『対応』の形** —— 生の Email を受けたいときに allowlist に足すのは自然だが、それは基板が拘束を失うことを意味する"
+     :file "appview/salesforce-crm-sfcrm9x3/salesforce_py_kotodama.py"
+     :find "\"contact\": {\"id\", \"account_id\", \"first_name\", \"last_name\", \"email_hash\"},"
+     :replace "\"contact\": {\"id\", \"account_id\", \"first_name\", \"last_name\", \"email_hash\", \"email\"},"
+     :must-fail ["the-cleanroom-api-writes-only-attributes-the-substrate-schema-declares"]}
+
+    {:id :open-saas/declared-runtime-stops-parsing
+     :why "manifest が `runtimeType: worker-py` として名指ししている module が Python として読めなくなる形。landing 前は**ずっとこの状態だった** —— EDN のキーワードが Python のリストに貼られており、誰も走らせていないので宣言だけが正しく見えていた"
+     :file "appview/salesforce-crm-sfcrm9x3/salesforce_py_kotodama.py"
+     :find "[[\":db.fn/retractEntity\", eid]]"
+     :replace "[[:db.fn/retractEntity, eid]]"
+     :must-fail ["the-runtime-the-manifest-declares-actually-parses"]}
+
+    {:id :open-saas/quickstart-number-drifts-from-the-module
+     :why "quickstart が印字している実測値を 1 つ書き換える形。**文書側**から撃つ。数字は実測として自信のある過去形で書かれているので、検査が無ければ黙って古くなる"
+     :file "docs/operator-quickstart.md"
+     :find "\"totalMrrJpy\":1578000"
+     :replace "\"totalMrrJpy\":1578500"
+     :must-fail ["the-overview-numbers-the-quickstart-prints-are-the-numbers-the-module-computes"]}
+
+    {:id :open-saas/seeded-subscription-mrr-changes-so-the-quickstart-goes-stale
+     :why "**逆向き。** seed の subscription を 1 件動かして quickstart の数字を古くする形。実装が動いても文書が動いても同じ検査が撃つことを確かめている"
+     :file "appview/open-saas-console-os4a5s1/src/open-saas-domain.ts"
+     :find "mrrJpy: 240000, contractMode: \"self-serve\""
+     :replace "mrrJpy: 260000, contractMode: \"self-serve\""
+     :must-fail ["the-overview-numbers-the-quickstart-prints-are-the-numbers-the-module-computes"]}
+
+    {:id :open-saas/blueprint-key-renamed
+     :why "blueprint のキーを改名して quickstart を直し忘れる形。JSON としてはどちらも正しいので、印字例を突き合わせるまで分からない"
+     :file "appview/open-saas-console-os4a5s1/src/open-saas-domain.ts"
+     :find "    apiDomains:"
+     :replace "    apiSurfaces:"
+     :must-fail ["the-blueprint-keys-the-quickstart-prints-are-the-keys-the-module-exposes"]}
+
+    {:id :open-saas/pii-guard-removed-from-create-lead
+     :why "`createLead` の `sha256:` 拒否を無効化する形。**理由の literal まで見る** —— 別の理由で throw したのを『拒否した』と数えないため（そのまま通れば raw PII が Tier 1 レコードに入る）"
+     :file "appview/salesforce-crm-sfcrm9x3/src/salesforce-domain.ts"
+     :find "if (!input.emailHash.startsWith(\"sha256:\")) {"
+     :replace "if (false) {"
+     :must-fail ["the-crm-domain-refuses-an-unhashed-email"]}
+
+    {:id :open-saas/manifest-name-drifts-from-the-directory
+     :why "manifest の `name` がディレクトリ名からずれる形。デプロイ側と tree 側が別の appview を指すが、どちらの JSON も正しい"
+     :file "appview/salesforce-crm-sfcrm9x3/kotodama.jsonld"
+     :find "\"name\": \"salesforce-crm-sfcrm9x3\""
+     :replace "\"name\": \"salesforce-crm\""
+     :must-fail ["each-kotodama-manifest-names-the-directory-it-sits-in"]}
+
+    {:id :open-saas/unimplemented-prefix-note-deleted
+     :why "`/at/...` は manifest が宣言していて実装が無い。README の明記を消す形 —— **注記を消すだけで検査が緩む**のを防ぐのがこの mutation の全仕事。逆向き（実装されたのに注記が残る）も同じ検査が撃つ"
+     :file "appview/README.md"
+     :find "- `/at/...` — AT/W Protocol の XRPC 面"
+     :replace "- (削除された注記) AT/W Protocol の XRPC 面"
+     :must-fail ["every-http-route-prefix-the-kotodama-manifests-declare-has-a-registration"]}
+
+    {:id :open-saas/project-file-points-at-a-missing-scheduler
+     :why "PROJECT.jsonld が指す scheduler のパスが実体からずれる形。JSON としては正しいので、その宣言を辿ろうとするまで分からない"
+     :file "PROJECT.jsonld"
+     :find "\"scheduler\": \"scheduler.jsonld\""
+     :replace "\"scheduler\": \"scheduler-v2.jsonld\""
+     :must-fail ["the-project-file-points-at-documents-and-appviews-that-exist"]}
+
+    {:id :open-saas/readme-test-count-goes-stale
+     :why "README が数えているテスト件数がずれる形。テストを 1 本足すか消すだけで起きるが、数字を検査するものが無ければ測ったように見えて古くなる"
+     :file "README.md"
+     :find "（vitest）で 14 + 14 件が通る"
+     :replace "（vitest）で 13 + 14 件が通る"
+     :must-fail ["the-readme-counts-the-tests-each-appview-actually-has"]}
+
+    {:id :open-saas/sobject-mapped-to-an-undeclared-namespace
+     :why "cleanroom API が受ける SObject を、基板スキーマが宣言していない namespace に写す形。upsert の軸になる identity 属性が無いまま transact することになる"
+     :file "appview/salesforce-crm-sfcrm9x3/salesforce_py_kotodama.py"
+     :find "\"Case\": \"case\","
+     :replace "\"Case\": \"ticket\","
+     :must-fail ["the-substrate-schema-declares-every-object-the-cleanroom-api-maps"]}]}
 ]}
