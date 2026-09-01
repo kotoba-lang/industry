@@ -20,15 +20,29 @@
 ;; adr-2608301700 が記録した欠陥の裏返しである。あちらは「終わらない job が
 ;; 前回の exit を持ち続ける」、こちらは「**始まれない job が同じ値を返し続ける**」。
 ;;
-;; ## この検査が出す 2 種類
+;; ## この検査が出す 2 種類 —— 片方だけが finding である
 ;;
-;;   cannot-start  WorkingDirectory / 実行ファイル / script が実在しない
-;;   silent        exit は 0 だが、ログを N 日書いていない
+;;   cannot-start  WorkingDirectory / 実行ファイル / script が実在しない → finding
+;;   silent        exit 0 だが StandardOutPath を N 日書いていない → **note のみ**
 ;;
-;; 後者が今日の手がかりだった。**exit だけを見ていると見えない。**
+;; silent を finding にしてはいけない。実測 2026-09-01、報告した 4 件が
+;; **4 件とも正常**だった:
 ;;
-;;   exit 0  全 agent が走れて、黙っている agent もいない
-;;   exit 1  上のいずれかが在る
+;;   itonami-5820-tunnel  KeepAlive の常駐。接続時しか書かない
+;;   akashi-public-data   KeepAlive の常駐。リクエスト時しか書かない
+;;   gpg-preset           RunAtLoad のみ。1 回で終わる設計
+;;   fleet-tick           **自前のログファイルに毎時書いていた**（stdout は未使用）
+;;
+;; 最後の 1 件が効く —— スクリプトが自分でログを開いているかどうかは plist から
+;; 知りようがない。したがって「stdout が古い」は動いていないことの証拠に
+;; ならない。同じ日に `--classpath` を script と誤認して 9/15 の偽陽性を出して
+;; おり、これはその 2 度目である。**判定材料を持たない軸で断定しない。**
+;;
+;; 除外できるものは除外する（KeepAlive で生存中 / 周期を持たない）。残りは
+;; note として出し、exit は cannot-start だけで決める。
+;;
+;;   exit 0  起動できない agent が無い
+;;   exit 1  起動できない agent が在る
 ;;   exit 2  測れなかった（launchctl も plist も読めない等）
 ;;
 ;; usage: nbb scripts/verify-launchd-agents.cljs [--stale-days 7] [--findings]
@@ -86,7 +100,7 @@
          (/ (- (js/Date.now) ms) 86400000.0))
        (catch :default _ nil)))
 
-(defn- check [{:keys [label status]}]
+(defn- check [{:keys [label status pid]}]
   (let [file (path/join agents-dir (str label ".plist"))]
     (when (fs/existsSync file)
       (let [wd (plist-value file "WorkingDirectory")
@@ -114,7 +128,15 @@
                                   v)))
                         first)
             out (plist-value file "StandardOutPath")
-            log-age (some-> out mtime-days-ago)]
+            log-age (some-> out mtime-days-ago)
+            ;; A KeepAlive job with a live pid is running right now; silence is
+            ;; what a resident tunnel or a static file server looks like.
+            resident? (and (= "true" (plist-value file "KeepAlive"))
+                           (not= "-" pid))
+            ;; No interval and no calendar entry means RunAtLoad-only: it ran
+            ;; once and is supposed to be finished.
+            periodic? (boolean (or (plist-value file "StartInterval")
+                                   (plist-value file "StartCalendarInterval")))]
         (cond-> []
           (and wd (not (fs/existsSync wd)))
           (conj {:kind "cannot-start" :label label :detail (str "WorkingDirectory absent: " wd)})
@@ -126,29 +148,34 @@
           (conj {:kind "cannot-start" :label label
                  :detail (str "script absent under workdir: " script)})
 
-          ;; exit 0 and nothing written for a long time. Not proof of a fault --
-          ;; a weekly job is quiet by design -- but it is the shape that hid a
-          ;; 36-day outage behind a plausible exit code, so it is reported and
-          ;; the reader decides.
-          (and (= 0 status) log-age (> log-age stale-days))
-          (conj {:kind "silent" :label label
-                 :detail (str "exit 0 but log untouched for "
-                              (.toFixed log-age 1) " days: " out)}))))))
+          ;; A quiet stdout is not evidence of a stopped job. Two shapes are
+          ;; quiet by design and are excluded outright; the rest is emitted as
+          ;; a note that does not affect the exit code, because the one thing
+          ;; that would settle it -- whether the script opened its own log --
+          ;; is not knowable from the plist.
+          (and (= 0 status) log-age (> log-age stale-days)
+               (not resident?) periodic?)
+          (conj {:kind "note-silent" :label label
+                 :detail (str "exit 0 but stdout untouched for "
+                              (.toFixed log-age 1) " days (may write its own log): " out)}))))))
 
 (defn- main []
   (let [agents (loaded-agents)]
     (if (empty? agents)
       (do (println "UNMEASURED\tlaunchctl-list-empty\tcould not read launchctl list")
           (.exit js/process 2))
-      (let [findings (vec (mapcat check agents))
-            cannot (filter #(= "cannot-start" (:kind %)) findings)
-            silent (filter #(= "silent" (:kind %)) findings)]
+      (let [all (vec (mapcat check agents))
+            findings (filterv #(= "cannot-start" (:kind %)) all)
+            notes (filterv #(= "note-silent" (:kind %)) all)]
         (println (str "SCANNED\t" (count agents)))
-        (println (str "CANNOT-START\t" (count cannot)))
-        (println (str "SILENT\t" (count silent) "\t(>" stale-days "d)"))
+        (println (str "CANNOT-START\t" (count findings)))
+        (println (str "NOTE-SILENT\t" (count notes) "\t(>" stale-days
+                      "d, not a finding)"))
         (when show-findings?
-          (doseq [f findings]
+          (doseq [f (concat findings notes)]
             (println (str "  " (:kind f) "\t" (:label f) "\t" (:detail f)))))
+        ;; Only cannot-start decides the exit. A note that cannot be settled
+        ;; must not turn the check red.
         (.exit js/process (if (seq findings) 1 0))))))
 
 (main)
