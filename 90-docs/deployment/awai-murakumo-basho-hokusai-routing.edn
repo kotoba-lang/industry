@@ -1,0 +1,164 @@
+{:contract/id "awai-murakumo-basho-hokusai-routing"
+ :contract/version 1
+ :contract/as-of "2026-09-01"
+ :contract/status :design-ready-local-adapters-unmerged
+ :contract/active? false
+ :contract/advertise-models? false
+
+ :ownership
+ {:model-developer "awai.network"
+  :inference-provider "murakumo.cloud"
+  :infrastructure-vendors ["Baseten" "Together"]}
+
+ :public-contracts
+ {:basho
+  {:model-id "awai-network/basho"
+   :modality :chat
+   :protocol :openai-chat-completions
+   :route "/v1/chat/completions"
+   :streaming true
+   :usage-accounting :input-and-output-tokens}
+
+  :hokusai
+  {:model-id "awai-network/hokusai"
+   :modality :audiovisual-video
+   :protocol :openrouter-async-video
+   :submit-route "/api/v1/videos"
+   :status-route "/api/v1/videos/{id}"
+   :content-route "/api/v1/videos/{id}/content"
+   :webhook :optional-signed
+   :usage-accounting :output-seconds-and-variant}}
+
+ :artifacts
+ {:basho
+  {:planned-base "Qwen/Qwen3.8-Flash-Next"
+   :fine-tuned-revision nil
+   :content-id nil
+   :state :not-trained}
+  :hokusai
+  {:planned-base "MiniMaxAI/MiniMax-H3"
+   :fine-tuned-revision nil
+   :content-id nil
+   :state :not-trained}}
+
+ :backends
+ {:basho
+  {:baseten
+   {:kind :custom-deployment
+    :serverless :scale-to-zero
+    :minimum-replicas 0
+    :endpoint-env "MURAKUMO_BASHO_BASETEN_ENDPOINT"
+    :credential-secret "MURAKUMO_BASHO_BASETEN_API_KEY"
+    :deployment-revision-env "MURAKUMO_BASHO_BASETEN_REVISION"
+    :state :not-deployed}
+   :together
+   {:kind :custom-model-dedicated-endpoint
+    :serverless :not-scale-to-zero
+    :eligibility :requires-supported-base-readback
+    :idle-policy :stop-endpoint-after-validation
+    :endpoint-env "MURAKUMO_BASHO_TOGETHER_ENDPOINT"
+    :credential-secret "MURAKUMO_BASHO_TOGETHER_API_KEY"
+    :deployment-revision-env "MURAKUMO_BASHO_TOGETHER_REVISION"
+    :state :not-deployed}}
+
+  :hokusai
+  {:baseten
+   {:kind :custom-deployment-async-queue
+    :serverless :scale-to-zero
+    :minimum-replicas 0
+    :endpoint-env "MURAKUMO_HOKUSAI_BASETEN_ENDPOINT"
+    :credential-secret "MURAKUMO_HOKUSAI_BASETEN_API_KEY"
+    :deployment-revision-env "MURAKUMO_HOKUSAI_BASETEN_REVISION"
+    :state :not-deployed}
+   :together
+   {:kind :dedicated-container-inference
+    :queue-api :sprocket
+    :serverless :scale-to-zero
+    :minimum-replicas 0
+    :access :sales-enablement-required
+    :endpoint-env "MURAKUMO_HOKUSAI_TOGETHER_ENDPOINT"
+    :credential-secret "MURAKUMO_HOKUSAI_TOGETHER_API_KEY"
+    :deployment-revision-env "MURAKUMO_HOKUSAI_TOGETHER_REVISION"
+    :state :access-not-confirmed}}}
+
+ :routing-policy
+ {:default :fail-closed
+  :provider-order :unset-until-measured
+  :vendor-urls-public? false
+  :credentials-in-requests-responses-or-logs? false
+  :select-backend-only-when
+  [:endpoint-configured
+   :credential-configured
+   :healthy
+   :capacity-confirmed
+   :artifact-revision-matches]
+  :fallback-only-when
+  [:same-artifact-content-id
+   :compatible-capabilities
+   :healthy
+   :capacity-confirmed]}
+
+ :readiness-gates
+ {:advertise-in-models
+  [:fine-tuned-artifact-readback
+   :license-and-dataset-rights-reviewed
+   :model-card-published
+   :japanese-and-safety-evals-passed
+   :direct-positive-and-negative-smokes-passed
+   :murakumo-public-contract-passed
+   :usage-accounting-passed
+   :price-capacity-and-data-policy-published
+   :representative-uptime-measured]
+
+  :basho-public-smoke
+  [:non-streaming-chat
+   :streaming-chat
+   :usage-token-counts
+   :invalid-model-rejected
+   :backend-timeout-mapped]
+
+  :hokusai-public-smoke
+  [:submit
+   :poll-to-terminal-state
+   :content-download
+   :signed-webhook
+   :invalid-reference-rejected
+   :duration-resolution-and-audio-accounting]}
+
+ :existing-implementation
+ {:chat-gateway-repo "orgs/network-awai/cloud-murakumo-api"
+  :generation-repo "orgs/network-awai/cloud-murakumo"
+  :generation-source-of-truth "/api/v1/generation"
+ :reuse
+  [:existing-generation-job-facade
+   :existing-minimax-h3-comfyui-graph
+   :existing-async-artifact-pipeline
+   :existing-openai-videos-backend-adapter]
+  :local-worktree-additions
+  {:chat-gateway
+   [:reserved-awai-network-namespace
+    :basho-explicit-provider-routing
+    :immutable-revision-match-gate
+    :vendor-credential-isolation
+    :advertisement-and-price-admission-gates]
+   :generation
+   [:openrouter-compatible-videos-front-adapter
+    :hokusai-model-entry
+    :backend-served-model-rewrite
+    :immutable-revision-match-gate]
+   :verification
+   {:chat-gateway-focused-tests {:tests 38 :assertions 198 :failures 0 :errors 0}
+    :generation-focused-tests {:tests 3 :assertions 11 :failures 0 :errors 0}
+    :full-build :blocked-by-isolated-worktree-sibling-dependencies}}
+  :required-additions
+  [:vendor-auth-secrets
+   :revision-pinning
+   :health-capacity-and-usage-observability]}
+
+ :current-proof
+ {:trained-models false
+ :production-endpoints false
+  :local-adapters-unmerged true
+  :openrouter-model-registration false
+  :live-public-inference false
+  :note "Architecture and deployment gates are recorded; no GPU deployment was created by this change."}}
