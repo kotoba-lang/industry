@@ -112,4 +112,47 @@ degraded page を入れた後の suite と deploy は、共有ビルドロック
 `game-kouryaku` は**両方の索引に載っている**。有料 walk は hyakka-data の全量索引
 （1.09M entity）を、無料の item ページは ledger 索引（そのサンプル）を読む。同じ corpus に
 ついて 2 つの索引が別の完全性で答える状態で、`corpus-pin` のコメントが元々警告していた
-重なりそのもの。今日壊れてはいないが、どちらを正本と決めるまで残る。"}]
+重なりそのもの。今日壊れてはいないが、どちらを正本と決めるまで残る。
+
+# 現在地（2026-09-01 closing 時点）
+
+**未着地。** `network-awai/app-hyakka` の branch `agent/the-bundle-carries-what-it-renders`
+（`960002b1`）に push し、draft PR #221 を開いた。merge していない —— degraded page
+（503 + 理由表示）を入れた後の suite が一度も完走していないため。
+
+共有ビルドロックが他セッションの JVM ビルドで何時間も飽和しており（load average は
+一時 884）、私の再試行は 3 秒間隔まで詰めても取り切れなかった。**一度、ロックで走らな
+かった run のログを `FAILs: 0` と読んだ** —— ログにはロックのメッセージしか無かった。
+以後は `Ran N tests containing` が出ることを条件にし、出なければ「走らなかった、これは
+pass ではない」と印字するようにした。
+
+## 再開手順
+
+    cd <worktree>            # or: origin/main から worktree を切って branch を checkout
+    npm test                 # scripts/resource-guard.mjs run build 越しに
+    npm run deploy           # catalog -> index -> release -> index:publish -> wrangler deploy
+
+deploy の順序には理由がある: バンドルが索引 root を pin するので索引はビルド前に要り、
+blocks が配られていない root を pin した worker は全 item ページで失敗するので publish は
+deploy の前に要る。
+
+## 直前の run が見つけた本物の regression（修正済み・未検証）
+
+catalogue item ページが索引なしでは描けなくなっていた。テスト自身のコメントが
+「catalogue item は corpus に問い合わせる前に memory から答える」と、壊れた不変条件を
+書いていた。502 で全部落とすのは過剰（見出し・クラス・記事本文・リンクは索引を要さない）、
+空の表を出すのは禁じた形。ページは描き、表の位置に理由を書き、503 + no-store + etag 無し
+で返す —— この body はその item の representation ではないので、後で 304 を返すと劣化した
+ページを現行として配ることになる。
+
+## 副産物として live に在るもの
+
+索引 blocks 61 本は既に公開済み（`kotobase-graph-database-production` の `ipld/<cid>`）。
+content-addressed で追加のみなので、この branch が merge されなくても既存の読み手を
+壊さない。root は `bafkreihmovk543cyshtmnfyv73xsqvubar2i6sv7kpvjtzhj22njamouoe`。
+
+## live との差
+
+wiki.kotobase.net は 2026-08-31 11:22Z のビルドのまま。9/1 に main へ着地した 2 つの
+文言修正（`metered` / `walk`）も、この移行も、まだ届いていない。壊れてはいない ——
+更新できないだけである。"}]
