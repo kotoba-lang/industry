@@ -1,0 +1,134 @@
+#!/usr/bin/env nbb
+;; p256-onchain-probe — can a contract on this chain verify a WebAuthn
+;; signature yet?
+;;
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/p256-onchain-probe.cljs [--chain base-sepolia]
+;;
+;; ## Why this is a script and not a remembered fact
+;;
+;; Passkeys sign with P-256 (ES256). A contract that checks a passkey needs
+;; P-256 verification on-chain, which RIP-7212 provides as a precompile at
+;; 0x100. Whether a given chain has turned it on is a moving target, and this
+;; workspace already recorded the wrong answer once: a session note said the
+;; precompile was "verified working on Base". Measured 2026-09-01 against the
+;; spec's exact layout, with a signature verified valid locally, Base returns
+;; nothing. A design was resting on that note.
+;;
+;; ## The measurement, and the step that makes it a measurement
+;;
+;; An eth_call to an address with no code returns empty, and a P-256
+;; verification that FAILS also returns empty (RIP-7212: "if the signature
+;; verification process fails, it does not return any output data"). So empty
+;; means either absent or rejecting, and a probe that stopped there would
+;; report "not available" without having been able to tell.
+;;
+;; Two things separate them:
+;;
+;;   1. The call shape is validated first, against precompiles that must
+;;      exist: identity at 0x04 must echo its input and sha256 at 0x02 must
+;;      match a digest computed locally. If those fail, this probe cannot
+;;      measure anything and says so rather than reporting an absence.
+;;   2. The signature is generated here and verified locally before being
+;;      sent. A valid signature returning empty from a live precompile is
+;;      impossible, so empty from a validated call shape means absent.
+;;
+;; A corrupted-signature control runs too. It cannot distinguish absent from
+;; rejecting on its own -- both are empty -- which is exactly why step 1
+;; exists.
+;;
+;; Exit 0 when the chain was measured, whatever the answer; 2 when it could
+;; not be measured. Not being able to check is not the same as an answer.
+
+(ns p256-onchain-probe
+  (:require [clojure.string :as str]
+            ["crypto" :as crypto]))
+
+(def ^:private argv (vec (drop 2 (.-argv js/process))))
+(defn- opt [f d] (or (second (drop-while #(not= f %) argv)) d))
+
+(def chains
+  {"base-sepolia" "https://sepolia.base.org"
+   "base"         "https://mainnet.base.org"
+   "optimism"     "https://mainnet.optimism.io"
+   "ethereum"     "https://ethereum-rpc.publicnode.com"
+   "sepolia"      "https://ethereum-sepolia-rpc.publicnode.com"})
+
+(def p256-precompile "0x0000000000000000000000000000000000000100")
+(def identity-precompile "0x0000000000000000000000000000000000000004")
+(def sha256-precompile "0x0000000000000000000000000000000000000002")
+
+(defn- eth-call [url to data]
+  (-> (js/fetch url #js {:method "POST"
+                         :headers #js {"content-type" "application/json"}
+                         :body (js/JSON.stringify
+                                (clj->js {:jsonrpc "2.0" :id 1 :method "eth_call"
+                                          :params [{:to to :data data :gas "0x200000"} "latest"]}))})
+      (.then (fn [^js r] (.json r)))
+      (.then (fn [^js j] (or (.-result j) :error)))
+      (.catch (fn [_] :error))))
+
+(defn- hex [^js buf] (str "0x" (.toString buf "hex")))
+
+(defn- vector! []
+  (let [kp (.generateKeyPairSync crypto "ec" #js {:namedCurve "prime256v1"})
+        spki (.export (.-publicKey kp) #js {:format "der" :type "spki"})
+        pub (.subarray spki (- (.-length spki) 65))
+        digest (-> (.createHash crypto "sha256")
+                   (.update (js/Buffer.from "itonami passkey gate"))
+                   (.digest))
+        sig (.sign crypto nil digest #js {:key (.-privateKey kp) :dsaEncoding "ieee-p1363"})]
+    {:valid-locally? (.verify crypto nil digest
+                              #js {:key (.-publicKey kp) :dsaEncoding "ieee-p1363"} sig)
+     :input (hex (js/Buffer.concat #js [digest (.subarray sig 0 64) (.subarray pub 1 65)]))
+     :corrupt (let [b (js/Buffer.from (js/Buffer.concat
+                                       #js [digest (.subarray sig 0 64) (.subarray pub 1 65)]))]
+                (aset b 63 (bit-xor (aget b 63) 1))
+                (hex b))}))
+
+(defn -main []
+  (let [chain (opt "--chain" "base-sepolia")
+        url (get chains chain)]
+    (when-not url
+      (println "REFUSED\tunknown chain" chain "-- known:" (str/join ", " (sort (keys chains))))
+      (js/process.exit 2))
+    (let [{:keys [valid-locally? input corrupt]} (vector!)
+          echo (str "0x" (str/join (repeat 16 "ab")))
+          want-sha (hex (-> (.createHash crypto "sha256") (.update (js/Buffer.from "abc")) (.digest)))]
+      (if-not valid-locally?
+        (do (println "REFUSED\tthe generated signature does not verify locally")
+            (js/process.exit 2))
+        (-> (js/Promise.all
+             #js [(eth-call url identity-precompile echo)
+                  (eth-call url sha256-precompile "0x616263")
+                  (eth-call url p256-precompile input)
+                  (eth-call url p256-precompile corrupt)])
+            (.then
+             (fn [^js rs]
+               (let [id-ok (= (aget rs 0) echo)
+                     sha-ok (= (aget rs 1) want-sha)
+                     valid (aget rs 2)
+                     bad (aget rs 3)]
+                 (println "CHAIN\t" chain)
+                 (println "METHOD\t" (if (and id-ok sha-ok)
+                                       "validated -- identity echoes and sha256 matches"
+                                       "NOT VALIDATED -- this probe cannot reach precompiles here"))
+                 (if-not (and id-ok sha-ok)
+                   (do (println "REFUSED\tan absence measured through a call shape that does not work")
+                       (println "\tis not an absence.")
+                       (js/process.exit 2))
+                   (do
+                     (println "P256\t" (cond
+                                         (= valid :error) "call failed"
+                                         (str/ends-with? (str valid) "1") "AVAILABLE -- returns 1 for a valid signature"
+                                         :else "not available -- returns nothing for a signature valid locally"))
+                     (println "CONTROL\t" (if (= bad valid)
+                                            "a corrupted signature answers the same, which is expected here and is why the method check above carries the argument"
+                                            "a corrupted signature answers differently"))
+                     (println)
+                     (if (str/ends-with? (str valid) "1")
+                       (println "A contract on this chain can check a passkey signature directly.")
+                       (println "A contract on this chain cannot check a passkey signature without\nan in-contract P-256 implementation. Verification stays off-chain."))
+                     (js/process.exit 0))))))
+            (.catch (fn [e] (println "REFUSED\t" (.-message e)) (js/process.exit 2))))))))
+
+(-main)
