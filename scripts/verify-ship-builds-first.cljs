@@ -113,6 +113,16 @@
       (println (str "CAN-SHIP-UNBUILT\t" (count unbuilt)))
       (println (str "BUILDS-OUTSIDE-THE-GUARD\t" (count unguarded)))
       (println (str "BOTH\t" (count ok)))
+      ;; The protocol the detector home parses: FINDING<TAB>severity<TAB>key<TAB>detail.
+      ;; Without these the home reads a run that exited 1 as carrying ZERO
+      ;; findings -- a detector that fires and reports nothing is the shape this
+      ;; whole registry exists to prevent. The indented lines below stay because
+      ;; they are what a person reads when running it by hand.
+      (doseq [r (concat unbuilt unguarded)]
+        (println (str "FINDING\tfail\t" (:path r) "\t"
+                      (if (:builds? r)
+                        "builds outside the guard"
+                        "ships without building first"))))
       (when findings?
         (doseq [r (concat unbuilt unguarded)]
           (println (str "  " (if (:builds? r) "unguarded" "unbuilt  ") "\t" (:path r)))))

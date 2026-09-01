@@ -2915,8 +2915,20 @@
               unbuilt, 39 build outside the guard, 2 do both. Not a fleet gate: it
               reads `orgs/`, so a node shipped only one repo's tree would report
               clean forever."
-   :script   "scripts/verify-ship-builds-first.cljs"
-   :args     ["--findings"]
+   ;; Registered 2026-08-31 in an older shape (:script/:args/:exit) that this
+   ;; home does not accept, and admission is fail-closed for the WHOLE registry:
+   ;; from that day until 2026-09-01 every tick ended `ADMISSION FAILED` and not
+   ;; one of the 60 detectors ran. Converted here, measured rather than guessed:
+   ;; the script has zero write calls, takes 4.9 s over 1,403 package.json, and
+   ;; its SCANNED line matches the evidence floor below.
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-ship-builds-first.cljs" "--findings" "--root" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :writes   :none
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 21600000
+   :timeout-ms  120000
    :exit     {0 "every ship script builds first, under the guard"
               1 "findings"
               2 "could not measure -- no orgs tree, or no ship script found at all"}
@@ -2952,6 +2964,9 @@
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
+   ;; Measured 2026-09-01, not assumed: the script contains zero
+   ;; writeFileSync / appendFileSync / mkdirSync / rm / rename calls.
+   :writes   :none
    :interval-ms 43200000
    :timeout-ms  600000}
 ]}
