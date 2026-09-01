@@ -5049,4 +5049,91 @@
        :find ":ns-regexp \"-test$\""
        :replace ":nsregexp \"-test$\""
        :must-fail ["REFUSED" "no :ns-regexp"]}]}
+
+     {:repo "orgs/kotoba-lang/labor"
+      :label "labor 賃金と輸出 —— 二つ目の host で走らせて初めて見える差"
+      ;; この repo は .cljc が JVM / ClojureScript / SCI / GraalVM に可搬だと
+      ;; 名乗りながら、deps.edn には runner が 1 本（JVM）しか無かった。だから
+      ;; ClojureScript は assertion を 1 つも実行していない —— 主張は落ちて
+      ;; いたのではなく**測られていなかった**。測られていない主張と、測って
+      ;; 満たされている主張は、どちらも何も出力しないので同じ顔をする。
+      ;;
+      ;; 二つ目の host で同じファイルを走らせた最初の実行が差を出した。
+      ;; `(+ 8 nil)` は JVM で NullPointerException、ClojureScript で 8。
+      ;;
+      ;; だから mutation の一部は **:cmd を nbb 側に差し替えて**登録している。
+      ;; :labor/guard-kept-on-jvm-dropped-on-cljs は `clojure -M:test` では
+      ;; **緑のまま**で、portable runner だけが赤くなる —— host が 1 つしか
+      ;; 無い suite が構造的に見られないものが在ることの、実演。
+      :cmd ["clojure" "-M:test"]
+      :green-marker "0 failures, 0 errors."
+      :mutations
+      [
+      {:id :labor/total-hours-stops-checking-hours
+       :why "この repo で二つ目の host を足した理由そのもの。`(+ 8 nil)` は JVM で NullPointerException、ClojureScript で 8 になる —— 同じ勤務表が、片方では落ち、片方では労働者が記録した時間より小さい数を静かに返す。8 はエラー値ではないので wages-for を通って payroll の gross になり、短いシフトと区別できないまま支払われる"
+       :file "src/kotoba/labor.cljc"
+       :find "  (reduce (fn [acc e]
+            (+ acc (amount (:ts/hours e) {:labor/field :ts/hours :ts/entry e})))
+          0
+          entries))"
+       :replace "  (reduce + (map :ts/hours entries)))"
+       :must-fail ["total-hours-refuses-an-entry-with-no-hours" "total-hours-refuses-a-non-numeric-hours-value"]}
+
+      {:id :labor/guard-kept-on-jvm-dropped-on-cljs
+       :why "**この suite で一番大事な 1 本。`clojure -M:test` はこの変異に対して緑のまま終わる** —— reader conditional の :cljs 分岐は JVM から構造的に見えないので、host が 1 つしか無かった頃の suite はこの退行を永久に報告できなかった。二つ目の host だけが赤くなることを確かめるためにここに在る（maturity-loop の README が `#?(:clj int :cljs identity)` として記録しているのと同じ class）"
+       :file "src/kotoba/labor.cljc"
+       :cmd ["nbb" "--classpath" "src:test" "test/run_portable.cljs"]
+       :green-marker "portable-check: OK"
+       :find "            (+ acc (amount (:ts/hours e) {:labor/field :ts/hours :ts/entry e})))"
+       :replace "            (+ acc #?(:clj (amount (:ts/hours e) {:labor/field :ts/hours :ts/entry e})
+                      :cljs (:ts/hours e))))"
+       :must-fail ["total-hours-refuses-an-entry-with-no-hours" "total-hours-refuses-a-non-numeric-hours-value"]}
+
+      {:id :labor/payroll-stops-checking-gross
+       :why "gross が欠けた payroll は、ClojureScript では net 0 の**整った記録**になった —— 何も支払われていない労働者が、well-formed な行として台帳に載る。JVM では例外なので、host によって『壊れる』と『静かに嘘をつく』が入れ替わる"
+       :file "src/kotoba/labor.cljc"
+       :find "  (let [gross (amount gross {:labor/field :payroll/gross :payroll/id id})"
+       :replace "  (let [gross gross"
+       :must-fail ["payroll-refuses-a-missing-gross"]}
+
+      {:id :labor/contracts-json-currency-unescaped
+       :why "同じ object の contract_id / worker / role は escaper を通り、currency だけ通っていなかった。`:currency` は labor/contract の普通の引数なので公開経路から到達する。Python の json module で確認済み: 引用符 1 つで JSON 文字列が早く閉じ、文書全体が parse できなくなる"
+       :file "src/kotoba/labor/export.cljc"
+       :find "\"\\\"currency\\\":\\\"\" (json-str (or (:contract/currency c) \"USD\")) \"\\\"}\")))"
+       :replace "\"\\\"currency\\\":\\\"\" (or (:contract/currency c) \"USD\") \"\\\"}\")))"
+       :must-fail ["contracts-json-escapes-the-currency-field"]}
+
+      {:id :labor/json-num-accepts-a-non-number
+       :why "`number?` を `some?` に緩めるのは、この検査を弱める最も自然な書き方。金額は quote 無しで埋め込まれるので、数でない値は**文字列層の外に出る** —— rate が `15,\"approved\":true` のとき、間違った rate ではなく object の**二つ目のキー**が生まれる。escape では塞げない（そのフィールドは quote されていない）"
+       :file "src/kotoba/labor/export.cljc"
+       :find "  [v ctx]
+  (if (number? v)
+    (str v)"
+       :replace "  [v ctx]
+  (if (some? v)
+    (str v)"
+       :must-fail ["contracts-json-refuses-a-non-numeric-rate" "payrolls-json-refuses-a-non-numeric-amount"]}
+
+      {:id :labor/payrolls-json-loses-the-currency-key
+       :why "record は currency を持ち payrolls->csv は列に出すのに、JSON だけが落としていた形。同じ payroll が、JSON の読み手には**単位の無い金額 3 つ**、CSV の読み手には単位付きの金額に見える"
+       :file "src/kotoba/labor/export.cljc"
+       :find "\"\\\"currency\\\":\\\"\" (json-str (or (:payroll/currency p) \"USD\")) \"\\\"}\")))"
+       :replace "\"\\\"currency_omitted\\\":\\\"\" (json-str (or (:payroll/currency p) \"USD\")) \"\\\"}\")))"
+       :must-fail ["payroll-json-carries-every-column-the-csv-carries"]}
+
+      {:id :labor/csv-gains-a-column-json-does-not
+       :why "不変条件を『currency が出ること』ではなく『CSV の各列が JSON にも在ること』として書いた理由。**次に片方だけへ足される列**を捕まえられるかを、逆向きから確かめる"
+       :file "src/kotoba/labor/export.cljc"
+       :find "(csv-row [\"payroll_id\" \"worker\" \"period\" \"gross\" \"deductions\" \"net\" \"currency\"])"
+       :replace "(csv-row [\"payroll_id\" \"worker\" \"period\" \"gross\" \"deductions\" \"net\" \"currency\" \"employer\"])"
+       :must-fail ["payroll-json-carries-every-column-the-csv-carries"]}
+
+      {:id :labor/portable-runner-quietly-covers-less
+       :why "**refusal の床。exit 2 でなければならない。** 名前空間の一覧は静的に書くしかない（require はコンパイル時に解決される）ので、それは tree についての主張になる。この runner を書いている最中に実際に起きた: 一覧が kotoba.labor.portable-test を編集で失い、それでも `3/3 namespaces / portable-check: OK` と印字して 7 つ少ないテストで緑を返した。いまは一覧を disk と突き合わせ、答えられないなら 0 でも 1 でもない値で終わる"
+       :file "test/run_portable.cljs"
+       :cmd ["nbb" "--classpath" "src:test" "test/run_portable.cljs"]
+       :green-marker "portable-check: OK"
+       :find "    kotoba.labor.portable-test])"
+       :replace "    kotoba.labor.export-test])"
+       :must-fail ["REFUSED"]}]}
 ]}
