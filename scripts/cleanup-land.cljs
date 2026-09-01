@@ -1453,11 +1453,20 @@
                            base (count demoted)))
           (doseq [p demoted] (println (str "      " p))))
         (report-base-ignored! base base-ignored bi)
-        (when (seq unresolved)
-          (println (format "  ⚠ 参照が解決しない %d 件 → :review（scanned %d）"
-                           (count unresolved) (:scanned uinfo)))
-          (doseq [[p syms] (:findings uinfo)]
-            (println (str "      " p "  " (str/join ", " syms)))))
+        ;; scanned は **常に** 印字する。`when (seq unresolved)` にすると、
+        ;; 参照を 1 件も見なかった run と、見て問題が無かった run が同じ沈黙になる
+        ;; —— この gate の docstring 自身が「zero-finding と zero-scan を区別する
+        ;; ために scanned を言う」と約束している、その約束が呼び出し側で消えていた
+        ;; （実測 2026-09-01、cloud-itonami-app への run が 11 件の .clj/.cljc を
+        ;; :additive に載せたが、gate が走ったのか走らなかったのかは出力から
+        ;; 判らなかった）。ADR-2608136000 の 4 問目そのもの。
+        (if (seq unresolved)
+          (do (println (format "  ⚠ 参照が解決しない %d 件 → :review（scanned %d）"
+                               (count unresolved) (:scanned uinfo)))
+              (doseq [[p syms] (:findings uinfo)]
+                (println (str "      " p "  " (str/join ", " syms)))))
+          (println (format "  unresolved-refs gate: 解決しない参照は無し（scanned %d）"
+                           (:scanned uinfo))))
         (if (:applied rvinfo)
           (when (seq reverted)
             (println (format "  ⚠ default branch が削除済みのパス %d 件 → :review（scanned %d, ref %s）"
@@ -1515,11 +1524,20 @@
               (println (str "      " p "  ← base: " (str/join ", " others)))))
           (println "  ⚠ source-twin gate: base tree が引けず未適用（:applied false）"))
         (report-tracked-safety! ts-dropped ts-info)
-        (when (seq unresolved)
-          (println (format "  ⚠ 参照が解決しない %d 件 → :review（scanned %d）"
-                           (count unresolved) (:scanned uinfo)))
-          (doseq [[p syms] (:findings uinfo)]
-            (println (str "      " p "  " (str/join ", " syms)))))
+        ;; scanned は **常に** 印字する。`when (seq unresolved)` にすると、
+        ;; 参照を 1 件も見なかった run と、見て問題が無かった run が同じ沈黙になる
+        ;; —— この gate の docstring 自身が「zero-finding と zero-scan を区別する
+        ;; ために scanned を言う」と約束している、その約束が呼び出し側で消えていた
+        ;; （実測 2026-09-01、cloud-itonami-app への run が 11 件の .clj/.cljc を
+        ;; :additive に載せたが、gate が走ったのか走らなかったのかは出力から
+        ;; 判らなかった）。ADR-2608136000 の 4 問目そのもの。
+        (if (seq unresolved)
+          (do (println (format "  ⚠ 参照が解決しない %d 件 → :review（scanned %d）"
+                               (count unresolved) (:scanned uinfo)))
+              (doseq [[p syms] (:findings uinfo)]
+                (println (str "      " p "  " (str/join ", " syms)))))
+          (println (format "  unresolved-refs gate: 解決しない参照は無し（scanned %d）"
+                           (:scanned uinfo))))
         (println (format "  archived → %s" adir))
         (when (seq (concat landed-additive landed-tracked))
           (println (format "  already landed on %s（内容一致でスキップ）: %d 件"
