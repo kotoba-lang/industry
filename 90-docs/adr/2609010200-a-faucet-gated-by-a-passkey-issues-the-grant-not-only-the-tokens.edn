@@ -1,0 +1,89 @@
+[{:db/id -1
+  :adr/id "adr-2609010200-a-faucet-gated-by-a-passkey-issues-the-grant-not-only-the-tokens"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/title "faucet は CAPTCHA ではなく passkey で門を作り、トークンだけでなく grant を発行する"
+  :adr/status "proposed"
+  :adr/date "2026-09-01"
+  :adr/last_verified "2026-09-01"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "itonami-faucet"
+  :adr/repos ["orgs/cloud-itonami/app-auth"
+              "orgs/kotoba-lang/webauthn"
+              "orgs/kotoba-lang/org-biscuitsec"]
+  :adr/related ["2609010100" "2608319800"]
+  :adr/body "2026-09-01. A faucet for itonami, gated by a passkey rather than a CAPTCHA, and
+issuing a grant rather than only sending tokens.
+
+## Why this came up
+
+The testnet buyer is built and cannot be funded. Every Base Sepolia faucet
+gates on a login or a CAPTCHA, and an agent must do neither -- one is
+credential entry, the other is bot-detection bypass. So the last step of an
+autonomous purchase is blocked by a human-verification puzzle placed in front
+of a machine.
+
+That is not an obstacle to route around. It is a signal that the CAPTCHA is
+measuring the wrong thing.
+
+## A CAPTCHA gates the wrong party
+
+A CAPTCHA asks: is a human here. For a faucet whose consumer is an agent, the
+only two outcomes are that a human solved it on the agent's behalf, in which
+case the puzzle measured nothing about the agent, or that the agent bypassed
+it, in which case it measured nothing at all. Either way the answer it returns
+is unrelated to the question a faucet actually has, which is whether this draw
+should count against somebody.
+
+## A passkey answers a question a faucet can use
+
+auth.itonami.cloud already runs passkey sign-in and publishes a full OAuth
+discovery document: authorize, token, introspect, userinfo. The faucet can be a
+relying party of it and implement no ceremony crypto of its own.
+
+What a passkey assertion establishes is narrower than identity and more useful
+than a CAPTCHA: a specific authenticator was present and its holder made a
+gesture. Draws are counted per credential, not per address and not per IP. An
+address is free to make and an IP is cheap to rotate; a credential costs a
+device.
+
+**The honest claim, stated so nobody overreads it**: a passkey proves one
+authenticator, not one person. Someone with several devices gets several
+allowances, and the faucet should say that rather than imply an identity it
+cannot see. What it buys is a rate limit that survives address rotation, which
+is the property a faucet needs.
+
+## The faucet issues the grant, which is why it belongs here
+
+A faucet that sends tokens to an address is a utility. This one issues the
+spend grant from ADR-2609010100 in the same act:
+
+  a person draws, once, with a passkey
+  the faucet funds the session address AND records the grant it may spend under
+  the agent spends within that grant, and never touches the passkey
+
+That resolves the contradiction that a passkey cannot sign a payment. It does
+not have to. It signs the grant, rarely, with a person present, which is
+exactly the root-and-holder shape the biscuit work already has. The faucet is
+the first issuer of those grants, and issuing them is what makes it load
+bearing rather than a convenience.
+
+## What it must refuse
+
+An assertion it cannot verify is refused, not treated as anonymous -- a forged
+token and no token must not produce the same response. A credential over its
+allowance is refused with the time it may return, because a refusal that does
+not say when is indistinguishable from a ban. A request for anything but a
+testnet is refused: a faucet that can dispense value is not a faucet.
+
+That last one is an invariant, not a policy. The faucet key must be
+structurally unable to touch mainnet -- funded only on testnets, so the failure
+mode of every bug in it is that testnet tokens move.
+
+## What is not decided here
+
+The allowance numbers, whether the drip is ETH and USDC or ETH only with USDC
+minted, and whether a second draw tops up the same session address or issues a
+new one. Those need the first draw to exist before they can be chosen on
+evidence rather than guessed."}]
