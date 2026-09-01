@@ -1,0 +1,81 @@
+[{:db/id -1
+  :adr/id "adr-2609010500-x402-client-sdks-hold-no-key"
+  :adr/title "x402 client SDKs hold no key: the signer is injected"
+  :adr/status "accepted"
+  :adr/date "2026-09-01"
+  :adr/related ["adr-2609010300-a-discovery-surface-is-a-promise-and-nothing-was-checking-it"
+                "adr-2609010400-the-fleet-cannot-mine-testnet-gas-and-does-not-need-to"]
+  :adr/body "2026-09-01. x402 client libraries for TypeScript and Python, at
+kotoba-lang/x402-sdk, with the signer injected.
+
+## Why an SDK at all
+
+x402 is four HTTP steps: ask, read the 402, pay, ask again with the proof. It
+is small enough that a library's job is not to hide it. What it is for is the
+handful of details that are easy to get wrong and expensive when they are.
+
+## The four the SDK exists for
+
+**The EIP-712 domain comes from the offer.** Base mainnet USDC declares
+`USD Coin`; Base Sepolia USDC declares `USDC`. Signing under the wrong one
+produces a signature that recovers a different address, and the payment is
+rejected as a bad signature -- which reads like the buyer's fault. The client
+refuses an offer carrying no domain rather than guessing one, and raises on an
+unknown network rather than defaulting its chain id.
+
+**The cheapest allowed offer wins, never accepts[0].** Sellers list the same
+resource on mainnet and on a testnet in their own order. Taking the first is
+how a buyer pays real money to rehearse.
+
+**A policy is required.** No policy refuses with `no-policy` rather than
+paying. A default ceiling is a limit nobody chose.
+
+**Every failing check is named, not just the first.** An offer on the wrong
+network usually names that network's token too, so a caller told only
+`network-not-allowed` fixes the network and is refused again.
+
+## The signer is injected
+
+These packages hold no key, sign nothing, and have no cryptography dependency.
+The wallet stays wherever its owner put it: viem, ethers, eth-account, a
+hardware device, a remote signer. A payment library that wants a key is a
+place a key can leak from, and this is the same injection seam the rest of
+this workspace uses -- webauthn's verifier, base-l2's transport, kotobase's
+sign-fn.
+
+It also keeps the packages honest about scope. They implement `exact`, where
+the facilitator submits and pays the gas so a buyer needs no ETH. An offer
+asking for `transaction` is refused by name rather than half-supported.
+
+## Two defects the tests did not find
+
+Both came from running against the live facilitator instead of against the
+suite.
+
+urllib's default User-Agent gets 403 from Cloudflare, so a Python client using
+it cannot reach x402.nexus at all -- and the failure arrives looking like
+authorisation rather than like a bot rule. The default fetch now sends a
+User-Agent.
+
+`select_offer` handed a None challenge raised AttributeError, reporting a
+protocol outcome as a bug in the caller's own code. It refuses with
+`not-a-challenge`.
+
+## Languages
+
+TypeScript and Python, following the layout of net-kotobase/sdk
+(packages/<language>, native tooling per package, one wire contract in
+spec/wire.md). Two done and exercised against a live service beats four
+scaffolded. Rust and Go are the obvious next two; the contract they implement
+is already written down.
+
+The wire contract is transcribed from kotoba-lang/pay's pay.x402 -- what
+x402.nexus actually runs -- rather than from a specification the server might
+have drifted from.
+
+## Not published to a registry
+
+The code is public at kotoba-lang/x402-sdk and installable from git. Publishing
+to npm and PyPI needs registry credentials this session does not have, so the
+package manifests are ready and the publish step is not done. Saying they are
+installable by name would be a claim about a registry nobody has pushed to."}]
