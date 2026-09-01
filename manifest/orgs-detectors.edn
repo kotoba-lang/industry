@@ -2877,4 +2877,32 @@
               build`, and the ship chaining `npm run build && …` so a failed build
               stops it. This measures the sanctioned path only -- neither incident
               went through a script, and no script can stop a CLI run by hand."}
+
+  {:id       :verify-actor-did-keys
+   :title    "a key in a DID document outside the enumerated actor set"
+   :why      "2026-09-01: etzhayyim.com resolves /actor/<handle>/did.json for ANY
+              handle -- `definitely-not-an-actor-9x7q` returns 200 with a
+              well-formed document -- and that is deliberate. Its own
+              /.well-known/actors.json enumerates 104 named actors and then counts
+              42,659 more as `society-scale keyless mirror-actors`, each namespace
+              marked `keyless observational mirror -- NOT the entity itself (no
+              impersonation, G1)`.
+
+              The safety of that open namespace rests on one property: a document
+              with no verification method cannot sign, so a mirror cannot speak as
+              the thing it mirrors. Put a key in one and the mirror becomes an
+              impersonator, and nothing about the URL changes to say so.
+
+              This was nearly broken from the outside on the day it was written.
+              Making the actor DID plane usable for agent authentication means
+              putting keys in documents, and the obvious way to do it -- key the
+              actors -- is right only for the enumerated ones. `tomoshibi`, the
+              one keyed document today, is enumerated; that was the pattern, and
+              nothing enforced it."
+   :argv     ["nbb" "{{repo}}/scripts/verify-actor-did-keys.cljs" "--findings" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 43200000
+   :timeout-ms  600000}
 ]}
