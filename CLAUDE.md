@@ -2152,8 +2152,29 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
 | 文字列 | **127 UTF-8 バイト上限** | EDN 1 MiB / string leaf 64 KiB（実測: 4,920 バイトの HTML 断片を構築可） |
 | capability | host-import 表（id 201+） | capability-registry（id 1–12）+ 型付き kit |
 
-- **型注釈はインライン構文**: `(defn f [p :string n :i64] :string body)`。
-  legacy の `^:i64` メタデータ形式ではない。
+- **型注釈はインライン構文で、いま必要なものだけ書く**（2026-09-01 改訂）:
+  `(defn f [p :string n] body)`。legacy の `^:i64` メタデータ形式ではない。
+  - **注釈は per-parameter**。1 つ書いたら全部書く規則は無くなった（kotoba-sema
+    `14b5536`）。
+  - **未注釈パラメータは body が要求する型を取る**（同 `0b0b31e`）。制約は型検査器
+    自身の拒否から読むので、operand 型の第 2 の表は存在しない。
+  - **結果型も省ける**（`infer-absent-results`）。
+  - 書く必要が残るのは、**body が要求しない**型だけ。実例: `or` of two `=` は i64 を
+    返すので、`(if (and has-x ...) ...)` の `has-x` は `:bool` と書かないと `if` の
+    分岐型が食い違う。
+  - ⚠ **書かれた注釈は決して推論で上書きされない。** 用途が食い違うパラメータは
+    `:i64` に戻り、以前と同じ場所で同じメッセージで落ちる。
+  - 実測 2026-09-01: `org-ietf-smtp` の 3 modules から 85 個中 **81 個**を外して、
+    生成 wasm32 は**バイト単位で同一**。残った 3 個は上の `:bool` 3 つ。
+- **`defdesugar` は使える**（2026-08-31、kotoba-sema `dae81ee`）。
+  `(defdesugar clamp [x lo hi] (if (< x lo) lo (if (> x hi) hi x)))` を書いて
+  `(clamp n 0 6)` と呼ぶ。**macro ではない** —— registered な head だけが展開され、
+  body は**それより前に宣言された** template に対してだけ展開されるので再帰は
+  構造的に不可能、引数は 1 度だけ synthesized name に束縛される（= 複数評価も
+  capture も起きない）。個数・arity・body node 数・総展開数はすべて有界。
+  ⚠ **`defmacro` の代わりに使えるのはこれだけ。** ADR-2608301500 が defmacro 恒久禁止の
+  根拠に据えているのがこの機構であり、2026-08-31 まで**実装が存在しなかった**。
+  なお同 ADR の fixture が使う `match` は今も未実装。
 - capability は今のところ `(ns x (:capabilities #{:ui/commit}))` + `(cap-call :ui/commit v)`、
   policy は `{:allow #{[:cap/call 9]}}` と書ける（宣言したのに使わないとコンパイルエラー）。
   **ただしこれを「effect の書き方」として広めない。** ADR-2607279200 §2 は
@@ -2434,13 +2455,33 @@ repo だけでなく言語の stdlib にも当たる）。
 fail-closed 化した。
 
 **したがって単一ファイルの guest は stdlib を引けない。** 共有する経路は project route
-（`--source-path` / `--module-lock`）だけで、それは CLI では JVM 経由になる（`bin/amu` の
-`nbbNativeEligible` が project mode を弾く）。**Q9 は JVM build 依存を禁じているので、
-JVM-free を保つ単一ファイル guest は、必要な小さなヘルパを自前で持つしかない。**
-これは規律の失敗ではなく道具の穴である —— 実測 2026-08-30、`org-ietf-smtp` /
-`org-ietf-pop3` / `org-ietf-imap` の 3 repo が同じバイト走査（空白送り・数字判定・
-大小無視比較）を**別々の名前で 3 回**書いている。重複を「まとめろ」と指示する前に、
-`compile --module-lock` が非 JS target を受けるか、nbb 側に linker が来るかを確かめること。
+（`--source-path` / `--module-lock`）である。
+
+⚠ **この節は 2026-08-30 に「project route は CLI では JVM 経由になる」と書いていた。
+`--source-path` については 2026-08-31 に解消済み**（amu#717）。`kotoba.compiler.nbb.project-files`
+が閉じたグラフを node:fs で解決し、portable な `project/link-source` に渡す:
+
+```bash
+amu compile main.cljk --source-path <dir> --target wasm32 --jvm-free   # exit 0
+```
+
+実測（`clojure` を PATH から外し `JAVA_HOME=/nonexistent`）: 2 module の project が
+通り、生成 wasm が `run(5) = 11` を返す（= もう一方の module のコードが走っている）。
+
+- **`--module-lock` はまだ JVM のまま。** resolver に Node 版が無く、path resolver で
+  lock 付きの build に答えると pin が黙って外れるので、`exit 64` で fail-closed。
+  **再現可能な build を要求する経路は今も JVM を通る。**
+- したがって「JVM-free を保つには単一ファイルにするしかない」はもう成り立たない。
+  実測 2026-08-30 に見つかった重複 —— `org-ietf-smtp` / `org-ietf-pop3` /
+  `org-ietf-imap` の 3 repo が同じバイト走査（空白送り・数字判定・大小無視比較）を
+  **別々の名前で 3 回**書いている —— は、いま共有できる。
+- **共有先の実例**: `kotoba-lang/kotoba-lang` の `lang/compat/clojure/string.kotoba`。
+  `.cljc` の `(:require [clojure.string :as str])` がそのまま解決する
+  （`--source-path <kotoba-lang>/lang/compat`）。**ただし置いてあるのは
+  `clojure.string` と厳密同値な 3 つ（`starts-with?` `ends-with?` `includes?`）だけ**
+  で、`index-of` `blank?` `trim` `lower-case` 等が**無い理由は 1 件ずつ
+  `lang/compat.edn` に書いてある** —— Kotoba の文字列面は UTF-8 バイトで addressing
+  されるので、それらは近似にしかならない。**近似を本名で置かない。**
 
 ## design system（css / html / shitsuke / liquid-glass-ui / kotoba-ui）は `.kotoba` 移行対象（オーナー判断 2026-07-27、ADR-2607270100 §10）
 
