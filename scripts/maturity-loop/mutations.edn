@@ -5297,4 +5297,73 @@
      :file "README.md"
      :find "（102 directories）"
      :replace "（120 directories）"
-     :must-fail ["prose-quotes-the-directory-count-in-the-artifact"]}]}]}
+     :must-fail ["prose-quotes-the-directory-count-in-the-artifact"]}]}
+
+  {:repo "orgs/kotoba-lang/wgsl"
+   :label "the WGSL compiler surface, and the CLJS branch a JVM-only suite cannot see"
+   ;; Until 2026-08-31 the suite was `.clj` while the implementation is `.cljc`,
+   ;; so portability was a claim rather than an observation -- and not an idle
+   ;; one. `kami.wgsl/num` floats every integral-looking literal precisely
+   ;; because ClojureScript cannot tell 0 from 0.0, and the runtimes take
+   ;; different branches through it:
+   ;;
+   ;;   (str 1e21)   JVM "1.0E21" -> caught by the "." test
+   ;;                CLJS "1e+21" -> only the "e" test stops "1e+21.0"
+   ;;
+   ;; The `e` branch is UNREACHABLE on the JVM. Measured 2026-08-31: deleting it
+   ;; leaves `clojure -M:test` at 0 failures while nbb reports 1 failure in
+   ;; f32-literal-coercion. Same shape as kotoba-lang/codebase's f64 decode.
+   ;; `run_tests.cljs` therefore runs both halves and is the cmd here; its
+   ;; marker is printed only when BOTH are green.
+   ;;
+   ;; All six below were replayed at pin 3d7aa3d1 before landing -- each anchor
+   ;; unique, each bite naming the invariant it claims, control green before and
+   ;; after. A seventh was tried and deliberately LEFT OUT: dropping the `:--`
+   ;; clause from `for-step` does not bite, because the fallback strips the
+   ;; trailing `;` off `stmt` and emits identical text. Listing it would have
+   ;; been theatre -- the failure mode this file exists to prevent.
+   :cmd ["nbb" "run_tests.cljs"]
+   :green-marker "wgsl: both runtimes green (nbb + JVM)"
+   :mutations
+   [{:id :wgsl/f32-exponent-branch-dropped
+     :why "the CLJS-only path. `num` appends \".0\" to anything that prints without a point; in JS (str 1e21) is \"1e+21\", so ONLY the \"e\" test stops it becoming \"1e+21.0\", which WGSL will not parse. The JVM prints \"1.0E21\" and short-circuits on \".\" -- it cannot observe this at all, which is the whole reason the suite is .cljc and this cmd runs both"
+     :file "src/kami/wgsl.cljc"
+     :find "(or (str/includes? s \".\") (str/includes? s \"e\"))"
+     :replace "(str/includes? s \".\")"
+     :must-fail ["f32-literal-coercion"]}
+
+    {:id :wgsl/swizzle-parens-dropped
+     :why "[:. e field] applies a field or swizzle to a computed value. The parens are load-bearing: without them (a + b).xyz reparses as a + b.xyz, which is valid WGSL with different arithmetic -- a silent wrong-pixels bug, not a compile error"
+     :file "src/kami/wgsl.cljc"
+     :find "(str \"(\" (go (first xs)) \").\" (ident (second xs)))"
+     :replace "(str (go (first xs)) \".\" (ident (second xs)))"
+     :must-fail ["swizzle-on-a-sub-expression"]}
+
+    {:id :wgsl/block-bodies-not-indented
+     :why "shader source is read by humans exactly when it is hardest to debug. Losing the indent is legal WGSL, so nothing downstream complains"
+     :file "src/kami/wgsl.cljc"
+     :find "#(str \"  \" (str/replace"
+     :replace "#(str \"\" (str/replace"
+     :must-fail ["control-flow-blocks" "for-loops" "function-signatures" "struct-and-shader-assembly"]}
+
+    {:id :wgsl/workgroup-size-assumed-vector
+     :why "a scalar workgroup size is the common 1-D case. Forgetting it emits @workgroup_size with a seq'd number rather than an argument list"
+     :file "src/kami/wgsl.cljc"
+     :find "(if (vector? workgroup-size) workgroup-size [workgroup-size])"
+     :replace "workgroup-size"
+     :must-fail ["function-signatures"]}
+
+    {:id :wgsl/for-init-semicolon-not-stripped
+     :why "the `for` header supplies its own separators, so the init statement's trailing `;` must come off. Leaving it emits `for (var i = 0;; ...)`"
+     :file "src/kami/wgsl.cljc"
+     :find "(str/replace (stmt init) #\";$\" \"\")"
+     :replace "(stmt init)"
+     :must-fail ["for-loops"]}
+
+    {:id :wgsl/facade-re-export-mis-wired
+     :why "kotoba.wgsl exists only so historical consumers (sprite-gpu, shaders, sky, render-shaders) keep resolving. A re-export pointed at the wrong impl during a tidy-up breaks them, and until now the suite reached only four of the six names. The test compares vars, not sample output -- equal output on one input would not prove the facade points at this implementation"
+     :file "src/kotoba/wgsl.cljc"
+     :find "(def struct* k/struct*)"
+     :replace "(def struct* k/binding*)"
+     :must-fail ["the-facade-re-exports-the-whole-surface" "struct-and-shader-assembly"]}]}
+]}
