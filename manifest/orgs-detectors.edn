@@ -2715,7 +2715,15 @@
               that path.
               Cannot be a fleet gate: it reads live public documents and probes
               hosts over the network, neither of which exists in a shipped
-              tree."
+              tree.
+              A catch-all host is reported UNMEASURED, not red. A single-page
+              app serves the same shell for every client-routed path by design
+              and this workspace requires SPAs, so demanding a fix would be a
+              standing red nobody should clear: yoro.etzhayyim.com redirects
+              every path to aozora.app, which returns the same 2455 bytes for
+              /search and for a path nobody routed. Those paths are unmeasured,
+              and the UNMEASURED lines print with or without --findings so a
+              clean exit cannot be read as every promise having been checked."
    :argv ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
           "{{repo}}/scripts/verify-advertised-surfaces.cljs" "--findings"]
    :cwd :root
@@ -2724,20 +2732,33 @@
    :evidence "SCANNED\t[1-9][0-9]*"
    :timeout-ms 120000
    :interval-ms 21600000
-   :measured "2026-09-01: 2s wall for 9 advertised paths on x402.nexus at load
-              27, and 40 paths on itonami.cloud in one run, so the 120s timeout
-              is far more headroom than the probe needs; 6h because a route can
-              be removed by any deploy.
-              Discriminates: verified against a local host serving the two real
+   :measured "2026-09-01: 81 advertised paths across the 6 hosts in this
+              workspace that publish a discovery document, in well under the
+              120s timeout at load 27; 6h because a route can be removed by any
+              deploy. The 6 come from requesting /llms.txt from all 425
+              non-wildcard hosts in the surface index: ten answered, and www
+              and alias names fold to five, plus itonami.cloud which is not in
+              that index.
+              Discriminates: verified against a local host serving both real
               shapes. A path advertised and answering 404 reports `absent`; the
-              same path answering the index page reports `same-as-control`; a
-              path with a distinct body is clean; and a POST-only path
-              advertised as POST answers 402 and is clean, which is what proves
-              the method is read from the document rather than assumed. Every
-              red this detector produced before those controls was its own
-              extraction bug -- GET-probing POST endpoints, a truncated
-              placeholder prefix, and fragment links -- and each is now a
-              self-test case."}
+              same path answering the index reports the host as UNMEASURED; a
+              path with a distinct body is clean; and a POST-only path answers
+              402 and is clean, which proves the method comes from the document
+              rather than being assumed.
+              Standing findings 2026-09-01, both confirmed by hand: two
+              atproto.etzhayyim.com .well-known paths answer Cloudflare 1033
+              (proxied hostname with nothing behind it), and
+              mcp.etzhayyim.com/xrpc/com.etzhayyim.mcp.message does not resolve
+              in DNS at all although orgs/kotoba-lang/app-agentgateway declares
+              that host. atproto.etzhayyim.com is promised by etzhayyim.com's
+              own llms.txt and claimed by no repo in the surface index.
+              Every red this produced before it had controls was its own bug,
+              six of them: GET-probing POST endpoints, a truncated placeholder
+              prefix, fragment links, globs, reading an HTML index served at
+              /openapi.json as if it were a discovery document, and a
+              registrable-domain helper threaded with ->> so that every host
+              compared equal and the same-site filter accepted everything. All
+              six are self-test cases now."}
 
   {:id :verify-declared-serving
    :title    "a model catalog saying `serving` about an endpoint that does not answer"
