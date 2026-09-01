@@ -90,8 +90,59 @@ and with `USDC` ours equals it byte for byte:
 With `USD Coin` the same authorization recovers a different address. Agreement
 with the contract is what makes this a proof rather than a self-portrait.
 
+## Asked again: mine the Base Sepolia ETH itself
+
+Base Sepolia still cannot be mined, and the reason has not changed. But the
+question has a real answer one layer down, and the first version of this
+record stopped too early by saying only that gas must come from outside.
+
+Base Sepolia ETH is MINTED BY THE BRIDGE. Deposit ETH into the OptimismPortal
+on Sepolia L1 -- 0x49f53e41452C74589E85cA1677426Ba426459e85, confirmed both by
+Base's own contract documentation and by 2059 bytes of code at that address on
+Sepolia -- and the same address is credited on Base Sepolia. So the question
+becomes where Sepolia L1 ETH comes from.
+
+Sepolia L1 is proof-of-stake with a permissioned validator set, so it cannot
+be mined either. But it can be EARNED BY HASHING. pk910 runs a CryptoNight
+proof-of-work faucet at sepolia-faucet.pk910.de: measured 2026-09-01, powParams
+{\\\"a\\\":\\\"cryptonight\\\"}, difficulty 12, 1000 H/s per session, 12-hour sessions,
+paying 0.05 to 2.5 ETH for work submitted. Its sibling faucets cover ephemery,
+holesky and hoodi. None covers Base Sepolia, which is why the bridge leg
+exists.
+
+That is mining in the sense that matters here: computation in, testnet ETH
+out, and no faucet operator deciding whether we deserve it. The minimum payout
+is 0.05 ETH, which at 0.00000144 ETH per settlement is about thirty-five
+thousand x402 payments.
+
+## The one gesture that is not ours to make
+
+That faucet's captcha module has requiredForStart: true. Solving a CAPTCHA is
+bot-detection bypass and is refused without exception, so a person starts the
+session. It is one gesture, once, and everything after it is machine work the
+faucet is explicitly built to accept -- ADR-2609010200 argued that a CAPTCHA in
+front of an agent measures the wrong party, and this is the same shape seen
+from the other side: the puzzle gates the human who starts, not the machine
+that works.
+
+The fleet does not help. A session is capped at 1000 H/s and a session costs a
+CAPTCHA, so this is a one-machine job; ten mac minis hashing into one capped
+session produce exactly what one does. Nor is a miner worth writing: the
+faucet's own page ships a WASM CryptoNight miner, and duplicating it for one
+capped session would be work with no consumer.
+
+## What exists now
+
+scripts/sepolia-to-base-bridge.cljs reports where the funds are and, once
+Sepolia ETH exists, builds the deposit that carries it across, holding back
+gas for itself. Both branches are exercised: unfunded exits 2 rather than
+reporting a pass it did not measure, and against a funded address it builds
+the transaction and prints it. It does not send, and it does not read a
+signing key.
+
 ## What is still missing
 
-One drip of Base Sepolia ETH into a facilitator wallet. That is the entire
-external dependency of the payment path now, it is about 0.0000015 ETH per
-settlement, and it cannot be mined."}]
+One session on the PoW faucet, started by a person solving one CAPTCHA. After
+that the path is: hash, claim to the Sepolia address, run the bridge script,
+and the x402 facilitator has gas. Nothing else in the payment path depends on
+anything outside this workspace."}]
