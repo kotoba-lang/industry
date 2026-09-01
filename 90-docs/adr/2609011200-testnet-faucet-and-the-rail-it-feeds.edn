@@ -1,0 +1,109 @@
+[{:db/id -1
+  :adr/id "adr-2609011200-testnet-faucet-and-the-rail-it-feeds"
+  :adr/title "The faucet pours, and the sellers it pours for accept the chain it pours on"
+  :adr/status "accepted"
+  :adr/date "2026-09-01"
+  :adr/tags ["x402" "faucet" "base-sepolia" "testnet" "nexus-x402" "murakumo" "kotobase"]
+  :adr/body "## Decision
+
+x402.nexus hands out Base Sepolia gas and USDC, and every seller that wants to be
+tried on it lists its resources on base-sepolia as well as base. Two halves, and
+either alone is useless: tokens that buy nothing, or an offer nobody can pay.
+
+## The pool
+
+Base Sepolia gas cannot be mined -- the chain reports difficulty 0x0 and a
+sequencer produces its blocks -- so the only ways in are a captcha-gated web
+faucet or a deposit from L1. The workspace already held Ethereum Sepolia ETH
+from a PoW faucet, so the pool is filled by depositing through Base's own
+L1StandardBridge (scripts/sepolia_to_base_bridge.cljs in nexus-x402).
+
+The bridge address is verified TWO ways, because a deposit to the wrong address
+is an ordinary transfer that succeeds and never arrives: against Base's
+published contract list, and against the chain, where the OptimismPortal's
+systemConfig() must return the SystemConfig Base documents for Sepolia. A
+bridge belonging to some other OP-stack chain passes eth_getCode and fails that.
+
+The first deposit REVERTED. A hand-picked 120000 gas limit against a real cost
+of 663000: it burnt its limit and arrived nowhere, and `eth_call` on the same
+calldata succeeded, so the calldata was never the problem. The script estimates
+and adds 25%. Value is refunded on revert; only gas was lost.
+
+Measured: 0.2 ETH at 0xD030410BABA777b1e7FacABf679295641203628A, a key generated
+for this and stored as kagi `FAUCET_BASE_SEPOLIA_KEY`. It signs for chain 84532
+and the chain id is not a parameter -- a testnet key that can be aimed at
+mainnet by a config change is a mainnet key.
+
+## The gate is a Biscuit, and that is not a retreat from the passkey
+
+A passkey is bound to a relying-party id. These credentials are registered to
+auth.itonami.cloud, so x402.nexus CANNOT run their ceremony -- the browser
+refuses the assertion before any code here would see it. That is WebAuthn, not
+a gap in the Worker, and the way past it is not a second rp-id and a second
+enrolment.
+
+So the ceremony stays where it is and the faucet consumes what a passkey
+sign-in produces: a Biscuit, which this Worker already verified against a
+public root it holds. One ceremony implementation, which is what nexus.faucet
+asked for in its own docstring.
+
+What that proves is stated rather than implied: the holder held a live
+credential from that issuer. NOT that a gesture happened just now -- a Biscuit
+outlives the assertion that caused it -- and not a device count, because it
+carries no authenticator counter. sign-count is reported as 0 rather than a
+fabricated rising number, which would make decide's clone check silently
+vacuous. Accounting is per HOLDER: stricter than per credential, not looser.
+
+## The halves are reported separately, always
+
+Gas and USDC arrive by different routes, so nexus.pour decides them
+independently. Gas funded and USDC empty is a WORKING faucet and reports as one.
+A balance that could not be READ is :balance-unknown and never :pool-exhausted --
+those call for different repairs, and reporting the second as the first sends
+someone to a funding page instead of a status page. An unreadable draw history
+refuses rather than defaulting to `no draws yet`, which would unenforce every
+ceiling exactly when the store is failing.
+
+## The sellers had to change, not just be listed
+
+A listing a seller cannot honour is worse than no listing. murakumo priced and
+verified on `base` from a private constant, and its vendored pay.x402 fell back
+to mainnet USD Coin whatever the network said -- so a base-sepolia offer would
+have named a token that does not exist where it told the buyer to send it.
+
+Three things move together: the offer fans out one entry per network (the
+facilitator derives exactly one rule per resource and reads its chain from
+price.network, so a resource listed once is listed on one chain); the token
+comes from a per-network table that REFUSES an unknown network rather than
+defaulting; and the chain is read from the payment and checked against an
+offered set BEFORE anything uses it. A `(or network chain)` fallback would have
+accepted a testnet transaction against a mainnet invoice.
+
+The chain is threaded into the KV cache key and the spend-gate payment-id too.
+Tx hashes are independent across chains, so a cache keyed on the hash alone
+would let a base-sepolia receipt answer a base payment, and a payment-id without
+the chain would let the two share one reservation. Both become reachable the
+moment a testnet listing exists.
+
+## Current position, measured 2026-09-01
+
+- x402.nexus: faucet live. GET /faucet reports the pool as measured; POST /faucet
+  refuses an absent credential and a malformed one by DIFFERENT names. Gas
+  funded, USDC UNFUNDED.
+- murakumo.cloud: 8 resources, base + base-sepolia, correct per-network asset and
+  per-network EIP-712 domain (USD Coin vs USDC). Listed in the catalog.
+- itonami.cloud: covered at hanmoto.itonami.cloud, which listed base-sepolia
+  before this work.
+- kotobase.net: change written, not yet landed.
+- kotoba.cloud: NOT DONE and not merely unfinished. It is a control plane (PQ key
+  lifecycle, library publishing) and sells nothing over x402 today, so listing it
+  on a testnet means first deciding what it sells and at what price. That is a
+  product decision, not a testnet extension, and inventing one would be the
+  failure this workspace calls advertising a dish the kitchen cannot cook.
+
+## What is still owed
+
+USDC. Circle's faucet is the only source of Base Sepolia USDC and it is
+captcha-gated, which an agent must not defeat. Until someone draws it into
+0xD030410BABA777b1e7FacABf679295641203628A, the faucet pours gas and says
+UNFUNDED for the other half -- which is the honest report, not a failure."}]
