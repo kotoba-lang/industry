@@ -101,6 +101,37 @@ moment a testnet listing exists.
   product decision, not a testnet extension, and inventing one would be the
   failure this workspace calls advertising a dish the kitchen cannot cook.
 
+## The loop was open, and that was the real instability (2026-09-01, later)
+
+Sizing was not the whole answer. Measured after the faucet went live: the family
+payTo 0xA00366...D4E, which EVERY base-sepolia listing named, is a Safe on
+Ethereum mainnet and has NO CONTRACT on Base Sepolia -- code 0, nonce 0 -- and a
+Safe address has no private key behind it. Testnet payments sent there were not
+misrouted; they were destroyed on arrival.
+
+So the rail burned 100% of what the faucet handed out, against a refill of
+10 USDC/24h. No per-draw size and no top-up schedule could make that converge.
+The faucet was not small, it was leaking.
+
+All three sellers now route base-sepolia to the faucet pool itself, so what the
+faucet pours comes back when it is spent:
+
+  murakumo   MURAKUMO_TREASURY_ADDR_TESTNET
+  kotobase   KOTOBASE_TREASURY_ADDR_TESTNET
+  hanmoto    TREASURY_ADDR_TESTNET
+
+Mainnet payTo is untouched and prices are unchanged -- the testnet is a
+rehearsal of the same claim, not a discount.
+
+Each fails CLOSED: with no testnet address configured the seller stops offering
+base-sepolia rather than falling back to the Safe. That fallback is not the
+smaller mistake; it is the one that destroys the payment, and the offer still
+looks valid from every angle a buyer can see. All three have a test that goes
+red when the fallback is reintroduced.
+
+Verified live: all 9 base-sepolia listings across the 3 sellers now name the
+pool, in the documents AND in the runtime 402 challenges.
+
 ## What is still owed
 
 USDC. Circle's faucet is the only source of Base Sepolia USDC and it is
