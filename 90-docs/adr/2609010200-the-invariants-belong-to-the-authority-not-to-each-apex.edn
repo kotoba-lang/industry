@@ -52,7 +52,35 @@
    product's own first sentence."
 
   :adr/decision
-  "Split the invariants by what they are properties OF. THREE categories, not
+  "SUPERSEDED IN ITS CENTRAL PROPOSAL, 2026-09-01, by work that landed while
+   this was being written. Kept because the ordering below is still live and
+   because the way it was superseded is worth reading.
+
+   This ADR proposed re-partitioning the axes — authority, surface, consent.
+   Another session went one layer deeper and fixed the root instead: state what
+   the DESIGN asserts, independently of what a probe can see, and only then say
+   how each claim is covered. That is `audit/invariants` in
+   90-docs/auth_plane_integration, landed as `State the invariants
+   independently of what a probe can see`. Every axis declares which invariant
+   it serves; coverage sorts the result covered / unobservable-with-a-declared-
+   reason / SILENT; a SILENT invariant fails the run with exit 2, and so does
+   the mirror case of an axis serving no declared invariant.
+
+   That is better than re-partitioning and for a reason this ADR half-saw. It
+   diagnosed the instrument as contradicting the design; the fix is not a
+   better partition of the instrument but making the design's claims the thing
+   the instrument is checked against. Re-partitioning axes still leaves axes
+   invented from what is easy to probe. Their version found a real hole on its
+   first run — controllers-are-rp-scoped had no axis at all, while the probe had
+   been recording the rpId it needed since its first version.
+
+   What survives below: the telos ordering, the consent-surface observation
+   (which is about WHICH surfaces a claim covers, not about how invariants are
+   grouped), and the struck item 3. What does not: the three-category split.
+
+   ── original decision, kept for the record ──
+
+   Split the invariants by what they are properties OF. THREE categories, not
    two — the first version proposed two and listed as a refutation that a
    surface where a person is expected per request would need a third. That
    refutation fired within a day, from the product's own landing page, so the
