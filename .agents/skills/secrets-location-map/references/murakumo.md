@@ -128,6 +128,10 @@
 
 ## Murakumo playtest critic token (ADR-2607162100、2026-07-16)
 
+- ⚠ **2026-09-01 実測: `MURAKUMO_CRITIC_TOKEN` は live vault
+  (`KAGI_HOME=$HOME/.kagi`) と repo-local の旧 vault のどちらにも存在しない** —
+  両方とも `no such item`。下記は旧配置の記録として残すが、現在の
+  `ANTHROPIC_PROXY_TOKEN_2` を取得できる経路として使ってはならない。
 - **`MURAKUMO_CRITIC_TOKEN`（kagi vault、compartment `gftdcojp`）** —
   `api.murakumo.cloud/v1/messages`（local-murakumo）の vision critic 用トークン。
   local-murakumo Worker の **secondary** 受理スロット `ANTHROPIC_PROXY_TOKEN_2`
