@@ -65,9 +65,9 @@ flatters.
 - The LEB128 defect in the released CLI is now public and unfixed. It is a
   correctness bug in a shipped binary and should be treated as the follow-up
   with the shortest fuse.
-- Absolute milliseconds remain unqualified: the measuring host is a mining
-  fleet node whose load1 does not go below 1.0. The ordering is qualified
-  separately, and the report says which of the two a reader is looking at.
+- Absolute milliseconds remain unqualified, and a later measurement showed this is structural rather than scheduling. Sampled on the quietest reachable fleet node with nothing else running, idle load1 held between 1.53 and 1.96 across 30 samples over two minutes, and all six reachable nodes sat between 1.28 and 2.32 at rest. A `load1 <= 1.0` gate is not normalized by core count, so on a 10-core M4 it asks for less total system activity than macOS's own idle daemons produce. That gate cannot pass on this hardware.
+
+- The workspace already contains both forms of the gate. The four older benchmarks and this one use `load1 <= 1.0`; the workload-domain suite uses `max(load1) <= 0.75 * logical CPU count`. This run's maximum load1 was 3.53 on 10 cores, so it fails the first and passes the second. The same samples are qualified or unqualified depending only on which gate is applied, and the two disagree today. Choosing one is an owner decision and was deliberately not made here -- relaxing a threshold so one's own run passes is the failure this instrument exists to prevent.
 
 # Boundaries
 
