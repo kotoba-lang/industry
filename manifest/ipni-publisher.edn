@@ -275,6 +275,108 @@
            "https://cid.contact/routing/v1/providers/{cid}"]
   :rule "read the age header; a cached miss and a real absence are the same bytes"}
 
+ ;; ── ADR-2608160300's own success criterion, run end to end on one CID ──
+ ;;
+ ;; The ADR asks for four things and says the fourth is not optional:
+ ;; advertise, see the index hand back kotobase's multiaddr, fetch from that
+ ;; address and re-hash, then IsRm and watch it go. "3 が無い advertise は
+ ;; 緑にしない."
+ ;;
+ ;;   2026-09-01T05:29Z  advertised. cid.contact indexed it in 15s and
+ ;;                      returned kotobase alongside the three third parties.
+ ;;   2026-09-01T05:33Z  fetched from that address; the bytes re-hashed to
+ ;;                      the CID that was asked for.
+ ;;   2026-09-01T05:45Z  two removals published, both synced. Five minutes
+ ;;                      later the entry was still listed, so the run was
+ ;;                      recorded NOT green rather than rounded up.
+ ;;   2026-09-01T12:07Z  it is gone. Six and a half hours, not five minutes.
+ ;;
+ ;; An absence is only evidence if the instrument can see a presence, so the
+ ;; measurement carries two controls and reports :unmeasured -- never :ok --
+ ;; when either is missing:
+ ;;
+ ;;   the witness multihash still returns its three third-party providers,
+ ;;   so the index has not merely forgotten the multihash; and
+ ;;
+ ;;   the same matcher, on the same surface, still finds kotobase at
+ ;;   :control-cid, so it is able to see kotobase at all.
+ ;;
+ ;; Without the second control this check would report success from a typo in
+ ;; a peer id. verify-ipni-publisher-record.cljs re-measures all three every
+ ;; six hours; this file records what they said, not a promise about them.
+ :ipni.publisher/lifecycle-proof
+ {:status :ok
+  :hypothesis "ipni-h1 (discoverable-as-provider)"
+  :adr "ADR-2608160300"
+  :surface "https://cid.contact/multihash/{base58btc-multihash}"   ; the uncached one
+  :provider "12D3KooWGmq2x23J59LmqyBT5ik8pK9gEz7N3Y4vdJidezf7Usz3"
+  :context "ipni-lifecycle-proof-2026-09-01"
+
+  :witness {:cid "bafkreiblkbkzpwvhg3ytykiqyjqorxvrv45sb77doxvv4anaapus6va5xe"
+            :multihash "QmRFjHhG3SkR1RnjwXZ7zz1zS5NpDsv6JCn5V4EkEzP8dv"
+            :content "the 3 bytes 'Any'"
+            :third-party-providers ["12D3KooWGhNCWnUze5JB4bjgumGkJJCDxK4iHmD8Sf9jrjhQazmb"
+                                    "12D3KooWSDpDrmbVV7yeVK4F6sSEAWcQjrwGmnjhiscM3nRfLst9"
+                                    "12D3KooWJPe4WJVdPR8XgXvRgZmcteY2BnXTbinsSzsNfoYUnYwh"]}
+
+  ;; A CID this operator still advertises, under a context that was never
+  ;; retracted -- the positive control.
+  :control {:cid "bafyreib662epgj5lnl2cisepwnq4z2hcqcm4eotvwwr72v76qrhvf45maq"
+            :multihash "QmSaS2KXyjqoR3JzkEsEgeZh1ZLsA9hMkN7RbsWWMWoiXu"
+            :context "ayatori-public-arrangement-v1"}
+
+  :halves
+  [{:half :appears
+    :at "2026-09-01T05:29:21Z"
+    :result :ok
+    :how "advertisement baguqeerau3ttnv5lhzos4fnztujrqmxbfvdu76lpyen4d27rukxmszn42fzq, announce 204, indexed in 15s. cid.contact returned /dns4/ipfs.kotobase.net/tcp/443/https as a fourth provider beside the three third parties, and GET ?format=raw from it returned 3 bytes whose sha256 reproduced the requested CID."}
+   {:half :disappears
+    :at "2026-09-01T12:07:01Z"
+    :result :ok
+    :how "GET /multihash/QmRFjHhG3SkR1RnjwXZ7zz1zS5NpDsv6JCn5V4EkEzP8dv, x-cache: Miss from cloudfront, no age header. 200 with three ProviderResults, all third parties; no kotobase identity among them. Control in the same minute: /multihash/QmSaS2KXyjqoR3JzkEsEgeZh1ZLsA9hMkN7RbsWWMWoiXu still returned this provider, so the matcher can see kotobase when kotobase is there."
+    :latency "removal synced 05:45:13Z, observed absent by 12:07:01Z; not narrowed further"}]
+
+  ;; ⚠ The maturity probe cannot go green on this and be right.
+  ;;
+  ;; 90-docs/ipni_maturity/probe.cljs pins `witness-cid` to THIS CID and
+  ;; scores :discoverable-as-provider (weight 0.20) on whether cid.contact
+  ;; lists kotobase for it. So the two halves of the criterion pull the
+  ;; axis in opposite directions: :appears turned it green at 05:29Z, and
+  ;; :disappears turned it red again by design. Measured 12:24Z the score
+  ;; is 80.99/100 with that axis at 0 and ipni-h1 ranked top -- nominating
+  ;; work that is already finished.
+  ;;
+  ;; It is not a wrong answer to the question it asks. The gateway does
+  ;; still serve these 3 bytes (200, "Any"), so "a CID kotobase serves
+  ;; resolves to third parties only" is literally true of a CID that was
+  ;; retracted on purpose. The sample is wrong for the axis, not the
+  ;; arithmetic: a served-but-deliberately-unadvertised object can never
+  ;; satisfy "is kotobase discoverable", and this is now permanently one.
+  ;;
+  ;; Two smaller things in the same measurement:
+  ;;   - the axis reads /routing/v1/providers/{cid}, which :lookup-surfaces
+  ;;     records as CACHED (observed age 1518 against max-age 7200). It
+  ;;     answers about the past and cannot say so.
+  ;;   - it decides by (str/includes? body "kotobase"), which any address
+  ;;     containing that substring satisfies -- not the peer id.
+  ;;
+  ;; Deliberately NOT fixed here. Repointing the sample would raise the
+  ;; score of the change that repointed it, which is the one edit whose
+  ;; result nobody can check. :control above is what an advertised sample
+  ;; looks like, and verify-ipni-publisher-record.cljs already re-measures
+  ;; it every six hours.
+  :instrument-conflict
+  {:with "90-docs/ipni_maturity/probe.cljs `witness-cid`"
+   :axis :discoverable-as-provider
+   :measured "2026-09-01T12:24:39Z"
+   :score 80.99
+   :effect "the axis is red because the removal succeeded"}
+
+  :not-proven
+  ["The removal was honoured by cid.contact. Other indexers were not asked."
+   "storetheindex removes by ContextID and ignores Entries on a removal, so this says nothing about whether the NoEntries sentinel is right -- only that a retraction from this publisher takes effect."
+   "How long it takes. The window is 5 minutes to 6h38m; nobody sampled between."]}
+
  ;; What is true now, measured rather than claimed. The round trip starts
  ;; from a CID and nothing else: ask the public index who serves it, fetch
  ;; from the address the index returns, re-hash, compare.
