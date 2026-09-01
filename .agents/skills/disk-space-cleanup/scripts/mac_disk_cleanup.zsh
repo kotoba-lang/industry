@@ -23,12 +23,10 @@ case "$task_home" in
     ;;
 esac
 
-typeset -a conservative_targets extended_targets
+typeset -a conservative_targets extended_targets active_dependency_targets
 conservative_targets=(
   "$task_home/.npm/_cacache"
   "$task_home/.npm/_logs"
-  "$task_home/.m2/repository"
-  "$task_home/.gradle/caches"
   "$task_home/.cache/kotoba-native"
   "$task_home/.cache/zig"
   "$task_home/.cache/gh"
@@ -64,6 +62,10 @@ extended_targets=(
   "$task_home/Library/Application Support/Google/Chrome/screen_ai"
   "$task_home/Library/Application Support/Google/Chrome/optimization_guide_model_store"
   "$task_home/Library/Application Support/zoom.us/asr/asr_model"
+)
+active_dependency_targets=(
+  "$task_home/.m2/repository"
+  "$task_home/.gradle/caches"
 )
 
 size_kib() {
@@ -119,6 +121,7 @@ print "[filesystem]"
 df -h /System/Volumes/Data
 audit_class conservative "${conservative_targets[@]}"
 audit_class extended "${extended_targets[@]}"
+audit_class active-dependency-preserved "${active_dependency_targets[@]}"
 runtime_kib=$(size_kib "$task_home/.cache/codex-runtimes")
 printf '[active-runtime-preserved]\n%10s KiB  %s\n' "$runtime_kib" "$task_home/.cache/codex-runtimes"
 print "[preserved] sessions, archived sessions, memories, worktrees, repositories, git history, DataLad, databases, documents, browser profiles, cloud-sync data, Docker volumes/containers"
