@@ -3029,6 +3029,17 @@
               fail loudly -- launchd KeepAlive restarts it forever and the port
               stays closed.
 
+              There is more than one such pointer, and they name different trees.
+              The superproject's `.mcp.json` runs `clojure -M:mcp` -- the second
+              alias #270 deleted -- in the west checkout under orgs/. That works
+              today only because `west update` REFUSED to advance that checkout
+              past another session's uncommitted files; the pin already points
+              past it. This is ADR-2609012000's "three pointers to the app, all
+              disagreeing" for the third time, and it keeps recurring because the
+              only way anyone checks a pointer is by starting it. So this reads
+              every configured entry point and resolves each against the tree IT
+              names, rather than against one directory.
+
               Measured the day it landed, on three real trees rather than fixtures:
               the west checkout (pre-#270) and the running release are both green on
               all three legs; origin/main is red on all three. The registry says

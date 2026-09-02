@@ -30,11 +30,23 @@
 ;; that. A resident whose launch command does not resolve does not fail loudly —
 ;; launchd `KeepAlive` restarts it, forever, and the port stays closed.
 ;;
-;; ## Three legs, and why they are not collapsed
+;; ## Every configured entry point, each against the tree IT names
 ;;
-;;   run-path   the plist's command, against the alias/file it needs in the tree
-;;   cli        whether `bin/itonami` answers a command from the registry
-;;   guest      whether the wasm the nbb hosts load is present in the tree
+;; There is more than one file that says how to start this app, and they name
+;; different trees. The launchd plist names `~/.cloud-itonami/current`; the
+;; superproject's `.mcp.json` names the west checkout under `orgs/`. Measured
+;; 2026-09-02, `.mcp.json` runs `clojure -M:mcp` -- the second alias #270
+;; deleted -- and it works today only because `west update` REFUSED to advance
+;; that checkout past a dirty tree. The pin already points past it.
+;;
+;; This is the same failure ADR-2609012000 recorded as "three pointers to the
+;; app, all disagreeing", and the reason it keeps recurring is that each pointer
+;; is checked, if at all, by starting it. So this reads them all and resolves
+;; each against its own directory rather than against one `--app`.
+;;
+;;   run-path:<source>  a configured start command, against the tree it names
+;;   cli                whether `bin/itonami` answers a command from the registry
+;;   guest              whether the wasm the nbb hosts load is present in the tree
 ;;
 ;; A tree can pass one and fail another, and each failure has a different fix.
 ;; Reporting a single boolean would make "the CLI is closed" and "the resident
@@ -92,6 +104,17 @@
   (when-let [home (aget js/process.env "HOME")]
     (path/join home "Library" "LaunchAgents" "dev.cloud-itonami.app.plist")))
 
+(defn shell-cd-target
+  "The directory a `cd <dir> && … exec <cmd>` line runs in, or nil.
+
+  Read because a start command is only meaningful against the tree it runs in,
+  and the two configured commands on this machine name DIFFERENT trees."
+  [text]
+  (when text
+    (some-> (or (second (re-find #"cd\s+\"([^\"]+)\"" text))
+                (second (re-find #"cd\s+([^\s&<]+)" text)))
+            str/trim not-empty)))
+
 (defn read-run-command
   "The last shell word-group of the plist's ProgramArguments that names a run.
 
@@ -143,43 +166,79 @@
             (some-> (:aliases m) keys set)))
         (catch :default _ nil)))))
 
-(defn check-run-path [app-dir plist-path]
-  (cond
-    (nil? plist-path) (unmeasured :run-path "plist-path-not-given")
-    (not (exists? plist-path)) (unmeasured :run-path "plist-absent")
-    :else
-    (let [text (slurp-file plist-path)]
-      (if (nil? text)
-        (unmeasured :run-path "plist-unreadable")
-        (let [command (read-run-command text)
-              spec (classify-run-command command)]
-          (case (:kind spec)
-            :clojure-alias
-            (let [aliases (deps-aliases app-dir)]
-              (cond
-                (nil? aliases) (unmeasured :run-path "deps-edn-unreadable")
-                (contains? aliases (keyword (:alias spec)))
-                (ok :run-path (str "plist runs -M:" (:alias spec)
-                                   "; deps.edn declares it"))
-                :else
-                (broken :run-path :resident-launch-alias-absent
-                        (str "plist runs `clojure -M:" (:alias spec)
-                             "` and deps.edn declares no such alias."
-                             " A release cut from this tree gives the resident a"
-                             " launch command that cannot resolve; launchd"
-                             " KeepAlive restarts it and the port stays closed."))))
+(defn entry-points
+  "Every configured way to start this app that this machine declares.
 
-            :node-script
-            (let [f (path/join app-dir (:script spec))]
-              (if (exists? f)
-                (ok :run-path (str "plist runs " (:script spec) "; present"))
-                (broken :run-path :resident-launch-script-absent
-                        (str "plist runs `" (:script spec)
-                             "` and the tree does not carry it."))))
+  Each carries the directory it runs in, because they differ: the plist names a
+  release under ~/.cloud-itonami, `.mcp.json` names the west checkout. Checking
+  both against one directory would report one of them about a tree it never
+  touches."
+  [root plist-path app-dir]
+  (let [from-plist
+        (when (and plist-path (exists? plist-path))
+          (when-let [text (slurp-file plist-path)]
+            (when-let [command (read-run-command text)]
+              [{:source "launchd" :command command
+                :dir (or (shell-cd-target text) app-dir)}])))
+        mcp-file (path/join root ".mcp.json")
+        from-mcp
+        (when (exists? mcp-file)
+          (when-let [text (slurp-file mcp-file)]
+            (try
+              (let [servers (-> (js/JSON.parse text)
+                                (aget "mcpServers")
+                                (js->clj))]
+                (->> servers
+                     (keep (fn [[name spec]]
+                             (let [line (str/join " " (concat [(get spec "command")]
+                                                              (get spec "args")))]
+                               ;; Only entries that name THIS app, by their key
+                               ;; or by their command. Another server's command
+                               ;; says nothing about this tree, and matching the
+                               ;; path alone would miss an entry whose directory
+                               ;; is named something else.
+                               (when (or (str/includes? (str name) "cloud-itonami-app")
+                                         (str/includes? line "cloud-itonami-app"))
+                                 {:source (str "mcp:" name)
+                                  :command (or (second (re-find #"exec\s+([^&\n]+)" line))
+                                               line)
+                                  :dir (or (shell-cd-target line) app-dir)}))))
+                     vec))
+              (catch :default _ nil))))]
+    (vec (concat from-plist from-mcp))))
 
-            (unmeasured :run-path
-                        (str "run-command-unrecognized"
-                             (when command (str ": " command))))))))))
+(defn check-entry-point [{:keys [source command dir]}]
+  (let [leg (keyword (str "run-path:" source))
+        spec (classify-run-command command)]
+    (cond
+      (not (exists? dir)) (unmeasured leg (str "directory-absent: " dir))
+      :else
+      (case (:kind spec)
+        :clojure-alias
+        (let [aliases (deps-aliases dir)]
+          (cond
+            (nil? aliases) (unmeasured leg (str "deps-edn-unreadable at " dir))
+            (contains? aliases (keyword (:alias spec)))
+            (ok leg (str source " runs -M:" (:alias spec)
+                         " in " dir "; deps.edn declares it"))
+            :else
+            (broken leg :configured-launch-alias-absent
+                    (str source " runs `clojure -M:" (:alias spec) "` in " dir
+                         " and that deps.edn declares no such alias."
+                         " The start command cannot resolve; under launchd"
+                         " KeepAlive it restarts forever with the port closed,"
+                         " and over stdio the client sees the connection close."))))
+
+        :node-script
+        (let [f (path/join dir (:script spec))]
+          (if (exists? f)
+            (ok leg (str source " runs " (:script spec) " in " dir "; present"))
+            (broken leg :configured-launch-script-absent
+                    (str source " runs `" (:script spec) "` and " dir
+                         " does not carry it."))))
+
+        (unmeasured leg (str "run-command-unrecognized"
+                             (when command (str ": " command))))))))
 
 ;; ---------------------------------------------------------------------------
 ;; the CLI
@@ -257,10 +316,17 @@
 ;; report
 ;; ---------------------------------------------------------------------------
 
-(defn measure [app-dir plist-path]
-  [(check-run-path app-dir plist-path)
-   (check-cli app-dir)
-   (check-guest app-dir)])
+(defn measure [root app-dir plist-path]
+  (let [points (entry-points root plist-path app-dir)]
+    (vec (concat
+          (if (seq points)
+            (map check-entry-point points)
+            ;; No plist and no .mcp.json entry naming this app. That is not
+            ;; "nothing is misconfigured"; it is "this machine does not say how
+            ;; the app starts", which cannot be checked.
+            [(unmeasured :run-path "no-configured-entry-point-found")])
+          [(check-cli app-dir)
+           (check-guest app-dir)]))))
 
 (defn- label [{:keys [status]}]
   (case status :ok "OK  " :broken "FAIL" :unmeasured "UNMEASURED"))
@@ -321,43 +387,75 @@
   (when wasm? (write! (path/join root "target" "amu" "server_main.wasm") "fixture"))
   root)
 
-(defn- plist! [p command]
+(defn- plist!
+  "A plist whose one shell string is `cd <dir> && … exec <command>`, entities and
+  all, because that is the shape the real one has and the reader has to survive
+  it."
+  [p dir command]
   (write! p (str "<plist><dict><key>ProgramArguments</key><array>"
                  "<string>/bin/zsh</string><string>-lc</string>"
-                 "<string>cd /x &amp;&amp; exec " command "</string>"
+                 "<string>cd " dir " &amp;&amp; export X=1 &amp;&amp; exec "
+                 command "</string>"
                  "</array></dict></plist>"))
   p)
 
 (defn self-test []
   (let [tmp (path/join (or (aget js/process.env "TMPDIR") "/tmp")
                        (str "itonami-run-path-" (.getTime (js/Date.))))
-        ;; a tree that can run what the plist names
+        ;; a tree that can run what the entry points name
         good (fixture! (path/join tmp "good")
-                       {:aliases [":server"] :cli-body "(println :dispatch)"
+                       {:aliases [":server" ":mcp"] :cli-body "(println :dispatch)"
                         :wasm? true})
         ;; the tree main actually has today
         bad (fixture! (path/join tmp "bad")
                       {:aliases [":test"]
                        :cli-body (str "(println \"" cli-closed-marker ".\")")
                        :wasm? false})
-        p-clj (plist! (path/join tmp "clj.plist") "/opt/homebrew/bin/clojure -M:server")
-        p-nbb (plist! (path/join tmp "nbb.plist") "nbb --classpath bin bin/host")
-        p-odd (plist! (path/join tmp "odd.plist") "/usr/bin/true")
-        run (fn [dir plist] (into {} (map (juxt :leg identity)) (measure dir plist)))
-        g (run good p-clj)
-        b (run bad p-clj)
-        gn (run good p-nbb)
-        odd (run good p-odd)
+        p-clj (plist! (path/join tmp "clj.plist") good
+                      "/opt/homebrew/bin/clojure -M:server")
+        p-bad (plist! (path/join tmp "bad.plist") bad
+                      "/opt/homebrew/bin/clojure -M:server")
+        p-nbb (plist! (path/join tmp "nbb.plist") good
+                      "nbb --classpath bin bin/host")
+        p-odd (plist! (path/join tmp "odd.plist") good "/usr/bin/true")
+        ;; a superproject-shaped root whose .mcp.json names the BAD tree, so the
+        ;; two entry points disagree the way this machine's did on 2026-09-02
+        root (path/join tmp "root")
+        _ (write! (path/join root ".mcp.json")
+                  (js/JSON.stringify
+                   (clj->js {"mcpServers"
+                             {"cloud-itonami-app"
+                              {"command" "/bin/sh"
+                               "args" ["-c" (str "cd \"" bad
+                                                "\" && exec clojure -M:mcp")]}
+                              "unrelated"
+                              {"command" "nbb" "args" ["something/else.cljs"]}}})))
+        one (fn [dir plist] (into {} (map (juxt :leg identity))
+                                  (measure (path/join tmp "no-root") dir plist)))
+        g (one good p-clj)
+        b (one bad p-bad)
+        gn (one good p-nbb)
+        odd (one good p-odd)
+        both (into {} (map (juxt :leg identity)) (measure root good p-clj))
+        legs (fn [m] (filter #(str/starts-with? (name %) "run-path") (keys m)))
         checks
-        [["a declared alias passes run-path" (= :ok (:status (:run-path g)))]
-         ["a deleted alias fails run-path" (= :broken (:status (:run-path b)))]
+        [["a declared alias passes" (= :ok (:status (get g :run-path:launchd)))]
+         ["a deleted alias fails" (= :broken (:status (get b :run-path:launchd)))]
          ["the deleted-alias failure is named"
-          (= :resident-launch-alias-absent (:id (:run-path b)))]
-         ["an nbb script the tree has passes" (= :ok (:status (:run-path gn)))]
+          (= :configured-launch-alias-absent (:id (get b :run-path:launchd)))]
+         ["an nbb script the tree has passes" (= :ok (:status (get gn :run-path:launchd)))]
          ["an unrecognized run command is unmeasured, not ok"
-          (= :unmeasured (:status (:run-path odd)))]
-         ["an absent plist is unmeasured, not ok"
-          (= :unmeasured (:status (check-run-path good (path/join tmp "none.plist"))))]
+          (= :unmeasured (:status (get odd :run-path:launchd)))]
+         ["no configured entry point is unmeasured, not ok"
+          (= :unmeasured (:status (first (measure (path/join tmp "no-root") good
+                                                  (path/join tmp "none.plist")))))]
+         ["an .mcp.json entry naming this app is its own leg"
+          (= 2 (count (legs both)))]
+         ["that leg is checked against the tree IT names, not the plist's"
+          (and (= :ok (:status (get both :run-path:launchd)))
+               (= :broken (:status (get both (keyword "run-path:mcp:cloud-itonami-app")))))]
+         ["an unrelated mcp server is not adopted"
+          (not-any? #(str/includes? (name %) "unrelated") (legs both))]
          ["a dispatching CLI passes" (= :ok (:status (:cli g)))]
          ["a closed CLI fails" (= :broken (:status (:cli b)))]
          ["present guest wasm passes" (= :ok (:status (:guest g)))]
@@ -365,7 +463,7 @@
          ["unmeasured never reads as ok"
           (not-any? #(= :ok (:status %))
                     (filter #(= :unmeasured (:status %))
-                            (concat (vals g) (vals b) (vals odd))))]]]
+                            (concat (vals g) (vals b) (vals odd) (vals both))))]]]
     (doseq [[name pass?] checks]
       (println (if pass? "PASS" "FAIL") name))
     (fs/rmSync tmp #js {:recursive true :force true})
@@ -385,7 +483,7 @@
             (println "  pass --app <checkout>; an app that is not here is not an"
                      "app that is fine")
             (js/process.exit 2))
-        (let [legs (measure app plist)
+        (let [legs (measure root app plist)
               counts (registry-counts app)]
           (if (switch? "--findings")
             (findings-report! app legs)
