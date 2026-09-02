@@ -204,6 +204,20 @@ Unison 構文の採用、汎用 effect handler と continuation 捕捉、global 
   2. 組込みの族単位の文言（`string operation arity mismatch` 等）は両方向で拒否済みだが、operation ではなく族を名指し、個数を出さない。約 30 箇所に散る別の小さな欠陥。今閉じた方向を将来の表拡張が再び開けないよう pin してある。
 - **`orgs/kotoba-lang` 配下 5,803 本の `.kotoba` / `.cljk` を screen して過剰引数の候補は 0 件**。ただし screen は近似（同一ファイル内の `defn` のみ、型注釈と destructuring の扱いが粗い）で、**過剰に報告する screen が 0 を返したことは、壊れないと期待する理由ではあっても証明ではない**と自ら記録している。
 
+### 5a. compile は「ハッシュごとに 1 回」になった —— CI8（着地 2026-09-02、第 2 反復）
+
+- amu `a8e30d5b`（PR 755、13 checks green）、契約側は kotoba-lang `fb6f10bf`（私が書いた。agent は意図的に kotoba-lang を触っていない）。
+- compiler が **JVM route と JVM-free な nbb route の両方**で全 top-level 関数の定義 CID を mint し、`check` 出力と `.provenance.edn` の `:definitions` に載せ、その CID の閉包を鍵に **wasm 出力段を incremental 化**した（既存 `compile-cache` の第 3 stage であって 2 つ目の cache ではない）。
+- **指標は再コンパイルされた定義数**（決定節のとおり wall clock ではない）。実測 4 通り: 無変更の再コンパイルは **0 本**で `.wasm` バイト一致 / private 関数 2 つとその呼び出し側を **rename しても 0 本**で `.wasm` バイト一致（CID の閉包が動かない）/ body を 1 つ変えると **3 本** / 封入した profile version を上げると `:emit-cache-key` が変わる（fresh worker は素で miss するので hit/miss だけでは判別にならない、と自ら書いている）。private 関数の**並べ替え**は `.wasm` を変えるので、順序も鍵に入っている。
+- **封入する body に関数名は片側も現れない**: `:typed-kir` は `{:op :kotoba.definition/function :params :body}` で、callee 参照は CID、閉路内の参照は group index。`:interface` は arity・引数型・**そこから到達する schema 定義の推移閉包**を持つ。再帰群は `scc-v1`（SCC 分割 + 成分内は canonical bytes が最小になる並び、全順列を試し 8 member で打ち切り。超えたら名前順に並べるのではなく `:recursive-group-too-large` で拒否）。閉路の全 member を rename しても CID は動かず、base case を別 member に移すと動く（対照）。
+- **2 つの gap を、達成ではなく gap として契約に書いた**:
+  1. **`:desugar-contract-version` を宣言する authority が無い。** amu が 1 を pin しているのは kotoba-lang の frozen vector が 1 だからで、gap の名を冠した test が pin している。**この compiler が mint する全ての定義 CID は、誰も所有していない数を封入している。** `:profile-version` は同じ位置に無い（grammar authority から読み、定数との一致を test が assert）。
+  2. **alpha 正規化が 2 箇所に実装され、どちらも authority ではない。** kir の `normalize` は **de Bruijn 化しない** —— 実測で `(+ a 1)` と `(+ b 1)` が別 CID になる。よって codebase の `typed-code` と amu の `definition-identity` が同じ KIR に対して同じ 5 binder の walk を各自持っている。`:identity-implementations :direction` が記録した収束は、この walk を **kotoba-kir の中へ**移すべきで、3 箇所目へではない。
+  - もう 1 つ: f32 module は**どちらの route でも定義 CID を持たない**（admit された値領域の float 形が 1 つしかなく、f32 literal が f64 の双子と衝突する）。広げずに拒否した。
+- **契約に書いた stage が誰にも検査されていなかった。** `:stages` と `:implementation` を突き合わせるものが無く、stage を宣言して実装の有無を言わないままにできた（`:identities` が 2026-08-10 に直された形と同じ）。両 key 集合の一致・`:status` の存在と値域・`:implemented` なら `:evidence` を持つこと、を要求する test を足した。**対照**: 実装 entry の無い stage を宣言すると exit 1、無改変で 20 tests / 166 assertions exit 0。
+- 検証: amu 全 suite 1,287 tests / 9,337 assertions exit 0、nbb wasm32 corpus 52 件 exit 0。`cache-material` から `:definitions` を落とすと exit 1（`(c) a body change misses the emission stage, got :hit`）。**CI が本物の破壊を 1 件捕まえた** —— `test-compiler-worker` が `:stage-cache {:hir :miss, :kir :hit}` という literal に一致していたので、より強い assertion（`:wasm :hit` + `:definitions-recompiled 0`）に替えた。
+- 影響として記録しておくもの: `.provenance.edn` に `:definitions` が封入されたので**全 artifact の provenance バイトが動く**（`.wasm` は不変）。`nbb/output_admission.cljs` の閉じた key 集合が新 record を**拒否した**ことでこの変更が捕まっており、今はその key を**必須**にしている —— identity 段を飛ばした artifact が、測ったかのように verify を通ることはない。npm 依存 `@noble/hashes` が増えた（kir の identity が `multiformats` を要求するため。避けると amu 側に 2 つ目の実装ができ、それは adr-2608550000 が defect と名指す形）。
+
 ### 残件（この ADR が次に指す先）
 
 1. `:state` ability（決定節のとおり。前提 4 つのうち vacuous な「handle は値でない」を先に赤にする）。
