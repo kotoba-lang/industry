@@ -3754,5 +3754,22 @@
    :script-args ["--min" "400"]
    :include-ext [".cljs" ".edn" ".cljc"]
    :min-files 900 :cd false}
+  ;; yui (結) — the five-domain participation & empowerment bot
+  ;; (ADR-2609022000, west child cloud-itonami/yui pin d75520f). This gate
+  ;; checks the CHARTER, not the sim: the closed mechanism vocabulary and
+  ;; the review gates G1/G3 must keep every catalog candidate admissible,
+  ;; and injecting a forbidden mechanism (engagement-maximizing, ad-targeting,
+  ;; extraction) must be unrepresentable. The charter data is carried inline
+  ;; (the yui tree itself is not shipped to this gate), so if the vocabularies
+  ;; drift between here and the yui repo's own test, invariant 3
+  ;; ("mechanism both aligned AND forbidden") turns red. Verified red by
+  ;; mutating a copy's vocabulary — exit 1 naming the polluted mechanism.
+  ;; :cd false until the gate has a green node receipt of its own.
+  {:name "yui" :id "yui-charter-gate" :org "cloud-itonami"
+   :gate :nbb-script
+   :script "gates/yui-charter-gate-check.cljs"
+   :script-args []
+   :include-ext [".cljs" ".edn"]
+   :min-files 3 :cd false}
   ;; ────────────────────────────────────────────────────────────────────────
   ]}
