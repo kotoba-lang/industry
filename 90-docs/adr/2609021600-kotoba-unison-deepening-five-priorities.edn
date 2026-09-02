@@ -218,6 +218,19 @@ Unison 構文の採用、汎用 effect handler と continuation 捕捉、global 
 - 検証: amu 全 suite 1,287 tests / 9,337 assertions exit 0、nbb wasm32 corpus 52 件 exit 0。`cache-material` から `:definitions` を落とすと exit 1（`(c) a body change misses the emission stage, got :hit`）。**CI が本物の破壊を 1 件捕まえた** —— `test-compiler-worker` が `:stage-cache {:hir :miss, :kir :hit}` という literal に一致していたので、より強い assertion（`:wasm :hit` + `:definitions-recompiled 0`）に替えた。
 - 影響として記録しておくもの: `.provenance.edn` に `:definitions` が封入されたので**全 artifact の provenance バイトが動く**（`.wasm` は不変）。`nbb/output_admission.cljs` の閉じた key 集合が新 record を**拒否した**ことでこの変更が捕まっており、今はその key を**必須**にしている —— identity 段を飛ばした artifact が、測ったかのように verify を通ることはない。npm 依存 `@noble/hashes` が増えた（kir の identity が `multiformats` を要求するため。避けると amu 側に 2 つ目の実装ができ、それは adr-2608550000 が defect と名指す形）。
 
+### 8. loop は accumulator の型を運ぶようになった（着地 2026-09-02、第 3 反復）
+
+- kotoba-sema `1afff23e`。ADR `docs/adr/0027-a-loop-carries-the-type-its-accumulator-has.md`。
+- **欠陥の形**: loop helper の戻り型が `:result (or *loop-result-type* :i64)` —— **取りうる値が 2 つしかない定数**で、`map` / `filter` だけがそれを `:vector-i64` に束縛していた。一方 helper の**引数側は 9 行隣で既に推論されていた**（`resolve-loop-helper-param-types`）。だから拒否文言が `expected f64, got i64` と **f64 を名指せた** —— compiler は accumulator の型を知っていて、それでも `:i64` を返していた。
+- **推論規則**: loop は `recur` でない tail exit から出ていくので、helper の結果型はその exit たちが一致する型。自己呼び出しを marker に置換して tail 位置を歩き（`if` / `do` / `let` が tail 透過。desugar 後に残る束縛形は `let` だけ）、tail marker を落とし（tail の自己呼び出しは `recur` そのもの）、helper 自身の引数環境で型付けする。関数リストに対する不動点なので入れ子 loop は内側から決まる。`recur` の各引数は対応する束縛の型に対して検査する。
+- **`map` / `filter` の明示束縛は残した。理由が測ってある** —— 推論だけで両方とも `:vector-i64` を導く（accumulator の init が `(vector-i64)` で唯一の exit が accumulator）ので、束縛は**冗長性検査**になった。宣言した結果型と exit が食い違えば拒否される。外しても HIR は同一で、残すコストは 2 行。
+- **引数の天井は定数ではない**: helper の引数は束縛 + **捕捉した外側の変数すべて**なので、loop 束縛の上限は `5 − 捕捉数`。5 束縛 + 0 捕捉は通り、4 + 2 は捕捉を名指して拒否される。
+- 動く型（KIR で実行まで確認）: `:i64` `:f64` `:f32` `:bool` `:string` `:keyword` `:vector-i64` `:vector-f64` record `:option-i64` `:result-i64`。1 つの loop に 3 種混在も可。`doseq` / `dotimes` は不変。
+- **正直な報告**: 4 つ目の error code（`:loop-result-type`）に**到達する source を見つけられなかった**。構成できた accumulator 型はすべて `validate-value-type!` が admit するもので、closure accumulator はその時点で既に i64 handle。ADR は「guard が発火した」とは書かず、そう書いてある。exit を 1 つも持たない loop（全 tail が `recur`）は `:i64` のままで、これは「推論すべきものが無い」であって fallback ではない、と明記。
+- **byte-identity 検査が本物の退行を捕まえた。** 最初の版は 2 つの事実を helper 自身の関数 map に足しており、それが **8 entry の array-map 閾値を越えて key の印字順を変え、値が 1 つも変わらないのに loop を使う全 module の HIR text が動いた**。今は side table（`analyze` ごとに 1 回束縛）で運ぶ。key 順を pin する test がその理由込みで在る。goldens は 6 プログラム × HIR / KIR × 2 runtime の 12 組（JVM の `0` と cljs の BigInt を別々に digest）、全部一致。
+- 検証: 新 ns は修正前 exit 1（13 tests / 53 assertions、8 failures + 26 errors）、修正後 exit 0。全 suite は merge 後 JVM 296 / 1363 exit 0、nbb 143 / 441 exit 0。既存 fixture で `:i64` 既定に依存していたものは無し。
+- **end-to-end を対照付きで測った**: amu は sema を `:git/sha` で pin するので、自分の clone の `src` だけを amu の launcher が組む classpath の先頭に足して `wasm_cli.cljs` を直接叩いた。**対照**として pin 側の sema（自分の base の祖先）を同じ classpath で走らせると probe は今も exit 65 —— これが「prepend が答えを変えた」ことを言う。自分の sema では `compile --target wasm32` が 455 byte を出し `main()` = 3。⚠ `resources` まで prepend すると `Could not find namespace: kotoba.artifact.core` で壊れる（resource shadowing）。`src` だけにする。
+
 ### 残件（この ADR が次に指す先）
 
 1. `:state` ability（決定節のとおり。前提 4 つのうち vacuous な「handle は値でない」を先に赤にする）。
