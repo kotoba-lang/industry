@@ -507,4 +507,37 @@
   :coverage/verified-at "2026-09-02"
   :source/dataset "itonami-coverage"
   :coverage/note "Street lighting (COFOG 06.4) in Japan is owned by MLIT's Road Bureau, which sets road and street lighting standards and publishes them on mlit.go.jp/road. Gate-fetched 2026-09-02: HTTP 200 / 17958 bytes."}
+{:db/id -1
+ :source/dataset "itonami-coverage"
+ :coverage/kind :cofog-group
+ :coverage/code "013"
+ :coverage/name "General services"
+ :coverage/division "01"
+ :coverage/division-name "General public services"
+ :coverage/authority-url "https://www.soumu.go.jp/"
+ :coverage/jurisdiction "jpn"
+ :coverage/verified-at "2026-09-02"
+ :coverage/note "COFOG 01.3 General services in Japan is owned by the Ministry of Internal Affairs and Communications (総務省), which manages government administrative organisation and public-sector reform policy; its soumu.go.jp portal publishes the administrative-management and civil-service reform programs any general-public-services actor would answer to. Gate-fetched 2026-09-02: HTTP 200 / 234960 bytes. Division 01 already had 011, 012 and 014 named; 013 is the general-administrative-services side."}
+ {:db/id -1
+ :source/dataset "itonami-coverage"
+ :coverage/kind :cofog-group
+ :coverage/code "041"
+ :coverage/name "General economic, commercial and labour affairs"
+ :coverage/division "04"
+ :coverage/division-name "Economic affairs"
+ :coverage/authority-url "https://www.mhlw.go.jp/"
+ :coverage/jurisdiction "jpn"
+ :coverage/verified-at "2026-09-02"
+ :coverage/note "COFOG 04.1 in Japan spans METI (commercial/economic affairs) and MHLW (labour affairs). METI root and English site both answered HTTP 403 to the gate's fetch this run, so the recorded authority is MHLW (HTTP 200 / 74969 bytes), which publishes labour standards, employment policy and statistics any general-economic-affairs actor would answer to; METI remains the commercial-side owner for a future re-attempt."}
+{:db/id -1
+ :source/dataset "itonami-coverage"
+ :coverage/kind :cofog-group
+ :coverage/code "095"
+ :coverage/name "Education not definable by level"
+ :coverage/division "09"
+ :coverage/division-name "Education"
+ :coverage/authority-url "https://www.mext.go.jp/"
+ :coverage/jurisdiction "jpn"
+ :coverage/verified-at "2026-09-02"
+ :coverage/note "COFOG 09.5 in Japan is owned by MEXT; the ministry root (HTTP 200 / 14542 bytes this run) publishes education policy, statistics and the annual white paper covering education programmes not definable by level. Division 09 already had 091-094 and 096-097; 095 completes it."}
 ]
