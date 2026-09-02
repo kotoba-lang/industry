@@ -327,8 +327,15 @@
   値は git にも Worker secret にも置かない —— Worker は署名済みの
   `did.jsonl` を配信するだけで、root を回転させるのはこの seed を持つ
   操作者だけ。
-- ⚠ **kagi には未保管**。2026-09-02 に `bin/kagi add` / `kagi ls` が 5 分以上
-  無応答（prompt 無し）だったため Keychain を正本にした。kagi が答えるように
-  なったら `webvh-root-<domain>` として複製すること（compartment `personal`）。
+- **kagi vault にも同名で複製済み（`webvh-root-kotoba.cloud` /
+  `webvh-root-kotobase.net` / `webvh-root-auth.kotoba.cloud`、compartment
+  `personal`、`KAGI_HOME=$HOME/.kagi`、2026-09-02）。** 取得は
+  `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get webvh-root-<domain>`。
+  Keychain と kagi は**同じ 32 byte** で、どちらか片方が読めなくなっても
+  もう片方から `webvh_root.clj` を回せる。
+  - 同日の先行記述「kagi には未保管」は、`bin/kagi` が無応答に見えたため
+    だった。実測では hang ではなく **1 コマンド約 2 分**（`unlock-status` で
+    wall 113 s / CPU 38 s、load 100 超のこの端末で）。`timeout 60` では
+    必ず切れるので、kagi を呼ぶときは `timeout 900` 以上を付ける。
   **seed を失うと、その apex の did:webvh は二度と更新できない**（SCID は
   残るが次の entry を署名できる鍵が無い）。

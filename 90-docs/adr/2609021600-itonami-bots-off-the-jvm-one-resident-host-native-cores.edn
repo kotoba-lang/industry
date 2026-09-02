@@ -1,0 +1,191 @@
+[{:db/id -1
+  :adr/id "adr-2609021600-itonami-bots-off-the-jvm-one-resident-host-native-cores"
+  :adr/doc_type "adr"
+  :adr/topic "itonami-bots-off-the-jvm-one-resident-host-native-cores"
+  :adr/status "proposed"
+  :adr/date "2026-09-02"
+  :adr/last_verified "2026-09-02"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/authoritative true
+  :adr/authoritative_for ["itonami cloud bots の runtime 構成（常駐 host / CLI client / 判断核）から JVM を外す設計"
+                          "hermes agent bots の cron 役割の退役順序と、その前に打つ即時処置"
+                          "kotoba compile / amu native を itonami bots のどの層に当てるか"]
+  :adr/related ["adr-2608313200-bot-fleet-memory-jvm-cpython-and-amu-native"
+                "adr-2609012300-hermes-bots-become-itonami-cli-bots"
+                "adr-2608312800-the-hermes-turn-loop-in-kotoba-and-the-itonami-bots-that-were-never-installed"
+                "adr-2608318000-hermes-residents-join-the-bots-plane"
+                "adr-2609012000-itonami-four-surfaces-stability"
+                "adr-2608314500-hermes-and-itonami-bot-session-close"
+                "adr-2608261100-kotoba-app-vertical-slice-is-the-migration-unit"
+                "adr-2607279200-kotoba-clojure-shaped-safety-elaboration-migration"
+                "adr-2608201300-jvm-new-surface-scaffold-guard"
+                "adr-2607241100-kotoba-stack-topology-and-design-cleanup"
+                "adr-2608311900-the-bridge-told-callers-their-own-tools-were-broken"
+                "ADR-2608160200"
+                "2608650000"]
+  :adr/title "itonami cloud bots を JVM から降ろす —— 常駐 host 1 本（nbb）、CLI は client、判断核は amu native、Hermes の cron 役割は退役"
+  :adr/source-format "edn"
+  :adr/body "# ADR-2609021600: itonami cloud bots を JVM から降ろす
+
+**Status**: proposed（設計。オーナー指示 2026-09-02「1, 2, 3 かつ jvm 依存をやめて kotoba compile, amu native で効率化する設計をまとめて」への回答。この ADR は何も実装していない）
+**Date**: 2026-09-02
+
+## 0. 依頼の 3 項目と、この ADR の範囲
+
+| # | 依頼 | この ADR での扱い |
+|---|---|---|
+| 1 | CLI を spawn ではなく常駐に喋らせる | D3。最初に着地させる slice（S1） |
+| 2 | native core に host 外殻を付ける | D2 + D4。常駐 host が外殻で、core は wasm32 / native の両方で同一 KIR |
+| 3 | Hermes の crash loop と scheduler 二重化を止める | D6。即時処置は運用（コード無し）、恒久処置は cron 役割の退役 |
+| + | JVM 依存をやめ、kotoba compile / amu native で効率化 | D1 の 3 層と S0〜S7 の順序 |
+
+範囲外: Hermes agent 全体の Kotoba 化（ADR-2608312800 が明記したとおり移ったのは turn loop 1 component）、Grok bots（Cloudflare Durable Objects、workstation に居ない）、31 profile の grants 再束縛（ADR-2609012300 の 96 件はオーナー判断）。
+
+## 1. 現在地（実測。値は引用せず、測り直す）
+
+ADR-2608313200（2026-08-31）と本日 2026-09-02 の再測定。**同じ仕事を比べた数字ではない**（起動して小さいことを 1 つして終わる、で揃えた）。
+
+| 経路 | 一発起動の床（peak RSS / wall） | 常駐 |
+|---|---|---|
+| itonami CLI（`clojure -M:cli`、JVM） | 648〜801 MB / 7.7〜11 s | server は JVM 1 本。task ごとに JVM を起こし 0〜4.2 GB に振れる |
+| nbb（`nbb -e`） | 78 MB / 1.6 s | —（この設計の常駐 host 候補） |
+| node（`node -e`） | 46 MB / 0.3 s | — |
+| Hermes CLI（CPython） | 35〜37 MB / 0.1〜0.6 s | gateway が 38〜45 profile を多重化、30 process / 約 1.8 GB 固定（08-31） |
+| amu native kexe（判断核 1 export） | 4 MB / 0.01 s（うち C loader 1.26 MB） | 存在しない |
+
+本日の状態（15:27 JST）: Hermes gateway は 14:47 から crash loop（watchdog が 30 s 間隔 × 10 s timeout × 3 strike ≈ 2 分で exit 75 → 再起動、6 回）、CPython は 0 本、残るのは Electron desktop 684 MB。`~/.hermes/cron/jobs.json` は 46 job → 2 job に縮小（14:54:13 JST、原因未特定、この session は触っていない）。itonami 常駐 `dev.cloud-itonami.app` は launchd に未ロード、port 1338 空。load average 87〜130。
+
+**読み方**: Hermes は「本数」（45 profile × 46 job × 毎時の LLM 呼び出し）で重く、itonami は「1 回あたりの床」（JVM 700 MB を task の数だけ払う）で重い。この設計が消すのは後者で、前者は D6 の退役で消す。
+
+## 2. 何が JVM を要求しているか（cloud-itonami-app の分解、origin/main 6c3a315）
+
+| 層 | 実体 | JVM が要る理由 |
+|---|---|---|
+| 判断核 | `src/cloud/itonami/app/*.kotoba` 19 本（bot_core / approval / model_routing / workforce_cadence / routine / store_core / organism_worker …） | **要らない**。19/19 が `--target aarch64-macos --jvm-free` でコンパイル済み（08-31 実測）。capability ゼロ、word 型 |
+| 機構 | `server.clj`（HTTP 面）、`store.clj`（journal）、provider transport（murakumo `/v1/messages`）、connectors（Workspace / mail / Drive）、scheduler の clock と queue（`fire-due-workforce!`、`max-active`）、session token（Keychain）、`mcp.clj`、`bot_import.clj`、`gc.clj`（disk 床） | 全部 clj で書かれているから。**判断は既に核に出ている**ので、ここに残っているのは socket・credential・fs・clock・process の機構だけ |
+| CLI | `cli.clj` + `app_client.clj` | `http://localhost:1338` に Bearer token で喋る **HTTP client** に過ぎない。client であるために JVM を起こし、server が居なければ `server_process.clj` がもう 1 本 JVM を spawn する |
+| MCP | `mcp.clj` | 同上。stdio ↔ 同じ HTTP 面 |
+
+つまり JVM は **server・CLI 1 回・MCP session 1 本**の 3 箇所で払われており、そのどれも判断を含まない。
+
+## 3. 決定（設計）
+
+### D1. プロセス構成は 3 層。JVM は runtime path のどこにも現れない
+
+```
+tier 0  kexe native     判断核。capability ゼロ、word 型。      自プロセスで走る時の床 4 MB / 0.01 s
+tier 1  wasm32 guest    capability を持つ product logic。        tier 2 の in-process。turn ごとに instance 生成
+tier 2  nbb resident    機構。socket / credential / fs / clock /  host 1 台に 1 process
+                        provider transport / scheduler tick / connectors
+```
+
+- **同じ `.kotoba` が tier 0 と tier 1 の両方に出る。** KIR は 1 つで、`bin/gen_kir_amu.cljs`（PR #242）が `:kir-sha256` の一致を証明する経路が既に在る。native と wasm32 は同一 KIR の 2 つの lowering であって 2 実装ではない。
+- **runtime path で `java` / `clojure` を起こさない。** 受け入れでは Q9（ADR-2608261100）と同じく `java` / `javac` / `clojure` / `clj` を deny / trace し、起きたら fail。JVM は oracle（parity の写し）と診断にだけ残す。
+- runtime 優先順位（kotoba wasm > clojurewasm > cljs > nbb > JVM/bb）に従い、tier 2 は nbb。新しい `.mjs` / `.sh` / `.clj` の production surface を書かない（`hermes_migration.clj` が ADR-2608201300 違反として既に検出されている形を増やさない）。
+
+### D2. 常駐 host は 1 本、nbb で書く（= 2 の「host 外殻」）
+
+`itonami-resident`（nbb `.cljs`、1 process、launchd `KeepAlive`）。amu の `runtime/browser-host.mjs`（`instantiateKotoba`、`allowCapabilities`、`typedCapCall`）、`wasi-host.mjs`、`http-service.mjs` は **消費する infra**（amu の成果物）であって、自分で書き直さない。
+
+host が所有するもの（全部「機構」）:
+
+| 所有 | 今日の置き場 | 備考 |
+|---|---|---|
+| loopback HTTP + unix socket | `server.clj` | **route は既存と同じ path / schema** にする。CLI・MCP・site・bots-status publisher が無改造で追従する |
+| session token | `agent_session` の Keychain 読み | 既知の service 名 1 件を狙い撃ち（安全床⑦）。kagi 経由 |
+| provider transport | `bots.clj` → murakumo | llm-v1 kit の `:transport` として注入。model 名は `murakumo-main` alias 解決（ADR-2607173100） |
+| journal / store | `store.clj apply-op` | EDN journal は Git + EDN 正本規則（ADR-2608039700）のまま。kotobase は projection |
+| scheduler の clock・queue・lock | `fire-due-workforce!` | 判断（due か / 次の間隔 / 並列 2 の admission）は核へ。lock は OS file lock のまま host |
+| connectors | `bot_tools.clj` 他 | connector ごとに host 側 transport + 核側判断。移るまでは **`:blocked`**（偽らない） |
+| bots-status publish | `scripts/loop-status-publish.cljs` | schema `cloud.itonami.bots-status.v1` 据え置き |
+
+host が決めないもの: route の判定（`http-service.mjs` が mesh の `route.kotoba` 型で示している分離をそのまま使う）、provider slot の admission（`bot_dispatcher.clj` の semantics は核へ）、bot の tool 許可（`bot_core`）、次の cadence（`workforce_cadence_core`）。
+
+guest への capability 付与は kit 単位。llm-v1 / http-v1 / http-ingress-v1 / state-v1 / storage-v1 / log-v1 は amu origin/main（8435eafb、本日）で `:wasm-aot :implemented`、clock-v1 は `:wasm32-kotoba-v1` だけ。**値を引用しない** —— CLAUDE.md の kit reader で毎回引く。
+
+turn ごとに instance を作り直す（fuel は instance 生涯で使い切り、`dom-driver.mjs` と同じ）。**成功の指標は round trip 数と process 数**で、wall clock ではない（load 100 超の機械で測る）。
+
+### D3. CLI は client。spawn しない（= 1）
+
+- `bin/itonami` は nbb の **HTTP / unix socket client** になり、`clojure -M:cli` を spawn しない。server が居なければ **JVM を起こさず**、専用の exit code（`resident-absent`、0 でも 1 でもない値）で launchd の起動コマンドを印字して終わる。「測れなかった」と「失敗した」を分ける規則（ADR-2608136000）をここにも当てる。
+- `itonami up` は `launchctl kickstart` の薄い wrapper。spawn ではない。
+- `bin/itonami-mcp` は同じ client を stdio に載せる。
+- 床の目標は nbb / node の床（本日 78 MB / 1.6 s、46 MB / 0.3 s）。**native client は今日は作れない** —— http の `:native-aot` が pending で、socket を持つ native guest が存在しない。作れるようになったら D4 の末尾で扱う。
+- 旧 `-M:cli` は compat / 診断として残すが gate にしない。
+
+### D4. 判断核は amu native、capability を持つ guest は wasm32。native の範囲は kit の `:native-aot` が決める
+
+- **19 核を `amu compile --target aarch64-macos --jvm-free` で kexe にする**のは今日できる。使い所は **process 境界が欲しい場所**: 一発起動の検査（gate、`itonami check` 相当）、Node を持たない fleet node / aiueos 側、parity の第 3 の目撃者。
+- **常駐 host の中では同じ核を wasm32 で in-process に走らせる。** kexe は C loader の別 process であり、Node に native を埋め込む host（N-API addon）は存在せず、**この ADR は新しい C / Rust の埋め込み host を書くことを提案しない**（機構であっても新規の非 cljc code は最小化する。ADR-2607241100 D6）。in-process wasm32 なら turn ごとの追加 process は 0 で、JVM 700 MB の床は消える。
+- **native の範囲は広げない、追いつかせる。** llm / http / storage / state / log の `:native-aot` が `:implemented` になった時点で tier 2 自体を native（C mechanism host + kexe）に置き換える経路が開く。それが ADR-2607198300 の終点であり、この ADR は順序だけ決める（S7）。
+- `agent.turn-loop` は 08-31 に record を理由に native 拒否と記録されたが、kotoba-kir origin/main は `native-scalar-record-type?` を admission に持つ。**書き直す前にもう一度 compile して測る**（拒否理由の literal を pin する）。
+- guest の既知の天井は `.kotoba` の中で申告する: `:document` 256 node、fuel 512 / instance、parameter 5 個、整数→文字列 builtin 無し、`/` の lowering 無し（ADR-2608312800 の 5 項目）。**一時制約はヘッダに撤去条件を書く**（ADR-2608650000）。
+
+### D5. turn loop と scheduler は Kotoba の正本を配線する
+
+- `agent.turn-loop`（Hermes の `conversation_loop.py` 転写、parity gate 付き）を tier 1 guest として常駐 host に配線する。provider 呼び出し・tool 実行・message 構築は host（ADR-2608312800 の分割どおり）。
+- scheduler は `workforce_cadence_core`（次の間隔）+ `routine_core`（再実行の可否）に **due 判定と順序付けの核を 1 つ足す**。host は clock を読み、queue を持ち、lock を取り、核の答えを実行する。
+- Hermes の 46 cron job は **itonami workforce job として同じ cron 式で表現できる**（`bot_import.clj` の bundle が `cron-jobs-schedules-and-health` を証拠として運んでいる）。**activate するかは ADR-2609012300 の 96 件と同じオーナー判断**で、この ADR は機構だけ用意する。
+
+### D6. Hermes: 即時処置（= 3）と cron 役割の退役
+
+即時処置は運用で、コードを書かない:
+
+1. **watchdog を負荷に合わせる。** `gateway.loop_watchdog_probe_timeout_s` / `loop_watchdog_max_strikes`（`config_defaults.py` 3166〜3181 行）を上げるか、load が高い間 `gateway.loop_watchdog: false`。event loop が飢えているだけの gateway を 2 分ごとに殺して再起動するのは、遅い gateway より悪い（再起動のたびに 45 profile を列挙し直す）。
+2. **scheduler は 1 つにする。** desktop（`web_server.py`）と gateway の両方が in-process scheduler を起こす。`cron/.tick.lock` で二重発火は防がれているが、列挙は 2 回走る。**gateway だけを launchd（`ai.hermes.gateway`、現在は launchctl に未ロード）で常駐させ、desktop（Electron 684 MB）は bootout する。** UI が要る時だけ手で開く。
+3. **jobs.json の 44 件。** 復元元は `scripts/hermes-*-bots/`（versioned original、README が install 手順を持つ）と公開 document（名前・schedule・model。prompt は載っていない）。Hermes に作り直すか itonami の workforce job として起こすかは **オーナー判断**。原因（2 scheduler の lost update が候補）は未特定なので、直前に **`jobs.json` の content hash を volatile 判定に使う**修正（ADR-2609012300 が「取らなかった durable fix」と書いたもの）を先に入れる。
+
+恒久処置: S4 で itonami resident が同じ schedule を回し始めた時点で **Hermes の cron 役割は終わる**。Hermes は対話 host としてだけ残すか、31 profile が import 済みなので撤去する。どちらもオーナー判断で、この ADR は「cron を 2 箇所で回さない」ことだけを決める。
+
+### D7. 移行順序（vertical slice、Q9 whole-component）
+
+| slice | 内容 | gate（落ちることを先に見る） |
+|---|---|---|
+| S0 | **測定 harness**。同じ仕事（1 task を 1 bot に投げて完走）で JVM 経路と新経路の peak RSS / wall / round trip / process 数を並べる。`java` `clojure` の trace | 新経路で `java` が 1 回でも起きたら赤 |
+| S1 | **CLI client（nbb）**。既存 JVM server に喋る。`bin/itonami` から `spawnSync clojure` を消す | CLI 1 回あたり JVM 0 本。resident 不在で exit `resident-absent` |
+| S2 | **常駐 host 骨格**。socket + token + journal reader + bots-status publish。19 核を wasm32 で in-process 実行 | `gen_kir_amu.cljs` の KIR sha 一致 + golden vector を両方向（1 枝反転で赤） |
+| S3 | **最初の vertical slice**: `bot_core` admission → llm-v1 transport（murakumo）→ `agent.turn-loop` → event → governor → UI → checkpoint。1 bot が JVM 無しで 1 task を完走 | S0 の同一仕事比較。provider 失敗は 0 でなく計数 |
+| S4 | **scheduler**。cadence / routine / due の核 + host の clock・queue・lock。Hermes cron の schedule を workforce job として受け入れ可能にする（activate はオーナー） | 2 slot を超えて provider に並ばない。`bots-status` の residents が新 host から出る |
+| S5 | **connectors**。1 connector = 1 slice。移るまで `:blocked` | tool を偽らない（ADR-2608311900 の salvage 穴を作らない） |
+| S6 | **JVM server を oracle / compat に降格**。plist を nbb resident に差し替え | suite の parity（JVM oracle は non-gating） |
+| S7 | **native resident**。llm / http / storage kit の `:native-aot` 到達後 | kit reader で測ってから着手 |
+
+S1 は他の slice に依存せず、**JVM を CLI 1 回ごとに払う分（700 MB × 呼び出し数）を即日消す**。着手順は S0 → S1 → S2 → S3 で、S3 が通るまで S4 以降を始めない。
+
+## 4. 受け入れ基準
+
+- runtime path に `java` / `clojure` が現れない（trace で証明。デフォルトで deny）。
+- S0 の**同じ仕事**の前後比較を ADR に貼る。「起動床」同士の比較を成果として書かない。
+- parity は KIR sha 一致 + golden vector。**両方向**（壊した 1 箇所と報告された 1 箇所が一致すること）。
+- `bots-status` が nbb resident から同じ schema で出る。
+- exit code は 3 値（答えた / 該当なし / 答えられなかった）。`resident-absent` は失敗と別の値。
+
+## 5. やらないこと
+
+- 新しい Rust。新しい `.mjs` / `.sh`。新しい production `.clj`。
+- Node に native を埋め込む addon。
+- per-bot process。bots の個体性は id / charter / state 行（repo-bots と ADR 0047 の切り方）。
+- 2 つ目の bots 設計（vocabulary は `bot-slo` を再利用）。
+- 「native に無い」を言語の限界として書く（ADR-2608650000）。
+
+## 6. 未測定とリスク（数字より先に読む）
+
+- **Node host で llm-v1 の typed contract を wasm32 guest に供給した実測が無い。** kit の `:wasm-aot :implemented` は amu の JVM 側 test（`llm_wasm_aot_test.clj`）で測られており、nbb 側は `test/nbb/llm-provider.cljs` が「production cljs LLM transport remains unimplemented」と自分で書いている（mock transport で reference runtime を回している）。S3 の最初の仕事はこれを測ることで、通らなければ tier 1 は reference runtime（KIR interpreter、nbb）で始めて wasm32 は後追いにする。
+- **床は Hermes より小さくならない。** nbb 78 MB / node 46 MB は CPython 35 MB の 1.3〜2 倍。勝つのは「JVM を呼び出しごとに払わない」「process が 1 本」であって床ではない。Hermes より軽いと言えるのは D6 で本数が消えた後。
+- turn_loop の native admission は再測定前。
+- Hermes jobs.json の 44 件消失の原因は未特定。復元前に volatile 判定の修正を入れないと再発しうる。
+- guest の天井（document 256 / fuel 512 / param 5）は bot の prompt 組み立てに当たる可能性がある。host 側で文字列を組み、guest には判断だけを渡す（ADR-2608261100 の guest / host 分割）。
+
+## 7. 次の一手（この ADR が accepted になったら）
+
+```
+# S0: 同じ仕事の測定（JVM 経路）。resident を起こしてから 1 task を投げ、peak RSS / wall / process を採る
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.cloud-itonami.app.plist
+/usr/bin/time -l ~/.local/bin/itonami bots task --id <bot> --text 自己紹介を一文で。
+# S1: bin/itonami を nbb client にする（cloud-itonami-app、worktree で）
+```
+
+着手前に amu / kotoba-kir / cloud-itonami-app の checkout を pin まで進める（本日 amu は 20、kotoba-kir は 31 commit 遅れており、この ADR は origin/main を読んで書いた）。
+"}]
