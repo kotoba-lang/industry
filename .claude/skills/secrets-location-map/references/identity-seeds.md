@@ -356,6 +356,14 @@
   login keychain は ssh 越しに書けない（`Write permissions error`、実測）ので
   file 置き。署名はノード上の `authn/scripts/webvh_witness.cljs`（nbb、lib は
   `~/.gftd/webvh-witness/lib/` に rsync 済み。levi は `npx --yes nbb`）。
+  **auditor の seed は witness proof だけでなく whois の第三者証明にも署名する**
+  （2026-09-02、ADR-2609021700）。simeon 上の `webvh_attest.cljs` が log を
+  公開 URL から取得・検証し、`DidLogAttestationCredential` をこの鍵で発行して
+  `whois.vp` に載せている。**この鍵を rotate すると、過去の attestation は
+  暗号的には有効なまま「文書が名指ししていない発行者」になる**
+  （`webvh_root.clj verify` が `UNNAMED issuer` と報告する）。rotate するなら
+  witness param を更新する version と、新しい鍵での attestation 再発行を 1 組で行う。
+
   **この端末が持つのは update key + witness 2 つで、閾値 3 に 1 つ足りない**
   —— 1 台の compromise では version を publish できない。1 ノードが死んだら
   その role は新 seed を別 host で作り直し、残り 3 + 新 1 で witness param を
