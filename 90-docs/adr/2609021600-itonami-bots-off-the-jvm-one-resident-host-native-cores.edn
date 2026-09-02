@@ -401,6 +401,111 @@ emitter が契約について食い違ったときにだけ赤くなり、この
 - **`run` が planned な限り、front end を `kotoba run` に載せることはできない。**
   208 command の front end 問題（open item 1）は未解決のままである。
 
+
+## front end 問題を解決した —— 2026-09-03（オーナー指示）
+
+### 何が無かったか
+
+#270 のあと、registry が数える 208 command には front end が 1 つも無かった。
+`bin/itonami` は全ての command に exit 2 を返していた。
+
+そして **registry だけでは足りない**ことが実測で分かった。手書きの 17 command
+（`bots list` / `auth login` / `tenant *` / `hermes *`）が使う route の一部は
+生成 registry に無い —— `GET /api/agent-bots`、`POST /api/agent-session`、
+`/api/profiles`、`/api/sessions` はどれも `:counts` の 208 に入らない。
+**registry だけを回す front end は、誰も打たない部分の front end になる。**
+
+### 決定 —— 1 つの解決器、2 つの名前の出所
+
+- `commands.clj` を **`commands.cljc`** にした。表の読み込み・最長一致・path
+  templating・query/body の分け方・flag spec は全部そこにあり、JVM と nbb が
+  同じ実装を使う。ClojureScript 側に 2 つ目の解決器を置けば、それは 2 人目の
+  決定者になる（ADR-2608197300 §3 が Python の EDN reader について書いた形）。
+- 手書き 17 を **`resources/cloud-itonami-app.cli-aliases.edn`** にデータとして
+  移した。33 entry。registry と同じ `{:command :method :template :params}` 形なので、
+  同じ `alias-request` が解く。**新しい route 表ではない** —— どの path も
+  `server.clj` が既に serve しているものだけ。
+- `bin/itonami` は **nbb の client**。JVM を起こさない。どの server に喋るかは
+  この file の問題ではなく、設定された host:port に居るものに喋る。
+- host 側の処理（`bots hygiene` / `bots refactor *`）は表に載らないので
+  `:host-side` として**名前で拒否する**。「そんな command は無い」と言えば、
+  打っていない typo を疑わせることになる。
+
+### exit code は契約
+
+    0  答えた
+    1  答えた: server が拒否した、または flag が足りない
+    2  答えられなかった: server が居ない / session が無い / そんな command は無い
+
+### 実測 —— 同じ仕事、両 front end（S0）
+
+稼働中の同じ server に対して `bots list` を端から端まで。load average 68。
+
+    nbb client   6.9 / 7.5 s   peak RSS 136 / 134 MB
+    JVM CLI      15.8 / 16.2 s peak RSS 600 / 522 MB
+
+**約 4 分の 1 のメモリ、約 2.2 倍の速さ。** `java` も `clojure` も解決しない PATH と
+`JAVA_HOME=/nonexistent` で `bots list` が通ることも確認した。
+
+### shebang で起動できること
+
+`nbb` の ns 形で sibling を require すると、呼び出し側が `--classpath` を
+覚えていない限り launcher は起動しない。`bin/itonami-mcp` がまさにそれで、
+`resident-mcp-launcher-does-not-spawn-clojure` は landing 以来赤かった。
+`nbb.classpath/add-classpath` を**自分の file の位置から**呼ぶ形にして、
+`bin/itonami` と `bin/itonami-mcp` の両方を直した。`--print-data-dir` は
+require より前に答える —— resident install は launcher 1 本だけを複製するので、
+「あなたの store はどこか」が tree の残りに依存してはならない。
+
+### 検査
+
+`cli_aliases_test`（JVM suite、9 deftest）: template の `{param}` に埋める先が
+あるか / body spec の語彙 / GET が body を持たないか / registry と名前が衝突した
+ときに method と path が一致するか / host-side が route を持たないか /
+`cli.clj` が送っていた request と golden 一致するか。
+
+`test/itonami_client_nbb.cljs`（nbb、server 不要の 9 checks + `--probe` 8 route）。
+
+**赤くなることを確かめた:**
+
+- `bots workforce` の path に typo を入れると、その行だけが `status 405` で赤くなり
+  exit 1。壊した箇所と報告が一致する。
+- server 不在 / token 不正はそれぞれ exit 2（`no-server` / `session-rejected`）。
+
+⚠ **probe の最初の版は無検査だった。** 未認証で「404 でなければ合格」としていたが、
+server は `/api/...` を prefix で 401 にするので、**gated prefix の中の typo は
+本物の route と同じ 401 を返す**。同じ typo が PASS した。認証して 2xx を
+要求する形に直して初めて 405 を捕まえた。ADR-2608136000 の形そのもので、
+**自分の検査で 1 度踏んだ**。
+
+### 触った既存の検査
+
+`launcher_test` の `replacement-launchers-are-not-clojure-wraps` は
+「`bin/itonami` に `spawnSync` の語が無いこと」と「`leftover JVM run path is
+closed` と書いてあること」を assert していた。前者は client が Keychain を読む
+のに `spawnSync` を使うので語としては当たらず（そもそも landing 時から
+**自分の説明コメントで**落ちていた）、後者は CLI が閉じていることを契約に
+していた。**契約が変わったので assertion を変えた** —— clojure を spawn しない
+こと、`-M:cli` を含まないこと、command を解決すること。
+
+### JVM suite
+
+    変更前   2,252 tests / 13,710 assertions   17 failures / 2 errors
+    変更後   2,252 tests / 13,716 assertions   10 failures / 1 error
+
+`launcher_test` の既存の赤 5 件が消えた（launcher が自分の shebang で起動できる
+ようになったため）。増えた失敗は無い。残る 10 + 1 は `bulky_waste_http_test`(8) /
+`bundle_test`(2) / `graph.clj`(1) で、いずれもこの変更が触っていない namespace。
+
+### 残り
+
+- **server 側は別問題のまま。** この front end は今日動いている resident
+  （release f9138fbd の JVM server、407 route）に喋る。main の tree から
+  同じ server を起こす経路は #270 で閉じたままで、nbb server が serve するのは
+  2 経路。**front end が在ることと、tree が server を出せることは別。**
+- `bots hygiene` / `bots refactor *` / hermes 以外の `bots import` は未移植。
+- `bots import hermes` の 3 段（preview → stage → provision）も未移植。
+
 ## closing —— 2026-09-02 の session を閉じるにあたっての現在地
 
 ### default branch との差（監査済み）
