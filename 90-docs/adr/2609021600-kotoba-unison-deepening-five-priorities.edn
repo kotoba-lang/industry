@@ -280,6 +280,25 @@ Unison 構文の採用、汎用 effect handler と continuation 捕捉、global 
 
 west pin を 5 件前進させ checkout を同期した直後に、今日直したはずの 2 つを共有 checkout の `amu` で自分で測ったところ、**どちらも今も拒否された**（map の i64 key は `map keys must be bounded keywords`、loop の f64 accumulator は `expected f64, got i64`）。原因は **amu が自前の `deps.edn` で kotoba-sema を `bb0d47c6` に pin している**ことで、修正の入った tip `1a073853` を読んでいない。**修正は sema の main に在り、compiler は誰もそれを consume していなかった。** west pin を進めることは、その repo の checkout を動かすだけで、**別 repo の `:git/sha` 依存を動かさない**。測らずに報告していれば「直った」と嘘を言っていた。amu の依存前進を別に走らせ、受け入れ条件をこの 2 つの probe が exit 0 で wasm32 まで通ることにした。
 
+### 13. PR 541 の 2 つの判断を引き取った —— そして emitter は 2 つある（着地 2026-09-03、第 3 反復）
+
+- kotoba `0ad166d9`（PR 541 merge）。これで文法 authority の 5 repo・7 ファイルがすべて揃った。
+- **emitter は 2 つあり、名前で区別できる**:
+
+  | | primary wasm | compile route |
+  |---|---|---|
+  | 名前 | `kotoba.runtime/wasm-binary` | `kotoba.compiler.core/compile-source`、target `:wasm32-kotoba-v1` |
+  | 実体 | `kotoba` repo の `src/kotoba/runtime.clj`（約 6k 行、独自の form walker） | amu の `compiler/core.clj`、elaboration は kotoba-sema |
+  | 入口 | `kotoba wasm emit` | `amu compile --target wasm32` |
+
+  私が `throw` / `try` の動作を測ったのは**後者**で、`:unsupported-op` に try を返していたのは**前者**。「abort は wasm で動く」と「abort は全 emitter で動く」は別の主張だった。
+- **私が渡した数字が誤っていた**（実測で訂正された）: 「abort の conformance 9 件」ではなく **abort の run case 6 件 + local-state の run case 3 件**。しかも **abort の head で拒否されているのは 9 件中 1 件だけ**で、**5 件は `defn-`** —— この emitter が一度も持ったことのない private 定義の surface —— **で先に拒否され、3 件は `atom` で拒否される**。したがって「try を教える」だけでは 9 件中 8 件は資格を得ない。option (b)（backend 未資格として明示）を**労力ではなく実測で**選んでいる。
+- pending は skip list ではない。manifest が既に持つ形（`:required-backends #{:kir}` / `:optional-backends`）の上に、**各 entry が記録どおりの (problem, op) で実際に拒否することを要求**し、authority が wasm backend に**要求**している case を pending に書くことを禁じ、走る case を 1 つも名指さない entry を拒否し、`QUALIFIED 30 … PENDING 9` を床 25 付きで印字する。**対照で「skip list ではない」ことを実証**している —— 本物の pending entry を落とすとその case は*要求*され `expected: (:kotoba.wasm/ok? wasm)` で落ちる。
+- **q6 は「mutation の禁止」ではなく「escape の禁止」を assert するようになった** —— 1 つの拒否が、1 つの admit（局所 atom が `= 1` を返す）と 9 つの厳密な拒否（escape を引数形と fn 捕捉形の 2 通り、`ref` / `dosync` / `volatile!` / `set!` / `binding` / `var` / `alter-var-root` の 7 head）に置き換わった。**弱くなったのではなく強くなった。** 何がいつなぜ変わったかは test の docstring に在る。
+- 検証: 変更前 702 tests / 9,556 assertions で 10 failures exit 1、変更後 703 / 9,596 で 0 exit 0。両判断とも意図的破壊で discriminate を実証（escape の assertion を局所 admit 側に向けると 2 failures、pending 側は 3 通りの改変で 3 failures）。
+- **merge 中に digest の借りが動いた**: kotoba-lang が admitted builtin を 1 つ増やしたので、**112 head あった差が 1 head になった**（0 ではない）。片側を丸ごと採ると同僚の測定か自分の resync のどちらかを捨てることになるので、**両方の literal を残して「等しくないこと」を assert** し、差が閉じたら 2 つ目が退役するようにした。
+- **set まわりの 3 つの overclaim は 3 つとも確認され、しかも報告より広かった。** `:conj` / `:disj` に lowering が無いだけでなく、**`contains?` も typed set では拒否される**（正しい拒否だが、authority が `:set-literal` の `:operations` にまだ載せている）。さらに **authority が自分の証拠として挙げている fixture `lang/conformance/collections/set.kotoba` が、amu route の 2 target で `expected keyword, got i64` に落ち、legacy emitter でだけ動いて 1 を返す**。その case は `:required-backends #{:kir :wasm32-kotoba-v1}` を宣言しているのに、**実際に走らせている場所は manifest の `:backends` map が名指してすらいない emitter だけ**だった。`:kir` が走らせるかは未測定。`surface-status.edn` は指示どおり触っていない（別途着手）。
+
 ### 残件（この ADR が次に指す先）
 
 1. `:state` ability（決定節のとおり。前提 4 つのうち vacuous な「handle は値でない」を先に赤にする）。
