@@ -59,12 +59,21 @@
                            ".." "..")))
 
 (defn- sh
-  "同期実行。`{:out :code}`。stderr は out に混ぜる —— 失敗の理由は大抵そちらに出る。"
+  "同期実行。`{:out :code}`。stderr は out に混ぜる —— 失敗の理由は大抵そちらに出る。
+
+  **spawn 自体が失敗したときは、その理由も混ぜる。** プロセスが起動しなかった
+  場合 `stdout` / `stderr` は両方 `null` で、`(str nil nil)` は空文字になる ——
+  つまり呼び手は**理由を 1 文字も受け取らないまま**、自分の推測を確信ありげに
+  印字する。実測 2026-09-03: `cwd` が存在しないだけの `git worktree add` が
+  空の本文で返り、呼び手が『pin が upstream に無いか、checkout が壊れている』と
+  報告した。pin も checkout も無傷で、無かったのはディレクトリだった。
+  理由は `.-error`（ENOENT）に入っていて、そこだけが捨てられていた。"
   [cmd cwd]
   (let [r (cp/spawnSync (first cmd) (clj->js (rest cmd))
                         #js {:cwd cwd :encoding "utf8" :shell false
                              :maxBuffer (* 64 1024 1024)})]
-    {:out (str (.-stdout r) (.-stderr r))
+    {:out (str (.-stdout r) (.-stderr r)
+               (when-let [e (.-error r)] (str "spawn failed: " (.-message e))))
      :code (or (.-status r) 1)}))
 
 (defn- guarded
@@ -249,7 +258,13 @@
         (let [wt (sh ["git" "worktree" "add" "--detach" dir sha] src)]
           (if-not (zero? (:code wt))
             (do (progress! (str "   FAIL: worktree を作れない — " (str/trim (:out wt))))
-                (progress! "         pin が upstream に無いか、checkout が壊れている")
+                ;; 3 つ目は実測で足した（2026-09-03）。superproject の
+                ;; **worktree から**この loop を回すと `orgs/` に west 管理の
+                ;; 子リポが無いので、pin も checkout も無傷のまま ENOENT になる。
+                ;; 直前の行が spawn の理由を出すので、どれなのかは読めば分かる。
+                (progress! (str "         pin が upstream に無いか、checkout が壊れているか、"
+                                "\n         " src " が存在しない"
+                                "（superproject の worktree には west 管理の orgs/ が無い）"))
                 {:errors 1})
             (try
               (link-siblings! root dir sandbox)
