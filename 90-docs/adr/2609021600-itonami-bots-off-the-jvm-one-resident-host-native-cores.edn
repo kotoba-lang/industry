@@ -308,6 +308,99 @@ mtime を hash する inventory では live な Hermes home に対して optimis
 - `~/.hermes/cron/jobs.json` が 46 job から 2 job に縮んだ件（14:54:13 JST）の原因は
   未特定のまま。復元はオーナー判断
 
+
+## compile を native に寄せた —— 2026-09-02（オーナー指示）
+
+### 前提にできるもの、できないもの（native kotoba 0.7.3 を実測）
+
+`/opt/homebrew/bin/kotoba` は実在の native arm64 バイナリで、`lang/cli.edn` の
+12 command すべてに応答する。ただし中身は 3 つに分かれた:
+
+    compile                            :compile/emitted            exit 0  実装
+    id / graph / git / rad / deploy / library                      exit 1  実 dispatcher
+    build / test                       rad 経由で実行される         exit 0
+    run / check / hinshitsu            :command/planned            exit 0  未実装
+
+**`check` は何も検査せずに exit 0 を返す。** `:check/planned` は未実装の意味で、
+`$?` を見る呼び出し側には成功と区別が付かない。同じバイナリで、存在しない command
+（`--version`）は exit 1 を返す —— つまり**知らない command は失敗、実装していない
+command は成功**という向きである。CLAUDE.md の Q9 は「各 target は verified native
+`kotoba check` / `kotoba compile` を通すこと」を要求しているので、**native の check を
+素直に配線すると、その gate は検査せずに緑になる。** adapter matrix の
+「check は M2 実装済み」は host が `:compiler-cli`（invoke は `clojure -M:run`）の
+場合の話で、native ではない。
+
+したがって寄せたのは **compile だけ**である。
+
+### 実測 —— 両 emitter は「別のバイト」で「同じ挙動」
+
+app の実 guest 2 本（`server_main` / `mcp_main`）を両経路で compile した。
+
+    amu 8435eafb (nbb, --jvm-free)   server 2031 B   mcp 2064 B   47 imports
+    native kotoba 0.7.3              server 1944 B   mcp 1977 B   45 imports
+
+差はどちらも 87 バイトで、**type / import / function / export / code の各 section**に
+出る。一方 **`kotoba.target` / `kotoba.compatibility` / `kotoba.typed` は
+バイト一致**、exports も一致、**native の imports は amu の真部分集合**
+（`vector-alloc-i64` と `vector-assoc-in-place-i64` を要求しない）。app 自身の
+`runtime/load-guest.mjs` で両方を読み、`main` は 1338 で一致、`health-route?` は
+4 ケースで一致した。**native の方が小さく、要求する host 表面も小さい。**
+
+### 決定
+
+`bin/kotoba` は **native CLI が在ればそれで emit し、無ければ amu adapter に落ちる**。
+`KOTOBA_EMITTER=native|amu` で強制でき、**native を強制して CLI が無い場合は拒否**する
+（黙って別の emitter を使うと、成果物の出所を誰も再構成できなくなる）。
+
+- 旧 ADAPTER-EMIT HOLD が守っていたのは「v0.6.29 の emit を**でっち上げない**」こと
+  だった。その保証は emitter を 1 つに絞ることではなく、**envelope に `:emitter` /
+  `:emitter-path` / `:emitter-sha256` を書く**ことで維持する。digest なのは、native CLI が
+  `--version` に `:command/unknown` を返し、記録できる version 文字列を持たないため。
+- **exit status を見ない。** native は未実装 command に exit 0 を返すので、emit の
+  判定は envelope の code だけで行う。
+- **runtime pin は動かしていない。** `deps.edn` は kotoba v0.6.29 のまま。
+  `compiler-pin.edn` は元々 runtime と emit frontend を別に持っており、動いたのは
+  後者だけである。ワークステーションのバイナリが 0.7.3 であること、そしてそれを
+  **emit に使うのは runtime bump とは別の判断**であることを同ファイルに記録した。
+- **host runtime は emit では作られない。** app の loader は amu の
+  `browser-host.mjs` を必要とするが native emit はそれを生まない。envelope は
+  `:host-runtime` を報告する —— 読めない成果物を出して成功と呼ばないため。
+
+### 検査（`test/emit_parity_nbb.cljs`）
+
+バイト一致は要求しない（差は実在し、誰も行動できない理由で赤くなる）。意味のある
+ところだけを assert する: identity 3 section のバイト一致 / exports 一致 /
+native imports ⊆ amu imports / app 自身の loader で `main` と probe が一致すること。
+**16 checks 緑。**
+
+**赤くなることを確かめた方向:**
+
+- `health-route?` を「任意の GET か POST」に壊すと、**`probes agree` は
+  `[true true true true]` で緑のまま**、`probes match expectations` だけが赤になった。
+  合意だけの検査なら壊れた述語を通していた。これが expected 列の存在理由である。
+- amu 不在 / CLI 不在はそれぞれ固有の理由で **exit 2**。
+
+**まだ赤を見ていない脚**: identity section / exports / imports-subset。これらは 2 つの
+emitter が契約について食い違ったときにだけ赤くなり、この file や guest を編集して
+正直に演出することはできない。**その緑は「検査済み」ではなく「未検証の識別力」として
+扱う** —— header にもそう書いた。
+
+### 着地
+
+    cloud-itonami/cloud-itonami-app  58a0598  native emit + parity 検査
+    com-junkawasaki/root             5a67e24  west pin 前進
+
+### 残り
+
+- **`check` の exit 0 は上流の問題。** 未実装が成功として返る限り、native check を
+  前提にした gate は劇場になる。`kotoba-lang/kotoba` へ上げるのが次の一手で、
+  この session ではやっていない。
+- **native の `--target` は `web` と `wasm` だけ。** amu の `wasm32-browser` /
+  `aarch64-macos` 等は native CLI に無いので、native に寄せられるのは
+  この 2 target を使う経路に限られる。
+- **`run` が planned な限り、front end を `kotoba run` に載せることはできない。**
+  208 command の front end 問題（open item 1）は未解決のままである。
+
 ## closing —— 2026-09-02 の session を閉じるにあたっての現在地
 
 ### default branch との差（監査済み）
