@@ -2,7 +2,7 @@
   :adr/id "adr-2609021600-itonami-bots-off-the-jvm-one-resident-host-native-cores"
   :adr/doc_type "adr"
   :adr/topic "itonami-bots-off-the-jvm-one-resident-host-native-cores"
-  :adr/status "proposed"
+  :adr/status "accepted"
   :adr/date "2026-09-02"
   :adr/last_verified "2026-09-02"
   :adr/deciders ["Jun Kawasaki"]
@@ -29,7 +29,7 @@
   :adr/source-format "edn"
   :adr/body "# ADR-2609021600: itonami cloud bots を JVM から降ろす
 
-**Status**: proposed（設計。オーナー指示 2026-09-02「1, 2, 3 かつ jvm 依存をやめて kotoba compile, amu native で効率化する設計をまとめて」への回答。この ADR は何も実装していない）
+**Status**: accepted（2026-09-02、オーナー指示 do it。設計はオーナー指示 2026-09-02「1, 2, 3 かつ jvm 依存をやめて kotoba compile, amu native で効率化する設計をまとめて」への回答。この ADR は何も実装していない）
 **Date**: 2026-09-02
 
 ## 0. 依頼の 3 項目と、この ADR の範囲
@@ -188,4 +188,97 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.cloud-itonami.app.pl
 ```
 
 着手前に amu / kotoba-kir / cloud-itonami-app の checkout を pin まで進める（本日 amu は 20、kotoba-kir は 31 commit 遅れており、この ADR は origin/main を読んで書いた）。
+
+## 実装の第一波 —— 2026-09-02（オーナー指示「do it」）
+
+### 前提が同じ日に変わった —— PR #270
+
+この ADR を書いた約 3 時間後（2026-09-02 15:50 JST）、cloud-itonami-app に PR #270 が
+入った。題は `Guest wasm run path; leftover JVM aliases deleted (not JVM-removed)`。
+deps.edn から `:server` / `:mcp` / `:cli` を削除し、launcher を wasm guest を読み込む
+nbb host に差し替えている。
+
+**S1 の「bin/itonami から spawn を消す」は、この commit で既に済んでいる。** 残ったのは
+その裏返しで、#270 自身が題の括弧で申告している —— port されていない。実測:
+
+- `bin/itonami` は registry のどの command に対しても exit 2 を返す（front end が無い）
+- nbb server が serve するのは `/health` と `/` だけ。registry が数える 407 route /
+  208 command に対して、分子は 2
+- nbb host が読む `target/amu/*.wasm` は build 生成物で、tree に無い
+
+**したがって S1 は「spawn を消す」から「208 command に front end を戻す」に変わった。**
+どちらの形で戻すか（JVM server に喋る nbb client か、guest wasm に route を足すか）は
+方向の判断であり、この session では選ばない —— 同じ日に別 session が閉じた経路を、
+記録なしに開け直さない。
+
+### 危険 —— main からリリースを切らない
+
+launchd の `dev.cloud-itonami.app` は今も `clojure -M:server` を実行する。main には
+その alias が無い。本番が気づいていないのは安全機構ではなく、`~/.cloud-itonami/current`
+が #270 より前のリリース（f9138fbd）を指しているからにすぎない。**次のリリースで
+それが反転する。** 解決できない launch command は大きな音を立てない —— launchd の
+KeepAlive が永久に再起動し、port は閉じたままになる。
+
+### 着地したもの
+
+| repo | commit | 内容 |
+|---|---|---|
+| com-junkawasaki/root | 3585dd1 | `scripts/verify-itonami-run-path.cljs` + orgs-detectors 登録 |
+| com-junkawasaki/root | 96afd03 | west: 49 pin を upstream tip へ前進 |
+| cloud-itonami/cloud-itonami-app | 下記 | jobs.json を mtime ではなく内容で比較する |
+
+**detector（`verify-itonami-run-path`）は 3 本の脚を別々に測る** —— run-path（plist の
+command と、それが要る alias / file）/ cli（`bin/itonami` が registry の command に
+答えるか）/ guest（host が読む wasm が tree に在るか）。1 つの boolean に畳まないのは、
+直し方が 3 つとも違い、app を止めるのはそのうち 1 つだけだから。分母は
+`resources/cloud-itonami-app.commands.edn` の `:counts` であって、file を数えた値ではない。
+
+fixture だけでなく**実在の 3 tree で両方向**を出した:
+
+    west checkout    6c3a315   pre-#270    exit 0   3 脚とも緑
+    origin/main      4e607f6   post-#270   exit 1   3 脚とも赤、それぞれ名前つき
+    稼働中リリース    f9138fbd              exit 0   3 脚とも緑
+
+`--self-test` は 11 checks で、各区別の両方向を出す（宣言された alias 対 削除された
+alias / dispatch する CLI 対 閉じた CLI / 在る wasm 対 無い wasm / 認識できない run
+command と plist 不在は ok ではなく unmeasured）。
+
+**jobs.json の lock** を直した —— ADR-2609012300 が「取らなかった durable fix」と
+書いたものである。cron ticker は約 2 分ごとに jobs.json を同一 bytes で書き直すので、
+mtime を hash する inventory では live な Hermes home に対して optimistic lock が
+構造的に閉じない。volatile 扱いにすれば lock は閉じるが、job 一覧の本物の編集が
+無検査で通る —— この migration が運ぶ当の設定である。内容を hash すれば保証は残り、
+雑音だけが消える。テスト 3 本で両方向を pin した（touch しても revision は動かない /
+編集すれば動く / content-hash は jobs.json だけで config.yaml の mtime は今も効く）。
+
+### west pull（同じ指示に含まれていた）
+
+    superproject   origin/main に同期
+    pin            4,259 project を走査し、tip から遅れていた 49 件を 1 commit で前進
+                   （96afd032。entry ごとに到達性・前進・blob 先行条件を検査）
+    checkout       49 のうち 46 が pin に追従
+
+追従しなかった 3 件は**他セッションの作業中ファイル**で、west は破棄せず拒否した
+（正しい挙動）。触っていない:
+
+    cloud-itonami-app   modified 3（bot.cljc / bots.clj / bot_test.clj）
+    app-aozora          untracked 4
+    app-hyakka          modified 4
+
+前進した pin には `cloud-itonami-app 4c86b4c -> 4e607f6` が含まれる。**pin が動いても
+本番は壊れない**（本番は release から動く）。壊れるのはリリースを切る操作である。
+止めなかったのは、CLAUDE.md の既定（pin は upstream default branch の tip）に従い、
+かつ detector が workspace の現在地を赤として正しく報告するようにするためである。
+
+### まだやっていない
+
+- S0 の「同じ仕事」比較（1 task を 1 bot に投げて完走させ、両経路の peak RSS /
+  wall / round trip / process 数を採る）。detector が測るのは tree であって turn ではない
+- S2 以降。front end の方向が決まるまで着手しない
+- D6 の Hermes 側の恒久処置。crash loop は 17:28 の再起動以降 load が 130 から 30 へ
+  下がって自然に収まっており、watchdog の設定変更は**別セッションが同じ home に対して
+  `bots import` を実行中**だったため見送った（config.yaml は inventory の対象で、
+  実行中の lock を壊しうる）
+- `~/.hermes/cron/jobs.json` が 46 job から 2 job に縮んだ件（14:54:13 JST）の原因は
+  未特定のまま。復元はオーナー判断
 "}]
