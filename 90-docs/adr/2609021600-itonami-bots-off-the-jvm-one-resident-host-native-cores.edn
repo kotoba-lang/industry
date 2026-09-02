@@ -270,6 +270,32 @@ mtime を hash する inventory では live な Hermes home に対して optimis
 止めなかったのは、CLAUDE.md の既定（pin は upstream default branch の tip）に従い、
 かつ detector が workspace の現在地を赤として正しく報告するようにするためである。
 
+### suite を通して分かった 2 件（どちらも #270 の側で、私の変更とは無関係）
+
+`clojure -M:test` を通した: **2,243 tests / 13,361 assertions、14 failures / 1 error**。
+失敗は 4 つの namespace に集中しており、そのどれも私が触った 3 file
+（hermes_migration.clj / hermes_migration_test.clj / test_runner.clj）に依存しない。
+**clean main で走らせ直してはいないので、「既存」は diff から見た判断であって測定ではない。**
+
+うち 2 件は #270 自身の `launcher_test.clj` で、内容が違う:
+
+- **`replacement-launchers-are-not-clojure-wraps` は、自分の説明文で落ちている。**
+  `(not (str/includes? itonami \"spawnSync\"))` を assert するが、
+  `bin/itonami` に `spawnSync` が現れるのは 4 行目のコメント 1 箇所だけ ——
+  `This used to spawnSync clojure -M:cli` という履歴の説明である。**呼び出しは 1 つも
+  無い。** つまりこの control は、自分が名乗っている理由（launcher が clojure の
+  wrapper であること）とは別の理由で赤くなっている。CLAUDE.md の 6 問目
+  （その検査は、自分が名乗っている理由で拒否したことがあるか）に該当する。
+- **`resident-mcp-launcher-does-not-spawn-clojure` は本物の赤。**
+  `nbb <bin/itonami-mcp> --print-data-dir` が `Could not find namespace: guest-runtime`
+  で exit 1 する。`bin/itonami-mcp` は `[guest-runtime]` を require し、その実体は
+  `bin/guest_runtime.cljs` なので、**`--classpath bin` を付けない限り解決しない** ——
+  自分の shebang（`#!/usr/bin/env nbb`）で起動しても動かない。実測: 付ければ exit 0。
+
+どちらも #270 の担当領域なので、この session では直していない。前者は control の
+書き換え（語ではなく呼び出しを見る）、後者は launcher が自分で classpath を解決する
+（`:require` ではなく絶対パスの dynamic import）か、呼び出し側を直すか、の判断が要る。
+
 ### まだやっていない
 
 - S0 の「同じ仕事」比較（1 task を 1 bot に投げて完走させ、両経路の peak RSS /
