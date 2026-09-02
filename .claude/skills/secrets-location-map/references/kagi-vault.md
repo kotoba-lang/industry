@@ -12,6 +12,22 @@
   動く（passphrase はKeychainが使えない場合の recovery 経路として残っている
   のみ）。`bin/kagi ls` で一覧、`bin/kagi get <name>` で取得。1Password から
   個別 item を持ち込みたい時は `bin/kagi import onepassword <file.1pux>`。
+  - **passkey PRF unlock 封筒（2026-09-02 時点で未登録）。** `kagi.unlock` は
+    VMK を multi-wrap でき、`bin/kagi unlock-enable-passkey` が WebAuthn PRF
+    （`prf.eval.first`）由来の鍵で VMK をもう 1 枚包む。手順: JVM 起動（この端末で
+    約 2 分）→ 既定ブラウザが `http://localhost:<port>/#<token>` を開く →
+    **120 秒以内に Touch ID** → `{:ok? true :enabled :passkey-prf}`。
+    `kagi unlock-status` の wrap が `:os-keychain` + `:passkey-prf` の 2 枚になる。
+    2026-09-02 に agent が起動したが、オーナー不在で 120 秒の窓を過ぎ
+    `passkey registration timed out`（vault は無変更）。**登録はオーナーが
+    端末に居るときに `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi
+    unlock-enable-passkey` を回す。** kagi pin `1f3dba2`（PR #32）以降が要る
+    —— それ以前は bridge が `127.0.0.1` を RP id にしていて Chromium が
+    `SecurityError: This is an invalid domain` で拒否する。
+    ⚠ 登録できても **CLI の unlock は passkey を使わない**（`unlock-vmk-auto` は
+    `KAGI_MASTER` → OS Keychain → passphrase の順だけ。`unlock-with-passkey-prf`
+    は関数として在るが `bin/kagi` から呼ばれていない）。passkey 封筒は今日の
+    ところ「Keychain が壊れたときの第 2 の鍵」であって、日常の unlock 経路ではない。
   ⚠ **2026-08-06 実測: `KOTOBA_SEED_PRODUCTION` / `KOTOBA_SEED_TESTNET` /
   `KOTOBASE_B2_KEY_ID` / `KOTOBASE_B2_APP_KEY` は 4 件とも存在しない** —
   live vault（`KAGI_HOME=$HOME/.kagi`）と repo-local vault
