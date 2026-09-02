@@ -1,0 +1,153 @@
+[{:db/id -1
+  :adr/id "adr-2609021600-kotoba-unison-deepening-five-priorities"
+  :adr/title "Kotoba の Unison 的性質を深める 5 つの優先順 — 定義 CID は effectful へ、abort / state は ability へ、名前解決は型主導へ、コレクションと stdlib は Kotoba 自身で、compile は CID 単位で"
+  :adr/status "accepted"
+  :adr/date "2026-09-02"
+  :adr/related ["ADR-kotoba-code-identity-and-abilities"
+                "ADR-kotoba-content-addressed-codebase"
+                "ADR-kotoba-typed-eval"
+                "adr-2608301500-guest-syntax-restrictions-classified-by-shielding-mechanism"
+                "adr-2608650000-kotoba-cannot-write-has-two-kinds-decision-core-extraction"
+                "adr-2608550000-cid-native-codebase-authoring-compile-discovery"
+                "adr-2607279200-kotoba-clojure-shaped-safety-elaboration-migration"
+                "adr-2608311750-cljk-migration-cost-is-not-effects"]
+  :adr/body "# Kotoba の Unison 的性質を深める 5 つの優先順
+
+**Status**: accepted / 2026-09-02 / owner 質問「より kotoba を unison 的性質に基づいて美しく、効率的で安全で、lisp, clojure の互換性も高めるには？ typed eval などはすでに統合、更新したはず」→ 回答の後「ok, では進めて」。
+
+## 現在地（2026-09-02 実測、kotoba-lang `02f353f` → GitHub main `4adda169`）
+
+Unison の 2 本柱は設計としては既に入っている。
+
+| 性質 | 状態 | 正本 |
+|---|---|---|
+| content-addressed definitions（定義 CID） | `:implemented`、payload v2、dag-cbor、effect row と desugar-contract-version を封入、Clojure / ClojureScript でバイト一致 | `kotoba-lang/lang/code-identity.edn`、実装は `kotoba-kir/src/kotoba/kir/definition_identity.cljc` |
+| typed abilities（名前付き操作 → 推論された effect row → typed capability call） | CI1〜CI7 `:implemented` | `ADR-kotoba-code-identity-and-abilities.md` |
+| 名前は定義 CID への不変な写像（namespace commit、rename は依存側を動かさない） | C1〜C5 完了 | `ADR-kotoba-content-addressed-codebase.md` |
+| typed eval（定義 CID + 引数だけを受け、source text / reader form / namespace 名 / host object を決して受けない。admission CID → value CID → receipt） | `:implemented` | `lang/typed-eval.edn`、`ADR-kotoba-typed-eval.md` |
+| 記法禁止の分類（5 つの shielding axis と widening path） | accepted | adr-2608301500 |
+
+残っている差は「Unison 的性質が、まだ純粋定義と wire 層にしか届いていない」ことである。実測で見つかった具体の drift と穴:
+
+1. `lang/code-identity.edn` は `:definition-cid {:scope :closed-deterministic-pure-definition}` と書き、kotoba-kir の docstring 3 箇所も「closed pure definition」と言う。一方で **機構は effect row を封入済み**で、frozen vector には `#{:host/http}` の行がある。さらに `lang/typed-eval.edn` は `:receipt :required-for-effectful-evaluation` と書き、effectful な定義を CID で呼ぶことを前提にしている。**2 文書は食い違っている。**
+2. `throw` / `try` / `catch` は `:explicit-errors`（shielding-axis `:control-effect-tracking`）で禁止のまま。widening path `:typed-abort-ability` は書かれているが前提 3 つとも `:not-met`。Clojure コードが移植できない最大の原因。
+3. `atom` / `swap!` / `reset!` は `:no-ambient-mutation`（axis `:authority`）。widening path `:state-kit-desugar` の前提 4 つは 1 met / 1 partial / 1 vacuous / 1 not-met。
+4. 数値は `f64-add` `f32-lt` のような型幅付き名で、`+` は i64 専用。
+5. `clojure.string` で exact なのは `starts-with?` `ends-with?` `includes?` の 3 つだけ。`compat.edn` 自身が「character-index 抽象がまだ無い」と書く。
+6. 可搬コレクションは pair-chain で走査が線形。stdlib `core.kotoba` は 12 定義。`for` は forbidden、`get-in` `sort-by` `mapv` `keep` `remove` `juxt` は無い。
+7. typed eval の cache は結果 memo（`[:admission-cid :input-value-cids]`）であって、コンパイル cache は定義 CID をキーにしていない。
+
+## 決定
+
+次の順で進める。番号は優先順であり、1 と 2 は 1 反復ずつ切れる大きさ。
+
+### 1. 定義 CID の scope を「checked な全定義」にする
+
+`:scope` を `:closed-deterministic-checked-definition` に改め、effectful な定義が identity を持つことを positive fixture（identity と lock admission の両方）で pin する。docstring の「pure」を直す。**エンコーディングは動かさない**（frozen vector 10 本の CID は不変でなければならない）。effect row の語彙（keyword のみ受理 vs compiler が出す `[:cap/call id]` ベクタ）が橋渡しされていなければ、黙って広げず gap として記録する。
+
+### 2. typed abort ability（Unison `Exception` と同型、ただし lexical・one-shot）
+
+`(throw e)` は enclosing function の effect row に `:abort` を足し、error 型 E は `e` の型。`(try body (catch e handler))` は body の `:abort` を row から除く。elaboration は **monadic な result 化**: `:abort` を持つ関数は `[:result T E]` を返す形へ落ち、呼び出し側は try の中では match、同じ E で abort する関数の中では propagate、それ以外は拒否。continuation 捕捉も unwinding 機構も要らないので、ADR の非目標 `:general-effect-handlers` は守られる。
+
+slice 1 の fail-closed 境界: export 境界で未処理の abort は拒否（wire ABI 不変）、`loop`/`recur`・lazy thunk・`doseq`/`dotimes`・dataspace facet scope の中の `throw` は前提 `:checked-lexical-facet-unwind` を引いて拒否。両方向の conformance vector を持つ。
+
+これが入ると `ex-info` / `ex-data` を compat 層で exact に置けて、例外で流れを書く普通の Clojure がそのまま通る。
+
+### 3. 名前解決を型主導に（TDNR）
+
+Unison が `+` を `Nat.+` / `Float.+` に引数の型で解決するのと同じく、`+ - * / < <= > >= =` は両 operand が `:f64` なら `f64-*`、`:f32` なら `f32-*` に elaborate する。**混合型は拒否**（暗黙変換は入れない。これは `:intentional-semantic-simplification` のまま）。既存の `f64-add` 等の名前は typed/ABI 境界で残す。float を含まないプログラムの出力はバイト不変。
+
+同じ「型主導」を文字列にも当てる: Kotoba は自分のエンコーディングを制御しているので、UTF-8 バイト addressing の上に code point 走査を純粋定義で置き、`clojure.string` の `blank?` `trim*` `index-of`（JVM の UTF-16 unit index を返す）等を **exact に本名で**提供する。exact にできない名前（Unicode case fold）は置かない —— `compat.edn` の「近似を本名で置かない」規則は不変。
+
+### 4. コレクションと stdlib は Kotoba 自身で書く
+
+Unison の `Map` が Unison で書かれているのと同じ置き場。HAMT / RRB は stdlib の純粋定義として書き、定義 CID が付くので全 backend で同一、host authority は増えない。native の word 型 admission に再帰値が無い点は「backend 未達」としてモジュール header に書く（adr-2608650000 の分類）。`for` は `doseq` と同じ有界 unroll に desugar できる。`keep` `remove` `mapv` `sort-by` 等は `core.kotoba` に純粋定義として足す。`defdesugar` は Unison も macro を持たない点で正しい選択なので据え置き。
+
+### 5. compile は「ハッシュごとに 1 回」で測る
+
+`amu compile` を定義 CID → KIR 断片の cache 上で incremental にする。指標は wall-clock ではなく **再コンパイルされた定義数**。`add` / `update` / `view` / `rename` を持つ codebase manager は adr-2608550000（CID ネイティブなオーサリング / codebase / compile / discovery）が既に accepted なので、本 ADR は新しい store を起こさず、そこへ接続する。
+
+### 3 → 4 の後に着手する: `:state` ability
+
+`atom` / `swap!` / `reset!` を instance-scoped な `:state` cell に desugar する（Unison `Ref` と同型、effect row に `:state`）。順序は、capability handle に型を与えて `widening_precondition_test` を赤にし、格納拒否を書き、desugar、conformance vector、wasm32-kotoba-v1 / native 資格。structured spawn（`future` / `pmap`）は sub-budget fuel 付き ability として設計可能だが未決定のまま。
+
+## やらないこと（ADR の非目標を再掲）
+
+Unison 構文の採用、汎用 effect handler と continuation 捕捉、global codebase namespace、source text のハッシュ、暗黙の数値昇格、`defmacro`。**CID は identity であって authority ではない**（typed-eval `:content-identity-is-not-authority`）も動かさない。
+
+## 着地記録
+
+### 1. 定義 CID の scope（着地 2026-09-02）
+
+- kotoba-kir `1be41264`、kotoba-lang `152ee8b9`（deps.edn の kotoba-kir pin を同 sha へ）。
+- `:scope :closed-deterministic-checked-definition`、`:effectful {:status :sealed-by-effect-row}`、positive fixture 2 本（identity / lock admission とも非空 effect row）。fixture は 18 → 20 本。frozen vector 10 本の CID は **バイト不変**（再生成後の git diff 空）。kir 3 docstring の「pure」を「checked」へ。
+- 検証: kir identity 2 ns 9 tests / 36 assertions exit 0、壊すと exit 1。kir 全 suite 242 tests / 1041 assertions exit 0。lang `code-identity-test` 16 tests / 112 assertions exit 0、fixture CID を壊すと exit 1。nbb `verify_code_identity_cljs` exit 0（JVM / cljs 10 本一致）、1 本壊すと exit 1。lang 全 suite は `safety-qualification-test` の 13 fail + 2 error が **pre-existing**（sibling checkout `../amu` 等を読む。untouched origin/main worktree で同数を再現）。
+- **実測で見つかった gap**: compiler（kotoba-sema `direct-facts` / `infer-effects`）が出す effect row は `[:cap/call id]` **ベクタ**で、`definition-identity` の `effect-row-problem` は keyword しか受けない。つまり **実際にコンパイルされた effectful 関数の row は今日 hash できない**。黙って広げず `lang/code-identity.edn :definition-cid :effect-row-vocabulary {:status :not-yet-bridged}` として記録し、kir test `compiler-wire-effect-rows-are-not-yet-hashable` で拒否文言を pin した。
+- **さらに見つかった gap**: `kotoba-lang/codebase` の `kotoba.codebase.typed-code` は **独自の identity エンコーディング**（effects を stable-name の sorted vector で持つ）を持ち、kotoba-kir の `definition-identity`（payload v2）と**定義 identity のアルゴリズムが 2 つ**ある。adr-2608550000 が「2 つの答え」を defect として名指ししていた形そのもの。橋渡し（named operation を keyword row として封入）と 2 実装の記録・統一方向は次の slice（下記）。
+
+### 1b. effect row の橋渡しと、identity 2 実装の記録（着地 2026-09-02）
+
+- kotoba-kir `1e00f830`、kotoba-lang `d9cc1ad8`（kotoba-kir pin を同 sha へ）、codebase `c19a0ff8`（kotoba-kir pin を `73acba38` → `1e00f830`。旧 pin は 138 commit 遅れで `definition_identity.cljc` 自体を含んでいなかった）。
+- **橋**: `kotoba.kir.definition-identity/effect-row-from-hir [hir {:id->name m}]`。compiler の `{:effects #{[:cap/call 8]} :named-operations #{…}}` と catalog の id→name 写像（kotoba-sema が catalog を所有し kotoba-kir に依存するので、写像は引数であって lookup ではない）から keyword row を作る。identity 本体は wire row を**今も拒否**し、橋が唯一の経路。名前の無い id は `effect row wire id has no catalog name: [:cap/call 200]` で拒否（`:problem :definition/effect-row-unbridged`）。2 id が 1 名に写る catalog も拒否（2 つの wire row を混同させない）。エンコーディングは不変（frozen vector 10 本は kotoba-kir 側にも複製してバイト一致を assert）。positive fixture `identity_named_operation_row.edn`（橋が作った row の CID = 手書き row の CID）。`:effect-row-vocabulary` は `:bridged`。
+- **2 実装の実測**: `typed_code.cljc` は `kotoba.kir.definition-identity` を一切 require しない（完全に独立）。同一定義 `(defn double [x] (* x 2))` の CID は typed-code `bafyreihetwjs…` / definition-identity `bafyreigk5ahn…` で**異なる**。typed-code の `\"effects\"` は `(vec (sort (map stable-name effects)))` で、`stable-name` は `str` に落ちるため compiler の wire row `[:cap/call 9]` は**文字列 `\"[:cap/call 9]\"`** として保存され、`typed_eval.cljc` が `(map keyword)` で読み戻すと `:[:cap/call 9]` になり `:allowed-effects` に決して一致しない。拒否も翻訳もされない。既存の codebase テストは keyword しか渡していなかった。
+- **persistence は UNVERIFIED**: codebase / kotoba / kotobase の committed fixture・README・resource に typed-code CID は 1 つも無いが、consumer（`kotoba codebase add --typed`、`library_release`、`reference_package`）は user-local store と任意の `kotobase.storage` provider に書くので、そこに在るかは列挙できない。よって統一（C(3)）は**やらず**、`lang/code-identity.edn :identity-implementations` に両実装・`:authority :kotoba.kir/definition-identity`・実測 CID・`:direction :typed-code-adopts-definition-identity`（versioned な新 typed-definition schema で、その CID が payload-v2 DefCID になる。committed cost 0、unmeasured cost = UNVERIFIED な store）を記録。codebase 側に「2 つの CID は**異なる**」ことと `\"[:cap/call 9]\"` エンコーディングを pin する test と README note。
+- 検証: kir identity 2 ns 11 tests / 73 assertions exit 0、adapter が拒否せず名前を捏造するよう壊すと 3 failures exit 1。kir 全 254 / 1140 exit 0。lang `code-identity-test` 17 / 126 exit 0、`:status` を戻すと exit 1。nbb verifier exit 0、拒否 literal を壊すと exit 1。codebase divergence test 2 / 9 exit 0、typed-code を throw させると exit 1。codebase 全 128 / 398 exit 0。lang 全 suite は sibling-checkout 読みの 10 fail + 1 error（pre-existing）。
+
+### 2. typed abort ability slice 1（着地 2026-09-02）
+
+- kotoba-hir `ac8e7051`（`valid-effect?` が `[:cap/call id]` しか認めず `:abort` が `invalid-effects` になっていたので、`:abort` だけを追加で admit。`:aborts` / `:throw` は拒否のまま）、kotoba-sema `e42b74ef`、kotoba-lang `d820effe`（test alias が kotoba-sema `e42b74ef` を pin。vendored grammar と `lang/guest-grammar.edn` はバイト一致）。
+- 実装: `(throw e)` は bottom 型、enclosing function の row に bare keyword `:abort`、E は operand の型で 1 関数 1 型。`(try body (catch e h))` / `(catch :string e h)` は body の `:abort` を除く。elaboration は `[:result T E]` への monadic 化で wire ABI 不変。**strict**: 関数が aborting になるのは自分の `throw` によってのみで、呼び出しは `:abort` を伝播させない。**subset**: aborting form は tail position か `let` binding 値としてのみ admit（operand / test / loop-init 位置は ANF が要るので拒否、契約に明記）。export / `main` に `:abort` が残れば拒否（`(:export …)` / `defn-` が無いと全関数が export になるので、abort する helper は `defn-` にする）。guard: `loop`/`doseq`/`dotimes`、lazy thunk、fn literal、dataspace facet を持つ row（`throw` と `try` の両方、interprocedural）、関数外の `throw`。
+- 契約: `lang/abort-ability.edn` v1（`:remaining` に export 境界の ABI 化・loop / lazy / fn / facet scope・operand 位置・非 strict 伝播・wasm32 / native 資格）。`surface-status.edn :explicit-errors` は `:enforcement :tracked-elaboration`、`:precondition-status :as-of 2026-09-02` で effect-row `:met`、conformance `:met`、facet-unwind `:not-met`（だから facet scope で拒否）。`grammar_authority.clj` は tracked-elaboration entry を「must be forbidden」から除外。kotoba-sema ADR 0007。
+- fixture: `lang/conformance/abort/` に positive 3 + negative 6（manifest に新 class `:compiler-run`、required `#{:kir}`）、`abort_conformance_test.clj` が negative を**厳密な文言**で実行。pin した拒否文言: `function f throws two different error types: string and i64` / `call to aborting function `f` must be inside try or in a function that aborts with the same error type` / `unhandled abort at export boundary; catch it with try: main` / `throw inside a loop/doseq/dotimes body is not admitted in abort slice 1: precondition :checked-lexical-facet-unwind is not met` / facet 版 / tail-position 版 / `try body cannot abort; there is nothing to catch` / `try catches string but its body aborts with i64` / `inferred effects exceed declared effect ceiling for f: #{:abort}` / `form outside pure-product profile: try`。
+- 検証: kotoba-sema `abort_ability_test` 20 tests / 49 assertions exit 0、loop guard を外すと exit 1（loop program が黙って admit され、helper が aborting になって caller の try が捕まえていた）。全 suite 173 / 856 exit 0（baseline 153 / 807）。kotoba-hir 5 / 15 exit 0。kotoba-lang は abort-conformance / widening / grammar-authority / conformance-matrix 等が exit 0、全 suite は `safety-qualification-test` q1 / q3 が sibling 読みの pre-existing（pristine origin/main で同一）。throw を含まないプログラムの HIR / KIR sha256 は `c14ca39e` と一致。
+- 記録すべき瑕疵: kotoba-sema の merge commit message が `Merge #30: …` と書かれているが PR は開かれておらず、**#30 は他者の open PR**。履歴は書き換えない。
+- amu への注意（次の slice）: module / KIR の `:effects` に `[:cap/call id]` ベクタと並んで keyword `:abort` が入るので、row member を `[tag id]` で分解する箇所に guard が要る。`binding` 内の sub-walk は eager（`mapv`）にする —— lazy `map` は unwind 後に dynamic table を空として読む（ADR 0007 に記録）。
+
+### 3a. 型主導の算術解決（着地 2026-09-02）
+
+- kotoba-sema `f9764cb1`（frontend.cljc +195/−24、数値演算子の領域のみ）。
+- `+ - * / < <= > >= =` が両 operand `:f64` なら `f64-*`、`:f32` なら `f32-*` に解決。単項 `-` は `f64-neg`/`f32-neg`、n 項は左畳み。`/` は i64 の読みを持たない（整数除算は `quot`）ので i64 では拒否。`quot` と bit 演算は整数専用のまま。`max`/`min` は i64 側に head が無いので対象外。
+- 混合型は `:kotoba.error/numeric-type-mismatch` で拒否し、両型と明示変換（`i64-to-f64-checked` / `-rounded`、`f64-to-i64-checked` / `-truncating`、`f32-to-f64-exact`、`f64-to-f32-rounded` 等）を文言で示す。暗黙変換は入れない。
+- 機構は `option-or` と同じ `rewrite-record-projection` の 1 branch（比較連鎖の desugar 後、validation 前）。`(defn f [a] (+ a 1.5))` は `a` を `[:f64]` に精緻化する。`check-value-types!` に fail-closed guard（float operand を持つ素の演算子が残っていれば `:numeric-resolution-unresolved`）。
+- 検証: 新 ns 18 tests / 50 assertions、`<` を `f64-le` に壊すと exit 1（2 failures）、無改変 exit 0。全 suite 177 tests / 901 assertions exit 0、nbb 可搬 suite 70 tests exit 0。float を含まない整数プログラム 2 本の golden はバイト一致。
+- pre-existing・対象外: `loop` の f64 accumulator は helper の結果型が `:i64` 既定で `if branches must have the same value type` になる（明示 `f64-add` でも同じ）。
+
+### 3b / 4a. exact な `clojure.string` と stdlib 拡張（着地 2026-09-02）
+
+- kotoba-lang `863052d0`。すべて純粋 Kotoba source、compiler 変更なし。JVM-free の project route（`--source-path`）で wasm32 まで実測。
+- **stdlib `core.kotoba` 0.3.0**（manifest version 3、sha256 は `stdlib.edn` と conformance manifest の両方で一致）: `keep remove mapv take-while drop-while sort sort-by partition distinct interpose juxt2` を追加。`mapv` は `map` head の alias ではない（stored closure を `map` に渡すと拒否されるため独立の eager walk）。fuel 実測: 512 call 予算で `sort-by` は昇順 15 要素まで、`sort`/`distinct`/`mapv` は 17 超。conformance case `:portable-source-stdlib-extended`（wasm32 5,355 byte、`main()` = 678392943530）。
+- absent と測定理由: `frequencies` / `get-in`（`get` / `assoc` は keyword key のみ: `expected keyword, got i64`）、`some`（`first-match` が予約）、`juxt`（可変長。`juxt2` で提供）。
+- **compat `clojure.string`**: `blank? trim triml trimr reverse` を exact に追加（合計 8 関数）。空白述語は JDK 21 `Character.isWhitespace` の範囲そのもの（U+00A0 / 2007 / 202F / 0085 を除外）。`reverse` は `StringBuilder.reverse` が surrogate pair を保つので astral でも exact（U+1F600 で assert）。`kotoba.string` に `utf16-index-of` / `utf16-last-index-of`（Clojure の UTF-16 unit index、nil は -1）。
+- absent と測定理由: `index-of` 本名（nil 半分: `:option-i64` の `(option-none)` を `if` の arm に置くと **到達しなくても wasm32 / wasm32-browser が project 全体で拒否**、`unsupported typed Wasm expression` exit 70、amu bb51dc14）。`split` / `join`（`[:list :string]` は `typed-list-new` と `vector-count` しか admit しない。regex arity は障害ではない —— `#\"…\"` literal は reader 拒否）。`lower-case` 等（bounded table は可能、未着手）。
+- oracle: `clojure.string` 48/48 + 28 入力 × 4 + reverse 14、空白述語は **12,575 code point** 走査で不一致 0。`kotoba.string` 28 byte case + 37 utf16 case × 2。stdlib 15 list × 10 関数 + partition + 安定性 + fuel 天井。
+- 検証: U+00A0 を空白にし `sort-by` を不安定にすると oracle 2 ns が exit 1（8 failures）、無改変で触った 5 ns 36 tests / 522 assertions exit 0。全 suite は `grammar-authority-test` / `safety-qualification-test` の 10 fail + 2 error が sibling checkout drift の pre-existing。
+- 残件だった `surface-status.edn :portable-source-stdlib :release`（`0.2.0` のまま）は、下記の文書 commit で `0.3.0` に直した。
+
+### 3a' / 4a'. 文書の追随（着地 2026-09-02）
+
+- kotoba-lang `9336e582`: `guest-grammar.edn :sugar :type-directed-arithmetic`（forms `+ - * / < > <= >= =`、`/` が admitted head に入る。vendored copy `resources/kotoba/lang/guest-grammar.edn` をバイト一致で更新）、`surface-status.edn :no-implicit-numeric-conversion`（`:intentional-semantic-simplification`、resolution の実測状況・拒否 code・fail-closed guard・loop / f64 の pre-existing gap）、`:portable-source-stdlib :release 0.3.0`、`stdlib.edn` の STALE 記録を閉じた、`docs/lang/surface-matrix.md` 再生成。
+- 検証: surface-matrix / surface-status-citations / documentation-contract / conformance-matrix / stdlib-manifest / grammar-authority の 6 ns、50 tests / 429 assertions exit 0。vendor 更新と再生成の前は同じ run が 6 failures exit 1（vendor drift 4 + surface matrix stale 1 + 派生 1）だった。
+
+### west pin（着地 2026-09-02）
+
+- superproject `63b63ff1`（`west-pin-put-batch.cljs`、5 entry とも default branch 到達性と前進を検査済み）: kotoba-kir `b6bfe238` → `1e00f830`、kotoba-hir `808c3adc` → `ac8e7051`、kotoba-sema `74ac0d72` → `e42b74ef`、codebase `40b3d533` → `c19a0ff8`、kotoba-lang `aa9b49f0` → `9336e582`。共有 checkout は `west update --fetch smart` で同 sha に同期済み。
+- amu の pin は下記の merge の後に別 commit で前進させた。
+
+### 2b / 3c. amu が abort と TDNR を consume（着地 2026-09-02）
+
+- amu `7e8f06d7`（PR #747 の merge commit。amu の main は branch-protected で `/merges` は 409、`gh pr merge --merge` で着地。required check 13 本 green）。deps.edn: kotoba-sema `e42b74ef` / kotoba-hir `ac8e7051` / kotoba-kir `1e00f830`、`deps-lock.edn` 再生成。kotoba-lang は deps に pin されておらず、vendored `guest-grammar.edn` は `9336e582` とバイト一致。
+- **bump で割れた床**: `throw` する helper と `try` する `main` の module は `capability policy denies required effects` で落ちた。module row `#{:abort}` に対し `kotoba.kir.admission/check` は `required − allowed` を取り、`:allow` は `[:cap/call <int>]` しか書けないので `:abort` は「要求されるが誰も grant できない」member だった。新 `src/kotoba/compiler/effect_row.cljc`（両 route）: `grants` が既知の control effect `#{:abort}` を admission 前に除き、未知 member は admission に届いて拒否される。報告は推論どおりの row（`check` は `:effects #{:abort}` を出し、provenance の HIR は不変）。guard した箇所は admission 呼び出し 7（`core.clj admit!`、`nbb/cli.cljs`、`nbb/wasm_cli.cljs` × 3、`receipt.clj create / verify`）+ `test_profile.clj` の分解 2。amu ADR 0294「abort is a row member nobody can grant」。
+- 実測（nbb `--jvm-free`、JVM route は全 probe で `.wasm` バイト一致）: (a) throw / try の module は wasm32 2,049 byte、`browser-host.mjs` で `main()` = **16n**、`check` は `:admission {:required #{} :minimal-policy {:allow #{}}}`。(b) 未処理 abort の export は exit 65、`:kotoba.error/abort-unhandled-export`、文言は sema と一致。(c) `(+ a b)` on f64 は bump 前 `expected i64, got f64` → 後は compile 成功、`.wasm` は `f64-add` 綴りと**バイト一致**。(d) `examples/todo-app.kotoba`（7,144 byte）と `examples/evm-answer.kotoba` は `.wasm` と `.provenance.edn` が bump 前後で**バイト一致**（golden は bump 前に採取）。wasm32 の emitter に `[:result T E]` / `:abort` の gap は無かった。
+- 検証: 全 suite 1,241 tests / 8,971 assertions / 0 failures exit 0（load ~200 で 19 分）。bump 直後は 3 fail + 3 error で、全部 bump 由来（kir pin の `aggregate_abi_test`、f64 同士の `=` が拒否されなくなった test は混合 pair の拒否を assert する形に、ambient negative corpus から `throw` を除去）。新 `effect_row_test.clj` + nbb corpus（`abort-callee` を wasm32 / wasm32-browser で）、raw `admission/check` が `:missing #{:abort}` で今も拒否することを pin（seam を外せる日を告げる tripwire）。`grants` を恒等にすると JVM 7 fail / 4 error exit 1、nbb 52 中 3 fail exit 1。無改変で JVM 8 / 31 exit 0、nbb 52 / 0 exit 0。
+- gap（報告のみ）: kotoba-kir `effect-row-from-hir` は `:abort` を含む row を `effect row member is not a wire capability call` で拒否する（amu はまだ呼んでいない。呼ぶ日に keyword を学ばせる）。native target は `(:effects hir)` を kexe に seal するが、aborting module は `[:result T E]` が word-typed admission gate で先に落ちるので seal 以降は未測定。`backend/evm.cljc` は非空 row を全部拒否するので aborting module も拒否（EVM は `[:result T E]` を lower できないので意図的に据え置き）。
+- **観測（是正は本 ADR の範囲外）**: amu の main では GitHub Actions が required check として実際に走っている（ADR-2607300900「CI/CD は murakumo fleet、Actions を使わない」と食い違う。org 単位で止まったのは com-junkawasaki / gftdcojp で、kotoba-lang は動いている）。
+
+### 残件（この ADR が次に指す先）
+
+1. `:state` ability（決定節のとおり。前提 4 つのうち vacuous な「handle は値でない」を先に赤にする）。
+2. abort slice 2: operand 位置（ANF）、非 strict 伝播、export 境界の `[:result T E]` ABI 化、loop / lazy / facet scope（`:checked-lexical-facet-unwind`）、wasm32-kotoba-v1 / native 資格。`effect-row-from-hir` に `:abort` を教える。
+3. `ex-info` / `ex-data` の compat 層（abort の E を document にする）。
+4. identity 2 実装の統一（`:direction :typed-code-adopts-definition-identity`、versioned schema。persisted な typed-code CID の有無が UNVERIFIED なので、先に store を列挙する）。
+5. HAMT / RRB を stdlib の純粋定義で、`for` の有界 desugar、`lower-case` 等の bounded table。
+6. compile cache を定義 CID キーに（adr-2608550000 の L2.5 に接続。指標は再コンパイル定義数）。
+"}]
