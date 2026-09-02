@@ -3771,5 +3771,19 @@
    :script-args []
    :include-ext [".cljs" ".edn"]
    :min-files 3 :cd false}
+  ;; yui funnel-coverage (yui-h4 publish-funnel-per-domain, measured
+  ;; 2026-09-02): counts doors exposing a MACHINE-READABLE funnel surface
+  ;; (json/edn). isekai's /api/funnel returns 200 text/html — the SPA
+  ;; fallback — so the check reads content types, not status codes (the
+  ;; endpoint-health lesson: a 200 is not health). Measured floor 3/5
+  ;; (kotobase.json, isekai fork-stats.edn, itonami.json); murakumo and
+  ;; kotoba.cloud are the yui-h4 work list. --min 3 now, raise when a door
+  ;; publishes. Verified red at --min 4.
+  {:name "yui" :id "yui-funnel-coverage" :org "cloud-itonami"
+   :gate :nbb-script
+   :script "gates/yui-funnel-coverage-check.cljs"
+   :script-args ["--min" "3"]
+   :include-ext [".cljs" ".edn"]
+   :min-files 3 :cd false}
   ;; ────────────────────────────────────────────────────────────────────────
   ]}
