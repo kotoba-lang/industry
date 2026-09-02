@@ -191,6 +191,19 @@ Unison 構文の採用、汎用 effect handler と continuation 捕捉、global 
 - oracle: **15,587 code point**（U+3100 未満の全部 + JVM がどこかに写す全 3,037 —— 生成器が取りこぼした写像も掃けるよう JVM に訊いて集めた）と、別に 244 の複数 code point 文字列。table は `scripts/gen_case_tables.clj` が生成（再生成でバイト一致）。Kotoba に code point → 文字列の構築子が無いので、各 block は連続範囲の写像先を並べた literal を `(* width (- point lo))` で索く形。**oracle は循環していない** —— Kotoba 側（offset・width・切り出し・走査）を走らせて答えを比べる。wasm32 で 25,908 byte。
 - 検証: `balance` から左偏の回転を落とすと exit 1 だが**落ちるのは `avl-height-bound-holds` 1 本だけ**（keys / vals / count / get / min / max / fold は全部通る。test の docstring がまさにその点を述べている）。`ß` → SS を落とすと 2 test 3 assertion が exit 1。無改変でそれぞれ 7 / 29 と 8 / 45 が exit 0。全 suite 337 tests / 2,384 assertions の 10 fail + 2 error は `grammar-authority` と `safety-qualification` の sibling checkout 読みで、**別 worktree の無改変 origin/main で同一集合を実測**した pre-existing。
 
+### 7. 過剰引数が拒否されるようになった —— 検査は在ったが、測る前に form が短くされていた（着地 2026-09-02、第 2 反復）
+
+- kotoba-sema `c031dd34`。上記 2c で見つけた穴を塞いだ。
+- **根本原因が、この workspace が繰り返し踏む形そのものだった。** `elaborate-named-ability` の call 分岐が引数を `(map f args expected-arg-types)` で歩いていた。**2 コレクションの `map` は短い方で止まる**ので、過剰引数の call はこの分岐から**短くなって出てくる**。その後 `validate-expr` の arity 検査は —— 正しく、最初から在ったのに —— **短くされた後の form** を測って通していた。つまり「検査が無かった」のではなく「検査が別のものを測っていた」。修正は count をその場で検査し、index で歩く（`map-indexed` + `(nth param-types index nil)`）ことで、`:params` と `:param-types` の将来の不一致が二度と form を短くできないようにした。
+- 実測表（before → after）: `(two 1 2 3)` と `(two 1 2 3 4 5)` は **admit されて 3 を返していた** → `function call arity mismatch: two takes 2 arguments; got 3|5`（`:kotoba.error/call-arity`、ex-data に `:function :expected :supplied`）。不足引数は元から拒否（`:subset-reject`）→ 同文言で `:call-arity` に統一。multi-arity・`defdesugar`・組込み・`if` は元から両方向で拒否されており**文言はバイト不変のまま** ex-data だけ足した（`no matching multi-arity clause` は amu が `=` で比較しているため）。
+- **ADR 0007 の `if` arity は clone 時点で既に閉じていた**（`if-parts` が arity ≠ 3 を拒否し `let_body_test` が pin）。同じ根本原因（destructuring が余りを表現できない pass が form を再構築する）で、既に修正済み。
+- byte-identity golden: multi-arity と closure の 2 本を **JVM / cljs 両方**で修正前に digest（`pr-str` が bigint を JVM では 42、cljs では 42n と書くため runtime ごとに要る）。8 つの digest すべて修正後も不変。
+- 検証: 新 ns `call-arity-test` 22 tests / 40 assertions —— **修正前 exit 1（14 failures）、修正後 exit 0**。JVM 全 suite 254 / 1222 exit 0、nbb 95 / 256 exit 0。**既存の test も fixture も 1 つも編集していない** —— この repo に穴に依存していたものは無かった。
+- **拒否しないまま残したもの 2 件**（ADR 0011 に理由付きで記録）:
+  1. **closure を誤 arity で呼ぶと compile は通り、実行時に `division-by-zero` で trap する。** closure 値の arity は静的な事実ではない（`invoke` は closure id で dispatch し、arity N の dispatcher はそのモジュールの arity N の lambda だけを持ち、末尾が `(quot 1 0)` の fallback）。**誤った個数が答えを返すことは無い**が、message が間違いではなく trap の道具を名指す。専用 trap を与えるのは frontend ではなく kir の lowering の話。`let` 束縛の `fn` literal だけに静的検査を足す案は**退けた** —— 1 つの綴りだけ拒否して他は trap のまま、というのは**まさにこの欠陥を生んだ部分 guard の形**だから。
+  2. 組込みの族単位の文言（`string operation arity mismatch` 等）は両方向で拒否済みだが、operation ではなく族を名指し、個数を出さない。約 30 箇所に散る別の小さな欠陥。今閉じた方向を将来の表拡張が再び開けないよう pin してある。
+- **`orgs/kotoba-lang` 配下 5,803 本の `.kotoba` / `.cljk` を screen して過剰引数の候補は 0 件**。ただし screen は近似（同一ファイル内の `defn` のみ、型注釈と destructuring の扱いが粗い）で、**過剰に報告する screen が 0 を返したことは、壊れないと期待する理由ではあっても証明ではない**と自ら記録している。
+
 ### 残件（この ADR が次に指す先）
 
 1. `:state` ability（決定節のとおり。前提 4 つのうち vacuous な「handle は値でない」を先に赤にする）。
