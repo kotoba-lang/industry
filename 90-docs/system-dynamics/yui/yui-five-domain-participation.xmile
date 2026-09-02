@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmile version="1.0" xmlns="http://docs.oasis-open.org/xmile/ns/XMILE/v1.0">
+  <header>
+    <vendor>cloud-itonami/yui</vendor>
+    <product version="1.0">yui-five-domain-participation</product>
+    <name>yui five-domain shared participation funnel</name>
+  </header>
+  <sim_specs method="euler" time_units="week">
+    <start>0</start>
+    <stop>104</stop>
+    <dt>0.25</dt>
+  </sim_specs>
+  <model name="yui_five_domain_participation">
+    <sim_specs method="euler" time_units="week">
+      <start>0</start>
+      <stop>104</stop>
+      <dt>0.25</dt>
+    </sim_specs>
+    <variables>
+      <flow name="Doors_Visit">
+        <eqn>MIN(3376 + 0 * Contributors + rep_to_reach * Reputation, Unaware / DT)</eqn>
+      </flow>
+      <aux name="conv_active_contrib">
+        <eqn>0.1</eqn>
+      </aux>
+      <stock name="Active">
+        <eqn>0</eqn>
+        <inflow>Activate</inflow>
+        <outflow>Active_Churn</outflow>
+        <outflow>Contribute</outflow>
+      </stock>
+      <aux name="rep_to_reach">
+        <eqn>2.0</eqn>
+      </aux>
+      <stock name="Signed_Up">
+        <eqn>0</eqn>
+        <inflow>Signup</inflow>
+        <outflow>Activate</outflow>
+        <outflow>Signup_Churn</outflow>
+      </stock>
+      <aux name="conv_visit_signup">
+        <eqn>0.0065263</eqn>
+      </aux>
+      <stock name="Reputation">
+        <eqn>0</eqn>
+        <inflow>Rep_Gain</inflow>
+        <outflow>Rep_Decay</outflow>
+      </stock>
+      <aux name="visitor_half_life">
+        <eqn>0.5</eqn>
+      </aux>
+      <aux name="signup_churn">
+        <eqn>0.02</eqn>
+      </aux>
+      <flow name="Signup_Churn">
+        <eqn>Signed_Up * signup_churn</eqn>
+      </flow>
+      <aux name="conv_signup_active">
+        <eqn>0.5</eqn>
+      </aux>
+      <flow name="Active_Churn">
+        <eqn>Active * active_churn</eqn>
+      </flow>
+      <flow name="Rep_Gain">
+        <eqn>Contribute * rep_per_contrib</eqn>
+      </flow>
+      <aux name="referral_half_life">
+        <eqn>2</eqn>
+      </aux>
+      <stock name="Unaware">
+        <eqn>400000</eqn>
+        <outflow>Doors_Visit</outflow>
+      </stock>
+      <flow name="Contribute">
+        <eqn>Active * conv_active_contrib</eqn>
+      </flow>
+      <aux name="contributor_churn">
+        <eqn>0.02</eqn>
+      </aux>
+      <aux name="active_churn">
+        <eqn>0.05</eqn>
+      </aux>
+      <flow name="Signup">
+        <eqn>Door_Visitors * conv_visit_signup</eqn>
+      </flow>
+      <stock name="Door_Visitors">
+        <eqn>0</eqn>
+        <inflow>Doors_Visit</inflow>
+        <outflow>Signup</outflow>
+        <outflow>Visitor_Expire</outflow>
+      </stock>
+      <aux name="rep_per_contrib">
+        <eqn>0.2</eqn>
+      </aux>
+      <flow name="Rep_Decay">
+        <eqn>Reputation / referral_half_life</eqn>
+      </flow>
+      <flow name="Contributor_Churn">
+        <eqn>Contributors * contributor_churn</eqn>
+      </flow>
+      <flow name="Visitor_Expire">
+        <eqn>Door_Visitors * visitor_half_life</eqn>
+      </flow>
+      <stock name="Contributors">
+        <eqn>0</eqn>
+        <inflow>Contribute</inflow>
+        <outflow>Contributor_Churn</outflow>
+      </stock>
+      <flow name="Activate">
+        <eqn>Signed_Up * conv_signup_active</eqn>
+      </flow>
+    </variables>
+  </model>
+</xmile>
