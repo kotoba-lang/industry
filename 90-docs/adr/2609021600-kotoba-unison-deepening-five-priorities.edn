@@ -299,6 +299,19 @@ west pin を 5 件前進させ checkout を同期した直後に、今日直し�
 - **merge 中に digest の借りが動いた**: kotoba-lang が admitted builtin を 1 つ増やしたので、**112 head あった差が 1 head になった**（0 ではない）。片側を丸ごと採ると同僚の測定か自分の resync のどちらかを捨てることになるので、**両方の literal を残して「等しくないこと」を assert** し、差が閉じたら 2 つ目が退役するようにした。
 - **set まわりの 3 つの overclaim は 3 つとも確認され、しかも報告より広かった。** `:conj` / `:disj` に lowering が無いだけでなく、**`contains?` も typed set では拒否される**（正しい拒否だが、authority が `:set-literal` の `:operations` にまだ載せている）。さらに **authority が自分の証拠として挙げている fixture `lang/conformance/collections/set.kotoba` が、amu route の 2 target で `expected keyword, got i64` に落ち、legacy emitter でだけ動いて 1 を返す**。その case は `:required-backends #{:kir :wasm32-kotoba-v1}` を宣言しているのに、**実際に走らせている場所は manifest の `:backends` map が名指してすらいない emitter だけ**だった。`:kir` が走らせるかは未測定。`surface-status.edn` は指示どおり触っていない（別途着手）。
 
+### 14. 壊れた probe から、宣言型を取る全 head の穴が出た（着地 2026-09-03、第 3 反復）
+
+- kotoba-sema `ad8755ea`、ADR `docs/adr/0031-a-declared-type-of-the-wrong-shape.md`。私が 12 で書いた probe は壊れており、その壊れ方が compiler を crash させた。
+- **crash は `typed-map-get` ではなかった。** それは非 map 型を正しく拒否する。落ちていたのは **`option-value-of`** で、lowering が宣言型から `(second (first args))` を**形の検査なしに**読んでおり、`(second :i64)` は host のエラー（nbb では `:i64 is not ISeqable`、JVM では `Don't know how to create ISeq from: Keyword`）。probe が malformed だったのは事実だが、**malformed な入力で compiler が crash するのは入力の欠陥ではなく compiler の欠陥。**
+- **1 件を直さず、形を掃いた。** 宣言型を取る head を総当たりした（115 head × arity 1〜5 × 誤った形 6 種）ところ、**nbb で 76 件、JVM で 36 件の生の host error** が出て、3 系統に分かれた: ①option / result の lowering 6 分岐が無防備に分解している ②record の 3 分岐が `(nth type 2 nil)` を使っている（既定値付きでも keyword には throw する）③**`validate-value-type!` が型を hash して `contains?` を答えている** —— `.kotoba` の整数 literal は JS の bigint なのでこれを生き延びられない。**これが nbb と JVM で 42 プログラム分の差の正体**で、ADR 0012 が 2 例記録した `:cljs` bigint 欠陥の**3 例目**。隣の typed-set / typed-map 分岐が既にやっていた形で全部 guard した。修正後は**両 runtime で生の host error 0、internal failure 0**。
+- **原因を持たない internal error を直した。** 3 つの per-expression chokepoint に `internal-failure!` を置き、逃げた host error に**どこから逃げたか**を名乗らせる。amu の redaction は残した（それが唯一 envelope に写る field なので、flag や stderr を足すと別 repo の変更になる）。CLI 実測: 前は `{:code :kotoba/internal-error, :source p6.kotoba}` だけ、後は `{:code :kotoba.error.internal-operation/option-value-of, :span {:line 2 :column 36 …}}`。**code に綴るのは `reserved-function-names` の head だけ**なので、利用者が選んだ名前は外に出ない。host の stack 枯渇は例外扱い（包むと本物の `:host-nesting-exhausted` が internal failure に格下げされ、nbb の test が捕まえた）。
+- **非対称は「拒否が正しく、message が間違っていた」。** ADR 0012 の決定 1 が、keyword key の literal は legacy の untagged pair-map を**バイト単位で**保つと決めている（`map-get` / `map-assoc` と全 `match` の map pattern がそれに対して書かれているため）。retype したのは `:i64` と `:string` だけ。だから p4 / p8 の拒否は正しく、一般的な `expression type mismatch` が正しいプログラムの欠陥のように読めていただけ。message は今、legacy 表現であること・いつそうなるか・代わりに何を書くかを述べる。**agent は自分の最初の文言も訂正している**（`(let [m {}] …)` も同じ拒否に届くので「i64 key の map literal」は二重に偽だった）。
+- byte-identity: well-formed な lookup と keyword-map プログラムの wasm が pin 側と自分側で同一 digest、`main()` も同値。検証は新 ns が修正前 JVM exit 1（21 failures）/ nbb 25 failures、修正後**両方 exit 0**（13 tests / 49 assertions）。掃き取り test は `scanned >= 2000` の床付き。全 suite は JVM 325 / 1480、nbb 170 / 550、いずれも exit 0。
+- **brief の外で 1 件**: 上流が入れた `set_operations_test.cljc` が **runner の 2 つのリストどちらにも登録されておらず、`:cljs` 側が一度も走っていなかった**（そのファイル自身の header が両方に要ると書いている）。登録した（nbb 163 → 170）。
+- **amu の bump が要る、かつ bump する人が知るべきことが 2 つある**:
+  1. **pin と一緒に文法も動く。** amu の deps.edn の規則は、自分が vendor する `guest-grammar.edn` が pin した sema の複製と等しいこと。sema@`1a073853` は `3e3f9748`、sema@`ad8755e` は `6e1202fd`（変えたのは上流の set-operations commit であってこの修正ではない）。
+  2. **その不変条件は amu の tip で既に破れている。** deps.edn のコメントは `3e3f9748` と主張しているのに、`6c245f69` のファイルは実際には **`67561e57`** を hash する。**amu の申告が amu 自身のファイルを説明していない。**
+
 ### 残件（この ADR が次に指す先）
 
 1. `:state` ability（決定節のとおり。前提 4 つのうち vacuous な「handle は値でない」を先に赤にする）。
