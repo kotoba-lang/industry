@@ -3010,4 +3010,47 @@
    :writes   :none
    :interval-ms 43200000
    :timeout-ms  600000}
+
+  {:id       :verify-itonami-run-path
+   :title    "the run path the resident is configured to take, against the tree it would take it in"
+   :why      "2026-09-02: cloud-itonami-app PR #270 landed as \"Guest wasm run path;
+              leftover JVM aliases deleted (**not JVM-removed**)\" -- it deletes
+              :server, :mcp and :cli from deps.edn and replaces the launchers with
+              nbb hosts that load a wasm guest. The parenthetical is the finding:
+              deleting a run path and porting what ran on it are indistinguishable
+              from the tree, because in both cases the alias is gone.
+
+              What separates them lives in a different file. The launchd plist
+              dev.cloud-itonami.app still reads `clojure -M:server`. Production did
+              not notice for one reason that is not a safeguard: ~/.cloud-itonami/
+              current points at a release cut BEFORE #270, so the alias the plist
+              names still exists in the release it names. The next release flips
+              that, and a resident whose launch command does not resolve does not
+              fail loudly -- launchd KeepAlive restarts it forever and the port
+              stays closed.
+
+              Measured the day it landed, on three real trees rather than fixtures:
+              the west checkout (pre-#270) and the running release are both green on
+              all three legs; origin/main is red on all three. The registry says
+              what the denominator is -- 407 routes / 208 commands generated from
+              server.clj's own cond -- so `two routes served` is a number here and
+              not a caveat in a commit message.
+
+              CANNOT be a fleet gate: the target is a west-managed checkout under
+              orgs/, which a gate's single-repo tree does not carry. It also reads
+              a plist in the operator's home, which no node has."
+   :argv     ["nbb" "--classpath" ".:scripts/nbb_compat"
+              "{{repo}}/scripts/verify-itonami-run-path.cljs" "--findings"
+              "--root" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   ;; Read 2026-09-02, not assumed: the script's only fs writes are mkdirSync /
+   ;; writeFileSync / rmSync inside `fixture!` and `plist!`, which run under
+   ;; --self-test alone and only beneath TMPDIR.
+   :writes   :none
+   :interval-ms 21600000                 ; 6h -- a release flip or a pin advance is
+                                         ; what changes the answer, and both are
+                                         ; day-scale events
+   :timeout-ms  120000}                  ; 2m -- measured 1.4s wall, three legs
 ]}
