@@ -231,6 +231,22 @@ Unison 構文の採用、汎用 effect handler と continuation 捕捉、global 
 - 検証: 新 ns は修正前 exit 1（13 tests / 53 assertions、8 failures + 26 errors）、修正後 exit 0。全 suite は merge 後 JVM 296 / 1363 exit 0、nbb 143 / 441 exit 0。既存 fixture で `:i64` 既定に依存していたものは無し。
 - **end-to-end を対照付きで測った**: amu は sema を `:git/sha` で pin するので、自分の clone の `src` だけを amu の launcher が組む classpath の先頭に足して `wasm_cli.cljs` を直接叩いた。**対照**として pin 側の sema（自分の base の祖先）を同じ classpath で走らせると probe は今も exit 65 —— これが「prepend が答えを変えた」ことを言う。自分の sema では `compile --target wasm32` が 455 byte を出し `main()` = 3。⚠ `resources` まで prepend すると `Could not find namespace: kotoba.artifact.core` で壊れる（resource shadowing）。`src` だけにする。
 
+### 9. map の key —— 型は最初から一般的で、狭かったのは friendly surface だった（着地 2026-09-02、第 3 反復）
+
+- kotoba-sema `cc2f5139`、kotoba-kir `ad6db332`、kotoba-lang `f41daf33`。
+- **前提が実測で 2 つ覆った。**
+  1. `[:map K V]` は **最初から K に対して一般的だった**。`typed-map-*` の全 op が `:i64` / `:string` / `:bool` / record を admit し、`:f32` / `:f64` を既に拒否していた。狭かったのはその上の friendly surface で、しかも **`assoc` は keyword を key に持つ typed map すら拒否していた**（`expected map, got [:map :keyword :i64]`）。「map は keyword 専用」という読みは症状であって原因ではなかった。
+  2. **record key は非決定的ではない。** 私の指示は「record は構造的等価だから決定的にできないだろう」と仮定していたが、順序は `compare-typed-values` が持つ言語側のもので、record を key にした map は**既に end-to-end で動いていた**。拒否していたら退行だったので、仮定を捨てて実測を記録した。
+- 結果: `:i64` と `:string` は literal・`get`・`assoc`・`contains?`・`dissoc`・`entry-at` の全経路で admit。`:bool` は literal だけ名指しで拒否（他は admit）。`:f64` / `:f32` は理由付きで拒否（**NaN は自分自身と等しくなく、+0.0 と −0.0 は等しいのにビットが違う** —— 可搬な key identity が無い）。probe は exit 65 → 0 になり wasm32 まで通る。
+- **順序は言語が持つ**（`kir.value/bounded-typed-value!` が key 型ごとに再ソートするので、書いた順に依存しない）: i64 は符号付き数値順、**string は UTF-16 code unit 順**（collation ではない —— 大文字が小文字より前）、keyword / symbol は印字テキスト順、bool は false → true、record は field ごと。
+- 拒否はすべて厳密な文言で pin（float key の理由、`:f64` と `:f32` を分けた 2 文言、**map の value に `:f64` は別の事実**（value に順序は要らない）、key の kind 混在、literal の entry 上限 31、非 typed-map 受け手には `typed-set-contains` / `typed-set-disj` を指す文言、`contains?` / `dissoc` の予約名）。
+- **この作業が既存の `:cljs` 欠陥を 2 つ露出させた**（どちらも先に origin/main で測ってから直した）:
+  1. `annotate-doseq-collection-kinds` が map literal を `(into {} …)` で作り直していた —— 8 entry を超えると promote して key を hash するが、`.kotoba` の整数 literal は **bigint**。9 entry の整数 key literal は **desugar より前に** `Cannot create property closure_uid on bigint` で死に、reader の comparator も捨てられていた。
+  2. `compare-typed-values` が i64 に `clojure.core/compare` を使っていた。**これは最初「wasm32 backend の欠陥」と誤測定された** —— `compile --target wasm32` が oracle を `lower` 経由で評価するので、2 entry の `[:map :i64 :i64]` が exit 70 の internal compiler error になっていた。1 entry は通り 2 entry は通らない、`:bool` / `:string` / `:keyword` は何個でも通る、というパターンが原因を指した。**自分の誤測定を訂正して報告している。**
+- stdlib: **`frequencies` が `:absent` から出た**（i64 key、本物の `clojure.core/frequencies` と一致）。**`get-in` は absent のままだが理由が置き換わった** —— Clojure では path は値だが、ここでは path が**型の一部**なので、1 段の path は内側の map を、2 段の path は i64 を返す。keyword key の問題ではなく単相性の問題だった。旧理由は `:was` の下に残してある。深さを名前に持つ `get-in2` を追加（`comp2` / `juxt2` と同じ流儀）。stdlib は version 5 / release 0.5.0、新 case は wasm32 5,126 byte で `main()` = 3555086133、既存 3 case に退行なし。
+- 検証: sema の新 ns は修正前 exit 1（21 tests / 50 assertions、20 fail + 23 error。通った 3 つは byte-identity 対照 2 つと無退行 case）、修正後 exit 0。sema 全 JVM 283 / 1310 exit 0、nbb 130 / 388 exit 0。kir の新 ns は修正前 13 errors、修正後 8 / 15 exit 0。**kotoba-lang の stdlib ns は古い sema pin では 767 errors** で、新しい pin で 37 / 1018 exit 0。
+- **意図的に残したもの（理由が良い）**: `lang/guest-grammar.edn` は今も `:contains?` を「bounded set membership scan」、`:dissoc` を「persistent bounded map filter」、`:map-literal` を keyword 専用と書いている。修正を書いた上で**revert した** —— このファイルは複数 repo に**バイト単位で複製**されており、1 repo だけ直すのは drift だから。調整版の 1 パスとして別に着手する（下記）。`lang/q9-kotoba-candidate-verification.edn` も 3 箇所で古い測定を現在値として持っている。`(let [m {}] (assoc m 1 10))` は今も明示 `typed-map-new` が要る（`m` の型は束縛時に決まる。これは推論ではなく書き換えの話）。map literal の value 型は `[:map K :i64]` 固定で、これが今回いちばん大きな残件。
+
 ### 残件（この ADR が次に指す先）
 
 1. `:state` ability（決定節のとおり。前提 4 つのうち vacuous な「handle は値でない」を先に赤にする）。
