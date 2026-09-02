@@ -1,6 +1,6 @@
 {:contract/id "awai-murakumo-basho-hokusai-routing"
- :contract/version 3
- :contract/as-of "2026-09-01"
+ :contract/version 4
+ :contract/as-of "2026-09-02"
  :contract/status :frontdoors-live-fail-closed
  :contract/active? true
  :contract/advertise-models? false
@@ -23,27 +23,54 @@
             :webhook :optional-signed
             :usage-accounting :output-seconds-and-variant}}
  :artifacts
- {:basho {:planned-base "Qwen/Qwen3.8-Flash-Next"
+ {:basho {;; Owner decision 2026-09-02 (root ADR-2609021200): the API base is
+          ;; GLM-5.3, served as the vendors' shared serverless catalog model.
+          ;; v3 said Qwen/Qwen3.8-Flash-Next; that was the plan for the
+          ;; fine-tune, which remains a later artifact.
+          :planned-base "zai-org/GLM-5.3"
+          :api-base-state :upstream-base-serving-not-fine-tuned
           :fine-tuned-revision nil :content-id nil :state :not-trained}
   :hokusai {:planned-base "MiniMaxAI/MiniMax-H3"
             :fine-tuned-revision nil :content-id nil :state :not-trained}}
+ :residency
+ {;; 「常駐しても月額 20 万円を超えない構成」— what "resident" means here.
+  ;; A dedicated always-on GLM-5.3 replica is >= 8xH100 (~$52/h, measured
+  ;; vendor list prices 2026-09-02) and cannot fit; the shared serverless
+  ;; catalog model has no idle cost and no cold start, so it IS always
+  ;; available, and the gateway's monthly budget is what bounds it.
+  :basho {:mode :serverless-shared-catalog
+          :dedicated-replicas 0
+          :monthly-budget-jpy 200000
+          :jpy-per-usd-pinned 160
+          :jpy-per-usd-as-of "2026-09-01"
+          :budget-usd-micros 1250000000
+          :price-usd-micros-per-mtok {:in 1400000 :out 4400000}
+          :enforced-by "cloud-murakumo-api self_models budget (MURAKUMO_BASHO_MONTHLY_BUDGET_JPY)"
+          :exhausted-response {:http-status 503
+                               :code "self_model_monthly_budget_exhausted"}
+          :overshoot-bound "concurrency x per-request reservation (read-then-append ledger); vendor spend limit is the second floor"}}
  :backends
  {:basho
-  {:baseten {:kind :custom-deployment
-             :serverless :scale-to-zero
+  {:baseten {:kind :serverless-model-api
+             :serverless :shared-catalog-pay-per-token
              :minimum-replicas 0
+             :endpoint "https://inference.baseten.co/v1/chat/completions"
+             :served-model "zai-org/GLM-5.3"
              :endpoint-env "MURAKUMO_BASHO_BASETEN_ENDPOINT"
              :credential-secret "MURAKUMO_BASHO_BASETEN_API_KEY"
              :deployment-revision-env "MURAKUMO_BASHO_BASETEN_REVISION"
-             :state :artifact-not-deployed}
-   :together {:kind :custom-model-dedicated-endpoint
-              :serverless :not-scale-to-zero
-              :eligibility :base-or-container-access-not-confirmed
-              :idle-policy :stop-endpoint-after-validation
+             :ready-env "MURAKUMO_BASHO_BASETEN_READY"
+             :state :credential-not-provisioned}
+   :together {:kind :serverless-model-api
+              :serverless :shared-catalog-pay-per-token
+              :minimum-replicas 0
+              :endpoint "https://api.together.xyz/v1/chat/completions"
+              :served-model "zai-org/GLM-5.3"
               :endpoint-env "MURAKUMO_BASHO_TOGETHER_ENDPOINT"
               :credential-secret "MURAKUMO_BASHO_TOGETHER_API_KEY"
               :deployment-revision-env "MURAKUMO_BASHO_TOGETHER_REVISION"
-              :state :access-not-confirmed}}
+              :ready-env "MURAKUMO_BASHO_TOGETHER_READY"
+              :state :credential-not-provisioned}}
   :hokusai
   {:baseten {:kind :custom-deployment-async-queue
              :serverless :scale-to-zero
@@ -64,11 +91,12 @@
  :routing-policy
  {:default :fail-closed
   :provider-order [:baseten :together]
-  :provider-order-rationale "Baseten custom deployments and scale-to-zero are available now; Together is gated on compatible-base or Dedicated Container access. Remeasure before GA."
+  :provider-order-rationale "Both vendors serve zai-org/GLM-5.3 serverless at the same list price ($1.40/$4.40 per Mtok); Baseten first because its cached-input price is lower ($0.14 vs $0.26) and it was the primary already. Remeasure TTFT/tok-s before GA."
   :vendor-urls-public? false
   :credentials-in-requests-responses-or-logs? false
   :select-backend-only-when [:endpoint-configured :credential-configured :healthy
-                             :capacity-confirmed :artifact-revision-matches]
+                             :capacity-confirmed :artifact-revision-matches
+                             :monthly-budget-not-exhausted]
   :fallback-only-when [:same-artifact-content-id :compatible-capabilities
                        :healthy :capacity-confirmed]}
  :readiness-gates
@@ -81,11 +109,23 @@
                         :usage-accounting-passed
                         :price-capacity-and-data-policy-published
                         :representative-uptime-measured]
+  :basho-internal-route [:vendor-credential-provisioned
+                         :provider-revision-attested-equal-to-artifact
+                         :direct-smoke-passed-ready-true
+                         :budget-vars-configured
+                         :budget-read-endpoint-answers]
   :basho-public-smoke [:non-streaming-chat :streaming-chat :usage-token-counts
                        :invalid-model-rejected :backend-timeout-mapped]
   :hokusai-public-smoke [:submit :poll-to-terminal-state :content-download
                          :signed-webhook :invalid-reference-rejected
                          :duration-resolution-and-audio-accounting]}
+ :consumers
+ {:itonami-cloud-agent {:repo "orgs/cloud-itonami/cloud-itonami-app"
+                        :profile "profiles/itonami.edn"
+                        :chat-model "awai-network/basho"
+                        :chat-fallback "z-ai/glm-5.3-flash"
+                        :video-model "awai-network/hokusai"
+                        :adr "docs/adr/0092-itonami-cloud-is-a-cloud-agent-on-murakumo.md"}}
  :merged-implementation
  {:basho {:repo "orgs/network-awai/cloud-murakumo-api"
           :pull-request 194
@@ -125,7 +165,9 @@
  {:trained-models false
   :basho-front-door-live true
   :basho-generation-live false
+  :basho-vendor-credentials-provisioned false
+  :basho-budget-enforcement-merged :see-root-adr-2609021200
   :hokusai-front-door-merged true
   :hokusai-front-door-live true
   :openrouter-model-registration false
-  :note "API boundaries are merged and fail closed. No Basho or Hokusai product checkpoint/backend is live or advertised."}}
+  :note "API boundaries are merged and fail closed. Basho's API base is decided (GLM-5.3 serverless, budgeted); no vendor credential is provisioned in the gateway yet, so no Basho or Hokusai generation is live or advertised."}}

@@ -62,7 +62,7 @@ awai.network は日本語に最適化した独自モデルを開発し、murakum
 
 2. **独自モデルの定義。** upstream model の単純 rename や再配布を独自モデルと呼ばない。awai.network が権利を確認した独自 dataset で fine-tune し、model card、dataset lineage、eval、安全性評価、base-model attribution を揃えた artifact だけを `Basho` / `Hokusai` として申請する。
 
-3. **Basho.** planned base は `Qwen/Qwen3.8-Flash-Next`。公式 card 上は 180B image-text-to-text model で、FP8 variant もある。現在の `basho-fp8-test` は Qwen3.5-9B の infrastructure smoke なので Basho 製品 checkpoint として扱わない。
+3. **Basho.** **API base は `zai-org/GLM-5.3`（2026-09-02 オーナー決定、ADR-2609021200 で改訂）。** Baseten Model APIs / Together とも serverless（従量課金、$1.40 / $4.40 per Mtok in/out）で同一 id を提供しており、murakumo gateway は Baseten → Together の順で route し、**月額 20 万円（pinned 160 JPY/USD で 1,250 USD）の予算を gateway が強制**する（超過は 503 `self_model_monthly_budget_exhausted`）。専用 GPU 常駐は 753B-A40B で 8×H100 以上を要し予算に収まらないので採らない —— 「常駐」は shared serverless catalog（idle 0 / cold start 無し）+ 予算上限を意味する。この upstream base を `awai-network/basho` id で serve するのは **murakumo 内部 route** であって、fine-tune 前に OpenRouter へ Basho として advertise しない。旧記述（2026-09-01）: planned base は `Qwen/Qwen3.8-Flash-Next` —— これは fine-tune 用 base の計画で、artifact としては別に残る。公式 card 上は 180B image-text-to-text model で、FP8 variant もある。現在の `basho-fp8-test` は Qwen3.5-9B の infrastructure smoke なので Basho 製品 checkpoint として扱わない。
 
 4. **Hokusai.** planned base は `MiniMaxAI/MiniMax-H3`。`awai-network/hokusai` は chat model ではなく、native audio を含む asynchronous video generation model として申請する。OpenRouter 自身が `minimax/h3` を video model として掲載しているため modality mismatch はない。public contract は `POST /api/v1/videos` → job id / polling URL → status → content download とし、対応する reference inputs、duration、resolution、aspect ratio、`generate_audio` を capability として宣言する。
 
