@@ -1,0 +1,95 @@
+[{:db/id -1
+  :adr/id "adr-2800010600-gftd-ai-deprecation-and-magatama-host-sdk"
+  :adr/title "gftd.ai is deprecated; and what deleting magatama-host-sdk actually costs"
+  :adr/status "accepted"
+  :adr/date "2026-09-02"
+  :adr/body "## Two owner instructions, 2026-09-02
+
+1. `gftdcojp/magatama-host-sdk` may be deleted.
+2. **gftd.ai is deprecated; refactor everything onto itonami.cloud.**
+
+This ADR records what was measured before acting, including a correction to a
+framing this session itself produced.
+
+## Correction: \"six symbols\" was misleading
+
+The four appviews that depend on the SDK import exactly six names, and this
+session reported that as \"a six-symbol shell\". That is true of the IMPORT
+SURFACE and false about the WORK:
+
+| symbol | where | size |
+|---|---|---|
+| `asAgentTool` / `withCapabilityTags` / `withOCELEvent` | `app-options.ts` | 3 lines each, `CommandOption` setters, touch no database |
+| `nsid` | already exists in `kotoba-lang/xrpc` (`@etzhayyim/xrpc`, `./nsid`) | nothing to move |
+| **`createWorkerExport`** | `index.ts` | calls `createDefaultHostSDK` |
+| **`HostSDK`** | `index.ts` | the interface over the whole host |
+
+`createDefaultHostSDK` builds `app.ts` (993 lines), `host-imports.ts` (1,289),
+the PDS `XrpcClient`, the Hono router and the WIT export surface
+(`httpHandler` / `wHandler` / `serveHandler` / `shinkaHandler`).
+
+**The SDK is 67 files, 68,345 lines.** Two of the six symbols ARE that. Moving
+them is moving the host runtime, not extracting a shell. The option chosen on
+2026-09-02 (\"move the six symbols first, then delete\") was chosen on the
+misleading half of that description.
+
+## Every dependent is dead
+
+| appview | route | measured |
+|---|---|---|
+| `cloud-itonami/media` | media.itonami.cloud | **NXDOMAIN** |
+| `cloud-itonami/news` | news.gftd.ai | timeout |
+| `gftdcojp/ai-gftd-media` | media.gftd.ai | timeout |
+| `gftdcojp/mamori` | mamori.gftd.ai | timeout |
+
+Control: `gftd.ai` itself answers 200 from the same client, so the timeouts are
+the hosts and not the network.
+
+**No itonami.cloud successor exists.** `itonami.cloud/media`, `/news` and
+`/mamori` return 200, but so does `/definitely-not-a-page`, and all four
+responses are the same SHA-256 as the home page — the SPA catch-all
+(`/* /index.html 200`). The same trap this session hit at `/install.sh`, where
+a catch-all 200 would have fed the home page into `sh`. **A 200 from this site
+is not evidence a surface exists; compare the body hash to the home page.**
+
+## What follows
+
+Nothing is live, and the SDK exists only to serve those four. Porting 68,345
+lines of host runtime into kotoba-lang so that four dead appviews keep
+building is work with no consumer. If media / news / mamori are wanted on
+itonami.cloud, that is a build on the itonami stack — which is live and
+already serving — not a port of the gftd-era host SDK.
+
+So the recommendation is **retire rather than migrate**, and the sequencing
+question for the owner is whether the four appviews are retired with it.
+
+## Blocked on the owner either way
+
+The workspace token carries `gist, read:org, repo`. GitHub requires
+**`delete_repo`** for `DELETE /repos/{owner}/{repo}`, so this agent cannot
+delete the repository regardless of the decision. Repository deletion is also
+outside the standing authorization in CLAUDE.md.
+
+## The gftd.ai deprecation surface
+
+**21 wrangler configs across 20 repositories** route to gftd.ai:
+
+    cloud-itonami/media  cloud-itonami/news  gftdcojp/ai-gftd-media
+    gftdcojp/apex  gftdcojp/engi  gftdcojp/fashion  gftdcojp/itad
+    gftdcojp/mamori  gftdcojp/shirabe  net-kotobase/engine
+    net-kotobase/ipfs  network-awai/cloud-murakumo
+    network-awai/cloud-murakumo-api
+    network-awai/cloud-murakumo-api-categories-deploy
+    network-awai/cloud-murakumo-api-codex-categories
+    network-awai/cloud-murakumo-api-codex-categories-final
+    network-awai/cloud-murakumo-llms-codex  network-awai/local-murakumo
+    network-awai/local-murakumo-fastmtp  network-awai/local-murakumo-runpod5090
+
+Four of them are the magatama dependents above. **Liveness was measured only
+for those four** — the other sixteen are unmeasured, and the same catch-all
+trap applies to any of them fronted by a SPA, so check body hashes rather than
+status codes. Do not read this list as sixteen live services needing a port.
+
+The surface index (`90-docs/surface/surface.datoms.edn`) also still carries
+`news.gftd.ai -> orgs/gftdcojp/ai-gftd-news`, a fifth gftd-era repo not in the
+wrangler list."}]
