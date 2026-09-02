@@ -307,4 +307,79 @@ mtime を hash する inventory では live な Hermes home に対して optimis
   実行中の lock を壊しうる）
 - `~/.hermes/cron/jobs.json` が 46 job から 2 job に縮んだ件（14:54:13 JST）の原因は
   未特定のまま。復元はオーナー判断
+
+## closing —— 2026-09-02 の session を閉じるにあたっての現在地
+
+### default branch との差（監査済み）
+
+    com-junkawasaki/root              origin/main 4271ace   behind 0 / ahead 0
+      3585dd1 detector（第 1 版）             ON-MAIN
+      c090093 ADR accepted + 第一波           ON-MAIN
+      ff243cb detector（entry point 一般化）  ON-MAIN
+      4271ace launcher_test の赤 2 件を記録   ON-MAIN
+      96afd03 west 49 pin 前進                ON-MAIN
+    cloud-itonami/cloud-itonami-app   origin/main 48d84ab
+      48d84ab jobs.json の内容ハッシュ        ON-MAIN
+
+**未着地の作業は無い。** branch・worktree・stash とも、この session が作ったものは
+残っていない（root の stash 0、app の stash 2 は 2026-08-14 / 08-20 の別セッション由来で
+触っていない）。PR は作っていない —— 全て server-side merge（`gh api .../merges`）で
+着地させた。
+
+### 検証の現在地（何を測り、何を測っていないか）
+
+| 対象 | 結果 |
+|---|---|
+| `verify-adr-edn-shape` / `docs-edn-check --strict-keys` / `verify-flattened-edn-prose` | この ADR に対して OK |
+| `verify-adr-identity` | 新しい id 衝突・曖昧参照なし |
+| `verify-west-pins` | 変更された pin はありません。OK |
+| detector `--self-test` | 14 checks、各区別の両方向 |
+| detector 実 tree | pre-#270 の 2 tree 緑 / origin/main 赤 3 件 / 現在の設定 緑 |
+| `clojure -M:test`（app） | 2,243 tests / 13,361 assertions、**14 failures / 1 error** |
+| detector を `orgs-detector-tick` 経由で | **未検証**。別インスタンスが lock を保持していた |
+
+**app の suite の赤は 4 namespace に集中しており、この session が触った 3 file とは
+依存関係が無い。ただし clean main で走らせ直していないので、「既存」は diff から見た
+判断であって測定ではない。** 内訳は `launcher_test`(5) / `bulky_waste_http_test`(8) /
+`bundle_test`(2) / `graph.clj`(1 error)。
+
+**detector が tick を通って 1 度緑になることは、まだ確認できていない。** この
+workspace 自身の規則（gate は fleet で 1 度緑になるまで landed としない）に照らすと、
+そこは未達である。単体では 4 つの tree に対して走らせ、両方向を出している。
+
+### 次に入る人の最初の一手
+
+1. detector が tick 経由で走ることを確認する（lock が空いてから）:
+   `nbb --classpath \".:scripts/nbb_compat\" scripts/orgs-detector-tick.cljs --only verify-itonami-run-path`
+2. いまの現在地を読む（4 脚。緑でも『古い tree を指しているから緑』でありうる）:
+   `nbb --classpath \".:scripts/nbb_compat\" scripts/verify-itonami-run-path.cljs --root .`
+3. S0（まだ誰もやっていない）。同じ仕事で両経路を測る:
+   `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.cloud-itonami.app.plist` のあと
+   `/usr/bin/time -l ~/.local/bin/itonami bots task --id <bot> --text <一文>`
+
+### オーナー判断が要る 3 つ
+
+1. **208 command の front end をどちらの形で戻すか。** JVM server に喋る nbb client か、
+   guest wasm に route を足すか。#270 が閉じた経路なので、この session では選んでいない。
+2. **`~/.hermes/cron/jobs.json` の 44 job**（2026-09-02 14:54:13 JST に 46 から 2 へ）。
+   原因未特定。復元元は `scripts/hermes-*-bots/` の versioned original と公開 document
+   （名前・schedule・model。prompt は載っていない）。**復元の前に volatile 判定の修正
+   （48d84ab）を含む release を使うこと** —— さもないと同じ形で再発しうる。
+3. **31 profile の grants 96 件**（ADR-2609012300 から据え置き）。
+
+### 触っていないもの（他セッションの作業）
+
+    orgs/cloud-itonami/cloud-itonami-app   modified 3、pin より 17 commit 手前
+    orgs/network-awai/app-aozora           untracked 4
+    orgs/network-awai/app-hyakka           modified 4
+
+west が pin への追従を拒否した 3 件で、破棄していない。**app の checkout が pin に
+追いついた時点で detector は赤になる** —— それは退行ではなく、workspace が #270 の
+tree を持ったという正しい報告である。
+
+### この session で 1 つだけ環境を直した
+
+superproject の `.git/index.lock` が 28 分前から残っており（0 バイト、保持プロセス
+無し）、全セッションの `git merge --ff-only` を止めていた。保持者が居ないことを
+`ps` で確認してから撤去した。
 "}]
