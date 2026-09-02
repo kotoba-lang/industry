@@ -339,3 +339,25 @@
     必ず切れるので、kagi を呼ぶときは `timeout 900` 以上を付ける。
   **seed を失うと、その apex の did:webvh は二度と更新できない**（SCID は
   残るが次の entry を署名できる鍵が無い）。
+- **witness の seed は apex root seed から独立している（version 2 以降、
+  2026-09-02、control-plane ADR-2609021700）。** 3-of-5 の 5 role それぞれが
+  自分の 32 byte を持ち、置き場所が custodian を表す:
+
+  | role | 置き場所 |
+  |---|---|
+  | security / legal | この端末の login Keychain `webvh-witness-<domain>-<role>`（account `authn`）+ kagi の同名 item（compartment `personal`） |
+  | operations | fleet node **judah** `~/.gftd/webvh-witness/<domain>-operations.b64`（0600、FileVault） |
+  | auditor | fleet node **simeon** `~/.gftd/webvh-witness/<domain>-auditor.b64` |
+  | recovery | fleet node **levi** `~/.gftd/webvh-witness/<domain>-recovery.b64` |
+
+  `<domain>` は `auth.kotoba.cloud` / `kotobase.net` / `kotoba.cloud` の 3 つ、
+  計 15 seed。ノードの seed は**ノード上で生成し、ノードから出さない**（ssh で
+  渡るのは enrollment 時の did:key と version ごとの proof だけ）。ノードの
+  login keychain は ssh 越しに書けない（`Write permissions error`、実測）ので
+  file 置き。署名はノード上の `authn/scripts/webvh_witness.cljs`（nbb、lib は
+  `~/.gftd/webvh-witness/lib/` に rsync 済み。levi は `npx --yes nbb`）。
+  **この端末が持つのは update key + witness 2 つで、閾値 3 に 1 つ足りない**
+  —— 1 台の compromise では version を publish できない。1 ノードが死んだら
+  その role は新 seed を別 host で作り直し、残り 3 + 新 1 で witness param を
+  restate する version を出す。
+
