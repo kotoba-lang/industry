@@ -312,6 +312,18 @@ west pin を 5 件前進させ checkout を同期した直後に、今日直し�
   1. **pin と一緒に文法も動く。** amu の deps.edn の規則は、自分が vendor する `guest-grammar.edn` が pin した sema の複製と等しいこと。sema@`1a073853` は `3e3f9748`、sema@`ad8755e` は `6e1202fd`（変えたのは上流の set-operations commit であってこの修正ではない）。
   2. **その不変条件は amu の tip で既に破れている。** deps.edn のコメントは `3e3f9748` と主張しているのに、`6c245f69` のファイルは実際には **`67561e57`** を hash する。**amu の申告が amu 自身のファイルを説明していない。**
 
+### 15. `conj` / `disj` は宣言されていて実装が無く、証拠の fixture は誰にも走らされていなかった（着地 2026-09-03、第 3 反復）
+
+- kotoba-sema `24a59c74`、kotoba-lang `a4c0835d`。
+- **`:kir` が `set.kotoba` を走らせていないことを 2 通りで測った。** ①探索: `bounded-set-literal-and-operations` と `collections/set.kotoba` は kotoba-lang の中にしか現れない。`:kir` と `:wasm32-kotoba-v1` の両方を駆動する唯一の実体である amu の `lang-conformance` は**別の manifest** を読む。`kotoba` の runner はこの manifest を読むが、駆動するのは legacy emitter で、しかも**自分が pin した kotoba-lang（main ではない）**を通して読んでいる。②実行: runner を作って当てると `:kir` は **heterogeneous な literal だけで**拒否する（`set item type mismatch`、`conj` / `disj` を実装した後でも）。**その case の第一 required backend は、一度も走らせていないし走らせられなかった。**
+- **`conj` / `disj` は authority が宣言し、arm が 1 つも無かった。** すぐ隣に `typed-set-conj` / `typed-set-disj` が完全に lowering された状態で座っていた。純粋な dispatch を足しただけで、authority の既存の主張が**バイト 1 つ resync せずに真になった**。**両方 reserved にもした** —— それ以前は `(defn conj …)` が**受理され**、head を黙って shadow できた（その方向を test が pin している）。
+- **`contains?` は authority を直し、コードは変えなかった** —— set に対する拒否は同日に意図して landing したもので、message は既に `typed-set-contains` を名指している。嘘をついていたのは `surface-status.edn` の側で、今は `contains? {:admitted false … :write-instead …}` と書く。
+- **同じ entry からさらに 2 つの overclaim が出た**: `:admission-limit` は 16 と書かれていたが実測 **32 admit / 33 拒否**、そして ADR の 16 の根拠が**使われていない pair-chain lowering** を説明していた。
+- **fixture が「誰も走らせていない case」でなくなった**: `set.kotoba` は `:required-backends` を保ったまま `:executed-by`（`:kir` を実行する新 test）と `:unexecuted-backends`（`:wasm32-kotoba-v1` は日付と閉じる条件つき）を記録し、validator が両者で `:required-backends` を**過不足なく**説明することを要求する（床つきなので記録を消して通すこともできない）。runner 側は逆向きに「case が自分を名指していること」を assert する。**4 通りの意図的破壊**（原本の fixture に戻す / `:kir` を宣言から外す / `:executed-by` に別 runner を書く / 実行記録を全部消す）がそれぞれ別の理由で赤くなる。
+- **範囲の注記をコードに書いた**: `vector.kotoba` / `higher_order.kotoba` / `destructuring.kotoba` は走っていない —— 見落としではなく、`(count [7 8 9])` が `operation has no admitted lowering` で拒否されるという**別の head における同一の欠陥**。黙って除外せず記録した。
+- **heterogeneous な set literal は admit されない。非 keyword の literal も admit されない**（desugar が `[:set :keyword]` を固定している）。拒否文言がそう述べ、negative case として pin してある（「何かが拒否された」ではなく required / actual の型で pin）。
+- 検証: sema の新 ns は修正前 **14 failures + 10 errors exit 1**（13 件が文字どおり `operation has no admitted lowering`、`(defn conj …)` は何も拒否しなかった）、修正後 exit 0。sema 全 312 / 1431 exit 0。kotoba-lang の全 suite の 13 fail + 1 error は、**同じ standalone レイアウトの無改変 origin/main で同一**と実測した pre-existing。
+
 ### 残件（この ADR が次に指す先）
 
 1. `:state` ability（決定節のとおり。前提 4 つのうち vacuous な「handle は値でない」を先に赤にする）。
