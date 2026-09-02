@@ -314,3 +314,21 @@
   `.itonami/identity.edn` と `cloud-itonami-app-latest` は**別の k51**。
   この公開名を更新するには元の 32-byte が要る。新しい seed は別 k51 になり、
   代わりにならない。値は git に置かない。
+
+## did:webvh apex root seeds (2026-09-02, control-plane ADR-2609021500)
+
+- **macOS login Keychain, generic-password items `webvh-root-kotoba.cloud` /
+  `webvh-root-kotobase.net` / `webvh-root-auth.kotoba.cloud`（account
+  `authn`）** — 各 apex の did:webvh root の **唯一の seed**（32 byte、base64）。
+  update-key の ladder（`update-0`, `update-1`, …）と 5 つの witness 鍵は、
+  この seed から HKDF-SHA256 で導出される（`net-kotobase/control-plane`
+  `authn/scripts/webvh_root.clj`）。取得は
+  `security find-generic-password -s webvh-root-<domain> -a authn -w`。
+  値は git にも Worker secret にも置かない —— Worker は署名済みの
+  `did.jsonl` を配信するだけで、root を回転させるのはこの seed を持つ
+  操作者だけ。
+- ⚠ **kagi には未保管**。2026-09-02 に `bin/kagi add` / `kagi ls` が 5 分以上
+  無応答（prompt 無し）だったため Keychain を正本にした。kagi が答えるように
+  なったら `webvh-root-<domain>` として複製すること（compartment `personal`）。
+  **seed を失うと、その apex の did:webvh は二度と更新できない**（SCID は
+  残るが次の entry を署名できる鍵が無い）。
