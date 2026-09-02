@@ -324,6 +324,27 @@ west pin を 5 件前進させ checkout を同期した直後に、今日直し�
 - **heterogeneous な set literal は admit されない。非 keyword の literal も admit されない**（desugar が `[:set :keyword]` を固定している）。拒否文言がそう述べ、negative case として pin してある（「何かが拒否された」ではなく required / actual の型で pin）。
 - 検証: sema の新 ns は修正前 **14 failures + 10 errors exit 1**（13 件が文字どおり `operation has no admitted lowering`、`(defn conj …)` は何も拒否しなかった）、修正後 exit 0。sema 全 312 / 1431 exit 0。kotoba-lang の全 suite の 13 fail + 1 error は、**同じ standalone レイアウトの無改変 origin/main で同一**と実測した pre-existing。
 
+### 16. compiler が今日の成果を consume した —— そして私自身の測定にも訂正が付いた（着地 2026-09-03、第 3 反復の締め）
+
+- amu `57ba0ee0`（PR 767、13 checks green）、west pin `db6b7d41`。deps は kotoba-sema `df383ba0` / kotoba-kir `233bd6bb`。
+- **私が自分で測った受け入れ**（共有 checkout の `bin/amu`、`--jvm-free`、値は `browser-host.mjs` 経由）:
+
+  | probe | 結果 |
+  |---|---|
+  | `(conj #{:a} :b)` → `typed-set-contains` | check 0、wasm32-browser 1,976 byte、`main()` = 1 |
+  | loop の f64 accumulator | 468 byte、`main()` = 3 |
+  | i64 key の map literal + `typed-map-count` | 1,961 byte、`main()` = 3 |
+  | 誤った宣言型（かつて crash した形） | **exit 70 の無情報 crash ではなく exit 65 + `option-value-of requires [:option payload-type]`** |
+
+- **担当が自分の報告に訂正を 3 つ添えた（そのまま記録する）**:
+  1. 上記 12 で私が「使えない」と測った 3 つのうち、**loop / map key / 過剰引数は、私が測った後に別セッションの bump で既に consume されていた**。今回の bump の獲得として数えていない。
+  2. 宣言型 guard の 3 系統も**大半は既に amu 側に在り**、`origin/main` の第 2 checkout に対する実測で `typed-map-count` と `typed-set-contains` は既に正しく拒否していた。exit 70 で逃げていた head は **`option-value-of` 1 つ**。amu 側で観測できる変化はそれと `conj` / `disj` で、「3 系統」より狭い。
+  3. 担当の最初の exit 70 も**私と同じ書き間違い**（option 型を取る位置に `:i64` を渡した）だった。map key の欠陥ではない。
+- **`deps.edn` の hash 申告は、別セッションが先に値を直していた**（#765）。残っていた本当の欠陥は、**その検査が自前の literal を pin していて `deps.edn` を一度も読まない**こと。`deps-edn-claim` がそれを塞ぐ（申告 vs 実バイト、申告 vs authority 定数、prose の sema 名 vs `:git/sha` の 3 経路）。**3 通りの破壊で赤くなり、宣言ブロックの削除は `CLAIMS 0` として拒否される**（消して通せない）。resync は不要だった（pin した sema の複製と `cmp` 一致、API の blob ではなく gitlibs の実 checkout に対して確認）。
+- fixture は `aggregate_abi_test` が古い kir sha を pin していた 1 件。**その literal は意図的な台帳**なので、そのファイルの慣習どおり説明 entry を添えて前進させた（緩めていない）。golden は `.wasm` / `.provenance.edn` の 4 つとも**バイト不変** —— この前進は純粋に追加的。
+- 検証: amu 全 suite 1,304 tests / 9,462 assertions、166 / 166 namespace、exit 0（baseline 1,303 / 9,455、差は足した test ちょうど 1 本）。nbb wasm32 52 件、hermetic 12 件 PASS。
+- **process の発見 2 件**: ①lock を `deps.edn` の文面編集**より前**に再生成すると、digest が古いバイトに束縛され hermetic test が拒否する —— **lock が設計どおり fail-closed した**。最終編集の後に再生成する。②担当の watcher が sentinel を待っていたが、その sentinel は書かれない形でコマンドを組み直していたため、**観測できない watcher と、まだ待っている watcher が同じ姿になっていた**。害が無かったのは、担当が watcher の沈黙から推論せず**元の出力を直接読んだ**から。今日の 15 件と同じ形が、道具の側にも出ている。
+
 ### 残件（この ADR が次に指す先）
 
 1. `:state` ability（決定節のとおり。前提 4 つのうち vacuous な「handle は値でない」を先に赤にする）。
