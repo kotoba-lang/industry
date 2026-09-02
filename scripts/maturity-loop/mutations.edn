@@ -41,7 +41,106 @@
  :isolation :worktree
 
  :suites
- [{:repo "orgs/cloud-itonami/org-un-isic"
+ [{:repo "orgs/cloud-itonami/app-bpmn"
+   :label "app-bpmn cross-plane —— README が散文で述べている食い違いを、散文の外で保つ"
+   ;; この repo の README は冒頭で「三つの面は互いに一致していない」と言い、
+   ;; その一致していなさを 1 つずつ散文で述べている。散文は自分が真でなくなった
+   ;; ことに気づかない —— 実測 2026-09-03、測定から 9 日で **ファイル数と
+   ;; `svelte/` の行の両方が既に嘘になっていた**（Svelte→cljs 移行で tree が
+   ;; 動いたのに、それを述べた段落は動かなかった）。
+   ;;
+   ;; 検査対象は面と面の**あいだ**にある事実なので、どの面にも属さない:
+   ;; `kotoba/test/bpmn.test.ts` は adapter を見ることができず、adapter には
+   ;; test が 1 本も無い。
+   ;;
+   ;; 一致を pin しているものと、**不一致**を pin しているものが混ざっている。
+   ;; どちらも「観測された値」として同じやり方で pin する —— だから赤は
+   ;; 「壊れた」ではなく「動いた」を意味し、修理された場合も赤くなる。
+   ;; どちらであるかは失敗メッセージが名乗る。
+   :cmd ["nbb" "test/cross_plane_test.cljs"]
+   :green-marker "cross-plane: OK"
+   :mutations
+   ;; ── 事実が動く側（exit 1）。7 件とも 2026-09-03 に赤くなるところを見た ──
+   [{:id :bpmn/route-dropped
+     :note "kotoba が export しているのに XRPC から呼べない操作ができる"
+     :file "xrpc-adapter/src/index.ts"
+     :find "  [`${NSID_BASE}.analyzeProcess`]: { method: \"POST\", handler: (e, input) => bpmnRwFree.analyzeProcess(e, input as any) },\n"
+     :replace ""
+     :must-fail ["xrpc-routes-cover-every-kotoba-export"]}
+
+    {:id :bpmn/route-added-that-nothing-exports
+     :note "route 表だけが増え、実体の無い NSID が公開される"
+     :file "xrpc-adapter/src/index.ts"
+     :find "  [`${NSID_BASE}.getActivityLog`]:"
+     :replace "  [`${NSID_BASE}.purgeEverything`]: { method: \"POST\", handler: (e, input) => bpmnRwFree.getActivityLog(e, input as any) },\n  [`${NSID_BASE}.getActivityLog`]:"
+     :must-fail ["xrpc-routes-add-nothing-kotoba-does-not-export"]}
+
+    {:id :bpmn/namespaces-unified
+     :note "**修理の側の赤**。split が消えたら README ごと更新させる"
+     :file "xrpc-adapter/src/index.ts"
+     :find "const NSID_BASE = \"com.etzhayyim.bpmn\";"
+     :replace "const NSID_BASE = \"com.etzhayyim.apps.bpmn\";"
+     :must-fail ["the-two-planes-still-do-not-share-a-namespace"]}
+
+    {:id :bpmn/kotoba-export-removed
+     :note "13 操作の集合そのものが動く"
+     :file "kotoba/src/index.ts"
+     :find "export { deployProcess, listProcesses, validateXml, compileJsonToXml, compileBpmn, analyzeProcess } from \"./process.js\";"
+     :replace "export { deployProcess, listProcesses, validateXml, compileJsonToXml, compileBpmn } from \"./process.js\";"
+     :must-fail ["kotoba-exports-are-the-thirteen-operations"]}
+
+    {:id :bpmn/kotoba-compiler-grows-a-branch
+     :note "2 つの JSON 語彙が重なり始める —— 黙って task になる範囲が変わる"
+     :file "kotoba/src/process.ts"
+     :find "        } else if (flowType === \"gateway\") {"
+     :replace "        } else if (flowType === \"startEvent\") {\n          xml += `    <bpmn2:startEvent id=\"${flowId}\" name=\"${flowName}\"/>\\n`;\n        } else if (flowType === \"gateway\") {"
+     :must-fail ["appview-step-types-compile-to-plain-task-on-the-kotoba-slice"]}
+
+    {:id :bpmn/appview-implements-a-missing-op
+     :note "appview が 10 of 13 でなくなる"
+     :file "appview/etzhayyim-wasm-bpmn-bx7qm9p4/src/app.ts"
+     :find "    sdk.app.command(nsid(\"com.etzhayyim.apps.bpmn.listProcesses\"),"
+     :replace "    sdk.app.command(nsid(\"com.etzhayyim.apps.bpmn.analyzeProcess\"),\n      async () => ({ ok: true }));\n    sdk.app.command(nsid(\"com.etzhayyim.apps.bpmn.listProcesses\"),"
+     :must-fail ["operations-the-appview-never-implemented"]}
+
+    {:id :bpmn/manifest-points-at-nothing
+     :note "actor manifest の component.path が tree から外れる"
+     :file "appview/etzhayyim-wasm-bpmn-bx7qm9p4/kotodama.jsonld"
+     :find "\"component\": { \"path\": \"src/app.ts\" },"
+     :replace "\"component\": { \"path\": \"src/gone.ts\" },"
+     :must-fail ["actor-manifest-component-path-exists-in-the-tree"]}
+
+    ;; ── 測れなくなる側（exit 2）。ここが本題である ──
+    ;;
+    ;; CLAUDE.md の 6 問の 1 と 2 —— 「入力が無いとき / そもそも実行できないとき
+    ;; 何を返すか」。pass を返すなら欠陥である。下の 3 件は、検査器が読む対象を
+    ;; それぞれ別の壊し方で奪い、**0 でも 1 でもない 2** が返ることを確かめる。
+    ;; `:must-fail ["REFUSED"]` は、通常の失敗と拒否を出力から区別するため。
+    {:id :bpmn/region-anchor-renamed
+     :note "走査範囲の目印が消える。**黙って全ファイルに広がってはならない**"
+     :file "appview/etzhayyim-wasm-bpmn-bx7qm9p4/src/app.ts"
+     :find "  const elements: string[] = [];"
+     :replace "  const emitted: string[] = [];"
+     :must-fail ["REFUSED"]}
+
+    {:id :bpmn/extractor-drops-below-floor
+     :note ["抽出器が読む**その文字列**を壊す。"
+            "⚠ 最初は `const flowType =` の側を壊して咬まなかった —— 比較の "
+            "`flowType === \"...\"` は無傷なので、壊れたのは TypeScript であって "
+            "抽出器の入力ではなかった。壊したものと報告されたものを一致させる。"]
+     :file "kotoba/src/process.ts"
+     :find "} else if (flowType === \"gateway\") {"
+     :replace "} else if (flowType === `gateway`) {"
+     :must-fail ["REFUSED"]}
+
+    {:id :bpmn/nsid-base-renamed
+     :note "route 表の起点が消え、routes が 0 件になる"
+     :file "xrpc-adapter/src/index.ts"
+     :find "const NSID_BASE = \"com.etzhayyim.bpmn\";"
+     :replace "const NSID_ROOT = \"com.etzhayyim.bpmn\";"
+     :must-fail ["REFUSED"]}]}
+
+  {:repo "orgs/cloud-itonami/org-un-isic"
    :label "org-un-isic ingest catalog —— 出所の pin と、それが何であるかの測定"
    ;; catalog.edn は 2 つの別々の腐り方をする。
    ;;
