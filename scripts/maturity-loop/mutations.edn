@@ -6345,4 +6345,174 @@
      :file "appview/okaimono-shopping-mcp-component/kotodama.jsonld"
      :find "\"nanoid\": \"ok4imn1o\""
      :replace "\"nanoidV2\": \"ok4imn1o\""
-     :must-fail ["the-files-this-suite-reads-still-declare-what-it-reads-from-them"]}]}]}
+     :must-fail ["the-files-this-suite-reads-still-declare-what-it-reads-from-them"]}]}
+
+  {:repo "orgs/cloud-itonami/app-houki"
+   :label "app-houki cross-plane —— README の 15 行の表を、散文の外で保つ"
+   ;; この repo の README は「この tree の散文のほとんどは、抽出前の layout か、
+   ;; この tree が一度も含まなかった設計のどちらかを述べている」と言い、15 行の
+   ;; 表でそれを 1 つずつ挙げている。その 15 行は **2026-08-23 に手で 1 回**
+   ;; 5b04279 に対して測られたきりで、散文は自分が真でなくなったことに気づかない。
+   ;;
+   ;; 検査対象は**ファイルとファイルのあいだ**にある事実なので、どの面にも属さない:
+   ;; `kotoba/test/houki.test.ts` は 1 module から 4 関数を import するだけで、
+   ;; adapter も 2 つの README も CLAUDE.md も見ることができず、adapter には
+   ;; test が 1 本も無い。
+   ;;
+   ;; 一致を pin しているものと、**不一致**を pin しているものが混ざっている。
+   ;; どちらも「観測された値」として同じやり方で pin する —— だから赤は
+   ;; 「壊れた」ではなく「動いた」を意味し、**修理された場合も赤くなる**
+   ;; （brace が閉じた / bearerToken が配線された / 5 つに test が付いた）。
+   ;; どちらであるかは失敗メッセージが名乗る。
+   ;;
+   ;; nbb と checkout だけで走る。`docs/operator-quickstart.md` §4 は kotoba の
+   ;; install を **26 分**と実測しており（git 依存 2 本が prepare で tsc を回す）、
+   ;; §6 は adapter がこの repo からはそもそも install できないことを実測している。
+   :cmd ["nbb" "test/cross_plane_test.cljs"]
+   :green-marker "cross-plane: OK"
+   :mutations
+   ;; ── 事実が動く側（exit 1）。13 件とも 2026-09-03 に赤くなるところを見た ──
+   [{:id :houki/route-dropped
+     :why "kotoba が export しているのに XRPC から呼べない操作ができる"
+     :file "xrpc-adapter/src/index.ts"
+     :find "  [`${NSID_BASE}.registerRuleBundle`]: {\n    method: \"POST\",\n    handler: (e, input) => houkirwFree.registerRuleBundle(e, input as Parameters<typeof houkirwFree.registerRuleBundle>[1]),\n  },\n"
+     :replace ""
+     :must-fail ["xrpc-routes-cover-every-kotoba-export"]}
+
+    {:id :houki/route-added-that-nothing-exports
+     :why "route 表だけが増え、実体の無い NSID が公開される"
+     :file "xrpc-adapter/src/index.ts"
+     :find "  [`${NSID_BASE}.extractRules`]: {"
+     :replace "  [`${NSID_BASE}.purgeDocuments`]: {\n    method: \"POST\",\n    handler: (e, input) => houkirwFree.extractRules(e, input as Parameters<typeof houkirwFree.extractRules>[1]),\n  },\n  [`${NSID_BASE}.extractRules`]: {"
+     :must-fail ["xrpc-routes-add-nothing-kotoba-does-not-export"]}
+
+    {:id :houki/kotoba-export-removed
+     :why "9 操作の集合そのものが動く"
+     :file "kotoba/src/index.ts"
+     :find "  listRuleBundles,\n"
+     :replace ""
+     :must-fail ["kotoba-exports-are-the-nine-operations"]}
+
+    {:id :houki/adapter-brace-closed
+     :why ["**修理の側の赤**。`createAuthedEtzhayyim({ env: {` は 2 つ開いて 1 つ閉じる。"
+           "閉じれば Worker は parse するが、README.md の「Does not compile as shipped」と "
+           "operator-quickstart §6 に貼られた TS1005 は同時に古くなる。"
+           "しかも parse する Worker は依然として session を持たない（下の bearerToken）"]
+     :file "xrpc-adapter/src/index.ts"
+     :find "      L2_RPC_URL: env.L2_RPC_URL,\n    });"
+     :replace "      L2_RPC_URL: env.L2_RPC_URL,\n      },\n    });"
+     :must-fail ["xrpc-adapter-source-does-not-parse"]}
+
+    {:id :houki/suite-grows-a-rule-test
+     :why "**修理の側の赤**。9 のうち test を持つのが 4 でなくなる"
+     :file "kotoba/test/houki.test.ts"
+     :find "  listDocuments,\n} from \"../src/index.js\";"
+     :replace "  listDocuments,\n  extractRules,\n} from \"../src/index.js\";"
+     :must-fail ["the-suite-imports-only-the-document-tier" "five-of-nine-operations-have-no-test"]}
+
+    {:id :houki/bearer-token-wired
+     :why "**修理の側の赤**。extractBearerToken の結果が初めて SDK に届く"
+     :file "xrpc-adapter/src/index.ts"
+     :find "      L2_RPC_URL: env.L2_RPC_URL,\n"
+     :replace "      L2_RPC_URL: env.L2_RPC_URL,\n      accessJwt: bearerToken,\n"
+     :must-fail ["bearer-token-is-extracted-and-never-used"]}
+
+    {:id :houki/fetched-content-read
+     :why ["**修理の側の赤**。この slice は「誰かが計算した結果を保存する」だけで "
+           "本文を一度も読まない。documentRegistry が fetchedContent を読み始めたら "
+           "README.md の「No document body is ever persisted」は古くなる。"
+           "⚠ 最初は `const now = new Date()` を anchor にして BUG になった —— "
+           "その行は ingestDocument と ingestText の両方に在り、:find が 2 回当たる"]
+     :file "kotoba/src/documentRegistry.ts"
+     :find "    sourceRef: input.url,"
+     :replace "    sourceRef: input.fetchedContent ? input.url : input.url,"
+     :must-fail ["fetched-content-is-declared-and-never-read"]}
+
+    {:id :houki/mapstatus-drops-notfound
+     :why ["getDocument / getRuleBundle の notFound は `status` を持たないので、"
+           "mapStatus の notFound 分岐は到達不能で、存在しない文書は HTTP 200 で返る。"
+           "到達不能な分岐は「整理」で消されやすい —— 消すと、この検査が指している "
+           "非対称そのものが読めなくなる"]
+     :file "xrpc-adapter/src/index.ts"
+     :find "  if (status === \"notFound\") return 400;\n"
+     :replace ""
+     :must-fail ["notfound-answers-carry-no-status-so-the-adapter-answers-200"]}
+
+    {:id :houki/claude-md-vocabulary-implemented
+     :why "CLAUDE.md が述べる 12 の識別子は source に 1 つも無い。実装は当然の次の一手なので、この行は最も動きやすい"
+     :file "kotoba/src/documentRegistry.ts"
+     :find "export async function ingestText("
+     :replace "function stripHTML(s: string): string {\n  return s.replace(/<[^>]*>/g, \"\");\n}\n\nexport async function ingestText("
+     :must-fail ["claude-md-vocabulary-appears-nowhere-in-the-source"]}
+
+    {:id :houki/adapter-readme-param-corrected
+     :why "**修理の側の赤**。README の 4 つの GET パラメータ名は、その endpoint が slice に渡す input 型の field ではない"
+     :file "xrpc-adapter/README.md"
+     :find "getDocument?documentId=..."
+     :replace "getDocument?docId=..."
+     :must-fail ["adapter-readme-get-params-name-fields-their-input-types-lack"]}
+
+    {:id :houki/list-rules-gains-the-documented-filter
+     :why "**修理の側の赤**。ListRulesInput に ruleSeq が生えると、README の記述と adapter の coercion の両方が同時に正しくなる"
+     :file "kotoba/src/types.ts"
+     :find "export interface ListRulesInput {\n  docId?: string;"
+     :replace "export interface ListRulesInput {\n  docId?: string;\n  ruleSeq?: number;"
+     :must-fail ["adapter-readme-get-params-name-fields-their-input-types-lack"
+                 "adapter-coerces-query-fields-no-get-input-type-declares"]}
+
+    {:id :houki/coverage-table-unified
+     :why "kotoba/README.md は 1 つの file の中で 8/8 と 4/8 を同時に主張し、barrel の docstring が 3 つ目を言う"
+     :file "kotoba/README.md"
+     :find "| **houki** | **4/8** | active |"
+     :replace "| **houki** | **9/9** | complete |"
+     :must-fail ["kotoba-readme-states-coverage-two-incompatible-ways"]}
+
+    {:id :houki/workspace-protocol-replaced
+     :why "**修理の側の赤**。workspace:* を解決する root package.json がこの repo に無いので adapter は install できない（operator-quickstart §6）"
+     :file "xrpc-adapter/package.json"
+     :find "workspace:*"
+     :replace "github:cloud-itonami/app-houki#main"
+     :must-fail ["adapter-depends-on-a-workspace-that-does-not-exist-here"]}
+
+    ;; ── 測れなくなる側（exit 2）。ここが本題である ──
+    ;;
+    ;; CLAUDE.md の 6 問の 1 と 2 —— 「入力が無いとき / そもそも実行できないとき
+    ;; 何を返すか」。pass を返すなら欠陥である。下の 5 件は、検査器が読む対象を
+    ;; それぞれ別の壊し方で奪い、**0 でも 1 でもない 2** が返ることを確かめる。
+    ;; `:must-fail ["REFUSED"]` は、通常の失敗と拒否を出力から区別するため。
+    {:id :houki/nsid-base-renamed
+     :why "route 表の起点が消え、routes が 0 件になる。空集合はあらゆる subset 断定に同意する"
+     :file "xrpc-adapter/src/index.ts"
+     :find "const NSID_BASE = \"com.etzhayyim.houki\";"
+     :replace "const NSID_ROOT = \"com.etzhayyim.houki\";"
+     :must-fail ["REFUSED"]}
+
+    {:id :houki/export-module-renamed
+     :why "export block の抽出が module 名に依存している。片方が消えても floor が拾う"
+     :file "kotoba/src/index.ts"
+     :find "} from \"./documentRegistry.js\";"
+     :replace "} from \"./registry.js\";"
+     :must-fail ["REFUSED"]}
+
+    {:id :houki/notfound-return-gains-a-status
+     :why ["**修理だが、この検査は答えを持たない**。status が付いた瞬間 :find の形が "
+           "変わり、floor 2 を割る。黙って 1 件で通すのではなく拒否する —— "
+           "「片方だけ直った」を「両方そのまま」と同じ顔で報告しないため"]
+     :file "kotoba/src/documentRegistry.ts"
+     :find "  if (!r) return { error: \"notFound\" };"
+     :replace "  if (!r) return { status: \"notFound\", error: \"notFound\" } as GetDocumentOutput;"
+     :must-fail ["REFUSED"]}
+
+    {:id :houki/coercion-region-anchor-removed
+     :why "走査範囲の目印が消える。**黙って file 全体に広がってはならない**"
+     :file "xrpc-adapter/src/index.ts"
+     :find "        // Coerce common numeric/boolean fields\n"
+     :replace ""
+     :must-fail ["REFUSED"]}
+
+    {:id :houki/input-interface-renamed
+     :why "interface が消えると field 集合は空になり、空集合は「README のパラメータは field でない」に同意してしまう"
+     :file "kotoba/src/types.ts"
+     :find "export interface ListRuleBundlesInput {"
+     :replace "export interface ListBundlesInput {"
+     :must-fail ["REFUSED"]}]}]}
