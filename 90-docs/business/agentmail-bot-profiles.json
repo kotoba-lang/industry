@@ -1,0 +1,58 @@
+{
+  "schema": "itonami.agentmail-bot-profiles.v1",
+  "note": "One bot profile per agentmail.to address. The inbox IS the bot's mail identity; its inbox-scoped API key (Keychain service per row) is the bot's own credential. The org key (kagi AGENTMAIL_API_KEY) is for administration only and is never a bot's identity.",
+  "updated": "2026-09-03",
+  "profiles": [
+    {
+      "address": "kotobase-net@agentmail.to",
+      "inbox_id": "kotobase-net@agentmail.to",
+      "display_name": "Kotobase Net Bot",
+      "metadata": {"bot_plane": "kotobase.net", "role": "contact-inbox"},
+      "client_id": "kotobase-net-inbox-v1",
+      "created_at": "2026-08-31T02:12:33.217Z",
+      "credential": {
+        "kind": "agentmail-inbox-scoped-api-key",
+        "keychain_service": "agentmail-inbox-key-kotobase-net",
+        "keychain_account": "agentmail"
+      },
+      "bound_plane": "kotobase.net (net-kotobase / kotobase-net)",
+      "resident_bot_candidates": ["kotobase-net", "kotobase"]
+    },
+    {
+      "address": "murakumo-cloud@agentmail.to",
+      "inbox_id": "murakumo-cloud@agentmail.to",
+      "display_name": "Murakumo Cloud Bot",
+      "metadata": {"bot_plane": "murakumo.cloud", "role": "contact-inbox"},
+      "client_id": "murakumo-cloud-inbox-v1",
+      "created_at": "2026-08-31T02:12:32.878Z",
+      "credential": {
+        "kind": "agentmail-inbox-scoped-api-key",
+        "keychain_service": "agentmail-inbox-key-murakumo-cloud",
+        "keychain_account": "agentmail"
+      },
+      "bound_plane": "murakumo.cloud (murakumo fleet surface)",
+      "resident_bot_candidates": ["murakumo-cloud", "murakumo"]
+    },
+    {
+      "address": "murakumo-gpu-bench@agentmail.to",
+      "inbox_id": "murakumo-gpu-bench@agentmail.to",
+      "display_name": "Murakumo GPU Bench Bot",
+      "metadata": {"bot_plane": "murakumo.gpu-bench", "role": "ops-inbox"},
+      "client_id": null,
+      "created_at": "2026-08-21T03:44:43.360Z",
+      "credential": {
+        "kind": "agentmail-inbox-scoped-api-key",
+        "keychain_service": "agentmail-inbox-key-murakumo-gpu-bench",
+        "keychain_account": "agentmail"
+      },
+      "bound_plane": "murakumo GPU bench (fleet ops / measurement)",
+      "resident_bot_candidates": ["murakumo", "murakumo-cloud"]
+    }
+  ],
+  "api": {
+    "base": "https://api.agentmail.to/v0",
+    "read_messages": "GET /inboxes/{inbox_id}/messages",
+    "read_message": "GET /inboxes/{inbox_id}/messages/{message_id}",
+    "send": "POST /inboxes/{inbox_id}/messages (inbox-scoped key or org key)"
+  }
+}
