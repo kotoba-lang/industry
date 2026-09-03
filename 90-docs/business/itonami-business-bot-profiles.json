@@ -1,6 +1,6 @@
 {
   "schema": "itonami.business-bot-profiles.v1",
-  "note": "One bot profile per business blueprint in the live open-business registry (snapshot 2026-09-03). A profile is a DESIGN + provisioning record, not a launch. Launch = POST /v1/grok-bots (checklist: itonami-business-bots skill). Mission context: 全人類を労働から解放する — each blueprint automates one economic domain behind a governed actor.",
+  "note": "One bot profile per business blueprint in the live open-business registry (snapshot 2026-09-03). A profile is a DESIGN + provisioning record, not a launch. Launch = POST /v1/grok-bots (checklist: itonami-business-bots skill). Mission context: 全人類を労働から解放する — each blueprint automates one economic domain behind a governed actor. Self-correction (ADR-2609031740): held bots auto-correct through the classified loop on the runtime/businesses surfaces.",
   "generated": "2026-09-03",
   "generated_from": {
     "live_registry": "https://itonami.cloud/api/open-business (28 blueprints, staticUpdated 2026-09-03)",
@@ -1790,5 +1790,23 @@
         "next_action": "launch-second-business-bot-candidate"
       }
     }
-  ]
+  ],
+  "self_correction": {
+    "policy": "self-correction-v1",
+    "module": "workers/grok-bots/self_correction.js (cloud-itonami)",
+    "adr": "ADR-2609031740",
+    "classes": {
+      "transient-upstream": "auto retry-backoff (5m..4h exp, max 6 per signature)",
+      "credential": "none — owner-scoped (fail-closed)",
+      "budget": "none — spend capacity is owner-scoped",
+      "projection-degraded": "adaptive backlog (halve on 502 CPU, recover per clean pass)",
+      "unknown": "none — fail-closed"
+    },
+    "surfaces": [
+      "/v1/grok-bots/runtime",
+      "/v1/grok-bots/businesses"
+    ],
+    "ledger": "bot/correction + projection/correction events (append-only, incl. 'none' decisions)",
+    "deployed": "2026-09-03 worker 6e132410, merge 9ee10e633c04"
+  }
 }
