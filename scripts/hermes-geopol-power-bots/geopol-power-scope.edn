@@ -1,0 +1,61 @@
+{:system/id :geopol-power-sourced-facts
+ :mission "Record observable, source-mandatory facts about relations among states, governments, and companies — procurement awards, appointments, mergers/acquisitions, sanctions/regulatory actions, partnerships, subsidies, contracts — into the wiki.kotobase.net (app-hyakka) claim graph. Power dynamics as interpretations are NOT recorded; only observable events and their sources."
+
+ ;; D1 boundary: interpretation-free. The graph stores events and stated facts;
+ ;; it never stores rankings, scores, influence ratings, or narrative analysis
+ ;; of who "holds power" over whom. Analysis belongs to readers, not to the wiki.
+ :analysis-boundary {:allow [:observable-event
+                             :stated-fact-from-primary-source
+                             :documented-relationship-existence]
+                     :forbid [:power-ranking
+                              :influence-score
+                              :allegiance-or-ideology-inference
+                              :narrative-power-analysis
+                              :prediction
+                              :person-scoring]}
+
+ :wiki-target "network-awai/app-hyakka"
+
+ :wiki-entity-types [:country :government-body :company :state-owned-enterprise
+                     :procurement-award :appointment :sanction-or-regulation
+                     :partnership :ownership-stake]
+
+ :wiki-required-fields [:subject
+                        :relation
+                        :object
+                        :observed-at
+                        :effective-at-or-stated-at
+                        :source-url
+                        :source-publisher
+                        :source-class
+                        :content-hash-or-archive-receipt]
+
+ ;; Primary official sources only. Reporting of a claim is not the claim.
+ :wiki-source-policy {:allow [:official-gazette
+                              :government-procurement-or-tender-portal
+                              :regulator-filing-or-docket
+                              :company-first-party-ir-or-press-release
+                              :official-court-or-tribunal-record
+                              :treaty-or-official-agreement-text]
+                      :forbid [:price-aggregator
+                               :third-party-wiki-prose
+                               :search-snippets
+                               :generated-summaries
+                               :people-search-brokers
+                               :social-media-posts
+                               :analyst-opinion-or-rating-agency-views
+                               :secondary-news-reporting-as-fact]}
+
+ ;; One run, at most two non-duplicate sources across at most two entities.
+ :run-limits {:max-sources-per-run 2
+              :max-entities-per-run 2
+              :max-prs-per-run 1}
+
+ :safety-boundaries [:no-power-ranking-or-inference
+                     :no-allegation-implies-guilt
+                     :no-person-scoring-or-private-biography
+                     :no-shared-orgs-worktree-write
+                     :no-direct-main-push
+                     :no-force-push
+                     :no-financial-commitment
+                     :no-contacting-people]}
