@@ -357,6 +357,20 @@ west pin を 5 件前進させ checkout を同期した直後に、今日直し�
 - 検証: 新 ns は pin された frontend に対して **6 failures + 22 errors exit 1**、修正後 18 tests / 40 assertions exit 0。merge 後の sema は JVM 352 / 1577、nbb 197 / 646 とも 0 failure。kotoba-lang の targeted 75 / 609 exit 0（全 suite の 5 fail + 1 error は pristine main で同数と実測済み）。end-to-end は wasm32-browser で `main()` = 125、**pin 側 sema を同じ classpath で走らせる対照は exit 65**。
 - **amu の bump は 5 つを同時にやる必要がある**（1 つでも欠けると `every-classpath-copy-of-the-grammar-is-the-same-grammar` が赤くなる。amu の vendored 複製が classpath 上で sema のものを shadow するため）: `deps.edn` の `:git/sha`、その隣の 2 つのコメント行、`resources/kotoba/lang/guest-grammar.edn` の実バイト、`guest_grammar_vendor_test` の authority 定数、そして `deps-lock.edn` の再生成（`--jvm-free` は stale な lock を拒否する）。kotoba-lang 側は `deferred-vendor-copies` に閉じる条件つきで記録済みで、**amu は自分の main では赤くない。**
 
+### 18. authority の主張に lowering があるかを機械が見るようになった（着地 2026-09-03、第 4 反復）
+
+- kotoba-lang `abc3c352`。`src/kotoba/lang/authority_claims.cljc`（純粋な列挙 + 測定を注入する `validate`。authority が test 専用の sema 依存なしで load できるように分離）と `test/kotoba/lang/authority_claim_lowering_test.clj`（実 frontend を駆動）。今日 4 回別々に見つけた形（`contains?` / `dissoc` / `conj` / `disj` / `count`）は、この 1 回で全部出ていた。
+- 列挙は **10 key・350 head・505 claim row**。**除外した key はすべて理由付きで記録**（`:forbidden-heads` は逆向きの主張で amu が既に検査、`:string-head-host-ops` 等はこの repo が駆動できない backend を宣言している、`:diagnostic-hints` は**拒否される** head の表、等）。`:invariants` を除いたのが一番判断を要した —— その `:surface` は「その不変条件が**何について**の話か」を並べており、**向きが entry ごとに違う**（`:no-interop` は admit されてはならない head、`:bool-is-a-type-not-a-number` は admit される head）。admission として読むと両方を主張してしまう。
+- **probe は正しくなる前に 3 回嘘をついた。3 回とも自信を持って間違えた**、と報告している: ①定義形を call 位置で probe したので 12 head が gap に見えた。②top-level 位置を足したら **全 head が present に見えた** —— `(count 0) (defn main [] 0)` は**位置ゆえに**拒否されるのに、fallback 文字列で分類する classifier がそれを「arm がある」と数えた。**71 件の absent が 0 になり、良い知らせに見えた。** ③そもそも「不在を意味する文字列」を手で列挙していたことが ② を可能にした。
+  **直し方が要点**: **存在しない head を全 (位置 × arity × 引数形) セルで probe し、その答えをそのセルの baseline にする。実在の head は baseline と*違う*ときだけ数える。** 不在を意味する文字列は 1 つも書き留めていない。
+- gap 表: **claimed-but-absent が 57**（全部 `operation has no admitted lowering`）。うち **49 は legacy wasm emitter の builtin 語彙**で、grammar 自身の prose が「別の surface」と書いており `:backends` を持たない。**190 head 中 141 は lowering する** —— 1 つの注釈なき key に 2 つの backend が混ざっている。frontend の gap としてではなく、per-head `:backends` を得たら閉じる項目として記録した。残りは `keys` `vals` `peek` `pop`（`count` と同類）と `keyword?` `string?` `symbol?` `string=`。
+- **present-but-unclaimed** も出た: `typed-set-contains` / `-conj` / `-disj` / `-count`、`map-new`、`i32-wrap`、`some?`。**`typed-set-contains` は `:set-literal` の拒否文言が「代わりにこれを書け」と指す当の操作で、それを主張しているものが 1 つも無かった。** `record-new` / `record-get` は authority が **prose 文字列の中に**綴っており、構造的な列挙では読めない。
+- **この検査は landing 中に本当に発火した。** origin/main を merge して sema pin が進んだ瞬間、`count` が arm を得て absent が 57 対 記録 58 になり、**逆向きの assertion が `count` を名指した**（`{:verdict :admitted :arity 1 :shape …}`）。赤が言うとおり例外行を削除した。並行 agent の修正を**1 回の merge の内に名指しで捕まえた。**
+- **自己捕捉が 2 件**: `:fn-ref` と `:invoke` が「call head ではない」表に入っていたが**どちらも head** だった（誰も検査していない表が飛ばしていた live な主張 2 件）。今はその表が head を隠せないことを test が禁じる。もう 1 件、`surface-status-claims` を `:checked-memory` を含まない既存関数の上に書いてしまい、**source 一覧が「その key を読んだ」と言っている横で 61 head が列挙されていなかった。**
+- **報告に添えられた訂正**: 最初の pristine baseline は working clone からの `git clone --shared` だったので `origin` がローカルディレクトリを指し、`git fetch origin` が一度も進めず、**古い commit に座ったまま origin/main だと信じて green を返していた**。GitHub から取り直すと branch と**同じ 6 件**が出て、それが stale な sibling clone 由来だと確定した。**主張と違う commit を測っていた baseline** —— それを探すための道具の側に、同じ形が出た。
+- 検証: 最終 34 tests / 364 assertions exit 0、`CLAIMS 350 (57 absent, 57 recorded)`。**4 通りの破壊がそれぞれ exit 1**（主張した head を消す / 古くなった例外を残す / 証拠集合を空にする（`CLAIMS 0` と床 320 で拒否）/ 実際に発火した 1 件）。
+- **どの frontend を測っているか**を docstring が述べる（`deps.edn` の `:test` が pin する sema。west pin と食い違う日があり、**両方測って absent 58 で対称差 0** と確認した上で、「west にあって `:test` に無い lowering は absent と読まれる」という**一方向の gap は本物**だと明記）。sha を docstring に書かない理由も書いてある —— 一度書いたら landing 前に stale になったから。
+
 ### 残件（この ADR が次に指す先）
 
 1. `:state` ability（決定節のとおり。前提 4 つのうち vacuous な「handle は値でない」を先に赤にする）。
