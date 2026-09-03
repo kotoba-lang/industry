@@ -6658,4 +6658,109 @@
      :file ".well-known/did.json"
      :find "\"id\" : \"did:web:etzhayyim.com:actor:graph-sos-intel\","
      :replace "\"id\" : \"did:web:graph-sos-intel.etzhayyim.com\","
-     :must-fail ["the-two-identities-still-disagree"]}]}]}
+     :must-fail ["the-two-identities-still-disagree"]}]}
+  {:repo "orgs/kotoba-lang/org-openstreetmap-overpass"
+   :label "overpass fetch アダプタ —— 『共有インフラへの節度』を名乗りから検査へ"
+   ;; この repo の README と `fetch.cljs` の docstring は、Overpass が無償の
+   ;; 共有インフラであることを理由に 3 つを名乗っている: 識別可能な User-Agent、
+   ;; 呼び出し間隔、429/5xx の retry は 1 度だけ。**2026-09-03 まで、その 3 つを
+   ;; 検査するものは 1 つも無かった** —— test は `core.cljc`（純粋な QL 組み立てと
+   ;; 応答正規化）だけを見ており、`fetch.cljs` 78 行は 0 本だった。
+   ;;
+   ;; 名乗りを実際に叩いて確かめる形にはできない: 『連打しないことの検査』の
+   ;; ために連打することになる。だから送信（`:fetch-fn`）と retry の待ち
+   ;; （`:retry-delay-ms`）を差し替え、**記録された呼び出しの列**に対して主張する。
+   ;; テスト側は既定の endpoint も潰してあるので、`:fetch-fn` を落とす退行が
+   ;; 入っても本番の Overpass には届かない（下の retry-relists-options-by-hand で
+   ;; 実演済み —— 潰す前は、その mutation が本物の Overpass を叩いていた）。
+   ;;
+   ;; **runner も検査対象である。** 元の `test/run.cljs` は `run-tests` の戻り値の
+   ;; :fail/:error を読んでいたが、async テストはまだ走っている最中にそれが返る。
+   ;; 実測 2026-09-03: 故意に外した async assertion が **exit 0 で通り、FAIL の行
+   ;; すら出力に現れなかった** —— 「測れなかった検査が、測って問題が無かった検査と
+   ;; 同じ値を返す」の最短形。いまは `:end-run-tests` から exit を採る。下の
+   ;; mutation は全部 async 経路を壊すので、runner が元の形に戻れば**どれも
+   ;; 噛まなくなる** —— この 8 件が緑であること自体が runner の証明になっている。
+   :cmd ["nbb" "--classpath" "src:test" "test/run.cljs"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   ;; 8 件とも 2026-09-03 に赤くなるところを見た。推測で足したものは無い。
+   [;; ── 名乗り ───────────────────────────────────────────────────────
+    {:id :ovp/user-agent-dropped
+     :why (str "header 名を 1 つ変えるだけで匿名の POST になる。Overpass の利用規約は"
+               "識別可能な UA を求めており、これは『動くが無作法』な退行 —— 応答は"
+               "変わらないので、叩いている側からは永久に気づけない")
+     :file "src/org_openstreetmap_overpass/fetch.cljs"
+     :find "\"User-Agent\" user-agent"
+     :replace "\"X-Quiet\" user-agent"
+     :must-fail ["every-request-identifies-itself"]}
+
+    ;; ── 間隔 ─────────────────────────────────────────────────────────
+    {:id :ovp/throttle-removed
+     :why (str "待ち時間の計算を 0 に潰す。`min-interval-ms` は引数として残るので"
+               "**呼び出し側からは設定できているように見える**が、実際には効かない。"
+               "間隔は主張ではなく、記録された 2 つの時刻の差として測る")
+     :file "src/org_openstreetmap_overpass/fetch.cljs"
+     :find "(let [wait (max 0 (- (+ @last-call min-interval-ms) (now-ms)))]"
+     :replace "(let [wait 0]"
+     :must-fail ["successive-calls-are-spaced-apart"]}
+
+    ;; ── retry の範囲（広がる方向）─────────────────────────────────────
+    {:id :ovp/http-400-becomes-retryable
+     :why (str "『retry すれば通るかも』で 4xx を足す形の退行。400 は待っても同じ答えが"
+               "返るので、共有インフラを 2 度叩くぶんだけ無作法になる")
+     :file "src/org_openstreetmap_overpass/fetch.cljs"
+     :find "#{429 502 503 504}"
+     :replace "#{400 429 502 503 504}"
+     :must-fail ["a-non-retryable-status-is-not-retried"]}
+
+    {:id :ovp/http-500-becomes-retryable
+     :why (str "502/503/504 が入っているなら 500 も、という一貫性に見える退行。"
+               "実際には 502/503/504 は過負荷（待てば直る）、500 は不具合（待っても直らない）"
+               "で別物。この境界は集合の中身にしか書かれていない")
+     :file "src/org_openstreetmap_overpass/fetch.cljs"
+     :find "#{429 502 503 504}"
+     :replace "#{429 500 502 503 504}"
+     :must-fail ["a-server-error-that-will-not-heal-is-not-retried"]}
+
+    {:id :ovp/response-ok-ignored
+     :why (str "成功判定に status を足して『400 も本文は読める』にする。"
+               "エラー本文を成功として parse すると :observations が空で返り、"
+               "**『この地域に対象が無い』と区別できなくなる** —— この repo が "
+               ":unclassified を数えている理由そのものを裏口から壊す")
+     :file "src/org_openstreetmap_overpass/fetch.cljs"
+     :find "(.-ok res)"
+     :replace "(or (.-ok res) (= 400 (.-status res)))"
+     :must-fail ["a-non-retryable-status-is-not-retried"]}
+
+    ;; ── retry が 2 回目に何を持ち越すか ───────────────────────────────
+    {:id :ovp/retry-relists-options-by-hand
+     :why (str "**これが元の形である。** retry 経路が opts を手で並べ直していたので、"
+               "新しい option を足した人はそこへの追加を忘れる —— 1 回目と 2 回目で"
+               "挙動の違う呼び出しになり、2 回目は既定へ黙って落ちる。落ちた先が"
+               "既定の endpoint なら、**検査が本番の Overpass を叩く**。"
+               "いまは (assoc opts :retry? false) で持ち越すので構造的に起きない")
+     :file "src/org_openstreetmap_overpass/fetch.cljs"
+     :find "(post-ql ql-string (assoc opts :retry? false))"
+     :replace "(post-ql ql-string {:endpoint endpoint :user-agent user-agent :min-interval-ms min-interval-ms :parse-opts parse-opts :retry? false})"
+     :must-fail ["the-retry-carries-the-options-it-was-given"
+                 "a-retryable-status-is-retried-exactly-once"]}
+
+    ;; ── 2 つの入口の広さ ─────────────────────────────────────────────
+    {:id :ovp/poles-entry-widens
+     :why (str "『fetch-poles でも selectors を使えると便利』という形の退行。"
+               "電柱用の短縮形が任意の選択子を受けるようになると、"
+               "**呼び出し側は 2 つの入口の違いを説明できなくなる**")
+     :file "src/org_openstreetmap_overpass/fetch.cljs"
+     :find "(select-keys opts [:kinds :timeout])"
+     :replace "(select-keys opts [:kinds :timeout :selectors :ways? :nwr? :meta?])"
+     :must-fail ["fetch-poles-is-the-narrow-entry-and-stays-narrow"]}
+
+    {:id :ovp/features-entry-drops-meta
+     :why (str "逆向き —— feature の入口から option を 1 つ落とす。呼び出し側は "
+               ":meta? true を渡し続け、**受け取る観測から version/timestamp が"
+               "黙って消える**（例外にはならない）")
+     :file "src/org_openstreetmap_overpass/fetch.cljs"
+     :find "[:selectors :kinds :timeout :ways? :nwr? :meta?]"
+     :replace "[:selectors :kinds :timeout :ways? :nwr?]"
+     :must-fail ["fetch-features-forwards-the-feature-options"]}]}]}
