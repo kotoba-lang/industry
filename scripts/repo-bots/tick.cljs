@@ -296,9 +296,22 @@
      :broke (count (filter #(= :broke (:event %)) recent))}))
 
 (defn- roster-drift
-  "west.yml に在って名簿に無い repo の数。名簿は生成物なので west.yml が進むと
-  黙って古くなり、**新しく登録された repo には bot が居ないまま**になる。
-  それは『床を割っていない』と同じ顔をするので、tick 自身が言う。
+  "名簿 (manifest/repo-bots.edn) が west.yml からどれだけ遅れているかを 2 つ数える。
+
+  `:missing` — west.yml に在って名簿に無い repo。名簿は生成物なので west.yml が
+  進むと黙って古くなり、**新しく登録された repo には bot が居ないまま**になる。
+  それは『床を割っていない』と同じ顔をする。
+
+  `:stale-pin` — 名簿の `:bot/pin` が west.yml の revision と違う repo。
+  `floor-pinned` は HEAD をこの `:bot/pin` と比べるので、**名簿が遅れた分だけ
+  誰も使っていない revision について答える**。向きは 2 つとも壊れる:
+  checkout が west.yml の pin ちょうどに在っても `:broken` と報告し（実測
+  2026-09-03、`kotoba-lang/num` —— HEAD = west pin = upstream tip の 3 点が一致
+  していたのに 7 日間 `pinned` として立ち続けた）、逆に HEAD がたまたま古い pin と
+  一致していれば west.yml が動いた後も `:ok` を返す。**後者は出力から見えない。**
+
+  ここを黙らせず tick 自身が言うのは、名簿の再生成が誰かの記憶に依存しているため。
+  ROSTER-DRIFT が membership しか見ていなかった間、pin の遅れは無症状だった。
 
   archived / datalad は名簿から意図的に外してあるので、ここでも外す —— さもないと
   常に 61 件のずれを報告し続け、**本物のずれが平常値に埋もれる**。
@@ -307,29 +320,35 @@
   [registry]
   (try
     (let [lines (str/split-lines (.readFileSync fs (.join path top "manifest" "west.yml") "utf8"))
-          eligible
-          (loop [ls lines cur nil out #{}]
+          eligible?  (fn [c] (and c (:path c)
+                                   (not (some #{"archived" "datalad"} (:groups c)))))
+          ;; path -> revision。revision が無い entry は nil のまま入れる（key の
+          ;; 有無が『west に在る』の答えなので、値が無いことで落とさない）。
+          west
+          (loop [ls lines cur nil out {}]
             (if-let [line (first ls)]
-              (let [flush (fn [o]
-                            (if (and cur (:path cur)
-                                     (not (some #{"archived" "datalad"} (:groups cur))))
-                              (conj o (:path cur))
-                              o))]
+              (let [flush (fn [o] (if (eligible? cur) (assoc o (:path cur) (:revision cur)) o))]
                 (cond
                   (re-find #"^    - name: \S+$" line) (recur (rest ls) {} (flush out))
                   (and cur (re-find #"^      path: (\S+)$" line))
                   (recur (rest ls) (assoc cur :path (second (re-find #"^      path: (\S+)$" line))) out)
+                  (and cur (re-find #"^      revision: (\S+)$" line))
+                  (recur (rest ls) (assoc cur :revision (second (re-find #"^      revision: (\S+)$" line))) out)
                   (and cur (re-find #"^      groups: \[(.*)\]$" line))
                   (recur (rest ls)
                          (assoc cur :groups (map str/trim (str/split (second (re-find #"^      groups: \[(.*)\]$" line)) #",")))
                          out)
                   :else (recur (rest ls) cur out)))
-              (if (and cur (:path cur)
-                       (not (some #{"archived" "datalad"} (:groups cur))))
-                (conj out (:path cur))
-                out)))
+              (if (eligible? cur) (assoc out (:path cur) (:revision cur)) out)))
           known (set (map :bot/repo registry))]
-      (count (remove known eligible)))
+      {:missing (count (remove known (keys west)))
+       ;; west 側に revision が無い entry は「pin が違う」ではなく測れない —— 数に
+       ;; 混ぜず落とす。名簿にしか無い repo も同様（それは :missing の裏で、
+       ;; ORPHAN として別に報告される）。
+       :stale-pin (count (for [b registry
+                               :let [w (get west (:bot/repo b))]
+                               :when (and w (:bot/pin b) (not= w (:bot/pin b)))]
+                           b))})
     (catch :default _ nil)))
 
 (defn- report! [registry state]
@@ -350,12 +369,16 @@
         unmeasured (- ticked measured)
         led (read-ledger)]
     (println (str "ROSTER\t" roster "\tbots"))
-    (let [d (roster-drift registry)]
+    (let [d (roster-drift registry)
+          parts (when d
+                  (cond-> []
+                    (pos? (:missing d))   (conj (str (:missing d) " 件が west.yml に在って名簿に無い"))
+                    (pos? (:stale-pin d)) (conj (str (:stale-pin d) " 件の :bot/pin が west.yml と違う"
+                                                     " —— その分 :pinned 床は誰も使っていない revision について答える"))))]
       (cond
-        (nil? d) (println "ROSTER-DRIFT\tUNMEASURED —— west.yml が読めない")
-        (pos? d) (println (str "ROSTER-DRIFT\t" d
-                              " 件が west.yml に在って名簿に無い"
-                              "\t再生成: nbb scripts/repo-bots/gen-registry.cljs"))))
+        (nil? d)   (println "ROSTER-DRIFT\tUNMEASURED —— west.yml が読めない")
+        (seq parts) (println (str "ROSTER-DRIFT\t" (str/join " / " parts)
+                                  "\t再生成: nbb scripts/repo-bots/gen-registry.cljs"))))
     (println (str "TICKED\t" ticked "\t(never " never ")"
                   (when (pos? orphans) (str "\tORPHAN " orphans " —— 名簿から消えた repo の state 行"))))
     (println (str "MEASURED\t" measured "\tUNMEASURED\t" unmeasured))
