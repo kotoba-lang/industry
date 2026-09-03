@@ -345,6 +345,18 @@ west pin を 5 件前進させ checkout を同期した直後に、今日直し�
 - 検証: amu 全 suite 1,304 tests / 9,462 assertions、166 / 166 namespace、exit 0（baseline 1,303 / 9,455、差は足した test ちょうど 1 本）。nbb wasm32 52 件、hermetic 12 件 PASS。
 - **process の発見 2 件**: ①lock を `deps.edn` の文面編集**より前**に再生成すると、digest が古いバイトに束縛され hermetic test が拒否する —— **lock が設計どおり fail-closed した**。最終編集の後に再生成する。②担当の watcher が sentinel を待っていたが、その sentinel は書かれない形でコマンドを組み直していたため、**観測できない watcher と、まだ待っている watcher が同じ姿になっていた**。害が無かったのは、担当が watcher の沈黙から推論せず**元の出力を直接読んだ**から。今日の 15 件と同じ形が、道具の側にも出ている。
 
+### 17. map literal の value 型 —— key のときと同じく、literal 以外は最初から一般的だった（着地 2026-09-03、第 4 反復）
+
+- kotoba-sema `0a5dcc2b`（ADR 0033）、kotoba-lang `a97c90b8`。
+- **実測表の第 1 列以外はすべて既に一般的だった。** `typed-map-new` / `get` / `assoc` / `dissoc` / `contains?` / `entry-at` は `:string` `:bool` `:keyword` record 入れ子 map vector set のすべてを admit し、`bounded-typed-value!` もそれらを検証していた。狭かったのは **bare literal だけ** —— 9 の key のときと**同じ形が 1 層上で**繰り返していた。
+- 機構: `map-literal-item-type` が literal 自身の値から value 型を読む（`:i64` `:string` `:bool` `:keyword` は直接、`typed-map-new` / `typed-set-new` / `record-new` / `hetero-vector-new` は宣言された第 1 引数から。いずれも reserved 名で descriptor head を検査する）。判らない式は何も寄与せず `:i64` のまま。`(assoc {} 1 <string>)` は desugar 後に走るので推論に訊く。
+- 拒否は 3 つとも型と障害を名指す（値の型が食い違う場合は**両方の型と両方の entry**、浮動小数の値、keyword key の非 i64 値には**貼り付けられる descriptor 付きで** `typed-map-new` を指す）。**keyword key の literal は今もバイト単位で legacy の `map-new` に落ちる** —— value 型の推論を受け取らないので、3 つ目の拒否が要る。
+- **浮動小数の障害は本物で、key から継承したものではなかった。** 実測: `bounded-typed-value!` は **key だけ**で sort し dedupe する（`[[1 10] [1 99]]` は値が違っても duplicate-key で throw する）。したがって value に順序も identity も要らない。value 側の障害は別物で、`validate-value-type!` が value 位置の浮動小数 encoding を持たないこと —— **そしてそれは frontend ではなく kotoba-kir が所有している。**
+- **stdlib の `:absent` は 1 つも無効化されなかった**（`get-in` は今も単相性、wasm32 の option 拒否 2 件は独立 isolate で再現）。**移動を捏造せず**、22 名すべてについて現行 toolchain での判定を `:reasons-re-read` として記録し、両方向を要求する ratchet test を足した。その再読で **`update`（`:withdrawn`）が stale だと分かった** —— isolate が今は exit 0 で compile し、記録された body が `browser-host.mjs` で 5 を返す。`:stale` として記録（再追加は version bump + oracle の仕事）。
+- **nbb の runner が JVM では捕まえられない欠陥を捕まえた**: 拒否文言が整数 key を `pr-str` して `#object[BigInt 1]` と印字していた —— **同じ拒否が 2 つの runtime で違うことを言っていた**。`str` に直した。bigint 由来の欠陥はこれで 4 例目。
+- 検証: 新 ns は pin された frontend に対して **6 failures + 22 errors exit 1**、修正後 18 tests / 40 assertions exit 0。merge 後の sema は JVM 352 / 1577、nbb 197 / 646 とも 0 failure。kotoba-lang の targeted 75 / 609 exit 0（全 suite の 5 fail + 1 error は pristine main で同数と実測済み）。end-to-end は wasm32-browser で `main()` = 125、**pin 側 sema を同じ classpath で走らせる対照は exit 65**。
+- **amu の bump は 5 つを同時にやる必要がある**（1 つでも欠けると `every-classpath-copy-of-the-grammar-is-the-same-grammar` が赤くなる。amu の vendored 複製が classpath 上で sema のものを shadow するため）: `deps.edn` の `:git/sha`、その隣の 2 つのコメント行、`resources/kotoba/lang/guest-grammar.edn` の実バイト、`guest_grammar_vendor_test` の authority 定数、そして `deps-lock.edn` の再生成（`--jvm-free` は stale な lock を拒否する）。kotoba-lang 側は `deferred-vendor-copies` に閉じる条件つきで記録済みで、**amu は自分の main では赤くない。**
+
 ### 残件（この ADR が次に指す先）
 
 1. `:state` ability（決定節のとおり。前提 4 つのうち vacuous な「handle は値でない」を先に赤にする）。
