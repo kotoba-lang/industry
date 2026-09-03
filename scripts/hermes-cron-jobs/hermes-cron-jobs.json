@@ -211,10 +211,10 @@
         "context_from": null,
         "deliver": "local",
         "enabled_toolsets": null,
-        "id": "9fae3ac234c7",
+        "id": "045c100bbbb2",
         "name": "isekai-bot-6420-watch",
         "no_agent": false,
-        "prompt": "捏造ゼロ — unknown は unknown と書く。business bot business-6420-assignmentisic64 (ISIC 6420 isekai web3-first) の health を fail-closed で点検する。手順: ①curl -sS -m 25 -H \"authorization: Bearer $(cat ~/.gftd/murakumo-service-token)\" https://itonami.cloud/api/v1/grok-bots/bots/business-6420-assignmentisic64/events で最新 3 event を取る。②差分検知: 前回記録した最新 event seq と比較し、変化が無ければ「isekai bot 6420: 差分なし (seq N)」1 行だけで終了。③変化があれば: checkpoint/committed が 2h 以内に在るか、error 系 event (bot/error, correction 等) の有無、bot_status (GET .../bots/business-6420-assignmentisic64) を読む。④最新 seq を /Users/junkawasaki/.hermes/profiles/isekai/cron/output/isekai-6420-lastseq.txt に書く。⑤checkpoint 2h 無し or bot_status paused/stopped or error event 在り → 異常として詳報 (running != healthy)。⑥公開面 https://isekai.network と fork feed /api/fork/feed の HTTP status も併記 (HTTP 200 だけでは健康ではない、約束どおりの物が返るか)。出力は 5 行以内。",
+        "prompt": "捏造ゼロ — unknown は unknown と書く。business bot business-6420-assignmentisic64 (ISIC 6420 isekai web3-first) の health を fail-closed で点検する。手順: ①curl -sS -m 25 -H \"authorization: Bearer $(cat ~/.gftd/murakumo-service-token)\" https://bots.itonami.cloud/v1/grok-bots/bots/business-6420-assignmentisic64/events?limit=8 の応答 JSON の **data 配列** (events ではなく data キー) を読む。②差分検知: data[0].seq を /Users/junkawasaki/.hermes/profiles/isekai/cron/output/isekai-6420-lastseq.txt に書かれた前回 seq と比較、同一なら「isekai bot 6420: 差分なし (seq N)」1 行で終了。③変化があれば: governor/held or error 系 event が data に無いか、bot status (GET .../bots/business-6420-assignmentisic64、last_error と budget_tokens_remaining を読む) を確認。budget_tokens_remaining=0 で status held の場合は「budget 枯渇 — owner 判断が必要」(raise/再起動は owner 承認事項)。④新しい data[0].seq を lastseq ファイルに上書き。⑤https://isekai.network と https://isekai.network/api/fork/feed の HTTP status + 返りが JSON か (200 だけでは健康ではない)。出力 5 行以内。",
         "repeat": {
           "completed": 0,
           "times": null
