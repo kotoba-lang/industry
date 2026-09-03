@@ -1,0 +1,115 @@
+[{:adr/authoritative_for
+  ["machi-hub（空き家・空き部屋を都市内小型物流ハブに転用する事業）の cloud-itonami Business Bot 化"
+   "転用判断面の新 blueprint cloud-itonami-machi-hub（ISIC 6810 primary、物流は optional）の設計境界"
+   "既存面との委譲境界 — 物流実行は 5320 / soko / kuramori、資産面は 6810 既存 actor が持ち、本 blueprint は転用判断のみを持つ"
+   "grok-bots Business Bot launch と cron watch の本 blueprint への適用"]
+ :adr/supersedes []
+ :adr/superseded_by []
+ :adr/topic "machi-hub-business-bot"
+ :adr/related
+ ["orgs/cloud-itonami/cloud-itonami-isic-6810（資産面の既存 blueprint。Realtor-LLM ⊣ RealtorGovernor。本 blueprint の actor 構造雛形兼判断の参照元"
+   "orgs/cloud-itonami/cloud-itonami-isic-5320（last-mile 配送の既存 blueprint。capability は kotoba-lang/logistics + omise + okaimono。転用後の実配送はこちら"
+   "orgs/cloud-itonami/cloud-itonami-isic-5210（terminal/depot Storage の既存 blueprint。governor 一意 keyword の慣行参照"
+   "orgs/kotoba-lang/soko（倉庫/物流 domain library。転用後の在庫・出荷 plan の受皿。本 blueprint は require しない — 判断面は self-contained"
+   "orgs/cloud-itonami/kuramori（倉庫内物流 robotics R0。実機を使わない限り本 blueprint と交差しない"
+   "90-docs/adr/2609032000-babiniku-business-bots-profile.edn（Business Bot profile 組織化の前例。本 ADR は同じ工程を新 blueprint に適用する"
+   "90-docs/adr/2609031630-bot-cron-jobs-are-organized-at-creation.edn（bot 作成時の cron organize 規則）"]
+ :adr/status "accepted"
+ :adr/id "adr-2609032142-machi-hub-business-bot"
+ :adr/doc_type "adr"
+ :adr/last_verified "2026-09-03"
+ :adr/body
+ "# ADR-2609032142: machi-hub — 空き家を都市内小型物流ハブに転用する判断面の blueprint + Business Bot
+
+**Status**: accepted
+**Date**: 2026-09-03
+**Deciders**: Jun Kawasaki（実行は itonami agent、恒久承認の範囲）
+
+## Context — 何を頼まれ、何が実測されたか
+
+オーナー指示（2026-09-03）: 「cloud itonami で 空き家や部屋を都市内の小型物流ハブに
+する bot、repo profile を計画して」→ plan 承認（「do it」）。
+
+**実測した現在地（2026-09-03、全て live probe または checkout 読み）:**
+
+| 事実 | 値 | 出所 |
+|---|---|---|
+| live registry | 30 blueprint。`cloud-itonami-6810`（Community Real-Estate Agency）登録済・未 launch | GET https://itonami.cloud/api/open-business |
+| 6810 blueprint repo | Realtor-LLM ⊣ RealtorGovernor。src/realty/{facts,governor,operation,store,phase,sim}.cljc | orgs/cloud-itonami/cloud-itonami-isic-6810 |
+| last-mile | ISIC 5320 blueprint（capability: kotoba-lang/logistics, omise, okaimono） | 同 repo blueprint.edn |
+| storage | ISIC 5210 blueprint（terminal/depot）。governor 一意 keyword 慣行の記録あり | 同 README |
+| 倉庫 domain library | kotoba-lang/soko（multi-location stock, shipment, fulfillment） | repo-search 実測 |
+| 倉庫内 robotics | kuramori 倉守（R0 sim のみ、G1 design+sim only） | 同 README |
+| 欠けている面 | 空き家 × 交通/需要条件 → micro-hub 転用の**判断** vertical はどの blueprint にも無い | concept-lookup + repo-search |
+
+## Decision
+
+### D1. 面の切り方 — 転用判断は 6810 primary の新 blueprint
+
+不動産の主体（空き家の利活用判断）は不動産活動なので **ISIC 6810 を primary** にする。
+物流は `:optional-technologies`。既存 5210/5320 は各々の vertical を持つため、
+それらに統合せず新 blueprint `cloud-itonami-machi-hub` を建てる。governor は
+fleet 一意 keyword `:machi-hub-governor`（5210 README の grep-verified 慣行）。
+
+**委譲境界**: 転用後の実配送は 5320 actor、在庫/出荷 plan は soko、倉庫内 robotics
+は kuramori が持つ。本 blueprint は require しない — 判断面は self-contained
+（5210 README「SELF-CONTAINED」前例）。capacity 計算に必要な物流概念は
+純関数として registry.cljc 内に最小限だけ書く。
+
+### D2. domain core（src/machi_hub/registry.cljc、pure cljc）
+
+- `site` = 空き家/空き部屋候補（area, floor, entrance, freight-access,
+  vacancy-months, asking-rent, zoning）
+- `demand` = hub 需要の観測（delivery-density, pickup-demand, distance-to-nearest-hub）
+- `feasible?` = micro-hub 転用可否（床面積・搬入口・需要閾値）。jurisdiction facts
+  （machi_hub/facts.cljc）に無い都市計画判断は `:unverified` を返し fail closed
+- `score` = 転用候補 ranking（rent spread, demand proximity, freight access）
+
+### D3. actor（HubAdvisor ⊣ HubGovernor、langgraph-clj StateGraph）
+
+6810 の realty/* 構造を雛形に adaptation。governor HARD gates:
+
+- **G1**: proposal のみ。契約締結・鍵授受・現地改修・内見の実行を LLM に出させない
+- **G2**: jurisdiction facts に無い規制判断は `:unverified`（fail closed）。
+  LLM に用途地域・建築確認の判断を作らせない
+- **G3**: 個人情報（賃借人・入居者・所有者名）を listing/ledger に載せない
+- **G4**: 転用先が物流のとき、実配送の着手は 5320 actor / Phase 承認後。
+  本 blueprint は proposal で止まる
+
+### D4. Business Bot launch（skill itonami-business-bots 手順どおり）
+
+1. blueprint を live registry に登録（public/open-business.json が SSoT。
+   registry.count 30→31、metadata 一緒に更新、version patch +1）
+2. Pages deploy（`npx wrangler pages deploy public --project-name=cloud-itonami
+   --branch=main --commit-dirty=true`）→ `GET /api/open-business` で count 31 実測
+3. bearer 204（kagi MURAKUMO_SERVICE_TOKEN_LOCAL_MURAKUMO、operator copy と
+   比較。echo しない）→ wallet 鍵生成・kagi 保存（LibreSSL 一潰し flag、
+   64 hex 検証）→ noble 1.9.7 署名 → POST
+4. credit は最小の 1000 micro-USDC（pause が支出を減らす方向。上げるのは
+   owner-scoped）。6420 の実測（tick 3 で budget-exhausted）を踏まえ、watch は
+   「budget 渇き = owner 判断」と報告する設計にする
+5. live verify: `GET /api/v1/grok-bots/bots/{bot_id}/activity` に最初の
+   conversation.checkpoint が着くこと（`running` 行だけでは健康ではない）
+
+### D5. 不変条件
+
+- **honest-default**: bot の checkpoint は「転用契約なし = 収益 0」を言う。
+  実ハブ運営・実契約が無いのに収益を示唆する記述は gate 違反
+- **判断面と実行面の分離**: 本 blueprint の ledger に実配送・実改修の記録を
+  書かせない（5320/kuramori の ledger に属する）
+- **1 bot = 1 blueprint**: machi-hub に対する2本目の bot は別 assignment
+
+## Consequences
+
+- (+) 空き家利活用の ops surface が itonami.cloud の監査可能な bot 面に載る。
+  毎時 bounded checkpoint が append-only ledger に残る
+- (+) 既存 actor 構造（6810 realty/*）の adaptation で済み、物流/倉庫面の再発明が無い
+- (−) 6810 と machi-hub が同じ ISIC を参照する — registry fuzzy match
+  （isic OR id OR path）で 6810 と衝突しないよう、id に `machihub` を含める
+- (−) 実際のハブ運営は物理事業であり bot 単独では収益にならない。scope honesty:
+  bot は ops surface であって収入ではない
+- リスク: 用途地域・住宅確保等規制・建築確認の jurisdiction facts は未整備。
+  未整備 jurisdiction は `:unverified` で fail closed（捏造しない）
+", :adr/deciders ["Jun Kawasaki"], :adr/date "2026-09-03", :adr/measured
+"{:probes {:registry {:count-before 30 :gap \"no machi-hub vertical\"} :isic-6810 {:blueprint :registered :launch :not-launched} :isic-5320 {:capability [\"kotoba-lang/logistics\" \"kotoba-lang/omise\" \"kotoba-lang/okaimono\"]} :soko {:layer [:warehouse :shipment :fulfillment]} :kuramori {:status :R0-sim-only}}}", :adr/title
+"ADR-2609032142: machi-hub — 空き家を都市内小型物流ハブに転用する判断面の blueprint と Business Bot（ISIC 6810 primary）", :adr/source-format "edn", :db/id -1}]
