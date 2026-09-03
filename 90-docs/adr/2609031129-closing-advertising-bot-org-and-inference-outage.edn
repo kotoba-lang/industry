@@ -1,0 +1,121 @@
+[{:db/id -1
+  :adr/id "adr-2609031129-closing-advertising-bot-org-and-inference-outage"
+  :adr/doc_type "adr"
+  :adr/topic "closing-advertising-bot-org-and-inference-outage"
+  :adr/title "ADR-2609031129: closing — 7310 bot 組織設計の着地と、inference 断・service token 二重 rotation の記録"
+  :adr/status "accepted"
+  :adr/date "2026-09-03"
+  :adr/last_verified "2026-09-03"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["2026-09-03 の広告 bot 組織設計タスク (ADR-2609030930) の着地証跡と現在地"
+   "gad inference 断 (ComfyUI-h3 が VRAM 86% + GPU 100% を占有) の実測と、agent が解決しなかった理由"
+   "MURAKUMO_SERVICE_TOKEN が同日に 2 度 rotation され、後発の rotation が先発の値を無効化した実測"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends ["adr-2609030930-advertising-7310-autonomous-bot-organization"]
+  :adr/related
+  ["adr-2609030930-advertising-7310-autonomous-bot-organization"
+   "adr-2607302100-advertising-four-planes"]
+  :adr/evidence
+  ["GitHub contents API: 90-docs/adr/2609030930-…edn が origin/main に実在 (12,261 bytes, merge 0a27f0c)"
+   "GitHub contents API: cloud-itonami-isic-7310 docs/bot-organization.md が main に実在 (3,845 bytes, merge 3be2b9b)"
+   "bots.itonami.cloud live: business-7310-assignmentisic73 — 3 ticks 完走 (checkpoint committed, http_get tool), その後 budget-exhausted で held"
+   "gad (100.82.98.110) SSH 実測: rocm-smi VRAM 86% / GPU 100%、ComfyUI-h3 (pid 2409002) が 43.9GB GPU メモリを占有"
+   "api.murakumo.cloud /v1/responses + /v1/chat/completions が 500 (error code: 1101)、/health は 200"]
+  :adr/body
+  "# ADR-2609031129: closing — 7310 bot 組織設計の着地と、inference 断・token 二重 rotation の記録
+
+## 着地したもの (default branch に実在、GitHub API で検証済み)
+
+| 成果物 | 位置 | 証跡 |
+|---|---|---|
+| **ADR-2609030930** (bot 組織設計: 4 bot + 承認面) | superproject `90-docs/adr/` | merge `0a27f0c`、contents API で 12,261 bytes 確認 |
+| **docs/bot-organization.md** (operator 要約) | `cloud-itonami-isic-7310` | merge `3be2b9b`、contents API で 3,845 bytes 確認 |
+| **west pin 前進** (cloud-itonami → d6c92c08) | superproject `manifest/west.yml` | commit `f6e9952`、verify-west-pins OK、`west update` で checkout 同期済み |
+| **skill `itonami-business-bots`** (launch/runbook + 実測 pitfall) | Hermes profile skills | live で読める (skill_view 実測) |
+| ** secrets-location-map 更新** (service token 再発行 + wallet 鍵) | `.claude/skills/secrets-location-map/references/` | 2 ファイル更新済み |
+
+## Business Bot の実績 (2026-09-03 実測)
+
+- `business-7310-assignmentisic73`: **3 ticks 完走**。各 tick で
+  `http_get` により `https://itonami.cloud/api/open-business/7310` を読み、
+  「blueprint 'cloud-itonami-isic-7310' を確認した」という checkpoint を commit。
+- 4 tick 目から **budget-exhausted で held** (launch 時の budget 4096 tokens を
+  3 ticks で消費、1 tick ≈ 1,634 tokens)。refill 済み (16,384) で start した直後、
+  下記の inference 断に当たり job/failed。
+
+## 発見した live 障害 2 件と、解決できたもの・できなかったもの
+
+### 1. inference 断 (未解決 — owner 判断が必要)
+
+- `api.murakumo.cloud` の `/v1/responses` `/v1/chat/completions` が
+  **500 (error code: 1101)**、`/health` は 200。 murakumo-main alias は
+  qwen3.8-27b (gad Vulkan) を指す。
+- gad (100.82.98.110) SSH 実測: **rocm-smi で VRAM 86% / GPU 100%**。
+  占有者は **ComfyUI-h3 (pid 2409002, 43.9 GB GPU メモリ)** + ComfyUI 本体 +
+  ComfyUI-034 の 3 インスタンス (generation.murakumo.cloud の本番 backend)。
+- llama-server (Qwen3.8-27B) は **vk::DeviceLostError で起動すら失敗**
+  (-ngl 999 も -ngl 33 も IQ2_M 8GB も同様)。GPU が空くまで上がらない。
+- **agent が ComfyUI を止めなかった理由**: それは generation plane の
+  本番 backend であり、「chat 用 model を上げるために本番生成 backend を止める」
+  は**資源の優先順位の owner 判断**であって agent の判断ではない (安全床の
+  「他者データの破壊」には当たらないが、live 共有 infra の稼働を下げる操作は
+  それ自体が本番影響)。7310 bot と default resident は held のまま静置した
+  (crash-loop させない)。
+
+**次の一手 (owner)**: (a) ComfyUI-h3 を止める → llama-server を上げる、または
+(b) VRAM が空いている別ノードに murakumo-main alias を振る
+(KV `murakumo-main` の PUT 1 件で fleet 全 consumer が追従)、のどちらか。
+後者が推奨 (generation を止めない)。
+
+### 2. MURAKUMO_SERVICE_TOKEN の二重 rotation (未解決 — 運用規律の問題)
+
+- 2026-09-03 00:15 に owner 承認 (B案) で再発行し kagi + `~/.gftd/` に保管、
+  authorize 204 実測。
+- **同日 10:3x 頃に別セッションが再 rotation し、先発の値が無効化された**
+  (authorize 401 を実測。kagi item も上書きされた)。
+- **再 rotation 合戦を起こさないために止めた** — 誰がどちらを正とするかは
+  両セッションの作業を統合する owner の判断。 Worker の secret は
+  最後に put した値が生きる。**現行の正値は、最後に rotation したセッションの
+  kagi/ファイル保管にある** (私の保管した値は上書き済みで無効)。
+- 教訓: この secret は `secrets-location-map` の murakumo.md に
+  「rotate すると /infer/runs write gate も grok-bots authorize も同時に落ちる」
+  と記録してあったが、**「同時刻に複数セッションが触らない」規律は機械強制が
+  無い**。rotation 前に `authorize` probe で現行値の有効性を測る手順を
+  skill に追記済み (itonami-business-bots)。
+
+## 未着手 (ADR-2609030930 の rollout 2-5)
+
+- B3 ops-metering bot の追加 (POST /v1/grok-bots/bots)
+- B1 営業 resident (loop-noren 雛形 + 7310 governor 差し替え)
+- B4 kaizen resident (週次、gftd.gate 呼び出し)
+- 4 bot の `cloud.itonami.bots-status.v1` residents 統合
+- **hourly loop 化** (owner 指示 2026-09-03: 「1h 単位で loop が回るように」):
+  B2 の DO bot は既に interval_ms 3,600,000 で hourly。ただし B2 の
+  queue prompt が blueprint 読みのままなので、intake checklist 追跡への
+  prompt 差し替えが「hourly で業務が進む」状態への第一歩。inference 回復が
+  先行条件。
+
+## 保全した owner WIP
+
+- superproject 本体の未コミット変更 3 件は他セッション/owner のものとして触らない:
+  `.claude/skills/secrets-location-map/references/{identity-seeds,murakumo}.md` (本タスクの
+  更新は GitHub main の merge には含めず、profile 側 file としてのみ存在 —
+  superproject の同 path は別管理)、`90-docs/observatory/observatory.datoms.edn`。
+- superproject 本体 checkout は `.git/index.lock` (10:03, 別セッション) により
+  ff-pull 未了。origin/main (0a27f0c) には全着地済みなので、次セッションが
+  lock 解放後に `git merge --ff-only origin/main` すれば追従する。
+
+## 次の最初の一手 (resume point)
+
+```
+# 1. inference 回復 (owner): VRAM を空けた上で
+ssh gad 'nohup /home/gad/murakumo/llama.cpp/build-vulkan/llama-b9873/llama-server    -m /home/gad/models/Qwen3.8-27B-GGUF/Qwen3.8-27B-Q4_K_M.gguf    -ngl 999 -c 262144 --parallel 1 --host 0.0.0.0 --port 8090 > /var/log/llama-server-qwen38.log 2>&1 &'
+# 2. curl -sS -o /dev/null -w '%{http_code}' -X POST https://api.murakumo.cloud/v1/chat/completions  #      -H 'content-type: application/json' -d '{\"model\":\"murakumo-main\",\"messages\":[{\"role\":\"user\",\"content\":\"ok\"}],\"max_tokens\":8}'
+#    → 200 になれば bots を start:
+#    POST /v1/grok-bots/bots/business-7310-assignmentisic73/start (Bearer)
+# 3. token: 最後に rotation したセッションの保管値を確認してから kagi を揃える
+```"}]
