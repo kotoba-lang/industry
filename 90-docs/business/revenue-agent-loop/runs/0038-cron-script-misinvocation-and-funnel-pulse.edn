@@ -1,0 +1,50 @@
+;; Run 0038 — kotobase-stab cron iteration 2026-09-03
+{:as-of "2026-09-03T10:32:40+09:00"
+ :kind :stabilization-run
+ :run-id "0038"
+
+ ;; 1. Script error report (delivered to user)
+ :script-error
+ {:file "~/.hermes/profiles/kotobase-stab/scripts/kotobase_lead_loop.cljs"
+  :reported "SyntaxError: closing parenthesis '}' does not match opening parenthesis '(' on line 24 (Python stderr format)"
+  :diagnosis "Mis-invocation, not a code defect. The .cljs file is valid ClojureScript (lines 24-26 are the internal-domains set literal). A Python interpreter was run against it. Same file executed via `nbb ... funnel-pulse` exits 0 and records a pulse."
+  :verified-fix "nbb v1.2.212 available at /opt/homebrew/bin/nbb; repo copy at 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljs ran clean (EXIT=0)."}
+ 
+ ;; 2. Measured signals (2026-09-03, all live)
+ :measurements
+ {:funnel-api {:status 200
+               :visitors 4810 :signups 31 :checkouts 0
+               :delta-since-last-pulse {:visitors 1836 :signups 6 :checkouts 0}
+               :last-pulse-before-this "2026-08-13T22:01:00+09:00 (21-day measurement gap — cron gap, not site downtime)"
+               :note "Visitor/signup movement without checkout is not demand. Score unchanged."}
+  :x402 {:submissions 4 :rejections 4 :settlements 0 :settlement-rate 0
+         :rejections-unexplained 3}
+  :stability-checks [{:path "/" :status 200 :time-s "0.078"}
+                     {:path "/signup" :status 200 :time-s "0.052"}
+                     {:path "/pricing" :status 200}
+                     {:path "/ipld/" :status 404 :note "also /ipld 404, /ipld/v1 400 — route alive but requires params; check path in the bot config is stale, not an outage"}
+                     {:path "/api/funnel" :status 200 :time-s "0.313"}]
+  :funnel-pulse-recording "appended to 90-docs/business/metrics/net-kotobase-funnel-pulses.edn (script did this, exit 0)"}
+ 
+ ;; 3. SCORE → SELECT (SCORECARD.md, 100-point weights)
+ :score-selection
+ {:selected "counsel approval follow-up on legal DRAFT packet (net-kotobase) — unblocking the only gate that holds every cash-first row"
+  :reason "Every ranked cash-first action is blocked: 6399/6310 = 75pt blocked by counsel-written-advice gate (run 0021 superseded the terms/DRAFT reason — legal site is live, only counsel advice missing); shinshi 62 / itonami-7810 65 / 5820 61 / 854 51 / babiniku 48 all red-gated. The 75pt row needs no product work, just a reply. Net-kotobase funnel: 31 signups, 0 checkouts, but commercial go stays no-go while /legal/* is DRAFT/UNAPPROVED (run 0031/0032). One gate, six blocked rows → highest leverage. WIP=1."
+  :wip "1 (Beekle form still requires human Chrome + Turnstile — untouched, not counted as attempted)"}
+ 
+ ;; 4. Bounded experiment — DRAFT ONLY, not sent
+ :experiment
+ {:type :draft-only
+  :deliverable "follow-up email draft to counsel requesting approval status of legal/counsel-review-packet.md (sent 2026-08-14, no return as of 2026-09-03; 20 days elapsed)"
+  :draft-path "90-docs/business/net-kotobase/counsel-followup-draft-20260903.md"
+  :destination "counsel of record (address on file in the counsel packet; agent does not send)"
+  :sent? false}
+
+ ;; 5. Next verification
+ :next [{:what "counsel written approval return (unblocks 75/65/62/61/51pt rows)"}
+        {:what "fix stale /ipld/ check path in cron config to /ipld/v1 or correct route"}
+        {:what "verify cron invocation uses nbb for .cljs (mis-invocation caused today's reported error)"}]
+
+ :canvas-ledger-touched? false
+ :score-raised? false
+ :exaggeration-guard "No external payments exist. 31 signups are not demand. No revenue counted."}
