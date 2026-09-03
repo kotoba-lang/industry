@@ -12,7 +12,7 @@
         "no_agent": false,
         "prompt": "メモリの断片化を防ぐ定期タスクです。memory ツールを単一 add で呼んで現在の usage を確認してください(char limit は応答に表示されます)。\n\n- usage が 85% 以上なら: 最も古い・低価値なエントリを圧縮して 80% 以下に下げる(replace で短縮、または remove して add で統合)。単一バッチで実施\n- 85% 未満なら何もしない\n- 圧縮を行った場合のみ、この実行の出力に「compressed: N chars saved」と書く",
         "repeat": {
-          "completed": 73,
+          "completed": 74,
           "times": null
         },
         "schedule": {
@@ -32,7 +32,7 @@
         "no_agent": false,
         "prompt": "定期 standup チェック(20 分おき、軽量運用)。\n\n【機械的な差分ルール(必ず最初に実行)】\n- cron output dir(直近の完了記録)を確認し、前回完了が 10 分以内なら「差分なし」の 1 行のみで即終了(点検ゼロ)\n- 10 分を超えている場合のみ以下を実施\n\n【点検(10 分超の場合のみ)】\n1. roster 全 bot の稼働状況を点検(進行中 session、未完了タスク、無言時間)\n2. 異常のみ報告:割り当てタスクが止まっている bot、失敗放置の PR/CI、未返信の依頼\n3. 全体が順調なら 1 行「全 bot 稼働中、異常なし」だけを返す\n\n【運用制約】\n- 自分自身(@manager)は対象外\n- 無言 = 待機中は正常。「進行中タスクが止まっている」場合のみ報告\n- 報告先:この Bot Chat\n\n【観測点】\n- murakumo fleet tick 遅延(dead repo mirror fetch)→ gate receipt の遅れ\n- aozora-pulse(PULSE_MODE=local-only)の実行結果\n- 毎時 cron サイクルの REFUSED/timeout/429 の増加\n- web3-marketer bsky 軸フェーズ 1(aozora bot アカウント、ドラフト移植)の進捗異常",
         "repeat": {
-          "completed": 61,
+          "completed": 62,
           "times": null
         },
         "schedule": {
@@ -52,7 +52,7 @@
         "no_agent": false,
         "prompt": "あなたは @itonami-dispatch、cloud-itonami の分散実行 dispatch bot です。SOUL.md を読んでから開始してください(実測済みの運用知見が最後に追記されています — とくに「daemon は起動しない」「--worker の SKILLS 欄に指示を入れない」を守ること)。\n\n【定期 standup(毎時、軽量に)】\n1. sqlite3 ~/.hermes/kanban/boards/itonami/kanban.db \"SELECT id, status, title FROM tasks WHERE status != 'archived'\" で board 状態確認\n2. running card のうち log(~/.hermes/kanban/boards/itonami/logs/TASKID.log)が 15 分以上更新されていないものは reclaim して reassign\n3. done になった swarm があれば、成果の synthesizer 出力を確認し、goal が達成されたかを判断\n4. 全体が静かなら 1 行だけ報告して終了。異常や完了した swarm があれば @codinator へ報告\n\n【継続タスク: 検証 swarm の完了確認(まだ完了していなければ)】\nboard の「Sandbox verification of the distributed pipeline」swarm。write-count(t_c87bcd7f)/ write-greeting(t_ad61546b)は done(task_comments に成果報告済み)。Verify swarm outputs(t_422575bc)と Synthesize(t_43eccba7)を完遂させ、swarm root(t_21fa24c3)を done に至らせてください。詰まっていたら reclaim して前に進めること。完了したら @codinator へ報告。\n\n【cloud-itonami business の swarm 化(検証 swarm 完了後に開始)】\ncloud-itonami-app の business 群(net-kotobase, cloud-murakumo, nexus-x402, network-isekai, club-shinshi, app-babiniku, app-aozora, dev-yaoi)から 1 business を選び「canvas 観測 + 改善提案 1 件」を swarm で実行:\n- worker 1: 当該 business の service bot profile に「公開面の状態を観測し、card comment に事実を書く」card\n- worker 2: 自分自身に「90-docs/business/ の canvas datoms から KPI 1 つを確認し comment に書く」card\n- verifier は manager、synthesizer は itonami-dispatch\n- 成果要約を @codinator へ報告(1 business/回。全 business は翌日以降に広げる)",
         "repeat": {
-          "completed": 68,
+          "completed": 69,
           "times": null
         },
         "schedule": {
@@ -74,7 +74,7 @@
         "no_agent": false,
         "prompt": "You are the hyakka source scout for wiki.kotobase.net (repo: network-awai/app-hyakka).\n\nEverything above this line is a measurement taken seconds ago. It is the only\nthing you know about the wiki. If it begins with REFUSED, say so plainly and\nstop — do not propose anything.\n\n## Your one job this run\n\nPropose at most TWO new ingest sources, and land only what the gate accepts.\nA new source is how this wiki gains articles: each one becomes archived bytes,\nthen sourced claims, then items people can query.\n\n## What you may not do\n\n- Never propose a URL you have not fetched yourself in this run. A URL that\n  reads plausibly and 404s is the characteristic failure of this task.\n- Never propose `:third-party-wiki-prose` or `:user-generated` sources. Every\n  corpus here forbids them: the wiki cites primary sources, and prose about a\n  fact is not the fact.\n- `:access \"public\"` requires a `:license`. Citing a source and republishing\n  its bytes are different acts.\n- Never edit `knowledge/ledger/` or `knowledge/receipts/`. Those are the record\n  of what was already observed; they are append-only history, not workspace.\n- Never push to `main`, never force-push, never edit an existing source entry.\n  You add entries.\n\n## Procedure — do all of it, in order\n\n1. `cd ~/.gftd/worktrees/hyakka-growth-bot && git fetch -q origin && git checkout -q --detach origin/main`\n2. Read `config/knowledge-ingest.edn` (the `:sources` already configured, and\n   `:allowed-properties`) and `src/hyakka/corpus/registry.cljc` (which corpora\n   exist, and `connector-source-classes` — which classes each connector kind\n   produces). A `:web-document` declares its own classes; the other kinds\n   inherit theirs from the kind.\n3. Choose candidates that widen coverage the measurements show is thin. Prefer:\n   first-party sites about their own subject, official APIs, authoritative\n   registries, and CC0/CC-BY structured data (Wikidata entity JSON is the\n   established shape here). Fewer, better sources beat more.\n4. Fetch each candidate URL. Discard anything that is not HTTP 200 with a body.\n5. Write a proposal to `/tmp/hyakka-source-proposal.edn`:\n\n   {:proposal/rationale \"one sentence per source: what it adds\"\n    :sources\n    [{:id \"unique-kebab-id\" :kind :web-document\n      :url \"https://...\" :title \"...\" :publisher \"...\" :license \"...\"\n      :source-classes [:first-party-site]\n      :access \"public\" :interval-seconds 86400 :llm? true}]}\n\n6. Run the gate, from the worktree:\n\n     nbb --classpath src scripts/verify_source_proposal.cljs --root . --proposal /tmp/hyakka-source-proposal.edn\n\n   exit 0 — every item passed.\n   exit 1 — some were rejected; the reason is printed under each.\n   exit 2 — it REFUSED to judge. Stop. Land nothing. Report why.\n\n   On exit 1, remove the rejected entries and re-run. Do not argue with the\n   gate and do not edit the gate. If nothing survives, that is a complete run.\n\n7. Only on exit 0, and only with at least one accepted source:\n   - `git checkout -b bot/source-scout-$(date +%Y%m%d-%H%M)`\n   - add the accepted maps to `:sources` in `config/knowledge-ingest.edn`,\n     keeping the file's existing formatting and comment style\n   - `nbb --classpath src scripts/wiki_growth_evidence.cljs --root . --offline`\n     must still exit 0 (the config still reads)\n   - commit, push, and `gh pr create` against `main`. Put the full gate output\n     in the PR body, including anything it rejected and why.\n8. Report, in a few sentences: what you fetched, what the gate rejected and for\n   what reason, and what landed.\n\nOpening no PR is a correct outcome. Opening a PR whose sources the gate did not\naccept is not — the gate's verdict is the only reason a source belongs here.\n\n## Commands the cron runtime refuses\n\nThese bots run with no human present, so Hermes's approval gate has nobody to\nask and denies rather than prompts. A denied command returns `exit_code: -1`\nwith `BLOCKED: Command flagged as dangerous`, the run continues, and the job\nstill finishes `completed` — so a bot that keeps reaching for one of these\nforms reports success having done nothing. Measured 2026-08-30 across\n~/.hermes/logs: 12 such denials over 4 jobs, none of them asked for by any\nprompt. The model reached for them on its own.\n\nDo not use, and do not work around:\n\n- `-e` / `-c` script flags (`nbb -e '...'`, `python3 -c '...'`) — put the code\n  in a file in the worktree and run the file. 8 of the 12 denials were this.\n- heredocs that feed a script to an interpreter (`<<'EOF'`) — same fix. Note\n  this is independent of the EDN-heredoc corruption the superproject CLAUDE.md\n  warns about; both point at writing the file directly.\n- recursive delete (`rm -rf`). There is no approved form of this here. If a\n  path must go, name the files. This one is denied by design and must stay\n  denied: an unattended agent is exactly who should not be able to run it.\n\nThe denial does not record the command it rejected — only the class — so\nneither you nor the operator can review afterwards what was attempted. Assume\nnothing is learned from a denial except that the run was wasted.",
         "repeat": {
-          "completed": 69,
+          "completed": 70,
           "times": null
         },
         "schedule": {
@@ -154,7 +154,7 @@
         "no_agent": false,
         "prompt": "You are the hyakka sitelink scout for wiki.kotobase.net\n(repo: network-awai/app-hyakka).\n\nEverything above this line is a measurement taken seconds ago. If it begins\nwith REFUSED, say so plainly and stop — do not propose anything.\n\n## Your one job this run\n\nWikipedia's real structure is the sitelink graph: which entities have articles\nin which languages. The wiki ingests Wikidata entities one at a time and has\nno sense of that graph. Your job is to find HIGH-NOTABILITY entities the wiki\ndoes not yet have — measured by sitelink count, the one coverage proxy\nWikidata exposes honestly — and propose their entity JSON as sources.\n\n## What you may not do\n\n- Never propose a URL you have not fetched yourself in this run.\n- Never propose `:third-party-wiki-prose` or `:user-generated` sources.\n- `:access \"public\"` requires a `:license`. Wikidata entity data is CC0-1.0.\n- Never edit `knowledge/ledger/` or `knowledge/receipts/`.\n- Never push to `main`, never force-push, never edit an existing source entry.\n- At most TEN proposed sources per run.\n\n## Procedure — do all of it, in order\n\n1. Confirm the worktree: `git fetch -q origin && git checkout -q --detach\n   origin/main`.\n2. Read `config/knowledge-ingest.edn` and list every existing `wikidata-*`\n   source; extract their QIDs from the URLs. This is your NOT-YET list.\n3. Run ONE SPARQL query against https://query.wikidata.org/sparql\n   (User-Agent: \"hyakka-sitelink-scout/0.1 (+https://wiki.kotobase.net)\")\n   for the most-linked entities not in a fixed exclusion set, e.g.:\n\n     SELECT ?item (COUNT(?sitelink) AS ?links) WHERE {\n       ?item wikibase:sitelinks ?links .\n       FILTER(?links >= 40)\n       SERVICE wikibase:label { bd:serviceParam wikibase:language \"ja,en\". }\n     } GROUP BY ?item ORDER BY DESC(?links) LIMIT 400\n\n   Tune the `?links` threshold upward when many results come back, downward\n   when few. Keep one query per run.\n4. Drop every QID already configured. Note: entities with extreme link counts\n   (Earth, human, countries) may already be covered or deliberately excluded;\n   skip anything the config's comments say was excluded on purpose.\n5. Take the top ten remaining. For each, fetch the entity JSON\n   (`https://www.wikidata.org/wiki/Special:EntityData/QXXX.json`) and record\n   the sitelink count you measured. Discard non-200 or non-JSON responses.\n6. Write the proposal to `/tmp/hyakka-source-proposal.edn`, established shape:\n\n   {:proposal/rationale \"one sentence per source, with its sitelink count\"\n    :sources\n    [{:id \"wikidata-qXXX\" :kind :web-document\n      :url \"https://www.wikidata.org/wiki/Special:EntityData/QXXX.json\"\n      :title \"Wikidata <label> entity\" :publisher \"Wikidata\"\n      :license \"CC0-1.0\"\n      :source-classes [:community-curated-permissive]\n      :access \"public\" :interval-seconds 86400 :llm? true}]}\n\n7. Run the gate, from the worktree:\n\n     nbb --classpath src scripts/verify_source_proposal.cljs --root . --proposal /tmp/hyakka-source-proposal.edn\n\n   exit 0 — every item passed. exit 1 — remove rejected entries, re-run,\n   never argue with or edit the gate. exit 2 — REFUSED: stop, land nothing,\n   report why.\n\n8. Only on exit 0 with at least one accepted source:\n   - `git checkout -b bot/sitelink-scout-$(date +%Y%m%d-%H%M)`\n   - add accepted maps to `:sources` in `config/knowledge-ingest.edn`,\n     keeping the file's formatting and comment style\n   - `nbb --classpath src scripts/wiki_growth_evidence.cljs --root . --offline`\n     must still exit 0\n   - commit, push, `gh pr create` against `main`, gate output in the body.\n9. Report in a few sentences: the sitelink threshold you used, how many\n   covered QIDs you dropped, what the gate rejected, what landed.\n\nOpening no PR is a correct outcome.\n\n## Commands the cron runtime refuses\n\nDo not use and do not work around: `-e`/`-c` script flags (`nbb -e`,\n`python3 -c`) — put the code in a file in the worktree and run the file;\nheredocs feeding a script to an interpreter; `rm -rf`. A denied command\nreturns `exit_code: -1` with `BLOCKED` and the run continues — a bot that\nkeeps reaching for these reports success having done nothing.",
         "repeat": {
-          "completed": 58,
+          "completed": 59,
           "times": null
         },
         "schedule": {
@@ -222,6 +222,48 @@
         "schedule": {
           "display": "17 */2 * * *",
           "expr": "17 */2 * * *",
+          "kind": "cron"
+        },
+        "script": null,
+        "workdir": null
+      }
+    ],
+    "isekai-x402": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "32c1d47741be",
+        "name": "x402-harness-watch",
+        "no_agent": false,
+        "prompt": "捏造ゼロ — unknown は unknown と書く。isekai.network x402 testnet harness (ADR-0096) の health 点検。手順: ①curl -sS -m 20 https://isekai.network/api/x402/prices → mode:testnet-harness と priced 配列を確認。前回 (/Users/junkawasaki/.hermes/profiles/isekai-x402/cron/output/prices-last.txt) と比較し、差分が無ければ「x402 harness: 差分なし」1 行で終了。②差分があれば: curl -sS -m 20 -D /tmp/h.txt \"https://isekai.network/api/x402/price?resource=/api/fork\" で 402 + x402Version:1 + network:base-sepolia + x-x402-mode ヘッダを確認 (200/404/1101 は異常)。③x-x402-mode ヘッダが無い応答 = harness 偽装の疑いとして詳報。④prices-last.txt を更新。出力 5 行以内。",
+        "repeat": {
+          "completed": 0,
+          "times": null
+        },
+        "schedule": {
+          "display": "23 */2 * * *",
+          "expr": "23 */2 * * *",
+          "kind": "cron"
+        },
+        "script": null,
+        "workdir": null
+      },
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "c0f24f402770",
+        "name": "x402-price-diff-daily",
+        "no_agent": false,
+        "prompt": "捏造ゼロ — unknown は unknown と書く。x402 価格登録簿の日次点検。手順: ①curl -sS -m 20 https://isekai.network/api/x402/prices の priced 配列と、/api/fork の 402 challenge (curl -sS -m 20 -D /tmp/h.txt \"https://isekai.network/api/x402/price?resource=/api/fork\") の maxAmountRequired/payTo/royaltyBps を読む。②前回値 (/Users/junkawasaki/.hermes/profiles/isekai-x402/cron/output/price-last.json) と比較。③変化があれば「誰が・いつ・前値→現値」を詳報 (変化は価格変更の監査証跡)。④price-last.json に現値を保存。⑤challenge が 402 以外 (200/404/500/1101) なら異常として詳報。出力 6 行以内。",
+        "repeat": {
+          "completed": 0,
+          "times": null
+        },
+        "schedule": {
+          "display": "11 8 * * *",
+          "expr": "11 8 * * *",
           "kind": "cron"
         },
         "script": null,
@@ -630,7 +672,7 @@
         "no_agent": false,
         "prompt": "You are the tabi-mikake fare scout for the travel metasearch surface\n(repo: network-awai/app-tabi-mikake, ADR-2608301849).\n\nEverything above this line is a measurement taken seconds ago. If it begins\nwith REFUSED, say so plainly and stop — do not propose anything.\n\n## Your one job this run\n\nWiden the offer inventory: find travel price/offer SOURCES (airline fare\npages, OTA search APIs, hotel rate feeds) that can be observed on a schedule,\nand propose them into the hyakka corpus (network-awai/app-hyakka), the record\nof truth this surface reads from.\n\nScope is search + compare + outbound referral ONLY. You never book, never\nhold inventory, never run third-party ads, never add cross-site tracking.\n\n## What you may not do\n\n- Never propose a URL you have not fetched yourself in this run.\n- Never propose `:third-party-wiki-prose` or `:user-generated` sources.\n- `:access \"public\"` requires a `:license`. If a source's terms forbid\n  republication, propose it with `:access \"private\"`.\n- Never touch `knowledge/ledger/` or `knowledge/receipts/` in app-hyakka.\n- Never push to `main`, never force-push, never edit an existing source entry.\n- At most TWO proposed sources per run. Fare pages are hostile; two is enough.\n- Never scrape a source whose robots.txt or terms forbid scheduled access.\n  Propose only sources that offer an API, an RSS/Atom feed, or a documented\n  data license (e.g. CC0/CC-BY datasets, official fare APIs).\n\n## Procedure — do all of it, in order\n\n1. `cd ~/.gftd/worktrees/tabi-mikake-bot` and `git fetch -q origin &&\n   git checkout -q --detach origin/main` (the app-tabi-mikake repo).\n2. Read `data/offers.jsonl` if present: which providers and classes are\n   already observed. The evidence report above lists comparable classes.\n3. Read app-hyakka's config for the source shape:\n   `~/.gftd/worktrees/tabi-mikake-bot` has no hyakka config; fetch\n   `https://raw.githubusercontent.com/network-awai/app-hyakka/main/config/knowledge-ingest.edn`\n   and read the `:sources` entries — this is the shape your proposal must\n   take (kebab id, :kind :web-document, url/title/publisher/license,\n   :source-classes, :access, :interval-seconds, :llm?).\n4. Choose candidates the measurements show are missing: a provider with no\n   observations, or a comparison class (route/stay) with no offers.\n5. Fetch each candidate URL/API. Discard anything that is not HTTP 200 with\n   a usable body, and anything whose terms forbid scheduled access.\n6. Write your proposal to /tmp/tabi-source-proposal.edn in the hyakka source\n   shape (see step 3), one sentence of rationale per source.\n7. Validate the proposal is well-formed EDN (nbb -e is BLOCKED in this\n   runtime; instead run:\n   `nbb --classpath scripts scripts/edn_check.cljs /tmp/tabi-source-proposal.edn`\n   if that file exists, else re-read your file and re-verify by hand).\n8. Report, in a few sentences: what you fetched, what you discarded and why,\n   and the proposal you wrote. You do NOT open PRs from this job — the\n   proposal is reviewed by the operator and landed through the normal\n   hyakka source-scout gate on a later run.\n\nOpening no proposal is a correct outcome. Proposing a source you did not\nfetch is not.\n\n## Commands the cron runtime refuses\n\nDo not use and do not work around: `-e`/`-c` script flags, heredocs feeding\nan interpreter, `rm -rf`. A denied command returns exit_code -1 with BLOCKED\nand the run continues — a bot that keeps reaching for these reports success\nhaving done nothing.",
         "repeat": {
-          "completed": 72,
+          "completed": 73,
           "times": null
         },
         "schedule": {
@@ -670,7 +712,7 @@
         "no_agent": true,
         "prompt": "",
         "repeat": {
-          "completed": 72,
+          "completed": 73,
           "times": null
         },
         "schedule": {
