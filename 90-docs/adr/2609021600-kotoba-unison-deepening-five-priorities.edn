@@ -371,6 +371,17 @@ west pin を 5 件前進させ checkout を同期した直後に、今日直し�
 - 検証: 最終 34 tests / 364 assertions exit 0、`CLAIMS 350 (57 absent, 57 recorded)`。**4 通りの破壊がそれぞれ exit 1**（主張した head を消す / 古くなった例外を残す / 証拠集合を空にする（`CLAIMS 0` と床 320 で拒否）/ 実際に発火した 1 件）。
 - **どの frontend を測っているか**を docstring が述べる（`deps.edn` の `:test` が pin する sema。west pin と食い違う日があり、**両方測って absent 58 で対称差 0** と確認した上で、「west にあって `:test` に無い lowering は absent と読まれる」という**一方向の gap は本物**だと明記）。sha を docstring に書かない理由も書いてある —— 一度書いたら landing 前に stale になったから。
 
+### 19. friendly な collection 名 —— 半分だけ真にできる主張は、authority を直す方を選んだ（着地 2026-09-03、第 4 反復）
+
+- kotoba-sema `7e277da6`（`0a5dcc2b` の中、ADR 0032）、kotoba-lang `96576fc2`。
+- **dispatch した**: `count` は 5 つの受け手族（bounded vector / f64 vector / heterogeneous vector / typed set / typed map）へ。`first` / `second` / `rest` は bounded vector へ（dispatch は `pair-first` / `pair-second` に対して行う —— `first` は**型が存在する前に** desugar されるため）。**`count` は reserved になった**（それまで `(defn count …)` は**受理されていた**）。`nth` は拒否文言を改善しただけで lowering は捏造していない。
+- **authority を直した方**（`surface-status.edn` の平坦な `:operations` 集合を操作ごとの record に変えた）: `peek` / `pop` —— Clojure の vector の `peek` / `pop` は**末尾**から取るが、`vector-drop` は先頭からの drop で `vector-pop` は存在しない。**`peek` だけ実装すると、authority 自身の fixture が拒否されたまま主張が半分だけ真になる**ので、両方とも実装しなかった。`keys` / `vals` —— `typed-map-keys` / `-vals` が無い。`empty?` —— 型が存在する前に `(= x 0)` へ desugar される。綴りは `(= (count c) 0)` で、**この変更のおかげで動く**。`last` / `seq` はどの authority も宣言していない（そう記録した）。
+- **書き換えだけでは足りなかった。** `infer-absent-parameter-types` は書き換え pass より**前**に走り、拒否された operand の型を ex-data から読む。そのため `(+ (pair-first [1 4 2]) (reduce add 4 [1 2 3]))` の拒否が、著者の vector ではなく **`reduce` の合成 helper**（collection 引数が `:vector-i64` ではなく `:i64` になっていた）を名指すようになった。同一 body を別の `:param-types` で dump して証明した上で、head に**型シグネチャも**与えた（`nth` は元から持っていた）。
+- fixture 3 本の結末: `higher_order.kotoba` は**走るようになった**。`destructuring.kotoba` は**ずっと走れていた** —— 記録されていた理由（`count` に lowering が無い）は**この case には偽**で、**理由なく未実行のまま置かれていた**。`vector.kotoba` は `peek` / `pop` のため今も走れず、`:as-of` / `:reason` / `:closes-when` / `:refused-with` 付きで park し、**記録された文言で今も拒否されることを assert する test** を足した（park された case が動き出したら赤くなる）。**validator の穴も塞いだ** —— `cases-with-execution-record` が `:executed-by` だけで絞っていたので、**deferral だけを記録した case が不可視**だった。床は 2 → 6。
+- **同じ罠を独立に踏んで直している**: 最初の baseline に `__kotoba_` 接頭の名前を使ったところ、それは**別の理由で**拒否されるので**全 head が present に見えた**（`keys` を含む）。18 の sweep が踏んだのと同型で、両者とも自力で気づいて直した。
+- 検証: sema の新 ns は pin 側 frontend に対して **9 tests / 56 assertions で 21 failures + 25 errors exit 1**（22 件が文字どおり `operation has no admitted lowering`、8 件が `expected i64, got vector-i64`、`(defn count …)` は何も拒否しなかった）、修正後 exit 0。sema 全 JVM 352 / 1577、nbb 197 / 646 とも 0。kotoba-lang の 46 / 354 exit 0 で、**同じファイルを古い sema pin に当てると exit 1**。byte-identity は既に compile していた 5 プログラムを両 runtime で digest して一致。end-to-end は pin 側 sema が exit 65、自分の sema で **`main()` = 17**。
+- **やらずに報告した**: `guest-grammar.edn` の `:diagnostic-hints` は今も `count` を「fuel-bounded な pair-chain 走査」、`keys` / `vals` を pair-chain 射影と書いており**3 通りに偽**。`authority_claims.cljc`（上記 18）が既にその staleness を記録して guard しているが、訂正するには **sha256 が 4 repo に pin されているファイルを動かす**ことになる。
+
 ### 残件（この ADR が次に指す先）
 
 1. `:state` ability（決定節のとおり。前提 4 つのうち vacuous な「handle は値でない」を先に赤にする）。
