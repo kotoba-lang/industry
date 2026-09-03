@@ -177,6 +177,19 @@
                                 (get-in g [:sum :requests] 0)))
               {} (get-in r [:data :viewer :accounts 0 :workersInvocationsAdaptive])))))
 
+(defn scanner-403-count
+  "groups (httpRequestsAdaptiveGroups) のうち、secret-probe path (.env/.git 等
+   gftd.traffic/probe-path-re 一致) への 403 レスポンスのリクエスト数。
+   pure — self-test で token 無しに検証できる (#47 triage 2026-09-03: shinshi.club
+   の 4xx の 62% がこれで、broken UI ではなく正常ブロック)。
+   403 以外 (404/499) は probe path でも外さない — 実害候補として残す。"
+  [groups]
+  (reduce + 0 (keep (fn [{:keys [count dimensions]}]
+                      (when (and (= 403 (get dimensions :edgeResponseStatus 0))
+                                 (re-find traffic/probe-path-re (get dimensions :clientRequestPath "")))
+                        count))
+                    groups)))
+
 (defn zone-top-paths
   "実際に user がどのpageにアクセスしているか (直近24h)。edgeResponseStatus で
    「実際に配信された page (2xx/3xx)」とスキャナ probe (4xx/5xx) を分離する —
@@ -211,6 +224,11 @@
                                         :else :server-error)))
               mix (reduce (fn [m g] (update m (status-of g) (fnil + 0) (:count g 0)))
                           {} groups)
+              ;; #47 (2026-09-03): 4xx の内訳で scanner secret-probe への 403
+              ;; (正常ブロック) を分離した「real 4xx」系列。probe-4xx-pct は
+              ;; 従来定義のまま据え置き (正本の改変はしない)、real-4xx を追加で
+              ;; 載せる。499 (client disconnect) は probe path であっても外さない。
+              scanner-403 (scanner-403-count groups)
               path-counts (->> groups
                                (filter #(= :ok (status-of %)))
                                (reduce (fn [m g] (update m (get-in g [:dimensions :clientRequestPath])
@@ -225,6 +243,7 @@
                                      (mapv (fn [entry] {:path (key entry) :requests (val entry)})))]
               {:ok channel-paths
                :status-mix mix
+               :real-4xx (- (get mix :client-error 0) scanner-403)
                :channel-mix {:channel (sum-class :channel)
                              :probe (sum-class :probe)
                              :unclassified (sum-class :unclassified)
@@ -233,7 +252,9 @@
                                 (sort-by val >)
                                 (take 8)
                                 (mapv (fn [[path n]] {:path path :requests n})))]
-              {:ok ok-paths :status-mix mix})))))
+              {:ok ok-paths
+               :status-mix mix
+               :real-4xx (- (get mix :client-error 0) scanner-403)})))))
     (catch :default _ nil)))
 
 (defn top-paths-summary
@@ -244,7 +265,7 @@
    参照) の probe-path-pct と、allowlist 未登録の real route かもしれない
    unclassified-pct を追記する (捏造ゼロ: 未分類は落とさず可視化)。
    governor の 300 chars 上限に収まるよう上位5件・path は40字で切る。"
-  [{:keys [ok status-mix channel-mix]}]
+  [{:keys [ok status-mix real-4xx channel-mix]}]
   (when (seq ok)
     (let [total (reduce + (vals status-mix))
           probe (get status-mix :client-error 0)
@@ -262,6 +283,8 @@
                           (take 5 ok)))
            (when (pos? total)
              (str " | 4xx(probe) " (Math/round (* 100.0 (/ probe total))) "%"
+                  (when (some? real-4xx)
+                    (str " · 4xx(real) " (Math/round (* 100.0 (/ real-4xx total))) "%"))
                   (when (pos? err)
                     (str " · 5xx " (Math/round (* 100.0 (/ err total))) "%"))))
            (when (and probe-path-pct (pos? probe-path-pct))
@@ -464,12 +487,15 @@
 (defn traffic-quality
   "24h の status-mix から probe(4xx)/5xx 率を % で。zone の uniques/requests を
    「見込み顧客」と読ませないための補正係数 (実測比、推定ではない)。"
-  [{:keys [status-mix]}]
+  [{:keys [status-mix real-4xx]}]
   (let [total (reduce + (vals (or status-mix {})))]
     (when (pos? total)
-      {:window "24h"
-       :probe-4xx-pct (Math/round (* 100.0 (/ (get status-mix :client-error 0) total)))
-       :error-5xx-pct (Math/round (* 100.0 (/ (get status-mix :server-error 0) total)))})))
+      (cond-> {:window "24h"
+               :probe-4xx-pct (Math/round (* 100.0 (/ (get status-mix :client-error 0) total)))
+               :error-5xx-pct (Math/round (* 100.0 (/ (get status-mix :server-error 0) total)))}
+        ;; #47 (2026-09-03): scanner secret-probe 403 を除いた実害系列。従来の
+        ;; probe-4xx-pct は据え置き — 正本の定義改変はせず追加のみ。
+        (some? real-4xx) (assoc :real-4xx-pct (Math/round (* 100.0 (/ real-4xx total))))))))
 
 (defn signal [p m]
   (let [z (:zone m) w (:workers-invocations-7d m) tq (:traffic-quality m)]
@@ -477,7 +503,9 @@
               (remove nil?
                       [(when z (str (:zone-name m) " 実測 " (:requests-7d z) " req/7d・"
                                     (:uniques-7d-sum z) " uniques(日次和)"
-                                    (when tq (str "・うち4xx probe " (:probe-4xx-pct tq) "%(24h)"))))
+                                    (when tq (str "・うち4xx probe " (:probe-4xx-pct tq) "%(24h)"
+                                                  (when-let [r (:real-4xx-pct tq)]
+                                                    (str " (real " r "%)"))))))
                        (when (seq w) (str "workers " (reduce + (vals w)) " inv/7d"))
                        (when-let [s (:stripe m)]
                          (str "Stripe active subs " (:active-subscriptions s)))
@@ -573,6 +601,24 @@
                     (vec (remove nil? [(when-not (cf-failed errs) :cloudflare) nil :health]))))
             (ok? "and still claims it when the call worked"
                  (= [:cloudflare :health]
-                    (vec (remove nil? [(when-not (cf-failed good) :cloudflare) nil :health]))))]]
+                    (vec (remove nil? [(when-not (cf-failed good) :cloudflare) nil :health]))))
+            ;; #47 (2026-09-03): scanner secret-probe 403 と real 4xx の分離
+            (ok? "scanner-403-count: /.env 403 だけを数える"
+                 (= 8 (scanner-403-count
+                       [{:count 5 :dimensions {:clientRequestPath "/mongodb/.env" :edgeResponseStatus 403}}
+                        {:count 3 :dimensions {:clientRequestPath "/.git/config" :edgeResponseStatus 403}}
+                        {:count 42 :dimensions {:clientRequestPath "/xrpc/ai.gftd.apps.shinshi.listAuthorFeed" :edgeResponseStatus 499}}
+                        {:count 10 :dimensions {:clientRequestPath "/firebase-key.json" :edgeResponseStatus 404}}
+                        {:count 2 :dimensions {:clientRequestPath "/wp-admin/install.php" :edgeResponseStatus 200}}])))
+            (ok? "scanner-403-count: 403 でも probe path でなければ外さない"
+                 (= 0 (scanner-403-count
+                       [{:count 7 :dimensions {:clientRequestPath "/en/actresses" :edgeResponseStatus 403}}])))
+            (ok? "traffic-quality: probe-4xx-pct は据え置き、real-4xx-pct が追加で付く"
+                 (= {:window "24h" :probe-4xx-pct 20 :error-5xx-pct 0 :real-4xx-pct 8}
+                    (traffic-quality {:status-mix {:ok 571 :client-error 143 :server-error 0}
+                                      :real-4xx 55})))
+            (ok? "traffic-quality: real-4xx 無しの旧データには新キーを足さない"
+                 (= {:window "24h" :probe-4xx-pct 20 :error-5xx-pct 0}
+                    (traffic-quality {:status-mix {:ok 571 :client-error 143}})))]]
     (js/process.exit (if (every? true? rs) 0 1)))
   (-main))
