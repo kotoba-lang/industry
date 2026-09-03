@@ -6515,4 +6515,147 @@
      :file "kotoba/src/types.ts"
      :find "export interface ListRuleBundlesInput {"
      :replace "export interface ListBundlesInput {"
-     :must-fail ["REFUSED"]}]}]}
+     :must-fail ["REFUSED"]}]}
+
+  {:repo "orgs/cloud-itonami/graph-sos-intel-actor"
+   :label "graph-sos-intel actor —— deny-by-default gate・3 面の宣言・quickstart の再現"
+   ;; この repo の宣言は 3 面に割れている: `actor-manifest.jsonld`（surface と
+   ;; capability と governance rule）、`.well-known/did.json`（配信される名乗り）、
+   ;; `src/graph_sos_intel/murakumo.cljc`（gate と cell）。**どの面も他の面を
+   ;; 見ていない**ので、面と面のあいだの事実はどこにも属さず、片方だけ動いても
+   ;; 誰も気づかない。
+   ;;
+   ;; 実測 2026-09-03: 9 個の cell は手書きに見えて、実際は manifest の
+   ;; xrpc nsid 3 + requiredCollections 2 + requiredLoops 4 から機械的に導ける
+   ;; （legacy-cell は同じ名前の `.` を `-` にしたもの）。導出できることを検査
+   ;; すると、**どちら側が動いても**赤くなる。
+   ;;
+   ;; 一致を pin しているものと、**不一致**を pin しているものが混ざっている
+   ;; （2 つの DID は今も食い違っている）。どちらも観測された値として同じやり方で
+   ;; pin するので、赤は「壊れた」ではなく「動いた」を意味する。
+   ;;
+   ;; 走らないテストの側: `actor-manifest.test.ts` は package.json を持たず
+   ;; `npx --yes vitest` が network に届く環境でしか走らない。オフラインでは
+   ;; 何も検査しないまま「テストが在る」ように見えるので、その literal が
+   ;; manifest と一致していることだけは、こちら側で offline に保つ。
+   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :green-marker "graph-sos-intel actor: all green"
+   :mutations
+   ;; 14 件とも 2026-09-03 に赤くなるところを見た。推測で足したものは無い。
+   [;; ── gate（緩む方向）──────────────────────────────────────────────
+    {:id :gsi/presence-counts-as-attestation
+     :why (str "「キーが在れば attest 済み」に緩める。`{:no-probing-baseline false}` は "
+               "『測ったうえで満たしていない』という最も強い否定なのに通る。"
+               "いま守っているのは `gate-value` の `or` である —— そこで false が "
+               "nil に潰れる。`boolean` を `some?` に変えても**この検査は赤くならない**")
+     :file "src/graph_sos_intel/murakumo.cljc"
+     :find "(remove #(boolean (gate-value attestations %)))"
+     :replace "(remove #(or (contains? attestations %) (boolean (gate-value attestations %))))"
+     :must-fail ["an-attestation-that-is-explicitly-false-does-not-count-as-attested"]}
+
+    {:id :gsi/string-attestation-shape-dropped
+     :why (str "attestation の受け口を 1 形だけ落とす。その形で attest している"
+               "呼び出し側**だけ**が黙って全部 blocked になる —— 安全側に倒れるので"
+               "誰も気づかない")
+     :file "src/graph_sos_intel/murakumo.cljc"
+     :find "      (get attestations (name gate))\n"
+     :replace ""
+     :must-fail ["every-attestation-shape-is-accepted"]}
+
+    {:id :gsi/blocked-plan-carries-records
+     :why (str "『plan は作るが実行しない』形にすると、blocked でも計算済みの record が"
+               "手前に置かれる。`:effects` だけ見て安心した呼び出し側が `:records` を"
+               "拾って書ける —— gate を通っていない書き込みが gate の出力から作れる")
+     :file "src/graph_sos_intel/murakumo.cljc"
+     :find "         {:status :blocked\n          :effects []}"
+     :replace "         {:status :blocked\n          :records (vec (records-for spec input))\n          :effects []}"
+     :must-fail ["blocked-plans-do-not-carry-records"]}
+
+    {:id :gsi/unknown-cell-silently-plans-nothing
+     :why "typo した cell 名が「何も書かなかった」ではなく「書いたつもりで書いていない」になる"
+     :file "src/graph_sos_intel/murakumo.cljc"
+     :find "(throw (ex-info \"unknown cell\" {:cell cell-key}))"
+     :replace "nil"
+     :must-fail ["unknown-cells-throw-rather-than-plan-nothing"]}
+
+    {:id :gsi/caller-retargets-the-effect
+     :why (str "『caller が collection を指定できると便利』という形の退行。"
+               "gate を通った plan が別の面へ書けるようになる")
+     :file "src/graph_sos_intel/murakumo.cljc"
+     :find "   :collection collection"
+     :replace "   :collection (or (:collection record) collection)"
+     :must-fail ["a-caller-supplied-record-cannot-retarget-the-effect"]}
+
+    ;; ── substrate と manifest のあいだ ────────────────────────────────
+    {:id :gsi/collection-namespace-renamed
+     :why "actor を改名すると書き込み先が動く。quickstart に書いてある collection も同時に嘘になる"
+     :file "src/graph_sos_intel/murakumo.cljc"
+     :find "(str \"com.etzhayyim.graph-sos-intel.\" name)"
+     :replace "(str \"com.etzhayyim.graphsosintel.\" name)"
+     :must-fail ["every-cell-writes-into-this-actors-own-namespace"
+                 "the-quickstarts-ready-demonstration-still-reproduces"]}
+
+    {:id :gsi/legacy-cell-name-case-drift
+     :why (str "legacy-cell は移行前の実行系が使っていた名前。1 文字の大小が違うだけで"
+               "旧系の記録と繋がらなくなるが、手打ちでは気づけない")
+     :file "src/graph_sos_intel/murakumo.cljc"
+     :find "com-etzhayyim-apps-graphSosIntel-health"
+     :replace "com-etzhayyim-apps-graphsosintel-health"
+     :must-fail ["each-legacy-cell-name-is-its-surface-with-dots-turned-into-dashes"]}
+
+    {:id :gsi/manifest-surface-without-a-cell
+     :why (str "manifest に surface を足して substrate に cell を足し忘れる。"
+               "その surface は **gate を一度も通らない**（cell-plan が throw する）")
+     :file "actor-manifest.jsonld"
+     :find "    \"kyumei\",\n    \"domain-knowledge\"\n  ],"
+     :replace "    \"kyumei\",\n    \"domain-knowledge\",\n    \"newloop\"\n  ],"
+     :must-fail ["the-substrate-cells-are-exactly-the-surfaces-the-manifest-declares"]}
+
+    {:id :gsi/capability-over-granted
+     :why "一度も使われない capability を宣言する。over-grant は「使っていないから無害」ではない"
+     :file "actor-manifest.jsonld"
+     :find "    \"agent.chat\",\n    \"derive:social\"\n  ],"
+     :replace "    \"agent.chat\",\n    \"derive:social\",\n    \"agent.invoke\"\n  ],"
+     :must-fail ["steps-never-call-an-undeclared-capability"]}
+
+    {:id :gsi/heavy-ddl-slipped-into-a-pipeline
+     :why (str "RULE-GRAPH-SOS-NO-HEAVY-DDL は「重い DDL を直接実行しない」と**散文で**"
+               "述べている。散文は自分が真でなくなったことに気づかない")
+     :file "actor-manifest.jsonld"
+     :find "SELECT count(*) AS idxCount"
+     :replace "CREATE INDEX idx_tmp ON vertex_x (y); SELECT count(*) AS idxCount"
+     :must-fail ["the-no-heavy-ddl-rule-exists-and-the-pipelines-obey-it"]}
+
+    ;; ── 文書 ──────────────────────────────────────────────────────────
+    {:id :gsi/quickstart-number-drifted
+     :why "quickstart は「実際に実行した出力」を載せている。数だけ動くと踏めない手順になる"
+     :file "docs/operator-quickstart.md"
+     :find "  \"pipelines\": 5,"
+     :replace "  \"pipelines\": 4,"
+     :must-fail ["the-quickstarts-manifest-numbers-are-the-manifests-numbers"]}
+
+    {:id :gsi/readme-gate-list-stale
+     :why "散文で並べた 7 本は、コード側が 1 本増減しても黙って古いまま残る"
+     :file "README.md"
+     :find "`:did-primary-baseline`, `:append-only-gate-baseline`,\n"
+     :replace "`:did-primary-baseline`,\n"
+     :must-fail ["the-readme-lists-exactly-the-seven-gates-the-code-requires"]}
+
+    {:id :gsi/vitest-literal-drifted
+     :why (str "network の無い環境では vitest が走らないので、その literal が manifest と"
+               "食い違っても誰も赤を見ない")
+     :file "actor-manifest.test.ts"
+     :find "expect(manifest.nanoid).toBe(\"gs0s1nt7\");"
+     :replace "expect(manifest.nanoid).toBe(\"gs0s1nt8\");"
+     :must-fail ["the-checked-in-vitest-still-asserts-the-truth"]}
+
+    ;; ── 修理の側の赤 ──────────────────────────────────────────────────
+    {:id :gsi/the-two-identities-were-unified
+     :why (str "**割れていること自体を pin している。** manifest と substrate は "
+               "`did:web:graph-sos-intel.etzhayyim.com` を名乗り、実際に配信される DID "
+               "document は `did:web:etzhayyim.com:actor:graph-sos-intel`。揃えたら赤に"
+               "なって、README ごと測り直せと言う")
+     :file ".well-known/did.json"
+     :find "\"id\" : \"did:web:etzhayyim.com:actor:graph-sos-intel\","
+     :replace "\"id\" : \"did:web:graph-sos-intel.etzhayyim.com\","
+     :must-fail ["the-two-identities-still-disagree"]}]}]}
