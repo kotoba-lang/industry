@@ -75,3 +75,15 @@ two jobs with `z-ai/glm-5.3-flash`, provider `openrouter`, reasoning `low`,
 local delivery, workdir `~/.gftd/worktrees/hyakka-growth-bot`, and the
 corresponding evidence wrapper and prompt. The dashboard is
 `http://127.0.0.1:9119/cron`.
+
+## `gp-review` — the merge gatekeeper
+
+A separate Hermes profile (`gp-review`, job `gp-pr-review`, hourly `35 * * * *`)
+reviews open `gp-schema-*` / `bot/gp-*` PRs against the five-point checklist
+(`pr-review.prompt.md` / `SOUL.md`): layer discipline (runs
+`verify_epistemics.cljs` itself), source labels, gates (new test failures must
+reproduce on pristine `origin/main` to be acceptable), blast radius, scope
+honesty. It squash-merges what passes with a review comment listing exactly
+what it verified, and posts refusal reasons otherwise. It is the only family
+actor allowed to merge. Evidence script: `gp_review_evidence.py` (open-PR
+inventory, decision-free).
