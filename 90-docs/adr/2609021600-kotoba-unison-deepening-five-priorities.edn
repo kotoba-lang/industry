@@ -410,6 +410,23 @@ west pin を 5 件前進させ checkout を同期した直後に、今日直し�
 同じ日に私は kotoba-sema の wire id assertion を直した（`5917518b`）—— コメントが「固定の上限ではなく連続性の検査」と書いている下で、式は `(range 1 31)` という固定の上限で、登録簿が 32 に増えて**コメントが「これでは落ちない」と約束した理由で**赤くなっていた。登録簿自身の大きさに対して書き直し、床を足した。
 **上記 20 の (2) は、その赤の別の半分である。** 私の修正は「検査が名乗りどおりに測る」ようにしたが、**id が間違った repo で足されたという事実は別の検査の仕事**で、それを fleet 検査が初回実行で見つけた。**2 つの修正は競合しない** —— 片方は主張と測定を一致させ、もう片方は変更が正しい場所で行われたかを見る。ただし、私の修正**だけ**を見た読み手は「赤は解消した」と読むので、ここに両方を並べて記録する。
 
+### 22. 静かに捨てられていた宣言 —— crash の双対（着地 2026-09-03、第 4 反復）
+
+- kotoba-sema `50aa11c`。12 head × 24 形の **288 probe** に、`defn` / `let` / `defdesugar` の body 内の入れ子宣言を加えて掃いた。
+- **「捨てられている」の証明が要点。** exit 0 では足りないので、各 admit された probe を**2 回 compile した** —— その宣言を含む版と、その行を消した版 —— で HIR の digest を比べる。**同一なら、その form が置いたものは 1 つも出力に入っていない。**
+- **その test だけでは偽陽性が出ることに自分で気づき、第 2 の問いを足した**: 「**その形が効くプログラムが 1 つでも在るか**」。この問いが変更を小さく保った。結果は 3 分類:
+  - **拒否（正しい）** 288 中 264。`defrecord` / `defprotocol` / `definterface` / `extend-protocol` / `defmulti` / `defmethod` / `defdesugar` / `ns` の全形と、body 内の入れ子宣言すべて。
+  - **受理されて効いている（正しい）**: 参照されない `(def f 42)`、呼ばれない template、実装されない protocol —— **digest は削除版と同一だが、witness が動かす**（参照すれば 42 を返し、呼べば 5 を返し、protocol を宣言すると後続の `extend-type` が拒否から admit に変わる）。
+  - **受理されて捨てられている（欠陥）** 12 形。`extend-type` の protocol section 無し全綴りと、`defdesugar` の body が `ns` / `defn` / `defn-` を持つ場合。**宣言済みの record と宣言済み protocol と動く `extend-protocol` の隣に `(extend-type R)` を置いても、`main` は 9 を計算し HIR は行を消した版と byte 一致していた。**
+- 原因: `protocol-extension-groups` が空の残余に `[]` を返し、`mapcat` が何も呼ばず、**そのアーム内の他の誰も `record-name` を読んでいなかった**。だから `(extend-type 42)` も `(extend-type Undeclared)` も `(extend-type)` と同じ経路で admit されていた。
+- **書かなかった一括禁止**: `(defn defrecord [x] (+ x 1))` は admit されるプログラムで、`(defdesugar t [y] (defrecord y))` はそれを**呼ぶ** admit される template（12 head 中 9 つで実測）。「template body に宣言を置くな」と禁じると**動いている source を壊す**。代わりに `definition-heads ∩ reserved-function-names` = `#{ns defn defn-}`（**呼び出しにも宣言にもなれない head**）を検査し、**交差として書いた**のでどちらの語彙が動いても追随する。綴れる 9 head が今も 7 を計算することを assert している。
+- 誤帰属も直した（`definterface` が自分の名前で拒否する。head は form から読み、**code は literal のまま** —— 文だけが head を運ぶ）。**兄弟も検査した**: 他の共有アームは「protocol extension …」という総称であって別 form の名前ではないので誤帰属ではない。**見つけて意図的に直さなかった 1 件**: `analyze*` が record/protocol の 5 head pass 全体を `guarding-definition 'defrecord` で包むので、`extend-type` から逃げた **host error** は `:kotoba.error.internal-operation/defrecord` と報告する。同型だが拒否ではなく internal-error の封筒で、しかも並行 agent が作業中の場所にあり、**未測定の host error を誘発せずに failing→passing を示せなかった**ので報告に留めた。
+- 旧挙動に依存していたものは **3 repo に 1 つも無かった**（実測: この repo の `extend-type` 1 件、kotoba-lang の 1 件、amu の 4 件はすべて protocol section を持つ。どの `defdesugar` body も宣言 head を持たない）。
+- byte-identity は **3 回**測った（修正前、**同じファイルに別 agent が着地した後に clean で測り直し**、修正後）。両 runtime で 8 digest とも同一、値も assert（32 と 16）—— **「全部拒否するようになった compiler」が通らないように。**
+- 床の設計が良い: `scanned ≥ 250` / `refused ≥ 200` / `admitted ≥ 1` に加えて、**inert を集合として assert する**（**数だと、ある形が消えて別の形が現れたときに隠れる**）。
+- 検証: 新 test は修正前 JVM 11 tests / 212 assertions で **89 failures exit 1**、修正後 0 exit 0。merge 後の全 suite は JVM 383 / 2065、nbb 228 / 1133 とも 0 failure。end-to-end は pin 側 sema が `(extend-type 42)` に **exit 0** を返し、自分の sema が exit 65 + span。**well-formed な `extend-type` の定義 CID は不変。**
+- **今も静かに admit されるもの（正しい）**: 参照されない `def` と呼ばれない template。それぞれ witness が test に在り、`conditionally-effective` の明示集合に入っていて sweep がそれと突き合わせるので、**次に本当に捨てられる形が現れたら、そこに witness 付きで追加しない限り見逃されない。**
+
 ### 残件（この ADR が次に指す先）
 
 1. `:state` ability（決定節のとおり。前提 4 つのうち vacuous な「handle は値でない」を先に赤にする）。
