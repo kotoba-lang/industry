@@ -382,6 +382,34 @@ west pin を 5 件前進させ checkout を同期した直後に、今日直し�
 - 検証: sema の新 ns は pin 側 frontend に対して **9 tests / 56 assertions で 21 failures + 25 errors exit 1**（22 件が文字どおり `operation has no admitted lowering`、8 件が `expected i64, got vector-i64`、`(defn count …)` は何も拒否しなかった）、修正後 exit 0。sema 全 JVM 352 / 1577、nbb 197 / 646 とも 0。kotoba-lang の 46 / 354 exit 0 で、**同じファイルを古い sema pin に当てると exit 1**。byte-identity は既に compile していた 5 プログラムを両 runtime で digest して一致。end-to-end は pin 側 sema が exit 65、自分の sema で **`main()` = 17**。
 - **やらずに報告した**: `guest-grammar.edn` の `:diagnostic-hints` は今も `count` を「fuel-bounded な pair-chain 走査」、`keys` / `vals` を pair-chain 射影と書いており**3 通りに偽**。`authority_claims.cljc`（上記 18）が既にその staleness を記録して guard しているが、訂正するには **sha256 が 4 repo に pin されているファイルを動かす**ことになる。
 
+### 20. 文法の複製 —— 影を落としていた複製を消した。7 ファイル 3 状態が 6 ファイル 1 状態に（着地 2026-09-03、第 4 反復）
+
+- amu `e1afa25c`（PR 769）、grammar `4457d762`、kotoba-lang `5f5a8256` と `6ced48d6`。kotoba は据え置き（理由は下記）。**私が「また手で閉じるのではなく再発を止めろ」と振った結果。**
+- **なぜ複製が在るのかを repo ごとに測った**（何がそのファイルを開くか、その repo が kotoba-lang を依存に宣言しているか）:
+
+  | repo | 依存宣言 | 読む主体 | 判定 |
+  |---|---|---|---|
+  | kotoba-sema | **無** | `frontend/load-catalog-forbidden` が **production で** `io/resource` する | **正当。** 文法が記述している frontend を所有しており、kotoba-lang を足すと inga / ucan / did / vc / identity を frontend に引き込む。**読み手と同じ commit で動く複製。** |
+  | grammar | **無** | runtime では誰も読まない。`gen-embedded.cljs` が committed な射影を作り `--check` が drift を拒否 | **正当な build 入力。** これが「生成して gitignore する」案を**その場で殺す** —— grammar の consumer は git 依存として解決するので、committed なものしか受け取れない |
+  | **amu** | **無** | **`src/` の中に読む主体が無い** | **冗長かつ有害。** `:paths` は依存より先なので、amu の複製が **kotoba-sema のものを shadow していた** —— **frontend の拒否集合が、別 repo の別 commit にあるファイルで決まっていた。** 唯一の効果が「frontend がどの文法を読むか」を選ぶことだった |
+  | kotoba | **有**（それでも 2 部持つ） | `vendor/grammar` の **committed な fork**（`.clj` が今も `io/resource`。上流は 2026-08-18 から `.cljc` で射影を読む） | 誰も見直さなかった歴史。戻すと唯一の読み手の挙動が変わるので owner 判断として記録 |
+  | kotoba-lang | （authority） | `lang/` が authority、`resources/` は consumer が解決するパスの同一バイト | 1 commit の中の 2 ファイル。波ではない |
+
+- **設計**: **shadow していた複製（amu）を消す。** これが instance ではなく**クラス**を消す唯一の変更で、消えた後は**文法と frontend が 1 つの pin で一緒に動く** —— 遅れた pin は「一貫して古い言語」であって、「build されたのと違う文法を読む frontend」ではなくなる。「shadow 側が stale だったらどうなるか」への直接の答えでもある: **shadow する複製が無い。** 加えて登録簿を `lang/vendored-copies.edn` **1 つ**にした（それまで **4 箇所**にあって互いに食い違っていた）。そして **GitHub に各 consumer の default branch を訊く** fleet 検査（checkout に依存しない答えが、逆向きの assertion を初めて可能にする）。
+- **退けた案**: 依存から読んで複製を持たない（4 consumer 中 3 つが依存を持たず、sema は production で読む）/ build 時生成して gitignore（grammar が殺す）/ ancestry ratchet を一般解にする（**repo をまたぐ deferral にだけ使い、1 つの classpath の中では厳密一致を必須のまま残した**）/ kotoba の guard を緩めて resync を通す（**kotoba 自身の ADR がその手を過去の誤りとして記録している**）。
+- **amu の bump は 5 点から 4 点になった**（複製が消えたので）。ただし `deps-lock.edn` は deps.edn の**バイト**を hash するので、`:git/sha` を動かさないコメント編集だけでも再生成が要る。
+- **owner 判断として残した 2 件**:
+  1. **kotoba の 2 部**: resync を最後まで通した上で**戻した**。文法バイトと新しい conformance 2 件が**同じ authority commit で来る**ので分けられず、その 2 件は kotoba の primary emitter が `:unsupported-op` で答える。pin を進めた状態で 4 failures。**guard を緩めれば通るが、それは kotoba 自身の ADR が過去の誤りとして記録した手**なので取らず、閉じ方を 2 通り書いた日付付き deferral にした。
+  2. **kotoba-sema の `capability-catalog.edn` が diverge しており、動いたのは複製の側だった。** sema `c823461` が `:screen/observe`(31) と `:screen/act`(32) を **consumer repo の中の vendored authority ファイル**に足しており、authority はその名前を知らない。しかも **amu の複製がそれを shadow していたので、それを lower するはずの compiler からは見えていなかった。****言語表面の変更が、間違った repository で行われていた。** fleet 検査の**初回実行で**見つかった —— **それまで何もこれを比較していなかった。**
+- **失敗の実演 6 通り**: 未 defer の drift（exit 1）/ **逆向き —— in-sync な複製を名指す deferral（`STALE-DEFERRAL … in sync at …`、exit 1。local 検査では原理的に println しかできなかった assertion）** / 測れなかった（`COMPARED 0/12`、**exit 2** で 0 とも 1 とも別）/ 裸・未知の deferral（exit 1）/ 退役した複製の復活（**バイト同一で戻しても構造的 assertion が 3 件落ちる**）/ 予定外だが kotoba 自身の guard が私の例外を名指しで拒否した（機構が自分に対して働いた）。
+- 最終状態: **7 ファイル 3 状態 → 6 ファイル 1 状態 + 1 件の日付・障害名つき deferral。** `PASS 9 in sync, 3 diverged and deferred, across 12 registered copies of 4 authorities`、exit 0。
+- **instance と structure を分けて報告している**: instance は grammar の resync と digest 表。structure は消した shadow 複製、単一の登録簿、正直な `COMPARED n/m`、例外台帳と逆向き assertion を持つ fleet 検査。**次に authority が変わったとき 3 状態を作らないのは後者。**
+
+### 21. 私が直した assertion と、この発見の関係（2026-09-03）
+
+同じ日に私は kotoba-sema の wire id assertion を直した（`5917518b`）—— コメントが「固定の上限ではなく連続性の検査」と書いている下で、式は `(range 1 31)` という固定の上限で、登録簿が 32 に増えて**コメントが「これでは落ちない」と約束した理由で**赤くなっていた。登録簿自身の大きさに対して書き直し、床を足した。
+**上記 20 の (2) は、その赤の別の半分である。** 私の修正は「検査が名乗りどおりに測る」ようにしたが、**id が間違った repo で足されたという事実は別の検査の仕事**で、それを fleet 検査が初回実行で見つけた。**2 つの修正は競合しない** —— 片方は主張と測定を一致させ、もう片方は変更が正しい場所で行われたかを見る。ただし、私の修正**だけ**を見た読み手は「赤は解消した」と読むので、ここに両方を並べて記録する。
+
 ### 残件（この ADR が次に指す先）
 
 1. `:state` ability（決定節のとおり。前提 4 つのうち vacuous な「handle は値でない」を先に赤にする）。
