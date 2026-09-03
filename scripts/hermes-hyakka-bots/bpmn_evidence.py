@@ -29,6 +29,13 @@ import os
 import subprocess
 import sys
 
+# Hourly-throttle (see throttle.py): a full mirror measurement is due once
+# per cooldown window; a throttled tick exits 0 with [SILENT].
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from throttle import gate, mark  # noqa: E402
+
+gate("hyakka-bpmn-scout", hours=float(os.environ.get("HYAKKA_EVIDENCE_COOLDOWN_H", "24")))
+
 SUPER = os.environ.get(
     "HYAKKA_BPMN_SUPERPROJECT", os.path.expanduser("~/github/com-junkawasaki"))
 NBB = os.environ.get("HYAKKA_NBB", "/opt/homebrew/bin/nbb")
@@ -136,6 +143,7 @@ def main() -> None:
     print("MEASURED\tmirrors read; the corpus decision is the bot's, on the "
           "ISIC precedent: namespace -> registry wiring -> seed -> ledger, "
           "every claim's evidence a verbatim substring of the pinned bytes.")
+    mark("hyakka-bpmn-scout")
 
 
 if __name__ == "__main__":

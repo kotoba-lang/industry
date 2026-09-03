@@ -20,6 +20,18 @@ import os
 import subprocess
 import sys
 
+# Hourly-throttle: the cron fires every hour; a full iteration is due only
+# once per cooldown window. A throttled run exits 0 with a [SILENT] banner
+# (the bot runs and is told "not due", never silently skipped), and a
+# throttled run marks nothing, so a blind tick never resets the clock.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from throttle import gate, lock, mark  # noqa: E402
+
+JOB = os.environ.get("HERMES_JOB_NAME", "hyakka-evidence")
+COOLDOWN_H = float(os.environ.get("HYAKKA_EVIDENCE_COOLDOWN_H", "24"))
+
+gate(JOB, hours=COOLDOWN_H)
+
 # Which worktree this run owns, in falling order of explicitness:
 #
 #   1. HYAKKA_BOT_WORKTREE — an operator saying it outright
@@ -69,6 +81,11 @@ def git(*args: str) -> subprocess.CompletedProcess:
 
 
 def main() -> None:
+    with lock("/tmp/hyakka-growth-bot.iterlock", name=JOB):
+        _main_locked()
+
+
+def _main_locked() -> None:
     if not os.path.isdir(os.path.join(WORKTREE, ".git")) and not os.path.exists(
             os.path.join(WORKTREE, ".git")):
         refuse(f"no git worktree at {WORKTREE}")
@@ -102,6 +119,7 @@ def main() -> None:
     print(f"worktree\t{WORKTREE}")
     print(f"head\t{head}")
     print(proc.stdout)
+    mark(JOB)  # only on a clean, SCANNED-bearing report
 
 
 if __name__ == "__main__":
