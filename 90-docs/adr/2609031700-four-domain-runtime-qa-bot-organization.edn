@@ -1,0 +1,169 @@
+[{:db/id -1
+  :adr/id "adr-2609031700-four-domain-runtime-qa-bot-organization"
+  :adr/doc_type "adr"
+  :adr/topic "four-domain-runtime-qa-bot-organization"
+  :adr/title "ADR-2609031700: murakumo.cloud / itonami.cloud / kotobase.net / kotoba.cloud の runtime QA を行う bot 組織 (ito.ai 参照)"
+  :adr/status "accepted"
+  :adr/date "2026-09-03"
+  :adr/last_verified "2026-09-03"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["4 ドメインの公開表面を runtime で検査する bot 組織 (計測 resident + 判読 bot + 発見起票 bot + gate)"
+   "manifest/endpoint-health.edn の 4 ドメイン probe 追加 (7 probe, 2026-09-03 実測つき)"
+   "ito.ai 方式 (実環境で動かして証跡を添える) の外部表面への適用範囲と限界"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related
+  ["adr-2608180100-endpoint-health-dark-outages"
+   "adr-2609030930-advertising-7310-autonomous-bot-organization"
+   "adr-2609022000-yui-five-domain-participation-empowerment-bot"
+   "adr-2607261200-yui-publish-funnel-per-domain"]
+  :adr/evidence
+  ["manifest/endpoint-health.edn: probe 6 → 13 (7 追加, 全部 2026-09-03 の実リクエストで約束を確定してから書いた)"
+   "実測 2026-09-03: :murakumo/chat-POST が 500 (error 1101, Worker threw exception) — murakumo-main alias (qwen3.8-27b) は status:serving と自己申告していたが配信は死んでいる。alias も status-evidence も stale (verified_at 2026-08-24, age 9 > max 7)"
+   "実測 2026-09-03: hyakka knowledge resident は published 94 / failed 106 (半落ち)、last_error に Kotobase transact 502 CPU limit。topic resident 9 件全部が同形"
+   "nbb scripts/verify-endpoint-health.cljs . --all --cheap-only 実測: 新 probe が :itonami/hyakka-knowledge-resident を DEGRADED で検出、exit 1 (--findings で FINDING 行を出力)"
+   "nbb 形式確認実測: :json-non-empty の複数キーは ([:a] [:b]) の「パスのリスト」形。[:a :b] は 1 本のネストした walk として解釈される (既存 6 probe が単一キー形だったため今まで未発覚)"]
+  :adr/body
+  "# ADR-2609031700: 4 ドメイン runtime QA bot 組織 (ito.ai 参照)
+
+## Context
+
+オーナー指示 (2026-09-03): 「https://www.ito.ai/ を参考に murakumo.cloud,
+itonami.cloud, kotobase.net, kotoba.cloud の qa を行う bots を組織して」。
+
+ito.ai (2026-09-03 実測) の主張は「**build your app on every PR, run the
+impacted flows, attach the failing test**」— diff を読んで推測するのではなく、
+実環境で動かして runtime 証跡 (video / logs / repro) を添える。価格は $40/mo
++ $1/追加 review。open source は無料。
+
+この方式を **自社 4 ドメインの公開表面** に適用する。対象の約束は各
+landing page が公言しているもの (murakumo: /.well-known/x402 と chat API、
+itonami: open-business registry と hyakka resident、kotobase: /mcp と
+wiki resident、kotoba.cloud: Passkey RP と control plane)。
+
+既存資産: `manifest/endpoint-health.edn` (手書き probe manifest) +
+`scripts/verify-endpoint-health.cljs` (実リクエスト → 4 値分類) +
+`scripts/endpoint-health-resident.cljs` (gad の systemd timer で 1 時間毎、
+uptime window を累積) + kotoba-lang/uptime (assert でない availability
+statement)。**この土台は ADR-2608180100 の 2 障害 (20 日間暗闇だった
+image gateway を含む) を実際に捕まえた方式で、既に gad で稼働中。**
+ゼロから bot 組織を作らず、この土台に 4 ドメイン分の約束を足す。
+
+## Decision
+
+### 1. 組織: 4 役分業 (ADR-2609030930 の bot 組織パターンの QA 版)
+
+| # | 役 | 実体 | 責任 | 権限 |
+|---|---|---|---|---|
+| M1 | **計測 resident** (すでに稼働) | gad の endpoint-health systemd timer (1h) | 実リクエスト → observations ledger → uptime statement | 書き込みは自分の 2 ファイルのみ (:slot/anonymous, 鍵なし) |
+| M2 | **発見判読 bot** | Hermes cron (profile itonami,週次) | statement + findings を読み、再現手つきの finding を起票するか判断 | 書き込みは 90-docs/qa/ finding ファイルのみ。deploy・修復はしない |
+| M3 | **修復起票 bot** (将来) | finding を読んだ owner session | finding を issue/PR に変える | finding 1 件 = 1 PR。gate は既存の fleet gates が担う |
+| G1 | **gate** (回帰防止) | fleet-ci `:nbb-script` gate | manifest の形検査 (probe 形式・json-non-empty パス形式) | tree のみ、live は叩かない |
+
+**なぜ M2 は Hermes cron で、DO bot でないか。** hyakka の前例
+(`scripts/hermes-hyakka-bots/README.md`) が示すとおり、判断を含む bot は
+evidence → 提案 → gate → PR の形にする。QA の finding は「壊れている」
+という主張であって、捏造された finding は障害より悪い。Hermes cron の
+script-first (evidence を stdout で注入) + 提案は PR 経路が正。DO bot
+(grok-bots) は予算消費型のビジネス loop 用で、QA 計測に予算を乗せるのは
+逆効果 (probe が安くなる方向に最適化してしまう)。
+
+### 2. 計測面: probe 6 → 13
+
+`manifest/endpoint-health.edn` に 7 probe を追加した。全部
+**実リクエストで約束を確定してから書いた** (規約: `:expect` は約束):
+
+| probe | 約束の由来 | 実測 2026-09-03 |
+|---|---|---|
+| `:itonami/open-business-registry` | Business Bot launch が読む registry | 200, count 28 |
+| `:itonami/hyakka-knowledge-resident` | resident 面の公開 API | **DEGRADED** — last_error に transact 502 |
+| `:kotobase/mcp-endpoint` | 価格ページが約束する MCP endpoint | 200 |
+| `:kotobase/wiki-resident` | wiki resident proxy | 200 |
+| `:murakumo/x402-offer` | landing が約束する x402 オファー | 200 |
+| `:kotoba-cloud/authn-health` | 「Passkey RP are live」 | 200, rpId あり |
+| `:kotoba-cloud/control-health` | CLI deploy の control plane | 200 |
+
+`:every-hours 1` にしたのは gad resident の timer 間隔と揃えるため。
+`:murakumo/chat-POST` (500 error 1101) は **:cost :gpu の probe として
+別途** 追加を検討 — cheap-only の運用では拾えない。alias の
+status:serving 自己申告が計測でないことは ADR-2608180100 の教訓どおり。
+
+### 3. 判読面 (M2) の形式 — ito.ai の「証跡を添える」の翻訳
+
+ito.ai の finding は「video / logs / repro」を添える。bot 組織の finding は:
+
+```
+90-docs/qa/<date>-<probe-id>.edn
+{:qa/finding-id \"...\" :qa/probe :itonami/hyakka-knowledge-resident
+ :qa/observed {...statement.edn からの引用...}
+ :qa/promise \"...endpoint-health.edn :note の約束...\"
+ :qa/repro \"nbb scripts/verify-endpoint-health.cljs . --only <id>\"
+ :qa/severity :degraded|:broken :qa/owner \"network-awai/cloud-itonami\"}
+```
+
+**repro が 1 コマンドで走ることが条件。** 走らない finding は ito.ai で
+言う「再現手順のないバグ報告」で、kenbun (bug 申告の審査) の対象になる。
+
+### 4. 直結 QA 面 (ito.ai の PR → container 方式の、自社版)
+
+ito.ai は「PR 毎に使い捨て container で app を build & run」する。自社の
+対応物は **west pin 前進時の runtime verify**: 各ドメイルの deploy 前に
+`kotoba build`/`npm test`/gate 通過を確認する既存規律 (AGENTS.md「ビルド/
+テストが通ることを先に検証してから deploy」) がそれ。追加するのは:
+
+- deploy 後に **probe 1 発を手で回す** (`--only <当該面>`): deploy は
+  push と違い fast-forward 検査を持たないので、「deploy した直後の
+  約束」を 1 リクエストで確かめる。ADR-2608180100 の image gateway は
+  これが無かったから 20 日間残った。
+- **release CID ごとの verify** は kotoba.cloud の library publish 経路が
+  既に持つ (verify → run by release CID)。QA 組織はこれを再実装しない。
+
+### 5. 実測で判明した工具の修正
+
+`:json-non-empty` の複数キーは `(path1 path2)` の**パスのリスト**形
+(`([:a] [:b])`)。`[:a :b]` は 1 本のネストした walk として解釈される。
+既存 6 probe が全部単一キー形だったため今まで表面化しなかった。今回の
+7 probe はすべて正しい形で書いた。**この落とし穴は gate 対象** (G1):
+manifest の probe を読んで「2 つ以上のキーを期待するのにベクトル 1 本で
+書いてある」probe を落とす検査を fleet gate に足すこと (未着手、rollout)。
+
+## Rollout
+
+1. [x] probe 7 件追加 + 実測で約束を確定 (2026-09-03, 本 ADR)
+2. [x] verify-endpoint-health で新 probe が DEGRADED を検出し exit 1
+       を返すことを確認 (落ちることを確かめてから landed の原則)
+3. [ ] gad resident に manifest を配布 (deploy 流程は既存 systemd timer が
+       担う。manifest は git pull で届く)
+4. [ ] M2 判読 bot を Hermes cron (profile itonami) に週次で登録
+5. [ ] G1 manifest 形検査 gate を fleet gates.edn に 1 行追加
+6. [ ] :murakumo/chat-POST を :cost :gpu probe として追加 (inference 断の
+       早期発見。owner が VRAM を空けた時に alias が復活したかを計測する
+       唯一の手段)
+
+## Alternatives
+
+- **ゼロから QA bot 組織を作る (DO bot 4 本)**: 権限・予算・公開面を全部
+  新規に持つ。既存の endpoint-health resident が稼働中で、ADP-2608180100
+  の実績があるのに重複する。棄却。
+- **status page を見る bot**: uptime lib の存在意義そのものが「assert で
+  ない statement」— status の自己申告は計測でない (ADR-2608180100 の
+  「自己申告は計測ではない」)。棄却。
+- **Hermes cron で直接 live を叩く**: gad resident の方が「laptop が
+  sleep しても回り続ける」性質を持つ (ADR-2608111721)。判読だけ
+  laptop 側 cron でよい。
+
+## Consequences
+
+- 4 ドメインの「約束」が manifest に機械可読で存在するようになった。
+  新しい面を公開したら probe を 1 行足す — これが QA 組織の成長経路。
+- hyakka projection 502 (CPU limit) は **既知の未解決課題** として
+  probe が継続的に DEGRADED を報告する。これは誤検知ではない —
+  projection が実際に半分落ちている。 Kotobase transact の CPU limit
+  対策 (sharding / payload 軽量化) は net-kotobase 側の別作業。
+- murakumo chat inference 断 (500 error 1101) は owner 判断待ち
+  (ADR-2609031129 の resume point)。chat-POST probe は回復を計測する
+  手段を提供する。"}]
