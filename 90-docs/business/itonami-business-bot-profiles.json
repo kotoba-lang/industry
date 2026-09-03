@@ -1,0 +1,1794 @@
+{
+  "schema": "itonami.business-bot-profiles.v1",
+  "note": "One bot profile per business blueprint in the live open-business registry (snapshot 2026-09-03). A profile is a DESIGN + provisioning record, not a launch. Launch = POST /v1/grok-bots (checklist: itonami-business-bots skill). Mission context: 全人類を労働から解放する — each blueprint automates one economic domain behind a governed actor.",
+  "generated": "2026-09-03",
+  "generated_from": {
+    "live_registry": "https://itonami.cloud/api/open-business (28 blueprints, staticUpdated 2026-09-03)",
+    "live_economy": "https://bots.itonami.cloud/v1/bot-economy",
+    "live_assignments": "https://bots.itonami.cloud/v1/grok-bots/businesses",
+    "commit_of_record": "6664a7303d4"
+  },
+  "mission": {
+    "statement": "全人類を労働から解放する",
+    "instrument": "governed business bots: one DO per (blueprint x assignment), hourly bounded loop, governor-vetted effects, append-only audit",
+    "origin_directive": "ADR-2609022000 (yui, 2026-09-02 owner directive)"
+  },
+  "plane": {
+    "canonical": "https://itonami.cloud/api/v1/grok-bots/*",
+    "compat": [
+      "https://bots.itonami.cloud/v1/grok-bots/*",
+      "https://api.murakumo.cloud/v1/grok-bots/*"
+    ],
+    "economy": "https://bots.itonami.cloud/v1/bot-economy"
+  },
+  "profile_schema": {
+    "profile_id": "bot-profile:<blueprint-id>",
+    "identity": "optional agentmail inbox; inbox-scoped key = bot's own credential (org key never is)",
+    "runtime": "DO per bot, hourly tick, model via murakumo-main alias",
+    "money": "unique lending position; 1000-50000 micro-USDC; murakumo/kotobase x402 only",
+    "audit": "append-only ledger + public credential-redacted activity feed (sha256, itonami-stable-json-v1)",
+    "health": "fail-closed: status running != healthy; require clean last_error AND projections keeping up AND recent checkpoint"
+  },
+  "infra_profiles": [
+    {
+      "profile_id": "bot-profile:hyakka-knowledge-resident",
+      "kind": "knowledge-resident",
+      "plane": "itonami-grok-bots (non-business DO resident)",
+      "surface": "https://itonami.cloud/api/v1/grok-bots/hyakka",
+      "persistence": "kotobase-r2-ipld",
+      "authority": "kotobase",
+      "measured_2026_09_03": {
+        "tick_count": 399,
+        "published_observations": 94,
+        "failed_projections": 106,
+        "last_error": "Kotobase transact 502 CPU limit"
+      },
+      "health": "half-healthy: collection ok, projection dropping ~half"
+    },
+    {
+      "profile_id": "bot-profile:hyakka-topic-residents",
+      "kind": "knowledge-resident-topic",
+      "count": 9,
+      "topics": [
+        "kagoshima-u-nyusatsu-buppin",
+        "kagoshima-u-nyusatsu-kouji",
+        "kagoshima-u-jinji-saiyou",
+        "public-company-apple",
+        "public-company-microsoft",
+        "jp-shakai-hoken-tekiyo",
+        "jp-roudou-hoken-tekiyo",
+        "jp-kensetsugyo-kyoka",
+        "jp-takken-menkyo"
+      ],
+      "surface": "https://itonami.cloud/api/v1/grok-bots/hyakka/topics",
+      "measured_2026_09_03": {
+        "published_total": 344,
+        "failed_total": 928
+      },
+      "health": "half-healthy (same 502 CPU projection failure on all)"
+    },
+    {
+      "profile_id": "bot-profile:default-resident",
+      "kind": "resident",
+      "surface": "https://itonami.cloud/api/v1/grok-bots/runtime",
+      "measured_2026_09_03": {
+        "status": "held",
+        "tick_count": 55,
+        "last_error": "murakumo 1101 not-JSON"
+      }
+    },
+    {
+      "profile_id": "bot-profile:mail-identities",
+      "kind": "mail-identity",
+      "registry": "90-docs/business/agentmail-bot-profiles.json",
+      "inboxes": [
+        "kotobase-net@agentmail.to",
+        "murakumo-cloud@agentmail.to",
+        "murakumo-gpu-bench@agentmail.to"
+      ],
+      "note": "contact/ops inboxes, not business-scoped; business bots add their own when needed"
+    }
+  ],
+  "summary": {
+    "blueprints_total": 28,
+    "with_repo": 24,
+    "launched": 2,
+    "seed_tenants": 4,
+    "blueprint_only": 22,
+    "launched_all_held_or_failing": true
+  },
+  "profiles": [
+    {
+      "profile_id": "bot-profile:cloud-itonami-isic-6399",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-isic-6399",
+        "name": "Meta Job Search",
+        "domain": "labor/meta-job-search",
+        "isic_rev5": "6399",
+        "repo": "https://github.com/cloud-itonami/cloud-itonami-isic-6399",
+        "repo_path": "/gftdcojp/cloud-itonami-isic-6399",
+        "governor": "job-search-portal-governor",
+        "console": "https://cloud-itonami.github.io/cloud-itonami-isic-6399/",
+        "offer": "Governed meta job-search: posting ingest, per-jurisdiction ad-law assessment, human-approved publish/delist, and an immutable 的確表示 audit ledger.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "labor-market-transparency",
+        "domain_family": "labor"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "job-search-portal-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-ops-jobs-seed-meta-search",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-ops-jobs-seed-meta-search",
+        "name": "Maturity seed Meta job search",
+        "domain": "jobs/meta-search",
+        "isic_rev5": "6399",
+        "repo": null,
+        "repo_path": "/ops-jobs-seed/meta-search",
+        "governor": "jobs-governor",
+        "console": "https://cloud-itonami.github.io/cloud-itonami-isic-6399/",
+        "offer": "Dogfood free-tenant for jobs vertical instrumentation (not a paid tenant).",
+        "self_registered": true,
+        "maturity_seed": true
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "labor-market-transparency",
+        "domain_family": "jobs"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "jobs-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "seed-tenant",
+        "next_action": "attach-to-vertical-instrumentation"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-6310",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-6310",
+        "name": "Talent Actor",
+        "domain": "hr/talent-management",
+        "isic_rev5": "6310",
+        "repo": "https://github.com/cloud-itonami/cloud-itonami-isic-6310",
+        "repo_path": "/gftdcojp/cloud-itonami-6310",
+        "governor": "policy-governor",
+        "console": "https://cloud-itonami.github.io/cloud-itonami-isic-6310/",
+        "offer": "Replace closed HR SaaS with a governed OSS talent-management actor and audit ledger.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "labor-market-transparency",
+        "domain_family": "hr"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "policy-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-ops-talent-seed-practice",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-ops-talent-seed-practice",
+        "name": "Maturity seed Talent practice",
+        "domain": "hr/talent",
+        "isic_rev5": "6310",
+        "repo": null,
+        "repo_path": "/ops-talent-seed/practice",
+        "governor": "talent-governor",
+        "console": "https://cloud-itonami.github.io/cloud-itonami-isic-6310/",
+        "offer": "Dogfood free-tenant for talent vertical instrumentation (not a paid tenant).",
+        "self_registered": true,
+        "maturity_seed": true
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "labor-market-transparency",
+        "domain_family": "hr"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "talent-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "seed-tenant",
+        "next_action": "attach-to-vertical-instrumentation"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-isic-7810",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-isic-7810",
+        "name": "Employment Placement Agency",
+        "domain": "labor/employment-placement",
+        "isic_rev5": "7810",
+        "repo": "https://github.com/cloud-itonami/cloud-itonami-isic-7810",
+        "repo_path": "/cloud-itonami/cloud-itonami-isic-7810",
+        "governor": "placement-governor",
+        "console": "https://cloud-itonami.github.io/cloud-itonami-isic-7810/",
+        "offer": "Near-flagship governed employment/placement actor: candidate–role matching drafts, human-approved placement effects, and an audit ledger for staffing operators.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "labor-market-transparency",
+        "domain_family": "labor"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "placement-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-ops-placement-seed-agency",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-ops-placement-seed-agency",
+        "name": "Maturity seed Placement agency",
+        "domain": "labor/employment-placement",
+        "isic_rev5": "7810",
+        "repo": null,
+        "repo_path": "/ops-placement-seed/agency",
+        "governor": "placement-governor",
+        "console": "https://cloud-itonami.github.io/cloud-itonami-isic-7810/",
+        "offer": "Dogfood free-tenant for placement vertical instrumentation (not a paid tenant).",
+        "self_registered": true,
+        "maturity_seed": true
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "labor-market-transparency",
+        "domain_family": "labor"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "placement-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "seed-tenant",
+        "next_action": "attach-to-vertical-instrumentation"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-isic-2410",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-isic-2410",
+        "name": "Manufacture of Basic Iron and Steel",
+        "domain": "manufacturing/basic-iron-steel",
+        "isic_rev5": "2410",
+        "repo": "https://github.com/cloud-itonami/cloud-itonami-isic-2410",
+        "repo_path": "/cloud-itonami/cloud-itonami-isic-2410",
+        "governor": "steelworks-governor",
+        "console": "https://cloud-itonami.github.io/cloud-itonami-isic-2410/",
+        "offer": "Governed steelworks heat operations: mill-rules verify, quality screen, robot heat-dispatch drafts, mill-cert drafts and CSV audit export.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "manufacturing"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "steelworks-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-isic-2811",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-isic-2811",
+        "name": "Manufacture of Engines and Turbines",
+        "domain": "manufacturing/engines-turbines",
+        "isic_rev5": "2811",
+        "repo": "https://github.com/cloud-itonami/cloud-itonami-isic-2811",
+        "repo_path": "/cloud-itonami/cloud-itonami-isic-2811",
+        "governor": "turbine-governor",
+        "console": "https://cloud-itonami.github.io/cloud-itonami-isic-2811/",
+        "offer": "Governed industrial engine/turbine unit fabrication: type-rules verify, NDT screen, robot unit-dispatch drafts, type-evidence drafts and CSV audit export.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "manufacturing"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "turbine-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-isic-3011",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-isic-3011",
+        "name": "Building of Ships and Floating Structures",
+        "domain": "manufacturing/shipbuilding",
+        "isic_rev5": "3011",
+        "repo": "https://github.com/cloud-itonami/cloud-itonami-isic-3011",
+        "repo_path": "/cloud-itonami/cloud-itonami-isic-3011",
+        "governor": "shipyard-governor",
+        "console": "https://cloud-itonami.github.io/cloud-itonami-isic-3011/",
+        "offer": "Governed shipyard block fabrication: class-rules verify, NDT screen, robot block-dispatch drafts, class-evidence drafts and CSV audit export for surveyors.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "manufacturing"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "shipyard-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-isic-7310",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-isic-7310",
+        "name": "Advertising",
+        "domain": "professional/advertising",
+        "isic_rev5": "7310",
+        "repo": "https://github.com/cloud-itonami/cloud-itonami-isic-7310",
+        "repo_path": "/cloud-itonami/cloud-itonami-isic-7310",
+        "governor": "campaign-governor",
+        "console": "https://cloud-itonami.github.io/cloud-itonami-isic-7310/",
+        "offer": "Governed advertising actor: campaign intake, advertising-standards evidence assessment, misleading-claim-risk screening, campaign placement, plus creator tie-up with creator-eligibility screening and sponsorship-disclosure gating (AdOps-LLM ⊣ Campaign Governor).",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "professional"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "campaign-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": true,
+          "bot_id": "business-7310-assignmentisic73",
+          "bot_status": "held",
+          "tick_count": 3,
+          "position_id": "bot-position:business-7310-assignmentisic73:1",
+          "credit_limit_micros": 10000,
+          "launched": "2026-09-03"
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "launched",
+        "next_action": "recover-from-1101-and-resume"
+      }
+    },
+    {
+      "profile_id": "bot-profile:network-awai-net-babiniku",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "network-awai-net-babiniku",
+        "name": "AI VTuber Performance Operations",
+        "domain": "media/ai-vtuber-performance",
+        "isic_rev5": "9219",
+        "repo": "https://github.com/network-awai/net-babiniku",
+        "repo_path": "/network-awai/net-babiniku",
+        "governor": "babiniku-governor",
+        "console": "https://babiniku.net/",
+        "offer": "Governed AI VTuber performance actor: LLM persona proposes dialogue/emotion/motion-cue turns, the governor (review-turn) is the only gate that renders or speaks them, live 3D VRM avatar on babiniku.net, plus creator-character (kisekae) supply and honest-default monetization rails that stay disabled until a real PSP contract exists (babiniku-performer-LLM ⊣ babiniku governor).",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "media"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "babiniku-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": true,
+          "bot_id": "business-9219-assignmentbabini",
+          "bot_status": "held",
+          "tick_count": 0,
+          "position_id": "bot-position:business-9219-assignmentbabini:1",
+          "credit_limit_micros": 1000,
+          "launched": "2026-09-03"
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "launched",
+        "next_action": "recover-from-1101-and-resume"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-unspsc-10",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-unspsc-10",
+        "name": "Live Plant and Animal Material and Accessories and Supplies",
+        "domain": "unspsc/10",
+        "isic_rev5": null,
+        "repo": "https://github.com/cloud-itonami/cloud-itonami-unspsc-10",
+        "repo_path": "/cloud-itonami/cloud-itonami-unspsc-10",
+        "governor": "unspsc-10-governor",
+        "console": "https://cloud-itonami.github.io/cloud-itonami-unspsc-10/",
+        "offer": "Governed open-business operator for UNSPSC segment 10 (Live Plant and Animal Material and Accessories and Supplies): registry-backed technology stack and operating states.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "unspsc"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "unspsc-10-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-unspsc-27",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-unspsc-27",
+        "name": "Tools and General Machinery",
+        "domain": "unspsc/27",
+        "isic_rev5": null,
+        "repo": "https://github.com/cloud-itonami/cloud-itonami-unspsc-27",
+        "repo_path": "/cloud-itonami/cloud-itonami-unspsc-27",
+        "governor": "unspsc-27-governor",
+        "console": "https://cloud-itonami.github.io/cloud-itonami-unspsc-27/",
+        "offer": "Governed open-business operator for UNSPSC segment 27 (Tools and General Machinery): registry-backed technology stack and operating states.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "unspsc"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "unspsc-27-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-unspsc-39",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-unspsc-39",
+        "name": "Electrical Systems and Lighting and Components and Accessories and Supplies",
+        "domain": "unspsc/39",
+        "isic_rev5": null,
+        "repo": "https://github.com/cloud-itonami/cloud-itonami-unspsc-39",
+        "repo_path": "/cloud-itonami/cloud-itonami-unspsc-39",
+        "governor": "unspsc-39-governor",
+        "console": "https://cloud-itonami.github.io/cloud-itonami-unspsc-39/",
+        "offer": "Governed open-business operator for UNSPSC segment 39 (Electrical Systems and Lighting and Components and Accessories and Supplies): registry-backed technology stack and operating states.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "unspsc"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "unspsc-39-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-unspsc-43",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-unspsc-43",
+        "name": "Information Technology Broadcasting and Telecommunications",
+        "domain": "unspsc/43",
+        "isic_rev5": null,
+        "repo": "https://github.com/cloud-itonami/cloud-itonami-unspsc-43",
+        "repo_path": "/cloud-itonami/cloud-itonami-unspsc-43",
+        "governor": "unspsc-43-governor",
+        "console": "https://cloud-itonami.github.io/cloud-itonami-unspsc-43/",
+        "offer": "Governed open-business operator for UNSPSC segment 43 (Information Technology Broadcasting and Telecommunications): registry-backed technology stack and operating states.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "unspsc"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "unspsc-43-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-unspsc-73",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-unspsc-73",
+        "name": "Industrial Production and Manufacturing Services",
+        "domain": "unspsc/73",
+        "isic_rev5": null,
+        "repo": "https://github.com/cloud-itonami/cloud-itonami-unspsc-73",
+        "repo_path": "/cloud-itonami/cloud-itonami-unspsc-73",
+        "governor": "unspsc-73-governor",
+        "console": "https://cloud-itonami.github.io/cloud-itonami-unspsc-73/",
+        "offer": "Governed open-business operator for UNSPSC segment 73 (Industrial Production and Manufacturing Services): registry-backed technology stack and operating states.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "unspsc"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "unspsc-73-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-isic-1313",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-isic-1313",
+        "name": "Textile Finishing and Garment Decoration",
+        "domain": "textiles/garment-decoration",
+        "isic_rev5": "1313",
+        "repo": "https://github.com/cloud-itonami/cloud-itonami-isic-1313",
+        "repo_path": "/cloud-itonami/cloud-itonami-isic-1313",
+        "governor": "finishing-policy-governor",
+        "console": null,
+        "offer": "Run garment decoration prepress and finishing: white-plate separation, proof approval gates and press actuation blocked until the proof is signed off.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "textiles"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "finishing-policy-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:shirohan",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "shirohan",
+        "name": "Shirohan — White Underbase Prepress",
+        "domain": "textiles/prepress",
+        "isic_rev5": "1313",
+        "repo": "https://github.com/cloud-itonami/shirohan",
+        "repo_path": "/cloud-itonami/shirohan",
+        "governor": "none (deterministic kernel)",
+        "console": null,
+        "offer": "Build the white underbase plate (白版) for garment and sticker printing from artwork or an image, in the browser, with choke, cut line, CMYK and AI/PSD export.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "textiles"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "none (deterministic kernel)",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-isic-1410",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-isic-1410",
+        "name": "Apparel Manufacturing Operations",
+        "domain": "apparel/cut-and-sew",
+        "isic_rev5": "1410",
+        "repo": "https://github.com/cloud-itonami/cloud-itonami-isic-1410",
+        "repo_path": "/cloud-itonami/cloud-itonami-isic-1410",
+        "governor": "apparel-policy-governor",
+        "console": null,
+        "offer": "Run apparel cut-and-sew production: intake, spec review, phase-gated 縫製工程 with an independent governor and an append-only ledger.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "apparel"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "apparel-policy-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-3512",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-3512",
+        "name": "Community Renewable Energy Operations",
+        "domain": "energy/community-renewables",
+        "isic_rev5": "3512",
+        "repo": "https://github.com/gftdcojp/cloud-itonami-3512",
+        "repo_path": "/gftdcojp/cloud-itonami-3512",
+        "governor": "grid-policy-governor",
+        "console": null,
+        "offer": "Operate local renewable energy assets, metering, dispatch recommendations and community-benefit reports.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "energy"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "grid-policy-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-3600",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-3600",
+        "name": "Community Water Safety Operations",
+        "domain": "water/safety-operations",
+        "isic_rev5": "3600",
+        "repo": "https://github.com/gftdcojp/cloud-itonami-3600",
+        "repo_path": "/gftdcojp/cloud-itonami-3600",
+        "governor": "water-safety-governor",
+        "console": null,
+        "offer": "Monitor water quality, leaks, incidents and evidence-backed public safety reports.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "water"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "water-safety-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-3830",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-3830",
+        "name": "Local Materials Recovery",
+        "domain": "circular/materials-recovery",
+        "isic_rev5": "3830",
+        "repo": "https://github.com/gftdcojp/cloud-itonami-3830",
+        "repo_path": "/gftdcojp/cloud-itonami-3830",
+        "governor": "traceability-governor",
+        "console": null,
+        "offer": "Run community recycling, reuse, repair, custody tracking and circular-material impact reporting.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "circular"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "traceability-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-6810",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-6810",
+        "name": "Community Real-Estate Agency",
+        "domain": "property/real-estate-agency",
+        "isic_rev5": "6810",
+        "repo": "https://github.com/cloud-itonami/cloud-itonami-L6810",
+        "repo_path": "/gftdcojp/cloud-itonami-6810",
+        "governor": "realtor-governor",
+        "console": null,
+        "offer": "Governed real-estate closing execution: listing intake, per-jurisdiction disclosure/title checklisting, buyer/seller/tenant KYC-sanctions screening, and a human-approved closing handoff (Realtor-LLM ⊣ RealtorGovernor).",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "property"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "realtor-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:e2eproof/commitledgertest",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "e2eproof/commitledgertest",
+        "name": "E2E Proof Test Tenant",
+        "domain": "testing/e2e-proof",
+        "isic_rev5": "6999",
+        "repo": "https://github.com/e2eproof/commitledgertest",
+        "repo_path": "/e2eproof/commitledgertest",
+        "governor": "self-governed",
+        "console": null,
+        "offer": "A throwaway self-registered tenant created solely to prove cloud-itonami-commitment-ledger's check-13 live-registry verification end to end (docs/adr/0003-isic6492-wiring-and-approval-resume.md).",
+        "self_registered": true,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "testing"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "self-governed",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-ops-maturity-seed-hr-practice",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-ops-maturity-seed-hr-practice",
+        "name": "Maturity seed HR practice",
+        "domain": "hr-management",
+        "isic_rev5": "8299",
+        "repo": null,
+        "repo_path": "/ops-maturity-seed/hr-practice",
+        "governor": "policy-governor",
+        "console": null,
+        "offer": "Dogfood free-tenant claim for hyp instrumentation (not a paid tenant).",
+        "self_registered": true,
+        "maturity_seed": true
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "labor-market-transparency",
+        "domain_family": "hr-management"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "policy-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "seed-tenant",
+        "next_action": "attach-to-vertical-instrumentation"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-8569",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-8569",
+        "name": "Community Learning Support",
+        "domain": "education/support",
+        "isic_rev5": "8569",
+        "repo": "https://github.com/gftdcojp/cloud-itonami-8569",
+        "repo_path": "/gftdcojp/cloud-itonami-8569",
+        "governor": "learner-safety-governor",
+        "console": null,
+        "offer": "Coordinate tutoring, attendance follow-up, study plans, scholarship guidance and learner-support evidence.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "education"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "learner-safety-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-8691",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-8691",
+        "name": "Health Access Navigation",
+        "domain": "health/access-navigation",
+        "isic_rev5": "8691",
+        "repo": "https://github.com/gftdcojp/cloud-itonami-8691",
+        "repo_path": "/gftdcojp/cloud-itonami-8691",
+        "governor": "health-access-governor",
+        "console": null,
+        "offer": "Route consented care-navigation intake to provider referrals, appointment support and follow-up queues.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "health"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "health-access-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:cloud-itonami-8810",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "cloud-itonami-8810",
+        "name": "Community Care Coordination",
+        "domain": "social-care/community-support",
+        "isic_rev5": "8810",
+        "repo": "https://github.com/gftdcojp/cloud-itonami-8810",
+        "repo_path": "/gftdcojp/cloud-itonami-8810",
+        "governor": "safeguarding-governor",
+        "console": null,
+        "offer": "Run consented community care plans, check-ins, caregiver queues, safeguarding escalation and workload reports.",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "social-care"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "safeguarding-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": false
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "blueprint-only",
+        "next_action": "launch-second-business-bot-candidate"
+      }
+    }
+  ]
+}
