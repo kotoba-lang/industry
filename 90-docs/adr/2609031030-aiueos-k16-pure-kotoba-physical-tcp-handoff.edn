@@ -1,0 +1,209 @@
+[{:db/id -1
+  :adr/id "adr-2609031030-aiueos-k16-pure-kotoba-physical-tcp-handoff"
+  :adr/title "AIUEOS K16 pure-Kotoba handoff: physical TCP is green; HTTPS, Murakumo, and Qwen remain separate gates"
+  :adr/status "accepted"
+  :adr/date "2026-09-03"
+  :adr/last_verified "2026-09-03"
+  :adr/last-verified "2026-09-03"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/repos ["com-junkawasaki/root"
+              "kotoba-lang/aiueos"
+              "kotoba-lang/amu"
+              "kotoba-lang/capability-link-frame"
+              "kotoba-lang/capability-dma-map"
+              "kotoba-lang/capability-mmio-map"
+              "kotoba-lang/capability-net-transport"
+              "kotoba-lang/org-ietf-tls"
+              "kotoba-lang/capability-crypto-tls"
+              "kotoba-lang/capability-http-fetch"
+              "net-kotobase/ipfs"
+              "network-awai/cloud-murakumo-api"]
+  :adr/authoritative_for ["GMKtec K16 上の pure-Kotoba AIUEOS 物理 TCP 証拠"
+                          "2026-09-03 時点の実験 branch、compiler、artifact、PXE 配信状態"
+                          "pure-Kotoba HTTPS、Murakumo node、Qwen 推論へ進む際の handoff と exit gate"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/related ["2608051200"
+                "2608052200"
+                "adr-2607184000-kotoba-transport-provider-components"
+                "adr-2608251418-aiueos-usb-install-and-headless-bootstrap"
+                "adr-2608153500-aiueos-maturity-roadmap-distributed-computing-premise"
+                "kotoba-lang/aiueos contracts/k16-kotoba-native-closure-v1.edn"
+                "kotoba-lang/aiueos contracts/physical-kotoba-native-k16-v1.edn"
+                "kotoba-lang/aiueos contracts/pure-kotoba-tcp-k16-v1.edn"]
+  :adr/body "# 問い
+
+別の agent がこの session の会話や一時ディレクトリを持たなくても、購入済み GMKtec K16 上で pure-Kotoba AIUEOS を Murakumo node として動かす作業を、どこから安全かつ正直に再開できるか。
+
+## 結論
+
+2026-09-03 10:20 JST、K16 の RTL8125 から Mac 直結 LAN 上で、pure-Kotoba kernel による Ethernet TX/RX、ARP、IPv4、TCP SYN、SYN-ACK header admission、ACK、RST、UDP positive receipt が実機で一続きに成功した。K16 画面の最終値は `60`、Mac の独立 receiver が観測した列は次である。
+
+```text
+AIUEOS_NATIVE_ARP_OK
+AIUEOS_NATIVE_NIC_40
+AIUEOS_NATIVE_NIC_43
+AIUEOS_NATIVE_NIC_44
+AIUEOS_NATIVE_NIC_45
+AIUEOS_NATIVE_TCP_OK
+```
+
+`60` はエラー 60 ではない。`native/kernel.kotoba` が screen base `0x60` に provider status を加算して表示し、provider status が 0 だった結果である。wire 上の `TCP_OK` と一致するため、画面だけの自己申告ではない。
+
+ここで green になったのは physical TCP gate までである。現在の pure-Kotoba path は TLS record を一 byte も送っておらず、HTTPS response、CACAO/Biscuit、Murakumo node registration、heartbeat、job polling、Qwen generation、decode tok/s はすべて未証明である。過去の C/reference image で表示された `direct https ok` や model handoff を、この pure-Kotoba artifact の証拠へ繰り上げてはならない。
+
+## ここまでに確定したもの
+
+### 1. 共通 native device-I/O 境界
+
+NIC 固有コードへ再び規則を埋め込まないため、次の共通 repo を作成・main merge・root genpon/west pin 済みにした。
+
+| repo | main / root pin | この slice の責任 |
+|---|---|---|
+| `capability-link-frame` | `8e859f5d1817374a1b1de8447961ac223ffd538c` | Ethernet wire length と frame 境界 |
+| `capability-dma-map` | `b3590c605a7c189b67a86c28aaae31ec7cdcb8bf` | descriptor command、release fence、DMA ownership |
+| `capability-mmio-map` | `cbbf4ec59f7ca010cec44be2dd84e310faadccee` | MMIO width と bounds |
+| `capability-net-transport` | `583a9f7c3f517a30a65cf9db3f2dcd19289cbef0` | TCP header length と SYN-ACK shape |
+
+Amu の device-I/O contract は PR 751 として main へ merge され、当時の merge SHA は `addc571b3da2c149f604c7fda16c6b1f26d7a187`。ただし今回の再現 build が使った compiler revision は `13d2f5dfe1adeaa99b7e9e6c04fcf8cb8fc15a4b` であり、2026-09-03 時点の Amu main `ec6a4de1cc9843508288058f36c0b12a24e5ba17` と diverged している。root pin も別の `57ba0ee0c2270d970d16753965ee9f8c8d0164d1` である。compiler commit を main または root pin と同一だと扱わない。
+
+### 2. pure-Kotoba AIUEOS 実験 branch
+
+正本は GitHub の `kotoba-lang/aiueos` branch `codex/pure-native-k16` である。
+
+| revision | 内容 |
+|---|---|
+| `c8a1827682643ae299ffa2e8a15b5b432d34a34d` | common capability source を閉包へ統合した基礎 artifact |
+| `cada7910f1ce5377011b498952423a6ac457847f` | TX diagnostic が `tx-frame` を再利用する前に SYN-ACK を分類する順序へ修正 |
+| `5e42cf9aafcb43e8408cd66b0a6022e3ea9e10e2` | immediate RX marker、header-only classifier、bounded wait を持つ実機成功 source |
+| `411b4756404c6a03c80c048725bc24b6bd400b71` | `60` と wire sequence を `pure-kotoba-tcp-k16-v1.edn` に固定した evidence commit |
+
+2026-09-03 10:28 JST の live comparison では、この branch は AIUEOS main `3096058a5396ed0ce325e0cd1e639d220727d2c4` に対して 26 commits ahead / 142 commits behind、merge base は `787afb30617f75742649461fa93b428c69446af6` だった。root `origin/main` は `4ad48db5e29a675eaf284530145a31540add969d`、root west pin の AIUEOS はさらに別の `daffd45b2214b0c6d34a126652ea1c46d0949e59` である。
+
+したがって、この branch を main へ直接 merge、rebase、または root pin へ前進してはならない。まず実験 branch 上で次の物理 gate を閉じ、main integration は差分を責任単位へ分解した別 tranche とする。履歴を書き換えず、必要なら current main から新しい integration branch を作り、証明済み source と contract を明示的に移植する。
+
+### 3. 実機成功 artifact
+
+| item | value |
+|---|---|
+| target | GMKtec K16、RTL8125 BDF `02:00.0`、vendor `10ec`、device `8125` |
+| K16 MAC / IPv4 | `70:70:fc:0b:b6:32` / `10.77.0.10` |
+| Mac link | `en11`、`10.77.0.1`、MAC `80:69:1a:17:4f:15` |
+| kernel | 143640 bytes、SHA-256 `2bfacd358caff8d52f2bcde985e945b88129bea494ad0b1dbfbe2864e967de9e` |
+| EFI | 162816 bytes、SHA-256 `0f3a86357d6ae996b37998e2b0998d9d3a2adf07de7e608747e711465d38b870` |
+| closure | C 0、CRT 0、foreign object 0、dynamic import 0 |
+| source | AIUEOS implementation `5e42cf9...`、evidence `411b475...`、Amu `13d2f5d...` |
+| host tests | `native_rtl8125_closure_test` 4 tests / 90 assertions passed |
+| QEMU | `AIUEOS_KOTOBA_NATIVE_QEMU_OK`、memory map v2、NX/WP/CR3、IDT14、ExitBootServices passed |
+| reproducibility | 独立した 2 build の KERNEL.ELF と BOOTX64.EFI が byte-identical |
+| disk effect | internal SSD write 0、USB runtime write 0、boot-order write 0 |
+
+Mac 上の現行 PXE 配信 artifact は `~/Library/Application Support/AIUEOS/K16 PXE/kotoba-native-rx-arrival-0f3a8635.efi`。launcher は同ディレクトリの `run-k16-pxe.sh`。launchd service は `cloud.murakumo.aiueos-k16-pxe`、wire log は `~/Library/Logs/AIUEOS/k16-pxe.stdout.log` である。transparent TCP relay は `cloud.murakumo.aiueos-k16-direct-bridge`、listen は `10.77.0.1:8443`、upstream は `api.murakumo.cloud:443`。
+
+今回の TCP success は PXE log の 10:20:12 更新で観測されたが、direct bridge log の最終更新は 10:00:50 だった。現 artifact は handshake 後すぐ ACK、RST、UDP receipt を送り connection を閉じるため、この run に TLS traffic が無いことと整合する。relay が listen していることを HTTPS success と数えない。
+
+### 4. `43` 停止から得たデバッグ規則
+
+失敗 artifact `f22150215f83a5ec4dfb15d94d58591ef95bc8e9de75be5b57a08aef4250a52b` は `ARP_OK -> 40 -> 43` で停止した。最終 artifact は次の三つを同時に変更して成功した。
+
+1. RX descriptor を見た瞬間、parse より先に wire marker `44` を送る。
+2. 最初の classifier を checksum recursion の無い header-only 判定へ縮める。
+3. RX wait を 1 window 8000000 iterations から 250000 へ縮め、4 windows 後に明示 timeout `21` を返す。
+
+これにより descriptor arrival、header admission、timeout を一回の boot で区別できるようになった。ただし三変更を一つずつ戻す実機 A/B はしていない。したがって旧 `43` 停止の単一根因を、長い poll、compiler code size、checksum、または packet loss のどれか一つに確定してはならない。
+
+現 status map は `40` gate entered、`43` SYN descriptor complete、`44` RX descriptor observed、`45` header admitted、`21` timeout、`90` invalid descriptor、`91` Ethernet/length、`92` IPv4、`94` TCP ports/ACK、`95` TCP shape である。reserved の `93` と `96` は次の IPv4/TCP checksum gate に使える。
+
+## 現在の責任境界
+
+| layer | authority / responsibility | 今回の実測 |
+|---|---|---|
+| Kotoba source | device と protocol の決定を typed source として表す | RTL8125/TCP source が artifact closure に入った |
+| Amu | checked KIR を x86_64 machine code へ下ろす | revision `13d2f5d...` で再現 build |
+| common capability repos | frame、DMA、MMIO、transport の再利用規則 | main merge と root pin 済み |
+| AIUEOS | UEFI boot、memory protection、RTL8125、TCP state、screen/wire diagnostics | physical TCP まで green |
+| `org-ietf-tls` | portable TLS 1.3 protocol core | `.cljc` client は live TLS 実績あり。ただし K16 native closure へ未接続。peer auth は SPKI pin 中心で full chain validation ではない |
+| `capability-crypto-tls` | TLS secret/network-write/crypto authority contract | contract-only。import は grant ではない |
+| `capability-http-fetch` | HTTP network-read authority contract | contract-only。provider 実装ではない |
+| Kototama | OS と分離して更新できる admitted runtime を持つべき層 | K16 current artifact には resident runtime 未接続 |
+| Kotobase/IPFS/IPNS | CID-addressed model/runtime distribution と latest pointer | K16 current artifact に HTTPS fetch 未接続 |
+| `auth.kotoba.cloud` | human Passkey ceremony と account session の正式 authority | K16 device enrollment ceremony 未実装。password/OAuth fallback は追加しない |
+| Murakumo | node admission、heartbeat、job dispatch、result receipt、speed metrics | current pure path では未接続 |
+| infer/num/torch | admitted runtime 内の inference execution | current pure path では未実行 |
+
+CACAO、Biscuit、passkey、耐量子暗号という語を一つの成功ラベルへまとめない。Passkey は `auth.kotoba.cloud` の human authority、CACAO/Biscuit は device/action delegation envelope、TLS/X.509 または pin は transport peer authentication であり、各々別の negative test と receipt を持つ。耐量子暗号は採用 algorithm と実装・相互運用を示すまで未実装である。
+
+## ここからの実装順
+
+### Gate N1: incoming checksum admission
+
+`44` を parse より前に残したまま、IPv4 checksum failure を `93`、TCP checksum failure を `96` として一段ずつ復元する。両方を一度に戻さない。host test、QEMU、独立 reproducible build の後、K16 で `44 -> 93/96/45` を観測する。`45` の後に `TCP_OK` が届いた時だけ N1 green。
+
+### Gate N2: persistent TCP byte stream
+
+現在の `tcp-ack-reset-and-receipt` は proof 用で、ACK 後に RST する。これを production path と呼ばない。sequence/ack tracking、複数 RX descriptor、reassembly、partial send/receive、FIN/RST、timeout、retransmission bounds を common `org-ietf-tcp` / transport contract と分担し、TLS record を運べる persistent stream を別 profile で作る。診断 profile は残し、runtime profile と混ぜない。
+
+過去の reference path では 2783-byte TLS response が単一 RX buffer を越えた。512-byte chunk と 25 ms spacing は過去の回避策であって current pure implementation の完成形ではない。N2 は複数 record/segment を loss なく再構成する実測を持つまで green にしない。
+
+### Gate N3: pure-Kotoba TLS 1.3
+
+新規 TLS を RTL8125 file に直書きしない。`org-ietf-tls` の RFC 8446 state/record/transcript/schedule、AIUEOS の既存 SHA-256、HKDF-SHA256、AES-128-GCM、X25519、TLS record contracts、`capability-crypto-tls` の authority を native source graph へ接続する。まず RFC 8448 byte vectors と wrong-key/wrong-Finished negative controls、次に Mac relay 越しの K16 ClientHello/Finished を観測する。
+
+`org-ietf-tls` の現在の live success は SPKI pin authentication であり full trust-anchor chain validation ではない。N3 の first profile は `api.murakumo.cloud` の server-name と immutable SPKI pin を artifact receipt に束縛し、pin mismatch、SAN mismatch、Finished mismatch、expired/not-yet-valid の扱いを明示する。full X.509 path validation を実装していないのに trusted chain と書かない。
+
+### Gate N4: HTTPS request/response
+
+K16 自身が TLS application data として最小 GET を送り、status line、headers、bounded body を復号する。Mac bridge は byte-for-byte forwarder に留め、Mac-side HTTP client や Mac-side TLS terminationを success に数えない。最初は read-only health/discovery、次に authenticated node endpoint の順にする。HTTP 200 だけで generation success としない。
+
+### Gate N5: device enrollment and Murakumo resident node
+
+起動時 UI に artifact version/hash と enrollment QR を表示する。QR は `auth.kotoba.cloud` の既存 Passkey session で scan し、human account と one-time device claim を結ぶ。device key は K16 が生成・保持し、reusable human credential を image、log、QR に入れない。CACAO/Biscuit envelope は node registration、heartbeat、job polling、result post の各 authority を別 grant として絞る。
+
+green の順序は registration receipt、node list、heartbeat freshness、job lease、job execution、persisted result。control endpoint の 401、node 名不一致、token 不明時に credential を上書きして進めない。network restart/reboot command は認証済み control capability として後から加え、物理 button 不要を claim する前に実機 ack と再接続を観測する。
+
+### Gate N6: Kototama runtime and Qwen inference
+
+AIUEOS kernel は boot/network/memory/capability admission を所有し、inference failure で OS reboot しない。Kototama resident runtime を更新可能な workload boundary とし、Murakumo、infer、num、torch がそこへ admitted provider として接続する。model は Kotobase/IPFS の immutable CID と IPNS/latest policyから取得し、NVMe A/B slots、RAM/VRAM residency、hash admission、rollback を別 contract にする。
+
+最初の実測は tiny deterministic model/token KAT、次に指定 Qwen artifactの実 token sequence、最後に 32k context coding-agent workload。Qwen の model 名、quantization、bytes、CID/hash、context、prompt tokens、generated tokens、threads、AVX2、cold load、TTFT、prefill tok/s、decode tok/s を receipt に固定する。Murakumo round-trip latency と K16 device-local decode tok/s を混ぜない。0 token、fallback model、host inference を K16 tok/s と報告しない。
+
+## 再開手順
+
+1. `kotoba-lang/aiueos` を fresh clone し、まず `411b4756404c6a03c80c048725bc24b6bd400b71` を detached で読む。開発を続ける時は remote `codex/pure-native-k16` の current tip を確認し、履歴を force update しない。
+2. `os/aiueos/contracts/pure-kotoba-tcp-k16-v1.edn` と `native/rtl8125.kotoba` を読む。会話ログよりこの contract と本 ADR を優先する。
+3. Amu は `13d2f5dfe1adeaa99b7e9e6c04fcf8cb8fc15a4b`、common capability four repos は上表の exact SHA を使用する。一時パス `/private/tmp/...` は正本ではなく、session をまたいで存在を仮定しない。
+4. `clojure -M:test -n aiueos.native-rtl8125-closure-test` を通す。pure native builder は `AIUEOS_NATIVE_K16_PREFLIGHT=1` と four `AIUEOS_*_SOURCE_PATH` を exact checkout へ向け、compiler directoryを明示する。
+5. build receipt が no C / no CRT / imports 0 / foreign 0 を示すこと、独立 build が byte-identical であること、QEMU smoke が memory protection と ExitBootServices を通ることを確認する。
+6. 新EFIを Mac PXE directoryへ別名で置き、launcher の file と HTTP URI を同じ basenameへ更新する。service restart 後、localhost fetch の SHA が build SHA と一致するまで K16を rebootしない。旧artifactは比較用に残す。
+7. K16 reboot 後、期待 MAC `70:70:fc:0b:b6:32` の DHCP/TFTP または HTTP fetch と、新 artifact basename/hashに結び付いた wire markerだけを証拠にする。無関係 MAC の DHCP、listener ready、QEMU、EFI downloadだけでは物理 gateを通さない。
+8. physical success を component contractへ artifact hash、screen code、wire sequence、時刻つきで追記してから source/evidence commitを non-forceで publishする。
+
+## Exit matrix at handoff
+
+| gate | state | evidence / blocker |
+|---|---|---|
+| PXE/UEFI pure boot | green | exact EFI download、QEMU boot chain、K16 screen |
+| physical RTL8125 + ARP | green | `AIUEOS_NATIVE_ARP_OK` |
+| physical TCP handshake | green | screen `60` + `40,43,44,45,TCP_OK` |
+| incoming IP/TCP checksum admission | amber | header-only classifier。N1で分離復元 |
+| persistent TCP stream | red | proof path は ACK 後 RST |
+| pure-Kotoba TLS 1.3 | red | portable/core ingredientsはあるが native K16 graph 未接続 |
+| K16-owned HTTPS | red | current run の TLS/HTTP bytes 0 |
+| Passkey device enrollment | red | `auth.kotoba.cloud` ceremony 未接続 |
+| Murakumo registration/heartbeat/job | red | current pure node 未登録 |
+| Qwen generation | red | token output 未観測 |
+| K16 decode tok/s | red | generated tokens と device-local timing 未観測 |
+| SSD persistent install | out of scope | current qualification は internal disk write 0 |
+
+## Consequences
+
+- pure-Kotoba NIC の物理 TCP feasibility は仮説ではなく、artifact-bound evidence になった。
+- 一方、AIUEOS main/root pin と実験 branch は大きく diverged している。物理成功を理由に wholesale merge しない。
+- screen code と wire receipt を各 gate に残す。monitor の表示だけ、Mac service の readyだけ、HTTP healthだけを上位 gateへ昇格しない。
+- OS基盤と inference runtimeを分ける。TLS/parser/model errorから kernel rebootを要求しない。
+- model distribution、KV同期、VRAMからcloudへのstreamingは後続設計であり、disk/RAM bypassを測定なしに claimしない。
+- 物理再起動が必要なのは host/QEMU/reproducibility gateを通したEFIだけ。source editごとにK16を再起動しない。
+
+**次の成功条件は、K16自身が checksum-admitted persistent TCP 上で pure-Kotoba TLS 1.3を完了し、認証済みHTTPS responseをwire receiptとして返すことである。**"}]
