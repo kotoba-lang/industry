@@ -440,6 +440,76 @@ west pin を 5 件前進させ checkout を同期した直後に、今日直し�
 - **`pop` と `keys` は 4 つ目・5 つ目の repo で止まる**（`kotoba-wasm` の host intrinsic と amu の `browser-host.mjs`。`keys` はそこに `[:list T]` という値種がそもそも無い）。**この 2 つだけ e2e を確認できていない**ことを `:backends-measured` に書いてある。
 - **amu の bump は 4 点で、kir の pin も含む**（見落としやすい —— **sema だけ動かすと frontend が `pop` を admit して KIR が `:unknown-function` で trap する**）。加えて `capability-catalog.edn` の resync が要る（その pin 跨ぎが sema `c823461` を越えるため）。**文法バイトと digest 定数はもうリストに無い** —— 20 が amu の複製を退役させたので。
 
+## Closing 2026-09-03
+
+### 着地したもの（この日）
+
+23 の記録が上に在る。repo ごとの最終 SHA は west pin `6b2b5eb4` が正本で、superproject は
+`origin/main` と 0/0、共有 checkout は pin と一致している。
+
+| repo | 最終 SHA | この日入ったもの |
+|---|---|---|
+| kotoba-lang | `153d35dd` | 定義 CID の scope / effect row 語彙 / identity 2 実装の記録 / stdlib 0.5.0 と exact な case / authority claim の機械検査 / 複製登録簿と fleet 検査 / capability catalog の promotion |
+| kotoba-sema | `63d76616` | 型主導算術 / 過剰引数の拒否 / abort slice 1-2 / local atom slice 1 / loop accumulator / map key と value / friendly collection heads / 宣言型 guard / malformed 宣言形 / 静かに捨てられていた宣言 / collection primitives |
+| kotoba-kir | `b021a0d1` | effect row の橋渡し / alpha 正規化の所有 / vector-take・typed-map-keys/vals・typed-list-nth |
+| kotoba-hir | `ac8e7051` | `:abort` を effect row member に |
+| amu | `e1afa25c` | 定義 CID と CID 鍵 cache / abort と TDNR の consume / **shadow していた文法複製の退役** |
+| codebase | `837f1185` | identity layer 2 を flag 裏に |
+| grammar | `4457d762` | 文法 resync と 3 射影の再生成 |
+| kotoba | `0ad166d9` | 2 emitter の分離記録 / q6 を escape の禁止に / pending は skip list でないことの実証 |
+
+### 検証（この日実際に走らせたもの）
+
+各 slice の記録に両方向の exit code と件数が在る。最後に**私自身が共有 checkout の
+`bin/amu` で測った**受け入れは 4 件（`conj` からの `typed-set-contains` が 1、loop の f64
+accumulator が 3、i64 key の map literal が 3、誤った宣言型が exit 70 の無情報 crash では
+なく exit 65 + 文言）。**測ったから分かったことが 2 つある** —— west pin を進めても amu は
+自前の `deps.edn` で古い frontend を pin しており修正が届いていなかったこと、そして私の
+probe 自身が壊れていて compiler の crash を掘り当てたこと。
+
+### この closing の時点で in-flight なもの（resume point）
+
+- **amu PR 770**（`agent/amu-consume-20260903c`）: 今日の frontend と KIR を consume し、
+  catalog を authority から resync する。**OPEN / MERGEABLE、9 SUCCESS + 4 IN_PROGRESS**
+  （06:02 開始）。担当 agent が緑を待って merge する段。これが着地するまで **`bin/amu` の
+  利用者には今日の frontend 変更が 1 つも届かない。** 落ちたら `deps.edn` の 4 点
+  （sema pin / kir pin / その隣の解析されるコメント行 / `deps-lock.edn` 再生成）を確認する。
+- **owner WIP を 1 件温存した**: 共有 checkout `orgs/kotoba-lang/kotoba-lang` に
+  `lang/capability-catalog.edn` の未コミット編集があり、`screen/observe` / `screen/act` を
+  authority へ promote する**下書き**だった。**main には同じ内容がより完全な形で入っている**
+  （どの repo から来た誤りかまで記録した版）ので、drop せず
+  `stash@{0}`（message に日付と理由）に退避した。**破棄していない。**
+
+### 次に効くもの（優先順）
+
+- **`:state` ability の kit desugar**（逃げる / 永続する / 関数をまたぐ atom）。local atom
+  slice 1 は host を要さない半分だけを取った。vacuous な前提「handle は値でない」を先に
+  赤にする順序は 6 に書いてある。
+- **abort slice 3**: export 境界を `[:result T E]` の ABI にする、`:checked-lexical-facet-unwind`
+  を実装して loop / lazy / facet scope を開ける、wasm32 / native 資格。
+- **`pop` と `keys` は 4 つ目・5 つ目の repo で止まっている**（`kotoba-wasm` の host intrinsic と
+  amu の `browser-host.mjs`。後者には `[:list T]` という値種がそもそも無い）。23 の
+  `:backends-measured` に書いてある。
+- **kotoba の文法複製 2 部**（20 の owner 判断 (1)）。resync は通るが、同じ authority commit で
+  来る conformance 2 件を kotoba の primary emitter が実行できない。guard を緩める手は
+  kotoba 自身の ADR が過去の誤りとして記録しているので取っていない。
+- **`:diagnostic-hints` が 3 通りに古い**（`count` / `keys` / `vals`、`peek` / `pop` の項が無い）。
+  正確な差し替え文は 23 の報告に在る。**sha256 が 4 repo に pin されたファイルなので**、
+  20 が入れた複製機構を通して動かす。
+- **fleet 検査 `check-vendored-copies-fleet.cljs` は手動のまま。**
+  `manifest/orgs-detectors.edn` に登録すれば session 開始時に出るが、その script の出力は
+  `FINDING<TAB>sev<TAB>key<TAB>detail` の protocol ではないので、**登録には出力形式の変更が要る**。
+
+### この日に 8 回出た同じ形（次の反復が最初に疑うべきもの）
+
+**検査は在るのに、測っている対象が名乗りと違う。** arity 検査は短くされた後の form を測り、
+`verify-normalized!` は自己完結した束縛形を見逃し、conformance の fixture は宣言した backend に
+一度も走らされず、amu は自分のファイルと違う hash を申告し、authority は実装の無い操作を記述し、
+連続性を謳うコメントの下に固定の上限が書かれ、`clone --shared` の baseline は別の commit を
+測って緑を返し、authority の 1 文が「list に accessor は無い」と誤って述べていた。
+**probe を書く側も 3 回同じ形に落ちた**（top-level 位置を足すと全 head が present に見える /
+`__kotoba_` 接頭の baseline は別の理由で拒否される、を 2 人が独立に踏んだ）。
+
 ### 残件（この ADR が次に指す先）
 
 1. `:state` ability（決定節のとおり。前提 4 つのうち vacuous な「handle は値でない」を先に赤にする）。
