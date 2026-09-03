@@ -73,5 +73,19 @@ ad-hoc に足され、実測 (2026-09-03) の状態がその証拠:
   「bot 作成時に周期業務の設計を同梱する」という原則は共通。
 - script 主体の job (hyakka / tabi の evidence script 群) は既に
   規則 2/4 を満たしている — この規則はそれを形式化するもので、
-  既に適合している job の書き直しを要求しない。"}
+  既に適合している job の書き直しを要求しない。
+
+## 改訂履歴
+
+- 2026-09-03 (4a75551396f): **定義の正本が repo に着地した。**
+  `~/.hermes/profiles/<p>/cron/jobs.json` は端末固有の稼働状態で他端末に
+  同期されないため、cron job の「定義」の正本を
+  `scripts/hermes-cron-jobs/hermes-cron-jobs.json`
+  (7 profile / 29 job、生成器 `export_cron.py`、`--check` で live と
+  一致検査) に置いた。cron を作る/変える/消したら export を回して
+  repo に着地させる。credential 値は形状検出して値そのものは焼かない
+  (実測の誤検知 `'task_comments'` → `sk_` 部分一致を長さしきい値で排除)。
+  新端末 re-register 手順は `scripts/hermes-cron-jobs/README.md`。
+  稼働状態 (paused/last_run) だけは各端末ローカルのまま、という境界は
+  台帳 schema に明記済み。" }
  ]
