@@ -1002,14 +1002,33 @@
         ["fail 'unknown gate kind' 92"])))))
 
 (def ^:private git-dep-re
-  #"io\.github\.([a-zA-Z0-9_.-]+)/([a-zA-Z0-9_.-]+)\s*\{[^}]*?:git/sha\s+\"([0-9a-f]{40})\"")
+  #"io\.github\.([a-zA-Z0-9_.-]+)/([a-zA-Z0-9_.-]+)(\s*\{[^}]*?:git/sha\s+\"([0-9a-f]{40})\"[^}]*\})")
+
+(defn- dep-repo-name
+  "依存 entry の :git/url から GitHub repo 名を取る。ライブラリ記号は repo 名と
+   一致しないことがある（実測: cloud-itonami-app の
+   `io.github.kotoba-lang/authentication-email` は repo `authentication` の
+   module alias（:deps/root \"modules/email\"）。lib 記号を repo 名として
+   mirror! すると `Repository not found` で die し、tick 全体が毎回死亡した
+   （実測 2026-09-01 13:28Z 以降 77 件の FATAL、fleet CI 停止）。
+   :git/url が無い entry は従来形（lib 記号 = repo 名）にフォールバックする。"
+  [lib-symbol entry-text]
+  (let [repo (second (re-find #":git/url \"https://github\.com/([a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+?)(\.git)?\"" entry-text))]
+    (or repo lib-symbol)))
 
 (defn git-deps-of
   "deps.edn の本文 → [{:lib \"io.github.org/name\" :org :repo :sha} …]。
-  :override-deps（:local 用）は :git/sha を持たないので自然に外れる。"
+   :repo は **:git/url から導出**する（lib 記号は repo 名の別名のことがある —
+   dep-repo-name の docstring 参照）。
+   :override-deps（:local 用）は :git/sha を持たないので自然に外れる。"
   [deps-text]
-  (mapv (fn [[_ org repo sha]]
-          {:lib (str "io.github." org "/" repo) :org org :repo repo :sha sha})
+  (mapv (fn [[_ org lib entry sha]]
+          (let [repo (dep-repo-name (str org "/" lib) entry)
+                [rorg rrepo] (str/split repo #"/")]
+            {:lib (str "io.github." org "/" lib)
+             :org (or rorg org)
+             :repo (or rrepo lib)
+             :sha sha}))
         (re-seq git-dep-re (str deps-text))))
 
 (defn git-deps-closure
