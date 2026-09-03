@@ -1,59 +1,83 @@
 {:system/id :geopol-power-sourced-facts
- :mission "Record observable, source-mandatory facts about relations among states, governments, and companies — procurement awards, appointments, mergers/acquisitions, sanctions/regulatory actions, partnerships, subsidies, contracts — into the wiki.kotobase.net (app-hyakka) claim graph. Power dynamics as interpretations are NOT recorded; only observable events and their sources."
+ :mission "Record sourced facts AND explicitly-labeled model analysis about relations among states, governments, and companies — procurement awards, appointments, mergers/acquisitions, sanctions/regulatory actions, partnerships, contracts — into the wiki.kotobase.net (app-hyakka) claim graph. Every datom carries a provenance label; interpretation is allowed, but never disguised as fact."
 
- ;; D1 boundary: interpretation-free. The graph stores events and stated facts;
- ;; it never stores rankings, scores, influence ratings, or narrative analysis
- ;; of who "holds power" over whom. Analysis belongs to readers, not to the wiki.
- :analysis-boundary {:allow [:observable-event
-                             :stated-fact-from-primary-source
-                             :documented-relationship-existence]
-                     :forbid [:power-ranking
-                              :influence-score
-                              :allegiance-or-ideology-inference
-                              :narrative-power-analysis
-                              :prediction
-                              :person-scoring]}
+ ;; Layered epistemics: every claim sits on exactly one layer. The layer label
+ ;; is a required field, stored as its own datom, queryable in the datom plane
+ ;; (1-ref joinable) — a reader can filter to observed facts alone, or include
+ ;; labeled inference, never mixing them silently.
+ :epistemic-layers
+ {:observed-fact      {:source-classes :primary-only}
+  :secondary-reported {:source-classes [:secondary-news :analyst-report :third-party-database]
+                       :rule "records that the publisher REPORTED a claim; carries :reported-claim/publisher and never upgrades to observed-fact"}
+  :model-inference    {:rule "derived by this bot's model from lower-layer claims; carries :inference/basis (datoms or claim ids it was derived from) and :inference/model; may cite zero external sources if fully derived from stored claims"}
+  :model-prediction   {:rule "forward-looking, produced by this bot's model; carries :prediction/as-of and :prediction/horizon; never a fact, never backfilled as if it came true — verification is a NEW observed-fact datom"}}
+
+ ;; Downgrade rule: a claim may never silently move UP a layer. An
+ ;; observed-fact is admitted only from a primary source fetched in-run. A
+ ;; secondary report stays secondary forever. Inference may cite anything at
+ ;; or below model-inference as basis.
+ :layer-upgrade-forbidden true
 
  :wiki-target "network-awai/app-hyakka"
 
+ ;; Storage topology (ADR-2607311100 D2/D4): claims live in the datom plane
+ ;; (1-ref, joinable via Datomic Client API); fetched source bytes live in the
+ ;; archive plane (content-addressed IPLD blocks, CID-referenced, never
+ ;; joined). Analysis/inference/prediction claims join to their basis datoms,
+ ;; so a two-hop query reads fact -> inference -> prediction through the same
+ ;; 1-ref edges.
+ :storage {:datom-plane {:joinable true
+                         :required-props [:claim/layer :claim/source-or-basis]}
+           :archive-plane {:ipld-blocks true
+                           :cid-ref-only true
+                           :full-text-public "per source license opt-in only"
+                           :primary-source-receipt "content hash + fetch timestamp + URL stored with the claim"}}
+
  :wiki-entity-types [:country :government-body :company :state-owned-enterprise
                      :procurement-award :appointment :sanction-or-regulation
-                     :partnership :ownership-stake]
+                     :partnership :ownership-stake :analyst-report]
 
  :wiki-required-fields [:subject
                         :relation
                         :object
+                        :claim/layer
                         :observed-at
                         :effective-at-or-stated-at
-                        :source-url
-                        :source-publisher
+                        :source-url-or-basis-claim-ids
+                        :source-publisher-or-model
                         :source-class
                         :content-hash-or-archive-receipt]
 
- ;; Primary official sources only. Reporting of a claim is not the claim.
- :wiki-source-policy {:allow [:official-gazette
-                              :government-procurement-or-tender-portal
-                              :regulator-filing-or-docket
-                              :company-first-party-ir-or-press-release
-                              :official-court-or-tribunal-record
-                              :treaty-or-official-agreement-text]
-                      :forbid [:price-aggregator
-                               :third-party-wiki-prose
-                               :search-snippets
-                               :generated-summaries
+ ;; Source policy is now layered, not binary. Everything admitted is labeled
+ ;; with the class it actually is.
+ :wiki-source-policy {:primary [:official-gazette
+                                :government-procurement-or-tender-portal
+                                :regulator-filing-or-docket
+                                :company-first-party-ir-or-press-release
+                                :official-court-or-tribunal-record
+                                :treaty-or-official-agreement-text]
+                      :secondary [:secondary-news-reporting
+                                  :analyst-or-rating-agency-report
+                                  :third-party-structured-database]
+                      :forbid [:search-snippets-only
+                               :generated-summaries-as-source
                                :people-search-brokers
-                               :social-media-posts
-                               :analyst-opinion-or-rating-agency-views
-                               :secondary-news-reporting-as-fact]}
+                               :social-media-posts-unless-official-account]}
 
- ;; One run, at most two non-duplicate sources across at most two entities.
+ ;; Per-run budgets. Analysis runs may add at most 2 inference/prediction
+ ;; claims per run, each with an explicit basis.
  :run-limits {:max-sources-per-run 2
               :max-entities-per-run 2
+              :max-inference-claims-per-run 2
               :max-prs-per-run 1}
 
- :safety-boundaries [:no-power-ranking-or-inference
-                     :no-allegation-implies-guilt
+ ;; Safety boundaries (narrowed from interpretation-ban to labeling discipline):
+ :safety-boundaries [:every-claim-carries-a-layer-label
+                     :no-layer-upgrade
+                     :allegation-or-charge-never-implies-guilt
                      :no-person-scoring-or-private-biography
+                     :person-appears-only-as-role-holder-in-official-record
+                     :prediction-never-verified-in-place
                      :no-shared-orgs-worktree-write
                      :no-direct-main-push
                      :no-force-push

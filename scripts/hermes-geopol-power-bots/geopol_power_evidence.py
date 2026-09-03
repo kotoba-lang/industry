@@ -21,13 +21,15 @@ WIKI_TARGETS = ["orgs/network-awai/app-hyakka"]
 SEARCH_TERMS = {
     "wiki": ["procurement", "appointment", "sanction", "partnership",
              "ownership", "contract", "award", "regulation",
-             "observed-at", "source-url"],
+             "observed-at", "source-url", "claim/layer", "model-inference",
+             "model-prediction", "secondary-reported", "inference/basis"],
 }
 
 WIKI_REQUIRED_FIELDS = [
-    "subject", "relation", "object", "observed-at",
-    "effective-at-or-stated-at", "source-url", "source-publisher",
-    "source-class", "content-hash-or-archive-receipt",
+    "subject", "relation", "object", "claim/layer", "observed-at",
+    "effective-at-or-stated-at", "source-url-or-basis-claim-ids",
+    "source-publisher-or-model", "source-class",
+    "content-hash-or-archive-receipt",
 ]
 
 FORBIDDEN_TOKENS = []  # tokens that would be *allowed* analysis surface; scope names them only to forbid
