@@ -1,0 +1,115 @@
+[{:db/id -1
+  :adr/id "adr-2609031930-kotobase-transact-cpu-outage-fix"
+  :adr/title "kotobase transact CPU 502 デッドロックの根因修正 — enforce-schema optout と subject-index prune"
+  :adr/authoritative_for
+  ["net-kotobase/control-plane gateway /api/transact の :enforce-schema 呼び出し元 optout
+    (デフォルト true は不変、merge 0f049e536d9f、worker 95a552cb)"
+   "kotoba-lang/kotobase-peer hot-datoms の subject-index prune
+    (component-scoped novelty read が無関係 tx block を fetch/decrypt しない。
+    merge d2767043b724、graph-database worker 32ddd193 @ git 769cc86ca7fb)"
+   "cloud-itonami hyakka client の :enforce-schema false 送信
+    (merge 7ddba1cbd645、worker d4aac339)"
+   "502 CPU デッドロックの機構の記述: 書き込みは policy scan の novelty 半分で
+    backlog 全体を decrypt、CPU 超過で 502、auto-fold は成功した書き込みの後でしか
+    発火しない → backlog は永遠に縮まない自己強化型の書き込み障害"]
+  , :adr/topic "kotobase-transact-cpu-outage-fix"
+  , :adr/related ["adr-2609031740-grok-bots-self-correction"
+                  "adr-2609031520-itonami-business-bot-profiles"
+                  "adr-2607032430"]
+  , :adr/status "accepted"
+  , :adr/doc_type "adr"
+  , :adr/last_verified "2026-09-03"
+  , :adr/body
+  "# ADR-2609031930: kotobase transact CPU 502 デッドロックの根因修正
+
+**Status**: accepted
+**Date**: 2026-09-03
+**Deciders**: Jun Kawasaki（agent 判断、恒久承認 2026-07-10 の範囲）
+
+## Context — 何が壊れていて、何が実測されたか
+
+hyakka resident 10 件が 2026-08-29 以降、collection は成功しながら projection が
+約 50% 失敗し続けていた（2026-09-03 実測: topics 合計 pub 342 / fail 943、
+jp-shakai-hoken-tekiyo は pub 0 / fail 112）。last_error は全員
+`projection: Kotobase transact 502: {:error \"Worker exceeded CPU time limit.\"}`。
+
+調査（2026-09-03、production 実測 + 3 repo の source 読解）で機構を特定した:
+
+1. **gateway が enforce_schema をハードコード** — net-kotobase/control-plane の
+   `client_api.cljc` は `/api/transact` に対して `:enforce_schema true` を常に送る。
+   engine 側 `do-transact` は `enforce_schema` が真のとき
+   `prepare-hosted-transaction` → `hot-db` で **グラフ全体を hydrate する**
+   （CPU はグラフサイズに比例）。ADR-2607032430 の O(|tx|) 追記 path は
+   `enforce_schema` 偽のときだけ使われる
+2. **policy scan の novelty 半分が backlog 全体を読む** — `enforce_schema=false`
+   にしても `do-transact` は policy scan（`eng/hot-datoms`、components
+   `[policy-entity]`）を `prev-chain` に対して回す。`hot-datoms` の novelty 半分は
+   **未 fold の tx block を全件 fetch + decrypt する**（subject-index を無視）
+3. **fold デッドロック** — auto-fold は「成功した書き込み」の後でしか発火しない
+   （`fold-due?` は `:ok resp` を要求）。書き込みが 502 で死んでいる間、fold は
+   一度も走らず、novelty は縮まない。**成功が必要なものの前提が成功を不可能にする
+   自己強化ループ**
+
+## Decision
+
+3 層の修正（依存順）:
+
+### 1. gateway — 呼び出し元が :enforce-schema を選べる（デフォルト true 不変）
+
+`client_api.cljc` の `/api/transact` spec が `(:enforce-schema model)` を読み、
+明示的に `false` の場合だけ `:enforce_schema false` を backend に渡す。既存の
+Client API caller は何も変えなくてよい（validate-and-expand 契約を維持）。
+
+### 2. engine — hot-datoms の subject-index prune（本質修正）
+
+`kotobase-peer/core.cljc` に `prune-novelty-cids` を追加: state が
+`novelty-subject-index` を持ち、scan が `:components` を名指すとき、**subject
+token が scan の blind-toked subject と交差しない tx block は fetch も decrypt も
+しない**。subject index は commit 時に tx の実際の subjects から書かれる exact
+metadata であってヒューリスティクスではない — 間違って skip される block は
+存在しない。legacy state / 不完全 index / nil blind-fn のときは従来どおり
+全件を返す（bit-for-bit 互換）。
+
+テスト 3 本追加（prune が matching row を返しつつ無関係 block の fetch を数値で
+減らすこと、index 無しの fallback、最新 block が matching な場合）。
+**251 tests / 760 assertions 全 green**。
+
+### 3. client — hyakka が :enforce-schema false を送る
+
+`hyakka_kotobase.js` の publishObservation が tx body に `:enforce-schema false`
+を加える。hyakka の tx は決定的な構造化 claim で `:db/ident` を使わないため
+O(|tx|) 追記 path が正しい。
+
+## Verification（2026-09-03 実測）
+
+| 層 | merge | deploy |
+|---|---|---|
+| gateway | 0f049e536d9f | worker 95a552cb（kotobase.net、predeploy check 5/5 ok） |
+| engine（peer） | d2767043b724 | graph-database worker 32ddd193 @ git 769cc86ca7fb（datoms.kotobase.net、`verified production Worker version` ログ付き） |
+| client | 7ddba1cbd645 | itonami-grok-bots worker d4aac339 |
+
+- gateway cljs suite **555 tests / 2707 assertions green**
+- peer JVM suite **251 tests / 760 assertions green**
+- deploy は deploy-versioned.mjs の gate（build reproduce + HEAD clean +
+  revision tag 検証）をすべて通過
+
+## Consequences
+
+- 書き込みが成功するようになれば auto-fold が再発火し、backlog は
+  `fold-max-novelty=4` の bound で 1 回 4 block ずつ排出される
+  （b5d25d18、2026-08-17 に済）。**fold を先に手で回す必要はない** — 最初の
+  1 回の成功が条件で、prune がそれを可能にする
+- 「グラフが育つと書けなくなる」クラスの故障はこれで構造的に閉じる:
+  policy scan は subject で skip され、schema 検査は caller が O(|tx|) path を
+  選べる
+- 残る known gap: production の `KOTOBASE_MAINTENANCE_OPERATOR_DIDS` は空で
+  operator fold endpoint は fail-closed（testnet のみ DID 設定済み）。operator
+  による手動 fold が必要な事態に備えて allowlist の provisioning は owner 判断
+  事項（安全床① で seed の推測・代替はしない）
+- e2e 実測は次の hourly tick（20:00 JST 頃）以降、cron job
+  `hyakka-502-fix-e2e-verification`（4a13205f6bfe）が pub/fail の推移を測って
+  レポートする。この ADR の「成功」判定はその数値で確定させる
+- murakumo 1101（断続的な upstream Worker 例外）は同日午後に実測した範囲では
+  高確率で 200 に回復しており、bot も checkpoint を再開した。graceful JSON
+  error 化は client 側の self-correction（ADR-2609031740）が吸収する
+"}]
