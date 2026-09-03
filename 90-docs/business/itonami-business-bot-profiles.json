@@ -3,7 +3,7 @@
   "note": "One bot profile per business blueprint in the live open-business registry (snapshot 2026-09-03). A profile is a DESIGN + provisioning record, not a launch. Launch = POST /v1/grok-bots (checklist: itonami-business-bots skill). Mission context: 全人類を労働から解放する — each blueprint automates one economic domain behind a governed actor. Self-correction (ADR-2609031740): held bots auto-correct through the classified loop on the runtime/businesses surfaces.",
   "generated": "2026-09-03",
   "generated_from": {
-    "live_registry": "https://itonami.cloud/api/open-business (28 blueprints, staticUpdated 2026-09-03)",
+    "live_registry": "https://itonami.cloud/api/open-business (29 blueprints, staticUpdated 2026-09-03)",
     "live_economy": "https://bots.itonami.cloud/v1/bot-economy",
     "live_assignments": "https://bots.itonami.cloud/v1/grok-bots/businesses",
     "commit_of_record": "6664a7303d4"
@@ -90,12 +90,12 @@
     }
   ],
   "summary": {
-    "blueprints_total": 28,
-    "with_repo": 24,
-    "launched": 2,
+    "blueprints_total": 29,
+    "with_repo": 25,
+    "launched": 3,
     "seed_tenants": 4,
-    "blueprint_only": 22,
-    "launched_all_held_or_failing": true
+    "blueprint_only": 4,
+    "launched_all_held_or_failing": false
   },
   "profiles": [
     {
@@ -1788,6 +1788,78 @@
       "provisioning": {
         "state": "blueprint-only",
         "next_action": "launch-second-business-bot-candidate"
+      }
+    },
+    {
+      "profile_id": "bot-profile:network-awai-network-isekai",
+      "kind": "business",
+      "business_blueprint": {
+        "id": "network-awai-network-isekai",
+        "name": "Web3-First Game Fork Economy Operations",
+        "domain": "media/game-fork-economy",
+        "isic_rev5": "6420",
+        "repo": "https://github.com/network-awai/network-isekai",
+        "repo_path": "/network-awai/network-isekai",
+        "governor": "isekai-governor",
+        "console": "https://isekai.network/",
+        "offer": "Governed game-fork economy actor on isekai.network: did:key fork authorship over a kotoba-git commit ledger (fork-publish-e2e 10/10), sybil-gated gem mint with royalty decay up the fork DAG, open game/stage/asset hub, and x402 micropayment rails that stay disabled until wired (isekai-economy-LLM ⊣ isekai governor).",
+        "self_registered": false,
+        "maturity_seed": false
+      },
+      "identity": {
+        "mail": null,
+        "note": "agentmail inbox optional; not provisioned yet"
+      },
+      "mission": {
+        "thesis": "全人類を労働から解放する — blueprint が担う経済領域を governed actor で自動化する",
+        "domain_goal": "domain-automation",
+        "domain_family": "media"
+      },
+      "runtime": {
+        "plane": "itonami-grok-bots (DO per bot)",
+        "model": "murakumo-main alias (KV resolved; never hardcode model ids)",
+        "interval_ms": 3600000,
+        "governor": "isekai-governor",
+        "registry_source": "https://itonami.cloud/api/open-business (DO re-fetches at launch)"
+      },
+      "money": {
+        "spending": "unique lending position only (trial LP, non-transferable, no on-chain token)",
+        "allowed_services": [
+          "murakumo",
+          "kotobase"
+        ],
+        "credit_bounds_micro_usdc": {
+          "min": 1000,
+          "max": 50000
+        },
+        "state": {
+          "assigned": true,
+          "bot_id": "business-6420-assignmentisic64",
+          "bot_status": "running",
+          "tick_count": 2,
+          "position_id": "bot-position:business-6420-assignmentisic64:1",
+          "credit_limit_micros": 10000,
+          "launched": "2026-09-03",
+          "wallet": {
+            "address": "0x17424b6d1924256c75d24257b5238a132b79c7b3",
+            "key_item": "ITONAMI_ISIC6420_BOT_WALLET_KEY (kagi, compartment personal)",
+            "note": "launch-signing only; execution_authority short-lived-cacao"
+          },
+          "assignment_id": "assignment-isic6420-20260903-01"
+        }
+      },
+      "audit": {
+        "checkpoint": "append-only event ledger per DO",
+        "public_feed": "https://itonami.cloud/api/v1/grok-bots/bots/{bot_id}/activity",
+        "integrity": "sha256 / itonami-stable-json-v1 (measured on live events)"
+      },
+      "health_rule": {
+        "fail_closed": true,
+        "rule": "running is not healthy; read last_error + published vs failed + recent checkpoint"
+      },
+      "provisioning": {
+        "state": "launched",
+        "next_action": "observe hourly checkpoints; wire x402 micropayment rails (currently disabled, honest default)"
       }
     }
   ],
