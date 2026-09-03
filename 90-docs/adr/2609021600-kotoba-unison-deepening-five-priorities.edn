@@ -427,6 +427,19 @@ west pin を 5 件前進させ checkout を同期した直後に、今日直し�
 - 検証: 新 test は修正前 JVM 11 tests / 212 assertions で **89 failures exit 1**、修正後 0 exit 0。merge 後の全 suite は JVM 383 / 2065、nbb 228 / 1133 とも 0 failure。end-to-end は pin 側 sema が `(extend-type 42)` に **exit 0** を返し、自分の sema が exit 65 + span。**well-formed な `extend-type` の定義 CID は不変。**
 - **今も静かに admit されるもの（正しい）**: 参照されない `def` と呼ばれない template。それぞれ witness が test に在り、`conditionally-effective` の明示集合に入っていて sweep がそれと突き合わせるので、**次に本当に捨てられる形が現れたら、そこに witness 付きで追加しない限り見逃されない。**
 
+### 23. 足りない primitive を足して、19 で縮めた主張を真にした（着地 2026-09-03、第 4 反復。オーナー指示による 19 の反転）
+
+- kotoba-kir `b021a0d1`、kotoba-sema `cb5cf553`、kotoba-lang `e76e2657`。**オーナー指摘（2026-09-03）「amu, kotoba に peek, pop, vector-pop なども言語的にあった方がいいのでは」** —— 19 は「半分だけ真になる主張は作らない」として authority を縮めたが、**足りない primitive を足して主張を完全に真にする**方が上位だった。
+- **`peek` は primitive を必要としなかった**（`(vector-at v (- (vector-count v) 1))` で既に表現できる。head だけ足した）。そして **`typed-list-count` は一度書いてから消した** —— `vector-count` は list の担体を意図的に歩くので既に動いていた。**authority 自身の「`[:list T]` は `typed-list-new` を持ち accessor primitive を 1 つも持たない」という文が、数える件について測定可能に誤りだった。**
+- 名前は **`vector-take`**（`vector-pop` ではない）: `vector-drop` の**鏡**であり（drop は尾を残し take は頭を残す）、`pop` はその 1 呼び出し。**既存のものと同じ仕事をする primitive は 2 つ目の綴りにすぎない。**
+- `keys` / `vals` が `[:set K]` ではなく `[:list K]` / `[:list V]` を返す理由が良い: map の key は相異なるので set でも忠実だが、**value は相異なるとは限らないので、同じ担体だと繰り返す値が黙って落ちる**。同じ変更に `typed-list-nth` が入っているのも同じ理由 —— **要素を 1 つも取り出せない射影は使えない。**
+- 受け手の意味論: `peek` / `pop` は bounded i64 / f64 vector の**末尾**から。他の受け手は拒否し、**legacy の pair chain を拒否する理由は「読みが曖昧だから」** —— pair chain はこの profile の list なので Clojure なら `peek` は `pair-first` だが、**ここでは pair chain も普通の整数もどちらも `:i64` なので、`(peek 5)` と `(peek ある連鎖)` は同じプログラム**になる。拒否文言は `first` / `rest` を指す（それらは正にその accessor に落ちる）。
+- **空の場合は trap**（隣人が全部そうするから）。**代価も書いてある**: 非空を知らないプログラムは `(if (= (count v) 0) … (peek v))` と書く必要がある。`[:option T]` は**仮定ではなく測定で**退けた —— `(option-none)` を `if` の arm に置くと wasm32-browser が project 全体を exit 70 で拒否し、**pin 側 frontend でも再現した**ので backend 側の事実。
+- authority は backend ごとに復元した（`:implementation` を継承させず `:backends-measured` を持たせ、**測っていない backend は UNMEASURED と書く**）。`vector.kotoba` は走るようになり、**park の test は削除ではなく裏返した** —— park が空になったので空列を回し、`DEFERRED 0 …（NOTHING PARKED — this deftest asserted nothing）` と印字する。**さらに `(peek (pop [7 8 9]))` は 2 通りの読みのどちらでも 8 なので判別に使えない**と気づき、判別する assertion（`(peek [7 8 9])` が 7 ではなく 9、`(first (pop [7 8 9]))` が 8 ではなく 7）を sema 側に置いている。
+- 検証: kir の新 ns は修正前 8 fail + 30 error exit 1（30 件が `:trap :unknown-function`）、修正後 exit 0。sema の新 ns は 34 fail + 38 error exit 1（37 件が `operation has no admitted lowering`）、修正後 exit 0。kotoba-lang の逆向き assertion（19 が置いた例外を名指す）も 2 failures → 0。byte-identity は **18 プログラム**を両 runtime で digest + 値。end-to-end は `(peek [7 8 9])` = 9、`(count (typed-list-new …))` = 2、対照は exit 65。
+- **`pop` と `keys` は 4 つ目・5 つ目の repo で止まる**（`kotoba-wasm` の host intrinsic と amu の `browser-host.mjs`。`keys` はそこに `[:list T]` という値種がそもそも無い）。**この 2 つだけ e2e を確認できていない**ことを `:backends-measured` に書いてある。
+- **amu の bump は 4 点で、kir の pin も含む**（見落としやすい —— **sema だけ動かすと frontend が `pop` を admit して KIR が `:unknown-function` で trap する**）。加えて `capability-catalog.edn` の resync が要る（その pin 跨ぎが sema `c823461` を越えるため）。**文法バイトと digest 定数はもうリストに無い** —— 20 が amu の複製を退役させたので。
+
 ### 残件（この ADR が次に指す先）
 
 1. `:state` ability（決定節のとおり。前提 4 つのうち vacuous な「handle は値でない」を先に赤にする）。
