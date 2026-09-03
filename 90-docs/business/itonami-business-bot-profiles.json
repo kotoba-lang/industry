@@ -1880,5 +1880,25 @@
     ],
     "ledger": "bot/correction + projection/correction events (append-only, incl. 'none' decisions)",
     "deployed": "2026-09-03 worker 6e132410, merge 9ee10e633c04"
+  },
+  "upstream_fixes_2026_09_03": {
+    "adr": "ADR-2609031930",
+    "gateway": {
+      "merge": "0f049e536d9f",
+      "worker": "95a552cb",
+      "change": "/api/transact honors caller :enforce-schema (default true unchanged)"
+    },
+    "engine": {
+      "merge": "d2767043b724",
+      "worker": "32ddd193 @ 769cc86ca7fb",
+      "change": "hot-datoms subject-index prune (skip unrelated novelty blocks in component-scoped scans)"
+    },
+    "client": {
+      "merge": "7ddba1cbd645",
+      "worker": "d4aac339",
+      "change": "hyakka transact sends :enforce-schema false (O(|tx|) append path)"
+    },
+    "mechanism": "502 CPU deadlock: policy scan read whole novelty per write; auto-fold only fires after success; success was impossible once novelty outgrew CPU budget",
+    "e2e_verification": "cron 4a13205f6bfe measures pub/fail progression after the 20:00 JST tick"
   }
 }
