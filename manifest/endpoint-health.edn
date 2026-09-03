@@ -120,4 +120,93 @@
    :expect {:status 200 :json-non-empty [:ok]}
    :owner "network-awai/cloud-murakumo"
    :note (str "images の 1 つ上流。2026-08-07 に作られ、8/18 まで誰もここを "
-              "指していなかった —— 健康なまま孤立していたホストが在りうる、の実例。")}]}
+              "指していなかった —— 健康なまま孤立していたホストが在りうる、の実例。")}
+
+  ;; ── 4 ドメイン QA 面 (2026-09-03、ito.ai 参照の runtime QA bot 組織 ADR-2609031700) ──
+  ;; ito.ai の主張「run the impacted flows and attach evidence」を外部表面に適用した
+  ;; もの: status ではなく、その面が「約束どおりの物」を返すかを実リクエストで測る。
+  ;; 実測 2026-09-03: この時点で murakumo chat は 500 (error 1101)、
+  ;; hyakka resident は published≈failed で半落ち — どちらもこの manifest が
+  ;; 拾うべき形の障害だった。
+
+  {:id :itonami/open-business-registry
+   :url "https://itonami.cloud/api/open-business"
+   :method :get
+   :timeout-ms 20000
+   :cost :cheap
+   :every-hours 1
+   :expect {:status 200 :json-non-empty ([:registry :count])}
+   :owner "cloud-itonami/cloud-itonami"
+   :note (str "Business Bot の launch が実行時に読む blueprint registry。"
+              "これが返らなくなると新規 bot launch が全部 "
+              "`registry reference is invalid` で落ちる (2026-09-03 実測の失敗形)。")}
+
+  {:id :itonami/hyakka-knowledge-resident
+   :url "https://itonami.cloud/api/v1/grok-bots/hyakka"
+   :method :get
+   :timeout-ms 20000
+   :cost :cheap
+   :every-hours 1
+   :expect {:status 200 :json-non-empty ([:status] [:published_observations])}
+   :degraded-when [{:json-path [:last_error] :contains "502"}
+                   {:json-path [:last_error] :contains "CPU time limit"}]
+   :owner "network-awai/cloud-itonami"
+   :note (str "hyakka 知識 resident。status:\"running\" だけでは健康ではない — "
+              "2026-09-03 実測で published 94 / failed 106 の半落ち + "
+              "last_error に Kotobase transact 502 (CPU limit) を自分で申告していた。"
+              "published ≈ failed は収集が動いて projection が落としている状態。")}
+
+  {:id :kotobase/mcp-endpoint
+   :url "https://kotobase.net/mcp"
+   :method :get
+   :timeout-ms 20000
+   :cost :cheap
+   :every-hours 1
+   :expect {:status 200 :json-non-empty ([:endpoint] [:protocol])}
+   :owner "network-awai/net-kotobase"
+   :note (str "価格ページと README が「MCP endpoint https://kotobase.net/mcp」と"
+              "約束している面そのもの。landing page が生きていてもここが死んでいれば"
+              "agent 接続の約束は破れている。")}
+
+  {:id :kotobase/wiki-resident
+   :url "https://wiki.kotobase.net/api/v1/resident"
+   :method :get
+   :timeout-ms 20000
+   :cost :cheap
+   :every-hours 1
+   :expect {:status 200 :json-non-empty ([:status] [:cursor])}
+   :owner "network-awai/app-hyakka"
+   :note (str "wiki.kotobase.net の resident proxy。itonami.cloud 側と同じパイプを"
+              "測る — どちらか片方だけ赤なら proxy 層、両方赤なら resident 本体。")}
+
+  {:id :murakumo/x402-offer
+   :url "https://murakumo.cloud/.well-known/x402"
+   :method :get
+   :timeout-ms 20000
+   :cost :cheap
+   :every-hours 1
+   :expect {:status 200 :json-non-empty ([:x402Version] [:resources])}
+   :owner "network-awai/local-murakumo"
+   :note (str "landing page が「公開オファーは /.well-known/x402」と約束している。"
+              "機械可読な価格と支払い条件 — agent 経済の入口。")}
+
+  {:id :kotoba-cloud/authn-health
+   :url "https://auth.kotoba.cloud/health"
+   :method :get
+   :timeout-ms 20000
+   :cost :cheap
+   :every-hours 1
+   :expect {:status 200 :json-non-empty ([:ok] [:rpId])}
+   :owner "kotoba-lang/app-kotoba-cloud"
+   :note (str "kotoba.cloud の Passkey RP。landing が「Discovery and the Passkey RP "
+              "are live」と約束している面。rpId が空なら RP として約束破れ。")}
+
+  {:id :kotoba-cloud/control-health
+   :url "https://api.kotoba.cloud/health"
+   :method :get
+   :timeout-ms 20000
+   :cost :cheap
+   :every-hours 1
+   :expect {:status 200 :json-non-empty ([:ok] [:service])}
+   :owner "kotoba-lang/app-kotoba-cloud"
+   :note "CLI deploy が読む control plane。topology 公開の約束の入口。"}]}
