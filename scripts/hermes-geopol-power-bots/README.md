@@ -7,8 +7,8 @@ model analysis/prediction, all connected in the datom plane (IPLD for bytes).
 
 | bot | schedule (Asia/Tokyo) | responsibility |
 |---|---:|---|
-| `gp-relation-schema` / `gp-relation-analysis` | `20 6 * * *` | layered claim schema (fact → inference → prediction joins), then ≤2 model claims per run |
-| `gp-relation-source` | `20 7 * * *` | primary official sources AND labeled `:secondary-reported` records, ≤2 per run |
+| `gp-relation-schema` / `gp-relation-analysis` | `15 * * * *` (hourly) | layered claim schema (fact → inference → prediction joins), then ≤2 model claims per run |
+| `gp-relation-source` | `45 * * * *` (hourly, after schema run) | primary official sources AND labeled `:secondary-reported` records, ≤2 per run |
 
 ## Layered epistemics (the core discipline)
 
