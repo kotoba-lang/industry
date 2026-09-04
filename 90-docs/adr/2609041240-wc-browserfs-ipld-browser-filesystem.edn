@@ -1,0 +1,108 @@
+[{:db/id -1
+  :adr/id "adr-2609041240-wc-browserfs-ipld-browser-filesystem"
+  :adr/title "webcontainer の browser filesystem は IPLD DAG (unixfs) + IPNI discovery + OPFS cache + kotobase durable plane で構成する"
+  :adr/status "accepted"
+  :adr/date "2026-09-04"
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/related ["adr-2609021200-itonami-cloud-agent-basho-glm53-serverless-budget" "adr-2608159100" "ADR-2608160300"]
+  :adr/body "# webcontainer の browser filesystem は IPLD DAG (unixfs) + IPNI discovery + OPFS cache + kotobase durable plane で構成する
+
+**Status**: accepted / 2026-09-04 / owner instruction「browser 内 filesystem などは
+unixfs など ipld, ipni, graphsync などを活用して」(この日、webcontainer bot
+profile 立ち上げと同時に指示)。
+
+## Context（実測 2026-09-04）
+
+- WebContainers.io 相当の単一物はこの workspace に無い（concept 索引に
+  container / sandbox / isolate の語彙無しを確認）。部品は揃っている:
+  guest 実行 = wasm-webcomponent (R2 qualified, import parity 14/14 実測) +
+  kototama、terminal model = kuro (R2, streaming host は Node のみ)、
+  mesh = murakumo (WASM lattice)。
+- **kuro の terminal backing は Node 限定** (`kuro.host.node` /
+  `kuro.host.stream-node` は node:child_process を spawn)。browser に
+  process は無い。kobo の console は 127.0.0.1 bind のローカルツールで
+  「it is still not isolation」と README が明言する。
+- **browser FS の主**は owner 指示どおり IPLD 系で組む。既存部品の実測:
+  - `kotoba-lang/tech-ipfs-specs-unixfs`: UnixFS file DAG、kubo 0.41 と
+    byte-identical CID、portable `.cljc`。`(unixfs/build bytes)` が
+    `{:cid :blocks :size}` を返し、`(unixfs/read-file get-block root-cid)`
+    で読める。chunker + balanced tree + UnixFS header 全部済み。
+  - `kotoba-lang/io-ipni-specs`: IPNI Advertisement / EntryChunk / SignedHead、
+    `transport-ipfs-gateway-http` (0x0920) metadata codec、announce message、
+    injected HTTP client。portable `.cljc`。
+  - `kotoba-lang/kotobase-protocol-ipfs`: `GET/HEAD /ipfs/{cid}` +
+    `/ipni/v1/*` の gateway surface (kotobase.net 側)。
+  - durable plane 正本 = ADR-2608159100: `PUT/GET https://kotobase.net/ipld/:cid`
+    (raw CIDv1 only)。localhost fallback / direct R2 は production path 禁止。
+  - `kotoba-lang/p2p`: kotoba commit chain の graph-sync protocol。
+  - `kotoba-lang/kuro.host.cid`: CIDv1/raw/sha256 mint (cljs, node:crypto)。
+    browser には同じ計算の WebCrypto 実装が必要（`crypto.subtle.digest` は
+    async）。
+- OPFS (Origin Private File System) への言及は workspace 内で 1 件のみ。
+  browser primitive としては sync access handle (Worker 内) を持つ唯一の
+  永続 byte store なので cache 層の床に使う。
+- graphsync: `kotoba-lang/p2p` が content-addressed commit chain の
+  graph-sync を持つ。汎用 GraphSync (IPLD GraphSync spec) の clean-room 実装
+  は無い — 必要になったら p2p の語彙で設計する（本 ADR の blocking ではない:
+  FS の primary path は gateway + IPNI で、P2P は second path）。
+
+## Decision
+
+1. **層の構成** (依存が下向き一方向):
+   - **L-fs: `wc.fs`** — POSIX 風 path API (`open`/`read`/`write`/`stat`/
+     `ls`/`mkdir`/`rm`) の pure `.cljc` model。実体は CID DAG への写像:
+     directory は IPLD map (path → child CID)、file は unixfs file DAG。
+     **op ベースで書き換え不可 (immutable)** — write は新 root CID を
+     生む。kuro の receipt 規約に合わせ、全 op に receipt を出す。
+   - **L-cache: `wc.fs.opfs`** — OPFS backed block cache (Worker 内 sync
+     access handle)。`get-block(cid)` は OPFS → kotobase gateway 順。
+     書き込みは「blocks を OPFS に置き、root CID を返す」まで。durable
+     publish は別 op (`fs/publish`)。
+   - **L-durable: kotobase gateway** — `PUT/GET kotobase.net/ipld/:cid`
+     (ADR-2608159100)。publish は block 群 (root last) を送り、CID を
+     検証してから記録する。fetch は IPNI (`io-ipni-specs` の
+     `find-providers`、provider metadata 0x0920) で provider を発見し、
+     gateway 経由で block を読む。**IPNI announce は pinning 側の既存
+     wiring を使う** (io-ipni-specs README: pinning owns announce wiring)。
+   - **L-host: `kuro.host.stream-browser`** — kuro の terminal host の
+     browser 実装。spawn の代わりに「WASM guest component + capability
+     imports」を backing にする。stdin/kill/streaming は Worker +
+     postMessage。receipt は `:kuro/isolation :browser-origin` を**必ず**
+     持つ（kuro CLAUDE.md 規律: isolation を書かない receipt は隔離され
+     ていたかのように読まれる）。
+2. **unixfs 部品は再実装しない** — `tech-ipfs-specs-unixfs` をそのまま
+   require する (`.cljc` なので browser でも動く)。足りないのは (a) browser
+   での sha256 (WebCrypto, async) と (b) dag-pb encode の cljs 実行確認の
+   2 点。gap が出たら unixfs 側に修正 PR (byte-identical を壊さない形)。
+3. **隔離の主張は capability + browser origin sandbox**。kobo README の
+   「capability set is an intent record, not a kernel」を引き継ぎ、
+   「実測した gate」だけを「済み」と言う。WebContainer の kernel-level
+   isolation を主張しない。deny-by-default capability + fuel/memory limit +
+   origin sandbox の組み合わせで主張範囲を明記する。
+4. ** Bot turn は mesh 側 (ADR-2609021200)** — この ADR は FS 層と terminal
+   host 層のみ。llm-infer admission 待ちの turn loop 移行は触らない。
+5. **配置**: L-fs は新 repo (名前は 4 面規則で `wc-` ではなく role なし
+   bare 名候補 — 作成時に `verify-repository-roles.cljs --name-audit` を
+   通す)。L-cache は同 repo 内 cljs namespace (OPFS は Worker 専用 API で
+   pure `.cljc` にできない)。L-host は kuro への PR (host は kuro の語彙)。
+
+## 実装順序 (最初の 3 スライス)
+
+1. **S1: wc.fs pure model** — path API + IPLD directory map + unixfs
+   file DAG 写像、in-memory block store での round-trip test (JVM + cljs)。
+2. **S2: opfs cache** — Worker 内 sync access handle での block cache、
+   playwright browser E2E (wasm-webcomponent の test/browser 慣習に倣う)。
+3. **S3: kuro.host.stream-browser** — guest component を backing にした
+   terminal host、receipt に `:kuro/isolation :browser-origin`。
+
+## Consequences
+
+- 「webcontainer で file を作る」が「CID を mint して DAG を組む」と同義に
+  なる — local の変更は即 kotobase に送られない (publish は明示 op)。
+- OPFS は origin scoped — 同一 origin の別 tab と共有、跨ぐと消える。
+  durable 正本は常に kotobase。
+- browser での unixfs 実行実績が tech-ipfs-specs-unixfs に付く (byte-
+  identical parity が cljs でも保たれるかの実測)。
+- IPNI discovery が生きるのは publish 側が announce した block 群。pinning
+  worker の wiring を使うため、単独では announce しない。"}]
