@@ -498,6 +498,26 @@
         },
         "script": null,
         "workdir": "/Users/junkawasaki/github/com-junkawasaki"
+      },
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "b888e2258cee",
+        "name": "jv-migration-scan-watch",
+        "no_agent": false,
+        "prompt": "jv-migration scan watch。SOUL.md を読んでから開始。捏造ゼロ — unknown は unknown と書く。\n\nMONITOR CHANGE DETECTED が来ていない場合（未検出）は「[SILENT]」のみで応答し delivery を抑制。\n\n検出時の手順:\n1. 出力の変化を読む: files / unassigned-dep-rows / scan.edn-clean? のどれが動いたか。\n2. nbb scripts/jvm-dependency-scan.cljs --check を回し、STALE なら scan.edn を再生成して差分を要約する（新規依存の登場、target の変化）。\n3. 未割当 (:unassigned) 依存が 3 件以上あるなら、その依存と repos 数を列挙して @codinator へ ADR-2609040930 改訂依頼の propose を報告に含める。\n4. 報告は 5 行以内。着手（PR）はしない — それ weekly job の仕事。\n\n禁止: 表に無い宛先の発明、共有 checkout 直編集、force-push。",
+        "repeat": {
+          "completed": 0,
+          "times": null
+        },
+        "schedule": {
+          "display": "47 6 * * 2",
+          "expr": "47 6 * * 2",
+          "kind": "cron"
+        },
+        "script": null,
+        "workdir": "/Users/junkawasaki/github/com-junkawasaki"
       }
     ],
     "machi-hub": [
@@ -732,7 +752,7 @@
         "id": "c46baeb5c90a",
         "name": "murakumo-model-registry-watch",
         "no_agent": false,
-        "prompt": "murakumo.cloud model registry の差分監視 job。捏造ゼロ — unknown は unknown と書く。手順: (1) curl -sS https://api.murakumo.cloud/infer/models -A Mozilla/5.0 で id 一覧を取る。(2) 状態ファイル /Users/junkawasaki/.hermes/profiles/murakumo-cloud/cron/model-registry-watch.state.json に前回の id 一覧 JSON があれば比較する。無ければ今回を baseline として保存して 1 行で終了。(3) 差分がない場合は「差分なし」1 行で終了し、何も書き換えない。(4) 差分がある場合のみ: 新規/消滅/改名 id を列挙し、新規 id は curl -sS https://api.murakumo.cloud/infer/models/<id> -A Mozilla/5.0 で descriptor を取って status / status-evidence.verdict / endpoint / fallback-endpoint / tasks を要約。(5) verdict が unverified になった既存 id があれば declared-status と verified_at の古さを指摘。(6) endpoint が https のものだけ curl -o /dev/null -w %{http_code} で軽く生存確認 (http/tailnet の gad endpoint はこの job からは届かないので skip して unknown と書く、無理に届けない)。(7) 今回の id 一覧を状態ファイルに保存。報告は 10 行以内。registry の変更 (PUT) を job からしてはならない — 監視のみ。",
+        "prompt": "murakumo.cloud model registry の差分監視 job。捏造ゼロ — unknown は unknown と書く。コマンド実行の制約: python3 -e/-c や node -e のような script execution フラグは禁止 (deny されるので最初から使わない)、curl とファイル読み書きのみで完結させる。手順: (1) curl -sS https://api.murakumo.cloud/infer/models -A Mozilla/5.0 で id 一覧を取る。(2) 状態ファイル /Users/junkawasaki/.hermes/profiles/murakumo-cloud/cron/model-registry-watch.state.json に前回の id 一覧 JSON があれば比較する。無ければ今回を baseline として保存して 1 行で終了。(3) 差分がない場合は「差分なし」1 行で終了し、何も書き換えない。(4) 差分がある場合のみ: 新規/消滅 id を列挙し、新規 id は curl -sS https://api.murakumo.cloud/infer/models/<id> -A Mozilla/5.0 で descriptor を取って status / status-evidence.verdict / endpoint / fallback-endpoint / tasks を要約。(5) verdict が unverified になった既存 id があれば declared-status と verified_at の古さを指摘。(6) endpoint の生存確認は curl -sS -o /dev/null -w '%{http_code}' --max-time 30 だけを使い (https の endpoint のみ。http/tailnet の gad endpoint は届かないので unknown と書く)、python での加工はしない。(7) 今回の id 一覧を状態ファイルに保存 (file write tool を使う)。報告は 10 行以内。registry の変更 (PUT) を job からしてはならない — 監視のみ。",
         "repeat": {
           "completed": 1,
           "times": null
@@ -752,7 +772,7 @@
         "id": "5c0aa63a5cb7",
         "name": "murakumo-hokusai-weekly",
         "no_agent": false,
-        "prompt": "hokusai (10Eros-Max video model) の週次保守点検 job。捏造ゼロ — unknown は unknown と書く、推測で serving と書かない。手順: (1) curl -sS https://api.murakumo.cloud/infer/models/network-awai/hokusai -A Mozilla/5.0 と flat の https://api.murakumo.cloud/infer/models/hokusai を読み、両 id の status / status-evidence.verdict / verified_at / endpoint / fallback-endpoint の整合を確認 (verified_at が 7 日以上古い entry があれば指摘)。(2) Modal fallback の生存確認: curl -sS -o /dev/null -w %{http_code} --max-time 120 https://junkawasakicom--comfy-10eros-comfyui.modal.run/system_stats (cold start で ~30s かかることがある。200 以外なら modal app list で comfy-10eros の state を確認して報告)。(3) 状態ファイル /Users/junkawasaki/.hermes/profiles/murakumo-cloud/cron/hokusai-weekly.state.json に前回の Modal http_code があれば比較、同値なら「変化なし」扱い。(4) 異常 (404/5xx/app 停止/verdict unverified) があったときだけ深掘りし、修復はしない — 発見と報告のみ。報告は 8 行以内。flat と namespaced の id が乖離したら (内容が違う/片方消えた) それを最重要として報告。",
+        "prompt": "hokusai (10Eros-Max video model) の週次保守点検 job。捏造ゼロ — unknown は unknown と書く、推測で serving と書かない。コマンド実行の制約: python3 -e/-c や node -e のような script execution フラグは禁止 (deny されるので最初から使わない)、curl とファイル読み書きのみで完結させる。手順: (1) curl -sS https://api.murakumo.cloud/infer/models/network-awai/hokusai -A Mozilla/5.0 と flat の https://api.murakumo.cloud/infer/models/hokusai -A Mozilla/5.0 を読み、両 id の status / status-evidence.verdict / verified_at / endpoint / fallback-endpoint の整合を確認 (verified_at が 7 日以上古い entry があれば指摘)。(2) Modal fallback の生存確認: curl -sS -o /dev/null -w '%{http_code}' --max-time 120 https://junkawasakicom--comfy-10eros-comfyui.modal.run/system_stats (cold start で ~30s。200 以外なら modal app list で comfy-10eros の state を確認して報告)。(3) 状態ファイル /Users/junkawasaki/.hermes/profiles/murakumo-cloud/cron/hokusai-weekly.state.json に前回の Modal http_code があれば比較、同値なら「変化なし」扱い。(4) 異常 (404/5xx/app 停止/verdict unverified/両 id の乖離) があったときだけ深掘りし、修復はしない — 発見と報告のみ。報告は 8 行以内。flat と namespaced の id が乖離したら最重要として報告。",
         "repeat": {
           "completed": 0,
           "times": null
