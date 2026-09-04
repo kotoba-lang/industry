@@ -568,6 +568,10 @@
                               "--type=ed25519"] {})
                     "hyakka-wiki-index"))]
       (checked ["ipfs" "name" "publish" "--key" key root] {}))
+    ;; index-root.edn is a tracked local record; restoring it keeps the
+    ;; worktree clean so the next tick's ff-only merge cannot be blocked by
+    ;; sink-written drift. The block CID above is the durable record.
+    (run ["git" "checkout" "--" "index-root.edn"] {:dir worktree :env env})
     (println "ipfs index root" root)))
 
 (defn- r2-datalake-sync! [env]
