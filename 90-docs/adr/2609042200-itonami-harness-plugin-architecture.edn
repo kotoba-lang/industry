@@ -1,0 +1,107 @@
+[{:db/id -1
+  :adr/id "adr-2609042200-itonami-harness-plugin-architecture"
+  :adr/title "itonami CLI は hermes を模倣せず deepseek-harness (Cordis) の構成契約を採用する — 全振る舞いを plugin に、profile は順序付き plugin レイヤ、サービスは安定キーで置換可能"
+  :adr/status "accepted"
+  :adr/date "2026-09-04"
+  :adr/related ["adr-2608280900-world-scale-dns-domain-collection"
+                "adr-2809032100-cloud-itonami-distributed-nameserver"]
+  :adr/body
+  "## 出発点の問い
+
+itonami CLI を hermes agent CLI をベースに UI/UX・command 互換を保って
+拡張してきたが、这个方向の延長 (hermes のコードを kotoba に port) では
+なく、deepseek-harness (dsh) の approach をベースに bot / profile /
+itonami CLI を設計し直す。どうするか。
+
+## Context
+
+- 2026-09-04 に hermes CLI parity 作業を実施: 101 CommandDef を mapping
+  し、slash command をレジストリ化 (help 自動生成)、skin engine、
+  /retry /verbose /timestamps /tools /handoff /whoami /model /version
+  /context /approvals /skills /plugins /botinfo /prompt まで実装。
+  client 側で完結する gap は全て埋まった (ok 30 / gap-client 0)。
+- hermes 本体は ~11k LOC の Python (Rich / prompt_toolkit / SQLite) で、
+  コードの port は依存ごと持ち込むことになるため当初から却下し、
+  「契約の移植」で進めてきた。ただし hermes の構成は「コアに蓄積」型で、
+  新 capability はコア toolset / cli.py に積み上がる。footprint ladder
+  という規律はあるが、構成原理は plugin-first ではない。
+- deepseek-harness (deepseek-ai/deepseek-harness) の answer は
+  \"Everything is a Plugin\": vendored Cordis フレームワークの上に、
+  model adapter / tool registry / session log / agent loop まですべてが
+  plugin。profile = 順序付き bundle レイヤ + patch。サービスは
+  ctx.<key> の安定キーで lookup し、import しない。
+- Cordis の 5 原則: (1) plugin は {:name :inject :apply} の map、
+  (2) context はサービスの repository、(3) :inject で依存宣言し
+  mount 順が依存で決まる、(4) 型付き event (:emit / :waterfall /
+  :parallel / :serial / :bail の 5 dispatch mode)、(5) 登録は可逆な
+  effect — unmount で逆順に unwind。
+- itonami CLI は nbb ClojureScript (~1k LOC + chat/theme モジュール)。
+  JVM 版 kotoba (orgs/kotoba-lang/agent — AgentRun / turn_loop を
+  hermes から transcription 済み) とは別レイヤで、 CLI はクライアント。
+- workspace 慣習: west superproject + leaf repo、ADR は EDN、
+  test は clojure -M:test (2291 tests / 13862 assertions)。
+
+## Decision
+
+1. **hermes の移植をやめ、dsh の構成契約を nbb ClojureScript に移植する。**
+   bin/itonami_harness.cljs に Cordis を実装:
+   - plugin = map {:name :inject :provides :description :apply}
+   - context = atom、:services (安定キー) / :plugins (mount 順) /
+     :events / :effects (plugin ごとの disposer 積み)
+   - dispatch 5 mode を同じ意味論で実装。:waterfall は around-
+     middleware (listener は (next) を呼んで委譲、呼ばずに返すと
+     short-circuit)、:bail は最初の非 nil で打ち切り
+   - mount! は :inject 解決 → (:apply plugin) → 記録。
+     登録は h/on / h/effect で disposer を返し、unmount! が逆順 unwind。
+   - itonami --dump-config が mount 済み plugin tree を出力 (dsh の
+     --dump-config parity)。
+
+2. **CLI の全振る舞いを plugin にする。** shipped profile
+   (`default`) は順序付き 3 レイヤ:
+   - itonami.config → :ctx/config (install path / EDN reader / 設定)
+   - itonami.theme  → :ctx/theme  (skin engine、hermes parity キー維持)
+   - itonami.chat   → :ctx/chat   (slash レジストリ、REPL 状態)
+   層の置換は同じ :name の plugin を後ろに足すだけ (dsh の patch と
+   同型)。/skin は :ctx/theme の live re-provide で実装 — これが
+   dsh の patch-reload の実例。
+
+3. **bot / profile の意味論は dsh の語彙に揃える。**
+   - profile = 順序付き plugin レイヤの合成 (bundle 込み)。
+     `web` `headless` 相当は itonami では `chat` (REPL) と将来の
+     `headless` (one-shot)。
+   - bot は変えない: cloud-itonami-app の Bot (durable performer、
+     ADR-2608200400 の DID + authority) はサーバ側の概念であり、
+     CLI はその front end に過ぎない。hermes の「profile = agent
+     instance」の概念は bot が既に担っている。
+   - agent loop の意味論は JVM 版 agent repo (AgentRun / turn_loop、
+     hermes からの transcription + oracle gate) が正本。CLI は
+     /v1/runs のクライアントであり、loop を複製しない。
+
+4. **hermes 互換層は成果物として保持する。** slash command 30 種・
+   skin キー体系・exit code 契約 (0/1/2) は hermes 利用者の操作感を
+   維持する。ただし実装の所属は全て plugin で、hermes 自体への依存は
+   ゼロのまま。
+
+## Consequences
+
+- CLI への新 capability はコアに積まず plugin で足す。footprint の
+  支払いは mount された plugin のみ。
+- サービスキー (:ctx/*) が public 契約になる。キーの削除・意味変更は
+  deprecation 手順を踏む。
+- :waterfall / :bail を使えば policy 差し込み (approval、redaction、
+  prompt 組み替え) が loop 触らずに足せる。次に来る候補: 送信前
+  redaction plugin、fleet routed transport plugin。
+- JVM 版 agent (kotoba-lang/agent) との役割分担は不変: CLI は client、
+  loop は server / JVM kernel。二重実装を作らない。
+- nbb の制約はそのまま: EDN に raw ESC / \\uXXXX 不可 (色は TERM-CODE
+  名)、namespace は dash→underscore ファイル名解決。
+
+## Verification
+
+- 実機: /skin kawaii で prompt が ♡ に切り替わり (live re-provide)、
+  全 slash command が chat service 経由で dispatch、one-shot turn
+  (ping → pong + tokens 表示)、/sessions / --dump-config が動作。
+- suite: 2291 tests / 13862 assertions, 0 failures。
+- commits: 94ec748 (harness + plugins)、先行 034014d..dfddb86 (hermes
+  parity stage 1-5)。リリースは ~/.cloud-itonami/current symlink flip。
+"}]
