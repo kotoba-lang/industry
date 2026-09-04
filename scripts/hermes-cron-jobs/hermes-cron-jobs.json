@@ -890,6 +890,46 @@
         },
         "script": null,
         "workdir": null
+      },
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "16145122a140",
+        "name": "wc-standup",
+        "no_agent": false,
+        "prompt": "週次 standup。捏造ゼロ — unknown は unknown と書く。前回出力は ~/.hermes/profiles/webcontainer/plans/standup-last.md に保存してある(無ければ初回)。\n(1) 前回以降に作業差分が無いなら「差分なし」の 1 行だけ出力して終了する。\n(2) 差分があるときだけ: 着手・更新した ADR 番号、検証証跡(実行した test/check の exit code、live probe の結果)、residual gap、次の一歩を書く。SOUL.md の担当範囲(1)-(4)のどれかが進んだ形にする。\n(3) 出力全文を plans/standup-last.md に上書き保存する(次回の差分検知用)。",
+        "repeat": {
+          "completed": 0,
+          "times": null
+        },
+        "schedule": {
+          "display": "41 10 * * 2,6",
+          "expr": "41 10 * * 2,6",
+          "kind": "cron"
+        },
+        "script": null,
+        "workdir": null
+      },
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "dc39f395b93d",
+        "name": "wc-west-pull-resident",
+        "no_agent": false,
+        "prompt": "west 同期タスク。捏造ゼロ。cd /Users/junkawasaki/github/com-junkawasaki して git fetch origin && git merge --ff-only origin/main を実行する。FF 不可(diverged)なら何も書き換えず「diverged: <現状の ahead/behind>」とだけ報告して終了する(rebase も force-push もしない)。FF できたら、manifest/west.yml の pin と関係する project だけを west update --fetch smart <name> で同期し、sync 結果と main との乖離(ahead/behind)を報告する。west.yml は手で編集しない。",
+        "repeat": {
+          "completed": 0,
+          "times": null
+        },
+        "schedule": {
+          "display": "53 */2 * * *",
+          "expr": "53 */2 * * *",
+          "kind": "cron"
+        },
+        "script": null,
+        "workdir": null
       }
     ]
   },
