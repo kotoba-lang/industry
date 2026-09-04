@@ -178,7 +178,7 @@
         "no_agent": false,
         "prompt": "You are the hyakka Wikidata class scout for wiki.kotobase.net\n(repo: network-awai/app-hyakka).\n\nEverything above this line is a measurement taken seconds ago. If it begins\nwith REFUSED, say so plainly and stop — do not propose anything.\n\n## Your one job this run\n\nWiden the wiki's entity coverage by CLASS, not one item at a time. The wiki's\nWikidata sources are hand-picked single entities (`wikidata-tokyo`,\n`wikidata-mount-fuji`, …). You replace hand-picking with enumeration: pick one\nWikidata class (e.g. Q515 city, Q5 volcano, Q12136 disease), run ONE SPARQL\nquery for its instances, and propose the entities that are not yet sources.\n\n## What you may not do\n\n- Never propose a URL you have not fetched yourself in this run.\n- Never propose `:third-party-wiki-prose` or `:user-generated` sources.\n- `:access \"public\"` requires a `:license`. Wikidata entity data is CC0-1.0.\n- Never edit `knowledge/ledger/` or `knowledge/receipts/`.\n- Never push to `main`, never force-push, never edit an existing source entry.\n- At most TEN proposed sources per run. Fewer, better sources beat more, and\n  the gate fetches each one — a huge batch wastes the run when one class is\n  mis-chosen.\n\n## Procedure — do all of it, in order\n\n1. `cd` to your worktree (the cwd you were started in is already the worktree)\n   and confirm `git fetch -q origin && git checkout -q --detach origin/main`\n   succeeds.\n2. Read `config/knowledge-ingest.edn` and list every existing\n   `wikidata-*` source. Extract the QIDs already present from the URLs\n   (`Special:EntityData/Q1490.json` → Q1490). This is your NOT-YET list.\n3. Rotate classes across runs: derive the class from the date so successive\n   runs widen different areas (e.g. day-of-year mod over a class list you\n   maintain in the run: cities, countries, volcanoes, rivers, companies,\n   species, languages, albums, films, universities, hospitals, …). Prefer\n   classes whose existing coverage the evidence report showed is thin.\n4. Run ONE SPARQL query against https://query.wikidata.org/sparql\n   (User-Agent: \"hyakka-class-scout/0.1 (+https://wiki.kotobase.net)\"),\n   e.g. for cities:\n\n     SELECT ?item WHERE { ?item wdt:P31 wd:Q515 . }\n     LIMIT 400\n\n   Keep the query cheap. Shuffle-free: take the first N and sort by ?item.\n5. Drop every QID already in the config. From the remainder take at most ten,\n   preferring ones with MANY sitelinks (Wikipedia coverage proxy): check\n   sitelink counts for your shortlist in ONE more SPARQL query using\n   wikibase:sitelinks, and keep the top ten. If a candidate has zero\n   sitelinks, drop it — notability lives there.\n6. Fetch each candidate's entity JSON\n   (`https://www.wikidata.org/wiki/Special:EntityData/QXXX.json`). Discard\n   anything that is not HTTP 200 with a JSON body.\n7. Write a proposal to `/tmp/hyakka-source-proposal.edn`, exactly the\n   established shape:\n\n   {:proposal/rationale \"one sentence per source: what it adds\"\n    :sources\n    [{:id \"wikidata-qXXX\" :kind :web-document\n      :url \"https://www.wikidata.org/wiki/Special:EntityData/QXXX.json\"\n      :title \"Wikidata <label> entity (<class>)\" :publisher \"Wikidata\"\n      :license \"CC0-1.0\"\n      :source-classes [:community-curated-permissive]\n      :access \"public\" :interval-seconds 86400 :llm? true}]}\n\n8. Run the gate, from the worktree:\n\n     nbb --classpath src scripts/verify_source_proposal.cljs --root . --proposal /tmp/hyakka-source-proposal.edn\n\n   exit 0 — every item passed.\n   exit 1 — some rejected; the reason is printed under each. Remove rejected\n   entries and re-run. Do not argue with the gate, do not edit the gate.\n   exit 2 — REFUSED. Stop. Land nothing. Report why.\n\n9. Only on exit 0 with at least one accepted source:\n   - `git checkout -b bot/wikidata-class-$(date +%Y%m%d-%H%M)`\n   - add the accepted maps to `:sources` in `config/knowledge-ingest.edn`,\n     keeping the file's formatting and comment style\n   - `nbb --classpath src scripts/wiki_growth_evidence.cljs --root . --offline`\n     must still exit 0\n   - commit, push, `gh pr create` against `main`, gate output in the body.\n10. Report in a few sentences: the class you enumerated, how many QIDs were\n    already covered, what the gate rejected, what landed.\n\nOpening no PR is a correct outcome.\n\n## Commands the cron runtime refuses\n\nDo not use and do not work around: `-e`/`-c` script flags (`nbb -e`,\n`python3 -c`) — put the code in a file in the worktree and run the file;\nheredocs feeding a script to an interpreter; `rm -rf`. A denied command\nreturns `exit_code: -1` with `BLOCKED` and the run continues — a bot that\nkeeps reaching for these reports success having done nothing.",
         "repeat": {
-          "completed": 77,
+          "completed": 78,
           "times": null
         },
         "schedule": {
@@ -868,6 +868,28 @@
         },
         "script": "tabi_cdc_export.sh",
         "workdir": "/Users/junkawasaki/.gftd/worktrees/tabi-mikake-bot"
+      }
+    ],
+    "webcontainer": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "20045a56e400",
+        "name": "wc-llm-infer-admission-watch",
+        "no_agent": false,
+        "prompt": "差分検知タスク。捏造ゼロ — unknown は unknown と書く。\n最初に /Users/junkawasaki/github/com-junkawasaki/orgs/kotoba-lang/capability-llm-infer/capability.edn を読み :capability/provider-status の値を確認する。前回状態は ~/.hermes/profiles/webcontainer/plans/llm-infer-status.txt に保存してある(無ければ初回として扱う)。\n(1) 値が :contract-only のままなら「差分なし: provider-status :contract-only (確認 <今日の日付>)」の 1 行だけ出力して終了する。plans への書き込みはしない。\n(2) 値が変わっていたら(admit 済み provider が付いたら): 変更を検知した日として plans/llm-infer-status.txt を更新し、superproject の ADR-2609021200 の「次の一手」に従って turn loop の on-mesh 移行タスクの着手記録を書き、bot-chat:codinator 宛に開始報告を出す。",
+        "repeat": {
+          "completed": 0,
+          "times": null
+        },
+        "schedule": {
+          "display": "23 */2 * * *",
+          "expr": "23 */2 * * *",
+          "kind": "cron"
+        },
+        "script": null,
+        "workdir": null
       }
     ]
   },
