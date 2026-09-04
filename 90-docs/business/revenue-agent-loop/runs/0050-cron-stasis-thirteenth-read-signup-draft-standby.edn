@@ -1,0 +1,49 @@
+;; Run 0050 — kotobase-stab cron iteration 2026-09-03 (thirteenth run of the day; 0044–0049 same day)
+{:as-of "2026-09-03"
+ :kind :stabilization-run
+ :run-id "0050"
+
+ ;; 1. Measured signals (live HTTP / nbb only)
+ :measurements
+ {:funnel-api {:status 200
+               :visitors 4902 :signups 31 :checkouts 0
+               :by-source {:visitors {:organic 3387 :openai-ads 3}
+                           :signups {:organic 27 :other 1}
+                           :checkouts {}}
+               :x402 {:challenges 33 :submissions 4 :rejections 4
+                      :settlements 0 :settlement-rate 0
+                      :rejection-reasons {:malformed-header 1}
+                      :rejections-classified 1 :rejections-unexplained 3
+                      :attempt-rate 0.121}}
+  :funnel-pulse "nbb kotobase_lead_loop.cljs funnel-pulse → EXIT=0, RESULT=recorded. DELTA {:visitors 6 :signups 0 :checkouts 0}. UNCHANGED=false, EXTERNAL-FUNNEL-CHANGE=false, SCANNED=1 (pulse counted 4901; live API read moments later showed 4902 — +1 during the check window)"
+  :stability-checks [{:path "/" :status 200 :time-s "0.074"}
+                     {:path "/signup" :status 200 :time-s "0.312"}
+                     {:path "/ipld/v1" :status 400 :note "expected — route alive, params required (baseline 2026-09-03)"}
+                     {:path "/ipld/" :status 404 :note "expected"}
+                     {:path "/api/funnel" :status 200 :note "payload parsed"}]}
+
+ ;; 2. SCORE → SELECT (SCORECARD.md; WIP=1)
+ :score-selection
+ {:selected "UNCHANGED from runs 0038–0049: counsel written-advice return on the net-kotobase legal packet — sole gate on the 75pt row (6399/6310 paid pilot to 5 external tenants) and transitively the 65/62/61/51/48pt red rows"
+  :reason "SCORECARD ranking unchanged (75/65/62/61/51/48, all counsel-gated). Deltas since 0049: +6 visitors (4896→4902 live API) / +0 signups / +0 checkouts — organic only, changes no row's score. Signups static at 31 for a thirteenth consecutive read. Counsel reply is human-dependent; sending is out of scope. WIP=1."
+  :wip "1 (counsel follow-up, awaiting human send + counsel reply)"}
+
+ ;; 3. Bounded experiment — DRAFT ONLY (carried over from 0045–0049; still awaiting owner go/no-go)
+ :experiment
+ {:type :draft-proposal
+  :status "carried over from run 0045 — no owner decision observed yet"
+  :trigger "runs 0038–0050: signups static at 31 across thirteen consecutive reads while visitors grew +6 this run; per 0044's next-verification the draft stands"
+  :what "/signup activation variant — one visible change: add the actual price anchor ('Secure Managed ¥19,800/mo' — the only live-priced SKU per run 0033) plus a single primary CTA near the signup form. No new pages, no deploy by this bot."
+  :expected-signal "signups counter above 31, and/or checkout-start events > 0, within the next measurement window"
+  :deploy-owner "owner decision required — live worker change, outside this bot's no-deploy boundary"
+  :sent? false}
+
+ ;; 4. Next verification
+ :next [{:what "counsel reply (unchanged blocker since 0038; unblocks 75/65/62/61/51/48pt rows)"}
+        {:what "x402: submissions still 4, settlements 0, 3 rejections still unexplained — any change is the first demand signal"}
+        {:what "/signup variant draft: awaiting owner go/no-go — do not implement without approval"}
+        {:what "rejections-unexplained 3/4: unchanged again — x402 observability gap persists"}]
+
+ :canvas-ledger-touched? false
+ :score-raised? false
+ :exaggeration-guard "Verified external revenue = 0. 31 signups are not demand. 4 x402 submissions / 0 settlements is not revenue. All deltas measured from live counters. Nothing sent externally, nothing deployed, nothing fabricated."}

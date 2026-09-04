@@ -1,0 +1,46 @@
+;; Run 0043 — kotobase-stab cron iteration 2026-09-03 (sixth run of the day; 0042 was 14:33)
+{:as-of "2026-09-03T15:01+09:00"
+ :kind :stabilization-run
+ :run-id "0043"
+
+ ;; 1. Measured signals (all live HTTP, no guessing)
+ :measurements
+ {:funnel-api {:status 200 :time-s "0.364"
+               :visitors 4834 :signups 31 :checkouts 0
+               :by-source {:visitors {:organic 3318 :openai-ads 3}
+                           :signups {:organic 27 :other 1}
+                           :checkouts {}}
+               :x402 {:challenges 33 :submissions 4 :rejections 4
+                      :settlements 0 :settlement-rate 0
+                      :rejection-reasons {:malformed-header 1}
+                      :rejections-classified 1 :rejections-unexplained 3
+                      :unmetered-twin-ratio 0 :unmetered-twin-reads 0
+                      :unpriced-plane-reads 0 :attempt-rate 0.121}}
+  :funnel-pulse "nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljs funnel-pulse → EXIT=0, RESULT=recorded. DELTA {:visitors 3 :signups 0 :checkouts 0}. UNCHANGED=false, EXTERNAL-FUNNEL-CHANGE=false. SCANNED=1"
+  :stability-checks [{:path "/" :status 200 :time-s "0.090"}
+                     {:path "/signup" :status 200 :time-s "0.326"}
+                     {:path "/ipld/v1" :status 400 :time-s "0.053" :note "expected — route alive, rejects missing params (baseline 2026-09-03)"}
+                     {:path "/ipld/" :status 404 :time-s "0.052" :note "expected — bare prefix has no index"}
+                     {:path "/api/funnel" :status 200 :time-s "0.364"}]}
+
+ ;; 2. SCORE → SELECT (SCORECARD.md 100-point weights; WIP=1)
+ :score-selection
+ {:selected "UNCHANGED from runs 0038–0042: counsel written-advice return on net-kotobase legal packet — sole gate on the 75pt row (6399/6310 paid pilot to 5 external tenants) and transitively the 65/62/61/51pt red rows"
+  :reason "SCORECARD cash-first ranking unchanged (75/65/62/61/51/48, all blocked on the counsel gate). Counsel draft verified present (90-docs/business/net-kotobase/counsel-followup-draft-20260903.md, 1193 bytes, mtime 10:33). Sending is out of this bot's scope; the reply is human-dependent. Funnel movement since 0042 is +4 visitors / +0 signups / +0 checkouts — organic-only, raises no row's score. WIP=1 respected."
+  :wip "1 (counsel follow-up, awaiting human send + counsel reply)"}
+
+ ;; 3. Bounded observation — x402 counter stasis
+ :experiment
+ {:type :verification-only
+  :what "x402 counters compared against run 0042 (14:33 read): challenges 33 / submissions 4 / rejections 4 / settlements 0 — identical 28 minutes later"
+  :result "no new x402 activity in the interval; no classification progress on the 3 unexplained rejections"
+  :sent? false}
+
+ ;; 4. Next verification
+ :next [{:what "counsel reply (unblocks 75/65/62/61/51pt rows — unchanged since 0038)"}
+        {:what "x402: any submission count change from 4, or rejections-classified progress beyond 1/4; a non-owner submission would be the first demand signal (owner tests are not revenue)"}
+        {:what "funnel signups: 31 static since run 0038 — if still 31 after the +visitor trickle continues, the activation gap (visitors → signups) remains the bottleneck to propose a bounded experiment against"}]
+
+ :canvas-ledger-touched? false
+ :score-raised? false
+ :exaggeration-guard "Verified external revenue = 0. 31 signups are not demand. 4 x402 submissions / 0 settlements is not revenue and attempt ownership is not measured. Nothing sent externally, nothing deployed."}
