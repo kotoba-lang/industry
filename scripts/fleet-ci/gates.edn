@@ -867,6 +867,23 @@
   ;;
   ;;   chain               29 /  87   ==       org-apache-arrow   40/130 vs 35/111
   ;;   ayatori             35 /  62   ==       org-apache-parquet 34/163 vs 31/152
+  ;;
+  ;;   ⚠ ayatori's `==` above stopped being true, and the two gates
+  ;;     disagreed for weeks without either turning red. Measured
+  ;;     2026-09-04: `:jvm-test` discovers namespaces through cognitect's
+  ;;     runner and saw all five test namespaces; `nbb-cross-runtime-query`
+  ;;     ran `run-tests.cljs`, whose `:require` list omitted
+  ;;     `ayatori.remote-test` -- the one namespace covering discovery ->
+  ;;     fetch -> CID verification -- so it saw four. 77 vs 66, both green.
+  ;;     Fixed upstream (kotoba-lang/ayatori#15): the suite is now derived
+  ;;     from the files on disk and refuses with exit 2 when it cannot see
+  ;;     them. Current counts are 91/239 under nbb and 87/231 on the JVM,
+  ;;     the difference being `#?(:cljs)`-only tests.
+  ;;
+  ;;     The numbers in this table are provenance for why each gate was
+  ;;     added, not a live claim. `==` in particular is a measurement with
+  ;;     a date, and nothing re-measures it -- so read a row as "this was
+  ;;     true when the gate landed", and measure again before relying on it.
   ;;   gremlin             23 /  37   ==
   ;;   org-graphql-http    23 /  39   ==       (both differ by `lake_e2e_test.clj`,
   ;;   opencypher-cypher   75 / 174   ==        which drives a real scan on the JVM)
