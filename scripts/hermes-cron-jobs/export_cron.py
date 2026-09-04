@@ -19,6 +19,22 @@ import re
 import sys
 
 HERMES_ROOT = os.path.expanduser("~/.hermes/profiles")
+
+
+def _now():
+    """UTC, second resolution. A ledger whose age cannot be read is
+    indistinguishable from a current one -- measured 2026-09-04, this file
+    covered 21 of 98 scheduled profiles and said nothing about when it had
+    last been written."""
+    import datetime
+    return datetime.datetime.now(datetime.timezone.utc).replace(
+        microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _undated(text):
+    """`text` with the generated_at line removed, for --check's comparison."""
+    return "\n".join(l for l in text.splitlines()
+                     if '"generated_at"' not in l)
 LEDGER = os.path.join(os.path.dirname(__file__), "hermes-cron-jobs.json")
 
 # credential に見える文字列の検出（値そのものを台帳に焼かないための衛生検査）。
@@ -52,7 +68,7 @@ def main():
               "note": "Re-registerable definition ledger for every Hermes "
                       "profile cron job. State fields are intentionally absent "
                       "(terminal-local). Regenerate with export_cron.py.",
-              "generated_at": "regenerated-on-run",
+              "generated_at": _now(),
               "profiles": {}}
 
     for jobs_file in sorted(glob.glob(os.path.join(HERMES_ROOT, "*", "cron", "jobs.json"))):
@@ -93,7 +109,13 @@ def main():
     if check:
         with open(LEDGER) as f:
             current = f.read()
-        if current == body:
+        # Compare the DEFINITIONS, not the timestamp. `generated_at` used to be
+        # the constant "regenerated-on-run" precisely so this byte comparison
+        # would not fire on every run -- which bought a working --check at the
+        # price of a ledger nobody could date. Normalising the one field that is
+        # expected to differ buys both: --check stays quiet when the definitions
+        # match, and the file says when it was last written.
+        if _undated(current) == _undated(body):
             print("hermes-cron-jobs.json is up to date.")
             return 0
         print("STALE: ledger differs from live cron definitions. Re-run without --check.")
