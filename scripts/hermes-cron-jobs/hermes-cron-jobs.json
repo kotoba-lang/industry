@@ -32,7 +32,7 @@
         "no_agent": false,
         "prompt": "定期 standup チェック(軽量・静穏運用)。\n\n【機械的な差分ルール(必ず最初に実行)】\n- cron output dir(直近の完了記録)を確認し、前回完了が 10 分以内なら「差分なし」の 1 行のみで即終了(点検ゼロ)\n- 10 分を超えている場合のみ以下を実施\n\n【当日経過は要約のみ】\n- card comment / ledger / ファイルの長文引用を最終応答に含めない(output limit 違反の実発生あり)\n- 異常の有無と 1 行サマリのみ。詳細は kanban board の comment を参照\n\n【新規 business swarm の作成】\n- codinator の明示指示がある場合のみ。静穏 tick では観測と報告のみ(09-01 の計画外投入 3 本が教訓)\n- 全 card done が通常状態。status 別 count は exact 取得(数え違い 44/46/48 が続出しているため)\n\n【点検(10 分超の場合のみ)】\n1. roster 全 bot の稼働状況を点検(進行中 session、未完了タスク、無言時間)\n2. 異常のみ報告:割り当てタスクが止まっている bot、失敗放置の PR/CI、未返信の依頼\n3. 全体が順調なら 1 行「全 bot 稼働中、異常なし」だけを返す\n\n【運用制約】\n- 自分自身(@manager)は対象外\n- 無言 = 待機中は正常。「進行中タスクが止まっている」場合のみ報告\n- 報告先:この Bot Chat",
         "repeat": {
-          "completed": 91,
+          "completed": 92,
           "times": null
         },
         "schedule": {
@@ -118,7 +118,7 @@
         "no_agent": false,
         "prompt": "You are the hyakka source scout for wiki.kotobase.net (repo: network-awai/app-hyakka).\n\nEverything above this line is a measurement taken seconds ago. It is the only\nthing you know about the wiki. If it begins with REFUSED, say so plainly and\nstop — do not propose anything.\n\n## Your one job this run\n\nPropose at most TWO new ingest sources, and land only what the gate accepts.\nA new source is how this wiki gains articles: each one becomes archived bytes,\nthen sourced claims, then items people can query.\n\n## What you may not do\n\n- Never propose a URL you have not fetched yourself in this run. A URL that\n  reads plausibly and 404s is the characteristic failure of this task.\n- Never propose `:third-party-wiki-prose` or `:user-generated` sources. Every\n  corpus here forbids them: the wiki cites primary sources, and prose about a\n  fact is not the fact.\n- `:access \"public\"` requires a `:license`. Citing a source and republishing\n  its bytes are different acts.\n- Never edit `knowledge/ledger/` or `knowledge/receipts/`. Those are the record\n  of what was already observed; they are append-only history, not workspace.\n- Never push to `main`, never force-push, never edit an existing source entry.\n  You add entries.\n\n## Procedure — do all of it, in order\n\n1. `cd ~/.gftd/worktrees/hyakka-growth-bot && git fetch -q origin && git checkout -q --detach origin/main`\n2. Read `config/knowledge-ingest.edn` (the `:sources` already configured, and\n   `:allowed-properties`) and `src/hyakka/corpus/registry.cljc` (which corpora\n   exist, and `connector-source-classes` — which classes each connector kind\n   produces). A `:web-document` declares its own classes; the other kinds\n   inherit theirs from the kind.\n3. Choose candidates that widen coverage the measurements show is thin. Prefer:\n   first-party sites about their own subject, official APIs, authoritative\n   registries, and CC0/CC-BY structured data (Wikidata entity JSON is the\n   established shape here). Fewer, better sources beat more.\n4. Fetch each candidate URL. Discard anything that is not HTTP 200 with a body.\n5. Write a proposal to `/tmp/hyakka-source-proposal.edn`:\n\n   {:proposal/rationale \"one sentence per source: what it adds\"\n    :sources\n    [{:id \"unique-kebab-id\" :kind :web-document\n      :url \"https://...\" :title \"...\" :publisher \"...\" :license \"...\"\n      :source-classes [:first-party-site]\n      :access \"public\" :interval-seconds 86400 :llm? true}]}\n\n6. Run the gate, from the worktree:\n\n     nbb --classpath src scripts/verify_source_proposal.cljs --root . --proposal /tmp/hyakka-source-proposal.edn\n\n   exit 0 — every item passed.\n   exit 1 — some were rejected; the reason is printed under each.\n   exit 2 — it REFUSED to judge. Stop. Land nothing. Report why.\n\n   On exit 1, remove the rejected entries and re-run. Do not argue with the\n   gate and do not edit the gate. If nothing survives, that is a complete run.\n\n7. Only on exit 0, and only with at least one accepted source:\n   - `git checkout -b bot/source-scout-$(date +%Y%m%d-%H%M)`\n   - add the accepted maps to `:sources` in `config/knowledge-ingest.edn`,\n     keeping the file's existing formatting and comment style\n   - `nbb --classpath src scripts/wiki_growth_evidence.cljs --root . --offline`\n     must still exit 0 (the config still reads)\n   - commit, push, and `gh pr create` against `main`. Put the full gate output\n     in the PR body, including anything it rejected and why.\n8. Report, in a few sentences: what you fetched, what the gate rejected and for\n   what reason, and what landed.\n\nOpening no PR is a correct outcome. Opening a PR whose sources the gate did not\naccept is not — the gate's verdict is the only reason a source belongs here.\n\n## Commands the cron runtime refuses\n\nThese bots run with no human present, so Hermes's approval gate has nobody to\nask and denies rather than prompts. A denied command returns `exit_code: -1`\nwith `BLOCKED: Command flagged as dangerous`, the run continues, and the job\nstill finishes `completed` — so a bot that keeps reaching for one of these\nforms reports success having done nothing. Measured 2026-08-30 across\n~/.hermes/logs: 12 such denials over 4 jobs, none of them asked for by any\nprompt. The model reached for them on its own.\n\nDo not use, and do not work around:\n\n- `-e` / `-c` script flags (`nbb -e '...'`, `python3 -c '...'`) — put the code\n  in a file in the worktree and run the file. 8 of the 12 denials were this.\n- heredocs that feed a script to an interpreter (`<<'EOF'`) — same fix. Note\n  this is independent of the EDN-heredoc corruption the superproject CLAUDE.md\n  warns about; both point at writing the file directly.\n- recursive delete (`rm -rf`). There is no approved form of this here. If a\n  path must go, name the files. This one is denied by design and must stay\n  denied: an unattended agent is exactly who should not be able to run it.\n\nThe denial does not record the command it rejected — only the class — so\nneither you nor the operator can review afterwards what was attempted. Assume\nnothing is learned from a denial except that the run was wasted.",
         "repeat": {
-          "completed": 84,
+          "completed": 85,
           "times": null
         },
         "schedule": {
@@ -456,6 +456,26 @@
         },
         "script": null,
         "workdir": null
+      },
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "c5980d344329",
+        "name": "itonami-ads-weekly",
+        "no_agent": false,
+        "prompt": "捏造ゼロ — unknown は unknown と書く。itonami ISIC 7310 (Advertising) vertical の週次営業観測と outreach ドラフト。書き込み系 API (start/pause/configure/送信) は絶対に実行しない — 実送信は /api/resend/send で owner 承認後のみ。\n\n①KPI 観測: curl -sS -A 'owner/1' https://itonami.cloud/api/fleet/metrics で tenants.{externalTotal,externalPaid,agentRuns7d,registryEntries} を読み、/Users/junkawasaki/.hermes/profiles/itonami/cron/output/itonami-ads-kpi-last.json に書かれた前回値と比較。全部同一なら「[SILENT]」だけで終了。\n②差分があれば: externalTotal/externalPaid の増加はポジティブ、agentRuns7d 急減 (-50%以上) は注意信号として報告。新しい last file を上書き。\n③outreach ドラフト (差分があった時のみ): /Users/junkawasaki/.hermes/profiles/itonami/cron/output/itonami-ads-outreach-draft-YYYYMMDD.md に、その週の KPI 変化を根拠にした広告主向け 1 paragraph 提案文を書く (送信はしない)。offer 文面は https://itonami.cloud/api/open-business/7310 の blueprint.offer を根拠にする。誇張禁止、実測数値のみ。送信に使える正経路もドラフト末尾に記録する: 共有 Resend boundary POST https://itonami.cloud/api/resend/send (Bearer RESEND_EXECUTOR_TOKEN、envelope は org/repo/tenant/campaignId/effectId/to/subject/text、送信者 identity は ITONAMI_MAIL_FROM — 両 credential とも 1Password op:// 参照は scripts/mail-creds.cljs が解決する)。\n出力 8 行以内。",
+        "repeat": {
+          "completed": 0,
+          "times": null
+        },
+        "schedule": {
+          "display": "0 7 * * 1",
+          "expr": "0 7 * * 1",
+          "kind": "cron"
+        },
+        "script": null,
+        "workdir": null
       }
     ],
     "machi-hub": [
@@ -490,7 +510,7 @@
         "no_agent": false,
         "prompt": "babiniku.net 運用 bot の定期 pulse (報告専用・変更はしない)。単一 run で次を実測:\n1) https://babiniku.net に GET (User-Agent: babiniku-pulse/0.1) — HTTP status 記録。\n2) repo ~/github/com-junkawasaki 配下の net-babiniku 関連 (AI VTuber chat Worker) の公開 URL を repo 設定 (wrangler.toml / routes) から確認し、同じく GET で死活記録。\n3) 全部正常 (2xx/3xx) なら応答は正確に1行: 「OK babiniku <日付> — 全緑 (<n> endpoint)」。\n4) 異常 (5xx/タイムアウト/DNS失敗) があれば1行サマリ + 異常 endpoint のみ詳報 (URL / HTTP status / エラー本文先頭)。\n規律: 観測のみ。修復・デプロイ・設定変更はしない (異常は報告して終了)。コマンド実行の制約: -e/-c スクリプトフラグ禁止、インタプリタへの heredoc 禁止、rm -rf 禁止 (cron ランタイムが拒否する)。失敗時も正直に「REPORT FAILED」と原因を書く。",
         "repeat": {
-          "completed": 36,
+          "completed": 37,
           "times": null
         },
         "schedule": {
@@ -550,7 +570,7 @@
         "no_agent": false,
         "prompt": "x402.nexus 決済 facilitator の定期 pulse (報告専用・変更はしない)。単一 run で次を実測:\n1) https://x402.nexus と https://x402.nexus/catalog に GET — HTTP status 記録 (2026-08-31 実測: 両方 200)。\n2) repo network-awai/nexus-x402 の設定から facilitator の gateway/catalog/apply endpoint を確認し、公開面のものを GET で死活記録 (認証必須 endpoint は 401=正常扱い)。\n3) 全部正常なら応答は正確に1行: 「OK x402 <日付> — 全緑 (<n> endpoint)」。\n4) 異常があれば1行サマリ + 異常 endpoint のみ詳報。決済カタログの内容整合 (価格/asset の明細な変化) に気づいたらそれも1行で注記。\n規律: 観測のみ。決済実行・カタログ変更・デプロイはしない。コマンド実行の制約: -e/-c スクリプトフラグ禁止、インタプリタへの heredoc 禁止、rm -rf 禁止。失敗時も正直に報告。",
         "repeat": {
-          "completed": 33,
+          "completed": 34,
           "times": null
         },
         "schedule": {
@@ -570,7 +590,7 @@
         "no_agent": false,
         "prompt": "network-isekai Pages 公開サイトの定期 pulse (報告専用・変更はしない)。単一 run で次を実測:\n1) https://isekai.network に GET — HTTP status 記録 (2026-08-31 実測: 200)。ETag か Last-Modified も記録。\n2) repo network-awai 配下の isekai Pages repo の main 最新 commit 時刻と、サイトの Last-Modified を比較し、main が進んでいるのにサイトが更新されていない (= デプロイ滞留) なら1行で注記。\n3) babiniku アセット連携 (サイト内で参照している外部アセット URL) が repo から特定できれば 1 つまで死活確認。\n4) 全部正常なら応答は正確に1行: 「OK isekai <日付> — 全緑 (last-modified: <値>)」。\n5) 異常 (5xx/タイムアウト/デプロイ滞留) があれば1行サマリ + 詳報。\n規律: 観測のみ。デプロイ・コンテンツ修正はしない。コマンド実行の制約: -e/-c スクリプトフラグ禁止、インタプリタへの heredoc 禁止、rm -rf 禁止。失敗時も正直に報告。",
         "repeat": {
-          "completed": 33,
+          "completed": 34,
           "times": null
         },
         "schedule": {
