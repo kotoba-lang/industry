@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Decision-free measurements for Otent geospatial vision bots."""
 from __future__ import annotations
-import argparse, datetime as dt, hashlib, os, subprocess
+import argparse, datetime as dt, hashlib, os, subprocess, sys, time, fcntl
 from pathlib import Path
+sys.path.insert(0, "/Users/junkawasaki/.hermes/profiles/hyakka/scripts")
+from throttle import gate, mark  # noqa: E402
 
 READ_ROOT=Path(os.environ.get("OTENT_VISION_READ_ROOT","~/github/com-junkawasaki")).expanduser()
 HERE=Path(__file__).resolve().parent
@@ -41,6 +43,7 @@ def tracked_text(root):
  return "\n".join(out)
 def main():
  p=argparse.ArgumentParser(); p.add_argument("scope",choices=tuple(CONFIG)); a=p.parse_args(); source,work=CONFIG[a.scope]
+ gate(f"otent-{a.scope}", hours=float(os.environ.get("OTENT_EVIDENCE_COOLDOWN_H","24")))
  print("OTENT_VISION_EVIDENCE_V1")
  print(f"measured_at={dt.datetime.now(dt.timezone.utc).isoformat()}\nscope={a.scope}\nread_root={READ_ROOT} (read only)\nworktree={work}")
  if not SCOPE_FILE.is_file(): return refuse("otent-vision-scope.edn is absent")
@@ -57,5 +60,5 @@ def main():
  for t in TOKENS[a.scope]: print(f"TOKEN name={t} present={'yes' if t.lower() in body.lower() else 'no'}")
  for rel in ["orgs/cloud-itonami/app-otent","orgs/kotoba-lang/com-mapillary-graph-api","orgs/kotoba-lang/org-openstreetmap-overpass"]:
   print(f"CANDIDATE path={rel} present={'yes' if (READ_ROOT/rel).is_dir() else 'no'}")
- print("END_OTENT_VISION_EVIDENCE_V1"); return 0
+ print("END_OTENT_VISION_EVIDENCE_V1"); mark(f"otent-{a.scope}"); return 0
 if __name__=="__main__": raise SystemExit(main())
