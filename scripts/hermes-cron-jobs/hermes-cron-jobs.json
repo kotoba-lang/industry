@@ -260,7 +260,7 @@
         "no_agent": false,
         "prompt": "捏造ゼロ — unknown は unknown と書く。business bot business-6420-assignmentisic64 (ISIC 6420 isekai web3-first) の health を fail-closed で点検する。認証不要の公開 activity feed だけを使い (bearer 不要 — murakumo-service-token / bots-status-token は 2026-09-03 に死亡したので使わない・参照しない)、書き込み系 (start/pause/configure) は絶対に実行しない — budget refill や resume は owner 承認事項。手順: ①curl -sS -m 25 https://itonami.cloud/api/v1/grok-bots/bots/business-6420-assignmentisic64/activity の応答 JSON を読む。イベント配列は **data キー** (events ではなく data。list 直下の場合もある — 3 形を順に試す)。②差分検知: data[0].activity_id を /Users/junkawasaki/.hermes/profiles/isekai/cron/output/isekai-6420-lastseq.txt に書かれた前回値と比較、同一なら「isekai bot 6420: 差分なし (event N)」1 行で終了。③変化があれば: type 別に runtime.governor/held / runtime.bot/correction / conversation.checkpoint を数え、businesses feed https://itonami.cloud/api/v1/grok-bots/businesses の該当 bot の status と self_correction.class も確認。status held + budget 系 class なら「budget 枯渇 — owner 判断が必要」(raise/再起動はしない)。held でも correction が新鮮なら self-correction loop が働いている (故障ではない)。④新しい data[0].activity_id を lastseq ファイルに上書き。⑤https://isekai.network と https://isekai.network/api/fork/feed の HTTP status + 返りが JSON か (200 だけでは健康ではない)。出力 5 行以内。",
         "repeat": {
-          "completed": 9,
+          "completed": 10,
           "times": null
         },
         "schedule": {
@@ -282,7 +282,7 @@
         "no_agent": false,
         "prompt": "捏造ゼロ — unknown は unknown と書く。isekai.network x402 testnet harness (ADR-0096) の health 点検。手順: ①curl -sS -m 20 https://isekai.network/api/x402/prices → mode:testnet-harness と priced 配列を確認。前回 (/Users/junkawasaki/.hermes/profiles/isekai-x402/cron/output/prices-last.txt) と比較し、差分が無ければ「x402 harness: 差分なし」1 行で終了。②差分があれば: curl -sS -m 20 -D /tmp/h.txt \"https://isekai.network/api/x402/price?resource=/api/fork\" で 402 + x402Version:1 + network:base-sepolia + x-x402-mode ヘッダを確認 (200/404/1101 は異常)。③x-x402-mode ヘッダが無い応答 = harness 偽装の疑いとして詳報。④prices-last.txt を更新。出力 5 行以内。",
         "repeat": {
-          "completed": 9,
+          "completed": 10,
           "times": null
         },
         "schedule": {
@@ -692,7 +692,7 @@
         "no_agent": false,
         "prompt": "kotoba-lang.org デプロイ監視 (webest 担当)。単一 run で次を実測:\n1) https://kotoba-lang.org の ETag/Last-Modified を取得し、前回の cron output (~/.hermes/cron/output 自 job の前回 md) と比較。\n2) kotoba-lang org の GitHub Pages deployment 状態を確認 (gh api repos/kotoba-lang/kotoba-lang/deployments --jq '.[0] | .environment + \" \" + .created_at + \" \" + .state' 等)。\n3) 変化なし → 1 行「OK webest-deploy <日付> — 変化なし」。変化があれば、どんな変更か (commit / deployment 番号) を 1-3 行で報告。自分の出した PR のデプロイ確認中なら、その計測 (ロード時間) を報告。\n4) サイトダウン (5xx/タイムアウト) は異常詳報。\n規律: 観測のみ。デプロイ操作はしない。コマンド実行の制約: -e/-c スクリプトフラグ禁止、インタプリタへの heredoc 禁止、rm -rf 禁止。",
         "repeat": {
-          "completed": 27,
+          "completed": 28,
           "times": null
         },
         "schedule": {
@@ -734,7 +734,7 @@
         "no_agent": false,
         "prompt": "murakumo.cloud model registry の差分監視 job。捏造ゼロ — unknown は unknown と書く。手順: (1) curl -sS https://api.murakumo.cloud/infer/models -A Mozilla/5.0 で id 一覧を取る。(2) 状態ファイル /Users/junkawasaki/.hermes/profiles/murakumo-cloud/cron/model-registry-watch.state.json に前回の id 一覧 JSON があれば比較する。無ければ今回を baseline として保存して 1 行で終了。(3) 差分がない場合は「差分なし」1 行で終了し、何も書き換えない。(4) 差分がある場合のみ: 新規/消滅/改名 id を列挙し、新規 id は curl -sS https://api.murakumo.cloud/infer/models/<id> -A Mozilla/5.0 で descriptor を取って status / status-evidence.verdict / endpoint / fallback-endpoint / tasks を要約。(5) verdict が unverified になった既存 id があれば declared-status と verified_at の古さを指摘。(6) endpoint が https のものだけ curl -o /dev/null -w %{http_code} で軽く生存確認 (http/tailnet の gad endpoint はこの job からは届かないので skip して unknown と書く、無理に届けない)。(7) 今回の id 一覧を状態ファイルに保存。報告は 10 行以内。registry の変更 (PUT) を job からしてはならない — 監視のみ。",
         "repeat": {
-          "completed": 0,
+          "completed": 1,
           "times": null
         },
         "schedule": {
@@ -964,7 +964,7 @@
         "no_agent": true,
         "prompt": "",
         "repeat": {
-          "completed": 90,
+          "completed": 91,
           "times": null
         },
         "schedule": {
@@ -974,6 +974,48 @@
         },
         "script": "tabi_cdc_export.sh",
         "workdir": "/Users/junkawasaki/.gftd/worktrees/tabi-mikake-bot"
+      }
+    ],
+    "tobari": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "41146acd63b9",
+        "name": "tobari-relay-probe",
+        "no_agent": false,
+        "prompt": "tobari relay probe — Apple Private Relay 相当 2 面 (mail relay / network relay) の現在地観測。捏造ゼロ — unknown は unknown と書く。差分検知を最初に: 前回 ~/.hermes/profiles/tobari/plans/relay-probe-last.txt と同じ結果なら「差分なし」1行で終了して上書き保存しない。手順: (1) curl -sS -o /dev/null -w '%{http_code}' --max-time 8 https://relay.itonami.cloud/health と https://mail-ingest.kotobase.net/health と https://smtp.kotobase.net/ (2) dig +short relay.itonami.cloud (3) 変化があれば nbb scripts/repo-search.cljs ohttp を com-junkawasaki root で引き、network relay 面 (OHTTP/MASQUE) の新着 repo を確認。異常 (NXDOMAIN 継続、新 5xx、unexpecte d 404) の時だけ深掘りし、結果を 3 行以内で plans/relay-probe-last.txt に保存。",
+        "repeat": {
+          "completed": 0,
+          "times": null
+        },
+        "schedule": {
+          "display": "19 */3 * * *",
+          "expr": "19 */3 * * *",
+          "kind": "cron"
+        },
+        "script": null,
+        "workdir": null
+      },
+      {
+        "context_from": null,
+        "deliver": "bot-chat:codinator",
+        "enabled_toolsets": null,
+        "id": "17207ee36d78",
+        "name": "tobari-weekly-standup",
+        "no_agent": false,
+        "prompt": "tobari weekly standup — 先週の relay 設計実装進捗を codinator へ報告。捏造ゼロ。差分検知: 変化が無ければ『先週からの変化なし』1 行で終了。含める: (1) relay.itonami.cloud DNS/live 状態の推移 (plans/relay-probe-last.txt の履歴から) (2) network relay (OHTTP) 面 ADR 起票の有無 (3) 次の一手 1 件。3-5 行で。",
+        "repeat": {
+          "completed": 0,
+          "times": null
+        },
+        "schedule": {
+          "display": "11 9 * * 1",
+          "expr": "11 9 * * 1",
+          "kind": "cron"
+        },
+        "script": null,
+        "workdir": null
       }
     ],
     "webcontainer": [
@@ -986,7 +1028,7 @@
         "no_agent": false,
         "prompt": "差分検知タスク。捏造ゼロ — unknown は unknown と書く。\n最初に /Users/junkawasaki/github/com-junkawasaki/orgs/kotoba-lang/capability-llm-infer/capability.edn を読み :capability/provider-status の値を確認する。前回状態は ~/.hermes/profiles/webcontainer/plans/llm-infer-status.txt に保存してある(無ければ初回として扱う)。\n(1) 値が :contract-only のままなら「差分なし: provider-status :contract-only (確認 <今日の日付>)」の 1 行だけ出力して終了する。plans への書き込みはしない。\n(2) 値が変わっていたら(admit 済み provider が付いたら): 変更を検知した日として plans/llm-infer-status.txt を更新し、superproject の ADR-2609021200 の「次の一手」に従って turn loop の on-mesh 移行タスクの着手記録を書き、bot-chat:codinator 宛に開始報告を出す。",
         "repeat": {
-          "completed": 1,
+          "completed": 2,
           "times": null
         },
         "schedule": {
