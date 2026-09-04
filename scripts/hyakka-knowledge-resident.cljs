@@ -533,6 +533,66 @@
       (println (str/trim version-line)))
     (println "live catalogue verified" actual)))
 
+;; ---- post-deploy sinks: IPFS index + R2 Data Catalog -----------------------
+;;
+;; Both are content-addressed projections of the SAME ledger the deploy above
+;; serves. Before 2026-09-04 neither ran in the loop: index-root.edn sat at
+;; its 2026-09-01 build while the wiki moved on, and the R2 Iceberg tables
+;; were only ever refreshed by hand. They run AFTER the public deploy and are
+;; best-effort — a failure here leaves the tick's exit code untouched unless
+;; BOTH fail, because neither sink can invalidate what wiki.kotobase.net
+;; already serves (each is addressed by content, not by this process).
+
+(def ipfs-post-failures (atom []))
+
+(defn- ipfs-index! [env]
+  "Rebuild the search index blocks, pin them into the local ipfs node (which
+  ipfs.kotobase.net serves from), and republish the wiki's IPNS name so the
+  mutable pointer lands on the new root. Best-effort per stage."
+  (checked ["nbb" "--classpath" "src:scripts" "scripts/build_index.cljs"]
+           {:dir worktree :env env})
+  (let [blocks-dir (str worktree "/.index-build/blocks")
+        root (let [s (checked ["cat" (str worktree "/index-root.edn")] {})]
+               (:index/root-cid (edn/read-string s)))]
+    (when-not root
+      (fail! "ipfs-index: no :index/root-cid in index-root.edn after build"))
+    (checked ["ipfs" "add" "-r" "--pin" "--quieter" blocks-dir] {})
+    ;; import the root block explicitly so the pin covers the whole DAG
+    (checked ["ipfs" "add" "--pin" "--quieter"
+              (str blocks-dir "/" root)] {})
+    ;; republish the wiki's IPNS name under a dedicated key (mints on first run)
+    (let [key (if (some #{"hyakka-wiki-index"}
+                        (str/split-lines (checked ["ipfs" "key" "list"] {})))
+                "hyakka-wiki-index"
+                (do (checked ["ipfs" "key" "gen" "hyakka-wiki-index"
+                              "--type=ed25519"] {})
+                    "hyakka-wiki-index"))]
+      (checked ["ipfs" "name" "publish" "--key" key root] {}))
+    (println "ipfs index root" root)))
+
+(defn- r2-datalake-sync! [env]
+  "Refresh the R2 Data Catalog Iceberg tables from the freshly committed
+  catalogue. datalake_sync.cljs resolves CF_CATALOG_TOKEN itself (env, then
+  Keychain) and refuses — not fails — when it cannot run."
+  (checked ["nbb" "--classpath" "src" "scripts/datalake_sync.cljs"]
+           {:dir worktree :env env}))
+
+(defn- post-deploy-sinks!
+  "Run both post-deploy sinks; record failures instead of throwing so one
+  broken sink cannot hide the other, and a broken sink cannot fail the tick
+  for work the wiki has already served. Exit-code reporting happens at the
+  end of main via ipfs-post-failures."
+  [env]
+  (doseq [[label f] [["ipfs-index (build + pin + ipns)" ipfs-index!]
+                     ["r2-datalake (Iceberg sync)" r2-datalake-sync!]]]
+    (try
+      (timed! label (fn [] (f env)))
+      (catch :default e
+        (swap! ipfs-post-failures conj {:step label :error (str (.-message e))})
+        (binding [*out* *err*]
+          (println (str "✗ " label " — best-effort sink failed: "
+                        (or (.-message e) (str e)))))))))
+
 (defn publish-then-deploy!
   "Publish to the datom plane, then deploy the public catalogue EITHER WAY.
 
@@ -603,7 +663,9 @@
               []
               (do
                 (timed! "ingest"
-                        #(checked ["nbb" "--classpath" "src" "scripts/resident_ingest.cljs" "--once"]
+                        #(checked ["nbb" "--classpath"
+                                   "src:../kotoba-lang/chain-observer/src"
+                                   "scripts/resident_ingest.cljs" "--once"]
                                   {:dir worktree :env env}))
                 (let [xs (changed-receipts)
                       lost (timed! "upload-raw (B2)"
@@ -629,11 +691,26 @@
            #(timed! "deploy-public (test + build + wrangler)"
                     (fn [] (deploy-public! env)))
            deploy?)
+          ;; content-addressed projections of the same ledger (IPFS index
+          ;; blocks + R2 Iceberg). Best-effort: recorded, not thrown.
+          (post-deploy-sinks!)
           (println "hyakka resident tick complete; receipts=" (count receipts)
                    "projected=" (count pending)
                    "deployed=" deploy?
                    "lost-archives=" (count @lost-archives)
-                   "kotobase-skipped=" (or (:skipped @kotobase-skip) 0))
+                   "kotobase-skipped=" (or (:skipped @kotobase-skip) 0)
+                   "sink-failures=" (count @ipfs-post-failures))
+          ;; post-deploy sinks are content-addressed projections: a failure is
+          ;; reported loudly but does not fail the tick, because neither sink
+          ;; can invalidate what wiki.kotobase.net already serves. One working
+          ;; sink out of two is still progress; both broken is an operator
+          ;; page, not a silent green.
+          (when (and (pos? (count @ipfs-post-failures))
+                     (= 2 (count @ipfs-post-failures)))
+            (binding [*out* *err*]
+              (println "FAILED both post-deploy sinks:"
+                       (mapv :step @ipfs-post-failures))
+              (set! (.-exitCode js/process) 1)))
           ;; A tick that finished its work but could not back some bytes is
           ;; neither a failure nor a clean run, and printing the count is not
           ;; enough on its own: launchd records the exit status, and a 0 here
