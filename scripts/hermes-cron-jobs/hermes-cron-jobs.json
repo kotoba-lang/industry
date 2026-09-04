@@ -12,7 +12,7 @@
         "no_agent": false,
         "prompt": "メモリの断片化を防ぐ定期タスクです。memory ツールを単一 add で呼んで現在の usage を確認してください(char limit は応答に表示されます)。\n\n- usage が 85% 以上なら: 最も古い・低価値なエントリを圧縮して 80% 以下に下げる(replace で短縮、または remove して add で統合)。単一バッチで実施\n- 85% 未満なら何もしない\n- 圧縮を行った場合のみ、この実行の出力に「compressed: N chars saved」と書く",
         "repeat": {
-          "completed": 89,
+          "completed": 90,
           "times": null
         },
         "schedule": {
@@ -52,7 +52,7 @@
         "no_agent": false,
         "prompt": "あなたは @itonami-dispatch、cloud-itonami の分散実行 dispatch bot です。SOUL.md を読んでから開始してください(実測済みの運用知見が最後に追記されています — とくに「daemon は起動しない」「--worker の SKILLS 欄に指示を入れない」を守ること)。\n\n【静穏運用の 2 原則】\n- 当日経過は要約のみ。card comment / ledger / ファイルの長文引用を最終応答に含めない(output limit 違反の実発生あり)\n- 新規 business swarm の作成は codinator の明示指示がある場合のみ。静穏 tick では観測と報告のみ(09-01 の計画外投入 3 本が教訓)\n- 全 card done が通常状態。status 別 count は sqlite3 の exact 取得で(数え違い 44/46/48 が続出しているため)\n\n【standup 手順(毎時、軽量に)】\n1. sqlite3 ~/.hermes/kanban/boards/itonami/kanban.db \"SELECT status, COUNT(*) FROM tasks WHERE status != 'archived' GROUP BY status\" で board 状態確認(exact count)\n2. running card のうち log(~/.hermes/kanban/boards/itonami/logs/TASKID.log)が 15 分以上更新されていないものは reclaim して reassign\n3. 全体が静かなら 1 行だけ報告して終了。異常や完了した swarm があれば @codinator へ報告",
         "repeat": {
-          "completed": 84,
+          "completed": 85,
           "times": null
         },
         "schedule": {
@@ -476,6 +476,28 @@
         },
         "script": null,
         "workdir": null
+      }
+    ],
+    "jv-migration": [
+      {
+        "context_from": null,
+        "deliver": "local",
+        "enabled_toolsets": null,
+        "id": "578ad45de978",
+        "name": "jv-migration-weekly",
+        "no_agent": false,
+        "prompt": "jv-migration weekly 言語依存置換 tick。SOUL.md を読んでから開始。捏造ゼロ — unknown は unknown と書く。\n\n手順:\n1. cd /Users/junkawasaki/github/com-junkawasaki && nbb scripts/jvm-dependency-scan.cljs --top 15 を実行し、90-docs/kotoba-stdlib-router/scan.edn を再生成する。git diff --stat で前回との差を確認（scan.edn は生成物）。\n2. 未割当 (:unassigned) の依存を数える。3 件以上あったらリストして @codinator へ ADR-2609040930 改訂依頼を報告に含める。\n3. 置換候補を 1 つ選ぶ: 基準は (a) 割当済み (:routed) の依存で (b) kotoba 側の面が実在するもの（orgs/kotoba-lang/<target> が checkout され namespace が在る）、(c) 未着地 repo（未置換）が多いもの。前回と同じ repo を選ばない（前回出力を session から確認、無ければ ~/.gftd/jv-migration/last-run.md を読む）。\n4. その repo を root-worktree.cljs create で worktree に取り、依存を表の宛先に置換する PR を 1 本だけ作る。置換は表の宛先のみ。新規 repo は作らない。検証は JVM baseline との出力一致（parity）を PR に貼る。exit 0 だけは証拠でない。\n5. 報告: 選んだ repo と依存、置換先、PR 番号、parity 証跡、次回の resume point。着手できない場合も「測定のみ」の報告をする（scan.edn 更新だけで valid な 1 tick）。\n\n禁止: 新規 repo の発明、表に無い宛先、共有 checkout 直編集、force-push、rebase。1 tick = 1 PR が上限。",
+        "repeat": {
+          "completed": 0,
+          "times": null
+        },
+        "schedule": {
+          "display": "23 6 * * 1",
+          "expr": "23 6 * * 1",
+          "kind": "cron"
+        },
+        "script": null,
+        "workdir": "/Users/junkawasaki/github/com-junkawasaki"
       }
     ],
     "machi-hub": [
