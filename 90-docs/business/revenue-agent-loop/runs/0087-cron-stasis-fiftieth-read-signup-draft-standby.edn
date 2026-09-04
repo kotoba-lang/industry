@@ -1,0 +1,54 @@
+;; Run 0087 — cron stability + fiftieth signup read (2026-09-04 JST)
+;; Role: kotobase-stab stabilization loop, 1 iteration. canvas-ledger.edn NOT touched.
+
+{;; 1. Signals (measured, not inferred)
+ :measured
+ {:funnel-pulse "nbb kotobase_lead_loop.cljs funnel-pulse → EXIT=0, RESULT=recorded. SCANNED=1. VISITORS=5766 SIGNUPS=31 CHECKOUTS=0. DELTA {:visitors 50 :signups 0 :checkouts 0}. UNCHANGED=false, EXTERNAL-FUNNEL-CHANGE=false, SCORE=unchanged. (run 0086 read: 5716)"
+  :api-funnel {:visitors 5766 :signups 31 :checkouts 0
+               :by-source {:visitors {:organic 4232 :openai-ads 3}
+                           :signups  {:organic 27 :other 1}}
+               :x402 {:challenges 33 :submissions 4 :rejections 4
+                      :settlements 0 :settlement-rate 0
+                      :rejection-reasons {:malformed-header 1}
+                      :rejections-classified 1 :rejections-unexplained 3
+                      :unmetered-twin-ratio 0 :unmetered-twin-reads 0
+                      :unpriced-plane-reads 0
+                      :attempt-rate 0.121}}
+  :stability-checks [{:path "/" :status 200 :time-s "0.069"}
+                     {:path "/signup" :status 200 :time-s "0.172"}
+                     {:path "/api/funnel" :status 200 :time-s "0.158" :note "payload parsed"}
+                     {:path "/ipld/v1" :status 400 :time-s "0.281 then 0.128 on repeat (19:58 JST)"
+                      :note "expected 400 = route exists, params required. Run 0086's 38.2s sample did NOT recur — fast again this window. Logged as one-off slow read, not a regression."}
+                     {:path "/ipld/" :status 404
+                      :note "baseline 2026-09-03 confirmed again"}]
+  :all-healthy? true
+  :flags ["visitors delta +50 vs pulse counter (5716→5766) / +50 vs api counter (5716→5766); organic 4183→4232; openai-ads flat at 3 across fourteen windows — fourteenth consecutive organic-labeled delta."
+          "signups static at 31 for fiftieth consecutive reads. x402 counters identical since run 0060. pulse/api counters agree again (both 5766)."
+          "/ipld/v1 latency: both samples <0.3s this window — run 0086's 38.2s anomaly resolved as one-off; no regression to escalate."]}}
+
+ ;; 2. SCORE → SELECT (SCORECARD.md; WIP=1)
+ :score-selection
+ {:selected "UNCHANGED from runs 0038–0086: counsel written-advice return on the net-kotobase legal packet — sole remaining gate on the 75pt row (cloud-itonami 6399/6310 paid pilot to 5 external tenants) and transitively the 65/62/61/51/48pt red rows"
+  :reason "SCORECARD ranking unchanged (75/65/62/61/51/48, all counsel-gated). Deltas since 0086: +50 visitors (organic-labeled; openai-ads flat at 3) / +0 signups (fiftieth consecutive read at 31) / +0 checkouts. x402 counters unchanged. Counsel draft exists on disk (90-docs/business/net-kotobase/counsel-followup-draft-20260903.md); reply is human-dependent; sending is out of scope. WIP=1."
+  :wip "1 (counsel follow-up, awaiting human send + counsel reply)"}
+
+ ;; 3. Bounded experiment — DRAFT ONLY (carried over from 0045–0086; still awaiting owner go/no-go)
+ :experiment
+ {:type :draft-proposal
+  :status "carried over from run 0045 — no owner decision observed yet"
+  :trigger "runs 0038–0087: signups static at 31 across fifty consecutive reads while visitors rose +728 over fourteen windows (+17/+32/+17/+82/+60/+9/+80/+29/+55/+46/+62/+106/+39/+50), all organic-labeled, 0 new signups. Conversion remains the gap; traffic acceleration without any signup response strengthens the case that the blocker is the page, not reach."
+  :what "/signup activation variant — one visible change: add the actual price anchor ('Secure Managed ¥19,800/mo' — the only live-priced SKU per run 0033) plus a single primary CTA near the signup form. No new pages, no deploy by this bot."
+  :expected-signal "signups counter above 31, and/or checkout-start events > 0, within the next measurement window"
+  :deploy-owner "owner decision required — live worker change, outside this bot's no-deploy boundary"
+  :sent? false}
+
+ ;; 4. Next verification
+ :next [{:what "counsel reply (unchanged blocker since 0038; unblocks 75/65/62/61/51/48pt rows)"}
+        {:what "/ipld/v1 latency: resolved — one-off 38.2s in run 0086, sub-second again this window (0.281s / 0.128s). No further watch item unless a new slow read appears."}
+        {:what "visitor source classification: fourteenth consecutive organic-labeled delta — UA/referrer breakdown requires worker logs or owner-side analytics; /api/funnel does not expose it. If unobtainable, treat the increment as unclassified traffic, not demand."}
+        {:what "x402: submissions still 4, settlements 0, 3 rejections still unexplained — any change is the first demand signal"}
+        {:what "/signup variant draft: awaiting owner go/no-go — do not implement without approval"}]
+
+ :canvas-ledger-touched? false
+ :score-raised? false
+ :exaggeration-guard "Verified external revenue = 0. 31 signups are not demand. 4 x402 submissions / 0 settlements is not revenue. Visitor increment (+50, organic-labeled) is traffic, not conversion — source unverified. /ipld/v1 one-off latency resolved without cause asserted beyond 'not recurring'. All deltas measured from live counters. Nothing sent externally, nothing deployed, nothing fabricated."}

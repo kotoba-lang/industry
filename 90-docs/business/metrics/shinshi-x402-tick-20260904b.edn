@@ -1,0 +1,31 @@
+{:doc/id "shinshi-x402-tick-20260904b"
+ :doc/status "draft"
+ :doc/date "2026-09-04"
+ :doc/actor "shinshi-sales cron tick"
+ :doc/type :issue-draft
+
+ ;; 実測 (2026-09-04 ~15:30 JST, 全て curl/JSON-RPC 実行値)
+ :observed
+ {:live-endpoints
+  {"GET /pay" "404 not found (未deploy)"
+   "GET /pay/quote?usd=0.5" "200 — 但し chain=ethereum / custody=safe-multisig / usdc-contract=Ethereum mainnet (旧虚偽値のまま)"
+   "GET /.well-known/x402" "200 — network=base, payTo=0xf15928…67Ac, $0.50 正常"
+   "GET /x402/premium/test" "402 challenge 正常 (maxAmountRequired 500000 = $0.50)"}
+  :repo-state "origin/main HEAD 25debdb に 758f748 (#42 fix) と 9ac7569 (#44 pay UI) は merge 済み → live に未反映 (deploy lag)"
+  :chain "payTo EOA Base USDC balance 0 / Base native balance 0; treasury Safe 0xA00366…2D4E Ethereum mainnet USDC 0 (publicnode/drpc 実測) → 実 USDC 送金 0 件、quote 成功数は /pay/quote 200 応答するが D1 pay_quote_daily は live 未計測 (PR #51 merge 済み・未deploy)"
+  :funnel-7d "visitors 386 / chatters 72 / scenes 163 / paying 0 (api/funnel 実測、前回 371/71/161/0)"
+  :exoclick "imp/revenue 未計測 — dashboard API アクセス不可。runs 0021 実測 (2026-07-09) から 7d USD 0・imp 0 の記録のみ。日次監視は未実装 (要 owner の dashboard 認証情報)"}
+
+ ;; 転換 0 の specific な理由 (本 tick の 1 件)
+ :conversion-zero-cause
+ "deploy lag: 転換を阻止していた 2 つの修正 (PR #42 /pay/quote を Base+実態表示へ、PR #44 人間向け /pay UI) は origin/main に merge済み だが live /pay は 404・/pay/quote は ethereum+safe-multisig の旧値を返す。つまり rail も UI も 'fix済みだが稼働していない' 状態。merge から deploy への経路が無い/止まっていることが今日の一次原因。"
+
+ :issue-draft
+ {:title "[deploy] #42/#44 の pay 修正が origin/main merge済みでも live に未反映 — /pay 404・quote は ethereum のまま (実測 2026-09-04)"
+  :body-要点
+  ["実測: origin/main 25debdb に 758f748 (PR #42) / 9ac7569 (PR #44) / 51 (quote counter) は含まれる。live shinshi.club は GET /pay→404、GET /pay/quote?usd=0.5→200 だが chain=ethereum・custody=safe-multisig・usdc-contract=Eth mainnet (修正前の虚偽値) を返す。"
+   "影響: x402 転換 0 の一次原因が 'UI不在' から 'deploy不在' に変わった。このままでは PR #51 の quote 計測も live されず validation ループが進まない。"
+   "ask: deploy pipeline の確認 (Actions が repo に存在しない — gh run list 404)。手動 deploy か CI 設定の追加を shinshi-eng に依頼。merge/deploy は approval-required。"
+   "計測: deploy 後 24h で /api/funnel :quotes (PR #51) を初読し quote 成功数を初計測する。価格 ($0.50) の変更は提案のみ・owner approval。"]}
+
+ :rule-guard "数字は全て実測 (curl / JSON-RPC / git merge-base / api/funnel)。ExoClick imp は未計測のまま記載。価格変更なし。"}
