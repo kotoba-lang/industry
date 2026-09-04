@@ -260,7 +260,7 @@
         "no_agent": false,
         "prompt": "捏造ゼロ — unknown は unknown と書く。business bot business-6420-assignmentisic64 (ISIC 6420 isekai web3-first) の health を fail-closed で点検する。認証不要の公開 activity feed だけを使い (bearer 不要 — murakumo-service-token / bots-status-token は 2026-09-03 に死亡したので使わない・参照しない)、書き込み系 (start/pause/configure) は絶対に実行しない — budget refill や resume は owner 承認事項。手順: ①curl -sS -m 25 https://itonami.cloud/api/v1/grok-bots/bots/business-6420-assignmentisic64/activity の応答 JSON を読む。イベント配列は **data キー** (events ではなく data。list 直下の場合もある — 3 形を順に試す)。②差分検知: data[0].activity_id を /Users/junkawasaki/.hermes/profiles/isekai/cron/output/isekai-6420-lastseq.txt に書かれた前回値と比較、同一なら「isekai bot 6420: 差分なし (event N)」1 行で終了。③変化があれば: type 別に runtime.governor/held / runtime.bot/correction / conversation.checkpoint を数え、businesses feed https://itonami.cloud/api/v1/grok-bots/businesses の該当 bot の status と self_correction.class も確認。status held + budget 系 class なら「budget 枯渇 — owner 判断が必要」(raise/再起動はしない)。held でも correction が新鮮なら self-correction loop が働いている (故障ではない)。④新しい data[0].activity_id を lastseq ファイルに上書き。⑤https://isekai.network と https://isekai.network/api/fork/feed の HTTP status + 返りが JSON か (200 だけでは健康ではない)。出力 5 行以内。",
         "repeat": {
-          "completed": 9,
+          "completed": 10,
           "times": null
         },
         "schedule": {
@@ -282,7 +282,7 @@
         "no_agent": false,
         "prompt": "捏造ゼロ — unknown は unknown と書く。isekai.network x402 testnet harness (ADR-0096) の health 点検。手順: ①curl -sS -m 20 https://isekai.network/api/x402/prices → mode:testnet-harness と priced 配列を確認。前回 (/Users/junkawasaki/.hermes/profiles/isekai-x402/cron/output/prices-last.txt) と比較し、差分が無ければ「x402 harness: 差分なし」1 行で終了。②差分があれば: curl -sS -m 20 -D /tmp/h.txt \"https://isekai.network/api/x402/price?resource=/api/fork\" で 402 + x402Version:1 + network:base-sepolia + x-x402-mode ヘッダを確認 (200/404/1101 は異常)。③x-x402-mode ヘッダが無い応答 = harness 偽装の疑いとして詳報。④prices-last.txt を更新。出力 5 行以内。",
         "repeat": {
-          "completed": 9,
+          "completed": 10,
           "times": null
         },
         "schedule": {
@@ -1028,7 +1028,7 @@
         "no_agent": false,
         "prompt": "差分検知タスク。捏造ゼロ — unknown は unknown と書く。\n最初に /Users/junkawasaki/github/com-junkawasaki/orgs/kotoba-lang/capability-llm-infer/capability.edn を読み :capability/provider-status の値を確認する。前回状態は ~/.hermes/profiles/webcontainer/plans/llm-infer-status.txt に保存してある(無ければ初回として扱う)。\n(1) 値が :contract-only のままなら「差分なし: provider-status :contract-only (確認 <今日の日付>)」の 1 行だけ出力して終了する。plans への書き込みはしない。\n(2) 値が変わっていたら(admit 済み provider が付いたら): 変更を検知した日として plans/llm-infer-status.txt を更新し、superproject の ADR-2609021200 の「次の一手」に従って turn loop の on-mesh 移行タスクの着手記録を書き、bot-chat:codinator 宛に開始報告を出す。",
         "repeat": {
-          "completed": 1,
+          "completed": 2,
           "times": null
         },
         "schedule": {
