@@ -2781,6 +2781,62 @@
               empty at load 46, and a transient there flips every finding
               between fail and warn -- two failures still print UNREADABLE."}
 
+{:id :verify-hermes-profile-fitness
+   :title    "the agent fleet's own registry, which could rebuild a fifth of it"
+   :why      "scripts/hermes-cron-jobs/ exists because the live cron definitions
+              live in ~/.hermes/profiles/<p>/cron/jobs.json, are terminal-local,
+              and are in no repo -- its stated purpose is to make a new
+              terminal's rebuild procedural. Measured 2026-09-04: 97 profiles
+              carried cron jobs and 21 were in the ledger. A rebuild from it
+              would have restored 21% of the fleet, and nothing said so.
+
+              The ledger's own --check reports that correctly: it exits 1 with
+              `STALE: ledger differs from live cron definitions`. Nothing ran
+              it. It appeared in no detector registry, no cron job and no gate;
+              the only references to it in the tree were its own README and its
+              own output file. And it recorded generated_at=\"regenerated-on-run\"
+              -- a literal, because --check compared the file byte for byte and
+              a real timestamp would have fired on every run. That bought a
+              working check at the price of a ledger nobody could date, so a
+              stale registry read exactly like a current one. Both are fixed
+              (--check now normalises the one field expected to differ), and
+              this detector is the part that keeps looking.
+
+              It counts and rates nothing: ledger coverage, jobs whose :script
+              or :workdir resolves nowhere, jobs declaring no :model (so
+              ADR-2608313500's model order does not reach them), and
+              failure_streak. Cannot be a fleet gate for the same reason as
+              verify-hermes-agent-health: its whole input is ~/.hermes on the
+              operator workstation, which exists in no repo tree and on no
+              node. It reads no credential -- job prompts are not printed, only
+              counted."
+   :argv ["nbb" "{{repo}}/scripts/verify-hermes-profile-fitness.cljs" "--findings"]
+   :cwd :root
+   :findings :protocol
+   :writes :none
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :timeout-ms 120000
+   :interval-ms 21600000
+   :measured "2026-09-04: 1.5s wall for 97 jobs.json across 157 profiles, so the
+              120s timeout is ~80x headroom; 6h because a profile is registered
+              or a worktree removed between turns, not between landed ADRs.
+              All three exits checked before landing. 0: --self-test, ten
+              assertions. 1: the live fleet, six findings before the fixes and
+              four after. 2: a missing profiles root, which refuses rather than
+              reporting a healthy fleet from an absent one.
+
+              The self-test earned its place twice, both times on THIS tool's
+              own counting. First: :script is a bare filename and a job with no
+              :workdir runs it from its own profile directory; resolving against
+              the process cwd reported 79 of 83 missing when the real number is
+              6. A resolution rule wrong in the direction of `missing` produces
+              a page of alarming findings that are all the tool's fault, which
+              is worse than silence because it gets acted on. Second: counting
+              a profile as scheduled because cron/jobs.json EXISTS raised a
+              coverage finding against `aozora`, whose jobs list is empty and
+              which export_cron.py rightly omits -- 100% coverage read as 99%.
+              Both corrections are pinned as assertions, in both directions."}
+
 {:id :verify-x402-offer-domain
    :title    "a live x402 offer whose EIP-712 domain is not the token's own"
    :why      "`extra` in a 402 offer is the domain a buyer signs under. If it
