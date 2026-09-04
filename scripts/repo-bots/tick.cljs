@@ -432,9 +432,25 @@
 ;; 一緒に返す。
 (def ^:private unattended-excluded #{:landed})
 
-(defn- next-finding [state & {:keys [unattended?]}]
+;; 名簿から消えた repo の state 行を候補にしない。
+;;
+;; `report!` は orphan を注意深く全部の数から外しているのに、**候補を配る側は
+;; 外していなかった**。名簿に無い bot は `select-wave` が registry から選ぶので
+;; 二度と測られず、`--only` は「波が空」で REFUSED になる —— つまりその finding は
+;; **どう直しても RESOLVED にならない**。それが「直せば塞がる finding」と同じ形で
+;; 出てくるので、loop は毎周それを渡され、そこで止まる。
+;;
+;; 実測 2026-09-04: orphan 11 行のうち 3 行が broken を 4 件持ち、4 件とも state 中
+;; 最古の :since だったため :pinned と :readme の**先頭に居座っていた**。
+;; local-murakumo が head に着いた時点で無人 loop は進めなくなっていた。
+;;
+;; ADR-2608136000 の 2 問目（そもそも実行できないとき何を返すか）。ここが返して
+;; いたのは pass ではなく**実行できない仕事**で、出力からはそれと分からない。
+;; 黙って捨てず、何件外したかを一緒に返す（:landed の held-for-a-human と同じ作法）。
+(defn- next-finding [state & {:keys [unattended? roster]}]
   (let [cands (for [[id row] (:bots state)
                     [f {:keys [since detail]}] (:broken row)
+                    :when (or (nil? roster) (contains? roster id))
                     :when (not (and unattended? (unattended-excluded f)))]
                 {:bot id :floor f :since since :detail detail})]
     (->> cands
@@ -537,11 +553,18 @@
       (cond
         (or (flag "--next") (flag "--next-unattended"))
         (let [unattended? (boolean (flag "--next-unattended"))
-              n (next-finding prev :unattended? unattended?)
+              roster (set (map :bot/id registry))
+              n (next-finding prev :unattended? unattended? :roster roster)
+              ;; held も orphan も**名簿の中だけ**で数える。名簿から消えた bot の
+              ;; :landed は「人のために取っておいた」のではなく、そもそも配れない。
               held (when unattended?
-                     (count (for [[_ row] (:bots prev)
+                     (count (for [[id row] (:bots prev)
                                   [f _] (:broken row)
-                                  :when (unattended-excluded f)] 1)))]
+                                  :when (contains? roster id)
+                                  :when (unattended-excluded f)] 1)))
+              orphaned (count (for [[id row] (:bots prev)
+                                    [_ _] (:broken row)
+                                    :when (not (contains? roster id))] 1))]
           ;; 候補が無いことと、測っていないことを区別する。state が空なら
           ;; 「finding 0 件」ではなく「まだ誰も測っていない」。
           (println (pr-str (cond
@@ -550,10 +573,21 @@
                                                 :ticked (count (:bots prev))}
                                         (and held (pos? held))
                                         (assoc :held-for-a-human held
-                                               :note "無人の周回では :landed を渡さない（他人の未 commit の作業）"))
+                                               :note "無人の周回では :landed を渡さない（他人の未 commit の作業）")
+                                        (pos? orphaned)
+                                        (assoc :orphan-findings-skipped orphaned))
                              :else (cond-> (merge {:outcome :candidate} n)
                                      (and held (pos? held))
-                                     (assoc :held-for-a-human held)))))
+                                     (assoc :held-for-a-human held)
+                                     (pos? orphaned)
+                                     (assoc :orphan-findings-skipped orphaned)))))
+          (when (pos? orphaned)
+            ;; 数だけ返して黙らない。放っておくと state に溜まり続けるので、
+            ;; 掃除の入口を stderr に出す（stdout は EDN 1 行のままにする）。
+            (binding [*print-fn* *print-err-fn*]
+              (println (str "NOTE\t名簿に無い bot の finding を " orphaned
+                            " 件外した —— どう直しても RESOLVED にならない。"
+                            " 一覧: nbb scripts/repo-bots/tick.cljs --report"))))
           (js/process.exit 0))
 
         (flag "--report")
