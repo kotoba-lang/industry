@@ -766,6 +766,26 @@
         },
         "script": null,
         "workdir": null
+      },
+      {
+        "context_from": null,
+        "deliver": "all",
+        "enabled_toolsets": null,
+        "id": "312f602e1569",
+        "name": "seiri-cleanup-retirement-weekly",
+        "no_agent": false,
+        "prompt": "superproject (~/github/com-junkawasaki) の週次 cleanup/retirement tick (seiri 担当)。正本手順: manifest/cleanup-workflow.md + repo skill git-cleanup-conflict。捏造ゼロ — 実測できない値は unknown と書く。\n\n手順:\n1. cd ~/github/com-junkawasaki && git fetch origin --quiet。git status -sb で main...origin/main の乖離を確認。behind/ahead があれば報告だけする (pull は west-pull-resident cron の管轄。rebase/force は禁止)。\n2. 在庫調査 (読取専用): nbb scripts/cleanup.cljs --subrepos (timeout 240s。失敗したら git worktree list / git branch / git stash list を手動で取る)。\n3. retirement 候補の判定: 各 stash と branch について content-containment — 追加行が現 origin/main に含まれるか (git merge-base --is-ancestor <sha> origin/main、git cherry -v origin/main <branch>、stash は git stash show -p の内容を main の該当ファイルと比較)。生成物 manifest/west.yml の差分は判定から除外。FF 不可の stale branch は rebase せず「clean branch 移植候補」として報告。\n4. 実行してよいのは安全処置だけ: ①完全 merge 済み branch (git merge-base --is-ancestor <branch> origin/main が成功、かつどの worktree にも checkout されていない) への git branch -d (-D ではない。拒否されたら報告して次へ) ②git worktree prune (prunable の admin 掃除のみ)。stash drop、実在 worktree の remove、branch -D、rebase、force-push、west update は禁止 (stash 全件 DO NOT DROP — codinator 決定 2026-09-01。drop は agent session で git-cleanup-conflict 手順・.git/stash-archive-<date>/ 退避後に実施)。\n5. 出力: 表形式 30 行以内 — 候補 1 行サマリ (種別/名前/判定/根拠)、実行した処置、escalation (agent session or owner が要るもの)。対象ゼロなら正確に [SILENT] のみ。",
+        "repeat": {
+          "completed": 0,
+          "times": null
+        },
+        "schedule": {
+          "display": "17 7 * * 1",
+          "expr": "17 7 * * 1",
+          "kind": "cron"
+        },
+        "script": null,
+        "workdir": null
       }
     ],
     "tabi-mikake": [
