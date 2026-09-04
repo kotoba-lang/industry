@@ -1,0 +1,59 @@
+[{:db/id -1
+  :adr/id "adr-2609041700-sec-sentinel-kotoba-scope-zero-vulns-and-a-stale-pin"
+  :adr/title "sec-sentinel scope=kotoba: 既知 CVE 0 件、ただし chicory pin が 1 年古かった"
+  :adr/status "accepted"
+  :adr/date "2026-09-04"
+  :adr/scope "orgs/kotoba-lang/kotoba (compiler, deps.edn)"
+  :adr/related ["adr-2608231600-the-vulnerability-model-existed-the-measurement-did-not" "adr-2608231700-vulnerabilities-count-differently-in-production-and-in-the-toolchain"]
+  :adr/body "# ADR-2609041700: sec-sentinel scope=kotoba: 既知 CVE 0 件、ただし chicory pin が 1 年古かった
+
+**Status**: accepted
+**Date**: 2026-09-04
+**Deciders**: sec-sentinel bot (autonomous iteration)
+**Scope**: `orgs/kotoba-lang/kotoba` (compiler, deps.edn — lockfile 表面なし)
+
+## Measurement (vuln_state.sh, 2026-09-04T08:46:36Z)
+
+scope=kotoba は lockfile 表面を持たない (npm audit / cargo audit の対象外)。
+測定対象は deps.edn の mvn 依存 4 本:
+
+| dependency | pinned | OSV / GitHub Advisory (2026-09-04 照合) |
+|---|---|---|
+| `com.dylibso.chicory/wasm` | 1.4.0 | 該当なし (0 件) |
+| `com.dylibso.chicory/runtime` | 1.4.0 | 該当なし (0 件) |
+| `org.clojure/tools.reader` | 1.5.2 | 該当なし (0 件) |
+| `io.github.clojure/tools.build` | 0.10.6 | 該当なし (0 件) |
+| `com.github.clj-easy/graal-build-time` | 1.0.5 | 該当なし (0 件) |
+
+**検出 0 件**。git 依存 (io.github.kotoba-lang/* の SHA pin 24 本) は OSV の
+ Maven 面に載らないため未照合 — ADR-2608231600 の「ecosystem 外 135 件」と
+同じ未測定区分であり、0 件 ≠ 安全と読むこと。
+
+## 対策 (1 反復 1 件)
+
+既知 CVE は無いが、chicory (kotoba.wasm-exec の production 実行エンジン) の
+pin が 1.4.0 のまま約 1 年経過していた。GitHub Advisory に登録された CVSS が
+後付けで確認されるまで放置しないため、現行 stable 1.7.5 への pin 更新を
+最小 diff で出した:
+
+- PR kotoba-lang/kotoba#550 — `bot/vuln-20260904-chicory-pin`
+- 検証: `clojure -P` 解決成功 / `clojure -M:test -k wasm-exec` 745 tests /
+  9,741 assertions, 0 failures, 2 errors — 変更前 baseline と完全同一
+  (2 errors は /tmp conformance fixture 欠如、既存の環境起因)
+- tools.reader / tools.build / graal-build-time は OSV 該当なしなので触らない
+
+## Consequences
+
+- scope=kotoba は lockfile 監査の型を持たないため、次回反復も「mvn 依存の
+  OSV 照合 + pin 鮮度」が測定手順になる。
+- git 依存 24 本の SHA pin は GitHub の依存グラフに載るが OSV 照合経路が無い。
+  埋めるなら kotoba-lang 内 repo の依存グラフ側 (jvm-dep-migrator 管轄) であり、
+  この bot は管轄外。
+- 既存 issue #526 (CLI 0.7.3 wasm バグ) は機能バグであって本 scope の脆弱性
+  計数には含まれない。
+
+## Related
+
+- ADR-2608231600 (測定はしたが是正は別 — 同じ姿勢を続ける)
+- ADR-2608231700 (dev/本番の区別 — scope=kotoba は build 時依存が主)
+"}]
