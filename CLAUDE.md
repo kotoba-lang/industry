@@ -1297,22 +1297,38 @@ CertGovernor）。
 - lock の `:kotoba.*` に archive 専用の raw CID を載せない。Location は protocol 外の記録（例 `:graph {:raw-cid …}`）。
 - document が raw なら identity と Location の文字列は一致してよい。dag-cbor commit では一致しない。それをバグにしない。
 
-## kotobase の Datalog join は ref 1本までしか届かない（repo-wide mandatory、2026-07-26、ADR-260726-kotobase-query-plane-is-one-ref）
+## kotobase の join 到達範囲は ref の本数ではなく合成の有無で決まる（repo-wide mandatory、2026-09-04 訂正、ADR-2809040800）
 
-**`kotobase.core/open` は `:ref-name` を1つしか取らず、`q` / `query` / `pull` /
-`datoms` はすべてその1本の chain から hydrate した db value に対して動く。つまり
-Datalog join の到達範囲はちょうど ref 1本で、別 ref・別データベースに分けたものは
-二度と join できない。**
+> **join が届く範囲は、query 時に 1 つの `IPatternSource` へ合成されている範囲である。**
+> ref を分けたこと自体は join を壊さない。合成を忘れたことが壊す。
 
-- **一緒にクエリしたいものは同じ ref に置く。** 何が joinable であるべきかを先に決め、
-  それを1本の ref に収める。
-- **書き込み負荷を理由に ref / データベースを分けない。** 先に「その ref を所有する
-  単一 writer を置いてバッチングする」を検討する。共有 ref の CAS 直列化はそれで
-  解消する — 競合をうまく捌くのではなく、競合が起きない構造にする。CCU が増えて
-  増えるのはイベント数であってトランザクション数ではない。
-- **それでも分けるときは、何が join できなくなるかを名指しで書く。** 「将来
-  ローテートするかも」ではなく「この境界を跨ぐ分析は N クエリ + マージになる」と
-  代償を記録する。**黙ったシャーディングを禁じる。**
+⚠ **この節は 2026-09-04 に反転した。** それまでは「join の到達範囲はちょうど ref
+1 本で、別 ref に分けたものは二度と join できない。これは実装の都合ではなく
+kotobase のデータモデルそのもの」と書いていた。**後段は実測で偽**
+（ADR-2809040800）。`kotoba-lang/datom-source` の `merged` に、答えがどちらの
+partition 単独にも存在しない 2 ホップの join を通すと届く:
+
+```
+partition A = [alice works-at acme,  bob works-at globex]
+partition B = [acme located-in kyoto, globex located-in osaka]
+
+partition A 単独 -> #{}      partition B 単独 -> #{}      merged A+B -> #{"alice"}
+```
+
+旧文は書かれた時点では正しかった —— `kotobase.core/open` が `:ref-name` を 1 つしか
+取らず、`q` が materialize 済み db を前提にしていた頃の記述である。その後
+`datom-source` の `IPatternSource` seam が入って天井が動いた。**ある日の実装の
+天井をデータモデルの性質として書くと、天井が動いた後も設計を縛り続ける**（下記
+`rule-kaizen` 節が名指ししている形そのもの）。
+
+- **分割してよい。ただし query 面で `merged` に合成することを設計に書く。**
+  問われるのは分割の可否ではなく、合成の有無。
+- **合成されていない分割を黙って作らない。** 「この境界を跨ぐ分析は N クエリ +
+  マージになる」と代償を名指しする義務は残る。変わったのは、その代償を払わずに
+  済む道（合成）が実在するという点だけ。
+- **書き込み負荷を理由に分けるのは、いまは正当な選択肢。** 合成する前提なら、
+  単一 writer + バッチングに寄せる必要はない。CCU が増えて増えるのはイベント数
+  であってトランザクション数ではない、という観察は変わらない。
 - **Durable Object のストレージ（`ctx.storage.sql`）に kotobase の durable plane を
   置かない。** 各 DO の SQLite は private で他から引けないので、object の数だけ独立した
   データベースができ、datom 面が孤島に割れる。**DO は直列化器・realtime room として
@@ -1322,10 +1338,16 @@ Datalog join の到達範囲はちょうど ref 1本で、別 ref・別データ
   ⚠ **この項は 2026-08-03 に「ストレージは D1」から書き換えた**（下記「D1 を前提に
   しない」節、ADR-2608039000）。要件は「**共有**バックエンドであること」（＝クエリ面を
   割らないこと）であって D1 であることではない。分散型経路では D1 を前提にしない。
-- **クエリ到達範囲と書き込み並列度は同じ ref で決まるため常に対立する。** 設計文書は
-  どちらを採ったかを明示すること。
+- **クエリ到達範囲と書き込み並列度はもう対立しない。** 合成すれば両立する。
+  設計文書に書くべきなのは「どちらを採ったか」ではなく「どこで合成するか」。
+- **本当の制約はコスト側にある。** query 名前空間は materialize 済み db（4 つの
+  in-memory index）を取るため、コストが O(result) ではなく **O(database)** に固定
+  される。実測（2026-08-01, arrangement）: 2k facts で 57ms / **50 block-read**、
+  32k で 678ms / **640 block-read** —— 返る行数によらず database のサイズに線形。
+  IPLD 越しでは block-read がそのまま network round trip になるので、ここが支配的に
+  なる。**到達範囲を心配する前にこれを測る。**
 
-実例（2026-07-26、この規則が生まれた事故）: sekaiju MMO の設計で D1 の書き込み
+実例（2026-07-26、この規則が生まれた事故 —— 分割そのものではなく **合成しなかったこと**が事故だった）: sekaiju MMO の設計で D1 の書き込み
 スループットを心配し `/char` を 64 データベース・`/guild` 4・`/market` 16・`/ledger`
 日次に分割した。容量と CAS レーンとしては妥当だったが、**ランキング・ギルド名簿・
 「この item を誰が持っているか」・経済監査・モデレーション、横断クエリしたいものが
@@ -1501,7 +1523,8 @@ L0c  object   S3 / R2 / B2 / IPFS   transport = object key + HTTP Range
   embedded index の両方を静かに嘘にする。compaction は新しい pack を書いて
   catalog を差し替える。
 - **pack catalog（CID → どの pack）は datom 面に置く。** 別の store に置くと
-  pack と commit と tenant を跨ぐ query が書けなくなる（ref 1 本規則）。
+  pack と commit と tenant を跨ぐ query が書けなくなる（合成されていない分割は
+  孤島になる、の実例。上記 ADR-2809040800）。
   catalog は **projection** であって premise ではない —— 消しても pack を走査して
   再構築できる形にする（D1 規則と同じ削除・再構築テスト）。
 - **columnar は pack に入れない。** Parquet / Arrow は large object のまま
