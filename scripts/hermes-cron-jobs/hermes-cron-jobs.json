@@ -532,7 +532,7 @@
         "no_agent": false,
         "prompt": "babiniku.net 運用 bot の定期 pulse (報告専用・変更はしない)。単一 run で次を実測:\n1) https://babiniku.net に GET (User-Agent: babiniku-pulse/0.1) — HTTP status 記録。\n2) repo ~/github/com-junkawasaki 配下の net-babiniku 関連 (AI VTuber chat Worker) の公開 URL を repo 設定 (wrangler.toml / routes) から確認し、同じく GET で死活記録。\n3) 全部正常 (2xx/3xx) なら応答は正確に1行: 「OK babiniku <日付> — 全緑 (<n> endpoint)」。\n4) 異常 (5xx/タイムアウト/DNS失敗) があれば1行サマリ + 異常 endpoint のみ詳報 (URL / HTTP status / エラー本文先頭)。\n規律: 観測のみ。修復・デプロイ・設定変更はしない (異常は報告して終了)。コマンド実行の制約: -e/-c スクリプトフラグ禁止、インタプリタへの heredoc 禁止、rm -rf 禁止 (cron ランタイムが拒否する)。失敗時も正直に「REPORT FAILED」と原因を書く。",
         "repeat": {
-          "completed": 39,
+          "completed": 40,
           "times": null
         },
         "schedule": {
@@ -612,7 +612,7 @@
         "no_agent": false,
         "prompt": "network-isekai Pages 公開サイトの定期 pulse (報告専用・変更はしない)。単一 run で次を実測:\n1) https://isekai.network に GET — HTTP status 記録 (2026-08-31 実測: 200)。ETag か Last-Modified も記録。\n2) repo network-awai 配下の isekai Pages repo の main 最新 commit 時刻と、サイトの Last-Modified を比較し、main が進んでいるのにサイトが更新されていない (= デプロイ滞留) なら1行で注記。\n3) babiniku アセット連携 (サイト内で参照している外部アセット URL) が repo から特定できれば 1 つまで死活確認。\n4) 全部正常なら応答は正確に1行: 「OK isekai <日付> — 全緑 (last-modified: <値>)」。\n5) 異常 (5xx/タイムアウト/デプロイ滞留) があれば1行サマリ + 詳報。\n規律: 観測のみ。デプロイ・コンテンツ修正はしない。コマンド実行の制約: -e/-c スクリプトフラグ禁止、インタプリタへの heredoc 禁止、rm -rf 禁止。失敗時も正直に報告。",
         "repeat": {
-          "completed": 36,
+          "completed": 37,
           "times": null
         },
         "schedule": {
@@ -924,7 +924,7 @@
         "no_agent": false,
         "prompt": "You are the tabi-mikake fare scout for the travel metasearch surface\n(repo: network-awai/app-tabi-mikake, ADR-2608301849).\n\nEverything above this line is a measurement taken seconds ago. If it begins\nwith REFUSED, say so plainly and stop — do not propose anything.\n\n## Your one job this run\n\nWiden the offer inventory: find travel price/offer SOURCES (airline fare\npages, OTA search APIs, hotel rate feeds) that can be observed on a schedule,\nand propose them into the hyakka corpus (network-awai/app-hyakka), the record\nof truth this surface reads from.\n\nScope is search + compare + outbound referral ONLY. You never book, never\nhold inventory, never run third-party ads, never add cross-site tracking.\n\n## What you may not do\n\n- Never propose a URL you have not fetched yourself in this run.\n- Never propose `:third-party-wiki-prose` or `:user-generated` sources.\n- `:access \"public\"` requires a `:license`. If a source's terms forbid\n  republication, propose it with `:access \"private\"`.\n- Never touch `knowledge/ledger/` or `knowledge/receipts/` in app-hyakka.\n- Never push to `main`, never force-push, never edit an existing source entry.\n- At most TWO proposed sources per run. Fare pages are hostile; two is enough.\n- Never scrape a source whose robots.txt or terms forbid scheduled access.\n  Propose only sources that offer an API, an RSS/Atom feed, or a documented\n  data license (e.g. CC0/CC-BY datasets, official fare APIs).\n\n## Procedure — do all of it, in order\n\n1. `cd ~/.gftd/worktrees/tabi-mikake-bot` and `git fetch -q origin &&\n   git checkout -q --detach origin/main` (the app-tabi-mikake repo).\n2. Read `data/offers.jsonl` if present: which providers and classes are\n   already observed. The evidence report above lists comparable classes.\n3. Read app-hyakka's config for the source shape:\n   `~/.gftd/worktrees/tabi-mikake-bot` has no hyakka config; fetch\n   `https://raw.githubusercontent.com/network-awai/app-hyakka/main/config/knowledge-ingest.edn`\n   and read the `:sources` entries — this is the shape your proposal must\n   take (kebab id, :kind :web-document, url/title/publisher/license,\n   :source-classes, :access, :interval-seconds, :llm?).\n4. Choose candidates the measurements show are missing: a provider with no\n   observations, or a comparison class (route/stay) with no offers.\n5. Fetch each candidate URL/API. Discard anything that is not HTTP 200 with\n   a usable body, and anything whose terms forbid scheduled access.\n6. Write your proposal to /tmp/tabi-source-proposal.edn in the hyakka source\n   shape (see step 3), one sentence of rationale per source.\n7. Validate the proposal is well-formed EDN (nbb -e is BLOCKED in this\n   runtime; instead run:\n   `nbb --classpath scripts scripts/edn_check.cljs /tmp/tabi-source-proposal.edn`\n   if that file exists, else re-read your file and re-verify by hand).\n8. Report, in a few sentences: what you fetched, what you discarded and why,\n   and the proposal you wrote. You do NOT open PRs from this job — the\n   proposal is reviewed by the operator and landed through the normal\n   hyakka source-scout gate on a later run.\n\nOpening no proposal is a correct outcome. Proposing a source you did not\nfetch is not.\n\n## Commands the cron runtime refuses\n\nDo not use and do not work around: `-e`/`-c` script flags, heredocs feeding\nan interpreter, `rm -rf`. A denied command returns exit_code -1 with BLOCKED\nand the run continues — a bot that keeps reaching for these reports success\nhaving done nothing.",
         "repeat": {
-          "completed": 90,
+          "completed": 91,
           "times": null
         },
         "schedule": {
