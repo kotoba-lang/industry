@@ -54,6 +54,36 @@
 
 (defn- exists? [p] (and (string? p) (seq p) (fs/existsSync p)))
 
+(defn profile-model
+  "`model.default` out of a profile's config.yaml, plus its fallback models.
+
+  Deliberately not a YAML parser: the two shapes wanted here are a
+  two-space-indented `default:` under a top-level `model:` block, and
+  `model:` entries under `fallback_providers:`. Anything else is reported as
+  nil rather than guessed.
+
+  Measured 2026-09-04, this is why a job-level `:model` of nil is NOT a
+  finding: 61 of 154 jobs declare none, and every one of them inherits a
+  profile default that does exist. An earlier version of this detector
+  warned about all 61."
+  [text]
+  (let [lines (str/split-lines (str text))
+        in-model (atom false) in-fb (atom false)
+        default (atom nil) fbs (atom [])]
+    (doseq [l lines]
+      (cond
+        (re-matches #"^model:\s*$" l) (do (reset! in-model true) (reset! in-fb false))
+        (re-matches #"^fallback_providers:\s*$" l) (do (reset! in-fb true) (reset! in-model false))
+        (re-matches #"^[A-Za-z_].*" l) (do (reset! in-model false) (reset! in-fb false))
+        :else
+        (do (when @in-model
+              (when-let [m (re-matches #"^\s+default:\s*['\"]?([^'\"\s]+)['\"]?\s*$" l)]
+                (reset! default (second m))))
+            (when @in-fb
+              (when-let [m (re-matches #"^\s+-?\s*model:\s*['\"]?([^'\"\s]+)['\"]?\s*$" l)]
+                (swap! fbs conj (second m)))))))
+    {:default @default :fallbacks @fbs}))
+
 (defn- expand [p]
   (if (str/starts-with? (str p) "~")
     (str (os/homedir) (subs (str p) 1))
@@ -85,7 +115,12 @@
         jobs (vec (mapcat (fn [{:keys [profile ok]}]
                             (map #(assoc % :profile profile) (:jobs ok)))
                           good))]
-    {:profiles names
+    {:profile-models
+     (into {} (for [p names
+                    :let [c (path/join profiles-root p "config.yaml")]
+                    :when (fs/existsSync c)]
+                [p (profile-model (fs/readFileSync c "utf8"))]))
+     :profiles names
      ;; SCHEDULED means "carries at least one job", not "has the file". A
      ;; profile whose jobs.json holds an empty list is not scheduled work, and
      ;; export_cron.py correctly omits it -- counting it here produced a
@@ -102,12 +137,21 @@
 
 (defn- dated? [s] (boolean (re-find #"\d{4}-\d{2}-\d{2}" (str s))))
 
+(def ^:const decided-primary
+  "ADR-2608313500, measured N=24: 100% usable vs 91.7% at a third of the cost."
+  "z-ai/glm-5.3-flash")
+
+(def ^:const fleet-alias
+  "ADR-2607173100: model ids move; consumers should name the alias and let the
+  KV entry resolve it. A profile on this is following a DIFFERENT accepted
+  rule, not violating one."
+  "murakumo-main")
+
 (defn findings-for
   "Pure: the finding set for an already-collected fleet."
-  [{:keys [scheduled jobs]} {:keys [names generated-at]} root]
+  [{:keys [scheduled jobs profile-models]} {:keys [names generated-at]} root]
   (let [n-sched (count scheduled)
         absent (remove names scheduled)
-        no-model (filter #(str/blank? (str (:model %))) jobs)
         failing (filter #(pos? (or (:failure_streak %) 0)) jobs)
         dangling (filter (fn [j]
                            (and (seq (str (:script j)))
@@ -143,11 +187,22 @@
              :detail (str (count bad-wd) " job(s) name a :workdir that does not exist -- "
                           (str/join ", " (take 6 (distinct (map :workdir bad-wd)))))})
 
-      (seq no-model)
-      (conj {:sev "warn" :key "model-unset"
-             :detail (str (count no-model) " of " (count jobs) " jobs declare no :model, so "
-                          "ADR-2608313500's order (z-ai/glm-5.3-flash primary) does not reach them "
-                          "-- they take whatever the profile default is, which the job does not record.")})
+
+      (seq (remove (fn [[_ m]] (#{decided-primary fleet-alias} (:default m))) profile-models))
+      (conj {:sev "warn" :key "model-primary-split"
+             :detail (let [by (frequencies (map (fn [[_ m]] (or (:default m) "(unreadable)"))
+                                                profile-models))
+                           glm (get by decided-primary 0)
+                           alias' (get by fleet-alias 0)
+                           other (- (count profile-models) glm alias')]
+                       (str "primary model.default across " (count profile-models) " profiles: "
+                            glm " on " decided-primary " (ADR-2608313500), "
+                            alias' " on " fleet-alias " (ADR-2607173100's alias), "
+                            other " on something else -- "
+                            (pr-str (into (sorted-map) (apply dissoc by [decided-primary fleet-alias])))
+                            ". The two ADRs do not reference each other: 2608313500 names a "
+                            "concrete id after measuring it, 2607173100 says consumers should "
+                            "name the alias and let KV resolve it. This is reported, not judged."))})
 
       (seq failing)
       (conj {:sev "warn" :key "failure-streak"
@@ -194,8 +249,40 @@
           (nil? (covered "ledger-staleness-unmeasurable"))]
          ["a literal generated_at does"
           (some? (naked "ledger-staleness-unmeasurable"))]
-         ["a job with no :model is a warn, not a fail"
-          (= "warn" (:sev (covered "model-unset")))]
+         ;; the correction this axis replaced: 61 of 154 jobs declare no
+         ;; :model and every one inherits a profile default, so warning about
+         ;; them was noise about the wrong layer
+         ["a job with no :model is not a finding"
+          (nil? (covered "model-unset"))]
+         ["a fleet all on the decided primary raises no split finding"
+          (nil? ((by-key (findings-for
+                          {:scheduled ["a"] :jobs []
+                           :profile-models {"a" {:default decided-primary}
+                                            "b" {:default decided-primary}}}
+                          {:names #{"a"} :generated-at "2026-09-04T00:00:00Z"} root))
+                 "model-primary-split"))]
+         ["the fleet alias counts as following a rule, not breaking one"
+          (nil? ((by-key (findings-for
+                          {:scheduled ["a"] :jobs []
+                           :profile-models {"a" {:default decided-primary}
+                                            "b" {:default fleet-alias}}}
+                          {:names #{"a"} :generated-at "2026-09-04T00:00:00Z"} root))
+                 "model-primary-split"))]
+         ["a third model is reported, and named"
+          (let [f ((by-key (findings-for
+                            {:scheduled ["a"] :jobs []
+                             :profile-models {"a" {:default decided-primary}
+                                              "b" {:default "some/other-model"}}}
+                            {:names #{"a"} :generated-at "2026-09-04T00:00:00Z"} root))
+                   "model-primary-split")]
+            (and (some? f) (str/includes? (:detail f) "some/other-model")))]
+         ["model.default is read from a nested config.yaml, fallbacks separately"
+          (= {:default "z-ai/glm-5.3-flash" :fallbacks ["claude-sonnet-5"]}
+             (profile-model (str "model:\n  provider: openrouter\n"
+                                 "  default: z-ai/glm-5.3-flash\n"
+                                 "providers:\n  openrouter:\n    base_url: x\n"
+                                 "fallback_providers:\n  - provider: custom\n"
+                                 "    model: claude-sonnet-5\n")))]
          ["failure_streak is counted"
           (str/includes? (:detail (covered "failure-streak")) "=3")]
          ;; the correction above, pinned: a profile with an empty :jobs list is
