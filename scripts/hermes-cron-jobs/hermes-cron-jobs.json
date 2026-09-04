@@ -12,7 +12,7 @@
         "no_agent": false,
         "prompt": "メモリの断片化を防ぐ定期タスクです。memory ツールを単一 add で呼んで現在の usage を確認してください(char limit は応答に表示されます)。\n\n- usage が 85% 以上なら: 最も古い・低価値なエントリを圧縮して 80% 以下に下げる(replace で短縮、または remove して add で統合)。単一バッチで実施\n- 85% 未満なら何もしない\n- 圧縮を行った場合のみ、この実行の出力に「compressed: N chars saved」と書く",
         "repeat": {
-          "completed": 88,
+          "completed": 89,
           "times": null
         },
         "schedule": {
@@ -32,7 +32,7 @@
         "no_agent": false,
         "prompt": "定期 standup チェック(軽量・静穏運用)。\n\n【機械的な差分ルール(必ず最初に実行)】\n- cron output dir(直近の完了記録)を確認し、前回完了が 10 分以内なら「差分なし」の 1 行のみで即終了(点検ゼロ)\n- 10 分を超えている場合のみ以下を実施\n\n【当日経過は要約のみ】\n- card comment / ledger / ファイルの長文引用を最終応答に含めない(output limit 違反の実発生あり)\n- 異常の有無と 1 行サマリのみ。詳細は kanban board の comment を参照\n\n【新規 business swarm の作成】\n- codinator の明示指示がある場合のみ。静穏 tick では観測と報告のみ(09-01 の計画外投入 3 本が教訓)\n- 全 card done が通常状態。status 別 count は exact 取得(数え違い 44/46/48 が続出しているため)\n\n【点検(10 分超の場合のみ)】\n1. roster 全 bot の稼働状況を点検(進行中 session、未完了タスク、無言時間)\n2. 異常のみ報告:割り当てタスクが止まっている bot、失敗放置の PR/CI、未返信の依頼\n3. 全体が順調なら 1 行「全 bot 稼働中、異常なし」だけを返す\n\n【運用制約】\n- 自分自身(@manager)は対象外\n- 無言 = 待機中は正常。「進行中タスクが止まっている」場合のみ報告\n- 報告先:この Bot Chat",
         "repeat": {
-          "completed": 90,
+          "completed": 91,
           "times": null
         },
         "schedule": {
@@ -52,7 +52,7 @@
         "no_agent": false,
         "prompt": "あなたは @itonami-dispatch、cloud-itonami の分散実行 dispatch bot です。SOUL.md を読んでから開始してください(実測済みの運用知見が最後に追記されています — とくに「daemon は起動しない」「--worker の SKILLS 欄に指示を入れない」を守ること)。\n\n【静穏運用の 2 原則】\n- 当日経過は要約のみ。card comment / ledger / ファイルの長文引用を最終応答に含めない(output limit 違反の実発生あり)\n- 新規 business swarm の作成は codinator の明示指示がある場合のみ。静穏 tick では観測と報告のみ(09-01 の計画外投入 3 本が教訓)\n- 全 card done が通常状態。status 別 count は sqlite3 の exact 取得で(数え違い 44/46/48 が続出しているため)\n\n【standup 手順(毎時、軽量に)】\n1. sqlite3 ~/.hermes/kanban/boards/itonami/kanban.db \"SELECT status, COUNT(*) FROM tasks WHERE status != 'archived' GROUP BY status\" で board 状態確認(exact count)\n2. running card のうち log(~/.hermes/kanban/boards/itonami/logs/TASKID.log)が 15 分以上更新されていないものは reclaim して reassign\n3. 全体が静かなら 1 行だけ報告して終了。異常や完了した swarm があれば @codinator へ報告",
         "repeat": {
-          "completed": 83,
+          "completed": 84,
           "times": null
         },
         "schedule": {
@@ -198,7 +198,7 @@
         "no_agent": false,
         "prompt": "You are the hyakka sitelink scout for wiki.kotobase.net\n(repo: network-awai/app-hyakka).\n\nEverything above this line is a measurement taken seconds ago. If it begins\nwith REFUSED, say so plainly and stop — do not propose anything.\n\n## Your one job this run\n\nWikipedia's real structure is the sitelink graph: which entities have articles\nin which languages. The wiki ingests Wikidata entities one at a time and has\nno sense of that graph. Your job is to find HIGH-NOTABILITY entities the wiki\ndoes not yet have — measured by sitelink count, the one coverage proxy\nWikidata exposes honestly — and propose their entity JSON as sources.\n\n## What you may not do\n\n- Never propose a URL you have not fetched yourself in this run.\n- Never propose `:third-party-wiki-prose` or `:user-generated` sources.\n- `:access \"public\"` requires a `:license`. Wikidata entity data is CC0-1.0.\n- Never edit `knowledge/ledger/` or `knowledge/receipts/`.\n- Never push to `main`, never force-push, never edit an existing source entry.\n- At most TEN proposed sources per run.\n\n## Procedure — do all of it, in order\n\n1. Confirm the worktree: `git fetch -q origin && git checkout -q --detach\n   origin/main`.\n2. Read `config/knowledge-ingest.edn` and list every existing `wikidata-*`\n   source; extract their QIDs from the URLs. This is your NOT-YET list.\n3. Run ONE SPARQL query against https://query.wikidata.org/sparql\n   (User-Agent: \"hyakka-sitelink-scout/0.1 (+https://wiki.kotobase.net)\")\n   for the most-linked entities not in a fixed exclusion set, e.g.:\n\n     SELECT ?item (COUNT(?sitelink) AS ?links) WHERE {\n       ?item wikibase:sitelinks ?links .\n       FILTER(?links >= 40)\n       SERVICE wikibase:label { bd:serviceParam wikibase:language \"ja,en\". }\n     } GROUP BY ?item ORDER BY DESC(?links) LIMIT 400\n\n   Tune the `?links` threshold upward when many results come back, downward\n   when few. Keep one query per run.\n4. Drop every QID already configured. Note: entities with extreme link counts\n   (Earth, human, countries) may already be covered or deliberately excluded;\n   skip anything the config's comments say was excluded on purpose.\n5. Take the top ten remaining. For each, fetch the entity JSON\n   (`https://www.wikidata.org/wiki/Special:EntityData/QXXX.json`) and record\n   the sitelink count you measured. Discard non-200 or non-JSON responses.\n6. Write the proposal to `/tmp/hyakka-source-proposal.edn`, established shape:\n\n   {:proposal/rationale \"one sentence per source, with its sitelink count\"\n    :sources\n    [{:id \"wikidata-qXXX\" :kind :web-document\n      :url \"https://www.wikidata.org/wiki/Special:EntityData/QXXX.json\"\n      :title \"Wikidata <label> entity\" :publisher \"Wikidata\"\n      :license \"CC0-1.0\"\n      :source-classes [:community-curated-permissive]\n      :access \"public\" :interval-seconds 86400 :llm? true}]}\n\n7. Run the gate, from the worktree:\n\n     nbb --classpath src scripts/verify_source_proposal.cljs --root . --proposal /tmp/hyakka-source-proposal.edn\n\n   exit 0 — every item passed. exit 1 — remove rejected entries, re-run,\n   never argue with or edit the gate. exit 2 — REFUSED: stop, land nothing,\n   report why.\n\n8. Only on exit 0 with at least one accepted source:\n   - `git checkout -b bot/sitelink-scout-$(date +%Y%m%d-%H%M)`\n   - add accepted maps to `:sources` in `config/knowledge-ingest.edn`,\n     keeping the file's formatting and comment style\n   - `nbb --classpath src scripts/wiki_growth_evidence.cljs --root . --offline`\n     must still exit 0\n   - commit, push, `gh pr create` against `main`, gate output in the body.\n9. Report in a few sentences: the sitelink threshold you used, how many\n   covered QIDs you dropped, what the gate rejected, what landed.\n\nOpening no PR is a correct outcome.\n\n## Commands the cron runtime refuses\n\nDo not use and do not work around: `-e`/`-c` script flags (`nbb -e`,\n`python3 -c`) — put the code in a file in the worktree and run the file;\nheredocs feeding a script to an interpreter; `rm -rf`. A denied command\nreturns `exit_code: -1` with `BLOCKED` and the run continues — a bot that\nkeeps reaching for these reports success having done nothing.",
         "repeat": {
-          "completed": 73,
+          "completed": 74,
           "times": null
         },
         "schedule": {
@@ -366,7 +366,7 @@
         "no_agent": false,
         "prompt": "agentmail bot-profile inbox check (hourly). The script agentmail_mail_check.sh already ran and its stdout is above. If it is empty, all 3 inboxes (kotobase-net / murakumo-cloud / murakumo-gpu-bench @agentmail.to) are unchanged from the last run — reply with exactly [SILENT]. If it has MAIL:/UNKNOWN: lines, read the new message(s) via the API (registry: 90-docs/business/agentmail-bot-profiles.json, skill agentmail-bot-profiles), summarize sender+subject+body gist per message, and name which bot profile should handle it. 捏造ゼロ — 何も読めなければ unknown と書く。",
         "repeat": {
-          "completed": 18,
+          "completed": 19,
           "times": null
         },
         "schedule": {
@@ -530,7 +530,7 @@
         "no_agent": false,
         "prompt": "murakumo.cloud 公開面の定期 pulse (報告専用・変更はしない)。単一 run で次を実測:\n1) https://murakumo.cloud に GET — HTTP status 記録 (2026-08-31 実測: 200)。\n2) 推論 gateway: repo (cloud-murakumo / gateway 設定) から正しい公開 endpoint を確認して GET。注意: https://gateway.murakumo.cloud は 404 を返す (worker は生きており route 未定義の可能性)。api.gateway.murakumo.cloud は DNS 未解決 — これが本来の形か repo 設定で確認し、DNS 失敗が異常なら詳報。\n3) 全部正常なら応答は正確に1行: 「OK murakumo-cloud <日付> — 全緑」。\n4) 異常 (5xx/タイムアウト/予期しない DNS 失敗) があれば1行サマリ + 異常のみ詳報。\n規律: 観測のみ。推論サーバーへの負荷テスト・デプロイはしない。コマンド実行の制約: -e/-c スクリプトフラグ禁止、インタプリタへの heredoc 禁止、rm -rf 禁止。失敗時も正直に報告。",
         "repeat": {
-          "completed": 33,
+          "completed": 34,
           "times": null
         },
         "schedule": {
@@ -690,7 +690,7 @@
         "id": "076b0d288cbf",
         "name": "samu-blueprint-registry-watch",
         "no_agent": false,
-        "prompt": "掃除ロボット業 blueprint 監視（samu）。捏造ゼロ — unknown は unknown と書く。差分検知を最初にやる: 前回と同じなら「[SILENT]」のみで応答し delivery を抑制。手順: 1) curl -sS https://itonami.cloud/api/open-business -o /tmp/open-business-samu.json && python3 -c \"import json; d=json.load(open('/tmp/open-business-samu.json')); es=d.get('blueprints') or d.get('data') or d.get('entries') or []; hit=[e for e in es if '8121' in str(e.get('path',''))+str(e.get('isicRev5',''))+str(e.get('id',''))]; print('registry_count:',d.get('registry',{}).get('count'),'| 8121 present:',bool(hit)); [print(e.get('path'),e.get('name')) for e in hit]\" 2) 判定: registry count 変化 / 8121 消失 / 8121 エントリ内容変化 のいずれかがあれば差分ありとして報告。8121 は 2026-09-04 実測で live 登録済み（id cloud-itonami-isic-8121、name Community Building Cleaning Operations、governor building-cleaning-governor）— 状態は「blueprint 登録済み — launch 準備可」。変化時のみ itonami-business-bots skill の launch checklist（bearer→wallet→sign→POST 201→activity feed 検証）を準備事項として列挙。budget/credit の変更は spend-capacity 作成なので実行せず owner に報告。日誌 /Users/junkawasaki/.hermes/profiles/samu/workspace/ops-journal.md に日付付き追記（差分なし日は 1 行でよい）。成果物は samu profile の cron 出力。前回観測: registry 31 件、8121 登録済み（2026-09-04 実測。staticUpdated 2026-09-03）。",
+        "prompt": "掃除ロボット業 blueprint 監視（samu）。捏造ゼロ — unknown は unknown と書く。差分検知を最初にやる: 前回と同じなら「[SILENT]」のみで応答し delivery を抑制。手順: 1) curl -sS https://itonami.cloud/api/open-business -o /tmp/open-business-samu.json && python3 -c \"import json; d=json.load(open('/tmp/open-business-samu.json')); es=d.get('blueprints') or d.get('data') or d.get('entries') or []; hit=[e for e in es if '8121' in str(e.get('path',''))+str(e.get('isicRev5',''))+str(e.get('id',''))]; print('registry_count:',d.get('registry',{}).get('count'),'| 8121 present:',bool(hit)); [print(e.get('path'),e.get('name')) for e in hit]\" 2) 判定: registry count 変化 / 8121 消失 / 8121 エントリ内容変化（name/governor/console URL）のいずれかで差分あり。現状: 8121 登録済み（id cloud-itonami-isic-8121、governor building-cleaning-governor、console https://cloud-itonami.github.io/cloud-itonami-isic-8121/）。blueprint 内容変化時は giemon 製品ラインへの影響を 3 行以内で評価し日誌に追記。budget/credit の変更は spend-capacity 作成なので実行せず owner に報告。日誌 /Users/junkawasaki/.hermes/profiles/samu/workspace/ops-journal.md に日付付き追記（差分なし日は 1 行）。前回観測: registry 31 件、8121 登録済み（2026-09-04 実測）。",
         "repeat": {
           "completed": 1,
           "times": null
@@ -710,7 +710,7 @@
         "id": "6b5964618fa9",
         "name": "samu-ops-journal",
         "no_agent": false,
-        "prompt": "掃除ロボット業 日次運用日誌（samu）。捏造ゼロ — unknown は unknown と書く。差分検知を最初にやる: 前日日誌と変わっていなければ「差分なし」1 行で終了し日誌にも 1 行だけ追記。手順: 1) cat ~/.hermes/profiles/samu/workspace/ops-journal.md（無ければ作る）で最終日を確認 2) 今日の観測: a) GET https://itonami.cloud/api/v1/grok-bots/businesses で giemon/8121/cleaning 関連 assignment の有無 b) GET https://itonami.cloud/api/v1/bot-economy で samu 関連 position の有無 c) registry 8121 状況（前回: 不在） 3) 日誌に日付付き 1 ブロック追記: 観測値と「次の一手」1 行。launch 済みなら activity feed (GET /api/v1/grok-bots/bots/{id}/activity) の最新 checkpoint を要約。held なら correction event を読んで分類を書く。budget/credit 変更は owner 決裁なので実行せず記す。成果物: ~/.hermes/profiles/samu/workspace/ops-journal.md",
+        "prompt": "掃除ロボット業 日次運用日誌（samu）。捏造ゼロ — unknown は unknown と書く。差分検知を最初にやる: 前日日誌と変わっていなければ「差分なし」1 行で終了し日誌にも 1 行だけ追記。手順: 1) cat ~/.hermes/profiles/samu/workspace/ops-journal.md で最終日確認 2) 観測: a) GET https://itonami.cloud/api/v1/grok-bots/bots/business-8121-assignmentisic81-samu/activity（samu 本体。最新 checkpoint を 1 行要約、usage_tokens と残 budget に触れる）b) GET https://itonami.cloud/api/v1/grok-bots/bots/business-8121-assignmentisic81/activity（旧 bot。2026-09-04 に pause 済み — 新 checkpoint が増えていたら報告）c) 種類別事業計画 ~/.hermes/profiles/samu/workspace/cleaning-business-plan.md の次の未着手分類を 1 つ挙げる 3) 日誌に日付付き 1 ブロック: 観測値 + 「次の一手」1 行。held/budget-exhausted は owner 決裁点 — 実行せず記す。成果物: ~/.hermes/profiles/samu/workspace/ops-journal.md",
         "repeat": {
           "completed": 1,
           "times": null
@@ -818,7 +818,7 @@
         "no_agent": true,
         "prompt": "",
         "repeat": {
-          "completed": 87,
+          "completed": 88,
           "times": null
         },
         "schedule": {
