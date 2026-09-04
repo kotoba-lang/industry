@@ -138,7 +138,7 @@
         "no_agent": false,
         "prompt": "You are the hyakka ontology scout for wiki.kotobase.net (repo: network-awai/app-hyakka).\n\nEverything above this line is a measurement taken seconds ago. If it begins\nwith REFUSED, say so plainly and stop.\n\n## Your one job this run\n\nLook at the section headed `ONTOLOGY SIGNAL — properties the extractor asserted\nand admission refused`, and propose adding at most TWO of those properties to\nthe wiki's vocabulary.\n\nRead that heading literally. Each line is a property that a model, working on\nreal archived bytes from a real source, already tried to state — and could not,\nbecause the property is not in `:allowed-properties`. That is the only\nevidence-backed reason this ontology may grow.\n\n**If the signal is empty, the correct action is to add nothing and say so.**\nAn ontology widened on a hunch admits facts nobody asked for and makes the\nplane harder to query, not richer. The gate will reject an uncorroborated\nproperty anyway — it recomputes the tally from the receipts itself and ignores\nwhatever number a proposal claims — so proposing one only wastes the run.\n\n## Procedure — do all of it, in order\n\n1. `cd ~/.gftd/worktrees/hyakka-growth-bot && git fetch -q origin && git checkout -q --detach origin/main`\n2. If the ontology signal is `none 0`, stop here and report that the corpus has\n   not pushed against its own edges since the last run. That is the whole\n   report. It is not a failure.\n3. Otherwise, for each candidate property, find the receipts that refused it:\n   `grep -rl \"<prop/name>\" knowledge/receipts/ | tail -5`, and read one. You\n   need to see the actual fact the extractor tried to assert and the source it\n   came from. A property you cannot trace to a concrete refused fact is not a\n   candidate.\n4. Write `/tmp/hyakka-ontology-proposal.edn`:\n\n   {:proposal/rationale \"...\"\n    :properties\n    [{:name \"prop/...\" :corpus \"world-knowledge\"\n      :rationale \"what it means, which sources supply it, and why the existing\n                  vocabulary cannot express it\"}]}\n\n5. Run the gate from the worktree:\n\n     nbb --classpath src scripts/verify_source_proposal.cljs --root . --proposal /tmp/hyakka-ontology-proposal.edn\n\n   exit 0 accepted · exit 1 rejected (reasons printed) · exit 2 REFUSED — stop.\n\n6. Only on exit 0, with at least one accepted property:\n   - `git checkout -b bot/ontology-scout-$(date +%Y%m%d-%H%M)`\n   - add each property to `:allowed-properties` in\n     `config/knowledge-ingest.edn`, in the block for its corpus, with a comment\n     naming the receipt that evidences it\n   - add the matching entry to `properties` in\n     `src/hyakka/corpus/registry.cljc` — the config and that vocabulary are\n     checked against each other by the test suite, and a property in one and\n     not the other is rejected at admission one fact at a time while the run\n     still reports success\n   - run `npm test` from the worktree. It must report 0 failures and 0 errors.\n     If the suite does not run at all, that is not a pass — say so and stop.\n   - commit, push, `gh pr create` against `main`, with the gate output and the\n     test summary in the body\n\n7. Report: which properties had refusals on record, which you proposed, what\n   the gate said, whether the suite ran, and what landed.\n\nNever edit `knowledge/ledger/` or `knowledge/receipts/`. Never push to `main`.\nNever edit the gate to make a proposal pass.",
         "repeat": {
-          "completed": 78,
+          "completed": 79,
           "times": null
         },
         "schedule": {
@@ -238,7 +238,7 @@
         "no_agent": true,
         "prompt": "",
         "repeat": {
-          "completed": 79,
+          "completed": 80,
           "times": null
         },
         "schedule": {
@@ -468,7 +468,7 @@
         "no_agent": false,
         "prompt": "Machi-Hub bot health watch (business-6810-assignmentisic68). 捏造ゼロ — unknown は unknown と書く。差分検知: まず curl -s \"https://itonami.cloud/api/v1/grok-bots/bots/business-6810-assignmentisic68/activity\" を取り、data[0].activity_id を ~/.gftd/machihub-watch-lastseq.txt の前回値と比べる。同一なら「差分なし」1行で終了。変化があれば: ①新 checkpoint の type/proposal/tool_result.ok を読む ②conversation.checkpoint が無い、または tool_result ok:false が続くならその状態を報告 ③bot が held/停止気配なら GET /api/v1/grok-bots/businesses と /api/v1/bot-economy で assignment/position status を確認して報告する（restart/reconfigure はしない — budget 補充と resume は owner 決定）。成果物: ~/.gftd/machihub-watch-lastseq.txt を最新 activity_id で更新。[SILENT]",
         "repeat": {
-          "completed": 0,
+          "completed": 1,
           "times": null
         },
         "schedule": {
