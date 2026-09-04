@@ -1,0 +1,46 @@
+;; Run 0044 — kotobase-stab cron iteration 2026-09-03 (seventh run of the day; 0043 was 15:01)
+{:as-of "2026-09-03"
+ :kind :stabilization-run
+ :run-id "0044"
+
+ ;; 1. Measured signals (all live HTTP / nbb, no guessing)
+ :measurements
+ {:funnel-api {:status 200 :time-s "0.094"
+               :visitors 4859 :signups 31 :checkouts 0
+               :by-source {:visitors {:organic 3344 :openai-ads 3}
+                           :signups {:organic 27 :other 1}
+                           :checkouts {}}
+               :x402 {:challenges 33 :submissions 4 :rejections 4
+                      :settlements 0 :settlement-rate 0
+                      :rejection-reasons {:malformed-header 1}
+                      :rejections-classified 1 :rejections-unexplained 3
+                      :unmetered-twin-ratio 0 :unmetered-twin-reads 0
+                      :unpriced-plane-reads 0 :attempt-rate 0.121}}
+  :funnel-pulse "nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljs funnel-pulse → EXIT=0, RESULT=recorded. DELTA {:visitors 26 :signups 0 :checkouts 0}. UNCHANGED=false, EXTERNAL-FUNNEL-CHANGE=false. SCANNED=1"
+  :stability-checks [{:path "/" :status 200 :time-s "0.111"}
+                     {:path "/signup" :status 200 :time-s "0.075"}
+                     {:path "/ipld/v1" :status 400 :time-s "0.315" :note "expected — route alive, rejects missing params (baseline 2026-09-03)"}
+                     {:path "/ipld/" :status 404 :time-s "0.409" :note "expected — bare prefix has no index"}
+                     {:path "/api/funnel" :status 200 :time-s "0.094"}]}
+
+ ;; 2. SCORE → SELECT (SCORECARD.md 100-point weights; WIP=1)
+ :score-selection
+ {:selected "UNCHANGED from runs 0038–0043: counsel written-advice return on net-kotobase legal packet — sole gate on the 75pt row (6399/6310 paid pilot to 5 external tenants) and transitively the 65/62/61/51pt red rows"
+  :reason "SCORECARD cash-first ranking unchanged (75/65/62/61/51/48, all blocked on the counsel gate). Funnel movement since 0043 is +25 visitors / +0 signups / +0 checkouts — organic-only, raises no row's score. Counsel reply is human-dependent; sending is out of this bot's scope. WIP=1 respected."
+  :wip "1 (counsel follow-up, awaiting human send + counsel reply)"}
+
+ ;; 3. Bounded observation — activation gap stasis
+ :experiment
+ {:type :verification-only
+  :what "Activation gap re-measured against runs 0038–0043: signups held at 31 across five consecutive reads while visitors grew 4834 → 4859 (0043→0044, +25; runs 0038–0042 also +visitor trickle, +0 signups)"
+  :result "visitors → signups conversion remains ~0.6% static (31/4859, organic-dominant); no signups from the +25 new visitors. The activation gap, not traffic, is the measured bottleneck. No experiment deployed — a signup-funnel change would touch the live worker, deferred to owner decision."
+  :sent? false}
+
+ ;; 4. Next verification
+ :next [{:what "counsel reply (unblocks 75/65/62/61/51pt rows — unchanged since 0038)"}
+        {:what "x402: any submission count change from 4, or rejections-classified progress beyond 1/4; a non-owner submission would be the first demand signal (owner tests are not revenue)"}
+        {:what "funnel signups: 31 static since run 0038 despite continuous +visitor trickle — if still 31 next run, propose (as draft only) a bounded /signup activation experiment for owner approval, e.g. one visible price/CTA variant on /signup"}]
+
+ :canvas-ledger-touched? false
+ :score-raised? false
+ :exaggeration-guard "Verified external revenue = 0. 31 signups are not demand. 4 x402 submissions / 0 settlements is not revenue. Conversion ratio 0.6% is computed from measured counters only. Nothing sent externally, nothing deployed, nothing fabricated."}

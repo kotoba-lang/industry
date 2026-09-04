@@ -1,0 +1,48 @@
+;; Run 0069 — cron stability + thirty-second signup read (2026-09-04, JST)
+;; Role: kotobase-stab stabilization loop, 1 iteration. canvas-ledger.edn NOT touched.
+
+{;; 1. Signals (measured, not inferred)
+ :measured
+ {:funnel-pulse "nbb kotobase_lead_loop.cljs funnel-pulse → EXIT=0, RESULT=recorded. SCANNED=1. VISITORS=5038 SIGNUPS=31 CHECKOUTS=0. DELTA {:visitors 15 :signups 0 :checkouts 0}. UNCHANGED=false, EXTERNAL-FUNNEL-CHANGE=false, SCORE=unchanged."
+  :api-funnel {:visitors 5039 :signups 31 :checkouts 0
+               :by-source {:visitors {:organic 3526 :openai-ads 3}
+                           :signups  {:organic 27 :other 1}}
+               :x402 {:challenges 33 :submissions 4 :rejections 4
+                      :settlements 0 :settlement-rate 0
+                      :rejection-reasons {:malformed-header 1}
+                      :rejections-classified 1 :rejections-unexplained 3
+                      :attempt-rate 0.121}}
+  :stability-checks [{:path "/" :status 200 :time-s "0.237"}
+                     {:path "/signup" :status 200}
+                     {:path "/api/funnel" :status 200 :note "payload parsed"}
+                     {:path "/ipld/v1" :status 400 :note "expected — route exists, params required"}
+                     {:path "/ipld/" :status 404 :note "expected — bare route 404 (baseline 2026-09-03)"}]
+  :all-healthy? true}
+
+ ;; 2. SCORE → SELECT (SCORECARD.md; WIP=1)
+ :score-selection
+ {:selected "UNCHANGED from runs 0038–0068: counsel written-advice return on the net-kotobase legal packet — sole remaining gate on the 75pt row (cloud-itonami 6399/6310 paid pilot to 5 external tenants) and transitively the 65/62/61/51/48pt red rows"
+  :reason "SCORECARD ranking unchanged (75/65/62/61/51/48, all counsel-gated). Deltas since 0068: +16 visitors (5023→5039; organic 3510→3526 — entire delta organic) / +0 signups / +0 checkouts. +16 is inside the 3–20 linear organic band, changes no row's score. Signups static at 31 for a thirty-second consecutive read. x402 counters identical since 0060 (submissions 4, settlements 0, unexplained 3). openai-ads visitors flat at 3. Counsel draft on disk (90-docs/business/net-kotobase/counsel-followup-draft-20260903.md); reply is human-dependent; sending is out of scope. WIP=1."
+  :wip "1 (counsel follow-up, awaiting human send + counsel reply)"}
+
+ ;; 3. Bounded experiment — DRAFT ONLY (carried over from 0045–0068; still awaiting owner go/no-go)
+ :experiment
+ {:type :draft-proposal
+  :status "carried over from run 0045 — no owner decision observed yet"
+  :trigger "runs 0038–0069: signups static at 31 across thirty-two consecutive reads; per 0044's next-verification the draft stands"
+  :what "/signup activation variant — one visible change: add the actual price anchor ('Secure Managed ¥19,800/mo' — the only live-priced SKU per run 0033) plus a single primary CTA near the signup form. No new pages, no deploy by this bot."
+  :expected-signal "signups counter above 31, and/or checkout-start events > 0, within the next measurement window"
+  :deploy-owner "owner decision required — live worker change, outside this bot's no-deploy boundary"
+  :sent? false}
+
+ ;; 4. Next verification
+ :next [{:what "counsel reply (unchanged blocker since 0038; unblocks 75/65/62/61/51/48pt rows)"}
+        {:what "x402: submissions still 4, settlements 0, 3 rejections still unexplained — any change is the first demand signal"}
+        {:what "/signup variant draft: awaiting owner go/no-go — do not implement without approval"}
+        {:what "/ipld/v1 latency: sub-0.1s again in 0068; watch item stays closed unless it recurs"}
+        {:what "visitors velocity: +16 this run — upper end of the 3–20 band; flag only if it exceeds 20 or openai-ads moves off 3"}
+        {:what "rejections-unexplained 3/4: unchanged — x402 observability gap persists"}]
+
+ :canvas-ledger-touched? false
+ :score-raised? false
+ :exaggeration-guard "Verified external revenue = 0. 31 signups are not demand. 4 x402 submissions / 0 settlements is not revenue. All deltas measured from live counters. Nothing sent externally, nothing deployed, nothing fabricated."}

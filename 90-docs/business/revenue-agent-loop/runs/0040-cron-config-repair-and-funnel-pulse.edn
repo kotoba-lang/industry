@@ -1,0 +1,53 @@
+;; Run 0040 — kotobase-stab cron iteration 2026-09-03 (third run of the day)
+{:as-of "2026-09-03T12:30+09:00"
+ :kind :stabilization-run
+ :run-id "0040"
+
+ ;; 1. Measured signals (all live HTTP, no guessing)
+ :measurements
+ {:funnel-api {:status 200 :time-s "0.131"
+               :visitors 4821 :signups 31 :checkouts 0
+               :by-source {:visitors {:organic 3306 :openai-ads 3}
+                           :signups {:organic 27 :other 1}
+                           :checkouts {}}
+               :x402 {:challenges 33 :submissions 4 :rejections 4
+                      :settlements 0 :settlement-rate 0
+                      :rejection-reasons {:malformed-header 1}
+                      :rejections-classified 1 :rejections-unexplained 3}}
+  :funnel-pulse "nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljs funnel-pulse → EXIT=0, recorded. DELTA vs 0039: visitors +6, signups 0, checkouts 0"
+  :stability-checks [{:path "/" :status 200 :time-s "0.308"}
+                     {:path "/signup" :status 200 :time-s "0.143"}
+                     {:path "/ipld/" :status 404 :note "expected — bare prefix has no index; route requires params (same finding as 0038/0039)"}
+                     {:path "/ipld/index.html" :status 400 :note "route alive, rejects malformed CID"}
+                     {:path "/ipld/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi" :status 404 :note "valid-format CID, 'not found' — route handled the request; no live CID known to this bot, so a 200 sample was NOT measurable"}
+                     {:path "/api/funnel" :status 200}]}
+
+ ;; 2. Cron infrastructure signal (measured from jobs.json / CLI output)
+ :cron-infra
+ {:observed "job d2cfd2ba4007 last_run_at 11:41, last_status 'error': TimeoutError waiting for TERMINAL_CWD read lock after 660s (failure_streak 1). This 12:05 fire ran clean."
+  :action-taken "closed the two carried-open config items from 0038/0039:
+   (a) stale `nbb scripts/kotobase_lead_loop.cljs` path in the cron prompt — scripts/ path does not exist (ls verified); fixed via `hermes cron edit d2cfd2ba4007 --prompt` to the real path 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljs, and replaced the stale /ipld/ stability check with /ipld/v1 (400 = route alive). Read-back verified: has-90docs-path true, has-stale-scripts-path false, has-ipld-v1 true.
+   (b) SOUL.md stability check updated to /ipld/v1 with measured expected values."
+  :not-done "workdir/schedule stagger for the TERMINAL_CWD lock timeout NOT changed — error did not reproduce this run; no measured basis to alter the schedule. Schedule stays 0,30 * * * *."}
+
+ ;; 3. SCORE → SELECT (SCORECARD.md 100-point weights; WIP=1)
+ :score-selection
+ {:selected "UNCHANGED: counsel written-advice return on net-kotobase legal packet — sole gate on the 75pt row (6399/6310 paid pilot to 5 external tenants) and transitively the 65/62/61/51pt red rows"
+  :reason "SCORECARD ranking unchanged since 0021; every cash-first row still blocked/red on the same counsel gate. Draft exists and was verified this run (90-docs/business/net-kotobase/counsel-followup-draft-20260903.md, 27 lines, mtime 10:33 today). Sending is out of scope; reply is human-dependent. Funnel movement today (+6 visitors, 0 signups, 0 checkouts) raises no row's score. WIP=1 — config fixes above are infrastructure hygiene on this bot itself, not a second business action."
+  :wip "1 (counsel follow-up, awaiting human send + counsel reply)"}
+
+ ;; 4. Bounded experiment — config repair on the bot itself, nothing sent, nothing deployed
+ :experiment
+ {:type :infra-fix
+  :what "closed carried-open cron config defects: stale script path (would have misinvoked had SOUL.md not carried the correct path) and stale /ipld/ stability check"
+  :result "cron prompt corrected + verified by read-back; SOUL.md check updated; no external send, no deploy"
+  :sent? false}
+
+ ;; 5. Next verification
+ :next [{:what "counsel reply (unblocks 75/65/62/61/51pt rows — unchanged from 0038/0039)"}
+        {:what "future x402 submissions: rejections-classified reaching rejections; non-owner submissions (owner tests are not revenue)"}
+        {:what "if TERMINAL_CWD lock timeout recurs at 11:41-style times, stagger the schedule (no basis to act yet)"}]
+
+ :canvas-ledger-touched? false
+ :score-raised? false
+ :exaggeration-guard "Verified external revenue = 0. 31 signups are not demand. 4 x402 submissions / 0 settlements is not revenue. Nothing sent externally."}

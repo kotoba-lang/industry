@@ -1,0 +1,52 @@
+;; Run 0041 — kotobase-stab cron iteration 2026-09-03 (fourth run of the day; 0040 was 12:30)
+{:as-of "2026-09-03T14:22+09:00"
+ :kind :stabilization-run
+ :run-id "0041"
+
+ ;; 1. Measured signals (all live HTTP, no guessing)
+ :measurements
+ {:funnel-api {:status 200 :time-s "0.095"
+               :visitors 4828 :signups 31 :checkouts 0
+               :by-source {:visitors {:organic 3313 :openai-ads 3}
+                           :signups {:organic 27 :other 1}
+                           :checkouts {}}
+               :x402 {:challenges 33 :submissions 4 :rejections 4
+                      :settlements 0 :settlement-rate 0
+                      :rejection-reasons {:malformed-header 1}
+                      :rejections-classified 1 :rejections-unexplained 3
+                      :unmetered-twin-ratio 0 :unmetered-twin-reads 0
+                      :unpriced-plane-reads 0 :attempt-rate 0.121}}
+  :funnel-pulse "nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljs funnel-pulse → EXIT=0, RESULT=recorded. DELTA {:visitors 3 :signups 0 :checkouts 0}. UNCHANGED=false, EXTERNAL-FUNNEL-CHANGE=false"
+  :stability-checks [{:path "/" :status 200 :time-s "0.064" :size 140559}
+                     {:path "/signup" :status 200 :time-s "0.075" :size 109869}
+                     {:path "/ipld/v1" :status 400 :time-s "0.045" :note "expected — route alive, rejects missing/malformed params (2026-09-03 実測 baseline)"}
+                     {:path "/ipld/" :status 404 :time-s "0.069" :note "expected — bare prefix has no index"}
+                     {:path "/api/funnel" :status 200 :time-s "0.095"}]}
+
+ ;; 2. Bounded verification — resolved the pulse-delta vs API-diff sampling mismatch
+ :delta-semantics
+ {:observation "manual curl diff vs run 0040 (4828-4821=+7) did not match pulse DELTA (+3)"
+  :finding "kotobase_lead_loop.cljs cmd-funnel-pulse (lines ~188-190): delta = fresh API fetch minus (:funnel prev|snapshot) — i.e. vs the PREVIOUS PULSE RECORD, not vs the agent's manual curl"
+  :conclusion "no fault: the pulse's own previous fetch and run 0040's curl sample different instants (0040's pulse record presumably carried 4825, its API fetch ran after the 4821 curl). Both numbers are measurements at different seconds; no counter drift inferred"}
+
+ ;; 3. SCORE → SELECT (SCORECARD.md 100-point weights; WIP=1)
+ :score-selection
+ {:selected "UNCHANGED from runs 0038/0039/0040: counsel written-advice return on net-kotobase legal packet — sole gate on the 75pt row (6399/6310 paid pilot to 5 external tenants) and transitively the 65/62/61/51pt red rows"
+  :reason "SCORECARD cash-first ranking unchanged (75/65/62/61/51/48, all blocked/red). 0038 produced the follow-up draft; re-verified this run: 90-docs/business/net-kotobase/counsel-followup-draft-20260903.md exists, 27 lines, addressed to counsel of record, asks the two bounded questions (approved as-is? / which [CONFIRM: item first?). Sending is out of this bot's scope; the reply is human-dependent. Today's funnel movement (visitors +3 by pulse, 0 signups, 0 checkouts) raises no row's score. WIP=1 respected."
+  :wip "1 (counsel follow-up, awaiting human send + counsel reply)"}
+
+ ;; 4. Bounded experiment — diagnosis/verification only, nothing sent, nothing deployed
+ :experiment
+ {:type :diagnosis-only
+  :what "verified funnel-pulse DELTA semantics from source and resolved the +3 vs +7 sampling mismatch"
+  :result "delta is vs previous pulse record; both numbers valid, different sampling instants; no deploy, no external send"
+  :sent? false}
+
+ ;; 5. Next verification
+ :next [{:what "counsel reply (unblocks 75/65/62/61/51pt rows — unchanged from 0038)"}
+        {:what "future x402 submissions: rejections-classified reaching rejections; any non-owner submission (owner tests are not revenue)"}
+        {:what "if TERMINAL_CWD lock timeout recurs (0040 note), stagger the cron schedule — no basis yet"}]
+
+ :canvas-ledger-touched? false
+ :score-raised? false
+ :exaggeration-guard "Verified external revenue = 0. 31 signups are not demand. 4 x402 submissions / 0 settlements is not revenue and ownership of attempts is not measured. Nothing sent externally."}

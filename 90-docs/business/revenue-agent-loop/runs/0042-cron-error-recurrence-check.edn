@@ -1,0 +1,52 @@
+;; Run 0042 — kotobase-stab cron iteration 2026-09-03 (fifth run of the day; 0041 was 14:22)
+{:as-of "2026-09-03T14:33+09:00"
+ :kind :stabilization-run
+ :run-id "0042"
+
+ ;; 1. Measured signals (all live HTTP, no guessing)
+ :measurements
+ {:funnel-api {:status 200
+               :visitors 4830 :signups 31 :checkouts 0
+               :by-source {:visitors {:organic 3315 :openai-ads 3}
+                           :signups {:organic 27 :other 1}
+                           :checkouts {}}
+               :x402 {:challenges 33 :submissions 4 :rejections 4
+                      :settlements 0 :settlement-rate 0
+                      :rejection-reasons {:malformed-header 1}
+                      :rejections-classified 1 :rejections-unexplained 3
+                      :unmetered-twin-ratio 0 :unmetered-twin-reads 0
+                      :unpriced-plane-reads 0 :attempt-rate 0.121}}
+  :funnel-pulse "nbb 90-docs/business/revenue-agent-loop/kotobase_lead_loop.cljs funnel-pulse → EXIT=0, RESULT=recorded. DELTA {:visitors 2 :signups 0 :checkouts 0}. UNCHANGED=false, EXTERNAL-FUNNEL-CHANGE=false. SCANNED=1"
+  :stability-checks [{:path "/" :status 200 :time-s "0.051"}
+                     {:path "/signup" :status 200 :time-s "0.062"}
+                     {:path "/ipld/v1" :status 400 :time-s "0.043" :note "expected — route alive, rejects missing params (baseline 2026-09-03)"}
+                     {:path "/ipld/" :status 404 :time-s "0.056" :note "expected — bare prefix has no index"}
+                     {:path "/api/funnel" :status 200 :time-s "0.433"}]}
+
+ ;; 2. Bounded verification — 0041's carried-open item (cron error recurrence)
+ :cron-infra
+ {:observed "jobs.json read-back: last_run_at 2026-09-03T14:24:37+09:00, last_status 'ok', failure_streak 0, schedule 0,30 * * * * unchanged"
+  :finding "TERMINAL_CWD read-lock timeout from 0040's 11:41 error did NOT recur at 14:24 fire"
+  :action-taken "none — no basis to change schedule"}
+
+ ;; 3. SCORE → SELECT (SCORECARD.md 100-point weights; WIP=1)
+ :score-selection
+ {:selected "UNCHANGED from runs 0038–0041: counsel written-advice return on net-kotobase legal packet — sole gate on the 75pt row (6399/6310 paid pilot to 5 external tenants) and transitively the 65/62/61/51pt red rows"
+  :reason "SCORECARD cash-first ranking unchanged (75/65/62/61/51/48, all blocked/red on the counsel gate). Draft exists (90-docs/business/net-kotobase/counsel-followup-draft-20260903.md; verified present through run 0041). Sending is out of this bot's scope; the reply is human-dependent. Today's funnel movement (+2 visitors by pulse, 0 signups, 0 checkouts) raises no row's score. WIP=1 respected."
+  :wip "1 (counsel follow-up, awaiting human send + counsel reply)"}
+
+ ;; 4. Bounded experiment — verification only, nothing sent, nothing deployed
+ :experiment
+ {:type :verification-only
+  :what "measured whether the 0040 cron lock error recurred (jobs.json last_status / failure_streak read-back)"
+  :result "no recurrence: last_status ok, failure_streak 0. No deploy, no external send"
+  :sent? false}
+
+ ;; 5. Next verification
+ :next [{:what "counsel reply (unblocks 75/65/62/61/51pt rows — unchanged from 0038)"}
+        {:what "future x402 submissions: rejections-classified reaching rejections; any non-owner submission (owner tests are not revenue)"}
+        {:what "if cron error status recurs again, stagger the schedule (no basis yet — 0 failures since 0040)"}]
+
+ :canvas-ledger-touched? false
+ :score-raised? false
+ :exaggeration-guard "Verified external revenue = 0. 31 signups are not demand. 4 x402 submissions / 0 settlements is not revenue and ownership of attempts is not measured. Nothing sent externally."}
