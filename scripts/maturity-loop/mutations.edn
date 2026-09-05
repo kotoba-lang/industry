@@ -7401,4 +7401,63 @@
      :file "src/cartography/sim.cljc"
      :find "               (pos? refusals))"
      :replace "               true)"
-     :must-fail ["a-table-that-refuses-nothing-fails"]}]}]}
+     :must-fail ["a-table-that-refuses-nothing-fails"]}]}
+  {:repo "orgs/cloud-itonami/cloud-itonami-assoc-6920-usa-aicpa"
+   :label "AICPA 引用カタログ —— 「その URL は、名乗っている文書に本当に解決するのか」"
+   ;; この repo は 2026-09-06 まで 2 件しか引用を持たず、AICPA が実際に発行して
+   ;; いる基準（AU-C / AR-C / AT-C / SSTS / SQMS / peer review / TSC /
+   ;; SOC 2 description criteria）が 1 件も無かった。8 件足したときの hazard は
+   ;; 「取れない URL を足す」ことではなく **「取れる URL が別の文書に解決する」**
+   ;; ことだった:
+   ;;
+   ;;   * aicpa-cima.com はこれらの route に JavaScript shell を返すので、
+   ;;     HTML に文書名が 1 文字も無い。200 は「どの文書か」を答えない。
+   ;;   * 退役した us.aicpa.org/research/standards/*.html は **全部が同一の
+   ;;     generic landing page へ 301 して 200 を返す**。死んだ引用と生きた引用が
+   ;;     status code でも content-type でも区別できない。
+   ;;
+   ;; 実測（2026-09-06）: ssae-no-18.pdf の旧 URL は 200 を返すが、着地先は
+   ;; `aicpa-statements-on-auditing-standards-currently-effective` だった。
+   ;; 8 件は描画後の文書名を記録した title と突き合わせて確認した。
+   ;;
+   ;; ここに載せる 5 件は **2026-09-06 に実際に赤くなるところを見た**もの。
+   ;; :by-topic-index-drop は「index 0 だけ見るテスト」なら緑のままになる形に
+   ;; 絞ってある —— by-topic-count は 3 のまま、index 0 の答えも正しいまま、
+   ;; i=1 と i=2 の 2 assertion だけが落ちる。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors."
+   :mutations
+   [{:id :aicpa/port-transcribes-a-wrong-url
+     :why "port が 2 entry の URL を取り違える。カタログの唯一の中身が引用なので、これが黙って通る repo は何も保証していない"
+     :file "src/association_facts.kotoba"
+     :find "\"url\") (option-some-of [:option :string] \"https://www.aicpa-cima.com/resources/download/2017-trust-services-criteria-with-revised-points-of-focus-2022\")"
+     :replace "\"url\") (option-some-of [:option :string] \"https://www.aicpa-cima.com/resources/download/get-description-criteria-for-your-organizations-soc-2-r-report\")"
+     :must-fail ["every-field-of-every-entry-is-transcribed"]}
+
+    {:id :aicpa/citation-moves-off-an-official-host
+     :why "引用が AICPA の発行面から離れる（archive の写しへ）。ns docstring が『OFFICIAL な aicpa 系 URL しか載せない』と主張しているので、その主張自体の検査"
+     :file "src/association/facts.cljc"
+     :find "\"https://www.aicpa-cima.com/resources/download/clarified-aicpa-standards-for-performing-and-reporting-on-peer-reviews\""
+     :replace "\"https://web.archive.org/web/2026/https://www.aicpa-cima.com/peer-review\""
+     :must-fail ["every-entry-cites-an-official-aicpa-url"]}
+
+    {:id :aicpa/port-invents-a-date
+     :why "catalog が持たない日付を port が答える。日付は**出所が持っていたときだけ**記録する規則なので、埋めてしまう退行が一番起きやすい"
+     :file "src/association_facts.kotoba"
+     :find "(string=? f \"url\") (option-some-of [:option :string] \"https://www.aicpa-cima.com/resources/download/aicpa-statement-on-quality-management-standards-no-1\")"
+     :replace "(string=? f \"established-date\") (option-some-of [:option :string] \"2022-06\")\n          (string=? f \"url\") (option-some-of [:option :string] \"https://www.aicpa-cima.com/resources/download/aicpa-statement-on-quality-management-standards-no-1\")"
+     :must-fail ["a-field-the-catalog-does-not-carry-is-absent-not-blank"]}
+
+    {:id :aicpa/by-topic-gives-up-after-index-0
+     :why "topic を引いたとき port が index 0 だけ答えて残りを捨てる。**index 0 しか見ないテストなら緑のまま**通る形（by-topic-count も 3 のまま）。12 topic 中 6 つが複数 entry に当たる"
+     :file "src/association_facts.kotoba"
+     :find "        (= i 0) (entry-field a 2 \"id\")\n        (= i 1) (entry-field a 3 \"id\")\n        (= i 2) (entry-field a 4 \"id\")"
+     :replace "        (= i 0) (entry-field a 2 \"id\")"
+     :must-fail ["by-topic-answers-the-same-entries-at-every-index"]}
+
+    {:id :aicpa/coverage-note-drifts
+     :why "2 つの面が『自分は何件持っているか』について食い違う。ibec で実際に起きた drift（片面が『Wikipedia 引用で seed』、もう片面が『official citation』）と同型"
+     :file "src/association/facts.cljc"
+     :find "\" aicpa rules, each citing an \""
+     :replace "\" aicpa rules seeded with an \""
+     :must-fail ["the-coverage-note-is-the-same-sentence-on-both-faces"]}]}]}
