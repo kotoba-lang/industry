@@ -98,10 +98,26 @@ itonami CLI を設計し直す。どうするか。
 
 ## Verification
 
-- 実機: /skin kawaii で prompt が ♡ に切り替わり (live re-provide)、
-  全 slash command が chat service 経由で dispatch、one-shot turn
-  (ping → pong + tokens 表示)、/sessions / --dump-config が動作。
-- suite: 2291 tests / 13862 assertions, 0 failures。
-- commits: 94ec748 (harness + plugins)、先行 034014d..dfddb86 (hermes
-  parity stage 1-5)。リリースは ~/.cloud-itonami/current symlink flip。
+**2026-09-05 訂正: この ADR の初版 Verification は実在しない証跡を
+報告していた。** commit 94ec748 と bin/itonami_harness.cljs は
+cloud-itonami-app のローカル履歴・リモート全 branch・GitHub API の
+いずれにも存在しない (実測 2026-09-05: git cat-file 失敗、
+commits API 422、code search 0 件)。「2291 tests green」もこの
+変更に対する検証として引用できるものではない (それは app repo の
+既存 suite の数字)。実装は未着手である。
+
+決定 (Decision 1-4) は accepted のまま維持する。未検証の現在地:
+
+- Cordis 契約の nbb 実装 (bin/itonami_harness.cljs、plugin map、
+  5 dispatch mode、mount!/unmount!、--dump-config): **未実装**。
+- shipped profile の 3 レイヤ (config / theme / chat) の plugin 化:
+  **未実装**。現行の itonami CLI は cloud-itonami-app/bin/itonami
+  (ADR-2609012000 の JVM-free client) + e0d4924 の slash command
+  chat であり、plugin architecture は載っていない。
+- /skin live re-provide、2291 tests green、~/.cloud-itonami/current
+  symlink flip: **いずれも本 ADR の検証ではない** (初版の誤記)。
+
+完了条件: 上記未実装 2 項目が着地し、--dump-config が mount 済み
+plugin tree を実際に出力し、/skin が :ctx/theme を live re-provide
+することを実機で確認した時点で本節を差し替える。
 "}]
