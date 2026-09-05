@@ -639,6 +639,72 @@
      :replace "            base base"
      :must-fail ["channel-state-accumulates-across-ticks-on-a-done-thread"]}]}
 
+  {:repo "orgs/kotoba-lang/appkit"
+   :label "appkit —— 34 行の repo が拠って立つ「変化点はちょうど 2 つ」という主張"
+   ;; appkit が存在する理由は `appkit.core` の docstring の 1 文だけである:
+   ;; kotoba-ui.core の component 群のうち、per-screen-shape の変化点を持つのは
+   ;; `panel`(`:surface`/`:elevation`) と `list-view`(`:surface`) だけなので、
+   ;; 包む価値があるのはその 2 つきり。**これは appkit についての主張ではなく
+   ;; kotoba-ui についての主張**で、この repo の中の何もそれを真に保てない。
+   ;;
+   ;; 2026-09-05 の実測: 既存テストの 1 本 `passthrough-components-are-just-
+   ;; kotoba-ui-test` は `(identical? ui/button ui/button)` —— 自分自身との比較で、
+   ;; **一度も discriminate したことがなかった**。しかも名乗っていた性質
+   ;; (「re-export される」) は実装がしていることですらない (appkit は何も
+   ;; re-export しない)。`(def button ui/button)` を足す —— まさにそれが守ると
+   ;; 称していた違反 —— を当てても、旧 suite は exit 0 で通った。
+   ;;
+   ;; ⚠ 上記の「変化点はちょうど 2 つ」を守る sweep test 自身の mutation は
+   ;; **ここに書けない**。壊す対象が appkit の tree ではなく依存の kotoba-ui だから
+   ;; である (`:local` alias で scratch worktree に差し替えて実測した:
+   ;; `(def toolbar glass/panel)` で sweep だけが赤くなり `toolbar` を名指しした)。
+   ;; ここに載るのは appkit 自身の tree で壊せる 6 件。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   ;; 6 件とも 2026-09-05 に赤くなるところを見た。
+   [{:id :appkit/merge-order-reversed
+     :why "呼び手の opts が既定に勝つこと —— 逆順に merge すると既定が上書きを飲み込む"
+     :file "src/appkit/core.cljc"
+     :find "(ui/panel body (merge default-panel-opts opts))"
+     :replace "(ui/panel body (merge opts default-panel-opts))"
+     :must-fail ["caller-opts-win-test" "caller-opts-win-per-key-test"]}
+
+    {:id :appkit/elevation-default-dropped
+     :why "desktop の pane が :flat であること（並置されるので影を持たない）"
+     :file "src/appkit/core.cljc"
+     :find "{:surface :thick :elevation :flat}"
+     :replace "{:surface :thick}"
+     :must-fail ["desktop-panel-defaults-test" "default-opts-are-published-contract-test"]}
+
+    {:id :appkit/defaults-equal-bare-kotoba-ui
+     :why "**appkit が存在する理由の側の赤**。既定が素の kotoba-ui と同じ値になったら、この repo は何もしていない"
+     :file "src/appkit/core.cljc"
+     :find "{:surface :thick :elevation :flat}"
+     :replace "{:surface :regular :elevation :raised}"
+     :must-fail ["defaults-actually-change-the-render-test"]}
+
+    {:id :appkit/re-exports-a-component
+     :why "appkit が component catalog を持たないこと —— re-export すると product repo に『kotoba-ui.core を require する』の第 2 の、部分的な入口ができる"
+     :file "src/appkit/core.cljc"
+     :find "(defn panel\n"
+     :replace "(def button ui/button)\n\n(defn panel\n"
+     :must-fail ["appkit-adds-no-components-test"]}
+
+    {:id :appkit/panel-arity-1-bypasses-defaults
+     :why "1-arity が 2-arity の {} 版であること —— 別経路になると既定が片方だけ効く"
+     :file "src/appkit/core.cljc"
+     :find "([body] (panel body {}))"
+     :replace "([body] (ui/panel body {}))"
+     :must-fail ["arity-1-is-arity-2-with-empty-opts-test" "desktop-panel-defaults-test"]}
+
+    {:id :appkit/list-view-arity-1-bypasses-defaults
+     :why "同上を list-view 側でも —— panel だけ直っていて list-view が抜ける形を捕まえる"
+     :file "src/appkit/core.cljc"
+     :find "([rows] (list-view rows {}))"
+     :replace "([rows] (ui/list-view rows {}))"
+     :must-fail ["arity-1-is-arity-2-with-empty-opts-test" "desktop-list-view-defaults-test"]}]}
+
   {:repo "orgs/kotoba-lang/prolly-tree"
    :label "prolly-tree inclusion proof"
    :cmd ["clojure" "-M:test"]
