@@ -11,6 +11,10 @@ HERE=Path(__file__).resolve().parent
 VERSIONED=READ_ROOT/"scripts/hermes-otent-vision-bots/otent-vision-scope.edn"
 SCOPE_FILE=VERSIONED if VERSIONED.is_file() else HERE/"otent-vision-scope.edn"
 HYAKKA=READ_ROOT/"orgs/network-awai/app-hyakka"; OTENT=READ_ROOT/"orgs/cloud-itonami/otent"
+# Which GitHub repository this scope opens PRs against — the backlog gate counts there.
+GATE_REPO={"schema":"network-awai/app-hyakka","earth-ingest":"cloud-itonami/otent",
+ "earth-vision":"cloud-itonami/otent","street-ingest":"cloud-itonami/otent",
+ "street-vision":"cloud-itonami/otent","publish":"network-awai/app-hyakka"}
 CONFIG={
  "schema":(HYAKKA,Path("~/.gftd/worktrees/otent-geo-ontology-bot").expanduser()),
  "earth-ingest":(OTENT,Path("~/.gftd/worktrees/otent-earth-imagery-bot").expanduser()),
@@ -57,6 +61,18 @@ def main():
  if not body: return refuse("no tracked source/config/test text could be measured")
  head=run(["git","rev-parse","--short=12","HEAD"],work,60).stdout.strip()
  print(f"scope_sha256={hashlib.sha256(SCOPE_FILE.read_bytes()).hexdigest()}\nhead={head}")
+ # Open-PR backlog gate: over cap this run drains instead of producing. A bot that
+ # opens one PR an hour into a repo nothing drains produces a queue, not work
+ # (measured 2026-09-05: otent carried 22 open PRs, 21 of them CONFLICTING).
+ sys.path.insert(0, str(READ_ROOT/"scripts/hermes-pr-queue"))
+ sys.path.insert(0, str(HERE))
+ try:
+  from backlog_gate import print_gate  # noqa: E402
+  print_gate(GATE_REPO[a.scope])
+ except ImportError as e:
+  print(f"BACKLOG repo={GATE_REPO[a.scope]} open=unknown status=unknown")
+  print(f"BACKLOG-BLOCK backlog_gate is unavailable ({e}); unknown is not under. "
+        "Do not open a new PR this run.")
  for t in TOKENS[a.scope]: print(f"TOKEN name={t} present={'yes' if t.lower() in body.lower() else 'no'}")
  for rel in ["orgs/cloud-itonami/app-otent","orgs/kotoba-lang/com-mapillary-graph-api","orgs/kotoba-lang/org-openstreetmap-overpass"]:
   print(f"CANDIDATE path={rel} present={'yes' if (READ_ROOT/rel).is_dir() else 'no'}")
