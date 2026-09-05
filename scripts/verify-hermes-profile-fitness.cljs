@@ -34,7 +34,7 @@
 ;; the tool's fault, which is worse than silence because it gets acted on.
 ;; Every path here is tried against the four places a job can actually mean.
 (ns verify-hermes-profile-fitness
-  (:require ["fs" :as fs] ["os" :as os] ["path" :as path]
+  (:require ["child_process" :as cp] ["fs" :as fs] ["os" :as os] ["path" :as path]
             [clojure.string :as str]))
 
 (def ^:private argv (vec (drop 2 (js->clj js/process.argv))))
@@ -109,6 +109,57 @@
                      (path/join root profile "scripts" base)]
               (seq (str workdir)) (conj (path/join (expand workdir) base))))))
 
+;; ── stranded executions ─────────────────────────────────────────────────────
+;;
+;; A cron run that is KILLED writes no terminal status. Measured 2026-09-05 on
+;; pr-cleanup/pr-queue-review: the run started 14:04, its process was gone by
+;; 16:05, and the job record still said `last_status: error` from the 13:00 run
+;; with `failure_streak: 2` and `last_run_at: 13:00`. `cron list` showed a job
+;; that simply had not run since 13:00. Nothing anywhere said a run had died.
+;;
+;; That is the shape this whole detector exists for: an execution that could
+;; not finish is indistinguishable from one that never started. The runner has
+;; a reaper (`cron.executions/recover_interrupted_executions`, which checks pid
+;; liveness) but it runs at ticker startup and from the cron TOOL path -- a row
+;; stranded by a killed run sits there until something restarts, and its own
+;; comment says a stale claim can block later manual runs.
+
+(defn- pid-alive?
+  "Conservative: an unobservable pid is dead, an observable one is live even
+  though the pid may have been reused. Under-reporting is the safe direction
+  for a finding whose remedy is 'reap this row'."
+  [pid]
+  (let [n (js/parseInt (str pid))]
+    (if (js/isNaN n)
+      true
+      (try (js/process.kill n 0) true
+           (catch :default e (= "EPERM" (.-code e)))))))
+
+(defn- stranded-rows
+  "Rows a profile left in claimed/running whose owning process is gone."
+  [profile db]
+  (let [out (try
+              (cp/execFileSync "sqlite3" #js ["-readonly" "-json" db
+                                              "select job_id,status,pid,coalesce(started_at,claimed_at) as at from executions where status in ('claimed','running')"]
+                               #js {:encoding "utf8" :timeout 20000
+                                    :stdio #js ["ignore" "pipe" "ignore"]})
+              (catch :default _ nil))
+        rows (when (seq (str out))
+               (try (js->clj (js/JSON.parse out) :keywordize-keys true)
+                    (catch :default _ nil)))]
+    (for [r rows :when (not (pid-alive? (:pid r)))]
+      (assoc r :profile profile))))
+
+(defn- collect-stranded [names]
+  (vec (mapcat (fn [p]
+                 (let [db (path/join profiles-root p "cron" "executions.db")]
+                   (if (fs/existsSync db) (stranded-rows p db) [])))
+               names)))
+
+(defn- age-minutes [at]
+  (let [t (js/Date.parse (str at))]
+    (if (js/isNaN t) 0 (/ (- (js/Date.now) t) 60000.0))))
+
 ;; ── measurement ─────────────────────────────────────────────────────────────
 
 (defn- collect []
@@ -134,7 +185,8 @@
      ;; coverage finding against the one profile that was right (measured
      ;; 2026-09-04: `aozora`, jobs: []).
      :scheduled (mapv :profile (filter #(seq (:jobs (:ok %))) good))
-     :broken broken :jobs jobs :files-read (count good)}))
+     :broken broken :jobs jobs :files-read (count good)
+     :stranded (collect-stranded names)}))
 
 (defn- ledger-state []
   (let [{:keys [ok error]} (read-json ledger-path)]
@@ -156,7 +208,7 @@
 
 (defn findings-for
   "Pure: the finding set for an already-collected fleet."
-  [{:keys [scheduled jobs profile-models]} {:keys [names generated-at]} root]
+  [{:keys [scheduled jobs profile-models stranded]} {:keys [names generated-at]} root]
   (let [n-sched (count scheduled)
         absent (remove names scheduled)
         failing (filter #(pos? (or (:failure_streak %) 0)) jobs)
@@ -284,6 +336,23 @@
                           (str/join ", " (take 6 (map #(str (:profile %) "/" (:name %)
                                                             " -> " (:provider %))
                                                       unresolvable-provider))))})
+
+      (seq stranded)
+      (conj {:sev (if (some #(> (age-minutes (:at %)) 60) stranded) "fail" "warn")
+             :key "stranded-execution"
+             ;; Severity is measured like missing-workdir is: a row a few
+             ;; minutes old is a kill the ticker will reap on its next start;
+             ;; one an hour old is a job that has silently stopped, because
+             ;; nothing on the job record says a run died.
+             :detail (str (count stranded) " execution row(s) sit in claimed/running with a dead "
+                          "owner process, so the job record carries no sign a run died: "
+                          (str/join ", " (take 6 (map #(str (:profile %) "/" (:job_id %) " "
+                                                            (:status %) " pid=" (:pid %) " age="
+                                                            (.toFixed (age-minutes (:at %)) 0) "m")
+                                                      stranded)))
+                          ". Reap with the runner's own checker: "
+                          "`from cron.executions import recover_interrupted_executions` "
+                          "(it verifies pid liveness and marks only provably-dead owners unknown).")})
 
       (seq failing)
       (conj {:sev "warn" :key "failure-streak"
@@ -424,6 +493,29 @@
                                              :last_status "error"}]}
                                     {:names #{"a"} :generated-at "2026-09-04T00:00:00Z"} root))
                            "missing-workdir")))]
+         ;; the class that leaves no trace on the job record at all
+         ["a live pid reads live and an unobservable one reads dead"
+          (and (pid-alive? (.-pid js/process)) (not (pid-alive? 999999)))]
+         ["a stranded row older than an hour is a fail, and is named"
+          (let [f ((by-key (findings-for
+                            {:scheduled ["a"] :profile-models {} :jobs []
+                             :stranded [{:profile "a" :job_id "j1" :status "running" :pid 999999
+                                         :at (.toISOString (js/Date. (- (js/Date.now) 7200000)))}]}
+                            {:names #{"a"} :generated-at "2026-09-05T00:00:00Z"} root))
+                   "stranded-execution")]
+            (and (= "fail" (:sev f)) (str/includes? (:detail f) "a/j1")))]
+         ["a minutes-old one is a warn, not a fail"
+          (= "warn" (:sev ((by-key (findings-for
+                                    {:scheduled ["a"] :profile-models {} :jobs []
+                                     :stranded [{:profile "a" :job_id "j1" :status "claimed" :pid 999999
+                                                 :at (.toISOString (js/Date. (- (js/Date.now) 300000)))}]}
+                                    {:names #{"a"} :generated-at "2026-09-05T00:00:00Z"} root))
+                           "stranded-execution")))]
+         ["no stranded rows raises nothing"
+          (nil? ((by-key (findings-for
+                          {:scheduled ["a"] :profile-models {} :jobs [] :stranded []}
+                          {:names #{"a"} :generated-at "2026-09-05T00:00:00Z"} root))
+                 "stranded-execution"))]
          ["failure_streak is counted"
           (str/includes? (:detail (covered "failure-streak")) "=3")]
          ;; the correction above, pinned: a profile with an empty :jobs list is
