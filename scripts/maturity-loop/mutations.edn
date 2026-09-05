@@ -7534,6 +7534,121 @@
      :find "\" aicpa rules, each citing an \""
      :replace "\" aicpa rules seeded with an \""
      :must-fail ["the-coverage-note-is-the-same-sentence-on-both-faces"]}]}
+  {:repo "orgs/cloud-itonami/cloud-itonami-isco-4225"
+   :label "inquiry desk actor refusals —— 案内窓口が『引用の無い回答』を拒めること"
+   ;; 実測（改修前 tip 0abfc59）: governor は 4 つの KB 不変条件を
+   ;; `(= :answer-inquiry op)` のときだけ、escalation を `:publish-faq` の
+   ;; ときだけ当てていたので、**それ以外の op は両方を素通りした**。
+   ;; `:purge-knowledge-base` と `:delete-client-records` が
+   ;; `{:ok? true :violations []}` を返し、actor は record を**書き込んだ**。
+   ;;
+   ;; さらに KB 検査が op の**綴り**に依存していたので、打ち間違いが
+   ;; 「何も引用せずに承認される道」になっていた:
+   ;;   {:op :answer_inquiry :kb-id nil} -> {:ok? true :violations []}
+   ;; README の中心的な HARD 規則（回答は登録済み KB entry を引用せよ）は、
+   ;; op を正確に綴った提案にだけ効いていた。
+   ;;
+   ;; freshness も同型で、`(integer? today)` / `(integer? valid-until)` で
+   ;; 守られていたため、**日付を出さないことが承認される道**だった ——
+   ;; `:today nil` は 2023-03-31 に失効した entry を 2026 年に配った。
+   ;;
+   ;; `:op nil` は governor に届く前に advisor/infer の `(name op)` で
+   ;; **NPE を投げた**。crash は拒否ではない —— verdict も violation も
+   ;; ledger entry も出ない。
+   ;;
+   ;; そして自動 commit と `approve!` で resume した commit は
+   ;; **keys (:disposition :record) で同一**だった。README は :publish-faq
+   ;; （外部公開）に必ず人間の sign-off を約束しているのに、台帳はどの
+   ;; 書き込みがそれを受けたのかを示せなかった。
+   ;;
+   ;; ここに載せる 9 件は **2026-09-06 に実際に赤くなるところを見た**もの。
+   ;; :reserved-reported-as-unsupported が特に効く: この変異の下でも
+   ;; :delete-client-records は **拒否されたまま**（hard? true）で、rule だけが
+   ;; :reserved-op から :unsupported-op に変わる。「拒否されたこと」だけを
+   ;; assert する test はこの変異で**緑のまま**通る。だからこの repo の test は
+   ;; 全部、名乗っている rule の literal を pin する。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors."
+   :mutations
+   [{:id :isco4225/vocabulary-check-dropped
+     :why "**穴そのもの**。語彙の外の op が violation を 1 つも起こさなくなり、admit される。改修前は actor が :purge-knowledge-base の record を書き込んでいた"
+     :file "src/inquiry/governor.cljc"
+     :find "      :unsupported [{:rule :unsupported-op\n                     :detail (str \"この actor が提案できる op ではない（受領: \"\n                                  (pr-str op) \"、既知: \"\n                                  (pr-str (sort (keys operation/supported))) \"）\")}]"
+     :replace "      :unsupported []"
+     :must-fail ["hard-on-an-undeclared-op"
+                 "hard-on-a-misspelled-op-rather-than-skipping-its-rules"
+                 "the-actor-no-longer-commits-an-undeclared-op"]},
+
+    {:id :isco4225/reserved-reported-as-unsupported
+     :why "reserved op が :unsupported-op として報告される。**拒否は続く**ので `(:hard? v)` だけを見る test は緑のまま —— 窓口担当は「op を打ち間違えた」と読み、実際に起きたこと（個人情報の開示や公的記録の訂正に手を伸ばした）が監査に残らない"
+     :file "src/inquiry/operation.cljc"
+     :find "    (contains? reserved op)  {:status :reserved  :reason (get reserved op)}\n"
+     :replace ""
+     ;; classify-is-total は **意図的に外してある**。この repo の
+     ;; classify-is-total は「どの op も 3 つの bucket のどれか 1 つに入る」
+     ;; という totality だけを主張しており、reserved 節を落としても
+     ;; reserved op は :unsupported に落ちる = やはり bucket の 1 つなので、
+     ;; この test は正しく緑のまま通る。2026-09-06 に実測して外した ——
+     ;; 落ちない test を :must-fail に書くと、harness はこの mutation を
+     ;; 永久に「噛まない」と報告し続ける。
+     :must-fail ["hard-on-a-reserved-op-with-its-own-name"
+                 "reserved-ops-are-an-authority-boundary"
+                 "reserved-is-not-merely-unsupported"]},
+
+    {:id :isco4225/answer-required-field-dropped
+     :why ":answer-inquiry が :answer を要求しなくなる。回答文の無い『回答』が well-formed になる"
+     :file "src/inquiry/operation.cljc"
+     :find "    :requires   #{:answer}\n"
+     :replace "    :requires   #{}\n"
+     :must-fail ["an-answer-must-carry-an-answer"
+                 "hard-on-an-answer-with-no-answer"]},
+
+    {:id :isco4225/confidence-bound-dropped
+     :why "confidence の 0..1 検査が無効化される。2.5 はどの floor よりも上なので escalation を静かに越える（改修前の実挙動）"
+     :file "src/inquiry/operation.cljc"
+     :find "      (when-let [c (:confidence proposal)]\n        (when-not (and (number? c) (<= 0 c 1))\n"
+     :replace "      (when-let [c (:confidence proposal)]\n        (when-not (or true (and (number? c) (<= 0 c 1)))\n"
+     :must-fail ["a-stated-confidence-must-be-a-confidence"
+                 "hard-on-a-confidence-that-is-not-a-confidence"]},
+
+    {:id :isco4225/undatable-request-check-dropped
+     :why "日付を出さない要求が freshness 比較を**素通り**する。改修前はこれで 2023 年に失効した entry が 2026 年に配られていた（落ちるのではなく到達しない）"
+     :file "src/inquiry/governor.cljc"
+     :find "      (and answering? kb-record (operation/undatable-fault request))\n      (conj {:rule :undatable-request :detail (operation/undatable-fault request)})\n\n"
+     :replace ""
+     :must-fail ["hard-on-an-undatable-request"
+                 "the-actor-no-longer-serves-expired-knowledge-without-a-date"]},
+
+    {:id :isco4225/unservable-entry-check-dropped
+     :why "有効期限を言えない KB entry が servable になる。期限切れでないことを示せない項目が配られる"
+     :file "src/inquiry/governor.cljc"
+     :find "      (and answering? kb-record (operation/unservable-fault kb-record))\n      (conj {:rule :unservable-kb-entry :detail (operation/unservable-fault kb-record)})\n\n"
+     :replace ""
+     :must-fail ["hard-on-an-entry-that-cannot-state-its-expiry"]},
+
+    {:id :isco4225/authorisation-collapsed
+     :why "人が resume した commit と governor が自動で通した commit が、また同じ entry を書く。README が :publish-faq（外部公開）に約束した sign-off を監査が示せなくなる —— 改修前の実挙動そのもの"
+     :file "src/inquiry/actor.cljc"
+     :find "                           auth (if (= :request-approval disposition)\n                                  :human-sign-off\n                                  :governor-clear)]"
+     :replace "                           auth :governor-clear]"
+     :must-fail ["a-human-approved-publication-is-visible-as-such-in-the-ledger"
+                 "the-two-committed-entries-do-not-look-alike"]},
+
+    {:id :isco4225/ledger-accepts-unauthorised-entry
+     :why "何が書き込みを許可したかを名乗らない entry が台帳に入れるようになる"
+     :file "src/inquiry/ledger.cljc"
+     :find "    (not (authorisations authorisation))\n"
+     :replace "    (and false (not (authorisations authorisation)))\n"
+     :must-fail ["an-entry-without-an-authorisation-is-refused"
+                 "an-unknown-authorisation-is-refused"]},
+
+    {:id :isco4225/advisor-crashes-on-nil-op
+     :why "`(name nil)` が戻り、:advise が :govern の**手前**で throw する。crash は拒否ではない —— verdict も violation も ledger entry も出ないので、actor が存在する理由そのものが起きない"
+     :file "src/inquiry/advisor.cljc"
+     :find "   :rationale (str \"proposed \" (pr-str op) \" for client \" (:client-id request))})"
+     :replace "   :rationale (str \"proposed \" (name op) \" for client \" (:client-id request))})"
+     :must-fail ["a-nil-op-is-refused-rather-than-crashing-the-run"]}]},
+
   {:repo "orgs/cloud-itonami/cloud-itonami-isco-2151"
    :label "electeng actor refusals —— governed actor の主張は「拒否できること」そのもの"
    ;; 実測（改修前 tip f509ac8）: governor は 2 つの HARD 検査を
