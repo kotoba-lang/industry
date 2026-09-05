@@ -1457,7 +1457,77 @@
      :file "src/langchain/model.cljc"
      :find "body {:model (or model default-model)"
      :replace "body {:model model"
-     :must-fail ["anthropic-wire-format"]}]}
+     :must-fail ["anthropic-wire-format"]}
+
+    ;; ここから 8 件は message / prompt / tool / json —— 2026-09-05 に
+    ;; test ファイルを持っていなかった 4 namespace。**「テストが 1 つも無い」
+    ;; ようには見えなかった**のがこの 4 つの厄介なところで、5 つの test
+    ;; namespace が fixture 用に require していたので、grep は当たる。
+    ;; 当たっていたのは「他のものを試すための道具として通っている」だけで、
+    ;; その 4 つ自身の不変条件は 1 つも主張されていなかった。
+    ;;
+    ;; 8 件とも、**新しい test を外した 126 tests / 463 assertions の suite に
+    ;; 対して当てて緑のまま**であることを実測している（2026-09-05）——
+    ;; つまり「赤くなるところを見た」だけでなく「これが無ければ誰も見ていない」
+    ;; を両方向で示した。9 件目として試した `->openai` の :parameters →
+    ;; :input_schema は既存の `tool->openai-shape` が捕まえたので、
+    ;; **登録していない** —— 既に守られている不変条件をもう 1 度数えると、
+    ;; この台帳が「何を新しく守ったか」を答えられなくなる。
+    {:id :langchain/tool-calls-drops-seq
+     :why "空の tool-call 一覧が nil として読めること。`seq` を外すと空 vector がそのまま返り、Clojure では空 vector は truthy なので `(when (tool-calls m) ...)` が真になる。例外は出ない —— agent loop が 0 件の呼び出しを持つ message に対して回り続けるだけで、その message は完全に正当に見える"
+     :file "src/langchain/message.cljc"
+     :find "  (seq (:tool-calls msg)))"
+     :replace "  (:tool-calls msg))"
+     :must-fail ["tool-calls-reads-nil-when-there-are-none"]}
+
+    {:id :langchain/last-message-drops-vec
+     :why "`peek` は vector には末尾を、list には**先頭**を返す。`(vec messages)` を外しても vector を渡しているかぎり正しく答え続けるので、テストが vector しか渡さなければ緑のまま。会話履歴が list や lazy-seq で届いた瞬間、`last-message` は最初の発話を最後の発話として返す"
+     :file "src/langchain/message.cljc"
+     :find "(defn last-message [messages] (peek (vec messages)))"
+     :replace "(defn last-message [messages] (peek messages))"
+     :must-fail ["last-message-is-the-last-not-the-first"]}
+
+    {:id :langchain/text-ignores-string-keys
+     :why "content block が JSON を通って戻ってきたとき、キーは keyword ではなく文字列である。`(or (:type %) (get % \"type\"))` の後半を落としても、Clojure 側で組んだ block を読むかぎり全部通る —— 壊れるのは **model の応答を decode して読む経路だけ**で、それは単体テストが最も作りにくい入力"
+     :file "src/langchain/message.cljc"
+     :find "(when (= \"text\" (or (:type %) (get % \"type\")))\n                          (or (:text %) (get % \"text\")))"
+     :replace "(when (= \"text\" (:type %))\n                          (:text %))"
+     :must-fail ["text-reads-string-content-and-content-blocks"]}
+
+    {:id :langchain/prompt-drops-string-keys
+     :why "template 変数が文字列キーでも解決すること。keyword キーだけ見るようにしても、Clojure のコードから呼ぶかぎり全部通る。落ちるのは decode 済み JSON を values に渡した経路で、そこでは `Missing template variable` という **原因を名指ししているのに誤解を招く** 例外になる（変数は在る。キーの型が違うだけ）"
+     :file "src/langchain/prompt.cljc"
+     :find "(let [v (or (get values (keyword k))\n                                 (get values k)\n                                 ::missing)]"
+     :replace "(let [v (or (get values (keyword k))\n                                 ::missing)]"
+     :must-fail ["format-template-accepts-keyword-or-string-keys"]}
+
+    {:id :langchain/prompt-drops-brace-escape
+     :why "`{{` が literal な `{` へ落ちること。この escape を消しても、テンプレートに `{{` が出てこないかぎり 1 つも壊れない —— そして prompt に JSON の例や Clojure の map を書き込むまで、`{{` は出てこない。出てきた瞬間、中身が変数名として読まれて throw する"
+     :file "src/langchain/prompt.cljc"
+     :find "(str/replace #\"\\{\\{\" \"\\u0000\")\n      "
+     :replace ""
+     :must-fail ["format-template-escapes-a-literal-open-brace"]}
+
+    {:id :langchain/tool-stringifies-content-blocks
+     :why "tool が返した content block（screenshot の image block 等）が `str` を通らずに素通りすること。`(vector? r) r` を落とすと block が `\"[{:type \\\"image\\\"...}]\"` という文字列になる。**成功して見える** —— :error? は立たず、role も id も正しく、model に届くのが画像ではなく画像の pr-str だというだけ"
+     :file "src/langchain/tool.cljc"
+     :find "(cond (string? r) r (vector? r) r :else (str r))"
+     :replace "(cond (string? r) r :else (str r))"
+     :must-fail ["execute-passes-content-blocks-through-untouched"]}
+
+    {:id :langchain/tool-loses-error-flag
+     :why "tool が投げた例外が `:error? true` を伴う tool_result になること。flag を落とすと content は `\"Error: ...\"` のままなので **人間が読めば失敗と分かる**が、`:error?` を見る分岐と Anthropic の is_error は成功として扱う。model は失敗した呼び出しの戻り値を、正しい答えとして次の推論に使う"
+     :file "src/langchain/tool.cljc"
+     :find "{:role :tool :tool-call-id id :error? true\n         :content (str \"Error: \" (ex-message e))}"
+     :replace "{:role :tool :tool-call-id id\n         :content (str \"Error: \" (ex-message e))}"
+     :must-fail ["execute-turns-a-thrown-exception-into-an-error-result"]}
+
+    {:id :langchain/json-default-read-drifts
+     :why "`default-json-read` / `default-json-write` が本当に decode / encode であること。host が override を渡さないときこの 2 つが全 JSON 経路の codec になるので、ここが別物へ差し替わると **parser も kotoba_db も、injection を一切使っていない host 全部**が黙って別の codec で動く。名前は正しいまま"
+     :file "src/langchain/json.cljc"
+     :find "(def default-json-read  decode)"
+     :replace "(def default-json-read  identity)"
+     :must-fail ["the-host-injected-defaults-are-these-functions"]}]}
 
   {:repo "orgs/kotoba-lang/langchain-store"
    :label "langchain-store —— 316 consumer が黙って依存している store seam の不変条件"
