@@ -1,0 +1,42 @@
+[{:db/id -1
+  :adr/id "adr-2609051400-pr-backlog-two-instruments-and-the-gate-that-opened-on-unknown"
+  :adr/title "PR backlog: the drain saw part of the queue, the producers saw none of it, and the gate opened on unknown"
+  :adr/status "accepted"
+  :adr/date "2026-09-05"
+  :adr/related ["adr-2809042300-hermes-bot-repair-the-watchdog-had-been-down-longest"
+                "ADR-2608136000" "ADR-2607300900" "ADR-2608313500"]
+  :adr/context
+  "Owner, 2026-09-05: github で pr が積もってしまっているので, hermes agent bot で pr が積み上がらないように整えて.
+
+Measured before the work. 265 open PRs across the seven fleet orgs: 146 authored by com-junkawasaki, 99 by dependabot, 20 by others. Of our own 146, 87 were CONFLICTING and 54 were drafts; the oldest was 522 days old and 56 were over a week old. Throughput was not the problem -- 348 PRs merged on 09-04 alone. The residue was.
+
+Three separate breaks produced it, and only one of them was visible as a failure.
+
+1. THE DRAIN WAS BEING KILLED MID-DISCOVERY. pr-cleanup/pr-queue-review ran 11:32 to 13:00 -- 88 minutes -- and ended in `Interrupted by shutdown before terminal completion`, its second consecutive failure. It had no measurement prelude, so each run spent most of its budget re-discovering the queue with gh calls, and a run that does not finish disposes of nothing. A 6-hour period made this worse, not better: the longer the gap, the larger the queue each run had to rediscover.
+
+2. THE OTHER DRAIN COULD NOT SEE MOST OF THE QUEUE. kotoba-merger ran every 30 minutes, reported ok, and searched with `head:svelte-to-cljs` and `head:bot` prefixes. Branches named `agent/*` -- which is what the cleanup and coding bots produce -- were outside every query it made. A green job that has never looked at the majority of its own queue reports success truthfully and changes nothing.
+
+3. THE PRODUCERS HAD NO STOPPING CONDITION. cloud-itonami/otent carried 22 open PRs, 21 of them CONFLICTING, fed by six hourly jobs that each branch from main and touch the same files (src/otent/imagery.cljc, test/run.cljs). Each merge conflicts every sibling behind it. The repo merges its newest PR and leaves the rest to rot: PRs #1, #3, #6, #7, #11 have been open since 08-30/08-31 while #59 through #65 merged."
+  :adr/decision
+  "TWO INSTRUMENTS, one on each side of the queue. Source of truth is scripts/hermes-pr-queue/ in the superproject; profile copies are terminal-local.
+
+A. pr_queue_scan.cljs (nbb) + pr_queue_scan.py (thin launcher, because the Hermes runner executes .sh via bash and everything else via Python -- ADR-2809042300). One GraphQL search per org, paged; per PR it reports age, draft, mergeable, checks, files, and a blob-level containment verdict (are all the paths this PR touches already byte-identical in its base?). Output is a bounded, ranked worklist of at most 25 WORK lines with an action each: CLOSE-SUPERSEDED? / VERIFY-AND-MERGE / RESOLVE-THEN-MERGE / DRAFT-DECIDE / INVESTIGATE-RED. Full fleet scan measured at 37 seconds. It is wired as the cron `script:` of both drain jobs, so its stdout is injected into the agent prompt: the agent no longer discovers, it disposes.
+
+Evidence floor: one failed query prints REFUSED and exits 2 -- neither 0 nor 1, because the queue was not measured. A partial queue is never reported as a short one.
+
+B. backlog_gate.py, called from the producers' evidence scripts. It counts the bot's own open PRs in the repository it is about to open one in, and over cap (default 5) tells the run to drain one instead of adding another. Wired into all six otent jobs through their shared otent_vision_evidence.py, plus a matching rule in each of the six prompts.
+
+JOB REPAIRS. pr-queue-review: scan prelude, 360m -> 120m, and an explicit per-run budget (merge 3 / resolve 2 / close 3, stop at 25 minutes) because a run that finishes small beats a run that is killed large. pr-queue-pulse: paused, with paused_reason recorded in jobs.json -- its diff-only observation is now the scan prelude, and it was spending 10-16 agent-minutes per run re-measuring what the review job measures. kotoba-merger: head-prefix search removed, scan worklist as input, and its name field -- which held a fragment of its own prompt -- fixed to kotoba-merger-tick.
+
+THE GATE OPENED ON UNKNOWN, AND THAT WAS FOUND BY TESTING THE FAILING DIRECTION. `gh pr list --repo <nonexistent> --author X --json number` exits 0 and prints `[]`. Adding --author routes the query through search, which answers an unreachable repository the same way it answers a repository with no open PRs. Without a probe, a renamed, deleted, or out-of-reach repo reads as a short queue and the producer gate opens. The gate now resolves `gh api repos/<repo>` before counting, and all three states were exercised: over (exit 1, 22 PRs listed), under (exit 0), unresolvable (exit 1, blocked). unknown blocks exactly like over."
+  :adr/consequences
+  "Drain capacity is now 12 review runs a day at 3 merges plus 2 resolutions plus 3 closes each, against roughly 30-60 PRs a day that do not self-merge, and both drain bots see the whole queue rather than a prefix of it.
+
+Not fixed, and not claimed: the 99 open dependabot PRs. Since GitHub Actions is disabled fleet-wide (ADR-2607300900) those PRs can never carry a check, so `merge when green` is structurally unavailable for them -- the choice is to verify them by running the repo suite, or to stop generating them and keep only the alerts, which the workspace already measures through its own dependency-vulnerabilities detector. That is an owner decision and is left open.
+
+The backlog gate is wired into otent only. app-hyakka (13 open) is next; the helper is repo-agnostic and each producer needs one import plus one prompt clause.
+
+Side effect to disclose: testing the patched otent evidence script with OTENT_EVIDENCE_COOLDOWN_H=0 called throttle mark() and moved otent-earth-ingest's 24h cooldown forward to 2026-09-05T14:01 JST. The previous value is not recoverable and was not reconstructed, because inventing a timestamp is worse than reporting the loss. The practical effect is bounded: that repo is over cap, so the gate blocks it from producing anyway. Producer scripts must be tested with HERMES_CRON_THROTTLE_DIR pointed at a scratch directory.
+
+Verification: the scan was run against the live fleet from the profile workdir exactly as the runner invokes it (exit 0, 44 lines, 138 open at 14:06 JST); the gate was exercised in all three directions; the repaired pr-queue-review was triggered with `hermes cron run` and observed executing rather than read back from config."
+  :adr/tags ["hermes" "cron" "pr-queue" "fleet" "evidence-floor"]}]
