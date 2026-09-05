@@ -25,7 +25,7 @@
                    :why \"native backend が運ぶのは :i64 :bool :string :keyword :record :option :result のみ。:vector / :set / :map / :list / :variant / :document は x86_64.cljc / aarch64.cljc に 0 回しか現れない（実測 2026-08-07）。problem/problem-field は :document を返し、errors/warnings は problem の集合を返すので、:record で 1 件を表現し直しても書けない\"
                    :release-condition \"kotoba-native が collection / document 値を運べるようになること\"
                    :gate \"adr-2607279200 W4: Define recursive logical values with explicit node/depth/byte budgets\"}]
-     :interim \"未決。W4 までの間 12+ repo と loop-system-dynamics の XMILE 実行経路 6 本が壊れたまま残る。巻き戻すか否かはオーナー入力を要する（決定 5）\"
+     :interim \"未決。W4 までの間（当時 2026-08-07 の記録）12+ repo と loop-system-dynamics の XMILE 実行経路 6 本が壊れたまま残る。巻き戻すか否かはオーナー入力を要する（決定 5）。現行は ADR-2608650000 —— W4 は landed しており、待ちが残るなら named backend の未達であって言語計画の未着手ではない。\"
      :not-blocked-on [\"実装工数\" \"tender-native の capability gate\" \"消費側の書き換え\"]}]"
 
   :adr/supersedes []
