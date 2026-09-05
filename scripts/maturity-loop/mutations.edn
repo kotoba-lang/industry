@@ -7288,4 +7288,117 @@
    :file "src/nist/murakumo.cljc"
    :find "(merge {:$type coll}"
    :replace "(merge {:$type (:legacy-cell spec)}"
-   :must-fail ["planned-records-default-their-type-to-their-collection"]}]}]}
+   :must-fail ["planned-records-default-their-type-to-their-collection"]}]}
+
+  {:repo "orgs/cloud-itonami/cloud-itonami-isco-2165"
+   :label "cartography actor refusals —— 「拒否できること」が governed actor の主張そのもの"
+   ;; この repo は 2026-09-06 まで governor / store の 2 部品しか持たず、
+   ;; **governor が allowlist ではなく denylist** だった。実測（改修前 tip
+   ;; edccb9c）: 誰も宣言していない op を registered site に対して
+   ;; confidence 0.95 で投げると `{:ok? true :violations []}` を返し、書き込まれた。
+   ;;
+   ;; 加えて **人が承認した commit と自動 commit の ledger entry が byte 一致**
+   ;; していたので、README が主張する robotics premise（binding surveyor
+   ;; authority は professional のもの）が任意の write について守られたことを
+   ;; 監査が示せなかった。
+   ;;
+   ;; ここに載せる 12 件は **2026-09-06 に実際に赤くなるところを見た**もの。
+   ;; うち 2 件は「壊し方を間違えた赤」を経由している:
+   ;;   * site-provenance を壊したつもりで :site-not-a-record の枝を殺していた
+   ;;     （赤くはなったが、名乗った理由とは別の理由だった）
+   ;;   * 正しい変異を当てると end-to-end の
+   ;;     blank-site-registration-does-not-establish-provenance が**緑のまま**
+   ;;     だった —— request が先に落ちるので、名乗っていた rule に一度も
+   ;;     到達していなかった。test を 2 本に割って rule を名指しさせた。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors."
+   :mutations
+   [{:id :isco2165/vocabulary-check-dropped
+     :why "**穴そのもの**。governor が allowlist をやめて denylist に戻る形。宣言されていない op が admit され、書き込まれる"
+     :file "src/cartography/governor.cljc"
+     :find "        (facts/vocabulary-violations proposal)\n"
+     :replace ""
+     :must-fail ["undeclared-operation-is-held-by-the-graph"]},
+
+    {:id :isco2165/reserved-reported-as-undeclared
+     :why "reserved op が :undeclared-operation として報告される。どちらも赤だが、operator は「誰かが op を打ち間違えた」と読む —— 実際に起きたのは licensed surveyor の権限に手を伸ばしたこと"
+     :file "src/cartography/facts.cljc"
+     :find "      (op/reserved? o)\n      [{:rule :no-legal-authority :detail (op/reserved-reason o)}]\n\n      "
+     :replace "      "
+     :must-fail ["reserved-operation-is-held-as-an-authority-breach-not-a-typo"
+                 "vocabulary-classifies-undeclared-and-reserved-differently"]},
+
+    {:id :isco2165/no-actuation-dropped
+     :why ":effect :propose 以外を弾く hard invariant が消える形"
+     :file "src/cartography/governor.cljc"
+     :find "        (when (not= :propose (:effect proposal))\n          [{:rule :no-actuation :detail \"effect は :propose のみ許可（直接書込禁止）\"}])\n"
+     :replace ""
+     :must-fail ["hard-on-no-actuation-violation"]},
+
+    {:id :isco2165/no-site-rule-dropped
+     :why "未登録 site の provenance 検査が消える"
+     :file "src/cartography/governor.cljc"
+     :find "          [{:rule :no-site :detail \"未登録 site/project\"}]"
+     :replace "          []"
+     :must-fail ["unregistered-site-is-held-for-that-reason"]},
+
+    {:id :isco2165/site-id-check-neutered
+     :why "provenance が「store が何か返した」に戻る形。blank な登録が site invariant を破る。**この変異が end-to-end test の false attestation を暴いた**"
+     :file "src/cartography/facts.cljc"
+     :find "    (and (map? site-record) (blank? (:site-id site-record)))"
+     :replace "    (and (map? site-record) false)"
+     :must-fail ["blank-site-registration-is-a-violation"
+                 "non-string-site-id-is-a-violation"
+                 "a-store-returning-a-blank-record-does-not-establish-provenance"]},
+
+    {:id :isco2165/request-site-check-neutered
+     :why "request が site を名乗らなくてよくなる形"
+     :file "src/cartography/facts.cljc"
+     :find "    (and (map? request) (blank? (:site-id request)))"
+     :replace "    (and (map? request) false)"
+     :must-fail ["request-must-name-a-site"
+                 "request-without-a-site-is-held-for-that-reason"]},
+
+    {:id :isco2165/escalate-checked-before-hard
+     :why "順序が入れ替わると、hard-block された低確信の proposal が**人間の承認に回る** —— 誰も yes と答える権限が無い問いを人間に出すことになる"
+     :file "src/cartography/phase.cljc"
+     :find "    (:hard? verdict)     :hold\n    (:escalate? verdict) :request-approval"
+     :replace "    (:escalate? verdict) :request-approval\n    (:hard? verdict)     :hold"
+     :must-fail ["hard-beats-escalate"]},
+
+    {:id :isco2165/approval-provenance-hardcoded
+     :why "**穴そのもの**。人間が承認した write と自動の write が ledger 上で区別できなくなる（改修前の状態に戻る）"
+     :file "src/cartography/actor.cljc"
+     :find "                           approved-by (if (phase/approved-commit? disposition)\n                                         :human\n                                         :actor)]"
+     :replace "                           approved-by :actor]"
+     :must-fail ["human-approved-commit-is-distinguishable-in-the-ledger"]},
+
+    {:id :isco2165/ledger-chain-not-extended
+     :why "store が生の conj に戻る形。append-only が artifact の性質ではなく code path の性質に戻る"
+     :file "src/cartography/store.cljc"
+     :find "(swap! _ledger led/append entry)"
+     :replace "(swap! _ledger conj entry)"
+     :must-fail ["store-chains-every-append"
+                 "the-ledger-a-run-leaves-behind-verifies"]},
+
+    {:id :isco2165/ledger-hash-ignores-position
+     :why "hash が前の hash を混ぜなくなると、**同じ内容の entry を別の位置に置いても verify が通る**（replay が検出できない）"
+     :file "src/cartography/ledger.cljc"
+     :find "           h (mod (+ 1469598103 prev) modulus)]"
+     :replace "           h (mod (+ 1469598103 0) modulus)]"
+     :must-fail ["chain-hash-is-deterministic"]},
+
+    {:id :isco2165/verify-skips-hash
+     :why "verify が seq と prev だけ見る形。seq/prev を手で整えた偽造 entry が通る"
+     :file "src/cartography/ledger.cljc"
+     :find "          (not= (:ledger/hash e)\n                (chain-hash prev (dissoc e :ledger/hash)))"
+     :replace "          (and false (not= (:ledger/hash e)\n                (chain-hash prev (dissoc e :ledger/hash))))"
+     :must-fail ["edited-entry-breaks-the-chain"
+                 "relinked-entry-still-breaks-on-hash"]},
+
+    {:id :isco2165/sim-refusal-floor-removed
+     :why "harness が「拒否 0 件」でも PASS を返す形。**劇場に戻る変異** —— 拒否を 1 件も示さない governed actor の緑は何も意味しない"
+     :file "src/cartography/sim.cljc"
+     :find "               (pos? refusals))"
+     :replace "               true)"
+     :must-fail ["a-table-that-refuses-nothing-fails"]}]}]}
