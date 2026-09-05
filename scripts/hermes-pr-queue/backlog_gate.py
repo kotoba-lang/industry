@@ -22,6 +22,7 @@ Use from a producer's evidence script:
 """
 from __future__ import annotations
 
+import datetime as dt
 import json
 import os
 import subprocess
@@ -29,6 +30,12 @@ from typing import List, Tuple
 
 DEFAULT_CAP = int(os.environ.get("PR_BACKLOG_CAP", "5"))
 AUTHOR = os.environ.get("PR_BACKLOG_AUTHOR", "com-junkawasaki")
+# Only PRs older than this count against the cap. A burst is not a backlog: measured
+# 2026-09-05, network-awai/app-hyakka held 13 open PRs at one moment and merged over
+# 100 in the surrounding 24 hours, while cloud-itonami/otent held 22 whose median age
+# was days. Counting open PRs alone would have throttled the healthy loop and the
+# stuck one identically.
+STALE_HOURS = float(os.environ.get("PR_BACKLOG_STALE_HOURS", "6"))
 
 
 def _gh(args: List[str], timeout: int = 90) -> Tuple[bool, str]:
@@ -66,11 +73,15 @@ def measure(repo: str, cap: int = DEFAULT_CAP) -> dict:
     except json.JSONDecodeError:
         return {"status": "unknown", "open": None, "cap": cap, "prs": [], "why": "unparseable gh output"}
     prs.sort(key=lambda p: p.get("createdAt") or "")
+    cutoff = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=STALE_HOURS)).isoformat()
+    stale = [p for p in prs if (p.get("createdAt") or "9999") < cutoff]
     return {
-        "status": "over" if len(prs) >= cap else "under",
+        "status": "over" if len(stale) >= cap else "under",
         "open": len(prs),
+        "stale": len(stale),
+        "stale_hours": STALE_HOURS,
         "cap": cap,
-        "prs": prs,
+        "prs": stale or prs,
         "why": "",
     }
 
@@ -79,6 +90,7 @@ def print_gate(repo: str, cap: int = DEFAULT_CAP, show: int = 8) -> bool:
     """Print the gate block. Returns True when this run must NOT open a new PR."""
     m = measure(repo, cap)
     print(f"BACKLOG repo={repo} open={m['open'] if m['open'] is not None else 'unknown'} "
+          f"stale={m.get('stale', 'unknown')} (older than {m.get('stale_hours', STALE_HOURS)}h) "
           f"cap={m['cap']} status={m['status']}")
     if m["status"] == "under":
         return False
@@ -86,7 +98,8 @@ def print_gate(repo: str, cap: int = DEFAULT_CAP, show: int = 8) -> bool:
         print(f"BACKLOG-BLOCK the open-PR count could not be measured ({m['why']}); "
               "unknown is not under. Do not open a new PR this run.")
         return True
-    print("BACKLOG-BLOCK this repository is at or over its open-PR cap. Do NOT open a new PR "
+    print("BACKLOG-BLOCK this repository is at or over its cap of PRs that nobody has drained. "
+          "Do NOT open a new PR "
           "this run. Drain exactly one of the PRs below instead: merge origin/main INTO the PR "
           "branch (never rebase, never force-push), run the repo's own suite, and merge it; or, "
           "if its content is already in main, close it with the containment evidence. Report what "

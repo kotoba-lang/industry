@@ -52,6 +52,11 @@ python3 scripts/hermes-pr-queue/backlog_gate.py cloud-itonami/otent   # exit 1 =
 
 3 状態（`under` / `over` / `unknown`）を出し、**unknown は over と同じく塞ぐ**。
 
+**数えるのは open ではなく「誰も流していない」PR**（既定 6h より古いもの。`PR_BACKLOG_STALE_HOURS`）。
+burst は backlog ではない —— app-hyakka は一瞬 13 件 open を抱えつつ 24h で 100 件以上 merge して
+おり、otent の 22 件は日単位で止まっていた。open 数だけで数えると、**健全な loop と詰まった
+loop に同じ栓をする**。
+
 ⚠ **`gh pr list --repo <存在しない repo> --author X --json …` は exit 0 で `[]` を返す**
 （`--author` を付けると search 経路に入り、到達できない repo を「open PR なし」と答える。
 実測 2026-09-05）。だから gate は数える前に `gh api repos/<repo>` で repo を解決する。
@@ -74,4 +79,5 @@ re-copy し、`python3 scripts/hermes-cron-jobs/export_cron.py` で cron 台帳�
 - **dependabot 99 件**は別問題。GitHub Actions は fleet 全体で無効（ADR-2607300900）なので
   これらの PR は **checks を一度も持てない** — 「緑だから merge」が構造的に成立しない。
   merge するか、PR 生成を止めて alert だけ残すかは owner 判断。ADR-2609051400 に記録。
-- backlog gate が入っているのは otent の 6 job だけ。次は app-hyakka（open 13）。
+- backlog gate が入っているのは otent の 6 job だけ。**次に入れる先は scan の `OVERCAP` 行が
+  名指しする repo**（ここに repo 名を焼かない。over かどうかは測るたびに変わる）。
