@@ -1,0 +1,37 @@
+[{:db/id -1
+  :adr/id "adr-2609051900-cleanup-sweep-stashes-branches-and-what-additive-actually-held"
+  :adr/title "Cleanup sweep: 22 stashes, 55 branches, and what the :additive class actually held"
+  :adr/status "accepted"
+  :adr/date "2026-09-05"
+  :adr/related ["adr-2609051700-orphan-audit-a-permanent-exit-2-that-told-you-to-retry"
+                "adr-2609051400-pr-backlog-two-instruments-and-the-gate-that-opened-on-unknown"
+                "ADR-2608136000"]
+  :adr/context
+  "A cleanup pass over the superproject and the west-managed children, run through skill git-cleanup-conflict.
+
+Starting state: 6 superproject stashes, 21 child-repo stashes across 10 object stores, 37 local branches, 32 remote branches on com-junkawasaki/root, 61 UNLANDED child repos of which 15 held untracked work.
+
+Two measurement notes that changed what the numbers mean. The survey reported stash counts of 12 for each of _wt-merge, _wt-prs-0904 and app-hyakka; those are three paths onto one object store, so the fleet held 12 of those stashes and not 36 -- linked worktrees keep the stash ref in the common dir. And .git is not always a directory: 22 checkouts carry a gitdir pointer file, which an enumeration written as `find -type d` cannot see (the blindspot cleanup-workflow records for cleanup-land). Resolving the gitdir first is what made the scan complete."
+  :adr/decision
+  "STASHES: 22 retired to zero, every one archived first (patch plus the stash^3 untracked file list) under each repository's own git dir, with the verdict written into index.txt beside it.
+
+Four held substantive source and were rescued to pushed branches rather than merged, so nothing waits on review: cloud-itonami/cloud-itonami-app (server.clj, 143 unlanded lines), gftdcojp/ai-gftd-yukkuri (a 171-file py-to-cljc migration snapshot), kotoba-lang/kotoba-sema (compiler frontend.cljc, 16 of 17 lines unlanded), and kotoba-lang/kotoba-lang, whose message said 'Preserved, not dropped'. That last one is the judgement worth recording: a stash is destroyed by any `git stash clear`, so moving it to a pushed branch preserves it MORE strongly than honouring the word 'stash' would have.
+
+The other 18 were archived and dropped: five app-hyakka entries whose tracked diff is empty and whose whole content is .gp-analysis-out scratch reachable only through stash^3; two landed; five pre-run corpus stashes for a scout that regenerates them hourly; three generated worker bundles or build output whose own messages say generated; two bench outputs; and one evidence-table row edit.
+
+A superproject stash appeared mid-sweep, created by a concurrent session five minutes earlier. It carried the same shape as the others -- a regenerable observatory projection plus three funnel pulses that nothing regenerates -- so its pulses were rescued too. Fourteen pulses in total reached main across two commits.
+
+BRANCHES: 32 local and 23 remote deleted, each archived (diff versus origin/main plus commit log) first. Four coverage-scout branches were not ancestors of main but were content-contained; the one that differed did so in a single reworded note line. Never touched: git-annex, branches checked out in another session's worktree, and six remote branches whose containment could not be shown.
+
+WHAT :additive ACTUALLY HELD. The land plan proposed 7 additive-only repositories, 1,148 files. Reading them instead of counting them: kotoba-lang/cron's 7 files are a live scheduler's runtime (a SQLite ledger with WAL sidecars, two dispatch locks, two ticker stamps); net-kotobase/docs' 651 are bench scripts and their output; kotoba-lang/torihiki's 433 are 282 txt, 96 log and 41 out under evidence/. Exactly one candidate was unambiguous work -- kotoba-lang/ioplan's test/ioplan/tranche1_test.cljc, on no branch and no remote -- and it was landed (PR #1, merged).
+
+The durable repair is not a judgement call repeated every sweep; it is the repository declaring what it does not track, because cleanup-land already reads the BASE branch's .gitignore. kotoba-lang/cron now declares its seven runtime paths. Verified in both directions before landing, with a candidate excludesFile: all 7 untracked runtime files become ignored, none of the 14 tracked files does. And in the real pipeline afterwards: `plan :additive 7 files` became `skip base-ignored 7 件 … additive=0`."
+  :adr/consequences
+  "Fleet stash count is zero and both archives are in place, so every dropped entry is recoverable without relying on reflog or gc.
+
+Two repositories are deliberately left undecided, with the measurement that decides them. net-kotobase/docs TRACKS bench38_out.json, bench38_out.txt and bench38_z2.py while 187 sibling bench* files sit untracked -- so bench output is a tracked artifact class there and a blanket ignore would be wrong; someone with the repo's intent should say which runs are evidence. kotoba-lang/torihiki tracks nothing under evidence/ or status/ at all, and its 519 untracked files there are 56 dated .md documents mixed with 419 run outputs. Deciding either from outside would be the same error the residue gate exists to prevent, run backwards: absence from main is not proof that something is scratch, any more than it is proof that something is new.
+
+Not done, and not claimed: `west update --fetch smart` was not run (measured at roughly four hours over 4,022 projects, on a machine already at load 26), so the skip-set population that the workflow calls the accurate inventory of local-only work is unmeasured for this pass. Freshness came instead from fetching each judged repository individually, which the workflow states is the only mechanism that provides it.
+
+Still standing: the shared superproject checkout sits on another session's branch agent/hakobi-vdt-pin with an unpushed commit, so ff-only sync is blocked until that session pushes; 60 UNLANDED child repos remain, and orgs/kotoba-cli-verify-120601/repo remains unclassified by design."
+  :adr/tags ["cleanup" "stash" "branches" "west" "evidence-floor"]}]
