@@ -1,35 +1,13 @@
-{:as-of "2026-08-22",
+{:as-of "2026-09-04",
  :sources [:cloudflare :health :emitter],
- :workers-invocations-7d {"nexus-x402" 2362},
+ :workers-invocations-7d {"nexus-x402" 6164},
  :health-status 200,
  :catalog
  {:x402Version 1,
   :service "nexus-x402",
-  :count 16,
+  :count 31,
   :items
-  [{:seller "kotobase",
-    :method "GET",
-    :path-prefix "/x402/ipfs/",
-    :gateway "https://x402.nexus/gateway/kotobase/x402/ipfs/…",
-    :description nil,
-    :price
-    {:usd "0.001",
-     :micros "1000",
-     :asset "USDC",
-     :network "base",
-     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"}}
-   {:seller "kotobase",
-    :method "POST",
-    :path-prefix "/x402/xrpc/",
-    :gateway "https://x402.nexus/gateway/kotobase/x402/xrpc/…",
-    :description nil,
-    :price
-    {:usd "0.002",
-     :micros "2000",
-     :asset "USDC",
-     :network "base",
-     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"}}
-   {:seller "kekkai",
+  [{:seller "kekkai",
     :method "POST",
     :path-prefix "/kekkai/x402/",
     :gateway "https://x402.nexus/gateway/kekkai/kekkai/x402/…",
@@ -154,6 +132,20 @@
      :asset "USDC",
      :network "base",
      :payTo "0x4945092C6586F078E0eD2130a53b0CDEe90c6796"}}
+   {:seller "hyakka",
+    :method "POST",
+    :path-prefix "/x402/query",
+    :gateway "https://x402.nexus/gateway/hyakka/x402/query…",
+    :description
+    "One 15-minute multi-hop join pass over the wiki.kotobase.net claim graph: up to 3 hops, either direction, across any of the corpora listed at /api/v1/datasets. Single-hop lookups stay free at /api/v1/corpus/*. Claims are CC0-1.0; the price is for the traversal, not for rights in the data.",
+    :direct "https://wiki.kotobase.net/x402/query…",
+    :settles-via-facilitator true,
+    :price
+    {:usd "0.05",
+     :micros "50000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"}}
    {:seller "murakumo",
     :method "POST",
     :path-prefix "/x402/v1/chat/completions",
@@ -166,7 +158,27 @@
      :micros "10000",
      :asset "USDC",
      :network "base",
-     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"}}
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
+    :credits
+    {:amount "1",
+     :asset "CREDITS",
+     :network "murakumo",
+     :scheme "credits",
+     :payTo "murakumo",
+     :redeemable false}}
+   {:seller "murakumo",
+    :method "POST",
+    :path-prefix "/x402/v1/chat/completions",
+    :gateway
+    "https://x402.nexus/gateway/murakumo/x402/v1/chat/completions…",
+    :description
+    "per-request LLM inference (OpenAI-compatible), up to 25,000 output tokens per request",
+    :price
+    {:usd "0.01",
+     :micros "10000",
+     :asset "USDC",
+     :network "base-sepolia",
+     :payTo "0xD030410BABA777b1e7FacABf679295641203628A"}}
    {:seller "murakumo",
     :method "POST",
     :path-prefix "/x402/v1/infer-memory",
@@ -179,7 +191,205 @@
      :micros "10000",
      :asset "USDC",
      :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
+    :credits
+    {:amount "1",
+     :asset "CREDITS",
+     :network "murakumo",
+     :scheme "credits",
+     :payTo "murakumo",
+     :redeemable false}}
+   {:seller "murakumo",
+    :method "POST",
+    :path-prefix "/x402/v1/infer-memory",
+    :gateway
+    "https://x402.nexus/gateway/murakumo/x402/v1/infer-memory…",
+    :description
+    "infer+memory: OpenAI-compatible inference plus durable Kotobase receipt CID, up to 25,000 output tokens per request",
+    :price
+    {:usd "0.01",
+     :micros "10000",
+     :asset "USDC",
+     :network "base-sepolia",
+     :payTo "0xD030410BABA777b1e7FacABf679295641203628A"}}
+   {:seller "murakumo",
+    :method "POST",
+    :path-prefix "/x402/v2/chat/completions",
+    :gateway
+    "https://x402.nexus/gateway/murakumo/x402/v2/chat/completions…",
+    :description
+    "x402 v2 EIP-3009 per-request LLM inference (OpenAI-compatible), up to 25,000 output tokens",
+    :price
+    {:usd "0.01",
+     :micros "10000",
+     :asset "USDC",
+     :network "base",
      :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"}}
+   {:seller "murakumo",
+    :method "POST",
+    :path-prefix "/x402/v2/chat/completions",
+    :gateway
+    "https://x402.nexus/gateway/murakumo/x402/v2/chat/completions…",
+    :description
+    "x402 v2 EIP-3009 per-request LLM inference (OpenAI-compatible), up to 25,000 output tokens",
+    :price
+    {:usd "0.01",
+     :micros "10000",
+     :asset "USDC",
+     :network "base-sepolia",
+     :payTo "0xD030410BABA777b1e7FacABf679295641203628A"}}
+   {:seller "murakumo",
+    :method "POST",
+    :path-prefix "/x402/v2/infer-memory",
+    :gateway
+    "https://x402.nexus/gateway/murakumo/x402/v2/infer-memory…",
+    :description
+    "x402 v2 infer+memory with Kotobase operation lifecycle and durable receipt CID, up to 25,000 output tokens",
+    :price
+    {:usd "0.01",
+     :micros "10000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"}}
+   {:seller "murakumo",
+    :method "POST",
+    :path-prefix "/x402/v2/infer-memory",
+    :gateway
+    "https://x402.nexus/gateway/murakumo/x402/v2/infer-memory…",
+    :description
+    "x402 v2 infer+memory with Kotobase operation lifecycle and durable receipt CID, up to 25,000 output tokens",
+    :price
+    {:usd "0.01",
+     :micros "10000",
+     :asset "USDC",
+     :network "base-sepolia",
+     :payTo "0xD030410BABA777b1e7FacABf679295641203628A"}}
+   {:seller "kotobase",
+    :method "GET",
+    :path-prefix "/x402/ipfs/",
+    :gateway "https://x402.nexus/gateway/kotobase/x402/ipfs/…",
+    :description "per-request content-addressed storage read",
+    :price
+    {:usd "0.001",
+     :micros "1000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
+    :credits
+    {:amount "0.1",
+     :asset "CREDITS",
+     :network "murakumo",
+     :scheme "credits",
+     :payTo "kotobase",
+     :redeemable false}}
+   {:seller "kotobase",
+    :method "GET",
+    :path-prefix "/x402/ipfs/",
+    :gateway "https://x402.nexus/gateway/kotobase/x402/ipfs/…",
+    :description "per-request content-addressed storage read",
+    :price
+    {:usd "0.001",
+     :micros "1000",
+     :asset "USDC",
+     :network "base-sepolia",
+     :payTo "0xD030410BABA777b1e7FacABf679295641203628A"}}
+   {:seller "kotobase",
+    :method "POST",
+    :path-prefix "/x402/xrpc/",
+    :gateway "https://x402.nexus/gateway/kotobase/x402/xrpc/…",
+    :description
+    "per-query knowledge-graph read (datomic.q / graph.sparql / graph.query / datomic.datoms / datomic.pull; explicit graph CID in body, no account)",
+    :price
+    {:usd "0.002",
+     :micros "2000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
+    :credits
+    {:amount "0.2",
+     :asset "CREDITS",
+     :network "murakumo",
+     :scheme "credits",
+     :payTo "kotobase",
+     :redeemable false}}
+   {:seller "kotobase",
+    :method "POST",
+    :path-prefix "/x402/xrpc/",
+    :gateway "https://x402.nexus/gateway/kotobase/x402/xrpc/…",
+    :description
+    "per-query knowledge-graph read (datomic.q / graph.sparql / graph.query / datomic.datoms / datomic.pull; explicit graph CID in body, no account)",
+    :price
+    {:usd "0.002",
+     :micros "2000",
+     :asset "USDC",
+     :network "base-sepolia",
+     :payTo "0xD030410BABA777b1e7FacABf679295641203628A"}}
+   {:seller "hanmoto",
+    :method "GET",
+    :path-prefix "/x402/counts",
+    :gateway "https://x402.nexus/gateway/hanmoto/x402/counts…",
+    :description nil,
+    :price
+    {:usd "0.001",
+     :micros "1000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"}}
+   {:seller "hanmoto",
+    :method "GET",
+    :path-prefix "/x402/counts",
+    :gateway "https://x402.nexus/gateway/hanmoto/x402/counts…",
+    :description nil,
+    :price
+    {:usd "0.001",
+     :micros "1000",
+     :asset "USDC",
+     :network "base-sepolia",
+     :payTo "0xD030410BABA777b1e7FacABf679295641203628A"}}
+   {:seller "hanmoto",
+    :method "GET",
+    :path-prefix "/x402/host/",
+    :gateway "https://x402.nexus/gateway/hanmoto/x402/host/…",
+    :description nil,
+    :price
+    {:usd "0.001",
+     :micros "1000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"}}
+   {:seller "hanmoto",
+    :method "GET",
+    :path-prefix "/x402/host/",
+    :gateway "https://x402.nexus/gateway/hanmoto/x402/host/…",
+    :description nil,
+    :price
+    {:usd "0.001",
+     :micros "1000",
+     :asset "USDC",
+     :network "base-sepolia",
+     :payTo "0xD030410BABA777b1e7FacABf679295641203628A"}}
+   {:seller "hanmoto",
+    :method "GET",
+    :path-prefix "/x402/unclassified",
+    :gateway "https://x402.nexus/gateway/hanmoto/x402/unclassified…",
+    :description nil,
+    :price
+    {:usd "0.002",
+     :micros "2000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"}}
+   {:seller "hanmoto",
+    :method "GET",
+    :path-prefix "/x402/unclassified",
+    :gateway "https://x402.nexus/gateway/hanmoto/x402/unclassified…",
+    :description nil,
+    :price
+    {:usd "0.002",
+     :micros "2000",
+     :asset "USDC",
+     :network "base-sepolia",
+     :payTo "0xD030410BABA777b1e7FacABf679295641203628A"}}
    {:seller "shinshi",
     :method "GET",
     :path-prefix "/x402/premium/",
@@ -192,24 +402,26 @@
      :network "base",
      :payTo "0xf1592811063554e2EDfC137964aE181C830967Ac"}}],
   :settlements
-  {:count 8,
-   :usd-total 0.07100000000000001,
-   :agent-hint {:agent 7, :human 0, :unknown 1},
+  {:count 7,
+   :usd-total 0.083,
+   :recorded 11,
+   :duplicates 4,
+   :agent-hint {:agent 5, :human 0, :unknown 2},
    :sources
    {:direct
-    {:paid-calls 1,
-     :paying-wallets 1,
-     :unique-repeat-buyers 0,
-     :repeat-rate 0,
-     :service-gmv-usd 0.001,
-     :repeat-buyer-revenue-usd 0,
-     :repeat-buyer-revenue-share 0},
+    {:paid-calls 4,
+     :paying-wallets 3,
+     :unique-repeat-buyers 1,
+     :repeat-rate 0.3333333333333333,
+     :service-gmv-usd 0.053000000000000005,
+     :repeat-buyer-revenue-usd 0.002,
+     :repeat-buyer-revenue-share 0.03773584905660377},
     :direct-agent
-    {:paid-calls 7,
+    {:paid-calls 3,
      :paying-wallets 1,
      :unique-repeat-buyers 1,
      :repeat-rate 1,
-     :service-gmv-usd 0.07,
-     :repeat-buyer-revenue-usd 0.07,
+     :service-gmv-usd 0.03,
+     :repeat-buyer-revenue-usd 0.03,
      :repeat-buyer-revenue-share 1}}}}, 
- :signal "workers 2362 inv/7d"}
+ :signal "workers 6164 inv/7d"}
