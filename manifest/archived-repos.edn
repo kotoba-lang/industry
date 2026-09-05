@@ -1,6 +1,6 @@
 ;; manifest/archived-repos.edn — 生成物。手で編集しない。
 ;; 再生成: nbb --classpath ".:scripts/nbb_compat" scripts/gen-archived-repos.cljs
-{:generated-at "2026-09-05T10:14:07.177Z"
+{:generated-at "2026-09-05T10:44:51.146Z"
  :source "gh api orgs/<org>/repos?type=all --paginate"
  :note "生成物（手編集禁止）。archived な repo は測定からは外さない —— スコアと fleet 平均には従来どおり入る。これが縛るのは itonami-maturity-improve loop の候補選択だけ。"
  :orgs ["cloud-itonami" "etzhayyim" "kotoba-lang" "network-awai"]
@@ -10,6 +10,7 @@
          "network-awai" {:total 44}}
  :archived-count 34
  :archived ["orgs/cloud-itonami/ads"
+            "orgs/cloud-itonami/ai-gftd-kaisya"
             "orgs/cloud-itonami/ai-kaisya"
             "orgs/cloud-itonami/app-shopping"
             "orgs/cloud-itonami/app-videos-legacy"
