@@ -7402,6 +7402,79 @@
      :find "               (pos? refusals))"
      :replace "               true)"
      :must-fail ["a-table-that-refuses-nothing-fails"]}]}
+  {:repo "orgs/cloud-itonami/cloud-itonami-assoc-6920-jpn-jicpa"
+   :label "JICPA 引用カタログ —— 「その引用は、いま効力のある版を指しているのか」"
+   ;; 姉妹の AICPA suite が「その URL は名乗っている文書に解決するのか」を問うのに
+   ;; 対し、こちらは **その一段先** —— URL は正しい文書に解決するが、その文書が
+   ;; **古い版**である、という形を問う。status code も content-type も
+   ;; ホスト名も、この違いを一切答えない。
+   ;;
+   ;; 実測（2026-09-06）: 倫理規則の引用は 2-22-0-2-20190618.pdf を指しており、
+   ;; その PDF の表紙は確かに「最終改正2019年７月22日」と書いてある。つまり
+   ;; 記述は**その文書について正しかった**。しかし同じ文書コード 2-22-0-2 の
+   ;; 現行版 (…-20260730.pdf) の表紙は改正の連鎖を印字している:
+   ;;
+   ;;     2019-07-22 → 2022-07-25 → 2024-07-18 → 2025-07-23 → 2026-07-22
+   ;;
+   ;; うち 3 つは この entry 自身の :retrieved-at "2026-07-15" より**前**にある。
+   ;; 記録は後から古くなったのではなく、**書かれた時点で既に古かった**。
+   ;;
+   ;; なぜ検査が捕まえなかったか: `last-revised-date` は最初の commit から cljc に
+   ;; 在り、Kotoba port に一度も移されていなかったので、parity test の比較対象
+   ;; フィールド列に載っていなかった。**どの版の話なのかを言う唯一のフィールドが、
+   ;; 誰も突き合わせていないフィールドだった。** 改修前の tree で実測: その日付を
+   ;; 1900-01-01 に変えても 10 test すべて緑、一方 URL を変えると赤 —— suite が
+   ;; 不活性だったのではなく、穴がそのフィールドに固有だった。
+   ;;
+   ;; ここに載せる 6 件は **2026-09-06 に実際に赤くなるところを見た**もの。
+   ;; :by-topic-index-drift は「index 0 だけ見るテスト」なら緑のままになる形に
+   ;; 絞ってある —— by-topic-count は 5 のまま、index 0 の答えも正しいまま、
+   ;; governance の i=2 の 1 assertion だけが落ちる。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors."
+   :mutations
+   [{:id :jicpa/port-answers-a-superseded-edition
+     :why "port が現行版ではなく 2019 年版の改正日を答える。**改修前はこの形が存在すらできなかった**（フィールドが port に無かった）ので、この mutation が赤いことがギャップの解消そのものの証拠になる"
+     :file "src/association_facts.kotoba"
+     :find "(string=? f \"last-revised-date\") (option-some-of [:option :string] \"2026-07-22\")"
+     :replace "(string=? f \"last-revised-date\") (option-some-of [:option :string] \"2019-07-22\")"
+     :must-fail ["every-field-of-every-entry-is-transcribed"]}
+
+    {:id :jicpa/port-drops-the-superseded-url
+     :why "訂正の痕跡が消える。supersedes-url が黙って NONE になると「この引用は一度間違っていた」が答えられなくなり、後の周が 2019 年版を現行として再登録できてしまう"
+     :file "src/association_facts.kotoba"
+     :find "(string=? f \"supersedes-url\") (option-some-of [:option :string] \"https://jicpa.or.jp/specialized_field/2-22-0-2-20190618.pdf\")"
+     :replace "(string=? f \"supersedes-url\") (option-none-of [:option :string])"
+     :must-fail ["every-field-of-every-entry-is-transcribed"]}
+
+    {:id :jicpa/by-topic-index-drift
+     :why "governance の i=2 だけが別 entry を指す。count は 5 のまま、index 0 も正しいままなので、**index 0 しか見ないテストなら緑のまま通る** —— カタログが 2 件だった頃はどの topic も 1 件ずつで、その盲点が見えなかった"
+     :file "src/association_facts.kotoba"
+     :find "(cond (= i 0) 1 (= i 1) 3 (= i 2) 4 (= i 3) 5 (= i 4) 6 :else 99)"
+     :replace "(cond (= i 0) 1 (= i 1) 3 (= i 2) 5 (= i 3) 5 (= i 4) 6 :else 99)"
+     :must-fail ["by-topic-answers-the-same-entries-at-every-index"]}
+
+    {:id :jicpa/compared-field-list-shrinks
+     :why "**検査の検査**。比較対象フィールド列から 1 つ落ちると、そのフィールドは port に在るのに突き合わされなくなる —— last-revised-date が最初の commit から辿った経路そのもの。この guard の最初の版は `fields` ではなく `kw->field` を読んでいたため、この mutation で**緑のまま通った**（mutation で発見し、修正した）"
+     :file "test/association_facts_kotoba_parity_test.clj"
+     :find "\"supersedes-url\" \"established-date\" \"last-revised-date\" \"retrieved-at\"])"
+     :replace "\"supersedes-url\" \"established-date\" \"retrieved-at\"])"
+     :must-fail ["the-compared-field-set-covers-every-field-the-catalog-uses"]}
+
+    {:id :jicpa/tx-data-drifts-from-the-catalog
+     :why "他 repo が実際に query するのは data/datascript-tx.edn の方であり、catalog とは別に手で保たれている。両者が食い違うと **cljc は片方の URL を答え、全ての consumer はもう片方を読む** —— それぞれ単体では正しく見える"
+     :file "data/datascript-tx.edn"
+     :find ":url \"https://jicpa.or.jp/about/activity/self-regulatory/lcaf/\""
+     :replace ":url \"https://jicpa.or.jp/about/activity/self-regulatory/lcaf-OLD/\""
+     :must-fail ["the-tx-data-file-says-what-the-catalog-says"]}
+
+    {:id :jicpa/citation-moves-off-the-association-domain
+     :why "引用が JICPA の発行面から離れる。:url-provenance :official-association-site は**主張**であって検査ではないので、その主張自体を突き合わせる"
+     :file "src/association/facts.cljc"
+     :find "\"https://jicpa.or.jp/about/activity/self-regulatory/monitoring/\""
+     :replace "\"https://example.com/about/activity/self-regulatory/monitoring/\""
+     :must-fail ["every-citation-is-on-the-association-s-own-domain"]}]}
+
   {:repo "orgs/cloud-itonami/cloud-itonami-assoc-6920-usa-aicpa"
    :label "AICPA 引用カタログ —— 「その URL は、名乗っている文書に本当に解決するのか」"
    ;; この repo は 2026-09-06 まで 2 件しか引用を持たず、AICPA が実際に発行して
