@@ -1,0 +1,186 @@
+[{:db/id -1
+ :adr/id "adr-2609051700-worker-cpu-base32-seq-expansion"
+ :adr/title "Worker CPU の 98.5% は base32 が 1 バイトを 8 要素の seq に展開していたこと"
+ :adr/status "accepted"
+ :adr/date "2026-09-05"
+ :adr/related ["adr-2608136000" "adr-2607300900" "adr-2608231600"]
+ :adr/body "# 何を測ったか
+
+オーナーの問い「Worker CPU が飽和しているが原因は?」に対する実測。
+
+Cloudflare account 4da88288 の 7 日間（GraphQL workersInvocationsAdaptive、
+requests x cpuTimeP50）:
+
+| Worker | CPU 秒 / 7 日 |
+|---|---:|
+| local-murakumo (api.murakumo.cloud) | 1,705,053 |
+| 他 79 本の合計 | 25,225 |
+
+**1 本で 98.5%。** 2.8 コアを 24 時間まわし続けている量である。
+
+wrangler tail の 45 秒サンプル（126 リクエスト、CPU 計 95.6 秒）で内訳を取ると:
+
+| path | 件数 | 平均 CPU | 平均 wall |
+|---|---:|---:|---:|
+| /infer/queue | 112 | 760 ms | 882 ms |
+| /infer/nodes/*/heartbeat | 8 | 1,176 ms | 2,290 ms |
+| /infer/hwmetrics | 4 | 3 ms | 156 ms |
+
+**cpu/wall = 86%** なので上流待ちではなく計算。そして `/infer/queue` を直接叩くと
+**応答は `[]`（2 バイト）**で 780〜1,360 ms。出力を作る費用ではない。
+
+負荷源は 1 つの IP から来る 5 体の Node poller で、各々約 1.9 秒周期。既定の
+poll-ms は 5000 だが実測周期はその 1/5 だった。
+
+# 原因の切り分け（推測が 3 回外れた記録）
+
+最初の 3 つの仮説はすべて外れており、外れ方に価値があるので残す。
+
+1. **「legacy catalog のデコードが支配的」** — R2 の実データを引くと catalog
+   directory に `legacy` リンクが**存在しない**。その経路は 1 ブロックも読まない。
+2. **「shard を大量にフェッチしている」** — hot window（10 分）の shard range
+   フィルタを実データに当てると **通過 shard は 0**。`event-read!` は 1 ブロックも
+   取得せず、EDN パースも 0 件だった。
+3. **「メルクル read が重い」** — 方向は合っていたが、重いのは read そのものでは
+   なく、read が 1 回ずつ行う **30 KB の catalog-directory ブロックのデコード**
+   だった。
+
+**コードを読んで得た確信は 3 回とも間違っており、R2 の実バイトを引いて測った
+ときだけ正しかった。**
+
+# 支配項
+
+実データ（30,155 バイト、643 リンク）を advanced-compiled ClojureScript で測る:
+
+| 段階 | ms/op |
+|---|---:|
+| cbor/decode | 0.9 |
+| `<-cbor-data`（tag 42 -> Link、643 本） | ~97 |
+| ipld/encode（validate! + 再エンコード） | 12.6 |
+| canonical 検証（byte-vector x2 + =） | 6.5 |
+| **ipld/decode 全体** | **124** |
+
+`ipld/decode` は canonical 性を保証するために**デコードのたびに全体を再エンコード
+して元バイトと突き合わせる**。これは意図的な不変条件であり、docstring がその理由を
+書いている（content-addressed identity 層が非 canonical な綴りを受け入れると、
+2 つのバイト列が 1 つの値を指しながら別の CID を持つ）。
+
+問題はその不変条件ではなく、支払い方だった。
+
+1. **`multiformats.base32/encode`** が 1 バイトを 8 要素の lazy seq に展開し、
+   `partition 5` で組み直し、各群を concat/repeat/count/reduce で再構築していた。
+   36 バイトの CID 1 本で 288 seq 要素と 58 個の中間コレクション。DAG-CBOR の
+   リンクは全部 CID なので、再エンコードでリンク 1 本につき 1 回これを払う。
+2. **canonical 検証**が `(= (byte-vector a) (byte-vector b))` で、30,155 要素の
+   PersistentVector を 2 本作っていた。どちらの vector も他では使われない。
+
+# co-scientist ループ
+
+fitness は**実測 ms**（LLM 判定でも heuristic でもない）。候補は incumbent との
+差分テストを通ってから数字が数えられる。
+
+| 候補 | 実測 | 判定 |
+|---|---|---|
+| H3 base32/encode をビット蓄積器に | 0.1511 -> 0.0064 ms/CID（23.6x） | 採用 |
+| H2b canonical 検証を 1 パスに | 6.5 -> 0.49 ms（13x） | 採用 |
+| H4 base32/decode を索引表に | 0.0066 -> 0.0031 ms（2.1x） | 採用 |
+| H1 CID による decode メモ化 | 状態を増やす。base が 18 ms なら後回し | 保留 |
+| H5 Link の CID を遅延生成 | defrecord の等価性/ハッシュ意味論を変える | 却下 |
+| H6 Worker Cache API | merkle-cache-disabled-contract に反する | 却下 |
+| H7 canonical 検証の削除 | 意図的な不変条件 | 却下 |
+
+合成後: **ipld/decode 124 ms -> 18.3 ms（6.6x）**。
+
+# 着地したもの
+
+- kotoba-lang/io-multiformats c45f82b — base32 encode/decode をビット蓄積器に。
+  出力はバイト単位で同一。テストは RFC 4648 のベクタ、置き換えた実装を oracle と
+  した長さ 0..39 全部 + 乱数 200 件の差分、CID 形（36 バイト -> 58 文字）を pin。
+- kotoba-lang/io-ipld 6fc39e6 — canonical 検証を 1 パスに。テストは非 canonical な
+  2 方向（キー順序違反、整数 5 の 2 バイト綴り）を**拒否理由まで** pin する
+  （`:ipld/problem :non-canonical-dag-cbor`）。切り詰めたブロックも throw するが
+  理由が違うので、それを区別できないテストは検証を消しても緑のままになる。
+- network-awai/cloud-murakumo-api c68fd97 — 両 sha を deps.edn に明示 pin し、
+  governed release artifact を焼き直して本番 deploy。
+- west pin 3 件を 1 commit で前進（0afa24e）。
+
+**どちらのテストも壊して赤くなることを確認してから landed とした。** io-multiformats
+は 2 種の本物の破壊で 452 / 199 assertion が落ち、無改変で 625 通る。io-ipld は
+述語を常に真にすると 6 assertion が落ちる。なお最初に試した 2 つの「破壊」は
+実は等価変換で、赤くならなかったのは検査の穴ではなかった。
+
+# 本番実測（deploy 後）
+
+| path | 前 | 後 |
+|---|---:|---:|
+| /infer/queue 平均 CPU | 760 ms | **285 ms** |
+| /infer/nodes/*/heartbeat | 1,176 ms | ~500 ms |
+| /infer/runs | 1,008 ms | 495 ms |
+
+**2.7x。** マイクロベンチの 6.6x より小さい。workerd は Node より遅く、残る
+285 ms は cbor/decode・`<-cbor-data` の map/vector 再構築・validate!・再エンコード
+である。ここは正直に 2.7x と書く。
+
+# repo-wide の予防
+
+`scripts/verify-codec-seq-expansion.cljs`（orgs-detector として登録）。
+
+**この class が何年も立っていられる理由は、呼び出し側の profile に現れないこと**
+である。呼び出し側から見えるのは「decode が遅い」だけで、理由は 2 つ下の
+ライブラリに在り、codec は正しく、テストは全部通る。だから検出は呼び出し側では
+なく codec 側で、形に対して行う。
+
+2 規則: (A) codec 形の namespace の 1 top-level form が `mapcat` と `partition` の
+両方を含む。(B) `(mapv ... (seq ...))` として定義された helper が 1 つの `=` の
+両辺で呼ばれ、その form に添字比較の経路が無い。
+
+**報告するのは形であって計測値ではない。** finding は「ここを測れ」であって
+「ここが遅い」ではなく、速さの正本はその repo の bench である。
+
+自己検証を毎回通す（2 つの既知不良を検出し、置き換え後を clean にできなければ
+起動を拒否する）。exit は三値で、走査 0 件・読めないファイル・自己検証失敗は
+すべて **2**（答えられなかった）であり、clean の 0 とは決して同じ値を返さない。
+`orgs/` は west 管理なので未 checkout の repo は fs に映らず、SCANNED を workspace
+総数と読ませないための NOTE を必ず印字する。
+
+実測 2026-09-05: orgs/ 全体で 97 ファイル走査、5 件・2 repo。両方とも今回直した
+ライブラリで、共有 checkout が修正前の pin のままであることによる真陽性。
+
+# オーナー指示: query 負荷は server ではなく client（未実装）
+
+2026-09-05 のオーナー指示「query 負荷は server 側ではなくて、client サイドの
+負担にして」。
+
+**上の修正はこれに答えていない。** 直したのは 1 回のデコードの費用であって、
+「空のキューを知るために毎回 catalog をデコードする」という構造ではない。
+残る 285 ms は依然としてそれである。
+
+安易な解（head CID を ETag にして 304 を返す）は**効かない**。head は書き込みの
+たびに変わり、5 ノードの heartbeat が数秒おきに書くので、条件付き GET はほぼ
+常に外れる。ETag を stream 単位にするには directory をデコードする必要があり、
+循環する。
+
+決めた方向は次のとおりで、実装はこの ADR の時点で**未着手**である:
+
+1. queue 書き込み時にだけ更新される小さな per-stream epoch オブジェクトを
+   content-addressed 面とは別に置く。poll は「その 1 個の小さな GET + 比較」に
+   なり、変化が無ければ catalog を 1 バイトも読まない（hwmetrics 並みの ~3 ms）。
+2. 変化があったときだけ、**client に shard の CID を返す**。フィルタ（model 一致、
+   claim 済み除外、可視性）は client が自分のブロック読みで行う。server は
+   「どこを見ろ」だけを答え、query を実行しない。
+3. poll-ms を既定の 5000 に戻す。これは緩和であって設計ではない。
+
+1 と 2 が入るまで、`/infer/queue` は 285 ms を払い続ける。
+
+# 副次的に見つかったもの（この ADR の範囲外、未修正）
+
+- `network-awai/cloud-murakumo-api` の main に、このマシンの絶対パスを指す
+  `node_modules` symlink が commit されている（40a534e、2026-09-04）。他の
+  checkout では dangling になる。
+- `/private/tmp/wrangler.jsonc` という無関係な設定ファイルがあり、/tmp 配下の
+  worktree から `wrangler` を実行すると repo の wrangler.toml ではなくそちらを
+  読む。`-c wrangler.toml` の明示で回避した。
+- `orgs/network-awai/local-murakumo` は改名前（cloud-murakumo-api）の stale な
+  未登録 checkout で、west には無い。最初にそこを読んで 19 commit 古い木を
+  正本として扱いかけた。
+"}]

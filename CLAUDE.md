@@ -799,6 +799,42 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
   main に着地させたあと、共有 checkout 側は `git fetch` と（内容一致を `shasum`
   で確認した上での）重複ファイルの削除だけで追従させる。
 
+## 基盤ライブラリの定数倍は、呼び出し側の profile に現れない（repo-wide mandatory、2026-09-05、ADR-2609051700）
+
+**「遅い」と分かった場所と、遅い理由が在る場所は、たいてい 2 層以上離れている。**
+呼び出し側のコードは正しく、そこにある profile もその層のことしか言わない。しかも
+基盤 codec は正しさが最優先なので、**正しく書かれた遅い実装はテストを全部通り、
+review でも通る。**
+
+実測 2026-09-05: Cloudflare account の Worker CPU の **98.5%**（週 170 万 CPU 秒、
+2.8 コア相当）を `api.murakumo.cloud` の 1 本が使っており、その 89% は
+`GET /infer/queue` —— **2 バイトの空配列を返すのに 760 ms**。原因は 2 層下の
+`multiformats/base32.cljc` が 1 バイトを 8 要素の lazy seq に展開していたことで、
+DAG-CBOR のリンクは全部 CID なので `ipld/decode` が canonical 再エンコードで
+リンク 1 本につき 1 回それを払っていた（643 リンクのブロックで 124 ms 中 97 ms）。
+
+- **プロファイルする層を、症状が出た層で止めない。** 症状の層で説明が付いたように
+  見えても、その説明が「このライブラリを呼んでいるから」で終わっているなら、
+  まだ測っていない。
+- **コードを読んで得た確信を測定の代わりにしない。** この 1 件で私は 3 回、
+  コードから原因を推定して 3 回とも外した（legacy catalog / shard フェッチ /
+  read そのもの）。当たったのは R2 の実バイトを引いて段階ごとに測ったときだけ。
+- **検出は呼び出し側ではなく codec 側で、形に対して行う。** 検査は
+  `nbb --classpath ".:scripts/nbb_compat" scripts/verify-codec-seq-expansion.cljs --findings orgs`
+  （`manifest/orgs-detectors.edn` の `:verify-codec-seq-expansion`）。捕まえるのは
+  ①`mapcat` して `partition` で組み直す形 ②バイト列の等価判定のために両辺を
+  persistent vector に materialise する形。**報告するのは形であって計測値ではない**
+  —— finding は「ここを測れ」であって「ここが遅い」ではない。
+- **基盤ライブラリの pin は、fix が main に在っても届かない。** io-multiformats /
+  io-ipld はどの deps.edn からも直接は引かれておらず、他 repo の `:git/sha` 経由で
+  しか入らない。tools.deps は**見せられた中で一番新しい sha**を選ぶので、誰かが
+  新しい sha を名指すまで fix は届かない。deploy する repo は自分の deps.edn に
+  **明示的な床**として pin し、理由を隣に書く（west pin には `verify-west-pins` が
+  あるが、`deps.edn` の pin には gate が無い）。
+
+⚠ **ここに測定値を書き足さない。** 上の数字は「何が起きたか」の記録であって、
+今日の値ではない。今日の値は上のコマンドとその repo の bench が持つ。
+
 ## 「無い」と結論する前に検索する（repo-wide mandatory、2026-08-04）
 
 **「この workspace には X が無い」「X を作る必要がある」と結論する前に、必ず
