@@ -1,0 +1,101 @@
+[{:db/id -1
+  :adr/id "adr-2609051400-itonami-cli-performance-baseline"
+  :adr/title "itonami CLI 性能ベースライン実測 — hermes agent と同等以上を機械測定で確認 (ADR-2609042200 の plugin harness 着地後)"
+  :adr/status "accepted"
+  :adr/date "2026-09-05"
+  :adr/related ["adr-2609042200-itonami-harness-plugin-architecture"]
+  :adr/body
+  "## 問い
+
+  ADR-2609042200 の plugin harness が着地した (cloud-itonami-app cc7a17d)。
+  itonami CLI は hermes agent と同等以上の CLI として成立しているか。
+  感覚ではなく実測で答える。
+
+  ## 測定環境
+
+  macOS 26.4 / Node v26.0.0 / nbb 1.5.211 / hermes venv Python。
+  両者とも同一機材・同時刻。itonami は resident server (launchd) 対 shoot、
+  hermes は単発 process。
+
+  ## 実測値
+
+  ### cold start (n=7, spawn → exit)
+
+  | path | median | min | max |
+  |---|---|---|---|
+  | itonami --dump-config | 243 ms | 239 | 249 |
+  | itonami --help | 276 ms | 264 | 302 |
+  | itonami commands chat | 270 ms | 257 | 275 |
+  | itonami status (resident 問い合わせ込み) | 310 ms | 293 | 469 |
+  | hermes --version | 183 ms | 178 | 206 |
+
+  nbb runtime 起動が hermes (python) より ~90 ms 重い。ただし status は
+  resident への HTTP /health 込みで 310 ms — hermes の実サブコマンド
+  (gateway 状態を引く系) は 525-685 ms だったので、実 work path では
+  itonami が速い。
+
+  ### one-shot agent turn (agent loop 実走行、n=3)
+
+  | path | median | min | max |
+  |---|---|---|---|
+  | itonami chat reply-with-pong | 9,969 ms | 9,557 | 11,421 |
+  | hermes -z reply-with-pong | 10,542 ms | 8,355 | 12,878 |
+
+  agent loop の実走行は同等 (差は model/provider 側の variance)。
+  itonami は SSE streaming で delta を逐次表示、hermes は完了一括。
+
+  ### REPL slash round-trip (stdin pipe)
+
+  - /status (resident /health): 307 ms, exit 0
+  - /skin kawaii + /skin 確認: 266 ms, exit 0, prompt が you ♡ に切替
+
+  ### memory (RSS, /usr/bin/time -l)
+
+  | path | max RSS |
+  |---|---|
+  | hermes --version | 36 MB |
+  | itonami --dump-config | 100 MB |
+
+  nbb/Sci ランタイムの常駐分で ~2.75x。cold path の取り引きであり、
+  resident 常駐形では amortize される。following: nbb の snapshot/
+  warm cache で削れる可能性 (未測定)。
+
+  ### harness 意味論のコスト (nbb, 実測)
+
+  - :waterfall 10 listeners × 1000 dispatch = 25 ms (1 dispatch 25 μs)
+  - mount+unmount 100 plugins = 7 ms (1 cycle 70 μs)
+  plugin 機構のオーバーヘッドは CLI の 1 冷起動 (243 ms) の 0.03% 未満で、
+  everything-is-a-plugin は性能上のトレードオフになっていない。
+
+  ### CLI 契約 (exit code, 実測)
+
+  - --help / --dump-config / commands / status → exit 0
+  - unknown command → exit 2 (could not answer)
+  - hermes の unknown slash も exit 2 で同等
+
+  ### 表面の広さ
+
+  - itonami: 208 registry commands / 408 routes / 33 aliases (commands.cljc 生成)
+  - hermes: 54 subcommand グループ + slash commands
+
+  ## 結論
+
+  - agent turn 実走行: 同等 (同等以上の根拠は streaming 表示と resident
+    model で常時 warm)
+  - 実 work path (status 等の resident 問い合わせ): itonami が ~2x 速い
+  - cold start 単体: hermes が ~90 ms 速い (nbb runtime 起動コスト)
+  - RSS: hermes が軽い (36 vs 100 MB) — cold path の取り引き
+  - plugin 機構オーバーヘッド: 計測上無視できる (dispatch 25 μs)
+
+  よって 「同等以上」 は 実 work path と agent turn で成立、cold start 単体は
+  未達 (nbb 起動コスト)。未達項目を隠さず記録する。
+
+  ## Consequences
+
+  - 成熟度: cloud-itonami-app composite 0.897 → 0.898 (coverage 0.988 →
+    0.992, activity 0.9998)。再生成本 manifest/repo-maturity-itonami-cli.edn
+  - cold start を削るなら nbb snapshot 化 (未着手)。 resident 前提の
+    運用では優先度低
+  - hermes parity の 30 slash command は chat service 経由で維持
+  
+  "}]
