@@ -485,6 +485,50 @@
               RAISES the mean. Deleting the sample must not be a quiet way to score
               higher."}
 
+  {:id       :verify-codec-seq-expansion
+   :title    "base codecs that expand a byte into a seq per bit, whose constant factor never appears in the caller's own profile"
+   :why      "2026-09-05 (ADR-2609051700): multiformats.base32/encode expanded every
+              byte into eight lazy-seq elements, regrouped them with `partition 5`,
+              and rebuilt each group with concat/repeat/count/reduce -- 288 seq
+              elements and 58 intermediate collections for one 36-byte CID. Every
+              DAG-CBOR link is a CID, so ipld/decode paid that once per link on its
+              canonicality re-encode: 97 of 124 ms on a real 30 KB catalog-directory
+              block holding 643 links. Downstream, api.murakumo.cloud's
+              GET /infer/queue spent 760 ms of Worker CPU to return a 2-byte empty
+              list, and that one route was 98.5% of the entire Cloudflare account's
+              Worker compute -- 1.7 million CPU-seconds a week, about 2.8 cores held
+              continuously. Nothing in the calling code was wrong, which is why it
+              stood: the cost was two libraries down, the codec was correct, and
+              every test passed. After the fix: encode 23.6x, ipld/decode 124 ms ->
+              18.3 ms, production /infer/queue 760 ms -> 285 ms. The second rule
+              covers the same day's other half -- ipld/decode answered `are these
+              bytes equal` by building two 30,155-element PersistentVectors.
+              This CANNOT be a fleet gate: it reads orgs/, which a gate never ships.
+              It reports a SHAPE, never a timing -- the finding says `measure this`,
+              and the authority on speed stays that repo's own bench."
+   :argv     ["nbb" "{{repo}}/scripts/verify-codec-seq-expansion.cljs" "--findings" "{{root}}/orgs"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :interval-ms 86400000                 ; 24h -- codec primitives change rarely and
+                                         ; the sweep is cheap; nothing here is urgent
+                                         ; within a day
+   :timeout-ms  600000                   ; 10m -- ~30x the measured 20s runtime
+   :writes   :none
+   :measured "2026-09-05: 20s over orgs/, 97 codec-shaped files scanned (checkouts
+              only -- orgs/ is west-managed and an unchecked-out project is invisible
+              to the filesystem, so SCANNED is not a workspace total and the detector
+              prints NOTE saying so). 5 findings in 2 repos, both of them the
+              libraries this detector was built from, whose shared checkouts still
+              sit at the pre-fix pins. Both directions shown: run against the fixed
+              io-multiformats worktree it exits 0 CLEAN, against the pre-fix one it
+              exits 1 on base32.cljc; against the fixed io-ipld worktree core.cljc no
+              longer matches while against the pre-fix one it does. Every run first
+              proves it can still tell the two known-bad shapes from their
+              replacements and REFUSES with exit 2 if it cannot -- exit 2 is also
+              what an empty scan and an unreadable candidate return, so a run that
+              could not answer never returns the value a clean run returns."}
+
   {:id       :verify-source-nul-bytes
    :title    "raw control bytes in source, which make grep answer as if a word is absent"
    :why      "2026-08-18/19: one NUL byte makes file(1) classify a source file as
