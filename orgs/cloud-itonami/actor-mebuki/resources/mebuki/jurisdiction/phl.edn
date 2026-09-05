@@ -1,0 +1,32 @@
+{:profile/id :phl
+ :profile/kind :jurisdiction
+ :profile/label {:ja "フィリピン" :en "Philippines"}
+ :profile/iso-3166 "PH"
+ :profile/measurement-status :unmeasured
+ :profile/instruments
+ {:instrument/relief-act {:en "Declaration of a State of Calamity by the local sanggunian, or nationally by the President"
+                          :note "Also triggers price controls on basic goods and lets local government tap its
+                                 calamity fund -- one declaration doing three jobs at once."}
+  :instrument/severe-disaster {:en "National state of calamity; access to the National Disaster Risk Reduction and Management Fund"}
+  :instrument/damage-certificate {:en "Barangay-level damage assessment (DANA) feeding municipal validation"
+                                  :note "The barangay is the smallest administrative unit and does the first count.
+                                         Assessment capacity therefore exists everywhere, but validation upward is the queue."}
+  :instrument/household-grant {:en "DSWD Assistance to Individuals in Crisis Situation; Emergency Shelter Assistance"}
+  :instrument/emergency-repair {:en "Emergency Shelter Assistance is paid as cash for materials, with the household doing the work"}
+  :instrument/public-demolition {:en "Local government clearing; no general publicly funded private demolition programme"}
+  :instrument/business-grant {:en "DTI livelihood seeding and microenterprise assistance"}
+  :instrument/insurance {:en "Very low household penetration; some parametric and microinsurance schemes" :status :unverified-in-repo}
+  :instrument/volunteer-coordination {:en "Barangay disaster committees, Philippine Red Cross, church networks, and the humanitarian cluster system where activated"}
+  :instrument/waste-plan {:en "Local solid waste management boards; capacity is routinely exceeded"}
+  :instrument/temporary-housing {:en "Evacuation centres, then in-place rebuilding; relocation sites for no-build zones"}}
+ :profile/notes
+ [{:claim "Recurrence is the defining variable: several damaging events per year in the
+           same municipalities means recovery from one flood is still running when the
+           next arrives, and the stocks in this model never return to zero."
+   :status :structural
+   :model-relevance "A single-event run understates the load. The honest use here is
+                     repeated runs with non-zero initial stocks, not a longer horizon."}
+  {:claim "Cash-for-materials with household self-build shifts the labour constraint from
+           contractors to the households themselves, which changes who is left behind:
+           those without an able-bodied adult, not those without a contractor."
+   :status :structural}]}

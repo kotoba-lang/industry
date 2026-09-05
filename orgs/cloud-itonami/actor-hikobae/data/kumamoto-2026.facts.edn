@@ -1,0 +1,228 @@
+;; hikobae — 令和8年熊本地震 (2026-07-28) の復旧・復興 観測事実
+;;
+;; RULE (root CLAUDE.md / ADR-2607203000): every number here is real, dated and
+;; sourced. Nothing in this file is estimated, interpolated or back-filled.
+;; Rates the model needs but nobody published are NOT in this file — they are
+;; derived from these observations by `hikobae.calibrate`, or declared as
+;; :assumed in `hikobae.model` with their basis. "Not measured" is a third
+;; state, distinct from zero and from a guess.
+;;
+;; Day 0 = 2026-07-28 (the mainshock). :day is whole days since day 0.
+
+{:event/id "kumamoto-2026"
+ :event/label "令和8年熊本地震 (2026 Kumamoto earthquake)"
+ :event/origin-time "2026-07-28T16:27:15+09:00"
+ :event/epicenter "熊本県熊本地方"
+ :event/depth-km 16
+ :event/magnitude-jma 7.1
+ :event/magnitude-jma-provisional? true
+ :event/max-shindo "7"
+ :event/max-shindo-municipalities ["宇城市" "氷川町"]
+ :event/day-zero "2026-07-28"
+
+ ;; ---------------------------------------------------------------------
+ ;; Primary source. Every :source-ref below resolves into this map.
+ ;; ---------------------------------------------------------------------
+ :event/sources
+ {:cao-status
+  {:publisher "内閣府（防災担当）"
+   :title "令和８年熊本地震に係る被害状況等について"
+   :url "https://www.bousai.go.jp/updates/r8kumamoto_jishin/status/index.html"
+   :note "日次の速報 PDF。本ファイルの数値は各日付版の該当時点値。速報であり後日改訂されうる。"}
+  :cao-portal
+  {:publisher "内閣府（防災担当）"
+   :title "令和８年熊本地震 防災情報のページ"
+   :url "https://www.bousai.go.jp/updates/r8kumamoto_jishin/index.html"}}
+
+ ;; ---------------------------------------------------------------------
+ ;; 1. Scalar observations — the exposure the recovery has to clear.
+ ;; ---------------------------------------------------------------------
+ :event/observations
+ [{:id :deaths/total :value 38 :unit :persons
+   :as-of "2026-08-23T10:00+09:00" :day 26 :source-ref :cao-status
+   :note "消防庁情報。うち「災害による負傷の悪化又は身体的負担による疾病により死亡した可能性のある死者」1名、「災害との関連を調査中の死者」1名を含む。八代市20/宇城市3/嘉島町7/甲佐町1/氷川町5。"}
+  {:id :deaths/confirmed-indirect :value :under-investigation :unit :persons
+   :as-of "2026-08-23T10:00+09:00" :day 26 :source-ref :cao-status
+   :note "災害関連死の認定は市町村審査会を経るため、発災1か月時点では確定しない。ここを 0 と記録しないこと — 未確定であって不在ではない。2016年熊本地震では最終的に関連死が直接死を上回った。"}
+  {:id :injured/severe :value 32 :unit :persons
+   :as-of "2026-08-23T10:00+09:00" :day 26 :source-ref :cao-status}
+  {:id :injured/light :value 332 :unit :persons
+   :as-of "2026-08-23T10:00+09:00" :day 26 :source-ref :cao-status}
+  {:id :buildings/fully-destroyed :value 1629 :unit :buildings
+   :as-of "2026-08-23T10:00+09:00" :day 26 :source-ref :cao-status
+   :note "全壊。速報値であり、災害対策基本法に基づく被害認定調査を受けた棟数とは必ずしも一致しない（原典の注記）。"}
+  {:id :buildings/half-destroyed :value 2258 :unit :buildings
+   :as-of "2026-08-23T10:00+09:00" :day 26 :source-ref :cao-status}
+  {:id :buildings/partially-damaged :value 20328 :unit :buildings
+   :as-of "2026-08-23T10:00+09:00" :day 26 :source-ref :cao-status}
+  {:id :buildings/damaged-total :value 24215 :unit :buildings
+   :as-of "2026-08-23T10:00+09:00" :day 26 :source-ref :cao-status}
+  {:id :shelter/peak-population :value 9931 :unit :persons
+   :as-of "2026-07-30" :day 2 :source-ref :cao-status
+   :note "最大避難者数。"}
+  {:id :shelter/peak-count :value 506 :unit :shelters
+   :as-of "2026-07-29" :day 1 :source-ref :cao-status}
+  {:id :water/peak-outage :value 108100 :unit :households
+   :as-of "2026-08-23T07:30+09:00" :day 26 :source-ref :cao-status
+   :note "最大断水戸数（4県15自治体で断水発生）。国土交通省情報。"}
+  {:id :power/peak-outage :value 48530 :unit :households
+   :as-of "2026-07-28T17:09+09:00" :day 0 :source-ref :cao-status
+   :note "経済産業省情報。8/23時点で高圧・低圧とも復旧済み。"}
+  {:id :gas/city-gas-restored :value 8827 :unit :households
+   :as-of "2026-08-23T09:00+09:00" :day 26 :source-ref :cao-status
+   :note "八代。倒壊家屋65戸を除く全戸で供給再開済み。"}
+  {:id :aftershocks/shindo3-plus :value 98 :unit :events
+   :as-of "2026-08-23T08:00+09:00" :day 26 :source-ref :cao-status
+   :note "震度7×1、震度5弱×5、震度4×23、震度3×69。"}
+  {:id :heat/forecast-max-temp :value 38 :unit :celsius
+   :as-of "2026-08-23T08:00+09:00" :day 26 :source-ref :cao-status
+   :note "8/23・8/25は最高気温38度の「危険な暑さ」。熱中症予防の注意喚起。避難生活の健康被害の駆動因子として記録している。"}
+  {:id :compound-hazard/typhoon-18 :value :approaching :unit :qualitative
+   :as-of "2026-08-23T08:00+09:00" :day 26 :source-ref :cao-status
+   :note "台風第18号が8/25に非常に強い勢力で沖縄・奄美に接近、熊本県では8/25〜27頃に強風等の影響の可能性。ブルーシート展張家屋への複合ハザード。"}]
+
+ ;; ---------------------------------------------------------------------
+ ;; 2. Trajectories — dated series. These are what `hikobae.calibrate`
+ ;;    fits against, and what the model is required to reproduce.
+ ;; ---------------------------------------------------------------------
+ :event/trajectories
+ {:shelter/population
+  {:unit :persons :source-ref :cao-status
+   :note "内閣府情報。各日版 PDF の「避難所・避難者数」。"
+   :points [{:day 1 :date "2026-07-29" :value 9186}
+            {:day 2 :date "2026-07-30" :value 9931}
+            {:day 3 :date "2026-07-31" :value 9637}
+            {:day 4 :date "2026-08-01" :value 9374}
+            {:day 6 :date "2026-08-03" :value 8700}
+            {:day 9 :date "2026-08-06" :value 6896}
+            {:day 13 :date "2026-08-10" :value 6171}
+            {:day 17 :date "2026-08-14" :value 3677}
+            {:day 20 :date "2026-08-17" :value 3122}
+            {:day 24 :date "2026-08-21" :value 2943}
+            {:day 26 :date "2026-08-23" :value 2840}]}
+
+  :shelter/count
+  {:unit :shelters :source-ref :cao-status
+   :points [{:day 1 :date "2026-07-29" :value 506}
+            {:day 2 :date "2026-07-30" :value 419}
+            {:day 3 :date "2026-07-31" :value 399}
+            {:day 4 :date "2026-08-01" :value 236}
+            {:day 6 :date "2026-08-03" :value 206}
+            {:day 9 :date "2026-08-06" :value 130}
+            {:day 13 :date "2026-08-10" :value 99}
+            {:day 17 :date "2026-08-14" :value 84}
+            {:day 20 :date "2026-08-17" :value 72}
+            {:day 24 :date "2026-08-21" :value 71}
+            {:day 26 :date "2026-08-23" :value 68}]}
+
+  :water/households-without-service
+  {:unit :households :source-ref :cao-status
+   :note "国土交通省情報。原典は「約N戸が断水中」。8/06→8/14 の踊り場と、8/14→8/17 の急落を保存すること — これは平滑化してはならない実観測で、8/11 設置の「井戸水対応チーム」という介入の効き目がここに出ている。"
+   :points [{:day 1  :date "2026-07-29" :value 84000}
+            {:day 3  :date "2026-07-31" :value 79000}
+            {:day 6  :date "2026-08-03" :value 45000}
+            {:day 9  :date "2026-08-06" :value 37600}
+            {:day 13 :date "2026-08-10" :value 34000}
+            {:day 17 :date "2026-08-14" :value 27800}
+            {:day 20 :date "2026-08-17" :value 8400}
+            {:day 24 :date "2026-08-21" :value 4300}
+            {:day 26 :date "2026-08-23" :value 3600}]}
+
+  :temporary-housing/units-started-cumulative
+  {:unit :units :source-ref :cao-status
+   :note "建設型応急住宅の着工。8/23版 PDF が着工日つきで列挙している団地の累積。賃貸型（みなし仮設）は戸数が公表されていないため、この系列には入っていない — 不在であって 0 ではない。"
+   :points [{:day 6  :date "2026-08-03" :value 70  :detail "宇城市3団地50戸・氷川町1団地20戸"}
+            {:day 12 :date "2026-08-09" :value 82  :detail "美里町1団地12戸"}
+            {:day 13 :date "2026-08-10" :value 174 :detail "熊本市3団地50戸・氷川町2団地42戸"}
+            {:day 14 :date "2026-08-11" :value 192 :detail "八代市1団地18戸"}
+            {:day 16 :date "2026-08-13" :value 205 :detail "氷川町1団地13戸"}
+            {:day 21 :date "2026-08-18" :value 276 :detail "八代市2団地51戸・甲佐町1団地20戸"}
+            {:day 25 :date "2026-08-22" :value 293 :detail "宇土市1団地17戸"}]}}
+
+ ;; ---------------------------------------------------------------------
+ ;; 3. Interventions — dated, named acts by an identified authority.
+ ;;    These are the model's leverage points, taken from the record rather
+ ;;    than proposed by us.
+ ;; ---------------------------------------------------------------------
+ :event/interventions
+ [{:id :legal/disaster-relief-act :day 0 :date "2026-07-28" :source-ref :cao-status
+   :actor "熊本県" :label "災害救助法の適用（10市10町1村）"
+   :unlocks [:shelter/operation :emergency-repair :temporary-housing/rental :water/emergency-supply]}
+  {:id :gov/emergency-hq :day 0 :date "2026-07-28" :source-ref :cao-status
+   :actor "政府" :label "令和8年熊本地震非常災害対策本部 設置 (18:20)"}
+  {:id :logistics/push-support :day 1 :date "2026-07-29" :source-ref :cao-status
+   :actor "内閣府ほか" :label "プッシュ型支援の開始（要請を待たずに物資を送る）"}
+  {:id :housing/temp-construction-request :day 0 :date "2026-07-28" :source-ref :cao-status
+   :actor "熊本県" :label "住宅生産関係団体（プレハブ建築協会・全木協・日本木造住宅産業協会）への協力要請"}
+  {:id :housing/rental-request :day 2 :date "2026-07-30" :source-ref :cao-status
+   :actor "熊本県" :label "賃貸関係団体への協力要請（賃貸型応急住宅＝みなし仮設）"}
+  {:id :housing/public-vacancy-request :day 6 :date "2026-08-03" :source-ref :cao-status
+   :actor "国" :label "全国の地方公共団体へ公営住宅空室の協力要請"}
+  {:id :legal/severe-disaster-designation :day 10 :date "2026-08-07" :source-ref :cao-status
+   :actor "内閣" :label "激甚災害の指定（閣議決定）"
+   :unlocks [:public-works/subsidy-uplift :sme/credit-guarantee-special]}
+  {:id :legal/livelihood-recovery-support :day 13 :date "2026-08-10" :source-ref :cao-status
+   :actor "熊本県" :label "被災者生活再建支援法の適用（第1条第3号）"
+   :unlocks [:household/recovery-grant]}
+  {:id :water/well-water-team :day 14 :date "2026-08-11" :source-ref :cao-status
+   :actor "現地応急給水支援本部" :label "「井戸水対応チーム」設置（被災地で多く使われている井戸の洗浄・業者確保）"
+   :note "この介入の直後、断水戸数の系列が踊り場（8/06〜8/14）から急落（8/14→8/17 で 27,800→8,400）へ転じている。因果を主張するにはこれだけでは足りないが、系列にはっきり出ている。"}
+  {:id :housing/interprefectural-staff :day 13 :date "2026-08-10" :source-ref :cao-status
+   :actor "石川県・岩手県・UR都市機構" :label "建築系職員7名が熊本県庁で応急住宅業務を支援"
+   :note "石川（能登）・岩手（東日本）— 直近の被災県が人を出している。経験の環流。"}
+  {:id :certificate/online-application :day :not-dated :date :not-dated :source-ref :cao-status
+   :actor "宇城市・八代市" :label "罹災証明書のオンライン申請導入 → 滞留を解消"
+   :note "8/23版に「罹災証明書の発行に関しては宇城市・八代市でオンライン申請を導入し、滞留を解消」とある。導入日が原典に無いので :not-dated。日付を推測して入れないこと。"}]
+
+ ;; ---------------------------------------------------------------------
+ ;; 4. Relief supply actually delivered (プッシュ型支援) as of day 26.
+ ;;    This is the resource list the question asks for, as measured.
+ ;; ---------------------------------------------------------------------
+ :event/relief-supply-delivered
+ {:as-of "2026-08-23T10:00+09:00" :day 26 :source-ref :cao-status
+  :items [{:id :drink :value 1380000 :unit :bottles :label "飲料" :note "別途 約4万本 手配中"}
+          {:id :staple-food :value 590000 :unit :meals :label "主食"}
+          {:id :liquid-milk :value 6600 :unit :bottles :label "液体ミルク"}
+          {:id :air-conditioner :value 1075 :unit :units :label "エアコン・クーラー"}
+          {:id :portable-toilet :value 45000 :unit :uses :label "携帯トイレ"}
+          {:id :cardboard-bed :value 5000 :unit :units :label "段ボールベッド" :note "別途 分散備蓄拠点に500個"}
+          {:id :blue-sheet :value 80000 :unit :sheets :label "ブルーシート"
+           :note "経産省 約35,000枚 + 国交省 約19,000枚 + 熊本県独自 約26,000枚 の合算。原典は3者別記。"}
+          {:id :recirculating-shower :value 145 :unit :units :label "水循環型シャワー"}
+          {:id :diaper :value 106000 :unit :pieces :label "おむつ"}
+          {:id :sanitary-product :value 46000 :unit :pieces :label "生理用品"}]}
+
+ ;; ---------------------------------------------------------------------
+ ;; 5. Response capacity actually mobilised.
+ ;; ---------------------------------------------------------------------
+ :event/response-capacity
+ {:as-of "2026-08-23T10:00+09:00" :day 26 :source-ref :cao-status
+  :volunteer-centres {:value 10 :unit :municipalities :as-of "2026-08-20"
+                      :municipalities ["熊本市" "宇土市" "宇城市" "八代市" "美里町" "御船町" "嘉島町" "益城町" "甲佐町" "氷川町"]
+                      :note "芦北町は8/17から一般ボランティアに移行。"}
+  :ngo-coordination {:organiser "KVOAD（熊本県の災害中間支援組織）"
+                     :meetings 24 :as-of "2026-08-22"
+                     :participants-onsite 20 :participants-online 35
+                     :note "「火の国会議」。7/29以降ほぼ毎日の情報共有会議。"}
+  :ship-based-medical {:vessel "防衛省PFI船舶「はくおうⅡ」（八代港）"
+                       :active-days 11 :users 37 :from "2026-08-05"
+                       :note "台風13号接近に伴い8/6以降一時中断、8/11再開。"}
+  :fuel-tankers {:value 65 :unit :vehicles
+                 :note "通常時の2倍以上。全国から集結。"}}
+
+ ;; ---------------------------------------------------------------------
+ ;; 6. Not measured. Named explicitly so their absence is visible.
+ ;; ---------------------------------------------------------------------
+ :event/unmeasured
+ [{:id :certificate/applications-received
+   :why "罹災証明書の申請件数・交付件数の全県計が日次速報に載っていない。被害認定調査の待ち行列長は本モデルで最も効く量なのに、公表系列が無い。"}
+  {:id :certificate/online-introduction-date
+   :why "宇城市・八代市のオンライン申請導入日が原典に無い。"}
+  {:id :temporary-housing/rental-units-occupied
+   :why "賃貸型応急住宅（みなし仮設）は21市町村で受付中とあるが、成約戸数が公表されていない。建設型より速く大量に供給されるのが通例なので、この不在はシェルター人口の減少経路の主要部分が観測できていないことを意味する。"}
+  {:id :displaced/outside-shelters
+   :why "車中泊・親族宅・テントの避難者は避難所集計に入らない。2016年熊本地震で車中泊が関連死（肺塞栓症）の主因のひとつになったが、母数が観測されない構造は変わっていない。"}
+  {:id :debris/disaster-waste-tonnes
+   :why "災害廃棄物の推計発生量が本速報に無い（処理施設の稼働状況のみ）。"}
+  {:id :economy/damage-estimate-total
+   :why "被害額の全体推計が本速報に無い。農林水産業・土木施設の部分値のみ。"}]}

@@ -1,0 +1,229 @@
+;; hikobae — 地震被害後のリソースとダイナミクスを、法域を問わず記述するための面
+;;
+;; 何をやっていて、何をやっていないか:
+;;
+;;   やっている — (a) どの法域の地震後にも成り立つと言える構造的不変量を、
+;;                反証の仕方つきで書く。(b) 各法域の制度を「名前」で対応づける。
+;;                制度の名前は測定値ではなく事実なので、ここには書ける。
+;;   やっていない — 各国の死者数・被害額・復旧日数のような**量**を書くこと。
+;;                持っていないので :unmeasured と書き、どこに訊けば測れるかを
+;;                書く。埋めない。埋めた瞬間にこの面は「測ったもの」と
+;;                「それらしいもの」を区別できなくなる（root CLAUDE.md
+;;                「測れなかった検査が、測って問題が無かった検査と同じ値を返す」）。
+;;
+;; したがって本ファイルの正しい読み方は「世界の地震被害データベース」ではなく
+;; **「どの法域でも同じモデルを立てられるようにする対応表と、埋めるべき穴の一覧」**。
+
+{:world/id "post-earthquake-recovery-world"
+ :world/version 1
+ :world/as-of "2026-08-23"
+
+ ;; =====================================================================
+ ;; 1. 構造的不変量 — 法域を問わず成り立つと主張するもの。
+ ;;    各項に :falsified-by（何を観測したらこの主張は死ぬか）を必ず書く。
+ ;;    反証条件を書けない主張はここに載せない。
+ ;; =====================================================================
+ :world/invariants
+ [{:id :inv/lifeline-restoration-order
+   :claim "復旧の速さは 電力・通信 > ガス > 上水 > 下水 の順になる。"
+   :because "架空設備は目視で被害箇所が特定でき、埋設設備は探索そのものが作業になる。
+             ガスと下水は戸別・管路の点検が世帯数に比例して要る。"
+   :evidence {:kumamoto-2026 "電力は最大48,530戸から26日で復旧済み、上水は最大108,100戸から26日後もなお約3,600戸が断水中（内閣府 2026-08-23）。"}
+   :falsified-by "上水の完全復旧が電力より早い地震が観測されたら（設備が全面的に更新された法域ではありうる）。"
+   :model-hook :restoration-rank}
+
+  {:id :inv/indirect-deaths-can-exceed-direct
+   :claim "避難生活が長引く法域では、間接死（災害関連死）が直接死を上回りうる。"
+   :because "直接死は数十秒で確定し増えないが、間接死は避難環境の質と滞在日数の積で増え続ける。"
+   :evidence {:kumamoto-2016 "直接死50人に対し災害関連死218人（日本の公式集計、内閣府/熊本県）。"
+              :kumamoto-2026 "発災26日時点で死者38人。関連死は市町村審査会を経るため未確定であり、0 ではない（内閣府 2026-08-23）。"}
+   :falsified-by "避難期間が長い（>30日）にもかかわらず間接死が直接死の1割未満に留まる事例。"
+   :model-hook :indirect-death-rate
+   :note "これがこのモデル全体の存在理由に近い。地震の死者数は地震が決めるのではなく、その後の数週間が決める部分がある。"}
+
+  {:id :inv/certification-gates-everything
+   :claim "被害の公的認定が、住宅・現金・解体・税・保険の下流工程すべてのゲートになる。
+           認定の待ち行列が復旧の律速であって、資金ではない（少なくとも最初の6か月は）。"
+   :because "被災者にいくら払うかを決めるには被害の程度を確定する必要があり、確定作業は
+             有資格の人間が現地を1棟ずつ見る作業なので、人数でしか速くならない。"
+   :evidence {:kumamoto-2026 "宇城市・八代市が罹災証明のオンライン申請を導入して「滞留を解消」と記録されている（内閣府 2026-08-23）。滞留が存在したこと自体の記録でもある。"}
+   :falsified-by "認定を待たずに一律給付する法域で、下流工程が同じだけ遅れる事例。"
+   :model-hook :assessment-queue
+   :caveat "認定機構を持たない法域では、このゲートは別の形（保険査定・国際機関の needs assessment・
+            集落長の名簿）で現れる。ゲートが無いのではなく、ゲートの持ち主が違う。"}
+
+  {:id :inv/attention-decays-need-does-not
+   :claim "外部からの支援（ボランティア・寄付・報道）の流入は週単位で減衰し、必要量は年単位で続く。"
+   :because "支援の流入は注目の関数であり、注目は新しい出来事に移る。必要量は物理的復旧の関数。"
+   :evidence {:kumamoto-2026 "発災翌日から中間支援組織による調整会議が毎日開かれている（8/22で第24回）— 減衰の速さが分かっているから初期に集中させている、と読める。"}
+   :falsified-by "発災6か月後のボランティア流入が1か月後を上回る事例。"
+   :model-hook :volunteer-decay}
+
+  {:id :inv/local-capacity-dips-when-demand-peaks
+   :claim "被災自治体の行政capacityは、需要が最大になるまさにその時に最小になる。"
+   :because "職員自身が被災者であり、庁舎も被災し、平時業務は止められず、
+             新規の災害業務（避難所・認定調査・証明交付・支援金）が同時に立ち上がる。"
+   :evidence {:kumamoto-2026 "八代市庁舎の躯体（免震ダンパー）損傷。石川県・岩手県・URの職員7名が県庁の応急住宅業務支援に入った（内閣府 2026-08-23）。"}
+   :falsified-by "外部応援ゼロで認定調査が完了した中規模以上の被災自治体。"
+   :model-hook :admin-capacity
+   :note "だから外部からの人的応援（日本の対口支援）は「親切」ではなく構造的な必要条件。"}
+
+  {:id :inv/land-is-the-hard-constraint
+   :claim "土地は地震の後に増えない。仮設住宅・廃棄物仮置場・資材ヤード・ヘリポートが
+           同じ空き地を取り合い、都市部ほど先に尽きる。"
+   :because "土地だけは lead time で増やせない唯一の主要資源だから。"
+   :falsified-by "用地確保が仮設着工の律速でなかった都市部の事例。"
+   :model-hook :land-contention}
+
+  {:id :inv/debris-exceeds-local-capacity
+   :claim "災害廃棄物の発生量は被災自治体の年間処理能力を桁で超えるので、
+           域内処理は原理的に不可能で、広域処理の合意が事前に無ければ交渉から始まる。"
+   :because "処理施設は平時の定常流量に合わせて作られており、倒壊家屋は数年分の廃棄物を一度に出す。"
+   :falsified-by "被災自治体が域内の既存施設だけで災害廃棄物を計画年限内に処理した事例。"
+   :model-hook :debris-throughput}
+
+  {:id :inv/slow-recovery-drives-outmigration
+   :claim "復旧が遅いほど人口が出ていき、人口が出ていくほど復旧能力（税・労働力・
+           事業の需要）が落ちる。これは自己強化ループで、放置すると復旧しない均衡に落ちる。"
+   :because "個人の移住判断は「戻れる見込みの時期」に対する期待で決まり、
+             期待が悪化すると判断は不可逆になる（転校・転職・住宅取得）。"
+   :falsified-by "復旧の遅い被災地で人口が発災前水準に自然回復した事例。"
+   :model-hook :outmigration-loop
+   :note "復興（rebuild）フェーズを応急（emergency）フェーズと同じ緊急度で扱う理由はここにある。"}]
+
+ ;; =====================================================================
+ ;; 2. 制度レジーム — 「誰が被害を認定し、誰が再建を払うか」で法域を分ける。
+ ;;    同じ物理現象でも、この2つが違えば復旧のダイナミクスは別物になる。
+ ;; =====================================================================
+ :world/regimes
+ [{:id :regime/state-certified
+   :label "国家が認定し、国家が払う"
+   :certification "行政による戸別の被害認定 → 公的証明書"
+   :finance "公費（国庫＋自治体）＋任意保険"
+   :binding-stock :assessment-queue
+   :characteristic "初期は認定の待ち行列が律速。資金は後から来るが、認定より先には流れない。
+                    公平性は高いが速度は人数で決まる。"
+   :examples ["日本（罹災証明書 + 被災者生活再建支援法）"]}
+
+  {:id :regime/insurance-led
+   :label "保険が査定し、保険が払う"
+   :certification "保険者による査定（公的認定と別建て、または公的機関が保険者）"
+   :finance "強制加入に近い地震保険プール＋再保険"
+   :binding-stock :adjuster-capacity
+   :characteristic "現金は速いが、査定人の総数と再保険の支払い能力が律速。
+                    未加入層と保険対象外の損害（土地・インフラ）が構造的に取り残される。"
+   :examples ["ニュージーランド（Toka Tū Ake / 旧 EQC）"
+              "トルコ（DASK 義務地震保険）"
+              "カリフォルニア（CEA、ただし加入率は低い）"]}
+
+  {:id :regime/aid-dependent
+   :label "外部が評価し、外部が払う"
+   :certification "国際機関・NGO による needs assessment（PDNA 等）"
+   :finance "国際援助・多国間開発金融・送金"
+   :binding-stock :external-pledge-disbursement-gap
+   :characteristic "表明された支援額と実際に届く額の差が最大の変数。
+                    調整コストが高く、現地の行政capacityを支援機関が吸い上げてしまうことがある。"
+   :examples ["ネパール 2015" "ハイチ 2010"]}
+
+  {:id :regime/self-recovery
+   :label "制度が届かず、世帯が自力で建て直す"
+   :certification "無い、または集落単位の名簿"
+   :finance "自己資金・送金・非公式融資"
+   :binding-stock :household-savings
+   :characteristic "公式統計にほとんど現れないので「復旧が速い」ように見える。
+                    実際には脆弱な建物が同じ場所に建て直され、次の地震の被害を先取りしている。"
+   :note "Build Back Better（仙台防災枠組 Priority 4）が最も効かない領域であり、最も必要な領域でもある。"}]
+
+ ;; =====================================================================
+ ;; 3. 日本固有業務の対応表。対応物が無いなら「無い」と書く。
+ ;; =====================================================================
+ :world/analogues
+ [{:jp-op :op/certificate-issuance
+   :jp-name "罹災証明書"
+   :analogues [{:jurisdiction "US" :name "FEMA Individual Assistance の inspection + verified loss"
+                :note "証明書という単一の紙は無く、プログラムごとに判定が分かれる。"}
+               {:jurisdiction "NZ" :name "Toka Tū Ake の claim assessment"
+                :note "保険査定が事実上の認定を兼ねる。"}
+               {:jurisdiction "TR" :name "hasar tespit（被害判定）"}
+               {:jurisdiction "aid-dependent" :name "無い（PDNA は集計であって世帯の権利を生まない）"}]}
+  {:jp-op :op/public-demolition
+   :jp-name "公費解体"
+   :analogues [{:jurisdiction "US" :name "USACE の Private Property Debris Removal（発動が例外的）"}
+               {:jurisdiction "many" :name "無い（所有者負担が既定）"
+                :note "無い場合、倒壊家屋は年単位で残り、再建も廃棄物処理も止まる。"}]}
+  {:jp-op :op/rental-temporary-housing
+   :jp-name "みなし仮設（賃貸型応急住宅）"
+   :analogues [{:jurisdiction "US" :name "FEMA Direct Lease / Transitional Sheltering Assistance"}
+               {:jurisdiction "TR" :name "コンテナ都市（既存賃貸在庫が薄いため建設型に寄る）"}]}
+  {:jp-op :op/mutual-aid-dispatch
+   :jp-name "対口支援"
+   :analogues [{:jurisdiction "US" :name "EMAC（Emergency Management Assistance Compact）"}
+               {:jurisdiction "EU" :name "EU Civil Protection Mechanism"}
+               {:jurisdiction "CN" :name "対口支援（同名・同型。四川2008以降の制度）"}]}
+  {:jp-op :op/legal-activation
+   :jp-name "災害救助法・激甚災害指定"
+   :analogues [{:jurisdiction "US" :name "Stafford Act の Presidential Disaster Declaration"}
+               {:jurisdiction "many" :name "国家緊急事態宣言"}]}]
+
+ ;; =====================================================================
+ ;; 4. 法域インスタンス。**構造の分類だけ**が入っている。
+ ;;    量はすべて :unmeasured で、測り方だけを書いてある。
+ ;; =====================================================================
+ :world/instances
+ [{:id :jp :label "日本" :regime :regime/state-certified
+   :certification-instrument "罹災証明書（災害対策基本法 第90条の2）"
+   :finance-instruments ["被災者生活再建支援法" "災害救助法" "激甚災害法" "地震保険（政府再保険）"]
+   :parameters {:assessment/surveyor-pool :unmeasured
+                :insurance/earthquake-penetration :unmeasured
+                :temp-housing/build-lead-days :unmeasured}
+   :how-to-measure {:assessment/surveyor-pool "各都道府県の住家被害認定調査員研修の修了者数。内閣府防災または各県の防災担当に照会。"
+                    :insurance/earthquake-penetration "損害保険料率算出機構の地震保険付帯率統計（都道府県別・年次）。"
+                    :temp-housing/build-lead-days "本 repo の kumamoto-2026 系列で着工日は取れている。完成日の公表を待って差分を取る。"}}
+
+  {:id :nz :label "ニュージーランド" :regime :regime/insurance-led
+   :certification-instrument "Toka Tū Ake（旧 EQC）の claim assessment"
+   :finance-instruments ["EQCover（住宅保険への自動付帯）" "民間保険" "再保険"]
+   :parameters {:insurance/earthquake-penetration :unmeasured
+                :adjuster/pool :unmeasured}
+   :how-to-measure {:insurance/earthquake-penetration "Toka Tū Ake / ICNZ の年次統計。"}
+   :note "住宅保険に地震補償が自動付帯するので加入率が構造的に高い。ただし Canterbury 2010-11 では
+          査定と再査定の待ち行列が年単位になり、『保険があれば速い』が自動的には成り立たないことを示した。"}
+
+  {:id :tr :label "トルコ" :regime :regime/insurance-led
+   :certification-instrument "hasar tespit（行政の被害判定）"
+   :finance-instruments ["DASK（義務地震保険）" "公的再建事業（TOKİ）"]
+   :parameters {:insurance/earthquake-penetration :unmeasured}
+   :how-to-measure {:insurance/earthquake-penetration "DASK の年次統計（県別付保率）。"}
+   :note "義務保険と行政判定が併存する混成型。建築基準の執行度が被害率を支配する典型例でもある。"}
+
+  {:id :us :label "アメリカ合衆国" :regime :regime/state-certified
+   :certification-instrument "FEMA inspection（プログラム別）"
+   :finance-instruments ["Stafford Act IA/PA" "SBA 災害融資" "NFIP（洪水。地震は別）" "CEA（カリフォルニア、任意）"]
+   :parameters {:insurance/earthquake-penetration :unmeasured}
+   :how-to-measure {:insurance/earthquake-penetration "California Department of Insurance / CEA の年次統計。"}
+   :note "地震保険は任意で加入率が低いため、実質は :regime/self-recovery に近い世帯が多数を占める。"}
+
+  {:id :np :label "ネパール" :regime :regime/aid-dependent
+   :certification-instrument "National Reconstruction Authority の受益者名簿"
+   :finance-instruments ["国際援助" "住宅再建補助金（段階払い）" "送金"]
+   :parameters {:external/pledge-to-disbursement-ratio :unmeasured}
+   :how-to-measure {:external/pledge-to-disbursement-ratio "PDNA と NRA の年次進捗報告の差分。"}
+   :note "段階払いの各段階が検査を必要とし、検査官の数が再建速度の律速になった — :inv/certification-gates-everything が
+          制度の名前を変えて再出現する例。"}]
+
+ ;; =====================================================================
+ ;; 5. この面の穴。埋まっていないことを明示的に持つ。
+ ;; =====================================================================
+ :world/gaps
+ [{:id :gap/only-one-event-instantiated
+   :what "実データで完全に走るインスタンスは kumamoto-2026 の1件だけ。他の4法域は構造分類のみ。"
+   :why "各法域の一次資料を実際に引いて日付つきで pin する作業が未実施。引いていないものを書かない方針のため空にしてある。"
+   :next "1法域につき1イベント、公式の日次/週次報告が公開されているものを選んで trajectory を作る。"}
+  {:id :gap/no-cross-event-calibration
+   :what "不変量は kumamoto-2026 と kumamoto-2016 の記録に照らしてあるが、複数イベント横断の検証はしていない。"
+   :why "上と同じ。"
+   :next ":falsified-by 条件を各イベントに当てて、生き残るかを見る。"}
+  {:id :gap/indirect-death-model-uncalibrated
+   :what "間接死の発生率は本モデルで最も効く係数だが、係数を張る実データが無い（2026年熊本は関連死が未確定）。"
+   :why "災害関連死の認定は市町村審査会を経るため、発災1か月では原理的に確定しない。"
+   :next "2016年熊本の関連死の月次認定推移（熊本県公表）を引いて事後校正する。それまでこの係数は :assumed のままにする。"}]}

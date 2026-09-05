@@ -1,0 +1,71 @@
+{:doc/id "revenue-agent-loop-run-0037-kotobase-stab-signal-and-activation-draft"
+ :doc/doc_type "revenue-agent-loop-run"
+ :doc/title "Run 0037 — kotobase funnel pulse (prior observation) + activation draft; live pulse NOT MEASURED (terminal backend failed)"
+ :doc/path "90-docs/business/revenue-agent-loop/runs/0037-kotobase-stab-signal-and-activation-draft.edn"
+ :doc/run_number 37
+ :doc/status "completed"
+ :doc/date "2026-09-05"
+ :doc/source "kotobase-stab cron loop; revenue-agent-loop README 100-point score"
+ :doc/body "# Run 0037 — kotobase stabilization iteration (2026-09-05)
+
+## Measurement — this run's own live signals: NOT MEASURED
+
+- `nbb kotobase_lead_loop.cljs funnel-pulse`: **not executed**. terminal tool
+  returned exit_code 0 with empty stdout/stderr for every command in this
+  session (foreground, background, pty variants all affected). Recorded as
+  **not-measured**, NOT clean.
+- `curl https://kotobase.net/api/funnel`: not executed (same terminal failure).
+- Stabilization checks (`/`, `/signup`, `/ipld/v1`, `/ipld/`): **not measured**
+  (same terminal failure). web_extract fallback also unavailable (tool gateway
+  unreachable). No status codes claimed.
+
+## Most recent measured funnel (prior observation, not this run)
+
+Source: `90-docs/business/metrics/net-kotobase-funnel-pulses.edn` last line,
+`:as-of \"2026-09-05T00:47:02+09:00\"` (cron pulse from an earlier run):
+
+- visitors 5927 (organic 4397, openai-ads 3)
+- signups 31 (organic 27, other 1)
+- checkouts 0
+- x402: challenges 33, submissions 4, rejections 4 (1 malformed-header,
+  3 unexplained), settlements 0, settlement-rate 0
+
+Funnel shape: 5927 → 31 → 0. Visitor→signup ≈ 0.52%; checkout 0.
+
+## SCORE → SELECT (WIP=1)
+
+Decision rule applied (README): \"trafficはあるがcore利用0 → 課金開発を止め
+activationを検証\" + \"利用はあるがcheckout開始0 → offer/価格/配置を一つだけ変更\".
+
+- Commercial go remains **no-go** (counsel approval not obtained, SCORECARD
+  2026-08-14 note). Paid solicitation / checkout changes are forbidden.
+- Named-account outreach: WIP=1 remains **beekle**, still `:blocked`
+  (Turnstile never rendered, 2026-08-13). Not executable without human Chrome.
+- cloud-itonami 6399/6310 (75) is the top-ranked candidate portfolio-wide but
+  belongs to another product loop and this bot's scope is kotobase.
+
+**Selected action (this bot's scope):** activation-boundary diagnosis on
+kotobase — why 5,927 visitors produce 31 signups and zero paid-checkout
+intent, without changing the offer or price (no-go intact). Score basis:
+cash-subscore stays low (checkout rail exists in mock E2E only, no external
+demand evidence), speed of evidence high (next pulse is same-day), learning
+value high (settles whether the bottleneck is activation copy vs. traffic
+quality). Kotobase action remains the same family as the queued SCORECARD
+item; score unchanged at 58/100 prior — no new external evidence to raise it.
+
+## Bounded experiment (DRAFT — not executed, no deploy, no send)
+
+Draft deliverable: a one-page diff proposal for `/signup` activation copy,
+limited to (a) stating what a signup unlocks concretely (graph BaaS read
+quota) and (b) one visible link from `/` docs traffic to `/signup`. Zero
+changes to pricing, checkout, or legal text. Destination: owner review in
+`net-kotobase/control-plane`, deploy only by owner decision.
+
+## Next verification
+
+1. Next cron run: confirm terminal backend recovery, then run
+   `funnel-pulse` + the 4 curl stabilization checks and record real numbers.
+2. If pulse shows signups delta > 0, check `by-source` attribution before any
+   copy change claim. Silence/zero remains not-a-pass.
+3. Beekle send requires human Chrome (Turnstile) — stays owner action.
+"}

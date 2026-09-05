@@ -1,0 +1,403 @@
+;; hikobae — 地震被害後に必要とされる リソース / 作業 / 業務 の分類
+;;
+;; 何のための表か: 「何をやるか」の一覧ではなく、**何が何を待っているか** の
+;; 記述である。復旧が遅れるのは、やることを知らないからではなく、上流の 1 本の
+;; 待ち行列が下流の 10 本を止めるからで、その辺が :gated-by と :binding-resource
+;; に入っている。ここが `hikobae.model` の stock/flow 構造の出所。
+;;
+;; :scope
+;;   :universal   — どの法域の地震後にも現れる（機構の名前は変わる）
+;;   :jp-specific — 日本の制度に固有（対応物が無い国がある）
+;; :scope が :jp-specific の項は `data/world-regimes.edn` の :regime/analogue で
+;; 各法域の対応物に写す。対応物が無い場合は「無い」と書く — 埋めない。
+
+{:taxonomy/id "post-earthquake-recovery-operations"
+ :taxonomy/version 1
+ :taxonomy/as-of "2026-08-23"
+ :taxonomy/grounding
+ "分類の骨格は 令和8年熊本地震（2026-07-28）の内閣府日次速報に実際に現れた業務から
+  起こし、平成28年熊本地震（2016）で問題として記録された論点（車中泊・関連死・
+  被害認定調査の滞留）を欠落チェックに使った。仙台防災枠組 2015-2030 の
+  Priority 4 (Build Back Better) と Sphere ハンドブックの最低基準を参照するが、
+  いずれも公開規格であって加盟・認証を意味しない。"
+
+ ;; ---------------------------------------------------------------------
+ ;; フェーズ。日数は目安であって定義ではない — 実際の境界は「前の相の
+ ;; 待ち行列が捌けたか」で決まる。
+ ;; ---------------------------------------------------------------------
+ :taxonomy/phases
+ [{:id :phase/rescue        :label-ja "救助・救急"       :label-en "search and rescue"        :nominal-days [0 3]}
+  {:id :phase/stabilise     :label-ja "生存の安定化"     :label-en "life stabilisation"       :nominal-days [0 14]}
+  {:id :phase/emergency     :label-ja "応急対応"         :label-en "emergency response"       :nominal-days [3 60]}
+  {:id :phase/restore       :label-ja "応急復旧"         :label-en "emergency restoration"    :nominal-days [7 180]}
+  {:id :phase/recover       :label-ja "生活再建・復旧"   :label-en "livelihood recovery"      :nominal-days [30 1095]}
+  {:id :phase/rebuild       :label-ja "復興"             :label-en "reconstruction"           :nominal-days [180 7300]}]
+
+ ;; ---------------------------------------------------------------------
+ ;; 業務 (operations)
+ ;; ---------------------------------------------------------------------
+ :taxonomy/operations
+ [;; === 人命・保健 ==================================================
+  {:id :op/search-and-rescue :phase :phase/rescue :domain :domain/life :scope :universal
+   :label-ja "捜索・救助" :label-en "urban search and rescue"
+   :resources [:res/rescue-team :res/heavy-equipment :res/canine :res/medical-triage]
+   :gated-by [:op/route-clearance]
+   :binding-resource :res/rescue-team
+   :note "72時間の壁。現実には初期救助の多くは公的機関ではなく近隣住民が担う — この分は動員計画に載らない。"}
+
+  {:id :op/emergency-medical :phase :phase/rescue :domain :domain/life :scope :universal
+   :label-ja "災害医療・広域搬送" :label-en "emergency medical and evacuation"
+   :resources [:res/dmat :res/hospital-bed :res/ambulance :res/helicopter :res/dialysis]
+   :gated-by [:op/route-clearance :op/hospital-lifeline]
+   :binding-resource :res/hospital-bed
+   :note "病院自身が被災者である。透析・在宅酸素・分娩は代替が効かず広域搬送の対象になる。"}
+
+  {:id :op/hospital-lifeline :phase :phase/rescue :domain :domain/life :scope :universal
+   :label-ja "医療機関のライフライン確保" :label-en "keeping hospitals supplied"
+   :resources [:res/water-tanker :res/generator :res/fuel]
+   :binding-resource :res/water-tanker
+   :note "2026熊本では避難所・医療機関に加え福祉施設を給水の優先対象として明示的に扱った（現地応急給水支援本部）。"}
+
+  {:id :op/public-health-rounds :phase :phase/stabilise :domain :domain/life :scope :universal
+   :label-ja "保健師の巡回・health surveillance" :label-en "public-health rounds in shelters"
+   :resources [:res/public-health-nurse :res/pharmacist :res/psychosocial-team]
+   :gated-by [:op/shelter-operation]
+   :binding-resource :res/public-health-nurse
+   :leverage :high
+   :note "関連死の主要な予防経路。エコノミークラス症候群・熱中症・低体温・感染症・服薬中断・脱水を拾う。ここが薄いと死者は静かに増える。"}
+
+  {:id :op/indirect-death-prevention :phase :phase/stabilise :domain :domain/life :scope :universal
+   :label-ja "災害関連死の予防" :label-en "preventing indirect deaths"
+   :resources [:res/air-conditioner :res/cardboard-bed :res/partition :res/hot-meal :res/bath :res/toilet]
+   :gated-by [:op/relief-logistics]
+   :binding-resource :res/air-conditioner
+   :leverage :highest
+   :note "2016年熊本地震では災害関連死（218人）が直接死（50人）を上回った。2026年は真夏の発災で 8/23 予報 38℃、台風18号接近。避難環境の質は快適さの話ではなく死亡率の話である。"}
+
+  ;; === 住まい ======================================================
+  {:id :op/shelter-operation :phase :phase/stabilise :domain :domain/housing :scope :universal
+   :label-ja "避難所の開設・運営" :label-en "shelter opening and operation"
+   :resources [:res/shelter-space :res/water :res/food :res/toilet :res/bath :res/staff]
+   :binding-resource :res/staff
+   :note "運営する自治体職員自身が被災者。運営を住民・NPOへ移す速さが、職員を被害認定調査へ回せる速さを決める。"}
+
+  {:id :op/outside-shelter-outreach :phase :phase/stabilise :domain :domain/housing :scope :universal
+   :label-ja "避難所外避難者（車中泊・親族宅）の把握と支援" :label-en "reaching people outside shelters"
+   :resources [:res/outreach-team :res/registry]
+   :binding-resource :res/outreach-team
+   :leverage :highest
+   :measurement-gap true
+   :note "避難所集計に入らないので統計上ほぼ見えない。2016年熊本で車中泊が肺塞栓症の温床になった。見えない母数に物資も保健も届かない — 観測の欠落がそのまま死亡に効く数少ない例。"}
+
+  {:id :op/emergency-repair :phase :phase/emergency :domain :domain/housing :scope :jp-specific
+   :label-ja "住宅の応急修理" :label-en "emergency repair of damaged homes"
+   :resources [:res/contractor :res/building-material :res/blue-sheet]
+   :gated-by [:op/damage-assessment :op/certificate-issuance]
+   :binding-resource :res/contractor
+   :note "災害救助法の応急修理。使うと応急仮設住宅に入れない等の制度上の分岐があり、被災者は情報不足のまま選択を迫られる。"}
+
+  {:id :op/tarping :phase :phase/emergency :domain :domain/housing :scope :universal
+   :label-ja "ブルーシート展張（二次被害の防止）" :label-en "tarping damaged roofs"
+   :resources [:res/blue-sheet :res/roofer :res/self-defence-force]
+   :binding-resource :res/roofer
+   :note "屋根に上がれる人手が律速。2026熊本では熊本県知事の要請で自衛隊が施工業者の地上補助に入った。雨・台風までの残り日数が締切。"}
+
+  {:id :op/rental-temporary-housing :phase :phase/emergency :domain :domain/housing :scope :jp-specific
+   :label-ja "賃貸型応急住宅（みなし仮設）" :label-en "rented units used as temporary housing"
+   :resources [:res/private-rental-stock :res/landlord-agreement :res/admin-staff]
+   :gated-by [:op/certificate-issuance]
+   :binding-resource :res/private-rental-stock
+   :leverage :high
+   :note "既存の空き家を使うので建設より桁で速い。都市部では最大の供給経路。ただし被災者はコミュニティから引き剥がされ分散する — 速さと孤立のトレードオフ。"}
+
+  {:id :op/built-temporary-housing :phase :phase/emergency :domain :domain/housing :scope :universal
+   :label-ja "建設型応急住宅" :label-en "purpose-built temporary housing"
+   :resources [:res/prefab-industry :res/land :res/site-utilities :res/construction-crew]
+   :gated-by [:op/certificate-issuance :op/land-siting]
+   :binding-resource :res/land
+   :note "2026熊本は発災当日に住宅生産関係団体へ要請、8/3 着工開始。用地確保が実質の律速で、公園・校庭を潰すと別の機能が止まる。"}
+
+  {:id :op/public-housing-vacancy :phase :phase/emergency :domain :domain/housing :scope :universal
+   :label-ja "公営住宅等の空室提供" :label-en "opening public-housing vacancies"
+   :resources [:res/public-housing-stock :res/admin-staff]
+   :binding-resource :res/public-housing-stock
+   :note "最も速い。ただし被災地外にしか空きが無いことが多く、通学・通院・生業から引き離す。"}
+
+  {:id :op/permanent-rehousing :phase :phase/rebuild :domain :domain/housing :scope :universal
+   :label-ja "恒久住宅への移行（災害公営住宅・自力再建）" :label-en "permanent rehousing"
+   :resources [:res/reconstruction-finance :res/land :res/construction-crew :res/mortgage]
+   :gated-by [:op/land-use-planning :op/recovery-grant]
+   :binding-resource :res/reconstruction-finance
+   :note "仮設の入居期限（原則2年）と恒久住宅の完成が合わないと、期限延長の連鎖になる。"}
+
+  ;; === 行政・証明（最上流のボトルネック）============================
+  {:id :op/damage-assessment :phase :phase/emergency :domain :domain/admin :scope :jp-specific
+   :label-ja "住家被害認定調査" :label-en "housing damage assessment survey"
+   :resources [:res/assessor :res/mutual-aid-staff :res/survey-device]
+   :binding-resource :res/assessor
+   :leverage :highest
+   :note "**復旧全体の律速**。ここを通らないと罹災証明が出ず、罹災証明が出ないと支援金・仮設・応急修理・公費解体・税減免・保険の実務が全部止まる。調査員は自治体建築職＋応援職員で、絶対数が足りない。"}
+
+  {:id :op/certificate-issuance :phase :phase/emergency :domain :domain/admin :scope :jp-specific
+   :label-ja "罹災証明書の交付" :label-en "issuing disaster-victim certificates"
+   :resources [:res/admin-staff :res/case-system]
+   :gated-by [:op/damage-assessment]
+   :binding-resource :res/admin-staff
+   :leverage :highest
+   :intervention-observed :certificate/online-application
+   :note "2026熊本では宇城市・八代市がオンライン申請を導入して滞留を解消したと 8/23 版に記録がある。窓口の物理待ち行列を消すのは、調査員を増やさずに下流を開ける数少ない手。"}
+
+  {:id :op/second-assessment :phase :phase/recover :domain :domain/admin :scope :jp-specific
+   :label-ja "二次調査・再調査" :label-en "re-assessment on appeal"
+   :resources [:res/assessor :res/admin-staff]
+   :gated-by [:op/certificate-issuance]
+   :binding-resource :res/assessor
+   :note "判定に不服があれば再調査。件数が読めず、同じ調査員を一次調査と食い合う。"}
+
+  {:id :op/municipal-continuity :phase :phase/rescue :domain :domain/admin :scope :universal
+   :label-ja "自治体の業務継続" :label-en "keeping the municipality running"
+   :resources [:res/city-hall :res/generator :res/mutual-aid-staff :res/records]
+   :binding-resource :res/mutual-aid-staff
+   :leverage :high
+   :note "庁舎が損傷し、職員自身が被災し、平時業務は止められない。2026熊本では八代市庁舎の免震ダンパーが破損。応援職員（対口支援）の到着速度が復旧全体の速度を決める。"}
+
+  {:id :op/recovery-grant :phase :phase/recover :domain :domain/admin :scope :jp-specific
+   :label-ja "被災者生活再建支援金の支給" :label-en "livelihood recovery grants"
+   :resources [:res/public-finance :res/admin-staff]
+   :gated-by [:op/certificate-issuance]
+   :binding-resource :res/admin-staff
+   :note "2026熊本では 8/10 に被災者生活再建支援法を適用。"}
+
+  ;; === ライフライン ================================================
+  {:id :op/power-restoration :phase :phase/restore :domain :domain/lifeline :scope :universal
+   :label-ja "電力の復旧" :label-en "power restoration"
+   :resources [:res/line-crew :res/power-vehicle :res/pole-transformer]
+   :binding-resource :res/line-crew
+   :restoration-rank 1
+   :note "架空線なので目視で壊れた場所が分かる。三系統のうち最速で戻るのは普遍的にこれ。2026熊本は最大48,530戸から復旧済み。残るのは引込線という個別事象。"}
+
+  {:id :op/water-restoration :phase :phase/restore :domain :domain/lifeline :scope :universal
+   :label-ja "上水道の復旧・応急給水" :label-en "water restoration and emergency supply"
+   :resources [:res/water-engineer :res/water-tanker :res/pipe :res/leak-survey :res/portable-purifier]
+   :binding-resource :res/leak-survey
+   :restoration-rank 3
+   :leverage :high
+   :note "埋設管なので漏水箇所を探す作業そのものが律速で、探すのに水圧が要るという循環がある。2026熊本の実測系列は 8/06〜8/14 に踊り場を作り（本管は繋がったが末端が出ない）、井戸水対応チーム設置（8/11）の後 8/14→8/17 で 27,800→8,400 に落ちた。"}
+
+  {:id :op/sewer-restoration :phase :phase/restore :domain :domain/lifeline :scope :universal
+   :label-ja "下水道の復旧" :label-en "sewer restoration"
+   :resources [:res/sewer-engineer :res/camera-survey :res/vacuum-truck]
+   :binding-resource :res/camera-survey
+   :restoration-rank 4
+   :note "最も遅く、最も見えない。上水が戻っても下水が壊れていればトイレは使えない — 避難所滞留の隠れた原因。"}
+
+  {:id :op/gas-restoration :phase :phase/restore :domain :domain/lifeline :scope :universal
+   :label-ja "都市ガス・LPガスの復旧と保安" :label-en "gas restoration and safety inspection"
+   :resources [:res/gas-crew :res/safety-inspector]
+   :binding-resource :res/safety-inspector
+   :restoration-rank 2
+   :note "戸別の開栓点検が要るので世帯数に比例した人手が要る。2026熊本ではイオンモール熊本のLPガス起因とみられる爆発で従業員7名が死亡しており、保安点検は形式ではない。"}
+
+  {:id :op/telecom-restoration :phase :phase/restore :domain :domain/lifeline :scope :universal
+   :label-ja "通信の復旧" :label-en "telecom restoration"
+   :resources [:res/mobile-base-station :res/satellite-link :res/generator]
+   :binding-resource :res/generator
+   :restoration-rank 1
+   :note "基地局の停波の多くは倒壊ではなく停電と伝送路断。電源が戻れば戻る。"}
+
+  {:id :op/route-clearance :phase :phase/rescue :domain :domain/lifeline :scope :universal
+   :label-ja "道路啓開" :label-en "route clearance"
+   :resources [:res/heavy-equipment :res/road-crew]
+   :binding-resource :res/heavy-equipment
+   :leverage :highest
+   :note "他の全部の前提。ここが遅れると救助も物資も給水も同じだけ遅れる。"}
+
+  ;; === 物流・支援 ==================================================
+  {:id :op/relief-logistics :phase :phase/stabilise :domain :domain/logistics :scope :universal
+   :label-ja "支援物資の調達・輸送・避難所への最終配送" :label-en "relief logistics and last-mile"
+   :resources [:res/regional-hub :res/truck :res/fuel :res/forklift :res/volunteer]
+   :gated-by [:op/route-clearance]
+   :binding-resource :res/volunteer
+   :note "広域物資拠点までは届くが、そこから避難所へのラストマイルで詰まるのが常。プッシュ型支援（要請を待たずに送る）は初期の情報空白を埋めるが、需要が見え始めたらプル型へ切り替えないと余剰が拠点を埋める。"}
+
+  {:id :op/volunteer-coordination :phase :phase/emergency :domain :domain/logistics :scope :universal
+   :label-ja "災害ボランティアセンターの運営と調整" :label-en "volunteer coordination"
+   :resources [:res/volunteer :res/coordinator :res/intermediary-ngo]
+   :binding-resource :res/coordinator
+   :note "ボランティアの流入は注目に比例して減衰し、必要量は減衰しない。2026熊本では中間支援組織 KVOAD が7/29以降ほぼ毎日の調整会議（8/22で第24回）を回している — 調整が無いと善意は現場で渋滞する。"}
+
+  {:id :op/fuel-supply :phase :phase/stabilise :domain :domain/logistics :scope :universal
+   :label-ja "燃料の供給確保" :label-en "fuel supply"
+   :resources [:res/tanker :res/service-station :res/oil-terminal]
+   :binding-resource :res/tanker
+   :note "発電機・給水車・重機・暖房/冷房が全部これに乗る。2026熊本では通常の2倍以上（65台程度）のタンクローリーを全国から集めた。"}
+
+  ;; === 廃棄物 ======================================================
+  {:id :op/debris-temporary-storage :phase :phase/emergency :domain :domain/waste :scope :universal
+   :label-ja "災害廃棄物 仮置場の開設・運営" :label-en "debris temporary storage sites"
+   :resources [:res/land :res/heavy-equipment :res/site-staff]
+   :binding-resource :res/land
+   :leverage :high
+   :note "用地が無いと道路脇が仮置場になり、道路啓開を戻してしまう。分別を最初にやるか後でやるかで総処理費が数倍変わる。"}
+
+  {:id :op/public-demolition :phase :phase/recover :domain :domain/waste :scope :jp-specific
+   :label-ja "公費解体" :label-en "publicly funded demolition"
+   :resources [:res/demolition-contractor :res/heavy-equipment :res/asbestos-survey :res/public-finance]
+   :gated-by [:op/certificate-issuance :op/debris-temporary-storage]
+   :binding-resource :res/demolition-contractor
+   :note "罹災証明の判定が前提。所有関係（相続未登記・共有）の解決が別の待ち行列を作り、これが年単位で伸びる。"}
+
+  {:id :op/debris-processing :phase :phase/recover :domain :domain/waste :scope :universal
+   :label-ja "災害廃棄物の破砕・選別・処理・再資源化" :label-en "debris processing and recycling"
+   :resources [:res/incinerator :res/crusher :res/wide-area-agreement]
+   :gated-by [:op/debris-temporary-storage]
+   :binding-resource :res/incinerator
+   :note "被災自治体の年間処理量の数倍〜十数倍が一度に出るので、域内処理は原理的に不可能。広域処理の協定が事前に無いと交渉から始まる。"}
+
+  ;; === 生業・経済 ==================================================
+  {:id :op/business-continuity :phase :phase/restore :domain :domain/economy :scope :universal
+   :label-ja "事業者の再開支援（なりわい）" :label-en "restarting businesses"
+   :resources [:res/sme-finance :res/equipment :res/workforce :res/supply-chain]
+   :gated-by [:op/lifeline-restored]
+   :binding-resource :res/sme-finance
+   :leverage :high
+   :note "雇用が戻らないと人口が戻らず、人口が戻らないと事業が戻らない。2026熊本では 8/7 の激甚災害指定で中小企業信用保険の特例（別枠化・てん補率引上げ）が動いた。"}
+
+  {:id :op/agriculture-restoration :phase :phase/recover :domain :domain/economy :scope :universal
+   :label-ja "農林水産業施設・農地の災害復旧" :label-en "agricultural restoration"
+   :resources [:res/farm-infrastructure :res/public-finance :res/construction-crew]
+   :binding-resource :res/construction-crew
+   :note "作付けの季節に間に合わなければ1年単位で遅れる — カレンダーが締切を決める数少ない領域。"}
+
+  {:id :op/employment-bridge :phase :phase/recover :domain :domain/economy :scope :universal
+   :label-ja "雇用の維持・つなぎ就労" :label-en "employment bridging"
+   :resources [:res/wage-subsidy :res/cash-for-work]
+   :binding-resource :res/wage-subsidy
+   :note "被災者を復旧作業に雇う（cash for work）と、所得・人口流出防止・人手不足が同時に効く。"}
+
+  ;; === コミュニティ・心理社会 ======================================
+  {:id :op/psychosocial-support :phase :phase/recover :domain :domain/community :scope :universal
+   :label-ja "こころのケア・孤立防止" :label-en "psychosocial support"
+   :resources [:res/psychosocial-team :res/community-space :res/peer-network]
+   :binding-resource :res/psychosocial-team
+   :leverage :high
+   :note "仮設・みなし仮設への分散は孤立死・自死の危険を上げる。効果が出るのが遅く、予算が切れるのが早い。"}
+
+  {:id :op/community-continuity :phase :phase/rebuild :domain :domain/community :scope :universal
+   :label-ja "コミュニティの継続（集団移転・見守り）" :label-en "keeping communities together"
+   :resources [:res/community-organiser :res/land :res/consensus-process]
+   :binding-resource :res/consensus-process
+   :note "住民合意そのものが律速。急ぐと合意が壊れ、待つと人が出ていく。"}
+
+  {:id :op/records-and-heritage :phase :phase/rebuild :domain :domain/community :scope :universal
+   :label-ja "記録・文化財の保全と継承" :label-en "records, heritage and memory"
+   :resources [:res/archivist :res/conservator :res/public-finance]
+   :binding-resource :res/public-finance
+   :note "後回しにされるが、復興の正統性はここに宿る。熊本城の復旧は数十年計画で、被災の象徴でも回復の象徴でもある。"}
+
+  ;; === 統治・財源 ==================================================
+  {:id :op/legal-activation :phase :phase/rescue :domain :domain/governance :scope :jp-specific
+   :label-ja "災害救助法・激甚災害指定・支援法の適用" :label-en "activating disaster legislation"
+   :resources [:res/national-government :res/prefecture]
+   :binding-resource :res/national-government
+   :leverage :highest
+   :note "適用の日付が下流の財源と権限を全部開ける。2026熊本: 災害救助法 7/28、激甚災害指定 8/7、被災者生活再建支援法 8/10。"}
+
+  {:id :op/land-use-planning :phase :phase/rebuild :domain :domain/governance :scope :universal
+   :label-ja "復興まちづくり計画・土地利用の再編" :label-en "reconstruction planning"
+   :resources [:res/planner :res/consensus-process :res/land-registry]
+   :binding-resource :res/consensus-process
+   :note "速さと正統性が正面から衝突する唯一の工程。速く決めると住民が乗らず、丁寧にやると人口が先に出ていく。"}
+
+  {:id :op/land-siting :phase :phase/emergency :domain :domain/governance :scope :universal
+   :label-ja "用地の確保（仮設・仮置場・資材ヤード）" :label-en "siting land for temporary uses"
+   :resources [:res/land :res/land-registry :res/negotiator]
+   :binding-resource :res/land
+   :note "仮設・仮置場・資材置場・ヘリポートが同じ空き地を取り合う。都市公園と校庭が最初に潰れ、子どもの居場所と避難所機能が同時に減る。"}
+
+  {:id :op/lifeline-restored :phase :phase/restore :domain :domain/lifeline :scope :universal
+   :label-ja "ライフライン復旧の完了（合成ゲート）" :label-en "lifelines restored (composite gate)"
+   :gated-by [:op/power-restoration :op/water-restoration :op/gas-restoration :op/telecom-restoration]
+   :synthetic true
+   :note "個別の業務ではなく、下流の依存を書くための合成ノード。"}
+
+  {:id :op/mutual-aid-dispatch :phase :phase/rescue :domain :domain/governance :scope :jp-specific
+   :label-ja "対口支援（応援職員の派遣）" :label-en "counterpart municipal staff dispatch"
+   :resources [:res/mutual-aid-staff]
+   :binding-resource :res/mutual-aid-staff
+   :leverage :highest
+   :note "被災自治体の行政capacity を外から足す唯一の手段。2026熊本では石川県・岩手県・UR の建築系職員が県庁の応急住宅業務に入った（8/10）— 直前の被災地が経験ごと人を出す構造になっている。"}
+
+  {:id :op/donation-distribution :phase :phase/recover :domain :domain/governance :scope :universal
+   :label-ja "義援金の配分" :label-en "distributing solidarity donations"
+   :resources [:res/donation-pool :res/admin-staff]
+   :gated-by [:op/certificate-issuance]
+   :binding-resource :res/admin-staff
+   :note "集まるのは速く、配るのは遅い。配分委員会と罹災証明を待つ間、被災者の手元には届かない。"}]
+
+ ;; ---------------------------------------------------------------------
+ ;; リソース (resources)。:replenishable? が false のものは、その地震のあいだ
+ ;; 総量が動かない — 計画で増やせない量。
+ ;; ---------------------------------------------------------------------
+ :taxonomy/resources
+ [{:id :res/rescue-team          :kind :human    :replenishable? true  :lead-time-days 1}
+  {:id :res/dmat                 :kind :human    :replenishable? true  :lead-time-days 1}
+  {:id :res/public-health-nurse  :kind :human    :replenishable? true  :lead-time-days 3}
+  {:id :res/psychosocial-team    :kind :human    :replenishable? true  :lead-time-days 14}
+  {:id :res/assessor             :kind :human    :replenishable? true  :lead-time-days 7
+   :note "建築系の資格・研修が要るので全国の総数が有限。ここが復旧全体の律速になる理由。"}
+  {:id :res/mutual-aid-staff     :kind :human    :replenishable? true  :lead-time-days 3}
+  {:id :res/admin-staff          :kind :human    :replenishable? false
+   :note "被災自治体の職員数は増えない。職員自身が被災者でもある。"}
+  {:id :res/volunteer            :kind :human    :replenishable? true  :decay :attention
+   :note "流入は注目に比例して減衰する。必要量は減衰しない。"}
+  {:id :res/coordinator          :kind :human    :replenishable? true  :lead-time-days 3}
+  {:id :res/intermediary-ngo     :kind :org      :replenishable? false}
+  {:id :res/contractor           :kind :human    :replenishable? true  :lead-time-days 14}
+  {:id :res/roofer               :kind :human    :replenishable? true  :lead-time-days 7}
+  {:id :res/demolition-contractor :kind :human   :replenishable? true  :lead-time-days 30}
+  {:id :res/construction-crew    :kind :human    :replenishable? true  :lead-time-days 21}
+  {:id :res/line-crew            :kind :human    :replenishable? true  :lead-time-days 1}
+  {:id :res/water-engineer       :kind :human    :replenishable? true  :lead-time-days 3}
+  {:id :res/sewer-engineer       :kind :human    :replenishable? true  :lead-time-days 7}
+  {:id :res/gas-crew             :kind :human    :replenishable? true  :lead-time-days 2}
+  {:id :res/safety-inspector     :kind :human    :replenishable? true  :lead-time-days 2}
+  {:id :res/leak-survey          :kind :human    :replenishable? true  :lead-time-days 7}
+  {:id :res/camera-survey        :kind :equipment :replenishable? true :lead-time-days 7}
+  {:id :res/heavy-equipment      :kind :equipment :replenishable? true :lead-time-days 2}
+  {:id :res/water-tanker         :kind :equipment :replenishable? true :lead-time-days 1}
+  {:id :res/portable-purifier    :kind :equipment :replenishable? true :lead-time-days 5}
+  {:id :res/generator            :kind :equipment :replenishable? true :lead-time-days 1}
+  {:id :res/power-vehicle        :kind :equipment :replenishable? true :lead-time-days 1}
+  {:id :res/tanker               :kind :equipment :replenishable? true :lead-time-days 1}
+  {:id :res/truck                :kind :equipment :replenishable? true :lead-time-days 1}
+  {:id :res/air-conditioner      :kind :supply   :replenishable? true  :lead-time-days 3}
+  {:id :res/cardboard-bed        :kind :supply   :replenishable? true  :lead-time-days 2}
+  {:id :res/partition            :kind :supply   :replenishable? true  :lead-time-days 2}
+  {:id :res/blue-sheet           :kind :supply   :replenishable? true  :lead-time-days 1}
+  {:id :res/toilet               :kind :supply   :replenishable? true  :lead-time-days 1}
+  {:id :res/bath                 :kind :service  :replenishable? true  :lead-time-days 3}
+  {:id :res/hot-meal             :kind :service  :replenishable? true  :lead-time-days 2}
+  {:id :res/water                :kind :supply   :replenishable? true  :lead-time-days 1}
+  {:id :res/food                 :kind :supply   :replenishable? true  :lead-time-days 1}
+  {:id :res/fuel                 :kind :supply   :replenishable? true  :lead-time-days 1}
+  {:id :res/land                 :kind :land     :replenishable? false
+   :note "地震のあいだ増えない。仮設・仮置場・資材ヤード・ヘリポートが同じ空き地を取り合う。"}
+  {:id :res/private-rental-stock :kind :stock    :replenishable? false
+   :note "既存の空室数が上限。都市部では厚く、農村部ではほぼ無い。"}
+  {:id :res/public-housing-stock :kind :stock    :replenishable? false}
+  {:id :res/hospital-bed         :kind :stock    :replenishable? false}
+  {:id :res/incinerator          :kind :facility :replenishable? false}
+  {:id :res/prefab-industry      :kind :industry :replenishable? false
+   :note "全国の生産能力が上限。同時多発災害では取り合いになる。"}
+  {:id :res/public-finance       :kind :finance  :replenishable? true  :lead-time-days 10}
+  {:id :res/sme-finance          :kind :finance  :replenishable? true  :lead-time-days 10}
+  {:id :res/reconstruction-finance :kind :finance :replenishable? true :lead-time-days 180}
+  {:id :res/donation-pool        :kind :finance  :replenishable? true  :decay :attention}
+  {:id :res/consensus-process    :kind :social   :replenishable? false
+   :note "急がせると壊れる。壊れると復興計画そのものが止まる。"}
+  {:id :res/land-registry        :kind :record   :replenishable? false
+   :note "相続未登記・共有名義が公費解体と用地取得を年単位で止める。地震の後に作れない。"}
+  {:id :res/records              :kind :record   :replenishable? false}
+  {:id :res/case-system          :kind :software :replenishable? true  :lead-time-days 3
+   :note "罹災証明のオンライン申請がここ。ソフトウェアは調査員を増やさずに窓口の待ち行列を消せる数少ない資源。"}]}

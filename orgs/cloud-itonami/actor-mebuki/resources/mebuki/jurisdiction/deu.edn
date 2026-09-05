@@ -1,0 +1,30 @@
+{:profile/id :deu
+ :profile/kind :jurisdiction
+ :profile/label {:ja "ドイツ" :en "Germany"}
+ :profile/iso-3166 "DE"
+ :profile/measurement-status :unmeasured
+ :profile/instruments
+ {:instrument/relief-act {:en "Katastrophenfall declared at Land level; civil protection is a Land competence"}
+  :instrument/severe-disaster {:en "Ad-hoc federal reconstruction fund voted after a major event, plus the EU Solidarity Fund"
+                               :note "Not a standing escalation mechanism: the instrument is legislated after the flood,
+                                      so its terms -- and its date -- are themselves a recovery variable."}
+  :instrument/damage-certificate {:en "Damage survey by the municipality and appointed experts (Gutachter) for the reconstruction aid programme"}
+  :instrument/household-grant {:en "Wiederaufbauhilfe from the federal-Land reconstruction fund"}
+  :instrument/emergency-repair {:en "Soforthilfe: a fast, small, largely unconditional first payment ahead of any survey"
+                                :note "Decoupling a first payment from the determination is the cleanest known way to stop
+                                       the assessment queue from also being a hunger queue."}
+  :instrument/public-demolition {:en "Municipal demolition orders; disposal handled through Land waste authorities"}
+  :instrument/business-grant {:en "Reconstruction aid for businesses; KfW lending"}
+  :instrument/insurance {:en "Elementarschadenversicherung, an optional extension to building cover"
+                         :note "Penetration is partial and is the subject of a standing policy debate about
+                                compulsory cover." :status :unverified-in-repo}
+  :instrument/volunteer-coordination {:en "THW (federal technical relief), fire services, and large-scale spontaneous volunteering"
+                                      :note "THW brings heavy pumping, power and bridging as a standing federal capability --
+                                             the resource most other jurisdictions have to improvise or hire."}
+  :instrument/waste-plan {:en "Land waste authorities; sites opened ad hoc"}
+  :instrument/temporary-housing {:en "Municipal placement, caravans, and rental market; no standing national temporary-housing programme"}}
+ :profile/notes
+ [{:claim "Masonry construction with cellars concentrates the damage below ground: the
+           dominant tasks are pumping out cellars, drying thick walls over months, and
+           replacing heating plant, rather than stripping out wet plasterboard."
+   :status :structural}]}

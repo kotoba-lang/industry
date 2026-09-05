@@ -1,0 +1,40 @@
+{:profile/id :usa
+ :profile/kind :jurisdiction
+ :profile/label {:ja "アメリカ合衆国" :en "United States"}
+ :profile/iso-3166 "US"
+ :profile/measurement-status :unmeasured
+ :profile/instruments
+ {:instrument/relief-act
+  {:en "Presidential Major Disaster Declaration under the Stafford Act"
+   :note "Requested by a governor, granted federally. Unlocks Individual Assistance
+          and Public Assistance separately -- a county can receive one and not the other."}
+  :instrument/severe-disaster {:en "Cost-share adjustment on Public Assistance"}
+  :instrument/damage-certificate
+  {:en "Joint Preliminary Damage Assessment, then FEMA inspection per registered household;
+        separately, the local floodplain administrator's Substantial Damage determination"
+   :note "Two different determinations with different consequences. The Substantial Damage
+          finding, made against the NFIP floodplain rules, can REQUIRE elevation or
+          demolition rather than merely permitting it -- an instrument that compels
+          build-back-better and has no counterpart in most other jurisdictions."}
+  :instrument/household-grant {:en "FEMA Individual Assistance: Housing Assistance and Other Needs Assistance"}
+  :instrument/emergency-repair {:en "FEMA Home Repair Assistance; some states run Sheltering and Temporary Essential Power"}
+  :instrument/public-demolition {:en "Public Assistance Category A debris removal, including private-property debris removal where separately authorised"}
+  :instrument/business-grant {:en "SBA disaster loans (the primary route -- lending, not grants), plus state programmes"}
+  :instrument/insurance
+  {:en "National Flood Insurance Program"
+   :note "Standard homeowner policies exclude flood, so cover is a separate deliberate
+          purchase. Uptake outside mandatory-purchase zones is low, which is why a
+          disproportionate share of US flood loss is uninsured."}
+  :instrument/volunteer-coordination {:en "National VOAD member organisations and long-term recovery groups; no single statutory coordinator"}
+  :instrument/waste-plan {:en "State and local debris management plans; USACE mission assignment for large events"}
+  :instrument/temporary-housing {:en "Rental assistance first; direct housing (manufactured units) only where the rental market cannot absorb demand"}}
+ :profile/notes
+ [{:claim "The entitlement branch runs on self-registration: a household that does not
+           register with FEMA is not assessed. Outreach is therefore part of the
+           assessment production line, not a courtesy alongside it."
+   :status :structural}
+  {:claim "Recovery money is dominated by lending rather than grants for both businesses
+           and, historically, many households -- which shifts recovery capacity toward
+           households that can service debt."
+   :status :unverified-in-repo
+   :how-to-verify "FEMA OpenFEMA IA/PA datasets and SBA disaster loan approvals for a given declaration"}]}

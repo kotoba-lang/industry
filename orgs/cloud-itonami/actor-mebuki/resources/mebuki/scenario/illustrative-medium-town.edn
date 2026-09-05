@@ -1,0 +1,77 @@
+;; AN ILLUSTRATIVE SCENARIO. NOT A MEASUREMENT OF ANY REAL FLOOD.
+;;
+;; Every number below was chosen by the author to be internally consistent and
+;; to make the model's couplings visible. None of them is observed. They exist
+;; so that the structure can be exercised and its behaviour argued about --
+;; which is a different activity from estimating what a particular town will
+;; need, and mebuki.needs stamps every result produced from this file so the
+;; two cannot be confused downstream.
+;;
+;; If you want an estimate for a real event, bind a jurisdiction profile with
+;; measured parameters. If a parameter is not measured, the honest output is
+;; that it is not measured.
+{:profile/id :scenario/illustrative-medium-town
+ :profile/kind :scenario
+ :scenario/illustrative true
+ :profile/label {:ja "例示シナリオ：中規模の町（実測ではない）"
+                 :en "Illustrative scenario: a medium-sized town (not measured)"}
+ :scenario/sketch
+ "A town where roughly three thousand buildings took water above floor level in
+  one night, the river fell within three days, and the response phase has ended.
+  Temperate climate, timber-frame housing with plasterboard, a functioning
+  rental market, an organised volunteer centre, and a waste site found in the
+  first week."
+ :profile/parameters
+ {"total_damaged_buildings" 3000
+  "initial_displaced_households" 1200
+  "households_per_building" 1.2
+  "persons_per_household" 2.4
+  "application_window_days" 30
+
+  "pump_capacity_bpd" 400
+  "dewatering_time_days" 3
+  "volunteer_crews" 120
+  "volunteer_centre_capacity" 80
+  "buildings_per_crew_day" 0.5
+  "dehumidifier_units" 300
+  "ambient_dry_rate" 0.02
+  "assisted_dry_rate" 0.1
+  "mold_hazard_rate" 0.05
+  "remediation_rate" 0.01
+  "write_off_fraction" 0.01
+
+  "assessor_crews" 12
+  "assessments_per_crew_day" 8
+  "reassessment_fraction" 0.15
+
+  "contractor_capacity_bpd" 15
+  "demolition_capacity_bpd" 5
+
+  "debris_per_cleanout_t" 8
+  "debris_per_demolition_t" 90
+  "truck_capacity_tpd" 600
+  "temp_site_capacity" 20000
+  "processing_capacity_tpd" 300
+  "kerbside_blocking_tonnes" 4000
+  "min_access_factor" 0.15
+
+  "temp_housing_order_rate" 15
+  "temp_housing_lead_days" 60
+
+  "outreach_crews" 10
+  "households_per_outreach_crew_day" 12
+
+  "business_grant_open_day" 90
+  "initial_businesses_closed" 400
+  "business_repair_capacity_bpd" 2
+  "initial_farmland_ha" 800
+  "farm_crew_capacity_hapd" 4}
+
+ :scenario/levers
+ "Parameters worth moving one at a time to see which one the recovery is
+  actually standing on. Each is a real procurement or staffing decision:
+    dehumidifier_units        -- how much of the drying stock takes the mold door
+    assessor_crews            -- the throughput of the certificate line
+    volunteer_centre_capacity -- whether arriving labour becomes work
+    temp_site_capacity        -- whether waste ends up at a site or on the road
+    temp_housing_lead_days    -- how long people stay in a gymnasium"}

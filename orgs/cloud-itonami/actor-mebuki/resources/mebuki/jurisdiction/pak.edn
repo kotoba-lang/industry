@@ -1,0 +1,43 @@
+{:profile/id :pak
+ :profile/kind :jurisdiction
+ :profile/label {:ja "パキスタン" :en "Pakistan"}
+ :profile/iso-3166 "PK"
+ :profile/measurement-status :unmeasured
+ :profile/instruments
+ {:instrument/relief-act {:en "National and Provincial Disaster Management Authorities under the NDM Act; provincial relief declarations"}
+  :instrument/severe-disaster {:en "International appeal and Post-Disaster Needs Assessment led with the World Bank, ADB, EU and UN"}
+  :instrument/damage-certificate
+  {:en "Household damage survey by district administration, verified against the national socio-economic registry"
+   :note "The determination is made against a pre-existing poverty registry rather than
+          against property title. Where most damaged houses have no registered title,
+          that substitution is the only thing that makes a per-household payment
+          possible at all -- and it is the single most transferable design idea in
+          this whole file."}
+  :instrument/household-grant {:en "Cash grant disbursed through the national social-protection payment rail"
+                               :note "Using an existing cash-transfer system rather than building a disaster one
+                                      collapses the entitlement queue from months to weeks, because the identity,
+                                      eligibility and payment plumbing already exist and are already audited."}
+  :instrument/emergency-repair {:en "Materials and cash-for-shelter through humanitarian shelter cluster partners"}
+  :instrument/public-demolition {:en "Not a programme. Damaged mud-built housing is cleared by the household."}
+  :instrument/business-grant {:en "Agricultural input packages (seed, fertiliser, livestock) rather than business grants"
+                              :note "For a mostly agricultural affected population the livelihood instrument is the
+                                     next planting season, and it has a hard meteorological deadline."}
+  :instrument/insurance {:en "Effectively absent for households" :status :unverified-in-repo}
+  :instrument/volunteer-coordination {:en "Humanitarian cluster system, military engineering, and local philanthropic networks"}
+  :instrument/waste-plan {:en "No formal disaster-waste stream; mud-built structures largely return to the ground"
+                          :note "The waste branch of the model is small here and the DRYING branch is irrelevant --
+                                 which is precisely why the model must be parameterised, not assumed."}
+  :instrument/temporary-housing {:en "Tents and transitional shelter kits; in-place rebuilding with resilient designs"}}
+ :profile/notes
+ [{:claim "Standing water persisted for months in parts of the 2022 floods because the
+           terrain drains slowly and pumping capacity is limited, so the recovery clock
+           for large areas started a season late."
+   :status :unverified-in-repo
+   :how-to-verify "2022 Pakistan Floods Post-Disaster Needs Assessment; UNOSAT flood extent time series"
+   :model-relevance "dewatering_time_days is not a rounding detail here. It is the
+                     parameter that decides whether the rest of the model runs at all."}
+  {:claim "Where households have no registered title and buildings are mud-built, both
+           the damage-certificate branch and the publicly-funded-demolition branch of
+           the model have no local instrument. The structure is unchanged; the bindings
+           are absent, and the absence is the finding."
+   :status :structural}]}

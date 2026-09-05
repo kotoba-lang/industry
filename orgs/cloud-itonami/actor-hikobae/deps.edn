@@ -1,0 +1,38 @@
+;; hikobae — 地震被害後の復旧リソース・ダイナミクス
+;;
+;; 依存は workspace 内の :local/root だけ。third-party maven / external git を
+;; top-level に置かない（root CLAUDE.md / skill new-project-scaffold）。
+;;
+;; org-oasis-open-xmile が XMILE 1.0 の意味論・方程式言語・シミュレータを持つ。
+;; ここはそれを消費するだけで、積分器も方程式パーサも書かない。
+;; dynamics は Meadows の leverage-point 採点を持つ。同じ理由で再実装しない。
+{:paths ["src" "data"]
+ :deps {org.clojure/clojure {:mvn/version "1.12.4"}
+        io.github.kotoba-lang/org-oasis-open-xmile
+        {:local/root "../../kotoba-lang/org-oasis-open-xmile"}
+        io.github.kotoba-lang/dynamics
+        {:local/root "../../kotoba-lang/dynamics"}}
+
+ :aliases
+ {;; org-oasis-open-xmile の deps.edn は dsl-core を git で引く。
+  ;; ネットワークを使わずに済むよう local checkout へ寄せる。
+  :local-deps {:override-deps {io.github.kotoba-lang/dsl-core
+                               {:local/root "../../kotoba-lang/dsl-core"}}}
+
+  :test {:extra-paths ["test"]
+         :override-deps {io.github.kotoba-lang/dsl-core
+                         {:local/root "../../kotoba-lang/dsl-core"}}
+         :main-opts ["-m" "hikobae.test-runner"]}
+
+  ;; XMILE 1.0 の XML を models/ に書き出す。
+  :emit {:override-deps {io.github.kotoba-lang/dsl-core
+                         {:local/root "../../kotoba-lang/dsl-core"}}
+         :main-opts ["-m" "hikobae.emit"]}
+
+  ;; シナリオ比較を標準出力に出す。
+  :report {:override-deps {io.github.kotoba-lang/dsl-core
+                           {:local/root "../../kotoba-lang/dsl-core"}}
+           :main-opts ["-m" "hikobae.report"]}
+
+  :lint {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2024.11.14"}}
+         :main-opts ["-m" "clj-kondo.main" "--lint" "src" "test" "--fail-level" "error"]}}}

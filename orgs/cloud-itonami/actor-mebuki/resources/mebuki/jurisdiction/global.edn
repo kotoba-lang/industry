@@ -1,0 +1,104 @@
+;; The jurisdiction-independent layer: what ROLES a recovery system needs
+;; somebody to play, and the open normative minima that apply everywhere.
+;;
+;; Every other file in this directory is a binding of these roles to the
+;; instruments one place actually has. A role with no local binding is not a
+;; formatting gap -- it is the finding. Where nothing issues a damage
+;; certificate, nothing downstream of the certificate can be gated on one,
+;; and the recovery either finds another trigger for money and demolition or
+;; it does not have one.
+{:profile/id :global
+ :profile/kind :role-vocabulary
+ :profile/label {:ja "共通（役割の語彙）" :en "Global (role vocabulary)"}
+
+ :profile/instrument-roles
+ [{:instrument/id :instrument/none
+   :ja "制度による前提なし" :en "No instrument gates this"}
+  {:instrument/id :instrument/relief-act
+   :ja "災害救助の発動" :en "Statutory relief activation"
+   :role "The legal act that makes publicly funded shelter, temporary housing and
+          emergency repair possible at all. Almost everything else waits on its date."}
+  {:instrument/id :instrument/severe-disaster
+   :ja "激甚災害等の上乗せ指定" :en "Severe-disaster escalation"
+   :role "A second designation that raises the share of cost carried above the local
+          authority. Its absence is what bankrupts small municipalities."}
+  {:instrument/id :instrument/damage-certificate
+   :ja "被害の公的認定（罹災証明に相当するもの）" :en "Official per-building damage determination"
+   :role "A per-building, appealable determination of damage severity. The pivot of the
+          whole system: cash, demolition, tax relief and often insurance hang off it,
+          which is why its throughput -- not its policy -- sets the recovery's pace."}
+  {:instrument/id :instrument/household-grant
+   :ja "被災世帯への給付" :en "Household recovery grant"
+   :role "Non-repayable money to a household, banded by the damage determination."}
+  {:instrument/id :instrument/emergency-repair
+   :ja "住宅の応急修理" :en "Emergency habitability repair"
+   :role "Public payment for the minimum repair that lets people live at home again.
+          Where it exists it empties the temporary-housing queue from the other end."}
+  {:instrument/id :instrument/public-demolition
+   :ja "公費解体" :en "Publicly funded demolition"
+   :role "Public demolition and disposal of a privately owned damaged building.
+          Requires both the damage determination and clear title or consent -- the
+          second requirement is the one that stalls informal and inherited housing."}
+  {:instrument/id :instrument/business-grant
+   :ja "事業再建の補助・融資" :en "Business recovery grant or lending"}
+  {:instrument/id :instrument/insurance
+   :ja "水災補償" :en "Flood insurance or mutual-aid cover"
+   :role "Private or public-private cover for flood loss. Penetration, not existence,
+          is what matters, and it varies by two orders of magnitude between places."}
+  {:instrument/id :instrument/volunteer-coordination
+   :ja "ボランティアの調整主体" :en "Volunteer coordination body"
+   :role "Whoever converts arriving goodwill into matched, insured, briefed work.
+          Where nobody plays this role, labour arrives and does not become throughput."}
+  {:instrument/id :instrument/waste-plan
+   :ja "災害廃棄物処理の計画と用地" :en "Disaster waste plan and land"
+   :role "Authority to open temporary storage sites and contract haulage at scale.
+          The scarce input is land, and land cannot be surged after the fact."}
+  {:instrument/id :instrument/temporary-housing
+   :ja "応急的な住まいの供給" :en "Temporary housing supply"
+   :role "Purpose-built units, leased private rentals, or cash for rent. Which of the
+          three a place can use is the single largest driver of shelter duration."}]
+
+ ;; Sphere Handbook 2018 minimum standards, cited as an open reference framework
+ ;; (NOT a membership claim -- same posture as actor-kazaori G9). These are
+ ;; normative floors for the displacement phase, not parameters of the model.
+ :profile/sphere-minima
+ [{:id :sphere/water-quantity :value 15 :unit "litre/person/day"
+   :source "Sphere Handbook 2018, WASH -- Water supply standard 2.1"
+   :note "Basic survival quantity for drinking, cooking and personal hygiene."}
+  {:id :sphere/covered-living-space :value 3.5 :unit "m2/person"
+   :source "Sphere Handbook 2018, Shelter and settlement standard 3"
+   :note "Minimum covered living area, excluding cooking and sanitation space."}
+  {:id :sphere/shared-toilet-ratio :value 20 :unit "person/toilet"
+   :source "Sphere Handbook 2018, WASH -- Excreta management standard 3.2"
+   :note "Maximum people sharing one toilet; sex-separated and safely reachable."}]
+
+ ;; What actually differs between places, once the structure is held constant.
+ ;; These are the axes a new jurisdiction profile should answer.
+ :profile/variation-axes
+ [{:axis :axis/climate
+   :ja "気候（乾燥速度と季節）" :en "Climate: how fast a wet building dries, and when"
+   :effect "Binds ambient_dry_rate and therefore the mold split. A monsoon recovery and
+            a temperate autumn recovery are not the same problem with different labels."}
+  {:axis :axis/construction
+   :ja "建築構法" :en "Construction type"
+   :effect "Timber frame with plasterboard and mineral-wool insulation must be stripped
+            and dried or it is written off. Masonry and concrete tolerate wetting but
+            hide contamination. Informal construction is usually a total loss."}
+  {:axis :axis/tenure
+   :ja "権利関係（登記・借家・非正規）" :en "Tenure: title, tenancy, informality"
+   :effect "The damage-certificate and public-demolition path assumes an identifiable
+            owner. Where households have no registered title, the entire entitlement
+            branch of this model is unavailable to exactly the people worst hit."}
+  {:axis :axis/insurance-penetration
+   :ja "水災補償の普及率" :en "Flood-cover penetration"
+   :effect "Decides whether reconstruction is financed privately, publicly, or not at all."}
+  {:axis :axis/labour-model
+   :ja "労働力の供給モデル" :en "Where the labour comes from"
+   :effect "Coordinated civilian volunteering, contracted market labour, NGO cluster
+            deployment, or military engineering. Each has a different arrival curve and
+            a different ceiling, and the volunteer-centre parameters mean different
+            things in each."}
+  {:axis :axis/waste-siting
+   :ja "仮置場の事前選定の有無" :en "Whether waste sites were designated in advance"
+   :effect "Pre-designated sites turn a three-week search into a day-one opening, which
+            is the difference between waste at a site and waste on the road."}]}

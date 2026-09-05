@@ -1,0 +1,64 @@
+;; manifest/bot-voice-profiles.edn — itonami bot への電話番号・音声通話の割り当て名簿
+;;
+;; THIS FILE IS THE ASSIGNMENT POLICY, NOT THE AUTHORITY.
+;;
+;; cua-bots.edn（画面操作の名簿）と bot-allowances.edn（支払い policy）と同じ
+;; 分業である。このファイルは「どの bot に、どの番号/音声面が割り当てられているか」
+;; を記録する。割り当てそのものの authority は既存の 2 actor にあり、ここでは
+;; 再実装しない:
+;;
+;;   番号の払い出し   cloud-itonami-numbering（ADR-2608301200, accepted）
+;;     — owner Passkey consent (:1345) と named operator 承認 (:1346) の
+;;       二段階を通らない限り番号は生まれない。consent だけでは pending、
+;;       operator 承認だけでは approved-not-actuated。committed は
+;;       provider (Telnyx) が success かつ requirements_met を返した時だけ。
+;;   音声の実行       denwaban（ADR-2608147800, accepted）
+;;     — provider-neutral admission contract。番号が割り当てられても
+;;       発着信可能とは扱わない（ADR-2608301200 D1 の境界を継承）。
+;;
+;; DENY BY DEFAULT. 名前の無い bot は番号も音声面も持たない。
+;; 記載があっても下記の :profile/consent-ref が実在する committed assignment
+;; に解決できない限り、その行は dead policy（verify が報告する）。
+;;
+;; A COMMITTED NUMBER IS NOT A LIVE VOICE LINE. 番号（課金対象・quarantine
+;; つき）と音声 session（denwaban admission を毎回通る）は別の面であり、
+;; この名簿でも別 field にする。混ぜない。
+
+{:voice-profile/version 1
+
+ ;; 割り当ての正本となる actor 表面。resolve は numbering の
+ ;; GET /v1/resolve?to= と GET /v1/numbers で観測する（ADR-2608301200）。
+ :voice-profile/numbering-actor "cloud-itonami-numbering"
+ :voice-profile/voice-actor "denwaban"
+
+ ;; 経済境界。番号は継続課金なので、monthly 上限は bot-allowances.edn と
+ ;; 同じ姿勢でここに明示する（未記載 = その bot は番号を申請できない）。
+ ;; Telnyx の order API に max-price field は無いため、上限の強制は
+ ;; numbering governor の quote cap（G3 / NUMBERING_MAX_*）に委ねる。
+ ;; ここに書くのは operator が承認してよい cap の宣言である。
+ :voice-profile/caps
+ {:monthly-usd 20            ; numbering の既定 quote cap と一致
+  :upfront-usd 20
+  :note "quote cap の強制は numbering governor (G3)。ここは operator 承認の上限宣言"}
+
+ ;; ── 割り当て名簿 ────────────────────────────────────────────────
+ ;; entry の形:
+ ;;   {:bot/id "<bot-allowances / cua-bots の bot id と一致させる>"
+ ;;    :profile/assignee-kind  :bot                  ; :agent | :bot（ADR D1）
+ ;;    :profile/consent-ref    "<numbering proposal ref>"
+ ;;    :profile/number         "+81…"                ; committed 実績のある番号
+ ;;    :profile/route          "did:...|topic:..."   ; 着信の配信先（owner ではない）
+ ;;    :profile/capabilities   #{:inbound :outbound} ; 発信は別途 operator 承認を要する
+ ;;    :profile/voice          {:adapter :denwaban
+ ;;                             :admission #{:inbound-pstn :bidirectional-media
+ ;;                                          :call-events :webhook-auth :hangup}
+ ;;                             :health :ready}  ; admission 未達なら :hold
+ ;;    :profile/enabled        false} ; 既定 false。live activation gate
+ ;;                                  ; （ADR-2608301200 の 7 条件）を別々に観測
+ ;;                                  ; してから true にする
+;;
+;; 名簿は現在 0 件。実番号の発注・課金は未実施（ADR-2608301200 Evidence
+;; boundary）であり、実在しない committed assignment をここに書くことは
+;; 「測れなかった測定を成功として報告する」ことになる。最初の entry は
+;; 実発注 → committed → denwaban admission 実測の順で着地してから足す。
+ :voice-profile/bots []}

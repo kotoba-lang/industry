@@ -1,0 +1,444 @@
+;; mebuki 芽吹 — post-flood recovery operations catalog.
+;;
+;; WHAT THIS FILE IS: the structural answer to "after the water goes down, what
+;; resources, tasks and lines of business does a flooded community actually
+;; need, and in what order does the need appear".  It is deliberately
+;; QUANTITY-FREE.  Every number in this repository lives in a jurisdiction
+;; profile or a labelled scenario (resources/mebuki/jurisdiction/*.edn), never
+;; here, because "how many pumps" is a measurement and "you will need pumps"
+;; is a structure.  Mixing them is how fabricated numbers get laundered into
+;; looking like facts.
+;;
+;; :order-window is an ORDERING HINT in days-after-water-recedes, not a
+;; measured duration.  It exists so the catalog can be sorted into the sequence
+;; a community meets these needs in; it is not a schedule and mebuki.needs
+;; never treats it as one.
+;;
+;; :model-var, when present, names the variable in the XMILE model built by
+;; mebuki.model that this catalog item parameterises or is measured by.
+;; mebuki.catalog-test asserts every one of them exists in the built model --
+;; a catalog item claiming a model link that is not there is a broken claim,
+;; not a documentation nit.
+;;
+;; :sector uses the IASC/OCHA cluster names; :sphere cites the Sphere Handbook
+;; 2018 chapter; :sendai cites the Sendai Framework 2015-2030 priority.  Both
+;; are open-publication reference frameworks, NOT memberships (same posture as
+;; actor-kazaori G9).
+{:catalog/id "mebuki.post-flood-recovery"
+ :catalog/version "1"
+ :catalog/scope
+ "Riverine / pluvial / stormwater flooding after extreme rainfall, in a
+  community that has already been through the response phase.  Structure is
+  jurisdiction-independent; jurisdiction profiles bind the local instruments.
+  Coastal-surge salinity, landslide/debris-flow burial and dam failure share
+  most of this chain but add steps this catalog does not yet carry."
+
+ :catalog/frameworks
+ [{:framework/id :sendai
+   :framework/name "Sendai Framework for Disaster Risk Reduction 2015-2030"
+   :framework/use "Priority 4 'Build Back Better' is the whole of :phase/build-back-better."}
+  {:framework/id :sphere
+   :framework/name "Sphere Handbook 2018 (Humanitarian Charter and Minimum Standards)"
+   :framework/use "Minimum standards for the shelter/WASH/health/food items."}
+  {:framework/id :iasc-cluster
+   :framework/name "IASC / UN OCHA cluster system"
+   :framework/use "The :sector vocabulary below is the cluster list."}
+  {:framework/id :iso-22320
+   :framework/name "ISO 22320 Security and resilience - Emergency management"
+   :framework/use "Incident-command vocabulary for the :operation items."}]
+
+ :catalog/sectors
+ [{:sector/id :sector/wash        :ja "水・衛生"        :en "Water, sanitation and hygiene"}
+  {:sector/id :sector/shelter     :ja "住まい"          :en "Shelter and settlement"}
+  {:sector/id :sector/health      :ja "保健・医療"      :en "Health"}
+  {:sector/id :sector/protection  :ja "要配慮者の保護"  :en "Protection"}
+  {:sector/id :sector/food        :ja "食と栄養"        :en "Food security and nutrition"}
+  {:sector/id :sector/logistics   :ja "物流"            :en "Logistics"}
+  {:sector/id :sector/cccm        :ja "避難所の運営"    :en "Camp coordination and camp management"}
+  {:sector/id :sector/early-recovery :ja "生活・なりわいの再建" :en "Early recovery"}
+  {:sector/id :sector/education   :ja "教育"            :en "Education"}
+  {:sector/id :sector/telecom     :ja "通信"            :en "Emergency telecommunications"}
+  {:sector/id :sector/waste       :ja "災害廃棄物"      :en "Disaster waste"
+   :sector/note "Not an IASC cluster. Split out because in a flood it is the single
+                 largest physical flow and it gates every other sector through road access."}
+  {:sector/id :sector/entitlement :ja "被害認定と支援制度" :en "Damage assessment and entitlement"
+   :sector/note "Not an IASC cluster. Split out because in a flood the paperwork that
+                 unlocks money and demolition is a throughput-limited production line,
+                 and it is the most commonly under-resourced one."}
+  {:sector/id :sector/infrastructure :ja "ライフライン・インフラ" :en "Lifelines and infrastructure"}]
+
+ :catalog/phases
+ [{:phase/id :phase/water-present :order 0 :ja "水が引くまで" :en "Water still present"
+   :phase/owner "actor-kazaori (response). mebuki observes only."}
+  {:phase/id :phase/muck-out      :order 1 :ja "泥出し・乾燥"     :en "Muck-out and drying"}
+  {:phase/id :phase/entitlement   :order 2 :ja "被害認定・罹災証明" :en "Damage assessment and certification"}
+  {:phase/id :phase/waste         :order 3 :ja "災害廃棄物"       :en "Disaster waste"}
+  {:phase/id :phase/housing       :order 4 :ja "住まいの確保"     :en "Housing"}
+  {:phase/id :phase/lifelines     :order 5 :ja "ライフライン復旧" :en "Lifeline restoration"}
+  {:phase/id :phase/livelihood    :order 6 :ja "なりわいの再開"   :en "Livelihood restart"}
+  {:phase/id :phase/people        :order 7 :ja "ひととこころ"     :en "People and mental health"}
+  {:phase/id :phase/finance       :order 8 :ja "資金と制度"       :en "Money and legal instruments"}
+  {:phase/id :phase/build-back-better :order 9 :ja "次への備え"   :en "Build back better"
+   :phase/owner "hands off to actor-sonae (preparedness). mebuki closes here."}]
+
+ :catalog/items
+ [;; ---------------------------------------------------------------- phase 0
+  {:id :resource/drainage-pump-truck :kind :resource :phase :phase/water-present
+   :sector :sector/wash :unit :unit/vehicle :order-window [0 14]
+   :ja "排水ポンプ車・可搬式ポンプ" :en "Drainage pump truck / portable pumps"
+   :model-var "pump_capacity_bpd"
+   :note "Owned by the response phase (kazaori). Listed because the recovery clock does
+          not start until standing water is gone, and pump shortfall shifts every
+          downstream window."}
+  {:id :task/dewatering :kind :task :phase :phase/water-present
+   :sector :sector/wash :unit :unit/building :order-window [0 14]
+   :needs #{:resource/drainage-pump-truck}
+   :ja "湛水排除・床下の汲み出し" :en "Dewatering, including under-floor voids"
+   :model-var "dewatering"}
+
+  ;; ---------------------------------------------------------------- phase 1
+  {:id :resource/ppe-boots :kind :resource :phase :phase/muck-out
+   :sector :sector/health :unit :unit/person-set :order-window [0 60]
+   :ja "踏み抜き防止インソール入り安全長靴" :en "Puncture-resistant safety boots"
+   :note "Flood mud hides glass, nails and needles. This is the item whose absence
+          converts volunteers into patients."}
+  {:id :resource/ppe-respirator :kind :resource :phase :phase/muck-out
+   :sector :sector/health :unit :unit/person-set :order-window [0 60]
+   :ja "防塵マスク（N95/DS2 相当）・保護メガネ・ゴム手袋" :en "N95/DS2 respirator, eye protection, gloves"
+   :note "Dried flood silt aerosolises; mold spore load rises steeply once drying starts."}
+  {:id :resource/hand-tools :kind :resource :phase :phase/muck-out
+   :sector :sector/shelter :unit :unit/tool-set :order-window [0 60]
+   :ja "角スコップ・デッキブラシ・一輪車・バケツ・土のう袋" :en "Square shovels, stiff brooms, wheelbarrows, buckets, sandbags"}
+  {:id :resource/pressure-washer :kind :resource :phase :phase/muck-out
+   :sector :sector/shelter :unit :unit/machine :order-window [0 90]
+   :ja "高圧洗浄機・給水タンク" :en "Pressure washers and water bowsers"}
+  {:id :resource/drying-equipment :kind :resource :phase :phase/muck-out
+   :sector :sector/shelter :unit :unit/machine :order-window [3 180]
+   :ja "業務用送風機・除湿機・発電機・投光器" :en "Industrial blowers, dehumidifiers, generators, work lights"
+   :model-var "dehumidifier_units"
+   :note "The highest-leverage physical resource in the whole catalog. Buildings do not
+          queue for repair, they queue for DRYNESS; every day a wet building waits it is
+          being reallocated from the repair branch to the mold branch (see
+          mebuki.model's dry_rate / mold_rate split)."}
+  {:id :resource/disinfectant :kind :resource :phase :phase/muck-out
+   :sector :sector/health :unit :unit/consumable :order-window [3 120]
+   :ja "消毒剤（消石灰・次亜塩素酸ナトリウム・逆性石けん）と噴霧器" :en "Disinfectant (slaked lime, hypochlorite, benzalkonium) and sprayers"}
+  {:id :resource/heat-illness-supplies :kind :resource :phase :phase/muck-out
+   :sector :sector/health :unit :unit/consumable :order-window [0 90]
+   :ja "飲料水・経口補水液・塩分補給・日陰と休憩所" :en "Drinking water, oral rehydration salts, salt, shade and rest areas"
+   :note "Summer muck-out is the phase that kills responders and residents who are not
+          counted as disaster deaths. Sphere health standards apply to the workforce too."}
+  {:id :resource/vacuum-tanker :kind :resource :phase :phase/muck-out
+   :sector :sector/waste :unit :unit/vehicle :order-window [0 60]
+   :ja "汚泥吸引車・バキュームカー" :en "Vacuum tankers for sludge and septic"}
+  {:id :resource/volunteer-labour :kind :resource :phase :phase/muck-out
+   :sector :sector/shelter :unit :unit/crew-day :order-window [0 120]
+   :ja "災害ボランティア（一般）" :en "General disaster volunteers"
+   :model-var "volunteer_crews"}
+  {:id :resource/skilled-trades :kind :resource :phase :phase/muck-out
+   :sector :sector/shelter :unit :unit/crew-day :order-window [7 730]
+   :ja "技術系ボランティア・大工・電気・給排水設備業者" :en "Skilled trades: technical volunteers, carpenters, electricians, plumbers"
+   :model-var "contractor_capacity_bpd"
+   :note "Scarce, slow-arriving, and the binding constraint on the repair branch long
+          after general volunteers have gone home."}
+  {:id :resource/heavy-equipment :kind :resource :phase :phase/muck-out
+   :sector :sector/waste :unit :unit/machine :order-window [0 365]
+   :ja "重機（バックホウ・積込機）とオペレーター" :en "Heavy equipment (excavators, loaders) with operators"}
+  {:id :task/contents-removal :kind :task :phase :phase/muck-out
+   :sector :sector/shelter :unit :unit/building :order-window [0 30]
+   :needs #{:resource/volunteer-labour :resource/hand-tools :resource/ppe-boots :resource/ppe-respirator}
+   :ja "家財の搬出" :en "Removing household contents"}
+  {:id :task/damage-photography :kind :task :phase :phase/muck-out
+   :sector :sector/entitlement :unit :unit/building :order-window [0 7]
+   :ja "被害の写真記録（片付ける前に撮る）" :en "Photographing damage BEFORE clearing"
+   :note "The cheapest task in the catalog and the one most often skipped. Once the
+          mud is out, the evidence for the damage certificate and the insurance claim
+          is gone with it. Its cost is minutes; its absence downgrades a household's
+          assessed damage band for the entire recovery."}
+  {:id :task/mud-removal :kind :task :phase :phase/muck-out
+   :sector :sector/shelter :unit :unit/building :order-window [0 45]
+   :needs #{:resource/volunteer-labour :resource/hand-tools :resource/vacuum-tanker
+            :resource/ppe-boots :resource/ppe-respirator :resource/heat-illness-supplies}
+   :ja "泥出し（床上・床下・側溝）" :en "Mud removal: above floor, under floor, and street drains"
+   :model-var "mud_removal"}
+  {:id :task/wet-material-stripout :kind :task :phase :phase/muck-out
+   :sector :sector/shelter :unit :unit/building :order-window [3 60]
+   :needs #{:resource/skilled-trades :resource/hand-tools}
+   :ja "畳・断熱材・石膏ボード・床板の撤去（腰壁カット）" :en "Stripping out tatami, insulation, plasterboard and floorboards"
+   :note "Cutting the wall above the waterline is what makes drying possible. Skipping
+          it is the standard way a house is 'cleaned' and then condemned six months later."}
+  {:id :task/drying-and-disinfection :kind :task :phase :phase/muck-out
+   :sector :sector/shelter :unit :unit/building :order-window [5 180]
+   :needs #{:resource/drying-equipment :resource/disinfectant}
+   :ja "床下・壁内の乾燥と消毒" :en "Drying and disinfecting sub-floor and wall cavities"
+   :model-var "drying_completion"}
+  {:id :operation/volunteer-centre :kind :operation :phase :phase/muck-out
+   :sector :sector/cccm :unit :unit/service :order-window [1 150]
+   :needs #{:resource/volunteer-labour}
+   :ja "災害ボランティアセンターの設置・運営" :en "Standing up and running a disaster volunteer centre"
+   :model-var "volunteer_centre_capacity"
+   :note "Intake of household needs, matching, tool lending, transport, volunteer
+          insurance, safety briefing, heat and infection control. Without it, arriving
+          labour does not become removed mud -- it becomes traffic."}
+  {:id :operation/worker-safety :kind :operation :phase :phase/muck-out
+   :sector :sector/health :unit :unit/service :order-window [0 180]
+   :needs #{:resource/ppe-boots :resource/ppe-respirator :resource/heat-illness-supplies}
+   :ja "作業安全・産業保健（熱中症・破傷風・レジオネラ・創傷感染）" :en "Occupational safety and health for the cleanup workforce"}
+
+  ;; ---------------------------------------------------------------- phase 2
+  {:id :resource/assessors :kind :resource :phase :phase/entitlement
+   :sector :sector/entitlement :unit :unit/crew-day :order-window [3 180]
+   :ja "住家被害認定調査員（自治体職員・応援職員）" :en "Damage assessment surveyors (municipal and mutual-aid staff)"
+   :model-var "assessor_crews"
+   :note "A flood damages thousands of buildings in one night and each one needs an
+          individual, appealable, on-site determination. This is a production line with
+          a measurable throughput, and it is almost always the narrowest one."}
+  {:id :task/damage-assessment :kind :task :phase :phase/entitlement
+   :sector :sector/entitlement :unit :unit/building :order-window [3 240]
+   :needs #{:resource/assessors}
+   :ja "住家被害認定調査（第一次・第二次）" :en "Housing damage assessment (first and second survey)"
+   :model-var "assessment_rate"}
+  {:id :task/certificate-issuance :kind :task :phase :phase/entitlement
+   :sector :sector/entitlement :unit :unit/household :order-window [7 365]
+   :needs #{:resource/assessors}
+   :ja "罹災証明書の申請受付・交付" :en "Receiving applications for and issuing the damage certificate"
+   :model-var "certificates_issued"
+   :gated-by #{:instrument/damage-certificate}
+   :note "The single document that unlocks cash grants, publicly-funded demolition,
+          rent waivers, tax relief and most insurance workflows. Everything downstream
+          of it inherits its queue."}
+  {:id :task/reassessment :kind :task :phase :phase/entitlement
+   :sector :sector/entitlement :unit :unit/building :order-window [21 365]
+   :needs #{:resource/assessors}
+   :ja "再調査の申請と第二次調査" :en "Re-assessment requests and second survey"
+   :model-var "reassessment"
+   :note "A real feedback edge, not an exception path: appeals return work to the same
+          queue that produced them, so an under-staffed assessment line does not just
+          run late, it runs late at an accelerating rate."}
+  {:id :operation/affected-person-register :kind :operation :phase :phase/entitlement
+   :sector :sector/entitlement :unit :unit/service :order-window [7 1095]
+   :ja "被災者台帳の整備と一元的な相談窓口" :en "Affected-person register and a single support desk"
+   :note "One record per household across every programme. Its absence is what makes
+          survivors re-tell their loss to a different desk for each form."}
+  {:id :operation/mutual-aid-staffing :kind :operation :phase :phase/entitlement
+   :sector :sector/entitlement :unit :unit/service :order-window [3 365]
+   :needs #{:resource/assessors}
+   :ja "応援職員の受入（対口支援・カウンターパート方式）" :en "Receiving mutual-aid staff from unaffected authorities"}
+  {:id :operation/legal-aid :kind :operation :phase :phase/entitlement
+   :sector :sector/protection :unit :unit/service :order-window [14 730]
+   :ja "無料法律相談（二重ローン・相続・借地借家・保険）" :en "Free legal aid: double loans, inheritance, tenancy, insurance disputes"}
+
+  ;; ---------------------------------------------------------------- phase 3
+  {:id :resource/temporary-storage-site :kind :resource :phase :phase/waste
+   :sector :sector/waste :unit :unit/site :order-window [0 540]
+   :ja "災害廃棄物の仮置場（用地・敷鉄板・防塵ネット・計量・警備）" :en "Temporary disaster-waste storage site (land, steel plates, dust netting, weighbridge, security)"
+   :model-var "temp_site_capacity"
+   :note "LAND is the resource, and land cannot be surged. A site not designated before
+          the flood is typically found in week three, by which time the waste is already
+          on the roadside, where it blocks the access that the rest of the recovery needs."}
+  {:id :resource/haulage-fleet :kind :resource :phase :phase/waste
+   :sector :sector/logistics :unit :unit/vehicle :order-window [0 540]
+   :ja "ダンプ・アームロール・収集運搬の委託事業者" :en "Tipper and roll-on fleet and contracted haulage"
+   :model-var "truck_capacity_tpd"}
+  {:id :resource/waste-processing-plant :kind :resource :phase :phase/waste
+   :sector :sector/waste :unit :unit/machine :order-window [30 1095]
+   :ja "破砕・選別機、焼却・最終処分の受入枠（広域処理を含む）" :en "Crushing and sorting plant, incineration and landfill capacity including out-of-area"
+   :model-var "processing_capacity_tpd"}
+  {:id :task/kerbside-segregation :kind :task :phase :phase/waste
+   :sector :sector/waste :unit :unit/tonne :order-window [0 120]
+   :needs #{:resource/volunteer-labour}
+   :ja "排出時の分別（可燃・不燃・家電・畳・木くず・コンクリ・危険物）" :en "Segregation at the kerb: burnable, non-burnable, appliances, tatami, timber, concrete, hazardous"
+   :note "Segregation done at the kerb costs one handling; segregation deferred to the
+          storage site costs three and needs the site to be twice as large."}
+  {:id :task/debris-hauling :kind :task :phase :phase/waste
+   :sector :sector/waste :unit :unit/tonne :order-window [0 540]
+   :needs #{:resource/haulage-fleet :resource/heavy-equipment :resource/temporary-storage-site}
+   :ja "仮置場への搬入" :en "Hauling to the temporary storage site"
+   :model-var "hauling"}
+  {:id :task/waste-processing :kind :task :phase :phase/waste
+   :sector :sector/waste :unit :unit/tonne :order-window [30 1095]
+   :needs #{:resource/waste-processing-plant}
+   :ja "二次仮置場での破砕選別・再資源化・最終処分" :en "Crushing, sorting, recycling and final disposal"
+   :model-var "processing"}
+  {:id :task/publicly-funded-demolition :kind :task :phase :phase/waste
+   :sector :sector/waste :unit :unit/building :order-window [60 1095]
+   :needs #{:resource/heavy-equipment :resource/haulage-fleet}
+   :gated-by #{:instrument/damage-certificate :instrument/public-demolition}
+   :ja "公費解体（申請・立会・解体・精算）" :en "Publicly funded demolition: application, walkthrough, demolition, settlement"
+   :model-var "demolition"}
+  {:id :operation/waste-management-plan :kind :operation :phase :phase/waste
+   :sector :sector/waste :unit :unit/service :order-window [3 1095]
+   :ja "災害廃棄物処理実行計画の策定と広域処理の調整" :en "Drafting the disaster-waste execution plan and arranging out-of-area processing"}
+  {:id :operation/illegal-dumping-control :kind :operation :phase :phase/waste
+   :sector :sector/waste :unit :unit/service :order-window [7 365]
+   :ja "便乗ごみ・不法投棄の抑止と受入管理" :en "Controlling opportunistic and illegal dumping at intake"}
+
+  ;; ---------------------------------------------------------------- phase 4
+  {:id :resource/shelter-comfort-kit :kind :resource :phase :phase/housing
+   :sector :sector/cccm :unit :unit/household :order-window [0 120]
+   :ja "段ボールベッド・パーティション・寝具・冷暖房" :en "Cardboard beds, partitions, bedding, heating and cooling"
+   :note "Sphere 2018 minimums apply from night one: covered living space per person,
+          shared-toilet ratio, and litres of water per person per day (see the global
+          jurisdiction profile for the cited figures)."}
+  {:id :resource/temporary-housing :kind :resource :phase :phase/housing
+   :sector :sector/shelter :unit :unit/household :order-window [21 1095]
+   :ja "応急仮設住宅（建設型）とみなし仮設（民間賃貸の借上げ）" :en "Temporary housing: purpose-built units and leased private rentals"
+   :model-var "temp_housing_supply"
+   :gated-by #{:instrument/relief-act}
+   :note "Leased private rental is available in days where a rental market exists and
+          not at all where it does not; purpose-built units take months and need land.
+          Which of the two a jurisdiction can use is the largest single driver of how
+          long people stay in a gymnasium."}
+  {:id :resource/repair-materials :kind :resource :phase :phase/housing
+   :sector :sector/shelter :unit :unit/building :order-window [30 1095]
+   :ja "復旧資材（合板・断熱材・石膏ボード・床材・給湯器・空調）" :en "Repair materials: plywood, insulation, plasterboard, flooring, water heaters, HVAC"
+   :note "Region-wide simultaneous demand. Lead time, not price, is what actually binds."}
+  {:id :task/emergency-home-repair :kind :task :phase :phase/housing
+   :sector :sector/shelter :unit :unit/building :order-window [14 540]
+   :needs #{:resource/skilled-trades :resource/repair-materials}
+   :gated-by #{:instrument/damage-certificate :instrument/emergency-repair}
+   :ja "住宅の応急修理（日常生活に必要な最小限の部分）" :en "Emergency home repair of the minimum needed to live there"
+   :model-var "repair_completion"
+   :note "Where this programme exists it is the cheapest route home and it removes a
+          household from the temporary-housing queue entirely."}
+  {:id :task/temporary-housing-allocation :kind :task :phase :phase/housing
+   :sector :sector/shelter :unit :unit/household :order-window [14 730]
+   :needs #{:resource/temporary-housing}
+   :ja "仮設住宅の用地選定・発注・入居調整" :en "Siting, ordering and allocating temporary housing"
+   :model-var "shelter_to_temp"}
+  {:id :operation/shelter-management :kind :operation :phase :phase/housing
+   :sector :sector/cccm :unit :unit/service :order-window [0 240]
+   :needs #{:resource/shelter-comfort-kit}
+   :ja "避難所の運営（衛生・食事・要配慮者・プライバシー・ペット）" :en "Running the shelters: hygiene, meals, at-risk residents, privacy, pets"}
+  {:id :operation/permanent-housing-pathway :kind :operation :phase :phase/housing
+   :sector :sector/shelter :unit :unit/service :order-window [180 1825]
+   :ja "恒久住宅への移行計画（災害公営住宅・自力再建・集団移転）" :en "Pathway to permanent housing: public disaster housing, self-rebuild, managed relocation"
+   :note "Temporary housing with no exit is how a two-year programme becomes a ten-year one."}
+
+  ;; ---------------------------------------------------------------- phase 5
+  {:id :task/water-supply-restoration :kind :task :phase :phase/lifelines
+   :sector :sector/wash :unit :unit/connection :order-window [0 120]
+   :ja "上水道の復旧と応急給水" :en "Restoring piped water and running emergency water points"}
+  {:id :task/sewer-restoration :kind :task :phase :phase/lifelines
+   :sector :sector/wash :unit :unit/connection :order-window [0 365]
+   :ja "下水道（管渠・ポンプ場・処理場）の復旧" :en "Restoring sewers, pumping stations and treatment works"
+   :note "Slower and less visible than water supply, and until it is done every
+          restored house is discharging into a system that cannot take it."}
+  {:id :task/power-restoration :kind :task :phase :phase/lifelines
+   :sector :sector/infrastructure :unit :unit/connection :order-window [0 90]
+   :ja "配電設備の復旧（浸水した引込・分電盤の安全確認を含む）" :en "Restoring distribution, including safety checks on flooded service entries and panels"
+   :note "A flooded consumer unit must not be re-energised. Reconnection is per-building
+          inspection work, not a network switching operation."}
+  {:id :task/telecom-restoration :kind :task :phase :phase/lifelines
+   :sector :sector/telecom :unit :unit/connection :order-window [0 60]
+   :ja "通信の復旧（可搬型基地局・公衆Wi-Fi・充電拠点）" :en "Restoring communications: portable cells, public Wi-Fi, charging points"}
+  {:id :task/road-clearance :kind :task :phase :phase/lifelines
+   :sector :sector/logistics :unit :unit/km :order-window [0 180]
+   :needs #{:resource/heavy-equipment}
+   :ja "道路啓開・法面と橋梁の応急復旧" :en "Road clearance and emergency repair of embankments and bridges"
+   :model-var "access_factor"}
+  {:id :task/levee-emergency-repair :kind :task :phase :phase/lifelines
+   :sector :sector/infrastructure :unit :unit/km :order-window [0 365]
+   :ja "堤防・護岸・排水機場の応急復旧（次の出水期まで）" :en "Emergency repair of levees, revetments and drainage pumping stations before the next flood season"
+   :note "Deadline is meteorological, not administrative. A breach not closed before the
+          next wet season re-runs the whole of this catalog."}
+
+  ;; ---------------------------------------------------------------- phase 6
+  {:id :resource/business-recovery-grant :kind :resource :phase :phase/livelihood
+   :sector :sector/early-recovery :unit :unit/business :order-window [30 1095]
+   :gated-by #{:instrument/business-grant}
+   :ja "事業再建の補助・災害融資・仮設店舗/工場" :en "Business recovery grants, disaster lending, temporary premises"
+   :model-var "business_funding_gate"}
+  {:id :resource/farm-inputs :kind :resource :phase :phase/livelihood
+   :sector :sector/food :unit :unit/hectare :order-window [30 730]
+   :ja "農機具・種苗・肥料・飼料の再取得" :en "Replacing farm machinery, seed, fertiliser and feed"}
+  {:id :task/business-plant-recovery :kind :task :phase :phase/livelihood
+   :sector :sector/early-recovery :unit :unit/business :order-window [14 1095]
+   :needs #{:resource/business-recovery-grant :resource/skilled-trades}
+   :ja "設備の洗浄・修理・入替、在庫廃棄、販路の回復" :en "Cleaning, repairing and replacing plant, writing off stock, rebuilding sales channels"
+   :model-var "business_reopening"}
+  {:id :task/farmland-restoration :kind :task :phase :phase/livelihood
+   :sector :sector/food :unit :unit/hectare :order-window [14 730]
+   :needs #{:resource/heavy-equipment :resource/farm-inputs}
+   :ja "農地の除礫・土砂撤去・除塩・用排水路の復旧" :en "Clearing stone and silt, desalination, and restoring irrigation and drainage channels"
+   :model-var "farmland_restoration"
+   :note "Bounded by the planting calendar, not by capacity. Missing the window costs a
+          whole season regardless of how fast the work is finished afterwards."}
+  {:id :operation/employment-protection :kind :operation :phase :phase/livelihood
+   :sector :sector/early-recovery :unit :unit/service :order-window [14 730]
+   :ja "雇用の維持（休業手当の助成・つなぎ雇用）と二重債務対策" :en "Protecting employment (wage subsidy, bridge jobs) and handling double indebtedness"}
+
+  ;; ---------------------------------------------------------------- phase 7
+  {:id :resource/public-health-nurses :kind :resource :phase :phase/people
+   :sector :sector/health :unit :unit/crew-day :order-window [3 730]
+   :ja "保健師・看護職による全戸訪問チーム" :en "Public-health nurse teams doing household visits"
+   :model-var "outreach_crews"}
+  {:id :task/health-outreach :kind :task :phase :phase/people
+   :sector :sector/health :unit :unit/household :order-window [3 730]
+   :needs #{:resource/public-health-nurses}
+   :ja "全戸訪問・生活不活発病と孤立の予防・服薬と受診の再開" :en "Household visits: preventing disuse syndrome and isolation, restarting medication and care"
+   :model-var "outreach_rate"
+   :note "The counter-measure to indirect disaster deaths, which in a flood typically
+          outnumber the drownings and are almost entirely preventable."}
+  {:id :task/psychosocial-support :kind :task :phase :phase/people
+   :sector :sector/health :unit :unit/household :order-window [7 1095]
+   :ja "こころのケア（急性期チーム→地域の精神保健への引き継ぎ）" :en "Psychosocial support, handed from acute teams to routine community mental health"}
+  {:id :task/child-and-school-continuity :kind :task :phase :phase/people
+   :sector :sector/education :unit :unit/child :order-window [3 365]
+   :ja "学校の再開・居場所・学習支援・通学手段" :en "Reopening schools, safe places, learning support and transport"
+   :note "A school used as a shelter cannot be a school. That trade-off is decided in
+          week one and felt for a year."}
+  {:id :task/at-risk-household-support :kind :task :phase :phase/people
+   :sector :sector/protection :unit :unit/household :order-window [0 1095]
+   :ja "要配慮者支援（高齢・障害・医療的ケア・妊産婦・外国人・ペット）" :en "Support for at-risk households: older people, disability, medical dependency, pregnancy, non-native speakers, pets"
+   :note "Also the population least able to do their own muck-out, and therefore the
+          one that silently accumulates in the un-dried stock."}
+  {:id :operation/community-cohesion :kind :operation :phase :phase/people
+   :sector :sector/protection :unit :unit/service :order-window [30 1825]
+   :ja "コミュニティの再建（自治会・見守り・集会所・移転先での関係づくり）" :en "Rebuilding community: neighbourhood associations, check-ins, meeting places, ties in relocation sites"}
+
+  ;; ---------------------------------------------------------------- phase 8
+  {:id :resource/household-recovery-grant :kind :resource :phase :phase/finance
+   :sector :sector/early-recovery :unit :unit/household :order-window [30 1095]
+   :gated-by #{:instrument/damage-certificate :instrument/household-grant}
+   :ja "被災世帯への現金給付・義援金の配分" :en "Cash grants to affected households and distribution of solidarity donations"
+   :model-var "funding_gate"}
+  {:id :resource/flood-insurance :kind :resource :phase :phase/finance
+   :sector :sector/early-recovery :unit :unit/household :order-window [7 730]
+   :gated-by #{:instrument/insurance}
+   :ja "水災補償（火災保険の水災担保・共済）の請求" :en "Flood cover claims under property insurance or mutual aid"
+   :note "Penetration varies by two orders of magnitude between jurisdictions and is the
+          main reason the same physical damage produces completely different recovery
+          curves in two countries."}
+  {:id :operation/disaster-declaration :kind :operation :phase :phase/finance
+   :sector :sector/entitlement :unit :unit/service :order-window [0 60]
+   :gated-by #{:instrument/relief-act :instrument/severe-disaster}
+   :ja "災害救助法の適用・激甚災害指定などの制度発動" :en "Triggering the statutory relief and severe-disaster designations"
+   :note "Upstream of nearly every other instrument. Its date, not the flood's date, is
+          when most of the money becomes legally possible."}
+  {:id :operation/tax-and-fee-relief :kind :operation :phase :phase/finance
+   :sector :sector/early-recovery :unit :unit/service :order-window [30 730]
+   :ja "税・保険料・公共料金の減免（雑損控除等を含む）" :en "Relief on taxes, social-insurance contributions and utility charges"}
+  {:id :operation/donation-governance :kind :operation :phase :phase/finance
+   :sector :sector/early-recovery :unit :unit/service :order-window [7 730]
+   :ja "義援金・寄付の受入と配分の統治（配分委員会・透明性）" :en "Governing intake and allocation of donations: allocation committee and public accounting"}
+
+  ;; ---------------------------------------------------------------- phase 9
+  {:id :task/inundation-record-publication :kind :task :phase :phase/build-back-better
+   :sector :sector/infrastructure :unit :unit/service :order-window [90 730]
+   :ja "浸水実績の記録と公表・ハザードマップの更新" :en "Recording and publishing the observed inundation and updating hazard maps"
+   :note "Sendai Priority 1. The flood that just happened is the best data the next
+          plan will ever get, and it is perishable."}
+  {:id :task/property-flood-resilience :kind :task :phase :phase/build-back-better
+   :sector :sector/shelter :unit :unit/building :order-window [180 1825]
+   :ja "住宅の耐水化（嵩上げ・ピロティ化・止水板・電気設備の高所化）" :en "Property-level flood resilience: raising, undercroft, barriers, lifting electrics"
+   :note "Sendai Priority 4. Only affordable at the moment the building is already open,
+          which is exactly the moment the repair grant rules usually forbid it."}
+  {:id :task/catchment-flood-works :kind :task :phase :phase/build-back-better
+   :sector :sector/infrastructure :unit :unit/service :order-window [365 3650]
+   :ja "流域治水（遊水地・雨水貯留・堤防強化・土地利用規制）" :en "Catchment-wide flood management: retention, storage, levee strengthening, land-use control"}
+  {:id :operation/pre-recovery-planning :kind :operation :phase :phase/build-back-better
+   :sector :sector/early-recovery :unit :unit/service :order-window [365 3650]
+   :ja "事前復興計画・仮置場の事前選定・受援計画の更新" :en "Pre-disaster recovery planning, pre-designating waste sites, updating the plan for receiving outside help"
+   :note "Everything in this phase is an input to actor-sonae. mebuki's last act is to
+          hand the measured shortfalls forward so the next flood meets a shorter queue."}]}

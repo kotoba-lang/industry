@@ -1,0 +1,114 @@
+;; Japan, Chiba Prefecture. The first binding of the global role vocabulary.
+;;
+;; HOW TO READ THE TWO HALVES OF THIS FILE. The instruments are law: their
+;; names and what they gate are stable facts, and they are written here
+;; without hedging. The parameters are measurements of one particular flood,
+;; and this repository has not measured any of them -- so every one of them
+;; says so, and says where the number would come from. mebuki.needs refuses
+;; to simulate from this profile for exactly that reason. That refusal is the
+;; feature: a recovery model that fills its own gaps with plausible values
+;; produces a curve that looks like evidence and is not.
+{:profile/id :jpn-chiba
+ :profile/kind :jurisdiction
+ :profile/label {:ja "日本・千葉県" :en "Japan, Chiba Prefecture"}
+ :profile/iso-3166 "JP-12"
+ :profile/measurement-status :unmeasured
+
+ :profile/instruments
+ {:instrument/relief-act
+  {:ja "災害救助法" :en "Disaster Relief Act"
+   :administered-by "都道府県（内閣府所管）" :applies-to "市町村単位で適用"
+   :note "避難所の設置、応急仮設住宅、住宅の応急修理、炊き出し等の根拠。適用の可否と
+          その日付が、以降ほぼ全ての公費支出の起点になる。"}
+  :instrument/severe-disaster
+  {:ja "激甚災害の指定（激甚災害法）" :en "Severe Disaster designation"
+   :note "査定を経て国庫補助率が引き上がる。小規模自治体では、これが無いと単独では
+          災害復旧事業の起債償還に耐えられない。"}
+  :instrument/damage-certificate
+  {:ja "罹災証明書" :en "Damage certificate (risai shomeisho)"
+   :legal-basis "災害対策基本法 第90条の2（市町村長が遅滞なく交付）"
+   :assessment-basis "内閣府「災害に係る住家の被害認定基準運用指針」"
+   :bands "全壊 / 大規模半壊 / 中規模半壊 / 半壊 / 準半壊 / 準半壊に至らない（一部損壊）"
+   :note "水害では外観判定に加えて浸水深が決め手になる。第一次調査の結果に不服があれば
+          再調査（第二次調査）を申請でき、その申請は同じ調査班の待ち行列に戻る。"}
+  :instrument/household-grant
+  {:ja "被災者生活再建支援金（基礎支援金・加算支援金）" :en "Livelihood recovery support payment"
+   :legal-basis "被災者生活再建支援法"
+   :note "罹災証明の判定区分と再建方法（建設購入／補修／賃借）で額が決まる。義援金の
+          配分も同じ判定を使うのが通例で、判定の遅れは複数の給付を同時に止める。"}
+  :instrument/emergency-repair
+  {:ja "住宅の応急修理" :en "Emergency habitability repair"
+   :legal-basis "災害救助法"
+   :note "日常生活に必要な最小限の部分を自治体が業者に発注して修理する。原則として
+          応急仮設住宅の入居と併用できないため、世帯はどちらかを選ぶことになる。"}
+  :instrument/public-demolition
+  {:ja "公費解体" :en "Publicly funded demolition"
+   :administered-by "市町村（環境省の災害等廃棄物処理事業費補助金）"
+   :note "罹災証明の判定と、所有者・共有者の同意（相続未了だと全員分）が要る。同意の
+          取り付けが、解体そのものより長くかかる典型。"}
+  :instrument/business-grant
+  {:ja "中小企業等グループ補助金・日本政策金融公庫の災害貸付・仮設店舗（中小機構）"
+   :en "Business group subsidy, disaster lending, temporary premises"}
+  :instrument/insurance
+  {:ja "火災保険の水災補償・共済" :en "Flood cover under fire insurance or mutual aid"
+   :note "水災補償は火災保険の任意付帯で、床上浸水や地盤面から一定以上といった支払要件が
+          あるのが一般的。付帯していない世帯が相当数いることが前提の設計を要する。"}
+  :instrument/volunteer-coordination
+  {:ja "災害ボランティアセンター（市町村社会福祉協議会）" :en "Disaster volunteer centre (municipal council of social welfare)"
+   :note "受付・ニーズ把握・マッチング・資機材貸出・ボランティア活動保険を一体で担う。
+          設置が遅れると、到着した人手が作業量に変換されないまま帰る。"}
+  :instrument/waste-plan
+  {:ja "災害廃棄物処理計画／処理実行計画・仮置場" :en "Disaster waste plan and temporary storage sites"
+   :administered-by "市町村（県が広域調整、環境省「災害廃棄物対策指針」）"}
+  :instrument/temporary-housing
+  {:ja "応急仮設住宅（建設型）・みなし仮設（民間賃貸住宅の借上げ）" :en "Temporary housing: built units and leased private rentals"
+   :note "みなし仮設は民間賃貸の在庫がある地域では数日で入居できる一方、在庫の薄い
+          郡部では成立しない。同じ県内でも市部と郡部で別の制度のように振る舞う。"}}
+
+ ;; Structural context. Claims about specific past events are marked as
+ ;; unverified IN THIS REPOSITORY: they are not sourced here, and this file
+ ;; will not let them be read as if they were.
+ :profile/context
+ [{:claim "千葉県は太平洋に突き出た房総半島にあり、東岸の九十九里平野をはじめ低平地が広い。
+           河川は概して短く勾配が緩いため、短時間強雨で内水氾濫と外水氾濫が同時に起きやすい。"
+   :status :structural-geography}
+  {:claim "一宮川水系（茂原市ほか）は繰り返し浸水被害を出しており、流域治水の対象となっている。"
+   :status :unverified-in-repo
+   :how-to-verify "千葉県 河川整備計画 / 一宮川流域治水プロジェクト、国土地理院の浸水推定図"}
+  {:claim "2019年（令和元年）の一連の台風・大雨で、県内は長期停電と広域の浸水被害を受けた。"
+   :status :unverified-in-repo
+   :how-to-verify "内閣府 被害状況即報、千葉県 災害記録誌、消防庁 災害情報"}
+  {:claim "罹災証明の交付主体は市町村であり、千葉県には54の市町村がある（37市16町1村）。
+           したがって被害認定の待ち行列は県で1本ではなく、市町村ごとに独立に存在する。"
+   :status :unverified-in-repo
+   :how-to-verify "千葉県 市町村一覧（総務省 全国地方公共団体コード）"
+   :model-relevance "assessor_crews は市町村単位で測るべき値であって、県計を割り算した
+                     数字で代用すると、小規模自治体の詰まりが平均に埋もれる。"}]
+
+ ;; Not one of these has been measured by this repository. Each says where the
+ ;; number lives. Filling any of them in without a citation is the failure mode
+ ;; this file exists to prevent.
+ :profile/parameters
+ {:mebuki/all-unmeasured true
+  :mebuki/sources
+  [{:for ["total_damaged_buildings" "initial_displaced_households"]
+    :where "内閣府 被害状況即報 / 市町村の被害認定調査の集計（住家被害の棟数と避難者数）"}
+   {:for ["assessor_crews" "assessments_per_crew_day" "reassessment_fraction"]
+    :where "被災市町村の被害認定調査体制（応援職員の受入実績を含む）と交付実績の推移"}
+   {:for ["volunteer_crews" "volunteer_centre_capacity" "buildings_per_crew_day"]
+    :where "市町村社協 災害ボランティアセンターの日報（受付人数・活動件数）"}
+   {:for ["dehumidifier_units" "ambient_dry_rate" "assisted_dry_rate" "mold_hazard_rate"]
+    :where "資機材の貸出台帳と、気象庁の当該期間の気温・湿度。乾燥速度そのものは
+            現場実測が要る量で、気象データだけからは出ない。"}
+   {:for ["temp_site_capacity" "truck_capacity_tpd" "processing_capacity_tpd"
+          "debris_per_cleanout_t" "debris_per_demolition_t"]
+    :where "市町村の災害廃棄物処理実行計画と仮置場の搬入実績（計量記録）"}
+   {:for ["kerbside_blocking_tonnes" "min_access_factor"]
+    :where "道路啓開の記録と、路上排出が通行に与えた影響の現地観察。数字として
+            記録している自治体はまれで、事後の聞き取りで再構成することになる。"}
+   {:for ["temp_housing_order_rate" "temp_housing_lead_days"]
+    :where "県の応急仮設住宅の発注・完成・入居の推移、みなし仮設の成約件数"}
+   {:for ["initial_businesses_closed" "business_repair_capacity_bpd" "business_grant_open_day"]
+    :where "商工会議所・商工会の被害調査、グループ補助金の公募開始日と交付決定の推移"}
+   {:for ["initial_farmland_ha" "farm_crew_capacity_hapd"]
+    :where "県 農林水産部の農地・農業用施設被害の集計"}]}}

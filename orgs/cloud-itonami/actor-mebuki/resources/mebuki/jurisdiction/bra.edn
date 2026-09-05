@@ -1,0 +1,32 @@
+{:profile/id :bra
+ :profile/kind :jurisdiction
+ :profile/label {:ja "ブラジル" :en "Brazil"}
+ :profile/iso-3166 "BR"
+ :profile/measurement-status :unmeasured
+ :profile/instruments
+ {:instrument/relief-act {:en "Municipal decree of situacao de emergencia or estado de calamidade publica, recognised federally through the S2iD system"}
+  :instrument/severe-disaster {:en "Federal recognition unlocks transfers from the national civil protection fund"}
+  :instrument/damage-certificate {:en "Municipal Defesa Civil damage form (FIDE) in S2iD, plus per-household registration for federal aid"}
+  :instrument/household-grant {:en "Federal reconstruction cash transfer to registered affected families, paid through the state bank"}
+  :instrument/emergency-repair {:en "Municipal and state material programmes; largely self-build"}
+  :instrument/public-demolition {:en "Municipal clearance, concentrated on structures in newly designated risk areas"}
+  :instrument/business-grant {:en "Emergency credit lines; deferral of federal tax and social-security obligations"}
+  :instrument/insurance {:en "Low household penetration outside high-value urban property" :status :unverified-in-repo}
+  :instrument/volunteer-coordination {:en "Defesa Civil with fire service, military, and very large spontaneous civil-society mobilisation"}
+  :instrument/waste-plan {:en "Municipal waste services, reinforced by state and federal contracts for large events"}
+  :instrument/temporary-housing {:en "Public shelters, rental vouchers (aluguel social), then public housing allocation"}}
+ :profile/notes
+ [{:claim "A withdrawal from the worker severance fund is opened to residents of
+           recognised calamity municipalities, giving affected households access to
+           their own savings within days -- money that reaches people faster than any
+           assessment-gated grant because it is not gated on damage at all, only on
+           where they live."
+   :status :unverified-in-repo
+   :how-to-verify "Caixa Economica Federal saque-calamidade rules and the S2iD list of recognised municipalities"
+   :model-relevance "A funding path that bypasses certificate_gate entirely. Modelling it
+                     means a second, ungated funding term -- not a larger value for the
+                     gated one."}
+  {:claim "Hillside and floodplain informal settlement means a large share of the damaged
+           stock sits in areas that will be designated no-build during recovery, which
+           converts repair demand into relocation demand mid-run."
+   :status :structural}]}

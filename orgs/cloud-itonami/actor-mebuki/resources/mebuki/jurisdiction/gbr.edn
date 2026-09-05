@@ -1,0 +1,37 @@
+{:profile/id :gbr
+ :profile/kind :jurisdiction
+ :profile/label {:ja "イギリス" :en "United Kingdom"}
+ :profile/iso-3166 "GB"
+ :profile/measurement-status :unmeasured
+ :profile/instruments
+ {:instrument/relief-act {:en "No single disaster declaration. Response runs through Local Resilience Forums; central support is activated scheme by scheme."
+                          :note "The absence of one declaration date means the instruments do not switch on
+                                 together, so the funding_gate in this model is not one step but several."}
+  :instrument/severe-disaster {:en "Bellwin scheme reimbursing local authorities above a threshold, plus ad-hoc Flood Recovery Framework activation"}
+  :instrument/damage-certificate {:en "No general public per-building determination. Loss adjusters appointed by insurers perform the equivalent function privately."
+                                  :note "The determination exists, but it belongs to the insurer, so its throughput is
+                                         a private-sector capacity question and uninsured households fall outside it
+                                         entirely."}
+  :instrument/household-grant {:en "Council-administered flood recovery grants where the Flood Recovery Framework is activated"}
+  :instrument/emergency-repair {:en "Property Flood Resilience grant, paid for repair that also reduces the next flood's damage"
+                                :note "Explicitly conditions recovery money on build-back-better rather than
+                                       restoration to the previous state -- the one instrument in this file that
+                                       closes the loop to the preparedness phase by design."}
+  :instrument/public-demolition {:en "Rare; demolition is normally an insurance-funded private decision"}
+  :instrument/business-grant {:en "Business recovery and business rates relief through councils"}
+  :instrument/insurance {:en "Flood Re, a reinsurance scheme that keeps household flood cover available and priced for high-risk homes"
+                         :note "Household penetration is high by international standards, which makes insurance --
+                                not the state -- the main reconstruction financier, and makes loss-adjuster
+                                capacity the binding administrative constraint."}
+  :instrument/volunteer-coordination {:en "Local authority and voluntary sector; no standing national disaster volunteer centre model"}
+  :instrument/waste-plan {:en "Local authority waste services with Environment Agency oversight"}
+  :instrument/temporary-housing {:en "Insurance-funded alternative accommodation for the insured; council homelessness duty for the rest"
+                                 :note "Two entirely separate housing pathways running in parallel, differing by
+                                        whether the household had cover -- so the same flood produces two recovery
+                                        curves in the same street."}}
+ :profile/notes
+ [{:claim "Because reconstruction is insurance-led, the model's funding_gate should be
+           driven by loss-adjuster and insurer settlement throughput, not by a public
+           assessment queue -- and a second, much slower ungated branch is needed for
+           uninsured households."
+   :status :structural}]}
