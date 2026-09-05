@@ -182,6 +182,19 @@
 (println "west に登録されているが org の一覧に無い entry:" (count orphans)
          "— 改名かどうかを 1 件ずつ GitHub に訊く")
 
+;; 残差 1 件につき GitHub API を 1 本叩く。**掃き出しが壊れて org の一覧が
+;; 短く返ると、west の全 entry が「一覧に無い」に見える** —— そのとき上の行は
+;; 数千件を 1 件ずつ訊きに行く。改名は現実には十数件なので、桁が違うなら
+;; 改名ではなく掃き出しの破損を疑い、**訊きに行く前に**止める。
+(def max-rename-probes 100)
+
+(when (> (count orphans) max-rename-probes)
+  (println)
+  (println "残差が" (count orphans) "件 —— 上限" max-rename-probes "を超えたので**書かない**。")
+  (println "この規模は改名ではなく掃き出しの破損（org 一覧が短く返った）を疑う。")
+  (println "org ごとの total を上の行と突き合わせること。")
+  (js/process.exit 1))
+
 (def resolved (mapv (fn [{:keys [org registered path]}]
                       (assoc (resolve-renamed org registered) :path path :org org))
                     orphans))
@@ -210,6 +223,10 @@
    :orgs (vec orgs)
    :swept (into (sorted-map) (map (juxt :org #(select-keys % [:total])) results))
    :archived-count (reduce + (map #(count (:archived %)) results))
+   ;; **この集合は west path で書かれている**（消費者である tick が候補を
+   ;; west path で照合するため）。消費側がこの marker を見て、古い生成器が
+   ;; 書いた GitHub 名の集合を黙って信じないようにする。
+   :key-space "west-path"
    :archived (vec (sort (distinct (concat archived-paths renamed-paths))))})
 
 (defn- render
@@ -225,6 +242,7 @@
        " :swept {" (str/join "\n         "
                              (map (fn [[o v]] (str (pr-str o) " " (pr-str v)))
                                   (:swept m))) "}\n"
+       " :key-space " (pr-str (:key-space m)) "\n"
        " :archived-count " (:archived-count m) "\n"
        " :archived [" (str/join "\n            " (map pr-str (:archived m))) "]}\n"))
 

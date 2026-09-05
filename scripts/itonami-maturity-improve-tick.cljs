@@ -177,6 +177,25 @@
 
 (def archived-paths (set (:archived archived)))
 
+;; ── 掃き出しがどの名前空間で答えているかを確かめる ────────────────────────
+;;
+;; **ここで照合する `:repo` は west path**（datoms 由来 = west.yml の `path:`）。
+;; 掃き出しが GitHub の *現在の* repo 名で書かれていると、改名された repo の
+;; 除外行はどの候補とも一致しない。しかも失敗の形が「除外 0 件」ではなく
+;; 「除外したつもりの 1 本が候補に戻っている」なので、**除外件数は出たまま**で、
+;; 順位を見ても分からない。
+;;
+;; 実測 2026-09-05: `ai-gftd-kaisya` → `ai-kaisya` の改名で除外が 17 → 16 に落ち、
+;; その archived な repo が 1 位に浮上した（その 1 手は push で空振りする）。
+;; 生成器は west path を出すよう直った。**だがこの loop が守られるかどうかを、
+;; 生成器が直っていることに依存させない** —— 古い生成器で再生成されれば
+;; `--check` は緑のまま集合だけが GitHub 名に戻る（`--check` は同じ生成器で
+;; 作り直して比べるので、この退行を原理的に検出できない）。だから消費側で見る。
+(def archived-key-space (:key-space archived))
+
+(def archived-key-space-ok?
+  (or (nil? archived) (= archived-key-space "west-path")))
+
 (def axes [:maturity/axis-substrate :maturity/axis-test :maturity/axis-governed
            :maturity/axis-ingest :maturity/axis-docs :maturity/axis-surface
            :maturity/axis-fresh])
@@ -703,6 +722,7 @@
                                   :total (:archived-count archived)}
                                  :missing)
                :archived-excluded (mapv :repo dropped)
+               :archived-key-space archived-key-space
                ;; **確認した本数を必ず残す。** `:moved []` だけでは「動いた repo が
                ;; 無かった」と「1 本も確かめられなかった」が同じ行になる。
                :movement {:checked (:checked movement)
@@ -779,6 +799,17 @@
                  "**archived な repo が候補に混ざる** —— 指名されても push できず"
                  "その周は空振りする。`nbb --classpath \".:scripts/nbb_compat\" "
                  "scripts/gen-archived-repos.cljs` で作り直す")))
+    ;; 名前空間が違う掃き出しは、**読めない掃き出しより危ない** —— 読めるので
+    ;; 除外は動いて見え、件数まで出る。一致しない分だけが静かに候補へ戻る。
+    (when-not archived-key-space-ok?
+      (log! (str "⚠ archived の掃き出しが west path で書かれている**保証が無い**"
+                 "（:key-space " (pr-str archived-key-space) "）。"
+                 "GitHub 名で書かれた集合だと、改名された repo の除外行はどの候補とも"
+                 "一致せず、**除外件数は出たままその分が候補に戻る**。"
+                 "上の除外件数はこの周では信用できない —— `nbb --classpath "
+                 "\".:scripts/nbb_compat\" scripts/gen-archived-repos.cljs` で作り直して"
+                 "から順位を読む（marker が無いだけで中身は正しいこともある。"
+                 "**その区別がこの行からは付かない、というのがこの警告の内容**）")))
     ;; 計測より後に動いた repo。**archived と同じく、落としたことを黙らない。**
     ;; これを黙ると、順位から repo が消えた理由が ledger だけでは再構成できない。
     (when (seq moved)
