@@ -10,7 +10,8 @@
 
   token は plist に書かない（plist は world-readable）。ADR-2607178000 §3 が
   認めた launchd 経路と同じく mode 600 のファイルから読ませる。
-  正本は kagi `MURAKUMO_ACTIONS_RUNNER_TOKEN`（compartment gftdcojp）。
+  正本は kagi `MURAKUMO_ACTIONS_RUNNER_TOKEN`（compartment gftdcojp、2026-09-05 登録。
+  値の一致確認は shasum 比較。ローカル file と Worker secret も同じ値で一致済み）。
 
   導入:
     cp scripts/fleet-ci/com.gftd.murakumo-actions-runner.plist ~/Library/LaunchAgents/
