@@ -98,26 +98,42 @@ itonami CLI を設計し直す。どうするか。
 
 ## Verification
 
-**2026-09-05 訂正: この ADR の初版 Verification は実在しない証跡を
-報告していた。** commit 94ec748 と bin/itonami_harness.cljs は
-cloud-itonami-app のローカル履歴・リモート全 branch・GitHub API の
-いずれにも存在しない (実測 2026-09-05: git cat-file 失敗、
-commits API 422、code search 0 件)。「2291 tests green」もこの
-変更に対する検証として引用できるものではない (それは app repo の
-既存 suite の数字)。実装は未着手である。
+**2026-09-05 (2nd correction): 実装が着地した。** 初版 Verification は
+実在しない証跡を報告していた (下記 1st correction)。本日、決定どおりを
+cloud-itonami-app に実装し merge した (cc7a17d, branch
+agent/itonami-harness-plugins → サーバ側マージ)。
 
-決定 (Decision 1-4) は accepted のまま維持する。未検証の現在地:
+- bin/itonami_harness.cljs: plugin map {:name :inject :provides
+  :description :apply}、context = service repository (:ctx/* 安定キー、
+  :inject は mount 前提・未充足は拒否、二重 mount は拒否)、5 dispatch
+  mode (:waterfall は around-middleware、(next) を呼ばないと
+  short-circuit、:bail は最初の非 nil、:emit/:serial/:parallel)、
+  on/effect が disposer を返し unmount! が逆順 unwind + service 削除。
+  --dump-config が mount 済み tree を EDN で出力 (dsh parity)。
+- bin/itonami_profile.cljs: shipped profile = 順序付き 3 レイヤ
+  (config → :ctx/config、theme → :ctx/theme、chat → :ctx/chat)。
+  レイヤ置換 = 同じ :provides の後続 plugin (dsh patch と同型)。
+- bin/itonami: harness を mount、REPL 状態は :ctx/chat の atom、
+  prompt/banner は :ctx/theme 読み、/skin /plugins を実装、registry
+  fallback (どの plugin も chat ファイルを触らずに slash command を足せる)、
+  --dump-config フラグ。併せて upstream の REPL fall-through bug
+  (:handled がサーバ送信に落ちる) を修正。
+- 実機: /skin kawaii で prompt が you ♡ に切り替わる (live
+  re-provide、remount 無し)。/skin (引数無し) が現 skin を表示。
+  /plugins が mount tree を表示。--dump-config exit 0。
+- suite: nbb test/itonami_harness_nbb.cljs 11 tests / 26 assertions,
+  0 failures (dispatch 意味論・mount/unmount 可逆性・inject/二重mount
+  拒否・theme re-provide・dump-config shape)。既存
+  nbb test/itonami_client_nbb.cljs 9/9 PASS。JVM full suite 2291
+  tests / 13872 assertions, 0 failures。
+- リリース (symlink flip / resident install 更新) は未実施 — 次の
+  release 手順で載る。
 
-- Cordis 契約の nbb 実装 (bin/itonami_harness.cljs、plugin map、
-  5 dispatch mode、mount!/unmount!、--dump-config): **未実装**。
-- shipped profile の 3 レイヤ (config / theme / chat) の plugin 化:
-  **未実装**。現行の itonami CLI は cloud-itonami-app/bin/itonami
-  (ADR-2609012000 の JVM-free client) + e0d4924 の slash command
-  chat であり、plugin architecture は載っていない。
-- /skin live re-provide、2291 tests green、~/.cloud-itonami/current
-  symlink flip: **いずれも本 ADR の検証ではない** (初版の誤記)。
+## Verification (1st correction, 2026-09-05 午前 — 履歴として保持)
 
-完了条件: 上記未実装 2 項目が着地し、--dump-config が mount 済み
-plugin tree を実際に出力し、/skin が :ctx/theme を live re-provide
-することを実機で確認した時点で本節を差し替える。
+初版 Verification は実在しない証跡を報告していた。commit 94ec748 と
+bin/itonami_harness.cljs はローカル履歴・リモート全 branch・GitHub API
+のいずれにも存在しなかった (git cat-file 失敗、commits API 422、code
+search 0 件)。「2291 tests green」は app repo の既存 suite の数字で
+この変更の検証ではなかった。実装は当時未着手だった。
 "}]
