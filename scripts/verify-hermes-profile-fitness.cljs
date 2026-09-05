@@ -136,25 +136,50 @@
            (catch :default e (= "EPERM" (.-code e)))))))
 
 (defn- stranded-rows
-  "Rows a profile left in claimed/running whose owning process is gone."
+  "{:rows [...] :unreadable <reason or nil>} for one profile's execution ledger.
+
+  `-readonly` is deliberately NOT passed. Measured 2026-09-05, an hour after
+  this axis first landed with it: every one of the fleet's ledgers is in WAL
+  mode, a read-only connection cannot bring up the -shm it needs, and sqlite3
+  exits 14 `unable to open database file`. The first version caught that and
+  returned no rows -- so the detector written to find silently-dead runs was
+  itself silently blind, and reported a clean fleet while a dead-owner row sat
+  in the very profile it was built for. The query is a SELECT; a normal
+  connection performs no write.
+
+  An unreadable ledger is returned as a reason, never as an empty row set."
   [profile db]
   (let [out (try
-              (cp/execFileSync "sqlite3" #js ["-readonly" "-json" db
-                                              "select job_id,status,pid,coalesce(started_at,claimed_at) as at from executions where status in ('claimed','running')"]
-                               #js {:encoding "utf8" :timeout 20000
-                                    :stdio #js ["ignore" "pipe" "ignore"]})
-              (catch :default _ nil))
-        rows (when (seq (str out))
-               (try (js->clj (js/JSON.parse out) :keywordize-keys true)
-                    (catch :default _ nil)))]
-    (for [r rows :when (not (pid-alive? (:pid r)))]
-      (assoc r :profile profile))))
+              {:ok (cp/execFileSync "sqlite3"
+                                    #js ["-cmd" ".timeout 5000" "-json" db
+                                         "select job_id,status,pid,coalesce(started_at,claimed_at) as at from executions where status in ('claimed','running')"]
+                                    #js {:encoding "utf8" :timeout 20000
+                                         :stdio #js ["ignore" "pipe" "pipe"]})}
+              (catch :default e
+                {:err (or (some-> (.-stderr e) str str/trim not-empty)
+                          (some-> (.-message e) str) "sqlite3 failed")}))]
+    (if (:err out)
+      {:rows [] :unreadable (str profile ": " (first (str/split-lines (str (:err out)))))}
+      (let [text (str (:ok out))
+            rows (if (str/blank? text)
+                   []
+                   (try (js->clj (js/JSON.parse text) :keywordize-keys true)
+                        (catch :default _ ::unparseable)))]
+        (if (= ::unparseable rows)
+          {:rows [] :unreadable (str profile ": ledger query returned unparseable JSON")}
+          {:rows (vec (for [r rows :when (not (pid-alive? (:pid r)))]
+                        (assoc r :profile profile)))
+           :unreadable nil})))))
 
-(defn- collect-stranded [names]
-  (vec (mapcat (fn [p]
-                 (let [db (path/join profiles-root p "cron" "executions.db")]
-                   (if (fs/existsSync db) (stranded-rows p db) [])))
-               names)))
+(defn- collect-stranded
+  "{:stranded [...] :stranded-unreadable [reasons]} across the fleet."
+  [names]
+  (let [per (for [p names
+                  :let [db (path/join profiles-root p "cron" "executions.db")]
+                  :when (fs/existsSync db)]
+              (stranded-rows p db))]
+    {:stranded (vec (mapcat :rows per))
+     :stranded-unreadable (vec (keep :unreadable per))}))
 
 (defn- age-minutes [at]
   (let [t (js/Date.parse (str at))]
@@ -173,7 +198,8 @@
         jobs (vec (mapcat (fn [{:keys [profile ok]}]
                             (map #(assoc % :profile profile) (:jobs ok)))
                           good))]
-    {:profile-models
+    (merge
+     {:profile-models
      (into {} (for [p names
                     :let [c (path/join profiles-root p "config.yaml")]
                     :when (fs/existsSync c)]
@@ -185,8 +211,8 @@
      ;; coverage finding against the one profile that was right (measured
      ;; 2026-09-04: `aozora`, jobs: []).
      :scheduled (mapv :profile (filter #(seq (:jobs (:ok %))) good))
-     :broken broken :jobs jobs :files-read (count good)
-     :stranded (collect-stranded names)}))
+      :broken broken :jobs jobs :files-read (count good)}
+     (collect-stranded names))))
 
 (defn- ledger-state []
   (let [{:keys [ok error]} (read-json ledger-path)]
@@ -208,7 +234,8 @@
 
 (defn findings-for
   "Pure: the finding set for an already-collected fleet."
-  [{:keys [scheduled jobs profile-models stranded]} {:keys [names generated-at]} root]
+  [{:keys [scheduled jobs profile-models stranded stranded-unreadable]}
+   {:keys [names generated-at]} root]
   (let [n-sched (count scheduled)
         absent (remove names scheduled)
         failing (filter #(pos? (or (:failure_streak %) 0)) jobs)
@@ -336,6 +363,15 @@
                           (str/join ", " (take 6 (map #(str (:profile %) "/" (:name %)
                                                             " -> " (:provider %))
                                                       unresolvable-provider))))})
+
+      (seq stranded-unreadable)
+      (conj {:sev "fail" :key "execution-ledger-unreadable"
+             ;; The evidence floor for the axis below: a ledger that could not
+             ;; be queried must not be counted as a ledger with nothing in it.
+             :detail (str (count stranded-unreadable)
+                          " profile(s) have an execution ledger this detector could not query, so "
+                          "their stranded rows are UNMEASURED rather than absent: "
+                          (str/join "; " (take 4 stranded-unreadable)))})
 
       (seq stranded)
       (conj {:sev (if (some #(> (age-minutes (:at %)) 60) stranded) "fail" "warn")
@@ -511,6 +547,31 @@
                                                  :at (.toISOString (js/Date. (- (js/Date.now) 300000)))}]}
                                     {:names #{"a"} :generated-at "2026-09-05T00:00:00Z"} root))
                            "stranded-execution")))]
+         ;; the defect this axis shipped with for one hour: -readonly cannot
+         ;; open a WAL ledger, the error was swallowed, and "could not read"
+         ;; came out as "nothing stranded"
+         ["a ledger that cannot be queried is a fail, not silence"
+          (let [f ((by-key (findings-for
+                            {:scheduled ["a"] :profile-models {} :jobs [] :stranded []
+                             :stranded-unreadable ["a: Error: in prepare, unable to open database file (14)"]}
+                            {:names #{"a"} :generated-at "2026-09-05T00:00:00Z"} root))
+                   "execution-ledger-unreadable")]
+            (and (= "fail" (:sev f)) (str/includes? (:detail f) "UNMEASURED")))]
+         ["a readable ledger raises no unreadable finding"
+          (nil? ((by-key (findings-for
+                          {:scheduled ["a"] :profile-models {} :jobs [] :stranded []
+                           :stranded-unreadable []}
+                          {:names #{"a"} :generated-at "2026-09-05T00:00:00Z"} root))
+                 "execution-ledger-unreadable"))]
+         ["a live WAL ledger is actually queryable by the collector"
+          (let [db (path/join root "wal" "cron" "executions.db")]
+            (fs/mkdirSync (path/join root "wal" "cron") #js {:recursive true})
+            (cp/execFileSync "sqlite3" #js [db "pragma journal_mode=wal; create table if not exists executions (id text, job_id text, status text, pid integer, claimed_at text, started_at text);"]
+                             #js {:stdio "ignore"})
+            (cp/execFileSync "sqlite3" #js [db "insert into executions values ('x','j','running',999999,'2026-09-05T10:00:00+09:00','2026-09-05T10:00:00+09:00');"]
+                             #js {:stdio "ignore"})
+            (let [r (stranded-rows "wal" db)]
+              (and (nil? (:unreadable r)) (= 1 (count (:rows r))))))]
          ["no stranded rows raises nothing"
           (nil? ((by-key (findings-for
                           {:scheduled ["a"] :profile-models {} :jobs [] :stranded []}
