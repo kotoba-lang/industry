@@ -7098,4 +7098,131 @@
      :file "src/tazuna/operation.cljc"
      :find "   \"manipulate\" {:kernel-code 4"
      :replace "   \"manipulate\" {:kernel-code 7"
-     :must-fail ["the-catalogue-carries-the-kernel-integer-protocol"]}]}]}
+     :must-fail ["the-catalogue-carries-the-kernel-integer-protocol"]}]}
+
+  {:repo "orgs/cloud-itonami/recap"
+   :label "recap cross-plane —— 5 つの面が同じ事実を手で 5 回書いている。どこも導出していない"
+   ;; recap は「どの XRPC method が在るか / どの upstream が serve するか /
+   ;; この app は何という名前か」を 5 箇所で宣言している —— src/app.ts、
+   ;; lg-clj/src/lg_recap/server.cljc、kotodama.jsonld、wrangler.jsonc、
+   ;; SvelteKit の BFF route。**どれも互いから導出されていない。**
+   ;;
+   ;; lg-clj の smoke suite は良い suite だが Clojure の面しか見えない ——
+   ;; NSID-MAP を、同じファイルに書かれた NSID-MAP の写しに対して assert する。
+   ;; 2 つの面を一緒に読むものが 1 つも無かったので、面と面のあいだの drift は
+   ;; 静かだった。
+   ;;
+   ;; 一致を pin しているものと、**不一致**を pin しているものが混ざっている。
+   ;; 後者（`src/app.ts` は何にもビルドされていない / 2 つの面が別のホストへ
+   ;; 転送する / built route に NSID の allowlist が無い）は「修理されたら赤く
+   ;; なる」—— それが正しい。分裂が直った瞬間に、誰が NSID を serve するかが
+   ;; 変わるからで、失敗メッセージがどちらの読みかを名乗る。
+   ;;
+   ;; 14 件とも 2026-09-06 に赤くなるところを見た。うち 2 件は exit 1 ではなく
+   ;; **exit 2（REFUSED）**で、「読めなかった」が「読んで問題が無かった」と
+   ;; 同じ値を返さないことを確かめている。
+   ;;
+   ;; nbb と checkout だけで走る（lg-clj の `bb test` と違って git 依存の解決が
+   ;; 要らない）。
+   :cmd ["nbb" "test/contract_test.cljs"]
+   :green-marker "recap contract: OK"
+   :mutations
+   [{:id :recap/nsid-typo
+     :why "edge の NSID を 1 文字変える。実際に起きる形は rename の取りこぼしで、TypeScript も Clojure も片側だけなら型が通る —— 実行時に lg 側が 404 を返すまで誰も気づかない"
+     :file "src/app.ts"
+     :find "nsid(\"com.etzhayyim.apps.recap.getInfo\")"
+     :replace "nsid(\"com.etzhayyim.apps.recap.getinfo\")"
+     :must-fail ["edge-and-dispatch-agree-on-the-nsid-set"]},
+
+{:id :recap/graph-rename-not-propagated
+     :why "NSID-MAP の値だけをずらす。graph を改名して片側を直し忘れた形。dispatch-xrpc は GRAPHS から nil を取り出して run-graph に渡すので、拒否ではなく 500 になる"
+     :file "lg-clj/src/lg_recap/server.cljc"
+     :find "\"com.etzhayyim.apps.recap.getInfo\"       \"get_info\""
+     :replace "\"com.etzhayyim.apps.recap.getInfo\"       \"getinfo\""
+     :must-fail ["dispatch-nsids-resolve-to-registered-graphs"]},
+
+{:id :recap/manifest-subscribes-to-nothing-dispatchable
+     :why "actor manifest が、この repo が dispatch できない collection を購読する。firehose 側は静かに何も受け取らない"
+     :file "kotodama.jsonld"
+     :find "\"collections\": [\"com.etzhayyim.apps.recap.download\"]"
+     :replace "\"collections\": [\"com.etzhayyim.apps.recap.transcribe\"]"
+     :must-fail ["manifest-subscribe-collections-are-dispatchable"]},
+
+{:id :recap/nanoid-drift
+     :why "nanoid は manifest・worker 名・APP_NANOID・route host の 4 箇所に手で書かれている。1 箇所だけ動くのが drift の既定形"
+     :file "wrangler.jsonc"
+     :find "\"APP_NANOID\": \"r3c4p001\""
+     :replace "\"APP_NANOID\": \"r3c4p002\""
+     :must-fail ["wrangler-app-nanoid-matches-the-manifest"]},
+
+{:id :recap/worker-renamed
+     :why "worker 名が nanoid から離れる。deploy は成功し、別名の worker が 1 つ増えるだけなので出力からは分からない"
+     :file "wrangler.jsonc"
+     :find "\"name\": \"kotodama-r3c4p001\""
+     :replace "\"name\": \"kotodama-recap\""
+     :must-fail ["worker-name-is-kotodama-plus-the-nanoid"]},
+
+{:id :recap/route-host-dropped
+     :why "nanoid host の route が別のホストに置き換わる。recap.etzhayyim.com は残るので手で叩く分には気づけない"
+     :file "wrangler.jsonc"
+     :find "\"pattern\": \"r3c4p001.etzhayyim.com/*\""
+     :replace "\"pattern\": \"old.etzhayyim.com/*\""
+     :must-fail ["a-route-is-served-at-the-nanoid-host"]},
+
+{:id :recap/description-drift
+     :why "APP_DESCRIPTION は manifest の profile.description の手写し。1 語ずれても deploy は通る"
+     :file "wrangler.jsonc"
+     :find "Powered by yt-dlp. Fair-use only.\","
+     :replace "Powered by ytdlp. Fair-use only.\","
+     :must-fail ["wrangler-description-mirrors-the-manifest"]},
+
+{:id :recap/display-name-drift
+     :why "同上、displayName の側"
+     :file "wrangler.jsonc"
+     :find "\"APP_DISPLAY_NAME\": \"Recap Media Agent\""
+     :replace "\"APP_DISPLAY_NAME\": \"Recap Agent\""
+     :must-fail ["wrangler-display-name-mirrors-the-manifest"]},
+
+{:id :recap/capabilities-drift
+     :why "APP_CAPABILITIES は JSON の中に JSON 文字列として埋まっている manifest の写し。1 要素落ちても構文は正しいまま"
+     :file "wrangler.jsonc"
+     :find "\\\"media-metadata\\\",\\\"multi-platform\\\""
+     :replace "\\\"media-metadata\\\""
+     :must-fail ["wrangler-capabilities-mirror-the-manifest"]},
+
+{:id :recap/orphan-plane-wired-in
+     :why "**修理の側の赤**。main を src/app.ts に向けると『src/app.ts は何にもビルドされていない』が偽になる。良い変更だが、その瞬間に NSID を誰が serve するかが変わるので、README と本 test を読み直させる"
+     :file "wrangler.jsonc"
+     :find "\"main\": \"svelte/.svelte-kit/cloudflare/_worker.js\""
+     :replace "\"main\": \"src/app.ts\""
+     :must-fail ["src-app-ts-is-built-by-nothing"
+                "wrangler-main-and-assets-share-the-adapter-output"]},
+
+{:id :recap/upstreams-unified
+     :why "**修理の側の赤**。宣言された edge（dispatcher）と実際に建つ edge（MCP router）が同じホストを指すようになったら、lg-clj の graph が live 経路から到達可能になったということ。分裂を pin している側が赤くなる"
+     :file "svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "'https://mcp.etzhayyim.com/xrpc/com.etzhayyim.mcp.message'"
+     :replace "'https://dispatcher.etzhayyim.com/xrpc/com.etzhayyim.mcp.message'"
+     :must-fail ["the-declared-edge-and-the-built-edge-target-different-hosts"
+                "bff-default-router-matches-the-wrangler-var"]},
+
+{:id :recap/allowlist-appeared
+     :why "**修理の側の赤**。built route に NSID の allowlist が入ると、この repo の 4 つの NSID が初めて live 経路で意味を持つ。今は [...path] がそのまま MCP tool 名になる"
+     :file "svelte/src/routes/xrpc/[...path]/+server.ts"
+     :find "const nsid = event.params.path;"
+     :replace "const nsid = event.params.path; if (nsid !== 'com.etzhayyim.apps.recap.download') return noStore({ error: 'x' }, { status: 403 });"
+     :must-fail ["deployed-xrpc-route-names-no-recap-nsid"]},
+
+{:id :recap/anchor-renamed-refuses
+     :why "検査器が自分の入力を見失う形。`(def GRAPHS` を改名すると region が取れず、**exit 2 の REFUSED**（0 でも 1 でもない）で終わることを確かめる —— 読めなかった検査が、読んで問題が無かった検査と同じ値を返さないこと"
+     :file "lg-clj/src/lg_recap/server.cljc"
+     :find "(def GRAPHS"
+     :replace "(def GRAPH-REGISTRY"
+     :must-fail ["anchor not found in lg-clj/src/lg_recap/server.cljc: \"(def GRAPHS\""]},
+
+{:id :recap/extractor-blinded-refuses
+     :why "同上、evidence floor の側。nsid() の抽出が 4 件を割ったら空集合を『一致』と読まずに REFUSED で落ちる"
+     :file "src/app.ts"
+     :find "nsid(\"com.etzhayyim.apps.recap.summarize\")"
+     :replace "NSID(\"com.etzhayyim.apps.recap.summarize\")"
+     :must-fail ["scanned 3 nsid() literals in src/app.ts (floor 4) — the extractor stopped matching"]}]}]}
