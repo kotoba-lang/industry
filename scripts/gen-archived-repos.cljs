@@ -88,7 +88,52 @@
                        (lines out))]
         {:org org
          :total (count rows)
+         :names (set (map first rows))
          :archived (vec (sort (map first (filter second rows))))}))))
+
+(defn- west-registered
+  "west.yml の project を org ごとに {registered-github-name -> west-path} で返す。
+
+  **この掃き出しの消費者は west のパスで候補を照合する。** GitHub が返すのは
+  *現在の* repo 名で、west が持つのは *登録時の* 名前なので、repo が改名された
+  瞬間に両者は食い違う。構成した `orgs/<org>/<github-name>` を書くと、その 1 本は
+  除外表に載っていながらどの候補とも一致しない —— 実測 2026-09-05、掃き出しを
+  最新化した直後に `ai-gftd-kaisya`(GitHub 上は `ai-kaisya`、archived)が除外
+  17 本から 16 本に落ちて loop の 1 位に浮上した。`--check` は緑になり、それが
+  守っているものは悪くなった。"
+  []
+  (let [text (try (fs/readFileSync "manifest/west.yml" "utf8") (catch :default _ nil))]
+    (when-not text
+      (println "manifest/west.yml が読めないので**書かない**。")
+      (println "west のパスに写せないまま書くと、改名された repo が候補に戻る。")
+      (js/process.exit 1))
+    (->> (str/split text #"(?m)^    - name: ")
+         rest
+         (keep (fn [b]
+                 (let [nm (first (str/split b #"\n"))
+                       rp (second (re-find #"(?m)^      repo-path: (\S+)" b))
+                       pa (second (re-find #"(?m)^      path: (orgs/\S+)" b))]
+                   (when pa
+                     (let [org (second (str/split pa #"/"))]
+                       [[org (or rp nm)] pa])))))
+         (into {}))))
+
+(def west-paths (west-registered))
+
+(defn- resolve-renamed
+  "登録名が org の一覧に無い west entry を 1 件ずつ GitHub に訊く（リダイレクトが
+   現在の repo を返す）。archived なら west のパスを返す。
+
+   **応答が読めなかったものは nil ではなく :error にする** —— 読めなかった repo を
+   『archived ではない』と数えると、候補に戻ったことに誰も気づかない。"
+  [org registered]
+  (let [{:keys [exit out err]}
+        (sh "gh" ["api" (str "repos/" org "/" registered)
+                  "--jq" "[.full_name, (.archived|tostring)] | @tsv"])]
+    (if-not (zero? exit)
+      {:error (str registered ": " (str/trim (or err out)))}
+      (let [[full a] (str/split (str/trim out) #"\t")]
+        {:registered registered :full full :archived? (= a "true")}))))
 
 (println "archived sweep:" (count orgs) "orgs —" (str/join ", " orgs))
 
@@ -117,6 +162,45 @@
   (println "org が空なのか掃き出しが黙って失敗したのか、この結果からは区別できない。")
   (js/process.exit 1))
 
+(def archived-paths
+  "GitHub の archived 名を west のパスへ写す。west に無い名前は従来どおり構成した
+   パスで出す —— west に登録されていない repo はそもそも候補にならないので、
+   ここで落としても routing は変わらない。"
+  (mapcat (fn [{:keys [org archived]}]
+            (map #(or (get west-paths [org %]) (str "orgs/" org "/" %)) archived))
+          results))
+
+(def orphans
+  "登録名が org の一覧に無い west entry。改名か削除のどちらかで、前者は archived を
+   隠している可能性がある。"
+  (for [{:keys [org names]} results
+        [[o registered] path] west-paths
+        :when (and (= o org) (not (contains? names registered)))]
+    {:org org :registered registered :path path}))
+
+(println)
+(println "west に登録されているが org の一覧に無い entry:" (count orphans)
+         "— 改名かどうかを 1 件ずつ GitHub に訊く")
+
+(def resolved (mapv (fn [{:keys [org registered path]}]
+                      (assoc (resolve-renamed org registered) :path path :org org))
+                    orphans))
+
+(when-let [bad (seq (filter :error resolved))]
+  (println)
+  (println "解決できなかった west entry があるので**書かない**:" (count bad) "件")
+  (doseq [b (take 5 bad)] (println "  " (:error b)))
+  (println "読めなかった repo を『archived ではない』と数えると、候補に戻ったことに")
+  (println "誰も気づかない。GitHub 側が答えられる状態で回し直すこと。")
+  (js/process.exit 1))
+
+(def renamed-paths
+  (->> resolved (filter :archived?) (map :path) vec))
+
+(doseq [r (filter :archived? resolved)]
+  (println "   改名された archived:" (:registered r) "→" (:full r)
+           "— west のパス" (:path r) "で除外する"))
+
 (def payload
   {:generated-at (.toISOString (js/Date.))
    :source "gh api orgs/<org>/repos?type=all --paginate"
@@ -126,9 +210,7 @@
    :orgs (vec orgs)
    :swept (into (sorted-map) (map (juxt :org #(select-keys % [:total])) results))
    :archived-count (reduce + (map #(count (:archived %)) results))
-   :archived (vec (sort (mapcat (fn [{:keys [org archived]}]
-                                  (map #(str "orgs/" org "/" %) archived))
-                                results)))})
+   :archived (vec (sort (distinct (concat archived-paths renamed-paths))))})
 
 (defn- render
   "1 path 1 行で書く。集合が増減したときの diff が読めることを優先する
