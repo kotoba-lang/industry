@@ -7225,4 +7225,67 @@
      :file "src/app.ts"
      :find "nsid(\"com.etzhayyim.apps.recap.summarize\")"
      :replace "NSID(\"com.etzhayyim.apps.recap.summarize\")"
-     :must-fail ["scanned 3 nsid() literals in src/app.ts (floor 4) — the extractor stopped matching"]}]}]}
+     :must-fail ["scanned 3 nsid() literals in src/app.ts (floor 4) — the extractor stopped matching"]}]}
+
+{:repo "orgs/cloud-itonami/nist"
+ :label "nist actor boundary —— cell-specs を introspect する suite が構造的に見られない不変条件"
+ :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+ :green-marker "nist actor contract: all green"
+ :mutations
+ [{:id :nist/gate-dropped
+   :why "**introspection の穴そのもの**。既存 suite は期待値を `:required-gates` から derive するので、baseline gate が 1 つ消えても緑のまま（実測: 消して緑だった）。7 gate を literal で持つ側だけが赤くなる"
+   :file "src/nist/murakumo.cljc"
+   :find "   :no-platform-held-key-baseline\n"
+   :replace ""
+   :must-fail ["common-gates-is-exactly-the-seven-baselines"
+               "every-cell-requires-every-baseline-gate"]},
+
+  {:id :nist/collection-namespace-drift
+   :why "README が『`com.etzhayyim.*` は compatibility identity』と述べている境界。collection が別 actor の NSID へ移っても、collections を spec から読む suite は気づかない"
+   :file "src/nist/murakumo.cljc"
+   :find "  (str \"com.etzhayyim.nist.\" name))"
+   :replace "  (str \"com.etzhayyim.apps.nist.\" name))"
+   :must-fail ["actor-identity-is-pinned"
+               "every-collection-lives-under-this-actors-namespace"]},
+
+  {:id :nist/actor-did-drift
+   :why "actor DID は did.json / actor-manifest.jsonld と対を成す。既存 suite は `m/actor-did` と record を突き合わせるだけなので、両方一緒に動けば緑のまま"
+   :file "src/nist/murakumo.cljc"
+   :find "  \"did:web:nist.etzhayyim.com\")"
+   :replace "  \"did:web:nist.cloud-itonami.com\")"
+   :must-fail ["actor-identity-is-pinned"]},
+
+  {:id :nist/safe-rkey-anchor-dropped
+   :why "`^` が落ちると did:web: が文字列の途中でも剥がれる。safe-rkey には 2026-09-06 まで直接テストが 1 件も無かった"
+   :file "src/nist/murakumo.cljc"
+   :find "(str/replace #\"^did:web:\" \"\")"
+   :replace "(str/replace #\"did:web:\" \"\")"
+   :must-fail ["safe-rkey-strips-only-a-leading-did-web-prefix"]},
+
+  {:id :nist/safe-rkey-bypassed
+   :why "records-for が sanitiser を通さなくなる形。既存 suite の rkey 検査は『非 blank な string』なので、未サニタイズの rkey もそのまま通る"
+   :file "src/nist/murakumo.cljc"
+   :find "             rkey (safe-rkey (or (:rkey record*)"
+   :replace "             rkey ((fn [x] (str x)) (or (:rkey record*)"
+   :must-fail ["records-for-sanitises-a-caller-supplied-rkey"]},
+
+  {:id :nist/blocked-plan-leaks-records
+   :why "gate が閉じているのに planned record が plan に載る。既存 suite は `:effects` の空だけを見るので、`:records` が付いても緑"
+   :file "src/nist/murakumo.cljc"
+   :find "         {:status :blocked\n          :effects []}"
+   :replace "         {:status :blocked\n          :records (vec (records-for spec input))\n          :effects []}"
+   :must-fail ["a-blocked-plan-carries-no-planned-records"]},
+
+  {:id :nist/false-attestation-accepted
+   :why "`{gate false}` が gate を満たすようになる。**false の場合だけ**を変える外科的な変異なので、既存 suite（\"yes\" と集合しか渡さない）は緑のまま —— 実測で確認済み"
+   :file "src/nist/murakumo.cljc"
+   :find "  (or (get attestations gate)\n"
+   :replace "  (or (when (and (map? attestations) (false? (get attestations gate))) true)\n      (get attestations gate)\n"
+   :must-fail ["a-false-attestation-does-not-satisfy-a-gate"]},
+
+  {:id :nist/record-type-drift
+   :why "AT Proto record の `$type` が書き込み先 collection と食い違う。既存 suite は $type を一度も読まない"
+   :file "src/nist/murakumo.cljc"
+   :find "(merge {:$type coll}"
+   :replace "(merge {:$type (:legacy-cell spec)}"
+   :must-fail ["planned-records-default-their-type-to-their-collection"]}]}]}
