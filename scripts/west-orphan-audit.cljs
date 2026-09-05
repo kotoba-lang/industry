@@ -263,7 +263,14 @@
         {:status :unverified
          :why (or (first (remove str/blank? (str/split-lines (str err))))
                   (str "gh api repos/" slug " exit " exit " with no stderr"))}))
-    {:status :unverified :why (str "origin が github.com の URL ではない: " origin-url)}))
+    ;; github.com を指さない remote は「訊けなかった」ではなく「訊きに行く先が
+    ;; GitHub ではない」。:no-remote と同じ構造的なケースで、再実行しても答えは
+    ;; 変わらない。実測 2026-09-05: orgs/kotoba-cli-verify-120601/repo の origin は
+    ;; ローカルの verifier scratch パスで、これが :ask-failed として数えられて
+    ;; いたため audit は毎回 exit 2 を返し、その理由として「gh が答えられる状態で
+    ;; 再実行すること」と印字していた —— 何度再実行しても変わらない助言である。
+    {:status :unverified :kind :non-github-remote
+     :why (str "origin が github.com の URL ではない: " origin-url)}))
 
 (defn reclassify-renamed
   "`:true-orphan-git` のうち、remote が **west に登録済みの repo へリダイレクトする**
@@ -299,7 +306,12 @@
                   (let [res (if (str/blank? (str origin))
                               {:status :unverified :kind :no-remote
                                :why "git remote が無い —— 後継を訊きに行く先が無い"}
-                              (assoc (canonical-slug origin) :kind :ask-failed))
+                              ;; canonical-slug が自分で kind を言ったならそれを尊重する。
+                              ;; 一律 :ask-failed で上書きすると、構造的なケース
+                              ;; （非 GitHub remote）が一時的なケースとして数えられ、
+                              ;; 恒久 exit 2 になる。
+                              (let [c (canonical-slug origin)]
+                                (assoc c :kind (or (:kind c) :ask-failed))))
                         canon (:slug res)
                         canon-path (when canon (str "orgs/" canon))]
                     (cond
@@ -698,13 +710,18 @@
                   "  (**確かめた上で**後継が無いもの。登録候補はここだけ)"))
     (let [uv (:renamed-unverified unregistered)
           af (count (filter #(= :ask-failed (:remote-unverified %)) uv))
-          nr (count (filter #(= :no-remote (:remote-unverified %)) uv))]
+          nr (count (filter #(= :no-remote (:remote-unverified %)) uv))
+          ng (count (filter #(= :non-github-remote (:remote-unverified %)) uv))]
       (println (str "  renamed-UNVERIFIED: " (count uv)
-                    "  (ask-failed=" af " no-remote=" nr
+                    "  (ask-failed=" af " no-remote=" nr " non-github-remote=" ng
                     ")  ← **後継を訊けなかった。orphan ではない**"))
       (when (pos? (count uv))
         (println "     この行は『登録し直す』にも『退役させる』にも使えない。")
-        (println "     ask-failed は gh が答えられなかっただけなので、まず再実行する。")
+        (when (pos? af)
+          (println "     ask-failed は gh が答えられなかっただけなので、まず再実行する。"))
+        (when (pos? (+ nr ng))
+          (println (str "     no-remote / non-github-remote は再実行しても変わらない"
+                        "（訊きに行く先が GitHub ではない）。手で分類すること。")))
         (when (:all? opts)
           (doseq [row uv]
             (println (str "     " (:path row) "  " (:remote-unverified row)
@@ -853,6 +870,7 @@
         unverified-rows (:renamed-unverified unreg)
         ask-failed (filterv #(= :ask-failed (:remote-unverified %)) unverified-rows)
         no-remote (filterv #(= :no-remote (:remote-unverified %)) unverified-rows)
+        non-github (filterv #(= :non-github-remote (:remote-unverified %)) unverified-rows)
         report {:counts {:local (count local)
                          :west (count west)
                          :unregistered (+ (count (:registered-elsewhere unreg))
@@ -870,7 +888,8 @@
                 ;; 「訊けなかった」を数として出す。0 でも印字する —— 出ていない数と
                 ;; 0 の数は別物で、前者は『この版はまだ測っていない』を意味する。
                 :remote-unverified {:ask-failed (count ask-failed)
-                                    :no-remote (count no-remote)}}]
+                                    :no-remote (count no-remote)
+                                    :non-github-remote (count non-github)}}]
     (cond
       (:findings? opts) (print-findings report)
       (:edn? opts)      (println (pr-str report))
