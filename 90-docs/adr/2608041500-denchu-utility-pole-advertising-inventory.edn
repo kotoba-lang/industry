@@ -199,9 +199,12 @@ mapillary 8 / 32、loop 9 / 38、cloud-itonami.okugai-ops 14 / 47。
    問い合わせ・申込ベース。同じ型に押し込むと『API がある』という嘘になる。
    代わりに denchu 側で `:execution :inquiry` として別に扱う。
 
-2. **`.kotoba` で書く** — 現時点では不可。柱 → 観測列 → タグ map という入れ子の
-   値が要り、recursive logical values は migration plan の W4 待ち（現在地であって
-   到達目標ではない）。第一 runtime は ClojureScript / nbb とし、JVM は使わない。
+2. **`.kotoba` で書く** — 当時（2026-08-04）は不可と判断した。柱 → 観測列 → タグ
+   map という入れ子の値が要り、recursive logical values は当時 migration plan の
+   W4 未着だったため。**現行: W4 は landed している**（compiler / kotoba-wasm /
+   kotoba-cljs、ADR-2608650000）。今この alternative を取り直すなら blocker は
+   native backend が再帰値を admit しないこと（backend 未達であって言語の天井では
+   ない）で、第一 runtime は ClojureScript / nbb で良い — 元の決定は現行でも変わらない。
 
 3. **Mapillary だけで起こす** — 却下しないが第一手にしない。token が要るうえ、
    検出は自動抽出なので人手マッピングの OSM より基礎信頼度を低く置いた
