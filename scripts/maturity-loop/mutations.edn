@@ -7460,4 +7460,93 @@
      :file "src/association/facts.cljc"
      :find "\" aicpa rules, each citing an \""
      :replace "\" aicpa rules seeded with an \""
-     :must-fail ["the-coverage-note-is-the-same-sentence-on-both-faces"]}]}]}
+     :must-fail ["the-coverage-note-is-the-same-sentence-on-both-faces"]}]}
+  {:repo "orgs/cloud-itonami/cloud-itonami-isco-2151"
+   :label "electeng actor refusals —— governed actor の主張は「拒否できること」そのもの"
+   ;; 実測（改修前 tip f509ac8）: governor は 2 つの HARD 検査を
+   ;; `(= :approve-load op)` のときだけ、escalation を
+   ;; `(= :energize-circuit op)` のときだけ当てていたので、**それ以外の op は
+   ;; 両方を素通りした**。`{:op :disable-rcd-protection}` が
+   ;; `{:ok? true :violations []}` を返し、actor は record を**書き込んだ**。
+   ;;
+   ;; 加えて `{:load nil}` `{:voltage-class nil}` も admit されていた ——
+   ;; 算術を `(number? load)` で、等値を `voltage-class` で守っていたため、
+   ;; README が「現場での交渉対象ではない」と呼ぶ 2 つの不変条件は
+   ;; **数値を自分から出した提案にだけ**効いていた。出さなければ通る。
+   ;;
+   ;; そして ampacity を持たない circuit は `check` を **throw させた**
+   ;; （NPE / CCE）。crash は拒否ではない —— verdict も violation も
+   ;; ledger entry も出ないので、actor が存在する理由そのものが起きない。
+   ;;
+   ;; ここに載せる 8 件は **2026-09-06 に実際に赤くなるところを見た**もの。
+   ;; :reserved-reported-as-unsupported が特に効く: この変異の下でも
+   ;; :disable-rcd-protection は **拒否されたまま**（hard? true）で、
+   ;; rule だけが :reserved-op から :unsupported-op に変わる。
+   ;; 「拒否されたこと」だけを assert する test はこの変異で**緑のまま**通る。
+   ;; だからこの repo の test は全部、名乗っている rule の literal を pin する。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors."
+   :mutations
+   [{:id :isco2151/vocabulary-check-dropped
+     :why "**穴そのもの**。語彙の外の op が violation を 1 つも起こさなくなり、admit される"
+     :file "src/electeng/governor.cljc"
+     :find "      (= :unsupported status)\n      (conj {:rule :unsupported-op\n             :detail (str (pr-str op) \" は未知の op（既知: \"\n                          (pr-str (sort (keys operation/supported)))\n                          \"）— 語彙の外にある op は既定で拒否する\")})\n\n"
+     :replace ""
+     :must-fail ["unsupported-op-is-refused-as-vocabulary-not-as-authority"
+                 "a-string-op-does-not-read-as-its-keyword"
+                 "nil-op-is-refused"]},
+
+    {:id :isco2151/reserved-reported-as-unsupported
+     :why "reserved op が :unsupported-op として報告される。**拒否は続く**ので `(:hard? v)` だけを見る test は緑のまま —— operator は「op を打ち間違えた」と読み、実際に起きたこと（保護装置の無効化に手を伸ばした）が監査に残らない"
+     :file "src/electeng/operation.cljc"
+     :find "    (contains? reserved op)  {:status :reserved  :reason (get reserved op)}\n"
+     :replace ""
+     :must-fail ["reserved-op-is-refused-as-authority-not-as-typo"
+                 "every-reserved-op-is-actually-refused"
+                 "classify-is-total"]},
+
+    {:id :isco2151/required-fields-dropped
+     :why ":approve-load が load / voltage-class を要求しなくなる。数値を書かない提案が well-formed になり、ampacity 余裕と電圧クラス一致を**素通りする**（落ちるのではなく到達しない）"
+     :file "src/electeng/operation.cljc"
+     :find "    :requires   #{:circuit-id :load :voltage-class}\n"
+     :replace "    :requires   #{:circuit-id}\n"
+     :must-fail ["an-approval-must-state-its-load"
+                 "an-approval-must-state-its-voltage-class"]},
+
+    {:id :isco2151/confidence-bound-dropped
+     :why "confidence の 0..1 検査が無効化される。2.5 はどの floor よりも上なので escalation を静かに越える"
+     :file "src/electeng/operation.cljc"
+     :find "      (when-let [c (:confidence proposal)]\n        (when-not (and (number? c) (<= 0 c 1))\n"
+     :replace "      (when-let [c (:confidence proposal)]\n        (when-not (or true (and (number? c) (<= 0 c 1)))\n"
+     :must-fail ["confidence-outside-0-1-is-refused"]},
+
+    {:id :isco2151/ratable-check-dropped
+     :why "定格を持たない circuit が拒否ではなく **throw** に戻る。改修前の実挙動そのもの"
+     :file "src/electeng/governor.cljc"
+     :find "      ratable\n      (conj {:rule :circuit-not-ratable :detail ratable})\n\n"
+     :replace ""
+     :must-fail ["an-unratable-circuit-is-refused-not-thrown"
+                 "a-string-ampacity-is-refused-not-thrown"]},
+
+    {:id :isco2151/authorisation-collapsed
+     :why "人が resume した commit と governor が自動で通した commit が、また同じ entry を書く。README が :energize-circuit に約束した sign-off を監査が示せなくなる"
+     :file "src/electeng/actor.cljc"
+     :find "                           auth (if (= :request-approval disposition)\n                                  :human-sign-off\n                                  :governor-clear)]"
+     :replace "                           auth :governor-clear]"
+     :must-fail ["an-auto-commit-and-a-signed-commit-are-distinguishable"
+                 "energization-is-never-recorded-as-governor-cleared"]},
+
+    {:id :isco2151/ledger-accepts-unauthorised-entry
+     :why "何が書き込みを許可したかを名乗らない entry が台帳に入れるようになる"
+     :file "src/electeng/ledger.cljc"
+     :find "    (not (authorisations authorisation))\n"
+     :replace "    (and false (not (authorisations authorisation)))\n"
+     :must-fail ["an-entry-must-name-its-authorisation"]},
+
+    {:id :isco2151/hold-may-claim-sign-off
+     :why "拒否された提案の entry が :human-sign-off を名乗れるようになる —— 誰も承認していないものを承認済みとして記録できる"
+     :file "src/electeng/ledger.cljc"
+     :find "    (and (= :hold disposition) (not= :governor-hold authorisation))\n"
+     :replace "    (and false (= :hold disposition) (not= :governor-hold authorisation))\n"
+     :must-fail ["a-hold-cannot-claim-sign-off"]}]}
+  ]}
