@@ -703,7 +703,49 @@
      :file "src/appkit/core.cljc"
      :find "([rows] (list-view rows {}))"
      :replace "([rows] (ui/list-view rows {}))"
-     :must-fail ["arity-1-is-arity-2-with-empty-opts-test" "desktop-list-view-defaults-test"]}]}
+     :must-fail ["arity-1-is-arity-2-with-empty-opts-test" "desktop-list-view-defaults-test"]}
+
+    ;; --- passthrough（2026-09-05 追加）-------------------------------------
+    ;; 上の 6 件は「どの既定を当てるか」と「呼び手が上書きできるか」を守るが、
+    ;; **呼び手の中身と opts が wrap を生き延びるか**は誰も見ていなかった。
+    ;; 実測: body を定数に差し替える / rows を捨てる / opts を select-keys で
+    ;; 絞る —— どれも旧 suite (9 tests) を exit 0 で通過した。appkit の唯一の
+    ;; 仕事は「透明であること」なので、黙って違う中身を描く wrapper は
+    ;; この repo が最も許容できない壊れ方である。
+    {:id :appkit/panel-body-discarded
+     :why "呼び手の body が描画に届くこと —— 既定だけ正しく当てて中身を捨てる wrapper は、クラス名を見る検査を全部通る"
+     :file "src/appkit/core.cljc"
+     :find "(ui/panel body (merge default-panel-opts opts))"
+     :replace "(ui/panel [\"MUTANT\"] (merge default-panel-opts opts))"
+     :must-fail ["panel-renders-the-caller-body-test"]}
+
+    {:id :appkit/list-view-rows-discarded
+     :why "同上を list-view 側で —— rows を落としても『--thick な list』には見える"
+     :file "src/appkit/core.cljc"
+     :find "(ui/list-view rows (merge default-list-view-opts opts))"
+     :replace "(ui/list-view [] (merge default-list-view-opts opts))"
+     :must-fail ["list-view-renders-the-caller-rows-test"]}
+
+    {:id :appkit/list-view-rows-reordered
+     :why "順序が呼び手のものであること。件数だけ数える検査と区別するために別立てにしてある"
+     :file "src/appkit/core.cljc"
+     :find "(ui/list-view rows (merge default-list-view-opts opts))"
+     :replace "(ui/list-view (reverse rows) (merge default-list-view-opts opts))"
+     :must-fail ["list-view-renders-the-caller-rows-test"]}
+
+    {:id :appkit/panel-opts-filtered
+     :why "appkit が既定を**足す**層であって opts を**選ぶ**層ではないこと。:surface/:elevation だけ通す実装は override 検査を全部満たしたまま、published な既定 map の上に自前 opts を積む使い方(= 想定されている使い方)を黙って壊す"
+     :file "src/appkit/core.cljc"
+     :find "(merge default-panel-opts opts)"
+     :replace "(merge default-panel-opts (select-keys opts [:surface :elevation]))"
+     :must-fail ["opts-appkit-knows-nothing-about-still-arrive-test"]}
+
+    {:id :appkit/list-view-opts-filtered
+     :why "同上を list-view 側で。liquid-glass v1 の list-view は :class を取るので、それが消えることで観測できる"
+     :file "src/appkit/core.cljc"
+     :find "(merge default-list-view-opts opts)"
+     :replace "(merge default-list-view-opts (select-keys opts [:surface]))"
+     :must-fail ["opts-appkit-knows-nothing-about-still-arrive-test"]}]}
 
   {:repo "orgs/kotoba-lang/prolly-tree"
    :label "prolly-tree inclusion proof"
