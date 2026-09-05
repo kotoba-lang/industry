@@ -6941,4 +6941,82 @@
      :file "src/org_openstreetmap_overpass/fetch.cljs"
      :find "[:selectors :kinds :timeout :ways? :nwr? :meta?]"
      :replace "[:selectors :kinds :timeout :ways? :nwr?]"
-     :must-fail ["fetch-features-forwards-the-feature-options"]}]}]}
+     :must-fail ["fetch-features-forwards-the-feature-options"]}]}
+
+  {:repo "orgs/cloud-itonami/cloud-itonami-isco-3152"
+   :label "maritime deck actor —— deny-by-default の allowlist と、拒否の理由"
+   ;; この repo の governor は「禁止する op を 5 つ名指しし、名指ししていない op は
+   ;; 全部通す」形だった。README は最初から `closed allowlist` と書いていたので、
+   ;; **閉じていたのは文書だけ**だった。実測（vessel 登録済み・confidence 0.8）:
+   ;; :alter-course / :override-autopilot / :issue-helm-order / :engine-order /
+   ;; :anything-at-all が **5 つとも :commit** して record を書いた —— 舵令と
+   ;; 機関命令、README が二度「やらない」と書いている当のものが通っていた。
+   ;;
+   ;; 禁止リストは「誰かが思いついた名前」の幅しか無い。だから許可の側を
+   ;; 列挙する（`maritime.operation/catalogue`）。
+   ;;
+   ;; **ここに載せる 7 件は 2026-09-06 に実際に赤くなるところを見たものだけ。**
+   ;; うち M4 は、この commit 自身のテストの穴を見つけた変異である ——
+   ;; `(is (seq (:detail violation)))` は generic fallback でも非空なので、
+   ;; 固有の文言を消しても suite は緑のままだった。いまは literal を pin している。
+   ;; CLAUDE.md「その検査は、自分が名乗っている理由で拒否したことがあるか」の実例。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :isco-3152/allowlist-admits-everything
+     :why "allowlist が閉じるのをやめると、禁止 op も未知 op も全部通る。**これが変更前の実際の状態**であり、変異ではなく退行の再現"
+     :file "src/maritime/operation.cljc"
+     :find "(contains? catalogue op)"
+     :replace "(or true (contains? catalogue op))"
+     :must-fail ["refuses-command-authority-nobody-wrote-down"
+                 "refuses-an-op-that-means-nothing"
+                 "refuses-a-missing-op"
+                 "permitted-ops-matches-the-catalogue"
+                 "rejects-course-command"]}
+
+    {:id :isco-3152/governor-stops-consulting-the-allowlist
+     :why "catalogue は正しいまま、governor がそれを読むのをやめる。片側だけを見るテストは緑のままになりうる形"
+     :file "src/maritime/governor.cljc"
+     :find "      (not (operation/permitted? op))\n"
+     :replace "      (and false (not (operation/permitted? op)))\n"
+     :must-fail ["refuses-command-authority-nobody-wrote-down"
+                 "refuses-an-op-that-means-nothing"
+                 "refuses-a-missing-op"
+                 "rejects-course-command"]}
+
+    {:id :isco-3152/required-fields-stop-being-required
+     :why "必須項目の検査が空集合を返すと、緯度だけの position report や港名の無い入港調整が **record として台帳に載る** —— 「何かの記録」ではなく「何でもない記録」になる"
+     :file "src/maritime/operation.cljc"
+     :find "(get-in catalogue [op :required] #{})"
+     :replace "(get-in catalogue [op :not-a-key] #{})"
+     :must-fail ["refuses-a-permitted-op-with-its-required-fields-missing"
+                 "a-nil-required-field-counts-as-missing"]}
+
+    {:id :isco-3152/governor-stops-consulting-incompleteness
+     :why "上の裏側 —— catalogue は required を持っているのに governor がそれを hard violation にしない"
+     :file "src/maritime/governor.cljc"
+     :find "      (seq missing)\n"
+     :replace "      (and false (seq missing))\n"
+     :must-fail ["refuses-a-permitted-op-with-its-required-fields-missing"
+                 "a-nil-required-field-counts-as-missing"]}
+
+    {:id :isco-3152/escalation-policy-silently-lost
+     :why "`:escalates?` を読む先を間違えると **hazard flagging が人間の署名なしに commit する**。confidence は 0.99 で通るので、confidence だけ見るテストは気づかない"
+     :file "src/maritime/operation.cljc"
+     :find "(boolean (get-in catalogue [op :escalates?]))"
+     :replace "(boolean (get-in catalogue [op :never-there]))"
+     :must-fail ["escalation-policy-comes-from-the-catalogue"]}
+
+    {:id :isco-3152/refusal-loses-its-specific-reason
+     :why "**この commit 自身のテストの穴を見つけた変異。** 拒否の文言が generic fallback に落ちても、`(seq (:detail violation))` は非空なので通っていた。拒否されたことと、名乗った理由で拒否されたことは別の主張である"
+     :file "src/maritime/operation.cljc"
+     :find "(or (get named-command-authority op)"
+     :replace "(or (get named-command-authority :absent-on-purpose)"
+     :must-fail ["named-command-authority-is-refused-with-its-own-reason"]}
+
+    {:id :isco-3152/allowlist-closes-too-far
+     :why "逆向き —— 許可されているはずの op が catalogue から落ちる。deny-by-default の gate は**閉じ過ぎても**気づかれにくい（拒否が増えるだけで、拒否は正常に見える）"
+     :file "src/maritime/operation.cljc"
+     :find ":coordinate-port-arrival"
+     :replace ":coordinate-port-arrival-DROPPED"
+     :must-fail ["every-catalogued-op-is-admitted-when-complete"]}]}]}
