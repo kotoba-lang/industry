@@ -7019,4 +7019,83 @@
      :file "src/maritime/operation.cljc"
      :find ":coordinate-port-arrival"
      :replace ":coordinate-port-arrival-DROPPED"
-     :must-fail ["every-catalogued-op-is-admitted-when-complete"]}]}]}
+     :must-fail ["every-catalogued-op-is-admitted-when-complete"]}]}  {:repo "orgs/cloud-itonami/tazuna"
+   :label "tazuna 手綱 teleop —— deny-by-default admission、その拒否は名乗った理由で落ちるか"
+   ;; この repo は同じ teleop 語彙を 4 箇所に持っていて、4 つ目だけが違った:
+   ;; lex/teleopCommand.edn（enum）・methods/teleop_safety.kotoba（canonical kernel、
+   ;; 範囲外を 14 で拒否）・methods/teleop_safety.cljc（unknown kind を拒否）は閉じており、
+   ;; cells/teleop_session/state_machine.cljc は allowlist を **1 つも持っていなかった**。
+   ;; そして relay するのは 4 つ目である。実測 2026-09-06（f180a77）: "weaponize" /
+   ;; "detonate" / "" が member-signed actuation として onChainAnchored true で通り、
+   ;; force 認可を一度も経ていない session も、force_class "weaponizable" も通った。
+   ;;
+   ;; だから撃つ先は「緩む方向」が主（catalogue を開く / governor を読むのをやめる /
+   ;; G3・N1 を落とす / 拒否の固有文言を失う）、そこに「閉じ過ぎる方向」（safety command
+   ;; が gate される / catalogue が lexicon から drift する）と固定値（kernel code）を足す。
+   ;; 8 件とも 2026-09-06 に赤くなるのを見た。docstring を 1 語変える control は
+   ;; 噛まないことも確認済み（= この 8 件が既定値ではない）。
+   :cmd ["clojure" "-Sdeps" "{:paths [\".\" \"src\" \"test\"]}" "-M" "-e" "(load-file \"run_tests.clj\")"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :tazuna/catalogue-opens-to-any-kind
+     :why "catalogue が何でも通すようになると、N1『weaponizable は表現不能』が語彙の性質でなくなる。これが landing 前の実際の状態だった —— 拒否は 3 箇所に在って、relay する 1 箇所に無かった"
+     :file "src/tazuna/operation.cljc"
+     :find "  (contains? catalogue kind))"
+     :replace "  (or true (contains? catalogue kind)))"
+     :must-fail ["an-uncatalogued-command-kind-is-refused"
+                 "the-cell-refuses-an-uncatalogued-kind-with-the-catalogue-reason"
+                 "the-cell-refuses-exactly-what-the-reasoner-refuses"]}
+
+    {:id :tazuna/cell-stops-consulting-the-governor
+     :why "governor の判定を無視して relay に進む形。**landing 前の挙動そのもの**で、governor.cljc が在るのに誰も読んでいなければ部品は飾りになる。ファイルの存在ではなく経路を撃つ"
+     :file "src/tazuna/cells/teleop_session/state_machine.cljc"
+     :find "    (when-not (governor/admitted? decision)"
+     :replace "    (when-not (or true (governor/admitted? decision))"
+     :must-fail ["the-cell-refuses-an-uncatalogued-kind-with-the-catalogue-reason"
+                 "the-cell-refuses-exactly-what-the-reasoner-refuses"]}
+
+    {:id :tazuna/force-authorization-not-required
+     :why "G3 Transparent Force を落とす。kernel は同じ条件を 11 で拒否しており、README は『force-authorization reference が無ければ grant は無い』と書いている —— 散文と kernel の両方が要求するものを、cell が黙って省ける状態に戻す"
+     :file "src/tazuna/governor.cljc"
+     :find "      (not (present? force-auth-ref))"
+     :replace "      (and false (not (present? force-auth-ref)))"
+     :must-fail ["actuation-without-force-authorization-is-refused"
+                 "the-cell-refuses-an-unauthorized-actuation"]}
+
+    {:id :tazuna/force-class-gate-dropped
+     :why "N1 の force class 検査を落とす。verify-force-auth 側にも同じ検査が在るので『どこかで見ている』ように見えるが、relay から入ると通らない —— 二重に持っている検査ほど、片方を落としても気づかれない"
+     :file "src/tazuna/governor.cljc"
+     :find "      (not (op/representable-force-class? force-class))"
+     :replace "      (and false (not (op/representable-force-class? force-class)))"
+     :must-fail ["an-unrepresentable-force-class-cannot-actuate"
+                 "the-cell-refuses-an-unrepresentable-force-class-at-relay"]}
+
+    {:id :tazuna/refusal-loses-its-specific-reason
+     :why "拒否の文言が generic に落ちる。『拒否されたこと』と『名乗った理由で拒否されたこと』は別の主張で、非空判定だけのテストはこれを通す（この loop が 2026-09-05 に踏んだ形）。detail の literal を pin しているのはそのため"
+     :file "src/tazuna/operation.cljc"
+     :find "  (str \"N1: command kind \" (pr-str kind) \" is not in the teleop catalogue \""
+     :replace "  (str \"refused \" (str \"\") \"\" "
+     :must-fail ["an-uncatalogued-command-kind-is-refused"
+                 "the-cell-refuses-an-uncatalogued-kind-with-the-catalogue-reason"]}
+
+    {:id :tazuna/catalogue-drifts-from-lexicon
+     :why "catalogue が lexicon の enum から離れる。catalogue は lex/teleopCommand.edn の射影であって第 5 の意見ではない、という主張が本当かをここで確かめる —— drift したら wire と in-code の語彙が静かに割れる"
+     :file "src/tazuna/operation.cljc"
+     :find "   \"handback\"   {:kernel-code 2"
+     :replace "   \"handback-DROPPED\"   {:kernel-code 2"
+     :must-fail ["the-catalogue-is-the-lexicon-vocabulary"
+                 "the-catalogue-names-exactly-the-benign-verbs"]}
+
+    {:id :tazuna/safety-command-becomes-gated
+     :why "逆向き —— 閉じ過ぎる方向。e-stop が gate されると、gate が壊れている時に止める手段が消える。拒否が増えるのは正常に見えるので、deny-by-default の gate はこちら側が特に気づかれにくい"
+     :file "src/tazuna/operation.cljc"
+     :find "   \"estop\"      {:kernel-code 1 :actuates? false :always-permitted? true"
+     :replace "   \"estop\"      {:kernel-code 1 :actuates? false :always-permitted? false"
+     :must-fail ["safety-commands-are-never-gated-or-signed"]}
+
+    {:id :tazuna/kernel-code-drift
+     :why "methods/teleop_safety.kotoba との境界は整数の protocol（halt=0 … manipulate=4）。片側だけ動かすと型は合うまま意味が入れ替わる —— 一番静かな壊れ方"
+     :file "src/tazuna/operation.cljc"
+     :find "   \"manipulate\" {:kernel-code 4"
+     :replace "   \"manipulate\" {:kernel-code 7"
+     :must-fail ["the-catalogue-carries-the-kernel-integer-protocol"]}]}]}
