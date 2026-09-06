@@ -1357,8 +1357,8 @@ CertGovernor）。
   fleet gate は `root-adr-identity`。**既知の衝突 23 件は据え置きで、表を増やさない**
   —— 新しい衝突は fail させる。
 - **横断 query**:
-  `nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs count`
-  `nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q '[:find ?id :where [?e "adr/id" ?id] [?e "adr/status" "accepted"]]'`
+  `nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" manifest/edn-query.cljs count`
+  `nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" manifest/edn-query.cljs q '[:find ?id :where [?e "adr/id" ?id] [?e "adr/status" "accepted"]]'`
   属性は datascript.js 向けに **裸文字列**（`"adr/id"`、コロン無し）。
 - **この面は 90-docs だけではない（2026-07-25 拡張、ADR-2607252000）。** 企業データと
   fleet 状態も同じ面に載っており、`:company/lei` を結合キーに **repo を跨いで join
@@ -1382,7 +1382,8 @@ CertGovernor）。
   `:observed`（PDS をアカウント側から数えたもの）は同じ列に見えて出所が違う。
   ```bash
   # 財務 × 法人実体 × ToS を 1 クエリで
-  nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q \
+  nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/datalog/src:orgs/kotoba-lang/datom-source/src" \
+    manifest/edn-query.cljs q \
     '[:find ?legal ?juris ?rev ?url :where
       [?a "company/lei" ?lei] [?a "source/dataset" "market-intel"] [?a "company/revenue-usd" ?rev]
       [?b "company/lei" ?lei] [?b "company/legal-name" ?legal] [?b "company/jurisdiction" ?juris]
