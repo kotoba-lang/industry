@@ -44,6 +44,13 @@ content-addressed graph の名前空間ごと変わる — 障害ではなく**�
   読み戻せなかった**ため、2026-07-29 にオーナー承認のもと再発行した
   （workspace 全体を grep して consumer ゼロを確認した上で交換）。
   取得: `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get KOTOBASE_ARCHIVE_TOKEN`。
+- ⚠ **2026-09-06 実測: `no such item` に戻っている。** `KAGI_HOME=$HOME/.kagi
+  orgs/kotoba-lang/kagi/bin/kagi get KOTOBASE_ARCHIVE_TOKEN` が exit 1 /
+  `no such item: KOTOBASE_ARCHIVE_TOKEN`。**同じ item で不在→在→不在が 3 回**なので、
+  この項の可否は毎回その場で測ること（下の 2026-08-27 の記述は当時の実測として残す）。
+  live Worker の secret 側が生きているかは別問題で、ここからは測れない。
+  取りにいけない間は archive 面への publish はオーナー操作（安全床①、agent は
+  token を再発行・推測しない）。
 - **2026-08-27 実測: この item は kagi vault に在り、live Worker に受理される。**
   `kagi get KOTOBASE_ARCHIVE_TOKEN` が exit 0 で値を返し、その値で
   `cloud.itonami.app.bundle put` と `cloud.itonami.app.graph put` が
