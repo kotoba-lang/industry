@@ -165,6 +165,21 @@
                           repos)]
     {:repos (count repos)
      :indexable (count with-readme)
+     ;; **west に登録されているのに、この tree では README が読めなかった repo。**
+     ;; 索引されないという意味では README の無い repo と同じ顔をするが、意味は
+     ;; 逆である —— あちらは「索引できない」、こちらは「ここに無い」。行を消す
+     ;; のはこちらだけで、しかも消えた行は上流に実在する repo のものになる。
+     ;; 実測 2026-09-07: 再生成すると 9 個の登録済み repo の行が消え、そのうち
+     ;; 6 個は README がこの checkout に無いだけだった（上流には在る）。
+     :registered-unscanned
+     ;; `orgs/` の外に pin されている project（manifest 自身など）は走査対象外
+     ;; なので数えない —— 恒久的な偽陽性になる。
+     (vec (sort (remove (into #{} (map :path) with-readme)
+                        (filter #(str/starts-with? % "orgs/") registered))))
+     ;; どの語彙で索引したか。**0 件の意味が語彙の版で変わる** —— 概念が
+     ;; 生成時の語彙に無ければ、0 件は「実装が無い」ではなく「まだ測って
+     ;; いない」である。記録しなければ、その 2 つは同じ顔で出てくる。
+     :vocabulary (vec (sort (map name (keys vocab))))
      :rows
      (vec (for [{:keys [org repo path src readme]} with-readme
                 :let [ld (lede src)
@@ -182,7 +197,7 @@
              :registered? (contains? registered path)
              :file (str/replace readme (str scan-root "/") "")}))}))
 
-(defn ->datoms [{:keys [rows repos indexable]}]
+(defn ->datoms [{:keys [rows repos indexable vocabulary registered-unscanned]}]
   (conj
    (vec (map-indexed
          (fn [i r]
@@ -205,6 +220,8 @@
     :concept/repos-total repos
     :concept/repos-indexable indexable
     :concept/repos-without-readme (- repos indexable)
+    :concept/vocabulary-terms (pr-str (vec vocabulary))
+    :concept/registered-unscanned (count registered-unscanned)
     :source/dataset "concept"}))
 
 (defn render [scanned datoms]
@@ -272,6 +289,13 @@
           (fs/writeFileSync out-file out)
           (println (str "concept index: " (count (:rows scanned)) " entries over "
                         (:indexable scanned) "/" (:repos scanned) " repos → "
-                        (str/replace out-file (str root "/") ""))))))))
+                        (str/replace out-file (str root "/") "")))
+          (when-let [missing (seq (:registered-unscanned scanned))]
+            (println (str "⚠ " (count missing) " 個の west 登録済み repo は、この tree で "
+                          "README が読めなかった。**索引できない repo とは別物**で、"
+                          "この索引はその分の行を落としている（上流には在る）。"))
+            (doseq [m (take 5 missing)] (println (str "    " m)))
+            (when (> (count missing) 5)
+              (println (str "    … 他 " (- (count missing) 5) " 件")))))))))
 
 (apply -main *command-line-args*)
