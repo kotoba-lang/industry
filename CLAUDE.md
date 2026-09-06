@@ -2188,9 +2188,12 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   表現に留める）か、対象を決めて別途 ADR 化しオーナー判断を仰ぐ。
 - **運用 tooling の script host は nbb のみ（ADR-2607173000、2026-07-17）— ただし将来
   優先順位は `kbb`（Kotoba script host）→ `nbb` →（退役: `bb`）（ADR-2607181900、
-  2026-07-18 roadmap 決定）。`kbb` は 2026-07-18 時点で未実装のコードが存在しない
-  target であり、ADR-2607181900 の readiness gate を通過するまでは以下の nbb-only
-  ルールがそのまま正本のまま変わらない。kbb の存在を前提にしたスクリプトを書かない。**
+  2026-07-18 roadmap 決定）。`kbb` は **実在する**（`kotoba-lang/kotoba` の `bin/kbb`。
+  backend は interpreter = JVM bootstrap / `--backend native` = amu KEXE + kexe_loader /
+  `bin/kbb_js.cljs` = amu `--target js` + Node host、ADR-2609051100・ADR-2609062200）が、
+  ADR-2607181900 の readiness gate（nbb スクリプト代表サブセットの移植 = 条件②）を
+  通過するまでは以下の nbb-only ルールがそのまま正本のまま変わらない。
+  運用スクリプトを kbb 前提で書かない。**
   `scripts/*.cljs`・`.claude/hooks/*.cljs`・west 拡張・child repo の
   task/test オーケストレーションは **`bb` バイナリを使わない**。新規に
   `bb.edn` / `#!/usr/bin/env bb` を置かない。残存は Wave 1–4 で削除中
@@ -2392,7 +2395,7 @@ target に落ちたときだけで、**それは amu の経路ではない**。
 | target | 出力 | host | 実行 | 使いどころ |
 |---|---|---|---|---|
 | `wasm32-browser` | `.wasm` | `amu/runtime/browser-host.mjs`（`kotoba:typed/cap-call`） | **nbb（JVM なし）** | **既定。** ブラウザ / Worker |
-| `js` / `js-browser` | restricted ESM `.mjs` | `amu/runtime/dom-driver.mjs` + `browser-host.mjs` | **clojure（JVM）** | 既存資産の互換のみ。**新規で選ばない** |
+| `js` / `js-browser` | restricted ESM `.mjs` | `amu/runtime/dom-driver.mjs` + `browser-host.mjs` | **nbb（JVM なし）**（2026-09-06、amu ADR 0340） | 既存資産の互換と、`kbb --backend js` の oracle。既定は上の wasm32-browser のまま |
 | `cljs-browser-kotoba-v1` | `.cljs` **ソーステキスト** | 無い（自分で require して `main` を呼ぶ） | **clojure（JVM）** | cljs toolchain に載せる必要があるときだけ |
 
 - **JVM を起こさないことは好みではなく容量の問題である。** 実測 2026-08-30、この 1 台
@@ -2419,9 +2422,13 @@ target に落ちたときだけで、**それは amu の経路ではない**。
   生涯で使い切りなので dom-driver は **1 インタラクション = 1 新規 instance** にしている
   —— 共有すると描画途中で `fuel-exhausted` になる。**整数→文字列の builtin が無い**
   （todo-app が ID を 26 文字のアルファベットから取っているのはそのため）。
-- **`js` / `cljs` target を選ぶと `clojure` が起きる。** それが JVM の入口であって、
+- **`cljs` target を選ぶと `clojure` が起きる。** それが JVM の入口であって、
   amu 自体の性質ではない。1 ファイルで分単位かかるので、どうしても使う場合でも
-  loop や hook に組み込む前に測る。**新規はこの 2 target を選ばない。**
+  loop や hook に組み込む前に測る。**新規はこの target を選ばない。**
+  ⚠ 2026-09-06 まで `js` もここに並んでいた。emitter（`kotoba-lang/kotoba-script`）が
+  `.cljc` になり、`amu compile --target js --jvm-free` は nbb で走る（amu ADR 0340。
+  parity は `test/nbb/js_parity.cljs` —— JVM 経路が書いた `runtime/http/route-decide.mjs`
+  とバイト一致）。**JVM に残るのは `cljs-browser` だけ。**
 - 実ブラウザでの確認は `amu/tests/browser/`（`app.html` + `browser.spec.mjs`、Playwright で
   trusted event を送る）。Node の mock DOM で足りるなら `createMockDom` が
   `browser-host.mjs` に在る。
@@ -2481,9 +2488,14 @@ target に落ちたときだけで、**それは amu の経路ではない**。
    移す前に、item 3 のコマンドで `http-ingress-v1` / `stream-ingress-v1` の行を実際に
    見る（ADR-2606290000 と整合）。2026-08-08 訂正: 旧文は「どちらの面にも無い」と
    書いていた。
-5. **`kbb`（Kotoba script host）は無い** — build スクリプトは nbb 据え置き。
-   `kotoba-lang/kotoba-script` は restricted-ESM emitter であって script runner ではない
-   （名前で誤解しないこと）。
+5. **`kbb`（Kotoba script host）は在るが、まだ script host の正本ではない** — build
+   スクリプトは nbb 据え置き（上の nbb-only 節）。⚠ **2026-09-06 訂正: 旧文は「kbb は無い」
+   と書いていたが偽だった。** `kotoba-lang/kotoba` に `bin/kbb`（JVM bootstrap）、
+   `--backend native`（ADR-2609051100）、`bin/kbb_js.cljs`（ADR-2609062200）が在り、
+   同じ policy で同じ script が native と js で同じ値を返す（demo_kbb_fs_read_native = 84）。
+   script が書く相手は `lib/kbb/*.kotoba`（`--source-path lib`）で、wire id を script に
+   書かない。`kotoba-lang/kotoba-script` は restricted-ESM emitter であって script runner
+   ではない（名前で誤解しないこと）。
    ⚠ **2026-09-06 訂正: 旧文はここに「fs/process/exec capability も無い」と書いていたが偽だった。**
    `amu/resources/kotoba/lang/capability-catalog.edn` の `:capabilities` は `:fs/transact`
    `:fs/browse` `:fs/app-data` `:process/spawn` `:env/read` `:git/run` `:secret/get`
