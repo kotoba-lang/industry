@@ -1,0 +1,70 @@
+[{:db/id -1
+  :adr/id "adr-2609072000-suji-and-biomech-are-the-same-subject-at-two-resolutions"
+  :adr/title "suji と biomech は同じ主題を 2 つの解像度で持っている —— 語彙に足したから見つかった"
+  :adr/status "accepted"
+  :adr/date "2026-09-07"
+  :adr/related ["adr-2608040100-origin-plane-is-reverse-dns-of-the-real-domain" "adr-2609062600-kami-app-suji-browser-posture-load"]
+  :adr/body "## 決定
+
+**`cloud-itonami/suji` と `kotoba-lang/biomech` は同じ主題（生体力学）に当たる。境界は
+解像度であり、両者の README がそれを述べる。** そして `manifest/concept-vocabulary.edn` の
+`:posture-load-biomechanics` が、筋 / biomechanics / 姿勢負荷 / %MVC / モーメントアーム
+などの語からこの 2 つ（と可視面の `kotoba-lang/kami-app-suji`）に届く経路を持つ。
+
+| repo | 解像度 | 持っているもの |
+|---|---|---|
+| `kotoba-lang/biomech` | 組織スケール | tissue の材料定数、Euler–Bernoulli 梁、FEM、softbody、血行。Hill 型集中定数筋（活性化動特性・遠心性増強・直列弾性腱）。solver backend は fea / kami-vehicle / kami-engine-cfd |
+| `cloud-itonami/suji` | 全身スケール | 静的逆動力学（RNEA 重力項）、Crowninshield–Brand の静的最適化、幾何モーメントアーム、レベル別椎間板圧縮、Rohmert 持久ドーズ。筋は 1 本の作用線に潰れている |
+| `kotoba-lang/kami-app-suji` | 可視面 | 上を WebGPU / WebGL 2.0 でブラウザに出す single-page app。物理も形状も持たない |
+
+## なぜ今日まで気づかなかったか
+
+**`suji` は 2026-08 の起草から今日まで、README でも ADR でも `biomech` を一度も名指して
+いない。** 逆も同じ。名前の規則（ADR-2608040100）は「面をまたぐ同一主題は可、条件は
+README が最近接 repo との境界を述べること」と定めているので、これは規則違反が 2 件
+放置されていた状態である。
+
+見つけ方が要点である。`nbb scripts/concept-lookup.cljs 筋` が
+『筋』は語彙に無い概念です を返したので語彙 entry を書き、索引を生成し直したら
+`kotoba-lang/biomech` が 3 件目として現れた。**索引を引いたのではなく、索引に足したから
+見つかった。** CLAUDE.md の「無いと言う前に索引を引く」は、引く側の規則としては効いて
+いたが、**まだ語彙に無い概念については何も守っていなかった** —— 引いて出ないことは
+不在の証拠にならない、と同じ節が自分で書いているとおり。
+
+## 綴りは、当たった先を見てから分けた
+
+`:spellings` は索引の鍵、`:query-spellings` は問いの語、という非対称をこのファイルは
+既に持っている。どちらに置くかは推測せず、索引を生成して当たった先を見て決めた:
+
+    endurance だけ  → kami-engine-multirotor（飛行持続時間）
+    肩こり だけ      → kizashi（徴候を感知する側。力学は解かない）
+
+2 語を `:query-spellings` へ移すと、概念はちょうど 3 repo に解決する（suji /
+kami-app-suji / biomech）。**当たりすぎる索引は当たらない索引と同じく使われない。**
+
+## 索引そのものは commit しない
+
+`gen-concept-index.cljs` は **今この checkout に展開されている repo** を走査する。
+今日この worktree で回すと他概念の行が 216 消えて 187 増えた —— 並行セッションの
+checkout 状態の差である。生成器の docstring が `--check` について同じことを書いている。
+**手書きの半分（語彙）だけを commit し、索引は次の全体再生成に任せる。**
+
+## 未測定であること（重要）
+
+**2 つの Hill 実装は突き合わせていない。** biomech 側は活性化動特性・遠心性増強・
+直列弾性腱まで持ち、suji 側は静的な力‐長さと受動張力だけである。同じ正規化長で
+同じ値を返すかどうかは、この ADR の時点で **未測定** であって、一致とも不一致とも
+書けない。突き合わせは別作業として走っている。
+
+**suji が biomech を使うべきか**も、この ADR は決めない。決めるには上の突き合わせと、
+`.cljc` の可搬性（suji はブラウザで動く必要があり、biomech の JVM 専用 loader が
+どこまで混ざっているか）を先に測る必要がある。
+
+## 帰結
+
+- 語彙 entry が landed（`db49f68`）。`筋` / `biomechanics` / `%MVC` / `モーメントアーム`
+  などが 3 repo に解決する。行数が索引に出るのは次の全体再生成から。
+- `biomech` / `suji` の README に境界節を足す（前者は進行中、後者は当該 repo を
+  排他保持している別作業の後）。
+- 語彙に無い概念は索引から見えない、という穴が 1 つ塞がった。**同じ穴は他にもある** ——
+  この語彙は 46 概念しか持たず、workspace は 4,400 repo ある。"}]
