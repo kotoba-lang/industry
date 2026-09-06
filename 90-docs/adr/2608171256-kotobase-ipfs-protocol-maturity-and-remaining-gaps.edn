@@ -285,6 +285,13 @@ signed record、redirectなしのlive probeを通す。DNSだけを置いて完�
 abuse/capacity、signer、soakを別serviceとして設計する。HTTP 200やprotocol algebraを
 libp2p live readinessへ読み替えない。
 
+**2026-09-06: product decision が出た。** successor は
+ADR-2609062800（`2609062800-kotobase-p2p-location-aware-video-delivery.edn`）。
+kotobase.net は自分が持つ bytes の public provider になり、fleet に anonymous な
+block-server role を足し、動画配信は CID-addressed segment + client 側 provider ranking
+で位置最適化する。上の 6 項目の実測は slice ごとに後続 ADR。**本 ADR 時点で実装はゼロ**
+のままで、G7 が禁じた読み替えはそのまま効く。
+
 ## Ordered next work
 
 WIPは1。**G1-G4 は 0.23.0 で閉じた。** 残るのは G5 / G6 / G7 で、**3 つとも
