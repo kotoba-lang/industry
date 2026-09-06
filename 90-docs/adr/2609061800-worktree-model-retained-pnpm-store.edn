@@ -18,7 +18,7 @@
 
 | 項目 | 値 |
 |---|---|
-| ディスク全体 / 空き | 926 GiB / **4.7 GiB（使用率 100%）** |
+| ディスク全体 / 空き | 926 GiB。空きは **測った瞬間で 4.7 GiB（100%）と 51 GiB（95%）の両方が出た**（下記「空き容量の読み方」） |
 | superproject の worktree | 14 本、1.5 GiB |
 | 子リポの worktree（live） | 206 本（85 repo）、32.9 GiB |
 | うち resident bot（`~/.gftd/worktrees`） | 82 本、25.8 GiB。**82 本すべてが app-hyakka** |
@@ -48,13 +48,17 @@ session 由来の子リポ worktree 124 本のうち **着地済みなのに残�
 ## Decision
 
 1. **worktree-per-task は維持する。** ディスクを理由に worktree をやめる根拠は無い（3.7%、再生成物を除けば 1.2%）。事故を防ぐ根拠（同時書き手が十数体）は残っている。CLAUDE.md の「superproject 本体は統合・閲覧専用」「1 task = 1 branch = 1 worktree」はそのまま生きる。
-2. **片付けを自動化する。** `scripts/worktree-retire.cljs` が、着地済み・clean・7 日超・idle（lsof の cwd / ps の argv に現れない）・unlocked・非 bot の worktree だけを `git worktree remove`（`--force` 無し）+ `git branch -d`（merged のみ）で撤去し、stale entry を prune する。dirty なものは触らない（git-cleanup-conflict の領分）。launchd `com.gftd.worktree-retire` が日次で `--apply`。dry-run 初回: SCANNED 258 / retire 13 / prune 40 / unverified 5。
+2. **片付けを自動化する。** `scripts/worktree-retire.cljs` が、着地済み・clean・7 日超・idle（lsof の cwd / ps の argv に現れない）・unlocked・非 bot の worktree だけを `git worktree remove`（`--force` 無し）+ `git branch -d`（merged のみ）で撤去し、stale entry を prune する。dirty なものは触らない（git-cleanup-conflict の領分）。launchd `com.gftd.worktree-retire` が日次で `--apply`。dry-run 初回: SCANNED 258 / retire 13 / prune 40 / unverified 5。同日 `--apply`: 13 本撤去（うち branch -d 9）、49 entry prune、UNVERIFIED 5（Codex の `~/Documents` 配下、`git status` が 60 秒で timeout —— iCloud 同期の dataless file の疑い、触っていない）。
 3. **node_modules は pnpm store 経由で入れる。** `scripts/worktree-node-modules-dedupe.cljs` が npm lockfile の worktree を `pnpm import` → `.npmrc` `node-linker=hoisted` → `pnpm install --frozen-lockfile` に置き換える。pnpm は APFS で store から **clonefile** するので、`du` は従来どおり全量を報告するが `df` は worktree 1 本あたり約 1 MB しか動かない（実測: du 255 MB に対し df 差 1 MB）。`hoisted` を選ぶのは shadow-cljs 等の解決を npm と同じ平坦配置に保つため。app-hyakka は repo 側に `pnpm-lock.yaml` / `.npmrc` / `packageManager` / `pnpm.onlyBuiltDependencies`（esbuild, workerd）を持たせる。古い detached worktree では両ファイルを `.git/info/exclude` に載せて untracked 扱いにしない。
 4. **superproject の内側に切られた worktree 34 本は、どちらのモデルでも直す対象。** west の topdir 誤認で本体の `orgs/` を書き換える（ADR-2607011345）。retire script は場所を理由に除外しないので、着地済みのものから順に消えていく。
 
+### 空き容量の読み方（2026-09-06 に踏んだ罠）
+
+同じ 1 時間の中で `df -k /` が **4.9 GB / 100%** と **51 GB / 95%** を返した。その間に 46 GB を消す操作はしていない。`/` は sealed system snapshot で、worktree が載る Data volume（`/System/Volumes/Data`）とは別の答えを返しうるうえ、APFS の purgeable / snapshot 回収で空きは操作と無関係に動く。**空きは「その瞬間の値」で、比較は同一 volume・数秒以内の before/after だけを信用する**（200 MB を書いて消す統制実験では df は ±200 MB を正確に追った）。dedupe script の `df-free` は worktree のパスで `df` を引く。この ADR の最初の版は 4.7 GiB を「disk が 100% 埋まっている」と読んでいた —— それは測った瞬間には真だったが、緊急性の根拠としては未測定だった。
+
 ## Consequences
 
-- 空き 4.7 GiB は worktree 論争より先に壊れる問題で、最大の梃子は app-hyakka の bot worktree 82 本が同じ node_modules を 82 回持っていることだった。dedupe で node_modules 分（最大 12.4 GiB）が戻る。`.shadow-cljs`（hyakka 1 本あたり 318 MB）と `.venv-datalake`（190 MB）は今回対象外 —— 前者は並行 build で共有キャッシュが壊れる、後者は Python 側の別問題。
+- 空き容量の逼迫は worktree 論争より先に壊れる問題で、最大の梃子は app-hyakka の bot worktree 82 本が同じ node_modules を 82 回持っていることだった。dedupe で node_modules 分（最大 12.4 GiB）が戻る。`.shadow-cljs`（hyakka 1 本あたり 318 MB）と `.venv-datalake`（190 MB）は今回対象外 —— 前者は並行 build で共有キャッシュが壊れる、後者は Python 側の別問題。
 - 「この端末だけで開発する」が本当に「同時書き手 1 人」になった時点で、この決定は再評価してよい。判定は `ps` と `launchctl list` で数える（末尾）。
 - オーナー端末のセッションだけ共有 checkout を直接編集してよい、という緩和案は**採らなかった**（オーナー判断は worktree 維持）。採る場合は superproject の「閲覧専用」規則を書き換える必要があり、bot / agent 側の worktree 必須は変わらない。
 
