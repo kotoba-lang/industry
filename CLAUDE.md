@@ -189,8 +189,18 @@ GitHub Actions ではない。
   `scripts/fleet-ci/gates.edn` に 1 行足す（gate 本体は `scripts/fleet-ci/gates/*.cljs`）。
   「Actions が今は動いているから」は理由にならない — **止まったのは org 単位**で、
   動いている org も同じ理由で止まりうる。
-- **Actions は repo 単位で無効化してある**（`scripts/github-actions-disable-sweep.cljs`）。
-  workflow ファイル自体は残るが inert。**ファイルの削除には GitHub の `workflow` OAuth scope が
+- **Actions は repo 単位で無効化「した」——それは掃除の記録であって、今の状態ではない**
+  （`scripts/github-actions-disable-sweep.cljs`）。無効化された repo では workflow ファイル
+  自体は残るが inert。
+  ⚠ **2026-09-06 訂正: 旧文は現在形で「無効化してある」と書いており、それが偽になる repo が
+  ある。** 実測: `kotoba-lang/amu` は `GET /repos/kotoba-lang/amu/actions/permissions` が
+  `{"enabled":true}` を返し、PR に 13 job のマトリクスが実走し（`test` × 3 platform /
+  `browser-matrix` × 2 / `safari` / `windows-arm64` / `android-ndk` /
+  `provider-qualification` × 3 / `server-kind` / `downstream-murakumo`）、**main は保護ブランチで
+  PR + 2 status check を要求する**。サーバ側 `gh api .../merges` は 409 で拒否され、PR 経路が
+  唯一の着地経路だった。
+  **したがって「この workspace では Actions は動いていない」を前提に手順を選ばない** ——
+  下記の節が自分で書いているとおり、状態は GitHub に訊くまで未測定である。訊いてから決める。**ファイルの削除には GitHub の `workflow` OAuth scope が
   要り、このワークスペースの token は持っていない**（push も Contents API も通らず、後者は
   403 でなく **404** を返すので「repo が無い」と誤読しやすい）。一方 **Actions の無効化は
   `repo` scope で通る** — 詰まっているのは「workflow ファイルを編集する」経路だけ。
@@ -2424,7 +2434,13 @@ target に落ちたときだけで、**それは amu の経路ではない**。
    `{:allow #{[:cap/call <id>]}}` を渡せば CLI からそのままコンパイルできる。
    `--policy` 無しは空 policy（deny-by-default は不変）。`:schemas` は project mode では
    引き続き拒否（同名 schema の衝突規則が未決定）。
-2. **capability kit の qualification をここに書き写さない — kit ファイルが正本。**
+2. **`guest-grammar.edn` の `:admitted-builtins` を「呼べる操作の一覧」として引かない**
+   （2026-09-06 追記）。実測: `document-sha256` はそこに**無い**のに guest source から呼べる。
+   `document-*` は 36 個あり（`document-canonical-bytes` / `document-equal?` /
+   `document-assoc` / `document-merge` / `document-print` ↔ `document-read` を含む）、
+   正本は `:sugar :document` と amu の W4 スライス群のほう。**ある操作が無いことを、
+   あの一覧に無いことから結論しない。** 今日それで一度誤診した。
+3. **capability kit の qualification をここに書き写さない — kit ファイルが正本。**
    `orgs/kotoba-lang/amu/resources/kotoba/lang/capability-kits/*.edn` の
    `:qualification` を引く。key の意味は `:reference`（KIR インタプリタ）/
    `:wasm-aot`（`wasm32-browser-kotoba-v1` + `kotoba:typed/cap-call`）/
@@ -2459,13 +2475,13 @@ target に落ちたときだけで、**それは amu の経路ではない**。
    `Measured 2026-08-18` と日付を書いて更新し続けている）。**「今日の既知ブロッカー」
    という見出しの節に値を書けば、その値は明日も「今日」として読まれる。**
    ここに残してよいのは*引き方*であって*引いた結果*ではない。
-3. **ingress capability は在る**（`capability-kits/http-ingress-v1.edn`、host-injects /
+4. **ingress capability は在る**（`capability-kits/http-ingress-v1.edn`、host-injects /
    guest-polls の accept-then-reply、queue 深さ 8、body 64 KiB）。**ただし ingress 系の
    qualification は他 kit と揃って進まない** —— Cloudflare Worker のエントリを Kotoba に
-   移す前に、item 2 のコマンドで `http-ingress-v1` / `stream-ingress-v1` の行を実際に
+   移す前に、item 3 のコマンドで `http-ingress-v1` / `stream-ingress-v1` の行を実際に
    見る（ADR-2606290000 と整合）。2026-08-08 訂正: 旧文は「どちらの面にも無い」と
    書いていた。
-4. **`kbb`（Kotoba script host）は無い** — build スクリプトは nbb 据え置き。
+5. **`kbb`（Kotoba script host）は無い** — build スクリプトは nbb 据え置き。
    `kotoba-lang/kotoba-script` は restricted-ESM emitter であって script runner ではない
    （名前で誤解しないこと）。
    ⚠ **2026-09-06 訂正: 旧文はここに「fs/process/exec capability も無い」と書いていたが偽だった。**
