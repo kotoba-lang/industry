@@ -5,11 +5,13 @@
   :adr/date "2026-09-06"
   :adr/repo "cloud-itonami/cloud-itonami-isic-6820"
   :adr/tags ["cloud-itonami" "isic-6820" "actor" "governor" "kanri-kumiai" "shuzen-tsumitatekin" "kubunshoyu-ho" "chouki-shuzen-keikaku"]
-  :adr/landed-commit "2f0b0b13e48efc5014da5f579b17c05370dfa489"
-  :adr/west-pin-commit "5c8e3fb5e5734845dab9893e442ec3ce1bdd7105"
+  :adr/landed-commit "2dfc0518b68648ecd599bcb81b23064418abb72b"
+  :adr/west-pin-commit "d88f05cd31c79ab2b5a7892cd2e2a92ba404e549"
   :adr/landed-commits ["547c86e65483da40cec577b9742dc4cd1a7c571a — 管理組合 actor (JPN)"
                        "577b277616590c04d89486328b3682157e053dce — DEU / ESP / FRA の法定決議要件"
-                       "2f0b0b13e48efc5014da5f579b17c05370dfa489 — SGP の法定決議要件"]
+                       "2f0b0b13e48efc5014da5f579b17c05370dfa489 — SGP の法定決議要件"
+                       "ac475330edcafa9eee076bdb364b3b4f67b91aac — AUS-NSW s 5 (反対側の閾値)"
+                       "2dfc0518b68648ecd599bcb81b23064418abb72b — AUS-NSW Sch 1 cl 14/17 (完成)"]
   :adr/body "cloud-itonami-isic-6820 は ISIC Rev.5 6820 (Real estate activities on a
 fee or contract basis) の open business blueprint として、**管理会社が
 所有者の代理で報酬を受け取り契約を実行する**面を実装していた。同じ ISIC
@@ -267,51 +269,80 @@ bot 検出の回避はこのワークスペースの安全床が禁じている�
 - west pin 前進 = a25de73b -> 0783d41f -> 5c8e3fb5
 - clojure -M:dev:test -> 188 tests / 755 assertions / 0 failures
 
+### 残った gap を常駐 bot にした (2026-09-06、オーナー指示「残りの gap は hermes bot profile, cron で job に」)
+
+正本は `scripts/hermes-kumiai-sources/`、稼働は Hermes profile
+`kumiai-sources`（cron 2 本: `0 */6 * * *` の probe と `30 9 * * *` の report）。
+
+**測るのは status ではなく本文。** 分類は `readable` / `wrong-body` /
+`undecodable` / `bot-challenge` / `http-<code>` / `error` の 6 つで、
+とくに **`undecodable` は「測れていない」であって「marker が無い」ではない**。
+独 gesetze-im-internet.de は ISO-8859-1 を返し、**shell の `grep` はそれを
+binary と見なして理由を言わずに 0 件を返す** —— この bot が Python で明示
+デコードするのはそのため。
+
+**bot は初回実行でいきなり gap を 1 つ閉じた。** AUS-NSW は
+`:source-behind-bot-challenge` として「回避しないので動かさない」と記録して
+いたが、probe が **plain な urllib GET で全文を返してもらった** —— チャレンジは
+出ておらず、何も破っていない。curl には 403、urllib には 200、数分後の同一
+要求には再び 403 という**間欠**だった。窓が開いている間に s 5 を読み、
+2 度目の窓で Schedule 1 cl 14 / 17 を読んで entry を完成させた。
+
+**その過程で bot 自身の欠陥も 1 つ出た。** `previous()` を append の**後**に
+呼んでいたため、直前の行が「今書いた行」になり、**CHANGED 分岐が一度も発火
+できない**状態だった。発火しない検査は、発火して何も見つけなかった検査と
+出力で区別できない —— この repo が繰り返し警告している形。修正後、
+異なる過去行を与えて発火することと、同一行で沈黙することの**両方**を実演した。
+
+### 現在地 (2026-09-06 終了時)
+
+| 状態 | 法域 |
+|---|---|
+| 判定可能（条文から転記） | JPN · DEU · ESP · FRA · SGP · **AUS-NSW** |
+| 全国一律の法定表が無い | USA-NY · GBR |
+| 表は在るが読めていない（bot が監視中） | ITA · CHN |
+
 ## 再開点 (会話履歴なしで続けられる粒度)
 
-**現在地の確認**（これが通れば手を入れる前の状態は健全）:
+**現在地の確認**:
 
 ```bash
 cd orgs/cloud-itonami/cloud-itonami-isic-6820
-clojure -M:dev:test        # 188 tests / 755 assertions / 0 failures
+clojure -M:dev:test        # 195 tests / 783 assertions / 0 failures
 clojure -M:lint            # 0 errors / 0 warnings
-clojure -M:dev:run-kumiai  # 5法域の決議要件 + 感度表 + HARD hold 11種
+clojure -M:dev:run-kumiai  # 6法域の決議要件 + 感度表 + HARD hold 11種
+python3 ../../../scripts/hermes-kumiai-sources/probe_kumiai_sources.py  # 出典の現況
 ```
 
-**次の一手は ITA / CHN の条文本体に届く URL を見つけること。** どちらも
-サイトは 200 を返すが本文でないので、取得経路の問題であって権限の問題では
-ない。SGP がまさにこの形で、公式索引を辿ったら解決した (`BMSMA2004` ->
-`BSMA2004`)。同じ手順を当てる:
+**次の一手は自分で来る。** `kumiai-sources` bot が 6 時間ごとに 8 法域の
+出典を測り、ITA / CHN の候補 URL のどれかが本文を返した tick に
+`OPPORTUNITY <ISO3> ... TODO: ...` を出す。**その報告を待って読みに行けばよく、
+こちらから探しに行く必要はない。** 出典が動いた場合も同じ経路で
+`REGRESSION` として出る。
 
-```bash
-# ITA: normattiva は caricaArticolo で条文を返す。codiceRedazionale と
-#      idArticolo の組を、目次フレームの HTML から拾って当てる
-curl -sSL 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262' | grep -oE 'caricaArticolo[^<]+' | head
-# CHN: flk.npc.gov.cn は SPA。内部 API (POST /api/detail) の id を
-#      /api/ の一覧レスポンスから取る
-```
+**報告を受けてやること**（bot は propose-only なので自分ではやらない）:
+`realty.kumiai.facts/catalog` の当該 entry で `:legal-basis-unverified` を
+`:legal-basis` に変え、`:resolutions` を足し、`:verified-on` を入れ、
+`:source-attempt` を消す。あわせて `jurisdictions_test.clj` に**両方向の
+fixture**を書く（条文が要求する形と、要求しない形の両方で答えが割れる票）。
 
-**加える先は `realty.kumiai.facts/catalog` の 1 entry**（`:legal-basis-unverified`
-を `:legal-basis` に変え、`:resolutions` を足し、`:verified-on` を入れ、
-`:source-attempt` を消す）と、`test/realty/kumiai/jurisdictions_test.clj`
-の両方向 fixture。**AUS-NSW は動かさない** —— bot チャレンジの回避は
-しないと決めた (`:source-behind-bot-challenge`)。公式 API か別配布が
-現れたときだけ動く。
-
-**モデル側に追加が要るかは、条文を読んでから決める。** これまでの4回の
-拡張はすべて「分数を足す」ではなく「形を足す」だった (母数3種・軸ごとの
-分数と母数・法定の再決議・分母を持たない比較・定義の一部としての通知期間)。
-ITA 第1136条は定足数と可決要件が回次で変わる形なので、ESP の
+**モデル側に形を足す必要があるかは、条文を読んでから決める。** これまでの
+6 法域で足したのは分数ではなく形だった —— 母数3種（総数/出席者/実投票）・
+軸ごとの分数と母数・法定の再決議・分母を持たない比較（賛成対反対）・
+定義の一部としての通知期間・**反対側に置かれた閾値**・**選言的な定足数**。
+ITA 第1136条は回次で定足数と可決要件が変わるので ESP の
 first-call / second-call と同型で足りる見込みだが、**読む前に決めない**。
 
 ## 残っている gap (正直に)
 
-- 検証済みの決議要件テーブルは **JPN / DEU / ESP / FRA / SGP の 5 法域**。
-  残りは 3 通りの理由で未検証: **ITA / CHN** は取得経路の問題 (200 を
-  返すが本文でない) で、条文本体に届く URL を見つければ解消する。
-  **AUS-NSW** は bot チャレンジの背後にあり、公式 API か別配布が現れる
-  まで動かない (回避はしない)。**USA-NY / GBR** はそもそも全国一律の
-  法定表が存在しない
+- 検証済みの決議要件テーブルは **6 法域**（JPN / DEU / ESP / FRA / SGP /
+  AUS-NSW）。**ITA / CHN** は取得経路の問題（200 を返すが本文でない）で、
+  条文本体に届く URL が見つかれば解消する —— `kumiai-sources` bot が
+  6 時間ごとに候補 URL を回して監視している。**USA-NY / GBR** はそもそも
+  全国一律の法定表が存在しない（読んでも解消しない）
+- **AUS-NSW Schedule 1 clause 17(2)(c)**（極小規模の組合では2名の出席で
+  足りる）は未実装。`nsw-quorum` の docstring がそう述べ、どちらへ誤るか
+  （HOLD 側）も述べている
 - **管理計画認定制度 (マンション管理適正化法第5条の4) とマンション
   長寿命化促進税制**は catalog に名前だけあり、判定は実装していない。
   引上げ基準は「幅の下限値を下回る額から上回る額へ引き上げたこと」で、
