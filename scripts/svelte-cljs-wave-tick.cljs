@@ -157,7 +157,18 @@
    を使ったので git は衝突せず、**2 つの agent が同じ repo を二重に移行しかけた**。
 
    agent は作業開始時に必ず linked worktree を作るので、**push より早く立つ印**が
-   これ。branch 名や path を決め打ちせず、linked worktree が 1 つでも在れば触らない。"
+   これ。branch 名や path を決め打ちせず、linked worktree が 1 つでも在れば触らない。
+
+   ⚠ **ただし「在る」のは実体であって台帳の行ではない。** `git worktree list` は
+   **実体が消えた worktree も 1 行として出し続ける**（`prunable <理由>` 付き）。
+   それは「誰かが作業中」ではなく**残骸**である。
+
+   実測 2026-09-07: IN-FLIGHT 15 件のうち **8 件が prunable のみ**で、
+   その 8 repo の branch はどれも main から **0 ahead**（中身は既に着地済み、
+   ディレクトリは OS の /tmp 掃除で消えていた）。残骸を live と数えていたので、
+   候補が 4 本出るはずの周に **1 本しか出ず**、しかも出力は正常に見えた ——
+   `git worktree prune` で 8 件消したら候補は 1 → 4 に戻った。
+   **走っている波と、走った跡が、同じ顔で数えられていた**（ADR-2608136000）。"
   [{:keys [repo]}]
   (try
     (let [r (.spawnSync cp "git"
@@ -165,7 +176,14 @@
                         #js {:encoding "utf8" :timeout 30000})]
       (if (not= 0 (aget r "status"))
         true                                     ; 訊けなければ触らない側に倒す
-        (> (count (re-seq #"(?m)^worktree " (str (aget r "stdout")))) 1)))
+        ;; porcelain は空行区切りのレコード列で、先頭が本体。実体が消えたものには
+        ;; `prunable` 行が付く。locked な worktree は git が prune しないので
+        ;; prunable にならず、ここでも live 側に残る（正しい）。
+        (let [linked (->> (str/split (str (aget r "stdout")) #"\n\s*\n")
+                          (map str/trim)
+                          (remove str/blank?)
+                          rest)]
+          (boolean (some #(not (re-find #"(?m)^prunable(\s|$)" %)) linked)))))
     (catch :default _ true)))
 
 (defn- remote-name
