@@ -163,7 +163,17 @@ def main():
     ap.add_argument("--thresholds", default="0.5,0.7,0.9,0.99")
     ap.add_argument("--max-new", type=int, default=192)
     ap.add_argument("--out", default="/home/gad/dllm-phase0/phase0-exec-eval.json")
+    ap.add_argument("--tasks", default=None,
+                    help="JSON file of {name,prompt,tests} objects; defaults to the 5 built in above. "
+                         "Validate any task file with validate_tasks.py before scoring a model with it -- "
+                         "a task no correct implementation can pass lowers every cell equally and silently.")
     args = ap.parse_args()
+
+    global TASKS
+    if args.tasks:
+        import json as _j
+        TASKS = _j.load(open(args.tasks))
+        print(f"loaded {len(TASKS)} tasks from {args.tasks}", flush=True)
 
     device = "cuda"
     tok = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)

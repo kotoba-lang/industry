@@ -1,6 +1,6 @@
 [{:db/id -1
   :adr/id "adr-2609063000-dllm-phase0-block-diffusion-measured-on-murakumo-gad"
-  :adr/title "dLLM Phase 0 を murakumo の gad で実測 —— block diffusion は AR と同じ正解率のまま forward を 2.1 分の 1 にする。ただし tok/forward だけを最適化すると 3.1 倍で正解 0/5 になる"
+  :adr/title "dLLM Phase 0 を murakumo の gad で実測 —— block diffusion は forward を 2.13 分の 1 にするが、実行正解率は 85% から 75% に落ちる。無料ではない（n=5 では無料に見えた）"
   :adr/status "accepted"
   :adr/date "2026-09-06"
   :adr/last_verified "2026-09-06"
@@ -28,9 +28,13 @@
 
 ## 一行で
 
-**本物の bidirectional block-diffusion trunk では、AR と同じ正解率（5 問中 4 問）を
-保ったまま forward 回数が 2.106 分の 1 になる。** 予算は ¥0（Modal ではなく murakumo
-自身の gad で回した）。ただし tok/forward を最大化する方向に振ると、3.129 という
+**本物の bidirectional block-diffusion trunk では forward 回数が 2.134 分の 1 になる。
+その代償は実行正解率 17/20 → 15/20（85% → 75%）。** 予算は ¥0（Modal ではなく
+murakumo 自身の gad で回した）。
+
+⚠ **この一行は 2026-09-06 に書き換えた。** 最初は 5 問で測って「AR と同じ正解率
+（4/5）のまま 2.106 分の 1」と書いた。**5 問では 4/5 と 3/5 を分離できない。**
+20 問で測り直すと差が出た。加えて、tok/forward を最大化する方向に振ると 3.129 という
 一番よく見える数字が **正解 0/5** を出す。
 
 ## Phase 0 の gate
@@ -91,6 +95,50 @@ block=16 の日本語は **AR より悪い**（1 未満）。code は字下げ�
 tok/forward を最大化する方向（block を大きく、閾値を下げる）は、**一番よく見える
 3.129 が正解 0/5** という形で裏切る。
 
+## 結果 3: n=20 で測り直したら結論が変わった
+
+5 問セットでは AR も block=4 も 4/5 で、差が無いように見えた。**5 問では 1 問差が
+誤差に埋もれる。** そこで 20 問セットを作り、**使う前に harness を証明した** ——
+参照実装で 20/20 通過、`None` を返す stub を 20/20 却下（`validate_tasks.py`）。
+
+| cell | 正解 | tok/forward | forwards |
+|---|---|---|---|
+| AR control（block=1） | **17/20**（85%） | 1.000 | 1155 |
+| block=4 / threshold 0.9 | **15/20**（75%） | **2.134** | 536 |
+| block=8 / threshold 0.9 | **14/20**（70%） | 2.312 | 513 |
+
+**同じではなかった。85% → 75%。** block=4 だけが落とした 2 問は `gcd_list`
+（`from functools import reduce` が**行ごと消えて** NameError）と
+`longest_common_prefix`。両方が落とした 3 問（run_length / transpose / rotate_list）は
+モデルの限界で decode とは無関係。
+
+**並列 decode の壊れ方は「文が丸ごと落ちる」である。** threshold 0.5 で
+`intervals.sort(...)` が消えたのと同じ形が、model card の推奨設定でも起きる。
+
+**block=8 は崖ではなく収穫逓減だった。** n=5 では 3/5 に見えたが n=20 では 70%。
+block 4→8 は **速度 +8% と引き換えに正解 −5 ポイント**なので、block=4 の方が良い
+取引である —— 理由は「8 で壊れるから」ではなく「8 が割に合わないから」。
+
+## 結果 4: 「checkpoint を合わせれば直る」は測って反証された
+
+SDAR は block 長ごとに別 checkpoint を配る（`-b8` `-b16` `-b32` `-b64`、無印が b4）。
+model card は `block_length=4 / denoising_steps=4` を推奨値として書く。そこで
+「block=8 の劣化は checkpoint 不一致では」と考え、b8 / b16 を取得して 2×2 を測った（n=5）。
+
+| checkpoint | decode block | 正解 | tok/forward |
+|---|---|---|---|
+| b4 | 4（一致） | 4/5 | 2.106 |
+| b4 | 8（不一致） | 3/5 | 2.259 |
+| b8 | 8（一致） | **2/5** | 2.348 |
+| b8 | 4（不一致） | 3/5 | 1.928 |
+| b16 | 16（一致） | **2/5** | 2.365 |
+| b16 | 4（不一致） | 3/5 | 2.081 |
+
+**一致させても戻らない。** b8@8（一致）は b4@8（不一致）より悪い。効いているのは
+checkpoint の一致ではなく **decode block を 4 に保つこと**で、それは checkpoint を
+跨いで成り立つ。**b8 / b16 checkpoint は素の性能自体が低い**（block 4 で回しても
+3/5 止まり）—— 学習時に品質を並列性と交換している。
+
 ## 見つけた欠陥 2 つ
 
 ### (1) mask 契約の静かな反転 —— AR control が捕まえた
@@ -150,8 +198,10 @@ distinct ratio と最長連続反復は、上の全セルで `問題なし` を�
 
 ## Decision
 
-1. **Phase 0 は通過とする。** ただし通過の内容は `tok/forward > 1` ではなく
-   **`AR と同じ実行正解率を保ったまま forward が 2.106 分の 1`** である。
+1. **Phase 0 は通過とする。** 通過の内容は `tok/forward > 1` ではなく
+   **`forward が 2.134 分の 1、実行正解率は 17/20 → 15/20`** である。
+   **利得は無料ではない** —— 10 ポイントの正解率と引き換えである。この交換を
+   受け入れるかは用途が決める（下書き生成は可、無検査の自動適用は不可）。
 2. **運転点は block=4 / threshold 0.9 に固定する。** block を上げる・閾値を下げる
    変更は、実行採点を同時に出さないかぎり採用しない。
 3. **以後、この系統の速度主張には実行採点を必ず併記する。** tok/forward 単独の
@@ -168,6 +218,9 @@ distinct ratio と最長連続反復は、上の全セルで `問題なし` を�
 - 日本語で利得がほぼ出ないことは、統一モデルの text 面の設計に効く。**並列 decode を
   日本語の応答速度の根拠にしない。**
 - 1.7B での測定である。スケールでの外挿はしていない。
+- **標本サイズが結論を決めた。** 5 問では「無料」に見え、20 問では 10 ポイントの
+  代償が見えた。この系統の主張には n と、harness が正例と負例の両方を出せることの
+  証明（`validate_tasks.py`）を必ず添える。
 
 ## 再現
 
