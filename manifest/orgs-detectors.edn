@@ -423,7 +423,11 @@
               CANNOT be a fleet gate twice over: it reads a superproject manifest AND
               it requires outbound HTTPS to cid.contact, and node egress is not
               uniform (measured 2026-08-13, 8 nodes 200 / zebulun 000)."
-   :argv     ["nbb" "{{repo}}/scripts/verify-ipni-publisher-record.cljs" "--findings"]
+   ;; --classpath is for `ipni.metadata`, which reads the advertisement's
+   ;; Metadata field. Required rather than reimplemented in the script: this
+   ;; workspace has already paid for two implementations of that one wire field.
+   :argv     ["nbb" "--classpath" "{{repo}}/orgs/kotoba-lang/io-ipni-specs/src"
+              "{{repo}}/scripts/verify-ipni-publisher-record.cljs" "--findings"]
    :cwd      :root
    :findings :protocol
    :evidence "SCANNED\t[1-9][0-9]*"
