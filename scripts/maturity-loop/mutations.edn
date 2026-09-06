@@ -745,7 +745,36 @@
      :file "src/appkit/core.cljc"
      :find "(merge default-list-view-opts opts)"
      :replace "(merge default-list-view-opts (select-keys opts [:surface]))"
-     :must-fail ["opts-appkit-knows-nothing-about-still-arrive-test"]}]}
+     :must-fail ["opts-appkit-knows-nothing-about-still-arrive-test"]}
+
+    ;; --- 両 wrapper を同じ契約で縛る（2026-09-06 追加）---------------------
+    ;; 上の 11 件は panel を固く、list-view を緩く守っていた。12 tests 時点の
+    ;; 実測: list-view の merge だけ逆順にする / published map に載っていない
+    ;; 既定を注入する —— **どちらも exit 0 で通った**。
+    ;; 前者は「panel は直っていて list-view が抜ける」というこの repo の
+    ;; 特徴的な壊れ方（`*-arity-1-bypasses-defaults` 2 件が在るのと同じ形）。
+    ;; 後者は published な既定 map が、値は主張どおりのまま **appkit の説明を
+    ;; やめる**形で、map の上に自前 opts を積む使い方が黙ってずれる。
+    {:id :appkit/list-view-merge-order-reversed
+     :why "呼び手の opts が既定に勝つことを **list-view 側でも**。panel の merge 順は初回から pin されていたが list-view は無防備だった"
+     :file "src/appkit/core.cljc"
+     :find "(ui/list-view rows (merge default-list-view-opts opts))"
+     :replace "(ui/list-view rows (merge opts default-list-view-opts))"
+     :must-fail ["list-view-caller-opts-win-test"]}
+
+    {:id :appkit/panel-undeclared-default
+     :why "published な `default-panel-opts` が appkit の足すもの**全部**であること。map に無い既定を注入しても、map 自体は主張どおりの値を保つので値を見る検査は全部通る"
+     :file "src/appkit/core.cljc"
+     :find "(ui/panel body (merge default-panel-opts opts))"
+     :replace "(ui/panel body (merge default-panel-opts {:id \"appkit-undeclared\"} opts))"
+     :must-fail ["published-default-maps-are-complete-test"]}
+
+    {:id :appkit/list-view-undeclared-default
+     :why "同上を list-view 側で —— 片方だけ完全な形を捕まえる"
+     :file "src/appkit/core.cljc"
+     :find "(ui/list-view rows (merge default-list-view-opts opts))"
+     :replace "(ui/list-view rows (merge default-list-view-opts {:class \"undeclared\"} opts))"
+     :must-fail ["published-default-maps-are-complete-test"]}]}
 
   {:repo "orgs/kotoba-lang/prolly-tree"
    :label "prolly-tree inclusion proof"
