@@ -18,12 +18,14 @@
 ;;      (tracked files are unaffected by exclude, so once main carries them
 ;;      nothing changes for fresh worktrees)
 ;;   4. rm -rf node_modules; pnpm install --frozen-lockfile --prefer-offline
-;;   5. floor check: node_modules/.bin has the same entries it had before
+;;   5. floor check: every .bin entry the repo can CALL (direct dep, or named in a
+;;      package.json script) is still there. Transitive bins npm used to link are
+;;      reported as a warning, not a failure.
 ;;
 ;; Never touches a worktree that is busy (process cwd inside it, or named on
 ;; a command line), locked, or whose repo cannot be found. Dry-run by default.
 ;;
-;;   nbb scripts/worktree-node-modules-dedupe.cljs [--root <dir>] [--repo orgs/<org>/<repo>] [--limit N] [--apply] [--force]
+;;   nbb scripts/worktree-node-modules-dedupe.cljs [--root <dir>] [--repo orgs/<org>/<repo>] [--limit N] [--only <worktree path>] [--apply] [--force]
 ;;   exit 0 = answered, 1 = a step failed, 2 = could not answer (lsof / pnpm missing, nothing scanned)
 (require '[clojure.string :as str])
 
@@ -38,6 +40,7 @@
 (def root (.resolve path (opt "--root" (.cwd js/process))))
 (def only-repo (opt "--repo" nil))
 (def limit (js/parseInt (opt "--limit" "100000") 10))
+(def only-path (opt "--only" nil))
 (def apply? (flag? "--apply"))
 (def receipt (.join path (.homedir os) ".gftd" "worktree-node-modules-dedupe.log"))
 
@@ -74,10 +77,15 @@
        (drop 1)))
 
 (defn busy-index []
+  ;; Every process whose argv names THIS script is excluded from the scan —
+  ;; not just our pid but the shells above us that carry `--only <path>` in
+  ;; their command line (a pid/ppid exclusion missed those, 2026-09-06).
   (let [lsof (sh "lsof -a -d cwd -F n 2>/dev/null") ps (sh "ps -axo command 2>/dev/null")]
     (when (and (= 0 (:exit lsof)) (not (str/blank? (:out lsof))))
       {:cwds (->> (str/split-lines (:out lsof)) (filter #(str/starts-with? % "n")) (map #(subs % 1)) set)
-       :cmds (:out ps)})))
+       :cmds (->> (str/split-lines (:out ps))
+                  (remove #(str/includes? % "worktree-node-modules-dedupe"))
+                  (str/join "\n"))})))
 (defn busy? [idx wt] (or (some #(or (= % wt) (str/starts-with? % (str wt "/"))) (:cwds idx)) (str/includes? (:cmds idx) wt)))
 
 (defn exclude! [repo]
@@ -93,6 +101,17 @@
 
 (defn bins [wt] (set (try (vec (.readdirSync fs (.join path wt "node_modules" ".bin"))) (catch :default _ []))))
 
+(defn callable-bins
+  "Names this worktree can actually invoke: bins of DIRECT dependencies plus any
+  word that appears in a package.json script. npm links every transitive bin
+  into .bin; pnpm links only direct ones. Losing a transitive bin nobody calls
+  is not a regression — losing one that a script names is."
+  [wt lost]
+  (let [pj (try (js/JSON.parse (.readFileSync fs (.join path wt "package.json") "utf8")) (catch :default _ #js {}))
+        direct (set (concat (js/Object.keys (or (.-dependencies pj) #js {})) (js/Object.keys (or (.-devDependencies pj) #js {}))))
+        scripts (str/join "\n" (js/Object.values (or (.-scripts pj) #js {})))]
+    (filter #(or (direct %) (re-find (re-pattern (str "(^|[^A-Za-z0-9_-])" % "([^A-Za-z0-9_-]|$)")) scripts)) lost)))
+
 (defn dedupe! [repo wt]
   (let [before-bins (bins wt) f0 (df-free wt)
         imp (if (exists? (.join path wt "pnpm-lock.yaml")) {:exit 0 :out "(pnpm-lock.yaml present)"} (sh "pnpm import" wt))]
@@ -104,15 +123,17 @@
           (let [f-rm (df-free wt)
                 ins (sh "pnpm install --frozen-lockfile --prefer-offline" wt)
                 after-bins (bins wt) f1 (df-free wt)
-                lost (remove after-bins before-bins)]
+                lost (remove after-bins before-bins)
+                lost-callable (callable-bins wt lost)]
             ;; two deltas, reported separately: what rm gave back and what the
             ;; install took. On a busy disk the sum is noisy; the second number
             ;; is the one that says whether the store is being shared.
             (cond (not= 0 (:exit ins)) {:ok false :step "pnpm install" :err (str/trim (or (:err ins) (:out ins)))}
-                  (seq lost) {:ok false :step "floor: .bin entries lost" :err (str/join "," lost)}
+                  (seq lost-callable) {:ok false :step "floor: callable .bin entries lost" :err (str/join "," lost-callable)}
                   :else {:ok true :rm-freed-mb (js/Math.round (/ (- f-rm f0) 1024))
                          :install-took-mb (js/Math.round (/ (- f-rm f1) 1024))
-                         :bins (count after-bins)}))))))
+                         :bins (count after-bins)
+                         :lost-transitive-bins (vec lost)}))))))
 
 (defn log! [m] (try (.mkdirSync fs (.dirname path receipt) #js {:recursive true})
                     (.appendFileSync fs receipt (str (js/JSON.stringify (clj->js m)) "\n")) (catch :default _ nil)))
@@ -124,7 +145,8 @@
     (println (str (if apply? "APPLY" "DRY-RUN") " root=" root " store=" (str/trim (:out (sh "pnpm store path")))))
     (doseq [repo (repos) wt (worktrees repo)
             :let [p (:path wt)]
-            :when (and (exists? (.join path p "package-lock.json")) (exists? (.join path p "node_modules")))
+            :when (and (or (nil? only-path) (= p only-path))
+                       (exists? (.join path p "package-lock.json")) (exists? (.join path p "node_modules")))
             :while (< (:done @c) limit)]
       (swap! c update :scanned inc)
       (cond
@@ -137,7 +159,8 @@
         :else (let [r (dedupe! repo p)]
                 (log! (merge {:at (.toISOString (js/Date.)) :repo (:rel repo) :path p} r))
                 (if (:ok r)
-                  (do (swap! c update :done inc) (println (str "DONE  " (:rel repo) "  " p "  rm freed " (:rm-freed-mb r) "MB, install took " (:install-took-mb r) "MB  .bin=" (:bins r))))
+                  (do (swap! c update :done inc) (println (str "DONE  " (:rel repo) "  " p "  rm freed " (:rm-freed-mb r) "MB, install took " (:install-took-mb r) "MB  .bin=" (:bins r)
+                                                (when (seq (:lost-transitive-bins r)) (str "  warn transitive .bin not linked (nothing calls them): " (str/join "," (:lost-transitive-bins r)))))))
                   (do (swap! c update :failed inc) (println (str "FAIL  " (:rel repo) "  " p "  " (:step r) ": " (:err r))))))))
     (let [{:keys [scanned done skipped failed]} @c]
       (println (str "SCANNED " scanned " done " done " skipped " skipped " failed " failed))
