@@ -11,7 +11,7 @@
   :source/dataset "substrate-fit"
   :arch/coverage true
   :arch/as-of "2026-09-06"
-  :arch/entries 19
+  :arch/entries 26
   :arch/rubric "manifest/substrate-fit-rubric.edn"
   :arch/adr "adr-2609061800-kotoba-web-architecture-fit"
   :arch/caveat "The substrate properties are checkable against the cited specs. The LEVEL assigned to each architecture is judgement, and so is the rubric. No gate produced these totals."
@@ -207,7 +207,7 @@
   :arch/name-ja "プロセスごとに状態を持つアクター（OTP 形）"
   :arch/cid-identity :mutable-cell :arch/structural-sharing :full-recompute
   :arch/fetch-locality :in-memory-only :arch/discoverability :session-bound
-  :arch/attenuation :capability-value :arch/effect-row :ambient
+  :arch/attenuation :unforgeable-bearer :arch/effect-row :ambient
   :arch/replay :nondeterministic :arch/pure-surface :needs-escaping-cell
   :arch/note "A pid is genuinely an unforgeable reference, which is the one axis it scores well on. Everything else is decided by the same fact: state that only a live process can see is state no CID can name, no peer can fetch and no log can replay."}
 
@@ -232,4 +232,86 @@
   :arch/fetch-locality :in-memory-only :arch/discoverability :session-bound
   :arch/attenuation :acl-lookup :arch/effect-row :injected-untyped
   :arch/replay :idempotent-only :arch/pure-surface :needs-macro-or-dynamic
-  :arch/note "Included because it is the thing most often reached for when someone wants what this substrate already gives. A container assembles a graph of live objects at startup; content addressing assembles a graph of values that were already assembled by whoever hashed them."}]
+  :arch/note "Included because it is the thing most often reached for when someone wants what this substrate already gives. A container assembles a graph of live objects at startup; content addressing assembles a graph of values that were already assembled by whoever hashed them."}
+
+ ;; ------------------------------------------- existing systems, added 2026-09-06
+ ;; Asked which shipped system is closest, these are the answers, scored rather
+ ;; than described. They are not adoption candidates -- most are not reachable
+ ;; from Kotoba -- but where one of them scores well on an axis, it is worth
+ ;; knowing that somebody has already shown the axis can be satisfied at all.
+ {:db/id -30 :source/dataset "substrate-fit"
+  :arch/id "ipvm-ucan-wnfs" :arch/layer :compute
+  :arch/evidence "https://github.com/ipvm-wg/spec"
+  :arch/name "IPVM + UCAN + WNFS (content-addressed computation)"
+  :arch/name-ja "IPVM + UCAN + WNFS（content-addressed な計算）"
+  :arch/cid-identity :definition-and-value :arch/structural-sharing :merkle-diff-free
+  :arch/fetch-locality :index-then-leaf :arch/discoverability :cid-plus-indexer
+  :arch/attenuation :offline-attenuable-token :arch/effect-row :effect-as-value
+  :arch/replay :execution-cid :arch/pure-surface :pure-with-result
+  :arch/note "The closest existing system to the whole stack, and the only one that reaches the Execution IR from the other direction: an invocation names its task, its effects and its authority, and the receipt is the CID of what happened. It has no interface layer, and its maturity is spec-stage rather than shipped."}
+
+ {:db/id -31 :source/dataset "substrate-fit"
+  :arch/id "atproto-mst" :arch/layer :durable
+  :arch/evidence "https://atproto.com/specs/repository"
+  :arch/name "AT Protocol repository (Merkle Search Tree + CAR + firehose)"
+  :arch/name-ja "AT Protocol リポジトリ（MST + CAR + firehose）"
+  :arch/cid-identity :value-cid :arch/structural-sharing :merkle-diff-free
+  :arch/fetch-locality :index-then-leaf :arch/discoverability :cid-plus-indexer
+  :arch/attenuation :acl-lookup :arch/effect-row :declared-list
+  :arch/replay :pure-fold :arch/pure-surface :pure-with-result
+  :arch/note "The one entry here running at scale. A repository is a Merkle Search Tree of DAG-CBOR records, synced as CAR, and an AppView is a fold over the firehose -- log plus indexer, shipped. It is worth reading for the axis it drops: authority is a DID and an OAuth session, so nothing attenuates, and that is the layer this workspace supplies from elsewhere."}
+
+ {:db/id -32 :source/dataset "substrate-fit"
+  :arch/id "automerge-local-first" :arch/layer :convergence
+  :arch/evidence "https://automerge.org/docs/under-the-hood/change_graph/"
+  :arch/name "Automerge (hashed change DAG)"
+  :arch/name-ja "Automerge（ハッシュ付き change DAG）"
+  :arch/cid-identity :value-cid :arch/structural-sharing :merkle-diff-free
+  :arch/fetch-locality :bounded-frontier :arch/discoverability :cid-only
+  :arch/attenuation :acl-lookup :arch/effect-row :declared-list
+  :arch/replay :pure-fold :arch/pure-surface :pure-with-result
+  :arch/note "Changes are hashed and form a DAG, and sync is an exchange of heads followed by what is missing -- the convergence row with an implementation behind it. Authority is explicitly out of scope in the local-first literature, which is why it scores where a merged model would not."}
+
+ {:db/id -33 :source/dataset "substrate-fit"
+  :arch/id "willow-meadowcap" :arch/layer :convergence
+  :arch/evidence "https://willowprotocol.org/specs/meadowcap/index.html"
+  :arch/name "Willow + Meadowcap (range sync with attenuable capabilities)"
+  :arch/name-ja "Willow + Meadowcap（減衰可能な capability つき範囲同期）"
+  :arch/cid-identity :value-cid :arch/structural-sharing :merkle-diff-free
+  :arch/fetch-locality :bounded-frontier :arch/discoverability :cid-only
+  :arch/attenuation :offline-attenuable-token :arch/effect-row :declared-list
+  :arch/replay :pure-fold :arch/pure-surface :pure-with-result
+  :arch/note "The only existing sync protocol that puts attenuable capabilities in the protocol rather than beside it: Meadowcap delegations narrow over a three-dimensional range, and reconciliation is fingerprint-based over that range. It is what Automerge scores badly on and what biscuit supplies here separately."}
+
+ {:db/id -34 :source/dataset "substrate-fit"
+  :arch/id "hypercore-holepunch" :arch/layer :durable
+  :arch/evidence "https://docs.pears.com/building-blocks/hypercore"
+  :arch/name "Hypercore / Holepunch (merkle tree over an append-only log)"
+  :arch/name-ja "Hypercore / Holepunch（append-only log 上の merkle tree）"
+  :arch/cid-identity :merkle-state :arch/structural-sharing :merkle-diff-free
+  :arch/fetch-locality :bounded-frontier :arch/discoverability :cid-plus-indexer
+  :arch/attenuation :unforgeable-bearer :arch/effect-row :ambient
+  :arch/replay :pure-fold :arch/pure-surface :pure-with-result
+  :arch/note "Closest existing thing to one-pack-per-transition with sparse retrieval: a merkle tree over an append-only log, replicated by range, discovered by key. The key is the read capability and it is all or nothing, which is the level between an unforgeable value and one that narrows."}
+
+ {:db/id -35 :source/dataset "substrate-fit"
+  :arch/id "spritely-goblins" :arch/layer :coordination
+  :arch/evidence "https://spritely.institute/goblins/"
+  :arch/name "Spritely Goblins (object capabilities + deterministic replay)"
+  :arch/name-ja "Spritely Goblins（object capability + 決定的 replay）"
+  :arch/cid-identity :immutable-value :arch/structural-sharing :persistent-structural
+  :arch/fetch-locality :in-memory-only :arch/discoverability :origin-server
+  :arch/attenuation :capability-value :arch/effect-row :injected-untyped
+  :arch/replay :deterministic-with-log :arch/pure-surface :needs-escaping-cell
+  :arch/note "The Lisp answer, and the only entry that gets attenuation right without a token format: a facet is a proxy that grants less than what it wraps. Its transactional heap replays deterministically, which is where its time travel comes from. Nothing about it is content-addressed, so the top four axes have nothing to grip."}
+
+ {:db/id -36 :source/dataset "substrate-fit"
+  :arch/id "incremental-sac" :arch/layer :interface
+  :arch/evidence "https://opensource.janestreet.com/incremental/"
+  :arch/name "Self-adjusting computation (Incremental / Adapton)"
+  :arch/name-ja "自己調整計算（Incremental / Adapton）"
+  :arch/cid-identity :mutable-cell :arch/structural-sharing :normalized-graph
+  :arch/fetch-locality :in-memory-only :arch/discoverability :session-bound
+  :arch/attenuation :ambient-session :arch/effect-row :ambient
+  :arch/replay :idempotent-only :arch/pure-surface :needs-escaping-cell
+  :arch/note "Included because it is the nearest IDEA to a merkle document UI: the update set is derived rather than computed by comparing two outputs. It is keyed by node identity in a dependency graph built at run time, not by content, and that one substitution is the whole difference -- a graph nobody can name, fetch or replay."}]
