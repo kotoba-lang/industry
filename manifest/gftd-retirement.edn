@@ -271,6 +271,33 @@
   :on-the-repository-itself
   "Extracting does not shrink it. The 7.4 GB is deleted history — training checkpoints (.npz, *_adapters.safetensors) and compiled binaries (murakumo-kubelet, runpod-kubelet, crossplane-cli) committed and later removed, under projects/ai-gftd-project-*. Shrinking needs history rewriting, which CLAUDE.md requires confirmation for. Extract what is original, then archive the repository as the record it is."}
 
+ ;; ── the 50-infra extraction, and what removal actually costs ────────────
+ :chain-contracts-extraction
+ {:landed "cloud-itonami/chain-contracts, private, commit c740698a"
+  :from "gftdcojp/apps-gftdcojp @ 201b41cf, path 50-infra/vultr/geth-private/"
+  :what "Fifteen original Solidity contracts for private chain 260425 -- actor and agent identity, their registries, escrows, and the GCC stablecoin -- with Foundry scripts, tests and the RUNBOOKs. 49 files, 396 KB."
+  :separated-from "contracts/lib/ was 90 of the 126 MB of 50-infra and is FOUR VENDORED SUBMODULES (forge-std, solady, coinbase/smart-wallet, openzeppelin-contracts-v4), re-declared as submodules in the new repository instead of copied. cache/ and broadcast/ are build and deploy artifacts and were left behind."
+  :contract-names-not-renamed
+  "Several still say Gftd. They name DEPLOYED code and contracts/ADDRESSES.md.edn records the addresses; renaming the source would not rename the deployment, it would only stop the source describing it. The repository name carries the retirement; the contract names carry the chain."
+  :content-not-history
+  "apps-gftdcojp is 8.4 GB and a subtree split would have cost more than it returned. The history stays there at that path and that sha, and the new README says so rather than leaving a reader to wonder."
+  :todo "NOT YET REGISTERED IN WEST. An unregistered repository is invisible to `ls`, `find` and grep -- the exact failure CLAUDE.md's search rule exists for. Register via repos.edn :extra-projects + gen-west-manifest.cljs --entry."}
+
+ :apps-gftdcojp-removal-plan
+ {:asked "vultr, geth などは除去してok, checkpoint なども除去してok"
+  :two-different-operations
+  "Removing them from the TREE is an ordinary commit and reclaims nothing -- the repository is 5.6 GB because of what is in its HISTORY, not its tree. Removing them from the history is a rewrite, and a rewrite means force-push, which CLAUDE.md places outside the standing authorisation and requires confirmation for. This instruction is that confirmation for THIS repository; recording it so the next reader does not have to infer it."
+  :what-the-purge-would-drop
+  ["projects/ai-gftd-project-*/**/checkpoints/**  (.npz and *_adapters.safetensors, 74-92 MB each)"
+   "50-infra/k8s/{murakumo,runpod}-kubelet  (compiled binaries, 86 MB each)"
+   "projects/ai-gftd-project-drive/**/crossplane-cli  (64 MB)"
+   "50-infra/vultr/**  (the chain infrastructure, now extracted)"]
+  :preconditions
+  ["A verified mirror bundle of the 5.6 GB repository FIRST. Every deletion this session was bundled before it happened and one of those bundles was wrong on the first attempt; a rewrite is less reversible than a delete, not more."
+   "git-filter-repo is installed (/opt/homebrew/bin/git-filter-repo) and 37 GB is free."
+   "The four vendored submodules and Git LFS pointers need checking before the run: filter-repo rewrites .gitmodules and LFS pointers are ordinary blobs."]
+  :not-done-yet "Stated rather than started. A rewrite of an 8 GB repository is not something to begin at the end of a turn."}
+
  :renames
  [;; SUPERSEDED by :wave-2-result above for the cloud-itonami rows -- kept
   ;; because the reasoning is what the gftdcojp rows still rest on.
