@@ -9,6 +9,7 @@
 ;;   nbb scripts/cleanup-land.cljs --apply --names a,b ; 対象を限定
 ;;   nbb scripts/cleanup-land.cljs --apply --max 20    ; 上限（残りは報告して打切り）
 ;;   nbb scripts/cleanup-land.cljs --apply --branches  ; :branches も処理（push / PR。merge しない）
+;;   nbb scripts/cleanup-land.cljs --apply --only-branches ; :branches だけ（:review を再生成しない）
 ;;
 ;; ── なぜ一律 merge しないか（重要） ────────────────────────────────────
 ;; UNLANDED を1種類として扱うと安全性が壊れる。危険度ではなく「main を壊しうるか」で
@@ -61,7 +62,14 @@
 (defn- opt [flag] (second (drop-while #(not= % flag) args)))
 (def only-names (some-> (opt "--names") (str/split #",") set))
 (def max-repos (some-> (opt "--max") parse-long))
-(def branches? (argset "--branches"))
+(def only-branches? (argset "--only-branches"))
+;; `--branches` は :additive / :review も一緒に走らせる。ところが cleanup-land は
+;; ローカル WIP を決して消さない（安全床）ので、再実行のたびに同じ未コミット
+;; ファイルから同じ preservation PR を作り直す。一度 triage して close した PR が
+;; 次の run で復活するため、branch だけを処理したいときに :review を巻き添えに
+;; できない（実測 2026-09-06: --branches を回したら 44 repo / 37 PR が全て前日に
+;; close 済みの PR の再生成だった)。--only-branches はその巻き添えを外す。
+(def branches? (or (argset "--branches") only-branches?))
 (def stamp
   "Archive directory suffix. Derived from today, not hardcoded: a fixed
   stamp makes every run write into the SAME .git/stash-archive-<stamp>/
@@ -1355,6 +1363,13 @@
     :else nil))
 
 (defn- land-repo! [{:keys [dir slug base additive skipped tracked deleted]}]
+  ;; --only-branches: :additive / :review を空にして branch だけの経路へ落とす。
+  ;; 「見なかったこと」にはせず、下で件数を named skip として印字する。
+  (let [held-additive additive held-tracked tracked
+        additive (if only-branches? [] additive)
+        tracked  (if only-branches? [] tracked)
+        deleted  (if only-branches? [] deleted)
+        skipped  (if only-branches? {} skipped)]
   ;; canonical 化はここ（着地対象がある repo だけ）。plan 段階ではやらない。
   (let [branch-work? (and branches? (seq (live-branches dir base)))
         ;; raw-slug（= remote が実在するか）と slug（= canonical 化して着地に使う名）
@@ -1382,6 +1397,9 @@
         _ (when (and slug (not (contains? @slug-claims slug)))
             (swap! slug-claims assoc slug dir))]
   (println (format "\n%s  (%s)" dir (or slug raw-slug "no-remote")))
+  (when (and only-branches? (or (seq held-additive) (seq held-tracked)))
+    (println (format "  skip only-branches  :additive %d / :review %d 件（--only-branches のため今回は着地させない）"
+                     (count held-additive) (count held-tracked))))
   (when (seq deleted)
     (println (format "  skip deleted        %d 件（削除は main に適用しない）: %s"
                      (count deleted) (str/join ", " (take 4 deleted)))))
@@ -1616,7 +1634,7 @@
                                       true))]
                 (println (format "  :review   %d files → %s （draft・merge しない）" files url)))
               (println "  :review   commit に失敗（報告のみ、ローカルは無傷）"))))
-        (when branches? (land-branches! dir slug base)))))))
+        (when branches? (land-branches! dir slug base))))))))
 
 (defn- live-branches
   "default branch から到達できないローカル branch。"
