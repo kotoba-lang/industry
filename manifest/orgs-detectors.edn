@@ -3370,9 +3370,13 @@
               すべてが『Actions が repo 全体で無効だから前回の artifact は失敗せずに
               古くなった』と書いていたが、GitHub に訊くと {\"enabled\":true} だった ——
               **理由の側が偽になっていた**ので、理由を読まずに時刻と commit を数える。
-              初回の実測（kotoba-lang の 8 件）で 2 件が HTTP 404 を返し、うち
-              kototama は build 記録が status: building のまま 2026-08-05 から動かず、
-              その後 main に 51 commit が着地していた。"
+              全件（8 org / Pages 有効 524 repo）で測ると: **URL が 200 を返さない 52**、
+              build 記録あり 496、build より後に commit が在る 444（うち status が
+              built でないもの 6 —— building 5 / errored 1）、遅れの中央値 5・最大 51。
+              444 を 1 件ずつ finding にすると使われなくなるので、**個別 finding は
+              境界が導出できる 2 つ**（開けない / build が完了していない）に限り、
+              残りは母数と最悪値を持つ 1 行の集計 finding にした。列挙しないことと
+              数えていないことは別である。"
    :argv ["nbb" "{{repo}}/scripts/verify-pages-freshness.cljs" "--findings"]
    :cwd :root
    :findings :protocol

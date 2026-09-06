@@ -42,6 +42,29 @@
 ;; 動かず、**URL は 404**。build 記録の有無と、人が開けるかどうかは別の問い。
 ;; だから両方引く。
 ;;
+;; ## 全件で測ったら、片方の class は finding にならなかった（2026-09-08）
+;;
+;; 8 org・**Pages 有効 524 repo**で走らせた結果:
+;;
+;;     URL が 200          472        URL が 200 を返さない   **52**
+;;     build 記録あり      496        記録なし（workflow 等）   28
+;;     build より後に commit  444     うち status built 437 / building 5 / errored 1
+;;                                    中央値 5 commit、最大 51
+;;
+;; **444 件を 1 件ずつ finding にすると、この検出器は使われなくなる**（この
+;; workspace 自身の規則: 当たりすぎる索引は当たらない索引と同じ）。しかも
+;; 「build より後に commit が在る」は欠陥ではない —— README だけの commit なら
+;; site は正しいままで、それはこの docstring が最初から言っていることである。
+;;
+;; だから **finding にするのは境界が導出できる 2 つだけ**にした:
+;;
+;;   ① URL が 200 を返さない        —— 人が開けない。欠陥である
+;;   ② build が完了していない       —— status が built でない（building / errored）。
+;;                                     kototama は 2026-08-05 から building のまま
+;;
+;; 残りは **1 行の集計 finding** にして母数と最悪値を持たせる。個別に列挙しない
+;; ことと、数えていないことは別である。
+;;
 ;; ## 答えられなかったときは答えない
 ;;
 ;; - org の一覧が引けなかった → **exit 2**（0 でも 1 でもない）。一覧が空なのと
@@ -164,6 +187,9 @@
               not-serving (remove serving? rows)
               built       (filter :build rows)
               stale       (filter #(and (:behind %) (pos? (:behind %))) built)
+              ;; **完了しなかった build** は、遅れているのとは別の欠陥。
+              unfinished  (filter #(and (:build %) (not= "built" (:status (:build %)))) rows)
+              plain-stale (remove (set unfinished) stale)
               no-record   (remove :build rows)]
           (println (str "SERVING\t" (count (filter serving? rows)) "\tURL が 200 を返した"))
           (println (str "BUILD-RECORD\t" (count built) "\tbuild 記録が引けた（残り "
@@ -195,16 +221,29 @@
                         (count (filter serving? no-record)) " 件は URL が 200 を返している。"))
           (when findings?
             (println)
+            ;; ① 人が開けない。これは欠陥なので 1 件ずつ出す。
             (doseq [r (sort-by :repo not-serving)]
               (println (str "FINDING\twarn\tpages-url-not-serving\t" (:repo r)
                             "\t" (:url (:cfg r)) " returned " (or (:http r) "no answer")
                             "; build record " (or (:created (:build r)) "absent")
                             " (" (or (:status (:build r)) (:status (:cfg r))) ")")))
-            (doseq [r (sort-by (comp - :behind) stale)]
-              (println (str "FINDING\twarn\tpages-behind-default-branch\t" (:repo r)
-                            "\t" (:behind r) (when (:capped? r) "+ (capped)")
-                            " commits landed on " (:branch r)
-                            " after the site was last built (" (:created (:build r)) ")"))))
+            ;; ② build が完了していない。これも 1 件ずつ。
+            (doseq [r (sort-by :repo unfinished)]
+              (println (str "FINDING\twarn\tpages-build-never-completed\t" (:repo r)
+                            "\tlast build is " (:status (:build r)) " since "
+                            (:created (:build r))
+                            (when (:behind r) (str "; " (:behind r) " commits landed since")))))
+            ;; 残りは母数のまま 1 行。**列挙しないことと数えていないことは別。**
+            (when (seq plain-stale)
+              (let [worst (first (sort-by (comp - :behind) plain-stale))]
+                (println (str "FINDING\tinfo\tpages-behind-default-branch-population\t"
+                              (count plain-stale) " repos"
+                              "\t" (count plain-stale) " of " (count built)
+                              " sites with a completed build have commits on their default"
+                              " branch since; worst " (:repo worst) " at " (:behind worst)
+                              (when (:capped? worst) "+")
+                              ". Listed in full in this run's output, not as findings:"
+                              " a commit that touched only a README leaves the site correct.")))))
           (.exit js/process (if (or (seq not-serving) (seq stale)) 1 0)))))))
 
 (-main)
