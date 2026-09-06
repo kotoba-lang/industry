@@ -7837,5 +7837,54 @@
      :file "src/statclerk/ledger.cljc"
      :find "    verdict (assoc :verdict (select-keys verdict\n                                         [:ok? :hard? :escalate? :confidence :violations]))"
      :replace "    verdict (assoc :verdict verdict)"
-     :must-fail ["a-hold-keeps-only-the-verdict-summary"]}]}]}
-  ]}
+     :must-fail ["a-hold-keeps-only-the-verdict-summary"]}]}
+
+  {:repo "orgs/cloud-itonami/cloud-itonami-isco-4226"
+   :label "reception desk —— この受付が『行ってよい操作』の目録が、実際に効いていること"
+   ;; この actor の governor は当初、op について 2 つのことしか列挙していなかった:
+   ;; どれが slot を要るか（:schedule-appointment）と、どれが escalate するか
+   ;; （:send-confirmation）。**どれを行ってよいかは列挙していなかった**ので、
+   ;; :op は allow-by-default だった —— 他のどんな keyword も hard rule を 1 つも
+   ;; 踏まず、floor を超える confidence で record を commit した。
+   ;;
+   ;; 実測（2026-09-06、graph を通して）: `:op :issue-refund` を confidence 0.95 で
+   ;; 出すと :disposition :commit に達し、store に払い戻しの record が書かれた
+   ;; （:violations は空）。同じ経路で `:op :unknown`（advisor/parse-proposal が
+   ;; 壊れた LLM 応答に対して出す値）は low-confidence の **escalation** として届き、
+   ;; 人間の承認者が commit に署名できた。
+   ;;
+   ;; 目録を `src/reception/operations.cljc` に置き、governor の op 依存の判断 3 つ
+   ;; （認可 / slot 検査の要否 / escalation）を全部そこから導くようにした。ここの
+   ;; mutation が確かめるのは **目録が飾りでないこと** —— entry を消せばその操作が
+   ;; 拒否され、:external-send? を倒せば人間の署名が外れる。M2 と M3 が
+   ;; **この変更より前から在るテスト**を赤くするのがその証拠。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :reception/authorization-dropped
+     :why "governor が目録を参照しなくなる。**認可検査そのものを外す形**（実際に起こりうる退行）。実測 2026-09-06: 6 件が赤、巻き添えなし —— 壊した検査と、赤くなった検査の名前が一致する"
+     :file "src/reception/governor.cljc"
+     :find "      (not authorized?)\n      (conj {:rule :unauthorized-operation"
+     :replace "      false\n      (conj {:rule :unauthorized-operation"
+     :must-fail ["hard-on-operation-outside-the-catalog"
+                 "unauthorized-operation-is-not-approvable"
+                 "hard-on-the-llm-parse-failure-op"
+                 "missing-op-is-refused"
+                 "actor-holds-an-unauthorized-operation-and-writes-nothing"
+                 "actor-never-interrupts-for-an-unauthorized-operation"]}
+
+    {:id :reception/catalog-entry-removed
+     :why "目録から :take-message が消える。**この変更より前から在る escalates-low-confidence が赤くなる** —— そのテストは :op :take-message を使っており、目録から落ちた瞬間に escalation ではなく hard hold になる。目録が既存の振る舞いを支えている証拠"
+     :file "src/reception/operations.cljc"
+     :find "   :take-message\n   {:requires-slot?  false\n    :external-send?  false\n    :description     \"Record a message from a caller for the client to collect.\"}\n\n"
+     :replace ""
+     :must-fail ["catalog-is-the-authority-list" "escalates-low-confidence"]}
+
+    {:id :reception/external-send-flipped
+     :why "目録の :send-confirmation で :external-send? を倒す = **その操作の人間署名が外れる**。boolean 1 つで既存テスト 2 件（escalates-confirmation-send / interrupts-then-sends-confirmation-on-human-approval）が赤くなる。目録が『述べている』のではなく『効いている』ことを、最も直接に示す mutation"
+     :file "src/reception/operations.cljc"
+     :find "   :send-confirmation\n   {:requires-slot?  false\n    :external-send?  true"
+     :replace "   :send-confirmation\n   {:requires-slot?  false\n    :external-send?  false"
+     :must-fail ["catalog-drives-escalation"
+                 "escalates-confirmation-send"
+                 "interrupts-then-sends-confirmation-on-human-approval"]}]}]}
