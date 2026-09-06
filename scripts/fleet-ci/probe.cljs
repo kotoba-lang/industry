@@ -114,6 +114,22 @@
     "echo wasmpin=$HOME/.gftd/wasm-pin/bin"
     "echo wasmtools=$(PATH=$HOME/.gftd/wasm-pin/bin:$PATH command -v wasm-tools)"
     "echo wasmtoolsv=$(PATH=$HOME/.gftd/wasm-pin/bin:$PATH wasm-tools --version 2>/dev/null | awk '{print $2}')"
+    ;; **npm egress, measured rather than assumed.** Root CLAUDE.md records
+    ;; this workspace writing the same value down twice as a constant and
+    ;; being wrong both times: "到達可能な 10 ノード全部で 200" was measured
+    ;; on 2026-08-05 and quoted for weeks, and on 2026-08-13 zebulun answered
+    ;; 000 for registry.npmjs.org while eight others answered 200. Measured
+    ;; again 2026-09-06: zebulun 000, simeon 000, judah 200, dan 200.
+    ;;
+    ;; It belongs here for the same reason `zig` and `wasmtime` do — a probe
+    ;; is re-run, and a comment is not. A gate whose entry needs `npm install`
+    ;; on a node without egress goes red for a reason that has nothing to do
+    ;; with the code it is checking, which is the failure mode this cap
+    ;; exists to remove.
+    ;;
+    ;; The registry, not github.com or 1.1.1.1: what the `:nbb-test` npm step
+    ;; actually reaches for. A node can have one and not the other.
+    "echo npmreg=$(curl -sS -o /dev/null -m 10 -w '%{http_code}' https://registry.npmjs.org/ 2>/dev/null || echo 000)"
     "echo wasmtime=$(command -v wasmtime)"
     "echo wasmtimev=$(wasmtime --version 2>/dev/null | awk '{print $2}')"
     ;; `wac` is the third tool amu's component tests reach for, and the reason
@@ -207,7 +223,7 @@
   clojure の maven cache / tarball 展開が数 GB 食うため — 空き 1–2GB のノードに
   JVM gate を投げると途中で落ちて false fail になる（naphtali/issachar が実際に
   この状態）。"
-  [{:keys [reachable? javahome clojure npx zig kotoba wasmtools wasmtime wac rosetta curl tar host] :as n}]
+  [{:keys [reachable? javahome clojure npx zig kotoba wasmtools wasmtime wac rosetta curl tar host npmreg] :as n}]
   (if (or (not reachable?) (contains? operator-hosts host))
     (assoc n :caps #{} :max-parallel 0
            :role (if (contains? operator-hosts host) :operator :unreachable))
@@ -249,12 +265,22 @@
           ;; recorded below rather than compared here -- this file must not
           ;; carry a copy of another repo's pin.
           wasm-tools? (and jvm? (seq wasmtools) (seq wasmtime) (seq wac)
-                           (= "yes" rosetta))]
+                           (= "yes" rosetta))
+          ;; `:egress` means the node can reach the npm registry — nothing
+          ;; wider. 000 is curl's "no answer at all", which is what a node
+          ;; behind the tailnet with no route out returns; anything 2xx/3xx
+          ;; counts, because npm follows redirects and a proxy answering 301
+          ;; is still a reachable registry. A 4xx/5xx is a registry that
+          ;; answered, so it is reachable too — the cap is about the route,
+          ;; not about the registry's health.
+          egress? (and node? (re-matches #"[1-5]\d\d" (str npmreg)))]
       (assoc n
              :cores cores
              :free-gb free
+             :npm-registry-status (str npmreg)
              :caps (cond-> #{} jvm? (conj :jvm) node? (conj :node) zig? (conj :zig)
-                           kotoba? (conj :kotoba) wasm-tools? (conj :wasm-tools))
+                           kotoba? (conj :kotoba) wasm-tools? (conj :wasm-tools)
+                           egress? (conj :egress))
              ;; 1 gate ≒ 1 JVM + maven。10 コアで 2 本までに抑える（他の
              ;; fleet 用途 — 推論・マイニング — と同居している前提）。
              :max-parallel (max 1 (min 2 (quot cores 4)))))))
@@ -265,7 +291,15 @@
 ;; function directly is landing a cap that has never once been seen to appear.
 (defn self-test! []
   (let [fails (atom 0)
-        check (fn [ok? label] (when-not ok? (swap! fails inc) (println "FAIL" label)))
+        ran (atom 0)
+        ;; `ran` exists because the count in the summary used to be the
+        ;; literal `10`, written when there were ten cases. Six more were
+        ;; added on 2026-09-06 and the line went on saying ten — a number
+        ;; that reports how many cases somebody once wrote, not how many
+        ;; ran, which is the shape this workspace keeps having to correct.
+        check (fn [ok? label]
+                (swap! ran inc)
+                (when-not ok? (swap! fails inc) (println "FAIL" label)))
         base {:host "t" :reachable? true :cores 10 :freegb "40"
               :curl "/usr/bin/curl" :tar "/usr/bin/tar" :loopback "yes"
               :javahome "/jdk" :clojure "/bin/clojure" :npx "/bin/npx"}
@@ -290,13 +324,34 @@
            "nor wasm-tools + wac without wasmtime")
     (check (not (contains? (caps-of (dissoc full :wasmtools)) :wasm-tools))
            "nor wasmtime + wac without wasm-tools")
+    ;; :egress — the cap that decides whether a gate whose `npm install` must
+    ;; work is allowed to land on a node. Every one of these was a real state
+    ;; on this fleet on 2026-09-06: judah and dan answered 200, zebulun and
+    ;; simeon answered 000.
+    (check (contains? (caps-of {:npmreg "200"}) :egress)
+           "a node that reaches the registry earns :egress")
+    (check (not (contains? (caps-of {:npmreg "000"}) :egress))
+           "000 is curl's no-answer-at-all — zebulun and simeon, measured")
+    (check (not (contains? (caps-of {}) :egress))
+           "and a MISSING measurement is not egress either. An unprobed node
+            must not inherit the cap by silence — that is the same shape as
+            reporting a check that could not run as a check that passed")
+    (check (contains? (caps-of {:npmreg "301"}) :egress)
+           "a redirect is a reachable registry; npm follows it")
+    (check (contains? (caps-of {:npmreg "503"}) :egress)
+           "so is a 5xx. The cap is about the ROUTE, not the registry's health
+            — withholding it there would make a gate's placement depend on
+            somebody else's outage")
+    (check (not (contains? (caps-of {:npmreg "200" :npx ""}) :egress))
+           "no npx, no :egress: there is nothing to run npm with, and the cap
+            is only ever asked for by node gates")
     (check (not (contains? (caps-of (assoc full :javahome "" :clojure "")) :wasm-tools))
            "without a JVM the cap is withheld: there is no gate that wants these
             without one, and a cap nothing can use is a promise that misleads")
     (check (empty? (:caps (classify (assoc base :reachable? false))))
            "an unreachable node carries no caps at all")
     (if (zero? @fails)
-      (println "probe: self-test OK (10 cases)")
+      (println (str "probe: self-test OK (" @ran " cases)"))
       (do (println "probe: self-test FAILED" @fails) (js/process.exit 1)))))
 
 (defn edn-node [n]
