@@ -124,6 +124,16 @@ ipfs.tech → tech-ipfs (tech-ipfs-specs-*)  boj.or.jp → jp-or-boj
 - 実測 2026-08-04: origin 面 1,432 のうち検査済み 99、うち **77 が誤配置**。一括改名は
   しない（規則が縛るのは新規登録）。既存の逸脱は `:gaps` に日付付きで記録済み。
 
+**例外は 1 つだけ: `gftd` の退役**（オーナー指示 2026-09-06、`manifest/gftd-retirement.edn`）。
+上の 2 条 ——「ドメイン移転で改名しない」と「一括改名はしない」—— は**生きている出所の
+ゆらぎ**を縛るものであって、**退役した会社の identity が live なインフラに名前を付け続けて
+いる**状態には適用しない、というのがオーナー判断。**この例外を他の repo 群に広げない** ——
+広げたければ同じように名指しの指示と、退役の根拠と、面ごとの改名表が要る。表・測定値・
+実行順・オーナーにしか決められない 6 件は retirement plan が持つ。⚠ **`gftdcojp` org の
+login 変更はこの workspace の token ではできない**（`admin:org` scope 無し。org admin では
+あるが token が違う。かつ org login は Settings UI の操作）。`~/.gftd/` も `mv` ではなく
+段階移行 —— fleet-ci 署名鍵と aiueos boot seed が入っていて、稼働中 45 job が読んでいる。
+
 ## 標準作業の常時許可（standing authorization）
 
 新規 project の scaffold → 登録フロー（ADR 起票 → 子リポ scaffold → GitHub repo
