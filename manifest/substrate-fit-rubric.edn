@@ -91,6 +91,7 @@
    :levels {:offline-attenuable-token {:score 10 :means "a token that verifies offline and can only be narrowed as it is delegated"}
             :capability-value  {:score  9 :means "an unforgeable value is passed; narrowing is possible by construction"}
             :declared-import   {:score  8 :means "declared imports intersected with a policy at admission"}
+            :unforgeable-bearer {:score 7 :means "an unforgeable reference that grants exactly what it grants and cannot be narrowed -- a read key, a pid, an ocap with no facet"}
             :scoped-context    {:score  5 :means "a context object carries rights by convention"}
             :acl-lookup        {:score  3 :means "the receiver looks the caller up in a table"}
             :ambient-session   {:score  1 :means "a session or a global user decides"}}}
