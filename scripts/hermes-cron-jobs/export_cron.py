@@ -52,6 +52,13 @@ CRED_RES = [
 ]
 
 
+def strip_repeat(repeat):
+    """Definition half of `repeat`, without the run counter."""
+    if not isinstance(repeat, dict):
+        return repeat
+    return {k: v for k, v in repeat.items() if k != "completed"}
+
+
 def redact_check(text):
     hits = []
     for rx in CRED_RES:
@@ -95,7 +102,14 @@ def main():
                 "no_agent": j.get("no_agent"),
                 "enabled_toolsets": j.get("enabled_toolsets"),
                 "context_from": j.get("context_from"),
-                "repeat": j.get("repeat"),
+                # `repeat` carries BOTH a definition (`times`, how many
+                # runs were asked for) and state (`completed`, how many
+                # have happened). Keeping `completed` made the ledger go
+                # stale on every single execution across all 184 jobs,
+                # so `--check` was permanently red and could never be
+                # the fleet gate this README offers it as. Strip the
+                # counter, keep the intent.
+                "repeat": strip_repeat(j.get("repeat")),
             }
             full_text = json.dumps(entry, ensure_ascii=False)
             creds = redact_check(full_text)

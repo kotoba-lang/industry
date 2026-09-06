@@ -25,6 +25,20 @@ python3 scripts/hermes-cron-jobs/export_cron.py          # 再生成
 python3 scripts/hermes-cron-jobs/export_cron.py --check  # 差分検査 (CI/fleet gate にも使える)
 ```
 
+`--check` が検出するのは **定義の変更だけ**。`repeat` は定義 (`times`) と
+状態 (`completed`) の両方を運ぶので、`completed` は落としてある —— 落とす前は
+**184 job のどれか 1 本が走るたびに STALE になり**、gate として使えば恒久的に
+赤だった。実測 2026-09-06、この修正の前後:
+
+| 出来事 | 修正前 | 修正後 |
+|---|---|---|
+| job が 1 回走った | STALE | up to date |
+| job を 1 本足した | STALE | STALE |
+| その job を消した | — | up to date |
+
+**両方向を確かめてから landed とする**（落ちない検査も、常に落ちる検査も、
+同じだけ無内容）。
+
 ## ⚠ 新規 profile を作った直後、agent job は必ず一度落ちる
 
 `hermes profile create <p>` が書く `config.yaml` は `model.provider` に
