@@ -288,6 +288,18 @@ binary と見なして理由を言わずに 0 件を返す** —— この bot �
 要求には再び 403 という**間欠**だった。窓が開いている間に s 5 を読み、
 2 度目の窓で Schedule 1 cl 14 / 17 を読んで entry を完成させた。
 
+**登録しただけでは動かなかった。** closing で 2 job を実際に `hermes cron run`
+で発火させたところ、script job は成功したが **agent job は
+`[blocked_config] Unknown provider 'openrouter-free'` で落ちた** ——
+`hermes profile create` が書く config.yaml は `model.provider` にその名前を
+書くが `providers:` ブロックも `secrets.command` も入れないため。
+`hermes cron list` では両方 `[active]` のままで、**script 側の成功を設定の
+十分性と読むと見逃す**。鍵に触らず config 2 ブロックを足して解消し、
+両 job が `completed` を durable record に残すところまで確認した
+(probe=silent、report=`変化なし`)。この落とし穴は
+`scripts/hermes-cron-jobs/README.md` に runbook として書いた ——
+**台帳に載っていることも `[active]` であることも、動くことではない。**
+
 **その過程で bot 自身の欠陥も 1 つ出た。** `previous()` を append の**後**に
 呼んでいたため、直前の行が「今書いた行」になり、**CHANGED 分岐が一度も発火
 できない**状態だった。発火しない検査は、発火して何も見つけなかった検査と
@@ -308,7 +320,7 @@ binary と見なして理由を言わずに 0 件を返す** —— この bot �
 
 ```bash
 cd orgs/cloud-itonami/cloud-itonami-isic-6820
-clojure -M:dev:test        # 195 tests / 783 assertions / 0 failures
+clojure -M:dev:test        # 195 tests / 783 assertions / 0 failures (closing 時に着地状態で再実行)
 clojure -M:lint            # 0 errors / 0 warnings
 clojure -M:dev:run-kumiai  # 6法域の決議要件 + 感度表 + HARD hold 11種
 python3 ../../../scripts/hermes-kumiai-sources/probe_kumiai_sources.py  # 出典の現況

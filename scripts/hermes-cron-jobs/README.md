@@ -25,6 +25,43 @@ python3 scripts/hermes-cron-jobs/export_cron.py          # 再生成
 python3 scripts/hermes-cron-jobs/export_cron.py --check  # 差分検査 (CI/fleet gate にも使える)
 ```
 
+## ⚠ 新規 profile を作った直後、agent job は必ず一度落ちる
+
+`hermes profile create <p>` が書く `config.yaml` は `model.provider` に
+`openrouter-free` を**書くが、その provider を定義しない**。`providers:` ブロックも
+`secrets.command` も入らないので、最初の agent job は
+
+```
+[blocked_config] provider credential missing: Unknown provider 'openrouter-free'
+```
+
+で失敗する。**`hermes cron list` では `[active]` のままなので、実際に走らせるまで
+分からない。** script job（`--no-agent`）は model を使わないので成功し、
+「片方は動いているから設定は足りている」と読めてしまう。
+
+直すのは config だけで、鍵に触る必要はない（鍵は login Keychain から
+`secrets.command` 経由で入る）。稼働中の profile（例 `cron-health`）から
+次の 2 ブロックを写す:
+
+```yaml
+secrets:
+  command:
+    enabled: true
+    command: printf 'OPENROUTER_API_KEY=%s\n' "$(security find-generic-password -s gftd.openrouter -w)"
+    helper_timeout_seconds: 10
+providers:
+  openrouter-free:
+    base_url: https://openrouter.ai/api/v1
+    api_mode: chat_completions
+    key_env: OPENROUTER_API_KEY
+    stale_timeout_seconds: 600
+```
+
+**登録したら必ず `hermes cron run <id>` で一度発火させ、`hermes cron runs` が
+`completed` を記録することまで見る。** 実測 2026-09-06（`kumiai-sources`）:
+`[active]` の 2 job のうち script 側は成功、agent 側は上記で失敗した。
+台帳に載っていることも、`[active]` であることも、動くことではない。
+
 ## 新端末での re-register 手順
 
 1. `hermes profile list` で profile を確認。無い profile は
