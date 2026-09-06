@@ -131,8 +131,44 @@
  {:label "query plane / datom 面"
   :spellings ["datalog" "datom" "query plane" "datascript" "triple store"
               "kotobase 方言" "kotobase dialect" "datomic" "datomic 方言"
-              "sparql" "cypher" "gremlin" "graphql" "text-to-query" "クエリ言語"]
+              "sparql" "cypher" "gremlin" "graphql" "text-to-query" "クエリ言語"
+              "ayatori" "綾取り" "あやとり"]
   :note "kotobase / arrangement / manifest/edn-query.cljs。⚠ 3 語は別物（ADR-2608189300）: **Datalog** = 形式（実装は kotoba-lang/datalog）/ **kotobase 方言** = 実際に書く EDN 記法 `[:find … :where …]`、系譜は Datomic だが所有はここ（`ref?` 既定が ipld.core/link?、`visible?` が required という Datomic に無い 2 点を持つ）/ **Datomic** = 他社製品、名乗ってよいのは kotoba-lang/datomic-client-shim だけ（shape 互換であって wire 互換ではない）。agent の query 入口は kotobase 方言、routine は GraphQL、Cypher / SPARQL / Gremlin は interop。surface は 6 つとも未 deploy（ADR-2608039975）。"}
+
+ :ipld-retrieval
+ {:label "IPLD 取得面 / content-addressed retrieval（どのブロックをどこから取り、どう検証するか）"
+  :spellings ["ayatori" "綾取り" "あやとり" "ipld" "ipni" "ipfs" "ipns" "carv2"
+              "car file" "unixfs" "adl" "selector" "cid" "content addressed"
+              "content-addressed" "block store" "provider discovery"
+              "delegated routing" "trustless gateway" "pinning"
+              "取得面" "ブロック取得" "コンテンツアドレス" "内容アドレス"]
+  :note "**ayatori（綾取り）は metaphor 名**なのでここに載せる —— 名前は
+『IPLD graph の query 面』を一文字も示さない（kuro / kobo と同じ形。ADR-2608039980）。
+
+層の持ち分は 1 つずつ別の主張で、**どれも次の証拠にならない**（ayatori README）:
+**IPLD**（io-ipld）が値・link・検証 / **IPNI**（io-ipni-specs、ayatori.discovery）が
+「その CID をどこが持つか」/ **CARv2**（io-ipld-car、ayatori.pack、
+kotobase-storage-pack）が「object の中のどこから frame が始まるか」/
+**arrangement + prolly-tree** が索引 / **ayatori.query** が Datalog。
+provider が返したことは取得の証拠でなく、CARv2 index entry は frame が CID に
+hash する証拠でなく、どれも query が評価された証拠ではない。
+
+⚠ **library に landed していることと本番の請求経路に載っていることは別。**
+数え直す（値をここから引かない）:
+
+    grep -rhoE '\\[(ipld[^ ]*|ayatori[^ ]*|arrangement[^ ]*)' orgs/net-kotobase/control-plane/*/src
+
+2026-09-06 に数えたときの形: graph-database worker は `ipld.core` と
+`arrangement.core`、protocols-worker は `ipld.core` と `ayatori.query` だけで、
+`ayatori.remote`(IPNI) と `ayatori.pack`(CARv2) は require されていなかった。
+一方 **retrieval 面（net-kotobase/ipfs = ipfs.kotobase.net）は別**で、
+UnixFS(`kotobase-ipfs.unixfs` + `ipld.dag-pb`)・CARv2・IPNS を持つ。
+**「kotobase は UnixFS を使っていない」と面を分けずに言わない。**
+
+契約は kotobase `docs/adr/2609060000-ipld-adl-selector-car-boundaries.md` と
+ayatori `docs/ipld-retrieval-contract.md`。FBL / Arrow buffer / ADL signalling は
+remaining rollout。**IPNS は canonical truth ではない**（kotobase
+docs/storage-architecture.md）—— 本番では private git snapshot だけが使う。"}
 
  :package-manager
  {:label "package / dependency management"
