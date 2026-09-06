@@ -147,6 +147,19 @@ readiness gate への進捗 (全て実測付きで landed / in-flight):
   実 getenv binding は未接続) ③ kbb 自体の JVM-free host 化 (v1 は
   bootstrap JVM host) ④ tasks.edn facade 検査の kbb 版 (EDN reader 依存)。
 
+- **slice 4 (2026-09-05/06 着地、amu PR #799 merged CI 13/13 green)**:
+  compiler wire id 35 = `:fs/app-data` (runtime id 202) — kotoba-lang#560 /
+  kotoba-sema#52 / amu sema pin ec2e2fe5。loader に fs_app_data_read_provider:
+  parent-resolved scope (fork 前 realpath)、Seatbelt `(allow file-read*
+  (subpath <resolved-entry>))`、guest path の granted+resolved 両綴り lexical
+  match + resolved 綴りへの re-spell、O_NOFOLLOW + portable fd containment
+  (macOS F_GETPATH / Linux dev+ino)。artifact#14/#16/#17 が loader-source-sha256
+  を 9a37d5eb まで前進 (identity pin + fuzz baseline 同時更新)。実測: in-scope
+  read 成功 (両綴り / 15 bytes → string-byte-length=15)、scope 外 / empty scope /
+  symlink 逃し / deny bitmap 全て SIGILL、no-allow SIGTRAP、filesystem+network
+  probe は引き続き deny、conformance / lang-native-conformance / fuzz-native /
+  sanitizer 全 green。write 半分は未実装 (次スライス: write provider、kbb shim、
+  tasks.edn facade の kbb 版)。
 - **js leg (2026-09-06、ADR-2609062200)**: `kotoba-script` を `.cljc` 化し
   `amu compile --target js --jvm-free` を nbb で host（amu ADR 0340、PR #827）。
   kotoba に `bin/kbb_js.cljs`（Node host、provider 35/33/34/20、receipt は v1 同形）と
