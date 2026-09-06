@@ -2639,8 +2639,39 @@ eval / interop / defmacro は CID と静的検査可能性そのものが要求�
 ### それ以外は native 追随を前提とした一時制約として書く
 
 map / set / 永続コレクション・closure / HOF・異種ベクタ・再帰値はすべて
-`:implemented-partial` で `#{:compiler :kotoba-wasm :kotoba-cljs}` に実装済み。
-native に無いだけ。**`defrecord` / `defprotocol` / `extend-type` / `extend-protocol` も同様に
+`:implemented-partial` で landed している。
+
+⚠ **旧文はここに「native に無いだけ」と続けていた。2026-09-06 に実測して偽。**
+`amu compile --jvm-free --target aarch64-macos` で `atom`/`swap!`/`deref`、
+`defrecord`+アクセサ、`defprotocol`+`extend-type`、`fn` を値として渡す高階関数の
+4 つとも通り、**kexe loader で実行して正しい値を返した**（12 / 74 / 15 / 7）。
+コンパイルが通ることと動くことを分けて確かめている。
+
+この一句は 1 日で実害を出した。**同じ段落の末尾が「これらを『無い』と仮定して
+判断核だけを切り出す設計にしない」と警告しているのに、その直前の一句が
+「native では無い」と言っていたため、native を target にした slice が
+判断核だけになった**（cloud-itonami-isic-6820 の kumiai actor、ADR-2609062400）。
+警告文は、その手前の断定に負ける。
+
+**backend ごとの現在地はここで読まない。1 コマンドで測る**（`:implementation`
+集合は surface-status 側でも更新が遅れうる —— 実測時、そこは HOF を
+`#{:compiler :kotoba-wasm :kotoba-cljs}` とだけ書いていたが native で動いた）:
+
+```bash
+A=orgs/kotoba-lang/amu/bin/amu
+printf '(ns t (:export [main]))\n(defn main [] :i64 (let [c (atom 0)] (swap! c + 5) (deref c)))\n' > /tmp/t.kotoba
+$A compile /tmp/t.kotoba --jvm-free --target aarch64-macos --output /tmp/t.kexe
+$A extract-native /tmp/t.kexe --symbol main --output /tmp/m.bin   # :offset を控える
+cc -O2 -o /tmp/loader orgs/kotoba-lang/amu/tools/kexe_loader.c
+/tmp/loader /tmp/m.bin <offset> 0 aarch64 -                        # 値が返る
+```
+
+⚠ **拒否メッセージを「その機能が無い」と読まない。** 実測 2026-09-06、
+`defprotocol` の `requires unique bounded (method [this ...]) signatures` と
+`fn value requires unique arities with zero to four unique parameters` は
+どちらも**書式の指摘**で、シグネチャの型注釈と `fn` リテラルの戻り値注釈を
+外したら両方 native まで通った。1 回目の拒否で止めると、実装状態どころか
+自分のタイプミスを言語の天井として記録することになる。**`defrecord` / `defprotocol` / `extend-type` / `extend-protocol` も同様に
 landed**（`:protocol-and-record-dispatch`。profile は `bounded-closed-world-static-dispatch`、
 `:dynamic-fallback false`、未知または未実装の receiver はコンパイル時に拒否）。`defmulti` /
 `defmethod` も `:closed-multimethod` として desugar される（hierarchy・preference・実行時拡張は

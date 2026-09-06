@@ -403,12 +403,65 @@ toolchain が無ければ exit **2**（どちらでもない）。
 
 ### 主張していないこと（Q9 の :blocked）
 
-**component は移行済みではなく `:blocked` である。** `store` / `operation` /
-`kumiaillm` / `registry` は langgraph の StateGraph・protocol・defrecord・atom・
-`langchain.db` に乗っており、これらは言語が admit しない host mechanism。
+**component は移行済みではなく `:blocked` である。** ただし**理由は 2026-09-06 に
+訂正した** —— 下記「:blocked の理由を取り違えていた」を参照。`store` /
+`operation` / `kumiaillm` / `registry` が admit されないのは**外界に触る部分が
+effect だから**であって、それらが使う記法のせいではない。
 そして **Q9 は決定核 fallback を移行単位として認めない**（ADR-2608261100）。
 残る `.cljc` suite は oracle であり、Q9 はそれを historical / non-gating と
 位置づける。**gate は上記の 1 コマンド**であって JVM suite ではない。
+
+### :blocked の理由を取り違えていた（2026-09-06 訂正、オーナー指摘）
+
+この ADR は当初 `:blocked` の理由に「langgraph の StateGraph・protocol・
+defrecord・atom・langchain.db」を並べていた。**4 つのうち 3 つは誤り。**
+オーナー指摘「最新の pure な kotoba でも capability 化は必須なんだっけ?
+unison 的性質で対応不要になったような?」を受けて実測した:
+
+| 構文 | wasm32-browser | aarch64-macos | native 実行値 |
+|---|---|---|---|
+| `atom` / `swap!` / `deref` (let 内) | OK | OK | 12（期待 12） |
+| `defrecord` + アクセサ | OK | OK | 74（期待 74） |
+| `defprotocol` + `extend-type` | OK | OK | 15（期待 15） |
+| `fn` を値として渡す高階関数 | OK | OK | 7（期待 7） |
+
+**コンパイル通過だけでなく kexe loader で実行して値を確かめた。**
+
+言語側の理屈は `lang/surface-status.edn`（origin/main）が持っている:
+`atom` / `swap!` / `reset!` / `deref` は **2026-09-02 から
+`:admitted-via-elaboration`** で `:forbidden-heads` から外れている。entry は今も
+`:intentional-security-constraint` だが、守っている性質は「**state が ambient で
+ないこと**」であって「state が無いこと」ではない —— 関数本体の外で名前を持てず、
+格納できず、実行時に存在しないセルは ambient ではない。`ref` は別枠の
+`:admitted-via-pure-core-elaboration` で、これが ADR-544 の pure S 式コアの
+**定義参照 `(ref name)`**（Unison 的な、値ではなく定義を指す方）。STM の
+`(ref value)` は今も `ambient-forbidden` で拒否される。
+
+**訂正後の線: capability が要るのは記法ではなく effect である。** `atom` /
+record / protocol / HOF にはもう要らない。今も要るのは実 I/O ——
+`langchain.db` への書き込み、LLM の HTTP 呼び出し、台帳の永続化 —— で、
+これは実装状態ではなく**性質**（ambient authority の排除）なので広がらない。
+
+したがって **StateGraph の純粋な骨格（state + event -> next-state + inert
+effects）は今日 native に載る見込みがある**。langgraph ライブラリ依存を外して
+契約だけ書き直す、別の migration unit として現実的。
+
+### この誤りがどこから来たか
+
+CLAUDE.md の該当段落は**末尾で正しく警告していた** ——「これらを『無い』と
+仮定して判断核だけを切り出す設計にしない」。しかし**その直前の一句が
+「native に無いだけ」と断定していた**ため、native を target にした slice が
+判断核だけになった。**警告文は、その手前の断定に負ける。**
+同じ commit で CLAUDE.md 側も直した（ADR-2809041200 の手順 3）。
+
+⚠ 加えて、最初に読んだ `orgs/kotoba-lang/kotoba-lang` の checkout は
+origin/main より **26 behind / 14 ahead**（`surface-status.edn` だけで 162 行差）
+だった。**stale な checkout を正本として読んでいた。**
+
+⚠ 測定中に 2 回、**自分の書式ミスを言語の天井として記録しかけた** ——
+`defprotocol` の `requires unique bounded (method [this ...]) signatures` も
+`fn value requires unique arities ...` も書式の指摘で、型注釈を外したら通った。
+1 回目の拒否で止めていたら、また実装状態を要件として書いていた。
 
 ## 再開点 (会話履歴なしで続けられる粒度)
 
