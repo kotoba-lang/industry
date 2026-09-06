@@ -173,6 +173,36 @@
    "ai-gftd-kotobase (blocked, above)"]
   :measured-after "4,333 projects, 0 duplicate names, orgs/gftdcojp entries 36 -> 29. The three moved checkouts were re-placed by west and verified at their pinned commits."}
 
+ ;; ── wave 5: the work that stays ─────────────────────────────────────────
+ ;;
+ ;; Owner 2026-09-06: lifescience, riken, kagoshima のやつとかは gftdcojp に
+ ;; 残しといて、それは仕事関係なので gftd archive に. Client engagements stay
+ ;; where they were done and become read-only; they are records of work, not
+ ;; components of a stack.
+ :wave-5-result
+ {:archived-in-place
+  [["240301-olsp-dbguide-web" "Open Life Science Platform database guide. Human work stopped long ago -- every commit since is dependabot, and archiving stops that noise too."]
+   ["250130-riken-suggest-edit" "RIKEN. Last human commit 2025-03-14."]
+   ["250305-jp-gftd-le-case-kaonavi" "kaonavi LE case. Last commit 2025-07-02. A dated case repo is a record of what was filed on that date."]
+   ["lf-case-lingling" "Litigation records, last touched 2026-06-25."]]
+  :already-archived ["241001-lifescience-web -- archived before this, and not registered in west; left alone"]
+  :kagoshima "No repository by that name exists in gftdcojp, cloud-itonami or com-junkawasaki. `kagoshima` appears only in documents (90-docs/regulatory/permits.datoms.edn, 90-docs/business/*, two hyakka ADRs). Either the work lives inside apps-gftdcojp, or it is not a repository. Not guessed at."
+  :still-to-classify
+  {:count 24
+   :proposed-stay
+   [["apps-gftdcojp" "5.6 GB business monorepo (_working, 00-contracts, 50-infra). Owner already called it 業務用 archive -- but it was pushed 2026-08-30, and archiving makes a repository read-only, so this needs a yes rather than an inference."]
+    ["m365-archive" "gftdcojp M365/Outlook archive, DataLad + git-annex. Same caution: still being pushed (2026-08-26), and archiving would stop that."]
+    ["manimani-operations" "Redacted Issue/PR projections and CDCI receipts -- operational records."]
+    ["fastlane-certs" "Signing certificates. Not registered in west."]]
+   :proposed-move
+   ["apex" "bpmn-engine-ts" "bpmn-sdk-rs" "chat-shell" "cloud-murakumo-mlx" "effect-actor"
+    "ghosthacker-shiropico-assets" "hume" "magatama-host-sdk" "router" "rs-jsonnet"
+    "shigarami" "sparql-ts" "tia" "wami-actor"
+    "weight-kototama" "weight-modal-emotion" "weight-modal-world" "weight-oka"]
+   :genuinely-ambiguous
+   [["itad" "ITAD -- 法人PCの回収・データ消去・廃棄証明書発行, described as (gftd.co.jp). A live business SERVICE of the retiring company: does the service move to the successor, or is it a gftd business record?"]
+    ["fashion" "fashion.gftd.ai -- 'gftd. brand EC site'. Same question, and its hostname is one of the *.gftd.ai that move to itonami.cloud."]]}}
+
  :renames
  [;; SUPERSEDED by :wave-2-result above for the cloud-itonami rows -- kept
   ;; because the reasoning is what the gftdcojp rows still rest on.
