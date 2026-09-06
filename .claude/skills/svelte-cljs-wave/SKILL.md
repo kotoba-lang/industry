@@ -95,7 +95,7 @@ commit して main に載せる。
 | **`package.json` に `"type": "module"` を書かない** | shadow-cljs の `:node-test` 出力は CommonJS（`__dirname`）。ESM 指定で `ReferenceError` になる。3 agent が踏んだ |
 | **build の sentinel / log を worktree の外に置かない** | 第 2 波で 3 agent が揃って `/private/tmp/claude-501/build-app.exit` という**共有パス**を使った。1 つの exit code を別の agent が自分の結果として読みうる。scratch は worktree の下か session 固有パスに置く |
 | **`:asset-path` は相対** | これらのページは path prefix の下に出る。絶対だと mount 先で壊れる |
-| **build は前景の retry loop で回す。background 監視に入らせない** | 下記。第 1・2 波で計 6 agent がこれで停止した |
+| **build は前景の retry loop で回す。background 監視に入らせない。かつ Bash 呼び出しに `timeout: 600000` を渡させる** | 下記。第 1・2 波で計 6 agent、第 7 波でさらに 1 agent がこれで停止した。timeout を落とすと harness が**勝手に** background へ移す |
 | **backend の `.ts` を書き換えない** | `src/app.ts` / `src/engine.ts` は Cloudflare Worker の本番ロジック。第 1 波で 2 agent が正しく拒否した。**svelte/ ディレクトリだけ**が対象 |
 | **README / operator-quickstart / `kotodama.jsonld` の `staticDir` も直す** | 消した svelte build を説明したまま残すと、文書が能動的に嘘になる |
 | **`wrangler.jsonc` / `wrangler.toml` が消したパスを指していたら直す**（下記の 1 通りに揃える） | 第 6 波で 3 agent が同じ問題に**3 通り**の答えを出した。scope を「frontend だけ」と書いた私の穴 |
@@ -219,11 +219,24 @@ tick が 2 件と出したが対象 appview には 1 件で、もう 1 件は**�
    移行が終わった瞬間に single-page 規則を破った app ができる**。画面の移動は
    state の変更であって location の変更ではない（ADR-2608080100）。
    view は表（data）で持ち、nav をそこから生成し、addressability は fragment
-   で与える。着地後の確認 —— exit 0 でなければ波は着地していない:
+   で与える。着地後の確認:
 
    ```bash
    nbb scripts/verify-single-page-app.cljs --root . --findings
    ```
+
+   ⚠ **exit 0 を合格条件にしない。この検出器は fleet 全体を見る**ので、
+   波と無関係な repo の finding で恒常的に exit 1 を返す（実測 2026-09-07:
+   `multi-document=11 no-document=21`、どれも今回の 4 repo と無関係）。
+   **exit 0 を要求すると、どの波も永久に着地できない。** 見るのは
+   **その波が触った repo が finding に出ていないこと**:
+
+   ```bash
+   grep -e <repo1> -e <repo2> ... /tmp/spa.log || echo "wave clean"
+   ```
+
+   波が新しい finding を*足していない*ことが条件であって、fleet が
+   clean であることではない（後者は別の仕事）。
 
 
 ⚠ **なぜ 1 通りに固定するか。** 第 6 波で 3 agent が同じ状況に別々に答えた ——
@@ -245,6 +258,14 @@ assets を向け直し（正しい・unverified と明記）、`app-society6` �
 
 **background 監視・Monitor・sentinel ファイルを使わせない。** 次の 1 行が実測で
 毎回通った形（私が第 2 波の 3 repo を全部これで着地させた）:
+
+⚠ **agent には `timeout: 600000` を Bash 呼び出しに渡させる。これを落とすと、
+自分から background にしなくても harness が background に**する**。** 下の loop は
+`sleep 45` × 9 回で既定の 2 分を超えるので、timeout を指定しなければ harness が
+勝手に background へ移し、agent は来ない通知を待って idle する —— **「自分から
+background 監視に入るな」だけでは防げない**。実測 2026-09-07（第 7 波、app-tia）:
+この 1 点で 1 agent が 212k token 使って停止し、resume が要った。作業自体は
+無傷で、build も落ちていなかった（lock が兄弟 agent に握られていただけ）。
 
 ```bash
 for i in $(seq 1 9); do
