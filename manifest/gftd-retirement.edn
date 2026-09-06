@@ -31,7 +31,7 @@
 ;; two clauses need the exception written into them when the first wave lands.
 {:plan/id :gftd-retirement
  :plan/date "2026-09-06"
- :plan/status :proposed
+ :plan/status :in-progress
 
  :measured
  {:as-of "2026-09-06"
@@ -65,8 +65,53 @@
  ;; already says -- because in every case here, `<org>/<name>` restates the
  ;; org, which CLAUDE.md calls redundant-but-not-wrong. The owner decision is
  ;; that a DEPRECATED origin restated is different from a live one restated.
+ ;; ⚠ WAVE 2 CHANGED THIS SECTION. The table below was written from names,
+ ;; and names were the wrong thing to read. Measured 2026-09-06, after the
+ ;; owner answered the gftd.ai question:
+ ;;
+ ;;   ALL THIRTEEN cloud-itonami repositories had ALREADY been renamed
+ ;;   upstream, to gftd-free names, and the manifest had not followed. Every
+ ;;   entry still worked -- through a GitHub redirect, which is exactly what
+ ;;   gen-west-manifest.cljs warns about in its own comments: a redirect is
+ ;;   not a name, and an old path can later be taken by something else.
+ ;;
+ ;; So the proposed names below were also wrong: upstream had chosen
+ ;; `audio-actor`, not `cloud-itonami-audio-actor` -- the org path already
+ ;; says cloud-itonami, and the elision was applied all the way. What wave 2
+ ;; actually did was point 10 entries at the names their repositories carry.
+ ;; Left as written so the correction is visible rather than tidied away.
+ ;;
+ ;; Three could not be renamed and the script refused them by name: west.yml
+ ;; already had `dougaka`, `dougaka-actor` and `dougaka-vector` as SEPARATE
+ ;; entries at the SAME pins -- the same repository registered twice, checked
+ ;; out to two paths on disk. A partial migration: three of the four new
+ ;; entries were added and all four old ones were left. Removing a duplicate
+ ;; is a deletion, not a rename, and both paths have live checkouts, so it is
+ ;; its own decision rather than a step in this one.
+ :wave-2-result
+ {:landed "west.yml commit ec66d5b20f6c6be901ceecc66dfce32a58b81afd, 10 entries"
+  :done [["cloud-itonami-gftd-audio-actor" "audio-actor"]
+         ["cloud-itonami-gftd-avatar-actor" "avatar-actor"]
+         ["cloud-itonami-gftd-illust-actor" "illust-actor"]
+         ["cloud-itonami-gftd-motion-actor" "motion-actor"]
+         ["cloud-itonami-gftd-rig-actor" "rig-actor"]
+         ["cloud-itonami-gftd-sculpt-actor" "sculpt-actor"]
+         ["cloud-itonami-gftd-voice-actor" "voice-actor"]
+         ["cloud-itonami-ai-gftd-kaisya" "ai-kaisya"]
+         ["ai-gftd-dougaka-kagaku" "dougaka-kagaku"]
+         ["ai-gftd-dougaka-kodomo" "dougaka-kodomo"]]
+  :refused-as-duplicates
+  [{:stale "ai-gftd-dougaka" :live "dougaka" :pin "e3aff7e3" :both-checked-out? true}
+   {:stale "cloud-itonami-ai-gftd-dougaka-actor" :live "dougaka-actor" :pin "8b491fd5" :both-checked-out? true}
+   {:stale "ai-gftd-dougaka-vector" :live "dougaka-vector" :pin "831718a6" :both-checked-out? true}]
+  :still-open
+  ["ai-kaisya still carries `ai-`, which the taxonomy does not have. The obvious target `kaisya` is a DIFFERENT repository (id 1305773355 vs 1284883752), so this is a naming decision rather than an elision."
+   "fleet-db.edn (genpon) still records the old names with :repo-path. `kagami reconcile` absorbs west.yml into it, and its input must be origin/main's west.yml -- not run here."]}
+
  :renames
- [;; cloud-itonami: the org already carries the identity, and `gftd` is a
+ [;; SUPERSEDED by :wave-2-result above for the cloud-itonami rows -- kept
+  ;; because the reasoning is what the gftdcojp rows still rest on.
+  ;; cloud-itonami: the org already carries the identity, and `gftd` is a
   ;; third restatement on top of it. Role plane throughout -- these are
   ;; governed actors, and `cloud-itonami-*-actor` is the established form.
   {:from "cloud-itonami/cloud-itonami-gftd-audio-actor"  :to "cloud-itonami-audio-actor"  :plane :role}
@@ -125,8 +170,8 @@
    :question "250305-jp-gftd-le-case-kaonavi -- does the dated-name convention keep the origin label?"
    :context "Here `jp-gftd` reads as origin plane rather than as the org restated. Dated case repos may be records of what was true on that date, in which case renaming them falsifies the record."}
   {:id :gftd-ai-zone
-   :question "*.gftd.ai hosts move to which zone?"
-   :context "auth, authn, analytics, atproto, arms, animeka, manga and more are live. Each is a Cloudflare route plus DNS. The successor zone is not derivable from anything in the tree."}]
+   :answered "2026-09-06: itonami.cloud. Owner: \"gftd.ai のリソースは全て itonami.cloud で ok\". Every *.gftd.ai host moves there; each is a Cloudflare route plus DNS, and wave 7 carries them."
+   :status :decided}]
 
  ;; ── order, so that the reversible parts happen first ────────────────────
  :waves
