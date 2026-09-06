@@ -3168,4 +3168,82 @@
                                          ; what changes the answer, and both are
                                          ; day-scale events
    :timeout-ms  120000}                  ; 2m -- measured 1.4s wall, three legs
+
+  {:id       :verify-declared-dependencies
+   :title    "src requires namespaces its own deps.edn does not account for"
+   :why      "A require is resolved by the classpath, and in this workspace the classpath is
+              assembled four ways -- `clojure -M:test`, a hand-written --classpath in
+              bin/run_tests.cljs, shadow-cljs reading :deps, and a sibling checkout that
+              happens to sit next door under orgs/. Three of the four put a dependency on the
+              classpath whether or not deps.edn names it, so an undeclared require resolves
+              for everyone who already has the dependency and for nobody else. The first
+              person it does not resolve for is always a new consumer, part-way through its
+              first run.
+              Measured twice on 2026-09-06 in one session. (1) kotobase-protocol-core's
+              deps.edn said `src has no dependencies at all ... verified by grep at the
+              2026-08-05 split`; src/kotobase/protocols/blocks.cljc arrived AFTER that split
+              and requires kotobase.store, so three surface repos needed the whole kotobase
+              repository on the classpath with nothing declaring it and a fourth found out as
+              `Could not find namespace: kotobase.store`. (2) net-kotobase/ipfs pinned io-ipld
+              twelve commits behind the namespace a new file needed -- the same shape one
+              layer down, where the coordinate is declared and the revision it names does not
+              carry the namespace.
+              Neither was carelessness. A comment recording a grep is only as true as the day
+              it was run, and nothing in this workspace re-ran it.
+              The two directions are reported apart, deliberately: `used but undeclared` says
+              add a coordinate (severity fail) and `declared but unused` says remove it or say
+              why it is there (severity warn, and it distinguishes a deliberate version FLOOR
+              from dead weight). Fusing them into one mismatch count is the failure this
+              detector exists to stop.
+              CANNOT be a fleet gate: resolving what a dependency PROVIDES means reading that
+              repository's checkout under orgs/, and a gate ships only the target repo's own
+              tree."
+   :argv     ["nbb" "--classpath" ".:scripts/nbb_compat"
+              "{{repo}}/scripts/verify-declared-dependencies.cljs" "--findings"
+              "--scan-root" "{{root}}"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*"
+   :writes   :none
+   :interval-ms 86400000                 ; 24h -- deps.edn and src ns forms move in days
+   :timeout-ms  300000                   ; 5m -- 80x the slower measured run
+   :measured "2026-09-06 on this machine, four runs: 3.64s and 3.27s at load average 30.2, then
+              11.81s and 9.85s at load 52.8. Byte-identical output all four times. The load is
+              recorded beside the number because this workstation runs many concurrent agent
+              sessions and the wall time is mostly theirs; the timeout below is sized against
+              the SLOWER pair. SCANNED 64 external requires from 65 source files across the
+              14 repos the default scope matches; 50 checkouts read in total once the
+              dependency closures are followed. Exit 2, 18 fail findings, 5 warns, 4 unmeasured.
+              Both directions were watched before landing, on the real repository rather than
+              on a fixture. A copy of kotobase-protocol-core carrying its PRE-FIX deps.edn
+              (`git show HEAD~1:deps.edn`, the `:deps {}` with the grep comment) exits 1 with
+              exactly `undeclared-require:...:kotobase.store`; the same tree with the shipped
+              deps.edn, nothing else changed, exits 0 clean. `--selftest` builds its own trees
+              and shows all three questions changing colour, including the pin question over
+              two real commits of a git repository it creates -- pinned one commit back it
+              reports the namespace that revision does not carry and not the one it does,
+              pinned forward it goes clean, and pinned to a sha no object store holds it says
+              unmeasured rather than behind.
+              The 18 fail findings are one defect repeated: six kotobase-protocol-* surface
+              repos (atproto, git, ipfs, issues, pinning, s3) carry `:deps {}` under a comment
+              saying `src depends only on kotobase-protocol-core`, and require
+              kotobase.protocols.{blocks,hash,http,json} and kotobase.store from src.
+              kotobase-protocol-core itself is clean -- its fix landed the same day.
+              The 4 unmeasured are one coordinate: `io.github.kotoba-lang/dag-cbor`, which
+              names a repository RENAMED to org-ietf-cbor. GitHub's redirect still resolves it
+              for tools.deps, which is why nothing had noticed, but there is no
+              orgs/kotoba-lang/dag-cbor to read -- so what it provides is unmeasured, and this
+              refuses to report agreement rather than assume. It is first reached from
+              kotoba-lang/security/deps.edn; tech-ipfs-specs-ipns already fixed its own copy
+              of the same coordinate and left a comment saying why. This is a standing gap in
+              the tree, not detector noise: the detector reads :inconclusive until a
+              coordinate is corrected or the checkout appears.
+              NOT `accepted`: an acceptance would have to name the finding key, and the honest
+              answer here is that the run genuinely did not measure that dependency. Recording
+              it as understood-and-deferred would put an exit-2 reason inside the class the
+              registry reserves for findings.
+              It reads WORKING TREES, like verify-dep-coordinate-identity and for the same
+              reason -- so a finding describes the deps.edn that is CHECKED OUT, which in this
+              workspace is regularly not the one upstream has. Check the dependency's main
+              before acting on one."}
 ]}
