@@ -265,5 +265,49 @@ bytes でも wall clock でもない。
   何も変わっていない（S4 が未了）
 - 広告に IPQ が載っている、とは言わない（S3 が未了）
 - IPQ が完全性を証明する、とは言わない（S5 が未了）
+
+## 残っている 1 件 —— IPQ は live だが、まだ announce されていない（2026-09-06 実測）
+
+検査は `scripts/verify-ipni-publisher-record.cljs --findings`（`--classpath` に
+`orgs/kotoba-lang/io-ipni-specs/src` を足す）。今日の実行は 13 検査中 12 が ok で、
+1 件だけ赤い:
+
+    ok   advertisement-metadata-is-well-formed  —  1 protocol(s): transport-ipfs-gateway-http
+    FAIL advertisement-announces-ipq           —  not announced: not-ipq (found 2336)
+
+`2336` = `0x920` = `transport-ipfs-gateway-http`。つまり **live の advertisement は
+gateway だけを名乗っており、IPQ を名乗っていない。**
+
+**コードの問題ではない。** `ipni-drain/src/index.ts` の `KOTOBASE_METADATA` は既に
+両方を運ぶ形（`a0 12 00` ++ `c0 92 c0 01 01 01`）で main に在り、drain Worker は
+今日 12:47 UTC に deploy 済み。赤いのは **advertisement chain の head が
+その前に発行されたものだから**である（head は
+`bafyreiaupk64m6ghvgwslukgq2rz2m5fwxut7qwlpojkj4apczbg34ie5e` のまま）。
+
+**そして head を進める経路は、内容を作らずには存在しない。** advertisement を
+発行するのは `kotobase-api-gateway-cljs` の `git_private_snapshot.cljc` だけで、
+`advertise?` は private git snapshot の append に付くフラグである
+（`publish-advertisement` は `append-candidate` の中からしか呼ばれない）。
+再 announce だけをする admin 経路は無い（探した）。**metadata の 1 field を
+直すために private git plane へ中身を捏造しない。**
+
+したがってこの finding は次の条件で閉じる: **次に `advertise` 付きの private git
+snapshot が 1 本 append されたとき。** それまでは「live だが未 announce」であり、
+IPNI 経由で provider を探す client は IPQ endpoint に辿り着けない。
+**待ちであって、未実装ではない。** 検査は赤のままにしておく —— 緑にする方法は
+発行することであって、検査を弱めることではない。
+
+## wire format は CARv1（2026-09-06 実測、記録の訂正ではなく口頭の訂正）
+
+descriptor は `\"response\": {\"content-type\": \"application/vnd.ipld.car\", \"car-version\": 1}`
+と言う。**実測もそのとおり** —— live の selection 応答の先頭は
+
+    3a a2 65 72 6f 6f 74 73 81 d8 2a 58 25 …
+    ^^ varint(58)  ^^ dag-cbor map  ^^^^^^^^^^^^^^^^^ \"roots\"
+
+で、**CARv2 の pragma（`0a a1 67 76 65 72 73 69 6f 6e 02`）では始まらない**。
+ADR-2609060000 が既に「HTTP streaming may use CARv1」と書いているとおりで、
+文書は正しい。CARv2 は pack（L0b）の形式であって、この応答の形式ではない。
+この 2 つを口頭で混ぜると、replay する側が index を探しにいく。
 "
 }]
