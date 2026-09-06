@@ -203,6 +203,29 @@
    [["itad" "ITAD -- 法人PCの回収・データ消去・廃棄証明書発行, described as (gftd.co.jp). A live business SERVICE of the retiring company: does the service move to the successor, or is it a gftd business record?"]
     ["fashion" "fashion.gftd.ai -- 'gftd. brand EC site'. Same question, and its hostname is one of the *.gftd.ai that move to itonami.cloud."]]}}
 
+ ;; ── wave 6: the 19, dispositioned one by one by the owner ───────────────
+ :wave-6-result
+ {:deleted ["apex" "chat-shell" "hume" "magatama-host-sdk" "router"]
+  :moved-to-com-junkawasaki-private
+  ["cloud-murakumo-mlx" "effect-actor" "bpmn-engine-ts" "bpmn-sdk-rs"
+   "ghosthacker-shiropico-assets" "rs-jsonnet" "shigarami" "sparql-ts"
+   "weight-kototama" "weight-modal-emotion" "weight-modal-world" "weight-oka"]
+  :moved-to-cloud-itonami ["tia" "wami-actor"]
+  :visibility "Six arrived public (effect-actor, bpmn-engine-ts, bpmn-sdk-rs, rs-jsonnet, shigarami, sparql-ts) and were set private, as asked. Public -> private is not the direction the standing authorisation excludes; making a repository public is."
+  :ghosthacker-note "The transfer refused with 'Repositories cannot be transferred to the original owner' -- it was ALREADY com-junkawasaki/ghosthacker-shiropico-assets, private and archived, and the gftdcojp path was only a redirect. Nothing to do; the west entry was pointed at the real owner."
+  :backups "All nineteen bundled from FRESH --mirror clones before anything was deleted or moved, and each verified two ways: `git bundle verify` reporting a complete history, AND the bundle's HEAD compared by sha against the live GitHub tip. 19/19."
+  :verification-that-failed-first
+  "The first verification loop reported 0/19 verified. The bundles were fine; the loop ran `git bundle verify` from /tmp/bundling, which is not a git repository, so the command failed and `grep -c` turned that failure into the number 0. A check that cannot run must not return the same value as a check that ran and found nothing wrong -- the same shape this session has been correcting all day, produced here by the correction itself."
+  :apex-needed-a-different-proof
+  "Its west entry could not be removed by the ordinary path: the clean-checkout test compares local commits against the upstream, and the upstream had just been deleted, so all 20 read as absent. Proved instead that ZERO local commits fall outside the bundle (whose tip equals the checkout's), removed the checkout, then unregistered with ALLOW_ABSENT=1 and the reason recorded."
+  :measured-after "4,328 projects, 0 duplicate names, orgs/gftdcojp entries 28 -> 9."
+  :left-in-gftdcojp
+  {:archived ["240301-olsp-dbguide-web" "250130-riken-suggest-edit"
+              "250305-jp-gftd-le-case-kaonavi" "lf-case-lingling"]
+   :business-records-not-yet-archived
+   ["apps-gftdcojp" "m365-archive" "manimani-operations"]
+   :still-ambiguous ["fashion" "itad"]}}
+
  :renames
  [;; SUPERSEDED by :wave-2-result above for the cloud-itonami rows -- kept
   ;; because the reasoning is what the gftdcojp rows still rest on.
