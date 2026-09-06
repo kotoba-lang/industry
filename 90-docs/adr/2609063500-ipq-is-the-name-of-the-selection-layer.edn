@@ -67,7 +67,7 @@ multicodec table を実測して選んだ（2026-09-06）:
 | **S1** | wire の名前 + surface の実装 | **2026-09-06 landed** |
 | **S2** | deploy —— Worker shell に載せ、本番 block 面の実 CID に対して smoke | **2026-09-06 landed**（下記） |
 | **S3** | advertise —— 広告 chain の metadata に IPQ を並記 | **2026-09-06 landed**（gate は赤のまま。下記） |
-| S4 | consume —— `ayatori.discovery` が IPQ provider を優先し、`ayatori.remote` が per-block GET の代わりに selection を使う | round trip 数で測る（bytes でも wall clock でもない） |
+| S4 | consume —— **再定義された**。配線の前にまず graph read 経路を観測可能にする | ADR-2609064500。pack が 97% の逐次項に効くという前提は、この workspace 自身の測定に否定されている |
 | S5 | IPQ/2 —— authenticated index boundaries | 未着手・未スケジュール |
 
 **S3 の gate が要点である。** metadata を足したつもりで落ちても、広告は
