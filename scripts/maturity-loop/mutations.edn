@@ -8008,4 +8008,66 @@
      :file "src/face_match/bounded_no_matcher.kotoba"
      :find "(if (= (record-get compare-result-type r :status) :review)"
      :replace "(if (= (field-get compare-result-type r :status) :review)"
-     :must-fail ["the-conformance-marker-is-the-one-that-record-reaches"]}]}]}
+     :must-fail ["the-conformance-marker-is-the-one-that-record-reaches"]}]}
+
+  {:repo "orgs/cloud-itonami/cloud-itonami-isco-4223"
+   :label "isco-4223 audit ledger —— 人が署名したことが証跡に残り続けるか"
+   ;; この actor の ledger は 2026-09-06 まで、governor が **escalate して人が
+   ;; 署名した** commit と、governor が素通しした commit を同じ entry で書いて
+   ;; いた（どちらも `{:disposition :commit :record ...}`、verdict 無し）。実測:
+   ;; 同じ :approve-inbound-route を同じ登録済み line に対して 2 度、advisor の
+   ;; confidence だけ 0.95 と 0.10（= confidence-floor 0.6 の下）で走らせると、
+   ;; 後者は :status :interrupted を返し actor/approve! を経てしか record に
+   ;; 到達しないのに、証跡は前者と区別が付かなかった。
+   ;;
+   ;; 「人の署名が要ったか」を証跡から答えられない監査台帳は監査台帳ではない。
+   ;; switchboard.ledger がその区別を持ち、誤報する entry を **書かせない**
+   ;; （fail-closed）。ここに在るのは、その拒否が今も落ちるかを繰り返し問う
+   ;; ためのもの。6 件とも 2026-09-06 に赤くなるところを見た。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   ;; ── 欠陥そのものへの回帰（actor 側を landing 前に戻す）──
+   [{:id :isco-4223/disposition-hard-coded-again
+     :why "commit の disposition を ledger に決めさせず :commit に固定する = 2026-09-06 以前の挙動。escalate された提約が素通しとして記帳される（いまは guard が throw するので fail-closed に落ちる）"
+     :file "src/switchboard/actor.cljc"
+     :find "disposition (ledger/commit-disposition verdict)"
+     :replace "disposition :commit"
+     :must-fail ["human-sign-off-is-visible-in-the-ledger"]}
+
+    ;; ── 拒否規則を 1 つずつ弱める（条件を常に偽にする、現実に起こる形）──
+    {:id :isco-4223/escalation-rule-weakened
+     :why "escalate された提案を :commit として記帳できてしまう —— 人の署名が証跡から消える"
+     :file "src/switchboard/ledger.cljc"
+     :find "(and (= :commit disposition) v? (:escalate? verdict))"
+     :replace "(and (= :commit disposition) v? false)"
+     :must-fail ["refuses-a-commit-that-hides-an-escalation"]}
+
+    {:id :isco-4223/approval-rule-weakened
+     :why "逆向き —— escalate されていない提案に人の承認を騙れてしまう。証跡は過小報告と同じくらい過大報告でも壊れる"
+     :file "src/switchboard/ledger.cljc"
+     :find "(and (= :commit-after-approval disposition) v? (not (:escalate? verdict)))"
+     :replace "(and (= :commit-after-approval disposition) v? false)"
+     :must-fail ["refuses-a-commit-that-invents-an-approval"]}
+
+    {:id :isco-4223/hard-refusal-rule-weakened
+     :why "governor が HARD 違反として拒否した提案を commit として記帳できてしまう —— actor の無条件不変条件が証跡側で崩れる"
+     :file "src/switchboard/ledger.cljc"
+     :find "(and committed? v? (:hard? verdict))"
+     :replace "(and committed? v? false)"
+     :must-fail ["refuses-a-commit-over-a-hard-refusal"]}
+
+    {:id :isco-4223/no-verdict-rule-weakened
+     :why "verdict を伴わない entry（= 旧形式そのもの）が通ってしまう。証拠の無い記帳"
+     :file "src/switchboard/ledger.cljc"
+     :find "      (not v?)\n      (conj {:rule :no-verdict"
+     :replace "      false\n      (conj {:rule :no-verdict"
+     :must-fail ["refuses-an-entry-with-no-verdict"]}
+
+    ;; ── 検査は在るが強制していない、という形 ──
+    {:id :isco-4223/append-not-fail-closed
+     :why "violations を計算するが throw しない = 規則が助言に降格する。書込経路の guard が助言になった瞬間、誤報 entry が普通に台帳へ入る"
+     :file "src/switchboard/ledger.cljc"
+     :find "(when (seq vs)"
+     :replace "(when false"
+     :must-fail ["append-is-fail-closed"]}]}]}
