@@ -134,31 +134,102 @@ OIDC identity に固定）で署名し、**deploy 側は両方を verify して�
 何も言っていない。**どちらかに寄せる決定が要る** —— fleet CI（murakumo）へ port するか、
 attested 経路を明示的に retire するか。放置は「署名しているつもり」を続けることになる。
 
-## nil の所在（確認済み、未修正）
+## nil の所在（両 copy とも修正済み、deploy はしていない。2026-09-07）
 
-ADR-2608170300 の silent partial read の被疑箇所は `store.cljs:207-212` に**在る**。
-`fetch-block-cached` の `(if bytes …)` の else が `(record-block-fetch! :miss cid)` と
-`nil` を返し、その nil が `block-fetcher` 経由で `:async-get-fn` として
-`xrpc.cljs:379` と `:1382` に入る。受け手は「保存されていない」と「まだ見えない」を
-区別できず、retry ではなく skip する —— 25 行中 9〜14 行を HTTP 200 で返す形。
+被疑箇所は**在った**。`fetch-block-cached` の `(if bytes …)` の else が
+`(record-block-fetch! :miss cid)` と `nil` を返し、その nil が `block-fetcher`
+経由で 2 つの consumer —— trampoline の `fetch1` と、xrpc の read/write
+store-extras が渡す `:async-get-fn` —— に入っていた。
 
-**今回のカウンタはこれを可視化するが、有罪判決はしない。** `miss=` がその分岐で
-非ゼロになるので、短い結果に `miss>0` が付けば機構を名指しできる。ただし
-①同期 trampoline 経路では nil は正当な制御フロー（block-miss → retry）なので
-`miss>0` 単体は証拠にならない ②両方の consumer が同じ関数を通るので、
-**どちらが nil を見たかはカウンタからは分からない。**
+**nil はそこで止まらない。** `trampoline/with-blocks` は `fetch1` が **resolve
+した値をそのまま cache する**ので、nil が「その block の値」として入り、同期
+`get-fn` はその CID について **miss を出すのをやめる**（黙って nil を返す）。
+その下の読み手は全部 nil 許容で書かれている —— `ipld/get-node` は
+`(when-let [bytes (get-fn cid)] …)`、kotobase-peer の `verified-node` も同型 ——
+ので、nil は `some->` に落ちて **walk が途中で終わる**。
+**どの walk に落ちるかで、crash になるか短い 200 になるかが決まる。**
+fetch 側は何も決めていない。
 
-そして **ADR-2608170300 の再現条件（pack writes ON）はこの copy では作れない** ——
-`KOTOBASE_PACK_WRITES` と pack tier は engine 側にしか無い。**被疑者はここに居て、
-それを浮かせた設定はここに無い。**
+### 再現（in-process、compiled worker + mock B2）
+
+`test/e2e-block-unavailable.mjs`（両 repo）。25 commit したあと、read が実際に
+GET する block のうち 1 つを取れなくして、**cold isolate から**読む
+（L1 は module state で、`flush!` が書いた直後の block を全部持っているため、
+同じ module 内の read は durable 面に届かない）。取れなくする方法は 2 通り:
+
+- per-object 面: その 1 object を消す
+- **packed 面（`KOTOBASE_PACK_WRITES=1`）: pack tip を 1 commit ぶん巻き戻す。**
+  手で block を消していない —— `pack_tip.cljs` が自分について書いている
+  last-writer-wins の race そのもので、同 docstring は
+  「nothing becomes wrong; something becomes temporarily invisible」と言っている
+
+**修正前、両方とも同じ形で落ちた**: `HTTP 400`
+`{\"error\":\"InternalError\",\"message\":\"Cannot read properties of null (reading 'length')\"}`。
+control-plane 側では ablation を **56 通り**（`datoms` と `q` の 2 read × その read が
+GET する 28 block）回して全部この形。`x-kotobase-kv-stats` は `miss=1`。
+
+**「temporarily invisible」は誤りではないが、読み手からは見えなかった。**
+
+### 修正 —— contract を 2 つに分ける
+
+| | 意味 | 使う側 |
+|---|---|---|
+| `block-fetcher`（不変） | **hint**。nil は「今どの tier にも無い」だけで、「保存されていない」と「まだ見えない」を区別しない | warm wave / shadow・candidate backend / cold-restore probe —— **block が無くてよいと宣言した呼び手** |
+| `required-block-fetcher`（新） | **correctness**。同じ nil を `:kotobase.store/block-unavailable` という ex-info（CID 付き）にする | read/write 本体の 2 seam |
+
+`run-with-store` / `run-with-bounded-store` が**両方の seam を同じ refusing
+fetcher に向ける**（各 construction site ではなく 1 箇所で override するので、
+2 度と片方だけ直らない）。warm wave は hint のままで、**stale な manifest
+entry 1 件で graph が落ちない**ことをテストが押さえている。
+
+refusal は per-call の atom にも記録して handler の戻り後に投げ直す ——
+`kotobase.server.handler/handle` は `:block-miss` 以外を全部
+`{:ok false :error \"InternalError\"}` に畳むので、投げ直さないと
+「名前のある拒否」がそこで消える（`with-read-budget` の `:timed-out?` が
+既に同じ迂回をしている）。xrpc は **503 `BlockUnavailable`**（retryable、
+block_cid つき）に写す —— request は正しいので 400 の側ではなく
+QueryTimeout / GraphTooLargeToHydrate の隣。
+
+**修正後、両シナリオとも 503 `BlockUnavailable`。block（または tip）を戻すと
+25 行が全部戻る。**
+
+### 両方向を見た
+
+`refusing` を 1 箇所だけ壊して（reject をやめて nil を resolve に戻す）走らせると、
+負のテスト 3 本が **`expected a refusal, got a result: {:result [bytes bytes nil bytes]}`**
+で赤くなる —— これが欠陥そのものの印字である。正のテスト 2 本（完全な read /
+stale hint）は緑のまま。
+
+suite: control-plane **448/1501 → 453/1512**、engine **264/757 → 269/767**、
+どちらも 0 failures。
+
+着地: `net-kotobase/control-plane` **87598445**、`net-kotobase/engine` **dcb1f590**。
+**deploy はしていない。**
+
+### 再現できなかったこと（正直に）
+
+**「HTTP 200 で 25 行中 9〜14 行」という形そのものは、今日のどちらの tree でも
+出せなかった。** 出たのは同じ nil の別の顔 —— 400 InternalError に JS の
+TypeError が載る形である。ADR-2608170300 当時とは kotobase-peer の pin も
+両 copy の source も動いており、nil が最初に当たる読み手が変わったのだと考えられる。
+どちらの顔になるかは fetch 側では決まらない、というのが上の観察の要点で、
+**だから両方の顔を消す修正になっている。**
+
+**一つだけ silent な 200 を再現した。head record（`ipns/<graph>.json`）を消すと、
+25 行の graph が `200` / `0 行` / `l1=0;l2=0;b2=0;miss=0;distinct=0` で返る。**
+これは head.cljs の側で、「head が無い = まだ commit されていない graph」という
+既存の contract であり、今回は**触っていない**。ただし
+「読めなかった」と「空だった」が同じ値で返る、という同型の欠陥である
+（ADR-2608136000 の class）。次の候補。
 
 ## 未決（governance であってコードではない）
 
 - **`net-kotobase/engine` と `control-plane` のどちらが正本か。** どちらも書いていない。
   script 名が同じなので、engine から手で `wrangler deploy` すれば production を
   上書きする。そうなった証拠も、そうならない保証も見つからなかった。
-- ADR-2608170300 の silent partial read が直ったかどうか。診断と被疑箇所は在るが、
-  修正 commit も再実行の receipt も見つからない。nil を返す形は deploy 側にも残っている。
+- ~~ADR-2608170300 の silent partial read が直ったかどうか~~ —— **2026-09-07 に
+  両 copy とも修正して着地した**（上記「nil の所在」節）。**deploy はしていない**ので、
+  本番の Worker は今も修正前の bundle を配っている。
 
 ## 同日の別件 —— 同じ形が protocol-core にも在った
 
