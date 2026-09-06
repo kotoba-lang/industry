@@ -1,0 +1,184 @@
+[{:db/id -1
+  :adr/id "adr-2609063000-dllm-phase0-block-diffusion-measured-on-murakumo-gad"
+  :adr/title "dLLM Phase 0 を murakumo の gad で実測 —— block diffusion は AR と同じ正解率のまま forward を 2.1 分の 1 にする。ただし tok/forward だけを最適化すると 3.1 倍で正解 0/5 になる"
+  :adr/status "accepted"
+  :adr/date "2026-09-06"
+  :adr/last_verified "2026-09-06"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "dllm-latent-unified-model-phase0"
+  :source/dataset "adr"
+  :adr/repos ["com-junkawasaki/root" "orgs/kotoba-lang/murakumo"]
+  :adr/authoritative_for
+  ["Phase 0 gate の判定（bidirectional block-diffusion trunk で tok/forward > 1 が実行採点つきで出るか）"
+   "murakumo の学習・計測可能な GPU 在庫の現在地（gad = Ryzen AI MAX+ 395 / 48 GiB VRAM / ROCm 7.13）"
+   "SDAR HF 実装の attention mask 契約（bool、True=attend）と、加算 float mask を渡したときの静かな反転"
+   "block diffusion の運転窓（block=4 / threshold 0.9）と、その外側で正解が壊れること"]
+  :adr/related
+  ["adr-2609040130（AR→並列生成変換の実測。本 ADR はその結論を confirm し、発現条件を 1 つ緩める）"
+   "adr-2607062300（p2p distillation $3k。fleet で学習不能という記述の scope を明確化する）"
+   "adr-2607173100（モデル id をハードコードしない）"]
+
+  :adr/body
+  "# ADR-2609063000: dLLM Phase 0 を murakumo の gad で実測
+
+**Status**: accepted / 2026-09-06 / オーナー指示「murakumo.cloud の リソースで進めてほしい」
+
+## 一行で
+
+**本物の bidirectional block-diffusion trunk では、AR と同じ正解率（5 問中 4 問）を
+保ったまま forward 回数が 2.106 分の 1 になる。** 予算は ¥0（Modal ではなく murakumo
+自身の gad で回した）。ただし tok/forward を最大化する方向に振ると、3.129 という
+一番よく見える数字が **正解 0/5** を出す。
+
+## Phase 0 の gate
+
+ADR-2609040130 は MLX 上で causal 重みのまま multi-token commit を試し、k=4/8/16 の
+全部で tok/forward < 1 かつ degenerate と測って、`速度利得は bidirectional block
+diffusion trunk に構造的に依存する` と結論した。Phase 0 はその条件を満たした実機で
+利得が本当に出るかを、**実行採点つきで**確かめるもの。
+
+## 実測ハードウェア（2026-09-06、gad）
+
+| 項目 | 実測 |
+|---|---|
+| SoC | AMD RYZEN AI MAX+ 395 w/ Radeon 8060S（Strix Halo, gfx1151）, 32 CPU |
+| VRAM | carve-out 48.0 GiB、`mem_get_info` free **47.5 GiB**（ComfyUI×2 + llama-server 稼働中） |
+| torch | 2.10.0+rocm7.13.0a20260513 / HIP 7.13.26183 / `cuda.is_available()` True |
+| 演算 | bf16 4096^3 matmul 11.8 ms = **11.61 TFLOP/s**（GPU use 93% と競合しながら） |
+| disk | 914G 単一ボリューム、**空き 45 GB**（ComfyUI 377G / models 146G / murakumo 88G） |
+| egress | huggingface.co 200 |
+
+`rocm-smi` の `VRAM Total Used 51.4 GB` は誤読しやすい —— torch の `mem_get_info` は
+47.5 GiB 空きと答える。**ROCm SMI の used 表示を空き容量の根拠にしない。**
+
+## 結果 1: tok/forward（threshold 0.9、max_new 128）
+
+| prompt | block | tok/fwd | forwards | distinct | rep |
+|---|---|---|---|---|---|
+| code | 1 | 1.000 | 91 | 0.560 | 1 |
+| code | 4 | 2.071 | 42 | 0.540 | 1 |
+| code | 8 | 1.872 | 47 | 0.511 | 1 |
+| code | 16 | 2.286 | 28 | 0.609 | 1 |
+| ja | 1 | 1.000 | 96 | 0.396 | 1 |
+| ja | 4 | 1.208 | 106 | 0.266 | 1 |
+| ja | 8 | 1.231 | 26 | 0.812 | 1 |
+| ja | 16 | **0.977** | 43 | 0.810 | 1 |
+
+**利得は領域依存**である。code では 1.87〜2.29、日本語では 0.98〜1.23 しか出ず、
+block=16 の日本語は **AR より悪い**（1 未満）。code は字下げ・括弧・繰り返す識別子など
+局所的に決まる位置が多く、閾値を超える並列 commit が起きやすい。
+
+## 結果 2: 実行採点（5 問、max_new 192、greedy）
+
+**これが判断に使う表**である。tok/forward は単独では誤誘導する。
+
+| block | threshold | 正解 | tok/forward | forwards |
+|---|---|---|---|---|
+| 1（AR control） | 0.9 | **4/5** | 1.000 | 355 |
+| 4 | 0.5 | 2/5 | 2.992 | 121 |
+| 4 | 0.7 | 3/5 | 2.613 | 137 |
+| **4** | **0.9** | **4/5** | **2.106** | 170 |
+| 4 | 0.99 | 4/5 | 1.584 | 226 |
+| 8 | 0.5 | **0/5** | 3.129 | 124 |
+| 8 | 0.7 | 1/5 | 2.600 | 135 |
+| 8 | 0.9 | 3/5 | 2.259 | 158 |
+| 8 | 0.99 | 3/5 | 1.564 | 227 |
+
+**運転窓は block=4 / threshold 0.9 の 1 セルだけ**で、そこでのみ AR と同じ 4/5 を保つ。
+tok/forward を最大化する方向（block を大きく、閾値を下げる）は、**一番よく見える
+3.129 が正解 0/5** という形で裏切る。
+
+## 見つけた欠陥 2 つ
+
+### (1) mask 契約の静かな反転 —— AR control が捕まえた
+
+`SDARAttention.forward` は `attention_mask.bool()` してから
+`F.scaled_dot_product_attention(attn_mask=..., is_causal=False)` に渡す。つまり契約は
+**bool（True=attend）**であって、通常の加算 float mask ではない。0.0/-inf の mask を
+渡すと `.bool()` で **0.0 → False、-inf → True** と**完全に反転**する。
+
+最初の測定はこれを踏み、`emememem`（distinct 0.125）を出した。**捕まえたのは
+AR control（block=1）**である —— 1.000 tok/forward という正しい数字と、壊れた文章が
+同時に出たので、壊れているのは block diffusion ではなく計測側だと分かった。
+control が無ければ、これは `ADR-2609040130 の再現` として記録されていた。
+
+付随: この実装には **mask 無しの経路が無い**。`attention_mask=None` は
+`torch.all(None)` に到達して TypeError になる。毎 forward で明示 mask が要る。
+
+logit 位置の規約も実測で確定した: MASK 位置 i の予測は **`logits[i]`**（拡散規約）。
+`logits[i-1]` は純 AR の next-token 分布と**完全に一致**する。
+
+### (2) 構造指標は正しさを測らない
+
+distinct ratio と最長連続反復は、上の全セルで `問題なし` を返した。生成コードを
+読むと**全部が誤り**だった —— threshold 0.5 は `intervals.sort(...)` の行が丸ごと
+欠落、0.7 は `return return merged`、0.9 と 0.99 は重なり判定が `interval[1] <=`
+（正しくは `interval[0]`）。
+
+**測れなかった正しさが、測って問題が無かった正しさと同じ値を返していた。**
+だから結果 2（実行採点）を足した。ADR-2608136000 の 6 問がそのまま当たる。
+
+## 既存 ADR との関係
+
+- **ADR-2609040130 は正しい。** 本 ADR はその結論（利得は bidirectional block trunk に
+  依存する）を confirm する。**緩めるのは発現条件の 1 つだけ** —— 同 ADR は
+  `利得の発現条件は CUDA engine（lmdeploy/JetEngine）上の bidirectional trunk` と
+  書いているが、実測では **ROCm + 素の eager SDPA + KV cache 無し**で出た。
+  必要なのは trunk であって engine ではない。JetEngine / CUDA への依存は計画から外せる。
+- **ADR-2607062300 の `fleet では LoRA 学習は原理的に不可能` は scope を読む。**
+  あれは **GLM-5.2 級のモデルを Mac ノード（M4 mini 16GiB × 11 + M1 Max 32GiB）で**
+  という主張で、いまも真である。gad はその数え上げに入っていない Linux/ROCm 機で、
+  **実際に LoRA を学習した実績が同じ箱に残っている**（`/home/gad/cpt-clj`、2026-06-12、
+  base `google/gemma-4-E4B-it-qat-q4_0-unquantized`、3 epoch を 1417 秒 / 1654 秒、
+  ログ末尾に `lora_B nonzero mass ... adapter learned`）。学習スタックは
+  `/home/gad/clj-train-venv`（peft 0.19.1 / trl 1.6.0 / datasets 5.0.0）。
+
+## murakumo の計算資源の現在地
+
+| 面 | 実体 | 使いどころ |
+|---|---|---|
+| gad | Ryzen AI MAX+ 395 / 48 GiB VRAM / ROCm 7.13、学習スタック在り | Phase 0・1、8B 級までの LoRA。¥0 |
+| Modal | `basho-320-18b` が既に `junkawasakicom--basho-320-18b-serve.modal.run` で serve 済み。`~/.modal.toml` あり、レートは `murakumo/docs/modal-gpu-reference.md` | 48 GiB を超える Phase 2 以降 |
+| xavier | Jetson AGX（CUDA sm72, 32GB） | 推論 head のみ |
+| Mac fleet | M4 mini ×10 | 推論のみ（MLX 単一ノード制約） |
+
+**Modal は外部ベンダではなく既に murakumo の一部**である。Phase 2 で H100 を借りるのは
+新しい取引ではなく、既にある経路の延長。
+
+## Decision
+
+1. **Phase 0 は通過とする。** ただし通過の内容は `tok/forward > 1` ではなく
+   **`AR と同じ実行正解率を保ったまま forward が 2.106 分の 1`** である。
+2. **運転点は block=4 / threshold 0.9 に固定する。** block を上げる・閾値を下げる
+   変更は、実行採点を同時に出さないかぎり採用しない。
+3. **以後、この系統の速度主張には実行採点を必ず併記する。** tok/forward 単独の
+   数字を性能として引用しない。
+4. **Phase 1 の計測箱は gad。** ただし **disk 45 GB が律速**で、8B 級（MMaDA-8B,
+   MIT, 8.08B, bf16 で約 16 GB）は入るが 16B 級（LLaDA2.0-Uni, apache-2.0, 16.3B,
+   約 33 GB）は入らない。ComfyUI が 377 GB を持っているが、**他者のデータなので
+   本 ADR では消さない** —— 空ける判断はオーナーに出す。
+
+## Consequences
+
+- ¥1M 計画の Phase 0 見積り（Modal H100 で約 $50）は **不要になった**。同じ問いに
+  murakumo 自身のハードウェアが ¥0 で答えた。
+- 日本語で利得がほぼ出ないことは、統一モデルの text 面の設計に効く。**並列 decode を
+  日本語の応答速度の根拠にしない。**
+- 1.7B での測定である。スケールでの外挿はしていない。
+
+## 再現
+
+```bash
+ssh gad
+cd /home/gad/dllm-phase0
+./venv/bin/python phase0_sdar_block_diffusion.py --blocks 1,4,8,16 --max-new 128 --threshold 0.9
+./venv/bin/python phase0_exec_eval.py --blocks 1,4,8 --thresholds 0.5,0.7,0.9,0.99
+```
+
+スクリプトは `scripts/dllm-phase0/` に置いた。環境は ComfyUI の venv-rocm7 を
+`.pth` で読み取り参照し、`transformers==4.52.4` と pure-PyTorch の flash_attn shim
+（`rms_norm_fn` のみ）を phase0 venv 内だけに入れてある。**production の ComfyUI venv と
+vendor の modeling_sdar.py は 1 バイトも変更していない。**"}]

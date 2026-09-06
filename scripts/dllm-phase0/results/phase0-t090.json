@@ -1,0 +1,109 @@
+{
+ "model": "/home/gad/dllm-phase0/SDAR-1.7B-Chat",
+ "results": [
+  {
+   "tokens": 91,
+   "forwards": 91,
+   "tok_per_forward": 1.0,
+   "wall_s": 28.92,
+   "tok_per_s_contended": 3.15,
+   "text": "```\ndef merge_intervals(intervals):\n    if not intervals:\n        return []\n    intervals.sort(key=lambda x: x[0])\n    merged = [intervals[0]]\n    for interval in intervals[1:]:\n        if interval[0] <= merged[-1][1]:\n            merged[-1][1] = max(merged[-1][1], interval[1])\n        else:\n            merged.append(interval)\n    return merged\n```",
+   "distinct_ratio": 0.56,
+   "longest_immediate_repeat": 1,
+   "prompt": "code",
+   "block": 1,
+   "threshold": 0.9
+  },
+  {
+   "tokens": 87,
+   "forwards": 42,
+   "tok_per_forward": 2.071,
+   "wall_s": 12.18,
+   "tok_per_s_contended": 7.14,
+   "text": "def merge_intervals(intervals):\n    if not intervals:\n        return []\n    intervals.sort(key=lambda x: x[0])\n    merged = [intervals[0]]\n    for interval in intervals[1:]:\n        if interval[0] <= merged[-1][1]:\n            merged[-1][1] = max(merged[-1][1], interval[1])\n        else:\n            merged.append(interval)\n    return merged",
+   "distinct_ratio": 0.54,
+   "longest_immediate_repeat": 1,
+   "prompt": "code",
+   "block": 4,
+   "threshold": 0.9
+  },
+  {
+   "tokens": 88,
+   "forwards": 47,
+   "tok_per_forward": 1.872,
+   "wall_s": 22.57,
+   "tok_per_s_contended": 3.9,
+   "text": "def merge_intervals(intervals):\n    if not intervals:\n        return []\n    intervals.sort(key=lambda x: x[0])\n    merged = [intervals[0]]\n    for interval in intervals[1:]:\n        if interval[1] <= merged[-1][1]:\n            merged[-1][1] = max(interval[-1][1], merged[-1][1])\n        else:\n            merged.append(interval)\n    return merged",
+   "distinct_ratio": 0.511,
+   "longest_immediate_repeat": 1,
+   "prompt": "code",
+   "block": 8,
+   "threshold": 0.9
+  },
+  {
+   "tokens": 64,
+   "forwards": 28,
+   "tok_per_forward": 2.286,
+   "wall_s": 14.9,
+   "tok_per_s_contended": 4.29,
+   "text": "def merge_intervals(intervals):\n    merged = []\n    for interval in intervals:\n        if not merged or merged[0][1] < interval[0]:\n            merged.append(interval)\n        else:\n            merged[-1][1] = max(merged[-1][1], interval[1])\n    return merged",
+   "distinct_ratio": 0.609,
+   "longest_immediate_repeat": 1,
+   "prompt": "code",
+   "block": 16,
+   "threshold": 0.9
+  },
+  {
+   "tokens": 96,
+   "forwards": 96,
+   "tok_per_forward": 1.0,
+   "wall_s": 43.42,
+   "tok_per_s_contended": 2.21,
+   "text": "自己回帰モデルは、前回の出力を入力として予測するため、前回の出力が予測に影響を及ぼす。一方、拡散言語モデルは、前回の出力を入力として予測するが、前回の出力が予測に影響を及ぼさない。そのため、拡散言語モデルは自己回帰モデルより速く予測できる。",
+   "distinct_ratio": 0.396,
+   "longest_immediate_repeat": 1,
+   "prompt": "ja",
+   "block": 1,
+   "threshold": 0.9
+  },
+  {
+   "tokens": 128,
+   "forwards": 106,
+   "tok_per_forward": 1.208,
+   "wall_s": 18.63,
+   "tok_per_s_contended": 6.87,
+   "text": "拡散言語モデルは、自己回帰モデルよりも速くなる理由は、自己回帰モデルは、前回の出力を入力として出力するのため、前回の出力を入力するための計算が複雑で、計算時間が長くなる一方、拡散言語モデルは、前回の出力を入力として出力するのではなく、前回の出力を入力として出力するのではなく、前回の出力を入力として出力するのではなく、前回の出力を入力として出力",
+   "distinct_ratio": 0.266,
+   "longest_immediate_repeat": 1,
+   "prompt": "ja",
+   "block": 4,
+   "threshold": 0.9
+  },
+  {
+   "tokens": 32,
+   "forwards": 26,
+   "tok_per_forward": 1.231,
+   "wall_s": 3.94,
+   "tok_per_s_contended": 8.12,
+   "text": "拡散言語モデルは、自己回帰モデルよりも高速に学習できるため、自己回帰モデルより速くなりうるのです。",
+   "distinct_ratio": 0.812,
+   "longest_immediate_repeat": 1,
+   "prompt": "ja",
+   "block": 8,
+   "threshold": 0.9
+  },
+  {
+   "tokens": 42,
+   "forwards": 43,
+   "tok_per_forward": 0.977,
+   "wall_s": 5.93,
+   "tok_per_s_contended": 7.08,
+   "text": "拡散言語モデルは、自己回帰モデルよりも、前回の出力を直接入力する方法を採するため、計算量が少なく、より速くなりうる。",
+   "distinct_ratio": 0.81,
+   "longest_immediate_repeat": 1,
+   "prompt": "ja",
+   "block": 16,
+   "threshold": 0.9
+  }
+ ]
+}

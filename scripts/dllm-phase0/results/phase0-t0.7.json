@@ -1,0 +1,31 @@
+{
+ "model": "/home/gad/dllm-phase0/SDAR-1.7B-Chat",
+ "results": [
+  {
+   "tokens": 90,
+   "forwards": 34,
+   "tok_per_forward": 2.647,
+   "wall_s": 2.16,
+   "tok_per_s_contended": 41.67,
+   "text": "def merge_intervals(intervals):\n    if not intervals:\n        return []\n    intervals.sort(key    = lambda x: x[0])\n    merged = [intervals[0]]\n    for interval in intervals[1:]:\n        if interval[0] <= merged[-1][1]:\n            merged[-1][1] = max(merged[-1][1], interval[1])\n        else:\n            merged.append(interval)\n    return return merged",
+   "distinct_ratio": 0.522,
+   "longest_immediate_repeat": 2,
+   "prompt": "code",
+   "block": 8,
+   "threshold": 0.7
+  },
+  {
+   "tokens": 25,
+   "forwards": 15,
+   "tok_per_forward": 1.667,
+   "wall_s": 0.92,
+   "tok_per_s_contended": 27.19,
+   "text": "拡散言語モデルは自己回帰モデルよりも速くなる理由、3行で説明してください。",
+   "distinct_ratio": 0.96,
+   "longest_immediate_repeat": 1,
+   "prompt": "ja",
+   "block": 8,
+   "threshold": 0.7
+  }
+ ]
+}
