@@ -1,6 +1,6 @@
 [{:db/id -1
   :adr/id "adr-2609063200-sdar-vl-graft-target-image-and-video-already-wired"
-  :adr/title "統一モデルの graft 先は SDAR-VL-Think-8B —— 画像も動画も（時間順序も）既に配線され、実測で動く。書く必要があるのは音声 projector 1 本だけ"
+  :adr/title "統一モデルの graft 先は SDAR-VL-Think-8B —— 画像・動画は既に配線済みで実測動作、音声も 22M の projector 1 本で配線した。3 面とも入力側は通った"
   :adr/status "accepted"
   :adr/date "2026-09-06"
   :adr/last_verified "2026-09-06"
@@ -28,9 +28,10 @@
 
 ## 一行で
 
-**画像と動画は既に配線されていて、実測で動く。時間順序も読める。**
-統一モデルのために書く必要があるのは **音声の projector 1 本と placeholder token 1 個**
-だけで、trunk・語彙本体・拡散 mask はいずれも無改造。
+**画像と動画は既に配線されていて、実測で動く。時間順序も読める。音声は
+22M の projector 1 本を書いて配線し、陰性対照つきで確認した。** 3 面とも
+**入力側は通った**。trunk・語彙・拡散 mask はいずれも無改造で、
+**語彙は 1 行も増えていない**。
 
 ## 6 つの probe（すべて gad で実測、2026-09-06）
 
@@ -76,11 +77,40 @@ probe 6 はその曖昧さを構造的に消す —— **完全に同じ 8 枚**
 |---|---|---|---|
 | 画像 | `<\\|image_pad\\|>` 151655 | SigLIP(1152) → projector → 4096 | **実測で動作** |
 | 動画 | `<\\|video_pad\\|>` 151656 | 同じ塔をフレームに適用、`video_preprocessor_config.json` 同梱 | **実測で動作（順序含む）** |
-| 音声 | **無し** | — | **唯一の実装対象** |
+| 音声 | `<\\|audio_pad\\|>` **151670**（既存の空き行を使用） | Whisper(1280) → projector → 4096 | **配線済み・未学習** |
 
 **動画は `予約されている` のではなく `配線されている`。** config が
 `video_token_index` を持ち、preprocessor が同梱され、そして実際に
 `pixel_values_videos (1, 8, 3, 384, 384)` が trunk に届いている。
+
+## 音声 graft（probe 7-9、2026-09-06 実測）
+
+視覚経路と同じ形で書いた —— 新方式は発明していない。
+
+```
+Whisper-large-v3 encoder (d_model 1280) → adaptive pool 64 位置
+  → AudioProjector: Linear(1280→4096) → GELU → Linear(4096→4096)   [22.0M params]
+  → <\\|audio_pad\\|> の位置に散布 → SDAR trunk 4096
+```
+
+**語彙は増やしていない。** trunk は `vocab_size 151936` を宣言しているのに実際に
+使われている最大 id は **151669** —— **266 行が確保済みで未使用**である。その 1 つ
+（**151670**）を `<\\|audio_pad\\|>` として使うので、embedding の resize が起きない。
+
+| # | 検査 | 結果 |
+|---|---|---|
+| 7 | **個数**: 投影ベクトル数 == placeholder 位置数 | **PASS** 64 == 64（prompt 78 tokens） |
+| 8 | **依存性**: 440 Hz 純音 vs ホワイトノイズ | **PASS** delta 2.0625 |
+| 9 | **陰性対照**: projector 出力層をゼロ化 | **PASS** delta **0.000000** |
+
+**probe 9 が probe 8 に意味を与える。** 出力層をゼロにすると 2 つのクリップは
+**bit 一致**する。したがって 2.0625 が系列長・プロンプト・サンプリングなど
+音声以外の差から来ている可能性は消えている。**この対照が無ければ、何らかの理由で
+異なる 2 つの forward はどれも `動いている音声経路` に見える。**
+
+⚠ **projector は乱数初期化であり、モデルは音声を理解しない。**
+probe 7-9 が示したのは **経路が音声依存の情報を運ぶこと**だけである。
+理解には 22M パラメータを音声-テキスト対で学習する必要があり、未着手。
 
 ## 接続仕様（実測した次元）
 
@@ -105,15 +135,20 @@ probe 6 はその曖昧さを構造的に消す —— **完全に同じ 8 枚**
    ≤32 GB 制約の中にあり、ADR-2609063000 が 8B で実測した
    `代償ゼロで 2.362 分の 1` の decode がそのまま乗る。
 2. **視覚側は実装しない。** 既存の経路が動くことを実測した。
-3. **書くのは音声の入力経路のみ** —— projector（1280 → 4096）と placeholder token 1 個。
+3. **音声の入力経路は書いた**（`scripts/dllm-phase0/audio_graft.py`）。placeholder は
+   既存の空き行を claim するので **語彙拡張も resize も無い**。次は 22M パラメータの
+   学習（音声-テキスト対が要る）。
 4. **MMaDA / Lumina-DiMOO は採らない。** 同じ 8.08B の any-to-any だが vendor の
    code repo が別途必要で、こちらは Phase 0 で書いた mask 契約・decode ループ・
    採点 harness が**そのまま使える**。
 
 ## Consequences / 未達
 
-- **これは入力側（理解）だけである。** 音声や動画を**生成**するには語彙拡張と
-  modality ごとの decoder が要る。そこは未着手。
+- **これは入力側の配線だけである。** 音声は**未学習**（probe 7-9 は経路の存在を
+  示すが理解は示さない）。音声や動画を**生成**するには語彙拡張と modality ごとの
+  decoder が要り、そこは未着手。
+- **`配線済み` と `動く` と `理解する` は 3 つの別の主張**である。画像と動画は
+  2 番目まで（probe 2/6）、音声は 1 番目まで。この ADR はどれがどれかを表で保つ。
 - **8B の日本語は未測定**（1.7B で著しく弱かった。ADR-2609063000）。
 - probe 6 は 1 問である。順序を読めることの証明としては十分だが、
   **どの程度読めるかは測っていない**。
@@ -128,5 +163,6 @@ ssh gad && cd /home/gad/dllm-phase0
 ./venv/bin/python vl_probe.py          # probe 1,2（画像）
 ./venv/bin/python vl_video_probe.py    # probe 3,4（動画・順序が届くか）
 PYTORCH_ALLOC_CONF=expandable_segments:True ./venv/bin/python vl_order_digits.py  # probe 6
+PYTORCH_ALLOC_CONF=expandable_segments:True ./venv/bin/python audio_graft.py      # probe 7,8,9
 ```
 "}]
