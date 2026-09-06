@@ -2073,8 +2073,22 @@
   ;; suite. Contrast the search-origin entry below, which needs no packages
   ;; at all.
   ;; NOT verified on a node.
+  ;; `:cap :egress` because of that measurement, not in spite of it. The
+  ;; planner put this gate on zebulun on its first plan, and zebulun answered
+  ;; 000 for the npm registry the same hour — the gate would have gone red
+  ;; for a reason that has nothing to do with the code it checks. The cap is
+  ;; produced by `probe.cljs`, so it is re-measured every probe instead of
+  ;; being a date-stamped sentence somebody quotes later.
+  ;;
+  ;; ⚠ `placement/required-cap` returns ONE cap: `(or (:cap w) <kind
+  ;; default>)`. So `:cap :egress` REPLACES `:nbb-test`'s implicit `:node`
+  ;; rather than adding to it. That is safe only because `classify` refuses
+  ;; to grant `:egress` to a node that would not also earn `:node` — there is
+  ;; no npx to run npm with — and a probe self-test pins that
+  ;; ("no npx, no :egress"). If that coupling is ever loosened, this entry
+  ;; can be placed on a node with a route out and nothing to run.
   {:name "kotobase-client" :gate :nbb-test :classpath "src:test"
-   :entry "test/run_tests.cljs" :ship-git-deps true :cd true}
+   :entry "test/run_tests.cljs" :ship-git-deps true :cap :egress :cd true}
 
   ;; search-origin — the published shard index and the page that queries it
   ;; in the reader's browser (root ADR-2609064000). Same story as
