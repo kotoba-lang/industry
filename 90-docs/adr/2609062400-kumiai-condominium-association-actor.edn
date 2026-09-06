@@ -5,14 +5,15 @@
   :adr/date "2026-09-06"
   :adr/repo "cloud-itonami/cloud-itonami-isic-6820"
   :adr/tags ["cloud-itonami" "isic-6820" "actor" "governor" "kanri-kumiai" "shuzen-tsumitatekin" "kubunshoyu-ho" "chouki-shuzen-keikaku"]
-  :adr/landed-commit "08924c11a5629988ba0064fc7ae11ce398e8089d"
-  :adr/west-pin-commit "16cda52804d1bc48e96b2e424e1f40694084d462"
+  :adr/landed-commit "ec16bacd7879cbc66f6ed6dc6e86b1f3cd97803a"
+  :adr/west-pin-commit "90fa82ba4c820dd3165ab98ae624aff316d53698"
   :adr/landed-commits ["547c86e65483da40cec577b9742dc4cd1a7c571a — 管理組合 actor (JPN)"
                        "577b277616590c04d89486328b3682157e053dce — DEU / ESP / FRA の法定決議要件"
                        "2f0b0b13e48efc5014da5f579b17c05370dfa489 — SGP の法定決議要件"
                        "ac475330edcafa9eee076bdb364b3b4f67b91aac — AUS-NSW s 5 (反対側の閾値)"
                        "2dfc0518b68648ecd599bcb81b23064418abb72b — AUS-NSW Sch 1 cl 14/17 (完成)"
-                       "08924c11a5629988ba0064fc7ae11ce398e8089d — 判定核を Kotoba へ (JVM なしで check / wasm)"]
+                       "08924c11a5629988ba0064fc7ae11ce398e8089d — 判定核を Kotoba へ (JVM なしで check / wasm)"
+                       "ec16bacd7879cbc66f6ed6dc6e86b1f3cd97803a — JDK を loop から外す (kotoba compile + amu native)"]
   :adr/body "cloud-itonami-isic-6820 は ISIC Rev.5 6820 (Real estate activities on a
 fee or contract basis) の open business blueprint として、**管理会社が
 所有者の代理で報酬を受け取り契約を実行する**面を実装していた。同じ ISIC
@@ -358,18 +359,66 @@ JVM を起こさない）。21 ケース —— 6 法域の**ちょうどの境�
 ⚠ **残りの `.cljc` は JVM の suite のまま**で、それが Kotoba module を測る
 oracle である。移行済みと書かない。
 
+### JDK を loop から外した (2026-09-06、オーナー指示「jvm 依存を無くして, kotoba compile, amu native のみに」)
+
+前段では **artifact のビルドに `--target js-browser` を使っており、これは
+`clojure` を起こす** —— source は移っても JDK は loop に残っていた。
+
+**JDK を拒否した環境で測った。** `scripts/kotoba_native_acceptance.cljs`（nbb）は
+`java` / `javac` / `clojure` / `clj` / `jarsigner` の stub（呼ばれたら trace に
+追記して exit 97）を作って **PATH の先頭に置き**、`JAVA_HOME` を毒し、その中で
+全工程を回す:
+
+```
+amu check   --jvm-free
+amu compile --jvm-free --target aarch64-macos    -> .kexe
+amu compile --jvm-free --target wasm32-browser   -> .wasm
+amu extract-native --symbol main
+cc tools/kexe_loader.c
+loader main.bin <offset> 0 aarch64 -             -> guest 自身の失敗数
+
+NATIVE  aarch64-macos  self-check-failures  0
+PARITY  CASES 20       DISAGREEMENTS 0
+JVM-INVOCATIONS 0
+PASS
+```
+
+guest に `main` を足した —— 6 法域が実際に依拠する境界を再導出し、**失敗の
+「個数」を返す**。boolean ではなく個数にしたのは、「何かが失敗した」しか
+言えない自己検査では 1 件の退行と壊れたビルドを区別できないから。
+
+**oracle parity を js artifact から native artifact へ移した。** `.cljc` は nbb が
+読み、Kotoba 側は loader 経由で呼ぶ（bool は ABI 上 0/1）。Q9 は oracle が
+nbb/CLJS でよいと言っているが、**検査対象のビルドに clojure を呼び戻すこと**は
+認めていない。`test/kotoba/parity.cljs` はそのため削除した。
+
+**この deny は飾りではない。** `amu test` を使わないのは、それが
+`clojure -M:run` に落ちるからで、**amu のサブコマンドで trace を踏むのはこれだけ**
+—— つまりこれが「trace が何かを検出できる」ことの証拠でもある。発火しない検査は、
+常に発火する検査と同じだけ無内容。
+
+**両方向**: `>` を `>=` に 1 箇所反転（過半数→以上）すると `main` が **2** を返し、
+parity も **不一致 2** を報告して exit 1。戻すと 0 と 0 で exit 0。
+toolchain が無ければ exit **2**（どちらでもない）。
+
+### 主張していないこと（Q9 の :blocked）
+
+**component は移行済みではなく `:blocked` である。** `store` / `operation` /
+`kumiaillm` / `registry` は langgraph の StateGraph・protocol・defrecord・atom・
+`langchain.db` に乗っており、これらは言語が admit しない host mechanism。
+そして **Q9 は決定核 fallback を移行単位として認めない**（ADR-2608261100）。
+残る `.cljc` suite は oracle であり、Q9 はそれを historical / non-gating と
+位置づける。**gate は上記の 1 コマンド**であって JVM suite ではない。
+
 ## 再開点 (会話履歴なしで続けられる粒度)
 
 **現在地の確認**:
 
 ```bash
 cd orgs/cloud-itonami/cloud-itonami-isic-6820
-# JVM を起こさない側から先に確かめる
-K=<workspace>/orgs/kotoba-lang/amu/bin/kotoba
-$K -M check <abs>/kotoba/kumiai/resolution_core.kotoba          # :ok true / 6 exports
-$K -M compile <abs>/kotoba/kumiai/resolution_core.kotoba --target wasm32-browser --output <abs>/rc.wasm
-nbb --classpath src:test test/kotoba/parity.cljs                # 21 cases / 0=pass 1=disagree 3=skip
-# oracle 側 (JVM)
+# gate: JDK を拒否した環境で build も acceptance も回す (0 pass / 1 fail / 2 測定不能)
+nbb --classpath src:scripts scripts/kotoba_native_acceptance.cljs
+# oracle 側 (JVM、Q9 では historical / non-gating)
 clojure -M:dev:test        # 195 tests / 783 assertions / 0 failures (closing 時に着地状態で再実行)
 clojure -M:lint            # 0 errors / 0 warnings
 clojure -M:dev:run-kumiai  # 6法域の決議要件 + 感度表 + HARD hold 11種
