@@ -7765,5 +7765,77 @@
      :file "src/electeng/ledger.cljc"
      :find "    (and (= :hold disposition) (not= :governor-hold authorisation))\n"
      :replace "    (and false (= :hold disposition) (not= :governor-hold authorisation))\n"
-     :must-fail ["a-hold-cannot-claim-sign-off"]}]}
+     :must-fail ["a-hold-cannot-claim-sign-off"]}]},
+
+  {:repo "orgs/cloud-itonami/cloud-itonami-isco-4312"
+   :label "statclerk actor ledger —— どの書き込みを何が許可したのかを、台帳が言えること"
+   ;; 実測（改修前 tip 3c3f9d8、`statclerk.actor` を 4 回走らせた）: 自動の
+   ;; :reconcile-batch と、:request-approval で中断し `actor/approve!` で人間が
+   ;; resume した :post-adjustment は、**どちらも keys (:disposition :record)**
+   ;; の entry を書いた。README は :post-adjustment（金銭的影響を持つ償却・訂正）に
+   ;; 必ず人間の sign-off を約束しているのに、台帳はどの書き込みがそれを受けたのかを
+   ;; 示せなかった。
+   ;;
+   ;; op 名では救えない。低 confidence（< governor/confidence-floor）の
+   ;; :reconcile-batch も同じ中断→resume 経路を通るので、**自動の
+   ;; :reconcile-batch と人間が sign-off した :reconcile-batch が並ぶ**。両者の
+   ;; 差は advisor が自分について申告した :confidence だけで、それは主張であって
+   ;; 「人間が thread を resume した」という証拠ではない。
+   ;;
+   ;; ここに載せる 7 件は **2026-09-06 に実際に赤くなるところを見た**もの。
+   ;; :governor-stops-escalating-adjustments が特に効く —— governor の
+   ;; escalation を外すと、ledger が**実行時に** throw して
+   ;; 「escalation 規則が緩んだという報告である」と名乗る。台帳の拒否が
+   ;; 単体テストの中だけでなく、走っている actor の中で効いていることの実演。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors."
+   :mutations
+   [{:id :isco4312/authorisation-not-required
+     :why "**穴そのもの**。台帳の項目が「何がこの書き込みを許可したか」を名乗らなくてよくなる。改修前 3c3f9d8 の実挙動そのもので、自動 commit と人間が sign-off した commit が keys (:disposition :record) で同一だった"
+     :file "src/statclerk/ledger.cljc"
+     :find "    (not (authorisations authorisation))\n    (str \":authorisation が無い、または未知（受領: \" (pr-str authorisation)\n         \"、既知: \" (pr-str (sort authorisations)) \"）\"\n         \" — 台帳の項目は、その書き込みを何が許可したかを名乗らなければならない\")\n\n"
+     :replace ""
+     :must-fail ["refuses-an-entry-that-does-not-say-what-authorised-it" "refuses-an-unknown-authorisation"]},
+
+    {:id :isco4312/commit-always-claims-governor-clear
+     :why ":commit ノードが到達経路を見なくなり、人間が resume した書き込みも :governor-clear を名乗る。**改修前と同じ状態に戻る**。:post-adjustment では ledger 自身が実行時に throw するので、actor test が error になる"
+     :file "src/statclerk/actor.cljc"
+     :find "                           auth (if (= :request-approval disposition)\n                                  :human-sign-off\n                                  :governor-clear)"
+     :replace "                           auth :governor-clear"
+     :must-fail ["separates-two-reconciles-that-used-to-look-identical" "interrupts-then-adjusts-on-human-approval"]},
+
+    {:id :isco4312/adjustment-may-claim-governor-clear
+     :why ":post-adjustment（金銭的影響を持つ）が governor 単独で commit されたと記録できるようになる。これは台帳の誤記ではなく escalation 規則が緩んだという報告なので、拒否されなければならない"
+     :file "src/statclerk/ledger.cljc"
+     :find "    (and (= :commit disposition)\n         (= :governor-clear authorisation)\n         (human-only-ops (:op record)))\n    (str (pr-str (:op record))\n         \" は金銭的影響を持つので governor 単独では commit できない\"\n         \"（README / governor の risky-op?）—\"\n         \" :governor-clear を名乗る項目は、台帳の誤記ではなく\"\n         \" escalation 規則が緩んだという報告である\")\n\n"
+     :replace ""
+     :must-fail ["refuses-an-adjustment-that-claims-the-governor-cleared-it"]},
+
+    {:id :isco4312/hold-authorisation-unchecked
+     :why "拒否された提案の entry が :human-sign-off を名乗れるようになる —— 誰も承認していないものを承認済みとして記録できる"
+     :file "src/statclerk/ledger.cljc"
+     :find "    (and (= :hold disposition) (not= :governor-hold authorisation))\n    (str \":hold の :authorisation は :governor-hold のみ（受領: \"\n         (pr-str authorisation) \"）\")\n\n"
+     :replace ""
+     :must-fail ["refuses-a-hold-authorised-by-anything-but-a-hold"]},
+
+    {:id :isco4312/older-entry-reported-as-automatic
+     :why "この namespace より前に書かれた entry（:authorisation を持たない）が :governor-clear として報告される。**判らなかったことと、人間が関与しなかったことを混同する** —— 監査で最も高くつく取り違え"
+     :file "src/statclerk/ledger.cljc"
+     :find "  [e]\n  (:authorisation e))"
+     :replace "  [e]\n  (or (:authorisation e) :governor-clear))"
+     :must-fail ["an-older-entry-answers-nil-not-governor-clear"]},
+
+    {:id :isco4312/governor-stops-escalating-adjustments
+     :why "governor が :post-adjustment の escalation をやめる。**台帳がこれを実行時に捕まえる**ことの実演: actor は :governor-clear で commit しようとし、ledger/entry が「escalation 規則が緩んだ」と名乗って throw する（実測 2026-09-06、error の本文がその文言であることを確認済み）"
+     :file "src/statclerk/governor.cljc"
+     :find "        risky-op? (= :post-adjustment (:op proposal))"
+     :replace "        risky-op? false"
+     :must-fail ["escalates-adjustment-posting" "interrupts-then-adjusts-on-human-approval"]},
+
+    {:id :isco4312/verdict-summary-passes-whole-map
+     :why "hold の :verdict が丸ごと台帳に入る。監査対象でない内部状態が append-only の記録に混ざり、entry の形が verdict の形に従属する"
+     :file "src/statclerk/ledger.cljc"
+     :find "    verdict (assoc :verdict (select-keys verdict\n                                         [:ok? :hard? :escalate? :confidence :violations]))"
+     :replace "    verdict (assoc :verdict verdict)"
+     :must-fail ["a-hold-keeps-only-the-verdict-summary"]}]}]}
   ]}
