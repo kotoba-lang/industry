@@ -5,13 +5,14 @@
   :adr/date "2026-09-06"
   :adr/repo "cloud-itonami/cloud-itonami-isic-6820"
   :adr/tags ["cloud-itonami" "isic-6820" "actor" "governor" "kanri-kumiai" "shuzen-tsumitatekin" "kubunshoyu-ho" "chouki-shuzen-keikaku"]
-  :adr/landed-commit "2dfc0518b68648ecd599bcb81b23064418abb72b"
-  :adr/west-pin-commit "d88f05cd31c79ab2b5a7892cd2e2a92ba404e549"
+  :adr/landed-commit "08924c11a5629988ba0064fc7ae11ce398e8089d"
+  :adr/west-pin-commit "16cda52804d1bc48e96b2e424e1f40694084d462"
   :adr/landed-commits ["547c86e65483da40cec577b9742dc4cd1a7c571a — 管理組合 actor (JPN)"
                        "577b277616590c04d89486328b3682157e053dce — DEU / ESP / FRA の法定決議要件"
                        "2f0b0b13e48efc5014da5f579b17c05370dfa489 — SGP の法定決議要件"
                        "ac475330edcafa9eee076bdb364b3b4f67b91aac — AUS-NSW s 5 (反対側の閾値)"
-                       "2dfc0518b68648ecd599bcb81b23064418abb72b — AUS-NSW Sch 1 cl 14/17 (完成)"]
+                       "2dfc0518b68648ecd599bcb81b23064418abb72b — AUS-NSW Sch 1 cl 14/17 (完成)"
+                       "08924c11a5629988ba0064fc7ae11ce398e8089d — 判定核を Kotoba へ (JVM なしで check / wasm)"]
   :adr/body "cloud-itonami-isic-6820 は ISIC Rev.5 6820 (Real estate activities on a
 fee or contract basis) の open business blueprint として、**管理会社が
 所有者の代理で報酬を受け取り契約を実行する**面を実装していた。同じ ISIC
@@ -314,12 +315,61 @@ binary と見なして理由を言わずに 0 件を返す** —— この bot �
 | 全国一律の法定表が無い | USA-NY · GBR |
 | 表は在るが読めていない（bot が監視中） | ITA · CHN |
 
+### 判定核を Kotoba へ移した (2026-09-06、オーナー指示「clojure じゃなくて kotoba -M にして」)
+
+**この actor は検証を全部 JVM でやっていた** —— CLAUDE.md の runtime 優先順位は
+JVM を最後に置いているので、これは規則違反だった。判定の中心を
+`kotoba/kumiai/resolution_core.kotoba` に移し、**JVM を起こさずに**
+`check` と `wasm32-browser` を通した (`requiredCapabilities: []`、2,512 bytes)。
+
+**全部を測ってから書いた（推測しない）**:
+
+- **`kotoba -M` の実体は `orgs/kotoba-lang/amu/bin/kotoba`**（nbb 駆動）。
+  PATH 上の `kotoba` は Rust の knowledge-graph node CLI（`serve`/`block`/
+  `sparql`）で `-M` を持たない。`~/.local/bin/kotoba` は**消えた /tmp を exec
+  する2行の shim** で、`which` は通り実行は 126 で落ちる —— skill が
+  「可用性は `which` で測るな、exit code を読め」と書いている当のもの。
+- `check` と `--target wasm32-browser` は JVM を起こさない。
+  **`--target js-browser` は clojure を起こす** —— README にそう書いた。
+  経路全体が JVM-free であるかのように書かない。
+- **fold ではなく judge-1/2/3 にした理由は測定結果**: `[:vector :i64]` は
+  `heterogeneous vector types must be a bounded vector` で拒否され、admit
+  される bounded vector は `vector-i64`/`vector-at` 系（record ではなく整数）。
+  record の vector は今日 admit されない。カタログの全規則は軸が最大3本なので
+  3つの入口で過不足なく覆え、**撤去条件はモジュール冒頭に書いた**。
+- **validation と `explain` は host に残した**。validation は throw で拒否し、
+  `throw` はこの言語の恒久的な外側（ADR-2608650000）。`[:result T E]` へ移すのは
+  全呼び出し側を変える別 slice であって、この slice に紛れ込ませない。
+
+**parity は両方向で実演した**（`test/kotoba/parity.cljs`、nbb なので検査自体も
+JVM を起こさない）。21 ケース —— 6 法域の**ちょうどの境界を全部**含み、float なら
+丸まる 99 の 2/3 も入っている:
+
+| 操作 | 結果 |
+|---|---|
+| Kotoba 側の `>` を `>=` に 1 箇所ひっくり返す | 不一致 3、exit 1（JPN 第39条 / DEU §21 Abs.2 / FRA art.26 の「ちょうど半分」） |
+| 戻す | 不一致 0、exit 0 |
+| artifact 未ビルド | SKIP、**exit 3** |
+
+**skip を 0 にしないのが要点**。実際、この harness の初稿は
+**比較の中で落ちた例外を import ハンドラが捕まえて SKIP として報告**していた ——
+未ビルドと失敗が同じ顔をしていた。import 失敗と呼び出し失敗を分けて直した。
+
+⚠ **残りの `.cljc` は JVM の suite のまま**で、それが Kotoba module を測る
+oracle である。移行済みと書かない。
+
 ## 再開点 (会話履歴なしで続けられる粒度)
 
 **現在地の確認**:
 
 ```bash
 cd orgs/cloud-itonami/cloud-itonami-isic-6820
+# JVM を起こさない側から先に確かめる
+K=<workspace>/orgs/kotoba-lang/amu/bin/kotoba
+$K -M check <abs>/kotoba/kumiai/resolution_core.kotoba          # :ok true / 6 exports
+$K -M compile <abs>/kotoba/kumiai/resolution_core.kotoba --target wasm32-browser --output <abs>/rc.wasm
+nbb --classpath src:test test/kotoba/parity.cljs                # 21 cases / 0=pass 1=disagree 3=skip
+# oracle 側 (JVM)
 clojure -M:dev:test        # 195 tests / 783 assertions / 0 failures (closing 時に着地状態で再実行)
 clojure -M:lint            # 0 errors / 0 warnings
 clojure -M:dev:run-kumiai  # 6法域の決議要件 + 感度表 + HARD hold 11種
