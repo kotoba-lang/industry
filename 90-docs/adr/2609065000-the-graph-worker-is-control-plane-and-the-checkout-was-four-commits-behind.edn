@@ -287,5 +287,45 @@ live artifact の出所を判定するときに手元の checkout を根拠に�
 GitHub（その commit が default branch から到達するか）と、
 配布側（version の annotation / binding 集合 / artifact の literal）の
 **両方に訊く**。片方だけなら、遅れた checkout と存在しないコードが同じ顔をする。
+
+## 追記（2026-09-06、この ADR の勧告 3・4 を実行し、7 を測った）
+
+**勧告 3（engine が本番 script を名指せる状態を止める）は実行済み。**
+`net-kotobase/engine` の `wrangler.jsonc` 冒頭の `name` を
+`kotobase-cf-wasm-staging` → **`kotobase-engine-candidate`** に変更し、なぜかを
+その場に書いた（merge `1e40778aef5dea4e9243e1e46d985e87e95625dc`、west pin
+`9a01d4769cd7`）。**どちらの tree が正本かは決めていない** —— 決まるまでの間、
+engine から出る deploy が本番を上書きできないようにしただけである。
+`test/architecture-boundary-gate.mjs --self-test` は変更の前後とも exit 1
+（control-plane 側のディレクトリ配置にある
+`contracts/architecture/capability-boundaries.json` が engine には無い）。
+既存の状態であって、この変更のせいではない。
+
+**勧告 4（engine の Actions 無効化）も実行済み。両方向を実測した:**
+
+    before: {\"enabled\":true,\"allowed_actions\":\"all\",\"sha_pinning_required\":false}
+    after:  {\"enabled\":false,\"sha_pinning_required\":false}
+    registered workflows: 0
+
+**勧告 7（重複 tree）は測った。消していない。**（2026-09-06 実測）
+
+| tree | git | 未コミット | 本番 script 名を持つ config |
+|---|---|---|---|
+| `net-kotobase/control-plane-legal-candidate` | be57723 | **3 件** | 2 |
+| `net-kotobase/control-plane-siwe-wallet` | 8db5cfc | 0 | 2 |
+| `net-kotobase/biscuit-auth-query-bench` | **git repo ですらない** | — | 2 |
+| `network-awai/net-kotobase` | f2d38219 | **5 件** | 1 |
+| `net-kotobase/control-plane-retired` | b8322d1 | 0 | 0 |
+
+**2 つが他者の未コミット作業を抱えている**ので、移動も削除もしていない
+（CLAUDE.md「他者の dirty/untracked を移動・削除しない」）。整理は
+`git-cleanup-conflict` の仕事であって、この ADR の仕事ではない。
+
+⚠ **この 4 つに対して deploy guard は効かない。** `wrangler-deploy-main-sync-guard`
+は `origin/main` との遅れで判定するが、west checkout の remote は org 名なので
+`origin/main` が解決できず **fail-open** する（CLAUDE.md「6 問」の 2 問目が
+名指ししている形で、実測で 4,406 中 2,824 が無検査）。つまりここから出る deploy は
+**930 commit 遅れの artifact を本番へ出荷できて、しかも何も言わない。**
+engine を改名して塞いだのは 5 本のうち 1 本だけである。
 "
 }]
