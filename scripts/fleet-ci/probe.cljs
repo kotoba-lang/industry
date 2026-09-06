@@ -130,6 +130,29 @@
     ;; The registry, not github.com or 1.1.1.1: what the `:nbb-test` npm step
     ;; actually reaches for. A node can have one and not the other.
     "echo npmreg=$(curl -sS -o /dev/null -m 10 -w '%{http_code}' https://registry.npmjs.org/ 2>/dev/null || echo 000)"
+    ;; **Why a node lost its capabilities, not just that it did.**
+    ;;
+    ;; Measured 2026-09-06: five of eight reachable nodes could not
+    ;; `bind(("0.0.0.0", 0))` at all — `[Errno 49] Can't assign requested
+    ;; address` — because every port in the ephemeral range was occupied by a
+    ;; TCP socket that was not being reaped. On those nodes even
+    ;; `curl http://127.0.0.1:...` returned 000: with no ephemeral port
+    ;; available, a machine cannot open a connection to ITSELF.
+    ;;
+    ;; `classify` already withheld every cap, correctly, through `loopback?`.
+    ;; What it could not say was why, and the difference cost an hour of
+    ;; ssh archaeology: lo0 was up, `ping 127.0.0.1` answered, and
+    ;; `bind(("127.0.0.1", 0))` succeeded — only the unbound client socket
+    ;; failed. These two numbers put the answer in nodes.edn.
+    ;;
+    ;; The split was exact and is why they are worth recording over time:
+    ;;   21 days uptime  judah/levi/dan       1-12 TIME_WAIT,  11-29 ports
+    ;;   64 days uptime  joseph/simeon/benjamin  15k-49k,     16k-32k ports
+    ;;   98 days uptime  zebulun/asher           26k-30k,        32,767 ports
+    ;; Three of three healthy, five of five wedged. A reboot is the only
+    ;; remedy this repo knows of; nothing here performs one.
+    "echo timewait=$(netstat -an -p tcp 2>/dev/null | grep -c TIME_WAIT)"
+    "echo ephemeral=$(netstat -an -p tcp 2>/dev/null | awk 'NR>2 {print $4}' | sed 's/.*\\.//' | awk '$1>=32768 && $1<=65535' | sort -u | wc -l | tr -d ' ')"
     "echo wasmtime=$(command -v wasmtime)"
     "echo wasmtimev=$(wasmtime --version 2>/dev/null | awk '{print $2}')"
     ;; `wac` is the third tool amu's component tests reach for, and the reason
@@ -223,7 +246,8 @@
   clojure の maven cache / tarball 展開が数 GB 食うため — 空き 1–2GB のノードに
   JVM gate を投げると途中で落ちて false fail になる（naphtali/issachar が実際に
   この状態）。"
-  [{:keys [reachable? javahome clojure npx zig kotoba wasmtools wasmtime wac rosetta curl tar host npmreg] :as n}]
+  [{:keys [reachable? javahome clojure npx zig kotoba wasmtools wasmtime wac rosetta curl tar host npmreg
+           timewait ephemeral] :as n}]
   (if (or (not reachable?) (contains? operator-hosts host))
     (assoc n :caps #{} :max-parallel 0
            :role (if (contains? operator-hosts host) :operator :unreachable))
@@ -233,6 +257,14 @@
           ;; テストでもローカルに server を立てるものは普通にあるので、cap
           ;; ごとではなく base 条件に入れる。
           loopback? (= "yes" (:loopback n))
+          ;; Not a cap condition — `loopback?` already withholds everything,
+          ;; and adding a second gate on the same fact would let the two
+          ;; disagree. This is the DIAGNOSIS that travels with the verdict:
+          ;; the ephemeral range is 32768-65535, so anything near 32,768 in
+          ;; use means the next connection this node tries to open — to
+          ;; anywhere, including itself — has nowhere to come from.
+          ports-in-use (num ephemeral)
+          port-exhausted? (>= ports-in-use 16000)
           base? (and (seq curl) (seq tar) loopback?)
           jvm? (and base? (seq javahome) (seq clojure) (>= free 8))
           node? (and base? (seq npx) (>= free 5))
@@ -278,6 +310,12 @@
              :cores cores
              :free-gb free
              :npm-registry-status (str npmreg)
+             :tcp-time-wait (num timewait)
+             :ephemeral-ports-in-use ports-in-use
+             ;; Recorded only when true. A key that is always present and
+             ;; usually false reads as noise; one that appears exactly when a
+             ;; node is wedged is the first thing anyone will see.
+             :port-exhausted? (or port-exhausted? nil)
              :caps (cond-> #{} jvm? (conj :jvm) node? (conj :node) zig? (conj :zig)
                            kotoba? (conj :kotoba) wasm-tools? (conj :wasm-tools)
                            egress? (conj :egress))
@@ -345,6 +383,26 @@
     (check (not (contains? (caps-of {:npmreg "200" :npx ""}) :egress))
            "no npx, no :egress: there is nothing to run npm with, and the cap
             is only ever asked for by node gates")
+    ;; The port-exhaustion diagnosis. It does not decide any capability —
+    ;; `loopback?` already does that — so what these pin is that the number
+    ;; reaches nodes.edn and that a wedged node is labelled rather than
+    ;; merely stripped.
+    (check (:port-exhausted? (classify (merge base {:ephemeral "32767"})))
+           "a full ephemeral range is labelled — zebulun/simeon/benjamin/asher, measured")
+    (check (nil? (:port-exhausted? (classify (merge base {:ephemeral "29"}))))
+           "a healthy node carries no label at all, rather than a false one")
+    (check (nil? (:port-exhausted? (classify base)))
+           "and an unmeasured node is not labelled exhausted by silence")
+    (check (= 12 (:tcp-time-wait (classify (merge base {:timewait "12"}))))
+           "TIME_WAIT travels with it: the count is what separated the 21-day
+            nodes (1-12) from the 64-day ones (15k-49k)")
+    (check (contains? (caps-of (merge base {:ephemeral "32767"})) :jvm)
+           "and the verdict still comes from loopback?, not from this — a node
+            with a full port range but a working loopback KEEPS its caps.
+            The cap question is whether a gate can run; this label only says
+            why one cannot. Two gates on the same fact could disagree, and
+            this assertion is what stops the label quietly becoming a second
+            one (it caught the inverted version of itself)")
     (check (not (contains? (caps-of (assoc full :javahome "" :clojure "")) :wasm-tools))
            "without a JVM the cap is withheld: there is no gate that wants these
             without one, and a cap nothing can use is a promise that misleads")
@@ -355,7 +413,13 @@
       (do (println "probe: self-test FAILED" @fails) (js/process.exit 1)))))
 
 (defn edn-node [n]
-  (let [{:keys [host reachable? os cores free-gb javahome clojure node nodev npx zig zigv kotoba wasmtools wasmtoolsv wasmtime wasmtimev wac wacv rosetta caps max-parallel detail loopback role]} n]
+  ;; ⚠ This formatter emits a FIXED key list. A key added to `classify` and
+  ;; not added here is computed, self-tested, and then silently dropped on
+  ;; the way to nodes.edn — which is exactly what happened to the three
+  ;; below on their first run: the probe reported them as `-` for every node
+  ;; and the numbers looked unmeasurable rather than unwritten.
+  (let [{:keys [host reachable? os cores free-gb javahome clojure node nodev npx zig zigv kotoba wasmtools wasmtoolsv wasmtime wasmtimev wac wacv rosetta caps max-parallel detail loopback role
+                npm-registry-status tcp-time-wait ephemeral-ports-in-use port-exhausted?]} n]
     (str "  {:host " (pr-str host)
          " :reachable? " (pr-str (boolean reachable?))
          (when os (str " :os " (pr-str os)))
@@ -382,6 +446,19 @@
          (when (and reachable? (= "no" rosetta)) (str "\n   :rosetta? false"))
          (when (and reachable? (= "no" loopback))
            (str "\n   :loopback? false"))
+         ;; The diagnosis that travels with a withheld capability. `:caps #{}`
+         ;; plus `:loopback? false` says a node cannot run gates; these say
+         ;; why, so the next person does not repeat the ssh archaeology that
+         ;; found it (lo0 up, ping fine, `bind(127.0.0.1,0)` fine — only an
+         ;; unbound client socket failing, because the ephemeral range was
+         ;; full and a machine with no free local port cannot connect even to
+         ;; itself).
+         (when (and reachable? tcp-time-wait)
+           (str "\n   :tcp-time-wait " tcp-time-wait
+                " :ephemeral-ports-in-use " (or ephemeral-ports-in-use 0)
+                (when port-exhausted? " :port-exhausted? true")))
+         (when (and reachable? (seq (str npm-registry-status)))
+           (str "\n   :npm-registry-status " (pr-str (str npm-registry-status))))
          (when reachable? (str "\n   :caps " (pr-str (or caps #{})) " :max-parallel " (or max-parallel 0)))
          ;; caps 空だけでは「意図的に外した」と「壊れて到達不可」が区別できない。
          ;; 外した理由を書かないと、後から読む人には故障に見える。
