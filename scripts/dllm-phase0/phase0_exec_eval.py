@@ -177,9 +177,18 @@ def main():
 
     device = "cuda"
     tok = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    # SDAR's repos disagree about which transformers they need, and their configs
+    # do not say so: 1.7B and 8B import LossKwargs (transformers 4.52, removed in
+    # 5.x) while 4B imports TransformersKwargs (5.x only) -- yet all three configs
+    # claim "transformers_version": "4.52.4".  So the interpreter, not the config,
+    # decides the kwarg spelling here.
+    import transformers as _tf
+    _dtype_kw = "dtype" if int(_tf.__version__.split(".")[0]) >= 5 else "torch_dtype"
     model = AutoModelForCausalLM.from_pretrained(
-        args.model, trust_remote_code=True, torch_dtype=torch.bfloat16, attn_implementation="eager"
+        args.model, trust_remote_code=True, attn_implementation="eager",
+        **{_dtype_kw: torch.bfloat16},
     ).to(device).eval()
+    print(f"transformers {_tf.__version__} (passed {_dtype_kw}=)", flush=True)
 
     rows = []
     for block in [int(x) for x in args.blocks.split(",")]:
