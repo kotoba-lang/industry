@@ -38,19 +38,32 @@
     while clj-kondo had been able to print `Missing else branch.` at it the
     whole time. It is absent from the sweep, which is the fix showing up.
   - `kotoba-lang/ayatori` `src/ayatori/remote.cljc:457` -- a nil block source
-    costs TWO discoveries and two fetches where none costs one, and a
-    rejecting source kills the Node process with an unhandled rejection.
-    **The sweep still reports it.** The commit said to have fixed it,
-    `baceead7`, is not in this checkout's object store and a fetch was
-    refused, so whether the fix exists upstream is unmeasured here. Checkout,
-    west pin and the repository's main are three different things
-    (ADR-2608136800); this detector reads the first, and the seven closing
-    parens on line 469 still close the `if-not`, leaving the `(try ...)` on
-    line 470 a sibling of it rather than its else.
+    cost TWO discoveries and two fetches where none costs one, and a
+    rejecting source killed the Node process with an unhandled rejection.
+    RESOLVED 2026-09-06, and how it resolved is the lesson. The defect was
+    real: the `if-not` opened at 457:37 and CLOSED at 469:89 with one child
+    form, so the `(try ...)` on line 470 was its sibling, not its else. But
+    the sweep above reported it against a repository whose `main` had already
+    been fixed -- `b539060`, merged as `baceead7`. The west pin was ALREADY
+    at that merge. Only the shared CHECKOUT lagged, at `408938c`, and this
+    detector reads the checkout. The first sweep recorded the fetch that
+    would have shown this as refused, and the fix as unmeasured; the fetch
+    succeeds, and the commit was one `git fetch` away the whole time.
+
+    So checkout, west pin and the repository's main are three different
+    things (ADR-2608136800) -- and the failure mode is not only the one that
+    phrase is usually quoted for. A stale checkout makes this detector report
+    a site that no longer exists in anything that ships, which is a FALSE
+    POSITIVE, the mirror of the silence the rest of this file is about. A
+    finding here means `the tree on disk carries it`. Before acting on one,
+    check `git -C <path> rev-parse HEAD` against the pin: `west update
+    --fetch smart <name>` cleared this one, and the site went with it.
 
   The other four -- `cloud-itonami-isic-3520`, `cloud-itonami-isic-853`,
   `network-awai/cloud-itonami` and `kototama-component` -- had never been
-  named anywhere before this ran.
+  named anywhere before this ran, and neither had the sixth file the count
+  includes without the prose naming it, `kotoba-lang/ooyake`
+  `src/ooyake/cells/world_model/state_machine.cljc:65`.
 
   **`:missing-body-in-when`** -- 1 site, and it earns its place on evidence
   rather than on symmetry with the first. It is `kotoba-lang/kotoba-lang`

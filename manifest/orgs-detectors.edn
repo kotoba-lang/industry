@@ -3268,13 +3268,25 @@
               to nil -- which the live Worker answered as 500 RangeError (fixed by hand
               2026-09-01 in d7225b7, while clj-kondo had been able to print `Missing else
               branch.` at it the whole time; it is absent from the sweep, which is the fix
-              showing up). kotoba-lang/ayatori src/ayatori/remote.cljc:457 costs TWO
-              discoveries and two fetches where none costs one, and kills the Node process on a
-              rejecting source -- and the sweep STILL REPORTS IT: the commit said to have fixed
-              it is not in this checkout's object store, and checkout, west pin and the
-              repository's main are three different things (ADR-2608136800). The other four --
-              cloud-itonami-isic-3520, cloud-itonami-isic-853, network-awai/cloud-itonami and
-              kototama-component -- had never been named anywhere before this ran.
+              showing up). kotoba-lang/ayatori src/ayatori/remote.cljc:457 cost TWO
+              discoveries and two fetches where none costs one, and killed the Node process on a
+              rejecting source. RESOLVED 2026-09-06. The defect was real -- the if-not opened at
+              457:37 and CLOSED at 469:89 with one child form, so the (try ...) on line 470 was
+              its sibling, not its else -- but the repository's main had ALREADY been fixed
+              (b539060, merged baceead7) and the west pin was ALREADY at that merge. Only the
+              shared CHECKOUT lagged, at 408938c, and this detector reads the checkout; the
+              fetch the first sweep recorded as refused in fact succeeds. `west update --fetch
+              smart ayatori` cleared it and the site went with it.
+              So checkout, west pin and main being three different things (ADR-2608136800) cuts
+              BOTH ways here: a stale checkout makes this detector report a site that no longer
+              exists in anything that ships -- a FALSE POSITIVE, the mirror of the silence the
+              rest of this entry is about. A finding means `the tree on disk carries it`; check
+              `git -C <path> rev-parse HEAD` against the pin before acting on one.
+              The other four -- cloud-itonami-isic-3520, cloud-itonami-isic-853,
+              network-awai/cloud-itonami and kototama-component -- had never been named anywhere
+              before this ran, and neither had the sixth file the count includes without the
+              prose naming it, kotoba-lang/ooyake
+              src/ooyake/cells/world_model/state_machine.cljc:65.
               missing-body-in-when, 1 site, and it earns its place on evidence not symmetry:
               kotoba-lang/kotoba-lang test/kotoba/cli_test.cljc:116 is
               `(when (pos? ...) #?(:clj (System/exit 1)))`, and under :cljs the reader
