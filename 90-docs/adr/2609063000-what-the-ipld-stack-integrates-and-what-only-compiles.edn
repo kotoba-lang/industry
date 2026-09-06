@@ -116,6 +116,18 @@ net-kotobase/ipfs は 127 tests / 540 assertions green。control として origi
 （ours vs theirs、訊くべきでない gateway を訊いた、504 のところが 502）。
 **deploy はこの ADR の主張に含まれない。** merged library は running Worker ではない。
 
+## この ADR の後に動いた行（2026-09-06、同日）
+
+上の表は「library に landed していることと本番の請求経路に載っていることは別」を
+示すために書いた。**retrieval 面の 1 行はその日のうちに動いた** ——
+ADR-2609063500 の S1/S2 で `ipfs.kotobase.net` に `/ipq/v1/` が載り、CARv2 の
+selection を実際に配るようになった（Worker version 96882734、実広告 block に対して
+replay 検証済み）。
+
+**graph query 面は動いていない。** `kotobase-graph-database` worker は無改変で、
+`ayatori.remote`(IPNI) と `ayatori.pack`(CARv2) は依然 require されていない。
+表を読むときは面を分けること —— それがこの ADR の要点そのものである。
+
 ## 測り直し方
 
 値をここから引かない。
