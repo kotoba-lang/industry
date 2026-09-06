@@ -2031,6 +2031,100 @@
    :script "gates/shard-index-check.cljs"
    :include-ext [".edn" ".cljs" ".cljc"] :min-files 10 :cd true}
 
+  ;; kotobase-client — the CID-verified block transport (root ADR-2609064000).
+  ;; Until now NOTHING RAN IT: measured 2026-09-06, this repo had no entry
+  ;; here at all, so its 102 tests existed only for whoever typed `npm test`.
+  ;; That matters more than usual for `kotobase.blocks`, whose whole job is to
+  ;; refuse bytes that do not hash to the CID they were fetched under — an
+  ;; unrun check of a verification path is two layers of nothing.
+  ;;
+  ;; `:ship-git-deps true` is load-bearing and is why this repo GAINED a
+  ;; deps.edn on the same day. The suite reaches `sha2.core` and
+  ;; `datom.source`, which live in sibling repos; the fleet ships one tree, so
+  ;; without deps.edn declaring them the classpath cannot name them and the
+  ;; gate would not be failing — it would never have asked its question.
+  ;;
+  ;; `:entry` is NOT `npm test`. That is `shadow-cljs :node-test`, a JVM
+  ;; build; the node has nbb. So the repo grew an nbb entry that runs the
+  ;; SEVEN namespaces both runtimes agree on, and names the two they do not:
+  ;; `client-request-test` (8 failures, 1 error) and
+  ;; `client-auth-profile-test` (1) come from SCI wrapping a throw raised
+  ;; inside a `.then` callback, which defeats `kotobase.client`'s retry
+  ;; predicate. Not a production defect — nothing runs that library under
+  ;; nbb — but a real difference, so it is excluded by name rather than left
+  ;; to fail. `test/run_tests.cljs` carries the reason.
+  ;;
+  ;; Measured before landing, on this machine:
+  ;;   nbb          55 tests / 163 assertions / 0 failures  (the seven)
+  ;;   shadow-cljs 102 tests / 320 assertions / 0 failures  (all nine)
+  ;; and the entry was made to fail twice, on purpose:
+  ;;   library broken (get-block stops verifying) -> exit 1, and the test
+  ;;     named is `get-block-rejects-bytes-that-do-not-hash-to-the-cid`
+  ;;   evidence floor raised to 400 -> exit 1, "REFUSING to report a pass:
+  ;;     55 tests ran" — the floor is there because a classpath that resolves
+  ;;     but loads nothing runs zero tests and reports zero failures, which
+  ;;     is the same output as a clean run.
+  ;; **This gate needs the node's npm install to work, and that was measured
+  ;; rather than assumed**: with `node_modules` moved aside the entry dies
+  ;; before any assertion with `Cannot find module '@noble/curves/ed25519.js'`
+  ;; (cacao-test). Egress is not uniform across the fleet and the value in
+  ;; this file must not become a constant (root CLAUDE.md), so if this goes
+  ;; red, exit 95 is npm install and the node is where to look — not the
+  ;; suite. Contrast the search-origin entry below, which needs no packages
+  ;; at all.
+  ;; NOT verified on a node.
+  {:name "kotobase-client" :gate :nbb-test :classpath "src:test"
+   :entry "test/run_tests.cljs" :ship-git-deps true :cd true}
+
+  ;; search-origin — the published shard index and the page that queries it
+  ;; in the reader's browser (root ADR-2609064000). Same story as
+  ;; kotobase-client above: measured 2026-09-06, no entry here at all.
+  ;;
+  ;; This repo GAVE UP its `.deps/<name>` symlinks to get here. Its suite
+  ;; reaches kotobase-shard-index, kotobase-client and org-nist-sha2, which
+  ;; were `:paths [".deps/kotobase-shard-index/src" …]` pointed at west
+  ;; checkouts by a `link_deps` script. That resolves on a developer's
+  ;; machine and nowhere else, so they are `:git/sha` deps now and
+  ;; `ship-git-deps!` places them. kotobase-shard-index needed a deps.edn of
+  ;; its own for that (tools.deps refuses a git coordinate with no manifest);
+  ;; it is `{:paths ["src"] :deps {}}` and the library is still
+  ;; dependency-free.
+  ;;
+  ;; **What this gate does NOT cover is the more useful half of the sentence.**
+  ;; Three checks in that repo cannot be node gates and are not:
+  ;;   `npm run query:live`     reads the live plane
+  ;;   `npm run check:browser`  drives a real browser against production
+  ;;   `npm run publish:index`  WRITES to the plane and mints a CACAO
+  ;; fleet-ci's invariant is that nodes hold no credentials and answer no
+  ;; production traffic, and a check that needs the internet measures the
+  ;; internet. Those three are operator-run acceptances; `test/run_tests.cljs`
+  ;; says so in its own docstring rather than leaving the absence to be
+  ;; discovered.
+  ;;
+  ;; Covered: the trampoline (including the two cases that exist for a
+  ;; partially published index) and the document's single-page invariants —
+  ;; which the repo-wide `verify-single-page-app` scanner cannot see, because
+  ;; it counts script-loading FILES and this document is rendered by a Worker
+  ;; at runtime.
+  ;;
+  ;; Measured before landing, on this machine:
+  ;;   nbb          10 tests / 23 assertions / 0 failures
+  ;;   shadow-cljs  10 tests / 23 assertions / 0 failures
+  ;; and made to fail twice, on purpose:
+  ;;   `cache-store` returning nil instead of throwing on a miss -> exit 1,
+  ;;     7 of 23 assertions fail (the index reads nil as "absent", so an
+  ;;     unfetched block would render as zero hits and call it an answer)
+  ;;   a second `<script>` in the document -> exit 1, and the test named is
+  ;;     `one-document-loads-exactly-one-bundle`
+  ;; **It needs no npm packages, measured the same way**: with `node_modules`
+  ;; moved aside it still reports 10 tests / 23 assertions / 0 failures. The
+  ;; shard index is deliberately dependency-free and the document renderer is
+  ;; portable `.cljc`, so this one runs on a node with no egress at all —
+  ;; unlike kotobase-client above.
+  ;; NOT verified on a node.
+  {:name "search-origin" :gate :nbb-test :classpath "src:test"
+   :entry "test/run_tests.cljs" :ship-git-deps true :cd true}
+
   ;; net-kotobase（kotobase.net の本体、private）。**network-awai org の GitHub
   ;; Actions は 2026-08-03T01:10Z 以降 1 本も起動していない**（実測: 全 workflow
   ;; failure、job は steps 0 件で 1-10 秒で終了。同 org の cloud-itonami /
