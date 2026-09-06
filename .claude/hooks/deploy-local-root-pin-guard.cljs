@@ -109,6 +109,56 @@
            distinct
            vec))))
 
+(defn- wrangler-config
+  "The wrangler config in `dir`, as text, or nil."
+  [dir]
+  (some (fn [n]
+          (let [f (path/join dir n)]
+            (when (fs/existsSync f) (str (fs/readFileSync f "utf8")))))
+        ["wrangler.toml" "wrangler.json" "wrangler.jsonc"]))
+
+(defn- self-contained-deploy?
+  "Whether the artifact this deploy ships is exactly the files in `dir`.
+
+  The guard's own policy says `:local/root` を持たない repo は素通り, but it
+  reads `deps.edn` from the GIT TOPLEVEL — so a Worker that is one JavaScript
+  file in a subdirectory is judged by the JVM application's dependencies, which
+  cannot reach it. Measured 2026-09-06: `services/agent-edge` (no deps.edn, no
+  build step, `main` beside it) was blocked by a 135-byte untracked markdown
+  file in `kotoba-lang/kotobase`, a library it does not and cannot link.
+
+  This narrows the guard to what it claims to measure rather than weakening it.
+  All four must hold, and any one of them failing falls back to the toplevel
+  check:
+
+    - the directory has a wrangler config of its own (it IS the project)
+    - it has no `deps.edn` and no `shadow-cljs.edn` (nothing Clojure to build)
+    - its wrangler config declares no `[build]` (nothing else builds into it)
+    - `main` resolves INSIDE the directory (the artifact is not carried in
+      from a tree built elsewhere)
+
+  A project that has its own `deps.edn` is NOT skipped: it falls through to the
+  toplevel check, exactly as before. This adds an exit, it does not change
+  which file the check reads — `services/app-edge` still gets judged by the
+  application's root `deps.edn` rather than by its own, which names jp-go-dds
+  and kotoba-kir. Making the check read the nearest file is a separate, larger
+  change; claiming it here would be this comment asserting more than the code
+  does. Measured 2026-09-06: app-edge and the repo root both still deny."
+  [dir]
+  (when-let [cfg (wrangler-config dir)]
+    (let [main (some-> (re-find #"(?m)^\s*\"?main\"?\s*[=:]\s*[\"']([^\"']+)[\"']" cfg)
+                       second)]
+      (and (not (fs/existsSync (path/join dir "deps.edn")))
+           (not (fs/existsSync (path/join dir "shadow-cljs.edn")))
+           ;; `[build]` in TOML, `"build"` in JSON. Either means something else
+           ;; produces what ships, and that something else is out of view here.
+           (not (re-find #"(?m)^\s*\[build\]" cfg))
+           (not (re-find #"(?m)^\s*\"build\"\s*:" cfg))
+           (some? main)
+           (let [abs (path/resolve dir main)
+                 rel (path/relative dir abs)]
+             (not (str/starts-with? rel "..")))))))
+
 (try
   (let [cmd (or (some-> (compat/read-stdin)
                         (json/parse-string true)
@@ -123,6 +173,8 @@
           dir (or cd ".")
           top (git dir "rev-parse" "--show-toplevel")]
       (when (str/blank? top) (allow!))
+      ;; A project that ships only its own files cannot ship a stale dependency.
+      (when (self-contained-deploy? (path/resolve dir)) (allow!))
       (let [roots (local-roots top)]
         (when (empty? roots) (allow!))
         (let [topdir (find-topdir top)]
